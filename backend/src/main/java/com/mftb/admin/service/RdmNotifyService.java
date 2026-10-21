@@ -23,6 +23,8 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -60,6 +62,16 @@ public class RdmNotifyService {
     private final RdmNotifyDedupeService dedupeService;
 
     /**
+     * Markdown 站内相对链接：{@code [文字](/rdm-xxx?id=1)}。
+     * <p>钉钉客户端不认相对地址，点开只会空白；而正文由各业务自己拼，漏一处就多一条死链，
+     * 所以在唯一出站入口统一补成公网绝对地址。
+     */
+    private static final Pattern RELATIVE_MD_LINK = Pattern.compile("\\]\\(/(?!/)([^)\\s]*)\\)");
+    private static final long PORTAL_BASE_TTL_MS = 60_000L;
+    private volatile String cachedPortalBase;
+    private volatile long cachedPortalBaseAt;
+
+    /**
      * 按事件通知一组接收人（一条群播报消息 @多人，因此一条事件只登记一行）。
      *
      * @param eventCode 事件编码（RdmConstants.EVENT_*）
@@ -70,6 +82,8 @@ public class RdmNotifyService {
      */
     public void notifyUsers(String eventCode, RdmRequirement req, Collection<SysUser> receivers,
                             String title, String text) {
+        // 先补全相对链接：入队前一次到位，后续落库/重试都拿绝对地址
+        text = absolutizeLinks(text);
         Set<String> mobiles = new LinkedHashSet<>();
         Set<String> names = new LinkedHashSet<>();
         for (SysUser user : receivers == null ? List.<SysUser>of() : receivers) {
@@ -133,6 +147,83 @@ public class RdmNotifyService {
         }
     }
 
+    /* ==================== 链接补全 ==================== */
+
+    /**
+     * 把正文里的站内 Markdown 相对链接补成公网绝对地址。
+     *
+     * <p>例：{@code [點擊處理](/rdm-delivery-item?id=5&mode=view)}<br>
+     * → {@code [點擊處理](https://portal.example/-mftb-admin-portal/#/rdm-delivery-item?id=5&mode=view)}
+     *
+     * <p>前端是 HashRouter，路由必须落在 {@code #/} 之后；已绝对化的链接（{@code http(s)://}）
+     * 与协议相对链接（{@code //host/...}）原样保留。取不到门户基址时不动正文，
+     * 宁可留一条旧相对链接，也不凭空造一个错误域名。
+     */
+    String absolutizeLinks(String text) {
+        if (!StringUtils.hasText(text) || !text.contains("](/")) {
+            return text;
+        }
+        String base = portalBaseUrl();
+        if (!StringUtils.hasText(base)) {
+            return text;
+        }
+        Matcher matcher = RELATIVE_MD_LINK.matcher(text);
+        StringBuilder out = new StringBuilder();
+        while (matcher.find()) {
+            matcher.appendReplacement(out, Matcher.quoteReplacement("](" + base + "/#/" + matcher.group(1) + ")"));
+        }
+        matcher.appendTail(out);
+        return out.toString();
+    }
+
+    /**
+     * 门户基址：优先取日报场景绑定的企业应用 {@code base_url}，未配置则回退任一启用应用。
+     * <p>与 {@code RdmDailyReportService.resolvePortalBaseUrl} 同口径；缓存 60s，
+     * 避免每条通知都查一次配置（改配置最多一分钟后生效）。
+     */
+    private String portalBaseUrl() {
+        long now = System.currentTimeMillis();
+        String cached = cachedPortalBase;
+        if (StringUtils.hasText(cached) && now - cachedPortalBaseAt < PORTAL_BASE_TTL_MS) {
+            return cached;
+        }
+        String base = firstBaseUrl("SELECT a.base_url FROM sys_notification_scenario s "
+                + "JOIN sys_notification_app a ON a.id = s.app_id "
+                + "WHERE s.scenario_key = ? AND s.enabled = 1 AND a.enabled = 1 "
+                + "AND a.base_url IS NOT NULL AND a.base_url <> '' LIMIT 1",
+                NotificationAppService.RDM_DAILY_REPORT);
+        if (!StringUtils.hasText(base)) {
+            base = firstBaseUrl("SELECT base_url FROM sys_notification_app "
+                    + "WHERE enabled = 1 AND base_url IS NOT NULL AND base_url <> '' "
+                    + "ORDER BY updated_at DESC LIMIT 1");
+        }
+        if (StringUtils.hasText(base)) {
+            cachedPortalBase = base;
+            cachedPortalBaseAt = now;
+        }
+        return base;
+    }
+
+    /** 取首个非空 base_url；读库异常不阻断通知，退化为不改写 */
+    private String firstBaseUrl(String sql, Object... args) {
+        try {
+            List<String> rows = args.length == 0
+                    ? jdbcTemplate.queryForList(sql, String.class)
+                    : jdbcTemplate.queryForList(sql, String.class, args);
+            if (rows == null || rows.isEmpty() || !StringUtils.hasText(rows.get(0))) {
+                return null;
+            }
+            String base = rows.get(0).trim();
+            while (base.endsWith("/") || base.endsWith("#")) {
+                base = base.substring(0, base.length() - 1);
+            }
+            return base;
+        } catch (RuntimeException e) {
+            log.warn("RDM 通知链接补全失败（保留相对链接）: {}", e.getMessage());
+            return null;
+        }
+    }
+
     /* ==================== 任务22 B.2：事件级去重入队 ==================== */
 
     /**
@@ -163,6 +254,8 @@ public class RdmNotifyService {
      */
     public boolean notifyDeduped(String eventCode, String objectType, Long objectId, String eventVersion,
                                 Long receiverUserId, Long reqId, String title, String text) {
+        // 同上：去重行与群播行走同一套链接补全，避免「群报能点、个人通知点不开」
+        text = absolutizeLinks(text);
         if (!StringUtils.hasText(text)) {
             log.debug("RDM 去重通知正文為空，按規則不發: event={}, objectType={}, objectId={}",
                     eventCode, objectType, objectId);

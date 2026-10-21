@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Alert, Button, Form, Input, Select, Switch, Table, Tag, message } from 'antd'
-import type { TableColumnsType } from 'antd'
-import { ArrowLeftOutlined, EyeOutlined, FileTextOutlined, SaveOutlined } from '@ant-design/icons'
+import { Alert, Button, Form, Input, Select, Switch, Tag, Tooltip, message } from 'antd'
+import { ArrowLeftOutlined, EyeOutlined, FileTextOutlined, LinkOutlined, SaveOutlined } from '@ant-design/icons'
 import { useAuth } from '../../../contexts/AuthContext'
+import DailyReportBoardPreviewModal from '../../../components/DailyReportBoardPreviewModal'
 import {
   fetchDailyReportTemplates,
   previewDailyReport,
@@ -79,6 +79,8 @@ export default function DailyReportTemplateForm() {
   const [saving, setSaving] = useState(false)
   const [previewing, setPreviewing] = useState(false)
   const [preview, setPreview] = useState<DailyReportPreviewResult | null>(null)
+  /** 看板预览弹窗：与预览链接同一个地址，不再跳新窗口 */
+  const [boardOpen, setBoardOpen] = useState(false)
   const contentRef = useRef<HTMLTextAreaElement | null>(null)
 
   const channel = Form.useWatch('channel', form)
@@ -157,6 +159,12 @@ export default function DailyReportTemplateForm() {
     }
   }
 
+  /** 打开预览链接对应的免登看板：与真实推送同一个地址，编辑时就能验证链接落地页 */
+  const openPreviewLink = () => {
+    if (!preview?.detailUrl) return
+    setBoardOpen(true)
+  }
+
   const handleSave = async () => {
     const v = await form.validateFields()
     setSaving(true)
@@ -179,22 +187,6 @@ export default function DailyReportTemplateForm() {
       setSaving(false)
     }
   }
-
-  const docColumns: TableColumnsType<PlaceholderDoc> = [
-    {
-      title: t('rdm.dailyTemplate.colPlaceholder'), dataIndex: 'key', key: 'key', width: 240,
-      render: (v: string) => (
-        <Tag color="blue" style={{ cursor: readOnly ? 'default' : 'pointer', margin: 0, fontFamily: 'monospace' }}
-          onClick={() => !readOnly && insertPlaceholder(v)}>
-          {v}
-        </Tag>
-      ),
-    },
-    {
-      title: t('rdm.dailyTemplate.colPlaceholderDesc'), key: 'desc',
-      render: (_, r) => <span style={{ fontSize: 12, color: '#595959' }}>{t(`rdm.dailyTemplate.${r.descKey}`)}</span>,
-    },
-  ]
 
   return (
     <div className="content-area">
@@ -263,6 +255,26 @@ export default function DailyReportTemplateForm() {
 
         <div style={cardStyle}>
           <CardTitle text={t('rdm.dailyTemplate.sectionContent')} hint={t('rdm.dailyTemplate.sectionContentHint')} />
+          {/*
+            可用占位符紧贴正文上方：一排多个、悬停看口径、点击插入光标处。
+            放在正文下方或做成两列表格时，配置的人要来回滚动对照，写错占位符是高频错误。
+          */}
+          <div className="tpl-placeholder-panel">
+            <div className="tpl-placeholder-head">
+              <span>{t('rdm.dailyTemplate.availablePlaceholders')}</span>
+              <span className="tpl-placeholder-tip">{t('rdm.dailyTemplate.placeholderInsertHint')}</span>
+            </div>
+            <div className="tpl-placeholder-list">
+              {placeholders.map(p => (
+                <Tooltip key={p.key} title={t(`rdm.dailyTemplate.${p.descKey}`)}>
+                  <button type="button" className="tpl-placeholder-chip" disabled={readOnly}
+                    onClick={() => insertPlaceholder(p.key)}>
+                    {p.key}
+                  </button>
+                </Tooltip>
+              ))}
+            </div>
+          </div>
           <Form.Item name="contentTpl" label={t('rdm.dailyTemplate.fieldContent')}
             rules={[{ required: true, message: t('rdm.dailyTemplate.contentRequired') }]}>
             <Input.TextArea
@@ -275,16 +287,6 @@ export default function DailyReportTemplateForm() {
             <Input.TextArea rows={2} maxLength={500} showCount />
           </Form.Item>
         </div>
-
-        {/* 占位符说明表：逐个标注「取的是哪份数据」，配置的人不必猜 */}
-        <div style={cardStyle}>
-          <CardTitle text={t('rdm.dailyTemplate.sectionPlaceholders')} hint={t('rdm.dailyTemplate.placeholderHint')} />
-          <Table rowKey="key" size="small" columns={docColumns} dataSource={placeholders}
-            pagination={false} showHeader />
-          <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 8 }}>
-            {t('rdm.dailyTemplate.placeholderFootnote')}
-          </div>
-        </div>
       </Form>
 
       {preview && (
@@ -294,6 +296,10 @@ export default function DailyReportTemplateForm() {
             <Alert type="warning" showIcon style={{ marginBottom: 8 }}
               message={t('rdm.dailyTemplate.unknownPlaceholders', { list: preview.unknownPlaceholders.join(', ') })} />
           )}
+          {preview.messageMode === 'fixed' && (
+            <Alert type="info" showIcon style={{ marginBottom: 8 }}
+              message={t('rdm.dailyTemplate.previewFixedModeHint')} />
+          )}
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{preview.title}</div>
           <pre style={{
             background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 6, padding: 12,
@@ -301,6 +307,16 @@ export default function DailyReportTemplateForm() {
           }}>
             {preview.content}
           </pre>
+          {preview.detailUrl && (
+            <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <Button icon={<LinkOutlined />} onClick={openPreviewLink}>
+                {t('rdm.dailyTemplate.viewBoard')}
+              </Button>
+              <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+                {t('rdm.dailyTemplate.previewOpenBoardHint')}
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -315,6 +331,12 @@ export default function DailyReportTemplateForm() {
           </Button>
         )}
       </div>
+
+      <DailyReportBoardPreviewModal
+        open={boardOpen}
+        url={preview?.detailUrl}
+        onClose={() => setBoardOpen(false)}
+      />
     </div>
   )
 }

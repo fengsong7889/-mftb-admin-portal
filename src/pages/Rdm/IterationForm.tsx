@@ -10,7 +10,9 @@ import { CalendarOutlined, SaveOutlined, TeamOutlined } from '@ant-design/icons'
 import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
 import RdmFormHeader from './components/RdmFormHeader'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
+import { countWorkdays, HOURS_PER_WORKDAY, workdayHours } from './workdays'
 import {
   fetchIterations,
   fetchProjectPage,
@@ -54,6 +56,7 @@ const USABLE_PROJECT_STATUS: string[] = [
 
 export default function IterationForm() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const iterationId = Number(searchParams.get('id') ?? 0)
 
@@ -92,6 +95,22 @@ export default function IterationForm() {
   const scheduledHours = currentIteration?.taskHours ?? 0
   const capacity = Form.useWatch('capacityHours', form)
   const loadRate = capacity && capacity > 0 ? Math.round((scheduledHours / capacity) * 100) : 0
+  /**
+   * 产能默认由起止日期推算（工作日 × 8h）。这里只做提示派生，不写表单：
+   * 写值只发生在用户主动改日期时，否则编辑态回填会静默覆盖存量产能。
+   */
+  const rangeValue = Form.useWatch('range', form)
+  const autoWorkdays = countWorkdays(rangeValue?.[0], rangeValue?.[1])
+  const autoCapacityHours = autoWorkdays * HOURS_PER_WORKDAY
+  /** 手改过后提示来源，避免使用者以为系统算错了 */
+  const capacityAdjusted = autoWorkdays > 0
+    && typeof capacity === 'number' && capacity > 0
+    && capacity !== autoCapacityHours
+  const capacityExtra = autoWorkdays > 0
+    ? (capacityAdjusted
+        ? t('rdm.iterationForm.capacityManualHint', { days: autoWorkdays, defaultValue: '{{days}} 個工作日 × 8h，已手動調整' })
+        : t('rdm.iterationForm.capacityAutoHint', { days: autoWorkdays, defaultValue: '{{days}} 個工作日 × 8h' }))
+    : t('rdm.iterationForm.capacityAutoEmpty', { defaultValue: '選擇起止日期後自動計算' })
   /** 类型联动：hotfix（紧急修复）可不挂项目，sprint/version 必挂（与后端 saveIteration 同口径） */
   const iterationTypeValue = Form.useWatch('iterationType', form)
   const projectRequired = iterationTypeValue !== RDM_ITERATION_TYPE.HOTFIX
@@ -167,8 +186,8 @@ export default function IterationForm() {
         title={iterationId ? '編輯迭代' : '新增迭代'}
         onBack={() => navigate(-1)}
         meta={iterationId
-          ? `迭代編碼 ${currentIteration?.code ?? '-'} 由系統發號、不可修改；產能按團隊可投入工時填寫`
-          : '迭代編碼保存時由系統按類型自動發號（常規 SP／版本專項 VER／緊急修復 HF）；產能按團隊可投入工時填寫'}
+          ? `迭代編碼 ${currentIteration?.code ?? '-'} 由系統發號、不可修改；產能依工作日 × 8h 自動計算，可手動調整`
+          : '迭代編碼保存時由系統按類型自動發號（常規 SP／版本專項 VER／緊急修復 HF）；產能依工作日 × 8h 自動計算，可手動調整'}
       />
 
       {iterationId > 0 && (
@@ -216,7 +235,14 @@ export default function IterationForm() {
               />
             </Form.Item>
             <Form.Item label="起止日期" name="range" rules={[{ required: true, message: '請選擇起止日期' }]}>
-              <DatePicker.RangePicker style={{ width: '100%' }} />
+              <DatePicker.RangePicker
+                style={{ width: '100%' }}
+                onChange={dates => {
+                  // 日期一改就按系统口径覆盖产能；随后仍可在输入框手改（extra 会标注已手改）
+                  const hours = workdayHours(dates?.[0], dates?.[1])
+                  if (hours > 0) form.setFieldValue('capacityHours', hours)
+                }}
+              />
             </Form.Item>
             <Form.Item label="狀態" name="status" rules={[{ required: true, message: '請選擇狀態' }]}>
               <Select options={Object.entries(RDM_ITERATION_STATUS_LABEL).map(([value, label]) => ({ value, label }))} />
@@ -234,8 +260,11 @@ export default function IterationForm() {
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            <Form.Item label="產能（工時）" name="capacityHours" rules={[{ required: true, message: '請填寫產能' }]}>
-              <InputNumber min={0} step={8} style={{ width: '100%' }} placeholder="例：400" />
+            <Form.Item
+              label="產能（工時）" name="capacityHours" rules={[{ required: true, message: '請填寫產能' }]}
+              extra={capacityExtra}
+            >
+              <InputNumber min={0} step={8} style={{ width: '100%' }} placeholder="選日期後自動填入" />
             </Form.Item>
             <Form.Item label="迭代負責人" name="owner">
               <EmployeeSelect single placeholder="搜尋姓名或工號" />

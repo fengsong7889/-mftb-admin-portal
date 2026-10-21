@@ -135,6 +135,12 @@ public final class RdmConstants {
     public static final String SCOPE_INTAKE = "intake";
     public static final String SCOPE_POOL = "pool";
     public static final String SCOPE_PRODUCT = "product";
+    /**
+     * 视角：某人相关（AI 助手“某人做了什么”）。
+     * <p>由 {@code RdmRequirementQuery.relatedUserId} 收敛（提出/产品/研发/验收/任务负责人）；
+     * 非全量用户仍由 relatedOnly 兜底，避免这个新视角成为绕过数据范围的入口。
+     */
+    public static final String SCOPE_PERSON = "person";
     public static final String SCOPE_DELIVERY = "delivery";
     public static final String SCOPE_ACCEPTANCE = "acceptance";
     /**
@@ -232,6 +238,12 @@ public final class RdmConstants {
      * 也不能推导提交权。两者必须分得开，菜单合并才安全。
      */
     public static final String ACTION_CONTRIBUTE = "contribute";
+    /**
+     * 推送权：把项目进度推送到钉钉群/个人。
+     * <p>与 edit 分开：能看到项目不等于可以对外发消息；AI 确认卡与
+     * {@code AgentActionService.confirm} 都按此动作二次校验。
+     */
+    public static final String ACTION_NOTIFY = "notify";
     public static final String MENU_ACCEPTANCE = "rdm-acceptance";
     public static final String MENU_DASHBOARD = "rdm-dashboard";
     public static final String MENU_WORKBENCH = "rdm-workbench";

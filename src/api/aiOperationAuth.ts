@@ -42,6 +42,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   merchant: '商戶管理',
   ai: 'AI 能力',
   notify: '通知渠道',
+  rdm: '產研交付',
 }
 
 /**
@@ -164,6 +165,41 @@ export async function aggregateCallStats(
       lastCalledAt: hit ? formatEpochOrDash(hit) : row.lastCalledAt,
     }
   })
+}
+
+export interface ToolScope {
+  /** 角色编码（sys_role.code 或 sys_user.function_roles 中的值） */
+  roles: string[]
+  /** 部门 id（sys_user.department_id） */
+  depts: number[]
+}
+
+/**
+ * 解析 ai_tool_policy.data_scope_json 的可见范围。
+ * <p>损坏/缺失一律视为“全员可见”，不能因为一条配置把工具整体关停。
+ */
+export function parseToolScope(raw?: string | null): ToolScope {
+  if (!raw) return { roles: [], depts: [] }
+  try {
+    const parsed = JSON.parse(raw) as { roles?: unknown; depts?: unknown }
+    const roles = Array.isArray(parsed.roles)
+      ? parsed.roles.filter((v) => v !== null && v !== undefined && v !== '').map(String)
+      : []
+    const depts = Array.isArray(parsed.depts)
+      ? parsed.depts
+        .filter((v) => v !== null && v !== undefined && v !== '' && typeof v !== 'boolean')
+        .map(Number)
+        .filter((n) => Number.isFinite(n))
+      : []
+    return { roles, depts }
+  } catch {
+    return { roles: [], depts: [] }
+  }
+}
+
+/** 序列化可见范围；空数组代表全员可见，保持字段存在便于运营看懂。 */
+export function serializeToolScope(scope: ToolScope): string {
+  return JSON.stringify({ roles: scope.roles, depts: scope.depts })
 }
 
 /** 更新策略（风险等级 / 审批凭证 / 数据范围 / 备注） */

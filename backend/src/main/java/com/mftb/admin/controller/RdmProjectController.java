@@ -7,12 +7,14 @@ import com.mftb.admin.constant.RdmConstants;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.dto.RdmFactVO;
 import com.mftb.admin.dto.RdmProjectDTO;
+import com.mftb.admin.dto.RdmProjectRequirementVO;
 import com.mftb.admin.dto.RdmProjectVO;
 import com.mftb.admin.entity.RdmProject;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.service.RdmAccessGuard;
 import com.mftb.admin.service.RdmAllowedActionsService;
 import com.mftb.admin.service.RdmProjectService;
+import com.mftb.admin.service.RdmProjectRequirementBoardService;
 import com.mftb.admin.service.RdmTodoNotifyService;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +42,8 @@ import java.util.List;
 public class RdmProjectController {
 
     private final RdmProjectService projectService;
+    /** 项目详情「迭代 → 需求」视角：交付清单/待推进/进度卡的新口径（与交付项事实源并存） */
+    private final RdmProjectRequirementBoardService requirementBoardService;
     private final RdmAllowedActionsService allowedActionsService;
     private final OperatorResolver operatorResolver;
     /** 任务22 B：手动催办（工作日口径 + 提醒日去重 + executeOnce 幂等） */
@@ -106,6 +110,17 @@ public class RdmProjectController {
     @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_PROJECT, action = "view")
     public Result<List<RdmProjectVO.DeliveryChecklist>> getDeliveryChecklist(@PathVariable Long id) {
         return Result.success(projectService.getDeliveryChecklist(id, currentUserId()));
+    }
+
+    /**
+     * 项目需求视角（迭代 → 需求 + 需求/任务口径待办 + 双口径概览）。
+     * <p>取代项目详情对 {@code /checklist}（仅交付项）的单一口径：需求未准入/未拆交付项时，
+     * 旧接口返回空列表，项目看起来“什么都没挂”。
+     */
+    @GetMapping("/{id}/requirement-board")
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_PROJECT, action = "view")
+    public Result<RdmProjectRequirementVO.Board> getRequirementBoard(@PathVariable Long id) {
+        return Result.success(requirementBoardService.getBoard(id, currentUserId()));
     }
 
     /* ==================== 任务22 A：待办看板 / 下钻 / 导出 / 对账 ==================== */

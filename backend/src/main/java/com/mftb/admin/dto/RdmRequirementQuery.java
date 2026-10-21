@@ -35,6 +35,23 @@ public class RdmRequirementQuery {
     /** 状态 */
     private String status;
 
+    /**
+     * 多状态查询（阶段桶映射后使用）。
+     * <p>AI 工具把“待审批/开发中/测试中”等语义桶映射成状态集合，避免让模型记 23 个内部状态码；
+     * 与 {@link #status} 同时存在时以精确 {@code status} 为准。
+     */
+    private List<String> statuses;
+
+    /** 仅看阻塞 */
+    private Boolean blockedOnly;
+
+    /**
+     * “与某人相关”的用户ID：OR 命中提出人 / 产品经理 / 研发负责人 / 验收人 / 未完成任务负责人。
+     * <p>用于 AI 的“某人做了什么”查询；非全量用户仍会被 {@link #toWrapper(Long, boolean)} 的
+     * relatedOnly 收敛，形成双保险。
+     */
+    private Long relatedUserId;
+
     /** 提出部门ID */
     private Long deptId;
 
@@ -135,6 +152,11 @@ public class RdmRequirementQuery {
         }
         if (StringUtils.hasText(status)) {
             wrapper.eq(RdmRequirement::getStatus, status);
+        } else if (statuses != null && !statuses.isEmpty()) {
+            wrapper.in(RdmRequirement::getStatus, statuses);
+        }
+        if (Boolean.TRUE.equals(blockedOnly)) {
+            wrapper.eq(RdmRequirement::getBlockedFlag, 1);
         }
         if (deptId != null) {
             wrapper.eq(RdmRequirement::getSubmitDeptId, deptId);
@@ -151,6 +173,16 @@ public class RdmRequirementQuery {
             wrapper.exists("SELECT 1 FROM rdm_work_task t WHERE t.req_id = rdm_requirement.id "
                     + "AND t.owner_user_id = {0} AND t.status IN ('todo','doing','blocked') AND t.deleted = 0",
                     handlerUserId);
+        }
+        if (relatedUserId != null) {
+            // OR 命中五类关系；“某人做了什么”不能只看提出人，否则研发/验收角色会漏
+            wrapper.and(w -> w.eq(RdmRequirement::getSubmitterUserId, relatedUserId)
+                    .or().eq(RdmRequirement::getAssigneePmUserId, relatedUserId)
+                    .or().eq(RdmRequirement::getDevOwnerUserId, relatedUserId)
+                    .or().eq(RdmRequirement::getAcceptorUserId, relatedUserId)
+                    .or().exists("SELECT 1 FROM rdm_work_task t WHERE t.req_id = rdm_requirement.id "
+                            + "AND t.owner_user_id = {0} AND t.status IN ('todo','doing','blocked') AND t.deleted = 0",
+                            relatedUserId));
         }
         if (flowVersion != null) {
             wrapper.eq(RdmRequirement::getFlowVersion, flowVersion);
@@ -276,6 +308,10 @@ public class RdmRequirementQuery {
             case RdmConstants.SCOPE_APPROVING -> {
                 // 待我审批：范围由服务层拿 OA 待办 id 后以 in(...) 收敛，这里不加人员字段条件；
                 // 一旦落到 default 分支，审批人就只会看到自己提的单，造成计数与列表不一致
+            }
+            case RdmConstants.SCOPE_PERSON -> {
+                // 某人视角：由 relatedUserId 收敛；非全量用户仍由 relatedOnly 兜底，
+                // 不在此处加人员条件，否则会与 relatedUserId 形成 AND，漏掉任务负责人命中
             }
             case RdmConstants.SCOPE_INTAKE -> {
                 /*

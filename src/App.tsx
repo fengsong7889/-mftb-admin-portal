@@ -208,6 +208,7 @@ const EmpQuotaDetail = lazy(() => import('./pages/AiQuotaAuth/empQuota/EmpQuotaD
 const RoleQuotaEdit = lazy(() => import('./pages/AiQuotaAuth/empQuota/RoleQuotaEdit'))
 const RoleQuotaDetail = lazy(() => import('./pages/AiQuotaAuth/empQuota/RoleQuotaDetail'))
 const AiOperationAuth = lazy(() => import('./pages/AiOperationAuth'))
+const AiAssistantConfig = lazy(() => import('./pages/AiAssistantConfig'))
 const AiOperationAuthEdit = lazy(() => import('./pages/AiOperationAuth/AiOperationAuthEdit'))
 const AiOperationAuthLog = lazy(() => import('./pages/AiOperationAuth/AiOperationAuthLog'))
 const AiUsageStats = lazy(() => import('./pages/AiUsageStats'))
@@ -355,6 +356,8 @@ const DailyReportRecords = lazy(() => import('./pages/Rdm/DailyReport/Records'))
 const DailyReportTrigger = lazy(() => import('./pages/Rdm/DailyReport/Trigger'))
 // 移動端日報頁：釘釘通知連結的落地頁，無獨立菜單
 const RdmDailyReport = lazy(() => import('./pages/Rdm/DailyReport'))
+// 进度日报看板（开放页）：推送链接的新落地页，凭 HMAC 令牌免登，不套后台布局
+const RdmDailyReportView = lazy(() => import('./pages/RdmDailyReportView'))
 // V3 分批交付：项目总览 / 提测工作台 / 发布中心
 const RdmProjectOverview = lazy(() => import('./pages/Rdm/ProjectOverview'))
 const RdmProjectDetail = lazy(() => import('./pages/Rdm/ProjectDetail'))
@@ -674,6 +677,7 @@ function AuthenticatedLayout() {
                             <Route path="/ai-role-quota-detail" element={<RoleQuotaDetail />} />
 
               <Route path="/ai-operation-auth" element={<AiOperationAuth />} />
+              <Route path="/ai-assistant-config" element={<AiAssistantConfig />} />
               <Route path="/ai-operation-auth-edit" element={<AiOperationAuthEdit />} />
               <Route path="/ai-operation-auth-log" element={<AiOperationAuthLog />} />
               <Route path="/ai-usage-stats" element={<AiUsageStats />} />
@@ -950,10 +954,13 @@ function AppRoutes() {
   const isPublicMeetingCheckin = location.pathname.startsWith('/meeting-checkin')
   // 纪要免登查看页同源：凭签名令牌鉴权，钉钉里点开的人可能没有后台账号
   const isPublicMeetingMinutes = location.pathname.startsWith('/meeting-minutes-view')
+  // 进度日报看板开放页：推送链接直接落地，未登录也要能看；令牌自带范围与有效期
+  const isPublicRdmDailyView = location.pathname.startsWith('/rdm-daily-view')
 
   return (
     <Routes>
-      {isPublicMobilePath || isPublicSignPath || isPublicMeetingCheckin || isPublicMeetingMinutes ? (
+      {isPublicMobilePath || isPublicSignPath || isPublicMeetingCheckin || isPublicMeetingMinutes
+        || isPublicRdmDailyView ? (
         <>
           <Route path="/m/asset-tag-view" element={
             <Suspense fallback={<PageLoading />}><AssetTagView /></Suspense>
@@ -966,6 +973,9 @@ function AppRoutes() {
           } />
           <Route path="/meeting-minutes-view" element={
             <Suspense fallback={<PageLoading />}><MeetingMinutesPage /></Suspense>
+          } />
+          <Route path="/rdm-daily-view" element={
+            <Suspense fallback={<PageLoading />}><RdmDailyReportView /></Suspense>
           } />
         </>
       ) : isAuthenticated ? (

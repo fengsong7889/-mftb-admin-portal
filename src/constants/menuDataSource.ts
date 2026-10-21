@@ -138,6 +138,7 @@ export const keyToPath: Record<string, string> = {
   // 智能中心(AI)
   'ai_model_hub': '/ai-model-hub',
   'ai-operation-auth': '/ai-operation-auth',
+  'ai-assistant-config': '/ai-assistant-config',
   'ai-access-request': '/ai-access-apply',
   'ai-mcp-service': '/ai-mcp-service',
   'ai-conversation-audit': '/ai-conversation-audit',
@@ -566,7 +567,7 @@ export const BACKEND_CONNECTED_KEYS: Set<string> = new Set([
   'rule-config', 'notification-config', 'workflow-config', 'version-history',
   'rule-ad-sales', 'rule-gift', 'rule-security', 'rule-algorithm', 'rule-seq',
   // 智能中心(AI)
-  'ai_model_hub', 'ai-operation-auth', 'ai-access-request',
+  'ai_model_hub', 'ai-operation-auth', 'ai-assistant-config', 'ai-access-request',
   'ai-mcp-service', 'ai-conversation-audit', 'ai_usage_stats', 'ai_energy_detail',
   'ai-model-provider', 'ai-model-list', 'ai-auth',
   'ai-dept-model-auth', 'ai-emp-model-auth', 'ai-pos-auth',

@@ -1,0 +1,1143 @@
+/*
+ * 进度日报看板（公开页）固定模板样式。
+ *
+ * 这里的样式是「模板本体」：不提供皮肤、不读配置、不接受自定义 CSS。
+ * 可调的只有后端下发的展示参数（需求明细/负责人/未挂项目迭代），
+ * 任何「看板样式可配置」的需求都应新增模板，而不是在此叠 if。
+ *
+ * 响应式靠 Grid auto-fit 自适应（项目规范禁止 @media 断点）。
+ */
+
+.rdm-board-page {
+  /* 全局 html/body/#root 是 overflow:hidden，这里必须自己成为滚动容器：
+     否则公开页与弹窗 iframe 都只能看到首屏，手机上也滑不动 */
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 20px 16px 40px;
+  background: #f4f5f7;
+  color: #262626;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.rdm-board-page *,
+.rdm-board-page *::before,
+.rdm-board-page *::after {
+  box-sizing: border-box;
+}
+
+.rdm-board-shell {
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+/* ── 载入与提示 ── */
+.rdm-board-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 14px;
+}
+
+.rdm-board-center-text {
+  font-size: 13px;
+  color: #8c8c8c;
+}
+
+.rdm-board-notice {
+  max-width: 520px;
+  margin: 12vh auto 0;
+  padding: 32px 28px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+.rdm-board-notice-icon {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 16px;
+  border-radius: 14px;
+  background: #fff7e6;
+  color: #e8720c;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rdm-board-notice-title {
+  font-size: 17px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.rdm-board-notice-msg {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #8c8c8c;
+  word-break: break-word;
+}
+
+.rdm-board-retry {
+  margin-top: 18px;
+  height: 34px;
+  padding: 0 18px;
+  border: 1px solid #e8720c;
+  border-radius: 8px;
+  background: #e8720c;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rdm-board-retry:hover {
+  background: #f59432;
+  border-color: #f59432;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(232, 114, 12, 0.35);
+}
+
+/* ── 页头 ── */
+.rdm-board-hero {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 16px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.rdm-board-hero-bar {
+  height: 4px;
+  background: linear-gradient(90deg, #e8720c, #f59432, #ffb347, #f59432, #e8720c);
+  background-size: 200% 100%;
+  animation: headerGradientShift 4s ease infinite;
+}
+
+.rdm-board-hero-inner {
+  padding: 20px 24px 18px;
+}
+
+.rdm-board-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rdm-board-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rdm-board-logo {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rdm-board-brand-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #262626;
+}
+
+.rdm-board-brand-sub {
+  margin-top: 2px;
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  color: #bfbfbf;
+}
+
+.rdm-board-type-pill {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #fff7e6;
+  color: #e8720c;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rdm-board-title {
+  margin: 16px 0 10px;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #1f1f1f;
+}
+
+.rdm-board-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px 18px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.rdm-board-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.rdm-board-expire {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: #fff7f0;
+  border: 1px solid #ffe7d1;
+  color: #ad4e00;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* ── KPI ── */
+.rdm-board-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.rdm-board-kpi {
+  padding: 14px 16px;
+  border-radius: 12px;
+  border-left: 3px solid #d9d9d9;
+  background: #fff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.rdm-board-kpi:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
+.rdm-board-kpi-label {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-bottom: 6px;
+}
+
+.rdm-board-kpi-value {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.rdm-board-kpi-unit {
+  font-size: 12px;
+  font-weight: 400;
+  color: #8c8c8c;
+}
+
+/* KPI 口径说明：避免读者把「本次推送範圍」的 1 个项目误读成全系统只有 1 个 */
+.rdm-board-kpi-scope {
+  margin: -6px 2px 14px;
+  font-size: 11px;
+  color: #8c8c8c;
+  line-height: 1.6;
+}
+
+/* ── 风险摘要 ── */
+.rdm-board-risk {
+  margin-bottom: 16px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #ffe7d1;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
+}
+
+.rdm-board-risk[data-empty="true"] {
+  border-color: #d9f7be;
+  background: #fcfffa;
+}
+
+.rdm-board-risk-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #ad4e00;
+}
+
+.rdm-board-risk[data-empty="true"] .rdm-board-risk-head {
+  color: #389e0d;
+}
+
+.rdm-board-risk-count {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #fff1f0;
+  color: #cf1322;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rdm-board-risk-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.rdm-board-risk-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: #fafafa;
+  font-size: 12px;
+}
+
+.rdm-board-risk-name {
+  font-weight: 600;
+  color: #262626;
+}
+
+.rdm-board-risk-none {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #52c41a;
+}
+
+/* ── 区块标题 ── */
+.rdm-board-section {
+  margin-bottom: 16px;
+}
+
+.rdm-board-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 2px 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #262626;
+}
+
+/* 标题行右侧的视图切换：推到最右，窄屏自动换行到标题下方 */
+.rdm-board-section-extra {
+  margin-left: auto;
+}
+
+/*
+ * 卡片/列表视图切换：胶囊分段 + 选中项浮起。
+ * 选中态用品牌橙文字与暖橙底、白色渐变高光，未选中保持安静，
+ * 避免在标题行里抢走项目名称的视觉焦点。
+ */
+.rdm-board-view-switch {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border: 1px solid #f0f0f0;
+  border-radius: 999px;
+  background: #f5f7fa;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.rdm-board-view-switch button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 76px;
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: #8c8c8c;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rdm-board-view-switch button:hover {
+  color: #e8720c;
+}
+
+.rdm-board-view-switch button[data-active="true"] {
+  border-color: #ffe7d1;
+  background: linear-gradient(135deg, #fff7f0 0%, #ffffff 70%);
+  color: #e8720c;
+  box-shadow: 0 2px 6px rgba(232, 114, 12, 0.16);
+}
+
+.rdm-board-view-switch button:focus-visible {
+  outline: 2px solid #e8720c;
+  outline-offset: 1px;
+}
+
+.rdm-board-view-switch .anticon {
+  font-size: 13px;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rdm-board-view-switch button[data-active="true"] .anticon {
+  transform: scale(1.08);
+}
+
+.rdm-board-section-bar {
+  width: 3px;
+  height: 15px;
+  border-radius: 2px;
+}
+
+.rdm-board-section-count {
+  font-size: 12px;
+  font-weight: 400;
+  color: #8c8c8c;
+}
+
+/* ── 全局展示口径（只影响下方明细，不改变顶部 KPI） ── */
+.rdm-board-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px 18px;
+  flex-wrap: wrap;
+  margin: -2px 2px 12px;
+  padding: 8px 12px;
+  border: 1px solid #eef0f3;
+  border-radius: 10px;
+  background: #fafbfc;
+}
+
+.rdm-board-filter-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rdm-board-filter-label {
+  font-size: 12px;
+  color: #8c8c8c;
+  white-space: nowrap;
+}
+
+.rdm-board-filter-hint {
+  margin-left: auto;
+  font-size: 12px;
+  color: #bfbfbf;
+}
+
+/* 存量兜底：历史迭代里的未完成需求，用整行按钮把它变成可发现、可点击的线索 */
+.rdm-board-legacy-hint {
+  flex-basis: 100%;
+  padding: 7px 12px;
+  border: 1px solid #ffe58f;
+  border-radius: 8px;
+  background: #fffbe6;
+  color: #ad6800;
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.rdm-board-legacy-hint:hover {
+  background: #fff7d6;
+}
+
+.rdm-board-legacy-hint:focus-visible {
+  outline: 2px solid #fa8c16;
+  outline-offset: 1px;
+}
+
+/* ── 项目卡 ── */
+.rdm-board-projects {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: 14px;
+}
+
+/* 列表视图：单列全宽，逐项目看甘特时不必反复横滑 */
+.rdm-board-projects[data-view="list"] {
+  grid-template-columns: 1fr;
+}
+
+/*
+ * 卡片视图下展开甘特时，该卡自动占满整行。
+ * 卡片宽度（约 1/3 屏）装不下时间轴，强行在卡内展开只能一点一点横向挪；
+ * 用 :has 直接根据子元素的展开态跨列，不需要把展开状态提升到父级。
+ */
+.rdm-board-projects[data-view="card"] .rdm-board-project:has(.rdm-board-req.is-open) {
+  grid-column: 1 / -1;
+}
+
+.rdm-board-card {
+  background: #fff;
+  border: 1px solid #eef0f3;
+  border-radius: 14px;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
+}
+
+.rdm-board-project {
+  padding: 18px 20px;
+  transition: box-shadow 0.25s ease;
+}
+
+.rdm-board-project:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.rdm-board-project-title-wrap {
+  min-width: 0;
+}
+
+.rdm-board-project-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1f1f1f;
+  word-break: break-word;
+}
+
+.rdm-board-project-no {
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: #f5f5f5;
+  color: #8c8c8c;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.rdm-board-project-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+/* 项目全量计数：作为“切换到历史视图”的导航信息，不随当前筛选变化 */
+.rdm-board-project-stats {
+  display: flex;
+  align-items: center;
+  gap: 4px 14px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+/* 项目头：标题在左、交付进度在右；窄屏自动换行到标题下方 */
+.rdm-board-project-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 18px;
+  flex-wrap: wrap;
+}
+
+.rdm-board-delivery {
+  flex: 1 1 220px;
+  max-width: 300px;
+  min-width: 200px;
+}
+
+.rdm-board-delivery-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.rdm-board-delivery-label {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.rdm-board-delivery-pct {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  color: #e8720c;
+}
+
+.rdm-board-delivery .rdm-board-progress-track {
+  height: 6px;
+}
+
+.rdm-board-delivery-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #8c8c8c;
+}
+
+.rdm-board-delivery-dot {
+  color: #d9d9d9;
+}
+
+.rdm-board-delivery-empty {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #bfbfbf;
+}
+
+.rdm-board-project-next {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.rdm-board-project-zero {
+  margin-top: 14px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fafafa;
+  color: #8c8c8c;
+  font-size: 12px;
+}
+
+/* 进度条 */
+.rdm-board-progress {
+  margin-top: 14px;
+}
+
+.rdm-board-progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: #f0f0f0;
+  overflow: hidden;
+}
+
+.rdm-board-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #e8720c, #f59432);
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rdm-board-progress-text {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.rdm-board-progress-pct {
+  color: #e8720c;
+  font-weight: 700;
+}
+
+/* 项目指标 */
+.rdm-board-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fafafa;
+}
+
+.rdm-board-metric {
+  text-align: center;
+}
+
+.rdm-board-metric-value {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.rdm-board-metric-label {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #8c8c8c;
+  white-space: nowrap;
+}
+
+.rdm-board-owners {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #595959;
+}
+
+/* ── 迭代与需求 ── */
+.rdm-board-project-body {
+  margin-top: 14px;
+  padding-top: 6px;
+  border-top: 1px dashed #f0f0f0;
+}
+
+.rdm-board-iteration {
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.rdm-board-iteration:last-child {
+  border-bottom: none;
+}
+
+.rdm-board-iteration-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 9px 2px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 12px;
+  color: #595959;
+}
+
+.rdm-board-iteration-summary::-webkit-details-marker {
+  display: none;
+}
+
+.rdm-board-iteration-caret {
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid #bfbfbf;
+  transition: transform 0.2s ease;
+}
+
+.rdm-board-iteration[open] .rdm-board-iteration-caret {
+  transform: rotate(90deg);
+}
+
+.rdm-board-iteration-code {
+  font-weight: 700;
+  color: #262626;
+}
+
+.rdm-board-iteration-name {
+  color: #595959;
+}
+
+.rdm-board-iteration-meta {
+  color: #8c8c8c;
+}
+
+.rdm-board-iteration-body {
+  padding: 2px 0 6px 13px;
+}
+
+.rdm-board-iteration-empty {
+  padding: 6px 0;
+  font-size: 12px;
+  color: #bfbfbf;
+}
+
+.rdm-board-req {
+  padding: 8px 0;
+  border-bottom: 1px solid #fafafa;
+}
+
+.rdm-board-req:last-child {
+  border-bottom: none;
+}
+
+.rdm-board-req-main {
+  min-width: 0;
+}
+
+.rdm-board-req-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: #262626;
+  word-break: break-word;
+}
+
+.rdm-board-req-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px 12px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #8c8c8c;
+}
+
+.rdm-board-req-no {
+  color: #8c8c8c;
+}
+
+.rdm-board-req-no-pending {
+  color: #bfbfbf;
+}
+
+/* ── 标签 ── */
+.rdm-board-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+/* ── 未挂项目迭代 ── */
+.rdm-board-unassigned {
+  padding: 14px 18px;
+  border-color: #ffe58f;
+}
+
+.rdm-board-note {
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.rdm-board-empty {
+  padding: 28px 0;
+  border-radius: 12px;
+  background: #fff;
+  text-align: center;
+  font-size: 13px;
+  color: #8c8c8c;
+}
+
+/* ── 页脚 ── */
+.rdm-board-footer {
+  margin-top: 22px;
+  padding: 16px 4px 0;
+  border-top: 1px solid #e8eaed;
+  font-size: 12px;
+  line-height: 1.9;
+  color: #8c8c8c;
+  text-align: center;
+}
+
+.rdm-board-footer-brand {
+  margin-top: 6px;
+  color: #bfbfbf;
+  letter-spacing: 0.5px;
+}
+
+/* ── 晨/晚报焦点条 ── */
+.rdm-board-focus {
+  display: flex;
+  align-items: center;
+  gap: 12px 20px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #eef0f3;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
+}
+
+.rdm-board-focus[data-evening="true"] {
+  border-color: #f9f0ff;
+  background: #fcfaff;
+}
+
+.rdm-board-focus-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #262626;
+}
+
+.rdm-board-focus-list {
+  display: flex;
+  align-items: center;
+  gap: 10px 22px;
+  flex-wrap: wrap;
+}
+
+.rdm-board-focus-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.rdm-board-focus-value {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.rdm-board-focus-label {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+/* ── 负责人芯片 ── */
+.rdm-board-owners-title {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.rdm-board-owner-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #f5f7fa;
+  color: #595959;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* ── 迭代块（嵌套在项目卡内） ── */
+.rdm-board-iteration-block {
+  padding: 10px 0;
+  border-top: 1px dashed #f0f0f0;
+}
+
+/* 已关闭迭代：左侧灰条标明历史版本，避免和推进中的版本混在一起误读 */
+.rdm-board-iteration-block[data-closed="true"] {
+  border-left: 3px solid #d9d9d9;
+  padding-left: 10px;
+}
+
+.rdm-board-iteration-block[data-closed="true"] .rdm-board-iteration-code {
+  color: #595959;
+}
+
+.rdm-board-iteration-block:first-child {
+  border-top: none;
+  padding-top: 2px;
+}
+
+.rdm-board-iteration-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #595959;
+}
+
+.rdm-board-iteration-owner {
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #e6f7ff;
+  color: #1890ff;
+  font-size: 11px;
+}
+
+/* 迭代进度/产能：数字来自快照，颜色只表达风险等级 */
+.rdm-board-iter-metrics {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.rdm-board-metric-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #fafafa;
+  color: #8c8c8c;
+  font-size: 11px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.rdm-board-metric-chip b {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.rdm-board-metric-chip.is-progress {
+  background: #e6f7ff;
+  color: #1890ff;
+}
+
+.rdm-board-metric-chip.is-success {
+  background: #f6ffed;
+  color: #52c41a;
+}
+
+.rdm-board-metric-chip.is-warn {
+  background: #fff7e6;
+  color: #fa8c16;
+}
+
+.rdm-board-metric-chip.is-danger {
+  background: #fff1f0;
+  color: #f5222d;
+}
+
+.rdm-board-metric-chip.is-muted {
+  background: #fafafa;
+  color: #bfbfbf;
+}
+
+.rdm-board-metric-chip-label {
+  opacity: 0.85;
+}
+
+/* 迭代类型胶囊本身就是说明入口（点击查看冲刺/版本/热修释义） */
+.rdm-board-type-help {
+  display: inline-flex;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 999px;
+}
+
+.rdm-board-type-help:hover .rdm-board-pill {
+  filter: brightness(0.96);
+}
+
+.rdm-board-type-help:focus-visible {
+  outline: 2px solid #e8720c;
+  outline-offset: 2px;
+}
+
+.rdm-board-req-list {
+  padding-left: 4px;
+}
+
+.rdm-board-unscheduled-reqs {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed #f0f0f0;
+}
+
+/* ── 需求行（可点击展开） ── */
+.rdm-board-req-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.rdm-board-req-head:hover {
+  background: #fafafa;
+}
+
+.rdm-board-req.is-open .rdm-board-req-head {
+  background: #f7faff;
+}
+
+.rdm-board-req-caret {
+  width: 0;
+  height: 0;
+  margin-top: 6px;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid #bfbfbf;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.rdm-board-req.is-open .rdm-board-req-caret {
+  transform: rotate(90deg);
+}
+
+.rdm-board-req-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.rdm-board-req-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: #262626;
+  word-break: break-word;
+}
+
+.rdm-board-req-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px 12px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #8c8c8c;
+}
+
+/* ── 甘特：复用「我的甘特圖」GanttBoard，只读 ── */
+.rdm-board-gantt {
+  margin: 4px 0 10px 12px;
+}
+
+/* 左栏紧凑/展开 + 任务收合：与「我的甘特圖」工具栏同口径；按钮靠左，与甘特左栏对齐 */
+.rdm-board-gantt-toolbar {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-bottom: 2px;
+}
+
+.rdm-board-gantt-toolbar .ant-btn {
+  height: 24px;
+  padding: 0 6px;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+/* 看板自身是长页面滚动，甘特不再单独限高，避免展开后只看到几行 */
+.rdm-board-gantt .rdm-g2-scroll {
+  max-height: none;
+}
+
+.rdm-board-gantt-empty {
+  font-size: 12px;
+  color: #bfbfbf;
+  padding: 4px 0;
+}

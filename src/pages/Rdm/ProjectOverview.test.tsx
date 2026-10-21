@@ -9,7 +9,7 @@
  *  5. reconciliation 不一致時給出提示而非靜默導出。
  */
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import i18n from '../../i18n'
 import {
@@ -190,6 +190,27 @@ describe('ProjectOverview 三層進度與剩餘工作口徑', () => {
   })
 })
 
+describe('ProjectOverview 項目編號列', () => {
+  it('列表直接展示後端下發的項目編號（PROJ+YYYYMMDD+2 位日序），不再只在導出文件裡可見', async () => {
+    vi.mocked(fetchProjectPage).mockResolvedValue({
+      records: [makeRow({ projectNo: 'PROJ2026102001' })], total: 1,
+    })
+    renderAt()
+    expect(await screen.findByText('PROJ2026102001')).toBeInTheDocument()
+    // 表头在冻结列下会渲染多份副本，按「至少出现一次」断言列名
+    expect(screen.getAllByText('項目編號').length).toBeGreaterThan(0)
+  })
+
+  it('存量項目 projectNo 為空時降級顯示 -，不留空白格', async () => {
+    vi.mocked(fetchProjectPage).mockResolvedValue({ records: [makeRow({ projectNo: null })], total: 1 })
+    const { container } = renderAt()
+    await screen.findByText('演示項目')
+    const cells = Array.from(container.querySelectorAll('.ant-table-tbody tr.ant-table-row td'))
+    // 列顺序：項目編號固定在首列，故第一個單元格即編號
+    expect(cells[0]?.textContent).toBe('-')
+  })
+})
+
 describe('ProjectOverview 行操作栏（不再收进「更多」）', () => {
   it('編輯/暫停直接渲染在操作列，无需先点下拉', async () => {
     renderAt()
@@ -205,8 +226,10 @@ describe('ProjectOverview 行操作栏（不再收进「更多」）', () => {
     renderAt()
     await screen.findByText('演示項目')
     expect(screen.getByRole('button', { name: '恢復推進' })).toBeInTheDocument()
-    // 已暂停标记只以 Tag 呈现，状态列不再把 0/1 数字渲染成文本
-    expect(screen.queryByText('0')).not.toBeInTheDocument()
+    // 已暂停标记只以 Tag 呈现，状态列不再把 0/1 数字渲染成文本。
+    // 限定在本行内查：统计卡数字动画从 0 起跳，全局 queryByText('0') 会误命中卡片而非表格
+    const row = (await screen.findByText('演示項目')).closest('tr') as HTMLElement
+    expect(within(row).queryByText('0')).not.toBeInTheDocument()
   })
 })
 

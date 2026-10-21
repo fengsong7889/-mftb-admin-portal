@@ -50,6 +50,12 @@ public class RdmTransitionDTO {
      */
     private Long projectId;
 
+    /**
+     * 交付流程版本（分配/认领时确定）：3=分批并行交付（默认）/ 2=传统整需求交付。
+     * <p>提交需求时不暴露；只在准入后的分配/认领窗口生效，已有任务或交付项后不得切换。
+     */
+    private Integer flowVersion;
+
     /** 研发进度百分比 */
     private Integer progress;
 

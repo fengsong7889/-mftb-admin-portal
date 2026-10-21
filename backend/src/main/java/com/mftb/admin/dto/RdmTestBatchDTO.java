@@ -51,6 +51,19 @@ public class RdmTestBatchDTO {
         private String buildMappingJson;
     }
 
+    /**
+     * 按任务解析提测范围（研发「按任务交付给测试」的入口）。
+     * <p>任务已挂交付项则复用，否则归入需求默认交付项并回填任务归属；
+     * 真正的提测仍以交付项为范围单位，测试/验收事实层不变。
+     */
+    @Data
+    public static class TaskScopeResolve {
+        /** 关联需求（必填） */
+        private Long reqId;
+        /** 选中的任务（必填，至少一个） */
+        private List<Long> taskIds;
+    }
+
     /** 退回提测（受理动作无请求体，退回必须给原因） */
     @Data
     public static class Return {

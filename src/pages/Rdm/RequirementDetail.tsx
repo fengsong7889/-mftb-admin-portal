@@ -38,6 +38,7 @@ import {
   BranchesOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
+  CopyOutlined,
   DeleteOutlined,
   DownOutlined,
   FileProtectOutlined,
@@ -70,6 +71,7 @@ import {
   addComment,
   addStructureChild,
   changeRequirementIteration,
+  copyRequirement,
   fetchDeliveryItems,
   fetchDeliverySummary,
   fetchIterations,
@@ -111,6 +113,7 @@ import {
   RDM_SOURCE_CHANNEL_LABEL,
   RDM_STATUS,
   RDM_STATUS_LABEL,
+  RDM_STAGE_LABEL,
   formatRdmReqNo,
   RDM_STATUS_STAGE,
   type RdmAcceptResult,
@@ -147,6 +150,7 @@ const VERSION_FALLBACK_HINT = '無發布版本記錄，可直接輸入版本號�
 const ACTION_EFFECT_HINT: Partial<Record<RdmAction, string>> = {
   [RDM_ACTION.SUBMIT]: '進入準入審批，由審批人決定是否受理',
   [RDM_ACTION.SUBMIT_POOL]: '跳過準入審批，需求直接進入需求池等待分配產品經理',
+  [RDM_ACTION.ACCEPT]: '已受理；若已存在 PRD / 評審記錄，狀態會自動對齊到事實位置',
 }
 
 /** 审批节点状态文案 */
@@ -248,6 +252,13 @@ const USABLE_PROJECT_STATUS: string[] = [
   RDM_PROJECT_STATUS.PREPARING,
   RDM_PROJECT_STATUS.IN_PROGRESS,
   RDM_PROJECT_STATUS.PARTIAL_DELIVERED,
+]
+
+/** 受理前的状态（可存在“受理前就写了 PRD”的历史越级数据，用于风险提示） */
+const PRE_ACCEPT_STATUSES: string[] = [
+  RDM_STATUS.ASSIGNED,
+  RDM_STATUS.EVALUATING,
+  RDM_STATUS.ON_HOLD,
 ]
 
 /** 活动流条目：评论与流转记录合并成一条时间线，但数据源与审计记录不变 */
@@ -549,6 +560,42 @@ export default function RequirementDetail() {
 
   /** 下一步文案：有动作就说清要判断什么，没动作就说清在等谁（不写「等 2 个动作」这种废话） */
   const nextStepHint = useMemo(() => {
+    const prds = summary?.prds ?? []
+    const reviews = summary?.reviews ?? []
+    const pendingReviews = reviews.filter(r => r.conclusion === 'pending').length
+    /*
+     * V3 分批交付：需求层只到受理，PRD/设计/开发/测试/验收以交付项为推进单位，
+     * 需求状态不再逐段变化（阶段条改由交付项推导）。
+     */
+    if (detail?.flowVersion === 3 && detail.status === RDM_STATUS.ACCEPTED) {
+      const stageLabel = detail.deliveryStage
+        ? RDM_STAGE_LABEL[detail.deliveryStage as RdmStage] ?? detail.deliveryStage
+        : null
+      if ((detail.deliveryItemCount ?? 0) > 0) {
+        return `V3 分批交付：交付項已推導至「${stageLabel}」（${detail.deliveryDoneCount ?? 0}/${detail.deliveryItemCount} 完成），下一步在交付項清單中推進`
+      }
+      return prds.length > 0
+        ? `V3 分批交付：PRD 已就緒（${prds.length} 份${pendingReviews > 0 ? `，${pendingReviews} 個評審進行中` : ''}），下一步建立交付項或提交排期`
+        : 'V3 分批交付：已受理，等待產品經理編寫 PRD；設計/開發/測試/驗收按交付項推進'
+    }
+    /*
+     * 已受理但 PRD 已存在（V2）：不能再提示「去写 PRD」。
+     * 先保存过草稿的需求会停在受理态，主按钮仍是「開始寫 PRD」，
+     * 这里明确告诉人下一步到底该做什么，而不是让人重新写一遍。
+     */
+    if (detail?.status === RDM_STATUS.ACCEPTED && prds.length > 0) {
+      /*
+       * 存量数据（本次修正前就已写好 PRD）会停在「已受理 + PRD 已存在」，
+       * 此时主按钮仍是「開始寫 PRD」；直接说清点下去只推流程、不丢内容，
+       * 避免用户以为要重写一遍。
+       */
+      if (primaryAction?.actionCode === RDM_ACTION.PRD_START) {
+        return 'PRD 已就緒：點「開始寫 PRD」把流程推進到 PRD 設計（不會清空已寫內容），接著發起評審'
+      }
+      return pendingReviews > 0
+        ? 'PRD 已就緒，評審進行中：等待評審人給出結論，通過後即可提交排期'
+        : 'PRD 已就緒：下一步發起評審，評審通過後提交排期（無需重寫 PRD）'
+    }
     if (primaryAction) {
       const base = ACTION_HINT[primaryAction.actionCode] ?? `可執行「${primaryAction.actionName}」推進本需求`
       // 动作按钮已全部平铺到页面底部：不指路会让人在处理条右侧干等找不到入口
@@ -559,7 +606,7 @@ export default function RequirementDetail() {
       ?? (serverActions
         ? `當前狀態由${detail?.currentHandler ?? '下一位處理人'}推進，你在這個環節沒有可執行動作`
         : '當前狀態無可執行動作')
-  }, [primaryAction, otherActions.length, serverActions, detail])
+  }, [primaryAction, otherActions.length, serverActions, detail, summary])
 
   /** 风险提示：同一风险只出现一次，处理条展示最需要行动的一项，其余可展开 */
   const riskItems = useMemo(() => {
@@ -577,8 +624,22 @@ export default function RequirementDetail() {
     if ((detail.reworkCount ?? 0) > 0) {
       items.push({ tone: 'warn', text: `驗收返工 ${detail.reworkCount} 次，返工原因見「驗收與發布」` })
     }
+    /*
+     * 歷史越級數據：受理前就寫了 PRD / 出了評審結論。
+     * 不提醒的话，用户会看到「評審已通過」与「接受需求」同时出现，以为系統壞了；
+     * 提醒后也說清接受需求之后會發生什麼。
+     */
+    if (PRE_ACCEPT_STATUSES.includes(detail.status)
+        && (summary?.prds.length ?? 0) > 0) {
+      items.push({
+        tone: 'warn',
+        text: detail.flowVersion === 3
+          ? '尚未受理就已存在 PRD / 評審記錄：V3 分批交付按交付項推進，接受需求後即可繼續'
+          : '尚未受理就已存在 PRD / 評審記錄（歷史越級操作）：接受需求後會自動對齊到事實狀態',
+      })
+    }
     return items
-  }, [detail])
+  }, [detail, summary])
 
   /**
    * 阶段条上每个节点的停留天数：把时间轴里细分状态的停留时长按阶段汇总。
@@ -586,6 +647,8 @@ export default function RequirementDetail() {
    * 还没走过的阶段不输出，节点下方宁可不显示也不编一个 0。
    */
   const stageStayDays = useMemo(() => {
+    // 已归档需求不再计算停留：归档是终点，节点上的天数只增不减，展示会误导成还在推进
+    if (detail?.status === RDM_STATUS.CLOSED) return {}
     const hoursByStage: Partial<Record<RdmStage, number>> = {}
     for (const node of detail?.timeline ?? []) {
       const st = RDM_STATUS_STAGE[node.status as RdmStatus]
@@ -597,7 +660,27 @@ export default function RequirementDetail() {
       if (hours && hours > 0) days[st as RdmStage] = Math.max(Math.round(hours / 24), 1)
     }
     return days
-  }, [detail?.timeline])
+  }, [detail?.timeline, detail?.status])
+
+  /**
+   * V3 階段條的推導口徑（只讀投影）：
+   * 交付項完成數 + 各狀態分佈 + 「需求狀態仍停在哪」。
+   * <p>必須同時說清兩件事，否則是「進度條點在開發、狀態却寫已受理」的矛盾觀感。
+   * <p>非 V3 需求返回 undefined，階段條行為完全不變。
+   */
+  const v3StageHint = useMemo(() => {
+    if (!detail || detail.flowVersion !== 3) return undefined
+    const statusLabel = RDM_STATUS_LABEL[detail.status as RdmStatus] ?? detail.status
+    const total = detail.deliveryItemCount ?? 0
+    const done = detail.deliveryDoneCount ?? 0
+    if (total === 0) {
+      return `V3 分批交付：階段由交付項推導，目前尚無交付項（需求狀態：${statusLabel}）`
+    }
+    const dist = Object.entries(detail.deliveryItemStatusCounts ?? {})
+      .map(([code, count]) => `${RDM_DELIVERY_ITEM_STATUS_LABEL[code] ?? code} ${count}`)
+      .join(' · ')
+    return `V3 分批交付：階段由交付項推導 · ${done}/${total} 完成${dist ? `（${dist}）` : ''} · 需求狀態仍為「${statusLabel}」`
+  }, [detail])
 
   /** 合并评论与流转记录成一条活动流（按时间倒序；内部记录的服务端可见性不变） */
   const activityItems = useMemo<ActivityItem[]>(() => {
@@ -880,6 +963,35 @@ export default function RequirementDetail() {
     }
   }
 
+  /**
+   * 複製需求：交付流程鎖定後需要換交付方式時的補捙路徑。
+   * <p>生成一條草稿（不繼承項目/迭代/流程版本），確認後跳提交頁繼續編輯。
+   */
+  const handleCopyRequirement = () => {
+    if (!detail) return
+    Modal.confirm({
+      title: '複製需求',
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+      content: (
+        <div style={{ fontSize: 13, lineHeight: 1.8 }}>
+          <div>將以當前需求為模板建立一條<b>草稿</b>，確認內容後再提交。</div>
+          <div style={{ color: '#8C8C8C', fontSize: 12, marginTop: 8 }}>
+            複製：標題、類型、優先級、規模、現狀與痛點、期望結果、業務價值、期望日期、需求對象、驗收人、意向產品經理。<br />
+            不複製：附件（需重新上傳）、所屬項目/迭代、交付流程（分配/認領時重新確定）、評審/PRD/任務/交付項/驗收記錄。
+          </div>
+        </div>
+      ),
+      okText: '確認複製',
+      cancelText: '取消',
+      onOk: async () => {
+        const created = await copyRequirement(detail.id)
+        message.success('已複製為草稿，請確認後提交')
+        navigate(`/rdm-submit?id=${created.id}`)
+      },
+    })
+  }
+
   if (!detail) {
     return (
       <div className="content-area">
@@ -928,7 +1040,13 @@ export default function RequirementDetail() {
       <div className="rdm-action-bar">
         {/* 流程节点：提交动作到底部后处理条横向空间腾出来了，九阶段直接铺开，不再收进弹窗 */}
         <div className="rdm-action-bar-stages">
-          <RequirementStageBar status={detail.status} overdue={detail.overdueFlag ?? false} stayDays={stageStayDays} />
+          <RequirementStageBar
+            status={detail.status}
+            overdue={detail.overdueFlag ?? false}
+            stayDays={stageStayDays}
+            derivedStage={detail.flowVersion === 3 && detail.deliveryStage ? detail.deliveryStage as RdmStage : null}
+            derivedHint={v3StageHint}
+          />
         </div>
         <div className="rdm-action-bar-left">
           <div className="rdm-action-bar-next">
@@ -1127,7 +1245,7 @@ export default function RequirementDetail() {
                                   <Space size={6} wrap>
                                     <StatusTag status={item.status} overdue={item.overdue} />
                                     <span>{item.content}</span>
-                                    {item.durationHours != null && item.durationHours > 0 && (
+                                    {!closed && item.durationHours != null && item.durationHours > 0 && (
                                       <span style={{ fontSize: 12, color: '#D46B08' }}>
                                         <ClockCircleOutlined /> 停留 {(item.durationHours / 24).toFixed(1)} 天
                                       </span>
@@ -1178,6 +1296,7 @@ export default function RequirementDetail() {
                     <>
                       <PlanSection
                         summary={summary}
+                        status={detail.status}
                         planReleaseDate={detail.planReleaseDate}
                         editable={canEditDelivery && !closed}
                         canCreate={canEditDelivery && !closed}
@@ -1275,6 +1394,20 @@ export default function RequirementDetail() {
                             {deliveryItems.length > 0 && <Tag color="blue" style={{ margin: 0 }}>{deliveryItems.length}</Tag>}
                             <span className="rdm-card-title-split" />
                             <span className="rdm-todo-hint">分批交付模式下，每個交付項獨立驗收與發布</span>
+                            {/* 交付項的唯一創建入口：必須挂需求（後端 createItem 强制 reqId） */}
+                            {canEditDelivery && (
+                              <Button
+                                type="link"
+                                size="small"
+                                icon={<PlusOutlined />}
+                                onClick={() => navigate(
+                                  `/rdm-delivery-item?mode=create&reqId=${detail.id}`
+                                  + (detail.projectId ? `&projectId=${detail.projectId}` : ''),
+                                )}
+                              >
+                                新增交付項
+                              </Button>
+                            )}
                           </div>
                           {deliveryItemsLoading ? (
                             <div style={{ textAlign: 'center', padding: 24 }}><Spin size="small" /></div>
@@ -1413,7 +1546,17 @@ export default function RequirementDetail() {
                   {detail.projectName ?? `項目 #${detail.projectId}`}
                 </a>
               ) : <span style={{ color: '#8C8C8C' }}>未掛項目</span>} />
-              <PropRow label="所屬迭代" value={detail.iterationCode ?? <span style={{ color: '#8C8C8C' }}>未關聯</span>} />
+              <PropRow label="所屬迭代" value={detail.iterationCode
+                ? (detail.iterationName ? `${detail.iterationName} · ${detail.iterationCode}` : detail.iterationCode)
+                : <span style={{ color: '#8C8C8C' }}>未關聯</span>} />
+              {/* 交付流程：业务方提交时不选；准入后在分配/认领时由产研确定（默认 V3） */}
+              <PropRow label="交付流程" value={
+                detail.flowVersion === 3
+                  ? 'V3 分批交付'
+                  : (['pool', 'assigned', 'evaluating'].includes(detail.status)
+                    ? <span style={{ color: '#E8720C' }}>V2 待產研確認（分配/認領時確定）</span>
+                    : 'V2 整需求交付')
+              } />
               {showAllProps && (
                 <>
                   <PropRow label="技術負責人" value={detail.dispatcherName ?? '-'} />
@@ -1433,7 +1576,7 @@ export default function RequirementDetail() {
                   <PropRow label="掛起復審" value={detail.onHoldUntil ?? '-'} />
                   <PropRow label="來源渠道" value={RDM_SOURCE_CHANNEL_LABEL[detail.sourceChannel as RdmSourceChannel] ?? detail.sourceChannel ?? '-'} />
                   <PropRow label="流程版本" value={detail.flowVersion ? `V${detail.flowVersion}` : '-'} />
-                  {detail.parentReqNo && <PropRow label="衍生自" value={<span style={{ color: '#1890FF' }}>{detail.parentReqNo}（驗收遺留）</span>} />}
+                  {detail.parentReqNo && <PropRow label="來源需求" value={<span style={{ color: '#1890FF' }}>{detail.parentReqNo}</span>} />}
                   {/* V3 新增屬性 */}
                   {detail.requirementKind && (
                     <PropRow label="需求種類" value={
@@ -1498,12 +1641,14 @@ export default function RequirementDetail() {
       </div>
 
       {/* ── 底部操作栏：所有流转动作按全局规范放页面底部，主按钮靠右 ── */}
-      <div className="form-footer">
+      <div className="form-footer rdm-detail-actions">
         <Button onClick={() => navigate(-1)}>返回</Button>
         {availableActions.length === 0 && (
-          <span className="rdm-action-bar-locked">
-            {serverActions ? '你在這個環節沒有可執行動作' : '當前狀態無可執行動作'}
-          </span>
+          <div className="rdm-action-bar-locked">
+            {detail.flowVersion === 3 && detail.status === RDM_STATUS.ACCEPTED
+              ? 'V3 分批交付：需求層已受理，後續動作在交付項 / 發布批次中執行'
+              : serverActions ? '你在這個環節沒有可執行動作' : '當前狀態無可執行動作'}
+          </div>
         )}
         {RDM_ACCEPTANCE_OPEN_STATUS.includes(detail.status) && (
           <Button
@@ -1517,6 +1662,10 @@ export default function RequirementDetail() {
         {ITERATION_ADJUSTABLE_STATUS.includes(detail.status as RdmStatus)
           && (hasPermission('rdm-requirement:edit') || hasPermission('rdm-requirement:dispatch')) && (
           <Button icon={<SwapOutlined />} onClick={openIterationModal}>調整迭代</Button>
+        )}
+        {/* 複製需求：流程版本鎖定後需要換交付方式的補捙路徑（生成草稿） */}
+        {hasPermission('rdm-requirement:create') && (
+          <Button icon={<CopyOutlined />} onClick={handleCopyRequirement}>複製需求</Button>
         )}
         {/* 原先收进「更多操作」下拉的动作全部平铺：藏在下拉里让人根本看不见能做什么 */}
         {otherActions.map(a => (
@@ -1627,6 +1776,7 @@ export default function RequirementDetail() {
                   allowClear
                   showSearch
                   optionFilterProp="label"
+                  style={{ width: '100%' }}
                   placeholder="選擇進行中的項目"
                   value={actionProjectId}
                   onChange={pid => {
@@ -1652,6 +1802,7 @@ export default function RequirementDetail() {
                 </div>
                 <Select
                   allowClear
+                  style={{ width: '100%' }}
                   value={iterationCode}
                   onChange={setIterationCode}
                   loading={actionOptionsLoading}

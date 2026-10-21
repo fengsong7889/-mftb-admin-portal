@@ -35,6 +35,7 @@ import {
   RDM_REVIEW_CONCLUSION,
   RDM_REVIEW_CONCLUSION_COLOR,
   RDM_REVIEW_CONCLUSION_LABEL,
+  RDM_STATUS,
   RDM_TASK_STATUS,
   RDM_TASK_STATUS_COLOR,
   RDM_TASK_STATUS_LABEL,
@@ -43,8 +44,21 @@ import {
   type RdmChangeType,
   type RdmPrdStatus,
   type RdmReviewConclusion,
+  type RdmStatus,
   type RdmTaskStatus,
 } from '../../../constants/rdm'
+
+/**
+ * PRD / 評審可寫的需求狀態：受理之後（含受理當下）、排期之前。
+ * <p>與後端 RdmDeliveryServiceImpl.PRD_PHASE_STATUSES 同源：評估中就寫 PRD、出評審結論，
+ * 會造成「評審已通過但頁面還讓人接受需求」的矛盾。
+ */
+const PRD_PHASE_STATUSES: string[] = [
+  RDM_STATUS.ACCEPTED,
+  RDM_STATUS.PRD_DESIGNING,
+  RDM_STATUS.REVIEWING,
+  RDM_STATUS.REVIEW_PASSED,
+]
 
 /** 浅色描边标签（类型类字段统一用这套，避免与状态语义色混淆） */
 function SoftTag({ color, text }: { color?: string; text: string }) {
@@ -337,8 +351,10 @@ function ReviewRow({ review, editable, onDecide }: {
  * 方案与计划小节：节点计划 → PRD → 评审。
  * <p>节点计划排在最前：PM 最先要回答的是「承诺过什么时间」，而不是已经拆了多少任务。
  */
-export function PlanSection({ summary, planReleaseDate, editable, canCreate, reqId, onReviewDecided }: {
+export function PlanSection({ summary, status, planReleaseDate, editable, canCreate, reqId, onReviewDecided }: {
   summary: RdmDeliverySummary | null
+  /** 需求当前状态：PRD/评审的写入口按状态开门（受理前不可写） */
+  status: string
   /** 计划上线日期：只用于说明「以已冻结基线为准」，不在这里改 */
   planReleaseDate?: string | null
   editable: boolean
@@ -351,6 +367,10 @@ export function PlanSection({ summary, planReleaseDate, editable, canCreate, req
   const prds = summary?.prds ?? []
   const reviews = summary?.reviews ?? []
   const baselineFrozen = milestones.length > 0 && milestones.every(m => m.baselineLocked)
+  /** 受理后（PRD 阶段）才允许写 PRD / 发起评审，前端只决定显隐，边界由后端重校 */
+  const prdPhase = PRD_PHASE_STATUSES.includes(status as RdmStatus)
+  const canWritePrd = canCreate && prdPhase
+  const canStartReview = canCreate && prdPhase && prds.length > 0
 
   return (
     <>
@@ -393,30 +413,34 @@ export function PlanSection({ summary, planReleaseDate, editable, canCreate, req
       <SectionTitle
         icon={<FileTextOutlined />} color="#E8720C" bg="#FFF7E6"
         text={`PRD（${prds.length}）`}
-        extra={canCreate && (
-          <Button size="small" icon={<PlusOutlined />} onClick={() => navigate(`/rdm-prd?reqId=${reqId}`)}>編寫 PRD</Button>
-        )}
+        extra={canWritePrd
+          ? <Button size="small" icon={<PlusOutlined />} onClick={() => navigate(`/rdm-prd?reqId=${reqId}`)}>編寫 PRD</Button>
+          : (canCreate && !prdPhase ? <span className="rdm-todo-hint">接受需求後才能編寫</span> : undefined)}
       />
       {prds.length === 0
-        ? <EmptyHint text="尚未編寫 PRD。PRD 的「驗收標準」會直接成為業務驗收檢查項，請寫清可驗證的口徑。" />
+        ? <EmptyHint text={prdPhase
+          ? '尚未編寫 PRD。PRD 的「驗收標準」會直接成為業務驗收檢查項，請寫清可驗證的口徑。'
+          : '需求尚未受理：先由產品經理接受需求（給出承諾出 PRD 日期），再由其編寫 PRD。'} />
         : prds.map(p => (
-          <PrdRow key={p.id} prd={p} editable={editable} onClick={() => navigate(`/rdm-prd?reqId=${reqId}&id=${p.id}`)} />
+          <PrdRow key={p.id} prd={p} editable={editable && prdPhase} onClick={() => navigate(`/rdm-prd?reqId=${reqId}&id=${p.id}`)} />
         ))}
 
       <SectionTitle
         icon={<TeamOutlined />} color="#1890FF" bg="#E6F7FF"
         text={`評審（${reviews.length}）`}
-        extra={canCreate && (
-          <Button size="small" icon={<TeamOutlined />} onClick={() => navigate(`/rdm-review?reqId=${reqId}`)}>發起評審</Button>
-        )}
+        extra={canStartReview
+          ? <Button size="small" icon={<TeamOutlined />} onClick={() => navigate(`/rdm-review?reqId=${reqId}`)}>發起評審</Button>
+          : (canCreate && prdPhase && prds.length === 0 ? <span className="rdm-todo-hint">先編寫 PRD 再發起</span> : undefined)}
       />
       {reviews.length === 0
-        ? <EmptyHint text="尚無評審記錄。發起需求評審後由研發/測試確認技術方案與可測性；評審通過才能凍結基線。" />
+        ? <EmptyHint text={prds.length === 0
+          ? '先編寫 PRD，再發起評審：評審要針對具體方案給出結論，空方案評審只會留下形式記錄。'
+          : '尚無評審記錄。發起需求評審後由研發/測試確認技術方案與可測性；評審通過才能凍結基線。'} />
         : reviews.map(r => (
           <ReviewRow
             key={r.id}
             review={r}
-            editable={editable}
+            editable={editable && prdPhase}
             onDecide={async (review, passed, conclusion) => {
               await decideReview(review.id, { passed, conclusionDesc: conclusion || undefined })
               message.success(passed ? '評審已通過' : '評審已退回')

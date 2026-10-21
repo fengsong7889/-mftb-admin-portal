@@ -84,7 +84,12 @@ export default function DailyReport() {
   const urlDate = searchParams.get('date')
   const urlType = searchParams.get('type')
   const urlProjectId = searchParams.get('projectId')
+  const urlIterationCode = searchParams.get('iterationCode')
+  // 多项目/全部项目快照没有单一 projectId，靠 scopeKey 精确定位（发送记录「查看日報」会带上）
+  const urlScopeKey = searchParams.get('scopeKey')
   const anchorProjectId = urlProjectId ? Number(urlProjectId) : null
+  // 未掛項目的迭代規則沒有 projectId，改帶 iterationCode 收斂到該迭代的那份快照
+  const anchorIterationCode = urlIterationCode || null
 
   const [date, setDate] = useState<Dayjs>(urlDate && dayjs(urlDate).isValid() ? dayjs(urlDate) : dayjs())
   // 手动触发存的快照行 report_type='manual'，通知链接会带 ?type=manual，因此三个值都要能接
@@ -100,8 +105,9 @@ export default function DailyReport() {
     setLoading(true)
     setError(null)
     try {
-      // anchorProjectId 同时用于收敛快照：同一天可能有多份手动/规则快照，不带项目会拿到别人的日报
-      const data = await fetchDailyReportSnapshot(date.format('YYYY-MM-DD'), type, anchorProjectId)
+      // anchorProjectId/anchorIterationCode/scopeKey 同时用于收敛快照：同一天可能有多份手动/规则快照，不带范围会拿到别人的日报
+      const data = await fetchDailyReportSnapshot(date.format('YYYY-MM-DD'), type, anchorProjectId,
+        anchorIterationCode, urlScopeKey)
       setSnapshot(data)
     } catch (e) {
       // 錯誤只展示「載入失敗 + 重試」，不回顯後端堆棧或 SQL（安全邊界）
@@ -110,7 +116,7 @@ export default function DailyReport() {
     } finally {
       setLoading(false)
     }
-  }, [date, type, anchorProjectId])
+  }, [date, type, anchorProjectId, anchorIterationCode, urlScopeKey])
 
   useEffect(() => {
     void load()

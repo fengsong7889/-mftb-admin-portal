@@ -428,7 +428,8 @@ export default function RdmWorkbench() {
                             交付項 {item.deliveryDoneCount ?? 0}/{item.deliveryItemCount}
                           </span>
                         )}
-                        {item.stayHours != null && item.stayHours > 24 && (
+                        {/* 已归档需求不再展示停留：归档是终点，天数只增不减 */}
+                        {item.status !== RDM_STATUS.CLOSED && item.stayHours != null && item.stayHours > 24 && (
                           <span style={{ color: '#D46B08' }}>
                             已停留 {Math.round(item.stayHours / 24)} 天
                           </span>
@@ -480,7 +481,7 @@ export default function RdmWorkbench() {
               </div>
               <div className="rdm-todo-item-meta">
                 <span>{formatRdmReqNo(row.reqNo)}</span>
-                {row.stayHours != null && row.stayHours > 24 && (
+                {row.status !== RDM_STATUS.CLOSED && row.stayHours != null && row.stayHours > 24 && (
                   <span style={{ color: '#D46B08' }}>已停留 {Math.round(row.stayHours / 24)} 天</span>
                 )}
               </div>

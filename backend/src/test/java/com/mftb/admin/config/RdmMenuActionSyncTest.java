@@ -47,7 +47,7 @@ class RdmMenuActionSyncTest {
     private static final List<String> REQUIREMENT_SEED =
             List.of("view", "create", "edit", "export", "view_all", "dispatch", "contribute");
     /** rdm-dashboard-project 的种子集（PROJECT_ACTIONS） */
-    private static final List<String> PROJECT_SEED = List.of("view", "create", "edit", "export");
+    private static final List<String> PROJECT_SEED = List.of("view", "create", "edit", "export", "notify");
 
     private JdbcTemplate jdbc;
     private RdmMenuInitializer initializer;
@@ -135,7 +135,7 @@ class RdmMenuActionSyncTest {
     @DisplayName("已覆盖种子动作时零写入（每次启动重放幂等）")
     void skipsWriteWhenAlreadyCoversSeed() {
         stubActionsPerMenu("[\"view\",\"create\",\"edit\",\"export\",\"view_all\",\"dispatch\",\"contribute\"]",
-                "[\"view\",\"create\",\"edit\",\"export\"]");
+                "[\"view\",\"create\",\"edit\",\"export\",\"notify\"]");
 
         ReflectionTestUtils.invokeMethod(initializer, "syncSeedActions");
 

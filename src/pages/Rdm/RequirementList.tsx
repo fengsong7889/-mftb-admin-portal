@@ -85,7 +85,7 @@ import { fetchEmployeeIdOptions } from '../../api/employee'
 import { buildRdmSubmitPath } from '../../constants/menuDataSource'
 import { buildDeptTree, type DeptNode } from '../Attendance/deptTree'
 import { exportRequirementRows } from './requirementExport'
-import { formatPerson, splitHandlers } from './handlerDisplay'
+import { formatHandlers, formatPerson, splitHandlers } from './handlerDisplay'
 import RequirementKanban from './components/RequirementKanban'
 import {
   RDM_FLOW_VERSION_LABEL,
@@ -99,10 +99,12 @@ import {
   RDM_SCOPE_LABEL,
   RDM_STATUS,
   RDM_ACCEPTANCE_OPEN_STATUS,
+  RDM_STAGE_LABEL,
   RDM_STATUS_LABEL,
   RDM_TERMINAL_STATUS,
   formatRdmReqNo,
   type RdmScope,
+  type RdmStage,
   type RdmStatus,
 } from '../../constants/rdm'
 import { ComplexityTag, PriorityTag, StatusTag, TypeTag } from './components/Tags'
@@ -298,6 +300,35 @@ export default function RequirementList({
   const [statsReady, setStatsReady] = useState(false)
   const [selectedKeys, setSelectedKeys] = useState<number[]>([])
   const [filters, setFilters] = useState<RequirementFilters>({})
+
+  /**
+   * 归属字典与下拉候选：项目/迭代各取一次。
+   * <p>名称以服务端下发的 projectName / iterationName 为准，本字典只做旧接口兜底与搜索区候选；
+   * 迭代接口最多回 200 条，更早的历史迭代未命中时列内回退显示编码，不留白。
+   */
+  const [projectChoices, setProjectChoices] = useState<{ value: number; label: string }[]>([])
+  const [iterationChoices, setIterationChoices] = useState<{ value: string; label: string }[]>([])
+  const [projectNameMap, setProjectNameMap] = useState<Record<number, string>>({})
+  const [iterationNameMap, setIterationNameMap] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    fetchProjectPage({ pageNo: 1, pageSize: 200 })
+      .then(res => {
+        const list = res.records ?? []
+        setProjectChoices(list.map((p: RdmProjectListItem) => ({ value: p.id, label: p.name })))
+        setProjectNameMap(Object.fromEntries(list.map((p: RdmProjectListItem) => [p.id, p.name])))
+      })
+      .catch(() => { /* 取不到只影响名称展示，回退到编号，不打断列表 */ })
+    // 归属体系改造：只把未关闭迭代放进筛选候选；已关闭迭代仍留在名称字典里供存量需求展示
+    fetchIterations(undefined, 200)
+      .then(list => {
+        setIterationChoices(list
+          .filter(i => i.status !== RDM_ITERATION_STATUS.CLOSED)
+          .map(i => ({ value: i.code, label: `${i.name}（${i.code}）` })))
+        setIterationNameMap(Object.fromEntries(list.map(i => [i.code, i.name])))
+      })
+      .catch(() => { /* 字典缺失时列内退回显示编码 */ })
+  }, [])
 
   /**
    * 分配权认 `rdm-intake:edit`（现行锚点，后端 MENU_DISPATCHER）与 `rdm-requirement:dispatch`（收敛后的新锚点）。
@@ -578,10 +609,11 @@ export default function RequirementList({
     { key: 'submitTime', title: '提交時間' },
     { key: 'expectDate', title: '期望完成' },
     { key: 'stay', title: '當前停留' },
-    { key: 'projectName', title: '所屬項目' },
+    { key: 'iterationCode', title: t('rdm.reqList.colIteration') },
+    { key: 'projectName', title: t('rdm.reqList.colProject') },
     { key: 'deliveryProgress', title: '交付進度' },
     { key: 'action', title: '操作' },
-  ]), [isIntakeSide])
+  ]), [isIntakeSide, t])
 
   /**
    * 默认展示列随页面角色变化：
@@ -609,6 +641,7 @@ export default function RequirementList({
         { key: 'pmName', visible: false },
         { key: 'expectDate', visible: false },
         { key: 'stay', visible: false },
+        { key: 'iterationCode', visible: false },
         { key: 'projectName', visible: false },
         { key: 'deliveryProgress', visible: false },
         { key: 'action', visible: true, locked: 'tail' as const },
@@ -632,6 +665,7 @@ export default function RequirementList({
         { key: 'submitTime', visible: false },
         { key: 'expectDate', visible: false },
         { key: 'stay', visible: false },
+        { key: 'iterationCode', visible: true },
         { key: 'projectName', visible: false },
         { key: 'deliveryProgress', visible: false },
         { key: 'action', visible: true, locked: 'tail' as const },
@@ -655,6 +689,7 @@ export default function RequirementList({
       { key: 'submitTime', visible: false },
       { key: 'expectDate', visible: false },
       { key: 'stay', visible: false },
+      { key: 'iterationCode', visible: true },
       { key: 'projectName', visible: false },
       { key: 'deliveryProgress', visible: false },
       { key: 'action', visible: true, locked: 'tail' as const },
@@ -748,8 +783,30 @@ export default function RequirementList({
       render: (v?: string | null) => <ComplexityTag complexity={v} />,
     },
     {
-      title: '當前狀態', dataIndex: 'status', key: 'status', width: 130,
-      render: (v: string, r) => <StatusTag status={v} overdue={r.overdueFlag ?? false} />,
+      /*
+       * 當前狀態列只回答「需求狀態機停在哪」；V3 的交付推進另起一行給推導階段，
+       * 兩者同時展示，「已受理 + 開發中」才不會被讀成自相矛盾。
+       */
+      title: '當前狀態', dataIndex: 'status', key: 'status', width: 150,
+      render: (v: string, r) => {
+        const derived = r.flowVersion === 3 && r.deliveryStage
+          ? RDM_STAGE_LABEL[r.deliveryStage as RdmStage] ?? r.deliveryStage
+          : null
+        return (
+          <div>
+            <StatusTag status={v} overdue={r.overdueFlag ?? false} />
+            {derived && (
+              <Tooltip
+                title={`階段由交付項推導（${r.deliveryDoneCount ?? 0}/${r.deliveryItemCount ?? 0} 完成）；需求狀態仍為「${RDM_STATUS_LABEL[v as RdmStatus] ?? v}」`}
+              >
+                <div style={{ marginTop: 2, fontSize: 12, color: '#722ED1', whiteSpace: 'nowrap' }}>
+                  交付：{derived}{r.deliveryItemCount ? ` ${r.deliveryDoneCount ?? 0}/${r.deliveryItemCount}` : ''}
+                </div>
+              </Tooltip>
+            )}
+          </div>
+        )
+      },
     },
     { title: '提出人', dataIndex: 'submitterName', key: 'submitter', width: 150, ellipsis: true, render: (v: string | null | undefined, r) => formatPerson({ name: v, empNo: r.submitterEmpNo }) || '-' },
     { title: '提出部門', dataIndex: 'submitDeptName', key: 'submitDeptName', width: 200, ellipsis: true, render: (v?: string | null) => v || '-' },
@@ -763,12 +820,15 @@ export default function RequirementList({
         // 前 2 位直出、其余折成 +N 懸浮看全部；无未完成任务时回退流程推演值（口径与看板/导出同源）
         const parts = splitHandlers(v)
         if (!parts) return r.currentHandler ?? '-'
+        // 单元格内单行省略：多人（姓名+工号）远超列宽，不限制会溢出压住右侧列；+N 固定不被压缩
         return (
-          <span style={{ whiteSpace: 'nowrap' }}>
-            {parts.shown.map(formatPerson).join('、')}
+          <span className="rdm-table-handlers">
+            <Tooltip title={formatHandlers(v)}>
+              <span className="rdm-table-handlers__text">{parts.shown.map(formatPerson).join('、')}</span>
+            </Tooltip>
             {parts.rest.length > 0 && (
               <Tooltip title={parts.rest.map(formatPerson).join('、')}>
-                <Tag color="default" style={{ marginLeft: 4, marginInlineEnd: 0 }}>+{parts.rest.length}</Tag>
+                <Tag color="default">+{parts.rest.length}</Tag>
               </Tooltip>
             )}
           </span>
@@ -784,6 +844,8 @@ export default function RequirementList({
     {
       title: '當前停留', key: 'stay', width: 96,
       render: (_, r) => {
+        // 已归档需求不再计算停留：归档后数字只增不减，展示出来会被误读成还在卡着
+        if (r.status === RDM_STATUS.CLOSED) return '-'
         const days = Math.round((r.stayHours ?? 0) / 24)
         if (!days) return '-'
         return (
@@ -794,12 +856,28 @@ export default function RequirementList({
       },
     },
     {
+      /*
+       * 需求挂迭代（归属体系改造）后，这一列是「需求 ↔ 迭代 ↔ 任务」对账的入口。
+       * 名称优先用服务端联表下发的 iterationName；缺失（旧接口/未回填）时回退到页头字典，
+       * 两者都没有（超出迭代接口 200 条上限的历史迭代）才只显编码，不能留空。
+       */
+      title: t('rdm.reqList.colIteration'), dataIndex: 'iterationCode', key: 'iterationCode', width: 190, ellipsis: true,
+      render: (v?: string | null, r?: RdmRequirementRow) => {
+        if (!v) return <span style={{ color: '#BFBFBF' }}>-</span>
+        const name = r?.iterationName ?? iterationNameMap[v]
+        const text = name ? `${name} · ${v}` : v
+        return <span title={text}>{text}</span>
+      },
+    },
+    {
       title: '所屬項目', dataIndex: 'projectName', key: 'projectName', width: 150, ellipsis: true,
       render: (v?: string | null, r?: RdmRequirementRow) => {
-        if (!v) return '-'
+        // 列表接口只下发 projectId，名称在页头字典里补（此前只认 v，导致该列恒为「-」）
+        const name = v ?? (r?.projectId != null ? projectNameMap[r.projectId] : undefined)
+        if (!name) return '-'
         return r?.projectId
-          ? <a className="rdm-table-title__link" href={`#/rdm-project-detail?id=${r.projectId}`}>{v}</a>
-          : <span>{v}</span>
+          ? <a className="rdm-table-title__link" href={`#/rdm-project-detail?id=${r.projectId}`}>{name}</a>
+          : <span>{name}</span>
       },
     },
     {
@@ -988,7 +1066,7 @@ export default function RequirementList({
               <span className="rdm-workspace-title">{RDM_SCOPE_LABEL[activeScope]}</span>
             )}
             <div style={{ flex: 1 }} />
-            <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
+            <Button icon={<ReloadOutlined />} onClick={load}>{t('rdm.workbench.refresh')}</Button>
           </div>
           )}
 
@@ -997,6 +1075,8 @@ export default function RequirementList({
             advanced={advancedFilters}
             minimal={minimal}
             expandAll
+            projectOptions={projectChoices}
+            iterationOptions={iterationChoices}
             onSearch={v => { setFilters(v); setPage(1) }}
             onReset={() => { setFilters({}); setPage(1) }}
           />
@@ -1010,7 +1090,7 @@ export default function RequirementList({
                   { key: 'total', icon: <FileAddOutlined />, value: statValue(kanbanStats.total), label: '範圍內需求', color: 'info' },
                   { key: 'pool', icon: <UserAddOutlined />, value: statValue(kanbanStats.pool), label: '待分配', color: 'brand' },
                   { key: 'overdue', icon: <AlertOutlined />, value: statValue(kanbanStats.overdue), label: '逾期需求', color: 'system' },
-                  { key: 'accept', icon: <CheckCircleOutlined />, value: statValue(kanbanStats.toAccept), label: '待驗收', color: 'success' },
+                  { key: 'accept', icon: <CheckCircleOutlined />, value: statValue(kanbanStats.toAccept), label: t('rdm.board.pendingAcceptance'), color: 'success' },
                 ]}
               />
             </div>
@@ -1030,7 +1110,7 @@ export default function RequirementList({
                 </Button>
               )}
               {!minimal && (
-                <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>導出</Button>
+                <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>{t('rdm.resLoad.btnExport')}</Button>
               )}
               {/* 甘特图入口：仅需求跟进清单（legacy）提供，不侵入提需求/认领分配页 */}
               {!minimal && isFollowUpSide && (
@@ -1144,20 +1224,23 @@ export default function RequirementList({
  * 低频条件收进「更多篩選」：收起时一并清掉这些字段，避免留下看不见的过滤条件
  * 让人以为列表坏了。
  */
-function SearchBar({ onSearch, onReset, advanced = false, minimal = false, expandAll = false }: {
+function SearchBar({ onSearch, onReset, advanced = false, minimal = false, expandAll = false,
+  projectOptions, iterationOptions }: {
   onSearch: (v: RequirementFilters) => void
   onReset: () => void
   advanced?: boolean
   minimal?: boolean
   /** 为 true 时所有筛选条件一次性平铺，不渲染「更多篩選/收起篩選」按钮 */
   expandAll?: boolean
+  /** 所属项目候选：由父组件取一次后下发，与列表列的项目名称同源 */
+  projectOptions: { value: number; label: string }[]
+  /** 所属迭代候选：同上，只含未关闭迭代 */
+  iterationOptions: { value: string; label: string }[]
 }) {
   const { t } = useTranslation()
   const [form] = Form.useForm<RequirementFilters>()
   const [deptTree, setDeptTree] = useState<DeptNode[]>([])
   const [pmOptions, setPmOptions] = useState<{ value: number; label: string }[]>([])
-  const [projectOptions, setProjectOptions] = useState<{ value: number; label: string }[]>([])
-  const [iterationOptions, setIterationOptions] = useState<{ value: string; label: string }[]>([])
   const [empOptions, setEmpOptions] = useState<{ value: number; label: string }[]>([])
   const [empSearching, setEmpSearching] = useState(false)
   const empTimer = useRef<ReturnType<typeof setTimeout>>()
@@ -1177,16 +1260,6 @@ function SearchBar({ onSearch, onReset, advanced = false, minimal = false, expan
         .then(list => setPmOptions(list.map(p => ({ value: p.userId, label: p.name }))))
         .catch(() => setPmOptions([]))
     }
-    // V3 筛选（所属项目）在所有路由可用，不依赖 advanced
-    fetchProjectPage({ pageNo: 1, pageSize: 200 })
-      .then(res => setProjectOptions((res.records ?? []).map((p: RdmProjectListItem) => ({ value: p.id, label: p.name }))))
-      .catch(() => setProjectOptions([]))
-    // 归属体系改造：迭代筛选（只给未关闭的迭代，已关闭的历史迭代不进候选）
-    fetchIterations()
-      .then(list => setIterationOptions(list
-        .filter(i => i.status !== RDM_ITERATION_STATUS.CLOSED)
-        .map(i => ({ value: i.code, label: `${i.name}（${i.code}）` }))))
-      .catch(() => setIterationOptions([]))
   }, [advanced])
 
   const statusOptions = (Object.keys(RDM_STATUS_LABEL) as RdmStatus[]).map(k => ({

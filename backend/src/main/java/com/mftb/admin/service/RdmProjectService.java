@@ -34,6 +34,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * RDM 项目管理服务（Batch 1）。
@@ -58,8 +60,25 @@ public class RdmProjectService {
     /** 项目编号规则 key（与 sys_biz_seq_rule.rule_key 一致） */
     private static final String SEQ_PROJECT = "rdm_project";
 
-    /** 项目成员角色：项目经理（rdm_project_member.role_code 口径，小写） */
+    /** 项目成员角色：六类负责人各自对应一行（rdm_project_member.role_code 口径，小写） */
     private static final String PROJECT_ROLE_PM = "pm";
+    private static final String PROJECT_ROLE_PRODUCT = "product";
+    private static final String PROJECT_ROLE_DEV_LEAD = "dev_lead";
+    private static final String PROJECT_ROLE_DESIGNER = "designer";
+    private static final String PROJECT_ROLE_QA = "qa";
+    private static final String PROJECT_ROLE_OPS = "ops";
+    /** 成员角色白名单（含执行岗 dev 与 PMO），手动添加成员时校验，防止脏角色码入库 */
+    private static final Set<String> PROJECT_MEMBER_ROLES = Set.of(
+            PROJECT_ROLE_PM, PROJECT_ROLE_PRODUCT, PROJECT_ROLE_DEV_LEAD,
+            "dev", PROJECT_ROLE_DESIGNER, PROJECT_ROLE_QA, PROJECT_ROLE_OPS, "pmo");
+
+    /**
+     * 一个负责人槽位的变更（旧值 → 新值）。
+     * <p>用 record 而不是直接传六个参数：创建时旧值恒为 null，编辑时只对「本次提供了该角色」
+     * 的槽位发起同步，避免局部更新（暂停/风险开关）误动成员表。
+     */
+    private record OwnerSlot(String roleCode, Long oldUserId, Long newUserId, String newUserName) {
+    }
 
     private final RdmProjectMapper projectMapper;
     private final RdmProjectMemberMapper memberMapper;
@@ -352,16 +371,16 @@ public class RdmProjectService {
         projectMapper.insert(project);
         log.info("創建 RDM 項目成功: id={}, no={}, operator={}", project.getId(), project.getProjectNo(), currentUserId);
 
-        // PM 自动入组：项目经理不入成员表，数据范围收敛会把他自己挡在项目外
-        if (project.getPmUserId() != null) {
-            RdmProjectMember pm = new RdmProjectMember();
-            pm.setProjectId(project.getId());
-            pm.setUserId(project.getPmUserId());
-            pm.setUserName(project.getPmUserName());
-            pm.setRoleCode(PROJECT_ROLE_PM);
-            pm.setJoinTime(LocalDateTime.now());
-            memberMapper.insert(pm);
-        }
+        // 六类负责人全部入组：成员表是数据范围/负载/权限的事实源，只写主表的负责人在详情
+        // 「項目成員」里看不到，也进不了自己负责的项目（requireProjectMember 会把本人挡住）。
+        // 同一人兼任多角色时按「一人一角色一行」写入（uk_project_user_role 口径）。
+        syncOwnerMembers(project.getId(), List.of(
+                new OwnerSlot(PROJECT_ROLE_PM, null, project.getPmUserId(), project.getPmUserName()),
+                new OwnerSlot(PROJECT_ROLE_PRODUCT, null, project.getProductOwnerUserId(), project.getProductOwnerUserName()),
+                new OwnerSlot(PROJECT_ROLE_DEV_LEAD, null, project.getTechLeadUserId(), project.getTechLeadUserName()),
+                new OwnerSlot(PROJECT_ROLE_DESIGNER, null, project.getUiDesignerUserId(), project.getUiDesignerUserName()),
+                new OwnerSlot(PROJECT_ROLE_QA, null, project.getQaLeadUserId(), project.getQaLeadUserName()),
+                new OwnerSlot(PROJECT_ROLE_OPS, null, project.getOpsLeadUserId(), project.getOpsLeadUserName())));
         return project;
     }
 
@@ -376,6 +395,13 @@ public class RdmProjectService {
         if (dto.getExpectedVersion() == null || !dto.getExpectedVersion().equals(project.getVersion())) {
             throw new BusinessException("項目已被他人修改，請刷新後重試");
         }
+        // 同步成员表要用「变更前」的负责人判定谁该退出，必须在下面覆盖字段之前先留存
+        Long oldPmUserId = project.getPmUserId();
+        Long oldProductOwnerUserId = project.getProductOwnerUserId();
+        Long oldTechLeadUserId = project.getTechLeadUserId();
+        Long oldUiDesignerUserId = project.getUiDesignerUserId();
+        Long oldQaLeadUserId = project.getQaLeadUserId();
+        Long oldOpsLeadUserId = project.getOpsLeadUserId();
         if (StringUtils.hasText(dto.getName())) {
             project.setName(dto.getName().trim());
         }
@@ -436,6 +462,33 @@ public class RdmProjectService {
         if (projectMapper.updateById(project) == 0) {
             throw new BusinessException("項目已被他人修改，請刷新後重試");
         }
+        // 负责人变更同步成员表：只对本次提供了该角色的槽位生效（userName 非 null 即已提供），
+        // 否则暂停/风险等局部更新会把没带 key 的角色误判为「清空」。
+        List<OwnerSlot> slots = new ArrayList<>();
+        if (dto.getPmUserName() != null) {
+            slots.add(new OwnerSlot(PROJECT_ROLE_PM, oldPmUserId, project.getPmUserId(), project.getPmUserName()));
+        }
+        if (dto.getProductOwnerUserName() != null) {
+            slots.add(new OwnerSlot(PROJECT_ROLE_PRODUCT, oldProductOwnerUserId,
+                    project.getProductOwnerUserId(), project.getProductOwnerUserName()));
+        }
+        if (dto.getTechLeadUserName() != null) {
+            slots.add(new OwnerSlot(PROJECT_ROLE_DEV_LEAD, oldTechLeadUserId,
+                    project.getTechLeadUserId(), project.getTechLeadUserName()));
+        }
+        if (dto.getUiDesignerUserName() != null) {
+            slots.add(new OwnerSlot(PROJECT_ROLE_DESIGNER, oldUiDesignerUserId,
+                    project.getUiDesignerUserId(), project.getUiDesignerUserName()));
+        }
+        if (dto.getQaLeadUserName() != null) {
+            slots.add(new OwnerSlot(PROJECT_ROLE_QA, oldQaLeadUserId,
+                    project.getQaLeadUserId(), project.getQaLeadUserName()));
+        }
+        if (dto.getOpsLeadUserName() != null) {
+            slots.add(new OwnerSlot(PROJECT_ROLE_OPS, oldOpsLeadUserId,
+                    project.getOpsLeadUserId(), project.getOpsLeadUserName()));
+        }
+        syncOwnerMembers(id, slots);
         log.info("更新 RDM 項目: id={}, operator={}", id, currentUserId);
     }
 
@@ -450,11 +503,17 @@ public class RdmProjectService {
         if (!StringUtils.hasText(dto.getRoleCode())) {
             throw new BusinessException("成員角色不能為空");
         }
+        // 角色码归一化到小写并校验白名单：前端历史上传过 'DEV' 这类大写值，大小写混存会让
+        // 按角色统计/映射全部漏算；不在白名单的码一律拒绝，不落库
+        String roleCode = dto.getRoleCode().trim().toLowerCase();
+        if (!PROJECT_MEMBER_ROLES.contains(roleCode)) {
+            throw new BusinessException("成員角色不合法");
+        }
         // 同项目同人同角色唯一（uk_project_user_role）；已在组则拒绝，避免重复计数
         Long dup = memberMapper.selectCount(new LambdaQueryWrapper<RdmProjectMember>()
                 .eq(RdmProjectMember::getProjectId, projectId)
                 .eq(RdmProjectMember::getUserId, dto.getUserId())
-                .eq(RdmProjectMember::getRoleCode, dto.getRoleCode())
+                .eq(RdmProjectMember::getRoleCode, roleCode)
                 .isNull(RdmProjectMember::getLeaveTime));
         if (dup != null && dup > 0) {
             throw new BusinessException("該成員已在項目中");
@@ -464,11 +523,11 @@ public class RdmProjectService {
         member.setUserId(dto.getUserId());
         member.setEmpNo(dto.getEmpNo());
         member.setUserName(resolveUserName(dto.getUserId(), dto.getUserName()));
-        member.setRoleCode(dto.getRoleCode());
+        member.setRoleCode(roleCode);
         member.setJoinTime(LocalDateTime.now());
         memberMapper.insert(member);
         log.info("添加 RDM 項目成員: projectId={}, userId={}, role={}, operator={}",
-                projectId, dto.getUserId(), dto.getRoleCode(), currentUserId);
+                projectId, dto.getUserId(), roleCode, currentUserId);
     }
 
     /** 移除项目成员（软移除：置 leave_time，保留历史参与） */
@@ -492,6 +551,80 @@ public class RdmProjectService {
             memberMapper.updateById(m);
         }
         log.info("移除 RDM 項目成員: projectId={}, userId={}, operator={}", projectId, userId, currentUserId);
+    }
+
+    /**
+     * 负责人变更同步到项目成员表（创建/编辑共用）。
+     *
+     * <p>为什么必须同步：{@code rdm_project_member} 是数据范围（{@link RdmAccessGuard}）、
+     * 团队负载与详情「項目成員」的唯一事实源；只把负责人写进主表时，详情页成员为空，
+     * 负责人本人也进不了自己负责的项目。
+     *
+     * <p>一人一角色一行（{@code uk_project_user_role} 口径）：同一人兼任 PM 与产品时写两行，
+     * 因此换人只需软移除「该角色」那一行，不会误伤其其他角色。
+     */
+    private void syncOwnerMembers(Long projectId, List<OwnerSlot> slots) {
+        if (projectId == null || slots == null || slots.isEmpty()) {
+            return;
+        }
+        for (OwnerSlot slot : slots) {
+            if (slot.oldUserId() != null && !Objects.equals(slot.oldUserId(), slot.newUserId())) {
+                deactivateMember(projectId, slot.oldUserId(), slot.roleCode());
+            }
+            if (slot.newUserId() != null) {
+                activateMember(projectId, slot.newUserId(), slot.newUserName(), slot.roleCode());
+            }
+        }
+    }
+
+    /** 软移除某人在项目中的某个角色（保留历史参与，与 removeMember 同一口径） */
+    private void deactivateMember(Long projectId, Long userId, String roleCode) {
+        List<RdmProjectMember> actives = memberMapper.selectList(new LambdaQueryWrapper<RdmProjectMember>()
+                .eq(RdmProjectMember::getProjectId, projectId)
+                .eq(RdmProjectMember::getUserId, userId)
+                .eq(RdmProjectMember::getRoleCode, roleCode)
+                .isNull(RdmProjectMember::getLeaveTime));
+        if (actives == null || actives.isEmpty()) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        for (RdmProjectMember m : actives) {
+            m.setLeaveTime(now);
+            memberMapper.updateById(m);
+        }
+    }
+
+    /**
+     * 成员入组：不存在则插入，曾离开（软删）过则复活同一行。
+     * <p>必须复活而不是重新插入：唯一键 {@code uk_project_user_role} 不区分 leave_time，
+     * 离任过的负责人在库里已经占着那一行，直接 insert 会撞唯一键，整个项目写入回滚。
+     */
+    private void activateMember(Long projectId, Long userId, String userName, String roleCode) {
+        RdmProjectMember existing = memberMapper.selectOne(new LambdaQueryWrapper<RdmProjectMember>()
+                .eq(RdmProjectMember::getProjectId, projectId)
+                .eq(RdmProjectMember::getUserId, userId)
+                .eq(RdmProjectMember::getRoleCode, roleCode));
+        if (existing == null) {
+            RdmProjectMember member = new RdmProjectMember();
+            member.setProjectId(projectId);
+            member.setUserId(userId);
+            member.setUserName(userName);
+            member.setRoleCode(roleCode);
+            member.setJoinTime(LocalDateTime.now());
+            memberMapper.insert(member);
+            return;
+        }
+        boolean rejoined = existing.getLeaveTime() != null;
+        boolean renamed = !Objects.equals(existing.getUserName(), userName);
+        if (!rejoined && !renamed) {
+            return;
+        }
+        existing.setUserName(userName);
+        if (rejoined) {
+            existing.setLeaveTime(null);
+            existing.setJoinTime(LocalDateTime.now());
+        }
+        memberMapper.updateById(existing);
     }
 
     /* ==================== 内部工具 ==================== */

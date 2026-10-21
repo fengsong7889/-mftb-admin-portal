@@ -11,7 +11,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import i18n from '../../i18n'
-import { createProject, fetchProjectChecklist, fetchProjectDetail, fetchProjectPending, updateProject } from '../../api/rdm'
+import { createProject, fetchProjectDetail, fetchProjectRequirementBoard, updateProject } from '../../api/rdm'
 import ProjectDetail from './ProjectDetail'
 
 /** 与后端 EmployeeVO 同形的在职员工桩（id 是 sys_user.id，empId 是工号） */
@@ -33,8 +33,7 @@ vi.mock('../../api/rdm', async () => {
   return {
     ...actual,
     fetchProjectDetail: vi.fn(),
-    fetchProjectChecklist: vi.fn(),
-    fetchProjectPending: vi.fn(),
+    fetchProjectRequirementBoard: vi.fn(),
     urgeProject: vi.fn(),
     addProjectMember: vi.fn(),
     removeProjectMember: vi.fn(),
@@ -62,8 +61,14 @@ beforeAll(async () => {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(fetchProjectDetail).mockResolvedValue(detail)
-  vi.mocked(fetchProjectChecklist).mockResolvedValue([] as never)
-  vi.mocked(fetchProjectPending).mockResolvedValue([] as never)
+  vi.mocked(fetchProjectRequirementBoard).mockResolvedValue({
+    iterations: [], unplanned: [], todos: [],
+    summary: {
+      iterationTotal: 0, requirementTotal: 0, requirementDelivered: 0, requirementInProgress: 0,
+      requirementPending: 0, blockedTaskCount: 0, pendingDecisionCount: 0,
+      pendingAcceptanceCount: 0, deliveryItemTotal: 0, deliveryItemDone: 0,
+    },
+  })
   vi.mocked(createProject).mockResolvedValue(detail)
   vi.mocked(updateProject).mockResolvedValue(undefined)
 })
@@ -87,8 +92,8 @@ async function pickEmployee(index: number) {
 describe('ProjectDetail 底部最后更新（§D.4）', () => {
   it('详情页 footer 同时展示最后更新人与最后更新时间', async () => {
     renderAt('/rdm-project-detail?id=5')
-    await screen.findByText('項目摘要')
-    // 「古月」在摘要里会出现多次（经理/产品负责人），所以只断言 footer 容器自身
+    await screen.findByText('基本信息')
+    // 「古月」在基本信息里会出现多次（经理/产品负责人），所以只断言 footer 容器自身
     const footer = document.querySelector('.rdm-detail-footer')
     expect(footer?.textContent).toContain('最後更新人')
     expect(footer?.textContent).toContain('古月')

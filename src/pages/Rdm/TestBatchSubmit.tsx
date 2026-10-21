@@ -21,9 +21,10 @@ import RdmFormHeader from './components/RdmFormHeader'
 import RemoteSearchSelect from '../../components/RemoteSearchSelect'
 import {
   fetchDeliveryItems,
+  fetchReqTasks,
   fetchRequirementPage,
+  resolveTestBatchTaskScope,
   submitTestBatch,
-  type RdmDeliveryItemListItem,
   type RdmTestBatchSubmitForm,
 } from '../../api/rdm'
 import { fetchEmployeeIdOptions } from '../../api/employee'
@@ -39,6 +40,8 @@ const TEST_ENV_OPTIONS = [
 /** 表单值形状（planEndTime 是 dayjs，提交时才格式化成字符串） */
 interface SubmitFormValues {
   reqId: number
+  /** 前端辅助字段：勾任务后由服务端解析成交付项，提交时不直接上送 */
+  taskIds?: number[]
   deliveryItemIds: number[]
   testEnv: string
   planEndTime?: dayjs.Dayjs
@@ -53,7 +56,11 @@ export default function TestBatchSubmit() {
   const [submitting, setSubmitting] = useState(false)
 
   const [reqOptions, setReqOptions] = useState<{ value: number; label: string }[]>([])
-  const [deliveryOptions, setDeliveryOptions] = useState<RdmDeliveryItemListItem[]>([])
+  /** 交付项选项只需要 id/编号/标题；按任务解析出的条目也能直接合并进来 */
+  const [deliveryOptions, setDeliveryOptions] = useState<{ id: number; itemNo: string; title: string }[]>([])
+  /** 当前需求下的任务（按任务交付的入口） */
+  const [taskOptions, setTaskOptions] = useState<{ value: number; label: string }[]>([])
+  const [resolvingScope, setResolvingScope] = useState(false)
   /** 测试负责人姓名：后端 DTO 要 userId + userName 两列，用户名从下拉 label 取，不让用户再手填 */
   const [leadName, setLeadName] = useState('')
   const [executorOptions, setExecutorOptions] = useState<{ value: string; label: string }[]>([])
@@ -75,14 +82,48 @@ export default function TestBatchSubmit() {
     }
   }, [reqOptions.length])
 
-  /** 换需求必须清空已选交付项：交付项属于需求，留着就是跨需求串数据 */
+  /** 换需求必须清空已选交付项/任务：它们属于需求，留着就是跨需求串数据 */
   const handleReqChange = async (reqId: number) => {
     form.setFieldValue('deliveryItemIds', [])
+    form.setFieldValue('taskIds', [])
+    setTaskOptions([])
     try {
-      const res = await fetchDeliveryItems({ reqId, pageSize: 100 })
-      setDeliveryOptions(res.records ?? [])
+      const [items, tasks] = await Promise.all([
+        fetchDeliveryItems({ reqId, pageSize: 100 }),
+        fetchReqTasks(reqId),
+      ])
+      setDeliveryOptions(items.records ?? [])
+      setTaskOptions((tasks ?? []).map(task => ({
+        value: task.id,
+        label: `${task.taskNo} ${task.title}${task.deliveryItemId ? ' · 已掛交付項' : ''}`,
+      })))
     } catch {
       setDeliveryOptions([])
+      setTaskOptions([])
+    }
+  }
+
+  /**
+   * 按任务交付：勾选任务后由服务端解析成交付项（已挂则复用，未挂归入默认交付项并回填任务）。
+   * <p>解析结果回填到「交付項」多选，仍可手工增减：事实层仍是交付项，不改测试快照口径。
+   */
+  const handleTaskChange = async (taskIds: number[]) => {
+    const reqId = form.getFieldValue('reqId') as number | undefined
+    if (!reqId || !taskIds?.length) return
+    setResolvingScope(true)
+    try {
+      const items = await resolveTestBatchTaskScope(reqId, taskIds)
+      form.setFieldValue('deliveryItemIds', items.map(item => item.id))
+      setDeliveryOptions(prev => {
+        const merged = new Map(prev.map(item => [item.id, item]))
+        items.forEach(item => merged.set(item.id, { id: item.id, itemNo: item.itemNo, title: item.title }))
+        return [...merged.values()]
+      })
+      message.success(`已按任務歸入 ${items.length} 個交付項`)
+    } catch {
+      // request.ts 已统一弹后端失败原因（如任务不属于該需求），这里不双弹
+    } finally {
+      setResolvingScope(false)
     }
   }
 
@@ -160,6 +201,22 @@ export default function TestBatchSubmit() {
                 onChange={value => { void handleReqChange(value as number) }}
                 options={reqOptions}
                 notFoundContent="輸入關鍵字可匹配需求"
+              />
+            </Form.Item>
+            <Form.Item
+              label="按任務交付（可選）"
+              name="taskIds"
+              className="rdm-field-full"
+              extra="勾選任務後自動帶出交付項；未拆交付項的任務會歸入該需求的默認交付項"
+            >
+              <Select
+                mode="multiple"
+                allowClear
+                loading={resolvingScope}
+                placeholder={reqOptions.length ? '先選需求，再勾要交付的任務' : '請先選擇關聯需求'}
+                optionFilterProp="label"
+                options={taskOptions}
+                onChange={handleTaskChange}
               />
             </Form.Item>
             <Form.Item

@@ -49,6 +49,9 @@ export interface StoredChatMessage {
   content: string
   attachments?: ChatMessage['attachments']
   toolTraces?: ChatMessage['toolTraces']
+  views?: ChatMessage['views']
+  pendingActions?: ChatMessage['pendingActions']
+  feedback?: ChatMessage['feedback']
   timestamp: string
 }
 
@@ -66,6 +69,9 @@ export function serializeChatMessages(messages: ChatMessage[]): string {
     content: m.content,
     ...(m.attachments ? { attachments: m.attachments } : {}),
     ...(m.toolTraces ? { toolTraces: m.toolTraces } : {}),
+    ...(m.views?.length ? { views: m.views } : {}),
+    ...(m.pendingActions?.length ? { pendingActions: m.pendingActions } : {}),
+    ...(m.feedback ? { feedback: m.feedback } : {}),
     timestamp: (m.timestamp instanceof Date ? m.timestamp : new Date(m.timestamp)).toISOString(),
   }))
   return JSON.stringify(stored)
@@ -86,6 +92,10 @@ export function parseConversation(conv: AiConversation): Conversation {
         timestamp: m.timestamp ? new Date(m.timestamp as string) : new Date(),
         // 工具痕迹要一起回放：刷新后“查了数据但界面上看不出来”会让用户怀疑结果是编的
         toolTraces: m.toolTraces,
+        // 结构化卡片与确认卡也要回放：否则刷新后明细消失、待确认动作无法操作
+        views: m.views,
+        pendingActions: m.pendingActions,
+        feedback: m.feedback,
       }))
     }
   } catch { /* 损坏数据回退空 */ }
@@ -97,6 +107,21 @@ export function parseConversation(conv: AiConversation): Conversation {
     createdAt: conv.createdAt,
     updatedAt: conv.updatedAt,
   }
+}
+
+/** 会话摘要结果（服务端真实摘要） */
+export interface AiConversationSummary {
+  compressed: boolean
+  summary: string
+  coveredCount: number
+  keptCount: number
+  tokens: number
+  model?: string
+}
+
+/** 触发服务端真实摘要；失败会抛错，调用方不得伪造摘要 */
+export function summarizeConversation(id: number): Promise<AiConversationSummary> {
+  return request.post<unknown, AiConversationSummary>(`/ai/conversations/${id}/summarize`)
 }
 
 /** 列出当前用户所有会话（按更新时间倒序） */

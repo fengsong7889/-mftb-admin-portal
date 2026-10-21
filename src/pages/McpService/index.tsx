@@ -8,7 +8,7 @@ import { TOOL_LEVEL_META, type ToolLevel } from '../../api/mock/aiPlatformMock'
 import { renderMenuIcon } from '../../components/MenuIcon'
 
 /** 內部分區分類（與後端 category 枚舉一致；notify 僅外部服務使用，內部分區不展示） */
-const CATEGORY_KEYS = ['all', 'finance', 'promotion', 'merchant', 'ai'] as const
+const CATEGORY_KEYS = ['all', 'finance', 'promotion', 'merchant', 'ai', 'rdm'] as const
 
 /** 安裝狀態篩選 */
 type InstallFilter = 'all' | 'installed' | 'uninstalled'

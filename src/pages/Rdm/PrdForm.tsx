@@ -23,8 +23,20 @@ import {
   type RdmPrdItem,
   type RdmPrdSnapshotItem,
 } from '../../api/rdm'
-import { formatRdmReqNo } from '../../constants/rdm'
+import { formatRdmReqNo, RDM_STATUS } from '../../constants/rdm'
 import './index.css'
+
+/**
+ * PRD / 評審可寫的需求狀態：受理之後（含受理當下）、排期之前。
+ * <p>與後端 RdmDeliveryServiceImpl.PRD_PHASE_STATUSES 同源：評估中就寫 PRD，
+ * 會被評估階段的駁回直接作廢，並造成「評審已通過但頁面還讓人接受需求」。
+ */
+const PRD_PHASE_STATUSES: string[] = [
+  RDM_STATUS.ACCEPTED,
+  RDM_STATUS.PRD_DESIGNING,
+  RDM_STATUS.REVIEWING,
+  RDM_STATUS.REVIEW_PASSED,
+]
 
 /** HTML 转义，用于把纯文本旧数据 / AI 草稿文字拼进 HTML 片段 */
 function escapeHtml(text: string): string {
@@ -58,7 +70,11 @@ export default function PrdForm() {
   const prdId = Number(searchParams.get('id') ?? 0)
 
   /** 需求头部展示信息：reqNo 存的是展示串（准入前行本就没有编号，不能拼出 null） */
-  const [requirement, setRequirement] = useState<{ reqNo: string; title: string; expectResult?: string | null } | null>(null)
+  const [requirement, setRequirement] = useState<{
+    reqNo: string; title: string; expectResult?: string | null
+    /** 需求状态 / 交付流程：决定能不能新建 PRD、能不能「保存并推进」 */
+    status: string; flowVersion?: number | null
+  } | null>(null)
   const [siblings, setSiblings] = useState<RdmPrdItem[]>([])
   const [saving, setSaving] = useState(false)
   /**
@@ -85,12 +101,28 @@ export default function PrdForm() {
 
   /** 定稿（评审中/已通过）且未勾选以新版本修改 → 表单只读 */
   const isLocked = currentStatus === 'reviewing' || currentStatus === 'approved'
+  /**
+   * 新建 PRD 的状态闸门：需求未受理时不允许写。
+   * <p>后端同样会拒（savePrd → requirePrdPhase），前端提前拦住，避免写完一大篇才报错。
+   * <p>已有 PRD 的编辑不受限：它已经是既成事实，改它不会改变“受理与否”的事实。
+   */
+  const phaseBlocked = !prdId && !!requirement?.status && !PRD_PHASE_STATUSES.includes(requirement.status)
+  /** 「保存并推进」只在“已受理、且非 V3 分批交付”时有意义：V3 需求状态不因 PRD 而推进 */
+  const canAdvance = !prdId && requirement?.status === RDM_STATUS.ACCEPTED && requirement?.flowVersion !== 3
+  /** 定稿后未开新版本 → 保存按钮禁用（不让用户点完才被拒） */
+  const saveBlocked = (isLocked && !newVersion) || phaseBlocked
 
   useEffect(() => {
     if (!reqId) return
     fetchRequirementDetail(reqId).then(d => {
       if (!d) return
-      setRequirement({ reqNo: formatRdmReqNo(d.reqNo), title: d.title, expectResult: d.expectResult })
+      setRequirement({
+        reqNo: formatRdmReqNo(d.reqNo),
+        title: d.title,
+        expectResult: d.expectResult,
+        status: String(d.status),
+        flowVersion: d.flowVersion,
+      })
     }).catch(() => message.error('需求資訊載入失敗'))
   }, [reqId])
 
@@ -233,8 +265,9 @@ export default function PrdForm() {
       })
       message.success(prdId ? (newVersion ? '已存為新版本草稿' : 'PRD 已更新') : 'PRD 已保存')
       navigate(`/rdm-detail?id=${reqId}`)
-    } catch {
-      message.error('保存失敗，請重試')
+    } catch (err) {
+      // request.ts 已统一弹后端真实文案，这里不再重复 message.error（§G.4 禁止双弹）
+      console.error(err)
     } finally {
       setSaving(false)
     }
@@ -260,6 +293,17 @@ export default function PrdForm() {
           onClose={() => setAiNotice(null)}
           style={{ marginBottom: 16 }}
           message={aiNotice.text}
+        />
+      )}
+
+      {/* 受理前不允许新建 PRD：后端会拒，前端先把入口说清楚，避免白写 */}
+      {phaseBlocked && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="需求尚未受理，暫時不能編寫 PRD"
+          description="請先由產品經理在需求詳情頁「接受需求」（給出承諾出 PRD 日期），再回來編寫；已寫過的 PRD 仍可繼續編輯。"
         />
       )}
 
@@ -356,9 +400,12 @@ export default function PrdForm() {
 
       <div className="form-footer">
         <Button onClick={() => navigate(-1)}>取消</Button>
-        <Button icon={<SaveOutlined />} loading={saving} onClick={() => handleSave(false)}>保存草稿</Button>
-        <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={() => handleSave(true)}>
-          保存並進入設計中
+        {/* 只有「已受理的 V2 需求」才有推进语义：其余场景只保存，避免按钮暗示一次不会发生的状态变化 */}
+        {canAdvance && (
+          <Button icon={<SaveOutlined />} loading={saving} disabled={saveBlocked} onClick={() => handleSave(false)}>保存草稿</Button>
+        )}
+        <Button type="primary" icon={<SaveOutlined />} loading={saving} disabled={saveBlocked} onClick={() => handleSave(canAdvance)}>
+          {canAdvance ? '保存並進入設計中' : '保存 PRD'}
         </Button>
       </div>
     </div>

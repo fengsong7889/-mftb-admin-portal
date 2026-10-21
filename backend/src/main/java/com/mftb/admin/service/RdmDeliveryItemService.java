@@ -392,6 +392,62 @@ public class RdmDeliveryItemService {
     }
 
     /**
+     * 按任务解析提测/验收范围（研发「按任务交付给测试」的入口语义）。
+     *
+     * <p><b>为何不改提测核心</b>：测试批次、用例快照、验收记录、发布闸门全部以
+     * {@code delivery_item_id} 为唯一验收单位。若把“验收单位”改成多态（交付项或任务），
+     * 上述每一处都要分叉。这里只做一层入口映射：任务已挂交付项就复用，没挂就归入该需求的
+     * 默认交付项（{@link #getOrCreateDefaultItem}）并回填 {@code rdm_work_task.delivery_item_id}。
+     *
+     * <p><b>安全边界</b>：任务必须属于传入需求，否则拒绝——
+     * 否则 A 需求的任务会被算进 B 需求的提测范围，冻结出越界快照。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public List<RdmDeliveryItem> resolveTaskScope(Long reqId, List<Long> taskIds, Long currentUserId) {
+        if (reqId == null) {
+            throw new BusinessException("需求不能為空");
+        }
+        if (taskIds == null || taskIds.isEmpty()) {
+            throw new BusinessException("請至少選擇一個任務");
+        }
+        // 只有 V3 才以交付项为验收单位；V1/V2 需求没有交付项语义，不得从这里混入
+        flowVersionGuard.requireFlowV3(reqId);
+        List<Long> ids = taskIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (ids.isEmpty()) {
+            throw new BusinessException("請至少選擇一個任務");
+        }
+        List<RdmWorkTask> tasks = taskMapper.selectBatchIds(ids);
+        if (tasks == null || tasks.isEmpty()) {
+            throw new BusinessException("任務不存在或已刪除");
+        }
+        for (RdmWorkTask task : tasks) {
+            if (task.getReqId() == null || !reqId.equals(task.getReqId())) {
+                throw new BusinessException("任務不屬於當前需求，拒絕按任務提測");
+            }
+        }
+
+        Map<Long, RdmDeliveryItem> resolved = new LinkedHashMap<>();
+        RdmDeliveryItem defaultItem = null;
+        for (RdmWorkTask task : tasks) {
+            RdmDeliveryItem item = task.getDeliveryItemId() == null
+                    ? null : deliveryItemMapper.selectById(task.getDeliveryItemId());
+            if (item == null || !reqId.equals(item.getReqId())) {
+                if (defaultItem == null) {
+                    defaultItem = getOrCreateDefaultItem(reqId, currentUserId);
+                }
+                item = defaultItem;
+                // 回填任务归属：下次同一任务再提测就能直接复用，不必重复解析
+                task.setDeliveryItemId(item.getId());
+                taskMapper.updateById(task);
+            }
+            resolved.putIfAbsent(item.getId(), item);
+        }
+        log.info("按任務解析提測範圍: reqId={}, tasks={}, items={}, operator={}",
+                reqId, tasks.size(), resolved.size(), currentUserId);
+        return new ArrayList<>(resolved.values());
+    }
+
+    /**
      * 为简单需求获取或创建默认交付项。
      * <p>简单需求（无拆分必要）自动创建一个覆盖整条需求的交付项，
      * 避免用户手动操作一步无意义的"新建交付项"。

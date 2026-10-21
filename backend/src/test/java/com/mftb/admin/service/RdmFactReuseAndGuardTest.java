@@ -199,8 +199,8 @@ class RdmFactReuseAndGuardTest {
         summaryService = new RdmSummaryService(factService, projectMapper, deliveryItemMapper, taskMapper,
                 testBatchMapper, testExecutionMapper, acceptanceMapper, issueMapper, scheduleService,
                 testBatchService, acceptanceRecordService, accessGuard);
-        controller = new RdmProjectController(projectService, allowedActionsService, operatorResolver,
-                todoNotifyService, accessGuard);
+        controller = new RdmProjectController(projectService, mock(RdmProjectRequirementBoardService.class),
+                allowedActionsService, operatorResolver, todoNotifyService, accessGuard);
 
         // 安全的默認樁：計數 0、集合空，避免 Math.toIntExact(null) 之類把測試失敗原因搞糊
         doReturn(0L).when(taskMapper).selectCount(any());
@@ -1051,8 +1051,8 @@ class RdmFactReuseAndGuardTest {
      * 參數下傳 / 結果封裝」，服務層口徑已由上面的真實實現用例覆蓋。
      */
     private RdmProjectController controllerWith(RdmProjectService mockedProjectService) {
-        return new RdmProjectController(mockedProjectService, allowedActionsService, operatorResolver,
-                todoNotifyService, accessGuard);
+        return new RdmProjectController(mockedProjectService, mock(RdmProjectRequirementBoardService.class),
+                allowedActionsService, operatorResolver, todoNotifyService, accessGuard);
     }
 
     /* ==================== 夹具 ==================== */

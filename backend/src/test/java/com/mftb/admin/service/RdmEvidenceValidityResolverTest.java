@@ -150,10 +150,10 @@ class RdmEvidenceValidityResolverTest {
 
         testBatchService = new RdmTestBatchService(testBatchMapper, executionMapper, deliveryItemMapper,
                 requirementMapper, issueMapper, accessGuard, bizSeqService, operatorResolver, testRoundMapper,
-                resolver, idempotentService);
+                resolver, idempotentService, mock(RdmDeliveryItemService.class));
         acceptanceRecordService = new RdmAcceptanceRecordService(acceptanceRecordMapper, deliveryItemMapper,
                 requirementMapper, bizSeqService, accessGuard, testBatchServiceForAcceptance, resolver,
-                idempotentService, openFactService);
+                idempotentService, openFactService, mock(RdmDeliveryItemService.class));
         deliveryItemService = new RdmDeliveryItemService(deliveryItemMapper, requirementMapper, taskMapper,
                 testBatchMapper, mock(RdmTestExecutionMapper.class), acceptanceRecordMapper, issueMapper,
                 projectMapper, userMapper, bizSeqService, accessGuard, invalidationMapper, resolver,

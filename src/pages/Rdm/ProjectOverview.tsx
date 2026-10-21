@@ -102,6 +102,9 @@ const DRILL_LABEL: Record<DrillKey, string> = {
  * <p>标题走 i18n，所以必须在组件内求值：模块顶层常量求值早于 i18n 初始化，直接把 key 渲染出来。
  */
 const buildColumnMeta = (t: TFunction) => [
+  // 項目編號（PROJ+YYYYMMDD+2 位日序，後端 ListItem 已下發）固定首列：
+  // 編號是跨系統引用項目的唯一標識（導出 bundle 早有此列），列表此前漏渲染。
+  { key: 'projectNo', title: '項目編號' },
   { key: 'name', title: t('rdm.projOverview.colName') },
   { key: 'pmUserName', title: t('rdm.projOverview.colPm') },
   { key: 'productOwnerUserName', title: t('rdm.projOverview.colPo') },
@@ -416,6 +419,11 @@ export default function ProjectOverview() {
 
   const columns: TableColumnsType<RdmProjectListItem> = [
     {
+      // 固定首列：14 位（PROJ+8 位日期+2 位日序）需留足寬度，存量空值降級 -
+      title: '項目編號', dataIndex: 'projectNo', key: 'projectNo', width: 150,
+      render: (v?: string | null) => v || <span style={{ color: '#8C8C8C' }}>-</span>,
+    },
+    {
       title: t('rdm.projOverview.colName'), dataIndex: 'name', key: 'name', width: 200,
       render: (name: string, record) => (
         <div
@@ -531,9 +539,9 @@ export default function ProjectOverview() {
     },
   ]
 
-  // §E.3 列配置：字段设置面板放操作区右侧，首列与操作列锁定
+  // §E.3 列配置：字段设置面板放操作区右侧，編號固定首列、操作列固定末列
   const { configComponent, applyConfig } = useColumnConfig('rdm-project-overview', columnMeta, [
-    { key: 'name', visible: true, locked: 'head' as const },
+    { key: 'projectNo', visible: true, locked: 'head' as const },
     { key: 'action', visible: true, locked: 'tail' as const },
   ])
   const visibleColumns = applyConfig(columns)

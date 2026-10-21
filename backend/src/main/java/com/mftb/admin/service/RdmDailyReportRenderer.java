@@ -2,6 +2,7 @@ package com.mftb.admin.service;
 
 import com.mftb.admin.constant.RdmDailyReportTemplates;
 import com.mftb.admin.dto.RdmDailyReportVO.IterationNode;
+import com.mftb.admin.dto.RdmDailyReportVO.MessageFieldOptions;
 import com.mftb.admin.dto.RdmDailyReportVO.ProjectNode;
 import com.mftb.admin.dto.RdmDailyReportVO.RequirementNode;
 import com.mftb.admin.dto.RdmDailyReportVO.Snapshot;
@@ -109,10 +110,21 @@ public class RdmDailyReportRenderer {
         String title = replace(titleTpl, snapshot, detailUrl, null, values);
         String content = replace(contentTpl, snapshot, detailUrl, null, values);
 
+        /*
+         * 迭代视角：规则只盯某个未挂项目的迭代（紧急修复）时，快照里没有任何项目节点，
+         * 仍用同一个 {{projectBlock}} 占位符渲染该迭代；否则会推一条「目前沒有在途項目」的空日报。
+         */
+        boolean iterationOnly = snapshot != null && snapshot.getScopeProjectId() == null
+                && StringUtils.hasText(snapshot.getScopeIterationCode());
+        List<IterationNode> unassigned = snapshot == null || snapshot.getUnassignedIterations() == null
+                ? List.of() : snapshot.getUnassignedIterations();
+        String projectSection = iterationOnly
+                ? unassignedBlock(unassigned)
+                : projectBlock(projects, MAX_PROJECTS_IN_GROUP, GROUP_CONTENT_LIMIT);
+
         // 层级片段最后填：它本身含 markdown 结构，不能被当作普通文本二次转义
         content = content
-                .replace(RdmDailyReportTemplates.PH_PROJECT_BLOCK,
-                        projectBlock(projects, MAX_PROJECTS_IN_GROUP, GROUP_CONTENT_LIMIT))
+                .replace(RdmDailyReportTemplates.PH_PROJECT_BLOCK, projectSection)
                 .replace(RdmDailyReportTemplates.PH_RISK_BLOCK,
                         projectBlock(riskProjects, MAX_PROJECTS_IN_GROUP, GROUP_CONTENT_LIMIT))
                 .replace(RdmDailyReportTemplates.PH_NORMAL_PROJECT_COUNT, String.valueOf(normalProjects.size()));
@@ -136,6 +148,232 @@ public class RdmDailyReportRenderer {
                 projectBlock(mine, MAX_PROJECTS_IN_GROUP, PERSONAL_CONTENT_LIMIT));
 
         return new Rendered(title, limit(content, PERSONAL_CONTENT_LIMIT), unknownOf(titleTpl, contentTpl, values));
+    }
+
+    /* ==================== 固定框架（预置日报） ==================== */
+
+    /** 固定框架默认字段开关（字段池见 {@link MessageFieldOptions}） */
+    private static final MessageFieldOptions DEFAULT_FIELDS = new MessageFieldOptions();
+
+    /** 固定框架引导句：只给一句话概述 + 链接文字，不把 URL 裸展在群里 */
+    private static final String FIXED_FOOTER = "\n> 需求明細、停留時長與甘特圖請看完整日報\n";
+    private static final String FIXED_LINK_TEXT = "[查看完整日報]";
+
+    /**
+     * 固定框架群报：汇总行 → 项目行 → 迭代行 → 未挂项目迭代 → 引导链接。
+     *
+     * <p>与自定义模板的根本区别：<b>层级结构写死在代码里</b>，可配的只有每行带哪几个字段。
+     * 需求明细不再进群消息（那是看板的职责），否则项目一多就是几十行需求名刷屏。
+     */
+    public Rendered renderGroupFixed(Snapshot snapshot, String detailUrl, boolean evening,
+                                     MessageFieldOptions fields) {
+        MessageFieldOptions f = fields == null ? DEFAULT_FIELDS : fields;
+        List<ProjectNode> projects = snapshot == null || snapshot.getProjects() == null
+                ? List.of() : snapshot.getProjects();
+        List<IterationNode> unassigned = snapshot == null || snapshot.getUnassignedIterations() == null
+                ? List.of() : snapshot.getUnassignedIterations();
+        boolean iterationOnly = snapshot != null && snapshot.getScopeProjectId() == null
+                && StringUtils.hasText(snapshot.getScopeIterationCode());
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(fixedHeading(snapshot, evening));
+        sb.append(fixedSummaryLine(snapshot, evening));
+        if (iterationOnly) {
+            appendFixedUnassigned(sb, unassigned, f, true);
+        } else {
+            appendFixedProjects(sb, projects, f);
+            appendFixedUnassigned(sb, unassigned, f, false);
+        }
+        sb.append(FIXED_FOOTER).append(linkLine(detailUrl));
+        return new Rendered(fixedTitle(snapshot, evening), limit(sb.toString().stripTrailing(), GROUP_CONTENT_LIMIT),
+                List.of());
+    }
+
+    /**
+     * 固定框架个人工作通知：同一套层级，只是项目集合收敛到收件人负责的项目。
+     * <p>不复用群报文案是因为个人视角要的是「我的项目」，把全公司项目推给个人是噪声。
+     */
+    public Rendered renderPersonalFixed(Snapshot snapshot, String detailUrl, boolean evening,
+                                        PersonalView personal, MessageFieldOptions fields) {
+        MessageFieldOptions f = fields == null ? DEFAULT_FIELDS : fields;
+        List<ProjectNode> mine = personal == null || personal.projects() == null ? List.of() : personal.projects();
+        StringBuilder sb = new StringBuilder();
+        sb.append(fixedHeading(snapshot, evening));
+        // 逾期/今日到期必须用收件人自己的口径：用全局数字会让每个人以为全公司的逾期都压在自己身上
+        sb.append("**").append(safe(personal == null ? "—" : personal.userName()))
+                .append("｜在途項目 ").append(sizeOf(mine))
+                .append("｜逾期 ").append(personal == null ? 0 : personal.overdueItemCount())
+                .append("｜今日到期 ").append(personal == null ? 0 : personal.todayDueItemCount())
+                .append("**\n");
+        appendFixedProjects(sb, mine, f);
+        sb.append(FIXED_FOOTER).append(linkLine(detailUrl));
+        return new Rendered(fixedTitle(snapshot, evening), limit(sb.toString().stripTrailing(), PERSONAL_CONTENT_LIMIT),
+                List.of());
+    }
+
+    private String fixedTitle(Snapshot snapshot, boolean evening) {
+        return "產研交付日報 " + reportDateOf(snapshot) + (evening ? "（晚報）" : "（晨報）");
+    }
+
+    private String fixedHeading(Snapshot snapshot, boolean evening) {
+        return "## " + (evening ? "🌙 " : "📊 ") + fixedTitle(snapshot, evening) + "\n";
+    }
+
+    /** 汇总行（框架固定不可关）：管理者第一眼要的是「今天要不要紧张」，不是项目清单 */
+    private String fixedSummaryLine(Snapshot snapshot, boolean evening) {
+        Summary s = summaryOf(snapshot);
+        StringBuilder sb = new StringBuilder("**在途項目 ").append(s.getProjectCount())
+                .append("｜迭代 ").append(s.getIterationActiveCount());
+        if (evening) {
+            sb.append("｜今日完成 ").append(s.getTodayDoneItemCount());
+        } else {
+            sb.append("｜今日到期 ").append(s.getTodayDueItemCount());
+        }
+        sb.append("｜已逾期 ").append(s.getOverdueItemCount())
+                .append("｜風險 ").append(s.getRiskProjectCount()).append("**\n");
+        return sb.toString();
+    }
+
+    private void appendFixedProjects(StringBuilder sb, List<ProjectNode> projects, MessageFieldOptions f) {
+        if (projects == null || projects.isEmpty()) {
+            sb.append("\n_目前沒有在途項目。_\n");
+            return;
+        }
+        int shown = 0;
+        for (ProjectNode p : projects) {
+            if (p == null || shown >= MAX_PROJECTS_IN_GROUP || sb.length() > GROUP_CONTENT_LIMIT) {
+                break;
+            }
+            sb.append("\n### ").append(safe(nullToDash(p.getProjectName())));
+            // 异常角标不可关：去掉后逾期项目与正常项目长得一样，精简反而变成致盲
+            if (isTrue(p.getRiskFlag())) {
+                sb.append(" ⚠️風險");
+            }
+            if (isTrue(p.getOverdueFlag())) {
+                sb.append(" ⏰逾期");
+            }
+            if (isTrue(p.getPausedFlag())) {
+                sb.append(" ⏸暫停");
+            }
+            sb.append('\n');
+            String detail = fixedProjectDetail(p, f);
+            if (StringUtils.hasText(detail)) {
+                sb.append("- ").append(detail).append('\n');
+            }
+            for (IterationNode it : p.getIterations() == null ? List.<IterationNode>of() : p.getIterations()) {
+                sb.append(fixedIterationLine(it, f, "- "));
+            }
+            shown++;
+        }
+        int rest = projects.size() - shown;
+        if (rest > 0) {
+            sb.append("\n> 另有 ").append(rest).append(" 個項目未展開，請點連結查看完整日報。\n");
+        }
+    }
+
+    /** 项目行字段（可配部分拼成一行）：项目名与异常角标在标题行，不属字段池 */
+    private String fixedProjectDetail(ProjectNode p, MessageFieldOptions f) {
+        List<String> parts = new ArrayList<>();
+        if (on(f.getProjectProductOwner()) && StringUtils.hasText(p.getProductOwnerUserName())) {
+            parts.add("產品 " + safe(p.getProductOwnerUserName()));
+        }
+        if (on(f.getProjectDeliveryProgress())) {
+            if (p.getDeliveryItemTotal() > 0) {
+                int pct = Math.max(0, Math.min(100, Math.round(
+                        p.getDeliveryItemCompleted() * 100f / p.getDeliveryItemTotal())));
+                parts.add("交付 " + p.getDeliveryItemCompleted() + "/" + p.getDeliveryItemTotal() + "（" + pct + "%）");
+            } else {
+                // 零承诺短路：尚未排交付项 ≠ 全部完成，必须显式说明
+                parts.add("交付 尚未排定");
+            }
+        }
+        if (on(f.getProjectIterationCount())) {
+            parts.add("迭代 " + p.getIterationActiveCount() + " 個");
+        }
+        if (on(f.getProjectPeriod()) && StringUtils.hasText(p.getPlanStartDate())
+                && StringUtils.hasText(p.getPlanEndDate())) {
+            parts.add("週期 " + p.getPlanStartDate() + "~" + p.getPlanEndDate());
+        }
+        if (on(f.getProjectNextDelivery()) && StringUtils.hasText(p.getNextDeliveryDate())) {
+            parts.add("下次交付 " + p.getNextDeliveryDate());
+        }
+        if (on(f.getProjectAbnormal()) && (p.getDeliveryItemOverdue() > 0 || p.getDeliveryItemBlocked() > 0)) {
+            parts.add("逾期 " + p.getDeliveryItemOverdue() + "｜阻塞 " + p.getDeliveryItemBlocked());
+        }
+        return String.join("｜", parts);
+    }
+
+    /** 迭代行：code + 名称必显（框架），其余字段按开关拼接 */
+    private String fixedIterationLine(IterationNode it, MessageFieldOptions f, String bullet) {
+        if (it == null) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder(bullet).append("迭代 ")
+                .append(safe(nullToDash(it.getCode())));
+        if (StringUtils.hasText(it.getName()) && !it.getName().equals(it.getCode())) {
+            sb.append(' ').append(safe(it.getName()));
+        }
+        List<String> meta = new ArrayList<>();
+        if (on(f.getIterationStatus()) && StringUtils.hasText(it.getStatus())) {
+            meta.add(iterationStatusLabel(it.getStatus()));
+        }
+        if (on(f.getIterationOwner()) && StringUtils.hasText(it.getOwnerName())) {
+            meta.add(safe(it.getOwnerName()));
+        }
+        if (on(f.getIterationProgress())) {
+            // 进度 = 任务进度按计划工时加权；产能 = 已排计划工时 / 迭代产能。
+            // 无任务/未设产能时不输出占位符，避免每行都拖一个「—｜未設定」
+            if (it.getProgressPercent() != null) {
+                meta.add("進度 " + it.getProgressPercent() + "%");
+            }
+            if (it.getCapacityHours() > 0) {
+                meta.add("產能 " + (it.getCapacityUsagePercent() == null ? 0 : it.getCapacityUsagePercent()) + "%");
+            }
+        }
+        if (on(f.getIterationReqTotal())) {
+            meta.add("需求 " + it.getRequirementCount());
+        }
+        if (on(f.getIterationReqTodayDue()) && it.getTodayDueReqCount() > 0) {
+            meta.add("今日到期 " + it.getTodayDueReqCount());
+        }
+        if (on(f.getIterationReqOverdue()) && it.getOverdueReqCount() > 0) {
+            meta.add("逾期 " + it.getOverdueReqCount());
+        }
+        if (on(f.getIterationPeriod()) && StringUtils.hasText(it.getStartDate())
+                && StringUtils.hasText(it.getEndDate())) {
+            meta.add(it.getStartDate() + "~" + it.getEndDate());
+        }
+        if (!meta.isEmpty()) {
+            sb.append('（').append(String.join("｜", meta)).append('）');
+        }
+        sb.append('\n');
+        return sb.toString();
+    }
+
+    private void appendFixedUnassigned(StringBuilder sb, List<IterationNode> unassigned, MessageFieldOptions f,
+                                       boolean asOnlySection) {
+        if (unassigned == null || unassigned.isEmpty()) {
+            return;
+        }
+        sb.append(asOnlySection ? "\n" : "\n").append("### 未掛項目的迭代（")
+                .append(unassigned.size()).append(" 個）\n");
+        for (IterationNode it : unassigned) {
+            sb.append(fixedIterationLine(it, f, "- "));
+        }
+    }
+
+    private static String linkLine(String detailUrl) {
+        return StringUtils.hasText(detailUrl)
+                ? FIXED_LINK_TEXT + "(" + detailUrl.trim() + ")\n"
+                : "\n";
+    }
+
+    private static boolean on(Boolean flag) {
+        return !Boolean.FALSE.equals(flag);
+    }
+
+    private static String reportDateOf(Snapshot snapshot) {
+        return snapshot == null || !StringUtils.hasText(snapshot.getReportDate()) ? "—" : snapshot.getReportDate();
     }
 
     /* ==================== 占位符替换 ==================== */
@@ -283,6 +521,22 @@ public class RdmDailyReportRenderer {
             sb.append("- 未排迭代（").append(unscheduled.size()).append(" 個需求）\n");
             appendRequirements(sb, unscheduled, "  ");
         }
+    }
+
+    /**
+     * 未挂项目迭代片段。
+     * <p>只用于「规则只盯某个未挂项目迭代」的快照：这类快照没有任何项目节点，
+     * 若仍走 {@link #projectBlock} 会推出一条「目前沒有在途項目」的空日报。
+     */
+    private String unassignedBlock(List<IterationNode> iterations) {
+        if (iterations == null || iterations.isEmpty()) {
+            return "_該迭代下暫無需求明細。_";
+        }
+        StringBuilder sb = new StringBuilder("\n### 未掛項目迭代\n");
+        for (IterationNode it : iterations) {
+            appendIteration(sb, it);
+        }
+        return sb.toString().stripTrailing();
     }
 
     private void appendOwnerLine(StringBuilder sb, ProjectNode p) {

@@ -25,6 +25,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -49,6 +50,10 @@ class AgentOrchestrationServiceTest {
     @Mock private com.mftb.admin.mapper.McpToolMapper mcpToolMapper;
     @Mock private com.mftb.admin.mapper.AiToolPolicyMapper toolPolicyMapper;
     @Mock private com.mftb.admin.service.AiToolPolicyService toolPolicyService;
+    @Mock private com.mftb.admin.util.OperatorResolver operatorResolver;
+    @Mock private AiGuardrailService guardrailService;
+    @Mock private AiUserMemoryService memoryService;
+    @Mock private AiPromptConfigService promptConfigService;
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -67,7 +72,7 @@ class AgentOrchestrationServiceTest {
         });
         return new AgentOrchestrationService(List.of(dummyTool), channelRouter, myCenterService,
                 eventService, llmClient, mapper, metering, conversationService, mcpToolMapper, toolPolicyMapper,
-                toolPolicyService);
+                toolPolicyService, promptConfigService, operatorResolver, guardrailService, memoryService);
     }
 
     private JsonNode json(String raw) {
@@ -289,5 +294,137 @@ class AgentOrchestrationServiceTest {
         assertTrue(toolsSent.stream().noneMatch(t ->
                 "email_sender".equals(((Map<?, ?>) t.get("function")).get("name"))),
                 "未启用的外部工具不应下发");
+    }
+
+    /**
+     * 试跑沙箱：必须用草稿 Prompt（systemPromptOverride），且不下发外部工具——
+     * 否则「试跑」会真的调用外部服务，配置人员点一下预览就能给真实客户发邮件。
+     */
+    @Test
+    void sandboxUsesDraftPromptAndHidesExternalTools() {
+        AgentOrchestrationService svc = buildService();
+        com.mftb.admin.entity.McpTool tool = new com.mftb.admin.entity.McpTool();
+        tool.setToolKey("email_sender");
+        tool.setParamsJson("{}");
+        tool.setSource("external");
+        tool.setInstalled(1);
+        when(mcpToolMapper.selectList(any())).thenReturn(List.of(tool));
+        com.mftb.admin.entity.AiToolPolicy policy = new com.mftb.admin.entity.AiToolPolicy();
+        policy.setToolKey("email_sender");
+        policy.setEnabled(1);
+        when(toolPolicyMapper.selectList(any())).thenReturn(List.of(policy));
+        when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(channel());
+        when(myCenterService.checkQuota(any(), any())).thenReturn(allowed());
+        ArgumentCaptor<Map<String, Object>> payloadCap = ArgumentCaptor.forClass(Map.class);
+        when(llmClient.chatCompletion(any(), any(), payloadCap.capture())).thenReturn(
+                json("{\"model\":\"m\",\"choices\":[{\"message\":{\"content\":\"ok\"}}]}"));
+
+        OrchestrateRequest req = request("試跑");
+        req.setSandbox(true);
+        req.setSystemPromptOverride("DRAFT-PROMPT");
+        svc.orchestrate(req, "alice");
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> messages = (List<Map<String, Object>>) payloadCap.getValue().get("messages");
+        assertEquals("DRAFT-PROMPT", messages.get(0).get("content"), "试跑必须用草稿 Prompt，而不是线上已发布版本");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> toolsSent = (List<Map<String, Object>>) payloadCap.getValue().get("tools");
+        assertNotNull(toolsSent);
+        assertTrue(toolsSent.stream().noneMatch(t ->
+                "email_sender".equals(((Map<?, ?>) t.get("function")).get("name"))),
+                "沙箱不下发外部工具");
+        assertTrue(toolsSent.stream().anyMatch(t ->
+                "query_account_balance".equals(((Map<?, ?>) t.get("function")).get("name"))),
+                "沙箱仍可验证内建只读工具");
+    }
+
+    /** disableTools=true 时不应再下发 tools，否则模型仍会尝试调工具，试跑结果不可比。 */
+    @Test
+    void disableToolsOmitsToolSchema() {
+        AgentOrchestrationService svc = buildService();
+        when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(channel());
+        when(myCenterService.checkQuota(any(), any())).thenReturn(allowed());
+        ArgumentCaptor<Map<String, Object>> payloadCap = ArgumentCaptor.forClass(Map.class);
+        when(llmClient.chatCompletion(any(), any(), payloadCap.capture())).thenReturn(
+                json("{\"model\":\"m\",\"choices\":[{\"message\":{\"content\":\"ok\"}}]}"));
+
+        OrchestrateRequest req = request("不帶工具");
+        req.setSandbox(true);
+        req.setDisableTools(true);
+        svc.orchestrate(req, "alice");
+
+        assertNull(payloadCap.getValue().get("tools"), "禁用工具时不应下发 tools");
+        verify(dummyTool, never()).execute(any(), any());
+    }
+
+    /** 输入护栏命中 block 时必须在调模型前返回，避免敏感内容进入上下文与计量。 */
+    @Test
+    void inputGuardrailBlocksBeforeLlmCall() {
+        AgentOrchestrationService svc = buildService();
+        when(guardrailService.checkInput(any())).thenReturn(
+                AiGuardrailService.GuardResult.block("input", "敏感詞"));
+
+        OrchestrateResult out = svc.orchestrate(request("包含敏感詞"), "alice");
+
+        assertEquals("guardrail_blocked", out.getErrorKind());
+        assertTrue(out.getText().contains("不允許"), out.getText());
+        verify(llmClient, never()).chatCompletion(any(), any(), any());
+    }
+
+    /** replace 动作要把改写后的输入交给模型，否则规则只是“提示”而没有生效。 */
+    @Test
+    void guardrailReplaceRewritesUserMessageBeforeLlm() {
+        AgentOrchestrationService svc = buildService();
+        when(guardrailService.checkInput(any())).thenReturn(
+                AiGuardrailService.GuardResult.ok("改寫後問題", List.of("已替換敏感內容")));
+        when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(channel());
+        when(myCenterService.checkQuota(any(), any())).thenReturn(allowed());
+        ArgumentCaptor<Map<String, Object>> payloadCap = ArgumentCaptor.forClass(Map.class);
+        when(llmClient.chatCompletion(any(), any(), payloadCap.capture())).thenReturn(
+                json("{\"model\":\"m\",\"choices\":[{\"message\":{\"content\":\"ok\"}}]}"));
+
+        svc.orchestrate(request("原問題"), "alice");
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> messages = (List<Map<String, Object>>) payloadCap.getValue().get("messages");
+        assertEquals("改寫後問題", messages.get(messages.size() - 1).get("content"));
+    }
+
+    /** 角色不在 data_scope_json.roles 内时，工具不下发——否则“可见范围”只是一句提示。 */
+    @Test
+    void toolHiddenByRoleVisibility() {
+        AgentOrchestrationService svc = buildService();
+        com.mftb.admin.entity.AiToolPolicy policy = new com.mftb.admin.entity.AiToolPolicy();
+        policy.setToolKey("query_account_balance");
+        policy.setEnabled(1);
+        policy.setDataScopeJson("{\"roles\":[\"rdm_pm\"]}");
+        when(toolPolicyMapper.selectList(any())).thenReturn(List.of(policy));
+        com.mftb.admin.entity.SysUser user = new com.mftb.admin.entity.SysUser();
+        user.setRole("user");
+        when(operatorResolver.currentUser()).thenReturn(user);
+        when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(channel());
+        when(myCenterService.checkQuota(any(), any())).thenReturn(allowed());
+        ArgumentCaptor<Map<String, Object>> payloadCap = ArgumentCaptor.forClass(Map.class);
+        when(llmClient.chatCompletion(any(), any(), payloadCap.capture())).thenReturn(
+                json("{\"model\":\"m\",\"choices\":[{\"message\":{\"content\":\"ok\"}}]}"));
+
+        svc.orchestrate(request("x"), "alice");
+
+        assertNull(payloadCap.getValue().get("tools"), "无权限角色不应收到该工具的 schema");
+    }
+
+    /** 自动记忆候选：只随回答返回建议，不在服务端自动落库。 */
+    @Test
+    void memorySuggestionAttachedForExplicitPreference() {
+        AgentOrchestrationService svc = buildService();
+        when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(channel());
+        when(myCenterService.checkQuota(any(), any())).thenReturn(allowed());
+        when(llmClient.chatCompletion(any(), any(), any())).thenReturn(
+                json("{\"model\":\"m\",\"choices\":[{\"message\":{\"content\":\"好的\"}}]}"));
+        when(memoryService.suggestFromMessage(any())).thenReturn("回答先給結論");
+
+        OrchestrateResult out = svc.orchestrate(request("記住：回答先給結論"), "alice");
+
+        assertEquals("回答先給結論", out.getMemorySuggestion());
     }
 }

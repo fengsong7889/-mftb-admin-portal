@@ -17,6 +17,11 @@ import org.springframework.util.StreamUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
 
 /**
  * RDM（產研交付）M1 结构迁移：建 12 张 {@code rdm_} 表 + 状态机/流转/SLA 种子 + 编号规则 + 准入流程定义。
@@ -372,6 +377,167 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
     private static final String DAILY_REPORT_NEW_UNIQUE = "uk_rdm_daily_report_scope";
 
     /**
+     * v3.20：日报规则表的 project_id 放宽为可空。
+     * <p><b>为何需要这一版</b>：v3.19 把规则定义为「项目 + 可选迭代」，但迭代排期已允许
+     * 紧急修复（hotfix）迭代不挂项目（v3.15）。用户在「進度日報 > 推送配置」选到这类迭代时，
+     * 规则应能以迭代为唯一范围保存；project_id 仍 NOT NULL 会导致保存直接报错或被迫编个项目。
+     * <p><b>只 MODIFY，不 DROP</b>：把 NOT NULL 改为 DEFAULT NULL，列上数据与索引
+     * {@code idx_rdm_daily_report_rule_project} 全部保留；MODIFY 本身可重放，
+     * 仍用 applyOnce + 后置 IS_NULLABLE 校验，缺一则不记版本、下次启动重试。
+     */
+    private static final String VERSION_DAILY_REPORT_RULE_PROJECT_NULLABLE = "rdm:schema:v3.20";
+    private static final String DAILY_REPORT_RULE_PROJECT_MODIFY_DDL =
+            "ALTER TABLE rdm_daily_report_rule MODIFY COLUMN project_id BIGINT DEFAULT NULL "
+                    + "COMMENT '目标项目ID（来自项目总览）；NULL=规则只以未挂项目的迭代（紧急修复）为范围'";
+
+    /**
+     * v3.21：存量项目编号按「创建日补号」收敛为 {@code PROJ + YYYYMMDD + 2 位日序}。
+     * <p><b>为何需要这一版</b>：v3.16 只把发号规则从 {@code PJ+YYYYMMDD+4 位} 改成
+     * {@code PROJ+YYYYMMDD+2 位}（纯配置改动，发号代码零改动），但它只影响<b>之后新建</b>的项目；
+     * 规则切换前已经建好的项目仍挂着旧前缀编号，于是同一个列表里新旧两套前缀并存。
+     * <p><b>为什么可以改</b>：全库只有 {@code rdm_project.project_no} 存编号本身，其余业务表
+     * （需求/迭代/交付项/成员/日报/发布批次）一律用 {@code project_id} 外键关联，改号不会断链；
+     * 影响面仅限已人工复制的历史文本（如已发出的消息）。
+     * <p><b>幂等</b>：只挑不符合 {@link #PROJECT_NO_COMPLIANT_REGEX} 的行，合规行不动，
+     * 重放时候选集合为空即 no-op；补出来的号按创建日的「已用最大序号 + 1」递增，同时把
+     * {@code sys_biz_seq} 当日水位推到同一位置，否则新建项目会从 01 重发、撞 project_no 唯一键。
+     */
+    private static final String VERSION_PROJECT_NO_REPAIR = "rdm:schema:v3.21";
+    /** 合规编号：PROJ + 8 位日期 + ≥ 2 位序号（超 99 自然扩位，不截断） */
+    private static final String PROJECT_NO_COMPLIANT_REGEX = "^PROJ[0-9]{8}[0-9]{2,}$";
+    /** 项目编号规则 key（与 sys_biz_seq_rule.rule_key / BizSeqService 一致） */
+    private static final String PROJECT_SEQ_RULE_KEY = "rdm_project";
+    /** 规则前缀：与 v3.16 的目标形态一致，不是它说明 v3.16 未完成，不允许补号后仍为旧形态 */
+    private static final String PROJECT_SEQ_PREFIX = "PROJ";
+
+    /**
+     * v3.22：日报看板开放链接与展示参数。
+     *
+     * <p><b>为何需要这一版</b>：推送链接从「站内页 + 登录」改为「免登看板」，需要两样东西：
+     * 链接有效期（x 天内可看）与展示参数（需求明细/负责人/未挂项目迭代）。
+     * 两者都是全局口径，放在日报配置单行上最自然，避免另建一张只有一行的配置表。
+     *
+     * <p><b>只加列，不改不删</b>：旧代码不认识新列也能正常运行；默认值取「30 天 + 全部展示」，
+     * 与当前页面行为一致，升级瞬间不需要人工补数据。
+     */
+    private static final String VERSION_DAILY_REPORT_BOARD = "rdm:schema:v3.22";
+    /** v3.22 配置表补列 {表, 列, DDL}：ADD COLUMN 不可重放，先查再加 */
+    private static final String[][] DAILY_REPORT_BOARD_COLUMNS = {
+            {"rdm_daily_report_config", "board_link_valid_days",
+                    "ALTER TABLE rdm_daily_report_config ADD COLUMN board_link_valid_days INT NOT NULL DEFAULT 30 "
+                            + "COMMENT '看板开放链接有效期（天）' AFTER personal_template_key"},
+            {"rdm_daily_report_config", "board_show_requirements",
+                    "ALTER TABLE rdm_daily_report_config ADD COLUMN board_show_requirements TINYINT NOT NULL DEFAULT 1 "
+                            + "COMMENT '看板是否展示需求明细 0/1' AFTER board_link_valid_days"},
+            {"rdm_daily_report_config", "board_show_owners",
+                    "ALTER TABLE rdm_daily_report_config ADD COLUMN board_show_owners TINYINT NOT NULL DEFAULT 1 "
+                            + "COMMENT '看板是否展示负责人姓名 0/1' AFTER board_show_requirements"},
+            {"rdm_daily_report_config", "board_show_unassigned",
+                    "ALTER TABLE rdm_daily_report_config ADD COLUMN board_show_unassigned TINYINT NOT NULL DEFAULT 1 "
+                            + "COMMENT '看板是否展示未挂项目的迭代 0/1' AFTER board_show_owners"},
+    };
+
+    /**
+     * v3.23：钉钉消息改为固定框架 + 全局字段开关，预置模板转为自定义模板。
+     *
+     * <p><b>为何要改</b>：旧群报把「项目→迭代→全部需求行」一次性铺到群里，项目一多就是几十行，
+     * 重点被淹没；而预置模板本身是可自由编辑的 Markdown，任何人都能把框架改乱，
+     * 导致同一个日报在不同群里结构各异。本次把层级框架固定到代码里，可配的只有字段开关。
+     *
+     * <p><b>两步变更</b>：
+     * <ol>
+     *   <li>配置表加 {@code message_mode}（默认 fixed，升级后新推送即走精简框架）与
+     *       {@code message_field_options}（JSON 字段开关）；</li>
+     *   <li>旧 7 套预置模板的 {@code is_preset} 置 0，转为可自由编辑的自定义模板保留——
+     *       不删行也不改文案，想回退到自定义模板模式只需把模式改回 template 并选中原模板。</li>
+     * </ol>
+     *
+     * <p><b>为何不用 DROP</b>：只加列 + UPDATE，旧代码忽略新列，回滚只需把模式改回 template。
+     */
+    private static final String VERSION_DAILY_REPORT_MESSAGE_FRAMEWORK = "rdm:schema:v3.23";
+    /** v3.23 配置表补列 {表, 列, DDL}：ADD COLUMN 不可重放，先查再加 */
+    private static final String[][] DAILY_REPORT_MESSAGE_COLUMNS = {
+            {"rdm_daily_report_config", "message_mode",
+                    "ALTER TABLE rdm_daily_report_config ADD COLUMN message_mode VARCHAR(16) NOT NULL DEFAULT 'fixed' "
+                            + "COMMENT '钉钉消息模式: fixed=固定框架 / template=自定义模板' AFTER board_show_unassigned"},
+            {"rdm_daily_report_config", "message_field_options",
+                    "ALTER TABLE rdm_daily_report_config ADD COLUMN message_field_options VARCHAR(1000) DEFAULT NULL "
+                            + "COMMENT '固定框架的字段开关（JSON，全局一套）' AFTER message_mode"},
+    };
+    /** 预置模板转自定义的 UPDATE（可重放：已经是 0 的行不受影响） */
+    private static final String DAILY_REPORT_PRESET_TO_CUSTOM_SQL =
+            "UPDATE rdm_daily_report_template SET is_preset = 0, updated_by = 'system', updated_at = NOW() "
+                    + "WHERE is_preset = 1 AND deleted = 0";
+
+    /**
+     * v3.24：存量项目负责人回填到项目成员表。
+     *
+     * <p><b>为何需要这一版</b>：创建项目时旧代码只把 PM 写进 {@code rdm_project_member}，
+     * 产品/技术/UI/测试/运维五类负责人只存主表；编辑项目更是从未同步成员表。
+     * 结果是详情页「項目成員」为空（负责人明明已选）、负责人本人也进不了项目
+     * （数据范围按成员表收敛）。本版把存量项目按负责人补齐，新写入由服务层同步。
+     *
+     * <p><b>只补不删</b>：不删任何成员行、不改其他角色；已离任（leave_time 非空）的同一行
+     * 优先复活而不再插入 —— 唯一键 uk_project_user_role 不区分 leave_time，直接 insert 会撞键。
+     * 重放时两者都是 no-op，可安全重跑。
+     */
+    private static final String VERSION_PROJECT_MEMBER_BACKFILL = "rdm:schema:v3.24";
+    /**
+     * v3.25：推送规则支持多项目范围（project_ids JSON），空数组 + project_id 为空 + 无迭代 = 全部在途项目。
+     * <p>为什么单独加列而不拆关联表：规则只是「一条推送范围配置」，不需要按项目反查规则；
+     * JSON 数组与 message_field_options 同模式，旧代码忽略即回退到 project_id 单项目口径。
+     * <p>ADD COLUMN 不可重放，逐列先查再加 + 后置校验。
+     */
+    private static final String VERSION_DAILY_REPORT_RULE_PROJECT_IDS = "rdm:schema:v3.25";
+    private static final String DAILY_REPORT_RULE_PROJECT_IDS_DDL =
+            "ALTER TABLE rdm_daily_report_rule ADD COLUMN project_ids VARCHAR(1000) DEFAULT NULL "
+                    + "COMMENT '多项目范围 JSON array；空=单项目/全部项目/仅迭代' AFTER project_id";
+
+    /**
+     * v3.26：个人日报收件人可配（角色白名单 + 追加/排除名单）。
+     *
+     * <p><b>为何要加</b>：v3.16 起个人通知的收件人被硬编码为「项目经理 + 产品负责人」，
+     * 而实际使用需要「技术/测试/UI/运维负责人也收」「PMO 或部门负责人额外收」「某人不收」
+     * 这些场景，没有配置入口只能改代码。本版把收件人从代码搬到配置表。
+     *
+     * <p><b>只加列，默认即现状</b>：{@code receiver_roles_json} 默认
+     * {@code ["pm","product_owner"]}，与改造前的发送对象完全一致，升级当天行为不变；
+     * 追加/排除名单默认 NULL（等价于空），不影响任何人。
+     *
+     * <p><b>与 receiver_scope 的关系</b>：v3.16 预留的 {@code receiver_scope}（接收范围）从未被
+     * 发送链路消费，本版起停止读写、保留列不删（迁移规范禁止 DROP COLUMN）；收件范围由规则的
+     * project_ids / iteration_code 表达，收件人由本版三列表达，不再有第三个“范围”概念。
+     *
+     * <p>ADD COLUMN 不可重放，逐列先查再加 + 后置校验。
+     */
+    private static final String VERSION_DAILY_REPORT_RECEIVERS = "rdm:schema:v3.26";
+    /** v3.26 配置表补列 {表, 列, DDL}：ADD COLUMN 不可重放，先查再加 */
+    private static final String[][] DAILY_REPORT_RECEIVER_COLUMNS = {
+            {"rdm_daily_report_config", "receiver_roles_json",
+                    "ALTER TABLE rdm_daily_report_config ADD COLUMN receiver_roles_json VARCHAR(255) "
+                            + "NOT NULL DEFAULT '[\"pm\",\"product_owner\"]' "
+                            + "COMMENT '收件角色白名单(JSON数组)：pm/product_owner/tech_lead/qa_lead/ui_designer/ops_lead/project_member' "
+                            + "AFTER personal_enabled"},
+            {"rdm_daily_report_config", "extra_receiver_user_ids_json",
+                    "ALTER TABLE rdm_daily_report_config ADD COLUMN extra_receiver_user_ids_json VARCHAR(2000) "
+                            + "DEFAULT NULL COMMENT '追加收件人 sys_user.id(JSON数组)，收到规则范围全部项目汇总' "
+                            + "AFTER receiver_roles_json"},
+            {"rdm_daily_report_config", "exclude_receiver_user_ids_json",
+                    "ALTER TABLE rdm_daily_report_config ADD COLUMN exclude_receiver_user_ids_json VARCHAR(2000) "
+                            + "DEFAULT NULL COMMENT '排除收件人 sys_user.id(JSON数组)，优先级最高' "
+                            + "AFTER extra_receiver_user_ids_json"},
+    };
+    /** {负责人列, 姓名列, 角色码}：六类负责人各自对应成员表一行（列名为白名单常量，非外部输入） */
+    private static final String[][] PROJECT_OWNER_MEMBER_SLOTS = {
+            {"pm_user_id", "pm_user_name", "pm"},
+            {"product_owner_user_id", "product_owner_user_name", "product"},
+            {"tech_lead_user_id", "tech_lead_user_name", "dev_lead"},
+            {"ui_designer_user_id", "ui_designer_user_name", "designer"},
+            {"qa_lead_user_id", "qa_lead_user_name", "qa"},
+            {"ops_lead_user_id", "ops_lead_user_name", "ops"},
+    };
+
+    /**
      * v3.17：rdm_status_def.stage 由旧 6 段细化为 9 段，与前端 RDM_STATUS_STAGE 同源。
      * <p>详情页状态条与需求看板列已改 9 段，但本表仍是旧值，导致看板「各階段平均停留」
      * 按旧口径聚合、需求配置页显示旧阶段名 —— 同一需求两处说法分裂，本迁移收口。
@@ -655,6 +821,20 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
                 this::doDailyReportTriggerColumnsMigrate, this::verifyDailyReportTriggerColumns);
         versionTracker.applyOnce(VERSION_DAILY_REPORT_RULES,
                 this::doDailyReportRulesMigrate, this::verifyDailyReportRules);
+        versionTracker.applyOnce(VERSION_DAILY_REPORT_RULE_PROJECT_NULLABLE,
+                this::doDailyReportRuleProjectNullableMigrate, this::verifyDailyReportRuleProjectNullable);
+        // 必须排在 v3.16（规则改 PROJ）之后：补号依赖规则行已是 PROJ，否则无从对齐新形态
+        versionTracker.applyOnce(VERSION_PROJECT_NO_REPAIR, this::doProjectNoRepair, this::verifyProjectNoRepair);
+        versionTracker.applyOnce(VERSION_DAILY_REPORT_BOARD,
+                this::doDailyReportBoardMigrate, this::verifyDailyReportBoardMigrate);
+        versionTracker.applyOnce(VERSION_DAILY_REPORT_MESSAGE_FRAMEWORK,
+                this::doDailyReportMessageFrameworkMigrate, this::verifyDailyReportMessageFramework);
+        versionTracker.applyOnce(VERSION_PROJECT_MEMBER_BACKFILL,
+                this::doProjectMemberBackfill, this::verifyProjectMemberBackfill);
+        versionTracker.applyOnce(VERSION_DAILY_REPORT_RULE_PROJECT_IDS,
+                this::doDailyReportRuleProjectIdsMigrate, this::verifyDailyReportRuleProjectIds);
+        versionTracker.applyOnce(VERSION_DAILY_REPORT_RECEIVERS,
+                this::doDailyReportReceiversMigrate, this::verifyDailyReportReceiversMigrate);
     }
 
     /**
@@ -1333,7 +1513,256 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
         }
     }
 
-    /** v3.19 后置校验：规则表就绪 + 四个范围列就绪 + 新唯一键就绪 + 旧唯一键已移除 */
+    /**
+     * v3.20：规则表 project_id 放宽为可空。
+     * <p>MODIFY COLUMN 本身可重放（已是可空时再执行也不改变结果），但仍由 applyOnce 门控；
+     * 失败必须抛出并不记版本，否则选到未挂项目迭代时保存会一直报 1048（Column cannot be null）。
+     */
+    private void doDailyReportRuleProjectNullableMigrate() {
+        if (!columnExists(DAILY_REPORT_RULE_TABLE, "project_id")) {
+            throw new IllegalStateException("RDM v3.20 核验失败：" + DAILY_REPORT_RULE_TABLE + ".project_id 列缺失");
+        }
+        jdbcTemplate.execute(DAILY_REPORT_RULE_PROJECT_MODIFY_DDL);
+        log.info("RDM v3.20 已放宽 {}.project_id 为可空（支持未挂项目的迭代规则）", DAILY_REPORT_RULE_TABLE);
+    }
+    
+    /** v3.20 后置校验：列必须可空，否则未挂项目迭代的规则仍存不进去 */
+    private void verifyDailyReportRuleProjectNullable() {
+        requireTables(new String[]{DAILY_REPORT_RULE_TABLE});
+        if (!columnNullable(DAILY_REPORT_RULE_TABLE, "project_id")) {
+            throw new IllegalStateException("RDM v3.20 核验失败：" + DAILY_REPORT_RULE_TABLE
+                    + ".project_id 仍为 NOT NULL，未挂项目的迭代规则无法保存");
+        }
+    }
+
+    /**
+     * v3.22：日报配置表补「看板链接有效期 + 展示参数」四列。
+     * <p>逐列先查再加，ADD COLUMN 不可重放；任何一列补失败都上抛、不记版本，下次启动重试。
+     */
+    private void doDailyReportBoardMigrate() {
+        for (String[] col : DAILY_REPORT_BOARD_COLUMNS) {
+            if (!columnExists(col[0], col[1])) {
+                jdbcTemplate.execute(col[2]);
+                log.info("RDM v3.22 日报配置补列: {}.{}", col[0], col[1]);
+            }
+        }
+    }
+
+    /** v3.22 后置校验：四列必须全部就绪，否则看板链接签发/展示参数会静默失效 */
+    private void verifyDailyReportBoardMigrate() {
+        requireTables(new String[]{"rdm_daily_report_config"});
+        for (String[] col : DAILY_REPORT_BOARD_COLUMNS) {
+            if (!columnExists(col[0], col[1])) {
+                throw new IllegalStateException("RDM v3.22 核验失败：" + col[0] + "." + col[1] + " 列缺失");
+            }
+        }
+    }
+
+    /**
+     * v3.23：消息模式与字段开关补列，并把旧预置模板转为自定义模板。
+     * <p>不吞异常：列缺失会让推送读写报错，预置标记没转成则模板页仍显示“预置不可改”。
+     */
+    private void doDailyReportMessageFrameworkMigrate() {
+        for (String[] col : DAILY_REPORT_MESSAGE_COLUMNS) {
+            if (!columnExists(col[0], col[1])) {
+                jdbcTemplate.execute(col[2]);
+                log.info("RDM v3.23 日报配置补列: {}.{}", col[0], col[1]);
+            }
+        }
+        int converted = jdbcTemplate.update(DAILY_REPORT_PRESET_TO_CUSTOM_SQL);
+        log.info("RDM v3.23 预置模板转自定义: {} 行", converted);
+    }
+
+    /** v3.23 后置校验：两列就绪且不再有预置行（否则模板页仍会挡住编辑） */
+    private void verifyDailyReportMessageFramework() {
+        requireTables(new String[]{"rdm_daily_report_config", "rdm_daily_report_template"});
+        for (String[] col : DAILY_REPORT_MESSAGE_COLUMNS) {
+            if (!columnExists(col[0], col[1])) {
+                throw new IllegalStateException("RDM v3.23 核验失败：" + col[0] + "." + col[1] + " 列缺失");
+            }
+        }
+        Integer presets = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM rdm_daily_report_template WHERE is_preset = 1 AND deleted = 0", Integer.class);
+        if (presets != null && presets > 0) {
+            throw new IllegalStateException("RDM v3.23 核验失败：仍有 " + presets + " 行预置模板未转为自定义模板");
+        }
+    }
+
+    /**
+     * v3.24：存量项目按六类负责人回填成员表。
+     * <p>不吞异常：表缺失、SQL 失败一律抛出，不记版本、下次启动重试；
+     * 静默跑完会让详情页成员继续为空且无人察觉。
+     */
+    private void doProjectMemberBackfill() {
+        int revived = 0;
+        int inserted = 0;
+        for (String[] slot : PROJECT_OWNER_MEMBER_SLOTS) {
+            String userCol = slot[0];
+            String nameCol = slot[1];
+            String role = slot[2];
+            // 先复活：离任过的负责人行仍占着 uk_project_user_role，直接插入会撞唯一键
+            revived += jdbcTemplate.update(
+                    "UPDATE rdm_project_member m JOIN rdm_project p ON p.id = m.project_id "
+                            + "SET m.leave_time = NULL, m.join_time = NOW(), "
+                            + "m.user_name = COALESCE(p." + nameCol + ", m.user_name) "
+                            + "WHERE m.role_code = ? AND m.leave_time IS NOT NULL "
+                            + "AND m.user_id = p." + userCol,
+                    role);
+            inserted += jdbcTemplate.update(
+                    "INSERT INTO rdm_project_member (project_id, user_id, user_name, role_code, join_time) "
+                            + "SELECT p.id, p." + userCol + ", p." + nameCol + ", ?, NOW() FROM rdm_project p "
+                            + "WHERE p." + userCol + " IS NOT NULL "
+                            + "AND NOT EXISTS (SELECT 1 FROM rdm_project_member m "
+                            + "WHERE m.project_id = p.id AND m.user_id = p." + userCol + " AND m.role_code = ?)",
+                    role, role);
+        }
+        log.info("RDM v3.24 项目负责人回填成员表: 复活 {} 行、新增 {} 行", revived, inserted);
+    }
+
+    /** v3.24 后置校验：每个有负责人的项目，六类负责人均存在对应的活跃成员行 */
+    private void verifyProjectMemberBackfill() {
+        requireTables(new String[]{"rdm_project", "rdm_project_member"});
+        for (String[] slot : PROJECT_OWNER_MEMBER_SLOTS) {
+            Integer missing = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM rdm_project p WHERE p." + slot[0] + " IS NOT NULL "
+                            + "AND NOT EXISTS (SELECT 1 FROM rdm_project_member m WHERE m.project_id = p.id "
+                            + "AND m.user_id = p." + slot[0] + " AND m.role_code = ? AND m.leave_time IS NULL)",
+                    Integer.class, slot[2]);
+            if (missing != null && missing > 0) {
+                throw new IllegalStateException("RDM v3.24 核验失败：" + slot[2] + " 负责人仍有 "
+                        + missing + " 个项目缺成员行");
+            }
+        }
+    }
+
+    /** v3.25：推送规则多项目范围列（逐列先查再加） */
+    private void doDailyReportRuleProjectIdsMigrate() {
+        if (!columnExists("rdm_daily_report_rule", "project_ids")) {
+            jdbcTemplate.execute(DAILY_REPORT_RULE_PROJECT_IDS_DDL);
+            log.info("已添加 rdm_daily_report_rule.project_ids 列");
+        }
+    }
+
+    /** v3.25 后置校验：多项目规则写入与读取都依赖该列 */
+    private void verifyDailyReportRuleProjectIds() {
+        if (!columnExists("rdm_daily_report_rule", "project_ids")) {
+            throw new IllegalStateException("RDM v3.25 核验失败：rdm_daily_report_rule.project_ids 列缺失");
+        }
+    }
+
+    /** v3.26：个人日报收件人三列（逐列先查再加） */
+    private void doDailyReportReceiversMigrate() {
+        for (String[] column : DAILY_REPORT_RECEIVER_COLUMNS) {
+            if (!columnExists(column[0], column[1])) {
+                jdbcTemplate.execute(column[2]);
+                log.info("已添加 {}.{} 列", column[0], column[1]);
+            }
+        }
+    }
+
+    /** v3.26 后置校验：收件人解析要读这三列，缺一列个人通知就会退化成空收件人 */
+    private void verifyDailyReportReceiversMigrate() {
+        for (String[] column : DAILY_REPORT_RECEIVER_COLUMNS) {
+            if (!columnExists(column[0], column[1])) {
+                throw new IllegalStateException("RDM v3.26 核验失败：" + column[0] + "." + column[1] + " 列缺失");
+            }
+        }
+    }
+
+    /**
+     * v3.21：存量项目编号按创建日补号。
+     * <p>不吞异常：规则行缺失 / 前缀不是 PROJ / UPDATE 撞 project_no 唯一键都直接抛出，
+     * 不记版本、下次启动重试；静默跑完会让新旧前缀继续并存且无人察觉。
+     */
+    private void doProjectNoRepair() {
+        List<Map<String, Object>> rules = jdbcTemplate.queryForList(
+                "SELECT prefix, seq_length FROM sys_biz_seq_rule WHERE rule_key = ? AND status = 1",
+                PROJECT_SEQ_RULE_KEY);
+        if (rules.isEmpty()) {
+            throw new IllegalStateException("RDM v3.21 核验失败：sys_biz_seq_rule 缺 "
+                    + PROJECT_SEQ_RULE_KEY + " 规则行，无从补号");
+        }
+        String prefix = String.valueOf(rules.get(0).get("prefix"));
+        int seqLength = ((Number) rules.get(0).get("seq_length")).intValue();
+        if (!PROJECT_SEQ_PREFIX.equals(prefix)) {
+            throw new IllegalStateException("RDM v3.21 核验失败：项目编号规则前缀为 " + prefix
+                    + "，需先完成 v3.16 的 PROJ 规则改造");
+        }
+
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, project_no, created_at FROM rdm_project "
+                        + "WHERE project_no IS NULL OR project_no NOT REGEXP ?", PROJECT_NO_COMPLIANT_REGEX);
+        if (rows.isEmpty()) {
+            log.info("RDM v3.21 存量项目编号均已是 PROJ 形态，无需补号");
+            return;
+        }
+
+        int repaired = 0;
+        for (Map<String, Object> row : rows) {
+            long id = ((Number) row.get("id")).longValue();
+            String oldNo = row.get("project_no") == null ? null : String.valueOf(row.get("project_no"));
+            String datePart = resolveProjectNoDatePart(row.get("created_at"));
+
+            // 序号取「该日已用最大序号」与「sys_biz_seq 当日水位」的较大值 +1：
+            // 只看向量表时，水位被清理或曾手工补号过就会重发同号、撞唯一键
+            Integer usedMax = jdbcTemplate.queryForObject(
+                    "SELECT COALESCE(MAX(CAST(SUBSTRING(project_no, "
+                            + (prefix.length() + datePart.length() + 1) + ") AS UNSIGNED)), 0) "
+                            + "FROM rdm_project WHERE project_no LIKE ?",
+                    Integer.class, prefix + datePart + "%");
+            List<Integer> current = jdbcTemplate.queryForList(
+                    "SELECT current_value FROM sys_biz_seq WHERE prefix = ? AND date_key = ?",
+                    Integer.class, prefix, datePart);
+            int seq = Math.max(usedMax == null ? 0 : usedMax, current.isEmpty() ? 0 : current.get(0)) + 1;
+            String newNo = buildProjectNo(prefix, datePart, seq, seqLength);
+
+            jdbcTemplate.update("UPDATE rdm_project SET project_no = ? WHERE id = ?", newNo, id);
+            // 补号必须同步推进当日水位（取 GREATEST 不回退），否则下一次新建从 01 重发会撞号
+            jdbcTemplate.update(
+                    "INSERT INTO sys_biz_seq (prefix, date_key, current_value, created_at, updated_at) "
+                            + "VALUES (?, ?, ?, NOW(), NOW()) "
+                            + "ON DUPLICATE KEY UPDATE current_value = GREATEST(current_value, VALUES(current_value)), "
+                            + "updated_at = NOW()",
+                    prefix, datePart, seq);
+            log.info("RDM v3.21 项目编号补号: id={} {} -> {}", id, oldNo, newNo);
+            repaired++;
+        }
+        log.info("RDM v3.21 存量项目编号补号完成: {} 行", repaired);
+    }
+
+    /** v3.21 后置校验：不允许再有非 PROJ 形态的编号残留（否则补号并未真正收敛） */
+    private void verifyProjectNoRepair() {
+        requireTables(new String[]{"rdm_project"});
+        Integer bad = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM rdm_project WHERE project_no IS NULL OR project_no NOT REGEXP ?",
+                Integer.class, PROJECT_NO_COMPLIANT_REGEX);
+        if (bad != null && bad > 0) {
+            throw new IllegalStateException("RDM v3.21 核验失败：仍有 " + bad
+                    + " 个项目编号不符合 PROJ+YYYYMMDD+序号");
+        }
+    }
+
+    /** 编号日期段取项目创建日：补出来的号要能解释「项目是哪天立的」，不能用部署当天冒充 */
+    private String resolveProjectNoDatePart(Object createdAt) {
+        LocalDate date;
+        if (createdAt instanceof java.sql.Timestamp ts) {
+            date = ts.toLocalDateTime().toLocalDate();
+        } else if (createdAt instanceof LocalDateTime ldt) {
+            date = ldt.toLocalDate();
+        } else if (createdAt instanceof LocalDate ld) {
+            date = ld;
+        } else {
+            date = LocalDate.now();
+        }
+        return date.format(DateTimeFormatter.BASIC_ISO_DATE);
+    }
+
+    /** 补零：seq_length=2 时 1→01；超过 99 自然扩位为 100，不截断也不循环 */
+    static String buildProjectNo(String prefix, String datePart, int seq, int seqLength) {
+        return prefix + datePart + String.format("%0" + seqLength + "d", seq);
+    }
+    
+    /** v3.19 后置校验：规则表就绪 + 四个范围列就绪 + 新唯一键就绪 + 旧唯一键已 移除 */
     private void verifyDailyReportRules() {
         requireTables(new String[]{DAILY_REPORT_RULE_TABLE});
         for (String[] col : DAILY_REPORT_SCOPE_COLUMNS) {
@@ -1808,6 +2237,16 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.COLUMNS "
                         + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+                Integer.class, table, column);
+        return count != null && count > 0;
+    }
+
+    /** 列是否可空（IS_NULLABLE='YES'）：MODIFY 后置校验用，防止只改注释不改约束的假成功 */
+    private boolean columnNullable(String table, String column) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? "
+                        + "AND IS_NULLABLE = 'YES'",
                 Integer.class, table, column);
         return count != null && count > 0;
     }

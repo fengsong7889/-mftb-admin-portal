@@ -42,6 +42,12 @@ public class NotificationAppService {
     public static final String FOLLOW_OVERDUE = "follow_overdue";
     /** 跟进事项完成通知（发回纪要群） */
     public static final String FOLLOW_DONE = "follow_done";
+    /**
+     * AI 助手个人推送：用户在聊天确认卡上确认后，把项目进度以钉钉工作通知发给指定员工。
+     * <p>与 RDM_DAILY_REPORT 分开：日报是定时批量，AI 推送是单次人工确认；
+     * 分开场景才能独立授权与停用，避免停日报时误伤 AI 推送。
+     */
+    public static final String AI_ASSISTANT_WORK = "ai_assistant_work";
     private static final String SIGN_SECRET = DingTalkAppService.SIGN_SECRET;
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private final JdbcTemplate jdbc;
@@ -61,14 +67,18 @@ public class NotificationAppService {
             MEETING_OPS,
             List.of("會議室釋放告知", "超時未簽到自動釋放或行政手動釋放時", "會議組織者"),
             RDM_DAILY_REPORT,
-            List.of("產研交付日報", "每日晨/晚報定時推送與管理員手動觸發時", "在途項目的項目經理與產品負責人（已綁定釘釘用戶 ID）"),
+            // 收件人自 v3.26 起可配（角色 + 追加/排除名单），这里不能再写死角色，否则与推送配置页矛盾
+            List.of("產研交付日報", "每日晨/晚報定時推送與管理員手動觸發時",
+                    "見「進度日報 > 推送配置」的收件人設定（預設項目經理與產品負責人，已綁定釘釘用戶 ID 者才收得到）"),
             MEETING_MINUTES,
             // 收件人由记录人在发送面板自选，因此对象列不能写成“參會人”：那会让人以为只能发参会人
             List.of("會議紀要", "紀要録入後手動發送（每一批一個通知，重發带批次標記）", "發送人選定的人（可含非參會人，已綁定釘釘用戶 ID）"),
             FOLLOW_OVERDUE,
             List.of("跟進事項逾期提醒", "每日掃描：事項過了完成時限仍未處理（同一事項同一天只提醒一次）", "該事項負責人"),
             FOLLOW_DONE,
-            List.of("跟進事項完成通知", "負責人更新處理結果後（回到當初發紀要的钉钉群）", "紀要發送時選定的群"));
+            List.of("跟進事項完成通知", "負責人更新處理結果後（回到當初發紀要的釘釘群）", "紀要發送時選定的群"),
+            AI_ASSISTANT_WORK,
+            List.of("AI 助手個人推送", "用戶在 AI 助手確認卡確認後，把項目進度發給指定員工時", "指定員工（已綁定釘釘用戶 ID）"));
 
     public List<View> list(String name, Boolean enabled) {
         List<ScenarioView> scenarios = scenarios();

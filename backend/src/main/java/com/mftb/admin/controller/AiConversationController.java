@@ -5,8 +5,10 @@ import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.entity.AiConversation;
 import com.mftb.admin.entity.AiConversationEvent;
+import com.mftb.admin.dto.AiConversationSummaryVO;
 import com.mftb.admin.service.AiConversationEventService;
 import com.mftb.admin.service.AiConversationService;
+import com.mftb.admin.service.agent.ConversationSummaryService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,6 +39,7 @@ public class AiConversationController {
 
     private final AiConversationService conversationService;
     private final AiConversationEventService eventService;
+    private final ConversationSummaryService summaryService;
     private final ObjectMapper objectMapper;
 
     /** 列出当前用户所有会话（按更新时间倒序） */
@@ -60,6 +63,16 @@ public class AiConversationController {
         validateMessages(req.getMessages());
         conversationService.updateConversation(id, req.getTitle(), req.getMessages(), req.getModelKey(), req.getTotalTokens());
         return Result.success();
+    }
+
+    /**
+     * 真实短期摘要：把“最近 6 条之外”的旧消息压缩成摘要并落库。
+     * <p>与前端旧“假压缩”不同：这里真的调用模型；失败返回错误，不伪造摘要。
+     */
+    @PostMapping("/{id}/summarize")
+    @Operation(summary = "壓縮會話（真實摘要）")
+    public Result<AiConversationSummaryVO> summarize(@PathVariable Long id) {
+        return Result.success(summaryService.summarize(id));
     }
 
     /** messages JSON 上限：条数≤200，单条≤32KB，总长≤1MB；防止客户端无节制写入 */

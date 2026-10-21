@@ -436,6 +436,34 @@ class RdmNotifyServiceTest {
     }
 
     @Test
+    @DisplayName("站内相对链接补成公网绝对地址（钉钉客户端不认相对路径）")
+    void absolutizeRelativeLinkUsesPortalBase() {
+        org.mockito.Mockito.when(jdbcTemplate.queryForList(
+                        org.mockito.ArgumentMatchers.contains("sys_notification_scenario"),
+                        eq(String.class), any(Object[].class)))
+                .thenReturn(List.of("https://portal.example/-mftb-admin-portal/"));
+
+        String out = notifyService.absolutizeLinks("[點擊處理](/rdm-delivery-item?id=5&mode=view)");
+
+        assertEquals("[點擊處理](https://portal.example/-mftb-admin-portal/#/rdm-delivery-item?id=5&mode=view)", out);
+    }
+
+    @Test
+    @DisplayName("已是绝对地址的链接不重复拼接；取不到门户基址时保留原文")
+    void absolutizeKeepsAbsoluteAndFallsBackWhenBaseMissing() {
+        String absolute = "[查看](https://portal.example/a#/rdm-detail?id=1)";
+        assertEquals(absolute, notifyService.absolutizeLinks(absolute));
+
+        org.mockito.Mockito.when(jdbcTemplate.queryForList(
+                        anyString(), eq(String.class), any(Object[].class)))
+                .thenReturn(List.of());
+        org.mockito.Mockito.when(jdbcTemplate.queryForList(anyString(), eq(String.class)))
+                .thenReturn(List.of());
+        String relative = "[點擊處理](/rdm-issue?id=9)";
+        assertEquals(relative, notifyService.absolutizeLinks(relative));
+    }
+
+    @Test
     @DisplayName("去重行与群播行同表同列族：send_status/attempts/next_retry_at语义一致（重试与抢占可共用）")
     void dedupeRowSharesOutboxSemantics() throws Exception {
         notifyDeduped();

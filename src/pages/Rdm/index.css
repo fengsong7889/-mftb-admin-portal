@@ -292,6 +292,30 @@
   flex-shrink: 0;
 }
 
+/* 当前处理人：多人时姓名段单行省略，+N 标签固定不被压缩，避免溢出压住右侧列。 */
+.rdm-table-handlers {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.rdm-table-handlers__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rdm-table-handlers > .ant-tag {
+  flex-shrink: 0;
+  margin-inline-end: 0;
+}
+
 .rdm-todo-item-title {
   font-size: 13px;
   color: #262626;
@@ -677,6 +701,93 @@
   font-weight: 600;
   color: #AD4E00;
   margin-bottom: 8px;
+}
+
+/* 上报面板里回显当前阻塞原因：解除阻塞前必须先看得见卡在哪 */
+.rdm-action-panel-blocked {
+  margin-left: 10px;
+  font-size: 12px;
+  font-weight: 400;
+  color: #D46B08;
+}
+
+/* 进度填到 100% 时的完成口径提示，避免用户以为“还能再报一次” */
+.rdm-action-panel-hint {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #FFF7E6;
+  border: 1px solid #FFE7BA;
+  font-size: 12px;
+  color: #AD4E00;
+}
+
+/* ========== 研发工作台：进度 / 阻塞展示 ========== */
+
+/* 进度列：进度条与百分比一行，工时单独一行（工时缺报与 0% 是两件事，不能挤成一句） */
+.rdm-task-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rdm-task-progress__line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rdm-task-progress__pct {
+  font-size: 12px;
+  font-weight: 600;
+  color: #595959;
+  min-width: 34px;
+  text-align: right;
+}
+
+.rdm-task-progress__hours {
+  font-size: 12px;
+  color: #8C8C8C;
+}
+
+/* 未填工时用警告色，避免读者把缺报读成“没花时间” */
+.rdm-task-progress__hours.is-missing {
+  color: #FA8C16;
+}
+
+/* 状态列：阻塞 Tag + 原因两行，原因过长省略，悬停看全文（单元格截断属允许用 title 的场景） */
+.rdm-task-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.rdm-task-status__block {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #D46B08;
+}
+
+/*
+ * 阻塞任务整行淡橙底 + 左侧竖条：阻塞在列表里必须一眼能扫到，
+ * 不能只靠状态列一个小 Tag（默认排序已把阻塞置顶，视觉上也要跟上）。
+ * 用 !important 是为了压过 antd 默认的 td 背景与 hover 背景。
+ */
+.nowrap-table .rdm-task-row--blocked > td {
+  background: #FFF7E6 !important;
+}
+
+.nowrap-table .rdm-task-row--blocked > td:first-child {
+  box-shadow: inset 3px 0 0 #FA8C16;
+}
+
+.nowrap-table .rdm-task-row--blocked:hover > td {
+  background: #FFE7BA !important;
 }
 
 /* ========== 目标定位（菜单/功能点） ========== */
@@ -1675,6 +1786,21 @@
 }
 
 /*
+ * 需求详情底部操作栏：无动作提示占满单独一行、排在所有按钮之后。
+ * 原先它在 flex 行内夹在「返回」与右侧动作之间，把按钮隔成两段；
+ * order 必须大于按钮默认的 0，否则 flex-basis:100% 仍会按 DOM 顺序插回按钮中间。
+ */
+.form-footer.rdm-detail-actions {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.form-footer.rdm-detail-actions .rdm-action-bar-locked {
+  flex-basis: 100%;
+  order: 99;
+  text-align: center;
+}
+
+/*
  * 动作执行弹窗的字段区：二次确认与必填字段在同一处完成，
  * 每行 2 个字段（弹窗宽 600px，3 列会把日期控件压出滚动条）。
  */
@@ -1685,11 +1811,21 @@
   margin-bottom: 16px;
 }
 
+/*
+ * 栅格子项必须允许收缩：1fr 轨道的默认最小宽度是 min-content，
+ * 下拉选中项文字一长（如「PROJ2026101801 · 推廣金重構項目」）就会把整列撑出弹窗右侧，
+ * 表现为「所属项目选择的数据溢出」（用户实测）。
+ */
+.rdm-action-modal-fields > div {
+  min-width: 0;
+}
+
 .rdm-action-modal-fields .ant-select,
 .rdm-action-modal-fields .ant-picker,
 .rdm-action-modal-fields .ant-input-number,
 .rdm-action-modal-fields .ant-auto-complete {
   width: 100%;
+  min-width: 0;
 }
 
 /* 弹窗内字段标签：与表单标签同一口径（12px 次色） */
@@ -2522,4 +2658,61 @@
   line-height: 18px;
   padding: 0 6px;
   flex-shrink: 0;
+}
+
+/* ── 进度日报模板编辑：可用占位符条 ── */
+/* 一排多个、可点击插入正文；正文下方不再单独占一张说明表 */
+.tpl-placeholder-panel {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px dashed #d6e4ff;
+  border-radius: 8px;
+  background: #f7faff;
+}
+
+.tpl-placeholder-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1d39c4;
+}
+
+.tpl-placeholder-tip {
+  font-size: 12px;
+  font-weight: 400;
+  color: #8c8c8c;
+}
+
+.tpl-placeholder-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tpl-placeholder-chip {
+  padding: 2px 8px;
+  border: 1px solid #d6e4ff;
+  border-radius: 5px;
+  background: #fff;
+  color: #1d39c4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 20px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tpl-placeholder-chip:hover:not(:disabled) {
+  border-color: #e8720c;
+  background: #fff7e6;
+  color: #e8720c;
+}
+
+.tpl-placeholder-chip:disabled {
+  cursor: default;
+  opacity: 0.6;
 }

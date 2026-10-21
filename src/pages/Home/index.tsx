@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { Button, Input, Tag, Empty, Dropdown, Modal, message, Drawer, Progress, Spin, Tooltip, Popover } from 'antd'
+import { Button, Input, Tag, Empty, Dropdown, Modal, message, Drawer, Progress, Spin, Tooltip, Popover, Select } from 'antd'
 import type { MenuProps } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -21,6 +21,10 @@ import ContextUsageIndicator from './ContextUsageIndicator'
 import TodayMeetingCard from './TodayMeetingCard'
 import { FAV_KEY, loadFavorites, defaultFavorites, MAX_FAVORITES, collectHomeMenus, chineseNameToPinyinEnglish, getGreeting, MAX_IMAGE_SIZE, MAX_FILE_SIZE, DIM_SOURCE_COLOR, DIM_SOURCE_LABEL_KEY } from './homeUtils'
 import AiRichText from './AiRichText'
+import AgentViewCard from './AgentViewCard'
+import AgentActionCard from './AgentActionCard'
+import { MyMemoryDrawer, RememberMemoryModal } from './MyMemory'
+import { submitFeedback } from '../../api/aiFeedback'
 import HelpPopover from '../../components/HelpPopover'
 import type { AiBlockReason } from './homeUtils'
 import {
@@ -53,14 +57,17 @@ import {
   SettingOutlined,
   CheckOutlined,
   UndoOutlined,
-  CompressOutlined,
   ReloadOutlined,
+  BulbOutlined,
+  SaveOutlined,
+  LikeOutlined,
+  DislikeOutlined,
 } from '@ant-design/icons'
 import { sendAgentMessage, fetchEngineStatus, probeEngineStatus, getEngineMode, setEngineMode, getContextWindowOptions, formatContextWindow } from '../../api/agent'
-import type { ChatMessage, ChatAttachment, LlmEngineStatus, LlmEngineMode, LlmRequestOptions, ThinkingDepth } from '../../api/agent'
+import type { ChatMessage, ChatAttachment, LlmEngineStatus, LlmEngineMode, LlmRequestOptions, ThinkingDepth, AgentPendingAction } from '../../api/agent'
 import { fetchMyQuotaUsage, fetchMyModels, fetchQuotaCheck, currencySymbol, formatNumber, formatCost } from '../../api/aiMyCenter'
 import type { MyQuotaUsage, MyModel, QuotaDimension, QuotaSource, QuotaCheckResult } from '../../api/aiMyCenter'
-import { fetchConversations, createConversation, updateConversation, deleteConversation, fetchDeletedConversations, restoreConversation, permanentDeleteConversation, serializeChatMessages, parseConversation } from '../../api/aiConversation'
+import { fetchConversations, createConversation, updateConversation, deleteConversation, fetchDeletedConversations, restoreConversation, permanentDeleteConversation, serializeChatMessages, parseConversation, summarizeConversation } from '../../api/aiConversation'
 import type { AiConversation } from '../../api/aiConversation'
 import type { Conversation } from '../../api/aiConversation'
 import './index.css'
@@ -123,6 +130,17 @@ const TOOL_NAME_KEYS: Record<string, string> = {
   query_account_balance: 'home.toolNameAccountBalance',
   query_approvals: 'home.toolNameApprovals',
   query_batches: 'home.toolNameBatches',
+  rdm_list_projects: 'home.toolNameRdmProjects',
+  rdm_project_progress: 'home.toolNameRdmProjectProgress',
+  rdm_list_iterations: 'home.toolNameRdmIterations',
+  rdm_query_requirements: 'home.toolNameRdmRequirements',
+  rdm_requirement_detail: 'home.toolNameRdmRequirementDetail',
+  rdm_my_todos: 'home.toolNameRdmTodos',
+  rdm_person_workload: 'home.toolNameRdmPersonWorkload',
+  rdm_stats_overview: 'home.toolNameRdmStats',
+  rdm_risks: 'home.toolNameRdmRisks',
+  rdm_list_tasks: 'home.toolNameRdmTasks',
+  rdm_prepare_progress_push: 'home.toolNameRdmPush',
 }
 
 
@@ -397,6 +415,43 @@ export default function Home() {
       return updated
     })
   }, [activeConvId])
+
+  /** 确认卡状态变化后回写消息并立即落库，刷新后不丢“已发送/已取消”状态 */
+  const handleActionUpdated = useCallback((messageId: string, actionId: number, next: AgentPendingAction) => {
+    updateActiveMessages((prev) => prev.map((m) => m.id === messageId ? {
+      ...m,
+      pendingActions: (m.pendingActions ?? []).map((a) => a.id === actionId ? { ...a, ...next } : a),
+    } : m), { immediate: true })
+  }, [updateActiveMessages])
+
+  /* ── 记忆 / 反馈（二期）── */
+  const [memoryOpen, setMemoryOpen] = useState(false)
+  const [rememberOpen, setRememberOpen] = useState(false)
+  const [rememberText, setRememberText] = useState('')
+  const [feedbackTarget, setFeedbackTarget] = useState<ChatMessage | null>(null)
+  const [feedbackReason, setFeedbackReason] = useState<string | undefined>(undefined)
+
+  const openRemember = useCallback((msg: ChatMessage) => {
+    setRememberText(msg.content.slice(0, 500))
+    setRememberOpen(true)
+  }, [])
+
+  const handleFeedback = useCallback(async (msg: ChatMessage, rating: 1 | -1, reason?: string) => {
+    try {
+      await submitFeedback({
+        conversationPk: activeConvId ?? undefined,
+        messageId: msg.id,
+        rating,
+        reason,
+        answerPreview: msg.content.slice(0, 500),
+        toolKeys: (msg.toolTraces ?? []).map((tr) => tr.toolKey).join(','),
+      })
+      updateActiveMessages((prev) => prev.map((m) => m.id === msg.id ? { ...m, feedback: rating } : m), { immediate: true })
+      message.success(t('home.feedbackThanks', { defaultValue: '感謝反饋' }))
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : t('home.feedbackFailed', { defaultValue: '反饋提交失敗' }))
+    }
+  }, [activeConvId, updateActiveMessages, t])
 
   /* ── 當前引擎（模型通道 / 使用權限）── */
   const [engine, setEngine] = useState<LlmEngineStatus | null>(null)
@@ -820,6 +875,9 @@ export default function Home() {
         // 后端标记为异常提示（无权/额度/超时/熔断）时：按错误态展示且不入库、不进上下文
         isError: !!reply.errorKind,
         toolTraces: reply.traces,
+        views: reply.views,
+        pendingActions: reply.pendingActions,
+        memorySuggestion: reply.memorySuggestion,
       }], { immediate: true })
       // 累积 tokens 并更新会话
       if (activeConvId && !reply.errorKind) {
@@ -859,35 +917,44 @@ export default function Home() {
     setMessageQueue((prev) => prev.filter((item) => item.id !== id))
   }
 
-  /** 压缩当前会话：保留最近 4 条消息，旧消息替换为摘要标记 */
-  const handleCompressConversation = () => {
-    if (!activeConvId || messages.length <= 4) {
+  /** 压缩当前会话：调用服务端真实摘要，保留最近 N 条消息；失败不伪造摘要 */
+  const handleCompressConversation = async () => {
+    if (!activeConvId || messages.length <= 7) {
       message.info(t('home.convCompressNoNeed'))
       return
     }
-    const keepCount = 4
-    const compressed: ChatMessage[] = [
-      {
-        id: `compress-${Date.now()}`,
-        role: 'assistant',
-        content: `[已压缩：${messages.length - keepCount} 条旧消息已归纳为上下文摘要，保留最近 ${keepCount} 条消息继续对话]`,
-        timestamp: new Date(),
-      },
-      ...messages.slice(-keepCount),
-    ]
-    // 估算压缩后的 tokens（约 4 字符/token）
-    const estimatedTokens = Math.round(
-      compressed.reduce((sum, m) => sum + m.content.length, 0) / 4
-    )
-    updateActiveMessages(() => compressed)
-    setConversations((prev) => prev.map((c) =>
-      c.id === activeConvId ? { ...c, totalTokens: estimatedTokens, messages: compressed } : c
-    ))
-    updateConversation(activeConvId, {
-      messages: serializeChatMessages(compressed),
-      totalTokens: estimatedTokens,
-    }).catch(() => {})
-    message.success(t('home.convCompressed'))
+    try {
+      const result = await summarizeConversation(activeConvId)
+      if (!result.compressed) {
+        message.info(t('home.convCompressNoNeed'))
+        return
+      }
+      const keepCount = result.keptCount || 6
+      const compressed: ChatMessage[] = [
+        {
+          id: `compress-${Date.now()}`,
+          role: 'assistant',
+          content: `[歷史摘要]\n${result.summary}\n\n（已壓縮 ${result.coveredCount} 條舊消息，保留最近 ${keepCount} 條）`,
+          timestamp: new Date(),
+        },
+        ...messages.slice(-keepCount),
+      ]
+      const estimatedTokens = Math.round(
+        compressed.reduce((sum, m) => sum + m.content.length, 0) / 4,
+      )
+      updateActiveMessages(() => compressed)
+      setConversations((prev) => prev.map((c) =>
+        c.id === activeConvId ? { ...c, totalTokens: estimatedTokens, messages: compressed } : c,
+      ))
+      updateConversation(activeConvId, {
+        messages: serializeChatMessages(compressed),
+        totalTokens: estimatedTokens,
+      }).catch(() => {})
+      message.success(t('home.convCompressed'))
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : t('home.aiServiceError')
+      message.error(msg)
+    }
   }
 
   const dateStr = currentTime.toLocaleDateString(dateLocale, {
@@ -1011,6 +1078,9 @@ export default function Home() {
         timestamp: new Date(),
         isError: !!reply.errorKind,
         toolTraces: reply.traces,
+        views: reply.views,
+        pendingActions: reply.pendingActions,
+        memorySuggestion: reply.memorySuggestion,
       }], { immediate: true })
       // 累积 tokens
       if (activeConvId && !reply.errorKind) {
@@ -1475,6 +1545,9 @@ export default function Home() {
           <button type="button" className="home-ai-tab-add" onClick={() => handleCreateConversation()} title={t('home.convNew')}>
             <PlusOutlined />
           </button>
+          <button type="button" className="home-ai-tab-add" onClick={() => setMemoryOpen(true)} title={t('home.memoryTitle', { defaultValue: '我的記憶' })}>
+            <BulbOutlined />
+          </button>
           {conversations.length > 3 && (
             <Popover
               trigger="click"
@@ -1623,6 +1696,44 @@ export default function Home() {
                       style={msg.isError ? { color: '#FF4D4F', background: '#FFF1F0', border: '1px solid #FFCCC7', borderRadius: 8, padding: '8px 12px' } : undefined}>
                       {msg.role === 'assistant' ? <AiRichText text={msg.content} /> : msg.content}
                     </div>
+                    {msg.role === 'assistant' && !!msg.views?.length && (
+                      <div className="home-chat-views">
+                        {msg.views.map((v) => <AgentViewCard key={v.id} view={v} />)}
+                      </div>
+                    )}
+                    {msg.role === 'assistant' && !!msg.pendingActions?.length && (
+                      <div className="home-chat-actions">
+                        {msg.pendingActions.map((a) => (
+                          <AgentActionCard key={a.id} action={a}
+                            onUpdated={(next) => handleActionUpdated(msg.id, a.id, next)} />
+                        ))}
+                      </div>
+                    )}
+                    {msg.role === 'assistant' && !msg.isError && (
+                      <div className="home-chat-msg-actions">
+                        {msg.memorySuggestion && (
+                          <Button type="link" size="small" icon={<BulbOutlined />}
+                            className="home-memory-suggestion"
+                            onClick={() => { setRememberText(msg.memorySuggestion ?? ''); setRememberOpen(true) }}>
+                            {t('home.memorySuggestion', {
+                              defaultValue: '記住“{{text}}”',
+                              text: msg.memorySuggestion,
+                            })}
+                          </Button>
+                        )}
+                        <Button type="link" size="small" icon={<SaveOutlined />} onClick={() => openRemember(msg)}>
+                          {t('home.remember', { defaultValue: '記住這條' })}
+                        </Button>
+                        <Tooltip title={t('home.feedbackUp', { defaultValue: '有幫助' })}>
+                          <Button type="text" size="small" className={msg.feedback === 1 ? 'is-active' : ''}
+                            icon={<LikeOutlined />} onClick={() => handleFeedback(msg, 1)} />
+                        </Tooltip>
+                        <Tooltip title={t('home.feedbackDown', { defaultValue: '沒幫助' })}>
+                          <Button type="text" size="small" className={msg.feedback === -1 ? 'is-active' : ''}
+                            icon={<DislikeOutlined />} onClick={() => { setFeedbackTarget(msg); setFeedbackReason(undefined) }} />
+                        </Tooltip>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -2043,6 +2154,35 @@ export default function Home() {
           <Empty description={t('home.usageEmpty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
         )}
       </Drawer>
+
+      <MyMemoryDrawer open={memoryOpen} onClose={() => setMemoryOpen(false)} />
+      <RememberMemoryModal open={rememberOpen} initialContent={rememberText}
+        onClose={() => setRememberOpen(false)} />
+      <Modal
+        open={!!feedbackTarget}
+        title={t('home.feedbackTitle', { defaultValue: '告訴我們哪裡不好' })}
+        onCancel={() => setFeedbackTarget(null)}
+        onOk={async () => {
+          if (!feedbackTarget) return
+          await handleFeedback(feedbackTarget, -1, feedbackReason)
+          setFeedbackTarget(null)
+        }}
+        okText={t('common.submit', { defaultValue: '提交' })}
+        destroyOnClose
+      >
+        <Select
+          style={{ width: '100%' }}
+          placeholder={t('home.feedbackReasonPlaceholder', { defaultValue: '選擇原因（可選）' })}
+          value={feedbackReason}
+          onChange={setFeedbackReason}
+          options={[
+            { value: 'wrong', label: t('home.feedbackReasonWrong', { defaultValue: '答非所問' }) },
+            { value: 'data', label: t('home.feedbackReasonData', { defaultValue: '數據不對' }) },
+            { value: 'verbose', label: t('home.feedbackReasonVerbose', { defaultValue: '太囉嗦' }) },
+            { value: 'permission', label: t('home.feedbackReasonPermission', { defaultValue: '權限提示不清' }) },
+          ]}
+        />
+      </Modal>
     </div>
   )
 }

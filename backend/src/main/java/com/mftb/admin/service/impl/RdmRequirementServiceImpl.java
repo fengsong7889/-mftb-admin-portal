@@ -62,6 +62,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -104,6 +105,26 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
      * 而不是像 {@code null} 那样被 {@code toWrapper} 当成「不受限 = 全量」。
      */
     private static final Long UNAUTHENTICATED_SCOPE_ID = -1L;
+
+    /**
+     * PRD 階段的細分狀態（受理後、排期前）。
+     * <p>只有進入這些狀態才允許編寫 PRD / 發起評審：
+     * 評估中的需求連「做不做」都還沒定，此時寫 PRD、出評審結論屬於越級操作，
+     * 會造成「評審已通過但頁面還讓你接受需求」的自相矛盾狀態。
+     */
+    private static final Set<String> PRD_PHASE_STATUSES = Set.of(
+            RdmConstants.STATUS_ACCEPTED,
+            RdmConstants.STATUS_PRD_DESIGNING,
+            RdmConstants.STATUS_REVIEWING,
+            RdmConstants.STATUS_REVIEW_PASSED);
+
+    /** V3 交付進度投影的階段碼（与前端 RDM_STAGE 同詞彙，只用于展示） */
+    private static final String STAGE_DESIGN = "design";
+    private static final String STAGE_REVIEW = "review";
+    private static final String STAGE_DEV = "dev";
+    private static final String STAGE_TEST = "test";
+    private static final String STAGE_UAT = "uat";
+    private static final String STAGE_RELEASE = "release";
 
     private final RdmRequirementMapper requirementMapper;
     private final RdmRequirementTargetMapper targetMapper;
@@ -173,7 +194,10 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         List<RdmRequirementVO> records = result.getRecords().stream()
                 .map(r -> RdmRequirementVO.from(r, stageOf))
                 .toList();
+        // V3 交付階段投影必須批量化：逐行查會把列表打成 N+1（一頁 20 行 = 40 次往返）
+        fillDeliveryStageBatch(records);
         attachHandlers(records);
+        fillOwnershipNames(records);
         return new PageResult<>(records, result.getTotal());
     }
 
@@ -213,6 +237,43 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         for (RdmRequirementVO vo : records) {
             Map<Long, RdmRequirementVO.HandlerPerson> m = byReq.get(vo.getId());
             vo.setHandlers(m == null ? java.util.List.of() : new java.util.ArrayList<>(m.values()));
+        }
+    }
+
+    /**
+     * 批量回填归属名称：所属项目 / 所属迭代各一次 IN 查询，不逐行回查。
+     * <p>行上只存 projectId / iterationCode，名称必须由服务端联表给出：
+     * 前端下拉字典受 200 条上限约束，历史迭代会退化成裸编码，看起来像「没挂迭代」。
+     * <p>包级可见便于直测：走 page() 全链路要桩 operatorResolver / 权限 / 分页，得不偿失。
+     */
+    void fillOwnershipNames(List<RdmRequirementVO> records) {
+        if (records == null || records.isEmpty()) {
+            return;
+        }
+        List<Long> projectIds = records.stream().map(RdmRequirementVO::getProjectId)
+                .filter(Objects::nonNull).distinct().toList();
+        Map<Long, String> projectNames = new LinkedHashMap<>();
+        if (!projectIds.isEmpty()) {
+            String placeholders = String.join(",", java.util.Collections.nCopies(projectIds.size(), "?"));
+            // rdm_project 建表即无 deleted 列（Batch 1），写 deleted = 0 会 Unknown column
+            jdbcTemplate.queryForList(
+                            "SELECT id, name FROM rdm_project WHERE id IN (" + placeholders + ")",
+                            projectIds.toArray())
+                    .forEach(row -> projectNames.put(((Number) row.get("id")).longValue(), String.valueOf(row.get("name"))));
+        }
+        List<String> iterationCodes = records.stream().map(RdmRequirementVO::getIterationCode)
+                .filter(StringUtils::hasText).distinct().toList();
+        Map<String, String> iterationNames = new LinkedHashMap<>();
+        if (!iterationCodes.isEmpty()) {
+            String placeholders = String.join(",", java.util.Collections.nCopies(iterationCodes.size(), "?"));
+            jdbcTemplate.queryForList(
+                            "SELECT code, name FROM rdm_iteration WHERE deleted = 0 AND code IN (" + placeholders + ")",
+                            iterationCodes.toArray())
+                    .forEach(row -> iterationNames.put(String.valueOf(row.get("code")), String.valueOf(row.get("name"))));
+        }
+        for (RdmRequirementVO vo : records) {
+            vo.setProjectName(vo.getProjectId() == null ? null : projectNames.get(vo.getProjectId()));
+            vo.setIterationName(vo.getIterationCode() == null ? null : iterationNames.get(vo.getIterationCode()));
         }
     }
 
@@ -368,9 +429,9 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         counts.put("total", countStatsSubset(query, userId, current, approvingIds, q -> { }));
         counts.put("overdue", countStatsSubset(query, userId, current, approvingIds, q -> q.setOverdueOnly(true)));
         counts.put("toAccept", countStatsSubset(query, userId, current, approvingIds,
-                q -> q.setStatus(RdmConstants.STATUS_UAT_PENDING)));
+                q -> { q.setStatuses(null); q.setStatus(RdmConstants.STATUS_UAT_PENDING); }));
         counts.put("pool", countStatsSubset(query, userId, current, approvingIds,
-                q -> q.setStatus(RdmConstants.STATUS_POOL)));
+                q -> { q.setStatuses(null); q.setStatus(RdmConstants.STATUS_POOL); }));
         return counts;
     }
 
@@ -416,13 +477,8 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         requireVisible(req, current, "查看詳情");
         Map<String, String> stageOf = configService.stageMap();
         RdmRequirementVO vo = RdmRequirementVO.from(req, stageOf);
-        // 归属体系改造：项目名联表下发（此前 VO 只有 projectId，前端只能拼「項目 #id」兜底）
-        if (req.getProjectId() != null) {
-            // rdm_project 无 deleted 列（Batch 1 建表即无），不能写 deleted = 0
-            vo.setProjectName(jdbcTemplate.queryForList(
-                            "SELECT name FROM rdm_project WHERE id = ?", req.getProjectId())
-                    .stream().findFirst().map(r -> String.valueOf(r.get("name"))).orElse(null));
-        }
+        // 归属体系改造：项目名/迭代名统一联表下发（此前 VO 只有 id/code，前端只能拼「項目 #id」兜底）
+        fillOwnershipNames(java.util.List.of(vo));
         vo.setDescription(req.getDescription());
         vo.setExpectResult(req.getExpectResult());
         vo.setBusinessValue(req.getBusinessValue());
@@ -480,6 +536,8 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         // 仅 V3 需求触发，V1/V2 不做额外查询、行为保持不变（也避免测试中 mock 服务返回 null 造成 NPE）。
         boolean flowV3 = req.getFlowVersion() != null && req.getFlowVersion() == RdmConstants.FLOW_VERSION_3;
         if (flowV3) {
+            // V3 交付進度投影（只讀）：需求狀態受理後停住，進度看交付項
+            fillDeliveryStage(vo, req.getId());
             if (RdmConstants.KIND_AGGREGATE.equals(req.getRequirementKind())) {
                 List<RdmRequirementStructureService.RequirementTreeNode> children =
                         structureService.getRequirementTree(req.getId());
@@ -532,9 +590,10 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         req.setOverdueFlag(0);
         // 新建需求走新链路（五节点/定稿快照/工时明细）；存量记录保持 flow_version=1，
         // 否则发布闸门会把历史记录一律算成「未做验收准备」。
-        // V3（第二批分层并行链路）：仅当客户端显式传 flowVersion=3 才走 V3，否则一律回落 V2；
-        // 服务端只认 3 与非 3，不接受任意版本号，避免伪造版本绕过闸门口径。V1/V2 行为保持不变。
-        boolean flowV3 = dto.getFlowVersion() != null && dto.getFlowVersion() == RdmConstants.FLOW_VERSION_3;
+        // 交付流程不在提交侧确定（业务方不懂 V2/V3）：创建时保持 V2 占位，
+        // 到准入后的分配/认领窗口再由产研确定（默认 V3，见 applyFlowVersionOnAssignment）。
+        boolean flowV3 = dto.getFlowVersion() != null
+                && dto.getFlowVersion() == RdmConstants.FLOW_VERSION_3;
         req.setFlowVersion(flowV3 ? RdmConstants.FLOW_VERSION_3 : 2);
         if (flowV3) {
             // V3：项目可后关联（准入阶段再挂，允许为空）；需求种类缺省 execution，聚合需求须显式声明 aggregate
@@ -610,7 +669,82 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
     }
 
     /**
-     * V3 执行类需求「已准入」后生成默认交付项（任务19 / 缺口1：正确时机 + 聚合不建 + 幂等）。
+     * 複製需求為新草稿（保留來源鏈）。
+     *
+     * <p><b>為何需要複製</b>：交付流程在分配/認領時確定後即鎖定，已產生任務/提測/驗收的需求
+     * 不允許原地降級（會讓交付項外鍵成為孤兒數據）。需要換交付方式的，就複製一條新需求重走流程，
+     * 原需求及其交付項/評審/測試/驗收記錄完整保留可追溯。
+     *
+     * <p><b>複製邊界</b>：只複製業務內容（標題/類型/優先級/規模/現狀/期望/價值/期望日期/需求對象/
+     * 驗收人/意向 PM）；<b>不複製</b>項目、迭代、交付流程（默認 V2 占位，分配時再定）、附件
+     * （data URL 體積大且需重新確認）、結構父需求、評審/PRD/任務/交付項/驗收記錄。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public RdmRequirementVO copy(Long id) {
+        RdmRequirement source = requireRequirement(id);
+        RdmRequirementCreateDTO dto = new RdmRequirementCreateDTO();
+        dto.setMode(RdmConstants.STATUS_DRAFT);
+        dto.setTitle(copyTitle(source.getTitle()));
+        dto.setReqType(source.getReqType());
+        dto.setPriority(source.getPriority());
+        dto.setComplexity(source.getComplexity());
+        dto.setDescription(source.getDescription());
+        dto.setExpectResult(source.getExpectResult());
+        dto.setBusinessValue(source.getBusinessValue());
+        dto.setExpectDate(source.getExpectDate() == null ? null : source.getExpectDate().toString());
+        dto.setAssignMode(source.getAssigneePmUserId() != null ? "PM" : "POOL");
+        dto.setPmUserId(source.getAssigneePmUserId());
+        dto.setAcceptorUserId(source.getAcceptorUserId());
+        dto.setTargets(copyTargets(id));
+        RdmRequirementVO created = create(dto);
+        if (created != null && created.getId() != null) {
+            // 來源鏈：複用 parent_req_id/parent_req_no（與驗收遺留同屬「從哪條需求來」的追溯字段）
+            jdbcTemplate.update(
+                    "UPDATE rdm_requirement SET parent_req_id = ?, parent_req_no = ? WHERE id = ?",
+                    source.getId(), source.getReqNo(), created.getId());
+            SysUser current = operatorResolver.currentUser();
+            log.info("複製需求: sourceId={}, newId={}, operator={}",
+                    id, created.getId(), current == null ? null : current.getName());
+        }
+        return created;
+    }
+
+    /** 複製標題：加「（複製）」後綴並保證不超標題上限 */
+    private String copyTitle(String title) {
+        String suffix = "（複製）";
+        String base = title == null ? "" : title.trim();
+        int max = RdmConstants.TITLE_MAX_LENGTH;
+        if (base.length() + suffix.length() <= max) {
+            return base + suffix;
+        }
+        return base.substring(0, Math.max(0, max - suffix.length())) + suffix;
+    }
+
+    /** 複製需求對象（定位信息），截圖路徑一並保留（與附件不同，它屬於定位證據） */
+    private List<RdmRequirementCreateDTO.Target> copyTargets(Long reqId) {
+        List<RdmRequirementTarget> rows = targetMapper.selectList(
+                new LambdaQueryWrapper<RdmRequirementTarget>().eq(RdmRequirementTarget::getReqId, reqId));
+        List<RdmRequirementCreateDTO.Target> targets = new ArrayList<>();
+        if (rows == null) {
+            return targets;
+        }
+        for (RdmRequirementTarget row : rows) {
+            RdmRequirementCreateDTO.Target target = new RdmRequirementCreateDTO.Target();
+            target.setAnchorType(row.getAnchorType());
+            target.setSystemCode(row.getSystemCode());
+            target.setMenuKey(row.getMenuKey());
+            target.setPagePath(row.getPagePath());
+            target.setAnchorName(row.getAnchorName());
+            target.setAnchorDesc(row.getAnchorDesc());
+            target.setScreenshotUrl(row.getScreenshotPath());
+            targets.add(target);
+        }
+        return targets;
+    }
+
+    /**
+     * V3 执行类需求「已准入」后生成默认交付项（任务19 / 缺口1：正确时机 + 聚合 不建 + 幂等）。
      * <p>准入 = 已通过准入审批或无需审批直接进池/受理。以下情形一律不建：
      * <ul>
      *   <li>非 V3 流程（V1/V2 整需求链路不以交付项为单位，语义完全不变）；</li>
@@ -1052,6 +1186,265 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
     }
 
     /**
+     * 靜默聯動推進：獨立保存點（NESTED），失敗只回 false。
+     * <p>不能沿用「在調用方 try/catch {@link #transition}」的寫法：內層事務拋錯後會把外層事務
+     * 標記為 rollback-only，即便這裡接住了異常，外層提交時依舊報
+     * {@code UnexpectedRollbackException}（前端看到的就是「系統繁忙」）。
+     * <p>做法：業務校驗拋出的異常不在此處接住，讓它穿出 NESTED 邊界——Spring 只回滾到保存點，
+     * 不會標記外層事務；再由調用方接住並記日誌。
+     */
+    @Override
+    @Transactional(propagation = Propagation.NESTED, rollbackFor = Exception.class)
+    public boolean tryAdvanceQuietly(Long reqId, String actionCode, RdmTransitionDTO payload) {
+        RdmRequirement req = reqId == null ? null : requirementMapper.selectById(reqId);
+        if (req == null || !StringUtils.hasText(actionCode)) {
+            return false;
+        }
+        // V3 分批交付：需求層只到受理，PRD/評審不再推動需求狀態（由交付項推進）
+        if (!flowVersionGuard.isTransitionActionAllowed(req.getFlowVersion(), actionCode)) {
+            log.info("聯動流轉跳過（V3 鏈路不允許該動作）: reqNo={}, action={}", req.getReqNo(), actionCode);
+            return false;
+        }
+        if (configService.findTransition(req.getStatus(), actionCode) == null) {
+            return false;
+        }
+        RdmTransitionDTO dto = payload == null ? new RdmTransitionDTO() : payload;
+        dto.setActionCode(actionCode);
+        // 同一事務內自調用（不經過代理）：業務校驗失敗的異常穿出 NESTED 邊界，由調用方接住
+        transition(req.getId(), dto);
+        return true;
+    }
+
+    /**
+     * 依照已存在的 PRD / 評審事實向前對齊狀態（只對 V1/V2 整需求鏈路）。
+     * <p>對齊規則（每一步仍受 {@code rdm_transition} 配置約束）：
+     * <ol>
+     *   <li>已受理 + 已有 PRD → prd_start（PRD 設計中）；</li>
+     *   <li>PRD 設計中 + 存在待評審的評審 / 最新評審已通過 → review_start（評審中）；</li>
+     *   <li>評審中 + 無待評審 → 最新通過則 review_pass；最新退回則 review_reject（回到 PRD 設計中）。</li>
+     * </ol>
+     * <p>不做的事：不自行受理（受理必須由產品給出承諾日期）、不對齊到排期之後的狀態、
+     * 不對最新一版已被退回的需求反覆重推（避免死循環）。
+     */
+    @Override
+    @Transactional(propagation = Propagation.NESTED, rollbackFor = Exception.class)
+    public void alignPrdPhaseStatus(Long reqId) {
+        RdmRequirement req = reqId == null ? null : requirementMapper.selectById(reqId);
+        if (req == null || req.getFlowVersion() != null && req.getFlowVersion() == RdmConstants.FLOW_VERSION_3) {
+            return;
+        }
+        SysUser current = operatorResolver.currentUser();
+        if (current == null) {
+            return;
+        }
+        // 最多走 3 步（受理→PRD 設計→評審中→評審通過）；上限只是防意外遞歸，不是業務規則
+        for (int step = 0; step < 3; step++) {
+            String action = nextAlignAction(req.getId(), req.getStatus());
+            if (action == null) {
+                return;
+            }
+            RdmTransitionDTO dto = new RdmTransitionDTO();
+            dto.setActionCode(action);
+            dto.setRemark(alignRemark(action));
+            try {
+                transitionInternal(req, action, dto, current, accessGuard.activeRoles(req.getId(), current), true);
+            } catch (BusinessException e) {
+                log.info("PRD 階段狀態對齊未完成: reqNo={}, action={}, reason={}", req.getReqNo(), action, e.getMessage());
+                return;
+            }
+            req = requirementMapper.selectById(reqId);
+            if (req == null) {
+                return;
+            }
+        }
+    }
+
+    /** 對齊時要執行的下一個動作；返回 null 表示現有狀態已與事實一致 */
+    private String nextAlignAction(Long reqId, String status) {
+        switch (status == null ? "" : status) {
+            case RdmConstants.STATUS_ACCEPTED:
+                return countRows("SELECT COUNT(*) FROM rdm_prd WHERE req_id = ? AND deleted = 0", reqId) > 0
+                        ? RdmConstants.ACTION_PRD_START : null;
+            case RdmConstants.STATUS_PRD_DESIGNING: {
+                if (countRows("SELECT COUNT(*) FROM rdm_review WHERE req_id = ? AND deleted = 0 AND conclusion = 'pending'", reqId) > 0) {
+                    return RdmConstants.ACTION_REVIEW_START;
+                }
+                // 已評審且最新一版通過：把狀態補到評審中，下一步再補評審通過
+                return "passed".equals(latestReviewConclusion(reqId)) ? RdmConstants.ACTION_REVIEW_START : null;
+            }
+            case RdmConstants.STATUS_REVIEWING: {
+                if (countRows("SELECT COUNT(*) FROM rdm_review WHERE req_id = ? AND deleted = 0 AND conclusion = 'pending'", reqId) > 0) {
+                    return null;
+                }
+                String latest = latestReviewConclusion(reqId);
+                if (latest == null) {
+                    return null;
+                }
+                return "passed".equals(latest) ? RdmConstants.ACTION_REVIEW_PASS : RdmConstants.ACTION_REVIEW_REJECT;
+            }
+            default:
+                return null;
+        }
+    }
+
+    /** 最新一條評審結論（按 id 倒序）；沒有評審時返回 null */
+    private String latestReviewConclusion(Long reqId) {
+        List<String> rows = jdbcTemplate.queryForList(
+                "SELECT conclusion FROM rdm_review WHERE req_id = ? AND deleted = 0 ORDER BY id DESC LIMIT 1",
+                String.class, reqId);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    private long countRows(String sql, Long reqId) {
+        Long count = jdbcTemplate.queryForObject(sql, Long.class, reqId);
+        return count == null ? 0L : count;
+    }
+
+    /** 對齊留痕：寫進狀態流水的說明，讓人看得出這一步不是人點的 */
+    private String alignRemark(String action) {
+        return RdmConstants.ACTION_REVIEW_REJECT.equals(action)
+                ? "自動對齊：最新評審結論為退回，狀態回到 PRD 設計中"
+                : "自動對齊：依已存在的 PRD / 評審記錄推進狀態";
+    }
+
+    /**
+     * V3 交付進度投影：由交付項事實推導九段階段條的當前段（<b>只讀</b>，不改需求狀態）。
+     *
+     * <p>為什麼不直接用需求狀態：V3 受理後，設計/開發/測試/驗收全部以交付項為推進單位，
+     * 需求狀態按設計停在 accepted；若界面直接畫 status，會永遠停在「PRD 設計」而誤導用户。
+     *
+     * <p>聚合口徑（短板）：多個交付項並行時取「最落後的未完成項」所在階段——
+     * 能不能上線由最慢那條決定，取最前沿會掩蓋風險。
+     * <ol>
+     *   <li>無交付項、或最落後項停在 preparing：按 PRD / 評審事實 → design 或 review；</li>
+     *   <li>全部 done → release（上線歸檔）；</li>
+     *   <li>其餘：developing → dev，testing → test，
+     *       pending_acceptance → uat，pending_release / released_pending → release。</li>
+     * </ol>
+     */
+    private void fillDeliveryStage(RdmRequirementVO vo, Long reqId) {
+        /*
+         * 只对「已受理及以后」的 V3 需求做投影：评估中/已分配阶段的交付项还是空的，
+         * 若也推到 design，阶段条会从「分配受理」直接跳到「PRD 設計」，
+         * 反而把「还没接受需求」掩盖掉。
+         */
+        if (!PRD_PHASE_STATUSES.contains(vo.getStatus())) {
+            return;
+        }
+        // rdm_delivery_item 无 deleted 列（Batch 1 建表即无），不能写 deleted = 0
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT status, COUNT(*) AS cnt FROM rdm_delivery_item WHERE req_id = ? GROUP BY status", reqId);
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (Map<String, Object> row : rows) {
+            String status = row.get("status") == null
+                    ? RdmConstants.DI_PREPARING : String.valueOf(row.get("status"));
+            counts.merge(status, ((Number) row.get("cnt")).intValue(), Integer::sum);
+        }
+        long reviews = countRows("SELECT COUNT(*) FROM rdm_review WHERE req_id = ? AND deleted = 0", reqId);
+        applyDeliveryStage(vo, counts, reviews);
+    }
+
+    /**
+     * 列表批量投影：当前页所有 V3 需求共用两条 GROUP BY 查询，避免逐行 N+1。
+     * <p>口径与详情完全同源（同一 {@link #applyDeliveryStage}），列表/看板不会与详情分叉。
+     */
+    private void fillDeliveryStageBatch(List<RdmRequirementVO> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return;
+        }
+        List<RdmRequirementVO> targets = new ArrayList<>();
+        for (RdmRequirementVO vo : rows) {
+            if (vo.getId() != null && vo.getFlowVersion() != null
+                    && vo.getFlowVersion() == RdmConstants.FLOW_VERSION_3
+                    && PRD_PHASE_STATUSES.contains(vo.getStatus())) {
+                targets.add(vo);
+            }
+        }
+        if (targets.isEmpty()) {
+            return;
+        }
+        List<Long> ids = targets.stream().map(RdmRequirementVO::getId).toList();
+        // 只拼接占位符个数，值全部走参数绑定（不拼用户数据）
+        String placeholders = String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
+        Object[] args = ids.toArray();
+        List<Map<String, Object>> itemRows = jdbcTemplate.queryForList(
+                "SELECT req_id, status, COUNT(*) AS cnt FROM rdm_delivery_item WHERE req_id IN ("
+                        + placeholders + ") GROUP BY req_id, status", args);
+        List<Map<String, Object>> reviewRows = jdbcTemplate.queryForList(
+                "SELECT req_id, COUNT(*) AS cnt FROM rdm_review WHERE req_id IN ("
+                        + placeholders + ") AND deleted = 0 GROUP BY req_id", args);
+        Map<Long, Map<String, Integer>> countsByReq = new LinkedHashMap<>();
+        for (Map<String, Object> row : itemRows) {
+            Long reqId = ((Number) row.get("req_id")).longValue();
+            String status = row.get("status") == null
+                    ? RdmConstants.DI_PREPARING : String.valueOf(row.get("status"));
+            countsByReq.computeIfAbsent(reqId, k -> new LinkedHashMap<>())
+                    .merge(status, ((Number) row.get("cnt")).intValue(), Integer::sum);
+        }
+        Map<Long, Long> reviewsByReq = new LinkedHashMap<>();
+        for (Map<String, Object> row : reviewRows) {
+            reviewsByReq.put(((Number) row.get("req_id")).longValue(), ((Number) row.get("cnt")).longValue());
+        }
+        for (RdmRequirementVO vo : targets) {
+            applyDeliveryStage(vo, countsByReq.getOrDefault(vo.getId(), Map.of()),
+                    reviewsByReq.getOrDefault(vo.getId(), 0L));
+        }
+    }
+
+    /** 单条/批量的共用投影：由交付项计数 + 评审计数推出阶段与 N/M */
+    private void applyDeliveryStage(RdmRequirementVO vo, Map<String, Integer> counts, long reviewCount) {
+        int total = 0;
+        int done = 0;
+        int minOrder = Integer.MAX_VALUE;
+        String minStatus = null;
+        for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+            String status = entry.getKey();
+            int cnt = entry.getValue() == null ? 0 : entry.getValue();
+            total += cnt;
+            if (RdmConstants.DI_DONE.equals(status)) {
+                done += cnt;
+                continue;
+            }
+            int order = deliveryStatusOrder(status);
+            if (order < minOrder) {
+                minOrder = order;
+                minStatus = status;
+            }
+        }
+        vo.setDeliveryItemCount(total);
+        vo.setDeliveryDoneCount(done);
+        vo.setDeliveryItemStatusCounts(counts);
+        if (total == 0 || RdmConstants.DI_PREPARING.equals(minStatus)) {
+            // 最落后的交付项还停在「待準備」时，交付项回答不了「PRD 写完没、评审了没」，改按 PRD / 评审事实定段
+            vo.setDeliveryStage(reviewCount > 0 ? STAGE_REVIEW : STAGE_DESIGN);
+            return;
+        }
+        if (done == total) {
+            vo.setDeliveryStage(STAGE_RELEASE);
+            return;
+        }
+        vo.setDeliveryStage(switch (minStatus == null ? "" : minStatus) {
+            case RdmConstants.DI_TESTING -> STAGE_TEST;
+            case RdmConstants.DI_PENDING_ACCEPTANCE -> STAGE_UAT;
+            case RdmConstants.DI_PENDING_RELEASE, RdmConstants.DI_RELEASED_PENDING -> STAGE_RELEASE;
+            default -> STAGE_DEV;
+        });
+    }
+
+    /** 交付項狀態先後序（取短板用）：數值越小越落後 */
+    private static int deliveryStatusOrder(String status) {
+        return switch (status) {
+            case RdmConstants.DI_PREPARING -> 1;
+            case RdmConstants.DI_DEVELOPING -> 2;
+            case RdmConstants.DI_TESTING -> 3;
+            case RdmConstants.DI_PENDING_ACCEPTANCE -> 4;
+            case RdmConstants.DI_PENDING_RELEASE -> 5;
+            case RdmConstants.DI_RELEASED_PENDING -> 6;
+            default -> 0;
+        };
+    }
+
+    /**
      * 调整迭代（归属体系改造）：属性变更而非状态流转，故不走 rdm_transition 状态机。
      * <p>场景：研发 bug / 需求不足要放另外版本，直接把需求换到其它迭代（对齐 Jira Move to sprint）。
      * <p>关键联动：同步该需求下未完成任务的 iteration_code——需求迭代与任务迭代必须同源，
@@ -1193,11 +1586,22 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
      */
     private void transitionInternal(RdmRequirement req, String actionCode, RdmTransitionDTO dto,
                                     SysUser current, Set<String> myRoles) {
+        transitionInternal(req, actionCode, dto, current, myRoles, false);
+    }
+
+    /**
+     * 一次流轉的實際執行。
+     *
+     * @param systemAlign 為真時表示這是「依事實對齊狀態」的系統動作：跳過角色校驗與通知
+     *                    （評審結論本身已在錄入時鑑權，這裡只是把狀態補到既成事實上）。
+     */
+    private void transitionInternal(RdmRequirement req, String actionCode, RdmTransitionDTO dto,
+                                    SysUser current, Set<String> myRoles, boolean systemAlign) {
         RdmConfigVO.Transition rule = configService.findTransition(req.getStatus(), actionCode);
         if (rule == null) {
             throw new BusinessException("當前狀態「" + labelOf(req.getStatus()) + "」不允許執行該操作，請刷新後重試");
         }
-        if (!canPerform(rule, current, myRoles)) {
+        if (!systemAlign && !canPerform(rule, current, myRoles)) {
             throw new BusinessException("您沒有權限執行「" + rule.getActionName() + "」");
         }
         applyRequiredGuard(rule, dto);
@@ -1218,13 +1622,18 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
             upsertRole(req.getId(), pm, RdmConstants.ROLE_PM);
         }
         if (StringUtils.hasText(dto != null ? dto.getRemark() : null)) {
-            if (actionCode.contains("reject") || actionCode.contains("fail")) {
+            // 對齊不是一次新的駁回：不能再把 rejectCount 加一輪（那會把駁回率算成事實的兩倍）
+            if (!systemAlign && (actionCode.contains("reject") || actionCode.contains("fail"))) {
                 req.setRejectReason(dto.getRemark());
                 req.setRejectCount(value(req.getRejectCount()) + 1);
             }
         }
         switch (actionCode) {
-            case RdmConstants.ACTION_DISPATCH -> applyProjectAndIteration(req, dto, false);
+            case RdmConstants.ACTION_DISPATCH -> {
+                // 分配是产研第一次确定交付方式的时点：默认 V3，也可在弹窗里选 V2
+                applyFlowVersionOnAssignment(req, dto, current == null ? null : current.getId());
+                applyProjectAndIteration(req, dto, false);
+            }
             case RdmConstants.ACTION_ACCEPT -> {
                 req.setAcceptTime(now);
                 req.setPromisedPrdDate(parseDate(dto == null ? null : dto.getPromisedDate()));
@@ -1295,9 +1704,21 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         markMilestoneActual(req.getId(), actionCode, now, operatorResolver.operatorSignature(actor));
         appendStatusLog(req, fromStatus, actor, actionCode, dto == null ? null : dto.getRemark());
 
-        notifyOnTransition(req, rule, actor);
-        log.info("需求流轉: reqNo={}, {} -> {}, action={}, operator={}",
-                req.getReqNo(), fromStatus, req.getStatus(), actionCode, req.getUpdatedBy());
+        if (!systemAlign) {
+            notifyOnTransition(req, rule, actor);
+        }
+        log.info("需求流轉: reqNo={}, {} -> {}, action={}, operator={}{}",
+                req.getReqNo(), fromStatus, req.getStatus(), actionCode, req.getUpdatedBy(),
+                systemAlign ? "（自動對齊）" : "");
+
+        /*
+         * 受理後立刻用既有事實校對一次狀態：舊數據可能在「評估中」就先寫了 PRD、甚至評審也出了結論，
+         * 只把狀態推到「已受理」會讓頁面又要求產品經理再寫一次 PRD（使用者實際遇到的混亂）。
+         */
+        if (!systemAlign && RdmConstants.ACTION_ACCEPT.equals(actionCode)
+                && PRD_PHASE_STATUSES.contains(req.getStatus())) {
+            alignPrdPhaseStatus(req.getId());
+        }
     }
 
     /**
@@ -1312,6 +1733,60 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
      * <p>不信任前端：项目/迭代存在性都走服务端查库校验。
      * <p>包可见：与 {@link #canPerform}/{@link #applyRequiredGuard} 同构，供单测直接钉住闸门口径。
      */
+    /**
+     * 分配/认领时确定交付流程（默认 V3 分批交付）。
+     *
+     * <p><b>为什么不在提交时选</b>：业务方不知道 V2/V3 是什么，也不该由他们决定；
+     * 提交时写入 V2 占位，到准入后的分配/认领才由产研确定。
+     *
+     * <p><b>窗口与安全边界</b>：
+     * <ul>
+     *   <li>仅 pool / assigned / evaluating 可确定；已受理或存量需求保持原版本；</li>
+     *   <li>已有未取消任务的一律不得升到 V3：那些任务没有交付项归属，
+     *       强行升级会出现「V2 任务 + V3 交付项」混合态；</li>
+     *   <li>升 V3 时补建默认交付项，需求种类缺省 execution。</li>
+     * </ul>
+     */
+    private void applyFlowVersionOnAssignment(RdmRequirement req, RdmTransitionDTO dto, Long operatorId) {
+        if (req == null || req.getId() == null) {
+            return;
+        }
+        Integer existing = req.getFlowVersion();
+        if (existing != null && existing == RdmConstants.FLOW_VERSION_3) {
+            return;
+        }
+        if (!FLOW_SELECTABLE_STATUSES.contains(req.getStatus())) {
+            return;
+        }
+        Integer explicit = dto == null ? null : dto.getFlowVersion();
+        Integer requested = explicit == null ? RdmConstants.FLOW_VERSION_3 : explicit;
+        if (requested != RdmConstants.FLOW_VERSION_3 && requested != 2) {
+            throw new BusinessException("交付流程只能是 V2 或 V3");
+        }
+        Long openTasks = taskMapper.selectCount(new LambdaQueryWrapper<RdmWorkTask>()
+                .eq(RdmWorkTask::getReqId, req.getId())
+                .ne(RdmWorkTask::getStatus, "cancelled"));
+        if (openTasks != null && openTasks > 0) {
+            // 已有任务：只有用户「明确」要求切 V3 才拒绝；默认升级（改派/存量重分配）
+            // 必须静默保持 V2，否则每次改派都会被流程选择拦住
+            if (explicit != null && explicit == RdmConstants.FLOW_VERSION_3) {
+                throw new BusinessException("需求已創建任務，不能再切換為分批交付（V3）");
+            }
+            return;
+        }
+        req.setFlowVersion(requested);
+        if (requested == RdmConstants.FLOW_VERSION_3) {
+            if (!StringUtils.hasText(req.getRequirementKind())) {
+                req.setRequirementKind(RdmConstants.KIND_EXECUTION);
+            }
+            deliveryItemService.getOrCreateDefaultItem(req.getId(), operatorId);
+        }
+    }
+
+    /** 交付流程可确定的窗口：准入后、研发执行前（分配/认领/评估） */
+    private static final Set<String> FLOW_SELECTABLE_STATUSES = Set.of(
+            RdmConstants.STATUS_POOL, RdmConstants.STATUS_ASSIGNED, RdmConstants.STATUS_EVALUATING);
+
     void applyProjectAndIteration(RdmRequirement req, RdmTransitionDTO dto, boolean required) {
         Long projectId = dto == null ? null : dto.getProjectId();
         String iterationCode = dto == null ? null : dto.getIterationCode();
@@ -1430,6 +1905,13 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
             throw new BusinessException("該需求已被他人認領或狀態已變更，請刷新後重試");
         }
         RdmRequirement claimed = requireRequirement(id);
+        // 认领是产研接手的第一刻：默认确定交付流程（V3），已建过任务的需求保持原版本
+        Integer flowBefore = claimed.getFlowVersion();
+        applyFlowVersionOnAssignment(claimed, null, current.getId());
+        if (!java.util.Objects.equals(flowBefore, claimed.getFlowVersion())) {
+            jdbcTemplate.update("UPDATE rdm_requirement SET flow_version = ?, requirement_kind = ? WHERE id = ?",
+                    claimed.getFlowVersion(), claimed.getRequirementKind(), id);
+        }
         upsertRole(id, current, RdmConstants.ROLE_PM);
         appendStatusLog(claimed, RdmConstants.STATUS_POOL, current, RdmConstants.ACTION_CLAIM,
                 "產品經理自需求池認領：" + current.getName());

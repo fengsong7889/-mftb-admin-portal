@@ -11,6 +11,15 @@ import java.util.List;
  */
 public class RdmTestBatchVO {
 
+    /** 按任务解析出的提测范围（交付项） */
+    @Data
+    public static class TaskScopeItem {
+        private Long id;
+        private String itemNo;
+        private String title;
+        private String status;
+    }
+
     /** 提测批次列表项 */
     @Data
     public static class ListItem {

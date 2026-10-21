@@ -1,4 +1,4 @@
-import { TOKEN_KEY } from './request'
+import request, { TOKEN_KEY } from './request'
 import { confirmExternalCall } from '../components/McpExternalConfirm'
 
 /**
@@ -40,6 +40,14 @@ export interface ChatMessage {
    * 与 isError 同理：它们是渲染用的元信息，不是对话内容。
    */
   toolTraces?: ToolTrace[]
+  /** 服务端结构化视图（随消息持久化，刷新可回放） */
+  views?: AgentView[]
+  /** 待确认动作（随消息持久化，刷新后仍可确认/取消） */
+  pendingActions?: AgentPendingAction[]
+  /** 用户反馈：1=赞 -1=踩；随消息持久化，刷新后保留 */
+  feedback?: 1 | -1
+  /** 自动记忆候选（用户确认后才落库；仅当轮展示，不写入会话内容） */
+  memorySuggestion?: string
 }
 
 /** auto=后端按单价值最优选通道；primary/off-peak=显式固定 */
@@ -60,6 +68,59 @@ export interface ToolTrace {
   success: boolean
 }
 
+/** 结构化视图：由服务端按权限收敛后下发，前端只渲染，不解析 Markdown 表格 */
+export interface AgentViewMetric {
+  label: string
+  value: string | number
+  unit?: string
+  tone?: 'default' | 'success' | 'warning' | 'danger'
+  hint?: string
+}
+
+export interface AgentViewColumn {
+  key: string
+  title: string
+  align?: 'left' | 'center' | 'right'
+  width?: number
+  type?: 'text' | 'tag' | 'progress' | 'number' | 'date'
+  toneMap?: Record<string, string>
+}
+
+export interface AgentViewNote {
+  tone?: 'info' | 'warning' | 'danger'
+  text: string
+}
+
+export interface AgentView {
+  id: string
+  kind: 'table' | 'metrics' | 'timeline'
+  title: string
+  subtitle?: string
+  metrics?: AgentViewMetric[]
+  columns?: AgentViewColumn[]
+  rows?: Record<string, unknown>[]
+  notes?: AgentViewNote[]
+  link?: { label: string; route: string }
+  total?: number
+}
+
+/** 待确认动作：模型只能生成预览，真正发送由用户在确认卡上确认 */
+export interface AgentPendingAction {
+  id: number
+  type: 'rdm_progress_group' | 'rdm_progress_person' | 'user_memory_save'
+  title: string
+  summary: string
+  preview: string
+  expiresAt: string
+  status?: 'pending' | 'processing' | 'sent' | 'failed' | 'cancelled' | 'expired'
+}
+
+export interface AgentActionResult {
+  status: string
+  text: string
+  message?: string
+}
+
 export interface AgentReply {
   text: string
   model: string
@@ -75,6 +136,12 @@ export interface AgentReply {
    * 而审计事件里其实已有 TOOL_CALL/TOOL_RESULT。
    */
   traces?: ToolTrace[]
+  /** 服务端结构化视图（指标卡/表格）；最多 3 个 */
+  views?: AgentView[]
+  /** 待确认动作（当前仅推送） */
+  pendingActions?: AgentPendingAction[]
+  /** 自动记忆候选：用户消息里明确“记住/以后都…”时由后端给出 */
+  memorySuggestion?: string
 }
 
 /* ────────────────── 引擎模式持久化（仅前端选择） ────────────────── */
@@ -100,6 +167,8 @@ interface OrchestrateResponse {
   traces?: { toolKey: string; argsDigest?: string; elapsedMs: number; success: boolean }[]
   pendingExternalCalls?: { id: string; name: string; argumentsJson: string }[]
   nextMessages?: unknown[]
+  views?: AgentView[]
+  pendingActions?: AgentPendingAction[]
 }
 
 /** 前端上下文窗口/思考深度通过 body 传给后端，替代旧 header 直连方案 */
@@ -237,6 +306,8 @@ export async function sendAgentMessage(
           model: lastModel,
           tokens: totalTokens,
           traces,
+          ...(resp.views?.length ? { views: resp.views } : {}),
+          ...(resp.pendingActions?.length ? { pendingActions: resp.pendingActions } : {}),
           // 后端的错误标记必须透传给调用方：错误提示不能当助手回复入库
           ...(resp.errorKind ? { errorKind: resp.errorKind } : {}),
         }
@@ -261,6 +332,23 @@ export async function sendAgentMessage(
     const msg = err instanceof Error ? err.message : String(err)
     return { text: `⚠️ AI 服務異常：${msg}`, model: lastModel, tokens: totalTokens, traces, errorKind: 'client_error' }
   }
+}
+
+/* ────────────────── 待确认动作（推送） ────────────────── */
+
+/** 确认并发送；服务端会再次校验 owner / 过期 / 推送权 / 项目可见性 */
+export async function confirmAgentAction(id: number): Promise<AgentActionResult> {
+  return (await request.post(`/agent/actions/${id}/confirm`)) as unknown as AgentActionResult
+}
+
+/** 取消待确认动作（仅发起人本人） */
+export async function cancelAgentAction(id: number): Promise<AgentPendingAction> {
+  return (await request.post(`/agent/actions/${id}/cancel`)) as unknown as AgentPendingAction
+}
+
+/** 刷新单个动作状态（刷新页面后校正确认卡） */
+export async function fetchAgentAction(id: number): Promise<AgentPendingAction> {
+  return (await request.get(`/agent/actions/${id}`)) as unknown as AgentPendingAction
 }
 
 /* ────────────────── 引擎状态展示（沿用旧字段，后端已提供 /api/agent/status） ────────────────── */

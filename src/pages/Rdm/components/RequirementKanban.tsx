@@ -12,7 +12,7 @@ import { Space, Tag, Tooltip } from 'antd'
 import { AlertOutlined } from '@ant-design/icons'
 import RequirementStageBar from './RequirementStageBar'
 import { PriorityTag, StatusTag, TypeTag } from './Tags'
-import { RDM_BOARD_COLUMNS, formatRdmReqNo, type RdmStatus } from '../../../constants/rdm'
+import { RDM_BOARD_COLUMNS, formatRdmReqNo, type RdmStage, type RdmStatus } from '../../../constants/rdm'
 import type { RdmRequirementRow } from '../../../api/rdm'
 import { formatHandlers, formatPerson, splitHandlers } from '../handlerDisplay'
 // 样式由承载页（需求清单）引入 index.css，本组件不重复引，与其他 components/ 下的组件一致
@@ -79,7 +79,14 @@ export default function RequirementKanban({ rows, limitHint, onOpen }: Requireme
                       <span>處理人：{cardHandlers || <span style={{ color: '#FF4D4F' }}>未分配</span>}</span>
                       {item.planReleaseDate && <span>計劃：{item.planReleaseDate}</span>}
                     </div>
-                    <RequirementStageBar status={item.status} compact overdue={item.overdueFlag ?? false} />
+                    <RequirementStageBar
+                      status={item.status}
+                      compact
+                      overdue={item.overdueFlag ?? false}
+                      /* V3：看板与详情/表格同源，阶段由交付项推导（只读投影） */
+                      derivedStage={item.flowVersion === 3 && item.deliveryStage ? item.deliveryStage as RdmStage : null}
+                      derivedHint={item.flowVersion === 3 && item.deliveryItemCount ? `交付項 ${item.deliveryDoneCount ?? 0}/${item.deliveryItemCount}` : undefined}
+                    />
                   </div>
                 </Tooltip>
               )

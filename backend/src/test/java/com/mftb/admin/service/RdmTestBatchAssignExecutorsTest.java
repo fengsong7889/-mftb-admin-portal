@@ -62,7 +62,8 @@ class RdmTestBatchAssignExecutorsTest {
                 batchMapper, mock(RdmTestExecutionMapper.class), mock(RdmDeliveryItemMapper.class),
                 mock(RdmRequirementMapper.class), mock(RdmIssueMapper.class), accessGuard,
                 mock(BizSeqService.class), operatorResolver, mock(RdmTestRoundMapper.class),
-                mock(EvidenceValidityResolver.class), mock(RdmIdempotentService.class));
+                mock(EvidenceValidityResolver.class), mock(RdmIdempotentService.class),
+                mock(RdmDeliveryItemService.class));
         // 非全量授权：requireTestLead 必须靠 currentUserId == testLeadUserId 通过
         when(accessGuard.canSeeAll(any())).thenReturn(false);
     }

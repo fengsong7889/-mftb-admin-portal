@@ -18,7 +18,6 @@ import {
   Form,
   Input,
   Modal,
-  Radio,
   Segmented,
   Select,
   Space,
@@ -75,15 +74,12 @@ import {
   RDM_COMPLEXITY_LABEL,
   getRdmComplexityLabel,
   getRdmPriorityLabel,
-  RDM_FLOW_VERSION,
-  RDM_FLOW_VERSION_LABEL,
   RDM_PRIORITY,
   RDM_PRIORITY_LABEL,
   RDM_PRIORITY_SLA_DAYS,
   RDM_REQ_TYPE,
   RDM_REQ_TYPE_LABEL,
   RDM_REQUIREMENT_KIND,
-  RDM_REQUIREMENT_KIND_LABEL,
   RDM_STATUS,
   type RdmComplexity,
   type RdmPriority,
@@ -353,8 +349,8 @@ export default function RequirementSubmit() {
           assignMode: d.intentPmUserId ? 'PM' : 'POOL',
           acceptorUserId: d.acceptorUserId ?? undefined,
           targets: (d.targets ?? []).length > 0 ? d.targets.map(fromTargetRef) : [{ kind: 'EXISTING' } as TargetValues],
-          // V3 分批交付字段回填（旧草稿无这些字段时保持 V2 默认）
-          flowVersion: d.flowVersion ?? RDM_FLOW_VERSION.V2,
+          // 归属字段回填：流程版本不再由提交方选择（系统统一走分批交付 V3），
+          // 旧草稿已挂的项目/结构父/需求种类仍要原样回传，否则续编会被当成清空
           projectId: d.projectId ?? undefined,
           requirementKind: (d.requirementKind ?? RDM_REQUIREMENT_KIND.EXECUTION) as string,
           structureParentReqId: d.structureParentReqId ?? undefined,
@@ -385,9 +381,6 @@ export default function RequirementSubmit() {
   const titleValue = Form.useWatch('title', form)
   const expectValue = Form.useWatch('expectResult', form)
   const pmUserId = Form.useWatch('pmUserId', form)
-  /** V3 联动：流程版本 / 需求种类（项目与结构父需求已后置到产研规划阶段，提交侧不再选择） */
-  const flowVersion = Form.useWatch('flowVersion', form)
-  const isV3 = flowVersion === RDM_FLOW_VERSION.V3
 
   /** 从其它页面带上下文进来时预填第一条对象（例：报表页右上角「提需求」） */
   const prefilledMenuPath = useMemo(() => {
@@ -530,15 +523,13 @@ export default function RequirementSubmit() {
         fileType: a.fileType,
         fileSize: a.fileSize,
       })),
-      // V3 分批交付字段：仅在选了 V3 时携带，V2 保持原有行为不变
-      ...(values.flowVersion === RDM_FLOW_VERSION.V3 ? {
-        flowVersion: RDM_FLOW_VERSION.V3,
-        projectId: values.projectId,
-        requirementKind: values.requirementKind ?? RDM_REQUIREMENT_KIND.EXECUTION,
-        structureParentReqId: values.requirementKind === RDM_REQUIREMENT_KIND.EXECUTION
-          ? values.structureParentReqId
-          : undefined,
-      } : {}),
+      // 交付流程不在提交侧确定：这里不传 flowVersion（后端写 V2 占位），
+      // 准入后由产研在分配/认领时确定（默认 V3）；项目/结构父仍按旧草稿原值回传
+      projectId: values.projectId,
+      requirementKind: values.requirementKind ?? RDM_REQUIREMENT_KIND.EXECUTION,
+      structureParentReqId: values.requirementKind === RDM_REQUIREMENT_KIND.EXECUTION
+        ? values.structureParentReqId
+        : undefined,
     }
   }
 
@@ -718,53 +709,14 @@ export default function RequirementSubmit() {
           priority: RDM_PRIORITY.P2,
           assignMode: 'POOL',
           targets: [{ kind: 'EXISTING' }],
-          flowVersion: RDM_FLOW_VERSION.V2,
           requirementKind: RDM_REQUIREMENT_KIND.EXECUTION,
         }}
       >
-        {/* ── ① 流程版本（V3 分批並行交付入口）── */}
-        <div className="rdm-form-section">
-          <div className="rdm-form-section-title">
-            <span className="rdm-icon-block" style={{ background: '#E6FFFB', color: '#13C2C2' }}><NodeIndexOutlined /></span>
-            流程版本
-            {/* 多句规则说明用 HelpPopover（可停留、有层次），禁止用 Tooltip 承载长文本 */}
-            <HelpPopover
-              title="流程版本怎麼選"
-              ariaLabel="流程版本說明"
-              content={'V2 為傳統整需求交付；V3 支持把大需求拆成聚合需求 + 執行需求，掛到項目下分批並行交付。'}
-            />
-          </div>
-          <div className="rdm-more-settings-fields">
-            <Form.Item label="交付流程" name="flowVersion" extra={isV3 ? '分批並行交付：區分聚合 / 執行需求（項目與迭代由產研規劃時掛接）' : '傳統整需求交付'}>
-              <Select
-                options={[
-                  { value: RDM_FLOW_VERSION.V2, label: `${RDM_FLOW_VERSION_LABEL[RDM_FLOW_VERSION.V2]}（傳統整需求交付）` },
-                  { value: RDM_FLOW_VERSION.V3, label: `${RDM_FLOW_VERSION_LABEL[RDM_FLOW_VERSION.V3]}（分批並行交付）` },
-                ]}
-              />
-            </Form.Item>
-            {/*
-              归属体系改造：提需求不再选项目——业务方不知道项目划分，项目由产研在分配/规划/排期阶段挂接。
-              隐藏域仅用于旧草稿回传：后端 update 对 V3 直写 projectId，不传会把旧草稿已挂的项目清掉。
-            */}
-            <Form.Item name="projectId" hidden><Input /></Form.Item>
-            <Form.Item name="structureParentReqId" hidden><Input /></Form.Item>
-          </div>
-          {isV3 && (
-            <Form.Item
-              label="需求種類"
-              name="requirementKind"
-              rules={[{ required: true, message: '請選擇需求種類' }]}
-              extra="聚合需求可拆執行需求分批交付；結構掛接在需求詳情頁完成（需先由產研掛項目）"
-            >
-              <Radio.Group>
-                <Radio value={RDM_REQUIREMENT_KIND.AGGREGATE}>{RDM_REQUIREMENT_KIND_LABEL[RDM_REQUIREMENT_KIND.AGGREGATE]}</Radio>
-                <Radio value={RDM_REQUIREMENT_KIND.EXECUTION}>{RDM_REQUIREMENT_KIND_LABEL[RDM_REQUIREMENT_KIND.EXECUTION]}</Radio>
-              </Radio.Group>
-            </Form.Item>
-          )}
-        </div>
         {/* ── ① 需求内容（业务方唯一必须回答的部分）── */}
+        {/* 流程版本已从提交侧移除：系统统一走分批交付（V3），业务方无需也不应选择交付流程 */}
+        <Form.Item name="projectId" hidden><Input /></Form.Item>
+        <Form.Item name="structureParentReqId" hidden><Input /></Form.Item>
+        <Form.Item name="requirementKind" hidden><Input /></Form.Item>
         <div className="rdm-form-section">
           <div className="rdm-form-section-title">
             <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}><FileTextOutlined /></span>

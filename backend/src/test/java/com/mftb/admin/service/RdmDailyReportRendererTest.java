@@ -261,6 +261,26 @@ class RdmDailyReportRendererTest {
                 "需关注项目应先出现: " + r.content());
     }
 
+    /* ==================== 迭代视角（未挂项目） ==================== */
+
+    @Test
+    @DisplayName("迭代视角：未挂项目迭代不走空项目列表，直接渲染该迭代明细")
+    void rendersUnassignedIterationScope() {
+        Snapshot s = snapshot(new ArrayList<>());
+        s.setScopeProjectId(null);
+        s.setScopeIterationCode("HF202610001");
+        s.setUnassignedIterations(new ArrayList<>(List.of(
+                iteration("HF202610001", List.of(req("REQ001", "線上熱修", "開發中", "P0"))))));
+
+        Rendered r = renderer.renderGroup("{{reportDate}}", "{{projectBlock}}", s,
+                "https://example.com/#/rdm-daily?iterationCode=HF202610001");
+
+        assertTrue(r.content().contains("HF202610001"), "未挂项目的迭代必须出现，否则规则推出去是一条空日报");
+        assertTrue(r.content().contains("線上熱修"));
+        assertFalse(r.content().contains("目前沒有在途項目"),
+                "迭代视角不能用「没有在途项目」当作内容");
+    }
+
     /* ==================== 个人视角 ==================== */
 
     @Test

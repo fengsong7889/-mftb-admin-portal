@@ -33,6 +33,7 @@ import {
   RDM_DELIVERY_ITEM_STATUS_COLOR,
   RDM_DELIVERY_ITEM_STATUS_LABEL,
   RDM_SCOPE,
+  RDM_STATUS,
   type RdmScope,
 } from '../../constants/rdm'
 import './index.css'
@@ -150,6 +151,8 @@ export default function AcceptanceList() {
     {
       title: '等待天數', key: 'stay', width: 100,
       render: (_, r) => {
+        // 已归档需求不再计算等待天数：归档后数字没有管理意义
+        if (r.status === RDM_STATUS.CLOSED) return '-'
         const days = Math.round((r.stayHours ?? 0) / 24)
         return <span style={{ color: days > 3 ? '#CF1322' : '#595959' }}>{days || '-'} 天</span>
       },

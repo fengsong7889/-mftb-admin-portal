@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -77,7 +78,7 @@ class RdmDailyReportControllerMappingTest {
     
     private MockMvc mvc() {
         RdmDailyReportService service = mock(RdmDailyReportService.class);
-        when(service.getSnapshot(any(), anyString(), any())).thenReturn(null);
+        when(service.getSnapshot(any(), anyString(), any(), any(), any())).thenReturn(null);
         when(service.listRecords(any())).thenReturn(List.of());
         when(service.listRules()).thenReturn(List.of());
         when(service.saveRule(any(), any())).thenReturn(new RdmDailyReportVO.Rule());
@@ -86,7 +87,7 @@ class RdmDailyReportControllerMappingTest {
         when(service.listTemplates(any())).thenReturn(List.of());
         when(service.saveTemplate(any(), any())).thenReturn(new RdmDailyReportVO.Template());
         when(service.preview(any())).thenReturn(new RdmDailyReportVO.PreviewResult());
-        when(service.triggerManual(anyString(), any(), any(), any(), anyBoolean()))
+        when(service.triggerManual(anyString(), anyList(), any(), any(), anyBoolean()))
                 .thenReturn(new RdmDailyReportVO.TriggerResult());
         OperatorResolver operator = mock(OperatorResolver.class);
         when(operator.currentOperatorName()).thenReturn("測試管理員");

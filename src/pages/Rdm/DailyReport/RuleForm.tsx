@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, Form, Input, Radio, Select, Space, Spin, Switch, TimePicker, message } from 'antd'
+import { Alert, Button, Checkbox, Form, Input, Radio, Select, Space, Spin, Switch, TimePicker, message } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined, SettingOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
@@ -9,6 +9,7 @@ import { useAuth } from '../../../contexts/AuthContext'
 import {
   fetchDailyReportRules,
   fetchDailyReportTemplates,
+  fetchDailyReportConfig,
   saveDailyReportRule,
   type DailyReportRuleForm as RuleFormValues,
   type DailyReportTemplate,
@@ -24,6 +25,11 @@ import '../index.css'
  */
 type RuleFormModel = Omit<RuleFormValues, 'pushTime'> & { pushTime: Dayjs | null }
 
+/** 迭代候选按所选项目收敛：未选项目时显示全部；已选项目时保留该项目迭代与未挂项目迭代 */
+function iterationResultsForProject(list: RdmIterationItem[], projectId?: number | null): RdmIterationItem[] {
+  return list.filter(i => projectId == null || i.projectId == null || i.projectId === projectId)
+}
+
 /**
  * 進度日報 > 推送配置 > 新增/編輯規則（独立页）。
  *
@@ -32,8 +38,10 @@ type RuleFormModel = Omit<RuleFormValues, 'pushTime'> & { pushTime: Dayjs | null
  *
  * <p>范围语义（用户明确要求的模型）：
  * <ul>
- *   <li>项目必选——推送以项目为载体，不选项目等于给全公司刷一遍；</li>
+ *   <li>不指定迭代时项目必选——不选项目等于给全公司刷一遍；</li>
  *   <li>迭代可留空——留空 = 该项目<b>全部迭代</b>；选定则只推该迭代的需求；</li>
+ *   <li><b>紧急修复迭代可不挂项目</b>（迭代排期已允许），因此先选迭代不再要求先选项目；
+ *       迭代挂了项目就自动带出项目，迭代未挂项目则项目留空、不做必填校验；</li>
  *   <li>同一项目可建多条规则（先推整个项目、另建一条只盯某个迭代），互不覆盖。</li>
  * </ul>
  */
@@ -49,14 +57,24 @@ export default function DailyReportRuleForm() {
 
   const [form] = Form.useForm<RuleFormModel>()
   const [projects, setProjects] = useState<RdmProjectListItem[]>([])
+  /** 当前搜索命中的迭代候选（最多 20 条，远程搜索） */
   const [iterations, setIterations] = useState<RdmIterationItem[]>([])
+  /** 已选迭代的完整快照：搜索结果刷新后不在列表里也要能显示并参与项目联动 */
+  const [pickedIteration, setPickedIteration] = useState<RdmIterationItem | null>(null)
   const [templates, setTemplates] = useState<DailyReportTemplate[]>([])
+  /** 消息模式：fixed 时模板选择不参与渲染，必须置灰并说明，避免“选了模板却没生效” */
+  const [messageMode, setMessageMode] = useState<string>('fixed')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [searching, setSearching] = useState(false)
+  const [iterationLoading, setIterationLoading] = useState(false)
+  const iterationSearchTimer = useRef<number | null>(null)
 
-  const projectId = Form.useWatch('projectId', form)
+  const projectIds = Form.useWatch('projectIds', form)
+  const allProjects = Form.useWatch('allProjects', form)
+  const iterationCode = Form.useWatch('iterationCode', form)
   const contentType = Form.useWatch('contentType', form)
+  const singleProjectId = projectIds?.length === 1 ? projectIds[0] : undefined
 
   const loadProjects = useCallback(async (keyword?: string) => {
     setSearching(true)
@@ -74,17 +92,49 @@ export default function DailyReportRuleForm() {
     void loadProjects()
   }, [loadProjects])
 
+  /** 远程搜索迭代：输入关键词后才回 20 条，未输入时加载最近的 20 条供直接选择 */
+  const loadIterations = useCallback(async (keyword?: string, pid?: number | null) => {
+    setIterationLoading(true)
+    try {
+      setIterations(await fetchIterations(keyword, 20, pid))
+    } catch {
+      setIterations([])
+    } finally {
+      setIterationLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadIterations()
+  }, [loadIterations])
+
+  /** 输入防抖 300ms：避免每敲一个字都打一次接口 */
+  const handleIterationSearch = (keyword: string) => {
+    if (iterationSearchTimer.current != null) {
+      window.clearTimeout(iterationSearchTimer.current)
+    }
+    iterationSearchTimer.current = window.setTimeout(() => {
+      void loadIterations(keyword, singleProjectId)
+    }, 300)
+  }
+
+  useEffect(() => () => {
+    if (iterationSearchTimer.current != null) {
+      window.clearTimeout(iterationSearchTimer.current)
+    }
+  }, [])
+
   useEffect(() => {
     void (async () => {
       setLoading(true)
       try {
-        const [tpls, its, rules] = await Promise.all([
+        const [tpls, rules, cfg] = await Promise.all([
           fetchDailyReportTemplates(),
-          fetchIterations(),
           editId ? fetchDailyReportRules() : Promise.resolve([]),
+          fetchDailyReportConfig(),
         ])
         setTemplates(tpls)
-        setIterations(its)
+        setMessageMode(cfg.messageMode ?? 'fixed')
         if (editId) {
           const rule = rules.find(r => r.id === editId)
           if (!rule) {
@@ -92,10 +142,14 @@ export default function DailyReportRuleForm() {
             navigate('/rdm-daily-report-rules', { replace: true })
             return
           }
+          const ruleProjectIds = rule.projectIds?.length
+            ? rule.projectIds
+            : (rule.projectId != null ? [rule.projectId] : [])
           form.setFieldsValue({
             id: rule.id,
             name: rule.name,
-            projectId: rule.projectId,
+            projectIds: ruleProjectIds,
+            allProjects: ruleProjectIds.length === 0 && !rule.iterationCode,
             iterationCode: rule.iterationCode ?? null,
             pushTime: rule.pushTime ? dayjs(rule.pushTime, 'HH:mm') : null,
             contentType: rule.contentType,
@@ -105,8 +159,21 @@ export default function DailyReportRuleForm() {
             remark: rule.remark ?? undefined,
           })
           // 编辑态补一次项目候选，避免下拉里只有第一页项目
-          if (!projects.some(p => p.id === rule.projectId)) {
-            void loadProjects(rule.projectNo ?? undefined)
+          if (ruleProjectIds.length > 0 && !projects.some(p => ruleProjectIds.includes(p.id))) {
+            void loadProjects(rule.projectName ?? undefined)
+          }
+          // 已选迭代可能不在最近 20 条里：按编码回查一次并钉住，保证回显与项目联动不被搜索刷新冲掉
+          if (rule.iterationCode) {
+            const hits = await fetchIterations(rule.iterationCode, 20, rule.projectId)
+            const picked: RdmIterationItem = hits.find(i => i.code === rule.iterationCode) ?? {
+              id: -1,
+              code: rule.iterationCode,
+              name: rule.iterationName ?? '',
+              projectId: rule.projectId,
+              projectName: rule.projectName,
+            }
+            setPickedIteration(picked)
+            setIterations(prev => prev.some(i => i.code === picked.code) ? prev : [picked, ...prev])
           }
         } else {
           form.setFieldsValue({
@@ -114,6 +181,8 @@ export default function DailyReportRuleForm() {
             pushTime: dayjs('09:00', 'HH:mm'),
             enabled: true,
             name: '',
+            projectIds: [],
+            allProjects: false,
             iterationCode: null,
           })
         }
@@ -126,12 +195,70 @@ export default function DailyReportRuleForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId])
 
-  /** 迭代候选按所选项目收敛：选项目前不可选迭代，避免把别的项目的迭代配进来 */
-  const iterationOptions = useMemo(
-    () => iterations
-      .filter(i => projectId != null && i.projectId === projectId)
-      .map(i => ({ value: i.code, label: `${i.code}${i.name ? ' ' + i.name : ''}` })),
-    [iterations, projectId])
+  const projectOptions = useMemo(() => {
+    const base = projects.map(p => ({ value: p.id, label: p.projectNo ? `${p.projectNo} ${p.name}` : p.name }))
+    const selected = projectIds ?? []
+    const missing = selected.filter(id => !base.some(o => o.value === id))
+      .map(id => {
+        const it = iterations.find(i => i.projectId === id)
+          ?? (pickedIteration?.projectId === id ? pickedIteration : null)
+        return { value: id, label: it?.projectName ?? `#${id}` }
+      })
+    return [...base, ...missing]
+  }, [projects, projectIds, iterations, pickedIteration])
+
+  /** 当前选中迭代（用于判断是否挂了项目、以及项目是否必填） */
+  const selectedIteration = useMemo(() => {
+    if (!iterationCode) {
+      return null
+    }
+    return iterations.find(i => i.code === iterationCode)
+      ?? (pickedIteration?.code === iterationCode ? pickedIteration : null)
+  }, [iterations, iterationCode, pickedIteration])
+
+  /**
+   * 迭代候选：
+   * <ul>
+   *   <li>未选项目时列出全部迭代——先选迭代是合法路径；</li>
+   *   <li>已选项目时列出该项目迭代 + 未挂项目的迭代（紧急修复），保证 hotfix 也能被选中；</li>
+   *   <li>标签上标出「未掛項目」，避免同名迭代选错。</li>
+   * </ul>
+   */
+  const iterationOptions = useMemo(() => {
+    const list = iterationResultsForProject(iterations, singleProjectId)
+    // 已选迭代不在本次搜索结果里时也要保留，否则下拉会回退成原始 code
+    if (pickedIteration && !list.some(i => i.code === pickedIteration.code)) {
+      list.unshift(pickedIteration)
+    }
+    return list.map(i => ({
+      value: i.code,
+      label: `${i.code}${i.name ? ' ' + i.name : ''}`
+        + (i.projectId == null ? `（${t('rdm.iteration.noProject')}）`
+          : singleProjectId == null && i.projectName ? `（${i.projectName}）` : ''),
+    }))
+  }, [iterations, pickedIteration, singleProjectId, t])
+
+  /**
+   * 选迭代后回填项目：迭代挂了项目就自动带出；迭代未挂项目（紧急修复）则清空项目，
+   * 与后端口径一致——规则以迭代为范围，不再挂项目。
+   */
+  const handleIterationChange = (code?: string) => {
+    if (!code) {
+      setPickedIteration(null)
+      return
+    }
+    const it = iterations.find(i => i.code === code)
+      ?? (pickedIteration?.code === code ? pickedIteration : undefined)
+    if (!it) {
+      return
+    }
+    setPickedIteration(it)
+    if (it.projectId != null) {
+      form.setFieldsValue({ projectIds: [it.projectId], allProjects: false })
+    } else {
+      form.setFieldsValue({ projectIds: [], allProjects: false })
+    }
+  }
 
   const groupOptions = useMemo(
     () => templates
@@ -146,13 +273,20 @@ export default function DailyReportRuleForm() {
 
   const handleSave = async () => {
     const v = await form.validateFields()
+    const ids = v.allProjects ? [] : (v.projectIds ?? [])
+    if (!v.allProjects && ids.length === 0 && !v.iterationCode) {
+      message.warning(t('rdm.dailyRule.targetRequired'))
+      return
+    }
     setSaving(true)
     try {
       await saveDailyReportRule({
         id: editId ?? undefined,
         name: v.name,
-        projectId: v.projectId,
-        iterationCode: v.iterationCode || null,
+        projectId: ids.length === 1 ? ids[0] : null,
+        projectIds: ids,
+        allProjects: Boolean(v.allProjects),
+        iterationCode: ids.length > 1 || v.allProjects ? null : (v.iterationCode || null),
         pushTime: v.pushTime ? v.pushTime.format('HH:mm') : '',
         contentType: v.contentType,
         groupTemplateKey: v.groupTemplateKey || null,
@@ -204,22 +338,58 @@ export default function DailyReportRuleForm() {
               rules={[{ required: true, message: t('rdm.dailyRule.nameRequired') }]}>
               <Input maxLength={100} showCount placeholder={t('rdm.dailyRule.namePlaceholder')} />
             </Form.Item>
+            {selectedIteration && selectedIteration.projectId == null && (
+              <Alert type="info" showIcon style={{ marginBottom: 16 }}
+                message={t('rdm.dailyRule.unboundIterationHint')} />
+            )}
+            {/* 「全部在途項目」是總開關：獨立成行；勾選即推送所有在途項目，下方所屬項目與指定迭代隨之鎖定 */}
+            <Form.Item name="allProjects" valuePropName="checked" style={{ marginBottom: 16 }}>
+              <Checkbox onChange={e => {
+                if (e.target.checked) {
+                  setPickedIteration(null)
+                  form.setFieldsValue({ projectIds: [], iterationCode: null })
+                }
+              }}>
+                {t('rdm.dailyRule.allProjects')}
+              </Checkbox>
+            </Form.Item>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
-              <Form.Item name="projectId" label={t('rdm.dailyRule.fieldProject')}
-                rules={[{ required: true, message: t('rdm.dailyRule.projectRequired') }]}>
+              <Form.Item name="projectIds" label={t('rdm.dailyRule.fieldProject')}
+                extra={t('rdm.dailyRule.projectOptionalHint')}>
                 <Select
-                  showSearch allowClear={false} placeholder={t('rdm.dailyRule.projectPlaceholder')}
+                  mode="multiple"
+                  style={{ width: '100%' }}
+                  showSearch allowClear
+                  disabled={allProjects}
+                  placeholder={t('rdm.dailyRule.projectPlaceholder')}
                   filterOption={false} onSearch={kw => void loadProjects(kw)}
                   notFoundContent={searching ? <Spin size="small" /> : t('rdm.dailyRule.noProjectMatch')}
-                  options={projects.map(p => ({ value: p.id, label: p.projectNo ? `${p.projectNo} ${p.name}` : p.name }))}
-                  onChange={() => form.setFieldsValue({ iterationCode: null })}
+                  options={projectOptions}
+                  onChange={(values: number[]) => {
+                    setPickedIteration(null)
+                    form.setFieldsValue({ iterationCode: null })
+                    // 只有恰好一个项目时才允许指定迭代；多项目/全部项目必须看全部
+                    void loadIterations(undefined, values.length === 1 ? values[0] : null)
+                  }}
                 />
               </Form.Item>
               <Form.Item name="iterationCode" label={t('rdm.dailyRule.fieldIteration')}
-                extra={t('rdm.dailyRule.iterationHint')}>
-                <Select allowClear placeholder={t('rdm.dailyRule.allIterations')}
-                  disabled={projectId == null} options={iterationOptions}
-                  notFoundContent={projectId == null ? t('rdm.dailyRule.pickProjectFirst') : t('rdm.dailyRule.noIteration')} />
+                extra={allProjects
+                  ? t('rdm.dailyRule.iterationMultiHint')
+                  : (projectIds?.length ?? 0) > 1
+                    ? t('rdm.dailyRule.iterationMultiHint')
+                    : t('rdm.dailyRule.iterationHint')}>
+                <Select allowClear showSearch filterOption={false}
+                  disabled={allProjects || (projectIds?.length ?? 0) > 1}
+                  onSearch={handleIterationSearch} loading={iterationLoading}
+                  placeholder={allProjects
+                    ? t('rdm.dailyRule.iterationPickSingleProject')
+                    : (projectIds?.length ?? 0) > 1
+                      ? t('rdm.dailyRule.iterationPickSingleProject')
+                      : t('rdm.dailyRule.iterationSearchPlaceholder')}
+                  options={iterationOptions} onChange={handleIterationChange}
+                  notFoundContent={iterationLoading
+                    ? <Spin size="small" /> : t('rdm.dailyRule.noIterationFound')} />
               </Form.Item>
             </div>
           </div>
@@ -241,12 +411,18 @@ export default function DailyReportRuleForm() {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
               <Form.Item name="groupTemplateKey" label={t('rdm.dailyRule.fieldGroupTpl')}>
-                <Select allowClear options={groupOptions} placeholder={t('rdm.dailyRule.useDefault')} />
+                <Select allowClear options={groupOptions} placeholder={t('rdm.dailyRule.useDefault')}
+                  disabled={messageMode !== 'template'} />
               </Form.Item>
               <Form.Item name="personalTemplateKey" label={t('rdm.dailyRule.fieldPersonalTpl')}>
-                <Select allowClear options={personalOptions} placeholder={t('rdm.dailyRule.useDefault')} />
+                <Select allowClear options={personalOptions} placeholder={t('rdm.dailyRule.useDefault')}
+                  disabled={messageMode !== 'template'} />
               </Form.Item>
             </div>
+            {messageMode !== 'template' && (
+              <Alert type="info" showIcon style={{ marginBottom: 12 }}
+                message={t('rdm.dailyRule.fixedModeTemplateHint')} />
+            )}
             <Space size={24} wrap>
               <Form.Item name="enabled" label={t('rdm.dailyRule.fieldEnabled')} valuePropName="checked"
                 style={{ marginBottom: 0 }}>

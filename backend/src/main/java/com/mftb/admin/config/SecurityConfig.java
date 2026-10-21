@@ -65,6 +65,10 @@ public class SecurityConfig {
             "/api/meeting/minutes-page/**",
             "/api/public/meeting-minutes",
             "/api/public/meeting-minutes/**",
+            // 进度日报看板开放页（钉钉通知直达）：令牌绑快照范围 + 有效期，HMAC 验签，
+            // 服务层仍要查快照表；白名单只解决「没有 JWT 也能访问」，不等于放行
+            "/api/public/rdm-daily-view",
+            "/api/public/rdm-daily-view/**",
             "/api/health/live",   // 存活探针（匿名，不依赖数据库）
             "/api/health/ready",  // 就绪探针（匿名，迁移/结构校验未通过时返回 503）
             "/error"

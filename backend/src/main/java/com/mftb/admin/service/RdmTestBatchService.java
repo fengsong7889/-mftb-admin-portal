@@ -93,8 +93,34 @@ public class RdmTestBatchService {
     private final EvidenceValidityResolver evidenceValidityResolver;
     /** Batch 3：受理/执行/复测接入原子幂等 executeOnce */
     private final RdmIdempotentService idempotentService;
+    /** 按任务解析提测范围：交付项归属/默认交付项复用交付项服务，不在测试层重建一套 */
+    private final RdmDeliveryItemService deliveryItemService;
 
     /* ==================== 提测批次流转 ==================== */
+
+    /**
+     * 按任务解析提测范围：研发在提测页勾任务，服务端映射成交付项。
+     * <p>已挂交付项的任务直接复用；未挂的归入需求默认交付项并回填 task.delivery_item_id。
+     * 返回的是交付项列表（提测提交仍传 deliveryItemIds），测试/验收事实层不变。
+     */
+    public List<RdmTestBatchVO.TaskScopeItem> resolveTaskScope(RdmTestBatchDTO.TaskScopeResolve dto,
+                                                              Long currentUserId) {
+        if (dto == null) {
+            throw new BusinessException("提測參數不能為空");
+        }
+        List<RdmDeliveryItem> items = deliveryItemService.resolveTaskScope(
+                dto.getReqId(), dto.getTaskIds(), currentUserId);
+        List<RdmTestBatchVO.TaskScopeItem> result = new ArrayList<>();
+        for (RdmDeliveryItem item : items) {
+            RdmTestBatchVO.TaskScopeItem vo = new RdmTestBatchVO.TaskScopeItem();
+            vo.setId(item.getId());
+            vo.setItemNo(item.getItemNo());
+            vo.setTitle(item.getTitle());
+            vo.setStatus(item.getStatus());
+            result.add(vo);
+        }
+        return result;
+    }
 
     /**
      * 提交提测批次。
@@ -391,6 +417,11 @@ public class RdmTestBatchService {
         executionMapper.insert(exec);
 
         recalculateBatchStatus(batch);
+        /*
+         * 測試事實變了，交付項狀態必須同步重算：recalculateStatus 只在手動接口與新範圍版本時觸發，
+         * 不補這一步，V3 階段條與驗收隊列會看着「測試已通過但交付項還在測試中」的陳舊狀態。
+         */
+        deliveryItemService.recalculateStatus(itemId);
         log.info("測試執行記錄已錄入: batchNo={}, round={}, result={}, caseId={}, item={}",
                 batch.getBatchNo(), exec.getRoundNo(), result, caseId, itemId);
         return exec;

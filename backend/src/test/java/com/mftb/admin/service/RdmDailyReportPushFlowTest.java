@@ -2,6 +2,7 @@ package com.mftb.admin.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mftb.admin.dto.RdmDailyReportVO.Config;
+import com.mftb.admin.dto.RdmDailyReportVO.PublicView;
 import com.mftb.admin.dto.RdmDailyReportVO.Snapshot;
 import com.mftb.admin.dto.RdmDailyReportVO.Summary;
 import com.mftb.admin.dto.RdmDailyReportVO.TriggerResult;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
@@ -19,6 +21,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -73,7 +76,7 @@ class RdmDailyReportPushFlowTest {
                 notifyService, dingTalkAppService, appService, userMapper, jdbc, new ObjectMapper());
         RdmDailyReportService spy = spy(real);
         doReturn(cfg).when(spy).loadConfig();
-        doReturn(snapshot).when(spy).buildSnapshot(any(LocalDate.class), anyString(), any(), any());
+        doReturn(snapshot).when(spy).buildSnapshot(any(LocalDate.class), anyString(), anyList(), any());
         when(jdbc.queryForObject(contains("FROM rdm_project"), eq(Integer.class), any())).thenReturn(1);
         when(jdbc.queryForObject(contains("FROM rdm_iteration"), eq(Integer.class), any(), any())).thenReturn(1);
         when(jdbc.queryForObject(contains("FROM rdm_daily_report"), eq(Integer.class), any(), any(), any()))
@@ -123,6 +126,30 @@ class RdmDailyReportPushFlowTest {
     }
 
     /* ==================== dry-run：绝不真发 ==================== */
+
+    @Test
+    @DisplayName("看板实时预览：按当前数据现算，不读已落库快照、不发送、不落库")
+    void boardPreviewBuildsLiveSnapshotWithoutPersisting() {
+        Config cfg = config(true, true, false);
+        cfg.setBoardShowRequirements(true);
+        cfg.setBoardShowOwners(true);
+        cfg.setBoardShowUnassigned(true);
+        Snapshot live = snapshot();
+        live.setGeneratedAt("2026-10-20 15:30:00");
+        live.setUnassignedIterations(new java.util.ArrayList<>());
+        RdmDailyReportService svc = service(cfg, live, 0);
+        when(jdbc.query(contains("rdm_daily_report_config"), any(RowMapper.class), any(Object[].class)))
+                .thenReturn(List.of(cfg));
+
+        PublicView view = svc.boardPreview("morning", 3L, "SP202610001");
+
+        assertTrue(view.isValid());
+        assertNotNull(view.getSnapshot());
+        assertEquals("2026-10-20 15:30:00", view.getSnapshot().getGeneratedAt(),
+                "预览必须带现算时间，不能回放旧快照");
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+        verify(notifyService, never()).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
+    }
 
     @Test
     @DisplayName("干跑：dryRun=true 时不入队群报、不落库快照，但把渲染结果回显给调用方")
@@ -361,7 +388,7 @@ class RdmDailyReportPushFlowTest {
 
         com.mftb.admin.common.BusinessException ex = assertThrows(
                 com.mftb.admin.common.BusinessException.class,
-                () -> svc.triggerManual("morning", null, null, "管理員", false));
+                () -> svc.triggerManual("morning", (Long) null, null, "管理員", false));
         assertTrue(ex.getMessage().contains("項目") || ex.getMessage().contains("项目"),
                 "应提示必须选择项目: " + ex.getMessage());
         verify(notifyService, never()).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
@@ -483,6 +510,23 @@ class RdmDailyReportPushFlowTest {
         verify(jdbc).query(
                 argThat((String sql) -> sql.contains("rdm_daily_report_rule") && !sql.contains("rdm_iteration")),
                 any(org.springframework.jdbc.core.RowMapper.class), any(Object[].class));
+    }
+
+    @Test
+    @DisplayName("按範圍鍵讀快照：多項目/全部項目沒有 projectId 也能精確命中對應行")
+    void getSnapshotUsesScopeKeyWhenPresent() throws Exception {
+        RdmDailyReportService svc = service(config(true, false, false), snapshot(), 0);
+        Snapshot stored = snapshot();
+        stored.setScopeLabel("全部在途項目");
+        when(jdbc.queryForList(contains("scope_key = ?"), eq(String.class), any(), any(), any()))
+                .thenReturn(List.of(new ObjectMapper().writeValueAsString(stored)));
+
+        Snapshot got = svc.getSnapshot(LocalDate.of(2026, 10, 19), "manual", null, null, "manual:all");
+
+        assertNotNull(got, "带范围键时应能读到快照，而不是依赖最新一条");
+        assertEquals("全部在途項目", got.getScopeLabel());
+        verify(jdbc).queryForList(contains("scope_key = ?"), eq(String.class),
+                eq("2026-10-19"), eq("manual"), eq("manual:all"));
     }
 
     /** 测试用的企业应用凭据快照（构造参数顺序：id, appKey, appSecret, agentId, baseUrl, enabled） */

@@ -101,7 +101,9 @@ class RdmAcceptanceDualPathTest {
                 bizSeqService, accessGuard, testBatchService,
                 // 任务33：失效过滤委派共享解析器，包同一个 mock Mapper 以保持桩数据口径不变
                 new EvidenceValidityResolver(evidenceInvalidationMapper), idempotentService,
-                openFactService);
+                openFactService,
+                // 验收写入后重算交付项状态：本用例只验证验收链路，重算用 mock 隔离
+                mock(RdmDeliveryItemService.class));
     }
 
     /* ==================== 夹具 ==================== */

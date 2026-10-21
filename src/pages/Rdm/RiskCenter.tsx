@@ -28,6 +28,7 @@ import { fetchDashboard, fetchRiskSummary, type RdmDashboardData, type RdmRiskIt
 import {
   RDM_RISK_COLOR,
   RDM_RISK_LABEL,
+  RDM_STATUS,
   RDM_STATUS_LABEL,
   formatRdmReqNo,
   type RdmRiskType,
@@ -132,11 +133,15 @@ export default function RiskCenter() {
     { title: '提出人', dataIndex: 'submitterName', key: 'submitterName', width: 110 },
     {
       title: '停留天數', dataIndex: 'days', key: 'days', width: 110, align: 'right',
-      render: (v: number) => (
-        <span style={{ color: v >= 30 ? '#CF1322' : v >= 14 ? '#FA8C16' : '#595959', fontWeight: 600 }}>
-          {v} 天
-        </span>
-      ),
+      render: (v: number, r) => {
+        // 已归档需求不再计停留：归档是终点，天数只增不减
+        if (r.status === RDM_STATUS.CLOSED) return '-'
+        return (
+          <span style={{ color: v >= 30 ? '#CF1322' : v >= 14 ? '#FA8C16' : '#595959', fontWeight: 600 }}>
+            {v} 天
+          </span>
+        )
+      },
     },
     {
       title: '操作', key: 'action', width: 90, fixed: 'right',

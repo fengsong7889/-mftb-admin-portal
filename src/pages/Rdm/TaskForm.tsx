@@ -9,22 +9,41 @@ import { Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Select, mes
 import { SaveOutlined } from '@ant-design/icons'
 import RdmFormHeader from './components/RdmFormHeader'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import RemoteSearchSelect from '../../components/RemoteSearchSelect'
+import type { OptionItem } from '../../api/types'
 import { fetchEmployees } from '../../api/employee'
 import {
   checkTaskOwner,
   fetchReqTasks,
   fetchRequirementDetail,
+  fetchRequirementPage,
   saveTask,
   type RdmTaskForm as RdmTaskFormValues,
   type RdmTaskOwnerCheck,
 } from '../../api/rdm'
-import { formatRdmReqNo } from '../../constants/rdm'
+import { formatRdmReqNo, RDM_STATUS } from '../../constants/rdm'
 import { useTaskTypeDict } from '../../hooks/useTaskTypeDict'
+import { countWorkdays, HOURS_PER_WORKDAY, workdayHours } from './workdays'
 import './index.css'
 
 const { TextArea } = Input
+
+/**
+ * 不能挂任务的需求状态：准入前（草稿/待审批/审批驳回）、需求池未分配、已上线/已归档。
+ * 与服务端 saveTask 的硬拦截同源（服务端只拒绝准入前三态 + 需求池），
+ * 已经上线/归档的需求再拆任务只会变成无人认领的尾巴。
+ */
+const TASK_REQ_EXCLUDED_STATUS = new Set<string>([
+  RDM_STATUS.DRAFT,
+  RDM_STATUS.INTAKE_PENDING,
+  RDM_STATUS.INTAKE_REJECTED,
+  RDM_STATUS.POOL,
+  RDM_STATUS.RELEASED,
+  RDM_STATUS.VERIFIED,
+  RDM_STATUS.CLOSED,
+])
 
 /** 表单内部结构（日期与负责人用组件类型，提交时转换） */
 interface FormValues {
@@ -38,9 +57,15 @@ interface FormValues {
 
 export default function TaskForm() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
-  const reqId = Number(searchParams.get('reqId') ?? 0)
+  const reqIdFromUrl = Number(searchParams.get('reqId') ?? 0)
   const taskId = Number(searchParams.get('id') ?? 0)
+  /**
+   * 所属需求改为可选：原先只认 URL 带来的 reqId，从研发工作台「新增任務」进入时
+   * 该字段是空且不可编辑，保存时才提示「請先選擇需求」——等于根本建不了任务。
+   */
+  const [reqId, setReqId] = useState(reqIdFromUrl)
 
   const [form] = Form.useForm<FormValues>()
   // 任务类型字典（业务可配置）：选项/确认框标签都从接口来，编辑旧任务时把当前值并入选项防回显空白
@@ -61,6 +86,23 @@ export default function TaskForm() {
   /** 预检请求序号：快速换人时丢弃过期响应，避免提醒对不上当前负责人 */
   const ownerCheckSeq = useRef(0)
   const [saving, setSaving] = useState(false)
+
+  /**
+   * 计划工时默认由计划起止推算（工作日 × 8h），只在用户主动改日期时写入，
+   * 编辑态回填不覆盖存量工时；手改后 extra 标注来源，避免误以为系统算错。
+   */
+  const planRangeValue = Form.useWatch('planRange', form)
+  const planHoursValue = Form.useWatch('planHours', form)
+  const autoWorkdays = countWorkdays(planRangeValue?.[0], planRangeValue?.[1])
+  const autoPlanHours = autoWorkdays * HOURS_PER_WORKDAY
+  const planHoursAdjusted = autoWorkdays > 0
+    && typeof planHoursValue === 'number' && planHoursValue > 0
+    && planHoursValue !== autoPlanHours
+  const planHoursExtra = autoWorkdays > 0
+    ? (planHoursAdjusted
+        ? t('rdm.taskForm.planHoursManualHint', { days: autoWorkdays, defaultValue: '{{days}} 個工作日 × 8h，已手動調整' })
+        : t('rdm.taskForm.planHoursAutoHint', { days: autoWorkdays, defaultValue: '{{days}} 個工作日 × 8h' }))
+    : t('rdm.taskForm.planHoursAutoEmpty', { defaultValue: '選擇計劃起止後自動計算' })
 
   /**
    * 选完人即预检负责人资格。
@@ -87,7 +129,7 @@ export default function TaskForm() {
 
   /** 编辑态：从需求任务列表里取回原任务，避免再开一个详情接口 */
   useEffect(() => {
-    if (!reqId) return
+    if (!reqId) { setRequirement(null); return }
     fetchRequirementDetail(reqId)
       .then(d => d && setRequirement({ reqNo: formatRdmReqNo(d.reqNo), title: d.title, status: d.status, iterationCode: d.iterationCode }))
       .catch(() => message.error('需求資訊載入失敗'))
@@ -112,6 +154,24 @@ export default function TaskForm() {
     }).catch(() => message.error('任務資訊載入失敗'))
   }, [reqId, taskId, form, checkOwner])
 
+  /** 可建任务的需求候选：只列在途需求，草稿/待审批/需求池/已上线不参与拆任务 */
+  const fetchRequirementOptions = useCallback(async (keyword: string): Promise<OptionItem[]> => {
+    const res = await fetchRequirementPage({
+      page: 1, size: 20, keyword: keyword || undefined, executionOnly: true,
+    })
+    return (res.records ?? [])
+      .filter(r => !TASK_REQ_EXCLUDED_STATUS.has(r.status))
+      .map(r => ({ value: String(r.id), label: `${formatRdmReqNo(r.reqNo)} · ${r.title}` }))
+  }, [])
+
+  /** 已选需求的回显选项：切过需求后不能回显成裸 id */
+  const reqInitialOptions = useMemo<OptionItem[]>(
+    () => (reqId && requirement
+      ? [{ value: String(reqId), label: `${requirement.reqNo} · ${requirement.title}` }]
+      : []),
+    [reqId, requirement],
+  )
+
   const fetchOwnerOptions = useCallback(async (keyword: string) => {
     const res = await fetchEmployees({ page: 1, size: 20, keyword: keyword || undefined, employmentStatus: 'active' })
     const records = res.records ?? []
@@ -127,7 +187,7 @@ export default function TaskForm() {
 
   const handleSave = async () => {
     if (!reqId) {
-      message.warning('請先選擇需求')
+      message.warning(t('rdm.taskForm.reqRequired', { defaultValue: '請先選擇需求' }))
       return
     }
     const values = await form.validateFields()
@@ -139,6 +199,7 @@ export default function TaskForm() {
       icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
       content: (
         <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>{t('rdm.taskForm.reqLabel', { defaultValue: '所屬需求' })}：</span><b>{requirement ? `${requirement.reqNo} · ${requirement.title}` : '-'}</b></div>
           <div className="confirm-info-row"><span>任務標題：</span><b>{values.title.trim()}</b></div>
           <div className="confirm-info-row"><span>任務類型：</span><b>{taskTypeLabelOf(values.taskType)}</b></div>
           <div className="confirm-info-row"><span>負責人：</span><b>{ownerText}</b></div>
@@ -197,8 +258,19 @@ export default function TaskForm() {
         <div className="rdm-form-section">
           <div className="rdm-form-section-title">任務信息</div>
           <div className="rdm-task-fields">
-            <Form.Item label="所屬需求" className="rdm-field-full">
-              <Input value={requirement ? `${requirement.reqNo} ${requirement.title}` : '-'} disabled />
+            {/* 非编辑态支持选需求：从研发工作台进入时没有 URL 的 reqId，锁死字段等于建不了任务 */}
+            <Form.Item label={t('rdm.taskForm.reqLabel', { defaultValue: '所屬需求' })} className="rdm-field-full" required={!taskId}>
+              {taskId ? (
+                <Input value={requirement ? `${requirement.reqNo} ${requirement.title}` : '-'} disabled />
+              ) : (
+                <RemoteSearchSelect
+                  value={reqId ? String(reqId) : undefined}
+                  placeholder={t('rdm.taskForm.reqPlaceholder', { defaultValue: '輸入需求編號或標題搜索（僅列在途需求）' })}
+                  fetchOptions={fetchRequirementOptions}
+                  initialOptions={reqInitialOptions}
+                  onChange={value => setReqId(Number(value) || 0)}
+                />
+              )}
             </Form.Item>
             <Form.Item label="任務類型" name="taskType" rules={[{ required: true, message: '請選擇任務類型' }]}>
               <Select
@@ -246,15 +318,23 @@ export default function TaskForm() {
             <Form.Item
               label="計劃工時（小時）"
               name="planHours"
+              extra={planHoursExtra}
               rules={[{
                 type: 'number', min: 0, max: 999,
                 message: '計劃工時必須在 0-999 人時之間',
               }]}
             >
-              <InputNumber min={0} step={1} placeholder="例：16" />
+              <InputNumber min={0} step={1} style={{ width: '100%' }} placeholder="選日期後自動填入" />
             </Form.Item>
             <Form.Item label="計劃起止" name="planRange">
-              <DatePicker.RangePicker />
+              <DatePicker.RangePicker
+                style={{ width: '100%' }}
+                onChange={dates => {
+                  // 日期一改就按系统口径覆盖工时；随后仍可手改（extra 会标注已手改）
+                  const hours = workdayHours(dates?.[0], dates?.[1])
+                  if (hours > 0) form.setFieldValue('planHours', hours)
+                }}
+              />
             </Form.Item>
             {/* 归属体系改造：迭代继承需求（只读），不再让研发/测试自己选——
                 他们不参与项目规划，且任务独立选迭代会与需求迭代分裂，统计对不上 */}

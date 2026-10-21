@@ -144,6 +144,8 @@ export interface RdmRequirementRow {
   versionNo?: string | null
   /** 所属迭代编码（详情属性区用于判断「是否已进迭代产能对账」） */
   iterationCode?: string | null
+  /** 所属迭代名称（服务端联表下发；缺失时前端用下拉字典或编码兜底） */
+  iterationName?: string | null
   /** 业务验收人姓名（不传即提出人本人，界面据此显示实际签字人） */
   acceptorName?: string | null
   /** 业务验收人 sys_user.id（草稿续编要回填，否则保存会把指派的验收人重置成提交人） */
@@ -183,10 +185,17 @@ export interface RdmRequirementRow {
   structureParentReqId?: number | null
   /** V3：结构化主需求编号 */
   structureParentReqNo?: string | null
-  /** V3：交付项总数（后端冗余计数） */
+  /** V3：交付项总数（后端冗余计数，列表/详情同源） */
   deliveryItemCount?: number | null
   /** V3：已完成交付项数 */
   deliveryDoneCount?: number | null
+  /**
+   * V3 交付進度投影（只讀）：由交付項事實推導的階段，取值與 RdmStage 同詞彙
+   * （design/review/dev/test/uat/release）。不寫需求狀態，列表與詳情共用同一口徑。
+   */
+  deliveryStage?: string | null
+  /** 各交付項狀態分佈（status → 件數），詳情懸停展開核對用 */
+  deliveryItemStatusCounts?: Record<string, number> | null
   /** 当前准入轮次（服务端裁决快照，与 rdm_intake_round 对齐） */
   intakeRoundNo?: number | null
   /** 本轮是否需审批（服务端裁决；1=需要 0=已命中免审策略） */
@@ -866,6 +875,11 @@ export async function createRequirement(form: RdmRequirementForm, mode: 'draft' 
   }
 }
 
+/** 複製需求為新草稿（不繼承項目/迭代/交付流程，分配時重新確定） */
+export async function copyRequirement(id: number): Promise<RdmRequirementRow> {
+  return request.post<unknown, RdmRequirementRow>(`/rdm/requirement/${id}/copy`)
+}
+
 /**
  * 提出人自助提交 / 修改后重提（服务端按当前状态选 submit 或 resubmit）。
  * <p>不走通用流转接口：那个入口要求 rdm-requirement:edit（产品处理权），
@@ -1421,10 +1435,25 @@ export async function fetchReqTasks(reqId: number): Promise<RdmTaskItem[]> {
   }
 }
 
-/** 迭代列表 */
-export async function fetchIterations(): Promise<RdmIterationItem[]> {
+/**
+ * 迭代列表 / 远程搜索。
+ * <p>带 keyword 时后端默认只回 20 条（下拉候选不需要全量）；无 keyword 时为最近 100 条，
+ * 供迭代排期等需要完整列表的页面使用。
+ * <p>projectId 非空时只回该项目的迭代 + 未挂项目的迭代（紧急修复）。
+ */
+export async function fetchIterations(keyword?: string, limit?: number, projectId?: number | null): Promise<RdmIterationItem[]> {
+  const params: Record<string, string | number> = {}
+  if (keyword && keyword.trim()) {
+    params.keyword = keyword.trim()
+  }
+  if (limit != null) {
+    params.limit = limit
+  }
+  if (projectId != null) {
+    params.projectId = projectId
+  }
   try {
-    return await request.get<unknown, RdmIterationItem[]>('/rdm/delivery/iterations', SILENT)
+    return await request.get<unknown, RdmIterationItem[]>('/rdm/delivery/iterations', { ...SILENT, params })
   } catch (err) {
     if (isBackendUnavailable(err)) return []
     throw err
@@ -2750,6 +2779,45 @@ export interface RdmProjectDeliveryChecklist {
   items: RdmChecklistItem[];
 }
 
+/** 项目需求视角（迭代 → 需求）：交付清单/待推进/进度卡的新口径 */
+export interface RdmProjectRequirementRow {
+  id: number; reqNo: string | null; title: string; status: string;
+  requirementKind: string | null; iterationCode: string | null;
+  pmName: string | null; devOwnerName: string | null;
+  planDevDate: string | null; planReleaseDate: string | null;
+  progress: number | null; blocked: boolean; overdue: boolean;
+  /** 交付项总数；0 表示未拆分（按需求整体交付） */
+  deliveryItemTotal: number; deliveryItemDone: number;
+}
+
+export interface RdmProjectIterationGroup {
+  iterationCode: string; iterationName: string; status: string;
+  startDate: string | null; endDate: string | null;
+  requirementTotal: number; requirementDelivered: number;
+  requirements: RdmProjectRequirementRow[];
+}
+
+/** type: intake_pending / unplanned / overdue / blocked_task / no_owner / decision */
+export interface RdmProjectRequirementTodo {
+  type: string; refId: number; reqId: number | null; reqNo: string | null;
+  title: string; detail: string | null; responsibleName: string | null;
+  dueDate: string | null; actionUrl: string | null;
+}
+
+export interface RdmProjectRequirementSummary {
+  iterationTotal: number; requirementTotal: number; requirementDelivered: number;
+  requirementInProgress: number; requirementPending: number;
+  blockedTaskCount: number; pendingDecisionCount: number; pendingAcceptanceCount: number;
+  deliveryItemTotal: number; deliveryItemDone: number;
+}
+
+export interface RdmProjectRequirementBoard {
+  iterations: RdmProjectIterationGroup[];
+  unplanned: RdmProjectRequirementRow[];
+  todos: RdmProjectRequirementTodo[];
+  summary: RdmProjectRequirementSummary;
+}
+
 export interface RdmChecklistItem {
   itemId: number; itemNo: string; title: string; coordinatorName: string;
   status: string; planEndDate: string; testStatus: string;
@@ -3282,10 +3350,14 @@ export async function fetchProjectChecklist(id: number): Promise<RdmProjectDeliv
   return request.get<unknown, RdmProjectDeliveryChecklist[]>(`/rdm/project/${id}/checklist`, SILENT)
 }
 
+/** 项目需求视角：迭代 → 需求 + 需求/任务口径待办 + 双口径概览 */
+export async function fetchProjectRequirementBoard(id: number): Promise<RdmProjectRequirementBoard> {
+  return request.get<unknown, RdmProjectRequirementBoard>(`/rdm/project/${id}/requirement-board`, SILENT)
+}
+
 export async function addProjectMember(id: number, data: { userId: number; empNo?: string; userName?: string; roleCode: string }): Promise<void> {
   return request.post<unknown, void>(`/rdm/project/${id}/members`, data)
 }
-
 export async function removeProjectMember(id: number, userId: number): Promise<void> {
   return request.delete<unknown, void>(`/rdm/project/${id}/members/${userId}`)
 }
@@ -3316,6 +3388,15 @@ export async function fetchTestBatches(params: RdmTestBatchQuery): Promise<{ rec
 
 export async function submitTestBatch(data: RdmTestBatchSubmitForm): Promise<RdmTestBatchDetail> {
   return request.post<unknown, RdmTestBatchDetail>('/rdm/test-batch', data)
+}
+
+/** 按任务解析提测范围：已挂交付项复用，未挂归入默认交付项（返回解析后的交付项） */
+export async function resolveTestBatchTaskScope(
+  reqId: number, taskIds: number[],
+): Promise<{ id: number; itemNo: string; title: string; status: string }[]> {
+  return request.post<unknown, { id: number; itemNo: string; title: string; status: string }[]>(
+    '/rdm/test-batch/task-scope', { reqId, taskIds },
+  )
 }
 
 export async function fetchTestBatchDetail(id: number): Promise<RdmTestBatchDetail> {

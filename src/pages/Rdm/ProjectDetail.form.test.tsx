@@ -11,7 +11,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { createProject, fetchProjectChecklist, fetchProjectDetail, fetchProjectPending, updateProject } from '../../api/rdm'
+import { createProject, fetchProjectDetail, fetchProjectRequirementBoard, updateProject } from '../../api/rdm'
 import ProjectDetail from './ProjectDetail'
 
 // 六个 EmployeeSelect 实例的 props 长一样（同一 placeholder），只能按 JSX 顺序定位：
@@ -28,8 +28,7 @@ vi.mock('../MeetingManagement/EmployeeSelect', () => ({
 
 vi.mock('../../api/rdm', () => ({
   fetchProjectDetail: vi.fn(),
-  fetchProjectChecklist: vi.fn(),
-  fetchProjectPending: vi.fn(),
+  fetchProjectRequirementBoard: vi.fn(),
   urgeProject: vi.fn(),
   addProjectMember: vi.fn(),
   removeProjectMember: vi.fn(),
@@ -49,8 +48,14 @@ const detail = {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(fetchProjectDetail).mockResolvedValue(detail)
-  vi.mocked(fetchProjectChecklist).mockResolvedValue([] as never)
-  vi.mocked(fetchProjectPending).mockResolvedValue([] as never)
+  vi.mocked(fetchProjectRequirementBoard).mockResolvedValue({
+    iterations: [], unplanned: [], todos: [],
+    summary: {
+      iterationTotal: 0, requirementTotal: 0, requirementDelivered: 0, requirementInProgress: 0,
+      requirementPending: 0, blockedTaskCount: 0, pendingDecisionCount: 0,
+      pendingAcceptanceCount: 0, deliveryItemTotal: 0, deliveryItemDone: 0,
+    },
+  })
   vi.mocked(createProject).mockResolvedValue(detail)
   vi.mocked(updateProject).mockResolvedValue(undefined)
 })

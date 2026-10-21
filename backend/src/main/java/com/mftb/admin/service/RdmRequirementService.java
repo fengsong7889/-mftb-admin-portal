@@ -44,6 +44,13 @@ public interface RdmRequirementService {
     /** 提交需求（mode=draft 存草稿），返回需求视图 */
     RdmRequirementVO create(RdmRequirementCreateDTO dto);
 
+    /**
+     * 複製需求為新草稿。
+     * <p>用於「流程版本確定後不可改」的補捙：需要換交付方式的，複製一條新需求重新走流程，
+     * 原需求的交付項/評審/測試/驗收記錄完整保留。不繼承項目/迭代/流程版本與衍生資料。
+     */
+    RdmRequirementVO copy(Long id);
+
     /** 修改需求（仅草稿/准入驳回态） */
     RdmRequirementVO update(Long id, RdmRequirementCreateDTO dto);
 
@@ -61,6 +68,26 @@ public interface RdmRequirementService {
 
     /** 状态流转（按 rdm_transition 校验角色与必填字段） */
     RdmRequirementVO transition(Long id, RdmTransitionDTO dto);
+
+    /**
+     * 審慎地聯動推進需求狀態（靜默、失敗不影響調用方事務）。
+     * <p>供 PRD / 評審等「交付過程寫入」後聯動需求狀態使用：當前狀態沒有該流轉配置、
+     * 角色或必填不滿足、V3 分批交付鏈路禁止該動作時一律返回 false，只記日誌不拋錯。
+     * <p>為什麼要獨立一個方法：以前在交付服務裡直接 try/catch 調 {@link #transition}，
+     * 內層 {@code @Transactional} 拋錯後會把外層事務標記為 rollback-only，
+     * 導致「PRD 已寫入但保存接口整體 500（系统繁忙）」。這裡用獨立保存點（NESTED）隔離，
+     * 聯動失敗只損失一次狀態推進，不會回滾主數據。
+     */
+    boolean tryAdvanceQuietly(Long reqId, String actionCode, RdmTransitionDTO payload);
+
+    /**
+     * 依「已存在的 PRD / 評審事實」把需求狀態對齊到事實所在位置（受理 → PRD 設計 → 評審）。
+     * <p>只對 V1/V2 整需求鏈路生效，且只向前對齊、不越過「評審通過」；
+     * 每步都走配置化流轉並寫入狀態流水，操作人為當前登錄人，便於事後追溯。
+     * <p>場景：舊數據在「評估中」就先把 PRD 寫好、評審也出了結論，受理後狀態仍停在
+     * 「已受理·待排期」，頁面又讓人再寫一次 PRD——用本方法把狀態補到事實位置。
+     */
+    void alignPrdPhaseStatus(Long reqId);
 
     /**
      * 调整迭代（归属体系改造）：属性变更而非状态流转，故不走 rdm_transition 状态机，

@@ -138,6 +138,7 @@ export const MENU_NAME_EN: Record<string, string> = {
   'ai-assistant': 'AI Center (AI)',
   'ai_model_hub': 'Model Access',
   'ai-operation-auth': 'AI Access Control',
+  'ai-assistant-config': 'AI Assistant Config',
   'ai_usage_stats': 'Energy Statistics',
   'ai_energy_detail': 'Energy Detail',
   // 智能中心 (AI) - 拆分后的新菜单 key

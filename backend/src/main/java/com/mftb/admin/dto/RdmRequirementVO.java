@@ -16,6 +16,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 需求视图对象（列表行 + 详情共用一套字段，列表不填充子集合）
@@ -69,6 +70,12 @@ public class RdmRequirementVO {
     private String promisedPrdDate;
     private String devOwnerName;
     private String iterationCode;
+    /**
+     * 所属迭代名称（列表/详情统一由服务端联表 rdm_iteration 回填）。
+     * <p>只有编码时前端只能靠迭代下拉字典拼名称，而字典受 200 条上限约束，
+     * 历史迭代会退化成裸编码；名称必须由服务端给出。
+     */
+    private String iterationName;
     private String planDevDate;
     private String planReleaseDate;
     private String actualReleaseDate;
@@ -132,6 +139,21 @@ public class RdmRequirementVO {
     private List<RdmRequirementStructureService.RequirementTreeNode> structureChildren = new ArrayList<>();
     /** 结构父需求信息（有结构父时填充，供详情页展示祖先） */
     private RdmRequirementStructureService.RequirementTreeNode structureParent;
+
+    /* ── V3 交付進度投影（只讀） ── */
+    /**
+     * 由交付項事實推導的階段，取值與前端九段階段條同詞彙：
+     * design / review / dev / test / uat / release。
+     * <p><b>只讀投影</b>：不寫 rdm_requirement.status、不參與 allowedActions。
+     * V3 需求受理後狀態按設計停住，進度只能看交付項，故另發一組展示字段。
+     */
+    private String deliveryStage;
+    /** 交付項總數（V3 詳情填充） */
+    private Integer deliveryItemCount;
+    /** 已完成交付項數（status=done） */
+    private Integer deliveryDoneCount;
+    /** 各交付項狀態分佈（status → 件數），供詳情展開核對 */
+    private Map<String, Integer> deliveryItemStatusCounts;
     /**
      * 需求管理类可执行动作（来自 {@link RdmAllowedActionsService#computeRequirementActions}）。
      * <p>与 {@link #allowedActions}（基于流转规则表的流转动作）互补：前者是「按角色可发起的管理操作」，

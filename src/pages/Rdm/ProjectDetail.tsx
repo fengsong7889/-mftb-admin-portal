@@ -1,10 +1,11 @@
 /**
  * 項目詳情 —— V3 分批交付項目單項完整視圖
  *
- * 三大板塊（上而下）：
- * 1. 項目摘要（Descriptions 4 列）
- * 2. 交付清單（按需求分組、可展開）
- * 3. 待推進事項（按類型分組）
+ * 四大板塊（上而下）：
+ * 1. 基本信息（Descriptions 4 列）
+ * 2. 項目目標（長文本獨立成卡，避免與字段網格混排後難以區分）
+ * 3. 交付清單（按需求分組、可展開）
+ * 4. 待推進事項（按類型分組）
  *
  * 右側邊欄：快捷操作 + 成員列表
  */
@@ -28,6 +29,7 @@ import {
 } from 'antd'
 import dayjs from 'dayjs'
 import {
+  AimOutlined,
   AlertOutlined,
   BellOutlined,
   CheckCircleOutlined,
@@ -53,36 +55,55 @@ import RdmFormHeader from './components/RdmFormHeader'
 import {
   addProjectMember,
   createProject,
-  fetchProjectChecklist,
   fetchProjectDetail,
-  fetchProjectPending,
+  fetchProjectRequirementBoard,
   removeProjectMember,
   updateProject,
   urgeProject,
-  type RdmChecklistItem,
-  type RdmProjectDeliveryChecklist,
   type RdmProjectDetail as ProjectDetailType,
-  type RdmProjectPendingItem,
+  type RdmProjectIterationGroup,
+  type RdmProjectRequirementBoard,
+  type RdmProjectRequirementRow,
+  type RdmProjectRequirementTodo,
 } from '../../api/rdm'
 import {
-  RDM_DELIVERY_ITEM_STATUS_COLOR,
-  RDM_DELIVERY_ITEM_STATUS_LABEL,
+  RDM_ITERATION_STATUS_LABEL,
   RDM_PROJECT_STATUS_COLOR,
   RDM_PROJECT_STATUS_LABEL,
+  RDM_STATUS_COLOR,
+  RDM_STATUS_LABEL,
 } from '../../constants/rdm'
 import './index.css'
 
-/** 待推進事項類型配置 */
+/**
+ * 待推進事項類型配置（需求/任務口徑）。
+ * <p>取代舊的交付項待辦：項目下的待准入需求、未排期需求、逾期需求、阻塞任務與待裁決問題
+ * 才是 PM 真正要推的事；交付項只是需求的驗收批次，不再是可見性前提。
+ */
 const PENDING_TYPE_CONFIG: Record<string, { icon: React.ReactNode; color: string; bg: string; label: string }> = {
-  unassigned: { icon: <FileTextOutlined />, color: '#E8720C', bg: '#FFF7E6', label: '未分發需求' },
-  blocked:    { icon: <StopOutlined />,      color: '#FF4D4F', bg: '#FFF1F0', label: '阻塞' },
-  decision:   { icon: <ThunderboltOutlined />, color: '#722ED1', bg: '#F9F0FF', label: '待裁決' },
-  confirm:    { icon: <CheckCircleOutlined />, color: '#1890FF', bg: '#E6F7FF', label: '待確認' },
-  overdue:    { icon: <ExclamationCircleOutlined />, color: '#FF4D4F', bg: '#FFF1F0', label: '補驗逾期' },
+  intake_pending: { icon: <FileTextOutlined />,          color: '#E8720C', bg: '#FFF7E6', label: '待准入需求' },
+  unplanned:      { icon: <ClockCircleOutlined />,      color: '#1890FF', bg: '#E6F7FF', label: '未排期需求' },
+  overdue:        { icon: <ExclamationCircleOutlined />, color: '#FF4D4F', bg: '#FFF1F0', label: '逾期需求' },
+  blocked_task:   { icon: <StopOutlined />,              color: '#FF4D4F', bg: '#FFF1F0', label: '阻塞任務' },
+  no_owner:       { icon: <UserAddOutlined />,           color: '#722ED1', bg: '#F9F0FF', label: '缺研發負責人' },
+  decision:       { icon: <ThunderboltOutlined />,       color: '#722ED1', bg: '#F9F0FF', label: '待裁決' },
 }
 
-/** 交付項狀態是否已完成 */
-const isItemDone = (status: string) => status === 'done'
+/** 需求交付完成口径：上线(released)仍需验收，不算完成 */
+const REQ_DONE_STATUSES = new Set(['verified', 'closed'])
+const isReqDone = (status: string) => REQ_DONE_STATUSES.has(status)
+
+/**
+ * 項目成員角色碼展示文案。
+ * <p>後端存的是小寫口徑（pm/product/dev_lead/dev/designer/qa/ops/pmo），直接原樣渲染會把
+ * 「dev_lead」這類下劃線碼擺到用戶面前；映射只影響展示，不改變寫入值。
+ */
+const MEMBER_ROLE_LABEL: Record<string, string> = {
+  pm: 'PM', product: '產品', dev_lead: '技術', dev: '研發', designer: 'UI', qa: '測試', ops: '運維', pmo: 'PMO',
+}
+
+/** 手動添加成員可選角色（與後端 RdmProjectDTO.MemberAdd 的 roleCode 白名單一致） */
+const MEMBER_ROLE_OPTIONS = ['pm', 'product', 'dev_lead', 'designer', 'qa', 'ops', 'pmo'] as const
 
 /**
  * 負責人選擇行：字段存 sys_user.id 标量，姓名快照由 onPick 旁路寫入 *UserName。
@@ -141,8 +162,8 @@ export default function ProjectDetail() {
 
   // ── 數據狀態 ──
   const [detail, setDetail] = useState<ProjectDetailType | null>(null)
-  const [checklist, setChecklist] = useState<RdmProjectDeliveryChecklist[]>([])
-  const [pending, setPending] = useState<RdmProjectPendingItem[]>([])
+  /** 需求視角：迭代分組 + 需求行 + 待推進；取代舊的交付項清單/待辦兩套接口 */
+  const [board, setBoard] = useState<RdmProjectRequirementBoard | null>(null)
   const [loading, setLoading] = useState(!isFormMode || mode === 'edit')
   const [error, setError] = useState<string | null>(null)
 
@@ -155,8 +176,9 @@ export default function ProjectDetail() {
 
   // ── 添加成員 Modal ──
   const [memberModalOpen, setMemberModalOpen] = useState(false)
+  const [memberUserId, setMemberUserId] = useState<number | null>(null)
   const [memberName, setMemberName] = useState('')
-  const [memberRole, setMemberRole] = useState('DEV')
+  const [memberRole, setMemberRole] = useState<string>('dev')
   const [memberSubmitting, setMemberSubmitting] = useState(false)
 
   // ── 催辦（urge）結果 ──
@@ -233,14 +255,12 @@ export default function ProjectDetail() {
           })
         }
       } else {
-        const [detailRes, checklistRes, pendingRes] = await Promise.all([
+        const [detailRes, boardRes] = await Promise.all([
           fetchProjectDetail(projectId),
-          fetchProjectChecklist(projectId),
-          fetchProjectPending(projectId),
+          fetchProjectRequirementBoard(projectId),
         ])
         setDetail(detailRes)
-        setChecklist(checklistRes ?? [])
-        setPending(pendingRes ?? [])
+        setBoard(boardRes)
       }
     } catch {
       setError(isFormMode ? '項目數據載入失敗，請重試' : '項目詳情載入失敗，請重試')
@@ -263,43 +283,115 @@ export default function ProjectDetail() {
     }
   }, [mode, projectId, loadAll, form])
 
-  // ── 篩選後的交付清單 ──
-  const filteredChecklist = useMemo(() => {
-    if (checklistFilter === 'all') return checklist
-    return checklist
-      .map(group => ({
-        ...group,
-        items: group.items.filter(item => !isItemDone(item.status)),
-      }))
-      .filter(group => group.items.length > 0)
-  }, [checklist, checklistFilter])
+  // ── 篩選後的迭代/需求（未完成 = 排除已驗證/已關閉）──
+  const visibleIterations = useMemo<RdmProjectIterationGroup[]>(() => {
+    const list = board?.iterations ?? []
+    if (checklistFilter === 'all') return list
+    return list.map(group => ({
+      ...group,
+      requirements: group.requirements.filter(req => !isReqDone(req.status)),
+    }))
+  }, [board, checklistFilter])
+
+  const visibleUnplanned = useMemo<RdmProjectRequirementRow[]>(() => {
+    const list = board?.unplanned ?? []
+    return checklistFilter === 'all' ? list : list.filter(req => !isReqDone(req.status))
+  }, [board, checklistFilter])
+
+  /** 交付清單是否有內容（迭代下需求 + 未排期需求） */
+  const hasRequirementContent = visibleIterations.some(g => g.requirements.length > 0) || visibleUnplanned.length > 0
 
   // ── 待推進事項按類型分組 ──
   const pendingGroups = useMemo(() => {
-    const map = new Map<string, RdmProjectPendingItem[]>()
-    for (const item of pending) {
+    const map = new Map<string, RdmProjectRequirementTodo[]>()
+    for (const item of board?.todos ?? []) {
       const list = map.get(item.type) ?? []
       list.push(item)
       map.set(item.type, list)
     }
     return Array.from(map.entries())
-  }, [pending])
+  }, [board])
+
+  /**
+   * 需求行渲染（迭代分组与未排期组共用）。
+   * <p>交付项完成度只作补充：未拆分（deliveryItemTotal=0）不代表没进展，不给“缺失”误导色。
+   */
+  const renderRequirementRows = (rows: RdmProjectRequirementRow[], emptyText: string) => {
+    if (rows.length === 0) {
+      return <div style={{ fontSize: 12, color: '#8C8C8C', padding: '4px 0' }}>{emptyText}</div>
+    }
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {rows.map(req => (
+          <div
+            key={req.id}
+            onClick={() => navigate(`/rdm-detail?id=${req.id}`)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '8px 12px',
+              borderRadius: 6,
+              border: '1px solid #f0f0f0',
+              background: req.blocked || req.overdue ? '#FFF7F0' : '#FAFBFC',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+          >
+            <Tag color="default" style={{ margin: 0, flexShrink: 0 }}>{req.reqNo || `需求 #${req.id}`}</Tag>
+            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13, color: '#262626' }}>
+              {req.title}
+            </span>
+            <span style={{ fontSize: 12, color: '#8C8C8C', flexShrink: 0 }}>
+              {req.pmName ? `PM ${req.pmName}` : 'PM -'} · {req.devOwnerName ? `研發 ${req.devOwnerName}` : '研發 -'}
+            </span>
+            <Tag
+              color={(RDM_STATUS_COLOR as Record<string, string>)[req.status] ?? 'default'}
+              style={{ margin: 0, flexShrink: 0 }}
+            >
+              {(RDM_STATUS_LABEL as Record<string, string>)[req.status] ?? req.status}
+            </Tag>
+            <span style={{ fontSize: 12, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{req.planDevDate || '-'}</span>
+            {req.deliveryItemTotal > 0 ? (
+              <Tag
+                color={req.deliveryItemDone === req.deliveryItemTotal ? 'success' : 'blue'}
+                style={{ margin: 0, flexShrink: 0 }}
+              >
+                交付項 {req.deliveryItemDone}/{req.deliveryItemTotal}
+              </Tag>
+            ) : (
+              <Tag style={{ margin: 0, flexShrink: 0 }}>未拆分</Tag>
+            )}
+            {req.blocked && <Tag color="error" style={{ margin: 0, flexShrink: 0 }}>阻塞</Tag>}
+            {req.overdue && <Tag color="red" style={{ margin: 0, flexShrink: 0 }}>逾期</Tag>}
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   // ── 添加成員 ──
+  /** 關閉並重置：不清空會讓下一次打開面帶上一次的人和角色 */
+  const closeMemberModal = () => {
+    setMemberModalOpen(false)
+    setMemberUserId(null)
+    setMemberName('')
+  }
+
   const handleAddMember = async () => {
-    if (!memberName.trim()) {
-      message.warning('請輸入成員姓名')
+    // 成員必須綁真實 sys_user.id：舊實現傳 userId: 0，寫進去的人在權限與負載計算裡都是幽靈行
+    if (!memberUserId) {
+      message.warning('請選擇成員')
       return
     }
     setMemberSubmitting(true)
     try {
-      await addProjectMember(projectId, { userId: 0, userName: memberName.trim(), roleCode: memberRole })
+      await addProjectMember(projectId, { userId: memberUserId, userName: memberName, roleCode: memberRole })
       message.success('成員添加成功')
-      setMemberModalOpen(false)
-      setMemberName('')
+      closeMemberModal()
       loadAll()
     } catch {
-      message.error('添加成員失敗')
+      // request.ts 已统一彈後端失敗原因（如「該成員已在項目中」），這裡再彈就是双彈（AGENTS §G.4）
     } finally {
       setMemberSubmitting(false)
     }
@@ -517,8 +609,9 @@ export default function ProjectDetail() {
           <Button icon={<BellOutlined />} loading={urging} onClick={handleUrge}>催辦待辦</Button>
         </div>
         <div className="action-section-right">
+          {/* 交付項只能在需求下拆分（后端强制 reqId）：项目维度不再提供创建入口 */}
           <Button icon={<EditOutlined />} onClick={() => navigate(`/rdm-project-detail?id=${detail.id}&mode=edit${listSuffix}`)}>編輯項目</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(`/rdm-delivery-item?projectId=${detail.id}&mode=create`)}>新增交付項</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/rdm-submit')}>新增需求</Button>
         </div>
       </div>
 
@@ -526,13 +619,13 @@ export default function ProjectDetail() {
       <div className="rdm-detail-grid">
         {/* 左側主內容 */}
         <div className="rdm-detail-main">
-          {/* Section 1：項目摘要 */}
+          {/* Section 1：基本信息（項目目標已拆出為獨立卡片） */}
           <div className="rdm-card">
             <div className="rdm-card-title">
               <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}>
                 <FileTextOutlined />
               </span>
-              項目摘要
+              基本信息
               <span className="rdm-card-title-split" />
             </div>
             <Descriptions
@@ -540,9 +633,6 @@ export default function ProjectDetail() {
               size="small"
               styles={{ label: { color: '#8C8C8C', fontSize: 12 }, content: { color: '#262626', fontSize: 13 } }}
             >
-              <Descriptions.Item label="項目目標" span={4}>
-                {detail.objective || <span style={{ color: '#BFBFBF' }}>未設定</span>}
-              </Descriptions.Item>
               <Descriptions.Item label="項目經理">{detail.pmUserName || '-'}</Descriptions.Item>
               <Descriptions.Item label="產品負責人">{detail.productOwnerUserName || '-'}</Descriptions.Item>
               <Descriptions.Item label="計劃開始">{detail.planStartDate || '-'}</Descriptions.Item>
@@ -560,7 +650,38 @@ export default function ProjectDetail() {
             </Descriptions>
           </div>
 
-          {/* Section 2：交付清單 */}
+          {/* Section 2：項目目標 —— 目標多為帶編號的多句長文，塞進 Descriptions 會和字段網格混成一片，故獨立成卡 */}
+          <div className="rdm-card">
+            <div className="rdm-card-title">
+              <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}>
+                <AimOutlined />
+              </span>
+              項目目標
+              <span className="rdm-card-title-split" />
+            </div>
+            {detail.objective ? (
+              <div
+                style={{
+                  padding: '12px 16px',
+                  borderRadius: 6,
+                  background: '#FAFBFC',
+                  border: '1px solid #f0f0f0',
+                  fontSize: 13,
+                  lineHeight: 1.9,
+                  color: '#262626',
+                  // 目標常按「1，2，3」分條書寫，保留使用者輸入的換行
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                }}
+              >
+                {detail.objective}
+              </div>
+            ) : (
+              <span style={{ fontSize: 13, color: '#BFBFBF' }}>未設定</span>
+            )}
+          </div>
+
+          {/* Section 3：交付清單 */}
           <div className="rdm-card">
             <div className="rdm-card-title">
               <span className="rdm-icon-block" style={{ background: '#F6FFED', color: '#52C41A' }}>
@@ -579,71 +700,59 @@ export default function ProjectDetail() {
               />
             </div>
 
-            {filteredChecklist.length === 0 ? (
-              <Empty description="暫無交付項" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            {!hasRequirementContent ? (
+              <Empty description="暫無需求" image={Empty.PRESENTED_IMAGE_SIMPLE}>
+                <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+                  項目下暫無迭代/需求；待准入需求也會出現在此處
+                </div>
+              </Empty>
             ) : (
               <Collapse
                 accordion={false}
-                defaultActiveKey={filteredChecklist.slice(0, 2).map(g => String(g.reqId))}
+                defaultActiveKey={[
+                  ...visibleIterations.slice(0, 2).map(g => g.iterationCode),
+                  ...(visibleUnplanned.length > 0 ? ['__unplanned__'] : []),
+                ]}
                 ghost
-                items={filteredChecklist.map(group => ({
-                  key: String(group.reqId),
-                  label: (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Tag color="blue" style={{ margin: 0 }}>{group.reqNo}</Tag>
-                      <span style={{ fontWeight: 500, color: '#262626' }}>{group.reqTitle}</span>
-                      <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 'auto' }}>
-                        {group.items.filter(i => isItemDone(i.status)).length}/{group.items.length} 完成
-                      </span>
-                    </div>
-                  ),
-                  children: (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {group.items.map((item: RdmChecklistItem) => (
-                        <div
-                          key={item.itemId}
-                          onClick={() => navigate(`/rdm-delivery-item?id=${item.itemId}&mode=view`)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 10,
-                            padding: '8px 12px',
-                            borderRadius: 6,
-                            border: '1px solid #f0f0f0',
-                            background: item.blockedReason ? '#FFF7F0' : '#FAFBFC',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
-                          }}
-                        >
-                          <Tag color="default" style={{ margin: 0, flexShrink: 0 }}>{item.itemNo}</Tag>
-                          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13, color: '#262626' }}>
-                            {item.title}
-                          </span>
-                          <span style={{ fontSize: 12, color: '#8C8C8C', flexShrink: 0 }}>{item.coordinatorName || '-'}</span>
-                          <Tag
-                            color={RDM_DELIVERY_ITEM_STATUS_COLOR[item.status] ?? 'default'}
-                            style={{ margin: 0, flexShrink: 0 }}
-                          >
-                            {RDM_DELIVERY_ITEM_STATUS_LABEL[item.status] ?? item.status}
-                          </Tag>
-                          <span style={{ fontSize: 12, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>
-                            {item.planEndDate || '-'}
-                          </span>
-                          {item.blockedReason && (
-                            <Tag color="error" style={{ margin: 0, flexShrink: 0, maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              阻塞：{item.blockedReason}
-                            </Tag>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ),
-                }))}
+                items={[
+                  ...visibleIterations.map(group => ({
+                    key: group.iterationCode,
+                    label: (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Tag color="purple" style={{ margin: 0 }}>{group.iterationCode}</Tag>
+                        <span style={{ fontWeight: 500, color: '#262626' }}>{group.iterationName}</span>
+                        <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+                          {(RDM_ITERATION_STATUS_LABEL as Record<string, string>)[group.status] ?? group.status}
+                          {group.startDate && ` · ${group.startDate} ~ ${group.endDate || '待定'}`}
+                        </span>
+                        <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 'auto' }}>
+                          {group.requirementDelivered}/{group.requirementTotal} 需求已交付
+                        </span>
+                      </div>
+                    ),
+                    children: renderRequirementRows(group.requirements, '該迭代下暫無需求'),
+                  })),
+                  ...(visibleUnplanned.length > 0
+                    ? [{
+                        key: '__unplanned__',
+                        label: (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Tag color="orange" style={{ margin: 0 }}>未排期</Tag>
+                            <span style={{ fontWeight: 500, color: '#262626' }}>未挂迭代的需求</span>
+                            <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 'auto' }}>
+                              {visibleUnplanned.length} 條，需在需求詳情排期時選擇迭代
+                            </span>
+                          </div>
+                        ),
+                        children: renderRequirementRows(visibleUnplanned, '暫無未排期需求'),
+                      }]
+                    : []),
+                ]}
               />
             )}
           </div>
 
-          {/* Section 3：待推進事項 */}
+          {/* Section 4：待推進事項 */}
           <div className="rdm-card">
             <div className="rdm-card-title">
               <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}>
@@ -651,7 +760,7 @@ export default function ProjectDetail() {
               </span>
               待推進事項
               <span className="rdm-card-title-split" />
-              <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>共 {pending.length} 項</span>
+              <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>共 {board?.todos.length ?? 0} 項</span>
             </div>
 
             {pendingGroups.length === 0 ? (
@@ -691,10 +800,15 @@ export default function ProjectDetail() {
                               transition: 'all 0.2s',
                             }}
                           >
-                            <Tag color="default" style={{ margin: 0, flexShrink: 0 }}>{item.refNo}</Tag>
+                            <Tag color="default" style={{ margin: 0, flexShrink: 0 }}>{item.reqNo || '-'}</Tag>
                             <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13, color: '#262626' }}>
                               {item.title}
                             </span>
+                            {item.detail && (
+                              <span style={{ fontSize: 12, color: '#8C8C8C', flexShrink: 0, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {item.detail}
+                              </span>
+                            )}
                             <span style={{ fontSize: 12, color: '#8C8C8C', flexShrink: 0 }}>{item.responsibleName || '-'}</span>
                             {item.dueDate && (
                               <span style={{ fontSize: 12, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>截止 {item.dueDate}</span>
@@ -712,7 +826,7 @@ export default function ProjectDetail() {
 
         {/* 右側邊欄 */}
         <div className="rdm-detail-side">
-          {/* 進度統計 */}
+          {/* 進度統計（雙口徑：需求/迭代為主，交付項為可選批次） */}
           <div className="rdm-card">
             <div className="rdm-card-title">
               <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}>
@@ -722,32 +836,63 @@ export default function ProjectDetail() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: '#8C8C8C' }}>已交付項</span>
-                <span style={{ color: '#52C41A', fontWeight: 600 }}>{detail.deliveredCount}</span>
+                <span style={{ color: '#8C8C8C' }}>已交付需求</span>
+                <span style={{ color: '#52C41A', fontWeight: 600 }}>
+                  {board?.summary.requirementDelivered ?? 0}
+                  <span style={{ color: '#BFBFBF', fontWeight: 400 }}> / {board?.summary.requirementTotal ?? 0}</span>
+                </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: '#8C8C8C' }}>承諾總項</span>
-                <span style={{ color: '#262626', fontWeight: 600 }}>{detail.totalDeliveryCount}</span>
-              </div>
-              {/* 進度條 */}
+              {/* 需求進度條 */}
               <div style={{ height: 6, borderRadius: 3, background: '#f0f0f0', overflow: 'hidden' }}>
                 <div style={{
                   height: '100%',
                   borderRadius: 3,
-                  width: detail.totalDeliveryCount > 0
-                    ? `${Math.round((detail.deliveredCount / detail.totalDeliveryCount) * 100)}%`
+                  width: (board?.summary.requirementTotal ?? 0) > 0
+                    ? `${Math.round(((board?.summary.requirementDelivered ?? 0) / (board!.summary.requirementTotal)) * 100)}%`
                     : '0%',
                   background: 'linear-gradient(90deg, #52C41A, #73D13D)',
                   transition: 'width 0.6s ease',
                 }} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: '#8C8C8C' }}>阻塞項</span>
-                <span style={{ color: detail.blockedCount > 0 ? '#FF4D4F' : '#262626', fontWeight: 600 }}>{detail.blockedCount}</span>
+                <span style={{ color: '#8C8C8C' }}>迭代數</span>
+                <span style={{ color: '#262626', fontWeight: 600 }}>{board?.summary.iterationTotal ?? 0}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: '#8C8C8C' }}>進行中需求</span>
+                <span style={{ color: '#1890FF', fontWeight: 600 }}>{board?.summary.requirementInProgress ?? 0}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: '#8C8C8C' }}>待准入/草稿需求</span>
+                <span style={{ color: (board?.summary.requirementPending ?? 0) > 0 ? '#E8720C' : '#262626', fontWeight: 600 }}>
+                  {board?.summary.requirementPending ?? 0}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                <span style={{ color: '#8C8C8C' }}>阻塞任務</span>
+                <span style={{ color: (board?.summary.blockedTaskCount ?? 0) > 0 ? '#FF4D4F' : '#262626', fontWeight: 600 }}>
+                  {board?.summary.blockedTaskCount ?? 0}
+                </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                 <span style={{ color: '#8C8C8C' }}>待裁決</span>
-                <span style={{ color: detail.pendingDecisionCount > 0 ? '#722ED1' : '#262626', fontWeight: 600 }}>{detail.pendingDecisionCount}</span>
+                <span style={{ color: (board?.summary.pendingDecisionCount ?? 0) > 0 ? '#722ED1' : '#262626', fontWeight: 600 }}>
+                  {board?.summary.pendingDecisionCount ?? 0}
+                </span>
+              </div>
+              {/* 次口徑：交付項（可選拆分批次，未拆分時為 0 不誤導） */}
+              <div style={{ borderTop: '1px dashed #f0f0f0', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                  <span style={{ color: '#8C8C8C' }}>交付項（可選批次）</span>
+                  <span style={{ color: '#262626', fontWeight: 600 }}>
+                    {board?.summary.deliveryItemDone ?? 0}
+                    <span style={{ color: '#BFBFBF', fontWeight: 400 }}> / {board?.summary.deliveryItemTotal ?? 0}</span>
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                  <span style={{ color: '#8C8C8C' }}>待驗收交付項</span>
+                  <span style={{ color: '#262626', fontWeight: 600 }}>{board?.summary.pendingAcceptanceCount ?? 0}</span>
+                </div>
               </div>
               {detail.nextDeliveryDate && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
@@ -783,7 +928,8 @@ export default function ProjectDetail() {
                 {detail.members.map(m => (
                   <div key={m.id} className="rdm-participant-row">
                     <span style={{ flex: 1, fontSize: 13, color: '#262626' }}>{m.userName || m.empNo}</span>
-                    <Tag color="default" style={{ margin: 0 }}>{m.roleCode}</Tag>
+                    {/* 历史行存过大写角色码（DEV），查找前归一化，否则会直接露出原始码 */}
+                    <Tag color="default" style={{ margin: 0 }}>{MEMBER_ROLE_LABEL[(m.roleCode || '').toLowerCase()] ?? m.roleCode}</Tag>
                     <Button
                       type="text"
                       size="small"
@@ -807,12 +953,13 @@ export default function ProjectDetail() {
               快捷操作
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* 交付項不再从项目入口创建：它挂需求，入口在需求详情「交付項清單」 */}
               <Button
                 block
                 icon={<PlusOutlined />}
-                onClick={() => navigate(`/rdm-delivery-item?projectId=${detail.id}&mode=create`)}
+                onClick={() => navigate('/rdm-submit')}
               >
-                新增交付項
+                新增需求
               </Button>
               <Button
                 block
@@ -846,7 +993,7 @@ export default function ProjectDetail() {
         title="添加項目成員"
         open={memberModalOpen}
         onOk={handleAddMember}
-        onCancel={() => { setMemberModalOpen(false); setMemberName('') }}
+        onCancel={closeMemberModal}
         confirmLoading={memberSubmitting}
         okText="確認添加"
         cancelText="取消"
@@ -854,24 +1001,27 @@ export default function ProjectDetail() {
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '8px 0' }}>
           <div>
-            <div style={{ fontSize: 13, color: '#595959', marginBottom: 6 }}>成員姓名 <span style={{ color: '#FF4D4F' }}>*</span></div>
-            <Input
-              placeholder="請輸入成員姓名"
-              value={memberName}
-              onChange={e => setMemberName(e.target.value)}
+            <div style={{ fontSize: 13, color: '#595959', marginBottom: 6 }}>成員 <span style={{ color: '#FF4D4F' }}>*</span></div>
+            {/* 必須選真實員工：後端以 userId 為歸屬鍵，手輸姓名無法建立可用的成員關係 */}
+            <EmployeeSelect
+              single
+              value={memberUserId ?? undefined}
+              placeholder="搜尋姓名或工號"
+              onChange={ids => setMemberUserId(ids[0] ?? null)}
+              onPick={items => setMemberName(items[0]?.name ?? '')}
             />
           </div>
           <div>
             <div style={{ fontSize: 13, color: '#595959', marginBottom: 6 }}>角色</div>
             <Space size={6} wrap>
-              {['PM', 'DEV', 'QA', 'DESIGNER', 'PMO'].map(role => (
+              {MEMBER_ROLE_OPTIONS.map(role => (
                 <Tag
                   key={role}
                   color={memberRole === role ? 'blue' : 'default'}
                   style={{ cursor: 'pointer', padding: '2px 10px' }}
                   onClick={() => setMemberRole(role)}
                 >
-                  {role}
+                  {MEMBER_ROLE_LABEL[role]}
                 </Tag>
               ))}
             </Space>

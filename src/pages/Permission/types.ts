@@ -577,6 +577,10 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'view', label: '查看' },
     { key: 'edit', label: '編輯' },
   ],
+  'ai-assistant-config': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
   // ── AI 菜单动作集（与后端 @RequirePermission 实测集一致）──
   // 未在此表登记的菜单会回退成全部 8 个通用动作（導入/啟用 等无关项），必须逐菜单补齐
   'ai-model-provider': [
@@ -1722,6 +1726,7 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'ai-emp-quota',
   'ai-emp-permission',
   'ai-operation-auth',
+  'ai-assistant-config',
   'ai_usage_stats',
   'ai_energy_detail',
   'ai-access-request',
@@ -2031,6 +2036,7 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/ai-emp-permission': 'ai-emp-permission',
   '/ai-emp-permission-detail': 'ai-emp-permission',
   '/ai-operation-auth': 'ai-operation-auth',
+  '/ai-assistant-config': 'ai-assistant-config',
   '/ai-operation-auth-edit': 'ai-operation-auth',
   '/ai-operation-auth-log': 'ai-operation-auth',
   '/ai-usage-stats': 'ai_usage_stats',
@@ -2193,6 +2199,13 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
 export const ROUTE_MENU_ANY_OF_MAP: Record<string, string[]> = {
   // 审批详情页：财务审批中心与 OA 流程事项两侧都能进（其余审批类型同页展示）
   '/approval-detail': ['approval-center', 'oa-requests'],
+  /*
+   * 移动端日报页：钉钉通知链接的落地页，读者是项目经理/产品负责人，
+   * 他们通常没有「推送配置」权限。主菜单 key 仍是 rdm-daily-report-rule（侧栏高亮用），
+   * 但这里必须与后端快照接口的 anyOf 同口径放行，否则点链接就是 403，推送等于白发。
+   */
+  '/rdm-daily': ['rdm-daily-report-rule', 'rdm-workbench', 'rdm-requirement',
+    'rdm-delivery-board', 'rdm-dashboard-board'],
 }
 
 /**

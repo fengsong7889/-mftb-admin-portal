@@ -348,24 +348,48 @@ export default function DeliveryBoard() {
       ),
     },
     {
-      title: '狀態', dataIndex: 'status', key: 'status', width: 100,
-      render: (v: string) => (
-        <Tag color={RDM_TASK_STATUS_COLOR[v as RdmTaskStatus] ?? 'default'} style={{ margin: 0 }}>
-          {RDM_TASK_STATUS_LABEL[v as RdmTaskStatus] ?? v}
-        </Tag>
+      title: '狀態', dataIndex: 'status', key: 'status', width: 200,
+      render: (v: string, r) => (
+        <div className="rdm-task-status">
+          <Tag color={RDM_TASK_STATUS_COLOR[v as RdmTaskStatus] ?? 'default'} style={{ margin: 0 }}>
+            {RDM_TASK_STATUS_LABEL[v as RdmTaskStatus] ?? v}
+          </Tag>
+          {/* 阻塞不能只报「阻塞中」：不显示原因就只能点进详情找卡点是谁、卡在哪 */}
+          {v === RDM_TASK_STATUS.BLOCKED && r.blockedReason && (
+            <div className="rdm-task-status__block" title={r.blockedReason}>
+              <WarningOutlined /> {r.blockedReason}
+            </div>
+          )}
+        </div>
       ),
     },
     {
-      title: '進度', key: 'progress', width: 130,
-      render: (_, r) => (
-        <Space size={6}>
-          <Progress percent={r.progress ?? 0} size="small" style={{ width: 66 }} />
-          {/* 缺报不等于 0：本工作台是研发看自己负载的地方，显示 0 会被当成“这活没花时间” */}
-          <span style={{ fontSize: 12, color: r.actualHoursReported ? '#8C8C8C' : '#FA8C16' }}>
-            {r.actualHoursReported ? `${r.actualHours ?? 0}/${r.planHours ?? '-'}h` : `未填報 / ${r.planHours ?? '-'}h`}
-          </span>
-        </Space>
-      ),
+      title: '進度', key: 'progress', width: 160,
+      render: (_, r) => {
+        const pct = r.progress ?? 0
+        const done = r.status === RDM_TASK_STATUS.DONE
+        const blocked = r.status === RDM_TASK_STATUS.BLOCKED
+        return (
+          <div className="rdm-task-progress">
+            <div className="rdm-task-progress__line">
+              <Progress
+                percent={pct}
+                size="small"
+                showInfo={false}
+                strokeColor={done ? '#52C41A' : blocked ? '#FA8C16' : r.overdue ? '#FF4D4F' : '#E8720C'}
+                style={{ width: 78, margin: 0 }}
+              />
+              <span className="rdm-task-progress__pct">{pct}%</span>
+            </div>
+            {/* 缺报不等于 0：工时与进度必须分开展示，否则「0% 未填報」会被读成这活没花时间 */}
+            <div className={`rdm-task-progress__hours${r.actualHoursReported ? '' : ' is-missing'}`}>
+              {r.actualHoursReported
+                ? t('rdm.deliveryBoard.progressHours', { actual: r.actualHours ?? 0, plan: r.planHours ?? '-', defaultValue: '工時 {{actual}} / {{plan}}h' })
+                : t('rdm.deliveryBoard.progressHoursMissing', { plan: r.planHours ?? '-', defaultValue: '未填工時 · 計劃 {{plan}}h' })}
+            </div>
+          </div>
+        )
+      },
     },
     {
       title: '計劃完成', dataIndex: 'planFinishDate', key: 'planFinishDate', width: 120,
@@ -386,9 +410,6 @@ export default function DeliveryBoard() {
           r.status === RDM_TASK_STATUS.TODO && (
             <Button key="start" type="link" size="small" onClick={() => handleReport(r, RDM_TASK_ACTION.START)}>開始</Button>
           ),
-          r.status === RDM_TASK_STATUS.DOING && (
-            <Button key="done" type="link" size="small" onClick={() => handleReport(r, RDM_TASK_ACTION.DONE)}>完成</Button>
-          ),
           r.status === RDM_TASK_STATUS.BLOCKED ? (
             <Button key="unblock" type="link" size="small" onClick={() => handleReport(r, RDM_TASK_ACTION.UNBLOCK)}>解除阻塞</Button>
           ) : (
@@ -406,7 +427,14 @@ export default function DeliveryBoard() {
     showExpandColumn: false,
     expandedRowRender: (r: RdmTaskItem) => (
       <div className="rdm-action-panel" style={{ margin: '4px 0 8px' }}>
-        <div className="rdm-action-panel-title">上報進度：{r.taskNo}</div>
+        <div className="rdm-action-panel-title">
+          上報進度：{r.taskNo}
+          {r.status === RDM_TASK_STATUS.BLOCKED && r.blockedReason && (
+            <span className="rdm-action-panel-blocked">
+              <WarningOutlined /> {t('rdm.deliveryBoard.blockReason', { reason: r.blockedReason, defaultValue: '阻塞原因：{{reason}}' })}
+            </span>
+          )}
+        </div>
         <Space size={12} wrap align="end">
           <span>
             <span style={{ fontSize: 12, color: '#595959', marginRight: 6 }}>進度 %</span>
@@ -420,14 +448,32 @@ export default function DeliveryBoard() {
             <span style={{ fontSize: 12, color: '#595959', marginRight: 6 }}>說明 / 阻塞原因</span>
             <Input value={remark} onChange={e => setRemark(e.target.value)} placeholder="完成/阻塞必填：交付說明或阻塞原因" style={{ width: 260 }} />
           </span>
-          {/* 计划起止时间属于排期修正，走任务编辑页；此处只报进度与工时 */}
+          {/*
+           * 不再单独提供「完成」：进度填到 100% 并确认就是完成，避免同一个结果有两个入口，
+           * 也避免两个按钮都能点、用户分不清该点哪个。计划起止时间属于排期修正，走编辑页。
+           */}
           <Space>
-            <Button type="primary" size="small" loading={saving} onClick={() => handleReport(r, RDM_TASK_ACTION.START)}>開始 / 上報進度</Button>
-            <Button size="small" loading={saving} onClick={() => handleReport(r, RDM_TASK_ACTION.DONE)}>完成</Button>
-            <Button size="small" danger loading={saving} onClick={() => handleReport(r, RDM_TASK_ACTION.BLOCK)}>標記阻塞</Button>
+            <Button type="primary" size="small" loading={saving}
+              onClick={() => handleReport(r, progress >= 100 ? RDM_TASK_ACTION.DONE : RDM_TASK_ACTION.START)}>
+              {progress >= 100
+                ? t('rdm.deliveryBoard.reportAndDone', { defaultValue: '上報並完成' })
+                : t('rdm.deliveryBoard.reportProgress', { defaultValue: '開始 / 上報進度' })}
+            </Button>
+            {r.status === RDM_TASK_STATUS.BLOCKED ? (
+              <Button size="small" loading={saving} onClick={() => handleReport(r, RDM_TASK_ACTION.UNBLOCK)}
+              >{t('rdm.deliveryBoard.unblock', { defaultValue: '解除阻塞' })}</Button>
+            ) : (
+              <Button size="small" danger loading={saving} onClick={() => handleReport(r, RDM_TASK_ACTION.BLOCK)}
+              >{t('rdm.deliveryBoard.block', { defaultValue: '標記阻塞' })}</Button>
+            )}
             <Button size="small" onClick={() => setExpandedId(null)}>取消</Button>
           </Space>
         </Space>
+        {progress >= 100 && (
+          <div className="rdm-action-panel-hint">
+            {t('rdm.deliveryBoard.doneAtHundred', { defaultValue: '進度 100% 上報後，二次確認即把任務標記為已完成，必須填寫交付說明' })}
+          </div>
+        )}
         {/* Batch2：前置依賴（跨交付項） */}
         <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed #E8EAED' }}>
           <Space size={8} wrap>
@@ -457,6 +503,7 @@ export default function DeliveryBoard() {
     <Table<RdmTaskItem>
       className="nowrap-table"
       rowKey="id"
+      rowClassName={r => (r.status === RDM_TASK_STATUS.BLOCKED ? 'rdm-task-row--blocked' : '')}
       loading={loading || extraLoading}
       columns={visibleColumns}
       dataSource={data}

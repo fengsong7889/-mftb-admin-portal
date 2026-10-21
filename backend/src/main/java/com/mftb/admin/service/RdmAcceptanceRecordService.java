@@ -72,6 +72,13 @@ public class RdmAcceptanceRecordService {
      * 开放事实的<b>只读</b>判定。本服务仅委派，不写任何发布表，因此不引入循环依赖。
      */
     private final RdmOpenFactService openFactService;
+    /**
+     * 验收写入后重算交付项状态（置于末位以免打乱既有构造参数序）。
+     * <p>recalculateStatus 原先只在手动接口与新范围版本时触发，验收通过后交付项会停在
+     * pending_acceptance（展示与验收队列陈旧，闸门读数却已通过）；验收写入后必须同步一次。
+     * <p>无循环依赖：RdmDeliveryItemService 只依赖 Mapper 与共享解析器。
+     */
+    private final RdmDeliveryItemService deliveryItemService;
 
     /* ==================== 查询 ==================== */
 
@@ -270,6 +277,11 @@ public class RdmAcceptanceRecordService {
         record.setConditionsJson(dto.getConditionsJson());
         record.setEvidenceJson(dto.getEvidenceJson());
         acceptanceRecordMapper.insert(record);
+        /*
+         * 验收事实变了，交付项状态立即重算：否则验收通过后交付项仍停在 pending_acceptance，
+         * V3 阶段条会把「待验收」继续画在头上（实际闸门读数已经通过）。
+         */
+        deliveryItemService.recalculateStatus(deliveryItemId);
         log.info("提交驗收結論: recordNo={}, itemId={}, type={}, stage={}, conclusion={}, scope={}, signer={}",
                 record.getRecordNo(), deliveryItemId, type, stage, conclusion, authoritativeScope, currentUserId);
         return record;

@@ -40,6 +40,17 @@ public class RdmTestBatchController {
     private final RdmAllowedActionsService allowedActionsService;
     private final OperatorResolver operatorResolver;
 
+    /**
+     * 按任务解析提测范围：研发勾选任务，服务端映射成交付项（已挂则复用，未挂归入默认交付项）。
+     * <p>仅做范围解析，不创建批次；真正的提测仍提交 deliveryItemIds。
+     */
+    @PostMapping("/task-scope")
+    @RequirePermission(menu = RdmConstants.MENU_DELIVERY_TEST, action = "create")
+    public Result<List<RdmTestBatchVO.TaskScopeItem>> resolveTaskScope(
+            @RequestBody RdmTestBatchDTO.TaskScopeResolve dto) {
+        return Result.success(testBatchService.resolveTaskScope(dto, currentUserId()));
+    }
+
     /* ==================== 查询 ==================== */
 
     /** 提测批次分页列表（非全量授权者收敛为「与我相关」的批次） */

@@ -6,6 +6,7 @@
  * 因此调用方必须把**当前已筛选、已分页加载的行**传进来，而不是让它自己去取数。
  */
 import ExcelJS from 'exceljs'
+import i18n from '../../i18n'
 import type { RdmRequirementRow } from '../../api/rdm'
 import { formatHandlers, formatPerson } from './handlerDisplay'
 import {
@@ -13,6 +14,7 @@ import {
   getRdmPriorityLabel,
   RDM_REQ_TYPE_LABEL,
   RDM_STAGE_LABEL,
+  RDM_STATUS,
   RDM_STATUS_LABEL,
   type RdmReqType,
   type RdmStage,
@@ -59,6 +61,8 @@ export async function exportRequirementRows(rows: RdmRequirementRow[], scopeLabe
     { header: '產品經理', key: 'pmName', width: 12 },
     { header: '研發負責人', key: 'devOwnerName', width: 12 },
     { header: '當前處理人', key: 'currentHandler', width: 12 },
+    { header: i18n.t('rdm.reqList.colProject'), key: 'projectName', width: 18 },
+    { header: i18n.t('rdm.reqList.colIteration'), key: 'iteration', width: 24 },
     { header: '提交時間', key: 'submitTime', width: 18 },
     { header: '期望完成', key: 'expectDate', width: 12 },
     { header: 'PRD 承諾', key: 'promisedPrdDate', width: 12 },
@@ -91,6 +95,11 @@ export async function exportRequirementRows(rows: RdmRequirementRow[], scopeLabe
       devOwnerName: r.devOwnerName ?? '',
       // 与表格/看板同源：导出不折叠，多人全部列出；无未完成任务时回退流程推演值
       currentHandler: formatHandlers(r.handlers, r.currentHandler),
+      // 归属字段与列表同一展示口径：迭代写成「名称 · 编码」，没有名称时至少给编码
+      projectName: r.projectName ?? '',
+      iteration: r.iterationCode
+        ? (r.iterationName ? `${r.iterationName} · ${r.iterationCode}` : r.iterationCode)
+        : '',
       submitTime: r.submitTime ?? '',
       expectDate: r.expectDate ?? '',
       promisedPrdDate: r.promisedPrdDate ?? '',
@@ -99,7 +108,8 @@ export async function exportRequirementRows(rows: RdmRequirementRow[], scopeLabe
       versionNo: r.versionNo ?? '',
       overdue: yesNo(r.overdueFlag),
       blocked: yesNo(r.blockedFlag),
-      stayDays: stayDays(r.stayHours),
+      // 已归档需求不再计算停留：与列表/看板同口径，导出也不给出只增不减的数字
+      stayDays: r.status === RDM_STATUS.CLOSED ? '' : stayDays(r.stayHours),
       updatedAt: r.updatedAt ?? '',
     })
   })

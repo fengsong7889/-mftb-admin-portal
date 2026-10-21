@@ -8,6 +8,8 @@ import com.mftb.admin.dto.RdmDailyReportVO.Config;
 import com.mftb.admin.dto.RdmDailyReportVO.ConfigForm;
 import com.mftb.admin.dto.RdmDailyReportVO.PreviewForm;
 import com.mftb.admin.dto.RdmDailyReportVO.PreviewResult;
+import com.mftb.admin.dto.RdmDailyReportVO.PublicView;
+import com.mftb.admin.dto.RdmDailyReportVO.ReceiverPreview;
 import com.mftb.admin.dto.RdmDailyReportVO.ReportRecord;
 import com.mftb.admin.dto.RdmDailyReportVO.Rule;
 import com.mftb.admin.dto.RdmDailyReportVO.RuleForm;
@@ -34,7 +36,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * RDM 進度日報接口：规则、模板、全局开关、快照、发送记录、预览与手动触发。
@@ -72,11 +76,14 @@ public class RdmDailyReportController {
     @RequirePermission(menu = RdmConstants.MENU_DAILY_REPORT_RULE,
             anyOf = {RdmConstants.MENU_DASHBOARD_BOARD, RdmConstants.MENU_WORKBENCH,
                     RdmConstants.MENU_REQUIREMENT, RdmConstants.MENU_DELIVERY_BOARD})
-    @Operation(summary = "日报快照（按日期与档位，可选按项目收敛）")
+    @Operation(summary = "日报快照（按日期与档位，可选按项目/迭代/范围键收敛）")
     public Result<Snapshot> snapshot(@RequestParam String date,
                                      @RequestParam(defaultValue = "morning") String type,
-                                     @RequestParam(required = false) Long projectId) {
-        return Result.success(dailyReportService.getSnapshot(parseDate(date), type, projectId));
+                                     @RequestParam(required = false) Long projectId,
+                                     @RequestParam(required = false) String iterationCode,
+                                     @RequestParam(required = false) String scopeKey) {
+        return Result.success(dailyReportService.getSnapshot(
+                parseDate(date), type, projectId, iterationCode, scopeKey));
     }
 
     /** 发送记录（发送记录页） */
@@ -127,6 +134,22 @@ public class RdmDailyReportController {
         return Result.success("全局配置已保存", dailyReportService.saveConfig(form, operatorName()));
     }
 
+    /**
+     * 个人日报收件人预览：按当前配置 + 规则实时范围现算「会发给谁、谁会收不到」。
+     *
+     * <p><b>为何不读快照</b>：快照是「上次发了什么」，预览是「改完配置下次会怎样」；
+     * 且历史快照不含新增的四类角色 userId，读快照会把新勾选的角色全部漏掉。
+     *
+     * <p>权限只要求 view：能看配置的人就应该能看「这份配置会发给谁」，
+     * 但不开放给仅有其他 RDM 菜单的人——员工姓名与钉钉绑定状态不应当成公共数据。
+     */
+    @GetMapping("/receiver-preview")
+    @RequirePermission(menu = RdmConstants.MENU_DAILY_REPORT_RULE)
+    @Operation(summary = "个人日报收件人预览（按当前配置现算，不读快照）")
+    public Result<ReceiverPreview> receiverPreview(@RequestParam(required = false) Long ruleId) {
+        return Result.success(dailyReportService.previewReceivers(ruleId));
+    }
+
     /* ==================== 推送模板 ==================== */
 
     @GetMapping("/templates")
@@ -134,6 +157,28 @@ public class RdmDailyReportController {
     @Operation(summary = "模板列表（channel 可选：group/personal）")
     public Result<List<Template>> templates(@RequestParam(required = false) String channel) {
         return Result.success(dailyReportService.listTemplates(channel));
+    }
+
+    /**
+     * 员工候选：按姓名/工号搜索，或按 {@code ids} 批量回显（收件人编辑态用）。
+     *
+     * <p><b>为什么不用通用 /api/employees</b>：那个接口挂在 employee-management 菜单下，
+     * 只被授予「進度日報」菜单的用户会得到 403，下拉静默为空。这里把权限锚定在两个日报菜单上，
+     * 模板页与推送配置页都能用，且只返回姓名+工号，不暴露部门/职位。
+     *
+     * <p><b>为何要 anyOf 放宽到推送配置</b>：v3.26 起个人日报收件人要在这里选人，
+     * 只持有「推送配置」权限的管理员不应因为缺「模板配置」菜单就选不了人。
+     *
+     * <p><b>为何要支持 ids</b>：多选收件人编辑态回显时若拿不到 label，
+     * antd 会把 userId 渲染成裸数字，用户无法确认选的是谁。
+     */
+    @GetMapping("/employee-options")
+    @RequirePermission(menu = RdmConstants.MENU_DAILY_REPORT_TEMPLATE,
+            anyOf = {RdmConstants.MENU_DAILY_REPORT_RULE})
+    @Operation(summary = "员工下拉（按姓名/工号搜索或按 ID 回显）：模板最后更新人与日报收件人共用")
+    public Result<List<Map<String, Object>>> employeeOptions(@RequestParam(required = false) String keyword,
+                                                             @RequestParam(required = false) String ids) {
+        return Result.success(dailyReportService.employeeOptions(keyword, ids));
     }
 
     @PostMapping("/template")
@@ -171,6 +216,25 @@ public class RdmDailyReportController {
     }
 
     /**
+     * 看板实时预览：手动触发页选定项目/迭代后，按当前数据即时生成一份视图，
+     * <b>不发送、不落库</b>。
+     *
+     * <p>为什么不复用公开看板链接：公开看板按令牌读取「已落库快照」，手动触发在真正推送前
+     * 还没有快照，链接只会显示“該日期的日報尚未生成”。实时预览必须现算，才能做到点开即看。
+     */
+    @GetMapping("/board-preview")
+    @RequirePermission(menu = RdmConstants.MENU_DAILY_REPORT_TRIGGER, action = "trigger")
+    @Operation(summary = "看板实时预览（不发送、不落库）")
+    public Result<PublicView> boardPreview(@RequestParam(defaultValue = "morning") String type,
+                                           @RequestParam(required = false) Long projectId,
+                                           @RequestParam(required = false) String projectIds,
+                                           @RequestParam(required = false, defaultValue = "false") boolean allProjects,
+                                           @RequestParam(required = false) String iterationCode) {
+        List<Long> ids = parseProjectIds(projectIds, projectId, allProjects);
+        return Result.success(dailyReportService.boardPreview(type, ids, iterationCode));
+    }
+
+    /**
      * 手动触发推送：选定项目（可选指定迭代）+ 内容档位，立即推送。
      * <p>独立 {@code trigger} 动作授权；服务端有节流（同一档位+项目一分钟内重复触发拒绝），
      * 前端另需二次确认弹窗——向项目负责人与钉钉群发消息是不可撤回动作，两道闸都不能省。
@@ -179,11 +243,42 @@ public class RdmDailyReportController {
     @RequirePermission(menu = RdmConstants.MENU_DAILY_REPORT_TRIGGER, action = "trigger")
     @Operation(summary = "手动触发日报推送（按项目/迭代）")
     public Result<TriggerResult> trigger(@RequestParam String type,
-                                         @RequestParam Long projectId,
+                                         @RequestParam(required = false) Long projectId,
+                                         @RequestParam(required = false) String projectIds,
+                                         @RequestParam(required = false, defaultValue = "false") boolean allProjects,
                                          @RequestParam(required = false) String iterationCode,
                                          @RequestParam(required = false, defaultValue = "false") boolean dryRun) {
-        TriggerResult r = dailyReportService.triggerManual(type, projectId, iterationCode, operatorName(), dryRun);
+        List<Long> ids = parseProjectIds(projectIds, projectId, allProjects);
+        if (ids.isEmpty() && !allProjects && !StringUtils.hasText(iterationCode)) {
+            throw new BusinessException("請選擇推送項目或全部項目");
+        }
+        if (allProjects && StringUtils.hasText(iterationCode)) {
+            throw new BusinessException("全部項目不能指定單一迭代");
+        }
+        TriggerResult r = dailyReportService.triggerManual(type, ids, iterationCode, operatorName(), dryRun);
         return Result.success(r.getMessage(), r);
+    }
+
+    /** 解析逗号分隔项目 ID；allProjects=true 时忽略单项目，空集合代表全部在途项目 */
+    private static List<Long> parseProjectIds(String projectIds, Long projectId, boolean allProjects) {
+        if (allProjects) {
+            return List.of();
+        }
+        if (StringUtils.hasText(projectIds)) {
+            List<Long> ids = new ArrayList<>();
+            for (String part : projectIds.split(",")) {
+                if (!StringUtils.hasText(part)) {
+                    continue;
+                }
+                try {
+                    ids.add(Long.parseLong(part.trim()));
+                } catch (NumberFormatException e) {
+                    throw new BusinessException("項目ID格式不正確: " + part);
+                }
+            }
+            return ids.stream().distinct().toList();
+        }
+        return projectId == null ? List.of() : List.of(projectId);
     }
 
     /* ==================== 内部工具 ==================== */

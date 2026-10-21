@@ -1,5 +1,8 @@
 package com.mftb.admin.service.agent.tool;
 
+import com.mftb.admin.dto.agent.AgentPendingAction;
+import com.mftb.admin.dto.agent.AgentView;
+
 import java.util.Map;
 
 /**
@@ -24,6 +27,22 @@ public interface AgentTool {
      * 失败也返回 JSON 字符串 {@code {"error": "..."}}，不抛，让 LLM 自行处理。
      */
     String execute(Map<String, Object> args, ToolCallContext ctx);
+
+    /**
+     * 富结果：content 给模型，view 给前端渲染卡片，pendingAction 给确认卡。
+     * <p>为什么把三者放在一起：它们来自同一次工具执行，分成三次调用会拿到
+     * 不同时刻的数据，出现“正文数字与卡片数字不一致”。
+     */
+    record RichOutput(String content, AgentView view, AgentPendingAction pendingAction) {
+        public static RichOutput of(String content) {
+            return new RichOutput(content, null, null);
+        }
+    }
+
+    /** 默认退化为纯文本工具；新工具覆写此方法返回 view / pendingAction。 */
+    default RichOutput executeRich(Map<String, Object> args, ToolCallContext ctx) {
+        return RichOutput.of(execute(args, ctx));
+    }
 
     /** 工具执行上下文：caller 与请求关联的会话主键。 */
     record ToolCallContext(String caller, Long conversationPk) {}

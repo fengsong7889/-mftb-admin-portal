@@ -2,6 +2,7 @@ package com.mftb.admin.service;
 
 import com.mftb.admin.dto.RdmProjectDTO;
 import com.mftb.admin.entity.RdmProject;
+import com.mftb.admin.entity.RdmProjectMember;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.RdmProjectMapper;
 import com.mftb.admin.mapper.RdmProjectMemberMapper;
@@ -15,11 +16,20 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -170,5 +180,109 @@ class RdmProjectOwnerWriteTest {
         update.setPausedFlag(1);
         service.updateProject(PROJECT, update, OPERATOR);
         assertEquals("古月", capturedUpdate().getUpdatedBy());
+    }
+
+    /** 创建时 projectMapper.insert 不回填 id，成员同步依赖它 → 用 doAnswer 补上 */
+    private void stubInsertBackfillsId() {
+        doAnswer(inv -> {
+            ((RdmProject) inv.getArgument(0)).setId(PROJECT);
+            return 1;
+        }).when(projectMapper).insert(any(RdmProject.class));
+    }
+
+    @Test
+    @DisplayName("创建项目：六类负责人全部入组（不只是 PM），同一人兼任多角色写多行")
+    void createProjectEnrollsAllOwners() {
+        stubInsertBackfillsId();
+
+        RdmProjectDTO.Create dto = new RdmProjectDTO.Create();
+        dto.setName("六負責人項目");
+        dto.setPmUserId(7L);
+        dto.setPmUserName("張三");
+        // 同一人兼任产品：uk_project_user_role 允许同人不同角色各一行
+        dto.setProductOwnerUserId(7L);
+        dto.setProductOwnerUserName("張三");
+        dto.setTechLeadUserId(8L);
+        dto.setTechLeadUserName("李四");
+        dto.setUiDesignerUserId(9L);
+        dto.setUiDesignerUserName("王五");
+        dto.setQaLeadUserId(10L);
+        dto.setQaLeadUserName("趙六");
+        dto.setOpsLeadUserId(11L);
+        dto.setOpsLeadUserName("錢七");
+        service.createProject(dto, OPERATOR);
+
+        ArgumentCaptor<RdmProjectMember> captor = ArgumentCaptor.forClass(RdmProjectMember.class);
+        verify(memberMapper, times(6)).insert(captor.capture());
+        List<RdmProjectMember> members = captor.getAllValues();
+        assertEquals(Set.of("pm", "product", "dev_lead", "designer", "qa", "ops"),
+                members.stream().map(RdmProjectMember::getRoleCode).collect(Collectors.toSet()),
+                "六类负责人必须各自入组，缺一类详情页就会少一行成员");
+        assertTrue(members.stream().allMatch(m -> PROJECT == m.getProjectId()));
+        assertEquals(2, members.stream().filter(m -> m.getUserId() == 7L).count(),
+                "同一人兼任 PM 与产品时必须写两行，否则换掉其中一个角色会误删另一个");
+        assertTrue(members.stream().allMatch(m -> m.getJoinTime() != null));
+    }
+
+    @Test
+    @DisplayName("编辑换 PM：旧 PM 行软移除、新 PM 入组（否则成员区永远与负责人不一致）")
+    void updateProjectSwapsPmMember() {
+        doReturn(stored()).when(projectMapper).selectById(PROJECT);
+        doReturn(1).when(projectMapper).updateById(any(RdmProject.class));
+        RdmProjectMember oldPm = new RdmProjectMember();
+        oldPm.setId(900L);
+        oldPm.setProjectId(PROJECT);
+        oldPm.setUserId(OLD_PM);
+        oldPm.setUserName("張三");
+        oldPm.setRoleCode("pm");
+        doReturn(List.of(oldPm)).when(memberMapper).selectList(any());
+
+        SysUser newPm = new SysUser();
+        newPm.setId(88L);
+        newPm.setName("王五");
+        doReturn(newPm).when(userMapper).selectById(88L);
+
+        RdmProjectDTO.Update dto = new RdmProjectDTO.Update();
+        dto.setExpectedVersion(3);
+        dto.setPmUserId(88L);
+        dto.setPmUserName("王五");
+        service.updateProject(PROJECT, dto, OPERATOR);
+
+        ArgumentCaptor<RdmProjectMember> updated = ArgumentCaptor.forClass(RdmProjectMember.class);
+        verify(memberMapper).updateById(updated.capture());
+        assertEquals(OLD_PM, updated.getValue().getUserId());
+        assertNotNull(updated.getValue().getLeaveTime(), "换人后旧 PM 必须软移除，否则两个人同时留在项目里");
+
+        ArgumentCaptor<RdmProjectMember> inserted = ArgumentCaptor.forClass(RdmProjectMember.class);
+        verify(memberMapper).insert(inserted.capture());
+        assertEquals(88L, inserted.getValue().getUserId());
+        assertEquals("pm", inserted.getValue().getRoleCode());
+        assertEquals("王五", inserted.getValue().getUserName());
+    }
+
+    @Test
+    @DisplayName("编辑清空负责人：只软移除该角色行，不插入新成员")
+    void clearingOwnerRemovesMemberRow() {
+        doReturn(stored()).when(projectMapper).selectById(PROJECT);
+        doReturn(1).when(projectMapper).updateById(any(RdmProject.class));
+        RdmProjectMember oldPo = new RdmProjectMember();
+        oldPo.setId(901L);
+        oldPo.setProjectId(PROJECT);
+        oldPo.setUserId(OLD_PO);
+        oldPo.setUserName("李四");
+        oldPo.setRoleCode("product");
+        doReturn(List.of(oldPo)).when(memberMapper).selectList(any());
+
+        RdmProjectDTO.Update dto = new RdmProjectDTO.Update();
+        dto.setExpectedVersion(3);
+        dto.setProductOwnerUserId(null);
+        dto.setProductOwnerUserName("");
+        service.updateProject(PROJECT, dto, OPERATOR);
+
+        ArgumentCaptor<RdmProjectMember> updated = ArgumentCaptor.forClass(RdmProjectMember.class);
+        verify(memberMapper).updateById(updated.capture());
+        assertEquals(OLD_PO, updated.getValue().getUserId());
+        assertNotNull(updated.getValue().getLeaveTime());
+        verify(memberMapper, never()).insert(any(RdmProjectMember.class));
     }
 }

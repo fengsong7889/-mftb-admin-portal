@@ -14,8 +14,7 @@ import ProjectDetail from './ProjectDetail'
 
 vi.mock('../../api/rdm', () => ({
   fetchProjectDetail: vi.fn(),
-  fetchProjectChecklist: vi.fn(),
-  fetchProjectPending: vi.fn(),
+  fetchProjectRequirementBoard: vi.fn(),
   urgeProject: vi.fn(),
   addProjectMember: vi.fn(),
   removeProjectMember: vi.fn(),
@@ -23,7 +22,7 @@ vi.mock('../../api/rdm', () => ({
   updateProject: vi.fn(),
 }))
 
-import { fetchProjectChecklist, fetchProjectDetail, fetchProjectPending } from '../../api/rdm'
+import { fetchProjectDetail, fetchProjectRequirementBoard } from '../../api/rdm'
 
 const detail = {
   id: 5, projectNo: 'PJ-005', name: '演示項目', objective: '目標', status: 'in_progress',
@@ -45,8 +44,14 @@ const urgeResult = {
 beforeEach(() => {
   vi.clearAllMocks()
   vi.mocked(fetchProjectDetail).mockResolvedValue(detail)
-  vi.mocked(fetchProjectChecklist).mockResolvedValue([] as never)
-  vi.mocked(fetchProjectPending).mockResolvedValue([] as never)
+  vi.mocked(fetchProjectRequirementBoard).mockResolvedValue({
+    iterations: [], unplanned: [], todos: [],
+    summary: {
+      iterationTotal: 0, requirementTotal: 0, requirementDelivered: 0, requirementInProgress: 0,
+      requirementPending: 0, blockedTaskCount: 0, pendingDecisionCount: 0,
+      pendingAcceptanceCount: 0, deliveryItemTotal: 0, deliveryItemDone: 0,
+    },
+  })
   vi.mocked(urgeProject).mockResolvedValue(urgeResult)
 })
 

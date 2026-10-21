@@ -200,12 +200,15 @@ public class RdmDeliveryController {
 
     /* ── 迭代排期 ── */
 
-    /** 迭代列表（含已排入需求数与工时，用于产能对比） */
+    /** 迭代列表（含已排入需求数与工时，用于产能对比）；支持关键词搜索与条数上限（远程搜索下拉） */
     @GetMapping("/iterations")
     @RequirePermission(menu = "rdm-delivery-iteration", anyOf = {"rdm-delivery-board", "rdm-requirement", "rdm-intake"},
                 anyPermissions = {"rdm-requirement:view_all"})
-    public Result<List<RdmDeliveryVO.Iteration>> iterations() {
-        return Result.success(deliveryService.listIterations());
+    public Result<List<RdmDeliveryVO.Iteration>> iterations(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long projectId,
+            @RequestParam(required = false) Integer limit) {
+        return Result.success(deliveryService.listIterations(keyword, projectId, limit));
     }
 
     /** 新增/编辑迭代 */

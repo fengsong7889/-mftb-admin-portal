@@ -1,0 +1,25 @@
+-- 268: 存量项目编号按创建日补号为 PROJ + YYYYMMDD + 2 位日序
+--
+-- 参照文档：实际幂等执行由 RdmSchemaMigrationInitializer 的 rdm:schema:v3.21 负责
+--          （只挑不符合 ^PROJ[0-9]{8}[0-9]{2,}$ 的行；合规行不动，重放即 no-op；
+--            补号同时把 sys_biz_seq 当日水位推进到已用最大序号，避免新建项目撞唯一键）。
+--
+-- 背景：v3.16 把发号规则从 PJ+YYYYMMDD+4 位改为 PROJ+YYYYMMDD+2 位，但它是纯配置改动
+--      （UPDATE sys_biz_seq_rule），只影响之后新建的项目；规则切换前建好的项目仍挂旧前缀，
+--      于是同一列表里新旧两套编号并存。
+--
+-- 为什么可以安全改号：全库只有 rdm_project.project_no 存编号本身，其余业务表
+--      （rdm_requirement / rdm_iteration / rdm_delivery_item / rdm_project_member /
+--        rdm_daily_report / rdm_release_batch / rdm_flow_config）一律用 project_id 外键关联，
+--      改号不会断链；影响面仅限已人工复制的历史文本（如已发出的消息正文）。
+--
+-- 示例（单项目场景）：PJ202610190001 -> PROJ2026101901
+--   UPDATE rdm_project SET project_no = 'PROJ2026101901'
+--    WHERE id = ? AND project_no NOT REGEXP '^PROJ[0-9]{8}[0-9]{2,}$';
+--   INSERT INTO sys_biz_seq (prefix, date_key, current_value, created_at, updated_at)
+--   VALUES ('PROJ', '20261019', 1, NOW(), NOW())
+--   ON DUPLICATE KEY UPDATE current_value = GREATEST(current_value, 1), updated_at = NOW();
+--
+-- 回滚：改号本身可逆（把旧编号写回），但需先确认没有新项目占用该号；
+--      补号已推进的 sys_biz_seq 水位不回退（回退会让后续发号重发同号、撞唯一键），
+--      留着只会让当天序号跳号，不影响正确性。

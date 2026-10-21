@@ -841,6 +841,16 @@ public class RdmProjectFactService {
         f.setPmUserName(p.getPmUserName());
         f.setProductOwnerUserId(p.getProductOwnerUserId());
         f.setProductOwnerUserName(p.getProductOwnerUserName());
+        // 角色负责人直接取项目主表快照：看板“相關負責人”只展示已配置的人，不在这里做成员表联查。
+        // userId 一并带出：日报收件人要按角色推导到人，只有姓名无法映射钉钉 userId
+        f.setTechLeadUserId(p.getTechLeadUserId());
+        f.setTechLeadUserName(p.getTechLeadUserName());
+        f.setQaLeadUserId(p.getQaLeadUserId());
+        f.setQaLeadUserName(p.getQaLeadUserName());
+        f.setUiDesignerUserId(p.getUiDesignerUserId());
+        f.setUiDesignerUserName(p.getUiDesignerUserName());
+        f.setOpsLeadUserId(p.getOpsLeadUserId());
+        f.setOpsLeadUserName(p.getOpsLeadUserName());
         f.setPlanStartDate(DateTimeUtils.format(p.getPlanStartDate()));
         f.setPlanEndDate(DateTimeUtils.format(p.getPlanEndDate()));
         f.setPausedFlag(p.getPausedFlag());

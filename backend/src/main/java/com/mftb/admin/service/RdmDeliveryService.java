@@ -75,6 +75,15 @@ public interface RdmDeliveryService {
     /** 迭代列表（含产能与已排入量） */
     List<RdmDeliveryVO.Iteration> listIterations();
 
+    /**
+     * 迭代候选搜索（远程搜索下拉用）。
+     *
+     * @param keyword   匹配迭代编码/名称，或所属项目编号/名称；为空时不限关键词
+     * @param projectId 限定所属项目；非空时同时包含未挂项目的迭代（紧急修复）
+     * @param limit     返回上限（1~200）；为空时带关键词默认 20、无关键词默认 100
+     */
+    List<RdmDeliveryVO.Iteration> listIterations(String keyword, Long projectId, Integer limit);
+
     /** 新增/编辑迭代 */
     RdmDeliveryVO.Iteration saveIteration(RdmDeliveryDTO.Iteration dto);
 

@@ -50,7 +50,7 @@ public class RdmMenuInitializer implements CommandLineRunner {
      * <p>本轮仍保持双锚点过渡：rdm-intake 的 view/edit 仍是全量可见与分配权的现行判定依据，
      * RdmAccessGuard 同时认新锚点，迁移完成前不拆旧。
      */
-    private static final String VERSION_KEY = "rdm:menu-seed:v3.18";
+    private static final String VERSION_KEY = "rdm:menu-seed:v3.19";
     /**
      * v3.16 授权镜像登记号：与菜单结构迁移分号登记，因为它**只能跑一次**。
      * <p>不能放进每次启动重放的 migrate()：管理员事后在新锚点上撤销的授权，
@@ -107,7 +107,7 @@ public class RdmMenuInitializer implements CommandLineRunner {
      * 实测非超管账号点暂停/新增一律 403「没有 [rdm-dashboard-project] 的[编辑]权限」。
      * <p>可授 ≠ 已授：本改动只动 sys_menu.actions 元数据，谁能勾仍由管理员显式决定。
      */
-    private static final String PROJECT_ACTIONS = "[\"view\",\"create\",\"edit\",\"export\"]";
+    private static final String PROJECT_ACTIONS = "[\"view\",\"create\",\"edit\",\"export\",\"notify\"]";
 
     /**
      * 團隊負載（rdm-resource-load）：可授动作集。
@@ -338,8 +338,11 @@ public class RdmMenuInitializer implements CommandLineRunner {
             "view", "create", "edit", "delete", "export", "import", "enable", "disable",
             "view_all", "dispatch", "contribute",
             // trigger：日報推送的「手動觸發」专用动作。不併入 edit 是因为它会向釘釘群與多位
-            // 負責人發不可撤回的訊息，「能改配置」與「能刷群」必須可分開授予。
-            "trigger");
+            // 負責人發不可撤回的訊息，「能改配置」與「能刷群」必須可分開授 予。
+            "trigger",
+            // notify：AI 助手把项目进度推送到钉钉群/个人；与 edit 分开，避免「能改项目」自动获得
+            // 「能对外发消息」的权力。
+            "notify");
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
@@ -379,7 +382,7 @@ public class RdmMenuInitializer implements CommandLineRunner {
         grantAdminMenus();
         deriveSystemAccess();
         permissionService.evictAll();
-        log.info("產研交付(RDM) 菜单已就绪（v3.17 可授动作集对齐：rdm-requirement = 种子 LIST_ACTIONS，rdm-dashboard-project = 种子 PROJECT_ACTIONS）: 菜单数={}, system_code={}", MENUS.length, SystemCode.RDM.code());
+        log.info("產研交付(RDM) 菜单已就绪（v3.19 可授动作集对齐：rdm-requirement = 种子 LIST_ACTIONS，rdm-dashboard-project = 种子 PROJECT_ACTIONS，新增 notify 推送权）: 菜单数={}, system_code={}", MENUS.length, SystemCode.RDM.code());
     }
 
     /**

@@ -32,6 +32,10 @@ Thumbs.db
 # Logs
 *.log
 
+# 本地后端进程 PID 文件（runtime 产物，禁止入库；backend/.gitignore 已按同规则忽略）
+.backend.pid
+backend/.backend.pid
+
 # Large media files (>100MB) - use `git lfs track` for large files
 # *.mp4
 # *.mov

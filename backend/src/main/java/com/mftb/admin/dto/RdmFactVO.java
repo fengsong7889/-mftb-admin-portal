@@ -176,6 +176,18 @@ public class RdmFactVO {
         private String pmUserName;
         private Long productOwnerUserId;
         private String productOwnerUserName;
+        /** 研发负责人（看板项目卡“相關負責人”有配置就展示） */
+        private Long techLeadUserId;
+        private String techLeadUserName;
+        /** 测试负责人 */
+        private Long qaLeadUserId;
+        private String qaLeadUserName;
+        /** 设计负责人 */
+        private Long uiDesignerUserId;
+        private String uiDesignerUserName;
+        /** 运维负责人 */
+        private Long opsLeadUserId;
+        private String opsLeadUserName;
         private String planStartDate;
         private String planEndDate;
         private Integer pausedFlag;

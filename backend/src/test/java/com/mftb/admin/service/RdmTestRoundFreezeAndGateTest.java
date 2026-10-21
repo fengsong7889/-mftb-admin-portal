@@ -97,7 +97,8 @@ class RdmTestRoundFreezeAndGateTest {
         service = new RdmTestBatchService(batchMapper, executionMapper, deliveryItemMapper, requirementMapper,
                 issueMapper, accessGuard, bizSeqService, operatorResolver, testRoundMapper,
                 // 任务33：失效过滤委派共享解析器，包同一个 mock Mapper 以保持桩数据口径不变
-                new EvidenceValidityResolver(evidenceInvalidationMapper), idempotentService);
+                new EvidenceValidityResolver(evidenceInvalidationMapper), idempotentService,
+                mock(RdmDeliveryItemService.class));
     }
 
     /* ==================== 夹具 ==================== */

@@ -106,6 +106,17 @@ public class RdmRequirementController {
     }
 
     /**
+     * 複製需求為新草稿。
+     * <p>用於「交付流程鎖定後需要換交付方式」的補捙：複製新需求重走流程，原需求及其
+     * 交付項/評審/測試/驗收記錄完整保留。要求 create 權（與提交需求同一權限錨點）。
+     */
+    @PostMapping("/requirement/{id}/copy")
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = "create")
+    public Result<RdmRequirementVO> copy(@PathVariable Long id) {
+        return Result.success("需求已複製為草稿", requirementService.copy(id));
+    }
+
+    /**
      * 提出人自助提交 / 修改后重提（只要求 create）。
      * <p>为什么不开到通用流转接口上：那个入口要求 {@code rdm-requirement:edit}，
      * 而 edit 是需求侧处理权（受理/PRD/评审/变更）；让员工为了提交自己的草稿去拿 edit，

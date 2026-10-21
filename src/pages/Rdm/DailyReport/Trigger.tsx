@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Alert, Button, Modal, Radio, Result, Select, Space, Spin, Tag, message } from 'antd'
-import { EyeOutlined, SendOutlined } from '@ant-design/icons'
-import { triggerDailyReport, type DailyReportTriggerResult } from '../../../api/rdmDailyReport'
+import { Alert, Button, Checkbox, Modal, Radio, Result, Select, Space, Spin, Tag, message } from 'antd'
+import { EyeOutlined, FundProjectionScreenOutlined, SendOutlined } from '@ant-design/icons'
+import { fetchDailyReportBoardPreview, triggerDailyReport, type DailyReportTriggerResult } from '../../../api/rdmDailyReport'
+import type { DailyReportPublicView } from '../../../api/rdmDailyReportPublic'
 import { fetchIterations, fetchProjectPage, type RdmIterationItem, type RdmProjectListItem } from '../../../api/rdm'
 import { useAuth } from '../../../contexts/AuthContext'
+import DailyReportBoardPreviewModal from '../../../components/DailyReportBoardPreviewModal'
 import '../index.css'
 
 /**
@@ -27,11 +29,14 @@ export default function DailyReportTrigger() {
   const [projects, setProjects] = useState<RdmProjectListItem[]>([])
   const [iterations, setIterations] = useState<RdmIterationItem[]>([])
   const [searching, setSearching] = useState(false)
-  const [projectId, setProjectId] = useState<number | undefined>()
+  const [projectIds, setProjectIds] = useState<number[]>([])
+  const [allProjects, setAllProjects] = useState(false)
   const [iterationCode, setIterationCode] = useState<string | undefined>()
   const [reportType, setReportType] = useState<'morning' | 'evening'>('morning')
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<DailyReportTriggerResult | null>(null)
+  const [boardOpen, setBoardOpen] = useState(false)
+  const [boardView, setBoardView] = useState<DailyReportPublicView | null>(null)
 
   const loadProjects = useCallback(async (keyword?: string) => {
     setSearching(true)
@@ -50,40 +55,83 @@ export default function DailyReportTrigger() {
     fetchIterations().then(setIterations).catch(() => setIterations([]))
   }, [loadProjects])
 
-  /** 迭代候选按所选项目收敛：未选项目时不给选项，避免跨项目误选 */
+  /** 只有恰好一个项目时才允许指定迭代；多项目/全部项目推送全部迭代 */
+  const singleProjectId = projectIds.length === 1 ? projectIds[0] : undefined
+  const hasTarget = allProjects || projectIds.length > 0 || Boolean(iterationCode)
+
   const iterationOptions = useMemo(
     () => iterations
-      .filter(i => projectId != null && i.projectId === projectId)
+      .filter(i => singleProjectId != null && i.projectId === singleProjectId)
       .map(i => ({ value: i.code, label: `${i.code}${i.name ? ' ' + i.name : ''}` })),
-    [iterations, projectId])
+    [iterations, singleProjectId])
 
-  const run = async (dryRun: boolean) => {
-    if (projectId == null) {
-      message.warning(t('rdm.dailyTrigger.projectRequired'))
-      return
+  const scopeParams = () => ({
+    projectId: singleProjectId,
+    projectIds: allProjects ? [] : projectIds,
+    allProjects,
+    iterationCode: singleProjectId ? iterationCode : undefined,
+  })
+
+  const run = async (dryRun: boolean): Promise<DailyReportTriggerResult | null> => {
+    if (!hasTarget) {
+      message.warning(t('rdm.dailyTrigger.targetRequired'))
+      return null
     }
     setBusy(true)
     try {
-      const res = await triggerDailyReport({ type: reportType, projectId, iterationCode, dryRun })
+      const res = await triggerDailyReport({ type: reportType, ...scopeParams(), dryRun })
       setResult(res)
       if (!dryRun) {
         message.success(res.message || t('rdm.dailyTrigger.done'))
       }
+      return res
     } catch (e) {
       message.error(e instanceof Error && e.message ? e.message : t('rdm.dailyTrigger.failed'))
+      return null
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * 查看看板：按当前数据即时生成一份视图（不发送、不落库）。
+   * 不再复用预览链接：推送前当天可能还没有快照，读链接只会得到“尚未生成”。
+   */
+  const handleViewBoard = async () => {
+    if (!hasTarget) {
+      message.warning(t('rdm.dailyTrigger.targetRequired'))
+      return
+    }
+    setBusy(true)
+    try {
+      const view = await fetchDailyReportBoardPreview({ type: reportType, ...scopeParams() })
+      setBoardView(view)
+      setBoardOpen(true)
+    } catch (e) {
+      message.error(e instanceof Error && e.message ? e.message : t('rdm.dailyTrigger.boardFailed'))
     } finally {
       setBusy(false)
     }
   }
 
   const handlePush = () => {
-    if (projectId == null) {
-      message.warning(t('rdm.dailyTrigger.projectRequired'))
+    if (!hasTarget) {
+      message.warning(t('rdm.dailyTrigger.targetRequired'))
       return
     }
-    const project = projects.find(p => p.id === projectId)
-    const target = `${project ? (project.projectNo ? project.projectNo + ' ' + project.name : project.name) : '#' + projectId}`
-      + ' / ' + (iterationCode || t('rdm.dailyTrigger.allIterations'))
+    let target: string
+    if (allProjects) {
+      target = `${t('rdm.dailyTrigger.allProjects')} / ${t('rdm.dailyTrigger.allIterations')}`
+    } else if (projectIds.length > 1) {
+      target = projectIds.map(id => {
+        const p = projects.find(x => x.id === id)
+        return p ? (p.projectNo ? `${p.projectNo} ${p.name}` : p.name) : `#${id}`
+      }).join('、') + ' / ' + t('rdm.dailyTrigger.allIterations')
+    } else {
+      const project = projects.find(p => p.id === singleProjectId)
+      target = `${project ? (project.projectNo ? project.projectNo + ' ' + project.name : project.name) : '—'}`
+        + ' / ' + (iterationCode || t('rdm.dailyTrigger.allIterations'))
+    }
     Modal.confirm({
       className: 'custom-confirm-modal',
       icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
@@ -106,44 +154,78 @@ export default function DailyReportTrigger() {
       <Alert type="info" showIcon style={{ marginBottom: 16 }} message={t('rdm.dailyTrigger.hint')} />
 
       <div style={cardStyle}>
+        {/* 「全部在途項目」是總開關：獨立成行；勾選即推送全部在途項目，下方項目與迭代隨之鎖定 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
+          <Checkbox checked={allProjects} disabled={!canTrigger}
+            onChange={e => {
+              setAllProjects(e.target.checked)
+              setIterationCode(undefined)
+              setResult(null)
+              if (e.target.checked) setProjectIds([])
+            }}>
+            {t('rdm.dailyTrigger.allProjects')}
+          </Checkbox>
+          {allProjects && (
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('rdm.dailyTrigger.allProjectsNoIteration')}</span>
+          )}
+        </div>
+
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
           <span style={labelStyle}>{t('rdm.dailyTrigger.fieldProject')}:</span>
           <Select
-            showSearch style={{ width: 340 }} disabled={!canTrigger}
-            placeholder={t('rdm.dailyTrigger.projectPlaceholder')}
-            value={projectId}
+            mode="multiple" showSearch style={{ width: 340, minWidth: 260 }} disabled={!canTrigger || allProjects}
+            placeholder={allProjects ? t('rdm.dailyTrigger.allProjects') : t('rdm.dailyTrigger.projectPlaceholder')}
+            value={projectIds}
             filterOption={false}
             onSearch={kw => void loadProjects(kw)}
             notFoundContent={searching ? <Spin size="small" /> : t('rdm.dailyTrigger.noProjectMatch')}
             options={projects.map(p => ({ value: p.id, label: p.projectNo ? `${p.projectNo} ${p.name}` : p.name }))}
-            onChange={v => { setProjectId(v); setIterationCode(undefined) }}
+            onChange={v => {
+              setProjectIds(v)
+              setIterationCode(undefined)
+              setResult(null)
+            }}
           />
-          <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('rdm.dailyTrigger.projectRequiredHint')}</span>
+          {!allProjects && (
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+              {projectIds.length > 1
+                ? t('rdm.dailyTrigger.multipleProjects', { count: projectIds.length })
+                : t('rdm.dailyTrigger.projectRequiredHint')}
+            </span>
+          )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
           <span style={labelStyle}>{t('rdm.dailyTrigger.fieldIteration')}:</span>
           <Select
-            allowClear style={{ width: 340 }} disabled={!canTrigger || projectId == null}
-            placeholder={projectId == null ? t('rdm.dailyTrigger.pickProjectFirst') : t('rdm.dailyTrigger.allIterations')}
-            value={iterationCode} onChange={setIterationCode}
+            allowClear style={{ width: 340 }} disabled={!canTrigger || singleProjectId == null}
+            placeholder={singleProjectId == null
+              ? t('rdm.dailyTrigger.iterationOnlySingle')
+              : t('rdm.dailyTrigger.allIterations')}
+            value={iterationCode} onChange={v => { setIterationCode(v); setResult(null) }}
             options={iterationOptions}
-            notFoundContent={projectId == null ? t('rdm.dailyTrigger.pickProjectFirst') : t('rdm.dailyTrigger.noIteration')}
+            notFoundContent={singleProjectId == null
+              ? t('rdm.dailyTrigger.iterationOnlySingle') : t('rdm.dailyTrigger.noIteration')}
           />
           <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('rdm.dailyTrigger.iterationHint')}</span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
           <span style={labelStyle}>{t('rdm.dailyTrigger.fieldType')}:</span>
-          <Radio.Group value={reportType} onChange={e => setReportType(e.target.value)} disabled={!canTrigger}>
+          <Radio.Group value={reportType} onChange={e => { setReportType(e.target.value); setResult(null) }}
+            disabled={!canTrigger}>
             <Radio.Button value="morning">{t('rdm.dailyTrigger.typeMorning')}</Radio.Button>
             <Radio.Button value="evening">{t('rdm.dailyTrigger.typeEvening')}</Radio.Button>
           </Radio.Group>
         </div>
 
-        <Space>
+        <Space wrap>
           <Button icon={<EyeOutlined />} loading={busy} disabled={!canTrigger} onClick={() => void run(true)}>
             {t('rdm.dailyTrigger.previewNoSend')}
+          </Button>
+          <Button icon={<FundProjectionScreenOutlined />} loading={busy} disabled={!canTrigger}
+            onClick={() => void handleViewBoard()}>
+            {t('rdm.dailyTrigger.viewBoard')}
           </Button>
           <Button type="primary" icon={<SendOutlined />} loading={busy} disabled={!canTrigger} onClick={handlePush}>
             {t('rdm.dailyTrigger.pushNow')}
@@ -184,6 +266,12 @@ export default function DailyReportTrigger() {
           )}
         </div>
       )}
+
+      <DailyReportBoardPreviewModal
+        open={boardOpen}
+        view={boardView}
+        onClose={() => setBoardOpen(false)}
+      />
     </div>
   )
 }

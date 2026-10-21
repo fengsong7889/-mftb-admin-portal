@@ -10,7 +10,7 @@
  * （VARCHAR(24)，四类全选恰好容纳），展示统一走 formatRdmReviewTypes 反查标签。
  */
 import { useEffect, useMemo, useState } from 'react'
-import { Button, DatePicker, Form, Input, Modal, Select, message } from 'antd'
+import { Alert, Button, DatePicker, Form, Input, Modal, Select, message } from 'antd'
 import { AuditOutlined, SendOutlined } from '@ant-design/icons'
 import RdmFormHeader from './components/RdmFormHeader'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -26,11 +26,24 @@ import {
 } from '../../api/rdm'
 import {
   RDM_REVIEW_TYPE_LABEL,
+  RDM_STATUS,
   formatRdmReqNo,
   formatRdmReviewTypes,
   type RdmReviewType,
 } from '../../constants/rdm'
 import './index.css'
+
+/**
+ * PRD / 評審可寫的需求狀態：受理之後（含受理當下）、排期之前。
+ * <p>與後端 RdmDeliveryServiceImpl.PRD_PHASE_STATUSES 同源；評估中就發評審，
+ * 會出現「需求還沒接受，評審已通過」的自相矛盾流轉。
+ */
+const PRD_PHASE_STATUSES: string[] = [
+  RDM_STATUS.ACCEPTED,
+  RDM_STATUS.PRD_DESIGNING,
+  RDM_STATUS.REVIEWING,
+  RDM_STATUS.REVIEW_PASSED,
+]
 
 /** 表单字段值：评审类型多选，提交时逗号拼接适配既有接口契约 */
 interface ReviewFormValues {
@@ -49,17 +62,26 @@ export default function ReviewForm() {
   const presetPrdId = Number(searchParams.get('prdId') ?? 0)
 
   const [form] = Form.useForm<ReviewFormValues>()
-  const [requirement, setRequirement] = useState<{ reqNo: string; title: string } | null>(null)
+  const [requirement, setRequirement] = useState<{ reqNo: string; title: string; status: string } | null>(null)
   const [prds, setPrds] = useState<RdmPrdItem[]>([])
+  /** PRD 列表是否真的拉成功：拉失败时不用空列表冒充「没有 PRD」把提交永久禁用 */
+  const [prdsLoaded, setPrdsLoaded] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     if (!reqId) return
     fetchRequirementDetail(reqId)
-      .then(d => d && setRequirement({ reqNo: formatRdmReqNo(d.reqNo), title: d.title }))
+      .then(d => d && setRequirement({ reqNo: formatRdmReqNo(d.reqNo), title: d.title, status: String(d.status) }))
       .catch(() => message.error(t('rdm.reviewForm.reqLoadFail')))
-    fetchDeliverySummary(reqId).then(s => setPrds(s?.prds ?? [])).catch(() => setPrds([]))
+    fetchDeliverySummary(reqId)
+      .then(s => { setPrds(s?.prds ?? []); setPrdsLoaded(true) })
+      .catch(() => setPrds([]))
   }, [reqId, t])
+
+  /** 受理前不能发起评审（后端同样会拒）；PRD 列表取到且为空时也无对象可评 */
+  const phaseBlocked = !!requirement && !PRD_PHASE_STATUSES.includes(requirement.status)
+  const noPrd = prdsLoaded && !!requirement && prds.length === 0 && !phaseBlocked
+  const submitBlocked = phaseBlocked || noPrd
 
   const reviewTypeOptions = useMemo(
     () => Object.entries(RDM_REVIEW_TYPE_LABEL).map(([value, label]) => ({ value, label })),
@@ -70,6 +92,14 @@ export default function ReviewForm() {
   const handleSubmit = async () => {
     if (!reqId) {
       message.warning(t('rdm.reviewForm.needReq'))
+      return
+    }
+    if (phaseBlocked) {
+      message.warning('需求尚未受理，請先接受需求後再發起評審')
+      return
+    }
+    if (noPrd) {
+      message.warning('請先編寫 PRD，再發起評審')
       return
     }
     let values: ReviewFormValues
@@ -128,6 +158,25 @@ export default function ReviewForm() {
         onBack={() => navigate(-1)}
         meta={requirement ? `${requirement.reqNo} · ${requirement.title}` : t('rdm.reviewForm.metaHint')}
       />
+
+      {phaseBlocked && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="需求尚未受理，暫時不能發起評審"
+          description="請先由產品經理在需求詳情頁「接受需求」，再按「編寫 PRD → 發起評審」的順序推進。"
+        />
+      )}
+      {noPrd && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="尚未編寫 PRD"
+          description="評審要針對具體方案給出結論，請先在需求詳情頁「編寫 PRD」，再回來發起評審。"
+        />
+      )}
 
       <div className="rdm-form-section">
         {/* 模块标题行：图标色块 + 标题 + 延伸分隔线 + 右侧说明（§C.3） */}
@@ -194,7 +243,9 @@ export default function ReviewForm() {
 
       <div className="form-footer">
         <Button onClick={() => navigate(-1)}>{t('common:cancel')}</Button>
-        <Button type="primary" icon={<SendOutlined />} loading={submitting} onClick={handleSubmit}>{t('rdm.reviewForm.submitBtn')}</Button>
+        <Button type="primary" icon={<SendOutlined />} loading={submitting} disabled={submitBlocked} onClick={handleSubmit}>
+          {t('rdm.reviewForm.submitBtn')}
+        </Button>
       </div>
     </div>
   )

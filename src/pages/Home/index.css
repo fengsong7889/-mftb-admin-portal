@@ -1967,6 +1967,256 @@
 }
 
 /* ─────────────────────────────────────────
+   AI 助手结构化视图（AgentViewCard）
+   ──────────────────────────────────────── */
+.home-chat-views {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.agent-view-card {
+  background: #ffffff;
+  border: 1px solid #f0f0f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+}
+
+.agent-view-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.agent-view-card__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.agent-view-card__subtitle {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-top: 2px;
+}
+
+.agent-view-card__total {
+  font-size: 12px;
+  color: #E8720C;
+  background: #FFF7E6;
+  border: 1px solid #FFD591;
+  border-radius: 999px;
+  padding: 1px 8px;
+  white-space: nowrap;
+}
+
+.agent-view-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.agent-view-metric {
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #FAFAFA;
+}
+
+.agent-view-metric__label {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.agent-view-metric__value {
+  font-size: 18px;
+  font-weight: 600;
+  color: #262626;
+  line-height: 1.4;
+}
+
+.agent-view-metric__unit {
+  font-size: 12px;
+  font-weight: 400;
+  color: #8c8c8c;
+  margin-left: 2px;
+}
+
+.agent-view-metric__hint {
+  font-size: 11px;
+  color: #bfbfbf;
+}
+
+.agent-view-metric--success .agent-view-metric__value { color: #52c41a; }
+.agent-view-metric--warning .agent-view-metric__value { color: #faad14; }
+.agent-view-metric--danger .agent-view-metric__value { color: #ff4d4f; }
+
+.agent-view-table .ant-table { font-size: 12px; }
+.agent-view-table .ant-table-thead > tr > th { background: #FAFAFA; font-weight: 600; }
+.agent-view-empty-cell { color: #bfbfbf; }
+
+.agent-view-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 110px;
+}
+
+.agent-view-progress .ant-progress { flex: 1; margin: 0; }
+
+.agent-view-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.agent-view-note {
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border-left: 3px solid #d9d9d9;
+  background: #FAFAFA;
+  color: #595959;
+}
+
+.agent-view-note--warning { border-left-color: #faad14; background: #FFFBE6; color: #ad6800; }
+.agent-view-note--danger { border-left-color: #ff4d4f; background: #FFF1F0; color: #a8071a; }
+.agent-view-note--info { border-left-color: #1890ff; background: #E6F7FF; color: #0958d9; }
+
+.agent-view-link { padding-left: 0; margin-top: 6px; color: #E8720C; }
+
+/* ─────────────────────────────────────────
+   AI 助手待确认动作卡（AgentActionCard）
+   ──────────────────────────────────────── */
+.home-chat-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.agent-action-card {
+  background: #ffffff;
+  border: 1px solid #FFD591;
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 4px rgba(232, 114, 12, 0.08);
+}
+
+.agent-action-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.agent-action-card__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #262626;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-action-card__summary {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-top: 2px;
+}
+
+.agent-action-card__preview {
+  margin-top: 10px;
+  max-height: 220px;
+  overflow: auto;
+  background: #FAFAFA;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.agent-action-card__preview pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #595959;
+}
+
+.agent-action-card__meta {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin: 8px 0;
+}
+
+.agent-action-card__footer {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* ─────────────────────────────────────────
+   AI 助手反馈 / 我的记忆（二期）
+   ──────────────────────────────────────── */
+.home-chat-msg-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.home-chat-msg-actions .ant-btn {
+  color: #8c8c8c;
+  padding: 0 6px;
+  height: 24px;
+}
+
+.home-chat-msg-actions .ant-btn.is-active {
+  color: #E8720C;
+}
+
+/* 自动记忆候选：内容可能较长，单行截断，点击后弹窗内可编辑完整内容 */
+.home-chat-msg-actions .home-memory-suggestion {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #E8720C;
+}
+
+.home-memory-add {
+  margin-bottom: 8px;
+}
+
+.home-memory-add-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.home-memory-hint {
+  font-size: 11px;
+  color: #8c8c8c;
+  line-height: 1.5;
+}
+
+.home-memory-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ─────────────────────────────────────────
    响应式
    ──────────────────────────────────────── */
 @media (max-width: 992px) {

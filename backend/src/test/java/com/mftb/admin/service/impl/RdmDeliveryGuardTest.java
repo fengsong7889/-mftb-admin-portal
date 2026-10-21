@@ -332,6 +332,30 @@ class RdmDeliveryGuardTest {
     }
 
     @Test
+    @DisplayName("受理前不能新建 PRD：评估中被业务闸门拒绝")
+    void prdCannotBeCreatedBeforeAccepted() {
+        when(requirementMapper.selectById(any())).thenReturn(requirement(RdmConstants.STATUS_EVALUATING));
+        RdmDeliveryDTO.Prd dto = new RdmDeliveryDTO.Prd();
+        dto.setReqId(1L);
+        dto.setTitle("推廣金賬戶 PRD");
+        dto.setContentRich("<p>正文</p>");
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.savePrd(dto));
+        assertTrue(ex.getMessage().contains("請先接受需求"), ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("受理前不能发起评审：评估中被业务闸门拒绝")
+    void reviewCannotBeCreatedBeforeAccepted() {
+        when(requirementMapper.selectById(any())).thenReturn(requirement(RdmConstants.STATUS_EVALUATING));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.createReview(reviewDto("dev")));
+        assertTrue(ex.getMessage().contains("請先接受需求"), ex.getMessage());
+        assertTrue(insertedReviews.isEmpty());
+    }
+
+    @Test
     @DisplayName("负数估时、起止倒挂、未知任务类型都被拦下")
     void taskFormIsValidated() {
         assertThrows(BusinessException.class,

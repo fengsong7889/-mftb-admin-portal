@@ -31,6 +31,14 @@ interface StageBarProps {
    * 没走过的阶段不传就不显示，避免用 0 天冒充事实。
    */
   stayDays?: Partial<Record<RdmStage, number>>
+  /**
+   * V3：由交付項事實推導的階段（只讀投影）。傳入時優先於 status 映射。
+   * <p>V3 需求受理後狀態按設計停住，設計/開發/測試/驗收按交付項推進；
+   * 不傳時行為完全等同舊版（V1/V2 不受影響）。
+   */
+  derivedStage?: RdmStage | null
+  /** 推導口徑說明（如「交付項 3/5 完成」），展示在階段條下方 */
+  derivedHint?: string
 }
 
 /** 阶段在 9 段序列中的下标 */
@@ -38,11 +46,15 @@ function stageIndex(stage: RdmStage) {
   return RDM_STAGE_ORDER.indexOf(stage)
 }
 
-export default function RequirementStageBar({ status, overdue, compact, stayDays }: StageBarProps) {
-  const stage = stageOfStatus(status)
+export default function RequirementStageBar({ status, overdue, compact, stayDays, derivedStage, derivedHint }: StageBarProps) {
+  const stage = derivedStage ?? stageOfStatus(status)
   const currentIdx = stageIndex(stage)
-  /** 驳回/挂起：仍留在原阶段但要把节点标红，否则异常停留会被读成正常推进 */
-  const stalled = RDM_STALLED_STATUS[status as RdmStatus]
+  /**
+   * 驳回/挂起：仍留在原阶段但要把节点标红，否则异常停留会被读成正常推进。
+   * <p>推导阶段（V3）不代表需求状态异常，不参与「异常停留」着色。
+   */
+  const stalled = derivedStage ? undefined : RDM_STALLED_STATUS[status as RdmStatus]
+  const derived = !!derivedStage
 
   // 紧凑模式（看板卡片）：只画 9 段细分段条 + 当前阶段名，避免列宽溢出
   if (compact) {
@@ -66,7 +78,12 @@ export default function RequirementStageBar({ status, overdue, compact, stayDays
           color: overdue ? '#CF1322' : '#8C8C8C',
         }}>
           {currentIdx >= 0 ? RDM_STAGE_LABEL[RDM_STAGE_ORDER[currentIdx]] : RDM_STATUS_LABEL[status as RdmStatus] ?? status}
+          {derived ? '（交付項）' : ''}
         </div>
+        {/* 看板卡片：推导阶段旁边直出 N/M，不占额外行也不靠悬停 */}
+        {derived && derivedHint && (
+          <div style={{ fontSize: 11, color: '#8C8C8C' }}>{derivedHint}</div>
+        )}
       </div>
     )
   }
@@ -116,11 +133,20 @@ export default function RequirementStageBar({ status, overdue, compact, stayDays
                       </div>
                       {active && (
                         <div style={{ fontSize: 12, color: '#8C8C8C' }}>
-                          細分狀態：<Tag color={alarm ? 'error' : 'orange'} style={{ margin: 0 }}>
-                            {RDM_STATUS_LABEL[status as RdmStatus] ?? status}
-                          </Tag>
-                          {stalled && (
-                            <span style={{ color: '#CF1322', marginLeft: 6 }}>{stalled}，需人工推進</span>
+                          {derived ? (
+                            <>
+                              階段來源：<Tag color="purple" style={{ margin: 0 }}>由交付項推導</Tag>
+                              {derivedHint ? <div style={{ marginTop: 4 }}>{derivedHint}</div> : null}
+                            </>
+                          ) : (
+                            <>
+                              細分狀態：<Tag color={alarm ? 'error' : 'orange'} style={{ margin: 0 }}>
+                                {RDM_STATUS_LABEL[status as RdmStatus] ?? status}
+                              </Tag>
+                              {stalled && (
+                                <span style={{ color: '#CF1322', marginLeft: 6 }}>{stalled}，需人工推進</span>
+                              )}
+                            </>
                           )}
                         </div>
                       )}
@@ -161,6 +187,10 @@ export default function RequirementStageBar({ status, overdue, compact, stayDays
           )
         })}
       </div>
+      {/* V3：把推导口径常驻在阶段条下方，避免「阶标在開発、需求状态却还是已受理」被读成矛盾 */}
+      {derived && derivedHint && (
+        <div style={{ marginTop: 4, paddingLeft: 2, fontSize: 12, color: '#8C8C8C' }}>{derivedHint}</div>
+      )}
     </div>
   )
 }

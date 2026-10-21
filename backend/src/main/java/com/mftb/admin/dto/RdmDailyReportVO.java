@@ -37,13 +37,78 @@ public final class RdmDailyReportVO {
         private Boolean groupEnabled;
         /** 个人工作通知开关 */
         private Boolean personalEnabled;
-        /** 接收范围：all_projects=全部在途项目 / risk_only=仅风险逾期项目 */
+        /**
+         * @deprecated 从未被消费的半成品（仅透传读写，发送链路无人读它）；收件人改由
+         *             {@link #receiverRoles} 等三字段表达。保留字段只为旧客户端传入时不报错。
+         */
+        @Deprecated
         private String receiverScope;
+        /**
+         * 收件角色白名单：pm / product_owner / tech_lead / qa_lead / ui_designer / ops_lead / project_member。
+         * <p>默认 pm + product_owner，与收件人可配之前的发送行为完全一致。
+         */
+        private List<String> receiverRoles;
+        /** 追加收件人 sys_user.id：不靠项目角色，收到规则范围内的全部项目汇总 */
+        private List<Long> extraReceiverUserIds;
+        /** 排除收件人 sys_user.id：优先级最高，从角色与追加名单中剔除 */
+        private List<Long> excludeReceiverUserIds;
         private String morningTemplateKey;
         private String eveningTemplateKey;
         private String personalTemplateKey;
+        /** 看板开放链接有效期（天）；1~90，默认 30 */
+        private Integer boardLinkValidDays;
+        /** 看板是否展示需求明细（样式固定，只控制内容） */
+        private Boolean boardShowRequirements;
+        /** 看板是否展示负责人姓名 */
+        private Boolean boardShowOwners;
+        /** 看板是否展示未挂项目的迭代 */
+        private Boolean boardShowUnassigned;
+        /** 钉钉消息模式：fixed=固定框架（只看字段开关）/ template=自定义模板文本 */
+        private String messageMode;
+        /** 固定框架的字段开关（全局一套，不随模板变化） */
+        private MessageFieldOptions messageFields;
         private String updatedBy;
         private String updatedAt;
+    }
+
+    /**
+     * 钉钉消息固定框架的字段开关（全局一套）。
+     *
+     * <p><b>为什么是“开关”而不是“模板文本”</b>：预置日报的层级框架（汇总行 → 项目行 →
+     * 迭代行 → 未挂项目迭代 → 引导链接）必须稳定，否则同一个日报在不同群里结构各异，
+     * 读者无法形成阅读习惯。能调的只有“每行展示哪几个字段”，因此这里全部是布尔开关，
+     * 不提供文案、顺序与层级配置入口。
+     *
+     * <p>项目名、迭代名、汇总行、引导链接是框架的一部分，<b>不在本开关池里</b>（不可关）。
+     */
+    @Data
+    public static class MessageFieldOptions {
+        /** 项目行：产品负责人 */
+        private Boolean projectProductOwner = true;
+        /** 项目行：交付进度（已完成/总数） */
+        private Boolean projectDeliveryProgress = true;
+        /** 项目行：在途迭代数 */
+        private Boolean projectIterationCount = true;
+        /** 项目行：项目周期（计划起~止） */
+        private Boolean projectPeriod = false;
+        /** 项目行：下次交付日 */
+        private Boolean projectNextDelivery = false;
+        /** 项目行：逾期/阻塞交付项计数 */
+        private Boolean projectAbnormal = false;
+        /** 迭代行：状态 */
+        private Boolean iterationStatus = true;
+        /** 迭代行：负责人 */
+        private Boolean iterationOwner = true;
+        /** 迭代行：进度（任务按计划工时加权）与产能负载率 */
+        private Boolean iterationProgress = true;
+        /** 迭代行：总需求数 */
+        private Boolean iterationReqTotal = false;
+        /** 迭代行：今日到期需求数 */
+        private Boolean iterationReqTodayDue = false;
+        /** 迭代行：逾期需求数 */
+        private Boolean iterationReqOverdue = false;
+        /** 迭代行：起止日期 */
+        private Boolean iterationPeriod = false;
     }
 
     /** 配置保存入参（服务端逐字段校验，不信任前端传值） */
@@ -54,10 +119,30 @@ public final class RdmDailyReportVO {
         private String eveningTime;
         private Boolean groupEnabled;
         private Boolean personalEnabled;
+        /** @deprecated 服务端不再读写，传了也会被忽略；改用下面三个收件人字段 */
+        @Deprecated
         private String receiverScope;
+        /** 收件角色白名单；null = 沿用库中现值，不重置已配名单 */
+        private List<String> receiverRoles;
+        /** 追加收件人 sys_user.id；null = 沿用库中现值 */
+        private List<Long> extraReceiverUserIds;
+        /** 排除收件人 sys_user.id；null = 沿用库中现值 */
+        private List<Long> excludeReceiverUserIds;
         private String morningTemplateKey;
         private String eveningTemplateKey;
         private String personalTemplateKey;
+        /** 看板开放链接有效期（天）；1~90，默认 30 */
+        private Integer boardLinkValidDays;
+        /** 看板是否展示需求明细 */
+        private Boolean boardShowRequirements;
+        /** 看板是否展示负责人姓名 */
+        private Boolean boardShowOwners;
+        /** 看板是否展示未挂项目的迭代 */
+        private Boolean boardShowUnassigned;
+        /** 钉钉消息模式：fixed / template */
+        private String messageMode;
+        /** 固定框架的字段开关 */
+        private MessageFieldOptions messageFields;
     }
 
     /* ==================== 推送模板 ==================== */
@@ -125,6 +210,10 @@ public final class RdmDailyReportVO {
         private List<String> unknownPlaceholders = new ArrayList<>();
         private String reportDate;
         private String reportType;
+        /** 预览链接：指向免登看板（与真实推送同一个 buildViewUrl），供编辑页直接打开验证落地页 */
+        private String detailUrl;
+        /** 本次预览实际走的渲染路径：fixed=固定框架（草稿文本不生效）/ template=自定义模板 */
+        private String messageMode;
     }
 
     /* ==================== 推送规则（多规则模型） ==================== */
@@ -140,7 +229,12 @@ public final class RdmDailyReportVO {
     public static class Rule {
         private Long id;
         private String name;
+        /** 目标项目；null = 未指定单项目（全部项目或仅未挂项目的迭代） */
         private Long projectId;
+        /** 多项目范围：为空表示单项目/全部项目/仅迭代，语义由 projectId + iterationCode 共同裁决 */
+        private List<Long> projectIds;
+        /** 范围展示文案：全部在途项目 / 项目A、项目B / 项目A / 迭代 SP… */
+        private String projectSummary;
         /** 冗余展示：项目编号/名称（避免前端再查一次项目） */
         private String projectNo;
         private String projectName;
@@ -165,7 +259,12 @@ public final class RdmDailyReportVO {
     public static class RuleForm {
         private Long id;
         private String name;
+        /** 可为空：迭代未挂项目（紧急修复）时规则不挂项目；迭代有项目时服务端以迭代为准回填校验 */
         private Long projectId;
+        /** 多项目范围：空数组 + projectId 为空 + 无迭代 = 全部在途项目 */
+        private List<Long> projectIds;
+        /** UI 显式“全部项目”标记（服务端以 projectIds 空 + 无迭代为准，保留字段兼容前端） */
+        private Boolean allProjects;
         /** 空 = 项目全部迭代 */
         private String iterationCode;
         private String pushTime;
@@ -204,6 +303,8 @@ public final class RdmDailyReportVO {
          * （v3.15 刻意不回填，由管理员在迭代排期逐个补挂）。日报如实列出，不塞进任何项目下。
          */
         private List<IterationNode> unassignedIterations = new ArrayList<>();
+        /** 未挂项目、也未挂迭代的执行需求（「全部在途项目」口径才加载；消息不展示，看板展示） */
+        private List<RequirementNode> unassignedRequirements = new ArrayList<>();
     }
 
     /** 汇总计数。单位在字段名里写清，避免管理者把「项」读成「个项目」。 */
@@ -234,6 +335,46 @@ public final class RdmDailyReportVO {
         private int deliveryItemCompleted;
         /** 在途项目的待办总数（项） */
         private int todoTotal;
+        /** 在途迭代数（含未挂项目的迭代，status != closed） */
+        private int iterationActiveCount;
+        /** 逾期需求数（overdue_flag=1） */
+        private int overdueReqCount;
+        /** 阻塞需求数（blocked_flag=1） */
+        private int blockedReqCount;
+        /** 逾期风险数：逾期或阻塞的需求去重计数（看板顶部第 4 个指标） */
+        private int overdueRiskReqCount;
+    }
+
+    /* ==================== 收件人预览 ==================== */
+
+    /**
+     * 收件人预览：发之前先看清「会发给谁、谁会收不到」。
+     * <p>按当前配置 + 规则实时范围现算，<b>不读快照</b>：快照是「上次发了什么」，
+     * 预览是「改完配置下次会怎样」，且历史快照不含新增的四类角色 userId。
+     */
+    @Data
+    public static class ReceiverPreview {
+        /** 最终收件人数（已剔除排除名单，含未绑定钉钉者） */
+        private int total;
+        /** 其中未绑定钉钉 userId 的人数；这些人会被跳过，不降级群发 */
+        private int unbound;
+        /** 追加收件人数（这些人的视角是规则范围全量项目） */
+        private int extraCount;
+        private List<ReceiverPreviewItem> receivers = new ArrayList<>();
+    }
+
+    /** 单个收件人：来源与可见范围都摆明，避免「凭什么他能收到」说不清 */
+    @Data
+    public static class ReceiverPreviewItem {
+        private Long userId;
+        private String userName;
+        private String empId;
+        /** 命中来源：角色 code（pm/product_owner/...）或 extra（追加名单） */
+        private List<String> sources = new ArrayList<>();
+        /** 该人在本规则下可见的项目数；追加收件人为规则范围全量 */
+        private int projectCount;
+        /** 是否绑定钉钉 userId；false 时不会收到 */
+        private boolean dingtalkBound;
     }
 
     /** 项目节点：项目级指标全部取自 {@code RdmProjectFactService} 事实源，禁止在此另起口径。 */
@@ -247,6 +388,15 @@ public final class RdmDailyReportVO {
         private String pmUserName;
         private Long productOwnerUserId;
         private String productOwnerUserName;
+        /** 项目角色负责人 userId：按角色推导收件人时的取值来源（姓名快照只用于展示） */
+        private Long techLeadUserId;
+        private String techLeadUserName;
+        private Long qaLeadUserId;
+        private String qaLeadUserName;
+        private Long uiDesignerUserId;
+        private String uiDesignerUserName;
+        private Long opsLeadUserId;
+        private String opsLeadUserName;
         private String planStartDate;
         private String planEndDate;
         private Integer riskFlag;
@@ -255,6 +405,8 @@ public final class RdmDailyReportVO {
         private int requirementTotal;
         private int deliveryItemTotal;
         private int deliveryItemCompleted;
+        /** 交付进度百分比；交付项总数为 0 时为 null（零承诺≠完成） */
+        private Integer deliveryProgressPercent;
         /**
          * 剩余工作 = 交付项总数 − 已完成数。
          * <p><b>展示侧必须先短路 {@code deliveryItemTotal == 0}</b>：新建但尚未排交付项的项目
@@ -272,6 +424,8 @@ public final class RdmDailyReportVO {
         private String nextDeliveryDate;
         /** 是否需关注（风险/逾期标记，或含逾期、阻塞交付项） */
         private boolean attention;
+        /** 该项目下的在途迭代数（status != closed）：消息项目行的「迭代 N 個」取此值 */
+        private int iterationActiveCount;
         /** 项目详情路由（取自 RdmConstants 单一真相源，通知侧绝不自己重拼路径） */
         private String detailUrl;
         private List<IterationNode> iterations = new ArrayList<>();
@@ -295,6 +449,24 @@ public final class RdmDailyReportVO {
         private String ownerName;
         private int requirementCount;
         private int requirementDoneCount;
+        /** 迭代产能工时（rdm_iteration.capacity_hours）；0=未設定 */
+        private int capacityHours;
+        /** 迭代下任务计划工时合计（只计已填写的 plan_hours） */
+        private double taskHours;
+        /** 已排计划工时 / 产能；产能未设置时为 null（不编造百分比） */
+        private Integer capacityUsagePercent;
+        /**
+         * 迭代进度：任务进度按计划工时加权后的百分比；无任务时为 null。
+         * <p>不用需求上的 progress 字段：该字段可能长期停留 0（任务已完成也不联动），
+         * 用它算迭代进度会与执行侧甘特图矛盾。
+         */
+        private Integer progressPercent;
+        private int taskTotal;
+        private int taskDone;
+        /** 该迭代下逾期需求数（overdue_flag=1） */
+        private int overdueReqCount;
+        /** 该迭代下今日到期需求数（plan_release_date = 报告日且未上线） */
+        private int todayDueReqCount;
         private List<RequirementNode> requirements = new ArrayList<>();
     }
 
@@ -308,8 +480,12 @@ public final class RdmDailyReportVO {
         private String status;
         /** 状态中文名，取自 rdm_status_def.label（不硬编码） */
         private String statusLabel;
+        /** 规模：SIMPLE/MEDIUM/COMPLEX/HUGE（产品评估后回填） */
+        private String complexity;
         private String priority;
         private String assigneePmName;
+        /** 当前状态已停留天数（以 status_enter_time 与报告日为基准；空则前端显示 —） */
+        private Integer stayDays;
         /**
          * 所属迭代编码（需求→迭代的挂接键）。
          * <p>迭代 code 全局唯一（{@code uk_rdm_iteration_code}），因此按它分组不会串项目；
@@ -321,6 +497,51 @@ public final class RdmDailyReportVO {
         private Integer blockedFlag;
         private Integer progress;
         private String detailUrl;
+        /** 甘特数据：该需求下的任务（角色/负责人/起止），为空时看板只画需求行 */
+        private List<TaskNode> tasks = new ArrayList<>();
+    }
+
+    /** 甘特任务节点（rdm_work_task 的任务级排期）。 */
+    @Data
+    public static class TaskNode {
+        private Long taskId;
+        private String taskNo;
+        private String title;
+        /** 任务类型（design/frontend/app/backend/qa/data）：甘特条颜色与我的甘特图同源 */
+        private String taskType;
+        /** 工作项角色编码（PM/DEV/QA/DESIGNER 等，前端按 RDM_ROLE_LABEL 翻译） */
+        private String roleCode;
+        private String ownerName;
+        private String ownerEmpNo;
+        /** 进度百分比 0-100（甘特条内展示） */
+        private Integer progress;
+        /** 计划工时（迭代进度/产能口径的权重） */
+        private Double planHours;
+        private String planStartDate;
+        private String planFinishDate;
+        private String status;
+    }
+
+    /* ==================== 免登看板 ==================== */
+
+    /**
+     * 看板开放页视图（无登录态）。
+     *
+     * <p><b>只输出展示所需字段</b>：不含手机号、钉钉 userId、站内详情路由（detailUrl 一律清空），
+     * 避免开放链接把外部访问者带回登录页，也避免转发后扩大内部信息暴露面。
+     * <p><b>invalid 与 valid=false</b>：签名错/过期/快照不存在统一走同一句提示，不区分原因。
+     */
+    @Data
+    public static class PublicView {
+        private boolean valid;
+        private String message;
+        /** 链接到期时间 yyyy-MM-dd HH:mm:ss（展示用） */
+        private String expireAt;
+        /** 实际生效的展示参数（前端只按它裁剪渲染，样式不变） */
+        private boolean showRequirements;
+        private boolean showOwners;
+        private boolean showUnassigned;
+        private Snapshot snapshot;
     }
 
     /* ==================== 触发结果与发送记录 ==================== */
@@ -344,6 +565,8 @@ public final class RdmDailyReportVO {
         private String groupContent;
         /** 人类可读结论（成功/被开关拦下/无数据等） */
         private String message;
+        /** 本次快照对应的看板链接（免登）：手动触发页可直接弹窗预览 */
+        private String detailUrl;
     }
 
     /** 发送记录列表行（配置页「發送記錄」tab） */
@@ -360,6 +583,10 @@ public final class RdmDailyReportVO {
         private Long projectId;
         private String projectNo;
         private String projectName;
+        /** 范围展示文案（多项目/全部项目/未挂项目迭代） */
+        private String scopeLabel;
+        /** 快照范围键（多项目/全部项目没有单一 projectId，记录页跳日报必须带上它才能精确命中） */
+        private String scopeKey;
         /** 快照目标迭代编码（null=项目全部迭代） */
         private String iterationCode;
         private Integer projectCount;

@@ -5,6 +5,7 @@ import com.mftb.admin.constant.RdmConstants;
 import com.mftb.admin.dto.RdmDailyReportVO.IterationNode;
 import com.mftb.admin.dto.RdmDailyReportVO.ProjectNode;
 import com.mftb.admin.dto.RdmDailyReportVO.RequirementNode;
+import com.mftb.admin.dto.RdmDailyReportVO.TaskNode;
 import com.mftb.admin.dto.RdmFactVO;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.RdmDailyReportService.IterationRow;
@@ -185,7 +186,9 @@ class RdmDailyReportAggregationTest {
         assertEquals(f.getProductOwnerUserName(), n.getProductOwnerUserName());
         assertEquals(f.getPlanStartDate(), n.getPlanStartDate());
         assertEquals(f.getPlanEndDate(), n.getPlanEndDate());
-        assertEquals(f.getRequirementTotal(), n.getRequirementTotal());
+        // 需求总数按快照范围统计（这里未传需求 → 0），不再直接搬事实源的项目全量：
+        // 按迭代推送时，项目全量会大于可见的需求行，造成“卡片数字与列表对不上”。
+        assertEquals(0, n.getRequirementTotal());
         assertEquals(f.getDeliveryItemTotal(), n.getDeliveryItemTotal());
         assertEquals(f.getDeliveryItemCompleted(), n.getDeliveryItemCompleted());
         assertEquals(f.getDeliveryItemOverdue(), n.getDeliveryItemOverdue());
@@ -199,6 +202,25 @@ class RdmDailyReportAggregationTest {
         assertEquals(f.getRiskFlag(), n.getRiskFlag());
         assertEquals(f.getOverdueFlag(), n.getOverdueFlag());
         assertEquals(f.getPausedFlag(), n.getPausedFlag());
+    }
+
+    @Test
+    @DisplayName("需求总数按快照范围统计：迭代视角不沿用项目全量需求数")
+    void requirementTotalFollowsSnapshotScope() {
+        RdmFactVO.ProjectFact f = fact(1L, "PROJ2026101901", "項目A");
+        ProjectNode projectScope = RdmDailyReportService.toProjectNode(
+                f,
+                List.of(iterationRow(101L, 1L, "SP202610001", "sprint"),
+                        iterationRow(102L, 1L, "SP202610002", "sprint")),
+                List.of(req(1L, "XQ001", "SP202610001", "developing"),
+                        req(2L, "XQ002", "SP202610002", "testing")));
+        assertEquals(2, projectScope.getRequirementTotal(), "项目视角 = 该项目可见需求数");
+
+        ProjectNode iterationScope = RdmDailyReportService.toProjectNode(
+                f,
+                List.of(iterationRow(101L, 1L, "SP202610001", "sprint")),
+                List.of(req(1L, "XQ001", "SP202610001", "developing")));
+        assertEquals(1, iterationScope.getRequirementTotal(), "迭代视角 = 该迭代可见需求数");
     }
 
     @Test
@@ -262,6 +284,64 @@ class RdmDailyReportAggregationTest {
         assertEquals("同名項目", nb.getProjectName());
         assertFalse(na.getDetailUrl().equals(nb.getDetailUrl()), "同名项目的链接必须按 ID 分开");
         assertFalse(na.getProjectId().equals(nb.getProjectId()));
+    }
+
+    /* ==================== 迭代进度/产能 ==================== */
+
+    private TaskNode task(int progress, String status, Double planHours) {
+        TaskNode t = new TaskNode();
+        t.setProgress(progress);
+        t.setStatus(status);
+        t.setPlanHours(planHours);
+        return t;
+    }
+
+    @Test
+    @DisplayName("迭代进度=任务进度按计划工时加权；未填工时的任务按平均值计权，产能=已排工时/产能")
+    void iterationProgressWeightedByPlanHours() {
+        IterationNode it = new IterationNode();
+        RequirementNode r = req(1L, "XQ001", "SP202610001", "developing");
+        // 已填工时 16h @100%、 8h @50%；未填工时的任务按 (16+8)/2=12h 计权 @0%
+        r.setTasks(List.of(task(100, "done", 16.0), task(50, "doing", 8.0), task(0, "todo", null)));
+
+        RdmDailyReportService.applyIterationMetrics(it, List.of(r), 80);
+
+        assertEquals(3, it.getTaskTotal());
+        assertEquals(1, it.getTaskDone());
+        assertEquals(24.0, it.getTaskHours(), 0.001, "已排工时只计已填写的计划工时");
+        // (100×16 + 50×8 + 0×12) ÷ (16+8+12) = 2000/36 ≈ 55.56 → 56
+        assertEquals(56, it.getProgressPercent());
+        assertEquals(80, it.getCapacityHours());
+        assertEquals(30, it.getCapacityUsagePercent(), "24h / 80h = 30%");
+    }
+
+    @Test
+    @DisplayName("无任务不编造 0%：进度为 null；产能未设置时为 null，超载允许 >100%")
+    void iterationMetricsDoNotInventPercentages() {
+        IterationNode empty = new IterationNode();
+        RdmDailyReportService.applyIterationMetrics(empty, List.of(), 0);
+        assertNull(empty.getProgressPercent(), "无任务应置 null，由展示侧显示「尚無任務」");
+        assertNull(empty.getCapacityUsagePercent(), "产能为 0 应置 null，不显示 0%");
+
+        IterationNode overloaded = new IterationNode();
+        RequirementNode r = req(2L, "XQ002", "SP202610001", "developing");
+        r.setTasks(List.of(task(60, "doing", 120.0)));
+        RdmDailyReportService.applyIterationMetrics(overloaded, List.of(r), 80);
+        assertEquals(150, overloaded.getCapacityUsagePercent(), "超载必须如实到 100% 以上");
+    }
+
+    @Test
+    @DisplayName("项目交付进度=已完成/总数；交付项为 0 时置 null（零承诺不谎报）")
+    void projectDeliveryProgressShortCircuitsZeroCommitment() {
+        ProjectNode normal = RdmDailyReportService.toProjectNode(
+                fact(1L, "PROJ001", "項目A"), List.of(), List.of());
+        assertEquals(33, normal.getDeliveryProgressPercent(), "2/6 ≈ 33%");
+
+        RdmFactVO.ProjectFact zero = fact(2L, "PROJ002", "項目B");
+        zero.setDeliveryItemTotal(0);
+        zero.setDeliveryItemCompleted(0);
+        ProjectNode empty = RdmDailyReportService.toProjectNode(zero, List.of(), List.of());
+        assertNull(empty.getDeliveryProgressPercent(), "尚未排交付项必须是 null，不能读成 0% 或 100%");
     }
 
     /* ==================== 手动触发节流 ==================== */

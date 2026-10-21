@@ -1,21 +1,27 @@
 package com.mftb.admin.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.RdmConstants;
 import com.mftb.admin.constant.RdmDailyReportTemplates;
 import com.mftb.admin.dto.RdmDailyReportVO.Config;
 import com.mftb.admin.dto.RdmDailyReportVO.ConfigForm;
 import com.mftb.admin.dto.RdmDailyReportVO.IterationNode;
+import com.mftb.admin.dto.RdmDailyReportVO.MessageFieldOptions;
 import com.mftb.admin.dto.RdmDailyReportVO.PreviewForm;
 import com.mftb.admin.dto.RdmDailyReportVO.PreviewResult;
 import com.mftb.admin.dto.RdmDailyReportVO.ProjectNode;
+import com.mftb.admin.dto.RdmDailyReportVO.PublicView;
+import com.mftb.admin.dto.RdmDailyReportVO.ReceiverPreview;
+import com.mftb.admin.dto.RdmDailyReportVO.ReceiverPreviewItem;
 import com.mftb.admin.dto.RdmDailyReportVO.ReportRecord;
 import com.mftb.admin.dto.RdmDailyReportVO.RequirementNode;
 import com.mftb.admin.dto.RdmDailyReportVO.Rule;
 import com.mftb.admin.dto.RdmDailyReportVO.RuleForm;
 import com.mftb.admin.dto.RdmDailyReportVO.Snapshot;
 import com.mftb.admin.dto.RdmDailyReportVO.Summary;
+import com.mftb.admin.dto.RdmDailyReportVO.TaskNode;
 import com.mftb.admin.dto.RdmDailyReportVO.Template;
 import com.mftb.admin.dto.RdmDailyReportVO.TemplateForm;
 import com.mftb.admin.dto.RdmDailyReportVO.TriggerResult;
@@ -25,6 +31,7 @@ import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.NotificationAppService.Credentials;
 import com.mftb.admin.service.RdmDailyReportRenderer.PersonalView;
 import com.mftb.admin.service.RdmDailyReportRenderer.Rendered;
+import com.mftb.admin.util.RdmDailyReportViewTokenUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,12 +43,14 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -80,11 +89,29 @@ public class RdmDailyReportService {
     @Value("${rdm.notify.dry-run:false}")
     private boolean notifyDryRun;
 
+    /**
+     * 看板开放链接的 HMAC 密钥：由 JWT 密钥按域隔离派生。
+     * <p>不直接复用 JWT 密钥：拿到看板链接签名能力不等于能伪造登录令牌，反之亦然。
+     */
+    @Value("${jwt.secret}")
+    private String jwtSecret;
+
     private static final String CONFIG_SLOT = "default";
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     /** HH:mm 严格校验：非法时间会让作业永远命不中或每分钟都命中，必须在写入时就拦下 */
     private static final Pattern TIME_PATTERN = Pattern.compile("^([01]\\d|2[0-3]):[0-5]\\d$");
-    private static final Set<String> RECEIVER_SCOPES = Set.of("all_projects", "risk_only");
+    /**
+     * 个人日报收件角色白名单。
+     * <p>全部取自 {@code rdm_project} 的六类负责人列与 {@code rdm_project_member}（成员）。
+     * <p><b>为何不纳入迭代/任务负责人</b>：{@code rdm_iteration} / {@code rdm_task} 只存
+     * {@code owner_name} 姓名快照、没有 user_id，按姓名反查 {@code sys_user} 会因重名发错人。
+     */
+    private static final List<String> RECEIVER_ROLES = List.of(
+            "pm", "product_owner", "tech_lead", "qa_lead", "ui_designer", "ops_lead", "project_member");
+    /** 默认收件角色 = 收件人可配之前的实际发送对象，保证升级当天发送行为不变 */
+    private static final List<String> DEFAULT_RECEIVER_ROLES = List.of("pm", "product_owner");
+    /** 追加/排除名单上限：到这个量级说明配置方式错了（应当用角色），而不是继续堆人 */
+    private static final int MAX_RECEIVER_USER_IDS = 100;
     private static final Set<String> CHANNELS = Set.of(
             RdmDailyReportTemplates.CHANNEL_GROUP, RdmDailyReportTemplates.CHANNEL_PERSONAL);
     private static final Set<String> TEMPLATE_TYPES = Set.of(
@@ -92,6 +119,18 @@ public class RdmDailyReportService {
             RdmDailyReportTemplates.TYPE_ANY);
     /** 发送记录默认取近 60 行（每天两档 ≈ 一个月） */
     private static final int DEFAULT_RECORD_LIMIT = 60;
+
+    /** 看板链接默认有效期（天）与允许区间：太长等于把内部进度长期挂在公网，太短读者来不及回看 */
+    private static final int DEFAULT_BOARD_LINK_VALID_DAYS = 30;
+    private static final int MIN_BOARD_LINK_VALID_DAYS = 1;
+    private static final int MAX_BOARD_LINK_VALID_DAYS = 90;
+    /** 看板链接路径（前端公开路由，不套后台布局、不要求登录） */
+    private static final String PUBLIC_VIEW_PATH = "/#/rdm-daily-view";
+
+    /** 钉钉消息模式：固定框架（默认）/ 自定义模板文本 */
+    private static final String MESSAGE_MODE_FIXED = "fixed";
+    private static final String MESSAGE_MODE_TEMPLATE = "template";
+    private static final Set<String> MESSAGE_MODES = Set.of(MESSAGE_MODE_FIXED, MESSAGE_MODE_TEMPLATE);
 
     /** 手动触发节流窗口：同一档位+项目 1 分钟内只允许真发一次 */
     private static final long MANUAL_THROTTLE_MS = 60_000L;
@@ -120,8 +159,8 @@ public class RdmDailyReportService {
         log.warn("日报推送配置行缺失，补插默认配置（config_slot={}）", CONFIG_SLOT);
         jdbc.update("INSERT IGNORE INTO rdm_daily_report_config "
                         + "(config_slot, enabled, morning_time, evening_time, group_enabled, personal_enabled, "
-                        + " receiver_scope, morning_template_key, evening_template_key, personal_template_key, updated_by) "
-                        + "VALUES (?, 1, '09:00', '18:00', 1, 1, 'all_projects', ?, ?, ?, 'system')",
+                        + " morning_template_key, evening_template_key, personal_template_key, updated_by) "
+                        + "VALUES (?, 1, '09:00', '18:00', 1, 1, ?, ?, ?, 'system')",
                 CONFIG_SLOT,
                 RdmDailyReportTemplates.defaultKeyOf(RdmDailyReportTemplates.CHANNEL_GROUP, RdmDailyReportTemplates.TYPE_MORNING),
                 RdmDailyReportTemplates.defaultKeyOf(RdmDailyReportTemplates.CHANNEL_GROUP, RdmDailyReportTemplates.TYPE_EVENING),
@@ -147,34 +186,85 @@ public class RdmDailyReportService {
                 StringUtils.hasText(current.getMorningTime()) ? current.getMorningTime() : "09:00", "晨報推送時間");
         String evening = normalizeTime(form.getEveningTime(),
                 StringUtils.hasText(current.getEveningTime()) ? current.getEveningTime() : "18:00", "晚報推送時間");
-        String scope = StringUtils.hasText(form.getReceiverScope()) ? form.getReceiverScope().trim() : "all_projects";
-        if (!RECEIVER_SCOPES.contains(scope)) {
-            throw new BusinessException("接收范围不合法: " + scope);
+        // 收件人：三字段为 null 时回落库中现值——旧客户端只改开关不应把已配名单重置成默认；
+        // 传空数组是「主动清空」，必须与 null 区分开（roles 清空后只要还有追加人仍可发）
+        List<String> roles = form.getReceiverRoles() == null
+                ? safeStringList(current.getReceiverRoles()) : normalizeReceiverRoles(form.getReceiverRoles());
+        List<Long> extra = form.getExtraReceiverUserIds() == null
+                ? safeLongList(current.getExtraReceiverUserIds())
+                : normalizeReceiverUserIds(form.getExtraReceiverUserIds(), "追加收件人");
+        List<Long> exclude = form.getExcludeReceiverUserIds() == null
+                ? safeLongList(current.getExcludeReceiverUserIds())
+                : normalizeReceiverUserIds(form.getExcludeReceiverUserIds(), "排除收件人");
+        // 两道拒绝都是为了让「开了个人渠道却一个人也发不出去」在保存时就暴露，而不是等到推送时静默空转
+        if (roles.isEmpty() && extra.isEmpty()) {
+            throw new BusinessException("個人日報至少需要選擇一個收件角色或指定追加收件人");
         }
-        String morningKey = requireTemplateKey(form.getMorningTemplateKey(),
-                RdmDailyReportTemplates.CHANNEL_GROUP, RdmDailyReportTemplates.TYPE_MORNING, "晨報模板");
-        String eveningKey = requireTemplateKey(form.getEveningTemplateKey(),
-                RdmDailyReportTemplates.CHANNEL_GROUP, RdmDailyReportTemplates.TYPE_EVENING, "晚報模板");
-        String personalKey = requireTemplateKey(form.getPersonalTemplateKey(),
-                RdmDailyReportTemplates.CHANNEL_PERSONAL, RdmDailyReportTemplates.TYPE_ANY, "個人通知模板");
+        if (roles.isEmpty() && extra.stream().allMatch(exclude::contains)) {
+            throw new BusinessException("排除收件人已覆蓋全部追加收件人，個人日報將無人可發");
+        }
+        String morningKey;
+        String eveningKey;
+        String personalKey;
+        String messageMode = normalizeMessageMode(form.getMessageMode(), current.getMessageMode());
+        if (MESSAGE_MODE_TEMPLATE.equals(messageMode)) {
+            // 自定义模板模式：模板是渲染真值源，必须存在且启用
+            morningKey = requireTemplateKey(form.getMorningTemplateKey(),
+                    RdmDailyReportTemplates.CHANNEL_GROUP, RdmDailyReportTemplates.TYPE_MORNING, "晨報模板");
+            eveningKey = requireTemplateKey(form.getEveningTemplateKey(),
+                    RdmDailyReportTemplates.CHANNEL_GROUP, RdmDailyReportTemplates.TYPE_EVENING, "晚報模板");
+            personalKey = requireTemplateKey(form.getPersonalTemplateKey(),
+                    RdmDailyReportTemplates.CHANNEL_PERSONAL, RdmDailyReportTemplates.TYPE_ANY, "個人通知模板");
+        } else {
+            // 固定框架模式：模板不参与渲染，不再校验存在性——否则用户删掉旧自定义模板后连开关都存不了
+            morningKey = blankToNull(form.getMorningTemplateKey());
+            eveningKey = blankToNull(form.getEveningTemplateKey());
+            personalKey = blankToNull(form.getPersonalTemplateKey());
+        }
+        int validDays = normalizeBoardLinkValidDays(form.getBoardLinkValidDays(), current.getBoardLinkValidDays());
+        // 展示参数不传时沿用库中现值：老页面/旧客户端只改开关，不应该把看板展示设置静默重置
+        boolean showRequirements = form.getBoardShowRequirements() == null
+                ? Boolean.TRUE.equals(current.getBoardShowRequirements()) : form.getBoardShowRequirements();
+        boolean showOwners = form.getBoardShowOwners() == null
+                ? Boolean.TRUE.equals(current.getBoardShowOwners()) : form.getBoardShowOwners();
+        boolean showUnassigned = form.getBoardShowUnassigned() == null
+                ? Boolean.TRUE.equals(current.getBoardShowUnassigned()) : form.getBoardShowUnassigned();
+        // 字段开关不传时沿用现值（与展示参数同理）；传了就以表单为准整体覆盖，避免逐个字段 merge 的歧义
+        MessageFieldOptions fields = form.getMessageFields() == null
+                ? current.getMessageFields() : form.getMessageFields();
+        String fieldsJson = writeMessageFields(fields);
 
         jdbc.update("INSERT INTO rdm_daily_report_config "
                         + "(config_slot, enabled, morning_time, evening_time, group_enabled, personal_enabled, "
-                        + " receiver_scope, morning_template_key, evening_template_key, personal_template_key, "
-                        + " updated_by, deleted) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0) "
+                        + " receiver_roles_json, extra_receiver_user_ids_json, exclude_receiver_user_ids_json, "
+                        + " morning_template_key, evening_template_key, personal_template_key, "
+                        + " board_link_valid_days, board_show_requirements, board_show_owners, board_show_unassigned, "
+                        + " message_mode, message_field_options, updated_by, deleted) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0) "
                         + "ON DUPLICATE KEY UPDATE enabled = VALUES(enabled), morning_time = VALUES(morning_time), "
                         + " evening_time = VALUES(evening_time), group_enabled = VALUES(group_enabled), "
-                        + " personal_enabled = VALUES(personal_enabled), receiver_scope = VALUES(receiver_scope), "
+                        + " personal_enabled = VALUES(personal_enabled), "
+                        + " receiver_roles_json = VALUES(receiver_roles_json), "
+                        + " extra_receiver_user_ids_json = VALUES(extra_receiver_user_ids_json), "
+                        + " exclude_receiver_user_ids_json = VALUES(exclude_receiver_user_ids_json), "
                         + " morning_template_key = VALUES(morning_template_key), "
                         + " evening_template_key = VALUES(evening_template_key), "
                         + " personal_template_key = VALUES(personal_template_key), "
+                        + " board_link_valid_days = VALUES(board_link_valid_days), "
+                        + " board_show_requirements = VALUES(board_show_requirements), "
+                        + " board_show_owners = VALUES(board_show_owners), "
+                        + " board_show_unassigned = VALUES(board_show_unassigned), "
+                        + " message_mode = VALUES(message_mode), "
+                        + " message_field_options = VALUES(message_field_options), "
                         + " updated_by = VALUES(updated_by), deleted = 0, updated_at = NOW()",
                 CONFIG_SLOT, bool(form.getEnabled(), true), morning, evening,
-                bool(form.getGroupEnabled(), true), bool(form.getPersonalEnabled(), true), scope,
-                morningKey, eveningKey, personalKey, operator);
-        log.info("日报推送配置已更新: 晨报={}, 晚报={}, 群报={}, 个人={}, 范围={}, operator={}",
-                morning, evening, form.getGroupEnabled(), form.getPersonalEnabled(), scope, operator);
+                bool(form.getGroupEnabled(), true), bool(form.getPersonalEnabled(), true),
+                writeStringList(roles), writeLongList(extra), writeLongList(exclude),
+                morningKey, eveningKey, personalKey, validDays, showRequirements, showOwners, showUnassigned,
+                messageMode, fieldsJson, operator);
+        log.info("日报推送配置已更新: 晨报={}, 晚报={}, 群报={}, 个人={}, 收件角色={}, 追加={}人, 排除={}人, 看板链接={}天, 消息模式={}, operator={}",
+                morning, evening, form.getGroupEnabled(), form.getPersonalEnabled(), roles,
+                extra.size(), exclude.size(), validDays, messageMode, operator);
         return loadConfig();
     }
 
@@ -188,6 +278,61 @@ public class RdmDailyReportService {
         return StringUtils.hasText(channel)
                 ? jdbc.query(sql, (rs, i) -> mapTemplate(rs), channel.trim())
                 : jdbc.query(sql, (rs, i) -> mapTemplate(rs));
+    }
+
+    /**
+     * 员工候选：按关键字模糊搜索，或按 ID 批量回显。
+     *
+     * <p>只返回 value（sys_user.id 的字符串）与 label（姓名(工号)）：部门/职位/职级属于个人敏感信息，
+     * 不应为了一个查询条件批量暴露。权限由控制器锚定到日报菜单，不依赖 employee-management。
+     *
+     * <p><b>为何要支持 ids</b>：多选收件人编辑态回显时，若控件拿不到已选项的 label，
+     * antd 会直接把 userId 渲染成裸数字，用户无法确认自己选的是谁。
+     */
+    public List<Map<String, Object>> employeeOptions(String keyword, String ids) {
+        if (StringUtils.hasText(ids)) {
+            List<Long> idList = parseIdCsv(ids);
+            if (idList.isEmpty()) {
+                return List.of();
+            }
+            // 回显不过滤 status：已选的人后来停用了也要显示出来，否则管理员看不到、也就无法移除它
+            return userMapper.selectBatchIds(idList).stream().map(this::toEmployeeOption).toList();
+        }
+        String kw = StringUtils.hasText(keyword) ? keyword.trim() : null;
+        LambdaQueryWrapper<SysUser> qw = new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getStatus, 1)
+                .and(kw != null, w -> w.like(SysUser::getName, kw).or().like(SysUser::getEmpId, kw))
+                .orderByAsc(SysUser::getEmpId)
+                .last("LIMIT 50");
+        return userMapper.selectList(qw).stream().map(this::toEmployeeOption).toList();
+    }
+
+    private Map<String, Object> toEmployeeOption(SysUser u) {
+        Map<String, Object> option = new LinkedHashMap<>();
+        option.put("value", String.valueOf(u.getId()));
+        option.put("label", (u.getName() == null ? "" : u.getName())
+                + "(" + (u.getEmpId() == null ? "" : u.getEmpId()) + ")");
+        return option;
+    }
+
+    /** 逗号分隔 ID 解析：非法片段丢弃，不因一个坏参数让整次回显失败 */
+    private static List<Long> parseIdCsv(String ids) {
+        List<Long> out = new ArrayList<>();
+        for (String part : ids.split(",")) {
+            String value = part.trim();
+            if (value.isEmpty()) {
+                continue;
+            }
+            try {
+                long id = Long.parseLong(value);
+                if (id > 0 && !out.contains(id)) {
+                    out.add(id);
+                }
+            } catch (NumberFormatException ignored) {
+                // 忽略非法片段
+            }
+        }
+        return out;
     }
 
     /**
@@ -298,12 +443,56 @@ public class RdmDailyReportService {
      *
      * @param date          口径日（晨报看今日到期，晚报看当日完成与明日到期）
      * @param reportType    morning / evening（内容口径，决定模板与汇总侧重）
-     * @param projectId     目标项目；null=全部在途项目（仅预览无项目上下文时用）
+     * @param projectId     目标项目；null=全部在途项目（仅预览无项目上下文时用）。
+     *                      迭代非空且未带项目时，先按迭代归属推导项目；迭代未挂项目（紧急修复）
+     *                      则快照只含该未归属迭代，绝不退化成「全部在途项目」。
      * @param iterationCode 目标迭代；非空时快照<b>只含该迭代</b>的需求（按迭代推送时用）
      */
     public Snapshot buildSnapshot(LocalDate date, String reportType, Long projectId, String iterationCode) {
+        return buildSnapshot(date, reportType,
+                projectId == null ? List.of() : List.of(projectId), iterationCode);
+    }
+
+    /**
+     * 多项目/全部项目快照。
+     * <p>范围语义：
+     * <ul>
+     *   <li>{@code projectIds} 非空：只取这些项目；</li>
+     *   <li>{@code projectIds} 为空且无迭代：全部在途项目（“全部项目”规则/手动触发）；</li>
+     *   <li>{@code projectIds} 为空且有迭代：仅该未挂项目迭代（紧急修复），不退化拉全部项目。</li>
+     * </ul>
+     * 多项目 + 单迭代是歧义范围（迭代只属于一个项目），直接拒绝。
+     */
+    public Snapshot buildSnapshot(LocalDate date, String reportType, List<Long> projectIds, String iterationCode) {
         LocalDate day = date == null ? LocalDate.now() : date;
         String type = normalizeReportType(reportType);
+        List<Long> ids = projectIds == null ? List.of() : projectIds.stream()
+                .filter(java.util.Objects::nonNull).distinct().toList();
+        boolean iterationOnly = false;
+        if (StringUtils.hasText(iterationCode)) {
+            if (ids.size() > 1) {
+                throw new BusinessException("多項目範圍不能指定單一迭代");
+            }
+            Map<String, Object> iterationRow = findIterationRow(iterationCode.trim());
+            if (iterationRow == null) {
+                throw new BusinessException("所選迭代不存在或已刪除: " + iterationCode);
+            }
+            Long iterationProjectId = toLong(iterationRow.get("project_id"));
+            if (ids.isEmpty()) {
+                if (iterationProjectId == null) {
+                    iterationOnly = true;
+                } else {
+                    ids = List.of(iterationProjectId);
+                }
+            } else if (iterationProjectId == null) {
+                throw new BusinessException("未掛項目的迭代不能指定項目");
+            } else if (!ids.get(0).equals(iterationProjectId)) {
+                throw new BusinessException("所選迭代不屬於所選項目");
+            }
+        }
+        final List<Long> scopeIds = ids;
+        final boolean onlyUnassignedIteration = iterationOnly;
+        Long scopeProjectId = ids.size() == 1 ? ids.get(0) : null;
 
         RdmFactVO.FactQuery query = new RdmFactVO.FactQuery();
         query.setIncludeTodos(true);
@@ -314,16 +503,16 @@ public class RdmDailyReportService {
         List<RdmFactVO.ProjectFact> active = facts.stream()
                 .filter(f -> f != null && f.getProjectId() != null)
                 .filter(f -> RdmConstants.PROJECT_ACTIVE_STATUSES.contains(f.getStatus()))
-                .filter(f -> projectId == null || projectId.equals(f.getProjectId()))
+                .filter(f -> !scopeIds.isEmpty() ? scopeIds.contains(f.getProjectId()) : !onlyUnassignedIteration)
                 .toList();
 
         Config cfg = loadConfig();
-        boolean riskOnly = "risk_only".equals(cfg.getReceiverScope()) && projectId == null;
+        boolean riskOnly = "risk_only".equals(cfg.getReceiverScope()) && scopeProjectId == null;
 
         Map<String, String> statusLabels = loadStatusLabels();
-        List<Long> projectIds = active.stream().map(RdmFactVO.ProjectFact::getProjectId).toList();
-        Map<Long, List<IterationRow>> iterationsByProject = loadIterations(projectIds);
-        Map<Long, List<RequirementNode>> reqsByProject = loadRequirements(projectIds, statusLabels);
+        List<Long> activeProjectIds = active.stream().map(RdmFactVO.ProjectFact::getProjectId).toList();
+        Map<Long, List<IterationRow>> iterationsByProject = loadIterations(activeProjectIds);
+        Map<Long, List<RequirementNode>> reqsByProject = loadRequirements(activeProjectIds, statusLabels, day);
 
         Snapshot snapshot = new Snapshot();
         snapshot.setReportDate(day.format(DATE_FMT));
@@ -331,6 +520,10 @@ public class RdmDailyReportService {
         snapshot.setReportTypeLabel(slotLabel(type));
         snapshot.setGeneratedAt(java.time.LocalDateTime.now()
                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        // 范围也写进快照：迭代归属可能在规则保存后才补挂项目，渲染与记录要以「解析后的项目」为准
+        snapshot.setScopeProjectId(scopeProjectId);
+        snapshot.setScopeIterationCode(StringUtils.hasText(iterationCode) ? iterationCode.trim() : null);
+        snapshot.setScopeLabel(buildScopeLabel(active, scopeIds, iterationCode, onlyUnassignedIteration));
 
         List<ProjectNode> nodes = new ArrayList<>();
         boolean scopedToIteration = StringUtils.hasText(iterationCode);
@@ -342,7 +535,7 @@ public class RdmDailyReportService {
                 iters = iters.stream().filter(x -> iterationCode.equals(x.code())).toList();
                 reqs = reqs.stream().filter(x -> iterationCode.equals(x.getIterationCode())).toList();
             }
-            nodes.add(toProjectNode(f, iters, reqs));
+            nodes.add(toProjectNode(f, iters, reqs, day));
         }
         // 需关注的排前面：管理者先看到异常，而不是按编号顺序翻到最后才发现逾期
         nodes.sort(Comparator.comparing((ProjectNode n) -> !n.isAttention())
@@ -358,14 +551,45 @@ public class RdmDailyReportService {
         }
         snapshot.setUnassignedIterations(buildUnassignedIterations(unassignedRows,
                 loadRequirementsByCodes(unassignedRows.stream().map(IterationRow::code)
-                        .filter(StringUtils::hasText).distinct().toList(), statusLabels)));
-        snapshot.setSummary(buildSummary(nodes, projectIds, day));
+                        .filter(StringUtils::hasText).distinct().toList(), statusLabels, day), day));
+        // 「全部在途项目」口径才加载未挂项目、也未挂迭代的执行需求；
+        // 单项目/多项目报告不把全公司孤儿需求塞进来。
+        boolean includeUnassignedDetails = scopeIds.isEmpty() && !onlyUnassignedIteration;
+        List<RequirementNode> unassignedRequirements = includeUnassignedDetails
+                ? loadUnassignedRequirements(statusLabels, day) : List.of();
+        snapshot.setUnassignedRequirements(new ArrayList<>(unassignedRequirements));
+        snapshot.setSummary(buildSummary(nodes, snapshot.getUnassignedIterations(), unassignedRequirements,
+                activeProjectIds, day, includeUnassignedDetails));
         return snapshot;
+    }
+
+    /** 未挂项目、也未挂迭代的执行需求（全部项目口径展示用；已排除执行侧地板中的准入前/需求池） */
+    private List<RequirementNode> loadUnassignedRequirements(Map<String, String> statusLabels, LocalDate day) {
+        String sql = "SELECT id, req_no, title, status, priority, assignee_pm_name, iteration_code, "
+                + "plan_release_date, overdue_flag, blocked_flag, progress, complexity, status_enter_time "
+                + "FROM rdm_requirement WHERE deleted = 0 " + executionFloorSql()
+                + "AND project_id IS NULL AND (iteration_code IS NULL OR iteration_code = '') ORDER BY priority, id";
+        List<Map<String, Object>> rows = jdbc.queryForList(sql);
+        if (rows == null || rows.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<RequirementNode> out = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            out.add(toRequirementNode(row, statusLabels, day));
+        }
+        attachTasks(out);
+        return out;
+    }
+
+    /** 项目节点（不带报告日）：单测与历史调用方用，今日到期需求数因此记 0 */
+    static ProjectNode toProjectNode(RdmFactVO.ProjectFact f, List<IterationRow> iterations,
+                                     List<RequirementNode> requirements) {
+        return toProjectNode(f, iterations, requirements, null);
     }
 
     /** 项目节点：指标全部搬事实源字段，本方法不做任何再计算（剩余工作只做 total-completed 的减法） */
     static ProjectNode toProjectNode(RdmFactVO.ProjectFact f, List<IterationRow> iterations,
-                                     List<RequirementNode> requirements) {
+                                     List<RequirementNode> requirements, LocalDate day) {
         ProjectNode n = new ProjectNode();
         n.setProjectId(f.getProjectId());
         n.setProjectNo(f.getProjectNo());
@@ -375,14 +599,24 @@ public class RdmDailyReportService {
         n.setPmUserName(f.getPmUserName());
         n.setProductOwnerUserId(f.getProductOwnerUserId());
         n.setProductOwnerUserName(f.getProductOwnerUserName());
+        // 四类角色 userId 与姓名一同带入快照：收件人按角色推导时只有姓名无法定位到人
+        n.setTechLeadUserId(f.getTechLeadUserId());
+        n.setTechLeadUserName(f.getTechLeadUserName());
+        n.setQaLeadUserId(f.getQaLeadUserId());
+        n.setQaLeadUserName(f.getQaLeadUserName());
+        n.setUiDesignerUserId(f.getUiDesignerUserId());
+        n.setUiDesignerUserName(f.getUiDesignerUserName());
+        n.setOpsLeadUserId(f.getOpsLeadUserId());
+        n.setOpsLeadUserName(f.getOpsLeadUserName());
         n.setPlanStartDate(f.getPlanStartDate());
         n.setPlanEndDate(f.getPlanEndDate());
         n.setRiskFlag(f.getRiskFlag());
         n.setOverdueFlag(f.getOverdueFlag());
         n.setPausedFlag(f.getPausedFlag());
-        n.setRequirementTotal(f.getRequirementTotal());
         n.setDeliveryItemTotal(f.getDeliveryItemTotal());
         n.setDeliveryItemCompleted(f.getDeliveryItemCompleted());
+        n.setDeliveryProgressPercent(clampPercent(f.getDeliveryItemTotal() <= 0 ? null
+                : f.getDeliveryItemCompleted() * 100d / f.getDeliveryItemTotal()));
         // 剩余工作 = 总数 - 已完成；总数为 0 时展示侧必须短路成「尚未排定」，不能读成「全部完成」
         n.setRemainingCount(Math.max(0, f.getDeliveryItemTotal() - f.getDeliveryItemCompleted()));
         n.setDeliveryItemOverdue(f.getDeliveryItemOverdue());
@@ -424,18 +658,132 @@ public class RdmDailyReportService {
             it.setRequirementCount(reqs.size());
             it.setRequirementDoneCount((int) reqs.stream()
                     .filter(r -> "released".equals(r.getStatus()) || "closed".equals(r.getStatus())).count());
+            applyIterationMetrics(it, reqs, row.capacityHours());
+            applyIterationRiskCounts(it, reqs, day);
             iterationNodes.add(it);
+        }
+        // 需求挂了迭代编码、但该迭代不在当前项目的迭代集合里（迭代未挂项目/已删除）：
+        // 不能静默丢行——否则项目需求数会小于系统清单。归入「未排迭代」如实展示。
+        java.util.Set<String> knownIterationCodes = iterationNodes.stream()
+                .map(IterationNode::getCode).filter(StringUtils::hasText)
+                .collect(java.util.stream.Collectors.toSet());
+        for (Map.Entry<String, List<RequirementNode>> e : byCode.entrySet()) {
+            if (!knownIterationCodes.contains(e.getKey())) {
+                unscheduled.addAll(e.getValue());
+            }
         }
         n.setIterations(iterationNodes);
         n.setUnscheduledRequirements(unscheduled);
+        // 需求总数按「可见需求」统计：挂到迭代的 + 未排迭代的。
+        // 不能直接用事实源的项目全量（迭代视角会大于可见行），也不能只数原始查询结果
+        // （需求挂了不存在的迭代时不会渲染出来，会造成卡片比列表多）。
+        n.setRequirementTotal(unscheduled.size()
+                + iterationNodes.stream().mapToInt(IterationNode::getRequirementCount).sum());
+        // 在途迭代数：消息项目行的「迭代 N 個」只数未关闭的，把已交付版本计进去会让人高估工作量
+        n.setIterationActiveCount((int) iterationNodes.stream()
+                .filter(x -> !"closed".equals(x.getStatus())).count());
         return n;
+    }
+
+    /**
+     * 迭代进度与产能（写入快照，消息与看板同一口径）。
+      *
+      * <p><b>迭代进度</b> = Σ(任务进度 × 计划工时) ÷ Σ计划工时。
+      * 任务进度是每个人自己上报的最细粒度事实；未填计划工时的任务按“已填工时的平均值”计权
+      * （全部未填则每条按 1h），避免未填工时的任务被直接忽略。无任务时不编造 0%，置 null。
+      *
+      * <p><b>产能</b> = 已填计划工时合计 ÷ {@code rdm_iteration.capacity_hours}；产能为 0 时置 null（未設定）。
+      * 不使用 {@code rdm_requirement.progress}：该字段可能长期停留 0（任务已完成也不联动），
+      * 用它算迭代进度会与执行侧甘特图矛盾。
+      */
+     static void applyIterationMetrics(IterationNode it, List<RequirementNode> reqs, int capacityHours) {
+         List<TaskNode> tasks = new ArrayList<>();
+         if (reqs != null) {
+             for (RequirementNode r : reqs) {
+                 if (r != null && r.getTasks() != null) {
+                     tasks.addAll(r.getTasks());
+                 }
+             }
+         }
+         int total = tasks.size();
+         int done = 0;
+         double knownHours = 0d;
+         int knownCount = 0;
+         for (TaskNode t : tasks) {
+             if (t == null) {
+                 continue;
+             }
+             if ("done".equals(t.getStatus())) {
+                 done++;
+             }
+             if (t.getPlanHours() != null && t.getPlanHours() > 0) {
+                 knownHours += t.getPlanHours();
+                 knownCount++;
+             }
+         }
+         double fallbackHours = knownCount > 0 ? knownHours / knownCount : 1d;
+         double weighted = 0d;
+         double weight = 0d;
+         for (TaskNode t : tasks) {
+             if (t == null) {
+                 continue;
+             }
+             int progress = t.getProgress() == null ? 0 : Math.max(0, Math.min(100, t.getProgress()));
+             double taskWeight = t.getPlanHours() != null && t.getPlanHours() > 0
+                     ? t.getPlanHours() : fallbackHours;
+             weighted += progress * taskWeight;
+             weight += taskWeight;
+         }
+         it.setTaskTotal(total);
+         it.setTaskDone(done);
+         it.setTaskHours(Math.round(knownHours * 10d) / 10d);
+         it.setProgressPercent(weight > 0 ? clampPercent(weighted / weight) : null);
+         it.setCapacityHours(Math.max(0, capacityHours));
+         // 产能允许 >100%：超载必须看得见，不能被截成 100%
+         it.setCapacityUsagePercent(capacityHours > 0
+                 ? (int) Math.max(0, Math.round(knownHours * 100d / capacityHours)) : null);
+     }
+     
+     /** 百分比夹在 0-100；入参 null 表示分母无效（如零承诺），返回 null 不编造数字 */
+     private static Integer clampPercent(Double value) {
+         if (value == null) {
+             return null;
+         }
+         return (int) Math.max(0, Math.min(100, Math.round(value)));
+     }
+     
+     /** 迭代级风险计数（逾期需求数、今日到期需求数）。
+     *
+     * <p>今日到期口径：{@code plan_release_date = 报告日} 且未上线。与项目级
+     * {@code todayDueItemCount}（交付项口径）是两个单位，字段名已写清 Req/Item，不得混用。
+     * 报告日为空（单测/历史调用）时不记今日到期，避得凭空造一个「今天」。
+     */
+    static void applyIterationRiskCounts(IterationNode it, List<RequirementNode> reqs, LocalDate day) {
+        List<RequirementNode> list = reqs == null ? List.of() : reqs;
+        it.setOverdueReqCount((int) list.stream().filter(r -> r != null && isOne(r.getOverdueFlag())).count());
+        if (day == null) {
+            return;
+        }
+        String dayText = day.format(DATE_FMT);
+        it.setTodayDueReqCount((int) list.stream().filter(r -> r != null
+                && dayText.equals(r.getPlanReleaseDate())
+                && !"released".equals(r.getStatus()) && !"closed".equals(r.getStatus())).count());
+    }
+
+    private static boolean isOne(Integer flag) {
+        return flag != null && flag == 1;
     }
 
     /* ==================== 内部：迭代与需求装载 ==================== */
 
     /** 迭代原始行（避免为只读聚合再建实体；包级可见供单测构造） */
     record IterationRow(Long id, Long projectId, String code, String name, String iterationType,
-                        String status, String startDate, String endDate, String ownerName) {
+                        String status, String startDate, String endDate, String ownerName, int capacityHours) {
+        /** 兼容历史构造：未提供产能时按 0（未設定）处理 */
+        IterationRow(Long id, Long projectId, String code, String name, String iterationType,
+                     String status, String startDate, String endDate, String ownerName) {
+            this(id, projectId, code, name, iterationType, status, startDate, endDate, ownerName, 0);
+        }
     }
 
     /**
@@ -460,7 +808,8 @@ public class RdmDailyReportService {
     private static final Long UNASSIGNED_KEY = -1L;
 
     private List<IterationRow> queryIterations(List<Long> projectIds) {
-        String sql = "SELECT id, project_id, code, name, iteration_type, status, start_date, end_date, owner_name "
+        String sql = "SELECT id, project_id, code, name, iteration_type, status, start_date, end_date, owner_name, "
+                + "capacity_hours "
                 + "FROM rdm_iteration WHERE deleted = 0 AND (project_id IS NULL"
                 + (projectIds.isEmpty() ? "" : " OR project_id IN (" + placeholders(projectIds.size()) + ")")
                 + ") ORDER BY start_date, code";
@@ -473,7 +822,7 @@ public class RdmDailyReportService {
                 (Long) rs.getObject("project_id"),
                 rs.getString("code"), rs.getString("name"), rs.getString("iteration_type"),
                 rs.getString("status"), formatDate(rs.getDate("start_date")), formatDate(rs.getDate("end_date")),
-                rs.getString("owner_name"));
+                rs.getString("owner_name"), rs.getInt("capacity_hours"));
     }
 
     /**
@@ -482,27 +831,46 @@ public class RdmDailyReportService {
      * （{@code uk_rdm_iteration_code}），因此按 code 分组不会串项目。
      * <p>{@code req_no} 在延迟发号口径下认领前为空，如实保留空值，不编造编号。
      */
-    private Map<Long, List<RequirementNode>> loadRequirements(List<Long> projectIds, Map<String, String> statusLabels) {
+    private Map<Long, List<RequirementNode>> loadRequirements(List<Long> projectIds, Map<String, String> statusLabels,
+                                                              LocalDate day) {
         Map<Long, List<RequirementNode>> byProject = new HashMap<>();
         if (projectIds.isEmpty()) {
             return byProject;
         }
         String sql = "SELECT id, req_no, title, status, priority, assignee_pm_name, project_id, iteration_code, "
-                + "plan_release_date, overdue_flag, blocked_flag, progress "
-                + "FROM rdm_requirement WHERE deleted = 0 AND project_id IN ("
+                + "plan_release_date, overdue_flag, blocked_flag, progress, complexity, status_enter_time "
+                + "FROM rdm_requirement WHERE deleted = 0 " + executionFloorSql() + "AND project_id IN ("
                 + placeholders(projectIds.size()) + ") ORDER BY priority, id";
+        List<RequirementNode> all = new ArrayList<>();
         for (Map<String, Object> row : jdbc.queryForList(sql, projectIds.toArray())) {
             Long pid = toLong(row.get("project_id"));
             if (pid == null) {
                 continue;
             }
-            byProject.computeIfAbsent(pid, k -> new ArrayList<>()).add(toRequirementNode(row, statusLabels));
+            RequirementNode node = toRequirementNode(row, statusLabels, day);
+            byProject.computeIfAbsent(pid, k -> new ArrayList<>()).add(node);
+            all.add(node);
         }
+        attachTasks(all);
         return byProject;
     }
 
+    /**
+     * 执行侧地板：与需求跟进清单（executionOnly）同口径，排除准入前三态与需求池。
+     *
+     * <p>日报是执行进度汇报，不是需求台账：草稿/待准入/准入驳回/待分配尚未进入执行，
+     * 如果计入「需求总数」，就会出现「日报比需求跟进清单多几条」的口径分叉。
+     */
+    private static String executionFloorSql() {
+        return "AND status NOT IN ('" + RdmConstants.STATUS_DRAFT + "','"
+                + RdmConstants.STATUS_INTAKE_PENDING + "','"
+                + RdmConstants.STATUS_INTAKE_REJECTED + "','"
+                + RdmConstants.STATUS_POOL + "') ";
+    }
+
     /** 行映射：需求原始行 → 展示节点（状态中文名查 rdm_status_def，不硬编码） */
-    private RequirementNode toRequirementNode(Map<String, Object> row, Map<String, String> statusLabels) {
+    private RequirementNode toRequirementNode(Map<String, Object> row, Map<String, String> statusLabels,
+                                              LocalDate day) {
         RequirementNode r = new RequirementNode();
         Long reqId = toLong(row.get("id"));
         r.setReqId(reqId);
@@ -511,6 +879,7 @@ public class RdmDailyReportService {
         String status = (String) row.get("status");
         r.setStatus(status);
         r.setStatusLabel(statusLabels.getOrDefault(status, status));
+        r.setComplexity((String) row.get("complexity"));
         r.setPriority((String) row.get("priority"));
         r.setAssigneePmName((String) row.get("assignee_pm_name"));
         r.setIterationCode((String) row.get("iteration_code"));
@@ -518,10 +887,73 @@ public class RdmDailyReportService {
         r.setOverdueFlag(toInt(row.get("overdue_flag")));
         r.setBlockedFlag(toInt(row.get("blocked_flag")));
         r.setProgress(toInt(row.get("progress")));
+        // 停留天数以 status_enter_time 为准（进入当前状态的时间），不拿 updated_at 冒充：
+        // 改个备注也会刷新 updated_at，用它算停留天数会把“停留 30 天”重置成 0
+        LocalDate entered = toLocalDate(row.get("status_enter_time"));
+        if (entered != null && day != null) {
+            r.setStayDays((int) Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(entered, day)));
+        }
         if (reqId != null) {
             r.setDetailUrl(RdmConstants.requirementRoute(reqId));
         }
         return r;
+    }
+
+    /**
+     * 批量挂载任务的甘特数据：一次 IN 查询，避免逐需求查任务（N+1）。
+     * <p>任务只读排期字段；负责人属于展示信息，公开看板会按 showOwners 开关裁剪。
+     */
+    private void attachTasks(List<RequirementNode> reqs) {
+        List<Long> ids = reqs.stream().map(RequirementNode::getReqId)
+                .filter(java.util.Objects::nonNull).distinct().toList();
+        if (ids.isEmpty()) {
+            return;
+        }
+        String sql = "SELECT id, task_no, req_id, task_type, title, role_code, owner_name, owner_emp_no, progress, "
+                + "plan_hours, plan_start_date, plan_finish_date, status "
+                + "FROM rdm_work_task WHERE deleted = 0 AND req_id IN (" + placeholders(ids.size()) + ") "
+                + "ORDER BY plan_start_date, plan_finish_date, id";
+        Map<Long, List<TaskNode>> byReq = new HashMap<>();
+        List<Map<String, Object>> rows = jdbc.queryForList(sql, ids.toArray());
+        if (rows == null) {
+            // 单元测试 mock 未桩任务查询时返回 null；生产 JdbcTemplate 永远不会返回 null
+            return;
+        }
+        for (Map<String, Object> row : rows) {
+            Long reqId = toLong(row.get("req_id"));
+            if (reqId == null) {
+                continue;
+            }
+            TaskNode t = new TaskNode();
+            t.setTaskId(toLong(row.get("id")));
+            t.setTaskNo((String) row.get("task_no"));
+            t.setTitle((String) row.get("title"));
+            t.setTaskType((String) row.get("task_type"));
+            t.setRoleCode((String) row.get("role_code"));
+            t.setOwnerName((String) row.get("owner_name"));
+            t.setOwnerEmpNo((String) row.get("owner_emp_no"));
+            t.setProgress(toInt(row.get("progress")));
+            t.setPlanHours(toDouble(row.get("plan_hours")));
+            t.setPlanStartDate(toDateString(row.get("plan_start_date")));
+            t.setPlanFinishDate(toDateString(row.get("plan_finish_date")));
+            t.setStatus((String) row.get("status"));
+            byReq.computeIfAbsent(reqId, k -> new ArrayList<>()).add(t);
+        }
+        reqs.forEach(r -> r.setTasks(byReq.getOrDefault(r.getReqId(), new ArrayList<>())));
+    }
+
+    /** 数据库 DATETIME → LocalDate（空/非法一律 null，不让脏值打断日报） */
+    private static LocalDate toLocalDate(Object value) {
+        if (value instanceof java.sql.Timestamp ts) {
+            return ts.toLocalDateTime().toLocalDate();
+        }
+        if (value instanceof java.time.LocalDateTime ldt) {
+            return ldt.toLocalDate();
+        }
+        if (value instanceof java.sql.Date d) {
+            return d.toLocalDate();
+        }
+        return null;
     }
 
     /** 状态编码 → 中文名（取 rdm_status_def.label，不硬编码状态文案） */
@@ -543,6 +975,12 @@ public class RdmDailyReportService {
      */
     static List<IterationNode> buildUnassignedIterations(List<IterationRow> unassignedRows,
                                                          Map<String, List<RequirementNode>> byCode) {
+        return buildUnassignedIterations(unassignedRows, byCode, null);
+    }
+
+    static List<IterationNode> buildUnassignedIterations(List<IterationRow> unassignedRows,
+                                                         Map<String, List<RequirementNode>> byCode,
+                                                         LocalDate day) {
         if (unassignedRows == null || unassignedRows.isEmpty()) {
             return new ArrayList<>();
         }
@@ -563,29 +1001,108 @@ public class RdmDailyReportService {
             it.setRequirementCount(reqs.size());
             it.setRequirementDoneCount((int) reqs.stream()
                     .filter(r -> "released".equals(r.getStatus()) || "closed".equals(r.getStatus())).count());
+            applyIterationMetrics(it, reqs, row.capacityHours());
+            applyIterationRiskCounts(it, reqs, day);
             list.add(it);
         }
         return list;
     }
 
+    /**
+     * 需求风险计数（逾期/阻塞/逾期风险去重）。
+     *
+     * <p>逾期风险数按“需求去重”：一条需求既逾期又阻塞只算 1，因为管理者要看的是
+     * “有多少条需求需要人介入”，而不是标签个数之和。
+     */
+    private static void fillRequirementRiskCounts(Summary s, List<ProjectNode> nodes,
+                                                  List<IterationNode> unassigned,
+                                                  List<RequirementNode> unassignedRequirements) {
+        java.util.Set<Long> overdue = new java.util.HashSet<>();
+        java.util.Set<Long> blocked = new java.util.HashSet<>();
+        java.util.Set<Long> risk = new java.util.HashSet<>();
+        int[] nullIds = new int[3];
+        List<RequirementNode> all = new ArrayList<>();
+        if (nodes != null) {
+            for (ProjectNode n : nodes) {
+                if (n.getIterations() != null) {
+                    n.getIterations().forEach(it -> {
+                        if (it != null && it.getRequirements() != null) {
+                            all.addAll(it.getRequirements());
+                        }
+                    });
+                }
+                if (n.getUnscheduledRequirements() != null) {
+                    all.addAll(n.getUnscheduledRequirements());
+                }
+            }
+        }
+        if (unassigned != null) {
+            unassigned.forEach(it -> {
+                if (it != null && it.getRequirements() != null) {
+                    all.addAll(it.getRequirements());
+                }
+            });
+        }
+        if (unassignedRequirements != null) {
+            all.addAll(unassignedRequirements);
+        }
+        for (RequirementNode r : all) {
+            if (r == null) {
+                continue;
+            }
+            boolean od = isOne(r.getOverdueFlag());
+            boolean bl = isOne(r.getBlockedFlag());
+            Long id = r.getReqId();
+            if (id == null) {
+                if (od) {
+                    nullIds[0]++;
+                }
+                if (bl) {
+                    nullIds[1]++;
+                }
+                if (od || bl) {
+                    nullIds[2]++;
+                }
+                continue;
+            }
+            if (od) {
+                overdue.add(id);
+            }
+            if (bl) {
+                blocked.add(id);
+            }
+            if (od || bl) {
+                risk.add(id);
+            }
+        }
+        s.setOverdueReqCount(overdue.size() + nullIds[0]);
+        s.setBlockedReqCount(blocked.size() + nullIds[1]);
+        s.setOverdueRiskReqCount(risk.size() + nullIds[2]);
+    }
+
     /** 按迭代 code 集合聚合需求（仅给未归属迭代用，codes 为空时不发 SQL） */
     private Map<String, List<RequirementNode>> loadRequirementsByCodes(List<String> codes,
-                                                                       Map<String, String> statusLabels) {
+                                                                       Map<String, String> statusLabels,
+                                                                       LocalDate day) {
         Map<String, List<RequirementNode>> byCode = new LinkedHashMap<>();
         if (codes == null || codes.isEmpty()) {
             return byCode;
         }
         String sql = "SELECT id, req_no, title, status, priority, assignee_pm_name, iteration_code, "
-                + "plan_release_date, overdue_flag, blocked_flag, progress "
-                + "FROM rdm_requirement WHERE deleted = 0 AND iteration_code IN ("
+                + "plan_release_date, overdue_flag, blocked_flag, progress, complexity, status_enter_time "
+                + "FROM rdm_requirement WHERE deleted = 0 " + executionFloorSql() + "AND iteration_code IN ("
                 + placeholders(codes.size()) + ") ORDER BY priority, id";
+        List<RequirementNode> all = new ArrayList<>();
         for (Map<String, Object> row : jdbc.queryForList(sql, codes.toArray())) {
             String code = (String) row.get("iteration_code");
             if (!StringUtils.hasText(code)) {
                 continue;
             }
-            byCode.computeIfAbsent(code, k -> new ArrayList<>()).add(toRequirementNode(row, statusLabels));
+            RequirementNode node = toRequirementNode(row, statusLabels, day);
+            byCode.computeIfAbsent(code, k -> new ArrayList<>()).add(node);
+            all.add(node);
         }
+        attachTasks(all);
         return byCode;
     }
 
@@ -604,16 +1121,37 @@ public class RdmDailyReportService {
      * <p>晨晚报共用同一套汇总字段（全都算），由模板决定展示哪几个——因此本方法不接 reportType：
      * 口径不分档位，才不会造成「同一天的晨报与晚报对不上数」。
      */
-    private Summary buildSummary(List<ProjectNode> nodes, List<Long> projectIds, LocalDate day) {
+    private Summary buildSummary(List<ProjectNode> nodes, List<IterationNode> unassignedIterations,
+                                 List<RequirementNode> unassignedRequirements, List<Long> projectIds,
+                                 LocalDate day, boolean includeUnassignedDetails) {
         Summary s = new Summary();
         s.setProjectCount(nodes.size());
         s.setRiskProjectCount((int) nodes.stream().filter(ProjectNode::isAttention).count());
         s.setNormalProjectCount(Math.max(0, nodes.size() - s.getRiskProjectCount()));
+        // 在途迭代数 = 各项目在途迭代 + 未挂项目的在途迭代：看板顶部「迭代版本数」与消息汇总同源
+        int activeIterations = nodes.stream().mapToInt(ProjectNode::getIterationActiveCount).sum();
+        if (unassignedIterations != null) {
+            activeIterations += (int) unassignedIterations.stream()
+                    .filter(x -> x != null && !"closed".equals(x.getStatus())).count();
+        }
+        s.setIterationActiveCount(activeIterations);
         for (ProjectNode n : nodes) {
             s.setRequirementTotal(s.getRequirementTotal() + n.getRequirementTotal());
             s.setDeliveryItemTotal(s.getDeliveryItemTotal() + n.getDeliveryItemTotal());
             s.setDeliveryItemCompleted(s.getDeliveryItemCompleted() + n.getDeliveryItemCompleted());
             s.setTodoTotal(s.getTodoTotal() + n.getTodoTotal());
+        }
+        fillRequirementRiskCounts(s, nodes, unassignedIterations, unassignedRequirements);
+        if (includeUnassignedDetails) {
+            if (unassignedRequirements != null) {
+                s.setRequirementTotal(s.getRequirementTotal() + unassignedRequirements.size());
+            }
+            if (unassignedIterations != null) {
+                s.setRequirementTotal(s.getRequirementTotal()
+                        + unassignedIterations.stream()
+                        .filter(it -> it != null && !"closed".equals(it.getStatus()))
+                        .mapToInt(IterationNode::getRequirementCount).sum());
+            }
         }
         if (!projectIds.isEmpty()) {
             String in = placeholders(projectIds.size());
@@ -664,6 +1202,10 @@ public class RdmDailyReportService {
         return value instanceof Number n ? n.intValue() : null;
     }
 
+    private static Double toDouble(Object value) {
+        return value instanceof Number n ? n.doubleValue() : null;
+    }
+
     /** DATE 列经 queryForList 回来是 java.sql.Date，转成 yyyy-MM-dd 字符串供展示与模板使用 */
     private static String toDateString(Object value) {
         if (value instanceof java.sql.Date d) {
@@ -700,22 +1242,52 @@ public class RdmDailyReportService {
      *
      * @param ruleId              规则ID（手动触发为 null）
      * @param ruleName            规则名称快照（记入快照，规则日后改名/删除历史记录仍可读）
-     * @param projectId           目标项目（必填：规则与手动触发都按项目维度）
+     * @param projectId           目标项目；迭代未挂项目（紧急修复）时可为 null，此时只按 iterationCode 收敛
      * @param iterationCode       目标迭代（null=该项目全部迭代）
      * @param contentType         morning=今日焦点 / evening=当日复盘（决定模板与汇总侧重）
      * @param groupTemplateKey    群报模板（空=按档位默认）
      * @param personalTemplateKey 个人模板（空=按档位默认）
      */
-    public record TriggerTarget(Long ruleId, String ruleName, Long projectId, String iterationCode,
-                                String contentType, String groupTemplateKey, String personalTemplateKey) {
+    public record TriggerTarget(Long ruleId, String ruleName, Long projectId, List<Long> projectIds,
+                                String iterationCode, String contentType, String groupTemplateKey,
+                                String personalTemplateKey) {
+        /** 兼容存量七参构造：单项目 / 仅迭代 / 全部项目 */
+        public TriggerTarget(Long ruleId, String ruleName, Long projectId, String iterationCode,
+                             String contentType, String groupTemplateKey, String personalTemplateKey) {
+            this(ruleId, ruleName, projectId,
+                    projectId == null ? List.of() : List.of(projectId), iterationCode,
+                    contentType, groupTemplateKey, personalTemplateKey);
+        }
+
+        public List<Long> scopeProjectIds() {
+            return projectIds == null ? List.of() : projectIds;
+        }
+
+        /** 空项目集合 + 无迭代 = 全部在途项目 */
+        public boolean allProjects() {
+            return scopeProjectIds().isEmpty() && !StringUtils.hasText(iterationCode);
+        }
+
         /**
          * 范围键（幂等维度）：规则=rule:{id}；手动=manual:{projectId}:{iterationCode}。
-         * <p>同一天同一档可能有多条规则/多次手动推送，必须有它才能各自成行、互不覆盖。
+         * <p>多项目/全部项目没有单一 projectId，用排序后的 id 集合/ALL 编码，保证同范围重复触发覆盖同一行、
+         * 不同范围互不覆盖。
          */
         public String scopeKey() {
-            return ruleId != null
-                    ? "rule:" + ruleId
-                    : "manual:" + projectId + ":" + (iterationCode == null ? "" : iterationCode);
+            if (ruleId != null) {
+                return "rule:" + ruleId;
+            }
+            List<Long> ids = scopeProjectIds();
+            if (ids.isEmpty()) {
+                return allProjects() ? "manual:all"
+                        : "manual:null:" + (iterationCode == null ? "" : iterationCode);
+            }
+            String suffix = iterationCode == null ? "" : iterationCode;
+            if (ids.size() == 1) {
+                return "manual:" + ids.get(0) + ":" + suffix;
+            }
+            return "manual:ids:" + ids.stream().sorted()
+                    .map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
         }
     }
 
@@ -729,6 +1301,7 @@ public class RdmDailyReportService {
                         + "WHERE r.deleted = 0 ORDER BY r.enabled DESC, r.push_time, r.id",
                 (rs, i) -> mapRule(rs));
         fillIterationNames(rules);
+        fillRuleProjectSummaries(rules);
         return rules;
     }
 
@@ -746,6 +1319,7 @@ public class RdmDailyReportService {
             return null;
         }
         fillIterationNames(rows);
+        fillRuleProjectSummaries(rows);
         return rows.get(0);
     }
 
@@ -801,16 +1375,38 @@ public class RdmDailyReportService {
             throw new BusinessException("推送规则不能为空");
         }
         String name = requireText(form.getName(), 100, "规则名称");
-        if (form.getProjectId() == null) {
-            throw new BusinessException("請選擇推送目標項目");
+        String iteration = blankToNull(form.getIterationCode());
+        List<Long> ids = form.getProjectIds() == null ? new ArrayList<>() : form.getProjectIds().stream()
+                .filter(java.util.Objects::nonNull).distinct().toList();
+        if (ids.isEmpty() && form.getProjectId() != null) {
+            ids = List.of(form.getProjectId());
         }
-        // 注意：rdm_project 没有逻辑删除列（Batch 1 建表即无），不能写 deleted = 0，否则真库报 Unknown column
-        Integer projectExists = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM rdm_project WHERE id = ?", Integer.class, form.getProjectId());
-        if (projectExists == null || projectExists == 0) {
-            throw new BusinessException("推送目標項目不存在或已刪除: " + form.getProjectId());
+        if (iteration != null) {
+            Map<String, Object> iterationRow = findIterationRow(iteration);
+            if (iterationRow == null) {
+                throw new BusinessException("所選迭代不存在或已刪除: " + iteration);
+            }
+            Long iterationProjectId = toLong(iterationRow.get("project_id"));
+            if (iterationProjectId == null) {
+                // 未挂项目的紧急修复迭代：规则不能再指定项目，否则范围会互相矛盾
+                if (!ids.isEmpty()) {
+                    throw new BusinessException("所選迭代未掛項目，規則不能再指定所屬項目（請清空項目後保存）");
+                }
+            } else {
+                if (ids.size() > 1 || (!ids.isEmpty() && !ids.get(0).equals(iterationProjectId))) {
+                    throw new BusinessException("指定迭代時只能選擇該迭代所屬項目");
+                }
+                ids = List.of(iterationProjectId);
+            }
         }
-        String iteration = normalizeIteration(form.getProjectId(), form.getIterationCode());
+        for (Long id : ids) {
+            requireProjectExists(id);
+        }
+        if (ids.size() > 1 && iteration != null) {
+            throw new BusinessException("多項目範圍不能指定單一迭代");
+        }
+        Long projectId = ids.size() == 1 ? ids.get(0) : null;
+        String projectIdsJson = ids.size() > 1 ? writeProjectIds(ids) : null;
         String pushTime = normalizeTime(form.getPushTime(), "09:00", "推送時間");
         String slot = normalizeReportType(form.getContentType());
         String groupKey = form.getGroupTemplateKey();
@@ -828,14 +1424,14 @@ public class RdmDailyReportService {
             if (existing == null) {
                 throw new BusinessException("規則不存在或已刪除: " + form.getId());
             }
-            jdbc.update("UPDATE rdm_daily_report_rule SET name = ?, project_id = ?, iteration_code = ?, "
+            jdbc.update("UPDATE rdm_daily_report_rule SET name = ?, project_id = ?, project_ids = ?, iteration_code = ?, "
                             + "push_time = ?, content_type = ?, group_template_key = ?, personal_template_key = ?, "
                             + "enabled = ?, remark = ?, updated_by = ?, updated_at = NOW() WHERE id = ? AND deleted = 0",
-                    name, form.getProjectId(), iteration, pushTime, slot,
+                    name, projectId, projectIdsJson, iteration, pushTime, slot,
                     blankToNull(groupKey), blankToNull(personalKey), bool(form.getEnabled(), true),
                     form.getRemark(), operator, form.getId());
-            log.info("日報推送規則已更新: id={}, project={}, iteration={}, time={}, slot={}, operator={}",
-                    form.getId(), form.getProjectId(), iteration, pushTime, slot, operator);
+            log.info("日報推送規則已更新: id={}, projects={}, iteration={}, time={}, slot={}, operator={}",
+                    form.getId(), ids, iteration, pushTime, slot, operator);
             return findRule(form.getId());
         }
 
@@ -844,16 +1440,24 @@ public class RdmDailyReportService {
         // 后一个可能拿到前一个刚插入的规则，界面会显示成「保存后变成了别人那条」。
         org.springframework.jdbc.support.KeyHolder keyHolder =
                 new org.springframework.jdbc.support.GeneratedKeyHolder();
+        // lambda 捕获要求 effectively final：范围解析阶段可能重写过 projectId
+        final Long insertProjectId = projectId;
         jdbc.update(connection -> {
             java.sql.PreparedStatement ps = connection.prepareStatement(
                     "INSERT INTO rdm_daily_report_rule "
-                            + "(name, project_id, iteration_code, push_time, content_type, group_template_key, "
+                            + "(name, project_id, project_ids, iteration_code, push_time, content_type, group_template_key, "
                             + " personal_template_key, enabled, remark, created_by, updated_by) "
-                            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     java.sql.Statement.RETURN_GENERATED_KEYS);
             int i = 1;
             ps.setString(i++, name);
-            ps.setLong(i++, form.getProjectId());
+            if (insertProjectId == null) {
+                // 迭代未挂项目（紧急修复）：规则只以迭代为范围，project_id 必须落 NULL 而不是 0
+                ps.setNull(i++, java.sql.Types.BIGINT);
+            } else {
+                ps.setLong(i++, insertProjectId);
+            }
+            ps.setString(i++, projectIdsJson);
             ps.setString(i++, iteration);
             ps.setString(i++, pushTime);
             ps.setString(i++, slot);
@@ -867,8 +1471,8 @@ public class RdmDailyReportService {
         }, keyHolder);
         Number key = keyHolder.getKey();
         Long newId = key == null ? null : key.longValue();
-        log.info("日報推送規則已新建: id={}, project={}, iteration={}, time={}, slot={}, operator={}",
-                newId, form.getProjectId(), iteration, pushTime, slot, operator);
+        log.info("日報推送規則已新建: id={}, projects={}, iteration={}, time={}, slot={}, operator={}",
+                newId, ids, iteration, pushTime, slot, operator);
         return newId == null ? null : findRule(newId);
     }
 
@@ -903,8 +1507,12 @@ public class RdmDailyReportService {
             skipped.setMessage("規則不存在或已刪除，跳過");
             return skipped;
         }
-        return push(new TriggerTarget(rule.getId(), rule.getName(), rule.getProjectId(), rule.getIterationCode(),
-                rule.getContentType(), rule.getGroupTemplateKey(), rule.getPersonalTemplateKey()), false, null, false);
+        List<Long> ids = rule.getProjectIds() != null && !rule.getProjectIds().isEmpty()
+                ? rule.getProjectIds()
+                : (rule.getProjectId() == null ? List.of() : List.of(rule.getProjectId()));
+        return push(new TriggerTarget(rule.getId(), rule.getName(), rule.getProjectId(), ids,
+                rule.getIterationCode(), rule.getContentType(),
+                rule.getGroupTemplateKey(), rule.getPersonalTemplateKey()), false, null, false);
     }
 
     /**
@@ -915,18 +1523,55 @@ public class RdmDailyReportService {
      */
     public TriggerResult triggerManual(String contentType, Long projectId, String iterationCode,
                                        String operator, boolean dryRun) {
-        String slot = normalizeReportType(contentType);
+        // 旧单项目入口：不传项目仍按原语义拒绝（全部项目必须走新入口显式表达）
         if (projectId == null) {
             throw new BusinessException("請選擇要推送的項目");
         }
-        // 同上：rdm_project 无逻辑删除列
-        Integer projectExists = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM rdm_project WHERE id = ?", Integer.class, projectId);
-        if (projectExists == null || projectExists == 0) {
-            throw new BusinessException("推送目標項目不存在或已刪除: " + projectId);
+        return triggerManual(contentType, List.of(projectId), iterationCode, operator, dryRun);
+    }
+
+    /**
+     * 手动触发（多项目/全部项目）：
+     * <ul>
+     *   <li>projectIds 非空：只推这些项目；</li>
+     *   <li>projectIds 为空且无迭代：全部在途项目（显式“全部项目”）；</li>
+     *   <li>projectIds 为空且有迭代：仅该未挂项目迭代。</li>
+     * </ul>
+     * 多项目 + 单迭代是歧义范围，直接拒绝。
+     */
+    public TriggerResult triggerManual(String contentType, List<Long> projectIds, String iterationCode,
+                                       String operator, boolean dryRun) {
+        String slot = normalizeReportType(contentType);
+        List<Long> ids = projectIds == null ? List.of() : projectIds.stream()
+                .filter(java.util.Objects::nonNull).distinct().toList();
+        String iteration = blankToNull(iterationCode);
+        if (iteration != null) {
+            if (ids.size() > 1) {
+                throw new BusinessException("多項目範圍不能指定單一迭代");
+            }
+            Map<String, Object> iterationRow = findIterationRow(iteration);
+            if (iterationRow == null) {
+                throw new BusinessException("所選迭代不存在或已刪除: " + iteration);
+            }
+            Long iterationProjectId = toLong(iterationRow.get("project_id"));
+            if (ids.isEmpty() && iterationProjectId != null) {
+                ids = List.of(iterationProjectId);
+            } else if (iterationProjectId == null && !ids.isEmpty()) {
+                throw new BusinessException("未掛項目的迭代不能指定項目");
+            } else if (!ids.isEmpty() && !ids.get(0).equals(iterationProjectId)) {
+                throw new BusinessException("所選迭代不屬於所選項目");
+            }
         }
-        String iteration = normalizeIteration(projectId, iterationCode);
-        return push(new TriggerTarget(null, null, projectId, iteration, slot, null, null), true, operator, dryRun);
+        for (Long id : ids) {
+            Integer projectExists = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM rdm_project WHERE id = ?", Integer.class, id);
+            if (projectExists == null || projectExists == 0) {
+                throw new BusinessException("推送目標項目不存在或已刪除: " + id);
+            }
+        }
+        Long singleProjectId = ids.size() == 1 ? ids.get(0) : null;
+        return push(new TriggerTarget(null, null, singleProjectId, ids, iteration, slot, null, null),
+                true, operator, dryRun);
     }
 
     /**
@@ -970,10 +1615,15 @@ public class RdmDailyReportService {
             return result;
         }
 
-        Snapshot snapshot = buildSnapshot(day, slot, target.projectId(), target.iterationCode());
-        snapshot.setScopeProjectId(target.projectId());
-        snapshot.setScopeIterationCode(target.iterationCode());
-        snapshot.setScopeLabel(scopeLabel(target));
+        Snapshot snapshot = buildSnapshot(day, slot, target.scopeProjectIds(), target.iterationCode());
+        // 单项目/迭代范围以 target 兜底：buildSnapshot 已会写入，但单测/未来替身可能只返回内容；
+        // 多项目/全部项目保持 null，快照靠 scopeKey 定位。
+        if (target.scopeProjectIds().size() == 1) {
+            snapshot.setScopeProjectId(target.scopeProjectIds().get(0));
+        }
+        if (StringUtils.hasText(target.iterationCode())) {
+            snapshot.setScopeIterationCode(target.iterationCode().trim());
+        }
         if (manual) {
             // 快照自身也要标成 manual：详情页按 URL 的 type 取数，标错就会读不到这一行
             snapshot.setReportType(RdmDailyReportTemplates.TYPE_MANUAL);
@@ -981,15 +1631,27 @@ public class RdmDailyReportService {
         }
         result.setProjectCount(snapshot.getSummary().getProjectCount());
         String baseUrl = resolvePortalBaseUrl();
-        String detailUrl = buildDetailUrl(baseUrl, day, storedType, null);
+        // 多项目/全部项目没有单一 projectId，链接必须带 scopeKey 才能精确命中这份快照；
+        // 单项目也一并带上，避免同日多规则时按「最新一条」打开别的范围。
+        String detailUrl = buildViewUrl(baseUrl, day, storedType, snapshot.getScopeProjectId(),
+                snapshot.getScopeIterationCode(), scopeKey, cfg.getBoardLinkValidDays());
+        // 回传给手动触发页：弹窗查看看板用，与真正发出去的链接是同一个
+        result.setDetailUrl(detailUrl);
 
-        // 规则可各自指定模板；未指定时回落到全局该档默认模板，再回落到代码内预置
-        String groupKey = StringUtils.hasText(target.groupTemplateKey())
-                ? target.groupTemplateKey()
-                : (RdmDailyReportTemplates.TYPE_MORNING.equals(slot)
-                ? cfg.getMorningTemplateKey() : cfg.getEveningTemplateKey());
-        Template groupTpl = resolveTemplate(RdmDailyReportTemplates.CHANNEL_GROUP, slot, groupKey);
-        Rendered group = renderer.renderGroup(groupTpl.getTitleTpl(), groupTpl.getContentTpl(), snapshot, detailUrl);
+        boolean eveningSlot = RdmDailyReportTemplates.TYPE_EVENING.equals(slot);
+        Rendered group;
+        if (isFixedMode(cfg)) {
+            // 固定框架模式：层级写死在渲染器，模板文本不参与渲染，因此不查模板（也不允许“改模板”改变框架）
+            group = renderer.renderGroupFixed(snapshot, detailUrl, eveningSlot, cfg.getMessageFields());
+        } else {
+            // 自定义模板模式：规则可各自指定模板；未指定时回落到全局该档默认模板，再回落到代码内预置
+            String groupKey = StringUtils.hasText(target.groupTemplateKey())
+                    ? target.groupTemplateKey()
+                    : (RdmDailyReportTemplates.TYPE_MORNING.equals(slot)
+                    ? cfg.getMorningTemplateKey() : cfg.getEveningTemplateKey());
+            Template groupTpl = resolveTemplate(RdmDailyReportTemplates.CHANNEL_GROUP, slot, groupKey);
+            group = renderer.renderGroup(groupTpl.getTitleTpl(), groupTpl.getContentTpl(), snapshot, detailUrl);
+        }
         result.setGroupTitle(group.title());
         result.setGroupContent(group.content());
 
@@ -1017,11 +1679,36 @@ public class RdmDailyReportService {
     }
 
     /** 范围说明（快照与记录页复用的可读文案） */
-    private static String scopeLabel(TriggerTarget target) {
-        String project = target.projectId() == null ? "—" : "項目#" + target.projectId();
-        return StringUtils.hasText(target.iterationCode())
-                ? project + " / 迭代 " + target.iterationCode()
+    private static String scopeLabel(Long projectId, String iterationCode) {
+        String project = projectId == null ? "未掛項目" : "項目#" + projectId;
+        return StringUtils.hasText(iterationCode)
+                ? project + " / 迭代 " + iterationCode
                 : project + " / 全部迭代";
+    }
+
+    /** 多项目/全部项目的可读范围：「全部在途項目」或「A、B、C」 */
+    private static String buildScopeLabel(List<RdmFactVO.ProjectFact> active, List<Long> ids,
+                                          String iterationCode, boolean iterationOnly) {
+        if (iterationOnly) {
+            return "未掛項目 / 迭代 " + iterationCode;
+        }
+        if (ids.isEmpty()) {
+            return "全部在途項目";
+        }
+        if (ids.size() == 1) {
+            return scopeLabel(ids.get(0), iterationCode);
+        }
+        List<String> names = active.stream()
+                .map(f -> StringUtils.hasText(f.getProjectName()) ? f.getProjectName() : "項目#" + f.getProjectId())
+                .limit(6).toList();
+        if (names.isEmpty()) {
+            return ids.size() + " 個項目";
+        }
+        String text = String.join("、", names);
+        if (active.size() > 6) {
+            text += " 等" + active.size() + " 個項目";
+        }
+        return text;
     }
 
     /**
@@ -1045,24 +1732,22 @@ public class RdmDailyReportService {
             // 场景未绑定应用/未启用：这是配置状态而非故障，记 info 并跳过，群报照常
             log.info("日报个人通知跳过：场景 {} 未绑定启用的企业应用（请在通知渠道配置页绑定）",
                     NotificationAppService.RDM_DAILY_REPORT);
-            return new int[]{0, countReceivers(snapshot)};
+            return new int[]{0, countReceivers(snapshot, cfg)};
         }
-        // 规则可指定个人模板；未指定回落到全局默认
-        String key = StringUtils.hasText(personalTemplateKey) ? personalTemplateKey : cfg.getPersonalTemplateKey();
-        Template tpl = resolveTemplate(RdmDailyReportTemplates.CHANNEL_PERSONAL, slot, key);
-
-        // 收件人 → 其负责的项目（PM 或产品负责人），用 LinkedHashSet 去重且保持稳定顺序
-        Map<Long, List<ProjectNode>> byReceiver = new LinkedHashMap<>();
-        for (ProjectNode p : snapshot.getProjects()) {
-            if (p.getPmUserId() != null) {
-                byReceiver.computeIfAbsent(p.getPmUserId(), k -> new ArrayList<>()).add(p);
-            }
-            if (p.getProductOwnerUserId() != null && !p.getProductOwnerUserId().equals(p.getPmUserId())) {
-                byReceiver.computeIfAbsent(p.getProductOwnerUserId(), k -> new ArrayList<>()).add(p);
-            }
+        // 规则可指定个人模板；未指定回落到全局默认。固定框架模式下模板不参与渲染，不白查一次库
+        boolean fixed = isFixedMode(cfg);
+        boolean eveningSlot = RdmDailyReportTemplates.TYPE_EVENING.equals(slot);
+        Template tpl = null;
+        if (!fixed) {
+            String key = StringUtils.hasText(personalTemplateKey)
+                    ? personalTemplateKey : cfg.getPersonalTemplateKey();
+            tpl = resolveTemplate(RdmDailyReportTemplates.CHANNEL_PERSONAL, slot, key);
         }
 
-        for (Map.Entry<Long, List<ProjectNode>> e : byReceiver.entrySet()) {
+        // 收件人 → 其可见项目：角色收件人只拿自己参与的项目，追加收件人拿规则范围全量
+        Map<Long, Receiver> byReceiver = resolveReceivers(snapshot, cfg);
+
+        for (Map.Entry<Long, Receiver> e : byReceiver.entrySet()) {
             SysUser user = userMapper.selectById(e.getKey());
             if (user == null || !StringUtils.hasText(user.getDingtalkUserId())) {
                 // fail-closed：未绑定钉钉 userId 就跳过这个人，绝不用手机号群发或降级到群里 @
@@ -1070,12 +1755,14 @@ public class RdmDailyReportService {
                 log.info("日报个人通知跳过（未绑定钉钉 userId）: userId={}", e.getKey());
                 continue;
             }
-            List<ProjectNode> mine = e.getValue();
-            String myUrl = mine.size() == 1
-                    ? buildDetailUrl(baseUrl, LocalDate.parse(snapshot.getReportDate(), DATE_FMT), urlType, mine.get(0).getProjectId())
-                    : detailUrl;
-            Rendered r = renderer.renderPersonal(tpl.getTitleTpl(), tpl.getContentTpl(), snapshot, myUrl,
-                    buildPersonalView(user.getName(), mine));
+            List<ProjectNode> mine = e.getValue().getProjects();
+            // 统一用本次快照的 scopeKey 链接：多项目/全部项目下，按单个项目拼链接可能命中不存在的单项目快照，
+            // 打开后就是空页；单项目时 scopeKey 也精确命中同一份快照。
+            String myUrl = detailUrl;
+            PersonalView personal = buildPersonalView(user.getName(), mine);
+            Rendered r = fixed
+                    ? renderer.renderPersonalFixed(snapshot, myUrl, eveningSlot, personal, cfg.getMessageFields())
+                    : renderer.renderPersonal(tpl.getTitleTpl(), tpl.getContentTpl(), snapshot, myUrl, personal);
             if (dryRun) {
                 sent++;
                 continue;
@@ -1122,17 +1809,315 @@ public class RdmDailyReportService {
         return new PersonalView(userName, mine, todo, overdue, todayDue, reqTotal, reqDone, deliveryTotal, deliveryDone);
     }
 
-    private int countReceivers(Snapshot snapshot) {
-        Set<Long> ids = new LinkedHashSet<>();
-        for (ProjectNode p : snapshot.getProjects()) {
-            if (p.getPmUserId() != null) {
-                ids.add(p.getPmUserId());
-            }
-            if (p.getProductOwnerUserId() != null) {
-                ids.add(p.getProductOwnerUserId());
+    private int countReceivers(Snapshot snapshot, Config cfg) {
+        return resolveReceivers(snapshot, cfg).size();
+    }
+
+    /* ==================== 收件人解析（推送与预览共用同一口径） ==================== */
+
+    /**
+     * 收件人 → 其可见项目 + 命中来源。
+     *
+     * <p><b>两类收件人的视角不同，不能混为一谈</b>：
+     * <ul>
+     *   <li><b>角色收件人</b>：只拿到自己在该规则范围内的项目（按项目归属分配）；</li>
+     *   <li><b>追加收件人</b>：没有项目归属，拿到规则范围的全部项目汇总。</li>
+     * </ul>
+     * 排除名单在最后一步剔除，优先级最高。同一人命中多个角色时按 projectId 去重，
+     * 避免同一个项目在个人报里重复出现。
+     *
+     * <p>推送与预览必须共用本方法：两处各写一套必然漂移，出现「预览说有 10 人、实发 8 人」。
+     */
+    private Map<Long, Receiver> resolveReceivers(Snapshot snapshot, Config cfg) {
+        // null = 配置对象未携带该字段（旧调用方/测试桩），按默认角色处理；
+        // 空数组 = 管理员主动清空角色、只留追加人，不能回落到默认值
+        List<String> roles = cfg.getReceiverRoles() == null
+                ? new ArrayList<>(DEFAULT_RECEIVER_ROLES) : safeStringList(cfg.getReceiverRoles());
+        List<ProjectNode> projects = snapshot.getProjects() == null ? List.of() : snapshot.getProjects();
+        // 成员表一次批量查：逐项目回查在「全部项目」规则下就是 N+1，推送会被拖到超时
+        Map<Long, List<Long>> memberUserIds = roles.contains("project_member")
+                ? loadActiveMemberUserIds(projects) : Map.of();
+
+        Map<Long, Receiver> byReceiver = new LinkedHashMap<>();
+        for (ProjectNode p : projects) {
+            for (String role : roles) {
+                for (Long userId : userIdsOfRole(p, role, memberUserIds)) {
+                    Receiver receiver = byReceiver.computeIfAbsent(userId, k -> new Receiver());
+                    receiver.getProjects().add(p);
+                    receiver.getSources().add(role);
+                }
             }
         }
-        return ids.size();
+
+        // 追加收件人：规则范围全量。取并集而非覆盖——他可能既是某项目 PM 又在追加名单里，
+        // 两重身份应当合并成「全量」，而不是按遍历顺序随机取一边
+        for (Long userId : safeLongList(cfg.getExtraReceiverUserIds())) {
+            Receiver receiver = byReceiver.computeIfAbsent(userId, k -> new Receiver());
+            receiver.getProjects().clear();
+            receiver.getProjects().addAll(projects);
+            receiver.getSources().add("extra");
+        }
+
+        // 排除优先于角色与追加
+        for (Long userId : safeLongList(cfg.getExcludeReceiverUserIds())) {
+            byReceiver.remove(userId);
+        }
+
+        byReceiver.values().forEach(Receiver::distinctProjects);
+        return byReceiver;
+    }
+
+    /** 收件人快照：可见项目 + 来源（来源只用于预览展示，推送侧不消费） */
+    private static final class Receiver {
+        private final List<ProjectNode> projects = new ArrayList<>();
+        private final Set<String> sources = new LinkedHashSet<>();
+
+        List<ProjectNode> getProjects() {
+            return projects;
+        }
+
+        Set<String> getSources() {
+            return sources;
+        }
+
+        /** 同一人命中多角色 / 同一项目被追加覆盖时会重复，按 projectId 去重且保持快照顺序 */
+        void distinctProjects() {
+            Map<Long, ProjectNode> seen = new LinkedHashMap<>();
+            for (ProjectNode p : projects) {
+                seen.putIfAbsent(p.getProjectId(), p);
+            }
+            projects.clear();
+            projects.addAll(seen.values());
+        }
+    }
+
+    /** 单个项目上某角色对应的 userId；project_member 走成员表（一人多角色会返回同一 id，由去重兜底） */
+    private List<Long> userIdsOfRole(ProjectNode p, String role, Map<Long, List<Long>> memberUserIds) {
+        return switch (role) {
+            case "pm" -> singleId(p.getPmUserId());
+            case "product_owner" -> singleId(p.getProductOwnerUserId());
+            case "tech_lead" -> singleId(p.getTechLeadUserId());
+            case "qa_lead" -> singleId(p.getQaLeadUserId());
+            case "ui_designer" -> singleId(p.getUiDesignerUserId());
+            case "ops_lead" -> singleId(p.getOpsLeadUserId());
+            case "project_member" -> memberUserIds.getOrDefault(p.getProjectId(), List.of());
+            default -> List.of();
+        };
+    }
+
+    private static List<Long> singleId(Long userId) {
+        return userId == null ? List.of() : List.of(userId);
+    }
+
+    /**
+     * 在途项目成员：一次 IN 查询返回 projectId → userId 列表。
+     * <p>只取 {@code leave_time IS NULL}：已离任成员不应继续收到日报，否则换人后旧成员会一直被打扰。
+     */
+    private Map<Long, List<Long>> loadActiveMemberUserIds(List<ProjectNode> projects) {
+        List<Long> projectIds = projects.stream().map(ProjectNode::getProjectId)
+                .filter(Objects::nonNull).distinct().toList();
+        if (projectIds.isEmpty()) {
+            return Map.of();
+        }
+        String placeholders = String.join(",", Collections.nCopies(projectIds.size(), "?"));
+        Map<Long, List<Long>> byProject = new HashMap<>();
+        jdbc.query("SELECT project_id, user_id FROM rdm_project_member "
+                        + "WHERE leave_time IS NULL AND project_id IN (" + placeholders + ")",
+                (java.sql.ResultSet rs) -> {
+                    long projectId = rs.getLong("project_id");
+                    long userId = rs.getLong("user_id");
+                    if (userId > 0) {
+                        byProject.computeIfAbsent(projectId, k -> new ArrayList<>()).add(userId);
+                    }
+                },
+                projectIds.toArray());
+        return byProject;
+    }
+
+    /**
+     * 收件人预览：按当前配置 + 指定规则的实时范围现算清单。
+     *
+     * <p><b>为何不读快照</b>：快照是「上次发了什么」，预览是「改完配置下次会怎样」；
+     * 且历史快照不含四类新增角色 userId，读快照会把新勾选的角色全部漏掉。
+     *
+     * <p>ruleId 为空时按「全部在途项目」估算，与页面上未选规则时的默认范围一致。
+     */
+    public ReceiverPreview previewReceivers(Long ruleId) {
+        Config cfg = loadConfig();
+        List<Long> projectIds = List.of();
+        String iterationCode = null;
+        if (ruleId != null) {
+            Rule rule = listRules().stream().filter(r -> Objects.equals(r.getId(), ruleId)).findFirst()
+                    .orElseThrow(() -> new BusinessException(404, "推送規則不存在"));
+            projectIds = rule.getProjectIds() == null ? List.of() : rule.getProjectIds();
+            iterationCode = rule.getIterationCode();
+        }
+        // 预览取「晨报」档位：快照内容与档位无关，个人通知的人数与模板无关，档位只影响标题
+        Snapshot snapshot = buildSnapshot(LocalDate.now(), RdmDailyReportTemplates.TYPE_MORNING,
+                projectIds, iterationCode);
+        Map<Long, Receiver> byReceiver = resolveReceivers(snapshot, cfg);
+
+        ReceiverPreview out = new ReceiverPreview();
+        out.setTotal(byReceiver.size());
+        if (byReceiver.isEmpty()) {
+            return out;
+        }
+        // 批量取员工：逐个 selectById 在这里就是 N+1，收件人一多预览会明显卡顿
+        Map<Long, SysUser> users = new HashMap<>();
+        userMapper.selectBatchIds(byReceiver.keySet()).forEach(u -> users.put(u.getId(), u));
+
+        int unbound = 0;
+        int extraCount = 0;
+        List<ReceiverPreviewItem> items = new ArrayList<>();
+        for (Map.Entry<Long, Receiver> entry : byReceiver.entrySet()) {
+            Receiver receiver = entry.getValue();
+            SysUser user = users.get(entry.getKey());
+            ReceiverPreviewItem item = new ReceiverPreviewItem();
+            item.setUserId(entry.getKey());
+            item.setUserName(user == null ? null : user.getName());
+            item.setEmpId(user == null ? null : user.getEmpId());
+            item.setSources(new ArrayList<>(receiver.getSources()));
+            item.setProjectCount(receiver.getProjects().size());
+            boolean bound = user != null && StringUtils.hasText(user.getDingtalkUserId());
+            item.setDingtalkBound(bound);
+            if (!bound) {
+                unbound++;
+            }
+            if (receiver.getSources().contains("extra")) {
+                extraCount++;
+            }
+            items.add(item);
+        }
+        out.setUnbound(unbound);
+        out.setExtraCount(extraCount);
+        out.setReceivers(items);
+        return out;
+    }
+
+    /* ---------- 收件人配置的校验与序列化 ---------- */
+
+    /** 角色白名单校验：非法值直接拒绝，不做“静默丢弃”——否则管理员以为生效了 */
+    private List<String> normalizeReceiverRoles(List<String> roles) {
+        List<String> out = new ArrayList<>();
+        if (roles == null) {
+            return out;
+        }
+        for (String role : roles) {
+            if (!StringUtils.hasText(role)) {
+                continue;
+            }
+            String code = role.trim();
+            if (!RECEIVER_ROLES.contains(code)) {
+                throw new BusinessException("不支持的收件角色: " + code);
+            }
+            if (!out.contains(code)) {
+                out.add(code);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * 名单校验：上限、去重、员工存在性。
+     * <p>存在性用一次 IN 查询；占位符按数量拼（值仍走参数绑定，不存在注入面）。
+     */
+    private List<Long> normalizeReceiverUserIds(List<Long> ids, String label) {
+        if (ids == null) {
+            return new ArrayList<>();
+        }
+        if (ids.size() > MAX_RECEIVER_USER_IDS) {
+            throw new BusinessException(label + "最多支持 " + MAX_RECEIVER_USER_IDS + " 人");
+        }
+        List<Long> out = new ArrayList<>();
+        for (Long id : ids) {
+            if (id != null && id > 0 && !out.contains(id)) {
+                out.add(id);
+            }
+        }
+        if (out.isEmpty()) {
+            return out;
+        }
+        String placeholders = String.join(",", Collections.nCopies(out.size(), "?"));
+        List<Long> found = jdbc.queryForList(
+                "SELECT id FROM sys_user WHERE status = 1 AND id IN (" + placeholders + ")",
+                Long.class, out.toArray());
+        if (found.size() != out.size()) {
+            throw new BusinessException(label + "包含不存在或已停用的员工，請重新選擇");
+        }
+        return out;
+    }
+
+    private static List<String> safeStringList(List<String> values) {
+        return values == null ? new ArrayList<>() : new ArrayList<>(values);
+    }
+
+    private static List<Long> safeLongList(List<Long> values) {
+        return values == null ? new ArrayList<>() : new ArrayList<>(values);
+    }
+
+    /**
+     * 读收件角色列：列缺失/为 NULL/坏 JSON 一律回落到默认角色（pm + product_owner），
+     * 但 {@code []} 原样返回——那是管理员「只要追加收件人」的主动选择，不能被默认值覆盖。
+     */
+    private List<String> readReceiverRoles(String json) {
+        if (!StringUtils.hasText(json)) {
+            return new ArrayList<>(DEFAULT_RECEIVER_ROLES);
+        }
+        try {
+            String[] values = objectMapper.readValue(json, String[].class);
+            if (values == null) {
+                return new ArrayList<>(DEFAULT_RECEIVER_ROLES);
+            }
+            List<String> out = new ArrayList<>();
+            for (String value : values) {
+                if (StringUtils.hasText(value) && RECEIVER_ROLES.contains(value) && !out.contains(value)) {
+                    out.add(value);
+                }
+            }
+            return out;
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            log.warn("日报收件角色解析失败，按默认角色处理: {}", e.getClass().getSimpleName());
+            return new ArrayList<>(DEFAULT_RECEIVER_ROLES);
+        }
+    }
+
+    /** 读 userId 名单列：坏数据不让整份配置不可读，丢弃非法值后按空处理 */
+    private List<Long> readLongList(String json) {
+        if (!StringUtils.hasText(json)) {
+            return new ArrayList<>();
+        }
+        try {
+            Long[] values = objectMapper.readValue(json, Long[].class);
+            if (values == null) {
+                return new ArrayList<>();
+            }
+            List<Long> out = new ArrayList<>();
+            for (Long value : values) {
+                if (value != null && value > 0 && !out.contains(value)) {
+                    out.add(value);
+                }
+            }
+            return out;
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            log.warn("日报收件人名单解析失败，按空处理: {}", e.getClass().getSimpleName());
+            return new ArrayList<>();
+        }
+    }
+
+    private String writeStringList(List<String> values) {
+        try {
+            return objectMapper.writeValueAsString(values == null ? List.of() : values);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new BusinessException("收件角色序列化失敗: " + e.getClass().getSimpleName());
+        }
+    }
+
+    private String writeLongList(List<Long> values) {
+        try {
+            return objectMapper.writeValueAsString(values == null ? List.of() : values);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new BusinessException("收件人名单序列化失敗: " + e.getClass().getSimpleName());
+        }
     }
 
     /* ==================== 快照落库与查询 ==================== */
@@ -1162,8 +2147,9 @@ public class RdmDailyReportService {
                         + " push_count = push_count + 1, trigger_type = VALUES(trigger_type), "
                         + " trigger_by = VALUES(trigger_by), last_push_at = NOW(), deleted = 0, "
                         + " updated_at = NOW()",
+                // 范围取快照上「解析后的值」而非入参：迭代后来补挂了项目时，记录行也要反映真实归属
                 snapshot.getReportDate(), snapshot.getReportType(), scopeKey, target.ruleId(),
-                target.projectId(), target.iterationCode(),
+                snapshot.getScopeProjectId(), snapshot.getScopeIterationCode(),
                 snapshot.getSummary().getProjectCount(), json, group.title(), group.content(),
                 personalSent, manual ? "manual" : "schedule", operator);
     }
@@ -1178,19 +2164,42 @@ public class RdmDailyReportService {
     /**
      * 读某日某档快照（移动端日报页数据源）；不存在返回 null，由调用方决定 404 或空态。
      *
-     * <p>同一日期同一档位可能有多条快照（多规则各自推送、或手动补发不同项目），
-     * 所以必须按 {@code projectId} 收敛；未带项目时取最新一条（{@code ORDER BY id DESC}），
-     * 否则 {@code LIMIT 1} 会稳定命中最早那条，导致通知链接打开别的项目的日报。
+     * <p>同一日期同一档位可能有多条快照（多规则各自推送、或手动补发不同范围），
+     * 所以必须按 {@code projectId} / {@code iterationCode} 收敛；都未带时取最新一条
+     * （{@code ORDER BY id DESC}），否则 {@code LIMIT 1} 会稳定命中最早那条，导致通知链接打开别的范围的日报。
      */
-    public Snapshot getSnapshot(LocalDate date, String reportType, Long projectId) {
+    public Snapshot getSnapshot(LocalDate date, String reportType, Long projectId, String iterationCode) {
+        return getSnapshot(date, reportType, projectId, iterationCode, null);
+    }
+
+    /**
+     * 读快照（可选范围键）。
+     *
+     * <p>{@code scopeKey} 非空时按范围键精确读取：多项目/全部项目快照的 {@code project_id} 为空，
+     * 只按项目/迭代收敛会打开同档位另一范围的日报。历史链接不带该参数，走原收敛逻辑。
+     */
+    public Snapshot getSnapshot(LocalDate date, String reportType, Long projectId, String iterationCode,
+                                String scopeKey) {
+        if (StringUtils.hasText(scopeKey)) {
+            return getSnapshotByScopeKey(date, reportType, scopeKey.trim());
+        }
         String type = normalizeReadableType(reportType);
-        String sql = "SELECT content_json FROM rdm_daily_report "
-                + "WHERE report_date = ? AND report_type = ? AND deleted = 0"
-                + (projectId == null ? "" : " AND project_id = ?")
-                + " ORDER BY id DESC LIMIT 1";
-        List<String> rows = projectId == null
-                ? jdbc.queryForList(sql, String.class, date.format(DATE_FMT), type)
-                : jdbc.queryForList(sql, String.class, date.format(DATE_FMT), type, projectId);
+        StringBuilder sql = new StringBuilder("SELECT content_json FROM rdm_daily_report "
+                + "WHERE report_date = ? AND report_type = ? AND deleted = 0");
+        List<Object> args = new ArrayList<>();
+        args.add(date.format(DATE_FMT));
+        args.add(type);
+        if (projectId != null) {
+            sql.append(" AND project_id = ?");
+            args.add(projectId);
+        }
+        // 未挂项目的迭代规则只有 iteration_code 可收敛：不带它就会打开同档位其他规则的快照
+        if (StringUtils.hasText(iterationCode)) {
+            sql.append(" AND iteration_code = ?");
+            args.add(iterationCode.trim());
+        }
+        sql.append(" ORDER BY id DESC LIMIT 1");
+        List<String> rows = jdbc.queryForList(sql.toString(), String.class, args.toArray());
         if (rows.isEmpty() || !StringUtils.hasText(rows.get(0))) {
             return null;
         }
@@ -1203,13 +2212,32 @@ public class RdmDailyReportService {
         }
     }
 
+    /** 按范围键精确读快照（多项目/全部项目链接；同一天多规则不会串范围） */
+    private Snapshot getSnapshotByScopeKey(LocalDate date, String reportType, String scopeKey) {
+        List<String> rows = jdbc.queryForList("SELECT content_json FROM rdm_daily_report "
+                        + "WHERE report_date = ? AND report_type = ? AND scope_key = ? AND deleted = 0 "
+                        + "ORDER BY id DESC LIMIT 1",
+                String.class, date.format(DATE_FMT), normalizeReadableType(reportType), scopeKey);
+        if (rows.isEmpty() || !StringUtils.hasText(rows.get(0))) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(rows.get(0), Snapshot.class);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            log.error("日报快照反序列化失败: date={}, type={}, scopeKey={}, error={}",
+                    date, reportType, scopeKey, e.getClass().getSimpleName());
+            return null;
+        }
+    }
+
     /** 发送记录（配置页「發送記錄」tab），按日期倒序 */
     public List<ReportRecord> listRecords(Integer limit) {
         int n = limit == null || limit <= 0 || limit > 365 ? DEFAULT_RECORD_LIMIT : limit;
-        return jdbc.query("SELECT d.id, d.report_date, d.report_type, d.rule_id, d.project_id, d.iteration_code, "
+        Map<Long, String> projectLabels = projectLabels();
+        return jdbc.query("SELECT d.id, d.report_date, d.report_type, d.rule_id, d.scope_key, d.project_id, d.iteration_code, "
                         + "d.project_count, d.personal_count, d.push_count, d.trigger_type, d.trigger_by, "
                         + "d.last_push_at, d.created_at, d.updated_at, "
-                        + "r.name AS rule_name, p.project_no, p.name AS project_name "
+                        + "r.name AS rule_name, r.project_ids AS rule_project_ids, p.project_no, p.name AS project_name "
                         + "FROM rdm_daily_report d "
                         + "LEFT JOIN rdm_daily_report_rule r ON r.id = d.rule_id "
                         + "LEFT JOIN rdm_project p ON p.id = d.project_id "
@@ -1225,6 +2253,10 @@ public class RdmDailyReportService {
                     r.setProjectNo(rs.getString("project_no"));
                     r.setProjectName(rs.getString("project_name"));
                     r.setIterationCode(rs.getString("iteration_code"));
+                    r.setScopeLabel(recordScopeLabel(rs.getString("scope_key"), rs.getString("rule_project_ids"),
+                            r.getProjectId(), r.getProjectNo(), r.getProjectName(), r.getIterationCode(), projectLabels));
+                    // 范围键一并下发：多项目/全部项目没有单一项目，记录页「查看日報」必须靠它精确命中
+                    r.setScopeKey(rs.getString("scope_key"));
                     r.setProjectCount((Integer) rs.getObject("project_count"));
                     r.setPersonalCount((Integer) rs.getObject("personal_count"));
                     r.setPushCount((Integer) rs.getObject("push_count"));
@@ -1235,6 +2267,48 @@ public class RdmDailyReportService {
                     r.setUpdatedAt(formatDateTime(rs.getTimestamp("updated_at")));
                     return r;
                 });
+    }
+
+    /** 项目 id → 「编号 名称」 */
+    private Map<Long, String> projectLabels() {
+        Map<Long, String> labels = new HashMap<>();
+        for (Map<String, Object> row : jdbc.queryForList("SELECT id, project_no, name FROM rdm_project")) {
+            Long id = toLong(row.get("id"));
+            if (id != null) {
+                labels.put(id, (StringUtils.hasText((String) row.get("project_no"))
+                        ? row.get("project_no") + " " : "") + (row.get("name") == null ? "" : row.get("name")));
+            }
+        }
+        return labels;
+    }
+
+    /** 发送记录的范围文案：规则多项目 / 手动多项目 / 全部项目 / 未挂项目迭代 */
+    private String recordScopeLabel(String scopeKey, String ruleProjectIdsJson, Long projectId,
+                                    String projectNo, String projectName, String iterationCode,
+                                    Map<Long, String> projectLabels) {
+        List<Long> ids = parseProjectIds(ruleProjectIdsJson);
+        if (ids.isEmpty() && scopeKey != null && scopeKey.startsWith("manual:ids:")) {
+            ids = java.util.Arrays.stream(scopeKey.substring("manual:ids:".length()).split(","))
+                    .filter(StringUtils::hasText)
+                    .map(s -> {
+                        try {
+                            return Long.parseLong(s.trim());
+                        } catch (NumberFormatException e) {
+                            return null;
+                        }
+                    }).filter(java.util.Objects::nonNull).toList();
+        }
+        if (!ids.isEmpty()) {
+            return ids.stream().map(id -> projectLabels.getOrDefault(id, "項目#" + id))
+                    .collect(java.util.stream.Collectors.joining("、"));
+        }
+        if (projectId != null) {
+            return (StringUtils.hasText(projectNo) ? projectNo + " " : "") + (projectName == null ? "" : projectName);
+        }
+        if (StringUtils.hasText(iterationCode)) {
+            return "未掛項目 / 迭代 " + iterationCode;
+        }
+        return "全部在途項目";
     }
 
     /**
@@ -1251,23 +2325,32 @@ public class RdmDailyReportService {
         Config cfg = loadConfig();
         String baseUrl = resolvePortalBaseUrl();
 
-        String titleTpl;
-        String contentTpl;
-        if (form != null && StringUtils.hasText(form.getContentTpl())) {
-            // 草稿模板：用户在编辑框里改的内容直接渲染，不需要先存盘
-            titleTpl = form.getTitleTpl() == null ? "" : form.getTitleTpl();
-            contentTpl = form.getContentTpl();
-        } else {
-            Template t = resolveTemplate(channel, type, RdmDailyReportTemplates.CHANNEL_PERSONAL.equals(channel)
-                    ? cfg.getPersonalTemplateKey()
-                    : RdmDailyReportTemplates.TYPE_MORNING.equals(type) ? cfg.getMorningTemplateKey() : cfg.getEveningTemplateKey());
-            titleTpl = t.getTitleTpl();
-            contentTpl = t.getContentTpl();
+        boolean fixed = isFixedMode(cfg);
+        String titleTpl = "";
+        String contentTpl = "";
+        if (!fixed) {
+            if (form != null && StringUtils.hasText(form.getContentTpl())) {
+                // 草稿模板：用户在编辑框里改的内容直接渲染，不需要先存盘
+                titleTpl = form.getTitleTpl() == null ? "" : form.getTitleTpl();
+                contentTpl = form.getContentTpl();
+            } else {
+                Template t = resolveTemplate(channel, type, RdmDailyReportTemplates.CHANNEL_PERSONAL.equals(channel)
+                        ? cfg.getPersonalTemplateKey()
+                        : RdmDailyReportTemplates.TYPE_MORNING.equals(type) ? cfg.getMorningTemplateKey() : cfg.getEveningTemplateKey());
+                titleTpl = t.getTitleTpl();
+                contentTpl = t.getContentTpl();
+            }
         }
 
         PreviewResult out = new PreviewResult();
         out.setReportDate(day.format(DATE_FMT));
         out.setReportType(type);
+        // 告知前端当前预览走的是哪条路径：固定框架下草稿文本框不生效，页面必须说明而不是让人自猜
+        out.setMessageMode(fixed ? MESSAGE_MODE_FIXED : MESSAGE_MODE_TEMPLATE);
+        // 链接只算一次：模板里的 {{detailUrl}} 与预览页「打开链接看板」必须是同一个地址，
+        // 否则用户复制去核对时会发现两处不一致
+        String detailUrl = buildViewUrl(baseUrl, day, type, null, null, cfg.getBoardLinkValidDays());
+        out.setDetailUrl(detailUrl);
         Rendered r;
         if (RdmDailyReportTemplates.CHANNEL_PERSONAL.equals(channel)) {
             Long requested = form == null ? null : form.getReceiverUserId();
@@ -1280,11 +2363,16 @@ public class RdmDailyReportService {
                     .filter(p -> receiverId.equals(p.getPmUserId()) || receiverId.equals(p.getProductOwnerUserId()))
                     .toList();
             SysUser user = receiverId == null ? null : userMapper.selectById(receiverId);
-            r = renderer.renderPersonal(titleTpl, contentTpl, snapshot,
-                    buildDetailUrl(baseUrl, day, type, null),
-                    buildPersonalView(user == null ? "預覽使用者" : user.getName(), mine));
+            PersonalView personal = buildPersonalView(user == null ? "預覽使用者" : user.getName(), mine);
+            r = fixed
+                    ? renderer.renderPersonalFixed(snapshot, detailUrl,
+                            RdmDailyReportTemplates.TYPE_EVENING.equals(type), personal, cfg.getMessageFields())
+                    : renderer.renderPersonal(titleTpl, contentTpl, snapshot, detailUrl, personal);
         } else {
-            r = renderer.renderGroup(titleTpl, contentTpl, snapshot, buildDetailUrl(baseUrl, day, type, null));
+            r = fixed
+                    ? renderer.renderGroupFixed(snapshot, detailUrl,
+                            RdmDailyReportTemplates.TYPE_EVENING.equals(type), cfg.getMessageFields())
+                    : renderer.renderGroup(titleTpl, contentTpl, snapshot, detailUrl);
         }
         out.setTitle(r.title());
         out.setContent(r.content());
@@ -1363,17 +2451,279 @@ public class RdmDailyReportService {
     }
 
     /**
-     * 拼移动端日报页链接。
-     * <p>路径 {@code /rdm-daily} 由前端路由注册；这里刻意不复用 {@code RdmConstants.ROUTE_*}，
-     * 因为那些常量是给系统内跳转用的相对路径，而钉钉里必须是完整外部 URL（含 {@code /#/}）。
+     * 拼看板开放链接（免登，钉钉里点开直接看板，不先进系统）。
+     *
+     * <p><b>为何不再拼站内 {@code /rdm-daily}</b>：那条路由受登录与菜单守卫保护，
+     * 未登录会先跳登录，登录后侧栏选中「推送配置」，读者看到的不是日报——
+     * 推送链接必须自带只读通行证，才能做到「点开即看」。
+     *
+     * <p>令牌绑定快照范围（日期/档位/项目/迭代）与有效期；{@code validDays} 来自推送配置，
+     * 每次发链接时快照定死，之后改配置只影响新链接（校验侧另用当前天数二次约束，见 publicView）。
      */
-    private String buildDetailUrl(String baseUrl, LocalDate day, String type, Long projectId) {
-        StringBuilder sb = new StringBuilder(baseUrl == null ? "" : baseUrl);
-        sb.append("/#/rdm-daily?date=").append(day.format(DATE_FMT)).append("&type=").append(type);
-        if (projectId != null) {
-            sb.append("&projectId=").append(projectId);
+    private String buildViewUrl(String baseUrl, LocalDate day, String type, Long projectId, String iterationCode,
+                                Integer validDays) {
+        return buildViewUrl(baseUrl, day, type, projectId, iterationCode, null, validDays);
+    }
+
+    private String buildViewUrl(String baseUrl, LocalDate day, String type, Long projectId, String iterationCode,
+                                String scopeKey, Integer validDays) {
+        int days = configuredBoardDays(validDays);
+        long issuedAt = System.currentTimeMillis();
+        long expireAt = issuedAt + days * 24L * 60L * 60L * 1000L;
+        String token = RdmDailyReportViewTokenUtil.generate(day, type, projectId,
+                StringUtils.hasText(iterationCode) ? iterationCode.trim() : null, issuedAt, expireAt, scopeKey, viewSecret());
+        return (baseUrl == null ? "" : baseUrl) + PUBLIC_VIEW_PATH + "?token=" + token;
+    }
+
+    /**
+     * 看板开放页取数（无登录态）。
+     *
+     * <p>三道校验缺一不可：
+     * <ol>
+     *   <li><b>渠道隔离密钥验签</b>：防伪造/篡改范围；</li>
+     *   <li><b>有效期双约束</b>：{@code now <= expireAt} 且 {@code now <= issuedAt + 当前配置天数}——
+     *       后者让「把有效期改小」能立即约束已发出的旧链接，而不必等它们自然到期；</li>
+     *   <li><b>快照仍要查库</b>：令牌只证明「哪份快照、在什么时间前」，快照被清理或从未生成时
+     *       一律返回不可用，绝不凭空渲染。</li>
+     * </ol>
+     * <p>所有失败原因统一一句提示：区分「签名错/过期/不存在」等于允许用错误响应枚举有效令牌。
+     */
+    public PublicView publicView(String token) {
+        PublicView view = new PublicView();
+        // 公开接口只读：不能走 loadConfig()（缺行时会补插），缺行直接用内存默认值
+        Config cfg = loadConfigForPublic();
+        int validDays = configuredBoardDays(cfg.getBoardLinkValidDays());
+        view.setShowRequirements(!Boolean.FALSE.equals(cfg.getBoardShowRequirements()));
+        view.setShowOwners(!Boolean.FALSE.equals(cfg.getBoardShowOwners()));
+        view.setShowUnassigned(!Boolean.FALSE.equals(cfg.getBoardShowUnassigned()));
+
+        RdmDailyReportViewTokenUtil.Token parsed = RdmDailyReportViewTokenUtil.parse(token, viewSecret());
+        long now = System.currentTimeMillis();
+        if (parsed == null) {
+            view.setMessage("連結無效或已失效");
+            return view;
         }
-        return sb.toString();
+        // 第二个上界故意用「签发时 + 当前配置天数」而不是 token 自带的 expireAt：
+        // 管理员把有效期从 30 天改为 7 天后，已发出的旧链接也应在一周后失效。
+        long currentLimit = parsed.issuedAt() + validDays * 24L * 60L * 60L * 1000L;
+        long effectiveExpire = Math.min(parsed.expireAt(), currentLimit);
+        view.setExpireAt(formatDateTime(new java.sql.Timestamp(effectiveExpire)));
+        if (now > effectiveExpire) {
+            view.setMessage("連結已過期，請聯繫推送人重新發送");
+            return view;
+        }
+        Snapshot snapshot = parsed.scopeKey() != null
+                ? getSnapshotByScopeKey(parsed.reportDate(), parsed.reportType(), parsed.scopeKey())
+                : getSnapshot(parsed.reportDate(), parsed.reportType(),
+                        parsed.projectId(), parsed.iterationCode());
+        if (snapshot == null) {
+            view.setMessage("該日期的日報尚未生成或已清理");
+            return view;
+        }
+        view.setValid(true);
+        view.setSnapshot(trimForPublic(snapshot, view.isShowRequirements(), view.isShowOwners(),
+                view.isShowUnassigned()));
+        return view;
+    }
+
+    /**
+     * 看板实时预览：按当前数据现算一份快照视图，不发送、不落库。
+     *
+     * <p>与 {@link #publicView(String)} 的差异只在数据来源：公开链接读已落库快照，
+     * 手动触发在推送前还没有快照，必须现算；展示参数仍取全局配置，裁剪规则完全一致，
+     * 保证弹窗里看到的层级/字段与真正推出去后点开的看板一致。
+     */
+    public PublicView boardPreview(String type, Long projectId, String iterationCode) {
+        return boardPreview(type, projectId == null ? List.of() : List.of(projectId), iterationCode);
+    }
+
+    public PublicView boardPreview(String type, List<Long> projectIds, String iterationCode) {
+        PublicView view = new PublicView();
+        // 预览是登录态管理动作，但仍用只读配置：缺行时不补插，避免看一次预览改库
+        Config cfg = loadConfigForPublic();
+        view.setShowRequirements(!Boolean.FALSE.equals(cfg.getBoardShowRequirements()));
+        view.setShowOwners(!Boolean.FALSE.equals(cfg.getBoardShowOwners()));
+        view.setShowUnassigned(!Boolean.FALSE.equals(cfg.getBoardShowUnassigned()));
+        Snapshot snapshot = buildSnapshot(LocalDate.now(), normalizeReportType(type), projectIds, iterationCode);
+        view.setValid(true);
+        view.setSnapshot(trimForPublic(snapshot, view.isShowRequirements(), view.isShowOwners(),
+                view.isShowUnassigned()));
+        view.setMessage("即時預覽");
+        return view;
+    }
+
+    /**
+     * 按展示参数裁剪快照：<b>只动内容，不动样式</b>。
+     *
+     * <p>无论开关如何，{@code detailUrl} 一律置空——详情页需要登录，开放页给站内链接
+     * 等于让读者点回去又碰一次登录墙，与「点开即看」的目标相反。
+     */
+    private Snapshot trimForPublic(Snapshot snapshot, boolean showRequirements, boolean showOwners,
+                                   boolean showUnassigned) {
+        for (ProjectNode p : snapshot.getProjects()) {
+            p.setDetailUrl(null);
+            // 内部用户 ID 对开放页没有展示价值：只保留姓名，最小化暴露面
+            p.setPmUserId(null);
+            p.setProductOwnerUserId(null);
+            // 收件人可配后新增的四类角色 userId 同理，开放页一律不返回
+            p.setTechLeadUserId(null);
+            p.setQaLeadUserId(null);
+            p.setUiDesignerUserId(null);
+            p.setOpsLeadUserId(null);
+            if (!showOwners) {
+                p.setPmUserName(null);
+                p.setProductOwnerUserName(null);
+                p.setTechLeadUserName(null);
+                p.setQaLeadUserName(null);
+                p.setUiDesignerUserName(null);
+                p.setOpsLeadUserName(null);
+            }
+            trimIterations(p.getIterations(), showRequirements, showOwners);
+            if (showRequirements) {
+                for (RequirementNode r : p.getUnscheduledRequirements()) {
+                    r.setDetailUrl(null);
+                    if (!showOwners) {
+                        r.setAssigneePmName(null);
+                        if (r.getTasks() != null) {
+                            r.getTasks().forEach(t -> t.setOwnerName(null));
+                        }
+                    }
+                }
+            } else {
+                p.setUnscheduledRequirements(new ArrayList<>());
+            }
+        }
+        if (showUnassigned) {
+            trimIterations(snapshot.getUnassignedIterations(), showRequirements, showOwners);
+        } else {
+            snapshot.setUnassignedIterations(new ArrayList<>());
+        }
+        if (showUnassigned && showRequirements) {
+            for (RequirementNode r : snapshot.getUnassignedRequirements()) {
+                r.setDetailUrl(null);
+                if (!showOwners) {
+                    r.setAssigneePmName(null);
+                    if (r.getTasks() != null) {
+                        r.getTasks().forEach(t -> {
+                            t.setOwnerName(null);
+                            t.setOwnerEmpNo(null);
+                        });
+                    }
+                }
+            }
+        } else {
+            snapshot.setUnassignedRequirements(new ArrayList<>());
+        }
+        return snapshot;
+    }
+
+    private void trimIterations(List<IterationNode> iterations, boolean showRequirements, boolean showOwners) {
+        for (IterationNode it : iterations) {
+            if (!showOwners) {
+                it.setOwnerName(null);
+            }
+            if (!showRequirements) {
+                it.setRequirements(new ArrayList<>());
+                continue;
+            }
+            for (RequirementNode r : it.getRequirements()) {
+                r.setDetailUrl(null);
+                if (!showOwners) {
+                    r.setAssigneePmName(null);
+                    if (r.getTasks() != null) {
+                        r.getTasks().forEach(t -> {
+                            t.setOwnerName(null);
+                            t.setOwnerEmpNo(null);
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    /** 公开接口专用的只读配置读取：缺行不补插，直接回默认配置，保证匿名请求不产生写操作。 */
+    private Config loadConfigForPublic() {
+        List<Config> rows = jdbc.query(
+                "SELECT * FROM rdm_daily_report_config WHERE config_slot = ? AND deleted = 0 LIMIT 1",
+                (rs, i) -> mapConfig(rs), CONFIG_SLOT);
+        return rows.isEmpty() ? fallbackConfig() : rows.get(0);
+    }
+
+    /**
+     * 读取侧的有效天数：库值异常（null/越界）一律收敛到合法区间，不让一个坏值把公开页打成 500。
+     * <p>写入侧仍用 {@link #normalizeBoardLinkValidDays} 严格拒绝越界。
+     */
+    private static int configuredBoardDays(Integer configured) {
+        if (configured == null) {
+            return DEFAULT_BOARD_LINK_VALID_DAYS;
+        }
+        return Math.max(MIN_BOARD_LINK_VALID_DAYS, Math.min(MAX_BOARD_LINK_VALID_DAYS, configured));
+    }
+
+    /**
+     * 校验看板链接有效期：不传沿用库中现值；越界直接拒绝（不静默改为默认值，
+     * 否则管理员以为存了 120 天、实际变成 90 天）。
+     */
+    private static int normalizeBoardLinkValidDays(Integer requested, Integer current) {
+        if (requested == null) {
+            return configuredBoardDays(current);
+        }
+        if (requested < MIN_BOARD_LINK_VALID_DAYS || requested > MAX_BOARD_LINK_VALID_DAYS) {
+            throw new BusinessException("看板連結有效期必須在 " + MIN_BOARD_LINK_VALID_DAYS
+                    + "~" + MAX_BOARD_LINK_VALID_DAYS + " 天之內: " + requested);
+        }
+        return requested;
+    }
+
+    /** 看板令牌签名密钥（域隔离派生，不直接拿 JWT 密钥签业务链接） */
+    private String viewSecret() {
+        return "rdm-daily-view:" + jwtSecret;
+    }
+
+    /** 当前配置是否为固定框架模式（未识别的值一律走固定框架，宁可不发乱码也不发错格式） */
+    private static boolean isFixedMode(Config cfg) {
+        return !MESSAGE_MODE_TEMPLATE.equals(
+                cfg == null || cfg.getMessageMode() == null ? null : cfg.getMessageMode().trim());
+    }
+
+    /** 消息模式：不传沿用现值，非法值直接拒（静默回退会让用户以为切了模式而实际没切） */
+    private static String normalizeMessageMode(String requested, String current) {
+        if (!StringUtils.hasText(requested)) {
+            String fallback = StringUtils.hasText(current) ? current.trim() : MESSAGE_MODE_FIXED;
+            return MESSAGE_MODES.contains(fallback) ? fallback : MESSAGE_MODE_FIXED;
+        }
+        String mode = requested.trim();
+        if (!MESSAGE_MODES.contains(mode)) {
+            throw new BusinessException("消息模式不合法（只接受 fixed / template）: " + requested);
+        }
+        return mode;
+    }
+
+    /** 字段开关序列化为 JSON 列值；写入失败直接抛出，不静默存空（存空会把管理员的勾选抹掉） */
+    private String writeMessageFields(MessageFieldOptions fields) {
+        MessageFieldOptions value = fields == null ? new MessageFieldOptions() : fields;
+        try {
+            return objectMapper.writeValueAsString(value);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new BusinessException("消息字段开关序列化失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 字段开关反序列化：空值或脏 JSON 一律回到默认值。
+     * <p>不抛异常：配置行可能在旧版本写入时为空，读不到不应该把推送打成 500。
+     */
+    private MessageFieldOptions readMessageFields(String json) {
+        if (!StringUtils.hasText(json)) {
+            return new MessageFieldOptions();
+        }
+        try {
+            MessageFieldOptions parsed = objectMapper.readValue(json, MessageFieldOptions.class);
+            return parsed == null ? new MessageFieldOptions() : parsed;
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            log.warn("日报消息字段开关解析失败，已用默认值: {}", e.getMessage());
+            return new MessageFieldOptions();
+        }
     }
 
     /**
@@ -1444,9 +2794,18 @@ public class RdmDailyReportService {
         c.setGroupEnabled(rs.getBoolean("group_enabled"));
         c.setPersonalEnabled(rs.getBoolean("personal_enabled"));
         c.setReceiverScope(rs.getString("receiver_scope"));
+        c.setReceiverRoles(readReceiverRoles(rs.getString("receiver_roles_json")));
+        c.setExtraReceiverUserIds(readLongList(rs.getString("extra_receiver_user_ids_json")));
+        c.setExcludeReceiverUserIds(readLongList(rs.getString("exclude_receiver_user_ids_json")));
         c.setMorningTemplateKey(rs.getString("morning_template_key"));
         c.setEveningTemplateKey(rs.getString("evening_template_key"));
         c.setPersonalTemplateKey(rs.getString("personal_template_key"));
+        c.setBoardLinkValidDays(rs.getInt("board_link_valid_days"));
+        c.setBoardShowRequirements(rs.getBoolean("board_show_requirements"));
+        c.setBoardShowOwners(rs.getBoolean("board_show_owners"));
+        c.setBoardShowUnassigned(rs.getBoolean("board_show_unassigned"));
+        c.setMessageMode(rs.getString("message_mode"));
+        c.setMessageFields(readMessageFields(rs.getString("message_field_options")));
         c.setUpdatedBy(rs.getString("updated_by"));
         c.setUpdatedAt(formatDateTime(rs.getTimestamp("updated_at")));
         return c;
@@ -1457,7 +2816,15 @@ public class RdmDailyReportService {
         Rule r = new Rule();
         r.setId(rs.getLong("id"));
         r.setName(rs.getString("name"));
-        r.setProjectId(rs.getLong("project_id"));
+        // 不能用 getLong：NULL 会被读成 0，前端会显示「项目#0」而不是「未掛項目」
+        Long projectId = (Long) rs.getObject("project_id");
+        List<Long> projectIds = parseProjectIds(rs.getString("project_ids"));
+        r.setProjectIds(projectIds);
+        // 单项目以 project_ids 为真值源；多项目 project_id 为 NULL，范围由 project_ids 表达
+        if (projectIds.size() == 1) {
+            projectId = projectIds.get(0);
+        }
+        r.setProjectId(projectId);
         r.setProjectNo(rs.getString("project_no"));
         r.setProjectName(rs.getString("project_name"));
         r.setIterationCode(rs.getString("iteration_code"));
@@ -1475,9 +2842,123 @@ public class RdmDailyReportService {
     }
 
     /**
-     * 迭代归属校验：空值视为「项目全部迭代」；非空时必须真实存在且属于该项目。
-     * <p>为什么不信任前端传的 iterationCode：规则存的是字符串，一旦存进一个不属于该项目的迭代，
-     * 每天到点都会发出一份「项目头上挂着别人家迭代」的错数据，而且不会报错。
+     * 规则范围展示：全部项目 / 多项目 / 单项目 / 未挂项目迭代。
+     * <p>项目列表仍以 rdm_project 为真值源（该表无 deleted 列），一次全量查询后内存拼接，
+     * 避免多项目规则逐条回查。
+     */
+    private void fillRuleProjectSummaries(List<Rule> rules) {
+        if (rules == null || rules.isEmpty()) {
+            return;
+        }
+        Map<Long, String> labels = new HashMap<>();
+        for (Map<String, Object> row : jdbc.queryForList("SELECT id, project_no, name FROM rdm_project")) {
+            Long id = toLong(row.get("id"));
+            if (id == null) {
+                continue;
+            }
+            String no = (String) row.get("project_no");
+            String name = (String) row.get("name");
+            labels.put(id, (StringUtils.hasText(no) ? no + " " : "") + (name == null ? "" : name));
+        }
+        for (Rule r : rules) {
+            if (r == null) {
+                continue;
+            }
+            List<Long> ids = r.getProjectIds() == null ? List.of() : r.getProjectIds();
+            if (ids.size() > 1) {
+                r.setProjectSummary(ids.stream()
+                        .map(id -> labels.getOrDefault(id, "項目#" + id))
+                        .collect(java.util.stream.Collectors.joining("、")));
+                r.setProjectId(null);
+                continue;
+            }
+            Long id = ids.size() == 1 ? ids.get(0) : r.getProjectId();
+            if (id != null) {
+                String label = labels.get(id);
+                if (label != null) {
+                    r.setProjectId(id);
+                    r.setProjectName(label.substring(label.indexOf(' ') + 1));
+                    r.setProjectNo(label.contains(" ") ? label.substring(0, label.indexOf(' ')) : null);
+                    r.setProjectSummary(label);
+                } else {
+                    r.setProjectSummary(r.getProjectName() == null ? "項目#" + id : r.getProjectName());
+                }
+            } else if (StringUtils.hasText(r.getIterationCode())) {
+                r.setProjectSummary("未掛項目 / 迭代 " + r.getIterationCode());
+            } else {
+                r.setProjectSummary("全部在途項目");
+            }
+        }
+    }
+
+    /** project_ids JSON → List<Long>；老数据/脏数据一律回落空列表（按单项目/全部项目兼容） */
+    private List<Long> parseProjectIds(String json) {
+        if (!StringUtils.hasText(json)) {
+            return new ArrayList<>();
+        }
+        try {
+            Long[] ids = objectMapper.readValue(json, Long[].class);
+            return ids == null ? new ArrayList<>() : new ArrayList<>(java.util.Arrays.asList(ids));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            log.warn("规则 project_ids 解析失败，按空范围处理: {}", e.getClass().getSimpleName());
+            return new ArrayList<>();
+        }
+    }
+
+    private String writeProjectIds(List<Long> ids) {
+        try {
+            return objectMapper.writeValueAsString(ids);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new BusinessException("項目範圍序列化失敗: " + e.getClass().getSimpleName());
+        }
+    }
+
+    /**
+     * 规则范围解析：迭代归属项目是唯一真值源。
+     * <ul>
+     *   <li>迭代挂了项目：表单未选项目则自动带出；选了不一致的项目则拒绝；</li>
+     *   <li>迭代未挂项目（紧急修复）：规则只以迭代为范围，表单不得再指定项目；</li>
+     *   <li>无迭代时项目必选已由 {@link #saveRule} 前置校验。</li>
+     * </ul>
+     * <p>包级可见的纯函数，不触库，便于直接单测四种组合。
+     */
+    static Long resolveRuleProjectId(Long formProjectId, Long iterationProjectId) {
+        if (iterationProjectId == null) {
+            if (formProjectId != null) {
+                throw new BusinessException("所選迭代未掛項目，規則不能再指定所屬項目（請清空項目後保存）");
+            }
+            return null;
+        }
+        if (formProjectId == null) {
+            return iterationProjectId;
+        }
+        if (!formProjectId.equals(iterationProjectId)) {
+            throw new BusinessException("所選迭代不屬於該項目: 迭代項目#" + iterationProjectId
+                    + "，表單項目#" + formProjectId);
+        }
+        return iterationProjectId;
+    }
+
+    private void requireProjectExists(Long projectId) {
+        // 注意：rdm_project 没有逻辑删除列（Batch 1 建表即无），不能写 deleted = 0，否则真库报 Unknown column
+        Integer projectExists = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM rdm_project WHERE id = ?", Integer.class, projectId);
+        if (projectExists == null || projectExists == 0) {
+            throw new BusinessException("推送目標項目不存在或已刪除: " + projectId);
+        }
+    }
+
+    /** 迭代原始行（只取归属判断所需列）；不存在返回 null */
+    private Map<String, Object> findIterationRow(String code) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT id, project_id FROM rdm_iteration WHERE code = ? AND deleted = 0 LIMIT 1", code);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    /**
+     * 迭代归属校验（手动触发用）：非空时必頊真实存在且属于该项目。
+     * <p>为什么不信任前端传的 iterationCode：每天到点都会发出一份「项目头上挂着别人家迭代」的错数据，
+     * 而且不会报错。规则保存走 {@link #resolveRuleProjectId}，它额外允许未挂项目的迭代。
      */
     private String normalizeIteration(Long projectId, String iterationCode) {
         if (!StringUtils.hasText(iterationCode)) {
@@ -1526,6 +3007,12 @@ public class RdmDailyReportService {
         c.setMorningTemplateKey(RdmDailyReportTemplates.KEY_GROUP_MORNING_OVERVIEW);
         c.setEveningTemplateKey(RdmDailyReportTemplates.KEY_GROUP_EVENING_REVIEW);
         c.setPersonalTemplateKey(RdmDailyReportTemplates.KEY_PERSONAL_TODO);
+        c.setBoardLinkValidDays(DEFAULT_BOARD_LINK_VALID_DAYS);
+        c.setBoardShowRequirements(true);
+        c.setBoardShowOwners(true);
+        c.setBoardShowUnassigned(true);
+        c.setMessageMode(MESSAGE_MODE_FIXED);
+        c.setMessageFields(new MessageFieldOptions());
         return c;
     }
 

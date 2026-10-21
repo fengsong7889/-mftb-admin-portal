@@ -70,4 +70,16 @@ describe('MenuPermissionGuard：跨业务共用页的任一菜单豁免', () => 
     mount('/system-access-apply', [])
     expect(screen.getByText('page-body')).toBeInTheDocument()
   })
+
+  it('移动端日报页：项目经理只有需求菜单（无推送配置权）也能打开钉钉链接', async () => {
+    await i18n.changeLanguage('zh-TW')
+    mount('/rdm-daily', ['rdm-requirement'])
+    expect(screen.getByText('page-body')).toBeInTheDocument()
+  })
+
+  it('移动端日报页：没有任何 RDM 菜单时仍然 403（豁免不等于公开）', async () => {
+    await i18n.changeLanguage('zh-TW')
+    mount('/rdm-daily', ['role-management'])
+    expect(screen.getByText('403')).toBeInTheDocument()
+  })
 })

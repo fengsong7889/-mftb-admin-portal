@@ -2456,6 +2456,214 @@
       "author": "Qoder",
       "ticket": "meeting-minutes-v2",
       "comment": "与 v1.0 共用同一个执行器（而不是另开一个 @Order(29) 的类）：新表的两个外键指向 biz_meeting_minutes，两个同序号 Bean 在全新库上的执行顺序不确定，可能先建子表而 1215 失败。事项从 content_json 搬到独立表，是因为它要按行更新状态、按行扫描逾期、按行去重提醒——JSON 只能整行覆盖，两个人同时更新必互相抹掉；唯一键 (minutes_id, kind, seq) 让保存成为“按位置 upsert”：组织者改措辞不会把负责人已填的处理结果清掉。关联表存 booking_no/title/time_text 快照而不是只存 id：被引用的纪要改期改名后，引用方仍要能说清“引自哪场会”。模板与开关分表：模板回答“怎么写”、开关回答“发不发”，使用者常常不是同一个人，合成一行会互相覆盖。模板只做 ${var} 字面替换，不引入模板引擎（配置页不应成为可执行逻辑入口）。历史事项回填只处理“该纪要还没有任何事项行”的行，且状态统一 pending：旧数据没有进度，凭空造一个“已完成”比空着更危险。菜单写入用“存在则不动”：管理员改过的名称/排序不能被每次启动重置。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.20",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.19"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "266_rdm_daily_report_rule_project_nullable.sql"
+      ],
+      "intent": "日报推送规则 project_id 放宽为可空：迭代排期允许紧急修复（hotfix）迭代不挂项目，规则选到这类迭代时应能以迭代为唯一范围保存，不要求也不允许再指定项目",
+      "author": "Qoder",
+      "comment": "v3.19 的规则模型是「项目 + 可选迭代」且 project_id NOT NULL，但 v3.15 已裁决 hotfix 迭代可不挂项目——用户在「進度日報 > 推送配置」选到这类迭代时，旧约束会让保存直接报 1048（Column cannot be null）或逼用户随便挂一个项目（错推）。本版只做 ALTER TABLE ... MODIFY COLUMN 把 NOT NULL 改为 DEFAULT NULL，列上数据与 idx_rdm_daily_report_rule_project 索引全部保留，不删列不删行；MODIFY 本身可重放，仍由 applyOnce 门控 + 后置 IS_NULLABLE 校验，失败不记版本、下次启动重试，避免「只改注释不改约束」的假成功。配套代码：保存规则时迭代有项目则以迭代项目为唯一真值源（自动回填），迭代无项目则 project_id 落 NULL；快照构建对无项目迭代只输出该迭代，详情链接带 iterationCode 收敛。266 脚本仅作参照文档，不进镜像。回滚需先清理 project_id IS NULL 的规则行再 MODIFY 回 NOT NULL（见 266 脚注），属有损回滚，上线前应确认该场景确有需要。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.21",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.20"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "268_rdm_project_no_repair.sql"
+      ],
+      "intent": "存量项目编号按创建日补号收敛为 PROJ+YYYYMMDD+2 位日序：v3.16 只改发号规则配置（UPDATE sys_biz_seq_rule），只影响之后新建的项目，规则切换前建好的项目仍挂旧前缀 PJ+YYYYMMDD+4 位，同一列表新旧两套编号并存",
+      "author": "Qoder",
+      "comment": "只挑不符合 ^PROJ[0-9]{8}[0-9]{2,}$ 的项目行补号，合规行不动，重放即 no-op。补号的日期段取该项目 created_at（缺省才用当天），使编号仍能解释「项目是哪天立的」；序号取「该日已用最大序号」与「sys_biz_seq 当日水位」的较大值+1，并用 ON DUPLICATE KEY UPDATE ... GREATEST 把水位推到同一位置——只改 rdm_project 不推水位，下一次新建会从 01 重发并撞 project_no 唯一键。安全边界：全库只有 rdm_project.project_no 存编号本身，需求/迭代/交付项/成员/日报/发布批次/流程配置全部用 project_id 外键关联，改号不断链；影响面仅限已人工复制的历史文本。不吞异常：规则行缺失、前缀不是 PROJ、UPDATE 撞唯一键一律抛出并不记版本、下次启动重试。后置校验要求不合规行为 0，否则说明补号未真正收敛。回滚=把旧编号写回（先确认无新项目占用该号），水位不回退（回退会重发同号）。268 脚本仅作参照文档，不进镜像。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.22",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.21"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "269_rdm_daily_report_board.sql"
+      ],
+      "intent": "日报推送配置增加看板开放链接有效期（1~90 天，默认 30）与三个展示参数（需求明细/负责人/未挂项目迭代）：推送链接改为免登看板，看板样式固定，只允许调整展示内容",
+      "author": "Qoder",
+      "ticket": "rdm-daily-board",
+      "comment": "推送链接从站内 /rdm-daily（需登录且侧栏锚定推送配置）改为 /rdm-daily-view?token=HMAC：令牌绑定日期/档位/项目/迭代范围与签发/到期，公开接口只读、按 IP+令牌指纹限流，服务层仍查快照表复核；有效期采用双上界（token.expireAt 与 issuedAt+当前配置天数取较小值），把有效期改小能立即约束已发出的旧链接。展示参数只裁剪内容（需求明细/负责人/未挂项目迭代），看板布局与配色写死在前端，不提供任何样式配置；detailUrl 与内部 userId 一律从开放视图剔除，避免把读者带回登录墙或扩大暴露面。仅 ADD COLUMN 且默认值向后兼容，旧代码可忽略新列；回滚只需改回旧 buildDetailUrl，列可保留。269 脚本仅作参照文档，不进镜像。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.23",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.22"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "270_rdm_daily_report_message_framework.sql"
+      ],
+      "intent": "钉钉日报改为固定框架（汇总行→项目行→迭代行→未挂项目迭代→引导链接）+ 全局字段开关，并把旧 7 套预置模板转为可自由编辑的自定义模板",
+      "author": "Qoder",
+      "ticket": "rdm-daily-message-framework",
+      "comment": "旧群报把项目→迭代→全部需求行一次性铺进群里，项目一多就是几十行，重点被淹没；预置模板本身又是可自由编辑的 Markdown，任何人都能把框架改乱，导致同一个日报在不同群里结构各异。本次把层级框架固定到渲染器代码里，可配的只有每行带哪几个字段（message_field_options JSON，全局一套），因此新增两列：message_mode（默认 fixed，升级后新推送即走精简框架）与 message_field_options。同时 UPDATE is_preset=0 把旧 7 套预置转为自定义模板保留：不删行、不改文案，想回退只需把模式改回 template 并选中原模板。只加列 + UPDATE，旧代码忽略新列，回滚无损。后置校验要求两列就绪且不再有 is_preset=1 的行，否则模板页仍会挡住编辑。270 脚本仅作参照文档，不进镜像。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.24",
+      "module": "rdm",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.23"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "271_rdm_project_member_backfill.sql"
+      ],
+      "intent": "存量项目的六类负责人回填到 rdm_project_member：旧代码创建项目只把 PM 入组、编辑项目从未同步成员表，导致详情「項目成員」为空且负责人本人进不了项目",
+      "author": "Qoder",
+      "ticket": "rdm-project-member-sync",
+      "comment": "成员表是数据范围（RdmAccessGuard）、团队负载与详情成员区的唯一事实源，而写入路径只有 rdm_project 主表的六组负责人列：旧 createProject 只插一条 pm 成员，updateProject 完全不碰成员表，于是「选了产品/研发/测试/UI」只体现在基本信息里，成员区仍是空的。本版按「一人一角色一行」补齐：同人多角色写多行（uk_project_user_role 口径），已离任（leave_time 非空）的同一行优先复活而非插入——唯一键不区分 leave_time，直接 insert 会撞键回滚。只补不删、不改其他角色，重放即 no-op；后置校验要求每个有负责人的项目在六类角色上都有活跃成员行，缺一行即不记版本、下次启动重试。271 脚本仅作参照文档，不进镜像。代码侧配合：createProject/updateProject 已改为六类负责人同步入组，换人时旧角色行软移除。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.25",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.24"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "272_rdm_daily_report_rule_project_ids.sql"
+      ],
+      "intent": "日报推送规则支持多项目范围 / 全部项目：规则表新增 project_ids JSON 列，空数组+project_id 为空+无迭代表示全部在途项目",
+      "author": "Qoder",
+      "ticket": "rdm-daily-report-multi-project",
+      "comment": "推送配置原先只能绑定一个项目，导致日报只能看单项目、无法做全公司或跨项目汇总。本版只加 project_ids 列（JSON array）：单项目继续用 project_id 兼容存量，多项目写 project_ids、project_id 落 NULL，全部项目则两者皆空且不指定迭代。旧代码忽略新列即回退到单项目口径；ADD COLUMN 不可重放，初始化器逐列先查再加并做后置校验，ContractRegistry 同步登记以便启动自愈。272 脚本仅作参照文档，不进镜像。"
+    },
+    {
+      "versionKey": "ai:assistant-tools-v1.0",
+      "module": "ai",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "aiAssistantToolSchemaInitializer",
+      "dependencies": [
+        "ai:governance:v1.0"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "269_mcp_tool_rdm.sql",
+        "270_ai_action_request.sql",
+        "271_ai_notification_scenario.sql"
+      ],
+      "intent": "为首页 AI 助手注册 11 个 RDM 内建工具、建 ai_action_request 推送确认表、注册 ai_assistant_work 个人推送场景",
+      "author": "Qoder",
+      "comment": "内建工具注册到 mcp_tool 供「工具广场/AI 操作授权」展示与启停；ai_tool_policy 默认放行只读工具、推送工具 medium。ai_action_request 承载确认卡状态机（pending→processing→sent/failed），15 分钟过期、原子抢占防重复。ai_assistant_work 默认不绑定应用，由管理员在通知配置页显式绑定；未绑定即 fail-closed。脚本只 INSERT IGNORE/CREATE TABLE IF NOT EXISTS，可重放；后置校验 11 个工具与策略、确认表、场景行全部就绪，失败不记版本。"
+    },
+    {
+      "versionKey": "ai:prompt-config-schema-v1.0",
+      "module": "ai",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "aiPromptConfigSchemaInitializer",
+      "dependencies": [
+        "ai:governance:v1.0"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "272_ai_prompt_config.sql"
+      ],
+      "intent": "建 AI 助手配置中心 6 张表（回答骨架/能力清单/术语口径/快捷提问/推送模板/变更审计），并种子 14 条能力、3 套 active 骨架、30 条核心术语",
+      "author": "Qoder",
+      "comment": "配置只影响「怎么说」（能力描述/回答骨架/术语口径），不影响工具启停、数据权限与安全不变量；安全规则仍由 AgentOrchestrationService 代码持有。种子全部 INSERT IGNORE，不覆盖管理员后续在菜单里改过的内容；后置校验 6 张表与 global active 骨架存在，失败不记版本。"
+    },
+    {
+      "versionKey": "ai:assistant-config-menu-v1.0",
+      "module": "ai",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "aiAssistantConfigMenuInitializer",
+      "dependencies": [
+        "core:menu-seed-v45"
+      ],
+      "status": "ACTIVE",
+      "intent": "新增「AI 助手配置」顶级菜单（ai-assistant-config），承载能力清单/回答骨架/术语口径三个 Tab",
+      "author": "Qoder",
+      "comment": "菜单每次启动幂等 upsert（被误删可自愈），只授予 view/edit：配置只改「怎么说」，不授予任何业务数据权限；超管直通不依赖授权行，但仍补一行 admin 授权便于菜单配置页展示。"
+    },
+    {
+      "versionKey": "ai:assistant-phase2-v1.0",
+      "module": "ai",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "aiAssistantPhase2SchemaInitializer",
+      "dependencies": [
+        "ai:prompt-config-schema-v1.0"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "273_ai_assistant_phase2.sql"
+      ],
+      "intent": "AI 助手二期：ai_conversation 增加 summary/summary_message_count/summary_updated_at，新建 ai_user_memory 与 ai_feedback",
+      "author": "Qoder",
+      "comment": "ADD COLUMN 不可重放，逐列先查 INFORMATION_SCHEMA 再补；两张新表 CREATE TABLE IF NOT EXISTS。ai_user_memory 按 (user_id, content_hash) 唯一去重，只存用户显式确认的偏好；ai_feedback 按 (user_id, message_id) 唯一，赞/踩可改。后置校验三列 + 两表全部就绪，失败不记版本。"
+    },
+    {
+      "versionKey": "ai:assistant-phase3-v1.0",
+      "module": "ai",
+      "phase": "BASE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "aiAssistantPhase3SchemaInitializer",
+      "dependencies": [
+        "ai:assistant-phase2-v1.0"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "274_ai_phase3.sql"
+      ],
+      "intent": "AI 助手三期：新建 ai_knowledge_doc / ai_knowledge_chunk / ai_guard_rule，注册 search_knowledge 工具（mcp_tool + ai_tool_policy + ai_capability），探测创建全文索引",
+      "author": "Qoder",
+      "comment": "脚本只 CREATE IF NOT EXISTS / INSERT IGNORE；全文索引不在脚本内，按 ngram→普通 FULLTEXT→LIKE 回退逐级降级，避免不支持 ngram 的环境整段迁移失败。后置校验三表 + 工具/策略/能力三处登记。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.26",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.25"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "275_daily_report_receivers.sql"
+      ],
+      "intent": "个人日报收件人可配：新增角色白名单与追加/排除名单三列，把收件人从硬编码的「项目经理+产品负责人」搬到配置表，默认值与改造前行为完全一致",
+      "author": "Qoder",
+      "ticket": "rdm-daily-report-receivers",
+      "comment": "v3.16 起个人通知收件人被硬编码为 PM + 产品负责人，实际需要技术/测试/UI/运维负责人也收、PMO 额外收、某人不收等场景，只能改代码。只加三列：receiver_roles_json（默认 [\"pm\",\"product_owner\"]，与改造前完全一致）、extra_receiver_user_ids_json（追加名单，收到规则范围全量项目汇总）、exclude_receiver_user_ids_json（排除名单，优先级最高）。v3.16 预留的 receiver_scope 从未被发送链路消费，本版起停止读写但保留列不删（禁止 DROP COLUMN）。ADD COLUMN 不可重放，初始化器逐列先查再加并做后置校验，ContractRegistry 同步登记以便启动自愈。275 脚本仅作参照文档，不进镜像。"
     }
   ]
 }

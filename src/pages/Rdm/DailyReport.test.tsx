@@ -205,8 +205,8 @@ describe('移動端日報頁', () => {
     renderPage('/rdm-daily?date=2026-10-01&type=evening')
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalled())
-    // 第三个参数是 projectId：通知链接不带项目时为 null，用于多快照收敛
-    expect(mockFetch).toHaveBeenCalledWith('2026-10-01', 'evening', null)
+    // 第三、四、五个参数是 projectId / iterationCode / scopeKey：通知链接不带范围时为 null，用于多快照收敛
+    expect(mockFetch).toHaveBeenCalledWith('2026-10-01', 'evening', null, null, null)
   })
 
   it('URL 帶 projectId 時用它收斂快照（同一天多份手動推送不能互相覆蓋）', async () => {
@@ -214,6 +214,22 @@ describe('移動端日報頁', () => {
     renderPage('/rdm-daily?date=2026-10-01&type=manual&projectId=6')
 
     await waitFor(() => expect(mockFetch).toHaveBeenCalled())
-    expect(mockFetch).toHaveBeenCalledWith('2026-10-01', 'manual', 6)
+    expect(mockFetch).toHaveBeenCalledWith('2026-10-01', 'manual', 6, null, null)
+  })
+
+  it('URL 帶 iterationCode 時用它收斂快照（未掛項目的迭代規則）', async () => {
+    mockFetch.mockResolvedValue(makeSnapshot())
+    renderPage('/rdm-daily?date=2026-10-01&type=morning&iterationCode=HF202610001')
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalled())
+    expect(mockFetch).toHaveBeenCalledWith('2026-10-01', 'morning', null, 'HF202610001', null)
+  })
+
+  it('URL 帶 scopeKey 時用它收斂快照（多項目/全部項目沒有單一 projectId）', async () => {
+    mockFetch.mockResolvedValue(makeSnapshot())
+    renderPage('/rdm-daily?date=2026-10-01&type=manual&scopeKey=manual%3Aall')
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalled())
+    expect(mockFetch).toHaveBeenCalledWith('2026-10-01', 'manual', null, null, 'manual:all')
   })
 })

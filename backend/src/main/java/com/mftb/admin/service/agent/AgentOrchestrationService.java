@@ -1,9 +1,12 @@
 package com.mftb.admin.service.agent;
 
 import com.mftb.admin.client.LlmHttpClient;
+import com.mftb.admin.dto.agent.AgentPendingAction;
+import com.mftb.admin.dto.agent.AgentView;
 import com.mftb.admin.service.agent.tool.AgentTool;
 import com.mftb.admin.entity.AiToolPolicy;
 import com.mftb.admin.entity.McpTool;
+import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.AiToolPolicyMapper;
 import com.mftb.admin.mapper.McpToolMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -11,12 +14,14 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mftb.admin.service.AiConversationEventService;
 import com.mftb.admin.service.AiConversationService;
 import com.mftb.admin.service.AiMyCenterService;
 import com.mftb.admin.dto.AiMyCenterDTO;
+import com.mftb.admin.util.OperatorResolver;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -49,7 +54,13 @@ public class AgentOrchestrationService {
             - 不要編造數據，只根據工具返回的實際結果回覆
             - 發送郵件等對外操作：用戶未提供收件人郵箱時必須先詢問確認，禁止編造郵箱地址
             - 標記「外部服務」的工具執行前系統會請求用戶人工確認，請在回覆中說明確認結果（已執行/被拒絕）
-            - 回覆簡潔清晰，重要數字加粗顯示""";
+            - 回覆簡潔清晰，重要數字加粗顯示
+            - 產研交付術語：項目 → 迭代 → 需求 → 任務；交付項是需求下的交付單元
+            - 回答產研問題時按「結論 → 風險與建議 → 口徑」組織；工具已返回 view 時，明細由系統卡片渲染，正文不要重複表格
+            - 待我審批/待分配/待我處理/待我驗收用 rdm_my_todos；查某狀態需求用 rdm_query_requirements；查某人做了什麼用 rdm_person_workload
+            - 項目/需求/迭代必須帶編號；人名或項目名模糊時先列候選讓用戶選，不要猜
+            - 若工具返回 scope.restricted=true，必須在回覆中寫明「僅顯示與您相關的數據」
+            - 推送必須先調用 rdm_prepare_progress_push 生成預覽；生成後只說「已生成推送預覽，請在確認卡確認」，不得說已發送""";
 
     private final List<AgentTool> tools;
     private final LlmChannelRouter channelRouter;
@@ -66,6 +77,14 @@ public class AgentOrchestrationService {
     private final AiToolPolicyMapper toolPolicyMapper;
     /** D2：内建工具执行也要写 ai_tool_exec_log（复用工具策略的日志入口） */
     private final com.mftb.admin.service.AiToolPolicyService toolPolicyService;
+    /** 配置中心：能力清单/回答骨架/术语口径（可为空，空则回退代码内置 Prompt） */
+    private final AiPromptConfigService promptConfigService;
+    /** 当前登录人：工具角色/部门可见性；非 Web 上下文为 null（暗退为全员可见） */
+    private final OperatorResolver operatorResolver;
+    /** 输入/输出合规护栏 */
+    private final AiGuardrailService guardrailService;
+    /** 自动记忆候选（只生成建议，用户确认后才落库） */
+    private final AiUserMemoryService memoryService;
 
     @Data
     public static class OrchestrateRequest {
@@ -74,6 +93,12 @@ public class AgentOrchestrationService {
         private Long conversationPk;
         /** auto / primary / off-peak */
         private String mode = "auto";
+        /** 配置中心试跑：用草稿组装好的完整 Prompt 覆盖线上 Prompt */
+        private String systemPromptOverride;
+        /** 试跑：不写会话事件、不暴露外部工具与推送工具 */
+        private boolean sandbox;
+        /** 试跑：完全不使用工具，只测回答风格 */
+        private boolean disableTools;
     }
 
     @Data
@@ -91,6 +116,14 @@ public class AgentOrchestrationService {
         private List<Map<String, Object>> nextMessages = List.of();
         /** 已执行过的内建工具调用（供事件时间线展示） */
         private List<ToolTrace> traces = new ArrayList<>();
+
+        /** 服务端生成的结构化视图（前端渲染指标卡/表格）；最多 3 个 */
+        private List<AgentView> views = new ArrayList<>();
+
+        /** 待用户确认的动作（当前仅推送）；最多 1 个 */
+        private List<AgentPendingAction> pendingActions = new ArrayList<>();
+        /** 自动记忆候选：用户消息里明确“记住/以后都…”时给出，前端一键确认后落库 */
+        private String memorySuggestion;
         /**
          * 本轮不是 AI 正常回复（熔断/无权限/额度/上游异常），而是给用户的提示文案。
          * <p>为什么需要这个标记：以前错误文案与正常回复一样回 HTTP 200 + text，前端把它当助手回复
@@ -115,6 +148,38 @@ public class AgentOrchestrationService {
             return out;
         }
         String username = caller;
+        SysUser currentUser = currentUser();
+        String lastUserText = lastUserText(req.getMessages());
+        // 输入护栏：命中 block 直接返回，不调模型也不落会话事件（避免敏感内容进入后续上下文）
+        AiGuardrailService.GuardResult inputGuard = guardrailService == null
+                ? null : guardrailService.checkInput(lastUserText);
+        String effectiveUserText = lastUserText;
+        if (inputGuard != null) {
+            if (inputGuard.isBlocked()) {
+                appendEvent(req.getConversationPk(), "POLICY_DECISION", username,
+                        Map.of("decision", "reject", "reason", "guardrail_input"));
+                out.setErrorKind("guardrail_blocked");
+                out.setText(inputGuard.getMessage());
+                return out;
+            }
+            if (StringUtils.hasText(inputGuard.getText())) effectiveUserText = inputGuard.getText();
+            if (!inputGuard.getWarnings().isEmpty()) {
+                appendEvent(req.getConversationPk(), "POLICY_DECISION", username,
+                        Map.of("decision", "warn", "reason", "guardrail_input",
+                                "count", inputGuard.getWarnings().size()));
+            }
+        }
+        // 工具启停只认 ai_tool_policy；能力清单与实际下发工具必须同源，再叠角色/部门可见性
+        Map<String, AiToolPolicy> policyBy = loadPolicyMap();
+        List<AgentTool> enabledTools = enabledBuiltInTools(policyBy, currentUser);
+        if (req.isDisableTools()) {
+            enabledTools = List.of();
+        } else if (req.isSandbox()) {
+            // 试跑不暴露推送工具：避免在沙箱里生成待确认动作
+            enabledTools = enabledTools.stream()
+                    .filter(t -> !"rdm_prepare_progress_push".equals(t.toolKey()))
+                    .toList();
+        }
         LlmChannelRouter.Channel channel = pickChannel(req.getMode(), username);
         if (channel == null) {
             out.setErrorKind("no_channel");
@@ -141,12 +206,14 @@ public class AgentOrchestrationService {
 
         // 复制 messages，前置 System Prompt；截断到最近 MAX_MESSAGES 条
         List<Map<String, Object>> working = new ArrayList<>();
-        working.add(Map.of("role", "system", "content", buildSystemPrompt()));
-        working.addAll(trimMessages(req.getMessages()));
+        String systemPrompt = StringUtils.hasText(req.getSystemPromptOverride())
+                ? req.getSystemPromptOverride() : buildSystemPrompt(enabledTools);
+        working.add(Map.of("role", "system", "content", systemPrompt));
+        working.addAll(withSanitizedLastUser(req.getMessages(), lastUserText, effectiveUserText));
 
         long totalTokens = 0;
         String modelUsed = channel.getDefaultModelKey();
-        List<Map<String, Object>> toolSchemas = allToolSchemas();
+        List<Map<String, Object>> toolSchemas = allToolSchemas(enabledTools, policyBy, req.isSandbox(), currentUser);
         // 每轮单独一个 requestId：一次上游往返 = 一条用量明细 + 一条预算流水，多轮工具循环不能共账
         String requestIdBase = "orch-" + java.util.UUID.randomUUID();
 
@@ -194,7 +261,7 @@ public class AgentOrchestrationService {
             String content = choice.path("content").asText("");
             JsonNode toolCalls = choice.path("tool_calls");
             if (!toolCalls.isArray() || toolCalls.isEmpty()) {
-                out.setText(content.isEmpty() ? "（無內容）" : content);
+                finishWithGuardedText(out, content.isEmpty() ? "（無內容）" : content, username, req, effectiveUserText);
                 out.setTokens(totalTokens);
                 out.setModel(modelUsed);
                 appendEvent(req.getConversationPk(), "ASSISTANT_TURN", username,
@@ -226,7 +293,7 @@ public class AgentOrchestrationService {
                     out.setErrorKind(e.getCategory().name().toLowerCase());
                     finalContent = e.userMessage();
                 }
-                out.setText(finalContent);
+                finishWithGuardedText(out, finalContent, username, req, effectiveUserText);
                 out.setTokens(totalTokens);
                 out.setModel(modelUsed);
                 return out;
@@ -261,10 +328,29 @@ public class AgentOrchestrationService {
                     pending.add(Map.of("id", callId, "name", name, "argumentsJson", argsJson));
                     continue;
                 }
+                if (!isToolEnabled(name, policyBy, currentUser)) {
+                    // 模型可能凭历史记忆调用已停用工具：执行前二次拦截，绝不“页面关了但接口还能跑”
+                    String disabled = "{\"error\":\"工具已停用\",\"hint\":\"請聯繫管理員在 AI 操作授權中開啟\"}";
+                    out.getTraces().add(new ToolTrace(name, shortDigest(argsJson), 0, false));
+                    working.add(Map.of("role", "tool", "tool_call_id", callId, "content", disabled));
+                    recordToolExecLog(name, username, shortDigest(argsJson), 0, false);
+                    continue;
+                }
                 Map<String, Object> args = parseArgs(argsJson);
                 long start = System.currentTimeMillis();
-                String toolResult = tool.execute(args, new AgentTool.ToolCallContext(username, req.getConversationPk()));
+                AgentTool.RichOutput rich = tool.executeRich(args, new AgentTool.ToolCallContext(username, req.getConversationPk()));
+                if (rich == null) {
+                    // 兼容旧工具/Mockito 桩只实现 execute 的情况：退化为纯文本结果
+                    rich = AgentTool.RichOutput.of(tool.execute(args, new AgentTool.ToolCallContext(username, req.getConversationPk())));
+                }
+                String toolResult = rich.content();
                 long cost = System.currentTimeMillis() - start;
+                if (rich.view() != null) {
+                    addView(out, rich.view());
+                }
+                if (rich.pendingAction() != null) {
+                    out.getPendingActions().add(rich.pendingAction());
+                }
                 boolean ok = toolResult != null && !toolResult.startsWith("{\"error\"");
                 out.getTraces().add(new ToolTrace(name, shortDigest(argsJson), cost, ok));
                 appendEvent(req.getConversationPk(), "TOOL_CALL", username,
@@ -330,25 +416,33 @@ public class AgentOrchestrationService {
         return llmClient.chatCompletion(channel.getBaseUrl(), channel.getApiKey(), payload);
     }
 
-    private List<Map<String, Object>> builtInToolSchemas() {
+    private List<Map<String, Object>> builtInToolSchemas(List<AgentTool> enabledTools) {
         List<Map<String, Object>> out = new ArrayList<>();
-        for (AgentTool t : tools) {
+        for (AgentTool t : enabledTools) {
+            String description = promptConfigService == null ? null
+                    : promptConfigService.descriptionOf(t.toolKey(), t.description());
+            if (description == null) description = t.description();
             out.add(Map.of(
                     "type", "function",
                     "function", Map.of(
                             "name", t.toolKey(),
-                            "description", t.description(),
+                            "description", description,
                             "parameters", t.schema())));
         }
         return out;
     }
 
     /**
-     * 内建工具 + 已安装且已授权的外部工具。外部工具的 params_json 直接作为 OpenAI function parameters，
-     * 前端旧行为一致；未登记 policy / enabled=0 的工具不会下发，避免 LLM 命中后无入口。
+     * 内建工具 + 已安装且已授权的外部工具。
+     * <p>内建工具也读 ai_tool_policy：存在策略行且 enabled=0 的不下发；
+     * 无策略行时保持历史行为（放行），新工具由迁移显式登记 enabled=1。
+     * <p>sandbox=true 时只下发内建只读工具，不暴露外部服务。
      */
-    private List<Map<String, Object>> allToolSchemas() {
-        List<Map<String, Object>> out = new ArrayList<>(builtInToolSchemas());
+    private List<Map<String, Object>> allToolSchemas(List<AgentTool> enabledTools,
+                                                     Map<String, AiToolPolicy> policyBy, boolean sandbox,
+                                                     SysUser currentUser) {
+        List<Map<String, Object>> out = new ArrayList<>(builtInToolSchemas(enabledTools));
+        if (sandbox) return out;
         Set<String> builtinKeys = new java.util.HashSet<>();
         for (AgentTool t : tools) builtinKeys.add(t.toolKey());
         try {
@@ -356,17 +450,11 @@ public class AgentOrchestrationService {
                     .eq(McpTool::getInstalled, 1)
                     .eq(McpTool::getSource, "external"));
             if (installed.isEmpty()) return out;
-            List<String> keys = installed.stream().map(McpTool::getToolKey).filter(k -> !builtinKeys.contains(k)).toList();
-            if (keys.isEmpty()) return out;
-            Map<String, AiToolPolicy> policyBy = new LinkedHashMap<>();
-            for (AiToolPolicy p : toolPolicyMapper.selectList(new LambdaQueryWrapper<AiToolPolicy>()
-                    .in(AiToolPolicy::getToolKey, keys))) {
-                policyBy.put(p.getToolKey(), p);
-            }
             for (McpTool tool : installed) {
                 if (builtinKeys.contains(tool.getToolKey())) continue;
                 AiToolPolicy policy = policyBy.get(tool.getToolKey());
                 if (policy == null || policy.getEnabled() == null || policy.getEnabled() != 1) continue;
+                if (!AiToolVisibility.visible(policy, currentUser)) continue;
                 Map<String, Object> parameters = parseParamsJson(tool.getParamsJson());
                 Map<String, Object> fn = new LinkedHashMap<>();
                 fn.put("name", tool.getToolKey());
@@ -380,6 +468,47 @@ public class AgentOrchestrationService {
         return out;
     }
 
+    /** 工具启停策略快照：一次会话只查一次，避免每轮重复查库。 */
+    private Map<String, AiToolPolicy> loadPolicyMap() {
+        Map<String, AiToolPolicy> map = new LinkedHashMap<>();
+        try {
+            for (AiToolPolicy p : toolPolicyMapper.selectList(new LambdaQueryWrapper<>())) {
+                if (p.getToolKey() != null) map.put(p.getToolKey(), p);
+            }
+        } catch (Exception e) {
+            log.warn("[AgentOrch] 读取工具策略失败，内建工具按默认放行：{}", e.getMessage());
+        }
+        return map;
+    }
+
+    private List<AgentTool> enabledBuiltInTools(Map<String, AiToolPolicy> policyBy, SysUser currentUser) {
+        List<AgentTool> list = new ArrayList<>();
+        for (AgentTool t : tools) {
+            if (isToolEnabled(t.toolKey(), policyBy, currentUser)) list.add(t);
+        }
+        return list;
+    }
+
+    private boolean isToolEnabled(String toolKey, Map<String, AiToolPolicy> policyBy, SysUser currentUser) {
+        AiToolPolicy policy = policyBy.get(toolKey);
+        if (policy == null || policy.getEnabled() == null || policy.getEnabled() == 1) {
+            // 角色/部门不在可见范围时按停用处理：页面和模型都不能再看到它
+            return AiToolVisibility.visible(policy, currentUser);
+        }
+        return false;
+    }
+
+    /** 同一轮最多保留 3 个视图；同 id 去重，避免模型重复调用同一工具刷屏。 */
+    private void addView(OrchestrateResult out, AgentView view) {
+        if (view == null) return;
+        if (view.getId() != null) {
+            boolean exists = out.getViews().stream().anyMatch(v -> view.getId().equals(v.getId()));
+            if (exists) return;
+        }
+        if (out.getViews().size() >= 3) out.getViews().remove(0);
+        out.getViews().add(view);
+    }
+
     @SuppressWarnings("unchecked")
     private Map<String, Object> parseParamsJson(String raw) {
         if (raw == null || raw.isBlank()) return Map.of("type", "object", "properties", Map.of());
@@ -387,16 +516,36 @@ public class AgentOrchestrationService {
         catch (Exception e) { return Map.of("type", "object", "properties", Map.of()); }
     }
 
-    private String buildSystemPrompt() {
+    private String buildSystemPrompt(List<AgentTool> enabledTools) {
+        String configured = promptConfigService == null ? null : promptConfigService.compose(enabledTools);
         StringBuilder sb = new StringBuilder();
-        sb.append("你是 MFTB 推廣管理後台的 AI 助手，幫助業務人員快速查詢系統數據。\n\n");
-        sb.append("你的能力範圍：\n");
-        int i = 1;
-        for (AgentTool t : tools) {
-            sb.append(i++).append(". ").append(t.description()).append('\n');
+        sb.append(basePrompt());
+        if (StringUtils.hasText(configured)) {
+            // 配置中心已包含能力清单/术语/骨架/领域规则；安全规则仍由代码追加，配置无法覆盖
+            sb.append(configured).append("\n\n");
+        } else {
+            sb.append("你的能力範圍：\n");
+            int i = 1;
+            for (AgentTool t : enabledTools) {
+                String name = promptConfigService == null ? null
+                        : promptConfigService.displayNameOf(t.toolKey(), t.description());
+                if (name == null) name = t.description();
+                sb.append(i++).append(". ").append(name).append('\n');
+            }
+            sb.append('\n');
         }
-        sb.append('\n').append(SYSTEM_RULES);
+        sb.append(safetyRules());
         return sb.toString();
+    }
+
+    /** 代码内置的角色设定（配置中心预览/试跑与线上同源）。 */
+    public static String basePrompt() {
+        return "你是 MFTB 推廣管理後台的 AI 助手，幫助業務人員快速查詢系統數據。\n\n";
+    }
+
+    /** 代码内置的安全不变量（配置无法覆盖）。 */
+    public static String safetyRules() {
+        return SYSTEM_RULES;
     }
 
     private AgentTool findTool(String key) {
@@ -462,6 +611,74 @@ public class AgentOrchestrationService {
         if (text == null) return "";
         String oneLine = text.replaceAll("\\s+", " ").trim();
         return oneLine.length() <= maxLen ? oneLine : oneLine.substring(0, maxLen) + "…";
+    }
+
+    /** 当前登录人；定时/测试等无 Web 上下文时返回 null（工具可见性按全员放行）。 */
+    private SysUser currentUser() {
+        try {
+            return operatorResolver == null ? null : operatorResolver.currentUser();
+        } catch (Exception e) {
+            log.debug("[AgentOrch] 读取登录人失败，工具可见性按全员处理: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private static String lastUserText(List<Map<String, Object>> messages) {
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            Map<String, Object> m = messages.get(i);
+            if ("user".equals(m.get("role"))) {
+                Object content = m.get("content");
+                return content == null ? "" : String.valueOf(content);
+            }
+        }
+        return "";
+    }
+
+    /**
+     * 护栏 replace 动作需要把改写后的用户输入带入模型。
+     * <p>请求消息可能是 Map.of 产生的不可变对象，必须复制后再改；只改最后一条 user。
+     */
+    private static List<Map<String, Object>> withSanitizedLastUser(List<Map<String, Object>> raw,
+                                                                  String original, String sanitized) {
+        List<Map<String, Object>> trimmed = trimMessages(raw);
+        if (!StringUtils.hasText(sanitized) || sanitized.equals(original)) return trimmed;
+        for (int i = trimmed.size() - 1; i >= 0; i--) {
+            if ("user".equals(trimmed.get(i).get("role"))) {
+                Map<String, Object> copy = new LinkedHashMap<>(trimmed.get(i));
+                copy.put("content", sanitized);
+                trimmed.set(i, copy);
+                break;
+            }
+        }
+        return trimmed;
+    }
+
+    /** 输出护栏 + 自动记忆候选：所有正常回答都从这里出口，避免漏掉某条 return。 */
+    private void finishWithGuardedText(OrchestrateResult out, String content, String username,
+                                       OrchestrateRequest req, String effectiveUserText) {
+        String text = content;
+        if (guardrailService != null) {
+            AiGuardrailService.GuardResult guard = guardrailService.checkOutput(text);
+            if (guard != null && guard.isBlocked()) {
+                appendEvent(req.getConversationPk(), "POLICY_DECISION", username,
+                        Map.of("decision", "reject", "reason", "guardrail_output"));
+                out.setErrorKind("guardrail_blocked");
+                out.setText(guard.getMessage());
+                return;
+            }
+            if (guard != null) {
+                if (guard.getText() != null) text = guard.getText();
+                if (guard.getWarnings() != null && !guard.getWarnings().isEmpty()) {
+                    appendEvent(req.getConversationPk(), "POLICY_DECISION", username,
+                            Map.of("decision", "warn", "reason", "guardrail_output",
+                                    "count", guard.getWarnings().size()));
+                }
+            }
+        }
+        out.setText(text);
+        if (!req.isSandbox() && memoryService != null && StringUtils.hasText(text)) {
+            out.setMemorySuggestion(memoryService.suggestFromMessage(effectiveUserText));
+        }
     }
 
     private void appendEvent(Long conversationPk, String type, String actor, Map<String, Object> payload) {

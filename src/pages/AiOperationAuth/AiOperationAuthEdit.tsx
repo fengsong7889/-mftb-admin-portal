@@ -21,7 +21,9 @@ import {
   TOOL_LEVEL_META,
 } from '../../api/mock/aiPlatformMock'
 import type { ToolDefinition, ToolLevel, ToolParam } from '../../api/mock/aiPlatformMock'
-import { fetchToolRegistry, updateToolPolicy } from '../../api/aiOperationAuth'
+import { fetchToolRegistry, updateToolPolicy, parseToolScope, serializeToolScope, type ToolPolicyRow } from '../../api/aiOperationAuth'
+import { fetchRoles } from '../../api/role'
+import { fetchDepartments } from '../../api/department'
 
 const TOOL_LEVELS: ToolLevel[] = ['L0', 'L1', 'L2', 'L3', 'L4']
 const EMPTY_PARAM: ToolParam = { name: '', type: 'string', required: false, whitelist: [], desc: '' }
@@ -36,6 +38,24 @@ export default function AiOperationAuthEdit() {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [draftParams, setDraftParams] = useState<ToolParam[]>([])
+  /** 已加载的策略：保存时保留审批/备注，避免只改可见范围却把它们清空 */
+  const [loadedPolicy, setLoadedPolicy] = useState<ToolPolicyRow | null>(null)
+  /** 角色/部门可见范围：空 = 全员可见 */
+  const [scopeRoles, setScopeRoles] = useState<string[]>([])
+  const [scopeDepts, setScopeDepts] = useState<number[]>([])
+  const [roleOptions, setRoleOptions] = useState<Array<{ value: string; label: string }>>([])
+  const [deptOptions, setDeptOptions] = useState<Array<{ value: number; label: string }>>([])
+
+  useEffect(() => {
+    fetchRoles()
+      .then((rows) => setRoleOptions(rows
+        .filter((r) => r.status !== 0)
+        .map((r) => ({ value: r.code || r.name, label: r.name }))))
+      .catch(() => setRoleOptions([]))
+    fetchDepartments()
+      .then((rows) => setDeptOptions(rows.map((d) => ({ value: d.id, label: d.name }))))
+      .catch(() => setDeptOptions([]))
+  }, [])
 
   /* ── 加载编辑数据（后端优先，失败回退 mock） ── */
   useEffect(() => {
@@ -47,6 +67,10 @@ export default function AiOperationAuthEdit() {
         if (cancelled) return
         const tool = rows.find((t) => t.id === toolId || t.code === toolId)
         if (tool) {
+          setLoadedPolicy(tool)
+          const scope = parseToolScope(tool.dataScopeJson)
+          setScopeRoles(scope.roles)
+          setScopeDepts(scope.depts)
           form.setFieldsValue({
             name: tool.name,
             code: tool.code,
@@ -92,8 +116,10 @@ export default function AiOperationAuthEdit() {
       updateToolPolicy(key, {
         enabled,
         riskLevel,
-        requireApproval: (values.requireApproval ?? 0) as number,
-        remark: (values.remark as string) ?? null as unknown as string,
+        requireApproval: (loadedPolicy?.requireApproval ?? 0) as number,
+        remark: loadedPolicy?.remark ?? undefined,
+        // 可见范围复用 data_scope_json；空数组=全员可见，逗号留空不清空其它字段
+        dataScopeJson: serializeToolScope({ roles: scopeRoles, depts: scopeDepts }),
       })
         .then(() => {
           message.success('工具已保存，權限等級即時生效')
@@ -195,6 +221,48 @@ export default function AiOperationAuthEdit() {
           </Form.Item>
       </div>
       </Form>
+
+      {/* ── 可见范围模块 ── */}
+      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ToolOutlined style={{ fontSize: 14, color: '#52c41a' }} />
+          </div>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>可見範圍</span>
+          <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
+        </div>
+        <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 16 }}>
+          留空 = 全員可見；選中後只有命中的角色或部門會看到/調用該工具。超管始終可見。此處只控制“能不能用”，數據範圍仍由業務菜單判定。
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div>
+            <div style={{ marginBottom: 6 }}>角色</div>
+            <Select
+              mode="multiple"
+              allowClear
+              style={{ width: '100%' }}
+              placeholder="不選 = 所有角色"
+              value={scopeRoles}
+              onChange={setScopeRoles}
+              options={roleOptions}
+              optionFilterProp="label"
+            />
+          </div>
+          <div>
+            <div style={{ marginBottom: 6 }}>部門</div>
+            <Select
+              mode="multiple"
+              allowClear
+              style={{ width: '100%' }}
+              placeholder="不選 = 所有部門"
+              value={scopeDepts}
+              onChange={setScopeDepts}
+              options={deptOptions}
+              optionFilterProp="label"
+            />
+          </div>
+        </div>
+      </div>
 
       {/* ── 参数白名单模块 ── */}
       <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>

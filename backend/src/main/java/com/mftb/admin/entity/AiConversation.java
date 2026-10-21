@@ -41,6 +41,15 @@ public class AiConversation {
     /** 本次会话累计请求次数 */
     private Integer requestCount;
 
+    /** 滚动历史摘要（超长对话压缩用；summary_message_count 记录已摘要条数） */
+    private String summary;
+
+    /** 已纳入摘要的消息条数 */
+    private Integer summaryMessageCount;
+
+    /** 摘要更新时间 */
+    private LocalDateTime summaryUpdatedAt;
+
     /** 员工姓名（非持久化，审计查询时通过 JOIN sys_user 填充） */
     @TableField(exist = false)
     private String empName;

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -161,9 +162,49 @@ class RdmDailyReportServiceTest {
                 null, null, 5L, "SP202610001", "morning", null, null);
         assertEquals("manual:5:SP202610001", manualIteration.scopeKey());
 
+        RdmDailyReportService.TriggerTarget multi = new RdmDailyReportService.TriggerTarget(
+                null, null, null, List.of(5L, 3L), null, "morning", null, null);
+        assertEquals("manual:ids:3,5", multi.scopeKey(), "多项目按排序后集合编码，重复触发同范围覆盖同一行");
+
+        RdmDailyReportService.TriggerTarget all = new RdmDailyReportService.TriggerTarget(
+                null, null, null, List.of(), null, "morning", null, null);
+        assertEquals("manual:all", all.scopeKey());
+
         // 三个范围键两两不同：否则同一天的手动补发会互相覆盖
         assertFalse(manualProject.scopeKey().equals(manualIteration.scopeKey()));
         assertFalse(manualIteration.scopeKey().equals(rule.scopeKey()));
         assertNull(null);
+    }
+
+    /* ==================== 规则范围：迭代归属项目 ==================== */
+
+    @Test
+    @DisplayName("规则范围：迭代已挂项目且未选项目 → 自动带出迭代项目")
+    void ruleScopeFillsProjectFromIteration() {
+        assertEquals(7L, RdmDailyReportService.resolveRuleProjectId(null, 7L),
+                "先选迭代是合法路径，项目由服务端从迭代带出");
+        assertEquals(7L, RdmDailyReportService.resolveRuleProjectId(7L, 7L),
+                "表单选的项目与迭代一致时照常通过");
+    }
+
+    @Test
+    @DisplayName("规则范围：迭代未挂项目（紧急修复）→ 允许规则不挂项目")
+    void ruleScopeAllowsUnassignedIteration() {
+        assertNull(RdmDailyReportService.resolveRuleProjectId(null, null),
+                "hotfix 迭代未挂项目时必须能以迭代为唯一范围落库");
+    }
+
+    @Test
+    @DisplayName("规则范围：迭代未挂项目却指定了项目 → 拒绝")
+    void ruleScopeRejectsProjectForUnassignedIteration() {
+        assertThrows(BusinessException.class, () -> RdmDailyReportService.resolveRuleProjectId(5L, null),
+                "不能把未挂项目的 hotfix 硬挂到某个项目头上，否则会推错范围");
+    }
+
+    @Test
+    @DisplayName("规则范围：项目与迭代归属不一致 → 拒绝")
+    void ruleScopeRejectsMismatchedProject() {
+        assertThrows(BusinessException.class, () -> RdmDailyReportService.resolveRuleProjectId(5L, 7L),
+                "迭代归属项目是唯一真值源，表单项目不一致必须拦下");
     }
 }

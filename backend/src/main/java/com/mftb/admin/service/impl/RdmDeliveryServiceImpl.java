@@ -79,6 +79,12 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
     private static final String SEQ_TASK = "rdm_work_task";
     private static final String SEQ_CHANGE = "rdm_change";
 
+    /** 审批（准入）通过前不允许建任务：这三个状态都还没有交付范围 */
+    private static final Set<String> TASK_BLOCKED_STATUSES = Set.of(
+            RdmConstants.STATUS_DRAFT,
+            RdmConstants.STATUS_INTAKE_PENDING,
+            RdmConstants.STATUS_INTAKE_REJECTED);
+
     /** 任务状态 */
     private static final String TASK_TODO = "todo";
     private static final String TASK_DOING = "doing";
@@ -100,6 +106,18 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
 
     /** 迭代状态白名单：与前端 constants/rdm.ts 的 RDM_ITERATION_STATUS 同源 */
     private static final Set<String> ITERATION_STATUSES = Set.of("planning", "active", "closed");
+
+    /**
+     * PRD / 評審可寫的需求狀態：受理之後（含受理當下）、排期之前。
+     * <p>「評估中」就寫 PRD、出評審結論是越級操作：需求還沒被產品接受，範圍隨時可能被駁回，
+     * 寫出來的 PRD 與評審結論無效，事後還會出現「評審已通過但頁面還讓人接受需求」的矛盾。
+     * <p>前端據此隱藏按鈕只是體驗；真正邊界在本校驗。
+     */
+    private static final Set<String> PRD_PHASE_STATUSES = Set.of(
+            RdmConstants.STATUS_ACCEPTED,
+            RdmConstants.STATUS_PRD_DESIGNING,
+            RdmConstants.STATUS_REVIEWING,
+            RdmConstants.STATUS_REVIEW_PASSED);
 
     private final RdmPrdMapper prdMapper;
     private final RdmReviewMapper reviewMapper;
@@ -174,6 +192,7 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
             }
             accessGuard.requireDeliveryWriter(dto.getReqId(), "編寫 PRD");
             RdmRequirement req = requireRequirement(dto.getReqId());
+            requirePrdPhase(req, "編寫 PRD");
             prd = new RdmPrd();
             prd.setPrdNo(bizSeqService.next(SEQ_PRD));
             prd.setReqId(req.getId());
@@ -203,11 +222,33 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
             prdMapper.updateById(prd);
         }
 
-        // 拆 PRD 即代表需求进入「PRD設計中」；状态不可流转时静默跳过（由详情页按钮显式推进）
+        // 拆 PRD 即代表需求進入「PRD設計中」；状态不可流转时静默跳过（由详情页按钮显式推进）
         if (prd.getId() != null && !Boolean.FALSE.equals(dto.getAdvanceRequirement())) {
             tryTransition(prd.getReqId(), RdmConstants.ACTION_PRD_START, null);
         }
+        /*
+         * PRD 一旦写入就是既成事实：把需求状态对齐到事实位置（受理→PRD 设计→评审/评审通过）。
+         * 不论保存草稿还是「保存并推进」都对齐：否则「已受理 + PRD 已存在」会同时出现
+         * 「開始寫 PRD」与「PRD 已写好」两个相互矛盾的指令。V3 需求自动跳过。
+         */
+        if (prd.getId() != null) {
+            alignQuietly(prd.getReqId());
+        }
         return toPrdVO(prdMapper.selectById(prd.getId()));
+    }
+
+    /**
+     * PRD / 評審的前置狀態閘門：需求必須已被產品接受（含受理後的 PRD/評審/通過階段）。
+     * <p>“先接受再寫 PRD”是業務口徑：接受給出的是承諾出 PRD 的日期與範圍，
+     * 反過來先寫 PRD 再說要不要接受，會讓評估階段的駁回直接作廢一份已完成評審的方案。
+     */
+    private void requirePrdPhase(RdmRequirement req, String action) {
+        String status = req.getStatus();
+        if (PRD_PHASE_STATUSES.contains(status)) {
+            return;
+        }
+        String label = configService.statusLabelMap().getOrDefault(status, status);
+        throw new BusinessException("需求當前狀態「" + label + "」，請先接受需求（受理）後再" + action);
     }
 
     /** 标题行哨兵：htmlToLines 用它保留「这行是标题」的信息，供验收标准节判定边界 */
@@ -304,6 +345,7 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         }
         RdmRequirement req = requireRequirement(dto.getReqId());
         accessGuard.requireDeliveryWriter(req.getId(), "發起評審");
+        requirePrdPhase(req, "發起評審");
         String reviewType = normalizeReviewType(dto.getReviewType());
         SysUser current = operatorResolver.currentUser();
         List<Long> participants = dto.getParticipantIds() == null ? List.of() : dto.getParticipantIds();
@@ -327,7 +369,10 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
             prd.setStatus(PRD_REVIEWING);
             prdMapper.updateById(prd);
         }
+        // V3 分批交付：需求層不因評審而推進狀態（自動跳過，不再把錯誤帶回主流程）
         tryTransition(req.getId(), RdmConstants.ACTION_REVIEW_START, null);
+        // 評審已發起＝評審中的事實：狀態落在受理/PRD 設計時一併對齊（V3 自動跳過）
+        alignQuietly(req.getId());
         notifyService.notifyUserIds(RdmConstants.EVENT_REVIEW_TODO, req, participants,
                 "需求評審邀約", "### 📝 需求評審邀約\n\n- **編號**: " + req.getReqNo()
                         + "\n- **標題**: " + req.getTitle()
@@ -374,6 +419,8 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         tryTransition(review.getReqId(),
                 passed ? RdmConstants.ACTION_REVIEW_PASS : RdmConstants.ACTION_REVIEW_REJECT,
                 passed ? null : remarkOnly(review.getConclusionDesc()));
+        // 結論已定＝評審結束的事實：狀態若還停在受理/PRD 設計，一併補到事實位置（V3 自動跳過）
+        alignQuietly(review.getReqId());
         return toReviewVO(reviewMapper.selectById(id));
     }
 
@@ -424,6 +471,11 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
             throw new BusinessException("請選擇任務類型");
         }
         RdmRequirement req = requireRequirement(dto.getReqId());
+        // 审批（准入）通过前不允许建任务：草稿/待准入/准入驳回的需求还没有交付范围，
+        // 此时建任务会以「未承诺的工作」进入负载与统计，也会在交付流程未定时制造混合数据。
+        if (TASK_BLOCKED_STATUSES.contains(req.getStatus())) {
+            throw new BusinessException("需求尚未通過審批（准入），不能創建或修改任務");
+        }
         accessGuard.requireDeliveryWriter(req.getId(), "指派/維護任務");
         validateTaskForm(dto);
         SysUser current = operatorResolver.currentUser();
@@ -726,8 +778,41 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
 
     @Override
     public List<RdmDeliveryVO.Iteration> listIterations() {
-        List<RdmIteration> iterations = iterationMapper.selectList(new LambdaQueryWrapper<RdmIteration>()
-                .orderByDesc(RdmIteration::getStartDate).last("LIMIT 50"));
+        return listIterations(null, null, null);
+    }
+
+    /**
+     * 迭代候选（支持远程搜索）：关键词匹配迭代编码/名称或所属项目编号/名称。
+     * <p>带关键词默认只回 20 条：下拉候选不需要全量，回得少才能快；无关键词保持 100 条供迭代排期等
+     * 需要完整列表的页面。limit 上限 200，防止调用方把快照拉回无界。
+     * <p>指定 projectId 时同时保留未挂项目的迭代：紧急修复迭代不属于任何项目，但规则要能选到它。
+     */
+    @Override
+    public List<RdmDeliveryVO.Iteration> listIterations(String keyword, Long projectId, Integer limit) {
+        boolean searching = StringUtils.hasText(keyword);
+        int cap = limit == null ? (searching ? 20 : 100) : Math.min(Math.max(limit, 1), 200);
+        LambdaQueryWrapper<RdmIteration> wrapper = new LambdaQueryWrapper<RdmIteration>()
+                .orderByDesc(RdmIteration::getStartDate)
+                .last("LIMIT " + cap);
+        if (projectId != null) {
+            wrapper.and(w -> w.eq(RdmIteration::getProjectId, projectId)
+                    .or().isNull(RdmIteration::getProjectId));
+        }
+        if (searching) {
+            String kw = keyword.trim();
+            String like = "%" + kw + "%";
+            // 未选项目时用户可能只记得项目名/编号：一并按所属项目匹配
+            List<Long> matchedProjectIds = jdbcTemplate.queryForList(
+                    "SELECT id FROM rdm_project WHERE project_no LIKE ? OR name LIKE ? LIMIT 50",
+                    Long.class, like, like);
+            wrapper.and(w -> {
+                w.like(RdmIteration::getCode, kw).or().like(RdmIteration::getName, kw);
+                if (!matchedProjectIds.isEmpty()) {
+                    w.or().in(RdmIteration::getProjectId, matchedProjectIds);
+                }
+            });
+        }
+        List<RdmIteration> iterations = iterationMapper.selectList(wrapper);
         // 项目名批量联表（一次 IN 查询）：逐行查 rdm_project 会把迭代列表变成 N+1
         Map<Long, String> projectNames = new LinkedHashMap<>();
         List<Long> projectIds = iterations.stream().map(RdmIteration::getProjectId)
@@ -739,6 +824,34 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
                             "SELECT id, name FROM rdm_project WHERE id IN (" + placeholders + ")",
                             projectIds.toArray())
                     .forEach(row -> projectNames.put(((Number) row.get("id")).longValue(), String.valueOf(row.get("name"))));
+        }
+        // 需求数/任务数/工时按 code 批量聚合：逐条迭代查会随上限翻倍成 200 次往返，
+        // 迭代下拉会慢到不可用（原 50 条已是 N+1，只是量小未暴露）
+        List<String> codes = iterations.stream().map(RdmIteration::getCode)
+                .filter(StringUtils::hasText).distinct().toList();
+        Map<String, Integer> reqCounts = new LinkedHashMap<>();
+        Map<String, Integer> taskCounts = new LinkedHashMap<>();
+        Map<String, BigDecimal> taskHours = new LinkedHashMap<>();
+        if (!codes.isEmpty()) {
+            String in = String.join(",", java.util.Collections.nCopies(codes.size(), "?"));
+            jdbcTemplate.queryForList(
+                            "SELECT iteration_code, COUNT(*) AS cnt FROM rdm_requirement "
+                                    + "WHERE deleted = 0 AND iteration_code IN (" + in + ") GROUP BY iteration_code",
+                            codes.toArray())
+                    .forEach(row -> reqCounts.put(String.valueOf(row.get("iteration_code")),
+                            zeroIfNull(toInt(row.get("cnt")))));
+            jdbcTemplate.queryForList(
+                            "SELECT iteration_code, COUNT(*) AS task_cnt, "
+                                    + "COALESCE(SUM(COALESCE(actual_hours, plan_hours)), 0) AS hours "
+                                    + "FROM rdm_work_task WHERE deleted = 0 AND iteration_code IN (" + in + ") "
+                                    + "GROUP BY iteration_code",
+                            codes.toArray())
+                    .forEach(row -> {
+                        String code = String.valueOf(row.get("iteration_code"));
+                        taskCounts.put(code, zeroIfNull(toInt(row.get("task_cnt"))));
+                        Object hours = row.get("hours");
+                        taskHours.put(code, hours == null ? BigDecimal.ZERO : new BigDecimal(hours.toString()));
+                    });
         }
         List<RdmDeliveryVO.Iteration> list = new ArrayList<>();
         for (RdmIteration it : iterations) {
@@ -756,19 +869,16 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
             vo.setOwnerName(it.getOwnerName());
             vo.setStatus(it.getStatus());
             vo.setRemark(it.getRemark());
-            vo.setReqCount(jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM rdm_requirement WHERE deleted = 0 AND iteration_code = ?",
-                    Integer.class, it.getCode()));
-            Map<String, Object> taskStat = jdbcTemplate.queryForList(
-                            "SELECT COUNT(*) AS task_cnt, COALESCE(SUM(COALESCE(actual_hours, plan_hours)), 0) AS hours "
-                                    + "FROM rdm_work_task WHERE deleted = 0 AND iteration_code = ?", it.getCode())
-                    .stream().findFirst().orElse(Map.of());
-            vo.setTaskCount(toInt(taskStat.get("task_cnt")));
-            Object hours = taskStat.get("hours");
-            vo.setTaskHours(hours == null ? BigDecimal.ZERO : new BigDecimal(hours.toString()));
+            vo.setReqCount(reqCounts.getOrDefault(it.getCode(), 0));
+            vo.setTaskCount(taskCounts.getOrDefault(it.getCode(), 0));
+            vo.setTaskHours(taskHours.getOrDefault(it.getCode(), BigDecimal.ZERO));
             list.add(vo);
         }
         return list;
+    }
+
+    private static int zeroIfNull(Integer value) {
+        return value == null ? 0 : value;
     }
 
     @Override
@@ -963,24 +1073,27 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
     /* ==================== 内部辅助 ==================== */
 
     /**
-     * 尝试推进需求状态：当前状态下没有该流转配置就跳过；
-     * 角色/必填不满足时只记日志，不回滚交付过程的数据录入。
+     * 尝试推进需求状态：当前状态下没有该流转配置就跳过。
+     * <p>走 {@link RdmRequirementService#tryAdvanceQuietly}（独立保存点）：失败只记日志，
+     * 不会把调用方事务标成 rollback-only。旧写法直接 try/catch 调用 transition，
+     * 内层抛错后外层事务已被标记“必须回滚”，于是 PRD 明明已写入，接口却整体 500。
      */
     private void tryTransition(Long reqId, String actionCode, RdmTransitionDTO payload) {
-        RdmRequirement req = reqId == null ? null : requirementMapper.selectById(reqId);
-        if (req == null) {
-            return;
-        }
-        if (configService.findTransition(req.getStatus(), actionCode) == null) {
-            return;
-        }
         try {
-            RdmTransitionDTO dto = payload == null ? new RdmTransitionDTO() : payload;
-            dto.setActionCode(actionCode);
-            requirementService.transition(req.getId(), dto);
-        } catch (BusinessException e) {
-            log.warn("交付過程聯動需求狀態未成功（不影響任務數據）: reqNo={}, action={}, reason={}",
-                    req.getReqNo(), actionCode, e.getMessage());
+            requirementService.tryAdvanceQuietly(reqId, actionCode, payload);
+        } catch (Exception e) {
+            // 聯動失敗只損失一次狀態推進，不能影響主數據寫入（PRD/評審已經存好）
+            log.info("交付過程聯動需求狀態未執行（不影響主數據）: reqId={}, action={}, reason={}",
+                    reqId, actionCode, e.getMessage());
+        }
+    }
+
+    /** 依既有 PRD / 評審事實對齊狀態（靜默）：對齊失敗不影響 PRD/評審主數據寫入 */
+    private void alignQuietly(Long reqId) {
+        try {
+            requirementService.alignPrdPhaseStatus(reqId);
+        } catch (Exception e) {
+            log.info("需求 PRD 階段狀態對齊未完成（不影響主數據）: reqId={}, reason={}", reqId, e.getMessage());
         }
     }
 
