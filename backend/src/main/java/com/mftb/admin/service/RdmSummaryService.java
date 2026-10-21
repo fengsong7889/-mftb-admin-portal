@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * RDM 统一摘要服务（Batch 2 / Phase 1B；任务22 收敛到统一事实源）。
@@ -93,6 +94,10 @@ public class RdmSummaryService {
     private final RdmAcceptanceRecordService acceptanceRecordService;
     /** 任务19 需求维度读守卫 */
     private final RdmAccessGuard accessGuard;
+
+    /** 工作台摘要缓存有效期：20s 内重复访问直接复用，避免每次重扫全量项目事实 */
+    private static final long WORKBENCH_CACHE_MS = 20_000L;
+    private final Map<Long, WorkbenchCacheEntry> workbenchCache = new ConcurrentHashMap<>();
 
     /* ==================== 项目级摘要 ==================== */
 
@@ -285,6 +290,31 @@ public class RdmSummaryService {
      * 且区分「待我处理 / 等待他人 / 未指派」，不再把别人该做的事算成我的待办。
      */
     public WorkbenchSummary getWorkbenchSummary(Long userId) {
+        if (userId == null) {
+            WorkbenchSummary empty = new WorkbenchSummary();
+            empty.setComputedAt(LocalDateTime.now());
+            empty.setProjects(new ArrayList<>());
+            log.debug("工作台摘要 fail-closed：未取得认证主体，返回空摘要（ 不退化全量）");
+            return empty;
+        }
+        long now = System.currentTimeMillis();
+        WorkbenchCacheEntry cached = workbenchCache.get(userId);
+        if (cached != null && cached.expiresAt() > now) {
+            return cached.value();
+        }
+        WorkbenchSummary s = computeWorkbenchSummary(userId);
+        workbenchCache.put(userId, new WorkbenchCacheEntry(s, now + WORKBENCH_CACHE_MS));
+        return s;
+    }
+
+    /**
+     * 工作台摘要的 20s 内存缓存。
+     * <p>该接口对管理员要扫全量项目事实（远端库实测 5~8s），而工作台首屏与收指标卡会连着打多次；
+     * 20s 内复用同一份结果，既不改聚合口径，也不会让用户看到过期数据超过半分钟。
+     */
+    private record WorkbenchCacheEntry(WorkbenchSummary value, long expiresAt) {}
+
+    private WorkbenchSummary computeWorkbenchSummary(Long userId) {
         WorkbenchSummary s = new WorkbenchSummary();
         s.setComputedAt(LocalDateTime.now());
         s.setProjects(new ArrayList<>());

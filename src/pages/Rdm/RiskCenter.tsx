@@ -56,13 +56,10 @@ export default function RiskCenter() {
     setLoading(true)
     setError(null)
     try {
-      // 明细与摘要并行取；两者在后端共用同一份 riskList，所以不会出现两套数字
-      const [data, sum] = await Promise.all([
-        fetchDashboard('month'),
-        fetchRiskSummary(minStayDays),
-      ])
+      // 明细先取：看板是首屏唯一依赖，AI 叙述（可能等上游 8s）放后台补齐，
+      // 否则整页白屏时间被 AI 调用拖住
+      const data = await fetchDashboard('month')
       setBoard(data)
-      setSummary(sum)
     } catch (err) {
       // 看板接口是静默请求，失败必须在这里说明，不能停在转圈假象上
       const text = err instanceof Error && err.message ? err.message : '風險數據載入失敗'
@@ -71,6 +68,10 @@ export default function RiskCenter() {
     } finally {
       setLoading(false)
     }
+    // 摘要/要点只影响叙述区，后端超时会自己回落结构化要点
+    fetchRiskSummary(minStayDays)
+      .then(sum => setSummary(sum))
+      .catch(() => setSummary(null))
   }, [minStayDays])
 
   useEffect(() => { void load() }, [load])

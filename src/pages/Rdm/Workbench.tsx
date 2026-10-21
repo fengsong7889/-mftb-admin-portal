@@ -212,25 +212,30 @@ export default function RdmWorkbench() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      // 只读接口任一失败都不应把整页打成空白，所以各自单独兜底
-      const [wb, mine, projects, summ, board] = await Promise.all([
+      // 首屏只等核心数据：项目列表（远端库 6s+）、摘要与待办看板各自较重，
+      // 统一放到首屏之后异步补齐，否则整页白屏时间 = 最慢的那个聚合接口
+      const [wb, mine] = await Promise.all([
         fetchWorkbench(),
         // 「待补充」走完整查询（size 拉满），不再从最近 6 条里筛，避免漏项
         fetchRequirementPage({ page: 1, size: 200, scope: RDM_SCOPE.MINE }).catch(() => null),
-        fetchProjectPage({ pageNo: 1, pageSize: 8 }).catch(() => null),
-        fetchWorkbenchSummary().catch(() => null),
-        fetchTodoBoard(0).catch(() => null),
       ])
       setData(wb)
       setMineRows(mine?.records ?? [])
-      setMyProjects(projects?.records ?? [])
-      setWbSummary(summ)
-      setTodoBoard(board)
     } catch {
       message.error('工作台數據載入失敗')
     } finally {
       setLoading(false)
     }
+    // 次级数据：只影响指标卡、我的项目与待办看板，失败或慢都不影响首屏
+    Promise.all([
+      fetchProjectPage({ pageNo: 1, pageSize: 8 }).catch(() => null),
+      fetchWorkbenchSummary().catch(() => null),
+      fetchTodoBoard(0).catch(() => null),
+    ]).then(([projects, summ, board]) => {
+      setMyProjects(projects?.records ?? [])
+      setWbSummary(summ)
+      setTodoBoard(board)
+    }).catch(() => { /* 三个接口已各自兜底，这里只防未预料的异常 */ })
   }, [])
 
   useEffect(() => { load() }, [load])

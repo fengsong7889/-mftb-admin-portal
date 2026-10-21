@@ -25,6 +25,12 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * RDM AI 辅助（M4+）：PRD 草稿生成、逾期风险摘要。
@@ -49,6 +55,15 @@ public class RdmAssistantService {
     private static final int MAX_OUTPUT_TOKENS = 1200;
     /** 风险摘要最多带多少条风险需求进 prompt */
     private static final int MAX_RISK_ITEMS = 12;
+    /** 通用 AI 调用上限：超过后走“本地结构化”兜底，不让整页被上游拖死。 */
+    private static final long DEFAULT_AI_TIMEOUT_MS = 20_000L;
+    /** 风险摘要是首屏阻塞项，只给 8 秒：超时直接回落结构化要点。 */
+    private static final long RISK_AI_TIMEOUT_MS = 8_000L;
+    private static final ExecutorService AI_CALL_POOL = Executors.newFixedThreadPool(4, r -> {
+        Thread t = new Thread(r, "rdm-ai-call");
+        t.setDaemon(true);
+        return t;
+    });
 
     private final RdmRequirementMapper requirementMapper;
     private final RdmPrdMapper prdMapper;
@@ -216,7 +231,7 @@ public class RdmAssistantService {
             return summary;
         }
         ChatResult chat = chat(buildRiskSystemPrompt(), buildRiskUserPrompt(stay, risks, summary.getHighlights()),
-                caller, "risk_summary");
+                caller, "risk_summary", RISK_AI_TIMEOUT_MS);
         if (chat.failed()) {
             summary.setNarrative(String.join("；", summary.getHighlights()) + "。");
             summary.setNotice(chat.error() == null ? "AI 摘要生成失敗，已改用結構化要點" : chat.error());
@@ -309,6 +324,15 @@ public class RdmAssistantService {
      * 这里保证「调用成功即记账」，失败不记账（没有消耗就不该出现在账本上）。
      */
     private ChatResult chat(String systemPrompt, String userPrompt, String caller, String purpose) {
+        return chat(systemPrompt, userPrompt, caller, purpose, DEFAULT_AI_TIMEOUT_MS);
+    }
+
+    /**
+     * 带超时的 LLM 调用。
+     * <p>上游慢时不能无限等：超时后把 Future 取消并返回可读错误，由调用方回落到本地结构化要点。
+     * 线程池固定 4 个守护线程，避免每次调用新建线程。
+     */
+    private ChatResult chat(String systemPrompt, String userPrompt, String caller, String purpose, long timeoutMs) {
         if (!StringUtils.hasText(caller)) {
             return new ChatResult(null, null, 0, null, "登錄狀態失效，請重新登錄後使用 AI 輔助");
         }
@@ -330,12 +354,32 @@ public class RdmAssistantService {
                 Map.of("role", "user", "content", userPrompt)));
         long started = System.currentTimeMillis();
         JsonNode resp;
+        Future<JsonNode> future = null;
         try {
-            resp = llmClient.chatCompletion(channel.getBaseUrl(), channel.getApiKey(), payload);
-        } catch (LlmHttpClient.LlmCallException e) {
-            log.warn("RDM AI 調用失敗[{}]: purpose={}, caller={}, elapsed={}ms, detail={}", e.getCategory(),
-                    purpose, caller, System.currentTimeMillis() - started, e.getMessage());
-            return new ChatResult(null, channel.getDefaultModelKey(), 0, channel.getLabel(), e.userMessage());
+            String baseUrl = channel.getBaseUrl();
+            String apiKey = channel.getApiKey();
+            future = AI_CALL_POOL.submit(() -> llmClient.chatCompletion(baseUrl, apiKey, payload));
+            resp = future.get(timeoutMs, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            if (future != null) future.cancel(true);
+            log.warn("RDM AI 調用逾時: purpose={}, caller={}, elapsed={}ms, timeout={}ms",
+                    purpose, caller, System.currentTimeMillis() - started, timeoutMs);
+            return new ChatResult(null, channel.getDefaultModelKey(), 0, channel.getLabel(),
+                    "AI 摘要生成逾時，已改用結構化要點");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return new ChatResult(null, channel.getDefaultModelKey(), 0, channel.getLabel(),
+                    "AI 服務被中斷，請稍後再試");
+        } catch (ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof LlmHttpClient.LlmCallException le) {
+                log.warn("RDM AI 調用失敗[{}]: purpose={}, caller={}, elapsed={}ms, detail={}", le.getCategory(),
+                        purpose, caller, System.currentTimeMillis() - started, le.getMessage());
+                return new ChatResult(null, channel.getDefaultModelKey(), 0, channel.getLabel(), le.userMessage());
+            }
+            log.warn("RDM AI 調用異常: purpose={}, caller={}, elapsed={}ms, detail={}",
+                    purpose, caller, System.currentTimeMillis() - started, String.valueOf(cause));
+            return new ChatResult(null, channel.getDefaultModelKey(), 0, channel.getLabel(), "AI 服務暫時不可用，請稍後再試");
         }
         if (resp == null) {
             log.warn("RDM AI 調用失敗: purpose={}, caller={}, elapsed={}ms", purpose, caller, System.currentTimeMillis() - started);
