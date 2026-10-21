@@ -182,6 +182,12 @@ public class AgentOrchestrationService {
                     .filter(t -> !"rdm_prepare_progress_push".equals(t.toolKey()))
                     .toList();
         }
+        // 按当前系统裁剪工具：物资/人事等未接入 AI 工具的系统只保留通用工具（知识库/术语）
+        if (StringUtils.hasText(req.getSystemCode())) {
+            enabledTools = enabledTools.stream()
+                    .filter(t -> AiPromptConfigService.inScope(scopeOf(t.toolKey()), req.getSystemCode()))
+                    .toList();
+        }
         LlmChannelRouter.Channel channel = pickChannel(req.getMode(), username);
         if (channel == null) {
             out.setErrorKind("no_channel");
@@ -331,14 +337,26 @@ public class AgentOrchestrationService {
                     continue;
                 }
                 if (!isToolEnabled(name, policyBy, currentUser)) {
-                    // 模型可能凭历史记忆调用已停用工具：执行前二次拦截，绝不“页面关了但接口还能跑”
+                    // 模型可能凭历史记忆调用已停用工具：执行前二次拦截，绝 不“页面关了但接口还能跑”
                     String disabled = "{\"error\":\"工具已停用\",\"hint\":\"請聯繫管理員在 AI 操作授權中開啟\"}";
                     out.getTraces().add(new ToolTrace(name, shortDigest(argsJson), 0, false));
                     working.add(Map.of("role", "tool", "tool_call_id", callId, "content", disabled));
                     recordToolExecLog(name, username, shortDigest(argsJson), 0, false);
                     continue;
                 }
-                Map<String, Object> args = parseArgs(argsJson);
+                if (!AiPromptConfigService.inScope(scopeOf(name), req.getSystemCode())) {
+                    // 系统未接入该能力：即使模型凭历史记忆点名，也不能跨系统查数据
+                    String outOfScope = "{\"error\":\"當前系統未接入該能力\",\"hint\":\"請前往對應系統的 AI 助手使用\"}";
+                    out.getTraces().add(new ToolTrace(name, shortDigest(argsJson), 0, false));
+                    working.add(Map.of("role", "tool", "tool_call_id", callId, "content", outOfScope));
+                    recordToolExecLog(name, username, shortDigest(argsJson), 0, false);
+                    continue;
+                }
+                Map<String, Object> args = new LinkedHashMap<>(parseArgs(argsJson));
+                // 知识库检索强制收敛到当前系统（common + 本系统），不依赖模型自填 systemCode
+                if ("search_knowledge".equals(name) && StringUtils.hasText(req.getSystemCode())) {
+                    args.put("systemCode", req.getSystemCode());
+                }
                 long start = System.currentTimeMillis();
                 AgentTool.RichOutput rich = tool.executeRich(args, new AgentTool.ToolCallContext(username, req.getConversationPk()));
                 if (rich == null) {
@@ -560,6 +578,27 @@ public class AgentOrchestrationService {
             if (t.toolKey().equals(key)) return t;
         }
         return null;
+    }
+
+    /** 工具归属作用域：能力表 domain 优先，缺失时按前缀推断；配置中心不可用时退化为全局放行。 */
+    private String scopeOf(String toolKey) {
+        try {
+            if (promptConfigService != null) {
+                String domain = promptConfigService.domainOfTool(toolKey);
+                if (StringUtils.hasText(domain)) return domain;
+            }
+            return inferScope(toolKey);
+        } catch (Exception e) {
+            log.debug("[AgentOrch] 读取工具作用域失败，按前缀推断: {}", e.getMessage());
+            return inferScope(toolKey);
+        }
+    }
+
+    private static String inferScope(String toolKey) {
+        if (toolKey == null) return "common";
+        if (toolKey.startsWith("rdm_")) return "rdm";
+        if (toolKey.startsWith("query_")) return "finance";
+        return "common";
     }
 
     private static List<Map<String, Object>> trimMessages(List<Map<String, Object>> raw) {

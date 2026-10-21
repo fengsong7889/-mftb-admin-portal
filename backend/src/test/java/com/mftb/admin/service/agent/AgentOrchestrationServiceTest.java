@@ -12,6 +12,7 @@ import com.mftb.admin.service.agent.AgentOrchestrationService.OrchestrateResult;
 import com.mftb.admin.service.agent.LlmChannelRouter.Channel;
 import com.mftb.admin.service.agent.tool.AgentTool;
 import com.mftb.admin.service.agent.tool.AgentTool.ToolCallContext;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -47,6 +48,8 @@ class AgentOrchestrationServiceTest {
     @Mock private LlmHttpClient llmClient;
     @Mock private LlmMeteringService metering;
     @Mock private AgentTool dummyTool;
+    @Mock private AgentTool rdmTool;
+    @Mock private AgentTool knowledgeTool;
     @Mock private com.mftb.admin.mapper.McpToolMapper mcpToolMapper;
     @Mock private com.mftb.admin.mapper.AiToolPolicyMapper toolPolicyMapper;
     @Mock private com.mftb.admin.service.AiToolPolicyService toolPolicyService;
@@ -73,6 +76,94 @@ class AgentOrchestrationServiceTest {
         return new AgentOrchestrationService(List.of(dummyTool), channelRouter, myCenterService,
                 eventService, llmClient, mapper, metering, conversationService, mcpToolMapper, toolPolicyMapper,
                 toolPolicyService, promptConfigService, operatorResolver, guardrailService, memoryService);
+    }
+
+    /** 带 RDM 工具的编排实例：用于验证「按系统裁剪工具」。 */
+    private AgentOrchestrationService buildScopedService() {
+        when(rdmTool.toolKey()).thenReturn("rdm_list_projects");
+        when(rdmTool.description()).thenReturn("rdm projects");
+        when(rdmTool.schema()).thenReturn(Map.of("type", "object", "properties", Map.of()));
+        when(mcpToolMapper.selectList(any())).thenReturn(List.of());
+        when(toolPolicyMapper.selectList(any())).thenReturn(List.of());
+        when(dummyTool.toolKey()).thenReturn("query_account_balance");
+        when(dummyTool.description()).thenReturn("desc");
+        when(dummyTool.schema()).thenReturn(Map.of("type", "object", "properties", Map.of()));
+        when(myCenterService.hasModelAccess(any())).thenReturn(true);
+        when(metering.settle(any(), any(), any(), any(), any())).thenReturn(0L);
+        // 工具归属交给前缀兜底（能力表 mock 返回 null）
+        when(promptConfigService.domainOfTool(any())).thenReturn(null);
+        return new AgentOrchestrationService(List.of(dummyTool, rdmTool), channelRouter, myCenterService,
+                eventService, llmClient, mapper, metering, conversationService, mcpToolMapper, toolPolicyMapper,
+                toolPolicyService, promptConfigService, operatorResolver, guardrailService, memoryService);
+    }
+
+    @Test
+    @DisplayName("按当前系统裁剪工具：物资系统不下发 RDM/财务工具，RDM 系统不下发财务工具")
+    void systemScopeFiltersTools() {
+        AgentOrchestrationService svc = buildScopedService();
+        when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(channel());
+        when(myCenterService.checkQuota(any(), any())).thenReturn(allowed());
+        ArgumentCaptor<Map<String, Object>> payloadCap = ArgumentCaptor.forClass(Map.class);
+        when(llmClient.chatCompletion(any(), any(), payloadCap.capture())).thenReturn(
+                json("{\"model\":\"m\",\"choices\":[{\"message\":{\"content\":\"ok\"}}]}"));
+
+        OrchestrateRequest eam = request("物資問題");
+        eam.setSystemCode("eam");
+        svc.orchestrate(eam, "alice");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> eamTools = (List<Map<String, Object>>) payloadCap.getValue().get("tools");
+        List<String> eamNames = eamTools == null ? List.of() : eamTools.stream()
+                .map(t -> String.valueOf(((Map<?, ?>) t.get("function")).get("name"))).toList();
+        assertTrue(eamNames.stream().noneMatch(n -> n.startsWith("rdm_")), "物资系统不应下发 RDM 工具");
+        assertTrue(eamNames.stream().noneMatch(n -> n.startsWith("query_")), "物资系统不应下发财务工具");
+
+        OrchestrateRequest rdm = request("項目問題");
+        rdm.setSystemCode("rdm");
+        svc.orchestrate(rdm, "alice");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> rdmTools = (List<Map<String, Object>>) payloadCap.getValue().get("tools");
+        List<String> rdmNames = rdmTools == null ? List.of() : rdmTools.stream()
+                .map(t -> String.valueOf(((Map<?, ?>) t.get("function")).get("name"))).toList();
+        assertTrue(rdmNames.contains("rdm_list_projects"), "RDM 系统应下发 RDM 工具");
+        assertTrue(rdmNames.stream().noneMatch(n -> n.startsWith("query_")), "RDM 系统不应下发财务工具");
+    }
+
+    @Test
+    @DisplayName("知识库检索强制带当前系统，不依赖模型自填")
+    void knowledgeSearchInjectsSystemScope() {
+        when(knowledgeTool.toolKey()).thenReturn("search_knowledge");
+        when(knowledgeTool.description()).thenReturn("knowledge");
+        when(knowledgeTool.schema()).thenReturn(Map.of("type", "object", "properties", Map.of()));
+        when(knowledgeTool.execute(any(), any())).thenReturn("{\"hits\":[]}");
+        when(mcpToolMapper.selectList(any())).thenReturn(List.of());
+        when(toolPolicyMapper.selectList(any())).thenReturn(List.of());
+        when(myCenterService.hasModelAccess(any())).thenReturn(true);
+        when(promptConfigService.domainOfTool(any())).thenReturn(null);
+        when(metering.settle(any(), any(), any(), any(), any())).thenReturn(0L);
+
+        AgentOrchestrationService svc = new AgentOrchestrationService(
+                List.of(knowledgeTool), channelRouter, myCenterService, eventService, llmClient, mapper,
+                metering, conversationService, mcpToolMapper, toolPolicyMapper, toolPolicyService,
+                promptConfigService, operatorResolver, guardrailService, memoryService);
+
+        when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(channel());
+        when(myCenterService.checkQuota(any(), any())).thenReturn(allowed());
+        // 第一轮：模型只传 query，不传 systemCode；第二轮直接给文本
+        String first = "{\"model\":\"m\",\"choices\":[{\"message\":{\"content\":null,"
+                + "\"tool_calls\":[{\"id\":\"c1\",\"type\":\"function\","
+                + "\"function\":{\"name\":\"search_knowledge\",\"arguments\":\"{\\\"query\\\":\\\"日報\\\"}\"}}]}}]}";
+        String second = "{\"model\":\"m\",\"choices\":[{\"message\":{\"content\":\"答\"}}]}";
+        when(llmClient.chatCompletion(any(), any(), any())).thenReturn(json(first), json(second));
+
+        OrchestrateRequest req = request("日報怎麼推送");
+        req.setSystemCode("rdm");
+        svc.orchestrate(req, "alice");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> argsCap = ArgumentCaptor.forClass(Map.class);
+        verify(knowledgeTool).execute(argsCap.capture(), any());
+        assertEquals("rdm", argsCap.getValue().get("systemCode"), "应强制注入当前系统");
+        assertEquals("日報", argsCap.getValue().get("query"));
     }
 
     private JsonNode json(String raw) {

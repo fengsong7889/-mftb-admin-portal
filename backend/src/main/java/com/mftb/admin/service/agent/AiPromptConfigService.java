@@ -167,6 +167,8 @@ public class AiPromptConfigService {
     private String buildComposed(Map<String, AiCapability> caps, Set<String> toolKeys, String systemCode) {
         List<AiCapability> visible = caps.values().stream()
                 .filter(c -> c.getToolKey() != null && toolKeys.contains(c.getToolKey()))
+                // 能力段按系统裁剪：未接入 AI 工具的系统（如物资）只保留通用工具，避免模型去调无权工具
+                .filter(c -> inScope(c.getDomain(), systemCode))
                 .toList();
         List<AiPromptProfile> profiles = profileMapper.selectList(new LambdaQueryWrapper<AiPromptProfile>()
                 .eq(AiPromptProfile::getStatus, "active"));
@@ -272,6 +274,27 @@ public class AiPromptConfigService {
     /** 骨架/规则的作用域匹配：profileKey 或 domain 命中即算。 */
     private static boolean matchesScope(AiPromptProfile p, String scope) {
         return scope.equalsIgnoreCase(p.getProfileKey()) || scope.equalsIgnoreCase(p.getDomain());
+    }
+
+    /**
+     * 工具/能力归属作用域：能力表 domain 优先，缺失时按 toolKey 前缀推断（rdm_ / query_ / common）。
+     * <p>供编排层按当前系统裁剪工具集，避免物资等未接入系统看到 RDM/财务工具。
+     */
+    public String domainOfTool(String toolKey) {
+        if (!StringUtils.hasText(toolKey)) return "common";
+        AiCapability cap = capabilityMap().get(toolKey);
+        if (cap != null && StringUtils.hasText(cap.getDomain())) return cap.getDomain();
+        if (toolKey.startsWith("rdm_")) return "rdm";
+        if (toolKey.startsWith("query_")) return "finance";
+        return "common";
+    }
+
+    /** 作用域过滤：无系统上下文时放行；common/空 总是放行。 */
+    static boolean inScope(String domain, String systemCode) {
+        if (!StringUtils.hasText(systemCode)) return true;
+        return !StringUtils.hasText(domain)
+                || "common".equalsIgnoreCase(domain)
+                || systemCode.equalsIgnoreCase(domain);
     }
 
     /* ────────────────── 提示词预览 / 试跑 ────────────────── */
