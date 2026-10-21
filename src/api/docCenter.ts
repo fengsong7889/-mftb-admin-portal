@@ -5,7 +5,7 @@
  * 菜單門禁與查閱審計；後端枚舉整型存儲（DocConstants.java），整型↔字符串
  * 映射收斂在本層，頁面層類型保持穩定。
  */
-import request from './request'
+import request, { SILENT_HEADER } from './request'
 
 export type DocType = 'doc' | 'sheet' | 'slide' | 'pdf' | 'link'
 export type DocStatus = 'draft' | 'reviewing' | 'published' | 'archived'
@@ -229,8 +229,13 @@ export async function deleteSpace(id: number): Promise<void> {
 
 /* ==================== 文檔索引 ==================== */
 
-export async function fetchDocNodes(q: DocQuery): Promise<DocNode[]> {
-  const rows = await request.get<unknown, RawNode[]>('/doc/nodes', { params: toParams(q) })
+export async function fetchDocNodes(q: DocQuery, opts?: { silent?: boolean }): Promise<DocNode[]> {
+  // silent：外域（如 RDM 需求詳情「關聯文檔」卡片）呼叫時，403/失敗由呼叫方靜默降級，
+  // 不讓全局攔截器把「沒有 doc-library 查看權限」彈成 toast。
+  const rows = await request.get<unknown, RawNode[]>('/doc/nodes', {
+    params: toParams(q),
+    ...(opts?.silent ? { headers: { [SILENT_HEADER]: '1' } } : {}),
+  })
   return (rows ?? []).map(mapNode)
 }
 

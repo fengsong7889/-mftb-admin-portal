@@ -53,6 +53,7 @@ class RdmSigningGuardTest {
         when(deliveryItemMapper.selectById(ITEM_ID)).thenReturn(item());
         guard = new RdmAccessGuard(operatorResolver, permissionService, requirementMapper, roleMapper,
                 mock(com.mftb.admin.mapper.RdmProjectMemberMapper.class),
+                mock(com.mftb.admin.mapper.RdmProjectMapper.class),
                 deliveryItemMapper,
                 mock(com.mftb.admin.mapper.RdmTestBatchMapper.class),
                 mock(com.mftb.admin.mapper.RdmReleaseBatchMapper.class));

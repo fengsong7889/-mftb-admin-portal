@@ -12,6 +12,7 @@
  * 3. 发起/裁决走行内面板（与评审结论录入同法），不开弹窗、不跳页。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Alert, Button, Checkbox, DatePicker, Input, Select, Space, Tag, Tooltip, message } from 'antd'
 import dayjs from 'dayjs'
 import {
@@ -35,7 +36,9 @@ import {
   RDM_RELEASE_STATUS_COLOR,
   RDM_RELEASE_STATUS_LABEL,
   RDM_STATUS,
+  RDM_TERMINAL_STATUS,
   type RdmReleaseStatus,
+  type RdmStatus,
 } from '../../../constants/rdm'
 
 interface ReleasePanelProps {
@@ -65,6 +68,7 @@ function CheckIcon({ check }: { check: RdmReleaseCheck }) {
 }
 
 export default function ReleasePanel({ reqId, status, flowVersion, editable }: ReleasePanelProps) {
+  const { t } = useTranslation()
   const [check, setCheck] = useState<RdmReleaseGate | null>(null)
   const [gates, setGates] = useState<RdmReleaseGate[]>([])
   const [loading, setLoading] = useState(false)
@@ -108,6 +112,8 @@ export default function ReleasePanel({ reqId, status, flowVersion, editable }: R
   /** check 每次刷新都是新对象，先固定 checks 引用，避开下游 useMemo 失效 */
   const checks = useMemo(() => check?.checks ?? [], [check])
   const blocking = check?.blockingCount ?? 0
+  /** 终态需求：闸门只能作为历史参考，不能再用红色阻断结论吓人 */
+  const terminal = RDM_TERMINAL_STATUS.includes(status as RdmStatus)
   const gateOpen = GATE_OPEN_STATUS.includes(status)
   const pendingGate = useMemo(() => gates.find(g => g.status === RDM_RELEASE_STATUS.PENDING), [gates])
   const validPass = useMemo(() => gates.find(g => g.status === RDM_RELEASE_STATUS.PASSED && !g.expired), [gates])
@@ -175,14 +181,18 @@ export default function ReleasePanel({ reqId, status, flowVersion, editable }: R
       </div>
 
       <Alert
-        type={blocking === 0 && !loadError ? 'success' : 'warning'}
+        type={terminal ? 'info' : loadError || check == null || loading ? 'warning' : blocking === 0 ? 'success' : 'warning'}
         showIcon
         style={{ marginBottom: 12 }}
-        message={loadError
-          ? `檢查項未能確認：${loadError}`
-          : blocking === 0
-            ? '檢查項已全部通過，可發起放行單'
-            : `還有 ${blocking} 項阻斷檢查未通過，處理後才能發起放行`}
+        message={terminal
+          ? t('rdm.release.terminalGate')
+          : loadError
+            ? `檢查項未能確認：${loadError}`
+            : check == null || loading
+              ? '檢查項載入中……'
+              : blocking === 0
+                ? '檢查項已全部通過，可發起放行單'
+                : `還有 ${blocking} 項阻斷檢查未通過，處理後才能發起放行`}
         description={flowVersion != null && flowVersion < 2
           ? '本需求為舊流程記錄（V1）：五節點計劃、PRD 定稿快照、工時明細三項檢查自動跳過，不會把歷史需求判成質量不合格。'
           : '檢查結果由服務端計算，前端無法偽造；豁免可以，但理由會隨放行單永久留痕。放行與發起必須是兩個人（系統管理員僅作運維應急例外）。'}

@@ -6,6 +6,7 @@ import { ClockCircleOutlined } from '@ant-design/icons'
 import {
   getRdmComplexityLabel,
   getRdmPriorityLabel,
+  normalizeRdmReqType,
   RDM_PRIORITY_COLOR,
   RDM_REQ_TYPE_COLOR,
   RDM_REQ_TYPE_LABEL,
@@ -15,7 +16,6 @@ import {
   RDM_STATUS_LABEL,
   type RdmComplexity,
   type RdmPriority,
-  type RdmReqType,
   type RdmRiskType,
   type RdmStatus,
 } from '../../../constants/rdm'
@@ -72,9 +72,10 @@ export function PriorityTag({ priority }: { priority?: string | null }) {
 
 /** 需求类型标签（浅色底 + 主色文字） */
 export function TypeTag({ reqType }: { reqType: string }) {
-  const key = reqType as RdmReqType
+  // 旧数据里出现过 feature 等小写/旧编码，先归一化再取色，避免被当成未知编码
+  const key = normalizeRdmReqType(reqType)
+  if (!key) return <UnknownTag value={reqType} />
   const color = RDM_REQ_TYPE_COLOR[key]
-  if (!color) return <UnknownTag value={reqType} />
   return (
     <Tag style={{ margin: 0, color, borderColor: `${color}66`, background: `${color}12`, fontWeight: 500 }}>
       {RDM_REQ_TYPE_LABEL[key]}

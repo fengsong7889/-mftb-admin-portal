@@ -77,6 +77,7 @@ class RdmIterationOwnershipTest {
         RdmAccessGuard accessGuard = new RdmAccessGuard(operatorResolver, permissionService, requirementMapper,
                 roleMapper,
                 mock(com.mftb.admin.mapper.RdmProjectMemberMapper.class),
+                mock(com.mftb.admin.mapper.RdmProjectMapper.class),
                 mock(com.mftb.admin.mapper.RdmDeliveryItemMapper.class),
                 mock(com.mftb.admin.mapper.RdmTestBatchMapper.class),
                 mock(com.mftb.admin.mapper.RdmReleaseBatchMapper.class));

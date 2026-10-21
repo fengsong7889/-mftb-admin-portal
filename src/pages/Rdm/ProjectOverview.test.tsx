@@ -73,11 +73,11 @@ describe('ProjectOverview URL ↔ 篩選/分頁同步', () => {
 })
 
 describe('ProjectOverview 統計卡下鑽', () => {
-  it('點擊「進行中項目」卡出現下鑽過濾 chip', async () => {
+  it('點擊「在管項目」卡出現下鑽過濾 chip', async () => {
     renderAt()
-    const card = await screen.findByTitle('點擊下鑽：僅看進行中項目')
+    const card = await screen.findByTitle('點擊下鑽：僅看籌備/進行中項目')
     fireEvent.click(card)
-    expect(await screen.findByText(/下鑽：進行中項目/)).toBeInTheDocument()
+    expect(await screen.findByText(/下鑽：在管項目/)).toBeInTheDocument()
   })
 
   it('下钻交给服务端：列表带 drill，统计卡不带 drill（否则卡片数字会被自己筛小）', async () => {
@@ -90,13 +90,13 @@ describe('ProjectOverview 統計卡下鑽', () => {
       total: 4,
     })
     vi.mocked(fetchProjectStats).mockClear()
-    fireEvent.click(await screen.findByTitle('點擊下鑽：僅看進行中項目'))
+    fireEvent.click(await screen.findByTitle('點擊下鑽：僅看籌備/進行中項目'))
     // 过去是纯前端过滤「已加载的本页」，跳页时卡片说 4 行、表格只给本页命中的行；
     // 现在必须把口径下发后端，让 total 与卡片同源
     await waitFor(() => expect(fetchProjectPage).toHaveBeenCalledWith(expect.objectContaining({ drill: 'inProgress' })))
     expect(fetchProjectStats).toHaveBeenCalledWith(expect.not.objectContaining({ drill: 'inProgress' }))
     // chip 与分页总数都用服务端返回的 total（不再是本页行数）
-    expect(await screen.findByText(/下鑽：進行中項目（4 個項目）/)).toBeInTheDocument()
+    expect(await screen.findByText(/下鑽：在管項目（4 個項目）/)).toBeInTheDocument()
     expect(screen.getByText('下鑽過濾：4 個項目')).toBeInTheDocument()
     expect(screen.getByText('進行中的項目4')).toBeInTheDocument()
   })

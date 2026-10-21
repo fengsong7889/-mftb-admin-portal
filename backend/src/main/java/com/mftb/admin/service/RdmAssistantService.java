@@ -53,8 +53,12 @@ public class RdmAssistantService {
 
     /** 单次生成的输出上限，避免一次草稿吃掉整份额度 */
     private static final int MAX_OUTPUT_TOKENS = 1200;
-    /** 风险摘要最多带多少条风险需求进 prompt */
-    private static final int MAX_RISK_ITEMS = 12;
+    /**
+     * 风险取数上限与看板共用：历史上这里是 12、看板是 20，同页并列会出现两套总数。
+     */
+    private static final int MAX_RISK_ITEMS = RdmAnalyticsService.RISK_QUERY_LIMIT;
+    /** 发给模型的明细条数上限：只影响叙述质量，不影响统计口径 */
+    private static final int AI_PROMPT_RISK_LIMIT = 12;
     /** 通用 AI 调用上限：超过后走“本地结构化”兜底，不让整页被上游拖死。 */
     private static final long DEFAULT_AI_TIMEOUT_MS = 20_000L;
     /** 风险摘要是首屏阻塞项，只给 8 秒：超时直接回落结构化要点。 */
@@ -276,7 +280,7 @@ public class RdmAssistantService {
         }
         List<RdmAssistantVO.RiskItem> overdue = byType.get("OVERDUE");
         if (overdue != null && !overdue.isEmpty()) {
-            points.add("逾期 " + overdue.size() + " 條，最久 " + overdue.get(0).getDays() + " 天未推进");
+            points.add("逾期 " + overdue.size() + " 條，最久 " + overdue.get(0).getDays() + " 天未推進");
         }
         List<RdmAssistantVO.RiskItem> stuck = byType.get("INTAKE_STUCK");
         if (stuck != null && !stuck.isEmpty()) {
@@ -304,10 +308,12 @@ public class RdmAssistantService {
 
     private String buildRiskUserPrompt(int window, List<RdmAssistantVO.RiskItem> risks, List<String> highlights) {
         StringBuilder sb = new StringBuilder();
-        sb.append("統計窗口：近 ").append(window).append(" 天。\n");
+        sb.append("統計窗口：").append(window > 0
+                ? "停留 ≥ " + window + " 天的風險需求"
+                : "全部風險需求（不按停留天數過濾）").append("。\n");
         sb.append("要點：").append(String.join("；", highlights)).append('\n');
-        sb.append("明細（最多 ").append(MAX_RISK_ITEMS).append(" 條）：\n");
-        risks.stream().limit(MAX_RISK_ITEMS).forEach(r -> sb.append("-")
+        sb.append("明細（最多 ").append(AI_PROMPT_RISK_LIMIT).append(" 條）：\n");
+        risks.stream().limit(AI_PROMPT_RISK_LIMIT).forEach(r -> sb.append("-")
                 .append(' ').append(r.getReqNo()).append(' ').append(r.getTitle())
                 .append("｜狀態 ").append(statusLabel(r.getStatus()))
                 .append("｜處理人 ").append(r.getHandler())

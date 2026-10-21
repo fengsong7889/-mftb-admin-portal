@@ -82,7 +82,7 @@ export default function DeliveryItemAcceptanceForm() {
   const [records, setRecords] = useState<RdmAcceptanceRecordListItem[]>([])
 
   // 表单状态
-  const [conclusion, setConclusion] = useState<string>(RDM_ACCEPT_RESULT.PASS)
+  const [conclusion, setConclusion] = useState<string>('')
   const [score, setScore] = useState<number | undefined>()
   const [testEnv, setTestEnv] = useState<string | undefined>()
   const [buildId, setBuildId] = useState('')
@@ -149,6 +149,8 @@ export default function DeliveryItemAcceptanceForm() {
 
   /** 提交前本地校验（不放宽后端门禁，只把「一定会被后端拒」的空值提前拦下） */
   const validate = (): string | null => {
+    // 不預設「驗收通過」：預設通過等於系統替驗收人做了決策
+    if (!conclusion) return t('rdm.acceptance.selectConclusion')
     if (isBusiness && (score == null || score < 1 || score > 5)) {
       return '業務驗收必須給 1-5 分正式滿意度評分'
     }

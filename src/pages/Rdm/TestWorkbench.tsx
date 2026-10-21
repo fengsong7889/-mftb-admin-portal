@@ -16,9 +16,12 @@ import {
   ReloadOutlined, SyncOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import StatCards from '../../components/StatCards'
+import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { rdmTableLocale } from './components/tableLocale'
 import {
   fetchTestBatches, acceptTestBatch, returnTestBatch,
   type RdmTestBatchListItem, type RdmTestBatchQuery,
@@ -50,7 +53,9 @@ const COLUMN_META = [
 
 export default function TestWorkbench() {
   const navigate = useNavigate()
-  const [loading, setLoading] = useState(false)
+  const { t } = useTranslation()
+  // 初始即 loading：避免 effect 置 true 前先闪一帧「暫無數據」
+  const [loading, setLoading] = useState(true)
   const [rows, setRows] = useState<RdmTestBatchListItem[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -59,11 +64,11 @@ export default function TestWorkbench() {
   // 搜索條件
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState<string | undefined>()
-  const [testLeadFilter, setTestLeadFilter] = useState('')
+  const [testLeadUserId, setTestLeadUserId] = useState<number | undefined>()
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null)
 
   // 統計
-  const [stats, setStats] = useState({ pending: 0, executing: 0, failed: 0, passed: 0 })
+  const [stats, setStats] = useState({ pending: 0, executing: 0, failed: 0, passed: 0, returned: 0 })
 
   // 退回 Modal
   const [returnOpen, setReturnOpen] = useState(false)
@@ -75,8 +80,13 @@ export default function TestWorkbench() {
     const q: RdmTestBatchQuery = { pageNo: page, pageSize }
     if (keyword.trim()) q.keyword = keyword.trim()
     if (statusFilter) q.status = statusFilter
+    // 负责人筛选必须是 sys_user.id：原先的姓名输入框根本没进查询条件（死筛选）
+    if (testLeadUserId) q.testLeadUserId = testLeadUserId
+    // 計劃結束時間區間（yyyy-MM-dd，后端含起止当天）
+    if (dateRange?.[0]) q.planEndFrom = dateRange[0].format('YYYY-MM-DD')
+    if (dateRange?.[1]) q.planEndTo = dateRange[1].format('YYYY-MM-DD')
     return q
-  }, [page, pageSize, keyword, statusFilter])
+  }, [page, pageSize, keyword, statusFilter, testLeadUserId, dateRange])
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -99,13 +109,17 @@ export default function TestWorkbench() {
     try {
       const baseQ: RdmTestBatchQuery = {}
       if (keyword.trim()) baseQ.keyword = keyword.trim()
-      const [p, e, f, s] = await Promise.all([
+      if (testLeadUserId) baseQ.testLeadUserId = testLeadUserId
+      if (dateRange?.[0]) baseQ.planEndFrom = dateRange[0].format('YYYY-MM-DD')
+      if (dateRange?.[1]) baseQ.planEndTo = dateRange[1].format('YYYY-MM-DD')
+      const [p, e, f, s, r] = await Promise.all([
         fetchTestBatches({ ...baseQ, status: RDM_TEST_BATCH_STATUS.PENDING, pageSize: 1 }),
         fetchTestBatches({ ...baseQ, status: RDM_TEST_BATCH_STATUS.EXECUTING, pageSize: 1 }),
         fetchTestBatches({ ...baseQ, status: RDM_TEST_BATCH_STATUS.FAILED, pageSize: 1 }),
         fetchTestBatches({ ...baseQ, status: RDM_TEST_BATCH_STATUS.PASSED, pageSize: 1 }),
+        fetchTestBatches({ ...baseQ, status: RDM_TEST_BATCH_STATUS.RETURNED, pageSize: 1 }),
       ])
-      setStats({ pending: p.total, executing: e.total, failed: f.total, passed: s.total })
+      setStats({ pending: p.total, executing: e.total, failed: f.total, passed: s.total, returned: r.total })
     } catch { /* 統計失敗不影響主列表 */ }
   }
 
@@ -113,7 +127,7 @@ export default function TestWorkbench() {
 
   const handleSearch = () => { setPage(1); void loadData() }
   const handleReset = () => {
-    setKeyword(''); setStatusFilter(undefined); setTestLeadFilter(''); setDateRange(null)
+    setKeyword(''); setStatusFilter(undefined); setTestLeadUserId(undefined); setDateRange(null)
     setPage(1)
   }
 
@@ -161,42 +175,42 @@ export default function TestWorkbench() {
   // ===== 表格列 =====
   const columns: TableColumnsType<RdmTestBatchListItem> = useMemo(() => [
     {
-      title: '批次號', dataIndex: 'batchNo', key: 'batchNo', width: 140,
+      title: '批次號', dataIndex: 'batchNo', key: 'batchNo', width: 120,
       render: (v: string, r) => (
         <a className="rdm-table-title__link" onClick={() => navigate(`/rdm-test-detail?id=${r.id}`)}>{v}</a>
       ),
     },
     {
-      title: '交付範圍', dataIndex: 'deliveryItemTitles', key: 'deliveryItemTitles', width: 200, ellipsis: true,
+      title: '交付範圍', dataIndex: 'deliveryItemTitles', key: 'deliveryItemTitles', width: 150, ellipsis: true,
       render: (v: string[]) => v?.join('、') || '-',
     },
     {
-      title: '需求', key: 'req', width: 200, ellipsis: true,
+      title: '需求', key: 'req', width: 160, ellipsis: true,
       render: (_, r) => <span>{r.reqNo} {r.reqTitle}</span>,
     },
     {
-      title: '環境', dataIndex: 'testEnv', key: 'testEnv', width: 90,
+      title: '環境', dataIndex: 'testEnv', key: 'testEnv', width: 80,
       render: (v: string) => <Tag>{v?.toUpperCase() || '-'}</Tag>,
     },
-    { title: '測試負責人', dataIndex: 'testLeadUserName', key: 'testLeadUserName', width: 110 },
+    { title: '測試負責人', dataIndex: 'testLeadUserName', key: 'testLeadUserName', width: 100 },
     {
       title: '狀態', dataIndex: 'status', key: 'status', width: 100,
       render: (v: string) => <Tag color={RDM_TEST_BATCH_STATUS_COLOR[v] || 'default'}>{RDM_TEST_BATCH_STATUS_LABEL[v] || v}</Tag>,
     },
-    { title: '輪次', dataIndex: 'roundNo', key: 'roundNo', width: 70, align: 'center' },
+    { title: '輪次', dataIndex: 'roundNo', key: 'roundNo', width: 60, align: 'center' },
     {
-      title: '計劃結束', dataIndex: 'planEndTime', key: 'planEndTime', width: 120,
+      title: '計劃結束', dataIndex: 'planEndTime', key: 'planEndTime', width: 110,
       render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD') : '-',
     },
     {
-      title: '通過/總數', key: 'ratio', width: 100, align: 'center',
+      title: '通過/總數', key: 'ratio', width: 90, align: 'center',
       render: (_, r) => {
         const color = r.totalCount === 0 ? '#8C8C8C' : r.passCount === r.totalCount ? '#52C41A' : r.passCount > 0 ? '#FA8C16' : '#FF4D4F'
         return <span style={{ color, fontWeight: 600 }}>{r.passCount}/{r.totalCount}</span>
       },
     },
     {
-      title: '操作', key: 'action', width: 180, fixed: 'right',
+      title: '操作', key: 'action', width: 150, fixed: 'right',
       render: (_, r) => {
         const actions: React.ReactNode[] = []
         if (r.status === RDM_TEST_BATCH_STATUS.PENDING) {
@@ -248,11 +262,11 @@ export default function TestWorkbench() {
             />
           </Form.Item>
           <Form.Item label="測試負責人">
-            <Input
-              placeholder="負責人姓名"
-              value={testLeadFilter}
-              onChange={e => setTestLeadFilter(e.target.value)}
-              allowClear
+            <EmployeeSelect
+              single
+              placeholder="搜尋姓名或工號"
+              value={testLeadUserId ? [testLeadUserId] : []}
+              onChange={ids => setTestLeadUserId(ids[0])}
             />
           </Form.Item>
           <Form.Item label="計劃結束時間">
@@ -262,7 +276,7 @@ export default function TestWorkbench() {
               style={{ width: '100%' }}
             />
           </Form.Item>
-          <Form.Item label=" ">
+          <Form.Item label=" " colon={false}>
             <div className="search-actions">
               <Button type="primary" onClick={handleSearch}>查詢</Button>
               <Button onClick={handleReset}>重置</Button>
@@ -274,11 +288,12 @@ export default function TestWorkbench() {
       {/* ── 統計卡片（必須在搜索區下方、操作區上方）：§B.7 统一走 StatCards（计数控件动画 + hover） ── */}
       <div style={{ marginBottom: 16 }}>
         <StatCards
-          animationKey={`${keyword}-${statusFilter}-${testLeadFilter}-${total}`}
+          animationKey={`${keyword}-${statusFilter}-${testLeadUserId}-${dateRange?.[0]?.format('YYYY-MM-DD') ?? ''}-${dateRange?.[1]?.format('YYYY-MM-DD') ?? ''}-${total}`}
           items={[
             { key: 'pending', icon: <ClockCircleOutlined />, color: 'brand', value: stats.pending, label: '待接收' },
             { key: 'executing', icon: <SyncOutlined spin />, color: 'info', value: stats.executing, label: '執行中' },
             { key: 'failed', icon: <CloseCircleOutlined />, color: 'danger', value: stats.failed, label: '待復測' },
+            { key: 'returned', icon: <CloseCircleOutlined />, color: 'system', value: stats.returned, label: RDM_TEST_BATCH_STATUS_LABEL[RDM_TEST_BATCH_STATUS.RETURNED] },
             { key: 'passed', icon: <CheckCircleOutlined />, color: 'success', value: stats.passed, label: '已通過' },
           ]}
         />
@@ -300,9 +315,10 @@ export default function TestWorkbench() {
         className="nowrap-table"
         rowKey="id"
         loading={loading}
+        locale={rdmTableLocale(loading, t('common.noData'))}
         columns={applyConfig(columns)}
         dataSource={rows}
-        scroll={{ x: 1400 }}
+        scroll={{ x: 1110 }}
         pagination={{
           current: page,
           pageSize,

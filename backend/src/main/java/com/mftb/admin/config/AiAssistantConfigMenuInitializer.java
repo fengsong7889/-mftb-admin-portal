@@ -31,6 +31,14 @@ public class AiAssistantConfigMenuInitializer implements CommandLineRunner {
 
     private static final String VERSION_KEY = "ai:assistant-menu-split-v2.1";
     private static final String SCRIPT = "275_ai_assistant_menu_split.sql";
+    /**
+     * v2.2：275 的授权清单只覆盖 8 个菜单，快捷提問/推送模板/記憶策略
+     * 三个菜单在存量库（v2.1 已登记）与全新建库上都没有任何授权行，只能另起版本补授。
+     */
+    private static final String VERSION_KEY_EXTRA_GRANTS = "ai:assistant-menu-split-v2.2";
+    private static final String SCRIPT_EXTRA_GRANTS = "279_ai_assistant_extra_menu_grants.sql";
+    private static final List<String> EXTRA_MENU_KEYS = List.of(
+            "ai-assistant-quick-prompt", "ai-assistant-push-template", "ai-assistant-memory");
     private static final String GROUP_KEY = "ai-assistant-group";
     /**
      * v45 已退役的一级包装目录 key，禁止复用：DataInitializer.retireSystemWrapperDirectories()
@@ -83,6 +91,8 @@ public class AiAssistantConfigMenuInitializer implements CommandLineRunner {
         softDeleteLegacy();
         backfillOverviewGrants();
         versionTracker.applyOnce(VERSION_KEY, this::migrateLegacyGrants, this::verify);
+        versionTracker.applyOnce(VERSION_KEY_EXTRA_GRANTS, this::migrateExtraMenuGrants,
+                this::verifyExtraMenuGrants);
         // 每次启动都校验（verify 只在首次应用时执行，不能拿它当回归闸门）
         assertGrouped();
     }
@@ -139,8 +149,8 @@ public class AiAssistantConfigMenuInitializer implements CommandLineRunner {
     }
 
     private void backfillDeptGrants() {
-        String sql = "INSERT IGNORE INTO sys_department_menu (department_id, menu_id, actions) "
-                + "SELECT DISTINCT x.department_id, ov.id, '[\"view\"]' "
+        String sql = "INSERT IGNORE INTO sys_department_menu (dept_id, menu_id, actions) "
+                + "SELECT DISTINCT x.dept_id, ov.id, '[\"view\"]' "
                 + "FROM sys_department_menu x "
                 + "JOIN sys_menu child ON child.id = x.menu_id "
                 + "AND child.menu_key LIKE 'ai-assistant-%' AND child.menu_key <> 'ai-assistant-overview' "
@@ -216,9 +226,20 @@ public class AiAssistantConfigMenuInitializer implements CommandLineRunner {
     }
 
     private void migrateLegacyGrants() {
-        ClassPathResource resource = new ClassPathResource(SCRIPT);
+        runScript(SCRIPT);
+        log.info("AI 助手菜单授权迁移完成");
+    }
+
+    private void migrateExtraMenuGrants() {
+        runScript(SCRIPT_EXTRA_GRANTS);
+        log.info("AI 助手补充菜单授权迁移完成");
+    }
+
+    /** 按分号切分执行 classpath 脚本（去掉 -- 注释行）；失败直接抛出，避免误记已迁移版本。 */
+    private void runScript(String script) {
+        ClassPathResource resource = new ClassPathResource(script);
         if (!resource.exists()) {
-            throw new IllegalStateException("未找到 AI 助手菜单授权迁移脚本: " + SCRIPT);
+            throw new IllegalStateException("未找到 AI 助手菜单授权迁移脚本: " + script);
         }
         try (InputStream is = resource.getInputStream()) {
             String raw = StreamUtils.copyToString(is, StandardCharsets.UTF_8);
@@ -229,9 +250,38 @@ public class AiAssistantConfigMenuInitializer implements CommandLineRunner {
                     jdbcTemplate.execute(trimmed);
                 }
             }
-            log.info("AI 助手菜单授权迁移完成");
         } catch (Exception e) {
-            throw new IllegalStateException("执行 AI 助手菜单授权迁移失败: " + SCRIPT, e);
+            throw new IllegalStateException("执行 AI 助手菜单授权迁移失败: " + script, e);
+        }
+    }
+
+    /**
+     * v2.2 后置校验：三个补充菜单必须挂在分组下、启用、动作集含 view/edit，且至少有一条角色授权。
+     * <p>只校验“有没有”，不校验具体是哪些角色：授权可以后续在功能授权里调整，属正常运维。
+     */
+    private void verifyExtraMenuGrants() {
+        Long groupId = jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_menu WHERE menu_key = ? AND deleted = 0 LIMIT 1",
+                Long.class, GROUP_KEY);
+        if (groupId == null) {
+            throw new IllegalStateException("AI 助手分组菜单未就绪");
+        }
+        for (String key : EXTRA_MENU_KEYS) {
+            Integer ready = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM sys_menu WHERE menu_key = ? AND parent_id = ? "
+                            + "AND deleted = 0 AND status = 1 "
+                            + "AND actions LIKE '%view%' AND actions LIKE '%edit%'",
+                    Integer.class, key, groupId);
+            if (ready == null || ready == 0) {
+                throw new IllegalStateException("AI 助手补充菜单未就绪: " + key);
+            }
+            Integer grants = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM sys_role_menu rm JOIN sys_menu m ON m.id = rm.menu_id "
+                            + "WHERE m.menu_key = ?",
+                    Integer.class, key);
+            if (grants == null || grants == 0) {
+                throw new IllegalStateException("AI 助手补充菜单未授权: " + key);
+            }
         }
     }
 

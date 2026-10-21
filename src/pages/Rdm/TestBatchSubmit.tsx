@@ -10,18 +10,19 @@
  * 测试负责人/执行人一律取员工下拉的 sys_user.id，不接受手填 ID（手填会传错人且无法校验）。
  * 校验顺序：validateFields → 组装 payload → 调 API（§B.3 禁止先弹后校验）。
  */
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button, DatePicker, Form, Input, Select, Space, message } from 'antd'
 import {
   MinusCircleOutlined, PlusOutlined, SendOutlined,
 } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
 import RemoteSearchSelect from '../../components/RemoteSearchSelect'
 import {
   fetchDeliveryItems,
   fetchReqTasks,
+  fetchRequirementDetail,
   fetchRequirementPage,
   resolveTestBatchTaskScope,
   submitTestBatch,
@@ -50,8 +51,19 @@ interface SubmitFormValues {
   buildIds?: { buildId?: string }[]
 }
 
+/** 可提测的需求状态：V3 需求受理后主状态可能一直停在 accepted，不能只认 scope=delivery */
+const TESTABLE_REQ_STATUS = new Set([
+  'accepted', 'prd_designing', 'reviewing', 'review_passed',
+  'scheduled', 'designing', 'developing', 'integration', 'testing', 'test_passed',
+])
+
 export default function TestBatchSubmit() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  /** 从交付项详情「提交提測」进入：预填需求与交付项，避免用户重新搜一遍 */
+  const urlReqId = Number(searchParams.get('reqId') ?? 0)
+  const urlDeliveryItemId = Number(searchParams.get('deliveryItemId') ?? 0)
+  const prefilledRef = useRef(false)
   const [form] = Form.useForm<SubmitFormValues>()
   const [submitting, setSubmitting] = useState(false)
 
@@ -74,16 +86,23 @@ export default function TestBatchSubmit() {
   const loadRequirements = useCallback(async () => {
     if (reqOptions.length) return
     try {
-      const res = await fetchRequirementPage({ size: 50, page: 1, scope: 'delivery', flowVersion: 3 })
+      /*
+       * 不再用 scope=delivery：该视角只认 scheduled 之后的状态，而 V3 需求受理后
+       * 主状态就停在 accepted（后续以交付项推进），导致提测「關聯需求」永远为空。
+       * 改为只按 flowVersion=3 取数，再用可提测状态过滤；真正的准入仍由服务端校验。
+       */
+      const res = await fetchRequirementPage({ size: 50, page: 1, flowVersion: 3 })
       // reqNo 在认领前为 null（延迟发号），统一走占位文案，不渲染出 "null"
-      setReqOptions((res.records ?? []).map(r => ({ value: r.id, label: `${formatRdmReqNo(r.reqNo)} ${r.title}` })))
+      setReqOptions((res.records ?? [])
+        .filter(r => TESTABLE_REQ_STATUS.has(r.status))
+        .map(r => ({ value: r.id, label: `${formatRdmReqNo(r.reqNo)} ${r.title}` })))
     } catch {
       // request.ts 已统一弹后端错误，此处不双弹（§G.4）
     }
   }, [reqOptions.length])
 
   /** 换需求必须清空已选交付项/任务：它们属于需求，留着就是跨需求串数据 */
-  const handleReqChange = async (reqId: number) => {
+  const handleReqChange = useCallback(async (reqId: number) => {
     form.setFieldValue('deliveryItemIds', [])
     form.setFieldValue('taskIds', [])
     setTaskOptions([])
@@ -101,7 +120,32 @@ export default function TestBatchSubmit() {
       setDeliveryOptions([])
       setTaskOptions([])
     }
-  }
+  }, [form])
+
+  /** URL 预填（仅首次）：候选里没有目标需求/交付项时补一条，避免回显成裸 ID */
+  useEffect(() => {
+    if (prefilledRef.current || !urlReqId) return
+    prefilledRef.current = true
+    void (async () => {
+      await loadRequirements()
+      try {
+        const detail = await fetchRequirementDetail(urlReqId)
+        if (detail) {
+          setReqOptions(prev => prev.some(o => o.value === urlReqId)
+            ? prev
+            : [{ value: urlReqId, label: `${formatRdmReqNo(detail.reqNo)} ${detail.title}` }, ...prev])
+        }
+      } catch { /* 选项补不上不阻断，提交时后端仍会校验 */ }
+      form.setFieldValue('reqId', urlReqId)
+      await handleReqChange(urlReqId)
+      if (urlDeliveryItemId) {
+        form.setFieldValue('deliveryItemIds', [urlDeliveryItemId])
+        setDeliveryOptions(prev => prev.some(o => o.id === urlDeliveryItemId)
+          ? prev
+          : [...prev, { id: urlDeliveryItemId, itemNo: `#${urlDeliveryItemId}`, title: '' }])
+      }
+    })()
+  }, [urlReqId, urlDeliveryItemId, loadRequirements, handleReqChange, form])
 
   /**
    * 按任务交付：勾选任务后由服务端解析成交付项（已挂则复用，未挂归入默认交付项并回填任务）。

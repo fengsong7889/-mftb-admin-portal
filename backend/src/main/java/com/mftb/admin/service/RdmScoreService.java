@@ -126,6 +126,16 @@ public class RdmScoreService {
             target.setRuleCode(form.getRuleCode().trim());
         }
         applyForm(target, form);
+        /*
+         * 升版默认从今天生效：前端表单里带的是旧版本的 effectiveFrom，
+         * 原样沿用会让 v1~vN 全部显示同一个历史日期，版本先后无法解释。
+         * 仅当调用方没有改日期（仍等于旧值）时才覆盖，保留 API 显式指定未来日期的能力。
+         */
+        if (editingEnabled && target.getEffectiveFrom() != null
+                && existing.getEffectiveFrom() != null
+                && target.getEffectiveFrom().equals(existing.getEffectiveFrom())) {
+            target.setEffectiveFrom(LocalDate.now());
+        }
         target.setUpdatedBy(signature);
 
         if (target.getId() == null) {
@@ -375,6 +385,14 @@ public class RdmScoreService {
             person.totalScore = person.totalScore.add(record.score);
             person.reqCount++;
             person.reworkCount += record.reworkCount == null ? 0 : record.reworkCount;
+            // 人员行与顶部汇总必须同一口径：有按时/一次通过就累加，原来这两个字段永不赋值，
+            // 列表恒显 0%，而卡片却按汇总算出 100%，同页两套数字。
+            if (Integer.valueOf(1).equals(record.onTime)) {
+                person.onTimeSum = person.onTimeSum.add(BigDecimal.ONE);
+            }
+            if (Integer.valueOf(1).equals(record.firstPass)) {
+                person.passSum = person.passSum.add(BigDecimal.ONE);
+            }
             if (record.breakdown != null) {
                 person.scoreSum = person.scoreSum.add(record.score);
             }
@@ -387,13 +405,25 @@ public class RdmScoreService {
             });
             dept.totalScore = dept.totalScore.add(record.score);
             dept.personSet.add(record.userName);
+            dept.totalRows++;
+            if (Integer.valueOf(1).equals(record.onTime)) {
+                dept.onTimeRows++;
+            }
         }
         for (RdmScoreVO.Person p : persons.values()) {
+            if (p.reqCount > 0) {
+                p.deliveredCount = p.reqCount;
+                p.onTimeRate = round2(p.onTimeSum.doubleValue() / p.reqCount);
+                p.firstPassRate = round2(p.passSum.doubleValue() / p.reqCount);
+            }
             board.getRanking().add(p);
         }
         board.getRanking().sort((a, b) -> b.totalScore.compareTo(a.totalScore));
         for (RdmScoreVO.DeptRow d : depts.values()) {
             d.personCount = d.personSet.size();
+            if (d.totalRows > 0) {
+                d.onTimeRate = round2(d.onTimeRows / (double) d.totalRows);
+            }
             d.avgScore = d.personCount == 0 ? BigDecimal.ZERO
                     : d.totalScore.divide(BigDecimal.valueOf(d.personCount), 2, java.math.RoundingMode.HALF_UP);
             board.getDeptRank().add(d);
@@ -616,6 +646,7 @@ public class RdmScoreService {
         vo.score = decimal(row.get("score"));
         vo.ruleVersion = row.get("rule_version") == null ? null : asLong(row.get("rule_version")).intValue();
         vo.onTime = row.get("on_time") == null ? null : asLong(row.get("on_time")).intValue();
+        vo.firstPass = row.get("first_pass") == null ? null : asLong(row.get("first_pass")).intValue();
         vo.reworkCount = row.get("rework_count") == null ? null : asLong(row.get("rework_count")).intValue();
         vo.acceptanceScore = row.get("acceptance_score") == null ? null : asLong(row.get("acceptance_score")).intValue();
         vo.pushStatus = (String) row.get("push_status");

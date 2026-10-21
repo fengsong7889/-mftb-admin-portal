@@ -63,6 +63,7 @@ export default function StatusSwitch({ checked, target, onConfirm, impact, disab
 
   return (
     <Switch
+      className="rdm-status-switch"
       checked={checked}
       disabled={disabled}
       checkedChildren="啟用"

@@ -5,13 +5,14 @@
  * 因此每行直接给出产能、已排任务工时与负载率，超载标红，避免拍脑袋承诺。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Dropdown, Modal, Progress, Space, Table, Tag, Tooltip, message } from 'antd'
+import { Button, DatePicker, Dropdown, Form, Input, Modal, Progress, Select, Space, Table, Tag, Tooltip, message } from 'antd'
 import type { MenuProps, TableColumnsType } from 'antd'
 import {
   AlertOutlined,
   FieldTimeOutlined,
   PlusOutlined,
   ReloadOutlined,
+  SearchOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -67,6 +68,14 @@ export default function IterationPlan() {
   const { hasPermission } = useAuth()
   const [rows, setRows] = useState<RdmIterationItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [form] = Form.useForm()
+  /** 搜索条件（查詢点击后才生效，避免输入过程中表格闪动） */
+  const [filters, setFilters] = useState<{
+    keyword?: string
+    projectId?: number
+    status?: RdmIterationStatus
+    range?: [dayjs.Dayjs, dayjs.Dayjs]
+  }>({})
   // 菜单收敛后「產品需求處理」已退役，它的 edit 平移到需求清单；仍查退役 key 会让有编辑权的人也按不动
   const canEdit = hasPermission('rdm-delivery-iteration:edit') || hasPermission('rdm-requirement:edit')
 
@@ -89,14 +98,38 @@ export default function IterationPlan() {
 
   useEffect(() => { void load() }, [load])
 
+  /** 所属项目候选：从已加载数据去重，不额外发请求 */
+  const projectOptions = useMemo(() => {
+    const map = new Map<number, string>()
+    rows.forEach(r => { if (r.projectId != null) map.set(r.projectId, r.projectName || `項目 #${r.projectId}`) })
+    return [...map.entries()].map(([value, label]) => ({ value, label }))
+  }, [rows])
+
+  /** 客户端筛选：迭代一次性拉全量，条件只影响当前视图 */
+  const filteredRows = useMemo(() => {
+    const kw = filters.keyword?.trim().toLowerCase()
+    return rows.filter(r => {
+      if (kw && !`${r.name ?? ''} ${r.code ?? ''}`.toLowerCase().includes(kw)) return false
+      if (filters.projectId != null && r.projectId !== filters.projectId) return false
+      if (filters.status && r.status !== filters.status) return false
+      if (filters.range) {
+        const [from, to] = filters.range
+        const start = r.startDate ? dayjs(r.startDate) : null
+        const end = r.endDate ? dayjs(r.endDate) : null
+        if (start && end && (end.isBefore(from, 'day') || start.isAfter(to, 'day'))) return false
+      }
+      return true
+    })
+  }, [rows, filters])
+
   const stats = useMemo(() => ({
-    total: rows.length,
-    active: rows.filter(r => r.status === RDM_ITERATION_STATUS.ACTIVE).length,
-    planning: rows.filter(r => r.status === RDM_ITERATION_STATUS.PLANNING).length,
-    overloaded: rows.filter(r => loadRate(r) > 100).length,
-    reqs: rows.reduce((s, r) => s + (r.reqCount ?? 0), 0),
-    hours: rows.reduce((s, r) => s + (r.taskHours ?? 0), 0),
-  }), [rows])
+    total: filteredRows.length,
+    active: filteredRows.filter(r => r.status === RDM_ITERATION_STATUS.ACTIVE).length,
+    planning: filteredRows.filter(r => r.status === RDM_ITERATION_STATUS.PLANNING).length,
+    overloaded: filteredRows.filter(r => loadRate(r) > 100).length,
+    reqs: filteredRows.reduce((s, r) => s + (r.reqCount ?? 0), 0),
+    hours: filteredRows.reduce((s, r) => s + (r.taskHours ?? 0), 0),
+  }), [filteredRows])
 
   /** 目标状态的影响说明：写进二次确认框，让用户在点下去之前就知道会锁住什么 */
   const statusImpact = (next: RdmIterationStatus): string => {
@@ -278,10 +311,52 @@ export default function IterationPlan() {
 
   return (
     <div className="content-area">
-      {/* 統計卡必須在操作區上方（§E.8）：先給口徑數字，再給動作入口 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 18, fontWeight: 700, color: '#262626' }}>
+        <FieldTimeOutlined style={{ color: '#E8720C' }} />
+        {t('rdm.iteration.pageTitle')}
+        <span style={{ fontSize: 12, fontWeight: 400, color: '#8C8C8C' }}>
+          {t('rdm.iteration.pageHint')}
+        </span>
+      </div>
+
+      <div className="search-section">
+        <Form
+          form={form}
+          layout="inline"
+          onFinish={v => setFilters({ keyword: v.keyword, projectId: v.projectId, status: v.status, range: v.range })}
+        >
+          <Form.Item name="keyword" label={t('rdm.iteration.colName')}>
+            <Input allowClear placeholder={t('rdm.iteration.keywordPlaceholder')} />
+          </Form.Item>
+          <Form.Item name="projectId" label={t('rdm.iteration.colProject')}>
+            <Select allowClear showSearch optionFilterProp="label" placeholder={t('common.all')} options={projectOptions} />
+          </Form.Item>
+          <Form.Item name="status" label={t('rdm.iteration.colStatus')}>
+            <Select
+              allowClear
+              placeholder={t('common.all')}
+              options={(Object.keys(RDM_ITERATION_STATUS) as RdmIterationStatus[]).map(s => ({
+                value: s,
+                label: RDM_ITERATION_STATUS_LABEL[s],
+              }))}
+            />
+          </Form.Item>
+          <Form.Item name="range" label={t('rdm.iteration.colStartDate')}>
+            <DatePicker.RangePicker style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item colon={false}>
+            <div className="search-actions">
+              <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>{t('common.search')}</Button>
+              <Button onClick={() => { form.resetFields(); setFilters({}) }}>{t('common.reset')}</Button>
+            </div>
+          </Form.Item>
+        </Form>
+      </div>
+
+      {/* 統計卡必須在搜索區下方、操作區上方（§E.8），且口径跟随筛选 */}
       <div style={{ marginBottom: 16 }}>
         <StatCards
-          animationKey="iteration"
+          animationKey={`iteration-${JSON.stringify(filters)}`}
           items={[
             { key: 'total', icon: <FieldTimeOutlined />, value: stats.total, label: '迭代總數', color: 'info' },
             { key: 'active', icon: <FieldTimeOutlined />, value: stats.active, label: '進行中', color: 'brand' },
@@ -314,7 +389,7 @@ export default function IterationPlan() {
         rowKey="id"
         loading={loading}
         columns={applyConfig(columns) as TableColumnsType<RdmIterationItem>}
-        dataSource={rows}
+        dataSource={filteredRows}
         scroll={{ x: 1860 }}
         pagination={{
           defaultPageSize: 10,

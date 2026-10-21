@@ -17,6 +17,7 @@ import {
   RiseOutlined,
 } from '@ant-design/icons'
 import { Line } from '@ant-design/charts'
+import dayjs from 'dayjs'
 import StatCards from '../../components/StatCards'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { deriveRdmColumnMeta } from './rdmColumnMeta'
@@ -78,21 +79,34 @@ export default function MetricTrend() {
 
   useEffect(() => { void load() }, [load])
 
-  /** 图表数据：把选中的指标摊平成 {日期, 指标, 值} */
+  /** 图表数据：把选中的指标摊平成 {日期, 指标, 值}；kind 用于拆分数量轴/比率轴 */
   const chartData = useMemo(() => {
-    const rows: { date: string; type: string; value: number }[] = []
+    const rows: { date: string; type: string; value: number; kind: 'rate' | 'count' }[] = []
     points.forEach(p => series.forEach(key => {
       const raw = p[key] ?? 0
       rows.push({
         date: p.statDate.slice(5),
         type: SERIES_OPTIONS.find(s => s.value === key)?.label ?? key,
         value: RATE_KEYS.includes(key) ? Math.round(raw * 1000) / 10 : Math.round(raw * 10) / 10,
+        kind: RATE_KEYS.includes(key) ? 'rate' : 'count',
       })
     }))
     return rows
   }, [points, series])
 
-  const latest = points[points.length - 1]
+  const rateChartData = useMemo(() => chartData.filter(r => r.kind === 'rate'), [chartData])
+  const countChartData = useMemo(() => chartData.filter(r => r.kind === 'count'), [chartData])
+
+  /**
+   * 卡片取「最近一个已完成的快照日」，而不是今天：
+   * 当日快照要等 job 跑完才有值，直接取最后一行会在早上把卡片全部显示成 0
+   * （表格里昨天的数据却是正常的，同页对不上）。
+   */
+  const latest = useMemo(() => {
+    const today = dayjs().format('YYYY-MM-DD')
+    const completed = points.filter(p => p.statDate < today)
+    return completed[completed.length - 1] ?? points[points.length - 1]
+  }, [points])
 
   const columns: TableColumnsType<RdmMetricPoint> = useMemo(() => [
     { title: '快照日期', dataIndex: 'statDate', key: 'statDate', width: 120 },
@@ -197,11 +211,11 @@ export default function MetricTrend() {
             animationKey={`${dim}-${days}-${latest.statDate}`}
             items={[
               { key: 'total', icon: <BarChartOutlined />, value: latest.reqTotal, label: '存量需求', color: 'info' },
-              { key: 'released', icon: <RiseOutlined />, value: latest.released, label: '昨日上線', color: 'success' },
+              { key: 'released', icon: <RiseOutlined />, value: latest.released, label: `${latest.statDate.slice(5)} 上線`, color: 'success' },
               { key: 'ontime', icon: <ClockCircleOutlined />, value: Math.round(latest.onTimeRate * 100), suffix: ' %', label: '按時交付率', color: latest.onTimeRate >= 0.8 ? 'success' : 'brand' },
               { key: 'pass', icon: <ClockCircleOutlined />, value: Math.round(latest.firstPassRate * 100), suffix: ' %', label: '驗收一次通過率', color: 'brand' },
               { key: 'cycle', icon: <ClockCircleOutlined />, value: Number(latest.avgDeliveryDays.toFixed(1)), decimals: 1, suffix: ' 天', label: '平均交付週期', color: 'system' },
-              { key: 'overdue', icon: <AlertOutlined />, value: latest.overdue, label: '當日逾期', color: 'system' },
+              { key: 'overdue', icon: <AlertOutlined />, value: latest.overdue, label: '快照日逾期', color: 'system' },
             ]}
           />
         </div>
@@ -212,23 +226,50 @@ export default function MetricTrend() {
           <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><RiseOutlined /></span>
           {RDM_METRIC_DIM_LABEL[dim]} · 近 {days} 天走勢
           <span className="rdm-card-title-split" />
-          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>比率類右軸讀法為百分比</span>
+          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>數量與比率分开两个坐标轴，比率已换算为百分比（0–100）</span>
         </div>
-        <div style={{ height: 300 }}>
+        <div style={{ minHeight: 300 }}>
           {loading
             ? <div style={{ textAlign: 'center', padding: 90 }}><Spin /></div>
             : (
-              <Line
-                data={chartData}
-                xField="date"
-                yField="value"
-                colorField="type"
-                height={300}
-                shapeField="smooth"
-                scale={{ color: { range: ['#E8720C', '#1890FF', '#52C41A', '#722ED1', '#FA8C16'] } }}
-                legend={{ color: { position: 'top', itemMarker: 'circle' } }}
-                axis={{ x: { title: false }, y: { title: false } }}
-              />
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: countChartData.length > 0 && rateChartData.length > 0 ? '1fr 1fr' : '1fr',
+                gap: 16,
+              }}>
+                {countChartData.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>數量</div>
+                    <Line
+                      data={countChartData}
+                      xField="date"
+                      yField="value"
+                      colorField="type"
+                      height={260}
+                      shapeField="smooth"
+                      scale={{ color: { range: ['#E8720C', '#1890FF', '#FA8C16'] } }}
+                      legend={{ color: { position: 'top', itemMarker: 'circle' } }}
+                      axis={{ x: { title: false }, y: { title: false } }}
+                    />
+                  </div>
+                )}
+                {rateChartData.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>比率（%）</div>
+                    <Line
+                      data={rateChartData}
+                      xField="date"
+                      yField="value"
+                      colorField="type"
+                      height={260}
+                      shapeField="smooth"
+                      scale={{ color: { range: ['#52C41A', '#722ED1'] }, y: { domainMin: 0, domainMax: 100 } }}
+                      legend={{ color: { position: 'top', itemMarker: 'circle' } }}
+                      axis={{ x: { title: false }, y: { title: false } }}
+                    />
+                  </div>
+                )}
+              </div>
             )}
         </div>
       </div>

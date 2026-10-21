@@ -99,9 +99,21 @@ export default function ScoreRuleConfig() {
   const handleSave = async (row: RdmScoreRule) => {
     try {
       const saved = await saveScoreRule(row)
-      setRules(prev => prev.map(r => (r.id === saved.id ? saved : r)))
+      // 升版会返回一个全新的 id：只 map 已存在行会把新版本丢掉，页面看不到 vN
+      setRules(prev => {
+        const withSaved = prev.some(r => r.id === saved.id)
+          ? prev.map(r => (r.id === saved.id ? saved : r))
+          : [...prev, saved]
+        // 启用新版时后端会停用旧版：本地同步，否则 currentRule 仍会命中旧版
+        return saved.enabled
+          ? withSaved.map(r => (r.id === saved.id ? saved : { ...r, enabled: false }))
+          : withSaved
+      })
       setDirty(prev => ({ ...prev, [row.id]: false }))
-      message.success(`規則 ${row.ruleCode} 已保存（版本 v${saved.version}），需點「按當前規則重算」才會影響分數`)
+      const active = rules.find(r => r.enabled) ?? currentRule
+      message.success(saved.enabled
+        ? `規則 ${saved.ruleCode} v${saved.version} 已保存並生效`
+        : `已生成 v${saved.version}；當前生效仍為 ${active ? `${active.ruleCode} v${active.version}` : '無'}，啟用後才切換`)
     } catch (err) {
       message.error(err instanceof Error && err.message ? err.message : '規則保存失敗')
     }

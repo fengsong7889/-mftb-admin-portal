@@ -12,6 +12,7 @@ import StatusSwitch from '../components/StatusSwitch'
 import { fetchStatusDefs, fetchTransitions, setTransitionEnabled, setStatusEnabled, type RdmStatusDefRow, type RdmTransitionRow } from '../../../api/rdm'
 import {
   RDM_ACTION_LABEL,
+  RDM_REQUIRED_FIELD_LABEL,
   RDM_ROLE_LABEL,
   RDM_STAGE_LABEL,
   RDM_STATUS_LABEL,
@@ -100,7 +101,8 @@ export default function StatusConfig() {
     },
     {
       title: '動作', dataIndex: 'actionCode', key: 'actionCode', width: 140,
-      render: (v: string) => RDM_ACTION_LABEL[v as RdmAction] ?? v,
+      // actionName 来自数据库（已是中文），旧枚举兜底走 RDM_ACTION_LABEL，不再露 resubmit_pool 这类原值
+      render: (v: string, r) => RDM_ACTION_LABEL[v as RdmAction] ?? r.actionName ?? v,
     },
     {
       title: '允許角色', key: 'roles', width: 240,
@@ -115,7 +117,7 @@ export default function StatusConfig() {
     {
       title: '必填字段', key: 'required', width: 200,
       render: (_, r) => (r.requiredFields.length
-        ? <Space size={4} wrap>{r.requiredFields.map(f => <Tag key={f} color="gold" style={{ margin: 0 }}>{f}</Tag>)}</Space>
+        ? <Space size={4} wrap>{r.requiredFields.map(f => <Tag key={f} color="gold" style={{ margin: 0 }}>{RDM_REQUIRED_FIELD_LABEL[f] ?? f}</Tag>)}</Space>
         : <span style={{ color: '#8C8C8C' }}>無</span>),
     },
     {

@@ -93,7 +93,10 @@ export default function QualityBoard() {
     },
     {
       title: '滿意度', dataIndex: 'avgScore', key: 'avgScore', width: 100,
-      render: (v: number) => <span style={{ color: v >= 4.5 ? '#52C41A' : v >= 4 ? '#FA8C16' : '#FF4D4F' }}>{v.toFixed(1)} / 5</span>,
+      // 无「上线后评分」的部门 avgScore 为 null：显示 '-'，不能伪装成 0 分
+      render: (v?: number | null) => (v == null
+        ? <span style={{ color: '#8C8C8C' }}>-</span>
+        : <span style={{ color: v >= 4.5 ? '#52C41A' : v >= 4 ? '#FA8C16' : '#FF4D4F' }}>{v.toFixed(1)} / 5</span>),
     },
     { title: '缺陷數', dataIndex: 'defectCount', key: 'defectCount', width: 90, render: (v: number) => <span style={{ color: v > 3 ? '#CF1322' : '#595959' }}>{v}</span> },
   ], [])
@@ -217,6 +220,9 @@ export default function QualityBoard() {
               yField="value"
               colorField="name"
               legend={false}
+              // 单分类时不能铺满整块画布：限宽 + 顶部数值标签，才看得出是柱状图
+              style={{ maxWidth: 56 }}
+              label={{ text: 'value', position: 'top' }}
               axis={{ y: { title: '需求數' }, x: { title: false } }}
               scale={{ color: { range: ['#52C41A', '#95DE64', '#FAAD14', '#FF7A45', '#FF4D4F'] } }}
             />

@@ -346,6 +346,7 @@ const RdmQualityBoard = lazy(() => import('./pages/Rdm/QualityBoard'))
 const RdmVersionTrace = lazy(() => import('./pages/Rdm/VersionTrace'))
 const RdmWeeklyReport = lazy(() => import('./pages/Rdm/WeeklyReport'))
 const RdmScoreBoard = lazy(() => import('./pages/Rdm/ScoreBoard'))
+const RdmScoreBudgetForm = lazy(() => import('./pages/Rdm/ScoreBudgetForm'))
 const RdmMetricTrend = lazy(() => import('./pages/Rdm/MetricTrend'))
 const RdmScoreRuleConfig = lazy(() => import('./pages/Rdm/Config/ScoreRuleConfig'))
 const RdmAcceptanceList = lazy(() => import('./pages/Rdm/AcceptanceList'))
@@ -356,7 +357,9 @@ const RdmTeamOutput = lazy(() => import('./pages/Rdm/TeamOutput'))
 const RdmResourceLoad = lazy(() => import('./pages/Rdm/ResourceLoad'))
 const RdmConfigStatus = lazy(() => import('./pages/Rdm/Config/StatusConfig'))
 const RdmTaskTypeConfig = lazy(() => import('./pages/Rdm/Config/TaskTypeConfig'))
+const RdmTaskTypeConfigForm = lazy(() => import('./pages/Rdm/Config/TaskTypeConfigForm'))
 const RdmConfigRouting = lazy(() => import('./pages/Rdm/Config/RoutingConfig'))
+const RdmConfigRoutingForm = lazy(() => import('./pages/Rdm/Config/RoutingConfigForm'))
 const RdmConfigSla = lazy(() => import('./pages/Rdm/Config/SlaConfig'))
 // 進度日報（一级菜单）：推送配置 / 模板配置 / 发送记录 / 手动触发 四个二级页
 const DailyReportRules = lazy(() => import('./pages/Rdm/DailyReport/Rules'))
@@ -761,11 +764,14 @@ function AuthenticatedLayout() {
               <Route path="/rdm-version-trace" element={<RdmVersionTrace />} />
               <Route path="/rdm-weekly-report" element={<RdmWeeklyReport />} />
               <Route path="/rdm-score" element={<RdmScoreBoard />} />
+              <Route path="/rdm-score-budget-form" element={<RdmScoreBudgetForm />} />
               <Route path="/rdm-metric-trend" element={<RdmMetricTrend />} />
               <Route path="/rdm-score-rule" element={<RdmScoreRuleConfig />} />
               <Route path="/rdm-config-status" element={<RdmConfigStatus />} />
                             <Route path="/rdm-task-type-config" element={<RdmTaskTypeConfig />} />
+              <Route path="/rdm-task-type-config-form" element={<RdmTaskTypeConfigForm />} />
               <Route path="/rdm-config-routing" element={<RdmConfigRouting />} />
+              <Route path="/rdm-config-routing-form" element={<RdmConfigRoutingForm />} />
               <Route path="/rdm-config-sla" element={<RdmConfigSla />} />
               {/* 進度日報：四个二级页 + 两个独立表单页（表单不得用 Modal 承载） */}
               <Route path="/rdm-daily-report-rules" element={<DailyReportRules />} />
@@ -966,6 +972,11 @@ function AppRoutes() {
    */
   useEffect(() => {
     Modal.destroyAll()
+    /*
+     * 路由切换后回到顶部：.app-content 是实际滚动容器，
+     * 从长列表点进详情时保留旧 scrollTop 会让标题/阶段条直接落在视口外。
+     */
+    document.querySelectorAll('.app-content').forEach(el => { el.scrollTop = 0 })
   }, [location.pathname])
 
   // 公開頁面（免登錄，不套後台佈局）：

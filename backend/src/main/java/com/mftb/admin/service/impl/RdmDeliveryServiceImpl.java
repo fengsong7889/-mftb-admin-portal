@@ -33,6 +33,7 @@ import com.mftb.admin.service.OaRequestService;
 import com.mftb.admin.service.RdmAccessGuard;
 import com.mftb.admin.service.RdmConfigService;
 import com.mftb.admin.service.RdmDeliveryService;
+import com.mftb.admin.service.RdmDeliveryItemService;
 import com.mftb.admin.service.RdmNotifyService;
 import com.mftb.admin.service.RdmRequirementService;
 import com.mftb.admin.service.RdmTaskTypeService;
@@ -150,6 +151,12 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
     private final com.mftb.admin.service.RdmFlowVersionGuard flowVersionGuard;
     /** 任务类型字典：写校验白名单/标签解析/角色推断与聚合桶同源本表（业务可配置） */
     private final RdmTaskTypeService taskTypeService;
+    /**
+     * 交付项状态回推：任务事实（新建/完成/删除）一旦变化，交付项必须同步重算，
+     * 否则会停在「待准备」而被提测接口拒掉（历史缺陷：派了任务仍然不能提测）。
+     * 只依赖 mapper 的服务，不与本类形成循环。
+     */
+    private final RdmDeliveryItemService deliveryItemService;
 
     /* ==================== PRD ==================== */
 
@@ -537,6 +544,10 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         } else {
             taskMapper.updateById(task);
         }
+        // 任务挂到交付项后立即回推状态：有进行中/已完成任务 → 研发中，才能继续提测
+        if (task.getDeliveryItemId() != null) {
+            deliveryItemService.recalculateStatus(task.getDeliveryItemId());
+        }
         // 任务负责人自动成为需求参与人，否则他在详情页看不到任何可执行动作
         bindParticipant(req.getId(), owner, task.getRoleCode());
         if (owner != null && task.getId() != null) {
@@ -707,6 +718,11 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         task.setActualHours(sumWorkHours(task.getId()));
         task.setUpdatedBy(operatorResolver.operatorSignature(current));
         taskMapper.updateById(task);
+
+        // 任务完成/阻塞会改变交付项阶段（研发中 → 可提测），进度上报后同步重算
+        if (task.getDeliveryItemId() != null) {
+            deliveryItemService.recalculateStatus(task.getDeliveryItemId());
+        }
 
         RdmRequirement req = requirementMapper.selectById(task.getReqId());
         if (req != null) {

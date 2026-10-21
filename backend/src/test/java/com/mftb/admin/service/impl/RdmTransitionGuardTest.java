@@ -68,6 +68,7 @@ class RdmTransitionGuardTest {
         // 否则测试里“可见/无权”的结论与真实调用链不是一个口径
         accessGuard = new RdmAccessGuard(operatorResolver, permissionService, requirementMapper, roleMapper,
                 mock(com.mftb.admin.mapper.RdmProjectMemberMapper.class),
+                mock(com.mftb.admin.mapper.RdmProjectMapper.class),
                 mock(com.mftb.admin.mapper.RdmDeliveryItemMapper.class),
                 mock(com.mftb.admin.mapper.RdmTestBatchMapper.class),
                 mock(com.mftb.admin.mapper.RdmReleaseBatchMapper.class));

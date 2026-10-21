@@ -20,7 +20,6 @@ import {
   Alert,
   Button,
   DatePicker,
-  Empty,
   Form,
   Input,
   Modal,
@@ -39,6 +38,7 @@ import {
   ControlOutlined,
   DownloadOutlined,
   PlusOutlined,
+  ProjectOutlined,
   ReloadOutlined,
   SearchOutlined,
   SwapOutlined,
@@ -49,6 +49,7 @@ import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import dayjs from 'dayjs'
 import StatCards from '../../components/StatCards'
+import { rdmTableLocale } from './components/tableLocale'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { useAuth } from '../../contexts/AuthContext'
 import {
@@ -91,7 +92,7 @@ interface EmpOption {
 type DrillKey = 'inProgress' | 'attention' | 'pending'
 
 const DRILL_LABEL: Record<DrillKey, string> = {
-  inProgress: '進行中項目',
+  inProgress: '在管項目',
   attention: '需關注項目',
   pending: '待裁決事項',
 }
@@ -648,8 +649,8 @@ export default function ProjectOverview() {
             items={[
               {
                 key: 'inProgress', icon: <SyncOutlined spin />, value: statVal(stats?.inProgressCount),
-                label: '進行中項目', color: 'info', active: drill === 'inProgress',
-                title: '點擊下鑽：僅看進行中項目', onClick: () => handleDrill('inProgress'),
+                label: '在管項目', color: 'info', active: drill === 'inProgress',
+                title: '點擊下鑽：僅看籌備/進行中項目', onClick: () => handleDrill('inProgress'),
               },
               {
                 key: 'attention', icon: <AlertOutlined />, value: statVal(stats?.attentionCount),
@@ -660,6 +661,10 @@ export default function ProjectOverview() {
                 key: 'pending', icon: <ClockCircleOutlined />, value: statVal(stats?.pendingDecisionCount),
                 label: '待裁決事項', color: 'system', active: drill === 'pending',
                 title: '點擊下鑽：僅看待裁決項目', onClick: () => handleDrill('pending'),
+              },
+              {
+                key: 'total', icon: <ProjectOutlined />, value: statVal(stats?.totalProjects),
+                label: '全部項目', color: 'info',
               },
             ]}
           />
@@ -708,11 +713,7 @@ export default function ProjectOverview() {
           },
           style: { cursor: 'pointer' },
         })}
-        locale={{
-          emptyText: error
-            ? <Empty description="載入失敗" image={Empty.PRESENTED_IMAGE_SIMPLE} />
-            : <Empty description="暫無項目數據" image={Empty.PRESENTED_IMAGE_SIMPLE} />,
-        }}
+        locale={rdmTableLocale(loading, error ? '載入失敗' : t('common.noData'))}
         pagination={{
           current: pageNo,
           pageSize,

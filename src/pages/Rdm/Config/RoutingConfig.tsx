@@ -13,18 +13,14 @@
  * scope_value 与 menuKey / systemCode / deptId / reqType 精确比对，只存显示名的规则永远匹配不上。
  */
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Input, Modal, Select, Space, Table, Tabs, Tag, TreeSelect, message } from 'antd'
+import { Button, Modal, Space, Table, Tabs, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import StatusSwitch from '../components/StatusSwitch'
 import AdmitPolicyPanel from './AdmitPolicyPanel'
-import { deleteRoutingRule, fetchProductOptions, fetchRoutingRules, saveRoutingRule, type RdmProductOption, type RdmRoutingRow } from '../../../api/rdm'
-import { fetchDepartments } from '../../../api/department'
-import { buildDeptTree, type DeptNode } from '../../Attendance/deptTree'
-import { RDM_REQ_TYPE_LABEL } from '../../../constants/rdm'
-import { PORTAL_SYSTEM_ICONS } from '../../../constants/portalSystems'
-import { keyToPath } from '../../../constants/menuDataSource'
+import { deleteRoutingRule, fetchRoutingRules, saveRoutingRule, type RdmRoutingRow } from '../../../api/rdm'
 import '../index.css'
 
 /** 匹配范围类型 */
@@ -44,113 +40,30 @@ type Txt = (key: string, original: string, options?: Record<string, unknown>) =>
 /** 分发矩阵（受理侧）：本文件只铺表格，准入侧见 AdmitPolicyPanel */
 function RoutingMatrix() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const txt = useCallback<Txt>((key, original, options) => t(key, { defaultValue: original, ...options }), [t])
   const [rows, setRows] = useState<RdmRoutingRow[]>([])
-  const [pmOptions, setPmOptions] = useState<RdmProductOption[]>([])
-  const [deptTree, setDeptTree] = useState<DeptNode[]>([])
   const [loading, setLoading] = useState(true)
 
-  // 部门树单独加载：它只服务「按提出部门」一个匹配维度，失败不得拖垮整个分发矩阵
   useEffect(() => {
-    fetchDepartments()
-      .then(list => setDeptTree(buildDeptTree(list ?? [])))
-      .catch(() => setDeptTree([]))
-  }, [])
-
-  /** 匹配對象候选（非部门维度）：值与标签都取后端比对用的真值 */
-  const scopeValueOptions = (scopeType: string): { value: string; label: string }[] => {
-    switch (scopeType) {
-      case 'SYSTEM':
-        return Object.keys(PORTAL_SYSTEM_ICONS).map(code => ({ value: code, label: code }))
-      case 'MENU':
-        return Object.keys(keyToPath).map(key => ({ value: key, label: key }))
-      case 'TYPE':
-        return Object.entries(RDM_REQ_TYPE_LABEL).map(([value, label]) => ({ value, label }))
-      default:
-        return []
-    }
-  }
-
-  useEffect(() => {
-    Promise.all([fetchRoutingRules(), fetchProductOptions()])
-      .then(([rules, pms]) => {
-        setRows(rules)
-        setPmOptions(pms)
-      })
+    fetchRoutingRules()
+      .then(setRows)
       .catch(() => message.error('分發矩陣載入失敗'))
       .finally(() => setLoading(false))
   }, [])
 
-  const updateRow = (id: number, patch: Partial<RdmRoutingRow>) => {
-    setRows(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r))
-  }
-
-  const handleAdd = () => {
-    setRows(prev => [...prev, {
-      // 本地 rowKey 用时间戳，但必须同时标 isNew：提交时要把它换成 null，
-      // 否则后端按「带 id 的更新」处理，影响 0 行却仍回「已保存」
-      id: Date.now(),
-      isNew: true,
-      scopeType: 'SYSTEM',
-      scopeValue: '',
-      scopeName: '',
-      pmUserId: pmOptions[0]?.userId ?? 0,
-      pmName: pmOptions[0]?.name ?? '',
-      loadCapacity: 8,
-      activeCount: 0,
-      priority: prev.length + 1,
-      enabled: true,
-    }])
-  }
-
-  /** 提交行数据给后端（新增送 null）；返回最新列表并刷新表格 */
-  const persistRow = async (row: RdmRoutingRow, patch?: Partial<RdmRoutingRow>) => {
-    const merged = { ...row, ...patch }
-    /*
-     * 校验必须 null-safe：旧写法直接 row.scopeName.trim()，后端返回的行上该字段为 null 时
-     * 会抛 TypeError，异步 handler 的 rejection 没人接 → 点「保存」既无请求也无提示（静默失败）。
-     */
-    const scopeValue = (merged.scopeValue ?? '').trim()
-    const scopeName = (merged.scopeName ?? '').trim()
-    if (!scopeValue) {
-      message.warning(txt('rdm.routing.scopeValueRequired', '請選擇匹配對象（後端按編碼精確匹配，不能只填顯示名）'))
-      return false
-    }
-    if (!merged.pmUserId) {
-      message.warning(txt('rdm.routing.pmRequired', '請選擇負責產品經理'))
-      return false
-    }
-    const pm = pmOptions.find(p => p.userId === merged.pmUserId)
-    try {
-      const { isNew: _isNew, ...rest } = merged
-      const next = await saveRoutingRule({
-        ...rest,
-        // 新增行必须送 null（而不是本地临时 id），后端才会走 INSERT
-        id: merged.isNew ? null : merged.id,
-        scopeValue,
-        scopeName: scopeName || pm?.name || scopeValue,
-        pmName: pm?.name ?? merged.pmName,
-      })
-      setRows(next)
-      return true
-    } catch {
-      // request.ts 已统一弹后端失败原因；这里只兜住异常，不让它变成无人接的 rejection
-      return false
-    }
-  }
-
-  const handleSave = async (row: RdmRoutingRow) => {
-    if (await persistRow(row)) message.success(txt('rdm.routing.rowSaved', '已保存，下次分配即刻生效'))
-  }
-
   /**
    * 启停开关直接落库（§B.8：确认后执行 API 并刷新）。
-   * 旧写法只 updateRow 改本地 state，用户以为开关就是生效状态，必须再点一次「保存」；
-   * 忘了点就出现「界面显示停用、后端仍在派单」的假状态。
+   * 行内编辑已迁到独立页，这里只保留启停这个单一动作。
    */
   const handleToggle = async (row: RdmRoutingRow, next: boolean) => {
-    const ok = await persistRow(row, { enabled: next })
-    if (!ok) throw new Error('toggle-failed')
+    const { isNew: _isNew, ...rest } = row
+    try {
+      setRows(await saveRoutingRule({ ...rest, id: row.id, enabled: next }))
+    } catch (err) {
+      // 接口是 SILENT：把后端原因抛给 StatusSwitch 统一提示
+      throw err instanceof Error ? err : new Error('保存失敗，請重試')
+    }
   }
 
   /** 移除：未落库的新增行直接丢，已落库的行走服务端删除 + 二次确认 */
@@ -183,95 +96,33 @@ function RoutingMatrix() {
     })
   }
 
+  const scopeLabel = (value: string) => SCOPE_OPTIONS.find(o => o.value === value)?.label ?? value
+
   const columns: TableColumnsType<RdmRoutingRow> = [
     {
       title: '優先級', dataIndex: 'priority', key: 'priority', width: 90,
-      render: (v: number, r) => <Input type="number" size="small" value={v} onChange={e => updateRow(r.id, { priority: Number(e.target.value) })} />,
     },
     {
-      title: '匹配範圍', key: 'scopeType', width: 130,
-      render: (_, r) => (
-        <Select
-          size="small"
-          style={{ width: 110 }}
-          value={r.scopeType}
-          // 换维度时旧的匹配對象不再有意义（部门 id 当系统码用会静默匹不上），一并清空
-          onChange={v => updateRow(r.id, { scopeType: v, scopeValue: '', scopeName: '' })}
-          options={SCOPE_OPTIONS}
-        />
-      ),
+      title: '匹配範圍', dataIndex: 'scopeType', key: 'scopeType', width: 130,
+      render: (v: string) => scopeLabel(v),
     },
     {
-      title: '匹配對象', key: 'scopeName', width: 220,
-      render: (_, r) => (
-        r.scopeType === 'DEPT' ? (
-          <TreeSelect
-            size="small"
-            style={{ width: 200 }}
-            treeData={deptTree}
-            value={r.scopeValue ? Number(r.scopeValue) : undefined}
-            showSearch
-            treeNodeFilterProp="title"
-            placeholder="選擇部門"
-            onChange={(value, labelList) => updateRow(r.id, {
-              scopeValue: value == null ? '' : String(value),
-              scopeName: String(labelList?.[0] ?? ''),
-            })}
-          />
-        ) : (
-          <Select
-            size="small"
-            style={{ width: 200 }}
-            showSearch
-            optionFilterProp="label"
-            value={r.scopeValue || undefined}
-            placeholder="選擇匹配對象"
-            options={scopeValueOptions(r.scopeType)}
-            onChange={v => updateRow(r.id, {
-              scopeValue: v,
-              scopeName: scopeValueOptions(r.scopeType).find(o => o.value === v)?.label ?? v,
-            })}
-          />
-        )
-      ),
+      title: '匹配對象', key: 'scopeName', width: 240, ellipsis: true,
+      render: (_, r) => <span title={r.scopeName || r.scopeValue}>{r.scopeName || r.scopeValue || '-'}</span>,
     },
     {
-      title: '負責產品經理', key: 'pm', width: 170,
-      render: (_, r) => (
-        <Select
-          size="small"
-          style={{ width: 150 }}
-          value={r.pmUserId}
-          onChange={v => updateRow(r.id, { pmUserId: v })}
-          options={pmOptions.map(pm => ({ value: pm.userId, label: pm.name }))}
-        />
-      ),
+      title: '負責產品經理', dataIndex: 'pmName', key: 'pm', width: 160,
+      render: (v?: string | null) => v || '-',
     },
     {
-      title: '備用人', key: 'backup', width: 150,
-      render: (_, r) => (
-        <Select
-          size="small"
-          style={{ width: 130 }}
-          allowClear
-          placeholder="主責休假時接手"
-          value={r.backupPmName}
-          onChange={v => updateRow(r.id, { backupPmName: v ?? undefined })}
-          options={pmOptions.map(pm => ({ value: pm.name, label: pm.name }))}
-        />
-      ),
+      title: '備用人', dataIndex: 'backupPmName', key: 'backup', width: 140,
+      render: (v?: string | null) => v || '-',
     },
     {
       title: '容量 / 在途', key: 'load', width: 120,
       render: (_, r) => (
         <Space size={4}>
-          <Input
-            type="number"
-            size="small"
-            style={{ width: 60 }}
-            value={r.loadCapacity}
-            onChange={e => updateRow(r.id, { loadCapacity: Number(e.target.value) })}
-          />
+          <span>{r.loadCapacity}</span>
           <Tag color={r.activeCount >= r.loadCapacity ? 'error' : 'processing'} style={{ margin: 0 }}>
             {r.activeCount}
           </Tag>
@@ -292,7 +143,7 @@ function RoutingMatrix() {
       title: '操作', key: 'action', width: 130, fixed: 'right',
       render: (_, r) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={() => handleSave(r)}>保存</Button>
+          <Button type="link" size="small" onClick={() => navigate(`/rdm-config-routing-form?id=${r.id}`)}>編輯</Button>
           <Button
             type="link"
             size="small"
@@ -315,7 +166,7 @@ function RoutingMatrix() {
           </Tag>
         </div>
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>新增規則</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/rdm-config-routing-form')}>新增規則</Button>
         </div>
       </div>
 

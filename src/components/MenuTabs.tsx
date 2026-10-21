@@ -18,13 +18,15 @@ import './MenuTabs.css'
 interface MenuTab {
   path: string
   title: string
+  /** 完整路径（含 query）：切语言时用它重算标题，保留新增/编辑等模式差异 */
+  fullPath?: string
 }
 
 /** localStorage key */
 const TABS_STORAGE_KEY = 'menu_tabs_history'
 
 /** 首页固定标签 */
-const HOME_TAB: MenuTab = { path: '/', title: '首頁' }
+const HOME_TAB: MenuTab = { path: '/', title: 'i18n:common.home', fullPath: '/' }
 
 /**
  * 从后端菜单树构建 path → { key, name } 映射 + menuKey → name 映射
@@ -228,6 +230,44 @@ const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
   '/hr-contract-renew-detail': { fixed: 'i18n:hrLifecycle.detailTitle' },
   // 菜单配置·高级设置（仅超管）：同一页按 ?id 区分新增/編輯，标题与页面 H2 一致
   '/menu-config/setting': { add: '新增菜單 · 高級設置', edit: '編輯菜單 · 高級設置' },
+  /*
+   * 產研交付（RDM）子頁面：這些路由在 pathToKey 裡有權限錨點，但頁簽不能直接沿用父菜單名，
+   * 否則「研發工作台/測試工作台/發布中心」會出現 2~3 個同名頁簽（同名不同路徑）。
+   * 子頁面一律給獨立標題，優先級高於 pathToKey（matchFullTitle 在 getMenuName 第 1 步）。
+   */
+  '/rdm-detail': { fixed: 'i18n:rdm.tab.reqDetail' },
+  '/rdm-submit': { add: 'i18n:rdm.tab.reqSubmitAdd', edit: 'i18n:rdm.tab.reqSubmitEdit' },
+  '/rdm-gantt': { fixed: 'i18n:rdm.tab.gantt' },
+  '/rdm-assign': { fixed: 'i18n:rdm.tab.assign' },
+  '/rdm-prd': { fixed: 'i18n:rdm.tab.prd' },
+  '/rdm-review': { fixed: 'i18n:rdm.tab.review' },
+  '/rdm-change': { fixed: 'i18n:rdm.tab.change' },
+  '/rdm-milestone': { fixed: 'i18n:rdm.tab.milestone' },
+  '/rdm-acceptance-form': { fixed: 'i18n:rdm.tab.acceptanceForm' },
+  '/rdm-task': { add: 'i18n:rdm.tab.taskAdd', edit: 'i18n:rdm.tab.taskEdit' },
+  '/rdm-test-detail': { fixed: 'i18n:rdm.tab.testDetail' },
+  '/rdm-test-submit': { fixed: 'i18n:rdm.tab.testSubmit' },
+  '/rdm-release-create': { fixed: 'i18n:rdm.tab.releaseCreate' },
+  '/rdm-release-detail': { fixed: 'i18n:rdm.tab.releaseDetail' },
+  '/rdm-delivery-item': {
+    modeParam: 'mode',
+    modeMap: { create: 'i18n:rdm.tab.deliveryItemCreate', edit: 'i18n:rdm.tab.deliveryItemEdit' },
+    detailFixed: 'i18n:rdm.tab.deliveryItemDetail',
+  },
+  '/rdm-project-detail': {
+    modeParam: 'mode',
+    modeMap: { create: 'i18n:rdm.tab.projectCreate', edit: 'i18n:rdm.tab.projectEdit' },
+    detailFixed: 'i18n:rdm.tab.projectDetail',
+  },
+  '/rdm-iteration-form': { add: 'i18n:rdm.tab.iterationAdd', edit: 'i18n:rdm.tab.iterationEdit' },
+  '/rdm-issue': { fixed: 'i18n:rdm.tab.issue' },
+  '/rdm-grayscale': { fixed: 'i18n:rdm.tab.grayscale' },
+  '/rdm-stock-migration': { fixed: 'i18n:rdm.tab.stockMigration' },
+  '/rdm-daily-report-rule-form': { add: 'i18n:rdm.tab.dailyRuleAdd', edit: 'i18n:rdm.tab.dailyRuleEdit' },
+  '/rdm-daily-report-template-form': { add: 'i18n:rdm.tab.dailyTemplateAdd', edit: 'i18n:rdm.tab.dailyTemplateEdit' },
+  '/rdm-config-routing-form': { add: 'i18n:rdm.tab.routingAdd', edit: 'i18n:rdm.tab.routingEdit' },
+  '/rdm-score-budget-form': { add: 'i18n:rdm.tab.scoreBudgetAdd', edit: 'i18n:rdm.tab.scoreBudgetEdit' },
+  '/rdm-task-type-config-form': { add: 'i18n:rdm.tab.taskTypeAdd', edit: 'i18n:rdm.tab.taskTypeEdit' },
 }
 
 /**
@@ -412,7 +452,9 @@ export default function MenuTabs() {
         const parsed: MenuTab[] = JSON.parse(saved)
         if (Array.isArray(parsed) && parsed.length > 0) {
           const hasHome = parsed.some(t => t.path === '/')
-          const restored = hasHome ? parsed : [HOME_TAB, ...parsed]
+          // 首页标签持久化的是旧文案：统一改回 i18n key，切语言时才能跟着变
+          const restored = (hasHome ? parsed : [HOME_TAB, ...parsed])
+            .map(t => (t.path === '/' ? { ...t, title: HOME_TAB.title, fullPath: '/' } : t))
           setTabs(restored)
         }
       }
@@ -484,20 +526,29 @@ export default function MenuTabs() {
       const prev = closingPath && closingPath !== '/' && closingPath !== currentTabPath
         ? previous.filter(tab => tab.path !== closingPath) : previous
       const exists = prev.find(t => t.path === currentTabPath)
-      if (exists) return prev
+      if (exists) {
+        // 首页固定保留 i18n key，不能被 getMenuName 解析后的文案覆盖（否则切语言不跟随）
+        if (currentTabPath === '/') return prev
+        // 同一基礎路徑復用標籤時同步標題：新增/編輯共用一條路由（query 不進 tabPath）時，
+        // 否則從「新增預算」跳到「調整預算」標題會停在「新增預算」。
+        const nextTitle = getMenuName(fullPath)
+        return exists.title === nextTitle && exists.fullPath === fullPath
+          ? prev
+          : prev.map(t => (t.path === currentTabPath ? { ...t, title: nextTitle, fullPath } : t))
+      }
       // 若當前路徑的基礎路徑已存在標籤（含 query），更新該標籤路徑與標題
       const normalizedBase = normalizePath(currentTabPath)
       if (normalizedBase !== currentTabPath) {
         const baseIdx = prev.findIndex(t => t.path === normalizedBase)
         if (baseIdx >= 0) {
-          const title = getMenuName(currentTabPath)
+          const title = getMenuName(fullPath)
           const updated = [...prev]
-          updated[baseIdx] = { path: currentTabPath, title }
+          updated[baseIdx] = { path: currentTabPath, title, fullPath }
           return updated
         }
       }
-      const title = getMenuName(currentTabPath)
-      return [...prev, { path: currentTabPath, title }]
+      const title = getMenuName(fullPath)
+      return [...prev, { path: currentTabPath, title, fullPath }]
     })
     if (closingPath && state && typeof state === 'object') {
       // 消费一次性关闭指令，避免浏览器后退到列表时再次关闭后来新开的标签。
@@ -521,7 +572,7 @@ export default function MenuTabs() {
   useEffect(() => {
     setTabs((prev) => prev.map((tab) => ({
       ...tab,
-      title: tab.path === '/' ? '首頁' : getMenuName(tab.path),
+      title: tab.path === '/' ? HOME_TAB.title : getMenuName(tab.fullPath ?? tab.path),
     })))
   }, [i18nInstance.language, getMenuName])
 
@@ -621,12 +672,12 @@ export default function MenuTabs() {
               onContextMenu={(e) => handleContextMenu(e, tab.path)}
             >
               {tab.path === '/' && <HomeOutlined className="menu-tab-home-icon" />}
-              <span className="menu-tab-title">{tab.title}</span>
+              <span className="menu-tab-title">{resolveTitle(tab.title, t)}</span>
               {tabs.length > 1 && (
                 <span
                   className="menu-tab-close"
                   onClick={(e) => handleClose(e, tab.path)}
-                  title="關閉"
+                  title={t('common.close')}
                 >
                   <CloseOutlined />
                 </span>
@@ -643,14 +694,14 @@ export default function MenuTabs() {
           onClick={(e) => e.stopPropagation()}
         >
           <div className="menu-tabs-context-item" onClick={() => handleCloseOthers(ctxMenu.path)}>
-            關閉其它
+            {t('common.closeOthers')}
           </div>
           <div className="menu-tabs-context-item" onClick={() => handleCloseRight(ctxMenu.path)}>
-            關閉右側
+            {t('common.closeRight')}
           </div>
           {ctxMenu.path !== '/' && (
             <div className="menu-tabs-context-item menu-tabs-context-item--danger" onClick={handleCloseAll}>
-              關閉全部
+              {t('common.closeAll')}
             </div>
           )}
         </div>

@@ -17,9 +17,11 @@ import {
   RocketOutlined, SearchOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import StatCards from '../../components/StatCards'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { rdmTableLocale } from './components/tableLocale'
 import {
   fetchReleaseBatches,
   type RdmReleaseBatchListItem,
@@ -59,6 +61,7 @@ const COLUMN_META = [
 
 export default function ReleaseCenter() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
 
   // ===== 列表状态 =====
   const [loading, setLoading] = useState(false)
@@ -273,7 +276,7 @@ export default function ReleaseCenter() {
               onChange={(dates) => setDateRange(dates as [dayjs.Dayjs | null, dayjs.Dayjs | null] | null)}
             />
           </Form.Item>
-          <Form.Item label=" ">
+          <Form.Item label=" " colon={false}>
             <div className="search-actions">
               <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
               <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
@@ -311,6 +314,7 @@ export default function ReleaseCenter() {
         className="nowrap-table"
         rowKey="id"
         loading={loading}
+        locale={rdmTableLocale(loading, t('common.noData'))}
         columns={applyConfig(columns)}
         dataSource={rows}
         tableLayout="fixed"

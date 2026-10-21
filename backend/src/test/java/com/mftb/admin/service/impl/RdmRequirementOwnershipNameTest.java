@@ -88,7 +88,8 @@ class RdmRequirementOwnershipNameTest {
         RdmRequirementRoleMapper roleMapper = mock(RdmRequirementRoleMapper.class);
         when(roleMapper.selectCount(any())).thenReturn(0L);
         RdmAccessGuard accessGuard = new RdmAccessGuard(operatorResolver, permissionService, requirementMapper,
-                roleMapper, mock(RdmProjectMemberMapper.class), mock(RdmDeliveryItemMapper.class),
+                roleMapper, mock(RdmProjectMemberMapper.class), mock(com.mftb.admin.mapper.RdmProjectMapper.class),
+                mock(RdmDeliveryItemMapper.class),
                 mock(RdmTestBatchMapper.class), mock(RdmReleaseBatchMapper.class));
         service = new RdmRequirementServiceImpl(
                 requirementMapper, mock(RdmRequirementTargetMapper.class),

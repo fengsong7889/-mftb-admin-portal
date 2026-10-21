@@ -173,6 +173,8 @@ public class RdmDeliveryItemService {
         vo.setStatus(item.getStatus());
         vo.setCoordinatorUserName(item.getCoordinatorUserName());
         vo.setCoordinatorUserId(item.getCoordinatorUserId());
+        vo.setProductAcceptorUserId(item.getProductAcceptorUserId());
+        vo.setBizAcceptorUserId(item.getBizAcceptorUserId());
         vo.setAcceptancePath(item.getAcceptancePath());
         vo.setPlanStartDate(DateTimeUtils.format(item.getPlanStartDate()));
         vo.setPlanEndDate(DateTimeUtils.format(item.getPlanEndDate()));
@@ -184,6 +186,7 @@ public class RdmDeliveryItemService {
         vo.setProductAcceptorUserName(item.getProductAcceptorUserName());
         vo.setBizAcceptorUserName(item.getBizAcceptorUserName());
         vo.setVersion(item.getVersion());
+        vo.setScopeFrozenAt(DateTimeUtils.format(item.getScopeFrozenAt()));
         vo.setCreatedAt(DateTimeUtils.format(item.getCreatedAt()));
         vo.setUpdatedAt(DateTimeUtils.format(item.getUpdatedAt()));
         // 推导字段
@@ -224,22 +227,41 @@ public class RdmDeliveryItemService {
             throw new BusinessException("關聯需求不存在");
         }
 
+        /*
+         * 责任人一律落 sys_user.id：姓名只是快照，权限判定（冻结/验收）只认 userId。
+         * 显式选择优先；未选择时按需求事实兜底（PM / 业务验收人 / 提出人），
+         * 保证新建交付项不会出现“只有姓名、冻结永远失败”的断链。
+         */
+        Long coordinatorUserId = dto.getCoordinatorUserId() != null
+                ? dto.getCoordinatorUserId()
+                : (req.getAssigneePmUserId() != null ? req.getAssigneePmUserId() : currentUserId);
+        if (coordinatorUserId == null) {
+            throw new BusinessException("請選擇交付項協調人");
+        }
+        Long productAcceptorUserId = dto.getProductAcceptorUserId() != null
+                ? dto.getProductAcceptorUserId() : req.getAssigneePmUserId();
+        Long bizAcceptorUserId = dto.getBizAcceptorUserId() != null
+                ? dto.getBizAcceptorUserId()
+                : (req.getAcceptorUserId() != null ? req.getAcceptorUserId() : req.getSubmitterUserId());
+
         RdmDeliveryItem item = new RdmDeliveryItem();
         item.setItemNo(bizSeqService.next(SEQ_DELIVERY_ITEM));
         item.setReqId(dto.getReqId());
-        item.setProjectId(dto.getProjectId());
+        // 项目归属从需求继承：交付项不挂项目会导致项目看板/发布批次取不到它
+        Long effectiveProjectId = dto.getProjectId() != null ? dto.getProjectId() : req.getProjectId();
+        item.setProjectId(effectiveProjectId);
         item.setTitle(dto.getTitle().trim());
         item.setScopeDesc(dto.getScopeDesc());
         item.setAcceptanceCriteria(dto.getAcceptanceCriteria());
         item.setScopeVersion(1);
-        item.setCoordinatorUserId(dto.getCoordinatorUserId());
-        item.setCoordinatorUserName(resolveUserName(dto.getCoordinatorUserId(), dto.getCoordinatorUserName()));
-        item.setProductAcceptorUserId(dto.getProductAcceptorUserId());
-        item.setProductAcceptorUserName(resolveUserName(dto.getProductAcceptorUserId(), dto.getProductAcceptorUserName()));
-        item.setBizAcceptorUserId(dto.getBizAcceptorUserId());
-        item.setBizAcceptorUserName(resolveUserName(dto.getBizAcceptorUserId(), dto.getBizAcceptorUserName()));
+        item.setCoordinatorUserId(coordinatorUserId);
+        item.setCoordinatorUserName(resolveUserName(coordinatorUserId, dto.getCoordinatorUserName()));
+        item.setProductAcceptorUserId(productAcceptorUserId);
+        item.setProductAcceptorUserName(resolveUserName(productAcceptorUserId, dto.getProductAcceptorUserName()));
+        item.setBizAcceptorUserId(bizAcceptorUserId);
+        item.setBizAcceptorUserName(resolveUserName(bizAcceptorUserId, dto.getBizAcceptorUserName()));
         // 验收路径：DTO > 项目默认 > A
-        item.setAcceptancePath(resolveAcceptancePath(dto.getAcceptancePath(), dto.getProjectId()));
+        item.setAcceptancePath(resolveAcceptancePath(dto.getAcceptancePath(), effectiveProjectId));
         item.setPlanStartDate(parseDate(dto.getPlanStartDate(), "計劃開始日期"));
         item.setPlanEndDate(parseDate(dto.getPlanEndDate(), "計劃結束日期"));
         item.setStatus(RdmConstants.DI_PREPARING);
@@ -293,6 +315,17 @@ public class RdmDeliveryItemService {
         if (dto.getAcceptanceCriteria() != null) {
             item.setAcceptanceCriteria(dto.getAcceptanceCriteria());
         }
+        /*
+         * 只传姓名、不传 userId 的旧写法会让协调人字段落库但权限永远匹配不上
+         * （历史缺陷：填了协调人，冻结仍提示「僅交付項協調人可以執行此操作」）。
+         * 这里显式拒绝，避免静默丢字段。
+         */
+        requireSelectedUserId(dto.getCoordinatorUserId(), dto.getCoordinatorUserName(),
+                item.getCoordinatorUserId(), "協調人");
+        requireSelectedUserId(dto.getProductAcceptorUserId(), dto.getProductAcceptorUserName(),
+                item.getProductAcceptorUserId(), "產品驗收人");
+        requireSelectedUserId(dto.getBizAcceptorUserId(), dto.getBizAcceptorUserName(),
+                item.getBizAcceptorUserId(), "業務驗收人");
         if (dto.getCoordinatorUserId() != null) {
             item.setCoordinatorUserId(dto.getCoordinatorUserId());
             item.setCoordinatorUserName(resolveUserName(dto.getCoordinatorUserId(), dto.getCoordinatorUserName()));
@@ -900,6 +933,18 @@ public class RdmDeliveryItemService {
             throw new BusinessException("驗收路徑只支持 A（先驗收後上線）或 B（先上線後驗收），當前值：" + path);
         }
         return path;
+    }
+
+    /**
+     * 人员字段必须带 userId：只传姓名时，若库里也没有存过 userId 就直接拒绝。
+     * <p>为什么不在前端静默补：前端无法从姓名可靠反查 sys_user.id（重名/改名），
+     * 只有真正的员工下拉才能给出确定 ID。
+     */
+    private void requireSelectedUserId(Long userId, String userName, Long storedUserId, String fieldLabel) {
+        if (!StringUtils.hasText(userName) || userId != null || storedUserId != null) {
+            return;
+        }
+        throw new BusinessException(fieldLabel + "必須從員工下拉中選擇");
     }
 
     private String resolveUserName(Long userId, String fallback) {

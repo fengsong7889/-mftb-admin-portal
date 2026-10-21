@@ -253,6 +253,50 @@ export const RDM_REQ_TYPE_LABEL: Record<RdmReqType, string> = {
   [RDM_REQ_TYPE.OTHER]: '其他',
 }
 
+/** 历史/测试数据里出现过的旧编码：只做展示兼容，不参与写入 */
+const RDM_REQ_TYPE_ALIAS: Record<string, RdmReqType> = {
+  FEATURE: RDM_REQ_TYPE.NEW_FEATURE,
+  BUGFIX: RDM_REQ_TYPE.BUG,
+  ENHANCE: RDM_REQ_TYPE.OPTIMIZE,
+}
+
+/** 归一化需求类型编码（兼容大小写与旧编码），无法识别返回 null */
+export function normalizeRdmReqType(value?: string | null): RdmReqType | null {
+  if (!value) return null
+  const key = value.trim().toUpperCase()
+  const normalized = RDM_REQ_TYPE_ALIAS[key] ?? key
+  return RDM_REQ_TYPE_LABEL[normalized as RdmReqType] ? normalized as RdmReqType : null
+}
+
+/** 需求类型展示文案：兼容大小写与旧编码（feature → 新增功能），不再泄漏英文原值 */
+export function getRdmReqTypeLabel(value?: string | null): string {
+  const key = normalizeRdmReqType(value)
+  return key ? RDM_REQ_TYPE_LABEL[key] : (value ?? '-')
+}
+
+/** 工作台待办原因码 → 中文（英文枚举不得直接上屏） */
+export const RDM_TODO_REASON_LABEL: Record<string, string> = {
+  unassigned: '未指派',
+  blocked: '阻塞',
+  overdue: '逾期',
+  pending_decision: '待裁決',
+  pending_product_acceptance: '待產品驗收',
+  pending_biz_acceptance: '待業務驗收',
+  test_not_passed: '測試未通過',
+  defer_residual: '延期殘留',
+  pending_release_decision: '待發布裁決',
+}
+
+/** 流转规则必填字段码 → 中文 */
+export const RDM_REQUIRED_FIELD_LABEL: Record<string, string> = {
+  remark: '備註',
+  pm: '產品經理',
+  promisedDate: '承諾出 PRD 日期',
+  planDate: '計劃上線日期',
+  versionNo: '上線版本',
+  score: '滿意度評分',
+}
+
 export const RDM_REQ_TYPE_COLOR: Record<RdmReqType, string> = {
   [RDM_REQ_TYPE.OPTIMIZE]: '#1890FF',
   [RDM_REQ_TYPE.NEW_FEATURE]: '#E8720C',
@@ -445,10 +489,14 @@ export const RDM_ACTION = {
   SUBMIT_POOL: 'submit_pool',
   WITHDRAW: 'withdraw',
   RESUBMIT: 'resubmit',
+  RESUBMIT_POOL: 'resubmit_pool',
   APPROVE_INTAKE: 'approve_intake',
   REJECT_INTAKE: 'reject_intake',
   DISPATCH: 'dispatch',
+  CLAIM: 'claim',
   REASSIGN: 'reassign',
+  REASSIGN_PM: 'reassign_pm',
+  URGE: 'urge',
   START_EVALUATE: 'start_evaluate',
   ACCEPT: 'accept',
   REJECT: 'reject',
@@ -483,10 +531,14 @@ export const RDM_ACTION_LABEL: Record<RdmAction, string> = {
   [RDM_ACTION.SUBMIT_POOL]: '免審批直送技術部',
   [RDM_ACTION.WITHDRAW]: '撤回修改',
   [RDM_ACTION.RESUBMIT]: '重新提交',
+  [RDM_ACTION.RESUBMIT_POOL]: '免審批重提直送技術部',
   [RDM_ACTION.APPROVE_INTAKE]: '審批通過',
   [RDM_ACTION.REJECT_INTAKE]: '審批駁回',
   [RDM_ACTION.DISPATCH]: '分配產品經理',
+  [RDM_ACTION.CLAIM]: '認領需求',
   [RDM_ACTION.REASSIGN]: '改派',
+  [RDM_ACTION.REASSIGN_PM]: '改派產品經理',
+  [RDM_ACTION.URGE]: '催辦',
   [RDM_ACTION.START_EVALUATE]: '開始評估',
   [RDM_ACTION.ACCEPT]: '接受需求',
   [RDM_ACTION.REJECT]: '駁回需求',
@@ -523,10 +575,14 @@ export const RDM_ACTION_TONE: Record<RdmAction, RdmActionTone> = {
   [RDM_ACTION.SUBMIT_POOL]: 'primary',
   [RDM_ACTION.WITHDRAW]: 'default',
   [RDM_ACTION.RESUBMIT]: 'primary',
+  [RDM_ACTION.RESUBMIT_POOL]: 'primary',
   [RDM_ACTION.APPROVE_INTAKE]: 'success',
   [RDM_ACTION.REJECT_INTAKE]: 'danger',
   [RDM_ACTION.DISPATCH]: 'primary',
+  [RDM_ACTION.CLAIM]: 'primary',
   [RDM_ACTION.REASSIGN]: 'default',
+  [RDM_ACTION.REASSIGN_PM]: 'default',
+  [RDM_ACTION.URGE]: 'default',
   [RDM_ACTION.START_EVALUATE]: 'default',
   [RDM_ACTION.ACCEPT]: 'success',
   [RDM_ACTION.REJECT]: 'danger',

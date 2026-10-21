@@ -8,7 +8,7 @@
  * 三块内容的共同点：它们回答的不是「谁分高」，而是「这个数凭什么能进考核」。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Collapse, DatePicker, Input, InputNumber, Modal, Progress, Select, Space, Table, Tag, Tooltip, message } from 'antd'
+import { Alert, Button, Collapse, DatePicker, Input, Modal, Progress, Space, Table, Tag, Tooltip, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import dayjs from 'dayjs'
 import {
@@ -17,9 +17,9 @@ import {
   FileProtectOutlined,
   PlusOutlined,
   RollbackOutlined,
-  SaveOutlined,
   SendOutlined,
 } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import {
   deleteScoreBudget,
   fetchHrSuggestions,
@@ -29,13 +29,11 @@ import {
   pushHrSuggestions,
   recomputeSnapshot,
   reviewHrSuggestion,
-  saveScoreBudget,
   withdrawHrSuggestion,
   type RdmHrSuggestionItem,
   type RdmMetricDefinition,
   type RdmScoreBudgetItem,
 } from '../../../api/rdm'
-import { fetchDepartments, type DepartmentItem } from '../../../api/department'
 import {
   RDM_SUGGESTION_STATUS,
   RDM_SUGGESTION_STATUS_COLOR,
@@ -56,16 +54,15 @@ interface ReviewDraft {
 }
 
 export default function GovernancePanel({ periodCode, editable }: GovernancePanelProps) {
+  const navigate = useNavigate()
   const [budgets, setBudgets] = useState<RdmScoreBudgetItem[]>([])
   const [suggestions, setSuggestions] = useState<RdmHrSuggestionItem[]>([])
   const [metrics, setMetrics] = useState<RdmMetricDefinition[]>([])
   const [busy, setBusy] = useState<string | null>(null)
-  const [deptOptions, setDeptOptions] = useState<{ value: number; label: string }[]>([])
   /** 快照重算区间（行内面板，不用 window.prompt：原生框无法校验也拦不住误操作） */
   const [recomputeOpen, setRecomputeOpen] = useState(false)
   const [recomputeRange, setRecomputeRange] = useState<[dayjs.Dayjs, dayjs.Dayjs] | null>(null)
-  /** 正在新增/编辑的预算行 */
-  const [budgetDraft, setBudgetDraft] = useState<RdmScoreBudgetItem | null>(null)
+  /** 正在复核的 HR 建议行（行内展开，与流转处理/评审结论同法） */
   const [reviewDraft, setReviewDraft] = useState<ReviewDraft | null>(null)
   const [reviewRemark, setReviewRemark] = useState('')
   const [withdrawTarget, setWithdrawTarget] = useState<RdmHrSuggestionItem | null>(null)
@@ -89,12 +86,6 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
 
   useEffect(() => { void load() }, [load])
 
-  useEffect(() => {
-    fetchDepartments()
-      .then((list: DepartmentItem[]) => setDeptOptions((list ?? []).map(d => ({ value: d.id, label: d.name }))))
-      .catch(() => setDeptOptions([]))
-  }, [])
-
   /** 按分组整理指标字典，前端不再各写一份解释 */
   const metricGroups = useMemo(() => {
     const map = new Map<string, RdmMetricDefinition[]>()
@@ -104,32 +95,6 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
     })
     return [...map.entries()]
   }, [metrics])
-
-  const handleSaveBudget = async () => {
-    if (!budgetDraft) {
-      return
-    }
-    if (!budgetDraft.scoreBudget || budgetDraft.scoreBudget <= 0) {
-      message.warning('預算上限必須大於 0')
-      return
-    }
-    if (!budgetDraft.remark?.trim()) {
-      message.warning('預算必須填寫依據（人力/迭代容量/歷史均值）')
-      return
-    }
-    setBusy('budget')
-    try {
-      await saveScoreBudget({ ...budgetDraft, periodCode })
-      message.success('預算已保存')
-      setBudgetDraft(null)
-      await load()
-    } catch (err) {
-      message.error(err instanceof Error && err.message ? err.message : '保存失敗')
-      throw err
-    } finally {
-      setBusy(null)
-    }
-  }
 
   const handleDeleteBudget = (row: RdmScoreBudgetItem) => {
     Modal.confirm({
@@ -307,11 +272,21 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
         <Space size={0}>
           {editable && (
             <>
-              <Button type="link" size="small" onClick={() => setBudgetDraft({ ...r })}>編輯</Button>
+              <Button
+                type="link"
+                size="small"
+                onClick={() => navigate(`/rdm-score-budget-form?periodCode=${encodeURIComponent(periodCode ?? '')}&id=${r.id}`)}
+              >
+                編輯
+              </Button>
               <span className="action-split">|</span>
             </>
           )}
-          <Button type="link" size="small" onClick={() => setBudgetDraft({ ...r, id: undefined, deptId: undefined })}>
+          <Button
+            type="link"
+            size="small"
+            onClick={() => navigate(`/rdm-score-budget-form?periodCode=${encodeURIComponent(periodCode ?? '')}&copyId=${r.id}`)}
+          >
             另存一份
           </Button>
           {editable && (
@@ -445,55 +420,14 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
         />
 
         {editable && (
-          budgetDraft ? (
-            <div className="rdm-action-panel" style={{ marginTop: 10 }}>
-              <div className="rdm-action-panel-title">{budgetDraft.id ? '調整預算' : '新增預算'}</div>
-              <Space wrap align="end">
-                <Select
-                  style={{ width: 200 }}
-                  allowClear
-                  placeholder="適用部門（不選=全員）"
-                  value={budgetDraft.deptId ?? undefined}
-                  options={deptOptions}
-                  onChange={v => setBudgetDraft({ ...budgetDraft, deptId: v ?? 0 })}
-                />
-                <InputNumber
-                  style={{ width: 150 }}
-                  min={1}
-                  addonBefore="上限"
-                  value={budgetDraft.scoreBudget}
-                  onChange={v => setBudgetDraft({ ...budgetDraft, scoreBudget: typeof v === 'number' ? v : 0 })}
-                />
-                <InputNumber
-                  style={{ width: 150 }}
-                  min={0}
-                  max={500}
-                  addonAfter="%預警"
-                  value={budgetDraft.warningRatio ?? 80}
-                  onChange={v => setBudgetDraft({ ...budgetDraft, warningRatio: typeof v === 'number' ? v : 80 })}
-                />
-                <Input
-                  style={{ width: 300 }}
-                  placeholder="預算依據（必填）"
-                  value={budgetDraft.remark ?? ''}
-                  onChange={e => setBudgetDraft({ ...budgetDraft, remark: e.target.value })}
-                />
-                <Button type="primary" icon={<SaveOutlined />} loading={busy === 'budget'} onClick={() => void handleSaveBudget()}>
-                  保存
-                </Button>
-                <Button onClick={() => setBudgetDraft(null)}>取消</Button>
-              </Space>
-            </div>
-          ) : (
-            <Button
-              size="small"
-              icon={<PlusOutlined />}
-              style={{ marginTop: 10 }}
-              onClick={() => setBudgetDraft({ periodCode: periodCode ?? '', scoreBudget: 0, deptId: 0 })}
-            >
-              新增預算
-            </Button>
-          )
+          <Button
+            size="small"
+            icon={<PlusOutlined />}
+            style={{ marginTop: 10 }}
+            onClick={() => navigate(`/rdm-score-budget-form?periodCode=${encodeURIComponent(periodCode ?? '')}`)}
+          >
+            新增預算
+          </Button>
         )}
       </div>
 

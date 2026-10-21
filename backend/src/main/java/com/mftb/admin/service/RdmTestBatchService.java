@@ -31,7 +31,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -499,6 +501,17 @@ public class RdmTestBatchService {
             wrapper.and(w -> w.like(RdmTestBatch::getBatchNo, kw)
                     .or().like(RdmTestBatch::getTestEnv, kw)
                     .or().like(RdmTestBatch::getTestLeadUserName, kw));
+        }
+        // 計劃結束時間區間：前端 RangePicker 的日期是「日」，含起止當天
+        try {
+            if (StringUtils.hasText(q.getPlanEndFrom())) {
+                wrapper.ge(RdmTestBatch::getPlanEndTime, LocalDate.parse(q.getPlanEndFrom().trim()).atStartOfDay());
+            }
+            if (StringUtils.hasText(q.getPlanEndTo())) {
+                wrapper.le(RdmTestBatch::getPlanEndTime, LocalDate.parse(q.getPlanEndTo().trim()).atTime(23, 59, 59));
+            }
+        } catch (DateTimeParseException e) {
+            throw new BusinessException("計劃結束時間格式應為 yyyy-MM-dd");
         }
         if (!canSeeAll() && currentUserId != null) {
             String uid = String.valueOf(currentUserId);

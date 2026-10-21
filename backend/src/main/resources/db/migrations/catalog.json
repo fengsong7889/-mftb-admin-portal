@@ -2700,6 +2700,23 @@
       "comment": "v2.0 的 view 插入先于 edit 插入，INSERT IGNORE 会让 edit 行被忽略；v2.1 重放同一脚本并把 edit 行改为 upsert，存量库与全新建库都能收敛到正确动作集。"
     },
     {
+      "versionKey": "ai:assistant-menu-split-v2.2",
+      "module": "ai",
+      "phase": "BASE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "aiAssistantConfigMenuInitializer",
+      "dependencies": [
+        "ai:assistant-menu-split-v2.1"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "279_ai_assistant_extra_menu_grants.sql"
+      ],
+      "intent": "补齐 275 漏授的三个 AI 配置菜单（快捷提問/推送模板/記憶策略）的角色与部门授权：按旧配置中心 → 兄弟配置菜单 → admin 兜底三段取并集",
+      "author": "Qoder",
+      "comment": "275 的授权清单只覆盖 8 个菜单且 v2.1 已登记，缺口无法靠重放回补；v2.2 另起版本键执行 279，全部 INSERT IGNORE/upsert，可重放。后置校验三菜单挂在分组下、启用、动作集含 view/edit 且至少一条角色授权，失败不记版本；同时修正初始化器部门补齐 SQL 的列名（dept_id）。"
+    },
+    {
       "versionKey": "ai:lookup-glossary-tool-v1.0",
       "module": "ai",
       "phase": "BASE_STRUCTURE",

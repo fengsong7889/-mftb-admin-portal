@@ -31,7 +31,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import StatCards from '../../components/StatCards'
 import { fetchDashboard, type RdmDashboardData } from '../../api/rdm'
-import { RDM_REQ_TYPE_LABEL, RDM_STAGE_LABEL, type RdmReqType, type RdmStage } from '../../constants/rdm'
+import { getRdmReqTypeLabel, RDM_STAGE_LABEL, type RdmStage } from '../../constants/rdm'
 import './index.css'
 
 /** 阶段耗时（小时 → 天，图表用） */
@@ -157,7 +157,7 @@ export default function RdmDashboard() {
           </div>
           <Pie
             height={260}
-            data={typeDist.map(d => ({ ...d, name: RDM_REQ_TYPE_LABEL[d.name as RdmReqType] ?? d.name }))}
+            data={typeDist.map(d => ({ ...d, name: getRdmReqTypeLabel(d.name) }))}
             angleField="value"
             colorField="name"
             radius={0.85}

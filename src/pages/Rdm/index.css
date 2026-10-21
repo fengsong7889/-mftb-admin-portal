@@ -2716,3 +2716,11 @@
   cursor: default;
   opacity: 0.6;
 }
+
+/*
+ * RDM 状态开关：checkedChildren/unCheckedChildren 是双字中文，
+ * antd 默认 44px 宽会把文字压在滑块下，统一加宽到 64px。
+ */
+.rdm-status-switch.ant-switch {
+  min-width: 64px;
+}

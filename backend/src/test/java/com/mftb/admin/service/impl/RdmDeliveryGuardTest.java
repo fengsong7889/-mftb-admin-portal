@@ -132,7 +132,8 @@ class RdmDeliveryGuardTest {
                 mock(RdmNotifyService.class), mock(RdmRequirementService.class),
                 mock(OaRequestService.class), mock(JdbcTemplate.class), accessGuard,
                 milestoneMapper, workLogMapper, mock(RdmPrdSnapshotMapper.class),
-                permissionService, mock(RdmDeliveryItemMapper.class), mock(RdmFlowVersionGuard.class), taskTypeService);
+                permissionService, mock(RdmDeliveryItemMapper.class), mock(RdmFlowVersionGuard.class), taskTypeService,
+                mock(com.mftb.admin.service.RdmDeliveryItemService.class));
         when(accessGuard.requireDeliveryWriter(anyLong(), anyString())).thenReturn(requirement(RdmConstants.STATUS_ACCEPTED));
         when(accessGuard.requireVisible(anyLong(), anyString())).thenReturn(requirement(RdmConstants.STATUS_ACCEPTED));
         when(requirementMapper.selectById(any())).thenReturn(requirement(RdmConstants.STATUS_ACCEPTED));

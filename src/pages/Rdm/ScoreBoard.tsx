@@ -24,6 +24,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import StatCards from '../../components/StatCards'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { rdmTableLocale } from './components/tableLocale'
 import { deriveRdmColumnMeta } from './rdmColumnMeta'
 /** 阶段 6：页内展开预算、HR 建议与指标口径（不新建路由，避开菜单页名兜底表上限） */
 import GovernancePanel from './components/GovernancePanel'
@@ -383,7 +384,7 @@ export default function ScoreBoard() {
           expandable={{
             expandedRowRender: r => <ScoreTracePanel records={recordsByPerson.get(r.userName) ?? []} />,
           }}
-          locale={{ emptyText: '本週期還沒有可計分的交付需求' }}
+          locale={rdmTableLocale(loading, '本週期還沒有可計分的交付需求')}
         />
       </div>
 
@@ -436,6 +437,7 @@ export default function ScoreBoard() {
           size="small"
           columns={visibleRecordColumns}
           dataSource={data?.records ?? []}
+          loading={loading}
           scroll={{ x: 1000 }}
           pagination={{
             defaultPageSize: 10,
@@ -445,7 +447,7 @@ export default function ScoreBoard() {
             showTotal: t => `共 ${t} 條`,
           }}
           expandable={{ expandedRowRender: r => <ScoreTracePanel records={[r]} /> }}
-          locale={{ emptyText: '還沒有積分流水，可點「按當前規則重算」生成' }}
+          locale={rdmTableLocale(loading, '還沒有積分流水，可點「按當前規則重算」生成')}
         />
       </div>
 

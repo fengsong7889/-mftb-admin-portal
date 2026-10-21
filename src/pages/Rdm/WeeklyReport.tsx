@@ -21,6 +21,7 @@ import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
 import StatCards from '../../components/StatCards'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { rdmTableLocale } from './components/tableLocale'
 import { deriveRdmColumnMeta } from './rdmColumnMeta'
 import { fetchIterations, fetchWeeklyReport, type RdmIterationItem, type RdmWeeklyReport } from '../../api/rdm'
 import { exportWeeklyReport } from './weeklyReportExport'
@@ -334,7 +335,7 @@ export default function WeeklyReport() {
               columns={visibleReleased}
               dataSource={report?.released ?? []}
               pagination={blockPagination()}
-              locale={{ emptyText: '本期無上線需求' }}
+              locale={rdmTableLocale(loading, '本期無上線需求')}
             />
           </div>
 
@@ -352,7 +353,7 @@ export default function WeeklyReport() {
               dataSource={report?.risks ?? []}
               pagination={blockPagination()}
               scroll={{ x: 900 }}
-              locale={{ emptyText: '當前沒有逾期或阻塞需求' }}
+              locale={rdmTableLocale(loading, '當前沒有逾期或阻塞需求')}
             />
           </div>
 
@@ -386,7 +387,7 @@ export default function WeeklyReport() {
                 columns={visibleNext}
                 dataSource={report?.nextWeek ?? []}
                 pagination={blockPagination()}
-                locale={{ emptyText: '下週暫無計劃上線的需求' }}
+                locale={rdmTableLocale(loading, '下週暫無計劃上線的需求')}
               />
             </div>
           </div>

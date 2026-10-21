@@ -41,7 +41,6 @@ import {
   mockProductOptions,
   mockPrdDraft,
   mockQualityData,
-  mockRiskSummary,
   mockSimilarRequirements,
   mockRoutingRules,
   mockSaveRoutingRule,
@@ -1368,6 +1367,8 @@ export interface RdmPrdForm {
 export interface RdmTaskForm {
   id?: number
   reqId: number
+  /** V3：任务归属的交付项，空则后端按需求默认交付项处理 */
+  deliveryItemId?: number
   prdId?: number | null
   taskType: string
   title: string
@@ -2691,10 +2692,14 @@ export async function generatePrdDraft(reqId: number): Promise<RdmPrdDraft | nul
  */
 export async function fetchRiskSummary(minStayDays = 0): Promise<RdmRiskSummary | null> {
   try {
-    return await request.post<unknown, RdmRiskSummary>('/rdm/assistant/risk-summary', null, { params: { minStayDays } })
-  } catch (err) {
-    if (isBackendUnavailable(err)) return mockRiskSummary(minStayDays)
-    throw err
+    return await request.post<unknown, RdmRiskSummary>('/rdm/assistant/risk-summary', null, { params: { minStayDays }, timeout: 45000 })
+  } catch {
+    /*
+     * 不再回退到前端 mock：mock 用的是另一套假数据（固定 slice(0,8)），
+     * 会让同一页的统计卡与摘要写出两套数字。摘要只是叙述，失败就不展示，
+     * 数字以上方统计卡/明细为准。
+     */
+    return null
   }
 }
 
@@ -2880,6 +2885,10 @@ export interface RdmDeliveryItemListItem {
 export interface RdmDeliveryItemDetail extends RdmDeliveryItemListItem {
   scopeDesc: string; acceptanceCriteria: string; prdSnapshotId: number | null;
   productAcceptorUserName: string; bizAcceptorUserName: string;
+  /** 责任人 sys_user.id：编辑回显必须用 ID，姓名只作快照 */
+  coordinatorUserId?: number | null;
+  productAcceptorUserId?: number | null;
+  bizAcceptorUserId?: number | null;
   version: number; createdAt: string;
   /** Batch2：範圍凍結時間（非空即已凍結，修改需走變更流程） */
   scopeFrozenAt?: string | null;
@@ -2989,7 +2998,12 @@ export interface RdmTestBatchSummary {
 
 export interface RdmTestBatchQuery {
   reqId?: number; status?: string; testLeadUserId?: number;
-  keyword?: string; pageNo?: number; pageSize?: number;
+  keyword?: string;
+  /** 計劃結束時間起（yyyy-MM-dd，含當天） */
+  planEndFrom?: string;
+  /** 計劃結束時間止（yyyy-MM-dd，含當天） */
+  planEndTo?: string;
+  pageNo?: number; pageSize?: number;
 }
 
 export interface RdmTestBatchSubmitForm {

@@ -24,6 +24,7 @@ import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import StatCards from '../../components/StatCards'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { rdmTableLocale } from './components/tableLocale'
 import { deriveRdmColumnMeta } from './rdmColumnMeta'
 import GanttChart from './components/GanttChart'
 import { useAuth } from '../../contexts/AuthContext'
@@ -311,9 +312,9 @@ export default function DeliveryBoard() {
   }
 
   const columns: TableColumnsType<RdmTaskItem> = [
-    { title: '任務編號', dataIndex: 'taskNo', key: 'taskNo', width: 150 },
+    { title: '任務編號', dataIndex: 'taskNo', key: 'taskNo', width: 100, ellipsis: true },
     {
-      title: '任務標題', dataIndex: 'title', key: 'title', width: 240, ellipsis: true,
+      title: '任務標題', dataIndex: 'title', key: 'title', width: 170, ellipsis: true,
       render: (v: string, r) => (
         <div className="rdm-table-title">
           <a className="rdm-table-title__link" title={v} href={`#/rdm-detail?id=${r.reqId}`}>{v}</a>
@@ -329,14 +330,14 @@ export default function DeliveryBoard() {
       ),
     },
     {
-      title: '類型', dataIndex: 'taskType', key: 'taskType', width: 100,
+      title: '類型', dataIndex: 'taskType', key: 'taskType', width: 90,
       render: (v: string) => {
         const color = taskTypeColorOf(v)
         return <Tag style={{ margin: 0, color, borderColor: `${color}66`, background: `${color}12` }}>{taskTypeLabelOf(v)}</Tag>
       },
     },
     {
-      title: '所屬需求', key: 'req', width: 220, ellipsis: true,
+      title: '所屬需求', key: 'req', width: 150, ellipsis: true,
       render: (_, r) => (
         <div style={{ lineHeight: 1.4 }}>
           <div className="rdm-table-title__link" title={r.reqTitle ?? undefined} style={{ color: '#262626' }}>{r.reqTitle ?? '-'}</div>
@@ -348,7 +349,7 @@ export default function DeliveryBoard() {
       ),
     },
     {
-      title: '狀態', dataIndex: 'status', key: 'status', width: 200,
+      title: '狀態', dataIndex: 'status', key: 'status', width: 120,
       render: (v: string, r) => (
         <div className="rdm-task-status">
           <Tag color={RDM_TASK_STATUS_COLOR[v as RdmTaskStatus] ?? 'default'} style={{ margin: 0 }}>
@@ -364,7 +365,7 @@ export default function DeliveryBoard() {
       ),
     },
     {
-      title: '進度', key: 'progress', width: 160,
+      title: '進度', key: 'progress', width: 140,
       render: (_, r) => {
         const pct = r.progress ?? 0
         const done = r.status === RDM_TASK_STATUS.DONE
@@ -392,12 +393,12 @@ export default function DeliveryBoard() {
       },
     },
     {
-      title: '計劃完成', dataIndex: 'planFinishDate', key: 'planFinishDate', width: 120,
+      title: '計劃完成', dataIndex: 'planFinishDate', key: 'planFinishDate', width: 110,
       render: (v?: string | null) => <span style={{ color: v && dayjs(v).isBefore(dayjs(), 'day') ? '#CF1322' : '#595959' }}>{v ?? '-'}</span>,
     },
-    { title: '迭代', dataIndex: 'iterationCode', key: 'iterationCode', width: 110, render: (v?: string | null) => v ?? '-' },
+    { title: '迭代', dataIndex: 'iterationCode', key: 'iterationCode', width: 100, ellipsis: true, render: (v?: string | null) => v ?? '-' },
     {
-      title: '操作', key: 'action', width: 230, fixed: 'right',
+      title: '操作', key: 'action', width: 160, fixed: 'right',
       // §B.9：操作列只用纯文字 + 竖线分隔，禁止图标；危险动作（阻塞）放最后
       render: (_, r) => {
         const actions = [
@@ -505,9 +506,10 @@ export default function DeliveryBoard() {
       rowKey="id"
       rowClassName={r => (r.status === RDM_TASK_STATUS.BLOCKED ? 'rdm-task-row--blocked' : '')}
       loading={loading || extraLoading}
+      locale={rdmTableLocale(loading || extraLoading, '暫無任務數據')}
       columns={visibleColumns}
       dataSource={data}
-      scroll={{ x: 1500 }}
+      scroll={{ x: 1140 }}
       expandable={expandableConfig}
       pagination={paged ? {
         // 客户端分页用 defaultPageSize：写死 pageSize 会变成受控常量，

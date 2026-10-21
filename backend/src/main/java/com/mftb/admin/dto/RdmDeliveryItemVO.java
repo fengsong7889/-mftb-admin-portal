@@ -72,8 +72,13 @@ public class RdmDeliveryItemVO {
         private String acceptanceCriteria;
         private Long prdSnapshotId;
         private Long coordinatorUserId;
+        /** 产品验收人 / 业务验收人的 sys_user.id：编辑回显必须用 ID，不能只返回姓名 */
+        private Long productAcceptorUserId;
+        private Long bizAcceptorUserId;
         private String productAcceptorUserName;
         private String bizAcceptorUserName;
+        /** 范围冻结时间（非空即已冻结） */
+        private String scopeFrozenAt;
         /** 乐观锁版本（编辑提交时回传 expectedVersion） */
         private Integer version;
         private String createdAt;

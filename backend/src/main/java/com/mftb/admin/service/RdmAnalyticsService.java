@@ -36,6 +36,12 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class RdmAnalyticsService {
 
+    /**
+     * 风险明细统一取数上限：看板 KPI、风险中心表格、AI 摘要必须共用同一个上限，
+     * 否则同一页会同时出现「12 条」与「20 条」两套总数（历史缺陷）。
+     */
+    public static final int RISK_QUERY_LIMIT = 200;
+
     /** 交付终态（计入已交付） */
     private static final String DELIVERED_STATUS_SQL = "('released','verified','closed')";
     /** 交付链路状态（在途，用于 PM 负载） */
@@ -61,7 +67,7 @@ public class RdmAnalyticsService {
         vo.setStageDuration(buildStageDuration());
         vo.setTrend(buildTrend(period));
         // 风险统一由 riskList 提供：「風險中心」页明细与 AI 风险摘要共用这一份 SQL（0 = 不按停留天数筛选）
-        vo.setRisks(riskList(20, 0));
+        vo.setRisks(riskList(RISK_QUERY_LIMIT, 0));
         vo.setBoard(buildBoard());
         return vo;
     }
@@ -252,7 +258,9 @@ public class RdmAnalyticsService {
             item.setDeptName((String) row.get("dept_name"));
             item.setAccepted((int) accepted);
             item.setFirstPassRate(accepted == 0 ? 0 : round(toLong(row.get("first_pass")) / (double) accepted));
-            item.setAvgScore(round(orZero(toDouble(row.get("avg_score")))));
+            // 没有任何「上线后评分」时 avg_score 为 NULL：不能 orZero 成 0.0，
+            // 否则部门行显示 0 分、顶部汇总却按有评分口径算出 5.0，同页两套满意度互相打脸。
+            item.setAvgScore(row.get("avg_score") == null ? null : round(toDouble(row.get("avg_score"))));
             item.setDefectCount((int) toLong(row.get("defects")));
             list.add(item);
         }
@@ -622,9 +630,9 @@ public class RdmAnalyticsService {
             rank.setDeptName((String) row.get("dept_name"));
             rank.setSubmitted(toLong(row.get("submitted")));
             rank.setDelivered(toLong(row.get("delivered")));
-            double delivered = toLong(row.get("on_time"));
-            double submitted = rank.getSubmitted();
-            rank.setOnTimeRate(submitted == 0 ? 0 : round(delivered / submitted));
+            long deliveredCount = toLong(row.get("delivered"));
+            long onTime = toLong(row.get("on_time"));
+            rank.setOnTimeRate(deliveredCount == 0 ? 0 : round(onTime / (double) deliveredCount));
             Double avgDays = toDouble(row.get("avg_days"));
             rank.setAvgDays(avgDays == null ? 0 : round(avgDays));
             list.add(rank);
@@ -739,6 +747,8 @@ public class RdmAnalyticsService {
                         + "      ELSE 'STAGNANT' END AS risk_type, "
                         + " TIMESTAMPDIFF(DAY, status_enter_time, NOW()) AS days "
                         + "FROM rdm_requirement WHERE deleted = 0 "
+                        // 终态不是风险：已归档/已上线/已确认交付的需求再算「超 7 天无进展」只会制造假警报
+                        + "AND status NOT IN ('closed','released','verified') "
                         + "AND (overdue_flag = 1 OR blocked_flag = 1 OR status IN ('pool','intake_pending') "
                         + "     OR (status_enter_time < DATE_SUB(NOW(), INTERVAL 7 DAY) AND status <> 'draft')) "
                         + stayCond

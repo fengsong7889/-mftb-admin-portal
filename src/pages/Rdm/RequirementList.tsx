@@ -65,6 +65,7 @@ import dayjs from 'dayjs'
 import StatCards from '../../components/StatCards'
 import { useAuth } from '../../contexts/AuthContext'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { rdmTableLocale } from './components/tableLocale'
 import {
   fetchRequirementPage,
   fetchScopeCounts,
@@ -290,7 +291,8 @@ export default function RequirementList({
   const [railCollapsed, setRailCollapsed] = useState<boolean>(readStoredRail)
   const [rows, setRows] = useState<RdmRequirementRow[]>([])
   const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(false)
+  // 初始即 loading：Table 在 effect 置 true 之前会先渲染一帧空态（首帧闪「暫無數據」）
+  const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(10)
   const [counts, setCounts] = useState<Record<string, number>>({})
@@ -956,7 +958,7 @@ export default function RequirementList({
         return (
           <Space size={0} split={<span className="action-split">|</span>}>
             <Button type="link" size="small" onClick={() => navigate(`/rdm-detail?id=${r.id}${detailFromQuery}`)}>{t('common.detail')}</Button>
-            {isFollowUpSide && (
+            {isFollowUpSide && !RDM_TERMINAL_STATUS.includes(status) && (
               <Button type="link" size="small" onClick={() => navigate(`/rdm-gantt?mode=single&reqId=${r.id}`)}>{t('rdm.reqList.btnSchedule')}</Button>
             )}
             {actions}
@@ -1180,6 +1182,7 @@ export default function RequirementList({
               tableLayout="fixed"
               dataSource={visibleRows}
               loading={loading}
+              locale={rdmTableLocale(loading, t('common.noData'))}
               rowSelection={rowSelection}
               scroll={{ x: tableWidth + (canBatchAssign ? 32 : 0) }}
               pagination={{

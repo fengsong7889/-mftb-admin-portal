@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.RdmConstants;
 import com.mftb.admin.entity.RdmDeliveryItem;
+import com.mftb.admin.entity.RdmProject;
 import com.mftb.admin.entity.RdmProjectMember;
 import com.mftb.admin.entity.RdmReleaseBatch;
 import com.mftb.admin.entity.RdmRequirement;
@@ -12,6 +13,7 @@ import com.mftb.admin.entity.RdmReview;
 import com.mftb.admin.entity.RdmTestBatch;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.RdmDeliveryItemMapper;
+import com.mftb.admin.mapper.RdmProjectMapper;
 import com.mftb.admin.mapper.RdmProjectMemberMapper;
 import com.mftb.admin.mapper.RdmReleaseBatchMapper;
 import com.mftb.admin.mapper.RdmRequirementMapper;
@@ -61,6 +63,8 @@ public class RdmAccessGuard {
     private final RdmRequirementRoleMapper roleMapper;
     /** Batch 1：项目成员资格判定 */
     private final RdmProjectMemberMapper projectMemberMapper;
+    /** 交付项协调人口径回落项目协调人时需要项目主表 */
+    private final RdmProjectMapper projectMapper;
     /** Batch 1：交付项协调人/验收人资格判定 */
     private final RdmDeliveryItemMapper deliveryItemMapper;
     /** Batch 1：提测批次测试负责人资格判定 */
@@ -322,10 +326,16 @@ public class RdmAccessGuard {
     }
 
     /**
-     * 交付项协调人守卫：只有协调人或管理员可操作。
-     * <p>协调人是「对这个交付项的研发进度负责」的人，换人须走项目编辑流程。
+     * 交付项协调人守卫：协调人本人、所属项目协调人（pm/pmo）或管理员可操作。
+     * <p>与 {@code RdmAllowedActionsService.computeDeliveryItemActions} 同口径：
+     * 否则项目协调人会看到「凍結範圍」按钮但一按就被拒，形成“按钮可见、接口必失败”的分裂。
+     * <p>协调人未配置时给出可操作指引，而不是笼统的“僅協調人可操作”。
      */
     public void requireDeliveryCoordinator(Long deliveryItemId, Long userId) {
+        // fail-closed：未登录不得当成任意人放行（userId 为 null 时下面 equals 也会 NPE）
+        if (userId == null) {
+            throw new BusinessException("登錄狀態失效，請重新登錄");
+        }
         if (isAdmin(userId)) {
             return;
         }
@@ -333,9 +343,34 @@ public class RdmAccessGuard {
         if (item == null) {
             throw new BusinessException("交付項不存在");
         }
-        if (!userId.equals(item.getCoordinatorUserId())) {
-            throw new BusinessException("僅交付項協調人可以執行此操作");
+        if (userId.equals(item.getCoordinatorUserId())) {
+            return;
         }
+        if (isProjectCoordinator(item.getProjectId(), userId)) {
+            return;
+        }
+        if (item.getCoordinatorUserId() == null && item.getProjectId() == null) {
+            throw new BusinessException("交付項未設置協調人，請先編輯並選擇協調人");
+        }
+        throw new BusinessException("僅交付項協調人可以執行此操作");
+    }
+
+    /** 项目协调人：项目经理本人，或在途且角色为 pm/pmo 的项目成员 */
+    private boolean isProjectCoordinator(Long projectId, Long userId) {
+        if (projectId == null || userId == null) {
+            return false;
+        }
+        RdmProject project = projectMapper.selectById(projectId);
+        if (project != null && userId.equals(project.getPmUserId())) {
+            return true;
+        }
+        Long memberCount = projectMemberMapper.selectCount(new LambdaQueryWrapper<RdmProjectMember>()
+                .eq(RdmProjectMember::getProjectId, projectId)
+                .eq(RdmProjectMember::getUserId, userId)
+                .in(RdmProjectMember::getRoleCode, Set.of("pm", "pmo"))
+                .isNull(RdmProjectMember::getLeaveTime));
+        // 单测里 mapper 是 mock，未 stub 时返回 null；不判空会直接 NPE
+        return memberCount != null && memberCount > 0;
     }
 
     /**

@@ -16,11 +16,12 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Alert, Button, Segmented, Space, Table, Tabs, Tag, message } from 'antd'
+import { Alert, Button, Form, Input, Segmented, Select, Space, Table, Tabs, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { CheckCircleOutlined, ClockCircleOutlined, ExportOutlined, ReloadOutlined } from '@ant-design/icons'
+import { CheckCircleOutlined, ClockCircleOutlined, ExportOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { rdmTableLocale } from './components/tableLocale'
 import HelpPopover from '../../components/HelpPopover'
 import { PriorityTag, StatusTag, TypeTag } from './components/Tags'
 import { fetchDeliveryItems, fetchRequirementPage, fetchScopeCounts, type RdmDeliveryItemListItem, type RdmRequirementRow } from '../../api/rdm'
@@ -32,6 +33,10 @@ import {
   RDM_DELIVERY_ITEM_STATUS,
   RDM_DELIVERY_ITEM_STATUS_COLOR,
   RDM_DELIVERY_ITEM_STATUS_LABEL,
+  RDM_PRIORITY,
+  RDM_PRIORITY_LABEL,
+  RDM_REQ_TYPE,
+  RDM_REQ_TYPE_LABEL,
   RDM_SCOPE,
   RDM_STATUS,
   type RdmScope,
@@ -77,6 +82,9 @@ export default function AcceptanceList() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [tab, setTab] = useState('pre')
+  const [form] = Form.useForm()
+  /** 验收队列自身的筛选（关键字/类型/优先级）；tab 仍按 scope 收敛状态 */
+  const [filters, setFilters] = useState<{ keyword?: string; reqType?: string; priority?: string }>({})
   const [rows, setRows] = useState<RdmRequirementRow[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -91,7 +99,14 @@ export default function AcceptanceList() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetchRequirementPage({ scope: TAB_SCOPE[tab], size: FETCH_SIZE, page: 1 })
+      const res = await fetchRequirementPage({
+        scope: TAB_SCOPE[tab],
+        size: FETCH_SIZE,
+        page: 1,
+        keyword: filters.keyword?.trim() || undefined,
+        reqType: filters.reqType,
+        priority: filters.priority,
+      })
       setRows(res.records ?? [])
       setTotal(res.total ?? 0)
     } catch {
@@ -101,7 +116,7 @@ export default function AcceptanceList() {
     } finally {
       setLoading(false)
     }
-  }, [tab])
+  }, [tab, filters])
 
   useEffect(() => { load() }, [load])
 
@@ -359,7 +374,17 @@ export default function AcceptanceList() {
       ),
     },
     { title: '簽署人', dataIndex: 'coordinatorUserName', key: 'coordinatorUserName', width: 110, render: (v?: string) => v || '-' },
-    { title: '結論', dataIndex: 'acceptanceStatus', key: 'acceptanceStatus', width: 110, render: (v?: string) => v || <span style={{ color: '#8C8C8C' }}>-</span> },
+    {
+      title: '結論', dataIndex: 'acceptanceStatus', key: 'acceptanceStatus', width: 110,
+      render: (v?: string) => {
+        if (!v) return <span style={{ color: '#8C8C8C' }}>-</span>
+        // 交付项推导出的结论是 pass/conditional/fail，必须走映射；直接渲染会出现英文枚举
+        const meta = RESULT_TAG[v]
+        return meta
+          ? <Tag color={meta.color} style={{ margin: 0 }}>{meta.text}</Tag>
+          : <span>{v}</span>
+      },
+    },
     { title: '輪次', dataIndex: 'scopeVersion', key: 'scopeVersion', width: 80, render: (v?: number) => (v ? `v${v}` : '-') },
     { title: '時間', dataIndex: 'updatedAt', key: 'updatedAt', width: 120, render: (v?: string) => v || '-' },
     {
@@ -427,6 +452,14 @@ export default function AcceptanceList() {
 
   return (
     <div className="content-area">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 18, fontWeight: 700, color: '#262626' }}>
+        <CheckCircleOutlined style={{ color: '#52C41A' }} />
+        {t('rdm.acceptance.pageTitle')}
+        <span style={{ fontSize: 12, fontWeight: 400, color: '#8C8C8C' }}>
+          上線前預驗收 / 上線後業務驗收 / 我的驗收記錄，三類隊列互不混用
+        </span>
+      </div>
+
       <div className="rdm-v3-acceptance-mode" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <Segmented
           value={acceptanceMode}
@@ -461,6 +494,38 @@ export default function AcceptanceList() {
         ]}
       />
 
+      <div className="search-section">
+        <Form
+          form={form}
+          layout="inline"
+          onFinish={v => setFilters({ keyword: v.keyword, reqType: v.reqType, priority: v.priority })}
+        >
+          <Form.Item name="keyword" label={t('rdm.acceptance.filterKeyword')}>
+            <Input allowClear placeholder={t('rdm.risk.keywordPlaceholder')} />
+          </Form.Item>
+          <Form.Item name="reqType" label={t('rdm.acceptance.filterType')}>
+            <Select
+              allowClear
+              placeholder={t('common.all')}
+              options={Object.values(RDM_REQ_TYPE).map(v => ({ value: v, label: RDM_REQ_TYPE_LABEL[v] }))}
+            />
+          </Form.Item>
+          <Form.Item name="priority" label={t('rdm.acceptance.filterPriority')}>
+            <Select
+              allowClear
+              placeholder={t('common.all')}
+              options={Object.values(RDM_PRIORITY).map(v => ({ value: v, label: RDM_PRIORITY_LABEL[v] }))}
+            />
+          </Form.Item>
+          <Form.Item colon={false}>
+            <div className="search-actions">
+              <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>{t('common.search')}</Button>
+              <Button onClick={() => { form.resetFields(); setFilters({}) }}>{t('common.reset')}</Button>
+            </div>
+          </Form.Item>
+        </Form>
+      </div>
+
       <div className="action-section">
         <div className="action-section-left">
           {tab !== 'history' && (
@@ -489,6 +554,9 @@ export default function AcceptanceList() {
         className="nowrap-table"
         rowKey="id"
         loading={loading}
+        locale={rdmTableLocale(loading, tab === 'pre'
+          ? t('rdm.acceptance.emptyPre', { defaultValue: '當前沒有待預驗收的需求' })
+          : t('common.noData'))}
         columns={visibleColumns}
         tableLayout="fixed"
         dataSource={rows}
@@ -501,12 +569,6 @@ export default function AcceptanceList() {
           showTotal: t => `共 ${t} 條`,
         }}
       />
-
-      {tab === 'pre' && rows.length === 0 && !loading && (
-        <div style={{ textAlign: 'center', color: '#8C8C8C', padding: 24 }}>
-          <CheckCircleOutlined style={{ color: '#52C41A', marginRight: 6 }} />當前沒有待預驗收的需求
-        </div>
-      )}
       </>
       )}
     </div>

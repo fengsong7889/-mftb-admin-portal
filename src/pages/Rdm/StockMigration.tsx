@@ -14,7 +14,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Alert, Button, Descriptions, Empty, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, Tag, message,
+  Alert, Button, Descriptions, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, Tag, message,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
@@ -23,6 +23,7 @@ import {
 } from '@ant-design/icons'
 import RdmFormHeader from './components/RdmFormHeader'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { rdmTableLocale } from './components/tableLocale'
 import { deriveRdmColumnMeta } from './rdmColumnMeta'
 import { formatRdmDateTime } from './datetime'
 import { useAuth } from '../../contexts/AuthContext'
@@ -440,7 +441,7 @@ export default function StockMigration() {
             pageSizeOptions: ['10', '20', '50', '100'],
             showTotal: t => `共 ${t} 個批次`,
           }} scroll={{ x: 800 }}
-          locale={{ emptyText: <Empty description="暫無遷移批次" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
+          locale={rdmTableLocale(listLoading, '暫無遷移批次')}
         />
       </div>
 

@@ -50,6 +50,7 @@ import { useTranslation } from 'react-i18next'
 import StatCards from '../../components/StatCards'
 import HelpPopover from '../../components/HelpPopover'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { rdmTableLocale } from './components/tableLocale'
 import {
   fetchResourceWorkload,
   fetchResourceMembers,
@@ -1053,7 +1054,7 @@ export default function ResourceLoad() {
             },
           ]}
           pagination={{ defaultPageSize: 20, showSizeChanger: true, showQuickJumper: true, pageSizeOptions: ['10', '20', '50'], showTotal: (total: number) => t('rdm.resLoad.pagerRows', { total }) }}
-          locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('rdm.resLoad.rosterEmpty')} /> }}
+          locale={rdmTableLocale(loading, t('rdm.resLoad.rosterEmpty'))}
         />
 
         {/* 纳入/编辑弹窗（轻量配置面板：选人+岗位+容量+备注） */}
@@ -1352,7 +1353,7 @@ export default function ResourceLoad() {
           pageSizeOptions: ['10', '20', '50'],
           showTotal: (total: number) => t('rdm.resLoad.pagerPeople', { total }),
         }}
-        locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('rdm.resLoad.tableEmpty')} /> }}
+        locale={rdmTableLocale(loading, t('rdm.resLoad.tableEmpty'))}
       />
 
       {/* 分派工作弹窗（三视图共用同一份） */}

@@ -114,6 +114,8 @@ import {
   RDM_STATUS,
   RDM_STATUS_LABEL,
   RDM_STAGE_LABEL,
+  RDM_TERMINAL_STATUS,
+  RDM_TEST_BATCH_STATUS_LABEL,
   formatRdmReqNo,
   RDM_STATUS_STAGE,
   type RdmAcceptResult,
@@ -337,8 +339,14 @@ export default function RequirementDetail() {
 
   useEffect(() => {
     if (!id) { setReqDocs([]); return }
-    fetchDocNodes({ bizType: 'REQ', bizId: id }).then(setReqDocs).catch(() => setReqDocs([]))
-  }, [id])
+    // 關聯文檔錨 doc-library:view：無該授權時直接不發請求（後端必然 403），
+    // 否則每打開一次需求詳情都會被全局攔截器彈一次無權限 toast。
+    if (!hasPermission('doc-library:view')) { setReqDocs([]); return }
+    // 兜底 silent：權限剛被回收/前端權限快照過期時仍 403，也只靜默隱藏卡片。
+    fetchDocNodes({ bizType: 'REQ', bizId: id }, { silent: true })
+      .then(setReqDocs)
+      .catch(() => setReqDocs([]))
+  }, [id, hasPermission])
 
   const load = useCallback(async () => {
     if (!id) return
@@ -612,7 +620,7 @@ export default function RequirementDetail() {
   const riskItems = useMemo(() => {
     if (!detail) return [] as { tone: 'danger' | 'warn'; text: string }[]
     const items: { tone: 'danger' | 'warn'; text: string }[] = []
-    if (detail.sla?.overdue) {
+    if (detail.sla?.overdue && !RDM_TERMINAL_STATUS.includes(detail.status as RdmStatus)) {
       items.push({ tone: 'danger', text: `已逾期 ${Math.abs(detail.sla.remainHours)} 小時，請盡快推進或調整排期` })
     }
     if (detail.blockedFlag) {
@@ -1402,7 +1410,8 @@ export default function RequirementDetail() {
                                 icon={<PlusOutlined />}
                                 onClick={() => navigate(
                                   `/rdm-delivery-item?mode=create&reqId=${detail.id}`
-                                  + (detail.projectId ? `&projectId=${detail.projectId}` : ''),
+                                  + (detail.projectId ? `&projectId=${detail.projectId}` : '')
+                                  + (detail.projectName ? `&projectName=${encodeURIComponent(detail.projectName)}` : ''),
                                 )}
                               >
                                 新增交付項
@@ -1421,12 +1430,24 @@ export default function RequirementDetail() {
                                 <Tag color={RDM_DELIVERY_ITEM_STATUS_COLOR[deliveryItems[0].status] ?? 'default'} style={{ margin: 0 }}>
                                   {RDM_DELIVERY_ITEM_STATUS_LABEL[deliveryItems[0].status] ?? deliveryItems[0].status}
                                 </Tag>
+                                <Button
+                                  type="link"
+                                  size="small"
+                                  style={{ marginLeft: 'auto' }}
+                                  onClick={() => navigate(`/rdm-delivery-item?mode=view&id=${deliveryItems[0].id}`)}
+                                >
+                                  {t('rdm.reqDetail.advanceDelivery')}
+                                </Button>
                               </div>
                               <div className="rdm-v3-delivery-single-meta">
                                 <span>協調人：{deliveryItems[0].coordinatorUserName || '-'}</span>
                                 <span>計劃結束：{deliveryItems[0].planEndDate || '-'}</span>
-                                <span>測試：{deliveryItems[0].testStatus || '-'}</span>
-                                <span>驗收：{deliveryItems[0].acceptanceStatus || '-'}</span>
+                                <span>測試：{deliveryItems[0].testStatus
+                                  ? (RDM_TEST_BATCH_STATUS_LABEL[deliveryItems[0].testStatus] ?? deliveryItems[0].testStatus)
+                                  : t('rdm.deliveryItem.noTest')}</span>
+                                <span>驗收：{deliveryItems[0].acceptanceStatus
+                                  ? (RDM_ACCEPT_RESULT_LABEL[deliveryItems[0].acceptanceStatus as RdmAcceptResult] ?? deliveryItems[0].acceptanceStatus)
+                                  : t('rdm.deliveryItem.noAcceptance')}</span>
                               </div>
                             </div>
                           ) : (
@@ -1447,8 +1468,10 @@ export default function RequirementDetail() {
                                   ),
                                 },
                                 { title: '計劃結束', dataIndex: 'planEndDate', key: 'planEndDate', width: 110, render: (v?: string | null) => v || '-' },
-                                { title: '測試', dataIndex: 'testStatus', key: 'testStatus', width: 80, render: (v?: string | null) => v || '-' },
-                                { title: '驗收', dataIndex: 'acceptanceStatus', key: 'acceptanceStatus', width: 80, render: (v?: string | null) => v || '-' },
+                                { title: '測試', dataIndex: 'testStatus', key: 'testStatus', width: 90,
+                                  render: (v?: string | null) => v ? (RDM_TEST_BATCH_STATUS_LABEL[v] ?? v) : '-' },
+                                { title: '驗收', dataIndex: 'acceptanceStatus', key: 'acceptanceStatus', width: 100,
+                                  render: (v?: string | null) => v ? (RDM_ACCEPT_RESULT_LABEL[v as RdmAcceptResult] ?? v) : '-' },
                                 {
                                   title: '操作', key: 'action', width: 60, fixed: 'right',
                                   render: (_, r) => (
@@ -1637,7 +1660,10 @@ export default function RequirementDetail() {
       {/* ── 最后更新（详情页统一收尾，不再单开操作记录卡片）── */}
       <div className="rdm-detail-footer">
         <span>最後更新時間：<b>{detail.updatedAt ?? '-'}</b></span>
-        <span>最近操作：<b>{detail.timeline[0]?.operatorName ?? '-'}</b>{detail.timeline[0] ? ` · ${detail.timeline[0].time}` : ''}</span>
+        {/* 與最後更新時間區分：這裡只統計狀態流轉，不包括 PRD/欄位編輯 */}
+        <span title={t('rdm.reqDetail.lastFlowHint')}>
+          {t('rdm.reqDetail.lastFlowLabel')}：<b>{detail.timeline[0]?.operatorName ?? '-'}</b>{detail.timeline[0] ? ` · ${detail.timeline[0].time}` : ''}
+        </span>
       </div>
 
       {/* ── 底部操作栏：所有流转动作按全局规范放页面底部，主按钮靠右 ── */}

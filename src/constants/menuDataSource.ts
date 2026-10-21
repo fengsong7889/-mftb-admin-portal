@@ -340,6 +340,12 @@ pathToKey['/rdm-iteration-form'] = 'rdm-delivery-iteration'
 // 進度日報的两个独立表单页（非菜单）：归属各自列表页，保证侧栏高亮/页签名/权限守卫有锚点
 pathToKey['/rdm-daily-report-rule-form'] = 'rdm-daily-report-rule'
 pathToKey['/rdm-daily-report-template-form'] = 'rdm-daily-report-template'
+// 分發矩陣新增/編輯獨立頁：權限錨點沿用列表菜單
+pathToKey['/rdm-config-routing-form'] = 'rdm-config-routing'
+// 貢獻分預算新增/調整獨立頁：權限錨點沿用產出積分菜單
+pathToKey['/rdm-score-budget-form'] = 'rdm-dashboard-score'
+// 任務類型新增/編輯獨立頁：權限錨點沿用任務類型菜單
+pathToKey['/rdm-task-type-config-form'] = 'rdm-task-type-config'
 // 移動端日報頁：從釘釘通知連結打開，無獨立菜單，側欄高亮與權限守衛都錨到「推送配置」
 // （後端快照介面的 @RequirePermission 也以 rdm-daily-report-rule 為主錨點、anyOf 放行各 RDM 承載菜單）
 pathToKey['/rdm-daily'] = 'rdm-daily-report-rule'

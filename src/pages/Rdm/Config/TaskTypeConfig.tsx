@@ -7,42 +7,27 @@
  * 停用只影响下拉与图例展示，存量任务照常解析。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Form, Input, InputNumber, Modal, Select, Switch, Table, Tag, message } from 'antd'
+import { Button, Form, Input, Modal, Select, Switch, Table, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../../contexts/AuthContext'
 import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import HelpPopover from '../../../components/HelpPopover'
 import { invalidateTaskTypeDict } from '../../../hooks/useTaskTypeDict'
 import {
-  createTaskType,
   fetchTaskTypeAll,
-  updateTaskType,
   updateTaskTypeStatus,
   RDM_TASK_TYPE_CATEGORY,
   type RdmTaskTypeOption,
 } from '../../../api/rdmTaskType'
 import '../index.css'
 
-/** 聚合桶选项（与后端 RdmTaskTypeConfig.CATEGORIES 同源） */
-const CATEGORY_OPTIONS = [
-  { value: RDM_TASK_TYPE_CATEGORY.DESIGN, label: 'design' },
-  { value: RDM_TASK_TYPE_CATEGORY.QA, label: 'qa' },
-  { value: RDM_TASK_TYPE_CATEGORY.DEV, label: 'dev' },
-] as const
-
-interface TaskTypeFormValues {
-  code?: string
-  label?: string
-  color?: string
-  category?: string
-  sortOrder?: number
-  remark?: string
-}
+/** 聚合桶标签（与后端 RdmTaskTypeConfig.CATEGORIES 同源；新增/编辑表单已移入独立页） */
 
 export default function TaskTypeConfig() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { hasPermission } = useAuth()
   const canEdit = hasPermission('rdm-task-type-config:edit')
 
@@ -51,10 +36,6 @@ export default function TaskTypeConfig() {
   const [keyword, setKeyword] = useState<string>()
   const [statusFilter, setStatusFilter] = useState<number>()
   const [searchForm] = Form.useForm<{ keyword?: string; status?: number }>()
-  const [form] = Form.useForm<TaskTypeFormValues>()
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editing, setEditing] = useState<RdmTaskTypeOption | null>(null)
-  const [saving, setSaving] = useState(false)
   const [modal, contextHolder] = Modal.useModal()
 
   const load = useCallback(async () => {
@@ -94,41 +75,7 @@ export default function TaskTypeConfig() {
     setStatusFilter(undefined)
   }
 
-  const openCreate = () => {
-    setEditing(null)
-    form.resetFields()
-    form.setFieldsValue({ category: RDM_TASK_TYPE_CATEGORY.DEV, sortOrder: (all.length ? Math.max(...all.map(i => i.sortOrder ?? 0)) : 0) + 1, color: '#1890FF' })
-    setModalOpen(true)
-  }
-
-  const openEdit = (record: RdmTaskTypeOption) => {
-    setEditing(record)
-    form.resetFields()
-    form.setFieldsValue({ label: record.label, color: record.color, category: record.category, sortOrder: record.sortOrder ?? 0, remark: record.remark ?? undefined })
-    setModalOpen(true)
-  }
-
-  /** 保存：新增走 create，编辑走 update（code 身份键不传）；成功后失效字典缓存并刷新 */
-  const handleSave = async () => {
-    const values = await form.validateFields()
-    setSaving(true)
-    try {
-      if (editing) {
-        await updateTaskType(editing.id, values)
-        message.success(t('common.updateSuccess'))
-      } else {
-        await createTaskType(values)
-        message.success(t('common.createSuccess'))
-      }
-      invalidateTaskTypeDict()
-      setModalOpen(false)
-      await load()
-    } catch {
-      // 失败原因由请求层统一提示（如「任務類型編碼已存在」），此处不双弹
-    } finally {
-      setSaving(false)
-    }
-  }
+  /** 新增/編輯已改為獨立頁：列表只負責搜索、狀態切換與入口 */
 
   /** §B.8 强制：状态 Switch 切换必须先二次确认，确认后才调接口 */
   const handleToggleStatus = (record: RdmTaskTypeOption, checked: boolean) => {
@@ -188,7 +135,7 @@ export default function TaskTypeConfig() {
       title: t('common.colAction'), key: 'action', width: 90,
       render: (_, record) => (
         canEdit ? (
-          <Button type="link" size="small" onClick={() => openEdit(record)}>{t('common.edit')}</Button>
+          <Button type="link" size="small" onClick={() => navigate(`/rdm-task-type-config-form?id=${record.id}`)}>{t('common.edit')}</Button>
         ) : <span style={{ color: '#8C8C8C' }}>{t('rdm.taskTypeConfig.readOnly')}</span>
       ),
     },
@@ -225,7 +172,7 @@ export default function TaskTypeConfig() {
         <div className="action-section-left" />
         <div className="action-section-right">
           {canEdit && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>{t('rdm.taskTypeConfig.add')}</Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/rdm-task-type-config-form')}>{t('rdm.taskTypeConfig.add')}</Button>
           )}
           {configComponent}
         </div>
@@ -240,60 +187,6 @@ export default function TaskTypeConfig() {
         scroll={{ x: 'max-content' }}
         pagination={false}
       />
-
-      {/* 新增/编辑弹窗（字典行级配置用 Modal 表单，遵循「新增/编辑独立页」之外的既有配置页交互） */}
-      <Modal
-        title={editing ? t('rdm.taskTypeConfig.editTitle') : t('rdm.taskTypeConfig.addTitle')}
-        open={modalOpen}
-        onOk={handleSave}
-        onCancel={() => setModalOpen(false)}
-        okText={t('common.confirm')}
-        cancelText={t('common.cancel')}
-        confirmLoading={saving}
-        width={480}
-        destroyOnClose
-      >
-        <Form form={form} layout="vertical" style={{ marginTop: 8 }}>
-          <Form.Item
-            label={t('rdm.taskTypeConfig.formCode')}
-            name="code"
-            rules={[{ required: true, message: t('rdm.taskTypeConfig.formCodePlaceholder') }, { pattern: /^[a-z0-9_]{1,32}$/, message: t('rdm.taskTypeConfig.formCodePlaceholder') }]}
-            extra={editing ? t('rdm.taskTypeConfig.formCodeHint') : undefined}
-          >
-            <Input placeholder={t('rdm.taskTypeConfig.formCodePlaceholder')} disabled={!!editing} maxLength={32} />
-          </Form.Item>
-          <Form.Item label={t('rdm.taskTypeConfig.formLabel')} name="label" rules={[{ required: true, message: t('rdm.taskTypeConfig.formLabel') }]}>
-            <Input placeholder={t('rdm.taskTypeConfig.formLabelPlaceholder')} maxLength={64} />
-          </Form.Item>
-          <Form.Item label={t('rdm.taskTypeConfig.formColor')} name="color" rules={[{ required: true, message: '#RRGGBB' }, { pattern: /^#[0-9A-Fa-f]{6}$/, message: '#RRGGBB' }]}>
-            <Input placeholder="#RRGGBB" maxLength={7} />
-          </Form.Item>
-          <Form.Item
-            label={(
-              <span>
-                {t('rdm.taskTypeConfig.formCategory')}
-                <HelpPopover
-                  title={t('rdm.taskTypeConfig.categoryHelpTitle')}
-                  ariaLabel={t('rdm.taskTypeConfig.categoryHelpTitle')}
-                  content={[
-                    { tone: 'info', body: t('rdm.taskTypeConfig.categoryHelpDesign') },
-                    { tone: 'info', body: t('rdm.taskTypeConfig.categoryHelpQa') },
-                    { tone: 'success', body: t('rdm.taskTypeConfig.categoryHelpDev') },
-                  ]}
-                />
-              </span>
-            )}
-            name="category"
-            rules={[{ required: true, message: t('rdm.taskTypeConfig.formCategory') }]}
-            extra={t('rdm.taskTypeConfig.formCategoryHint')}
-          >
-            <Select options={CATEGORY_OPTIONS.map(o => ({ value: o.value, label: o.label }))} />
-          </Form.Item>
-          <Form.Item label={t('rdm.taskTypeConfig.formSort')} name="sortOrder" extra={t('rdm.taskTypeConfig.formSortHint')} rules={[{ required: true, message: t('rdm.taskTypeConfig.formSort') }]}>
-            <InputNumber min={0} max={9999} style={{ width: '100%' }} />
-          </Form.Item>
-        </Form>
-      </Modal>
     </div>
   )
 }

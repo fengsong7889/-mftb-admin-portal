@@ -18,6 +18,7 @@ import {
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { rdmTableLocale } from './components/tableLocale'
 import StatCards from '../../components/StatCards'
 import { fetchVersionHistory } from '../../api/versionHistory'
 import type { VersionHistoryRecord } from '../../api/versionHistory'
@@ -35,7 +36,7 @@ import {
 import { PriorityTag } from './components/Tags'
 import './index.css'
 
-/** 版本列表兜底（后端版本历史不可用时仍可演示追溯） */
+/** 版本列表兜底：仅在接口失败时给下拉一个可用值，不得当作默认选中项（真实版本是 1.0.x） */
 const FALLBACK_VERSIONS = ['2.9.0', '2.10.0', '2.11.0']
 
 export default function VersionTrace() {
@@ -49,15 +50,29 @@ export default function VersionTrace() {
   const [trace, setTrace] = useState<RdmVersionTrace | null>(null)
   const [loading, setLoading] = useState(true)
   const [sourceReqId, setSourceReqId] = useState(reqId)
+  /** 版本列表是否已落地：未落地前不得用 fallback 当默认值（否则首屏永远停在 2.9.0） */
+  const [versionsLoaded, setVersionsLoaded] = useState(false)
 
   /** 版本下拉：来自 sys_version_history（发布记录），字段含发布日期与摘要 */
   useEffect(() => {
     fetchVersionHistory({ page: 1, size: 30 })
       .then(res => setVersions(res.records ?? []))
       .catch(() => setVersions([]))
+      .finally(() => setVersionsLoaded(true))
   }, [])
 
+  /** 深链 ?versionNo= 变化时同步到 state（首次 mount 只读一次，后续前进/后退会丢参数） */
+  const urlVersionNo = searchParams.get('versionNo') ?? ''
+  useEffect(() => {
+    if (urlVersionNo && urlVersionNo !== versionNo) setVersionNo(urlVersionNo)
+    // 只在 URL 变化时同步；本地下拉切换不回写 URL，避免每次选择都新增历史记录
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlVersionNo])
+
   const load = useCallback(async () => {
+    // 版本列表没回来前不查也不关 loading：否则会先拿 fallback 版本号请求一遍，
+    // 页面还会先闪一下“该版本暂无关联需求”的空态
+    if (!sourceReqId && !versionsLoaded) return
     setLoading(true)
     try {
       if (sourceReqId) {
@@ -67,7 +82,12 @@ export default function VersionTrace() {
         if (byReq.versionNo) setVersionNo(byReq.versionNo)
         return
       }
-      const target = versionNo || versions[0]?.versionNo || FALLBACK_VERSIONS[0]
+      // 版本列表已就绪，用第一个真实版本作为默认值
+      const target = versionNo || versions[0]?.versionNo
+      if (!target) {
+        setTrace(null)
+        return
+      }
       if (!versionNo) setVersionNo(target)
       setTrace(await fetchVersionTrace(target))
     } catch {
@@ -75,15 +95,16 @@ export default function VersionTrace() {
     } finally {
       setLoading(false)
     }
-  }, [sourceReqId, versionNo, versions])
+  }, [sourceReqId, versionNo, versions, versionsLoaded])
 
   useEffect(() => { void load() }, [load])
 
   const versionOptions = useMemo(() => (
     versions.length
       ? versions.map(v => ({ value: v.versionNo, label: `${v.versionNo}（${v.releaseDate ?? '-'}）` }))
-      : FALLBACK_VERSIONS.map(v => ({ value: v, label: v }))
-  ), [versions])
+      // 仅接口失败时给兜底选项；正常加载中不显示假版本
+      : (versionsLoaded ? FALLBACK_VERSIONS.map(v => ({ value: v, label: v })) : [])
+  ), [versions, versionsLoaded])
 
   const columns: TableColumnsType<RdmVersionTrace['requirements'][number]> = useMemo(() => [
     {
@@ -258,7 +279,7 @@ export default function VersionTrace() {
             pageSizeOptions: ['10', '20', '50', '100'],
             showTotal: t => `共 ${t} 條`,
           }}
-          locale={{ emptyText: '該版本暫無關聯需求（版本記錄存在但需求未綁定版本號，或該版本尚未發布）' }}
+          locale={rdmTableLocale(loading, '該版本暫無關聯需求（版本記錄存在但需求未綁定版本號，或該版本尚未發布）')}
         />
       </div>
     </div>

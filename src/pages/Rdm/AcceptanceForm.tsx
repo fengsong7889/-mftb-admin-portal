@@ -122,7 +122,7 @@ function RequirementAcceptanceForm() {
   const [detail, setDetail] = useState<RdmRequirementDetail | null>(null)
   const [history, setHistory] = useState<RdmAcceptanceRecord[]>([])
   const [cases, setCases] = useState<RdmAcceptanceCaseForm[]>([])
-  const [result, setResult] = useState<RdmAcceptResult>(RDM_ACCEPT_RESULT.PASS)
+  const [result, setResult] = useState<RdmAcceptResult | ''>('')
   /** 满意度不预置分数：预置 5 分会让「必填满意度」校验永远提前满足，等于替业务方打分 */
   const [score, setScore] = useState<number | undefined>()
   const [testEnv, setTestEnv] = useState<RdmTestEnv>()
@@ -191,6 +191,11 @@ function RequirementAcceptanceForm() {
 
   /** 提交前校验（顺序：表单校验 → 二次确认 → 调接口） */
   const validate = (): boolean => {
+    // 不預設結論：預設「驗收通過」且可能因檢查項被禁用，等於替驗收人簽字
+    if (!result) {
+      message.warning(t('rdm.acceptance.selectConclusion'))
+      return false
+    }
     // 满意度不预选后必须真由验收人给分，否则质量因子会退化成常量
     // 上线后业务验收无论结论如何都必须打分（目标⑦：强制 1-5 分）
     if ((isPostRelease || result !== RDM_ACCEPT_RESULT.FAIL) && !score) {

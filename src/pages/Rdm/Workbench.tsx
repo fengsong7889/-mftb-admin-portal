@@ -62,6 +62,7 @@ import {
   RDM_STAGE_ORDER,
   RDM_STATUS,
   RDM_STATUS_LABEL,
+  RDM_TODO_REASON_LABEL,
   formatRdmReqNo,
   RDM_STATUS_STAGE,
   type RdmStatus,
@@ -321,8 +322,8 @@ export default function RdmWorkbench() {
       <div style={{ marginBottom: 16 }}>
         <StatCards
           items={[
-            { key: 'myProjects', icon: <ProjectOutlined />, value: wbSummary.myProjectCount, label: '我的項目數', color: 'info' },
-            { key: 'myPending', icon: <ClockCircleOutlined />, value: wbSummary.myPendingTaskCount, label: '待辦任務數', color: 'system' },
+            { key: 'myProjects', icon: <ProjectOutlined />, value: wbSummary.myProjectCount, label: '我參與的項目', color: 'info' },
+            { key: 'myPending', icon: <ClockCircleOutlined />, value: wbSummary.myPendingTaskCount, label: '待我處理的任務', color: 'system' },
             { key: 'myDelivery', icon: <RocketOutlined />, value: wbSummary.myDeliveryItemCount, label: '我的交付項數', color: 'brand' },
             { key: 'upcoming', icon: <AlertOutlined />, value: wbSummary.upcomingDeadlineCount, label: '近期到期數', color: 'success' },
           ]}
@@ -380,7 +381,9 @@ export default function RdmWorkbench() {
                       {item.overdue && <span style={{ color: '#FF4D4F' }}> · 逾期{item.overdueWorkingDays ? ` ${item.overdueWorkingDays} 工作日` : ''}</span>}
                     </div>
                     {item.reasons.length > 0 && (
-                      <div style={{ fontSize: 12, color: '#D46B08', marginTop: 2 }}>{item.reasons.join('；')}</div>
+                      <div style={{ fontSize: 12, color: '#D46B08', marginTop: 2 }}>
+                        {item.reasons.map(r => RDM_TODO_REASON_LABEL[r] ?? r).join('；')}
+                      </div>
                     )}
                   </div>
                 ))}
@@ -505,9 +508,9 @@ export default function RdmWorkbench() {
       <div className="rdm-v3-projects">
         <div className="rdm-card-title">
           <span className="rdm-icon-block" style={{ background: '#F0F5FF', color: '#2F54EB' }}><ProjectOutlined /></span>
-          我的項目
+          項目一覽
           <Tag color="blue" style={{ margin: 0 }}>{myProjects.length}</Tag>
-          <span className="rdm-todo-hint">分批交付項目進度一覽</span>
+          <span className="rdm-todo-hint">可見範圍內的分批交付項目進度一覽</span>
           <span className="rdm-card-title-split" />
           <Button type="link" size="small" onClick={() => navigate('/rdm-project')}>
             項目總覽 <RightOutlined style={{ fontSize: 11 }} />

@@ -94,6 +94,7 @@ export default function TeamOutput() {
             size="small"
             style={{ width: 90 }}
             strokeColor={rateColor(r.onTimeRate)}
+            showInfo={false}
           />
           <span style={{ fontSize: 12, color: '#595959' }}>{Math.round(r.onTimeRate * 100)}%</span>
         </Space>

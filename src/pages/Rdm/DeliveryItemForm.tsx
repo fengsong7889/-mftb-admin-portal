@@ -9,7 +9,7 @@
  *
  * 佈局遵循 AGENTS.md §C：RdmFormHeader + 白色 div 模塊卡 + form-footer
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Alert,
   Button,
@@ -35,8 +35,10 @@ import {
   SaveOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
+import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
 import HelpPopover from '../../components/HelpPopover'
 import {
   createDeliveryItem,
@@ -51,8 +53,10 @@ import {
   type RdmScopeVersionEntry,
 } from '../../api/rdm'
 import {
+  RDM_ACCEPT_RESULT_LABEL,
   RDM_DELIVERY_ITEM_STATUS_COLOR,
   RDM_DELIVERY_ITEM_STATUS_LABEL,
+  RDM_TEST_BATCH_STATUS_LABEL,
 } from '../../constants/rdm'
 import './index.css'
 
@@ -76,12 +80,15 @@ const PATH_HELP_SECTIONS = [
 
 export default function DeliveryItemForm() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
 
   const mode: FormMode = (searchParams.get('mode') as FormMode) || 'create'
   const itemId = searchParams.get('id') ? Number(searchParams.get('id')) : null
   const reqId = searchParams.get('reqId') ? Number(searchParams.get('reqId')) : null
   const projectId = searchParams.get('projectId') ? Number(searchParams.get('projectId')) : null
+  /** 从需求详情带入的项目名：只读展示用，避免把裸 ID 直接给用户看 */
+  const projectNameFromUrl = searchParams.get('projectName') ?? ''
 
   const isView = mode === 'view'
   const isEdit = mode === 'edit'
@@ -92,6 +99,11 @@ export default function DeliveryItemForm() {
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /**
+   * 人员姓名快照：表单值只存 sys_user.id（权限判定只认 ID），
+   * 提交时把下拉带回的姓名一并落库，列表/详情就不用再查一次员工表。
+   */
+  const pickedNames = useRef<Record<string, string>>({})
 
   // ── Batch2：範圍版本管理 ──
   const [scopeHistory, setScopeHistory] = useState<RdmScopeVersionEntry[]>([])
@@ -113,13 +125,18 @@ export default function DeliveryItemForm() {
         title: res.title,
         scopeDesc: res.scopeDesc,
         acceptanceCriteria: res.acceptanceCriteria,
-        coordinatorUserName: res.coordinatorUserName,
-        productAcceptorUserName: res.productAcceptorUserName,
-        bizAcceptorUserName: res.bizAcceptorUserName,
+        coordinatorUserId: res.coordinatorUserId ?? undefined,
+        productAcceptorUserId: res.productAcceptorUserId ?? undefined,
+        bizAcceptorUserId: res.bizAcceptorUserId ?? undefined,
         acceptancePath: res.acceptancePath,
         planStartDate: res.planStartDate ? dayjs(res.planStartDate) : null,
         planEndDate: res.planEndDate ? dayjs(res.planEndDate) : null,
       })
+      pickedNames.current = {
+        coordinatorUserId: res.coordinatorUserName ?? '',
+        productAcceptorUserId: res.productAcceptorUserName ?? '',
+        bizAcceptorUserId: res.bizAcceptorUserName ?? '',
+      }
     } catch {
       setError('交付項詳情載入失敗')
     } finally {
@@ -214,9 +231,13 @@ export default function DeliveryItemForm() {
         projectId: values.projectId ?? projectId ?? detail?.projectId ?? undefined,
         scopeDesc: values.scopeDesc || undefined,
         acceptanceCriteria: values.acceptanceCriteria || undefined,
-        coordinatorUserName: values.coordinatorUserName || undefined,
-        productAcceptorUserName: values.productAcceptorUserName || undefined,
-        bizAcceptorUserName: values.bizAcceptorUserName || undefined,
+        // 员工下拉的 value 是 sys_user.id；姓名为快照，两者成对提交
+        coordinatorUserId: values.coordinatorUserId ?? undefined,
+        coordinatorUserName: values.coordinatorUserId ? pickedNames.current.coordinatorUserId || undefined : undefined,
+        productAcceptorUserId: values.productAcceptorUserId ?? undefined,
+        productAcceptorUserName: values.productAcceptorUserId ? pickedNames.current.productAcceptorUserId || undefined : undefined,
+        bizAcceptorUserId: values.bizAcceptorUserId ?? undefined,
+        bizAcceptorUserName: values.bizAcceptorUserId ? pickedNames.current.bizAcceptorUserId || undefined : undefined,
         acceptancePath: values.acceptancePath || undefined,
         planStartDate: values.planStartDate ? values.planStartDate.format('YYYY-MM-DD') : undefined,
         planEndDate: values.planEndDate ? values.planEndDate.format('YYYY-MM-DD') : undefined,
@@ -225,11 +246,14 @@ export default function DeliveryItemForm() {
       if (isEdit && itemId && detail) {
         await updateDeliveryItem(itemId, { ...payload, expectedVersion: detail.version })
         message.success('交付項更新成功')
+        navigate(-1)
       } else {
-        await createDeliveryItem(payload as Parameters<typeof createDeliveryItem>[0])
+        const created = await createDeliveryItem(payload as Parameters<typeof createDeliveryItem>[0])
         message.success('交付項創建成功')
+        // 建完直接进新交付项的详情：回退到上一页会让用户以为没建成功，也看不到编号
+        navigate(`/rdm-delivery-item?id=${created.id}&mode=view`, { replace: true })
       }
-      navigate(-1)
+      return
     } catch (err) {
       // antd validateFields 拋出的錯誤不需要額外提示
       if (err && typeof err === 'object' && 'errorFields' in err) return
@@ -270,6 +294,10 @@ export default function DeliveryItemForm() {
   if (isView && detail) {
     const statusLabel = RDM_DELIVERY_ITEM_STATUS_LABEL[detail.status] ?? detail.status
     const statusColor = RDM_DELIVERY_ITEM_STATUS_COLOR[detail.status] ?? 'default'
+    const testStatusLabel = detail.testStatus ? (RDM_TEST_BATCH_STATUS_LABEL[detail.testStatus] ?? detail.testStatus) : t('rdm.deliveryItem.noTest')
+    const acceptanceStatusLabel = detail.acceptanceStatus
+      ? (RDM_ACCEPT_RESULT_LABEL[detail.acceptanceStatus as keyof typeof RDM_ACCEPT_RESULT_LABEL] ?? detail.acceptanceStatus)
+      : t('rdm.deliveryItem.noAcceptance')
     return (
       <div className="content-area">
         <RdmFormHeader
@@ -406,6 +434,45 @@ export default function DeliveryItemForm() {
           </Descriptions>
         </div>
 
+        {/* 交付推進：V3 的后续动作全部挂在交付项上，避免用户回到需求页找不到入口 */}
+        <div className="rdm-form-section">
+          <div className="rdm-form-section-title">
+            <span className="rdm-icon-block" style={{ background: '#E6FFFB', color: '#13C2C2' }}>
+              <CheckCircleOutlined />
+            </span>
+            {t('rdm.deliveryItem.advanceTitle')}
+            {!scopeFrozen && <Tag color="warning" style={{ margin: 0 }}>{t('rdm.deliveryItem.freezeFirst')}</Tag>}
+            <span className="rdm-card-title-split" />
+          </div>
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 12 }}
+            message={t('rdm.deliveryItem.advanceHint')}
+            description={t('rdm.deliveryItem.advanceMeta', {
+              progress: detail.taskProgress || 0,
+              test: testStatusLabel,
+              acceptance: acceptanceStatusLabel,
+            })}
+          />
+          <Space wrap>
+            <Button onClick={() => navigate(`/rdm-task?reqId=${detail.reqId}&deliveryItemId=${detail.id}`)}>
+              {t('rdm.deliveryItem.assignTask')}
+            </Button>
+            <Button onClick={() => navigate(`/rdm-test-submit?reqId=${detail.reqId}&deliveryItemId=${detail.id}`)}>
+              {t('rdm.deliveryItem.submitTest')}
+            </Button>
+            <Button
+              onClick={() => navigate(`/rdm-acceptance-form?id=${detail.reqId}&deliveryItemId=${detail.id}&tab=gate`)}
+            >
+              {t('rdm.deliveryItem.accept')}
+            </Button>
+            <Button type="primary" ghost onClick={() => navigate(`/rdm-detail?id=${detail.reqId}&tab=gate`)}>
+              {t('rdm.deliveryItem.reqDetail')}
+            </Button>
+          </Space>
+        </div>
+
         {/* 元數據 */}
         <div className="rdm-detail-footer">
           <span>創建於 <b>{detail.createdAt?.slice(0, 16).replace('T', ' ') || '-'}</b></span>
@@ -505,9 +572,20 @@ export default function DeliveryItemForm() {
             />
           )}
 
-          <Form.Item name="projectId" label="所屬項目" hidden={!projectId}>
+          {/* projectId 只提交、不展示；对用户显示项目名（没有名字时至少标成「項目 #7」） */}
+          <Form.Item name="projectId" hidden>
             <Input />
           </Form.Item>
+          {(projectId || detail?.projectId) && (
+            <Form.Item label={t('rdm.deliveryItem.projectLabel')}>
+              <Input
+                disabled
+                value={projectNameFromUrl
+                  || detail?.projectName
+                  || t('rdm.deliveryItem.projectFallback', { id: projectId ?? detail?.projectId })}
+              />
+            </Form.Item>
+          )}
 
           <Form.Item name="scopeDesc" label="範圍描述">
             <TextArea
@@ -551,23 +629,66 @@ export default function DeliveryItemForm() {
             責任人與路徑
           </div>
 
+          {/* 选人字段统一用 EmployeeSelect（远程搜索下拉）。它的 value 契约是 number[]，
+              表单/接口存标量 ID，用 getValueProps / normalize 做双向适配。 */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
-            <Form.Item name="coordinatorUserName" label="協調人">
-              <Input placeholder="交付項協調負責人" />
+            <Form.Item
+              name="coordinatorUserId"
+              label="協調人"
+              tooltip={t('rdm.deliveryItem.coordinatorTooltip')}
+              extra={t('rdm.deliveryItem.coordinatorExtra')}
+              getValueProps={(v?: number) => ({ value: v == null ? [] : [v] })}
+              normalize={(picked?: number[]) => picked?.[0]}
+            >
+              <EmployeeSelect
+                single
+                placeholder={t('rdm.deliveryItem.coordinatorPlaceholder')}
+                seed={detail?.coordinatorUserId && detail?.coordinatorUserName
+                  ? [{ id: detail.coordinatorUserId, name: detail.coordinatorUserName }]
+                  : undefined}
+                onPick={items => {
+                  const picked = items[0]
+                  if (picked) pickedNames.current.coordinatorUserId = picked.name
+                }}
+              />
             </Form.Item>
             <Form.Item
-              name="productAcceptorUserName"
+              name="productAcceptorUserId"
               label="產品驗收人"
               tooltip="默認為主責 PM"
+              getValueProps={(v?: number) => ({ value: v == null ? [] : [v] })}
+              normalize={(picked?: number[]) => picked?.[0]}
             >
-              <Input placeholder="默認為主責 PM" />
+              <EmployeeSelect
+                single
+                placeholder={t('rdm.deliveryItem.productAcceptorPlaceholder')}
+                seed={detail?.productAcceptorUserId && detail?.productAcceptorUserName
+                  ? [{ id: detail.productAcceptorUserId, name: detail.productAcceptorUserName }]
+                  : undefined}
+                onPick={items => {
+                  const picked = items[0]
+                  if (picked) pickedNames.current.productAcceptorUserId = picked.name
+                }}
+              />
             </Form.Item>
             <Form.Item
-              name="bizAcceptorUserName"
+              name="bizAcceptorUserId"
               label="業務驗收人"
               tooltip="默認為需求提出人"
+              getValueProps={(v?: number) => ({ value: v == null ? [] : [v] })}
+              normalize={(picked?: number[]) => picked?.[0]}
             >
-              <Input placeholder="默認為需求提出人" />
+              <EmployeeSelect
+                single
+                placeholder={t('rdm.deliveryItem.bizAcceptorPlaceholder')}
+                seed={detail?.bizAcceptorUserId && detail?.bizAcceptorUserName
+                  ? [{ id: detail.bizAcceptorUserId, name: detail.bizAcceptorUserName }]
+                  : undefined}
+                onPick={items => {
+                  const picked = items[0]
+                  if (picked) pickedNames.current.bizAcceptorUserId = picked.name
+                }}
+              />
             </Form.Item>
           </div>
 

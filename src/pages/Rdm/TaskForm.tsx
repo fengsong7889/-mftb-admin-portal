@@ -61,6 +61,9 @@ export default function TaskForm() {
   const [searchParams] = useSearchParams()
   const reqIdFromUrl = Number(searchParams.get('reqId') ?? 0)
   const taskId = Number(searchParams.get('id') ?? 0)
+  /** 从交付项详情进入时带上 deliveryItemId：任务必须归属到该交付项，否则交付项永远停在“待准备” */
+  const deliveryItemIdFromUrl = Number(searchParams.get('deliveryItemId') ?? 0)
+  const [deliveryItemId, setDeliveryItemId] = useState(deliveryItemIdFromUrl)
   /**
    * 所属需求改为可选：原先只认 URL 带来的 reqId，从研发工作台「新增任務」进入时
    * 该字段是空且不可编辑，保存时才提示「請先選擇需求」——等于根本建不了任务。
@@ -146,6 +149,7 @@ export default function TaskForm() {
         planRange: task.planStartDate && task.planFinishDate
           ? [dayjs(task.planStartDate), dayjs(task.planFinishDate)] : undefined,
       })
+      if (task.deliveryItemId) setDeliveryItemId(task.deliveryItemId)
       if (task.ownerName) {
         setOwnerLabel(task.ownerEmpNo ? `${task.ownerName}（${task.ownerEmpNo}）` : task.ownerName)
       }
@@ -225,6 +229,8 @@ export default function TaskForm() {
       const payload: RdmTaskFormValues = {
         id: taskId || undefined,
         reqId,
+        // V3：任务归属交付项；为空时由服务端按需求默认交付项处理
+        deliveryItemId: deliveryItemId || undefined,
         taskType: values.taskType,
         title: values.title.trim(),
         content: values.content,
@@ -252,6 +258,15 @@ export default function TaskForm() {
         onBack={() => navigate(-1)}
         meta={requirement ? `${requirement.reqNo} · ${requirement.title}` : '將需求拆成可執行任務並指派到人，工時用於產出量化'}
       />
+
+      {deliveryItemId > 0 && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message={t('rdm.taskForm.deliveryItemHint', { id: deliveryItemId })}
+        />
+      )}
 
       {/* 表单不再锁 720px：独立页必须撑满内容区，字段按全局规范每行 3 列铺开 */}
       <Form form={form} layout="vertical">

@@ -130,6 +130,10 @@ public class RdmTestBatchDTO {
         private Long testLeadUserId;
         /** 关键字（匹配批次号/环境/负责人） */
         private String keyword;
+        /** 計劃結束時間起（yyyy-MM-dd，含當天） */
+        private String planEndFrom;
+        /** 計劃結束時間止（yyyy-MM-dd，含當天） */
+        private String planEndTo;
         private Integer pageNo = 1;
         private Integer pageSize = 20;
     }

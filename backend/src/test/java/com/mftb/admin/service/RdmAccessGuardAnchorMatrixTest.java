@@ -69,6 +69,7 @@ class RdmAccessGuardAnchorMatrixTest {
         when(requirementMapper.selectById(100L)).thenReturn(requirement100());
         return new RdmAccessGuard(operatorResolver, permissionService, requirementMapper,
                 mock(RdmRequirementRoleMapper.class), mock(RdmProjectMemberMapper.class),
+                mock(com.mftb.admin.mapper.RdmProjectMapper.class),
                 mock(RdmDeliveryItemMapper.class), mock(RdmTestBatchMapper.class),
                 mock(RdmReleaseBatchMapper.class));
     }

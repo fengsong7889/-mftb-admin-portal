@@ -10,8 +10,8 @@
  * 3. 原来「近 7/14/30 天」是假的：服务端压根没把这个参数用于筛选。这里改成真实可用的
  *    「停留 ≥ N 天」阈值——风险的意义就是「现在卡在谁手上卡了多久」。
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Segmented, Space, Spin, Table, Tag, message } from 'antd'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, Button, Form, Input, Segmented, Select, Space, Spin, Table, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   AlertOutlined,
@@ -20,8 +20,10 @@ import {
   ReloadOutlined,
   RiseOutlined,
   SafetyCertificateOutlined,
+  SearchOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import StatCards from '../../components/StatCards'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { fetchDashboard, fetchRiskSummary, type RdmDashboardData, type RdmRiskItem, type RdmRiskSummary } from '../../api/rdm'
@@ -46,15 +48,24 @@ const STAY_OPTIONS = [
 
 export default function RiskCenter() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [minStayDays, setMinStayDays] = useState(0)
   const [board, setBoard] = useState<RdmDashboardData | null>(null)
   const [summary, setSummary] = useState<RdmRiskSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [form] = Form.useForm()
+  /** 搜索条件（查詢点击后生效；阈值 Segmented 仍属筛选的一部分） */
+  const [filters, setFilters] = useState<{ keyword?: string; riskType?: string; status?: string }>({})
+  /** 摘要请求序号：阈值快速切换时丢弃过期响应，避免旧摘要盖住新口径 */
+  const summarySeq = useRef(0)
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
+    setSummary(null)
+    const seq = ++summarySeq.current
+    // 先取明细/KPI，摘要单独异步：AI 摘要慢或失败不能挡住整页首屏（历史上会空白 13s+）
     try {
       // 明细先取：看板是首屏唯一依赖，AI 叙述（可能等上游 8s）放后台补齐，
       // 否则整页白屏时间被 AI 调用拖住
@@ -70,8 +81,8 @@ export default function RiskCenter() {
     }
     // 摘要/要点只影响叙述区，后端超时会自己回落结构化要点
     fetchRiskSummary(minStayDays)
-      .then(sum => setSummary(sum))
-      .catch(() => setSummary(null))
+      .then(sum => { if (seq === summarySeq.current) setSummary(sum) })
+      .catch(() => { if (seq === summarySeq.current) setSummary(null) })
   }, [minStayDays])
 
   useEffect(() => { void load() }, [load])
@@ -84,6 +95,24 @@ export default function RiskCenter() {
     const all = board?.risks ?? []
     return minStayDays > 0 ? all.filter(r => (r.days ?? 0) >= minStayDays) : all
   }, [board, minStayDays])
+
+  /** 搜索是在阈值切片上再收窄，卡/表/明细计数同源 */
+  const filteredRisks = useMemo(() => {
+    const kw = filters.keyword?.trim().toLowerCase()
+    return risks.filter(r => {
+      if (kw && !`${r.reqNo ?? ''} ${r.title ?? ''} ${r.handler ?? ''}`.toLowerCase().includes(kw)) return false
+      if (filters.riskType && r.riskType !== filters.riskType) return false
+      if (filters.status && r.status !== filters.status) return false
+      return true
+    })
+  }, [risks, filters])
+
+  /** 状态候选只列当前风险里实际出现的值，避免 23 个状态的噪音 */
+  const statusOptions = useMemo(() => {
+    const set = new Set<string>()
+    risks.forEach(r => { if (r.status) set.add(r.status) })
+    return [...set].map(s => ({ value: s, label: RDM_STATUS_LABEL[s as RdmStatus] ?? s }))
+  }, [risks])
 
   const columnMeta = useMemo(() => ([
     { key: 'riskType', title: '風險類型' },
@@ -100,11 +129,14 @@ export default function RiskCenter() {
     { key: 'action', visible: true, locked: 'tail' as const },
   ])
 
-  const counts = useMemo(() => {
+  const filteredCounts = useMemo(() => {
     const acc: Record<string, number> = {}
-    risks.forEach(r => { acc[r.riskType] = (acc[r.riskType] ?? 0) + 1 })
+    filteredRisks.forEach(r => { acc[r.riskType] = (acc[r.riskType] ?? 0) + 1 })
     return acc
-  }, [risks])
+  }, [filteredRisks])
+
+  /** 摘要是全量口径（服务端按阈值生成），有搜索条件时隐藏，避免与筛后卡/表冲突 */
+  const hasSearchFilters = !!(filters.keyword || filters.riskType || filters.status)
 
   const columns: TableColumnsType<RdmRiskItem> = [
     {
@@ -119,7 +151,7 @@ export default function RiskCenter() {
       },
     },
     {
-      title: '需求標題', dataIndex: 'title', key: 'title', width: 320, ellipsis: true,
+      title: '需求標題', dataIndex: 'title', key: 'title', width: 260, ellipsis: true,
     },
     /*
      * 審批卡殼（INTAKE_STUCK）行属准入前需求，还没有正式编号；
@@ -130,8 +162,8 @@ export default function RiskCenter() {
       title: '當前狀態', dataIndex: 'status', key: 'status', width: 130,
       render: (v?: string | null) => (v ? (RDM_STATUS_LABEL[v as RdmStatus] ?? v) : '-'),
     },
-    { title: '當前處理人', dataIndex: 'handler', key: 'handler', width: 120 },
-    { title: '提出人', dataIndex: 'submitterName', key: 'submitterName', width: 110 },
+    { title: '當前處理人', dataIndex: 'handler', key: 'handler', width: 100 },
+    { title: '提出人', dataIndex: 'submitterName', key: 'submitterName', width: 100 },
     {
       title: '停留天數', dataIndex: 'days', key: 'days', width: 110, align: 'right',
       render: (v: number, r) => {
@@ -195,21 +227,49 @@ export default function RiskCenter() {
         />
       )}
 
+      <div className="search-section">
+        <Form
+          form={form}
+          layout="inline"
+          onFinish={v => setFilters({ keyword: v.keyword, riskType: v.riskType, status: v.status })}
+        >
+          <Form.Item name="keyword" label={t('rdm.risk.keywordLabel')}>
+            <Input allowClear placeholder={t('rdm.risk.keywordPlaceholder')} />
+          </Form.Item>
+          <Form.Item name="riskType" label={t('rdm.risk.typeLabel')}>
+            <Select
+              allowClear
+              placeholder={t('common.all')}
+              options={(Object.keys(RDM_RISK_LABEL) as RdmRiskType[]).map(k => ({ value: k, label: RDM_RISK_LABEL[k] }))}
+            />
+          </Form.Item>
+          <Form.Item name="status" label={t('rdm.risk.statusLabel')}>
+            <Select allowClear placeholder={t('common.all')} options={statusOptions} />
+          </Form.Item>
+          <Form.Item colon={false}>
+            <div className="search-actions">
+              <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>{t('common.search')}</Button>
+              <Button onClick={() => { form.resetFields(); setFilters({}) }}>{t('common.reset')}</Button>
+            </div>
+          </Form.Item>
+        </Form>
+      </div>
+
       <div style={{ marginBottom: 16 }}>
         <StatCards
-          animationKey={`risk-${minStayDays}`}
+          animationKey={`risk-${minStayDays}-${JSON.stringify(filters)}`}
           items={[
-            { key: 'total', icon: <AlertOutlined />, value: risks.length, label: '風險需求', color: risks.length > 0 ? 'brand' : 'success' },
-            { key: 'blocked', icon: <AlertOutlined />, value: counts.BLOCKED ?? 0, label: '阻塞中', color: 'system' },
-            { key: 'overdue', icon: <RiseOutlined />, value: counts.OVERDUE ?? 0, label: '已逾期', color: 'brand' },
-            { key: 'unassigned', icon: <AlertOutlined />, value: counts.UNASSIGNED ?? 0, label: '無主待分配', color: 'info' },
-            { key: 'stuck', icon: <SafetyCertificateOutlined />, value: counts.INTAKE_STUCK ?? 0, label: '審批停滯', color: 'system' },
-            { key: 'stagnant', icon: <BranchesOutlined />, value: counts.STAGNANT ?? 0, label: '超 7 天無進展', color: 'info' },
+            { key: 'total', icon: <AlertOutlined />, value: filteredRisks.length, label: '風險需求', color: filteredRisks.length > 0 ? 'brand' : 'success' },
+            { key: 'blocked', icon: <AlertOutlined />, value: filteredCounts.BLOCKED ?? 0, label: '阻塞中', color: 'system' },
+            { key: 'overdue', icon: <RiseOutlined />, value: filteredCounts.OVERDUE ?? 0, label: '已逾期', color: 'brand' },
+            { key: 'unassigned', icon: <AlertOutlined />, value: filteredCounts.UNASSIGNED ?? 0, label: '無主待分配', color: 'info' },
+            { key: 'stuck', icon: <SafetyCertificateOutlined />, value: filteredCounts.INTAKE_STUCK ?? 0, label: '審批停滯', color: 'system' },
+            { key: 'stagnant', icon: <BranchesOutlined />, value: filteredCounts.STAGNANT ?? 0, label: '超 7 天無進展', color: 'info' },
           ]}
         />
       </div>
 
-      {summary?.narrative && (
+      {summary?.narrative && !hasSearchFilters && (
         <div className="rdm-risk-narrative" style={{ marginBottom: 16 }}>
           <div className="rdm-risk-narrative-text">{summary.narrative}</div>
           <Space size={6} wrap style={{ marginTop: 6 }}>
@@ -233,7 +293,7 @@ export default function RiskCenter() {
       <div className="rdm-card">
         <div className="rdm-card-title">
           <span className="rdm-icon-block" style={{ background: '#FFF1F0', color: '#FF4D4F' }}><AlertOutlined /></span>
-          風險明細（{risks.length}）
+          風險明細（{filteredRisks.length}）
           <span className="rdm-card-title-split" />
           {configComponent}
         </div>
@@ -243,8 +303,8 @@ export default function RiskCenter() {
           size="small"
           loading={loading}
           columns={applyConfig(columns) as TableColumnsType<RdmRiskItem>}
-          dataSource={risks}
-          scroll={{ x: 1100 }}
+          dataSource={filteredRisks}
+          scroll={{ x: 1080 }}
           pagination={{
             defaultPageSize: 20,
             showSizeChanger: true,

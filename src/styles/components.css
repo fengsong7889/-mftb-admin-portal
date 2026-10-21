@@ -2741,6 +2741,23 @@
   border-color: #FF7875;
   box-shadow: 0 4px 12px rgba(255, 77, 79, 0.35);
 }
+/*
+ * antd 5 的 okType:'danger' 实际渲染为 default 型按钮（ant-btn-default.ant-btn-dangerous），
+ * 只写 .ant-btn-primary.ant-btn-dangerous 时危险确认按钮会退化成灰色，
+ * 用户看不出这是不可逆操作。这里补上 default 型态。
+ */
+.ant-modal-confirm .ant-modal-confirm-btns .ant-btn-dangerous {
+  background: #FF4D4F;
+  border-color: #FF4D4F;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(255, 77, 79, 0.3);
+}
+.ant-modal-confirm .ant-modal-confirm-btns .ant-btn-dangerous:hover {
+  background: #FF7875;
+  border-color: #FF7875;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(255, 77, 79, 0.35);
+}
 /* 确认按钮尺寸（只对统一样式的确认弹窗生效，颜色由上面的全局规则兜底） */
 .custom-confirm-modal .ant-modal-confirm-btns .ant-btn-primary {
   height: 38px;
@@ -2776,6 +2793,23 @@
 .custom-confirm-modal .ant-modal-confirm-btns .ant-btn-default:hover {
   border-color: #E8720C;
   color: #E8720C;
+}
+/*
+ * 危险确认按钮必须排在「取消按钮白底」规则之后：
+ * antd 的 danger 型就是 ant-btn-default，两者同特异性，顺序靠后就赢。
+ * 只写 .ant-btn-primary.ant-btn-dangerous 不会命中，按钮会变成白底灰字。
+ */
+.custom-confirm-modal .ant-modal-confirm-btns .ant-btn-dangerous {
+  background: #FF4D4F;
+  border: 1px solid #FF4D4F;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(255, 77, 79, 0.3);
+}
+.custom-confirm-modal .ant-modal-confirm-btns .ant-btn-dangerous:hover {
+  background: #FF7875;
+  border-color: #FF7875;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(255, 77, 79, 0.35);
 }
 
 /* ── 表單標籤幫助提示（label + ? 圖標 + Tooltip） ── */
