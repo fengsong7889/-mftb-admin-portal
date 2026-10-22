@@ -221,7 +221,10 @@ export default function RoleQuotaEdit() {
                       <div style={{ width: 16, height: 16, borderRadius: 3, border: `1px solid ${checked ? '#E8720C' : '#d9d9d9'}`, background: checked ? '#E8720C' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', flexShrink: 0 }}>
                         {checked && <span style={{ color: '#fff', fontSize: 10, lineHeight: 1 }}>✓</span>}
                       </div>
-                      <span style={{ fontSize: 13, color: '#262626' }}>{emp.name}（{emp.empId}）{emp.department && <span style={{ fontSize: 11, color: '#8C8C8C', marginLeft: 4 }}>— {emp.department}</span>}</span>
+                      <span style={{ fontSize: 13, color: '#262626' }}>
+                        {/* 选人列表统一「姓名（工號）」，部门不参与消歧 */}
+                        {emp.name}（{emp.empId}）
+                      </span>
                     </div>
                   )
                 })}
@@ -247,7 +250,8 @@ export default function RoleQuotaEdit() {
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {selectedEmpList.map((emp) => (
                       <Tag key={emp.id} closable onClose={() => setBoundUsers((prev) => prev.filter((id) => id !== emp.id))} style={{ fontSize: 12, margin: 0 }}>
-                        {emp.name}（{emp.empId}）{emp.department && ` — ${emp.department}`}
+                        {/* 选人列表统一「姓名（工號）」，部门不参与消歧 */}
+                        {emp.name}（{emp.empId}）
                       </Tag>
                     ))}
                   </div>

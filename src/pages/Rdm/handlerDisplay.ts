@@ -32,3 +32,34 @@ export function splitHandlers(
   if (!handlers || handlers.length === 0) return null
   return { shown: handlers.slice(0, max), rest: handlers.slice(max) }
 }
+
+/** 回退处理人所需的最小行数据（列表行与导出共用） */
+export interface HandlerFallbackRow {
+  currentHandler?: string | null
+  submitterName?: string | null
+  submitterEmpNo?: string | null
+  pmName?: string | null
+  pmEmpNo?: string | null
+  dispatcherName?: string | null
+  dispatcherEmpNo?: string | null
+}
+
+/** 「姓名（工号）」结尾：已带工号（正常流转写入的口径）不再补，避免出现双括号 */
+const WITH_EMP_NO = /[（(][A-Za-z0-9]+[）)]$/
+
+/**
+ * 无未完成任务时的回退处理人文本。
+ *
+ * <p>currentHandler 是流程推演快照：正常流转写入的是「姓名（工号）」，
+ * 但存量导入等历史数据只有姓名。这里只补工号、不改姓名：
+ * 按姓名匹配行内的提出人/产品经理/分派人取工号，匹配不上（「審批人」「技術部（待指派）」）原样返回。
+ */
+export function fallbackHandlerText(row: HandlerFallbackRow): string {
+  const raw = row.currentHandler?.trim()
+  if (!raw) return ''
+  if (WITH_EMP_NO.test(raw)) return raw
+  if (raw === row.submitterName?.trim()) return formatPerson({ name: raw, empNo: row.submitterEmpNo })
+  if (raw === row.pmName?.trim()) return formatPerson({ name: raw, empNo: row.pmEmpNo })
+  if (raw === row.dispatcherName?.trim()) return formatPerson({ name: raw, empNo: row.dispatcherEmpNo })
+  return raw
+}

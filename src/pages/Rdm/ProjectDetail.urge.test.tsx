@@ -22,6 +22,11 @@ vi.mock('../../api/rdm', () => ({
   updateProject: vi.fn(),
 }))
 
+// 「催辦待辦」按 rdm-dashboard-project:edit 收敛；本文件测催办结果，需给全权限
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: () => true }),
+}))
+
 import { fetchProjectDetail, fetchProjectRequirementBoard } from '../../api/rdm'
 
 const detail = {

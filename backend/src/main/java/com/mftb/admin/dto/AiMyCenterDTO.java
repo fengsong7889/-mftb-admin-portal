@@ -20,6 +20,8 @@ public class AiMyCenterDTO {
         private String username;
         private String name;
         private String empId;
+        /** 是否不设额度上限（内置系统管理员豁免额度管控；为 true 时 dimensions 为空属正常） */
+        private Boolean unlimited = Boolean.FALSE;
         /** 当前账号生效的额度维度（员工/部门/职位/角色） */
         private List<QuotaDimensionVO> dimensions = new ArrayList<>();
         /** 整体用量概览（今日/本月） */
@@ -148,7 +150,7 @@ public class AiMyCenterDTO {
         private String providerName;
         /** 部署类型：cloud/private */
         private String deployType;
-        /** 授权来源：dept/position/role/employee */
+        /** 授权来源：dept/position/role/employee；system=内置系统管理员默认拥有全部模型 */
         private List<String> sources = new ArrayList<>();
 
         /* ── 模型能力字段（前端展示能力标签 & 输入方式提示） ── */

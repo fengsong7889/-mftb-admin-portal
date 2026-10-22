@@ -46,8 +46,9 @@ class RdmMenuActionSyncTest {
     /** rdm-requirement 的种子集（LIST_ACTIONS），顺序按 ACTION_ORDER */
     private static final List<String> REQUIREMENT_SEED =
             List.of("view", "create", "edit", "export", "view_all", "dispatch", "contribute");
-    /** rdm-dashboard-project 的种子集（PROJECT_ACTIONS） */
-    private static final List<String> PROJECT_SEED = List.of("view", "create", "edit", "export", "notify");
+    /** rdm-dashboard-project 的种子集（PROJECT_ACTIONS）：v3.20 起含 delete（空壳项目可删） */
+    private static final List<String> PROJECT_SEED =
+            List.of("view", "create", "edit", "delete", "export", "notify");
 
     private JdbcTemplate jdbc;
     private RdmMenuInitializer initializer;
@@ -106,14 +107,15 @@ class RdmMenuActionSyncTest {
     }
 
     @Test
-    @DisplayName("項目總覽补齐 create/edit：暂停/新增项目的写权锚点")
+    @DisplayName("項目總覽补齐 create/edit/delete：暂停/新增项目与空壳项目删除的写权锚点")
     void projectActionsExpandedToSeed() {
         stubActionsPerMenu("[\"view\",\"create\",\"edit\",\"export\",\"view_all\",\"dispatch\",\"contribute\"]",
                 "[\"view\",\"export\"]");
 
         ReflectionTestUtils.invokeMethod(initializer, "syncSeedActions");
 
-        // v3.17 之前这张表没有 rdm-dashboard-project，非超管点「暫停項目」只能拿到 403
+        // v3.17 之前这张表没有 rdm-dashboard-project，非超管点「暫停項目」只能拿到 403；
+        // v3.20 再补 delete，否则「刪除」在授权中心勾不到
         assertEquals(PROJECT_SEED, captureWrittenActions(RdmConstants.MENU_DASHBOARD_PROJECT));
     }
 

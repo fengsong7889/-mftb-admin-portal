@@ -26,6 +26,11 @@ vi.mock('../MeetingManagement/EmployeeSelect', () => ({
   ),
 }))
 
+// 详情页按 rdm-dashboard-project:edit 收敛编辑入口；本文件测表单提交，需给全权限
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: () => true }),
+}))
+
 vi.mock('../../api/rdm', () => ({
   fetchProjectDetail: vi.fn(),
   fetchProjectRequirementBoard: vi.fn(),

@@ -90,6 +90,9 @@ public interface RdmDeliveryService {
     /** 列表直改迭代状态（只更新状态与操作人，不回写其它字段） */
     void updateIterationStatus(Long id, String status);
 
+    /** 删除迭代（逻辑删；迭代下仍有需求或任务时拒绝） */
+    void deleteIteration(Long id);
+
     /* ── 需求变更 ── */
 
     /** 需求下的变更记录 */

@@ -103,7 +103,42 @@
 }
 
 .home-greeting-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.home-greeting-clock {
   text-align: right;
+}
+
+/* 会议栏收起后的恢复入口：不新增行，只占问候栏右侧的小胶囊 */
+.home-greeting-meeting {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid #D6E4F0;
+  background: #F7FBFF;
+  color: #595959;
+  font-size: 12px;
+  font-family: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.home-greeting-meeting:hover {
+  border-color: #E8720C;
+  background: #FFF7E6;
+  color: #E8720C;
+}
+
+.home-greeting-meeting:focus-visible {
+  outline: 2px solid #E8720C;
+  outline-offset: 2px;
 }
 
 .home-greeting-time {
@@ -152,15 +187,15 @@
 .home-ai-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px 24px;
+  gap: 10px;
+  padding: 10px 20px;
   border-bottom: 1px solid #f0f0f0;
   background: linear-gradient(180deg, #fffdfb, #ffffff);
 }
 
 .home-ai-avatar {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: transparent;
   display: flex;
@@ -244,12 +279,77 @@
 
 .home-ai-badge-icon { font-size: 10px; }
 
-/* 徽章區：引擎標識 + 內測模式 */
+/* 徽章區：額度 + 加量 + 引擎 + 設定，全部並進頭部一行 */
 .home-ai-badges {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* 我的用量：原獨立資訊條壓成頭部膠囊，點擊打開用量明細 */
+.home-ai-usage-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid #eef0f3;
+  background: #fafbfc;
+  color: #595959;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.home-ai-usage-pill:hover {
+  border-color: #E8720C;
+  background: #FFF7E6;
+  color: #E8720C;
+}
+
+.home-ai-usage-pill:focus-visible {
+  outline: 2px solid #E8720C;
+  outline-offset: 2px;
+}
+
+.home-ai-usage-pill-label { font-weight: 500; }
+
+.home-ai-usage-pill-value {
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* 申請加量/加模型：保留常駐入口，但壓成頭部小膠囊 */
+.home-ai-apply-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid #E8720C;
+  background: transparent;
+  color: #E8720C;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.home-ai-apply-pill:hover {
+  background: #FFF7E6;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(232, 114, 12, 0.15);
 }
 
 /* 當前引擎（可點擊切換）：默認省錢優先 = 綠色，代表走單價最低的通道 */
@@ -423,91 +523,16 @@
   color: #8C8C8C;
 }
 
-/* ─────────────────────────────────────────
-   額度管理資訊條（獨立行，與模型選擇分行展示）
-   ───────────────────────────────────────── */
-.home-ai-infobar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 7px 24px;
-  background: #fff;
-  border-bottom: 1px solid #f0f0f0;
-  flex-shrink: 0;
-}
-
-.home-ai-infobar--blocked {
-  background: #FFFBF5;
-  border-bottom-color: #FFE7BA;
-}
-
-.home-ai-infobar-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 6px;
-  transition: background 0.2s;
-  flex: 1;
-  min-width: 0;
-}
-
-.home-ai-infobar-left:hover {
-  background: #F5F5F5;
-}
-
-.home-ai-infobar-label {
-  font-size: 12px;
-  color: #595959;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.home-ai-infobar-apply {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 12px;
-  border-radius: 999px;
-  border: 1px solid #E8720C;
-  background: transparent;
-  color: #E8720C;
-  font-size: 11px;
-  font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.2s;
-  flex-shrink: 0;
-}
-
-.home-ai-infobar-apply:hover {
-  background: #FFF7E6;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(232, 114, 12, 0.15);
-}
-
-.home-ai-infobar-warn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: #D46B08;
-  line-height: 1.5;
-}
-
-/* 主體 */
+/* 主體：上下留白收緊，聊天區優先 */
 .home-ai-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 24px;
+  padding: 16px 20px;
   background: #fafbfc;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 /* 空状态 Hero */
@@ -780,29 +805,29 @@
   30% { transform: translateY(-6px); background: #E8720C; }
 }
 
-/* 快捷提问条 */
-.home-ai-quick {
+/* 快捷提问弹层：从输入区按钮展开，不再常驻占一行 */
+.home-ai-quick-panel {
   display: flex;
-  gap: 8px;
-  padding: 10px 24px;
-  border-top: 1px solid #f0f0f0;
-  overflow-x: auto;
-  background: #fff;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  max-width: 320px;
+  padding: 2px;
 }
 
-.home-ai-quick::-webkit-scrollbar { height: 0; }
-
 .home-ai-quick-btn {
-  flex-shrink: 0;
-  padding: 5px 14px;
-  border-radius: 999px;
+  padding: 6px 12px;
+  border-radius: 8px;
   border: 1px solid #eef0f3;
   background: #fafbfc;
   color: #595959;
   font-size: 12px;
+  font-family: inherit;
+  text-align: left;
+  line-height: 1.5;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .home-ai-quick-btn:hover {
@@ -1042,7 +1067,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 8px 16px;
+  padding: 4px 16px;
   border-bottom: 1px solid #f0f0f0;
   background: #fafbfc;
   overflow-x: auto;
@@ -1055,7 +1080,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
+  padding: 3px 10px;
   border-radius: 8px;
   border: 1px solid transparent;
   background: transparent;
@@ -1116,8 +1141,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 8px;
   border: 1px dashed #D9D9D9;
   background: transparent;
@@ -1138,8 +1163,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 8px;
   border: none;
   background: transparent;
@@ -1188,8 +1213,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 8px;
   border: none;
   background: transparent;
@@ -1317,17 +1342,8 @@
 }
 
 /* ─────────────────────────────────────────
-   能力展示条
+   能力標籤（原底部展示條已收進設置面板）
    ───────────────────────────────────────── */
-.home-ai-capabilities {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 24px;
-  background: #fff;
-  flex-wrap: wrap;
-}
-
 .home-ai-cap-tag {
   font-size: 11px;
   padding: 2px 8px;
@@ -1617,10 +1633,33 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 24px 16px;
+  padding: 10px 20px 12px;
   border-top: 1px solid #f0f0f0;
   background: #fff;
   position: relative;
+}
+
+/* 輸入區左側工具按鈕（快捷提問等）：與附件按鈕同尺寸 */
+.home-ai-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid #eef0f3;
+  background: #fafbfc;
+  color: #8C8C8C;
+  font-size: 14px;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.home-ai-tool-btn:hover {
+  border-color: #E8720C;
+  background: #FFF7E6;
+  color: #E8720C;
 }
 
 .home-ai-input--dragging {
@@ -1717,6 +1756,13 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
+}
+
+/* 模型能力：原底部獨立一行的標籤組，收進設置面板 */
+.home-ai-settings-caps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .home-ai-settings-options {

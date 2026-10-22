@@ -1,6 +1,7 @@
 package com.mftb.admin.service.agent;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.mftb.admin.constant.BuiltinAccounts;
 import com.mftb.admin.entity.AiModel;
 import com.mftb.admin.entity.AiProvider;
 import com.mftb.admin.mapper.AiModelMapper;
@@ -76,6 +77,8 @@ public class LlmChannelRouter {
     }
 
     public boolean isChannelAllowed(String channel, String username) {
+        // 内置系统管理员默认拥有全部模型：不受 sys_config 通道白名单限制（与模型/额度豁免同源口径）
+        if (BuiltinAccounts.isSystemAccount(username)) return true;
         List<String> accounts = loadAccounts(channel);
         if (accounts.isEmpty()) return true;
         return username != null && accounts.contains(username);

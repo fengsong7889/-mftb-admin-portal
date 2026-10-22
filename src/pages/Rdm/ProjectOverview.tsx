@@ -57,6 +57,7 @@ import {
   fetchProjectDetail,
   fetchProjectPage,
   fetchProjectStats,
+  deleteProject,
   updateProject,
   type RdmFactQuery,
   type RdmProjectListItem,
@@ -175,6 +176,13 @@ export default function ProjectOverview() {
   const [statsAnimKey, setStatsAnimKey] = useState(0)
 
   const [exporting, setExporting] = useState(false)
+
+  // ── 可授动作（按钮口径与后端 @RequirePermission 同源）──
+  // 只有 view 的人必须只看到「詳情」：编辑/暂停/删除/新增各自要对应动作，
+  // 否则点进去必然 403，等于把「看不到的权限」伪装成可用入口。
+  const canCreateProject = hasPermission('rdm-dashboard-project:create')
+  const canEditProject = hasPermission('rdm-dashboard-project:edit')
+  const canDeleteProject = hasPermission('rdm-dashboard-project:delete')
 
   // ── 提交到 URL（合併式更新，未傳的鍵保留） ──
   const commitQuery = useCallback((patch: Record<string, string | number | undefined | null>) => {
@@ -324,6 +332,38 @@ export default function ProjectOverview() {
           // 后端 DTO 的 pausedFlag 是 Integer(TINYINT)，上送布尔会被 Jackson 拒成 400「請求參數格式錯誤」
           await updateProject(record.id, { pausedFlag: nextPaused ? 1 : 0, expectedVersion: detail.version })
           message.success(nextPaused ? '已暫停項目' : '已恢復推進')
+          loadList(queryParams)
+          loadStats(queryParams)
+        } catch {
+          // request.ts 已统一弹后端失败原因，这里不再双弹
+        }
+      },
+    })
+  }
+
+  // ── 刪除（僅未掛任何需求的空殼項目；服務端會一併邏輯刪除未掛需求的迭代） ──
+  const handleDelete = (record: RdmProjectListItem) => {
+    Modal.confirm({
+      title: t('rdm.projOverview.deleteTitle'),
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>{t('rdm.projOverview.deleteNoLabel')}</span><b>{record.projectNo || '-'}</b></div>
+          <div className="confirm-info-row"><span>{t('rdm.projOverview.deleteNameLabel')}</span><b>{record.name}</b></div>
+          <div style={{ marginTop: 8, color: '#8C8C8C' }}>
+            {t('rdm.projOverview.deleteHint')}
+          </div>
+        </div>
+      ),
+      okText: t('rdm.projOverview.deleteOk'),
+      okType: 'danger',
+      cancelText: t('common.cancel'),
+      onOk: async () => {
+        try {
+          await deleteProject(record.id)
+          message.success(t('rdm.projOverview.deleteSuccess'))
+          // 列表与统计卡同源刷新：删掉一行后卡片数字必须同步变化
           loadList(queryParams)
           loadStats(queryParams)
         } catch {
@@ -527,15 +567,25 @@ export default function ProjectOverview() {
     { title: t('rdm.projOverview.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 110, render: (v?: string | null) => v || '-' },
     { title: t('rdm.projOverview.colUpdatedAt'), dataIndex: 'updatedAt', key: 'updatedAt', width: 135, sorter: true, defaultSortOrder: 'descend', render: (v?: string) => v?.slice(0, 10) || '-' },
     {
-      title: t('common.colAction'), key: 'action', width: 220, fixed: 'right',
-      /** §B.9 操作列纯文字 + 竖线分隔；原先收进「更多」的编辑/暂停直接放出来，省一次点击与误点下拉 */
+      title: t('common.colAction'), key: 'action', width: 260, fixed: 'right',
+      /**
+       * §B.9 操作列纯文字 + 竖线分隔；詳情对所有能看列表的人开放（只读视图），
+       * 編輯/暫停按 edit、刪除按 delete 逐项渲染 —— 只有查看权的人不应看到会 403 的入口。
+       */
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={() => navigate(`/rdm-project-detail?id=${record.id}&${searchParams.toString()}`)}>詳情</Button>
-          <Button type="link" size="small" onClick={() => navigate(`/rdm-project-detail?id=${record.id}&mode=edit&${searchParams.toString()}`)}>{t('common.edit')}</Button>
-          <Button type="link" size="small" onClick={() => handleTogglePause(record)}>
-            {record.pausedFlag === 1 ? t('rdm.projOverview.btnResume') : t('rdm.projOverview.btnPause')}
-          </Button>
+          <Button type="link" size="small" onClick={() => navigate(`/rdm-project-detail?id=${record.id}&${searchParams.toString()}`)}>{t('common.detail')}</Button>
+          {canEditProject && (
+            <Button type="link" size="small" onClick={() => navigate(`/rdm-project-detail?id=${record.id}&mode=edit&${searchParams.toString()}`)}>{t('common.edit')}</Button>
+          )}
+          {canEditProject && (
+            <Button type="link" size="small" onClick={() => handleTogglePause(record)}>
+              {record.pausedFlag === 1 ? t('rdm.projOverview.btnResume') : t('rdm.projOverview.btnPause')}
+            </Button>
+          )}
+          {canDeleteProject && (
+            <Button type="link" size="small" danger onClick={() => handleDelete(record)}>{t('common.delete')}</Button>
+          )}
         </Space>
       ),
     },
@@ -689,9 +739,11 @@ export default function ProjectOverview() {
           )}
         </div>
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(`/rdm-project-detail?mode=create&${searchParams.toString()}`)}>
-            新增項目
-          </Button>
+          {canCreateProject && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate(`/rdm-project-detail?mode=create&${searchParams.toString()}`)}>
+              新增項目
+            </Button>
+          )}
           {configComponent}
         </div>
       </div>

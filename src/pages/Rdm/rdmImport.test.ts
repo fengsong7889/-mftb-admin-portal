@@ -98,6 +98,18 @@ describe('parseRequirementImportExcel', () => {
     expect(messages).toContain('雲效編號與第 4 行重複')
   })
 
+  it('云效编号非必填：留空的行仍可导入', async () => {
+    const file = await buildExcel([
+      ['非雲效來源的需求', '', '開發中', '', '', '', '', ''],
+    ])
+
+    const result = await parseRequirementImportExcel(file)
+
+    expect(result.errors).toHaveLength(0)
+    expect(result.rows).toHaveLength(1)
+    expect(result.rows[0].externalNo).toBe('')
+  })
+
   it('模板示例行被跳过，不计入有效数据', async () => {
     const file = await buildExcel([
       ['（示例）門店推廣報表支持按區域篩選', 'STORY-000001', '開發中', '', '', '', '', ''],
@@ -111,17 +123,90 @@ describe('parseRequirementImportExcel', () => {
     expect(result.rows[0].externalNo).toBe('STORY-9')
   })
 
-  it('表头缺列时直接报错，不逐行解析', async () => {
+  it('表头缺必填列时直接报错，不逐行解析', async () => {
     const wb = new ExcelJS.Workbook()
     const ws = wb.addWorksheet('sheet')
-    ws.addRow(['需求名稱', '需求狀態'])
-    ws.addRow(['只有两列', '開發中'])
+    // 云效编号已改为非必填，缺它不再拒收；需求状态仍是必填
+    ws.addRow(['需求名稱', '雲效編號'])
+    ws.addRow(['只有两列', 'STORY-1'])
     const file = new File([await wb.xlsx.writeBuffer()], 'bad.xlsx')
 
     const result = await parseRequirementImportExcel(file)
 
     expect(result.rows).toHaveLength(0)
     expect(result.errors[0].message).toContain('表頭缺少必要列')
+  })
+
+  it('表头不含云效编号列也能导入（非必填）', async () => {
+    const wb = new ExcelJS.Workbook()
+    const ws = wb.addWorksheet('需求導入')
+    ws.addRow(['需求名稱', '需求狀態', '需求描述'])
+    ws.addRow(['非雲效需求', '開發中', '直接錄入'])
+    const file = new File([await wb.xlsx.writeBuffer()], 'no-external.xlsx')
+
+    const result = await parseRequirementImportExcel(file)
+
+    expect(result.errors).toHaveLength(0)
+    expect(result.rows).toHaveLength(1)
+    expect(result.rows[0].externalNo).toBe('')
+    expect(result.rows[0].status).toBe(RDM_STATUS.DEVELOPING)
+  })
+
+  it('下载模板原样回灌可解析：數據頁在前、字典頁在后', async () => {
+    // 回归防线：数据页必须是默认打开的第一个页签，字典页只做参考
+    let blob: Blob | undefined
+    const createObjectURL = vi.fn((value: Blob) => {
+      blob = value
+      return 'blob:template'
+    })
+    vi.stubGlobal('URL', { ...URL, createObjectURL })
+
+    await generateRequirementImportTemplate()
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(await blob!.arrayBuffer())
+    expect(wb.worksheets.map(sheet => sheet.name)).toEqual(['需求導入', '狀態字典'])
+    wb.getWorksheet('需求導入')?.addRow(['推廣金充值', 'MFTB-2801', '已分配·待受理', '', '', '', '', ''])
+
+    const file = new File([await wb.xlsx.writeBuffer()], 'template.xlsx')
+    const result = await parseRequirementImportExcel(file)
+
+    expect(result.errors).toHaveLength(0)
+    expect(result.rows).toHaveLength(1)
+    expect(result.rows[0].externalNo).toBe('MFTB-2801')
+  })
+
+  it('旧模板（字典页在前）仍可解析，兼容已下发的文件', async () => {
+    const wb = new ExcelJS.Workbook()
+    const dict = wb.addWorksheet('狀態字典')
+    dict.addRow(['可填狀態（中文）', '狀態碼', '說明'])
+    dict.addRow(['開發中', 'developing', '开发中'])
+    const sheet = wb.addWorksheet('需求導入')
+    sheet.addRow(HEADERS)
+    sheet.addRow(['舊模板需求', 'STORY-8', '開發中', '', '', '', '', ''])
+
+    const file = new File([await wb.xlsx.writeBuffer()], 'legacy.xlsx')
+    const result = await parseRequirementImportExcel(file)
+
+    expect(result.errors).toHaveLength(0)
+    expect(result.rows).toHaveLength(1)
+    expect(result.rows[0].externalNo).toBe('STORY-8')
+  })
+
+  it('数据页签被改名时按表头兜底定位', async () => {
+    const wb = new ExcelJS.Workbook()
+    const dict = wb.addWorksheet('狀態字典')
+    dict.addRow(['可填狀態（中文）', '狀態碼', '說明'])
+    dict.addRow(['開發中', 'developing', '开发中'])
+    const sheet = wb.addWorksheet('Sheet1')
+    sheet.addRow(HEADERS)
+    sheet.addRow(['改名后仍可導入', 'STORY-7', '開發中', '', '', '', '', ''])
+
+    const file = new File([await wb.xlsx.writeBuffer()], 'renamed.xlsx')
+    const result = await parseRequirementImportExcel(file)
+
+    expect(result.errors).toHaveLength(0)
+    expect(result.rows).toHaveLength(1)
+    expect(result.rows[0].externalNo).toBe('STORY-7')
   })
 })
 

@@ -436,7 +436,7 @@ export default function RequirementSubmit() {
       fetchEmployees({ page: 1, size: 30, keyword: keyword.trim() || undefined, employmentStatus: 'active' })
         .then(res => setAcceptorOptions(prev => {
           const map = new Map(prev.map(o => [o.value, o.label]))
-          ;(res.records ?? []).forEach((e: EmployeeItem) => map.set(e.id, `${e.name}（${e.empId}${e.department ? ` · ${e.department}` : ''}）`))
+          ;(res.records ?? []).forEach((e: EmployeeItem) => map.set(e.id, `${e.name}（${e.empId}）`))
           return [...map.entries()].map(([value, label]) => ({ value, label }))
         }))
         .catch(() => { /* 搜索失敗保留已有候選 */ })
@@ -630,7 +630,7 @@ export default function RequirementSubmit() {
           </div>
           {values.assignMode === 'POOL' && (
             <div className="confirm-info-row">
-              <span>技術負責人：</span>
+              <span>項目負責人：</span>
               <b>{techLeadOptions.find(u => u.userId === values.dispatcherUserId)?.name ?? '由技術部指派'}</b>
             </div>
           )}
@@ -858,7 +858,7 @@ export default function RequirementSubmit() {
             )}
             {assignMode === 'POOL' && (
               <Form.Item
-                label="技術負責人"
+                label="項目負責人"
                 name="dispatcherUserId"
                 extra="選填，不選由技術部指派"
               >
@@ -869,7 +869,8 @@ export default function RequirementSubmit() {
                   placeholder="按姓名 / 工號搜索"
                   options={techLeadOptions.map(u => ({
                     value: u.userId,
-                    label: `${formatEmployee(u.name, u.empNo)}${u.deptName ? ` · ${u.deptName}` : ''}`,
+                    // 选人下拉统一「姓名（工號）」：部门不参与消歧，拼进来只会挤占可读宽度
+                    label: formatEmployee(u.name, u.empNo),
                   }))}
                 />
               </Form.Item>
@@ -922,14 +923,14 @@ export default function RequirementSubmit() {
                         本單按「{decision.policyName || '默認策略'}」（版本 {decision.policyVersion || 'v1'}）處理：
                         {decision.approvalNodes?.length
                           ? `先送 ${decision.approvalNodes.join(' → ')}，通過後才到達技術部。`
-                          : '該策略未配審批節點，會進入審批異常待辦，由技術負責人處理，不會自動放行。'}
+                          : '該策略未配審批節點，會進入審批異常待辦，由項目負責人處理，不會自動放行。'}
                         {decision.abnormal ? '（審批節點缺失 → 異常待辦）' : ''}
                       </>
                     )
                   : (
                       <>
                         本單按「{decision.policyName || '默認策略'}」（版本 {decision.policyVersion || 'v1'}）免審直送技術部；
-                        未指定產品經理時仍由技術負責人分派。
+                        未指定產品經理時仍由項目負責人分派。
                       </>
                     )
               ) : (

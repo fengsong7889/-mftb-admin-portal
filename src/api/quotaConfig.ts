@@ -33,6 +33,8 @@ export interface QuotaVO {
   resetDayOfMonth: number
   createdAt: string
   updatedAt: string
+  /** 最后更新人（姓名）；存量数据为空 */
+  updatedBy: string | null
 }
 
 /** 单条额度保存请求（后端 AiQuotaDTO.QuotaConfigRequest） */

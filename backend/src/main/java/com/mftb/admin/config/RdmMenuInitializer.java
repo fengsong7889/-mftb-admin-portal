@@ -50,7 +50,7 @@ public class RdmMenuInitializer implements CommandLineRunner {
      * <p>本轮仍保持双锚点过渡：rdm-intake 的 view/edit 仍是全量可见与分配权的现行判定依据，
      * RdmAccessGuard 同时认新锚点，迁移完成前不拆旧。
      */
-    private static final String VERSION_KEY = "rdm:menu-seed:v3.19";
+    private static final String VERSION_KEY = "rdm:menu-seed:v3.20";
     /**
      * v3.16 授权镜像登记号：与菜单结构迁移分号登记，因为它**只能跑一次**。
      * <p>不能放进每次启动重放的 migrate()：管理员事后在新锚点上撤销的授权，
@@ -105,9 +105,11 @@ public class RdmMenuInitializer implements CommandLineRunner {
      * <p>RdmProjectController 的新增挂 create、编辑挂 edit，而「暫停/恢復推進」就是走编辑
      * PATCH 改 pausedFlag；种子只列 view/export 时授权中心勾不到写权，
      * 实测非超管账号点暂停/新增一律 403「没有 [rdm-dashboard-project] 的[编辑]权限」。
+     * <p>v3.20 补 delete：空壳项目（未挂任何需求）支持删除，接口挂 delete 动作；
+     * 不列入则授权中心永远勾不到，只有超管能删。
      * <p>可授 ≠ 已授：本改动只动 sys_menu.actions 元数据，谁能勾仍由管理员显式决定。
      */
-    private static final String PROJECT_ACTIONS = "[\"view\",\"create\",\"edit\",\"export\",\"notify\"]";
+    private static final String PROJECT_ACTIONS = "[\"view\",\"create\",\"edit\",\"delete\",\"export\",\"notify\"]";
 
     /**
      * 團隊負載（rdm-resource-load）：可授动作集。
@@ -382,7 +384,7 @@ public class RdmMenuInitializer implements CommandLineRunner {
         grantAdminMenus();
         deriveSystemAccess();
         permissionService.evictAll();
-        log.info("產研交付(RDM) 菜单已就绪（v3.19 可授动作集对齐：rdm-requirement = 种子 LIST_ACTIONS，rdm-dashboard-project = 种子 PROJECT_ACTIONS，新增 notify 推送权）: 菜单数={}, system_code={}", MENUS.length, SystemCode.RDM.code());
+        log.info("產研交付(RDM) 菜单已就绪（v3.20 可授动作集对齐：rdm-dashboard-project 补 delete，空壳项目/迭代可删）: 菜单数={}, system_code={}", MENUS.length, SystemCode.RDM.code());
     }
 
     /**
@@ -1098,10 +1100,10 @@ public class RdmMenuInitializer implements CommandLineRunner {
          */
         assertMenuActionsInclude("rdm-requirement",
                 "view", "create", "edit", "export", "view_all", "dispatch", "contribute");
-        // v3.17：項目總覽的写权锚点。缺 create/edit 不会报错，只会让非超管永远勾不到
-        // 「新增/编辑/暂停项目」，所以它必须和 rdm-requirement 一样进后置校验
+        // v3.17/v3.20：項目總覽的写权锚点。缺 create/edit/delete 不会报错，只会让非超管
+        // 永远勾不到「新增/编辑/暂停项目」，所以它必须和 rdm-requirement 一样进后置校验
         assertMenuActionsInclude(RdmConstants.MENU_DASHBOARD_PROJECT,
-                "view", "create", "edit", "export");
+                "view", "create", "edit", "delete", "export");
         // v3.7 退役验收：被收敛的菜单不得仍有存活行，也不得残留孤儿授权（残留会让授权树出现幽灵节点）
         for (String[] row : RETIRED_MENU_MERGE) {
             String retiredKey = row[0];

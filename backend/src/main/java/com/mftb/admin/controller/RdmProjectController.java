@@ -182,6 +182,19 @@ public class RdmProjectController {
         return Result.success("項目已更新", null);
     }
 
+    /**
+     * 删除项目（仅限未挂任何需求的空壳项目）。
+     * <p>菜单动作 delete 是 v3.20 新登记的可授动作；服务层再校验「项目下无需求」，
+     * 并把未挂需求的迭代一并逻辑删除。
+     */
+    @DeleteMapping("/{id}")
+    @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_PROJECT, action = "delete")
+    public Result<Void> deleteProject(@PathVariable Long id) {
+        projectService.deleteProject(id, currentUserId());
+        log.info("RDM 项目已删除: id={}, operator={}", id, operatorResolver.currentOperatorName());
+        return Result.success("項目已刪除", null);
+    }
+
     /** 添加项目成员 */
     @PostMapping("/{id}/members")
     @RequirePermission(menu = RdmConstants.MENU_DASHBOARD_PROJECT, action = "edit")

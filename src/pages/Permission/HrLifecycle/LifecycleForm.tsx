@@ -444,7 +444,8 @@ export default function LifecycleForm({ type }: Props) {
                 notFoundContent={empSearching ? undefined : t('common.noData')}
                 options={empOptions.map(o => ({
                   value: o.userId,
-                  label: `${o.name}(${o.empId})${o.department ? ` · ${o.department}` : ''}${o.position ? ` / ${o.position}` : ''}`,
+                  // 选人下拉统一「姓名(工號)」：部门/职位属组织与任职信息，不拼进选项
+                  label: `${o.name}(${o.empId})`,
                 }))}
               />
             </Form.Item>

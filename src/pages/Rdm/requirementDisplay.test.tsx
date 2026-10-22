@@ -120,6 +120,30 @@ describe('需求列表展示回归', () => {
     expect(within(rail as HTMLElement).getByText('7')).toBeInTheDocument()
   })
 
+  /**
+   * 存量导入等历史行的 currentHandler 快照只有姓名，列表回退时必须按行内人员补工号；
+   * 提出人列同样按「姓名（工号）」完整展示，不能被列宽截断。
+   */
+  it('当前处理人历史快照补工号，提出人完整展示姓名与工号', async () => {
+    vi.mocked(fetchRequirementPage).mockResolvedValue({
+      records: [{
+        ...row,
+        submitterName: '馮松',
+        submitterEmpNo: 'MF00002',
+        pmName: '馮松',
+        pmEmpNo: 'MF00002',
+        handlers: [],
+        currentHandler: '馮松',
+      }],
+      total: 1,
+    })
+    render(<MemoryRouter><RequirementList /></MemoryRouter>)
+    await screen.findByRole('link', { name: title })
+
+    // 默认列配置下「提出人」「當前處理人」两列可见，都必须是「姓名（工号）」
+    expect(screen.getAllByText('馮松（MF00002）')).toHaveLength(2)
+  })
+
   it('验收三个页签均保持字段独立和中文优先级', async () => {
     render(<MemoryRouter><AcceptanceList /></MemoryRouter>)
     await screen.findByRole('link', { name: title })

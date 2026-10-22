@@ -125,6 +125,12 @@ public class RdmRequirementImportServiceImpl implements RdmRequirementImportServ
         Map<String, Integer> seenInBatch = new HashMap<>();
 
         List<RowPlan> plans = new ArrayList<>();
+        /*
+         * 单批解析缓存：导入模板里整列通常是同一个项目/迭代/人员（一份需求清单往往全挂一个迭代），
+         * 逐行回查会把 90 行放大成 300+ 次数据库往返；远程库（RDS）单次 20~50ms 时，
+         * 光校验就会超过前端等待上限。同一批次内按原样文本缓存成功结果，失败不缓存（修正后重传即可）。
+         */
+        LookupCache cache = new LookupCache();
         for (int i = 0; i < rows.size(); i++) {
             RdmRequirementImportDTO.Row row = rows.get(i);
             int rowNo = row != null && row.getRowNo() != null ? row.getRowNo() : i + 2;
@@ -145,14 +151,15 @@ public class RdmRequirementImportServiceImpl implements RdmRequirementImportServ
             } else if (title.length() > 200) {
                 errors.add("需求名稱超過 200 字");
             }
-            if (!StringUtils.hasText(externalNo)) {
-                errors.add("雲效編號不能為空");
-            } else if (externalNo.length() > 64) {
-                errors.add("雲效編號超過 64 字");
-            } else {
-                Integer firstRow = seenInBatch.putIfAbsent(externalNo, rowNo);
-                if (firstRow != null) {
-                    errors.add("雲效編號與第 " + firstRow + " 行重複");
+            // 云效编号非必填：存量需求不全是云效来源，只有填了才做长度与批内查重
+            if (StringUtils.hasText(externalNo)) {
+                if (externalNo.length() > 64) {
+                    errors.add("雲效編號超過 64 字");
+                } else {
+                    Integer firstRow = seenInBatch.putIfAbsent(externalNo, rowNo);
+                    if (firstRow != null) {
+                        errors.add("雲效編號與第 " + firstRow + " 行重複");
+                    }
                 }
             }
 
@@ -173,28 +180,28 @@ public class RdmRequirementImportServiceImpl implements RdmRequirementImportServ
             RdmProject project = null;
             String projectName = trim(row == null ? null : row.getProjectName());
             if (StringUtils.hasText(projectName)) {
-                project = resolveProject(projectName, errors);
+                project = resolveProject(projectName, errors, cache);
             }
 
             RdmIteration iteration = null;
             String iterationName = trim(row == null ? null : row.getIterationName());
             if (StringUtils.hasText(iterationName)) {
-                iteration = resolveIteration(iterationName, project, errors);
+                iteration = resolveIteration(iterationName, project, errors, cache);
             }
             // 只填了迭代没填项目：用迭代所属项目回填，避免「需求挂迭代但不挂项目」的孤儿排期
             if (project == null && iteration != null && iteration.getProjectId() != null) {
-                project = projectMapper.selectById(iteration.getProjectId());
+                project = cache.projectsById.computeIfAbsent(iteration.getProjectId(), projectMapper::selectById);
             }
 
             // 项目经理：行内填了以行为准；没填且绑了项目则继承项目 PM（业务口径：两者结合）
-            SysUser projectManager = resolveUser(row == null ? null : row.getProjectManager(), "項目經理", errors);
+            SysUser projectManager = resolveUser(row == null ? null : row.getProjectManager(), "項目經理", errors, cache);
             if (projectManager == null && StringUtils.hasText(trim(row == null ? null : row.getProjectManager()))) {
                 // 明确填写但匹配失败，错误已进 errors，不再继承项目 PM 掩盖问题
                 projectManager = null;
             } else if (projectManager == null && project != null && project.getPmUserId() != null) {
                 projectManager = userMapper.selectById(project.getPmUserId());
             }
-            SysUser productManager = resolveUser(row == null ? null : row.getProductManager(), "產品經理", errors);
+            SysUser productManager = resolveUser(row == null ? null : row.getProductManager(), "產品經理", errors, cache);
 
             if (!errors.isEmpty()) {
                 result.getItems().add(item(rowNo, externalNo, title, "failed", String.join("；", errors), null));
@@ -257,8 +264,14 @@ public class RdmRequirementImportServiceImpl implements RdmRequirementImportServ
         req.setPriority("P2");
         req.setDescription(plan.description);
         req.setSourceChannel(SOURCE_YUNXIAO);
-        req.setExternalNo(plan.externalNo);
-        req.setExternalSource(SOURCE_YUNXIAO);
+        /*
+         * 云效编号非必填，空值必须落 NULL 而不是空串：
+         * (external_source, external_no) 上有唯一索引，多条空串会被判成重复，
+         * 第一批之后所有无编号的导入都会撞唯一键整批失败。
+         */
+        boolean hasExternalNo = StringUtils.hasText(plan.externalNo);
+        req.setExternalNo(hasExternalNo ? plan.externalNo : null);
+        req.setExternalSource(hasExternalNo ? SOURCE_YUNXIAO : null);
         // 历史记录口径：没有五节点/定稿快照/工时明细，不能被新链路闸门按新口径卡住
         req.setFlowVersion(1);
         req.setNeedApproval(0);
@@ -289,8 +302,8 @@ public class RdmRequirementImportServiceImpl implements RdmRequirementImportServ
             req.setProjectManagerUserName(plan.projectManager.getName());
         }
         req.setCurrentHandlerName(plan.productManager != null
-                ? plan.productManager.getName()
-                : (plan.projectManager == null ? null : plan.projectManager.getName()));
+                ? personLabel(plan.productManager)
+                : personLabel(plan.projectManager));
         req.setCreatedBy(signature);
         req.setUpdatedBy(signature);
         requirementMapper.insert(req);
@@ -343,7 +356,9 @@ public class RdmRequirementImportServiceImpl implements RdmRequirementImportServ
         statusLog.setOperatorUserId(current.getId());
         statusLog.setOperatorName(current.getName());
         statusLog.setOperatorRole(IMPORT_OPERATOR_ROLE);
-        statusLog.setRemark("存量導入（雲效 " + plan.externalNo + "）");
+        statusLog.setRemark(StringUtils.hasText(plan.externalNo)
+                ? "存量導入（雲效 " + plan.externalNo + "）"
+                : "存量導入");
         statusLog.setEnterTime(now);
         statusLog.setIsOverdue(0);
         statusLogMapper.insert(statusLog);
@@ -377,23 +392,43 @@ public class RdmRequirementImportServiceImpl implements RdmRequirementImportServ
         return new HashSet<>(found);
     }
 
-    /** 按项目名称匹配；重名与不存在都阻断，避免把需求挂到错误项目上 */
-    private RdmProject resolveProject(String name, List<String> errors) {
+    /**
+     * 按项目编号或名称匹配。
+     * <p>业务在模板里通常直接填项目编号（PROJ 开头），只认名称会把正确的编号报成
+     * 「项目不存在」。重号/重名与不存在都阻断，避免把需求挂到错误项目上。
+     */
+    private RdmProject resolveProject(String nameOrNo, List<String> errors, LookupCache cache) {
+        RdmProject cached = cache.projects.get(nameOrNo);
+        if (cached != null) {
+            return cached;
+        }
         List<RdmProject> projects = projectMapper.selectList(new LambdaQueryWrapper<RdmProject>()
-                .eq(RdmProject::getName, name));
+                .and(w -> w.eq(RdmProject::getProjectNo, nameOrNo).or().eq(RdmProject::getName, nameOrNo)));
         if (projects.isEmpty()) {
-            errors.add("所屬項目「" + name + "」不存在，請先在產研交付系統建好項目");
+            errors.add("所屬項目「" + nameOrNo + "」不存在，請先在產研交付系統建好項目（可填項目編號或名稱）");
             return null;
         }
         if (projects.size() > 1) {
-            errors.add("所屬項目「" + name + "」存在 " + projects.size() + " 個同名項目，請先改名區分");
+            errors.add("所屬項目「" + nameOrNo + "」匹配到 " + projects.size() + " 個項目，請改填項目編號");
             return null;
         }
+        cache.projects.put(nameOrNo, projects.get(0));
         return projects.get(0);
     }
 
     /** 按迭代编码或名称匹配；同时校验与项目归属一致 */
-    private RdmIteration resolveIteration(String nameOrCode, RdmProject project, List<String> errors) {
+    private RdmIteration resolveIteration(String nameOrCode, RdmProject project, List<String> errors,
+                                          LookupCache cache) {
+        RdmIteration cached = cache.iterations.get(nameOrCode);
+        if (cached != null) {
+            // 缓存命中也要重做归属校验：同一迭代可能出现在不同项目下
+            if (project != null && cached.getProjectId() != null
+                    && !project.getId().equals(cached.getProjectId())) {
+                errors.add("所屬迭代「" + nameOrCode + "」不屬於項目「" + project.getName() + "」");
+                return null;
+            }
+            return cached;
+        }
         List<RdmIteration> iterations = iterationMapper.selectList(new LambdaQueryWrapper<RdmIteration>()
                 .and(w -> w.eq(RdmIteration::getCode, nameOrCode).or().eq(RdmIteration::getName, nameOrCode)));
         if (iterations.isEmpty()) {
@@ -410,17 +445,23 @@ public class RdmRequirementImportServiceImpl implements RdmRequirementImportServ
             errors.add("所屬迭代「" + nameOrCode + "」不屬於項目「" + project.getName() + "」");
             return null;
         }
+        cache.iterations.put(nameOrCode, iteration);
         return iteration;
     }
 
     /**
-     * 解析人员：「姓名(工号)」优先；只填姓名时必须全库唯一。
-     * <p>重名不猜：猜错会把需求派给另一个人，且导入后很难被发现。
+     * 解析人员：支持「姓名(工号)」、纯姓名、纯工号三种写法。
+     * <p>模板里业务常直接填工号（如 MF00006），只认姓名会把工号报成「人员不存在」。
+     * <p>只填姓名时要求全库唯一；重名不猜：猜错会把需求派给另一个人，且导入后很难被发现。
      */
-    private SysUser resolveUser(String raw, String label, List<String> errors) {
+    private SysUser resolveUser(String raw, String label, List<String> errors, LookupCache cache) {
         String text = trim(raw);
         if (!StringUtils.hasText(text)) {
             return null;
+        }
+        SysUser cached = cache.users.get(text);
+        if (cached != null) {
+            return cached;
         }
         Matcher matcher = USER_WITH_EMP_NO.matcher(text);
         if (matcher.matches()) {
@@ -431,23 +472,50 @@ public class RdmRequirementImportServiceImpl implements RdmRequirementImportServ
                     .eq(SysUser::getName, name)
                     .eq(SysUser::getStatus, 1));
             if (matched.size() == 1) {
+                cache.users.put(text, matched.get(0));
                 return matched.get(0);
             }
             errors.add(label + "「" + text + "」不存在或已停用，請核對姓名與工號");
             return null;
         }
-        List<SysUser> matched = userMapper.selectList(new LambdaQueryWrapper<SysUser>()
+        List<SysUser> byName = userMapper.selectList(new LambdaQueryWrapper<SysUser>()
                 .eq(SysUser::getName, text)
                 .eq(SysUser::getStatus, 1));
-        if (matched.size() == 1) {
-            return matched.get(0);
+        if (byName.size() == 1) {
+            cache.users.put(text, byName.get(0));
+            return byName.get(0);
         }
-        if (matched.isEmpty()) {
-            errors.add(label + "「" + text + "」不存在或已停用");
-        } else {
-            errors.add(label + "「" + text + "」有 " + matched.size() + " 位同名員工，請填「姓名(工號)」");
+        if (byName.size() > 1) {
+            errors.add(label + "「" + text + "」有 " + byName.size() + " 位同名員工，請填「姓名(工號)」");
+            return null;
         }
+        // 姓名没命中再按工号认一次：工号在 sys_user 内唯一，不依赖姓名写法
+        List<SysUser> byEmpId = userMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getEmpId, text)
+                .eq(SysUser::getStatus, 1));
+        if (byEmpId.size() == 1) {
+            cache.users.put(text, byEmpId.get(0));
+            return byEmpId.get(0);
+        }
+        if (byEmpId.size() > 1) {
+            errors.add(label + "工號「" + text + "」對應 " + byEmpId.size() + " 位員工，請填「姓名(工號)」");
+            return null;
+        }
+        errors.add(label + "「" + text + "」不存在或已停用");
         return null;
+    }
+
+    /**
+     * 「姓名（工号）」：与主流程 computeHandler 的处理人展示口径一致。
+     * <p>导入若只写姓名，列表回退展示的当前处理人就丢了工号，同名同事无法区分。
+     */
+    private static String personLabel(SysUser user) {
+        if (user == null || !StringUtils.hasText(user.getName())) {
+            return null;
+        }
+        return StringUtils.hasText(user.getEmpId())
+                ? user.getName() + "（" + user.getEmpId() + "）"
+                : user.getName();
     }
 
     /** 状态对应的研发进度初值：只影响进度条展示，不参与任何质量判定 */
@@ -514,5 +582,17 @@ public class RdmRequirementImportServiceImpl implements RdmRequirementImportServ
         private RdmIteration iteration;
         private SysUser projectManager;
         private SysUser productManager;
+    }
+
+    /**
+     * 单批导入的解析缓存。
+     * <p>只缓存「匹配成功」的结果：失败行本来就会让整批不写，重复回查不构成性能问题，
+     * 缓存失败还会把「重传修正后的文件」引向旧结论。
+     */
+    private static final class LookupCache {
+        private final Map<String, RdmProject> projects = new HashMap<>();
+        private final Map<Long, RdmProject> projectsById = new HashMap<>();
+        private final Map<String, RdmIteration> iterations = new HashMap<>();
+        private final Map<String, SysUser> users = new HashMap<>();
     }
 }

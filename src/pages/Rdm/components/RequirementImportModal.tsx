@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Alert, Button, Modal, Space, Table, Tag, Upload, message } from 'antd'
+import { Alert, Button, Modal, Space, Table, Tag, Tooltip, Upload, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { CheckCircleOutlined, CloseCircleOutlined, DownloadOutlined, InboxOutlined } from '@ant-design/icons'
 import { RDM_STATUS_LABEL } from '../../../constants/rdm'
@@ -115,6 +115,40 @@ export default function RequirementImportModal({ open, onClose, onImport }: Requ
     }
   }
 
+  /**
+   * 移除预览中的某一行：只改本地待提交列表，不触发任何请求。
+   * 行号保留 Excel 原值，删除后不重排，用户仍能对照原文件定位。
+   */
+  const handleRemoveRow = (row: ParsedRdmImportRow) => {
+    if (rows.length <= 1) {
+      message.warning(t('rdm.import.warnKeepAtLeastOne'))
+      return
+    }
+    Modal.confirm({
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+      title: t('rdm.import.removeTitle'),
+      content: t('rdm.import.removeContent', { rowNo: row.rowNo, title: row.title }),
+      okText: t('rdm.import.removeOk'),
+      cancelText: t('rdm.import.btnCancel'),
+      okButtonProps: { danger: true },
+      onOk: () => {
+        setRows(prev => prev.filter(item => item.rowNo !== row.rowNo))
+      },
+    })
+  }
+
+  /**
+   * 移除按钮不可用的原因：
+   * - 有错误行时整批本来就不可确认，此时移除只会让人误以为能「删掉错误」，先修文件；
+   * - 只剩一条时必须保留，和后端「至少填写一行」的约束对齐。
+   */
+  const removeBlockedTip = errors.length > 0
+    ? t('rdm.import.removeTipErrors')
+    : rows.length <= 1
+      ? t('rdm.import.removeTipLast')
+      : ''
+
   const columns: TableColumnsType<ParsedRdmImportRow> = [
     { title: t('rdm.import.colRowNo'), dataIndex: 'rowNo', key: 'rowNo', width: 60 },
     { title: t('rdm.import.colTitle'), dataIndex: 'title', key: 'title', width: 240, ellipsis: true },
@@ -131,6 +165,28 @@ export default function RequirementImportModal({ open, onClose, onImport }: Requ
     { title: t('rdm.import.colProjectName'), dataIndex: 'projectName', key: 'projectName', width: 150, ellipsis: true, render: (v?: string) => v || '-' },
     { title: t('rdm.import.colIterationName'), dataIndex: 'iterationName', key: 'iterationName', width: 130, ellipsis: true, render: (v?: string) => v || '-' },
     { title: t('rdm.import.colDescription'), dataIndex: 'description', key: 'description', width: 200, ellipsis: true, render: (v?: string) => v || '-' },
+    {
+      title: t('rdm.import.colAction'),
+      key: 'action',
+      width: 80,
+      // 表格列宽超过弹窗宽度，操作列固定在右侧，避免必须横向滚动才能移除
+      fixed: 'right',
+      render: (_: unknown, row: ParsedRdmImportRow) => (
+        <Tooltip title={removeBlockedTip || undefined}>
+          <span>
+            <Button
+              type="link"
+              size="small"
+              danger
+              disabled={!!removeBlockedTip}
+              onClick={() => handleRemoveRow(row)}
+            >
+              {t('rdm.import.btnRemove')}
+            </Button>
+          </span>
+        </Tooltip>
+      ),
+    },
   ]
 
   return (
@@ -226,7 +282,7 @@ export default function RequirementImportModal({ open, onClose, onImport }: Requ
             rowKey="rowNo"
             size="small"
             pagination={rows.length > 10 ? { pageSize: 10, showSizeChanger: false, showTotal: count => t('rdm.import.totalCount', { count }) } : false}
-            scroll={{ x: 1200, y: 260 }}
+            scroll={{ x: 1280, y: 260 }}
           />
         </div>
       )}

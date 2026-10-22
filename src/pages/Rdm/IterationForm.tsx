@@ -59,6 +59,11 @@ export default function IterationForm() {
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const iterationId = Number(searchParams.get('id') ?? 0)
+  /**
+   * 只读详情：列表操作列的「詳情」带 mode=view 进入，表单整体禁用且不渲染保存按钮。
+   * <p>缺省仍是 edit：迭代列表的「編輯」与站内既有链接都不带 mode，保持原行为。
+   */
+  const readOnly = searchParams.get('mode') === 'view'
 
   const [form] = Form.useForm<FormValues>()
   const [iterations, setIterations] = useState<RdmIterationItem[]>([])
@@ -183,11 +188,14 @@ export default function IterationForm() {
   return (
     <div className="content-area">
       <RdmFormHeader
-        title={iterationId ? '編輯迭代' : '新增迭代'}
+        title={readOnly ? t('rdm.iterationForm.viewTitle') : iterationId ? '編輯迭代' : '新增迭代'}
         onBack={() => navigate(-1)}
-        meta={iterationId
-          ? `迭代編碼 ${currentIteration?.code ?? '-'} 由系統發號、不可修改；產能依工作日 × 8h 自動計算，可手動調整`
-          : '迭代編碼保存時由系統按類型自動發號（常規 SP／版本專項 VER／緊急修復 HF）；產能依工作日 × 8h 自動計算，可手動調整'}
+        backText={readOnly ? t('rdm.iterationForm.back') : undefined}
+        meta={readOnly
+          ? t('rdm.iterationForm.viewMeta', { code: currentIteration?.code ?? '-' })
+          : iterationId
+            ? `迭代編碼 ${currentIteration?.code ?? '-'} 由系統發號、不可修改；產能依工作日 × 8h 自動計算，可手動調整`
+            : '迭代編碼保存時由系統按類型自動發號（常規 SP／版本專項 VER／緊急修復 HF）；產能依工作日 × 8h 自動計算，可手動調整'}
       />
 
       {iterationId > 0 && (
@@ -202,7 +210,7 @@ export default function IterationForm() {
         />
       )}
 
-      <Form form={form} layout="vertical" initialValues={{ iterationType: RDM_ITERATION_TYPE.SPRINT, status: RDM_ITERATION_STATUS.PLANNING }}>
+      <Form form={form} layout="vertical" disabled={readOnly} initialValues={{ iterationType: RDM_ITERATION_TYPE.SPRINT, status: RDM_ITERATION_STATUS.PLANNING }}>
         {/* 迭代信息 */}
         <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
@@ -277,8 +285,10 @@ export default function IterationForm() {
       </Form>
 
       <div className="form-footer">
-        <Button onClick={() => navigate(-1)}>取消</Button>
-        <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSave}>保存迭代</Button>
+        <Button onClick={() => navigate(-1)}>{readOnly ? t('rdm.iterationForm.back') : '取消'}</Button>
+        {!readOnly && (
+          <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSave}>保存迭代</Button>
+        )}
       </div>
     </div>
   )

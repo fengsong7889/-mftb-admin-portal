@@ -22,6 +22,7 @@ import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -82,6 +83,8 @@ public class RdmProjectService {
 
     private final RdmProjectMapper projectMapper;
     private final RdmProjectMemberMapper memberMapper;
+    /** 删除前置校验要跨表计数（需求/迭代），按主键与编码查询，走只读 SQL 而不是另拼 Mapper */
+    private final JdbcTemplate jdbcTemplate;
     private final RdmRequirementMapper requirementMapper;
     private final RdmWorkTaskMapper taskMapper;
     private final SysUserMapper userMapper;
@@ -490,6 +493,50 @@ public class RdmProjectService {
         }
         syncOwnerMembers(id, slots);
         log.info("更新 RDM 項目: id={}, operator={}", id, currentUserId);
+    }
+
+    /**
+     * 删除项目（仅限未挂任何需求的空壳项目）。
+     *
+     * <p><b>口径</b>：项目下（含挂在该项目迭代上的）需求一条都不能有；通过校验后，
+     * 项目下<b>未挂需求的迭代一并逻辑删除</b> —— 项目已被删除，留在列表里的迭代会变成
+     * 无法归属的孤儿行，且 sprint/version 又不允许置空项目。
+     *
+     * <p><b>为什么物理删项目</b>：{@code rdm_project} 建表时就没有 {@code deleted} 列，
+     * 全仓有十几处手写 SQL 直接 {@code SELECT ... FROM rdm_project}。补逻辑删不仅要改实体，
+     * 还要逐处补过滤，漏一处就出现「已删除但列表仍能查到」的幽灵项目；
+     * 而本方法的前置条件已经把业务数据清空，物理删的损失只有成员行（随即一并清理）。
+     *
+     * <p>权限：菜单动作（{@code delete}）在控制器校验，这里只做资源归属守卫，
+     * 与 {@link #updateProject} 同口径（项目成员或管理员）。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteProject(Long id, Long currentUserId) {
+        RdmProject project = requireProject(id);
+        accessGuard.requireProjectMember(id, currentUserId);
+        /*
+         * 需求归属有两条线：直接挂 project_id，或只挂迭代编码（iteration_code）。
+         * 只查 project_id 会漏掉「迭代已挂项目、需求只写了迭代编码」的存量行，
+         * 一旦删项目，这些需求就失去所属项目。
+         */
+        Integer reqCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM rdm_requirement WHERE deleted = 0 AND (project_id = ? "
+                        + "OR iteration_code IN (SELECT code FROM rdm_iteration WHERE project_id = ? AND deleted = 0))",
+                Integer.class, id, id);
+        if (reqCount != null && reqCount > 0) {
+            throw new BusinessException("該項目下仍有 " + reqCount + " 條需求，請先移除或轉移需求後再刪除");
+        }
+        // 迭代随项目逻辑删除：项目已不存在，迭代列表不应再出现无法归属的行
+        int removedIterations = jdbcTemplate.update(
+                "UPDATE rdm_iteration SET deleted = 1, updated_by = ?, updated_at = NOW() "
+                        + "WHERE project_id = ? AND deleted = 0",
+                operatorResolver.operatorSignature(operatorResolver.currentUser()), id);
+        // 成员行没有 deleted 列，项目删除后不再被任何查询引用，物理清理
+        memberMapper.delete(new LambdaQueryWrapper<RdmProjectMember>()
+                .eq(RdmProjectMember::getProjectId, id));
+        projectMapper.deleteById(id);
+        log.info("刪除 RDM 項目: id={}, projectNo={}, 級聯迭代={}, operator={}",
+                id, project.getProjectNo(), removedIterations, currentUserId);
     }
 
     /** 添加项目成员 */

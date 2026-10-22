@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 import java.util.Set;
@@ -75,7 +76,7 @@ class RdmProjectOwnerWriteTest {
         when(bizSeqService.next("rdm_project")).thenReturn("PJ202610190001");
         when(operatorResolver.currentOperatorName()).thenReturn("古月");
 
-        service = new RdmProjectService(projectMapper, memberMapper,
+        service = new RdmProjectService(projectMapper, memberMapper, mock(JdbcTemplate.class),
                 mock(RdmRequirementMapper.class), mock(RdmWorkTaskMapper.class), userMapper,
                 bizSeqService, accessGuard, factService,
                 mock(RdmWorkingDayCalculator.class), operatorResolver);

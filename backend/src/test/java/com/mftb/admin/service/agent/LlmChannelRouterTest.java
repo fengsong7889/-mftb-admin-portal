@@ -118,6 +118,16 @@ class LlmChannelRouterTest {
         assertEquals(LlmChannelRouter.REASON_ACCOUNT_RESTRICTED, router.diagnose(LlmChannelRouter.CHANNEL_PRIMARY, "MF00001"));
     }
 
+    /** 内置系统管理员默认拥有全部模型：白名单再严也不该把自己锁在门外，且无需读取白名单。 */
+    @Test
+    @DisplayName("内置系统管理员不受白名单限制")
+    void builtinAdminBypassesWhitelist() {
+        when(sysConfigService.getConfigValueCached("ai_model_qw_accounts")).thenReturn("[\"MF00001\"]");
+
+        assertTrue(router.isChannelAllowed(LlmChannelRouter.CHANNEL_PRIMARY, "admin"));
+        org.mockito.Mockito.verify(sysConfigService, org.mockito.Mockito.never()).getConfigValueCached(any());
+    }
+
     private static com.mftb.admin.entity.AiProvider provider(String apiKey) {
         com.mftb.admin.entity.AiProvider p = new com.mftb.admin.entity.AiProvider();
         p.setId(1L);

@@ -6,6 +6,7 @@ import { collectHomeMenus } from './homeUtils'
 import type { MenuVO } from '../../api/menu'
 import { fetchPortalContext } from '../../api/portal'
 import { fetchQuickFavorites, saveQuickFavorites } from '../../api/auth'
+import { fetchMyQuotaUsage } from '../../api/aiMyCenter'
 import { sendAgentMessage } from '../../api/agent'
 import { writeCurrentSystemCode } from '../../hooks/useCurrentSystem'
 
@@ -14,6 +15,8 @@ const state = vi.hoisted(() => ({
   navigation: { loading: false, loaded: true, error: null as string | null },
   emptyNavigation: false,
   refetch: vi.fn().mockResolvedValue(undefined),
+  /** 当前登录人角色：admin 时后端会下发 unlimited，前端据此隐藏申请入口 */
+  role: 'user' as 'user' | 'admin',
 }))
 
 const financeMenu: MenuVO = { id: 1, parentId: null, menuKey: 'finance-entry', name: '財務測試菜單', path: '/finance-entry', systemCode: 'finance', type: 2, status: 1, sort: 1 }
@@ -30,7 +33,7 @@ const t = (key: string, options?: { defaultValue?: string } | string) =>
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t, i18n: { language: 'zh-TW' } }) }))
 vi.mock('../../i18n/menuNameEn', () => ({ translateMenuName: (_key: string, name: string) => name }))
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({
-  user: { username: 'home-test', name: '測試員工', avatar: 'default', role: 'user' },
+  user: { username: 'home-test', name: '測試員工', avatar: 'default', role: state.role },
   hasMenuPermission: (key: string) => !state.denied.has(key),
 }) }))
 vi.mock('../../contexts/MenuContext', () => ({ useMenu: () => ({ menuTree: menus, status: 'online', refresh: state.refetch }) }))
@@ -72,6 +75,13 @@ vi.mock('../../api/aiConversation', () => ({
   restoreConversation: vi.fn(),
   permanentDeleteConversation: vi.fn(),
 }))
+// 首页会议栏默认无会时不渲染；mock 掉避免测试向真实后端发请求
+vi.mock('../../api/meeting', () => ({
+  fetchMyMeetingSummary: vi.fn().mockResolvedValue({
+    todayCount: 0, upcomingCount: 0, pendingResponseCount: 0,
+    nextTitle: null, nextStartTime: null, nextRoomName: null,
+  }),
+}))
 vi.mock('../../components/PikachuFace', () => ({ default: () => null }))
 vi.mock('../../components/AiLogo', () => ({ default: () => null }))
 
@@ -89,6 +99,7 @@ beforeEach(() => {
   state.denied.clear()
   state.navigation = { loading: false, loaded: true, error: null }
   state.emptyNavigation = false
+  state.role = 'user'
   vi.mocked(fetchPortalContext).mockResolvedValue({ systems, superAdmin: false })
   vi.mocked(fetchQuickFavorites).mockResolvedValue(['finance-entry', 'ads-entry'])
 })
@@ -116,6 +127,23 @@ describe('系统首页 AI 助手区域', () => {
     expect(screen.queryByRole('button', { name: '財務測試菜單' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '廣告測試菜單' })).toBeInTheDocument()
     expect(sendAgentMessage).not.toHaveBeenCalled()
+  })
+
+  it('内置系統管理員不顯示「申請加量/加模型」，用量展示不設上限', async () => {
+    state.role = 'admin'
+    vi.mocked(fetchMyQuotaUsage).mockResolvedValue({
+      username: 'admin',
+      name: '系統管理員',
+      empId: '',
+      unlimited: true,
+      dimensions: [],
+      usage: { todayTokens: 0, monthTokens: 0, todayRequests: 0, monthRequests: 0, todayCosts: [], monthCosts: [] },
+      recentRecords: [],
+    })
+    mount()
+    // 不限期展示（未打开的抽屉不影响头部胶囊），且不再出现申请入口
+    expect(await screen.findByText('home.usageUnlimitedValue')).toBeInTheDocument()
+    expect(screen.queryByText('home.aiApplyMore')).toBeNull()
   })
 
   it.each(['empty', 'error', 'loading'])('导航 %s 时不扩大为全量菜单', async (mode) => {

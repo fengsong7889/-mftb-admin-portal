@@ -136,7 +136,8 @@ export default function AttendanceGroupForm() {
       // 已选成员必须先塞进 options，否则多选框只显示 id 数字
       const existing: MemberOption[] = (members ?? []).map(m => ({
         value: m.userId,
-        label: `${m.empName ?? ''}(${m.empNo ?? ''})${m.deptName ? ` · ${m.deptName}` : ''}`,
+        // 选人下拉统一「姓名(工號)」，部门不参与消歧
+        label: `${m.empName ?? ''}(${m.empNo ?? ''})`,
       }))
       setMemberOptions(existing)
       setMemberIds(existing.map(o => o.value))
@@ -170,7 +171,8 @@ export default function AttendanceGroupForm() {
       const res = await fetchEmployees({ page: 1, size: 50, keyword: keyword || undefined, employmentStatus: 'active' })
       const options = (res.records ?? []).map(e => ({
         value: e.id,
-        label: `${e.name}(${e.empId})${e.department ? ` · ${e.department}` : ''}`,
+        // 选人下拉统一「姓名(工號)」，部门不参与消歧
+        label: `${e.name}(${e.empId})`,
       }))
       // 保留已选项的 label：搜索结果不含已选员工时，否则多选框会退化成显示 id
       setMemberOptions(prev => {
@@ -199,7 +201,8 @@ export default function AttendanceGroupForm() {
       memberOptions.forEach(o => merged.set(o.value, o))
       results.forEach(res => (res.records ?? []).forEach(e => merged.set(e.id, {
         value: e.id,
-        label: `${e.name}(${e.empId})${e.department ? ` · ${e.department}` : ''}`,
+        // 选人下拉统一「姓名(工號)」，部门不参与消歧
+        label: `${e.name}(${e.empId})`,
       })))
       setMemberOptions([...merged.values()])
       const ids = [...merged.keys()]

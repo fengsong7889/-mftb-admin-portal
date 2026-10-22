@@ -1,57 +1,35 @@
 import { useState, useCallback, useMemo, useEffect } from 'react'
-import TableColumnConfig, { type ColumnConfig, applyColumnConfig } from '../components/TableColumnConfig'
+import TableColumnConfig, {
+  type ColumnConfig,
+  applyColumnConfig,
+  isSameColumnConfig,
+  mergeColumnConfigs,
+} from '../components/TableColumnConfig'
 
-/** 从 localStorage 读取已保存的列配置（按保存顺序） */
+/**
+ * 从 localStorage 读取已保存的列配置，并与最新列定义合并。
+ * <p>合并口径统一由 mergeColumnConfigs 负责：补齐页面新增列（如「所屬迭代」）、
+ * 剔除已下线列、保留用户显隐与顺序，避免新列在存量用户的列表/列配置里永久缺失。
+ */
 function loadSavedConfig(storageKey: string | undefined, defaults: ColumnConfig[]): ColumnConfig[] {
   if (!storageKey) return defaults
   try {
     const saved = localStorage.getItem(`table-config-${storageKey}`)
-    if (saved) {
-      const parsed = JSON.parse(saved) as ColumnConfig[]
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        // 以保存的顺序为基准，补齐新增列、移除已删除列
-        const _defaultKeys = new Set(defaults.map(c => c.key))
-        const result: ColumnConfig[] = []
-        let hasStaleKeys = false
-        // 先按保存顺序排列
-        for (const savedItem of parsed) {
-          const def = defaults.find(d => d.key === savedItem.key)
-          if (def) {
-            result.push({
-              ...savedItem,
-              title: def.title, // 标题跟随最新（可能因语言切换而变化）
-              locked: savedItem.locked ?? def.locked ?? null,
-            })
-          } else {
-            // 发现已删除的旧 key，标记需要清理
-            hasStaleKeys = true
-          }
-        }
-        // 新增列插入到 locked:'tail' 之前，而非追加到末尾
-        const newCols: ColumnConfig[] = []
-        for (const def of defaults) {
-          if (!result.some(r => r.key === def.key)) {
-            newCols.push({ key: def.key, title: def.title, visible: true, locked: def.locked ?? null })
-          }
-        }
-        if (newCols.length > 0) {
-          const tailIdx = result.findIndex(c => c.locked === 'tail')
-          const insertAt = tailIdx >= 0 ? tailIdx : result.length
-          result.splice(insertAt, 0, ...newCols)
-        }
-        // 如果存在已删除的旧 key，将清理后的配置写回 localStorage
-        if (hasStaleKeys) {
-          localStorage.setItem(`table-config-${storageKey}`, JSON.stringify(result))
-        }
-        // 安全检查：如果可见列过少（少于 2 列），说明配置异常，回退到默认配置
-        const visibleCount = result.filter(c => c.visible).length
-        if (visibleCount < 2) {
-          localStorage.removeItem(`table-config-${storageKey}`)
-          return defaults
-        }
-        return result
-      }
+    if (!saved) return defaults
+    const parsed = JSON.parse(saved) as ColumnConfig[]
+    if (!Array.isArray(parsed) || parsed.length === 0) return defaults
+    const merged = mergeColumnConfigs(parsed, defaults)
+    // 合并结果与本地存量不一致（补了新列 / 删了旧列）就写回：
+    // 否则列配置抽屉会反复读到缺列的旧配置，用户操作一次就把新列抹回表格
+    if (!isSameColumnConfig(parsed, merged)) {
+      localStorage.setItem(`table-config-${storageKey}`, JSON.stringify(merged))
     }
+    // 安全检查：如果可见列过少（少于 2 列），说明配置异常，回退到默认配置
+    if (merged.filter(c => c.visible).length < 2) {
+      localStorage.removeItem(`table-config-${storageKey}`)
+      return defaults
+    }
+    return merged
   } catch { /* ignore */ }
   return defaults
 }
@@ -107,50 +85,12 @@ export function useColumnConfig(
     loadSavedConfig(pageKey, initialConfig)
   )
 
-  // 当可用列发生变化时（如新增/删除语言列），同步更新 config 状态：
-  // 移除已不存在的列配置，保留已有列的可见性/锁定/顺序设置，新增列默认可见
+  // 当可用列发生变化时（如新增/删除列、语言切换改标题），同步更新 config 状态：
+  // 合并口径统一走 mergeColumnConfigs，保留用户已保存的顺序与显隐
   useEffect(() => {
     setConfig(prev => {
-      const prevKeys = new Set(prev.map(c => c.key))
-      const initialKeys = new Set(initialConfig.map(c => c.key))
-
-      // 检查是否需要更新（列集合有变化）
-      const needsUpdate =
-        prevKeys.size !== initialKeys.size ||
-        [...initialKeys].some(k => !prevKeys.has(k))
-
-      if (!needsUpdate) {
-        // 仅更新标题（可能因语言切换而变化），保持顺序不变
-        const titleChanged = prev.some(p => {
-          const ic = initialConfig.find(c => c.key === p.key)
-          return ic && ic.title !== p.title
-        })
-        if (!titleChanged) return prev
-        return prev.map(p => {
-          const ic = initialConfig.find(c => c.key === p.key)
-          return ic ? { ...p, title: ic.title } : p
-        })
-      }
-
-      // 列集合有变化：按 prev 顺序保留已有列，新增列插入到 locked: 'tail' 之前
-      const synced: ColumnConfig[] = []
-      for (const p of prev) {
-        if (initialKeys.has(p.key)) {
-          const ic = initialConfig.find(c => c.key === p.key)
-          synced.push({ ...p, title: ic?.title ?? p.title })
-        }
-      }
-      // 新增列：插入到第一个 locked:'tail' 列之前，而非追加到末尾
-      const tailIdx = synced.findIndex(c => c.locked === 'tail')
-      const insertAt = tailIdx >= 0 ? tailIdx : synced.length
-      const newCols: ColumnConfig[] = []
-      for (const ic of initialConfig) {
-        if (!prevKeys.has(ic.key)) {
-          newCols.push({ key: ic.key, title: ic.title, visible: true, locked: ic.locked ?? null })
-        }
-      }
-      synced.splice(insertAt, 0, ...newCols)
-      return synced
+      const next = mergeColumnConfigs(prev, initialConfig)
+      return isSameColumnConfig(prev, next) ? prev : next
     })
   }, [initialConfig])
 

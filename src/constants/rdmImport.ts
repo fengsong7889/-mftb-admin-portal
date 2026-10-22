@@ -29,7 +29,8 @@ export interface RdmImportColumn {
 /** 模板列（顺序即模板列序） */
 export const RDM_IMPORT_COLUMNS: readonly RdmImportColumn[] = [
   { key: 'title', header: '需求名稱', aliases: ['需求名稱', '需求名称', 'title'], width: 32, required: true },
-  { key: 'externalNo', header: '雲效編號', aliases: ['雲效編號', '云效编号', 'externalNo'], width: 18, required: true },
+  // 雲效編號非必填：存量需求不全是雲效來源，留空即視為本系統直接錄入
+  { key: 'externalNo', header: '雲效編號', aliases: ['雲效編號', '云效编号', 'externalNo'], width: 18 },
   { key: 'status', header: '需求狀態', aliases: ['需求狀態', '需求状态', 'status'], width: 16, required: true },
   { key: 'projectManager', header: '項目經理', aliases: ['項目經理', '项目经理', 'projectManager'], width: 14 },
   { key: 'productManager', header: '產品經理', aliases: ['產品經理', '产品经理', 'productManager'], width: 14 },

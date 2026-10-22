@@ -87,5 +87,7 @@ public class AiQuotaDTO {
         private Integer resetDayOfMonth;
         private String createdAt;
         private String updatedAt;
+        /** 最后更新人（姓名）；存量数据为空时前端显示 - */
+        private String updatedBy;
     }
 }

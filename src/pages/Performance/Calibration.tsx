@@ -421,7 +421,8 @@ export default function PerfCalibration() {
           placeholder={t('hrPerf.evaluatorPlaceholder')} value={picked} onChange={setPicked}
           options={candidates.map(c => ({
             value: c.userId,
-            label: `${c.name}${c.empId ? `（${c.empId}）` : ''}${c.department ? ` · ${c.department}` : ''}`,
+            // 选人下拉统一「姓名（工號）」，部门不参与消歧
+            label: `${c.name}${c.empId ? `（${c.empId}）` : ''}`,
           }))} />
       </Modal>
     </div>

@@ -5,6 +5,7 @@ import com.mftb.admin.dto.AiQuotaDTO;
 import com.mftb.admin.entity.AiQuotaConfig;
 import com.mftb.admin.mapper.AiQuotaConfigMapper;
 import com.mftb.admin.service.AiQuotaService;
+import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -24,6 +25,8 @@ public class AiQuotaServiceImpl implements AiQuotaService {
 
     private final AiQuotaConfigMapper quotaMapper;
     private final JdbcTemplate jdbcTemplate;
+    /** 写入 updated_by：最后更新人（姓名口径） */
+    private final OperatorResolver operatorResolver;
 
     @Override
     public List<AiQuotaDTO.QuotaVO> listDeptQuotas(AiQuotaDTO.DeptQuotaQueryRequest query) {
@@ -34,7 +37,7 @@ public class AiQuotaServiceImpl implements AiQuotaService {
                    COALESCE(q.used_today, 0) AS used_today,
                    COALESCE(q.used_month, 0) AS used_month,
                    q.auto_reset, q.reset_day_of_month,
-                   q.created_at, q.updated_at
+                   q.created_at, q.updated_at, q.updated_by
             FROM ai_quota_config q
             LEFT JOIN sys_department d ON q.target_id = d.id AND d.deleted = 0
             LEFT JOIN ai_model m ON q.model_id = m.id AND m.deleted = 0
@@ -73,6 +76,7 @@ public class AiQuotaServiceImpl implements AiQuotaService {
             vo.setResetDayOfMonth(rs.getInt("reset_day_of_month"));
             vo.setCreatedAt(rs.getString("created_at"));
             vo.setUpdatedAt(rs.getString("updated_at"));
+            vo.setUpdatedBy(rs.getString("updated_by"));
             return vo;
         });
     }
@@ -86,7 +90,7 @@ public class AiQuotaServiceImpl implements AiQuotaService {
                    COALESCE(q.used_today, 0) AS used_today,
                    COALESCE(q.used_month, 0) AS used_month,
                    q.auto_reset, q.reset_day_of_month,
-                   q.created_at, q.updated_at
+                   q.created_at, q.updated_at, q.updated_by
             FROM ai_quota_config q
             LEFT JOIN sys_user u ON q.target_id = u.id AND u.deleted = 0
             LEFT JOIN ai_model m ON q.model_id = m.id AND m.deleted = 0
@@ -129,6 +133,7 @@ public class AiQuotaServiceImpl implements AiQuotaService {
             vo.setResetDayOfMonth(rs.getInt("reset_day_of_month"));
             vo.setCreatedAt(rs.getString("created_at"));
             vo.setUpdatedAt(rs.getString("updated_at"));
+            vo.setUpdatedBy(rs.getString("updated_by"));
             return vo;
         });
     }
@@ -164,6 +169,8 @@ public class AiQuotaServiceImpl implements AiQuotaService {
      * 保存或更新配额配置
      */
     private void saveOrUpdateQuota(AiQuotaDTO.QuotaConfigRequest request) {
+        // 最后更新人：新增与编辑都刷新，列表据此追溯「谁改的额度」
+        String operator = operatorResolver.currentOperatorName();
         // 检查是否已存在该配置的记录（modelId 为 null 时必须用 IS NULL 匹配，
         // 否则 eq(column, null) 生成 model_id = NULL 恒不命中，导致重复插入撞唯一键）
         LambdaQueryWrapper<AiQuotaConfig> dupWrapper = new LambdaQueryWrapper<AiQuotaConfig>()
@@ -182,6 +189,7 @@ public class AiQuotaServiceImpl implements AiQuotaService {
             existing.setMonthlyQuota(request.getMonthlyQuota());
             existing.setAutoReset(request.getAutoReset());
             existing.setResetDayOfMonth(request.getResetDayOfMonth());
+            existing.setUpdatedBy(operator);
             quotaMapper.updateById(existing);
         } else {
             // 新增记录
@@ -194,6 +202,7 @@ public class AiQuotaServiceImpl implements AiQuotaService {
             quota.setAutoReset(request.getAutoReset() != null ? request.getAutoReset() : 1);
             quota.setResetDayOfMonth(request.getResetDayOfMonth() != null ? request.getResetDayOfMonth() : 1);
             quota.setStatus(1);
+            quota.setUpdatedBy(operator);
             quotaMapper.insert(quota);
         }
     }

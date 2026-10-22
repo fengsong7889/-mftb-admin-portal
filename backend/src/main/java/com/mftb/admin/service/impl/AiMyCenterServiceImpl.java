@@ -63,6 +63,8 @@ import java.util.function.Predicate;
  * 我的用量：汇总当前账号在四个维度（员工/部门/职位/角色）生效的额度配置，
  * 已用量统一按 biz_llm_usage 请求明细实时聚合（与能耗统计同源），避免配置表冗余字段失真；
  * 我的授权模型：部门策略组、职位映射、角色映射、员工覆盖四个维度取并集，仅返回启用模型。
+ * <p>唯一豁免：内置系统管理员（{@link BuiltinAccounts#isSystemAccount}）默认拥有全部启用模型、
+ * 不受额度管控（用量视图以 {@code unlimited=true} 标记），避免超管被自己的配置面板拦在门外。
  */
 @Slf4j
 @Service
@@ -119,7 +121,11 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
         vo.setName(user.getName());
         vo.setEmpId(user.getEmpId());
 
-        List<Dim> dims = collectAllDims(user);
+        // 内置系统管理员默认不限额：不汇总任何额度维度，由 unlimited 标识驱动前端展示
+        boolean unlimited = BuiltinAccounts.isSystemAccount(user.getUsername());
+        vo.setUnlimited(unlimited);
+
+        List<Dim> dims = unlimited ? List.of() : collectAllDims(user);
 
         // 模型限制展示与用量过滤需要 modelKey，批量加载维度引用的模型
         Map<Long, AiModel> modelMap = loadModels(dims.stream().map(Dim::modelId).toList());
@@ -519,23 +525,38 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
         vo.setModelId(targetId);
         vo.setModelKey(targetKey);
 
-        // 仅保留作用于目标模型的维度：modelId==null（全部模型）或与目标模型一致
-        List<Dim> applicable = collectAllDims(user).stream()
-                .filter(d -> d.modelId() == null || (targetId != null && d.modelId().equals(targetId)))
-                .toList();
+        /*
+         * 内置系统管理员不受额度管控（任意维度/任意模型都不限额）：
+         * 放在维度汇总之前无条件返回，避免超管被部门/角色等组织维度策略意外命中。
+         */
+        if (BuiltinAccounts.isSystemAccount(user.getUsername())) {
+            vo.setQuotaConfigured(false);
+            vo.setAllowed(true);
+            vo.setAction("allow");
+            vo.setMessage("內置系統管理員不受額度管控");
+            return vo;
+        }
+
+        /*
+         * 未指定模型 = 首页「是否开通」综合校验：必须把「绑定具体模型」的额度也算进来。
+         * 旧实现 targetId 为 null 时会把 modelId!=null 的维度全部过滤掉，导致员工明明在
+         * 「员工专属额度」里配了某个模型的额度，首页仍判成 quotaConfigured=false（提示去申请）。
+         */
+        boolean comprehensive = targetId == null && (targetKey == null || targetKey.isBlank());
+        List<Dim> allDims = collectAllDims(user);
+        // 指定模型时仅保留作用于该模型的维度：modelId==null（全部模型）或与目标模型一致
+        List<Dim> applicable = comprehensive
+                ? allDims
+                : allDims.stream()
+                        .filter(d -> d.modelId() == null || d.modelId().equals(targetId))
+                        .toList();
         if (applicable.isEmpty()) {
             /*
              * 额度必须显式授予才能使用 AI 助手：旧实现在此处直接放行（「無額度限制，放行」），
              * 等于「没人配额度 = 不限量」，与项目「默认拒绝」的安全基线相反，也让首页早已写好的
-             * 「暫無可用額度，請提交申請」拦截文案永远走不到。现改为默认拒绝，仅内置系统管理员不受额度管控。
+             * 「暫無可用額度，請提交申請」拦截文案永远走不到。现改为默认拒绝。
              */
             vo.setQuotaConfigured(false);
-            if (BuiltinAccounts.isSystemAccount(user.getUsername())) {
-                vo.setAllowed(true);
-                vo.setAction("allow");
-                vo.setMessage("內置系統管理員不受額度管控");
-                return vo;
-            }
             vo.setAllowed(false);
             vo.setAction("reject");
             vo.setMessage("尚未獲得 AI 使用額度，請在「AI 使用申請」提交申請，審批通過後將為你分配額度");
@@ -568,13 +589,16 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
         double worstRatio = -1d;
         boolean anyOver = false;
         boolean anySoft = false;
+        /** 是否存在仍可用的维度（未设限额或未超额）；综合校验据此避免「一个模型超额就整体拦死」 */
+        boolean anyAvailable = false;
         int chosenRank = 0;            // reject=3 approve=2 downgrade=1
         String chosenAction = null;
         Long chosenDowngrade = null;
         for (Dim d : applicable) {
             BigDecimal quota = d.quotaValue();
             if (quota == null || quota.signum() <= 0) {
-                continue;   // 未设有效限额
+                anyAvailable = true;    // 未设有效限额 = 不限制，视为可用
+                continue;
             }
             AiModel m = d.modelId() != null ? modelMap.get(d.modelId()) : null;
             BigDecimal used = aggregateUsed(rows, d, m != null ? m.getModelKey() : null);
@@ -598,8 +622,11 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
                 if ("downgrade".equals(action) && d.downgradeModelId() != null && chosenDowngrade == null) {
                     chosenDowngrade = d.downgradeModelId();
                 }
-            } else if (ratio * 100 >= softThreshold) {
-                anySoft = true;
+            } else {
+                anyAvailable = true;
+                if (ratio * 100 >= softThreshold) {
+                    anySoft = true;
+                }
             }
         }
 
@@ -613,7 +640,11 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
             vo.setHitUsagePercent((int) Math.floor(worstRatio * 100));
         }
 
-        if (anyOver) {
+        /*
+         * 综合校验（未指定模型）时，只要还有任一可用维度就整体放行：
+         * 具体某个模型超额，由网关/RDM 助手按模型精确校验去拦，首页不该因此变成「未开通」。
+         */
+        if (anyOver && !(comprehensive && anyAvailable)) {
             vo.setOverLimit(true);
             vo.setAction(chosenAction);
             switch (chosenAction) {
@@ -695,10 +726,22 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
         }
 
         Map<Long, Set<String>> sources = new LinkedHashMap<>();
-        collectDeptModels(user, sources);
-        collectPositionModels(user, sources);
-        collectRoleModels(user, sources);
-        collectEmployeeModels(user, sources);
+        /*
+         * 内置系统管理员不参与四维模型授权：默认拥有全部启用模型，
+         * 与 checkQuota() 的额度豁免同源口径（超管不该被自己的配置面板拦在门口）。
+         */
+        if (BuiltinAccounts.isSystemAccount(user.getUsername())) {
+            modelMapper.selectList(new LambdaQueryWrapper<AiModel>()
+                            .eq(AiModel::getStatus, 1)
+                            .orderByAsc(AiModel::getSortOrder)
+                            .orderByAsc(AiModel::getId))
+                    .forEach(model -> sources.put(model.getId(), new LinkedHashSet<>(List.of("system"))));
+        } else {
+            collectDeptModels(user, sources);
+            collectPositionModels(user, sources);
+            collectRoleModels(user, sources);
+            collectEmployeeModels(user, sources);
+        }
         if (sources.isEmpty()) {
             return List.of();
         }

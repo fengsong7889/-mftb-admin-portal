@@ -52,6 +52,7 @@ import { useTranslation } from 'react-i18next'
 import type { FormInstance } from 'antd'
 import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
 import RdmFormHeader from './components/RdmFormHeader'
+import { useAuth } from '../../contexts/AuthContext'
 import {
   addProjectMember,
   createProject,
@@ -155,10 +156,18 @@ type FormMode = 'create' | 'edit' | 'view'
 export default function ProjectDetail() {
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const { hasPermission } = useAuth()
   const [searchParams] = useSearchParams()
   const mode: FormMode = (searchParams.get('mode') as FormMode) || 'view'
   const projectId = searchParams.get('id') ? Number(searchParams.get('id')) : NaN
   const isFormMode = mode === 'create' || mode === 'edit'
+  /**
+   * 详情页只读边界：只有 view 的人不得看到编辑/成员维护/催办入口。
+   * 这些按钮背后都是 @RequirePermission(..., action = "edit") 的写接口，
+   * 放出来只会让查看者点一次 403；真正的强校验仍由后端兜底。
+   */
+  const canEditProject = hasPermission('rdm-dashboard-project:edit')
+  const canCreateProject = hasPermission('rdm-dashboard-project:create')
 
   // ── 數據狀態 ──
   const [detail, setDetail] = useState<ProjectDetailType | null>(null)
@@ -508,6 +517,24 @@ export default function ProjectDetail() {
     )
   }
 
+  // ── 表單權限守衛：直接拼 URL 進入 edit/create 也不放行 ──
+  // 列表已按權限隱藏入口，這裡再兜一層前端體驗邊界（安全仍由後端 @RequirePermission 兜底），
+  // 避免只有查看權的人通過手改地址進入可提交的表單。
+  if (isFormMode && !(mode === 'create' ? canCreateProject : canEditProject)) {
+    return (
+      <div className="content-area">
+        <RdmFormHeader title={mode === 'edit' ? '編輯項目' : '新增項目'} onBack={() => backToList()} backText="返回項目" />
+        <Alert
+          type="warning"
+          showIcon
+          message={t('rdm.projDetail.editDeniedTitle')}
+          description={t('rdm.projDetail.editDeniedDesc')}
+          action={<Button size="small" onClick={() => backToList()}>{t('rdm.projDetail.backToProject')}</Button>}
+        />
+      </div>
+    )
+  }
+
   // ── 表單視圖（create / edit）──
   if (isFormMode) {
     return (
@@ -606,11 +633,15 @@ export default function ProjectDetail() {
       <div className="action-section">
         <div className="action-section-left">
           <Button icon={<ReloadOutlined />} onClick={loadAll}>刷新</Button>
-          <Button icon={<BellOutlined />} loading={urging} onClick={handleUrge}>催辦待辦</Button>
+          {canEditProject && (
+            <Button icon={<BellOutlined />} loading={urging} onClick={handleUrge}>催辦待辦</Button>
+          )}
         </div>
         <div className="action-section-right">
           {/* 交付項只能在需求下拆分（后端强制 reqId）：项目维度不再提供创建入口 */}
-          <Button icon={<EditOutlined />} onClick={() => navigate(`/rdm-project-detail?id=${detail.id}&mode=edit${listSuffix}`)}>編輯項目</Button>
+          {canEditProject && (
+            <Button icon={<EditOutlined />} onClick={() => navigate(`/rdm-project-detail?id=${detail.id}&mode=edit${listSuffix}`)}>編輯項目</Button>
+          )}
           <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/rdm-submit')}>新增需求</Button>
         </div>
       </div>
@@ -911,15 +942,17 @@ export default function ProjectDetail() {
               </span>
               項目成員
               <span className="rdm-card-title-split" />
-              <Button
-                type="link"
-                size="small"
-                icon={<UserAddOutlined />}
-                onClick={() => setMemberModalOpen(true)}
-                style={{ padding: 0, height: 'auto' }}
-              >
-                添加
-              </Button>
+              {canEditProject && (
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<UserAddOutlined />}
+                  onClick={() => setMemberModalOpen(true)}
+                  style={{ padding: 0, height: 'auto' }}
+                >
+                  添加
+                </Button>
+              )}
             </div>
             {detail.members.length === 0 ? (
               <div style={{ fontSize: 12, color: '#8C8C8C', textAlign: 'center', padding: 8 }}>暫無成員</div>
@@ -930,14 +963,16 @@ export default function ProjectDetail() {
                     <span style={{ flex: 1, fontSize: 13, color: '#262626' }}>{m.userName || m.empNo}</span>
                     {/* 历史行存过大写角色码（DEV），查找前归一化，否则会直接露出原始码 */}
                     <Tag color="default" style={{ margin: 0 }}>{MEMBER_ROLE_LABEL[(m.roleCode || '').toLowerCase()] ?? m.roleCode}</Tag>
-                    <Button
-                      type="text"
-                      size="small"
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={() => handleRemoveMember(m.userId, m.userName)}
-                      style={{ padding: '0 4px', height: 'auto' }}
-                    />
+                    {canEditProject && (
+                      <Button
+                        type="text"
+                        size="small"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={() => handleRemoveMember(m.userId, m.userName)}
+                        style={{ padding: '0 4px', height: 'auto' }}
+                      />
+                    )}
                   </div>
                 ))}
               </div>
@@ -961,20 +996,24 @@ export default function ProjectDetail() {
               >
                 新增需求
               </Button>
-              <Button
-                block
-                icon={<EditOutlined />}
-                onClick={() => navigate(`/rdm-project-detail?id=${detail.id}&mode=edit${listSuffix}`)}
-              >
-                編輯項目信息
-              </Button>
-              <Button
-                block
-                icon={<UserAddOutlined />}
-                onClick={() => setMemberModalOpen(true)}
-              >
-                添加項目成員
-              </Button>
+              {canEditProject && (
+                <Button
+                  block
+                  icon={<EditOutlined />}
+                  onClick={() => navigate(`/rdm-project-detail?id=${detail.id}&mode=edit${listSuffix}`)}
+                >
+                  編輯項目信息
+                </Button>
+              )}
+              {canEditProject && (
+                <Button
+                  block
+                  icon={<UserAddOutlined />}
+                  onClick={() => setMemberModalOpen(true)}
+                >
+                  添加項目成員
+                </Button>
+              )}
             </div>
           </div>
         </div>

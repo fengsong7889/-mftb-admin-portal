@@ -290,8 +290,8 @@ export default function EmpRoleAuthEdit() {
                         {checked && <span style={{ color: '#fff', fontSize: 10, lineHeight: 1 }}>✓</span>}
                       </div>
                       <span style={{ fontSize: 13, color: '#262626' }}>
+                        {/* 选人列表统一「姓名（工號）」，部门不参与消歧 */}
                         {emp.name}（{emp.empId}）
-                        {emp.department && <span style={{ fontSize: 11, color: '#8C8C8C', marginLeft: 4 }}>— {emp.department}</span>}
                       </span>
                     </div>
                   )
@@ -358,7 +358,8 @@ export default function EmpRoleAuthEdit() {
                         onClose={() => setBoundUsers((prev) => prev.filter((id) => id !== emp.id))}
                         style={{ fontSize: 12, margin: 0 }}
                       >
-                        {emp.name}（{emp.empId}）{emp.department && ` — ${emp.department}`}
+                        {/* 选人列表统一「姓名（工號）」，部门不参与消歧 */}
+                        {emp.name}（{emp.empId}）
                       </Tag>
                     ))}
                   </div>

@@ -1022,6 +1022,22 @@
       "comment": "RdmProjectController 的新增挂 create、编辑挂 edit，而「暂停/恢复推进」就是走编辑 PATCH 改 paused_flag。v3.15 的 ACTION_SYNC 白名单只列了 rdm-requirement，所以 rdm-dashboard-project 的存量行一直停在 [view,export]：授权中心勾不到写动作，端到端实测非超管点「暫停項目」一律 403「没有 [rdm-dashboard-project] 的[编辑]权限」，新增/编辑同死（超管靠代码直通所以从来看不出来）。本轮把该菜单列入 ACTION_SYNC_FROM_SEED，并把种子动作常量从 VIEW_EXPORT 改为 PROJECT_ACTIONS=[view,create,edit,export]；语义仍是只并集追加、不删减管理员额外自定义的动作。可授 ≠ 已授：不往 sys_role_menu/sys_department_menu 写任何一行，具体授给哪个角色/部门仍由管理员裁决（本次开发环境按管理员指示先授给董事長兼首席執行官辦公室）。后置校验：assertMenuActionsInclude 实查 rdm-dashboard-project 行已包含 view/create/edit/export，缺则不记版本。取代 rdm:menu-seed:v3.15。"
     },
     {
+      "versionKey": "rdm:menu-seed:v3.20",
+      "module": "rdm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "rdmMenuInitializer",
+      "dependencies": [
+        "rdm:menu-seed:v3.17"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [],
+      "intent": "項目總覽(rdm-dashboard-project) 可授动作集补 delete，使未挂需求的空壳项目可被授权删除",
+      "author": "空壳项目删除",
+      "ticket": "rdm-project-delete",
+      "comment": "用户要求「未挂任何需求的项目支持删除」。新增 DELETE /api/rdm/project/{id} 挂 rdm-dashboard-project:delete；该动作若不在 sys_menu.actions 里，授权中心永远勾不到，非超管即使被授了删除权也会 403。本轮把 PROJECT_ACTIONS 从 [view,create,edit,export,notify] 扩为 [view,create,edit,delete,export,notify]，菜单已在 ACTION_SYNC_FROM_SEED 白名单中，种子动作会并集追加到存量行；仍不写任何 sys_role_menu/sys_department_menu 授权行，可授 ≠ 已授，谁能删仍由管理员显式勾选（超管靠代码直通）。删除口径：项目下（含挂在该项目迭代上的）需求必须为 0，通过后项目下未挂需求的迭代一并逻辑删除、成员行与项目行物理删除——rdm_project 无 deleted 列，补逻辑删需改十余处手写 SQL，漏一处即出幽灵项目。迭代删除沿用已有 rdm-delivery-iteration:delete 锚点（从 rdm-product 平移而来），新增 DELETE /api/rdm/delivery/iteration/{id}，服务端校验无需求且无任务。后置校验：assertMenuActionsInclude 实查 rdm-dashboard-project 行已包含 view/create/edit/delete/export，缺则不记版本。取代 rdm:menu-seed:v3.17。"
+    },
+    {
       "versionKey": "rdm:anchor-grant-mirror:v1",
       "module": "rdm",
       "phase": "MENU_SEED",
@@ -2796,6 +2812,23 @@
       "intent": "AI 配置多系统作用域：ai_guard_rule / ai_push_template 补 system_code，RDM 推送模板回填 rdm",
       "author": "Qoder",
       "comment": "ADD COLUMN 走 INFORMATION_SCHEMA 探测，不执行 278 脚本（脚本含非幂等 ALTER）；能力/骨架/术语复用既有 domain 列。"
+    },
+    {
+      "versionKey": "ai:quota-config-updated-by-v1.0",
+      "module": "ai",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "aiQuotaConfigUpdatedByInitializer",
+      "dependencies": [
+        "ai:scope-v1.0"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "285_ai_quota_config_updated_by.sql"
+      ],
+      "intent": "ai_quota_config 补 updated_by：员工专属/部门额度列表可追溯最后修改人",
+      "author": "Qoder",
+      "comment": "ADD COLUMN 走 INFORMATION_SCHEMA 探测（不可重放），后置校验缺列不记版本；只加列，旧代码忽略新列，无回填（存量行显示 -）。285 脚本仅作参照文档，不进镜像。"
     },
     {
       "versionKey": "rdm:schema:v3.28",

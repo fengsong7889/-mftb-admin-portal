@@ -212,7 +212,7 @@ const STATUS_WAIT_HINT: Partial<Record<RdmStatus, string>> = {
   [RDM_STATUS.DRAFT]: '草稿只有自己能看到，提交後才會進入審批或需求池',
   [RDM_STATUS.INTAKE_PENDING]: '準入審批中，等待當前審批人裁決',
   [RDM_STATUS.INTAKE_REJECTED]: '準入審批被駁回，需提出人修改後重新提交',
-  [RDM_STATUS.POOL]: '需求在池中等待技術負責人分配產品經理',
+  [RDM_STATUS.POOL]: '需求在池中等待項目負責人分配產品經理',
   [RDM_STATUS.ASSIGNED]: '已分配，等待產品經理受理',
   [RDM_STATUS.EVALUATING]: '產品經理評估中，結論出來後會通知你',
   [RDM_STATUS.REJECTED]: '產品駁回了需求，可查看理由後決定是否重開',
@@ -1583,7 +1583,7 @@ export default function RequirementDetail() {
               } />
               {showAllProps && (
                 <>
-                  <PropRow label="技術負責人" value={detail.dispatcherName ?? '-'} />
+                  <PropRow label="項目負責人" value={detail.dispatcherName ?? '-'} />
                   <PropRow label="研發負責人" value={detail.devOwnerName ?? '-'} />
                   <PropRow label="分配時間" value={detail.distributeTime ?? '-'} />
                   <PropRow label="受理時間" value={detail.acceptTime ?? '-'} />

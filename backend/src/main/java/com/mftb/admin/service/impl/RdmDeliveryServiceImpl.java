@@ -1111,6 +1111,42 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
     }
 
     /**
+     * 删除迭代（仅限未挂任何需求的空迭代）。
+     *
+     * <p>需求与任务都以 {@code iteration_code}（编码而非主键）挂接迭代，因此不能靠外键级联，
+     * 必须在删除前逐表计数：有需求就拒绝（提示先移除/转移需求），有任务也拒绝
+     * （任务虽必挂需求，但存量脏数据可能出现需求已删、任务未删的悬挂行）。
+     * <p>删除走 {@code deleteById}，实体上有 {@code @TableLogic}，实际是 {@code deleted=1}，
+     * 历史需求/报表里已固化的迭代编码快照不受影响。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteIteration(Long id) {
+        if (id == null) {
+            throw new BusinessException("請選擇要刪除的迭代");
+        }
+        RdmIteration current = iterationMapper.selectById(id);
+        if (current == null) {
+            throw new BusinessException("迭代不存在或已刪除");
+        }
+        Integer reqCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM rdm_requirement WHERE deleted = 0 AND iteration_code = ?",
+                Integer.class, current.getCode());
+        if (reqCount != null && reqCount > 0) {
+            throw new BusinessException("該迭代下仍有 " + reqCount + " 條需求，請先移除或轉移需求後再刪除");
+        }
+        Integer taskCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM rdm_work_task WHERE deleted = 0 AND iteration_code = ?",
+                Integer.class, current.getCode());
+        if (taskCount != null && taskCount > 0) {
+            throw new BusinessException("該迭代下仍有 " + taskCount + " 個任務，請先處理任務後再刪除");
+        }
+        iterationMapper.deleteById(id);
+        log.info("刪除 RDM 迭代: id={}, code={}, operator={}",
+                id, current.getCode(), operatorResolver.currentOperatorName());
+    }
+
+    /**
      * 按類型發迭代編碼（系統生成，前端不再收手工輸入）。
      * <p>取號後再查唯一鍵兜底：存量手工編碼理論上可能佔用同形狀號（如早年手工錄過
      * SP202610001），撞號則順延取下一個，重試 5 次仍撞則 fail-closed。

@@ -72,6 +72,11 @@ export interface MyQuotaUsage {
   username: string
   name: string
   empId: string
+  /**
+   * 是否不设额度上限（内置系统管理员豁免额度管控）。
+   * 为 true 时 dimensions 为空属正常，不得判定为「未配置额度」。
+   */
+  unlimited?: boolean
   dimensions: QuotaDimension[]
   usage: MyUsageSummary
   recentRecords: MyUsageRecord[]
@@ -137,8 +142,8 @@ export function fetchQuotaCheck(modelKey?: string): Promise<QuotaCheckResult> {
 
 /* ══════════ 我的授权模型 ══════════ */
 
-/** 授权来源：部门策略组/职位/角色/员工 */
-export type ModelAuthSource = 'dept' | 'position' | 'role' | 'employee'
+/** 授权来源：部门策略组/职位/角色/员工；system=内置系统管理员默认拥有全部模型 */
+export type ModelAuthSource = 'dept' | 'position' | 'role' | 'employee' | 'system'
 
 export interface MyModel {
   modelId: number

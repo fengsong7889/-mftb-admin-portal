@@ -38,7 +38,8 @@ export default function EmployeePermTrace() {
         const res = await fetchEmployees({ page: 1, size: 50, keyword: keyword || undefined, employmentStatus: 'active' })
         setEmployeeOptions((res.records ?? []).map((e: EmployeeItem) => ({
           value: e.id,
-          label: `${e.name} (${e.empId})${e.department ? ` · ${e.department}` : ''}`,
+          // 选人下拉统一「姓名 (工號)」，部门不参与消歧
+          label: `${e.name} (${e.empId})`,
         })))
       } catch {
         // 错误提示由请求层统一处理

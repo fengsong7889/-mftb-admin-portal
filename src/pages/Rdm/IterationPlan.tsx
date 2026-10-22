@@ -20,7 +20,7 @@ import { useColumnConfig } from '../../hooks/useColumnConfig'
 import dayjs from 'dayjs'
 import StatCards from '../../components/StatCards'
 import { useAuth } from '../../contexts/AuthContext'
-import { fetchIterations, updateIterationStatus, type RdmIterationItem } from '../../api/rdm'
+import { deleteIteration, fetchIterations, updateIterationStatus, type RdmIterationItem } from '../../api/rdm'
 import { formatEmployee } from '../../utils/employeeDisplay'
 import {
   RDM_ITERATION_STATUS,
@@ -79,6 +79,8 @@ export default function IterationPlan() {
   }>({})
   // 菜单收敛后「產品需求處理」已退役，它的 edit 平移到需求清单；仍查退役 key 会让有编辑权的人也按不动
   const canEdit = hasPermission('rdm-delivery-iteration:edit') || hasPermission('rdm-requirement:edit')
+  /** 删除锚点从已退役的 rdm-product 平移而来，只有显式勾了 delete 的人可删 */
+  const canDelete = hasPermission('rdm-delivery-iteration:delete')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -166,6 +168,43 @@ export default function IterationPlan() {
           await updateIterationStatus(row.id, next)
           message.success(t('rdm.iteration.statusUpdated'))
           // 重取列表：状态同时决定卡片口径与排序（进行中优先），本地改写会两头不一致
+          await load()
+        } catch {
+          // request.ts 已统一弹后端失败原因，这里不再双弹
+        }
+      },
+    })
+  }
+
+  /**
+   * 删除迭代：先本地判断「挂了多少需求」，把不可删的后果说在点下去之前；
+   * 真正的边界仍由服务端重查（含任务），这里只是提前给出可读提示。
+   */
+  const handleDelete = (row: RdmIterationItem) => {
+    const reqCount = row.reqCount ?? 0
+    Modal.confirm({
+      title: t('rdm.iteration.deleteTitle'),
+      className: 'custom-confirm-modal',
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>{t('rdm.iteration.deleteCodeLabel')}</span><b>{row.code}</b></div>
+          <div className="confirm-info-row"><span>{t('rdm.iteration.deleteNameLabel')}</span><b>{row.name}</b></div>
+          <div className="confirm-info-row"><span>{t('rdm.iteration.deleteReqLabel')}</span><b>{t('rdm.iteration.deleteReqCount', { n: reqCount })}</b></div>
+          <div style={{ marginTop: 8, color: reqCount > 0 ? '#CF1322' : '#8C8C8C' }}>
+            {reqCount > 0 ? t('rdm.iteration.deleteBlocked') : t('rdm.iteration.deleteHint')}
+          </div>
+        </div>
+      ),
+      okText: t('rdm.iteration.deleteOk'),
+      okType: 'danger',
+      cancelText: t('common.cancel'),
+      // 已挂需求时直接拦下，不白跑一次必然失败的请求
+      okButtonProps: { disabled: reqCount > 0 },
+      onOk: async () => {
+        try {
+          await deleteIteration(row.id)
+          message.success(t('rdm.iteration.deleteSuccess'))
           await load()
         } catch {
           // request.ts 已统一弹后端失败原因，这里不再双弹
@@ -273,24 +312,37 @@ export default function IterationPlan() {
       title: t('rdm.iteration.colRemark'), dataIndex: 'remark', key: 'remark', ellipsis: true, render: (v?: string | null) => v ?? '-'
     },
     {
-      title: t('common.colAction'), key: 'action', width: 160, fixed: 'right',
-      /** §B.9 操作列纯文字 + 竖线分隔：詳情→編輯→其他动作，状态直改不藏图标按钮 */
+      title: t('common.colAction'), key: 'action', width: 240, fixed: 'right',
+      /**
+       * §B.9 操作列纯文字 + 竖线分隔：詳情 → 編輯 → 其他动作。
+       * <p>詳情对所有人开放（进入只读视图）：过去无编辑权时整列只显示「僅查看」，
+       * 等于连看都看不了，只能去找有编辑权的人代看。编辑/改状态/删除按权限逐项渲染。
+       */
       render: (_, r) => {
-        if (!canEdit) return <span style={{ color: '#8C8C8C', fontSize: 12 }}>{t('rdm.iteration.viewOnly')}</span>
         const current = (r.status ?? RDM_ITERATION_STATUS.PLANNING) as RdmIterationStatus
         const items: MenuProps['items'] = Object.values(RDM_ITERATION_STATUS)
           .filter(s => s !== current)
           .map(s => ({ key: s, label: RDM_ITERATION_STATUS_LABEL[s] }))
         return (
           <Space size={0} split={<span className="action-split">|</span>}>
-            <Button type="link" size="small" onClick={() => navigate(`/rdm-iteration-form?id=${r.id}`)}>{t('common.edit')}</Button>
-            <Dropdown
-              menu={{ items, onClick: ({ key }) => handleChangeStatus(r, key as RdmIterationStatus) }}
-              trigger={['click']}
-              placement="bottomRight"
-            >
-              <Button type="link" size="small">{t('rdm.iteration.changeStatus')}</Button>
-            </Dropdown>
+            <Button type="link" size="small" onClick={() => navigate(`/rdm-iteration-form?id=${r.id}&mode=view`)}>
+              {t('common.detail')}
+            </Button>
+            {canEdit && (
+              <Button type="link" size="small" onClick={() => navigate(`/rdm-iteration-form?id=${r.id}`)}>{t('common.edit')}</Button>
+            )}
+            {canEdit && (
+              <Dropdown
+                menu={{ items, onClick: ({ key }) => handleChangeStatus(r, key as RdmIterationStatus) }}
+                trigger={['click']}
+                placement="bottomRight"
+              >
+                <Button type="link" size="small">{t('rdm.iteration.changeStatus')}</Button>
+              </Dropdown>
+            )}
+            {canDelete && (
+              <Button type="link" size="small" danger onClick={() => handleDelete(r)}>{t('common.delete')}</Button>
+            )}
           </Space>
         )
       },

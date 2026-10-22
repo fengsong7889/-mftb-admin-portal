@@ -36,6 +36,7 @@ import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.impl.RdmScheduleServiceImpl;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.OperatorResolver;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -194,7 +195,7 @@ class RdmFactReuseAndGuardTest {
         // 工作日曆用真實實現（只 mock 它的 mapper）：逾期工作日口徑必須與任務21 同源，
         // 若把 RdmWorkingDayCalculator 也 mock 掉，本類就證明不了「用的是真實工作日曆」
         workingDayCalculator = new RdmWorkingDayCalculator(calendarMapper);
-        projectService = new RdmProjectService(projectMapper, memberMapper, requirementMapper, taskMapper,
+        projectService = new RdmProjectService(projectMapper, memberMapper, mock(JdbcTemplate.class), requirementMapper, taskMapper,
                 userMapper, bizSeqService, accessGuard, factService, workingDayCalculator, operatorResolver);
         summaryService = new RdmSummaryService(factService, projectMapper, deliveryItemMapper, taskMapper,
                 testBatchMapper, testExecutionMapper, acceptanceMapper, issueMapper, scheduleService,

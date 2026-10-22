@@ -3531,12 +3531,28 @@
     "greetingAfternoon": "Good afternoon",
     "greetingEvening": "Good evening",
     "greetingPartner": "Partner",
+    "meetingTitle": "Today's Meetings",
+    "meetingUnit": "session(s)",
+    "meetingPending": "{{count}} awaiting your response",
+    "meetingPendingShort": "{{count}} awaiting response",
+    "meetingNext": "Next: {{title}}",
+    "meetingView": "View My Meetings",
+    "meetingCollapse": "Collapse",
+    "meetingCollapseTip": "After collapsing, reopen it from “Today's Meetings” at the top right",
+    "meetingExpandAria": "Expand today's meetings",
+    "meetingChip": "{{count}} meeting(s) today",
+    "meetingChipAria": "Expand today's meetings, {{count}} session(s)",
     "aiTitle": "AI Assistant",
     "aiBeta": "Beta",
     "aiBetaTip": "This feature is in internal beta. AI assistant responses are for reference only; please verify against actual business data before use.",
     "aiOnline": "Online",
     "aiMyUsage": "My Usage",
     "aiApplyMore": "Apply for More",
+    "aiQuickPrompt": "Quick Prompts",
+    "aiCapability": "Model Capabilities",
+    "usageAvailableFull": "100% available",
+    "usageUsedFull": "100% used",
+    "usageUsedPercent": "{{percent}}% used",
     "aiQuotaSufficient": "Sufficient",
     "aiQuotaTight": "Tight",
     "aiQuotaInsufficient": "Low",
@@ -3579,6 +3595,8 @@
     "usageQuotaDimsTitle": "My Quota Dimensions",
     "usageDimsEmpty": "No quota available",
     "usageDimsEmptyHint": "No quota configured: the assistant is allowed to run with your authorized models (no quota gate). To control usage per employee/department, ask an admin to configure quota policies under \"Quota Management\".",
+    "usageDimsUnlimited": "No quota limit",
+    "usageDimsUnlimitedHint": "The built-in system administrator has all models by default with no usage cap, so no model or quota application is needed.",
     "aiBlockedBadge": "Not Activated",
     "aiBlockedNoModelsTitle": "No AI Model Access",
     "aiBlockedNoModelsDesc": "Your account has no access to any AI models, so the AI Assistant is unavailable. Please submit an application — once approved, you will be granted model access and allocated quota, and you can start chatting.",
@@ -3720,7 +3738,8 @@
     "aiBetaTipAction": "Please verify key figures on the business pages before use; report wrong answers to us.",
     "aiBetaTipLabelAction": "How to use",
     "engineChipKilled": "Killed",
-    "infoBarNoQuotaLimit": "No quota limit (requests are not gated by quota)"
+    "infoBarNoQuotaLimit": "No quota limit (requests are not gated by quota)",
+    "usageUnlimitedValue": "Unlimited"
   },
   "conversationAudit": {
     "pageTitle": "Conversation Audit",
@@ -11649,6 +11668,7 @@
       "colProjectName": "Project",
       "colIterationName": "Iteration",
       "colDescription": "Description",
+      "colAction": "Action",
       "errNoSheet": "The file has no valid worksheet",
       "errNoHeader": "Header row not found. Please use the template downloaded from the bulk import dialog.",
       "errMissingColumns": "Missing required columns: {{columns}}",
@@ -11683,7 +11703,16 @@
       "warnNothingToImport": "Nothing to import",
       "warnValidationFailed": "{{count}} row(s) failed validation; nothing was written",
       "successImported": "Import completed: {{imported}} imported",
-      "successWithSkipped": "Import completed: {{imported}} imported, {{skipped}} skipped"
+      "successWithSkipped": "Import completed: {{imported}} imported, {{skipped}} skipped",
+      "btnRemove": "Remove",
+      "removeTitle": "Remove this row?",
+      "removeContent": "Row {{rowNo}} \"{{title}}\" will be excluded from this import. The original Excel file is not modified.",
+      "removeOk": "Remove",
+      "removeTipLast": "Keep at least one requirement",
+      "removeTipErrors": "Fix the invalid rows in the file before removing rows",
+      "warnKeepAtLeastOne": "Keep at least one requirement",
+      "warnTimeout": "The import exceeded the client wait limit; the backend may still be writing. Refresh the list first to verify the result. Imported Yunxiao numbers are skipped automatically on retry.",
+      "warnImportFailed": "Import failed, please try again"
     },
     "board": {
       "title": "Daily Delivery Board",
@@ -12590,6 +12619,15 @@
       "confirmOk": "Confirm",
       "statusUpdated": "Iteration status updated",
       "viewOnly": "View only",
+      "deleteTitle": "Delete iteration",
+      "deleteOk": "Delete",
+      "deleteCodeLabel": "Iteration code: ",
+      "deleteNameLabel": "Iteration name: ",
+      "deleteReqLabel": "Scheduled requirements: ",
+      "deleteReqCount": "{{n}}",
+      "deleteBlocked": "This iteration still has requirements. Remove or move them before deleting.",
+      "deleteHint": "Only iterations with no requirements can be deleted; this cannot be undone.",
+      "deleteSuccess": "Iteration deleted",
       "changeStatus": "Change status",
       "colName": "Iteration",
       "colType": "Type",
@@ -12612,7 +12650,10 @@
     "iterationForm": {
       "capacityAutoEmpty": "Auto-calculated after picking dates",
       "capacityAutoHint": "{{days}} workdays × 8h",
-      "capacityManualHint": "{{days}} workdays × 8h (manually adjusted)"
+      "capacityManualHint": "{{days}} workdays × 8h (manually adjusted)",
+      "viewTitle": "Iteration detail",
+      "viewMeta": "Iteration code {{code}} is system-generated; this is a read-only view, use Edit to modify",
+      "back": "Back"
     },
     "projOverview": {
       "tagPaused": "Paused",
@@ -12652,11 +12693,18 @@
       "filterPlanDate": "Planned period",
       "filterPm": "Project Manager",
       "filterPo": "Product Owner",
-      "filterStatus": "Status"
+      "filterStatus": "Status",
+      "deleteTitle": "Delete project",
+      "deleteOk": "Delete",
+      "deleteNoLabel": "Project no.: ",
+      "deleteNameLabel": "Project name: ",
+      "deleteHint": "Only projects with no requirements can be deleted; iterations without requirements under the project are deleted too, and this cannot be undone.",
+      "deleteSuccess": "Project deleted"
     },
     "reqList": {
       "colIteration": "Iteration",
       "colProject": "Project",
+      "colExternalNo": "Yunxiao No.",
       "btnSchedule": "Schedule",
       "btnMyGantt": "My Gantt",
       "btnGlobalGantt": "Global Gantt",
@@ -12670,7 +12718,10 @@
     "projDetail": {
       "tagPaused": "Paused",
       "tagRisk": "Risk",
-      "tagOverdue": "Overdue"
+      "tagOverdue": "Overdue",
+      "editDeniedTitle": "You do not have permission for this action",
+      "editDeniedDesc": "This account can only view project details. Contact the project owner or an administrator to add or modify a project.",
+      "backToProject": "Back to projects"
     },
     "reqSubmit": {
       "draftSaved": "Draft saved. Continue via \"Edit\" in the \"Submit Requirement\" menu, or click \"Submit\" to send",

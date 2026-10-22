@@ -18,7 +18,8 @@ import { translateMenuName } from '../../i18n/menuNameEn'
 import PikachuFace from '../../components/PikachuFace'
 import AiLogo from '../../components/AiLogo'
 import ContextUsageIndicator from './ContextUsageIndicator'
-import TodayMeetingCard from './TodayMeetingCard'
+import TodayMeetingCard, { TodayMeetingRestoreChip } from './TodayMeetingCard'
+import { useTodayMeetingBar } from './useTodayMeetingBar'
 import { FAV_KEY, loadFavorites, defaultFavorites, MAX_FAVORITES, collectHomeMenus, chineseNameToPinyinEnglish, getGreeting, MAX_IMAGE_SIZE, MAX_FILE_SIZE, DIM_SOURCE_COLOR, DIM_SOURCE_LABEL_KEY } from './homeUtils'
 import AiRichText from './AiRichText'
 import AgentViewCard from './AgentViewCard'
@@ -193,6 +194,8 @@ export default function Home() {
   const { t, i18n: i18nInstance } = useTranslation()
   const { user, hasMenuPermission } = useAuth()
   const { currentSystemCode } = useCurrentSystem()
+  // 会议栏数据/收起状态提升到页面层：收起后整栏不占行高，恢复入口在问候栏右侧
+  const meetingBar = useTodayMeetingBar()
   const systemNavigation = useSystemNavigation(currentSystemCode)
   const [systems, setSystems] = useState<PortalSystem[]>([])
 
@@ -464,6 +467,8 @@ export default function Home() {
   const [thinkingEnabled, setThinkingEnabled] = useState(false)
   const [thinkingDepth, setThinkingDepth] = useState<ThinkingDepth>('xhigh')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  /** 快捷提問彈層：選中一條即回填輸入框並收起，避免彈層擋住聊天區 */
+  const [quickOpen, setQuickOpen] = useState(false)
   /** 标记 AI 设置首次加载（后端/localStorage）是否已完成，防止挂载时默认值覆盖云端数据 */
   const aiSettingsLoadedRef = useRef(false)
   const aiSettingsSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -513,7 +518,8 @@ export default function Home() {
    * 多種原因分開提示，引導用戶聯繫管理員開通對應權限
    */
   const noModels = modelsLoaded && myModels.length === 0
-  const noQuota = usageLoaded && (myUsage?.dimensions.length ?? 0) === 0
+  // 内置系统管理员（unlimited）没有额度维度属正常，不能判成「未配置额度」
+  const noQuota = usageLoaded && !myUsage?.unlimited && (myUsage?.dimensions.length ?? 0) === 0
   
   // 前端兆底：所有维度都已达到或超过 100%（当后端校验未加载时使用）
   const quotaExhaustedFallback = useMemo(() => {
@@ -1365,20 +1371,24 @@ export default function Home() {
           </div>
         </div>
         <div className="home-greeting-right">
-          <div className="home-greeting-time">{timeStr}</div>
-          <div className="home-greeting-date">{dateStr}</div>
+          {/* 会议栏收起后的恢复入口：放在问候栏内，不额外占行 */}
+          <TodayMeetingRestoreChip bar={meetingBar} />
+          <div className="home-greeting-clock">
+            <div className="home-greeting-time">{timeStr}</div>
+            <div className="home-greeting-date">{dateStr}</div>
+          </div>
         </div>
       </div>
 
-      {/* 今日會議概览：无 meeting-my 菜单或后端不可用时整卡不渲染 */}
-      <TodayMeetingCard />
+      {/* 今日會議概览：无 meeting-my 菜单、后端不可用、今日无会或用户已收起时整栏不渲染 */}
+      <TodayMeetingCard bar={meetingBar} />
 
       {/* 主区域：左 AI 助手 + 右快捷入口 */}
       <div className="home-main-grid">
       {/* AI 助手（核心） */}
       <div className="home-ai">
         <div className="home-ai-header">
-          <div className="home-ai-avatar"><AiLogo size={40} /></div>
+          <div className="home-ai-avatar"><AiLogo size={32} /></div>
           <div className="home-ai-title">
             <h3>
               {t('home.aiTitle')}
@@ -1401,6 +1411,60 @@ export default function Home() {
             </span>
           </div>
           <div className="home-ai-badges">
+            {/* 額度資訊並入頭部：原本獨立一行的資訊條取消，把高度讓給聊天區 */}
+            {!aiBlocked && (
+              // 用 div 而非 button：Progress 内部是块级节点，放进 button 属非法嵌套
+              <div
+                className="home-ai-usage-pill"
+                role="button"
+                tabIndex={0}
+                onClick={handleOpenUsage}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenUsage() }
+                }}
+              >
+                <DatabaseOutlined style={{ fontSize: 12 }} />
+                <span className="home-ai-usage-pill-label">{t('home.aiMyUsage')}</span>
+                {infoBarUsedPercent !== null ? (
+                  <>
+                    <Progress
+                      percent={infoBarUsedPercent}
+                      size="small"
+                      showInfo={false}
+                      strokeColor={infoBarUsedPercent < 40 ? '#52C41A' : infoBarUsedPercent < 80 ? '#FAAD14' : '#FF4D4F'}
+                      style={{ width: 36, margin: 0 }}
+                    />
+                    <span
+                      className="home-ai-usage-pill-value"
+                      style={{ color: infoBarUsedPercent < 40 ? '#52C41A' : infoBarUsedPercent < 80 ? '#FAAD14' : '#FF4D4F' }}
+                    >
+                      {infoBarUsedPercent === 0
+                        ? t('home.usageAvailableFull')
+                        : infoBarUsedPercent === 100
+                          ? t('home.usageUsedFull')
+                          : t('home.usageUsedPercent', { percent: infoBarUsedPercent })}
+                    </span>
+                  </>
+                ) : (
+                  // 未配額度不等於“沒數據”：空值直接說明「無額度限制」，不顯示破折號
+                  <span className="home-ai-usage-pill-value">
+                    {myUsage?.unlimited ? t('home.usageUnlimitedValue') : t('home.infoBarNoQuotaLimit')}
+                  </span>
+                )}
+              </div>
+            )}
+            {/* 内置系統管理員默認全部模型 + 不限额，不再展示「申請加量/加模型」常駐入口 */}
+            {!aiBlocked && user?.role !== 'admin' && (
+              <button
+                type="button"
+                className="home-ai-apply-pill"
+                onClick={() => navigate('/ai-access-apply?reason=topup')}
+                title={t('home.aiApplyMore')}
+              >
+                <PlusOutlined style={{ fontSize: 9 }} />
+                {t('home.aiApplyMore')}
+              </button>
+            )}
             <Dropdown
               menu={aiBlocked
                 ? { items: [] }
@@ -1483,6 +1547,45 @@ export default function Home() {
                         )}
                       </div>
                     )}
+                    {/* 模型能力：原先独占底部一行，收进设置面板，减少常驻信息干扰 */}
+                    {(currentCapabilities.text || currentCapabilities.image || currentCapabilities.audio
+                      || currentCapabilities.video || currentCapabilities.toolCalling || currentCapabilities.thinking) && (
+                      <div className="home-ai-settings-section">
+                        <div className="home-ai-settings-label">{t('home.aiCapability')}</div>
+                        <div className="home-ai-settings-caps">
+                          {currentCapabilities.text && (
+                            <Tag className="home-ai-cap-tag home-ai-cap-tag--active" bordered={false}>
+                              <FileTextOutlined /> {t('home.capText')}
+                            </Tag>
+                          )}
+                          {currentCapabilities.image && (
+                            <Tag className="home-ai-cap-tag home-ai-cap-tag--active" bordered={false}>
+                              <PictureOutlined /> {t('home.capImage')}
+                            </Tag>
+                          )}
+                          {currentCapabilities.audio && (
+                            <Tag className="home-ai-cap-tag home-ai-cap-tag--active" bordered={false}>
+                              🎤 {t('home.capAudio')}
+                            </Tag>
+                          )}
+                          {currentCapabilities.video && (
+                            <Tag className="home-ai-cap-tag home-ai-cap-tag--active" bordered={false}>
+                              🎤 {t('home.capVideo')}
+                            </Tag>
+                          )}
+                          {currentCapabilities.toolCalling && (
+                            <Tag className="home-ai-cap-tag home-ai-cap-tag--tool" bordered={false}>
+                              <ThunderboltOutlined /> {t('home.capToolCalling')}
+                            </Tag>
+                          )}
+                          {currentCapabilities.thinking && (
+                            <Tag className="home-ai-cap-tag home-ai-cap-tag--think" bordered={false}>
+                              💭 {t('home.capThinking')}
+                            </Tag>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 }
               >
@@ -1496,53 +1599,6 @@ export default function Home() {
               </Popover>
             )}
           </div>
-        </div>
-
-        {/* 額度管理資訊條（獨立行，與模型選擇分行展示） */}
-        <div className={`home-ai-infobar${aiBlocked ? ' home-ai-infobar--blocked' : ''}`}>
-          {aiBlocked ? (
-            <div className="home-ai-infobar-warn">
-              <LockOutlined style={{ fontSize: 13 }} />
-              <span>{t('home.aiBlockedBadge')} — {t(BLOCKED_DESC_KEY[blockReason])}</span>
-            </div>
-          ) : (
-            <>
-              <div className="home-ai-infobar-left" onClick={handleOpenUsage} role="button" tabIndex={0}>
-                <DatabaseOutlined style={{ fontSize: 13, color: '#8C8C8C' }} />
-                <span className="home-ai-infobar-label">{t('home.aiMyUsage')}</span>
-                {infoBarUsedPercent !== null && (
-                  <>
-                    <Progress
-                      percent={infoBarUsedPercent}
-                      size="small"
-                      showInfo={false}
-                      strokeColor={infoBarUsedPercent < 40 ? '#52C41A' : infoBarUsedPercent < 80 ? '#FAAD14' : '#FF4D4F'}
-                      style={{ width: 60, margin: '0 2px' }}
-                    />
-                    <span style={{
-                      fontSize: 11, fontWeight: 500,
-                      color: infoBarUsedPercent < 40 ? '#52C41A' : infoBarUsedPercent < 80 ? '#FAAD14' : '#FF4D4F',
-                      whiteSpace: 'nowrap',
-                    }}>
-                      ({infoBarUsedPercent === 0 ? `可用100%` : infoBarUsedPercent === 100 ? `已用100%` : `已使用${infoBarUsedPercent}%`})
-                    </span>
-                  </>
-                )}
-                {infoBarUsedPercent === null && (
-                  // 未配额度不等于“没数据”：以前是个干枛的「—」，用户会误读为用量丢失
-                  <span style={{ fontSize: 11, color: '#8C8C8C' }}>{t('home.infoBarNoQuotaLimit')}</span>
-                )}
-              </div>
-              <button
-                type="button"
-                className="home-ai-infobar-apply"
-                onClick={() => navigate('/ai-access-apply?reason=topup')}
-              >
-                <PlusOutlined style={{ fontSize: 10 }} />
-                {t('home.aiApplyMore')}
-              </button>
-            </>
-          )}
         </div>
 
         {/* 会话标签栏 */}
@@ -1774,52 +1830,7 @@ export default function Home() {
           )}
         </div>
 
-        {/* 歷史對話有阻塞卡片時，底部不重複顯示橫幅；無阻塞時顯示快捷提問 */}
-        {!isEmpty && !blockReason && (
-          <div className="home-ai-quick">
-            {quickQuestions.map((q) => (
-              <button type="button" key={q.text} className="home-ai-quick-btn" onClick={() => setInputText(q.text)}>
-                {q.text}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* 能力展示条 */}
-        {!aiBlocked && (
-          <div className="home-ai-capabilities">
-            {currentCapabilities.text && (
-              <Tag className="home-ai-cap-tag home-ai-cap-tag--active" bordered={false}>
-                <FileTextOutlined /> {t('home.capText')}
-              </Tag>
-            )}
-            {currentCapabilities.image && (
-              <Tag className="home-ai-cap-tag home-ai-cap-tag--active" bordered={false}>
-                <PictureOutlined /> {t('home.capImage')}
-              </Tag>
-            )}
-            {currentCapabilities.audio && (
-              <Tag className="home-ai-cap-tag home-ai-cap-tag--active" bordered={false}>
-                🎤 {t('home.capAudio')}
-              </Tag>
-            )}
-            {currentCapabilities.video && (
-              <Tag className="home-ai-cap-tag home-ai-cap-tag--active" bordered={false}>
-                🎤 {t('home.capVideo')}
-              </Tag>
-            )}
-            {currentCapabilities.toolCalling && (
-              <Tag className="home-ai-cap-tag home-ai-cap-tag--tool" bordered={false}>
-                <ThunderboltOutlined /> {t('home.capToolCalling')}
-              </Tag>
-            )}
-            {currentCapabilities.thinking && (
-              <Tag className="home-ai-cap-tag home-ai-cap-tag--think" bordered={false}>
-                💭 {t('home.capThinking')}
-              </Tag>
-            )}
-          </div>
-        )}
+        {/* 快捷提問與模型能力不再各佔一行：快捷提問收進輸入區按鈕，能力收進右上角設定面板 */}
 
         {/* 附件预览区 */}
         {attachments.length > 0 && (
@@ -1920,6 +1931,38 @@ export default function Home() {
           onDrop={handleDrop}
         >
           {isDragging && <div className="home-ai-drag-overlay">{t('home.dragHint')}</div>}
+          {/* 快捷提問：原本占一整行，收进输入区左侧按钮，点开即可选择 */}
+          {!isEmpty && !blockReason && quickQuestions.length > 0 && (
+            <Popover
+              open={quickOpen}
+              onOpenChange={setQuickOpen}
+              trigger="click"
+              placement="topLeft"
+              content={
+                <div className="home-ai-quick-panel">
+                  {quickQuestions.map((q) => (
+                    <button
+                      type="button"
+                      key={q.text}
+                      className="home-ai-quick-btn"
+                      onClick={() => { setInputText(q.text); setQuickOpen(false) }}
+                    >
+                      {q.icon} {q.text}
+                    </button>
+                  ))}
+                </div>
+              }
+            >
+              <button
+                type="button"
+                className="home-ai-tool-btn"
+                title={t('home.aiQuickPrompt')}
+                aria-label={t('home.aiQuickPrompt')}
+              >
+                <ThunderboltOutlined />
+              </button>
+            </Popover>
+          )}
           {(currentCapabilities.file || currentCapabilities.image) && !aiBlocked && (
             <>
               <input
@@ -2093,13 +2136,24 @@ export default function Home() {
             {/* 我的額度维度（員工/部門/職位/角色，已用按請求明細實時聚合） */}
             <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>{t('home.usageQuotaDimsTitle')}</div>
             {myUsage.dimensions.length === 0 ? (
-              <div style={{ border: '1px dashed #FFD591', background: '#FFFBF5', borderRadius: 12, padding: '20px 16px', textAlign: 'center', marginBottom: 20 }}>
-                <div style={{ width: 40, height: 40, margin: '0 auto 10px', borderRadius: '50%', background: '#FFF7E6', border: '1px solid #FFE7BA', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D46B08', fontSize: 18 }}>
-                  <LockOutlined />
+              myUsage.unlimited ? (
+                // 内置系统管理员：无额度维度属预期，展示为不限额而非「未配置额度」空态
+                <div style={{ border: '1px dashed #B7EB8F', background: '#F6FFED', borderRadius: 12, padding: '20px 16px', textAlign: 'center', marginBottom: 20 }}>
+                  <div style={{ width: 40, height: 40, margin: '0 auto 10px', borderRadius: '50%', background: '#F6FFED', border: '1px solid #D9F7BE', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#389E0D', fontSize: 18 }}>
+                    <CheckCircleOutlined />
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#262626', marginBottom: 6 }}>{t('home.usageDimsUnlimited')}</div>
+                  <div style={{ fontSize: 12, color: '#8C8C8C', lineHeight: 1.7 }}>{t('home.usageDimsUnlimitedHint')}</div>
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#262626', marginBottom: 6 }}>{t('home.usageDimsEmpty')}</div>
-                <div style={{ fontSize: 12, color: '#8C8C8C', lineHeight: 1.7 }}>{t('home.usageDimsEmptyHint')}</div>
-              </div>
+              ) : (
+                <div style={{ border: '1px dashed #FFD591', background: '#FFFBF5', borderRadius: 12, padding: '20px 16px', textAlign: 'center', marginBottom: 20 }}>
+                  <div style={{ width: 40, height: 40, margin: '0 auto 10px', borderRadius: '50%', background: '#FFF7E6', border: '1px solid #FFE7BA', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D46B08', fontSize: 18 }}>
+                    <LockOutlined />
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#262626', marginBottom: 6 }}>{t('home.usageDimsEmpty')}</div>
+                  <div style={{ fontSize: 12, color: '#8C8C8C', lineHeight: 1.7 }}>{t('home.usageDimsEmptyHint')}</div>
+                </div>
+              )
             ) : (
               myUsage.dimensions.map((dim, i) => {
                 const quota = Number(dim.quotaValue) || 0

@@ -585,6 +585,8 @@ public class AiEmpPermissionServiceImpl implements AiEmpPermissionService {
                     } else {
                         config.setMonthlyQuota(adj.getNewValue().intValue());
                     }
+                    // 详情页直接调整额度也属于「改额度」，同步刷新最后更新人
+                    config.setUpdatedBy(currentUsername());
                     quotaConfigMapper.updateById(config);
                 }
             }

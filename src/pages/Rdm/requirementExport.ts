@@ -8,7 +8,7 @@
 import ExcelJS from 'exceljs'
 import i18n from '../../i18n'
 import type { RdmRequirementRow } from '../../api/rdm'
-import { formatHandlers, formatPerson } from './handlerDisplay'
+import { fallbackHandlerText, formatHandlers, formatPerson } from './handlerDisplay'
 import {
   formatRdmReqNo,
   getRdmPriorityLabel,
@@ -91,10 +91,10 @@ export async function exportRequirementRows(rows: RdmRequirementRow[], scopeLabe
       stage: label(RDM_STAGE_LABEL, r.stage as RdmStage),
       submitterName: formatPerson({ name: r.submitterName, empNo: r.submitterEmpNo }),
       submitDeptName: r.submitDeptName ?? '',
-      pmName: r.pmName ?? '',
+      pmName: formatPerson({ name: r.pmName, empNo: r.pmEmpNo }),
       devOwnerName: r.devOwnerName ?? '',
-      // 与表格/看板同源：导出不折叠，多人全部列出；无未完成任务时回退流程推演值
-      currentHandler: formatHandlers(r.handlers, r.currentHandler),
+      // 与表格/看板同源：导出不折叠，多人全部列出；无未完成任务时回退流程推演值（历史行补工号）
+      currentHandler: formatHandlers(r.handlers) || fallbackHandlerText(r),
       // 归属字段与列表同一展示口径：迭代写成「名称 · 编码」，没有名称时至少给编码
       projectName: r.projectName ?? '',
       iteration: r.iterationCode

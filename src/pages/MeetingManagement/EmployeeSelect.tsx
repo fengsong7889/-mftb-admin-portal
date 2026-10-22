@@ -48,7 +48,7 @@ interface Props {
   seed?: { id: number; name: string; empId?: string | null }[]
 }
 
-interface Loaded { id: number; name: string; empId?: string; department?: string }
+interface Loaded { id: number; name: string; empId?: string }
 
 interface Option { value: number; label: ReactNode }
 
@@ -115,7 +115,6 @@ export default function EmployeeSelect({
         id: item.id,
         name: item.name || item.username,
         empId: item.empId,
-        department: item.department,
       }))
       loaded.forEach(item => archive.current.set(item.id, item))
       setSearchResults(loaded)
@@ -144,7 +143,7 @@ export default function EmployeeSelect({
       const found = await Promise.all(missing.map(async id => {
         try {
           const e = await fetchEmployee(id)
-          return { id, name: e.name || e.username, empId: e.empId, department: e.department } as Loaded
+          return { id, name: e.name || e.username, empId: e.empId } as Loaded
         } catch {
           return null
         }
@@ -179,8 +178,8 @@ export default function EmployeeSelect({
         label: (
           <Space size={4}>
             <span>{item.name}</span>
+            {/* 选人下拉统一「姓名 + 工號」，不拼部门：部门不参与消歧，且会批量暴露组织归属 */}
             {item.empId && <Tag style={{ marginInlineEnd: 0 }}>{item.empId}</Tag>}
-            {item.department && <span style={{ color: '#8C8C8C', fontSize: 12 }}>{item.department}</span>}
           </Space>
         ),
       }))

@@ -120,7 +120,8 @@ export default function LeaveQuotaForm() {
                 disabled={isEdit} onSearch={searchEmp} onFocus={() => searchEmp('')}
                 options={options.map(o => ({
                   value: o.userId,
-                  label: `${o.name}(${o.empId})${o.department ? ` · ${o.department}` : ''}`,
+                  // 选人下拉统一「姓名(工號)」，部门不参与消歧
+                  label: `${o.name}(${o.empId})`,
                 }))} />
             </Form.Item>
             <Form.Item name="leaveType" label={t('hrLeave.leaveType')}

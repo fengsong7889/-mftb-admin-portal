@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Drawer, Checkbox, Button, Space } from 'antd'
 import { useTranslation } from 'react-i18next'
 import {
@@ -27,12 +27,76 @@ interface TableColumnConfigProps {
   storageKey?: string
 }
 
-/** 默认字段配置（从 localStorage 恢复） */
+/**
+ * 合并「本地已保存的列配置」与「页面最新列定义」。
+ *
+ * <p>为什么必须合并而不能原样使用本地存量：页面后续新增的列（如需求清单的「所屬迭代」）
+ * 不在旧配置里，列配置抽屉就永远看不到这些列；一旦在抽屉里勾选/确认，还会把缺失新列的
+ * 旧配置写回，表格上的新列随之消失。
+ *
+ * <p>合并口径：
+ * - 保留用户已保存的顺序、显隐与锁定（用户显式关闭的列不会因补齐被重新打开）；
+ * - 剔除已下线的列，标题/默认锁定跟随最新定义（语言切换、锁定调整）；
+ * - 新增列插在默认顺序中「前一个已存在列」之后，避免新列永远沉到表格最右侧；
+ *   前驱列也找不到时才退回尾部锁定列之前。
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function mergeColumnConfigs(
+  saved: ColumnConfig[] | null | undefined,
+  defaults: ColumnConfig[],
+): ColumnConfig[] {
+  if (!Array.isArray(saved) || saved.length === 0) return defaults.map(c => ({ ...c }))
+  const merged: ColumnConfig[] = []
+  for (const item of saved) {
+    const def = defaults.find(d => d.key === item.key)
+    if (def) {
+      merged.push({
+        ...item,
+        title: def.title,
+        visible: item.visible ?? def.visible,
+        locked: item.locked ?? def.locked ?? null,
+      })
+    }
+  }
+  defaults.forEach((def, defIdx) => {
+    if (merged.some(c => c.key === def.key)) return
+    let insertAt = -1
+    for (let i = defIdx - 1; i >= 0; i--) {
+      const pos = merged.findIndex(c => c.key === defaults[i].key)
+      if (pos >= 0) { insertAt = pos + 1; break }
+    }
+    if (insertAt < 0) {
+      const tailIdx = merged.findIndex(c => c.locked === 'tail')
+      insertAt = tailIdx >= 0 ? tailIdx : merged.length
+    }
+    merged.splice(insertAt, 0, {
+      key: def.key,
+      title: def.title,
+      visible: def.visible,
+      locked: def.locked ?? null,
+    })
+  })
+  return merged
+}
+
+/** 两份列配置是否等价（key 顺序 + 标题 + 显隐 + 锁定） */
+export function isSameColumnConfig(a: ColumnConfig[], b: ColumnConfig[]): boolean {
+  if (a.length !== b.length) return false
+  return a.every((item, i) => (
+    item.key === b[i].key
+    && item.title === b[i].title
+    && item.visible === b[i].visible
+    && item.locked === b[i].locked
+  ))
+}
+
+/** 默认字段配置（从 localStorage 恢复，并与最新列定义合并） */
 function loadConfig(storageKey: string | undefined, defaults: ColumnConfig[]): ColumnConfig[] {
   if (!storageKey) return defaults
   try {
     const saved = localStorage.getItem(`table-config-${storageKey}`)
-    if (saved) return JSON.parse(saved)
+    if (!saved) return defaults
+    return mergeColumnConfigs(JSON.parse(saved) as ColumnConfig[], defaults)
   } catch { /* ignore */ }
   return defaults
 }
@@ -48,6 +112,19 @@ export default function TableColumnConfig({ columns, onChange, storageKey }: Tab
   const [draft, setDraft] = useState<ColumnConfig[]>(() => loadConfig(storageKey, columns))
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dragOver, setDragOver] = useState<{ zone: string; index: number } | null>(null)
+
+  /**
+   * 列定义发生变化（新增列 / 删除列 / 语言切换改标题）时同步草稿。
+   * <p>draft 只在挂载时读取一次，页面热更新或角色切换后 columns 已变、draft 还是旧的，
+   * 抽屉里就会缺列；此时点任意开关都会把旧草稿写回，等于把新列从表格上抹掉。
+   * 合并口径见 mergeColumnConfigs：保留用户已有顺序与显隐，只补新列、剔旧列、刷新标题。
+   */
+  useEffect(() => {
+    setDraft(prev => {
+      const next = mergeColumnConfigs(prev, columns)
+      return isSameColumnConfig(prev, next) ? prev : next
+    })
+  }, [columns])
 
   // 保存到 localStorage 并通知父组件
   const applyConfig = useCallback((newConfig: ColumnConfig[]) => {

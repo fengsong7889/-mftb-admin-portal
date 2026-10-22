@@ -88,7 +88,12 @@ import { fetchEmployeeIdOptions } from '../../api/employee'
 import { buildRdmSubmitPath } from '../../constants/menuDataSource'
 import { buildDeptTree, type DeptNode } from '../Attendance/deptTree'
 import { exportRequirementRows } from './requirementExport'
-import { formatHandlers, formatPerson, splitHandlers } from './handlerDisplay'
+import {
+  fallbackHandlerText,
+  formatHandlers,
+  formatPerson,
+  splitHandlers,
+} from './handlerDisplay'
 import RequirementKanban from './components/RequirementKanban'
 import RequirementImportModal from './components/RequirementImportModal'
 import type { ParsedRdmImportRow } from './rdmImport'
@@ -216,6 +221,17 @@ interface RequirementListProps {
    * <p>用于「认领/分配」页面——它只管待分配需求的中转，不需要多视图和导出。
    */
   minimal?: boolean
+}
+
+/**
+ * 判定请求是否因超时失败。
+ * <p>导入接口单独放宽了超时，但后端事务仍有可能比等待上限更久；此时不能按
+ * 「导入失败」提示，否则用户会重试并把没有云效编号的行重复建单。
+ */
+function isRequestTimeout(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const { code, message } = err as { code?: string; message?: string }
+  return code === 'ECONNABORTED' || /timeout/i.test(message ?? '')
 }
 
 /** 读偏好：隐私模式下 localStorage 会抛，不能因为读偏好失败让整个页面打不开 */
@@ -429,31 +445,46 @@ export default function RequirementList({
    * 「当前页多出几行但总数没变」的错位。
    */
   const handleRequirementImport = useCallback(async (importRows: ParsedRdmImportRow[]) => {
-    const result = await importRequirements(importRows.map(row => ({
-      rowNo: row.rowNo,
-      title: row.title,
-      externalNo: row.externalNo,
-      status: row.status,
-      projectManager: row.projectManager,
-      productManager: row.productManager,
-      projectName: row.projectName,
-      iterationName: row.iterationName,
-      description: row.description,
-    })))
-    if (result.failed > 0) {
-      return {
-        imported: result.imported,
-        skipped: result.skipped,
-        failed: result.failed,
-        messages: result.items
-          .filter(item => item.result === 'failed')
-          .map(item => `第 ${item.rowNo} 行 ${item.externalNo || item.title}：${item.message ?? '導入失敗'}`),
+    try {
+      const result = await importRequirements(importRows.map(row => ({
+        rowNo: row.rowNo,
+        title: row.title,
+        externalNo: row.externalNo,
+        status: row.status,
+        projectManager: row.projectManager,
+        productManager: row.productManager,
+        projectName: row.projectName,
+        iterationName: row.iterationName,
+        description: row.description,
+      })))
+      if (result.failed > 0) {
+        return {
+          imported: result.imported,
+          skipped: result.skipped,
+          failed: result.failed,
+          messages: result.items
+            .filter(item => item.result === 'failed')
+            .map(item => `第 ${item.rowNo} 行 ${item.externalNo || item.title}：${item.message ?? '導入失敗'}`),
+        }
       }
+      message.success(`導入完成：成功 ${result.imported} 條${result.skipped > 0 ? `，跳過 ${result.skipped} 條（雲效編號已存在）` : ''}`)
+      await load()
+      return { imported: result.imported, skipped: result.skipped, failed: 0, messages: [] }
+    } catch (err) {
+      /*
+       * 接口走静默请求，错误必须在这里统一提示。超时并不等于未写入：
+       * 后端事务可能仍在执行，直接说失败会诱导用户重试，没有云效编号的行会重复建单。
+       * 先刷新列表让用户核对，再决定是否重导。
+       */
+      if (isRequestTimeout(err)) {
+        message.warning(t('rdm.import.warnTimeout'))
+        void load()
+      } else {
+        message.error(err instanceof Error && err.message ? err.message : t('rdm.import.warnImportFailed'))
+      }
+      throw err
     }
-    message.success(`導入完成：成功 ${result.imported} 條${result.skipped > 0 ? `，跳過 ${result.skipped} 條（雲效編號已存在）` : ''}`)
-    await load()
-    return { imported: result.imported, skipped: result.skipped, failed: 0, messages: [] }
-  }, [load])
+  }, [load, t])
 
   useEffect(() => {
     // 计数只被视图栏消费：单切片页（提需求）与极简页（认领/分配）不渲染视图栏，没消费方就不必多打一次请求。
@@ -639,28 +670,39 @@ export default function RequirementList({
     }
   }
 
-  const columnMeta = useMemo(() => ([
-    { key: 'title', title: '需求標題' },
-    { key: 'status', title: '當前狀態' },
-    { key: 'priority', title: '優先級' },
-    { key: 'currentHandler', title: '當前處理人' },
-    { key: 'submitter', title: '提出人' },
-    { key: 'submitDeptName', title: '提出部門' },
-    { key: 'planReleaseDate', title: '計劃上線' },
-    { key: 'reqNo', title: '需求編號' },
-    { key: 'intakeFlowNo', title: '審批流程編號' },
-    { key: 'admission', title: isIntakeSide ? '審批狀態' : '準入口徑' },
-    { key: 'reqType', title: '需求類型' },
-    { key: 'complexity', title: '規模' },
-    { key: 'pmName', title: '產品經理' },
-    { key: 'submitTime', title: '提交時間' },
-    { key: 'expectDate', title: '期望完成' },
-    { key: 'stay', title: '當前停留' },
-    { key: 'iterationCode', title: t('rdm.reqList.colIteration') },
-    { key: 'projectName', title: t('rdm.reqList.colProject') },
-    { key: 'deliveryProgress', title: '交付進度' },
-    { key: 'action', title: '操作' },
-  ]), [isIntakeSide, t])
+  const columnMeta = useMemo(() => {
+    const meta = [
+      { key: 'title', title: '需求標題' },
+      { key: 'status', title: '當前狀態' },
+      { key: 'priority', title: '優先級' },
+      { key: 'currentHandler', title: '當前處理人' },
+      { key: 'submitter', title: '提出人' },
+      { key: 'submitDeptName', title: '提出部門' },
+      { key: 'planReleaseDate', title: '計劃上線' },
+      { key: 'reqNo', title: '需求編號' },
+      { key: 'intakeFlowNo', title: '審批流程編號' },
+      { key: 'admission', title: isIntakeSide ? '審批狀態' : '準入口徑' },
+      { key: 'reqType', title: '需求類型' },
+      { key: 'complexity', title: '規模' },
+      { key: 'pmName', title: '產品經理' },
+      { key: 'submitTime', title: '提交時間' },
+      { key: 'expectDate', title: '期望完成' },
+      { key: 'stay', title: '當前停留' },
+      { key: 'iterationCode', title: t('rdm.reqList.colIteration') },
+      { key: 'projectName', title: t('rdm.reqList.colProject') },
+      { key: 'deliveryProgress', title: '交付進度' },
+      { key: 'action', title: '操作' },
+    ]
+    /*
+     * 雲效編號只挂在需求跟進清單：它只记录「需求是否由云效迁移而来」，
+     * 不参与任何业务规则；提需求/认领分配页没有迁移语义，不下发该列。
+     */
+    if (isFollowUpSide) {
+      const at = meta.findIndex(item => item.key === 'reqNo') + 1
+      meta.splice(at, 0, { key: 'externalNo', title: t('rdm.reqList.colExternalNo') })
+    }
+    return meta
+  }, [isFollowUpSide, isIntakeSide, t])
 
   /**
    * 默认展示列随页面角色变化：
@@ -728,6 +770,8 @@ export default function RequirementList({
       { key: 'submitDeptName', visible: true },
       { key: 'planReleaseDate', visible: true },
       { key: 'reqNo', visible: true },
+      // 云效编号：迁移标记，跟进清单默认展示，用户可在列配置里关掉
+      { key: 'externalNo', visible: true },
       { key: 'intakeFlowNo', visible: false },
       { key: 'admission', visible: false },
       { key: 'reqType', visible: false },
@@ -770,6 +814,22 @@ export default function RequirementList({
         </span>
       ),
     },
+    /*
+     * 雲效編號：只展示云效迁移过来的原始编号，不参与任何业务规则；
+     * 仅需求跟进清单（legacy）下发该列，未从云效导入的行显示占位符。
+     */
+    ...(isFollowUpSide
+      ? [{
+          title: t('rdm.reqList.colExternalNo'),
+          dataIndex: 'externalNo',
+          key: 'externalNo',
+          width: 140,
+          ellipsis: true,
+          render: (v?: string | null) => (v
+            ? <span style={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>{v}</span>
+            : <span style={{ color: '#BFBFBF' }}>-</span>),
+        }]
+      : []),
     {
       title: '審批流程編號', dataIndex: 'intakeFlowNo', key: 'intakeFlowNo', width: 158,
       render: (v?: string | null, r?: RdmRequirementRow) => {
@@ -855,16 +915,17 @@ export default function RequirementList({
         )
       },
     },
-    { title: '提出人', dataIndex: 'submitterName', key: 'submitter', width: 150, ellipsis: true, render: (v: string | null | undefined, r) => formatPerson({ name: v, empNo: r.submitterEmpNo }) || '-' },
+    { title: '提出人', dataIndex: 'submitterName', key: 'submitter', width: 200, ellipsis: true, render: (v: string | null | undefined, r) => formatPerson({ name: v, empNo: r.submitterEmpNo }) || '-' },
     { title: '提出部門', dataIndex: 'submitDeptName', key: 'submitDeptName', width: 200, ellipsis: true, render: (v?: string | null) => v || '-' },
     {
-      title: '產品經理', dataIndex: 'pmName', key: 'pmName', width: 120,
+      // 单人员字段按「姓名（工号）」宽度给足，避免工号被省略成 "..."
+      title: '產品經理', dataIndex: 'pmName', key: 'pmName', width: 190, ellipsis: true,
       render: (v: string | null | undefined, r) => v
         ? formatPerson({ name: v, empNo: r.pmEmpNo })
         : <span style={{ color: '#FF4D4F' }}>未分配</span>,
     },
     {
-      title: '當前處理人', dataIndex: 'handlers', key: 'currentHandler', width: 190,
+      title: '當前處理人', dataIndex: 'handlers', key: 'currentHandler', width: 215,
       render: (v: RdmHandlerPerson[] | null | undefined, r) => {
         // 前 2 位直出、其余折成 +N 懸浮看全部；无未完成任务时回退流程推演值（口径与看板/导出同源）
         const parts = splitHandlers(v)
@@ -877,7 +938,8 @@ export default function RequirementList({
           if (r.status === RDM_STATUS.POOL && r.dispatcherName) {
             return formatPerson({ name: r.dispatcherName, empNo: r.dispatcherEmpNo })
           }
-          return r.currentHandler ?? '-'
+          // 历史快照只有姓名（存量导入未带工号）：按行内同名字段补工号，避免找人时无法区分同名
+          return fallbackHandlerText(r) || '-'
         }
         // 单元格内单行省略：多人（姓名+工号）远超列宽，不限制会溢出压住右侧列；+N 固定不被压缩
         return (
@@ -1216,7 +1278,7 @@ export default function RequirementList({
               type="info"
               showIcon
               style={{ marginBottom: 12 }}
-              message="需求池視角：勾選後可批量分配產品經理；分配即通知對方，超 24 小時未受理將自動升級提醒技術負責人。"
+              message="需求池視角：勾選後可批量分配產品經理；分配即通知對方，超 24 小時未受理將自動升級提醒項目負責人。"
             />
           )}
 

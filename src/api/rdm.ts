@@ -988,7 +988,15 @@ export interface RdmRequirementImportRowInput {
  * 参数级问题（空列表、超上限、无权限）仍走统一错误响应。
  */
 export async function importRequirements(rows: RdmRequirementImportRowInput[]): Promise<RdmRequirementImportResult> {
-  return request.post<unknown, RdmRequirementImportResult>('/rdm/requirement/import', { rows })
+  return request.post<unknown, RdmRequirementImportResult>('/rdm/requirement/import', { rows }, {
+    ...SILENT,
+    /*
+     * 导入是逐条发号 + 写需求/角色/流水/PRD 的同步批量动作（单批上限 500 行），
+     * 默认 15s 会在后端仍在写入时先报 timeout，用户误以为失败后会重试并重复建单。
+     * 单独放宽到 3 分钟；错误提示由页面按「超时可能仍在写入」的口径统一给出。
+     */
+    timeout: 180000,
+  })
 }
 
 /** 批量分配产品经理（需求池） */
@@ -2302,6 +2310,14 @@ export function updateIterationStatus(id: number, status: RdmIterationStatus) {
   return request.patch<unknown, void>(`/rdm/delivery/iteration/${id}/status`, { status })
 }
 
+/**
+ * 删除迭代（服务端逻辑删）。
+ * <p>仅未挂需求/任务的空迭代可删；不满足时后端返回明确原因，由 request.ts 统一弹出。
+ */
+export function deleteIteration(id: number) {
+  return request.delete<unknown, void>(`/rdm/delivery/iteration/${id}`)
+}
+
 /* ==================== M3：验收历史、质量口径、版本追溯、周报 ==================== */
 
 /** 一条验收记录（含第几次验收，attempt>1 即为返工） */
@@ -3427,6 +3443,14 @@ export async function fetchProjectDetail(id: number): Promise<RdmProjectDetail> 
 
 export async function updateProject(id: number, data: RdmProjectUpdateForm): Promise<void> {
   return request.patch<unknown, void>(`/rdm/project/${id}`, data)
+}
+
+/**
+ * 删除项目（仅限未挂任何需求的空壳项目）。
+ * <p>项目下未挂需求的迭代由服务端一并逻辑删除；有需求时返回明确原因，不静默失败。
+ */
+export async function deleteProject(id: number): Promise<void> {
+  return request.delete<unknown, void>(`/rdm/project/${id}`)
 }
 
 export async function fetchProjectSummary(id: number): Promise<RdmProjectSummary> {

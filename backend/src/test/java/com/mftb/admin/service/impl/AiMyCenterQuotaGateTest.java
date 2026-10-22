@@ -178,6 +178,71 @@ class AiMyCenterQuotaGateTest {
         assertTrue("allow".equals(vo.getAction()), "实际 action=" + vo.getAction());
     }
 
+    @Test
+    @DisplayName("员工专属额度绑定具体模型：首页综合校验仍算已配置并放行")
+    void modelScopedQuotaCountsInComprehensiveCheck() {
+        loginAs(101L, "MF00002");
+
+        AiQuotaConfig config = new AiQuotaConfig();
+        config.setQuotaType("employee");
+        config.setTargetId(101L);
+        config.setModelId(1L);          // 额度只作用于「通义千问 3.7 Flash」
+        config.setMonthlyQuota(100_000);
+        config.setStatus(1);
+        when(quotaConfigMapper.selectList(any())).thenReturn(List.of(config));
+
+        AiMyCenterDTO.QuotaCheckVO vo = service.checkQuota(null, null);
+
+        assertTrue(vo.isAllowed(), "绑模型的额度也是额度，不能判成「未配置」");
+        assertTrue(vo.isQuotaConfigured(), "必须能识别出该账号已有额度");
+        assertTrue("allow".equals(vo.getAction()), "实际 action=" + vo.getAction());
+    }
+
+    @Test
+    @DisplayName("一个模型超额、另一个模型仍然可用：综合校验放行，按模型精确校验才拦")
+    void comprehensiveCheckPassesWhenAnotherModelStillHasQuota() {
+        loginAs(101L, "MF00002");
+
+        AiQuotaConfig over = new AiQuotaConfig();
+        over.setQuotaType("employee");
+        over.setTargetId(101L);
+        over.setModelId(1L);
+        over.setMonthlyQuota(100);
+        over.setStatus(1);
+        AiQuotaConfig ok = new AiQuotaConfig();
+        ok.setQuotaType("employee");
+        ok.setTargetId(101L);
+        ok.setModelId(2L);
+        ok.setMonthlyQuota(100);
+        ok.setStatus(1);
+        when(quotaConfigMapper.selectList(any())).thenReturn(List.of(over, ok));
+
+        AiModel m1 = new AiModel();
+        m1.setId(1L);
+        m1.setModelKey("qwen-3.7-flash");
+        m1.setName("通义千问 3.7 Flash");
+        AiModel m2 = new AiModel();
+        m2.setId(2L);
+        m2.setModelKey("deepseek-chat");
+        m2.setName("DeepSeek Chat");
+        when(modelMapper.selectList(any())).thenReturn(List.of(m1, m2));
+        when(modelMapper.selectOne(any())).thenReturn(m1);
+
+        LlmUsage used = new LlmUsage();
+        used.setUsername("MF00002");
+        used.setModel("qwen-3.7-flash");
+        used.setPromptTokens(100);
+        used.setCompletionTokens(0);
+        used.setCreatedAt(java.time.LocalDateTime.now());
+        when(llmUsageMapper.selectList(any())).thenReturn(List.of(used));
+
+        AiMyCenterDTO.QuotaCheckVO comprehensive = service.checkQuota(null, null);
+        assertTrue(comprehensive.isAllowed(), "还有其他模型额度可用，首页不应整体拦截");
+
+        AiMyCenterDTO.QuotaCheckVO scoped = service.checkQuota(null, "qwen-3.7-flash");
+        assertFalse(scoped.isAllowed(), "指定已超额模型时必须拦截");
+    }
+
     private static void assertEqualsReject(AiMyCenterDTO.QuotaCheckVO vo) {
         assertTrue("reject".equals(vo.getAction()),
                 "action 必须是 reject，网关/编排/RDM 助手三处调用点都只认 reject，实际=" + vo.getAction());

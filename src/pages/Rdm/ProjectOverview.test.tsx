@@ -8,12 +8,13 @@
  *  4. 導出調 export-bundle 且帶當前 filters；
  *  5. reconciliation 不一致時給出提示而非靜默導出。
  */
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+import { Modal } from 'antd'
 import i18n from '../../i18n'
 import {
-  fetchExportBundle, fetchProjectDetail, fetchProjectPage, fetchProjectStats, updateProject,
+  deleteProject, fetchExportBundle, fetchProjectDetail, fetchProjectPage, fetchProjectStats, updateProject,
 } from '../../api/rdm'
 import { exportProjectBundle } from './projectExport'
 import ProjectOverview from './ProjectOverview'
@@ -23,8 +24,16 @@ beforeAll(async () => {
   await i18n.changeLanguage('zh-TW')
 })
 
+/**
+ * 按用例动态收回某个菜单动作：默认全部授予（大多数用例只关心列表/统计），
+ * 权限收敛与删除用例只针对性地摘掉对应动作。
+ */
+const deniedPermissions = vi.hoisted(() => new Set<string>())
 vi.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ hasPermission: () => true, hasMenuPermission: () => true }),
+  useAuth: () => ({
+    hasPermission: (key: string) => !deniedPermissions.has(key),
+    hasMenuPermission: () => true,
+  }),
 }))
 
 vi.mock('./projectExport', () => ({ exportProjectBundle: vi.fn() }))
@@ -37,6 +46,7 @@ vi.mock('../../api/rdm', () => ({
   fetchExportBundle: vi.fn(),
   fetchProjectDetail: vi.fn(),
   updateProject: vi.fn(),
+  deleteProject: vi.fn(),
 }))
 
 function makeRow(overrides: Record<string, unknown> = {}) {
@@ -58,8 +68,14 @@ function renderAt(entry = '/rdm-project') {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  deniedPermissions.clear()
   vi.mocked(fetchProjectPage).mockResolvedValue({ records: [makeRow()], total: 1 })
   vi.mocked(fetchProjectStats).mockResolvedValue({ inProgressCount: 3, attentionCount: 2, pendingDecisionCount: 1 } as never)
+})
+
+// Modal.confirm 静态挂在 body 上，cleanup() 不回收；残留弹窗会让下一条用例命中多份文本
+afterEach(() => {
+  Modal.destroyAll()
 })
 
 describe('ProjectOverview URL ↔ 篩選/分頁同步', () => {
@@ -256,5 +272,36 @@ describe('ProjectOverview 暫停真調後端', () => {
     fireEvent.click(screen.getByRole('button', { name: '恢復推進' }))
     fireEvent.click(await screen.findByRole('button', { name: /確認恢復/ }))
     await waitFor(() => expect(updateProject).toHaveBeenCalledWith(1, { pausedFlag: 0, expectedVersion: 4 }))
+  })
+})
+
+describe('ProjectOverview 權限收斂與刪除', () => {
+  it('只有查看權時操作列僅保留詳情，不渲染新增/編輯/暫停/刪除', async () => {
+    deniedPermissions.add('rdm-dashboard-project:edit')
+    deniedPermissions.add('rdm-dashboard-project:create')
+    deniedPermissions.add('rdm-dashboard-project:delete')
+    renderAt()
+    await screen.findByText('演示項目')
+    // 查看者必须能进只读详情；其余入口一律不渲染，避免点一次必然 403
+    expect(screen.getByRole('button', { name: '詳情' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '編輯' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '暫停項目' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '刪除' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /新增項目/ })).not.toBeInTheDocument()
+  })
+
+  it('刪除走二次確認並真調 deleteProject，成功後刷新列表', async () => {
+    vi.mocked(deleteProject).mockResolvedValue(undefined)
+    renderAt()
+    await screen.findByText('演示項目')
+    vi.mocked(fetchProjectPage).mockClear()
+    fireEvent.click(screen.getByRole('button', { name: '刪除' }))
+    // antd confirm 同时渲染 .ant-modal-title 与 .ant-modal-confirm-title 两份标题
+    expect((await screen.findAllByText('確認刪除項目')).length).toBeGreaterThan(0)
+    expect(document.body.textContent).toContain('僅未掛任何需求的項目可刪除')
+    fireEvent.click(await screen.findByRole('button', { name: /確認刪除/ }))
+    await waitFor(() => expect(deleteProject).toHaveBeenCalledWith(1))
+    // 删除成功后必须重新取数与统计，不能只弹一句成功
+    await waitFor(() => expect(fetchProjectPage).toHaveBeenCalled())
   })
 })

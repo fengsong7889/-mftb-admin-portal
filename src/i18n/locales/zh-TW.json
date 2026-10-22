@@ -3411,12 +3411,28 @@
     "greetingAfternoon": "下午好",
     "greetingEvening": "晚上好",
     "greetingPartner": "夥伴",
+    "meetingTitle": "今日會議",
+    "meetingUnit": "場",
+    "meetingPending": "待你響應 {{count}} 則",
+    "meetingPendingShort": "待響應 {{count}} 則",
+    "meetingNext": "下一場：{{title}}",
+    "meetingView": "查看我的會議",
+    "meetingCollapse": "收起",
+    "meetingCollapseTip": "收起後可在右上角「今日會議」重新展開",
+    "meetingExpandAria": "展開今日會議",
+    "meetingChip": "今日會議 {{count}} 場",
+    "meetingChipAria": "展開今日會議，共 {{count}} 場",
     "aiTitle": "AI 智能助手",
     "aiBeta": "內測模式",
     "aiBetaTip": "當前處於內測階段，AI 助手回答結果僅供參考，請結合實際業務數據自行核驗後使用。",
     "aiOnline": "在線",
     "aiMyUsage": "我的用量",
     "aiApplyMore": "申請加量/加模型",
+    "aiQuickPrompt": "快捷提問",
+    "aiCapability": "模型能力",
+    "usageAvailableFull": "可用100%",
+    "usageUsedFull": "已用100%",
+    "usageUsedPercent": "已使用{{percent}}%",
     "aiQuotaSufficient": "充足",
     "aiQuotaTight": "緊張",
     "aiQuotaInsufficient": "不足",
@@ -3459,6 +3475,8 @@
     "usageQuotaDimsTitle": "我的額度維度",
     "usageDimsEmpty": "暫無可用額度",
     "usageDimsEmptyHint": "尚未配置額度限制，目前可按授權模型正常使用 AI 助手（不按額度攔截）。若需按人/部門管控用量，請聯繫管理員在「配額管理」配置額度策略。",
+    "usageDimsUnlimited": "不設額度上限",
+    "usageDimsUnlimitedHint": "內置系統管理員默認擁有全部模型且不限制用量，無需申請模型授權或額度。",
     "aiBlockedBadge": "未開通",
     "aiBlockedNoModelsTitle": "暫無 AI 模型權限",
     "aiBlockedNoModelsDesc": "你的賬號暫無任何 AI 模型的使用權限，因此無法使用 AI 助手。請提交申請，審批通過後將為你開通模型授權並分配額度，開通後即可開始對話。",
@@ -3600,7 +3618,8 @@
     "aiBetaTipAction": "重要數字與結論請回到業務頁面覆核後再使用；發現答案有誤歡迎回饋。",
     "aiBetaTipLabelAction": "使用建議",
     "engineChipKilled": "已熔斷",
-    "infoBarNoQuotaLimit": "尚未設定額度限制（不按額度攔截）"
+    "infoBarNoQuotaLimit": "尚未設定額度限制（不按額度攔截）",
+    "usageUnlimitedValue": "不設上限"
   },
   "conversationAudit": {
     "pageTitle": "對話審計",
@@ -11649,6 +11668,7 @@
       "colProjectName": "所屬項目",
       "colIterationName": "所屬迭代",
       "colDescription": "需求描述",
+      "colAction": "操作",
       "errNoSheet": "檔案無有效工作表",
       "errNoHeader": "未找到表頭：請使用「批量導入」彈窗下載的模板",
       "errMissingColumns": "表頭缺少必要列：{{columns}}",
@@ -11683,7 +11703,16 @@
       "warnNothingToImport": "沒有可導入的數據",
       "warnValidationFailed": "有 {{count}} 行未通過校驗，本次未寫入任何數據",
       "successImported": "導入完成：成功 {{imported}} 條",
-      "successWithSkipped": "導入完成：成功 {{imported}} 條，跳過 {{skipped}} 條"
+      "successWithSkipped": "導入完成：成功 {{imported}} 條，跳過 {{skipped}} 條",
+      "btnRemove": "移除",
+      "removeTitle": "確認移除該行？",
+      "removeContent": "第 {{rowNo}} 行「{{title}}」將不參與本次導入，原始 Excel 不會被修改。",
+      "removeOk": "確認移除",
+      "removeTipLast": "至少保留 1 條需求",
+      "removeTipErrors": "請先修正檔案中的錯誤行，再移除不需要的資料",
+      "warnKeepAtLeastOne": "至少保留 1 條需求",
+      "warnTimeout": "導入處理超過前端等待上限，後端可能仍在寫入。請先重新整理列表核對結果；已導入的雲效編號重複導入會自動跳過。",
+      "warnImportFailed": "導入失敗，請重試"
     },
     "board": {
       "title": "進度日報看板",
@@ -12590,6 +12619,15 @@
       "confirmOk": "確認",
       "statusUpdated": "迭代狀態已更新",
       "viewOnly": "僅查看",
+      "deleteTitle": "確認刪除迭代",
+      "deleteOk": "確認刪除",
+      "deleteCodeLabel": "迭代編碼：",
+      "deleteNameLabel": "迭代名稱：",
+      "deleteReqLabel": "已排需求：",
+      "deleteReqCount": "{{n}} 條",
+      "deleteBlocked": "該迭代下仍有需求，請先移除或轉移需求後再刪除。",
+      "deleteHint": "僅未掛需求的迭代可刪除；刪除後不可恢復。",
+      "deleteSuccess": "迭代已刪除",
       "changeStatus": "修改狀態",
       "colName": "迭代",
       "colType": "類型",
@@ -12612,7 +12650,10 @@
     "iterationForm": {
       "capacityAutoEmpty": "選擇起止日期後自動計算",
       "capacityAutoHint": "{{days}} 個工作日 × 8h",
-      "capacityManualHint": "{{days}} 個工作日 × 8h，已手動調整"
+      "capacityManualHint": "{{days}} 個工作日 × 8h，已手動調整",
+      "viewTitle": "迭代詳情",
+      "viewMeta": "迭代編碼 {{code}} 由系統發號；本頁為只讀視圖，如需修改請使用「編輯」",
+      "back": "返回"
     },
     "projOverview": {
       "tagPaused": "已暫停",
@@ -12652,11 +12693,18 @@
       "filterPlanDate": "計劃日期",
       "filterPm": "項目負責人",
       "filterPo": "產品負責人",
-      "filterStatus": "進度狀態"
+      "filterStatus": "進度狀態",
+      "deleteTitle": "確認刪除項目",
+      "deleteOk": "確認刪除",
+      "deleteNoLabel": "項目編號：",
+      "deleteNameLabel": "項目名稱：",
+      "deleteHint": "僅未掛任何需求的項目可刪除；項目下未掛需求的迭代會一併刪除，且不可恢復。",
+      "deleteSuccess": "項目已刪除"
     },
     "reqList": {
       "colIteration": "所屬迭代",
       "colProject": "所屬項目",
+      "colExternalNo": "雲效編號",
       "btnSchedule": "排期",
       "btnMyGantt": "我的甘特圖",
       "btnGlobalGantt": "全局甘特圖",
@@ -12670,7 +12718,10 @@
     "projDetail": {
       "tagPaused": "已暫停",
       "tagRisk": "風險",
-      "tagOverdue": "已逾期"
+      "tagOverdue": "已逾期",
+      "editDeniedTitle": "您沒有該操作的權限",
+      "editDeniedDesc": "當前賬號僅可查看項目詳情；如需新增或修改項目，請聯繫項目負責人或系統管理員。",
+      "backToProject": "返回項目"
     },
     "reqSubmit": {
       "draftSaved": "草稿已保存，可在「提需求」菜單裡點「編輯」繼續填、「提交」送出",

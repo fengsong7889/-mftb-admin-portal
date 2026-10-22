@@ -108,35 +108,51 @@ function cellText(value: ExcelJS.CellValue): string {
  * 解析需求导入 Excel。
  *
  * 只有「必填缺失 / 状态非法 / 文件内云效编号重复」会阻断该行；
- * 项目经理、产品经理、项目、迭代的匹配交给后端（前端没有权威人员与项目数据）。
+ * 云效编号非必填（存量需求不全是云效来源），项目经理、产品经理、项目、迭代的匹配
+ * 交给后端（前端没有权威人员与项目数据）。
  */
 export async function parseRequirementImportExcel(file: File): Promise<ParsedRdmImportExcel> {
   const buffer = await file.arrayBuffer()
   const wb = new ExcelJS.Workbook()
   await wb.xlsx.load(buffer)
-  const ws = wb.worksheets[0]
-  if (!ws) {
+  if (wb.worksheets.length === 0) {
     return {
       rows: [],
       errors: [{ rowNo: 0, message: i18n.t('rdm.import.errNoSheet', { defaultValue: '檔案無有效工作表' }) }],
     }
   }
 
-  // 先转二维数组再定位表头行：用户可能在表头上方保留说明行
-  const matrix: string[][] = []
-  ws.eachRow({ includeEmpty: true }, (row, rowNumber) => {
-    const cells: string[] = []
-    row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-      cells[colNumber - 1] = cellText(cell.value)
-    })
-    matrix[rowNumber - 1] = cells
-  })
-
+  /*
+   * 数据页签虽然排在模板首位，但用户可能删过、改过页签名或调整顺序，
+   * 所以不能假设 worksheets[0] 就是数据页：先按页签名定位，找不到再逐个页签扫描表头兜底。
+   */
+  const candidates = [
+    ...wb.worksheets.filter(sheet => sheet.name === RDM_IMPORT_DATA_SHEET),
+    ...wb.worksheets.filter(sheet => sheet.name !== RDM_IMPORT_DATA_SHEET),
+  ]
   const titleAliases = aliasesOf('title').map(normalize)
-  const headerRowIndex = matrix.findIndex(row => (row ?? []).some(cell => {
-    const text = normalize(cell)
-    return titleAliases.some(alias => text === alias || text.includes(alias))
-  }))
+  let matrix: string[][] = []
+  let headerRowIndex = -1
+  for (const sheet of candidates) {
+    // 先转二维数组再定位表头行：用户可能在表头上方保留说明行
+    const rows: string[][] = []
+    sheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+      const cells: string[] = []
+      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        cells[colNumber - 1] = cellText(cell.value)
+      })
+      rows[rowNumber - 1] = cells
+    })
+    const index = rows.findIndex(row => (row ?? []).some(cell => {
+      const text = normalize(cell)
+      return titleAliases.some(alias => text === alias || text.includes(alias))
+    }))
+    if (index >= 0) {
+      matrix = rows
+      headerRowIndex = index
+      break
+    }
+  }
   if (headerRowIndex < 0) {
     return {
       rows: [],
@@ -204,9 +220,7 @@ export async function parseRequirementImportExcel(file: File): Promise<ParsedRdm
     if (title.length > 200) {
       rowErrors.push(i18n.t('rdm.import.errTitleTooLong', { max: 200, defaultValue: '需求名稱超過 {{max}} 字' }))
     }
-    if (!externalNo) {
-      rowErrors.push(i18n.t('rdm.import.errExternalNoEmpty', { defaultValue: '雲效編號不能為空' }))
-    }
+    // 云效编号非必填：留空表示非云效来源，只有填了才做长度与批内查重
     if (externalNo.length > 64) {
       rowErrors.push(i18n.t('rdm.import.errExternalNoTooLong', { max: 64, defaultValue: '雲效編號超過 {{max}} 字' }))
     }
@@ -271,25 +285,14 @@ export async function parseRequirementImportExcel(file: File): Promise<ParsedRdm
 /**
  * 生成需求导入模板（返回 object URL，调用方使用后需 revokeObjectURL）。
  *
- * 状态列内置下拉，选项来自「状态字典」页签；该页签同时给出状态码与说明，
- * 便于用户在不打开系统的情况下确认填法。
+ * 页签顺序：数据页在前、状态字典在后。
+ * 为什么数据页在前：操作人打开模板的第一动作是录需求，默认落在字典页会多一次切换，
+ * 也容易把数据误填进字典页；状态列本身已有下拉，字典仅供查不到时参考。
+ * 状态列下拉按页签名引用字典页，因此字典页排在后面不影响校验。
  */
 export async function generateRequirementImportTemplate(): Promise<string> {
   const wb = new ExcelJS.Workbook()
   wb.creator = RDM_IMPORT_CREATOR
-
-  const dict = wb.addWorksheet(RDM_IMPORT_DICT_SHEET.name)
-  dict.columns = [
-    { header: RDM_IMPORT_DICT_SHEET.labelHeader, key: 'label', width: 20 },
-    { header: RDM_IMPORT_DICT_SHEET.codeHeader, key: 'code', width: 18 },
-    { header: RDM_IMPORT_DICT_SHEET.hintHeader, key: 'hint', width: 36 },
-  ]
-  for (const item of RDM_IMPORT_STATUS_DICT) {
-    dict.addRow({ label: item.label, code: item.code, hint: item.hint })
-  }
-  dict.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } }
-  dict.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8720C' } }
-  dict.views = [{ state: 'frozen', ySplit: 1 }]
 
   const ws = wb.addWorksheet(RDM_IMPORT_DATA_SHEET)
   ws.columns = RDM_IMPORT_COLUMNS.map(col => ({ header: col.header, key: col.key, width: col.width }))
@@ -321,6 +324,20 @@ export async function generateRequirementImportTemplate(): Promise<string> {
       error: RDM_IMPORT_STATUS_VALIDATION.error,
     }
   }
+
+  // 字典页放在最后：仅供状态拿不准时查，不打断录需求动线
+  const dict = wb.addWorksheet(RDM_IMPORT_DICT_SHEET.name)
+  dict.columns = [
+    { header: RDM_IMPORT_DICT_SHEET.labelHeader, key: 'label', width: 20 },
+    { header: RDM_IMPORT_DICT_SHEET.codeHeader, key: 'code', width: 18 },
+    { header: RDM_IMPORT_DICT_SHEET.hintHeader, key: 'hint', width: 36 },
+  ]
+  for (const item of RDM_IMPORT_STATUS_DICT) {
+    dict.addRow({ label: item.label, code: item.code, hint: item.hint })
+  }
+  dict.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } }
+  dict.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8720C' } }
+  dict.views = [{ state: 'frozen', ySplit: 1 }]
 
   const buf = await wb.xlsx.writeBuffer()
   const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })

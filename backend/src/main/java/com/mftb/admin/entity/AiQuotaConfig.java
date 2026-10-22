@@ -56,6 +56,9 @@ public class AiQuotaConfig {
     /** 状态：1=启用 0=停用 */
     private Integer status;
 
+    /** 最后更新人（姓名口径，保存时由服务层显式刷新） */
+    private String updatedBy;
+
     /** 逻辑删除 */
     @TableLogic
     private Integer deleted;

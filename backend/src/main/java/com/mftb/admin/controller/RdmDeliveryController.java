@@ -232,6 +232,19 @@ public class RdmDeliveryController {
         return Result.success("迭代狀態已更新", null);
     }
 
+    /**
+     * 删除迭代（逻辑删）。
+     * <p>权限锚点与删除任务保持一致（{@code rdm-delivery-iteration:delete}）：
+     * 该动作从已退役的 rdm-product 平移而来，持有者本就是能删迭代的人。
+     * <p>「未挂需求才能删」由服务层逐表计数兜底，前端按钮显隐不作为安全边界。
+     */
+    @DeleteMapping("/iteration/{id}")
+    @RequirePermission(menu = "rdm-delivery-iteration", action = "delete", anyOf = {"rdm-delivery-board", "rdm-intake"})
+    public Result<Void> deleteIteration(@PathVariable Long id) {
+        deliveryService.deleteIteration(id);
+        return Result.success("迭代已刪除", null);
+    }
+
     /* ── 需求变更 ── */
 
     /** 需求下的变更记录 */

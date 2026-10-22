@@ -58,7 +58,7 @@ function blankPolicy(seq: number): RdmIntakePolicy {
     scopeSystems: [],
     scopeReqTypes: [],
     approvalNodes: ['直屬主管'],
-    dispatcherName: '技術負責人',
+    dispatcherName: '項目負責人',
     priority: seq,
     effectiveFrom: dayjs().format('YYYY-MM-DD'),
     version: 'v1',

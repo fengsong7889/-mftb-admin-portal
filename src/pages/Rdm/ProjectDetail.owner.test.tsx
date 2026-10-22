@@ -25,6 +25,11 @@ vi.mock('../../api/employee', () => ({
   fetchEmployee: vi.fn(async () => emp),
 }))
 
+// 表单/详情入口按 rdm-dashboard-project:edit|create 收敛；本文件测提交契约，需给全权限
+vi.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: () => true }),
+}))
+
 // 只覆盖本页真正调用的八个写/读接口，其余导出保留真实实现：
 // 整模块替换时，只要被间接导入的模块用到别的 rdm 导出，就会报
 // 「No xxx export is defined on the mock」

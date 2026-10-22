@@ -75,6 +75,9 @@ npm run check:confirm-modal
 5. **员工选择统一用 `EmployeeSelect` 组件**：凡表单中需要选择员工/人员的字段，一律使用
    `src/pages/MeetingManagement/EmployeeSelect.tsx`（`single` 模式单选），禁止使用普通 `<Input>` 文本框。
    选项显示格式为 `姓名(工号)` 如 `张三(MF00001)`，数据源为在职员工远程搜索接口。
+   **所有选员工的下拉框只显示「姓名 + 工号」，禁止拼部门**（含 `· 部门`、`（部门）` 等形式）：
+   部门不能帮助消歧，还会把组织归属批量暴露给任何能打开该页的人。仅当用户明确要求带部门时
+   才可展示，并必须在调用处注释说明理由（例：`src/api/employee.ts` 的资产使用人场景）。
    表单需同时存储 `*UserId`（sys_user.id）和 `*UserName`（姓名快照）两个字段，
    通过 `onChange` 写 userId、`onPick` 写 userName 实现双写。
    参考实现：`src/pages/Rdm/ProjectDetail.tsx`（项目基本信息负责人字段）。

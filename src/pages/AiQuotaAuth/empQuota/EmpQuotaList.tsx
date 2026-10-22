@@ -493,6 +493,7 @@ export default function EmpQuotaList() {
     { key: 'usedToday', title: t('aiQuotaAuth.usedTodayCol') },
     { key: 'usedMonth', title: t('aiQuotaAuth.usedMonthCol') },
     { key: 'resetDayOfMonth', title: t('aiQuotaAuth.resetDayLabel') },
+    { key: 'updatedBy', title: t('aiQuotaAuth.lastUpdatedByCol') },
     { key: 'updatedAt', title: t('aiQuotaAuth.lastUpdatedAtCol') },
     { key: 'action', title: t('common.action') },
   ]
@@ -531,6 +532,7 @@ export default function EmpQuotaList() {
       key: 'resetDayOfMonth', title: t('aiQuotaAuth.resetDayLabel'), dataIndex: 'resetDayOfMonth', width: 110, align: 'center',
       render: (v: number, row) => (row.autoReset === 1 ? t('aiQuotaAuth.resetDayValue', { day: v }) : t('aiQuotaAuth.disabledTag')),
     },
+    { key: 'updatedBy', title: t('aiQuotaAuth.lastUpdatedByCol'), dataIndex: 'updatedBy', width: 100, render: (v: string | null) => v || '-' },
     { key: 'updatedAt', title: t('aiQuotaAuth.lastUpdatedAtCol'), dataIndex: 'updatedAt', width: 160, render: (v: string) => v || '-' },
     {
       key: 'action', title: t('common.action'), width: 140, align: 'center', fixed: 'right',
