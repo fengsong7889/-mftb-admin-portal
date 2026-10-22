@@ -28,6 +28,7 @@ import { rdmTableLocale } from './components/tableLocale'
 import { deriveRdmColumnMeta } from './rdmColumnMeta'
 /** 阶段 6：页内展开预算、HR 建议与指标口径（不新建路由，避开菜单页名兜底表上限） */
 import GovernancePanel from './components/GovernancePanel'
+import { formatEmployee } from '../../utils/employeeDisplay'
 import { useAuth } from '../../contexts/AuthContext'
 import {
   fetchScoreBoard,
@@ -240,7 +241,7 @@ export default function ScoreBoard() {
       title: '需求標題', dataIndex: 'reqTitle', key: 'reqTitle', width: 280, ellipsis: true,
       render: (v: string, r) => <a className="rdm-table-title__link" title={v} href={`#/rdm-detail?id=${r.reqId}`}>{v}</a>,
     },
-    { title: '人員', dataIndex: 'userName', key: 'userName', width: 100 },
+    { title: '人員', dataIndex: 'userName', key: 'userName', width: 140, render: (v: string, r) => formatEmployee(v, r.empNo) },
     {
       title: '角色', dataIndex: 'roleCode', key: 'roleCode', width: 110,
       render: (v: string) => <Tag color="geekblue" style={{ margin: 0 }}>{RDM_ROLE_LABEL[v as RdmRoleCode] ?? v}</Tag>,

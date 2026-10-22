@@ -18,6 +18,7 @@ vi.mock('../../api/rdm', () => ({
   fetchFunctionPoints: vi.fn().mockResolvedValue([]),
   fetchMenuTree: vi.fn().mockResolvedValue([]),
   fetchProductOptions: vi.fn().mockResolvedValue([]),
+  fetchTechLeadOptions: vi.fn().mockResolvedValue([]),
   fetchProjectPage: vi.fn().mockResolvedValue({ records: [], total: 0 }),
   // 返回落点与草稿内容无关：给 null 让续编回填分支直接跳过，聚焦在导航接线上
   fetchRequirementDetail: vi.fn().mockResolvedValue(null),

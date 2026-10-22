@@ -5,17 +5,21 @@ import com.mftb.admin.dto.RdmScheduleDTO;
 import com.mftb.admin.dto.RdmScheduleVO;
 import com.mftb.admin.entity.RdmRequirement;
 import com.mftb.admin.entity.RdmTaskDependency;
+import com.mftb.admin.entity.RdmTaskPlanLog;
 import com.mftb.admin.entity.RdmWorkCalendar;
 import com.mftb.admin.entity.RdmWorkTask;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.RdmMilestoneMapper;
 import com.mftb.admin.mapper.RdmRequirementMapper;
+import com.mftb.admin.mapper.RdmRequirementRoleMapper;
 import com.mftb.admin.mapper.RdmTaskDependencyMapper;
+import com.mftb.admin.mapper.RdmTaskPlanLogMapper;
 import com.mftb.admin.mapper.RdmWorkCalendarMapper;
 import com.mftb.admin.mapper.RdmWorkTaskMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.RdmAccessGuard;
 import com.mftb.admin.service.RdmIdempotentService;
+import com.mftb.admin.service.RdmPrdTaskService;
 import com.mftb.admin.util.OperatorResolver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,6 +34,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -57,9 +62,21 @@ class RdmScheduleGuardTest {
     private OperatorResolver operatorResolver;
     private JdbcTemplate jdbcTemplate;
     private RdmIdempotentService idempotentService;
+    private RdmRequirementMapper requirementMapper;
+    private RdmTaskPlanLogMapper taskPlanLogMapper;
     private RdmScheduleServiceImpl service;
 
     private static final long OWNER = 41L;
+
+    /** LambdaUpdateWrapper 需要实体 TableInfo 缓存（纯 Mockito 环境不会自动建） */
+    @org.junit.jupiter.api.BeforeAll
+    static void initTableInfo() {
+        org.apache.ibatis.builder.MapperBuilderAssistant assistant =
+                new org.apache.ibatis.builder.MapperBuilderAssistant(
+                        new com.baomidou.mybatisplus.core.MybatisConfiguration(), "");
+        com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(assistant, RdmWorkTask.class);
+        com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(assistant, RdmRequirement.class);
+    }
 
     @BeforeEach
     void setUp() {
@@ -78,6 +95,9 @@ class RdmScheduleGuardTest {
         when(idempotentService.executeOnce(any(), any(), any()))
                 .thenAnswer(inv -> ((java.util.function.Supplier<?>) inv.getArgument(1)).get());
         RdmRequirementMapper requirementMapper = mock(RdmRequirementMapper.class);
+        this.requirementMapper = requirementMapper;
+        RdmRequirementRoleMapper roleMapper = mock(RdmRequirementRoleMapper.class);
+        taskPlanLogMapper = mock(RdmTaskPlanLogMapper.class);
         // 日历保存会先确认人存在（排程输入不能指向一个不存在的人）
         SysUser owner = new SysUser();
         owner.setId(OWNER);
@@ -93,8 +113,8 @@ class RdmScheduleGuardTest {
                 // 保证请假/周末支援等真实工作日数学与原私有实现逐字等价。
                 new com.mftb.admin.service.RdmWorkingDayCalculator(calendarMapper),
                 // 预存工作区改动：RdmScheduleServiceImpl 构造器新增需求角色/任务计划日志两个依赖，补 mock 解除 test-compile 阻塞
-                mock(com.mftb.admin.mapper.RdmRequirementRoleMapper.class),
-                mock(com.mftb.admin.mapper.RdmTaskPlanLogMapper.class));
+                roleMapper,
+                taskPlanLogMapper);
 
         SysUser current = new SysUser();
         current.setId(OWNER);
@@ -104,6 +124,7 @@ class RdmScheduleGuardTest {
         when(operatorResolver.operatorSignature(any())).thenReturn("MF00041|李四");
         when(accessGuard.canSeeAll(any())).thenReturn(true);
         when(accessGuard.requireVisible(any(), anyString())).thenReturn(requirement());
+        when(accessGuard.requireById(any())).thenReturn(requirement());
         when(accessGuard.requireDeliveryWriter(any(), anyString())).thenReturn(requirement());
         when(dependencyMapper.selectList(any())).thenReturn(List.of());
         // 真实 insert 会回填主键：环检测失败时要靠这个 id 回滚刚写入的边
@@ -113,6 +134,7 @@ class RdmScheduleGuardTest {
         });
         when(calendarMapper.selectList(any())).thenReturn(List.of());
         when(taskMapper.selectList(any())).thenReturn(List.of());
+        when(roleMapper.selectList(any())).thenReturn(List.of());
         when(milestoneMapper.selectList(any())).thenReturn(List.of());
     }
 
@@ -342,6 +364,58 @@ class RdmScheduleGuardTest {
 
         BusinessException ex = assertThrows(BusinessException.class, () -> service.saveCalendar(dto));
         assertTrue(ex.getMessage().contains("本人"), ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("PRD 任务本人可调排期：不再被当成只读系统任务")
+    void prdTaskAdjustableByOwner() {
+        RdmWorkTask prd = task(7L, "產出 PRD 並提交評審", "8");
+        prd.setTaskType(RdmPrdTaskService.TASK_TYPE_PRD);
+        when(taskMapper.selectList(any())).thenReturn(List.of(prd));
+
+        RdmScheduleDTO.GanttQuery q = new RdmScheduleDTO.GanttQuery();
+        q.setMode("single");
+        q.setReqId(1L);
+        RdmScheduleVO.GanttPage page = service.gantt(q);
+
+        RdmScheduleVO.GanttTask ganttTask = page.getRequirements().get(0).getTasks().get(0);
+        assertTrue(ganttTask.getCanAdjust(), "产品经理本人的 PRD 任务应可调排期");
+        assertNull(ganttTask.getReadOnlyReason());
+    }
+
+    @Test
+    @DisplayName("PRD 任务改完成日：同步需求承诺日期并写入审计说明")
+    void prdTaskPlanSyncsPromisedDate() {
+        RdmRequirement req = requirement();
+        req.setPromisedPrdDate(LocalDate.of(2026, 11, 1));
+        when(accessGuard.requireById(1L)).thenReturn(req);
+        RdmWorkTask prd = task(7L, "產出 PRD 並提交評審", "8");
+        prd.setTaskType(RdmPrdTaskService.TASK_TYPE_PRD);
+        prd.setPlanStartDate(LocalDate.of(2026, 10, 1));
+        prd.setPlanFinishDate(LocalDate.of(2026, 11, 1));
+        prd.setPlanVersion(1);
+        when(taskMapper.selectById(7L)).thenReturn(prd);
+        when(taskMapper.update(any(), any())).thenReturn(1);
+        when(requirementMapper.update(any(), any())).thenReturn(1);
+
+        RdmScheduleDTO.TaskPlanBatch batch = new RdmScheduleDTO.TaskPlanBatch();
+        RdmScheduleDTO.TaskPlanItem item = new RdmScheduleDTO.TaskPlanItem();
+        item.setTaskId(7L);
+        item.setExpectedPlanVersion(1);
+        item.setPlanStartDate("2026-10-01");
+        item.setPlanFinishDate("2026-11-15");
+        batch.setItems(List.of(item));
+        batch.setClientRequestId("test-prd-plan-sync");
+
+        service.updateTaskPlans(batch);
+
+        // 完成日变化必须同步需求「承诺出 PRD 日期」
+        verify(requirementMapper).update(any(), any());
+        org.mockito.ArgumentCaptor<RdmTaskPlanLog> captor =
+                org.mockito.ArgumentCaptor.forClass(RdmTaskPlanLog.class);
+        verify(taskPlanLogMapper).insert(captor.capture());
+        assertNotNull(captor.getValue().getRemark());
+        assertTrue(captor.getValue().getRemark().contains("同步需求承諾出 PRD 日期"));
     }
 
     private static RdmScheduleVO.Bar barOf(RdmScheduleVO.Plan plan, long taskId) {

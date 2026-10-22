@@ -101,7 +101,8 @@ class RdmIterationOwnershipTest {
                 mock(com.mftb.admin.service.RdmFlowVersionGuard.class),
                 mock(com.mftb.admin.service.RdmRequirementStructureService.class),
                 mock(com.mftb.admin.service.RdmDeliveryItemService.class),
-                mock(com.mftb.admin.service.RdmAllowedActionsService.class));
+                mock(com.mftb.admin.service.RdmAllowedActionsService.class),
+                mock(com.mftb.admin.service.RdmPrdTaskService.class));
         when(configService.stageMap()).thenReturn(Map.of());
     }
 

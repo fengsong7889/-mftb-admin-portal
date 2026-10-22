@@ -204,7 +204,7 @@
       "rdmSubmit": "提交需求",
       "rdmIntake": "需求審批",
       "rdmDispatch": "分配受理",
-      "rdmDesign": "PRD 設計",
+      "rdmDesign": "PRD 產出",
       "rdmDev": "開發",
       "rdmRelease": "上線歸檔",
       "searching": "正在搜索匹配中",
@@ -11639,6 +11639,52 @@
     "totalRecords_one": "共 {{count}} 條"
   },
   "rdm": {
+    "import": {
+      "colRowNo": "行號",
+      "colTitle": "需求名稱",
+      "colExternalNo": "雲效編號",
+      "colStatus": "需求狀態",
+      "colProjectManager": "項目經理",
+      "colProductManager": "產品經理",
+      "colProjectName": "所屬項目",
+      "colIterationName": "所屬迭代",
+      "colDescription": "需求描述",
+      "errNoSheet": "檔案無有效工作表",
+      "errNoHeader": "未找到表頭：請使用「批量導入」彈窗下載的模板",
+      "errMissingColumns": "表頭缺少必要列：{{columns}}",
+      "listSeparator": "、",
+      "errTitleEmpty": "需求名稱不能為空",
+      "errTitleTooLong": "需求名稱超過 {{max}} 字",
+      "errExternalNoEmpty": "雲效編號不能為空",
+      "errExternalNoTooLong": "雲效編號超過 {{max}} 字",
+      "errStatusEmpty": "需求狀態不能為空",
+      "errStatusInvalid": "需求狀態「{{status}}」不在產研交付系統狀態字典內",
+      "errExternalNoDuplicate": "雲效編號與第 {{rowNo}} 行重複",
+      "errRowLine": "第 {{rowNo}} 行 {{label}}：{{reasons}}",
+      "reasonSeparator": "；",
+      "errNoDataRows": "檔案無有效資料行",
+      "modalTitle": "批量導入存量需求",
+      "btnCancel": "取消",
+      "btnConfirm": "確認導入",
+      "btnConfirmCount": "確認導入（{{count}} 條）",
+      "alertTitle": "導入的是已准入的歷史需求",
+      "alertDesc": "不會發起准入審批、不進入待辦、不發送通知；導入後可在需求跟進清單中繼續建任務並填寫任務時間。",
+      "templateColumns": "模板列：需求名稱、雲效編號、需求狀態、項目經理、產品經理、所屬項目、所屬迭代、需求描述。",
+      "templateStatusHint": "需求狀態請從下拉列表選擇產研交付系統的狀態。",
+      "btnDownloadTemplate": "下載模板",
+      "uploadParsing": "正在解析…",
+      "uploadPlaceholder": "點擊或拖拽 Excel 檔案到此處",
+      "uploadHint": "支援 .xlsx / .xls，單次建議不超過 500 條",
+      "errorCount": "{{count}} 處問題需要修正後才能導入",
+      "validCount": "已通過前端校驗 {{count}} 條；人員、項目、迭代與雲效編號將在導入時由後端復核",
+      "totalCount": "共 {{count}} 條",
+      "warnNoRows": "檔案無有效資料行",
+      "warnParseFailed": "檔案解析失敗：請確認是 .xlsx 檔案且未加密",
+      "warnNothingToImport": "沒有可導入的數據",
+      "warnValidationFailed": "有 {{count}} 行未通過校驗，本次未寫入任何數據",
+      "successImported": "導入完成：成功 {{imported}} 條",
+      "successWithSkipped": "導入完成：成功 {{imported}} 條，跳過 {{skipped}} 條"
+    },
     "board": {
       "title": "進度日報看板",
       "brand": "麦峰集团·项目汇报",
@@ -12051,12 +12097,19 @@
       "boardShowOwners": "展示負責人",
       "boardShowUnassigned": "展示未掛項目迭代",
       "msgTitle": "釘釘消息",
-      "msgHint": "層級框架固定，只調每行展示的字段",
+      "msgHint": "以釘釘卡片發送，標題即結論，只調每行展示的字段",
       "msgMode": "消息模式",
-      "msgModeFixed": "固定框架（推薦）",
+      "msgModeFixed": "固定卡片版式（推薦）",
       "msgModeTemplate": "自定義模板",
-      "msgFrameworkNote": "固定框架層級：匯總行 → 項目 → 迭代 → 未掛項目迭代 → 查看鏈接；不可增刪層級。",
-      "msgTemplateNote": "自定義模板模式下，消息按所選模板的正文渲染，下列字段開關不生效。",
+      "msgFrameworkNote": "固定版式：標題（日期＋逾期/風險）→ 指標行 → 需關注項目 → 正常項目折疊，底部按鈕直達完整日報；層級不可增刪。",
+      "msgTemplateNote": "自定義模板模式下，消息按所選模板的正文渲染（純文字氣泡，不帶卡片按鈕），下列字段開關不生效。",
+      "msgAdvanced": "進階：訊息欄位",
+      "quietPolicy": "無異常降噪",
+      "quietFull": "照常發完整摘要",
+      "quietBrief": "只發一句結論（推薦）",
+      "quietSkip": "當日不發送（仍生成日報）",
+      "quietHint": "僅對定時推送生效：無逾期、無到期、無風險時自動降噪；手動觸發與預覽照常發完整內容。",
+      "msgIterationScope": "僅對「未掛項目的迭代」與自定義模板生效",
       "msgProjectFields": "項目行字段",
       "msgIterationFields": "迭代行字段",
       "msgFieldProjectProductOwner": "產品負責人",
@@ -12198,7 +12251,13 @@
       "filterUpdatedByPh": "搜尋姓名或工號",
       "filterUpdatedAt": "最後更新時間",
       "defaultNow": "默認中",
-      "previewFixedModeHint": "當前釘釘消息為「固定框架」模式：預覽展示的是框架渲染結果，正文模板不會生效；如需使用模板文案，請在推送配置切到「自定義模板」。",
+      "previewFixedModeHint": "當前釘釘消息為「固定卡片版式」：預覽展示的是卡片標題與正文（底部「查看日報」按鈕不在預覽內），正文模板不會生效；如需使用模板文案，請在推送配置切到「自定義模板」。",
+      "previewCardTitle": "卡片效果預覽（按真機尺寸）",
+      "previewRawShow": "查看原始 Markdown",
+      "previewRawHide": "收起原始 Markdown",
+      "previewAppName": "產研交付日報",
+      "previewButton": "查看完整日報",
+      "previewTemplateNoButton": "自定義模板為純文字氣泡，不帶卡片按鈕",
       "viewBoard": "查看看板"
     },
     "dailyRecord": {
@@ -12605,7 +12664,8 @@
       "intakeFilteredMsg": "本視圖已過濾 {{count}} 條「未準入」需求（草稿 / 審批中 / 審批駁回），請前往「提需求」菜單查看與處理審批。",
       "intakeHint": "準入前（草稿 / 審批中 / 審批駁回）請到「提需求」菜單處理；待分配（需求池）請到「認領/分配」菜單分配產品經理。",
       "collapseFilter": "收起篩選",
-      "moreFilter": "更多篩選"
+      "moreFilter": "更多篩選",
+      "btnBatchImport": "批量導入"
     },
     "projDetail": {
       "tagPaused": "已暫停",
@@ -12620,7 +12680,11 @@
     },
     "reqSections": {
       "btnScheduleGantt": "排期甘特圖",
-      "addTask": "新增任務"
+      "addTask": "新增任務",
+      "deliverByPromise": "按承諾日期交付",
+      "hoursUnreported": "未填報 / {{plan}}h",
+      "btnPrdPage": "PRD 頁面",
+      "btnReportDone": "去上報完成"
     },
     "deliveryBoard": {
       "btnTeamLoad": "團隊負載",
@@ -12730,7 +12794,11 @@
       "legendOverdue": "逾期",
       "legendSpan": "需求整體跨度（匯總，唯讀）",
       "cancelAdjust": "取消調整",
-      "saveSchedule": "保存排期"
+      "saveSchedule": "保存排期",
+      "editingHint": "拖動條身改排期 · 兩端加減工期 · 條下圓點改進度",
+      "prdConfirmTitle": "確認調整 PRD 排期？",
+      "prdConfirmNote": "PRD 任務完成日與需求「承諾出 PRD 日期」同源，儲存後會一併更新需求承諾日期。",
+      "prdConfirmOk": "確認儲存"
     },
     "ganttBoard": {
       "monthLabel": "{{y}}年{{m}}月",
@@ -12746,7 +12814,19 @@
       "start": "開始",
       "end": "結束",
       "me": "我",
-      "sameDay": "當天"
+      "sameDay": "當天",
+      "progressPanelHint": "拖動圓點鬆手即保存；100% 需填寫交付說明",
+      "progressPanelHintPrd": "PRD 任務進度最高 99%；100% 以「提交評審」為準，提交後自動完成",
+      "progressCapToast": "PRD 任務進度最高 99%：100% 以「提交評審」為準，提交後系統自動完成",
+      "progressDoneTitle": "完成任務",
+      "progressDoneHint": "進度 100% 會把任務標記為已完成，必須填寫交付說明或交付物連結（作為驗收與績效依據）。",
+      "progressDoneRequired": "完成任務必須填寫交付說明或交付物連結",
+      "progressDonePlaceholder": "交付說明或交付物連結（必填）",
+      "progressDoneOk": "確認完成",
+      "progressDoneSaved": "任務已完成",
+      "prdDateSyncNote": "PRD 任務完成日與需求「承諾出 PRD 日期」同源，改期後會一併更新；進度最高 99%，100% 以提交評審為準。",
+      "progressPanelTitle": "任務進度",
+      "progressPanelApply": "套用"
     },
     "tab": {
       "reqDetail": "需求詳情",
@@ -13118,6 +13198,11 @@
     },
     "release": {
       "terminalGate": "需求已進入終態，檢查項僅作歷史參考"
+    },
+    "releasePanel": {
+      "title": "發布放行",
+      "v3Title": "V3 分批交付：以交付項 / 發布批次為上線單位",
+      "v3Desc": "本需求不走整需求放行。上線請在交付項中完成範圍凍結、提測與驗收後，到「發布中心」創建發布批次；發布批次包含測試、驗收、缺陷、依賴、範圍五類硬門禁與四眼審批。"
     }
   },
   "aiModel": {

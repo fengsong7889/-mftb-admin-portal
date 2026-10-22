@@ -204,7 +204,7 @@
       "rdmSubmit": "Submit",
       "rdmIntake": "Approve",
       "rdmDispatch": "Assign",
-      "rdmDesign": "PRD",
+      "rdmDesign": "PRD Output",
       "rdmDev": "Develop",
       "rdmRelease": "Release",
       "searching": "Searching for matches",
@@ -11639,6 +11639,52 @@
     "totalRecords_one": "{{count}} record"
   },
   "rdm": {
+    "import": {
+      "colRowNo": "Row",
+      "colTitle": "Requirement",
+      "colExternalNo": "Yunxiao No.",
+      "colStatus": "Status",
+      "colProjectManager": "Project Manager",
+      "colProductManager": "Product Manager",
+      "colProjectName": "Project",
+      "colIterationName": "Iteration",
+      "colDescription": "Description",
+      "errNoSheet": "The file has no valid worksheet",
+      "errNoHeader": "Header row not found. Please use the template downloaded from the bulk import dialog.",
+      "errMissingColumns": "Missing required columns: {{columns}}",
+      "listSeparator": ", ",
+      "errTitleEmpty": "Requirement name is required",
+      "errTitleTooLong": "Requirement name exceeds {{max}} characters",
+      "errExternalNoEmpty": "Yunxiao No. is required",
+      "errExternalNoTooLong": "Yunxiao No. exceeds {{max}} characters",
+      "errStatusEmpty": "Status is required",
+      "errStatusInvalid": "Status \"{{status}}\" is not in the R&D delivery status dictionary",
+      "errExternalNoDuplicate": "Yunxiao No. duplicates row {{rowNo}}",
+      "errRowLine": "Row {{rowNo}} {{label}}: {{reasons}}",
+      "reasonSeparator": "; ",
+      "errNoDataRows": "The file has no valid data rows",
+      "modalTitle": "Bulk Import Existing Requirements",
+      "btnCancel": "Cancel",
+      "btnConfirm": "Confirm Import",
+      "btnConfirmCount": "Confirm Import ({{count}})",
+      "alertTitle": "Importing historical requirements that are already admitted",
+      "alertDesc": "No admission approval, to-do, or notifications will be triggered. After import you can keep creating tasks and filling in task dates in the follow-up list.",
+      "templateColumns": "Template columns: Requirement, Yunxiao No., Status, Project Manager, Product Manager, Project, Iteration, Description.",
+      "templateStatusHint": "Pick the status from the dropdown list of the R&D delivery system.",
+      "btnDownloadTemplate": "Download Template",
+      "uploadParsing": "Parsing…",
+      "uploadPlaceholder": "Click or drag an Excel file here",
+      "uploadHint": "Supports .xlsx / .xls; up to 500 rows per import",
+      "errorCount": "{{count}} issue(s) must be fixed before import",
+      "validCount": "{{count}} row(s) passed front-end validation; staff, projects, iterations and Yunxiao No. will be re-checked by the backend",
+      "totalCount": "{{count}} total",
+      "warnNoRows": "The file has no valid data rows",
+      "warnParseFailed": "Failed to parse the file. Make sure it is an .xlsx file and not encrypted.",
+      "warnNothingToImport": "Nothing to import",
+      "warnValidationFailed": "{{count}} row(s) failed validation; nothing was written",
+      "successImported": "Import completed: {{imported}} imported",
+      "successWithSkipped": "Import completed: {{imported}} imported, {{skipped}} skipped"
+    },
     "board": {
       "title": "Daily Delivery Board",
       "brand": "Maifeng Group · Project Report",
@@ -12051,12 +12097,19 @@
       "boardShowOwners": "Show owners",
       "boardShowUnassigned": "Show unassigned iterations",
       "msgTitle": "DingTalk message",
-      "msgHint": "The hierarchy is fixed; only per-row fields are configurable",
+      "msgHint": "Sent as a DingTalk card: the title states the conclusion; only per-row fields are configurable",
       "msgMode": "Message mode",
-      "msgModeFixed": "Fixed framework (recommended)",
+      "msgModeFixed": "Fixed card layout (recommended)",
       "msgModeTemplate": "Custom template",
-      "msgFrameworkNote": "Fixed hierarchy: summary → project → iteration → unassigned iterations → view link. The hierarchy cannot be changed.",
-      "msgTemplateNote": "In custom template mode the message uses the selected template body; the field switches below do not apply.",
+      "msgFrameworkNote": "Fixed layout: title (date + overdue/risk) → metrics row → projects needing attention → normal projects collapsed, with a button to the full report. The hierarchy is not configurable.",
+      "msgTemplateNote": "In custom template mode the message renders the selected template body (plain text bubble without a card button), and the field switches below do not apply.",
+      "msgAdvanced": "Advanced: message fields",
+      "quietPolicy": "Quiet-day policy",
+      "quietFull": "Always send the full summary",
+      "quietBrief": "Send a one-line conclusion (recommended)",
+      "quietSkip": "Do not send (report is still generated)",
+      "quietHint": "Applies to scheduled pushes only: days without overdue, due or at-risk items are quieted down. Manual triggers and previews always send the full content.",
+      "msgIterationScope": "Applies only to unassigned iterations and custom templates",
       "msgProjectFields": "Project row fields",
       "msgIterationFields": "Iteration row fields",
       "msgFieldProjectProductOwner": "Product owner",
@@ -12198,7 +12251,13 @@
       "filterUpdatedByPh": "Search name or employee ID",
       "filterUpdatedAt": "Last updated at",
       "defaultNow": "Default",
-      "previewFixedModeHint": "DingTalk messages are in Fixed framework mode: this preview shows the framework output and the template body is ignored. Switch to Custom template in Push settings to use template text.",
+      "previewFixedModeHint": "DingTalk messages use the fixed card layout: this preview shows the card title and body (the view-report button is not part of the preview) and the template body is ignored. Switch to Custom template in Push settings to use template text.",
+      "previewCardTitle": "Card preview (phone-sized)",
+      "previewRawShow": "Show raw Markdown",
+      "previewRawHide": "Hide raw Markdown",
+      "previewAppName": "R&D Delivery Report",
+      "previewButton": "View full report",
+      "previewTemplateNoButton": "Custom templates render as a plain text bubble without a card button",
       "viewBoard": "View board"
     },
     "dailyRecord": {
@@ -12605,7 +12664,8 @@
       "intakeFilteredMsg": "This view filters out {{count}} pre-admission requirements (draft / approving / rejected); handle approvals in the \"Submit Requirement\" menu.",
       "intakeHint": "Before admission (draft / approving / rejected), go to \"Submit Requirement\"; for pool items go to \"Claim/Assign\" to assign a PM.",
       "collapseFilter": "Fewer filters",
-      "moreFilter": "More filters"
+      "moreFilter": "More filters",
+      "btnBatchImport": "Bulk import"
     },
     "projDetail": {
       "tagPaused": "Paused",
@@ -12620,7 +12680,11 @@
     },
     "reqSections": {
       "btnScheduleGantt": "Schedule Gantt",
-      "addTask": "Add Task"
+      "addTask": "Add Task",
+      "deliverByPromise": "Delivered by promised date",
+      "hoursUnreported": "Unreported / {{plan}}h",
+      "btnPrdPage": "PRD page",
+      "btnReportDone": "Report completion"
     },
     "deliveryBoard": {
       "btnTeamLoad": "Team Load",
@@ -12730,7 +12794,11 @@
       "legendOverdue": "Overdue",
       "legendSpan": "Requirement overall span (summary, read-only)",
       "cancelAdjust": "Cancel changes",
-      "saveSchedule": "Save schedule"
+      "saveSchedule": "Save schedule",
+      "editingHint": "Drag a bar to reschedule · drag either end to change duration · drag the dot below to update progress",
+      "prdConfirmTitle": "Confirm PRD schedule change?",
+      "prdConfirmNote": "The PRD task finish date is the same as the requirement's promised PRD date; saving will update the promised date as well.",
+      "prdConfirmOk": "Save"
     },
     "ganttBoard": {
       "monthLabel": "{{y}}-{{m}}",
@@ -12746,7 +12814,19 @@
       "start": "Start",
       "end": "End",
       "me": "Me",
-      "sameDay": "Same day"
+      "sameDay": "Same day",
+      "progressPanelHint": "Drag the dot to save on release; 100% requires delivery notes",
+      "progressPanelHintPrd": "PRD task progress is capped at 99%; 100% is set by submitting the PRD for review",
+      "progressCapToast": "PRD task progress is capped at 99%; 100% is set by submitting the PRD for review",
+      "progressDoneTitle": "Complete task",
+      "progressDoneHint": "Setting progress to 100% marks the task as done; delivery notes or a deliverable link are required for acceptance and performance records.",
+      "progressDoneRequired": "Completing a task requires delivery notes or a deliverable link",
+      "progressDonePlaceholder": "Delivery notes or deliverable link (required)",
+      "progressDoneOk": "Complete",
+      "progressDoneSaved": "Task completed",
+      "prdDateSyncNote": "The PRD task finish date is the same as the requirement's promised PRD date and will be updated together; progress is capped at 99%, and 100% is set by submitting for review.",
+      "progressPanelTitle": "Task progress",
+      "progressPanelApply": "Apply"
     },
     "tab": {
       "reqDetail": "Requirement Details",
@@ -13118,6 +13198,11 @@
     },
     "release": {
       "terminalGate": "Requirement is in a terminal state; checks are historical only."
+    },
+    "releasePanel": {
+      "title": "Release approval",
+      "v3Title": "V3 phased delivery: release by delivery item / release batch",
+      "v3Desc": "This requirement does not use whole-requirement release. To go live, complete scope freeze, test submission and acceptance on the delivery item, then create a release batch in Release Center. A batch enforces five hard gates (test, acceptance, defects, dependencies, scope) and four-eyes approval."
     }
   },
   "aiModel": {

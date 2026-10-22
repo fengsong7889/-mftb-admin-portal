@@ -26,6 +26,7 @@ import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import { decideReview, type RdmChangeItem, type RdmDeliverySummary, type RdmPrdItem, type RdmReviewItem, type RdmTaskItem } from '../../../api/rdm'
 import { useTaskTypeDict } from '../../../hooks/useTaskTypeDict'
+import { formatPerson } from '../handlerDisplay'
 import {
   RDM_CHANGE_STATUS_COLOR,
   RDM_CHANGE_STATUS_LABEL,
@@ -163,7 +164,7 @@ export function TaskSection({ summary, editable, reqId, canCreate }: {
       title: '類型', dataIndex: 'taskType', key: 'taskType', width: 90,
       render: (v: string) => <SoftTag color={taskTypeColorOf(v)} text={taskTypeLabelOf(v)} />,
     },
-    { title: '負責人', dataIndex: 'ownerName', key: 'ownerName', width: 100, render: (v?: string | null) => v ?? '-' },
+    { title: '負責人', dataIndex: 'ownerName', key: 'ownerName', width: 130, render: (v: string | null | undefined, r) => formatPerson({ name: v, empNo: r.ownerEmpNo }) || '-' },
     /*
       起止日期拆成两列：计划完成日原先只藏在任务标题的「計劃 xxx」小字里，
       既看不出工期跨度，也没法与开始日期对齐比较，排期讨论时要逐个点开详情。
@@ -197,7 +198,10 @@ export function TaskSection({ summary, editable, reqId, canCreate }: {
           <Progress percent={r.progress ?? 0} size="small" style={{ width: 62 }} />
           {/* 缺报不等于 0：把未填报当成 0 会同时做假负载与估时偏差 */}
           <span style={{ fontSize: 12, color: r.actualHoursReported ? '#8C8C8C' : '#FA8C16' }}>
-            {r.actualHoursReported ? `${r.actualHours ?? 0}/${r.planHours ?? '-'}h` : `未填報 / ${r.planHours ?? '-'}h`}
+            {r.taskType === 'prd'
+              // PRD 任务以承诺日期为交付口径，不按工时考核，避免“未填报/-h”被误读为漏报
+              ? t('rdm.reqSections.deliverByPromise')
+              : r.actualHoursReported ? `${r.actualHours ?? 0}/${r.planHours ?? '-'}h` : t('rdm.reqSections.hoursUnreported', { plan: r.planHours ?? '-' })}
           </span>
         </Space>
       ),
@@ -206,11 +210,15 @@ export function TaskSection({ summary, editable, reqId, canCreate }: {
       title: '操作', key: 'action', width: 150,
       render: (_, r) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          {editable && r.status === RDM_TASK_STATUS.TODO && (
-            <Button type="link" size="small" onClick={() => navigate(`/rdm-task?reqId=${reqId}&id=${r.id}`)}>編輯</Button>
+          {editable && r.status === RDM_TASK_STATUS.TODO && r.taskType !== 'prd' && (
+            <Button type="link" size="small" onClick={() => navigate(`/rdm-task?reqId=${reqId}&id=${r.id}`)}>{t('common.edit')}</Button>
+          )}
+          {/* PRD 任務的日期來自「承諾出 PRD 日期」，不提供任務編輯入口，避免把承諾日期改走 */}
+          {editable && r.taskType === 'prd' && (
+            <Button type="link" size="small" onClick={() => navigate(`/rdm-prd?reqId=${reqId}`)}>{t('rdm.reqSections.btnPrdPage')}</Button>
           )}
           {editable && r.status === RDM_TASK_STATUS.DOING && (
-            <Button type="link" size="small" onClick={() => navigate('/rdm-delivery')}>去上報完成</Button>
+            <Button type="link" size="small" onClick={() => navigate('/rdm-delivery')}>{t('rdm.reqSections.btnReportDone')}</Button>
           )}
           {r.status === RDM_TASK_STATUS.BLOCKED && r.blockedReason && (
             <Tooltip title={r.blockedReason}>

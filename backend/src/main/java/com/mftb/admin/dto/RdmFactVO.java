@@ -174,8 +174,12 @@ public class RdmFactVO {
         private String status;
         private Long pmUserId;
         private String pmUserName;
+        /** 产品经理工号（批量按 pmUserId 回填，列表统一姓名+工号） */
+        private String pmUserEmpNo;
         private Long productOwnerUserId;
         private String productOwnerUserName;
+        /** 产品负责人工号（批量按 productOwnerUserId 回填） */
+        private String productOwnerUserEmpNo;
         /** 研发负责人（看板项目卡“相關負責人”有配置就展示） */
         private Long techLeadUserId;
         private String techLeadUserName;

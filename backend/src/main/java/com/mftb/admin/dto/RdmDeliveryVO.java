@@ -197,9 +197,11 @@ public class RdmDeliveryVO {
         private String startDate;
         private String endDate;
         private Integer capacityHours;
-        /** 迭代負責人ID：编辑表单回填用（只回显 ownerName 会导致保存时丢负责人） */
+        /** 迭代負責人ID：编辑表单回填用（只回显 ownerName 会导致保存时丢负 责人） */
         private Long ownerUserId;
         private String ownerName;
+        /** 负责人工号（服务端按 ownerUserId 批量回填，列表统一展示姓名+工号） */
+        private String ownerEmpNo;
         private String status;
         private String remark;
         /** 已排入本迭代的需求数与工时（产能对比） */

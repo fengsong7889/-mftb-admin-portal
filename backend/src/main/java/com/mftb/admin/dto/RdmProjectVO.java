@@ -19,7 +19,9 @@ public class RdmProjectVO {
         private String name;
         private String objective;
         private String pmUserName;
+        private String pmUserEmpNo;
         private String productOwnerUserName;
+        private String productOwnerUserEmpNo;
         private String planStartDate;
         private String planEndDate;
         private String status;

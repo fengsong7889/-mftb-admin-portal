@@ -101,7 +101,7 @@
       "rdmSubmit": "申請",
       "rdmIntake": "承認",
       "rdmDispatch": "割り当て",
-      "rdmDesign": "PRD設計",
+      "rdmDesign": "PRD産出",
       "rdmDev": "開発",
       "rdmRelease": "リリース",
       "searching": "一致する情報を検索中",
@@ -955,5 +955,41 @@
     "statScheduleUnscheduled": "週間未設定の人数",
     "noValidWorksheet": "ファイルに有効なワークシートがありません",
     "noValidDataRows": "ファイルに有効なデータ行がありません"
+  },
+  "rdm": {
+    "gantt": {
+      "editingHint": "バーをドラッグして日程変更 · 両端で期間調整 · 下の丸をドラッグして進捗変更",
+      "prdConfirmTitle": "PRD スケジュール変更の確認",
+      "prdConfirmNote": "PRD タスクの完了日は要件の「PRD 提出予定日」と同一です。保存すると予定日も更新されます。",
+      "prdConfirmOk": "保存する"
+    },
+    "ganttBoard": {
+      "progressPanelHint": "丸をドラッグして離すと保存されます。100% には成果説明が必要です",
+      "progressPanelHintPrd": "PRD タスクの進捗は最大 99% です。100% はレビュー提出時に設定されます",
+      "progressCapToast": "PRD タスクの進捗は最大 99% です。100% はレビュー提出時に設定されます",
+      "progressDoneTitle": "タスクを完了",
+      "progressDoneHint": "進捗 100% でタスクは完了になります。成果説明または成果物リンクが必須です（受入・評価の根拠）。",
+      "progressDoneRequired": "タスク完了には成果説明または成果物リンクが必要です",
+      "progressDonePlaceholder": "成果説明または成果物リンク（必須）",
+      "progressDoneOk": "完了する",
+      "progressDoneSaved": "タスクを完了しました",
+      "prdDateSyncNote": "PRD タスクの完了日は要件の「PRD 提出予定日」と同一で、変更すると予定日も更新されます。進捗は最大 99%、100% はレビュー提出時に設定されます。",
+      "progressPanelTitle": "タスク進捗",
+      "progressPanelApply": "適用"
+    },
+    "reqSections": {
+      "deliverByPromise": "約束日納品",
+      "hoursUnreported": "未報告 / {{plan}}h",
+      "btnPrdPage": "PRD ページ",
+      "btnReportDone": "完了を報告"
+    },
+    "releasePanel": {
+      "title": "リリース承認",
+      "v3Title": "V3 段階納品：納品項目 / リリースバッチ単位でリリース",
+      "v3Desc": "本要件は要件全体のリリースを行いません。リリースは納品項目で範囲凍結・テスト提出・受入を完了した後、「リリースセンター」でリリースバッチを作成してください。バッチにはテスト・受入・不具合・依存関係・範囲の五つのハードゲートと四眼承認があります。"
+    },
+    "reqList": {
+      "btnBatchImport": "一括インポート"
+    }
   }
 }

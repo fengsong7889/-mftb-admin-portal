@@ -36,9 +36,11 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * RDM 統一權威事實源（任務22 A.1 / A.2 / A.5 / A.6 / A.7）。
@@ -791,11 +793,32 @@ public class RdmProjectFactService {
     private List<RdmFactVO.ProjectFact> toProjectFacts(Snapshot s) {
         List<RdmFactVO.ProjectFact> result = new ArrayList<>();
         Map<Long, int[]> todoCountsByProject = groupTodoCounts(s.board);
+        // 负责人工号一次 IN 回填：项目列表是管理者识别人的主场景，只有姓名时同名同事无法区分
+        Set<Long> ownerIds = new HashSet<>();
+        for (RdmProject project : s.projects) {
+            if (project == null) {
+                continue;
+            }
+            if (project.getPmUserId() != null) {
+                ownerIds.add(project.getPmUserId());
+            }
+            if (project.getProductOwnerUserId() != null) {
+                ownerIds.add(project.getProductOwnerUserId());
+            }
+        }
+        Map<Long, String> ownerEmpNos = new HashMap<>();
+        if (!ownerIds.isEmpty()) {
+            userMapper.selectBatchIds(ownerIds).forEach(u -> {
+                if (u.getId() != null && StringUtils.hasText(u.getEmpId())) {
+                    ownerEmpNos.put(u.getId(), u.getEmpId());
+                }
+            });
+        }
         for (RdmProject project : s.projects) {
             if (project == null || project.getId() == null) {
                 continue;
             }
-            result.add(toProjectFact(project, s, todoCountsByProject.get(project.getId())));
+            result.add(toProjectFact(project, s, todoCountsByProject.get(project.getId()), ownerEmpNos));
         }
         return result;
     }
@@ -830,7 +853,7 @@ public class RdmProjectFactService {
         return counts;
     }
 
-    private RdmFactVO.ProjectFact toProjectFact(RdmProject p, Snapshot s, int[] todoCounts) {
+    private RdmFactVO.ProjectFact toProjectFact(RdmProject p, Snapshot s, int[] todoCounts, Map<Long, String> ownerEmpNos) {
         RdmFactVO.ProjectFact f = new RdmFactVO.ProjectFact();
         f.setProjectId(p.getId());
         f.setProjectNo(p.getProjectNo());
@@ -839,8 +862,10 @@ public class RdmProjectFactService {
         f.setStatus(p.getStatus());
         f.setPmUserId(p.getPmUserId());
         f.setPmUserName(p.getPmUserName());
+        f.setPmUserEmpNo(p.getPmUserId() == null ? null : ownerEmpNos.get(p.getPmUserId()));
         f.setProductOwnerUserId(p.getProductOwnerUserId());
         f.setProductOwnerUserName(p.getProductOwnerUserName());
+        f.setProductOwnerUserEmpNo(p.getProductOwnerUserId() == null ? null : ownerEmpNos.get(p.getProductOwnerUserId()));
         // 角色负责人直接取项目主表快照：看板“相關負責人”只展示已配置的人，不在这里做成员表联查。
         // userId 一并带出：日报收件人要按角色推导到人，只有姓名无法映射钉钉 userId
         f.setTechLeadUserId(p.getTechLeadUserId());

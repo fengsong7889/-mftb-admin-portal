@@ -24,6 +24,7 @@ import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { rdmTableLocale } from './components/tableLocale'
 import { deriveRdmColumnMeta } from './rdmColumnMeta'
 import { fetchIterations, fetchWeeklyReport, type RdmIterationItem, type RdmWeeklyReport } from '../../api/rdm'
+import { formatEmployee } from '../../utils/employeeDisplay'
 import { exportWeeklyReport } from './weeklyReportExport'
 import {
   RDM_RISK_COLOR,
@@ -119,7 +120,7 @@ export default function WeeklyReport() {
       render: (v: string, r) => <a className="rdm-table-title__link" title={v} href={`#/rdm-detail?id=${r.reqId}`}>{v}</a>,
     },
     { title: '關聯版本', dataIndex: 'versionNo', key: 'versionNo', width: 110, render: (v?: string | null) => v ?? '-' },
-    { title: '產品經理', dataIndex: 'pmName', key: 'pmName', width: 110, render: (v?: string | null) => v ?? '-' },
+    { title: '產品經理', dataIndex: 'pmName', key: 'pmName', width: 140, render: (v: string | null | undefined, r) => formatEmployee(v, r.pmEmpNo) || '-' },
     { title: '上線日期', dataIndex: 'actualReleaseDate', key: 'actualReleaseDate', width: 120, render: (v?: string | null) => v ?? '-' },
     {
       title: '滿意度', dataIndex: 'acceptanceScore', key: 'acceptanceScore', width: 100,

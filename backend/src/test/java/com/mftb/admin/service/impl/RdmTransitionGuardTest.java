@@ -90,7 +90,8 @@ class RdmTransitionGuardTest {
                 mock(com.mftb.admin.service.RdmFlowVersionGuard.class),
                 mock(com.mftb.admin.service.RdmRequirementStructureService.class),
                 mock(com.mftb.admin.service.RdmDeliveryItemService.class),
-                mock(com.mftb.admin.service.RdmAllowedActionsService.class));
+                mock(com.mftb.admin.service.RdmAllowedActionsService.class),
+                mock(com.mftb.admin.service.RdmPrdTaskService.class));
     }
 
     private static SysUser user(long id, String empId, String name) {

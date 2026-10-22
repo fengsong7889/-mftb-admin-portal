@@ -1,5 +1,6 @@
 package com.mftb.admin.service;
 
+import com.mftb.admin.constant.RdmConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -57,7 +58,7 @@ public class RdmNotifyDispatcher {
             return;
         }
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT scenario, title, content, at_mobiles, attempts FROM rdm_notify_log "
+                "SELECT scenario, title, content, msg_type, btn_title, btn_url, at_mobiles, attempts FROM rdm_notify_log "
                         + "WHERE id = ? AND deleted = 0", id);
         if (rows.isEmpty()) {
             log.warn("通知任務已消失但狀態為 sending: id={}", id);
@@ -68,6 +69,10 @@ public class RdmNotifyDispatcher {
         String scenario = (String) row.get("scenario");
         String title = (String) row.get("title");
         String content = (String) row.get("content");
+        String msgType = row.get("msg_type") == null
+                ? RdmConstants.NOTIFY_MSG_MARKDOWN : String.valueOf(row.get("msg_type"));
+        String btnTitle = (String) row.get("btn_title");
+        String btnUrl = (String) row.get("btn_url");
         List<String> atMobiles = splitToList((String) row.get("at_mobiles"));
 
         if (dryRun) {
@@ -81,8 +86,19 @@ public class RdmNotifyDispatcher {
             return;
         }
         try {
-            DingTalkService.SendOutcome outcome =
-                    dingTalkService.sendMarkdownSync(scenario, title, content, atMobiles, false);
+            DingTalkService.SendOutcome outcome;
+            if (RdmConstants.NOTIFY_MSG_ACTION_CARD.equals(msgType)
+                    && StringUtils.hasText(btnTitle) && StringUtils.hasText(btnUrl)) {
+                outcome = dingTalkService.sendActionCardSync(scenario, title, content, btnTitle, btnUrl);
+            } else {
+                if (RdmConstants.NOTIFY_MSG_ACTION_CARD.equals(msgType)) {
+                    // 卡片缺按钮：降级成同正文 markdown 而不是直接失败。
+                    // 宁可少一个按钮，不要让一条「日报已生成」彻底发不出去；日志保留可排查的线索。
+                    log.warn("通知卡片缺少按钮，降级为 markdown 发送: id={}, btnTitle={}, btnUrl={}",
+                            id, StringUtils.hasText(btnTitle), StringUtils.hasText(btnUrl));
+                }
+                outcome = dingTalkService.sendMarkdownSync(scenario, title, content, atMobiles, false);
+            }
             if (outcome != null && outcome.channelAccepted()) {
                 markFinal(id, "sent", null, outcome.channelName());
                 return;

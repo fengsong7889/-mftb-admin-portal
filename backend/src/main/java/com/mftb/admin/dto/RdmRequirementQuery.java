@@ -114,6 +114,17 @@ public class RdmRequirementQuery {
             RdmConstants.STATUS_INTEGRATION, RdmConstants.STATUS_TESTING, RdmConstants.STATUS_TEST_PASSED);
 
     /**
+     * V3 需求在「研發交付中」视角的补充口径。
+     * <p>V3 分批交付的主状态受案后<b>永远停在 accepted</b>（设计上不再逐段变，
+     * 进度由交付项推导），而 {@link #DELIVERY_STATUS} 只认 scheduled 之后的主状态 ——
+     * 只按状态白名单收敛，正在开发/测试的 V3 需求在「研發交付中」里根本看不见。
+     * <p>因此追加：flow_version=3 且 accepted、且存在未完成交付项的需求。
+     * 完成/上线后的不再算「交付中」，与旧链路口径一致（上线归验收/台账）。
+     */
+    private static final String V3_IN_FLIGHT_ITEM_SQL =
+            "SELECT req_id FROM rdm_delivery_item WHERE deleted = 0 AND status <> 'done'";
+
+    /**
      * 验收记录状态集合：验收人已经或正在出结论的环节。
      * <p>含 released 是因为「上线后正式验收」通过时不改状态（只写结论与分数），
      * 要等「確認交付」才推到 verified；漏掉它会让刚签完单的人在自己的记录页里找不到那条。
@@ -262,7 +273,11 @@ public class RdmRequirementQuery {
                 }
                 wrapper.in(RdmRequirement::getStatus, ACCEPTANCE_HISTORY_STATUS);
             }
-            case RdmConstants.SCOPE_DELIVERY -> wrapper.in(RdmRequirement::getStatus, DELIVERY_STATUS);
+            case RdmConstants.SCOPE_DELIVERY -> wrapper.and(w -> w.in(RdmRequirement::getStatus, DELIVERY_STATUS)
+                    /* V3：主状态恒为 accepted，按「存在未完成交付项」判定仍在交付中（见 V3_IN_FLIGHT_ITEM_SQL） */
+                    .or(v3 -> v3.eq(RdmRequirement::getFlowVersion, RdmConstants.FLOW_VERSION_3)
+                            .eq(RdmRequirement::getStatus, RdmConstants.STATUS_ACCEPTED)
+                            .inSql(RdmRequirement::getId, V3_IN_FLIGHT_ITEM_SQL)));
             case RdmConstants.SCOPE_PRODUCT -> {
                 if (currentUserId != null) {
                     wrapper.eq(RdmRequirement::getAssigneePmUserId, currentUserId);

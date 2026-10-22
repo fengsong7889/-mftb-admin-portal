@@ -21,6 +21,7 @@ import dayjs from 'dayjs'
 import StatCards from '../../components/StatCards'
 import { useAuth } from '../../contexts/AuthContext'
 import { fetchIterations, updateIterationStatus, type RdmIterationItem } from '../../api/rdm'
+import { formatEmployee } from '../../utils/employeeDisplay'
 import {
   RDM_ITERATION_STATUS,
   RDM_ITERATION_STATUS_COLOR,
@@ -239,7 +240,7 @@ export default function IterationPlan() {
         </Tag>
       ),
     },
-    { title: t('rdm.iteration.colOwner'), dataIndex: 'ownerName', key: 'ownerName', width: 110, render: (v?: string | null) => v ?? '-' },
+    { title: t('rdm.iteration.colOwner'), dataIndex: 'ownerName', key: 'ownerName', width: 140, render: (v: string | null | undefined, r: RdmIterationItem) => formatEmployee(v, r.ownerEmpNo) || '-' },
     { title: t('rdm.iteration.colReqCount'), dataIndex: 'reqCount', key: 'reqCount', width: 90, render: (v?: number) => v ?? 0 },
     { title: t('rdm.iteration.colTaskCount'), dataIndex: 'taskCount', key: 'taskCount', width: 90, render: (v?: number) => v ?? 0 },
     {

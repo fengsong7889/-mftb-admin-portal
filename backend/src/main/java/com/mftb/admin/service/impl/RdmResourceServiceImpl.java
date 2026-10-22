@@ -23,6 +23,7 @@ import com.mftb.admin.service.IdempotentKey;
 import com.mftb.admin.service.RdmAccessGuard;
 import com.mftb.admin.service.RdmDeliveryService;
 import com.mftb.admin.service.RdmIdempotentService;
+import com.mftb.admin.service.RdmPrdTaskService;
 import com.mftb.admin.service.RdmRequirementService;
 import com.mftb.admin.service.RdmResourceService;
 import com.mftb.admin.service.RdmTaskTypeService;
@@ -532,10 +533,16 @@ public class RdmResourceServiceImpl implements RdmResourceService {
             String type = t.getTaskType() == null ? "" : t.getTaskType();
             // 三类计数改按字典 category（design/qa/dev），未知桶一律 dev 兑底，新类型自动入研发桶
             String category = taskTypeService.categoryOf(type);
-            switch (category) {
-                case RdmTaskTypeConfig.CATEGORY_DESIGN -> { designTasks++; roles.add(RdmResourceVO.ROLE_DESIGNER); }
-                case RdmTaskTypeConfig.CATEGORY_QA -> { testTasks++; roles.add(RdmResourceVO.ROLE_QA); }
-                default -> { devTasks++; roles.add(RdmResourceVO.ROLE_DEV); }
+            // PRD 產出在字典里归入设计桶（工时口径），但角色标签必须显示为产品，而不是设计师
+            if (RdmPrdTaskService.TASK_TYPE_PRD.equals(type)) {
+                designTasks++;
+                roles.add(RdmResourceVO.ROLE_PRODUCT);
+            } else {
+                switch (category) {
+                    case RdmTaskTypeConfig.CATEGORY_DESIGN -> { designTasks++; roles.add(RdmResourceVO.ROLE_DESIGNER); }
+                    case RdmTaskTypeConfig.CATEGORY_QA -> { testTasks++; roles.add(RdmResourceVO.ROLE_QA); }
+                    default -> { devTasks++; roles.add(RdmResourceVO.ROLE_DEV); }
+                }
             }
             if ("blocked".equals(t.getStatus())) {
                 hasBlocked = true;

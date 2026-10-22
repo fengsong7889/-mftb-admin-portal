@@ -32,7 +32,11 @@ vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => false, user: { empId: 'MF00011' } }),
 }))
 vi.mock('./requirementExport', () => ({ exportRequirementRows: vi.fn() }))
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+  // i18n/index.ts 在模块加载时执行 .use(initReactI18next)：缺这个导出会让整条引用链在 import 期就抛错
+  initReactI18next: { type: '3rdParty', init: () => {} },
+}))
 
 const row = {
   id: 91,

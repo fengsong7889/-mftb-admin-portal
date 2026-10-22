@@ -305,7 +305,7 @@ INSERT IGNORE INTO rdm_status_def (code, label, stage, sort_order, final_flag, s
   ('rejected','已駁回','dispatch',7,0,1),
   ('on_hold','挂起暂缓','dispatch',8,0,1),
   ('accepted','已受理·待排期','product',9,0,1),
-  ('prd_designing','PRD設計中','product',10,0,1),
+  ('prd_designing','PRD 產出中','product',10,0,1),
   ('reviewing','評審中','product',11,0,1),
   ('review_passed','評審通過','product',12,0,1),
   ('scheduled','已排期','delivery',13,0,1),

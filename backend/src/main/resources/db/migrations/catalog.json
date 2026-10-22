@@ -2663,7 +2663,25 @@
       "intent": "个人日报收件人可配：新增角色白名单与追加/排除名单三列，把收件人从硬编码的「项目经理+产品负责人」搬到配置表，默认值与改造前行为完全一致",
       "author": "Qoder",
       "ticket": "rdm-daily-report-receivers",
-      "comment": "v3.16 起个人通知收件人被硬编码为 PM + 产品负责人，实际需要技术/测试/UI/运维负责人也收、PMO 额外收、某人不收等场景，只能改代码。只加三列：receiver_roles_json（默认 [\"pm\",\"product_owner\"]，与改造前完全一致）、extra_receiver_user_ids_json（追加名单，收到规则范围全量项目汇总）、exclude_receiver_user_ids_json（排除名单，优先级最高）。v3.16 预留的 receiver_scope 从未被发送链路消费，本版起停止读写但保留列不删（禁止 DROP COLUMN）。ADD COLUMN 不可重放，初始化器逐列先查再加并做后置校验，ContractRegistry 同步登记以便启动自愈。275 脚本仅作参照文档，不进镜像。"
+      "comment": "v3.16 起个人通知收件人被硬编码为 PM + 产品负责人，实际需要技术/测试/UI/运维负责人也收、PMO 额外收、某人不收等场景，只能改代码。只加三列：receiver_roles_json（默认 [\"pm\",\"product_owner\"]，与改造前完全一致）、extra_receiver_user_ids_json（追加名单，收到规则范围全量项目汇总）、exclude_receiver_user_ids_json（排除名单，优先级最高）。v3.16 预留的 receiver_scope 从未被发送链路消费 ，本版起停止读写但保留列不删（禁止 DROP COLUMN）。ADD COLUMN 不可重放，初始化器 逐列先查再加并做后置校验，ContractRegistry 同步登记以便启动自愈。275 脚本仅作参 照文档，不进镜像。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.27",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.26"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "280_rdm_prd_task.sql"
+      ],
+      "intent": "产品经理 PRD 任务：注册 prd 任务类型、节点改名「PRD 產出中」、为存量在途且已承诺 PRD 日期的需求补建 PRD 任务，使产出进度进入任务页签与甘特图",
+      "author": "Qoder",
+      "ticket": "rdm-prd-task-visibility",
+      "comment": "接受需求时承诺的 PRD 日期原先只落在 rdm_requirement.promised_prd_date，任务页签与甘特图只读 rdm_work_task，导致产品经理的 PRD 工作完全不可见。本版只 INSERT IGNORE 任务类型、条件 UPDATE 状态标签、NOT EXISTS 补建任务；任务编号 RTPRD+8 位需求ID 为一次性补建专用，与正常发号不冲突。无新列、无 DROP，可安全重放。"
     },
     {
       "versionKey": "ai:assistant-menu-split-v2.0",
@@ -2778,6 +2796,94 @@
       "intent": "AI 配置多系统作用域：ai_guard_rule / ai_push_template 补 system_code，RDM 推送模板回填 rdm",
       "author": "Qoder",
       "comment": "ADD COLUMN 走 INFORMATION_SCHEMA 探测，不执行 278 脚本（脚本含非幂等 ALTER）；能力/骨架/术语复用既有 domain 列。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.28",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.27"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "281_rdm_daily_report_card.sql"
+      ],
+      "intent": "日报消息卡片化：rdm_notify_log 补 msg_type / btn_title / btn_url，使群报与个人日报可发钉钉卡片消息（带一个跳转按钮），而不是只能发 markdown",
+      "author": "Qoder",
+      "ticket": "rdm-daily-card",
+      "comment": "卡片消息不是正文子集：消息类型与按钮文案/地址必须独立存储，否则 dispatcher 无从判定发什么、重试也还原不出按钮。msg_type 默认 'markdown'，存量待发行与其它业务事件（需求提醒/会议纪要）行为不变；仅日报在 fixed 版式下显式写 action_card。按钮信息若拼进正文会污染渲染，故不加 JSON 列而用两个平列字段（卡片固定一个按钮）。只 ADD COLUMN，旧代码忽略新列；回滚只需把日报改回 markdown 发送，列可保留。281 脚本仅作参照文档，不进镜像。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.29",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.28"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "282_rdm_requirement_import.sql"
+      ],
+      "intent": "存量需求导入（云效迁移）：rdm_requirement 补 external_no / external_source / project_manager_user_id / project_manager_user_name，并建 (external_source, external_no) 唯一索引做导入幂等",
+      "author": "Qoder",
+      "ticket": "rdm-requirement-import",
+      "comment": "云效编号只用于回查原始需求，不能当正式需求号（XQ 由 BizSeqService 发号且被前端按规则格式化），故单独成列并作为幂等键：同一编号重复导入跳过。唯一键含来源列，避免将来接入其他来源时编号空间重叠误伤。项目经理建在需求级：需求可只绑迭代不绑项目，项目级 PM 取不到人；绑项目时由导入逻辑继承项目 PM 兜底。ADD COLUMN / CREATE INDEX 均不可重放，初始化器逐列查 INFORMATION_SCHEMA、索引查 STATISTICS，后置校验四列与索引缺一不记版本。282 脚本为一次性参考文档。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.30",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.29"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "283_rdm_daily_report_quiet.sql"
+      ],
+      "intent": "日报无异常日降噪：rdm_daily_report_config 补 quiet_policy（full/brief/skip），把「无逾期无到期」的日子压成一句结论或不发",
+      "author": "Qoder",
+      "ticket": "rdm-daily-quiet",
+      "comment": "日报每天都发，但多数日子全是「全部正常」，长摘要反而让读者形成「不用看」的习惯。降噪只作用于定时推送：手动触发与预览照常发完整内容（用户主动要看）；skip 只跳过发送，不跳过快照落库（否则定时任务会反复重试、详情页空白）。策略放全局配置而不是规则：降噪是全公司统一阅读习惯，叠加到规则会让「这条规则为什么没发」难以解释。默认 brief（仍有一条，不会让人以为系统坏了），回滚只需把值改回 full。只 ADD COLUMN，旧代码忽略新列。283 脚本仅作参照文档，不进镜像。"
+    },
+    {
+      "versionKey": "rdm:prd-output-naming:v1.0",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.30"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [],
+      "intent": "PRD 节点结果口径统一：編寫 → 產出（阶段状态、任务类型、存量任务标题与 AI 术语）",
+      "author": "Qoder",
+      "ticket": "rdm-prd-output-naming",
+      "comment": "v3.27 可能已在开发库以「PRD 編寫」执行过；修改已执行迁移的脚本不会重跑，故用独立版本键把存量状态标签、prd 任务类型名、PRD 任务标题/说明与 AI 术语统一到「PRD 產出」。只匹配旧默认值，不覆盖管理员自定义名称；无结构变更、无 DROP。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.31",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.30"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "284_rdm_task_progress_audit.sql"
+      ],
+      "intent": "甘特图进度直改与 PRD 排期承诺同步的审计结构：rdm_task_plan_log 补 remark，新增 rdm_task_progress_log",
+      "author": "Qoder",
+      "ticket": "rdm-gantt-progress",
+      "comment": "进度从交付工作台扩到甘特图后，拖拽次数会远高于原来的表单上报；进度又是绩效与验收的原始事实，没有留痕就无法回答「谁把 60% 改成 100%」。新增只追加的进度审计表，记录变更前后进度/状态、操作人、说明与客户端请求标识；不用 rdm_task_plan_log 是因为那张表记的是日期语义，混入进度会让排期追溯失真。同版给排期审计补 remark：PRD 任务完成日与需求「承诺出 PRD 日期」同源，改期会同步承诺日期，必须能看出这次变更是承诺变更而不只是内部排期微调。只 ADD COLUMN + CREATE TABLE IF NOT EXISTS，旧代码忽略新列与新表；284 脚本仅作参照文档，不进镜像。"
     }
   ]
 }

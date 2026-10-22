@@ -56,6 +56,7 @@ public class RdmQualityVO {
         /** 返工次数（rework_count） */
         private Integer reworkCount;
         private String pmName;
+        private String pmEmpNo;
         private String submitDeptName;
         /** 最近一次验收退回原因 */
         private String lastRejectReason;

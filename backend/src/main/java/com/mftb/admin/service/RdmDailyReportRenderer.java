@@ -155,120 +155,285 @@ public class RdmDailyReportRenderer {
     /** 固定框架默认字段开关（字段池见 {@link MessageFieldOptions}） */
     private static final MessageFieldOptions DEFAULT_FIELDS = new MessageFieldOptions();
 
-    /** 固定框架引导句：只给一句话概述 + 链接文字，不把 URL 裸展在群里 */
-    private static final String FIXED_FOOTER = "\n> 需求明細、停留時長與甘特圖請看完整日報\n";
-    private static final String FIXED_LINK_TEXT = "[查看完整日報]";
+    /**
+     * 卡片正文长度上限（字符）。
+     * <p>钉钉 action_card 的 markdown 建议 1000 字符以内，群机器人卡片同一量级；
+     * 取 900 留出转义与 emoji 的余量。超限不是「截断继续塞」，而是说明还想把所有项目
+     * 都放进消息——正确做法是收敛到「需关注项目」，其余交给详情页。
+     */
+    static final int CARD_CONTENT_LIMIT = 900;
+
+    /** 卡片最多展开的关注项目数：再多读者也读不完，剩下的折叠成一行计数 */
+    private static final int MAX_ATTENTION_IN_CARD = 5;
+
+    /** 卡片引导句：URL 在按钮里，正文不再裸出链接（群里一排长 URL 是最难看的部分） */
+    private static final String CARD_FOOTER = "\n> 完整明細請看完整日報\n";
+    /** 无详情链接时的兜底引导：宁可少一句指引，也不发一个点不动的空链接 */
+    private static final String CARD_FOOTER_NO_LINK = "\n> 打開產研交付日報可查看完整明細\n";
 
     /**
-     * 固定框架群报：汇总行 → 项目行 → 迭代行 → 未挂项目迭代 → 引导链接。
+     * 无异常日极简结论（降噪策略 brief）：一句话说完，不列项目。
      *
-     * <p>与自定义模板的根本区别：<b>层级结构写死在代码里</b>，可配的只有每行带哪几个字段。
-     * 需求明细不再进群消息（那是看板的职责），否则项目一多就是几十行需求名刷屏。
+     * <p><b>为何还要保留一条而不直接静默</b>：读者需要知道「系统今天跑过了、确实没事」，
+     * 而不是在“今天没收到”与“系统坏了”之间猜。正文只回答「有没有事」，明细在按钮里。
+     */
+    public Rendered renderGroupQuiet(Snapshot snapshot, boolean evening, String detailUrl) {
+        // 用 summary 的项目数而不是 projects.size()：正文列表可能被截断/折叠，计数必须与指标同源
+        int projects = summaryOf(snapshot).getProjectCount();
+        String body = "✅ **今日無異常**\n在途 " + projects + " 個項目均在計劃內，無逾期，"
+                + (evening ? "明日無到期。" : "今日無到期。") + "\n";
+        return new Rendered(cardGroupTitle(snapshot, evening),
+                body + (StringUtils.hasText(detailUrl) ? CARD_FOOTER : CARD_FOOTER_NO_LINK), List.of());
+    }
+
+    /** 个人无异常日极简结论：只回答「我负责的项目今天要不要动」 */
+    public Rendered renderPersonalQuiet(Snapshot snapshot, boolean evening, PersonalView personal,
+                                        String detailUrl) {
+        String name = personal == null ? "—" : safe(personal.userName());
+        int mine = personal == null || personal.projects() == null ? 0 : personal.projects().size();
+        String body = "✅ **" + name + "，今日無異常**\n負責的 " + mine + " 個項目均在計劃內，無逾期，"
+                + (evening ? "明日無到期。" : "今日無到期。") + "\n";
+        return new Rendered(cardPersonalTitle(snapshot, evening, personal),
+                body + (StringUtils.hasText(detailUrl) ? CARD_FOOTER : CARD_FOOTER_NO_LINK), List.of());
+    }
+
+    /**
+     * 固定框架群报（卡片版式）：结论标题 → 指标行 → 需关注项目 → 正常项目折叠。
+     *
+     * <p><b>与旧版（多级标题 + 嵌套列表）的根本区别</b>：钉钉 markdown <b>不支持嵌套列表</b>，
+     * 旧的「项目 {@code ###} → 迭代 {@code -} → 需求 {@code "  -"}」在客户端会被压成同一层的
+     * 一排横线，项目一多读者就分不清谁属于谁——这正是「看着很乱、层级不醒目」的根因。
+     * 卡片版式因此只用<b>单层列表</b>，归属由「项目名加粗 + 同行分隔符」表达；
+     * 需求明细不再进消息（那是看板的职责），只保留计数。
+     *
+     * <p><b>标题就是结论</b>：钉钉会话列表只露 title，所以「逾期 2、风险 1」必须写进标题，
+     * 不点开也能判断今天要不要紧张；正文只负责回答「哪几个项目」。
      */
     public Rendered renderGroupFixed(Snapshot snapshot, String detailUrl, boolean evening,
                                      MessageFieldOptions fields) {
         MessageFieldOptions f = fields == null ? DEFAULT_FIELDS : fields;
         List<ProjectNode> projects = snapshot == null || snapshot.getProjects() == null
                 ? List.of() : snapshot.getProjects();
+        List<ProjectNode> attention = projects.stream()
+                .filter(p -> p != null && p.isAttention()).toList();
         List<IterationNode> unassigned = snapshot == null || snapshot.getUnassignedIterations() == null
                 ? List.of() : snapshot.getUnassignedIterations();
         boolean iterationOnly = snapshot != null && snapshot.getScopeProjectId() == null
                 && StringUtils.hasText(snapshot.getScopeIterationCode());
 
         StringBuilder sb = new StringBuilder();
-        sb.append(fixedHeading(snapshot, evening));
-        sb.append(fixedSummaryLine(snapshot, evening));
+        // 指标行与下方项目块之间必须留空行：钉钉 markdown 把连续单换行归并成一段，
+        // 不加空行时「在途 6｜…」会和「需關注 N 個項目」粘成一行
+        sb.append(cardMetrics(snapshot, evening)).append("\n\n");
         if (iterationOnly) {
-            appendFixedUnassigned(sb, unassigned, f, true);
+            sb.append(cardUnassigned(unassigned, f));
         } else {
-            appendFixedProjects(sb, projects, f);
-            appendFixedUnassigned(sb, unassigned, f, false);
+            // 无关注项目时只给一句肯定句：先输出空占位再跟一行「其餘 N 個正常」会重复两次绿色结论
+            if (attention.isEmpty()) {
+                sb.append("🟢 **全部 ").append(projects.size()).append(" 個在途項目進展正常**\n");
+            } else {
+                sb.append(cardAttentionProjects(attention, snapshot, f));
+                int normal = projects.size() - attention.size();
+                if (normal > 0) {
+                    sb.append("\n🟢 其餘 ").append(normal).append(" 個項目進展正常\n");
+                }
+            }
+            sb.append(cardUnassigned(unassigned, f));
         }
-        sb.append(FIXED_FOOTER).append(linkLine(detailUrl));
-        return new Rendered(fixedTitle(snapshot, evening), limit(sb.toString().stripTrailing(), GROUP_CONTENT_LIMIT),
-                List.of());
+        sb.append(StringUtils.hasText(detailUrl) ? CARD_FOOTER : CARD_FOOTER_NO_LINK);
+        return new Rendered(cardGroupTitle(snapshot, evening),
+                limit(sb.toString().stripTrailing(), CARD_CONTENT_LIMIT), List.of());
     }
 
     /**
-     * 固定框架个人工作通知：同一套层级，只是项目集合收敛到收件人负责的项目。
-     * <p>不复用群报文案是因为个人视角要的是「我的项目」，把全公司项目推给个人是噪声。
+     * 固定框架个人工作通知（卡片版式）：同一套层级，只是项目集合收敛到收件人负责的项目。
+     *
+     * <p>不复用群报文案是因为个人视角要的是「我的项目」，把全公司项目推给个人是噪声；
+     * 更重要的是逾期/今日到期必须用<b>收件人自己的口径</b>——用全局数字会让每个人
+     * 以为全公司的逾期都压在自己身上。
      */
     public Rendered renderPersonalFixed(Snapshot snapshot, String detailUrl, boolean evening,
                                         PersonalView personal, MessageFieldOptions fields) {
         MessageFieldOptions f = fields == null ? DEFAULT_FIELDS : fields;
         List<ProjectNode> mine = personal == null || personal.projects() == null ? List.of() : personal.projects();
+        int overdue = personal == null ? 0 : personal.overdueItemCount();
+        int todayDue = personal == null ? 0 : personal.todayDueItemCount();
+        int urgent = overdue + todayDue;
+        String name = personal == null ? "—" : safe(personal.userName());
+
         StringBuilder sb = new StringBuilder();
-        sb.append(fixedHeading(snapshot, evening));
-        // 逾期/今日到期必须用收件人自己的口径：用全局数字会让每个人以为全公司的逾期都压在自己身上
-        sb.append("**").append(safe(personal == null ? "—" : personal.userName()))
-                .append("｜在途項目 ").append(sizeOf(mine))
-                .append("｜逾期 ").append(personal == null ? 0 : personal.overdueItemCount())
-                .append("｜今日到期 ").append(personal == null ? 0 : personal.todayDueItemCount())
-                .append("**\n");
-        appendFixedProjects(sb, mine, f);
-        sb.append(FIXED_FOOTER).append(linkLine(detailUrl));
-        return new Rendered(fixedTitle(snapshot, evening), limit(sb.toString().stripTrailing(), PERSONAL_CONTENT_LIMIT),
-                List.of());
-    }
+        sb.append("**").append(name).append("，")
+                .append(urgent > 0 ? "今天有 " + urgent + " 項交付要處理" : "今天沒有到期或逾期的交付項")
+                .append("**\n\n");
+        sb.append(cardPersonalMetrics(mine.size(), overdue, todayDue)).append("\n\n");
 
-    private String fixedTitle(Snapshot snapshot, boolean evening) {
-        return "產研交付日報 " + reportDateOf(snapshot) + (evening ? "（晚報）" : "（晨報）");
-    }
-
-    private String fixedHeading(Snapshot snapshot, boolean evening) {
-        return "## " + (evening ? "🌙 " : "📊 ") + fixedTitle(snapshot, evening) + "\n";
-    }
-
-    /** 汇总行（框架固定不可关）：管理者第一眼要的是「今天要不要紧张」，不是项目清单 */
-    private String fixedSummaryLine(Snapshot snapshot, boolean evening) {
-        Summary s = summaryOf(snapshot);
-        StringBuilder sb = new StringBuilder("**在途項目 ").append(s.getProjectCount())
-                .append("｜迭代 ").append(s.getIterationActiveCount());
-        if (evening) {
-            sb.append("｜今日完成 ").append(s.getTodayDoneItemCount());
+        // 个人视角的关注集合 = 项目级风险/逾期 + 今日有交付的项目（后者的口径与上方指标同源）
+        List<ProjectNode> attention = mine.stream()
+                .filter(p -> p != null && (p.isAttention() || isDueOn(p, snapshot)))
+                .toList();
+        if (attention.isEmpty()) {
+            sb.append(cardAllNormal(mine));
         } else {
-            sb.append("｜今日到期 ").append(s.getTodayDueItemCount());
+            sb.append(cardAttentionProjects(attention, snapshot, f));
+            int normal = mine.size() - attention.size();
+            if (normal > 0) {
+                sb.append("\n🟢 其餘 ").append(normal).append(" 個項目進展正常\n");
+            }
         }
-        sb.append("｜已逾期 ").append(s.getOverdueItemCount())
-                .append("｜風險 ").append(s.getRiskProjectCount()).append("**\n");
+        sb.append(StringUtils.hasText(detailUrl) ? CARD_FOOTER : CARD_FOOTER_NO_LINK);
+        return new Rendered(cardPersonalTitle(snapshot, evening, personal),
+                limit(sb.toString().stripTrailing(), CARD_CONTENT_LIMIT), List.of());
+    }
+
+    /**
+     * 个人卡片指标行。
+     * <p>与群报不同，这里不必展示「風險項目數」——个人只关心「今天要动几件事」；
+     * 全为 0 时给一个 ✅ 肯定句，而不是三行「0」。
+     */
+    private String cardPersonalMetrics(int projectCount, int overdue, int todayDue) {
+        List<String> parts = new ArrayList<>();
+        parts.add("📦 在途 " + projectCount);
+        if (todayDue > 0) {
+            parts.add("🟡 今日到期 " + todayDue + " 項");
+        }
+        if (overdue > 0) {
+            parts.add("🔴 逾期 " + overdue + " 項");
+        }
+        if (todayDue == 0 && overdue == 0) {
+            parts.add("✅ 今日無異常");
+        }
+        return "**" + String.join("｜", parts) + "**";
+    }
+
+    /** 群报卡片标题：日期 + 档位 + 结论（逾期/风险计数），无异常时直说无异常 */
+    private String cardGroupTitle(Snapshot snapshot, boolean evening) {
+        String head = "產研交付日報 " + shortDate(snapshot) + (evening ? " 晚報" : " 晨報");
+        Summary s = summaryOf(snapshot);
+        int overdue = s.getOverdueItemCount();
+        int risk = s.getRiskProjectCount();
+        if (overdue <= 0 && risk <= 0) {
+            return head + "｜今日無異常";
+        }
+        List<String> parts = new ArrayList<>();
+        if (overdue > 0) {
+            parts.add("逾期 " + overdue);
+        }
+        if (risk > 0) {
+            parts.add("風險 " + risk);
+        }
+        return head + "｜" + String.join(" · ", parts);
+    }
+
+    /** 个人卡片标题：同样结论化——不点开就知道今天有没有事 */
+    private String cardPersonalTitle(Snapshot snapshot, boolean evening, PersonalView personal) {
+        String head = "產研交付日報 " + shortDate(snapshot) + (evening ? " 晚報" : " 晨報");
+        int urgent = personal == null ? 0 : personal.overdueItemCount() + personal.todayDueItemCount();
+        return head + "｜" + (urgent > 0 ? "你有 " + urgent + " 項要處理" : "今日無異常");
+    }
+
+    /** 标题里的短日期（MM-dd）：卡片标题空间有限，年份对日报是冗余信息 */
+    private static String shortDate(Snapshot snapshot) {
+        String date = reportDateOf(snapshot);
+        return date.length() >= 10 ? date.substring(5) : date;
+    }
+
+    /** 群报指标行：限定单位避免「2」到底是项目还是交付项 —— 逾期/到期是项，风险是项目 */
+    private String cardMetrics(Snapshot snapshot, boolean evening) {
+        Summary s = summaryOf(snapshot);
+        List<String> parts = new ArrayList<>();
+        parts.add("在途 " + s.getProjectCount());
+        if (evening) {
+            parts.add("今日完成 " + s.getTodayDoneItemCount() + " 項");
+            parts.add("今日上線 " + s.getTodayReleasedCount() + " 個");
+        } else {
+            parts.add("今日到期 " + s.getTodayDueItemCount() + " 項");
+        }
+        parts.add(zeroAware("逾期 ", s.getOverdueItemCount(), " 項"));
+        parts.add(zeroAware("風險 ", s.getRiskProjectCount(), " 個"));
+        return "**" + String.join("｜", parts) + "**";
+    }
+
+    private static String zeroAware(String label, int value, String unit) {
+        return value > 0 ? label + value + unit : "✅ " + label + "0" + unit;
+    }
+
+    /**
+     * 个人视角「全部正常」块。
+     *
+     * <p>为何个人列出项目名、群报不列：个人的在途项目通常就 1~3 个，列出名字能直接回答
+     * 「我负责的这几个都在推进」；群报动辄十几个项目，逐个列就是刷屏，一句计数就够。
+     */
+    private String cardAllNormal(List<ProjectNode> mine) {
+        if (mine.isEmpty()) {
+            return "🟢 **目前沒有在途項目**\n";
+        }
+        StringBuilder sb = new StringBuilder("🟢 **全部 ").append(mine.size()).append(" 個項目進展正常**\n");
+        if (mine.size() <= MAX_ATTENTION_IN_CARD) {
+            for (ProjectNode p : mine) {
+                if (p != null) {
+                    sb.append("- ▸ ").append(safe(nullToDash(p.getProjectName()))).append('\n');
+                }
+            }
+        }
         return sb.toString();
     }
 
-    private void appendFixedProjects(StringBuilder sb, List<ProjectNode> projects, MessageFieldOptions f) {
-        if (projects == null || projects.isEmpty()) {
-            sb.append("\n_目前沒有在途項目。_\n");
-            return;
+    /**
+     * 需关注项目块：一个项目一行（状态灯 + 加粗项目名 + 字段池拼接），不再逐迭代铺开。
+     *
+     * <p>为何不再逐迭代列出：卡片正文只有 900 字符，一个项目三五个迭代就能把它填满，
+     * 而读者真正要判断的是「哪个项目出事了」。迭代明细属于详情页。
+     */
+    private String cardAttentionProjects(List<ProjectNode> attention, Snapshot snapshot, MessageFieldOptions f) {
+        if (attention == null || attention.isEmpty()) {
+            return "🟢 **暫無需關注項目**\n";
         }
+        StringBuilder sb = new StringBuilder("🔴 **需關注 ").append(attention.size()).append(" 個項目**\n");
         int shown = 0;
-        for (ProjectNode p : projects) {
-            if (p == null || shown >= MAX_PROJECTS_IN_GROUP || sb.length() > GROUP_CONTENT_LIMIT) {
+        for (ProjectNode p : attention) {
+            if (p == null || shown >= MAX_ATTENTION_IN_CARD || sb.length() > CARD_CONTENT_LIMIT) {
                 break;
             }
-            sb.append("\n### ").append(safe(nullToDash(p.getProjectName())));
-            // 异常角标不可关：去掉后逾期项目与正常项目长得一样，精简反而变成致盲
-            if (isTrue(p.getRiskFlag())) {
-                sb.append(" ⚠️風險");
-            }
-            if (isTrue(p.getOverdueFlag())) {
-                sb.append(" ⏰逾期");
-            }
-            if (isTrue(p.getPausedFlag())) {
-                sb.append(" ⏸暫停");
-            }
-            sb.append('\n');
+            sb.append("- ").append(cardFlag(p, snapshot)).append(' ')
+                    .append("**").append(safe(nullToDash(p.getProjectName()))).append("**");
             String detail = fixedProjectDetail(p, f);
             if (StringUtils.hasText(detail)) {
-                sb.append("- ").append(detail).append('\n');
+                sb.append(' ').append(detail);
             }
-            for (IterationNode it : p.getIterations() == null ? List.<IterationNode>of() : p.getIterations()) {
-                sb.append(fixedIterationLine(it, f, "- "));
-            }
+            sb.append('\n');
             shown++;
         }
-        int rest = projects.size() - shown;
+        int rest = attention.size() - shown;
         if (rest > 0) {
-            sb.append("\n> 另有 ").append(rest).append(" 個項目未展開，請點連結查看完整日報。\n");
+            sb.append("- 另有 ").append(rest).append(" 個需關注項目，請看完整日報\n");
         }
+        return sb.toString();
+    }
+
+    /**
+     * 项目状态灯：逾期 > 风险/阻塞 > 今日有交付 > 普通。
+     * <p>用 emoji 而不是颜色标记：钉钉各端对 {@code <font color>} 支持不一致，
+     * emoji 在任何客户端都能渲染，且在纯文本预览里也不会退化成一堆标签。
+     */
+    private static String cardFlag(ProjectNode p, Snapshot snapshot) {
+        if (isTrue(p.getOverdueFlag()) || p.getDeliveryItemOverdue() > 0) {
+            return "🔴";
+        }
+        if (isTrue(p.getRiskFlag()) || p.getDeliveryItemBlocked() > 0) {
+            return "🟠";
+        }
+        if (isDueOn(p, snapshot)) {
+            return "🟡";
+        }
+        return "▸";
+    }
+
+    /** 今日是否由该项目交付：口径取快照 reportDate 而不是系统当前时间，保证历史快照重发时仍自洽 */
+    private static boolean isDueOn(ProjectNode p, Snapshot snapshot) {
+        return p != null && snapshot != null && StringUtils.hasText(snapshot.getReportDate())
+                // 已完成的项目残留 nextDeliveryDate 时不得再标「今日到期」（零承诺同理）
+                && p.getRemainingCount() > 0
+                && snapshot.getReportDate().equals(p.getNextDeliveryDate());
     }
 
     /** 项目行字段（可配部分拼成一行）：项目名与异常角标在标题行，不属字段池 */
@@ -350,22 +515,17 @@ public class RdmDailyReportRenderer {
         return sb.toString();
     }
 
-    private void appendFixedUnassigned(StringBuilder sb, List<IterationNode> unassigned, MessageFieldOptions f,
-                                       boolean asOnlySection) {
+    /** 未挂项目迭代块：卡片里只列迭代行，标题用加粗而不是三级标题（卡片正文不靠字号分层） */
+    private String cardUnassigned(List<IterationNode> unassigned, MessageFieldOptions f) {
         if (unassigned == null || unassigned.isEmpty()) {
-            return;
+            return "";
         }
-        sb.append(asOnlySection ? "\n" : "\n").append("### 未掛項目的迭代（")
-                .append(unassigned.size()).append(" 個）\n");
+        StringBuilder sb = new StringBuilder("\n🧩 **未掛項目的迭代 ")
+                .append(unassigned.size()).append(" 個**\n");
         for (IterationNode it : unassigned) {
             sb.append(fixedIterationLine(it, f, "- "));
         }
-    }
-
-    private static String linkLine(String detailUrl) {
-        return StringUtils.hasText(detailUrl)
-                ? FIXED_LINK_TEXT + "(" + detailUrl.trim() + ")\n"
-                : "\n";
+        return sb.toString();
     }
 
     private static boolean on(Boolean flag) {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { Alert, Button, Checkbox, Form, InputNumber, Modal, Select, Space, Spin, Switch, Table, Tag, message } from 'antd'
+import { Alert, Button, Checkbox, Collapse, Form, InputNumber, Modal, Select, Space, Spin, Switch, Table, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   DeleteOutlined,
@@ -166,6 +166,7 @@ export default function DailyReportRules() {
         boardShowUnassigned: cfg.boardShowUnassigned,
         messageMode: cfg.messageMode,
         messageFields: cfg.messageFields,
+        quietPolicy: cfg.quietPolicy ?? 'brief',
       })
       // 已选员工回显：多选框拿不到 label 会把 userId 渲染成裸数字，管理员无法确认选的是谁
       const presetIds = [...(cfg.extraReceiverUserIds ?? []), ...(cfg.excludeReceiverUserIds ?? [])]
@@ -322,6 +323,7 @@ export default function DailyReportRules() {
         boardShowUnassigned: v.boardShowUnassigned,
         messageMode: v.messageMode,
         messageFields: v.messageFields,
+        quietPolicy: v.quietPolicy,
       })
       setConfig(next)
       setCfgDirty(false)
@@ -696,40 +698,78 @@ export default function DailyReportRules() {
                   { label: t('rdm.dailyRule.msgModeTemplate'), value: 'template' },
                 ]} />
               </Form.Item>
+              {/*
+                降噪是「阅读习惯」级开关，不是自由配置：只给三档，不提供表达式/时间窗等细节，
+                否则「今天为什么没发」会变成一件需要看配置才能解释的事。
+                仅对定时推送生效；手动触发与预览照常发完整内容（用户主动要看）。
+              */}
+              <Form.Item name="quietPolicy" label={t('rdm.dailyRule.quietPolicy')} style={{ marginBottom: 8 }}>
+                <Select options={[
+                  { label: t('rdm.dailyRule.quietFull'), value: 'full' },
+                  { label: t('rdm.dailyRule.quietBrief'), value: 'brief' },
+                  { label: t('rdm.dailyRule.quietSkip'), value: 'skip' },
+                ]} />
+              </Form.Item>
             </div>
             <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 10 }}>
               {messageMode === 'template'
                 ? t('rdm.dailyRule.msgTemplateNote')
                 : t('rdm.dailyRule.msgFrameworkNote')}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>
-                  {t('rdm.dailyRule.msgProjectFields')}
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '4px 12px' }}>
-                  {PROJECT_FIELDS.map(f => (
-                    <Form.Item key={f.key} name={['messageFields', f.key]} valuePropName="checked"
-                      style={{ marginBottom: 0 }}>
-                      <Checkbox disabled={messageMode === 'template'}>{t(f.labelKey)}</Checkbox>
-                    </Form.Item>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>
-                  {t('rdm.dailyRule.msgIterationFields')}
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '4px 12px' }}>
-                  {ITERATION_FIELDS.map(f => (
-                    <Form.Item key={f.key} name={['messageFields', f.key]} valuePropName="checked"
-                      style={{ marginBottom: 0 }}>
-                      <Checkbox disabled={messageMode === 'template'}>{t(f.labelKey)}</Checkbox>
-                    </Form.Item>
-                  ))}
-                </div>
-              </div>
+            <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 10 }}>
+              {t('rdm.dailyRule.quietHint')}
             </div>
+            {/*
+              字段开关收进「進階」折叠区：固定版式的默认值就是推荐值（需关注项目 + 交付进度 + 负责人），
+              绝大多数人不需要调；把它们平铺在主表单里，只会让「只能选不能配」的承诺名存实亡。
+              已保存的历史配置仍然生效，不因折叠而重置。
+            */}
+            <Collapse
+              ghost
+              size="small"
+              style={{ marginBottom: 4 }}
+              items={[{
+                key: 'messageFields',
+                label: (
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>
+                    {t('rdm.dailyRule.msgAdvanced')}
+                  </span>
+                ),
+                children: (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>
+                        {t('rdm.dailyRule.msgProjectFields')}
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '4px 12px' }}>
+                        {PROJECT_FIELDS.map(f => (
+                          <Form.Item key={f.key} name={['messageFields', f.key]} valuePropName="checked"
+                            style={{ marginBottom: 0 }}>
+                            <Checkbox disabled={messageMode === 'template'}>{t(f.labelKey)}</Checkbox>
+                          </Form.Item>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 2 }}>
+                        {t('rdm.dailyRule.msgIterationFields')}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 8 }}>
+                        {t('rdm.dailyRule.msgIterationScope')}
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '4px 12px' }}>
+                        {ITERATION_FIELDS.map(f => (
+                          <Form.Item key={f.key} name={['messageFields', f.key]} valuePropName="checked"
+                            style={{ marginBottom: 0 }}>
+                            <Checkbox disabled={messageMode === 'template'}>{t(f.labelKey)}</Checkbox>
+                          </Form.Item>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ),
+              }]}
+            />
           </div>
         </Form>
         {canEdit && (

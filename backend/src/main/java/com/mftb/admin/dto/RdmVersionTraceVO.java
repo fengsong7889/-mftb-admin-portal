@@ -46,6 +46,7 @@ public class RdmVersionTraceVO {
         private String submitDeptName;
         private String submitterName;
         private String pmName;
+        private String pmEmpNo;
         private String planReleaseDate;
         private String actualReleaseDate;
         /** 验收结论: pass/conditional/fail */

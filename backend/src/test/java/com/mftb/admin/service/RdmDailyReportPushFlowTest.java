@@ -30,6 +30,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -162,7 +163,9 @@ class RdmDailyReportPushFlowTest {
         verify(jdbc, never()).update(anyString(), any(Object[].class));
         assertTrue(r.isDryRun(), "结果必须标明是干跑");
         assertFalse(r.isGroupDispatched(), "干跑不得声称群报已投递");
-        assertTrue(r.getGroupContent() != null && r.getGroupContent().contains("產研交付日報"),
+        assertTrue(r.getGroupTitle() != null && r.getGroupTitle().contains("產研交付日報"),
+                "干跑应回显渲染后的群报标题，实际: " + r.getGroupTitle());
+        assertTrue(r.getGroupContent() != null && !r.getGroupContent().isBlank(),
                 "干跑应回显渲染后的群报正文，实际: " + r.getGroupContent());
     }
 
@@ -187,8 +190,8 @@ class RdmDailyReportPushFlowTest {
 
         svc.push(ruleTarget(), false, null, true);
 
-        verify(dingTalkAppService, never()).sendWorkNotification(anyString(), org.mockito.ArgumentMatchers.anyLong(),
-                anyList(), anyString(), anyString());
+        verify(dingTalkAppService, never()).sendWorkActionCard(anyString(), org.mockito.ArgumentMatchers.anyLong(),
+                anyList(), anyString(), anyString(), anyString(), anyString());
     }
 
     /* ==================== 全局开关 ==================== */
@@ -324,8 +327,8 @@ class RdmDailyReportPushFlowTest {
         assertTrue(r.isGroupDispatched(), "个人通道未就绪不得阻塞群报");
         verify(notifyService, times(1)).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
         assertEquals(0, r.getPersonalSent());
-        verify(dingTalkAppService, never()).sendWorkNotification(anyString(), org.mockito.ArgumentMatchers.anyLong(),
-                anyList(), anyString(), anyString());
+        verify(dingTalkAppService, never()).sendWorkActionCard(anyString(), org.mockito.ArgumentMatchers.anyLong(),
+                anyList(), anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -351,8 +354,8 @@ class RdmDailyReportPushFlowTest {
         verify(notifyService, never()).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
         assertFalse(r.isGroupDispatched(), "群报开关关闭时不得入队群消息");
         assertEquals(1, r.getPersonalSent(), "个人通知应独立发出");
-        verify(dingTalkAppService).sendWorkNotification(eq(NotificationAppService.RDM_DAILY_REPORT), eq(9L),
-                eq(List.of("ding-77")), anyString(), anyString());
+        verify(dingTalkAppService).sendWorkActionCard(eq(NotificationAppService.RDM_DAILY_REPORT), eq(9L),
+                eq(List.of("ding-77")), anyString(), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -375,8 +378,8 @@ class RdmDailyReportPushFlowTest {
 
         assertEquals(0, r.getPersonalSent());
         assertEquals(1, r.getPersonalSkipped(), "未绑定者应计入跳过，便于运维发现漏绑");
-        verify(dingTalkAppService, never()).sendWorkNotification(anyString(), org.mockito.ArgumentMatchers.anyLong(),
-                anyList(), anyString(), anyString());
+        verify(dingTalkAppService, never()).sendWorkActionCard(anyString(), org.mockito.ArgumentMatchers.anyLong(),
+                anyList(), anyString(), anyString(), anyString(), anyString());
     }
 
     /* ==================== 手动触发入口校验 ==================== */
@@ -527,6 +530,85 @@ class RdmDailyReportPushFlowTest {
         assertEquals("全部在途項目", got.getScopeLabel());
         verify(jdbc).queryForList(contains("scope_key = ?"), eq(String.class),
                 eq("2026-10-19"), eq("manual"), eq("manual:all"));
+    }
+
+    /* ==================== 无异常日降噪 ==================== */
+
+    /** 干净日快照：无逾期、无到期、无风险，只有一个不关注的项目 */
+    private Snapshot cleanSnapshot() {
+        var project = new com.mftb.admin.dto.RdmDailyReportVO.ProjectNode();
+        project.setProjectId(3L);
+        project.setProjectName("項目A");
+        return snapshot(List.of(project));
+    }
+
+    @Test
+    @DisplayName("降噪 brief：无异常日只发一句结论，不再铺开项目清单")
+    void quietBriefCompressesCleanDay() {
+        Config cfg = config(true, true, false);
+        cfg.setMessageMode("fixed");
+        cfg.setQuietPolicy("brief");
+        RdmDailyReportService svc = service(cfg, cleanSnapshot(), 0);
+
+        TriggerResult r = svc.push(ruleTarget(), false, null, false);
+
+        assertTrue(r.isGroupDispatched(), "brief 仍要发一条，不能静默");
+        assertTrue(r.getGroupContent().contains("今日無異常"), r.getGroupContent());
+        assertFalse(r.getGroupContent().contains("需關注"), "无异常日不应出现需关注块: " + r.getGroupContent());
+        assertTrue(r.getGroupTitle().contains("今日無異常"), r.getGroupTitle());
+    }
+
+    @Test
+    @DisplayName("降噪 skip：无异常日不发群报与个人，但快照照落库（可打开日报、定时不重试）")
+    void quietSkipSkipsSendingButKeepsSnapshot() {
+        Config cfg = config(true, true, true);
+        cfg.setMessageMode("fixed");
+        cfg.setQuietPolicy("skip");
+        RdmDailyReportService svc = service(cfg, cleanSnapshot(), 0);
+
+        TriggerResult r = svc.push(ruleTarget(), false, null, false);
+
+        assertFalse(r.isGroupDispatched(), "skip 不得入队群消息");
+        assertEquals(0, r.getPersonalSent());
+        assertEquals(0, r.getPersonalSkipped(), "策略性不发不是异常跳过，不能计进 skipped");
+        assertTrue(r.getMessage().contains("降噪"), "结果要能解释为什么没发: " + r.getMessage());
+        verify(notifyService, never()).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
+        verify(notifyService, never()).notifyActionCard(anyString(), anyString(), anyString(), anyString(), anyString());
+        verify(dingTalkAppService, never()).sendWorkActionCard(anyString(), org.mockito.ArgumentMatchers.anyLong(),
+                anyList(), anyString(), anyString(), anyString(), anyString());
+        // 快照仍要落库：不落快照，定时任务下次 tick 会重跑、详情页也没有内容
+        verify(jdbc, atLeastOnce()).update(contains("INSERT INTO rdm_daily_report"), any(Object[].class));
+    }
+
+    @Test
+    @DisplayName("降噪不适用于异常日：有逾期时即使配了 skip 也照常发完整摘要")
+    void quietSkipIgnoredWhenAbnormal() {
+        Config cfg = config(true, true, false);
+        cfg.setMessageMode("fixed");
+        cfg.setQuietPolicy("skip");
+        Snapshot dirty = cleanSnapshot();
+        dirty.getSummary().setOverdueItemCount(1);
+        RdmDailyReportService svc = service(cfg, dirty, 0);
+
+        TriggerResult r = svc.push(ruleTarget(), false, null, false);
+
+        assertTrue(r.isGroupDispatched(), "有逾期必须照常发");
+        assertTrue(r.getGroupContent().contains("逾期"), r.getGroupContent());
+    }
+
+    @Test
+    @DisplayName("降噪不适用于干跑：预览即使配了 skip 也要渲染出内容（否则预览空白）")
+    void quietSkipIgnoredForDryRun() {
+        Config cfg = config(true, true, false);
+        cfg.setMessageMode("fixed");
+        cfg.setQuietPolicy("skip");
+        RdmDailyReportService svc = service(cfg, cleanSnapshot(), 0);
+
+        TriggerResult r = svc.push(ruleTarget(), false, null, true);
+
+        assertTrue(r.isDryRun());
+        assertTrue(r.getGroupContent() != null && !r.getGroupContent().isBlank(),
+                "干跑要能看到渲染结果，实际: " + r.getGroupContent());
     }
 
     /** 测试用的企业应用凭据快照（构造参数顺序：id, appKey, appSecret, agentId, baseUrl, enabled） */

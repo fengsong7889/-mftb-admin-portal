@@ -86,6 +86,7 @@ public class RdmWeeklyReportVO {
     @Data
     public static class PmRow {
         private String pmName;
+        private String pmEmpNo;
         private Integer active;
         private Integer delivered;
         private Integer overdue;
@@ -99,6 +100,7 @@ public class RdmWeeklyReportVO {
         private String title;
         private String versionNo;
         private String pmName;
+        private String pmEmpNo;
         private String actualReleaseDate;
         private Integer acceptanceScore;
     }

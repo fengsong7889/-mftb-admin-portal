@@ -101,7 +101,7 @@
       "rdmSubmit": "제출",
       "rdmIntake": "승인",
       "rdmDispatch": "배정",
-      "rdmDesign": "PRD 설계",
+      "rdmDesign": "PRD 산출",
       "rdmDev": "개발",
       "rdmRelease": "배포",
       "searching": "일치하는 정보 검색 중",
@@ -955,5 +955,41 @@
     "statScheduleUnscheduled": "전주 미편성 인원",
     "noValidWorksheet": "파일에 유효한 워크시트가 없습니다",
     "noValidDataRows": "파일에 유효한 데이터 행이 없습니다"
+  },
+  "rdm": {
+    "gantt": {
+      "editingHint": "막대를 끌어 일정 변경 · 양끝으로 기간 조정 · 아래 점을 끌어 진행률 변경",
+      "prdConfirmTitle": "PRD 일정 변경 확인",
+      "prdConfirmNote": "PRD 작업 완료일은 요구사항의 'PRD 제출 예정일'과 동일하며, 저장 시 예정일도 함께 변경됩니다.",
+      "prdConfirmOk": "저장"
+    },
+    "ganttBoard": {
+      "progressPanelHint": "점을 끌어 놓으면 저장됩니다. 100%는 산출물 설명이 필요합니다",
+      "progressPanelHintPrd": "PRD 작업 진행률은 최대 99%입니다. 100%는 리뷰 제출 시 설정됩니다",
+      "progressCapToast": "PRD 작업 진행률은 최대 99%입니다. 100%는 리뷰 제출 시 설정됩니다",
+      "progressDoneTitle": "작업 완료",
+      "progressDoneHint": "진행률 100%는 작업을 완료로 표시합니다. 산출물 설명 또는 산출물 링크가 필요합니다(검수·성과 근거).",
+      "progressDoneRequired": "작업 완료에는 산출물 설명 또는 산출물 링크가 필요합니다",
+      "progressDonePlaceholder": "산출물 설명 또는 산출물 링크(필수)",
+      "progressDoneOk": "완료",
+      "progressDoneSaved": "작업이 완료되었습니다",
+      "prdDateSyncNote": "PRD 작업 완료일은 요구사항의 'PRD 제출 예정일'과 동일하며 변경 시 예정일도 함께 갱신됩니다. 진행률은 최대 99%, 100%는 리뷰 제출 시 설정됩니다.",
+      "progressPanelTitle": "작업 진행률",
+      "progressPanelApply": "적용"
+    },
+    "reqSections": {
+      "deliverByPromise": "약속일 기준 납품",
+      "hoursUnreported": "미보고 / {{plan}}h",
+      "btnPrdPage": "PRD 페이지",
+      "btnReportDone": "완료 보고"
+    },
+    "releasePanel": {
+      "title": "릴리스 승인",
+      "v3Title": "V3 단계별 납품: 납품 항목 / 릴리스 배치 단위로 릴리스",
+      "v3Desc": "이 요구사항은 전체 요구사항 릴리스를 사용하지 않습니다. 릴리스하려면 납품 항목에서 범위 동결, 테스트 제출, 검수를 완료한 후 '릴리스 센터'에서 릴리스 배치를 생성하세요. 배치에는 테스트, 검수, 결함, 의존성, 범위의 5가지 하드 게이트와 4-eyes 승인이 적용됩니다."
+    },
+    "reqList": {
+      "btnBatchImport": "일괄 가져오기"
+    }
   }
 }

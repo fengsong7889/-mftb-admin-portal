@@ -64,6 +64,7 @@ import {
   type RdmProjectStatsCard,
 } from '../../api/rdm'
 import { fetchEmployees, type EmployeeItem } from '../../api/employee'
+import { formatEmployee } from '../../utils/employeeDisplay'
 import { exportProjectBundle } from './projectExport'
 import {
   RDM_PROJECT_STATUS_COLOR,
@@ -436,8 +437,8 @@ export default function ProjectOverview() {
         </div>
       ),
     },
-    { title: t('rdm.projOverview.colPm'), dataIndex: 'pmUserName', key: 'pmUserName', width: 110, render: (v?: string | null) => v || '-' },
-    { title: t('rdm.projOverview.colPo'), dataIndex: 'productOwnerUserName', key: 'productOwnerUserName', width: 110, render: (v?: string | null) => v || '-' },
+    { title: t('rdm.projOverview.colPm'), dataIndex: 'pmUserName', key: 'pmUserName', width: 150, render: (v: string | null | undefined, r) => formatEmployee(v, r.pmUserEmpNo) || '-' },
+    { title: t('rdm.projOverview.colPo'), dataIndex: 'productOwnerUserName', key: 'productOwnerUserName', width: 150, render: (v: string | null | undefined, r) => formatEmployee(v, r.productOwnerUserEmpNo) || '-' },
     { title: t('rdm.projOverview.colPlanStart'), dataIndex: 'planStartDate', key: 'planStartDate', width: 125, sorter: true, render: (v?: string | null) => v || <span style={{ color: '#8C8C8C' }}>-</span> },
     { title: t('rdm.projOverview.colPlanEnd'), dataIndex: 'planEndDate', key: 'planEndDate', width: 125, sorter: true, render: (v?: string | null) => v || <span style={{ color: '#8C8C8C' }}>-</span> },
     {

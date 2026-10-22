@@ -128,8 +128,10 @@ export interface RdmRequirementRow {
   submitTime?: string | null
   pmName?: string | null
   pmEmpNo?: string | null
-  devOwnerName?: string | null
+  dispatcherUserId?: number | null
   dispatcherName?: string | null
+  dispatcherEmpNo?: string | null
+  devOwnerName?: string | null
   currentHandler?: string | null
   /**
    * 當前處理人聚合：未完成任務（todo/doing/blocked）的負責人，按人去重。
@@ -141,6 +143,12 @@ export interface RdmRequirementRow {
   planReleaseDate?: string | null
   actualReleaseDate?: string | null
   versionNo?: string | null
+  /** 外部来源编号（云效）：仅回查原始需求，不参与需求编号规则 */
+  externalNo?: string | null
+  externalSource?: string | null
+  /** 需求级项目经理（存量导入时使用；未绑项目时才有值） */
+  projectManagerUserId?: number | null
+  projectManagerName?: string | null
   /** 所属迭代编码（详情属性区用于判断「是否已进迭代产能对账」） */
   iterationCode?: string | null
   /** 所属迭代名称（服务端联表下发；缺失时前端用下拉字典或编码兜底） */
@@ -356,6 +364,8 @@ export interface RdmRequirementForm {
   /** PM=直接指定产品经理；POOL=提交技术部分发 */
   assignMode: 'PM' | 'POOL'
   pmUserId?: number
+  /** 技术负责人ID（仅 assignMode=POOL 时生效；提出人选定后需求池處理人就是具体的人） */
+  dispatcherUserId?: number
   /** 仅 mock 阶段用于列表回显；真实接口按 pmUserId 在后端回填姓名 */
   pmName?: string
   /** 是否免审批（管理岗或规则命中时由后端判定） */
@@ -471,6 +481,14 @@ export interface RdmProductOption {
   domains: string[]
   activeCount: number
   capacity: number
+}
+
+/** 通用员工候选（技术负责人等）：姓名+工号是统一展示口径 */
+export interface RdmEmployeeOption {
+  userId: number
+  empNo?: string | null
+  name: string
+  deptName?: string | null
 }
 
 /** SLA 配置行（后端 RdmConfigVO.Sla 同构） */
@@ -680,6 +698,7 @@ export interface RdmRiskItem {
   title: string
   status?: RdmStatus | string | null
   submitterName: string
+  submitterEmpNo?: string | null
   handler: string
   days: number
 }
@@ -701,7 +720,7 @@ export interface RdmDashboardData {
   }
   typeDist: { name: string; value: number }[]
   deptRank: { deptName: string; submitted: number; delivered: number; onTimeRate: number; avgDays: number }[]
-  pmRank: { pmName: string; active: number; delivered: number; overdue: number; avgDays: number }[]
+  pmRank: { pmName: string; pmEmpNo?: string | null; active: number; delivered: number; overdue: number; avgDays: number }[]
   stageDuration: { stage: RdmStage | string; avgHours: number }[]
   trend: { date: string; submitted: number; delivered: number }[]
   risks: RdmRiskItem[]
@@ -838,6 +857,11 @@ export async function fetchProductOptions(): Promise<RdmProductOption[]> {
   }
 }
 
+/** 技术负责人候选（具备需求分配权的在职员工） */
+export async function fetchTechLeadOptions(): Promise<RdmEmployeeOption[]> {
+  return request.get<unknown, RdmEmployeeOption[]>('/rdm/options/tech-leads', SILENT)
+}
+
 /** 系统 → 菜单 级联树 */
 export async function fetchMenuTree(): Promise<RdmMenuTreeNode[]> {
   try {
@@ -921,6 +945,50 @@ export async function changeRequirementIteration(
   form: { projectId?: number | null; iterationCode: string; remark?: string },
 ) {
   return request.put<unknown, RdmRequirementRow>(`/rdm/requirement/${id}/iteration`, form)
+}
+
+/** 存量导入单行结果 */
+export interface RdmRequirementImportItem {
+  rowNo: number
+  externalNo: string
+  title: string
+  /** imported=已导入 / skipped=云效编号已存在 / failed=校验未通过 */
+  result: 'imported' | 'skipped' | 'failed'
+  message?: string
+  /** 导入成功后的正式需求编号（XQ...） */
+  reqNo?: string
+}
+
+/** 存量导入结果：先全量校验，任何一行失败则整批不落库 */
+export interface RdmRequirementImportResult {
+  total: number
+  imported: number
+  skipped: number
+  failed: number
+  items: RdmRequirementImportItem[]
+}
+
+/** 导入行（字段与下载的模板列一一对应） */
+export interface RdmRequirementImportRowInput {
+  rowNo: number
+  title: string
+  externalNo: string
+  status: string
+  projectManager?: string
+  productManager?: string
+  projectName?: string
+  iterationName?: string
+  description?: string
+}
+
+/**
+ * 批量导入存量需求（云效迁移）。
+ *
+ * 行级问题不抛错，统一在返回体里逐行给出（imported/skipped/failed）；
+ * 参数级问题（空列表、超上限、无权限）仍走统一错误响应。
+ */
+export async function importRequirements(rows: RdmRequirementImportRowInput[]): Promise<RdmRequirementImportResult> {
+  return request.post<unknown, RdmRequirementImportResult>('/rdm/requirement/import', { rows })
 }
 
 /** 批量分配产品经理（需求池） */
@@ -1242,6 +1310,7 @@ export interface RdmIterationItem {
   capacityHours?: number
   ownerUserId?: number | null
   ownerName?: string | null
+  ownerEmpNo?: string | null
   status?: string
   remark?: string | null
   reqCount?: number
@@ -1493,8 +1562,17 @@ export async function checkTaskOwner(userId: number): Promise<RdmTaskOwnerCheck>
   }
 }
 
-/** 上报任务进度与工时 */
-export function reportTask(id: number, payload: { action: string; progress?: number; actualHours?: number; remark?: string }) {
+/** 上报任务进度与工时（action=progress 为甘特图直接拖进度，带 expectedProgress 做乐观锁） */
+export function reportTask(id: number, payload: {
+  action: string
+  progress?: number
+  /** 期望的当前进度：与库中不一致则服务端拒绝，避免并发互盖 */
+  expectedProgress?: number
+  actualHours?: number
+  remark?: string
+  /** 客户端幂等请求标识（松手即保存的重试对账） */
+  clientRequestId?: string
+}) {
   return request.post<unknown, RdmTaskItem>(`/rdm/delivery/task/${id}/progress`, payload)
 }
 
@@ -2268,6 +2346,7 @@ export interface RdmQualityData {
     title: string
     reworkCount: number
     pmName?: string | null
+    pmEmpNo?: string | null
     submitDeptName?: string | null
     lastRejectReason?: string | null
   }[]
@@ -2291,6 +2370,7 @@ export interface RdmVersionTrace {
     submitDeptName?: string | null
     submitterName?: string | null
     pmName?: string | null
+    pmEmpNo?: string | null
     planReleaseDate?: string | null
     actualReleaseDate?: string | null
     acceptanceResult?: string | null
@@ -2318,8 +2398,8 @@ export interface RdmWeeklyReport {
     onTimeRate: number
   }
   byDept: { deptName: string; submitted: number; delivered: number; overdue: number; avgDays: number }[]
-  byPm: { pmName: string; active: number; delivered: number; overdue: number }[]
-  released: { reqId: number; reqNo: string; title: string; versionNo?: string | null; pmName?: string | null; actualReleaseDate?: string | null; acceptanceScore?: number | null }[]
+  byPm: { pmName: string; pmEmpNo?: string | null; active: number; delivered: number; overdue: number }[]
+  released: { reqId: number; reqNo: string; title: string; versionNo?: string | null; pmName?: string | null; pmEmpNo?: string | null; actualReleaseDate?: string | null; acceptanceScore?: number | null }[]
   /*
    * 风险行的 reqNo 可空：INTAKE_STUCK 是准入前需求，还没有正式编号（延迟发号）。
    * released/nextWeek 只会是准入后需求，保持非空。
@@ -2717,6 +2797,7 @@ export type RdmTriStateFlag = 0 | 1
 export interface RdmProjectListItem {
   id: number; projectNo: string; name: string; objective: string;
   pmUserName: string; productOwnerUserName: string;
+  pmUserEmpNo?: string | null; productOwnerUserEmpNo?: string | null;
   planStartDate: string; planEndDate: string;
   status: string; pausedFlag: RdmTriStateFlag; riskFlag: RdmTriStateFlag; overdueFlag: RdmTriStateFlag;
   deliveredCount: number; totalDeliveryCount: number;

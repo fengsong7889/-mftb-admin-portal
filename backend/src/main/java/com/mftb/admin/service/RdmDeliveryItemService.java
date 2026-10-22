@@ -484,12 +484,34 @@ public class RdmDeliveryItemService {
      * 为简单需求获取或创建默认交付项。
      * <p>简单需求（无拆分必要）自动创建一个覆盖整条需求的交付项，
      * 避免用户手动操作一步无意义的"新建交付项"。
+     * <p>调用方若手里已有<b>尚未落库</b>的需求快照（如分配动作刚写入 PM），
+     * 必须走 {@link #getOrCreateDefaultItem(RdmRequirement, Long)}：本方法会重新读库，
+     * 读不到事务内的未提交改动，默认交付项会丢掉产品验收人，验收环节将无人可签。
      */
     @Transactional(rollbackFor = Exception.class)
     public RdmDeliveryItem getOrCreateDefaultItem(Long reqId, Long currentUserId) {
         if (reqId == null) {
             throw new BusinessException("需求ID不能為空");
         }
+        RdmRequirement req = requirementMapper.selectById(reqId);
+        if (req == null) {
+            throw new BusinessException("需求不存在");
+        }
+        return getOrCreateDefaultItem(req, currentUserId);
+    }
+
+    /**
+     * 默认交付项（使用调用方传入的需求快照）。
+     * <p>为什么保留快照重载：分配/准入等动作在<b>同一事务</b>内改完需求字段后立即建交付项，
+     * 此时重新读库拿到的是改动前的行 —— 协调人、产品验收人、项目归属会全部落空，
+     * 后续冻结/验收/发布逐环节都会因"无人可签/无项目"卡死。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public RdmDeliveryItem getOrCreateDefaultItem(RdmRequirement req, Long currentUserId) {
+        if (req == null || req.getId() == null) {
+            throw new BusinessException("需求ID不能為空");
+        }
+        Long reqId = req.getId();
         // 已有交付项则返回第一条
         List<RdmDeliveryItem> existing = deliveryItemMapper.selectList(
                 new LambdaQueryWrapper<RdmDeliveryItem>()
@@ -498,11 +520,6 @@ public class RdmDeliveryItemService {
                         .last("LIMIT 1"));
         if (!existing.isEmpty()) {
             return existing.get(0);
-        }
-        // 自动创建
-        RdmRequirement req = requirementMapper.selectById(reqId);
-        if (req == null) {
-            throw new BusinessException("需求不存在");
         }
         RdmDeliveryItemDTO.Create dto = new RdmDeliveryItemDTO.Create();
         dto.setReqId(reqId);

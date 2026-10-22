@@ -430,7 +430,8 @@ class RdmNotifyServiceTest {
         notifyService.notifyUsers(EVENT, null, List.of(receiver()), TITLE, "  ");
 
         ArgumentCaptor<String> status = ArgumentCaptor.forClass(String.class);
-        verify(preparedStatement).setString(eq(8), status.capture());
+        // 群播 INSERT 多插了 msg_type/btn_title/btn_url 三列（卡片化），send_status 后移为第 11 位
+        verify(preparedStatement).setString(eq(11), status.capture());
         assertEquals("skipped", status.getValue());
         verifyNoInteractions(dispatcher);
     }

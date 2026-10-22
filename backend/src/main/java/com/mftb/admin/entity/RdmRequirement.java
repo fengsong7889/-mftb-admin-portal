@@ -113,6 +113,16 @@ public class RdmRequirement {
     /** 产品经理姓名快照 */
     private String assigneePmName;
 
+    /**
+     * 项目经理 sys_user.id（需求级）。
+     * <p>存量导入时使用：绑定了项目就默认继承 rdm_project.pm_user_id，只绑迭代或不绑项目时
+     * 取导入行填写的人。与 dev_owner（研发负责人）、dispatcher（分发人）是三回事，不能互相代替。
+     */
+    private Long projectManagerUserId;
+
+    /** 项目经理姓名快照 */
+    private String projectManagerUserName;
+
     /** 提交时指定的产品经理ID（意向）：需审批时先存意向，审批通过后再生效为受理人 */
     private Long intentPmUserId;
 
@@ -145,6 +155,17 @@ public class RdmRequirement {
 
     /** 关联发布版本号 sys_version_history.version_no */
     private String versionNo;
+
+    /**
+     * 外部来源编号（如云效工作项编号）。
+     * <p>仅记录用于回查原始需求，<b>不参与需求编号规则</b>：正式号 req_no 只能由
+     * BizSeqService 在首次准入时发号，禁止拿外部编号冒充。与 external_source 组成唯一键，
+     * 也是存量导入的幂等键（同一编号重复导入直接跳过）。
+     */
+    private String externalNo;
+
+    /** 外部来源：当前仅 YUNXIAO */
+    private String externalSource;
 
     /** 当前状态 */
     private String status;

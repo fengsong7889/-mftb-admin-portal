@@ -106,11 +106,15 @@ public class RdmDeliveryDTO {
     /** 任务进度/工时上报 */
     @Data
     public static class TaskProgress {
-        /** start/done/block/unblock */
+        /** start/done/block/unblock/progress（progress=甘特图直接拖进度） */
         private String action;
         private Integer progress;
+        /** 期望的当前进度（乐观锁）：与库中不一致则拒绝，防止两个入口并发互盖 */
+        private Integer expectedProgress;
         private BigDecimal actualHours;
         private String remark;
+        /** 客户端幂等请求标识（甘特图松手即保存的重试对账） */
+        private String clientRequestId;
     }
 
     /** 迭代新增/编辑 */

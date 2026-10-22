@@ -63,6 +63,7 @@ public class RdmDashboardVO {
     @Data
     public static class PmRank {
         private String pmName;
+        private String pmEmpNo;
         private Long active;
         private Long delivered;
         private Long overdue;
@@ -98,6 +99,7 @@ public class RdmDashboardVO {
         private String title;
         private String status;
         private String submitterName;
+        private String submitterEmpNo;
         private String handler;
         private Long days;
     }

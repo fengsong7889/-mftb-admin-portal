@@ -44,7 +44,7 @@ export const RDM_STATUS_LABEL: Record<RdmStatus, string> = {
   [RDM_STATUS.REJECTED]: '已駁回',
   [RDM_STATUS.ON_HOLD]: '掛起暫緩',
   [RDM_STATUS.ACCEPTED]: '已受理·待排期',
-  [RDM_STATUS.PRD_DESIGNING]: 'PRD設計中',
+  [RDM_STATUS.PRD_DESIGNING]: 'PRD 產出中',
   [RDM_STATUS.REVIEWING]: '評審中',
   [RDM_STATUS.REVIEW_PASSED]: '評審通過',
   [RDM_STATUS.SCHEDULED]: '已排期',
@@ -58,6 +58,38 @@ export const RDM_STATUS_LABEL: Record<RdmStatus, string> = {
   [RDM_STATUS.RELEASED]: '已上線',
   [RDM_STATUS.VERIFIED]: '已確認交付',
   [RDM_STATUS.CLOSED]: '已歸檔',
+}
+
+/**
+ * 状态中文名（简体）。
+ *
+ * 只用于匹配用户输入：存量导入模板允许用简体输入法填写状态，解析时按简繁两份文案归一。
+ * 展示仍以 RDM_STATUS_LABEL（繁中）为准，不要把本表直接渲染到界面。
+ */
+export const RDM_STATUS_LABEL_SIMPLIFIED: Record<RdmStatus, string> = {
+  [RDM_STATUS.DRAFT]: '草稿',
+  [RDM_STATUS.INTAKE_PENDING]: '待审批',
+  [RDM_STATUS.INTAKE_REJECTED]: '审批驳回',
+  [RDM_STATUS.POOL]: '需求池待分配',
+  [RDM_STATUS.ASSIGNED]: '已分配待受理',
+  [RDM_STATUS.EVALUATING]: '评估中',
+  [RDM_STATUS.REJECTED]: '已驳回',
+  [RDM_STATUS.ON_HOLD]: '挂起暂缓',
+  [RDM_STATUS.ACCEPTED]: '已受理待排期',
+  [RDM_STATUS.PRD_DESIGNING]: 'PRD编写中',
+  [RDM_STATUS.REVIEWING]: '评审中',
+  [RDM_STATUS.REVIEW_PASSED]: '评审通过',
+  [RDM_STATUS.SCHEDULED]: '已排期',
+  [RDM_STATUS.DESIGNING]: 'UI设计中',
+  [RDM_STATUS.DEVELOPING]: '开发中',
+  [RDM_STATUS.INTEGRATION]: '联调中',
+  [RDM_STATUS.TESTING]: '测试中',
+  [RDM_STATUS.TEST_PASSED]: '测试通过',
+  [RDM_STATUS.UAT_PENDING]: '待业务验收',
+  [RDM_STATUS.UAT_REJECTED]: '验收未通过',
+  [RDM_STATUS.RELEASED]: '已上线',
+  [RDM_STATUS.VERIFIED]: '已确认交付',
+  [RDM_STATUS.CLOSED]: '已归档',
 }
 
 /** 状态标签色（antd Tag color） */
@@ -113,7 +145,7 @@ export const RDM_STAGE_LABEL: Record<RdmStage, string> = {
   [RDM_STAGE.SUBMIT]: '提交需求',
   [RDM_STAGE.INTAKE]: '需求審批',
   [RDM_STAGE.DISPATCH]: '分配受理',
-  [RDM_STAGE.DESIGN]: 'PRD 設計',
+  [RDM_STAGE.DESIGN]: 'PRD 產出',
   [RDM_STAGE.REVIEW]: '評審排期',
   [RDM_STAGE.DEV]: '開發',
   [RDM_STAGE.TEST]: '測試',
@@ -126,7 +158,7 @@ export const RDM_STAGE_DESC: Record<RdmStage, string> = {
   [RDM_STAGE.SUBMIT]: '提出人填寫需求內容與期望',
   [RDM_STAGE.INTAKE]: '等上級或指定人審批準入',
   [RDM_STAGE.DISPATCH]: '技術負責人分配、產品經理受理',
-  [RDM_STAGE.DESIGN]: '產品經理撰寫 PRD 與驗收標準',
+  [RDM_STAGE.DESIGN]: '產品經理產出 PRD 與驗收標準',
   [RDM_STAGE.REVIEW]: '研發評審 PRD 並排進迭代',
   [RDM_STAGE.DEV]: '已排期待开工，或 UI/開發/聯調進行中',
   [RDM_STAGE.TEST]: 'QA 測試與缺陷回歸',
@@ -742,7 +774,7 @@ export const RDM_BOARD_COLUMNS: { key: RdmStage | 'archived'; label: string; sta
   },
   {
     key: RDM_STAGE.DESIGN,
-    label: 'PRD 設計',
+    label: 'PRD 產出',
     statuses: [RDM_STATUS.ACCEPTED, RDM_STATUS.PRD_DESIGNING],
   },
   {
@@ -807,6 +839,8 @@ export const RDM_RISK_COLOR: Record<RdmRiskType, string> = {
 
 /** 执行任务类型（与 rdm_work_task.task_type 对齐） */
 export const RDM_TASK_TYPE = {
+  /** 产品经理编写 PRD：受理时自动生成，不属于 UI 设计 */
+  PRD: 'prd',
   DESIGN: 'design',
   FRONTEND: 'frontend',
   APP: 'app',
@@ -817,6 +851,7 @@ export const RDM_TASK_TYPE = {
 export type RdmTaskType = (typeof RDM_TASK_TYPE)[keyof typeof RDM_TASK_TYPE]
 
 export const RDM_TASK_TYPE_LABEL: Record<RdmTaskType, string> = {
+  [RDM_TASK_TYPE.PRD]: 'PRD 產出',
   [RDM_TASK_TYPE.DESIGN]: 'UI 設計',
   [RDM_TASK_TYPE.FRONTEND]: '前端開發',
   [RDM_TASK_TYPE.APP]: 'APP 開發',
@@ -826,6 +861,7 @@ export const RDM_TASK_TYPE_LABEL: Record<RdmTaskType, string> = {
 }
 
 export const RDM_TASK_TYPE_COLOR: Record<RdmTaskType, string> = {
+  [RDM_TASK_TYPE.PRD]: '#E8720C',
   [RDM_TASK_TYPE.DESIGN]: '#EB2F96',
   [RDM_TASK_TYPE.FRONTEND]: '#1890FF',
   [RDM_TASK_TYPE.APP]: '#FA8C16',

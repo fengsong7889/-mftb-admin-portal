@@ -43,6 +43,13 @@ public class RdmRequirementCreateDTO {
     /** 指定产品经理ID */
     private Long pmUserId;
 
+    /**
+     * 技术负责人ID（仅 assignMode=POOL 时生效）。
+     * <p>提出人往往知道「该找哪位技术负责人」但不知道具体产品经理；
+     * 先选定负责人，需求池里的「當前處理人」才能是一个真实的人，而不是角色名。
+     */
+    private Long dispatcherUserId;
+
     /** 是否需要准入审批（管理岗或规则命中时由后端覆盖） */
     private Boolean needApproval;
 

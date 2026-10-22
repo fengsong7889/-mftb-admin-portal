@@ -130,6 +130,33 @@ public class RdmNotifyService {
     }
 
     /**
+     * 群播卡片：一条带「查看详情」按钮的卡片消息。
+     *
+     * <p><b>为何单独一个入口而不是给 {@link #notifyUsers} 加参数</b>：卡片多了两个协议必填项
+     * （按钮文案与地址），而两者为空时钉钉会受理但读者无处可点。这里在入队前就把空值当「按规则不发」，
+     * 不让一条注定无效的卡片占着重试队列反复失败。
+     *
+     * <p>与 markdown 群播共用同一张队列表、同一套抢占与退避重试——卡片只是多两个字段，
+     * 不是另一条投递通道（另一条通道必然漏掉 dry-run / 重试 / 审计）。
+     *
+     * @param markdown 渲染后的卡片正文
+     * @param btnTitle 按钮文案（钉钉限制 20 字符内）
+     * @param btnUrl   按钮跳转地址（钉钉限制 500 字符内）
+     */
+    public void notifyActionCard(String eventCode, String title, String markdown, String btnTitle, String btnUrl) {
+        String text = absolutizeLinks(markdown);
+        boolean blank = !StringUtils.hasText(text);
+        Long id = insertTask(eventCode, null, RdmConstants.NOTIFY_SCENARIO, title, text,
+                List.of(), List.of(), blank ? "skipped" : "pending",
+                blank ? null : "消息为空，按规则未发送",
+                RdmConstants.NOTIFY_MSG_ACTION_CARD, btnTitle, btnUrl);
+        if (blank || id == null) {
+            return;
+        }
+        dispatchAfterCommit(id);
+    }
+
+    /**
      * 事务内登记、提交后再发：回滚的需求不该发出「已进入需求池」这种通知。
      * <p>无活动事务（如定时作业）时直接投递：此时没有「提交前」可言，
      * 但<b>仍经由 dispatcher</b>，因此 dry-run / 抢占领取 / 退避重试 三项语义一个不少。
@@ -386,14 +413,24 @@ public class RdmNotifyService {
     private Long insertTask(String eventCode, RdmRequirement req, String scenario, String title,
                             String text, List<String> atMobiles, List<String> receiverNames,
                             String status, String error) {
+        return insertTask(eventCode, req, scenario, title, text, atMobiles, receiverNames, status, error,
+                RdmConstants.NOTIFY_MSG_MARKDOWN, null, null);
+    }
+
+    /** 带消息类型与卡片按钮的登记（msgType=markdown 时按钮可为空，保持单一路径） */
+    private Long insertTask(String eventCode, RdmRequirement req, String scenario, String title,
+                            String text, List<String> atMobiles, List<String> receiverNames,
+                            String status, String error, String msgType, String btnTitle, String btnUrl) {
         try {
-            return doInsertTask(eventCode, req, scenario, title, text, atMobiles, receiverNames, status, error);
+            return doInsertTask(eventCode, req, scenario, title, text, atMobiles, receiverNames,
+                    status, error, msgType, btnTitle, btnUrl);
         } catch (RuntimeException e) {
             log.error("RDM 通知任務登記失敗，改為提交後重試登記（絕不繞過 dry-run、絕不在提交前發送）: "
                             + "event={}, req={}, error={}",
                     eventCode, req != null ? req.getReqNo() : null, e.getMessage());
             if ("pending".equals(status)) {
-                scheduleLegacyReinsert(eventCode, req, scenario, title, text, atMobiles, receiverNames);
+                scheduleLegacyReinsert(eventCode, req, scenario, title, text, atMobiles, receiverNames,
+                        msgType, btnTitle, btnUrl);
             }
             return null;
         }
@@ -401,11 +438,12 @@ public class RdmNotifyService {
 
     /** 群播行的提交后重试登记（语义同 {@link #scheduleDedupeReinsert}，仅列集不同）。 */
     private void scheduleLegacyReinsert(String eventCode, RdmRequirement req, String scenario, String title,
-                                       String text, List<String> atMobiles, List<String> receiverNames) {
+                                       String text, List<String> atMobiles, List<String> receiverNames,
+                                       String msgType, String btnTitle, String btnUrl) {
         Runnable reinsert = () -> {
             try {
                 Long id = doInsertTask(eventCode, req, scenario, title, text, atMobiles, receiverNames,
-                        "pending", null);
+                        "pending", null, msgType, btnTitle, btnUrl);
                 if (id == null) {
                     log.error("RDM 通知重試登記未取回主鍵，需人工補發: event={}", eventCode);
                     return;
@@ -432,10 +470,11 @@ public class RdmNotifyService {
     /** 真正执行 INSERT（异常上抛，由调用方决定重试还是让位）。 */
     private Long doInsertTask(String eventCode, RdmRequirement req, String scenario, String title,
                               String text, List<String> atMobiles, List<String> receiverNames,
-                              String status, String error) {
+                              String status, String error, String msgType, String btnTitle, String btnUrl) {
         String sql = "INSERT INTO rdm_notify_log (req_id, event_code, channel, scenario, title, content, "
+                + "msg_type, btn_title, btn_url, "
                 + "at_mobiles, receivers, send_status, attempts, next_retry_at, error_msg, deleted) "
-                + "VALUES (?, ?, 'DINGTALK', ?, ?, ?, ?, ?, ?, 0, "
+                + "VALUES (?, ?, 'DINGTALK', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, "
                 + ("pending".equals(status) ? "now()" : "NULL") + ", ?, 0)";
         KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbcTemplate.update(connection -> {
@@ -446,6 +485,9 @@ public class RdmNotifyService {
             ps.setString(idx++, scenario);
             ps.setString(idx++, truncate(title, 200));
             ps.setString(idx++, text);
+            ps.setString(idx++, StringUtils.hasText(msgType) ? msgType : RdmConstants.NOTIFY_MSG_MARKDOWN);
+            ps.setString(idx++, truncate(btnTitle, 32));
+            ps.setString(idx++, truncate(btnUrl, 512));
             ps.setString(idx++, join(atMobiles));
             ps.setString(idx++, join(receiverNames));
             ps.setString(idx++, status);

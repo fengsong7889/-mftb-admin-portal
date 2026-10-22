@@ -51,6 +51,7 @@ import {
   CheckCircleOutlined,
   ExportOutlined,
   FileAddOutlined,
+  ImportOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   PartitionOutlined,
@@ -70,6 +71,7 @@ import {
   fetchRequirementPage,
   fetchScopeCounts,
   fetchRequirementStats,
+  importRequirements,
   fetchProductOptions,
   fetchProjectPage,
   fetchIterations,
@@ -88,6 +90,8 @@ import { buildDeptTree, type DeptNode } from '../Attendance/deptTree'
 import { exportRequirementRows } from './requirementExport'
 import { formatHandlers, formatPerson, splitHandlers } from './handlerDisplay'
 import RequirementKanban from './components/RequirementKanban'
+import RequirementImportModal from './components/RequirementImportModal'
+import type { ParsedRdmImportRow } from './rdmImport'
 import {
   RDM_FLOW_VERSION_LABEL,
   RDM_ITERATION_STATUS,
@@ -409,6 +413,47 @@ export default function RequirementList({
   }, [view, page, querySize, activeScope, filters, executionOnly])
 
   useEffect(() => { load() }, [load])
+
+  /** 存量需求批量导入弹窗：只挂在需求跟进清单，导入的是已准入历史需求 */
+  const [importOpen, setImportOpen] = useState(false)
+  /*
+   * 导入沿用 create 动作（不新增动作，避免菜单动作集并集同步时把批量写能力
+   * 自动发给所有已有该菜单授权的角色），再叠加「全量可见」：能建单不等于能往
+   * 全公司需求池批量灌数据，与后端服务层同口径。
+   */
+  const canImport = hasPermission('rdm-requirement:create') && canSeeAll
+
+  /**
+   * 确认导入：行级失败不抛错，回传弹窗展示逐行原因；全部通过后刷新当前列表。
+   * <p>刷新用 load 而不是改本地 rows：导入会改变服务端分页与计数，本地拼接会出现
+   * 「当前页多出几行但总数没变」的错位。
+   */
+  const handleRequirementImport = useCallback(async (importRows: ParsedRdmImportRow[]) => {
+    const result = await importRequirements(importRows.map(row => ({
+      rowNo: row.rowNo,
+      title: row.title,
+      externalNo: row.externalNo,
+      status: row.status,
+      projectManager: row.projectManager,
+      productManager: row.productManager,
+      projectName: row.projectName,
+      iterationName: row.iterationName,
+      description: row.description,
+    })))
+    if (result.failed > 0) {
+      return {
+        imported: result.imported,
+        skipped: result.skipped,
+        failed: result.failed,
+        messages: result.items
+          .filter(item => item.result === 'failed')
+          .map(item => `第 ${item.rowNo} 行 ${item.externalNo || item.title}：${item.message ?? '導入失敗'}`),
+      }
+    }
+    message.success(`導入完成：成功 ${result.imported} 條${result.skipped > 0 ? `，跳過 ${result.skipped} 條（雲效編號已存在）` : ''}`)
+    await load()
+    return { imported: result.imported, skipped: result.skipped, failed: 0, messages: [] }
+  }, [load])
 
   useEffect(() => {
     // 计数只被视图栏消费：单切片页（提需求）与极简页（认领/分配）不渲染视图栏，没消费方就不必多打一次请求。
@@ -813,15 +858,27 @@ export default function RequirementList({
     { title: '提出人', dataIndex: 'submitterName', key: 'submitter', width: 150, ellipsis: true, render: (v: string | null | undefined, r) => formatPerson({ name: v, empNo: r.submitterEmpNo }) || '-' },
     { title: '提出部門', dataIndex: 'submitDeptName', key: 'submitDeptName', width: 200, ellipsis: true, render: (v?: string | null) => v || '-' },
     {
-      title: '產品經理', dataIndex: 'pmName', key: 'pmName', width: 100,
-      render: (v?: string | null) => v ?? <span style={{ color: '#FF4D4F' }}>未分配</span>,
+      title: '產品經理', dataIndex: 'pmName', key: 'pmName', width: 120,
+      render: (v: string | null | undefined, r) => v
+        ? formatPerson({ name: v, empNo: r.pmEmpNo })
+        : <span style={{ color: '#FF4D4F' }}>未分配</span>,
     },
     {
       title: '當前處理人', dataIndex: 'handlers', key: 'currentHandler', width: 190,
       render: (v: RdmHandlerPerson[] | null | undefined, r) => {
         // 前 2 位直出、其余折成 +N 懸浮看全部；无未完成任务时回退流程推演值（口径与看板/导出同源）
         const parts = splitHandlers(v)
-        if (!parts) return r.currentHandler ?? '-'
+        if (!parts) {
+          /*
+           * 需求池还没有任务，处理人只能是提出人指定的技术负责人。
+           * 优先用结构化字段（姓名+工号），旧数据没有该字段时再回退 currentHandler 快照，
+           * 避免历史库存量数据仍显示「技術負責人」这个找不到人的角色名。
+           */
+          if (r.status === RDM_STATUS.POOL && r.dispatcherName) {
+            return formatPerson({ name: r.dispatcherName, empNo: r.dispatcherEmpNo })
+          }
+          return r.currentHandler ?? '-'
+        }
         // 单元格内单行省略：多人（姓名+工号）远超列宽，不限制会溢出压住右侧列；+N 固定不被压缩
         return (
           <span className="rdm-table-handlers">
@@ -1114,6 +1171,11 @@ export default function RequirementList({
               {!minimal && (
                 <Button className="btn-export" icon={<ExportOutlined />} onClick={handleExport}>{t('rdm.resLoad.btnExport')}</Button>
               )}
+              {!minimal && isFollowUpSide && canImport && (
+                <Button className="btn-import" icon={<ImportOutlined />} onClick={() => setImportOpen(true)}>
+                  {t('rdm.reqList.btnBatchImport')}
+                </Button>
+              )}
               {/* 甘特图入口：仅需求跟进清单（legacy）提供，不侵入提需求/认领分配页 */}
               {!minimal && isFollowUpSide && (
                 <>
@@ -1210,6 +1272,12 @@ export default function RequirementList({
           )}
         </div>
       </div>
+
+      <RequirementImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImport={handleRequirementImport}
+      />
     </div>
   )
 }

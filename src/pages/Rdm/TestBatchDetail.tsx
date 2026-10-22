@@ -422,9 +422,11 @@ export default function TestBatchDetail() {
               border: '1px solid #f0f0f0', borderRadius: 12,
             }}>
               <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>通過率</div>
+              {/* status=normal：antd 在 percent=100 时默认渲染勾图标而不显示数字，通过率 100% 会看不到具体百分比 */}
               <Progress
                 type="circle"
                 size={72}
+                status="normal"
                 percent={Math.max(0, Math.min(100, Math.round(summary.passRate)))}
                 strokeColor={summary.passRate >= 80 ? '#52C41A' : summary.passRate >= 50 ? '#FA8C16' : '#FF4D4F'}
               />

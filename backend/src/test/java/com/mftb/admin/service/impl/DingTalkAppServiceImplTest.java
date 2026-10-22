@@ -5,6 +5,7 @@ import com.mftb.admin.service.NotificationAppService;
 import com.mftb.admin.service.NotificationAppService.Credentials;
 import com.mftb.admin.service.DingTalkAppService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.task.SyncTaskExecutor;
 import org.springframework.scheduling.annotation.AsyncAnnotationBeanPostProcessor;
@@ -95,5 +96,38 @@ class DingTalkAppServiceImplTest {
         processor.setExecutor(new SyncTaskExecutor());
         var proxy = (DingTalkAppService) processor.postProcessAfterInitialization(service, "dingTalkAppService");
         assertFalse(proxy.sendWorkNotification(CLAIM_SIGN, 1, List.of(), "测试", "测试").join());
+    }
+
+    @Test
+    @DisplayName("工作通知卡片：正文与按钮必须用 action_card 的 markdown/single_title/single_url（与群机器人协议不同）")
+    @SuppressWarnings("unchecked")
+    void workActionCardUsesCorpConversationProtocol() {
+        allowToken();
+        when(http.postForObject(anyString(), any(), eq(Map.class))).thenReturn(Map.of("errcode", 0));
+
+        assertTrue(service.sendWorkActionCard(CLAIM_SIGN, 1, List.of("u1"),
+                "產研交付日報 10-20 晨報｜逾期 2", "**在途 2｜逾期 2**", "查看完整日報",
+                "https://portal.example/#/rdm-daily-view?token=x").join());
+
+        var body = org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(http).postForObject(anyString(), body.capture(), eq(Map.class));
+        Map<String, Object> msg = (Map<String, Object>) ((Map<String, Object>) body.getValue()).get("msg");
+        assertEquals("action_card", msg.get("msgtype"));
+        Map<String, Object> card = (Map<String, Object>) msg.get("action_card");
+        assertEquals("**在途 2｜逾期 2**", card.get("markdown"));
+        assertEquals("查看完整日報", card.get("single_title"));
+        assertEquals("https://portal.example/#/rdm-daily-view?token=x", card.get("single_url"));
+        // 群机器人的驼峰字段混进来时钉钉会当成空正文受理，必须锁住
+        assertFalse(card.containsKey("singleTitle"));
+        assertFalse(card.containsKey("text"));
+    }
+
+    @Test
+    @DisplayName("工作通知卡片：按钮缺失直接不发（卡片没有出口时比 markdown 更差）")
+    void workActionCardWithoutButtonIsRejected() {
+        allowToken();
+        assertFalse(service.sendWorkActionCard(CLAIM_SIGN, 1, List.of("u1"),
+                "標題", "正文", "", "https://portal.example/x").join());
+        verify(http, never()).postForObject(anyString(), any(), eq(Map.class));
     }
 }

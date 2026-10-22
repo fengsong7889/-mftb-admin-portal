@@ -56,11 +56,13 @@ import {
   fetchFunctionPoints,
   fetchMenuTree,
   fetchProductOptions,
+  fetchTechLeadOptions,
   fetchRequirementDetail,
   simulateIntake,
   submitRequirement,
   updateRequirement,
   uploadAttachment,
+  type RdmEmployeeOption,
   type RdmIntakeDecision,
   type RdmMenuTreeNode,
   type RdmProductOption,
@@ -68,6 +70,7 @@ import {
   type RdmTargetRef,
 } from '../../api/rdm'
 import SimilarNotice from './components/SimilarNotice'
+import { formatEmployee } from '../../utils/employeeDisplay'
 import { ACTION_LABEL_MAP } from '../Permission/types'
 import {
   RDM_ANCHOR_TYPE,
@@ -154,6 +157,8 @@ interface FormValues {
   expectDate?: dayjs.Dayjs
   assignMode: 'PM' | 'POOL'
   pmUserId?: number
+  /** 技术负责人（提交技术部统一分配时由提出人指定） */
+  dispatcherUserId?: number
   /** 業務驗收人（sys_user.id），默认提交人本人，可改选其他同事 */
   acceptorUserId?: number
   reqType: RdmReqType
@@ -290,6 +295,8 @@ export default function RequirementSubmit() {
   const [form] = Form.useForm<FormValues>()
   const [menuTree, setMenuTree] = useState<RdmMenuTreeNode[]>([])
   const [pmOptions, setPmOptions] = useState<RdmProductOption[]>([])
+  /** 技术负责人候选：只列具备分配权的在职员工，选完需求池的處理人就是具体的人 */
+  const [techLeadOptions, setTechLeadOptions] = useState<RdmEmployeeOption[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [draftSaving, setDraftSaving] = useState(false)
   /** 業務驗收人候选（远程搜索，保留已选项 label 避免退化成 id） */
@@ -346,6 +353,7 @@ export default function RequirementSubmit() {
           expectDate: d.expectDate ? dayjs(d.expectDate) : undefined,
           // 草稿阶段落库的是「意向 PM」，受理人要等审批通过才生效，回填必须读同一个字段
           pmUserId: d.intentPmUserId ?? undefined,
+          dispatcherUserId: d.dispatcherUserId ?? undefined,
           assignMode: d.intentPmUserId ? 'PM' : 'POOL',
           acceptorUserId: d.acceptorUserId ?? undefined,
           targets: (d.targets ?? []).length > 0 ? d.targets.map(fromTargetRef) : [{ kind: 'EXISTING' } as TargetValues],
@@ -366,6 +374,12 @@ export default function RequirementSubmit() {
           setAcceptorOptions(prev => (prev.some(o => o.value === d.acceptorUserId)
             ? prev
             : [{ value: d.acceptorUserId as number, label: d.acceptorName as string }, ...prev]))
+        }
+        // 草稿回填的技术负责人可能已不在候选里（离职/收权）：先补一条只读回显，避免下拉退化成裸 id
+        if (d.dispatcherUserId && d.dispatcherName) {
+          setTechLeadOptions(prev => (prev.some(u => u.userId === d.dispatcherUserId)
+            ? prev
+            : [{ userId: d.dispatcherUserId as number, name: d.dispatcherName as string, empNo: null }, ...prev]))
         }
         setDraftLoaded(true)
       })
@@ -395,6 +409,7 @@ export default function RequirementSubmit() {
   useEffect(() => {
     fetchMenuTree().then(setMenuTree).catch(() => setMenuTree([]))
     fetchProductOptions().then(setPmOptions).catch(() => setPmOptions([]))
+    fetchTechLeadOptions().then(setTechLeadOptions).catch(() => setTechLeadOptions([]))
   }, [])
 
   /** 業務驗收人默认选中提交人本人（按工号匹配到 sys_user.id），可改选他人 */
@@ -515,6 +530,8 @@ export default function RequirementSubmit() {
       assignMode: values.assignMode,
       pmUserId: values.assignMode === 'PM' ? pm?.userId : undefined,
       pmName: values.assignMode === 'PM' ? pm?.name : undefined,
+      // 技术负责人只在统一分配路径下上送：直接指定 PM 时服务端会忽略，避免库里留下无意义的中间人
+      dispatcherUserId: values.assignMode === 'POOL' ? values.dispatcherUserId : undefined,
       // 业务验收人必须随请求送出：不传的话服务端一律回落成提交人本人，界面上选的人等于白选
       acceptorUserId: values.acceptorUserId,
       attachments: attachments.map(a => ({
@@ -611,6 +628,12 @@ export default function RequirementSubmit() {
             <span>受理路徑：</span>
             <b>{values.assignMode === 'PM' ? `指定產品經理（${pm?.name ?? '-'}）` : '提交技術部統一分配'}</b>
           </div>
+          {values.assignMode === 'POOL' && (
+            <div className="confirm-info-row">
+              <span>技術負責人：</span>
+              <b>{techLeadOptions.find(u => u.userId === values.dispatcherUserId)?.name ?? '由技術部指派'}</b>
+            </div>
+          )}
           <div className="confirm-info-row">
             <span>審批要求：</span>
             <b>{decision
@@ -798,7 +821,7 @@ export default function RequirementSubmit() {
                 提交技術部統一分配（推薦）
               </div>
               <div className="rdm-assign-option-desc">
-                需求進入需求池，由技術部負責人瞭解後分發給對應產品經理，避免找錯人。
+                需求進入需求池，由技術部負責人分發給對應產品經理；知道負責人的話可在下方直接選定，避免找錯人。
               </div>
             </div>
             <div
@@ -828,7 +851,25 @@ export default function RequirementSubmit() {
                   optionFilterProp="label"
                   options={pmOptions.map(pm => ({
                     value: pm.userId,
-                    label: `${pm.name}（在途 ${pm.activeCount}/${pm.capacity} · ${pm.domains.join('/')}）`,
+                    label: `${formatEmployee(pm.name, pm.empNo)}（在途 ${pm.activeCount}/${pm.capacity} · ${pm.domains.join('/')}）`,
+                  }))}
+                />
+              </Form.Item>
+            )}
+            {assignMode === 'POOL' && (
+              <Form.Item
+                label="技術負責人"
+                name="dispatcherUserId"
+                extra="選填，不選由技術部指派"
+              >
+                <Select
+                  allowClear
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="按姓名 / 工號搜索"
+                  options={techLeadOptions.map(u => ({
+                    value: u.userId,
+                    label: `${formatEmployee(u.name, u.empNo)}${u.deptName ? ` · ${u.deptName}` : ''}`,
                   }))}
                 />
               </Form.Item>

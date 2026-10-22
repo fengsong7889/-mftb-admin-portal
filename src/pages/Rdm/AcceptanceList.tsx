@@ -24,6 +24,7 @@ import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { rdmTableLocale } from './components/tableLocale'
 import HelpPopover from '../../components/HelpPopover'
 import { PriorityTag, StatusTag, TypeTag } from './components/Tags'
+import { formatPerson } from './handlerDisplay'
 import { fetchDeliveryItems, fetchRequirementPage, fetchScopeCounts, type RdmDeliveryItemListItem, type RdmRequirementRow } from '../../api/rdm'
 import { exportRequirementRows } from './requirementExport'
 import {
@@ -151,10 +152,10 @@ export default function AcceptanceList() {
     },
     { title: '需求類型', dataIndex: 'reqType', key: 'reqType', width: 100, render: (v: string) => <TypeTag reqType={v} /> },
     { title: '優先級', dataIndex: 'priority', key: 'priority', width: 110, render: (v: string) => <PriorityTag priority={v} /> },
-    { title: '提出人', dataIndex: 'submitterName', key: 'submitter', width: 110, ellipsis: true, render: (v?: string | null) => v || '-' },
+    { title: '提出人', dataIndex: 'submitterName', key: 'submitter', width: 140, ellipsis: true, render: (v: string | null | undefined, r) => formatPerson({ name: v, empNo: r.submitterEmpNo }) || '-' },
     { title: '提出部門', dataIndex: 'submitDeptName', key: 'submitDeptName', width: 200, ellipsis: true, render: (v?: string | null) => v || '-' },
     { title: '需求編號', dataIndex: 'reqNo', key: 'reqNo', width: 150 },
-    { title: '產品經理', dataIndex: 'pmName', key: 'pmName', width: 100, render: (v?: string | null) => v ?? '-' },
+    { title: '產品經理', dataIndex: 'pmName', key: 'pmName', width: 120, render: (v: string | null | undefined, r) => formatPerson({ name: v, empNo: r.pmEmpNo }) || '-' },
   ]
 
   const pendingColumns: TableColumnsType<RdmRequirementRow> = [

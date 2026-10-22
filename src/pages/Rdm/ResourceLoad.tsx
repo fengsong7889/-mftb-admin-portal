@@ -64,6 +64,7 @@ import {
   type RdmUnassignedItem,
 } from '../../api/rdm'
 import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
+import { formatEmployee } from '../../utils/employeeDisplay'
 import './index.css'
 
 const { RangePicker } = DatePicker
@@ -596,8 +597,8 @@ export default function ResourceLoad() {
       fixed: 'left',
       render: (_, r) => (
         <div>
-          <div style={{ fontWeight: 600, color: '#262626', fontSize: 13 }}>{r.userName}</div>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{r.empNo} · {r.dept}</div>
+          <div style={{ fontWeight: 600, color: '#262626', fontSize: 13 }}>{formatEmployee(r.userName, r.empNo)}</div>
+          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{r.dept || '-'}</div>
         </div>
       ),
     },

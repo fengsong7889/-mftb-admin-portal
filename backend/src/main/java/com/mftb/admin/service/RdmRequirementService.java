@@ -144,6 +144,9 @@ public interface RdmRequirementService {
     /** 产品经理候选（含在途负载） */
     List<RdmOptionVO.ProductManager> productManagers();
 
+    /** 技术负责人候选（具备需求分配权）：提出人选定后需求池的处理人就是具体的人 */
+    List<RdmOptionVO.Employee> techLeads();
+
     /** 系统 → 菜单 级联树 */
     List<RdmOptionVO.MenuNode> menuTree();
 

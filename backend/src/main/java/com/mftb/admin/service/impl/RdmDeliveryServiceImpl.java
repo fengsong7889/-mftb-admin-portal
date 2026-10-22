@@ -17,6 +17,7 @@ import com.mftb.admin.entity.RdmPrdSnapshot;
 import com.mftb.admin.entity.RdmRequirement;
 import com.mftb.admin.entity.RdmRequirementRole;
 import com.mftb.admin.entity.RdmReview;
+import com.mftb.admin.entity.RdmTaskProgressLog;
 import com.mftb.admin.entity.RdmTaskTypeConfig;
 import com.mftb.admin.entity.RdmWorkLog;
 import com.mftb.admin.entity.RdmWorkTask;
@@ -27,6 +28,7 @@ import com.mftb.admin.mapper.RdmPrdMapper;
 import com.mftb.admin.mapper.RdmRequirementMapper;
 import com.mftb.admin.mapper.RdmRequirementRoleMapper;
 import com.mftb.admin.mapper.RdmReviewMapper;
+import com.mftb.admin.mapper.RdmTaskProgressLogMapper;
 import com.mftb.admin.mapper.RdmWorkTaskMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.OaRequestService;
@@ -35,6 +37,7 @@ import com.mftb.admin.service.RdmConfigService;
 import com.mftb.admin.service.RdmDeliveryService;
 import com.mftb.admin.service.RdmDeliveryItemService;
 import com.mftb.admin.service.RdmNotifyService;
+import com.mftb.admin.service.RdmPrdTaskService;
 import com.mftb.admin.service.RdmRequirementService;
 import com.mftb.admin.service.RdmTaskTypeService;
 import com.mftb.admin.util.BizSeqService;
@@ -151,12 +154,16 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
     private final com.mftb.admin.service.RdmFlowVersionGuard flowVersionGuard;
     /** 任务类型字典：写校验白名单/标签解析/角色推断与聚合桶同源本表（业务可配置） */
     private final RdmTaskTypeService taskTypeService;
+    /** 产品经理 PRD 任务：受理时生成、提交评审时完成、评审退回时重开（口径集中在服务侧） */
+    private final RdmPrdTaskService prdTaskService;
     /**
      * 交付项状态回推：任务事实（新建/完成/删除）一旦变化，交付项必须同步重算，
      * 否则会停在「待准备」而被提测接口拒掉（历史缺陷：派了任务仍然不能提测）。
      * 只依赖 mapper 的服务，不与本类形成循环。
      */
     private final RdmDeliveryItemService deliveryItemService;
+    /** 进度变更审计（只追加）：记录谁把哪条任务从多少改到多少，供绩效与验收追溯 */
+    private final RdmTaskProgressLogMapper progressLogMapper;
 
     /* ==================== PRD ==================== */
 
@@ -240,6 +247,8 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
          */
         if (prd.getId() != null) {
             alignQuietly(prd.getReqId());
+            // 存量需求可能已受理但还没有 PRD 任务：写 PRD 时顺手补建，避免任务视图长期缺一条
+            prdTaskService.ensureTask(requireRequirement(prd.getReqId()), current);
         }
         return toPrdVO(prdMapper.selectById(prd.getId()));
     }
@@ -375,6 +384,12 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
             RdmPrd prd = requirePrd(dto.getPrdId());
             prd.setStatus(PRD_REVIEWING);
             prdMapper.updateById(prd);
+            /*
+             * PRD 已输出并提交评审 = 产品经理对「承诺出 PRD 日期」的兑现时点，
+             * 任务在此时收口；评审通过与否是质量问题，不改变「PRD 已交」这个事实。
+             * 只有挂了 PRD 的评审才收口，避免“无 PRD 的形式评审”误关产品任务。
+             */
+            prdTaskService.completeTask(req.getId(), current);
         }
         // V3 分批交付：需求層不因評審而推進狀態（自動跳過，不再把錯誤帶回主流程）
         tryTransition(req.getId(), RdmConstants.ACTION_REVIEW_START, null);
@@ -426,6 +441,10 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         tryTransition(review.getReqId(),
                 passed ? RdmConstants.ACTION_REVIEW_PASS : RdmConstants.ACTION_REVIEW_REJECT,
                 passed ? null : remarkOnly(review.getConclusionDesc()));
+        // 评审退回意味着 PRD 需要返工：把已收口的 PRD 任务重新打开，否则甘特图上永远显示「已完成」
+        if (!passed && review.getPrdId() != null) {
+            prdTaskService.reopenTask(review.getReqId(), current);
+        }
         // 結論已定＝評審結束的事實：狀態若還停在受理/PRD 設計，一併補到事實位置（V3 自動跳過）
         alignQuietly(review.getReqId());
         return toReviewVO(reviewMapper.selectById(id));
@@ -667,6 +686,9 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
     public RdmDeliveryVO.Task updateTaskProgress(Long id, RdmDeliveryDTO.TaskProgress dto) {
         RdmWorkTask task = requireTask(id);
         SysUser current = operatorResolver.currentUser();
+        if (current == null) {
+            throw new BusinessException("登錄狀態失效，請重新登錄");
+        }
         accessGuard.requireVisible(task.getReqId(), "查看任務");
         // 上报进度的合法人群：任务负责人本人，或 PM/研发负责人/PMO 与全量授权者。
         // 原先只认负责人：owner 为空时反而任何人都能改，且负责人离职后没人能更正
@@ -676,6 +698,21 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         }
         String action = dto.getAction() == null ? "" : dto.getAction();
         LocalDateTime now = LocalDateTime.now();
+        int oldProgress = task.getProgress() == null ? 0 : task.getProgress();
+        String oldStatus = task.getStatus();
+        boolean prdTask = RdmPrdTaskService.TASK_TYPE_PRD.equals(task.getTaskType());
+        /*
+         * 幂等重试：甘特图松手即保存可能因超时重发。若期望值已过期、但目标值恰好就是库中值，
+         * 说明上一次其实已经成功，直接返回成功；否则会把「请求已生效」误报成并发冲突。
+         */
+        if ("progress".equals(action) && dto.getExpectedProgress() != null && dto.getProgress() != null
+                && dto.getProgress().equals(oldProgress)) {
+            return toTaskVO(task, requirementMapper.selectById(task.getReqId()));
+        }
+        // 乐观锁：期望进度与库中不一致说明别人已经改过，必须刷新后再改（不用 version 列，进度本身就是版本）
+        if (dto.getExpectedProgress() != null && !dto.getExpectedProgress().equals(oldProgress)) {
+            throw new BusinessException(ResultCode.CONFLICT.getCode(), "任務進度已被他人修改，請刷新後重試");
+        }
         switch (action) {
             case "start" -> {
                 task.setStatus(TASK_DOING);
@@ -684,7 +721,37 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
                     task.setProgress(dto.getProgress());
                 }
             }
+            case "progress" -> {
+                if (dto.getProgress() == null) {
+                    throw new BusinessException("請提供進度百分比");
+                }
+                if (TASK_DONE.equals(task.getStatus()) || TASK_CANCELLED.equals(task.getStatus())) {
+                    throw new BusinessException("任務已完成或已取消，不能調整進度");
+                }
+                if (TASK_BLOCKED.equals(task.getStatus())) {
+                    throw new BusinessException("任務處於阻塞狀態，請先解除阻塞再調整進度");
+                }
+                /*
+                 * PRD 任务的 100% 不是普通进度，而是「PRD 已提交评审」的业务事实：
+                 * 允许手动置满会出现「任务显示完成、需求却仍在 PRD 产出中」，必须走提交评审。
+                 */
+                if (prdTask && dto.getProgress() >= 100) {
+                    throw new BusinessException("PRD 任務的 100% 以「提交評審」為準，請在需求詳情提交評審");
+                }
+                if (!prdTask && dto.getProgress() >= 100) {
+                    throw new BusinessException("進度 100% 會把任務標記為完成，請改用「完成任務」並填寫交付說明");
+                }
+                if (TASK_TODO.equals(task.getStatus()) && dto.getProgress() > 0) {
+                    task.setStatus(TASK_DOING);
+                    task.setActualStartTime(task.getActualStartTime() == null ? now : task.getActualStartTime());
+                }
+                task.setProgress(dto.getProgress());
+            }
             case "done" -> {
+                // PRD 任务的完成时点是「提交评审」，不能从进度上报入口手动置完成
+                if (prdTask) {
+                    throw new BusinessException("PRD 任務的完成以「提交評審」為準，不能手動標記完成");
+                }
                 /*
                  * 完成必须留下一句交付说明或交付物链接：「100%」本身不是证据，
                  * 没有它一旦出问题根本无法复盘当时交的是什么。
@@ -717,7 +784,49 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         }
         task.setActualHours(sumWorkHours(task.getId()));
         task.setUpdatedBy(operatorResolver.operatorSignature(current));
-        taskMapper.updateById(task);
+        /*
+         * 用条件更新做乐观锁：expectedProgress 作为 WHERE 条件，避免「先查后写」之间被另一入口插队。
+         * 不用 updateById 是因为它无法携带期望值，并发下会静默 last-write-wins。
+         */
+        LambdaUpdateWrapper<RdmWorkTask> update = new LambdaUpdateWrapper<RdmWorkTask>()
+                .eq(RdmWorkTask::getId, id)
+                .set(RdmWorkTask::getStatus, task.getStatus())
+                .set(RdmWorkTask::getProgress, task.getProgress())
+                .set(RdmWorkTask::getActualStartTime, task.getActualStartTime())
+                .set(RdmWorkTask::getActualFinishTime, task.getActualFinishTime())
+                .set(RdmWorkTask::getBlockedReason, task.getBlockedReason())
+                .set(RdmWorkTask::getActualHours, task.getActualHours())
+                .set(RdmWorkTask::getUpdatedBy, task.getUpdatedBy())
+                .set(RdmWorkTask::getUpdatedAt, now);
+        if (dto.getExpectedProgress() != null) {
+            if (dto.getExpectedProgress() == 0) {
+                // 存量任务的 progress 可能是 NULL：与 0 视为同一版本，否则首次拖动会被误判成并发冲突
+                update.and(w -> w.isNull(RdmWorkTask::getProgress).or().eq(RdmWorkTask::getProgress, 0));
+            } else {
+                update.eq(RdmWorkTask::getProgress, dto.getExpectedProgress());
+            }
+        }
+        int affected = taskMapper.update(null, update);
+        if (affected == 0) {
+            throw new BusinessException(ResultCode.CONFLICT.getCode(), "任務進度已被他人修改，請刷新後重試");
+        }
+        // 审计：只有进度或状态真的变了才落行，避免重复上报同一数值制造噪音
+        int newProgress = task.getProgress() == null ? 0 : task.getProgress();
+        if (oldProgress != newProgress || !java.util.Objects.equals(oldStatus, task.getStatus())) {
+            RdmTaskProgressLog audit = new RdmTaskProgressLog();
+            audit.setTaskId(task.getId());
+            audit.setTaskNo(task.getTaskNo());
+            audit.setReqId(task.getReqId());
+            audit.setUserId(current.getId());
+            audit.setUserName(current.getName());
+            audit.setOldProgress(oldProgress);
+            audit.setNewProgress(newProgress);
+            audit.setOldStatus(oldStatus);
+            audit.setNewStatus(task.getStatus());
+            audit.setRemark(dto.getRemark());
+            audit.setClientRequestId(dto.getClientRequestId());
+            progressLogMapper.insert(audit);
+        }
 
         // 任务完成/阻塞会改变交付项阶段（研发中 → 可提测），进度上报后同步重算
         if (task.getDeliveryItemId() != null) {
@@ -870,6 +979,17 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
                     });
         }
         List<RdmDeliveryVO.Iteration> list = new ArrayList<>();
+        // 负责人工号批量回填：列表统一「姓名（工号）」，逐行查 sys_user 会把迭代下拉打成 N+1
+        List<Long> ownerIds = iterations.stream().map(RdmIteration::getOwnerUserId)
+                .filter(java.util.Objects::nonNull).distinct().toList();
+        Map<Long, String> ownerEmpNos = new LinkedHashMap<>();
+        if (!ownerIds.isEmpty()) {
+            userMapper.selectBatchIds(ownerIds).forEach(u -> {
+                if (u.getId() != null && StringUtils.hasText(u.getEmpId())) {
+                    ownerEmpNos.put(u.getId(), u.getEmpId());
+                }
+            });
+        }
         for (RdmIteration it : iterations) {
             RdmDeliveryVO.Iteration vo = new RdmDeliveryVO.Iteration();
             vo.setId(it.getId());
@@ -883,6 +1003,7 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
             vo.setCapacityHours(it.getCapacityHours());
             vo.setOwnerUserId(it.getOwnerUserId());
             vo.setOwnerName(it.getOwnerName());
+            vo.setOwnerEmpNo(it.getOwnerUserId() == null ? null : ownerEmpNos.get(it.getOwnerUserId()));
             vo.setStatus(it.getStatus());
             vo.setRemark(it.getRemark());
             vo.setReqCount(reqCounts.getOrDefault(it.getCode(), 0));
@@ -1207,6 +1328,11 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
 
     /** 任务类型 → 参与角色：按字典聚合桶映射（design→设计师、qa→测试、dev/未知→研发），字典缺行时沿用内置兜底 */
     private String roleOfTaskType(String taskType) {
+        // PRD 產出是产品经理的职责：类型字典的 category=design 只用于工时聚合，
+        // 角色分组必须落到 PM，否则甘特图会把产品经理的 PRD 任务显示在「設計師」组
+        if (RdmPrdTaskService.TASK_TYPE_PRD.equals(taskType)) {
+            return RdmConstants.ROLE_PM;
+        }
         return switch (taskTypeService.categoryOf(taskType)) {
             case RdmTaskTypeConfig.CATEGORY_DESIGN -> RdmConstants.ROLE_DESIGNER;
             case RdmTaskTypeConfig.CATEGORY_QA -> RdmConstants.ROLE_QA;

@@ -24,7 +24,11 @@ vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => false, user: { empId: 'TEST001' } }),
 }))
 vi.mock('./requirementExport', () => ({ exportRequirementRows: vi.fn() }))
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+  // i18n/index.ts 在模块加载时执行 .use(initReactI18next)：缺这个导出会让整条引用链在 import 期就抛错
+  initReactI18next: { type: '3rdParty', init: () => {} },
+}))
 
 const title = '測試需求全生命週期流程驗證—長標題不可覆蓋相鄰的狀態和優先級欄位'.repeat(3)
 const department = '董事長兼首席執行官辦公室與跨部門協作中心'

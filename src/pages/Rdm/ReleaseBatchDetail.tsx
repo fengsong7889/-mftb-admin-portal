@@ -755,7 +755,21 @@ export default function ReleaseBatchDetail() {
             )}
           </>
         ) : (
-          <Alert type="info" showIcon message="尚未執行檢查" description="請點擊「執行檢查」按鈕啟動放行檢查" style={{ marginBottom: 12 }} />
+          s === RDM_RELEASE_BATCH_STATUS.CHECKING
+          || s === RDM_RELEASE_BATCH_STATUS.DEPLOYING
+          || s === RDM_RELEASE_BATCH_STATUS.VERIFYING
+          || s === RDM_RELEASE_BATCH_STATUS.RELEASED
+          || s === RDM_RELEASE_BATCH_STATUS.ROLLED_BACK
+            ? (
+              <Alert
+                type="success"
+                showIcon
+                message="放行檢查已通過（申請時已凍結）"
+                description="本批次已申請發布，檢查結論已固化在申請快照中；已結束的批次不再實時重算，詳情以時間線與審批記錄為準。"
+                style={{ marginBottom: 12 }}
+              />
+            )
+            : <Alert type="info" showIcon message="尚未執行檢查" description="請點擊「執行檢查」按鈕啟動放行檢查" style={{ marginBottom: 12 }} />
         )}
       </div>
 

@@ -9,6 +9,11 @@
  * 数据与写回均走真实接口：读 GET /rdm/schedule/gantt（按需求分页、批量取任务/角色防 N+1）；
  * 写 POST /rdm/schedule/task-plans（本人任务 + expected planVersion 乐观锁 + 审计 + 幂等，整批原子）。
  * 前端 canAdjust 仅作 UX 提示，真正裁决在服务端；拖动只改本地 draft，保存才落库。
+ *
+ * 进度与排期分开保存：
+ * - 进度松手即调 POST /rdm/delivery/task/{id}/progress（action=progress / done），乐观更新 + 失败回滚；
+ * - PRD 任务进度封顶 99%，100% 只由「提交评审」产生；普通任务 100% 需填交付说明；
+ * - PRD 任务改完成日会同步需求「承诺出 PRD 日期」，保存前二次确认。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Checkbox, Input, Modal, Pagination, Segmented, Select, Space, Spin, Tag, message } from 'antd'
@@ -29,9 +34,11 @@ import dayjs from 'dayjs'
 import { useAuth } from '../../contexts/AuthContext'
 import {
   fetchRdmGantt,
+  reportTask,
   saveRdmTaskPlans,
   type RdmGanttPage,
   type RdmGanttQuery,
+  type RdmGanttRequirement,
   type RdmGanttTask,
   type RdmTaskPlanItem,
 } from '../../api/rdm'
@@ -92,6 +99,8 @@ export default function RequirementGantt() {
   const [onlyMine, setOnlyMine] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [draft, setDraft] = useState<GanttDraft>({})
+  /** 进度乐观草稿：请求期间覆盖服务端值，成功/失败后移除 */
+  const [progressDraft, setProgressDraft] = useState<Record<number, number>>({})
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [todayNonce, setTodayNonce] = useState(0)
@@ -227,6 +236,13 @@ export default function RequirementGantt() {
     return m
   }, [page])
 
+  /** 任务 → 所属需求：PRD 改期确认需要展示需求号，避免只看到任务号不知道改的是哪条承诺 */
+  const taskReqById = useMemo(() => {
+    const m = new Map<number, RdmGanttRequirement>()
+    page?.requirements.forEach(r => r.tasks.forEach(t => m.set(t.id, r)))
+    return m
+  }, [page])
+
   const draftCount = Object.keys(draft).length
 
   const onDragChange = useCallback((taskId: number, start: string, end: string) => {
@@ -240,6 +256,61 @@ export default function RequirementGantt() {
     }
     setDraft(prev => ({ ...prev, [taskId]: { start, end } }))
   }, [t])
+
+  /**
+   * 进度提交：松手即保存（乐观更新 + 失败回滚），不并入底部「保存排期」。
+   * <p>100% 走完成任务（必须带交付说明）；PRD 任务由面板封顶 99%，不会走到 done。
+   * 并发保护：把拖动前的服务端进度作为 expectedProgress 上送，过期则服务端拒绝覆盖。
+   */
+  const onProgressCommit = useCallback(async (taskId: number, progress: number, remark?: string): Promise<boolean> => {
+    const src = taskById.get(taskId)
+    if (!src) return false
+    const prev = progressDraft[taskId] ?? src.progress ?? 0
+    const isDone = progress >= 100
+    setProgressDraft(p => ({ ...p, [taskId]: progress }))
+    try {
+      const res = await reportTask(taskId, {
+        action: isDone ? 'done' : 'progress',
+        progress,
+        expectedProgress: prev,
+        remark,
+        clientRequestId: `gantt-progress-${taskId}-${Date.now()}`,
+      })
+      // 以服务端事实为准：完成会同时改状态，不能只信本地草稿
+      setPage(prevPage => prevPage ? {
+        ...prevPage,
+        requirements: prevPage.requirements.map(r => ({
+          ...r,
+          tasks: r.tasks.map(t => {
+            if (t.id !== taskId) return t
+            const nextStatus = res.status ?? t.status
+            // 任务一旦完成，日期与进度都不能再拖；不等下一次刷新就收掉手柄
+            return {
+              ...t,
+              progress: res.progress ?? progress,
+              status: nextStatus,
+              canAdjust: nextStatus === 'done' ? false : t.canAdjust,
+            }
+          }),
+        })),
+      } : prevPage)
+      setProgressDraft(p => {
+        const next = { ...p }
+        delete next[taskId]
+        return next
+      })
+      if (isDone) message.success(t('rdm.ganttBoard.progressDoneSaved'))
+      return true
+    } catch {
+      // 失败回滚：清掉草稿即回到服务端值；错误文案由 request.ts 统一弹出
+      setProgressDraft(p => {
+        const next = { ...p }
+        delete next[taskId]
+        return next
+      })
+      return false
+    }
+  }, [taskById, progressDraft, t])
 
   const toggleGroup = useCallback((id: string) => {
     setExpanded(prev => {
@@ -268,6 +339,44 @@ export default function RequirementGantt() {
     if (items.length === 0) {
       message.warning(t('rdm.gantt.nothingToSave'))
       return
+    }
+    /*
+     * PRD 任务的完成日与需求「承诺出 PRD 日期」同源：改完成日就是对外承诺变更，
+     * 不能像普通内部排期那样静默落库，保存前必须把新日期逐条摆出来二次确认。
+     * 只改开始日不触动承诺，不需要弹窗。
+     */
+    const prdItems = items.filter(it => {
+      const src = taskById.get(it.taskId)
+      return src?.taskType === 'prd' && src.planFinishDate !== it.planFinishDate
+    })
+    if (prdItems.length > 0) {
+      const confirmed = await new Promise<boolean>(resolve => {
+        Modal.confirm({
+          title: t('rdm.gantt.prdConfirmTitle'),
+          className: 'custom-confirm-modal',
+          icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+          content: (
+            <div className="confirm-info-card">
+              {prdItems.map(it => {
+                const src = taskById.get(it.taskId)
+                const req = taskReqById.get(it.taskId)
+                return (
+                  <div key={it.taskId} className="confirm-info-row">
+                    <span>{req?.reqNo ?? src?.taskNo ?? '-'}</span>
+                    <b>{src?.planFinishDate ?? '-'} → {it.planFinishDate}</b>
+                  </div>
+                )
+              })}
+              <div className="rdm-gantt-prd-confirm-note">{t('rdm.gantt.prdConfirmNote')}</div>
+            </div>
+          ),
+          okText: t('rdm.gantt.prdConfirmOk'),
+          cancelText: t('rdm.gantt.keepEditing'),
+          onOk: () => resolve(true),
+          onCancel: () => resolve(false),
+        })
+      })
+      if (!confirmed) return
     }
     const seq = ++saveSeq.current
     const clientRequestId = `gantt-${Date.now()}-${seq}`
@@ -315,9 +424,14 @@ export default function RequirementGantt() {
   const hasRows = rows.length > 0
   const total = page?.total ?? 0
   // 當前頁可拖動任務數：编辑模式下為 0 時給明確引導，避免用戶對著唯讀色块空拖
+  // PRD 任务第一阶段由前端放开（与 GanttBoard 的 prdOwned 同口径），否则只有 PRD 任务的人会被误判为无可调项
   const adjustableCount = useMemo(
-    () => page?.requirements.reduce((n, r) => n + r.tasks.filter(t => t.canAdjust).length, 0) ?? 0,
-    [page],
+    () => page?.requirements.reduce((n, r) => n + r.tasks.filter(t =>
+      t.canAdjust
+      || (t.taskType === 'prd' && t.ownerUserId != null && t.ownerUserId === myId
+        && t.status !== 'done' && t.status !== 'cancelled'),
+    ).length, 0) ?? 0,
+    [page, myId],
   )
 
   return (
@@ -365,6 +479,7 @@ export default function RequirementGantt() {
           <Button icon={allExpanded ? <ShrinkOutlined /> : <ExpandAltOutlined />} onClick={toggleAllGroups}>{allExpanded ? t('rdm.gantt.collapseAll') : t('rdm.gantt.expandAll')}</Button>
           <Button icon={<ColumnWidthOutlined />} onClick={() => setCompact(c => !c)}>{compact ? t('rdm.gantt.wideLeft') : t('rdm.gantt.compactLeft')}</Button>
           <Checkbox checked={onlyMine} onChange={e => { setOnlyMine(e.target.checked); setPageNum(1) }}>{t('rdm.gantt.onlyMineTasks')}</Checkbox>
+          {editMode && <span className="rdm-gantt-edit-hint">{t('rdm.gantt.editingHint')}</span>}
         </Space>
         <Space size={8}>
           {draftCount > 0 && <Tag color="warning" style={{ margin: 0 }}>{t('rdm.gantt.unsavedTag', { count: draftCount })}</Tag>}
@@ -402,6 +517,8 @@ export default function RequirementGantt() {
             onDragChange={onDragChange}
             onStartEditDates={setEditingTaskId}
             onDateChange={onDateChange}
+            progressDraft={progressDraft}
+            onProgressCommit={onProgressCommit}
           />
           <div className="rdm-gantt-pager">
             <span>{t('rdm.gantt.loadedPager', { loaded: page?.loaded ?? 0, total })}</span>

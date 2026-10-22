@@ -47,6 +47,46 @@ public class DingTalkAppServiceImpl implements DingTalkAppService {
     @Override
     @Async
     public CompletableFuture<Boolean> sendWorkNotification(String scenario, long appId, List<String> userIds, String title, String content) {
+        Map<String, Object> msg = new LinkedHashMap<>();
+        msg.put("msgtype", "markdown");
+        Map<String, String> markdown = new LinkedHashMap<>();
+        markdown.put("title", title);
+        markdown.put("text", content);
+        msg.put("markdown", markdown);
+        return sendWork(scenario, appId, userIds, msg, title);
+    }
+
+    /**
+     * 发送工作通知卡片：正文走 {@code action_card.markdown}，底部一个整体跳转按钮。
+     *
+     * <p><b>按钮缺失就直接不发</b>：卡片没有按钮时读者只能看到几百字摘要却无处可去，
+     * 比发 markdown 更差；这里 fail-fast 并返回 false，由调用方降级或记跳过。
+     *
+     * <p><b>字段名不能写成群机器人那套</b>（text/singleTitle/singleURL）：工作通知只认
+     * markdown/single_title/single_url，写错会被当成正文为空受理。
+     */
+    @Override
+    @Async
+    public CompletableFuture<Boolean> sendWorkActionCard(String scenario, long appId, List<String> userIds,
+                                                         String title, String markdown, String btnTitle, String btnUrl) {
+        if (!StringUtils.hasText(markdown) || !StringUtils.hasText(btnTitle) || !StringUtils.hasText(btnUrl)) {
+            log.warn("钉钉工作通知卡片未发送：正文或按钮为空（卡片必须带跳转按钮）");
+            return CompletableFuture.completedFuture(false);
+        }
+        Map<String, Object> card = new LinkedHashMap<>();
+        card.put("title", title);
+        card.put("markdown", markdown);
+        card.put("single_title", btnTitle);
+        card.put("single_url", btnUrl);
+        Map<String, Object> msg = new LinkedHashMap<>();
+        msg.put("msgtype", "action_card");
+        msg.put("action_card", card);
+        return sendWork(scenario, appId, userIds, msg, title);
+    }
+
+    /** 工作通知公共链路：解析应用凭证 → 取 token → 投递 → 按 errcode 回报结果 */
+    private CompletableFuture<Boolean> sendWork(String scenario, long appId, List<String> userIds,
+                                                Map<String, Object> msg, String title) {
         if (userIds == null || userIds.isEmpty()) {
             log.warn("钉钉工作通知未发送：接收人列表为空");
             return CompletableFuture.completedFuture(false);
@@ -62,12 +102,6 @@ public class DingTalkAppServiceImpl implements DingTalkAppService {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("agent_id", Long.parseLong(app.getAgentId()));
             body.put("userid_list", String.join(",", userIds));
-            Map<String, Object> msg = new LinkedHashMap<>();
-            msg.put("msgtype", "markdown");
-            Map<String, String> markdown = new LinkedHashMap<>();
-            markdown.put("title", title);
-            markdown.put("text", content);
-            msg.put("markdown", markdown);
             body.put("msg", msg);
 
             @SuppressWarnings("unchecked")

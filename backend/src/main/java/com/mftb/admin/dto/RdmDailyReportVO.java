@@ -67,6 +67,11 @@ public final class RdmDailyReportVO {
         private String messageMode;
         /** 固定框架的字段开关（全局一套，不随模板变化） */
         private MessageFieldOptions messageFields;
+        /**
+         * 无异常日降噪策略：full=照常发摘要 / brief=只发一句结论 / skip=不发（仍落快照）。
+         * <p>只作用于定时推送；手动触发与预览永远发完整内容。
+         */
+        private String quietPolicy;
         private String updatedBy;
         private String updatedAt;
     }
@@ -143,6 +148,8 @@ public final class RdmDailyReportVO {
         private String messageMode;
         /** 固定框架的字段开关 */
         private MessageFieldOptions messageFields;
+        /** 无异常日降噪策略：null = 沿用库中现值 */
+        private String quietPolicy;
     }
 
     /* ==================== 推送模板 ==================== */

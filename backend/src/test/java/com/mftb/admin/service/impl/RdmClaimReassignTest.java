@@ -106,7 +106,8 @@ class RdmClaimReassignTest {
                 mock(com.mftb.admin.service.RdmFlowVersionGuard.class),
                 mock(com.mftb.admin.service.RdmRequirementStructureService.class),
                 mock(com.mftb.admin.service.RdmDeliveryItemService.class),
-                mock(com.mftb.admin.service.RdmAllowedActionsService.class));
+                mock(com.mftb.admin.service.RdmAllowedActionsService.class),
+                mock(com.mftb.admin.service.RdmPrdTaskService.class));
 
         when(operatorResolver.isAdmin(any())).thenReturn(false);
         when(operatorResolver.currentUser()).thenReturn(user(31L, "陳雅婷"));

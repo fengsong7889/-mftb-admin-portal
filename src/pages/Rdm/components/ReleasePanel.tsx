@@ -87,6 +87,13 @@ export default function ReleasePanel({ reqId, status, flowVersion, editable }: R
   const [decideSummary, setDecideSummary] = useState('')
 
   const load = useCallback(async () => {
+    /*
+     * V3 分批交付：需求层不走整需求放行（后端 flowVersionGuard 会直接拒），
+     * 这里不再拉检查项 —— 否则会算出一组与交付链条无关的“阻断项”，误导用户去补 PRD/任务。
+     */
+    if (flowVersion === 3) {
+      return
+    }
     setLoading(true)
     setLoadError(null)
     try {
@@ -105,7 +112,7 @@ export default function ReleasePanel({ reqId, status, flowVersion, editable }: R
     } finally {
       setLoading(false)
     }
-  }, [reqId])
+  }, [reqId, flowVersion])
 
   useEffect(() => { void load() }, [load])
 
@@ -117,6 +124,29 @@ export default function ReleasePanel({ reqId, status, flowVersion, editable }: R
   const gateOpen = GATE_OPEN_STATUS.includes(status)
   const pendingGate = useMemo(() => gates.find(g => g.status === RDM_RELEASE_STATUS.PENDING), [gates])
   const validPass = useMemo(() => gates.find(g => g.status === RDM_RELEASE_STATUS.PASSED && !g.expired), [gates])
+
+  /*
+   * V3 需求：整需求放行入口必须让位给交付项/发布批次。
+   * 保留卡片而非直接不渲染：详情页仍需要一处回答“上线怎么走”，
+   * 否则用户会以为系统漏了发布入口。
+   */
+  if (flowVersion === 3) {
+    return (
+      <div className="rdm-card" id="rdm-release-gate">
+        <div className="rdm-card-title">
+          <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><RocketOutlined /></span>
+          {t('rdm.releasePanel.title')}
+          <span className="rdm-card-title-split" />
+        </div>
+        <Alert
+          type="info"
+          showIcon
+          message={t('rdm.releasePanel.v3Title')}
+          description={t('rdm.releasePanel.v3Desc')}
+        />
+      </div>
+    )
+  }
 
   const resetApply = () => {
     setApplyOpen(false)

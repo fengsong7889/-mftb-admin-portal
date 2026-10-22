@@ -74,9 +74,15 @@ export default function TaskForm() {
   // 任务类型字典（业务可配置）：选项/确认框标签都从接口来，编辑旧任务时把当前值并入选项防回显空白
   const { options: taskTypeDictOptions, labelOf: taskTypeLabelOf } = useTaskTypeDict()
   const currentTaskType = Form.useWatch('taskType', form)
-  const taskTypeOptions = currentTaskType && !taskTypeDictOptions.some(o => o.value === currentTaskType)
-    ? [{ value: currentTaskType, label: taskTypeLabelOf(currentTaskType) }, ...taskTypeDictOptions]
-    : taskTypeDictOptions
+  /*
+   * PRD 任務由「接受需求」自動生成，不让手工新建：
+   * 手建会与承诺日期脱钩，也会出现同一需求多条 PRD 任务、甘特图上重复占两条的情况。
+   * 编辑存量 PRD 任务时仍把当前值并入选项，避免回显空白。
+   */
+  const manualTaskTypeOptions = taskTypeDictOptions.filter(o => o.value !== 'prd')
+  const taskTypeOptions = currentTaskType && !manualTaskTypeOptions.some(o => o.value === currentTaskType)
+    ? [{ value: currentTaskType, label: taskTypeLabelOf(currentTaskType) }, ...manualTaskTypeOptions]
+    : manualTaskTypeOptions
   const [requirement, setRequirement] = useState<{ reqNo: string; title: string; status: string; iterationCode?: string | null } | null>(null)
   /** 负责人显示名：表单值只有 userId，确认框光靠 id 没法核对派给了谁 */
   const [ownerLabel, setOwnerLabel] = useState<string>()

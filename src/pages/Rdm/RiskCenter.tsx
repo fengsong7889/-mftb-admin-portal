@@ -27,6 +27,7 @@ import { useTranslation } from 'react-i18next'
 import StatCards from '../../components/StatCards'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { fetchDashboard, fetchRiskSummary, type RdmDashboardData, type RdmRiskItem, type RdmRiskSummary } from '../../api/rdm'
+import { formatEmployee } from '../../utils/employeeDisplay'
 import {
   RDM_RISK_COLOR,
   RDM_RISK_LABEL,
@@ -162,8 +163,8 @@ export default function RiskCenter() {
       title: '當前狀態', dataIndex: 'status', key: 'status', width: 130,
       render: (v?: string | null) => (v ? (RDM_STATUS_LABEL[v as RdmStatus] ?? v) : '-'),
     },
-    { title: '當前處理人', dataIndex: 'handler', key: 'handler', width: 100 },
-    { title: '提出人', dataIndex: 'submitterName', key: 'submitterName', width: 100 },
+    { title: '當前處理人', dataIndex: 'handler', key: 'handler', width: 150 },
+    { title: '提出人', dataIndex: 'submitterName', key: 'submitterName', width: 140, render: (v: string | null | undefined, r) => formatEmployee(v, r.submitterEmpNo) || '-' },
     {
       title: '停留天數', dataIndex: 'days', key: 'days', width: 110, align: 'right',
       render: (v: number, r) => {

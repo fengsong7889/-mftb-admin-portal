@@ -8,11 +8,14 @@ import com.mftb.admin.dto.RdmAcceptanceDTO;
 import com.mftb.admin.dto.RdmAcceptanceVO;
 import com.mftb.admin.dto.RdmOptionVO;
 import com.mftb.admin.dto.RdmRequirementCreateDTO;
+import com.mftb.admin.dto.RdmRequirementImportDTO;
+import com.mftb.admin.dto.RdmRequirementImportVO;
 import com.mftb.admin.dto.RdmRequirementQuery;
 import com.mftb.admin.dto.RdmRequirementVO;
 import com.mftb.admin.dto.RdmTransitionDTO;
 import com.mftb.admin.dto.RdmWorkbenchVO;
 import com.mftb.admin.entity.RdmComment;
+import com.mftb.admin.service.RdmRequirementImportService;
 import com.mftb.admin.service.RdmRequirementService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,6 +41,7 @@ import java.util.Map;
 public class RdmRequirementController {
 
     private final RdmRequirementService requirementService;
+    private final RdmRequirementImportService requirementImportService;
 
     /* ==================== 查询 ==================== */
 
@@ -89,6 +93,18 @@ public class RdmRequirementController {
     @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = "create")
     public Result<RdmRequirementVO> create(@RequestBody RdmRequirementCreateDTO dto) {
         return Result.success("需求已提交", requirementService.create(dto));
+    }
+
+    /**
+     * 批量導入存量需求（雲效遷移）。
+     * <p>權限沿用 create：導入等同批量建單，不新增動作，避免菜單動作集並集同步時
+     * 把批量寫能力自動發給所有已有該菜單授權的角色。服務層還會再校驗「全量可見」。
+     * <p>行級問題不拋異常，統一進返回體的逐行結果；參數級問題（空列表/超上限/無權限）才報錯。
+     */
+    @PostMapping("/requirement/import")
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = "create")
+    public Result<RdmRequirementImportVO> importRequirements(@RequestBody RdmRequirementImportDTO dto) {
+        return Result.success("導入完成", requirementImportService.importRequirements(dto));
     }
 
     /** 修改需求（仅草稿态） */
@@ -240,6 +256,17 @@ public class RdmRequirementController {
                 anyPermissions = {"rdm-requirement:view_all"})
     public Result<List<RdmOptionVO.ProductManager>> productManagers() {
         return Result.success(requirementService.productManagers());
+    }
+
+    /**
+     * 技术负责人候选（具备需求分配权）。
+     * <p>权限与「提交需求」同源（create）：提出人才是选负责人的人，
+     * 不能因为没拿到分配权就看不到候选。
+     */
+    @GetMapping("/options/tech-leads")
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = "create")
+    public Result<List<RdmOptionVO.Employee>> techLeads() {
+        return Result.success(requirementService.techLeads());
     }
 
     /** 系统 → 菜单 级联树 */

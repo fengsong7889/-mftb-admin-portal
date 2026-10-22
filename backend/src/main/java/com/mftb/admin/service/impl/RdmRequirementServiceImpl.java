@@ -51,6 +51,7 @@ import com.mftb.admin.service.RdmIntakeCallbackService;
 import com.mftb.admin.service.RdmIntakePolicyService;
 import com.mftb.admin.service.RdmIntakeRoundService;
 import com.mftb.admin.service.RdmNotifyService;
+import com.mftb.admin.service.RdmPrdTaskService;
 import com.mftb.admin.service.RdmReleaseService;
 import com.mftb.admin.service.RdmRequirementService;
 import com.mftb.admin.service.RdmRequirementStructureService;
@@ -161,6 +162,8 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
     private final RdmDeliveryItemService deliveryItemService;
     /** V3 分层：需求管理类可执行动作计算（与流转动作互补） */
     private final RdmAllowedActionsService allowedActionsService;
+    /** 产品经理 PRD 任务：受理时生成、改派时同步负责人（任务口径不散落到两个服务） */
+    private final RdmPrdTaskService prdTaskService;
 
     /* ==================== 查询 ==================== */
 
@@ -274,6 +277,32 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         for (RdmRequirementVO vo : records) {
             vo.setProjectName(vo.getProjectId() == null ? null : projectNames.get(vo.getProjectId()));
             vo.setIterationName(vo.getIterationCode() == null ? null : iterationNames.get(vo.getIterationCode()));
+        }
+        fillDispatcherEmpNos(records);
+    }
+
+    /**
+     * 批量回填技术负责人工号：需求表只存了姓名快照，工号按 dispatcherUserId 一次 IN 查询补齐。
+     * <p>「当前处理人」在需求池阶段只能靠这个字段展示具体的人，缺工号就退回“只有名字”的口径。
+     */
+    void fillDispatcherEmpNos(List<RdmRequirementVO> records) {
+        if (records == null || records.isEmpty()) {
+            return;
+        }
+        List<Long> userIds = records.stream().map(RdmRequirementVO::getDispatcherUserId)
+                .filter(Objects::nonNull).distinct().toList();
+        if (userIds.isEmpty()) {
+            return;
+        }
+        Map<Long, String> empNos = userMapper.selectBatchIds(userIds).stream()
+                .filter(u -> u.getId() != null)
+                .collect(java.util.stream.Collectors.toMap(SysUser::getId, u -> u.getEmpId() == null ? "" : u.getEmpId(),
+                        (a, b) -> a));
+        for (RdmRequirementVO vo : records) {
+            if (vo.getDispatcherUserId() != null) {
+                String empNo = empNos.get(vo.getDispatcherUserId());
+                vo.setDispatcherEmpNo(StringUtils.hasText(empNo) ? empNo : null);
+            }
         }
     }
 
@@ -623,6 +652,16 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         SysUser acceptor = resolveAcceptor(dto.getAcceptorUserId(), current);
         req.setAcceptorUserId(acceptor.getId());
         req.setAcceptorName(acceptor.getName());
+        /*
+         * 技术负责人只在「提交技术部统一分配」时生效：直接指定产品经理的需求不需要中间分发人。
+         * 先选负责人再进需求池，是为了让「當前處理人」在分配前就是一个真实的人（姓名+工号），
+         * 而不是一个无法落到人的角色名。
+         */
+        SysUser dispatcher = resolveDispatcher(dto.getDispatcherUserId(), pm);
+        if (dispatcher != null) {
+            req.setDispatcherUserId(dispatcher.getId());
+            req.setDispatcherName(dispatcher.getName());
+        }
 
         if (draft) {
             req.setStatus(RdmConstants.STATUS_DRAFT);
@@ -767,7 +806,8 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
                 || RdmConstants.STATUS_INTAKE_REJECTED.equals(status)) {
             return;
         }
-        deliveryItemService.getOrCreateDefaultItem(req.getId(), operatorId);
+        // 传快照：准入回调/提交链路可能刚改写需求字段，重读库会拿到旧行
+        deliveryItemService.getOrCreateDefaultItem(req, operatorId);
     }
 
     /** 是否 V3 分批交付流程版本（仅认 3，与 RdmFlowVersionGuard 同口径） */
@@ -894,6 +934,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         validateCreate(dto);
         Long previousAcceptorUserId = req.getAcceptorUserId();
         Long previousPmUserId = req.getIntentPmUserId();
+        Long previousDispatcherUserId = req.getDispatcherUserId();
         Long previousStructureParentReqId = req.getStructureParentReqId();
         req.setTitle(dto.getTitle().trim());
         req.setReqType(dto.getReqType());
@@ -928,6 +969,12 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         SysUser acceptor = resolveAcceptor(dto.getAcceptorUserId(), current);
         req.setAcceptorUserId(acceptor.getId());
         req.setAcceptorName(acceptor.getName());
+        // 草稿续编同样要能改技术负责人；清空走下面的显式 UpdateWrapper，否则 null 不会进 SET
+        SysUser dispatcher = resolveDispatcher(dto.getDispatcherUserId(), pm);
+        if (dispatcher != null) {
+            req.setDispatcherUserId(dispatcher.getId());
+            req.setDispatcherName(dispatcher.getName());
+        }
         // 任务19 / 缺口1：草稿续编时补齐 V3 字段，避免 projectId/requirementKind 被静默丢弃
         //（与旧版静默丢弃意向 PM/验收人同类问题）。仅草稿可改，此处直接落标量字段；
         // 结构父变更走 structureService 完整校验，不在这里直写 structureParentReqId 绕过校验。
@@ -951,6 +998,13 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
                     .eq(RdmRequirement::getId, id)
                     .set(RdmRequirement::getIntentPmUserId, null)
                     .set(RdmRequirement::getIntentPmName, null));
+        }
+        // 清空技术负责人同样必须显式置空：否则界面已改回「系统指派」，库里还挂着旧负责人
+        if (dispatcher == null && previousDispatcherUserId != null) {
+            requirementMapper.update(null, new LambdaUpdateWrapper<RdmRequirement>()
+                    .eq(RdmRequirement::getId, id)
+                    .set(RdmRequirement::getDispatcherUserId, null)
+                    .set(RdmRequirement::getDispatcherName, null));
         }
 
         // 任务19 / 缺口1：结构父变更走 structureService 完整校验（父需 aggregate、两端鉴权、同项目、均 V3、无环），
@@ -1138,6 +1192,28 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
     }
 
     /**
+     * 解析并提出人指定的技术负责人（仅 POOL 模式生效）。
+     * <p>必须校验分配权：选了没有分配权的人，需求会永久卡在需求池 —— 提出人以为已经找到人，
+     * 实际没人能推进。宁可提交时拒绝并让他改选，也不能静默存下一个无效负责人。
+     */
+    private SysUser resolveDispatcher(Long dispatcherUserId, SysUser pm) {
+        if (pm != null || dispatcherUserId == null) {
+            return null;
+        }
+        SysUser dispatcher = userMapper.selectById(dispatcherUserId);
+        if (dispatcher == null) {
+            throw new BusinessException("所選技術負責人不存在或已停用，請重新選擇");
+        }
+        if (dispatcher.getStatus() != null && dispatcher.getStatus() == 0) {
+            throw new BusinessException("所選技術負責人已離職或停用，請重新選擇");
+        }
+        if (!accessGuard.canDispatch(dispatcher)) {
+            throw new BusinessException("所選技術負責人不具備需求分配權限，請改選他人或留空由系統指派");
+        }
+        return dispatcher;
+    }
+
+    /**
      * 解析并校验业务验收人：不传即提交人本人。
      * <p>以前是「查不到人就静默回落到提交人」——用户明明指派了别人，单据上却变成自己签字，
      * 属于把前端传的 userId 当可信数据。现在查不到/已停用一律直接拒绝，
@@ -1303,7 +1379,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
     /** 對齊留痕：寫進狀態流水的說明，讓人看得出這一步不是人點的 */
     private String alignRemark(String action) {
         return RdmConstants.ACTION_REVIEW_REJECT.equals(action)
-                ? "自動對齊：最新評審結論為退回，狀態回到 PRD 設計中"
+                ? "自動對齊：最新評審結論為退回，狀態回到 PRD 產出中"
                 : "自動對齊：依已存在的 PRD / 評審記錄推進狀態";
     }
 
@@ -1630,9 +1706,19 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         }
         switch (actionCode) {
             case RdmConstants.ACTION_DISPATCH -> {
+                /*
+                 * 先落项目/迭代，再确定交付流程：默认交付项要继承项目归属与刚分配的 PM。
+                 * 顺序反了（先建交付项后挂项目）会让交付项永久无项目、无产品验收人，
+                 * 项目看板/发布批次/验收签字逐环节都拿不到真实责任人与归属。
+                 */
+                applyProjectAndIteration(req, dto, false);
                 // 分配是产研第一次确定交付方式的时点：默认 V3，也可在弹窗里选 V2
                 applyFlowVersionOnAssignment(req, dto, current == null ? null : current.getId());
-                applyProjectAndIteration(req, dto, false);
+                // 提出人未指定技术负责人时，以真正执行分派的人为准，避免需求池的处理人永远空白
+                if (req.getDispatcherUserId() == null && current != null) {
+                    req.setDispatcherUserId(current.getId());
+                    req.setDispatcherName(current.getName());
+                }
             }
             case RdmConstants.ACTION_ACCEPT -> {
                 req.setAcceptTime(now);
@@ -1712,12 +1798,15 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
                 systemAlign ? "（自動對齊）" : "");
 
         /*
-         * 受理後立刻用既有事實校對一次狀態：舊數據可能在「評估中」就先寫了 PRD、甚至評審也出了結論，
-         * 只把狀態推到「已受理」會讓頁面又要求產品經理再寫一次 PRD（使用者實際遇到的混亂）。
+         * 受理后立刻把「承诺出 PRD 日期」落成产品经理的任务：任务页签与甘特图只读任务表，
+         * 不建任务则产品侧进度完全不可见（此前只能看到一个静态日期字段）。
+         * 同时用既有事实校对一次状态：旧数据可能在「评估中」就先写了 PRD，避免页面又要求再写一次。
          */
-        if (!systemAlign && RdmConstants.ACTION_ACCEPT.equals(actionCode)
-                && PRD_PHASE_STATUSES.contains(req.getStatus())) {
-            alignPrdPhaseStatus(req.getId());
+        if (!systemAlign && RdmConstants.ACTION_ACCEPT.equals(actionCode)) {
+            prdTaskService.ensureTask(req, actor);
+            if (PRD_PHASE_STATUSES.contains(req.getStatus())) {
+                alignPrdPhaseStatus(req.getId());
+            }
         }
     }
 
@@ -1779,7 +1868,8 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
             if (!StringUtils.hasText(req.getRequirementKind())) {
                 req.setRequirementKind(RdmConstants.KIND_EXECUTION);
             }
-            deliveryItemService.getOrCreateDefaultItem(req.getId(), operatorId);
+            // 传快照而非 id：PM/项目刚写入内存、尚未落库，重读库会丢失默认验收人与项目归属
+            deliveryItemService.getOrCreateDefaultItem(req, operatorId);
         }
     }
 
@@ -1964,6 +2054,8 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
          */
         deactivateRole(id, previousPm, RdmConstants.ROLE_PM);
         upsertRole(id, target, RdmConstants.ROLE_PM);
+        // 未完成的 PRD 任务跟着新受理人走：换人后仍由旧人背 PRD 截止日，甘特图会指向已离任的人
+        prdTaskService.syncOwner(req, target, current);
         RdmRequirement reassigned = requireRequirement(id);
         appendStatusLog(reassigned, req.getStatus(), current, RdmConstants.ACTION_REASSIGN_PM,
                 "改派產品經理：" + (StringUtils.hasText(req.getAssigneePmName()) ? req.getAssigneePmName() : "未指定")
@@ -2562,6 +2654,34 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
     }
 
     /**
+     * 技术负责人候选：在职、启用且具备需求分配权的员工。
+     * <p>只返回能真正推进需求的人：选了无分配权的人，需求会永久卡在需求池。
+     * 用户量有限（几百人）,逐人鉴权与本类其他候选接口口径一致；超过上限时按 id 截断，
+     * 前端仍可搜索，不把全公司扫进下拉。
+     */
+    @Override
+    public List<RdmOptionVO.Employee> techLeads() {
+        List<RdmOptionVO.Employee> list = new ArrayList<>();
+        userMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                        .eq(SysUser::getDeleted, 0)
+                        .orderByAsc(SysUser::getId)
+                        .last("LIMIT 300"))
+                .stream()
+                .filter(u -> u.getId() != null)
+                .filter(u -> u.getStatus() == null || u.getStatus() != 0)
+                .filter(accessGuard::canDispatch)
+                .forEach(u -> {
+                    RdmOptionVO.Employee e = new RdmOptionVO.Employee();
+                    e.setUserId(u.getId());
+                    e.setEmpNo(u.getEmpId());
+                    e.setName(u.getName());
+                    e.setDeptName(resolveDeptName(u.getDepartmentId()));
+                    list.add(e);
+                });
+        return list;
+    }
+
+    /**
      * 需求可针对的菜单候选：系统 → 可导航页面（两级，前端 Cascader 也只渲染两级）。
      * <p>选取标准是「能不能真的导航到这个页面」（path 非空且启用），而不是按菜单层级硬编码。
      * <p>原实现遇到 {@code parent_id IS NULL} 就 continue，而 RDM 菜单拍平后
@@ -2731,13 +2851,44 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
 
     private String computeHandler(RdmRequirement req, SysUser pmHint) {
         return switch (req.getStatus() == null ? "" : req.getStatus()) {
-            case RdmConstants.STATUS_DRAFT -> req.getSubmitterName();
+            case RdmConstants.STATUS_DRAFT -> personLabel(req.getSubmitterName(), req.getSubmitterEmpNo());
             case RdmConstants.STATUS_INTAKE_PENDING, RdmConstants.STATUS_INTAKE_REJECTED -> "審批人";
-            case RdmConstants.STATUS_POOL -> "技術負責人";
-            case RdmConstants.STATUS_UAT_PENDING, RdmConstants.STATUS_VERIFIED -> req.getAcceptorName();
-            case RdmConstants.STATUS_RELEASED, RdmConstants.STATUS_CLOSED -> req.getAssigneePmName();
-            default -> StringUtils.hasText(req.getAssigneePmName()) ? req.getAssigneePmName() : "待分配";
+            /*
+             * 需求池阶段还没有受理人，處理人只可能是「提出人指定/系统分派的技术负责人」。
+             * 此前写死「技術負責人」只是角色名，用户无法知道该找谁；现在展示具体人（姓名+工号），
+             * 未指定时明确写成「待指派」，而不是用一个看似有人的角色名。
+             */
+            case RdmConstants.STATUS_POOL -> StringUtils.hasText(req.getDispatcherName())
+                    ? personLabel(req.getDispatcherName(), empNoOf(req.getDispatcherUserId()))
+                    : "技術部（待指派）";
+            case RdmConstants.STATUS_UAT_PENDING, RdmConstants.STATUS_VERIFIED ->
+                    personLabel(req.getAcceptorName(), empNoOf(req.getAcceptorUserId()));
+            case RdmConstants.STATUS_RELEASED, RdmConstants.STATUS_CLOSED ->
+                    personLabel(req.getAssigneePmName(), req.getAssigneePmEmpNo());
+            default -> {
+                if (StringUtils.hasText(req.getAssigneePmName())) {
+                    yield personLabel(req.getAssigneePmName(), req.getAssigneePmEmpNo());
+                }
+                yield pmHint == null ? "待分配" : personLabel(pmHint.getName(), pmHint.getEmpId());
+            }
         };
+    }
+
+    /** 「姓名（工号）」是列表/详情/催办共用的处理人展示口径；无工号时只给姓名，不留空括号 */
+    private String personLabel(String name, String empNo) {
+        if (!StringUtils.hasText(name)) {
+            return null;
+        }
+        return StringUtils.hasText(empNo) ? name + "（" + empNo + "）" : name;
+    }
+
+    /** 处理人快照没存工号时按用户 id 反查一次（只在写侧调用，不在列表循环里逐行查） */
+    private String empNoOf(Long userId) {
+        if (userId == null) {
+            return null;
+        }
+        SysUser user = userMapper.selectById(userId);
+        return user == null ? null : user.getEmpId();
     }
 
     private String labelOf(String status) {

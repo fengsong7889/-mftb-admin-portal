@@ -11,7 +11,7 @@
  * 校验顺序：validateFields → 组装 payload → 调 API（§B.3 禁止先弹后校验）。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Button, DatePicker, Form, Input, Select, Space, message } from 'antd'
+import { Alert, Button, DatePicker, Form, Input, Select, Space, message } from 'antd'
 import {
   MinusCircleOutlined, PlusOutlined, SendOutlined,
 } from '@ant-design/icons'
@@ -49,6 +49,8 @@ interface SubmitFormValues {
   testLeadUserId?: string
   executorUserIds?: string[]
   buildIds?: { buildId?: string }[]
+  /** 测试用例草稿：受理时由服务端规范化成冻结用例集，为空会被拒绝 */
+  cases?: { deliveryItemId?: number; caseTitle?: string }[]
 }
 
 /** 可提测的需求状态：V3 需求受理后主状态可能一直停在 accepted，不能只认 scope=delivery */
@@ -76,6 +78,12 @@ export default function TestBatchSubmit() {
   /** 测试负责人姓名：后端 DTO 要 userId + userName 两列，用户名从下拉 label 取，不让用户再手填 */
   const [leadName, setLeadName] = useState('')
   const [executorOptions, setExecutorOptions] = useState<{ value: string; label: string }[]>([])
+  /**
+   * 已选交付项：用例必须挂到本次提测范围内的交付项。
+   * <p>服务端受理时会丢弃“不属于本批次交付项”的用例；前端这里先做同源过滤，
+   * 避免用户添了用例、受理时却被静默丢掉，冻结集变空随后遭拒。
+   */
+  const selectedItemIds = Form.useWatch('deliveryItemIds', form) ?? []
 
   /**
    * 需求清单：取研发交付范围内前 50 条本地模糊匹配。
@@ -177,6 +185,20 @@ export default function TestBatchSubmit() {
     } catch { /* 下拉搜索失敗保持原選項，不打斷填寫 */ }
   }
 
+  /**
+   * 选定交付项后自动带一行空白用例，避免用户漏填。
+   * <p>只在“完全没有用例”时补：用户已手工删改过的行不覆盖；换交付项时也不自动添加，
+   * 避免下拉切来切去把已写好的标题冲掉。
+   */
+  const selectedKey = selectedItemIds.join(',')
+  useEffect(() => {
+    if (!selectedItemIds.length) return
+    const current = form.getFieldValue('cases') as SubmitFormValues['cases']
+    if (current && current.length > 0) return
+    form.setFieldValue('cases', selectedItemIds.map((id: number) => ({ deliveryItemId: id })))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedKey])
+
   const handleSubmit = async () => {
     let values: SubmitFormValues
     try {
@@ -189,6 +211,17 @@ export default function TestBatchSubmit() {
       message.warning('請選擇測試負責人')
       return
     }
+    /*
+     * 用例集不能为空：服务端受理时会拒绝空冻结用例集（受理即冻结，fail-closed）。
+     * 前端先拦一道，避免用户一路填完提交、到受理才被拒，交付项已置 testing 后还得退回重来。
+     */
+    const cases = (values.cases ?? [])
+      .filter(c => c && c.deliveryItemId && (c.caseTitle ?? '').trim())
+      .map(c => ({ deliveryItemId: Number(c.deliveryItemId), caseTitle: (c.caseTitle ?? '').trim() }))
+    if (!cases.length) {
+      message.warning('請至少添加一條測試用例（受理時將凍結為必測用例集）')
+      return
+    }
     const payload: RdmTestBatchSubmitForm = {
       reqId: values.reqId,
       deliveryItemIds: values.deliveryItemIds,
@@ -198,6 +231,7 @@ export default function TestBatchSubmit() {
       executorUserIds: (values.executorUserIds ?? []).map(Number),
       planEndTime: values.planEndTime ? values.planEndTime.format('YYYY-MM-DD HH:mm:ss') : undefined,
       buildIds: (values.buildIds ?? []).map(b => (b.buildId ?? '').trim()).filter(Boolean),
+      caseSnapshotJson: JSON.stringify(cases),
     }
     setSubmitting(true)
     try {
@@ -314,6 +348,67 @@ export default function TestBatchSubmit() {
               />
             </Form.Item>
           </div>
+        </div>
+
+        {/* ── 測試用例（受理時凍結為必測用例集，不可為空）── */}
+        <div className="rdm-form-section">
+          <div className="rdm-form-section-title">測試用例</div>
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 12 }}
+            message="受理提測時本清單會凍結為必測用例集，測試負責人逐條錄入結果；提交後不可修改"
+          />
+          <Form.List name="cases">
+            {(fields, { add, remove }) => (
+              <>
+                {fields.map(({ key, name, ...restField }) => (
+                  <Space key={key} align="baseline" style={{ display: 'flex', marginBottom: 8 }} wrap>
+                    <Form.Item
+                      {...restField}
+                      name={[name, 'deliveryItemId']}
+                      style={{ marginBottom: 0, width: 300 }}
+                      rules={[{ required: true, message: '請選擇所屬交付項' }]}
+                    >
+                      <Select
+                        placeholder="所屬交付項"
+                        options={deliveryOptions
+                          .filter(d => selectedItemIds.includes(d.id))
+                          .map(d => ({ value: d.id, label: `${d.itemNo} ${d.title}` }))}
+                      />
+                    </Form.Item>
+                    <Form.Item
+                      {...restField}
+                      name={[name, 'caseTitle']}
+                      style={{ marginBottom: 0, width: 360 }}
+                      rules={[{ required: true, message: '請輸入用例標題' }]}
+                    >
+                      <Input placeholder="用例標題，如：保存後列表即時刷新" maxLength={120} />
+                    </Form.Item>
+                    {fields.length > 1 && (
+                      <Button
+                        type="link"
+                        size="small"
+                        danger
+                        icon={<MinusCircleOutlined />}
+                        onClick={() => remove(name)}
+                      >
+                        移除
+                      </Button>
+                    )}
+                  </Space>
+                ))}
+                <Button
+                  type="dashed"
+                  icon={<PlusOutlined />}
+                  onClick={() => add({ deliveryItemId: selectedItemIds[0] })}
+                  block
+                >
+                  新增用例
+                </Button>
+              </>
+            )}
+          </Form.List>
         </div>
 
         {/* ── 構建標識 ── */}

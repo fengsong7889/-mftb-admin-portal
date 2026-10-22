@@ -5,6 +5,7 @@ import { Alert, Button, Form, Input, Select, Switch, Tag, Tooltip, message } fro
 import { ArrowLeftOutlined, EyeOutlined, FileTextOutlined, LinkOutlined, SaveOutlined } from '@ant-design/icons'
 import { useAuth } from '../../../contexts/AuthContext'
 import DailyReportBoardPreviewModal from '../../../components/DailyReportBoardPreviewModal'
+import DingTalkCardPreview from './DingTalkCardPreview'
 import {
   fetchDailyReportTemplates,
   previewDailyReport,
@@ -81,6 +82,8 @@ export default function DailyReportTemplateForm() {
   const [preview, setPreview] = useState<DailyReportPreviewResult | null>(null)
   /** 看板预览弹窗：与预览链接同一个地址，不再跳新窗口 */
   const [boardOpen, setBoardOpen] = useState(false)
+  /** 原始 Markdown：默认收起，只在需要复制/排查渲染差异时展开 */
+  const [showRaw, setShowRaw] = useState(false)
   const contentRef = useRef<HTMLTextAreaElement | null>(null)
 
   const channel = Form.useWatch('channel', form)
@@ -300,13 +303,28 @@ export default function DailyReportTemplateForm() {
             <Alert type="info" showIcon style={{ marginBottom: 8 }}
               message={t('rdm.dailyTemplate.previewFixedModeHint')} />
           )}
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{preview.title}</div>
-          <pre style={{
-            background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 6, padding: 12,
-            fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0, maxHeight: 360, overflow: 'auto',
-          }}>
-            {preview.content}
-          </pre>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>{t('rdm.dailyTemplate.previewCardTitle')}</div>
+            <Button type="link" size="small" onClick={() => setShowRaw(v => !v)}>
+              {showRaw ? t('rdm.dailyTemplate.previewRawHide') : t('rdm.dailyTemplate.previewRawShow')}
+            </Button>
+          </div>
+          {/* 卡片效果按真机尺寸预览：固定版式带按钮，自定义模板是纯文字气泡 */}
+          <DingTalkCardPreview
+            title={preview.title}
+            content={preview.content}
+            mode={preview.messageMode === 'template' ? 'template' : 'fixed'}
+            buttonText={preview.messageMode === 'template' ? undefined : t('rdm.dailyTemplate.previewButton')}
+            timeText="09:00"
+          />
+          {showRaw && (
+            <pre style={{
+              background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 6, padding: 12, marginTop: 10,
+              fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 360, overflow: 'auto',
+            }}>
+              {preview.content}
+            </pre>
+          )}
           {preview.detailUrl && (
             <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <Button icon={<LinkOutlined />} onClick={openPreviewLink}>

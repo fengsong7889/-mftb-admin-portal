@@ -220,7 +220,7 @@ public class RdmAnalyticsService {
     private List<RdmQualityVO.ReworkItem> buildReworkRank() {
         List<RdmQualityVO.ReworkItem> list = new ArrayList<>();
         for (Map<String, Object> row : jdbcTemplate.queryForList(
-                "SELECT r.id, r.req_no, r.title, r.rework_count, r.assignee_pm_name, r.submit_dept_name, "
+                "SELECT r.id, r.req_no, r.title, r.rework_count, r.assignee_pm_name, r.assignee_pm_emp_no, r.submit_dept_name, "
                         + " (SELECT a.issues FROM rdm_acceptance a "
                         + "   WHERE a.deleted = 0 AND a.req_id = r.id AND a.result = 'fail' "
                         + "   ORDER BY a.accept_time DESC LIMIT 1) AS last_reason "
@@ -233,6 +233,7 @@ public class RdmAnalyticsService {
             item.setTitle((String) row.get("title"));
             item.setReworkCount((int) toLong(row.get("rework_count")));
             item.setPmName((String) row.get("assignee_pm_name"));
+            item.setPmEmpNo((String) row.get("assignee_pm_emp_no"));
             item.setSubmitDeptName((String) row.get("submit_dept_name"));
             item.setLastRejectReason((String) row.get("last_reason"));
             list.add(item);
@@ -275,7 +276,7 @@ public class RdmAnalyticsService {
         long releasedCnt = 0;
         for (Map<String, Object> row : jdbcTemplate.queryForList(
                 "SELECT id, req_no, title, status, req_type, priority, submit_dept_name, submitter_name, "
-                        + " assignee_pm_name, plan_release_date, actual_release_date, acceptance_result, "
+                        + " assignee_pm_name, assignee_pm_emp_no, plan_release_date, actual_release_date, acceptance_result, "
                         + " acceptance_score, rework_count, "
                         + " (SELECT MAX(attempt) FROM rdm_acceptance a "
                         + "    WHERE a.deleted = 0 AND a.req_id = r.id) AS attempt, "
@@ -295,6 +296,7 @@ public class RdmAnalyticsService {
             item.setSubmitDeptName((String) row.get("submit_dept_name"));
             item.setSubmitterName((String) row.get("submitter_name"));
             item.setPmName((String) row.get("assignee_pm_name"));
+            item.setPmEmpNo((String) row.get("assignee_pm_emp_no"));
             item.setPlanReleaseDate(str(row.get("plan_release_date")));
             item.setActualReleaseDate(str(row.get("actual_release_date")));
             item.setAcceptanceResult((String) row.get("acceptance_result"));
@@ -437,15 +439,16 @@ public class RdmAnalyticsService {
     private List<RdmWeeklyReportVO.PmRow> buildWeeklyPmRows(boolean byIteration, String iterationCode) {
         List<RdmWeeklyReportVO.PmRow> list = new ArrayList<>();
         for (Map<String, Object> row : jdbcTemplate.queryForList(
-                "SELECT COALESCE(assignee_pm_name,'未分配') AS pm_name, "
+                "SELECT COALESCE(assignee_pm_name,'未分配') AS pm_name, assignee_pm_emp_no AS pm_emp_no, "
                         + " SUM(CASE WHEN status IN " + IN_FLIGHT_STATUS_SQL + " THEN 1 ELSE 0 END) AS active, "
                         + " SUM(CASE WHEN status IN " + DELIVERED_STATUS_SQL + " THEN 1 ELSE 0 END) AS delivered, "
                         + " SUM(CASE WHEN overdue_flag = 1 THEN 1 ELSE 0 END) AS overdue "
                         + "FROM rdm_requirement WHERE deleted = 0" + (byIteration ? " AND iteration_code = ?" : "")
-                        + " GROUP BY pm_name ORDER BY active DESC",
+                        + " GROUP BY assignee_pm_name, assignee_pm_emp_no ORDER BY active DESC",
                 byIteration ? new Object[]{iterationCode} : new Object[0])) {
             RdmWeeklyReportVO.PmRow item = new RdmWeeklyReportVO.PmRow();
             item.setPmName((String) row.get("pm_name"));
+            item.setPmEmpNo((String) row.get("pm_emp_no"));
             item.setActive((int) toLong(row.get("active")));
             item.setDelivered((int) toLong(row.get("delivered")));
             item.setOverdue((int) toLong(row.get("overdue")));
@@ -464,7 +467,7 @@ public class RdmAnalyticsService {
             args.add(iterationCode);
         }
         for (Map<String, Object> row : jdbcTemplate.queryForList(
-                "SELECT id, req_no, title, version_no, assignee_pm_name, actual_release_date, acceptance_score "
+                "SELECT id, req_no, title, version_no, assignee_pm_name, assignee_pm_emp_no, actual_release_date, acceptance_score "
                         + "FROM rdm_requirement WHERE deleted = 0 "
                         + "AND actual_release_date >= ? AND actual_release_date < ?"
                         + (byIteration ? " AND iteration_code = ?" : "")
@@ -476,6 +479,7 @@ public class RdmAnalyticsService {
             item.setTitle((String) row.get("title"));
             item.setVersionNo((String) row.get("version_no"));
             item.setPmName((String) row.get("assignee_pm_name"));
+            item.setPmEmpNo((String) row.get("assignee_pm_emp_no"));
             item.setActualReleaseDate(str(row.get("actual_release_date")));
             item.setAcceptanceScore(row.get("acceptance_score") == null
                     ? null : (int) toLong(row.get("acceptance_score")));
@@ -643,7 +647,7 @@ public class RdmAnalyticsService {
     private List<RdmDashboardVO.PmRank> buildPmRank() {
         List<RdmDashboardVO.PmRank> list = new ArrayList<>();
         for (Map<String, Object> row : jdbcTemplate.queryForList(
-                "SELECT assignee_pm_name AS pm_name, "
+                "SELECT assignee_pm_name AS pm_name, MAX(assignee_pm_emp_no) AS pm_emp_no, "
                         + " SUM(CASE WHEN status IN " + IN_FLIGHT_STATUS_SQL + " THEN 1 ELSE 0 END) AS active_cnt, "
                         + " SUM(CASE WHEN status IN " + DELIVERED_STATUS_SQL + " THEN 1 ELSE 0 END) AS delivered, "
                         + " SUM(CASE WHEN overdue_flag = 1 THEN 1 ELSE 0 END) AS overdue, "
@@ -653,6 +657,7 @@ public class RdmAnalyticsService {
                         + "GROUP BY assignee_pm_name ORDER BY delivered DESC, active_cnt DESC")) {
             RdmDashboardVO.PmRank rank = new RdmDashboardVO.PmRank();
             rank.setPmName((String) row.get("pm_name"));
+            rank.setPmEmpNo((String) row.get("pm_emp_no"));
             rank.setActive(toLong(row.get("active_cnt")));
             rank.setDelivered(toLong(row.get("delivered")));
             rank.setOverdue(toLong(row.get("overdue")));
@@ -739,7 +744,7 @@ public class RdmAnalyticsService {
         String stayCond = minStayDays > 0
                 ? "AND TIMESTAMPDIFF(DAY, status_enter_time, NOW()) >= ? " : "";
         for (Map<String, Object> row : jdbcTemplate.queryForList(
-                "SELECT id, req_no, title, status, submitter_name, COALESCE(current_handler_name,'待分配') AS handler, "
+                "SELECT id, req_no, title, status, submitter_name, submitter_emp_no, COALESCE(current_handler_name,'待分配') AS handler, "
                         + " CASE WHEN blocked_flag = 1 THEN 'BLOCKED' "
                         + "      WHEN status = 'pool' THEN 'UNASSIGNED' "
                         + "      WHEN status = 'intake_pending' THEN 'INTAKE_STUCK' "
@@ -761,6 +766,7 @@ public class RdmAnalyticsService {
             risk.setTitle((String) row.get("title"));
             risk.setStatus((String) row.get("status"));
             risk.setSubmitterName((String) row.get("submitter_name"));
+            risk.setSubmitterEmpNo((String) row.get("submitter_emp_no"));
             risk.setHandler((String) row.get("handler"));
             risk.setDays(toLong(row.get("days")));
             list.add(risk);

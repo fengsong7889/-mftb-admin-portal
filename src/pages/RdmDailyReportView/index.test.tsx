@@ -138,7 +138,10 @@ function openPage(entry = '/rdm-daily-view?token=abc') {
 
 describe('進度日報看板（開放頁）', () => {
   beforeEach(async () => {
-    vi.clearAllMocks()
+    // 必须是 mockReset 而不是 clearAllMocks：后者只清调用记录，
+    // 上一个用例设的 mockRejectedValue 会泄漏到下一个用例，
+    // 表现为「明明给了正常数据却报网络异常」的随机失败。
+    fetchView.mockReset()
     await i18n.changeLanguage('zh-TW')
   })
 
@@ -428,10 +431,11 @@ describe('進度日報看板（開放頁）', () => {
 
     await waitFor(() => expect(screen.getAllByText('登錄頁重構').length).toBeGreaterThan(0))
     expect(screen.getByText('研發成員')).toBeInTheDocument()
-    expect(screen.getByText('研發甲')).toBeInTheDocument()
+    // 负责人按统一口径渲染「姓名（工号）」，不再只显示姓名
+    expect(screen.getByText('研發甲（MF001）')).toBeInTheDocument()
     expect(screen.getAllByText('登錄回歸測試').length).toBeGreaterThan(0)
     expect(screen.getByText('測試')).toBeInTheDocument()
-    expect(screen.getByText('測試乙')).toBeInTheDocument()
+    expect(screen.getByText('測試乙（MF002）')).toBeInTheDocument()
     // 复用「我的甘特圖」：需求行 + 任务条、进度徽标、今天线都在
     expect(document.querySelector('.rdm-g2')).not.toBeNull()
     expect(document.querySelector('.rdm-g2-spanbar')).not.toBeNull()

@@ -263,4 +263,62 @@ class RdmNotifyDispatcherTest {
         dryRun(true);
         assertTrue(dispatcher.isDryRun());
     }
+
+    /* ==================== 卡片载荷（日报卡片化） ==================== */
+
+    /** 卡片行：msg_type + 按钮文案/地址齐全 */
+    private static Map<String, Object> cardRow() {
+        return Map.of("scenario", "rdm", "title", "產研交付日報 10-20 晨報｜逾期 2",
+                "content", "**在途 2｜逾期 2**", "msg_type", "action_card",
+                "btn_title", "查看完整日報", "btn_url", "https://portal.example/#/rdm-daily-view?token=x",
+                "at_mobiles", "", "attempts", 1);
+    }
+
+    @Test
+    @DisplayName("msg_type=action_card：走卡片通道，不能退化成 markdown（否则按钮信息白存）")
+    void actionCardRowUsesCardChannel() {
+        dryRun(false);
+        doReturn(List.of(cardRow())).when(jdbcTemplate).queryForList(anyString(), ArgumentMatchers.<Object>any());
+        doReturn(DingTalkService.SendOutcome.accepted("dingtalk")).when(dingTalkService)
+                .sendActionCardSync(anyString(), anyString(), anyString(), anyString(), anyString());
+
+        dispatcher.send(TASK_ID);
+
+        verify(dingTalkService).sendActionCardSync(eq("rdm"), eq("產研交付日報 10-20 晨報｜逾期 2"),
+                eq("**在途 2｜逾期 2**"), eq("查看完整日報"),
+                eq("https://portal.example/#/rdm-daily-view?token=x"));
+        verify(dingTalkService, never()).sendMarkdownSync(any(), any(), any(), anyList(), anyBoolean());
+    }
+
+    @Test
+    @DisplayName("action_card 缺按钮：降级为同正文 markdown，不把一条日报彻底发不出去")
+    void actionCardWithoutButtonFallsBackToMarkdown() {
+        dryRun(false);
+        Map<String, Object> broken = new java.util.HashMap<>(cardRow());
+        broken.remove("btn_url");
+        doReturn(List.of(broken)).when(jdbcTemplate).queryForList(anyString(), ArgumentMatchers.<Object>any());
+        doReturn(DingTalkService.SendOutcome.accepted("dingtalk")).when(dingTalkService)
+                .sendMarkdownSync(anyString(), anyString(), anyString(), anyList(), anyBoolean());
+
+        dispatcher.send(TASK_ID);
+
+        verify(dingTalkService).sendMarkdownSync(eq("rdm"), anyString(), eq("**在途 2｜逾期 2**"),
+                anyList(), eq(false));
+        verify(dingTalkService, never()).sendActionCardSync(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("存量行无 msg_type 列值：按 markdown 发送，升级前入队的任务行为不变")
+    void legacyRowWithoutMsgTypeStaysMarkdown() {
+        dryRun(false);
+        doReturn(List.of(row(1, "正文"))).when(jdbcTemplate).queryForList(anyString(), ArgumentMatchers.<Object>any());
+        doReturn(DingTalkService.SendOutcome.accepted("dingtalk")).when(dingTalkService)
+                .sendMarkdownSync(anyString(), anyString(), anyString(), anyList(), anyBoolean());
+
+        dispatcher.send(TASK_ID);
+
+        verify(dingTalkService).sendMarkdownSync(eq("rdm"), eq("標題"), eq("正文"),
+                eq(List.of("13800000000")), eq(false));
+        verify(dingTalkService, never()).sendActionCardSync(any(), any(), any(), any(), any());
+    }
 }

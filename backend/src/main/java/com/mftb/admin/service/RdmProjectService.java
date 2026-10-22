@@ -681,7 +681,9 @@ public class RdmProjectService {
         vo.setName(fact.getProjectName());
         vo.setObjective(fact.getObjective());
         vo.setPmUserName(fact.getPmUserName());
+        vo.setPmUserEmpNo(fact.getPmUserEmpNo());
         vo.setProductOwnerUserName(fact.getProductOwnerUserName());
+        vo.setProductOwnerUserEmpNo(fact.getProductOwnerUserEmpNo());
         vo.setPlanStartDate(fact.getPlanStartDate());
         vo.setPlanEndDate(fact.getPlanEndDate());
         vo.setStatus(fact.getStatus());

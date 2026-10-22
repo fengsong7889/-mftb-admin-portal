@@ -129,6 +129,32 @@ public class DingTalkServiceImpl implements DingTalkService {
     }
 
     /**
+     * 同步发送群机器人 ActionCard（带一个整体跳转按钮）。
+     *
+     * <p>字段名是群机器人协议：正文写 {@code text}（不是 markdown）、按钮是驼峰
+     * {@code singleTitle/singleURL}。写成工作通知那套（markdown/single_title）钉钉会
+     * 当成空正文受理或直接报参数错误，两类卡片看起来一样、协议不同，不能混用。
+     *
+     * <p>ActionCard 不支持 @ 人（钉钉侧忽略 at 节点），因此不传 at，避免发出“看着 @ 了实际没 @”的假象。
+     */
+    @Override
+    public SendOutcome sendActionCardSync(String scenario, String title, String text, String singleTitle,
+                                          String singleURL) {
+        SysNotificationChannel channel = resolveChannel(scenario);
+        if (channel == null) return SendOutcome.unknown("channel_not_found");
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("msgtype", "actionCard");
+        Map<String, String> card = new LinkedHashMap<>();
+        card.put("title", title);
+        card.put("text", text);
+        card.put("singleTitle", singleTitle);
+        card.put("singleURL", singleURL);
+        card.put("btnOrientation", "0");
+        body.put("actionCard", card);
+        return doPostSync(channel, body);
+    }
+
+    /**
      * 按渠道 id 精确发送。
      *
      * <p>这里没有也不应该有“回退默认渠道”：会议纪要发错群是内部信息外泄，

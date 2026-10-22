@@ -59,6 +59,7 @@ import HelpPopover from '../../components/HelpPopover'
 import RemarkTextArea from '../../components/RemarkTextArea'
 import { buildRdmDetailPath, resolveRdmDetailBackPath } from '../../constants/menuDataSource'
 import { useAuth } from '../../contexts/AuthContext'
+import { formatEmployee } from '../../utils/employeeDisplay'
 import RequirementStageBar from './components/RequirementStageBar'
 import AcceptanceTraceCard from './components/AcceptanceTraceCard'
 import ReleasePanel from './components/ReleasePanel'
@@ -217,7 +218,7 @@ const STATUS_WAIT_HINT: Partial<Record<RdmStatus, string>> = {
   [RDM_STATUS.REJECTED]: '產品駁回了需求，可查看理由後決定是否重開',
   [RDM_STATUS.ON_HOLD]: '需求被掛起暫緩，等待確認是否繼續推進',
   [RDM_STATUS.ACCEPTED]: '已受理，等待產品經理編寫 PRD',
-  [RDM_STATUS.PRD_DESIGNING]: 'PRD 編寫中',
+  [RDM_STATUS.PRD_DESIGNING]: RDM_STATUS_LABEL[RDM_STATUS.PRD_DESIGNING],
   [RDM_STATUS.REVIEWING]: '評審中，等待評審人給出結論',
   [RDM_STATUS.REVIEW_PASSED]: '評審通過，等待排期與凍結基線',
   [RDM_STATUS.SCHEDULED]: '已排期，等待設計/開發啟動',
@@ -598,7 +599,7 @@ export default function RequirementDetail() {
        * 避免用户以为要重写一遍。
        */
       if (primaryAction?.actionCode === RDM_ACTION.PRD_START) {
-        return 'PRD 已就緒：點「開始寫 PRD」把流程推進到 PRD 設計（不會清空已寫內容），接著發起評審'
+        return 'PRD 已就緒：點「開始寫 PRD」把流程推進到 PRD 產出（不會清空已寫內容），接著發起評審'
       }
       return pendingReviews > 0
         ? 'PRD 已就緒，評審進行中：等待評審人給出結論，通過後即可提交排期'
@@ -1035,7 +1036,7 @@ export default function RequirementDetail() {
             <PriorityTag priority={detail.priority} />
           </Space>
         }
-        meta={`${formatRdmReqNo(detail.reqNo)} · 提出人 ${detail.submitterName}${detail.submitDeptName ? `（${detail.submitDeptName}）` : ''} · 提交於 ${detail.submitTime ?? '-'}`}
+        meta={`${formatRdmReqNo(detail.reqNo)}${detail.externalNo ? ` · 雲效 ${detail.externalNo}` : ''} · 提出人 ${detail.submitterName}${detail.submitDeptName ? `（${detail.submitDeptName}）` : ''} · 提交於 ${detail.submitTime ?? '-'}${detail.projectManagerName ? ` · 項目經理 ${detail.projectManagerName}` : ''}`}
         onBack={() => navigate(-1)}
         extra={
           <Space>
@@ -1754,7 +1755,7 @@ export default function RequirementDetail() {
                   loading={actionOptionsLoading}
                   options={pmOptions.map(pm => ({
                     value: pm.userId,
-                    label: `${pm.name} · 在途 ${pm.activeCount}/${pm.capacity}`,
+                    label: `${formatEmployee(pm.name, pm.empNo)} · 在途 ${pm.activeCount}/${pm.capacity}`,
                   }))}
                 />
               </div>
@@ -1763,6 +1764,10 @@ export default function RequirementDetail() {
               <div>
                 <div className="rdm-action-modal-label">承諾出 PRD 日期 *</div>
                 <DatePicker style={{ width: '100%' }} value={promisedDate} onChange={setPromisedDate} />
+                {/* 这个日期不只是字段：受理后会变成一条带负责人的 PRD 任务，管理侧靠它在甘特图上看产品进度 */}
+                <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>
+                  受理後自動生成「PRD 產出」任務（負責人＝產品經理），子任務與甘特圖均可見
+                </div>
               </div>
             )}
             {requiredFields.includes('planDate') && (

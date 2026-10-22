@@ -27,12 +27,15 @@ import {
 } from '../../api/rdm'
 import { RDM_STATUS, RDM_STATUS_COLOR, RDM_STATUS_LABEL, formatRdmReqNo, type RdmStatus } from '../../constants/rdm'
 import { PriorityTag } from './components/Tags'
+import { formatPerson } from './handlerDisplay'
+import { formatEmployee } from '../../utils/employeeDisplay'
 import './index.css'
 
 /** 选中的产品经理（确认框与提交都要用名字，避免提交后再去反查） */
 interface PickedPm {
   userId: number
   name: string
+  empNo?: string | null
   loadText: string
 }
 
@@ -137,11 +140,13 @@ export default function AssignPm() {
         </Tag>
       ),
     },
-    { title: '提出人', dataIndex: 'submitterName', key: 'submitterName', width: 110, ellipsis: true },
+    { title: '提出人', dataIndex: 'submitterName', key: 'submitterName', width: 140, ellipsis: true, render: (v: string | null | undefined, r) => formatPerson({ name: v, empNo: r.submitterEmpNo }) || '-' },
     { title: '提出部門', dataIndex: 'submitDeptName', key: 'submitDeptName', width: 180, ellipsis: true, render: (v?: string | null) => v || '-' },
     {
-      title: '現負責產品', dataIndex: 'pmName', key: 'pmName', width: 120,
-      render: (v?: string | null) => v || <span style={{ color: '#8C8C8C' }}>未分配</span>,
+      title: '現負責產品', dataIndex: 'pmName', key: 'pmName', width: 140,
+      render: (v: string | null | undefined, r) => v
+        ? formatPerson({ name: v, empNo: r.pmEmpNo })
+        : <span style={{ color: '#8C8C8C' }}>未分配</span>,
     },
   ]
 
@@ -166,13 +171,13 @@ export default function AssignPm() {
     const target = picked
     Modal.confirm({
       title: mode === 'REASSIGN'
-        ? `確認把 ${ids.length} 條需求改派給 ${target.name}？`
-        : `確認把 ${ids.length} 條需求分配給 ${target.name}？`,
+        ? `確認把 ${ids.length} 條需求改派給 ${formatEmployee(target.name, target.empNo)}？`
+        : `確認把 ${ids.length} 條需求分配給 ${formatEmployee(target.name, target.empNo)}？`,
       className: 'custom-confirm-modal',
       icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
       content: (
         <div className="confirm-info-card">
-          <div className="confirm-info-row"><span>產品經理：</span><b>{target.name}</b></div>
+          <div className="confirm-info-row"><span>產品經理：</span><b>{formatEmployee(target.name, target.empNo)}</b></div>
           <div className="confirm-info-row"><span>當前負荷：</span><b>{target.loadText}</b></div>
           <div className="confirm-info-row"><span>需求：</span><b>{rows.map(r => formatRdmReqNo(r.reqNo)).join('、') || `${ids.length} 條`}</b></div>
           <div className="confirm-info-row"><span>狀態影響：</span><b>{mode === 'REASSIGN'
@@ -298,11 +303,12 @@ export default function AssignPm() {
                   onClick={() => setPicked({
                     userId: pm.userId,
                     name: pm.name,
+                    empNo: pm.empNo,
                     loadText: `在途 ${pm.activeCount}/${pm.capacity} · ${reason}`,
                   })}
                 >
                   <div className="rdm-pm-card-head">
-                    <span className="rdm-pm-card-name">{pm.name}</span>
+                    <span className="rdm-pm-card-name">{formatEmployee(pm.name, pm.empNo)}</span>
                     {active && <Tag color="orange" icon={<CheckCircleOutlined />} style={{ margin: 0 }}>已選</Tag>}
                     {hit.length > 0 && <Tag color="green" style={{ margin: 0 }}>領域匹配</Tag>}
                   </div>

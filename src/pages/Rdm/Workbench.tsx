@@ -41,6 +41,7 @@ import dayjs from 'dayjs'
 import StatCards from '../../components/StatCards'
 import HelpPopover, { type HelpSection } from '../../components/HelpPopover'
 import { useAuth } from '../../contexts/AuthContext'
+import { formatEmployee } from '../../utils/employeeDisplay'
 import { buildRdmSubmitPath } from '../../constants/menuDataSource'
 import {
   fetchProjectPage,
@@ -427,7 +428,7 @@ export default function RdmWorkbench() {
                       </div>
                       <div className="rdm-todo-item-meta">
                         <span>{formatRdmReqNo(item.reqNo)}</span>
-                        <span>提出人：{item.submitterName}</span>
+                        <span>提出人：{formatEmployee(item.submitterName, item.submitterEmpNo) || '-'}</span>
                         {item.submitDeptName && <span>{item.submitDeptName}</span>}
                         {item.expectDate && <span>期望：{item.expectDate}</span>}
                         {/* V3：显示交付项进度 */}

@@ -30,6 +30,7 @@ import com.mftb.admin.mapper.RdmWorkTaskMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.RdmAccessGuard;
 import com.mftb.admin.service.RdmIdempotentService;
+import com.mftb.admin.service.RdmPrdTaskService;
 import com.mftb.admin.service.IdempotentKey;
 import com.mftb.admin.service.RdmScheduleService;
 import com.mftb.admin.service.RdmWorkingDayCalculator;
@@ -46,6 +47,7 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -1317,6 +1319,8 @@ public class RdmScheduleServiceImpl implements RdmScheduleService {
                 && !RdmConstants.STATUS_VERIFIED.equals(req.getStatus());
         boolean ownerMine = myId != null && myId.equals(t.getOwnerUserId());
         boolean statusOk = !"done".equals(t.getStatus()) && !"cancelled".equals(t.getStatus());
+        // PRD 任务由产品经理本人调整：完成日仍与「承诺出 PRD 日期」同源，
+        // 保存时在 doUpdateTaskPlans 内同步需求承诺日期，不再把它当只读系统任务。
         boolean canAdjust = ownerMine && statusOk && reqOpen;
         g.setCanAdjust(canAdjust);
         if (!canAdjust) {
@@ -1409,6 +1413,25 @@ public class RdmScheduleServiceImpl implements RdmScheduleService {
             if (affected == 0) {
                 throw new BusinessException(ResultCode.CONFLICT.getCode(), "排期已被他人修改，請刷新後重試");
             }
+            /*
+             * PRD 任务的完成日 = 对业务承诺的出 PRD 日期：改期必须同步需求，
+             * 否则详情页与甘特图会出现两个日期，下一次保存 PRD 还会被 ensureTask 覆盖回去。
+             * 只同步完成日：开始日是内部排期，不改变对外承诺。
+             */
+            String promiseRemark = null;
+            if (RdmPrdTaskService.TASK_TYPE_PRD.equals(task.getTaskType())
+                    && !Objects.equals(task.getPlanFinishDate(), nf)) {
+                LocalDate oldPromise = req.getPromisedPrdDate();
+                requirementMapper.update(null, new LambdaUpdateWrapper<RdmRequirement>()
+                        .eq(RdmRequirement::getId, req.getId())
+                        .set(RdmRequirement::getPromisedPrdDate, nf)
+                        .set(RdmRequirement::getUpdatedBy, operatorResolver.operatorSignature(current))
+                        .set(RdmRequirement::getUpdatedAt, LocalDateTime.now()));
+                promiseRemark = "同步需求承諾出 PRD 日期 " + DateTimeUtils.format(oldPromise)
+                        + " → " + DateTimeUtils.format(nf);
+                log.info("RDM PRD 任務改期同步承諾日期: taskId={}, reqId={}, {} -> {}",
+                        task.getId(), req.getId(), oldPromise, nf);
+            }
             RdmTaskPlanLog audit = new RdmTaskPlanLog();
             audit.setTaskId(task.getId());
             audit.setTaskNo(task.getTaskNo());
@@ -1422,6 +1445,7 @@ public class RdmScheduleServiceImpl implements RdmScheduleService {
             audit.setOldVersion(expected);
             audit.setNewVersion(expected + 1);
             audit.setClientRequestId(RdmIdempotentService.normalizeClientRequestId(batch.getClientRequestId()));
+            audit.setRemark(promiseRemark);
             taskPlanLogMapper.insert(audit);
             result.setUpdated(result.getUpdated() + 1);
             result.getTasks().add(toGanttTask(taskMapper.selectById(task.getId()), req, current.getId()));

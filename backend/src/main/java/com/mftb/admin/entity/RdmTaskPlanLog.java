@@ -48,6 +48,9 @@ public class RdmTaskPlanLog {
     /** 幂等请求标识（与 rdm_idempotent_log 对应，便于对账重试） */
     private String clientRequestId;
 
+    /** 变更说明：PRD 任务改期同步需求「承诺出 PRD 日期」时标注，避免只看到日期变化看不出承诺变更 */
+    private String remark;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 }

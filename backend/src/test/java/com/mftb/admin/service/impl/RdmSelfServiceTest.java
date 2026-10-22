@@ -115,7 +115,8 @@ class RdmSelfServiceTest {
                 mock(com.mftb.admin.service.RdmFlowVersionGuard.class),
                 mock(com.mftb.admin.service.RdmRequirementStructureService.class),
                 mock(com.mftb.admin.service.RdmDeliveryItemService.class),
-                mock(com.mftb.admin.service.RdmAllowedActionsService.class));
+                mock(com.mftb.admin.service.RdmAllowedActionsService.class),
+                mock(com.mftb.admin.service.RdmPrdTaskService.class));
 
         // 默认裁决：需审批、走上级主管；不预置时 service 会拿到 null 裁决并NPE，测试要的是真实分支
         when(policyService.decide(any(), any(), any())).thenReturn(approveDecision());

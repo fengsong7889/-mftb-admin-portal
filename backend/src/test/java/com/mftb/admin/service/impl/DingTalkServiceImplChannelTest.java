@@ -157,4 +157,30 @@ class DingTalkServiceImplChannelTest {
         assertFalse(outcome.channelAccepted());
         assertEquals("130101", outcome.errcode());
     }
+
+    @Test
+    @DisplayName("群机器人卡片：正文键是 text、按钮是驼峰 singleTitle/singleURL（与工作通知协议不同）")
+    @SuppressWarnings("unchecked")
+    void actionCardUsesRobotProtocol() {
+        when(channelService.findByScenario("rdm")).thenReturn(channel(3L, "研發群", "dingtalk", 1, SELECTED_HOOK));
+        when(restTemplate.postForObject(anyString(), any(), eq(Map.class)))
+                .thenReturn(Map.of("errcode", 0, "errmsg", "ok"));
+
+        SendOutcome outcome = service.sendActionCardSync("rdm", "產研交付日報 10-20 晨報｜逾期 2",
+                "**在途 2｜逾期 2**", "查看完整日報", "https://portal.example/#/rdm-daily-view?token=x");
+
+        assertTrue(outcome.channelAccepted());
+        ArgumentCaptor<Map<String, Object>> body = ArgumentCaptor.forClass(Map.class);
+        verify(restTemplate).postForObject(anyString(), body.capture(), eq(Map.class));
+        assertEquals("actionCard", body.getValue().get("msgtype"));
+        Map<String, Object> card = (Map<String, Object>) body.getValue().get("actionCard");
+        assertEquals("**在途 2｜逾期 2**", card.get("text"));
+        assertEquals("查看完整日報", card.get("singleTitle"));
+        assertEquals("https://portal.example/#/rdm-daily-view?token=x", card.get("singleURL"));
+        // 工作通知的下划线字段写进群机器人会被当成参数错误，必须锁住
+        assertFalse(card.containsKey("single_title"));
+        assertFalse(card.containsKey("markdown"));
+        // ActionCard 不支持 @ 人，不得发出一个看着 @ 了实际没 @ 的 at 节点
+        assertFalse(body.getValue().containsKey("at"));
+    }
 }

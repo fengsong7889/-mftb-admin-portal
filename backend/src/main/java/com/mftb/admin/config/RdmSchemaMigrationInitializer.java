@@ -538,6 +538,133 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
     };
 
     /**
+     * v3.27：产品经理 PRD 任务 + 节点改名。
+     *
+     * <p><b>为何需要这一版</b>：接受需求时必须承诺出 PRD 日期，但承诺只存在
+     * {@code rdm_requirement.promised_prd_date}；子任务页签与甘特图只读 {@code rdm_work_task}，
+     * 于是「产品经理什么时候出 PRD」在任务视图里完全不可见，管理者无法据此催办。
+     *
+     * <p><b>本版做三件事</b>：① 注册内置任务类型 {@code prd}（PRD 產出）；
+     * ② 状态「PRD設計中」改名「PRD 產出中」，避免与 UI 设计混淆；
+     * ③ 为存量在途且已承诺 PRD 日期的需求补建 PRD 任务（编号 RTPRD+需求ID，一次性补建专用）。
+     *
+     * <p><b>幂等</b>：INSERT IGNORE + 条件 UPDATE + NOT EXISTS，可安全重放；无 DROP / 无删列。
+     */
+    private static final String VERSION_PRD_TASK = "rdm:schema:v3.27";
+    private static final String PRD_TASK_SCRIPT = "280_rdm_prd_task.sql";
+
+    /**
+     * PRD 节点结果口径统一：編寫 → 產出。
+     *
+     * <p><b>为何单独一版</b>：v3.27 已在部分开发库执行过（当时叫「PRD 編寫」），
+     * 修改已执行迁移的脚本不会重跑；用新版本键把存量状态标签、任务类型名、
+     * 任务标题与 AI 术语统一到「PRD 產出」，避免新旧口径并存。
+     *
+     * <p><b>幂等</b>：只匹配旧默认值，管理员自定义的名称不被覆盖；可安全重放。
+     */
+    private static final String VERSION_PRD_OUTPUT_NAMING = "rdm:prd-output-naming:v1.0";
+
+    /**
+     * v3.28：钉钉日报消息卡片化。
+     *
+     * <p><b>为何要动投递队列表</b>：卡片消息（群机器人 actionCard / 工作通知 action_card）不是
+     * 正文的子集——它需要<b>独立的消息类型</b>与<b>按钮文案 + 跳转地址</b>。旧表只有 title/content，
+     * dispatcher 拿到一行正文无从判断该发 markdown 还是卡片；按钮信息若拼进正文，重试时还原不出、
+     * 还会把按钮文字混进正文渲染。
+     *
+     * <p><b>为何默认 'markdown'</b>：存量待发行与其它业务事件（需求提醒、会议纪要等）走的都是
+     * markdown 通道，默认值让它们的行为一字不变；只有日报在写任务时显式声明 action_card。
+     *
+     * <p><b>幂等</b>：ADD COLUMN 不可重放，逐列先查再加 + 后置校验；无 DROP。
+     */
+    private static final String VERSION_NOTIFY_CARD = "rdm:schema:v3.28";
+    private static final String NOTIFY_CARD_SCRIPT = "281_rdm_daily_report_card.sql";
+    /** v3.28 投递队列表补列 {表, 列, DDL}：ADD COLUMN 不可重放，先查再加 */
+    private static final String[][] NOTIFY_CARD_COLUMNS = {
+            {"rdm_notify_log", "msg_type",
+                    "ALTER TABLE rdm_notify_log ADD COLUMN msg_type VARCHAR(16) NOT NULL DEFAULT 'markdown' "
+                            + "COMMENT '投递消息类型: markdown/action_card（卡片带一个跳转按钮）' AFTER content"},
+            {"rdm_notify_log", "btn_title",
+                    "ALTER TABLE rdm_notify_log ADD COLUMN btn_title VARCHAR(32) DEFAULT NULL "
+                            + "COMMENT '卡片按钮文案（msg_type=action_card 时必填）' AFTER msg_type"},
+            {"rdm_notify_log", "btn_url",
+                    "ALTER TABLE rdm_notify_log ADD COLUMN btn_url VARCHAR(512) DEFAULT NULL "
+                            + "COMMENT '卡片按钮跳转地址（msg_type=action_card 时必填）' AFTER btn_title"},
+    };
+
+    /**
+     * v3.30：无异常日降噪策略。
+     *
+     * <p><b>为何要这一版</b>：日报每天都发，但大多数日子「无逾期、无到期」，正文只是把「全部正常」
+     * 写成长摘要；久了读者会形成「日报不用看」的习惯，真正出事那天反而被忽略。
+     * 降噪把「无异常日」压成一句结论（brief）或干脆不发（skip），异常日不变。
+     *
+     * <p><b>为何放在配置表而不是规则表</b>：降噪是全局阅读习惯问题（全公司统一口径），
+     * 不是某个项目组的局部偏好；规则已经负责「发什么范围」，再叠加降噪策略会让
+     * 「为什么这条规则没发」变得难以解释。
+     *
+     * <p>默认 {@code brief}：不会让人以为系统坏了（仍有一条），又比完整摘要安静。
+     * 只 ADD COLUMN，旧代码忽略新列；回滚只需把值改回 {@code full}。
+     */
+    private static final String VERSION_QUIET_POLICY = "rdm:schema:v3.30";
+    private static final String QUIET_POLICY_SCRIPT = "283_rdm_daily_report_quiet.sql";
+    private static final String[][] QUIET_POLICY_COLUMNS = {
+            {"rdm_daily_report_config", "quiet_policy",
+                    "ALTER TABLE rdm_daily_report_config ADD COLUMN quiet_policy VARCHAR(16) NOT NULL DEFAULT 'brief' "
+                            + "COMMENT '无异常日降噪策略: full=照常发摘要 / brief=只发一句结论 / skip=不发（仍落快照）' "
+                            + "AFTER message_field_options"},
+    };
+
+    /**
+     * v3.31：甘特图进度直改 + PRD 排期承诺同步的审计结构。
+     *
+     * <p><b>为何要这一版</b>：甘特图从「只改计划日期」扩到「直接改进度」后，
+     * 进度是绩效与验收的原始事实，必须能追溯「谁在什么时候把哪条任务从多少改到多少」；
+     * 同时 PRD 任务改完成日会同步需求的「承诺出 PRD 日期」，也要能看出这次改期
+     * 顺带改了对外承诺。
+     *
+     * <p><b>幂等</b>：只 ADD COLUMN + CREATE TABLE IF NOT EXISTS；列先查 INFORMATION_SCHEMA。
+     * 无 DROP / 无删列，旧代码忽略新列与新表。
+     */
+    private static final String VERSION_TASK_PROGRESS_AUDIT = "rdm:schema:v3.31";
+    private static final String TASK_PROGRESS_AUDIT_SCRIPT = "284_rdm_task_progress_audit.sql";
+
+    /**
+     * v3.29：存量需求导入（云效迁移）结构。
+     *
+     * <p><b>为何需要 external_no</b>：云效编号只用于回查原始需求，不能当正式需求号
+     * （正式号 XQ 由 BizSeqService 发号、全局唯一且被前端按编号规则格式化）。外部编号单独成列，
+     * 既能反查云效，又能作为导入幂等键：同一编号重复导入直接跳过，不会批量建出重复需求。
+     *
+     * <p><b>为何唯一键是 (external_source, external_no)</b>：将来若再接其他来源，
+     * 不同来源的编号空间可能重叠；只用 external_no 建唯一键会误伤。
+     *
+     * <p><b>为何项目经理建在需求级</b>：需求可以只绑迭代不绑项目，此时项目级 PM 取不到人；
+     * 需求级快照让「没绑项目的需求也有明确负责人」，绑项目时由导入逻辑继承项目 PM 兜底。
+     *
+     * <p><b>幂等</b>：ADD COLUMN / CREATE INDEX 都不可重放，逐列先查 INFORMATION_SCHEMA、
+     * 索引先查 STATISTICS；无 DROP。
+     */
+    private static final String VERSION_REQUIREMENT_IMPORT = "rdm:schema:v3.29";
+    private static final String REQUIREMENT_IMPORT_SCRIPT = "282_rdm_requirement_import.sql";
+    private static final String REQUIREMENT_IMPORT_UNIQUE = "uk_rdm_req_external";
+    /** v3.29 需求表补列 {表, 列, DDL}：ADD COLUMN 不可重放，先查再加 */
+    private static final String[][] REQUIREMENT_IMPORT_COLUMNS = {
+            {"rdm_requirement", "external_no",
+                    "ALTER TABLE rdm_requirement ADD COLUMN external_no VARCHAR(64) DEFAULT NULL "
+                            + "COMMENT '外部来源编号（云效工作项编号），仅记录用于回查' AFTER version_no"},
+            {"rdm_requirement", "external_source",
+                    "ALTER TABLE rdm_requirement ADD COLUMN external_source VARCHAR(32) DEFAULT NULL "
+                            + "COMMENT '外部来源: YUNXIAO' AFTER external_no"},
+            {"rdm_requirement", "project_manager_user_id",
+                    "ALTER TABLE rdm_requirement ADD COLUMN project_manager_user_id BIGINT DEFAULT NULL "
+                            + "COMMENT '项目经理ID（需求级，未绑项目时使用）' AFTER assignee_pm_name"},
+            {"rdm_requirement", "project_manager_user_name",
+                    "ALTER TABLE rdm_requirement ADD COLUMN project_manager_user_name VARCHAR(64) DEFAULT NULL "
+                            + "COMMENT '项目经理姓名快照' AFTER project_manager_user_id"},
+    };
+
+    /**
      * v3.17：rdm_status_def.stage 由旧 6 段细化为 9 段，与前端 RDM_STATUS_STAGE 同源。
      * <p>详情页状态条与需求看板列已改 9 段，但本表仍是旧值，导致看板「各階段平均停留」
      * 按旧口径聚合、需求配置页显示旧阶段名 —— 同一需求两处说法分裂，本迁移收口。
@@ -835,6 +962,15 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
                 this::doDailyReportRuleProjectIdsMigrate, this::verifyDailyReportRuleProjectIds);
         versionTracker.applyOnce(VERSION_DAILY_REPORT_RECEIVERS,
                 this::doDailyReportReceiversMigrate, this::verifyDailyReportReceiversMigrate);
+        versionTracker.applyOnce(VERSION_PRD_TASK, this::doPrdTaskMigrate, this::verifyPrdTaskMigrate);
+        versionTracker.applyOnce(VERSION_NOTIFY_CARD, this::doNotifyCardMigrate, this::verifyNotifyCardMigrate);
+        versionTracker.applyOnce(VERSION_REQUIREMENT_IMPORT,
+                this::doRequirementImportMigrate, this::verifyRequirementImportMigrate);
+        versionTracker.applyOnce(VERSION_QUIET_POLICY, this::doQuietPolicyMigrate, this::verifyQuietPolicyMigrate);
+        versionTracker.applyOnce(VERSION_PRD_OUTPUT_NAMING,
+                this::doPrdOutputNamingMigrate, this::verifyPrdOutputNamingMigrate);
+        versionTracker.applyOnce(VERSION_TASK_PROGRESS_AUDIT,
+                this::doTaskProgressAuditMigrate, this::verifyTaskProgressAuditMigrate);
     }
 
     /**
@@ -1666,6 +1802,222 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
             if (!columnExists(column[0], column[1])) {
                 throw new IllegalStateException("RDM v3.26 核验失败：" + column[0] + "." + column[1] + " 列缺失");
             }
+        }
+    }
+
+    /** v3.27：注册 prd 任务类型、改节点名、补建存量 PRD 任务（脚本内部幂等） */
+    private void doPrdTaskMigrate() {
+        int executed = executeScript(PRD_TASK_SCRIPT);
+        log.info("RDM v3.27 PRD 任务迁移已执行: {} 条语句（{}）", executed, PRD_TASK_SCRIPT);
+        renameAiGlossaryTerm();
+    }
+
+    /**
+     * 同步 AI 术语表中的旧节点名。
+     * <p>AI 术语初始化器可能晚于本迁移运行，且 INSERT IGNORE 不会改旧行；
+     * 这里先探测表存在再定向改名，目标名已存在时跳过（避免撞唯一键）。
+     */
+    private void renameAiGlossaryTerm() {
+        Integer exists = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.TABLES "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ai_glossary'",
+                Integer.class);
+        if (exists == null || exists == 0) {
+            return;
+        }
+        int updated = jdbcTemplate.update(
+                "UPDATE ai_glossary SET term = 'PRD 產出中' WHERE domain = 'rdm' "
+                        + "AND term IN ('PRD設計中', 'PRD 編寫中') "
+                        + "AND NOT EXISTS (SELECT 1 FROM (SELECT id FROM ai_glossary "
+                        + "WHERE domain = 'rdm' AND term = 'PRD 產出中') existing)");
+        if (updated > 0) {
+            log.info("RDM v3.27 AI 術語已同步改名: {} 條", updated);
+            return;
+        }
+        // AI 初始化器可能已先插入新术语（两个术语并存）：把旧术语停用，避免 AI 检索到两套口径
+        int deactivated = jdbcTemplate.update(
+                "UPDATE ai_glossary SET status = 'inactive' WHERE domain = 'rdm' "
+                        + "AND term IN ('PRD設計中', 'PRD 編寫中') AND status = 'active' "
+                        + "AND EXISTS (SELECT 1 FROM (SELECT id FROM ai_glossary "
+                        + "WHERE domain = 'rdm' AND term = 'PRD 產出中') existing)");
+        if (deactivated > 0) {
+            log.info("RDM v3.27 AI 舊術語已停用: {} 條", deactivated);
+        }
+    }
+
+    /**
+     * v3.27 后置校验：类型行必须存在且启用；状态标签已改；在途已承诺需求不得再有缺失的 PRD 任务。
+     * <p>不校验等于把「脚本没执行成功」记成迁移成功，上线后任务视图仍然看不到产品进度。
+     */
+    private void verifyPrdTaskMigrate() {
+        Integer typeReady = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM rdm_task_type_config WHERE code = 'prd' AND enabled = 1 AND deleted = 0",
+                Integer.class);
+        if (typeReady == null || typeReady == 0) {
+            throw new IllegalStateException("RDM v3.27 核验失败：任务类型 prd 未注册或未启用");
+        }
+        Integer missing = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM rdm_requirement r WHERE r.deleted = 0 "
+                        + "AND r.promised_prd_date IS NOT NULL AND r.assignee_pm_user_id IS NOT NULL "
+                        + "AND r.status NOT IN ('released', 'verified', 'closed') "
+                        + "AND NOT EXISTS (SELECT 1 FROM rdm_work_task t WHERE t.req_id = r.id "
+                        + "AND t.task_type = 'prd' AND t.deleted = 0)",
+                Integer.class);
+        if (missing != null && missing > 0) {
+            throw new IllegalStateException("RDM v3.27 核验失败：仍有 " + missing + " 条在途需求缺少 PRD 任务");
+        }
+    }
+
+    /**
+     * PRD 结果口径归一：把 v3.27 可能已写入的「PRD 編寫」统一到「PRD 產出」。
+     * <p>只匹配旧默认值，管理员自定义名称不被覆盖；任务标题/说明也只改旧文案。
+     */
+    private void doPrdOutputNamingMigrate() {
+        int status = jdbcTemplate.update(
+                "UPDATE rdm_status_def SET label = 'PRD 產出中' WHERE code = 'prd_designing' "
+                        + "AND label IN ('PRD設計中', 'PRD 設計中', 'PRD 編寫中')");
+        int type = jdbcTemplate.update(
+                "UPDATE rdm_task_type_config SET label = 'PRD 產出' WHERE code = 'prd' AND label = 'PRD 編寫'");
+        int task = jdbcTemplate.update(
+                "UPDATE rdm_work_task SET title = '產出 PRD 並提交評審', "
+                        + "content = REPLACE(content, '編寫 PRD', '產出 PRD') "
+                        + "WHERE task_type = 'prd' AND deleted = 0 "
+                        + "AND (title = '編寫 PRD 並提交評審' OR content LIKE '%編寫 PRD%')");
+        log.info("RDM PRD 结果口径归一: 状态 {} 条、任务类型 {} 条、任务 {} 条", status, type, task);
+        renameAiGlossaryTerm();
+    }
+
+    /** 后置校验：旧默认文案不得残留（自定义名称不在此列） */
+    private void verifyPrdOutputNamingMigrate() {
+        Integer oldStatus = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM rdm_status_def WHERE code = 'prd_designing' "
+                        + "AND label IN ('PRD設計中', 'PRD 設計中', 'PRD 編寫中')", Integer.class);
+        if (oldStatus != null && oldStatus > 0) {
+            throw new IllegalStateException("RDM PRD 结果口径未归一：状态标签仍为旧值");
+        }
+        Integer oldTask = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM rdm_work_task WHERE task_type = 'prd' AND deleted = 0 "
+                        + "AND title = '編寫 PRD 並提交評審'", Integer.class);
+        if (oldTask != null && oldTask > 0) {
+            throw new IllegalStateException("RDM PRD 结果口径未归一：仍有 " + oldTask + " 条任务使用旧标题");
+        }
+    }
+
+    /**
+     * v3.31：排期审计补「变更说明」列 + 新建进度变更审计表。
+     * <p>不吞异常：缺列/缺表必须抛出且不记版本，下次启动重试。
+     */
+    private void doTaskProgressAuditMigrate() {
+        if (!columnExists("rdm_task_plan_log", "remark")) {
+            jdbcTemplate.execute("ALTER TABLE rdm_task_plan_log ADD COLUMN remark VARCHAR(255) DEFAULT NULL "
+                    + "COMMENT '变更说明(如:同步需求承诺出PRD日期)' AFTER client_request_id");
+            log.info("已添加 rdm_task_plan_log.remark 列");
+        }
+        jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS rdm_task_progress_log ("
+                + "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID', "
+                + "task_id BIGINT NOT NULL COMMENT '任务ID rdm_work_task.id', "
+                + "task_no VARCHAR(32) DEFAULT NULL COMMENT '任务编号快照', "
+                + "req_id BIGINT NOT NULL COMMENT '需求ID(冗余便于追溯)', "
+                + "user_id BIGINT NOT NULL COMMENT '操作人 sys_user.id', "
+                + "user_name VARCHAR(64) DEFAULT NULL COMMENT '操作人姓名快照', "
+                + "old_progress INT DEFAULT NULL COMMENT '变更前进度', "
+                + "new_progress INT DEFAULT NULL COMMENT '变更后进度', "
+                + "old_status VARCHAR(32) DEFAULT NULL COMMENT '变更前状态', "
+                + "new_status VARCHAR(32) DEFAULT NULL COMMENT '变更后状态', "
+                + "remark VARCHAR(1000) DEFAULT NULL COMMENT '说明/完成交付说明', "
+                + "client_request_id VARCHAR(64) DEFAULT NULL COMMENT '客户端请求标识', "
+                + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '变更时间', "
+                + "KEY idx_tplg_task (task_id), KEY idx_tplg_req (req_id)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='RDM任务进度变更审计(只追加)'");
+        log.info("RDM v3.31 进度审计迁移完成（{}）：rdm_task_progress_log 与排期说明列就绪",
+                TASK_PROGRESS_AUDIT_SCRIPT);
+    }
+
+    /** v3.31 后置校验：排期说明列 + 进度审计表齐备，缺任一项不记版本 */
+    private void verifyTaskProgressAuditMigrate() {
+        if (!columnExists("rdm_task_plan_log", "remark")) {
+            throw new IllegalStateException("RDM v3.31 核验失败：rdm_task_plan_log.remark 列缺失");
+        }
+        requireTables(new String[]{"rdm_task_progress_log"});
+    }
+
+    /** v3.28：投递队列补消息类型与卡片按钮列（281 脚本仅作参照文档，不进镜像） */
+    private void doNotifyCardMigrate() {
+        for (String[] column : NOTIFY_CARD_COLUMNS) {
+            if (!columnExists(column[0], column[1])) {
+                jdbcTemplate.execute(column[2]);
+                log.info("已添加 {}.{} 列", column[0], column[1]);
+            }
+        }
+        log.info("RDM v3.28 日报卡片化迁移已执行（{}）", NOTIFY_CARD_SCRIPT);
+    }
+
+    /**
+     * v3.28 后置校验：三列缺一都不能记成功。
+     * <p>为何是硬条件：dispatcher 按 {@code msg_type} 选发送方法、按 {@code btn_title/btn_url}
+     * 组装按钮；缺列时要么整条通知发送失败，要么退化成无按钮卡片（读者点不进去）。
+     */
+    private void verifyNotifyCardMigrate() {
+        for (String[] column : NOTIFY_CARD_COLUMNS) {
+            if (!columnExists(column[0], column[1])) {
+                throw new IllegalStateException("RDM v3.28 核验失败：" + column[0] + "." + column[1] + " 列缺失");
+            }
+        }
+    }
+
+    /** v3.30：配置表补无异常日降噪策略列（283 脚本仅作参照文档，不进镜像） */
+    private void doQuietPolicyMigrate() {
+        for (String[] column : QUIET_POLICY_COLUMNS) {
+            if (!columnExists(column[0], column[1])) {
+                jdbcTemplate.execute(column[2]);
+                log.info("已添加 {}.{} 列", column[0], column[1]);
+            }
+        }
+        log.info("RDM v3.30 无异常降噪策略迁移已执行（{}）", QUIET_POLICY_SCRIPT);
+    }
+
+    /** v3.30 后置校验：缺列会让配置读取报错，且降噪策略会静默退回默认值而无法察觉 */
+    private void verifyQuietPolicyMigrate() {
+        for (String[] column : QUIET_POLICY_COLUMNS) {
+            if (!columnExists(column[0], column[1])) {
+                throw new IllegalStateException("RDM v3.30 核验失败：" + column[0] + "." + column[1] + " 列缺失");
+            }
+        }
+    }
+
+    /**
+     * v3.29：存量需求导入结构（外部编号 + 需求级项目经理）与导入幂等唯一索引。
+     * <p>索引必须真的存在：导入服务靠它挡住并发重复写入，只靠应用层先查后插
+     * 在两次点击/多副本场景下仍会建出重复需求。
+     */
+    private void doRequirementImportMigrate() {
+        for (String[] column : REQUIREMENT_IMPORT_COLUMNS) {
+            if (!columnExists(column[0], column[1])) {
+                jdbcTemplate.execute(column[2]);
+                log.info("已添加 {}.{} 列", column[0], column[1]);
+            }
+        }
+        if (!indexExists("rdm_requirement", REQUIREMENT_IMPORT_UNIQUE)) {
+            jdbcTemplate.execute("CREATE UNIQUE INDEX " + REQUIREMENT_IMPORT_UNIQUE
+                    + " ON rdm_requirement (external_source, external_no)");
+            log.info("已创建 rdm_requirement 外部编号唯一索引 {}", REQUIREMENT_IMPORT_UNIQUE);
+        }
+        log.info("RDM v3.29 存量需求导入结构迁移已执行（{}）", REQUIREMENT_IMPORT_SCRIPT);
+    }
+
+    /**
+     * v3.29 后置校验：四列与唯一索引缺一都不能记成功。
+     * <p>为何是硬条件：缺列时导入直接 bad SQL grammar；缺索引时重复导入会建出重复需求，
+     * 且这两种情况只会在真正点「确认导入」时才暴露，必须启动期就拦住。
+     */
+    private void verifyRequirementImportMigrate() {
+        for (String[] column : REQUIREMENT_IMPORT_COLUMNS) {
+            if (!columnExists(column[0], column[1])) {
+                throw new IllegalStateException("RDM v3.29 核验失败：" + column[0] + "." + column[1] + " 列缺失");
+            }
+        }
+        if (!indexExists("rdm_requirement", REQUIREMENT_IMPORT_UNIQUE)) {
+            throw new IllegalStateException("RDM v3.29 核验失败：唯一索引 " + REQUIREMENT_IMPORT_UNIQUE + " 缺失");
         }
     }
 

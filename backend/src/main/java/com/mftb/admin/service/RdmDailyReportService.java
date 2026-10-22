@@ -132,6 +132,22 @@ public class RdmDailyReportService {
     private static final String MESSAGE_MODE_TEMPLATE = "template";
     private static final Set<String> MESSAGE_MODES = Set.of(MESSAGE_MODE_FIXED, MESSAGE_MODE_TEMPLATE);
 
+    /** 无异常日降噪：照常发完整摘要（改造前行为，回滚用） */
+    private static final String QUIET_FULL = "full";
+    /** 无异常日降噪：只发一句结论（默认） */
+    private static final String QUIET_BRIEF = "brief";
+    /** 无异常日降噪：当日不发（仍落快照，打开日报页可看） */
+    private static final String QUIET_SKIP = "skip";
+    private static final Set<String> QUIET_POLICIES = Set.of(QUIET_FULL, QUIET_BRIEF, QUIET_SKIP);
+    private static final String DEFAULT_QUIET_POLICY = QUIET_BRIEF;
+
+    /**
+     * 卡片按钮文案（钉钉限制 20 字符内）。
+     * <p>群报与个人用不同文案：同一个「查看完整日報」发给个人时，读者会以为点进了全公司报表。
+     */
+    private static final String CARD_BTN_GROUP = "查看完整日報";
+    private static final String CARD_BTN_PERSONAL = "查看我的日報";
+
     /** 手动触发节流窗口：同一档位+项目 1 分钟内只允许真发一次 */
     private static final long MANUAL_THROTTLE_MS = 60_000L;
     /**
@@ -233,14 +249,16 @@ public class RdmDailyReportService {
         MessageFieldOptions fields = form.getMessageFields() == null
                 ? current.getMessageFields() : form.getMessageFields();
         String fieldsJson = writeMessageFields(fields);
+        // 降噪策略不传时沿用库中现值（与展示参数同理）；传了必须命中白名单，不接受静默回退
+        String quietPolicy = normalizeQuietPolicy(form.getQuietPolicy(), current.getQuietPolicy());
 
         jdbc.update("INSERT INTO rdm_daily_report_config "
                         + "(config_slot, enabled, morning_time, evening_time, group_enabled, personal_enabled, "
                         + " receiver_roles_json, extra_receiver_user_ids_json, exclude_receiver_user_ids_json, "
                         + " morning_template_key, evening_template_key, personal_template_key, "
                         + " board_link_valid_days, board_show_requirements, board_show_owners, board_show_unassigned, "
-                        + " message_mode, message_field_options, updated_by, deleted) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0) "
+                        + " message_mode, message_field_options, quiet_policy, updated_by, deleted) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0) "
                         + "ON DUPLICATE KEY UPDATE enabled = VALUES(enabled), morning_time = VALUES(morning_time), "
                         + " evening_time = VALUES(evening_time), group_enabled = VALUES(group_enabled), "
                         + " personal_enabled = VALUES(personal_enabled), "
@@ -256,15 +274,16 @@ public class RdmDailyReportService {
                         + " board_show_unassigned = VALUES(board_show_unassigned), "
                         + " message_mode = VALUES(message_mode), "
                         + " message_field_options = VALUES(message_field_options), "
+                        + " quiet_policy = VALUES(quiet_policy), "
                         + " updated_by = VALUES(updated_by), deleted = 0, updated_at = NOW()",
                 CONFIG_SLOT, bool(form.getEnabled(), true), morning, evening,
                 bool(form.getGroupEnabled(), true), bool(form.getPersonalEnabled(), true),
                 writeStringList(roles), writeLongList(extra), writeLongList(exclude),
                 morningKey, eveningKey, personalKey, validDays, showRequirements, showOwners, showUnassigned,
-                messageMode, fieldsJson, operator);
-        log.info("日报推送配置已更新: 晨报={}, 晚报={}, 群报={}, 个人={}, 收件角色={}, 追加={}人, 排除={}人, 看板链接={}天, 消息模式={}, operator={}",
+                messageMode, fieldsJson, quietPolicy, operator);
+        log.info("日报推送配置已更新: 晨报={}, 晚报={}, 群报={}, 个人={}, 收件角色={}, 追加={}人, 排除={}人, 看板链接={}天, 消息模式={}, 降噪={}, operator={}",
                 morning, evening, form.getGroupEnabled(), form.getPersonalEnabled(), roles,
-                extra.size(), exclude.size(), validDays, messageMode, operator);
+                extra.size(), exclude.size(), validDays, messageMode, quietPolicy, operator);
         return loadConfig();
     }
 
@@ -1639,8 +1658,18 @@ public class RdmDailyReportService {
         result.setDetailUrl(detailUrl);
 
         boolean eveningSlot = RdmDailyReportTemplates.TYPE_EVENING.equals(slot);
+        // 降噪只作用于定时推送：手动触发是「我现在就要看」，预览更不能被降噪吞掉内容。
+        // 三个条件里任何一个为真都保留完整摘要：manual / dryRun / 策略为 full 或当日有异常。
+        String quietPolicy = normalizeQuietPolicy(cfg.getQuietPolicy(), DEFAULT_QUIET_POLICY);
+        boolean quietGate = !manual && !effectiveDryRun && isQuietGroupDay(snapshot, eveningSlot);
+        boolean quietSkip = quietGate && QUIET_SKIP.equals(quietPolicy);
+        boolean quietBrief = quietGate && !QUIET_FULL.equals(quietPolicy);
+
         Rendered group;
-        if (isFixedMode(cfg)) {
+        if (quietBrief) {
+            // brief 与 skip 都渲染极简结论：skip 也要落快照，快照内容必须与「今日无异常」一致
+            group = renderer.renderGroupQuiet(snapshot, eveningSlot, detailUrl);
+        } else if (isFixedMode(cfg)) {
             // 固定框架模式：层级写死在渲染器，模板文本不参与渲染，因此不查模板（也不允许“改模板”改变框架）
             group = renderer.renderGroupFixed(snapshot, detailUrl, eveningSlot, cfg.getMessageFields());
         } else {
@@ -1656,25 +1685,38 @@ public class RdmDailyReportService {
         result.setGroupContent(group.content());
 
         boolean groupDispatched = false;
-        if (Boolean.TRUE.equals(cfg.getGroupEnabled()) && !effectiveDryRun) {
+        if (Boolean.TRUE.equals(cfg.getGroupEnabled()) && !effectiveDryRun && !quietSkip) {
             // 群报走 outbox：RdmNotifyService 登记后由 RdmNotifyDispatcher 抢占发送并退避重试
-            notifyService.notifyUsers(RdmConstants.EVENT_DAILY_REPORT, null, List.of(), group.title(), group.content());
+            if (useCard(cfg, detailUrl)) {
+                notifyService.notifyActionCard(RdmConstants.EVENT_DAILY_REPORT, group.title(), group.content(),
+                        CARD_BTN_GROUP, detailUrl);
+            } else {
+                // 模板模式或链接不是绝对地址（钉钉不认站内相对路径，按钮会点不动）时保持 markdown
+                notifyService.notifyUsers(RdmConstants.EVENT_DAILY_REPORT, null, List.of(),
+                        group.title(), group.content());
+            }
             groupDispatched = true;
         }
         result.setGroupDispatched(groupDispatched);
 
-        int[] personal = pushPersonal(snapshot, cfg, slot, storedType, baseUrl, detailUrl,
-                target.personalTemplateKey(), effectiveDryRun);
+        int[] personal = quietSkip ? new int[]{0, 0}
+                : pushPersonal(snapshot, cfg, slot, storedType, baseUrl, detailUrl,
+                target.personalTemplateKey(), effectiveDryRun, quietBrief);
         result.setPersonalSent(personal[0]);
         result.setPersonalSkipped(personal[1]);
 
         if (!effectiveDryRun) {
             persistSnapshot(snapshot, group, personal[0], manual, operator, scopeKey, target);
         }
-        result.setMessage(buildMessage(snapshot, groupDispatched, personal[0], personal[1], effectiveDryRun));
-        log.info("日报推送完成: date={}, scope={}, slot={}, storedType={}, manual={}, 项目={}, 群报={}, 个人发送={}, 个人跳过={}, dryRun={}",
+        if (quietSkip) {
+            // 跳发不是失败：快照已落库，详情页能打开，消息中心也能解释「今天为什么没发」
+            result.setMessage("今日無異常，已按降噪策略（skip）跳過發送；日報已生成，可手動打開查看");
+        } else {
+            result.setMessage(buildMessage(snapshot, groupDispatched, personal[0], personal[1], effectiveDryRun));
+        }
+        log.info("日报推送完成: date={}, scope={}, slot={}, storedType={}, manual={}, 项目={}, 群报={}, 个人发送={}, 个人跳过={}, dryRun={}, quiet={}",
                 day, scopeKey, slot, storedType, manual, snapshot.getSummary().getProjectCount(), groupDispatched,
-                personal[0], personal[1], effectiveDryRun);
+                personal[0], personal[1], effectiveDryRun, quietSkip ? "skip" : quietBrief ? "brief" : "full");
         return result;
     }
 
@@ -1721,7 +1763,7 @@ public class RdmDailyReportService {
      * @return {@code [已发送人数, 跳过人数]}
      */
     private int[] pushPersonal(Snapshot snapshot, Config cfg, String slot, String urlType, String baseUrl,
-                               String detailUrl, String personalTemplateKey, boolean dryRun) {
+                               String detailUrl, String personalTemplateKey, boolean dryRun, boolean quietBrief) {
         int sent = 0;
         int skipped = 0;
         if (!Boolean.TRUE.equals(cfg.getPersonalEnabled())) {
@@ -1760,16 +1802,26 @@ public class RdmDailyReportService {
             // 打开后就是空页；单项目时 scopeKey 也精确命中同一份快照。
             String myUrl = detailUrl;
             PersonalView personal = buildPersonalView(user.getName(), mine);
-            Rendered r = fixed
+            // 个人降噪口径与群报不同：一个人可能全公司无异常、但他自己负责的项目有逾期，此时照常发完整内容
+            boolean quiet = quietBrief && isQuietPersonalDay(personal);
+            Rendered r = quiet
+                    ? renderer.renderPersonalQuiet(snapshot, eveningSlot, personal, myUrl)
+                    : (fixed
                     ? renderer.renderPersonalFixed(snapshot, myUrl, eveningSlot, personal, cfg.getMessageFields())
-                    : renderer.renderPersonal(tpl.getTitleTpl(), tpl.getContentTpl(), snapshot, myUrl, personal);
+                    : renderer.renderPersonal(tpl.getTitleTpl(), tpl.getContentTpl(), snapshot, myUrl, personal));
             if (dryRun) {
                 sent++;
                 continue;
             }
             try {
-                dingTalkAppService.sendWorkNotification(NotificationAppService.RDM_DAILY_REPORT, app.getId(),
-                        List.of(user.getDingtalkUserId()), r.title(), r.content());
+                if (useCard(cfg, myUrl)) {
+                    dingTalkAppService.sendWorkActionCard(NotificationAppService.RDM_DAILY_REPORT, app.getId(),
+                            List.of(user.getDingtalkUserId()), r.title(), r.content(),
+                            CARD_BTN_PERSONAL, myUrl);
+                } else {
+                    dingTalkAppService.sendWorkNotification(NotificationAppService.RDM_DAILY_REPORT, app.getId(),
+                            List.of(user.getDingtalkUserId()), r.title(), r.content());
+                }
                 sent++;
             } catch (RuntimeException ex) {
                 // 单人失败不影响其他人：日报是周期性汇总，漏一个人下次时点自然补上
@@ -2686,6 +2738,17 @@ public class RdmDailyReportService {
                 cfg == null || cfg.getMessageMode() == null ? null : cfg.getMessageMode().trim());
     }
 
+    /**
+     * 是否发钉钉卡片：固定框架 + 链接是绝对地址，两个条件缺一不可。
+     *
+     * <p><b>为何要卡绝对地址</b>：卡片只有一个按钮作为出口，没有正文里的链接兜底；
+     * 而 {@code /#/rdm-daily-view?token=...} 这种站内相对路径在钉钉客户端点开就是空白页。
+     * 此时宁可退回 markdown（至少正文里还有一句引导）。
+     */
+    private static boolean useCard(Config cfg, String url) {
+        return isFixedMode(cfg) && StringUtils.hasText(url) && url.startsWith("http");
+    }
+
     /** 消息模式：不传沿用现值，非法值直接拒（静默回退会让用户以为切了模式而实际没切） */
     private static String normalizeMessageMode(String requested, String current) {
         if (!StringUtils.hasText(requested)) {
@@ -2697,6 +2760,56 @@ public class RdmDailyReportService {
             throw new BusinessException("消息模式不合法（只接受 fixed / template）: " + requested);
         }
         return mode;
+    }
+
+    /**
+     * 降噪策略归一：不传沿用现值，非法值直接拒。
+     *
+     * <p><b>为何非法值不静默回退</b>：服务端回退会让用户以为「已改成 skip」而实际仍是 brief，
+     * 属于“配了没生效”的典型纠纷；保存时直接报错才能让人看见。
+     */
+    private static String normalizeQuietPolicy(String requested, String current) {
+        if (!StringUtils.hasText(requested)) {
+            String fallback = StringUtils.hasText(current) ? current.trim() : DEFAULT_QUIET_POLICY;
+            return QUIET_POLICIES.contains(fallback) ? fallback : DEFAULT_QUIET_POLICY;
+        }
+        String policy = requested.trim();
+        if (!QUIET_POLICIES.contains(policy)) {
+            throw new BusinessException("無異常降噪策略不合法（只接受 full / brief / skip）: " + requested);
+        }
+        return policy;
+    }
+
+    /**
+     * 群报是否「无异常日」：没有任何需要行动的事项。
+     *
+     * <p>口径直接取快照（与正文同源，不再算一套）：
+     * 晨报看今日到期/逾期/风险；晚报看明日到期/逾期/风险——
+     * 「今天完成了多少」不属异常，不能拿它把晚报从降噪里拉回来。
+     */
+    private static boolean isQuietGroupDay(Snapshot snapshot, boolean evening) {
+        Summary s = snapshot == null || snapshot.getSummary() == null ? new Summary() : snapshot.getSummary();
+        if (s.getOverdueItemCount() > 0 || s.getRiskProjectCount() > 0) {
+            return false;
+        }
+        return evening ? s.getTomorrowDueItemCount() == 0 : s.getTodayDueItemCount() == 0;
+    }
+
+    /**
+     * 个人通知是否「无异常日」：只看收件人自己的口径。
+     *
+     * <p>另需排除项目级关注标记（风险/阻塞），否则会出现「正文说无异常、下面却列着需关注项目」的自相矛盾。
+     */
+    private static boolean isQuietPersonalDay(PersonalView personal) {
+        if (personal == null) {
+            return false;
+        }
+        if (personal.overdueItemCount() > 0 || personal.todayDueItemCount() > 0) {
+            return false;
+        }
+        return personal.projects() == null || personal.projects().stream()
+                .filter(p -> p != null)
+                .noneMatch(p -> p.isAttention() || p.getDeliveryItemOverdue() > 0 || p.getDeliveryItemBlocked() > 0);
     }
 
     /** 字段开关序列化为 JSON 列值；写入失败直接抛出，不静默存空（存空会把管理员的勾选抹掉） */
@@ -2806,6 +2919,7 @@ public class RdmDailyReportService {
         c.setBoardShowUnassigned(rs.getBoolean("board_show_unassigned"));
         c.setMessageMode(rs.getString("message_mode"));
         c.setMessageFields(readMessageFields(rs.getString("message_field_options")));
+        c.setQuietPolicy(rs.getString("quiet_policy"));
         c.setUpdatedBy(rs.getString("updated_by"));
         c.setUpdatedAt(formatDateTime(rs.getTimestamp("updated_at")));
         return c;
@@ -3013,6 +3127,7 @@ public class RdmDailyReportService {
         c.setBoardShowUnassigned(true);
         c.setMessageMode(MESSAGE_MODE_FIXED);
         c.setMessageFields(new MessageFieldOptions());
+        c.setQuietPolicy(DEFAULT_QUIET_POLICY);
         return c;
     }
 

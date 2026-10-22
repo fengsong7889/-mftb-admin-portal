@@ -23,6 +23,7 @@ import StatCards from '../../components/StatCards'
 import { fetchVersionHistory } from '../../api/versionHistory'
 import type { VersionHistoryRecord } from '../../api/versionHistory'
 import { fetchRequirementTrace, fetchVersionTrace, type RdmVersionTrace } from '../../api/rdm'
+import { formatEmployee } from '../../utils/employeeDisplay'
 import {
   RDM_ACCEPT_RESULT,
   RDM_ACCEPT_RESULT_COLOR,
@@ -124,7 +125,7 @@ export default function VersionTrace() {
       ),
     },
     { title: '提出部門', dataIndex: 'submitDeptName', key: 'submitDeptName', width: 180, ellipsis: true, render: (v?: string | null) => v || '-' },
-    { title: '產品經理', dataIndex: 'pmName', key: 'pmName', width: 100, render: (v?: string | null) => v ?? '-' },
+    { title: '產品經理', dataIndex: 'pmName', key: 'pmName', width: 140, render: (v: string | null | undefined, r) => formatEmployee(v, r.pmEmpNo) || '-' },
     {
       title: '狀態', dataIndex: 'status', key: 'status', width: 110,
       render: (v: string) => <Tag style={{ margin: 0 }}>{RDM_STATUS_LABEL[v as RdmStatus] ?? v}</Tag>,

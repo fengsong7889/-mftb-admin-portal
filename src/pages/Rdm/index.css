@@ -1665,12 +1665,53 @@
 .rdm-g2-unscheduled.add:hover { background: #FFE7BA; border-color: #D46B08; border-style: solid; }
 .rdm-g2-sameday { position: absolute; top: 50%; transform: translateY(-50%); font-size: 10px; color: #8C8C8C; }
 
+/* ── 進度軌與拖動手柄（第一階段：本地預覽）── */
+/* 軌道貼在條形下沿的空隙，與條身平移/兩端改期分離，避免三種手勢搶事件 */
+.rdm-g2-ptrack {
+  position: absolute; height: 4px; border-radius: 2px;
+  background: rgba(0, 0, 0, 0.06); z-index: 2; pointer-events: none;
+}
+.rdm-g2-ptrack-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: #E8720C; opacity: .5; }
+.rdm-g2-pgrip {
+  position: absolute; width: 12px; height: 12px; margin-left: -6px; z-index: 4;
+  border-radius: 50%; background: #fff; border: 2px solid #E8720C;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .2); cursor: ew-resize; touch-action: none;
+}
+.rdm-g2-pgrip:hover, .rdm-g2-pgrip:focus-visible, .rdm-g2-pgrip.dragging {
+  transform: scale(1.15); outline: none;
+  box-shadow: 0 0 0 3px rgba(232, 114, 12, .18), 0 2px 6px rgba(0, 0, 0, .22);
+}
+.rdm-g2-ptip {
+  position: absolute; z-index: 4; background: #E8720C; color: #fff;
+  font-size: 11px; padding: 2px 8px; border-radius: 4px; white-space: nowrap; pointer-events: none;
+}
+/* 百分比徽标可点击（精确面板入口），按钮需抹平浏览器默认样式 */
+button.rdm-g2-bar-pct { border: 0; cursor: pointer; font-family: inherit; }
+button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
+
+/* 進度精確面板：滑桿 + 數字 + 快捷檔位 */
+.rdm-g2-ppanel { width: 268px; }
+.rdm-g2-ppanel-title { font-size: 12px; color: #262626; font-weight: 600; margin-bottom: 4px; }
+.rdm-g2-ppanel-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.rdm-g2-ppanel-hint { margin-top: 8px; font-size: 11px; color: #8C8C8C; }
+.rdm-g2-ppanel-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+
+/* 完成任務彈窗：先把後果說清，再讓用戶填交付說明 */
+.rdm-g2-done-hint { margin-bottom: 8px; font-size: 12px; color: #595959; line-height: 1.6; }
+
+/* 調整模式操作口徑提示 */
+.rdm-gantt-edit-hint { font-size: 12px; color: #8C8C8C; }
+/* PRD 改期確認：把「承諾日期也會一起改」放在日期行下方，避免只看到日期變化 */
+.rdm-gantt-prd-confirm-note { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #FFE7D1; font-size: 12px; color: #8C8C8C; line-height: 1.6; }
+
 /* 悬浮卡片：标题 + 标签-取值键值行，层次清晰、可一眼扫读 */
 .rdm-g2-hover { min-width: 220px; }
 .rdm-g2-hover-row { display: flex; align-items: baseline; gap: 8px; padding: 2px 0; font-size: 12px; }
 .rdm-g2-hover-row > span { flex: none; width: 44px; color: #8C8C8C; }
 .rdm-g2-hover-row > b { flex: 1; min-width: 0; color: #262626; font-weight: 500; }
 .rdm-g2-hover-overdue { margin-left: 6px; font-style: normal; color: #CF1322; font-weight: 600; }
+/* 悬浮卡片補充說明：PRD 承諾日同步、唯讀原因等 */
+.rdm-g2-hover-note { margin-top: 6px; padding-top: 6px; border-top: 1px dashed #E8EAED; font-size: 11px; color: #8C8C8C; line-height: 1.5; }
 /* 进度行重点标记：标签提色 + 迷你进度条 + 加粗彩色百分比 */
 .rdm-g2-hover-progress > span { color: #E8720C; font-weight: 600; }
 .rdm-g2-hover-progress-val { display: flex; align-items: center; gap: 8px; }
@@ -2724,3 +2765,108 @@
 .rdm-status-switch.ant-switch {
   min-width: 64px;
 }
+
+/* ========== 钉钉消息卡片效果预览（模板/配置页） ==========
+   结构：会话底色 + 应用名/时间 + 白卡（标题 / 正文 / 按钮）。
+   设计意图：让管理员在保存前就看到「读者会看到什么」，
+   尺寸贴近手机端（360px 内），避免用桌面宽度假装成真机。 */
+.rdm-dingtalk-preview {
+  background: #ededed;
+  border-radius: 12px;
+  padding: 14px;
+  max-width: 420px;
+}
+
+.rdm-dingtalk-preview__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.rdm-dingtalk-preview__app {
+  font-weight: 500;
+}
+
+.rdm-dingtalk-preview__bubble {
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 14px;
+  max-width: 360px;
+}
+
+/* 卡片消息：底部悬停的独立按钮区需要一点层次，但不能重到抢标题 */
+.rdm-dingtalk-preview__bubble--card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.rdm-dingtalk-preview__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #262626;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.rdm-dingtalk-preview__body {
+  font-size: 13px;
+  color: #262626;
+  line-height: 1.7;
+}
+
+.rdm-dingtalk-preview__line {
+  word-break: break-word;
+}
+
+.rdm-dingtalk-preview__gap {
+  height: 8px;
+}
+
+.rdm-dingtalk-preview__quote {
+  font-size: 12px;
+  color: #8c8c8c;
+  padding-left: 8px;
+  border-left: 2px solid #e5e5e5;
+}
+
+.rdm-dingtalk-preview__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  word-break: break-word;
+}
+
+.rdm-dingtalk-preview__dot {
+  flex: none;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #8c8c8c;
+  margin-top: 8px;
+}
+
+.rdm-dingtalk-preview__footer {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.rdm-dingtalk-preview__button {
+  display: block;
+  text-align: center;
+  background: #f5f5f5;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1677ff;
+}
+
+.rdm-dingtalk-preview__hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #bfbfbf;
+}
+

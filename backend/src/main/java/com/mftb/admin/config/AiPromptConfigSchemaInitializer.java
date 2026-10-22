@@ -168,7 +168,7 @@ public class AiPromptConfigSchemaInitializer implements CommandLineRunner {
         seedTerm("rdm", "需求池·待分配", "審批通過但尚未分配產品負責人", null, 11);
         seedTerm("rdm", "已分配·待受理", "已分配產品負責人，等待產品受理", null, 12);
         seedTerm("rdm", "評估中", "產品正在評估需求價值與方案", null, 13);
-        seedTerm("rdm", "PRD設計中", "產品正在編寫 PRD", null, 14);
+        seedTerm("rdm", "PRD 產出中", "產品正在產出 PRD（區別於 UI 設計）", null, 14);
         seedTerm("rdm", "評審中", "需求/方案正在評審", null, 15);
         seedTerm("rdm", "已排期", "已排入迭代，等待開發", null, 16);
         seedTerm("rdm", "開發中", "研發正在開發（含 UI 設計、聯調）", null, 17);

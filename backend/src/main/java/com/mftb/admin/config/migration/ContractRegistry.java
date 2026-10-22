@@ -44,6 +44,8 @@ public class ContractRegistry {
         combined.add(rdmDailyReportConfigContract());
         // RDM 日报推送规则：多项目范围列缺列会让规则保存/定时推送直接报错
         combined.add(rdmDailyReportRuleContract());
+        // RDM 通知投递队列：msg_type/按钮列缺列会让 dispatcher 的 SELECT 直接报错，所有 RDM 通知同时断流
+        combined.add(rdmNotifyLogCardContract());
         // 组织数据权限（数据范围）：SysRole 实体已带 dataScope 字段，缺列会让所有角色查询报错
         combined.addAll(orgScopeContracts());
         // HR 生效日引擎：在职/离职判定改成 code 驱动后，缺 operation_code 列会直接报错；
@@ -1030,6 +1032,39 @@ public class ContractRegistry {
                         new ContractSpec.ColumnSpec("exclude_receiver_user_ids_json",
                                 "ALTER TABLE rdm_daily_report_config ADD COLUMN exclude_receiver_user_ids_json VARCHAR(2000) "
                                         + "DEFAULT NULL COMMENT '排除收件人 sys_user.id(JSON数组)，优先级最高' "
-                                        + "AFTER extra_receiver_user_ids_json")));
+                                        + "AFTER extra_receiver_user_ids_json"),
+                        // v3.30 降噪策略：缺列会让保守取值整体失效（配置页存不进去、读回来恒为 null）
+                        new ContractSpec.ColumnSpec("quiet_policy",
+                                "ALTER TABLE rdm_daily_report_config ADD COLUMN quiet_policy VARCHAR(16) NOT NULL DEFAULT 'brief' "
+                                        + "COMMENT '无异常日降噪策略: full=照常发摘要 / brief=只发一句结论 / skip=不发（仍落快照）' "
+                                        + "AFTER message_field_options")));
+    }
+
+    /**
+     * RDM 通知投递队列的卡片列契约（{@code rdm:schema:v3.28}）。
+     *
+     * <p><b>为何登记</b>：{@code rdm_notify_log} 是所有 RDM 通知（需求提醒、催办、会议、日报）的
+     * 唯一出站表，而 dispatcher 的读取语句包含 {@code msg_type/btn_title/btn_url}。
+     * 一旦生产缺列，SELECT 直接报错 → 不只是日报没样式，而是<b>全部 RDM 通知断流</b>，
+     * 且失败发生在异步线程里、主流程毫无感知。登记后每次启动实查并在缺列时自愈。
+     *
+     * <p>为什么 {@code createTableIfMissing} 留空：表由 204 脚本建立，这里再抄一份建表 DDL
+     * 会成为第二份真值；真缺表时宁可上报漂移卡住 readiness。
+     */
+    public static ContractSpec rdmNotifyLogCardContract() {
+        return new ContractSpec(
+                "rdm-notify-log-card",
+                "rdm_notify_log",
+                null,
+                List.of(
+                        new ContractSpec.ColumnSpec("msg_type",
+                                "ALTER TABLE rdm_notify_log ADD COLUMN msg_type VARCHAR(16) NOT NULL DEFAULT 'markdown' "
+                                        + "COMMENT '投递消息类型: markdown/action_card（卡片带一个跳转按钮）' AFTER content"),
+                        new ContractSpec.ColumnSpec("btn_title",
+                                "ALTER TABLE rdm_notify_log ADD COLUMN btn_title VARCHAR(32) DEFAULT NULL "
+                                        + "COMMENT '卡片按钮文案（msg_type=action_card 时必填）' AFTER msg_type"),
+                        new ContractSpec.ColumnSpec("btn_url",
+                                "ALTER TABLE rdm_notify_log ADD COLUMN btn_url VARCHAR(512) DEFAULT NULL "
+                                        + "COMMENT '卡片按钮跳转地址（msg_type=action_card 时必填）' AFTER btn_title")));
     }
 }

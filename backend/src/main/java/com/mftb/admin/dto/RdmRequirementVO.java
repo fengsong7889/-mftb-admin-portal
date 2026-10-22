@@ -61,11 +61,21 @@ public class RdmRequirementVO {
     private String intakePolicyVersion;
     /** 命中链路（逐行展示，配置页与详情页共用） */
     private java.util.List<String> intakeExplain;
+    private Long dispatcherUserId;
     private String dispatcherName;
+    /** 技术负责人工号（由服务端按 dispatcherUserId 批量回填；快照表不存冗余列） */
+    private String dispatcherEmpNo;
     private String distributeTime;
     private Long assigneePmUserId;
     private String pmName;
     private String pmEmpNo;
+    /**
+     * 需求级项目经理（存量导入时使用）。
+     * <p>与产品经理、研发负责人分开：它回答「谁对这条需求的整体交付负责」，
+     * 绑了项目时默认继承项目 PM。
+     */
+    private Long projectManagerUserId;
+    private String projectManagerName;
     private String acceptTime;
     private String promisedPrdDate;
     private String devOwnerName;
@@ -80,6 +90,9 @@ public class RdmRequirementVO {
     private String planReleaseDate;
     private String actualReleaseDate;
     private String versionNo;
+    /** 外部来源编号（云效）：仅回查用，不参与需求编号规则 */
+    private String externalNo;
+    private String externalSource;
     private String currentHandler;
 
     /**
@@ -411,11 +424,14 @@ public class RdmRequirementVO {
         vo.setIntakePolicyName(r.getIntakePolicyName());
         vo.setIntakePolicyVersion(r.getIntakePolicyVersion());
         vo.setIntakeExplain(splitLines(r.getIntakeExplain()));
+        vo.setDispatcherUserId(r.getDispatcherUserId());
         vo.setDispatcherName(r.getDispatcherName());
         vo.setDistributeTime(DateTimeUtils.format(r.getDistributeTime()));
         vo.setAssigneePmUserId(r.getAssigneePmUserId());
         vo.setPmName(r.getAssigneePmName());
         vo.setPmEmpNo(r.getAssigneePmEmpNo());
+        vo.setProjectManagerUserId(r.getProjectManagerUserId());
+        vo.setProjectManagerName(r.getProjectManagerUserName());
         vo.setAcceptTime(DateTimeUtils.format(r.getAcceptTime()));
         vo.setPromisedPrdDate(DateTimeUtils.format(r.getPromisedPrdDate()));
         vo.setDevOwnerName(r.getDevOwnerName());
@@ -424,6 +440,9 @@ public class RdmRequirementVO {
         vo.setPlanReleaseDate(DateTimeUtils.format(r.getPlanReleaseDate()));
         vo.setActualReleaseDate(DateTimeUtils.format(r.getActualReleaseDate()));
         vo.setVersionNo(r.getVersionNo());
+        // 外部来源编号（云效）：仅回查用，不参与需求编号规则
+        vo.setExternalNo(r.getExternalNo());
+        vo.setExternalSource(r.getExternalSource());
         vo.setCurrentHandler(r.getCurrentHandlerName());
         vo.setProgress(r.getProgress());
         vo.setBlockedFlag(r.getBlockedFlag() != null && r.getBlockedFlag() == 1);

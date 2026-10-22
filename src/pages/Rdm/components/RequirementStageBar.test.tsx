@@ -12,10 +12,10 @@ import RequirementStageBar from './RequirementStageBar'
 import { RDM_STATUS } from '../../../constants/rdm'
 
 describe('需求阶段条', () => {
-  it('V1/V2：不传推导阶段时仍按需求状态映射（已受理 → PRD 設計）', () => {
+  it('V1/V2：不传推导阶段时仍按需求状态映射（已受理 → PRD 產出）', () => {
     render(<RequirementStageBar status={RDM_STATUS.ACCEPTED} compact />)
-    const label = screen.getByText(/PRD 設計/)
-    expect(label.textContent).toBe('PRD 設計')
+    const label = screen.getByText(/PRD 產出/)
+    expect(label.textContent).toBe('PRD 產出')
   })
 
   it('V3：传入推导阶段后按交付项推进（已受理 + dev → 開發）', () => {

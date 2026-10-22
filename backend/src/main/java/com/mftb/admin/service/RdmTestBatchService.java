@@ -629,25 +629,67 @@ public class RdmTestBatchService {
         List<RdmTestExecution> execs = executionMapper.selectList(new LambdaQueryWrapper<RdmTestExecution>()
                 .eq(RdmTestExecution::getBatchId, batchId)
                 .eq(round != null, RdmTestExecution::getRoundNo, round));
-        int pass = 0, fail = 0, blocked = 0, skip = 0;
+        /*
+         * 分母必须是「受理时冻结的用例集」，不是执行记录条数：
+         * 受理后到第一条结果录完之前，执行记录为 0，但必测用例集已经冻结（可能 1 条），
+         * 此时摘要显示「總用例數 0」与冻结事实矛盾；同一用例重复录入也会把总数吹大。
+         * 未冻结（未受理）的旧批次仍按执行条数回退，不改变历史口径。
+         */
+        RdmTestRound frozenRound = currentFrozenRound(batch);
+        Set<String> frozenCaseIds = new LinkedHashSet<>();
+        if (frozenRound != null) {
+            for (Map<String, Object> c : JsonUtils.parseMapList(frozenRound.getCaseSnapshotJson())) {
+                String cid = trimToNull(Objects.toString(c.get("caseId"), null));
+                if (cid != null) {
+                    frozenCaseIds.add(cid);
+                }
+            }
+        }
+        // 同一 caseId 多次录入时以最后一条为准（复测/重录不得重复计数）
+        Map<String, String> latestResultByCase = new LinkedHashMap<>();
+        int legacyPass = 0, legacyFail = 0, legacyBlocked = 0, legacySkip = 0;
         for (RdmTestExecution e : execs) {
-            switch (e.getResult() == null ? "" : e.getResult()) {
-                case RESULT_PASS -> pass++;
-                case RESULT_FAIL -> fail++;
-                case RESULT_BLOCKED -> blocked++;
-                case RESULT_SKIP -> skip++;
+            String result = e.getResult() == null ? "" : e.getResult();
+            String caseId = trimToNull(e.getCaseId());
+            if (frozenRound != null && caseId != null) {
+                latestResultByCase.put(caseId, result);
+                continue;
+            }
+            switch (result) {
+                case RESULT_PASS -> legacyPass++;
+                case RESULT_FAIL -> legacyFail++;
+                case RESULT_BLOCKED -> legacyBlocked++;
+                case RESULT_SKIP -> legacySkip++;
                 default -> { }
             }
         }
+        int pass = 0, fail = 0, blocked = 0, skip = 0;
+        if (frozenRound != null) {
+            for (String result : latestResultByCase.values()) {
+                switch (result) {
+                    case RESULT_PASS -> pass++;
+                    case RESULT_FAIL -> fail++;
+                    case RESULT_BLOCKED -> blocked++;
+                    case RESULT_SKIP -> skip++;
+                    default -> { }
+                }
+            }
+        } else {
+            pass = legacyPass;
+            fail = legacyFail;
+            blocked = legacyBlocked;
+            skip = legacySkip;
+        }
         int executed = pass + fail + blocked; // skip 视为「必测未执行」
+        int total = frozenRound != null ? frozenCaseIds.size() : execs.size();
         RdmTestBatchVO.BatchSummary summary = new RdmTestBatchVO.BatchSummary();
-        summary.setTotalCases(execs.size());
+        summary.setTotalCases(total);
         summary.setExecutedCases(executed);
         summary.setPassedCases(pass);
         summary.setFailedCases(fail);
         summary.setBlockedCases(blocked);
         summary.setSkippedCases(skip);
-        summary.setNotExecutedCases(skip);
+        summary.setNotExecutedCases(Math.max(total - executed - skip, 0));
         summary.setPassRate(executed == 0 ? 0 : (int) Math.round(pass * 100.0 / executed));
         return summary;
     }
@@ -746,8 +788,10 @@ public class RdmTestBatchService {
         Map<Long, Integer> scopeByItem = scopeVersionByItem(itemIds);
         List<Map<String, Object>> cases = normalizeCaseSnapshot(batch.getCaseSnapshotJson(), scopeByItem);
         if (cases.isEmpty()) {
-            // 拒绝空冻结用例集（否则 isTestPassed 恒 false / 恒 true 都不可接受）
-            throw new BusinessException("拒絕凍結空用例集：受理提測必須有規範化後的必測用例集");
+            // 拒绝空冻结用例集（否则 isTestPassed 恒 false / 恒 true 都不可接受）；
+            // 同时给出自救路径：提测已把交付项置 testing，不回退就无法重新提测
+            throw new BusinessException("拒絕凍結空用例集：受理提測必須有規範化後的必測用例集"
+                    + "（請退回本批次，在提測表單補充測試用例後重新提測）");
         }
         String caseSnapshotJson = JsonUtils.toJson(cases);
         String buildMappingJson = StringUtils.hasText(batch.getBuildMappingJson())

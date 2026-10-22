@@ -111,7 +111,8 @@ class RdmRequirementOwnershipNameTest {
                 mock(RdmFlowVersionGuard.class),
                 mock(RdmRequirementStructureService.class),
                 mock(RdmDeliveryItemService.class),
-                mock(RdmAllowedActionsService.class));
+                mock(RdmAllowedActionsService.class),
+                mock(com.mftb.admin.service.RdmPrdTaskService.class));
         when(configService.stageMap()).thenReturn(Map.of());
         // 纯单测无 MyBatis 容器：LambdaQueryWrapper 需要实体 TableInfo 才能把方法引用映射成列
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "");

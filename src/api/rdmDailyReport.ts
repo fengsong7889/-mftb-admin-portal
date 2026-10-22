@@ -86,6 +86,13 @@ export interface DailyReportMessageFields {
 /** 钉钉消息模式：fixed=固定框架 / template=自定义模板文本 */
 export type DailyReportMessageMode = 'fixed' | 'template'
 
+/**
+ * 无异常日降噪策略。
+ * <p>full=照常发完整摘要；brief=只发一句结论；skip=当日不发（仍生成快照）。
+ * <p>仅对定时推送生效；手动触发与预览永远发完整内容。
+ */
+export type DailyReportQuietPolicy = 'full' | 'brief' | 'skip'
+
 /** 推送配置（全庫只一行，後端以 config_slot='default' 約束） */
 export interface DailyReportConfig {
   /** 日報總開關；關閉後定時與手動觸發都不出站 */
@@ -119,6 +126,8 @@ export interface DailyReportConfig {
   messageMode: DailyReportMessageMode
   /** 固定框架的字段开关 */
   messageFields: DailyReportMessageFields
+  /** 无异常日降噪策略：full/brief/skip（仅对定时推送生效） */
+  quietPolicy: DailyReportQuietPolicy
   updatedBy?: string | null
   updatedAt?: string | null
 }
@@ -144,6 +153,8 @@ export interface DailyReportConfigForm {
   boardShowUnassigned?: boolean
   messageMode?: DailyReportMessageMode
   messageFields?: Partial<DailyReportMessageFields>
+  /** 传 null/undefined = 沿用后端现值 */
+  quietPolicy?: DailyReportQuietPolicy
 }
 
 /* ==================== 推送模板 ==================== */

@@ -166,6 +166,12 @@ public class BizSeqService {
      */
     public static final String RULE_RDM_REQUIREMENT = "rdm_requirement";
     /**
+     * RDM 执行任务编号（RT + YYYYMMDD + 4 位日流水）。
+     * <p>手工建任务与「受理需求自动生成的 PRD 任务」共用同一条规则，
+     * 保证任务编号格式唯一，不另造一套前缀。
+     */
+    public static final String RULE_RDM_WORK_TASK = "rdm_work_task";
+    /**
      * 迭代編碼－常規迭代（SP + YYYYMM + 3 位月流水，如 SP202610001）。
      * <p>迭代編碼一律系統發號、前端不再收手工輸入：編碼是需求/任務掛接的穩定鍵，
      * 手工填寫會同期撞號與格式漂移（歷史曾出現 SP2026-10A 與 SP2026-10B 並存兩種寫法）。

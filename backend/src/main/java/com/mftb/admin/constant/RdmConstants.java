@@ -967,6 +967,16 @@ public final class RdmConstants {
     public static final String NOTIFY_STATUS_ABANDONED = "abandoned";
     public static final String NOTIFY_STATUS_SKIPPED = "skipped";
 
+    /**
+     * 投递消息类型（{@code rdm_notify_log.msg_type}）。
+     *
+     * <p>{@link #NOTIFY_MSG_MARKDOWN} 是默认值，也是存量待发行的含义：普通文本气泡；
+     * {@link #NOTIFY_MSG_ACTION_CARD} 是带一个整体跳转按钮的卡片（群机器人 actionCard /
+     * 工作通知 action_card，两者协议字段不同，由发送层各自组装）。
+     */
+    public static final String NOTIFY_MSG_MARKDOWN = "markdown";
+    public static final String NOTIFY_MSG_ACTION_CARD = "action_card";
+
     /* ==================== 存量迁移执行与灰度管理写侧（任务29，尾部追加） ==================== */
 
     /**

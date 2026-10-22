@@ -24,6 +24,7 @@ import HelpPopover from '../../components/HelpPopover'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { deriveRdmColumnMeta } from './rdmColumnMeta'
 import { fetchQualityData, type RdmQualityData } from '../../api/rdm'
+import { formatEmployee } from '../../utils/employeeDisplay'
 import { RDM_DEFECT_SEVERITY_COLOR, RDM_DEFECT_SEVERITY_LABEL, type RdmDefectSeverity } from '../../constants/rdm'
 import './index.css'
 
@@ -62,7 +63,7 @@ export default function QualityBoard() {
     },
     { title: '需求編號', dataIndex: 'reqNo', key: 'reqNo', width: 150 },
     { title: '提出部門', dataIndex: 'submitDeptName', key: 'submitDeptName', width: 180, ellipsis: true, render: (v?: string | null) => v || '-' },
-    { title: '產品經理', dataIndex: 'pmName', key: 'pmName', width: 110, render: (v?: string | null) => v ?? '-' },
+    { title: '產品經理', dataIndex: 'pmName', key: 'pmName', width: 140, render: (v: string | null | undefined, r) => formatEmployee(v, r.pmEmpNo) || '-' },
     {
       title: '返工次數', dataIndex: 'reworkCount', key: 'reworkCount', width: 110,
       sorter: (a, b) => a.reworkCount - b.reworkCount,

@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom'
 import StatCards from '../../components/StatCards'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
 import { fetchDashboard, type RdmDashboardData } from '../../api/rdm'
+import { formatEmployee } from '../../utils/employeeDisplay'
 import './index.css'
 
 type DeptRow = RdmDashboardData['deptRank'][number]
@@ -115,7 +116,7 @@ export default function TeamOutput() {
   ]
 
   const pmColumns: TableColumnsType<PmRow> = [
-    { title: '產品經理', dataIndex: 'pmName', key: 'pmName', width: 140 },
+    { title: '產品經理', dataIndex: 'pmName', key: 'pmName', width: 160, render: (v: string, r) => formatEmployee(v, r.pmEmpNo) },
     {
       title: '在途需求', dataIndex: 'active', key: 'active', width: 110,
       sorter: (a, b) => a.active - b.active,

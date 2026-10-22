@@ -77,6 +77,25 @@ public interface DingTalkService {
     SendOutcome sendMarkdownSync(String scenario, String title, String text, java.util.List<String> atMobiles, boolean isAtAll);
 
     /**
+     * 同步发送群机器人 ActionCard 卡片（带一个整体跳转按钮），返回渠道受理状态。
+     *
+     * <p><b>为何不用 {@link #sendActionCard}</b>：那个是发完就忘的异步方法，没有结果；
+     * 日报走 outbox，必须知道渠道是否真的受理，否则无法决定重试还是放弃。
+     *
+     * <p><b>与工作通知 action_card 的差异</b>：群机器人正文键是 {@code text}、按钮是驼峰
+     * {@code singleTitle/singleURL}；工作通知则是 {@code markdown} 与下划线 {@code single_title/single_url}。
+     * 两套协议不能复用同一个 body 构造器。
+     *
+     * <p>ActionCard 不支持 @ 指定人，故不接收 atMobiles。
+     *
+     * @param text       Markdown 正文（群机器人卡片建议 ≤ 1000 字符，过长会发送失败）
+     * @param singleTitle 按钮文案（≤ 20 字符）
+     * @param singleURL   按钮跳转地址（≤ 500 字符）
+     */
+    SendOutcome sendActionCardSync(String scenario, String title, String text, String singleTitle,
+                                   String singleURL);
+
+    /**
      * 按渠道 id 精确同步发送 Markdown，返回渠道受理状态。
      *
      * <p>与 {@link #sendMarkdownSync} 的区别是存在意义：场景路由拿不到目标时**会回退到平台默认渠道**，

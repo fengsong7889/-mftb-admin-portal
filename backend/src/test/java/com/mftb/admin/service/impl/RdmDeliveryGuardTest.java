@@ -82,6 +82,8 @@ class RdmDeliveryGuardTest {
     static void initTableInfo() {
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "");
         TableInfoHelper.initTableInfo(assistant, RdmWorkTask.class);
+        // 进度审计实体在条件更新后插入，纯 Mockito 环境同样需要 TableInfo 缓存
+        TableInfoHelper.initTableInfo(assistant, com.mftb.admin.entity.RdmTaskProgressLog.class);
     }
 
     private RdmAccessGuard accessGuard;
@@ -98,6 +100,7 @@ class RdmDeliveryGuardTest {
     private SysUserMapper userMapper;
     private PermissionService permissionService;
     private RdmTaskTypeService taskTypeService;
+    private com.mftb.admin.mapper.RdmTaskProgressLogMapper progressLogMapper;
     private RdmDeliveryService service;
 
     @BeforeEach
@@ -114,6 +117,7 @@ class RdmDeliveryGuardTest {
         userMapper = mock(SysUserMapper.class);
         permissionService = mock(PermissionService.class);
         taskTypeService = mock(RdmTaskTypeService.class);
+        progressLogMapper = mock(com.mftb.admin.mapper.RdmTaskProgressLogMapper.class);
         // 任务类型字典 stub：六种内置 code 放行（resolveByCode 非 null），其余 null 被 validateTaskForm 拒绝；
         // categoryOf 按内置三桶兑底，保证 roleOfTaskType 的 switch 不落 null
         when(taskTypeService.resolveByCode(anyString())).thenAnswer(inv -> {
@@ -133,7 +137,9 @@ class RdmDeliveryGuardTest {
                 mock(OaRequestService.class), mock(JdbcTemplate.class), accessGuard,
                 milestoneMapper, workLogMapper, mock(RdmPrdSnapshotMapper.class),
                 permissionService, mock(RdmDeliveryItemMapper.class), mock(RdmFlowVersionGuard.class), taskTypeService,
-                mock(com.mftb.admin.service.RdmDeliveryItemService.class));
+                mock(com.mftb.admin.service.RdmPrdTaskService.class),
+                mock(com.mftb.admin.service.RdmDeliveryItemService.class),
+                progressLogMapper);
         when(accessGuard.requireDeliveryWriter(anyLong(), anyString())).thenReturn(requirement(RdmConstants.STATUS_ACCEPTED));
         when(accessGuard.requireVisible(anyLong(), anyString())).thenReturn(requirement(RdmConstants.STATUS_ACCEPTED));
         when(requirementMapper.selectById(any())).thenReturn(requirement(RdmConstants.STATUS_ACCEPTED));
@@ -423,6 +429,86 @@ class RdmDeliveryGuardTest {
         outOfRange.setAction("start");
         outOfRange.setProgress(180);
         assertThrows(BusinessException.class, () -> service.updateTaskProgress(5L, outOfRange));
+    }
+
+    @Test
+    @DisplayName("甘特图拖进度：PRD 任务封顶 99%，100% 必须走提交评审")
+    void prdProgressCannotReachHundred() {
+        RdmWorkTask prd = task();
+        prd.setTaskType("prd");
+        prd.setStatus("doing");
+        prd.setProgress(40);
+        when(taskMapper.selectById(any())).thenReturn(prd);
+
+        RdmDeliveryDTO.TaskProgress dto = new RdmDeliveryDTO.TaskProgress();
+        dto.setAction("progress");
+        dto.setProgress(100);
+        dto.setExpectedProgress(40);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.updateTaskProgress(5L, dto));
+        assertTrue(ex.getMessage().contains("提交評審"), ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("甘特图拖进度：期望进度已过期时拒绝覆盖")
+    void progressConflictRejected() {
+        RdmWorkTask t = task();
+        t.setStatus("doing");
+        t.setProgress(60);
+        when(taskMapper.selectById(any())).thenReturn(t);
+
+        RdmDeliveryDTO.TaskProgress dto = new RdmDeliveryDTO.TaskProgress();
+        dto.setAction("progress");
+        dto.setProgress(80);
+        dto.setExpectedProgress(40);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.updateTaskProgress(5L, dto));
+        assertTrue(ex.getMessage().contains("已被他人修改"), ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("甘特图拖进度：todo 任务改进度自动进入进行中，并留进度审计")
+    void progressMovesTodoToDoingAndAudits() {
+        RdmWorkTask t = task();
+        t.setStatus("todo");
+        t.setProgress(0);
+        when(taskMapper.selectById(any())).thenReturn(t);
+        when(taskMapper.update(any(), any())).thenReturn(1);
+        when(workLogMapper.selectList(any())).thenReturn(List.of());
+
+        RdmDeliveryDTO.TaskProgress dto = new RdmDeliveryDTO.TaskProgress();
+        dto.setAction("progress");
+        dto.setProgress(30);
+        dto.setExpectedProgress(0);
+        dto.setClientRequestId("gantt-progress-test");
+
+        service.updateTaskProgress(5L, dto);
+
+        assertEquals("doing", t.getStatus());
+        assertEquals(30, t.getProgress());
+        ArgumentCaptor<com.mftb.admin.entity.RdmTaskProgressLog> captor =
+                ArgumentCaptor.forClass(com.mftb.admin.entity.RdmTaskProgressLog.class);
+        verify(progressLogMapper).insert(captor.capture());
+        assertEquals(0, captor.getValue().getOldProgress());
+        assertEquals(30, captor.getValue().getNewProgress());
+        assertEquals("gantt-progress-test", captor.getValue().getClientRequestId());
+    }
+
+    @Test
+    @DisplayName("甘特图拖进度：阻塞任务必须先解除阻塞")
+    void blockedTaskProgressRejected() {
+        RdmWorkTask t = task();
+        t.setStatus("blocked");
+        t.setProgress(20);
+        when(taskMapper.selectById(any())).thenReturn(t);
+
+        RdmDeliveryDTO.TaskProgress dto = new RdmDeliveryDTO.TaskProgress();
+        dto.setAction("progress");
+        dto.setProgress(50);
+        dto.setExpectedProgress(20);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.updateTaskProgress(5L, dto));
+        assertTrue(ex.getMessage().contains("解除阻塞"), ex.getMessage());
     }
 
     @Test
