@@ -2187,21 +2187,6 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
                 + "請隨後到「授權中心」為其補權";
     }
 
-    /** 负责人能否进交付工作台上报进度（或持有需求处理权） */
-    private boolean canOwnerReportProgress(SysUser owner) {
-        return permissionService.hasPermission(owner, RdmConstants.MENU_DELIVERY_BOARD, "edit")
-                || permissionService.hasPermission(owner, RdmConstants.MENU_REQUIREMENT, "edit");
-    }
-
-    private static String ownerInactiveWarning(SysUser owner) {
-        return "任務負責人「" + owner.getName() + "」已離職或停用，請改派他人";
-    }
-
-    private static String ownerNoPermissionWarning(SysUser owner) {
-        return "「" + owner.getName() + "」當前無研發交付權限：任務可正常保存，但他在交付工作台看不到上報入口，"
-                + "請隨後到「授權中心」為其補權";
-    }
-
     /** 参与人ID串 → 姓名串（快照展示用，不泄露多余字段） */
     private String namesOfIds(String ids) {
         if (!StringUtils.hasText(ids)) {
