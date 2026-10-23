@@ -16,7 +16,7 @@
  * - 合并并发请求（abort 前一次）
  */
 import { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo, type ReactNode } from 'react'
-import { fetchMenuTree } from '../api/menu'
+import { fetchMyMenuTree } from '../api/menu'
 import type { MenuVO } from '../api/menu'
 import { isBackendUnavailable } from '../api/request'
 import { useAuth } from './AuthContext'
@@ -46,23 +46,29 @@ export function useMenu() {
 
 /** 菜单状态 Provider（须放在 AuthProvider 内部） */
 export function MenuProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
+  const userId = user?.id
   const [menuTree, setMenuTree] = useState<MenuVO[] | null>(null)
   const [status, setStatus] = useState<MenuConnectionStatus>('loading')
 
   /** 防止并发请求互相覆盖：每次发起新请求时递增版本号 */
   const fetchIdRef = useRef(0)
+  const controllerRef = useRef<AbortController | null>(null)
 
   const fetchMenu = useCallback(async (silent = false) => {
+    if (!isAuthenticated || userId == null) return
     const thisFetch = ++fetchIdRef.current
+    controllerRef.current?.abort()
+    const controller = new AbortController()
+    controllerRef.current = controller
     if (!silent) setStatus('loading')
     try {
-      const tree = await fetchMenuTree()
+      const tree = await fetchMyMenuTree(controller.signal)
       if (thisFetch !== fetchIdRef.current) return // 已被新请求取代
-      setMenuTree(tree.length > 0 ? tree : null)
+      setMenuTree(tree)
       setStatus('online')
     } catch (err) {
-      if (thisFetch !== fetchIdRef.current) return
+      if (thisFetch !== fetchIdRef.current || controller.signal.aborted) return
       if (isBackendUnavailable(err)) {
         setStatus('offline')
       } else {
@@ -71,18 +77,20 @@ export function MenuProvider({ children }: { children: ReactNode }) {
       }
       setMenuTree(null)
     }
-  }, [])
+  }, [isAuthenticated, userId])
 
   /** 手动刷新 */
   const refresh = useCallback(() => fetchMenu(true), [fetchMenu])
 
   /** 登录态变化时重新加载菜单 */
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchMenu()
-    } else {
-      setMenuTree(null)
-      setStatus('loading')
+    setMenuTree(null)
+    setStatus('loading')
+    if (isAuthenticated) void fetchMenu()
+    return () => {
+      // 登出/换账号/卸载立即使在途响应失效，不能只换 key 后等下次轮询。
+      ++fetchIdRef.current
+      controllerRef.current?.abort()
     }
   }, [isAuthenticated, fetchMenu])
 

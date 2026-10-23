@@ -133,6 +133,8 @@ export default function PetMascot() {
    * 这些页面只保留宠物本体，不弹任何气泡。
    */
   const suppressBubble = location.pathname.startsWith('/rdm')
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const [yieldToControls, setYieldToControls] = useState(false)
   const navigate = useNavigate()
   const { hasPermission: _hasPermission } = useAuth()
   const [pos, setPos] = useState({ x: window.innerWidth - 110, y: window.innerHeight - 180 })
@@ -333,11 +335,46 @@ export default function PetMascot() {
     return { x: w - DOCK_PEEK + halfExtent - BODY_WIDTH / 2, y: pos.y, cls: 'docked-right' }
   })()
 
+  useEffect(() => {
+    if (!suppressBubble) { setYieldToControls(false); return }
+    let frame = 0
+    const inspect = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        const rect = wrapperRef.current?.getBoundingClientRect()
+        if (!rect) return
+        // 用实际外框相交判定，中心点探测会遗漏头像边角压住按钮的情形。
+        const obstructs = [...document.querySelectorAll(BLOCKING_SELECTOR)].some(node => {
+          if (node.closest('.pet-mascot-wrapper')) return false
+          const r = node.getBoundingClientRect()
+          return r.width > 0 && r.height > 0 && rect.left < r.right && rect.right > r.left
+            && rect.top < r.bottom && rect.bottom > r.top
+        })
+        setYieldToControls(obstructs)
+      })
+    }
+    inspect()
+    window.addEventListener('scroll', inspect, true)
+    window.addEventListener('resize', inspect)
+    const observer = new MutationObserver(inspect)
+    const content = document.querySelector('.app-content')
+    if (content) observer.observe(content, { childList: true, subtree: true })
+    return () => {
+      cancelAnimationFrame(frame)
+      observer.disconnect()
+      window.removeEventListener('scroll', inspect, true)
+      window.removeEventListener('resize', inspect)
+    }
+  }, [suppressBubble, location.pathname, dockInfo.x, dockInfo.y])
+
   return (
     <>
       <div
+        ref={wrapperRef}
         className={`pet-mascot-wrapper ${isDragging ? 'dragging' : ''} ${hideSpot ? `docked ${dockInfo.cls}` : ''}`}
-        style={{ left: dockInfo.x, top: dockInfo.y }}
+        style={{ left: dockInfo.x, top: dockInfo.y,
+          visibility: yieldToControls ? 'hidden' : undefined,
+          pointerEvents: yieldToControls ? 'none' : undefined }}
         onMouseDown={handleMouseDown}
         onMouseEnter={handleMouseEnter}
         onClick={handleClick}

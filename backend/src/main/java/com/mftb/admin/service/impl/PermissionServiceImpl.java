@@ -69,6 +69,16 @@ public class PermissionServiceImpl implements PermissionService {
 
 
     @Override
+    public NavigationSnapshot navigationSnapshot(SysUser user) {
+        if (user == null || user.getId() == null) return new NavigationSnapshot(false, Set.of(), Map.of());
+        if (SUPER_ADMIN_ROLE.equalsIgnoreCase(user.getRole())) return new NavigationSnapshot(true, Set.of(), Map.of());
+        PermissionCache cache = obtainCache(user);
+        Map<String, Set<String>> menus = new HashMap<>();
+        cache.perms().forEach((key, actions) -> menus.put(key, Set.copyOf(actions)));
+        return new NavigationSnapshot(cache.superAdmin(), Set.copyOf(cache.accessibleSystems()), Map.copyOf(menus));
+    }
+
+    @Override
     public void evictAll() {
         cacheMap.clear();
         // 同步递增全局权限 revision，确保其他实例下次读时自动重新加载。

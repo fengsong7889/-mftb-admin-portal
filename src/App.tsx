@@ -1,12 +1,12 @@
 import { useState, useEffect, Suspense, lazy } from 'react'
 import { Layout, Spin, Modal } from 'antd'
-import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { createHashRouter, RouterProvider, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ensureLanguageBundle, getSavedLanguage } from './i18n'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { MenuProvider } from './contexts/MenuContext'
 import { CompanyBrandProvider } from './contexts/CompanyBrandContext'
-import { UnsavedChangesProvider } from './contexts/UnsavedChangesContext'
+import { UnsavedChangesProvider, UnsavedNavigationGuard } from './contexts/UnsavedChangesContext'
 import Sidebar from './components/Sidebar'
 import HeaderBar from './components/HeaderBar'
 import MenuTabs from './components/MenuTabs'
@@ -749,7 +749,7 @@ function AuthenticatedLayout() {
               <Route path="/rdm-assign" element={<RdmAssignPm />} />
               <Route path="/rdm-iteration" element={<RdmIterationPlan />} />
               <Route path="/rdm-iteration-form" element={<RdmIterationForm />} />
-              <Route path="/rdm-prd" element={<RdmPrdForm />} />
+              <Route path="/rdm-prd" element={<PrdRoute />} />
               <Route path="/rdm-review" element={<RdmReviewForm />} />
               <Route path="/rdm-change" element={<RdmChangeForm />} />
               {/* 节点计划：受理后的五节点承诺与基线冻结 */}
@@ -963,6 +963,17 @@ function RedirectToLogin() {
   return <Navigate to={to} replace />
 }
 
+/** 同 pathname 切换文档身份也重挂载，旧文档响应和草稿不能写入新文档。 */
+function PrdRoute() {
+  const { search } = useLocation()
+  const params = new URLSearchParams(search)
+  if (params.get('reqId') && !params.get('id') && !params.get('draftId')) {
+    params.set('draftId', crypto.randomUUID())
+    return <Navigate to={`/rdm-prd?${params}`} replace />
+  }
+  return <RdmPrdForm key={`${params.get('reqId')}:${params.get('id')}:${params.get('draftId')}`} />
+}
+
 /** 路由守衛 */
 function AppRoutes() {
   const { isAuthenticated } = useAuth()
@@ -1027,14 +1038,25 @@ function AppRoutes() {
   )
 }
 
-function App() {
+function EditorNavigationGuard() {
+  const { isAuthenticated, user } = useAuth()
+  /*
+   * 只看「是否登录」与「是否被强制改密」：
+   * 是否真有未保存内容由页面登记的 guard 决定（shouldBlock），
+   * 再叠加菜单权限判定只会多一个让守卫静默失效的变量。
+   * 鉴权失效/强制改密时必须立即放行，内容保护不能阻塞安全退出。
+   */
+  return <UnsavedNavigationGuard enabled={isAuthenticated && !user?.mustChangePassword} />
+}
+
+function AppProviders() {
   return (
-    <HashRouter>
       <AuthProvider>
         <MenuProvider>
           <CompanyBrandProvider>
             {/* 未保存内容保护：页签关闭/切换等导航入口统一询问；必须包住页签栏与页面 */}
             <UnsavedChangesProvider>
+              <EditorNavigationGuard />
               <AppRoutes />
               {/* 首次登录/密码被重置：未完成改密前拦住整个后台（含企业门户） */}
               <ForcePasswordChangeGate />
@@ -1042,8 +1064,13 @@ function App() {
           </CompanyBrandProvider>
         </MenuProvider>
       </AuthProvider>
-    </HashRouter>
   )
+}
+
+// 保留所有既有 Hash 深链和业务 Routes，唯一稳定根路由提供官方 blocker 所需上下文。
+const router = createHashRouter([{ path: '*', element: <AppProviders /> }])
+function App() {
+  return <RouterProvider router={router} />
 }
 
 export default App

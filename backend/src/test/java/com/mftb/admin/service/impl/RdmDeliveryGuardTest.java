@@ -82,6 +82,7 @@ class RdmDeliveryGuardTest {
     static void initTableInfo() {
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "");
         TableInfoHelper.initTableInfo(assistant, RdmWorkTask.class);
+        TableInfoHelper.initTableInfo(assistant, RdmPrd.class);
         // 进度审计实体在条件更新后插入，纯 Mockito 环境同样需要 TableInfo 缓存
         TableInfoHelper.initTableInfo(assistant, com.mftb.admin.entity.RdmTaskProgressLog.class);
     }
@@ -147,6 +148,7 @@ class RdmDeliveryGuardTest {
         when(milestoneMapper.selectList(any())).thenReturn(List.of());
         when(milestoneMapper.selectOne(any())).thenReturn(null);
         when(prdMapper.selectById(any())).thenReturn(frozenPrd());
+        when(prdMapper.update(any(), any())).thenReturn(1);
         when(taskMapper.selectById(any())).thenReturn(task());
         // createReview 链路：插入捕获 + 回读同一条实体，joinNames 需要真实姓名
         when(reviewMapper.insert(any(RdmReview.class))).thenAnswer(i -> {
@@ -340,15 +342,51 @@ class RdmDeliveryGuardTest {
     }
 
     @Test
-    @DisplayName("PRD 并发保存：不传期望版本时不启用乐观锁，存量调用方不受影响")
-    void prdSaveWithoutExpectedVersionKeepsLegacyBehaviour() {
+    @DisplayName("PRD 并发保存：已有文档缺少版本时拒绝，防客户端跳过版本保护")
+    void prdSaveWithoutExpectedVersionIsRejected() {
         when(prdMapper.selectById(any())).thenReturn(draftPrd(3));
         RdmDeliveryDTO.Prd dto = new RdmDeliveryDTO.Prd();
         dto.setId(9L);
         dto.setTitle("舊調用方");
         dto.setContentRich("<p>正文</p>");
 
-        assertDoesNotThrow(() -> service.savePrd(dto));
+        assertThrows(BusinessException.class, () -> service.savePrd(dto));
+        verify(prdMapper, org.mockito.Mockito.never()).update(any(), any());
+    }
+
+    @Test
+    @DisplayName("PRD 读取后被并发修改：WHERE 带版本，零行更新报冲突")
+    void prdSaveUsesAtomicVersionPredicate() {
+        when(prdMapper.selectById(any())).thenReturn(draftPrd(3));
+        when(prdMapper.update(any(), any())).thenAnswer(inv -> {
+            com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<RdmPrd> wrapper = inv.getArgument(1);
+            assertTrue(wrapper.getSqlSegment().contains("row_version ="));
+            assertTrue(wrapper.getParamNameValuePairs().containsValue(3));
+            assertTrue(wrapper.getSqlSet().contains("row_version = row_version + 1"));
+            return 0;
+        });
+        RdmDeliveryDTO.Prd dto = new RdmDeliveryDTO.Prd();
+        dto.setId(9L);
+        dto.setTitle("競態保存");
+        dto.setExpectedRowVersion(3);
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.savePrd(dto));
+        assertEquals(com.mftb.admin.common.ResultCode.CONFLICT.getCode(), ex.getCode());
+        verify(prdMapper, org.mockito.Mockito.never()).insert(any(RdmPrd.class));
+    }
+
+    @Test
+    @DisplayName("PRD 同版本保存一次后递增，重复请求不再次写入")
+    void prdSaveAdvancesVersionAndRejectsReplay() {
+        RdmPrd prd = draftPrd(3);
+        when(prdMapper.selectById(any())).thenReturn(prd);
+        RdmDeliveryDTO.Prd dto = new RdmDeliveryDTO.Prd();
+        dto.setId(9L);
+        dto.setTitle("版本保存");
+        dto.setExpectedRowVersion(3);
+        dto.setAdvanceRequirement(false);
+        assertEquals(4, service.savePrd(dto).getRowVersion());
+        assertThrows(BusinessException.class, () -> service.savePrd(dto));
+        verify(prdMapper).update(any(), any());
     }
 
     @Test

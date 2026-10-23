@@ -36,10 +36,17 @@ public class MenuController {
         return Result.success(menuService.list());
     }
 
-    /** 查询菜单树（首页解析菜单名称用，所有登录用户可访问） */
+    /** 管理端全量树：菜单配置与授权中心需要查看未授权菜单，但普通导航不得调用。 */
     @GetMapping("/tree")
+    @RequirePermission(menu = "menu-config", anyOf = {"authorization-center", "function-permission"})
     public Result<List<MenuVO>> tree() {
         return Result.success(menuService.tree());
+    }
+
+    /** 用户端导航树：身份取自认证上下文，服务端裁剪系统与菜单可见范围。 */
+    @GetMapping("/my-tree")
+    public Result<List<MenuVO>> myTree() {
+        return Result.success(menuService.myTree());
     }
 
     /** 查询菜单详情 */

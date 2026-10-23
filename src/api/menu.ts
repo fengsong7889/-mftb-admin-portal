@@ -51,6 +51,11 @@ export async function fetchMenuTree() {
   }
 }
 
+/** 用户导航只使用服务端裁剪树；失败向上抛，不能回退全量管理接口。 */
+export function fetchMyMenuTree(signal?: AbortSignal): Promise<MenuVO[]> {
+  return request.get<unknown, MenuVO[]>('/menus/my-tree', { ...SILENT, signal })
+}
+
 /** 获取菜单平铺列表 */
 export async function fetchMenuList() {
   try {

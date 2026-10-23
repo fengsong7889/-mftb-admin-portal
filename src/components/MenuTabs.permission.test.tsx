@@ -4,7 +4,7 @@ import { createInstance } from 'i18next'
 import zh from '../i18n/locales/zh-TW.json'
 import en from '../i18n/locales/en.json'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import MenuTabs from './MenuTabs'
+import MenuTabs, { tabPath } from './MenuTabs'
 
 /** 仅 home / asset-list 视为「有权限」；其余受控路由视为无权限（用于验证 403 路由不建标签） */
 const allowed = vi.hoisted(() => new Set(['home', 'asset-list']))
@@ -35,6 +35,14 @@ function mountAt(path: string) {
   )
   return container.querySelectorAll('.menu-tab-item').length
 }
+
+describe('PRD 页签身份', () => {
+  it('保留文档身份并规范化参数顺序', () => {
+    expect(tabPath('/rdm-prd?id=2&from=rdm-intake&reqId=1')).toBe('/rdm-prd?reqId=1&id=2')
+    expect(tabPath('/rdm-prd?reqId=1&id=3')).not.toBe(tabPath('/rdm-prd?reqId=1&id=2'))
+    expect(tabPath('/rdm-prd?draftId=a&reqId=1')).not.toBe(tabPath('/rdm-prd?draftId=b&reqId=1'))
+  })
+})
 
 describe('MenuTabs 权限标签过滤', () => {
   beforeEach(async () => {

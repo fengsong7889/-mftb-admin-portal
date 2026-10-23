@@ -15,12 +15,12 @@
 | P03 多角色与流程补测 | 部分完成 | 已完成：侧栏差异/越权拦截/「只看自己」与管理员全量/未授权直访 403；未完成：V3 发布全链路、真并发抢单、通知实发 |
 | P04 请求生命周期 | 完成 | 新增 `useRequestGate`（序号 + AbortController + 重试策略），接入需求清单/项目总览/工作台；单测 9 例 |
 | P05 统计与周报口径 | 完成 | 统计复制完整筛选、子指标改交集语义；周报部门口径改为本期上线；后端单测 6 例 |
-| P06 PRD 保护 | 完成 | 本机暂存 + 页签/页内返回/刷新离开提醒 + 服务端 `rdm_prd.row_version` 乐观锁（v3.34，写点递增、冲突拒绝）；仅浏览器前进/后退拦截未做（需 Data Router 迁移，单独立项） |
+| P06 PRD 保护 | 完成 | 本机暂存（draftId 隔离、预算拒绝而非静默淘汰）+ 页签/页内返回/刷新 + **浏览器前进后退与同路径换文档**（迁移 `createHashRouter` 用官方 `useBlocker`）+ 服务端乐观锁改为「UPDATE 带版本条件、零行即冲突」，评审/另存新版本写点同步递增 |
 | P07 列表场景缓存 | 完成 | 用户/环境隔离 key、精确 pathname、TTL 24h、每账号 50 条、参数校验；单测 4 例 |
 | P08 看板下钻与分页 | 完成 | 后端 BoardColumn 下发与 count 同源的 statuses；前端点击列带 statuses 下钻并在列表顶部显示可清除的条件；看板「再載入」至 200 条上限 |
-| P09 SLA 运行取证 | 部分完成 | 机制存在性已确认（扫描/预警/升级/去重）；真实阈值跨期与投递未执行（需独立环境与测试渠道） |
-| P10 UI 细节 | 部分完成 | 批次号全文/复制、个性化配置顺序稳定已做；宠物遮挡、双语全量收口未做 |
-| P11 回归与清场 | 完成 | 前端 `npm run verify`（静态门禁全通过，vitest 127/130，3 个超时失败单跑通过）+ 后端 `mvn clean test`（2257 例 0 失败）；已提交 `dde5bf19` 并推送 main |
+| P09 SLA 运行取证 | 部分完成 | 已修两处真实缺陷（命名锁跨连接、延长 SLA 后误发预警）并补 7 例阈值/去重/锁失败单测；**真实跨期与投递仍需独立环境+测试通知渠道，未执行** |
+| P10 UI 细节 | 完成 | 批次号全文/复制、个性化配置顺序稳定；宠物改为外框相交让位（RDM 页压住按钮时整体隐藏且不接收指针事件）；本批新增文案全部走双语 `rdm.prd.*` |
+| P11 回归与清场 | 进行中 | 首批已提交 `dde5bf19` 并推送；第二批改动（菜单裁剪/导航保护/PRD 原子乐观锁/SLA/宠物/双语）全量门禁复跑中，尚未提交 |
 | P12 管理员全量视角（新增需求） | 完成 | 研发任务/批次对管理员放开；非管理员传 all 仍按本人收敛；服务端裁决 |
 
 ## 环境与隔离
@@ -115,6 +115,19 @@
 - **服务端 PRD 并发版本**（v3.34）：`rdm_prd.row_version` 由迁移新增并登记 catalog；`savePrd` 在传入 `expectedRowVersion` 时比对并拒绝过期写入，落库用 SQL 自增（`row_version = row_version + 1`）；前端 `PrdForm` 回传打开时读到的版本。单测覆盖「不一致拒绝」与「未传不启用旧行为」。
 - **看板下钻与加载更多**（P08）：`BoardColumn.statuses` 与列 `count` 同源下发；项目看板点击列跳需求清单并显示可清除的下钻条件（搜索不改丢该条件）；看板「再載入」逐段扩到 200 条（服务端单次上限）。
 
+### 第二批补充完成（2026-10-23 晚间，尚未提交）
+
+| 项 | 交付内容 | 证据 |
+|---|---|---|
+| 菜单服务端裁剪（RDM-14） | 新增 `GET /api/menus/my-tree`（身份只取认证上下文，不接受 userId），系统准入 ∩ 菜单 view 后裁剪；目录仅在有授权子菜单时保留且清空 path/actions；剥离 `component`/`updatedBy`/时间戳。`GET /api/menus/tree` 收口为 `menu-config` + `authorization-center`/`function-permission`，前端导航改走 `my-tree`，登出/换账号立即 abort 在途响应 | `MenuServiceImplGuardTest` 6 例；浏览器实测受限账号 `my-tree` 只回 16 个 key、`tree` 业务码 403 |
+| PRD 原子乐观锁（RDM-17） | `UPDATE ... WHERE id=? AND row_version=?` + `row_version=row_version+1`，零行即 CONFLICT；已有文档缺 `expectedRowVersion` 直接拒绝（不再"未传即跳过"）；发起评审、录结论、另存新版本全部递增版本；派生前先锁源行版本 | `RdmDeliveryGuardTest` 新增 3 例（原子谓词/零行冲突/递增后重放拒绝） |
+| 浏览器前进后退与同路径换文档（RDM-20） | `HashRouter` → `createHashRouter + RouterProvider`（单一稳定根路由，业务 `Routes` 不变），官方 `useBlocker` 覆盖 PUSH/REPLACE/POP；`/rdm-prd` 以 `reqId:id:draftId` 作 key，同 pathname 换文档也重挂载；鉴权失效/强制改密时立即放行并取消确认 | `UnsavedChangesContext.test.tsx` 5 例（后退取消/暂存后离开、身份切换与 replace、暂存失败可重试、撤权放行、页签关闭不二次弹框） |
+| PRD 暂存预算（RDM-21） | 新建 PRD 补 `draftId`（同需求两份草稿不再串内容）；数量/总体积超预算改为**拒绝写入并保留上次快照**，不再静默淘汰最早的未保存文档；读取时校验字段类型与版本基线 | `prdDraftStore.test.ts` 8 例 |
+| SLA 两处缺陷（RDM-18/19） | 命名锁改为复用 `MigrationLock`（`GET_LOCK`/`RELEASE_LOCK` 同一借出连接，异常也释放）；延长 SLA 后未到预警点不再发「即将逾期」 | `RdmSlaSchedulerTest` 7 例（17/18/24/25h 边界、延长清标记、已发去重、无规则与锁失败不发） |
+| 宠物让位（RDM-23） | 原实现只按中心点避让，头像边角仍可压住按钮并吞点击；改为宠物外框与热区**相交即整体让位**（`visibility:hidden` + `pointer-events:none`），滚动/尺寸变化/DOM 变化重算 | `PetMascot.test.tsx` 1 例 |
+| 双语收口 | 未保存确认框与放弃二次确认全部改走 `rdm.prd.*`（新增 12 个 key，繁中/英文同步），不再硬编码 | `npm run check:i18n` 通过 |
+| 工程修复（RDM-22） | `vitest.config.ts` 仍用 Vitest 4 已移除的 `poolOptions.forks`，并发预算实际失效；改 `maxWorkers` | 全量套件不再出现批量超时 |
+
 ## 验证记录（run-20261023-01）
 
 | 项目 | 命令 | 结果 |
@@ -151,6 +164,50 @@
 
 待完成以让后端真正生效：在 Sealos 控制台把 `mftb-admin-backend` 镜像切到上面 sha → 首次启动执行 `rdm:schema:v3.34` → 轮询 `/api/health/ready` 到 200（启动期 5~6 分钟为正常中间态）→ 用生产账号跑 `scripts/verify-deploy.sh`。
 
+## 菜单裁剪（B2/RDM-14）实测证据（2026-10-23 深夜，后端重建后）
+
+| 账号 | 授权 | `/api/menus/my-tree` | `/api/menus/tree` |
+|---|---|---|---|
+| MF00032（QA-RDM-PM） | 6 项（含分组，启动期被继承扩散为 15 行） | 200，17 个 key（15 个 rdm） | **业务码 403**「没有 [menu-config] 的[查看]权限」 |
+| MF00033（改绑 QA-RDM-MIN） | 仅 `rdm-workbench:view`、`rdm-delivery-board:view` + rdm 系统准入 | 200，**精确 3 节点**：两个授权叶子 + `rdm-delivery` 目录（`path=null`、`actions=[]`、`component` 已剥离） | 403 |
+| MF00034（QA-RDM-TEST） | 3 项（扩散为 10 行） | 200，13 个 key | 403 |
+| admin | 超管 | 200，242 个 key | 200，244 个 key（含 2 个停用项由管理端可见） |
+
+`my-tree` 与 `/api/auth/info` 的 permissions 完全同源（MF00033 两侧均为 2 项），不再出现「接口给全量、前端过滤」的信息暴露。
+
+### 同批查出的两项既有语义（不改代码，登记待决策）
+
+1. **RDM-24（P2，扩权风险）**：`RdmMenuInitializer.inheritGroupGrants()` 每次启动都把分组目录的授权 `INSERT IGNORE` 复制给组内全部叶子。实测只授 `rdm-delivery` 一个分组的角色，重启后在 `sys_role_menu` 里变成 14 行（研发/测试/发布/迭代全部到手）。原意是菜单拆分升级时不让存量角色失权，但副作用是「只勾一个分组＝拿到整组」。建议改为一次性结构迁移或只对新增叶子补授，需业务确认。
+2. **系统准入是导航硬前提**：`my-tree` 与既有 `portal/systems/{code}/navigation` 同口径（系统准入 ∩ 菜单 view）。实测新建角色若只有菜单授权、没有 `sys_role_system` 行，`my-tree` 返回空树（而旧的「全量树 + 前端过滤」会照常显示菜单）。存量核查：有菜单授权却缺系统准入的仅 rdm 2 行、eam 1 行、portal 1 行、hr 部门 1 行（多为本次夹具），影响面极小；处置方式是在授权中心补系统准入，而不是放宽导航口径。
+
+## PRD 未保存保护（B1/RDM-20）真实浏览器实测（2026-10-24 凌晨）
+
+迁移 `HashRouter` → `createHashRouter + RouterProvider` 后，用真实浏览器（admin）在 `#/rdm-prd?reqId=20&id=19` 修改「原型链接」制造脏态，逐项验证：
+
+| 场景 | 动作 | 结果 |
+|---|---|---|
+| 侧栏点击切页（PUSH） | 点「個人工作台」 | ✅ `blocker.state=blocked`、URL 保持 `/rdm-prd`、编辑器仍在、弹出「有未保存的內容，確定要離開嗎？」 |
+| 选「繼續編輯」 | 点取消 | ✅ 留在原文档，输入内容保留，blocker 回到 `unblocked` |
+| 刷新/关闭标签页 | reload | ✅ 触发浏览器原生 `beforeunload` 提醒 |
+| 顶部页签点击/关闭 | 五个入口 | ✅ 确认后按目标路径精确放行一次（不再重复弹框） |
+| **浏览器后退 / 直接改 hash（POP）** | `history.back()` / `location.hash=` | ❌ **未拦截**：日志显示 blocker 收到 `POP` 且 `decision=true`，但 `createHashHistory` 无法回滚浏览器已完成的 hash 变更，页面仍切走 |
+
+结论：Data Router 迁移让 PUSH 类导航（侧栏/页签/页内返回）统一走官方 blocker，并消除了旧 `approvedOnce` 定时器在后台标签被节流后「误放行」的隐患；但 **POP 拦截在本架构下不可达**，已在 `defects.csv` 记为 `RDM-20 / BLOCKED`，替代保护仅剩 `beforeunload`。要彻底解决需把 Hash 路由换成 BrowserRouter（要求静态托管配置 rewrite 回退）或等上游在 hash history 上支持回滚。
+
+## 第二批门禁（2026-10-24 凌晨）
+
+| 项目 | 命令 | 结果 |
+|---|---|---|
+| 后端全量 | `mvn -o -B clean test` | **2274 例，0 失败**，BUILD SUCCESS |
+| 前端全量 | `VITEST_MAX_FORKS=2 npx vitest run` | **133 文件全通过** |
+| 类型检查 | `npm run typecheck` | 0 error |
+| Lint | `npm run lint` | 0 error（443 warning 为既有基线） |
+| 菜单一致性 | `npm run check:menu` | 通过 |
+| 统计卡位置 | `npm run check:stat-order` | 152 个列表页通过 |
+| 确认弹窗 | `npm run check:confirm-modal` | 260 处调用通过（含本次新增的放弃二次确认） |
+| i18n | `npm run check:i18n` | 通过（rdm 3425 = 基线） |
+| 密钥扫描 | `npm run secret-scan` | 890 文件无敏感信息 |
+
 ## 回归风险与说明
 
 1. `confirmLeave` 在“无脏页面”时必须**同步**返回 true；返回 Promise 会让页签切换延后一个微任务，已出现测试失败并被修复，后续不得改回统一 async。
@@ -167,6 +224,15 @@
 2. `GET /api/menus/tree` 保留给「菜单管理」页，加 `@RequirePermission(menu="menu-management")`（或菜单管理专属 action）。
 3. 前端 `MenuContext` 切到 `/menus/my-tree`；`Sidebar` 的本地过滤保留作为兜底。
 4. 回归点：菜单管理页仍需全量树；超管、受限角色、无系统准入账号三种视角；页签恢复与 30s 轮询行为不变。
+
+## 测试夹具清场（2026-10-24 凌晨）
+
+| 对象 | 处置 | 复核 |
+|---|---|---|
+| 员工 MF00032 / MF00033 / MF00034（id 39/40/41） | `PUT /api/employees/{id}/status?status=0` 停用 | 用原密码登录返回 `1002 账号已被禁用` |
+| 角色 QA-RDM-PM / QA-RDM-DEV / QA-RDM-TEST / QA-RDM-MIN（id 20/21/22/23） | `PUT /api/roles/{id}/status?status=0` 停用 | 状态接口返回 200；保留行以便回溯，未物理删除 |
+
+说明：采用**停用**而非删除，保证授权行、审计与登录日志可追溯；如需彻底清理，在授权中心确认无引用后再删除员工与角色。本轮未改动任何真实员工、真实项目成员与业务单据。
 
 ## 交接说明
 

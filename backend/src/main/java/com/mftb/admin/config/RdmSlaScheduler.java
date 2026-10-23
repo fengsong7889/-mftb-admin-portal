@@ -1,6 +1,7 @@
 package com.mftb.admin.config;
 
 import com.mftb.admin.constant.RdmConstants;
+import com.mftb.admin.config.migration.MigrationLock;
 import com.mftb.admin.service.RdmConfigService;
 import com.mftb.admin.service.RdmNotifyService;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ public class RdmSlaScheduler {
     private static final int REMIND_INTERVAL_HOURS = 24;
 
     private final JdbcTemplate jdbcTemplate;
+    private final MigrationLock migrationLock;
     private final RdmConfigService configService;
     private final RdmNotifyService notifyService;
     private final com.mftb.admin.mapper.RdmRequirementMapper requirementMapper;
@@ -36,18 +38,13 @@ public class RdmSlaScheduler {
     /** 默认每 30 分钟扫描一次，可用 rdm.sla.scan-interval-ms 覆盖 */
     @Scheduled(fixedDelayString = "${rdm.sla.scan-interval-ms:1800000}", initialDelayString = "${rdm.sla.initial-delay-ms:120000}")
     public void scan() {
-        Integer locked = jdbcTemplate.queryForObject("SELECT GET_LOCK(?, 0)", Integer.class, LOCK_KEY);
-        if (locked == null || locked != 1) {
-            log.debug("RDM SLA 扫描跳过：其它实例持有命名锁");
-            return;
-        }
         try {
-            doScan();
+            // GET_LOCK/RELEASE_LOCK 是连接级；两次独立 JdbcTemplate 调用可能借到不同连接。
+            // 复用既有持锁器，在同一借出连接上获取并释放，扫描异常也会 finally 释放。
+            migrationLock.runExclusive(LOCK_KEY, 0, this::doScan);
         } catch (Exception e) {
             // 定时任务失败不能打断调度线程；下一轮会自动重试
             log.error("RDM SLA 掃描失敗: {}", e.getMessage(), e);
-        } finally {
-            jdbcTemplate.queryForObject("SELECT RELEASE_LOCK(?)", Integer.class, LOCK_KEY);
         }
     }
 
@@ -103,6 +100,8 @@ public class RdmSlaScheduler {
                 log.info("RDM 停留已缓解，清除逾期标记: reqId={}, status={}, 停留={}h, SLA={}h",
                         reqId, status, stayed, slaHours);
             }
+            // 延长 SLA 后只清除旧标记；未到预警点不能发送新的「即将逾期」提醒。
+            if (!overdue && !nearingWarn) continue;
             String event = overdue ? RdmConstants.EVENT_SLA_OVERDUE : RdmConstants.EVENT_SLA_WARN;
             if (alreadyNotified(reqId, event)) {
                 continue;

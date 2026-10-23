@@ -202,16 +202,12 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
                 if (!StringUtils.hasText(dto.getChangeReason())) {
                     throw new BusinessException("以新版本修改必須填寫變更原因，它會進版本鏈");
                 }
+                requirePrdVersion(prd, dto);
+                // 锁定源行版本再派生新版本，避免两次并发派生都基于过期源内容。
+                updatePrdWithVersion(prd);
                 prd = forkVersion(prd, dto, current);
-            } else if (hasVersionConflict(prd, dto)) {
-                /*
-                 * 乐观锁：前端带着「打开时读到的 row_version」来保存，与库里不一致说明
-                 * 编辑期间已被他人保存。此时继续写会把对方刚写的内容整段抹掉，
-                 * 而双方都会收到「保存成功」——这是最难事后发现的数据丢失，必须拒绝。
-                 */
-                throw new BusinessException("這份 PRD 在你編輯期間已被其他人保存（你打開時是第 "
-                        + dto.getExpectedRowVersion() + " 版，現在是第 " + prd.getRowVersion()
-                        + " 版）。為避免覆蓋他人內容已停止保存，請重新打開核對後再提交");
+            } else {
+                requirePrdVersion(prd, dto);
             }
         } else {
             if (dto.getReqId() == null) {
@@ -229,7 +225,8 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
             prd.setAuthorName(current == null ? req.getAssigneePmName() : current.getName());
             prd.setCreatedBy(operatorResolver.operatorSignature(current));
         }
-        prd.setParentPrdId(dto.getParentPrdId());
+        // 派生版本的 parent 指向原定稿 PRD，不能被客户端空值覆盖。
+        if (!(dto.getId() != null && prd.getId() == null)) prd.setParentPrdId(dto.getParentPrdId());
         prd.setTitle(dto.getTitle().trim());
         prd.setTargetUsers(dto.getTargetUsers());
         prd.setFeatureList(dto.getFeatureList());
@@ -248,14 +245,7 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
             prd.setRowVersion(0);
             prdMapper.insert(prd);
         } else {
-            /*
-             * row_version 必须由 SQL 自增，不能交给实体回写：实体里的值还是读出来的旧版本，
-             * 全字段更新会把刚比对过的版本号又写回原值，乐观锁永远停在 0。
-             */
-            prd.setRowVersion(null);
-            prdMapper.update(prd, new LambdaUpdateWrapper<RdmPrd>()
-                    .eq(RdmPrd::getId, prd.getId())
-                    .setSql("row_version = row_version + 1"));
+            updatePrdWithVersion(prd);
         }
 
         // 拆 PRD 即代表需求進入「PRD設計中」；状态不可流转时静默跳过（由详情页按钮显式推进）
@@ -404,8 +394,11 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
 
         if (dto.getPrdId() != null) {
             RdmPrd prd = requirePrd(dto.getPrdId());
+            if (!Objects.equals(prd.getReqId(), req.getId())) {
+                throw new BusinessException("PRD 不屬於本需求");
+            }
             prd.setStatus(PRD_REVIEWING);
-            prdMapper.updateById(prd);
+            updatePrdWithVersion(prd);
             /*
              * PRD 已输出并提交评审 = 产品经理对「承诺出 PRD 日期」的兑现时点，
              * 任务在此时收口；评审通过与否是质量问题，不改变「PRD 已交」这个事实。
@@ -455,7 +448,7 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
                 prd.setStatus(passed ? PRD_APPROVED : PRD_REJECTED);
                 prd.setReviewTime(LocalDateTime.now());
                 prd.setReviewConclusion(review.getConclusionDesc());
-                prdMapper.updateById(prd);
+                updatePrdWithVersion(prd);
                 // 结论落定的同时冻结一版：事后能回答「这次评审通过的到底是哪一版内容」
                 snapshotPrd(prd, review, passed, current);
             }
@@ -2087,16 +2080,35 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
 
     /**
      * 是否发生并发覆盖冲突。
-     * <p>只在前端明确传了期望版本时才判定：不传代表调用方不使用乐观锁（存量脚本、
-     * 集成测试等），此时保持旧行为，不能把「未传」当成「版本 0」直接拒绝所有人。
-     * <p>库中版本为 null（v3.34 迁移前的旧行未回填）时按 0 处理，与迁移默认值一致。
+     * <p>已有 PRD 的所有编辑调用必须传入读取时的版本，旧客户端缺版本明确拒绝。
+     * <p>版本比较只作提前提示，真正的并发边界在条件更新的 WHERE 子句。
      */
     private static boolean hasVersionConflict(RdmPrd prd, RdmDeliveryDTO.Prd dto) {
-        if (dto.getExpectedRowVersion() == null) {
-            return false;
-        }
         int current = prd.getRowVersion() == null ? 0 : prd.getRowVersion();
-        return dto.getExpectedRowVersion() != current;
+        return !Objects.equals(dto.getExpectedRowVersion(), current);
+    }
+
+    private static void requirePrdVersion(RdmPrd prd, RdmDeliveryDTO.Prd dto) {
+        if (dto.getExpectedRowVersion() == null || dto.getExpectedRowVersion() < 0) {
+            throw new BusinessException(400, "缺少有效的 PRD 版本，請重新載入後再保存");
+        }
+        if (hasVersionConflict(prd, dto)) {
+            throw new BusinessException(ResultCode.CONFLICT.getCode(), "這份 PRD 已被其他人保存，請保留本機內容並重新載入比較");
+        }
+    }
+
+    /** 原子比较并递增；零行更新必须中止事务，不能再读最新版自动覆盖。 */
+    private void updatePrdWithVersion(RdmPrd prd) {
+        int version = prd.getRowVersion() == null ? 0 : prd.getRowVersion();
+        prd.setRowVersion(null);
+        int affected = prdMapper.update(prd, new LambdaUpdateWrapper<RdmPrd>()
+                .eq(RdmPrd::getId, prd.getId())
+                .eq(RdmPrd::getRowVersion, version)
+                .setSql("row_version = row_version + 1"));
+        if (affected != 1) {
+            throw new BusinessException(ResultCode.CONFLICT.getCode(), "這份 PRD 已被其他人修改，請保留本機內容並重新載入比較");
+        }
+        prd.setRowVersion(version + 1);
     }
 
     /**
@@ -2126,7 +2138,7 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         copy.setCreatedBy(operatorResolver.operatorSignature(current));
         // 新版本是独立的一行，从第 0 版开始计数（不能继承父 PRD 的版本号）
         copy.setRowVersion(0);
-        prdMapper.insert(copy);
+        // 由 savePrd 填好本次正文后一次性插入；新行版本保持 0。
         log.info("PRD 已開新版本: prdNo={}, {} -> {}, reason={}",
                 copy.getPrdNo(), origin.getVersionNo(), copy.getVersionNo(), dto.getChangeReason());
         return copy;

@@ -9,6 +9,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 
+import java.util.List;
+
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -92,11 +95,37 @@ class RoleMenuPermissionTest extends SecurityTestBase {
                     .andExpect(jsonPath("$.code").value(200));
         }
 
+        /**
+         * 契约变更（2026-10-23）：/api/menus/tree 是<b>管理端全量菜单树</b>，
+         * 旧行为让任何登录用户都能拿到全站菜单名与路径（含未授权项），
+         * 属于结构信息暴露；导航改由服务端裁剪的 /my-tree 提供。
+         * 这里把旧断言按新契约反转，并同时钉住「导航树对所有登录用户可用」，
+         * 避免收口管理接口时把普通用户的侧栏一起弄没。
+         */
         @Test
-        @DisplayName("所有登录用户 GET /api/menus/tree → 200（无 @RequirePermission，仅认证）")
-        void anyUserMenuTree() throws Exception {
-            // /tree 端点无 @RequirePermission 注解，仅需通过 JWT 认证
+        @DisplayName("访客 GET /api/menus/tree → code=403（全量树仅限菜单/授权管理）")
+        void guestFullMenuTreeDenied() throws Exception {
+            denyAllPermissions(guestUser);
             mockMvc.perform(authGet("/api/menus/tree", guestUser))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(403));
+        }
+
+        @Test
+        @DisplayName("管理员 GET /api/menus/tree → 200（菜单配置需全量树）")
+        void adminFullMenuTree() throws Exception {
+            grantAllPermissions(adminUser);
+            mockMvc.perform(authGet("/api/menus/tree", adminUser))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value(200));
+        }
+
+        @Test
+        @DisplayName("所有登录用户 GET /api/menus/my-tree → 200（服务端裁剪的导航树）")
+        void anyUserMyMenuTree() throws Exception {
+            denyAllPermissions(guestUser);
+            when(menuService.myTree()).thenReturn(List.of());
+            mockMvc.perform(authGet("/api/menus/my-tree", guestUser))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200));
         }

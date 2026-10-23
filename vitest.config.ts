@@ -33,9 +33,8 @@ export default defineConfig({
     hookTimeout: 30000,
     setupFiles: ['./src/test/setup.ts'],
     pool: 'forks',
-    poolOptions: {
-      forks: { maxForks, minForks: 1 },
-    },
+    // Vitest 4 已移除 poolOptions.forks，预算必须放到顶层才会生效。
+    maxWorkers: maxForks,
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['node_modules', 'dist'],
     coverage: {

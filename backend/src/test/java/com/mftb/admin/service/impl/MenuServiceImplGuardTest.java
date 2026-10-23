@@ -23,8 +23,12 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -119,6 +123,97 @@ class MenuServiceImplGuardTest {
     private void loginAs(SysUser user) {
         when(operatorResolver.currentUser()).thenReturn(user);
         when(operatorResolver.isAdmin(user)).thenReturn("admin".equals(user.getRole()));
+        when(permissionService.navigationSnapshot(user)).thenReturn(
+                new PermissionService.NavigationSnapshot("admin".equals(user.getRole()), Set.of(), Map.of()));
+    }
+
+    private SysMenu nav(long id, Long parent, String key, String system, int type) {
+        SysMenu menu = new SysMenu();
+        menu.setId(id);
+        menu.setParentId(parent);
+        menu.setMenuKey(key);
+        menu.setName(key);
+        menu.setSystemCode(system);
+        menu.setType(type);
+        menu.setPath("/" + key);
+        menu.setComponent("internal-component");
+        menu.setActions("[\"view\",\"edit\"]");
+        menu.setStatus(1);
+        menu.setSort((int) id);
+        menu.setUpdatedBy("private-operator");
+        return menu;
+    }
+
+    @Test
+    void navigationPrunesSiblingsAndActionsButKeepsAncestor() {
+        loginAs(normalAdmin);
+        when(sysMenuMapper.selectList(any())).thenReturn(List.of(
+                nav(1, null, "rdm-group", "rdm", 1),
+                nav(2, 1L, "rdm-dev", null, 2), nav(3, 1L, "rdm-test", null, 2)));
+        when(permissionService.navigationSnapshot(normalAdmin)).thenReturn(new PermissionService.NavigationSnapshot(
+                false, Set.of("rdm"), Map.of("rdm-dev", Set.of("view"))));
+        var tree = menuService.myTree();
+        assertEquals(1, tree.size());
+        assertNull(tree.get(0).getPath());
+        assertEquals(List.of("rdm-dev"), tree.get(0).getChildren().stream().map(n -> n.getMenuKey()).toList());
+        var leaf = tree.get(0).getChildren().get(0);
+        assertEquals(List.of("view"), leaf.getActions());
+        assertNull(leaf.getUpdatedBy());
+        assertNull(leaf.getComponent());
+        verify(permissionService).navigationSnapshot(normalAdmin);
+        // 导航裁剪不能污染管理树；管理界面仍拿到原始动作与兄弟节点。
+        assertEquals(2, menuService.tree().get(0).getChildren().size());
+    }
+
+    @Test
+    void navigationRequiresSystemAccessEvenWithMenuGrant() {
+        loginAs(normalAdmin);
+        when(sysMenuMapper.selectList(any())).thenReturn(List.of(nav(1, null, "rdm-dev", "rdm", 2)));
+        when(permissionService.navigationSnapshot(normalAdmin)).thenReturn(new PermissionService.NavigationSnapshot(
+                false, Set.of(), Map.of("rdm-dev", Set.of("view"))));
+        assertTrue(menuService.myTree().isEmpty());
+    }
+
+    @Test
+    void navigationPromotesExplicitCrossSystemChildWithoutLeakingParent() {
+        loginAs(normalAdmin);
+        when(sysMenuMapper.selectList(any())).thenReturn(List.of(
+                nav(1, null, "hidden-group", "hr", 1), nav(2, 1L, "rdm-dev", "rdm", 2)));
+        when(permissionService.navigationSnapshot(normalAdmin)).thenReturn(new PermissionService.NavigationSnapshot(
+                false, Set.of("rdm"), Map.of("rdm-dev", Set.of("view"))));
+        assertEquals(List.of("rdm-dev"), menuService.myTree().stream().map(n -> n.getMenuKey()).toList());
+    }
+
+    @Test
+    void navigationAdminSeesAllEnabledMenusNotDisabledBranches() {
+        loginAs(adminUser);
+        SysMenu disabled = nav(3, null, "disabled-group", "hr", 1);
+        disabled.setStatus(0);
+        when(sysMenuMapper.selectList(any())).thenReturn(List.of(
+                nav(1, null, "rdm-dev", "rdm", 2), nav(2, null, "hr", "hr", 2),
+                disabled, nav(4, 3L, "disabled-child", "hr", 2)));
+        var tree = menuService.myTree();
+        assertEquals(List.of("rdm-dev", "hr"), tree.stream().map(n -> n.getMenuKey()).toList());
+        assertEquals(List.of("view", "edit"), tree.get(0).getActions());
+    }
+
+    @Test
+    void navigationRejectsAnonymousAndUnownedMenu() {
+        assertThrows(PermissionDeniedException.class, () -> menuService.myTree());
+        loginAs(normalAdmin);
+        when(sysMenuMapper.selectList(any())).thenReturn(List.of(nav(1, null, "unowned", null, 2)));
+        when(permissionService.navigationSnapshot(normalAdmin)).thenReturn(new PermissionService.NavigationSnapshot(
+                false, Set.of(), Map.of("unowned", Set.of("view"))));
+        assertTrue(menuService.myTree().isEmpty());
+    }
+
+    @Test
+    void managementTreeHasPermissionGateAndUserTreeDoesNotAcceptUserId() throws Exception {
+        var gate = com.mftb.admin.controller.MenuController.class.getMethod("tree")
+                .getAnnotation(com.mftb.admin.annotation.RequirePermission.class);
+        assertEquals("menu-config", gate.menu());
+        assertTrue(List.of(gate.anyOf()).contains("authorization-center"));
+        assertEquals(0, com.mftb.admin.controller.MenuController.class.getMethod("myTree").getParameterCount());
     }
 
     // ────────────── 普通管理员：名称可改 ──────────────

@@ -39,6 +39,12 @@ public interface PermissionService {
      */
     String resolveSystemCodeOfMenu(String menuKey);
 
+    /** 导航一次取权限快照，避免逐菜单重复查询全局权限 revision。 */
+    record NavigationSnapshot(boolean superAdmin, java.util.Set<String> systems,
+                              java.util.Map<String, java.util.Set<String>> menus) { }
+
+    NavigationSnapshot navigationSnapshot(SysUser user);
+
     /** 清空权限缓存 (角色/部门/员工授权变更后调用) */
     void evictAll();
 }

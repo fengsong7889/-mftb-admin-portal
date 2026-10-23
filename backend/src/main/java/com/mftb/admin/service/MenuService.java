@@ -16,6 +16,9 @@ public interface MenuService {
     /** 查询菜单树 */
     List<MenuVO> tree();
 
+    /** 当前认证用户的导航树：系统准入与菜单权限交集，不接受客户端用户 ID */
+    List<MenuVO> myTree();
+
     /** 根据ID查询菜单详情 */
     MenuVO detail(Long id);
 

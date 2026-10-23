@@ -17,6 +17,7 @@ const PREFIX = 'rdm-prd-draft:v1:'
 const TTL_MS = 24 * 60 * 60 * 1000
 const MAX_BYTES = 1024 * 1024
 const MAX_PER_OWNER = 10
+const MAX_TOTAL_BYTES = 3 * 1024 * 1024
 
 export interface PrdDraftPayload {
   title: string
@@ -35,8 +36,8 @@ export interface PrdDraftPayload {
   savedAt: number
 }
 
-function keyOf(owner: string, reqId: number, prdId: number | null): string {
-  return `${PREFIX}${owner}:${reqId}:${prdId ?? 'new'}`
+function keyOf(owner: string, reqId: number, prdId: number | null, draftId?: string): string {
+  return `${PREFIX}${owner}:${reqId}:${prdId ?? (draftId ? `new:${draftId}` : 'new')}`
 }
 
 function byteLength(text: string): number {
@@ -47,32 +48,22 @@ function byteLength(text: string): number {
   }
 }
 
-function prune(owner: string): void {
-  try {
-    const prefix = `${PREFIX}${owner}:`
-    const alive: { k: string; savedAt: number }[] = []
-    const now = Date.now()
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const k = sessionStorage.key(i)
-      if (!k || !k.startsWith(prefix)) continue
-      let savedAt = 0
-      try {
-        savedAt = Number((JSON.parse(sessionStorage.getItem(k) || '{}') as PrdDraftPayload).savedAt ?? 0)
-      } catch {
-        savedAt = 0
-      }
-      if (!savedAt || now - savedAt > TTL_MS) {
-        sessionStorage.removeItem(k)
-        continue
-      }
-      alive.push({ k, savedAt })
+/** 只淘汰过期/损坏内容，不能静默删除仍有效的未保存文档。 */
+function existingDrafts(owner: string): { key: string; bytes: number }[] {
+  const result: { key: string; bytes: number }[] = []
+  for (let i = sessionStorage.length - 1; i >= 0; i--) {
+    const key = sessionStorage.key(i)
+    if (!key?.startsWith(`${PREFIX}${owner}:`)) continue
+    const raw = sessionStorage.getItem(key) ?? ''
+    let savedAt = 0
+    try { savedAt = JSON.parse(raw).savedAt } catch { /* 无效缓存按过期处理 */ }
+    if (!Number.isFinite(savedAt) || savedAt <= 0 || savedAt > Date.now() || Date.now() - savedAt > TTL_MS) {
+      sessionStorage.removeItem(key)
+    } else {
+      result.push({ key, bytes: byteLength(raw) })
     }
-    if (alive.length <= MAX_PER_OWNER) return
-    alive.sort((a, b) => a.savedAt - b.savedAt)
-    alive.slice(0, alive.length - MAX_PER_OWNER).forEach(item => sessionStorage.removeItem(item.k))
-  } catch {
-    // 隐私模式/配额异常只影响恢复
   }
+  return result
 }
 
 /** 本机暂存归属：环境 + 登录用户 */
@@ -86,13 +77,16 @@ export function prdDraftOwner(userId?: number | null): string {
  * @returns true=已写入；false=内容过大或存储不可用（调用方必须提示「暂存失败」，不能假装成功）
  */
 export function savePrdDraft(
-  owner: string, reqId: number, prdId: number | null, payload: Omit<PrdDraftPayload, 'savedAt'>,
+  owner: string, reqId: number, prdId: number | null, payload: Omit<PrdDraftPayload, 'savedAt'>, draftId?: string,
 ): boolean {
   const serialized = JSON.stringify({ ...payload, savedAt: Date.now() })
   if (byteLength(serialized) > MAX_BYTES) return false
   try {
-    sessionStorage.setItem(keyOf(owner, reqId, prdId), serialized)
-    prune(owner)
+    const key = keyOf(owner, reqId, prdId, draftId)
+    const other = existingDrafts(owner).filter(item => item.key !== key)
+    if (other.length >= MAX_PER_OWNER || other.reduce((sum, item) => sum + item.bytes, 0)
+        + byteLength(serialized) > MAX_TOTAL_BYTES) return false
+    sessionStorage.setItem(key, serialized)
     return true
   } catch {
     return false
@@ -100,17 +94,21 @@ export function savePrdDraft(
 }
 
 /** 读取本机暂存：结构不合法、超过 24 小时或跨账号一律视为没有 */
-export function loadPrdDraft(owner: string, reqId: number, prdId: number | null): PrdDraftPayload | null {
+export function loadPrdDraft(owner: string, reqId: number, prdId: number | null, draftId?: string): PrdDraftPayload | null {
   try {
-    const raw = sessionStorage.getItem(keyOf(owner, reqId, prdId))
+    const raw = sessionStorage.getItem(keyOf(owner, reqId, prdId, draftId))
     if (!raw) return null
     const parsed = JSON.parse(raw) as PrdDraftPayload
     if (!parsed || typeof parsed.contentRich !== 'string' || typeof parsed.title !== 'string') {
-      sessionStorage.removeItem(keyOf(owner, reqId, prdId))
+      sessionStorage.removeItem(keyOf(owner, reqId, prdId, draftId))
       return null
     }
-    if (!Number.isFinite(parsed.savedAt) || Date.now() - parsed.savedAt > TTL_MS) {
-      sessionStorage.removeItem(keyOf(owner, reqId, prdId))
+    if (byteLength(raw) > MAX_BYTES || !Number.isFinite(parsed.savedAt) || parsed.savedAt > Date.now()
+      || Date.now() - parsed.savedAt > TTL_MS
+      || ['targetUsers', 'featureList', 'acceptanceCriteria', 'prototypeUrl'].some(field =>
+        typeof (parsed as unknown as Record<string, unknown>)[field] !== 'string')
+      || (parsed.baseRowVersion != null && (!Number.isSafeInteger(parsed.baseRowVersion) || parsed.baseRowVersion < 0))) {
+      sessionStorage.removeItem(keyOf(owner, reqId, prdId, draftId))
       return null
     }
     return parsed
@@ -120,9 +118,9 @@ export function loadPrdDraft(owner: string, reqId: number, prdId: number | null)
 }
 
 /** 正式保存成功或用户明确放弃后清理 */
-export function clearPrdDraft(owner: string, reqId: number, prdId: number | null): void {
+export function clearPrdDraft(owner: string, reqId: number, prdId: number | null, draftId?: string): void {
   try {
-    sessionStorage.removeItem(keyOf(owner, reqId, prdId))
+    sessionStorage.removeItem(keyOf(owner, reqId, prdId, draftId))
   } catch {
     // 清不掉只会在下次打开时多一次恢复询问
   }

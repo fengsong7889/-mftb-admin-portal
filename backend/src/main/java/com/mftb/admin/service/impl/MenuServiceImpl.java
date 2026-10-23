@@ -65,6 +65,55 @@ public class MenuServiceImpl implements MenuService {
     }
 
     @Override
+    public List<MenuVO> myTree() {
+        SysUser user = operatorResolver.currentUser();
+        if (user == null) {
+            throw new PermissionDeniedException("menus", "view");
+        }
+        // 系统权限一次请求内复用，菜单权限仍由现有角色/部门合并引擎裁决。
+        return filterNavigation(tree(), null, permissionService.navigationSnapshot(user));
+    }
+
+    private List<MenuVO> filterNavigation(List<MenuVO> nodes, String inheritedSystem,
+                                         PermissionService.NavigationSnapshot access) {
+        List<MenuVO> result = new ArrayList<>();
+        for (MenuVO node : nodes) {
+            if (!Integer.valueOf(1).equals(node.getStatus())) continue;
+            String owner = StringUtils.hasText(node.getSystemCode()) ? node.getSystemCode() : inheritedSystem;
+            List<MenuVO> children = filterNavigation(node.getChildren(), owner, access);
+            boolean admitted = access.superAdmin() || "portal".equals(owner)
+                    || (StringUtils.hasText(owner) && access.systems().contains(owner));
+            // 显式归属其它系统的子菜单可以提升；禁止返回无准入的外层目录名称。
+            if (!admitted) {
+                result.addAll(children);
+                continue;
+            }
+            boolean permitted = Integer.valueOf(2).equals(node.getType())
+                    && (access.superAdmin() || access.menus().getOrDefault(node.getMenuKey(), Set.of()).contains("view"));
+            if (!permitted && children.isEmpty()) continue;
+            node.setChildren(children);
+            node.setSystemCode(owner);
+            // 用户导航不需要操作人、更新时间和后端组件名。
+            node.setUpdatedBy(null);
+            node.setCreatedAt(null);
+            node.setUpdatedAt(null);
+            node.setComponent(null);
+            if (permitted) {
+                node.setActions(node.getActions().stream()
+                        .filter(action -> access.superAdmin()
+                                || access.menus().getOrDefault(node.getMenuKey(), Set.of()).contains(action))
+                        .toList());
+            } else {
+                // 仅为已授权子菜单保留的目录，不给目录本身添加可点击路径或动作。
+                node.setPath(null);
+                node.setActions(List.of());
+            }
+            result.add(node);
+        }
+        return result;
+    }
+
+    @Override
     public MenuVO detail(Long id) {
         SysMenu menu = requireMenu(id);
         String parentName = null;

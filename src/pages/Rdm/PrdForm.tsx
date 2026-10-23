@@ -26,7 +26,7 @@ import {
 import { formatRdmReqNo, RDM_STATUS } from '../../constants/rdm'
 import { buildRdmDetailPath } from '../../constants/menuDataSource'
 import { useAuth } from '../../contexts/AuthContext'
-import { useConfirmLeave, useUnsavedGuard } from '../../contexts/UnsavedChangesContext'
+import { useUnsavedGuard } from '../../contexts/UnsavedChangesContext'
 import { clearPrdDraft, loadPrdDraft, prdDraftOwner, savePrdDraft } from './prdDraftStore'
 import { useRdmBack } from './useRdmBack'
 import './index.css'
@@ -72,6 +72,7 @@ export default function PrdForm() {
   const [searchParams] = useSearchParams()
   const reqId = Number(searchParams.get('reqId') ?? 0)
   const prdId = Number(searchParams.get('id') ?? 0)
+  const draftId = searchParams.get('draftId') ?? undefined
   /** 保存/取消后能回退就回来源页，直接打开才 replace 到详情（带上 from 保持侧栏高亮） */
   const goBack = useRdmBack(reqId ? buildRdmDetailPath({ id: reqId, from: searchParams.get('from') }) : '/rdm-requirement')
 
@@ -80,7 +81,6 @@ export default function PrdForm() {
   /** 本机暂存归属：环境 + 用户；不同账号绝不共用 */
   const draftOwner = prdDraftOwner(user?.id)
   const { register: registerUnsaved } = useUnsavedGuard()
-  const confirmLeave = useConfirmLeave()
 
   const [requirement, setRequirement] = useState<{
     reqNo: string; title: string; expectResult?: string | null
@@ -117,7 +117,8 @@ export default function PrdForm() {
    * 输入后又改回原样也不应继续提示。
    */
   const [baseline, setBaseline] = useState<string>('')
-  const dirty = useMemo(() => JSON.stringify(form) !== baseline, [form, baseline])
+  const dirty = useMemo(() => baseline !== '' && (JSON.stringify(form) !== baseline
+    || newVersion || !!changeReason.trim()), [form, baseline, newVersion, changeReason])
   const dirtyRef = useRef(dirty)
   dirtyRef.current = dirty
   const formRef = useRef(form)
@@ -144,7 +145,7 @@ export default function PrdForm() {
   /** 「保存并推进」只在“已受理、且非 V3 分批交付”时有意义：V3 需求状态不因 PRD 而推进 */
   const canAdvance = !prdId && requirement?.status === RDM_STATUS.ACCEPTED && requirement?.flowVersion !== 3
   /** 定稿后未开新版本 → 保存按钮禁用（不让用户点完才被拒） */
-  const saveBlocked = (isLocked && !newVersion) || phaseBlocked
+  const saveBlocked = !requirement || baseline === '' || (isLocked && !newVersion) || phaseBlocked
 
   useEffect(() => {
     if (!reqId) return
@@ -172,7 +173,7 @@ export default function PrdForm() {
   ) => {
     if (draftChecked.current || !reqId) return
     draftChecked.current = true
-    const draft = loadPrdDraft(draftOwner, reqId, prdId || null)
+    const draft = loadPrdDraft(draftOwner, reqId, prdId || null, draftId)
     if (!draft) return
     const restored = {
       title: draft.title ?? serverForm.title,
@@ -181,17 +182,16 @@ export default function PrdForm() {
       featureList: draft.featureList ?? '',
       acceptanceCriteria: draft.acceptanceCriteria ?? '',
       prototypeUrl: draft.prototypeUrl ?? '',
-      contentRich: draft.contentRich ?? '',
+      contentRich: DOMPurify.sanitize(draft.contentRich ?? ''),
     }
     if (JSON.stringify(restored) === JSON.stringify(serverForm)) {
       // 与服务器内容一致：没有恢复价值，直接清掉，避免下次再问
-      clearPrdDraft(draftOwner, reqId, prdId || null)
+      clearPrdDraft(draftOwner, reqId, prdId || null, draftId)
       return
     }
-    const changedOnServer = serverHadCurrent
-      && !!serverUpdatedAtValue
-      && !!draft.baseUpdatedAt
-      && draft.baseUpdatedAt !== serverUpdatedAtValue
+    const changedOnServer = serverHadCurrent && (draft.baseRowVersion == null
+      || draft.baseRowVersion !== serverRowVersion.current
+      || (!!serverUpdatedAtValue && !!draft.baseUpdatedAt && draft.baseUpdatedAt !== serverUpdatedAtValue))
     Modal.confirm({
       title: t('rdm.prd.draftFoundTitle'),
       className: 'custom-confirm-modal',
@@ -210,12 +210,14 @@ export default function PrdForm() {
       okText: t('rdm.prd.draftRestoreAction'),
       cancelText: t('rdm.prd.draftDiscardAction'),
       onOk: () => {
+        // 保留草稿原版本；不能把旧内容套上新版本号后覆盖服务器的新内容。
+        if (prdId) serverRowVersion.current = draft.baseRowVersion ?? null
         setForm(restored)
         setDraftNotice({ savedAt: draft.savedAt, failed: false })
         message.info(t('rdm.prd.draftRestoredMsg'))
       },
       onCancel: () => {
-        clearPrdDraft(draftOwner, reqId, prdId || null)
+        clearPrdDraft(draftOwner, reqId, prdId || null, draftId)
       },
     })
   }
@@ -223,14 +225,15 @@ export default function PrdForm() {
   /** 编辑态回填；同时取同需求下的 PRD 作为「父 PRD」候选（逐级拆解） */
   useEffect(() => {
     if (!reqId) return
+    let alive = true
     fetchDeliverySummary(reqId).then(summary => {
-      if (!summary) return
+      if (!alive || !summary) return
       setSiblings(summary.prds.filter(p => p.id !== prdId))
       const current = summary.prds.find(p => p.id === prdId)
       if (current) {
         setCurrentStatus(current.status)
         serverUpdatedAt.current = current.updatedAt ?? null
-        serverRowVersion.current = current.rowVersion ?? 0
+        serverRowVersion.current = current.rowVersion ?? null
         if (prdId) {
           fetchPrdSnapshots(prdId).then(setSnapshots).catch(() => setSnapshots([]))
         }
@@ -251,7 +254,8 @@ export default function PrdForm() {
         // 新建 PRD：基线是空表单，服务器没有可覆盖的内容
         offerDraftRestore(formRef.current, null, false)
       }
-    }).catch(() => message.error('PRD 資訊載入失敗'))
+    }).catch(() => { if (alive) message.error('PRD 資訊載入失敗') })
+    return () => { alive = false }
     // offerDraftRestore 只依赖当前挂载参数；刻意不进依赖，避免每次渲染重复询问
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reqId, prdId])
@@ -273,11 +277,12 @@ export default function PrdForm() {
       const ok = savePrdDraft(draftOwner, reqId, prdId || null, {
         ...formRef.current,
         baseUpdatedAt: serverUpdatedAt.current,
-      })
+        baseRowVersion: serverRowVersion.current ?? undefined,
+      }, draftId)
       setDraftNotice({ savedAt: Date.now(), failed: !ok })
     }, 500)
     return () => clearTimeout(timer)
-  }, [form, dirty, reqId, prdId, draftOwner])
+  }, [form, dirty, reqId, prdId, draftOwner, draftId])
 
   /** 离开保护：页签切换/关闭等导航入口统一询问；stash 用最新表单内容 */
   useEffect(() => registerUnsaved({
@@ -287,17 +292,18 @@ export default function PrdForm() {
       const ok = savePrdDraft(draftOwner, reqId, prdId || null, {
         ...formRef.current,
         baseUpdatedAt: serverUpdatedAt.current,
-      })
+        baseRowVersion: serverRowVersion.current ?? undefined,
+      }, draftId)
       setDraftNotice({ savedAt: Date.now(), failed: !ok })
       return ok
     },
     discard: () => {
-      if (reqId) clearPrdDraft(draftOwner, reqId, prdId || null)
+      if (reqId) clearPrdDraft(draftOwner, reqId, prdId || null, draftId)
       setBaseline(JSON.stringify(formRef.current))
       setDraftNotice(null)
     },
     describe: () => (requirement ? `${requirement.reqNo} · ${requirement.title}` : 'PRD 內容'),
-  }), [registerUnsaved, reqId, prdId, draftOwner, requirement])
+  }), [registerUnsaved, reqId, prdId, draftOwner, draftId, requirement])
 
   /** 刷新/关闭浏览器：浏览器允许的最小提示（自定义文案无法保证展示） */
   useEffect(() => {
@@ -394,16 +400,16 @@ export default function PrdForm() {
     })
   }
 
-  /** 页面内返回/取消也要走同一套未保存保护 */
-  const handleLeave = async () => {
-    const decision = confirmLeave()
-    if (decision !== true && !await decision) return
-    goBack()
-  }
+  /**
+   * 页面内返回/取消：不再自己弹确认。
+   * <p>导航统一由 Data Router 的 blocker 拦截并询问，避免“页内先问一次、路由再问一次”
+   * 的双弹框；暂存动作仍由同一个 guard 承担，保护没有减弱。
+   */
+  const handleLeave = () => { goBack() }
 
   /** 确认后才落库 */
   const submitPrd = async (advance: boolean, title: string) => {
-    if (!reqId) return
+    if (!reqId || saveBlocked) return
     if (isLocked && !newVersion) {
       message.warning('該 PRD 已定稿，請先勾選「以新版本修改」')
       return
@@ -428,12 +434,13 @@ export default function PrdForm() {
         advanceRequirement: advance,
         newVersion: newVersion || undefined,
         changeReason: newVersion ? changeReason.trim() : undefined,
-        // 开新版本时后端不碰原行，不需要版本号；原地保存则带上打开时读到的版本
-        expectedRowVersion: prdId && !newVersion ? serverRowVersion.current ?? undefined : undefined,
+        // 编辑与另存新版本都校验来源版本，暂存恢复后仍沿用暂存时的旧基线。
+        expectedRowVersion: prdId ? serverRowVersion.current ?? undefined : undefined,
       })
       // 正式保存成功：本机暂存已完成使命，清掉避免下次重复询问
-      clearPrdDraft(draftOwner, reqId, prdId || null)
+      clearPrdDraft(draftOwner, reqId, prdId || null, draftId)
       setBaseline(JSON.stringify(formRef.current))
+      dirtyRef.current = false
       message.success(prdId ? (newVersion ? '已存為新版本草稿' : 'PRD 已更新') : 'PRD 已保存')
       // 不能用 navigate(详情URL)：那会再 push 一条，连点返回来回穿越表单页
       goBack()
