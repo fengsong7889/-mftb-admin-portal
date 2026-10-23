@@ -122,15 +122,21 @@ export interface RdmRequirementRow {
   complexity?: RdmComplexity | string | null
   status: RdmStatus | string
   stage?: RdmStage | string | null
+  /** 提出人 sys_user.id（属性栏变更与「本人」判定依赖，缺失时无法回填选人组件） */
+  submitterUserId?: number | null
   submitterName: string
   submitterEmpNo?: string | null
   submitDeptName?: string | null
   submitTime?: string | null
   pmName?: string | null
   pmEmpNo?: string | null
+  /** 受理产品经理 sys_user.id（属性栏整栏编辑回显依赖；只回姓名无法回填选人组件） */
+  assigneePmUserId?: number | null
   dispatcherUserId?: number | null
   dispatcherName?: string | null
   dispatcherEmpNo?: string | null
+  /** 研發負責人 ID（屬性欄編輯回顯依賴；只回姓名無法回填選人組件） */
+  devOwnerUserId?: number | null
   devOwnerName?: string | null
   currentHandler?: string | null
   /**
@@ -947,6 +953,67 @@ export async function changeRequirementIteration(
   return request.put<unknown, RdmRequirementRow>(`/rdm/requirement/${id}/iteration`, form)
 }
 
+/**
+ * 詳情頁屬性欄可修改字段。
+ * <p>語義：不傳的字段不改；日期傳空串清空；ccUserIds 傳數組即整份替換（[] 清空）。
+ * <p>狀態、需求類型、歸屬項目、參與角色不在本接口：狀態走流轉、類型影響準入路由、
+ * 項目變更要級聯交付項、角色即權限面。
+ */
+export interface RdmRequirementAttrs {
+  submitterUserId?: number
+  devOwnerUserId?: number
+  acceptorUserId?: number
+  projectManagerUserId?: number
+  priority?: string
+  complexity?: string
+  expectDate?: string
+  promisedPrdDate?: string
+  planReleaseDate?: string
+  ccUserIds?: number[]
+  remark?: string
+}
+
+/** 逐字段修改需求屬性（詳情頁右側屬性欄） */
+export async function changeRequirementAttrs(id: number, attrs: RdmRequirementAttrs) {
+  return request.put<unknown, RdmRequirementRow>(`/rdm/requirement/${id}/attrs`, attrs)
+}
+
+/**
+ * 批量變更需求提出人（存量導入歸屬糾正）。
+ * <p>服務端同步主表快照與 SUBMITTER 角色行，並逐條寫狀態流水；返回實際變更條數。
+ */
+export async function batchChangeSubmitter(
+  ids: number[],
+  submitterUserId: number,
+  remark?: string,
+): Promise<number> {
+  return request.post<unknown, number>('/rdm/requirement/batch-change-submitter',
+    { ids, submitterUserId, remark }, SILENT)
+}
+
+/** 批量補錄受理信息結果：跳過原因分開返回，避免「108 條漏了幾條」被靜默吞掉 */
+export interface RdmBatchBackfillResult {
+  updated: number
+  skippedNoPm: number
+  skippedStatus: number
+}
+
+/**
+ * 批量補錄受理信息（存量導入需求）。
+ * <p>只補「承諾出 PRD 日期 + 產品任務」，不改需求狀態：導入時已生成 approved PRD，
+ * 回退狀態會造成「狀態說沒 PRD、庫裡有定稿 PRD」的矛盾。
+ * <p>排期後 / V3 分批交付 / 缺產品經理的行由服務端逐條跳過並計數。
+ */
+export async function batchBackfillAccept(
+  ids: number[],
+  promisedPrdDate: string,
+  pmUserId?: number,
+  remark?: string,
+): Promise<RdmBatchBackfillResult> {
+  return request.post<unknown, RdmBatchBackfillResult>('/rdm/requirement/batch-backfill-accept',
+    { ids, promisedPrdDate, pmUserId, remark }, SILENT)
+}
+
 /** 存量导入单行结果 */
 export interface RdmRequirementImportItem {
   rowNo: number
@@ -976,6 +1043,8 @@ export interface RdmRequirementImportRowInput {
   status: string
   projectManager?: string
   productManager?: string
+  /** 提出人（業務歸屬人），格式「姓名(工號)」/姓名/工號；留空由後端按導入操作人落庫 */
+  submitter?: string
   projectName?: string
   iterationName?: string
   description?: string
@@ -1501,6 +1570,39 @@ export async function fetchMyTasks(status?: string): Promise<RdmTaskItem[]> {
     if (isBackendUnavailable(err)) return []
     throw err
   }
+}
+
+/** 团队任务视图的成员项（只含姓名+工号；共同项目数用于解释可见原因） */
+export interface RdmTeamMember {
+  userId: number
+  name: string
+  empNo?: string | null
+  /** 与当前人的共同项目数；全量数据范围（管理员/PMO）为 null */
+  sharedProjectCount?: number | null
+}
+
+/**
+ * 团队任务视图的成员列表（同项目成员）。
+ * <p>后端按「共同在途项目」收敛；管理员/PMO 返回全公司在职员工。
+ * <p>失败返回空数组：成员下拉不可用不应挡住「我的任务」。
+ */
+export async function fetchTeamMembers(): Promise<RdmTeamMember[]> {
+  try {
+    return await request.get<unknown, RdmTeamMember[]>('/rdm/delivery/team/members', SILENT)
+  } catch (err) {
+    if (isBackendUnavailable(err)) return []
+    throw err
+  }
+}
+
+/**
+ * 指定成员的任务（团队协作视图）。
+ * <p>后端只返回你们共同项目下的任务；无共同项目会返回业务错误，
+ * 调用方必须把真实文案展示出来，不能伪装成「对方没任务」。
+ */
+export async function fetchTeamTasks(userId: number, status?: string): Promise<RdmTaskItem[]> {
+  return await request.get<unknown, RdmTaskItem[]>('/rdm/delivery/tasks/team',
+    { params: { userId, status }, ...SILENT })
 }
 
 /** 需求下任务列表 */

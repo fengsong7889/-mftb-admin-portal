@@ -17,7 +17,7 @@
  *
  * i18n：横幅文案已走 rdm.workbench.* 双语键；页面其余区块仍是存量硬编码，按棘轮分批清理。
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Empty, Space, Spin, Tag, message } from 'antd'
 import {
   AlertOutlined,
@@ -191,6 +191,13 @@ export default function RdmWorkbench() {
   const { t } = useTranslation()
   const { user, hasMenuPermission, hasPermission } = useAuth()
   const [loading, setLoading] = useState(true)
+  /**
+   * 刷新态与首屏态分开：点「刷新」时如果复用 loading，整页会被 Spin 顶掉再重排，
+   * 用户刚看到的卡片位置全部丢失（实测刷新后滚动位置回顶）。首屏才用 loading，
+   * 后续刷新只让按钮转圈，内容留在原地。
+   */
+  const [refreshing, setRefreshing] = useState(false)
+  const loadedOnce = useRef(false)
   const [data, setData] = useState<RdmWorkbenchData | null>(null)
   /**
    * 我提的需求（含草稿与被驳回的），走列表接口 scope=mine（不带执行侧地板），与待办分区不同口径。
@@ -212,7 +219,8 @@ export default function RdmWorkbench() {
   )
 
   const load = useCallback(async () => {
-    setLoading(true)
+    if (loadedOnce.current) setRefreshing(true)
+    else setLoading(true)
     try {
       // 首屏只等核心数据：项目列表（远端库 6s+）、摘要与待办看板各自较重，
       // 统一放到首屏之后异步补齐，否则整页白屏时间 = 最慢的那个聚合接口
@@ -227,6 +235,8 @@ export default function RdmWorkbench() {
       message.error('工作台數據載入失敗')
     } finally {
       setLoading(false)
+      setRefreshing(false)
+      loadedOnce.current = true
     }
     // 次级数据：只影响指标卡、我的项目与待办看板，失败或慢都不影响首屏
     Promise.all([
@@ -619,7 +629,20 @@ export default function RdmWorkbench() {
           </div>
         ))}
       </div>
-    ) : null,
+    ) : (
+      <div className="rdm-card">
+        <div className="rdm-card-title">
+          <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}>
+            <ClockCircleOutlined />
+          </span>
+          最近交付動態
+          <span className="rdm-card-title-split" />
+        </div>
+        {/* 配置里开着这一块就必须有可见内容：返回 null 会留下一个空 div，
+            用户只看到一大段空白，以为页面没渲染完 */}
+        <div className="rdm-empty-hint">暫時沒有新的交付動態，需求狀態推進後會出現在這裡</div>
+      </div>
+    ),
   }
 
   return (
@@ -654,7 +677,7 @@ export default function RdmWorkbench() {
             >
               {t('rdm.workbench.submitRequirement', { defaultValue: '我要提需求' })}
             </Button>
-            <Button icon={<ReloadOutlined />} onClick={load}>{t('rdm.workbench.refresh', { defaultValue: '刷新' })}</Button>
+            <Button icon={<ReloadOutlined />} loading={refreshing} onClick={load}>{t('rdm.workbench.refresh', { defaultValue: '刷新' })}</Button>
             <WorkbenchCustomize layout={layout} />
           </div>
         </div>

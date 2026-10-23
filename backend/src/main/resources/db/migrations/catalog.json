@@ -2917,6 +2917,60 @@
       "author": "Qoder",
       "ticket": "rdm-gantt-progress",
       "comment": "进度从交付工作台扩到甘特图后，拖拽次数会远高于原来的表单上报；进度又是绩效与验收的原始事实，没有留痕就无法回答「谁把 60% 改成 100%」。新增只追加的进度审计表，记录变更前后进度/状态、操作人、说明与客户端请求标识；不用 rdm_task_plan_log 是因为那张表记的是日期语义，混入进度会让排期追溯失真。同版给排期审计补 remark：PRD 任务完成日与需求「承诺出 PRD 日期」同源，改期会同步承诺日期，必须能看出这次变更是承诺变更而不只是内部排期微调。只 ADD COLUMN + CREATE TABLE IF NOT EXISTS，旧代码忽略新列与新表；284 脚本仅作参照文档，不进镜像。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.32",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.31"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "286_rdm_reopen_pm.sql"
+      ],
+      "intent": "驳回后允许本单受理产品经理重新打开：rejected→intake_pending 的 reopen 动作补 PM 角色",
+      "author": "Qoder",
+      "ticket": "rdm-reopen-pm",
+      "comment": "reopen 原先只给 SUBMITTER/PMO/DISPATCHER，产品经理驳回后无法撤销自己的决定；改派给新 PM 后，新 PM 拿到 PM 角色行却仍看不到「重新打開」，只能查看不能推进。本版只 UPDATE 未包含 PM 的那一行，仍由 activeRoles 按本单角色行收敛，不是全局放开。幂等匹配用逗号包裹精确比对，避免 PMO 的 PM 子串误判；若运营已停用该动作则跳过，不阻塞启动。286 脚本仅作参照文档，不进镜像。"
+    },
+    {
+      "versionKey": "rdm:transition:v1.1",
+      "module": "rdm",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:transition:v1.0"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "287_rdm_back_to_evaluate.sql"
+      ],
+      "intent": "存量導入需求受控回退：review_passed → evaluating 的 back_to_evaluate 动作（只给 PM、必填说明）",
+      "author": "Qoder",
+      "ticket": "rdm-backfill-accept",
+      "comment": "存量導入直接落已准入狀態，缺少受理承諾日期與產品任務；批量補錄修復歷史事實，但個別需求確需重走受理/PRD 流程時狀態機沒有回退邊（review_passed 只有 schedule 一條出邊）。做成 rdm_transition 配置而非代碼分支：詳情頁按 allowedActions 渲染，新增一行即出現「退回評估」，不需要前端發版；寫側仍由 transitionInternal 校驗角色與必填。allowed_roles 只給 PM——管理員由 canPerform 直通，不寫進角色列表以免把「管理員」變成可授權角色。回退時 transitionInternal 會把已收口的產品任務重新打開（reopenTask），否則產品經理在工作台看不到待辦。287 腳本僅作參照文檔，不進鏡像；冪等靠 INSERT IGNORE + 唯一鍵 (from_status, action_code)。"
+    },
+    {
+      "versionKey": "rdm:transition:v1.2",
+      "module": "rdm",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:transition:v1.0"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "288_rdm_schedule_required_fields.sql"
+      ],
+      "intent": "排期必填字段与代码闸门对齐：schedule.required_fields 由 planDate 补为 planDate,project,iteration",
+      "author": "Qoder",
+      "ticket": "rdm-schedule-required-fields",
+      "comment": "归属体系改造把「项目+迭代」做成了排期硬闸门（applyProjectAndIteration required=true），但 204 种子里 schedule 的 required_fields 仍是 planDate。详情页动作弹窗按服务端 allowedActions 下发的 requiredFields 渲染字段，于是生产上排期弹窗没有项目/迭代选择器，而写侧又要求两者，用户只能看到「提交排期必須選擇所屬項目與迭代」却无处可选。本版只更新仍为旧值 planDate 的行，不覆盖管理员自定义；后置校验只要求旧值残留为 0，允许运营调整必填集合。同时后端闸门在请求未带归属时回退复核需求已有项目/迭代，避免「明明已挂好仍被要求重选」。288 脚本仅作参照文档，不进镜像。"
     }
   ]
 }

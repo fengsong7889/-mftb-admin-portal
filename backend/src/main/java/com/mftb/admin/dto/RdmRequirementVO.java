@@ -78,6 +78,8 @@ public class RdmRequirementVO {
     private String projectManagerName;
     private String acceptTime;
     private String promisedPrdDate;
+    /** 研發負責人ID（詳情頁屬性欄回顯與編輯依賴；只回姓名無法回填選人組件） */
+    private Long devOwnerUserId;
     private String devOwnerName;
     private String iterationCode;
     /**
@@ -434,6 +436,7 @@ public class RdmRequirementVO {
         vo.setProjectManagerName(r.getProjectManagerUserName());
         vo.setAcceptTime(DateTimeUtils.format(r.getAcceptTime()));
         vo.setPromisedPrdDate(DateTimeUtils.format(r.getPromisedPrdDate()));
+        vo.setDevOwnerUserId(r.getDevOwnerUserId());
         vo.setDevOwnerName(r.getDevOwnerName());
         vo.setIterationCode(r.getIterationCode());
         vo.setPlanDevDate(DateTimeUtils.format(r.getPlanDevDate()));

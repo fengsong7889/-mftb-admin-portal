@@ -45,6 +45,7 @@ import {
   SyncOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { readRdmListScene, useRdmListScene, useRdmScrollRestore } from './useListSceneRestore'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import dayjs from 'dayjs'
@@ -141,6 +142,12 @@ export default function ProjectOverview() {
   const planDateTo = searchParams.get('planDateTo') ?? ''
   const pageNo = Number(searchParams.get('pageNo') ?? 1)
   const pageSize = Number(searchParams.get('pageSize') ?? DEFAULT_PAGE_SIZE)
+
+  /**
+   * 返回原位置的滚动还原：页码/筛选本来就在 URL 里，缺的只是滚动位置。
+   * key 带上查询串，换一批条件时不会跳回上一批数据的旧位置。
+   */
+  const sceneKey = `project:${searchParams.toString()}`
   const drill = (searchParams.get('drill') as DrillKey | null) ?? null
 
   // ── 搜索草稿（輸入過程不入 URL，點「查詢」才提交） ──
@@ -167,6 +174,17 @@ export default function ProjectOverview() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /**
+   * 强制刷新令牌：查询/重置/重试必须每次都重新取数。
+   * <p>只靠 URL 变化触发时，条件没改（最典型：加载失败后点「重試」）不会产生新请求，
+   * 用户看到的是点了没反应；令牌与 URL 变更在同一次事件里合并，effect 仍只跑一次。
+   */
+  const [reloadNonce, setReloadNonce] = useState(0)
+
+  /** 记录/还原列表滚动位置（返回详情页后落回原处）；key 与筛选同源，换条件不串位置 */
+  const [initialScene] = useState(() => readRdmListScene(sceneKey))
+  useRdmListScene(sceneKey, { page: pageNo, size: pageSize, filters: {} }, '/rdm-project')
+  useRdmScrollRestore(sceneKey, !loading && total > 0, initialScene?.scrollTop)
 
   // ── 統計卡數據（失敗保留上次值，不回零） ──
   const [stats, setStats] = useState<RdmProjectStatsCard | null>(null)
@@ -233,9 +251,21 @@ export default function ProjectOverview() {
       setRows(res.records ?? [])
       setTotal(res.total ?? 0)
     } catch {
-      setError('項目列表載入失敗，請重試')
-      setRows([])
-      setTotal(0)
+      /*
+       * 一次自动重试再定性。
+       * 开发模式 StrictMode 会双发同一请求、路由切换也会取消在途请求，axios 统一抛
+       * Network Error；直接置错会让「从详情返回列表」变成空表 + 红色失败横幅，
+       * 而网络里其实有一条 200 已经回来。
+       */
+      try {
+        const res = await fetchProjectPage(params)
+        setRows(res.records ?? [])
+        setTotal(res.total ?? 0)
+      } catch {
+        setError('項目列表載入失敗，請重試')
+        setRows([])
+        setTotal(0)
+      }
     } finally {
       setLoading(false)
     }
@@ -250,9 +280,17 @@ export default function ProjectOverview() {
       setStats(res)
       setStatsError(false)
     } catch {
-      // 不靜默歸零：有上次值就沿用，沒有就保持 null（卡片渲染「—」明確錯誤態）
-      setStats(lastGoodStats.current)
-      setStatsError(true)
+      // 同上：取消/双发请求先重试一次，避免返回列表时误报「統計載入失敗」
+      try {
+        const retry = await fetchProjectStats(params)
+        lastGoodStats.current = retry
+        setStats(retry)
+        setStatsError(false)
+      } catch {
+        // 不靜默歸零：有上次值就沿用，沒有就保持 null（卡片渲染「—」明確錯誤態）
+        setStats(lastGoodStats.current)
+        setStatsError(true)
+      }
     } finally {
       setStatsLoading(false)
     }
@@ -261,7 +299,8 @@ export default function ProjectOverview() {
   useEffect(() => {
     loadList(listQuery)
     loadStats(queryParams)
-  }, [listQuery, queryParams, loadList, loadStats])
+    // reloadNonce 不进请求参数，只用于「条件没变也要重取」；刻意放在依赖里
+  }, [listQuery, queryParams, loadList, loadStats, reloadNonce])
 
   // ── 負責人 / 產品負責人搜索（員工接口远程搜索，labelInValue → *UserId 進查詢） ──
   const searchEmployee = useCallback(async (kw: string, setOptions: (options: EmpOption[]) => void) => {
@@ -290,6 +329,8 @@ export default function ProjectOverview() {
       pageNo: 1,
     })
     setStatsAnimKey(k => k + 1)
+    // 条件与上次相同（或正处于失败态）时 URL 不会变，必须显式触发一次取数
+    setReloadNonce(n => n + 1)
   }
 
   // ── 重置 ──
@@ -301,6 +342,7 @@ export default function ProjectOverview() {
     setPlanRangeDraft(null)
     setSearchParams(new URLSearchParams(), { replace: true })
     setStatsAnimKey(k => k + 1)
+    setReloadNonce(n => n + 1)
   }
 
   // ── 分頁 ──
@@ -459,6 +501,25 @@ export default function ProjectOverview() {
   /** §E.3 列配置元數據：标题跟随 i18n，语言切换时字段面板不掉回 key */
   const columnMeta = useMemo(() => buildColumnMeta(t), [t])
 
+  /**
+   * 详情地址：把当前筛选参数带过去，返回时才能落回同一批数据。
+   * <p>拼接时过滤空串，否则 searchParams 为空会生成 `?id=8&` 这种带悬挂分隔符的地址
+   * （刷新、分享、日志里都多一个无意义字符）。
+   */
+  const detailPath = (id: number, extra?: string) =>
+    `/rdm-project-detail?${[`id=${id}`, extra, searchParams.toString()].filter(Boolean).join('&')}`
+
+  /** 负责人列：姓名 + 工号在 150px 内放不下，单行截断并悬浮看全文（表格截断属 Tooltip 正当场景） */
+  const renderOwner = (name?: string | null, empNo?: string | null) => {
+    const text = formatEmployee(name, empNo)
+    if (!text) return '-'
+    return (
+      <Tooltip title={text} placement="topLeft">
+        <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{text}</span>
+      </Tooltip>
+    )
+  }
+
   const columns: TableColumnsType<RdmProjectListItem> = [
     {
       // 固定首列：14 位（PROJ+8 位日期+2 位日序）需留足寬度，存量空值降級 -
@@ -470,15 +531,15 @@ export default function ProjectOverview() {
       render: (name: string, record) => (
         <div
           style={{ fontWeight: 600, color: '#262626', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-          onClick={() => navigate(`/rdm-project-detail?id=${record.id}&${searchParams.toString()}`)}
+          onClick={() => navigate(detailPath(record.id))}
           title={name}
         >
           {name}
         </div>
       ),
     },
-    { title: t('rdm.projOverview.colPm'), dataIndex: 'pmUserName', key: 'pmUserName', width: 150, render: (v: string | null | undefined, r) => formatEmployee(v, r.pmUserEmpNo) || '-' },
-    { title: t('rdm.projOverview.colPo'), dataIndex: 'productOwnerUserName', key: 'productOwnerUserName', width: 150, render: (v: string | null | undefined, r) => formatEmployee(v, r.productOwnerUserEmpNo) || '-' },
+    { title: t('rdm.projOverview.colPm'), dataIndex: 'pmUserName', key: 'pmUserName', width: 150, render: (v: string | null | undefined, r) => renderOwner(v, r.pmUserEmpNo) },
+    { title: t('rdm.projOverview.colPo'), dataIndex: 'productOwnerUserName', key: 'productOwnerUserName', width: 150, render: (v: string | null | undefined, r) => renderOwner(v, r.productOwnerUserEmpNo) },
     { title: t('rdm.projOverview.colPlanStart'), dataIndex: 'planStartDate', key: 'planStartDate', width: 125, sorter: true, render: (v?: string | null) => v || <span style={{ color: '#8C8C8C' }}>-</span> },
     { title: t('rdm.projOverview.colPlanEnd'), dataIndex: 'planEndDate', key: 'planEndDate', width: 125, sorter: true, render: (v?: string | null) => v || <span style={{ color: '#8C8C8C' }}>-</span> },
     {
@@ -490,7 +551,7 @@ export default function ProjectOverview() {
       render: (_, record) => (
         <span
           style={{ color: '#1890FF', cursor: 'pointer', fontSize: 13 }}
-          onClick={() => navigate(`/rdm-project-detail?id=${record.id}&${searchParams.toString()}`)}
+          onClick={() => navigate(detailPath(record.id))}
         >
           {t('rdm.projOverview.deliveryTriple', {
             req: record.requirementTotal ?? 0,
@@ -574,9 +635,9 @@ export default function ProjectOverview() {
        */
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" size="small" onClick={() => navigate(`/rdm-project-detail?id=${record.id}&${searchParams.toString()}`)}>{t('common.detail')}</Button>
+          <Button type="link" size="small" onClick={() => navigate(detailPath(record.id))}>{t('common.detail')}</Button>
           {canEditProject && (
-            <Button type="link" size="small" onClick={() => navigate(`/rdm-project-detail?id=${record.id}&mode=edit&${searchParams.toString()}`)}>{t('common.edit')}</Button>
+            <Button type="link" size="small" onClick={() => navigate(detailPath(record.id, 'mode=edit'))}>{t('common.edit')}</Button>
           )}
           {canEditProject && (
             <Button type="link" size="small" onClick={() => handleTogglePause(record)}>
@@ -607,7 +668,7 @@ export default function ProjectOverview() {
       {error && (
         <Alert
           type="error" showIcon closable style={{ marginBottom: 12 }} message={error}
-          action={<Button size="small" onClick={() => loadList(queryParams)}>重試</Button>}
+          action={<Button size="small" onClick={() => setReloadNonce(n => n + 1)}>重試</Button>}
         />
       )}
 
@@ -762,7 +823,7 @@ export default function ProjectOverview() {
           onClick: (e) => {
             const target = e.target as HTMLElement
             if (target.closest('button') || target.closest('.ant-dropdown')) return
-            navigate(`/rdm-project-detail?id=${record.id}&${searchParams.toString()}`)
+            navigate(detailPath(record.id))
           },
           style: { cursor: 'pointer' },
         })}

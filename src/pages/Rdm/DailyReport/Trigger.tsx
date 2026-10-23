@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Alert, Button, Checkbox, Modal, Radio, Result, Select, Space, Spin, Tag, message } from 'antd'
 import { EyeOutlined, FundProjectionScreenOutlined, SendOutlined } from '@ant-design/icons'
-import { fetchDailyReportBoardPreview, triggerDailyReport, type DailyReportTriggerResult } from '../../../api/rdmDailyReport'
+import { fetchDailyReportBoardPreview, fetchDailyReportEmployeeOptions, triggerDailyReport, type DailyReportTriggerResult } from '../../../api/rdmDailyReport'
+import type { OptionItem } from '../../../api/types'
 import type { DailyReportPublicView } from '../../../api/rdmDailyReportPublic'
 import { fetchIterations, fetchProjectPage, type RdmIterationItem, type RdmProjectListItem } from '../../../api/rdm'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -33,6 +34,11 @@ export default function DailyReportTrigger() {
   const [allProjects, setAllProjects] = useState(false)
   const [iterationCode, setIterationCode] = useState<string | undefined>()
   const [reportType, setReportType] = useState<'morning' | 'evening'>('morning')
+  /** 发送对象：all=群+個人（現狀）/ group=僅群 / users=僅指定人 */
+  const [recipientMode, setRecipientMode] = useState<'all' | 'group' | 'users'>('all')
+  const [recipientUserIds, setRecipientUserIds] = useState<number[]>([])
+  const [employeeOptions, setEmployeeOptions] = useState<OptionItem[]>([])
+  const [employeeLoading, setEmployeeLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<DailyReportTriggerResult | null>(null)
   const [boardOpen, setBoardOpen] = useState(false)
@@ -65,6 +71,35 @@ export default function DailyReportTrigger() {
       .map(i => ({ value: i.code, label: `${i.code}${i.name ? ' ' + i.name : ''}` })),
     [iterations, singleProjectId])
 
+  /**
+   * 指定人搜索：远程按姓名/工号查；已选项的 label 累积保留，
+   * 换搜索词或清空输入后已选的人不会退化成裸 ID。
+   */
+  const searchEmployees = useCallback(async (keyword?: string) => {
+    setEmployeeLoading(true)
+    try {
+      const list = await fetchDailyReportEmployeeOptions(keyword ?? '')
+      setEmployeeOptions(prev => {
+        const merged = new Map(prev.map(o => [o.value, o]))
+        list.forEach(o => merged.set(o.value, o))
+        return [...merged.values()]
+      })
+    } catch {
+      // 搜索失败不清空已选项：宁可少几个候选，也不能把已选的人变成 #123
+    } finally {
+      setEmployeeLoading(false)
+    }
+  }, [])
+
+  /** 发送对象校验：仅指定人时必须至少选一人，不能静默执行成「一个都没发」 */
+  const validateRecipient = (): boolean => {
+    if (recipientMode === 'users' && recipientUserIds.length === 0) {
+      message.warning(t('rdm.dailyTrigger.recipientRequired'))
+      return false
+    }
+    return true
+  }
+
   const scopeParams = () => ({
     projectId: singleProjectId,
     projectIds: allProjects ? [] : projectIds,
@@ -77,9 +112,19 @@ export default function DailyReportTrigger() {
       message.warning(t('rdm.dailyTrigger.targetRequired'))
       return null
     }
+    // 真发才校验发送对象：预览/干跑不发送，不拦人
+    if (!dryRun && !validateRecipient()) {
+      return null
+    }
     setBusy(true)
     try {
-      const res = await triggerDailyReport({ type: reportType, ...scopeParams(), dryRun })
+      const res = await triggerDailyReport({
+        type: reportType,
+        ...scopeParams(),
+        dryRun,
+        recipientMode,
+        recipientUserIds: recipientMode === 'users' ? recipientUserIds : undefined,
+      })
       setResult(res)
       if (!dryRun) {
         message.success(res.message || t('rdm.dailyTrigger.done'))
@@ -119,6 +164,9 @@ export default function DailyReportTrigger() {
       message.warning(t('rdm.dailyTrigger.targetRequired'))
       return
     }
+    if (!validateRecipient()) {
+      return
+    }
     let target: string
     if (allProjects) {
       target = `${t('rdm.dailyTrigger.allProjects')} / ${t('rdm.dailyTrigger.allIterations')}`
@@ -139,6 +187,15 @@ export default function DailyReportTrigger() {
       content: t('rdm.dailyTrigger.confirmContent', {
         type: reportType === 'morning' ? t('rdm.dailyTrigger.typeMorning') : t('rdm.dailyTrigger.typeEvening'),
         target,
+        recipient: recipientMode === 'all'
+          ? t('rdm.dailyTrigger.recipientAll')
+          : recipientMode === 'group'
+            ? t('rdm.dailyTrigger.recipientGroup')
+            : t('rdm.dailyTrigger.recipientUsersNamed', {
+                names: recipientUserIds
+                  .map(id => employeeOptions.find(o => o.value === String(id))?.label ?? `#${id}`)
+                  .join('、'),
+              }),
       }),
       okText: t('rdm.dailyTrigger.confirmOk'),
       cancelText: t('rdm.dailyTrigger.confirmCancel'),
@@ -218,6 +275,53 @@ export default function DailyReportTrigger() {
             <Radio.Button value="evening">{t('rdm.dailyTrigger.typeEvening')}</Radio.Button>
           </Radio.Group>
         </div>
+
+        {/* 发送对象：手动触发可以只发群或只发指定人，不再一律「群 + 全体个人」 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+          <span style={labelStyle}>{t('rdm.dailyTrigger.fieldRecipient')}:</span>
+          <Radio.Group
+            value={recipientMode}
+            onChange={e => {
+              const mode = e.target.value as 'all' | 'group' | 'users'
+              setRecipientMode(mode)
+              setResult(null)
+              // 首次切到“仅指定人”时预拉一页候选，避免下拉空白
+              if (mode === 'users' && employeeOptions.length === 0) void searchEmployees('')
+            }}
+            disabled={!canTrigger}
+          >
+            <Radio.Button value="all">{t('rdm.dailyTrigger.recipientAll')}</Radio.Button>
+            <Radio.Button value="group">{t('rdm.dailyTrigger.recipientGroup')}</Radio.Button>
+            <Radio.Button value="users">{t('rdm.dailyTrigger.recipientUsers')}</Radio.Button>
+          </Radio.Group>
+          <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+            {recipientMode === 'group'
+              ? t('rdm.dailyTrigger.recipientGroupHint')
+              : recipientMode === 'users'
+                ? t('rdm.dailyTrigger.recipientUsersHint')
+                : ''}
+          </span>
+        </div>
+
+        {recipientMode === 'users' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+            <span style={labelStyle}>{t('rdm.dailyTrigger.recipientLabel')}:</span>
+            <Select
+              mode="multiple"
+              showSearch
+              style={{ width: 340, minWidth: 260 }}
+              disabled={!canTrigger}
+              placeholder={t('rdm.dailyTrigger.recipientPlaceholder')}
+              value={recipientUserIds.map(String)}
+              filterOption={false}
+              onSearch={kw => void searchEmployees(kw)}
+              notFoundContent={employeeLoading ? <Spin size="small" /> : t('rdm.dailyTrigger.noEmployeeMatch')}
+              options={employeeOptions}
+              onChange={v => { setRecipientUserIds(v.map(Number)); setResult(null) }}
+            />
+            <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('rdm.dailyTrigger.recipientLimit')}</span>
+          </div>
+        )}
 
         <Space wrap>
           <Button icon={<EyeOutlined />} loading={busy} disabled={!canTrigger} onClick={() => void run(true)}>

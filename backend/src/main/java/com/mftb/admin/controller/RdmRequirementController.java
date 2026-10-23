@@ -6,7 +6,11 @@ import com.mftb.admin.constant.RdmConstants;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.dto.RdmAcceptanceDTO;
 import com.mftb.admin.dto.RdmAcceptanceVO;
+import com.mftb.admin.dto.RdmBatchBackfillAcceptDTO;
+import com.mftb.admin.dto.RdmBatchBackfillVO;
+import com.mftb.admin.dto.RdmBatchSubmitterDTO;
 import com.mftb.admin.dto.RdmOptionVO;
+import com.mftb.admin.dto.RdmRequirementAttrDTO;
 import com.mftb.admin.dto.RdmRequirementCreateDTO;
 import com.mftb.admin.dto.RdmRequirementImportDTO;
 import com.mftb.admin.dto.RdmRequirementImportVO;
@@ -162,6 +166,42 @@ public class RdmRequirementController {
                 anyPermissions = {"rdm-requirement:dispatch"})
     public Result<RdmRequirementVO> changeIteration(@PathVariable Long id, @RequestBody RdmTransitionDTO dto) {
         return Result.success("迭代已調整", requirementService.changeIteration(id, dto));
+    }
+
+    /**
+     * 詳情頁右側屬性欄逐字段修改（負責人/優先級/規模/日期/抄送）。
+     * <p>狀態、需求類型、歸屬項目、參與角色不在此入口：分別由狀態機、准入路由、
+     * 項目遷移與角色授權承擔，避免屬性面板繞過各自的閘門。
+     */
+    @PutMapping("/requirement/{id}/attrs")
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = "edit", anyOf = {"rdm-intake", "rdm-acceptance"},
+                anyPermissions = {"rdm-requirement:dispatch"})
+    public Result<RdmRequirementVO> changeAttributes(@PathVariable Long id,
+                                                     @RequestBody RdmRequirementAttrDTO dto) {
+        return Result.success("屬性已更新", requirementService.changeAttributes(id, dto));
+    }
+
+    /**
+     * 批量變更提出人（存量導入歸屬糾正、人員調整）。
+     * <p>權限錨點與批量分配同源：能決定需求歸屬的人才能改提出人。
+     */
+    @PostMapping("/requirement/batch-change-submitter")
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = RdmConstants.ACTION_DISPATCH,
+            anyPermissions = {RdmConstants.MENU_INTAKE + ":edit"})
+    public Result<Integer> batchChangeSubmitter(@RequestBody RdmBatchSubmitterDTO dto) {
+        return Result.success("提出人已更新", requirementService.batchChangeSubmitter(dto));
+    }
+
+    /**
+     * 批量補錄受理信息（存量導入需求補承諾 PRD 日期 + 產品任務）。
+     * <p>權限錨點與批量分配同源：能決定需求歸屬的人才能補受理事實。
+     * <p>不改需求狀態：導入時已生成 approved PRD，回退狀態只會製造事實矛盾。
+     */
+    @PostMapping("/requirement/batch-backfill-accept")
+    @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = RdmConstants.ACTION_DISPATCH,
+            anyPermissions = {RdmConstants.MENU_INTAKE + ":edit"})
+    public Result<RdmBatchBackfillVO> batchBackfillAccept(@RequestBody RdmBatchBackfillAcceptDTO dto) {
+        return Result.success("受理信息已補錄", requirementService.batchBackfillAccept(dto));
     }
 
     /**

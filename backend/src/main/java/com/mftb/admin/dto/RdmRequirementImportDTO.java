@@ -39,6 +39,13 @@ public class RdmRequirementImportDTO {
         /** 产品经理，格式「姓名(工号)」或姓名 */
         private String productManager;
 
+        /**
+         * 提出人（业务归属人），格式「姓名(工号)」/姓名/工号。
+         * <p>留空时沿用导入操作人：存量清单通常由对接人统一导入，
+         * 但业务提出人应可由模板指定，否则导入后需要再逐条改归属。
+         */
+        private String submitter;
+
         /** 所属项目名称（必须已存在） */
         private String projectName;
 

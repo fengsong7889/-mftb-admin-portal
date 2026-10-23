@@ -284,8 +284,8 @@ class RdmDailyReportRendererTest {
     /* ==================== 个人视角 ==================== */
 
     @Test
-    @DisplayName("个人通知：渲染收件人姓名与其负责项目，链接可带 projectId")
-    void rendersPersonalView() {
+    @DisplayName("个人通知：正文不署收件人姓名（追加收件人会误读归属），其余口径照常渲染")
+    void rendersPersonalViewWithoutRecipientName() {
         ProjectNode mine = project(7L, "PROJ2026101901", "我的項目", 4, 1);
         Snapshot s = snapshot(List.of(mine));
         PersonalView view = new PersonalView("張三", List.of(mine), 3, 1, 2, 6, 2, 4, 1);
@@ -295,13 +295,28 @@ class RdmDailyReportRendererTest {
         Rendered r = renderer.renderPersonal(preset.titleTpl(), preset.contentTpl(), s,
                 "https://x/#/rdm-daily?projectId=7", view);
 
-        assertTrue(r.content().contains("張三，您的產研交付日報"), "应含收件人姓名: " + r.content());
+        assertFalse(r.content().contains("張三，"),
+                "个人日报不得出现收件人署名（领导收到会误以为需求全归此人）: " + r.content());
+        assertTrue(r.content().contains("您的產研交付日報"), "结论式抬头必须保留: " + r.content());
         assertTrue(r.content().contains("負責項目：**1 個**"), "应含其负责项目数");
         assertTrue(r.content().contains("待處理：**3 項**（逾期 1）"), "应含待办与逾期");
         assertTrue(r.content().contains("今日到期：**2 項**"), "应含今日到期");
         assertTrue(r.content().contains("我的項目"), "应展开其负责项目明细");
         assertTrue(r.content().contains("https://x/#/rdm-daily?projectId=7"), "应含带 projectId 的链接");
         assertFalse(r.content().contains("{{myProjectBlock}}"), "个人片段占位符不应残留");
+    }
+
+    @Test
+    @DisplayName("个人通知：自定义模板写了 {{userName}} 也不渲染姓名（口径不能靠模板自觉）")
+    void personalTemplateCannotReintroduceName() {
+        Snapshot s = snapshot(List.of(project(1L, "PROJ2026101901", "項目A", 1, 0)));
+        PersonalView view = new PersonalView("張三", List.of(), 0, 0, 0, 0, 0, 0, 0);
+
+        Rendered r = renderer.renderPersonal("{{userName}}的日報", "{{userName}}，今日無異常", s, "", view);
+
+        assertFalse(r.content().contains("張三"), "姓名占位符必须恒为空: " + r.content());
+        assertFalse(r.title().contains("張三"), "标题同样不得出现姓名: " + r.title());
+        assertFalse(r.content().contains("{{"), "占位符不应原样残留: " + r.content());
     }
 
     @Test
@@ -330,7 +345,8 @@ class RdmDailyReportRendererTest {
         Rendered r = renderer.renderGroup("日報", "{{userName}} {{myTodoCount}} {{myProjectCount}}", s, "");
 
         assertFalse(r.content().contains("{{"), "任何个人占位符都不应残留: " + r.content());
-        assertTrue(r.content().contains("— 0 0"), "空视角应渲染为占位符值而非空白");
+        // 姓名占位符恒为空串，故这里只剩两个计数（空视角按 0 渲染）
+        assertEquals("0 0", r.content().strip(), "空视角应渲染为占位符值而非空白");
     }
 
     /* ==================== 截断与空态 ==================== */

@@ -265,6 +265,8 @@ const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
   '/rdm-stock-migration': { fixed: 'i18n:rdm.tab.stockMigration' },
   '/rdm-daily-report-rule-form': { add: 'i18n:rdm.tab.dailyRuleAdd', edit: 'i18n:rdm.tab.dailyRuleEdit' },
   '/rdm-daily-report-template-form': { add: 'i18n:rdm.tab.dailyTemplateAdd', edit: 'i18n:rdm.tab.dailyTemplateEdit' },
+  // 內置版式詳情頁：權限錨定推送配置菜單，但頁簽必須自報身份，否則會被叫成「推送配置」
+  '/rdm-daily-report-template-builtin': { fixed: 'i18n:rdm.tab.builtinLayout' },
   '/rdm-config-routing-form': { add: 'i18n:rdm.tab.routingAdd', edit: 'i18n:rdm.tab.routingEdit' },
   '/rdm-score-budget-form': { add: 'i18n:rdm.tab.scoreBudgetAdd', edit: 'i18n:rdm.tab.scoreBudgetEdit' },
   '/rdm-task-type-config-form': { add: 'i18n:rdm.tab.taskTypeAdd', edit: 'i18n:rdm.tab.taskTypeEdit' },

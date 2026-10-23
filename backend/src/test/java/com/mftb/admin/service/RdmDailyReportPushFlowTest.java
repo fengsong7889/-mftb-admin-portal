@@ -22,6 +22,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -380,6 +381,93 @@ class RdmDailyReportPushFlowTest {
         assertEquals(1, r.getPersonalSkipped(), "未绑定者应计入跳过，便于运维发现漏绑");
         verify(dingTalkAppService, never()).sendWorkActionCard(anyString(), org.mockito.ArgumentMatchers.anyLong(),
                 anyList(), anyString(), anyString(), anyString(), anyString());
+    }
+
+    /* ==================== 手动触发的发送对象 ==================== */
+
+    @Test
+    @DisplayName("仅群聊：群报照发，任何个人通知都不发")
+    void groupOnlySkipsAllPersonal() {
+        var project = new com.mftb.admin.dto.RdmDailyReportVO.ProjectNode();
+        project.setProjectId(3L);
+        project.setProjectNo("PROJ2026101901");
+        project.setProjectName("項目A");
+        project.setPmUserId(77L);
+        RdmDailyReportService svc = service(config(true, true, true), snapshot(List.of(project)), 0);
+        when(appService.resolve(NotificationAppService.RDM_DAILY_REPORT)).thenReturn(testCredentials());
+        SysUser pm = new SysUser();
+        pm.setId(77L);
+        pm.setName("張三");
+        pm.setDingtalkUserId("ding-77");
+        when(userMapper.selectById(77L)).thenReturn(pm);
+
+        TriggerResult r = svc.push(manualTarget(null), true, "管理員", false,
+                new RdmDailyReportService.RecipientOverride("group", List.of()));
+
+        assertTrue(r.isGroupDispatched());
+        assertEquals(0, r.getPersonalSent(), "仅群聊不得发个人通知");
+        verify(dingTalkAppService, never()).sendWorkActionCard(anyString(), org.mockito.ArgumentMatchers.anyLong(),
+                anyList(), anyString(), anyString(), anyString(), anyString());
+        verify(dingTalkAppService, never()).sendWorkNotification(anyString(), org.mockito.ArgumentMatchers.anyLong(),
+                anyList(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("仅指定人：不发群，且只发给选中的人（配置收件人里的其他人不打扰）")
+    void usersOnlySendsToSelectedPeople() {
+        var project = new com.mftb.admin.dto.RdmDailyReportVO.ProjectNode();
+        project.setProjectId(3L);
+        project.setProjectNo("PROJ2026101901");
+        project.setProjectName("項目A");
+        project.setPmUserId(77L);
+        RdmDailyReportService svc = service(config(true, true, true), snapshot(List.of(project)), 0);
+        when(appService.resolve(NotificationAppService.RDM_DAILY_REPORT)).thenReturn(testCredentials());
+        SysUser pm = new SysUser();
+        pm.setId(77L);
+        pm.setName("張三");
+        pm.setDingtalkUserId("ding-77");
+        SysUser selected = new SysUser();
+        selected.setId(88L);
+        selected.setName("李四");
+        selected.setDingtalkUserId("ding-88");
+        when(userMapper.selectById(77L)).thenReturn(pm);
+        when(userMapper.selectById(88L)).thenReturn(selected);
+
+        TriggerResult r = svc.push(manualTarget(null), true, "管理員", false,
+                new RdmDailyReportService.RecipientOverride("users", List.of(88L)));
+
+        assertFalse(r.isGroupDispatched(), "仅指定人不得发群");
+        assertEquals(1, r.getPersonalSent());
+        org.mockito.ArgumentCaptor<List<String>> captor = org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(dingTalkAppService).sendWorkActionCard(eq(NotificationAppService.RDM_DAILY_REPORT), eq(9L),
+                captor.capture(), anyString(), anyString(), anyString(), anyString());
+        assertEquals(List.of("ding-88"), captor.getValue(), "只应发给被选中的人");
+    }
+
+    @Test
+    @DisplayName("仅指定人但个人渠道已关闭：直接拒绝，不能绕过管理员关掉的闸")
+    void usersModeRejectedWhenPersonalDisabled() {
+        RdmDailyReportService svc = service(config(true, true, false), snapshot(), 0);
+
+        com.mftb.admin.common.BusinessException ex = assertThrows(
+                com.mftb.admin.common.BusinessException.class,
+                () -> svc.push(manualTarget(null), true, "管理員", false,
+                        new RdmDailyReportService.RecipientOverride("users", List.of(88L))));
+        assertTrue(ex.getMessage().contains("個人通知渠道"), ex.getMessage());
+        verify(dingTalkAppService, never()).sendWorkActionCard(anyString(), org.mockito.ArgumentMatchers.anyLong(),
+                anyList(), anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("节流按发送对象分别计时：刚发完群，立刻发个人不被拦")
+    void throttleKeyedByRecipient() {
+        RdmDailyReportService svc = service(config(true, true, true), snapshot(), 0);
+
+        assertNull(svc.checkManualThrottle("morning", 3L, "group", 1000L));
+        assertNull(svc.checkManualThrottle("morning", 3L, "users:88", 1500L),
+                "不同发送对象不应共享节流窗口");
+        assertNotNull(svc.checkManualThrottle("morning", 3L, "users:88", 2000L),
+                "同一发送对象仍应受 1 分钟节流约束");
     }
 
     /* ==================== 手动触发入口校验 ==================== */

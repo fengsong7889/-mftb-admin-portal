@@ -563,6 +563,25 @@ export function previewDailyReport(form: DailyReportPreviewForm): Promise<DailyR
   return request.post<unknown, DailyReportPreviewResult>(`${BASE}/preview`, form)
 }
 
+/** 内置版式（系统内置、不可编辑）：类型与模板配置页的三张内置卡片一一对应 */
+export type DailyReportBuiltinLayoutType = 'group_morning' | 'group_evening' | 'personal'
+
+export interface DailyReportBuiltinLayout {
+  type: DailyReportBuiltinLayoutType
+  title: string
+  content: string
+  messageMode: DailyReportMessageMode
+}
+
+/**
+ * 内置版式示例：固定示例数据 + 固定框架渲染，不受当前消息模式影响。
+ * <p>为什么不复用 previewDailyReport：那个按配置的 messageMode 分叉，用户选了自定义模板后
+ * 看到的就不是内置版式，详情页会自相矛盾。
+ */
+export function fetchDailyReportBuiltinLayout(type: DailyReportBuiltinLayoutType): Promise<DailyReportBuiltinLayout> {
+  return request.get<unknown, DailyReportBuiltinLayout>(`${BASE}/builtin-layout`, { params: { type } })
+}
+
 /**
  * 手動觸發推送（需 rdm-daily-report-trigger:trigger 權限）。
  * <p>项目范围三选一：单项目 projectId / 多项目 projectIds / 全部项目 allProjects=true。
@@ -579,11 +598,18 @@ export function triggerDailyReport(params: {
   /** 可選：只推該項目下的某個迭代（仅单项目可用） */
   iterationCode?: string
   dryRun?: boolean
+  /** 发送对象：all=群+個人 / group=仅群 / users=仅指定人 */
+  recipientMode?: 'all' | 'group' | 'users'
+  /** 僅 recipientMode=users 時使用 */
+  recipientUserIds?: number[]
 }): Promise<DailyReportTriggerResult> {
   return request.post<unknown, DailyReportTriggerResult>(`${BASE}/trigger`, null, {
     params: {
       ...params,
       projectIds: params.projectIds && params.projectIds.length > 0 ? params.projectIds.join(',') : undefined,
+      recipientUserIds: params.recipientUserIds && params.recipientUserIds.length > 0
+        ? params.recipientUserIds.join(',')
+        : undefined,
     },
   })
 }

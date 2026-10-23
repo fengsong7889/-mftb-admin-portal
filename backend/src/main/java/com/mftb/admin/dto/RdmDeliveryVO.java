@@ -95,6 +95,20 @@ public class RdmDeliveryVO {
     }
 
     /**
+     * 团队任务视图的成员项。
+     * <p>只暴露姓名与工号：任务协作需要找人，不需要把部门/组织归属一并摊开；
+     * {@code sharedProjectCount} 用于说明"为什么他能被看到"（共同项目数）。
+     */
+    @Data
+    public static class TeamMember {
+        private Long userId;
+        private String name;
+        private String empNo;
+        /** 与当前人的共同项目数；全量数据范围（管理员/PMO）为 null，表示不受项目限制 */
+        private Integer sharedProjectCount;
+    }
+
+    /**
      * 任务负责人资格预检结果。
      * <p>只用于界面提醒：无研发交付权限不阻断保存（先排期、后补权限），
      * 离职/停用才会在保存时被真正拦下。

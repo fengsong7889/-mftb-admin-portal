@@ -6,6 +6,7 @@ import type { TableColumnsType } from 'antd'
 import {
   DeleteOutlined,
   EditOutlined,
+  EyeOutlined,
   LinkOutlined,
   NotificationOutlined,
   PlusOutlined,
@@ -33,24 +34,42 @@ import {
 } from '../../../api/rdmDailyReport'
 import '../index.css'
 
-/** 项目行可勾选字段（顺序即页面展示顺序；label 走 i18n） */
+/**
+ * 固定版式下的三个内置场景：与「晨報/晚報/個人」默认模板一一对应。
+ * 只提供只读的「查看樣式」入口——它们没有模板行，改不了也不需要改。
+ */
+const BUILTIN_LAYOUT_ENTRIES: Array<{
+  type: 'group_morning' | 'group_evening' | 'personal'
+  labelKey: string
+}> = [
+  { type: 'group_morning', labelKey: 'rdm.dailyRule.defaultMorningTpl' },
+  { type: 'group_evening', labelKey: 'rdm.dailyRule.defaultEveningTpl' },
+  { type: 'personal', labelKey: 'rdm.dailyRule.defaultPersonalTpl' },
+]
+
+/**
+ * 项目行可勾选字段（顺序即页面展示顺序；label 走 i18n）。
+ * <p>逾期/阻塞计数不在此列：它属异常角标，始终显示——否则「需關注」里只剩一个红灯、
+ * 看不到严重程度，读者还得回去翻看板。
+ */
 const PROJECT_FIELDS: Array<{ key: keyof DailyReportMessageFields; labelKey: string }> = [
   { key: 'projectProductOwner', labelKey: 'rdm.dailyRule.msgFieldProjectProductOwner' },
   { key: 'projectDeliveryProgress', labelKey: 'rdm.dailyRule.msgFieldProjectDeliveryProgress' },
   { key: 'projectIterationCount', labelKey: 'rdm.dailyRule.msgFieldProjectIterationCount' },
   { key: 'projectPeriod', labelKey: 'rdm.dailyRule.msgFieldProjectPeriod' },
   { key: 'projectNextDelivery', labelKey: 'rdm.dailyRule.msgFieldProjectNextDelivery' },
-  { key: 'projectAbnormal', labelKey: 'rdm.dailyRule.msgFieldProjectAbnormal' },
 ]
 
-/** 迭代行可勾选字段 */
+/**
+ * 迭代行可勾选字段。
+ * <p>今日到期/逾期计数不在此列：同属异常角标，始终显示（只列有异常的迭代时，这是唯一说明
+ * 「为什么列它」的信息）。
+ */
 const ITERATION_FIELDS: Array<{ key: keyof DailyReportMessageFields; labelKey: string }> = [
   { key: 'iterationStatus', labelKey: 'rdm.dailyRule.msgFieldIterationStatus' },
   { key: 'iterationOwner', labelKey: 'rdm.dailyRule.msgFieldIterationOwner' },
   { key: 'iterationProgress', labelKey: 'rdm.dailyRule.msgFieldIterationProgress' },
   { key: 'iterationReqTotal', labelKey: 'rdm.dailyRule.msgFieldIterationReqTotal' },
-  { key: 'iterationReqTodayDue', labelKey: 'rdm.dailyRule.msgFieldIterationReqTodayDue' },
-  { key: 'iterationReqOverdue', labelKey: 'rdm.dailyRule.msgFieldIterationReqOverdue' },
   { key: 'iterationPeriod', labelKey: 'rdm.dailyRule.msgFieldIterationPeriod' },
 ]
 
@@ -314,9 +333,14 @@ export default function DailyReportRules() {
         receiverRoles: v.receiverRoles ?? [],
         extraReceiverUserIds: v.extraReceiverUserIds ?? [],
         excludeReceiverUserIds: v.excludeReceiverUserIds ?? [],
-        morningTemplateKey: v.morningTemplateKey ?? null,
-        eveningTemplateKey: v.eveningTemplateKey ?? null,
-        personalTemplateKey: v.personalTemplateKey ?? null,
+        /*
+         * 模板键一律从 store 读，不取 validateFields 的返回值：
+         * fixed 模式下三个模板下拉是条件不渲染的，若从校验结果里取会得到 undefined，
+         * 保存后就把用户之前选的自定义模板清成 null，切回模板模式时选择悄悄丢失。
+         */
+        morningTemplateKey: form.getFieldValue('morningTemplateKey') ?? null,
+        eveningTemplateKey: form.getFieldValue('eveningTemplateKey') ?? null,
+        personalTemplateKey: form.getFieldValue('personalTemplateKey') ?? null,
         boardLinkValidDays: v.boardLinkValidDays,
         boardShowRequirements: v.boardShowRequirements,
         boardShowOwners: v.boardShowOwners,
@@ -630,20 +654,6 @@ export default function DailyReportRules() {
               </div>
             </div>
           </div>
-          {/* 默认模板与上方开关分层：模板只是内容兜底，不参与开关层级 */}
-          <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px dashed #f0f0f0' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
-              <Form.Item name="morningTemplateKey" label={t('rdm.dailyRule.defaultMorningTpl')}>
-                <Select allowClear options={groupMorning} placeholder={t('rdm.dailyRule.useDefault')} />
-              </Form.Item>
-              <Form.Item name="eveningTemplateKey" label={t('rdm.dailyRule.defaultEveningTpl')}>
-                <Select allowClear options={groupEvening} placeholder={t('rdm.dailyRule.useDefault')} />
-              </Form.Item>
-              <Form.Item name="personalTemplateKey" label={t('rdm.dailyRule.defaultPersonalTpl')}>
-                <Select allowClear options={personalOptions} placeholder={t('rdm.dailyRule.useDefault')} />
-              </Form.Item>
-            </div>
-          </div>
 
           {/*
             看板與連結：樣式固定（前端寫死），這裡只調展示參數。
@@ -716,6 +726,42 @@ export default function DailyReportRules() {
                 ? t('rdm.dailyRule.msgTemplateNote')
                 : t('rdm.dailyRule.msgFrameworkNote')}
             </div>
+            {/*
+              模板选择必须与消息模式联动：
+              fixed 下 renderGroupFixed / renderPersonalFixed 直接生成正文，模板键完全不参与渲染，
+              再让用户选「晨報默認模板」就是一份永远不生效的配置，还会让人以为改模板能改内容。
+              所以 fixed 时把三个下拉换成三张「查看樣式」入口，template 时才出现下拉。
+              注意：fixed 分支只做条件渲染、不清空表单值，切回 template 时原选择仍在。
+            */}
+            {messageMode === 'template' ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
+                <Form.Item name="morningTemplateKey" label={t('rdm.dailyRule.defaultMorningTpl')}>
+                  <Select allowClear options={groupMorning} placeholder={t('rdm.dailyRule.useDefault')} />
+                </Form.Item>
+                <Form.Item name="eveningTemplateKey" label={t('rdm.dailyRule.defaultEveningTpl')}>
+                  <Select allowClear options={groupEvening} placeholder={t('rdm.dailyRule.useDefault')} />
+                </Form.Item>
+                <Form.Item name="personalTemplateKey" label={t('rdm.dailyRule.defaultPersonalTpl')} style={{ marginBottom: 8 }}>
+                  <Select allowClear options={personalOptions} placeholder={t('rdm.dailyRule.useDefault')} />
+                </Form.Item>
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16,
+                marginBottom: 10, padding: '10px 12px', borderRadius: 8,
+                background: '#f0f6ff', border: '1px solid #d6e4ff',
+              }}>
+                {BUILTIN_LAYOUT_ENTRIES.map(item => (
+                  <div key={item.type} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, color: '#595959' }}>{t(item.labelKey)}</span>
+                    <Button size="small" icon={<EyeOutlined />}
+                      onClick={() => navigate(`/rdm-daily-report-template-builtin?type=${item.type}`)}>
+                      {t('rdm.dailyRule.viewBuiltinStyle')}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
             <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 10 }}>
               {t('rdm.dailyRule.quietHint')}
             </div>

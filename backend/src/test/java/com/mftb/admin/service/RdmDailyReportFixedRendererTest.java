@@ -119,16 +119,19 @@ class RdmDailyReportFixedRendererTest {
     }
 
     @Test
-    @DisplayName("无逾期无风险时标题直说今日无异常，不堆 0")
+    @DisplayName("无逾期无风险无到期时标题直说今日无异常，不堆 0")
     void titleSaysNoAbnormalWhenClean() {
         Snapshot s = snapshot();
         s.getSummary().setOverdueItemCount(0);
         s.getSummary().setRiskProjectCount(0);
+        // 今日到期也属异常口径：只清逾期/风险时标题应显示「今日到期 1」，不能说无异常
+        s.getSummary().setTodayDueItemCount(0);
 
         Rendered r = renderer.renderGroupFixed(s, "https://example.com/u", false, new MessageFieldOptions());
 
         assertTrue(r.title().contains("今日無異常"), r.title());
         assertFalse(r.title().contains("逾期 0"), "标题不该出现 0 值计数，实际: " + r.title());
+        assertFalse(r.title().contains("今日到期 0"), "标题不该出现 0 值计数，实际: " + r.title());
     }
 
     @Test
@@ -160,28 +163,35 @@ class RdmDailyReportFixedRendererTest {
     }
 
     @Test
-    @DisplayName("指标行：逾期/风险为 0 时带 ✅，让「没有」也是信息")
-    void metricsMarksZero() {
-        Snapshot clean = snapshot();
-        clean.getSummary().setOverdueItemCount(0);
-        clean.getSummary().setRiskProjectCount(0);
-        String content = renderer.renderGroupFixed(clean, "u", false, new MessageFieldOptions()).content();
-        assertTrue(content.contains("✅ 逾期 0"), content);
-        assertTrue(content.contains("✅ 風險 0"), content);
+    @DisplayName("指标行：0 值不打印，只留真正非零的指标")
+    void metricsSkipZero() {
+        Snapshot s = snapshot();
+        s.getSummary().setOverdueItemCount(0);
+        s.getSummary().setRiskProjectCount(0);
+        s.getSummary().setTodayDueItemCount(0);
+
+        // 项目节点仍是关注态（summary 与节点在真实聚合里同源，这里只压指标行），故走完整版
+        String content = renderer.renderGroupFixed(s, "u", false, new MessageFieldOptions()).content();
+
+        assertTrue(content.startsWith("**在途 2**"), content);
+        assertFalse(content.contains("逾期 0"), content);
+        assertFalse(content.contains("風險 0"), content);
+        assertFalse(content.contains("今日到期 0"), content);
     }
 
     @Test
     @DisplayName("字段开关：只影响行内字段，不影响项目行本身与状态灯")
     void fieldTogglesOnlyChangeContent() {
         String off = renderer.renderGroupFixed(snapshot(), "u", false, new MessageFieldOptions()).content();
-        assertFalse(off.contains("週期 2026-09-01~2026-12-31"), off);
+        assertFalse(off.contains("週期"), off);
 
         MessageFieldOptions on = new MessageFieldOptions();
         on.setProjectPeriod(true);
         on.setProjectNextDelivery(true);
         String enabled = renderer.renderGroupFixed(snapshot(), "u", false, on).content();
-        assertTrue(enabled.contains("週期 2026-09-01~2026-12-31"), enabled);
-        assertTrue(enabled.contains("下次交付 2026-10-22"), enabled);
+        // 日期压成 MM-dd：卡片宽度有限，年份对日报是冗余信息
+        assertTrue(enabled.contains("週期 09-01~12-31"), enabled);
+        assertTrue(enabled.contains("下次交付 10-22"), enabled);
         assertTrue(enabled.contains("- 🔴 **門戶改版**"), "开关不得影响项目行与状态灯，实际: " + enabled);
 
         MessageFieldOptions noOwner = new MessageFieldOptions();
@@ -202,6 +212,8 @@ class RdmDailyReportFixedRendererTest {
         assertTrue(r.title().contains("今日無異常"), r.title());
         assertTrue(r.content().contains("內部工具"), r.content());
         assertFalse(r.content().contains("門戶改版"), "不得混入他人项目，实际: " + r.content());
+        assertFalse(r.content().contains("張三，"),
+                "个人卡片不得出现收件人署名（追加收件人会误以为项目全归此人）: " + r.content());
 
         PersonalView urgent = new PersonalView("張三",
                 List.of(snapshot.getProjects().get(0)), 0, 2, 1, 0, 0, 0, 0);
@@ -223,17 +235,76 @@ class RdmDailyReportFixedRendererTest {
 
         assertTrue(content.contains("今天沒有到期或逾期的交付項"), content);
         assertTrue(content.contains("✅ 今日無異常"), content);
+        assertFalse(content.contains("張三，"), "无异常日极简结论同样不署姓名: " + content);
         assertFalse(content.contains("逾期 0"), content);
         assertFalse(content.contains("今日到期 0"), content);
     }
 
     @Test
-    @DisplayName("未挂项目迭代：加粗一行计数 + 迭代行，不用三级标题")
-    void unassignedIterationsKept() {
+    @DisplayName("降噪 brief 个人消息：不署姓名，只给「今日無異常 + 負責的 N 個項目」")
+    void personalQuietBriefHasNoName() {
+        Snapshot snapshot = snapshot();
+        PersonalView quiet = new PersonalView("張三",
+                List.of(snapshot.getProjects().get(1)), 0, 0, 0, 0, 0, 0, 0);
+
+        Rendered r = renderer.renderPersonalQuiet(snapshot, false, quiet, "u");
+
+        assertFalse(r.content().contains("張三"),
+                "brief 消息同样不署姓名（领导收到会误以为项目全归此人）: " + r.content());
+        assertTrue(r.content().startsWith("✅ **今日無異常**"), r.content());
+        assertTrue(r.content().contains("負責的 1 個項目均在計劃內"), r.content());
+        assertTrue(r.title().contains("今日無異常"), r.title());
+    }
+
+    @Test
+    @DisplayName("无异常日：一句话收口，不列项目与迭代明细")
+    void cleanDayCollapsesToSingleLine() {
+        Snapshot s = snapshot();
+        s.getProjects().forEach(p -> p.setAttention(false));
+        s.getSummary().setOverdueItemCount(0);
+        s.getSummary().setRiskProjectCount(0);
+        s.getSummary().setTodayDueItemCount(0);
+
+        Rendered r = renderer.renderGroupFixed(s, "u", false, new MessageFieldOptions());
+
+        assertTrue(r.content().startsWith("✅ **今日無異常**"), r.content());
+        assertFalse(r.content().contains("🧩"), "无异常日不列未挂迭代，实际: " + r.content());
+        assertFalse(r.content().contains("進展正常"),
+                "不再重复「全部 N 個項目進展正常」这句，实际: " + r.content());
+    }
+
+    @Test
+    @DisplayName("未挂项目迭代：全部正常时压成一行计数，不逐条铺开")
+    void unassignedIterationsCollapsedWhenClean() {
         String content = renderer.renderGroupFixed(snapshot(), "u", false, new MessageFieldOptions()).content();
 
-        assertTrue(content.contains("🧩 **未掛項目的迭代 1 個**"), content);
-        assertTrue(content.contains("迭代 HF202610001 緊急修復"), content);
+        assertTrue(content.contains("🧩 未掛項目的迭代 1 個，均無逾期"), content);
+        assertFalse(content.contains("HF202610001"), "正常迭代不展开，实际: " + content);
+    }
+
+    @Test
+    @DisplayName("未挂项目迭代：只列有逾期/今日到期的，异常计数不受字段开关控制")
+    void unassignedIterationsOnlyIssues() {
+        Snapshot s = snapshot();
+        IterationNode bad = new IterationNode();
+        bad.setIterationId(10L);
+        bad.setCode("SP202610099");
+        bad.setName("延期迭代");
+        bad.setStatus("active");
+        bad.setOverdueReqCount(2);
+        s.getUnassignedIterations().add(bad);
+
+        MessageFieldOptions off = new MessageFieldOptions();
+        off.setIterationPeriod(false);
+        // 已退役的开关：即使显式关掉，异常计数也必须显示，否则看不出这一行为什么被列出来
+        off.setIterationReqOverdue(false);
+        String content = renderer.renderGroupFixed(s, "u", false, off).content();
+
+        assertTrue(content.contains("🧩 **未掛項目的迭代 2 個**"), content);
+        assertTrue(content.contains("🔴 SP202610099 延期迭代"), content);
+        assertTrue(content.contains("逾期 2"), content);
+        assertTrue(content.contains("- 其餘 1 個正常"), content);
+        assertFalse(content.contains("HF202610001"), "正常迭代不展开，实际: " + content);
     }
 
     @Test

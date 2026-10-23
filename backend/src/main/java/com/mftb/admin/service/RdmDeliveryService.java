@@ -43,6 +43,14 @@ public interface RdmDeliveryService {
     /** 我的任务（研发/设计/测试人员视角） */
     List<RdmDeliveryVO.Task> myTasks(String status);
 
+    /**
+     * 指定成员的任务（团队协作视图：同项目对接、联调时查看对方进度）。
+     * <p>数据范围由 {@code RdmTeamScopeService} 收敛：只有与目标同属至少一个在途项目
+     * 才可见，且只返回共同项目下的任务；{@code canSeeAll}（管理员/PMO）不受项目限制。
+     * <p>{@code ownerUserId} 为空或等于当前人时，等价于 {@link #myTasks(String)}。
+     */
+    List<RdmDeliveryVO.Task> teamTasks(Long ownerUserId, String status);
+
     /** 新增/编辑任务 */
     RdmDeliveryVO.Task saveTask(RdmDeliveryDTO.Task dto);
 

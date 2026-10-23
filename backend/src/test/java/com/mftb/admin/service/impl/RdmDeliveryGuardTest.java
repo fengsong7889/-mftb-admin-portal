@@ -139,7 +139,8 @@ class RdmDeliveryGuardTest {
                 permissionService, mock(RdmDeliveryItemMapper.class), mock(RdmFlowVersionGuard.class), taskTypeService,
                 mock(com.mftb.admin.service.RdmPrdTaskService.class),
                 mock(com.mftb.admin.service.RdmDeliveryItemService.class),
-                progressLogMapper);
+                progressLogMapper,
+                mock(com.mftb.admin.service.RdmTeamScopeService.class));
         when(accessGuard.requireDeliveryWriter(anyLong(), anyString())).thenReturn(requirement(RdmConstants.STATUS_ACCEPTED));
         when(accessGuard.requireVisible(anyLong(), anyString())).thenReturn(requirement(RdmConstants.STATUS_ACCEPTED));
         when(requirementMapper.selectById(any())).thenReturn(requirement(RdmConstants.STATUS_ACCEPTED));

@@ -61,6 +61,8 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * RDM 交付过程服务实现（M2）。
@@ -164,6 +166,8 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
     private final RdmDeliveryItemService deliveryItemService;
     /** 进度变更审计（只追加）：记录谁把哪条任务从多少改到多少，供绩效与验收追溯 */
     private final RdmTaskProgressLogMapper progressLogMapper;
+    /** 团队任务视图的数据范围守卫：共同项目成员可见，避免任务台变成全量绩效看板 */
+    private final com.mftb.admin.service.RdmTeamScopeService teamScopeService;
 
     /* ==================== PRD ==================== */
 
@@ -466,25 +470,67 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         if (current == null) {
             return List.of();
         }
-        LambdaQueryWrapper<RdmWorkTask> wrapper = new LambdaQueryWrapper<RdmWorkTask>()
-                .eq(RdmWorkTask::getOwnerUserId, current.getId())
-                .orderByAsc(RdmWorkTask::getPlanFinishDate)
-                .orderByDesc(RdmWorkTask::getId);
-        if (StringUtils.hasText(status)) {
-            wrapper.eq(RdmWorkTask::getStatus, status);
-        }
-        /*
-         * 不传 status 就是真的全部：之前默认退化成“未完成”，导致工作台「全部」页签
-         * 永远看不到已完成任务（端到端测试实测）。该页默认视图就是未完成，
-         * 是由前端 filter 保证的，服务端不应替调用方做这个决定。
-         */
-        List<RdmWorkTask> tasks = taskMapper.selectList(wrapper.last("LIMIT 100"));
+        List<RdmWorkTask> tasks = loadTasksByOwner(current.getId(), status);
         List<RdmDeliveryVO.Task> list = new ArrayList<>();
         for (RdmWorkTask t : tasks) {
             RdmRequirement req = requirementMapper.selectById(t.getReqId());
             list.add(toTaskVO(t, req));
         }
         return list;
+    }
+
+    /**
+     * 指定成员的任务（团队协作视图）。
+     * <p>先由 {@code RdmTeamScopeService} 算出共同项目：普通成员只能看到共同项目下的任务，
+     * 避免借"同项目"看到对方其他项目的活；管理员/PMO 不受项目限制。
+     */
+    @Override
+    public List<RdmDeliveryVO.Task> teamTasks(Long ownerUserId, String status) {
+        SysUser current = operatorResolver.currentUser();
+        if (current == null) {
+            return List.of();
+        }
+        if (ownerUserId == null || ownerUserId.equals(current.getId())) {
+            return myTasks(status);
+        }
+        Set<Long> commonProjects = teamScopeService.commonProjectIds(ownerUserId);
+        List<RdmWorkTask> tasks = loadTasksByOwner(ownerUserId, status);
+        List<RdmDeliveryVO.Task> list = new ArrayList<>();
+        if (commonProjects == null) {
+            for (RdmWorkTask t : tasks) {
+                list.add(toTaskVO(t, requirementMapper.selectById(t.getReqId())));
+            }
+            return list;
+        }
+        List<Long> reqIds = tasks.stream().map(RdmWorkTask::getReqId)
+                .filter(Objects::nonNull).distinct().toList();
+        Map<Long, RdmRequirement> reqMap = reqIds.isEmpty() ? Map.of()
+                : requirementMapper.selectBatchIds(reqIds).stream()
+                .collect(Collectors.toMap(RdmRequirement::getId, r -> r, (a, b) -> a));
+        for (RdmWorkTask t : tasks) {
+            RdmRequirement req = reqMap.get(t.getReqId());
+            // 需求没挂项目时无法证明属于共同项目，按不可见处理（不猜）
+            if (req == null || req.getProjectId() == null || !commonProjects.contains(req.getProjectId())) {
+                continue;
+            }
+            list.add(toTaskVO(t, req));
+        }
+        return list;
+    }
+
+    /**
+     * 按负责人取任务（"我的"与"团队"共用同一排序与上限）。
+     * <p>不传 status 就是真的全部：默认只看未完成是前端视图的决定，服务端不替调用方做。
+     */
+    private List<RdmWorkTask> loadTasksByOwner(Long ownerUserId, String status) {
+        LambdaQueryWrapper<RdmWorkTask> wrapper = new LambdaQueryWrapper<RdmWorkTask>()
+                .eq(RdmWorkTask::getOwnerUserId, ownerUserId)
+                .orderByAsc(RdmWorkTask::getPlanFinishDate)
+                .orderByDesc(RdmWorkTask::getId);
+        if (StringUtils.hasText(status)) {
+            wrapper.eq(RdmWorkTask::getStatus, status);
+        }
+        return taskMapper.selectList(wrapper.last("LIMIT 100"));
     }
 
     @Override
@@ -2124,6 +2170,21 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
     /** 负责人是否已离职或停用 */
     private static boolean isInactive(SysUser owner) {
         return owner.getStatus() != null && owner.getStatus() == 0;
+    }
+
+    /** 负责人能否进交付工作台上报进度（或持有需求处理权） */
+    private boolean canOwnerReportProgress(SysUser owner) {
+        return permissionService.hasPermission(owner, RdmConstants.MENU_DELIVERY_BOARD, "edit")
+                || permissionService.hasPermission(owner, RdmConstants.MENU_REQUIREMENT, "edit");
+    }
+
+    private static String ownerInactiveWarning(SysUser owner) {
+        return "任務負責人「" + owner.getName() + "」已離職或停用，請改派他人";
+    }
+
+    private static String ownerNoPermissionWarning(SysUser owner) {
+        return "「" + owner.getName() + "」當前無研發交付權限：任務可正常保存，但他在交付工作台看不到上報入口，"
+                + "請隨後到「授權中心」為其補權";
     }
 
     /** 负责人能否进交付工作台上报进度（或持有需求处理权） */

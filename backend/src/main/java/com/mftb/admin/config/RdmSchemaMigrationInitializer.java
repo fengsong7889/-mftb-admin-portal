@@ -630,6 +630,79 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
     private static final String TASK_PROGRESS_AUDIT_SCRIPT = "284_rdm_task_progress_audit.sql";
 
     /**
+     * v3.32：驳回后允许本单受理产品经理重新打开。
+     *
+     * <p><b>为何要这一版</b>：{@code rejected → intake_pending} 的 reopen 动作原先只允许
+     * SUBMITTER / PMO / DISPATCHER。产品经理驳回后无法撤销自己的决定；把需求改派给新 PM 后，
+     * 新 PM 虽然拿到了 PM 角色行，却仍看不到「重新打開」，只能查看不能推进。
+     *
+     * <p><b>权限边界</b>：allowed_roles 增加 PM 后，仍由 {@code RdmAccessGuard.activeRoles}
+     * 按「本单 PM 角色行」收敛——只对本需求的受理 PM 生效，不是把所有驳回单开放给全体产品经理。
+     *
+     * <p><b>幂等</b>：只 UPDATE 未包含 PM 的那一行；用逗号包裹精确匹配，
+     * 不能写 {@code LIKE '%PM%'}（PMO 含 PM 子串，会被误判为已包含）。
+     */
+    private static final String VERSION_REOPEN_PM = "rdm:schema:v3.32";
+
+    /**
+     * 存量導入需求回退能力：評審通過 → 評估中（{@code back_to_evaluate}）。
+     *
+     * <p><b>為何需要</b>：存量導入直接落已准入狀態，缺少「接受需求」的承諾日期與產品任務；
+     * 批量補錄能補齊 108 條的歷史事實，但個別需求若確實要重走受理/PRD 流程，
+     * 狀態機裡卻沒有回退邊（{@code review_passed} 只有 schedule 一條出邊）。
+     *
+     * <p><b>為何做成配置而不是代碼分支</b>：前端詳情頁按 {@code allowedActions} 渲染按鈕，
+     * 新增一行 {from_status, action_code} 即可出現「退回評估」，不需要前端發版；
+     * 寫側仍由 {@code transitionInternal} 校驗角色與必填，回退路徑不可被繞過。
+     *
+     * <p><b>冪等</b>：INSERT IGNORE + 唯一鍵 (from_status, action_code)，可安全重放；
+     * 不覆蓋運營自定義的按鈕名/角色/排序。
+     */
+    private static final String VERSION_BACK_TO_EVALUATE = "rdm:transition:v1.1";
+    private static final String ACTION_BACK_TO_EVALUATE = "back_to_evaluate";
+
+    /**
+     * 排期必填字段與代碼閘門對齊：{@code schedule.required_fields} 補上 project / iteration。
+     *
+     * <p><b>為何需要</b>：歸屬體系改造把「項目+迭代」做成了排期硬閘門
+     * （{@code applyProjectAndIteration(required=true)}），但 204 種子裡
+     * {@code schedule} 的 {@code required_fields} 仍是 {@code planDate}。
+     * 詳情頁動作彈窗按服務端下發的 requiredFields 渲染字段，於是生產上
+     * <b>排期彈窗裡根本沒有項目/迭代選擇器</b>，而後端閘門又要求兩者，
+     * 用戶只能看到「提交排期必須選擇所屬項目與迭代」卻無處可選。
+     *
+     * <p><b>口徑</b>：只改仍為舊值 {@code planDate} 的行，不覆蓋管理員自定義；
+     * 後置校驗只檢查「舊值殘留為 0」，不強制必須等於某個集合（允許運營調整）。
+     */
+    private static final String VERSION_SCHEDULE_REQUIRED_FIELDS = "rdm:transition:v1.2";
+    private static final String SCHEDULE_REQUIRED_FIELDS = "planDate,project,iteration";
+
+    /**
+     * v3.33：个人日报正文去掉收件人姓名。
+     *
+     * <p><b>为何要这一版</b>：个人通知的收件人除「项目经理/产品负责人」外，还有推送规则里
+     * 追加的部门负责人、PMO 等；追加收件人拿的是规则范围下的全量项目，并非其本人负责的项目。
+     * 正文以「姓名，今日無異常」开头时，领导打开会误以为这些需求全归署名人，或怀疑系统把
+     * 别人的日报发错了对象。<b>姓名只用于「发给谁」的路由，不应进入消息内容。</b>
+     *
+     * <p><b>为何要改库里的模板</b>：v3.16 播种的个人模板以 {@code {{userName}}，} 开头，
+     * v3.23 起这些行已转为用户可编辑的自定义模板，<b>不会再随代码常量刷新</b>；只改常量
+     * 只能影响全新库。渲染器虽已把该占位符恒替换为空串，但会留下「### 📌 ，您的產研交付日報」
+     * 这样的孤立逗号，故这里连同占位符与紧随的逗号/冒号一起清掉。
+     *
+     * <p><b>幂等</b>：只 UPDATE 仍含该占位符的行，重放时候选集合为空即 no-op；无 DROP / 无删列。
+     */
+    private static final String VERSION_DAILY_REPORT_NO_NAME = "rdm:schema:v3.33";
+    /** 清姓名占位符（连同其后的中英文逗号/冒号与空格），顺序：长串优先，最后才是裸占位符 */
+    private static final String[][] DAILY_REPORT_NO_NAME_PATTERNS = {
+            {"{{userName}}，", ""},
+            {"{{userName}}：", ""},
+            {"{{userName}}, ", ""},
+            {"{{userName}},", ""},
+            {"{{userName}}", ""},
+    };
+
+    /**
      * v3.29：存量需求导入（云效迁移）结构。
      *
      * <p><b>为何需要 external_no</b>：云效编号只用于回查原始需求，不能当正式需求号
@@ -971,6 +1044,13 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
                 this::doPrdOutputNamingMigrate, this::verifyPrdOutputNamingMigrate);
         versionTracker.applyOnce(VERSION_TASK_PROGRESS_AUDIT,
                 this::doTaskProgressAuditMigrate, this::verifyTaskProgressAuditMigrate);
+        versionTracker.applyOnce(VERSION_REOPEN_PM, this::doReopenPmMigrate, this::verifyReopenPmMigrate);
+        versionTracker.applyOnce(VERSION_DAILY_REPORT_NO_NAME,
+                this::doDailyReportNoNameMigrate, this::verifyDailyReportNoNameMigrate);
+        versionTracker.applyOnce(VERSION_BACK_TO_EVALUATE,
+                this::doBackToEvaluateSeed, this::verifyBackToEvaluateSeed);
+        versionTracker.applyOnce(VERSION_SCHEDULE_REQUIRED_FIELDS,
+                this::doScheduleRequiredFieldsSeed, this::verifyScheduleRequiredFieldsSeed);
     }
 
     /**
@@ -1939,6 +2019,152 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
             throw new IllegalStateException("RDM v3.31 核验失败：rdm_task_plan_log.remark 列缺失");
         }
         requireTables(new String[]{"rdm_task_progress_log"});
+    }
+
+    /**
+     * v3.32：给 rejected → intake_pending 的 reopen 动作补 PM 角色（286 脚本仅作参照文档，不进镜像）。
+     * <p>幂等：只更新角色列表里没有独立 PM 项的那一行；逗号包裹后精确匹配，
+     * 避免 PMO 的 PM 子串被误判为「已包含 PM」。
+     * <p>管理员把该动作停用/删除时不强行复活：verify 会跳过，不阻塞启动。
+     */
+    private void doReopenPmMigrate() {
+        int updated = jdbcTemplate.update(
+                "UPDATE rdm_transition SET allowed_roles = 'SUBMITTER,PMO,DISPATCHER,PM' "
+                        + "WHERE from_status = 'rejected' AND to_status = 'intake_pending' "
+                        + "AND action_code = 'reopen' AND status = 1 "
+                        + "AND CONCAT(',', allowed_roles, ',') NOT LIKE '%,PM,%'");
+        log.info("RDM v3.32 驳回重开动作已补充 PM 角色: {} 行", updated);
+    }
+
+    /**
+     * v3.32 后置校验：动作仍启用时必须包含 PM。
+     * <p>不把「动作必须存在」当硬条件：运营可能在状态配置页停用/删除该动作，
+     * 那是业务决定，不应阻塞启动；但动作存在却没加上 PM，说明迁移没落库，必须抛错重试。
+     */
+    private void verifyReopenPmMigrate() {
+        Integer active = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM rdm_transition WHERE from_status = 'rejected' "
+                        + "AND to_status = 'intake_pending' AND action_code = 'reopen' AND status = 1",
+                Integer.class);
+        if (active == null || active == 0) {
+            log.warn("RDM v3.32 校驗跳過：rejected→intake_pending 的 reopen 動作已被停用或刪除");
+            return;
+        }
+        Integer withPm = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM rdm_transition WHERE from_status = 'rejected' "
+                        + "AND to_status = 'intake_pending' AND action_code = 'reopen' AND status = 1 "
+                        + "AND CONCAT(',', allowed_roles, ',') LIKE '%,PM,%'",
+                Integer.class);
+        if (withPm == null || withPm == 0) {
+            throw new IllegalStateException("RDM v3.32 核驗失敗：reopen 動作的 allowed_roles 未包含 PM");
+        }
+    }
+
+    /**
+     * 存量導入需求回退：review_passed → evaluating 的「退回評估」動作種子。
+     * <p>只給 PM：退回是產品側對自己受理結論的撤銷；管理員由 {@code canPerform} 直通，
+     * 不把管理員寫進 allowed_roles（那會讓「管理員」變成一個可授權角色，擴權面失控）。
+     */
+    private void doBackToEvaluateSeed() {
+        int inserted = jdbcTemplate.update(
+                "INSERT IGNORE INTO rdm_transition (from_status, to_status, action_code, action_name, "
+                        + "allowed_roles, required_fields, sort_order, status) "
+                        + "VALUES ('review_passed', 'evaluating', ?, '退回評估', 'PM', 'remark', 33, 1)",
+                ACTION_BACK_TO_EVALUATE);
+        log.info("RDM 存量需求回退動作種子已寫入: back_to_evaluate 新增 {} 行", inserted);
+    }
+
+    /**
+     * 後置校驗：動作存在時必須可用且落點是 evaluating。
+     * <p>與 v3.32 同口徑：運營主動停用/刪除是業務決定，不阻塞啟動；
+     * 但行還在卻指向別處，說明遷移寫壞了，必須拋錯。
+     */
+    private void verifyBackToEvaluateSeed() {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT to_status, status, required_fields FROM rdm_transition "
+                        + "WHERE from_status = 'review_passed' AND action_code = ? AND deleted = 0",
+                ACTION_BACK_TO_EVALUATE);
+        if (rows.isEmpty()) {
+            log.warn("RDM 校驗跳過：review_passed→evaluating 的 back_to_evaluate 動作已被刪除");
+            return;
+        }
+        Map<String, Object> row = rows.get(0);
+        if (!"evaluating".equals(String.valueOf(row.get("to_status")))
+                || !"1".equals(String.valueOf(row.get("status")))
+                || row.get("required_fields") == null
+                || !String.valueOf(row.get("required_fields")).contains("remark")) {
+            throw new IllegalStateException("RDM 核驗失敗：back_to_evaluate 動作配置不是 evaluating/啟用/必填說明");
+        }
+    }
+
+    /**
+     * 排期必填字段補齊：只更新仍為 204 舊值 {@code planDate} 的那一行。
+     * <p>不覆蓋管理員自定義（例如運營另外加了 versionNo），避免每次發版都把配置改回去。
+     */
+    private void doScheduleRequiredFieldsSeed() {
+        int updated = jdbcTemplate.update(
+                "UPDATE rdm_transition SET required_fields = ? "
+                        + "WHERE from_status = 'review_passed' AND to_status = 'scheduled' "
+                        + "AND action_code = 'schedule' AND required_fields = 'planDate' AND deleted = 0",
+                SCHEDULE_REQUIRED_FIELDS);
+        log.info("RDM 排期必填字段已與代碼閘門對齊: {} 行（planDate → {}）", updated, SCHEDULE_REQUIRED_FIELDS);
+    }
+
+    /**
+     * 後置校驗：只要排期動作仍啟用，就不能再殘留舊值 {@code planDate}。
+     * <p>不校驗「必須等於三元組」：管理員可以自行增減必填字段，那是業務決定；
+     * 但舊值殘留說明本遷移沒落庫，前端彈窗仍不會渲染項目/迭代，必須拋錯重試。
+     */
+    private void verifyScheduleRequiredFieldsSeed() {
+        Integer active = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM rdm_transition WHERE from_status = 'review_passed' "
+                        + "AND to_status = 'scheduled' AND action_code = 'schedule' AND status = 1 AND deleted = 0",
+                Integer.class);
+        if (active == null || active == 0) {
+            log.warn("RDM 校驗跳過：排期動作 schedule 已被停用或刪除");
+            return;
+        }
+        Integer legacy = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM rdm_transition WHERE from_status = 'review_passed' "
+                        + "AND to_status = 'scheduled' AND action_code = 'schedule' "
+                        + "AND required_fields = 'planDate' AND deleted = 0",
+                Integer.class);
+        if (legacy != null && legacy > 0) {
+            throw new IllegalStateException("RDM 核驗失敗：schedule.required_fields 仍為舊值 planDate，未補 project/iteration");
+        }
+    }
+
+    /**
+     * v3.33：清掉存量日报模板里的姓名占位符。
+     * <p>只更新仍含占位符的行：重放时候选集合为空即 no-op，用户对模板的其它编辑一字不动。
+     */
+    private void doDailyReportNoNameMigrate() {
+        int updated = 0;
+        for (String[] pattern : DAILY_REPORT_NO_NAME_PATTERNS) {
+            String like = "%" + pattern[0] + "%";
+            updated += jdbcTemplate.update(
+                    "UPDATE rdm_daily_report_template SET content_tpl = REPLACE(content_tpl, ?, ?), "
+                            + "updated_by = 'system', updated_at = NOW() "
+                            + "WHERE deleted = 0 AND content_tpl LIKE ?",
+                    pattern[0], pattern[1], like);
+            updated += jdbcTemplate.update(
+                    "UPDATE rdm_daily_report_template SET title_tpl = REPLACE(title_tpl, ?, ?), "
+                            + "updated_by = 'system', updated_at = NOW() "
+                            + "WHERE deleted = 0 AND title_tpl LIKE ?",
+                    pattern[0], pattern[1], like);
+        }
+        log.info("RDM v3.33 日报模板去姓名完成：清理 {} 处", updated);
+    }
+
+    /** v3.33 后置校验：任何未删除模板残留该占位符都会渲染出人名之外的空洞，视为迁移未完成 */
+    private void verifyDailyReportNoNameMigrate() {
+        Integer left = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM rdm_daily_report_template WHERE deleted = 0 "
+                        + "AND (content_tpl LIKE '%{{userName}}%' OR title_tpl LIKE '%{{userName}}%')",
+                Integer.class);
+        if (left != null && left > 0) {
+            throw new IllegalStateException("RDM v3.33 核驗失敗：仍有 " + left + " 個日報模板殘留 {{userName}}");
+        }
     }
 
     /** v3.28：投递队列补消息类型与卡片按钮列（281 脚本仅作参照文档，不进镜像） */

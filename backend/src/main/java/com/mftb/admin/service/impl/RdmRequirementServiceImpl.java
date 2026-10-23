@@ -10,9 +10,13 @@ import com.mftb.admin.dto.OaRequestVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.dto.RdmAcceptanceDTO;
 import com.mftb.admin.dto.RdmAcceptanceVO;
+import com.mftb.admin.dto.RdmBatchBackfillAcceptDTO;
+import com.mftb.admin.dto.RdmBatchBackfillVO;
+import com.mftb.admin.dto.RdmBatchSubmitterDTO;
 import com.mftb.admin.dto.RdmConfigVO;
 import com.mftb.admin.dto.RdmOptionVO;
 import com.mftb.admin.dto.RdmIntakeVO;
+import com.mftb.admin.dto.RdmRequirementAttrDTO;
 import com.mftb.admin.dto.RdmRequirementCreateDTO;
 import com.mftb.admin.dto.RdmRequirementQuery;
 import com.mftb.admin.dto.RdmRequirementVO;
@@ -1593,6 +1597,547 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         return RdmRequirementVO.from(requirementMapper.selectById(id), configService.stageMap());
     }
 
+    /** 屬性面板不可改的終態：已上線/已驗收/已關閉需先 reopen，避免上線後改歸屬造成統計口徑漂移 */
+    private static final List<String> ATTR_LOCKED_STATUS = Arrays.asList(
+            RdmConstants.STATUS_RELEASED, RdmConstants.STATUS_VERIFIED, RdmConstants.STATUS_CLOSED);
+
+    private static final Set<String> PRIORITY_CODES = Set.of("P0", "P1", "P2", "P3");
+    private static final Set<String> COMPLEXITY_CODES = Set.of("SIMPLE", "MEDIUM", "COMPLEX", "HUGE");
+
+    /**
+     * 詳情頁屬性欄逐字段修改。
+     * <p>權限分層：提出人只給分配權/全量權（權屬變更）；產品/研發/驗收/項目經理/優先級/日期
+     * 給分配權或本單 PM/研發負責人/PMO；業務期望額外放開提出人本人（他只改自己的期望時間）。
+     * <p>所有變更合併成一條狀態流水，時間軸能看到「誰在什麼時候把什麼從 A 改成 B」。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public RdmRequirementVO changeAttributes(Long id, RdmRequirementAttrDTO dto) {
+        RdmRequirement req = requireRequirement(id);
+        SysUser current = operatorResolver.currentUser();
+        if (current == null) {
+            throw new BusinessException("登錄狀態失效，請重新登錄");
+        }
+        requireVisible(req, current, "修改屬性");
+        if (dto == null) {
+            throw new BusinessException("沒有需要修改的屬性");
+        }
+        if (ATTR_LOCKED_STATUS.contains(req.getStatus())) {
+            throw new BusinessException("當前狀態「" + labelOf(req.getStatus()) + "」不允許修改屬性，請先重新打開需求");
+        }
+        if (Arrays.asList(RdmConstants.EDITABLE_STATUS).contains(req.getStatus())
+                || RdmConstants.STATUS_INTAKE_PENDING.equals(req.getStatus())) {
+            throw new BusinessException("草稿/待審批/準入駁回的需求請在「編輯需求」中修改");
+        }
+
+        boolean manager = operatorResolver.isAdmin(current) || accessGuard.canSeeAll(current)
+                || accessGuard.canDispatch(current);
+        Set<String> roles = accessGuard.activeRoles(id, current);
+        boolean deliverySide = roles.contains(RdmConstants.ROLE_PM) || roles.contains(RdmConstants.ROLE_DEV_LEAD)
+                || roles.contains(RdmConstants.ROLE_PMO);
+        boolean canEditDeliveryAttrs = manager || deliverySide;
+        boolean submitterSelf = current.getId().equals(req.getSubmitterUserId());
+
+        List<String> changes = new ArrayList<>();
+        Set<Long> notifyIds = new LinkedHashSet<>();
+        boolean clearExpectDate = false;
+        boolean clearPromisedDate = false;
+        boolean clearPlanReleaseDate = false;
+
+        /* ── 提出人：權屬變更，只給分配權/全量權 ── */
+        if (dto.getSubmitterUserId() != null && !dto.getSubmitterUserId().equals(req.getSubmitterUserId())) {
+            if (!manager) {
+                throw new BusinessException("只有需求分配人/管理員可以變更提出人");
+            }
+            SysUser next = requireActiveEmployee(dto.getSubmitterUserId(), "提出人");
+            Long previous = req.getSubmitterUserId();
+            changes.add("提出人：" + personLabel(req.getSubmitterName(), req.getSubmitterEmpNo())
+                    + " → " + personLabel(next.getName(), next.getEmpId()));
+            if (previous != null) {
+                deactivateRole(id, previous, RdmConstants.ROLE_SUBMITTER);
+                notifyIds.add(previous);
+            }
+            upsertActiveRole(id, next, RdmConstants.ROLE_SUBMITTER);
+            notifyIds.add(next.getId());
+            req.setSubmitterUserId(next.getId());
+            req.setSubmitterEmpNo(next.getEmpId());
+            req.setSubmitterName(next.getName());
+            req.setSubmitDeptId(next.getDepartmentId());
+            req.setSubmitDeptName(next.getDepartment());
+        }
+
+        /* ── 研發負責人 ── */
+        if (dto.getDevOwnerUserId() != null && !dto.getDevOwnerUserId().equals(req.getDevOwnerUserId())) {
+            if (!canEditDeliveryAttrs) {
+                throw new BusinessException("您沒有權限變更研發負責人");
+            }
+            SysUser next = requireActiveEmployee(dto.getDevOwnerUserId(), "研發負責人");
+            Long previous = req.getDevOwnerUserId();
+            changes.add("研發負責人：" + (StringUtils.hasText(req.getDevOwnerName()) ? req.getDevOwnerName() : "未指定")
+                    + " → " + next.getName());
+            if (previous != null) {
+                deactivateRole(id, previous, RdmConstants.ROLE_DEV_LEAD);
+                notifyIds.add(previous);
+            }
+            upsertActiveRole(id, next, RdmConstants.ROLE_DEV_LEAD);
+            notifyIds.add(next.getId());
+            req.setDevOwnerUserId(next.getId());
+            req.setDevOwnerName(next.getName());
+        }
+
+        /* ── 業務驗收人 ── */
+        if (dto.getAcceptorUserId() != null && !dto.getAcceptorUserId().equals(req.getAcceptorUserId())) {
+            if (!canEditDeliveryAttrs) {
+                throw new BusinessException("您沒有權限變更業務驗收人");
+            }
+            SysUser next = requireActiveEmployee(dto.getAcceptorUserId(), "業務驗收人");
+            Long previous = req.getAcceptorUserId();
+            changes.add("業務驗收人：" + (StringUtils.hasText(req.getAcceptorName()) ? req.getAcceptorName() : "未指定")
+                    + " → " + next.getName());
+            if (previous != null) {
+                deactivateRole(id, previous, RdmConstants.ROLE_ACCEPTOR);
+                notifyIds.add(previous);
+            }
+            upsertActiveRole(id, next, RdmConstants.ROLE_ACCEPTOR);
+            notifyIds.add(next.getId());
+            req.setAcceptorUserId(next.getId());
+            req.setAcceptorName(next.getName());
+        }
+
+        /* ── 需求級項目經理 ── */
+        if (dto.getProjectManagerUserId() != null
+                && !dto.getProjectManagerUserId().equals(req.getProjectManagerUserId())) {
+            if (!canEditDeliveryAttrs) {
+                throw new BusinessException("您沒有權限變更項目經理");
+            }
+            SysUser next = requireActiveEmployee(dto.getProjectManagerUserId(), "項目經理");
+            changes.add("項目經理："
+                    + (StringUtils.hasText(req.getProjectManagerUserName()) ? req.getProjectManagerUserName() : "未指定")
+                    + " → " + next.getName());
+            req.setProjectManagerUserId(next.getId());
+            req.setProjectManagerUserName(next.getName());
+            notifyIds.add(next.getId());
+        }
+
+        /* ── 優先級 ── */
+        if (StringUtils.hasText(dto.getPriority())) {
+            String priority = dto.getPriority().trim().toUpperCase();
+            if (!PRIORITY_CODES.contains(priority)) {
+                throw new BusinessException("優先級只能是 P0/P1/P2/P3");
+            }
+            if (!priority.equals(req.getPriority())) {
+                if (!canEditDeliveryAttrs) {
+                    throw new BusinessException("您沒有權限調整優先級");
+                }
+                changes.add("優先級：" + req.getPriority() + " → " + priority);
+                req.setPriority(priority);
+            }
+        }
+
+        /* ── 預期規模：產品評估職責，只給 PM/管理側 ── */
+        if (StringUtils.hasText(dto.getComplexity())) {
+            String complexity = dto.getComplexity().trim().toUpperCase();
+            if (!COMPLEXITY_CODES.contains(complexity)) {
+                throw new BusinessException("預期規模只能是 SIMPLE/MEDIUM/COMPLEX/HUGE");
+            }
+            if (!complexity.equals(req.getComplexity())) {
+                if (!(manager || roles.contains(RdmConstants.ROLE_PM))) {
+                    throw new BusinessException("只有產品經理/管理員可以評估預期規模");
+                }
+                changes.add("預期規模：" + (req.getComplexity() == null ? "待評估" : req.getComplexity())
+                        + " → " + complexity);
+                req.setComplexity(complexity);
+            }
+        }
+
+        /* ── 業務期望日期：提出人本人可改自己的期望 ── */
+        if (dto.getExpectDate() != null) {
+            LocalDate next = parseDate(dto.getExpectDate());
+            if (!Objects.equals(next, req.getExpectDate())) {
+                if (!(canEditDeliveryAttrs || submitterSelf)) {
+                    throw new BusinessException("您沒有權限調整業務期望日期");
+                }
+                changes.add("業務期望：" + (req.getExpectDate() == null ? "未填寫" : req.getExpectDate())
+                        + " → " + (next == null ? "清空" : next));
+                req.setExpectDate(next);
+                clearExpectDate = next == null;
+            }
+        }
+
+        /* ── 承諾出 PRD 日期 ── */
+        if (dto.getPromisedPrdDate() != null) {
+            LocalDate next = parseDate(dto.getPromisedPrdDate());
+            if (!Objects.equals(next, req.getPromisedPrdDate())) {
+                if (!canEditDeliveryAttrs) {
+                    throw new BusinessException("您沒有權限調整承諾出 PRD 日期");
+                }
+                changes.add("承諾出 PRD：" + (req.getPromisedPrdDate() == null ? "未承諾" : req.getPromisedPrdDate())
+                        + " → " + (next == null ? "清空" : next));
+                req.setPromisedPrdDate(next);
+                clearPromisedDate = next == null;
+            }
+        }
+
+        /* ── 計劃上線日期 ── */
+        if (dto.getPlanReleaseDate() != null) {
+            LocalDate next = parseDate(dto.getPlanReleaseDate());
+            if (!Objects.equals(next, req.getPlanReleaseDate())) {
+                if (!canEditDeliveryAttrs) {
+                    throw new BusinessException("您沒有權限調整計劃上線日期");
+                }
+                changes.add("計劃上線：" + (req.getPlanReleaseDate() == null ? "待排期" : req.getPlanReleaseDate())
+                        + " → " + (next == null ? "清空" : next));
+                req.setPlanReleaseDate(next);
+                clearPlanReleaseDate = next == null;
+            }
+        }
+
+        /* ── 抄送：整份替換（空數組即清空） ── */
+        if (dto.getCcUserIds() != null) {
+            if (!(canEditDeliveryAttrs || submitterSelf)) {
+                throw new BusinessException("您沒有權限維護抄送人");
+            }
+            LinkedHashSet<Long> nextIds = new LinkedHashSet<>();
+            for (Long userId : dto.getCcUserIds()) {
+                if (userId != null) {
+                    nextIds.add(userId);
+                }
+            }
+            List<RdmRequirementRole> currentCc = roleMapper.selectList(new LambdaQueryWrapper<RdmRequirementRole>()
+                    .eq(RdmRequirementRole::getReqId, id)
+                    .eq(RdmRequirementRole::getRoleCode, RdmConstants.ROLE_CC)
+                    .eq(RdmRequirementRole::getIsActive, 1));
+            Set<Long> currentIds = new LinkedHashSet<>();
+            for (RdmRequirementRole role : currentCc) {
+                currentIds.add(role.getUserId());
+                if (!nextIds.contains(role.getUserId())) {
+                    deactivateRole(id, role.getUserId(), RdmConstants.ROLE_CC);
+                }
+            }
+            List<String> names = new ArrayList<>();
+            for (Long userId : nextIds) {
+                SysUser user = requireActiveEmployee(userId, "抄送人");
+                names.add(user.getName());
+                if (!currentIds.contains(userId)) {
+                    upsertActiveRole(id, user, RdmConstants.ROLE_CC);
+                }
+            }
+            changes.add("抄送：" + (names.isEmpty() ? "清空" : String.join("、", names)));
+        }
+
+        if (changes.isEmpty()) {
+            throw new BusinessException("沒有檢測到需要修改的屬性");
+        }
+        req.setUpdatedBy(operatorResolver.operatorSignature(current));
+        requirementMapper.updateById(req);
+        // updateById 默認 NOT_NULL，清空日期必須顯式 SET NULL，否則界面顯示已清空、庫裡還留舊值
+        if (clearExpectDate || clearPromisedDate || clearPlanReleaseDate) {
+            LambdaUpdateWrapper<RdmRequirement> clear = new LambdaUpdateWrapper<RdmRequirement>()
+                    .eq(RdmRequirement::getId, id);
+            if (clearExpectDate) {
+                clear.set(RdmRequirement::getExpectDate, null);
+            }
+            if (clearPromisedDate) {
+                clear.set(RdmRequirement::getPromisedPrdDate, null);
+            }
+            if (clearPlanReleaseDate) {
+                clear.set(RdmRequirement::getPlanReleaseDate, null);
+            }
+            requirementMapper.update(null, clear);
+        }
+
+        String remark = StringUtils.hasText(dto.getRemark()) ? "；說明：" + dto.getRemark().trim() : "";
+        appendStatusLog(req, req.getStatus(), current, "change_attr", String.join("；", changes) + remark);
+        notifyIds.remove(current.getId());
+        if (!notifyIds.isEmpty()) {
+            notifyService.notifyUserIds(RdmConstants.EVENT_STATUS_CHANGED, req, new ArrayList<>(notifyIds),
+                    "需求屬性已更新",
+                    "### ✏️ 需求屬性更新\n\n- **需求**：" + (req.getReqNo() == null ? "-" : req.getReqNo())
+                            + " " + req.getTitle()
+                            + "\n- **變更**：" + String.join("；", changes)
+                            + "\n- **操作人**：" + current.getName());
+        }
+        log.info("需求屬性變更: reqNo={}, changes={}, operator={}",
+                req.getReqNo(), String.join("；", changes), req.getUpdatedBy());
+        return RdmRequirementVO.from(requirementMapper.selectById(id), configService.stageMap());
+    }
+
+    /**
+     * 批量變更提出人。
+     * <p>不校驗需求狀態：提出人是權屬字段，不影響流程；已上線的需求也可能需要更正歸屬。
+     * <p>逐條寫主表 + 角色行 + 狀態流水，任何一條失敗整批回滾（避免一半人一半人）。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int batchChangeSubmitter(RdmBatchSubmitterDTO dto) {
+        SysUser current = operatorResolver.currentUser();
+        if (current == null) {
+            throw new BusinessException("登錄狀態失效，請重新登錄");
+        }
+        if (!(operatorResolver.isAdmin(current) || accessGuard.canSeeAll(current) || accessGuard.canDispatch(current))) {
+            throw new BusinessException("只有需求分配人/管理員可以變更提出人");
+        }
+        if (dto == null || dto.getIds() == null || dto.getIds().isEmpty()) {
+            throw new BusinessException("請選擇需要變更提出人的需求");
+        }
+        List<Long> ids = dto.getIds().stream().filter(Objects::nonNull).distinct().toList();
+        if (ids.size() > 500) {
+            throw new BusinessException("單次最多變更 500 條需求，請分批操作");
+        }
+        SysUser next = requireActiveEmployee(dto.getSubmitterUserId(), "提出人");
+        String remark = StringUtils.hasText(dto.getRemark()) ? "；說明：" + dto.getRemark().trim() : "";
+        String signature = operatorResolver.operatorSignature(current);
+        int changed = 0;
+        for (Long reqId : ids) {
+            RdmRequirement req = requirementMapper.selectById(reqId);
+            if (req == null) {
+                continue;
+            }
+            Long previous = req.getSubmitterUserId();
+            if (next.getId().equals(previous)) {
+                continue;
+            }
+            jdbcTemplate.update(
+                    "UPDATE rdm_requirement SET submitter_user_id = ?, submitter_emp_no = ?, submitter_name = ?, "
+                            + "submit_dept_id = ?, submit_dept_name = ?, updated_by = ?, updated_at = now() "
+                            + "WHERE id = ? AND deleted = 0",
+                    next.getId(), next.getEmpId(), next.getName(), next.getDepartmentId(),
+                    next.getDepartment(), signature, reqId);
+            if (previous != null) {
+                deactivateRole(reqId, previous, RdmConstants.ROLE_SUBMITTER);
+            }
+            upsertActiveRole(reqId, next, RdmConstants.ROLE_SUBMITTER);
+            appendStatusLog(req, req.getStatus(), current, "change_submitter",
+                    "變更提出人：" + personLabel(req.getSubmitterName(), req.getSubmitterEmpNo())
+                            + " → " + personLabel(next.getName(), next.getEmpId()) + remark);
+            changed++;
+        }
+        log.info("批量變更提出人完成: target={}, changed={}, operator={}", ids.size(), changed, signature);
+        return changed;
+    }
+
+    /**
+     * 批量補錄受理信息（存量導入需求）。
+     *
+     * <p><b>為什麼不回退狀態</b>：導入時已隨需求生成一份 approved PRD，
+     * 若把狀態退回受理前，會出現「狀態說還沒寫 PRD、庫裡卻躺著定稿 PRD」的矛盾；
+     * 而回退後重新受理又會因評審記錄缺失停在 PRD 產出中，108 條等於重走一遍評審。
+     * 因此本方法只補「受理事實」（承諾日期 + 產品任務），狀態保持不動。
+     *
+     * <p><b>產品任務口徑</b>：按已完成補建（PRD 已隨導入產出），
+     * 只補歷史可見性，不給產品經理製造形式化待辦；已有未完成任務的只同步日期與負責人，
+     * 已完成任務不改寫歷史歸屬（與 {@link RdmPrdTaskService#ensureTask} 同口徑）。
+     *
+     * <p><b>審計</b>：補錄不是一次狀態變更，流水 {@code from_status = to_status} 且立即閉合，
+     * 避免成為一條永不關閉的 open 行、把後續狀態停留時長算錯。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public RdmBatchBackfillVO batchBackfillAccept(RdmBatchBackfillAcceptDTO dto) {
+        SysUser current = operatorResolver.currentUser();
+        if (current == null) {
+            throw new BusinessException("登錄狀態失效，請重新登錄");
+        }
+        if (!(operatorResolver.isAdmin(current) || accessGuard.canSeeAll(current) || accessGuard.canDispatch(current))) {
+            throw new BusinessException("只有需求分配人/管理員可以補錄受理信息");
+        }
+        List<Long> ids = dto == null || dto.getIds() == null ? List.of()
+                : dto.getIds().stream().filter(Objects::nonNull).distinct().toList();
+        if (ids.isEmpty()) {
+            throw new BusinessException("請選擇需要補錄受理信息的需求");
+        }
+        if (ids.size() > 500) {
+            throw new BusinessException("單次最多補錄 500 條需求，請分批操作");
+        }
+        LocalDate promised = parseDate(dto.getPromisedPrdDate());
+        if (promised == null) {
+            throw new BusinessException("請填寫承諾出 PRD 日期");
+        }
+        SysUser pm = null;
+        if (dto.getPmUserId() != null) {
+            pm = requireActiveEmployee(dto.getPmUserId(), "產品經理");
+            requirePmEligible(pm);
+        }
+
+        String signature = operatorResolver.operatorSignature(current);
+        String remark = StringUtils.hasText(dto.getRemark()) ? "；說明：" + dto.getRemark().trim() : "";
+        RdmBatchBackfillVO result = new RdmBatchBackfillVO();
+        for (Long reqId : ids) {
+            RdmRequirement req = requirementMapper.selectById(reqId);
+            if (!isBackfillable(req)) {
+                result.setSkippedStatus(result.getSkippedStatus() + 1);
+                continue;
+            }
+            SysUser owner = pm != null ? pm
+                    : (req.getAssigneePmUserId() == null ? null : userMapper.selectById(req.getAssigneePmUserId()));
+            /*
+             * 離職/停用的歷史受理人不能再承接任務：任務掛到停用賬號後，
+             * 工作台與團隊負載都按 owner 過濾，等於補了一條誰也看不到的任務。
+             * 這種行走 skippedNoPm，讓用戶先批量分配或指定新的產品經理再重試。
+             */
+            if (owner == null || (owner.getStatus() != null && owner.getStatus() == 0)) {
+                result.setSkippedNoPm(result.getSkippedNoPm() + 1);
+                continue;
+            }
+            /*
+             * 明確指定產品經理時同步主表與角色行：只寫任務負責人會讓權限口徑與任務歸屬分裂，
+             * 被指定的人拿不到受理權，任務卻掛在他名下。
+             */
+            if (pm != null && !pm.getId().equals(req.getAssigneePmUserId())) {
+                applyPm(req, pm, current);
+                req.setCurrentHandlerName(computeHandler(req, null));
+                requirementMapper.updateById(req);
+                upsertActiveRole(req.getId(), pm, RdmConstants.ROLE_PM);
+            }
+            jdbcTemplate.update(
+                    "UPDATE rdm_requirement SET promised_prd_date = ?, updated_by = ?, updated_at = now() "
+                            + "WHERE id = ? AND deleted = 0",
+                    promised, signature, reqId);
+            syncBackfillPrdTask(req, owner, promised, signature);
+            insertBackfillLog(req, current, "存量補錄受理：承諾出 PRD 日期 " + promised
+                    + "；產品任務按已完成補建" + remark);
+            result.setUpdated(result.getUpdated() + 1);
+        }
+        log.info("批量補錄受理信息完成: target={}, updated={}, skippedNoPm={}, skippedStatus={}, operator={}",
+                ids.size(), result.getUpdated(), result.getSkippedNoPm(), result.getSkippedStatus(), signature);
+        return result;
+    }
+
+    /**
+     * 可補錄範圍：整需求鏈路（V1/V2）且停在 PRD 階段。
+     * <p>排期後的需求承諾日期已不影響任何門禁，補錄只會污染歷史；V3 分批交付由交付項推進，
+     * 不生成整需求 PRD 任務，補錄會造出無人認領的孤兒任務。
+     */
+    private boolean isBackfillable(RdmRequirement req) {
+        if (req == null) {
+            return false;
+        }
+        if (req.getFlowVersion() != null && req.getFlowVersion() == RdmConstants.FLOW_VERSION_3) {
+            return false;
+        }
+        return PRD_PHASE_STATUSES.contains(req.getStatus());
+    }
+
+    /** 補建/同步產品任務：無任務則按已完成補建，已有未完成任務只同步計劃與負責人 */
+    private void syncBackfillPrdTask(RdmRequirement req, SysUser owner, LocalDate promised, String signature) {
+        RdmWorkTask existing = taskMapper.selectOne(new LambdaQueryWrapper<RdmWorkTask>()
+                .eq(RdmWorkTask::getReqId, req.getId())
+                .eq(RdmWorkTask::getTaskType, RdmPrdTaskService.TASK_TYPE_PRD)
+                .ne(RdmWorkTask::getStatus, "cancelled")
+                .orderByDesc(RdmWorkTask::getId)
+                .last("LIMIT 1"));
+        if (existing != null) {
+            if ("done".equals(existing.getStatus())) {
+                return;
+            }
+            taskMapper.update(null, new LambdaUpdateWrapper<RdmWorkTask>()
+                    .eq(RdmWorkTask::getId, existing.getId())
+                    .set(RdmWorkTask::getPlanFinishDate, promised)
+                    .set(RdmWorkTask::getOwnerUserId, owner.getId())
+                    .set(RdmWorkTask::getOwnerName, owner.getName())
+                    .set(RdmWorkTask::getOwnerEmpNo, owner.getEmpId())
+                    .set(RdmWorkTask::getIterationCode, req.getIterationCode())
+                    .set(RdmWorkTask::getUpdatedBy, signature));
+            return;
+        }
+        RdmWorkTask task = new RdmWorkTask();
+        task.setTaskNo(bizSeqService.next(BizSeqService.RULE_RDM_WORK_TASK));
+        task.setReqId(req.getId());
+        task.setTaskType(RdmPrdTaskService.TASK_TYPE_PRD);
+        task.setTitle(RdmPrdTaskService.PRD_TASK_TITLE);
+        task.setContent("存量導入補建：承諾 " + promised + " 前產出 PRD；導入時已生成定稿 PRD，任務按已完成補錄。");
+        task.setOwnerUserId(owner.getId());
+        task.setOwnerName(owner.getName());
+        task.setOwnerEmpNo(owner.getEmpId());
+        task.setRoleCode(RdmConstants.ROLE_PM);
+        task.setStatus("done");
+        task.setProgress(100);
+        // 計劃開始取受理日（導入時間），缺失時退回承諾日，保證甘特圖有可畫區間
+        task.setPlanStartDate(req.getAcceptTime() == null ? promised : req.getAcceptTime().toLocalDate());
+        task.setPlanFinishDate(promised);
+        task.setActualStartTime(req.getAcceptTime());
+        LocalDateTime prdTime = latestPrdReviewTime(req.getId());
+        task.setActualFinishTime(prdTime == null ? req.getAcceptTime() : prdTime);
+        task.setIterationCode(req.getIterationCode());
+        task.setPlanVersion(1);
+        task.setCreatedBy(signature);
+        task.setUpdatedBy(signature);
+        taskMapper.insert(task);
+    }
+
+    /** 最新一份 PRD 的定稿時間（導入時即為生成時間），作為產品任務的實際完成時間 */
+    private LocalDateTime latestPrdReviewTime(Long reqId) {
+        List<java.sql.Timestamp> rows = jdbcTemplate.queryForList(
+                "SELECT review_time FROM rdm_prd WHERE req_id = ? AND deleted = 0 ORDER BY id DESC LIMIT 1",
+                java.sql.Timestamp.class, reqId);
+        return rows.isEmpty() || rows.get(0) == null ? null : rows.get(0).toLocalDateTime();
+    }
+
+    /**
+     * 補錄流水：狀態未變更，進入即閉合。
+     * <p>不能複用 {@link #appendStatusLog}：那條會寫 open 行，而 {@code closeOpenStatusLog}
+     * 只關閉最新一條，會讓更早的狀態行永遠 open，直接把停留時長統計算歪。
+     */
+    private void insertBackfillLog(RdmRequirement req, SysUser actor, String remark) {
+        LocalDateTime now = LocalDateTime.now();
+        RdmStatusLog statusLog = new RdmStatusLog();
+        statusLog.setReqId(req.getId());
+        statusLog.setFromStatus(req.getStatus());
+        statusLog.setToStatus(req.getStatus());
+        statusLog.setActionCode(RdmConstants.ACTION_BACKFILL_ACCEPT);
+        statusLog.setOperatorUserId(actor.getId());
+        statusLog.setOperatorName(actor.getName());
+        statusLog.setOperatorRole(resolveMyRole(req, actor));
+        statusLog.setRemark(remark);
+        statusLog.setEnterTime(now);
+        statusLog.setLeaveTime(now);
+        statusLog.setDurationSeconds(0L);
+        statusLog.setIsOverdue(0);
+        statusLogMapper.insert(statusLog);
+    }
+
+    /** 人員選擇校驗：必須存在且在職（停用/離職不能成為新的歸屬人） */
+    private SysUser requireActiveEmployee(Long userId, String label) {
+        SysUser user = userId == null ? null : userMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(label + "不存在，請重新選擇");
+        }
+        if (user.getStatus() != null && user.getStatus() == 0) {
+            throw new BusinessException(label + "已離職或停用，請改選其他人");
+        }
+        return user;
+    }
+
+    /**
+     * 恢復或新增參與角色行。
+     * <p>唯一鍵 (req_id, user_id, role_code) 不含 deleted，軟刪行不能直接再插，
+     * 且 {@code @TableLogic} 會讓 selectOne 看不到軟刪行；故用 jdbcTemplate 繞過邏輯刪除查回原行並恢復。
+     */
+    private void upsertActiveRole(Long reqId, SysUser user, String roleCode) {
+        if (reqId == null || user == null || !StringUtils.hasText(roleCode)) {
+            return;
+        }
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id FROM rdm_requirement_role WHERE req_id = ? AND user_id = ? AND role_code = ? LIMIT 1",
+                reqId, user.getId(), roleCode);
+        if (!rows.isEmpty()) {
+            jdbcTemplate.update(
+                    "UPDATE rdm_requirement_role SET is_active = 1, deleted = 0, emp_no = ?, emp_name = ?, "
+                            + "join_time = now() WHERE id = ?",
+                    user.getEmpId(), user.getName(), ((Number) rows.get(0).get("id")).longValue());
+            return;
+        }
+        RdmRequirementRole role = new RdmRequirementRole();
+        role.setReqId(reqId);
+        role.setUserId(user.getId());
+        role.setEmpNo(user.getEmpId());
+        role.setEmpName(user.getName());
+        role.setRoleCode(roleCode);
+        role.setIsActive(1);
+        role.setJoinTime(LocalDateTime.now());
+        roleMapper.insert(role);
+    }
+
     /**
      * 准入审批代理：把需求详情页的「審批通過 / 審批駁回」转交给 OA 引擎。
      * <p>走 OA 而非直接改状态，才能同时拿到三样东西：审批人身份校验（fail-closed）、
@@ -1769,6 +2314,11 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
                 req.setReopenCount(value(req.getReopenCount()) + 1);
                 releaseService.revokeOpenGates(req.getId(), "需求已重开，旧放行结论不再沿用");
             }
+            case RdmConstants.ACTION_BACK_TO_EVALUATE -> {
+                // 退回評估意味著要重新走受理與 PRD 產出：已收口的產品任務必須重新打開，
+                // 否則產品經理在工作台看不到它，回退只是把狀態改回去了
+                prdTaskService.reopenTask(req.getId(), actor);
+            }
             default -> {
                 if (dto != null && dto.getProgress() != null) {
                     req.setProgress(dto.getProgress());
@@ -1882,10 +2432,22 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         String iterationCode = dto == null ? null : dto.getIterationCode();
         boolean hasIteration = StringUtils.hasText(iterationCode);
         if (!hasIteration && projectId == null) {
-            if (required) {
+            if (!required) {
+                return;
+            }
+            /*
+             * 排期未改歸屬時按需求已有歸屬複核，而不是直接要求重選：
+             * 前端動作彈窗是否渲染項目/迭代取決於 rdm_transition.required_fields，
+             * 歷史庫只配了 planDate，用戶明明已在屬性欄掛好項目+迭代，
+             * 仍會被「必須選擇所屬項目與迭代」擋住（生產已發生）。
+             * 已有值照樣走下面的存在性/關閉/歸屬一致性校驗，不跳過任何門禁。
+             */
+            projectId = req.getProjectId();
+            iterationCode = req.getIterationCode();
+            hasIteration = StringUtils.hasText(iterationCode);
+            if (!hasIteration && projectId == null) {
                 throw new BusinessException("提交排期必須選擇所屬項目與迭代");
             }
-            return;
         }
         Long resolvedProjectId = projectId;
         if (hasIteration) {

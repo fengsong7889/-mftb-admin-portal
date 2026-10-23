@@ -441,13 +441,10 @@ export default function AcceptanceList() {
           pageSizeOptions: ['10', '20', '50', '100'],
           showTotal: t => `共 ${t} 條`,
         }}
+        /* 空态交给 Table 自己渲染：此前表格用 antd 默认「無此資料」，
+           下方再补一行自定义提示，同一屏出现两套空态文案 */
+        locale={rdmTableLocale(diLoading, `當前沒有${DI_QUEUE_LABEL[diQueue]}的交付項`)}
       />
-
-      {diRows.length === 0 && !diLoading && (
-        <div style={{ textAlign: 'center', color: '#8C8C8C', padding: 24 }}>
-          <CheckCircleOutlined style={{ color: '#52C41A', marginRight: 6 }} />當前沒有{DI_QUEUE_LABEL[diQueue]}的交付項
-        </div>
-      )}
     </>
   )
 
@@ -557,7 +554,7 @@ export default function AcceptanceList() {
         loading={loading}
         locale={rdmTableLocale(loading, tab === 'pre'
           ? t('rdm.acceptance.emptyPre', { defaultValue: '當前沒有待預驗收的需求' })
-          : t('common.noData'))}
+          : t('rdm.acceptance.emptyDeliveryItem', { defaultValue: '當前沒有待驗收的交付項' }))}
         columns={visibleColumns}
         tableLayout="fixed"
         dataSource={rows}

@@ -82,7 +82,9 @@ export default function RdmDashboard() {
             需求吞吐 · 交付效率 · 風險預警 · 個人產出
           </span>
         </div>
-        <Space size={8}>
+        {/* 工具条必须可换行：5 个按钮 + 周期切换在 992px 宽窗口下总宽超过内容区，
+            原先用 Space 单行排列会把「導出週報」推出右边界（实测右缘 1026px > 992px） */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 8 }}>
           <Segmented
             value={period}
             onChange={v => setPeriod(v as string)}
@@ -99,13 +101,14 @@ export default function RdmDashboard() {
           <Button icon={<BranchesOutlined />} onClick={() => navigate('/rdm-version-trace')}>版本追溯</Button>
           <Button icon={<CalculatorOutlined />} onClick={() => navigate('/rdm-score')}>產出積分</Button>
           <Button className="btn-export" icon={<ExportOutlined />} onClick={() => navigate('/rdm-weekly-report')}>導出週報</Button>
-        </Space>
+        </div>
       </div>
 
       {/* ── 结果指标 ── */}
       <div style={{ marginBottom: 16 }}>
         <StatCards
           animationKey={period}
+          columns={4}
           items={[
             { key: 'total', icon: <InboxOutlined />, value: overview.reqTotal, label: '需求總量', color: 'info' },
             { key: 'submitted', icon: <RiseOutlined />, value: overview.submittedThisMonth, label: '本期新提交', color: 'brand' },
@@ -125,9 +128,9 @@ export default function RdmDashboard() {
           <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}><RiseOutlined /></span>
           交付流水線負載
           <span className="rdm-card-title-split" />
-          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>點列可進入對應視角處理</span>
+          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>點擊進入需求清單查看明細</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${board.columns.length}, 1fr)`, gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
           {board.columns.map(col => (
             <div
               key={col.key}

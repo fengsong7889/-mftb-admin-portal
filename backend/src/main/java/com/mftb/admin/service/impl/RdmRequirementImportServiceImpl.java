@@ -202,6 +202,15 @@ public class RdmRequirementImportServiceImpl implements RdmRequirementImportServ
                 projectManager = userMapper.selectById(project.getPmUserId());
             }
             SysUser productManager = resolveUser(row == null ? null : row.getProductManager(), "產品經理", errors, cache);
+            /*
+             * 提出人可选：模板留空即沿用导入操作人（历史口径）。
+             * 填了就必須解析成功，否則整批不寫——不能把業務歸屬靜默記到導入人身上。
+             */
+            String submitterText = trim(row == null ? null : row.getSubmitter());
+            SysUser submitter = resolveUser(submitterText, "提出人", errors, cache);
+            if (!StringUtils.hasText(submitterText)) {
+                submitter = current;
+            }
 
             if (!errors.isEmpty()) {
                 result.getItems().add(item(rowNo, externalNo, title, "failed", String.join("；", errors), null));
@@ -219,6 +228,7 @@ public class RdmRequirementImportServiceImpl implements RdmRequirementImportServ
             plan.iteration = iteration;
             plan.projectManager = projectManager;
             plan.productManager = productManager;
+            plan.submitter = submitter;
             plans.add(plan);
             // 占位成功项，写入阶段再回填 reqNo；保证返回顺序与请求一致
             result.getItems().add(item(rowNo, externalNo, title, "imported", null, null));
@@ -278,10 +288,12 @@ public class RdmRequirementImportServiceImpl implements RdmRequirementImportServ
         req.setSubmitTime(now);
         req.setAcceptTime(now);
         req.setStatusEnterTime(now);
-        req.setSubmitterUserId(current.getId());
-        req.setSubmitterEmpNo(current.getEmpId());
-        req.setSubmitterName(current.getName());
-        req.setSubmitDeptId(current.getDepartmentId());
+        req.setSubmitterUserId(plan.submitter.getId());
+        req.setSubmitterEmpNo(plan.submitter.getEmpId());
+        req.setSubmitterName(plan.submitter.getName());
+        req.setSubmitDeptId(plan.submitter.getDepartmentId());
+        // 部門名稱快照必須成對寫入：只寫 id 會讓列表「提出部門」列長期顯示空
+        req.setSubmitDeptName(plan.submitter.getDepartment());
         req.setStatus(plan.status);
         req.setProgress(progressOf(plan.status));
         req.setBlockedFlag(0);
@@ -308,7 +320,7 @@ public class RdmRequirementImportServiceImpl implements RdmRequirementImportServ
         req.setUpdatedBy(signature);
         requirementMapper.insert(req);
 
-        insertRole(req.getId(), current, RdmConstants.ROLE_SUBMITTER);
+        insertRole(req.getId(), plan.submitter, RdmConstants.ROLE_SUBMITTER);
         if (plan.productManager != null) {
             insertRole(req.getId(), plan.productManager, RdmConstants.ROLE_PM);
         }
@@ -321,8 +333,8 @@ public class RdmRequirementImportServiceImpl implements RdmRequirementImportServ
         prd.setContentRich(toPrdHtml(plan.description));
         prd.setStatus("approved");
         prd.setVersionNo("v1.0");
-        prd.setAuthorUserId(plan.productManager != null ? plan.productManager.getId() : current.getId());
-        prd.setAuthorName(plan.productManager != null ? plan.productManager.getName() : current.getName());
+        prd.setAuthorUserId(plan.productManager != null ? plan.productManager.getId() : plan.submitter.getId());
+        prd.setAuthorName(plan.productManager != null ? plan.productManager.getName() : plan.submitter.getName());
         prd.setReviewTime(now);
         prd.setReviewConclusion("存量導入，免評審");
         prd.setCreatedBy(signature);
@@ -582,6 +594,8 @@ public class RdmRequirementImportServiceImpl implements RdmRequirementImportServ
         private RdmIteration iteration;
         private SysUser projectManager;
         private SysUser productManager;
+        /** 提出人；模板留空时为导入操作人 */
+        private SysUser submitter;
     }
 
     /**

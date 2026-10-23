@@ -3,7 +3,11 @@ package com.mftb.admin.service;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.dto.RdmAcceptanceDTO;
 import com.mftb.admin.dto.RdmAcceptanceVO;
+import com.mftb.admin.dto.RdmBatchBackfillAcceptDTO;
+import com.mftb.admin.dto.RdmBatchBackfillVO;
+import com.mftb.admin.dto.RdmBatchSubmitterDTO;
 import com.mftb.admin.dto.RdmOptionVO;
+import com.mftb.admin.dto.RdmRequirementAttrDTO;
 import com.mftb.admin.dto.RdmRequirementCreateDTO;
 import com.mftb.admin.dto.RdmRequirementQuery;
 import com.mftb.admin.dto.RdmRequirementVO;
@@ -98,6 +102,30 @@ public interface RdmRequirementService {
      * PM / DEV_LEAD / PMO / DISPATCHER 参与者或全量权限者。
      */
     RdmRequirementVO changeIteration(Long id, RdmTransitionDTO dto);
+
+    /**
+     * 需求屬性變更（詳情頁右側屬性欄逐字段修改）。
+     * <p>只處理非 null 字段；日期空串=清空，抄送數組=整份替換。每次變更寫一條狀態流水，
+     * 便於時間軸追溯；人員字段同步對應參與角色行，避免「界面換了人、權限還掛舊人」。
+     * <p>狀態/需求類型/歸屬項目/參與角色不在本入口，理由見 {@link RdmRequirementAttrDTO}。
+     */
+    RdmRequirementVO changeAttributes(Long id, RdmRequirementAttrDTO dto);
+
+    /**
+     * 批量變更需求提出人（存量導入歸屬糾正、人員調整）。
+     * <p>主表快照與 SUBMITTER 角色行同步更新；已有角色行缺失時補插，保證
+     * {@code RdmAccessGuard.activeRoles()} 與主表口徑一致。返回實際變更條數。
+     */
+    int batchChangeSubmitter(RdmBatchSubmitterDTO dto);
+
+    /**
+     * 批量補錄受理信息（存量導入需求）。
+     * <p>導入直接落了已准入狀態，但沒有「接受需求」的承諾日期與產品任務。
+     * 本方法只補 {@code promised_prd_date} + 產品任務 + 審計流水，<b>不改需求狀態</b>：
+     * 導入時已生成 approved PRD，回退狀態會製造「狀態說沒 PRD、庫裡有定稿 PRD」的矛盾。
+     * <p>僅處理 PRD 階段且尚無未取消 prd 任務的需求；缺產品經理或狀態不適用的行分開計數返回。
+     */
+    RdmBatchBackfillVO batchBackfillAccept(RdmBatchBackfillAcceptDTO dto);
 
     /** 批量分配产品经理 */
     int batchAssign(List<Long> ids, Long pmUserId);

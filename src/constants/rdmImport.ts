@@ -12,7 +12,7 @@ import { RDM_STATUS, RDM_STATUS_LABEL, RDM_STATUS_LABEL_SIMPLIFIED, type RdmStat
 /** 导入模板列定义（数组顺序即模板列序） */
 export interface RdmImportColumn {
   /** 解析结果字段名 */
-  key: 'title' | 'externalNo' | 'status' | 'projectManager' | 'productManager' | 'projectName' | 'iterationName' | 'description'
+  key: 'title' | 'externalNo' | 'status' | 'projectManager' | 'productManager' | 'submitter' | 'projectName' | 'iterationName' | 'description'
   /** 模板表头（同时用于缺列提示） */
   header: string
   /**
@@ -34,6 +34,8 @@ export const RDM_IMPORT_COLUMNS: readonly RdmImportColumn[] = [
   { key: 'status', header: '需求狀態', aliases: ['需求狀態', '需求状态', 'status'], width: 16, required: true },
   { key: 'projectManager', header: '項目經理', aliases: ['項目經理', '项目经理', 'projectManager'], width: 14 },
   { key: 'productManager', header: '產品經理', aliases: ['產品經理', '产品经理', 'productManager'], width: 14 },
+  // 提出人留空时由后端按导入操作人落库；填「姓名(工號)」可精确指定业务归属人
+  { key: 'submitter', header: '提出人', aliases: ['提出人', '提出人員', '提出人员', 'submitter'], width: 16 },
   { key: 'projectName', header: '所屬項目', aliases: ['所屬項目', '所属项目', 'projectName'], width: 22 },
   { key: 'iterationName', header: '所屬迭代', aliases: ['所屬迭代', '所属迭代', 'iterationName'], width: 20 },
   { key: 'description', header: '需求描述', aliases: ['需求描述', 'description'], width: 48 },
@@ -71,6 +73,7 @@ export const RDM_IMPORT_SAMPLE_ROW = {
   externalNo: 'STORY-000001',
   projectManager: '張三(MF00001)',
   productManager: '李四(MF00002)',
+  submitter: '王五(MF00003)',
   projectName: '推廣報表二期',
   iterationName: 'SP2026-10A',
   description: '需求背景與預期結果，導入後會同步生成一份 PRD。',

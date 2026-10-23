@@ -162,6 +162,7 @@ export default function RequirementImportModal({ open, onClose, onImport }: Requ
     },
     { title: t('rdm.import.colProjectManager'), dataIndex: 'projectManager', key: 'projectManager', width: 120, render: (v?: string) => v || '-' },
     { title: t('rdm.import.colProductManager'), dataIndex: 'productManager', key: 'productManager', width: 120, render: (v?: string) => v || '-' },
+    { title: t('rdm.import.colSubmitter'), dataIndex: 'submitter', key: 'submitter', width: 120, render: (v?: string) => v || '-' },
     { title: t('rdm.import.colProjectName'), dataIndex: 'projectName', key: 'projectName', width: 150, ellipsis: true, render: (v?: string) => v || '-' },
     { title: t('rdm.import.colIterationName'), dataIndex: 'iterationName', key: 'iterationName', width: 130, ellipsis: true, render: (v?: string) => v || '-' },
     { title: t('rdm.import.colDescription'), dataIndex: 'description', key: 'description', width: 200, ellipsis: true, render: (v?: string) => v || '-' },
@@ -282,7 +283,7 @@ export default function RequirementImportModal({ open, onClose, onImport }: Requ
             rowKey="rowNo"
             size="small"
             pagination={rows.length > 10 ? { pageSize: 10, showSizeChanger: false, showTotal: count => t('rdm.import.totalCount', { count }) } : false}
-            scroll={{ x: 1280, y: 260 }}
+            scroll={{ x: 1400, y: 260 }}
           />
         </div>
       )}

@@ -346,6 +346,7 @@ export default function ScoreBoard() {
         <div style={{ marginBottom: 16 }}>
           <StatCards
             animationKey={`${data?.period.code}-${data?.ruleVersion}`}
+            columns={4}
             items={[
               { key: 'total', icon: <CalculatorOutlined />, value: Number(summary.totalScore.toFixed(1)), decimals: 1, label: '積分總量', color: 'brand' },
               { key: 'person', icon: <TeamOutlined />, value: summary.personCount, label: '計分人數', color: 'info' },

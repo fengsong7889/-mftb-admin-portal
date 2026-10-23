@@ -155,6 +155,16 @@ public class RdmTestBatchService {
             if (item == null) {
                 throw new BusinessException("交付項不存在或已刪除: id=" + itemId);
             }
+            /*
+             * 提测前按事实重算一次交付项状态：按任務提測会在提测前才把任务归入默认交付项，
+             * 任务已是 doing/done 但交付项仍停在 preparing 时，原来的状态校验会把合法提测误拒。
+             * 重算以任务/测试/验收事实为准，不会把没有任务支撑的交付项凭空推进。
+             */
+            deliveryItemService.recalculateStatus(itemId);
+            RdmDeliveryItem refreshed = deliveryItemMapper.selectById(itemId);
+            if (refreshed != null) {
+                item = refreshed;
+            }
             if (!RdmConstants.DI_DEVELOPING.equals(item.getStatus())) {
                 throw new BusinessException("交付項「" + item.getTitle() + "」當前狀態不可提測，僅「研發中」可提測");
             }

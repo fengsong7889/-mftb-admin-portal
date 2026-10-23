@@ -366,6 +366,7 @@ const DailyReportRules = lazy(() => import('./pages/Rdm/DailyReport/Rules'))
 const DailyReportRuleForm = lazy(() => import('./pages/Rdm/DailyReport/RuleForm'))
 const DailyReportTemplates = lazy(() => import('./pages/Rdm/DailyReport/Templates'))
 const DailyReportTemplateForm = lazy(() => import('./pages/Rdm/DailyReport/TemplateForm'))
+const DailyReportBuiltinTemplate = lazy(() => import('./pages/Rdm/DailyReport/BuiltinTemplateDetail'))
 const DailyReportRecords = lazy(() => import('./pages/Rdm/DailyReport/Records'))
 const DailyReportTrigger = lazy(() => import('./pages/Rdm/DailyReport/Trigger'))
 // 移動端日報頁：釘釘通知連結的落地頁，無獨立菜單
@@ -778,6 +779,7 @@ function AuthenticatedLayout() {
               <Route path="/rdm-daily-report-rule-form" element={<DailyReportRuleForm />} />
               <Route path="/rdm-daily-report-templates" element={<DailyReportTemplates />} />
               <Route path="/rdm-daily-report-template-form" element={<DailyReportTemplateForm />} />
+              <Route path="/rdm-daily-report-template-builtin" element={<DailyReportBuiltinTemplate />} />
               <Route path="/rdm-daily-report-records" element={<DailyReportRecords />} />
               <Route path="/rdm-daily-report-trigger" element={<DailyReportTrigger />} />
               {/* V3 分批交付：项目 / 提测 / 发布 / 交付项 / 问题 */}

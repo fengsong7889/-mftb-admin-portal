@@ -5,6 +5,7 @@ import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.RdmDeliveryDTO;
 import com.mftb.admin.dto.RdmDeliveryVO;
 import com.mftb.admin.service.RdmDeliveryService;
+import com.mftb.admin.service.RdmTeamScopeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,6 +31,8 @@ import java.util.List;
 public class RdmDeliveryController {
 
     private final RdmDeliveryService deliveryService;
+    /** 团队任务视图的数据范围：共同项目成员可见（只读） */
+    private final RdmTeamScopeService teamScopeService;
 
     /* ── 交付概览 ── */
 
@@ -154,6 +157,30 @@ public class RdmDeliveryController {
                 anyPermissions = {"rdm-requirement:view_all"})
     public Result<List<RdmDeliveryVO.Task>> myTasks(@RequestParam(required = false) String status) {
         return Result.success(deliveryService.myTasks(status));
+    }
+
+    /**
+     * 团队任务视图的成员列表（同项目成员；管理员/PMO 为全公司在职员工）。
+     * <p>只读：任务协作需要知道同项目同事的进度，不开放任何写能力。
+     */
+    @GetMapping("/team/members")
+    @RequirePermission(menu = "rdm-delivery-board", anyOf = {"rdm-requirement", "rdm-acceptance", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:view_all"})
+    public Result<List<RdmDeliveryVO.TeamMember>> teamMembers() {
+        return Result.success(teamScopeService.teamMembers());
+    }
+
+    /**
+     * 指定成员的任务（团队协作视图）。
+     * <p>数据范围由服务端按「共同在途项目」收敛：只能看共同项目下的任务；
+     * 无共同项目返回业务错误，不返回空列表伪装成"对方没任务"。
+     */
+    @GetMapping("/tasks/team")
+    @RequirePermission(menu = "rdm-delivery-board", anyOf = {"rdm-requirement", "rdm-acceptance", "rdm-intake"},
+                anyPermissions = {"rdm-requirement:view_all"})
+    public Result<List<RdmDeliveryVO.Task>> teamTasks(@RequestParam Long userId,
+                                                      @RequestParam(required = false) String status) {
+        return Result.success(deliveryService.teamTasks(userId, status));
     }
 
     /** 新增/编辑任务 */

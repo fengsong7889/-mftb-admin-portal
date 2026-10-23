@@ -153,6 +153,34 @@ class RdmIterationOwnershipTest {
     }
 
     @Test
+    @DisplayName("排期闸门：请求未带归属时按需求已有项目/迭代复核，不强制重选")
+    void scheduleFallsBackToExistingOwnership() {
+        RdmRequirement r = req(1L, RdmConstants.STATUS_REVIEW_PASSED);
+        r.setProjectId(9L);
+        r.setIterationCode("SP202610002");
+        stubIteration(9L, "active");
+        stubProjectExists();
+
+        service.applyProjectAndIteration(r, new RdmTransitionDTO(), true);
+
+        assertEquals(9L, r.getProjectId());
+        assertEquals("SP202610002", r.getIterationCode());
+    }
+
+    @Test
+    @DisplayName("排期闸门：回退使用已有迭代时仍校验迭代未关闭")
+    void scheduleFallbackStillRejectsClosedIteration() {
+        RdmRequirement r = req(1L, RdmConstants.STATUS_REVIEW_PASSED);
+        r.setProjectId(9L);
+        r.setIterationCode("SP202609001");
+        stubIteration(9L, "closed");
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.applyProjectAndIteration(r, new RdmTransitionDTO(), true));
+        assertTrue(ex.getMessage().contains("迭代已關閉"), ex.getMessage());
+    }
+
+    @Test
     @DisplayName("排期闸门：迭代有项目时以迭代为准回写需求项目（单一真值源）")
     void scheduleDerivesProjectFromIteration() {
         RdmRequirement r = req(1L, RdmConstants.STATUS_REVIEW_PASSED);

@@ -36,6 +36,8 @@ export interface ParsedRdmImportRow {
   statusText: string
   projectManager?: string
   productManager?: string
+  /** 提出人（業務歸屬人）；留空由後端按導入操作人落庫 */
+  submitter?: string
   projectName?: string
   iterationName?: string
   description?: string
@@ -176,6 +178,7 @@ export async function parseRequirementImportExcel(file: File): Promise<ParsedRdm
     status: findCol(...aliasesOf('status')),
     projectManager: findCol(...aliasesOf('projectManager')),
     productManager: findCol(...aliasesOf('productManager')),
+    submitter: findCol(...aliasesOf('submitter')),
     projectName: findCol(...aliasesOf('projectName')),
     iterationName: findCol(...aliasesOf('iterationName')),
     description: findCol(...aliasesOf('description')),
@@ -267,6 +270,7 @@ export async function parseRequirementImportExcel(file: File): Promise<ParsedRdm
       statusText,
       projectManager: pick(colIndex.projectManager) || undefined,
       productManager: pick(colIndex.productManager) || undefined,
+      submitter: pick(colIndex.submitter) || undefined,
       projectName: pick(colIndex.projectName) || undefined,
       iterationName: pick(colIndex.iterationName) || undefined,
       description: pick(colIndex.description) || undefined,

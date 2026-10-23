@@ -87,7 +87,7 @@ class RdmDailyReportControllerMappingTest {
         when(service.listTemplates(any())).thenReturn(List.of());
         when(service.saveTemplate(any(), any())).thenReturn(new RdmDailyReportVO.Template());
         when(service.preview(any())).thenReturn(new RdmDailyReportVO.PreviewResult());
-        when(service.triggerManual(anyString(), anyList(), any(), any(), anyBoolean()))
+        when(service.triggerManual(anyString(), anyList(), any(), any(), anyBoolean(), any()))
                 .thenReturn(new RdmDailyReportVO.TriggerResult());
         OperatorResolver operator = mock(OperatorResolver.class);
         when(operator.currentOperatorName()).thenReturn("測試管理員");

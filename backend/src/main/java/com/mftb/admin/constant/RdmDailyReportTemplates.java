@@ -67,6 +67,11 @@ public final class RdmDailyReportTemplates {
     public static final String PH_DETAIL_URL = "{{detailUrl}}";
 
     /* ---- 个人模板专用 ---- */
+    /**
+     * 收件人姓名占位符。<b>已停用</b>：个人日报一律不署姓名（追加收件人拿到的项目并非其本人负责，
+     * 署名会让领导误以为需求全归署名人或以为消息发错人），渲染器恒替换为空串。
+     * 常量与白名单保留仅为兼容历史模板与未知占位符判定，新模板不要再使用。
+     */
     public static final String PH_USER_NAME = "{{userName}}";
     public static final String PH_MY_PROJECT_COUNT = "{{myProjectCount}}";
     public static final String PH_MY_TODO_COUNT = "{{myTodoCount}}";
@@ -182,7 +187,7 @@ public final class RdmDailyReportTemplates {
             new Preset(KEY_PERSONAL_TODO, "個人·F 待辦視角", CHANNEL_PERSONAL, TYPE_ANY,
                     "您的產研交付日報 {{reportDate}}",
                     """
-                    ### 📌 {{userName}}，您的產研交付日報（{{reportDate}} {{reportTypeLabel}}）
+                    ### 📌 您的產研交付日報（{{reportDate}} {{reportTypeLabel}}）
                     - 負責項目：**{{myProjectCount}} 個**
                     - 待處理：**{{myTodoCount}} 項**（逾期 {{myOverdueCount}}）
                     - 今日到期：**{{myTodayDueCount}} 項**
@@ -195,7 +200,7 @@ public final class RdmDailyReportTemplates {
             new Preset(KEY_PERSONAL_OVERVIEW, "個人·G 總覽視角", CHANNEL_PERSONAL, TYPE_ANY,
                     "您的產研交付日報 {{reportDate}}",
                     """
-                    ### 📋 {{userName}}，您負責項目的完整進度（{{reportDate}} {{reportTypeLabel}}）
+                    ### 📋 您負責項目的完整進度（{{reportDate}} {{reportTypeLabel}}）
                     - 負責項目：**{{myProjectCount}} 個**
                     - 需求：**{{myRequirementCount}} 個**（已完成 {{myRequirementDoneCount}}）
                     - 交付項：**{{myDeliveryCount}} 項**（已完成 {{myDeliveryDoneCount}}，剩餘 {{myRemainingCount}}）

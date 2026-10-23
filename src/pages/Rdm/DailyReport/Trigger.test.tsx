@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { Modal } from 'antd'
+import type { ModalFuncProps } from 'antd'
 import DailyReportTrigger from './Trigger'
 import i18n from '../../../i18n'
 
@@ -29,6 +31,9 @@ vi.mock('../../../api/rdmDailyReport', async (importOriginal) => {
     ...actual,
     triggerDailyReport: (params: unknown) => triggerReport(params),
     fetchDailyReportBoardPreview: (params: unknown) => boardPreview(params),
+    fetchDailyReportEmployeeOptions: vi.fn(async () => [
+      { value: '9', label: '李四(MF00009)' },
+    ]),
   }
 })
 
@@ -123,5 +128,82 @@ describe('進度日報手動觸發：查看看板', () => {
       iterationCode: undefined,
     })
     await waitFor(() => expect(document.querySelector('.rdm-board-page')).not.toBeNull())
+  })
+})
+
+describe('進度日報手動觸發：發送對象', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    await i18n.changeLanguage('zh-TW')
+    triggerReport.mockResolvedValue({
+      reportDate: '2026-10-20',
+      reportType: 'manual',
+      dryRun: false,
+      groupDispatched: true,
+      personalSent: 1,
+      personalSkipped: 0,
+      projectCount: 1,
+      message: '已推送',
+      groupTitle: 't',
+      groupContent: 'c',
+    })
+  })
+
+  /** 选第一个项目（与上方看板用例同一交互方式） */
+  async function selectProject() {
+    const combos = screen.getAllByRole('combobox')
+    fireEvent.mouseDown(combos[0])
+    const option = await screen.findByText('PROJ2026102001 門戶改版')
+    fireEvent.click(option)
+  }
+
+  /** 二次确认弹窗：直接执行 onOk，避免测试里再点一次弹窗按钮 */
+  function autoConfirm() {
+    return vi.spyOn(Modal, 'confirm').mockImplementation((opts: ModalFuncProps) => {
+      void opts.onOk?.()
+      return { destroy: vi.fn(), update: vi.fn() } as unknown as ReturnType<typeof Modal.confirm>
+    })
+  }
+
+  it('默認「全部」：提交 recipientMode=all（群 + 個人）', async () => {
+    const confirm = autoConfirm()
+    renderPage()
+    await selectProject()
+
+    fireEvent.click(screen.getByRole('button', { name: /立即推送/ }))
+
+    await waitFor(() => expect(triggerReport).toHaveBeenCalledTimes(1))
+    expect(triggerReport).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'morning',
+      projectId: 1,
+      recipientMode: 'all',
+      recipientUserIds: undefined,
+      dryRun: false,
+    }))
+    confirm.mockRestore()
+  })
+
+  it('僅群聊：提交 recipientMode=group，且不要求選人', async () => {
+    const confirm = autoConfirm()
+    renderPage()
+    await selectProject()
+
+    fireEvent.click(screen.getByRole('radio', { name: /僅群聊/ }))
+    fireEvent.click(screen.getByRole('button', { name: /立即推送/ }))
+
+    await waitFor(() => expect(triggerReport).toHaveBeenCalledTimes(1))
+    expect(triggerReport).toHaveBeenCalledWith(expect.objectContaining({ recipientMode: 'group' }))
+    confirm.mockRestore()
+  })
+
+  it('僅指定人但未選人：攔截並提示，不調用觸發接口', async () => {
+    renderPage()
+    await selectProject()
+
+    fireEvent.click(screen.getByRole('radio', { name: /僅指定人/ }))
+    fireEvent.click(screen.getByRole('button', { name: /立即推送/ }))
+
+    expect(await screen.findByText('請選擇要發送的指定人員')).toBeInTheDocument()
+    expect(triggerReport).not.toHaveBeenCalled()
   })
 })

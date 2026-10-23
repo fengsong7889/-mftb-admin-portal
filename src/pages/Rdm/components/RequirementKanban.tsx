@@ -37,7 +37,22 @@ export default function RequirementKanban({ rows, limitHint, onOpen }: Requireme
   }, [rows])
 
   return (
-    <div className="rdm-board">
+    <>
+      {/*
+        截断/未归档提示必须放在看板上方：看板列高可达一屏，提示原先放在全部列之后，
+        用户根本滚不到，只看得到「只有 100 张卡」却不知道总数是多少。
+      */}
+      {(orphan.length > 0 || limitHint) && (
+        <div className="rdm-board-notice">
+          {orphan.length > 0 && (
+            <span style={{ color: '#D46B08' }}>
+              另有 {orphan.length} 條需求的狀態未歸入看板列，請切換表格視圖查看。
+            </span>
+          )}
+          {limitHint && <span style={{ marginLeft: orphan.length > 0 ? 12 : 0 }}>{limitHint}</span>}
+        </div>
+      )}
+      <div className="rdm-board">
       {grouped.map(col => (
         <div key={col.key} className="rdm-board-col">
           <div className="rdm-board-col-head">
@@ -99,18 +114,7 @@ export default function RequirementKanban({ rows, limitHint, onOpen }: Requireme
           </div>
         </div>
       ))}
-
-      {/* 未归入任何看板列的状态：宁可显式暴露，也不要静默消失（否则数量对不上只能靠猜） */}
-      {(orphan.length > 0 || limitHint) && (
-        <div style={{ marginTop: 12, fontSize: 12, color: '#8C8C8C' }}>
-          {orphan.length > 0 && (
-            <span style={{ color: '#D46B08' }}>
-              另有 {orphan.length} 條需求的狀態未歸入看板列，請切換表格視圖查看。
-            </span>
-          )}
-          {limitHint && <span style={{ marginLeft: orphan.length > 0 ? 12 : 0 }}>{limitHint}</span>}
-        </div>
-      )}
-    </div>
+      </div>
+    </>
   )
 }

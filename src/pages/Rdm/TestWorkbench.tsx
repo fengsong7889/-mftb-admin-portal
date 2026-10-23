@@ -40,14 +40,16 @@ const { TextArea } = Input
  */
 const COLUMN_META = [
   { key: 'batchNo', title: '批次號' },
+  // 狀態/輪次/通過比紧邻批次号：窄窗口下表格只能露出前 3-4 列，
+  // 原先状态排在第 6 列，测试人员一进来根本看不到批次过没过
+  { key: 'status', title: '狀態' },
+  { key: 'roundNo', title: '輪次' },
+  { key: 'ratio', title: '通過/總數' },
   { key: 'deliveryItemTitles', title: '交付範圍' },
   { key: 'req', title: '需求' },
   { key: 'testEnv', title: '環境' },
   { key: 'testLeadUserName', title: '測試負責人' },
-  { key: 'status', title: '狀態' },
-  { key: 'roundNo', title: '輪次' },
   { key: 'planEndTime', title: '計劃結束' },
-  { key: 'ratio', title: '通過/總數' },
   { key: 'action', title: '操作' },
 ]
 
@@ -181,6 +183,18 @@ export default function TestWorkbench() {
       ),
     },
     {
+      title: '狀態', dataIndex: 'status', key: 'status', width: 100,
+      render: (v: string) => <Tag color={RDM_TEST_BATCH_STATUS_COLOR[v] || 'default'}>{RDM_TEST_BATCH_STATUS_LABEL[v] || v}</Tag>,
+    },
+    { title: '輪次', dataIndex: 'roundNo', key: 'roundNo', width: 60, align: 'center' },
+    {
+      title: '通過/總數', key: 'ratio', width: 90, align: 'center',
+      render: (_, r) => {
+        const color = r.totalCount === 0 ? '#8C8C8C' : r.passCount === r.totalCount ? '#52C41A' : r.passCount > 0 ? '#FA8C16' : '#FF4D4F'
+        return <span style={{ color, fontWeight: 600 }}>{r.passCount}/{r.totalCount}</span>
+      },
+    },
+    {
       title: '交付範圍', dataIndex: 'deliveryItemTitles', key: 'deliveryItemTitles', width: 150, ellipsis: true,
       render: (v: string[]) => v?.join('、') || '-',
     },
@@ -194,20 +208,8 @@ export default function TestWorkbench() {
     },
     { title: '測試負責人', dataIndex: 'testLeadUserName', key: 'testLeadUserName', width: 100 },
     {
-      title: '狀態', dataIndex: 'status', key: 'status', width: 100,
-      render: (v: string) => <Tag color={RDM_TEST_BATCH_STATUS_COLOR[v] || 'default'}>{RDM_TEST_BATCH_STATUS_LABEL[v] || v}</Tag>,
-    },
-    { title: '輪次', dataIndex: 'roundNo', key: 'roundNo', width: 60, align: 'center' },
-    {
       title: '計劃結束', dataIndex: 'planEndTime', key: 'planEndTime', width: 110,
       render: (v: string) => v ? dayjs(v).format('YYYY-MM-DD') : '-',
-    },
-    {
-      title: '通過/總數', key: 'ratio', width: 90, align: 'center',
-      render: (_, r) => {
-        const color = r.totalCount === 0 ? '#8C8C8C' : r.passCount === r.totalCount ? '#52C41A' : r.passCount > 0 ? '#FA8C16' : '#FF4D4F'
-        return <span style={{ color, fontWeight: 600 }}>{r.passCount}/{r.totalCount}</span>
-      },
     },
     {
       title: '操作', key: 'action', width: 150, fixed: 'right',

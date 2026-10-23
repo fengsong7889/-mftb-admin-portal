@@ -41,6 +41,7 @@ import {
   CopyOutlined,
   DeleteOutlined,
   DownOutlined,
+  EditOutlined,
   FileProtectOutlined,
   HistoryOutlined,
   InfoCircleOutlined,
@@ -65,12 +66,14 @@ import AcceptanceTraceCard from './components/AcceptanceTraceCard'
 import ReleasePanel from './components/ReleasePanel'
 import { ChangeSection, DeliverySummaryBar, PlanSection, TaskSection } from './components/RequirementSections'
 import { ComplexityTag, PriorityTag, StatusTag, TypeTag } from './components/Tags'
+import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
 import { fetchVersionHistory } from '../../api/versionHistory'
 import { fetchDocNodes, DOC_STATUS_COLOR, type DocNode, type DocStatus } from '../../api/docCenter'
 import {
   RDM_INTAKE_MODE_LABEL,
   addComment,
   addStructureChild,
+  changeRequirementAttrs,
   changeRequirementIteration,
   copyRequirement,
   fetchDeliveryItems,
@@ -83,6 +86,7 @@ import {
   fetchRequirementPage,
   fetchRequirementTree,
   fetchTransitions,
+  reassignPm,
   removeStructureChild,
   transitionRequirement,
   urgeRequirement,
@@ -91,6 +95,7 @@ import {
   type RdmIterationItem,
   type RdmProductOption,
   type RdmProjectListItem,
+  type RdmRequirementAttrs,
   type RdmRequirementDetail,
   type RdmStructureTreeNode,
   type RdmTransitionRow,
@@ -107,6 +112,10 @@ import {
   RDM_ITERATION_STATUS,
   RDM_ACCEPT_RESULT_LABEL,
   RDM_ACCEPTANCE_OPEN_STATUS,
+  RDM_COMPLEXITY,
+  RDM_COMPLEXITY_LABEL,
+  RDM_PRIORITY,
+  RDM_PRIORITY_LABEL,
   RDM_PROJECT_STATUS,
   RDM_REQUIREMENT_KIND,
   RDM_REQUIREMENT_KIND_LABEL,
@@ -257,6 +266,31 @@ const USABLE_PROJECT_STATUS: string[] = [
   RDM_PROJECT_STATUS.PARTIAL_DELIVERED,
 ]
 
+/**
+ * 屬性欄整欄編輯的草稿：人員存 userId、日期存 dayjs，保存時再按字段歸屬路由到對應端點。
+ * <p>狀態、需求類型、歸屬項目、參與角色不在內：分別由狀態機、準入路由、項目遷移、角色授權承擔。
+ */
+interface AttrDraft {
+  submitterUserId?: number
+  devOwnerUserId?: number
+  acceptorUserId?: number
+  projectManagerUserId?: number
+  priority?: string
+  complexity?: string
+  expectDate?: dayjs.Dayjs | null
+  promisedPrdDate?: dayjs.Dayjs | null
+  planReleaseDate?: dayjs.Dayjs | null
+  ccUserIds?: number[]
+  pmUserId?: number
+  iterationCode?: string
+}
+
+/**
+ * 屬性可編輯狀態：終態（已上線/已驗收/已關閉）要先 reopen，草稿/待審批走各自入口。
+ * 與後端 ATTR_LOCKED_STATUS + EDITABLE_STATUS 同口徑，前端只決定編輯入口顯隱。
+ */
+const ATTR_EDITABLE_STATUS: string[] = [...ITERATION_ADJUSTABLE_STATUS, RDM_STATUS.REJECTED]
+
 /** 受理前的状态（可存在“受理前就写了 PRD”的历史越级数据，用于风险提示） */
 const PRE_ACCEPT_STATUSES: string[] = [
   RDM_STATUS.ASSIGNED,
@@ -272,7 +306,7 @@ type ActivityItem =
 export default function RequirementDetail() {
   const navigate = useNavigate()
   const { t } = useTranslation()
-  const { hasPermission } = useAuth()
+  const { user, hasPermission } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const id = Number(searchParams.get('id') ?? 0)
   const tabParam = searchParams.get('tab') as DetailTab | null
@@ -306,6 +340,10 @@ export default function RequirementDetail() {
   const [iterModalCode, setIterModalCode] = useState<string | undefined>()
   const [iterModalRemark, setIterModalRemark] = useState('')
   const [iterModalSaving, setIterModalSaving] = useState(false)
+  /** 屬性欄整欄編輯態（對齐雲效：一次進入、逐欄修改、統一保存） */
+  const [inlineEditing, setInlineEditing] = useState(false)
+  const [attrDraft, setAttrDraft] = useState<AttrDraft>({})
+  const [attrSaving, setAttrSaving] = useState(false)
   const [activeAction, setActiveAction] = useState<RdmAction | null>(null)
   const [remark, setRemark] = useState('')
   const [planDate, setPlanDate] = useState<dayjs.Dayjs | null>(null)
@@ -528,6 +566,8 @@ export default function RequirementDetail() {
     const reverse = new Set<string>([
       RDM_ACTION.REJECT, RDM_ACTION.REJECT_INTAKE, RDM_ACTION.HOLD, RDM_ACTION.BLOCK,
       RDM_ACTION.WITHDRAW, RDM_ACTION.REVIEW_REJECT, RDM_ACTION.TEST_REJECT, RDM_ACTION.UAT_FAIL, RDM_ACTION.REASSIGN,
+      // 退回評估是存量糾錯的回退路徑：不能因為當前角色沒有排期權而被推成默認主按鈕
+      RDM_ACTION.BACK_TO_EVALUATE,
     ])
     const forward = availableActions.filter(a => !reverse.has(a.actionCode))
     const rank = (code: RdmAction) => {
@@ -542,10 +582,23 @@ export default function RequirementDetail() {
     }
   }, [availableActions])
 
-  const requiredFields: RdmActionField[] = useMemo(
-    () => (activeAction ? availableActions.find(a => a.actionCode === activeAction)?.requiredFields ?? [] : []),
-    [activeAction, availableActions],
-  )
+  /**
+   * 动作必填字段。
+   * <p>排期动作额外兜底 project/iteration：写侧闸门
+   * （applyProjectAndIteration required=true）本来就要求项目+迭代，但历史库的
+   * rdm_transition.required_fields 可能仍是 planDate。若完全照下发字段渲染，
+   * 弹窗里不会出现项目/迭代选择器，用户只能看到后端报「必須選擇所屬項目與迭代」。
+   * 与写侧闸门同口径补齐，不改变其它动作的字段。
+   */
+  const requiredFields: RdmActionField[] = useMemo(() => {
+    const fields = activeAction
+      ? availableActions.find(a => a.actionCode === activeAction)?.requiredFields ?? []
+      : []
+    if (activeAction === RDM_ACTION.SCHEDULE) {
+      return Array.from(new Set<RdmActionField>([...fields, 'planDate', 'project', 'iteration']))
+    }
+    return fields
+  }, [activeAction, availableActions])
 
   /** 选填字段（如排期时的所属迭代）：不拦截提交，但必须给地方填 */
   const optionalFields: RdmActionField[] = useMemo(
@@ -919,6 +972,14 @@ export default function RequirementDetail() {
   const openActionModal = (code: RdmAction) => {
     setActiveAction(code)
     clearActionFields()
+    /*
+     * 排期默认带出需求已有归属：项目/迭代已经挂好的需求不该被迫重选一遍；
+     * 用户仍可在弹窗里改成别的项目/迭代（后端会重做一致性校验）。
+     */
+    if (code === RDM_ACTION.SCHEDULE && detail) {
+      setActionProjectId(detail.projectId ?? undefined)
+      setIterationCode(detail.iterationCode ?? undefined)
+    }
     ensureActionOptions()
   }
 
@@ -969,6 +1030,125 @@ export default function RequirementDetail() {
       message.error(err instanceof Error && err.message ? err.message : '調整失敗，請重試')
     } finally {
       setIterModalSaving(false)
+    }
+  }
+
+  /* ── 屬性欄整欄編輯：前端只控制可編輯性，字段級權限與狀態由服務端權威校驗 ── */
+  const myRoleCodes = useMemo(
+    () => (detail?.roles ?? [])
+      .filter(r => r.userId === user?.id && r.active !== false)
+      .map(r => r.roleCode),
+    [detail, user],
+  )
+  const canDispatchAttrs = hasPermission('rdm-requirement:dispatch')
+  const canEditDeliveryAttrs = hasPermission('rdm-requirement:edit') || canDispatchAttrs
+    || myRoleCodes.some(code => code === 'PM' || code === 'DEV_LEAD' || code === 'PMO')
+  const attrRowEditable = !!detail && ATTR_EDITABLE_STATUS.includes(detail.status)
+  const canInlineEdit = attrRowEditable && (canDispatchAttrs || canEditDeliveryAttrs)
+  /** 產品經理改派走獨立端點：需求池無受理人、或沒有分配權時不給改 */
+  const canEditPmInline = attrRowEditable && canDispatchAttrs
+    && detail?.status !== RDM_STATUS.POOL && !!detail?.pmName
+
+  /** 進入整欄編輯：用當前詳情初始化草稿（日期轉 dayjs、抄送取 CC 角色行） */
+  const startInlineEdit = () => {
+    if (!detail) return
+    setAttrDraft({
+      submitterUserId: detail.submitterUserId ?? undefined,
+      devOwnerUserId: detail.devOwnerUserId ?? undefined,
+      acceptorUserId: detail.acceptorUserId ?? undefined,
+      projectManagerUserId: detail.projectManagerUserId ?? undefined,
+      priority: detail.priority,
+      complexity: detail.complexity ?? undefined,
+      expectDate: detail.expectDate ? dayjs(detail.expectDate) : null,
+      promisedPrdDate: detail.promisedPrdDate ? dayjs(detail.promisedPrdDate) : null,
+      planReleaseDate: detail.planReleaseDate ? dayjs(detail.planReleaseDate) : null,
+      ccUserIds: (detail.roles ?? []).filter(r => r.roleCode === 'CC').map(r => r.userId),
+      pmUserId: detail.assigneePmUserId ?? undefined,
+      iterationCode: detail.iterationCode ?? undefined,
+    })
+    setInlineEditing(true)
+    ensureActionOptions()
+  }
+
+  const cancelInlineEdit = () => {
+    setInlineEditing(false)
+    setAttrDraft({})
+  }
+
+  /**
+   * 保存整欄：按字段歸屬路由到三個端點（屬性 / 改派產品經理 / 調整迭代），只提交有變化的字段。
+   * <p>三個端點不是同一事務：任一失敗即停止後續，提示後刷新詳情（已生效部分不會被回滾），
+   * 草稿保留供用戶對照最新值再保存；下一次保存按最新詳情算差異，不會重複提交已生效字段。
+   */
+  const saveInlineEdit = async () => {
+    if (!detail) return
+    const asDate = (value?: dayjs.Dayjs | null) => (value ? value.format('YYYY-MM-DD') : '')
+    const currentCc = (detail.roles ?? []).filter(r => r.roleCode === 'CC')
+      .map(r => r.userId).sort().join(',')
+    const draftCc = (attrDraft.ccUserIds ?? []).slice().sort().join(',')
+    const attrs: RdmRequirementAttrs = {}
+    if (attrDraft.submitterUserId && attrDraft.submitterUserId !== detail.submitterUserId) {
+      attrs.submitterUserId = attrDraft.submitterUserId
+    }
+    if (attrDraft.devOwnerUserId && attrDraft.devOwnerUserId !== detail.devOwnerUserId) {
+      attrs.devOwnerUserId = attrDraft.devOwnerUserId
+    }
+    if (attrDraft.acceptorUserId && attrDraft.acceptorUserId !== detail.acceptorUserId) {
+      attrs.acceptorUserId = attrDraft.acceptorUserId
+    }
+    if (attrDraft.projectManagerUserId && attrDraft.projectManagerUserId !== detail.projectManagerUserId) {
+      attrs.projectManagerUserId = attrDraft.projectManagerUserId
+    }
+    if (attrDraft.priority && attrDraft.priority !== detail.priority) {
+      attrs.priority = attrDraft.priority
+    }
+    if (attrDraft.complexity && attrDraft.complexity !== detail.complexity) {
+      attrs.complexity = attrDraft.complexity
+    }
+    if (asDate(attrDraft.expectDate) !== (detail.expectDate ?? '')) {
+      attrs.expectDate = asDate(attrDraft.expectDate)
+    }
+    if (asDate(attrDraft.promisedPrdDate) !== (detail.promisedPrdDate ?? '')) {
+      attrs.promisedPrdDate = asDate(attrDraft.promisedPrdDate)
+    }
+    if (asDate(attrDraft.planReleaseDate) !== (detail.planReleaseDate ?? '')) {
+      attrs.planReleaseDate = asDate(attrDraft.planReleaseDate)
+    }
+    if (draftCc !== currentCc) {
+      attrs.ccUserIds = attrDraft.ccUserIds ?? []
+    }
+    const pmChanged = !!attrDraft.pmUserId && attrDraft.pmUserId !== detail.assigneePmUserId
+    const iterationChanged = !!attrDraft.iterationCode && attrDraft.iterationCode !== detail.iterationCode
+    if (Object.keys(attrs).length === 0 && !pmChanged && !iterationChanged) {
+      message.info(t('rdm.attr.noChange'))
+      return
+    }
+    setAttrSaving(true)
+    try {
+      if (Object.keys(attrs).length > 0) {
+        await changeRequirementAttrs(detail.id, attrs)
+      }
+      if (pmChanged) {
+        await reassignPm(detail.id, { userId: attrDraft.pmUserId!, name: '' },
+          t('rdm.attr.reassignReasonAuto'))
+      }
+      if (iterationChanged) {
+        await changeRequirementIteration(detail.id, {
+          projectId: detail.projectId ?? null,
+          iterationCode: attrDraft.iterationCode!,
+          remark: t('rdm.attr.iterationReasonAuto'),
+        })
+      }
+      message.success(t('rdm.attr.saved'))
+      setInlineEditing(false)
+      setAttrDraft({})
+      await Promise.all([load(), loadSummary()])
+    } catch (err) {
+      message.error(err instanceof Error && err.message ? err.message : t('rdm.attr.saveFailed'))
+      // 部分變更可能已生效：刷新詳情，草稿保留供對照後重存
+      await load()
+    } finally {
+      setAttrSaving(false)
     }
   }
 
@@ -1544,35 +1724,216 @@ export default function RequirementDetail() {
               <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><FileProtectOutlined /></span>
               屬性
               <span className="rdm-card-title-split" />
-              <Button
-                type="link"
-                size="small"
-                style={{ padding: 0, height: 'auto' }}
-                onClick={() => setShowAllProps(v => !v)}
-              >
-                {showAllProps ? '收起' : '更多'}
-              </Button>
+              {inlineEditing ? (
+                <Space size={6}>
+                  <Button size="small" onClick={cancelInlineEdit}>{t('rdm.attr.cancel')}</Button>
+                  <Button size="small" type="primary" loading={attrSaving} onClick={saveInlineEdit}>
+                    {t('rdm.attr.save')}
+                  </Button>
+                </Space>
+              ) : (
+                <>
+                  {canInlineEdit && (
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<EditOutlined />}
+                      style={{ padding: 0, height: 'auto' }}
+                      onClick={startInlineEdit}
+                    >
+                      {t('rdm.attr.edit')}
+                    </Button>
+                  )}
+                  <Button
+                    type="link"
+                    size="small"
+                    style={{ padding: 0, height: 'auto' }}
+                    onClick={() => setShowAllProps(v => !v)}
+                  >
+                    {showAllProps ? '收起' : '更多'}
+                  </Button>
+                </>
+              )}
             </div>
+            {detail.status === RDM_STATUS.REJECTED && (
+              <div className="rdm-rejected-hint">{t('rdm.attr.rejectedHint')}</div>
+            )}
             <div className="rdm-prop-list">
               {/* 类型/优先级/规模统一走标签组件，与标题栏同一口径（历史旧码不会变裸文本或空白） */}
               <PropRow label="需求類型" value={<TypeTag reqType={detail.reqType} />} />
-              <PropRow label="優先級" value={<PriorityTag priority={detail.priority} />} />
+              <PropRow
+                label={t('rdm.attr.submitter')}
+                value={formatEmployee(detail.submitterName, detail.submitterEmpNo) || '-'}
+                editing={inlineEditing && canDispatchAttrs}
+                editor={
+                  <EmployeeSelect
+                    single
+                    value={attrDraft.submitterUserId}
+                    onChange={ids => setAttrDraft(d => ({ ...d, submitterUserId: ids[0] }))}
+                  />
+                }
+              />
+              <PropRow
+                label={t('rdm.attr.priority')}
+                value={<PriorityTag priority={detail.priority} />}
+                editing={inlineEditing && canEditDeliveryAttrs}
+                editor={
+                  <Select
+                    value={attrDraft.priority}
+                    onChange={v => setAttrDraft(d => ({ ...d, priority: v }))}
+                    options={Object.values(RDM_PRIORITY).map(value => ({
+                      value,
+                      label: RDM_PRIORITY_LABEL[value],
+                    }))}
+                  />
+                }
+              />
               {/* 历史旧编码统一走标签组件，与标题栏口径一致（不渲染成空白，也不裸文本） */}
-              <PropRow label="預期規模" value={detail.complexity ? <ComplexityTag complexity={detail.complexity} /> : '待產品評估'} />
-              <PropRow label="產品經理" value={detail.pmName ?? <span style={{ color: '#FF4D4F' }}>未分配</span>} />
-              <PropRow label="業務驗收人" value={detail.acceptorName ?? detail.submitterName} />
-              <PropRow label="業務期望" value={detail.expectDate ?? '未填寫'} />
-              <PropRow label="承諾出 PRD" value={detail.promisedPrdDate ?? '未承諾'} />
-              <PropRow label="計劃上線" value={detail.planReleaseDate ?? <span style={{ color: '#8C8C8C' }}>待排期</span>} />
-              {/* 归属体系改造：项目与迭代是一等属性，不再收进「更多」里（有值即常显） */}
+              <PropRow
+                label={t('rdm.attr.complexity')}
+                value={detail.complexity ? <ComplexityTag complexity={detail.complexity} /> : t('rdm.attr.tbdComplexity')}
+                editing={inlineEditing && (canDispatchAttrs || myRoleCodes.includes('PM'))}
+                editor={
+                  <Select
+                    value={attrDraft.complexity}
+                    onChange={v => setAttrDraft(d => ({ ...d, complexity: v }))}
+                    options={Object.values(RDM_COMPLEXITY).map(value => ({
+                      value,
+                      label: RDM_COMPLEXITY_LABEL[value],
+                    }))}
+                  />
+                }
+              />
+              <PropRow
+                label={t('rdm.attr.pm')}
+                value={detail.pmName ?? <span style={{ color: '#FF4D4F' }}>{t('rdm.attr.unassigned')}</span>}
+                // 需求池走「分配」而非改派；无受理人时由批量分配/认领产生，不能在这里凭空指派
+                editing={inlineEditing && canEditPmInline}
+                editor={
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    value={attrDraft.pmUserId}
+                    onChange={v => setAttrDraft(d => ({ ...d, pmUserId: v }))}
+                    loading={actionOptionsLoading}
+                    options={pmOptions.map(pm => ({
+                      value: pm.userId,
+                      label: t('rdm.attr.pmOption', { name: pm.name, count: pm.activeCount }),
+                    }))}
+                  />
+                }
+              />
+              <PropRow
+                label={t('rdm.attr.acceptor')}
+                value={detail.acceptorName ?? detail.submitterName}
+                editing={inlineEditing && canEditDeliveryAttrs}
+                editor={
+                  <EmployeeSelect
+                    single
+                    value={attrDraft.acceptorUserId}
+                    onChange={ids => setAttrDraft(d => ({ ...d, acceptorUserId: ids[0] }))}
+                  />
+                }
+              />
+              <PropRow
+                label={t('rdm.attr.expectDate')}
+                value={detail.expectDate ?? t('rdm.attr.tbdExpect')}
+                editing={inlineEditing && (canEditDeliveryAttrs || user?.id === detail.submitterUserId)}
+                editor={
+                  <DatePicker
+                    allowClear
+                    value={attrDraft.expectDate ?? null}
+                    onChange={v => setAttrDraft(d => ({ ...d, expectDate: v }))}
+                  />
+                }
+              />
+              <PropRow
+                label={t('rdm.attr.promisedPrdDate')}
+                value={detail.promisedPrdDate ?? t('rdm.attr.tbdPromise')}
+                editing={inlineEditing && canEditDeliveryAttrs}
+                editor={
+                  <DatePicker
+                    allowClear
+                    value={attrDraft.promisedPrdDate ?? null}
+                    onChange={v => setAttrDraft(d => ({ ...d, promisedPrdDate: v }))}
+                  />
+                }
+              />
+              <PropRow
+                label={t('rdm.attr.planReleaseDate')}
+                value={detail.planReleaseDate ?? <span style={{ color: '#8C8C8C' }}>{t('rdm.attr.tbdSchedule')}</span>}
+                editing={inlineEditing && canEditDeliveryAttrs}
+                editor={
+                  <DatePicker
+                    allowClear
+                    value={attrDraft.planReleaseDate ?? null}
+                    onChange={v => setAttrDraft(d => ({ ...d, planReleaseDate: v }))}
+                  />
+                }
+              />
+              {/* 归属体系改造：项目与迭代是一等属性，不再收进「更多」里（ 有值即常显） */}
               <PropRow label="所屬項目" value={detail.projectId ? (
                 <a style={{ color: '#2F54EB' }} onClick={() => navigate(`/rdm-project-detail?id=${detail.projectId}`)}>
                   {detail.projectName ?? `項目 #${detail.projectId}`}
                 </a>
               ) : <span style={{ color: '#8C8C8C' }}>未掛項目</span>} />
-              <PropRow label="所屬迭代" value={detail.iterationCode
-                ? (detail.iterationName ? `${detail.iterationName} · ${detail.iterationCode}` : detail.iterationCode)
-                : <span style={{ color: '#8C8C8C' }}>未關聯</span>} />
+              <PropRow
+                label={t('rdm.attr.iteration')}
+                value={detail.iterationCode
+                  ? (detail.iterationName ? `${detail.iterationName} · ${detail.iterationCode}` : detail.iterationCode)
+                  : <span style={{ color: '#8C8C8C' }}>{t('rdm.attr.unlinked')}</span>}
+                editing={inlineEditing
+                  && ITERATION_ADJUSTABLE_STATUS.includes(detail.status as RdmStatus)
+                  && (hasPermission('rdm-requirement:edit') || hasPermission('rdm-requirement:dispatch'))}
+                editor={
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    loading={actionOptionsLoading}
+                    value={attrDraft.iterationCode}
+                    onChange={v => setAttrDraft(d => ({ ...d, iterationCode: v }))}
+                    options={iterationOptionsFor(detail.projectId ?? undefined)}
+                  />
+                }
+              />
+              <PropRow
+                label={t('rdm.attr.cc')}
+                value={(() => {
+                  const cc = (detail.roles ?? []).filter(r => r.roleCode === 'CC')
+                  return cc.length > 0 ? cc.map(r => r.name).join(' / ') : '-'
+                })()}
+                editing={inlineEditing && (canEditDeliveryAttrs || user?.id === detail.submitterUserId)}
+                editor={
+                  <EmployeeSelect
+                    value={attrDraft.ccUserIds ?? []}
+                    onChange={ids => setAttrDraft(d => ({ ...d, ccUserIds: ids }))}
+                  />
+                }
+              />
+              <PropRow
+                label={t('rdm.attr.devOwner')}
+                value={detail.devOwnerName ?? '-'}
+                editing={inlineEditing && canEditDeliveryAttrs}
+                editor={
+                  <EmployeeSelect
+                    single
+                    value={attrDraft.devOwnerUserId}
+                    onChange={ids => setAttrDraft(d => ({ ...d, devOwnerUserId: ids[0] }))}
+                  />
+                }
+              />
+              <PropRow
+                label={t('rdm.attr.projectManager')}
+                value={detail.projectManagerName ?? '-'}
+                editing={inlineEditing && canEditDeliveryAttrs}
+                editor={
+                  <EmployeeSelect
+                    single
+                    value={attrDraft.projectManagerUserId}
+                    onChange={ids => setAttrDraft(d => ({ ...d, projectManagerUserId: ids[0] }))}
+                  />
+                }
+              />
               {/* 交付流程：业务方提交时不选；准入后在分配/认领时由产研确定（默认 V3） */}
               <PropRow label="交付流程" value={
                 detail.flowVersion === 3
@@ -1584,7 +1945,6 @@ export default function RequirementDetail() {
               {showAllProps && (
                 <>
                   <PropRow label="項目負責人" value={detail.dispatcherName ?? '-'} />
-                  <PropRow label="研發負責人" value={detail.devOwnerName ?? '-'} />
                   <PropRow label="分配時間" value={detail.distributeTime ?? '-'} />
                   <PropRow label="受理時間" value={detail.acceptTime ?? '-'} />
                   <PropRow label="實際上線" value={detail.actualReleaseDate ?? '-'} />
@@ -2056,12 +2416,19 @@ function IntakePolicySection({ detail, navigate }: {
   )
 }
 
-/** 属性行 */
-function PropRow({ label, value }: { label: string; value: React.ReactNode }) {
+/** 属性行：整栏编辑态时右侧换成行内控件，否则显示只读值 */
+function PropRow({ label, value, editing, editor }: {
+  label: string
+  value: React.ReactNode
+  editing?: boolean
+  editor?: React.ReactNode
+}) {
   return (
-    <div className="rdm-prop-row">
+    <div className={`rdm-prop-row${editing ? ' is-editing' : ''}`}>
       <span className="rdm-prop-label">{label}</span>
-      <span className="rdm-prop-value">{value}</span>
+      {editing
+        ? <span className="rdm-prop-editor">{editor}</span>
+        : <span className="rdm-prop-value">{value}</span>}
     </div>
   )
 }

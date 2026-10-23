@@ -7,6 +7,7 @@ import { useAuth } from '../../../contexts/AuthContext'
 import DailyReportBoardPreviewModal from '../../../components/DailyReportBoardPreviewModal'
 import DingTalkCardPreview from './DingTalkCardPreview'
 import {
+  fetchDailyReportConfig,
   fetchDailyReportTemplates,
   previewDailyReport,
   saveDailyReportTemplate,
@@ -38,7 +39,8 @@ const GROUP_PLACEHOLDERS: PlaceholderDoc[] = [
 const PERSONAL_PLACEHOLDERS: PlaceholderDoc[] = [
   { key: '{{reportDate}}', descKey: 'phReportDate' },
   { key: '{{reportTypeLabel}}', descKey: 'phReportTypeLabel' },
-  { key: '{{userName}}', descKey: 'phUserName' },
+  // {{userName}} 已停用：个人日报不署收件人姓名（追加收件人的项目并非其本人负责，
+  // 署名会让领导误以为需求全归署名人或以为消息发错人），因此不再在说明里提供该变量
   { key: '{{myProjectCount}}', descKey: 'phMyProjectCount' },
   { key: '{{myTodoCount}}', descKey: 'phMyTodoCount' },
   { key: '{{myOverdueCount}}', descKey: 'phMyOverdueCount' },
@@ -84,7 +86,18 @@ export default function DailyReportTemplateForm() {
   const [boardOpen, setBoardOpen] = useState(false)
   /** 原始 Markdown：默认收起，只在需要复制/排查渲染差异时展开 */
   const [showRaw, setShowRaw] = useState(false)
+  /**
+   * 当前消息模式：fixed 下本页编辑的正文完全不参与渲染。
+   * 拉取失败静默（只是少了提示），不阻塞编辑。
+   */
+  const [messageMode, setMessageMode] = useState('fixed')
   const contentRef = useRef<HTMLTextAreaElement | null>(null)
+
+  useEffect(() => {
+    void fetchDailyReportConfig()
+      .then(cfg => setMessageMode(cfg.messageMode ?? 'fixed'))
+      .catch(() => undefined)
+  }, [])
 
   const channel = Form.useWatch('channel', form)
 
@@ -221,6 +234,11 @@ export default function DailyReportTemplateForm() {
 
       {source?.preset && (
         <Alert type="info" showIcon style={{ marginBottom: 12 }} message={t('rdm.dailyTemplate.presetEditHint')} />
+      )}
+
+      {messageMode !== 'template' && (
+        <Alert type="warning" showIcon style={{ marginBottom: 12 }}
+          message="當前為系統內置版式，本模板保存後不會生效" />
       )}
 
       <Form form={form} layout="vertical" disabled={readOnly || loading}>

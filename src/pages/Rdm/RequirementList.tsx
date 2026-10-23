@@ -49,7 +49,9 @@ import {
   AlertOutlined,
   BarChartOutlined,
   CheckCircleOutlined,
+  EditOutlined,
   ExportOutlined,
+  FieldTimeOutlined,
   FileAddOutlined,
   ImportOutlined,
   MenuFoldOutlined,
@@ -64,10 +66,15 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import StatCards from '../../components/StatCards'
+import RemarkTextArea from '../../components/RemarkTextArea'
+import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
 import { useAuth } from '../../contexts/AuthContext'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { readRdmListScene, useRdmListScene, useRdmScrollRestore } from './useListSceneRestore'
 import { rdmTableLocale } from './components/tableLocale'
 import {
+  batchBackfillAccept,
+  batchChangeSubmitter,
   fetchRequirementPage,
   fetchScopeCounts,
   fetchRequirementStats,
@@ -96,6 +103,8 @@ import {
 } from './handlerDisplay'
 import RequirementKanban from './components/RequirementKanban'
 import RequirementImportModal from './components/RequirementImportModal'
+import RequirementBackfillModal from './components/RequirementBackfillModal'
+import type { RequirementBackfillPayload } from './components/RequirementBackfillModal'
 import type { ParsedRdmImportRow } from './rdmImport'
 import {
   RDM_FLOW_VERSION_LABEL,
@@ -309,19 +318,39 @@ export default function RequirementList({
   const [view, setView] = useState<ViewMode>(readStoredView)
   /** 视图栏收起偏好：宽屏看列表时想多留宽度给表格，窄屏默认收起 */
   const [railCollapsed, setRailCollapsed] = useState<boolean>(readStoredRail)
+
+  /**
+   * 场景快照（页码/每页条数/筛选/滚动位置）：从详情返回时原样还原。
+   * <p>只在本页首次挂载时读取，之后由 useRdmListScene 单向写入；
+   * 视角切换会换 key，避免把「我的需求」的筛选带到「全部」。
+   */
+  const sceneKey = `requirement:${location.pathname}:${activeScope}:${view}`
+  const [initialScene] = useState(() => readRdmListScene<RequirementFilters>(sceneKey))
+
   const [rows, setRows] = useState<RdmRequirementRow[]>([])
   const [total, setTotal] = useState(0)
   // 初始即 loading：Table 在 effect 置 true 之前会先渲染一帧空态（首帧闪「暫無數據」）
   const [loading, setLoading] = useState(true)
-  const [page, setPage] = useState(1)
-  const [size, setSize] = useState(10)
+  const [page, setPage] = useState(initialScene?.page ?? 1)
+  const [size, setSize] = useState(initialScene?.size ?? 10)
   const [counts, setCounts] = useState<Record<string, number>>({})
   /** 看板信号卡（服务端统计结果） */
   const [stats, setStats] = useState<Record<string, number>>({})
   /** 统计卡是否已取到数：未取到时显示占位符，不能把「还在加载/取数失败」渲染成 0 */
   const [statsReady, setStatsReady] = useState(false)
   const [selectedKeys, setSelectedKeys] = useState<number[]>([])
-  const [filters, setFilters] = useState<RequirementFilters>({})
+  /** 批量變更提出人（存量導入歸屬糾正）：勾選後統一改到同一人 */
+  const [submitterOpen, setSubmitterOpen] = useState(false)
+  const [submitterUserId, setSubmitterUserId] = useState<number>()
+  const [submitterRemark, setSubmitterRemark] = useState('')
+  const [submitterSaving, setSubmitterSaving] = useState(false)
+  const [backfillOpen, setBackfillOpen] = useState(false)
+  const [backfillSaving, setBackfillSaving] = useState(false)
+  const [filters, setFilters] = useState<RequirementFilters>(initialScene?.filters ?? {})
+
+  /** 场景写回 + 滚动还原：数据就绪后才滚，避免表格还没撑开就滚到 0 */
+  useRdmListScene(sceneKey, { page, size, filters }, location.pathname)
+  useRdmScrollRestore(sceneKey, !loading && (view === 'table' || rows.length > 0), initialScene?.scrollTop)
 
   /**
    * 归属字典与下拉候选：项目/迭代各取一次。
@@ -453,6 +482,7 @@ export default function RequirementList({
         status: row.status,
         projectManager: row.projectManager,
         productManager: row.productManager,
+        submitter: row.submitter,
         projectName: row.projectName,
         iterationName: row.iterationName,
         description: row.description,
@@ -494,20 +524,23 @@ export default function RequirementList({
   }, [activeScope, executionOnly, minimal, scopeTabs.length])
 
   /**
-   * 看板信号卡：服务端按当前筛选条件出数，只在看板视图下取。
+   * 信号卡：服务端按当前筛选条件出数。
    *
-   * 以前是对已加载的 rows 做 filter().length，而看板一次只拉 RDM_KANBAN_SIZE 条，
-   * 需求一多四个数字就永远停在上限，看起来像「逾期只有 60 条」。
+   * <p>以前只允许看板视图取数（表格不渲染卡片），现在两种视图共用同一组卡片，
+   * 表格视图直接进入时也必须取，否则四张卡恒为「—」。
+   *
+   * <p>更早的实现在前端对已加载的 rows 做 filter().length，看板一次只拉
+   * RDM_KANBAN_SIZE 条，需求一多四个数字就永远停在上限，看起来像「逾期只有 60 条」。
    */
   useEffect(() => {
-    if (view !== 'kanban') return
+    if (minimal) return
     let alive = true
     setStatsReady(false)
     fetchRequirementStats({ scope: activeScope, executionOnly, ...filters })
       .then(s => { if (alive) { setStats(s); setStatsReady(true) } })
       .catch(() => { if (alive) { setStats({}); setStatsReady(false) } })
     return () => { alive = false }
-  }, [view, activeScope, filters, executionOnly])
+  }, [minimal, activeScope, filters, executionOnly])
 
   /** 切换视角：写回 URL（而不是另存一份 state），否则刷新就丢，也无法从工作台深链带进来 */
   const switchScope = (key: string) => {
@@ -667,6 +700,58 @@ export default function RequirementList({
       }
     } catch {
       message.error('導出失敗，請重試')
+    }
+  }
+
+  /**
+   * 批量變更提出人（存量導入歸屬糾正）。
+   * <p>服務端同步主表快照 + SUBMITTER 角色行並逐條寫流水；任何一條失敗整批回滾，
+   * 不會出現「改了一半」的權屬分布。
+   */
+  const handleBatchSubmitter = async () => {
+    if (!submitterUserId) { message.warning(t('rdm.batchSubmitter.pickRequired')); return }
+    if (!submitterRemark.trim()) { message.warning(t('rdm.batchSubmitter.reasonRequired')); return }
+    setSubmitterSaving(true)
+    try {
+      const changed = await batchChangeSubmitter(selectedKeys, submitterUserId, submitterRemark.trim())
+      message.success(t('rdm.batchSubmitter.success', { count: changed }))
+      setSubmitterOpen(false)
+      setSelectedKeys([])
+      await load()
+    } catch (err) {
+      message.error(err instanceof Error && err.message ? err.message : t('rdm.batchSubmitter.failed'))
+    } finally {
+      setSubmitterSaving(false)
+    }
+  }
+
+  /**
+   * 批量補錄受理信息（存量導入需求）。
+   * <p>不回退狀態：導入時已生成 approved PRD，回退會製造「狀態與 PRD 事實不一致」；
+   * 服務端按「PRD 階段 + 有產品經理」逐條處理，跳過數必須顯示出來，不能只報成功。
+   */
+  const handleBackfill = async (payload: RequirementBackfillPayload) => {
+    setBackfillSaving(true)
+    try {
+      const result = await batchBackfillAccept(
+        selectedKeys, payload.promisedPrdDate, payload.pmUserId, payload.remark,
+      )
+      if (result.skippedNoPm > 0 || result.skippedStatus > 0) {
+        message.warning(t('rdm.batchBackfill.partial', {
+          count: result.updated,
+          noPm: result.skippedNoPm,
+          status: result.skippedStatus,
+        }))
+      } else {
+        message.success(t('rdm.batchBackfill.success', { count: result.updated }))
+      }
+      setBackfillOpen(false)
+      setSelectedKeys([])
+      await load()
+    } catch (err) {
+      message.error(err instanceof Error && err.message ? err.message : t('rdm.batchBackfill.failed'))
+    } finally {
+      setBackfillSaving(false)
     }
   }
 
@@ -1110,10 +1195,11 @@ export default function RequirementList({
   }, [rows, clientHiddenStatuses])
   const hiddenRowCount = clientHiddenStatuses.length > 0 ? rows.length - visibleRows.length : 0
 
-  /** 批量勾选只对“有分配权 + 停在需求池视角 + 表格视图”有意义：看板卡片无法勾选，
-   *  列设置在看板下也没有列可设 —— 两者在不满足时直接隐藏，而不是留一个永远点不动的按钮 */
-  const canBatchAssign = canDispatch && isPoolView && view === 'table'
-  const rowSelection = canBatchAssign
+  /** 批量勾选：有分配权 + 表格视图即可（不限需求池视角，「跟进清单」也要能批量改提出人）；
+   *  「批量分配」仍只对停在需求池视角有意义 */
+  const canSelectRows = canDispatch && view === 'table'
+  const canBatchAssign = canSelectRows && isPoolView
+  const rowSelection = canSelectRows
     ? { selectedRowKeys: selectedKeys, onChange: (keys: React.Key[]) => setSelectedKeys(keys as number[]) }
     : undefined
 
@@ -1196,14 +1282,16 @@ export default function RequirementList({
             advanced={advancedFilters}
             minimal={minimal}
             expandAll
+            initialFilters={initialScene?.filters}
             projectOptions={projectChoices}
             iterationOptions={iterationChoices}
             onSearch={v => { setFilters(v); setPage(1) }}
             onReset={() => { setFilters({}); setPage(1) }}
           />
 
-          {/* 统计卡：极简模式不需要（认领/分配页只看待分配，无需全局信号卡） */}
-          {!minimal && view === 'kanban' && (
+          {/* 统计卡：两种视图共用同一口径（§E.8 卡片必须在搜索区下方）。
+              历史上只在看板视图渲染，切到表格就整块消失，同一批数据两套首屏信息，容易被当成加载失败 */}
+          {!minimal && (
             <div style={{ marginBottom: 16 }}>
               <StatCards
                 animationKey={`${activeScope}-${JSON.stringify(filters)}`}
@@ -1228,6 +1316,28 @@ export default function RequirementList({
                   onClick={() => navigate(`/rdm-assign?ids=${selectedKeys.join(',')}&back=${assignBack}`)}
                 >
                   批量分配{selectedKeys.length ? `（${selectedKeys.length}）` : ''}
+                </Button>
+              )}
+              {canSelectRows && (
+                <Button
+                  icon={<EditOutlined />}
+                  disabled={selectedKeys.length === 0}
+                  onClick={() => {
+                    setSubmitterUserId(undefined)
+                    setSubmitterRemark('')
+                    setSubmitterOpen(true)
+                  }}
+                >
+                  {t('rdm.batchSubmitter.button')}{selectedKeys.length ? ` (${selectedKeys.length})` : ''}
+                </Button>
+              )}
+              {canSelectRows && (
+                <Button
+                  icon={<FieldTimeOutlined />}
+                  disabled={selectedKeys.length === 0}
+                  onClick={() => setBackfillOpen(true)}
+                >
+                  {t('rdm.batchBackfill.button')}{selectedKeys.length ? ` (${selectedKeys.length})` : ''}
                 </Button>
               )}
               {!minimal && (
@@ -1308,7 +1418,7 @@ export default function RequirementList({
               loading={loading}
               locale={rdmTableLocale(loading, t('common.noData'))}
               rowSelection={rowSelection}
-              scroll={{ x: tableWidth + (canBatchAssign ? 32 : 0) }}
+              scroll={{ x: tableWidth + (canSelectRows ? 32 : 0) }}
               pagination={{
                 current: page,
                 pageSize: size,
@@ -1340,6 +1450,52 @@ export default function RequirementList({
         onClose={() => setImportOpen(false)}
         onImport={handleRequirementImport}
       />
+
+      {/* 批量變更提出人：主表快照 + SUBMITTER 角色行同步，逐條寫流水 */}
+      <Modal
+        title={t('rdm.batchSubmitter.title')}
+        open={submitterOpen}
+        onCancel={() => setSubmitterOpen(false)}
+        onOk={handleBatchSubmitter}
+        okText={t('rdm.batchSubmitter.confirm')}
+        cancelText={t('rdm.batchSubmitter.cancel')}
+        confirmLoading={submitterSaving}
+        okButtonProps={{ disabled: !submitterUserId || !submitterRemark.trim() }}
+        destroyOnHidden
+        width={480}
+      >
+        <div className="confirm-info-card" style={{ marginBottom: 16 }}>
+          <div className="confirm-info-row">
+            <span>{t('rdm.batchSubmitter.selected')}</span>
+            <b>{t('rdm.batchSubmitter.count', { count: selectedKeys.length })}</b>
+          </div>
+        </div>
+        <div className="rdm-action-modal-label">{t('rdm.batchSubmitter.newSubmitter')}</div>
+        <EmployeeSelect
+          single
+          value={submitterUserId}
+          onChange={ids => setSubmitterUserId(ids[0])}
+          placeholder={t('rdm.batchSubmitter.pickRequired')}
+        />
+        <div className="rdm-action-modal-label" style={{ marginTop: 12 }}>{t('rdm.batchSubmitter.reason')}</div>
+        <RemarkTextArea
+          placeholder={t('rdm.batchSubmitter.reasonPlaceholder')}
+          value={submitterRemark}
+          onChange={e => setSubmitterRemark(e.target.value)}
+        />
+        <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>
+          {t('rdm.batchSubmitter.hint')}
+        </div>
+      </Modal>
+
+      {/* 批量補錄受理信息（存量導入）：只補承諾日期與產品任務，需求狀態不變 */}
+      <RequirementBackfillModal
+        open={backfillOpen}
+        count={selectedKeys.length}
+        saving={backfillSaving}
+        onClose={() => setBackfillOpen(false)}
+        onSubmit={handleBackfill}
+      />
     </div>
   )
 }
@@ -1358,13 +1514,15 @@ export default function RequirementList({
  * 让人以为列表坏了。
  */
 function SearchBar({ onSearch, onReset, advanced = false, minimal = false, expandAll = false,
-  projectOptions, iterationOptions }: {
+  initialFilters, projectOptions, iterationOptions }: {
   onSearch: (v: RequirementFilters) => void
   onReset: () => void
   advanced?: boolean
   minimal?: boolean
   /** 为 true 时所有筛选条件一次性平铺，不渲染「更多篩選/收起篩選」按钮 */
   expandAll?: boolean
+  /** 从详情返回时带回来的筛选快照：只回填表单，不再触发一次查询 */
+  initialFilters?: RequirementFilters
   /** 所属项目候选：由父组件取一次后下发，与列表列的项目名称同源 */
   projectOptions: { value: number; label: string }[]
   /** 所属迭代候选：同上，只含未关闭迭代 */
@@ -1383,6 +1541,18 @@ function SearchBar({ onSearch, onReset, advanced = false, minimal = false, expan
   const handlerTimer = useRef<ReturnType<typeof setTimeout>>()
   /** 极简模式或 expandAll：查询条件全部展开，不需要收起 */
   const [more, setMore] = useState(minimal || expandAll)
+
+  /**
+   * 还原上次查询条件到表单。
+   * <p>不能用 initialValues：antd 的 resetFields() 是「回到 initialValues」，
+   * 绑上去会让【重置】变成「恢复上次查询」，搜索框里的词清不掉。
+   * 这里只在挂载时单向下发一次，重置仍走 resetFields 回到空值。
+   */
+  useEffect(() => {
+    if (initialFilters && Object.keys(initialFilters).length > 0) {
+      form.setFieldsValue(initialFilters)
+    }
+  }, [form, initialFilters])
 
   useEffect(() => {
     if (advanced) {

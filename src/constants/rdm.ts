@@ -555,6 +555,10 @@ export const RDM_ACTION = {
   REOPEN: 'reopen',
   BLOCK: 'block',
   UNBLOCK: 'unblock',
+  /** 評審通過 → 評估中：存量導入需求的受控回退（rdm_transition 配置驱动） */
+  BACK_TO_EVALUATE: 'back_to_evaluate',
+  /** 非流转动作：補錄受理信息，只寫狀態流水（from = to），用於時間軸展示 */
+  BACKFILL_ACCEPT: 'backfill_accept',
 } as const
 export type RdmAction = (typeof RDM_ACTION)[keyof typeof RDM_ACTION]
 
@@ -597,6 +601,8 @@ export const RDM_ACTION_LABEL: Record<RdmAction, string> = {
   [RDM_ACTION.REOPEN]: '重新打開',
   [RDM_ACTION.BLOCK]: '標記阻塞',
   [RDM_ACTION.UNBLOCK]: '解除阻塞',
+  [RDM_ACTION.BACK_TO_EVALUATE]: '退回評估',
+  [RDM_ACTION.BACKFILL_ACCEPT]: '存量補錄受理',
 }
 
 /** 动作按钮语义（UI 配色分类） */
@@ -641,6 +647,8 @@ export const RDM_ACTION_TONE: Record<RdmAction, RdmActionTone> = {
   [RDM_ACTION.REOPEN]: 'primary',
   [RDM_ACTION.BLOCK]: 'danger',
   [RDM_ACTION.UNBLOCK]: 'default',
+  [RDM_ACTION.BACK_TO_EVALUATE]: 'danger',
+  [RDM_ACTION.BACKFILL_ACCEPT]: 'default',
 }
 
 /** 动作字段（前端按此弹出补充表单，后端 rdm_transition.required_fields 为权威） */
@@ -663,6 +671,7 @@ export const RDM_ACTION_REQUIRED_FIELDS: Partial<Record<RdmAction, RdmActionFiel
   [RDM_ACTION.VERIFY]: ['score'],
   [RDM_ACTION.BLOCK]: ['blockReason'],
   [RDM_ACTION.REOPEN]: ['remark'],
+  [RDM_ACTION.BACK_TO_EVALUATE]: ['remark'],
 }
 
 /**

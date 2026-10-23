@@ -62,6 +62,9 @@ vi.mock('../../api/rdm', () => ({
   fetchWorkbenchSummary: vi.fn(),
   fetchTodoBoard: vi.fn(),
   fetchMyTasks: vi.fn(),
+  // 研发工作台「我的研發任務」面板会拉团队成员；本测试不验证切换，给空列表即可
+  fetchTeamMembers: vi.fn().mockResolvedValue([]),
+  fetchTeamTasks: vi.fn(),
   fetchTestBatches: vi.fn(),
   fetchIssues: vi.fn(),
   fetchReleaseBatches: vi.fn(),

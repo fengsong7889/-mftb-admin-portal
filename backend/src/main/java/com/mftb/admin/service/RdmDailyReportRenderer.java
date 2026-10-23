@@ -77,7 +77,9 @@ public class RdmDailyReportRenderer {
     /**
      * 个人视角数据（渲染 {@code {{myXxx}}} 占位符与 {@code {{myProjectBlock}}}）。
      *
-     * @param userName          收件人姓名
+     * @param userName          收件人姓名。<b>仅作上下文保留，不进入消息正文</b>：
+     *                          个人日报一律不署名（收件人可能是追加的观察者，其收到的项目
+     *                          不等于本人负责的项目），{@code {{userName}}} 恒渲染为空串
      * @param projects          该收件人负责的项目（PM 或产品负责人）
      * @param todoCount         其待办总数
      * @param overdueItemCount  其项目下逾期交付项数
@@ -186,12 +188,18 @@ public class RdmDailyReportRenderer {
                 body + (StringUtils.hasText(detailUrl) ? CARD_FOOTER : CARD_FOOTER_NO_LINK), List.of());
     }
 
-    /** 个人无异常日极简结论：只回答「我负责的项目今天要不要动」 */
+    /**
+     * 个人无异常日极简结论：只回答「我负责的项目今天要不要动」。
+     *
+     * <p><b>为何正文不署收件人姓名</b>：个人通知的收件人不只是角色负责人，还包括推送规则里
+     * 追加的收件人（部门负责人、PMO 等），后者拿到的是规则范围下的全量项目，并非「自己负责的项目」。
+     * 正文一旦带上姓名，领导打开会误以为这条消息里的需求全归署名人，或怀疑系统把别人的日报发错了对象。
+     * 姓名只用于「发给谁」的路由，不应出现在消息内容里。
+     */
     public Rendered renderPersonalQuiet(Snapshot snapshot, boolean evening, PersonalView personal,
                                         String detailUrl) {
-        String name = personal == null ? "—" : safe(personal.userName());
         int mine = personal == null || personal.projects() == null ? 0 : personal.projects().size();
-        String body = "✅ **" + name + "，今日無異常**\n負責的 " + mine + " 個項目均在計劃內，無逾期，"
+        String body = "✅ **今日無異常**\n負責的 " + mine + " 個項目均在計劃內，無逾期，"
                 + (evening ? "明日無到期。" : "今日無到期。") + "\n";
         return new Rendered(cardPersonalTitle(snapshot, evening, personal),
                 body + (StringUtils.hasText(detailUrl) ? CARD_FOOTER : CARD_FOOTER_NO_LINK), List.of());
@@ -208,6 +216,10 @@ public class RdmDailyReportRenderer {
      *
      * <p><b>标题就是结论</b>：钉钉会话列表只露 title，所以「逾期 2、风险 1」必须写进标题，
      * 不点开也能判断今天要不要紧张；正文只负责回答「哪几个项目」。
+     *
+     * <p><b>无异常日直接收敛成一句话</b>：与降噪 brief 复用同一段文案，不再输出
+     * 「全部 N 個項目進展正常」再逐条铺开迭代明细——群里每天刷屏几十行，真正出事那天
+     * 反而没人看。正常的迭代明细属于看板，消息里只保留计数。
      */
     public Rendered renderGroupFixed(Snapshot snapshot, String detailUrl, boolean evening,
                                      MessageFieldOptions fields) {
@@ -221,16 +233,23 @@ public class RdmDailyReportRenderer {
         boolean iterationOnly = snapshot != null && snapshot.getScopeProjectId() == null
                 && StringUtils.hasText(snapshot.getScopeIterationCode());
 
+        // 无异常日：项目与未挂迭代都没有要处理的事，一句话收口，不列任何明细
+        if (!iterationOnly && attention.isEmpty()
+                && unassigned.stream().noneMatch(RdmDailyReportRenderer::iterationHasIssue)) {
+            return renderGroupQuiet(snapshot, evening, detailUrl);
+        }
+
         StringBuilder sb = new StringBuilder();
         // 指标行与下方项目块之间必须留空行：钉钉 markdown 把连续单换行归并成一段，
         // 不加空行时「在途 6｜…」会和「需關注 N 個項目」粘成一行
         sb.append(cardMetrics(snapshot, evening)).append("\n\n");
         if (iterationOnly) {
-            sb.append(cardUnassigned(unassigned, f));
+            // 迭代视角只有这一个迭代：无异常也要列出，否则消息里看不到任何内容
+            sb.append(cardUnassigned(unassigned, f, true));
         } else {
             // 无关注项目时只给一句肯定句：先输出空占位再跟一行「其餘 N 個正常」会重复两次绿色结论
             if (attention.isEmpty()) {
-                sb.append("🟢 **全部 ").append(projects.size()).append(" 個在途項目進展正常**\n");
+                sb.append("🟢 **在途 ").append(projects.size()).append(" 個項目進展正常**\n");
             } else {
                 sb.append(cardAttentionProjects(attention, snapshot, f));
                 int normal = projects.size() - attention.size();
@@ -238,7 +257,7 @@ public class RdmDailyReportRenderer {
                     sb.append("\n🟢 其餘 ").append(normal).append(" 個項目進展正常\n");
                 }
             }
-            sb.append(cardUnassigned(unassigned, f));
+            sb.append(cardUnassigned(unassigned, f, false));
         }
         sb.append(StringUtils.hasText(detailUrl) ? CARD_FOOTER : CARD_FOOTER_NO_LINK);
         return new Rendered(cardGroupTitle(snapshot, evening),
@@ -251,6 +270,9 @@ public class RdmDailyReportRenderer {
      * <p>不复用群报文案是因为个人视角要的是「我的项目」，把全公司项目推给个人是噪声；
      * 更重要的是逾期/今日到期必须用<b>收件人自己的口径</b>——用全局数字会让每个人
      * 以为全公司的逾期都压在自己身上。
+     *
+     * <p>正文同样不署收件人姓名，理由见 {@link #renderPersonalQuiet}：追加收件人拿到的项目
+     * 不等于其本人负责的项目，署名会把「规则范围」误读成「某个人的工作汇报」。
      */
     public Rendered renderPersonalFixed(Snapshot snapshot, String detailUrl, boolean evening,
                                         PersonalView personal, MessageFieldOptions fields) {
@@ -259,10 +281,9 @@ public class RdmDailyReportRenderer {
         int overdue = personal == null ? 0 : personal.overdueItemCount();
         int todayDue = personal == null ? 0 : personal.todayDueItemCount();
         int urgent = overdue + todayDue;
-        String name = personal == null ? "—" : safe(personal.userName());
 
         StringBuilder sb = new StringBuilder();
-        sb.append("**").append(name).append("，")
+        sb.append("**")
                 .append(urgent > 0 ? "今天有 " + urgent + " 項交付要處理" : "今天沒有到期或逾期的交付項")
                 .append("**\n\n");
         sb.append(cardPersonalMetrics(mine.size(), overdue, todayDue)).append("\n\n");
@@ -305,16 +326,33 @@ public class RdmDailyReportRenderer {
         return "**" + String.join("｜", parts) + "**";
     }
 
-    /** 群报卡片标题：日期 + 档位 + 结论（逾期/风险计数），无异常时直说无异常 */
+    /**
+     * 群报卡片标题：日期 + 档位 + 结论（到期/逾期/风险计数），无异常时直说无异常。
+     *
+     * <p><b>口径必须覆盖正文</b>：标题只算 {@code summary} 会出现「标题说今日無異常、正文却列着
+     * 红灯」的分裂——未挂项目迭代的逾期/今日到期需求记在迭代节点上，不在 summary 的交付项口径里；
+     * 晨报的今日到期同样不进 summary 的逾期口径。三处相加才与正文一致。
+     */
     private String cardGroupTitle(Snapshot snapshot, boolean evening) {
         String head = "產研交付日報 " + shortDate(snapshot) + (evening ? " 晚報" : " 晨報");
         Summary s = summaryOf(snapshot);
-        int overdue = s.getOverdueItemCount();
+        List<IterationNode> unassigned = snapshot == null || snapshot.getUnassignedIterations() == null
+                ? List.of() : snapshot.getUnassignedIterations();
+        int unassignedOverdue = unassigned.stream().filter(it -> it != null)
+                .mapToInt(IterationNode::getOverdueReqCount).sum();
+        int unassignedTodayDue = unassigned.stream().filter(it -> it != null)
+                .mapToInt(IterationNode::getTodayDueReqCount).sum();
+        int overdue = s.getOverdueItemCount() + unassignedOverdue;
         int risk = s.getRiskProjectCount();
-        if (overdue <= 0 && risk <= 0) {
+        // 晚报看的是明日到期，迭代节点没有明日口径，只并晨报的今日到期
+        int due = evening ? s.getTomorrowDueItemCount() : s.getTodayDueItemCount() + unassignedTodayDue;
+        if (overdue <= 0 && risk <= 0 && due <= 0) {
             return head + "｜今日無異常";
         }
         List<String> parts = new ArrayList<>();
+        if (due > 0) {
+            parts.add((evening ? "明日到期 " : "今日到期 ") + due);
+        }
         if (overdue > 0) {
             parts.add("逾期 " + overdue);
         }
@@ -337,24 +375,42 @@ public class RdmDailyReportRenderer {
         return date.length() >= 10 ? date.substring(5) : date;
     }
 
-    /** 群报指标行：限定单位避免「2」到底是项目还是交付项 —— 逾期/到期是项，风险是项目 */
+    /** 正文里的短日期（MM-dd）：同一理由，且「2026-10-17~2026-10-31」这种整段会吃掉半行 */
+    private static String shortDay(String date) {
+        if (!StringUtils.hasText(date)) {
+            return "";
+        }
+        return date.length() >= 10 ? date.substring(5) : date;
+    }
+
+    /**
+     * 群报指标行：限定单位避免「2」到底是项目还是交付项 —— 逾期/到期是项，风险是项目。
+     *
+     * <p><b>只显示有值的指标</b>：一行「在途 8｜今日到期 0 項｜✅ 逾期 0 項｜✅ 風險 0 個」
+     * 四个指标全铺开时，读者要逐个读完才知道「今天没事」；0 值在这里没有信息量，
+     * 反而把真正非零的那一项埋掉了。异常计数为空时整行只剩在途数。
+     */
     private String cardMetrics(Snapshot snapshot, boolean evening) {
         Summary s = summaryOf(snapshot);
         List<String> parts = new ArrayList<>();
         parts.add("在途 " + s.getProjectCount());
         if (evening) {
-            parts.add("今日完成 " + s.getTodayDoneItemCount() + " 項");
-            parts.add("今日上線 " + s.getTodayReleasedCount() + " 個");
-        } else {
-            parts.add("今日到期 " + s.getTodayDueItemCount() + " 項");
+            if (s.getTodayDoneItemCount() > 0) {
+                parts.add("今日完成 " + s.getTodayDoneItemCount() + " 項");
+            }
+            if (s.getTodayReleasedCount() > 0) {
+                parts.add("今日上線 " + s.getTodayReleasedCount() + " 個");
+            }
+        } else if (s.getTodayDueItemCount() > 0) {
+            parts.add("🟡 今日到期 " + s.getTodayDueItemCount() + " 項");
         }
-        parts.add(zeroAware("逾期 ", s.getOverdueItemCount(), " 項"));
-        parts.add(zeroAware("風險 ", s.getRiskProjectCount(), " 個"));
+        if (s.getOverdueItemCount() > 0) {
+            parts.add("🔴 逾期 " + s.getOverdueItemCount() + " 項");
+        }
+        if (s.getRiskProjectCount() > 0) {
+            parts.add("🟠 風險 " + s.getRiskProjectCount() + " 個");
+        }
         return "**" + String.join("｜", parts) + "**";
-    }
-
-    private static String zeroAware(String label, int value, String unit) {
-        return value > 0 ? label + value + unit : "✅ " + label + "0" + unit;
     }
 
     /**
@@ -457,24 +513,53 @@ public class RdmDailyReportRenderer {
         }
         if (on(f.getProjectPeriod()) && StringUtils.hasText(p.getPlanStartDate())
                 && StringUtils.hasText(p.getPlanEndDate())) {
-            parts.add("週期 " + p.getPlanStartDate() + "~" + p.getPlanEndDate());
+            parts.add("週期 " + shortDay(p.getPlanStartDate()) + "~" + shortDay(p.getPlanEndDate()));
         }
         if (on(f.getProjectNextDelivery()) && StringUtils.hasText(p.getNextDeliveryDate())) {
-            parts.add("下次交付 " + p.getNextDeliveryDate());
+            parts.add("下次交付 " + shortDay(p.getNextDeliveryDate()));
         }
-        if (on(f.getProjectAbnormal()) && (p.getDeliveryItemOverdue() > 0 || p.getDeliveryItemBlocked() > 0)) {
-            parts.add("逾期 " + p.getDeliveryItemOverdue() + "｜阻塞 " + p.getDeliveryItemBlocked());
+        /*
+         * 逾期/阻塞是异常角标，不受开关控制：这一行之所以出现在「需關注」里，读者必须能立刻
+         * 看到严重程度；关掉开关只显示一个红灯、不给数量，等于让人回去翻看板。
+         * 只拼非零项，避免出现「逾期 0｜阻塞 1」这种噪音。
+         */
+        List<String> abnormal = new ArrayList<>();
+        if (p.getDeliveryItemOverdue() > 0) {
+            abnormal.add("逾期 " + p.getDeliveryItemOverdue() + " 項");
+        }
+        if (p.getDeliveryItemBlocked() > 0) {
+            abnormal.add("阻塞 " + p.getDeliveryItemBlocked() + " 項");
+        }
+        if (!abnormal.isEmpty()) {
+            parts.add(String.join("｜", abnormal));
         }
         return String.join("｜", parts);
     }
 
-    /** 迭代行：code + 名称必显（框架），其余字段按开关拼接 */
+    /**
+     * 迭代行：code + 名称必显（框架），其余字段按开关拼接。
+     *
+     * <p>精简规则：
+     * <ul>
+     *   <li>逾期/今日到期是<b>异常角标，不受开关控制</b>——否则关掉开关后，这一行为什么被列出来
+     *       就完全看不出来了；只拼非零项；</li>
+     *   <li>進度/產能只在有值时输出：每行拖一个「產能 0%」纯属噪音；</li>
+     *   <li>日期区间压成 {@code MM-dd~MM-dd}，年份对日报是冗余信息。</li>
+     * </ul>
+     */
     private String fixedIterationLine(IterationNode it, MessageFieldOptions f, String bullet) {
         if (it == null) {
             return "";
         }
-        StringBuilder sb = new StringBuilder(bullet).append("迭代 ")
-                .append(safe(nullToDash(it.getCode())));
+        boolean overdue = it.getOverdueReqCount() > 0;
+        boolean todayDue = it.getTodayDueReqCount() > 0;
+        StringBuilder sb = new StringBuilder(bullet);
+        if (overdue) {
+            sb.append("🔴 ");
+        } else if (todayDue) {
+            sb.append("🟡 ");
+        }
+        sb.append(safe(nullToDash(it.getCode())));
         if (StringUtils.hasText(it.getName()) && !it.getName().equals(it.getCode())) {
             sb.append(' ').append(safe(it.getName()));
         }
@@ -488,25 +573,27 @@ public class RdmDailyReportRenderer {
         if (on(f.getIterationProgress())) {
             // 进度 = 任务进度按计划工时加权；产能 = 已排计划工时 / 迭代产能。
             // 无任务/未设产能时不输出占位符，避免每行都拖一个「—｜未設定」
-            if (it.getProgressPercent() != null) {
+            if (it.getProgressPercent() != null && it.getProgressPercent() > 0) {
                 meta.add("進度 " + it.getProgressPercent() + "%");
             }
-            if (it.getCapacityHours() > 0) {
-                meta.add("產能 " + (it.getCapacityUsagePercent() == null ? 0 : it.getCapacityUsagePercent()) + "%");
+            if (it.getCapacityHours() > 0 && it.getCapacityUsagePercent() != null
+                    && it.getCapacityUsagePercent() > 0) {
+                meta.add("產能 " + it.getCapacityUsagePercent() + "%");
             }
         }
-        if (on(f.getIterationReqTotal())) {
+        // 需求 0 不进消息：它不是行动项，只会在每行拖一个零
+        if (on(f.getIterationReqTotal()) && it.getRequirementCount() > 0) {
             meta.add("需求 " + it.getRequirementCount());
         }
-        if (on(f.getIterationReqTodayDue()) && it.getTodayDueReqCount() > 0) {
+        if (todayDue) {
             meta.add("今日到期 " + it.getTodayDueReqCount());
         }
-        if (on(f.getIterationReqOverdue()) && it.getOverdueReqCount() > 0) {
+        if (overdue) {
             meta.add("逾期 " + it.getOverdueReqCount());
         }
         if (on(f.getIterationPeriod()) && StringUtils.hasText(it.getStartDate())
                 && StringUtils.hasText(it.getEndDate())) {
-            meta.add(it.getStartDate() + "~" + it.getEndDate());
+            meta.add(shortDay(it.getStartDate()) + "~" + shortDay(it.getEndDate()));
         }
         if (!meta.isEmpty()) {
             sb.append('（').append(String.join("｜", meta)).append('）');
@@ -515,15 +602,37 @@ public class RdmDailyReportRenderer {
         return sb.toString();
     }
 
-    /** 未挂项目迭代块：卡片里只列迭代行，标题用加粗而不是三级标题（卡片正文不靠字号分层） */
-    private String cardUnassigned(List<IterationNode> unassigned, MessageFieldOptions f) {
+    /** 迭代是否有要处理的事：逾期/今日到期需求。判定不看字段开关，开关只影响展示多少字段 */
+    private static boolean iterationHasIssue(IterationNode it) {
+        return it != null && (it.getOverdueReqCount() > 0 || it.getTodayDueReqCount() > 0);
+    }
+
+    /**
+     * 未挂项目迭代块。
+     *
+     * <p><b>为何默认只列异常的</b>：未挂项目的迭代往往十几条，逐条铺开就是刷屏，而群里读者
+     * 要判断的是「有没有事」；正常迭代的排版、进度属于看板。全部正常时压成一行计数。
+     *
+     * @param forceDetail 迭代视角（规则只盯一个未挂迭代）必须展开，否则消息里没有任何内容
+     */
+    private String cardUnassigned(List<IterationNode> unassigned, MessageFieldOptions f, boolean forceDetail) {
         if (unassigned == null || unassigned.isEmpty()) {
             return "";
         }
+        List<IterationNode> issues = unassigned.stream()
+                .filter(RdmDailyReportRenderer::iterationHasIssue).toList();
+        if (!forceDetail && issues.isEmpty()) {
+            return "\n🧩 未掛項目的迭代 " + unassigned.size() + " 個，均無逾期\n";
+        }
+        List<IterationNode> lines = forceDetail ? unassigned : issues;
         StringBuilder sb = new StringBuilder("\n🧩 **未掛項目的迭代 ")
                 .append(unassigned.size()).append(" 個**\n");
-        for (IterationNode it : unassigned) {
+        for (IterationNode it : lines) {
             sb.append(fixedIterationLine(it, f, "- "));
+        }
+        int normal = unassigned.size() - lines.size();
+        if (normal > 0) {
+            sb.append("- 其餘 ").append(normal).append(" 個正常\n");
         }
         return sb.toString();
     }
@@ -567,7 +676,15 @@ public class RdmDailyReportRenderer {
 
         // 个人视角占位符：personal 为 null（群报渲染路径）时也要替换掉，否则群里会露出 {{userName}} 原文
         PersonalView p = personal == null ? new PersonalView("—", List.of(), 0, 0, 0, 0, 0, 0, 0) : personal;
-        out = out.replace(RdmDailyReportTemplates.PH_USER_NAME, safe(p.userName()));
+        /*
+         * {{userName}} 恒渲染为空串：个人日报一律不署收件人姓名。
+         * 为什么不在渲染层保留能力、只改预置模板——模板行是用户可自由编辑的（v3.23 起预置已转自定义），
+         * 只要渲染器还给姓名，任何人把占位符写回模板就会重新出现归属误读；
+         * 而追加收件人（部门负责人/PMO）收到的项目集合并不等于其本人负责的项目，
+         * 「正文署名 + 全量项目」正是让领导误以为所有需求都归署名人、或以为消息发错人的根因。
+         * 占位符仍留在白名单内：既不会被当成未知占位符原样露出，历史模板也不必强制改写。
+         */
+        out = out.replace(RdmDailyReportTemplates.PH_USER_NAME, "");
         out = out.replace(RdmDailyReportTemplates.PH_MY_PROJECT_COUNT, String.valueOf(sizeOf(p.projects())));
         out = out.replace(RdmDailyReportTemplates.PH_MY_TODO_COUNT, String.valueOf(p.todoCount()));
         out = out.replace(RdmDailyReportTemplates.PH_MY_OVERDUE_COUNT, String.valueOf(p.overdueItemCount()));

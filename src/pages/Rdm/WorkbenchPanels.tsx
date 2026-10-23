@@ -13,7 +13,8 @@
  * 待界面确认后的第二阶段统一抽取 domain 键并同步 zh-TW/en 两份文件。
  */
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, Space, Spin, Tag } from 'antd'
+import { useTranslation } from 'react-i18next'
+import { Alert, Button, Select, Space, Spin, Tag } from 'antd'
 import { RightOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
@@ -21,9 +22,12 @@ import {
   fetchIssues,
   fetchMyTasks,
   fetchReleaseBatches,
+  fetchTeamMembers,
+  fetchTeamTasks,
   fetchTestBatches,
   type RdmReleaseBatchListItem,
   type RdmTaskItem,
+  type RdmTeamMember,
   type RdmTestBatchListItem,
 } from '../../api/rdm'
 import {
@@ -56,12 +60,14 @@ function PanelShell(props: {
   action?: React.ReactNode
   loading: boolean
   error?: boolean
+  /** 失败原因（如“没有共同项目”）：只给默认的“數據載入失敗”会让人反复重试一个权限问题 */
+  errorText?: string
   onRetry?: () => void
   emptyText?: string
   hasData: boolean
   children: React.ReactNode
 }) {
-  const { icon, iconBg, iconColor, title, count, hint, action, loading, error, onRetry, emptyText, hasData, children } = props
+  const { icon, iconBg, iconColor, title, count, hint, action, loading, error, errorText, onRetry, emptyText, hasData, children } = props
   return (
     <div className="rdm-card" style={{ marginBottom: 16 }}>
       <div className="rdm-card-title">
@@ -84,10 +90,10 @@ function PanelShell(props: {
         <Alert
           type="error"
           showIcon
-          message="數據載入失敗"
+          message={errorText ?? '數據載入失敗'}
           description={(
             <span>
-              該區塊暫時取不到數據，不影響其他區塊。
+              {errorText ? '不影響其他區塊。' : '該區塊暫時取不到數據，不影響其他區塊。'}
               {onRetry && (
                 <Button type="link" size="small" onClick={onRetry} style={{ padding: '0 4px' }}>重試</Button>
               )}
@@ -135,26 +141,78 @@ function taskUrgency(task: RdmTaskItem): number {
 /** 我的研发任务：研发同学进入工作台第一眼该看到的东西（旧版这里只有「我提交的需求」） */
 export function MyDevTasksPanel() {
   const navigate = useNavigate()
-  const { data, loading, error, reload } = usePanelFetch(() => fetchMyTasks())
+  const { t } = useTranslation()
+  const [members, setMembers] = useState<RdmTeamMember[]>([])
+  /** 0 = 我的任务；>0 = 指定成员（团队协作视图） */
+  const [ownerId, setOwnerId] = useState(0)
+  const [data, setData] = useState<RdmTaskItem[] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [errorText, setErrorText] = useState<string | null>(null)
+
+  // 成员列表失败不阻断「我的任务」：下拉只保留「我的任務」一项
+  useEffect(() => {
+    let alive = true
+    fetchTeamMembers()
+      .then(list => { if (alive) setMembers(list) })
+      .catch(() => { /* 静默：没有团队视图也能正常看自己的任务 */ })
+    return () => { alive = false }
+  }, [])
+
+  const load = useCallback(async (id: number) => {
+    setLoading(true)
+    setErrorText(null)
+    try {
+      setData(id > 0 ? await fetchTeamTasks(id) : await fetchMyTasks())
+    } catch (err) {
+      // 无共同项目是权限/归属问题，必须把后端原文摆出来，不能伪装成「对方没任务」
+      setData(null)
+      setErrorText(err instanceof Error && err.message ? err.message : t('rdm.teamTask.loadFailed', { defaultValue: '數據載入失敗' }))
+    } finally {
+      setLoading(false)
+    }
+  }, [t])
+
+  useEffect(() => { void load(ownerId) }, [load, ownerId])
+
   const rows = (data ?? []).slice().sort((a, b) => taskUrgency(a) - taskUrgency(b))
+  const viewingTeam = ownerId > 0
   return (
     <PanelShell
       icon={RDM_SECTION_ICON['dev-tasks']}
       iconBg="#E6F7FF"
       iconColor="#1890FF"
-      title="我的研發任務"
+      title={viewingTeam ? t('rdm.teamTask.teamTitle', { defaultValue: '團隊成員任務' }) : t('rdm.teamTask.myTitle', { defaultValue: '我的研發任務' })}
       count={rows.length}
-      hint="僅列指派給我的未完成任務，逾期與阻塞置頂"
-      loading={loading}
-      error={error}
-      onRetry={reload}
-      hasData={rows.length > 0}
-      emptyText="目前沒有指派給你的未完成任務，可到研發工作台查看全部交付項"
+      hint={viewingTeam ? t('rdm.teamTask.teamHint', { defaultValue: '僅顯示你們共同項目下的任務，逾期與阻塞置頂' }) : t('rdm.teamTask.myHint', { defaultValue: '僅列指派給我的未完成任務，逾期與阻塞置頂' })}
       action={(
-        <Button type="link" size="small" onClick={() => navigate('/rdm-delivery')}>
-          研發工作台 <RightOutlined style={{ fontSize: 11 }} />
-        </Button>
+        <Space size={8}>
+          <Select
+            size="small"
+            style={{ width: 200 }}
+            value={ownerId}
+            onChange={setOwnerId}
+            showSearch
+            optionFilterProp="label"
+            aria-label={t('rdm.teamTask.switcherLabel', { defaultValue: '切換查看成員' })}
+            options={[
+              { value: 0, label: t('rdm.teamTask.selfOption', { defaultValue: '我的任務' }) },
+              ...members.map(m => ({
+                value: m.userId,
+                label: m.empNo ? `${m.name}（${m.empNo}）` : m.name,
+              })),
+            ]}
+          />
+          <Button type="link" size="small" onClick={() => navigate('/rdm-delivery')}>
+            {t('rdm.teamTask.gotoBoard', { defaultValue: '研發工作台' })} <RightOutlined style={{ fontSize: 11 }} />
+          </Button>
+        </Space>
       )}
+      loading={loading}
+      error={Boolean(errorText)}
+      errorText={errorText ?? undefined}
+      onRetry={() => { void load(ownerId) }}
+      hasData={rows.length > 0}
+      emptyText={viewingTeam ? t('rdm.teamTask.teamEmpty', { defaultValue: '該成員在你們的共同項目下暫無未完成任務' }) : t('rdm.teamTask.empty', { defaultValue: '目前沒有指派給你的未完成任務，可到研發工作台查看全部交付項' })}
     >
       {rows.slice(0, 6).map(task => (
         <div key={task.id} className="rdm-todo-item">
@@ -181,9 +239,12 @@ export function MyDevTasksPanel() {
           <Tag color={RDM_TASK_STATUS_COLOR[task.status as keyof typeof RDM_TASK_STATUS_COLOR] ?? 'default'} style={{ margin: 0 }}>
             {RDM_TASK_STATUS_LABEL[task.status as keyof typeof RDM_TASK_STATUS_LABEL] ?? task.status}
           </Tag>
-          <Button type="link" size="small" onClick={() => navigate('/rdm-delivery')}>
-            到工作台處理
-          </Button>
+          {/* 团队视图不提供“到工作台处理”：那是自己的操作台，会让人误以为能代他人上报 */}
+          {!viewingTeam && (
+            <Button type="link" size="small" onClick={() => navigate('/rdm-delivery')}>
+              {t('rdm.teamTask.toWorkbench', { defaultValue: '到工作台處理' })}
+            </Button>
+          )}
         </div>
       ))}
     </PanelShell>

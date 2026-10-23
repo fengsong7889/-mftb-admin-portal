@@ -19,6 +19,7 @@ import { PlusOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import StatusSwitch from '../components/StatusSwitch'
+import { rdmTableLocale } from '../components/tableLocale'
 import AdmitPolicyPanel from './AdmitPolicyPanel'
 import { deleteRoutingRule, fetchRoutingRules, saveRoutingRule, type RdmRoutingRow } from '../../../api/rdm'
 import '../index.css'
@@ -179,6 +180,7 @@ function RoutingMatrix() {
         dataSource={rows}
         pagination={false}
         scroll={{ x: 1180 }}
+        locale={rdmTableLocale(loading, '還沒有配置分發規則，新增後新需求會按優先級推薦產品經理')}
       />
     </>
   )

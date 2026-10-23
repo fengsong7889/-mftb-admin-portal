@@ -7,6 +7,7 @@ import com.mftb.admin.constant.RdmConstants;
 import com.mftb.admin.constant.RdmDailyReportTemplates;
 import com.mftb.admin.dto.RdmDailyReportVO.Config;
 import com.mftb.admin.dto.RdmDailyReportVO.ConfigForm;
+import com.mftb.admin.dto.RdmDailyReportVO.BuiltinLayout;
 import com.mftb.admin.dto.RdmDailyReportVO.IterationNode;
 import com.mftb.admin.dto.RdmDailyReportVO.MessageFieldOptions;
 import com.mftb.admin.dto.RdmDailyReportVO.PreviewForm;
@@ -1244,13 +1245,67 @@ public class RdmDailyReportService {
      * @return {@code null} = 放行（并已记下本次时刻）；非 null = 拒绝原因
      */
     String checkManualThrottle(String slot, Long projectId, long nowMillis) {
-        String key = slot + ":" + (projectId == null ? "all" : projectId);
+        return checkManualThrottle(slot, projectId, null, nowMillis);
+    }
+
+    /**
+     * 手动真发节流（带发送对象维度）。
+     * <p>「刚发完群、马上发个人」是合法操作，不能被同一个窗口拦住；
+     * 反之只发同一个人也不能借不同对象绕过 1 分钟限制。
+     */
+    String checkManualThrottle(String slot, Long projectId, String recipientKey, long nowMillis) {
+        String key = slot + ":" + (projectId == null ? "all" : projectId)
+                + (StringUtils.hasText(recipientKey) ? ":" + recipientKey : "");
         Long last = lastManualPushAt.get(key);
         if (last != null && nowMillis - last < MANUAL_THROTTLE_MS) {
             return "距上次手動推送不足 1 分鐘，請稍後再試（避免重複刷屏）";
         }
         lastManualPushAt.put(key, nowMillis);
         return null;
+    }
+
+    /**
+     * 手动触发的发送对象覆盖（只作用于手动触发；定时规则仍按推送配置的群+个人）。
+     * <ul>
+     *   <li>{@code all}（默认）：群 + 配置收件人；</li>
+     *   <li>{@code group}：只发群，不发个人；</li>
+     *   <li>{@code users}：只发指定人，不发群、不发其他收件人。</li>
+     * </ul>
+     * <p>指定人的内容口径是「本次推送范围全量汇总」：他们未必是项目成员，
+     * 按项目归属裁剪会得到一份空日报。
+     */
+    public record RecipientOverride(String mode, List<Long> userIds) {
+        public static final String MODE_ALL = "all";
+        public static final String MODE_GROUP = "group";
+        public static final String MODE_USERS = "users";
+
+        public static RecipientOverride all() {
+            return new RecipientOverride(MODE_ALL, List.of());
+        }
+
+        public boolean groupAllowed() {
+            return !MODE_USERS.equals(mode);
+        }
+
+        public boolean personalAllowed() {
+            return !MODE_GROUP.equals(mode);
+        }
+
+        public List<Long> targetUserIds() {
+            return userIds == null ? List.of() : userIds;
+        }
+
+        /** 节流键后缀：不同发送对象各自计时 */
+        public String throttleKey() {
+            if (MODE_GROUP.equals(mode)) {
+                return "group";
+            }
+            if (MODE_USERS.equals(mode)) {
+                return "users:" + targetUserIds().stream().sorted()
+                        .map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+            }
+            return null;
+        }
     }
 
     /**
@@ -1560,6 +1615,14 @@ public class RdmDailyReportService {
      */
     public TriggerResult triggerManual(String contentType, List<Long> projectIds, String iterationCode,
                                        String operator, boolean dryRun) {
+        return triggerManual(contentType, projectIds, iterationCode, operator, dryRun, null);
+    }
+
+    /**
+     * 手动触发（带发送对象）：recipient 为空 = 群 + 个人（现状）；group = 仅群；users = 仅指定人。
+     */
+    public TriggerResult triggerManual(String contentType, List<Long> projectIds, String iterationCode,
+                                       String operator, boolean dryRun, RecipientOverride recipient) {
         String slot = normalizeReportType(contentType);
         List<Long> ids = projectIds == null ? List.of() : projectIds.stream()
                 .filter(java.util.Objects::nonNull).distinct().toList();
@@ -1590,7 +1653,7 @@ public class RdmDailyReportService {
         }
         Long singleProjectId = ids.size() == 1 ? ids.get(0) : null;
         return push(new TriggerTarget(null, null, singleProjectId, ids, iteration, slot, null, null),
-                true, operator, dryRun);
+                true, operator, dryRun, recipient);
     }
 
     /**
@@ -1599,6 +1662,18 @@ public class RdmDailyReportService {
      * @param manual true=手动触发（写 manual 档 + 节流）；false=定时（当日该范围该档已推送则跳过）
      */
     public TriggerResult push(TriggerTarget target, boolean manual, String operator, boolean dryRun) {
+        // 旧入口：未指定发送对象，按配置的「群 + 个人」
+        return push(target, manual, operator, dryRun, null);
+    }
+
+    /**
+     * 推送核心（带发送对象覆盖）。
+     *
+     * @param recipient 手动触发的发送对象覆盖；null = 按配置的群+个人（定时任务固定为 null）
+     */
+    public TriggerResult push(TriggerTarget target, boolean manual, String operator, boolean dryRun,
+                              RecipientOverride recipient) {
+        RecipientOverride recipients = recipient == null ? RecipientOverride.all() : recipient;
         // slot = 内容口径档位（决定模板与汇总侧重）；storedType = 快照行的 report_type。
         // 两者必须分开：手动补发推的仍是一份晨报/晚报内容，但不能占用定时档的幂等行。
         String slot = normalizeReportType(target.contentType());
@@ -1622,7 +1697,8 @@ public class RdmDailyReportService {
             // 节流只对「真发」生效：预览/干跑可以反复点，不应被拦。
             // 刻意放在总开关判定之后：被开关拦下的尝试不消耗节流窗口，否则管理员
             // 刚打开开关立即补发会被告知「距上次不足 1 分钟」，而其实一次都没发出去。
-            String reject = checkManualThrottle(slot, target.projectId(), System.currentTimeMillis());
+            String reject = checkManualThrottle(slot, target.projectId(), recipients.throttleKey(),
+                    System.currentTimeMillis());
             if (reject != null) {
                 throw new BusinessException(reject);
             }
@@ -1685,7 +1761,8 @@ public class RdmDailyReportService {
         result.setGroupContent(group.content());
 
         boolean groupDispatched = false;
-        if (Boolean.TRUE.equals(cfg.getGroupEnabled()) && !effectiveDryRun && !quietSkip) {
+        if (recipients.groupAllowed()
+                && Boolean.TRUE.equals(cfg.getGroupEnabled()) && !effectiveDryRun && !quietSkip) {
             // 群报走 outbox：RdmNotifyService 登记后由 RdmNotifyDispatcher 抢占发送并退避重试
             if (useCard(cfg, detailUrl)) {
                 notifyService.notifyActionCard(RdmConstants.EVENT_DAILY_REPORT, group.title(), group.content(),
@@ -1699,9 +1776,17 @@ public class RdmDailyReportService {
         }
         result.setGroupDispatched(groupDispatched);
 
-        int[] personal = quietSkip ? new int[]{0, 0}
-                : pushPersonal(snapshot, cfg, slot, storedType, baseUrl, detailUrl,
-                target.personalTemplateKey(), effectiveDryRun, quietBrief);
+        int[] personal;
+        if (quietSkip || !recipients.personalAllowed()) {
+            personal = new int[]{0, 0};
+        } else if (!recipients.targetUserIds().isEmpty()) {
+            // 仅指定人：内容按本次推送范围全量汇总（指定人未必是项目成员，不能按项目归属裁剪）
+            personal = pushPersonalToUsers(snapshot, cfg, slot, storedType, baseUrl, detailUrl,
+                    target.personalTemplateKey(), effectiveDryRun, quietBrief, recipients.targetUserIds());
+        } else {
+            personal = pushPersonal(snapshot, cfg, slot, storedType, baseUrl, detailUrl,
+                    target.personalTemplateKey(), effectiveDryRun, quietBrief);
+        }
         result.setPersonalSent(personal[0]);
         result.setPersonalSkipped(personal[1]);
 
@@ -1827,6 +1912,71 @@ public class RdmDailyReportService {
                 // 单人失败不影响其他人：日报是周期性汇总，漏一个人下次时点自然补上
                 skipped++;
                 log.warn("日报个人通知发送失败: userId={}, error={}", e.getKey(), ex.getClass().getSimpleName());
+            }
+        }
+        return new int[]{sent, skipped};
+    }
+
+    /**
+     * 仅指定人的个人通知（手动触发）。
+     * <p>与 {@link #pushPersonal} 的差异只有两点：收件人来自参数；内容按本次推送范围全量汇总
+     * （指定人未必是项目成员，按项目归属裁剪会得到空日报）。渲染、降噪、发送口径必须与其一致，
+     * 改一处必须同步另一处。
+     */
+    private int[] pushPersonalToUsers(Snapshot snapshot, Config cfg, String slot, String urlType, String baseUrl,
+                                      String detailUrl, String personalTemplateKey, boolean dryRun,
+                                      boolean quietBrief, List<Long> userIds) {
+        if (!Boolean.TRUE.equals(cfg.getPersonalEnabled()) && !dryRun) {
+            // 个人渠道是管理员关掉的闸：指定人不能绕过它，否则「关掉个人通知」形同虚设；
+            // 干跑只是预览内容，不发送，不受渠道开关限制
+            throw new BusinessException("個人通知渠道已關閉，無法只發給指定人；請先在推送配置開啟個人渠道");
+        }
+        Credentials app = dryRun ? null : appService.resolve(NotificationAppService.RDM_DAILY_REPORT);
+        if (!dryRun && app == null) {
+            throw new BusinessException("個人通知渠道未綁定企業應用，請先在通知渠道配置頁綁定");
+        }
+        boolean fixed = isFixedMode(cfg);
+        boolean eveningSlot = RdmDailyReportTemplates.TYPE_EVENING.equals(slot);
+        Template tpl = null;
+        if (!fixed) {
+            String key = StringUtils.hasText(personalTemplateKey)
+                    ? personalTemplateKey : cfg.getPersonalTemplateKey();
+            tpl = resolveTemplate(RdmDailyReportTemplates.CHANNEL_PERSONAL, slot, key);
+        }
+        List<ProjectNode> scopeProjects = snapshot.getProjects() == null ? List.of() : snapshot.getProjects();
+        int sent = 0;
+        int skipped = 0;
+        for (Long userId : userIds) {
+            SysUser user = userMapper.selectById(userId);
+            if (user == null || !StringUtils.hasText(user.getDingtalkUserId())) {
+                skipped++;
+                log.info("日报指定人通知跳过（用户不存在或未绑定钉钉 userId）: userId={}", userId);
+                continue;
+            }
+            PersonalView personal = buildPersonalView(user.getName(), scopeProjects);
+            boolean quiet = quietBrief && isQuietPersonalDay(personal);
+            Rendered r = quiet
+                    ? renderer.renderPersonalQuiet(snapshot, eveningSlot, personal, detailUrl)
+                    : (fixed
+                    ? renderer.renderPersonalFixed(snapshot, detailUrl, eveningSlot, personal, cfg.getMessageFields())
+                    : renderer.renderPersonal(tpl.getTitleTpl(), tpl.getContentTpl(), snapshot, detailUrl, personal));
+            if (dryRun) {
+                sent++;
+                continue;
+            }
+            try {
+                if (useCard(cfg, detailUrl)) {
+                    dingTalkAppService.sendWorkActionCard(NotificationAppService.RDM_DAILY_REPORT, app.getId(),
+                            List.of(user.getDingtalkUserId()), r.title(), r.content(),
+                            CARD_BTN_PERSONAL, detailUrl);
+                } else {
+                    dingTalkAppService.sendWorkNotification(NotificationAppService.RDM_DAILY_REPORT, app.getId(),
+                            List.of(user.getDingtalkUserId()), r.title(), r.content());
+                }
+                sent++;
+            } catch (RuntimeException ex) {
+                skipped++;
+                log.warn("日报指定人通知发送失败: userId={}, error={}", userId, ex.getClass().getSimpleName());
             }
         }
         return new int[]{sent, skipped};
@@ -2363,6 +2513,101 @@ public class RdmDailyReportService {
         return "全部在途項目";
     }
 
+    /* ==================== 内置版式（系统内置、不可编辑） ==================== */
+
+    /** 内置版式类型：与模板配置页的三张内置卡片一一对应 */
+    private static final Set<String> BUILTIN_LAYOUT_TYPES = Set.of("group_morning", "group_evening", "personal");
+
+    /**
+     * 内置版式示例：固定示例数据 + 固定框架渲染器，不读库、不读快照、不受当前消息模式影响。
+     *
+     * <p><b>为何不合并到 preview</b>：preview 按配置的 {@code messageMode} 分叉，
+     * 用户选了自定义模板后看到的就不是内置版式；这里的答案必须恒定是内置版式的样子。
+     * 示例数据也固定不读库——真实库可能全空，示例要能稳定展示「有异常的日子」的完整形态。
+     */
+    public BuiltinLayout builtinLayout(String type) {
+        String layout = StringUtils.hasText(type) ? type.trim() : "group_morning";
+        if (!BUILTIN_LAYOUT_TYPES.contains(layout)) {
+            throw new BusinessException("內置版式類型不合法（只接受 group_morning / group_evening / personal）: " + type);
+        }
+        boolean evening = "group_evening".equals(layout);
+        Snapshot demo = demoSnapshot(evening);
+        Rendered rendered = "personal".equals(layout)
+                ? renderer.renderPersonalFixed(demo, "", evening, demoPersonalView(demo), new MessageFieldOptions())
+                : renderer.renderGroupFixed(demo, "", evening, new MessageFieldOptions());
+        return new BuiltinLayout(layout, rendered.title(), rendered.content(), MESSAGE_MODE_FIXED);
+    }
+
+    /**
+     * 内置版式的示例快照：一个风险项目 + 一个正常项目 + 一个逾期迭代 + 一个正常迭代。
+     * <p>日期取今天，保证「今日到期」角标与相对时间在示例里真实可见。
+     */
+    private Snapshot demoSnapshot(boolean evening) {
+        LocalDate day = LocalDate.now();
+        Snapshot s = new Snapshot();
+        s.setReportDate(day.format(DATE_FMT));
+        s.setReportType(evening ? RdmDailyReportTemplates.TYPE_EVENING : RdmDailyReportTemplates.TYPE_MORNING);
+        s.setReportTypeLabel(evening ? "晚報" : "晨報");
+        Summary sum = new Summary();
+        sum.setProjectCount(8);
+        sum.setRiskProjectCount(1);
+        sum.setNormalProjectCount(7);
+        sum.setIterationActiveCount(6);
+        sum.setTodayDueItemCount(1);
+        sum.setOverdueItemCount(2);
+        sum.setTomorrowDueItemCount(3);
+        sum.setTodayDoneItemCount(5);
+        sum.setTodayReleasedCount(2);
+        s.setSummary(sum);
+
+        ProjectNode attention = new ProjectNode();
+        attention.setProjectId(-1L);
+        attention.setProjectName("推廣金重構");
+        attention.setProductOwnerUserName("李四");
+        attention.setDeliveryItemTotal(10);
+        attention.setDeliveryItemCompleted(3);
+        attention.setDeliveryItemOverdue(2);
+        attention.setDeliveryItemBlocked(1);
+        attention.setRemainingCount(7);
+        attention.setIterationActiveCount(2);
+        attention.setRiskFlag(1);
+        attention.setAttention(true);
+        attention.setNextDeliveryDate(day.format(DATE_FMT));
+
+        ProjectNode normal = new ProjectNode();
+        normal.setProjectId(-2L);
+        normal.setProjectName("內部工具");
+        normal.setDeliveryItemTotal(4);
+        normal.setDeliveryItemCompleted(4);
+        normal.setAttention(false);
+
+        IterationNode issue = new IterationNode();
+        issue.setIterationId(-1L);
+        issue.setCode("SP2026-DLV");
+        issue.setName("迭代-交付鏈路");
+        issue.setStatus("active");
+        issue.setProgressPercent(50);
+        issue.setRequirementCount(3);
+        issue.setOverdueReqCount(1);
+        issue.setOwnerName("馮松");
+
+        IterationNode cleanIt = new IterationNode();
+        cleanIt.setIterationId(-2L);
+        cleanIt.setCode("SP202610001");
+        cleanIt.setName("11月第一版迭代");
+        cleanIt.setStatus("planning");
+        cleanIt.setOwnerName("王五");
+
+        s.setProjects(new ArrayList<>(List.of(attention, normal)));
+        s.setUnassignedIterations(new ArrayList<>(List.of(issue, cleanIt)));
+        return s;
+    }
+
+    /** 个人版式的示例视角：1 项逾期 + 2 项今日到期，用于展示「要处理几件事」的结论 */
+    private PersonalView demoPersonalView(Snapshot demo) {
+        return new PersonalView("", demo.getProjects(), 3, 1, 2, 6, 2, 4, 1);
+    }
+
     /**
      * 预览：按（可能是未存盘的草稿）模板渲染真实数据，不发送、不落库。
      * <p>供配置页「实时预览」与手动触发的「預覽不發送」共用。
@@ -2786,13 +3031,22 @@ public class RdmDailyReportService {
      * <p>口径直接取快照（与正文同源，不再算一套）：
      * 晨报看今日到期/逾期/风险；晚报看明日到期/逾期/风险——
      * 「今天完成了多少」不属异常，不能拿它把晚报从降噪里拉回来。
+     *
+     * <p><b>未挂项目的迭代必须单独判一次</b>：它们的逾期/今日到期需求记在迭代节点上，
+     * 不在 {@code summary} 的交付项口径里。漏这一步，一个有逾期需求的迭代会被判成
+     * 「无异常日」走 brief，正文一句「今日無異常」就把逾期整个藏掉了。
      */
     private static boolean isQuietGroupDay(Snapshot snapshot, boolean evening) {
         Summary s = snapshot == null || snapshot.getSummary() == null ? new Summary() : snapshot.getSummary();
         if (s.getOverdueItemCount() > 0 || s.getRiskProjectCount() > 0) {
             return false;
         }
-        return evening ? s.getTomorrowDueItemCount() == 0 : s.getTodayDueItemCount() == 0;
+        if (evening ? s.getTomorrowDueItemCount() > 0 : s.getTodayDueItemCount() > 0) {
+            return false;
+        }
+        return snapshot == null || snapshot.getUnassignedIterations() == null
+                || snapshot.getUnassignedIterations().stream().noneMatch(it -> it != null
+                && (it.getOverdueReqCount() > 0 || it.getTodayDueReqCount() > 0));
     }
 
     /**

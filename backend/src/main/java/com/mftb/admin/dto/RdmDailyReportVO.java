@@ -223,6 +223,19 @@ public final class RdmDailyReportVO {
         private String messageMode;
     }
 
+    /**
+     * 内置版式的示例渲染（系统内置、不可编辑）。
+     *
+     * <p><b>为什么不复用 {@link PreviewResult}</b>：那个按当前配置的 {@code messageMode} 分叉渲染——
+     * 用户配了自定义模板时，预览出来的是模板正文，看不到内置版式的样子；而这里要的正是
+     * 「内置版式长什么样」的确定性输出。
+     *
+     * <p><b>为什么用固定示例数据而不是真实数据</b>：示例要能稳定展示「有异常的日子」的完整形态，
+     * 真实库可能全空；也不该把业务项目的真实明细当成「版式示例」展示给只能看模板配置的人。
+     */
+    public record BuiltinLayout(String type, String title, String content, String messageMode) {
+    }
+
     /* ==================== 推送规则（多规则模型） ==================== */
 
     /**

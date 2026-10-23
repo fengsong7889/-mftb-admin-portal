@@ -507,6 +507,17 @@
   padding-bottom: 8px;
 }
 
+/* 看板顶部提示条（数据被截断 / 有状态未归入列）：必须在列之前可见 */
+.rdm-board-notice {
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #8C8C8C;
+  background: #FFF7F0;
+  border: 1px solid #FFE7D1;
+  border-radius: 6px;
+}
+
 .rdm-board-col {
   width: 268px;
   flex-shrink: 0;
@@ -1976,6 +1987,35 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   word-break: break-all;
 }
 
+/* 屬性欄整欄編輯態：標籤左對齊，右側控件佔滿剩餘寬度（對齐雲效屬性面板） */
+.rdm-prop-row.is-editing {
+  align-items: center;
+}
+
+.rdm-prop-editor {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.rdm-prop-editor .ant-select,
+.rdm-prop-editor .ant-picker {
+  width: 100%;
+}
+
+/* 驳回状态提示：说明谁能重新打开，避免在「认领/分配」里找不到单时误判为数据丢失 */
+.rdm-rejected-hint {
+  margin: 8px 0 4px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: #FFF7E6;
+  border: 1px solid #FFD591;
+  color: #AD6800;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 /* 参与人：一人一行、多角色并排，取代原来一角色一行的六行清单 */
 .rdm-participant-block {
   border-top: 1px solid #f0f0f0;
@@ -2249,18 +2289,46 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
  * 全局 .search-section 的 4 列 grid 用的是 repeat(4, 1fr)，1fr 的最小轨道宽度是
  * auto，会被三个并排按钮的固有宽度撑破整行；这里把轨道锁成 minmax(0,1fr)、
  * 让按钮组可换行，容器就不会再被内容顶宽。只作用于 RDM 工作区，不动全局样式。
+ *
+ * 续修（窄视口复验）：需求清单带左侧视图栏，内容区实测只剩 ~486px，
+ * 固定 4 列会把每个条件压到 110px 左右、查询按钮被挤成两行。改用 auto-fit
+ * 自适应列数后，窄屏自动落到 2 列/1 列；查询按钮组独占一整行并左对齐。
  */
 .rdm-workspace .search-section .ant-form-inline {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
 .rdm-workspace .search-section .ant-form-item {
   min-width: 0;
 }
 
+/* 操作按钮组是表单最后一个 Form.Item：独占整行，避免只占 1 列时被挤到换行居中 */
+.rdm-workspace .search-section .ant-form-inline > .ant-form-item:last-child {
+  grid-column: 1 / -1;
+}
+
 .rdm-workspace .search-section .search-actions {
   flex-wrap: wrap;
   row-gap: 8px;
+  justify-content: flex-start;
+}
+
+/*
+ * 操作区溢出修复：批量分配/变更提出人/补录/导出/导入/甘特等入口最多 6 个，
+ * 窄屏下总宽超过内容区（实测 721px vs 486px），而 .action-section 默认
+ * flex-end + nowrap，超出部分向左溢出到侧边栏底下，按钮点不到。
+ * 允许换行并给左右两组 min-width:0，超宽时整行折到下一行而不是钻到侧栏下。
+ */
+.rdm-workspace .action-section {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+.rdm-workspace .action-section-left,
+.rdm-workspace .action-section-right {
+  flex-wrap: wrap;
+  row-gap: 8px;
+  min-width: 0;
 }
 
 /* ========== 提測工作台統計卡片 ========== */

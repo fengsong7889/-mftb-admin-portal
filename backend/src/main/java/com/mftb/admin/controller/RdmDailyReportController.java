@@ -4,6 +4,7 @@ import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.constant.RdmConstants;
+import com.mftb.admin.dto.RdmDailyReportVO.BuiltinLayout;
 import com.mftb.admin.dto.RdmDailyReportVO.Config;
 import com.mftb.admin.dto.RdmDailyReportVO.ConfigForm;
 import com.mftb.admin.dto.RdmDailyReportVO.PreviewForm;
@@ -152,6 +153,24 @@ public class RdmDailyReportController {
 
     /* ==================== 推送模板 ==================== */
 
+    /**
+     * 内置版式示例（系统内置、不可编辑）。
+     *
+     * <p>模板配置页的「查看详情」用它展示固定版式长什么样：<b>固定示例数据</b>渲染，
+     * 不读快照、不读真实项目，也不受当前 {@code messageMode} 影响——否则用户一旦选了自定义模板，
+     * 「内置版式」详情就会显示成模板正文，等于撒谎。
+     *
+     * <p><b>为何 anyOf 放宽到推送配置</b>：入口在「推送配置」的釘釘消息区（模板选择与样式查看同处），
+     * 只持有推送配置权限的管理员点进去不应 403；详情页的侧栏高亮与权限守卫也锚定该菜单。
+     */
+    @GetMapping("/builtin-layout")
+    @RequirePermission(menu = RdmConstants.MENU_DAILY_REPORT_TEMPLATE,
+            anyOf = {RdmConstants.MENU_DAILY_REPORT_RULE})
+    @Operation(summary = "内置版式示例渲染（不可编辑）")
+    public Result<BuiltinLayout> builtinLayout(@RequestParam String type) {
+        return Result.success(dailyReportService.builtinLayout(type));
+    }
+
     @GetMapping("/templates")
     @RequirePermission(menu = RdmConstants.MENU_DAILY_REPORT_TEMPLATE)
     @Operation(summary = "模板列表（channel 可选：group/personal）")
@@ -174,7 +193,7 @@ public class RdmDailyReportController {
      */
     @GetMapping("/employee-options")
     @RequirePermission(menu = RdmConstants.MENU_DAILY_REPORT_TEMPLATE,
-            anyOf = {RdmConstants.MENU_DAILY_REPORT_RULE})
+            anyOf = {RdmConstants.MENU_DAILY_REPORT_RULE, RdmConstants.MENU_DAILY_REPORT_TRIGGER})
     @Operation(summary = "员工下拉（按姓名/工号搜索或按 ID 回显）：模板最后更新人与日报收件人共用")
     public Result<List<Map<String, Object>>> employeeOptions(@RequestParam(required = false) String keyword,
                                                              @RequestParam(required = false) String ids) {
@@ -247,7 +266,9 @@ public class RdmDailyReportController {
                                          @RequestParam(required = false) String projectIds,
                                          @RequestParam(required = false, defaultValue = "false") boolean allProjects,
                                          @RequestParam(required = false) String iterationCode,
-                                         @RequestParam(required = false, defaultValue = "false") boolean dryRun) {
+                                         @RequestParam(required = false, defaultValue = "false") boolean dryRun,
+                                         @RequestParam(required = false, defaultValue = "all") String recipientMode,
+                                         @RequestParam(required = false) String recipientUserIds) {
         List<Long> ids = parseProjectIds(projectIds, projectId, allProjects);
         if (ids.isEmpty() && !allProjects && !StringUtils.hasText(iterationCode)) {
             throw new BusinessException("請選擇推送項目或全部項目");
@@ -255,8 +276,44 @@ public class RdmDailyReportController {
         if (allProjects && StringUtils.hasText(iterationCode)) {
             throw new BusinessException("全部項目不能指定單一迭代");
         }
-        TriggerResult r = dailyReportService.triggerManual(type, ids, iterationCode, operatorName(), dryRun);
+        RdmDailyReportService.RecipientOverride recipient = parseRecipient(recipientMode, recipientUserIds);
+        TriggerResult r = dailyReportService.triggerManual(type, ids, iterationCode, operatorName(), dryRun, recipient);
         return Result.success(r.getMessage(), r);
+    }
+
+    /**
+     * 解析发送对象：all=群+個人（默認，現狀）/ group=僅群 / users=僅指定人。
+     * <p>users 必須給人：空清單直接拒絕，不把「沒選人」靜默執行成「一個都沒發」。
+     */
+    private static RdmDailyReportService.RecipientOverride parseRecipient(String mode, String userIds) {
+        String normalized = StringUtils.hasText(mode) ? mode.trim().toLowerCase() : "all";
+        if (!List.of("all", "group", "users").contains(normalized)) {
+            throw new BusinessException("發送對象不合法: " + mode);
+        }
+        if (!"users".equals(normalized)) {
+            return new RdmDailyReportService.RecipientOverride(normalized, List.of());
+        }
+        List<Long> ids = new ArrayList<>();
+        if (StringUtils.hasText(userIds)) {
+            for (String part : userIds.split(",")) {
+                if (!StringUtils.hasText(part)) {
+                    continue;
+                }
+                try {
+                    ids.add(Long.parseLong(part.trim()));
+                } catch (NumberFormatException e) {
+                    throw new BusinessException("人員ID格式不正確: " + part);
+                }
+            }
+        }
+        List<Long> distinct = ids.stream().distinct().toList();
+        if (distinct.isEmpty()) {
+            throw new BusinessException("請選擇要發送的指定人員");
+        }
+        if (distinct.size() > 20) {
+            throw new BusinessException("單次最多指定 20 人，請分批發送");
+        }
+        return new RdmDailyReportService.RecipientOverride(normalized, distinct);
     }
 
     /** 解析逗号分隔项目 ID；allProjects=true 时忽略单项目，空集合代表全部在途项目 */

@@ -99,6 +99,20 @@ public final class RdmConstants {
     public static final String ACTION_VERIFY = "verify";
     public static final String ACTION_UAT_FAIL = "uat_fail";
 
+    /**
+     * 退回評估：評審通過 → 評估中（回退重走受理）。
+     * <p>只為存量導入/歷史錯誤提供受控回退，不參與主鏈推進；配置在 {@code rdm_transition}，
+     * 由詳情頁按 {@code allowedActions} 渲染，禁止代碼裡硬編碼回退路徑。
+     */
+    public static final String ACTION_BACK_TO_EVALUATE = "back_to_evaluate";
+
+    /**
+     * 存量補錄受理信息（非流轉動作）。
+     * <p>僅寫 {@code rdm_status_log} 作為審計痕跡，{@code from_status = to_status}；
+     * 不是 {@code rdm_transition} 配置項，不能被 {@code transition()} 觸發。
+     */
+    public static final String ACTION_BACKFILL_ACCEPT = "backfill_accept";
+
     /* ==================== 参与角色 ==================== */
 
     public static final String ROLE_SUBMITTER = "SUBMITTER";
