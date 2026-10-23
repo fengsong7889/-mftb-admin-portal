@@ -194,6 +194,18 @@
       "comment": "產研協同系統更名產研交付系統（與協同辦公系統→流程審批系統同步，消除雙「協同」命名混淆）：sys_system 展示名由 SystemPortalSchemaInitializer.seedSystems 每次啟動幂等刷新，本遷移負責存量 sys_biz_seq_rule.biz_menu 归属文案「產研協同」→「產研交付」的幂等归一（REPLACE 無残留時更新 0 行）。"
     },
     {
+      "versionKey": "seq:init-v22",
+      "module": "seq",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "bizSeqRuleInitializer",
+      "dependencies": [
+        "seq:init-v1"
+      ],
+      "status": "ACTIVE",
+      "comment": "AI 使用申請流程編號規則 key 對齊：sys_biz_seq_rule 對 prefix 有唯一鍵，AI 前綴早被舊種子 rule_key=ai_access 佔住，v6 種子按 ai_access_request 寫入時被 INSERT IGNORE 靜默吞掉，導致提交 AI 使用申請 fail-closed 報「編號生成規則未配置或已停用: ai_access_request」。本遷移原地把舊行 rule_key 改名為 ai_access_request（prefix/位數/起點與 sys_biz_seq 流水一律不動，已發單號保持連續），已有規範 key 時不動，兩者皆無時補種子；附后置校驗，失敗不記版本、下次啟動重試。參考 SQL: sql/289_fix_ai_access_seq_rule_key.sql"
+    },
+    {
       "versionKey": "eam:schema-v1",
       "module": "eam",
       "phase": "MODULE_STRUCTURE",
@@ -2935,6 +2947,21 @@
       "author": "Qoder",
       "ticket": "rdm-reopen-pm",
       "comment": "reopen 原先只给 SUBMITTER/PMO/DISPATCHER，产品经理驳回后无法撤销自己的决定；改派给新 PM 后，新 PM 拿到 PM 角色行却仍看不到「重新打開」，只能查看不能推进。本版只 UPDATE 未包含 PM 的那一行，仍由 activeRoles 按本单角色行收敛，不是全局放开。幂等匹配用逗号包裹精确比对，避免 PMO 的 PM 子串误判；若运营已停用该动作则跳过，不阻塞启动。286 脚本仅作参照文档，不进镜像。"
+    },
+    {
+      "versionKey": "rdm:schema:v3.34",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.32"
+      ],
+      "status": "ACTIVE",
+      "intent": "PRD 并发版本号：rdm_prd 增加 row_version，保存时按版本号拒绝覆盖他人修改",
+      "author": "Qoder",
+      "ticket": "rdm-prd-optimistic-lock",
+      "comment": "PRD 保存原为 updateById 全字段覆盖，两人同时编辑时后保存者会抹掉前者刚写的内容且双方都收到保存成功。本版只新增 rdm_prd.row_version（INT NOT NULL DEFAULT 0，先查 INFORMATION_SCHEMA 再 ADD，可重放、无 DROP），存量行默认 0；配合 savePrd 在传入期望版本时比对并递增，不传则保持旧行为，不阻断存量调用方。依赖指 v3.32：v3.33（日报去姓名）未在登记表立项，不自造悬空依赖。"
     },
     {
       "versionKey": "rdm:transition:v1.1",

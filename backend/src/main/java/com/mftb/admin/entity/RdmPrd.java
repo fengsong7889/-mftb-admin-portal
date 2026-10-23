@@ -68,6 +68,13 @@ public class RdmPrd {
 
     private String updatedBy;
 
+    /**
+     * 并发版本号（乐观锁）：每次正式保存 +1。
+     * <p>不能用 updatedAt 代替：它精度到秒且被多处业务顺手更新，
+     * 同一秒内的两次保存会被误判为无冲突。
+     */
+    private Integer rowVersion;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

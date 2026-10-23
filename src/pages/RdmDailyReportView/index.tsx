@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -9,7 +9,9 @@ import {
   AppstoreOutlined,
   ClockCircleOutlined,
   ColumnWidthOutlined,
+  CopyOutlined,
   ExpandAltOutlined,
+  ExportOutlined,
   LinkOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
@@ -21,6 +23,7 @@ import AnimatedNumber from '../../components/AnimatedNumber'
 import HelpPopover, { type HelpSection } from '../../components/HelpPopover'
 import GanttBoard, { type GanttDraft, type GanttRow, type GanttTask } from '../Rdm/components/GanttBoard'
 import { fetchDailyReportPublicView, type DailyReportPublicView } from '../../api/rdmDailyReportPublic'
+import { changeAppLanguage, LANGUAGE_STORAGE_KEY } from '../../i18n'
 import type {
   DailyReportIteration,
   DailyReportProject,
@@ -190,12 +193,23 @@ function parseDate(value?: string | null) {
 }
 
 export default function RdmDailyReportView() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token') ?? ''
   const [view, setView] = useState<DailyReportPublicView | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  /*
+   * 公開看板默認中文：全局在「無語言記錄」時默認英文，但本頁讀者幾乎都是從釘釘
+   * 點進來的中文同事，首屏一整套英文指標等於白推。只在從未選過語言時兜底，
+   * 且不寫入 localStorage —— 系統內的國家默認語言策略不受本頁影響。
+   */
+  useLayoutEffect(() => {
+    if (!localStorage.getItem(LANGUAGE_STORAGE_KEY) && !i18n.language?.startsWith('zh')) {
+      void i18n.changeLanguage('zh-TW')
+    }
+  }, [i18n])
 
   const load = useCallback(async () => {
     if (!token) {
@@ -225,6 +239,7 @@ export default function RdmDailyReportView() {
   return (
     <div className="rdm-board-page">
       <div className="rdm-board-shell">
+        <BoardUtilityBar />
         {loading ? (
           <div className="rdm-board-center">
             <Spin size="large" />
@@ -247,6 +262,110 @@ export default function RdmDailyReportView() {
       </div>
     </div>
   )
+}
+
+/**
+ * 工具条：語言切換 + 外部瀏覽器入口。
+ *
+ * <p><b>為什麼需要「在瀏覽器打開」</b>：釘釘電腦端點開連結默認落在右側側邊欄
+ * （寬約 490px 且不支持縮放），這不是頁面寫窄了 —— 看板本身最大寬度 1080px、
+ * 隨容器自適應。唯一能拿到完整寬度與縮放能力的途徑是系統瀏覽器，所以在此提供入口。
+ *
+ * <p>頁面內語言切換而非跟隨系統：看板是免登頁，同一個人在不同終端可能
+ * 拿到完全不同的默認語言，必須允許就近切換。
+ */
+function BoardUtilityBar() {
+  const { t, i18n } = useTranslation()
+  const [copyState, setCopyState] = useState<'idle' | 'done' | 'failed'>('idle')
+  const desktopDingTalk = useMemo(isDingTalkDesktop, [])
+  const lang = i18n.language?.startsWith('zh') ? 'zh-TW' : 'en'
+
+  // 復製結果只做短暫反餽，不彈全局 message：公開頁沒有 App 上下文，且彈層會遮住首屏
+  useEffect(() => {
+    if (copyState === 'idle') return
+    const timer = window.setTimeout(() => setCopyState('idle'), 2600)
+    return () => window.clearTimeout(timer)
+  }, [copyState])
+
+  const openInBrowser = useCallback(() => {
+    const url = window.location.href
+    if (desktopDingTalk) {
+      /*
+       * 釘釘統一跳轉協議：pc_slide=false 交給系統默認瀏覽器；
+       * 缺省或 true 會落回釘釘側邊欄（即本頁當前所處的窄容器）。
+       * 用臨時 <a> 觸發而不是給 location 賦值：協議未被系統注冊時頁面不會被卸載。
+       */
+      const link = document.createElement('a')
+      link.href = `dingtalk://dingtalkclient/page/link?url=${encodeURIComponent(url)}&pc_slide=false`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      return
+    }
+    window.open(url, '_blank', 'noopener')
+  }, [desktopDingTalk])
+
+  const copyLink = useCallback(async () => {
+    setCopyState((await writeClipboard(window.location.href)) ? 'done' : 'failed')
+  }, [])
+
+  return (
+    <div className="rdm-board-utility-bar">
+      <Segmented
+        size="small"
+        className="rdm-board-lang-switch"
+        aria-label={t('rdm.board.langSwitchAria', { defaultValue: '切換語言' })}
+        value={lang}
+        onChange={value => changeAppLanguage(String(value))}
+        options={[
+          { value: 'zh-TW', label: t('rdm.board.langZh', { defaultValue: '中文' }) },
+          { value: 'en', label: t('rdm.board.langEn', { defaultValue: 'EN' }) },
+        ]}
+      />
+      <Button size="small" icon={<CopyOutlined />} onClick={() => void copyLink()}>
+        {copyState === 'done'
+          ? t('rdm.board.copyLinkDone', { defaultValue: '已複製連結' })
+          : copyState === 'failed'
+            ? t('rdm.board.copyLinkFailedShort', { defaultValue: '請手動複製' })
+            : t('rdm.board.copyLink', { defaultValue: '複製連結' })}
+      </Button>
+      <Button size="small" type="primary" icon={<ExportOutlined />} onClick={openInBrowser}>
+        {t('rdm.board.openInBrowser', { defaultValue: '在瀏覽器打開' })}
+      </Button>
+    </div>
+  )
+}
+
+/** 釘釘桌面端（Mac/Windows）：側邊欄容器，需要引導到外部瀏覽器 */
+function isDingTalkDesktop(): boolean {
+  const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent
+  return /DingTalk/i.test(ua) && !/Mobile|Android|iPhone|iPad|iPod/i.test(ua)
+}
+
+/** 寫剪貼板：異步 API 不可用（非 HTTPS/權限被拒）時用 execCommand 兜底 */
+async function writeClipboard(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {
+    /* 落到下面的兜底實現 */
+  }
+  try {
+    const area = document.createElement('textarea')
+    area.value = text
+    area.setAttribute('readonly', '')
+    area.style.position = 'fixed'
+    area.style.opacity = '0'
+    document.body.appendChild(area)
+    area.select()
+    const ok = document.execCommand('copy')
+    document.body.removeChild(area)
+    return ok
+  } catch {
+    return false
+  }
 }
 
 /**

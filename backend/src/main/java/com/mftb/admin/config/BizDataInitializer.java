@@ -830,10 +830,12 @@ public class BizDataInitializer implements CommandLineRunner {
         int inserted = jdbcTemplate.update(
                 "INSERT IGNORE INTO sys_biz_seq_rule (rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) "
                         + "VALUES ('oa_request', 'OA流程編號', '審批中心', 'OA', 'YYYYMMDD', 4, 1, 1, 'OA流程編號')");
-        // AI 申请编号规则
+        // AI 申请编号规则（key 必须与 BizSeqService.RULE_AI_ACCESS_REQUEST 一致：AI 前缀是唯一键，
+        // 两边写不同 key 时后写入的种子会被 INSERT IGNORE 静默丢弃）
         int aiInserted = jdbcTemplate.update(
                 "INSERT IGNORE INTO sys_biz_seq_rule (rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, status, remark) "
-                        + "VALUES ('ai_access', 'AI申請流程編號', '審批中心', 'AI', 'YYYYMMDD', 4, 1, 1, 'AI申請流程編號')");
+                        + "VALUES (?, 'AI申請流程編號', '審批中心', 'AI', 'YYYYMMDD', 4, 1, 1, 'AI申請流程編號')",
+                BizSeqService.RULE_AI_ACCESS_REQUEST);
         if (inserted > 0 || aiInserted > 0) {
             log.info("已写入OA/AI流程编号规则");
         }
@@ -950,12 +952,12 @@ public class BizDataInitializer implements CommandLineRunner {
                 String currentFlowNo = (String) record.get("flow_no");
                 Long id = ((Number) record.get("id")).longValue();
 
-                // 用 BizSeqService 按 ai_access 规则重新生成流程编号
+                // 用 BizSeqService 按 AI 使用申請编号规则重新生成流程编号
                 Object applyTimeObj = record.get("apply_time");
                 LocalDate applyDate = applyTimeObj != null
                     ? ((java.time.LocalDateTime) applyTimeObj).toLocalDate()
                     : LocalDate.now();
-                String newFlowNo = bizSeqService.next("ai_access", applyDate);
+                String newFlowNo = bizSeqService.next(BizSeqService.RULE_AI_ACCESS_REQUEST, applyDate);
 
                 if (nodeName != null) {
                     jdbcTemplate.update(

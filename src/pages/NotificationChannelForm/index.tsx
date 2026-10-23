@@ -33,6 +33,9 @@ export default function NotificationChannelForm() {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  /** 已保存的 Webhook（后端脱敏值）：编辑时只做提示，不回填输入框 */
+  const [maskedWebhook, setMaskedWebhook] = useState('')
+  const [secretConfigured, setSecretConfigured] = useState(false)
 
   /** 加载详情（编辑模式） */
   const loadDetail = useCallback(async () => {
@@ -40,6 +43,9 @@ export default function NotificationChannelForm() {
     setLoading(true)
     try {
       const detail = await getChannelDetail(Number(editId))
+      // Webhook 与密钥一律不回填输入框：避免把已保存值再写回去，也避免浏览器误当成登录表单
+      setMaskedWebhook(detail.webhookUrl || '')
+      setSecretConfigured(!!detail.secretConfigured)
       form.setFieldsValue({
         name: detail.name,
         channel: detail.channel,
@@ -63,13 +69,16 @@ export default function NotificationChannelForm() {
 
   /** 保存 */
   const handleSubmit = async () => {
+    // 校验失败已在表单项内标红，不再额外弹全局提示
+    const values = await form.validateFields().catch(() => null)
+    if (!values) return
+    setSubmitting(true)
     try {
-      const values = await form.validateFields()
-      setSubmitting(true)
       const dto: ChannelSaveDTO = {
-        name: values.name,
+        name: String(values.name).trim(),
         channel: values.channel,
-        webhookUrl: values.webhookUrl || '',
+        webhookUrl: String(values.webhookUrl || '').trim(),
+        // undefined = 不修改已保存密钥；空串 = 显式清空（改用关键词模式）
         secret: values.secret,
         atMobiles: values.atMobiles || '',
         enabled: values.enabled ? 1 : 0,
@@ -86,7 +95,7 @@ export default function NotificationChannelForm() {
       }
       navigate('/notification-config')
     } catch {
-      message.error('保存失敗')
+      // 具体失败原因已由 axios 拦截器按后端 message 弹出，此处不重复提示
     } finally {
       setSubmitting(false)
     }
@@ -132,7 +141,8 @@ export default function NotificationChannelForm() {
       </div>
 
       {/* ====== 表单内容 ====== */}
-      <Form form={form} layout="vertical">
+      {/* autoComplete="off"：本页并非登录表单，禁止浏览器把登录凭据填充进 Webhook/密钥框 */}
+      <Form form={form} layout="vertical" autoComplete="off">
         {/* 基本信息 */}
         <div style={{
           borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16,
@@ -161,17 +171,49 @@ export default function NotificationChannelForm() {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0 16px' }}>
             <Form.Item label="Webhook 地址" name="webhookUrl"
-              rules={[{ required: !isEditMode, message: '請輸入 Webhook 地址' }]}>
-              <Input placeholder="https://oapi.dingtalk.com/robot/send?access_token=..." />
+              rules={[
+                { required: !isEditMode, message: '請輸入 Webhook 地址' },
+                {
+                  validator: (_, value: string) => {
+                    if (!value) return Promise.resolve()
+                    if (!/^https?:\/\//i.test(value)) {
+                      return Promise.reject(new Error('Webhook 地址必須以 http:// 或 https:// 開頭'))
+                    }
+                    if (form.getFieldValue('channel') === 'dingtalk' && !value.includes('access_token=')) {
+                      return Promise.reject(new Error('釘釘 Webhook 應包含 access_token 參數'))
+                    }
+                    return Promise.resolve()
+                  },
+                },
+              ]}>
+              <Input id="nc-webhook-url" name="nc-webhook-url" autoComplete="off" data-lpignore="true"
+                placeholder="https://oapi.dingtalk.com/robot/send?access_token=..." />
               {isEditMode && (
-                <span style={{ fontSize: 12, color: '#8C8C8C' }}>留空表示不修改 Webhook 地址</span>
+                <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+                  留空表示不修改{maskedWebhook ? `（當前：${maskedWebhook}）` : ''}
+                </span>
               )}
             </Form.Item>
 
-            <Form.Item label="加簽密鑰" name="secret">
-              <Input.Password placeholder="SEC...（留空表示不修改）" />
+            <Form.Item label="加簽密鑰" name="secret"
+              rules={[
+                {
+                  validator: (_, value: string) => {
+                    if (!value) return Promise.resolve()
+                    if (form.getFieldValue('channel') === 'dingtalk' && !value.startsWith('SEC')) {
+                      return Promise.reject(new Error('釘釘加簽密鑰以 SEC 開頭，請勿填寫登錄密碼或其他字符'))
+                    }
+                    return Promise.resolve()
+                  },
+                },
+              ]}>
+              {/* new-password：Chrome 不再把它当成登录密码框做自动填充 */}
+              <Input.Password id="nc-sign-secret" name="nc-sign-secret" autoComplete="new-password"
+                data-lpignore="true"
+                placeholder={isEditMode ? '留空表示不修改' : 'SEC...（關鍵詞模式可留空）'} />
               <span style={{ fontSize: 12, color: '#8C8C8C' }}>
                 釘釘機器人安全設置中的加簽密鑰（SEC 開頭），如使用關鍵詞模式可留空
+                {isEditMode && `；當前${secretConfigured ? '已配置' : '未配置'}`}
               </span>
             </Form.Item>
           </div>

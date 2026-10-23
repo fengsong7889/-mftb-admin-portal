@@ -12,7 +12,7 @@ import {
 import type { TableColumnsType } from 'antd'
 import {
   CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined,
-  PlusOutlined,
+  CopyOutlined, PlusOutlined,
   ReloadOutlined, SyncOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -177,9 +177,35 @@ export default function TestWorkbench() {
   // ===== 表格列 =====
   const columns: TableColumnsType<RdmTestBatchListItem> = useMemo(() => [
     {
-      title: '批次號', dataIndex: 'batchNo', key: 'batchNo', width: 120,
+      title: '批次號', dataIndex: 'batchNo', key: 'batchNo', width: 160, ellipsis: true,
       render: (v: string, r) => (
-        <a className="rdm-table-title__link" onClick={() => navigate(`/rdm-test-detail?id=${r.id}`)}>{v}</a>
+        /* 批次号是测试同学对日志/截图的主键，必须能看全也能一键复制；
+           复制图标放在编号单元格内，不占操作列（§B.9 禁止操作列图标） */
+        <Space size={4}>
+          <a
+            className="rdm-table-title__link"
+            title={v}
+            style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 110, display: 'inline-block' }}
+            onClick={() => navigate(`/rdm-test-detail?id=${r.id}`)}
+          >
+            {v}
+          </a>
+          <Button
+            type="text"
+            size="small"
+            aria-label={`複製批次號 ${v}`}
+            icon={<CopyOutlined style={{ fontSize: 12 }} />}
+            onClick={async e => {
+              e.stopPropagation()
+              try {
+                await navigator.clipboard.writeText(v)
+                message.success(t('rdm.testBatch.copyOk'))
+              } catch {
+                message.error(t('rdm.testBatch.copyFail'))
+              }
+            }}
+          />
+        </Space>
       ),
     },
     {
@@ -230,7 +256,7 @@ export default function TestWorkbench() {
         return <Space size={0} split={<span className="action-split">|</span>}>{actions}</Space>
       },
     },
-  ], [navigate])
+  ], [navigate, t])
 
   const statusOptions = Object.entries(RDM_TEST_BATCH_STATUS_LABEL).map(([value, label]) => ({ value, label }))
 

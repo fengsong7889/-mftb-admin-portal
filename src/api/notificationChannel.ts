@@ -10,7 +10,10 @@ export interface ChannelItem {
   name: string
   channel: string
   webhookUrl: string
+  /** 后端不回传密钥本身：固定为 ******** 或空串 */
   secret: string
+  /** 是否已配置加签密钥（编辑页只做提示，不回显） */
+  secretConfigured?: boolean
   atMobiles: string
   enabled: number
   isDefault: number
@@ -27,6 +30,7 @@ export interface ChannelSaveDTO {
   name: string
   channel: string
   webhookUrl: string
+  /** 编辑时不传（undefined）表示保留已保存密钥；传空串表示显式清空 */
   secret?: string
   atMobiles?: string
   enabled?: number

@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Select, message } from 'antd'
 import { SaveOutlined } from '@ant-design/icons'
 import RdmFormHeader from './components/RdmFormHeader'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import RemoteSearchSelect from '../../components/RemoteSearchSelect'
@@ -24,8 +24,10 @@ import {
   type RdmTaskOwnerCheck,
 } from '../../api/rdm'
 import { formatRdmReqNo, RDM_STATUS } from '../../constants/rdm'
+import { buildRdmDetailPath } from '../../constants/menuDataSource'
 import { useTaskTypeDict } from '../../hooks/useTaskTypeDict'
 import { countWorkdays, HOURS_PER_WORKDAY, workdayHours } from './workdays'
+import { useRdmBack } from './useRdmBack'
 import './index.css'
 
 const { TextArea } = Input
@@ -56,7 +58,6 @@ interface FormValues {
 }
 
 export default function TaskForm() {
-  const navigate = useNavigate()
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const reqIdFromUrl = Number(searchParams.get('reqId') ?? 0)
@@ -69,6 +70,12 @@ export default function TaskForm() {
    * 该字段是空且不可编辑，保存时才提示「請先選擇需求」——等于根本建不了任务。
    */
   const [reqId, setReqId] = useState(reqIdFromUrl)
+  /**
+   * 保存/取消后的落点：能回退就回来源页（需求详情 / 研发工作台 / 交付看板）。
+   * <p>详情页的侧栏高亮与「返回」都依赖 URL 里的 from，兜底路径必须带上，
+   * 否则直接打开表单页的人保存后会被落到默认的「需求跟进清单」。
+   */
+  const goBack = useRdmBack(reqId ? buildRdmDetailPath({ id: reqId, from: searchParams.get('from') }) : '/rdm-delivery')
 
   const [form] = Form.useForm<FormValues>()
   // 任务类型字典（业务可配置）：选项/确认框标签都从接口来，编辑旧任务时把当前值并入选项防回显空白
@@ -248,7 +255,8 @@ export default function TaskForm() {
       }
       await saveTask(payload)
       message.success(taskId ? '任務已更新' : '任務已創建並指派')
-      navigate(reqId ? `/rdm-detail?id=${reqId}` : '/rdm-delivery')
+      // 不能用 navigate(详情URL)：那会再 push 一条，连点返回来回穿越表单页（历史栈无限增长）
+      goBack()
     } catch {
       // request.ts 已统一弹后端返回的失败原因（如「已離職或停用，請改派他人」），此处不再重复弹
     } finally {
@@ -261,7 +269,7 @@ export default function TaskForm() {
       {/* ── 页面头部（统一组件）── */}
       <RdmFormHeader
         title={taskId ? '編輯任務' : '新增研發任務'}
-        onBack={() => navigate(-1)}
+        onBack={goBack}
         meta={requirement ? `${requirement.reqNo} · ${requirement.title}` : '將需求拆成可執行任務並指派到人，工時用於產出量化'}
       />
 
@@ -379,7 +387,7 @@ export default function TaskForm() {
       </Form>
 
       <div className="form-footer">
-        <Button onClick={() => navigate(-1)}>取消</Button>
+        <Button onClick={goBack}>取消</Button>
         <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSave}>保存任務</Button>
       </div>
     </div>

@@ -34,6 +34,18 @@ public class SchemaContractValidator implements CommandLineRunner {
     private final ContractRegistry contractRegistry;
     private final MigrationLock migrationLock;
     private final DatabaseReadinessState readinessState;
+    /** 两路入口只允许真正执行一次（自愈 DDL 不能重放两次） */
+    private final java.util.concurrent.atomic.AtomicBoolean executed = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+    /**
+     * Bean 初始化即打一行：用于区分「Bean 没被创建」与「Bean 创建了但 Runner 没被执行」。
+     * <p>这两类问题在日志上表现相同（只有 readiness=DOWN 而没有任何校验日志），
+     * 但修复方向完全不同，必须可观测。
+     */
+    @jakarta.annotation.PostConstruct
+    void announceBean() {
+        log.warn("结构契约校验器已装配（等待 Runner 执行）");
+    }
 
     /** 严格模式：存在无法自愈的漂移时中止启动。生产应设为 true（SCHEMA_STRICT=true）。 */
     @Value("${schema.strict:false}")
@@ -45,8 +57,35 @@ public class SchemaContractValidator implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        verifyAndMark("CommandLineRunner");
+    }
+
+    /**
+     * 就绪事件兜底：本类曾出现「Bean 已装配（@PostConstruct 有日志）但 Runner 未被调用」——
+     * 现象就是 readiness 永远 DOWN、但日志里一条校验记录都没有。
+     * <p>两路都走同一个幂等入口，无论哪种机制生效都不会重复执行 DDL。
+     * <p>代价：在这一路径下 strict=true 已无法中止启动（容器已就绪），
+     * 生产靠 readiness 探针拦流量；strict 主要防“带着漂移的实例被当成健康”。
+     */
+    @org.springframework.context.event.EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+    public void onReady() {
+        verifyAndMark("ApplicationReadyEvent");
+    }
+
+    /** 幂等入口：两路入口共用；先到先执行，后到的直接返回 */
+    private void verifyAndMark(String trigger) {
+        if (!executed.compareAndSet(false, true)) {
+            return;
+        }
         List<ContractSpec> contracts = contractRegistry.allContracts();
         List<String> drift = new ArrayList<>();
+        /*
+         * 入口就打印一行：readiness 变 DOWN 时，运维第一件事是区分「校验跑挂」与「确实漂移」。
+         * 历史上这两个分支的日志都只在末尾输出，一旦在校验中途被阻断（如命名锁超时），
+         * 日志里就只有一条「DOWN」而没有任何线索。
+         */
+        log.warn("结构契约校验开始：契约 {} 个，checkOnly={}，trigger={}",
+                contracts.size(), checkOnly, trigger);
         try {
             if (checkOnly) {
                 drift.addAll(SchemaContractChecker.validateOnly(jdbcTemplate, contracts));

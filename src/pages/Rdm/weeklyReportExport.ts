@@ -70,7 +70,8 @@ export async function exportWeeklyReport(report: RdmWeeklyReport): Promise<void>
   dept.columns = [
     { header: '部門', key: 'deptName', width: 22 },
     { header: '本週提交', key: 'submitted', width: 12 },
-    { header: '已交付', key: 'delivered', width: 12 },
+    // 与页面/顶部摘要同源：本期上线需求数，不是当前已交付存量
+    { header: '本期上線', key: 'delivered', width: 12 },
     { header: '逾期', key: 'overdue', width: 10 },
     { header: '平均交付天數', key: 'avgDays', width: 16 },
   ]

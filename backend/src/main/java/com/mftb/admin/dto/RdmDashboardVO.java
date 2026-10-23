@@ -117,5 +117,11 @@ public class RdmDashboardVO {
         private String title;
         private Long count;
         private Long overdue;
+        /**
+         * 该列覆盖的需求状态集合。
+         * <p>必须与 {@link #count} 在同一处从同一份状态列表算出：前端拿它下钻到需求清单，
+         * 否则列上写 105、点进去只有 1 条，用户会认为数据是假的。
+         */
+        private List<String> statuses;
     }
 }

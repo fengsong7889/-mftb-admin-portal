@@ -182,6 +182,13 @@ class RdmDeliveryGuardTest {
         return req;
     }
 
+    private static RdmPrd draftPrd(int rowVersion) {
+        RdmPrd prd = frozenPrd();
+        prd.setStatus("draft");
+        prd.setRowVersion(rowVersion);
+        return prd;
+    }
+
     private static RdmPrd frozenPrd() {
         RdmPrd prd = new RdmPrd();
         prd.setId(9L);
@@ -314,6 +321,34 @@ class RdmDeliveryGuardTest {
         assertEquals("UI 評審", RdmDeliveryServiceImpl.reviewTypeLabel("ui"));
         assertEquals("-", RdmDeliveryServiceImpl.reviewTypeLabel(null));
         assertEquals("-", RdmDeliveryServiceImpl.reviewTypeLabel("  "));
+    }
+
+    @Test
+    @DisplayName("PRD 并发保存：版本号不一致时拒绝覆盖他人内容")
+    void prdSaveRejectsStaleRowVersion() {
+        when(prdMapper.selectById(any())).thenReturn(draftPrd(3));
+        RdmDeliveryDTO.Prd dto = new RdmDeliveryDTO.Prd();
+        dto.setId(9L);
+        dto.setTitle("並發保存");
+        dto.setContentRich("<p>正文</p>");
+        dto.setExpectedRowVersion(2);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.savePrd(dto));
+        assertTrue(ex.getMessage().contains("已被其他人保存"), ex.getMessage());
+        // 冲突分支必须在落库前就返回，不能先写后报错
+        verify(prdMapper, org.mockito.Mockito.never()).insert(any(RdmPrd.class));
+    }
+
+    @Test
+    @DisplayName("PRD 并发保存：不传期望版本时不启用乐观锁，存量调用方不受影响")
+    void prdSaveWithoutExpectedVersionKeepsLegacyBehaviour() {
+        when(prdMapper.selectById(any())).thenReturn(draftPrd(3));
+        RdmDeliveryDTO.Prd dto = new RdmDeliveryDTO.Prd();
+        dto.setId(9L);
+        dto.setTitle("舊調用方");
+        dto.setContentRich("<p>正文</p>");
+
+        assertDoesNotThrow(() -> service.savePrd(dto));
     }
 
     @Test
@@ -635,5 +670,42 @@ class RdmDeliveryGuardTest {
         assertThrows(BusinessException.class, () -> service.updateIterationStatus(3L, null));
         assertThrows(BusinessException.class, () -> service.updateIterationStatus(99L, "closed"));
         verify(iterationMapper).updateById(any(RdmIteration.class));
+    }
+
+    @Test
+    @DisplayName("我的任務：管理員 scope=all 看全部；普通角色偽造 all 仍按負責人收斂")
+    void myTasksAdminAllOnlyForAdmin() {
+        RdmWorkTask mine = task();
+        RdmWorkTask other = task();
+        other.setId(999L);
+        other.setOwnerUserId(99L);
+        other.setTitle("他人的任務");
+
+        List<com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<RdmWorkTask>> captured = new ArrayList<>();
+        when(taskMapper.selectList(any())).thenAnswer(inv -> {
+            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<RdmWorkTask> wrapper = inv.getArgument(0);
+            captured.add(wrapper);
+            boolean ownerFiltered = wrapper.getSqlSegment().contains("owner_user_id");
+            return ownerFiltered ? List.of(mine) : List.of(mine, other);
+        });
+        when(requirementMapper.selectById(any())).thenReturn(requirement(RdmConstants.STATUS_ACCEPTED));
+
+        // 普通用户：即使前端传 all=true，也必须带 owner_user_id 条件，只能拿到自己的
+        when(operatorResolver.isAdmin(any())).thenReturn(false);
+        assertEquals(1, service.myTasks(null, true).size());
+        assertTrue(captured.get(0).getSqlSegment().contains("owner_user_id"),
+                "非管理员传 all 不得放开范围");
+
+        // 管理员：不带 owner 条件，返回全部
+        captured.clear();
+        when(operatorResolver.isAdmin(any())).thenReturn(true);
+        assertEquals(2, service.myTasks(null, true).size());
+        assertFalse(captured.get(0).getSqlSegment().contains("owner_user_id"),
+                "管理员 scope=all 不应再按负责人收敛");
+
+        // 管理员默认（不传 all）仍只看自己的：避免管理员误以为默认页就是全量
+        captured.clear();
+        assertEquals(1, service.myTasks(null, false).size());
+        assertTrue(captured.get(0).getSqlSegment().contains("owner_user_id"));
     }
 }

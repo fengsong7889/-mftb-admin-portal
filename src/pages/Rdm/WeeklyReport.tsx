@@ -162,7 +162,7 @@ export default function WeeklyReport() {
   const deptColumns: TableColumnsType<RdmWeeklyReport['byDept'][number]> = useMemo(() => [
     { title: '部門', dataIndex: 'deptName', key: 'deptName', width: 160 },
     { title: '本週提交', dataIndex: 'submitted', key: 'submitted', width: 100 },
-    { title: '已交付', dataIndex: 'delivered', key: 'delivered', width: 100 },
+    { title: '本期上線', dataIndex: 'delivered', key: 'delivered', width: 110 },
     { title: '逾期', dataIndex: 'overdue', key: 'overdue', width: 90, render: (v: number) => <span style={{ color: v > 0 ? '#CF1322' : '#52C41A' }}>{v}</span> },
     { title: '平均交付天數', dataIndex: 'avgDays', key: 'avgDays', width: 130, render: (v: number) => `${v.toFixed(1)} 天` },
   ], [])

@@ -7,6 +7,7 @@ import { OFFLINE_MENU_LABELS } from '../constants/offlineMenus'
 import { pathToKey } from './Sidebar'
 import { isPathBackendConnected } from '../constants/menuDataSource'
 import { useMenu } from '../contexts/MenuContext'
+import { useConfirmLeave } from '../contexts/UnsavedChangesContext'
 import { useAuth } from '../contexts/AuthContext'
 import { ROUTE_MENU_KEY_MAP } from '../pages/Permission/types'
 import { useTranslation } from 'react-i18next'
@@ -438,6 +439,8 @@ export default function MenuTabs() {
   const navigate = useNavigate()
   const { i18n: i18nInstance, t } = useTranslation()
   const { menuTree, status: menuStatus } = useMenu()
+  /** 关闭/切换页签前先问未保存页面：返回 false 表示用户选择继续编辑 */
+  const confirmLeave = useConfirmLeave()
   const { hasMenuPermission } = useAuth()
   const [tabs, setTabs] = useState<MenuTab[]>([HOME_TAB])
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -578,28 +581,38 @@ export default function MenuTabs() {
     })))
   }, [i18nInstance.language, getMenuName])
 
-  /** 点击标签：导航到对应路径 */
-  const handleTabClick = useCallback((path: string) => {
+  /** 点击标签：导航到对应路径（离开当前页前先过未保存保护） */
+  const handleTabClick = useCallback(async (path: string) => {
     const currentFullPath = location.pathname + location.search
     if (path === tabPath(currentFullPath)) return
+    const decision = confirmLeave()
+    if (decision !== true) {
+      // 无脏页面时 confirmLeave 同步返回 true，保证普通切换仍是同步导航
+      if (!await decision) return
+    }
     navigate(path)
-  }, [navigate, location.pathname, location.search])
+  }, [navigate, location.pathname, location.search, confirmLeave])
 
-  /** 关闭标签 */
-  const handleClose = useCallback((e: React.MouseEvent, path: string) => {
+  /** 关闭标签：只有关闭的是当前页时才需要离开确认 */
+  const handleClose = useCallback(async (e: React.MouseEvent, path: string) => {
     e.stopPropagation()
+    const currentPath = tabPath(location.pathname + location.search)
+    const closingActive = path === currentPath
+    if (closingActive) {
+      const decision = confirmLeave()
+      if (decision !== true && !await decision) return
+    }
     setTabs((prev) => {
       if (prev.length <= 1) return prev
       const idx = prev.findIndex(t => t.path === path)
       const next = prev.filter(t => t.path !== path)
-      const currentFullPath = location.pathname + location.search
-      if (path === tabPath(currentFullPath) && next.length > 0) {
+      if (closingActive && next.length > 0) {
         const targetIdx = Math.min(idx, next.length - 1)
         navigate(next[targetIdx].path)
       }
       return next
     })
-  }, [navigate, location.pathname, location.search])
+  }, [navigate, location.pathname, location.search, confirmLeave])
 
   /** 当前激活的路径 */
   const activePath = tabPath(location.pathname + location.search)
@@ -633,32 +646,56 @@ export default function MenuTabs() {
     return () => window.removeEventListener('click', handler)
   }, [ctxMenu])
 
-  const handleCloseOthers = useCallback((path: string) => {
+  const handleCloseOthers = useCallback(async (path: string) => {
+    // 目标页不是当前页 → 会离开当前编辑页，必须先确认
+    if (path !== activePath) {
+      const decision = confirmLeave()
+      if (decision !== true && !await decision) {
+        setCtxMenu(null)
+        return
+      }
+    }
     setTabs((prev) => {
       const kept = prev.filter(t => t.path === path || t.path === '/')
       if (path !== activePath) navigate(path)
       return kept
     })
     setCtxMenu(null)
-  }, [navigate, activePath])
+  }, [navigate, activePath, confirmLeave])
 
-  const handleCloseRight = useCallback((path: string) => {
+  const handleCloseRight = useCallback(async (path: string) => {
+    const idx = tabs.findIndex(t => t.path === path)
+    const activeIdx = tabs.findIndex(t => t.path === activePath)
+    // 当前页在待关闭范围内（且不是保留点）时会离开它
+    if (activeIdx > idx && activePath !== '/') {
+      const decision = confirmLeave()
+      if (decision !== true && !await decision) {
+        setCtxMenu(null)
+        return
+      }
+    }
     setTabs((prev) => {
-      const idx = prev.findIndex(t => t.path === path)
-      const kept = prev.filter((_, i) => i <= idx || prev[i].path === '/')
+      const cut = prev.findIndex(t => t.path === path)
+      const kept = prev.filter((_, i) => i <= cut || prev[i].path === '/')
       if (!kept.some(t => t.path === activePath)) {
         navigate(path)
       }
       return kept
     })
     setCtxMenu(null)
-  }, [navigate, activePath])
+  }, [navigate, activePath, tabs, confirmLeave])
 
-  const handleCloseAll = useCallback(() => {
+  const handleCloseAll = useCallback(async () => {
+    // 关闭全部必然离开当前页：先过未保存保护
+    const decision = confirmLeave()
+    if (decision !== true && !await decision) {
+      setCtxMenu(null)
+      return
+    }
     setTabs([HOME_TAB])
     navigate('/')
     setCtxMenu(null)
-  }, [navigate])
+  }, [navigate, confirmLeave])
 
   if (tabs.length === 0) return null
 

@@ -6,6 +6,7 @@ import { ensureLanguageBundle, getSavedLanguage } from './i18n'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { MenuProvider } from './contexts/MenuContext'
 import { CompanyBrandProvider } from './contexts/CompanyBrandContext'
+import { UnsavedChangesProvider } from './contexts/UnsavedChangesContext'
 import Sidebar from './components/Sidebar'
 import HeaderBar from './components/HeaderBar'
 import MenuTabs from './components/MenuTabs'
@@ -1032,9 +1033,12 @@ function App() {
       <AuthProvider>
         <MenuProvider>
           <CompanyBrandProvider>
-            <AppRoutes />
-            {/* 首次登录/密码被重置：未完成改密前拦住整个后台（含企业门户） */}
-            <ForcePasswordChangeGate />
+            {/* 未保存内容保护：页签关闭/切换等导航入口统一询问；必须包住页签栏与页面 */}
+            <UnsavedChangesProvider>
+              <AppRoutes />
+              {/* 首次登录/密码被重置：未完成改密前拦住整个后台（含企业门户） */}
+              <ForcePasswordChangeGate />
+            </UnsavedChangesProvider>
           </CompanyBrandProvider>
         </MenuProvider>
       </AuthProvider>

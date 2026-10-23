@@ -1,5 +1,7 @@
 package com.mftb.admin.common;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DuplicateKeyException;
@@ -11,6 +13,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
@@ -96,9 +99,25 @@ public class GlobalExceptionHandler {
         return Result.error(ResultCode.ERROR.getCode(), "數據庫操作異常, 請稍後重試");
     }
 
+    /**
+     * 客户端提前断开连接：浏览器刷新/关闭页面、前端超时或 AbortController 取消请求、网关超时等，
+     * 容器写响应时抛 Broken pipe。这不是服务端故障，且连接已不可写（再次写出只会二次失败），
+     * 因此只记 debug 且不带堆栈，避免生产日志被成片伪 ERROR 淹没。
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleClientDisconnect(AsyncRequestNotUsableException e, HttpServletRequest request) {
+        logClientDisconnect(e, request);
+    }
+
     /** 其它未捕获异常 */
     @ExceptionHandler(Exception.class)
-    public Result<Void> handleException(Exception e) {
+    public Result<Void> handleException(Exception e, HttpServletRequest request, HttpServletResponse response) {
+        // 响应已提交（含客户端已断开导致写出中断）时无法再写错误体：直接返回 null，
+        // 由 Spring 标记请求已处理，不再尝试第二次写出（否则只会在日志里追加一条失败记录）。
+        if (response.isCommitted()) {
+            logClientDisconnect(e, request);
+            return null;
+        }
         // 沿 cause 链向下查找，定位真正的异常根因（MyBatis 常将 SQLException 包裹为 MyBatisSystemException）
         Throwable root = e;
         while (root.getCause() != null && root.getCause() != root) {
@@ -116,6 +135,12 @@ public class GlobalExceptionHandler {
         }
         log.error("系统异常 [{}]: {}", e.getClass().getSimpleName(), e.getMessage(), e);
         return Result.error(ResultCode.ERROR.getCode(), "系統繁忙, 請稍後重試");
+    }
+
+    /** 记录客户端断连（只一行、不带堆栈）：生产默认 info 级别不输出，需定位时临时设 LOG_LEVEL=debug */
+    private void logClientDisconnect(Throwable e, HttpServletRequest request) {
+        log.debug("客户端已断开，跳过响应写出: {} {} ({})",
+                request.getMethod(), request.getRequestURI(), e.getMessage());
     }
 
     /** 判断类名是否包含 SQL 关键字 */

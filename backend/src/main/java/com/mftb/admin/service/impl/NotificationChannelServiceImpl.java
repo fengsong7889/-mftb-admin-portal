@@ -92,11 +92,11 @@ public class NotificationChannelServiceImpl implements NotificationChannelServic
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long create(SysNotificationChannelSaveDTO dto) {
-        validateDto(dto);
+        validateDto(dto, true);
         String operator = operatorResolver.currentOperatorName();
 
         SysNotificationChannel entity = new SysNotificationChannel();
-        applyDto(entity, dto);
+        applyDto(entity, dto, true);
         entity.setCreatedBy(operator);
         entity.setUpdatedBy(operator);
         entity.setDeleted(0);
@@ -115,9 +115,9 @@ public class NotificationChannelServiceImpl implements NotificationChannelServic
     public void update(Long id, SysNotificationChannelSaveDTO dto) {
         SysNotificationChannel entity = mapper.selectById(id);
         if (entity == null) throw new BusinessException("通知渠道不存在");
-        validateDto(dto);
+        validateDto(dto, false);
 
-        applyDto(entity, dto);
+        applyDto(entity, dto, false);
         entity.setUpdatedBy(operatorResolver.currentOperatorName());
 
         // 如果设为默认，先取消同平台其他默认
@@ -186,6 +186,12 @@ public class NotificationChannelServiceImpl implements NotificationChannelServic
             return "Webhook 地址未配置";
         }
 
+        // 历史脏数据（典型：浏览器把登录凭据自动填充进「加签密钥」）先本地拦掉，
+        // 否则钉钉只回一句很长的「签名不匹配」，看不出真正原因。
+        if (StringUtils.hasText(entity.getSecret()) && !entity.getSecret().startsWith("SEC")) {
+            return "發送失敗: 加簽密鑰格式不正確（釘釘機器人密鑰以 SEC 開頭），請重新填寫後保存";
+        }
+
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("msgtype", "text");
         Map<String, String> text = new HashMap<>();
@@ -199,39 +205,105 @@ public class NotificationChannelServiceImpl implements NotificationChannelServic
             if (response != null && Integer.valueOf(0).equals(response.get("errcode"))) {
                 return "測試消息發送成功，請查看釘釘群";
             } else {
-                String errMsg = response != null ? String.valueOf(response.get("errmsg")) : "未知錯誤";
-                return "發送失敗: " + errMsg;
+                String errMsg = response != null ? String.valueOf(response.get("errmsg")) : null;
+                return "發送失敗: " + mapDingTalkError(errMsg);
             }
         } catch (Exception e) {
-            log.error("钉钉测试消息发送失败", e);
-            return "發送失敗: " + e.getMessage();
+            // 异常文本里带着完整 webhook（含 access_token 与 sign），只记类型，禁止入日志与响应
+            log.error("钉钉测试消息发送失败: {}", e.getClass().getSimpleName());
+            return "發送失敗: " + e.getClass().getSimpleName();
         }
     }
 
     /* ==================== 内部方法 ==================== */
 
-    private void validateDto(SysNotificationChannelSaveDTO dto) {
+    /** 保存校验：create 必须带 Webhook；update 时 Webhook/密钥的空值表示沿用原配置 */
+    private void validateDto(SysNotificationChannelSaveDTO dto, boolean creating) {
         if (!StringUtils.hasText(dto.getName())) {
             throw new BusinessException("渠道名稱不能為空");
         }
         if (!StringUtils.hasText(dto.getChannel())) {
             throw new BusinessException("平台類型不能為空");
         }
-        if (!StringUtils.hasText(dto.getWebhookUrl())) {
+        String webhook = dto.getWebhookUrl() == null ? null : dto.getWebhookUrl().trim();
+        if (creating && !StringUtils.hasText(webhook)) {
             throw new BusinessException("Webhook 地址不能為空");
+        }
+        if (StringUtils.hasText(webhook)) {
+            validateWebhook(dto.getChannel(), webhook);
+        }
+        String secret = dto.getSecret() == null ? null : dto.getSecret().trim();
+        if (StringUtils.hasText(secret)) {
+            validateSecret(dto.getChannel(), secret);
         }
     }
 
-    private void applyDto(SysNotificationChannel entity, SysNotificationChannelSaveDTO dto) {
-        entity.setName(dto.getName());
+    /** Webhook 必须是 http(s) 地址；钉钉渠道还必须是机器人 send 地址，挡住工号等误填值 */
+    private void validateWebhook(String channel, String webhook) {
+        if (webhook.length() > 500) {
+            throw new BusinessException("Webhook 地址過長（最多 500 字符）");
+        }
+        if (!webhook.startsWith("https://") && !webhook.startsWith("http://")) {
+            throw new BusinessException("Webhook 地址格式不正確：必須以 http:// 或 https:// 開頭");
+        }
+        if ("dingtalk".equals(channel) && !webhook.contains("access_token=")) {
+            throw new BusinessException("釘釘 Webhook 地址不正確：應為 https://oapi.dingtalk.com/robot/send?access_token=...");
+        }
+    }
+
+    /** 钉钉加签密钥固定以 SEC 开头：拦掉浏览器自动填充的登录密码等脏值 */
+    private void validateSecret(String channel, String secret) {
+        if (secret.length() > 200) {
+            throw new BusinessException("加簽密鑰過長（最多 200 字符）");
+        }
+        if ("dingtalk".equals(channel) && !secret.startsWith("SEC")) {
+            throw new BusinessException("加簽密鑰格式不正確：釘釘機器人加簽密鑰以 SEC 開頭，請勿填寫登錄密碼或其他字符");
+        }
+    }
+
+    /**
+     * 写库赋值：Webhook 与密钥均支持「不修改」语义。
+     * <ul>
+     *   <li>Webhook：空值表示沿用原值</li>
+     *   <li>加签密钥：null 表示沿用原值；空串表示显式清空（改用关键词模式）</li>
+     * </ul>
+     */
+    private void applyDto(SysNotificationChannel entity, SysNotificationChannelSaveDTO dto, boolean creating) {
+        entity.setName(dto.getName().trim());
         entity.setChannel(dto.getChannel());
-        entity.setWebhookUrl(dto.getWebhookUrl());
-        entity.setSecret(dto.getSecret() != null ? dto.getSecret() : "");
+        if (StringUtils.hasText(dto.getWebhookUrl())) {
+            entity.setWebhookUrl(dto.getWebhookUrl().trim());
+        } else if (creating) {
+            entity.setWebhookUrl("");
+        }
+        if (dto.getSecret() != null) {
+            entity.setSecret(dto.getSecret().trim());
+        } else if (creating) {
+            entity.setSecret("");
+        }
         entity.setAtMobiles(dto.getAtMobiles() != null ? dto.getAtMobiles() : "");
         entity.setEnabled(dto.getEnabled() != null ? dto.getEnabled() : 1);
         entity.setIsDefault(dto.getIsDefault() != null ? dto.getIsDefault() : 0);
         entity.setScenarios(dto.getScenarios() != null ? dto.getScenarios() : "");
         entity.setRemark(dto.getRemark() != null ? dto.getRemark() : "");
+    }
+
+    /** 把钉钉的长文案错误映射成可操作提示（原文含解决方案、参考链接，不适合直接弹给用户） */
+    private String mapDingTalkError(String errMsg) {
+        if (errMsg == null || errMsg.isBlank()) return "未知錯誤";
+        String lower = errMsg.toLowerCase();
+        boolean signMismatch = (lower.contains("sign") && (lower.contains("not match") || lower.contains("mismatch")))
+                || errMsg.contains("签名不匹配") || errMsg.contains("簽名不匹配");
+        if (signMismatch) {
+            return "加簽密鑰不正確：請填寫釘釘機器人安全設置中 SEC 開頭的加簽密鑰（不要填登錄密碼或其他字符）";
+        }
+        if (lower.contains("keyword") || errMsg.contains("关键词") || errMsg.contains("關鍵詞")) {
+            return "機器人使用關鍵詞模式，消息內容未包含已配置的關鍵詞";
+        }
+        if (lower.contains("token")) {
+            return "Webhook access_token 無效，請重新複製機器人 Webhook 地址";
+        }
+        return errMsg;
     }
 
     /** 取消同平台下其他渠道的默认标记 */
@@ -258,13 +330,10 @@ public class NotificationChannelServiceImpl implements NotificationChannelServic
         } else {
             map.put("webhookUrl", webhook != null ? webhook : "");
         }
-        // secret 脱敏：显示前 6 字符 + ****
-        String secret = entity.getSecret();
-        if (secret != null && secret.length() > 6) {
-            map.put("secret", secret.substring(0, 6) + "****");
-        } else {
-            map.put("secret", secret != null ? secret : "");
-        }
+        // 加签密钥属凭据：只回「是否已配置」，不回任何前后缀
+        boolean secretConfigured = StringUtils.hasText(entity.getSecret());
+        map.put("secret", secretConfigured ? "********" : "");
+        map.put("secretConfigured", secretConfigured);
         map.put("atMobiles", entity.getAtMobiles() != null ? entity.getAtMobiles() : "");
         map.put("enabled", entity.getEnabled());
         map.put("isDefault", entity.getIsDefault());

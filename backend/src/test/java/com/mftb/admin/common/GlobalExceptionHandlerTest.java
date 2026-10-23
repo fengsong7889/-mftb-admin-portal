@@ -1,5 +1,7 @@
 package com.mftb.admin.common;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -12,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -21,6 +24,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * GlobalExceptionHandler 单元测试
@@ -28,6 +32,17 @@ import static org.mockito.Mockito.mock;
 class GlobalExceptionHandlerTest {
 
     private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
+
+    /** 未提交响应：兜底处理仍应正常返回错误体 */
+    private static HttpServletResponse openResponse() {
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        when(response.isCommitted()).thenReturn(false);
+        return response;
+    }
+
+    private static HttpServletRequest anyRequest() {
+        return mock(HttpServletRequest.class);
+    }
 
     @Test
     @DisplayName("业务异常: 透传业务码与消息")
@@ -41,7 +56,7 @@ class GlobalExceptionHandlerTest {
     @DisplayName("SQL 异常: 不向前端泄露异常详情（回归测试）")
     void sqlExceptionMessageNotLeaked() {
         String sensitive = "Table 'fengsong.biz_fin_detail' doesn't exist";
-        Result<Void> result = handler.handleException(new SQLException(sensitive));
+        Result<Void> result = handler.handleException(new SQLException(sensitive), anyRequest(), openResponse());
 
         assertThat(result.getCode()).isEqualTo(ResultCode.ERROR.getCode());
         assertThat(result.getMessage())
@@ -53,7 +68,8 @@ class GlobalExceptionHandlerTest {
     @DisplayName("MyBatis 包裹的 SQL 根因: 沿 cause 链识别且不外泄")
     void wrappedSqlException() {
         Result<Void> result = handler.handleException(
-                new RuntimeException("wrapper", new SQLException("Duplicate column 'secret_col'")));
+                new RuntimeException("wrapper", new SQLException("Duplicate column 'secret_col'")),
+                anyRequest(), openResponse());
 
         assertThat(result.getCode()).isEqualTo(ResultCode.ERROR.getCode());
         assertThat(result.getMessage()).doesNotContain("secret_col");
@@ -62,7 +78,7 @@ class GlobalExceptionHandlerTest {
     @Test
     @DisplayName("普通系统异常: 返回通用提示")
     void genericException() {
-        Result<Void> result = handler.handleException(new IllegalStateException("internal detail"));
+        Result<Void> result = handler.handleException(new IllegalStateException("internal detail"), anyRequest(), openResponse());
         assertThat(result.getCode()).isEqualTo(ResultCode.ERROR.getCode());
         assertThat(result.getMessage()).doesNotContain("internal detail");
     }
@@ -116,6 +132,27 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().getCode()).isEqualTo(ResultCode.METHOD_NOT_ALLOWED.getCode());
         assertThat(response.getBody().getMessage()).isEqualTo("不支援此請求方法");
+    }
+
+    @Test
+    @DisplayName("客户端断开(Broken pipe): 只记 debug 且不抛异常, 不作系统故障上报")
+    void clientDisconnectIsNotReportedAsSystemError() {
+        AsyncRequestNotUsableException exception = new AsyncRequestNotUsableException(
+                "ServletOutputStream failed to write: java.io.IOException: Broken pipe");
+
+        // 不抛异常即通过：该分支不得走到 handleException 的 ERROR 堆栈与 500 响应体
+        handler.handleClientDisconnect(exception, anyRequest());
+    }
+
+    @Test
+    @DisplayName("响应已提交: 兜底处理不再写错误体, 返回 null 交由 Spring 结束请求")
+    void committedResponseSkipsErrorBody() {
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        when(response.isCommitted()).thenReturn(true);
+
+        Result<Void> result = handler.handleException(new IllegalStateException("boom"), anyRequest(), response);
+
+        assertThat(result).isNull();
     }
 
     @Test

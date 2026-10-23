@@ -11808,7 +11808,9 @@
       "toWorkbench": "Open in board",
       "empty": "No unfinished tasks assigned to you; open the delivery board for all items",
       "teamEmpty": "This member has no unfinished tasks in your shared projects",
-      "loadFailed": "Failed to load data"
+      "loadFailed": "Failed to load data",
+      "adminTitle": "All development tasks",
+      "adminHint": "Admin view: all tasks, overdue and blocked first"
     },
     "board": {
       "title": "Daily Delivery Board",
@@ -11842,6 +11844,13 @@
       "kpiIterations": "Iterations",
       "kpiRequirements": "Requirements",
       "kpiRisk": "Overdue risks",
+      "openInBrowser": "Open in browser",
+      "copyLink": "Copy link",
+      "copyLinkDone": "Link copied",
+      "copyLinkFailedShort": "Copy manually",
+      "langSwitchAria": "Switch language",
+      "langZh": "中文",
+      "langEn": "EN",
       "focusMorning": "Today's focus",
       "focusEvening": "Daily review",
       "ownersTitle": "Owners",
@@ -12601,7 +12610,9 @@
       "frozenCasePlaceholder": "Pick a frozen case of this round ({{count}} in total)",
       "caseIdLabel": "Case ID",
       "caseIdFallbackTooltip": "Nothing is frozen yet, so no stable case ID is available; accept the test batch before recording results",
-      "caseIdFallbackPlaceholder": "e.g. CASE-LOGIN-001 (switch to the dropdown after acceptance)"
+      "caseIdFallbackPlaceholder": "e.g. CASE-LOGIN-001 (switch to the dropdown after acceptance)",
+      "copyOk": "Batch no. copied",
+      "copyFail": "Copy failed, please select manually"
     },
     "workbench": {
       "submitRequirement": "Submit a Requirement",
@@ -12856,7 +12867,8 @@
       "reportAndDone": "Report & complete",
       "block": "Mark blocked",
       "unblock": "Unblock",
-      "doneAtHundred": "Reporting 100% marks the task as done after confirmation; a delivery note is required"
+      "doneAtHundred": "Reporting 100% marks the task as done after confirmation; a delivery note is required",
+      "adminScopeHint": "Admin view: all development tasks on this page"
     },
     "deliveryItem": {
       "noTest": "Not tested",
@@ -13365,7 +13377,19 @@
       "title": "Release approval",
       "v3Title": "V3 phased delivery: release by delivery item / release batch",
       "v3Desc": "This requirement does not use whole-requirement release. To go live, complete scope freeze, test submission and acceptance on the delivery item, then create a release batch in Release Center. A batch enforces five hard gates (test, acceptance, defects, dependencies, scope) and four-eyes approval."
-    }
+    },
+    "prd": {
+      "draftFoundTitle": "Unsaved local draft found",
+      "draftTimeLabel": "Saved at: ",
+      "draftLengthLabel": "Length: ",
+      "draftServerChanged": "The server copy changed after this draft was saved; restoring and saving may overwrite someone else. Review first.",
+      "draftRestoreAction": "Restore draft",
+      "draftDiscardAction": "Discard draft",
+      "draftRestoredMsg": "Local draft restored. Review before saving.",
+      "draftSavedHint": "Saved locally at {{time}}. Recoverable within 24 hours in this tab only.",
+      "draftFailedHint": "Local draft failed (content too large or storage unavailable). Save the PRD before leaving."
+    },
+    "releaseCenter": {}
   },
   "aiModel": {
     "basicInfo": "Basic Info",

@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, DatePicker, Form, Input, Modal, Select, message } from 'antd'
 import { AuditOutlined, SendOutlined } from '@ant-design/icons'
 import RdmFormHeader from './components/RdmFormHeader'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
@@ -31,6 +31,8 @@ import {
   formatRdmReviewTypes,
   type RdmReviewType,
 } from '../../constants/rdm'
+import { buildRdmDetailPath } from '../../constants/menuDataSource'
+import { useRdmBack } from './useRdmBack'
 import './index.css'
 
 /**
@@ -55,11 +57,12 @@ interface ReviewFormValues {
 }
 
 export default function ReviewForm() {
-  const navigate = useNavigate()
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const reqId = Number(searchParams.get('reqId') ?? 0)
   const presetPrdId = Number(searchParams.get('prdId') ?? 0)
+  /** 提交/取消后能回退就回来源页，直接打开才 replace 到详情（带上 from 保持侧栏高亮） */
+  const goBack = useRdmBack(reqId ? buildRdmDetailPath({ id: reqId, from: searchParams.get('from') }) : '/rdm-requirement')
 
   const [form] = Form.useForm<ReviewFormValues>()
   const [requirement, setRequirement] = useState<{ reqNo: string; title: string; status: string } | null>(null)
@@ -141,7 +144,8 @@ export default function ReviewForm() {
         conclusionDesc: values.conclusionDesc?.trim() || undefined,
       })
       message.success(t('rdm.reviewForm.submitSuccess'))
-      navigate(`/rdm-detail?id=${reqId}`)
+      // 不能用 navigate(详情URL)：那会再 push 一条，连点返回来回穿越表单页
+      goBack()
     } catch (err) {
       // request.ts 已统一弹错误提示，此处仅日志与状态恢复，避免双弹（§G.4）
       console.error(err)
@@ -155,7 +159,7 @@ export default function ReviewForm() {
       <RdmFormHeader
         title={t('rdm.reviewForm.title')}
         backText={t('rdm.reviewForm.backToReq')}
-        onBack={() => navigate(-1)}
+        onBack={goBack}
         meta={requirement ? `${requirement.reqNo} · ${requirement.title}` : t('rdm.reviewForm.metaHint')}
       />
 
@@ -242,7 +246,7 @@ export default function ReviewForm() {
       </div>
 
       <div className="form-footer">
-        <Button onClick={() => navigate(-1)}>{t('common:cancel')}</Button>
+        <Button onClick={goBack}>{t('common:cancel')}</Button>
         <Button type="primary" icon={<SendOutlined />} loading={submitting} disabled={submitBlocked} onClick={handleSubmit}>
           {t('rdm.reviewForm.submitBtn')}
         </Button>

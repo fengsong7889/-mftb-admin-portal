@@ -11808,7 +11808,9 @@
       "toWorkbench": "到工作台處理",
       "empty": "目前沒有指派給你的未完成任務，可到研發工作台查看全部交付項",
       "teamEmpty": "該成員在你們的共同項目下暫無未完成任務",
-      "loadFailed": "數據載入失敗"
+      "loadFailed": "數據載入失敗",
+      "adminTitle": "全部研發任務",
+      "adminHint": "管理員視角：顯示全部任務，逾期與阻塞置頂"
     },
     "board": {
       "title": "進度日報看板",
@@ -11842,6 +11844,13 @@
       "kpiIterations": "迭代版本",
       "kpiRequirements": "需求總數",
       "kpiRisk": "逾期風險",
+      "openInBrowser": "在瀏覽器打開",
+      "copyLink": "複製連結",
+      "copyLinkDone": "已複製連結",
+      "copyLinkFailedShort": "請手動複製",
+      "langSwitchAria": "切換語言",
+      "langZh": "中文",
+      "langEn": "EN",
       "focusMorning": "今日焦點",
       "focusEvening": "當日復盤",
       "ownersTitle": "相關負責人",
@@ -12601,7 +12610,9 @@
       "frozenCasePlaceholder": "選擇本輪凍結用例（共 {{count}} 條）",
       "caseIdLabel": "用例ID",
       "caseIdFallbackTooltip": "尚未受理凍結，沒有可用的穩定用例ID；先受理提測批次再錄結果",
-      "caseIdFallbackPlaceholder": "例：CASE-LOGIN-001（受理後請改為下拉選擇）"
+      "caseIdFallbackPlaceholder": "例：CASE-LOGIN-001（受理後請改為下拉選擇）",
+      "copyOk": "批次號已複製",
+      "copyFail": "複製失敗，請手動選取"
     },
     "workbench": {
       "submitRequirement": "我要提需求",
@@ -12856,7 +12867,8 @@
       "reportAndDone": "上報並完成",
       "block": "標記阻塞",
       "unblock": "解除阻塞",
-      "doneAtHundred": "進度 100% 上報後，二次確認即把任務標記為已完成，必須填寫交付說明"
+      "doneAtHundred": "進度 100% 上報後，二次確認即把任務標記為已完成，必須填寫交付說明",
+      "adminScopeHint": "管理員視角：本頁顯示全部研發任務（不受「只看自己」限制）"
     },
     "deliveryItem": {
       "noTest": "未提測",
@@ -13365,7 +13377,19 @@
       "title": "發布放行",
       "v3Title": "V3 分批交付：以交付項 / 發布批次為上線單位",
       "v3Desc": "本需求不走整需求放行。上線請在交付項中完成範圍凍結、提測與驗收後，到「發布中心」創建發布批次；發布批次包含測試、驗收、缺陷、依賴、範圍五類硬門禁與四眼審批。"
-    }
+    },
+    "prd": {
+      "draftFoundTitle": "發現本機暫存的未保存內容",
+      "draftTimeLabel": "暫存時間：",
+      "draftLengthLabel": "內容長度：",
+      "draftServerChanged": "伺服器上的內容在暫存後已變化，恢復後保存可能覆蓋他人修改，請先核對",
+      "draftRestoreAction": "恢復暫存",
+      "draftDiscardAction": "丟棄暫存",
+      "draftRestoredMsg": "已恢復本機暫存，請核對後再保存",
+      "draftSavedHint": "已暫存到本機 {{time}}；離開頁面前可在 24 小時內恢復（僅限本分頁）。",
+      "draftFailedHint": "本機暫存失敗（內容過大或瀏覽器儲存不可用），請先點「保存 PRD」，離開將不會保留本次修改。"
+    },
+    "releaseCenter": {}
   },
   "aiModel": {
     "basicInfo": "基礎信息",

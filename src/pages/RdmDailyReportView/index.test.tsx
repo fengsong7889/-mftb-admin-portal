@@ -494,4 +494,46 @@ describe('進度日報看板（開放頁）', () => {
     await waitFor(() => expect(screen.getByText('看板載入失敗')).toBeInTheDocument())
     expect(screen.getByRole('button', { name: /重\s*試/ })).toBeInTheDocument()
   })
+
+  it('工具條：可在頁面內切換中英，並持久化選擇', async () => {
+    fetchView.mockResolvedValue({
+      valid: true,
+      expireAt: null,
+      showRequirements: true,
+      showOwners: true,
+      showUnassigned: true,
+      snapshot: SNAPSHOT,
+    })
+    openPage()
+
+    await waitFor(() => expect(screen.getAllByText(/門戶改版/).length).toBeGreaterThan(0))
+    // 免登頁必須自帶語言入口：全局默認英文，但看板讀者以中文為主
+    expect(screen.getByRole('radiogroup', { name: '切換語言' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /在瀏覽器打開/ })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('EN'))
+    await waitFor(() => expect(screen.getByText('Project progress')).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: /Open in browser/ })).toBeInTheDocument()
+    // 切換後持久化，下一次從釘釘點開不必重新選擇
+    expect(localStorage.getItem('app_language')).toBe('en')
+  })
+
+  it('非釘釘環境：「在瀏覽器打開」用新窗口打開當前看板連結', async () => {
+    fetchView.mockResolvedValue({
+      valid: true,
+      expireAt: null,
+      showRequirements: true,
+      showOwners: true,
+      showUnassigned: true,
+      snapshot: SNAPSHOT,
+    })
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
+    openPage()
+
+    await waitFor(() => expect(screen.getAllByText(/門戶改版/).length).toBeGreaterThan(0))
+    fireEvent.click(screen.getByRole('button', { name: /在瀏覽器打開/ }))
+    // 帶 token 的完整地址必須原樣交給瀏覽器，不能重新拼接
+    expect(openSpy).toHaveBeenCalledWith(window.location.href, '_blank', 'noopener')
+    openSpy.mockRestore()
+  })
 })

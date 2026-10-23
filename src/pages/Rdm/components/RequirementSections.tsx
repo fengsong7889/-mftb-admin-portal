@@ -21,7 +21,7 @@ import {
   SwapOutlined,
   TeamOutlined,
 } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import { decideReview, type RdmChangeItem, type RdmDeliverySummary, type RdmPrdItem, type RdmReviewItem, type RdmTaskItem } from '../../../api/rdm'
@@ -143,6 +143,18 @@ export function TaskSection({ summary, editable, reqId, canCreate }: {
 }) {
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const [searchParams] = useSearchParams()
+  /**
+   * 任务表单保存后会回退到详情页，from 必须跟着带过去：
+   * 否则详情页侧栏高亮会回落默认的「需求跟进清单」，从其他菜单进来的用户会看到高亮跳走。
+   */
+  const from = searchParams.get('from')
+  const taskFormPath = (taskId?: number) => {
+    const params = new URLSearchParams({ reqId: String(reqId) })
+    if (taskId) params.set('id', String(taskId))
+    if (from) params.set('from', from)
+    return `/rdm-task?${params.toString()}`
+  }
   // 任务类型字典（业务可配置）：类型标签/颜色从接口取，未知 code 兑底原文
   const { labelOf: taskTypeLabelOf, colorOf: taskTypeColorOf } = useTaskTypeDict()
   const tasks = summary?.tasks ?? []
@@ -211,7 +223,7 @@ export function TaskSection({ summary, editable, reqId, canCreate }: {
       render: (_, r) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           {editable && r.status === RDM_TASK_STATUS.TODO && r.taskType !== 'prd' && (
-            <Button type="link" size="small" onClick={() => navigate(`/rdm-task?reqId=${reqId}&id=${r.id}`)}>{t('common.edit')}</Button>
+            <Button type="link" size="small" onClick={() => navigate(taskFormPath(r.id))}>{t('common.edit')}</Button>
           )}
           {/* PRD 任務的日期來自「承諾出 PRD 日期」，不提供任務編輯入口，避免把承諾日期改走 */}
           {editable && r.taskType === 'prd' && (
@@ -241,7 +253,7 @@ export function TaskSection({ summary, editable, reqId, canCreate }: {
             {/* 排期甘特图：看本需求全部角色的计划起止，与清单行内「排期」同一入口 */}
             <Button size="small" icon={<BarChartOutlined />} onClick={() => navigate(`/rdm-gantt?mode=single&reqId=${reqId}`)}>{t('rdm.reqSections.btnScheduleGantt')}</Button>
             {canCreate && (
-              <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => navigate(`/rdm-task?reqId=${reqId}`)}>
+              <Button size="small" type="primary" icon={<PlusOutlined />} onClick={() => navigate(taskFormPath())}>
                 {t('rdm.reqSections.addTask')}
               </Button>
             )}

@@ -43,6 +43,7 @@ import HelpPopover, { type HelpSection } from '../../components/HelpPopover'
 import { useAuth } from '../../contexts/AuthContext'
 import { formatEmployee } from '../../utils/employeeDisplay'
 import { buildRdmSubmitPath } from '../../constants/menuDataSource'
+import { isCanceledError, readWithRetry, useRequestGate } from './useRequestGate'
 import {
   fetchProjectPage,
   fetchRequirementPage,
@@ -218,37 +219,55 @@ export default function RdmWorkbench() {
     [hasMenuPermission, hasPermission, user?.role],
   )
 
+  /** 核心与次级数据各自只认最新一轮；刷新时取消上一轮，旧响应不覆盖新首屏 */
+  const coreGate = useRequestGate()
+  const secondaryGate = useRequestGate()
+
   const load = useCallback(async () => {
     if (loadedOnce.current) setRefreshing(true)
     else setLoading(true)
+    const core = coreGate.next()
     try {
       // 首屏只等核心数据：项目列表（远端库 6s+）、摘要与待办看板各自较重，
       // 统一放到首屏之后异步补齐，否则整页白屏时间 = 最慢的那个聚合接口
+      const mineRead = readWithRetry(
+        sig => fetchRequirementPage({ page: 1, size: 200, scope: RDM_SCOPE.MINE }, sig),
+        core.signal,
+      ).catch(err => {
+        // 取消不是失败；「待补充」是次级信息，取不到不影响主工作台
+        if (isCanceledError(err)) throw err
+        return null
+      })
       const [wb, mine] = await Promise.all([
-        fetchWorkbench(),
-        // 「待补充」走完整查询（size 拉满），不再从最近 6 条里筛，避免漏项
-        fetchRequirementPage({ page: 1, size: 200, scope: RDM_SCOPE.MINE }).catch(() => null),
+        readWithRetry(sig => fetchWorkbench(sig), core.signal),
+        mineRead,
       ])
+      if (!core.isLatest()) return
       setData(wb)
       setMineRows(mine?.records ?? [])
-    } catch {
+    } catch (err) {
+      if (!core.isLatest() || isCanceledError(err)) return
       message.error('工作台數據載入失敗')
     } finally {
-      setLoading(false)
-      setRefreshing(false)
-      loadedOnce.current = true
+      if (core.isLatest()) {
+        setLoading(false)
+        setRefreshing(false)
+        loadedOnce.current = true
+      }
     }
     // 次级数据：只影响指标卡、我的项目与待办看板，失败或慢都不影响首屏
+    const secondary = secondaryGate.next()
     Promise.all([
-      fetchProjectPage({ pageNo: 1, pageSize: 8 }).catch(() => null),
+      fetchProjectPage({ pageNo: 1, pageSize: 8 }, secondary.signal).catch(() => null),
       fetchWorkbenchSummary().catch(() => null),
       fetchTodoBoard(0).catch(() => null),
     ]).then(([projects, summ, board]) => {
+      if (!secondary.isLatest()) return
       setMyProjects(projects?.records ?? [])
       setWbSummary(summ)
       setTodoBoard(board)
     }).catch(() => { /* 三个接口已各自兜底，这里只防未预料的异常 */ })
-  }, [])
+  }, [coreGate, secondaryGate])
 
   useEffect(() => { load() }, [load])
 

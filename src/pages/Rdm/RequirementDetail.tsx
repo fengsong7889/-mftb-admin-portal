@@ -64,6 +64,7 @@ import { formatEmployee } from '../../utils/employeeDisplay'
 import RequirementStageBar from './components/RequirementStageBar'
 import AcceptanceTraceCard from './components/AcceptanceTraceCard'
 import ReleasePanel from './components/ReleasePanel'
+import { useRdmBack } from './useRdmBack'
 import { ChangeSection, DeliverySummaryBar, PlanSection, TaskSection } from './components/RequirementSections'
 import { ComplexityTag, PriorityTag, StatusTag, TypeTag } from './components/Tags'
 import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
@@ -119,11 +120,13 @@ import {
   RDM_PROJECT_STATUS,
   RDM_REQUIREMENT_KIND,
   RDM_REQUIREMENT_KIND_LABEL,
+  RDM_ROLE,
   RDM_ROLE_LABEL,
   RDM_SOURCE_CHANNEL_LABEL,
   RDM_STATUS,
   RDM_STATUS_LABEL,
   RDM_STAGE_LABEL,
+  RDM_TASK_TYPE_LABEL,
   RDM_TERMINAL_STATUS,
   RDM_TEST_BATCH_STATUS_LABEL,
   formatRdmReqNo,
@@ -136,6 +139,7 @@ import {
   type RdmSourceChannel,
   type RdmStage,
   type RdmStatus,
+  type RdmTaskType,
 } from '../../constants/rdm'
 import './index.css'
 
@@ -320,6 +324,11 @@ export default function RequirementDetail() {
   const goDetail = (reqId: number) => navigate(buildRdmDetailPath({ id: reqId, from: searchParams.get('from') }))
   /** 正文加载失败时的返回落点：跟随进入来源，无来源才回需求跟进清单 */
   const backListPath = resolveRdmDetailBackPath(searchParams.toString())
+  /**
+   * 详情页返回：有站内历史就回上一页（列表 / 看板 / 工作台）；直接打开时回
+   * 「跟随 from 的列表」，不能 navigate(-1) 把用户退出整个站点。
+   */
+  const goBack = useRdmBack(backListPath)
 
   const [detail, setDetail] = useState<RdmRequirementDetail | null>(null)
   /** 正文取数状态：失败要能说清为什么，不能伪装成「一直在载入」 */
@@ -788,6 +797,23 @@ export default function RequirementDetail() {
     return [...map.values()]
   }, [detail])
 
+  /**
+   * 參與人的細分崗位：按成員在本需求下的任務類型歸集（前端開發 / 後端開發 / APP 開發 / 數據…）。
+   * <p>角色表只記 DEV 一檔，「研發成員」看不出誰負責哪塊；任務類型是唯一真實來源，
+   * 拼在角色標籤後面（如「研發成員·後端開發」）。summary 未就緒時退回純角色名。
+   */
+  const taskTypesByUser = useMemo(() => {
+    const map = new Map<number, string[]>()
+    const tasks = summary?.tasks ?? []
+    tasks.forEach(task => {
+      if (!task.ownerUserId || !task.taskType) return
+      const types = map.get(task.ownerUserId) ?? []
+      if (!types.includes(task.taskType)) types.push(task.taskType)
+      map.set(task.ownerUserId, types)
+    })
+    return map
+  }, [summary])
+
   const canEditDelivery = hasPermission('rdm-requirement:edit') || hasPermission('rdm-delivery-board:edit')
   const closed = detail?.status === RDM_STATUS.CLOSED
 
@@ -868,9 +894,11 @@ export default function RequirementDetail() {
    */
   const confirmAction = async () => {
     if (!activeAction || !execActionRow) return
-    if (!validateActionFields(execActionRow.requiredFields)) return
+    // 校验与渲染同源：用 requiredFields（含排期强制补齐的 project/iteration），
+    // 不再用服务端原始下发的 execActionRow.requiredFields
+    if (!validateActionFields(requiredFields)) return
     try {
-      await runTransition(execActionRow, buildTransitionPayload(activeAction, execActionRow.requiredFields))
+      await runTransition(execActionRow, buildTransitionPayload(activeAction, requiredFields))
     } catch {
       // 失败原因已弹提示，保留弹窗供修正后重试
     }
@@ -1217,7 +1245,7 @@ export default function RequirementDetail() {
           </Space>
         }
         meta={`${formatRdmReqNo(detail.reqNo)}${detail.externalNo ? ` · 雲效 ${detail.externalNo}` : ''} · 提出人 ${detail.submitterName}${detail.submitDeptName ? `（${detail.submitDeptName}）` : ''} · 提交於 ${detail.submitTime ?? '-'}${detail.projectManagerName ? ` · 項目經理 ${detail.projectManagerName}` : ''}`}
-        onBack={() => navigate(-1)}
+        onBack={goBack}
         extra={
           <Space>
             <Button icon={<BellOutlined />} onClick={handleUrge}>催辦</Button>
@@ -2001,17 +2029,25 @@ export default function RequirementDetail() {
 
             <div className="rdm-participant-block">
               <div className="rdm-participant-title">參與人（{participants.length}）</div>
-              {participants.map(p => (
-                <div key={p.userId} className="rdm-participant-row">
-                  <span style={{ color: '#262626' }}>{p.name}</span>
-                  <Space size={4} wrap style={{ marginLeft: 'auto' }}>
-                    {p.roles.map(role => (
-                      <Tag key={role} color="geekblue" style={{ margin: 0 }}>{RDM_ROLE_LABEL[role as RdmRoleCode] ?? role}</Tag>
-                    ))}
-                  </Space>
-                  <span style={{ fontSize: 12, color: '#8C8C8C', width: 72, textAlign: 'right' }}>{p.empNo ?? '-'}</span>
-                </div>
-              ))}
+              {participants.map(p => {
+                // 研發成員追加任務類型細分；其他角色（PM/提出人/測試…）角色名已足够自述
+                const devTypes = (taskTypesByUser.get(p.userId) ?? [])
+                  .map(code => RDM_TASK_TYPE_LABEL[code as RdmTaskType] ?? code)
+                return (
+                  <div key={p.userId} className="rdm-participant-row">
+                    <span style={{ color: '#262626', flexShrink: 0 }}>{formatEmployee(p.name, p.empNo)}</span>
+                    <Space size={4} wrap style={{ marginLeft: 'auto', justifyContent: 'flex-end' }}>
+                      {p.roles.map(role => {
+                        const roleLabel = RDM_ROLE_LABEL[role as RdmRoleCode] ?? role
+                        const label = role === RDM_ROLE.DEV && devTypes.length > 0
+                          ? `${roleLabel}·${devTypes.join(' / ')}`
+                          : roleLabel
+                        return <Tag key={role} color="geekblue" style={{ margin: 0 }}>{label}</Tag>
+                      })}
+                    </Space>
+                  </div>
+                )
+              })}
               {participants.length === 0 && <div className="rdm-empty-hint">尚無參與人記錄</div>}
             </div>
           </div>
@@ -2029,7 +2065,7 @@ export default function RequirementDetail() {
 
       {/* ── 底部操作栏：所有流转动作按全局规范放页面底部，主按钮靠右 ── */}
       <div className="form-footer rdm-detail-actions">
-        <Button onClick={() => navigate(-1)}>返回</Button>
+        <Button onClick={goBack}>返回</Button>
         {availableActions.length === 0 && (
           <div className="rdm-action-bar-locked">
             {detail.flowVersion === 3 && detail.status === RDM_STATUS.ACCEPTED

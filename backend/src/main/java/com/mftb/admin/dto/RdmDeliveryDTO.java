@@ -34,6 +34,12 @@ public class RdmDeliveryDTO {
         private Boolean newVersion;
         /** 版本变更原因（newVersion=true 时必填，写进版本链） */
         private String changeReason;
+        /**
+         * 编辑前读到的并发版本号（{@code rdm_prd.row_version}）。
+         * <p>传了且与库中不一致 → 拒绝保存，避免把他人刚写入的内容整段覆盖；
+         * 不传视为不启用乐观锁（保留旧行为，供存量调用方与自动化脚本使用）。
+         */
+        private Integer expectedRowVersion;
     }
 
     /** 发起评审 */

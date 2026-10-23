@@ -693,6 +693,23 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
      * <p><b>幂等</b>：只 UPDATE 仍含该占位符的行，重放时候选集合为空即 no-op；无 DROP / 无删列。
      */
     private static final String VERSION_DAILY_REPORT_NO_NAME = "rdm:schema:v3.33";
+
+    /**
+     * v3.34：PRD 并发版本号 {@code rdm_prd.row_version}。
+     *
+     * <p><b>为何需要</b>：PRD 保存原来是 updateById 全字段覆盖，两个产品经理同时打开同一份 PRD
+     * 时，后保存的人会把前一个人刚写的内容整段抹掉，且双方都收到「保存成功」。
+     * 前端暂存只能提示「服务器已变化」，无法阻止正式保存覆盖。
+     *
+     * <p><b>为何是独立列而不是复用 updated_at</b>：updated_at 精度到秒且被多处业务顺手更新，
+     * 用它做比较会出现「同一秒内两次保存认为没冲突」；独立整型递增列语义单一、可乐观锁自增。
+     *
+     * <p><b>幂等</b>：先查 information_schema 再 ADD COLUMN，可重放；无 DROP、无数据改写，
+     * 存量行默认 0，首次保存即进入正常递增。
+     */
+    private static final String VERSION_PRD_ROW_VERSION = "rdm:schema:v3.34";
+    private static final String PRD_ROW_VERSION_DDL =
+            "ALTER TABLE rdm_prd ADD COLUMN row_version INT NOT NULL DEFAULT 0 COMMENT '并发版本号(乐观锁)'";
     /** 清姓名占位符（连同其后的中英文逗号/冒号与空格），顺序：长串优先，最后才是裸占位符 */
     private static final String[][] DAILY_REPORT_NO_NAME_PATTERNS = {
             {"{{userName}}，", ""},
@@ -1051,6 +1068,23 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
                 this::doBackToEvaluateSeed, this::verifyBackToEvaluateSeed);
         versionTracker.applyOnce(VERSION_SCHEDULE_REQUIRED_FIELDS,
                 this::doScheduleRequiredFieldsSeed, this::verifyScheduleRequiredFieldsSeed);
+        versionTracker.applyOnce(VERSION_PRD_ROW_VERSION,
+                this::doPrdRowVersionMigrate, this::verifyPrdRowVersionMigrate);
+    }
+
+    /** v3.34：给 rdm_prd 补并发版本号列（已存在则跳过，可重放） */
+    private void doPrdRowVersionMigrate() {
+        if (columnExists("rdm_prd", "row_version")) {
+            return;
+        }
+        jdbcTemplate.execute(PRD_ROW_VERSION_DDL);
+    }
+
+    /** v3.34 后置校验：列必须存在，否则乐观锁在保存时静默退化为覆盖写 */
+    private void verifyPrdRowVersionMigrate() {
+        if (!columnExists("rdm_prd", "row_version")) {
+            throw new IllegalStateException("RDM v3.34 核驗失敗：rdm_prd.row_version 列缺失");
+        }
     }
 
     /**

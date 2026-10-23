@@ -34,6 +34,8 @@ public class RdmDeliveryVO {
         private String reviewConclusion;
         private String createdAt;
         private String updatedAt;
+        /** 并发版本号：前端保存时原样回传，服务端据此判断是否被他人改过 */
+        private Integer rowVersion;
     }
 
     /** 评审记录 */

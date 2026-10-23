@@ -70,7 +70,8 @@ import RemarkTextArea from '../../components/RemarkTextArea'
 import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
 import { useAuth } from '../../contexts/AuthContext'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { readRdmListScene, useRdmListScene, useRdmScrollRestore } from './useListSceneRestore'
+import { readRdmListScene, rdmSceneOwner, useRdmListScene, useRdmScrollRestore } from './useListSceneRestore'
+import { isCanceledError, readWithRetry, useRequestGate } from './useRequestGate'
 import { rdmTableLocale } from './components/tableLocale'
 import {
   batchBackfillAccept,
@@ -109,6 +110,7 @@ import type { ParsedRdmImportRow } from './rdmImport'
 import {
   RDM_FLOW_VERSION_LABEL,
   RDM_ITERATION_STATUS,
+  RDM_KANBAN_MAX_SIZE,
   RDM_KANBAN_SIZE,
   RDM_PRE_ADMISSION_STATUS,
   RDM_PRIORITY_LABEL,
@@ -189,6 +191,12 @@ interface RequirementFilters {
   requirementKind?: string
   /** V3：流程版本 */
   flowVersion?: number
+  /**
+   * 看板列下钻：多个状态的逗号串（如 {@code pool,assigned}）。
+   * <p>与后端 {@code statuses} 字段对齐；必须传逗号串，数组会被 axios 序列化成
+   * {@code statuses[]=a}，后端按名绑不上，筛选会静默失效。
+   */
+  statuses?: string
 }
 
 /** 视图形态偏好存储键（PM 习惯看板、业务/技术习惯表格，不应每次回来重选） */
@@ -325,7 +333,17 @@ export default function RequirementList({
    * 视角切换会换 key，避免把「我的需求」的筛选带到「全部」。
    */
   const sceneKey = `requirement:${location.pathname}:${activeScope}:${view}`
-  const [initialScene] = useState(() => readRdmListScene<RequirementFilters>(sceneKey))
+  /** 缓存归属：环境 + 登录用户，避免换账号继承上一个人的筛选与滚动位置 */
+  const sceneOwner = rdmSceneOwner(user?.id)
+  const [initialScene] = useState(() => readRdmListScene<RequirementFilters>(sceneKey, sceneOwner))
+
+  /**
+   * 看板列下钻条件（来自项目看板「交付流水線」列的点击）。
+   * <p>statuses 是后端与列计数同源下发的状态集合，这里只负责传递与展示；
+   * src 仅用于把列名写进可见提示，不参与任何判定。
+   */
+  const drillStatuses = searchParams.get('statuses')?.trim() ?? ''
+  const drillSource = searchParams.get('src')?.trim() ?? ''
 
   const [rows, setRows] = useState<RdmRequirementRow[]>([])
   const [total, setTotal] = useState(0)
@@ -346,11 +364,66 @@ export default function RequirementList({
   const [submitterSaving, setSubmitterSaving] = useState(false)
   const [backfillOpen, setBackfillOpen] = useState(false)
   const [backfillSaving, setBackfillSaving] = useState(false)
-  const [filters, setFilters] = useState<RequirementFilters>(initialScene?.filters ?? {})
+  const [filters, setFilters] = useState<RequirementFilters>(() => {
+    const base = { ...(initialScene?.filters ?? {}) }
+    // 历史快照可能存过 statuses（旧版缓存）；下钻条件只认 URL，不从缓存继承
+    delete base.statuses
+    /*
+     * 看板列下钻的条件在 URL 上，优先级高于上次会话快照：
+     * 用户刚从看板某一列点进来，要看的就是这一列，不能被上次的筛选盖掉。
+     */
+    return drillStatuses ? { ...base, statuses: drillStatuses } : base
+  })
+
+  /**
+   * 清除下钻条件：筛选、页码、URL 三处一起清。
+   * <p>只清 state 不清 URL 的话，刷新或从详情返回时旧条件会重新生效，
+   * 用户会以为「清掉了又自己跑回来」。
+   */
+  const clearDrillFilter = useCallback(() => {
+    setFilters(prev => {
+      const rest = { ...prev }
+      delete rest.statuses
+      return rest
+    })
+    setPage(1)
+    const next = new URLSearchParams(searchParams)
+    next.delete('statuses')
+    next.delete('src')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
+
+  /**
+   * 同路径仅改 hash 查询串（再次从看板点另一列）也要生效。
+   * <p>原先只在挂载时读一次 URL，已在需求清单页时换列会「地址变了但内容不跳」，
+   * 用户只能手动刷新。这里以 URL 为准单向同步 filters.statuses。
+   */
+  useEffect(() => {
+    setFilters(prev => {
+      if ((prev.statuses ?? '') === drillStatuses) return prev
+      const next = { ...prev }
+      if (drillStatuses) {
+        next.statuses = drillStatuses
+      } else {
+        delete next.statuses
+      }
+      return next
+    })
+  }, [drillStatuses])
 
   /** 场景写回 + 滚动还原：数据就绪后才滚，避免表格还没撑开就滚到 0 */
-  useRdmListScene(sceneKey, { page, size, filters }, location.pathname)
-  useRdmScrollRestore(sceneKey, !loading && (view === 'table' || rows.length > 0), initialScene?.scrollTop)
+  /**
+   * 场景快照不保存跨页面的临时下钻条件。
+   * <p>statuses 来自 URL（看板列点击），属于「这一次要看的范围」；写进会话缓存后，
+   * 下次从菜单裸地址进入仍会被旧条件过滤，且 URL 上已无来源，标签只能退化成「看板列」。
+   */
+  const sceneFilters = useMemo(() => {
+    const rest = { ...filters }
+    delete rest.statuses
+    return rest
+  }, [filters])
+  useRdmListScene(sceneKey, { page, size, filters: sceneFilters }, location.pathname, sceneOwner)
+  useRdmScrollRestore(sceneKey, !loading && (view === 'table' || rows.length > 0), initialScene?.scrollTop, sceneOwner)
 
   /**
    * 归属字典与下拉候选：项目/迭代各取一次。
@@ -434,28 +507,43 @@ export default function RequirementList({
     })
   }
 
-  /** 看板按列铺开、不翻页，所以一次拉固定上限；表格走分页 */
-  const querySize = view === 'kanban' ? RDM_KANBAN_SIZE : size
-  const kanbanTruncated = view === 'kanban' && total > RDM_KANBAN_SIZE
+  /**
+   * 看板单次加载量：默认 100 条，可用「再載入」逐段扩到 200 条（服务端单次返回上限）。
+   * <p>看板不做分页，超过上限时原先只能「缩小筛选范围」或切表格；
+   * 但也不能无限扩容，一次拉全表会把接口与浏览器一起拖慢。
+   */
+  const [kanbanLimit, setKanbanLimit] = useState(RDM_KANBAN_SIZE)
+  const querySize = view === 'kanban' ? kanbanLimit : size
+  const kanbanTruncated = view === 'kanban' && total > kanbanLimit
+
+  /** 列表/统计各自只认最新一次请求；切视角或卸载时取消在途请求，旧响应不写回 */
+  const listGate = useRequestGate()
+  const statsGate = useRequestGate()
 
   const load = useCallback(async () => {
+    const ticket = listGate.next()
     setLoading(true)
     try {
-      const res = await fetchRequirementPage({
-        page: view === 'kanban' ? 1 : page,
-        size: querySize,
-        scope: activeScope,
-        executionOnly,
-        ...filters,
-      })
+      const res = await readWithRetry(
+        sig => fetchRequirementPage({
+          page: view === 'kanban' ? 1 : page,
+          size: querySize,
+          scope: activeScope,
+          executionOnly,
+          ...filters,
+        }, sig),
+        ticket.signal,
+      )
+      if (!ticket.isLatest()) return
       setRows(res.records ?? [])
       setTotal(res.total ?? 0)
-    } catch {
+    } catch (err) {
+      if (!ticket.isLatest() || isCanceledError(err)) return
       message.error('需求清單載入失敗')
     } finally {
-      setLoading(false)
+      if (ticket.isLatest()) setLoading(false)
     }
-  }, [view, page, querySize, activeScope, filters, executionOnly])
+  }, [listGate, view, page, querySize, activeScope, filters, executionOnly])
 
   useEffect(() => { load() }, [load])
 
@@ -534,13 +622,21 @@ export default function RequirementList({
    */
   useEffect(() => {
     if (minimal) return
-    let alive = true
+    const ticket = statsGate.next()
     setStatsReady(false)
-    fetchRequirementStats({ scope: activeScope, executionOnly, ...filters })
-      .then(s => { if (alive) { setStats(s); setStatsReady(true) } })
-      .catch(() => { if (alive) { setStats({}); setStatsReady(false) } })
-    return () => { alive = false }
-  }, [minimal, activeScope, filters, executionOnly])
+    readWithRetry(sig => fetchRequirementStats({ scope: activeScope, executionOnly, ...filters }, sig), ticket.signal)
+      .then(s => {
+        if (!ticket.isLatest()) return
+        setStats(s)
+        setStatsReady(true)
+      })
+      .catch(err => {
+        if (!ticket.isLatest() || isCanceledError(err)) return
+        setStats({})
+        setStatsReady(false)
+      })
+    // 与列表同一组 filters：条件一变立刻取消上一轮统计，避免旧口径数字闪回
+  }, [minimal, activeScope, filters, executionOnly, statsGate])
 
   /** 切换视角：写回 URL（而不是另存一份 state），否则刷新就丢，也无法从工作台深链带进来 */
   const switchScope = (key: string) => {
@@ -1277,6 +1373,21 @@ export default function RequirementList({
           </div>
           )}
 
+          {/* 看板下钻条件：必须可见可清除。
+              隐藏过滤会让用户把「某一列的几十条」当成全量数据，进而怀疑系统丢了需求 */}
+          {filters.statuses && (
+            <div style={{ marginBottom: 12 }}>
+              <Tag
+                color="blue"
+                closable
+                onClose={e => { e.preventDefault(); clearDrillFilter() }}
+              >
+                來自交付流水線：{drillSource || '看板列'}
+                （{(filters.statuses ?? '').split(',').filter(Boolean).length} 個狀態，統計卡與列表同口徑）
+              </Tag>
+            </div>
+          )}
+
           {/* ── 搜索区 ── */}
           <SearchBar
             advanced={advancedFilters}
@@ -1285,8 +1396,12 @@ export default function RequirementList({
             initialFilters={initialScene?.filters}
             projectOptions={projectChoices}
             iterationOptions={iterationChoices}
-            onSearch={v => { setFilters(v); setPage(1) }}
-            onReset={() => { setFilters({}); setPage(1) }}
+            onSearch={v => {
+              // 搜索只改表单字段：不清掉看板下钻的 statuses，否则改个优先级就丢下钻条件
+              setFilters(prev => ({ ...v, statuses: prev.statuses }))
+              setPage(1)
+            }}
+            onReset={() => { setFilters({}); setPage(1); clearDrillFilter() }}
           />
 
           {/* 统计卡：两种视图共用同一口径（§E.8 卡片必须在搜索区下方）。
@@ -1437,9 +1552,23 @@ export default function RequirementList({
             <RequirementKanban
               rows={visibleRows}
               onOpen={id => navigate(`/rdm-detail?id=${id}&tab=activity`)}
-              limitHint={kanbanTruncated
-                ? `已顯示前 ${RDM_KANBAN_SIZE} 條（共 ${total} 條），請縮小篩選範圍或切回表格視圖翻頁。`
-                : undefined}
+              limitHint={kanbanTruncated ? (
+                <span>
+                  已顯示前 {kanbanLimit} 條（共 {total} 條）。
+                  {kanbanLimit < RDM_KANBAN_MAX_SIZE ? (
+                    <Button
+                      type="link"
+                      size="small"
+                      style={{ padding: '0 4px', height: 'auto' }}
+                      onClick={() => setKanbanLimit(Math.min(kanbanLimit + RDM_KANBAN_SIZE, RDM_KANBAN_MAX_SIZE))}
+                    >
+                      再載入 {Math.min(RDM_KANBAN_SIZE, RDM_KANBAN_MAX_SIZE - kanbanLimit)} 條
+                    </Button>
+                  ) : (
+                    '已達單次載入上限，請縮小篩選範圍或切回表格視圖翻頁。'
+                  )}
+                </span>
+              ) : undefined}
             />
           )}
         </div>

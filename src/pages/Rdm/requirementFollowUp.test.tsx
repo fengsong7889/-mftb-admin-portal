@@ -63,8 +63,10 @@ describe('需求跟进清单（执行侧地板）', () => {
     render(<MemoryRouter><RequirementList /></MemoryRouter>)
     await screen.findByText('已分配執行中行')
 
+    // 第二个参数是取消信号
     expect(fetchRequirementPage).toHaveBeenCalledWith(
       expect.objectContaining({ scope: 'mine', executionOnly: true }),
+      expect.anything(),
     )
     expect(fetchScopeCounts).toHaveBeenCalledWith(true)
   })

@@ -74,7 +74,7 @@ describe('提交需求页（合并视图）', () => {
     expect(screen.queryByText('視圖')).not.toBeInTheDocument()
     expect(screen.queryByText('我的需求')).not.toBeInTheDocument()
 
-    expect(fetchRequirementPage).toHaveBeenCalledWith(expect.objectContaining({ scope: 'intake' }))
+    expect(fetchRequirementPage).toHaveBeenCalledWith(expect.objectContaining({ scope: 'intake' }), expect.anything())
     // 视图栏没了，各切片计数也就没消费方 —— 不再为它多打一次请求
     expect(fetchScopeCounts).not.toHaveBeenCalled()
   })
@@ -87,7 +87,7 @@ describe('提交需求页（合并视图）', () => {
     )
     await screen.findByText('合并视图里的需求行')
 
-    expect(fetchRequirementPage).toHaveBeenCalledWith(expect.objectContaining({ scope: 'intake' }))
+    expect(fetchRequirementPage).toHaveBeenCalledWith(expect.objectContaining({ scope: 'intake' }), expect.anything())
   })
 
   it('工具条用视角名当页面标题，让用户知道自己在看哪一份数据', async () => {

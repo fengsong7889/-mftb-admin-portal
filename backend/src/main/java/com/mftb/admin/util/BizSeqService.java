@@ -101,7 +101,13 @@ public class BizSeqService {
     public static final String RULE_OA_REQUEST = "oa_request";
     /** HR 入转调离单据编号（RS + YYYYMMDD + 4位, 同时用于关联 OA 审批流程编号） */
     public static final String RULE_HR_LIFECYCLE_REQUEST = "hr_lifecycle_request";
-    /** AI 使用申请流程编号 */
+    /**
+     * AI 使用申请流程编号规则 key。
+     * <p>
+     * 存量库曾用 ai_access 作 rule_key，而 sys_biz_seq_rule 的 prefix 是唯一键，
+     * 新 key 的种子会撞上 AI 前缀被 INSERT IGNORE 静默丢弃（提交报「編號生成規則未配置」）。
+     * 存量行由 BizSeqRuleInitializer 的 seq:init-v22 原地改名，前端规则目錄同步使用本 key。
+     */
     public static final String RULE_AI_ACCESS_REQUEST = "ai_access_request";
     /**
      * 系统权限申请流程编号（XTSQ + YYYYMMDD + 2 位日流水，从 01 起，超 99 自然扩位）。

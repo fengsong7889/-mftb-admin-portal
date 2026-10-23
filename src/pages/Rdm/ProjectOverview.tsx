@@ -45,7 +45,8 @@ import {
   SyncOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { readRdmListScene, useRdmListScene, useRdmScrollRestore } from './useListSceneRestore'
+import { readRdmListScene, rdmSceneOwner, useRdmListScene, useRdmScrollRestore } from './useListSceneRestore'
+import { isCanceledError, readWithRetry, useRequestGate } from './useRequestGate'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import dayjs from 'dayjs'
@@ -128,7 +129,7 @@ const buildColumnMeta = (t: TFunction) => [
 export default function ProjectOverview() {
   const navigate = useNavigate()
   const { t } = useTranslation()
-  const { hasPermission } = useAuth()
+  const { hasPermission, user } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
 
   // ── URL 是篩選/分頁的單一事實源（刷新/返回不丟條件） ──
@@ -148,6 +149,8 @@ export default function ProjectOverview() {
    * key 带上查询串，换一批条件时不会跳回上一批数据的旧位置。
    */
   const sceneKey = `project:${searchParams.toString()}`
+  /** 缓存归属：环境 + 登录用户，避免换账号继承上一个人的筛选与滚动位置 */
+  const sceneOwner = rdmSceneOwner(user?.id)
   const drill = (searchParams.get('drill') as DrillKey | null) ?? null
 
   // ── 搜索草稿（輸入過程不入 URL，點「查詢」才提交） ──
@@ -182,9 +185,9 @@ export default function ProjectOverview() {
   const [reloadNonce, setReloadNonce] = useState(0)
 
   /** 记录/还原列表滚动位置（返回详情页后落回原处）；key 与筛选同源，换条件不串位置 */
-  const [initialScene] = useState(() => readRdmListScene(sceneKey))
-  useRdmListScene(sceneKey, { page: pageNo, size: pageSize, filters: {} }, '/rdm-project')
-  useRdmScrollRestore(sceneKey, !loading && total > 0, initialScene?.scrollTop)
+  const [initialScene] = useState(() => readRdmListScene(sceneKey, sceneOwner))
+  useRdmListScene(sceneKey, { page: pageNo, size: pageSize, filters: {} }, '/rdm-project', sceneOwner)
+  useRdmScrollRestore(sceneKey, !loading && total > 0, initialScene?.scrollTop, sceneOwner)
 
   // ── 統計卡數據（失敗保留上次值，不回零） ──
   const [stats, setStats] = useState<RdmProjectStatsCard | null>(null)
@@ -243,58 +246,52 @@ export default function ProjectOverview() {
   )
 
   // ── 載入列表 ──
+  /**
+   * 列表与统计各自持有请求闸门：只允许最新一次写入，旧请求在切条件/卸载时取消。
+   * <p>重试策略由 readWithRetry 统一裁决（只重试传输故障与 502/503/504），
+   * 不再无差别重试业务失败或取消，避免把正常返回渲染成「載入失敗」。
+   */
+  const listGate = useRequestGate()
+  const statsGate = useRequestGate()
+
   const loadList = useCallback(async (params: RdmProjectQuery) => {
+    const ticket = listGate.next()
     setLoading(true)
     setError(null)
     try {
-      const res = await fetchProjectPage(params)
+      const res = await readWithRetry(sig => fetchProjectPage(params, sig), ticket.signal)
+      if (!ticket.isLatest()) return
       setRows(res.records ?? [])
       setTotal(res.total ?? 0)
-    } catch {
-      /*
-       * 一次自动重试再定性。
-       * 开发模式 StrictMode 会双发同一请求、路由切换也会取消在途请求，axios 统一抛
-       * Network Error；直接置错会让「从详情返回列表」变成空表 + 红色失败横幅，
-       * 而网络里其实有一条 200 已经回来。
-       */
-      try {
-        const res = await fetchProjectPage(params)
-        setRows(res.records ?? [])
-        setTotal(res.total ?? 0)
-      } catch {
-        setError('項目列表載入失敗，請重試')
-        setRows([])
-        setTotal(0)
-      }
+    } catch (err) {
+      if (!ticket.isLatest() || isCanceledError(err)) return
+      setError('項目列表載入失敗，請重試')
+      setRows([])
+      setTotal(0)
     } finally {
-      setLoading(false)
+      if (ticket.isLatest()) setLoading(false)
     }
-  }, [])
+  }, [listGate])
 
   // ── 載入統計卡（失敗不回零：保留 lastGoodStats，僅標記錯誤態） ──
   const loadStats = useCallback(async (params: RdmProjectQuery) => {
+    const ticket = statsGate.next()
     setStatsLoading(true)
     try {
-      const res = await fetchProjectStats(params)
+      const res = await readWithRetry(sig => fetchProjectStats(params, sig), ticket.signal)
+      if (!ticket.isLatest()) return
       lastGoodStats.current = res
       setStats(res)
       setStatsError(false)
-    } catch {
-      // 同上：取消/双发请求先重试一次，避免返回列表时误报「統計載入失敗」
-      try {
-        const retry = await fetchProjectStats(params)
-        lastGoodStats.current = retry
-        setStats(retry)
-        setStatsError(false)
-      } catch {
-        // 不靜默歸零：有上次值就沿用，沒有就保持 null（卡片渲染「—」明確錯誤態）
-        setStats(lastGoodStats.current)
-        setStatsError(true)
-      }
+    } catch (err) {
+      if (!ticket.isLatest() || isCanceledError(err)) return
+      // 不靜默歸零：有上次值就沿用，沒有就保持 null（卡片渲染「—」明確錯誤態）
+      setStats(lastGoodStats.current)
+      setStatsError(true)
     } finally {
-      setStatsLoading(false)
+      if (ticket.isLatest()) setStatsLoading(false)
     }
-  }, [])
+  }, [statsGate])
 
   useEffect(() => {
     loadList(listQuery)

@@ -1,0 +1,23 @@
+caseId,workPackage,flowVersion,actorAlias,resourceScope,precondition,steps,expected,actual,result,evidenceType,runId,buildRef,evidencePath
+REQ-01,P04,V1/V2/V3,admin,rdm-project,列表可加载,A 条件请求延迟返回后再切 B 条件,只显示 B 的结果且不出现 A 的错误,/tmp/vitest-final.log 与 useRequestGate.test.ts,PASS,UNIT,run-20261023-01,29ed675d,src/pages/Rdm/useRequestGate.test.ts
+REQ-02,P04,V1/V2/V3,admin,rdm-project,A 已取消、B 成功,取消后旧 catch 写状态,不出现誤報載入失敗,取消分支直接 return,PASS,UNIT,run-20261023-01,29ed675d,src/pages/Rdm/useRequestGate.ts
+REQ-03,P04,all,admin,rdm,首个 GET 503 后成功,连续失败两次,只重试一次且第二次失败才提示,9 例单测覆盖,PASS,UNIT,run-20261023-01,29ed675d,src/pages/Rdm/useRequestGate.test.ts
+REQ-04,P04,all,admin,rdm,401/403/500,发生鉴权或业务失败,不自动重试,策略表覆盖,PASS,UNIT,run-20261023-01,29ed675d,src/pages/Rdm/useRequestGate.test.ts
+REQ-05,P04,all,admin,rdm-project,条件不变点查詢/重試,刷新令牌触发,列表与统计各发一次最新请求,ProjectOverview.test.tsx 通过,PASS,UNIT,run-20261023-01,29ed675d,src/pages/Rdm/ProjectOverview.test.tsx
+STATS-01,P05,all,admin,rdm-requirement,筛选优先级 P1,查看统计卡与列表,卡片为过滤结果子集,统计 effect 与列表同 filters,PASS,CODE_INSPECTION,run-20261023-01,29ed675d,src/pages/Rdm/RequirementList.tsx
+STATS-02,P05,all,admin,rdm-requirement,筛 status=evaluating,查看待分配/待验收卡,两卡为 0,statusScope 与 status 取 AND,PASS,UNIT,run-20261023-01,29ed675d,backend/src/test/java/com/mftb/admin/dto/RdmRequirementQueryStatsTest.java
+STATS-03,P05,all,admin,rdm-requirement,项目/迭代/提出人交叉筛选,统计复算,统计与列表同口径,复制完整筛选字段,PASS,CODE_INSPECTION,run-20261023-01,29ed675d,backend/src/main/java/com/mftb/admin/service/impl/RdmRequirementServiceImpl.java
+WEEKLY-01,P05,V1/V2,admin,rdm-weekly,选定一周,对比顶部已上线与部门合计,两者同区间同粒度,部门 delivered 改为 actual_release_date 区间,PASS,UNIT,run-20261023-01,29ed675d,backend/src/test/java/com/mftb/admin/service/RdmWeeklyReportConsistencyTest.java
+NAV-01,P07,all,admin,rdm-requirement,滚动到 600 后进详情,浏览器后退,恢复 600 与页码/每页,owner 隔离与快照记录,PASS,UNIT,run-20261023-01,29ed675d,src/pages/Rdm/useListSceneRestore.test.ts
+NAV-03,P07,all,user A->user B,rdm-requirement,A 设置筛选后退出,B 登录,不继承 A 的筛选/位置,owner=环境:用户 隔离；登出清理,PASS,UNIT,run-20261023-01,29ed675d,src/pages/Rdm/useListSceneRestore.test.ts
+PRD-01,P06,all,pm,rdm-prd,编辑正文未保存,切页签,出现离开确认,已接入 MenuTabs,PARTIAL,BROWSER,run-20261023-01,29ed675d,docs/qa/rdm-2026-10/execution.md
+PRD-02,P06,all,pm,rdm-prd,选择暂存并离开,重新打开同一 PRD,可从本机暂存恢复,prdDraftStore 5 例通过,PASS,UNIT,run-20261023-01,29ed675d,src/pages/Rdm/prdDraftStore.test.ts
+PRD-03,P06,all,pm,rdm-prd,同一需求两份 PRD,分别编辑,暂存互不串,key 含 reqId/prdId,PASS,UNIT,run-20261023-01,29ed675d,src/pages/Rdm/prdDraftStore.test.ts
+PRD-04,P06,all,pm,rdm-prd,浏览器后退,离开未保存页,应拦截,未覆盖（需 Data Router）,BLOCKED,CODE_INSPECTION,run-20261023-01,29ed675d,docs/qa/rdm-2026-10/execution.md
+PRD-08,P06,all,pm A/pm B,rdm-prd,A/B 读同版本,A 保存后 B 保存,B 冲突不覆盖A,未实现 row_version,OPEN,CODE_INSPECTION,run-20261023-01,29ed675d,docs/qa/rdm-2026-10/execution.md
+UI-TABLE-03,P10,all,qa,rdm-test,批次号超宽,悬浮与点击复制,显示全文并复制成功,已加 title+复制按钮,PASS,CODE_INSPECTION,run-20261023-01,29ed675d,src/pages/Rdm/TestWorkbench.tsx
+UI-CONFIG-01,P10,all,pm,rdm-workbench,取消一个区块勾选,继续操作其它项,条目位置不跳变,面板按注册表固定顺序,PASS,CODE_INSPECTION,run-20261023-01,29ed675d,src/pages/Rdm/WorkbenchCustomize.tsx
+AUTH-01,P03,all,viewer_a,rdm,未建立专用账号,直接调用编辑接口,拒绝,未执行,BLOCKED,BROWSER,run-20261023-01,29ed675d,docs/qa/rdm-2026-10/execution.md
+FLOW-V3-01,P03,V3,release_a/reviewer_a,rdm,未建立专用账号,多交付项发布全链路,按门禁推进,未执行,BLOCKED,API,run-20261023-01,29ed675d,docs/qa/rdm-2026-10/execution.md
+ADMIN-01,P12,all,admin,rdm-delivery,管理员携带 scope=all,请求 tasks/mine?scope=all,返回全部任务且页面提示管理员视角,RdmDeliveryGuardTest 29 例通过,PASS,UNIT,run-20261023-01,29ed675d,backend/src/test/java/com/mftb/admin/service/impl/RdmDeliveryGuardTest.java
+ADMIN-02,P12,all,dev_a,rdm-delivery,普通角色伪造 scope=all,请求 tasks/mine?scope=all,仍只返回本人任务,服务端按 owner 收敛,PASS,UNIT,run-20261023-01,29ed675d,backend/src/test/java/com/mftb/admin/service/impl/RdmDeliveryGuardTest.java

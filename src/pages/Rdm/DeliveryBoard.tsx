@@ -85,7 +85,9 @@ export default function DeliveryBoard() {
   const { t } = useTranslation()
   // 任务类型字典（业务可配置）：类型标签/颜色从接口取，未知 code 兑底原文
   const { labelOf: taskTypeLabelOf, colorOf: taskTypeColorOf } = useTaskTypeDict()
-  const { hasPermission } = useAuth()
+  const { hasPermission, user } = useAuth()
+  /** 管理员不受「只看自己」限制：本页展示全部任务（服务端 scope=all 亦会二次校验） */
+  const isAdmin = user?.role === 'admin'
   /** 两个视图共用一个页面：新建路由会撞 MenuTabs 的非菜单页名兜底表上限（已达 20/20） */
   const [mode, setMode] = useState('task')
   const [view, setView] = useState('open')
@@ -123,7 +125,7 @@ export default function DeliveryBoard() {
     setLoading(true)
     try {
       const status = view === 'open' || view === 'all' ? undefined : view
-      const list = await fetchMyTasks(status)
+      const list = await fetchMyTasks(status, isAdmin ? 'all' : undefined)
       // 未完成视角下，逾期与阻塞的任务置顶，避免被列表淹没
       const sorted = [...list].sort((a, b) => {
         const rank = (t: RdmTaskItem) => (t.status === RDM_TASK_STATUS.BLOCKED ? 0 : t.overdue ? 1 : t.status === RDM_TASK_STATUS.DOING ? 2 : 3)
@@ -135,7 +137,7 @@ export default function DeliveryBoard() {
     } finally {
       setLoading(false)
     }
-  }, [view])
+  }, [view, isAdmin])
 
   useEffect(() => { void load() }, [load])
 
@@ -525,6 +527,15 @@ export default function DeliveryBoard() {
 
   return (
     <div className="content-area">
+      {isAdmin && mode === 'task' && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={t('rdm.deliveryBoard.adminScopeHint')}
+        />
+      )}
+
       {/* 頁面說明横幅：不屬統計卡，按 §E.8 留在搜索區上方（僅任務形態需要這段口徑說明） */}
       {mode === 'task' && (
         <Alert
@@ -576,12 +587,26 @@ export default function DeliveryBoard() {
       <div className="action-section">
         <div className="action-section-left">
           <Button icon={<ReloadOutlined />} onClick={load}>刷新</Button>
-          <Button onClick={() => navigate('/rdm-iteration')}>迭代排期</Button>
-          <Button onClick={() => navigate('/rdm-requirement?scope=delivery')}>查看交付中需求</Button>
-          <Button onClick={() => navigate('/rdm-resource-load')}>{t('rdm.deliveryBoard.btnTeamLoad')}</Button>
+          {/*
+            跳转类按钮按目标菜单权限隐藏。
+            受限角色（例如只授「研發工作台」）能看到这些按钮，点下去直接进 403 页，
+            是「暴露了做不到的动作」——比不显示更差：用户会以为系统坏了或自己没权限被针对。
+            hasPermission 已内置 admin 直通，不会削弱管理员可用性。
+          */}
+          {hasPermission('rdm-delivery-iteration:view') && (
+            <Button onClick={() => navigate('/rdm-iteration')}>迭代排期</Button>
+          )}
+          {hasPermission('rdm-requirement:view') && (
+            <Button onClick={() => navigate('/rdm-requirement?scope=delivery')}>查看交付中需求</Button>
+          )}
+          {hasPermission('rdm-resource-load:view') && (
+            <Button onClick={() => navigate('/rdm-resource-load')}>{t('rdm.deliveryBoard.btnTeamLoad')}</Button>
+          )}
         </div>
         <div className="action-section-right">
-          <Button type="primary" icon={<FileAddOutlined />} onClick={() => navigate('/rdm-task')}>新增任務</Button>
+          {hasPermission('rdm-delivery-board:create') && (
+            <Button type="primary" icon={<FileAddOutlined />} onClick={() => navigate('/rdm-task')}>新增任務</Button>
+          )}
           {configComponent}
         </div>
       </div>

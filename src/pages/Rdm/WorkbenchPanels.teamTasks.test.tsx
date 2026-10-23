@@ -23,6 +23,18 @@ vi.mock('../../api/rdm', () => ({
   fetchTestBatches: vi.fn().mockResolvedValue([]),
 }))
 
+/*
+ * 面板按角色决定拉取口径（管理员取全部任务），必须提供登录态；
+ * 这里只换掉 useAuth，保留 AuthProvider 等其余导出，避免连带拆掉上下文模块。
+ */
+vi.mock('../../contexts/AuthContext', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../contexts/AuthContext')>()
+  return {
+    ...actual,
+    useAuth: () => ({ user: { id: 8, role: 'user', name: '張三', empNo: 'MF00008' } }),
+  }
+})
+
 const api = vi.mocked(rdmApi)
 
 function task(id: number, title: string): RdmTaskItem {

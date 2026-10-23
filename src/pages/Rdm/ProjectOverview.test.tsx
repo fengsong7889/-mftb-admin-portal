@@ -82,9 +82,10 @@ describe('ProjectOverview URL ↔ 篩選/分頁同步', () => {
   it('從 URL 還原 keyword/status/pmUserId/pageNo/pageSize 並真正進入查詢參數', async () => {
     renderAt('/rdm-project?keyword=abc&status=in_progress&pmUserId=7&pmName=%E5%BC%B5%E4%B8%89&pageNo=2&pageSize=50')
     await waitFor(() => expect(fetchProjectPage).toHaveBeenCalled())
+    // 第二个参数是取消信号：读取接口已支持 AbortSignal，断言只关心查询条件
     expect(fetchProjectPage).toHaveBeenCalledWith(expect.objectContaining({
       keyword: 'abc', status: 'in_progress', pmUserId: 7, pageNo: 2, pageSize: 50,
-    }))
+    }), expect.anything())
   })
 })
 
@@ -109,8 +110,8 @@ describe('ProjectOverview 統計卡下鑽', () => {
     fireEvent.click(await screen.findByTitle('點擊下鑽：僅看籌備/進行中項目'))
     // 过去是纯前端过滤「已加载的本页」，跳页时卡片说 4 行、表格只给本页命中的行；
     // 现在必须把口径下发后端，让 total 与卡片同源
-    await waitFor(() => expect(fetchProjectPage).toHaveBeenCalledWith(expect.objectContaining({ drill: 'inProgress' })))
-    expect(fetchProjectStats).toHaveBeenCalledWith(expect.not.objectContaining({ drill: 'inProgress' }))
+    await waitFor(() => expect(fetchProjectPage).toHaveBeenCalledWith(expect.objectContaining({ drill: 'inProgress' }), expect.anything()))
+    expect(fetchProjectStats).toHaveBeenCalledWith(expect.not.objectContaining({ drill: 'inProgress' }), expect.anything())
     // chip 与分页总数都用服务端返回的 total（不再是本页行数）
     expect(await screen.findByText(/下鑽：在管項目（4 個項目）/)).toBeInTheDocument()
     expect(screen.getByText('下鑽過濾：4 個項目')).toBeInTheDocument()
@@ -122,14 +123,14 @@ describe('ProjectOverview 統計卡下鑽', () => {
     await screen.findByText('演示項目')
     vi.mocked(fetchProjectPage).mockClear()
     fireEvent.click(await screen.findByTitle('點擊下鑽：僅看風險/逾期/已暫停項目'))
-    await waitFor(() => expect(fetchProjectPage).toHaveBeenCalledWith(expect.objectContaining({ drill: 'attention' })))
+    await waitFor(() => expect(fetchProjectPage).toHaveBeenCalledWith(expect.objectContaining({ drill: 'attention' }), expect.anything()))
     vi.mocked(fetchProjectPage).mockClear()
     fireEvent.click(await screen.findByTitle('點擊下鑽：僅看待裁決項目'))
-    await waitFor(() => expect(fetchProjectPage).toHaveBeenCalledWith(expect.objectContaining({ drill: 'pending' })))
+    await waitFor(() => expect(fetchProjectPage).toHaveBeenCalledWith(expect.objectContaining({ drill: 'pending' }), expect.anything()))
     // 再點同口徑卡 = 取消下钻，drill 不得残留在列表请求里
     vi.mocked(fetchProjectPage).mockClear()
     fireEvent.click(await screen.findByTitle('點擊下鑽：僅看待裁決項目'))
-    await waitFor(() => expect(fetchProjectPage).toHaveBeenCalledWith(expect.objectContaining({ drill: undefined })))
+    await waitFor(() => expect(fetchProjectPage).toHaveBeenCalledWith(expect.objectContaining({ drill: undefined }), expect.anything()))
   })
 })
 

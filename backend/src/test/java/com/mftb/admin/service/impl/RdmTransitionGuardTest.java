@@ -194,12 +194,12 @@ class RdmTransitionGuardTest {
     void requiredFieldMustBeFilled() {
         RdmConfigVO.Transition accept = rule(List.of(RdmConstants.ROLE_PM), List.of("promisedDate"));
         RdmTransitionDTO empty = new RdmTransitionDTO();
-        BusinessException ex = assertThrows(BusinessException.class, () -> service.applyRequiredGuard(accept, empty));
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.applyRequiredGuard(null, accept, empty));
         assertTrue(ex.getMessage().contains("承諾出 PRD 日期"), ex.getMessage());
 
         RdmTransitionDTO filled = new RdmTransitionDTO();
         filled.setPromisedDate("2026-10-15");
-        assertDoesNotThrow(() -> service.applyRequiredGuard(accept, filled));
+        assertDoesNotThrow(() -> service.applyRequiredGuard(null, accept, filled));
     }
 
     @Test
@@ -208,17 +208,53 @@ class RdmTransitionGuardTest {
         RdmConfigVO.Transition reject = rule(List.of(RdmConstants.ROLE_PM), List.of("remark"));
         RdmTransitionDTO blank = new RdmTransitionDTO();
         blank.setRemark("   ");
-        assertThrows(BusinessException.class, () -> service.applyRequiredGuard(reject, blank));
+        assertThrows(BusinessException.class, () -> service.applyRequiredGuard(null, reject, blank));
 
         RdmConfigVO.Transition dispatch = rule(List.of(RdmConstants.ROLE_DISPATCHER), List.of("pm"));
         RdmTransitionDTO noPm = new RdmTransitionDTO();
         noPm.setPmUserId(null);
-        assertThrows(BusinessException.class, () -> service.applyRequiredGuard(dispatch, noPm));
+        assertThrows(BusinessException.class, () -> service.applyRequiredGuard(null, dispatch, noPm));
 
         when(permissionService.hasPermission(any(), eq(RdmConstants.MENU_INTAKE), eq("edit"))).thenReturn(true);
         RdmTransitionDTO withPm = new RdmTransitionDTO();
         withPm.setPmUserId(9L);
-        assertDoesNotThrow(() -> service.applyRequiredGuard(dispatch, withPm));
+        assertDoesNotThrow(() -> service.applyRequiredGuard(null, dispatch, withPm));
+    }
+
+    /**
+     * 排期必填「project/iteration」回归。
+     * <p>历史上这两个 key 漏在 switch 外，恒落到 {@code default -> null}：
+     * v1.2 迁移把 schedule.required_fields 补成 {@code planDate,project,iteration} 后，
+     * 弹窗里明明选好了项目与迭代，后端仍恒报「需要填寫「project」」。
+     */
+    @Test
+    @DisplayName("排期必填项目/迭代：请求带值或需求已挂归属均放行，两处都没有才拒")
+    void scheduleProjectAndIterationAreRequired() {
+        RdmConfigVO.Transition schedule = rule(List.of(RdmConstants.ROLE_PM), List.of("planDate", "project", "iteration"));
+        schedule.setActionCode("schedule");
+        schedule.setActionName("提交排期");
+
+        // 1) 弹窗内选好项目+迭代
+        RdmTransitionDTO withOwnership = new RdmTransitionDTO();
+        withOwnership.setPlanDate("2026-12-31");
+        withOwnership.setProjectId(901L);
+        withOwnership.setIterationCode("PROJ2026101901-1");
+        assertDoesNotThrow(() -> service.applyRequiredGuard(null, schedule, withOwnership));
+
+        // 2) 请求未带归属，但属性栏已挂好：按已有值复核，不得要求重选
+        com.mftb.admin.entity.RdmRequirement existing = new com.mftb.admin.entity.RdmRequirement();
+        existing.setProjectId(902L);
+        existing.setIterationCode("PROJ2026101901-2");
+        RdmTransitionDTO planOnly = new RdmTransitionDTO();
+        planOnly.setPlanDate("2026-12-31");
+        assertDoesNotThrow(() -> service.applyRequiredGuard(existing, schedule, planOnly));
+
+        // 3) 两处都没有：拒绝，且提示中文字段名而不是英文 key
+        RdmTransitionDTO nothing = new RdmTransitionDTO();
+        nothing.setPlanDate("2026-12-31");
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.applyRequiredGuard(new com.mftb.admin.entity.RdmRequirement(), schedule, nothing));
+        assertTrue(ex.getMessage().contains("所屬項目"), ex.getMessage());
     }
 
     /* ==================== 单条需求可见性（防猜 id 越权） ==================== */

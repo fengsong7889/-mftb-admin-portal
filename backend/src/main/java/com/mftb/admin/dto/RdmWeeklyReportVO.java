@@ -77,6 +77,11 @@ public class RdmWeeklyReportVO {
     public static class DeptRow {
         private String deptName;
         private Integer submitted;
+        /**
+         * 本期上线需求数（与顶部 summary.released 同一日期区间、同一筛选口径）。
+         * <p>不是「当前已交付存量」：按状态快照统计会把往期上线量混进来，
+         * 导致部门合计与顶部本期已上线数永远对不上。
+         */
         private Integer delivered;
         private Integer overdue;
         private Double avgDays;

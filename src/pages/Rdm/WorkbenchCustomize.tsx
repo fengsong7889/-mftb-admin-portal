@@ -30,14 +30,13 @@ export default function WorkbenchCustomize({ layout }: { layout: WorkbenchLayout
   const [open, setOpen] = useState(false)
   const { visibleKeys, candidates, toggle, move, reset, customized, identities } = layout
 
-  /** 隐藏区块按注册表顺序排在可见区块之后，方便一眼看到「还有什么没开」 */
-  const rows = useMemo(() => {
-    const hidden = candidates.filter(meta => !visibleKeys.includes(meta.key))
-    const visibleMeta = visibleKeys
-      .map(key => candidates.find(meta => meta.key === key))
-      .filter((meta): meta is NonNullable<typeof meta> => !!meta)
-    return [...visibleMeta, ...hidden]
-  }, [candidates, visibleKeys])
+  /**
+   * 面板顺序固定按候选注册表渲染，只切换显隐。
+   * <p>历史实现把隐藏项沉到末尾：用户取消勾选后，该项立刻跳到列表最下方，
+   * 上移/下移按钮的位置也跟着变，连续操作很容易误关其它区块。
+   * 排序仍只作用于 visibleKeys（上移/下移按钮），不改动面板本身的阅读顺序。
+   */
+  const rows = useMemo(() => candidates, [candidates])
 
   const content = (
     <div style={{ width: 380 }}>

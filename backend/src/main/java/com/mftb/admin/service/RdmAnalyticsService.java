@@ -412,13 +412,17 @@ public class RdmAnalyticsService {
         List<Object> args = new ArrayList<>();
         args.add(start);
         args.add(end);
+        // 第二对日期参数属于「本期上线」：必须与顶部 summary.released 同一区间口径，
+        // 否则部门产出合计与顶部已上线数对不上（历史实现按当前状态快照统计，会混入往期上线量）
+        args.add(start);
+        args.add(end);
         if (byIteration) {
             args.add(iterationCode);
         }
         for (Map<String, Object> row : jdbcTemplate.queryForList(
                 "SELECT COALESCE(submit_dept_name,'未填部門') AS dept_name, "
                         + " SUM(CASE WHEN submit_time >= ? AND submit_time < ? THEN 1 ELSE 0 END) AS submitted, "
-                        + " SUM(CASE WHEN status IN " + DELIVERED_STATUS_SQL + " THEN 1 ELSE 0 END) AS delivered, "
+                        + " SUM(CASE WHEN actual_release_date >= ? AND actual_release_date < ? THEN 1 ELSE 0 END) AS delivered, "
                         + " SUM(CASE WHEN overdue_flag = 1 THEN 1 ELSE 0 END) AS overdue, "
                         + " AVG(CASE WHEN actual_release_date IS NOT NULL AND accept_time IS NOT NULL "
                         + "      THEN (CASE WHEN actual_release_date >= DATE(accept_time) THEN DATEDIFF(actual_release_date, DATE(accept_time)) END) END) AS avg_days "
@@ -800,6 +804,8 @@ public class RdmAnalyticsService {
         column.setTitle(title);
         column.setCount(toLong(row.get("cnt")));
         column.setOverdue(toLong(row.get("overdue")));
+        // 与 count 同源：前端拿这份集合下钻，保证「列上的数字」= 「点进去的行数」
+        column.setStatuses(statuses);
         return column;
     }
 

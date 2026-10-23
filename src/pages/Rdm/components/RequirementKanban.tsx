@@ -7,7 +7,7 @@
  * 看到的是同一份筛选结果 —— 之前看板有自己一套 fetch 且忽略搜索条件，
  * 切视图等于换了个查询，是这两个页面本质重复却表现不一致的根因。
  */
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { Space, Tag, Tooltip } from 'antd'
 import { AlertOutlined } from '@ant-design/icons'
 import RequirementStageBar from './RequirementStageBar'
@@ -19,8 +19,11 @@ import { formatHandlers, formatPerson, splitHandlers } from '../handlerDisplay'
 
 interface RequirementKanbanProps {
   rows: RdmRequirementRow[]
-  /** 达到数量上限时的提示文案（看板不做翻页，必须告知截断） */
-  limitHint?: string
+  /**
+   * 达到数量上限时的提示内容（看板不做翻页，必须告知截断）。
+   * <p>允许传节点：「再載入 N 條」按钮必须贴着截断提示，用户才找得到扩容入口。
+   */
+  limitHint?: ReactNode
   onOpen: (id: number) => void
 }
 

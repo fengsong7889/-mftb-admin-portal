@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Checkbox, DatePicker, Input, InputNumber, Modal, Select, Space, message } from 'antd'
 import { SendOutlined } from '@ant-design/icons'
 import RdmFormHeader from './components/RdmFormHeader'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { useAuth } from '../../contexts/AuthContext'
 import {
@@ -20,6 +20,8 @@ import {
   type RdmPrdItem,
 } from '../../api/rdm'
 import { RDM_CHANGE_TYPE, RDM_CHANGE_TYPE_LABEL, formatRdmReqNo, type RdmChangeType } from '../../constants/rdm'
+import { buildRdmDetailPath } from '../../constants/menuDataSource'
+import { useRdmBack } from './useRdmBack'
 import './index.css'
 
 const { TextArea } = Input
@@ -34,9 +36,10 @@ const CHANGE_TYPE_OPTIONS = [
 ].map(value => ({ value, label: RDM_CHANGE_TYPE_LABEL[value] }))
 
 export default function ChangeForm() {
-  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const reqId = Number(searchParams.get('reqId') ?? 0)
+  /** 提交/取消后能回退就回来源页，直接打开才 replace 到详情（带上 from 保持侧栏高亮） */
+  const goBack = useRdmBack(reqId ? buildRdmDetailPath({ id: reqId, from: searchParams.get('from') }) : '/rdm-requirement')
   const { user } = useAuth()
 
   const [requirement, setRequirement] = useState<{ reqNo: string; title: string; planReleaseDate?: string | null } | null>(null)
@@ -126,7 +129,8 @@ export default function ChangeForm() {
             newPlanReleaseDate: form.affectsSchedule ? form.newPlanReleaseDate?.format('YYYY-MM-DD') : undefined,
           })
           message.success(`變更申請已提交審批${res?.changeNo ? `（${res.changeNo}）` : ''}`)
-          navigate(`/rdm-detail?id=${reqId}`)
+          // 不能用 navigate(详情URL)：那会再 push 一条，连点返回来回穿越表单页
+          goBack()
         } catch {
           message.error('提交失敗，請重試')
           throw new Error('submit failed') // 保持弹窗打开，便于用户重试
@@ -143,7 +147,7 @@ export default function ChangeForm() {
       <RdmFormHeader
         title="需求變更申請"
         backText="返回需求"
-        onBack={() => navigate(-1)}
+        onBack={goBack}
         meta={requirement ? `${requirement.reqNo} · ${requirement.title}` : '變更需經審批，通過後系統才承認新的口徑與排期'}
       />
 
@@ -246,7 +250,7 @@ export default function ChangeForm() {
       </div>
 
       <div className="form-footer">
-        <Button onClick={() => navigate(-1)}>取消</Button>
+        <Button onClick={goBack}>取消</Button>
         <Button type="primary" icon={<SendOutlined />} loading={submitting} onClick={handleSubmit}>提交變更申請</Button>
       </div>
     </div>

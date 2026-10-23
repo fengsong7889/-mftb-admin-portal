@@ -462,9 +462,9 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         counts.put("total", countStatsSubset(query, userId, current, approvingIds, q -> { }));
         counts.put("overdue", countStatsSubset(query, userId, current, approvingIds, q -> q.setOverdueOnly(true)));
         counts.put("toAccept", countStatsSubset(query, userId, current, approvingIds,
-                q -> { q.setStatuses(null); q.setStatus(RdmConstants.STATUS_UAT_PENDING); }));
+                q -> q.setStatusScope(List.of(RdmConstants.STATUS_UAT_PENDING))));
         counts.put("pool", countStatsSubset(query, userId, current, approvingIds,
-                q -> { q.setStatuses(null); q.setStatus(RdmConstants.STATUS_POOL); }));
+                q -> q.setStatusScope(List.of(RdmConstants.STATUS_POOL))));
         return counts;
     }
 
@@ -486,6 +486,12 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         return n == null ? 0L : n;
     }
 
+    /**
+     * 复制一份与列表完全同源的筛选条件。
+     * <p>统计卡、视图栏计数与列表行数必须能互相对上；漏掉任何一个筛选字段都会出现
+     * 「筛了项目/迭代/提出人之后，卡片还是全量」的口径分叉，而且不会报错、只会静默算错。
+     * <p>集合字段复制成新列表，避免子指标计算修改共享引用。
+     */
     private static RdmRequirementQuery copyFiltersForStats(RdmRequirementQuery src) {
         RdmRequirementQuery q = new RdmRequirementQuery();
         q.setScope(src.getScope());
@@ -493,13 +499,21 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         q.setReqType(src.getReqType());
         q.setPriority(src.getPriority());
         q.setStatus(src.getStatus());
+        q.setStatuses(src.getStatuses() == null ? null : new java.util.ArrayList<>(src.getStatuses()));
+        q.setBlockedOnly(src.getBlockedOnly());
         q.setDeptId(src.getDeptId());
         q.setPmUserId(src.getPmUserId());
+        q.setSubmitterUserId(src.getSubmitterUserId());
         q.setOverdueOnly(src.getOverdueOnly());
+        q.setRelatedUserId(src.getRelatedUserId());
         // 执行侧地板必须跟着复制：否则需求跟进清单的看板信号卡会比列表多算准入前/需求池的单
         q.setExecutionOnly(src.getExecutionOnly());
         // 当前处理人筛选必须与列表同源：否则筛人后看板信号卡/视图栏计数与表格行数分叉
         q.setHandlerUserId(src.getHandlerUserId());
+        q.setProjectId(src.getProjectId());
+        q.setIterationCode(src.getIterationCode());
+        q.setRequirementKind(src.getRequirementKind());
+        q.setFlowVersion(src.getFlowVersion());
         return q;
     }
 
@@ -2225,7 +2239,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         if (!systemAlign && !canPerform(rule, current, myRoles)) {
             throw new BusinessException("您沒有權限執行「" + rule.getActionName() + "」");
         }
-        applyRequiredGuard(rule, dto);
+        applyRequiredGuard(req, rule, dto);
 
         String fromStatus = req.getStatus();
         LocalDateTime now = LocalDateTime.now();
@@ -3504,8 +3518,14 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         return allowed.contains(RdmConstants.ROLE_DISPATCHER) && canDispatch(current);
     }
 
-    /** 必填字段校验（与 rdm_transition.required_fields 同源）；包内可见供单测验证口径 */
-    void applyRequiredGuard(RdmConfigVO.Transition rule, RdmTransitionDTO dto) {
+    /**
+     * 必填字段校验（与 rdm_transition.required_fields 同源）；包内可见供单测验证口径。
+     * <p>{@code project}/{@code iteration} 与 {@link #applyProjectAndIteration} 同口径：
+     * 请求未携带归属时按需求已有值复核，避免「屬性欄已掛好項目/迭代，排期仍被要求重選」。
+     * <p>这两个 key 一旦漏在 switch 外就会落到 default 恒为 null，导致配置了必填就永远拒绝；
+     * 因此新增任何 required_fields 取值时必须同步补分支与 {@link #fieldLabel} 文案。
+     */
+    void applyRequiredGuard(RdmRequirement req, RdmConfigVO.Transition rule, RdmTransitionDTO dto) {
         for (String field : rule.getRequiredFields()) {
             String value = switch (field) {
                 case "remark" -> dto == null ? null : dto.getRemark();
@@ -3516,6 +3536,20 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
                 case "score" -> dto == null || dto.getScore() == null ? null : String.valueOf(dto.getScore());
                 case "pm" -> dto == null || dto.getPmUserId() == null ? null : String.valueOf(dto.getPmUserId());
                 case "blockReason" -> dto == null ? null : dto.getBlockReason();
+                case "project" -> {
+                    Long projectId = dto == null ? null : dto.getProjectId();
+                    if (projectId == null && req != null) {
+                        projectId = req.getProjectId();
+                    }
+                    yield projectId == null ? null : String.valueOf(projectId);
+                }
+                case "iteration" -> {
+                    String iterationCode = dto == null ? null : dto.getIterationCode();
+                    if (!StringUtils.hasText(iterationCode) && req != null) {
+                        iterationCode = req.getIterationCode();
+                    }
+                    yield iterationCode;
+                }
                 default -> null;
             };
             if (!StringUtils.hasText(value)) {
@@ -3534,6 +3568,8 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
             case "score" -> "交付滿意度";
             case "pm" -> "產品經理";
             case "blockReason" -> "阻塞原因";
+            case "project" -> "所屬項目";
+            case "iteration" -> "所屬迭代";
             default -> field;
         };
     }

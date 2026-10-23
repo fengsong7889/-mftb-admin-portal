@@ -169,6 +169,18 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
     /** 增量版本: 產研協同系統更名產研交付系統，存量编号规则 biz_menu 归属文案同步归一 */
     private static final String V_INIT_RDM_MENU_LABEL_RENAME = "seq:init-v21";
 
+    /**
+     * 增量版本: AI 使用申請流程編號規則 key 對齊（ai_access → ai_access_request）。
+     * <p>
+     * sys_biz_seq_rule 對 prefix 有唯一鍵，AI 前綴早已被舊種子的 rule_key=ai_access 佔住，
+     * v6 種子按 ai_access_request 寫入時被 INSERT IGNORE 靜默吞掉，服務端按規範 key 查規則
+     * 直接 fail-closed，AI 使用申請提交必報「編號生成規則未配置」。
+     */
+    private static final String V_INIT_AI_ACCESS_RULE_KEY = "seq:init-v22";
+
+    /** AI 使用申請規則的舊 key（僅作存量對齊依據，新代碼一律用 BizSeqService.RULE_AI_ACCESS_REQUEST） */
+    private static final String LEGACY_AI_ACCESS_RULE_KEY = "ai_access";
+
     /** 订单号快照表：各广告明细表按 order_id 同步快照 */
     private static final String[] AD_ORDER_ITEM_TABLES = {
             "biz_ad_order_item_star", "biz_ad_order_item_new_store", "biz_ad_order_item_revive",
@@ -241,6 +253,48 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
         versionTracker.applyOnce(V_INIT_AD_ORDER_CODES,
                 this::migrateAdOrderCodes, this::verifyAdOrderCodes);
         versionTracker.applyOnce(V_INIT_RDM_MENU_LABEL_RENAME, this::renameRdmRuleBizMenu);
+        versionTracker.applyOnce(V_INIT_AI_ACCESS_RULE_KEY,
+                this::alignAiAccessRuleKey, this::verifyAiAccessRuleKey);
+    }
+
+    /**
+     * 存量修正：把 AI 使用申請流程編號規則的 key 從舊值 ai_access 原地改為規範 key。
+     * <p>
+     * 為什麼是改名而不是補種子：sys_biz_seq_rule 的 uk_seq_rule_prefix 讓同一 prefix（AI）
+     * 只能存在一行，舊行不改名就永遠插不進新 key。改名只動 rule_key，prefix / 位數 /
+     * 起點與 sys_biz_seq 的流水行都不動，已發出的 AI 單號保持連續、不會重號。
+     * <p>
+     * 三種存量形態都要收口：已有規範 key（新庫）→ 不動；只有舊 key → 改名；兩者皆無 → 補種子。
+     */
+    void alignAiAccessRuleKey() {
+        if (countRule(BizSeqService.RULE_AI_ACCESS_REQUEST) == 0) {
+            if (countRule(LEGACY_AI_ACCESS_RULE_KEY) > 0) {
+                int renamed = jdbcTemplate.update(
+                        "UPDATE sys_biz_seq_rule SET rule_key = ? WHERE rule_key = ?",
+                        BizSeqService.RULE_AI_ACCESS_REQUEST, LEGACY_AI_ACCESS_RULE_KEY);
+                log.info("AI 使用申請編號規則 key 對齊: {} → {}（{} 行）",
+                        LEGACY_AI_ACCESS_RULE_KEY, BizSeqService.RULE_AI_ACCESS_REQUEST, renamed);
+            } else {
+                seedAiAccessRequestRule();
+            }
+        }
+        // 規則快取是啟動期讀的，改完必須失效，否則是本次啟動內仍按舊 key 查不到
+        bizSeqService.refreshRules();
+    }
+
+    /** 後置校驗：規範 key 的規則行確實存在，否則不記版本、下次啟動重試 */
+    void verifyAiAccessRuleKey() {
+        if (countRule(BizSeqService.RULE_AI_ACCESS_REQUEST) == 0) {
+            throw new IllegalStateException(
+                    "AI 使用申請流程編號規則未就緒: " + BizSeqService.RULE_AI_ACCESS_REQUEST);
+        }
+    }
+
+    /** 按 rule_key 統計規則行數（遷移校驗用，不做業務判斷） */
+    private int countRule(String ruleKey) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_biz_seq_rule WHERE rule_key = ?", Integer.class, ruleKey);
+        return count == null ? 0 : count;
     }
 
     /**
@@ -587,7 +641,13 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
         }
     }
 
-    /** AI 使用申请流程编号规则种子（AI + YYYYMMDD + 4位自增序号，归属审批中心） */
+    /**
+     * AI 使用申请流程编号规则种子（AI + YYYYMMDD + 4位自增序号，归属审批中心）。
+     * <p>
+     * 注意：AI 前缀在 sys_biz_seq_rule 上是唯一键，若同一前缀被旧 key 占着，这里的
+     * INSERT IGNORE 会被静默丢弃 —— 存量库由 {@code alignAiAccessRuleKey} 改名收口，
+     * 种子只服务「规则行完全不存在」的场景。
+     */
     private void seedAiAccessRequestRule() {
         int inserted = jdbcTemplate.update(
                 "INSERT IGNORE INTO sys_biz_seq_rule "

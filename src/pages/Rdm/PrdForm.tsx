@@ -6,14 +6,14 @@
  * 标题不再手填：新建 PRD 取需求标题作为列表展示名（编辑态保留原标题），
  * 后端 savePrd 仍强校验 title 非空，故提交前自动兜底。
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Checkbox, Input, Modal, Space, Tag, message } from 'antd'
 import { BulbOutlined, LockOutlined, SaveOutlined } from '@ant-design/icons'
 import DOMPurify from 'dompurify'
 import { useTranslation } from 'react-i18next'
 import RdmFormHeader from './components/RdmFormHeader'
 import RichTextEditor from '../../components/RichTextEditor'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import {
   fetchDeliverySummary,
   fetchPrdSnapshots,
@@ -24,6 +24,11 @@ import {
   type RdmPrdSnapshotItem,
 } from '../../api/rdm'
 import { formatRdmReqNo, RDM_STATUS } from '../../constants/rdm'
+import { buildRdmDetailPath } from '../../constants/menuDataSource'
+import { useAuth } from '../../contexts/AuthContext'
+import { useConfirmLeave, useUnsavedGuard } from '../../contexts/UnsavedChangesContext'
+import { clearPrdDraft, loadPrdDraft, prdDraftOwner, savePrdDraft } from './prdDraftStore'
+import { useRdmBack } from './useRdmBack'
 import './index.css'
 
 /**
@@ -63,13 +68,20 @@ function plainText(html: string): string {
 }
 
 export default function PrdForm() {
-  const navigate = useNavigate()
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const reqId = Number(searchParams.get('reqId') ?? 0)
   const prdId = Number(searchParams.get('id') ?? 0)
+  /** 保存/取消后能回退就回来源页，直接打开才 replace 到详情（带上 from 保持侧栏高亮） */
+  const goBack = useRdmBack(reqId ? buildRdmDetailPath({ id: reqId, from: searchParams.get('from') }) : '/rdm-requirement')
 
   /** 需求头部展示信息：reqNo 存的是展示串（准入前行本就没有编号，不能拼出 null） */
+  const { user } = useAuth()
+  /** 本机暂存归属：环境 + 用户；不同账号绝不共用 */
+  const draftOwner = prdDraftOwner(user?.id)
+  const { register: registerUnsaved } = useUnsavedGuard()
+  const confirmLeave = useConfirmLeave()
+
   const [requirement, setRequirement] = useState<{
     reqNo: string; title: string; expectResult?: string | null
     /** 需求状态 / 交付流程：决定能不能新建 PRD、能不能「保存并推进」 */
@@ -99,6 +111,28 @@ export default function PrdForm() {
     contentRich: '',
   })
 
+  /**
+   * 脏状态基线：服务端加载/正式保存成功后更新。
+   * <p>用内容比较而不是"输入即脏"：用户打开就离开不应该被拦；
+   * 输入后又改回原样也不应继续提示。
+   */
+  const [baseline, setBaseline] = useState<string>('')
+  const dirty = useMemo(() => JSON.stringify(form) !== baseline, [form, baseline])
+  const dirtyRef = useRef(dirty)
+  dirtyRef.current = dirty
+  const formRef = useRef(form)
+  formRef.current = form
+  /** 服务端当前行的 updatedAt：恢复本机暂存时用于识别"服务器已变化" */
+  const serverUpdatedAt = useRef<string | null>(null)
+  /**
+   * 服务端当前行的并发版本号：保存时原样回传，后端据此拒绝覆盖他人刚写入的内容。
+   * <p>不能拿 updatedAt 代替：它精度到秒，同一秒内的两次保存看起来完全一样。
+   */
+  const serverRowVersion = useRef<number | null>(null)
+  const [draftNotice, setDraftNotice] = useState<{ savedAt: number; failed: boolean } | null>(null)
+  /** 本机暂存恢复只尝试一次，避免每次重渲染反复弹确认框 */
+  const draftChecked = useRef(false)
+
   /** 定稿（评审中/已通过）且未勾选以新版本修改 → 表单只读 */
   const isLocked = currentStatus === 'reviewing' || currentStatus === 'approved'
   /**
@@ -126,6 +160,66 @@ export default function PrdForm() {
     }).catch(() => message.error('需求資訊載入失敗'))
   }, [reqId])
 
+  /**
+   * 恢复本机暂存：必须等服务器内容先落地，否则后到的 setForm 会把恢复内容盖掉。
+   * <p>服务器 updatedAt 与暂存基线不一致时仍允许恢复，但明确提示"服务器已变化"，
+   * 由用户自己决定保留哪一份；本实现不自动合并富文本。
+   */
+  const offerDraftRestore = (
+    serverForm: typeof form,
+    serverUpdatedAtValue: string | null,
+    serverHadCurrent: boolean,
+  ) => {
+    if (draftChecked.current || !reqId) return
+    draftChecked.current = true
+    const draft = loadPrdDraft(draftOwner, reqId, prdId || null)
+    if (!draft) return
+    const restored = {
+      title: draft.title ?? serverForm.title,
+      parentPrdId: draft.parentPrdId,
+      targetUsers: draft.targetUsers ?? '',
+      featureList: draft.featureList ?? '',
+      acceptanceCriteria: draft.acceptanceCriteria ?? '',
+      prototypeUrl: draft.prototypeUrl ?? '',
+      contentRich: draft.contentRich ?? '',
+    }
+    if (JSON.stringify(restored) === JSON.stringify(serverForm)) {
+      // 与服务器内容一致：没有恢复价值，直接清掉，避免下次再问
+      clearPrdDraft(draftOwner, reqId, prdId || null)
+      return
+    }
+    const changedOnServer = serverHadCurrent
+      && !!serverUpdatedAtValue
+      && !!draft.baseUpdatedAt
+      && draft.baseUpdatedAt !== serverUpdatedAtValue
+    Modal.confirm({
+      title: t('rdm.prd.draftFoundTitle'),
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>{t('rdm.prd.draftTimeLabel')}</span><b>{new Date(draft.savedAt).toLocaleString()}</b></div>
+          <div className="confirm-info-row"><span>{t('rdm.prd.draftLengthLabel')}</span><b>{plainText(draft.contentRich ?? '').length} 字</b></div>
+          {changedOnServer && (
+            <div className="confirm-info-row">
+              <span>注意：</span><b>{t('rdm.prd.draftServerChanged')}</b>
+            </div>
+          )}
+        </div>
+      ),
+      okText: t('rdm.prd.draftRestoreAction'),
+      cancelText: t('rdm.prd.draftDiscardAction'),
+      onOk: () => {
+        setForm(restored)
+        setDraftNotice({ savedAt: draft.savedAt, failed: false })
+        message.info(t('rdm.prd.draftRestoredMsg'))
+      },
+      onCancel: () => {
+        clearPrdDraft(draftOwner, reqId, prdId || null)
+      },
+    })
+  }
+
   /** 编辑态回填；同时取同需求下的 PRD 作为「父 PRD」候选（逐级拆解） */
   useEffect(() => {
     if (!reqId) return
@@ -135,10 +229,12 @@ export default function PrdForm() {
       const current = summary.prds.find(p => p.id === prdId)
       if (current) {
         setCurrentStatus(current.status)
+        serverUpdatedAt.current = current.updatedAt ?? null
+        serverRowVersion.current = current.rowVersion ?? 0
         if (prdId) {
           fetchPrdSnapshots(prdId).then(setSnapshots).catch(() => setSnapshots([]))
         }
-        setForm({
+        const loaded = {
           title: current.title,
           parentPrdId: current.parentPrdId ?? undefined,
           targetUsers: current.targetUsers ?? '',
@@ -146,10 +242,73 @@ export default function PrdForm() {
           acceptanceCriteria: current.acceptanceCriteria ?? '',
           prototypeUrl: current.prototypeUrl ?? '',
           contentRich: toEditorHtml(current.contentRich ?? ''),
-        })
+        }
+        setForm(loaded)
+        // 服务端内容就是基线：只有之后真正改动才算脏
+        setBaseline(JSON.stringify(loaded))
+        offerDraftRestore(loaded, current.updatedAt ?? null, true)
+      } else if (!prdId) {
+        // 新建 PRD：基线是空表单，服务器没有可覆盖的内容
+        offerDraftRestore(formRef.current, null, false)
       }
     }).catch(() => message.error('PRD 資訊載入失敗'))
+    // offerDraftRestore 只依赖当前挂载参数；刻意不进依赖，避免每次渲染重复询问
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reqId, prdId])
+
+  /** 新建 PRD 的初始基线：空表单不算脏 */
+  useEffect(() => {
+    if (prdId || baseline) return
+    setBaseline(JSON.stringify(formRef.current))
+  }, [prdId, baseline])
+
+  /**
+   * 脏内容 500ms 防抖暂存。
+   * <p>只写 sessionStorage，不发正式保存请求；存储失败要显式提示，
+   * 不能让用户以为内容已经安全。
+   */
+  useEffect(() => {
+    if (!reqId || !dirty) return
+    const timer = setTimeout(() => {
+      const ok = savePrdDraft(draftOwner, reqId, prdId || null, {
+        ...formRef.current,
+        baseUpdatedAt: serverUpdatedAt.current,
+      })
+      setDraftNotice({ savedAt: Date.now(), failed: !ok })
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [form, dirty, reqId, prdId, draftOwner])
+
+  /** 离开保护：页签切换/关闭等导航入口统一询问；stash 用最新表单内容 */
+  useEffect(() => registerUnsaved({
+    isDirty: () => dirtyRef.current,
+    stash: () => {
+      if (!reqId) return false
+      const ok = savePrdDraft(draftOwner, reqId, prdId || null, {
+        ...formRef.current,
+        baseUpdatedAt: serverUpdatedAt.current,
+      })
+      setDraftNotice({ savedAt: Date.now(), failed: !ok })
+      return ok
+    },
+    discard: () => {
+      if (reqId) clearPrdDraft(draftOwner, reqId, prdId || null)
+      setBaseline(JSON.stringify(formRef.current))
+      setDraftNotice(null)
+    },
+    describe: () => (requirement ? `${requirement.reqNo} · ${requirement.title}` : 'PRD 內容'),
+  }), [registerUnsaved, reqId, prdId, draftOwner, requirement])
+
+  /** 刷新/关闭浏览器：浏览器允许的最小提示（自定义文案无法保证展示） */
+  useEffect(() => {
+    if (!dirty) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [dirty])
 
   /**
    * 生成 PRD 草稿。
@@ -235,6 +394,13 @@ export default function PrdForm() {
     })
   }
 
+  /** 页面内返回/取消也要走同一套未保存保护 */
+  const handleLeave = async () => {
+    const decision = confirmLeave()
+    if (decision !== true && !await decision) return
+    goBack()
+  }
+
   /** 确认后才落库 */
   const submitPrd = async (advance: boolean, title: string) => {
     if (!reqId) return
@@ -262,9 +428,15 @@ export default function PrdForm() {
         advanceRequirement: advance,
         newVersion: newVersion || undefined,
         changeReason: newVersion ? changeReason.trim() : undefined,
+        // 开新版本时后端不碰原行，不需要版本号；原地保存则带上打开时读到的版本
+        expectedRowVersion: prdId && !newVersion ? serverRowVersion.current ?? undefined : undefined,
       })
+      // 正式保存成功：本机暂存已完成使命，清掉避免下次重复询问
+      clearPrdDraft(draftOwner, reqId, prdId || null)
+      setBaseline(JSON.stringify(formRef.current))
       message.success(prdId ? (newVersion ? '已存為新版本草稿' : 'PRD 已更新') : 'PRD 已保存')
-      navigate(`/rdm-detail?id=${reqId}`)
+      // 不能用 navigate(详情URL)：那会再 push 一条，连点返回来回穿越表单页
+      goBack()
     } catch (err) {
       // request.ts 已统一弹后端真实文案，这里不再重复 message.error（§G.4 禁止双弹）
       console.error(err)
@@ -278,12 +450,28 @@ export default function PrdForm() {
       <RdmFormHeader
         title={prdId ? '編輯 PRD' : '編寫 PRD'}
         backText="返回需求"
-        onBack={() => navigate(-1)}
+        onBack={handleLeave}
         badge={siblings.length > 0 ? (
           <span style={{ fontSize: 12, fontWeight: 400, color: '#8C8C8C' }}>同需求已有 {siblings.length} 份 PRD</span>
         ) : undefined}
         meta={requirement ? `${requirement.reqNo} · ${requirement.title}` : t('rdm.prdForm.metaFallback', { defaultValue: '需求說明支援富文本編輯' })}
       />
+
+      {dirty && draftNotice && (
+        <div
+          style={{
+            marginBottom: 16, padding: '8px 12px', borderRadius: 6, fontSize: 12,
+            background: draftNotice.failed ? '#FFF1F0' : '#FFF7F0',
+            border: `1px solid ${draftNotice.failed ? '#FFCCC7' : '#FFE7D1'}`,
+            color: draftNotice.failed ? '#CF1322' : '#8C8C8C',
+          }}
+          role="status"
+        >
+          {draftNotice.failed
+            ? t('rdm.prd.draftFailedHint')
+            : t('rdm.prd.draftSavedHint', { time: new Date(draftNotice.savedAt).toLocaleTimeString() })}
+        </div>
+      )}
 
       {aiNotice && (
         <Alert
@@ -399,7 +587,7 @@ export default function PrdForm() {
       </fieldset>
 
       <div className="form-footer">
-        <Button onClick={() => navigate(-1)}>取消</Button>
+        <Button onClick={handleLeave}>取消</Button>
         {/* 只有「已受理的 V2 需求」才有推进语义：其余场景只保存，避免按钮暗示一次不会发生的状态变化 */}
         {canAdvance && (
           <Button icon={<SaveOutlined />} loading={saving} disabled={saveBlocked} onClick={() => handleSave(false)}>保存草稿</Button>

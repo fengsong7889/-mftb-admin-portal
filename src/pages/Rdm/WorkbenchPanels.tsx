@@ -14,6 +14,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useAuth } from '../../contexts/AuthContext'
 import { Alert, Button, Select, Space, Spin, Tag } from 'antd'
 import { RightOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -142,6 +143,9 @@ function taskUrgency(task: RdmTaskItem): number {
 export function MyDevTasksPanel() {
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const { user } = useAuth()
+  /** 管理员不受「只看自己」限制：面板展示全部研发任务（服务端 scope=all 二次校验） */
+  const isAdmin = user?.role === 'admin'
   const [members, setMembers] = useState<RdmTeamMember[]>([])
   /** 0 = 我的任务；>0 = 指定成员（团队协作视图） */
   const [ownerId, setOwnerId] = useState(0)
@@ -162,7 +166,7 @@ export function MyDevTasksPanel() {
     setLoading(true)
     setErrorText(null)
     try {
-      setData(id > 0 ? await fetchTeamTasks(id) : await fetchMyTasks())
+      setData(id > 0 ? await fetchTeamTasks(id) : await fetchMyTasks(undefined, isAdmin ? 'all' : undefined))
     } catch (err) {
       // 无共同项目是权限/归属问题，必须把后端原文摆出来，不能伪装成「对方没任务」
       setData(null)
@@ -170,7 +174,7 @@ export function MyDevTasksPanel() {
     } finally {
       setLoading(false)
     }
-  }, [t])
+  }, [t, isAdmin])
 
   useEffect(() => { void load(ownerId) }, [load, ownerId])
 
@@ -181,9 +185,17 @@ export function MyDevTasksPanel() {
       icon={RDM_SECTION_ICON['dev-tasks']}
       iconBg="#E6F7FF"
       iconColor="#1890FF"
-      title={viewingTeam ? t('rdm.teamTask.teamTitle', { defaultValue: '團隊成員任務' }) : t('rdm.teamTask.myTitle', { defaultValue: '我的研發任務' })}
+      title={viewingTeam
+        ? t('rdm.teamTask.teamTitle', { defaultValue: '團隊成員任務' })
+        : isAdmin
+          ? t('rdm.teamTask.adminTitle', { defaultValue: '全部研發任務' })
+          : t('rdm.teamTask.myTitle', { defaultValue: '我的研發任務' })}
       count={rows.length}
-      hint={viewingTeam ? t('rdm.teamTask.teamHint', { defaultValue: '僅顯示你們共同項目下的任務，逾期與阻塞置頂' }) : t('rdm.teamTask.myHint', { defaultValue: '僅列指派給我的未完成任務，逾期與阻塞置頂' })}
+      hint={viewingTeam
+        ? t('rdm.teamTask.teamHint', { defaultValue: '僅顯示你們共同項目下的任務，逾期與阻塞置頂' })
+        : isAdmin
+          ? t('rdm.teamTask.adminHint', { defaultValue: '管理員視角：顯示全部任務，逾期與阻塞置頂' })
+          : t('rdm.teamTask.myHint', { defaultValue: '僅列指派給我的未完成任務，逾期與阻塞置頂' })}
       action={(
         <Space size={8}>
           <Select

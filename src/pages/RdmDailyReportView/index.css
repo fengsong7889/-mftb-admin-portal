@@ -15,7 +15,7 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  padding: 20px 16px 40px;
+  padding: 16px 14px 32px;
   background: #f4f5f7;
   color: #262626;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -31,6 +31,21 @@
 .rdm-board-shell {
   max-width: 1080px;
   margin: 0 auto;
+}
+
+/* ── 工具條：語言切換與外部瀏覽器入口 ── */
+.rdm-board-utility-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+/* 釘釘側邊欄寬約 490px：控件不換行時優先壓縮間距，換行時仍保持右對齊 */
+.rdm-board-utility-bar .ant-segmented {
+  flex-shrink: 0;
 }
 
 /* ── 载入与提示 ── */
@@ -123,7 +138,7 @@
 }
 
 .rdm-board-hero-inner {
-  padding: 20px 24px 18px;
+  padding: 18px 18px 16px;
 }
 
 .rdm-board-brand-row {

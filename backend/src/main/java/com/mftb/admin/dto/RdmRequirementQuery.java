@@ -42,6 +42,14 @@ public class RdmRequirementQuery {
      */
     private List<String> statuses;
 
+    /**
+     * 统计子指标的状态范围（服务端内部字段，不由前端直接传）。
+     * <p>与 {@link #status} / {@link #statuses} 是 <b>AND</b> 关系：看板四个信号卡要求
+     * 「在当前筛选结果里数某个状态」，例如筛了 evaluating 时「待分配」必须是 0。
+     * <p>不能再用覆盖 status 的老做法：那会把用户选的筛选条件顶掉，数字变成另一组口径。
+     */
+    private List<String> statusScope;
+
     /** 仅看阻塞 */
     private Boolean blockedOnly;
 
@@ -165,6 +173,10 @@ public class RdmRequirementQuery {
             wrapper.eq(RdmRequirement::getStatus, status);
         } else if (statuses != null && !statuses.isEmpty()) {
             wrapper.in(RdmRequirement::getStatus, statuses);
+        }
+        // 统计子指标：与上面的筛选条件取交集，而不是覆盖用户选择
+        if (statusScope != null && !statusScope.isEmpty()) {
+            wrapper.in(RdmRequirement::getStatus, statusScope);
         }
         if (Boolean.TRUE.equals(blockedOnly)) {
             wrapper.eq(RdmRequirement::getBlockedFlag, 1);

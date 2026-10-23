@@ -1451,6 +1451,13 @@ export const RDM_TERMINAL_STATUS: RdmStatus[] = [
 export const RDM_KANBAN_SIZE = 100
 
 /**
+ * 看板「再載入」的总上限。
+ * <p>与需求分页接口单次返回上限对齐（200 条）：超过这个量必须走表格分页，
+ * 继续扩容只会把一屏上百张卡片塞进同一个 DOM，滚动与交互一起变卡。
+ */
+export const RDM_KANBAN_MAX_SIZE = 200
+
+/**
  * 可冻结五节点基线的需求状态（前端唯一来源）。
  * <p>必须与后端 RdmDeliveryServiceImpl.BASELINE_FREEZE_STATUS 一字不差：前端曾经只判
  * 「评审通过」，而正常动线是先排期再冻结基线，结果排期之后按钮永远消失，

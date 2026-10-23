@@ -730,7 +730,7 @@ export interface RdmDashboardData {
   stageDuration: { stage: RdmStage | string; avgHours: number }[]
   trend: { date: string; submitted: number; delivered: number }[]
   risks: RdmRiskItem[]
-  board: { columns: { key: string; title: string; count: number; overdue: number }[] }
+  board: { columns: { key: string; title: string; count: number; overdue: number; statuses?: string[] }[] }
 }
 
 /** 列表查询条件（字段名与后端 RdmRequirementQuery 对齐） */
@@ -751,6 +751,13 @@ export interface RdmRequirementQuery {
   submitterUserId?: number
   /** 當前處理人用户 ID：命中該人負責的未完成任務（todo/doing/blocked）所屬需求 */
   handlerUserId?: number
+  /**
+   * 多状态筛选（逗号串，如 {@code pool,assigned}）。
+   * <p>必须用逗号串而不是数组：axios 默认把数组序列化成 {@code statuses[]=a}，
+   * Spring 按名绑定收不到带方括号的键，接口会表现为「筛选无效、返回全量」。
+   * <p>用于看板列下钻：列上的 count 与这份集合由后端同源下发。
+   */
+  statuses?: string
   /** V3：按所属项目过滤 */
   projectId?: number
   /** V3：按需求种类过滤 aggregate/execution */
@@ -773,9 +780,9 @@ export interface RdmRequirementQuery {
 /* ==================== 查询 ==================== */
 
 /** 需求分页列表 */
-export async function fetchRequirementPage(query: RdmRequirementQuery): Promise<PageResult<RdmRequirementRow>> {
+export async function fetchRequirementPage(query: RdmRequirementQuery, signal?: AbortSignal): Promise<PageResult<RdmRequirementRow>> {
   try {
-    return await request.get<unknown, PageResult<RdmRequirementRow>>('/rdm/requirement', { params: query, ...SILENT })
+    return await request.get<unknown, PageResult<RdmRequirementRow>>('/rdm/requirement', { params: query, ...SILENT, signal })
   } catch (err) {
     if (isBackendUnavailable(err)) {
       const records = mockListRequirements(query)
@@ -804,9 +811,10 @@ export async function fetchScopeCounts(executionOnly = false): Promise<Record<st
  */
 export async function fetchRequirementStats(
   query: Omit<RdmRequirementQuery, 'page' | 'size'>,
+  signal?: AbortSignal,
 ): Promise<Record<string, number>> {
   try {
-    return await request.get<unknown, Record<string, number>>('/rdm/requirement/stats', { params: query, ...SILENT })
+    return await request.get<unknown, Record<string, number>>('/rdm/requirement/stats', { params: query, ...SILENT, signal })
   } catch (err) {
     if (isBackendUnavailable(err)) return mockRequirementStats(query)
     throw err
@@ -834,9 +842,9 @@ export async function fetchAllowedActions(id: number): Promise<RdmAllowedAction[
 }
 
 /** 工作台待办聚合 */
-export async function fetchWorkbench(): Promise<RdmWorkbenchData> {
+export async function fetchWorkbench(signal?: AbortSignal): Promise<RdmWorkbenchData> {
   try {
-    return await request.get<unknown, RdmWorkbenchData>('/rdm/workbench', SILENT)
+    return await request.get<unknown, RdmWorkbenchData>('/rdm/workbench', { ...SILENT, signal })
   } catch (err) {
     if (isBackendUnavailable(err)) return mockWorkbench()
     throw err
@@ -1316,6 +1324,8 @@ export interface RdmPrdItem {
   reviewConclusion?: string | null
   createdAt?: string | null
   updatedAt?: string | null
+  /** 并发版本号：编辑时原样回传（expectedRowVersion），用于拒绝覆盖他人刚保存的内容 */
+  rowVersion?: number | null
 }
 
 /** 评审记录 */
@@ -1507,6 +1517,12 @@ export interface RdmPrdForm {
   newVersion?: boolean
   /** 版本变更原因（newVersion 时必填） */
   changeReason?: string
+  /**
+   * 打开编辑时读到的 rowVersion。
+   * <p>传了且与服务器不一致 → 后端拒绝保存，避免两人同时编辑时后保存者静默抹掉前者内容。
+   * 新建 PRD 不传。
+   */
+  expectedRowVersion?: number
 }
 
 /** 任务表单 */
@@ -1563,9 +1579,10 @@ export async function fetchDeliverySummary(reqId: number): Promise<RdmDeliverySu
  * 以下列表接口在后端不可用时统一返回空数组：
  * M2 交付数据（PRD/任务/评审）没有合理的前端假数据可编，空态比假数据诚实。
  */
-export async function fetchMyTasks(status?: string): Promise<RdmTaskItem[]> {
+export async function fetchMyTasks(status?: string, scope?: 'all'): Promise<RdmTaskItem[]> {
   try {
-    return await request.get<unknown, RdmTaskItem[]>('/rdm/delivery/tasks/mine', { params: { status }, ...SILENT })
+    // scope=all 只在服务端确认是管理员时生效；普通角色传了也会被按本人收敛
+    return await request.get<unknown, RdmTaskItem[]>('/rdm/delivery/tasks/mine', { params: { status, scope }, ...SILENT })
   } catch (err) {
     if (isBackendUnavailable(err)) return []
     throw err
@@ -3531,8 +3548,8 @@ export interface RdmAcceptanceRecordSubmitForm {
 
 // ===== 项目 Project =====
 
-export async function fetchProjectPage(params: RdmProjectQuery): Promise<{ records: RdmProjectListItem[]; total: number }> {
-  return request.get<unknown, { records: RdmProjectListItem[]; total: number }>('/rdm/project', { params, ...SILENT })
+export async function fetchProjectPage(params: RdmProjectQuery, signal?: AbortSignal): Promise<{ records: RdmProjectListItem[]; total: number }> {
+  return request.get<unknown, { records: RdmProjectListItem[]; total: number }>('/rdm/project', { params, ...SILENT, signal })
 }
 
 export async function createProject(data: RdmProjectCreateForm): Promise<RdmProjectDetail> {
@@ -3559,8 +3576,8 @@ export async function fetchProjectSummary(id: number): Promise<RdmProjectSummary
   return request.get<unknown, RdmProjectSummary>(`/rdm/project/${id}/summary`, SILENT)
 }
 
-export async function fetchProjectStats(params: RdmProjectQuery): Promise<RdmProjectStatsCard> {
-  return request.get<unknown, RdmProjectStatsCard>('/rdm/project/stats', { params, ...SILENT })
+export async function fetchProjectStats(params: RdmProjectQuery, signal?: AbortSignal): Promise<RdmProjectStatsCard> {
+  return request.get<unknown, RdmProjectStatsCard>('/rdm/project/stats', { params, ...SILENT, signal })
 }
 
 export async function fetchProjectPending(id: number): Promise<RdmProjectPendingItem[]> {

@@ -134,7 +134,7 @@ export default function RdmDashboard() {
           {board.columns.map(col => (
             <div
               key={col.key}
-              onClick={() => navigate('/rdm-requirement')}
+              onClick={() => navigate(`/rdm-requirement?statuses=${encodeURIComponent((col.statuses ?? []).join(','))}&src=${encodeURIComponent(col.title)}`)}
               style={{
                 border: '1px solid #e8eaed', borderRadius: 8, padding: '12px 14px', cursor: 'pointer',
                 background: col.overdue > 0 ? '#FFF7F0' : '#FAFBFC',

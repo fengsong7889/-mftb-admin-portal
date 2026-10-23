@@ -8,6 +8,7 @@ import { STORAGE_KEYS, CONTROLLED_MENU_KEYS, resolveFirstAccessiblePath } from '
 import { login as loginApi, logout as logoutApi, getUserInfo, TOKEN_KEY, AUTH_UNAUTHORIZED_EVENT, SESSION_CONFLICT_EVENT, FORCE_LOGOUT_EVENT, ACCOUNT_DISABLED_EVENT, resetUnauthorizedGuard } from '../api'
 import { updateAvatarApi } from '../api/auth'
 import { isBackendUnavailable } from '../api/request'
+import { clearSessionCaches } from '../utils/sessionCaches'
 import { writeCurrentSystemCode } from '../hooks/useCurrentSystem'
 import type { SessionConflictDetail, ForceLogoutDetail } from '../api'
 
@@ -183,6 +184,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem('is_authenticated')
       localStorage.removeItem('user_info')
+      // 登录态失效后不能把上一账号的列表条件/未保存草稿留给下一个登录者
+      clearSessionCaches()
     }
     window.addEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized)
     return () => window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized)
@@ -233,6 +236,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem('is_authenticated')
     localStorage.removeItem('user_info')
+    // 主动登出/账号切换：本机列表条件与未保存草稿一并清理，避免留给下一个登录者
+    clearSessionCaches()
   }, [])
 
   /**

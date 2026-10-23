@@ -151,12 +151,16 @@ public class RdmDeliveryController {
         return Result.success(deliveryService.listTasks(reqId));
     }
 
-    /** 我的任务（研发/设计/测试视角；不传 status 时返回未完成） */
+    /**
+     * 我的任务（研发/设计/测试视角；不传 status 时返回未完成）。
+     * <p>{@code scope=all} 仅对管理员生效：管理员可查看全部任务，其他角色仍只看自己的。
+     */
     @GetMapping("/tasks/mine")
     @RequirePermission(menu = "rdm-delivery-board", anyOf = {"rdm-requirement", "rdm-acceptance", "rdm-intake"},
                 anyPermissions = {"rdm-requirement:view_all"})
-    public Result<List<RdmDeliveryVO.Task>> myTasks(@RequestParam(required = false) String status) {
-        return Result.success(deliveryService.myTasks(status));
+    public Result<List<RdmDeliveryVO.Task>> myTasks(@RequestParam(required = false) String status,
+                                                    @RequestParam(required = false) String scope) {
+        return Result.success(deliveryService.myTasks(status, "all".equalsIgnoreCase(scope)));
     }
 
     /**
