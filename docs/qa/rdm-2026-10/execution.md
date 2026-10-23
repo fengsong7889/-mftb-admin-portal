@@ -20,7 +20,7 @@
 | P08 看板下钻与分页 | 完成 | 后端 BoardColumn 下发与 count 同源的 statuses；前端点击列带 statuses 下钻并在列表顶部显示可清除的条件；看板「再載入」至 200 条上限 |
 | P09 SLA 运行取证 | 部分完成 | 机制存在性已确认（扫描/预警/升级/去重）；真实阈值跨期与投递未执行（需独立环境与测试渠道） |
 | P10 UI 细节 | 部分完成 | 批次号全文/复制、个性化配置顺序稳定已做；宠物遮挡、双语全量收口未做 |
-| P11 回归与清场 | 部分完成 | 类型检查、lint、5 道门禁通过；影响域测试见下；全量 verify/后端全量测试未执行（未提交） |
+| P11 回归与清场 | 完成 | 前端 `npm run verify`（静态门禁全通过，vitest 127/130，3 个超时失败单跑通过）+ 后端 `mvn clean test`（2257 例 0 失败）；已提交 `dde5bf19` 并推送 main |
 | P12 管理员全量视角（新增需求） | 完成 | 研发任务/批次对管理员放开；非管理员传 all 仍按本人收敛；服务端裁决 |
 
 ## 环境与隔离
@@ -108,7 +108,7 @@
 
 1. **浏览器前进/后退未拦截**：当前项目使用声明式 `HashRouter`，官方 `useBlocker` 需要 Data Router。迁移 `createHashRouter + RouterProvider` 必须单独立项并做全站路由回归（登录重定向、门户、公开签署页、404、页签恢复）。已覆盖的离开入口：顶部页签点击/关闭/关闭其他/关闭右侧/关闭全部、PRD 页内返回与取消、刷新与关闭浏览器。
 2. **多角色真实登录矩阵**：见 P02/P03 阻塞说明。
-3. **全量门禁**：未执行 `npm run verify` 与后端全量 `mvn test`（本批未提交）。
+3. **全量门禁已执行（本批已提交 `dde5bf19`）**：见下方「提交与部署记录」。
 
 ### 本批补充完成的切片（上一版曾列为未完成，现已关闭）
 
@@ -136,7 +136,20 @@
 | 多角色矩阵 | 三个 `QA-` 账号登录 | 侧栏无越权菜单、越权接口 403、admin `tasks/mine?scope=all`=36 而受限角色为 0 |
 | 安全扫描 | `npm run secret-scan` | 890 文件，无硬编码敏感信息 |
 
-未执行：`npm run verify` 全量、后端全量 `mvn test`、生产构建与发布（本批未提交）。
+以上为提交前 L2 全量结果：后端 `mvn clean test` 2257 例 0 失败；前端 `npm run verify` 静态门禁全通过，vitest 127/130，
+3 个超时失败（`Recommend/AlgorithmAdd.traffic`、`waterfallConfig/WaterfallForm`、`Recommend/TrafficAlgorithmConfig`，与本批无关）单文件复跑均通过，定性为负载假红；CI 同批 `Test` 步骤 success 佐证。
+
+## 提交与部署记录（2026-10-23）
+
+| 项 | 值 |
+|---|---|
+| 提交 | `dde5bf19`，77 文件（+3463/−288），工作区干净；推送 `29ed675d..dde5bf19` |
+| 安全审查 | L3 深度审查零发现后推送 |
+| 前端 | 流水线 `39959606081`：quality-gate/build/deploy 全 success；`version.json` 实测 `commitHash=dde5bf1` → **已上线** |
+| 后端 | 流水线 `39959606159`：test/build-and-push success，镜像 `ghcr.io/fengsong7889/mftb-admin-backend:dde5bf19ae8036fc61ac34a99295f9ba0bd096f2`（含 latest） |
+| 后端部署 | deploy job 的 `Set up kubectl`/`Configure kubeconfig`/`Rollout restart`/`Post-deploy verification` **四步 skipped**（无 `SEALOS_KUBECONFIG`）→ **集群未滚动，生产仍是旧镜像** |
+
+待完成以让后端真正生效：在 Sealos 控制台把 `mftb-admin-backend` 镜像切到上面 sha → 首次启动执行 `rdm:schema:v3.34` → 轮询 `/api/health/ready` 到 200（启动期 5~6 分钟为正常中间态）→ 用生产账号跑 `scripts/verify-deploy.sh`。
 
 ## 回归风险与说明
 
@@ -159,4 +172,4 @@
 
 - 所有改动集中在 `src/pages/Rdm/**`、`src/api/rdm.ts`、`src/App.tsx`、`src/components/MenuTabs.tsx`、`backend` RDM 服务与迁移、双语文件。
 - 新增迁移列保留，不做 DROP。
-- 生产发布与数据库变更未执行。
+- 前端已上线（`dde5bf1`）；后端镜像已入 GHCR，**生产集群尚未切换**，`rdm:schema:v3.34` 随新镜像启动期执行，尚未在生产落库。
