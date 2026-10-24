@@ -55,6 +55,10 @@ public class EamAssetLifecycleServiceImpl implements EamAssetLifecycleService {
                 if (asset.getCurrentHolderId() != null && !Objects.equals(asset.getCurrentHolderId(), claim.getEmployeeId())) {
                     throw new BusinessException("領用來源與持有人不一致，請先核對領用關係");
                 }
+                // 代辦領用未經本人簽署就被遺失/報廢/送修終止，會留下永遠無法補簽的孤儿記錄
+                // （與歸還同一套規矩）：先讓本人補簽，再辦理異常處置。
+                if ("proxy_pending".equals(claim.getSignatureStatus()))
+                    throw new BusinessException("該領用為代辦領用且本人尚未補簽，請先完成簽署再辦理異常處置");
                 claimMapper.update(null, new UpdateWrapper<EamClaim>()
                         .eq("id", claim.getId())
                         .set("status", closedStatus)

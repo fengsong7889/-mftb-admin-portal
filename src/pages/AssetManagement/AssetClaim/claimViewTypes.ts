@@ -15,6 +15,8 @@ export type SignatureStatus = typeof SIGNATURE_STATUS[keyof typeof SIGNATURE_STA
 
 export interface ClaimStatsData {
   employeeCount: number
+  /** 全部领用记录（不加状态条件，含取消/终止态）；个人视图的「本人資產記錄」取它 */
+  totalCount: number
   claimedCount: number
   returnedCount: number
   pendingSignatureCount: number
@@ -84,6 +86,8 @@ export interface ClaimQuery {
   keyword?: string
   departmentId?: number
   status?: ClaimStatus
+  /** 多状态过滤（逗号分隔），如「異常終止」页签的取消/調撥/遺失/報廢/送修 */
+  statuses?: string
   pendingSignature?: boolean
   employeeId?: number
 }

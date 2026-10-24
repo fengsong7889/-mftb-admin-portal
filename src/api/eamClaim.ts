@@ -49,7 +49,7 @@ export async function fetchClaimStats(query: Partial<ClaimQuery>): Promise<Claim
     return await request.get<unknown, ClaimStatsData>(`/eam/claims/stats?${params}`)
   } catch (err) {
     if (isBackendUnavailable(err)) {
-      return { employeeCount: 0, claimedCount: 0, returnedCount: 0, pendingSignatureCount: 0 }
+      return { employeeCount: 0, totalCount: 0, claimedCount: 0, returnedCount: 0, pendingSignatureCount: 0 }
     }
     throw err
   }
@@ -71,7 +71,7 @@ export async function fetchEmployeeSummary(query: ClaimQuery): Promise<ClaimSumm
       return {
         records: [],
         total: 0,
-        stats: { employeeCount: 0, claimedCount: 0, returnedCount: 0, pendingSignatureCount: 0 },
+        stats: { employeeCount: 0, totalCount: 0, claimedCount: 0, returnedCount: 0, pendingSignatureCount: 0 },
       }
     }
     throw err

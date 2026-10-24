@@ -8,6 +8,7 @@ import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.EamBorrowQuery;
 import com.mftb.admin.dto.EamBorrowStatsVO;
 import com.mftb.admin.dto.EamBorrowVO;
+import com.mftb.admin.entity.EamAsset;
 import com.mftb.admin.entity.EamBorrow;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.EamAssetMapper;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.time.LocalDate;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -46,6 +48,7 @@ class EamBorrowSelfScopeTest {
     private static final long OTHER_ID = 7L;
 
     private EamBorrowMapper borrowMapper;
+    private EamAssetMapper assetMapper;
     private EamBorrowServiceImpl service;
 
     private final SysUser self = user(SELF_ID, "MF00002", "馮松");
@@ -55,10 +58,11 @@ class EamBorrowSelfScopeTest {
     void setUp() {
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), EamBorrow.class);
         borrowMapper = mock(EamBorrowMapper.class);
+        assetMapper = mock(EamAssetMapper.class);
         OperatorResolver resolver = mock(OperatorResolver.class);
         when(resolver.currentUser()).thenReturn(self);
         lenient().when(resolver.currentOperatorName()).thenReturn(self.getName());
-        service = new EamBorrowServiceImpl(borrowMapper, mock(EamAssetMapper.class),
+        service = new EamBorrowServiceImpl(borrowMapper, assetMapper,
                 mock(SysUserMapper.class), mock(BizSeqService.class), resolver);
     }
 
@@ -112,6 +116,40 @@ class EamBorrowSelfScopeTest {
                 "必须锁定登录人: " + wrapper.getParamNameValuePairs());
         assertFalse(wrapper.getParamNameValuePairs().containsValue(OTHER_ID),
                 "外部传入的 holderId 不得生效: " + wrapper.getParamNameValuePairs());
+    }
+
+    @Test
+    @DisplayName("借用中与已逾期按到期日派生：不依赖库内 status 是否被作业翻转过")
+    @SuppressWarnings("unchecked")
+    void activeAndOverdueCountsAreDerivedFromDueDate() {
+        when(borrowMapper.selectCount(any())).thenReturn(0L);
+
+        service.myStats();
+
+        ArgumentCaptor<LambdaQueryWrapper<EamBorrow>> captor = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(borrowMapper, times(4)).selectCount(captor.capture());
+        List<LambdaQueryWrapper<EamBorrow>> wrappers = captor.getAllValues();
+        String active = wrappers.get(0).getSqlSegment();
+        String overdue = wrappers.get(1).getSqlSegment();
+        assertTrue(active.contains("due_date >="), "借用中必须限定未到期: " + active);
+        assertTrue(overdue.contains("due_date <"), "已逾期必须按到期日判定: " + overdue);
+        assertTrue(overdue.contains("return_date"), "已逾期必须排除已归还: " + overdue);
+    }
+
+    @Test
+    @DisplayName("过期未还的借用展示为已逾期并给出逾期天数")
+    void expiredActiveBorrowIsDisplayedAsOverdue() {
+        EamBorrow borrow = borrow(9L, SELF_ID);
+        borrow.setDueDate(LocalDate.now().minusDays(3));
+        when(borrowMapper.selectById(9L)).thenReturn(borrow);
+        EamAsset asset = new EamAsset();
+        asset.setId(6L);
+        when(assetMapper.selectById(6L)).thenReturn(asset);
+
+        EamBorrowVO vo = service.myDetail(9L);
+
+        assertEquals("overdue", vo.getStatus());
+        assertEquals(3, vo.getOverdueDays().intValue());
     }
 
     @Test

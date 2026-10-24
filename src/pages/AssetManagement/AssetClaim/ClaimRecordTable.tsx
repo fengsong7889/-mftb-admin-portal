@@ -60,13 +60,24 @@ export function SignatureStatusTag({ status }: { status: SignatureStatus }) {
   return <Tag color={meta?.color}>{meta?.label ?? '未知簽署狀態'}</Tag>
 }
 /**
- * 是否还能发起签署：两种合法情形，其余一律不可签。
- * 1) 待领用 + 待本人签署 —— 首次签署；2) 在用 + 代办未签 —— 代办人已经领走，
- * 需事后由本人补签。已归仍保持未签的历史记录不允许回头补签。
+ * 已终止且資產已釋放的狀態；配合代办未簽时只补签名（不改领用状态与资产归属）。
+ * 与后端 EamClaimServiceImpl.CLOSED_STATUSES 保持同一集合。
+ */
+const CLOSED_STATUSES: ClaimStatus[] = [
+  CLAIM_STATUS.RETURNED, CLAIM_STATUS.TRANSFERRED, CLAIM_STATUS.LOSS_CLOSED,
+  CLAIM_STATUS.SCRAP_CLOSED, CLAIM_STATUS.REPAIR_CLOSED,
+]
+/**
+ * 是否还能发起签署：三种合法情形，其余一律不可签。
+ * 1) 待签领用 + 待本人签署 —— 首次签署；2) 在用 + 代办未签 —— 代办人已经领走，
+ * 需事后由本人补签；3) 已终止（归还/调拨/遗失/报废/送修）+ 代办未签 —— 拦截上线前
+ * 的遗留记录，只能补签名，不改领用状态与资产归属（否则永久卡在「资产归属无法生效」）。
+ * 三种情形与后端 applyPendingSignature（「待我簽署」页签与待签卡）保持同一口径。
  */
 export function canSignClaim(record: ClaimRow): boolean {
   return (record.status === CLAIM_STATUS.PENDING && record.signatureStatus === SIGNATURE_STATUS.PENDING)
     || (record.status === CLAIM_STATUS.CLAIMED && record.signatureStatus === SIGNATURE_STATUS.PROXY_PENDING)
+    || (CLOSED_STATUSES.includes(record.status) && record.signatureStatus === SIGNATURE_STATUS.PROXY_PENDING)
 }
 interface Props {
   data?: ClaimPage<ClaimRow>

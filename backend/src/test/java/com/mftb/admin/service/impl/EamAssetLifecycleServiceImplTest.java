@@ -51,6 +51,24 @@ class EamAssetLifecycleServiceImplTest {
     }
 
     @Test
+    void rejectsClosingProxyUnsignedClaim() {
+        // 代辦領用未經本人簽署就被遺失/報廢/送修終止，會留下永遠無法補簽的孤儿記錄
+        EamAsset asset = heldAsset();
+        asset.setActiveClaimId(5L);
+        EamClaim claim = new EamClaim();
+        claim.setId(5L);
+        claim.setStatus("claimed");
+        claim.setEmployeeId(22L);
+        claim.setSignatureStatus("proxy_pending");
+        when(claimMapper.selectForUpdate(5L)).thenReturn(claim);
+
+        BusinessException err = assertThrows(BusinessException.class,
+                () -> service.closeActiveSource(asset, EamAssetLifecycleService.CLOSE_LOSS, 99L, "報失"));
+        assertTrue(err.getMessage().contains("補簽"), "实际提示: " + err.getMessage());
+        verify(claimMapper, never()).update(any(EamClaim.class), any());
+    }
+
+    @Test
     void closesActiveClaimToLossClosed() {
         EamAsset asset = heldAsset();
         asset.setActiveClaimId(5L);

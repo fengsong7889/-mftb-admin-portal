@@ -59,6 +59,14 @@ public class EamClaimServiceImpl implements EamClaimService {
 
     private static final Set<String> VALID_STATUSES = Set.of("pending_signature", "claimed", "returned", "cancelled", "transferred");
 
+    /**
+     * 已终止且資產已釋放的歷史狀態（歸還/調撥/遺失/報廢/送修）。
+     * <p>這些狀態下若簽收仍為 proxy_pending，說明代辦領用從未經本人補簽——
+     * 攔截上線前的遗留數據只能靠「歸還後補簽」收口，否則就永久卡在資產歸屬無法生效。
+     */
+    private static final Set<String> CLOSED_STATUSES = Set.of(
+            "returned", "transferred", "loss_closed", "scrap_closed", "repair_closed");
+
     /* ==================== 查询 ==================== */
 
     @Override
@@ -78,13 +86,14 @@ public class EamClaimServiceImpl implements EamClaimService {
                 statsWrapper(query).select(EamClaim::getEmployeeId).groupBy(EamClaim::getEmployeeId))
                 .stream().map(EamClaim::getEmployeeId).toList();
         stats.setEmployeeCount((long) distinctEmpIds.size());
-        // 各状态统计
+        // 全部記錄：不加状态条件，与「全部記錄」页签同一条件（含待签/取消/遗失/报废/送修等），
+        // 个人视图第一张卡取它；以前前端用 claimed+returned 相加，会把待签/取消/终止态漏掉。
+        stats.setTotalCount(claimMapper.selectCount(statsWrapper(query)));
+        // 各状态统计（与「在用資產」「已歸還」页签同条件）
         stats.setClaimedCount(claimMapper.selectCount(statsWrapper(query).eq(EamClaim::getStatus, "claimed")));
         stats.setReturnedCount(claimMapper.selectCount(statsWrapper(query).eq(EamClaim::getStatus, "returned")));
-        // 待签记录（含代办补签）
-        stats.setPendingSignatureCount(claimMapper.selectCount(
-                statsWrapper(query).in(EamClaim::getStatus, "pending_signature", "claimed")
-                        .in(EamClaim::getSignatureStatus, "pending", "proxy_pending")));
+        // 待签记录（含代办补签）：与「待我簽署」页签同一条件
+        stats.setPendingSignatureCount(claimMapper.selectCount(applyPendingSignature(statsWrapper(query))));
         return stats;
     }
 
@@ -383,7 +392,12 @@ public class EamClaimServiceImpl implements EamClaimService {
     private void doSign(EamClaim claim, String signatureImage, SysUser signer) {
         boolean supplementary = "claimed".equals(claim.getStatus()) && "proxy_pending".equals(claim.getSignatureStatus());
         boolean reSign = "claimed".equals(claim.getStatus()) && "signed".equals(claim.getSignatureStatus());
-        if (!"pending_signature".equals(claim.getStatus()) && !supplementary && !reSign) throw new BusinessException("當前狀態不可簽署");
+        // 歷史遗留：歸還/異常處置拦截上线前，代辦領用可能在本人未簽的情況下就已終止，
+        // 留下永遠無法補簽的孤儿記錄。這類記錄只補簽名（不改領用狀態、不碰資產歸屬）。
+        boolean legacyReturnedUnsigned = CLOSED_STATUSES.contains(claim.getStatus())
+                && "proxy_pending".equals(claim.getSignatureStatus());
+        if (!"pending_signature".equals(claim.getStatus()) && !supplementary && !reSign && !legacyReturnedUnsigned)
+            throw new BusinessException("當前狀態不可簽署");
         EamAsset lockedAsset = assetMapper.selectOne(new LambdaQueryWrapper<EamAsset>()
                 .eq(EamAsset::getId, claim.getAssetId()).last("FOR UPDATE"));
         if (lockedAsset == null) throw new BusinessException("資產不存在");
@@ -391,7 +405,7 @@ public class EamClaimServiceImpl implements EamClaimService {
             if (!Objects.equals(lockedAsset.getActiveClaimId(), claim.getId())
                     || !Objects.equals(lockedAsset.getCurrentHolderId(), claim.getEmployeeId())
                     || !"in_use".equals(lockedAsset.getStatus())) throw new BusinessException("領用關係已變更，不可補簽");
-        } else if (!reSign) {
+        } else if (!reSign && !legacyReturnedUnsigned) {
             if (lockedAsset.getActiveClaimId() != null && !Objects.equals(lockedAsset.getActiveClaimId(), claim.getId())) {
                 throw new BusinessException("資產已被其它員工領用，無法領用");
             } else if (lockedAsset.getActiveClaimId() != null || !"idle".equals(lockedAsset.getStatus())) {
@@ -429,8 +443,8 @@ public class EamClaimServiceImpl implements EamClaimService {
         String sigStatus = "signed";
         claimMapper.updateSignature(claim.getId(), evidence.getId(), sigStatus, contentHash, signerName);
 
-        // 4. 状态推进到 claimed（重新签署时状态不变，仅更新签名相关字段）
-        claim.setStatus("claimed");
+        // 4. 状态推进到 claimed（重新签署、已归还补签时状态不变，仅更新签名相关字段）
+        if (!legacyReturnedUnsigned) claim.setStatus("claimed");
         claim.setSignatureStatus(sigStatus);
         claim.setSignedAt(LocalDateTime.now());
         claim.setContentHash(contentHash);
@@ -438,8 +452,8 @@ public class EamClaimServiceImpl implements EamClaimService {
         claim.setUpdatedBy(signerName);
         claimMapper.updateById(claim);
 
-        // 5. 更新资产持有人（重新签署时资产已在用，跳过状态变更）
-        if (!reSign) {
+        // 5. 更新资产持有人（重新签署时资产已在用；已归还补签时资产早已释放，均不得回写）
+        if (!reSign && !legacyReturnedUnsigned) {
             EamAsset asset = assetMapper.selectOne(
                     new LambdaQueryWrapper<EamAsset>().eq(EamAsset::getId, claim.getAssetId()).last("FOR UPDATE"));
             if (asset != null) {
@@ -465,6 +479,9 @@ public class EamClaimServiceImpl implements EamClaimService {
         if (reSign) {
             eventType = "re_signed";
             eventDesc = "員工重新簽署（覆蓋原簽名）";
+        } else if (legacyReturnedUnsigned) {
+            eventType = "proxy_signed";
+            eventDesc = "代辦領用歸還後補簽（不改領用狀態與資產歸屬）";
         } else if (claim.getProxyMode() == 1) {
             eventType = "proxy_signed";
             eventDesc = "代辦補簽完成";
@@ -697,6 +714,11 @@ public class EamClaimServiceImpl implements EamClaimService {
     private LambdaQueryWrapper<EamClaim> queryWrapperNoKeyword(EamClaimQuery q) {
         LambdaQueryWrapper<EamClaim> w = new LambdaQueryWrapper<>();
         w.eq(hasText(q.getStatus()), EamClaim::getStatus, q.getStatus());
+        // 多状态过滤：「異常終止」页签把 cancelled/transferred/loss_closed/scrap_closed/repair_closed
+        // 一起查；这些记录以前只能在「全部記錄」里看到，列表与统计卡都没有入口。
+        if (q.getStatuses() != null && !q.getStatuses().isEmpty()) {
+            w.in(EamClaim::getStatus, q.getStatuses());
+        }
         w.eq(q.getEmployeeId() != null, EamClaim::getEmployeeId, q.getEmployeeId());
         // 部门过滤：领用表没有 department_id，经由员工表收敛到部门（含子部门）的员工。
         // 之前这个参数从前端传上来但后端根本没用它，选了部门列表与统计卡都不会变。
@@ -709,9 +731,25 @@ public class EamClaimServiceImpl implements EamClaimService {
             w.in(EamClaim::getEmployeeId, deptEmpIds);
         }
         if (Boolean.TRUE.equals(q.getPendingSignature())) {
-            w.in(EamClaim::getStatus, "pending_signature", "claimed")
-                    .in(EamClaim::getSignatureStatus, "pending", "proxy_pending");
+            applyPendingSignature(w);
         }
+        return w;
+    }
+
+    /**
+     * 「待我簽署」条件（列表页签与统计卡共用一份，避免两边口径分叉）：
+     * <ol>
+     *   <li>待簽領用 + 未簽 —— 首次簽署；</li>
+     *   <li>在用 + 代辦未簽 —— 代辦領走後本人補簽；</li>
+     *   <li>已終止（歸還/調撥/遺失/報廢/送修）+ 代辦未簽 —— 攔截上線前的遗留記錄，只補簽名不改狀態（見 doSign）。</li>
+     * </ol>
+     * 三者都是“本人現在真能簽”的狀態；若計入不可簽的記錄，待辦會變成點不動的死鏈。
+     */
+    private LambdaQueryWrapper<EamClaim> applyPendingSignature(LambdaQueryWrapper<EamClaim> w) {
+        w.and(x -> x.in(EamClaim::getStatus, "pending_signature", "claimed")
+                .in(EamClaim::getSignatureStatus, "pending", "proxy_pending")
+                .or(y -> y.in(EamClaim::getStatus, CLOSED_STATUSES)
+                        .eq(EamClaim::getSignatureStatus, "proxy_pending")));
         return w;
     }
 

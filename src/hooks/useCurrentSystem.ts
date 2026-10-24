@@ -110,6 +110,10 @@ export function buildPathToSystemMap(tree: MenuVO[] | null): Record<string, stri
  */
 const PATH_TO_SYSTEM_OVERRIDE: Record<string, string> = {
   '/system-access-apply': 'oa', // 系统权限申请 → 流程审批系统
+  // 員工個人資產入口（頭像下拉「我的資產」，資料全部來自 /api/eam/*，不依賴任何業務菜單
+  // 授權，因此刻意不掛菜單）；不鎖定歸屬時側欄會退化成全量菜單樹。
+  '/my-assets': 'eam', // 我的資產 → 物資管理系統
+  '/my-claims': 'eam', // 我的領用（含簽署）→ 物資管理系統
 }
 
 /**

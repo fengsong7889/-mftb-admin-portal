@@ -96,6 +96,10 @@ public class EamReturnServiceImpl implements EamReturnService {
             claim = claimMapper.selectForUpdate(dto.getClaimId());
             if (claim == null) throw new BusinessException("領用記錄不存在");
             if (!"claimed".equals(claim.getStatus())) throw new BusinessException("僅在用領用可歸還");
+            // 代辦領用未經本人簽署就歸還，簽署權會隨歸還一起消失：之後既不計入待簽，
+            // 也無法補簽，資產歸屬永遠無法生效（歷史上已產生 3 條這種孤儿記錄）。
+            if ("proxy_pending".equals(claim.getSignatureStatus()))
+                throw new BusinessException("代辦領用尚未由本人補簽，請先完成簽署再辦理歸還");
             sourceType = "claim";
             sourceId = claim.getId();
             assetId = claim.getAssetId();

@@ -73,6 +73,12 @@ describe('不含 path 的后端菜单', () => {
     expect(resolveSystemFromPathname('/system-access-apply', null)).toBe('oa')
     expect(resolveSystemFromPathname('/system-access-apply', [hr])).toBe('oa')
   })
+  it('员工个人资产入口硬编码归属物资管理系统，任何菜单树下都不回退全量菜单', () => {
+    // 我的资产/我的领用刻意不挂菜单（人人可用），不在树里；不锁定归属时侧栏会展开全量菜单树
+    expect(resolveSystemFromPathname('/my-assets', [])).toBe('eam')
+    expect(resolveSystemFromPathname('/my-assets', null)).toBe('eam')
+    expect(resolveSystemFromPathname('/my-claims', [hr])).toBe('eam')
+  })
   it('服务端有效自定义路径优先，动态子路径匹配最长前缀', () => {
     const menu = { ...finance, path: '/custom-account' }
     expect(resolveMenuPath(menu)).toBe('/custom-account')

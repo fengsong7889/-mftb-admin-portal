@@ -71,6 +71,8 @@ npm run check:confirm-modal
 3. **环境变量**：前端 Mock 凭据通过 `.env.local`（已 gitignore）注入，参考 `.env.example`；
    后端运行时凭据（`DB_URL`/`DB_USERNAME`/`DB_PASSWORD`/`JWT_SECRET`）统一放 `backend/.env.local`（已 gitignore），
    参考 `backend/.env.local.example`。**任何受版本控制的文件禁止写入明文凭据**，由 `npm run secret-scan` 拦截。
+   环境全貌（后端地址、数据库、工具链版本、换电脑清单）见 `ENVIRONMENT-REFERENCE.md`，
+   环境信息变动时必须同步更新该文件（见「参考文档索引 · 环境与运维」）。
 4. **路径别名**：`@/` 映射到 `src/`，在 `tsconfig.json` 和 `vite.config.ts` 中同步配置。
 5. **员工选择统一用 `EmployeeSelect` 组件**：凡表单中需要选择员工/人员的字段，一律使用
    `src/pages/MeetingManagement/EmployeeSelect.tsx`（`single` 模式单选），禁止使用普通 `<Input>` 文本框。
@@ -155,6 +157,41 @@ src/
 | `security-architecture-quality.md` | 前后端开发 | 安全元规则、总原则、开发工作流、前后端规范、数据库设计、API 契约、测试门禁、完成定义、禁止清单、检查清单 |
 | `business-data-dictionary.md` | 涉及业务枚举值 | 系统级枚举常量（品牌、业务类型、状态等） |
 | `efficient-dev-mode.md` | 涉及界面调整 | 高效开发模式（两阶段交付：先 UI 后 i18n/后端/数据库） |
+
+---
+
+## 参考文档索引（非强制规则，按场景查阅）
+
+> 本节只做导航：**强制规范仅指上方「按需规则文件索引」中的 9 份规则**，本节文档不构成门禁。
+
+### 环境与运维
+
+| 文档 | 内容 | 何时查阅 |
+|------|------|---------|
+| `ENVIRONMENT-REFERENCE.md` | 本地开发环境**唯一参考手册**：Mock 降级机制与已接入模块、后端本地/生产（Sealos）部署、生产 RDS 与 SQLPub 开发库、开发库初始化步骤、前端端口与 GitHub Pages 部署、工具链版本、换电脑必做清单、常见问题速查 | 换电脑 / 重装环境 / 本地起不来 / 改完部署地址、数据库连接或环境变量后需同步维护 |
+| `backend/SERVICE-RESTART-GUIDE.md` | 后端重启详细指南（`backend-restart.md` 的下游引用） | 执行后端重启、排查重启未生效 |
+
+> ⚠️ `ENVIRONMENT-REFERENCE.md` 内含本地开发与 Mock 模式的明文口令（既有例外，仅用于本地联调）。引用时只写位置和类型，**禁止把口令值复制到其它受版本控制的文件、日志或提交信息**；真实环境凭据一律只走环境变量（见「关键约束 3」）。该文件第八节要求：环境信息变动时同步更新本文件。
+
+### 设计与方案文档（`docs/`，全部已入库）
+
+| 文档 | 内容 |
+|------|------|
+| `docs/design/` | 21 份功能设计方案（AI 助手与对话回收站、员工模块与 Core HR、统一门户分系统权限、RDM 深度测试与体验评估、资产盘点/调拨/异常处置、耗材管理、钉钉 Webhook、MCP 服务、企业级 Agent 路线、安全测试体系 R-24 等）。**新增或改造某模块前，先检索该目录是否已有定版方案，避免与既有决策冲突。** |
+| `docs/system-portal/inventory.md` | 统一门户 · 分系统改造的**唯一归属真值**：`sys_menu.system_code` 种子、前端门户卡片、`PermissionAspect` 系统准入判定均以此为准；改归属必须同步本文件与 `SystemCode.java` |
+| `docs/qa/rdm-2026-10/` | RDM 深度测试资产：用例 `cases.csv`、缺陷 `defects.csv`、执行记录 `execution.md` |
+| `docs/RDM_Batch34_Handoff.md` | RDM 第三、四批改造的进度与交接说明（工作区状态、剩余待办、关键契约签名、安全约束） |
+| `docs/ATTENDANCE_FOLLOWUP_2026-10.md` | 考勤假勤系统深度测试后续批次与跟进项 |
+| `docs/code-comment-audit_2026-10.md` | 代码注释覆盖度审计与例外登记 |
+
+### 本地工具文档（未入库，仅本机有效）
+
+| 文档 | 说明 |
+|------|------|
+| `.qoder/REPOWIKI-GUIDE.md` | Repo Wiki 自动更新系统使用指南 |
+| `.qoder/DEPLOYMENT-SUMMARY.md` | Repo Wiki 自动更新系统的部署总结 |
+
+> `.qoder/` 下**只有 `rules/` 已纳入版本控制**，其余（`scripts/`、`temp/`、`logs/` 等）均为本机资产。任何 CI 门禁、`npm script`、GitHub Actions 步骤**都不得依赖 `.qoder/` 下未入库的文件**，否则会导致 CI 恒失败。
 
 ---
 

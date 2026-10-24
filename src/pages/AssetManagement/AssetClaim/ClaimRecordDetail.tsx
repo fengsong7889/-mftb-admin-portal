@@ -192,10 +192,10 @@ export default function ClaimRecordDetail({ record, loading, error, onBack, onSi
         ) : <Empty description="簽收信息尚未加載" />}
         {record?.signatureStatus === SIGNATURE_STATUS.PROXY_PENDING && <Alert type="warning" showIcon className="claim-notice"
           message={record.status === CLAIM_STATUS.RETURNED
-            ? `此資產已於 ${record.returnDate ?? '—'} 歸還，簽收狀態仍為「代辦未簽」，已無法補簽。`
+            ? `此資產已於 ${record.returnDate ?? '—'} 歸還，簽收狀態仍為「代辦未簽」，需由本人補簽確認。`
             : '管理員代辦未簽，不能視為員工本人已確認。'}
           description={record.status === CLAIM_STATUS.RETURNED
-            ? '資產已歸還，補簽流程不再適用，當前簽署狀態保持不變，僅供內部記錄。'
+            ? '這是歸還前未補簽的遗留記錄：補簽只補簽名憑證，不改領用狀態（仍為已歸還）、也不重新分配資產。'
             : '補簽只確認歷史領用事實，不重新分配資產，也不影響之後的新領用。'}
           style={{ marginBottom: 16 }} />}
         <p className="claim-muted" style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 16 }}>僅作為內部簽收憑證，不承諾 CA 認證、可信時間戳或特定司法效力。憑證僅允許受控查看和下載。</p>

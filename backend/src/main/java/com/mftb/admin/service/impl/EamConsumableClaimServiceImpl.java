@@ -87,6 +87,10 @@ public class EamConsumableClaimServiceImpl implements EamConsumableClaimService 
         if (StringUtils.hasText(query.getApplicantName())) wrapper.like(EamConsumableClaim::getApplicantName, query.getApplicantName().trim());
         if (query.getDepartmentId() != null) wrapper.in(EamConsumableClaim::getDepartmentId, collectDeptAndDescendants(query.getDepartmentId()));
         if (StringUtils.hasText(query.getStatus())) wrapper.eq(EamConsumableClaim::getStatus, query.getStatus());
+        // 多状态过滤：「已結束」页签把已駁回/已撤銷一起查（以前这两种状态在个人页签里无入口）
+        if (query.getStatuses() != null && !query.getStatuses().isEmpty()) {
+            wrapper.in(EamConsumableClaim::getStatus, query.getStatuses());
+        }
         if (query.getApplicantId() != null) wrapper.eq(EamConsumableClaim::getApplicantId, query.getApplicantId());
         wrapper.orderByDesc(EamConsumableClaim::getId);
         return wrapper;

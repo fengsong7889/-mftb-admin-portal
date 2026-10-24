@@ -7,7 +7,7 @@
  *  - 耗材领用：/api/eam/consumables/claims/my（+ /my/stats，后端强制申请人 = 当前登录人）
  * 详情统一走独立视图（?type=&id=），不使用弹窗；领用签署复用 /my-claims 的同一份实现。
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Alert, Button, Result, Tabs, Tag } from 'antd'
 import { DatabaseOutlined, FieldTimeOutlined, InboxOutlined } from '@ant-design/icons'
@@ -15,7 +15,6 @@ import { useTranslation } from 'react-i18next'
 import DetailPageHeader from '../../components/DetailPageHeader'
 import { useAuth } from '../../contexts/AuthContext'
 import { fetchMyClaimStats } from '../../api/eamClaim'
-import type { ClaimStatsData } from '../AssetManagement/AssetClaim/claimViewTypes'
 import { MyClaimDetail } from '../AssetManagement/AssetClaim/MyClaims'
 import ConsumableClaimDetail from '../Consumable/Claim/ClaimDetail'
 import { positiveId } from '../AssetManagement/AssetTransfer/transferUtils'
@@ -23,6 +22,7 @@ import MyClaimPane from './MyClaimPane'
 import MyBorrowPane from './MyBorrowPane'
 import MyConsumablePane from './MyConsumablePane'
 import MyBorrowDetail from './MyBorrowDetail'
+import { useMyAssetsStats } from './useMyAssetsStats'
 import '../AssetManagement/AssetClaim/index.css'
 
 const TAB_CLAIM = 'claim'
@@ -52,13 +52,10 @@ export default function MyAssets() {
     return next
   }, [fromPortal])
 
-  /** 领用统计提升到页级：待签提醒条与领用卡片共用同一份数据 */
-  const [claimStats, setClaimStats] = useState<ClaimStatsData>()
-  useEffect(() => {
-    let active = true
-    fetchMyClaimStats().then((result) => { if (active) setClaimStats(result) }).catch(() => { if (active) setClaimStats(undefined) })
-    return () => { active = false }
-  }, [])
+  /** 领用统计：与列表同刻取数（切页签/进出详情/窗口聚焦都会重取），
+   *  否则「详情里签完字回到列表」时列表已刷新、卡片还停在旧数字。 */
+  const searchKey = params.toString()
+  const claimStats = useMyAssetsStats(fetchMyClaimStats, searchKey)
 
   const handleTabChange = useCallback((key: string) => setParams(buildParams({ tab: key })), [buildParams, setParams])
 

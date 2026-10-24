@@ -807,11 +807,14 @@ export default function Sidebar({ collapsed }: SidebarProps) {
    *    同路徑只變 from 參數時也要重新判定歸屬系統。 */
   const lastSystemSyncPathRef = useRef<string | null>(null)
   useEffect(() => {
-    if (!menuTree) return
+    // 硬編碼歸屬的非菜單路由（我的資產 / 系統權限申請）不依賴菜單樹：
+    // 菜單樹未就緒時若直接 return，首屏側欄會先渲染一次全量菜單再收斂。
+    const overridden = resolveSystemFromPathname(location.pathname, null, location.search)
+    if (!overridden && !menuTree) return
     const locationKey = `${location.pathname}${location.search}`
     if (lastSystemSyncPathRef.current === locationKey) return
     lastSystemSyncPathRef.current = locationKey
-    const sys = resolveSystemFromPathname(location.pathname, menuTree, location.search)
+    const sys = overridden ?? resolveSystemFromPathname(location.pathname, menuTree, location.search)
     if (isBusinessSystemCode(sys) && sys !== currentSystemCode) {
       setCurrentSystemCode(sys)
     }

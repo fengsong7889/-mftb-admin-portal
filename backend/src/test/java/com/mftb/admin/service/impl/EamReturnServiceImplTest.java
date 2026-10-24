@@ -45,6 +45,18 @@ class EamReturnServiceImplTest {
     @Mock private OperatorResolver operatorResolver;
     @InjectMocks private EamReturnServiceImpl service;
 
+    @Test
+    void proxyUnsignedClaimCannotBeReturned() {
+        // 代辦領用未經本人簽署就歸還，簽署權會隨歸還一起消失，資產歸屬永遠無法生效
+        EamClaim claim = stubClaim();
+        claim.setSignatureStatus("proxy_pending");
+
+        BusinessException err = assertThrows(BusinessException.class, () -> service.register(dto(null)));
+        assertTrue(err.getMessage().contains("補簽"), "实际提示: " + err.getMessage());
+        assertEquals("claimed", claim.getStatus());
+        verifyNoInteractions(returnMapper, assetMapper, bizSeqService);
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"不存在或已刪除", "已停用", "同名部門"})
     void invalidDepartmentDoesNotWriteReturnOrReleaseClaim(String reason) {
@@ -207,6 +219,7 @@ class EamReturnServiceImplTest {
         claim.setAssetId(2L);
         claim.setEmployeeId(22L);
         claim.setStatus("claimed");
+        claim.setSignatureStatus("signed");
         when(claimMapper.selectForUpdate(5L)).thenReturn(claim);
         return claim;
     }

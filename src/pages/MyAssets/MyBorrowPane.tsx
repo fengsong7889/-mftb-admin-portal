@@ -4,7 +4,7 @@
  * 数据源 /api/eam/borrows/my 与 /my/stats（登录即可，后端强制 holderId = 当前登录人），
  * 因此未授予「借用管理」菜单权限的员工同样能看到本人借用记录。
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Alert, Button, Empty, Table, Tabs, Tag } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { ExclamationCircleOutlined, FieldTimeOutlined, InboxOutlined, RotateLeftOutlined } from '@ant-design/icons'
@@ -13,12 +13,13 @@ import AssetParameters from '../../components/AssetParameters'
 import BrandTag from '../../components/BrandTag'
 import { useAssetParameterCatalog } from '../../hooks/useAssetParameterCatalog'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { fetchMyBorrowStats, fetchMyBorrows, type BorrowQuery, type BorrowRow, type BorrowStatsData } from '../../api/eamBorrow'
+import { fetchMyBorrowStats, fetchMyBorrows, type BorrowQuery, type BorrowRow } from '../../api/eamBorrow'
 import { BORROW_STATUS_COLOR, BORROW_STATUS_LABEL } from '../AssetManagement/AssetBorrow/borrowStatus'
 import { ClaimSection } from '../AssetManagement/AssetClaim/ClaimLayout'
 import { TransferError } from '../AssetManagement/AssetTransfer/TransferLayout'
 import { useTransferData } from '../AssetManagement/AssetTransfer/useTransferData'
 import MyAssetsStats, { type MyAssetsStatItem } from './MyAssetsStats'
+import { useMyAssetsStats } from './useMyAssetsStats'
 
 const TAB_ALL = 'all'
 type BorrowTab = typeof TAB_ALL | BorrowRow['status']
@@ -44,13 +45,8 @@ export default function MyBorrowPane({ scopeKey, onOpen }: Props) {
   const fetcher = useCallback(() => fetchMyBorrows(query), [query])
   const { data, loading, error, refresh } = useTransferData(fetcher)
 
-  /** 本人借用统计（失败保持未加载态，卡片显示 —） */
-  const [stats, setStats] = useState<BorrowStatsData>()
-  useEffect(() => {
-    let active = true
-    fetchMyBorrowStats().then((result) => { if (active) setStats(result) }).catch(() => { if (active) setStats(undefined) })
-    return () => { active = false }
-  }, [])
+  /** 本人借用统计：切页签/窗口聚焦重取（与列表同刻，避免卡片停在挂载那一刻） */
+  const stats = useMyAssetsStats(fetchMyBorrowStats, tab)
 
   const statItems = useMemo<MyAssetsStatItem[]>(() => [
     { key: 'total', label: t('myAssets.borrowStatTotal', '本人借用記錄'), value: stats?.totalCount, icon: <InboxOutlined />, color: '#1890FF', background: '#E6F7FF' },

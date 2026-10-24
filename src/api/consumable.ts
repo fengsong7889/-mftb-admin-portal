@@ -433,6 +433,8 @@ export function fetchConsumableClaimDetail(id: number) {
 /** 查询：GET /eam/consumables/claims/my（支持与管理视图相同的筛选条件） */
 export function fetchMyConsumableClaims(params?: {
   page?: number; size?: number; status?: string
+  /** 多状态过滤（逗号分隔），如「已結束」的 rejected+cancelled */
+  statuses?: string
   claimNo?: string; applicantName?: string; departmentId?: number
 }) {
   return request.get<unknown, PageResult<ConsumableClaim>>('/eam/consumables/claims/my', { params })

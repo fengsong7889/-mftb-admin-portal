@@ -16,10 +16,24 @@ import { ClaimSection } from '../AssetManagement/AssetClaim/ClaimLayout'
 import { useTransferData } from '../AssetManagement/AssetTransfer/useTransferData'
 import { TransferError } from '../AssetManagement/AssetTransfer/TransferLayout'
 
-/** 个人视图页签：全部 / 待我簽署（含代辦補簽）/ 在用 / 已歸還 */
+/** 个人视图页签：全部 / 待我簽署（含代辦補簽）/ 在用 / 已歸還 / 異常終止 */
 const TAB_ALL = 'all'
 const TAB_SIGN = 'pendingSignature'
-type ClaimTab = typeof TAB_ALL | typeof TAB_SIGN | ClaimStatus
+const TAB_CLOSED = 'closed'
+type ClaimTab = typeof TAB_ALL | typeof TAB_SIGN | typeof TAB_CLOSED | ClaimStatus
+
+/**
+ * 異常終止：領用因取消/調撥/遺失/報廢/送修而結束。
+ * 這些記錄以前沒有頁簽入口，只能在「全部記錄」裡刷出來；
+ * 卡片首格「本人資產記錄」把它們算進全量，因此必須有一條可達的入口。
+ */
+const CLOSED_STATUSES: ClaimStatus[] = [
+  CLAIM_STATUS.CANCELLED,
+  CLAIM_STATUS.TRANSFERRED,
+  CLAIM_STATUS.LOSS_CLOSED,
+  CLAIM_STATUS.SCRAP_CLOSED,
+  CLAIM_STATUS.REPAIR_CLOSED,
+]
 
 interface Props {
   stats?: ClaimStatsData
@@ -39,7 +53,8 @@ export default function MyClaimPane({ stats, scopeKey, initialTab, onOpen }: Pro
   const query = useMemo<ClaimQuery>(() => ({
     page,
     size,
-    status: tab === TAB_ALL || tab === TAB_SIGN ? undefined : tab,
+    status: tab === TAB_ALL || tab === TAB_SIGN || tab === TAB_CLOSED ? undefined : tab,
+    statuses: tab === TAB_CLOSED ? CLOSED_STATUSES.join(',') : undefined,
     pendingSignature: tab === TAB_SIGN ? true : undefined,
   }), [page, size, tab])
 
@@ -62,6 +77,7 @@ export default function MyClaimPane({ stats, scopeKey, initialTab, onOpen }: Pro
     { key: TAB_SIGN, label: t('myAssets.tabSign', '待我簽署') },
     { key: CLAIM_STATUS.CLAIMED, label: t('myAssets.tabInUse', '在用資產') },
     { key: CLAIM_STATUS.RETURNED, label: t('myAssets.tabReturned', '已歸還') },
+    { key: TAB_CLOSED, label: t('myAssets.tabClosed') },
   ]
 
   return (

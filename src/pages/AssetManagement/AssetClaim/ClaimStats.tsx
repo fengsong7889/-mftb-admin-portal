@@ -2,8 +2,13 @@
  * 领用统计卡片（四张）。
  *
  * 两种口径：列表页看全局（第一张为「涉及员工」），员工详情页传 personal 看个人
- * —— 个人视角下员工数恒为 1 没有信息量，所以同一张卡改成展示「本人资产记录」，
- * 值取在用 + 已归还。
+ * —— 个人视角下员工数恒为 1 没有信息量，所以同一张卡改成展示「本人资产记录」。
+ *
+ * 四张卡必须与页面页签一一对应（卡 = 页签 total），不能自己拼算：
+ *  本人資產記錄 = totalCount（全部記錄页签，含待签/取消/遗失/报废/送修等）；
+ *  在用資產   = claimedCount（在用頁簽）；已歸還記錄 = returnedCount（已歸還頁簽）；
+ *  待簽記錄   = pendingSignatureCount（待我簽署頁簽）。
+ * 历史上第一张卡用 claimed+returned 相加，漏掉待签与各类终止态，卡片与列表长期对不上。
  *
  * data 缺省时显示 — 而不是 0：— 代指尚未加载或加载失败，0 会被读成“确实没有”，
  * 两者语义必须区分。调用方在报错时传 data=undefined 就走同一分支。
@@ -23,7 +28,7 @@ interface Props {
 
 export default function ClaimStats({ data, scopeKey, personal = false }: Props) {
   const items = [
-    { key: 'employeeCount' as const, label: personal ? '本人資產記錄' : '涉及員工', value: personal && data ? data.claimedCount + data.returnedCount : data?.employeeCount, icon: <TeamOutlined />, color: '#1890FF', background: '#E6F7FF' },
+    { key: 'employeeCount' as const, label: personal ? '本人資產記錄' : '涉及員工', value: personal ? data?.totalCount : data?.employeeCount, icon: <TeamOutlined />, color: '#1890FF', background: '#E6F7FF' },
     { key: 'claimedCount' as const, label: '在用資產', value: data?.claimedCount, icon: <InboxOutlined />, color: '#52C41A', background: '#F6FFED' },
     { key: 'returnedCount' as const, label: '已歸還記錄', value: data?.returnedCount, icon: <CheckCircleOutlined />, color: '#E8720C', background: '#FFF7E6' },
     { key: 'pendingSignatureCount' as const, label: '待簽記錄（含代辦補簽）', value: data?.pendingSignatureCount, icon: <AuditOutlined />, color: '#722ED1', background: '#F9F0FF' },

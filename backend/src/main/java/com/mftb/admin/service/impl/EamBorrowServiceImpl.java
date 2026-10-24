@@ -79,12 +79,26 @@ public class EamBorrowServiceImpl implements EamBorrowService {
     public EamBorrowStatsVO myStats() {
         SysUser current = requireLogin();
         EamBorrowStatsVO stats = new EamBorrowStatsVO();
-        stats.setActiveCount(countByStatus(current.getId(), "active"));
-        stats.setOverdueCount(countByStatus(current.getId(), "overdue"));
+        // 借用中/已逾期按到期日派生，与列表页签、VO 展示同源：
+        // 库里的 status 不会随日期自动翻转（没有定时作业），直接读 status 会让
+        // 过期借用永远显示「借用中」、已逾期卡恒为 0。
+        stats.setActiveCount(borrowMapper.selectCount(effectiveWrapper(current.getId(), false)));
+        stats.setOverdueCount(borrowMapper.selectCount(effectiveWrapper(current.getId(), true)));
         stats.setReturnedCount(countByStatus(current.getId(), "returned"));
         stats.setTotalCount(borrowMapper.selectCount(
                 new LambdaQueryWrapper<EamBorrow>().eq(EamBorrow::getHolderId, current.getId())));
         return stats;
+    }
+
+    /** 有效借用（借用中/已逾期）的派生条件：status 只是登记值，到期日才是真相 */
+    private LambdaQueryWrapper<EamBorrow> effectiveWrapper(Long holderId, boolean overdue) {
+        LambdaQueryWrapper<EamBorrow> w = new LambdaQueryWrapper<EamBorrow>()
+                .eq(EamBorrow::getHolderId, holderId)
+                .in(EamBorrow::getStatus, "active", "overdue")
+                .isNull(EamBorrow::getReturnDate);
+        return overdue
+                ? w.lt(EamBorrow::getDueDate, LocalDate.now())
+                : w.ge(EamBorrow::getDueDate, LocalDate.now());
     }
 
     private SysUser requireLogin() {
@@ -217,10 +231,13 @@ public class EamBorrowServiceImpl implements EamBorrowService {
             vo.setCompanyBrand(asset.getCompanyBrand());
         }
 
-        // 计算逾期天数
-        if ("overdue".equals(borrow.getStatus()) && borrow.getReturnDate() == null) {
-            long days = ChronoUnit.DAYS.between(borrow.getDueDate(), LocalDate.now());
-            vo.setOverdueDays((int) days);
+        // 计算逾期天数：逾期以到期日为准，库内 status 未必被翻转过（无定时作业），
+        // 否则过期借用会永远显示「借用中」、逾期天数恒为空。
+        if (borrow.getReturnDate() == null && borrow.getDueDate() != null
+                && ("active".equals(borrow.getStatus()) || "overdue".equals(borrow.getStatus()))
+                && borrow.getDueDate().isBefore(LocalDate.now())) {
+            vo.setStatus("overdue");
+            vo.setOverdueDays((int) ChronoUnit.DAYS.between(borrow.getDueDate(), LocalDate.now()));
         }
 
         return vo;
@@ -232,8 +249,22 @@ public class EamBorrowServiceImpl implements EamBorrowService {
             w.and(x -> x.like(EamBorrow::getBorrowNo, q.getKeyword().trim())
                     .or().like(EamBorrow::getHolderName, q.getKeyword().trim()));
         }
-        w.eq(hasText(q.getStatus()), EamBorrow::getStatus, q.getStatus());
         w.eq(q.getHolderId() != null, EamBorrow::getHolderId, q.getHolderId());
+        // 借用中/已逾期按到期日派生（与 myStats 同一口径）：
+        // 直接 eq(status) 会把过期未还的借用归到「借用中」，页签与统计卡都对不上。
+        if (hasText(q.getStatus())) {
+            if ("overdue".equals(q.getStatus())) {
+                w.in(EamBorrow::getStatus, "active", "overdue")
+                        .lt(EamBorrow::getDueDate, LocalDate.now())
+                        .isNull(EamBorrow::getReturnDate);
+            } else if ("active".equals(q.getStatus())) {
+                w.in(EamBorrow::getStatus, "active", "overdue")
+                        .ge(EamBorrow::getDueDate, LocalDate.now())
+                        .isNull(EamBorrow::getReturnDate);
+            } else {
+                w.eq(EamBorrow::getStatus, q.getStatus());
+            }
+        }
         w.eq(hasText(q.getDepartment()), EamBorrow::getDepartment, q.getDepartment());
         if (hasText(q.getStartDate())) {
             w.ge(EamBorrow::getStartDate, LocalDate.parse(q.getStartDate(), DateTimeFormatter.ISO_DATE));

@@ -4,22 +4,27 @@
  * 数据源 /api/eam/consumables/claims/my 与 /my/stats（登录即可，后端强制 applicantId = 当前登录人）。
  * 耗材领用「提交即出库」，无归还流程，因此页签按单据状态划分。
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Button, Empty, Table, Tabs, Tag } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { AuditOutlined, CheckCircleOutlined, DatabaseOutlined, InboxOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import BrandTag from '../../components/BrandTag'
 import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { fetchMyConsumableClaimStats, fetchMyConsumableClaims, type ConsumableClaim, type ConsumableClaimStats } from '../../api/consumable'
+import { fetchMyConsumableClaimStats, fetchMyConsumableClaims, type ConsumableClaim } from '../../api/consumable'
 import { CLAIM_STATUS_COLOR, type ClaimStatus } from '../Consumable/Claim/constants'
 import { ClaimSection } from '../AssetManagement/AssetClaim/ClaimLayout'
 import { TransferError } from '../AssetManagement/AssetTransfer/TransferLayout'
 import { useTransferData } from '../AssetManagement/AssetTransfer/useTransferData'
 import MyAssetsStats, { type MyAssetsStatItem } from './MyAssetsStats'
+import { useMyAssetsStats } from './useMyAssetsStats'
 
 const TAB_ALL = 'all'
-type ConsumableTab = typeof TAB_ALL | ClaimStatus
+const TAB_CLOSED = 'closed'
+type ConsumableTab = typeof TAB_ALL | typeof TAB_CLOSED | ClaimStatus
+
+/** 「已結束」：已駁回 + 已撤銷（这两种终态以前在个人页签里没有入口） */
+const CLOSED_STATUSES: ClaimStatus[] = ['rejected', 'cancelled']
 
 interface Props {
   scopeKey: string
@@ -33,18 +38,18 @@ export default function MyConsumablePane({ scopeKey, onOpen }: Props) {
   const [size, setSize] = useState(10)
 
   const fetcher = useCallback(
-    () => fetchMyConsumableClaims({ page, size, status: tab === TAB_ALL ? undefined : tab }),
+    () => fetchMyConsumableClaims({
+      page,
+      size,
+      status: tab === TAB_ALL || tab === TAB_CLOSED ? undefined : tab,
+      statuses: tab === TAB_CLOSED ? CLOSED_STATUSES.join(',') : undefined,
+    }),
     [page, size, tab],
   )
   const { data, loading, error, refresh } = useTransferData(fetcher)
 
-  /** 本人耗材领用统计（失败保持未加载态，卡片显示 —） */
-  const [stats, setStats] = useState<ConsumableClaimStats>()
-  useEffect(() => {
-    let active = true
-    fetchMyConsumableClaimStats().then((result) => { if (active) setStats(result) }).catch(() => { if (active) setStats(undefined) })
-    return () => { active = false }
-  }, [])
+  /** 本人耗材领用统计：切页签/窗口聚焦重取（与列表同刻，避免卡片停在挂载那一刻） */
+  const stats = useMyAssetsStats(fetchMyConsumableClaimStats, tab)
 
   const statusLabels: Record<ClaimStatus, string> = {
     pending: t('myAssets.consumablePending', '待發放'),
@@ -61,11 +66,18 @@ export default function MyConsumablePane({ scopeKey, onOpen }: Props) {
     { key: 'issued', label: statusLabels.issued, value: stats?.issuedCount, icon: <CheckCircleOutlined />, color: '#52C41A', background: '#F6FFED' },
   ]
 
+  /**
+   * 页签与四张卡一一对应：卡片的「待發放 / 待出庫 / 已出庫」各自都能点进对应列表，
+   * 四种终态（含已駁回/已撤銷）统一进「已結束」。
+   * 历史上页签是「全部/待發放/已出庫/已撤銷」，卡片却展示待出庫，两边对不上——
+   * 待出庫的单据在列表里根本刷不出来，已駁回则彻底无入口。
+   */
   const tabs: { key: ConsumableTab; label: string }[] = [
     { key: TAB_ALL, label: t('myAssets.tabAll', '全部記錄') },
     { key: 'pending', label: statusLabels.pending },
+    { key: 'approved', label: statusLabels.approved },
     { key: 'issued', label: statusLabels.issued },
-    { key: 'cancelled', label: statusLabels.cancelled },
+    { key: TAB_CLOSED, label: t('myAssets.consumableClosed') },
   ]
 
   const columns: TableColumnsType<ConsumableClaim> = [
