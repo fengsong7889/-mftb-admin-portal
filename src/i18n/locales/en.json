@@ -117,6 +117,20 @@
   "portal": {
     "title": "Group Portal",
     "appCenter": "Application Center",
+    "appTab": "Mobile App",
+    "appGroup": "Mobile Applications",
+    "appGroupDesc": "Prototype preview · data comes from the live backend",
+    "appMerchant": "Merchant App",
+    "appMerchantDesc": "Buy ads and place real orders; orders sync back to the console",
+    "appMerchantStatus": "Live orders",
+    "appConsumer": "Consumer App",
+    "appConsumerDesc": "Browse merchants running promotions and their peak hours",
+    "appConsumerStatus": "Data pending",
+    "favoritesEmpty": "No favorites yet · click ☆ on a card to add one",
+    "favoritesMore": "+{{count}} more",
+    "favoritesCollapse": "Collapse",
+    "favUndo": "Undo",
+    "statAllGranted": "All granted",
     "quotes": [
       "Master the simple things and you are no longer ordinary",
       "Today's progress is the setup for tomorrow's result",
@@ -215,17 +229,13 @@
       "hrAssigned": "Team assignment complete",
       "attendancePunched": "Clocked in · 09:00",
       "leaveApproved": "Leave approved · Out today",
-      "meetingBooked": "Room booked · 10:00–11:00",
+      "meetingBooked": "Room booked · 10:00~11:00",
       "meetingCheckedIn": "Checked in · in session",
       "meetingInviteSent": "Invites delivered · 3 people",
       "workflowArchived": "Approved · Archived",
       "accessDenied": "Verification failed, access denied",
       "accessGranted": "Verification passed, access allowed",
       "verifyingIdentity": "Identity verification",
-      "pacificOcean": "Pacific Ocean",
-      "atlanticOcean": "Atlantic Ocean",
-      "indianOcean": "Indian Ocean",
-      "arcticOcean": "Arctic Ocean",
       "recommendMatched": "Audience matched",
       "storesSynced": "Store data synced",
       "newOrder": "New order received",
@@ -239,7 +249,6 @@
       "review": "Review",
       "approved": "Approved",
       "docKnowledgeBase": "Knowledge base",
-      "docIndex": "Unified index",
       "docCloudDocs": "Cloud docs",
       "docKnowledgeVault": "Enterprise knowledge vault",
       "docArchiveFiles": "Archive & files"
@@ -2695,8 +2704,11 @@
     "unlock": "Unlock"
   },
   "common": {
+    "searching": "Searching...",
+    "underDevelopment": "Export is under development...",
     "basicInfo": "Basic Info",
     "loading": "Loading...",
+    "requestTimeout": "The network response timed out. Please try again later.",
     "noData": "No Data",
     "confirm": "Confirm",
     "confirmSubmit": "Confirm & Submit",
@@ -3146,6 +3158,7 @@
     "refreshHint": "Refreshing returns you to this page; unsaved form input may be lost."
   },
   "guard": {
+    "offlineSub": "The backend is temporarily unavailable. This feature requires backend support. Prototype pages remain accessible.",
     "403Sub": "Sorry, you don't have permission to access this menu. Please ask the administrator to authorize your role or department in \"Function Authorization\"",
     "backHome": "Back to Home",
     "goMenu": "Go to an Accessible Menu"
@@ -3449,6 +3462,7 @@
     "inactiveStatus": "Disabled"
   },
   "home": {
+    "quickEntryNoResult": "No matching result",
     "welcomeBack": "Welcome back, Bee",
     "tips0": "Some menu pages of this prototype system are integrated with the backend and support password login with real data",
     "tips1": "The database can be accessed online via the SQLPUB platform for the latest business data",
@@ -3744,6 +3758,8 @@
     "usageUnlimitedValue": "Unlimited"
   },
   "conversationAudit": {
+    "eventList": "Events",
+    "noEvents": "No server-side events (historical conversations not collected or gateway not connected)",
     "pageTitle": "Conversation Audit",
     "search": "Search",
     "reset": "Reset",
@@ -5883,6 +5899,7 @@
     "customDeptPlaceholder": "Select the departments to grant"
   },
   "roleManagement": {
+    "builtinAdminTag": "Built-in admin",
     "colName": "Role Name",
     "colDescription": "Description",
     "colEmployeeCount": "Employees",
@@ -5940,6 +5957,7 @@
     "selfServiceHelpLimit": "Write the role description in business language (who it fits and what it can do). Employees only see the name and description; with an empty description they can only guess from the name, which leads to wrong picks and slower approvals."
   },
   "employee": {
+    "roleAdminUnbindable": "Built-in admin role cannot be unbound",
     "colEmpId": "Emp ID",
     "colName": "Name",
     "colDepartment": "Department",

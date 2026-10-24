@@ -12,6 +12,20 @@
   "portal": {
     "title": "그룹 포털",
     "appCenter": "애플리케이션 센터",
+    "appTab": "모바일 앱",
+    "appGroup": "모바일 애플리케이션",
+    "appGroupDesc": "프로토타입 미리보기 · 데이터는 실제 백엔드에서 조회",
+    "appMerchant": "가맹점 앱",
+    "appMerchantDesc": "광고를 구매하고 실제 주문, 주문은 관리 화면에 동기화",
+    "appMerchantStatus": "실제 주문",
+    "appConsumer": "사용자 앱",
+    "appConsumerDesc": "프로모션 중인 가맹점과 골든타임 조회",
+    "appConsumerStatus": "데이터 연동 대기",
+    "favoritesEmpty": "즐겨찾기가 없습니다 · 카드 오른쪽 위 ☆를 눌러 추가",
+    "favoritesMore": "{{count}}개 더",
+    "favoritesCollapse": "접기",
+    "favUndo": "실행 취소",
+    "statAllGranted": "모두 개통됨",
     "quotes": [
       "쉬운 일을 끝까지 해내는 것이 곧 비범함입니다",
       "오늘의 진전이 내일의 결과를 만듭니다",
@@ -110,17 +124,13 @@
       "hrAssigned": "부서 배정 완료",
       "attendancePunched": "출퇴근 등록 · 09:00",
       "leaveApproved": "휴가 승인 · 오늘 휴무",
-      "meetingBooked": "회의실 예약됨 · 10:00–11:00",
+      "meetingBooked": "회의실 예약됨 · 10:00~11:00",
       "meetingCheckedIn": "출석 등록 · 회의 중",
       "meetingInviteSent": "초대 발송 완료 · 3명",
       "workflowArchived": "승인 · 보관 완료",
       "accessDenied": "인증 실패, 접근 거부",
       "accessGranted": "인증 성공, 접근 허용",
       "verifyingIdentity": "신원 확인",
-      "pacificOcean": "태평양",
-      "atlanticOcean": "대서양",
-      "indianOcean": "인도양",
-      "arcticOcean": "북극해",
       "recommendMatched": "대상 고객 매칭 완료",
       "storesSynced": "매장 데이터 통합 완료",
       "newOrder": "새 주문 도착",
@@ -134,7 +144,6 @@
       "review": "심사",
       "approved": "승인",
       "docKnowledgeBase": "지식 축적",
-      "docIndex": "통합 인덱스",
       "docCloudDocs": "클라우드 문서",
       "docKnowledgeVault": "기업 지식 저장소",
       "docArchiveFiles": "아카이브 자료"
@@ -382,7 +391,8 @@
     "transferFrom": "이동 전 → 이동 후"
   },
   "common": {
-    "pleaseSelect": "Please select"
+    "pleaseSelect": "Please select",
+    "requestTimeout": "네트워크 응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요."
   },
   "authorizationCenter": {
     "directoryNodeTip": "This node is a grouping directory with no assignable actions; grant permissions on the menus under it."

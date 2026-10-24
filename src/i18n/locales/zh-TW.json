@@ -117,6 +117,20 @@
   "portal": {
     "title": "集團門戶",
     "appCenter": "應用中心",
+    "appTab": "移動 APP",
+    "appGroup": "移動應用",
+    "appGroupDesc": "原型預覽 · 數據取自真實後端",
+    "appMerchant": "商家端",
+    "appMerchantDesc": "選購廣告、真實下單，訂單同步後台可查",
+    "appMerchantStatus": "真實下單",
+    "appConsumer": "用戶端",
+    "appConsumerDesc": "瀏覽正在推廣的商家與黃金時段",
+    "appConsumerStatus": "數據待接入",
+    "favoritesEmpty": "還沒有常用系統 · 在卡片右上角點 ☆ 添加",
+    "favoritesMore": "+{{count}} 展開",
+    "favoritesCollapse": "收起",
+    "favUndo": "撤銷",
+    "statAllGranted": "全部已開通",
     "quotes": [
       "把每一件簡單的事做好，就是不簡單",
       "今天的推進，是明天結果的伏筆",
@@ -215,17 +229,13 @@
       "hrAssigned": "已加入對應部門",
       "attendancePunched": "打卡成功 · 09:00",
       "leaveApproved": "假單已核准 · 今日休假",
-      "meetingBooked": "會議室已預訂 · 10:00–11:00",
+      "meetingBooked": "會議室已預訂 · 10:00~11:00",
       "meetingCheckedIn": "已簽到 · 會議進行中",
       "meetingInviteSent": "邀約已送達 · 3 人",
       "workflowArchived": "審批通過 · 已歸檔",
       "accessDenied": "驗證失敗，拒絕訪問",
       "accessGranted": "驗證成功，允許訪問",
       "verifyingIdentity": "身份驗證",
-      "pacificOcean": "太平洋",
-      "atlanticOcean": "大西洋",
-      "indianOcean": "印度洋",
-      "arcticOcean": "北冰洋",
       "recommendMatched": "精準推薦已匹配",
       "storesSynced": "門店數據已匯總",
       "newOrder": "新訂單到達",
@@ -239,7 +249,6 @@
       "review": "審批",
       "approved": "通過",
       "docKnowledgeBase": "知識沉澱",
-      "docIndex": "統一索引",
       "docCloudDocs": "雲文檔",
       "docKnowledgeVault": "企業知識庫",
       "docArchiveFiles": "檔案資料"
@@ -2575,7 +2584,10 @@
     "unlock": "解除鎖定"
   },
   "common": {
+    "searching": "搜索中...",
+    "underDevelopment": "導出功能開發中...",
     "loading": "加載中...",
+    "requestTimeout": "網路回應逾時，請稍後重試",
     "noData": "暫無數據",
     "confirm": "確定",
     "confirmSubmit": "確定提交",
@@ -3026,6 +3038,7 @@
     "refreshHint": "刷新後仍會回到當前頁面，未保存的表單內容可能丟失。"
   },
   "guard": {
+    "offlineSub": "後端服務暫時不可用，該功能需要後端支持。原型頁面仍可訪問。",
     "403Sub": "抱歉，您沒有訪問該菜單的權限，請聯繫管理員到「功能授權」為您的角色或部門授權",
     "backHome": "返回首頁",
     "goMenu": "前往可用菜單"
@@ -3329,6 +3342,7 @@
     "inactiveStatus": "已停用"
   },
   "home": {
+    "quickEntryNoResult": "無匹配結果",
     "welcomeBack": "歡迎回來,小蜜蜂",
     "tips0": "該原型系統部分菜單界面已實現前後端聯調，支持賬號密碼登錄並運行真實數據",
     "tips1": "數據庫可通過 SQLPUB 平台在線訪問，隨時查看最新業務數據",
@@ -3624,6 +3638,8 @@
     "usageUnlimitedValue": "不設上限"
   },
   "conversationAudit": {
+    "eventList": "執行事件",
+    "noEvents": "暫無服務端事件（歷史會話未採集或閘道尚未接入）",
     "pageTitle": "對話審計",
     "filterKeyword": "搜索工號或姓名",
     "filterModel": "篩選模型",
@@ -5763,6 +5779,7 @@
     "customDeptPlaceholder": "請選擇可見的部門"
   },
   "roleManagement": {
+    "builtinAdminTag": "內置超管",
     "colName": "角色名稱",
     "colDescription": "描述",
     "colEmployeeCount": "員工人數",
@@ -5820,6 +5837,7 @@
     "selfServiceHelpLimit": "先把「角色描述」寫成業務語言（適用人群 + 能做什麼）：員工只看得到角色名稱與描述，描述為空時只能靠名字猜，容易選錯、審批也慢。"
   },
   "employee": {
+    "roleAdminUnbindable": "超管內置角色，不可綁定",
     "colEmpId": "工號",
     "colName": "姓名",
     "colDepartment": "所屬部門",

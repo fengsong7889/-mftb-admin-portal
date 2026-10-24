@@ -1443,13 +1443,18 @@
   pointer-events: none;
 }
 
-/* 品牌标识 */
+/* 品牌标识
+ * bottom 30 → 48：原位置压在视口最底边，品牌字下缘被裁掉约 40%，还与登录卡片的橙色光晕叠在一起
+ * 几乎不可读；再用 safe-area 兜住小屏（评审 P0-8）。
+ */
 .video-brand {
   position: absolute;
-  bottom: 30px;
+  bottom: calc(48px + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
   z-index: 2;
+  max-width: calc(100% - 32px);
+  text-align: center;
 }
 .video-brand-text {
   font-size: 14px;

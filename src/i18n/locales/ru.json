@@ -12,6 +12,20 @@
   "portal": {
     "title": "Групповой портал",
     "appCenter": "Центр приложений",
+    "appTab": "Мобильное приложение",
+    "appGroup": "Мобильные приложения",
+    "appGroupDesc": "Предпросмотр прототипа · данные из рабочего бэкенда",
+    "appMerchant": "Приложение продавца",
+    "appMerchantDesc": "Покупка рекламы и реальные заказы, синхронизация с панелью",
+    "appMerchantStatus": "Реальные заказы",
+    "appConsumer": "Приложение пользователя",
+    "appConsumerDesc": "Просмотр продвигаемых продавцов и часов пик",
+    "appConsumerStatus": "Данные ожидаются",
+    "favoritesEmpty": "Избранного пока нет · нажмите ☆ на карточке",
+    "favoritesMore": "Ещё {{count}}",
+    "favoritesCollapse": "Свернуть",
+    "favUndo": "Отменить",
+    "statAllGranted": "Все доступны",
     "quotes": [
       "Простое, сделанное безупречно, — и есть мастерство",
       "Сегодняшний шаг — задел для завтрашнего результата",
@@ -110,17 +124,13 @@
       "hrAssigned": "Сотрудник назначен в отдел",
       "attendancePunched": "Отметка проставлена · 09:00",
       "leaveApproved": "Отпуск согласован · сегодня нет",
-      "meetingBooked": "Переговорная занята · 10:00–11:00",
+      "meetingBooked": "Переговорная занята · 10:00~11:00",
       "meetingCheckedIn": "Отмечен · идёт встреча",
       "meetingInviteSent": "Приглашения отправлены · 3",
       "workflowArchived": "Одобрено · В архиве",
       "accessDenied": "Проверка не пройдена, доступ запрещён",
       "accessGranted": "Проверка пройдена, доступ разрешён",
       "verifyingIdentity": "Проверка личности",
-      "pacificOcean": "Тихий океан",
-      "atlanticOcean": "Атлантический океан",
-      "indianOcean": "Индийский океан",
-      "arcticOcean": "Северный Ледовитый океан",
       "recommendMatched": "Аудитория подобрана",
       "storesSynced": "Данные магазинов собраны",
       "newOrder": "Получен новый заказ",
@@ -134,7 +144,6 @@
       "review": "Проверка",
       "approved": "Одобрено",
       "docKnowledgeBase": "База знаний",
-      "docIndex": "Единый индекс",
       "docCloudDocs": "Облачные документы",
       "docKnowledgeVault": "Корпоративное хранилище знаний",
       "docArchiveFiles": "Архив и материалы"
@@ -382,7 +391,8 @@
     "transferFrom": "До → После"
   },
   "common": {
-    "pleaseSelect": "Please select"
+    "pleaseSelect": "Please select",
+    "requestTimeout": "Истекло время ожидания ответа сети. Повторите попытку позже."
   },
   "authorizationCenter": {
     "directoryNodeTip": "This node is a grouping directory with no assignable actions; grant permissions on the menus under it."

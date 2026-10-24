@@ -256,8 +256,9 @@ body {
 @keyframes portalHrMatch {
   0%, 30%, 100% { stroke-dashoffset: 1; opacity: 0; }
   34% { stroke-dashoffset: 1; opacity: 1; }
-  45%, 90% { stroke-dashoffset: 0; opacity: 1; }
-  97% { stroke-dashoffset: 0; opacity: 0; }
+  45%, 58% { stroke-dashoffset: 0; opacity: 1; }
+  /* 人一到位，匹配线就淡出：原来留到 90%，人会顶着一条线（用户反馈） */
+  64% { stroke-dashoffset: 0; opacity: 0; }
 }
 @keyframes portalHrProfileCheck {
   0%, 31%, 100% { opacity: 0; }
@@ -489,14 +490,16 @@ body {
   6% { opacity: 1; transform: translateX(-14px); stroke: #8C8C8C; }
   18%, 20% { opacity: 1; transform: translateX(61px); stroke: #8C8C8C; }
   22%, 34% { opacity: 1; transform: translateX(61px); stroke: #FF4D4F; }
-  42%, 100% { opacity: 0; transform: translateX(-14px); stroke: #8C8C8C; }
+  /* 被拒后把钥匙「拔回」左侧再消失：直接 opacity:0 会像凭空蒸发 */
+  40% { opacity: 1; transform: translateX(-14px); stroke: #8C8C8C; }
+  44%, 100% { opacity: 0; transform: translateX(-14px); stroke: #8C8C8C; }
 }
 @keyframes portalKeyGranted {
   0%, 45% { opacity: 0; transform: translateX(-14px); stroke: #8C8C8C; }
   50% { opacity: 1; transform: translateX(-14px); stroke: #8C8C8C; }
   64%, 66% { opacity: 1; transform: translateX(61px); stroke: #8C8C8C; }
-  70%, 88% { opacity: 1; transform: translateX(61px); stroke: #52C41A; }
-  97%, 100% { opacity: 0; transform: translateX(-14px); stroke: #8C8C8C; }
+  70%, 90% { opacity: 1; transform: translateX(61px); stroke: #52C41A; }
+  92%, 100% { opacity: 0; transform: translateX(-14px); stroke: #8C8C8C; }
 }
 @keyframes portalLockShake {
   0%, 18%, 36%, 100% { transform: translateX(0); }
@@ -530,13 +533,18 @@ body {
   0%, 16%, 45%, 64%, 100% { opacity: 1; }
   18%, 43%, 66%, 99% { opacity: 0; }
 }
+/* 门户权限卡的开合时间线（6s 周期，全卡只有一条叙事）：
+ *  6~20%  钥匙插入 → 22~36% 被拒（锁抖动 + 红告警 + 「驗證失敗」）→ 40% 钥匙拔回 → 门始终不动
+ * 50~66%  再次插入 → 72~90% 锁开（绿勾 + 「驗證成功」）→ 84~92% 门开一道光
+ * 92%     钥匙先拔出 → 92% 之后门才关
+ * 关键约束：门不能在拒绝段打开，否则会读成「被拒绝了门却自己开了」。 */
 @keyframes portalAccessDoorLeft {
-  0%, 67%, 99%, 100% { transform: translateX(0); }
-  76%, 91% { transform: translateX(-25px); }
+  0%, 78%, 100% { transform: translateX(0); }
+  84%, 92% { transform: translateX(-25px); }
 }
 @keyframes portalAccessDoorRight {
-  0%, 67%, 99%, 100% { transform: translateX(0); }
-  76%, 91% { transform: translateX(25px); }
+  0%, 78%, 100% { transform: translateX(0); }
+  84%, 92% { transform: translateX(25px); }
 }
 /* 门户广告推荐场景：人群圈选 → 算法竞价打分排序 → Top1 入首屏坑位 → 曝光回流调权。 */
 @keyframes portalAdsTarget {

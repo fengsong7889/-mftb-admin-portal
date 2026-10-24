@@ -9,13 +9,13 @@
  * 整体版式参考企业门户通行做法（顶部横幅 + 概览指标 + 业务域分组应用墙 + 指引带），
  * 分组与筛选只做视觉归类，授权判定仍以门户接口返回为唯一依据。
  */
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Button, Empty, Input, Modal, Spin, Tabs, message } from 'antd'
 import {
   AccountBookOutlined, AppstoreOutlined, ClockCircleOutlined, CloseOutlined, ControlOutlined,
-  DeploymentUnitOutlined, FileProtectOutlined, GlobalOutlined, LockOutlined, PartitionOutlined,
-  QuestionCircleOutlined, RiseOutlined, SafetyCertificateOutlined, ScheduleOutlined, SearchOutlined,
-  MobileOutlined, StarFilled, StarOutlined, TeamOutlined, ThunderboltOutlined,
+  DeploymentUnitOutlined, LockOutlined, PartitionOutlined, RiseOutlined, SafetyCertificateOutlined,
+  ScheduleOutlined, SearchOutlined, MobileOutlined, StarFilled, StarOutlined, TeamOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -220,6 +220,16 @@ const FAVORITES_KEY = (username: string) => `portal_favorites:${username}`
 const RECENT_KEY = (username: string) => `portal_recent:${username}`
 /** 收藏不设上限：常用与否由员工自己判断，系统总量只会越来越多。最近使用是滚动窗口，保留最后访问的若干个。 */
 const MAX_RECENT = 8
+/**
+ * 常用带单行可见上限：超过就把容器限高，其余用「+N 展开」折叠（评审 F7）。
+ * 不设上限时 20 个收藏约 5 行 ≈ 250px，会把卡片墙直接挤出首屏。
+ */
+const FAVORITES_CLAMP_THRESHOLD = 4
+
+/** 入场自动播的卡片数（评审 M3①）：首屏一行 = 5 列，只让「看得见的」动起来。 */
+const AUTOPLAY_CARD_COUNT = 5
+/** 播完即停：6s 主周期 + 4 张×0.35s 错峰余量，多给 600ms 避免最后一帧被截断。 */
+const AUTOPLAY_DURATION_MS = 6600
 
 /** 读取编码列表：脏数据一律按空处理，不能让一次坏写入把整个门户打不开。 */
 function readCodeList(raw: string | null): string[] {
@@ -329,6 +339,15 @@ export default function Portal() {
    * 不参与任何准入判定；拉不到就当成无在途（不打断门户渲染）。
    */
   const [pendingRequestSystems, setPendingRequestSystems] = useState<Set<string>>(new Set())
+  /** 常用带是否展开：超过单行上限时由「+N 展開」按钮收起/展开（评审 F7）。 */
+  const [favoritesExpanded, setFavoritesExpanded] = useState(false)
+  /**
+   * 入场自动播一次（评审 M3①）：只对首屏首行的 5 张卡按 0.35s 错峰播一遍完整分镜，
+   * 让用户知道「这里能动」；播完即停，不会每张卡永远在循环。
+   * 用 ref 锁死「整个会话只自动播一次」，切换 Tab / 筛选不重播。
+   */
+  const [autoplayCodes, setAutoplayCodes] = useState<string[]>([])
+  const autoplayDoneRef = useRef(false)
 
   /**
    * 按当前登录用户加载个人常用/最近使用；无 username（含测试桩）时保持为空，避免串号。
@@ -370,6 +389,19 @@ export default function Portal() {
   useEffect(() => {
     void load()
   }, [load])
+
+  /**
+   * 入场自动播：授权列表到手后，首屏首行几张卡错峰播一遍完整分镜（评审 M3①）。
+   * 两个跳过条件：已整体播过一次（不重复骚扰）、用户开了 reduced-motion（尊重系统偏好）。
+   */
+  useEffect(() => {
+    if (autoplayDoneRef.current || loading || loadError || systems.length === 0) return
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    autoplayDoneRef.current = true
+    setAutoplayCodes(systems.slice(0, AUTOPLAY_CARD_COUNT).map((system) => system.code))
+    const timer = window.setTimeout(() => setAutoplayCodes([]), AUTOPLAY_DURATION_MS)
+    return () => window.clearTimeout(timer)
+  }, [systems, loading, loadError])
 
   /** 只看当前登录人自己的在途单（/my 接口服务端按登录态过滤，不信任前端参数） */
   useEffect(() => {
@@ -431,9 +463,30 @@ export default function Portal() {
     }
     // 云端整份覆盖。失败不打断操作：本地已经生效，下次改动会再试，刷新时回退本地缓存。
     savePortalFavorites(next).catch(() => { /* 后端不可用时降级为仅本地持久化 */ })
-    message.success(adding
-      ? t('portal.favAdded', '已加入常用 · {{name}}', { name })
-      : t('portal.favRemoved', '已移出常用 · {{name}}', { name }))
+    if (adding) {
+      message.success(t('portal.favAdded', '已加入常用 · {{name}}', { name }))
+      return
+    }
+    // × 紧贴 chip 主体、误点即删，只弹一句 toast 无从回退 → toast 里给「撤销」（评审 F5）
+    const restore = () => {
+      const restored = [...favorites.filter((item) => item !== code), code]
+      setFavorites(restored)
+      writeCodeList(FAVORITES_KEY(username), restored)
+      savePortalFavorites(restored).catch(() => { /* 撤销失败不回滚 UI，下次改动重试 */ })
+      message.success(t('portal.favAdded', '已加入常用 · {{name}}', { name }))
+    }
+    message.open({
+      type: 'success',
+      duration: 5,
+      content: (
+        <span className="portal-undo-toast">
+          {t('portal.favRemoved', '已移出常用 · {{name}}', { name })}
+          <button type="button" className="portal-undo-btn" onClick={restore}>
+            {t('portal.favUndo', '撤銷')}
+          </button>
+        </span>
+      ),
+    })
   }, [favorites, t, user?.username])
 
   /** 记录最近使用：真正跳转成功前才写，弹窗引导申请的未授权系统不会被记进来。 */
@@ -483,8 +536,12 @@ export default function Portal() {
     }
   }
 
-  /** 常用带只渲染仍然有权进入的系统：收藏里残留的编码（权限已撤销/系统已下线）自动被过滤掉。 */
-  const favoriteSystems = useMemo(() => favorites
+  /**
+   * 常用带只渲染仍然有权进入的系统：收藏里残留的编码（权限已撤销/系统已下线）自动被过滤掉。
+   * 顺序固定「最近添加在前」（评审 F7）：常用带空间有限，最该露出的就是刚标的那几个。
+   */
+  const favoriteSystems = useMemo(() => [...favorites]
+    .reverse()
     .map((code) => systems.find((system) => system.code === code))
     .filter((system): system is PortalSystem => !!system),
   [favorites, systems])
@@ -496,14 +553,19 @@ export default function Portal() {
     .filter((system): system is PortalSystem => !!system),
   [recent, favorites, systems])
 
+  /** 常用带实际渲染的条目数：原口径只取收藏数，下排还有最近使用时数字就对不上（评审 F3）。 */
+  const quickItemCount = favoriteSystems.length + recentSystems.length
+
   /** 单卡结构保持原样（整卡即按钮、卡内无独立操作按钮与图标）；收藏按钮挂在卡片外壳上，与卡按钮同级。 */
   const renderCard = (sys: ViewSystem, hasAccess: boolean) => {
     const favorited = favorites.includes(sys.code)
     const pendingRequest = !hasAccess && pendingRequestSystems.has(sys.code)
+    const autoplaying = autoplayCodes.includes(sys.code)
     return (
     <div
       key={sys.code}
       className="portal-card-shell"
+      data-autoplay={autoplaying ? '1' : undefined}
       onPointerEnter={(event) => { if (event.pointerType !== 'touch') setHoveredSystem(sys.code) }}
       onPointerLeave={() => setHoveredSystem(current => current === sys.code ? null : current)}
       onPointerCancel={() => setHoveredSystem(current => current === sys.code ? null : current)}
@@ -517,7 +579,14 @@ export default function Portal() {
         aria-label={`${sys.name} · ${hasAccess ? t('portal.enter') : pendingRequest ? t('portal.cardPendingRequest') : t('portal.requestAccess')}`}
       >
         <span className="portal-card-cover">
-          <SystemArtwork code={sys.code} name={sys.artworkName} active={hoveredSystem === sys.code} style={artworkStyle} />
+          <SystemArtwork
+            code={sys.code}
+            name={sys.artworkName}
+            active={hoveredSystem === sys.code || autoplaying}
+            /* 悬停走 2.4s 微循环，入场自动播走 6s 完整分镜（评审 M3 两级策略） */
+            mode={hoveredSystem === sys.code ? 'loop' : 'once'}
+            style={artworkStyle}
+          />
           {!hasAccess && <span className="portal-card-lock" aria-hidden="true"><LockOutlined /></span>}
         </span>
         <span className="portal-card-body">
@@ -547,15 +616,20 @@ export default function Portal() {
     )
   }
 
-  /** 常用带的小胶囊：色点取业务域语义色，不引入新色值；名称走与卡片同一套 i18n 解析。 */
+  /**
+   * 常用带的小胶囊。
+   * <p>收藏（我的意图）用业务域淡色实底 + ×，最近使用（系统记录）用无底色 + 1px 描边：
+   * 「实心 = 我标的 / 空心 = 系统记的」一眼可分辨，不靠一行 12px 灰字（评审 F4）。
+   * <p>色点保留，但加 title 显示业务域名，让颜色编码可学习（评审 F6①）。
+   */
   const renderQuickChip = (sys: PortalSystem, removable: boolean) => {
     const view = toView(sys)
     const domain = resolveDomain(view.code, view.artworkName)
     return (
       <span
         key={sys.code}
-        className="portal-quick-item"
-        style={{ background: domain.toneBg, borderColor: `${domain.tone}22` }}
+        className={`portal-quick-item${removable ? '' : ' portal-quick-item--recent'}`}
+        style={removable ? { background: domain.toneBg, borderColor: `${domain.tone}22` } : undefined}
       >
         <button
           type="button"
@@ -563,7 +637,12 @@ export default function Portal() {
           onClick={() => handleEnter(sys)}
           aria-label={`${view.name} · ${t('portal.enter')}`}
         >
-          <span className="portal-quick-dot" style={{ background: domain.tone }} aria-hidden="true" />
+          <span
+            className="portal-quick-dot"
+            style={{ background: domain.tone }}
+            title={t(domain.nameKey, domain.nameFallback)}
+            aria-hidden="true"
+          />
           <span className="portal-quick-name">{view.name}</span>
         </button>
         {removable && (
@@ -701,20 +780,18 @@ export default function Portal() {
     )
   }
 
-  /** 概览指标卡配色沿用设计令牌 A.1 与 B.7 统计卡色板，数值统一走计数动画。 */
+  /**
+   * 概览指标卡配色沿用设计令牌 A.1 与 B.7 统计卡色板，数值统一走计数动画。
+   * 口径统一为「占比 + 绝对数」（评审 L4）：原先前两格是个数、第三格是比率、第四格是总数，
+   * 四种格子三种量纲，其中「0 可申请」与「16 平台接入」没有对比基准就无从解读。
+   * 「可申请 0」额外给一句微文案，让 0 看起来是「无待办」而不是「加载坏了」。
+   */
   const stats = [
-    { key: 'authorized', icon: <AppstoreOutlined />, tone: '#1890FF', bg: '#E6F7FF', value: systems.length, suffix: '', label: t('portal.statAuthorized', '已授權系統') },
-    { key: 'requestable', icon: <SafetyCertificateOutlined />, tone: '#E8720C', bg: '#FFF7E6', value: unauthorizedSystems.length, suffix: '', label: t('portal.statRequestable', '可申請系統') },
-    { key: 'domain', icon: <PartitionOutlined />, tone: '#52C41A', bg: '#F6FFED', value: authorizedDomainCount, suffix: ` / ${PORTAL_DOMAINS.length}`, label: t('portal.statDomain', '覆蓋業務板塊') },
-    { key: 'total', icon: <DeploymentUnitOutlined />, tone: '#722ED1', bg: '#F9F0FF', value: totalSystemCount, suffix: '', label: t('portal.statTotal', '平台接入應用') },
-  ]
-
-  /** 底部指引带：把原本孤零的一行灰字提示扩展为四张说明卡，补足页面下沿信息量。 */
-  const guides = [
-    { key: 'access', icon: <SafetyCertificateOutlined />, tone: '#E8720C', title: t('portal.guideAccess', '權限說明'), desc: t('portal.accessNote') },
-    { key: 'apply', icon: <FileProtectOutlined />, tone: '#1890FF', title: t('portal.guideApply', '申請指引'), desc: t('portal.guideApplyDesc', '在「未獲得權限」分頁點擊卡片即可發起權限申請，審批通過後自動開通。') },
-    { key: 'locale', icon: <GlobalOutlined />, tone: '#52C41A', title: t('portal.guideLocale', '語言與地區'), desc: t('portal.guideLocaleDesc', '頂欄可切換國家與語言，系統名稱與簡介跟随界面語言展示。') },
-    { key: 'search', icon: <QuestionCircleOutlined />, tone: '#722ED1', title: t('portal.guideSearch', '搜索與篩選'), desc: t('portal.guideSearchDesc', '搜索支持系統名稱與簡介關鍵字，業務板塊膠囊可快速縮小範圍。') },
+    { key: 'authorized', icon: <AppstoreOutlined />, tone: '#1890FF', bg: '#E6F7FF', value: systems.length, suffix: ` / ${totalSystemCount}`, label: t('portal.statAuthorized', '已授權系統'), hint: '' },
+    // 可申請 0 → 灰显（评审 L4）：0 是「无待办」，不该跟其它三格的彩色数字抢注意力
+    { key: 'requestable', icon: <SafetyCertificateOutlined />, tone: unauthorizedSystems.length === 0 ? '#BFBFBF' : '#E8720C', bg: unauthorizedSystems.length === 0 ? '#FAFAFA' : '#FFF7E6', value: unauthorizedSystems.length, suffix: ` / ${totalSystemCount}`, label: t('portal.statRequestable', '可申請系統'), hint: unauthorizedSystems.length === 0 ? t('portal.statAllGranted', '全部已開通') : '' },
+    { key: 'domain', icon: <PartitionOutlined />, tone: '#52C41A', bg: '#F6FFED', value: authorizedDomainCount, suffix: ` / ${PORTAL_DOMAINS.length}`, label: t('portal.statDomain', '覆蓋業務板塊'), hint: '' },
+    { key: 'total', icon: <DeploymentUnitOutlined />, tone: '#722ED1', bg: '#F9F0FF', value: totalSystemCount, suffix: '', label: t('portal.statTotal', '平台接入應用'), hint: '' },
   ]
 
   return (
@@ -769,17 +846,19 @@ export default function Portal() {
               {loading || loadError ? '—' : <AnimatedNumber value={item.value} suffix={item.suffix} />}
             </b>
             <span className="portal-stat-label">{item.label}</span>
+            {item.hint ? <span className="portal-stat-hint">{item.hint}</span> : null}
           </div>
         ))}
       </div>
 
       {/*
         我的常用：内容模块，独立白卡。它是「入口清单」，点击是导航，
-        所以给块面、给标题，与下方卡片墙同属内容层；
-        搜索中（结果已收敛，再排一次会互相打架）、加载中与移动 APP 页签都不展示。
+        所以给块面、给标题，与下方卡片墙同属内容层。
+        搜索中（结果已收敛，再排一次会互相打架）、加载中与移动 APP 页签都不展示；
+        但「没有收藏也没有最近使用」时要照常渲染空态——
+        这是新用户唯一知道「常用」存在的时机（评审 F1③）。
       */}
-      {activeTab !== 'app' && !keyword.trim() && !loading && !loadError
-        && (favoriteSystems.length > 0 || recentSystems.length > 0) && (
+      {activeTab !== 'app' && !keyword.trim() && !loading && !loadError && (
         <section className="portal-favorites" aria-label={t('portal.quickFavorite', '我的常用')}>
           <header className="portal-favorites-head">
             <span className="portal-favorites-icon" aria-hidden="true"><StarFilled /></span>
@@ -787,13 +866,34 @@ export default function Portal() {
             <h2 className="portal-favorites-title">
               {favoriteSystems.length > 0 ? t('portal.quickFavorite', '我的常用') : t('portal.quickRecent', '最近使用')}
             </h2>
-            <span className="portal-favorites-count">{(favoriteSystems.length || recentSystems.length)}</span>
+            {quickItemCount > 0 && <span className="portal-favorites-count">{quickItemCount}</span>}
             <span className="portal-favorites-line" aria-hidden="true" />
-            <span className="portal-favorites-tip">{t('portal.favoritesTip', '在卡片右上角點 ☆ 即可加入常用')}</span>
+            <span className="portal-favorites-tip">
+              <StarOutlined aria-hidden="true" />
+              {t('portal.favoritesTip', '在卡片右上角點 ☆ 即可加入常用')}
+            </span>
           </header>
-          {favoriteSystems.length > 0 && (
-            <div className="portal-favorites-chips">{favoriteSystems.map((sys) => renderQuickChip(sys, true))}</div>
+
+          {quickItemCount === 0 && (
+            <p className="portal-favorites-empty">{t('portal.favoritesEmpty', '還沒有常用系統 · 在卡片右上角點 ☆ 添加')}</p>
           )}
+
+          {favoriteSystems.length > 0 && (
+            <>
+              {/* 单行限高，超出折叠，避免常用带把卡片墙挤下去（评审 F7） */}
+              <div className={`portal-favorites-chips${favoritesExpanded ? '' : ' is-clamped'}`}>
+                {favoriteSystems.map((sys) => renderQuickChip(sys, true))}
+              </div>
+              {favoriteSystems.length > FAVORITES_CLAMP_THRESHOLD && (
+                <button type="button" className="portal-favorites-more" onClick={() => setFavoritesExpanded((value) => !value)}>
+                  {favoritesExpanded
+                    ? t('portal.favoritesCollapse', '收起')
+                    : t('portal.favoritesMore', '+{{count}} 展開', { count: favoriteSystems.length - FAVORITES_CLAMP_THRESHOLD })}
+                </button>
+              )}
+            </>
+          )}
+
           {recentSystems.length > 0 && (
             <div className={`portal-favorites-chips${favoriteSystems.length > 0 ? ' portal-favorites-recent' : ''}`}>
               {favoriteSystems.length > 0 && (
@@ -855,7 +955,8 @@ export default function Portal() {
                 <span className="portal-tab-label">
                   <AppstoreOutlined aria-hidden="true" />
                   <span>{t('portal.authorized')}</span>
-                  {!loading && !loadError && <span className="portal-tab-count">{systems.length}</span>}
+                  {/* 加载失败时计数是默认值 0，不是真实结果，显示「—」（评审 P0-7） */}
+                  {!loading && <span className="portal-tab-count">{loadError ? '—' : systems.length}</span>}
                 </span>
               ),
               children: renderSystemPanel(systems, true),
@@ -866,7 +967,7 @@ export default function Portal() {
                 <span className="portal-tab-label">
                   <LockOutlined aria-hidden="true" />
                   <span>{t('portal.unauthorized')}</span>
-                  {!loading && !loadError && <span className="portal-tab-count">{unauthorizedSystems.length}</span>}
+                  {!loading && <span className="portal-tab-count">{loadError ? '—' : unauthorizedSystems.length}</span>}
                 </span>
               ),
               children: renderSystemPanel(unauthorizedSystems, false),
@@ -886,23 +987,23 @@ export default function Portal() {
         />
       </div>
 
-      {/* 指引带与页脚：填充页面下沿，把入口说明固定在同一屏内 */}
-      <div className="portal-guides">
-        {guides.map((item) => (
-          <div key={item.key} className="portal-guide-card">
-            <span className="portal-guide-icon" style={{ background: `${item.tone}14`, color: item.tone }}>{item.icon}</span>
-            <span className="portal-guide-title">{item.title}</span>
-            <span className="portal-guide-desc">{item.desc}</span>
-          </div>
-        ))}
-      </div>
-
+      {/*
+        页脚：原四张指引卡已删除（评审 L2）——它们解释的都是「点卡片能进系统」「右上角能切语言」
+        这类一眼就懂的常识，却占 96px 高 + 24px 间距，出现在每次进门户的路径上。
+        只把「怎么申请权限」收敛成右侧一个文字链，点开直接进系統權限申請页（该页无 system 参数也能打开）。
+      */}
       <footer className="portal-footer">
         <span className="portal-footer-brand">
           <ThunderboltOutlined aria-hidden="true" />
           {t('portal.footerBrand', '麥峰企業門戶 · 業務系統統一入口')}
         </span>
-        <span className="portal-footer-copy">{t('portal.footerCopy', '© {{year}} 麥峰科技', { year: now.getFullYear() })}</span>
+        <span className="portal-footer-right">
+          <button type="button" className="portal-footer-help" onClick={() => navigate('/system-access-apply')}>
+            {t('portal.guideApply', '申請指引')}
+            <span aria-hidden="true">›</span>
+          </button>
+          <span className="portal-footer-copy">{t('portal.footerCopy', '© {{year}} 麥峰科技', { year: now.getFullYear() })}</span>
+        </span>
       </footer>
 
       {/* 未授权系统点击后的申请引导弹窗：关闭或进入权限申请流程二选一 */}

@@ -177,14 +177,37 @@ request.interceptors.response.use(
     } else if (status >= 500) {
       if (!silent) message.error('服務器異常，請稍後重試')
     } else {
-      if (!silent) message.error(error?.message || '網絡異常')
+      // 超时/连接中断必须给业务可读文案：axios 原文「timeout of 15000ms exceeded」
+      // 是英文技术黑话，与界面语言不一致，用户也不知道能不能重试（评审 P0-7）。
+      const code = (error as { code?: string } | undefined)?.code
+      const timedOut = code === 'ECONNABORTED' || code === 'ETIMEDOUT'
+        || /timeout/i.test(typeof error?.message === 'string' ? error.message : '')
+      if (!silent) {
+        if (timedOut) void showTimeoutMessage()
+        else message.error(error?.message || '網絡異常')
+      }
     }
     return Promise.reject(error)
   },
 )
 
 /**
- * 处理登录失效（Token 过期 / 被清除 / 无效）:
+ * 超时提示：文案取 i18n 的 common.requestTimeout，但不在文件顶部静态 import src/i18n ——
+ * 原因见文件头说明：静态引入会在 mock react-i18next 的测试里于模块加载期抛错。
+ * 这里用动态 import 惰性取值，模块早已初始化时即刻 resolve，不会再付一次初始化成本；
+ * 取值失败（jsdom / 被 mock）则回落到繁中字面量，不影响错误上报链路。
+ */
+async function showTimeoutMessage() {
+  try {
+    const { default: i18n } = await import('../i18n')
+    message.error(i18n.t('common.requestTimeout', { defaultValue: '網路回應逾時，請稍後重試' }))
+  } catch {
+    message.error('網路回應逾時，請稍後重試')
+  }
+}
+
+/**
+ * 处理登录失效（Token 过期 / 被清除 / 无效）：
  * 清除本地登录信息, 提示用户, 并通知 AuthContext 同步清除 React 登录态,
  * 由路由守卫将用户带回登录页。并发 401 只处理一次。
  */

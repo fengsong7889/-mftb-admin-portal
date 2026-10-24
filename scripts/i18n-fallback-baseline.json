@@ -1,0 +1,4 @@
+{
+  "_comment": "i18n 兜底文案基线（scripts/check-i18n-fallback.mjs）。只允许下降：清掉一处双参 t(key,'中文') 就下调一次；新增文案必须用单参 t(key) 并补语言包。",
+  "redundantFallback": 255
+}

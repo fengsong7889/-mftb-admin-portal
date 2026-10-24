@@ -38,6 +38,8 @@ jobs:
         run: npm run check:confirm-modal
       - name: i18n Coverage
         run: npm run check:i18n
+      - name: i18n Fallback Copy
+        run: npm run check:i18n-fallback
       - name: Secret Scan
         run: npm run secret-scan
       - name: Test

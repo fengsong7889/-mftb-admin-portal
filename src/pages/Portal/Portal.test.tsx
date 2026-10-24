@@ -99,6 +99,18 @@ function mount(path = '/portal') {
   )
 }
 
+/**
+ * 等入场自动播收尾（评审 M3①：首行卡片会自动播一遍 6s 分镜）。
+ * 用 data-autoplay 归零作信号：播完后 Portal 会移除这个标记，
+ * 之后的 data-motion 变化才确定是悬停/指针引起的。
+ */
+async function waitAutoplaySettled(container: HTMLElement) {
+  await waitFor(
+    () => expect(container.querySelector('.portal-card-shell[data-autoplay="1"]')).toBeNull(),
+    { timeout: 9000 },
+  )
+}
+
 async function selectLanguage(label: string) {
   fireEvent.mouseDown(screen.getByRole('combobox', { name: i18n.t('portal.language') }))
   fireEvent.click(await screen.findByText(label, { selector: '.ant-select-item-option-content' }))
@@ -154,8 +166,10 @@ describe('门户常用入口带（收藏与最近使用）', () => {
     vi.mocked(fetchPortalFavorites).mockResolvedValue([])
     const { container } = mount()
     await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
-    expect(container.querySelector('.portal-favorites')).toBeNull()
+    // 云端已清空 → 不再有任何收藏星标；常用模块仍渲染，但展示空态占位（评审 F1③）
     expect(container.querySelector('.portal-card-fav.is-on')).toBeNull()
+    expect(container.querySelector('.portal-favorites-empty')).toBeInTheDocument()
+    expect(container.querySelector('.portal-quick-item')).toBeNull()
   })
 
   it('云端从未同步（null）时保留本地缓存，不被误判成「用户清空了」', async () => {
@@ -376,7 +390,7 @@ describe('场景区分与低干扰动效', () => {
     const image = container.querySelector('svg')
     expect(image).toHaveAttribute('data-reduced-motion', 'true')
     expect(image).toHaveAttribute('data-motion', 'idle')
-    expect(image?.querySelectorAll('.portal-globe-greeting')).toHaveLength(1)
+    expect(image?.querySelectorAll('.portal-map-scene')).toHaveLength(1)
     const listener = vi.mocked(query.addEventListener).mock.calls.find(([event]) => event === 'change')?.[1]
     query.matches = false
     act(() => { if (typeof listener === 'function') listener.call(query, new Event('change')) })
@@ -394,6 +408,9 @@ describe('场景区分与低干扰动效', () => {
     const searchCard = screen.getByRole('button', { name: /搜索運營.*進入系統/ })
     const financeShell = financeCard.closest('.portal-card-shell')!
     const searchShell = searchCard.closest('.portal-card-shell')!
+    // 入场自动播（评审 M3①）：首行卡片挂载后先自己播一遍，播完才归为静态
+    expect(container.querySelectorAll('.portal-card-shell[data-autoplay="1"]').length).toBeGreaterThan(0)
+    await waitAutoplaySettled(container)
     expect(container.querySelector('.portal-motion-toggle')).toBeNull()
     expect(container.querySelector('[data-motion="running"]')).toBeNull()
     fireEvent.pointerEnter(financeShell, { pointerType: 'mouse' })
@@ -417,6 +434,8 @@ describe('场景区分与低干扰动效', () => {
     unmount()
     const refreshed = mount()
     await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
+    // 重新进门户会再自动播一次（每次进页面都有一次「这里能动」的提示）
+    await waitAutoplaySettled(refreshed.container)
     expect(refreshed.container.querySelector('[data-motion="running"]')).toBeNull()
   })
 
@@ -424,6 +443,8 @@ describe('场景区分与低干扰动效', () => {
     const { container } = mount()
     const card = await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
     const shell = card.closest('.portal-card-shell')!
+    // 先等入场自动播收尾，否则会把自动播的 running 误判成触摸引起的残留
+    await waitAutoplaySettled(container)
     fireEvent.pointerEnter(shell, { pointerType: 'touch' })
     expect(container.querySelector('[data-motion="running"]')).toBeNull()
     fireEvent.pointerEnter(shell, { pointerType: 'mouse' })
@@ -434,43 +455,23 @@ describe('场景区分与低干扰动效', () => {
     expect(container.querySelector('[data-motion="running"]')).toBeNull()
   })
 
-  it('真实地球仅悬停时运转，随机国家抵达中心才显示问候，移出重置并取消帧回调', () => {
-    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
-    vi.spyOn(Math, 'random').mockReturnValue(0)
-    let nextFrame: FrameRequestCallback = () => undefined
-    let frameId = 0
-    const request = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => { nextFrame = callback; return ++frameId })
-    const cancel = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined)
-    const { container, rerender, unmount } = render(<SystemArtwork code="translation" />)
-    const globe = container.querySelector('.portal-globe-scene')!
-    expect(globe).toHaveAttribute('data-world-source', 'natural-earth')
-    expect(Number(globe.getAttribute('data-country-count'))).toBeGreaterThan(150)
-    expect(globe).toHaveAttribute('data-country', 'CN')
-    expect(request).not.toHaveBeenCalled()
-    const initialLand = container.querySelector('.portal-globe-land')!.getAttribute('d')
-    rerender(<SystemArtwork code="translation" active />)
-    act(() => nextFrame(0))
-    expect(globe).toHaveAttribute('data-country', 'US')
-    expect(globe).toHaveAttribute('data-arrived', 'false')
-    expect(container.querySelector('.portal-globe-greeting')).toHaveAttribute('opacity', '0')
-    act(() => nextFrame(900))
-    expect(container.querySelector('.portal-globe-land')!.getAttribute('d')).not.toBe(initialLand)
-    act(() => nextFrame(1800))
-    expect(globe).toHaveAttribute('data-center', '-98.00,38.00')
-    expect(globe).toHaveAttribute('data-arrived', 'true')
-    expect(container.querySelector('.portal-globe-greeting')).toHaveTextContent('Hello')
-    const pin = container.querySelector('.portal-globe-pin circle')!
-    expect(Number(pin.getAttribute('cx'))).toBeCloseTo(160)
-    expect(Number(pin.getAttribute('cy'))).toBeCloseTo(94)
-    act(() => nextFrame(3600))
-    expect(globe).not.toHaveAttribute('data-country', 'US')
-    rerender(<SystemArtwork code="translation" />)
-    expect(cancel).toHaveBeenCalled()
-    expect(globe).toHaveAttribute('data-country', 'CN')
-    expect(container.querySelector('.portal-globe-land')).toHaveAttribute('d', initialLand)
-    rerender(<SystemArtwork code="translation" active />)
-    unmount()
-    expect(cancel).toHaveBeenCalledTimes(2)
+  it('翻译卡是平铺世界地图 + 随机地标，静态层自身完整且品牌橙只出现一次', () => {
+    const { container } = render(<SystemArtwork code="translation" />)
+    const map = container.querySelector('.portal-map-scene')!
+    expect(map).toBeInTheDocument()
+    // 平铺地图：陆地与国界两条 path 都带真实几何数据，不是占位图形
+    const paths = map.querySelectorAll('path')
+    expect(paths.length).toBeGreaterThanOrEqual(2)
+    expect((paths[0].getAttribute('d') ?? '').length).toBeGreaterThan(100)
+    // 地标候选 8 个国家，静态默认第一个（CN），播放时随机切换
+    expect(map).toHaveAttribute('data-country', 'CN')
+    expect(Number(map.getAttribute('data-country-total'))).toBe(8)
+    // 文字 2 处：问候语 + 国家名
+    expect(map).toHaveTextContent('你好')
+    // 品牌橙只出现 1 次（地标实心点），扩散环是描边不算
+    expect(map.querySelectorAll('[fill="#E8720C"]')).toHaveLength(1)
+    // 大动作（评审 M1）：扩散环挂 portal-art-motion
+    expect(map.querySelector('.portal-map-ripple')).toHaveClass('portal-art-motion')
   })
 
   it('权限钥匙的初始配色中性，并具备身份扫描、门禁及准确结果文案', () => {
@@ -484,13 +485,13 @@ describe('场景区分与低干扰动效', () => {
 
   it.each([
     ['search', ['.portal-search-lens', '.portal-art-typing']],
-    ['finance', ['.portal-finance-formulas', '.portal-finance-display', '.portal-art-typing']],
+    ['finance', ['.portal-finance-check', '.portal-finance-display', '.portal-art-typing']],
     ['iam', ['.portal-key-denied', '.portal-key-granted', '.portal-lock-alarm', '.portal-lock-shackle']],
     ['ai', ['.portal-robot-eye', '.portal-robot-pupil', '.portal-robot-smile', '.portal-robot-signal']],
     ['eam', ['.portal-eam-laptop', '.portal-eam-custodian', '.portal-eam-asset-tag', '.portal-eam-assignment-path', '.portal-eam-supply', '.portal-eam-supply-confirm']],
     ['hr', ['.portal-hr-profile', '.portal-hr-match-path', '.portal-hr-member', '.portal-hr-welcome']],
     ['oa', ['.portal-workflow-paper', '.portal-workflow-stage-2', '.portal-office-signature', '.portal-office-archived']],
-    ['translation', ['.portal-globe-land', '.portal-globe-meridian', '.portal-globe-greeting']],
+    ['translation', ['.portal-map-scene', '.portal-map-ripple']],
     ['ads', ['.portal-ads-target', '.portal-ads-intake', '.portal-ads-scan', '.portal-ads-lead', '.portal-ads-promote', '.portal-ads-slot', '.portal-ads-heart', '.portal-ads-loop', '.portal-ads-result']],
     ['merchant', ['.portal-merchant-route', '.portal-merchant-pin-2', '.portal-merchant-metric']],
     ['merchantWorkbench', ['.portal-order-receipt', '.portal-order-stamp', '.portal-order-done']],
@@ -499,8 +500,13 @@ describe('场景区分与低干扰动效', () => {
     const { container } = render(<SystemArtwork code={code} />)
     for (const selector of selectors) expect(container.querySelector(selector)).toBeInTheDocument()
     expect(container.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
-    if (code === 'finance') expect(container.querySelector('.portal-finance-display')).toHaveTextContent('ROI=F/PV')
-    if (code === 'translation') expect(container.querySelectorAll('.portal-globe-greeting')).toHaveLength(1)
+    if (code === 'finance') {
+      expect(container.querySelector('.portal-finance-display')).toHaveTextContent('ROI=F/PV')
+      // 三行公式已按评审 P0-1 删除：它会被计算器与硬币叠压，且是全站唯一衬线体
+      expect(container.querySelector('.portal-finance-formulas')).toBeNull()
+      expect(container.querySelector('.portal-finance-check')).toBeInTheDocument()
+    }
+    if (code === 'translation') expect(container.querySelectorAll('.portal-map-scene')).toHaveLength(1)
   })
 
   it('广告推荐场景画的是算法投流链路：人群定向、竞价排序、首屏坑位与曝光回流', () => {
@@ -556,6 +562,8 @@ describe('场景区分与低干扰动效', () => {
     const card = await screen.findByRole('button', { name: '物資管理系統 · 進入系統' })
     const image = card.querySelector('svg[data-scene="eam"]')!
     const shell = card.closest('.portal-card-shell')!
+    // 先等入场自动播播完，否则拿到的是自动播的 running 而不是静止态
+    await waitAutoplaySettled(document.body)
     expect(image).toHaveAttribute('data-motion', 'idle')
     expect(image.querySelector('[class*="portal-stock-"]')).toBeNull()
     expect(image.querySelector('.portal-eam-asset-tag')).toHaveTextContent('IT-024')

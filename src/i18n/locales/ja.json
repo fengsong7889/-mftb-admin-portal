@@ -12,6 +12,20 @@
   "portal": {
     "title": "グループポータル",
     "appCenter": "アプリケーションセンター",
+    "appTab": "モバイルアプリ",
+    "appGroup": "モバイルアプリ",
+    "appGroupDesc": "プロトタイププレビュー · データは実際のバックエンドから取得",
+    "appMerchant": "加盟店アプリ",
+    "appMerchantDesc": "広告を購入して実際に注文、注文は管理画面に同期",
+    "appMerchantStatus": "実際の注文",
+    "appConsumer": "ユーザーアプリ",
+    "appConsumerDesc": "配信中の加盟店とゴールデンタイムを閲覧",
+    "appConsumerStatus": "データ連携待ち",
+    "favoritesEmpty": "お気に入りはまだありません · カード右上の ☆ で追加",
+    "favoritesMore": "他 {{count}} 件",
+    "favoritesCollapse": "閉じる",
+    "favUndo": "元に戻す",
+    "statAllGranted": "すべて開通済み",
     "quotes": [
       "簡単なことを確実にやり遂げることが、不平凡への道",
       "今日の前進が、明日の結果の伏線になる",
@@ -110,17 +124,13 @@
       "hrAssigned": "部署への配属が完了",
       "attendancePunched": "打刻完了 · 09:00",
       "leaveApproved": "休暇承認済み · 本日は休業",
-      "meetingBooked": "会議室予約済み · 10:00–11:00",
+      "meetingBooked": "会議室予約済み · 10:00~11:00",
       "meetingCheckedIn": "出席登録済み · 会議中",
       "meetingInviteSent": "招待送付済み · 3名",
       "workflowArchived": "承認済み・保管完了",
       "accessDenied": "認証失敗、アクセス拒否",
       "accessGranted": "認証成功、アクセス許可",
       "verifyingIdentity": "本人確認",
-      "pacificOcean": "太平洋",
-      "atlanticOcean": "大西洋",
-      "indianOcean": "インド洋",
-      "arcticOcean": "北極海",
       "recommendMatched": "対象ユーザーとマッチ",
       "storesSynced": "店舗データを集約",
       "newOrder": "新しい注文を受信",
@@ -134,7 +144,6 @@
       "review": "審査",
       "approved": "承認済み",
       "docKnowledgeBase": "ナレッジ蓄積",
-      "docIndex": "統一インデックス",
       "docCloudDocs": "クラウド文書",
       "docKnowledgeVault": "企業ナレッジベース",
       "docArchiveFiles": "アーカイブ資料"
@@ -382,7 +391,8 @@
     "transferFrom": "異動前 → 異動後"
   },
   "common": {
-    "pleaseSelect": "Please select"
+    "pleaseSelect": "Please select",
+    "requestTimeout": "ネットワーク応答がタイムアウトしました。しばらくしてから再試行してください。"
   },
   "authorizationCenter": {
     "directoryNodeTip": "This node is a grouping directory with no assignable actions; grant permissions on the menus under it."

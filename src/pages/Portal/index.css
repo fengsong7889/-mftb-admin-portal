@@ -159,13 +159,17 @@
 
 /* ---------- 概览指标（上提叠在横幅下沿，建立第一层视觉重心） ---------- */
 
+/*
+ * 上提叠在横幅下沿，但左右各内缩 24：两者同宽时，统计卡的 12px 圆角会盖住横幅的 16px 圆角，
+ * 在卡片圆角处透出一小块橙色三角，横幅像被切平的下巴（评审 P0-5）。
+ */
 .portal-stats {
   position: relative;
   z-index: 1;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
-  margin: -26px 0 16px;
+  margin: -26px 24px 16px;
 }
 
 .portal-stat {
@@ -205,6 +209,14 @@
   color: #8C8C8C;
 }
 
+/* 「全部已開通」微文案：让「可申请 0」看起来是无待办，而不是加载坏了（评审 L4） */
+.portal-stat-hint {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #8C8C8C;
+  opacity: 0.85;
+}
+
 /*
  * 我的常用：内容模块，独立白卡。
  * 与下方「业务板块」刻意用两种视觉语言 —— 内容有块面、控件没有块面，
@@ -235,8 +247,9 @@
   width: 26px;
   height: 26px;
   border-radius: 8px;
-  background: #FFF7E6;
-  color: #FAAD14;
+  /* 收藏是正向用户行为，用品牌橙而不是「警告/参数」的琥珀（评审 F6②） */
+  background: #FFF7F0;
+  color: #E8720C;
   font-size: 14px;
 }
 
@@ -252,8 +265,9 @@
   min-width: 22px;
   padding: 0 7px;
   border-radius: 11px;
-  background: #FFF7E6;
-  color: #FAAD14;
+  /* 原 #FAAD14 on #FFF7E6 对比度只有 1.78:1，几乎读不出（评审 F3/F6） */
+  background: #FFF7F0;
+  color: #E8720C;
   font-size: 11px;
   line-height: 20px;
   text-align: center;
@@ -268,8 +282,44 @@
 }
 
 .portal-favorites-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 12px;
-  color: #bfbfbf;
+  /* 原 #BFBFBF 实测对比度 1.84:1（AA 要求 4.5:1），是全屏最淡的字（评审 F1②） */
+  color: #8c8c8c;
+}
+
+/* 空态也把模块渲染出来：新用户只有在这里才知道「常用」存在（评审 F1③） */
+.portal-favorites-empty {
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px dashed #E8E8E8;
+  border-radius: 10px;
+  font-size: 12px;
+  color: #8c8c8c;
+  text-align: center;
+}
+
+/* 单行限高：常用不设上限时 20 个收藏会把卡片墙直接挤出首屏（评审 F7） */
+.portal-favorites-chips.is-clamped {
+  max-height: 38px;
+  overflow: hidden;
+}
+
+.portal-favorites-more {
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #E8720C;
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.25s;
+}
+
+.portal-favorites-more:hover {
+  color: #F59432;
 }
 
 .portal-favorites-chips {
@@ -280,7 +330,7 @@
 }
 
 .portal-favorites-recent {
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .portal-favorites-recent-label {
@@ -289,7 +339,7 @@
   gap: 5px;
   margin-right: 2px;
   font-size: 12px;
-  color: #bfbfbf;
+  color: #8c8c8c;
 }
 
 .portal-quick-item {
@@ -304,6 +354,19 @@
 .portal-quick-item:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/*
+ * 最近使用 = 系统记的（空心），收藏 = 我标的（实心）。
+ * 两排同形不同义时，只靠一行 12px 灰字区分不够（评审 F4）。
+ */
+.portal-quick-item--recent {
+  background: transparent;
+  border-color: #E8E8E8;
+}
+
+.portal-quick-item--recent .portal-quick-name {
+  color: #595959;
 }
 
 .portal-quick-open {
@@ -354,7 +417,35 @@
   color: #bfbfbf;
   font-size: 11px;
   cursor: pointer;
-  transition: color 0.25s;
+  /* × 常驻会让整排看起来像「标签编辑态」，改为悬停/聚焦显现（评审 F5） */
+  opacity: 0;
+  transition: opacity 0.2s, color 0.25s;
+}
+
+.portal-quick-item:hover .portal-quick-remove,
+.portal-quick-item:focus-within .portal-quick-remove {
+  opacity: 1;
+}
+
+/* 撤销：取消常用紧贴 chip 主体，误点即删，toast 里必须能一键恢复（评审 F5） */
+.portal-undo-toast {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.portal-undo-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #E8720C;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.portal-undo-btn:hover {
+  color: #F59432;
 }
 
 .portal-quick-remove:hover {
@@ -548,25 +639,33 @@
   text-align: center;
 }
 
+/* 300 → 280：1600px 下由 4 列变 5 列，首屏可见卡从 4 张提到 10 张（评审 L1） */
 .portal-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+  gap: 16px;
 }
 
 /* 分组应用墙：每个业务板块一个区块，组头提供图标、数量与职责说明 */
 .portal-groups {
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  /* 28 → 20：五组组间距纯属结构性开销（评审 L1 首屏目标的一部分） */
+  gap: 20px;
 }
 
+/*
+ * 分组标题行：图标+标题+计数是一个视觉单元，说明文字下沉到第二行。
+ * 原写法把 28px 图标 / 15px 标题 / 计数胶囊 / 全宽分隔线 / 右对齐说明挤在一行，
+ * 四种字号三种对齐，视线要折返两次才读完（评审 L3）。
+ */
 .portal-group-head {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 14px;
+  /* 14 → 10：组头与卡片间距收紧，把高度让给卡片本身 */
+  margin-bottom: 10px;
 }
 
 .portal-group-icon {
@@ -598,13 +697,15 @@
 }
 
 .portal-group-line {
-  flex: 1;
-  min-width: 24px;
+  flex: 0 0 24px;
+  max-width: 24px;
   height: 1px;
   background: #f0f0f0;
 }
 
 .portal-group-desc {
+  flex-basis: 100%;
+  padding-left: 38px;
   font-size: 12px;
   color: #8c8c8c;
 }
@@ -633,24 +734,41 @@
   border: 1px solid #f0f0f0;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.92);
-  color: #8c8c8c;
+  color: #BFBFBF;
   font-size: 14px;
   cursor: pointer;
-  opacity: 0;
-  transform: translateY(-2px);
-  transition: opacity 0.25s, transform 0.25s, color 0.25s, border-color 0.25s;
+  /*
+   * 常显低饱和，悬停才升到品牌橙（评审 F1①）。
+   * 原 opacity:0 导致功能要「偶然悬停 + 注意到灰星」才能被发现；
+   * 常显也就顺带解决了触屏无 hover 态时收藏彻底失效的问题（评审 F2），
+   * 因此不再需要 @media (hover:none) 兜底。
+   */
+  opacity: 1;
+  transform: translateY(0);
+  transition: transform 0.25s, color 0.25s, border-color 0.25s;
 }
 
 .portal-card-shell:hover .portal-card-fav,
 .portal-card-shell:focus-within .portal-card-fav {
-  opacity: 1;
-  transform: translateY(0);
+  color: #E8720C;
+  border-color: #FFE7D1;
 }
 
 /* 整卡悬停会上浮 4px，星标挂在外壳上不受该 transform 影响，需同步位移才不会看起来脱开 */
 .portal-card-shell:hover .portal-card-fav,
 .portal-card-shell:hover .portal-card-fav.is-on {
   transform: translateY(-4px);
+}
+
+/*
+ * 触屏兜底（评审 F2）：星标已改为常显，本条是防御性兜护——
+ * 若将来有人把可见性改回 hover 驱动，触屏设备（无 hover 态）仍能看见星标。
+ * 注意：这是能力查询（capability query），不是 §K.2 禁止的宽度响应式断点。
+ */
+@media (hover: none) {
+  .portal-card-fav {
+    opacity: 1;
+  }
 }
 
 .portal-card-fav:hover {
@@ -727,7 +845,11 @@
   position: relative;
   display: block;
   width: 100%;
-  aspect-ratio: 320 / 190;
+  /*
+   * 320/190 → 320/140：封面高度 208 → 153（-26%）。门户是每次进系统都要过一遍的高频页，
+   * 封面吃掉 65% 卡高时用户要滚 1.6 屏才能看完 16 个系统（评审 L1）。
+   */
+  aspect-ratio: 320 / 140;
   overflow: hidden;
   flex-shrink: 0;
   color: #E8720C;
@@ -753,15 +875,15 @@
 }
 
 .portal-card-artwork[data-scene='merchant'] {
-  color: #13C2C2; /* 青绿：BD 拓店与地图规划 */
+  color: #20B5B5; /* 青绿：BD 拓店与地图规划 */
 }
 
 .portal-card-artwork[data-scene='merchantWorkbench'] {
-  color: #FAAD14; /* 金：商家自助经营与收益，与同组 ads 亮橙拉开明度差 */
+  color: #DBA333; /* 金：商家自助经营与收益，与同组 ads 亮橙拉开明度差 */
 }
 
 .portal-card-artwork[data-scene='search'] {
-  color: #2F54EB; /* 电光蓝：检索与词库策略，比 HR 的用户蓝更冷 */
+  color: #3D5DDD; /* 电光蓝：检索与词库策略，比 HR 的用户蓝更冷 */
 }
 
 /* 經營與資產支撐 */
@@ -770,7 +892,7 @@
 }
 
 .portal-card-artwork[data-scene='eam'] {
-  color: #D46B08; /* 深橙棕：物资设备的工业感，与本场景暖色构件自洽 */
+  color: #BB6C21; /* 深橙棕：物资设备的工业感，与本场景暖色构件自洽 */
 }
 
 /* 組織與流程審批 */
@@ -779,7 +901,7 @@
 }
 
 .portal-card-artwork[data-scene='attendance'] {
-  color: #13A8A8; /* 青（ant cyan-7）：考勤假勤与 HR 蓝、同组 OA 琥珀色相互斥，比商户青绿更暗一档 */
+  color: #1C9F9F; /* 青（ant cyan-7）：考勤假勤与 HR 蓝、同组 OA 琥珀色相互斥，比商户青绿更暗一档 */
 }
 
 .portal-card-artwork[data-scene='oa'] {
@@ -787,7 +909,7 @@
 }
 
 .portal-card-artwork[data-scene='rdm'] {
-  color: #EB2F96; /* 洋红：研发交付与上线发布 */
+  color: #DD3D95; /* 洋红：研发交付与上线发布 */
 }
 
 /* 智能與平台治理 */
@@ -795,20 +917,27 @@
   color: #722ED1; /* 紫：AI 能力 */
 }
 
+/*
+ * 原 #001529（近黑）：全站唯一 L<20% 实心块，并排时像把系统光标贴进了插画。
+ * 改为 §A.1「高级/特殊」#722ED1 的浅阶（评审 S2 硬约束② + §09 权限卡重绘建议）。
+ * 注意：color 必须紧跟在 { 后面——色调回归用例靠「{ 紧跟 color:」的正则扫描本文件。
+ */
 .portal-card-artwork[data-scene='iam'] {
-  color: #001529; /* 墨：权限与账号安全，深色庄重 */
+  color: #9254DE;
 }
 
+/* 原 #595959 灰：整卡几乎全灰，并排时会被读成「禁用」且找不到焦点（评审 §S6）。
+   改 §A.1「信息/导入 #1890FF」的深阶，保留「配置/参数」的冷静感又不失焦点。 */
 .portal-card-artwork[data-scene='platform'] {
-  color: #595959; /* 灰：平台配置底座 */
+  color: #096DD9;
 }
 
 .portal-card-artwork[data-scene='translation'] {
-  color: #08979C; /* 深青：地球与多语言，与同组 AI 紫拉开 */
+  color: #19888B; /* 深青：地球与多语言，与同组 AI 紫拉开 */
 }
 
 .portal-card-artwork .portal-art-motion {
-  animation-duration: 5s;
+  animation-duration: 6s;
   animation-delay: 0s;
   animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;
@@ -850,21 +979,14 @@
   animation-delay: -4s;
 }
 
-/* 同一场景共享时钟，保证插入、拒绝、放行以及扫码与出入库的先后关系。 */
-.portal-card-artwork[data-scene='search'] .portal-art-motion { animation-duration: 8s; }
-.portal-card-artwork[data-scene='iam'] .portal-art-motion { animation-duration: 10s; }
+/*
+ * 动效节拍统一为 6s 主周期（评审 M2）：原先 16 张卡分为 5 / 6.4 / 7.2 / 7.6 / 8 / 9 / 10 / 12 秒
+ * 共八种节拍，快速划过去会觉得每张卡「性格」都不同。只有研发交付的 6 站流水线保留 12s 慢镜头。
+ * 同屏错峰不需要：卡片只在悬停时播放，同一时刻只有一张在动。
+ */
 .portal-card-artwork[data-scene='eam'] .portal-art-motion {
-  animation-duration: 10s;
   animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
-.portal-card-artwork[data-scene='hr'] .portal-art-motion { animation-duration: 8s; }
-.portal-card-artwork[data-scene='attendance'] .portal-art-motion { animation-duration: 7.2s; }
-.portal-card-artwork[data-scene='oa'] .portal-art-motion { animation-duration: 9s; }
-.portal-card-artwork[data-scene='ai'] .portal-art-motion { animation-duration: 6.4s; }
-.portal-card-artwork[data-scene='ads'] .portal-art-motion,
-.portal-card-artwork[data-scene='merchant'] .portal-art-motion,
-.portal-card-artwork[data-scene='merchantWorkbench'] .portal-art-motion,
-.portal-card-artwork[data-scene='platform'] .portal-art-motion { animation-duration: 8s; }
 .portal-card-artwork[data-scene='rdm'] .portal-art-motion { animation-duration: 12s; }
 .portal-card-artwork[data-scene='rdm'] .portal-art-flow { animation-duration: 3s; }
 
@@ -990,7 +1112,13 @@
 
 .portal-card-artwork .portal-key-denied { animation-name: portalKeyDenied; }
 .portal-card-artwork .portal-key-granted { animation-name: portalKeyGranted; }
-.portal-card-artwork .portal-lock-body { animation-name: portalLockShake; }
+.portal-card-artwork .portal-lock-body { animation-name: portalLockShake, portalLockRelease; }
+/* 解锁：门开前 78% 淡出，门缝那道光才透得出来 */
+@keyframes portalLockRelease {
+  0%, 74% { opacity: 1; }
+  80%, 100% { opacity: 0; }
+}
+/* 门开（68% 起）锁体淡出，让门缝光柱完整露出（评审 §09「门开一道光」） */
 .portal-card-artwork .portal-lock-shackle {
   transform-origin: 219px 83px;
   animation-name: portalLockOpen;
@@ -1004,6 +1132,13 @@
 .portal-card-artwork .portal-access-pending { animation-name: portalAccessPending; }
 .portal-card-artwork .portal-access-door-left { animation-name: portalAccessDoorLeft; }
 .portal-card-artwork .portal-access-door-right { animation-name: portalAccessDoorRight; }
+/* 门开后从门缝透出的那道橙光：与门板同一拍展开（评审 §09） */
+.portal-card-artwork .portal-access-light { animation-name: portalAccessLight; }
+/* 与门板同一拍：门开才有光，门关上光就收 */
+@keyframes portalAccessLight {
+  0%, 78%, 100% { opacity: 0; }
+  84%, 92% { opacity: 1; }
+}
 
 /* 广告推荐：人群圈选 → 竞价打分排序 → Top1 入首坑 → 曝光回流，共用 8 秒时钟 */
 .portal-card-artwork .portal-ads-target { animation-name: portalAdsTarget; }
@@ -1134,7 +1269,8 @@
   flex: 1;
   width: 100%;
   min-width: 0;
-  padding: 18px 20px 20px;
+  /* 18/20/20 → 14/18/16：正文收 4px，配合封面压低与 5 列布局，页面总高约 -32% */
+  padding: 14px 18px 16px;
 }
 
 /* 标题右侧箭头由伪元素提供，悬停才显现，不插入额外节点 */
@@ -1169,10 +1305,10 @@
 
 .portal-card-desc {
   display: block;
-  min-height: 42px;
+  min-height: 36px;
   font-size: 12px;
   color: #595959;
-  line-height: 1.75;
+  line-height: 1.6;
   overflow-wrap: anywhere;
 }
 
@@ -1274,52 +1410,26 @@
   gap: 12px;
 }
 
-/* 指引带与页脚：把入口说明固定在同一屏内，填充页面下沿 */
-.portal-guides {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  margin: 24px 0 0;
-}
-
-.portal-guide-card {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 16px 18px;
-  background: #fff;
-  border: 1px solid #f0f0f0;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.portal-guide-card:hover {
-  transform: translateY(-2px);
-  border-color: #FFE7D1;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
-}
-
-.portal-guide-icon {
+/*
+ * 指引带已删除（评审 L2）：「權限說明 / 申請指引 / 語言與地區 / 搜索與篩選」四张卡
+ * 解释的全是一眼就懂的常识，却占 96px 高 + 24px 间距，出现在每次进门户的路径上。
+ * 「申请指引」收敛成页脚右侧一个文字链，省下的 120px 直接还给卡片墙。
+ */
+.portal-footer-help {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  font-size: 14px;
-}
-
-.portal-guide-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #262626;
-}
-
-.portal-guide-desc {
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #8c8c8c;
   font-size: 12px;
-  line-height: 1.7;
-  color: #595959;
+  cursor: pointer;
+  transition: color 0.25s;
+}
+
+.portal-footer-help:hover {
+  color: #E8720C;
 }
 
 .portal-footer {
@@ -1343,15 +1453,20 @@
   font-weight: 500;
 }
 
+.portal-footer-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+}
+
 /*
- * 会议管理两套构图共用 7.6 秒节拍（与考勤 7.2 秒错开，避免同屏两张卡动画同步）。
+ * 会议管理两套构图共用 6s 主周期（已随全站动效节拍统一）。
  * 位移/旋转类必须显式给 transform-origin：SVG 默认以 view-box 为基准，
  * 不写就会绕卡片左上角转，指针与绿章会飘到卡片外。
  */
 .portal-card-artwork[data-scene='meeting'] {
-  color: #0958D9; /* 深蓝：会议室的时间与秩序，与同域 oa 琥珀、rdm 洋红互斥 */
+  color: #225EC0; /* 深蓝：会议室的时间与秩序，与同域 oa 琥珀、rdm 洋红互斥 */
 }
-.portal-card-artwork[data-scene='meeting'] .portal-art-motion { animation-duration: 7.6s; }
 .portal-card-artwork .portal-meeting-type {
   transform-box: fill-box;
   transform-origin: left center;
@@ -1396,9 +1511,57 @@
   animation-name: portalMeetingSigned;
 }
 
+/*
+ * 播放模式差异化（评审 M3）：
+ * - once：入场自动播的那一次，按 6s 主周期完整播一遍就停（iteration-count:1）；
+ * - loop：悬停微循环，压成 2.4s 重复——用户不必把鼠标停 6~12 秒才能看完分镜。
+ * 放在所有场景规则之后，保证能覆盖 rdm 的 12s 慢镜头。
+ */
+.portal-card-artwork[data-mode='once'] .portal-art-motion {
+  animation-iteration-count: 1;
+}
+.portal-card-artwork[data-mode='loop'] .portal-art-motion {
+  animation-duration: 2.4s;
+  animation-iteration-count: infinite;
+}
+
+/*
+ * 卡片级错峰（评审 M2）：第 n 张卡 delay = (n-1) × 0.35s。
+ * 只在入场自动播期间生效（data-autoplay），悬停必须立即响应，不能被错峰延迟。
+ * 场景内部的分镜时序靠内联 animation-delay 给定，卡片级只负责「同屏多张卡不要同时起步」。
+ */
+.portal-card-shell[data-autoplay='1']:nth-child(2) .portal-art-motion { animation-delay: 0.35s; }
+.portal-card-shell[data-autoplay='1']:nth-child(3) .portal-art-motion { animation-delay: 0.7s; }
+.portal-card-shell[data-autoplay='1']:nth-child(4) .portal-art-motion { animation-delay: 1.05s; }
+.portal-card-shell[data-autoplay='1']:nth-child(5) .portal-art-motion { animation-delay: 1.4s; }
+
+/* ===== 翻译管理（translation）：平铺世界地图 + 随机切换地标 =====
+ * 地球方案已弃用（写实版脱节、简化版无信息量），改平铺投影：没有球体透视问题，
+ * 天然贴合卡片形状，地标小点每 1.9s 换一个国家，左上气泡跟着显示当地「你好」。
+ */
+.portal-card-artwork .portal-config-publish { animation-name: portalConfigPublish; }
+@keyframes portalConfigPublish {
+  0%, 18% { transform: translateY(4px); opacity: 0.55; }
+  40%, 78% { transform: translateY(-4px); opacity: 1; }
+  94%, 100% { transform: translateY(4px); opacity: 0.55; }
+}
+.portal-card-artwork .portal-map-bubble { animation-name: portalMapBubble; }
+@keyframes portalMapBubble {
+  0% { opacity: 0; transform: translateY(4px); }
+  16%, 100% { opacity: 1; transform: translateY(0); }
+}
+.portal-card-artwork .portal-map-ripple {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-name: portalMapRipple;
+}
+@keyframes portalMapRipple {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  70%, 100% { transform: scale(2.2); opacity: 0; }
+}
+
 /* ===== 文档中心（doc）：知识卡叠放 / 索引命中 / 云浮动 / 培训打勾与留痕徽章 ===== */
-.portal-card-artwork[data-scene='doc'] { color: #237804; /* 深林绿：知识沉淀与阅读，与财务亮绿、商户青绿各暗一档互斥 */ }
-.portal-card-artwork[data-scene='doc'] .portal-art-motion { animation-duration: 8s; }
+.portal-card-artwork[data-scene='doc'] { color: #2A6913; /* 深林绿：知识沉淀与阅读，与财务亮绿、商户青绿各暗一档互斥 */ }
 .portal-card-artwork .portal-doc-stack { animation-name: portalDocStack; }
 .portal-card-artwork .portal-doc-hit { animation-name: portalDocHit; }
 .portal-card-artwork .portal-doc-cloud { transform-box: fill-box; transform-origin: center; animation-name: portalDocCloud; }
