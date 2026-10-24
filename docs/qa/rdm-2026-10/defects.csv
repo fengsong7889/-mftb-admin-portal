@@ -11,15 +11,15 @@ RDM-09,ORIGINAL,P2,验收与分发矩阵空态落 antd 默认無此資料,CONFIR
 RDM-10,ORIGINAL,P2,工作台最近动态开启但无内容时留空白区块,CONFIRMED,29ed675d,前端,src/pages/Rdm/Workbench.tsx,EMPTY-02,CLOSED,无
 RDM-11,ORIGINAL,P2,工作台刷新整页被 Spin 顶掉且位置回顶,CONFIRMED,29ed675d,前端,src/pages/Rdm/Workbench.tsx,REQ-07,CLOSED,无
 RDM-12,ORIGINAL,P2,项目负责人列截断无提示且详情 URL 带悬挂 &,CONFIRMED,29ed675d,前端,src/pages/Rdm/ProjectOverview.tsx,UI-TABLE-02,CLOSED,无
-RDM-13,ORIGINAL,P2,看板流水线卡片承诺按对应视角但无筛选,CONFIRMED,29ed675d,前端+后端,src/pages/Rdm/Dashboard.tsx,BOARD-DRILL-01,OPEN,文案已改为查看明细分；真实下钻未实现（P08）
-RDM-14,ORIGINAL,P2,需求看板一次只渲染 100 条且超出无入口,CONFIRMED,29ed675d,前端,src/pages/Rdm/components/RequirementKanban.tsx,BOARD-PAGE-01,OPEN,已提示截断；加载更多未实现
-RDM-15,ORIGINAL,P3,RDM 文案硬编码繁体未走 i18n,SUSPECTED,29ed675d,前端,—,I18N-01,OPEN,本批仅新增文案走 i18n，存量未迁移
+RDM-13,ORIGINAL,P2,看板流水线卡片承诺按对应视角但无筛选,CONFIRMED,29ed675d,前端+后端,src/pages/Rdm/Dashboard.tsx,BOARD-PAGE-01,CLOSED,下钻条件只进列表不进统计卡;列计数与下钻行数已同源验证
+RDM-14,ORIGINAL,P2,需求看板一次只渲染 100 条且超出无入口,CONFIRMED,29ed675d,前端,src/pages/Rdm/components/RequirementKanban.tsx,BOARD-PAGE-01,CLOSED,服务端单次上限200条;超出需收窄搜索条件
+RDM-15,ORIGINAL,P3,RDM 文案硬编码繁体未走 i18n,SUSPECTED,29ed675d,前端,—,I18N-01,OPEN,本批新增文案已走 i18n并登记双语;存量硬编码按模块分批迁移
 RDM-16,ORIGINAL,P3,测试批次号截断且无法复制,CONFIRMED,29ed675d,前端,src/pages/Rdm/TestWorkbench.tsx,UI-TABLE-03,CLOSED,无
 RDM-17,INTRODUCED_BY_FIX,P2,统计卡两视图共用后表格视图冷启动恒显示破折号,CONFIRMED,29ed675d,前端,src/pages/Rdm/RequirementList.tsx,STATS-02,CLOSED,无
 RDM-18,ORIGINAL,P1,项目总览从详情返回误报加载失败并空表,CONFIRMED,29ed675d,前端,ProjectOverview.tsx/useRequestGate.ts,REQ-01/REQ-02,CLOSED,无
 RDM-19,ORIGINAL,P2,验收交付项内层表格默认空态与外层提示形成两套,CONFIRMED,29ed675d,前端,src/pages/Rdm/AcceptanceList.tsx,EMPTY-03,CLOSED,无
-RDM-20,ORIGINAL,P1,未保存 PRD 在页签切换/页面卸载时静默丢失,SUSPECTED,29ed675d,前端,prdDraftStore.ts/UnsavedChangesContext.tsx,PRD-01/PRD-02/PRD-03,PARTIAL,浏览器前进后退未拦截；服务端并发版本未实现
-RDM-21,ORIGINAL,P2,PRD 恢复暂存后保存可能覆盖他人修改,SUSPECTED,29ed675d,后端+前端,prdDraftStore.ts,PRD-08,OPEN,缺少 row_version 乐观锁与冲突测试
+RDM-20,ORIGINAL,P1,未保存 PRD 在页签切换/页面卸载时静默丢失,SUSPECTED,29ed675d,前端,prdDraftStore.ts/UnsavedChangesContext.tsx,PRD-01/PRD-02/PRD-03,CLOSED,浏览器前进后退(POP)由 RDM-34 单独跟踪并标注 BLOCKED
+RDM-21,ORIGINAL,P2,PRD 恢复暂存后保存可能覆盖他人修改,SUSPECTED,29ed675d,后端+前端,prdDraftStore.ts,PRD-08,CLOSED,冲突时要求保留本机内容并重新载入;缺版本参数直接拒绝
 RDM-22,ORIGINAL,P2,周报顶部已上线与部门已交付时间口径不一致,CONFIRMED,29ed675d,后端,src/main/java/com/mftb/admin/service/RdmAnalyticsService.java,WEEKLY-01,CLOSED,历史跨期数据需业务复核
 RDM-23,ORIGINAL,P2,列表统计未复制全部筛选条件导致卡片与列表口径分叉,CONFIRMED,29ed675d,后端,RdmRequirementServiceImpl.java,STATS-03,CLOSED,需在真实库补交叉筛选抽样
 RDM-24,ORIGINAL,P2,请求取消/乱序未处理导致旧结果覆盖新条件与误报失败,CONFIRMED,29ed675d,前端,src/pages/Rdm/useRequestGate.ts,REQ-01..REQ-05,CLOSED,写请求仍依赖服务端幂等

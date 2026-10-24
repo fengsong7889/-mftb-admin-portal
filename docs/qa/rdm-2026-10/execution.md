@@ -248,6 +248,28 @@
 本批生效后的行为变化（需在切后端镜像后才会在生产显现）：`/api/menus/tree` 对非管理人员返回 403、导航改由 `/api/menus/my-tree` 提供、PRD 保存强制版本号、SLA 扫描与延长告警口径修正。
 **切换注意**：新镜像启动期会执行 `rdm:schema:v3.34`（若尚未执行），readiness 大约 5~6 分钟后才转 200 属正常中间态。
 
+## 扩权类缺陷同类扫描（2026-10-24）
+
+修完 RDM-38 后，对全部写 `sys_role_menu` / `sys_department_menu` 的初始化器做了归类核查，结论：**无同级别未修项**。
+
+| 初始化器 | 授权写入方式 | 判定 |
+|---|---|---|
+| `RdmMenuInitializer.inheritGroupGrants` | 跨菜单复制（父→子） | 原为每次启动，**本轮已修为一次性**（RDM-38） |
+| `DataInitializer.splitRuleConfigMenus` | 跨菜单复制（rule-config→7 个新菜单） | 已在 `applyOnce(core:menu-seed-v45)` 内，只在 `V_MENU_SEED` 递增时跑一次 |
+| `AttendanceMenuInitializer` | 补自身菜单授权 | 已有防护：注释明确「管理员主动收窄过的动作集不得被启动重放扩权」，且只对空动作补默认值 |
+| `EmployeePermSplitMenuInitializer` | 只补 admin | admin 本就全权，非扩权 |
+| 其余 Hr/Eam/Meeting/Doc 等 Schema 初始化器 | 补自身新建菜单的初始授权 | 均为一次性结构迁移，且对象是当次新建菜单 |
+
+## 缺陷台账盘点（2026-10-24 收口）
+
+| 状态 | 数量 | 说明 |
+|---|---|---|
+| CLOSED | 36 | 含本轮新增并关闭的 RDM-27~RDM-33、RDM-35~RDM-38 |
+| BLOCKED | 1 | RDM-34：浏览器前进后退（POP）在 createHashHistory 下无法回滚；替代保护为 beforeunload |
+| OPEN | 1 | RDM-15：RDM 存量繁体文案按模块分批迁 i18n（本批新增文案已全部走 i18n 并登记双语） |
+
+更正说明：`defects.csv` 此前存在编号冲突（NEW/REGRESSION 批次复用了 ORIGINAL 已占用的 RDM-13~24），已统一重编为 RDM-27~RDM-38 并更新 `execution.md` 中的全部引用；现 39 行均为 11 字段、无重复 ID。
+
 ## 交接说明
 
 - 所有改动集中在 `src/pages/Rdm/**`、`src/api/rdm.ts`、`src/App.tsx`、`src/components/MenuTabs.tsx`、`backend` RDM 服务与迁移、双语文件。
