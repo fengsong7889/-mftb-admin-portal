@@ -57,6 +57,13 @@ public class RdmMenuInitializer implements CommandLineRunner {
      * 会被重放的镜像从旧锚点又加回来（“撤权不复活”是方案 §五 的红线）。
      */
     private static final String MIRROR_VERSION_KEY = "rdm:anchor-grant-mirror:v1";
+    /**
+     * v3.35 分组授权继承登记号：与菜单结构迁移分号登记，因为同样**只能跑一次**。
+     * <p>继承本身只为结构升级当次补位；若每次启动重放，管理员在授权中心撤销的子菜单授权
+     * 会被父菜单的存量授权用 INSERT IGNORE 再插回来（“撤权不复活”红线）。
+     * <p>将来再有新建分组需要继承，另起 v2 key，不要回退成每次执行。
+     */
+    private static final String GROUP_GRANT_INHERIT_VERSION_KEY = "rdm:menu-group-grant-inherit:v1";
     private static final String ADMIN_ROLE_CODE = "admin";
     /** 被取消的旧一级目录（软删，保留回滚能力） */
     private static final String LEGACY_ROOT_KEY = "rdm-center";
@@ -380,7 +387,9 @@ public class RdmMenuInitializer implements CommandLineRunner {
         assertAnchorRemapCoversLiveMenu(ANCHOR_PRECHECK_MENU);
         // 先搬完旧菜单授权再补新叶子继承：退役不能目标未就位就执行
         retireMenusMergingGrants();
-        inheritGroupGrants();
+        // 授权继承是一次性迁移：补完就交给授权中心，重放会把管理员撤销的授权再插回来
+        versionTracker.applyOnce(GROUP_GRANT_INHERIT_VERSION_KEY,
+                this::inheritGroupGrants, this::verifyGroupGrantNodes);
         grantAdminMenus();
         deriveSystemAccess();
         permissionService.evictAll();
@@ -837,15 +846,33 @@ public class RdmMenuInitializer implements CommandLineRunner {
      * 原先被授了父 key 的角色/部门不会自动拥有新 key，升级当日就会出现
      * “超管能看到、普通用户点开是空白”的漂移。此处把父分组上的授权原样复制到每个子菜单。
      * <p>用 INSERT IGNORE（而非 ON DUPLICATE KEY UPDATE）：已存在的子菜单授权可能是管理员在
-     * 授权中心自定义过的，本迁移每次启动都会重放，不得把它刷回父菜单的动作集。
+     * 授权中心自定义过的，不得把它刷回父菜单的动作集。
+     * <p>只在 v3.35 迁移里执行一次（见 {@code GROUP_GRANT_INHERIT_VERSION_KEY}）：
+     * 每次启动重放会让“管理员撤销过的子菜单授权”复活。
      */
-    private void inheritGroupGrants() {
+    void inheritGroupGrants() {
         // 先补新分组自己的授权，再处理叶子继承（顺序不能翻，否则新分组下的叶子无基准可继承）
         for (String[] mapping : GROUP_GRANT_SEED) {
             inheritOneGroup(mapping);
         }
         for (String[] mapping : GROUP_GRANT_INHERIT) {
             inheritOneGroup(mapping);
+        }
+    }
+
+    /**
+     * 授权继承的验收：只校验映射里的父子节点都存在，**不断言授权行**。
+     * <p>继承后管理员撤销授权是正常运维动作，把授权行写进验收会让“合法的撤权”变成启动失败。
+     */
+    void verifyGroupGrantNodes() {
+        for (String[][] table : new String[][][]{GROUP_GRANT_SEED, GROUP_GRANT_INHERIT}) {
+            for (String[] mapping : table) {
+                for (String key : mapping) {
+                    if (queryMenuIdByKey(key) == null) {
+                        throw new IllegalStateException(key + " 节点不存在，授权继承前提未满足");
+                    }
+                }
+            }
         }
     }
 

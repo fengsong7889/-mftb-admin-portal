@@ -25,15 +25,15 @@ RDM-23,ORIGINAL,P2,列表统计未复制全部筛选条件导致卡片与列表�
 RDM-24,ORIGINAL,P2,请求取消/乱序未处理导致旧结果覆盖新条件与误报失败,CONFIRMED,29ed675d,前端,src/pages/Rdm/useRequestGate.ts,REQ-01..REQ-05,CLOSED,写请求仍依赖服务端幂等
 RDM-25,ORIGINAL,P3,列表场景缓存未按账号隔离且换条件互写,CONFIRMED,29ed675d,前端,useListSceneRestore.ts,NAV-03,CLOSED,无
 RDM-26,ORIGINAL,P3,个性化配置取消勾选后条目跳到末尾易误关,CONFIRMED,29ed675d,前端,WorkbenchCustomize.tsx,UI-CONFIG-01,CLOSED,无
-RDM-13,REGRESSION,P2,受限角色在研發工作台可见迭代排期/查看交付中需求/團隊負載三个越权入口按钮点击进403,CONFIRMED,29ed675d,前端,src/pages/Rdm/DeliveryBoard.tsx,AUTH-01,CLOSED,按钮隐藏依赖前端权限数据;服务端仍兜底403
-RDM-14,NEW,P3,/api/menus/tree 对任意登录用户返回全量菜单(含未授权菜单名与路径)属信息暴露,CONFIRMED,29ed675d,后端,MenuController.tree + MenuServiceImpl.myTree,MENU-01..MENU-06,CLOSED,管理端全量树改由 menu-config/authorization-center/function-permission 授权持有
-RDM-15,REGRESSION,P3,看板下钻条件被写入列表场景缓存导致下次裸地址进入仍被过滤,CONFIRMED,29ed675d,前端,RequirementList/useListSceneRestore,NAV-04,CLOSED,statuses已改为只认URL
-RDM-16,REGRESSION,P3,同路径仅改hash查询串不触发重新取数,CONFIRMED,29ed675d,前端,RequirementList,NAV-05,CLOSED,已补URL变化同步effect
-RDM-17,NEW,P1,PRD乐观锁仅在保存前比较版本且UPDATE无版本条件;并发两次保存仍可互相覆盖;缺版本参数时完全跳过检查,CONFIRMED,29ed675d,后端,RdmDeliveryServiceImpl.savePrd/updatePrdWithVersion,PRD-08,CLOSED,另存新版本与评审写点同步递增版本
-RDM-18,NEW,P2,SLA定时作业用两次独立JdbcTemplate调用做GET_LOCK/RELEASE_LOCK;连接级锁可能落在不同连接上,CONFIRMED,29ed675d,后端,RdmSlaScheduler.scan,SLA-01,CLOSED,改为复用MigrationLock同一借出连接
-RDM-19,NEW,P2,SLA延长后仅清除旧逾期标记却仍发送「即将逾期」提醒,CONFIRMED,29ed675d,后端,RdmSlaScheduler.doScan,SLA-02,CLOSED,未到预警点直接跳过发送
-RDM-20,NEW,P2,浏览器前进后退与同路径换PRD文档不受未保存保护,CONFIRMED,29ed675d,前端,App.tsx createHashRouter + UnsavedNavigationGuard,NAV-06..NAV-08,BLOCKED,已迁移Data Router后PUSH导航/页签/页内返回均拦截成功;但createHashHistory对POP(hash赋值与浏览器后退)无法回滚(实测blocker返回true仍放行);替代保护仅剩beforeunload
-RDM-21,NEW,P3,同需求两份新建PRD共用同一暂存键会互相串内容,CONFIRMED,29ed675d,前端,prdDraftStore draftId + PrdRoute key,PRD-03,CLOSED,无
-RDM-22,NEW,P3,vitest配置沿用Vitest4已移除的poolOptions.forks导致并发预算失效;全量套件出现批量超时假红,CONFIRMED,29ed675d,工程,vitest.config.ts maxWorkers,ENV-01,CLOSED,低配机仍建议VITEST_MAX_FORKS=2
-RDM-23,NEW,P3,RDM页宠物仅按中心点避让;实际外框可压住按钮并吞掉点击,CONFIRMED,29ed675d,前端,PetMascot.tsx 外框相交判定,UI-PET-01,CLOSED,相交时整体让位(隐藏且不接收指针事件)
-RDM-24,ORIGINAL,P2,RdmMenuInitializer每次启动把分组授权复制给全部子菜单;仅授分组的角色重启后自动获得组内所有叶子权限,CONFIRMED,29ed675d,后端,RdmMenuInitializer.inheritGroupGrants,NOT_RUN,PENDING-DECISION,建议改为一次性结构迁移或只补新增叶子;需业务确认是否保留该升级兼容语义
+RDM-27,REGRESSION,P2,受限角色在研發工作台可见迭代排期/查看交付中需求/團隊負載三个越权入口按钮点击进403,CONFIRMED,29ed675d,前端,src/pages/Rdm/DeliveryBoard.tsx,AUTH-01,CLOSED,按钮隐藏依赖前端权限数据;服务端仍兜底403
+RDM-28,NEW,P3,/api/menus/tree 对任意登录用户返回全量菜单(含未授权菜单名与路径)属信息暴露,CONFIRMED,29ed675d,后端,MenuController.tree + MenuServiceImpl.myTree,MENU-01..MENU-06,CLOSED,管理端全量树改由 menu-config/authorization-center/function-permission 授权持有
+RDM-29,REGRESSION,P3,看板下钻条件被写入列表场景缓存导致下次裸地址进入仍被过滤,CONFIRMED,29ed675d,前端,RequirementList/useListSceneRestore,NAV-04,CLOSED,statuses已改为只认URL
+RDM-30,REGRESSION,P3,同路径仅改hash查询串不触发重新取数,CONFIRMED,29ed675d,前端,RequirementList,NAV-05,CLOSED,已补URL变化同步effect
+RDM-31,NEW,P1,PRD乐观锁仅在保存前比较版本且UPDATE无版本条件;并发两次保存仍可互相覆盖;缺版本参数时完全跳过检查,CONFIRMED,29ed675d,后端,RdmDeliveryServiceImpl.savePrd/updatePrdWithVersion,PRD-08,CLOSED,另存新版本与评审写点同步递增版本
+RDM-32,NEW,P2,SLA定时作业用两次独立JdbcTemplate调用做GET_LOCK/RELEASE_LOCK;连接级锁可能落在不同连接上,CONFIRMED,29ed675d,后端,RdmSlaScheduler.scan,SLA-01,CLOSED,改为复用MigrationLock同一借出连接
+RDM-33,NEW,P2,SLA延长后仅清除旧逾期标记却仍发送「即将逾期」提醒,CONFIRMED,29ed675d,后端,RdmSlaScheduler.doScan,SLA-02,CLOSED,未到预警点直接跳过发送
+RDM-34,NEW,P2,浏览器前进后退与同路径换PRD文档不受未保存保护,CONFIRMED,29ed675d,前端,App.tsx createHashRouter + UnsavedNavigationGuard,NAV-06..NAV-08,BLOCKED,已迁移Data Router后PUSH导航/页签/页内返回均拦截成功;但createHashHistory对POP(hash赋值与浏览器后退)无法回滚(实测blocker返回true仍放行);替代保护仅剩beforeunload
+RDM-35,NEW,P3,同需求两份新建PRD共用同一暂存键会互相串内容,CONFIRMED,29ed675d,前端,prdDraftStore draftId + PrdRoute key,PRD-03,CLOSED,无
+RDM-36,NEW,P3,vitest配置沿用Vitest4已移除的poolOptions.forks导致并发预算失效;全量套件出现批量超时假红,CONFIRMED,29ed675d,工程,vitest.config.ts maxWorkers,ENV-01,CLOSED,低配机仍建议VITEST_MAX_FORKS=2
+RDM-37,NEW,P3,RDM页宠物仅按中心点避让;实际外框可压住按钮并吞掉点击,CONFIRMED,29ed675d,前端,PetMascot.tsx 外框相交判定,UI-PET-01,CLOSED,相交时整体让位(隐藏且不接收指针事件)
+RDM-38,NEW,P2,RdmMenuInitializer每次启动把分组授权复制给全部子菜单;仅授分组的角色重启后自动获得组内所有叶子权限,CONFIRMED,29ed675d,后端,RdmMenuInitializer.inheritGroupGrants,MENU-07,CLOSED,改为一次性迁移(rdm:menu-group-grant-inherit:v1);重启验证第二次启动不再执行;撤权不复活由H2用例锁定
