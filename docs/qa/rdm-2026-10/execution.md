@@ -234,6 +234,18 @@
 
 说明：采用**停用**而非删除，保证授权行、审计与登录日志可追溯；如需彻底清理，在授权中心确认无引用后再删除员工与角色。本轮未改动任何真实员工、真实项目成员与业务单据。
 
+## 第二批提交与上线核验（2026-10-24）
+
+| 项 | 值 |
+|---|---|
+| 提交 | `6d9879b5`（30 文件，+770/−210），L3 深度审查零发现后推送 `7911138f..6d9879b5` |
+| 前端 | 流水线 `40042770420`：quality-gate / build / deploy 全 success；`version.json` 实测 `commitHash=6d9879b` → **已上线** |
+| 后端 | 流水线 `40042770418`：test / build-and-push success，镜像 `ghcr.io/fengsong7889/mftb-admin-backend:6d9879b53eb6e0dabe039cea1ceb36b0932a677f` |
+| 后端部署 | deploy job 的 kubectl/rollout/verify 四步仍 **skipped**（仓库无 `SEALOS_KUBECONFIG`）→ 生产集群未滚动，需在 Sealos 手动切到上述 sha |
+
+本批生效后的行为变化（需在切后端镜像后才会在生产显现）：`/api/menus/tree` 对非管理人员返回 403、导航改由 `/api/menus/my-tree` 提供、PRD 保存强制版本号、SLA 扫描与延长告警口径修正。
+**切换注意**：新镜像启动期会执行 `rdm:schema:v3.34`（若尚未执行），readiness 大约 5~6 分钟后才转 200 属正常中间态。
+
 ## 交接说明
 
 - 所有改动集中在 `src/pages/Rdm/**`、`src/api/rdm.ts`、`src/App.tsx`、`src/components/MenuTabs.tsx`、`backend` RDM 服务与迁移、双语文件。
