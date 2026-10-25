@@ -3604,6 +3604,26 @@
       "author": "Qoder",
       "ticket": "hcm-d3-rule-menu",
       "comment": "規則集沒有默認值，必須有可視配置入口業務才能錄入；與 D3 第二批的配置頁同一批落地，避免出現無頁面的受控菜單。"
+    },
+    {
+      "versionKey": "hcm:payroll-run-schema:v1.0",
+      "module": "hcm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "payrollRunSchemaInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "hcm:payroll-schema:v1.0",
+        "hcm:payroll-benefit-schema:v1.0",
+        "hcm:payroll-rule-schema:v1.0"
+      ],
+      "scriptFiles": [
+        "300_payroll_run.sql"
+      ],
+      "intent": "D3 第三批：核算批次、工資單、工資單明細",
+      "author": "Qoder",
+      "ticket": "hcm-d3-run",
+      "comment": "工資單金額是結果快照而非視圖計算：工資單一旦生成必須能原樣重放，不能因後來調薪或改費率而變。批次狀態 DRAFT/CALCULATED/LOCKED 由 CHECK 約束，鎖定後服務層拒絕重算。同一批次同一雇傭只允許一張工資單（唯一鍵）。明細存名稱快照，避免薪酬項目改名後歷史工資單跟著變。300 腳本僅作參照文檔，不進鏡像。"
     }
   ]
 }
