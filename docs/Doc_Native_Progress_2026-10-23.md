@@ -873,10 +873,11 @@ REPLAY_DB_PASSWORD=...
 
 ### 25.7 当前验证状态
 
-- 生产库服务：PID **14588**，`live=200`、`ready=200`，JAR 12:42:25；接口管理 15 个中文系统、系统方案库 22 条。
+- 生产库服务：PID **14588**，`live=200`、`ready=200`，运行中 JAR 12:42:25；`target/mftb-admin.jar` 已重新打包为 12:56:23，下次重启即用最新包；接口管理 15 个中文系统、系统方案库 22 条。
 - 生产类编译：`mvn -Dmaven.test.skip=true package` 成功；JAR 已复制回 `target/mftb-admin.jar`，重启用 `restart-service.sh --fast`。
-- 后端测试：被并行改动 `AgentRunWorkerAndActionExecutionTest` 的构造器不匹配阻断（`AgentRunWorker` 新增 `SysUserMapper` 参数，测试未同步），非本轮改动；待其修复后补跑全量。
-- 本轮新增的 `OrgScopeSchemaInitializerTest`、`UserSessionSchemaInitializerTest`、`MigrationCatalogTest` 在并行阻断前已通过。
+- 后端全量：**2550 项，0 failure / 0 error / 22 skipped，BUILD SUCCESS**（并行测试构造器已修复后补跑）。
+- 前端全量：本轮未改前端；上一轮 `npm run verify` 为 141 文件 / 1270 项全部通过。
+- 本轮新增的 `OrgScopeSchemaInitializerTest`、`UserSessionSchemaInitializerTest`、`MigrationCatalogTest` 已包含在全量通过中。
 
 
 
