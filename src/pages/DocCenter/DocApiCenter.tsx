@@ -20,6 +20,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { formatDocKnowledgeTime } from '@/api/docKnowledge'
 import { DocPlanSectionTitle } from './docPlanUi'
 import { docPlanCardStyle } from './docPlanStyle'
+import { docGaps, parseRequestParams, parseResponseSchema, type ApiFieldNode, type ApiParamNode } from './docApiSchema'
 
 const METHOD_COLOR: Record<string, string> = {
   GET: 'green', POST: 'blue', PUT: 'orange', DELETE: 'red', PATCH: 'purple',
@@ -66,16 +67,23 @@ function CodeBlock({ text }: { text?: string | null }) {
   return <pre style={CODE_STYLE}>{text?.trim() ? text : '—'}</pre>
 }
 
-function requestRows(entry: DocApiCatalogEntry | null) {
-  try {
-    const parsed = JSON.parse(entry?.requestSchema ?? '[]')
-    return Array.isArray(parsed) ? parsed as {
-      name?: string; type?: string; annotations?: string[];
-      fields?: { name: string; type: string }[]
-    }[] : []
-  } catch {
-    return []
-  }
+/** 類型展示：Java 類型為主，中文類型與枚舉可選值為輔助。 */
+function TypeCell({ type, label, enumValues }: { type?: string; label?: string; enumValues?: string[] }) {
+  return (
+    <div>
+      <div>
+        {type || '—'}
+        {label ? <span style={{ color: '#8c8c8c', marginLeft: 6, fontSize: 12 }}>{label}</span> : null}
+      </div>
+      {enumValues?.length ? <div style={{ color: '#8c8c8c', fontSize: 12 }}>{enumValues.join(' / ')}</div> : null}
+    </div>
+  )
+}
+
+function RequiredCell({ value }: { value?: boolean | null }) {
+  const { t } = useTranslation()
+  if (value == null) return <>—</>
+  return <>{value ? t('common.yes') : t('common.no')}</>
 }
 
 export default function DocApiCenter() {
@@ -83,6 +91,7 @@ export default function DocApiCenter() {
   const [systems, setSystems] = useState<DocApiCatalogSystem[]>([])
   const [systemCode, setSystemCode] = useState<string | undefined>()
   const [keyword, setKeyword] = useState('')
+  const [filter, setFilter] = useState<string | undefined>()
   const [rows, setRows] = useState<DocApiCatalogEntry[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -108,7 +117,7 @@ export default function DocApiCenter() {
   const load = useCallback(async (targetPage = page) => {
     setLoading(true)
     try {
-      const result = await fetchDocApiCatalog({ systemCode, keyword, page: targetPage, size })
+      const result = await fetchDocApiCatalog({ systemCode, keyword, filter, page: targetPage, size })
       setRows(result.records)
       setTotal(result.total)
       setPage(result.page)
@@ -117,10 +126,10 @@ export default function DocApiCenter() {
     } finally {
       setLoading(false)
     }
-  }, [systemCode, keyword, page, size, t])
+  }, [systemCode, keyword, filter, page, size, t])
 
   useEffect(() => { void loadSystems() }, [loadSystems])
-  useEffect(() => { void load(1) }, [systemCode]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void load(1) }, [systemCode, filter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const openEdit = (entry: DocApiCatalogEntry) => {
     setEditing(entry)
@@ -170,7 +179,11 @@ export default function DocApiCenter() {
       title: t('docKnowledge.apiName'), dataIndex: 'apiName', ellipsis: true,
       render: (value: string | null | undefined, row) => (
         <div>
-          <div style={{ fontWeight: 600 }}>{value || <span style={{ color: '#bfbfbf' }}>{t('docKnowledge.apiNameMissing')}</span>}</div>
+          <div style={{ fontWeight: 600 }}>
+            {value || <span style={{ color: '#bfbfbf' }}>{t('docKnowledge.apiNameMissing')}</span>}
+            {value && row.apiNameSource === 'auto'
+              ? <Tag color="blue" style={{ marginLeft: 6 }}>{t('docKnowledge.apiAutoName')}</Tag> : null}
+          </div>
           <span style={{ color: '#8c8c8c', fontSize: 12 }}>{row.method} {row.path}</span>
         </div>
       ),
@@ -178,6 +191,18 @@ export default function DocApiCenter() {
     {
       title: t('docKnowledge.apiScenario'), dataIndex: 'scenario', ellipsis: true,
       render: (value?: string | null) => value?.trim() || <span style={{ color: '#bfbfbf' }}>—</span>,
+    },
+    {
+      title: t('docKnowledge.apiDocCompleteness'), dataIndex: 'id', width: 130,
+      render: (_: unknown, row) => {
+        const gaps = docGaps(row)
+        if (gaps.length === 0) return <Tag color="green">{t('docKnowledge.apiDocComplete')}</Tag>
+        return (
+          <Tooltip title={gaps.map(gap => t(`docKnowledge.apiGap.${gap}`)).join(' · ')}>
+            <Tag color="orange">{t('docKnowledge.apiDocGapCount', { count: gaps.length })}</Tag>
+          </Tooltip>
+        )
+      },
     },
     { title: t('docKnowledge.apiDocStatus'), dataIndex: 'docStatus', width: 100,
       render: (value: number) => <Tag color={value === 2 ? 'green' : value === 3 ? 'red' : 'default'}>{t(`docKnowledge.apiDocStatusValue.${value}`)}</Tag> },
@@ -192,7 +217,8 @@ export default function DocApiCenter() {
     else message.error(t('docKnowledge.apiCopyFailed'))
   }
 
-  const selectedParams = useMemo(() => requestRows(selected), [selected])
+  const selectedParams = useMemo(() => parseRequestParams(selected), [selected])
+  const selectedResponse = useMemo(() => parseResponseSchema(selected), [selected])
   const allEndpoints = useMemo(() => systems.reduce((sum, item) => sum + item.endpointCount, 0), [systems])
 
   return (
@@ -223,6 +249,15 @@ export default function DocApiCenter() {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <Space wrap style={{ marginBottom: 12 }}>
+            <Select allowClear value={filter} style={{ width: 150 }}
+              placeholder={t('docKnowledge.apiFilterAll')}
+              onChange={value => { setFilter(value); setPage(1) }}
+              options={[
+                { value: 'incomplete', label: t('docKnowledge.apiFilterIncomplete') },
+                { value: 'draft', label: t('docKnowledge.apiFilterDraft') },
+                { value: 'published', label: t('docKnowledge.apiFilterPublished') },
+                { value: 'deprecated', label: t('docKnowledge.apiFilterDeprecated') },
+              ]} />
             <Input.Search allowClear value={keyword} onChange={e => setKeyword(e.target.value)}
               onSearch={() => void load(1)} placeholder={t('docKnowledge.apiDocSearchPlaceholder')} style={{ width: 280 }} />
             <Button icon={<ReloadOutlined />} onClick={() => void load()} loading={loading}>{t('docKnowledge.reload')}</Button>
@@ -231,7 +266,7 @@ export default function DocApiCenter() {
             </Button>
           </Space>
           <Table rowKey="id" size="small" dataSource={rows} columns={columns} loading={loading}
-            scroll={{ x: 900 }} onRow={record => ({ onClick: () => setSelected(record), style: { cursor: 'pointer' } })}
+            scroll={{ x: 1080 }} onRow={record => ({ onClick: () => setSelected(record), style: { cursor: 'pointer' } })}
             pagination={{
               current: page, pageSize: size, total, showSizeChanger: true, showQuickJumper: true,
               showTotal: count => t('common.total', { count }),
@@ -284,24 +319,31 @@ export default function DocApiCenter() {
             <Typography.Title level={5}>{t('docKnowledge.apiScenario')}</Typography.Title>
             <Typography.Paragraph>{selected.scenario || t('docKnowledge.apiNoScenario')}</Typography.Paragraph>
             <Typography.Title level={5}>{t('docKnowledge.apiRequest')}</Typography.Title>
-            <Table rowKey={(_, index) => String(index)} size="small" pagination={false} dataSource={selectedParams}
+            <Table size="small" pagination={false} dataSource={selectedParams}
+              rowKey={(row, index) => row.path ?? row.name ?? String(index)}
               locale={{ emptyText: t('docKnowledge.apiNoRequest') }}
               columns={[
-                { title: t('docKnowledge.apiParamName'), dataIndex: 'name', width: 160 },
                 {
-                  title: t('docKnowledge.apiParamType'), dataIndex: 'type', ellipsis: true,
-                  render: (value: string, row: { fields?: { name: string; type: string }[] }) => (
-                    <div>
+                  title: t('docKnowledge.apiParamName'), dataIndex: 'name', width: 220,
+                  render: (value: string, row: ApiParamNode) => (
+                    <Space size={4} wrap>
                       <span>{value}</span>
-                      {row.fields?.length ? (
-                        <div style={{ marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                          {row.fields.map(field => <Tag key={field.name}>{field.name}: {field.type}</Tag>)}
-                        </div>
-                      ) : null}
-                    </div>
+                      {row.location ? <Tag>{t(`docKnowledge.apiLocation.${row.location}`)}</Tag> : null}
+                    </Space>
                   ),
                 },
-                { title: t('docKnowledge.apiParamAnnotation'), dataIndex: 'annotations', width: 160, render: (value?: string[]) => (value ?? []).map(item => <Tag key={item}>{item}</Tag>) },
+                {
+                  title: t('docKnowledge.apiParamType'), dataIndex: 'type', ellipsis: true,
+                  render: (value: string | undefined, row: ApiParamNode) => <TypeCell type={value} label={row.typeLabel} />,
+                },
+                {
+                  title: t('docKnowledge.apiParamRequired'), dataIndex: 'required', width: 80,
+                  render: (value: boolean | null | undefined) => <RequiredCell value={value} />,
+                },
+                {
+                  title: t('docKnowledge.apiParamDescription'), dataIndex: 'description', ellipsis: true,
+                  render: (value?: string | null) => value?.trim() || '—',
+                },
               ]} />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 20 }}>
               <Typography.Title level={5} style={{ margin: 0 }}>{t('docKnowledge.apiRequestExample')}</Typography.Title>
@@ -310,10 +352,37 @@ export default function DocApiCenter() {
               </Button>
             </div>
             <CodeBlock text={selected.requestExample || curlSample(selected)} />
-            <Typography.Title level={5} style={{ marginTop: 20 }}>{t('docKnowledge.apiResponse')}</Typography.Title>
+            <Typography.Title level={5} style={{ marginTop: 20 }}>{t('docKnowledge.apiResponseFields')}</Typography.Title>
             <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
-              {t('docKnowledge.apiResponseType')}：{selected.responseSchema || '—'}
+              {t('docKnowledge.apiResponseType')}：{selected.responseSchema || selectedResponse.raw || '—'}
             </Typography.Paragraph>
+            <Table key={selected.id} size="small" pagination={false} dataSource={selectedResponse.fields}
+              rowKey={row => row.path ?? row.name ?? ''}
+              expandable={{ defaultExpandAllRows: true }}
+              locale={{ emptyText: t('docKnowledge.apiNoResponseFields') }}
+              columns={[
+                {
+                  title: t('docKnowledge.apiFieldName'), dataIndex: 'name', width: 220, ellipsis: true,
+                  render: (value: string, row: ApiFieldNode) => (
+                    <Tooltip title={row.path}><span>{value}</span></Tooltip>
+                  ),
+                },
+                {
+                  title: t('docKnowledge.apiParamType'), dataIndex: 'type', ellipsis: true,
+                  render: (value: string | undefined, row: ApiFieldNode) => (
+                    <TypeCell type={value} label={row.typeLabel} enumValues={row.enumValues} />
+                  ),
+                },
+                {
+                  title: t('docKnowledge.apiParamRequired'), dataIndex: 'required', width: 80,
+                  render: (value: boolean | null | undefined) => <RequiredCell value={value} />,
+                },
+                {
+                  title: t('docKnowledge.apiParamDescription'), dataIndex: 'description', ellipsis: true,
+                  render: (value?: string | null) => value?.trim() || '—',
+                },
+              ]} />
+            <Typography.Title level={5}>{t('docKnowledge.apiResponse')}</Typography.Title>
             <CodeBlock text={selected.responseExample} />
             <Typography.Title level={5} style={{ marginTop: 20 }}>{t('docKnowledge.apiErrorCodes')}</Typography.Title>
             <CodeBlock text={selected.errorCodes} />

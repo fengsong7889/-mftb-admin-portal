@@ -912,3 +912,62 @@ REPLAY_DB_PASSWORD=...
 
 
 
+
+## 二十七、接口文档内容补齐与出参 schema（2026-10-25）
+
+> 目标：让「接口管理」从可编辑的清单变成可直接交给外部对接方的文档——每个接口有名称、所需权限、
+> 请求参数（位置/必填/说明）、出参字段表、响应示例与错误码。本节兑现 23.5 的两条边界。
+
+### 27.1 出参 schema（代码派生，只读）
+
+| 能力 | 实现 |
+|---|---|
+| 泛型解包 | `ApiSchemaResolver` 用 `ResolvableType` 解析 `Result<PageResult<XxxVO>>`、`List<T>`、数组、Map 与嵌套 DTO，泛型变量按声明处实参还原 |
+| 字段语义 | 名称（`@JsonProperty` 优先）、类型（Java 类型 + 中文类型标签）、必填（`@NotNull/@NotBlank/@NotEmpty/@Schema(requiredMode)`）、说明（`@Schema`/`@JsonPropertyDescription`/常见字段词典）、枚举可选值 |
+| 深度与上限 | 深度 5、单接口 150 行，超出截断；循环引用按栈去重，不会死循环 |
+| 示例 | 按真实包装层生成 `{"code":200,"message":"操作成功","data":...}`；值按类型占位，`password/token/secret` 输出 `***`，不含任何运行时数据 |
+| 容错 | 单个签名推导失败只降级该接口（空结构/无示例），不中断全量扫描 |
+
+### 27.2 内容补齐（草稿可审）
+
+- **接口名称**：`@Operation.summary` 优先（`api_name_source=operation`）；缺失时按「动词 + 具体主体」生成草稿
+  （`page→列表`、`detail+assets→資產詳情`、`updateStatus+roles→修改角色狀態`），标记 `auto`；
+  **取不到具体主体就留空**——不再用系统名兜底编造「新增物資管理」这类名字。
+- **所需权限**：从 `@RequirePermission` 推导 `menu:action`，`anyOf`/`anyPermissions` 以 ` | ` 并列（1348 个接口中 1238 个有值，其余为公开/无注解接口）。
+- **错误码**：按平台真实口径生成通用错误码（业务错误 HTTP 200 + body.code；404/405 为真实状态），403 文案带上该接口所需权限。
+- **请求参数**：补 `location`（query/path/body/header）、`required`、`description` 与 DTO 字段树，替代原先只有 Java 类型与注解标签的展示。
+- **请求示例**：按 `@RequestBody` 的 DTO 生成占位 JSON（482 个写接口），`password/accessToken` 等输出 `***`，但 `promptTokens` 这类用量计数不脱敏。
+
+### 27.3 结构与迁移
+
+| 项 | 内容 |
+|---|---|
+| 表结构 | `doc_api_catalog` 增 `response_fields MEDIUMTEXT`、`api_name_source VARCHAR(16)`；仅 ADD COLUMN |
+| 迁移 | `doc:api-catalog-v1.3`（依赖 v1.2，`applyOnce` + 列校验，失败不记成功）；参考脚本 `301_doc_api_response_schema.sql`；`catalog.json` 已登记 |
+| 扫描写入 | `response_fields` 每次重扫覆盖（纯派生）；`api_name`/`api_name_source` 只覆盖空值或 `auto`，人工命名永不被覆盖；`auth_scope`/`error_codes`/`request_example`/`response_example` 只在空值时补齐 |
+| 查询 | `GET /api-center/apis` 增 `filter`（draft/published/deprecated/incomplete，白名单片段拼 SQL），返回 `responseFields`、`apiNameSource` |
+| 前端 | 抽屉新增「響應參數」树表（字段/类型/必填/说明，默认展开）；請求參數改位置/必填/说明四列；列表增「文檔完整度」（缺名称/出参/示例/错误码）与状态筛选，自动命名显示「自動草稿」标签 |
+
+### 27.4 验证
+
+| 层 | 命令/口径 | 结果 |
+|---|---|---|
+| 单元 | `mvn -o -B test -Dtest=ApiSchemaResolverTest` | 9 条通过（泛型、嵌套、必填、枚举、脱敏、循环、命名、留空、请求体示例） |
+| 真实库集成 | `DOC_API_SCAN_IT=true mvn test -Dtest=DocApiCatalogIntegrationTest` | 通过：扫描 1348 个接口，全部有出参结构与错误码，1238 个有 scope；`/api-center/apis` 出参含 `ApiCatalogPage`、`auth_scope=doc-api-center:view`、示例 `code=200` 且无密码字段 |
+| 迁移 | `sys_schema_version` 实查 | `doc:api-catalog-v1.3` 已落库（2026-10-25T15:46:16），两列类型正确 |
+| 文档模块回归 | `ApiSchemaResolverTest + DocKnowledgeSecurityTest + DocNativeSecurityTest + MigrationCatalogTest + DocKnowledgeSchemaTest` | 31 条全绿 |
+| 前端 | `tsc --noEmit`、`eslint`、`vitest docApiSchema.test.ts`、`check:i18n` | 0 error；6 条 helper 用例通过；18085 条 key 全部解析 |
+| 全量回归 | 后端 `mvn -o -B test`；前端 `npm run verify` | 后端 **2566 条**，Failures 0 / Errors 0 / Skipped 2；前端 **142 文件 / 1279 条**全绿（含 lint/typecheck/menu/stat-order/confirm-modal/i18n/secret-scan） |
+| 服务 | `restart-service.sh --rebuild` | `live=200`、`ready=200`（162s）；同步耗时日志实测 **50–53s / 1348 接口**，仍在页面 120s 超时内 |
+
+数据抽样：1348 个接口全部有名称（自动草稿 760、`@Operation` 等既有名称 588）、全部有出参结构与错误码，1238 个有 scope，482 个写接口有请求体示例；示例中 `password/accessToken` 均为 `***`，用量计数保持数值。
+
+> 注：`response_example`/`error_codes` 只在空值时补齐，实测第二轮扫描已不覆盖首轮内容；因此示例格式微调（datetime 补秒）只对新增行生效，属预期。
+
+### 27.5 边界与后续
+
+- 出参是**编译期签名**派生，运行期动态 JSON（`Map<String,Object>` 里临时拼的字段）无法展开，只能看到 Map 类型。
+- 请求示例只针对 `@RequestBody`；GET 的 query 参数以参数表 + cURL 为准，不编造查询值。
+- 字段中文说明大部分来自常见字段词典；DTO 未加 `@Schema` 时不会编造业务含义。
+- 已有行的 `response_example`/`error_codes` 遵循「非空不覆盖」，格式改进只对新增/空值行生效；需要全量刷新时应先人工确认再清空这两列。
+- 接口名草稿只解决「有没有」，不替代人工复核；对外发布前仍应由负责人按 `auto` 标签逐条确认。

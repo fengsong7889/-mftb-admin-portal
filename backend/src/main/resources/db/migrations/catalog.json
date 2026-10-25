@@ -1856,6 +1856,23 @@
       "comment": "早期掃描直接把路由前綴當系統代碼；本輪在常量和 DocApiSystemMap 收斂後，用 path 重算 system_code 與中文名寫回。只 UPDATE source='code' 的機器行，不碰人工導入的 OpenAPI 行；按 id 批更新且幂等，每次啟動重放自愈。"
     },
     {
+      "versionKey": "doc:api-catalog-v1.3",
+      "module": "doc",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "docSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "301_doc_api_response_schema.sql"
+      ],
+      "dependencies": [
+        "doc:api-catalog-v1.2"
+      ],
+      "intent": "接口出參結構（response_fields）與接口名稱來源（api_name_source）：從方法簽名派生的只讀字段表，支撐對外文檔的響應參數展示",
+      "author": "Qoder",
+      "comment": "出參由反射方法簽名推導，不保存任何運行時值；例值按類型佔位且 password/token/secret 輸出 ***。api_name_source 區分 operation/auto/manual，重掃只覆蓋 auto，不覆蓋人工命名。"
+    },
+    {
       "versionKey": "doc:api-catalog-v1.0",
       "module": "doc",
       "phase": "MODULE_STRUCTURE",
