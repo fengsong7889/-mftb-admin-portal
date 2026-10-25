@@ -567,9 +567,11 @@ describe('场景区分与低干扰动效', () => {
     const card = await screen.findByRole('button', { name: '物資管理系統 · 進入系統' })
     const image = card.querySelector('svg[data-scene="eam"]')!
     const shell = card.closest('.portal-card-shell')!
-    // 先等入场自动播播完，否则拿到的是自动播的 running 而不是静止态
+    // 先等入场自动播播完，否则拿到的是自动播的 running 而不是静止态。
+    // data-motion 回落与自动播标记移除是两次渲染，CI 上两者之间有间隙，
+    // 因此这里等 idle 而不是紧跟 waitAutoplaySettled 后立即断言。
     await waitAutoplaySettled(document.body)
-    expect(image).toHaveAttribute('data-motion', 'idle')
+    await waitFor(() => expect(image).toHaveAttribute('data-motion', 'idle'))
     expect(image.querySelector('[class*="portal-stock-"]')).toBeNull()
     expect(image.querySelector('.portal-eam-asset-tag')).toHaveTextContent('IT-024')
     expect(image.querySelector('.portal-eam-custodian')).toHaveTextContent(zh.portal.artwork.assetCustodian)
