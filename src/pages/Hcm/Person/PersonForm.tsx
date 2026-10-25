@@ -223,11 +223,18 @@ export default function HcmPersonForm() {
         : <Tag color="default">{t('hcmPerson.terminated')}</Tag>),
     },
     {
-      key: 'action', title: t('common.action'), width: 190,
+      key: 'action', title: t('common.action'), width: 270,
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => navigate(`/hcm-person-employment-form?id=${record.id}&personId=${id}`)}>
             {t('common.edit')}
+          </Button>
+          {/* 薪酬挂在雇佣上：从这段雇佣直接进薪酬标准，避免用户手动拼 employmentId */}
+          <Button
+            type="link" size="small"
+            onClick={() => navigate(`/hcm-payroll-standard?employmentId=${record.id}`)}
+          >
+            {t('payroll.standard.section')}
           </Button>
           <Button
             type="link" size="small"
