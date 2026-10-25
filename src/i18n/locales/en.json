@@ -346,6 +346,10 @@
       "doc": {
         "name": "Document Center",
         "description": "A unified index and reading gateway for requirement docs, HR & admin policies, and training materials."
+      },
+      "payroll": {
+        "name": "Payroll & Benefits",
+        "description": "Pay components, salary standards, payroll runs and payslips, with rules kept separate for each region"
       }
     }
   },
@@ -13869,5 +13873,55 @@
     "profileDeleteConfirm": "Delete this profile record?",
     "profileDeleteSuccess": "Profile record deleted",
     "profilePersonMissing": "Person information is missing"
+  },
+  "payroll": {
+    "component": {
+      "add": "New Pay Component",
+      "addTitle": "New Pay Component",
+      "editTitle": "Edit Pay Component",
+      "basicInfo": "Component Info",
+      "code": "Code",
+      "name": "Name",
+      "nameEn": "English Name",
+      "type": "Type",
+      "taxable": "Taxable",
+      "taxableYes": "Taxable",
+      "taxableNo": "Non-taxable",
+      "currency": "Currency",
+      "currencyHint": "Leave blank to follow salary standard",
+      "keywordPlaceholder": "Search code / name",
+      "codeRequired": "Code is required",
+      "nameRequired": "Name is required",
+      "typeRequired": "Type is required",
+      "codePlaceholder": "e.g. BASE / BONUS",
+      "typeHint": "Earnings increase net pay, deductions reduce it, employer cost only counts toward labour cost (e.g. employer social insurance) and never changes net pay.",
+      "deleteConfirm": "Delete this pay component?",
+      "deleteSuccess": "Pay component deleted"
+    },
+    "standard": {
+      "add": "New Salary Standard",
+      "addTitle": "New Salary Standard",
+      "editTitle": "Edit Salary Standard",
+      "section": "Salary Standard",
+      "baseAmount": "Base Salary",
+      "baseAmountRequired": "Base salary is required",
+      "changeType": "Change Type",
+      "effectiveFrom": "Effective From",
+      "effectiveTo": "Effective To",
+      "effectiveToHint": "Leave blank for current",
+      "current": "Current",
+      "asOf": "As Of",
+      "asOfHint": "Show the standard effective on a date",
+      "reason": "Reason",
+      "currencyRequired": "Currency is required",
+      "effectiveFromRequired": "Effective date is required",
+      "deleteConfirm": "Delete this salary standard?",
+      "deleteSuccess": "Salary standard deleted",
+      "needEmployment": "Open salary standards from an employment record",
+      "needEmploymentHint": "Salary standards are attached to an employment (one person may hold several across legal entities). Select an employment first.",
+      "goPerson": "Go to People",
+      "ruleHint": "Only one standard per employment at a time: end the previous one before adding a new one, otherwise historical payslips cannot be reproduced.",
+      "addTitleShort": "New Salary Standard"
+    }
   }
 }

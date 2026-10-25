@@ -446,6 +446,8 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
                 // 55：插在人力資源（60）之前——組織編制是人事上下游的主數據源，門戶上先看到“定組織再定人”
                 {SystemCode.ORGANIZATION.code(), "組織編制系統", "Organization & Headcount",
                         "法人主體、管理組織、職位職級與崗位編制的主數據治理", "ApartmentOutlined", 55},
+                {SystemCode.PAYROLL.code(), "薪酬福利系統", "Payroll & Benefits",
+                        "薪酬項目、定調薪、核算批次與工資單，三地規則分開維護", "MoneyCollectOutlined", 62},
                 {SystemCode.HR.code(), "人力資源系統", "Human Resources",
                         "連接員工、組織與職位，掌握人事動態", "TeamOutlined", 60},
                 {SystemCode.ATTENDANCE.code(), "考勤假勤系統", "Workforce & Attendance",
@@ -497,6 +499,7 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
                 "ai-conversation-audit", "ai-access-request"));
         updateMenuSystem(SystemCode.HR.code(),        List.of("hr-profile", "hr-lifecycle", "hr-config",
                 "org-center", "perf-center", "perf-report-center", "ess-center", "hcm-person"));
+        updateMenuSystem(SystemCode.PAYROLL.code(), List.of("hcm-payroll-component", "hcm-payroll-standard"));
         updateMenuSystem(SystemCode.ORGANIZATION.code(), List.of("hcm-org-legal", "hcm-org-unit",
                 "hcm-org-job-family", "hcm-org-job-grade", "hcm-org-position"));
         updateMenuSystem(SystemCode.EAM.code(),       List.of("asset-dashboard", "consumable-ops", "asset-flow-ops",

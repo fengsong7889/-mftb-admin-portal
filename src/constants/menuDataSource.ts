@@ -285,6 +285,8 @@ export const keyToPath: Record<string, string> = {
   // 不先写空壳路径，否则离线菜单门禁会当成「页面未接」报出来。
   'hcm-org-legal':        '/hcm-org-legal',
   'hcm-org-unit':         '/hcm-org-unit',
+  'hcm-payroll-component': '/hcm-payroll-component',
+  'hcm-payroll-standard':  '/hcm-payroll-standard',
   'hcm-org-job-family':   '/hcm-org-job-family',
   'hcm-org-job-grade':    '/hcm-org-job-grade',
   'hcm-org-position':     '/hcm-org-position',
@@ -429,6 +431,9 @@ pathToKey['/vehicle-ledger/backfill'] = 'vehicle-ledger'
 pathToKey['/hcm-org-legal-form'] = 'hcm-org-legal'
 pathToKey['/hcm-org-legal-detail'] = 'hcm-org-legal'
 pathToKey['/hcm-org-unit-form'] = 'hcm-org-unit'
+pathToKey['/hcm-payroll-component-form'] = 'hcm-payroll-component'
+pathToKey['/hcm-payroll-standard'] = 'hcm-payroll-standard'
+pathToKey['/hcm-payroll-standard-form'] = 'hcm-payroll-standard'
 pathToKey['/hcm-org-unit-detail'] = 'hcm-org-unit'
 pathToKey['/hcm-org-job-family-form'] = 'hcm-org-job-family'
 pathToKey['/hcm-org-job-family-detail'] = 'hcm-org-job-family'
@@ -642,6 +647,7 @@ export const BACKEND_CONNECTED_KEYS: Set<string> = new Set([
   'vehicle-files', 'vehicle-dispatch', 'vehicle-ledger', 'my-vehicle-use', 'vehicle-master-data',
   // 組織編制系统：两个菜单及其表单/详情页全部走真实 /api/hcm/v1/organization/*，无前端 mock 回退
   'hcm-org-legal', 'hcm-org-unit', 'hcm-org-job-family', 'hcm-org-job-grade', 'hcm-org-position',
+  'hcm-payroll-component', 'hcm-payroll-standard',
   'hcm-person',
   // 考勤假勤系统：菜单来自后端 sys_menu（阶段二 2A 已落种子），因此十个菜单全部必须登记：
   // 未登记会被 check-menu-consistency 判为「离线路由无法阻断」。

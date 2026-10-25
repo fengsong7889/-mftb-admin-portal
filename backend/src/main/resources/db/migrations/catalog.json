@@ -3242,6 +3242,22 @@
       "author": "Qoder",
       "ticket": "hcm-d2-basic",
       "comment": "項目類型分 EARNING/DEDUCTION/EMPLOYER_COST 三類：雇主承擔的社保不進實發但進人力成本，混在一起工資單與成本報表必然對不上；taxable 是法定屬性不是界面開關。薪酬標準日期生效而不是「當前工資一個字段」：調薪必須能回答「2026-09 他在拿多少」，覆蓋式更新會讓歷史工資單無法重現。金額 DECIMAL(18,4) 且強制帶幣種。當前有效標準唯一不靠服務層：生成列 current_employment 只對未結束行取 employment_id，並發兩次定薪時服務層區間校驗會同時通過，必須由數據庫兜住。本批不開放接口與菜單，避免出現沒有頁面的受控入口；API 與頁面隨 D2 第二批。297 腳本僅作參照文檔，不進鏡像。"
+    },
+    {
+      "versionKey": "hcm:payroll-menu:v1.0",
+      "module": "hcm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "hcmPayrollMenuInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "hcm:payroll-schema:v1.0",
+        "core:system-portal:v1.0"
+      ],
+      "intent": "薪酬福利系統首两个菜单（薪資項目 / 薪酬標準）+ admin 授权与系统准入反推",
+      "author": "Qoder",
+      "ticket": "hcm-d2-menu",
+      "comment": "不复用 hr 菜单 key：薪酬是独立责任域，复用即让「看人事档案」的人自动获得看全员工资的授权。只种两个真实页面，核算批次与工资单（D3）落地时再追加，不先种空壳。admin 授权只补空动作集，deriveSystemAccess 按菜单授权反推薪酬系统准入。"
     }
   ]
 }

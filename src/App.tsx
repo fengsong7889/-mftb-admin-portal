@@ -74,6 +74,10 @@ const HcmOrgJobGradeList = lazy(() => import('./pages/Hcm/Organization/JobGradeL
 const HcmOrgJobGradeForm = lazy(() => import('./pages/Hcm/Organization/JobGradeForm'))
 const HcmOrgPositionList = lazy(() => import('./pages/Hcm/Organization/PositionList'))
 const HcmOrgPositionForm = lazy(() => import('./pages/Hcm/Organization/PositionForm'))
+const HcmPayrollComponentList = lazy(() => import('./pages/Hcm/Payroll/ComponentList'))
+const HcmPayrollComponentForm = lazy(() => import('./pages/Hcm/Payroll/ComponentForm'))
+const HcmPayrollStandardList = lazy(() => import('./pages/Hcm/Payroll/StandardList'))
+const HcmPayrollStandardForm = lazy(() => import('./pages/Hcm/Payroll/StandardForm'))
 // C3 人員主檔（hr 域，菜单 hcm-person）
 const HcmPersonList = lazy(() => import('./pages/Hcm/Person/PersonList'))
 const HcmPersonForm = lazy(() => import('./pages/Hcm/Person/PersonForm'))
@@ -559,6 +563,10 @@ function AuthenticatedLayout() {
               <Route path="/hcm-org-job-grade-detail" element={<HcmOrgJobGradeForm />} />
               <Route path="/hcm-org-position" element={<HcmOrgPositionList />} />
               <Route path="/hcm-org-position-form" element={<HcmOrgPositionForm />} />
+              <Route path="/hcm-payroll-component" element={<HcmPayrollComponentList />} />
+              <Route path="/hcm-payroll-component-form" element={<HcmPayrollComponentForm />} />
+              <Route path="/hcm-payroll-standard" element={<HcmPayrollStandardList />} />
+              <Route path="/hcm-payroll-standard-form" element={<HcmPayrollStandardForm />} />
               <Route path="/hcm-org-position-detail" element={<HcmOrgPositionForm />} />
               <Route path="/hcm-person" element={<HcmPersonList />} />
               <Route path="/hcm-person-form" element={<HcmPersonForm />} />

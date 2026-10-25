@@ -1579,6 +1579,15 @@
   object-fit: cover;
 }
 
+/* ===== 薪酬福利（payroll）：工资单逐行落数、算薪齿轮转一档、发放对勾盖章 ===== */
+.portal-card-artwork[data-scene='payroll'] { color: #2BCA65; /* 翠绿：薪酬与发放，与考勤青、HR 天蓝、组织靛蓝互斥 */ }
+@keyframes portalPayrollRows { 0% { opacity: 0; transform: translateY(6px); } 18%, 100% { opacity: 1; transform: translateY(0); } }
+@keyframes portalPayrollGear { 0%, 100% { transform: rotate(0deg); } 45% { transform: rotate(120deg); } }
+@keyframes portalPayrollCheck { 0%, 62% { opacity: 0; } 74%, 100% { opacity: 1; } }
+.portal-card-artwork[data-scene='payroll'] .portal-payroll-rows { animation-name: portalPayrollRows; }
+.portal-card-artwork[data-scene='payroll'] .portal-payroll-gear { transform-box: fill-box; transform-origin: center; animation-name: portalPayrollGear; }
+.portal-card-artwork[data-scene='payroll'] .portal-payroll-check { animation-name: portalPayrollCheck; }
+
 /* ===== 組織編制（organization）：节点树接上上级、编制条落位、结果对勾 ===== */
 .portal-card-artwork[data-scene='organization'] { color: #5E46D8; /* 靛蓝：组织与编制，与 AI 紫 / 权限紫 / 搜索电光蓝互斥 */ }
 .portal-card-artwork .portal-org-child { animation-name: portalOrgChild; }

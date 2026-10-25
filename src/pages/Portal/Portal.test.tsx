@@ -206,8 +206,8 @@ describe('门户场景卡片与授权边界', () => {
     expect(card.querySelector('.portal-card-body .anticon')).toBeNull()
     fireEvent.click(screen.getByRole('tab', { name: /未獲得權限/ }))
     const cards = within(screen.getByRole('tabpanel')).getAllByRole('button')
-    // 目录卡片数 = sys_system 业务系统数（新增 organization 组织编制系统后为 16）
-    expect(cards).toHaveLength(16)
+    // 目录卡片数 = sys_system 业务系统数（新增 payroll 薪酬福利系统后为 17）
+    expect(cards).toHaveLength(17)
     cards.forEach(button => {
       expect(button).toBeEnabled()
       expect(button).toHaveClass('is-locked')
@@ -220,8 +220,8 @@ describe('门户场景卡片与授权边界', () => {
     expect(loadSystemNavigation).not.toHaveBeenCalled()
     expect(localStorage.getItem('current_system_code')).toBeNull()
     const scenes = Array.from(container.querySelectorAll('[data-scene]'), image => image.getAttribute('data-scene'))
-    // 16 个目录系统 + 接口返回的 finance = 17 张卡片，每张都有专属场景插画
-    expect(new Set(scenes).size).toBe(17)
+    // 17 个目录系统 + 接口返回的 finance = 18 张卡片，每张都有专属场景插画
+    expect(new Set(scenes).size).toBe(18)
     expect(Array.from(screen.getByRole('tabpanel').querySelectorAll('.portal-card-body'), node => node.textContent).join('')).not.toMatch(/[A-Za-z]/)
   })
 
@@ -282,7 +282,7 @@ describe('门户场景卡片与授权边界', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /取\s*消/ }))
     await waitFor(() => expect(dialog).toHaveClass(/ant-zoom-leave/))
     expect(document.querySelector('[data-testid="system-route"]')).toBeNull()
-    expect(document.querySelectorAll('.portal-card.is-locked').length).toBe(16)
+    expect(document.querySelectorAll('.portal-card.is-locked').length).toBe(17)
     expect(localStorage.getItem('current_system_code')).toBeNull()
     expect(loadSystemNavigation).not.toHaveBeenCalled()
   })
@@ -302,8 +302,8 @@ describe('门户场景卡片与授权边界', () => {
     expect(await screen.findByText(zh.portal.noSystem)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', { name: /未獲得權限/ }))
     const cards = within(screen.getByRole('tabpanel')).getAllByRole('button')
-    // 16 个业务系统 + 测试内注入的 future 系统 = 17 张未授权卡片
-    expect(cards).toHaveLength(17)
+    // 17 个业务系统 + 测试内注入的 future 系统 = 18 张未授权卡片
+    expect(cards).toHaveLength(18)
     cards.forEach(button => expect(button).toHaveClass('is-locked'))
   })
 
@@ -592,7 +592,7 @@ describe('场景区分与低干扰动效', () => {
     const tones = new Map<string, string>()
     for (const [, scene, color] of css.matchAll(/\.portal-card-artwork\[data-scene='(\w+)'\]\s*\{\s*color:\s*(#[\dA-Fa-f]{6})/g)) tones.set(scene, color)
     expect([...tones.keys()].sort()).toEqual([
-      'ads', 'ai', 'attendance', 'doc', 'eam', 'finance', 'hr', 'iam', 'meeting', 'merchant', 'merchantWorkbench', 'oa', 'organization', 'platform', 'rdm', 'search', 'translation',
+      'ads', 'ai', 'attendance', 'doc', 'eam', 'finance', 'hr', 'iam', 'meeting', 'merchant', 'merchantWorkbench', 'oa', 'organization', 'payroll', 'platform', 'rdm', 'search', 'translation',
     ].sort())
     expect(new Set(tones.values()).size).toBe(tones.size)
     // 营销与商家增长组内四张卡并排展示，色相必须彼此互斥

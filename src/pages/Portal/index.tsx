@@ -70,6 +70,10 @@ const PORTAL_SYSTEM_CATALOG: readonly PortalSystem[] = [
     description: '法人主體、管理組織、職位職級與崗位編制', icon: 'ApartmentOutlined',
   },
   {
+    code: 'payroll', name: '薪酬福利系統', nameEn: 'Payroll & Benefits',
+    description: '薪酬項目、薪酬標準（定調薪）、核算批次與工資單', icon: 'MoneyCollectOutlined',
+  },
+  {
     code: 'hr', name: '人力資源系統', nameEn: 'Human Resources',
     description: '員工、組織、職位、員工動態', icon: 'TeamOutlined',
   },

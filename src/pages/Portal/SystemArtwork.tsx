@@ -1099,6 +1099,37 @@ function OrganizationScene() {
   </g>
 }
 
+function PayrollScene() {
+  return <g className="portal-payroll-scene">
+    {/* 工资单：三行明细逐行落数，合计条压底 */}
+    <g className="portal-art-motion portal-payroll-rows">
+      <rect x="72" y="40" width="112" height="128" rx="10" fill="#fff" stroke="currentColor" strokeOpacity="0.32" strokeWidth="2" />
+      {[0, 1, 2].map((row) => (
+        <g key={row}>
+          <rect x="88" y={62 + row * 20} width={row === 2 ? 40 : 62} height="5" rx="2.5" fill="currentColor" opacity={row === 2 ? 0.42 : 0.28} />
+          <rect x="150" y={62 + row * 20} width="18" height="5" rx="2.5" fill="currentColor" opacity="0.28" />
+        </g>
+      ))}
+      <rect x="88" y="128" width="80" height="12" rx="6" fill="currentColor" opacity="0.16" />
+      <rect x="88" y="128" width="52" height="12" rx="6" fill="currentColor" opacity="0.62" />
+    </g>
+    {/* 算薪齿轮：只在一条时间线里转一档，不抢工资单的叙事 */}
+    <g className="portal-art-motion portal-payroll-gear">
+      <circle cx="216" cy="100" r="24" fill="currentColor" opacity="0.12" />
+      <circle cx="216" cy="100" r="9" fill="currentColor" opacity="0.5" />
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
+        <rect key={deg} x="213" y="66" width="6" height="12" rx="3" fill="currentColor"
+          opacity="0.45" transform={`rotate(${deg} 216 100)`} />
+      ))}
+    </g>
+    {/* 结果对勾：品牌橙全场景只出现一次 */}
+    <g className="portal-art-motion portal-payroll-check">
+      <circle cx="212" cy="48" r="12" fill="#E8720C" />
+      <path d="m206 48 4.2 4.4 7.4-8.2" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+    </g>
+  </g>
+}
+
 const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
   finance: (
     <>
@@ -1383,6 +1414,8 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
   ),
   translation: null,
   organization: <OrganizationScene />,
+  /* 薪酬福利：工资单落数 → 算薪齿轮转一档 → 发放对勾，一条时间线讲完 */
+  payroll: <PayrollScene />,
   /*
    * 考勤假勤：两套构图——「今日出勤动线」与「请假与额度」，进门户时逐档轮换。
    * 共用同一个 data-scene 场景色，不新增系统卡片也不会多出一个色。

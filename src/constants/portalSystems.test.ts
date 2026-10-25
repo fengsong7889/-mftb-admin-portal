@@ -19,6 +19,7 @@ const AUTHORITATIVE_NAMES: Record<string, string> = {
   finance: '財務結算系統',
   ai: '人工智能系統',
   organization: '組織編制系統',
+  payroll: '薪酬福利系統',
   hr: '人力資源系統',
   attendance: '考勤假勤系統',
   eam: '物資管理系統',

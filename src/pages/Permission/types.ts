@@ -943,6 +943,19 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
   ],
   // 組織編制系統：動作集與後端 HcmOrganizationConstants.ACTIONS_FULL 逐字對齊，
   // 少了任一動作，授權中心就勾不出對應能力（超管直通看不出來，普通角色線上才 403）
+  // 薪酬福利：viewSensitive 之外的金额可见性由 payroll 域自身的 action 控制
+  'hcm-payroll-component': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增項目' },
+    { key: 'edit', label: '編輯/啟停' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'hcm-payroll-standard': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增標準' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
   'hcm-org-legal': [
     { key: 'view', label: '查看' },
     { key: 'create', label: '新增法人' },
@@ -1839,6 +1852,8 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'hcm-org-job-grade',
   'hcm-org-position',
   'hcm-person',
+  'hcm-payroll-component',
+  'hcm-payroll-standard',
   // 考勤假勤系统（后端 AttendanceMenuInitializer 已按菜单鉴权，前端同步纳入受控）
   'attendance-workbench',
   'attendance-group',
@@ -2198,6 +2213,10 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/hcm-org-job-grade-detail': 'hcm-org-job-grade',
   '/hcm-org-position': 'hcm-org-position',
   '/hcm-org-position-form': 'hcm-org-position',
+  '/hcm-payroll-component': 'hcm-payroll-component',
+  '/hcm-payroll-component-form': 'hcm-payroll-component',
+  '/hcm-payroll-standard': 'hcm-payroll-standard',
+  '/hcm-payroll-standard-form': 'hcm-payroll-standard',
   '/hcm-org-position-detail': 'hcm-org-position',
   '/hcm-person': 'hcm-person',
   '/hcm-person-form': 'hcm-person',

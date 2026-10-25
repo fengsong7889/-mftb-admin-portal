@@ -346,6 +346,10 @@
       "doc": {
         "name": "文檔中心系統",
         "description": "需求文檔、人事行政制度與培訓課程的統一索引與查閱入口"
+      },
+      "payroll": {
+        "name": "薪酬福利系統",
+        "description": "薪酬項目、定調薪、核算批次與工資單，三地規則分開維護"
       }
     }
   },
@@ -13871,5 +13875,55 @@
     "profileDeleteConfirm": "確定要刪除該檔案記錄嗎？",
     "profileDeleteSuccess": "檔案記錄已刪除",
     "profilePersonMissing": "缺少人員信息，無法保存"
+  },
+  "payroll": {
+    "component": {
+      "add": "新增薪資項目",
+      "addTitle": "新增薪資項目",
+      "editTitle": "編輯薪資項目",
+      "basicInfo": "項目信息",
+      "code": "項目編碼",
+      "name": "項目名稱",
+      "nameEn": "英文名稱",
+      "type": "項目類型",
+      "taxable": "應稅",
+      "taxableYes": "應稅",
+      "taxableNo": "免稅",
+      "currency": "幣種",
+      "currencyHint": "不填則隨人員薪酬標準",
+      "keywordPlaceholder": "搜索項目編碼 / 名稱",
+      "codeRequired": "請填寫項目編碼",
+      "nameRequired": "請填寫項目名稱",
+      "typeRequired": "請選擇項目類型",
+      "codePlaceholder": "如 BASE / BONUS",
+      "typeHint": "應發增加實發、扣除減少實發、雇主成本只進人力成本（如公司承擔的社保），不影響員工實發。",
+      "deleteConfirm": "確認刪除該薪資項目？",
+      "deleteSuccess": "薪資項目已刪除"
+    },
+    "standard": {
+      "add": "新增薪酬標準",
+      "addTitle": "新增薪酬標準",
+      "editTitle": "編輯薪酬標準",
+      "section": "薪酬標準",
+      "baseAmount": "基本工資",
+      "baseAmountRequired": "請填寫基本工資",
+      "changeType": "變更類型",
+      "effectiveFrom": "生效日期",
+      "effectiveTo": "結束日期",
+      "effectiveToHint": "留空表示當前有效",
+      "current": "當前有效",
+      "asOf": "按日期查看",
+      "asOfHint": "選擇日期查看當時生效的標準",
+      "reason": "調薪原因",
+      "currencyRequired": "請選擇幣種",
+      "effectiveFromRequired": "請選擇生效日期",
+      "deleteConfirm": "確認刪除該薪酬標準？",
+      "deleteSuccess": "薪酬標準已刪除",
+      "needEmployment": "請從人員的雇傭記錄進入薪酬標準",
+      "needEmploymentHint": "薪酬標準掛在雇傭關係上（同一人可能多法人並行），需先選定一段雇傭。",
+      "goPerson": "前往人員主檔",
+      "ruleHint": "同一雇傭同一時間只能有一段標準：調薪請先結束上一段再新開一段，直接改金額會讓歷史工資單無法重現。",
+      "addTitleShort": "新增薪酬標準"
+    }
   }
 }
