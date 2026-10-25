@@ -6,6 +6,7 @@ import {
   BellOutlined,
   CheckOutlined,
   GiftOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import UserMenu from './UserMenu'
@@ -72,6 +73,14 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
       borderColor: '#FFA000',
       bgColor: '#FFF8E1',
     },
+    doc_ack_pending: {
+      icon: <SafetyCertificateOutlined />,
+      color: '#1890FF',
+      tag: '制度待簽收',
+      tagColor: 'processing',
+      borderColor: '#1890FF',
+      bgColor: '#E6F7FF',
+    },
     // 後續可擴展更多通知類型:
     // approval_pending: { icon: <FileTextOutlined />, color: '#1890FF', tag: '審批待辦', ... },
     // recharge_alert: { icon: <DollarOutlined />, color: '#52C41A', tag: '充值提醒', ... },
@@ -121,6 +130,8 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
                 // 点击赠送到期通知跳转到推广赠送菜单
                 if (item.type === 'gift_expire' && item.storeId) {
                   navigate(`/gift-detail-view?storeId=${item.storeId}&adType=${item.adType}`)
+                } else if (item.type === 'doc_ack_pending' && item.docNodeId) {
+                  navigate(`/doc-center/knowledge?id=${item.docNodeId}${item.docRevisionId ? `&revision=${item.docRevisionId}` : ''}`)
                 }
               }}
             >

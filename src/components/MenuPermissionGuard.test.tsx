@@ -8,8 +8,8 @@
  *     防止这张表被当成"后门"放宽整个权限模型；
  *  3. 两个菜单都没有时仍然 403——放宽的是"跨业务可见"，不是把详情页变成公开页。
  */
-import { describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
 import { I18nextProvider } from 'react-i18next'
 import { MemoryRouter } from 'react-router-dom'
 import i18n from '../i18n'
@@ -17,12 +17,14 @@ import zh from '../i18n/locales/zh-TW.json'
 import MenuPermissionGuard from './MenuPermissionGuard'
 
 const mockAuth = { user: { role: 'guest' }, hasMenuPermission: vi.fn() }
+const mockMenu = { status: 'online' }
+beforeEach(() => { mockMenu.status = 'online' })
 
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: () => mockAuth,
 }))
 vi.mock('../contexts/MenuContext', () => ({
-  useMenu: () => ({ status: 'online' }),
+  useMenu: () => mockMenu,
 }))
 
 function mount(path: string, granted: string[]) {
@@ -37,6 +39,37 @@ function mount(path: string, granted: string[]) {
     </I18nextProvider>,
   )
 }
+
+describe('Doc Native 路由权限与离线门禁', () => {
+  it('仅持方案权限即可打开回执详情', () => {
+    mount('/doc-plans/detail?id=41&revision=83', ['doc-plans'])
+    expect(screen.getByText('page-body')).toBeInTheDocument()
+  })
+  it('知识库详情复用文档库权限，分类治理复用治理菜单权限', () => {
+    mount('/doc-center/knowledge?id=41', ['doc-library'])
+    expect(screen.getByText('page-body')).toBeInTheDocument()
+    cleanup()
+    mount('/doc-governance/taxonomy', ['doc-governance'])
+    expect(screen.getByText('page-body')).toBeInTheDocument()
+    cleanup()
+    mount('/doc-governance/clearance', ['doc-governance'])
+    expect(screen.getByText('page-body')).toBeInTheDocument()
+    cleanup()
+    mount('/doc-center/my-acks', ['doc-library'])
+    expect(screen.getByText('page-body')).toBeInTheDocument()
+  })
+  it.each(['/doc-plans', '/doc-plans/detail?id=41&revision=83', '/doc-governance'])('无对应权限不能访问 %s', path => {
+    mount(path, ['doc-library'])
+    expect(screen.getByText('403')).toBeInTheDocument()
+    expect(screen.queryByText('page-body')).not.toBeInTheDocument()
+  })
+  it.each(['/doc-plans', '/doc-plans/detail?id=41&revision=83', '/doc-governance'])('离线时阻断 %s，不放行演示数据', path => {
+    mockMenu.status = 'offline'
+    mount(path, ['doc-plans', 'doc-governance'])
+    expect(screen.getByText('503')).toBeInTheDocument()
+    expect(screen.queryByText('page-body')).not.toBeInTheDocument()
+  })
+})
 
 describe('MenuPermissionGuard：跨业务共用页的任一菜单豁免', () => {
   it('审批详情页：只有 OA 流程事項权限（申请人/审批人）也能进入', async () => {

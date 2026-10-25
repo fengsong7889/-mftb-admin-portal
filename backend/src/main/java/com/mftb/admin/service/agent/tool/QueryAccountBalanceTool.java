@@ -90,8 +90,8 @@ public class QueryAccountBalanceTool implements AgentTool {
             }).toList();
             return toJson(Map.of("total", result.getTotal(), "records", summary));
         } catch (Exception e) {
-            log.warn("[AgentTool] query_account_balance 失敗 caller={}: {}", ctx.caller(), e.getMessage());
-            return errorJson("查询失败: " + e.getMessage());
+            log.warn("[AgentTool] query_account_balance 失敗 type={}", e.getClass().getSimpleName());
+            return errorJson("無法查詢賬戶，請確認權限或稍後重試");
         }
     }
 
@@ -128,7 +128,7 @@ public class QueryAccountBalanceTool implements AgentTool {
 
     private String toJson(Object value) {
         try { return objectMapper.writeValueAsString(value); }
-        catch (Exception e) { return errorJson(e.getMessage()); }
+        catch (Exception e) { return errorJson("查詢結果無法處理"); }
     }
 
     private static String errorJson(String msg) {

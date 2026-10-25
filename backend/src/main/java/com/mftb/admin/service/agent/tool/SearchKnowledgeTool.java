@@ -24,6 +24,7 @@ public class SearchKnowledgeTool implements AgentTool {
 
     private final AiKnowledgeService knowledgeService;
     private final ObjectMapper objectMapper;
+    private final com.mftb.admin.util.OperatorResolver operatorResolver;
 
     @Override
     public String toolKey() {
@@ -79,7 +80,14 @@ public class SearchKnowledgeTool implements AgentTool {
                 limit = 5;
             }
         }
-        List<AiKnowledgeService.KnowledgeHit> hits = knowledgeService.search(query, systemCode, limit);
+        List<AiKnowledgeService.KnowledgeHit> hits;
+        try {
+            com.mftb.admin.entity.SysUser user = operatorResolver.currentUser();
+            if (user == null) return RichOutput.of("{\"error\":\"未取得登錄身份\",\"errorKind\":\"unauthorized\"}");
+            hits = knowledgeService.search(query, systemCode, limit, user);
+        } catch (com.mftb.admin.common.BusinessException denied) {
+            return RichOutput.of("{\"error\":\"知識檢索失敗\",\"errorKind\":\"knowledge_search_denied\"}");
+        }
         if (hits.isEmpty()) {
             return RichOutput.of("{\"total\":0,\"hint\":\"知識庫未檢索到相關內容，請如實說明未收錄，不要編造\"}");
         }

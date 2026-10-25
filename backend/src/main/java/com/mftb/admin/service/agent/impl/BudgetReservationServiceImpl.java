@@ -31,6 +31,8 @@ public class BudgetReservationServiceImpl implements BudgetReservationService {
     private static final String STATUS_RELEASED = "RELEASED";
 
     private final AiBudgetLedgerMapper ledgerMapper;
+    /** WP05：配置了预算池则成为硬上限；未配置时沿用既有额度策略。 */
+    private final com.mftb.admin.service.agent.platform.AiBudgetPoolService poolService;
 
     @Override
     @Transactional(rollbackFor = Exception.class, propagation = Propagation.REQUIRED)
@@ -55,6 +57,12 @@ public class BudgetReservationServiceImpl implements BudgetReservationService {
         BigDecimal reservedCost = computeCost(promptTokensEst, completionTokensEst, 0,
                 unitInputPerMillion, unitOutputPerMillion, null);
         boolean hasPrice = unitInputPerMillion != null && unitOutputPerMillion != null;
+        if (hasPrice && reservedCost != null && reservedCost.signum() > 0
+                && !poolService.tryReserve("USER", username, com.mftb.admin.service.agent.platform.AiBudgetPoolService.currentPeriod(),
+                        currency == null ? "CNY" : currency, reservedCost)) {
+            throw new com.mftb.admin.service.agent.platform.AiBudgetPoolService.BudgetDeniedException(
+                    "已超出本月 AI 預算，請申請額度或等待下期");
+        }
 
         AiBudgetLedger row = new AiBudgetLedger();
         row.setRequestId(requestId);
@@ -101,6 +109,15 @@ public class BudgetReservationServiceImpl implements BudgetReservationService {
                 .set(AiBudgetLedger::getVerificationStatus, hasPrice ? "VERIFIED" : "UNKNOWN"));
         if (affected == 0) {
             log.info("预算结算未命中 RESERVED 行：{}", requestId);
+            return;
+        }
+        AiBudgetLedger settled = ledgerMapper.selectOne(new LambdaQueryWrapper<AiBudgetLedger>()
+                .eq(AiBudgetLedger::getRequestId, requestId).last("LIMIT 1"));
+        if (settled != null) {
+            poolService.settle("USER", settled.getUsername(),
+                    com.mftb.admin.service.agent.platform.AiBudgetPoolService.currentPeriod(),
+                    settled.getCurrency(), settled.getReservedCost(),
+                    actualCost != null ? actualCost : BigDecimal.ZERO);
         }
     }
 
@@ -116,6 +133,14 @@ public class BudgetReservationServiceImpl implements BudgetReservationService {
                 .set(AiBudgetLedger::getErrorMessage, truncate(errorMessage)));
         if (affected == 0) {
             log.info("预算释放未命中 RESERVED 行：{}", requestId);
+            return;
+        }
+        AiBudgetLedger released = ledgerMapper.selectOne(new LambdaQueryWrapper<AiBudgetLedger>()
+                .eq(AiBudgetLedger::getRequestId, requestId).last("LIMIT 1"));
+        if (released != null) {
+            poolService.release("USER", released.getUsername(),
+                    com.mftb.admin.service.agent.platform.AiBudgetPoolService.currentPeriod(),
+                    released.getCurrency(), released.getReservedCost());
         }
     }
 

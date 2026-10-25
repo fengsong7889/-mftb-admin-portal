@@ -11,6 +11,18 @@
       "status": "ACTIVE"
     },
     {
+      "versionKey": "core:user-session-columns-v1.0",
+      "module": "core",
+      "phase": "BASE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "userSessionSchemaInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [],
+      "intent": "空库基座自愈：sys_user 补齐 department_en/last_active_at/active_token/active_login_ip/force_logout_* 列，避免旧 01_init_system.sql 基座缺列导致首次实体查询失败",
+      "author": "Qoder",
+      "comment": "@Order(1) 早于 OrgScope(@Order 2)、PasswordPolicy(@Order 3)、EmployeeDetail(@Order 4) 与 DataInitializer(@Order 5)。只补列不改数据，不写 AFTER（quick_favorites 等列由后续 DataInitializer 补，不能反向依赖）。"
+    },
+    {
       "versionKey": "core:user-password-policy-v1",
       "module": "core",
       "phase": "BASE_STRUCTURE",
@@ -1701,6 +1713,197 @@
       "comment": "業務口徑已改為打烊不計分而是被召回側過濾，但該語義此前只存在於前端常量 BUSINESS_STATE_ITEMS 的第 4 檔 filtered，靠索引位置約定，看 condition_items 完全無法得知這一檔不計分，未來計分/召回側極易照舊扣分。遷移把 condition_items[3].condition 寫成 'filtered' 並將 score 歸 0，評分說明以舊文案片段作條件同步（管理員自定義過的不覆蓋）。用 Java 解析 JSON 後回寫而不是 MySQL JSON_SET，是為了能在 H2 單測裡驗證冪等與校驗；生產等價 SQL 見 sql/235_organic_stb02_filtered.sql。注意：本遷移只完成「數據側口徑」，商家營業狀態的寫入方（商家端上報接口）與召回側按 filtered 過濾都在本倉庫之外，尚未落地。"
     },
     {
+      "versionKey": "doc:native-content-v2.0",
+      "module": "doc",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "docSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "290_doc_native_content.sql"
+      ],
+      "dependencies": [
+        "doc:schema:v1.0"
+      ],
+      "intent": "原生方案正文、不可变版本、空间权限、确认交接、幂等回执与受限集成凭据",
+      "author": "Qoder",
+      "comment": "原生字段以 doc_node 一对一扩展表承载；不改旧 ID，旧接口排除原生记录。结构与约束验证失败不得标记成功。"
+    },
+    {
+      "versionKey": "doc:native-menu-v2.0",
+      "module": "doc",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "docSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "doc:native-content-v2.0",
+        "doc:menu:v1.3"
+      ],
+      "intent": "新增方案管理和治理集成菜单，维持旧菜单及账号权限",
+      "author": "Qoder"
+    },
+    {
+      "versionKey": "doc:knowledge-v3.0",
+      "module": "doc",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "docSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "292_doc_knowledge_p0.sql"
+      ],
+      "dependencies": [
+        "doc:native-content-v2.0"
+      ],
+      "intent": "P0 知识库地基：分类/标签/文件资产/主体 ACL/密级/统一检索索引",
+      "author": "Qoder",
+      "comment": "8 表 + 既有表扩展列；分类/标签/ACL/索引回填幂等；结构契约登记 ContractRegistry，校验失败不得记成功。"
+    },
+    {
+      "versionKey": "doc:clearance-v1.0",
+      "module": "doc",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "docSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "293_doc_clearance_audit.sql"
+      ],
+      "dependencies": [
+        "doc:knowledge-v3.0"
+      ],
+      "intent": "用户密级授权变更审计：doc_user_clearance 为当前值，审计表只追加",
+      "author": "Qoder"
+    },
+    {
+      "versionKey": "doc:ack-v1.0",
+      "module": "doc",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "docSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "294_doc_ack.sql"
+      ],
+      "dependencies": [
+        "doc:knowledge-v3.0"
+      ],
+      "intent": "制度签收范围与回执；只对当前生效版本签收",
+      "author": "Qoder"
+    },
+    {
+      "versionKey": "doc:reading-v1.0",
+      "module": "doc",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "docSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "295_doc_reading.sql"
+      ],
+      "dependencies": [
+        "doc:ack-v1.0"
+      ],
+      "intent": "P1 阅读域：阅读进度、收藏、笔记、书目元数据",
+      "author": "Qoder"
+    },
+    {
+      "versionKey": "doc:api-v1.0",
+      "module": "doc",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "docSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "296_doc_api_spec.sql"
+      ],
+      "dependencies": [
+        "doc:reading-v1.0"
+      ],
+      "intent": "P1c 接口文档：OpenAPI 规格、操作清单与两版差异",
+      "author": "Qoder"
+    },
+    {
+      "versionKey": "doc:api-catalog-v1.1",
+      "module": "doc",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "docSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "300_doc_api_doc_fields.sql"
+      ],
+      "dependencies": [
+        "doc:api-catalog-v1.0"
+      ],
+      "intent": "接口文档化字段：名称、说明、场景、鉴权、可见性、发布状态、负责人、版本、示例、错误码、变更记录",
+      "author": "Qoder"
+    },
+    {
+      "versionKey": "doc:api-catalog-v1.2",
+      "module": "doc",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "docSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [],
+      "dependencies": [
+        "doc:api-catalog-v1.1"
+      ],
+      "intent": "接口清單系統代碼歸一：舊路由前綴（agent/ad/menus…）歸並到 16 個正式系統，system_name 統一中文，消除左側中英混排",
+      "author": "Qoder",
+      "comment": "早期掃描直接把路由前綴當系統代碼；本輪在常量和 DocApiSystemMap 收斂後，用 path 重算 system_code 與中文名寫回。只 UPDATE source='code' 的機器行，不碰人工導入的 OpenAPI 行；按 id 批更新且幂等，每次啟動重放自愈。"
+    },
+    {
+      "versionKey": "doc:api-catalog-v1.0",
+      "module": "doc",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "docSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "299_doc_api_catalog.sql"
+      ],
+      "dependencies": [
+        "doc:system-plan-v1.0"
+      ],
+      "intent": "全系统接口清单：按系统记录路径、方法、处理类、入参与返回类型",
+      "author": "Qoder"
+    },
+    {
+      "versionKey": "doc:system-plan-v1.0",
+      "module": "doc",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "docSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "298_doc_system_plan.sql"
+      ],
+      "dependencies": [
+        "doc:archive-v1.0"
+      ],
+      "intent": "系统方案库：归档系统建设/整改生成的 MD 方案与来源元数据",
+      "author": "Qoder"
+    },
+    {
+      "versionKey": "doc:archive-v1.0",
+      "module": "doc",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "docSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "297_doc_archive.sql"
+      ],
+      "dependencies": [
+        "doc:api-v1.0"
+      ],
+      "intent": "P1d 档案：保管期限、冻结、销毁申请/审批与清册",
+      "author": "Qoder"
+    },
+    {
       "versionKey": "doc:schema:v1.0",
       "module": "doc",
       "phase": "MODULE_STRUCTURE",
@@ -3191,6 +3394,49 @@
       "author": "Qoder",
       "ticket": "hcm-c3-profile",
       "comment": "为什么五类合成一张表：它们都是挂在人员身上的档案证据行，生命周期完全一致（HR 手工维护、可附证据、需核实、无审批流、不参与日期生效与核算），差异只是字段语义；分五张表会让详情页发五个请求、校验写五遍。与 emp_position_record 的边界：那张表是任职事实（影响编制与薪资），本表只做档案证据。旧员工详情里这四类没有持久化模型（奖惩是空 state），所以要新建而不是聚合只读。295 脚本仅作参照文档，不进镜像。"
+    },
+    {
+      "versionKey": "ai:agent-platform-core-v1.0",
+      "module": "ai",
+      "phase": "BASE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "agentPlatformSchemaInitializer",
+      "dependencies": [
+        "ai:scope-v1.0"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "291_agent_platform_core.sql"
+      ],
+      "intent": "企业 Agent 平台核心域：应用与版本、预算池、动作提案与回执、知识 ACL、数据分级与端点批准、持久运行、评测与发布快照（仅新增表）"
+    },
+    {
+      "versionKey": "ai:agent-platform-core-v1.1",
+      "module": "ai",
+      "phase": "BASE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "agentPlatformSchemaInitializer",
+      "dependencies": [
+        "ai:agent-platform-core-v1.0"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "291_agent_platform_core.sql"
+      ],
+      "intent": "运行租约：ai_run 增加 lease_owner / lease_expires_at / attempt，支持多实例安全领取与崩溃回收"
+    },
+    {
+      "versionKey": "ai:agent-platform-menu-v1.0",
+      "module": "ai",
+      "phase": "BASE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "agentPlatformMenuInitializer",
+      "dependencies": [
+        "ai:agent-platform-core-v1.1"
+      ],
+      "status": "ACTIVE",
+      "scriptFiles": [],
+      "intent": "企業 Agent 控制台一级菜单 + 8 个二级菜单（独立动作集，admin 兜底授权，不改动旧菜单）"
     },
     {
       "versionKey": "hcm:person-menu:v1.1",

@@ -27,17 +27,17 @@ public final class AiToolVisibility {
     }
 
     public static boolean visible(AiToolPolicy policy, SysUser user) {
-        if (policy == null || !StringUtils.hasText(policy.getDataScopeJson())) return true;
-        if (user == null) return true;
-        if (isAdmin(user)) return true;
+        if (policy == null || user == null) return false;
+        if (!StringUtils.hasText(policy.getDataScopeJson())) return true;
         JsonNode scope;
         try {
             scope = MAPPER.readTree(policy.getDataScopeJson());
         } catch (Exception e) {
-            log.warn("[AiToolVisibility] data_scope_json 解析失败 tool={}: {}",
-                    policy.getToolKey(), e.getMessage());
-            return true;
+            log.warn("[AiToolVisibility] 工具范围配置无效，拒绝使用 tool={}", policy.getToolKey());
+            return false;
         }
+        if (!validScope(scope)) return false;
+        if (isAdmin(user)) return true;
         List<String> roles = textArray(scope.path("roles"));
         List<Long> depts = longArray(scope.path("depts"));
         if (roles.isEmpty() && depts.isEmpty()) return true;
@@ -50,6 +50,37 @@ public final class AiToolVisibility {
             return depts.contains(user.getDepartmentId());
         }
         return false;
+    }
+
+    /** 配置结构损坏不能等价于空范围，否则误配置会扩大授权。 */
+    private static boolean validScope(JsonNode scope) {
+        if (scope == null || !scope.isObject()) return false;
+        java.util.Iterator<String> fields = scope.fieldNames();
+        while (fields.hasNext()) {
+            String key = fields.next();
+            if (!"roles".equals(key) && !"depts".equals(key)) return false;
+        }
+        JsonNode roles = scope.get("roles");
+        if (roles != null) {
+            if (!roles.isArray()) return false;
+            for (JsonNode role : roles) {
+                if (!role.isTextual() || !StringUtils.hasText(role.asText())) return false;
+            }
+        }
+        JsonNode depts = scope.get("depts");
+        if (depts != null) {
+            if (!depts.isArray()) return false;
+            for (JsonNode dept : depts) {
+                if (dept.isIntegralNumber() && dept.canConvertToLong() && dept.asLong() > 0) continue;
+                if (!dept.isTextual()) return false;
+                try {
+                    if (Long.parseLong(dept.asText()) <= 0) return false;
+                } catch (NumberFormatException e) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     private static boolean isAdmin(SysUser user) {

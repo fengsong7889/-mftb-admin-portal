@@ -11,8 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * 工具可见性：data_scope_json 的 roles/depts 是“能不能看到工具”的边界。
  *
- * <p>空配置 = 全员可见（保持历史行为）；超管始终可见；配置损坏时放行而不是全站禁用，
- * 但会留下 warn 日志——不能因为一条运营配置把助手整体关停。
+ * <p>已登记策略的空范围允许已登录用户；配置损坏、未登记策略与身份缺失默认拒绝。
  */
 class AiToolVisibilityTest {
 
@@ -58,14 +57,27 @@ class AiToolVisibilityTest {
     }
 
     @Test
-    @DisplayName("配置损坏时放行，不把助手整体关停")
-    void brokenJsonFallsBackToVisible() {
-        assertTrue(AiToolVisibility.visible(policy("not-json"), user("user", null, 3L)));
+    @DisplayName("配置损坏时默认拒绝，不扩大工具权限")
+    void brokenJsonFailsClosed() {
+        assertFalse(AiToolVisibility.visible(policy("not-json"), user("user", null, 3L)));
     }
 
     @Test
-    @DisplayName("无策略行按历史行为放行")
-    void missingPolicyVisible() {
-        assertTrue(AiToolVisibility.visible(null, user("user", null, 3L)));
+    @DisplayName("缺少登录身份时不能放行受限工具")
+    void missingIdentityCannotUseRestrictedTool() {
+        assertFalse(AiToolVisibility.visible(policy("{\"roles\":[\"finance_manager\"]}"), null));
+    }
+
+    @Test
+    @DisplayName("错误类型的范围不能退化为全员可见")
+    void malformedScopeTypesCannotBroadenAccess() {
+        assertFalse(AiToolVisibility.visible(policy("{\"roles\":\"finance_manager\"}"), user("user", null, 3L)));
+        assertFalse(AiToolVisibility.visible(policy("{\"depts\":[\"invalid\"]}"), user("user", null, 3L)));
+    }
+
+    @Test
+    @DisplayName("无策略行默认拒绝")
+    void missingPolicyRejected() {
+        assertFalse(AiToolVisibility.visible(null, user("user", null, 3L)));
     }
 }

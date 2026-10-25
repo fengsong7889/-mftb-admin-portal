@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -77,11 +78,11 @@ class QueryAccountBalanceToolTest {
     }
 
     @Test
-    void serviceFailureReturnsErrorJsonNotThrow() {
+    void serviceFailureReturnsErrorJsonWithoutInternalDetail() {
         when(finAccountService.page(any())).thenThrow(new RuntimeException("DB 挂了"));
         String out = newTool().execute(Map.of(), new AgentTool.ToolCallContext("bob", null));
         assertTrue(out.startsWith("{\"error\":"));
-        assertTrue(out.contains("DB 挂了"));
+        assertFalse(out.contains("DB 挂了"), "不得把内部异常文本回给模型");
     }
 
     @Test

@@ -10,6 +10,11 @@ import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.FinBatch;
 import com.mftb.admin.mapper.FinBatchMapper;
 import com.mftb.admin.service.FinBatchService;
+import com.mftb.admin.service.FinReadAccess;
+import com.mftb.admin.service.DataScopeService;
+import com.mftb.admin.service.PermissionService;
+import com.mftb.admin.util.OperatorResolver;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -24,10 +29,16 @@ import java.util.List;
 public class FinBatchServiceImpl implements FinBatchService {
 
     private final FinBatchMapper batchMapper;
+    private final DataScopeService dataScopeService;
+    private final PermissionService permissionService;
+    private final OperatorResolver operatorResolver;
 
     @Override
     public PageResult<FinBatchVO> page(FinBatchQuery query) {
+        Set<String> groups = FinReadAccess.require("batch-query", operatorResolver, permissionService, dataScopeService);
+        if (groups != null && groups.isEmpty()) return new PageResult<>(List.of(), 0L);
         LambdaQueryWrapper<FinBatch> wrapper = new LambdaQueryWrapper<>();
+        FinReadAccess.constrain(wrapper, groups, FinBatch::getGroupCode, FinBatch::getBatchType);
         if (StringUtils.hasText(query.getGroupId())) {
             wrapper.like(FinBatch::getGroupCode, query.getGroupId());
         }
@@ -78,15 +89,18 @@ public class FinBatchServiceImpl implements FinBatchService {
 
     @Override
     public FinBatchVO detail(String batchNo, String groupId) {
+        Set<String> groups = FinReadAccess.require("batch-query", operatorResolver, permissionService, dataScopeService);
+        if (groups != null && groups.isEmpty()) throw new BusinessException(404, "批次不存在或無權查看");
         LambdaQueryWrapper<FinBatch> wrapper = new LambdaQueryWrapper<FinBatch>()
                 .eq(FinBatch::getBatchNo, batchNo);
+        FinReadAccess.constrain(wrapper, groups, FinBatch::getGroupCode, FinBatch::getBatchType);
         if (StringUtils.hasText(groupId)) {
             wrapper.eq(FinBatch::getGroupCode, groupId);
         }
         wrapper.orderByAsc(FinBatch::getId).last("LIMIT 1");
         FinBatch batch = batchMapper.selectOne(wrapper);
         if (batch == null) {
-            throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "批次不存在: " + batchNo);
+            throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "批次不存在或無權查看");
         }
         return FinBatchVO.from(batch);
     }

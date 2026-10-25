@@ -37,7 +37,16 @@ public interface AiToolPolicyService {
     Map<String, Object> queryExecLogs(long page, long size, String toolKey, String caller);
     /**
      * 网关执行前调用：允许则返回放行副本；拒绝抛 IllegalArgumentException。
-     * require_approval=1 时必须传入非空 approvalToken。
+     * <p>requireApproval=1 时 approvalToken 必须是已审批且未消费的动作提案号，并额外校验参数。
      */
     AiToolPolicy enforce(String toolKey, String approvalToken, String caller, String argsDigest);
+
+    /**
+     * 带执行参数的版本：需要审批时以「已审批提案 + 冻结参数」放行且仅能消费一次。
+     * <p>内部试跑/模型自主循环拿不到可信提案时，仍由 4 参版本默认拒绝。
+     */
+    default AiToolPolicy enforce(String toolKey, String approvalToken, String caller, String argsDigest,
+                                 java.util.Map<String, Object> args) {
+        return enforce(toolKey, approvalToken, caller, argsDigest);
+    }
 }

@@ -71,6 +71,28 @@ public class DocSchemaMigrationInitializer implements CommandLineRunner {
      * 口徑：路徑 = 有序的文檔清單；「已讀」由 doc_view_log 推導，不另建進度表。
      */
     static final String VERSION_LEARNING = "doc:learning:v1.0";
+    /** P0 知识库地基：分类/标签/资产/主体 ACL/密级/统一检索。 */
+    static final String VERSION_KNOWLEDGE = "doc:knowledge-v3.0";
+    /** P0 补口：密级授权变更审计（doc_user_clearance 为当前值）。 */
+    static final String VERSION_CLEARANCE = "doc:clearance-v1.0";
+    /** P1a：制度签收范围 + 回执。 */
+    static final String VERSION_ACK = "doc:ack-v1.0";
+    /** P1 阅读域：阅读进度/收藏/笔记/书目。 */
+    static final String VERSION_READING = "doc:reading-v1.0";
+    /** P1c：OpenAPI 规范/操作/差异。 */
+    static final String VERSION_API = "doc:api-v1.0";
+    /** P1d：档案与销毁。 */
+    static final String VERSION_ARCHIVE = "doc:archive-v1.0";
+    /** 系统方案库。 */
+    static final String VERSION_SYSTEM_PLAN = "doc:system-plan-v1.0";
+    /** 全系统接口清单。 */
+    static final String VERSION_API_CATALOG = "doc:api-catalog-v1.0";
+    /** 接口文档化字段。 */
+    static final String VERSION_API_DOC = "doc:api-catalog-v1.1";
+    /** 接口清單系統代碼歸一（舊路由前綴 → 16 個正式系統，名稱統一中文）。 */
+    static final String VERSION_API_DOC_SYSTEMS = "doc:api-catalog-v1.2";
+    /** 系统方案库/接口管理两个新菜单。 */
+    static final String VERSION_CATALOG_MENU = "doc:catalog-menu-v1.0";
     /** 學習路徑入口菜單（頂級「學習路徑」/doc-learning）；單獨版本鍵理由同 v1.1/v1.2 */
     static final String VERSION_MENU_V13 = "doc:menu:v1.3";
 
@@ -111,6 +133,30 @@ public class DocSchemaMigrationInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) {
         versionTracker.applyOnce(VERSION_SCHEMA, this::doSchemaMigrate, this::verifySchema);
+        versionTracker.applyOnce("doc:native-content-v2.0", () -> DocNativeSchema.migrate(jdbcTemplate), () -> DocNativeSchema.verify(jdbcTemplate));
+        DocNativeSchema.verify(jdbcTemplate);
+        versionTracker.applyOnce(VERSION_KNOWLEDGE, () -> DocKnowledgeSchema.migrate(jdbcTemplate), () -> DocKnowledgeSchema.verify(jdbcTemplate));
+        DocKnowledgeSchema.verify(jdbcTemplate);
+        versionTracker.applyOnce(VERSION_CLEARANCE, () -> DocClearanceSchema.migrate(jdbcTemplate), () -> DocClearanceSchema.verify(jdbcTemplate));
+        DocClearanceSchema.verify(jdbcTemplate);
+        versionTracker.applyOnce(VERSION_ACK, () -> DocAckSchema.migrate(jdbcTemplate), () -> DocAckSchema.verify(jdbcTemplate));
+        DocAckSchema.verify(jdbcTemplate);
+        versionTracker.applyOnce(VERSION_READING, () -> DocReadingSchema.migrate(jdbcTemplate), () -> DocReadingSchema.verify(jdbcTemplate));
+        DocReadingSchema.verify(jdbcTemplate);
+        versionTracker.applyOnce(VERSION_API, () -> DocApiSchema.migrate(jdbcTemplate), () -> DocApiSchema.verify(jdbcTemplate));
+        DocApiSchema.verify(jdbcTemplate);
+        versionTracker.applyOnce(VERSION_ARCHIVE, () -> DocArchiveSchema.migrate(jdbcTemplate), () -> DocArchiveSchema.verify(jdbcTemplate));
+        DocArchiveSchema.verify(jdbcTemplate);
+        versionTracker.applyOnce(VERSION_SYSTEM_PLAN, () -> DocSystemPlanSchema.migrate(jdbcTemplate), () -> DocSystemPlanSchema.verify(jdbcTemplate));
+        DocSystemPlanSchema.verify(jdbcTemplate);
+        versionTracker.applyOnce(VERSION_API_CATALOG, () -> DocApiCatalogSchema.migrate(jdbcTemplate), () -> DocApiCatalogSchema.verify(jdbcTemplate));
+        DocApiCatalogSchema.verify(jdbcTemplate);
+        versionTracker.applyOnce(VERSION_API_DOC, () -> DocApiCatalogSchema.addDocumentationColumns(jdbcTemplate),
+                () -> DocApiCatalogSchema.verifyDocumentationColumns(jdbcTemplate));
+        DocApiCatalogSchema.verifyDocumentationColumns(jdbcTemplate);
+        versionTracker.applyOnce(VERSION_API_DOC_SYSTEMS, () -> DocApiCatalogSchema.normalizeSystems(jdbcTemplate));
+        // 歸一為冪等活邏輯：新環境/舊庫每次啟動都自癒，防止已記版本後再出現英文系統名
+        DocApiCatalogSchema.normalizeSystems(jdbcTemplate);
         versionTracker.applyOnce(VERSION_LEARNING, this::doLearningSchema, this::verifyLearningSchema);
         versionTracker.applyOnce(VERSION_SEED, this::doSeedSpaces, this::verifySpaces);
         // 菜單與會話域同口徑：版本已落地的庫仍重放 task，保持結構自癒
@@ -128,6 +174,52 @@ public class DocSchemaMigrationInitializer implements CommandLineRunner {
         // v1.3 新增學習路徑菜單；任務冪等，重放無害
         if (!versionTracker.applyOnce(VERSION_MENU_V13, this::doMenuMigrate, this::verifyMenus)) {
             doMenuMigrate();
+        }
+        if (!versionTracker.applyOnce("doc:native-menu-v2.0", this::doNativeMenus, this::verifyNativeMenus)) doNativeMenus();
+        verifyNativeMenus();
+        if (!versionTracker.applyOnce(VERSION_CATALOG_MENU, this::doCatalogMenus, this::verifyCatalogMenus)) {
+            doCatalogMenus();
+        }
+        verifyCatalogMenus();
+    }
+
+    private void doNativeMenus() {
+        ensureMenu(null, "doc-plans", "方案管理", "/doc-plans", "DocPlans", "FileTextOutlined", 1,
+                "[\"view\",\"edit\",\"confirm\",\"export\"]", "Plan Management");
+        ensureMenu(null, "doc-governance", "治理與集成", "/doc-governance", "DocGovernance", "SafetyCertificateOutlined", 6,
+                "[\"view\"]", "Governance & Integrations");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order=CASE menu_key WHEN 'doc-library' THEN 2 WHEN 'doc-learning' THEN 3 WHEN 'doc-stats' THEN 4 WHEN 'doc-space' THEN 5 END WHERE menu_key IN ('doc-library','doc-learning','doc-stats','doc-space') AND deleted=0");
+        Long admin=queryAdminRoleId();
+        if (admin!=null) {
+            upsertGrant(admin,"doc-plans","[\"view\",\"edit\",\"confirm\",\"export\"]");
+            upsertGrant(admin,"doc-governance","[\"view\"]");
+        }
+        deriveSystemAccess(); permissionService.evictAll();
+    }
+
+    private void verifyNativeMenus() {
+        if (queryMenuId("doc-plans")==null || queryMenuId("doc-governance")==null)
+            throw new IllegalStateException("原生文档菜单未就绪");
+    }
+
+    private void doCatalogMenus() {
+        ensureMenu(null, "doc-system-plans", "系統方案庫", "/doc-system-plans", "DocSystemPlans",
+                "FolderOpenOutlined", 7, "[\"view\",\"edit\"]", "System Plans");
+        ensureMenu(null, "doc-api-center", "接口管理", "/doc-api-center", "DocApiCenter",
+                "ApiOutlined", 8, "[\"view\",\"edit\"]", "API Center");
+        Long admin = queryAdminRoleId();
+        if (admin != null) {
+            upsertGrant(admin, "doc-system-plans", "[\"view\",\"edit\"]");
+            upsertGrant(admin, "doc-api-center", "[\"view\",\"edit\"]");
+        }
+        deriveSystemAccess();
+        permissionService.evictAll();
+        log.info("文檔中心專題菜單已就緒（系統方案庫/接口管理）");
+    }
+
+    private void verifyCatalogMenus() {
+        if (queryMenuId("doc-system-plans") == null || queryMenuId("doc-api-center") == null) {
+            throw new IllegalStateException("系统方案库/接口管理菜单未就绪");
         }
     }
 

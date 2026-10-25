@@ -216,6 +216,7 @@ public class EamSchemaMigrationInitializer implements CommandLineRunner {
                 + "to_user_id BIGINT NULL COMMENT '接收人 ID', "
                 + "to_user_name VARCHAR(128) NOT NULL COMMENT '接收人姓名', "
                 + "to_department VARCHAR(128) NOT NULL COMMENT '接收人部门', "
+                + "receiver_type VARCHAR(20) NOT NULL DEFAULT 'employee' COMMENT '接收人类型：employee=员工 / department=部门', "
                 + "handover_date DATE NOT NULL COMMENT '交接日期', "
                 + "asset_count INT NOT NULL DEFAULT 0 COMMENT '交接资产数量', "
                 + "reason VARCHAR(32) NOT NULL COMMENT '交接原因：resign/transfer/other', "

@@ -166,23 +166,46 @@ public class RdmToolSupport {
     }
 
     public ProjectLookup resolveProject(String raw, SysUser user) {
+        if (user == null || user.getId() == null) return ProjectLookup.fail("未取得登錄身份", "請重新登錄後再試");
         if (!StringUtils.hasText(raw)) {
             return ProjectLookup.fail("請提供項目編號或名稱", "例如：PROJ2026090101 或 會員改版");
         }
         String kw = raw.trim();
         List<Map<String, Object>> rows;
         try {
+            RdmFactVO.Scope scope = factService.resolveLookupScope(user.getId());
+            if (scope == null || !scope.isAuthenticated()
+                    || !scope.isCanSeeAll() && (scope.getProjectIds() == null || scope.getProjectIds().isEmpty())) {
+                return ProjectLookup.fail("未找到可查看的項目", "請確認項目編號與權限");
+            }
+            List<Object> params = new ArrayList<>(List.of(kw, "%" + kw + "%"));
+            String restriction = "";
+            if (!scope.isCanSeeAll()) {
+                restriction = "AND id IN (" + String.join(",", java.util.Collections.nCopies(scope.getProjectIds().size(), "?")) + ") ";
+                params.addAll(scope.getProjectIds());
+            }
+            params.add(kw);
             rows = jdbcTemplate.queryForList(
                     "SELECT id, project_no, name, status FROM rdm_project "
-                            + "WHERE project_no = ? OR name LIKE ? "
-                            + "ORDER BY (project_no = ?) DESC, id DESC LIMIT 6",
-                    kw, "%" + kw + "%", kw);
+                            + "WHERE (project_no = ? OR name LIKE ?) " + restriction
+                            + "ORDER BY (project_no = ?) DESC, id DESC LIMIT 6", params.toArray());
+            // 读取后复核撤权；任何权限查询异常都由外层 fail-closed 处理。
+            List<Map<String, Object>> visible = new ArrayList<>();
+            for (Map<String, Object> row : rows) {
+                try {
+                    factService.requireProjectVisible(((Number) row.get("id")).longValue(), user.getId());
+                    visible.add(row);
+                } catch (BusinessException denied) {
+                    // 无权候选不参与消歧、数量或唯一命中判断。
+                }
+            }
+            rows = visible;
         } catch (Exception e) {
             log.warn("[RdmTool] 项目解析失败 raw={}: {}", raw, e.getMessage());
             return ProjectLookup.fail("查詢項目失敗", "請稍後再試");
         }
         if (rows.isEmpty()) {
-            return ProjectLookup.fail("未找到項目「" + kw + "」", "請確認項目名稱或編號是否正確");
+            return ProjectLookup.fail("未找到可查看的項目", "請確認項目編號與權限");
         }
         // 唯一命中：编号精确或名称精确
         List<Map<String, Object>> exact = rows.stream()
@@ -205,7 +228,7 @@ public class RdmToolSupport {
             RdmProject project = factService.requireProjectVisible(id, user == null ? null : user.getId());
             return ProjectLookup.ok(project);
         } catch (BusinessException e) {
-            return ProjectLookup.fail(e.getMessage(), "請確認您是否為該項目成員，或改用其他項目");
+            return ProjectLookup.fail("未找到可查看的項目", "請確認項目編號與權限");
         } catch (Exception e) {
             log.warn("[RdmTool] 项目可见性校验失败 id={}: {}", id, e.getMessage());
             return ProjectLookup.fail("無法查看該項目", "請稍後再試");
@@ -223,19 +246,22 @@ public class RdmToolSupport {
         public boolean ok() { return user != null; }
     }
 
-    public PersonLookup resolvePerson(String raw) {
+    public PersonLookup resolvePerson(String raw, SysUser caller) {
+        if (caller == null || caller.getId() == null) return PersonLookup.fail("未取得登錄身份", "請重新登錄後再試");
         if (!StringUtils.hasText(raw)) {
             return PersonLookup.fail("請提供員工姓名或工號", "例如：張三 或 MF00001");
         }
         String kw = raw.trim();
         List<Map<String, Object>> rows;
         try {
+            boolean all = canSeeAll(caller);
+            List<Object> params = new ArrayList<>(List.of(kw, "%" + kw + "%"));
+            if (!all) params.add(caller.getId());
+            params.add(kw);
             rows = jdbcTemplate.queryForList(
-                    "SELECT id, name, emp_id, department FROM sys_user "
-                            + "WHERE (status IS NULL OR status = 1) "
-                            + "AND (emp_id = ? OR name LIKE ?) "
-                            + "ORDER BY (emp_id = ?) DESC, name LIMIT 6",
-                    kw, "%" + kw + "%", kw);
+                    "SELECT id, name, emp_id FROM sys_user WHERE status = 1 "
+                            + "AND (emp_id = ? OR name LIKE ?) " + (all ? "" : "AND id = ? ")
+                            + "ORDER BY (emp_id = ?) DESC, name LIMIT 6", params.toArray());
         } catch (Exception e) {
             log.warn("[RdmTool] 人员解析失败 raw={}: {}", raw, e.getMessage());
             return PersonLookup.fail("查詢員工失敗", "請稍後再試");
@@ -252,13 +278,15 @@ public class RdmToolSupport {
                 Map<String, Object> c = new LinkedHashMap<>();
                 c.put("姓名", r.get("name"));
                 c.put("工號", r.get("emp_id"));
-                c.put("部門", r.get("department"));
                 return c;
             }).toList();
             return PersonLookup.ambiguous(candidates);
         }
         SysUser user = sysUserMapper.selectById(((Number) chosen.get("id")).longValue());
-        if (user == null) return PersonLookup.fail("員工不存在或已離職", "請確認後再試");
+        if (user == null || !Integer.valueOf(1).equals(user.getStatus())
+                || !sameUser(caller, user) && !canSeeAll(caller)) {
+            return PersonLookup.fail("未找到可查看的員工", "請確認姓名、工號及權限");
+        }
         return PersonLookup.ok(user);
     }
 

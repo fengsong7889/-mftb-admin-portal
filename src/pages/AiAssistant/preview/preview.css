@@ -1,0 +1,98 @@
+.agent-platform-preview {
+  color: #262626;
+}
+
+.agent-platform-preview__context,
+.agent-platform-preview__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.agent-platform-preview__layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.agent-platform-preview__nav {
+  flex: 0 0 210px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid #e8eaed;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.agent-platform-preview__nav button {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 12px;
+  border: 0;
+  border-radius: 8px;
+  color: #595959;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  transition: background 0.2s;
+}
+
+.agent-platform-preview__nav button:hover,
+.agent-platform-preview__nav button[aria-current='page'] {
+  color: #E8720C;
+  background: #FFF7F0;
+}
+
+.agent-platform-preview__nav button:focus-visible {
+  outline: 2px solid #E8720C;
+  outline-offset: 2px;
+}
+
+.agent-platform-preview__nav button > .anticon { margin-top: 3px; font-size: 16px; }
+.agent-platform-preview__nav button small { display: block; margin-top: 5px; color: #8C8C8C; font-size: 11px; line-height: 1.6; }
+.agent-platform-preview__main { flex: 1; min-width: 0; }
+.agent-platform-preview__heading { margin-top: 0; }
+.agent-platform-preview__heading h2 { margin: 0 0 6px; font-size: 18px; color: #1890FF; }
+.agent-platform-preview__heading p { margin: 0; font-size: 13px; color: #8C8C8C; }
+
+.agent-platform-preview__card {
+  background: #fff;
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.agent-platform-preview h3 { display: flex; align-items: center; gap: 8px; font-size: 15px; margin: 0 0 20px; }
+.agent-platform-preview h3 > .anticon { color: #E8720C; }
+.agent-platform-preview h4 { font-size: 14px; margin: 0 0 12px; }
+.agent-platform-preview p { line-height: 1.8; }
+.agent-platform-preview__spaced { margin-top: 20px; }
+.agent-platform-preview__muted { font-size: 12px; color: #8C8C8C; line-height: 1.7; }
+.agent-platform-preview__scenario-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.agent-platform-preview__scenario-grid article { padding: 20px; border: 1px solid #e8eaed; border-radius: 8px; }
+.agent-platform-preview__scenario-grid article h4 { margin-top: 14px; }
+.agent-platform-preview__scenario-grid article p { font-size: 13px; color: #595959; min-height: 48px; }
+.agent-platform-preview__split { display: flex; flex-wrap: wrap; align-items: stretch; gap: 20px; }
+.agent-platform-preview__form { flex: 1 1 320px; min-width: 0; }
+.agent-platform-preview__fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+.agent-platform-preview__fields .ant-input-number-group-wrapper,
+.agent-platform-preview__fields .ant-input-number { width: 100%; }
+.agent-platform-preview__result { flex: 1 1 320px; min-width: 0; border: 1px solid #FFE7D1; border-radius: 8px; background: #FFF7F0; padding: 20px; }
+.agent-platform-preview__result ol { padding-left: 20px; font-size: 13px; color: #595959; line-height: 2; }
+.agent-platform-preview__amount { font-size: 32px; font-weight: 700; color: #E8720C; margin: 20px 0; }
+.agent-platform-preview__amount small { font-size: 13px; font-weight: 400; color: #8C8C8C; margin-left: 8px; }
+.agent-platform-preview__artifact { white-space: pre-wrap; overflow-wrap: anywhere; padding: 16px; border: 1px solid #e8eaed; border-radius: 8px; background: #fff; font: inherit; font-size: 13px; line-height: 1.9; }
+.agent-platform-preview__card .search-section { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
+.agent-platform-preview__card .search-section > .ant-input-group-wrapper { flex: 1 1 260px; }
+.agent-platform-preview__card .search-section > label { display: flex; flex-direction: column; gap: 8px; min-width: 240px; font-size: 13px; }
+.agent-platform-preview__checks { display: grid; gap: 12px; margin-top: 20px; }
+.agent-platform-preview__checks > div { border: 1px solid #e8eaed; border-radius: 8px; padding: 14px; }
+.agent-platform-preview__checks p { color: #595959; font-size: 13px; margin-bottom: 0; }

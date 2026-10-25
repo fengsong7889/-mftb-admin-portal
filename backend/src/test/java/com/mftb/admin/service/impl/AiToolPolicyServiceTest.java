@@ -6,6 +6,7 @@ import com.mftb.admin.mapper.AiToolExecLogMapper;
 import com.mftb.admin.mapper.AiToolPolicyMapper;
 import com.mftb.admin.util.OperatorResolver;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -25,8 +26,17 @@ class AiToolPolicyServiceTest {
     @Mock private AiToolPolicyMapper policyMapper;
     @Mock private AiToolExecLogMapper execLogMapper;
     @Mock private OperatorResolver operatorResolver;
+    @Mock private com.mftb.admin.service.agent.platform.AiActionProposalService proposalService;
 
     @InjectMocks private AiToolPolicyServiceImpl service;
+
+    @BeforeEach
+    void authenticatedCaller() {
+        com.mftb.admin.entity.SysUser user = new com.mftb.admin.entity.SysUser();
+        user.setUsername("alice");
+        user.setRole("user");
+        org.mockito.Mockito.lenient().when(operatorResolver.currentUser()).thenReturn(user);
+    }
 
     @Test
     void unregisteredToolRejectedAndAudited() {
@@ -84,6 +94,91 @@ class AiToolPolicyServiceTest {
         AiToolPolicy returned = service.enforce("query_approvals", null, "alice", "digest");
         assertSame(ok, returned);
         verify(execLogMapper, times(0)).insert(any(AiToolExecLog.class));
+    }
+
+    @Test
+    void arbitraryNonEmptyApprovalTokenCannotAuthorizeExecution() {
+        AiToolPolicy policy = new AiToolPolicy();
+        policy.setToolKey("send_email");
+        policy.setEnabled(1);
+        policy.setRequireApproval(1);
+        when(policyMapper.selectOne(any())).thenReturn(policy);
+        // 4 参版本没有参数，无法绑定提案 → 一律拒绝，不能凭字符串凭证放行。
+        assertThrows(IllegalArgumentException.class,
+                () -> service.enforce("send_email", "not-a-verified-approval", "alice", "digest"));
+        ArgumentCaptor<AiToolExecLog> cap = ArgumentCaptor.forClass(AiToolExecLog.class);
+        verify(execLogMapper).insert(cap.capture());
+        assertEquals("approval_required", cap.getValue().getDecision());
+    }
+
+    @Test
+    void approvedProposalWithMatchingParamsAuthorizesOnce() {
+        AiToolPolicy policy = new AiToolPolicy();
+        policy.setToolKey("send_email");
+        policy.setEnabled(1);
+        policy.setRequireApproval(1);
+        when(policyMapper.selectOne(any())).thenReturn(policy);
+        when(proposalService.canonicalJson(any())).thenReturn("{\"to\":\"a@b.c\"}");
+        when(proposalService.sha256(any())).thenReturn("hash");
+        when(proposalService.consume("AP-1", "alice", "send_email", "hash"))
+                .thenReturn(new com.mftb.admin.service.agent.platform.AiActionProposalService.Consumed(
+                        9L, "AP-1", "send_email", "{\"to\":\"a@b.c\"}"));
+
+        AiToolPolicy returned = service.enforce("send_email", "AP-1", "alice", "digest",
+                java.util.Map.of("to", "a@b.c"));
+
+        assertSame(policy, returned);
+        verify(proposalService).consume("AP-1", "alice", "send_email", "hash");
+    }
+
+    @Test
+    void invalidProposalIsRejectedAndAudited() {
+        AiToolPolicy policy = new AiToolPolicy();
+        policy.setToolKey("send_email");
+        policy.setEnabled(1);
+        policy.setRequireApproval(1);
+        when(policyMapper.selectOne(any())).thenReturn(policy);
+        when(proposalService.canonicalJson(any())).thenReturn("{}");
+        when(proposalService.sha256(any())).thenReturn("hash");
+        when(proposalService.consume(any(), any(), any(), any()))
+                .thenThrow(new com.mftb.admin.common.BusinessException(403, "已過期"));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.enforce("send_email", "AP-9", "alice", "digest", java.util.Map.of()));
+        ArgumentCaptor<AiToolExecLog> cap = ArgumentCaptor.forClass(AiToolExecLog.class);
+        verify(execLogMapper).insert(cap.capture());
+        assertEquals("approval_invalid", cap.getValue().getRejectReason());
+    }
+
+    @Test
+    void roleScopeMustBeCheckedAtExecution() {
+        AiToolPolicy policy = new AiToolPolicy();
+        policy.setToolKey("query_approvals");
+        policy.setEnabled(1);
+        policy.setRequireApproval(0);
+        policy.setDataScopeJson("{\"roles\":[\"finance_manager\"]}");
+        when(policyMapper.selectOne(any())).thenReturn(policy);
+        com.mftb.admin.entity.SysUser user = new com.mftb.admin.entity.SysUser();
+        user.setUsername("alice");
+        user.setRole("user");
+        when(operatorResolver.currentUser()).thenReturn(user);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.enforce("query_approvals", null, "alice", "digest"));
+    }
+
+    @Test
+    void mismatchedCallerCannotExecuteAsAnotherAccount() {
+        AiToolPolicy policy = new AiToolPolicy();
+        policy.setToolKey("query_approvals");
+        policy.setEnabled(1);
+        when(policyMapper.selectOne(any())).thenReturn(policy);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.enforce("query_approvals", null, "bob", "digest"));
+        ArgumentCaptor<AiToolExecLog> cap = ArgumentCaptor.forClass(AiToolExecLog.class);
+        verify(execLogMapper).insert(cap.capture());
+        assertEquals("caller_not_authenticated", cap.getValue().getRejectReason());
     }
 
     @Test

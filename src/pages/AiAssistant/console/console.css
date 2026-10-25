@@ -1,0 +1,102 @@
+.agent-console {
+  color: #262626;
+}
+
+.agent-console__topbar,
+.agent-console__toolbar,
+.agent-console__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.agent-console__toolbar {
+  justify-content: flex-start;
+  margin: 12px 0;
+}
+
+.agent-console__heading {
+  margin-top: 4px;
+}
+
+.agent-console__heading h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  color: #1890FF;
+}
+
+.agent-console__heading p {
+  margin: 0;
+  font-size: 13px;
+  color: #8C8C8C;
+}
+
+.agent-console__pane {
+  padding-top: 4px;
+}
+
+.agent-console__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-console__tab > .anticon {
+  color: #E8720C;
+}
+
+.agent-console__card {
+  background: #fff;
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.agent-console h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 20px;
+  font-size: 15px;
+}
+
+.agent-console h3 > .anticon {
+  color: #E8720C;
+}
+
+.agent-console h4 {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+
+.agent-console__muted {
+  font-size: 12px;
+  color: #8C8C8C;
+  line-height: 1.7;
+}
+
+.agent-console__spaced {
+  margin-top: 20px;
+}
+
+.agent-console__blocking {
+  margin: 4px 0 0;
+  padding-left: 20px;
+  line-height: 1.9;
+  font-size: 13px;
+}
+
+.agent-console__card .search-section {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.agent-console .ant-tabs-nav {
+  margin-bottom: 8px;
+}

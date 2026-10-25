@@ -45,6 +45,8 @@ public class AiKnowledgeService {
     private final AiKnowledgeChunkMapper chunkMapper;
     private final JdbcTemplate jdbcTemplate;
     private final AiConfigAuditService auditService;
+    /** WP08：检索前注入服务端授权，不依赖模型自填系统或前端过滤。 */
+    private final com.mftb.admin.service.agent.platform.AiKnowledgeAclService aclService;
 
     /** 列表不返回正文，避免配置页一次拉回几十万字。 */
     public List<AiKnowledgeDoc> list(String keyword, String systemCode) {
@@ -167,43 +169,50 @@ public class AiKnowledgeService {
      * @param systemCode 可选：限定系统
      * @param limit      1~10
      */
-    public List<KnowledgeHit> search(String query, String systemCode, int limit) {
+    public List<KnowledgeHit> search(String query, String systemCode, int limit,
+                                     com.mftb.admin.entity.SysUser user) {
         String q = trim(query);
-        if (!StringUtils.hasText(q)) return List.of();
+        if (!StringUtils.hasText(q) || user == null) return List.of();
         if (q.length() > MAX_QUERY) q = q.substring(0, MAX_QUERY);
         int cap = Math.min(Math.max(limit, 1), 10);
-        List<KnowledgeHit> hits = fullTextSearch(q, systemCode, cap);
-        if (hits.isEmpty()) hits = likeSearch(q, systemCode, cap);
+        java.util.List<String[]> subjects = aclService.subjects(user);
+        if (subjects.isEmpty()) return List.of();
+        List<KnowledgeHit> hits = fullTextSearch(q, systemCode, cap, subjects);
+        if (hits.isEmpty()) hits = likeSearch(q, systemCode, cap, subjects);
         return hits;
     }
 
-    private List<KnowledgeHit> fullTextSearch(String q, String systemCode, int limit) {
+    private List<KnowledgeHit> fullTextSearch(String q, String systemCode, int limit, java.util.List<String[]> subjects) {
         if (q.length() > 80) return List.of();
         try {
             boolean bySystem = StringUtils.hasText(systemCode);
-            String sql = "SELECT c.doc_id, c.chunk_no, c.content, d.title, d.system_code, "
+            List<Object> args = new ArrayList<>();
+            args.add(q);
+            args.add(q);
+            StringBuilder sql = new StringBuilder("SELECT c.doc_id, c.chunk_no, c.content, d.title, d.system_code, "
                     + "MATCH(c.content) AGAINST (? IN NATURAL LANGUAGE MODE) AS score "
                     + "FROM ai_knowledge_chunk c JOIN ai_knowledge_doc d ON d.id = c.doc_id "
-                    + "WHERE d.status = 'active' AND MATCH(c.content) AGAINST (? IN NATURAL LANGUAGE MODE) > 0 "
-                    + (bySystem ? "AND d.system_code = ? " : "")
-                    + "ORDER BY score DESC LIMIT ?";
-            if (bySystem) {
-                return jdbcTemplate.query(sql,
-                        (rs, i) -> toHit(rs.getLong("doc_id"), rs.getInt("chunk_no"), rs.getString("content"),
-                                rs.getString("title"), rs.getString("system_code"), rs.getDouble("score"), q),
-                        q, q, systemCode, limit);
+                    + "WHERE d.status = 'active' AND MATCH(c.content) AGAINST (? IN NATURAL LANGUAGE MODE) > 0 ");
+            if (bySystem) { sql.append("AND d.system_code = ? "); args.add(systemCode); }
+            if (!subjects.isEmpty()) {
+                sql.append("AND EXISTS (SELECT 1 FROM ai_knowledge_acl a WHERE a.doc_id = d.id AND a.permission = 'read' AND ")
+                        .append(aclService.subjectClause(subjects, args, "a")).append(") ");
+            } else {
+                sql.append("AND 1 = 0 ");
             }
-            return jdbcTemplate.query(sql,
+            sql.append("ORDER BY score DESC LIMIT ?");
+            args.add(limit);
+            return jdbcTemplate.query(sql.toString(),
                     (rs, i) -> toHit(rs.getLong("doc_id"), rs.getInt("chunk_no"), rs.getString("content"),
                             rs.getString("title"), rs.getString("system_code"), rs.getDouble("score"), q),
-                    q, q, limit);
+                    args.toArray());
         } catch (Exception e) {
             log.debug("[AiKnowledge] FULLTEXT 不可用，回退 LIKE: {}", e.getMessage());
             return List.of();
         }
     }
 
-    private List<KnowledgeHit> likeSearch(String q, String systemCode, int limit) {
+    private List<KnowledgeHit> likeSearch(String q, String systemCode, int limit, java.util.List<String[]> subjects) {
         List<String> tokens = tokens(q);
         if (tokens.isEmpty()) tokens = List.of(q);
         StringBuilder where = new StringBuilder();
@@ -213,17 +222,23 @@ public class AiKnowledgeService {
             where.append("c.content LIKE ?");
             args.add("%" + tokens.get(i) + "%");
         }
-        String sql = "SELECT c.doc_id, c.chunk_no, c.content, d.title, d.system_code "
+        StringBuilder sql = new StringBuilder("SELECT c.doc_id, c.chunk_no, c.content, d.title, d.system_code "
                 + "FROM ai_knowledge_chunk c JOIN ai_knowledge_doc d ON d.id = c.doc_id "
-                + "WHERE d.status = 'active' AND (" + where + ") "
-                + (StringUtils.hasText(systemCode) ? "AND d.system_code = ? " : "")
-                + "ORDER BY d.updated_at DESC LIMIT ?";
-        if (StringUtils.hasText(systemCode)) args.add(systemCode);
+                + "WHERE d.status = 'active' AND (" + where + ") ");
+        if (StringUtils.hasText(systemCode)) { sql.append("AND d.system_code = ? "); args.add(systemCode); }
+        if (!subjects.isEmpty()) {
+            sql.append("AND EXISTS (SELECT 1 FROM ai_knowledge_acl a WHERE a.doc_id = d.id AND a.permission = 'read' AND ")
+                    .append(aclService.subjectClause(subjects, args, "a")).append(") ");
+        } else {
+            sql.append("AND 1 = 0 ");
+        }
+        sql.append("ORDER BY d.updated_at DESC LIMIT ?");
         args.add(Math.max(limit * 3, 10));
-        List<KnowledgeHit> rows = jdbcTemplate.query(sql,
+        // JDBC 驱动可能返回不可变列表，排序前必须复制，否则撤权后的空结果会抛 UnsupportedOperationException。
+        List<KnowledgeHit> rows = new ArrayList<>(jdbcTemplate.query(sql.toString(),
                 (rs, i) -> toHit(rs.getLong("doc_id"), rs.getInt("chunk_no"), rs.getString("content"),
                         rs.getString("title"), rs.getString("system_code"), 0d, q),
-                args.toArray());
+                args.toArray()));
         for (KnowledgeHit row : rows) {
             int hits = 0;
             String lower = row.getSnippet() == null ? "" : row.getSnippet().toLowerCase(Locale.ROOT);

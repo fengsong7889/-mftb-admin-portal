@@ -116,6 +116,23 @@ ai:
     # LLM 专用 HTTP 超时：思考型模型单次补全常超 10s，不能复用通用 RestTemplate 的短超时
     connect-timeout-ms: ${AI_LLM_CONNECT_TIMEOUT_MS:10000}
     read-timeout-ms: ${AI_LLM_READ_TIMEOUT_MS:120000}
+  run:
+    # WP06 过渡运行执行器：默认关闭（前端尚未接运行 API、数据分级未配置时开启只会产生失败记录）。
+    # 需要后台执行队列任务时设 AI_RUN_WORKER_ENABLED=true；Temporal 上线后本执行器退役。
+    worker-enabled: ${AI_RUN_WORKER_ENABLED:false}
+    worker-delay-ms: ${AI_RUN_WORKER_DELAY_MS:30000}
+    worker-initial-delay-ms: ${AI_RUN_WORKER_INITIAL_DELAY_MS:150000}
+
+# 文檔中心 P0 文件載體：二進制只進對象存儲，不入 MySQL；本地開發用磁盤，生產替換 S3 實現
+doc:
+  storage:
+    local-root: ${DOC_STORAGE_LOCAL_ROOT:./.local/doc-assets}
+    max-bytes: ${DOC_STORAGE_MAX_BYTES:52428800}
+    space-quota-bytes: ${DOC_STORAGE_SPACE_QUOTA_BYTES:2147483648}
+  office-converter:
+    # Gotenberg 内部地址；留空时 Office 预览明确返回未配置，不伪造预览
+    url: ${DOC_OFFICE_CONVERTER_URL:}
+    timeout-ms: ${DOC_OFFICE_CONVERTER_TIMEOUT_MS:60000}
 
 # 騰訊文檔開放平台集成（個人開發者）：憑據經 backend/.env.local 注入，嚴禁寫死進受版本控制文件
 tencent:

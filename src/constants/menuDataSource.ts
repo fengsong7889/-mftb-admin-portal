@@ -138,6 +138,14 @@ export const keyToPath: Record<string, string> = {
   // 智能中心(AI)
   'ai_model_hub': '/ai-model-hub',
   'ai-operation-auth': '/ai-operation-auth',
+  'agent-overview': '/agent-overview',
+  'agent-apps': '/agent-apps',
+  'agent-budget': '/agent-budget',
+  'agent-actions': '/agent-actions',
+  'agent-knowledge': '/agent-knowledge',
+  'agent-data': '/agent-data',
+  'agent-runs': '/agent-runs',
+  'agent-evaluation': '/agent-evaluation',
   'ai-assistant-overview': '/ai-assistant',
   'ai-assistant-capability': '/ai-assistant/capability',
   'ai-assistant-profile': '/ai-assistant/profile',
@@ -304,10 +312,14 @@ export const keyToPath: Record<string, string> = {
   'attendance-monthly':    '/attendance-monthly',
   'attendance-setting':    '/attendance-setting',
   // 文檔中心：菜單真值由 DocSchemaMigrationInitializer 寫入 sys_menu
+  'doc-plans': '/doc-plans',
+  'doc-governance': '/doc-governance',
   'doc-library': '/doc-center',
   'doc-space': '/doc-space',
   'doc-stats': '/doc-stats',
   'doc-learning': '/doc-learning',
+  'doc-system-plans': '/doc-system-plans',
+  'doc-api-center': '/doc-api-center',
   // 会议管理系统（meeting）—— 独立入口，菜单真值由 MeetingSchemaMigrationInitializer 写入 sys_menu。
   // 只登记 M1 已交付的 4 个；看板与预约规则分属 M3/M2，菜单跟随页面一起登记，
   // 提前登记会让菜单指向一个不存在的路由（点击后白屏）。
@@ -463,6 +475,22 @@ pathToKey['/meeting-blacklist-form'] = 'meeting-config'
 // 签到二维码指向的独立免登页：不套后台布局，注册进 pathToKey 只为了菜单高亮不报错
 pathToKey['/meeting-checkin'] = 'meeting-my'
 // 文檔中心子頁（詳情/登記/編輯歸文檔庫，空間表單歸空間管理）：守衛與頁簽高亮才有錨點
+pathToKey['/doc-plans/detail'] = 'doc-plans'
+pathToKey['/doc-plans/edit'] = 'doc-plans'
+pathToKey['/doc-plans/confirm'] = 'doc-plans'
+pathToKey['/doc-plans/handoff'] = 'doc-plans'
+pathToKey['/doc-plans/acl'] = 'doc-plans'
+pathToKey['/doc-plans/execution'] = 'doc-plans'
+pathToKey['/doc-governance/members'] = 'doc-governance'
+pathToKey['/doc-governance/taxonomy'] = 'doc-governance'
+pathToKey['/doc-governance/clearance'] = 'doc-governance'
+pathToKey['/doc-center/knowledge'] = 'doc-library'
+pathToKey['/doc-center/my-acks'] = 'doc-library'
+pathToKey['/doc-books'] = 'doc-library'
+pathToKey['/doc-archives'] = 'doc-library'
+pathToKey['/doc-system-plans'] = 'doc-system-plans'
+pathToKey['/doc-system-plans/detail'] = 'doc-system-plans'
+pathToKey['/doc-api-center'] = 'doc-api-center'
 pathToKey['/doc-center/detail'] = 'doc-library'
 pathToKey['/doc-center/register'] = 'doc-library'
 pathToKey['/doc-center/edit'] = 'doc-library'
@@ -620,6 +648,9 @@ export const BACKEND_CONNECTED_KEYS: Set<string> = new Set([
   'ai-assistant-profile', 'ai-assistant-glossary', 'ai-assistant-knowledge',
   'ai-assistant-guardrail', 'ai-assistant-feedback', 'ai-assistant-audit',
   'ai-assistant-quick-prompt', 'ai-assistant-push-template', 'ai-assistant-memory', 'ai-access-request',
+  // 企業 Agent 控制台（治理面，独立于 AI 助手使用入口）
+  'agent-overview', 'agent-apps', 'agent-budget', 'agent-actions',
+  'agent-knowledge', 'agent-data', 'agent-runs', 'agent-evaluation',
   'ai-mcp-service', 'ai-conversation-audit', 'ai_usage_stats', 'ai_energy_detail',
   'ai-model-provider', 'ai-model-list', 'ai-auth',
   'ai-dept-model-auth', 'ai-emp-model-auth', 'ai-pos-auth',
@@ -661,6 +692,10 @@ export const BACKEND_CONNECTED_KEYS: Set<string> = new Set([
   'notification-template', 'notification-switch',
   // 文檔中心：四個菜單及子頁全部走真實 /api/doc/*，無前端 mock 回退
   'doc-library', 'doc-space', 'doc-stats', 'doc-learning',
+  // 原生入口必须在线，不能回退到第一阶段演示数据。
+  'doc-plans', 'doc-governance',
+  // 专题视图：系统方案库、接口管理
+  'doc-system-plans', 'doc-api-center',
   // EAM 採購
   'purchase-order', 'purchase-request',
   // 耗材管理

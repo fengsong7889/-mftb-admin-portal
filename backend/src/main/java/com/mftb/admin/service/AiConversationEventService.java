@@ -12,6 +12,9 @@ import java.util.Map;
  */
 public interface AiConversationEventService {
 
+    /** 消耗模型／执行工具前验证身份和可选会话归属；无会话不等于无身份。 */
+    String requireOwned(Long conversationPk, String actor);
+
     /** 追加一条事件；payloadJson 需已脱敏。 */
     AiConversationEvent append(Long conversationPk, String conversationNo, String eventType,
                                 String actor, Map<String, Object> payload);

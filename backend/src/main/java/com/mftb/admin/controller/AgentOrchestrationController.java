@@ -2,9 +2,8 @@ package com.mftb.admin.controller;
 
 import com.mftb.admin.common.Result;
 import com.mftb.admin.service.agent.AgentOrchestrationService;
-import com.mftb.admin.service.agent.AgentOrchestrationService.OrchestrateRequest;
+import com.mftb.admin.dto.agent.AgentChatRequest;
 import com.mftb.admin.service.agent.AgentOrchestrationService.OrchestrateResult;
-import com.mftb.admin.service.agent.AiKillSwitchService;
 import com.mftb.admin.util.OperatorResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
@@ -26,12 +25,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AgentOrchestrationController {
 
     private final AgentOrchestrationService orchestrationService;
-    private final AiKillSwitchService killSwitchService;
     private final OperatorResolver operatorResolver;
 
     @PostMapping("/orchestrate")
     @Operation(summary = "多轮工具编排（后端 tool 循环）")
-    public Result<OrchestrateResult> orchestrate(@RequestBody OrchestrateRequest req) {
+    public Result<OrchestrateResult> orchestrate(@RequestBody AgentChatRequest req) {
         // 账号口径：白名单匹配、用量记账、事件 actor 都用登录账号（工号），不用显示姓名
         String caller = operatorResolver.currentOperatorAccount();
         OrchestrateResult out = new OrchestrateResult();
@@ -40,13 +38,6 @@ public class AgentOrchestrationController {
             out.setText("登錄狀態無效或已過期，請重新登錄後使用 AI 助手");
             return Result.success(out);
         }
-        if (killSwitchService.isEngaged()) {
-            AiKillSwitchService.Status st = killSwitchService.current();
-            // errorKind 必须标上：否则熍断公告会被前端当普通 AI 回复写进会话历史（实测会污染整个会话）
-            out.setErrorKind("kill_switch");
-            out.setText("AI 服務已臨時停用（緊急熔斷中）。操作人：" + st.operator() + "；原因：" + st.reason());
-            return Result.success(out);
-        }
-        return Result.success(orchestrationService.orchestrate(req, caller));
+        return Result.success(orchestrationService.orchestrate(req.toCommand(), caller));
     }
 }

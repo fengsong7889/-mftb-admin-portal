@@ -57,6 +57,7 @@ public class ConversationSummaryService {
     private final LlmHttpClient llmClient;
     private final LlmMeteringService metering;
     private final ObjectMapper objectMapper;
+    private final AiModelAdmissionService admissionService;
 
     public AiConversationSummaryVO summarize(Long conversationId) {
         SysUser user = operatorResolver.currentUser();
@@ -64,8 +65,10 @@ public class ConversationSummaryService {
         if (user == null || !StringUtils.hasText(account)) {
             throw new BusinessException("登錄狀態已失效，請重新登錄");
         }
+        AiModelAdmissionService.Decision availability = admissionService.checkAvailability(account);
+        if (!availability.allowed()) throw new BusinessException(availability.message());
         AiConversation conv = conversationMapper.selectById(conversationId);
-        if (conv == null || !account.equals(conv.getUsername())) {
+        if (conv == null || !account.equals(conv.getUsername()) || Integer.valueOf(1).equals(conv.getDeleted())) {
             throw new BusinessException("會話不存在或無權操作");
         }
         List<Map<String, Object>> messages = parseMessages(conv.getMessages());
@@ -90,18 +93,22 @@ public class ConversationSummaryService {
         if (channel == null) {
             throw new BusinessException("當前賬號沒有可用模型，請聯繫管理員開通後再壓縮會話");
         }
+        AiModelAdmissionService.Decision decision = admissionService.check(account, channel.getDefaultModelKey());
+        if (!decision.allowed()) throw new BusinessException(decision.message());
         String requestId = "summary-" + UUID.randomUUID();
-        metering.reserve(requestId, account, channel,
-                Math.max(1, transcript.length() / 4), MAX_SUMMARY_TOKENS);
-        try {
-            Map<String, Object> payload = new LinkedHashMap<>();
+        Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("model", channel.getDefaultModelKey());
             payload.put("temperature", 0.2);
             payload.put("max_tokens", MAX_SUMMARY_TOKENS);
             payload.put("messages", List.of(
                     Map.of("role", "system", "content", SYSTEM_PROMPT),
                     Map.of("role", "user", "content", transcript)));
-            JsonNode resp = llmClient.chatCompletion(channel.getBaseUrl(), channel.getApiKey(), payload);
+        AiOutboundPolicyService.Prepared prepared = admissionService.prepare(account, channel, payload, "common");
+        if (!prepared.decision().allowed()) throw new BusinessException(prepared.decision().httpStatus(), prepared.decision().message());
+        metering.reserve(requestId, account, channel,
+                Math.max(1, transcript.length() / 4), MAX_SUMMARY_TOKENS);
+        try {
+            JsonNode resp = llmClient.chatCompletion(channel.getBaseUrl(), channel.getApiKey(), prepared.payload());
             long tokens = metering.settle(requestId, account, "auto", channel, resp);
             String summary = resp.path("choices").path(0).path("message").path("content").asText("");
             if (!StringUtils.hasText(summary)) {
@@ -174,8 +181,11 @@ public class ConversationSummaryService {
 
     /** 供前端展示“已使用摘要”的可选能力（当前按需调用）。 */
     public List<String> summaryHints(Long conversationId) {
+        String account = operatorResolver.currentOperatorAccount();
+        if (!StringUtils.hasText(account)) throw new BusinessException("登錄狀態已失效，請重新登錄");
         AiConversation conv = conversationMapper.selectById(conversationId);
-        if (conv == null || !StringUtils.hasText(conv.getSummary())) return new ArrayList<>();
+        if (conv == null || !account.equals(conv.getUsername())) throw new BusinessException("會話不存在或無權操作");
+        if (!StringUtils.hasText(conv.getSummary())) return new ArrayList<>();
         return List.of(conv.getSummary());
     }
 }

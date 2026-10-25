@@ -69,6 +69,8 @@ DOMAINS = {
 
 PUBLIC_NS = ['common', 'menu', 'portal']
 KEY_RE = re.compile(r"""(?<![A-Za-z0-9_.])t\(\s*['"`]([A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)+)['"`]""")
+# tr(key, 中文兜底) 与控制台模块级 i18n.t 同样是引用入口，漏掉就查不到
+REF_RE = re.compile(r"""(?<![A-Za-z0-9_.])(?:tr|i18n\.t|t)\(\s*['"`]([A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)+)['"`]""")
 SINGLE_BRACE_RE = re.compile(r'(?<!\{)\{([a-zA-Z]+)\}(?!\})')
 CJK_RE = re.compile(r'[\u3400-\u9fff]')
 DEFAULT_VALUE_RE = re.compile(r"defaultValue:\s*'(?:[^'\\\\]|\\\\.)*'")
@@ -131,6 +133,59 @@ def resolves(data, dotted):
     return not isinstance(node, dict)
 
 
+def find_dotted_keys(node, prefix=''):
+    """找出「带点扁平键」：如 agentConsole 下的 "agentConsole.s00"。
+    i18next 按点路径解析，这类键永远查不到，且中英两侧同时错位时一致性比对检不出来。"""
+    out = []
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if '.' in key:
+                out.append(f'{prefix}{key}')
+            out.extend(find_dotted_keys(value, f'{prefix}{key}.'))
+    return out
+
+
+def all_source_files():
+    out = []
+    for root, _dirs, names in os.walk(os.path.join(ROOT, 'src')):
+        if os.sep + 'i18n' + os.sep in root + os.sep:
+            continue
+        for name in names:
+            if name.endswith(('.ts', '.tsx')) and '.test.' not in name:
+                out.append(os.path.join(root, name))
+    return sorted(out)
+
+
+def check_references(problems, locales, db_keys):
+    """全局引用解析：t()/tr()/i18n.t() 的静态 key 必须在 zh-TW 与 en 都能解析。
+
+    旧逻辑只在 DOMAINS 登记的域内检查，域外命名空间（如 agentConsole）整段漏检；
+    2026-10 的「带点扁平键」事故就是借此逃过门禁的，故改为全 src 扫描。
+    """
+    refs = 0
+    missing = []
+    for path in all_source_files():
+        rel = os.path.relpath(path, ROOT)
+        text = strip_comments(io.open(path, encoding='utf-8').read())
+        for match in REF_RE.finditer(text):
+            key = match.group(1)
+            # 形如 t('mcpService.transport_' + x) 的前缀拼接不是完整 key，按动态处理跳过
+            tail = text[match.end():match.end() + 8].lstrip()
+            if tail.startswith('+'):
+                continue
+            refs += 1
+            if key.split('.')[0] in db_keys or key in db_keys:
+                continue
+            ok = [lang for lang in REQUIRED_LANGS if resolves(locales[lang], key)]
+            if not ok:
+                missing.append(f'{rel}: 引用 "{key}" 在 zh-TW/en 均无法解析 → 英文界面会回落 defaultValue（中文）')
+            elif len(ok) != len(REQUIRED_LANGS):
+                for lang in REQUIRED_LANGS:
+                    if lang not in ok:
+                        missing.append(f'{rel}: 引用 "{key}" 在 {lang}.json 缺失（另一语已有，切换语言会串）')
+    return refs, missing
+
+
 def collect_files(domain):
     out = []
     for directory in domain['dirs']:
@@ -180,20 +235,6 @@ def main():
                 residue = DEFAULT_VALUE_RE.sub('', line)
                 if CJK_RE.search(residue):
                     rel_lines += 1
-                for match in KEY_RE.finditer(line):
-                    key = match.group(1)
-                    ns = key.split('.')[0]
-                    if ns in PUBLIC_NS:
-                        continue
-                    if key in db_keys:
-                        continue
-                    if any(resolves(locales[lang], key) for lang in REQUIRED_LANGS):
-                        # 两语只有一份时，另一语会回落成外语而不是报错消失，仍要单独提醒
-                        for lang in REQUIRED_LANGS:
-                            if not resolves(locales[lang], key):
-                                problems.append(f'{rel}: t("{key}") 在 {lang}.json 缺失（另一语已有，回落会串语言）')
-                        continue
-                    problems.append(f'{rel}: t("{key}") 静态两语与后端快照都没有 → 界面会掉回原始 key')
             hardcoded += rel_lines
         counts[name] = hardcoded
         limit = baseline.get(name)
@@ -203,6 +244,9 @@ def main():
                 f'新增文案必须走 t()，不得硬编码；确属存量清理导致的路径变动请一并说明后 --update')
 
     if update:
+        # 写基线发生在引用解析之前，这里先算一次，避免 UnboundLocalError
+        _refs, _missing = check_references([], locales, db_keys)
+        counts['_refsMissing'] = len(_missing)
         json.dump(counts, io.open(BASELINE, 'w', encoding='utf-8'), indent=2, ensure_ascii=False)
         print('基线已写入:', counts)
         return 0
@@ -213,6 +257,9 @@ def main():
         for ns in domain['namespaces']:
             tw_keys = set(flatten(locales['zh-TW'].get(ns, {}), ns))
             en_keys = set(flatten(locales['en'].get(ns, {}), ns))
+            for lang in REQUIRED_LANGS:
+                for bad in find_dotted_keys(locales[lang].get(ns, {})):
+                    problems.append(f'{lang}.json: {ns}.{bad} 是「带点扁平键」，i18next 按点路径查不到，必须拆成嵌套结构')
             for key in sorted(tw_keys - en_keys):
                 problems.append(f'语言包 {ns} 域 {name}: {key} 在 en.json 缺失（会回落成英文 key 或空白）')
             for key in sorted(en_keys - tw_keys):
@@ -224,6 +271,19 @@ def main():
                 for key, value in flatten(node, ns).items():
                     if isinstance(value, str) and SINGLE_BRACE_RE.search(value):
                         problems.append(f'{lang}.json: {key} 的插值写成单花括号，i18next 不解析：{value[:40]}')
+
+    refs, missing = check_references(problems, locales, db_keys)
+    ref_limit = baseline.get('_refsMissing')
+    print(f'引用解析：扫描 {refs} 条静态 key，无法解析 {len(missing)} 条（基线 {ref_limit if ref_limit is not None else "未设定"}）')
+    if update:
+        counts['_refsMissing'] = len(missing)
+    elif ref_limit is None:
+        problems.append(f'引用解析基线缺失，请先执行 --update 固化存量（当前 {len(missing)} 条）')
+    elif len(missing) > ref_limit:
+        problems.append(f'引用解析失败数 {len(missing)} 超过基线 {ref_limit}（新增 {len(missing) - ref_limit} 条）：新增文案必须同时登记 zh-TW/en')
+        problems.extend(missing[:40])
+    else:
+        print(f'  ✅ 未超过基线（可清理存量后 --update 收紧）')
 
     print('硬编码中文行数（域 → 基线 → 当前）:')
     for name, value in counts.items():

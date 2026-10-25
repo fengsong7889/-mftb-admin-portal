@@ -3,6 +3,9 @@ package com.mftb.admin.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.service.FinReadAccess;
+import com.mftb.admin.service.DataScopeService;
+import com.mftb.admin.service.PermissionService;
 import com.mftb.admin.common.ResultCode;
 import com.mftb.admin.dto.ApproveResultVO;
 import com.mftb.admin.dto.ApprovalNodeInstance;
@@ -79,6 +82,8 @@ public class FinApprovalServiceImpl implements FinApprovalService {
     private static final String ROLE_FIN = "FIN_FIN_APPROVER";
 
     private final FinApprovalMapper approvalMapper;
+    private final DataScopeService dataScopeService;
+    private final PermissionService permissionService;
     private final FinDebtBillMapper debtBillMapper;
     private final BizGiftRecordMapper giftRecordMapper;
     private final WorkflowConfigMapper workflowConfigMapper;
@@ -95,7 +100,10 @@ public class FinApprovalServiceImpl implements FinApprovalService {
 
     @Override
     public PageResult<FinApprovalVO> page(FinApprovalQuery query) {
+        java.util.Set<String> groups = FinReadAccess.require("approval-center", operatorResolver, permissionService, dataScopeService);
+        if (groups != null && groups.isEmpty()) return new PageResult<>(List.of(), 0L);
         LambdaQueryWrapper<FinApproval> wrapper = new LambdaQueryWrapper<>();
+        FinReadAccess.constrain(wrapper, groups, FinApproval::getGroupCode, FinApproval::getApprovalType);
         if (StringUtils.hasText(query.getGroupId())) {
             wrapper.like(FinApproval::getGroupCode, query.getGroupId());
         }
@@ -153,7 +161,13 @@ public class FinApprovalServiceImpl implements FinApprovalService {
 
     @Override
     public FinApprovalVO detail(String flowNo) {
-        return FinApprovalVO.from(requireApproval(flowNo));
+        java.util.Set<String> groups = FinReadAccess.require("approval-center", operatorResolver, permissionService, dataScopeService);
+        if (groups != null && groups.isEmpty()) throw new BusinessException(404, "審批流程不存在或無權查看");
+        LambdaQueryWrapper<FinApproval> wrapper = new LambdaQueryWrapper<FinApproval>().eq(FinApproval::getFlowNo, flowNo);
+        FinReadAccess.constrain(wrapper, groups, FinApproval::getGroupCode, FinApproval::getApprovalType);
+        FinApproval approval = approvalMapper.selectOne(wrapper);
+        if (approval == null) throw new BusinessException(404, "審批流程不存在或無權查看");
+        return FinApprovalVO.from(approval);
     }
 
     /* ==================== 申请提交 ==================== */

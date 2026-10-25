@@ -307,6 +307,18 @@ public class AiPromptConfigService {
         return previewPrompt(profileKey, null);
     }
 
+    /** 试跑只取当前指定骨架；不混入其他系统能力或个人记忆。 */
+    public AiPromptProfile profileForTestRun(String profileKey) {
+        String key = StringUtils.hasText(profileKey) ? profileKey : "global";
+        AiPromptProfile profile = profileMapper.selectOne(new LambdaQueryWrapper<AiPromptProfile>()
+                .eq(AiPromptProfile::getProfileKey, key)
+                .in(AiPromptProfile::getStatus, List.of("draft", "active"))
+                .orderByDesc(AiPromptProfile::getStatus).orderByDesc(AiPromptProfile::getVersion)
+                .last("LIMIT 1"));
+        if (profile == null) throw new com.mftb.admin.common.BusinessException(404, "試跑骨架不存在或不可用");
+        return profile;
+    }
+
     public String previewPrompt(String profileKey, String query) {
         String key = StringUtils.hasText(profileKey) ? profileKey : "global";
         AiPromptProfile profile = profileMapper.selectOne(new LambdaQueryWrapper<AiPromptProfile>()

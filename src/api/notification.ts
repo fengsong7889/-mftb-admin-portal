@@ -3,7 +3,7 @@ import request, { SILENT_HEADER, isBackendUnavailable } from './request'
 /* ==================== 类型定义 ==================== */
 
 /** 通知类型枚举（可扩展） */
-export type NotificationType = 'gift_expire'
+export type NotificationType = 'gift_expire' | 'doc_ack_pending'
 
 /** 通知项 */
 export interface NotificationItem {
@@ -17,6 +17,9 @@ export interface NotificationItem {
   adType?: string
   expireDate?: string
   daysLeft?: number
+  docNodeId?: number
+  docRevisionId?: number
+  docDueDate?: string
   createdAt?: string
 }
 

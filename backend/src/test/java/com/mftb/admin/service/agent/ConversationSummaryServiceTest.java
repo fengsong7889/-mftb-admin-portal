@@ -52,6 +52,10 @@ class ConversationSummaryServiceTest {
     @Mock private LlmChannelRouter channelRouter;
     @Mock private LlmHttpClient llmClient;
     @Mock private LlmMeteringService metering;
+    @Mock private com.mftb.admin.service.AiMyCenterService myCenterService;
+    @Mock private AiKillSwitchService killSwitchService;
+    @Mock private com.mftb.admin.service.PermissionService permissions;
+    @Mock private AiOutboundPolicyService outbound;
 
     private final ObjectMapper mapper = new ObjectMapper();
     private ConversationSummaryService service;
@@ -59,11 +63,19 @@ class ConversationSummaryServiceTest {
     @BeforeEach
     void setUp() {
         service = new ConversationSummaryService(conversationMapper, operatorResolver,
-                channelRouter, llmClient, metering, mapper);
+                channelRouter, llmClient, metering, mapper,
+                new AiModelAdmissionService(myCenterService, killSwitchService, operatorResolver, permissions, outbound));
+                        when(outbound.prepare(any(), any(), any())).thenAnswer(inv -> new AiOutboundPolicyService.Prepared(
+                                new AiModelAdmissionService.Decision(null, null, 200), inv.getArgument(1)));
         SysUser user = new SysUser();
         user.setId(9L);
         when(operatorResolver.currentUser()).thenReturn(user);
         when(operatorResolver.currentOperatorAccount()).thenReturn("alice");
+        when(myCenterService.hasModelAccess(any())).thenReturn(true);
+        com.mftb.admin.dto.AiMyCenterDTO.QuotaCheckVO quota = new com.mftb.admin.dto.AiMyCenterDTO.QuotaCheckVO();
+        quota.setAllowed(true);
+        quota.setAction("allow");
+        when(myCenterService.checkQuota(any(), any())).thenReturn(quota);
         when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_OFF_PEAK), anyString()))
                 .thenReturn(channel());
     }
@@ -167,6 +179,46 @@ class ConversationSummaryServiceTest {
 
         assertTrue(e.getMessage().contains("無權"), e.getMessage());
         verify(llmClient, never()).chatCompletion(any(), any(), any());
+    }
+
+    @Test
+    void summaryCannotBypassModelAuthorization() throws Exception {
+        when(conversationMapper.selectById(1L)).thenReturn(conversation(10, "alice"));
+        when(myCenterService.hasModelAccess(any())).thenReturn(false);
+
+        assertThrows(BusinessException.class, () -> service.summarize(1L));
+        verify(llmClient, never()).chatCompletion(any(), any(), any());
+        verify(metering, never()).reserve(any(), any(), any(), anyInt(), anyInt());
+    }
+
+    @Test
+    void summaryCannotBypassQuotaApproval() throws Exception {
+        when(conversationMapper.selectById(1L)).thenReturn(conversation(10, "alice"));
+        com.mftb.admin.dto.AiMyCenterDTO.QuotaCheckVO quota = new com.mftb.admin.dto.AiMyCenterDTO.QuotaCheckVO();
+        quota.setAction("approve");
+        quota.setRequiresApproval(true);
+        when(myCenterService.checkQuota(any(), any())).thenReturn(quota);
+
+        assertThrows(BusinessException.class, () -> service.summarize(1L));
+        verify(llmClient, never()).chatCompletion(any(), any(), any());
+    }
+
+    @Test
+    void killSwitchBlocksSummaryBeforeReadingHistory() {
+        when(killSwitchService.isEngaged()).thenReturn(true);
+
+        assertThrows(BusinessException.class, () -> service.summarize(1L));
+        verify(conversationMapper, never()).selectById(any());
+        verify(llmClient, never()).chatCompletion(any(), any(), any());
+    }
+
+    @Test
+    void summaryHintsRequireConversationOwnership() throws Exception {
+        AiConversation conv = conversation(10, "bob");
+        conv.setSummary("其他人的摘要");
+        when(conversationMapper.selectById(1L)).thenReturn(conv);
+
+        assertThrows(BusinessException.class, () -> service.summaryHints(1L));
     }
 
     @Test

@@ -13,6 +13,7 @@ import com.mftb.admin.service.agent.LlmChannelRouter.Channel;
 import com.mftb.admin.service.agent.tool.AgentTool;
 import com.mftb.admin.service.agent.tool.AgentTool.ToolCallContext;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -57,12 +58,55 @@ class AgentOrchestrationServiceTest {
     @Mock private AiGuardrailService guardrailService;
     @Mock private AiUserMemoryService memoryService;
     @Mock private AiPromptConfigService promptConfigService;
+    @Mock private AiKillSwitchService killSwitchService;
+    @Mock private com.mftb.admin.service.PermissionService permissions;
+    @Mock private AiOutboundPolicyService outbound;
+    @Mock private com.mftb.admin.service.agent.platform.AiApplicationService applications;
 
     private final ObjectMapper mapper = new ObjectMapper();
 
+    @BeforeEach
+    void authenticatedExecutionContext() {
+        com.mftb.admin.entity.SysUser user = new com.mftb.admin.entity.SysUser();
+        user.setUsername("alice");
+        user.setRole("user");
+        when(operatorResolver.currentUser()).thenReturn(user);
+        when(operatorResolver.currentOperatorAccount()).thenReturn("alice");
+        when(toolPolicyService.enforce(any(), any(), any(), any())).thenAnswer(inv -> enabledPolicy(inv.getArgument(0)));
+        when(permissions.hasSystemAccess(any(), any())).thenReturn(true);
+        // 编排算法测试使用显式批准的模拟出口，实际生产阻断另有独立用例。
+        when(outbound.prepare(any(), any(), any())).thenAnswer(inv -> new AiOutboundPolicyService.Prepared(
+                new AiModelAdmissionService.Decision(null, null, 200), inv.getArgument(1)));
+    }
+
+    private AiModelAdmissionService admissionService() {
+        return new AiModelAdmissionService(myCenterService, killSwitchService, operatorResolver, permissions, outbound);
+    }
+
+    private static com.mftb.admin.entity.AiToolPolicy enabledPolicy(String key) {
+        com.mftb.admin.entity.AiToolPolicy policy = new com.mftb.admin.entity.AiToolPolicy();
+        policy.setToolKey(key);
+        policy.setEnabled(1);
+        policy.setRequireApproval(0);
+        return policy;
+    }
+
+    private void registerEmailTool() {
+        com.mftb.admin.entity.McpTool tool = new com.mftb.admin.entity.McpTool();
+        tool.setToolKey("email_sender");
+        tool.setDescription("發送郵件");
+        tool.setSource("external");
+        tool.setInstalled(1);
+        tool.setParamsJson("{}");
+        when(mcpToolMapper.selectList(any())).thenReturn(List.of(tool));
+        when(toolPolicyMapper.selectList(any())).thenReturn(
+                List.of(enabledPolicy("query_account_balance"), enabledPolicy("email_sender")));
+    }
+
     private AgentOrchestrationService buildService() {
         when(mcpToolMapper.selectList(any())).thenReturn(List.of());
-        when(toolPolicyMapper.selectList(any())).thenReturn(List.of());
+        when(toolPolicyMapper.selectList(any())).thenReturn(List.of(enabledPolicy("query_account_balance"),
+                        enabledPolicy("rdm_list_projects"), enabledPolicy("search_knowledge")));
         when(dummyTool.toolKey()).thenReturn("query_account_balance");
         when(dummyTool.description()).thenReturn("desc");
         when(dummyTool.schema()).thenReturn(Map.of("type", "object", "properties", Map.of()));
@@ -73,9 +117,10 @@ class AgentOrchestrationServiceTest {
             JsonNode usage = ((JsonNode) inv.getArgument(4)).path("usage");
             return usage.path("prompt_tokens").asLong(0) + usage.path("completion_tokens").asLong(0);
         });
-        return new AgentOrchestrationService(List.of(dummyTool), channelRouter, myCenterService,
+        return new AgentOrchestrationService(List.of(dummyTool), channelRouter, admissionService(),
                 eventService, llmClient, mapper, metering, conversationService, mcpToolMapper, toolPolicyMapper,
-                toolPolicyService, promptConfigService, operatorResolver, guardrailService, memoryService);
+                toolPolicyService, promptConfigService, operatorResolver, guardrailService, memoryService,
+                applications);
     }
 
     /** 带 RDM 工具的编排实例：用于验证「按系统裁剪工具」。 */
@@ -84,7 +129,8 @@ class AgentOrchestrationServiceTest {
         when(rdmTool.description()).thenReturn("rdm projects");
         when(rdmTool.schema()).thenReturn(Map.of("type", "object", "properties", Map.of()));
         when(mcpToolMapper.selectList(any())).thenReturn(List.of());
-        when(toolPolicyMapper.selectList(any())).thenReturn(List.of());
+        when(toolPolicyMapper.selectList(any())).thenReturn(List.of(enabledPolicy("query_account_balance"),
+                        enabledPolicy("rdm_list_projects"), enabledPolicy("search_knowledge")));
         when(dummyTool.toolKey()).thenReturn("query_account_balance");
         when(dummyTool.description()).thenReturn("desc");
         when(dummyTool.schema()).thenReturn(Map.of("type", "object", "properties", Map.of()));
@@ -92,9 +138,10 @@ class AgentOrchestrationServiceTest {
         when(metering.settle(any(), any(), any(), any(), any())).thenReturn(0L);
         // 工具归属交给前缀兜底（能力表 mock 返回 null）
         when(promptConfigService.domainOfTool(any())).thenReturn(null);
-        return new AgentOrchestrationService(List.of(dummyTool, rdmTool), channelRouter, myCenterService,
+        return new AgentOrchestrationService(List.of(dummyTool, rdmTool), channelRouter, admissionService(),
                 eventService, llmClient, mapper, metering, conversationService, mcpToolMapper, toolPolicyMapper,
-                toolPolicyService, promptConfigService, operatorResolver, guardrailService, memoryService);
+                toolPolicyService, promptConfigService, operatorResolver, guardrailService, memoryService,
+                applications);
     }
 
     @Test
@@ -136,15 +183,16 @@ class AgentOrchestrationServiceTest {
         when(knowledgeTool.schema()).thenReturn(Map.of("type", "object", "properties", Map.of()));
         when(knowledgeTool.execute(any(), any())).thenReturn("{\"hits\":[]}");
         when(mcpToolMapper.selectList(any())).thenReturn(List.of());
-        when(toolPolicyMapper.selectList(any())).thenReturn(List.of());
+        when(toolPolicyMapper.selectList(any())).thenReturn(List.of(enabledPolicy("query_account_balance"),
+                        enabledPolicy("rdm_list_projects"), enabledPolicy("search_knowledge")));
         when(myCenterService.hasModelAccess(any())).thenReturn(true);
         when(promptConfigService.domainOfTool(any())).thenReturn(null);
         when(metering.settle(any(), any(), any(), any(), any())).thenReturn(0L);
 
         AgentOrchestrationService svc = new AgentOrchestrationService(
-                List.of(knowledgeTool), channelRouter, myCenterService, eventService, llmClient, mapper,
+                List.of(knowledgeTool), channelRouter, admissionService(), eventService, llmClient, mapper,
                 metering, conversationService, mcpToolMapper, toolPolicyMapper, toolPolicyService,
-                promptConfigService, operatorResolver, guardrailService, memoryService);
+                promptConfigService, operatorResolver, guardrailService, memoryService, applications);
 
         when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(channel());
         when(myCenterService.checkQuota(any(), any())).thenReturn(allowed());
@@ -232,6 +280,7 @@ class AgentOrchestrationServiceTest {
     @Test
     void pendingExternalToolReturnsWithoutExecuting() {
         AgentOrchestrationService svc = buildService();
+        registerEmailTool();
         Channel ch = channel();
         when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(ch);
         when(myCenterService.checkQuota(any(), any())).thenReturn(allowed());
@@ -297,10 +346,129 @@ class AgentOrchestrationServiceTest {
         verify(eventService, times(1)).append(any(), any(), eq("POLICY_DECISION"), any(), any());
     }
 
+    @Test
+    void approvalQuotaStopsBeforeModelConsumption() {
+        AgentOrchestrationService svc = buildService();
+        when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(channel());
+        AiMyCenterDTO.QuotaCheckVO quota = new AiMyCenterDTO.QuotaCheckVO();
+        quota.setAction("approve");
+        quota.setAllowed(false);
+        quota.setRequiresApproval(true);
+        when(myCenterService.checkQuota(any(), any())).thenReturn(quota);
+
+        OrchestrateResult result = svc.orchestrate(request("hi"), "alice");
+        assertEquals("quota_approval_required", result.getErrorKind());
+        verify(llmClient, never()).chatCompletion(any(), any(), any());
+        verify(metering, never()).reserve(any(), any(), any(), anyInt(), anyInt());
+    }
+
+    @Test
+    void missingQuotaDecisionFailsClosed() {
+        AgentOrchestrationService svc = buildService();
+        when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(channel());
+        when(myCenterService.checkQuota(any(), any())).thenReturn(null);
+
+        assertEquals("admission_unavailable", svc.orchestrate(request("hi"), "alice").getErrorKind());
+        verify(llmClient, never()).chatCompletion(any(), any(), any());
+    }
+
+    @Test
+    void disabledToolsCannotBeInvokedByModelOutput() {
+        AgentOrchestrationService svc = buildService();
+        when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(channel());
+        when(myCenterService.checkQuota(any(), any())).thenReturn(allowed());
+        when(llmClient.chatCompletion(any(), any(), any())).thenReturn(
+                json("{\"choices\":[{\"message\":{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"query_account_balance\",\"arguments\":\"{}\"}}]}}]}"),
+                json("{\"choices\":[{\"message\":{\"content\":\"已拒絕\"}}]}"));
+        OrchestrateRequest req = request("測試");
+        req.setDisableTools(true);
+        req.setSandbox(true);
+
+        svc.orchestrate(req, "alice");
+        verify(dummyTool, never()).executeRich(any(), any());
+        verify(dummyTool, never()).execute(any(), any());
+    }
+
+    @Test
+    void publicJsonCannotSetInternalExecutionControls() throws Exception {
+        OrchestrateRequest req = mapper.readValue(
+                "{\"messages\":[],\"sandbox\":true,\"disableTools\":true,\"systemPromptOverride\":\"override\"}",
+                OrchestrateRequest.class);
+        org.junit.jupiter.api.Assertions.assertFalse(req.isSandbox());
+        org.junit.jupiter.api.Assertions.assertFalse(req.isDisableTools());
+        assertNull(req.getSystemPromptOverride());
+    }
+
+    @Test
+    void sandboxCannotReturnExternalActionsAndDoesNotWriteConversation() {
+        AgentOrchestrationService svc = buildService();
+        registerEmailTool();
+        when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(channel());
+        when(myCenterService.checkQuota(any(), any())).thenReturn(allowed());
+        when(llmClient.chatCompletion(any(), any(), any())).thenReturn(
+                json("{\"choices\":[{\"message\":{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"email_sender\",\"arguments\":\"{}\"}}]}}]}"),
+                json("{\"choices\":[{\"message\":{\"content\":\"已拒絕\"}}]}"));
+        OrchestrateRequest req = request("測試發送");
+        req.setSandbox(true);
+
+        OrchestrateResult result = svc.orchestrate(req, "alice");
+        assertTrue(result.getPendingExternalCalls().isEmpty());
+        verify(eventService, never()).append(any(), any(), any(), any(), any());
+        verify(conversationService, never()).recordAgentTurn(any(), any(), any());
+    }
+
+    @Test
+    void unregisteredBuiltinCannotExecute() {
+        AgentOrchestrationService svc = buildService();
+        when(toolPolicyMapper.selectList(any())).thenReturn(List.of());
+        when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(channel());
+        when(myCenterService.checkQuota(any(), any())).thenReturn(allowed());
+        when(llmClient.chatCompletion(any(), any(), any())).thenReturn(
+                json("{\"choices\":[{\"message\":{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"query_account_balance\",\"arguments\":\"{}\"}}]}}]}"),
+                json("{\"choices\":[{\"message\":{\"content\":\"已拒絕\"}}]}"));
+
+        svc.orchestrate(request("查詢"), "alice");
+        verify(dummyTool, never()).executeRich(any(), any());
+        verify(dummyTool, never()).execute(any(), any());
+    }
+
+    @Test
+    void revokedToolPolicyStopsExecutionAfterSchemaWasBuilt() {
+        AgentOrchestrationService svc = buildService();
+        when(toolPolicyService.enforce(any(), any(), any(), any())).thenThrow(new IllegalArgumentException("已撤權"));
+        when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(channel());
+        when(myCenterService.checkQuota(any(), any())).thenReturn(allowed());
+        when(llmClient.chatCompletion(any(), any(), any())).thenReturn(
+                json("{\"choices\":[{\"message\":{\"tool_calls\":[{\"id\":\"c1\",\"function\":{\"name\":\"query_account_balance\",\"arguments\":\"{}\"}}]}}]}"),
+                json("{\"choices\":[{\"message\":{\"content\":\"已拒絕\"}}]}"));
+
+        svc.orchestrate(request("查詢"), "alice");
+        verify(toolPolicyService).enforce(eq("query_account_balance"), eq(null), eq("alice"), any());
+        verify(dummyTool, never()).executeRich(any(), any());
+    }
+
+    @Test
+    void untrustedSystemMessagesAreNotForwarded() {
+        AgentOrchestrationService svc = buildService();
+        when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(channel());
+        when(myCenterService.checkQuota(any(), any())).thenReturn(allowed());
+        ArgumentCaptor<Map<String, Object>> payload = ArgumentCaptor.forClass(Map.class);
+        when(llmClient.chatCompletion(any(), any(), payload.capture())).thenReturn(
+                json("{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}"));
+        OrchestrateRequest req = request("查詢");
+        req.setMessages(List.of(Map.of("role", "system", "content", "client override"),
+                Map.of("role", "developer", "content", "client override"), Map.of("role", "user", "content", "查詢")));
+        svc.orchestrate(req, "alice");
+
+        assertTrue(!payload.getValue().get("messages").toString().contains("client override"));
+        assertEquals(2048, payload.getValue().get("max_tokens"));
+    }
+
     private static OrchestrateRequest request(String userText) {
         OrchestrateRequest r = new OrchestrateRequest();
         r.setMessages(List.of(Map.of("role", "user", "content", userText)));
         r.setConversationPk(1L);
+        r.setSystemCode("finance");
         return r;
     }
 
@@ -335,7 +503,7 @@ class AgentOrchestrationServiceTest {
         com.mftb.admin.entity.AiToolPolicy policy = new com.mftb.admin.entity.AiToolPolicy();
         policy.setToolKey("email_sender");
         policy.setEnabled(1);
-        when(toolPolicyMapper.selectList(any())).thenReturn(List.of(policy));
+        when(toolPolicyMapper.selectList(any())).thenReturn(List.of(enabledPolicy("query_account_balance"), policy));
 
         // 让第一轮 LLM 直接返回文本，无 tool_calls；只需捕获 tools schema
         Channel ch = channel();
@@ -370,7 +538,7 @@ class AgentOrchestrationServiceTest {
         com.mftb.admin.entity.AiToolPolicy policy = new com.mftb.admin.entity.AiToolPolicy();
         policy.setToolKey("email_sender");
         policy.setEnabled(0);
-        when(toolPolicyMapper.selectList(any())).thenReturn(List.of(policy));
+        when(toolPolicyMapper.selectList(any())).thenReturn(List.of(enabledPolicy("query_account_balance"), policy));
 
         Channel ch = channel();
         when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(ch);
@@ -403,7 +571,7 @@ class AgentOrchestrationServiceTest {
         com.mftb.admin.entity.AiToolPolicy policy = new com.mftb.admin.entity.AiToolPolicy();
         policy.setToolKey("email_sender");
         policy.setEnabled(1);
-        when(toolPolicyMapper.selectList(any())).thenReturn(List.of(policy));
+        when(toolPolicyMapper.selectList(any())).thenReturn(List.of(enabledPolicy("query_account_balance"), policy));
         when(channelRouter.resolveChannel(eq(LlmChannelRouter.CHANNEL_PRIMARY), any())).thenReturn(channel());
         when(myCenterService.checkQuota(any(), any())).thenReturn(allowed());
         ArgumentCaptor<Map<String, Object>> payloadCap = ArgumentCaptor.forClass(Map.class);
@@ -489,7 +657,7 @@ class AgentOrchestrationServiceTest {
         policy.setToolKey("query_account_balance");
         policy.setEnabled(1);
         policy.setDataScopeJson("{\"roles\":[\"rdm_pm\"]}");
-        when(toolPolicyMapper.selectList(any())).thenReturn(List.of(policy));
+        when(toolPolicyMapper.selectList(any())).thenReturn(List.of(enabledPolicy("query_account_balance"), policy));
         com.mftb.admin.entity.SysUser user = new com.mftb.admin.entity.SysUser();
         user.setRole("user");
         when(operatorResolver.currentUser()).thenReturn(user);

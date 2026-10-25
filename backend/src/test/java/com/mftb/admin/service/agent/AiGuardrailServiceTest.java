@@ -16,6 +16,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -111,13 +112,13 @@ class AiGuardrailServiceTest {
     }
 
     @Test
-    @DisplayName("规则表不可用时放行，不能因为护栏故障让回答整条失败")
-    void toleratesRepositoryFailure() {
+    @DisplayName("规则表不可用时默认阻止，不能以可用性为由跳过安全策略")
+    void blocksWhenRepositoryUnavailable() {
         when(ruleMapper.selectList(any())).thenThrow(new RuntimeException("db down"));
 
         AiGuardrailService.GuardResult result = service.checkInput("正常問題");
 
-        assertFalse(result.isBlocked());
-        assertEquals("正常問題", result.getText());
+        assertTrue(result.isBlocked());
+        assertNull(result.getText());
     }
 }

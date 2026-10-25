@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, Empty, Space, Tag, message } from 'antd'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { Alert, Button, Empty, Space, Spin, Tag, message } from 'antd'
 import { ReloadOutlined, RightOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { fetchAssistantOverview, type AiAssistantOverview } from '../../api/aiOverview'
 import AiAssistantPageShell from './PageShell'
@@ -34,8 +34,24 @@ function formatTime(value?: string | number | null) {
   return String(value).replace('T', ' ').slice(0, 19)
 }
 
-/** AI 助手概览：后端按权限收敛，前端只渲染返回的卡片。 */
+const EnterpriseAgentPreview = lazy(() => import('./preview/EnterpriseAgentPreview'))
+const AgentConsolePreview = lazy(() => import('./console/AgentConsolePreview'))
+
+/** 隔离原型与真实概览；预览分支不挂载真实取数逻辑。 */
 export default function OverviewPage() {
+  const [params] = useSearchParams()
+  const preview = params.get('preview')
+  if (preview === 'enterprise') {
+    return <Suspense fallback={<Spin />}><EnterpriseAgentPreview /></Suspense>
+  }
+  if (preview === 'console') {
+    return <Suspense fallback={<Spin />}><AgentConsolePreview /></Suspense>
+  }
+  return <AssistantOverviewContent />
+}
+
+/** AI 助手概览：后端按权限收敛，前端只渲染返回的卡片。 */
+function AssistantOverviewContent() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [data, setData] = useState<AiAssistantOverview | null>(null)
@@ -60,6 +76,8 @@ export default function OverviewPage() {
       backTo="/"
     >
       <div className="action-section" style={{ marginBottom: 12 }}>
+        <Button onClick={() => navigate('/ai-assistant?preview=enterprise')}>企業 Agent 方案預覽</Button>
+        <Button onClick={() => navigate('/ai-assistant?preview=console')}>企業 Agent 控制台（預覽）</Button>
         <Button icon={<ReloadOutlined />} loading={loading} onClick={load}>
           {t('common.refresh', { defaultValue: '刷新' })}
         </Button>

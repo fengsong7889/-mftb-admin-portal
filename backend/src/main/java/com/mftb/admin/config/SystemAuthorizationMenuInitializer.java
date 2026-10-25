@@ -9,6 +9,8 @@ import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 /**
  * 权限中心 "系统授权" 菜单初始化（Round 4）。
  * <p>在 permission 顶级菜单下新增 {@code system-authorization} 叶子菜单，
@@ -45,8 +47,10 @@ public class SystemAuthorizationMenuInitializer implements CommandLineRunner {
 
     private void doMigrate() {
         Long parentId = queryMenuIdByKey(PARENT_KEY);
+        // 生产已把 permission 包装壳拍平，system-authorization 就是顶级菜单；
+        // 空库/旧库没有 permission 壳时不能直接抛错，按顶级落地。
         if (parentId == null) {
-            throw new IllegalStateException("permission 顶级菜单不存在，无法挂载 " + MENU_KEY);
+            log.info("permission 顶级菜单不存在，{} 按顶级菜单落地", MENU_KEY);
         }
         // 清理历史软删残留，避免唯一键冲突（幂等）
         jdbcTemplate.update("DELETE FROM sys_menu WHERE menu_key = ? AND deleted = 1", MENU_KEY);
@@ -95,9 +99,11 @@ public class SystemAuthorizationMenuInitializer implements CommandLineRunner {
     }
 
     private Long queryMenuIdByKey(String key) {
-        return jdbcTemplate.queryForObject(
+        // queryForObject 在缺行时会抛 IncorrectResultSizeDataAccessException；空库/旧库应返回 null 由调用方兜底。
+        List<Long> rows = jdbcTemplate.query(
                 "SELECT id FROM sys_menu WHERE menu_key = ? AND deleted = 0 LIMIT 1",
                 (rs, rowNum) -> rs.getLong("id"),
                 key);
+        return rows.isEmpty() ? null : rows.get(0);
     }
 }
