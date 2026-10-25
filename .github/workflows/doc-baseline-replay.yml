@@ -68,16 +68,22 @@ jobs:
           BASELINE_TARGET_DB_PASSWORD: ''
         run: |
           set -euo pipefail
-          python scripts/doc-baseline/replay_check.py \
+          if ! python scripts/doc-baseline/replay_check.py \
             --allow-reset \
             --jar backend/target/mftb-admin.jar \
-            --work-dir "$RUNNER_TEMP/doc-baseline"
+            --work-dir "$RUNNER_TEMP/doc-baseline" 2>&1 | tee "$RUNNER_TEMP/doc-baseline-console.log"; then
+            msg=$(tail -8 "$RUNNER_TEMP/doc-baseline-console.log" | tr '\n' ' ' | cut -c1-900)
+            echo "::error title=Doc baseline replay::${msg}"
+            exit 1
+          fi
 
       - name: Upload replay evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: doc-baseline-replay
-          path: ${{ runner.temp }}/doc-baseline/**
+          path: |
+            ${{ runner.temp }}/doc-baseline/**
+            ${{ runner.temp }}/doc-baseline-console.log
           if-no-files-found: warn
           retention-days: 7

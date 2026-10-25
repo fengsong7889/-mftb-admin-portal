@@ -30,6 +30,13 @@ def start_app(jar, port, log_path, timeout, run_name):
     if not java:
         raise SystemExit('找不到 java；请设置 JAVA_HOME')
     env = dict(os.environ)
+    # 应用读的是 DB_URL/DB_USERNAME/DB_PASSWORD；必须从 BASELINE_TARGET_* 显式映射，
+    # 不能依赖调用方 shell 里残留的 DB_URL（否则会误连其它库或 CI 直接缺变量启动失败）。
+    env.update({
+        'DB_URL': os.environ['BASELINE_TARGET_DB_URL'],
+        'DB_USERNAME': os.environ['BASELINE_TARGET_DB_USERNAME'],
+        'DB_PASSWORD': os.environ.get('BASELINE_TARGET_DB_PASSWORD', ''),
+    })
     storage_root = os.environ.get('BASELINE_DOC_STORAGE_ROOT') or os.path.join(tempfile.gettempdir(), 'doc-assets')
     os.makedirs(storage_root, exist_ok=True)
     env.update({

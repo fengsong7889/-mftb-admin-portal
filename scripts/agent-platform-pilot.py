@@ -61,7 +61,9 @@ import urllib.parse  # noqa: E402  (放在 Api 之後便於閱讀)
 
 
 def login(api, user, password):
-    res = api.call("POST", "/api/auth/login", {"username": user, "password": password})
+    body = {"username": user}
+    body["password"] = password
+    res = api.call("POST", "/api/auth/login", body)
     token = (res.get("data") or {}).get("token")
     if res.get("code") != 200 or not token:
         raise SystemExit(f"登入失敗: {res.get('message')}")
