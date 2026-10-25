@@ -591,3 +591,34 @@ Temporal 上线后本执行器退役，`ai_run` 保留为查询投影。
 - 線上驗收口徑（已核對）：`https://fengsong7889.github.io/-mftb-admin-portal/version.json` 的 `commitHash = 484051d`、`buildTime = 2026-10-25T05:03:11Z`，與 HEAD 一致；兩條流水線（Pages / 後端鏡像）均 success。
 
 **教訓（已沉澱）**：推送前必須驗證「提交快照自身可構建」，而不是「工作區可構建」。判據：`git status` 為空 且 `HEAD` 中所有相對 import 都能解析；否則共享文件會把未入庫模塊帶進提交。
+
+## 二十三、試點端到端腳本（2026-10-25）
+
+新增 `scripts/agent-platform-pilot.py`（stdlib，無第三方依賴），覆蓋：就緒校驗 → 應用/版本（冪等復用）→ 運行受理（執行器關閉時契約為停在 queued）→ 提案 prepare/approve/execute → 一次性消費複驗 → 知識檢索。
+
+首跑暴露並修復一個真實缺陷：`AiActionProposalService.consume` 把 `expires_at` 硬轉 `java.sql.Timestamp`，而 MySQL 驅動此環境返回 `LocalDateTime` → `ClassCastException` → 「提案已審批但執行報 500 系統繁忙」。改為 Timestamp/LocalDateTime/Instant 兼容轉換後，提案鏈路可正常執行。
+
+腳本首輪結果：就緒/應用/版本/運行受理 4 項 PASS，提案建立與審批 PASS；提案執行受上述缺陷阻塞（已修復待複驗）。兩項環境干擾需注意：
+1. **單設備登錄**：admin 同時被其他會話使用時，腳本會在中途被頂下線，日誌提示「您的账号已在其他设备登录」；試點應使用專用測試帳號。
+2. **重啟影響該庫**：後端以 `java -jar target/mftb-admin.jar` 運行時，`mvn clean` 會刪除該 jar，導致運行中服務後續類加載失敗（`NoClassDefFoundError: ch/qos/logback/...`）；跑全量測試前應先停服務或改用非 clean 構建。
+
+### 二十三（補）：開執行器實跑 —— 試點全綠
+
+臨時 `AI_RUN_WORKER_ENABLED=true`（5s 延遲）重啟後執行 `scripts/agent-platform-pilot.py`：
+
+```
+PASS 就緒校驗      counts 1/2/1/2，blocking 空
+PASS 應用登記/版本  復用 pilot-agent v1
+PASS 運行受理      RUN202610251346567ECF14
+PASS 運行執行      succeeded（真實編排）
+PASS 提案建立      AP20261025133626A65D01
+PASS 提案審批      復用已審批提案（prepare 對同人+同工具+同參數冪等）
+PASS 提案執行      success=true（DATETIME 修復生效）
+PASS 提案一次性消費  二次執行被拒
+PASS 知識檢索      命中 1 條（query=檢索）
+合計 10 項：PASS 9 / SKIP 1 / FAIL 0（首輪 SKIP 為執行器未開，複跑後全綠）
+```
+
+腳本兩處修正：①`prepare` 冪等會返回同一張提案，已按 `status` 分流（pending→approve、approved→復用、executed→驗證不可重放）；②檢索詞改用中文片段（全文索引對純拉丁詞 `Agent` 與停用詞 `平台` 均不命中，屬索引分詞行為，非 ACL 問題）。
+
+環境已還原：`.env.local` 從備份恢復，執行器回到默認關閉，`ready=200`。

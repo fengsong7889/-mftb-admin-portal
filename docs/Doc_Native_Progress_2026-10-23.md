@@ -879,6 +879,36 @@ REPLAY_DB_PASSWORD=...
 - 前端全量：本轮未改前端；上一轮 `npm run verify` 为 141 文件 / 1270 项全部通过。
 - 本轮新增的 `OrgScopeSchemaInitializerTest`、`UserSessionSchemaInitializerTest`、`MigrationCatalogTest` 已包含在全量通过中。
 
+---
+
+## 二十六、基线重放门禁固化（2026-10-25）
+
+把 `.local` 里的一次性重放脚本固化为仓库内可复现流程：
+
+| 文件 | 作用 |
+|---|---|
+| `scripts/doc-baseline/refresh_baseline.py` | 从源库导出 schema + 配置种子 + 压缩翻译语料；不复制用户/业务数据，敏感配置值清空 |
+| `scripts/doc-baseline/db_utils.py` | JDBC 环境解析、全库清空、SQL 导入、备份/恢复、行数校验 |
+| `scripts/doc-baseline/replay_check.py` | 导入基线 → 启动 ready → 二次启动幂等 → 备份/恢复 → 再启动 |
+| `scripts/doc-baseline/run-local.sh` | 从 `backend/.env.replay.local` 读取测试库，本地一键跑 |
+| `backend/sql/baseline/*` | 可提交基线 fixture（schema / seed / translation.gz） |
+| `.github/workflows/doc-baseline-replay.yml` | MySQL 8.4 service + JDK 17 的 CI 门禁 |
+
+安全护栏：
+
+- 必须显式 `--allow-reset`；目标库名不能是 `fengsong`，只允许含 `test`/`baseline`/`replay`
+- 连接只读环境变量，仓库内不写任何凭据
+- 文件日志与备份默认放 `$TMPDIR`，不污染工作区
+
+首次固化后的本地实测：
+
+- 基线：**351 表 / 398 个迁移版本**
+- run1 **163s**、run2 **163s**、恢复后 run3 **166s**，均 `ready=200`
+- 备份 **351 表 / 10,344 行 / 962,836 bytes**，恢复后逐表行数 **0 不一致**
+- 基线不再包含用户和业务数据；CI 不复制生产数据
+
+> 该门禁验证的是“当前 schema 基线”重放，不是“只有 5 张基表的裸库自建”。后者仍缺完整 baseline，属于后续工程债。
+
 
 
 

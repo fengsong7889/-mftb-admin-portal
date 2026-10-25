@@ -124,8 +124,10 @@ public class AiActionProposalService {
         if (!requester.equals(row.get("requester"))) throw new BusinessException(403, "只能執行本人提出的動作");
         if (!toolKey.equals(row.get("tool_key"))) throw new BusinessException(403, "工具與提案不一致");
         if (!argsDigest.equals(row.get("params_hash"))) throw new BusinessException(403, "參數與已審批內容不一致，請重新提案");
-        java.sql.Timestamp expires = (java.sql.Timestamp) row.get("expires_at");
-        if (expires == null || expires.toLocalDateTime().isBefore(LocalDateTime.now())) {
+        // MySQL 驅動對 DATETIME 的返回型別隨版本/參數而變（Timestamp 或 LocalDateTime），
+        // 直接強轉會在執行期拋 ClassCastException，必須按實際型別兼容轉換。
+        LocalDateTime expires = toLocalDateTime(row.get("expires_at"));
+        if (expires == null || expires.isBefore(LocalDateTime.now())) {
             throw new BusinessException(403, "動作提案已過期，請重新提案並審批");
         }
         int updated = jdbc.update("UPDATE ai_action_proposal SET status='executing', consumed_at=NOW() "
@@ -133,6 +135,16 @@ public class AiActionProposalService {
         if (updated == 0) throw new BusinessException(409, "動作提案已被其他請求消費");
         return new Consumed(((Number) row.get("id")).longValue(), proposalNo, toolKey,
                 String.valueOf(row.get("params_json")));
+    }
+
+    /** 兼容 TIMESTAMP / DATETIME 的返回型別差異；null 表示無到期時間。 */
+    private static LocalDateTime toLocalDateTime(Object value) {
+        if (value instanceof LocalDateTime dt) return dt;
+        if (value instanceof java.sql.Timestamp ts) return ts.toLocalDateTime();
+        if (value instanceof java.time.Instant instant) {
+            return LocalDateTime.ofInstant(instant, java.time.ZoneId.systemDefault());
+        }
+        return null;
     }
 
     /** 记录回执；外部超时可能已成功，状态必须允许 unknown 并等待对账。 */

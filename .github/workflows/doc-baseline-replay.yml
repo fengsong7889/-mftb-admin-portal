@@ -1,0 +1,89 @@
+name: Doc Baseline Replay
+
+on:
+  push:
+    branches: ['main']
+    paths:
+      - 'backend/sql/baseline/**'
+      - 'scripts/doc-baseline/**'
+      - 'backend/src/main/java/com/mftb/admin/config/**'
+      - 'backend/src/main/resources/application.yml'
+      - '.github/workflows/doc-baseline-replay.yml'
+  pull_request:
+    branches: ['main']
+    paths:
+      - 'backend/sql/baseline/**'
+      - 'scripts/doc-baseline/**'
+      - 'backend/src/main/java/com/mftb/admin/config/**'
+      - 'backend/src/main/resources/application.yml'
+      - '.github/workflows/doc-baseline-replay.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  replay:
+    name: Baseline import / boot twice / backup restore
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: fengsong_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install python deps
+        run: python -m pip install pymysql cryptography
+
+      - name: Build jar (skip tests; backend-docker.yml owns full tests)
+        run: mvn -B package -Dmaven.test.skip=true -f backend/pom.xml
+
+      - name: Replay baseline
+        env:
+          BASELINE_TARGET_DB_URL: jdbc:mysql://127.0.0.1:3306/fengsong_test?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+          BASELINE_TARGET_DB_USERNAME: root
+          BASELINE_TARGET_DB_PASSWORD: ''
+        run: |
+          set -euo pipefail
+          if ! python scripts/doc-baseline/replay_check.py \
+            --allow-reset \
+            --jar backend/target/mftb-admin.jar \
+            --work-dir "$RUNNER_TEMP/doc-baseline" 2>&1 | tee "$RUNNER_TEMP/doc-baseline-console.log"; then
+            msg=$(tail -8 "$RUNNER_TEMP/doc-baseline-console.log" | tr '\n' ' ' | cut -c1-900)
+            echo "::error title=Doc baseline replay::${msg}"
+            exit 1
+          fi
+
+      - name: Upload replay evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: doc-baseline-replay
+          path: |
+            ${{ runner.temp }}/doc-baseline/**
+            ${{ runner.temp }}/doc-baseline-console.log
+          if-no-files-found: warn
+          retention-days: 7
