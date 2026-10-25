@@ -661,3 +661,23 @@ PASS 知識檢索      命中 1 條（query=檢索）
 驗證：`tsc --noEmit` 0 error、`eslint` 0 error、`check:menu` 通過。
 
 待辦：新增表單文案目前為繁中硬編碼（console 不在 i18n 硬編碼棘輪域內，未觸發門禁），下一輪補 `agentConsole.form.*` 詞條。
+
+### 二十四（補二）：A–D 瀏覽器複驗結果
+
+| 項 | 結果 |
+|---|---|
+| 1a 新增應用 ui-e2e | ✅ 列表出現、草稿/未發布 |
+| 1b 發布新版本 | ✅ 發布成功變 v1（`tool_whitelist_json=["query_approvals"]` 已落庫）；❗工具白名單列顯示「—」 |
+| 2 新增預算池 APP/ui-e2e/ALL/100 | ✅ 落庫並展示 |
+| 3a 登記分級 ui-e2e-sys/INTERNAL | ✅ |
+| 3b 批准端點 deepseek-chat（30 天） | ✅ 有效期為 approved_at+30 天，備註更新 |
+| 4 提案通過/執行 | ⏸ 無 pending 提案，未在 UI 點擊（API 鏈路已於試點腳本驗證） |
+| 5 網絡/console | platform 請求全 200；console 0 error |
+| 6 總覽四卡 | ✅ 3/2/1/2 與 `ops/readiness` 完全一致 |
+
+複驗暴露的缺陷與修復：
+
+1. **工具白名單列恆為「—」**：`fetchApplications` 把 `tools` 硬編碼為 `[]`（怕 N+1）。改為後端列表 SQL 直接 `LEFT JOIN ai_application_version ON version_no = published_version` 帶出 `tool_whitelist_json`，前端解析為陣列——一次查詢解決，不做逐行詳情。
+2. **端點有效期 / 提案有效期仍顯示 epoch 毫秒**：統一走 `fmtTs` 格式化。
+
+驗證：後端 `mvn compile` 通過並重啟（ready=200）；`GET /applications` 三個應用均帶出白名單（ui-e2e/pilot-agent=`["query_approvals"]`、demo-agent=`["rdm.project.summary"]`）；`tsc` 0 error。

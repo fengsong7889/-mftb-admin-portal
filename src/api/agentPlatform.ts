@@ -120,14 +120,25 @@ export function fetchReadiness() {
   return request.get<unknown, AgentReadiness>('/agent/platform/ops/readiness')
 }
 
+function parseStringArray(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.map(String)
+  if (typeof raw !== 'string' || !raw.trim()) return []
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.map(String) : []
+  } catch {
+    return []
+  }
+}
+
 export async function fetchApplications(keyword?: string): Promise<AgentApplicationRow[]> {
   const rows = await request.get<unknown, Dict[]>('/agent/platform/applications', { params: { keyword } })
   return (rows ?? []).map(row => ({
     key: str(row.app_key), name: str(row.name), system: str(row.system_code, 'common'),
     owner: str(row.owner_name, '—'), publishedVersion: num(row.published_version),
     state: num(row.published_version) > 0 ? 'published' : 'draft',
-    // 工具白名單在版本詳情中；列表不逐行拉詳情，避免 N+1
-    tools: [], knowledge: [],
+    // 列表 SQL 已 LEFT JOIN 已發布版本，直接解析白名單，避免逐行拉詳情
+    tools: parseStringArray(row.tool_whitelist_json), knowledge: [],
   }))
 }
 

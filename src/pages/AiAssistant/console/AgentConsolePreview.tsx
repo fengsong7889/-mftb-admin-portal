@@ -293,7 +293,7 @@ function ActionsPane() {
     { key: 'requester', title: tr('agentConsole.s57', '申請人'), dataIndex: 'requester', width: 150 },
     { key: 'status', title: tr('agentConsole.s54', '狀態'), width: 160, render: (_, row) => <Tag color={ACTION_TAG[row.status].color}>{ACTION_TAG[row.status].text}</Tag> },
     { key: 'approval', title: tr('agentConsole.s16', '審批引用'), width: 170, render: (_, row) => row.approvalRef ?? <span className="agent-console__muted">—</span> },
-    { key: 'expires', title: tr('agentConsole.s48', '有效期至'), dataIndex: 'expiresAt', width: 170 },
+    { key: 'expires', title: tr('agentConsole.s48', '有效期至'), width: 170, render: (_, row) => fmtTs(row.expiresAt) },
     {
       key: 'ops', title: '操作', width: 160,
       render: (_, row) => row.status === 'pending'
@@ -436,7 +436,7 @@ function DataEndpointsPane() {
     { key: 'model', title: tr('agentConsole.s51', '模型端點'), dataIndex: 'model', width: 200 },
     { key: 'level', title: tr('agentConsole.s11', '可接收等級'), dataIndex: 'maxLevel', width: 140, render: (value: string) => <Tag color="purple">{value}</Tag> },
     { key: 'residency', title: tr('agentConsole.s85', '駐留'), width: 120, render: (_, row) => row.residency === 'private' ? <Tag color="green">內網</Tag> : <Tag>外部</Tag> },
-    { key: 'expires', title: tr('agentConsole.s33', '批准有效期'), dataIndex: 'expiresAt', width: 140 },
+    { key: 'expires', title: tr('agentConsole.s33', '批准有效期'), width: 170, render: (_, row) => fmtTs(row.expiresAt) },
     { key: 'note', title: tr('agentConsole.s04', '備註'), dataIndex: 'note' },
   ]
 

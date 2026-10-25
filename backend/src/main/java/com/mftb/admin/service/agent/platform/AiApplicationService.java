@@ -27,11 +27,14 @@ public class AiApplicationService {
     private final ObjectMapper mapper;
 
     public List<Map<String, Object>> list(String keyword) {
-        String sql = "SELECT id, app_key, name, system_code, owner_name, purpose, status, published_version, updated_at "
-                + "FROM ai_application WHERE 1=1";
+        // 列表带出「已发布版本」的工具白名单：前端要在列上展示，逐行再查详情会 N+1
+        String sql = "SELECT a.id, a.app_key, a.name, a.system_code, a.owner_name, a.purpose, a.status, "
+                + "a.published_version, a.updated_at, v.tool_whitelist_json "
+                + "FROM ai_application a LEFT JOIN ai_application_version v "
+                + "ON v.app_id = a.id AND v.version_no = a.published_version WHERE 1=1";
         List<Object> args = new ArrayList<>();
         if (StringUtils.hasText(keyword)) {
-            sql += " AND (app_key LIKE ? OR name LIKE ?)";
+            sql += " AND (a.app_key LIKE ? OR a.name LIKE ?)";
             args.add("%" + keyword.trim() + "%");
             args.add("%" + keyword.trim() + "%");
         }
