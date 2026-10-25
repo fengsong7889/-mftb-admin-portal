@@ -9,8 +9,11 @@ import com.mftb.admin.entity.HrEmployment;
 import com.mftb.admin.entity.HrProfileItem;
 import com.mftb.admin.entity.Person;
 import com.mftb.admin.service.HcmPersonService;
+import com.mftb.admin.service.PermissionService;
 import com.mftb.admin.service.HrLifecycleService;
 import com.mftb.admin.service.HrProfileService;
+import com.mftb.admin.util.HcmPiiMasker;
+import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -41,6 +44,8 @@ public class HcmPersonController {
     private final HcmPersonService personService;
     private final HrLifecycleService hrLifecycleService;
     private final HrProfileService hrProfileService;
+    private final PermissionService permissionService;
+    private final OperatorResolver operatorResolver;
 
     /* ==================== 人员 ==================== */
 
@@ -50,13 +55,19 @@ public class HcmPersonController {
                                                   @RequestParam(defaultValue = "20") long size,
                                                   @RequestParam(required = false) String keyword,
                                                   @RequestParam(required = false) Integer status) {
-        return Result.success(personService.listPersons(page, size, keyword, status));
+        Result<PageResult<Person>> result = Result.success(personService.listPersons(page, size, keyword, status));
+        if (result.getData() != null) {
+            maskIfNeeded(result.getData().getRecords());
+        }
+        return result;
     }
 
     @GetMapping("/persons/{id}")
     @RequirePermission(menu = "hcm-person")
     public Result<Person> personDetail(@PathVariable Long id) {
-        return Result.success(personService.getPerson(id));
+        Person person = personService.getPerson(id);
+        maskIfNeeded(person);
+        return Result.success(person);
     }
 
     /** 建档：允许不填账号（无账号人员），账号映射由服务层校验唯一 */
@@ -108,6 +119,36 @@ public class HcmPersonController {
                 })
                 .toList();
         return Result.success(summary);
+    }
+
+    /**
+     * 字段级脱敏：没有 {@code hcm-person:viewSensitive} 时掩掉手机/邮箱/出生日期。
+     * <p>管理员与具备该动作的角色看到明文；其余角色仍能看花名册，只是联系方式被掩。
+     */
+    private void maskIfNeeded(Iterable<Person> persons) {
+        if (persons == null || canViewSensitive()) {
+            return;
+        }
+        for (Person person : persons) {
+            maskPerson(person);
+        }
+    }
+
+    private void maskIfNeeded(Person person) {
+        if (person == null || canViewSensitive()) {
+            return;
+        }
+        maskPerson(person);
+    }
+
+    private void maskPerson(Person person) {
+        person.setMobile(HcmPiiMasker.mobile(person.getMobile()));
+        person.setEmail(HcmPiiMasker.email(person.getEmail()));
+        person.setBirthDate(null);
+    }
+
+    private boolean canViewSensitive() {
+        return permissionService.hasPermission(operatorResolver.currentUser(), "hcm-person", "viewSensitive");
     }
 
     /* ==================== 档案扩展（教育/履历/资质/奖惩） ==================== */

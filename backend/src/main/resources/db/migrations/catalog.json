@@ -3191,6 +3191,21 @@
       "author": "Qoder",
       "ticket": "hcm-c3-profile",
       "comment": "为什么五类合成一张表：它们都是挂在人员身上的档案证据行，生命周期完全一致（HR 手工维护、可附证据、需核实、无审批流、不参与日期生效与核算），差异只是字段语义；分五张表会让详情页发五个请求、校验写五遍。与 emp_position_record 的边界：那张表是任职事实（影响编制与薪资），本表只做档案证据。旧员工详情里这四类没有持久化模型（奖惩是空 state），所以要新建而不是聚合只读。295 脚本仅作参照文档，不进镜像。"
+    },
+    {
+      "versionKey": "hcm:person-menu:v1.1",
+      "module": "hcm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "hcmPersonMenuInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "hcm:person-menu:v1.0"
+      ],
+      "intent": "人員主檔菜单补 viewSensitive 动作（字段级脱敏的授权抓手）",
+      "author": "Qoder",
+      "ticket": "hcm-c5-field",
+      "comment": "为什么单独版本键：ensureMenu 对已存在菜单不覆盖 actions，只改 v1.0 声明存量库拿不到新动作集，授权中心勾不出来，字段级脱敏永远解不开。只动这一个菜单并显式授 admin（内置运维角色必须能看明文），其他角色保持默认拒绝——服务的脱敏逻辑是「没有 viewSensitive 就掩手机/邮箱/出生日期」，属于默认安全而不是默认放开。后置校验要求 actions 含 viewSensitive。"
     }
   ]
 }
