@@ -31,6 +31,11 @@ RUN apk add --no-cache tzdata git && \
     git config --system --add safe.directory /app && \
     apk del tzdata
 
+# 文档中心本地对象存储目录：必须在切换用户前建好并授权，
+# 否则非 root 用户 app 无法在 /app 下创建 .local，启动即 AccessDeniedException。
+# 多实例部署请改用共享对象存储，或把 DOC_STORAGE_LOCAL_ROOT 指向挂载的持久卷。
+RUN mkdir -p /app/.local/doc-assets/tmp && chown -R app:app /app/.local
+
 USER app
 
 EXPOSE 8080
@@ -38,5 +43,7 @@ EXPOSE 8080
 # JVM 优化：堆按容器内存百分比弹性分配（容器感知，自动适配 Sealos 配额，建议配额 >=1G）；
 # 限制 Metaspace 与线程栈，防止非堆内存挤爆容器限额触发 OOM；OOM 时快速退出交由编排重建
 ENV JAVA_OPTS="-XX:InitialRAMPercentage=50.0 -XX:MaxRAMPercentage=60.0 -XX:MaxMetaspaceSize=192m -Xss512k -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ExitOnOutOfMemoryError"
+# 显式声明存储根目录，与上面预建目录保持一致（可用环境变量覆盖为持久卷路径）
+ENV DOC_STORAGE_LOCAL_ROOT=/app/.local/doc-assets
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
