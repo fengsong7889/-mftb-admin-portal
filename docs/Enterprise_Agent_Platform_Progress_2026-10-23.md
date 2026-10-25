@@ -583,3 +583,11 @@ Temporal 上线后本执行器退役，`ai_run` 保留为查询投影。
 | 補測 | `AiDataPolicyResidencyTest` 4 條（非法 residency 必須在落庫前 400 拒絕）已隨 `dc43b0ec` 推送 |
 
 **未做**：英文界面人工視覺確認（dev server 多實例 3000/3001/5173 互相搶單設備會話，瀏覽器自動化多次被踢回登入頁）；靜態側已保證 136 個 `agentConsole.*` 引用在 en 全部命中且無中文值。Temporal 編排與 WP12 試點驗收依賴外部條件。
+
+### 二十二（補）：CI 綠燈與線上驗收口徑
+
+- 首次推送 `dc43b0ec` 兩條流水線皆失敗：前端止於 **Type Check**（`App.tsx` 引用 18 個 `pages/DocCenter/*` 模塊未入庫），後端 `mvn package` 同源（Doc 控制器/服務類未入庫）。**已提交的共享文件引用了未提交的模塊，導致提交本身不可構建。**
+- 修復：`484051dd` 將工作區既有的 Doc/MCP 改動（152 文件）一併入庫；校驗 `HEAD` 的 `App.tsx` 缺失模塊數 = 0。本地基線：後端 2546 條全綠、前端 verify EXIT=0、build 成功。
+- 線上驗收口徑（已核對）：`https://fengsong7889.github.io/-mftb-admin-portal/version.json` 的 `commitHash = 484051d`、`buildTime = 2026-10-25T05:03:11Z`，與 HEAD 一致；兩條流水線（Pages / 後端鏡像）均 success。
+
+**教訓（已沉澱）**：推送前必須驗證「提交快照自身可構建」，而不是「工作區可構建」。判據：`git status` 為空 且 `HEAD` 中所有相對 import 都能解析；否則共享文件會把未入庫模塊帶進提交。
