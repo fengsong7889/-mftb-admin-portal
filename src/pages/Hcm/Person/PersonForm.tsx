@@ -8,14 +8,17 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Button, DatePicker, Form, Input, Modal, Select, Space, Switch, Table, Tag, Timeline, message } from 'antd'
+import { Button, DatePicker, Form, Input, Modal, Select, Space, Switch, Table, Tabs, Tag, Timeline, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { SaveOutlined, IdcardOutlined, SafetyCertificateOutlined, PlusOutlined } from '@ant-design/icons'
+import { SaveOutlined, IdcardOutlined, SafetyCertificateOutlined, PlusOutlined, ProfileOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import {
+  PROFILE_ITEM_TYPES,
   createPerson,
+  deleteProfileItem,
   fetchPersonLifecycle,
+  fetchProfileItems,
   getPerson,
   listAssignments,
   listEmployments,
@@ -25,6 +28,7 @@ import {
   type HrEmployment,
   type Person,
   type PersonLifecycleItem,
+  type PersonProfileItem,
 } from '../../../api/hcmPerson'
 import { CardTitle, FormHeader, UpdatedFooter, cardStyle, formatTimestamp, grid3 } from '../Organization/shared'
 
@@ -57,6 +61,10 @@ export default function HcmPersonForm() {
   const [allAssignments, setAllAssignments] = useState<Array<{ item: HrAssignment; employmentId: number }>>([])
   // 既有异动单据（只读聚合）：以 person.sys_user_id 为锚点，无账号人员为空
   const [lifecycle, setLifecycle] = useState<PersonLifecycleItem[]>([])
+  // 档案扩展：按类型分开取，避免一次拉全量
+  const [profileType, setProfileType] = useState<string>('EDUCATION')
+  const [profileItems, setProfileItems] = useState<PersonProfileItem[]>([])
+  const [profileLoading, setProfileLoading] = useState(false)
 
   const loadDetail = useCallback(async () => {
     if (!id) return
@@ -84,6 +92,42 @@ export default function HcmPersonForm() {
     if (!id) return
     fetchPersonLifecycle(id).then(setLifecycle).catch(() => setLifecycle([]))
   }, [id])
+
+  const loadProfileItems = useCallback(async (personId: number, itemType: string) => {
+    setProfileLoading(true)
+    try {
+      setProfileItems(await fetchProfileItems(personId, itemType))
+    } catch {
+      setProfileItems([])
+    } finally {
+      setProfileLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!id || !isDetail) return
+    void loadProfileItems(id, profileType)
+  }, [id, isDetail, profileType, loadProfileItems])
+
+  const handleDeleteProfileItem = (record: PersonProfileItem) => {
+    Modal.confirm({
+      title: t('hcmPerson.profileDeleteConfirm'),
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>{t('hcmPerson.profileTitle')}：</span><b>{record.title}</b></div>
+        </div>
+      ),
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      onOk: async () => {
+        await deleteProfileItem(record.id as number)
+        message.success(t('hcmPerson.profileDeleteSuccess'))
+        if (id) await loadProfileItems(id, profileType)
+      },
+    })
+  }
 
   useEffect(() => {
     if (!id) return
@@ -364,6 +408,65 @@ export default function HcmPersonForm() {
                 </div>
               ),
             }}
+          />
+        </div>
+      )}
+
+      {isDetail && (
+        <div style={cardStyle}>
+          <CardTitle
+            icon={<ProfileOutlined />}
+            title={t('hcmPerson.profileSection')}
+            extra={(
+              <Button
+                type="primary" size="small" icon={<PlusOutlined />}
+                onClick={() => navigate(`/hcm-person-profile-form?personId=${id}&itemType=${profileType}`)}
+              >
+                {t('hcmPerson.addProfileItem')}
+              </Button>
+            )}
+          />
+          <Tabs
+            activeKey={profileType}
+            onChange={setProfileType}
+            items={PROFILE_ITEM_TYPES.map((item) => ({ key: item.value, label: item.label }))}
+          />
+          <Table<PersonProfileItem>
+            rowKey="id"
+            size="small"
+            loading={profileLoading}
+            pagination={false}
+            dataSource={profileItems}
+            locale={{ emptyText: t('hcmPerson.profileEmpty') }}
+            columns={[
+              { key: 'title', title: t('hcmPerson.profileTitle'), dataIndex: 'title' },
+              { key: 'orgName', title: t('hcmPerson.profileOrg'), dataIndex: 'orgName', width: 180,
+                render: (v: string) => v || '-' },
+              { key: 'roleTitle', title: t('hcmPerson.profileRole'), dataIndex: 'roleTitle', width: 150,
+                render: (v: string) => v || '-' },
+              { key: 'period', title: t('hcmPerson.profilePeriod'), width: 190,
+                render: (_, row) => `${row.startDate || '-'} ~ ${row.endDate || t('hcmPerson.openEnded')}` },
+              { key: 'verifyStatus', title: t('hcmPerson.profileVerify'), dataIndex: 'verifyStatus', width: 100,
+                render: (v: number) => (v === 1
+                  ? <Tag color="green">{t('hcmOrg.legal.verified')}</Tag>
+                  : <Tag color="orange">{t('hcmOrg.legal.pendingVerify')}</Tag>) },
+              {
+                key: 'action', title: t('common.action'), width: 140,
+                render: (_, row) => (
+                  <Space size={0} split={<span className="action-split">|</span>}>
+                    <Button
+                      type="link" size="small"
+                      onClick={() => navigate(`/hcm-person-profile-form?id=${row.id}&personId=${id}&itemType=${profileType}`)}
+                    >
+                      {t('common.edit')}
+                    </Button>
+                    <Button type="link" size="small" danger onClick={() => handleDeleteProfileItem(row)}>
+                      {t('common.delete')}
+                    </Button>
+                  </Space>
+                ),
+              },
+            ]}
           />
         </div>
       )}

@@ -13855,6 +13855,21 @@
     "lifecycleType": "異動類型",
     "lifecycleStatus": "狀態",
     "lifecycleEffective": "生效日期",
-    "lifecycleFlowNo": "流程編號"
+    "lifecycleFlowNo": "流程編號",
+    "profileSection": "檔案擴展",
+    "profileType": "檔案類型",
+    "profileTitle": "標題",
+    "profileOrg": "機構",
+    "profileRole": "專業/職位/等級",
+    "profileCertNo": "證書編號",
+    "profileVerify": "核實狀態",
+    "profilePeriod": "起止",
+    "profileEmpty": "暫無記錄",
+    "profileTitleRequired": "請填寫標題",
+    "addProfileItem": "新增記錄",
+    "editProfileItem": "編輯記錄",
+    "profileDeleteConfirm": "確定要刪除該檔案記錄嗎？",
+    "profileDeleteSuccess": "檔案記錄已刪除",
+    "profilePersonMissing": "缺少人員信息，無法保存"
   }
 }

@@ -2202,6 +2202,7 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/hcm-person-detail': 'hcm-person',
   '/hcm-person-employment-form': 'hcm-person',
   '/hcm-person-assignment-form': 'hcm-person',
+  '/hcm-person-profile-form': 'hcm-person',
   '/attendance-workbench': 'attendance-workbench',
   '/attendance-group': 'attendance-group',
   '/attendance-group-form': 'attendance-group',

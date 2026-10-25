@@ -13853,6 +13853,21 @@
     "lifecycleType": "Type",
     "lifecycleStatus": "Status",
     "lifecycleEffective": "Effective date",
-    "lifecycleFlowNo": "Workflow no."
+    "lifecycleFlowNo": "Workflow no.",
+    "profileSection": "Profile records",
+    "profileType": "Record type",
+    "profileTitle": "Title",
+    "profileOrg": "Organization",
+    "profileRole": "Major / position / level",
+    "profileCertNo": "Certificate no.",
+    "profileVerify": "Verification",
+    "profilePeriod": "Period",
+    "profileEmpty": "No records",
+    "profileTitleRequired": "Please enter the title",
+    "addProfileItem": "New record",
+    "editProfileItem": "Edit record",
+    "profileDeleteConfirm": "Delete this profile record?",
+    "profileDeleteSuccess": "Profile record deleted",
+    "profilePersonMissing": "Person information is missing"
   }
 }

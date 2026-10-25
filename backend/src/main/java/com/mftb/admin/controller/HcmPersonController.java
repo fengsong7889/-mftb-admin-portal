@@ -6,9 +6,11 @@ import com.mftb.admin.dto.HcmPersonLifecycleVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.HrAssignment;
 import com.mftb.admin.entity.HrEmployment;
+import com.mftb.admin.entity.HrProfileItem;
 import com.mftb.admin.entity.Person;
 import com.mftb.admin.service.HcmPersonService;
 import com.mftb.admin.service.HrLifecycleService;
+import com.mftb.admin.service.HrProfileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -38,6 +40,7 @@ public class HcmPersonController {
 
     private final HcmPersonService personService;
     private final HrLifecycleService hrLifecycleService;
+    private final HrProfileService hrProfileService;
 
     /* ==================== 人员 ==================== */
 
@@ -105,6 +108,42 @@ public class HcmPersonController {
                 })
                 .toList();
         return Result.success(summary);
+    }
+
+    /* ==================== 档案扩展（教育/履历/资质/奖惩） ==================== */
+
+    @GetMapping("/persons/{id}/profile-items")
+    @RequirePermission(menu = "hcm-person")
+    public Result<java.util.List<HrProfileItem>> listProfileItems(@PathVariable Long id,
+                                                                 @RequestParam(required = false) String itemType) {
+        return Result.success(hrProfileService.listByPerson(id, itemType));
+    }
+
+    @GetMapping("/profile-items/{id}")
+    @RequirePermission(menu = "hcm-person")
+    public Result<HrProfileItem> profileItemDetail(@PathVariable Long id) {
+        return Result.success(hrProfileService.getItem(id));
+    }
+
+    @PostMapping("/profile-items")
+    @RequirePermission(menu = "hcm-person", action = "create")
+    public Result<HrProfileItem> createProfileItem(@RequestBody HrProfileItem item) {
+        item.setId(null);
+        return Result.success("檔案記錄已新增", hrProfileService.saveItem(item));
+    }
+
+    @PutMapping("/profile-items/{id}")
+    @RequirePermission(menu = "hcm-person", action = "edit")
+    public Result<HrProfileItem> updateProfileItem(@PathVariable Long id, @RequestBody HrProfileItem item) {
+        item.setId(id);
+        return Result.success("檔案記錄已保存", hrProfileService.saveItem(item));
+    }
+
+    @DeleteMapping("/profile-items/{id}")
+    @RequirePermission(menu = "hcm-person", action = "delete")
+    public Result<Void> deleteProfileItem(@PathVariable Long id) {
+        hrProfileService.deleteItem(id);
+        return Result.success("檔案記錄已刪除", null);
     }
 
     /* ==================== 雇佣关系 ==================== */

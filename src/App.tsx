@@ -79,6 +79,7 @@ const HcmPersonList = lazy(() => import('./pages/Hcm/Person/PersonList'))
 const HcmPersonForm = lazy(() => import('./pages/Hcm/Person/PersonForm'))
 const HcmEmploymentForm = lazy(() => import('./pages/Hcm/Person/EmploymentForm'))
 const HcmAssignmentForm = lazy(() => import('./pages/Hcm/Person/AssignmentForm'))
+const HcmProfileItemForm = lazy(() => import('./pages/Hcm/Person/ProfileItemForm'))
 const OrganizationManagement = lazy(() => import('./pages/Permission/Organization'))
 const PositionManagement = lazy(() => import('./pages/Permission/Position'))
 const HrDictManagement = lazy(() => import('./pages/Permission/HrDict'))
@@ -564,6 +565,7 @@ function AuthenticatedLayout() {
               <Route path="/hcm-person-detail" element={<HcmPersonForm />} />
               <Route path="/hcm-person-employment-form" element={<HcmEmploymentForm />} />
               <Route path="/hcm-person-assignment-form" element={<HcmAssignmentForm />} />
+              <Route path="/hcm-person-profile-form" element={<HcmProfileItemForm />} />
               <Route path="/position-management" element={<PositionManagement />} />
               <Route path="/hr-dict" element={<HrDictManagement />} />
               <Route path="/hr-dict-edit" element={<HrDictForm />} />

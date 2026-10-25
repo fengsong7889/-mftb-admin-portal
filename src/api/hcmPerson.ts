@@ -43,6 +43,53 @@ export function fetchPersonLifecycle(personId: number) {
   return request.get<unknown, PersonLifecycleItem[]>(`/hcm/v1/hr/persons/${personId}/lifecycle`)
 }
 
+/** 档案扩展项：教育/履历/资质/奖励/处分 */
+export interface PersonProfileItem {
+  id?: number
+  personId: number
+  itemType: string
+  title: string
+  orgName?: string | null
+  roleTitle?: string | null
+  certNo?: string | null
+  startDate?: string | null
+  endDate?: string | null
+  evidenceUrl?: string | null
+  evidenceName?: string | null
+  verifyStatus?: number
+  remark?: string | null
+}
+
+export const PROFILE_ITEM_TYPES = [
+  { value: 'EDUCATION', label: '教育' },
+  { value: 'WORK', label: '履歷' },
+  { value: 'QUALIFICATION', label: '資質' },
+  { value: 'REWARD', label: '獎勵' },
+  { value: 'PUNISH', label: '處分' },
+] as const
+
+export function fetchProfileItems(personId: number, itemType?: string) {
+  return request.get<unknown, PersonProfileItem[]>(`/hcm/v1/hr/persons/${personId}/profile-items`, {
+    params: { itemType },
+  })
+}
+
+export function getProfileItem(id: number) {
+  return request.get<unknown, PersonProfileItem>(`/hcm/v1/hr/profile-items/${id}`)
+}
+
+export function createProfileItem(data: PersonProfileItem) {
+  return request.post<unknown, PersonProfileItem>('/hcm/v1/hr/profile-items', data)
+}
+
+export function updateProfileItem(id: number, data: PersonProfileItem) {
+  return request.put<unknown, PersonProfileItem>(`/hcm/v1/hr/profile-items/${id}`, data)
+}
+
+export function deleteProfileItem(id: number) {
+  return request.delete(`/hcm/v1/hr/profile-items/${id}`)
+}
+
 /** 雇佣关系 */
 export interface HrEmployment {
   id?: number

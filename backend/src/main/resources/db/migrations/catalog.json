@@ -3173,6 +3173,24 @@
       "author": "Qoder",
       "ticket": "hcm-c4-contract",
       "comment": "不新建合同事件表：emp_contract 已是「一人多份合同」台账，一行一份；续签只是新的一行，用 previous_contract_id 串成链即可，拆出事件表会让「当前有效合同」需要跨表推断。解除必须落 terminated_date + reason，不能只把 status 改成字符串——方案要求解除是可追溯事件。证据只存地址与文件名，不冒充已验证电子签。ALTER 逐列先查 information_schema 再补（ADD COLUMN 不可重放），后置校验六列齐全。294 脚本仅作参照文档，不进镜像。"
+    },
+    {
+      "versionKey": "hcm:hr-profile-schema:v1.0",
+      "module": "hcm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "hrProfileSchemaInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "hcm:person-schema:v1.0"
+      ],
+      "scriptFiles": [
+        "295_hr_profile_item.sql"
+      ],
+      "intent": "C3 收口：建 hr_profile_item（教育/履历/资质/奖惩 的档案证据表）",
+      "author": "Qoder",
+      "ticket": "hcm-c3-profile",
+      "comment": "为什么五类合成一张表：它们都是挂在人员身上的档案证据行，生命周期完全一致（HR 手工维护、可附证据、需核实、无审批流、不参与日期生效与核算），差异只是字段语义；分五张表会让详情页发五个请求、校验写五遍。与 emp_position_record 的边界：那张表是任职事实（影响编制与薪资），本表只做档案证据。旧员工详情里这四类没有持久化模型（奖惩是空 state），所以要新建而不是聚合只读。295 脚本仅作参照文档，不进镜像。"
     }
   ]
 }
