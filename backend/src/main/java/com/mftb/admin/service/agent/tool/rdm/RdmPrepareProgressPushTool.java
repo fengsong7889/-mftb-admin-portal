@@ -94,7 +94,7 @@ public class RdmPrepareProgressPushTool implements AgentTool {
         SysUser recipient = null;
         String recipientLabel;
         if ("person".equals(targetType)) {
-            RdmToolSupport.PersonLookup person = support.resolvePerson(support.argStr(args, "person"));
+            RdmToolSupport.PersonLookup person = support.resolvePerson(support.argStr(args, "person"), user);
             if (!person.ok()) {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("error", person.error());

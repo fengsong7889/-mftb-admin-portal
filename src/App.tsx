@@ -229,6 +229,14 @@ const RoleQuotaDetail = lazy(() => import('./pages/AiQuotaAuth/empQuota/RoleQuot
 const AiOperationAuth = lazy(() => import('./pages/AiOperationAuth'))
 const AiAssistantConfig = lazy(() => import('./pages/AiAssistantConfig'))
 const AiAssistantOverview = lazy(() => import('./pages/AiAssistant/OverviewPage'))
+// 企業 Agent 控制台（治理面）：8 个二级菜单共用一个页面，按 pane 渲染
+const AgentConsoleModule = lazy(async () => {
+  const module = await import('./pages/AiAssistant/console/AgentConsolePreview')
+  return { default: module.AgentConsole }
+})
+function AgentConsoleRoute({ pane }: { pane: 'overview' | 'apps' | 'budget' | 'actions' | 'knowledge' | 'data' | 'runs' | 'evaluation' }) {
+  return <AgentConsoleModule pane={pane} />
+}
 const AiAssistantCapability = lazy(() => import('./pages/AiAssistant/CapabilityPage'))
 const AiAssistantProfile = lazy(() => import('./pages/AiAssistant/ProfilePage'))
 const AiAssistantGlossary = lazy(() => import('./pages/AiAssistant/GlossaryPage'))
@@ -409,6 +417,24 @@ const RdmGrayscaleConfig = lazy(() => import('./pages/Rdm/GrayscaleConfig'))
 
 // 文檔中心（階段二：真實 /api/doc/**；菜單種子已由 DocSchemaMigrationInitializer 落庫）
 const DocCenter = lazy(() => import('./pages/DocCenter'))
+const DocPlans = lazy(() => import('./pages/DocCenter/DocPlans'))
+const DocPlanDetail = lazy(() => import('./pages/DocCenter/DocPlanDetail'))
+const DocPlanEdit = lazy(() => import('./pages/DocCenter/DocPlanEdit'))
+const DocPlanConfirm = lazy(() => import('./pages/DocCenter/DocPlanConfirm'))
+const DocPlanHandoff = lazy(() => import('./pages/DocCenter/DocPlanHandoff'))
+const DocPlanAcl = lazy(() => import('./pages/DocCenter/DocPlanAcl'))
+const DocPlanExecution = lazy(() => import('./pages/DocCenter/DocPlanExecution'))
+const DocGovernance = lazy(() => import('./pages/DocCenter/DocGovernance'))
+const DocGovernanceMembers = lazy(() => import('./pages/DocCenter/DocGovernanceMembers'))
+const DocTaxonomy = lazy(() => import('./pages/DocCenter/DocTaxonomy'))
+const DocClearance = lazy(() => import('./pages/DocCenter/DocClearance'))
+const DocKnowledgeDetail = lazy(() => import('./pages/DocCenter/DocKnowledgeDetail'))
+const DocMyAcks = lazy(() => import('./pages/DocCenter/DocMyAcks'))
+const DocBooks = lazy(() => import('./pages/DocCenter/DocBooks'))
+const DocArchives = lazy(() => import('./pages/DocCenter/DocArchives'))
+const DocSystemPlans = lazy(() => import('./pages/DocCenter/DocSystemPlans'))
+const DocSystemPlanDetail = lazy(() => import('./pages/DocCenter/DocSystemPlanDetail'))
+const DocApiCenter = lazy(() => import('./pages/DocCenter/DocApiCenter'))
 const DocSpaceManage = lazy(() => import('./pages/DocCenter/DocSpaceManage'))
 const DocSpaceForm = lazy(() => import('./pages/DocCenter/DocSpaceForm'))
 const DocStats = lazy(() => import('./pages/DocCenter/DocStats'))
@@ -746,6 +772,14 @@ function AuthenticatedLayout() {
                             <Route path="/ai-role-quota-detail" element={<RoleQuotaDetail />} />
 
               <Route path="/ai-operation-auth" element={<AiOperationAuth />} />
+              <Route path="/agent-overview" element={<AgentConsoleRoute pane="overview" />} />
+              <Route path="/agent-apps" element={<AgentConsoleRoute pane="apps" />} />
+              <Route path="/agent-budget" element={<AgentConsoleRoute pane="budget" />} />
+              <Route path="/agent-actions" element={<AgentConsoleRoute pane="actions" />} />
+              <Route path="/agent-knowledge" element={<AgentConsoleRoute pane="knowledge" />} />
+              <Route path="/agent-data" element={<AgentConsoleRoute pane="data" />} />
+              <Route path="/agent-runs" element={<AgentConsoleRoute pane="runs" />} />
+              <Route path="/agent-evaluation" element={<AgentConsoleRoute pane="evaluation" />} />
               <Route path="/ai-assistant" element={<AiAssistantOverview />} />
               <Route path="/ai-assistant/capability" element={<AiAssistantCapability />} />
               <Route path="/ai-assistant/profile" element={<AiAssistantProfile />} />
@@ -977,6 +1011,24 @@ function AuthenticatedLayout() {
               <Route path="/doc-center/detail" element={<DocCenter />} />
               <Route path="/doc-center/register" element={<DocCenter />} />
               <Route path="/doc-center/edit" element={<DocCenter />} />
+              <Route path="/doc-center/knowledge" element={<DocKnowledgeDetail />} />
+              <Route path="/doc-center/my-acks" element={<DocMyAcks />} />
+              <Route path="/doc-books" element={<DocBooks />} />
+              <Route path="/doc-archives" element={<DocArchives />} />
+              <Route path="/doc-system-plans" element={<DocSystemPlans />} />
+              <Route path="/doc-system-plans/detail" element={<DocSystemPlanDetail />} />
+              <Route path="/doc-api-center" element={<DocApiCenter />} />
+              <Route path="/doc-plans" element={<DocPlans />} />
+              <Route path="/doc-plans/detail" element={<DocPlanDetail />} />
+              <Route path="/doc-plans/edit" element={<DocPlanEdit />} />
+              <Route path="/doc-plans/confirm" element={<DocPlanConfirm />} />
+              <Route path="/doc-plans/handoff" element={<DocPlanHandoff />} />
+              <Route path="/doc-plans/acl" element={<DocPlanAcl />} />
+              <Route path="/doc-plans/execution" element={<DocPlanExecution />} />
+              <Route path="/doc-governance" element={<DocGovernance />} />
+              <Route path="/doc-governance/members" element={<DocGovernanceMembers />} />
+              <Route path="/doc-governance/taxonomy" element={<DocTaxonomy />} />
+              <Route path="/doc-governance/clearance" element={<DocClearance />} />
               <Route path="/doc-space" element={<DocSpaceManage />} />
               <Route path="/doc-space/form" element={<DocSpaceForm />} />
               <Route path="/doc-stats" element={<DocStats />} />

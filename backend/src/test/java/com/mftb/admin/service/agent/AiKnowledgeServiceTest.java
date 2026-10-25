@@ -45,7 +45,8 @@ class AiKnowledgeServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AiKnowledgeService(docMapper, chunkMapper, jdbcTemplate, auditService);
+        service = new AiKnowledgeService(docMapper, chunkMapper, jdbcTemplate, auditService,
+                new com.mftb.admin.service.agent.platform.AiKnowledgeAclService(jdbcTemplate));
     }
 
     @Test

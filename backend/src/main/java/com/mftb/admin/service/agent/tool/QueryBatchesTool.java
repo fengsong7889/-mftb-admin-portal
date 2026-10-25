@@ -85,8 +85,8 @@ public class QueryBatchesTool implements AgentTool {
             }).toList();
             return toJson(Map.of("total", result.getTotal(), "records", summary));
         } catch (Exception e) {
-            log.warn("[AgentTool] query_batches 失敗 caller={}: {}", ctx.caller(), e.getMessage());
-            return errorJson("查询失败: " + e.getMessage());
+            log.warn("[AgentTool] query_batches 失敗 type={}", e.getClass().getSimpleName());
+            return errorJson("無法查詢批次，請確認權限或稍後重試");
         }
     }
 
@@ -114,7 +114,7 @@ public class QueryBatchesTool implements AgentTool {
     }
     private String toJson(Object v) {
         try { return objectMapper.writeValueAsString(v); }
-        catch (Exception e) { return errorJson(e.getMessage()); }
+        catch (Exception e) { return errorJson("查詢結果無法處理"); }
     }
     private static String errorJson(String msg) {
         return "{\"error\":\"" + (msg == null ? "unknown" : msg.replace("\"", "'")) + "\"}";

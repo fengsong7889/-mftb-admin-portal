@@ -19,8 +19,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mftb.admin.service.AiConversationEventService;
 import com.mftb.admin.service.AiConversationService;
-import com.mftb.admin.service.AiMyCenterService;
-import com.mftb.admin.dto.AiMyCenterDTO;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.mftb.admin.util.OperatorResolver;
 
 import java.util.ArrayList;
@@ -64,7 +63,7 @@ public class AgentOrchestrationService {
 
     private final List<AgentTool> tools;
     private final LlmChannelRouter channelRouter;
-    private final AiMyCenterService myCenterService;
+    private final AiModelAdmissionService admissionService;
     private final AiConversationEventService eventService;
     private final LlmHttpClient llmClient;
     private final ObjectMapper objectMapper;
@@ -85,6 +84,8 @@ public class AgentOrchestrationService {
     private final AiGuardrailService guardrailService;
     /** 自动记忆候选（只生成建议，用户确认后才落库） */
     private final AiUserMemoryService memoryService;
+    /** WP04：应用发布版本的工具白名单；未带应用时保持系统级裁剪。 */
+    private final com.mftb.admin.service.agent.platform.AiApplicationService applications;
 
     @Data
     public static class OrchestrateRequest {
@@ -94,13 +95,20 @@ public class AgentOrchestrationService {
         /** auto / primary / off-peak */
         private String mode = "auto";
         /** 配置中心试跑：用草稿组装好的完整 Prompt 覆盖线上 Prompt */
+        @JsonProperty(access = JsonProperty.Access.READ_ONLY)
         private String systemPromptOverride;
         /** 试跑：不写会话事件、不暴露外部工具与推送工具 */
+        @JsonProperty(access = JsonProperty.Access.READ_ONLY)
         private boolean sandbox;
         /** 试跑：完全不使用工具，只测回答风格 */
+        @JsonProperty(access = JsonProperty.Access.READ_ONLY)
         private boolean disableTools;
         /** 当前业务系统（rdm/finance/eam/hr…）：决定取哪套骨架/护栏/记忆；空=共用 */
         private String systemCode;
+        /** 应用标识；由服务端查发布版本决定工具白名单，未发布即拒绝。 */
+        private String applicationKey;
+        /** 运行冻结的版本号：仅后台 Worker 设置，HTTP 请求不暴露。 */
+        private Integer applicationVersion;
     }
 
     @Data
@@ -144,7 +152,22 @@ public class AgentOrchestrationService {
     }
 
     public OrchestrateResult orchestrate(OrchestrateRequest req, String caller) {
+        try {
+            return run(req, caller);
+        } catch (com.mftb.admin.common.BusinessException e) {
+            OrchestrateResult denied = new OrchestrateResult();
+            denied.setErrorKind("execution_blocked");
+            denied.setText(e.getMessage());
+            return denied;
+        }
+    }
+
+    private OrchestrateResult run(OrchestrateRequest req, String caller) {
         OrchestrateResult out = new OrchestrateResult();
+        if (req.isSandbox()) req.setConversationPk(null);
+        eventService.requireOwned(req.getConversationPk(), caller);
+        if (!StringUtils.hasText(req.getSystemCode())) req.setSystemCode("common");
+        if (rejectAdmission(out, req, caller, admissionService.checkContext(caller, req.getSystemCode()), 0, null)) return out;
         if (req.getMessages() == null || req.getMessages().isEmpty()) {
             out.setText("（無消息可處理）");
             return out;
@@ -179,7 +202,10 @@ public class AgentOrchestrationService {
         } else if (req.isSandbox()) {
             // 试跑不暴露推送工具：避免在沙箱里生成待确认动作
             enabledTools = enabledTools.stream()
-                    .filter(t -> !"rdm_prepare_progress_push".equals(t.toolKey()))
+                    .filter(t -> Set.of("query_account_balance", "query_batches", "query_approvals", "search_knowledge",
+                                                "lookup_glossary", "rdm_list_iterations", "rdm_list_projects", "rdm_list_tasks",
+                                                "rdm_my_todos", "rdm_person_workload", "rdm_project_progress", "rdm_query_requirements",
+                                                "rdm_requirement_detail", "rdm_risks", "rdm_stats_overview").contains(t.toolKey()))
                     .toList();
         }
         // 按当前系统裁剪工具：物资/人事等未接入 AI 工具的系统只保留通用工具（知识库/术语）
@@ -188,56 +214,75 @@ public class AgentOrchestrationService {
                     .filter(t -> AiPromptConfigService.inScope(scopeOf(t.toolKey()), req.getSystemCode()))
                     .toList();
         }
+        // WP04：应用发布版本决定工具白名单；应用未发布或白名单为空时不允许任何业务工具。
+        if (StringUtils.hasText(req.getApplicationKey())) {
+            java.util.Map<String, Object> version = req.getApplicationVersion() == null
+                    ? applications.published(req.getApplicationKey())
+                    : applications.version(req.getApplicationKey(), req.getApplicationVersion());
+            if (version == null) {
+                out.setErrorKind("app_not_published");
+                out.setText("該應用尚未發布可用版本，請先發布後再使用");
+                return out;
+            }
+            List<String> whitelist = applications.toolWhitelist(version);
+            enabledTools = enabledTools.stream().filter(t -> whitelist.contains(t.toolKey())).toList();
+        }
         LlmChannelRouter.Channel channel = pickChannel(req.getMode(), username);
         if (channel == null) {
             out.setErrorKind("no_channel");
             out.setText("當前賬號沒有可用模型（部分模型未對你開放），請聯繫管理員申請開通");
             return out;
         }
-        // A3：模型授权必须在服务端判定——前端把输入框置灰不是安全边界，绕过 UI 直接 POST 就能偷跑模型
+        // 准入结果由共享服务裁决，审批与降级要求不等于允许继续使用原模型。
         String modelKey = channel.getDefaultModelKey();
-        if (!isModelAuthorized(modelKey)) {
-            appendEvent(req.getConversationPk(), "POLICY_DECISION", username, Map.of(
-                    "decision", "reject", "reason", "no_model_auth", "model", String.valueOf(modelKey)));
-            out.setErrorKind("no_model_auth");
-            out.setText("當前賬號未被授權使用模型「" + modelKey + "」，請聯繫管理員在「員工模型權控」開通後重試");
-            return out;
-        }
-        AiMyCenterDTO.QuotaCheckVO quota = myCenterService.checkQuota(null, modelKey);
-        if (quota != null && "reject".equals(quota.getAction())) {
-            out.setErrorKind("quota_reject");
-            out.setText(quota.getMessage() == null ? "已超出額度限制" : quota.getMessage());
-            return out;
-        }
+        if (rejectAdmission(out, req, username, admissionService.check(username, modelKey), 0, modelKey)) return out;
 
         appendEvent(req.getConversationPk(), "USER_TURN", username, snapshotLastUser(req.getMessages()));
 
         // 复制 messages，前置 System Prompt；截断到最近 MAX_MESSAGES 条
         List<Map<String, Object>> working = new ArrayList<>();
-        String systemPrompt = StringUtils.hasText(req.getSystemPromptOverride())
+        String systemPrompt = req.isSandbox() && StringUtils.hasText(req.getSystemPromptOverride())
                 ? req.getSystemPromptOverride() : buildSystemPrompt(enabledTools, effectiveUserText, req.getSystemCode());
         working.add(Map.of("role", "system", "content", systemPrompt));
         working.addAll(withSanitizedLastUser(req.getMessages(), lastUserText, effectiveUserText));
 
         long totalTokens = 0;
         String modelUsed = channel.getDefaultModelKey();
-        List<Map<String, Object>> toolSchemas = allToolSchemas(enabledTools, policyBy, req.isSandbox(), currentUser);
+        List<Map<String, Object>> toolSchemas = req.isDisableTools() ? List.of()
+                : allToolSchemas(enabledTools, policyBy, req.isSandbox(), currentUser);
+        Set<String> allowedToolKeys = new java.util.HashSet<>();
+        for (Map<String, Object> schema : toolSchemas) {
+            if (schema.get("function") instanceof Map<?, ?> function) {
+                allowedToolKeys.add(String.valueOf(function.get("name")));
+            }
+        }
         // 每轮单独一个 requestId：一次上游往返 = 一条用量明细 + 一条预算流水，多轮工具循环不能共账
         String requestIdBase = "orch-" + java.util.UUID.randomUUID();
 
         for (int round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+            if (rejectAdmission(out, req, username, admissionService.check(username, modelKey), totalTokens, modelUsed)) return out;
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("model", channel.getDefaultModelKey());
             payload.put("messages", working);
             payload.put("temperature", 0.3);
+            payload.put("max_tokens", ESTIMATED_COMPLETION_TOKENS);
             if (!toolSchemas.isEmpty()) {
                 payload.put("tools", toolSchemas);
                 payload.put("tool_choice", "auto");
             }
+            AiOutboundPolicyService.Prepared prepared = admissionService.prepare(username, channel, payload, req.getSystemCode());
+            if (rejectAdmission(out, req, username, prepared.decision(), totalTokens, modelUsed)) return out;
+            payload = prepared.payload();
             JsonNode resp;
             String roundRequestId = requestIdBase + "-r" + round;
-            metering.reserve(roundRequestId, username, channel,
-                    estimatePromptTokens(working), ESTIMATED_COMPLETION_TOKENS);
+            try {
+                metering.reserve(roundRequestId, username, channel,
+                        estimatePromptTokens(working), ESTIMATED_COMPLETION_TOKENS);
+            } catch (com.mftb.admin.common.BusinessException denied) {
+                out.setErrorKind("budget_exceeded");
+                out.setText(denied.getMessage());
+                return out;
+            }
             try {
                 resp = callLlm(channel, payload);
             } catch (LlmHttpClient.LlmCallException e) {
@@ -275,16 +320,27 @@ public class AgentOrchestrationService {
                 appendEvent(req.getConversationPk(), "ASSISTANT_TURN", username,
                         Map.of("chars", content.length(), "preview", preview(content, 200), "toolCalls", 0));
                 // B4：本回合真正完成，服务端记一次调用并固定实际使用的模型
-                conversationService.recordAgentTurn(req.getConversationPk(), username, modelUsed);
+                if (!req.isSandbox()) conversationService.recordAgentTurn(req.getConversationPk(), username, modelUsed);
                 return out;
             }
             if (round == MAX_TOOL_ROUNDS) {
                 // 轮次超限，去掉 tools 再拿一次收尾
+                payload = new LinkedHashMap<>(payload);
                 payload.remove("tools");
                 payload.remove("tool_choice");
                 String finalRequestId = requestIdBase + "-rfinal";
-                metering.reserve(finalRequestId, username, channel,
-                        estimatePromptTokens(working), ESTIMATED_COMPLETION_TOKENS);
+                if (rejectAdmission(out, req, username, admissionService.check(username, modelKey), totalTokens, modelUsed)) return out;
+                AiOutboundPolicyService.Prepared finalPrepared = admissionService.prepare(username, channel, payload, req.getSystemCode());
+                if (rejectAdmission(out, req, username, finalPrepared.decision(), totalTokens, modelUsed)) return out;
+                payload = finalPrepared.payload();
+                try {
+                    metering.reserve(finalRequestId, username, channel,
+                            estimatePromptTokens(working), ESTIMATED_COMPLETION_TOKENS);
+                } catch (com.mftb.admin.common.BusinessException denied) {
+                    out.setErrorKind("budget_exceeded");
+                    out.setText(denied.getMessage());
+                    return out;
+                }
                 String finalContent;
                 try {
                     JsonNode finalResp = callLlm(channel, payload);
@@ -330,6 +386,14 @@ public class AgentOrchestrationService {
                 String name = String.valueOf(fn.get("name"));
                 String argsJson = String.valueOf(fn.get("arguments"));
                 String callId = String.valueOf(tc.get("id"));
+                // 执行端复核本次实际下发集合，模型不能凭历史或幻觉恢复被裁剪的工具。
+                if (!allowedToolKeys.contains(name)) {
+                    out.getTraces().add(new ToolTrace(name, shortDigest(argsJson), 0, false));
+                    working.add(Map.of("role", "tool", "tool_call_id", callId,
+                            "content", "{\"error\":\"本次運行未授權使用該工具\"}"));
+                    recordToolExecLog(name, username, shortDigest(argsJson), 0, false);
+                    continue;
+                }
                 AgentTool tool = findTool(name);
                 if (tool == null) {
                     // 未识别（外部服务），回给前端：确认 + 执后同 nextMessages 追补 tool result
@@ -352,6 +416,16 @@ public class AgentOrchestrationService {
                     recordToolExecLog(name, username, shortDigest(argsJson), 0, false);
                     continue;
                 }
+                try {
+                    if (toolPolicyService.enforce(name, null, username, shortDigest(argsJson)) == null) {
+                        throw new IllegalArgumentException("工具授權不可用");
+                    }
+                } catch (RuntimeException e) {
+                    out.getTraces().add(new ToolTrace(name, shortDigest(argsJson), 0, false));
+                    working.add(Map.of("role", "tool", "tool_call_id", callId,
+                            "content", "{\"error\":\"工具執行未獲授權，請檢查权限或審批狀態\"}"));
+                    continue;
+                }
                 Map<String, Object> args = new LinkedHashMap<>(parseArgs(argsJson));
                 // 知识库检索强制收敛到当前系统（common + 本系统），不依赖模型自填 systemCode
                 if ("search_knowledge".equals(name) && StringUtils.hasText(req.getSystemCode())) {
@@ -368,7 +442,7 @@ public class AgentOrchestrationService {
                 if (rich.view() != null) {
                     addView(out, rich.view());
                 }
-                if (rich.pendingAction() != null) {
+                if (!req.isSandbox() && rich.pendingAction() != null) {
                     out.getPendingActions().add(rich.pendingAction());
                 }
                 boolean ok = toolResult != null && !toolResult.startsWith("{\"error\"");
@@ -393,6 +467,18 @@ public class AgentOrchestrationService {
             }
         }
         return out;
+    }
+
+    private boolean rejectAdmission(OrchestrateResult out, OrchestrateRequest req, String caller,
+                                    AiModelAdmissionService.Decision decision, long tokens, String model) {
+        if (decision.allowed()) return false;
+        out.setErrorKind(decision.errorKind());
+        out.setText(decision.message());
+        out.setTokens(tokens);
+        out.setModel(model);
+        appendEvent(req.getConversationPk(), "POLICY_DECISION", caller,
+                Map.of("decision", "reject", "reason", decision.errorKind()));
+        return true;
     }
 
     /* ────────────────── 内部工具 ────────────────── */
@@ -454,8 +540,8 @@ public class AgentOrchestrationService {
 
     /**
      * 内建工具 + 已安装且已授权的外部工具。
-     * <p>内建工具也读 ai_tool_policy：存在策略行且 enabled=0 的不下发；
-     * 无策略行时保持历史行为（放行），新工具由迁移显式登记 enabled=1。
+     * <p>内建工具也读 ai_tool_policy：只有显式登记且启用的工具才下发；
+     * 无策略行、策略不可用或缺少登录身份时默认拒绝。
      * <p>sandbox=true 时只下发内建只读工具，不暴露外部服务。
      */
     private List<Map<String, Object>> allToolSchemas(List<AgentTool> enabledTools,
@@ -496,7 +582,7 @@ public class AgentOrchestrationService {
                 if (p.getToolKey() != null) map.put(p.getToolKey(), p);
             }
         } catch (Exception e) {
-            log.warn("[AgentOrch] 读取工具策略失败，内建工具按默认放行：{}", e.getMessage());
+            log.warn("[AgentOrch] 读取工具策略失败，本轮不提供工具，异常类型={}", e.getClass().getSimpleName());
         }
         return map;
     }
@@ -511,11 +597,8 @@ public class AgentOrchestrationService {
 
     private boolean isToolEnabled(String toolKey, Map<String, AiToolPolicy> policyBy, SysUser currentUser) {
         AiToolPolicy policy = policyBy.get(toolKey);
-        if (policy == null || policy.getEnabled() == null || policy.getEnabled() == 1) {
-            // 角色/部门不在可见范围时按停用处理：页面和模型都不能再看到它
-            return AiToolVisibility.visible(policy, currentUser);
-        }
-        return false;
+        return policy != null && Integer.valueOf(1).equals(policy.getEnabled())
+                && AiToolVisibility.visible(policy, currentUser);
     }
 
     /** 同一轮最多保留 3 个视图；同 id 去重，避免模型重复调用同一工具刷屏。 */
@@ -602,27 +685,15 @@ public class AgentOrchestrationService {
     }
 
     private static List<Map<String, Object>> trimMessages(List<Map<String, Object>> raw) {
-        if (raw.size() <= MAX_MESSAGES) return new ArrayList<>(raw);
-        return new ArrayList<>(raw.subList(raw.size() - MAX_MESSAGES, raw.size()));
+        List<Map<String, Object>> safe = raw.stream().filter(m -> m != null
+                && !"system".equals(m.get("role")) && !"developer".equals(m.get("role"))).toList();
+        return new ArrayList<>(safe.subList(Math.max(0, safe.size() - MAX_MESSAGES), safe.size()));
     }
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> parseArgs(String json) {
         try { return objectMapper.readValue(json, Map.class); }
         catch (Exception e) { return Map.of(); }
-    }
-
-    /**
-     * A3：模型授权校验。走 {@link AiMyCenterService#hasModelAccess(String)}（与首页 my-models 同源），
-     * 网关与编排共用一个口径，避开“前端置灰、后端放行”的越权。
-     */
-    private boolean isModelAuthorized(String modelKey) {
-        try {
-            return myCenterService.hasModelAccess(modelKey);
-        } catch (Exception e) {
-            log.warn("[AgentOrch] 授权模型查询失败，拒绝调用: {}", e.getMessage());
-            return false;
-        }
     }
 
     /** 预占用的 prompt 估算：消息条数 × 200 兑底（无 tokenizer），结算以服务端实际 usage 为准。 */
@@ -729,7 +800,6 @@ public class AgentOrchestrationService {
 
     private void appendEvent(Long conversationPk, String type, String actor, Map<String, Object> payload) {
         if (conversationPk == null) return;
-        try { eventService.append(conversationPk, null, type, actor, payload); }
-        catch (Exception e) { log.warn("[AgentOrch] 事件写入失败 type={}: {}", type, e.getMessage()); }
+        eventService.append(conversationPk, null, type, actor, payload);
     }
 }

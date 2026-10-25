@@ -41,21 +41,24 @@ public class FinAccountServiceImpl implements FinAccountService {
     private final OperatorResolver operatorResolver;
     /** V0 Sprint 1 §B.7：账户列表与 AI 内置工具同源，无授权不展示。 */
     private final DataScopeService dataScopeService;
+    private final com.mftb.admin.service.PermissionService permissionService;
 
     @Override
     public PageResult<FinAccountVO> page(FinAccountQuery query) {
         // 以集团管理数据为源按「集团×品牌」派生：集团有对应品牌门店才展示，未开户显示零余额
         // 非超管仅可见已授权集团（与 AdOrderServiceImpl 同源）；空集合直接短路避免全量泄露
-        Set<String> authorizedGroups = dataScopeService.resolveAuthorizedGroupCodes();
+        Set<String> authorizedGroups = com.mftb.admin.service.FinReadAccess.require(
+                "account-balance", operatorResolver, permissionService, dataScopeService);
         if (authorizedGroups != null && authorizedGroups.isEmpty()) {
             return new PageResult<>(List.of(), 0L);
         }
         long total = accountMapper.countDerived(query.getGroupId(), query.getGroupName(),
                 query.getBrand(), query.getStatus(), authorizedGroups);
-        long offset = (long) (query.getPage() - 1) * query.getSize();
+        long size = PageResult.normalizeSize(query.getSize());
+        long offset = (PageResult.normalizePage(query.getPage()) - 1) * size;
         List<FinAccountVO> records = total == 0 ? List.of()
                 : accountMapper.selectDerivedPage(query.getGroupId(), query.getGroupName(),
-                        query.getBrand(), query.getStatus(), authorizedGroups, offset, query.getSize());
+                        query.getBrand(), query.getStatus(), authorizedGroups, offset, size);
         return new PageResult<>(records, total);
     }
 
@@ -208,6 +211,9 @@ public class FinAccountServiceImpl implements FinAccountService {
 
     @Override
     public List<FinAccount> findAccountsByGroupCode(String groupCode) {
+        Set<String> groups = com.mftb.admin.service.FinReadAccess.require(
+                "account-balance", operatorResolver, permissionService, dataScopeService);
+        if (groups != null && !groups.contains(groupCode)) throw new BusinessException(404, "賬戶不存在或無權查看");
         return accountMapper.selectList(
                 new LambdaQueryWrapper<FinAccount>()
                         .eq(FinAccount::getGroupCode, groupCode));

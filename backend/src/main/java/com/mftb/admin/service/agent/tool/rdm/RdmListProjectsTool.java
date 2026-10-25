@@ -83,7 +83,7 @@ public class RdmListProjectsTool implements AgentTool {
         query.setStatus(status);
         String pm = support.argStr(args, "pm");
         if (pm != null) {
-            RdmToolSupport.PersonLookup person = support.resolvePerson(pm);
+            RdmToolSupport.PersonLookup person = support.resolvePerson(pm, user);
             if (!person.ok()) return RichOutput.of(lookupError(person.error(), person.hint(), person.candidates()));
             query.setPmUserId(person.user().getId());
         }

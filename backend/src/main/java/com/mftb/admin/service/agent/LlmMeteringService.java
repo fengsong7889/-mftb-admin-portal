@@ -42,6 +42,9 @@ public class LlmMeteringService {
         try {
             budgetService.reserve(requestId, account, channel.getDefaultModelKey(), promptEst, completionEst,
                     channel.getInputPrice(), channel.getOutputPrice(), channel.getCurrency());
+        } catch (com.mftb.admin.service.agent.platform.AiBudgetPoolService.BudgetDeniedException e) {
+            // 预算池拒绝不能降级为“只记日志”：没有预占就不允许发起上游调用。
+            throw new com.mftb.admin.common.BusinessException(429, e.getMessage());
         } catch (RuntimeException e) {
             log.warn("[LlmMetering] 預算預占失敗 request={}: {}", requestId, e.getMessage());
         }

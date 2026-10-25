@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 class BudgetReservationServiceTest {
 
     @Mock private AiBudgetLedgerMapper ledgerMapper;
+    @Mock private com.mftb.admin.service.agent.platform.AiBudgetPoolService poolService;
 
     @InjectMocks private BudgetReservationServiceImpl service;
 
@@ -42,6 +43,7 @@ class BudgetReservationServiceTest {
 
     @Test
     void reserveInsertsNewRowWithEstimatedVerification() {
+        when(poolService.tryReserve(any(), any(), any(), any(), any())).thenReturn(true);
         when(ledgerMapper.selectOne(any())).thenReturn(null);
         org.mockito.Mockito.doAnswer(inv -> { inv.<AiBudgetLedger>getArgument(0).setId(1L); return 1; }).when(ledgerMapper).insert(any(AiBudgetLedger.class));
         Reservation r = service.reserve("req-1", "alice", "deepseek-chat",

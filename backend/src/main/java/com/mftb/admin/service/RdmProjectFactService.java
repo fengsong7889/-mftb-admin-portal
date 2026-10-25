@@ -204,6 +204,22 @@ public class RdmProjectFactService {
         throw new BusinessException("您不是該項目成員，無法查看該項目數據");
     }
 
+    /** 消歧先取授权 ID 集合；负责人没有成员行时仍与单项目守卫保持一致。 */
+    public RdmFactVO.Scope resolveLookupScope(Long userId) {
+        SysUser user = userId == null ? null : userMapper.selectById(userId);
+        if (user == null || !Integer.valueOf(1).equals(user.getStatus())) return resolveScope(null);
+        RdmFactVO.Scope scope = resolveScope(userId);
+        if (!scope.isCanSeeAll()) {
+            java.util.Set<Long> ids = new java.util.LinkedHashSet<>(scope.getProjectIds());
+            projectMapper.selectList(new LambdaQueryWrapper<RdmProject>()
+                    .select(RdmProject::getId)
+                    .and(w -> w.eq(RdmProject::getPmUserId, userId).or().eq(RdmProject::getProductOwnerUserId, userId)))
+                    .stream().map(RdmProject::getId).filter(Objects::nonNull).forEach(ids::add);
+            scope.setProjectIds(new ArrayList<>(ids));
+        }
+        return scope;
+    }
+
     /* ==================== 对外事实入口 ==================== */
 
     /**

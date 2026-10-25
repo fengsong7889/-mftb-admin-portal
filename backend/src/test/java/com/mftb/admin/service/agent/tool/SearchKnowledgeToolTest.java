@@ -37,13 +37,17 @@ class SearchKnowledgeToolTest {
 
     @BeforeEach
     void setUp() {
-        tool = new SearchKnowledgeTool(knowledgeService, mapper);
+        com.mftb.admin.util.OperatorResolver operators = org.mockito.Mockito.mock(com.mftb.admin.util.OperatorResolver.class);
+        com.mftb.admin.entity.SysUser user = new com.mftb.admin.entity.SysUser();
+        user.setId(7L); user.setUsername("alice"); user.setStatus(1);
+        org.mockito.Mockito.lenient().when(operators.currentUser()).thenReturn(user);
+        tool = new SearchKnowledgeTool(knowledgeService, mapper, operators);
     }
 
     @Test
     @DisplayName("命中时返回标题与片段，并生成知识库表格视图")
     void returnsHitsAndView() {
-        when(knowledgeService.search(eq("日報"), eq("rdm"), eq(5))).thenReturn(List.of(
+        when(knowledgeService.search(eq("日報"), eq("rdm"), eq(5), any())).thenReturn(List.of(
                 new AiKnowledgeService.KnowledgeHit(1L, 0, "日報推送規範", "rdm", "每日 09:00 推送", 1.5)));
 
         AgentTool.RichOutput out = tool.executeRich(Map.of("query", "日報", "systemCode", "rdm"),
@@ -59,7 +63,7 @@ class SearchKnowledgeToolTest {
     @Test
     @DisplayName("未命中时提示不要编造，且不生成空表格")
     void emptyHitsAsksNotToFabricate() throws Exception {
-        when(knowledgeService.search(any(), any(), anyInt())).thenReturn(List.of());
+        when(knowledgeService.search(any(), any(), anyInt(), any())).thenReturn(List.of());
 
         AgentTool.RichOutput out = tool.executeRich(Map.of("query", "不存在的主題"),
                 new AgentTool.ToolCallContext("alice", null));
@@ -76,6 +80,6 @@ class SearchKnowledgeToolTest {
         AgentTool.RichOutput out = tool.executeRich(Map.of(), new AgentTool.ToolCallContext("alice", null));
 
         assertTrue(mapper.readTree(out.content()).has("error"));
-        verify(knowledgeService, org.mockito.Mockito.never()).search(any(), any(), anyInt());
+        verify(knowledgeService, org.mockito.Mockito.never()).search(any(), any(), anyInt(), any());
     }
 }

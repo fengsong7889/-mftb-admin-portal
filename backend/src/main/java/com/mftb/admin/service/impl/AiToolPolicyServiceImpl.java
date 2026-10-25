@@ -9,6 +9,7 @@ import com.mftb.admin.mapper.AiToolExecLogMapper;
 import com.mftb.admin.mapper.AiToolPolicyMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.AiToolPolicyService;
+import com.mftb.admin.service.agent.AiToolVisibility;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +40,8 @@ public class AiToolPolicyServiceImpl implements AiToolPolicyService {
     private final AiToolExecLogMapper execLogMapper;
     private final OperatorResolver operatorResolver;
     private final SysUserMapper sysUserMapper;
+    /** WP07：需要审批的工具必须以已审批且未消费的动作提案放行。 */
+    private final com.mftb.admin.service.agent.platform.AiActionProposalService proposalService;
 
     @Override
     public List<AiToolPolicy> listAll() {
@@ -133,6 +136,12 @@ public class AiToolPolicyServiceImpl implements AiToolPolicyService {
 
     @Override
     public AiToolPolicy enforce(String toolKey, String approvalToken, String caller, String argsDigest) {
+        return enforce(toolKey, approvalToken, caller, argsDigest, null);
+    }
+
+    @Override
+    public AiToolPolicy enforce(String toolKey, String approvalToken, String caller, String argsDigest,
+                                java.util.Map<String, Object> args) {
         AiToolPolicy policy = find(toolKey);
         if (policy == null) {
             recordReject(toolKey, caller, argsDigest, "policy_not_registered");
@@ -142,10 +151,28 @@ public class AiToolPolicyServiceImpl implements AiToolPolicyService {
             recordReject(toolKey, caller, argsDigest, "policy_disabled");
             throw new IllegalArgumentException("工具已停用：" + toolKey);
         }
-        if (policy.getRequireApproval() != null && policy.getRequireApproval() == 1
-                && !StringUtils.hasText(approvalToken)) {
-            recordReject(toolKey, caller, argsDigest, "approval_required");
-            throw new IllegalArgumentException("工具需审批凭证：" + toolKey);
+        SysUser user = operatorResolver.currentUser();
+        if (user == null || !StringUtils.hasText(caller) || !caller.equals(user.getUsername())) {
+            recordReject(toolKey, caller, argsDigest, "caller_not_authenticated");
+            throw new IllegalArgumentException("登录身份无效，不能执行工具");
+        }
+        if (!AiToolVisibility.visible(policy, user)) {
+            recordReject(toolKey, caller, argsDigest, "tool_scope_denied");
+            throw new IllegalArgumentException("当前账号无权使用该工具");
+        }
+        if (Integer.valueOf(1).equals(policy.getRequireApproval())) {
+            // WP07：审批必须绑定到具体提案与冻结参数；字符串凭证不再具备授权效力。
+            if (!StringUtils.hasText(approvalToken) || args == null) {
+                recordReject(toolKey, caller, argsDigest, "approval_required");
+                throw new IllegalArgumentException("該工具需要已綁定本次參數的審批提案，請先生成提案並完成審批");
+            }
+            try {
+                proposalService.consume(approvalToken, caller, toolKey,
+                        proposalService.sha256(proposalService.canonicalJson(args)));
+            } catch (RuntimeException e) {
+                recordReject(toolKey, caller, argsDigest, "approval_invalid");
+                throw new IllegalArgumentException("審批提案無效或已過期：" + e.getMessage());
+            }
         }
         return policy;
     }
@@ -155,7 +182,8 @@ public class AiToolPolicyServiceImpl implements AiToolPolicyService {
         logEntry.setToolKey(toolKey);
         logEntry.setCaller(caller);
         logEntry.setArgsDigest(argsDigest);
-        logEntry.setDecision("approval_required".equals(reason) ? "approval_required" : "reject");
+        logEntry.setDecision("approval_invalid".equals(reason)
+                ? "reject" : ("approval_required".equals(reason) ? "approval_required" : "reject"));
         logEntry.setRejectReason(reason);
         logEntry.setSuccess(0);
         logExecution(logEntry);

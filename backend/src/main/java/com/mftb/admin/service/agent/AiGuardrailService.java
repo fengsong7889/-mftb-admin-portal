@@ -134,27 +134,42 @@ public class AiGuardrailService {
                     .in(AiGuardRule::getScope, List.of(stage, "both"))
                     .in(AiGuardRule::getSystemCode, scopes));
         } catch (Exception e) {
-            // 规则表不可用时放行，但不能让回答整条挂掉；失败会体现在日志里
-            log.warn("[AiGuardrail] 读取规则失败，跳过护栏: {}", e.getMessage());
-            return GuardResult.pass(text);
+            // 安全策略不可读取时无法证明可放行，不能以可用性为由跳过。
+            log.warn("[AiGuardrail] 讀取規則失敗 type={}", e.getClass().getSimpleName());
+            return GuardResult.block(stage, "安全規則暫時無法確認");
         }
         String current = text;
         List<String> warnings = new ArrayList<>();
+        if (rules == null) return GuardResult.block(stage, "安全規則暫時無法確認");
         for (AiGuardRule rule : rules) {
-            boolean hit = matches(rule, current);
+            if (rule == null || !StringUtils.hasText(rule.getPattern())
+                    || !List.of("keyword", "regex").contains(String.valueOf(rule.getRuleType()))
+                    || !List.of("block", "warn", "replace").contains(String.valueOf(rule.getAction()))) {
+                return GuardResult.block(stage, "安全規則配置無效");
+            }
+            boolean hit;
+            try {
+                hit = matches(rule, current);
+            } catch (RuntimeException e) {
+                return GuardResult.block(stage, "安全規則配置無效");
+            }
             if (!hit) continue;
-            String action = rule.getAction() == null ? "warn" : rule.getAction();
+            String action = rule.getAction();
             if ("block".equals(action)) {
                 String label = StringUtils.hasText(rule.getRemark()) ? rule.getRemark() : "敏感內容";
                 log.info("[AiGuardrail] 命中拦截规则 id={} stage={}", rule.getId(), stage);
                 return GuardResult.block(stage, label);
             }
             if ("replace".equals(action)) {
-                current = replace(rule, current);
-                warnings.add("已按規則「" + rule.getPattern() + "」替換敏感內容");
+                try {
+                    current = replace(rule, current);
+                } catch (RuntimeException e) {
+                    return GuardResult.block(stage, "安全規則配置無效");
+                }
+                warnings.add("已按安全規則替換敏感內容");
                 continue;
             }
-            warnings.add("命中提醒規則「" + rule.getPattern() + "」");
+            warnings.add("命中安全提醒規則");
         }
         return GuardResult.ok(current, warnings);
     }
@@ -165,8 +180,7 @@ public class AiGuardrailService {
             try {
                 return Pattern.compile(rule.getPattern(), Pattern.CASE_INSENSITIVE).matcher(text).find();
             } catch (PatternSyntaxException e) {
-                log.warn("[AiGuardrail] 规则正则无效 id={}: {}", rule.getId(), e.getDescription());
-                return false;
+                throw new IllegalStateException("安全規則正則無效");
             }
         }
         return text.toLowerCase(Locale.ROOT).contains(rule.getPattern().toLowerCase(Locale.ROOT));
@@ -179,7 +193,7 @@ public class AiGuardrailService {
                 return Pattern.compile(rule.getPattern(), Pattern.CASE_INSENSITIVE).matcher(text)
                         .replaceAll(replacement);
             } catch (PatternSyntaxException e) {
-                return text;
+                throw new IllegalStateException("安全替換規則無效");
             }
         }
         return text.replaceAll("(?i)" + Pattern.quote(rule.getPattern()),

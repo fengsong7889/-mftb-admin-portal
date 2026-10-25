@@ -47,7 +47,7 @@ class FinAccountBalanceQueryTest {
         accountMapper = mock(FinAccountMapper.class);
         dataScopeService = mock(DataScopeService.class);
         service = new FinAccountServiceImpl(
-                accountMapper, mock(BizMerchantGroupMapper.class), mock(OperatorResolver.class), dataScopeService);
+                accountMapper, mock(BizMerchantGroupMapper.class), mock(OperatorResolver.class), dataScopeService, mock(PermissionService.class));
     }
 
     private FinAccount account(String groupCode, String brand, String balance, String status) {

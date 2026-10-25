@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mftb.admin.client.LlmHttpClient;
 import com.mftb.admin.common.Result;
-import com.mftb.admin.dto.AiMyCenterDTO;
+import com.mftb.admin.service.agent.AiModelAdmissionService;
 import com.mftb.admin.service.AiConversationEventService;
 import com.mftb.admin.service.AiMyCenterService;
 import com.mftb.admin.service.agent.AiKillSwitchService;
@@ -53,6 +53,7 @@ public class AgentGatewayController {
     private final AiConversationEventService conversationEventService;
     /** V0 §八 V0-7：紧急熍断，命中时 chat 直接 503 */
     private final AiKillSwitchService killSwitchService;
+    private final AiModelAdmissionService admissionService;
 
     /** 与旧 Vite 中间件兼容：POST /api/llm/chat/completions → POST /api/agent/chat/completions */
     @PostMapping("/chat/completions")
@@ -61,16 +62,26 @@ public class AgentGatewayController {
                                   @RequestHeader(value = "x-llm-mode", required = false, defaultValue = DEFAULT_MODE) String mode,
                                   @RequestHeader(value = "x-llm-request-id", required = false) String requestIdHeader,
                                   @RequestHeader(value = "x-llm-conversation-pk", required = false) Long conversationPk) {
+        try {
+            return chatValidated(payload, mode, requestIdHeader, conversationPk);
+        } catch (com.mftb.admin.common.BusinessException e) {
+            return ResponseEntity.status(e.getCode()).body(Map.of("error", e.getMessage(), "errorKind", "request_blocked"));
+        }
+    }
+
+    private ResponseEntity<?> chatValidated(Map<String, Object> payload, String mode, String requestIdHeader, Long conversationPk) {
+        com.mftb.admin.dto.agent.AgentChatRequest.validateCompatibility(payload);
+        if (!Set.of("auto", "primary", "off-peak").contains(String.valueOf(mode))) {
+            throw new com.mftb.admin.common.BusinessException(400, "不支援的模型模式");
+        }
         String username = operatorResolver.currentOperatorAccount();
         if (username == null) {
             return ResponseEntity.status(401).body(Map.of("error", "登录状态无效或已过期，请重新登录后使用 AI 助手"));
         }
-        // V0 §八 V0-7：熎断优先级最高，拉不到任何模型/工具
-        if (killSwitchService.isEngaged()) {
-            Status st = killSwitchService.current();
-            log.warn("[AgentGateway] 熎断中，拒绝 chat 请求：operator={} reason={}", st.operator(), st.reason());
-            return ResponseEntity.status(503).body(Map.of("error",
-                    "AI 服务已临时停用（紧急熎断中）。操作人：" + st.operator() + "；原因：" + st.reason()));
+        conversationEventService.requireOwned(conversationPk, username);
+        AiModelAdmissionService.Decision availability = admissionService.checkAvailability(username);
+        if (!availability.allowed()) {
+            return ResponseEntity.status(availability.httpStatus()).body(Map.of("error", availability.message(), "errorKind", availability.errorKind()));
         }
         // V0 §B.6：命中新回合（最后一条 role=user）时写 USER_TURN；回写成功后写 ASSISTANT_TURN
         maybeAppendUserTurn(conversationPk, payload, username);
@@ -97,34 +108,28 @@ public class AgentGatewayController {
                     "當前賬號沒有可用模型（部分模型未對你開放），請聯繫管理員申請開通"));
         }
 
-        // A3：服务端模型准入（与编排同源）；不信任前端，也不把“置灰”当安全边界
-        if (!myCenterService.hasModelAccess(chosen.getDefaultModelKey())) {
-            appendEvent(conversationPk, "POLICY_DECISION", username, Map.of(
-                    "decision", "reject", "reason", "no_model_auth", "model", String.valueOf(chosen.getDefaultModelKey())));
-            return ResponseEntity.status(403).body(Map.of("error",
-                    "當前賬號未被授權使用模型「" + chosen.getDefaultModelKey() + "」，請聯繫管理員在「員工模型權控」開通"));
-        }
-
-        // 配额校验：命中 reject 直接拒绝；downgrade 不改变通道选择（模型降级留待下一 PR）
-        AiMyCenterDTO.QuotaCheckVO quota = myCenterService.checkQuota(null, chosen.getDefaultModelKey());
-        if (quota != null && "reject".equals(quota.getAction())) {
-            appendEvent(conversationPk, "POLICY_DECISION", username, Map.of(
-                    "decision", "reject", "reason", "quota_exhausted",
-                    "hitSource", String.valueOf(quota.getHitSource()),
-                    "hitUsagePercent", String.valueOf(quota.getHitUsagePercent())));
-            return ResponseEntity.status(429).body(Map.of("error",
-                    quota.getMessage() == null ? "已超出額度限制" : quota.getMessage()));
+        AiModelAdmissionService.Decision decision = admissionService.check(username, chosen.getDefaultModelKey());
+        if (!decision.allowed()) {
+            appendEvent(conversationPk, "POLICY_DECISION", username,
+                    Map.of("decision", "reject", "reason", decision.errorKind()));
+            return ResponseEntity.status(decision.httpStatus())
+                    .body(Map.of("error", decision.message(), "errorKind", decision.errorKind()));
         }
 
         // V0 §B.1：预占预算（估算 prompt = 消息条数×200 兑底，completion = max_tokens 或 2048）
         String requestId = requestIdHeader != null ? requestIdHeader : UUID.randomUUID().toString();
-        metering.reserve(requestId, username, chosen, estimatePromptTokens(payload), estimateCompletionTokens(payload));
-
         // 改写请求体：替换 model 为通道默认；其余字段透传（messages/tools/temperature 等）
         Map<String, Object> outbound = new LinkedHashMap<>(payload);
         if (chosen.getDefaultModelKey() != null) {
             outbound.put("model", chosen.getDefaultModelKey());
         }
+        var prepared = admissionService.prepare(username, chosen, outbound, "common");
+        if (!prepared.decision().allowed()) {
+            return ResponseEntity.status(prepared.decision().httpStatus())
+                    .body(Map.of("error", prepared.decision().message(), "errorKind", prepared.decision().errorKind()));
+        }
+        outbound = prepared.payload();
+        metering.reserve(requestId, username, chosen, estimatePromptTokens(outbound), estimateCompletionTokens(outbound));
         try {
             String body = llmClient.chatCompletionRaw(chosen.getBaseUrl(), chosen.getApiKey(), outbound);
             reportUsageAndSettle(username, mode, chosen, chosenLabel, body, requestId, conversationPk);
@@ -179,11 +184,7 @@ public class AgentGatewayController {
     /** 写事件；conversationPk 为空时静默跳过（历史会话或无会话上下文时仍允许 chat）。 */
     private void appendEvent(Long conversationPk, String type, String actor, Map<String, Object> payload) {
         if (conversationPk == null) return;
-        try {
-            conversationEventService.append(conversationPk, null, type, actor, payload);
-        } catch (Exception e) {
-            log.warn("[AgentGateway] 事件写入失败 type={}: {}", type, e.getMessage());
-        }
+        conversationEventService.append(conversationPk, null, type, actor, payload);
     }
 
     /**
@@ -218,8 +219,10 @@ public class AgentGatewayController {
                     "chars", content.length(),
                     "preview", content.length() > 200 ? content.substring(0, 200) + "…" : content,
                     "toolCalls", toolCalls));
+        } catch (com.mftb.admin.common.BusinessException e) {
+            throw e;
         } catch (Exception e) {
-            log.warn("[AgentGateway] ASSISTANT_TURN 写入失败: {}", e.getMessage());
+            throw new com.mftb.admin.common.BusinessException(503, "模型回覆審計無法完成，請勿自動重試");
         }
     }
 

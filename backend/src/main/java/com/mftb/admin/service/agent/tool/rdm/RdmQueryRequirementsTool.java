@@ -130,19 +130,19 @@ public class RdmQueryRequirementsTool implements AgentTool {
         }
         String pm = support.argStr(args, "pm");
         if (pm != null) {
-            RdmToolSupport.PersonLookup p = support.resolvePerson(pm);
+            RdmToolSupport.PersonLookup p = support.resolvePerson(pm, user);
             if (!p.ok()) return RichOutput.of(lookupError(p.error(), p.hint(), p.candidates()));
             query.setPmUserId(p.user().getId());
         }
         String submitter = support.argStr(args, "submitter");
         if (submitter != null) {
-            RdmToolSupport.PersonLookup p = support.resolvePerson(submitter);
+            RdmToolSupport.PersonLookup p = support.resolvePerson(submitter, user);
             if (!p.ok()) return RichOutput.of(lookupError(p.error(), p.hint(), p.candidates()));
             query.setSubmitterUserId(p.user().getId());
         }
         String handler = support.argStr(args, "handler");
         if (handler != null) {
-            RdmToolSupport.PersonLookup p = support.resolvePerson(handler);
+            RdmToolSupport.PersonLookup p = support.resolvePerson(handler, user);
             if (!p.ok()) return RichOutput.of(lookupError(p.error(), p.hint(), p.candidates()));
             query.setHandlerUserId(p.user().getId());
         }

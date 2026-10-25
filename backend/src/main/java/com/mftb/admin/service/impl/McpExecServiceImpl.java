@@ -36,18 +36,22 @@ public class McpExecServiceImpl implements McpExecService {
     private final AiConversationEventService eventService;
     /** V0 §八 V0-7：熎断优先，命中时一律拒绝工具执行 */
     private final AiKillSwitchService killSwitchService;
+    /** WP07：外部工具执行完必须写回执，否则提案会永久停在 executing。 */
+    private final com.mftb.admin.service.agent.platform.AiActionProposalService proposals;
     private final Map<String, McpExternalHandler> handlers;
 
     public McpExecServiceImpl(McpToolMapper mcpToolMapper, OperatorResolver operatorResolver,
                               AiToolPolicyService policyService,
                               AiConversationEventService eventService,
                               AiKillSwitchService killSwitchService,
+                              com.mftb.admin.service.agent.platform.AiActionProposalService proposals,
                               List<McpExternalHandler> handlerList) {
         this.mcpToolMapper = mcpToolMapper;
         this.operatorResolver = operatorResolver;
         this.policyService = policyService;
         this.eventService = eventService;
         this.killSwitchService = killSwitchService;
+        this.proposals = proposals;
         this.handlers = handlerList.stream()
                 .collect(Collectors.toMap(McpExternalHandler::toolKey, Function.identity()));
     }
@@ -64,17 +68,21 @@ public class McpExecServiceImpl implements McpExecService {
 
     public String execute(String toolKey, Map<String, Object> args,
                           String approvalToken, String conversationId, Long conversationPk) {
+        String caller = operatorResolver.currentOperatorAccount();
+        String ownedNumber = eventService.requireOwned(conversationPk, caller);
+        if (conversationId != null && !conversationId.equals(ownedNumber)) {
+            throw new com.mftb.admin.common.BusinessException(400, "會話編號不一致");
+        }
+        conversationId = ownedNumber;
         // V0 §八 V0-7：熎断优先于工具策略，命中时直接拒绝并写审计
         if (killSwitchService.isEngaged()) {
-            String caller = operatorResolver.currentOperatorName();
             recordRejectUnderKillSwitch(toolKey, caller, conversationId, conversationPk);
             throw new IllegalStateException("AI 服务已临时停用（紧急熎断中），无法执行外部工具：" + toolKey);
         }
-        String caller = operatorResolver.currentOperatorName();
         String digest = digestArgs(args);
         // V0 §B.2：先执行 ai_tool_policy 前置拦截（默认拒绝/启停/审批凭证）
         try {
-            policyService.enforce(toolKey, approvalToken, caller, digest);
+            policyService.enforce(toolKey, approvalToken, caller, digest, args);
             appendEvent(conversationPk, "POLICY_DECISION", caller,
                     Map.of("toolKey", toolKey, "decision", "allow"));
         } catch (RuntimeException e) {
@@ -111,6 +119,7 @@ public class McpExecServiceImpl implements McpExecService {
         } catch (RuntimeException e) {
             success = 0;
             err = e.getClass().getSimpleName() + ": " + e.getMessage();
+            recordProposalReceipt(approvalToken, "unknown", err, digest);
             appendEvent(conversationPk, "TOOL_RESULT", caller,
                     Map.of("toolKey", toolKey, "success", 0, "error", String.valueOf(err)));
             throw e;
@@ -120,7 +129,8 @@ public class McpExecServiceImpl implements McpExecService {
         }
         appendEvent(conversationPk, "TOOL_RESULT", caller,
                 Map.of("toolKey", toolKey, "success", 1));
-        log.info("[MCP Exec] {}({}) by {} → {}", toolKey, tool.getName(), caller, result);
+        recordProposalReceipt(approvalToken, "accepted", null, digest);
+        log.info("[MCP Exec] tool={} caller={} success={}", toolKey, caller, success);
         return result;
     }
 
@@ -141,11 +151,7 @@ public class McpExecServiceImpl implements McpExecService {
     /** 写入会话事件；conversationPk 为空时静默跳过。失败不阻断主链路。 */
     private void appendEvent(Long conversationPk, String type, String actor, Map<String, Object> payload) {
         if (conversationPk == null) return;
-        try {
-            eventService.append(conversationPk, null, type, actor, payload);
-        } catch (Exception e) {
-            log.warn("[MCP Exec] 事件写入失败 type={}: {}", type, e.getMessage());
-        }
+        eventService.append(conversationPk, null, type, actor, payload);
     }
 
     private void recordAllow(String toolKey, String caller, String conversationId,
@@ -160,6 +166,16 @@ public class McpExecServiceImpl implements McpExecService {
         entry.setElapsedMs(cost);
         entry.setSuccess(success);
         policyService.logExecution(entry);
+    }
+
+    /** 仅当 approvalToken 是动作提案号时写回执；普通凭证不产生副作用。 */
+    private void recordProposalReceipt(String approvalToken, String status, String detail, String digest) {
+        if (approvalToken == null || !approvalToken.startsWith("AP")) return;
+        try {
+            proposals.recordReceiptByNo(approvalToken, status, null, detail, digest);
+        } catch (RuntimeException e) {
+            log.warn("[MCP Exec] 提案回执写入失败 type={}", e.getClass().getSimpleName());
+        }
     }
 
     /** 参数摘要：SHA-256 前 16 位；不落敏感原文，供回溯相同参数的多次调用。 */

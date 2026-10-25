@@ -66,7 +66,7 @@ public class RdmPersonWorkloadTool implements AgentTool {
         if (personRaw == null) {
             return RichOutput.of(support.error("請提供員工姓名或工號", "例如：張三 或 MF00001"));
         }
-        RdmToolSupport.PersonLookup lookup = support.resolvePerson(personRaw);
+        RdmToolSupport.PersonLookup lookup = support.resolvePerson(personRaw, user);
         if (!lookup.ok()) {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("error", lookup.error());

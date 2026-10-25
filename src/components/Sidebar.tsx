@@ -53,6 +53,7 @@ import {
   LineChartOutlined,
   AimOutlined,
   ReadOutlined,
+  PlayCircleOutlined,
   HomeOutlined,
   ColumnHeightOutlined,
   SettingOutlined,
@@ -115,7 +116,8 @@ import {
   UserSwitchOutlined, // 員工自助（一级域）
   FieldTimeOutlined, // 我的假期
   FormOutlined, // 我的申請單據
-  FolderOpenOutlined, // 我的檔案
+  FolderOpenOutlined, // 我的檔案 / 系統方案庫
+  ApiOutlined, // 接口管理
   FileProtectOutlined, // 證明開具（自助）
   PrinterOutlined, // 證明開具（人事台账）
   StarOutlined, // 績效考核（一级域）
@@ -279,6 +281,14 @@ const _OLD_KEY_TO_PATH_REMOVED = {
   // 智能中心(AI)
   'ai_model_hub': '/ai-model-hub',
   'ai-operation-auth': '/ai-operation-auth',
+  'agent-overview': '/agent-overview',
+  'agent-apps': '/agent-apps',
+  'agent-budget': '/agent-budget',
+  'agent-actions': '/agent-actions',
+  'agent-knowledge': '/agent-knowledge',
+  'agent-data': '/agent-data',
+  'agent-runs': '/agent-runs',
+  'agent-evaluation': '/agent-evaluation',
   'ai-assistant-overview': '/ai-assistant',
   'ai-assistant-capability': '/ai-assistant/capability',
   'ai-assistant-profile': '/ai-assistant/profile',
@@ -544,6 +554,15 @@ const keyToIcon: Record<string, ReactNode> = {
   'version-history': <HistoryOutlined />,
   'notification-config': <BellOutlined />,
   // 智能中心 (AI)
+  'agent-platform': <ControlOutlined />,
+  'agent-overview': <DashboardOutlined />,
+  'agent-apps': <AppstoreOutlined />,
+  'agent-budget': <ThunderboltOutlined />,
+  'agent-actions': <SafetyCertificateOutlined />,
+  'agent-knowledge': <ReadOutlined />,
+  'agent-data': <DatabaseOutlined />,
+  'agent-runs': <PlayCircleOutlined />,
+  'agent-evaluation': <ExperimentOutlined />,
   'ai-assistant-group': <RobotOutlined />,
   'ai_model_hub': <CloudServerOutlined />,
   'ai-operation-auth': <ToolOutlined />,   // AI 权控管理
@@ -700,6 +719,11 @@ const keyToIcon: Record<string, ReactNode> = {
   // v3.13 新建分组图标
   'rdm-test-quality-group':  <ExperimentOutlined />,
   'rdm-release-accept-group': <CloudUploadOutlined />,
+  // 原生文档菜单图标与后端种子保持一致，名称仍以后端为准。
+  'doc-plans': <FileTextOutlined />,
+  'doc-governance': <SafetyCertificateOutlined />,
+  'doc-system-plans': <FolderOpenOutlined />,
+  'doc-api-center': <ApiOutlined />,
 }
 
 /** 按实际归属剪枝；跨系统挂载的节点提升到所属系统，不继承外层系统的入口。 */
