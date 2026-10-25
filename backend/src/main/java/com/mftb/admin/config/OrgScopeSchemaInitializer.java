@@ -52,9 +52,11 @@ public class OrgScopeSchemaInitializer implements CommandLineRunner {
                         + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = 'data_scope'",
                 Integer.class, ROLE_TABLE);
         if (colExists == null || colExists == 0) {
+            // 不能写 AFTER permissions：本初始化器 @Order(2) 早于 DataInitializer(@Order 5)，
+            // 全新库此时 sys_role 还没有 permissions 列，引用它会让空库启动直接失败。
             jdbcTemplate.execute("ALTER TABLE " + ROLE_TABLE
                     + " ADD COLUMN data_scope TINYINT NOT NULL DEFAULT 1"
-                    + " COMMENT '数据范围: 1仅本人 2本部门 3本部门及以下 4自定部门 5全部' AFTER permissions");
+                    + " COMMENT '数据范围: 1仅本人 2本部门 3本部门及以下 4自定部门 5全部'");
         }
         // 存量角色统一落 1（仅本人，严格模式）：DEFAULT 已覆盖新列，但 MySQL 加带默认值的列
         // 历史行本就取默认值，这里显式收敛一次以兼容「先手工加过列、值为 NULL」的漂移库。

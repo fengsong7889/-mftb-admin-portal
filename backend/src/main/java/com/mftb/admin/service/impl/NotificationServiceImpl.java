@@ -1,6 +1,7 @@
 package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.mftb.admin.dto.DocKnowledgeDTO.PendingAck;
 import com.mftb.admin.dto.NotificationItemVO;
 import com.mftb.admin.entity.BizGiftRecord;
 import com.mftb.admin.entity.BizStore;
@@ -8,6 +9,7 @@ import com.mftb.admin.mapper.BizGiftRecordMapper;
 import com.mftb.admin.mapper.BizStoreMapper;
 import com.mftb.admin.service.DingTalkService;
 import com.mftb.admin.service.NotificationService;
+import com.mftb.admin.service.doc.DocAckService;
 import com.mftb.admin.service.SysConfigService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +37,7 @@ public class NotificationServiceImpl implements NotificationService {
     private final BizStoreMapper storeMapper;
     private final SysConfigService sysConfigService;
     private final DingTalkService dingTalkService;
+    private final DocAckService docAckService;
 
     /** 广告类型显示名映射 */
     private static final Map<String, String> AD_TYPE_LABELS = Map.of(
@@ -57,21 +60,53 @@ public class NotificationServiceImpl implements NotificationService {
 
         // 1. 赠送到期提醒
         notifications.addAll(generateGiftExpiryNotifications());
+        // 2. 制度待签收/逾期提醒（实时从统一待签收查询生成，不额外落提醒表）
+        notifications.addAll(generateDocAckNotifications());
 
         // 后续可在此追加其它通知类型:
         // notifications.addAll(generateApprovalPendingNotifications());
         // notifications.addAll(generateRechargeNotifications());
 
-        // 钉钉推送：将赠送到期提醒聚合为一条 Markdown 消息推送到钉钉群
-        if (!notifications.isEmpty() && dingTalkService.isEnabled()) {
+        // 钉钉推送：仅聚合赠送到期提醒，制度提醒留在站内铃铛
+        List<NotificationItemVO> giftNotifications = notifications.stream()
+                .filter(item -> "gift_expire".equals(item.getType())).toList();
+        if (!giftNotifications.isEmpty() && dingTalkService.isEnabled()) {
             try {
-                sendGiftExpiryDingTalkSummary(notifications);
+                sendGiftExpiryDingTalkSummary(giftNotifications);
             } catch (Exception e) {
                 log.warn("赠送到期钉钉推送失败: {}", e.getMessage());
             }
         }
 
         return notifications;
+    }
+
+    /** 待签收制度进入站内铃铛；无文档菜单权限或查询失败时不影响赠送到期提醒。 */
+    private List<NotificationItemVO> generateDocAckNotifications() {
+        try {
+            LocalDate today = LocalDate.now();
+            List<PendingAck> pending = docAckService.pending(1, 10).records();
+            List<NotificationItemVO> items = new ArrayList<>();
+            for (PendingAck row : pending) {
+                NotificationItemVO item = new NotificationItemVO();
+                item.setId("doc-ack-" + row.nodeId() + "-" + row.revisionId());
+                item.setType("doc_ack_pending");
+                item.setTitle("制度待簽收");
+                String due = row.dueAt() == null ? "" : "，截止 " + row.dueAt();
+                item.setContent("《" + row.title() + "》尚未簽收" + due);
+                item.setDocNodeId(row.nodeId());
+                item.setDocRevisionId(row.revisionId());
+                item.setDocDueDate(row.dueAt());
+                item.setDaysLeft(row.dueAt() == null ? null
+                        : (int) ChronoUnit.DAYS.between(today, row.dueAt()));
+                item.setCreatedAt(java.time.LocalDateTime.now().toString());
+                items.add(item);
+            }
+            return items;
+        } catch (Exception e) {
+            log.debug("制度待签收通知生成跳过: {}", e.getMessage());
+            return List.of();
+        }
     }
 
     /**

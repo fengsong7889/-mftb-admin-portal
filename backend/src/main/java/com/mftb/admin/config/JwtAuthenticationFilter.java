@@ -75,6 +75,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String token = resolveToken(request);
+        // 集成凭据由后置专用过滤器鉴定，不尝试作为 JWT 解析或写入普通会话。
+        if (token != null && token.startsWith(com.mftb.admin.service.doc.DocIntegrationGrantService.TOKEN_PREFIX)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
         if (StringUtils.hasText(token) && jwtUtil.validateToken(token)) {
             String username = jwtUtil.getUsername(token);
 

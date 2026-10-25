@@ -58,6 +58,7 @@ public class AiPromptConfigController {
 
     private final AiPromptConfigService configService;
     private final AgentOrchestrationService orchestrationService;
+    private final com.mftb.admin.service.agent.AiModelAdmissionService admissionService;
     private final OperatorResolver operatorResolver;
     private final AiKnowledgeService knowledgeService;
     private final AiScopeGuard scopeGuard;
@@ -71,6 +72,11 @@ public class AiPromptConfigController {
         private String profileKey;
         private String question;
         private boolean useTools = true;
+
+        @com.fasterxml.jackson.annotation.JsonAnySetter
+        public void rejectUnknown(String key, Object value) {
+            throw new BusinessException(400, "試跑請求包含不支援的欄位");
+        }
     }
 
     /* ────────────────── 能力清单 ────────────────── */
@@ -163,12 +169,20 @@ public class AiPromptConfigController {
     @RequirePermission(menu = MENU_PROFILE, action = "edit")
     @Operation(summary = "提示詞草稿試跑（sandbox）")
     public Result<AiPromptTestRunVO> testRun(@RequestBody TestRunRequest body) {
-        if (body == null || !StringUtils.hasText(body.getQuestion())) {
+        if (body == null || !StringUtils.hasText(body.getQuestion()) || body.getQuestion().length() > 32_768) {
             throw new BusinessException("請輸入示例問題");
         }
         String account = operatorResolver.currentOperatorAccount();
+        var availability = admissionService.checkAvailability(account);
+        if (!availability.allowed()) throw new BusinessException(availability.httpStatus(), availability.message());
         checkTestRunRate(account);
-        String sections = configService.previewPrompt(body.getProfileKey(), body.getQuestion());
+        var profile = configService.profileForTestRun(body.getProfileKey());
+        String scope = profile.getDomain();
+        if (!StringUtils.hasText(scope) || "global".equals(scope)) scope = "common";
+        var context = admissionService.checkContext(account, scope);
+        if (!context.allowed()) throw new BusinessException(context.httpStatus(), context.message());
+        String sections = java.util.Objects.toString(profile.getResponseSkeleton(), "") + "\n"
+                + java.util.Objects.toString(profile.getExtraRules(), "");
         String prompt = AgentOrchestrationService.basePrompt()
                 + (StringUtils.hasText(sections) ? sections + "\n\n" : "")
                 + AgentOrchestrationService.safetyRules();
@@ -177,6 +191,7 @@ public class AiPromptConfigController {
         req.setMessages(List.of(Map.of("role", "user", "content", body.getQuestion().trim())));
         req.setSystemPromptOverride(prompt);
         req.setSandbox(true);
+        req.setSystemCode(scope);
         req.setDisableTools(!body.isUseTools());
         req.setMode("auto");
         AgentOrchestrationService.OrchestrateResult result = orchestrationService.orchestrate(req, account);
@@ -256,7 +271,8 @@ public class AiPromptConfigController {
             @RequestParam String query,
             @RequestParam(required = false) String systemCode,
             @RequestParam(defaultValue = "5") int limit) {
-        return Result.success(knowledgeService.search(query, systemCode, limit));
+        return Result.success(knowledgeService.search(query, systemCode, limit,
+                operatorResolver.currentUser()));
     }
 
     /* ────────────────── 輸入/輸出護欄 ────────────────── */

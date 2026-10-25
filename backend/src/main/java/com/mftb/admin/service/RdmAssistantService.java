@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mftb.admin.client.LlmHttpClient;
 import com.mftb.admin.constant.RdmConstants;
-import com.mftb.admin.dto.LlmUsageRecordRequest;
 import com.mftb.admin.dto.RdmAssistantVO;
 import com.mftb.admin.dto.RdmDashboardVO;
 import com.mftb.admin.entity.RdmComment;
@@ -37,8 +36,8 @@ import java.util.concurrent.TimeoutException;
  *
  * <p>三条纪律（对齐项目既有 AI 网关的做法，不另立规则）：
  * <ol>
- *   <li><b>额度与账本同源</b>：走 {@link LlmChannelRouter} 取通道、{@link AiMyCenterService} 校验配额、
- *       {@link LlmUsageService} 记账 —— RDM 的消耗必须出现在同一张「使用统计」里，
+ *   <li><b>额度与账本同源</b>：走 {@link LlmChannelRouter} 取通道、{@link com.mftb.admin.service.agent.AiModelAdmissionService} 统一准入、
+ *       {@link com.mftb.admin.service.agent.LlmMeteringService} 计量 —— RDM 的消耗必须出现在同一张「使用统计」里，
  *       否则会出现"绕过计量偷跑模型"的审计盲区。</li>
  *   <li><b>AI 不参与判定</b>：草稿只填表单不落库；风险摘要里"哪些需求逾期"来自 SQL，
  *       大模型只负责把要点写成一段话。数字绝不由模型产出。</li>
@@ -75,8 +74,8 @@ public class RdmAssistantService {
     /** 需求级访问守卫：AI 草稿会把需求正文送给模型，必须先过资源归属 */
     private final RdmAccessGuard accessGuard;
     private final LlmChannelRouter channelRouter;
-    private final AiMyCenterService myCenterService;
-    private final LlmUsageService llmUsageService;
+    private final com.mftb.admin.service.agent.AiModelAdmissionService admissionService;
+    private final com.mftb.admin.service.agent.LlmMeteringService metering;
     private final RdmConfigService configService;
     /** 风险取数唯一入口所在：摘要与页面列表必须共用，所以这里依赖而不是再写一份 SQL */
     private final RdmAnalyticsService analyticsService;
@@ -326,7 +325,7 @@ public class RdmAssistantService {
     /* ==================== 通道与记账 ==================== */
 
     /**
-     * 统一的单次 LLM 调用：熔断/配额由入口层与 {@link AiMyCenterService} 负责，
+     * 统一的单次 LLM 调用：身份、急停、模型授权与额度由 {@link com.mftb.admin.service.agent.AiModelAdmissionService} 负责，
      * 这里保证「调用成功即记账」，失败不记账（没有消耗就不该出现在账本上）。
      */
     private ChatResult chat(String systemPrompt, String userPrompt, String caller, String purpose) {
@@ -342,14 +341,15 @@ public class RdmAssistantService {
         if (!StringUtils.hasText(caller)) {
             return new ChatResult(null, null, 0, null, "登錄狀態失效，請重新登錄後使用 AI 輔助");
         }
+        var availability = admissionService.checkContext(caller, "rdm");
+        if (!availability.allowed()) return new ChatResult(null, null, 0, null, availability.message());
         LlmChannelRouter.Channel channel = resolveChannel(caller);
         if (channel == null) {
             return new ChatResult(null, null, 0, null, "當前賬號沒有可用的 AI 模型，請聯繫管理員開通");
         }
-        var quota = myCenterService.checkQuota(null, channel.getDefaultModelKey());
-        if (quota != null && "reject".equals(quota.getAction())) {
-            return new ChatResult(null, channel.getDefaultModelKey(), 0, channel.getLabel(),
-                    quota.getMessage() == null ? "已超出本月 AI 額度，無法使用" : quota.getMessage());
+        var admission = admissionService.check(caller, channel.getDefaultModelKey());
+        if (!admission.allowed()) {
+            return new ChatResult(null, channel.getDefaultModelKey(), 0, channel.getLabel(), admission.message());
         }
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("model", channel.getDefaultModelKey());
@@ -358,36 +358,51 @@ public class RdmAssistantService {
         payload.put("messages", List.of(
                 Map.of("role", "system", "content", systemPrompt),
                 Map.of("role", "user", "content", userPrompt)));
+        var prepared = admissionService.prepare(caller, channel, payload, "rdm");
+        if (!prepared.decision().allowed()) {
+            return new ChatResult(null, channel.getDefaultModelKey(), 0, channel.getLabel(), prepared.decision().message());
+        }
+        String requestId = "rdm-" + java.util.UUID.randomUUID();
+        try {
+            metering.reserve(requestId, caller, channel, Math.max(1, (systemPrompt.length() + userPrompt.length()) / 4), MAX_OUTPUT_TOKENS);
+        } catch (BusinessException denied) {
+            return new ChatResult(null, channel.getDefaultModelKey(), 0, channel.getLabel(), denied.getMessage());
+        }
         long started = System.currentTimeMillis();
         JsonNode resp;
         Future<JsonNode> future = null;
         try {
             String baseUrl = channel.getBaseUrl();
             String apiKey = channel.getApiKey();
-            future = AI_CALL_POOL.submit(() -> llmClient.chatCompletion(baseUrl, apiKey, payload));
+            future = AI_CALL_POOL.submit(() -> llmClient.chatCompletion(baseUrl, apiKey, prepared.payload()));
             resp = future.get(timeoutMs, TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
             if (future != null) future.cancel(true);
+            metering.release(requestId, "TIMEOUT");
             log.warn("RDM AI 調用逾時: purpose={}, caller={}, elapsed={}ms, timeout={}ms",
                     purpose, caller, System.currentTimeMillis() - started, timeoutMs);
             return new ChatResult(null, channel.getDefaultModelKey(), 0, channel.getLabel(),
                     "AI 摘要生成逾時，已改用結構化要點");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            metering.release(requestId, "INTERRUPTED");
             return new ChatResult(null, channel.getDefaultModelKey(), 0, channel.getLabel(),
                     "AI 服務被中斷，請稍後再試");
         } catch (ExecutionException e) {
             Throwable cause = e.getCause();
             if (cause instanceof LlmHttpClient.LlmCallException le) {
+                metering.release(requestId, le.getCategory().name());
                 log.warn("RDM AI 調用失敗[{}]: purpose={}, caller={}, elapsed={}ms, detail={}", le.getCategory(),
                         purpose, caller, System.currentTimeMillis() - started, le.getMessage());
                 return new ChatResult(null, channel.getDefaultModelKey(), 0, channel.getLabel(), le.userMessage());
             }
+            metering.release(requestId, "UNEXPECTED");
             log.warn("RDM AI 調用異常: purpose={}, caller={}, elapsed={}ms, detail={}",
                     purpose, caller, System.currentTimeMillis() - started, String.valueOf(cause));
             return new ChatResult(null, channel.getDefaultModelKey(), 0, channel.getLabel(), "AI 服務暫時不可用，請稍後再試");
         }
         if (resp == null) {
+            metering.release(requestId, "empty_body");
             log.warn("RDM AI 調用失敗: purpose={}, caller={}, elapsed={}ms", purpose, caller, System.currentTimeMillis() - started);
             return new ChatResult(null, channel.getDefaultModelKey(), 0, channel.getLabel(), "AI 服務暫時不可用，請稍後再試");
         }
@@ -398,9 +413,10 @@ public class RdmAssistantService {
         String model = StringUtils.hasText(resp.path("model").asText(null))
                 ? resp.path("model").asText() : channel.getDefaultModelKey();
         if (!StringUtils.hasText(text)) {
+            metering.release(requestId, "empty_text");
             return new ChatResult(null, model, 0, channel.getLabel(), "AI 未返回內容，請重試或手工填寫");
         }
-        recordUsage(caller, channel, model, promptTokens, completionTokens);
+        metering.settle(requestId, caller, "auto", channel, resp);
         log.info("RDM AI 調用完成: purpose={}, caller={}, model={}, tokens={}, elapsed={}ms",
                 purpose, caller, model, (long) promptTokens + completionTokens, System.currentTimeMillis() - started);
         return new ChatResult(text, model, (long) promptTokens + completionTokens, channel.getLabel(), null);
@@ -413,23 +429,6 @@ public class RdmAssistantService {
             return primary;
         }
         return channelRouter.resolveChannel(LlmChannelRouter.CHANNEL_OFF_PEAK, caller);
-    }
-
-    /** 用量记进与 AI 助手同一张账，避免「绕过计量偷跑模型」 */
-    private void recordUsage(String caller, LlmChannelRouter.Channel channel, String model,
-                             int promptTokens, int completionTokens) {
-        try {
-            LlmUsageRecordRequest record = new LlmUsageRecordRequest();
-            record.setMode("auto");
-            record.setChannel(StringUtils.hasText(channel.getLabel()) ? channel.getLabel() : LlmChannelRouter.CHANNEL_PRIMARY);
-            record.setModel(model);
-            record.setPromptTokens(promptTokens);
-            record.setCompletionTokens(completionTokens);
-            llmUsageService.record(caller, record);
-        } catch (Exception e) {
-            // 记账失败不能把已经生成的内容丢掉；但必须留警告，账本缺口要能被查出来
-            log.warn("RDM AI 用量上報失敗（結果仍返回）: caller={}, model={}, msg={}", caller, model, e.getMessage());
-        }
     }
 
     /** 状态中文名走配置表（状态机可自定义名称，不能写死） */

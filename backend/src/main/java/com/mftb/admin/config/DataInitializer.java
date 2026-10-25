@@ -285,6 +285,19 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         }
     }
 
+    /** 幂等建系统配置表；历史库已存在时跳过。 */
+    private void ensureSysConfigTable() {
+        jdbcTemplate.execute(
+            "CREATE TABLE IF NOT EXISTS sys_config ("
+            + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+            + "config_key VARCHAR(100) NOT NULL UNIQUE COMMENT '配置项唯一标识（如 session_idle_timeout_ms）', "
+            + "config_value VARCHAR(500) NOT NULL COMMENT '配置值', "
+            + "description VARCHAR(200) DEFAULT NULL COMMENT '配置说明', "
+            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP, "
+            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+            + ") COMMENT '系统配置表（通用 key-value 存储）'");
+    }
+
     /** 将代码中声明的产品版本号同步写入 sys_config (幂等: INSERT ... ON DUPLICATE KEY UPDATE) */
     private void syncProductVersion() {
         try {
@@ -705,6 +718,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
 
     /** 钉钉企业内部应用 (163 脚本等效): sys_user 补 dingtalk_user_id 列 + sys_config 应用配置种子, 幂等 */
     private void migrateDingTalkAppSignature() {
+        // 空库自愈：38_sys_config.sql 为参考脚本，应用启动必须先保证 key-value 配置表存在。
+        ensureSysConfigTable();
         // 1) sys_user 增加 dingtalk_user_id（员工与钉钉账号绑定, 领用签署等工作通知定向推送用）
         addColumnIfAbsent("sys_user", "dingtalk_user_id",
                 "ALTER TABLE sys_user ADD COLUMN dingtalk_user_id VARCHAR(64) DEFAULT NULL "
@@ -1931,6 +1946,13 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
     }
 
     private void addColumnIfAbsent(String table, String column, String alterSql) {
+        // 空库时业务表可能由后续 initializer 创建；此时跳过，由该表的 DDL 自己带全列。
+        // 已存在表仍按原逻辑补列，不改变存量库行为。
+        Integer tables = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.TABLES "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?",
+                Integer.class, table);
+        if (tables == null || tables == 0) return;
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.COLUMNS "
                         + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
@@ -2876,6 +2898,9 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             }
         }
         // system_code 回填 platform
+        addColumnIfAbsent("sys_menu", "system_code",
+                "ALTER TABLE sys_menu ADD COLUMN system_code VARCHAR(32) DEFAULT NULL "
+                        + "COMMENT '归属系统编码；顶级菜单必填，叶子菜单继承父级；NULL 表示暂未归属'");
         jdbcTemplate.update(
                 "UPDATE sys_menu SET system_code = 'platform' "
                         + "WHERE menu_key IN ('rule-center','rule-ad-sales','rule-gift','rule-security','rule-algorithm','rule-seq') AND deleted = 0");
@@ -3017,7 +3042,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         // 一级目录归属：与 hr 同域，否则门户 HR 系统导航剪枝会把 org-center 整棵丢弃
         String hrSystemCode = jdbcTemplate.queryForList(
                         "SELECT system_code FROM sys_menu WHERE menu_key = 'hr' AND deleted = 0 LIMIT 1", String.class)
-                .stream().findFirst().orElse("hr");
+                .stream().filter(Objects::nonNull).findFirst().orElse("hr");
         jdbcTemplate.update("UPDATE sys_menu SET system_code = ? WHERE id = ? AND (system_code IS NULL OR system_code = '')",
                 hrSystemCode, orgCenterId);
 
@@ -3635,6 +3660,9 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
      * 以及流程类型种子数据和编号规则
      */
     private void migrateOaTables() {
+        // 先建流程配置表：本方法会向 biz_workflow_config 写 oa_general/ai_access 种子，
+        // 而历史建表代码在未排序的 BizDataInitializer 中，空库会晚于本方法执行。
+        ensureWorkflowConfigTable();
         // 1. 流程定义表
         jdbcTemplate.execute(
             "CREATE TABLE IF NOT EXISTS biz_oa_process ("
@@ -3747,11 +3775,49 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             + "VALUES ('ai_access', 'AI使用申請審批', 1, 'AI模型權限與額度申請審批流程')");
 
         // 6. 编号规则：OA流程编号
+        ensureBizSeqRuleTable();
         jdbcTemplate.update(
             "INSERT IGNORE INTO sys_biz_seq_rule (rule_key, rule_name, biz_menu, prefix, date_format, seq_length, seq_start, remark) "
             + "VALUES ('oa_request', 'OA流程編號', 'OA中心', 'OA', 'YYYYMMDD', 4, 1, '{prefix} + YYYYMMDD + {n}位自增序號')");
 
         log.info("OA中心表及种子数据已就绪");
+    }
+
+    /** 幂等建编号规则表；历史库已存在时跳过，列由后续增量迁移补齐。 */
+    private void ensureBizSeqRuleTable() {
+        jdbcTemplate.execute(
+            "CREATE TABLE IF NOT EXISTS sys_biz_seq_rule ("
+            + "id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID', "
+            + "rule_key VARCHAR(64) NOT NULL COMMENT '规则唯一标识（与前端 key 一致）', "
+            + "rule_name VARCHAR(64) NOT NULL COMMENT '业务类型名称', "
+            + "biz_menu VARCHAR(64) NULL COMMENT '所属菜单', "
+            + "prefix VARCHAR(16) NOT NULL COMMENT '编号前缀', "
+            + "date_format VARCHAR(16) NOT NULL DEFAULT '' COMMENT '日期格式: YYYYMMDD / YYMM / 空=无日期维度', "
+            + "seq_length INT NOT NULL DEFAULT 4 COMMENT '自增序号位数', "
+            + "seq_start INT NOT NULL DEFAULT 0 COMMENT '序号起始: 0=从0000起 1=从0001起', "
+            + "remark VARCHAR(255) NULL COMMENT '备注', "
+            + "status TINYINT NOT NULL DEFAULT 1 COMMENT '状态: 1=启用 0=停用', "
+            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间', "
+            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间', "
+            + "UNIQUE KEY uk_seq_rule_key (rule_key), "
+            + "UNIQUE KEY uk_seq_rule_prefix (prefix)"
+            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='编号生成规则配置表'");
+    }
+
+    /** 幂等建流程配置表；历史库已存在时跳过，列由后续增量迁移补齐。 */
+    private void ensureWorkflowConfigTable() {
+        jdbcTemplate.execute(
+            "CREATE TABLE IF NOT EXISTS biz_workflow_config ("
+            + "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',"
+            + "flow_type VARCHAR(32) NOT NULL UNIQUE COMMENT '流程类型标识: recharge/deduct/transfer/merge/gift',"
+            + "flow_name VARCHAR(64) NOT NULL COMMENT '流程展示名称',"
+            + "approval_enabled TINYINT NOT NULL DEFAULT 1 COMMENT '审批开关: 1=启用审批, 0=停用(直接执行)',"
+            + "description VARCHAR(200) DEFAULT NULL COMMENT '流程说明',"
+            + "updated_by VARCHAR(64) DEFAULT NULL COMMENT '最后更新人',"
+            + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',"
+            + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',"
+            + "UNIQUE KEY uk_workflow_flow_type (flow_type)"
+            + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='流程配置表'");
     }
 
     /**

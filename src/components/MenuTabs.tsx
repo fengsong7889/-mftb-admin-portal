@@ -83,6 +83,22 @@ interface SubPageTitle {
 }
 
 const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
+  '/doc-plans/detail': { fixed: 'i18n:docNative.detailTitle' },
+  '/doc-plans/edit': { add: 'i18n:docNative.createTitle', edit: 'i18n:docNative.editTitle' },
+  '/doc-plans/confirm': { fixed: 'i18n:docNative.confirmTitle' },
+  '/doc-plans/handoff': { fixed: 'i18n:docNative.handoffTitle' },
+  '/doc-plans/acl': { fixed: 'i18n:docNative.aclTitle' },
+  '/doc-plans/execution': { fixed: 'i18n:docNative.executionTitle' },
+  '/doc-governance/members': { fixed: 'i18n:docNative.membersTitle' },
+  '/doc-governance/taxonomy': { fixed: 'i18n:docKnowledge.taxonomyTitle' },
+  '/doc-governance/clearance': { fixed: 'i18n:docKnowledge.clearanceTitle' },
+  '/doc-center/knowledge': { fixed: 'i18n:docKnowledge.detailTitle' },
+  '/doc-center/my-acks': { fixed: 'i18n:docKnowledge.myAcksTitle' },
+  '/doc-books': { fixed: 'i18n:docKnowledge.booksTitle' },
+  '/doc-archives': { fixed: 'i18n:docKnowledge.archivesTitle' },
+  '/doc-system-plans': { fixed: 'i18n:docKnowledge.systemPlansTitle' },
+  '/doc-system-plans/detail': { fixed: 'i18n:docKnowledge.systemPlanDetailTitle' },
+  '/doc-api-center': { fixed: 'i18n:docKnowledge.apiCenterTitle' },
   // 财务管理
   '/recharge-add': { fixed: 'i18n:accountBalance.rechargePageTitle' },
   '/transfer-add': { fixed: 'i18n:accountBalance.transferTitle' },

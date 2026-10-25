@@ -94,7 +94,9 @@ public class DocLearningService {
             return vo;
         }
         List<Long> nodeIds = items.stream().map(DocLearningItem::getNodeId).distinct().toList();
-        Map<Long, DocNode> nodes = nodeMapper.selectBatchIds(nodeIds).stream()
+        Map<Long, DocNode> nodes = nodeMapper.selectList(new LambdaQueryWrapper<DocNode>().in(DocNode::getId, nodeIds)
+                .notInSql(DocNode::getId, "SELECT node_id FROM doc_native_document")
+                .notInSql(DocNode::getSpaceId, "SELECT space_id FROM doc_space_access")).stream()
                 .collect(Collectors.toMap(DocNode::getId, n -> n, (a, b) -> a));
         Map<Long, String> spaceNames = spaceNames();
         Set<Long> myReadNodes = myReadNodes(username, nodeIds);
@@ -195,7 +197,9 @@ public class DocLearningService {
         if (nodeIds.isEmpty()) {
             throw new BusinessException("請至少添加一篇文檔");
         }
-        int existing = nodeMapper.selectBatchIds(nodeIds).size();
+        int existing = nodeMapper.selectList(new LambdaQueryWrapper<DocNode>().in(DocNode::getId, nodeIds)
+                .notInSql(DocNode::getId, "SELECT node_id FROM doc_native_document")
+                .notInSql(DocNode::getSpaceId, "SELECT space_id FROM doc_space_access")).size();
         if (existing != nodeIds.size()) {
             throw new BusinessException("部分文檔不存在或已刪除，請重新選擇");
         }

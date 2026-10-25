@@ -29,6 +29,13 @@ public class ContractRegistry {
         combined.add(permAuditLogContract());
         // 文檔中心：索引與留痕三表為 doc 域關鍵寫入路徑，啟動自愈防遷移漏執行
         combined.addAll(docCenterContracts());
+        combined.addAll(com.mftb.admin.config.DocNativeSchema.contracts());
+        // 文檔中心 P0 知識庫地基：分類/標籤/資產/主體 ACL/密級/統一檢索
+        combined.addAll(com.mftb.admin.config.DocKnowledgeSchema.contracts());
+        // 文檔中心密級授權審計：全局主體屬性，不屬於單一空間
+        combined.addAll(com.mftb.admin.config.DocClearanceSchema.contracts());
+        // 文檔中心制度簽收：範圍 + 回執
+        combined.addAll(com.mftb.admin.config.DocAckSchema.contracts());
         // 文檔中心：學習路徑兩表（新人入職包/培訓清單）同為關鍵寫入路徑
         combined.addAll(docLearningContracts());
         // HR 入转调离：审批回调办理链路的关键写入表，启动自愈保证不因迁移漏执行而缺表

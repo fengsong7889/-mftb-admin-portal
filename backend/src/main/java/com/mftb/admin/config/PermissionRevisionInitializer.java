@@ -13,11 +13,13 @@ import org.springframework.stereotype.Component;
  * <p>建 {@code sys_permission_revision} 单行表并 seed id=1, revision=0；
  * 与 {@link SystemPortalSchemaInitializer} 一起构成统一门户改造的阶段 B/Round 3 底座。
  * <p>参考 SQL: {@code backend/sql/193_permission_revision.sql}（一次性文档）。
+ * <p>启动顺序取 {@code @Order(1)}：DataInitializer(@Order 5) 在初始化内置管理员时会立即
+ * 递增权限版本号，空库若等到 @Order(16) 才建表会直接启动失败。
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@Order(16)
+@Order(1)
 public class PermissionRevisionInitializer implements CommandLineRunner {
 
     private static final String VERSION_KEY = "core:permission-revision:v1.0";

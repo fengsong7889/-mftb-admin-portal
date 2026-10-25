@@ -18,6 +18,7 @@ import com.mftb.admin.mapper.DocNodeMapper;
 import com.mftb.admin.mapper.DocSpaceMapper;
 import com.mftb.admin.mapper.DocViewLogMapper;
 import com.mftb.admin.mapper.SysUserMapper;
+import com.mftb.admin.service.doc.DocIndexService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,11 +51,13 @@ public class DocService {
     private final DocNodeMapper nodeMapper;
     private final DocViewLogMapper viewLogMapper;
     private final SysUserMapper userMapper;
+    private final DocIndexService searchIndex;
 
     /* ==================== 空間 ==================== */
 
     public List<DocSpace> listSpaces() {
         return spaceMapper.selectList(new LambdaQueryWrapper<DocSpace>()
+                .notInSql(DocSpace::getId, "SELECT space_id FROM doc_space_access")
                 .orderByAsc(DocSpace::getSortOrder)
                 .orderByAsc(DocSpace::getId));
     }
@@ -109,7 +112,8 @@ public class DocService {
     }
 
     private DocSpace requireSpace(Long id) {
-        DocSpace space = id == null ? null : spaceMapper.selectById(id);
+        DocSpace space = id == null ? null : spaceMapper.selectOne(new LambdaQueryWrapper<DocSpace>()
+                        .eq(DocSpace::getId, id).notInSql(DocSpace::getId, "SELECT space_id FROM doc_space_access"));
         if (space == null) {
             throw new BusinessException("空間不存在");
         }
@@ -165,6 +169,7 @@ public class DocService {
         node.setCreatedBy(username);
         node.setUpdatedBy(username);
         nodeMapper.insert(node);
+        searchIndex.upsert(node.getId());
         return DocNodeVO.from(node, spaceNames().get(node.getSpaceId()));
     }
 
@@ -175,6 +180,7 @@ public class DocService {
         applyDto(node, dto);
         node.setUpdatedBy(username);
         nodeMapper.updateById(node);
+        searchIndex.upsert(id);
         return DocNodeVO.from(node, spaceNames().get(node.getSpaceId()));
     }
 
@@ -182,6 +188,7 @@ public class DocService {
     public void delete(Long id, String username) {
         requireNode(id);
         nodeMapper.deleteById(id);
+        searchIndex.delete(id);
     }
 
     /* ==================== 查閱留痕 ==================== */
@@ -210,6 +217,7 @@ public class DocService {
      */
     @Transactional
     public void reportDuration(Long nodeId, String username, Integer durationSec) {
+        requireNode(nodeId);
         if (durationSec == null || durationSec < 0) {
             return;
         }
@@ -245,8 +253,10 @@ public class DocService {
             vo.setRows(List.of());
             return vo;
         }
-        Map<Long, DocNode> nodes = nodeMapper.selectBatchIds(
-                        aggregated.stream().map(DocViewStatRow::getNodeId).toList())
+        Map<Long, DocNode> nodes = nodeMapper.selectList(new LambdaQueryWrapper<DocNode>()
+                        .in(DocNode::getId, aggregated.stream().map(DocViewStatRow::getNodeId).toList())
+                        .notInSql(DocNode::getId, "SELECT node_id FROM doc_native_document")
+                        .notInSql(DocNode::getSpaceId, "SELECT space_id FROM doc_space_access"))
                 .stream().collect(Collectors.toMap(DocNode::getId, n -> n, (a, b) -> a));
         Map<Long, String> names = spaceNames();
         List<DocViewStatsVO.Row> rows = aggregated.stream()
@@ -272,7 +282,10 @@ public class DocService {
 
     private LambdaQueryWrapper<DocNode> buildFilter(String keyword, Long spaceId, Integer status, Integer docType,
                                                     String bizType, Long bizId) {
-        LambdaQueryWrapper<DocNode> w = new LambdaQueryWrapper<>();
+        // 旧菜单是全库索引权限，必须排除原生内容和原生私有空间，不能成为新权限的旁路。
+        LambdaQueryWrapper<DocNode> w = new LambdaQueryWrapper<DocNode>()
+                .notInSql(DocNode::getId, "SELECT node_id FROM doc_native_document")
+                .notInSql(DocNode::getSpaceId, "SELECT space_id FROM doc_space_access");
         if (spaceId != null) {
             w.eq(DocNode::getSpaceId, spaceId);
         }
@@ -303,9 +316,7 @@ public class DocService {
         if (dto == null) {
             throw new BusinessException("請求體不能為空");
         }
-        if (dto.getSpaceId() == null || spaceMapper.selectById(dto.getSpaceId()) == null) {
-            throw new BusinessException("所屬空間不存在");
-        }
+        requireSpace(dto.getSpaceId());
         if (!StringUtils.hasText(dto.getTitle())) {
             throw new BusinessException("文檔標題不能為空");
         }
@@ -353,7 +364,9 @@ public class DocService {
     }
 
     private DocNode requireNode(Long id) {
-        DocNode node = id == null ? null : nodeMapper.selectById(id);
+        DocNode node = id == null ? null : nodeMapper.selectOne(new LambdaQueryWrapper<DocNode>()
+                        .eq(DocNode::getId, id).notInSql(DocNode::getId, "SELECT node_id FROM doc_native_document")
+                        .notInSql(DocNode::getSpaceId, "SELECT space_id FROM doc_space_access"));
         if (node == null) {
             throw new BusinessException("文檔不存在或已刪除");
         }

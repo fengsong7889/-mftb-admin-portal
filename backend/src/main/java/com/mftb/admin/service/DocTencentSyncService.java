@@ -7,6 +7,7 @@ import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.DocConstants;
 import com.mftb.admin.entity.DocNode;
 import com.mftb.admin.mapper.DocNodeMapper;
+import com.mftb.admin.service.doc.DocIndexService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,6 +36,7 @@ public class DocTencentSyncService {
 
     private final TencentDocsClient client;
     private final DocNodeMapper nodeMapper;
+    private final DocIndexService searchIndex;
 
     @Value("${tencent.docs.sync-space-id:1}")
     private Long syncSpaceId;
@@ -113,6 +115,7 @@ public class DocTencentSyncService {
             node.setCreatedBy("system");
             node.setUpdatedBy("system");
             nodeMapper.insert(node);
+            searchIndex.upsert(node.getId());
             counters[0]++;
         } else {
             existing.setTitle(title.length() > DocConstants.TITLE_MAX ? title.substring(0, DocConstants.TITLE_MAX) : existing.getTitle());
@@ -120,6 +123,7 @@ public class DocTencentSyncService {
             existing.setTencentUrl(link);
             existing.setUpdatedBy("system");
             nodeMapper.updateById(existing);
+            searchIndex.upsert(existing.getId());
             counters[1]++;
         }
     }

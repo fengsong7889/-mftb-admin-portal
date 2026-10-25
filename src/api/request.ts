@@ -96,6 +96,10 @@ request.interceptors.request.use(
 request.interceptors.response.use(
   (response: AxiosResponse<ApiResult>) => {
     const res = response.data
+    // 二进制下载（如 Markdown 导出）不包装 Result，直接返回文件，不能按业务 JSON 解析
+    if (response.config.responseType === 'blob') {
+      return res as never
+    }
     // 业务成功: 直接返回 data
     if (res.code === SUCCESS_CODE) {
       return res.data as never

@@ -569,3 +569,17 @@ Temporal 上线后本执行器退役，`ai_run` 保留为查询投影。
 第一次 `mvn -o clean test` 出現 **15 failures / 386 errors**（僅跑到 1704 條就大量 `NoClassDefFoundError`：`EamBorrowStatsVO`、`RequestHashUtil`、`RdmIdempotentService$ConcurrentDuplicateSignal`，另有 Mockito `class redefinition failed: invalid class`）。複查 `target/classes` 中對應 .class 存在且時間戳落在本次編譯窗口，surefire 報告無 "Unresolved compilation problems"（可排除 JDT 污染），判定為**運行期類文件被並發重寫/環境抖動**，非代碼回歸。
 
 隔離後原樣重跑：**2536 條，Failures 0 / Errors 0 / Skipped 22，BUILD SUCCESS**（比上次 2496 多出的 40 條含本輪新增的平台與執行器用例）。
+
+## 二十二、合併後全量與推送（2026-10-25）
+
+| 動作 | 結果 |
+|---|---|
+| 合併上游 HCM-C5（`59c58c84`） | 無衝突；上游僅動 `catalog.json`(+33) 與 `Permission/types.ts`(+2) 與 Agent 無交集 |
+| 合併態後端全量 | **2546 條**，Failures 0 / Errors 0 / Skipped 22，BUILD SUCCESS（較合併前 +10 條，來自上游 HCM 用例） |
+| 合併態前端門禁 | `tsc` 0 error、`check:menu` 通過、`check:i18n` 引用 17875 條全解析 |
+| 生產構建 | `npm run build` 成功（36s，僅既有 chunk>2000kB 警告） |
+| 推送 | `e098ff7c` + `59c58c84` → `dc43b0ec` 已推到 origin/main，本地與遠端一致 |
+| 版本記錄 | 1.0.105.00（minor，id=125） |
+| 補測 | `AiDataPolicyResidencyTest` 4 條（非法 residency 必須在落庫前 400 拒絕）已隨 `dc43b0ec` 推送 |
+
+**未做**：英文界面人工視覺確認（dev server 多實例 3000/3001/5173 互相搶單設備會話，瀏覽器自動化多次被踢回登入頁）；靜態側已保證 136 個 `agentConsole.*` 引用在 en 全部命中且無中文值。Temporal 編排與 WP12 試點驗收依賴外部條件。

@@ -75,7 +75,7 @@ public class SecurityConfig {
     };
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, @Lazy com.mftb.admin.service.doc.DocIntegrationGrantService docGrants) throws Exception {
         http
                 // 关闭 CSRF (前后端分离, 使用 JWT)
                 .csrf(AbstractHttpConfigurer::disable)
@@ -98,7 +98,9 @@ public class SecurityConfig {
                             response.getWriter().write(objectMapper.writeValueAsString(result));
                         }))
                 // 注册 JWT 过滤器
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                // Spring 按实际类登记过滤器顺序；JWT 为懒加载代理，不能用原始类作为后置锚点。
+                .addFilterAfter(new DocIntegrationAuthenticationFilter(docGrants, objectMapper), jwtAuthenticationFilter.getClass());
 
         return http.build();
     }

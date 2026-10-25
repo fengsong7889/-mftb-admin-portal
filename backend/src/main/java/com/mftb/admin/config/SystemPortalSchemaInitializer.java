@@ -385,12 +385,12 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
     }
 
     private void addMenuSystemCodeColumnIfAbsent() {
-        if (columnExists("sys_menu", "system_code")) {
-            return;
+        if (!columnExists("sys_menu", "system_code")) {
+            jdbcTemplate.execute(
+                    "ALTER TABLE sys_menu ADD COLUMN system_code VARCHAR(32) DEFAULT NULL "
+                            + "COMMENT '归属系统编码；顶级菜单必填，叶子菜单继承父级；NULL 表示暂未归属'");
         }
-        jdbcTemplate.execute(
-                "ALTER TABLE sys_menu ADD COLUMN system_code VARCHAR(32) DEFAULT NULL "
-                        + "COMMENT '归属系统编码；顶级菜单必填，叶子菜单继承父级；NULL 表示暂未归属'");
+        // 列可能已由更早的 base 初始化补齐，但索引仍必须就绪；不能因列存在就跳过索引。
         if (!indexExists("sys_menu", "idx_menu_system_code")) {
             jdbcTemplate.execute("ALTER TABLE sys_menu ADD INDEX idx_menu_system_code (system_code)");
         }

@@ -4,8 +4,11 @@ import {
   RDM_SUBMIT_PATH,
   buildRdmSubmitPath,
   keyToPath,
+  pathToKey,
+  isPathBackendConnected,
   resolveRdmSubmitBackMenuKey,
 } from './menuDataSource'
+import { CONTROLLED_MENU_KEYS, MENU_ACTIONS_MAP, ROUTE_MENU_KEY_MAP } from '../pages/Permission/types'
 
 /**
  * 「提交需求」表单页返回落点的解析规则。
@@ -15,6 +18,37 @@ import {
  *  2. from 是 URL 可控参数，白名单外的值一律当无来源，不得被拿去当跳转路径（开放重定向）；
  *  3. 无来源时的默认落点保持历史口径：草稿回「提需求」（草稿只在那张页展示），新建回工作台。
  */
+
+describe('Doc Native 菜单登记', () => {
+  it.each([['doc-plans', '/doc-plans'], ['doc-governance', '/doc-governance']])('菜单 %s 同步导航、受控清单和离线阻断', (key, path) => {
+    expect(keyToPath[key]).toBe(path)
+    expect(pathToKey[path]).toBe(key)
+    expect(ROUTE_MENU_KEY_MAP[path]).toBe(key)
+    expect(CONTROLLED_MENU_KEYS).toContain(key)
+    expect(isPathBackendConnected(path)).toBe(true)
+  })
+  it('知识库详情与分类治理子页复用父菜单锚点', () => {
+    expect(pathToKey['/doc-center/knowledge']).toBe('doc-library')
+    expect(ROUTE_MENU_KEY_MAP['/doc-center/knowledge']).toBe('doc-library')
+    expect(isPathBackendConnected('/doc-center/knowledge')).toBe(true)
+    expect(pathToKey['/doc-center/my-acks']).toBe('doc-library')
+    expect(ROUTE_MENU_KEY_MAP['/doc-center/my-acks']).toBe('doc-library')
+    expect(isPathBackendConnected('/doc-center/my-acks')).toBe(true)
+    expect(pathToKey['/doc-governance/taxonomy']).toBe('doc-governance')
+    expect(ROUTE_MENU_KEY_MAP['/doc-governance/taxonomy']).toBe('doc-governance')
+    expect(isPathBackendConnected('/doc-governance/taxonomy')).toBe(true)
+    expect(pathToKey['/doc-governance/clearance']).toBe('doc-governance')
+    expect(ROUTE_MENU_KEY_MAP['/doc-governance/clearance']).toBe('doc-governance')
+    expect(isPathBackendConnected('/doc-governance/clearance')).toBe(true)
+  })
+  it('回执详情只复用方案菜单，不要求旧文档库权限', () => {
+    expect(pathToKey['/doc-plans/detail']).toBe('doc-plans')
+    expect(ROUTE_MENU_KEY_MAP['/doc-plans/detail']).toBe('doc-plans')
+    expect(isPathBackendConnected('/doc-plans/detail')).toBe(true)
+    expect(MENU_ACTIONS_MAP['doc-plans'].map(action => action.key)).toEqual(['view', 'edit', 'confirm', 'export'])
+    expect(MENU_ACTIONS_MAP['doc-governance'].map(action => action.key)).toEqual(['view'])
+  })
+})
 
 describe('提交需求页返回落点解析', () => {
   it('from 命中白名单时返回落在点进来的那张菜单', () => {

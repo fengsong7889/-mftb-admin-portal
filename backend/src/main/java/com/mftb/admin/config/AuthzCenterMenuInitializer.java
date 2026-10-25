@@ -57,8 +57,9 @@ public class AuthzCenterMenuInitializer implements CommandLineRunner {
 
     private void doMigrate() {
         Long parentId = queryMenuIdByKey(PARENT_KEY);
+        // permission 包装壳在生产已拍平；空库/旧库缺壳时按顶级菜单落地，不能阻断启动。
         if (parentId == null) {
-            throw new IllegalStateException("permission 顶级菜单不存在，无法挂载 " + MENU_KEY);
+            log.info("permission 顶级菜单不存在，{} 按顶级菜单落地", MENU_KEY);
         }
         // 清理历史软删残留，避免唯一键冲突（幂等）
         jdbcTemplate.update("DELETE FROM sys_menu WHERE menu_key = ? AND deleted = 1", MENU_KEY);

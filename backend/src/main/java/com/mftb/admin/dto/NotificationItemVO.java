@@ -14,7 +14,7 @@ public class NotificationItemVO {
     /** 通知唯一 ID */
     private String id;
 
-    /** 通知类型: gift_expire（赠送到期提醒） */
+    /** 通知类型: gift_expire（赠送到期提醒）/ doc_ack_pending（制度待签收） */
     private String type;
 
     /** 通知标题 */
@@ -40,6 +40,15 @@ public class NotificationItemVO {
 
     /** 剩余天数（仅 gift_expire 类型） */
     private Integer daysLeft;
+
+    /** 关联文档节点（doc_ack_pending） */
+    private Long docNodeId;
+
+    /** 关联文档修订（doc_ack_pending） */
+    private Long docRevisionId;
+
+    /** 制度签收截止日（doc_ack_pending） */
+    private LocalDate docDueDate;
 
     /** 通知生成时间 */
     private String createdAt;
