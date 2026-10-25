@@ -106,7 +106,12 @@ function mount(path = '/portal') {
  */
 async function waitAutoplaySettled(container: HTMLElement) {
   await waitFor(
-    () => expect(container.querySelector('.portal-card-shell[data-autoplay="1"]')).toBeNull(),
+    () => {
+      // data-autoplay 移除与 data-motion 回落是两次渲染；只等前者会在 CI 偶发把
+      // 自动播的 running 误判成后续悬停引起的播放。
+      expect(container.querySelector('.portal-card-shell[data-autoplay="1"]')).toBeNull()
+      expect(container.querySelector('[data-motion="running"]')).toBeNull()
+    },
     { timeout: 9000 },
   )
 }
