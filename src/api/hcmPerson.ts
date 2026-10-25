@@ -28,6 +28,21 @@ export interface Person {
   updatedAt?: number | null
 }
 
+/** 人事异动摘要（只读聚合，敏感字段不返回） */
+export interface PersonLifecycleItem {
+  reqNo?: string | null
+  type?: string | null
+  status?: string | null
+  effectiveDate?: string | null
+  reason?: string | null
+  flowNo?: string | null
+}
+
+/** 该人员的异动摘要；无账号人员返回空数组 */
+export function fetchPersonLifecycle(personId: number) {
+  return request.get<unknown, PersonLifecycleItem[]>(`/hcm/v1/hr/persons/${personId}/lifecycle`)
+}
+
 /** 雇佣关系 */
 export interface HrEmployment {
   id?: number

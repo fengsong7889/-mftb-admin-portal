@@ -97,6 +97,23 @@ public class HrLifecycleServiceImpl implements HrLifecycleService {
         return new PageResult<>(records, result.getTotal());
     }
 
+    @Override
+    public List<HrLifecycleVO> listByUser(Long userId, int limit) {
+        if (userId == null) {
+            return List.of();
+        }
+        // limit 先夹到 1~100：接口来自页面聚合，不能让它变成全表导出
+        int size = Math.min(Math.max(limit, 1), 100);
+        List<HrLifecycleRequest> rows = hrLifecycleRequestMapper.selectList(
+                new LambdaQueryWrapper<HrLifecycleRequest>()
+                        .eq(HrLifecycleRequest::getUserId, userId)
+                        .orderByDesc(HrLifecycleRequest::getId)
+                        .last("LIMIT " + size));
+        List<HrLifecycleVO> records = rows.stream().map(HrLifecycleVO::from).toList();
+        attachTasks(records);
+        return records;
+    }
+
     /**
      * 批量贴执行状态（一次 IN 查完，不在循环里逐单查）。
      * <p>列表不贴就看不出哪单在「等生效」、哪单「办理失败」，只能一个个点迚详情看。 */

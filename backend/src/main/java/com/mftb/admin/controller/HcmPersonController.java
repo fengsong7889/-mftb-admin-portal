@@ -2,11 +2,13 @@ package com.mftb.admin.controller;
 
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
+import com.mftb.admin.dto.HcmPersonLifecycleVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.HrAssignment;
 import com.mftb.admin.entity.HrEmployment;
 import com.mftb.admin.entity.Person;
 import com.mftb.admin.service.HcmPersonService;
+import com.mftb.admin.service.HrLifecycleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -35,6 +37,7 @@ import java.time.LocalDate;
 public class HcmPersonController {
 
     private final HcmPersonService personService;
+    private final HrLifecycleService hrLifecycleService;
 
     /* ==================== 人员 ==================== */
 
@@ -73,6 +76,35 @@ public class HcmPersonController {
     public Result<Void> deletePerson(@PathVariable Long id) {
         personService.deletePerson(id);
         return Result.success("人員已刪除", null);
+    }
+
+    /**
+     * 该人员的人事异动摘要（只读聚合）。
+     * <p>
+     * 无账号人员直接返回空：异动单据以 sys_user 为锚点（旧域），没有账号就没有单据，
+     * 这是事实而不是错误。敏感字段（证件/手机/邮箱）不在此返回。
+     */
+    @GetMapping("/persons/{id}/lifecycle")
+    @RequirePermission(menu = "hcm-person")
+    public Result<java.util.List<HcmPersonLifecycleVO>> personLifecycle(@PathVariable Long id) {
+        Person person = personService.getPerson(id);
+        if (person.getSysUserId() == null) {
+            return Result.success(java.util.List.of());
+        }
+        java.util.List<HcmPersonLifecycleVO> summary = hrLifecycleService.listByUser(person.getSysUserId(), 50)
+                .stream()
+                .map(vo -> {
+                    HcmPersonLifecycleVO item = new HcmPersonLifecycleVO();
+                    item.setReqNo(vo.getReqNo());
+                    item.setType(vo.getType());
+                    item.setStatus(vo.getStatus());
+                    item.setEffectiveDate(vo.getEffectiveDate());
+                    item.setReason(vo.getReason());
+                    item.setFlowNo(vo.getFlowNo());
+                    return item;
+                })
+                .toList();
+        return Result.success(summary);
     }
 
     /* ==================== 雇佣关系 ==================== */

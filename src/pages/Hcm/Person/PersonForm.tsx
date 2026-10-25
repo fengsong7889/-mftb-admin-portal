@@ -8,13 +8,14 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Alert, Button, DatePicker, Form, Input, Modal, Select, Space, Switch, Table, Tag, Timeline, message } from 'antd'
+import { Button, DatePicker, Form, Input, Modal, Select, Space, Switch, Table, Tag, Timeline, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { SaveOutlined, IdcardOutlined, SafetyCertificateOutlined, PlusOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import {
   createPerson,
+  fetchPersonLifecycle,
   getPerson,
   listAssignments,
   listEmployments,
@@ -23,8 +24,19 @@ import {
   type HrAssignment,
   type HrEmployment,
   type Person,
+  type PersonLifecycleItem,
 } from '../../../api/hcmPerson'
 import { CardTitle, FormHeader, UpdatedFooter, cardStyle, formatTimestamp, grid3 } from '../Organization/shared'
+
+/** 异动类型标签（与后端 HrLifecycleConstants 的取值逐字对应） */
+const LIFECYCLE_TYPE_LABEL: Record<string, string> = {
+  onboard: '入職',
+  regular: '轉正',
+  transfer: '調動',
+  dimission: '離職',
+  renew: '續簽',
+  rehire: '返聘',
+}
 
 export default function HcmPersonForm() {
   const { t } = useTranslation()
@@ -43,6 +55,8 @@ export default function HcmPersonForm() {
   const [assignments, setAssignments] = useState<Record<number, HrAssignment[]>>({})
   // 全量任职（时间轴用）：与展开行的懒加载互不干扰
   const [allAssignments, setAllAssignments] = useState<Array<{ item: HrAssignment; employmentId: number }>>([])
+  // 既有异动单据（只读聚合）：以 person.sys_user_id 为锚点，无账号人员为空
+  const [lifecycle, setLifecycle] = useState<PersonLifecycleItem[]>([])
 
   const loadDetail = useCallback(async () => {
     if (!id) return
@@ -65,6 +79,11 @@ export default function HcmPersonForm() {
   useEffect(() => {
     void loadDetail()
   }, [loadDetail])
+
+  useEffect(() => {
+    if (!id) return
+    fetchPersonLifecycle(id).then(setLifecycle).catch(() => setLifecycle([]))
+  }, [id])
 
   useEffect(() => {
     if (!id) return
@@ -248,12 +267,32 @@ export default function HcmPersonForm() {
 
       {isDetail && (
         <div style={cardStyle}>
-          <Alert
-            type="info"
-            showIcon
-            style={{ marginBottom: 16 }}
-            message={t('hcmPerson.lifecycleNotice')}
-          />
+          <CardTitle icon={<SafetyCertificateOutlined />} title={t('hcmPerson.lifecycleTitle')} />
+          <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 12 }}>{t('hcmPerson.lifecycleNotice')}</div>
+          {lifecycle.length === 0 ? (
+            <div style={{ fontSize: 13, color: '#8C8C8C', marginBottom: 16 }}>
+              {t('hcmPerson.lifecycleEmpty')}
+            </div>
+          ) : (
+            <Table<PersonLifecycleItem>
+              rowKey={(row) => `${row.reqNo ?? ''}-${row.flowNo ?? ''}-${row.effectiveDate ?? ''}`}
+              size="small"
+              style={{ marginBottom: 16 }}
+              pagination={false}
+              dataSource={lifecycle}
+              columns={[
+                { key: 'reqNo', title: t('hcmPerson.lifecycleReqNo'), dataIndex: 'reqNo', width: 170,
+                  render: (v: string) => v || '-' },
+                { key: 'type', title: t('hcmPerson.lifecycleType'), dataIndex: 'type', width: 120,
+                  render: (v: string) => LIFECYCLE_TYPE_LABEL[v] ?? v ?? '-' },
+                { key: 'status', title: t('hcmPerson.lifecycleStatus'), dataIndex: 'status', width: 120 },
+                { key: 'effectiveDate', title: t('hcmPerson.lifecycleEffective'), dataIndex: 'effectiveDate', width: 130,
+                  render: (v: string) => v || '-' },
+                { key: 'flowNo', title: t('hcmPerson.lifecycleFlowNo'), dataIndex: 'flowNo', width: 160,
+                  render: (v: string) => v || '-' },
+              ]}
+            />
+          )}
           <CardTitle
             icon={<IdcardOutlined />}
             title={t('hcmPerson.employmentSection')}

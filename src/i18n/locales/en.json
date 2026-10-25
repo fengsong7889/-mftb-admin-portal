@@ -13846,6 +13846,13 @@
     "timelineTitle": "Assignment timeline",
     "timelineEmpty": "No assignment records",
     "timelineCurrent": "Current",
-    "timelineLine": "Unit #{{unit}} · FTE {{fte}} · seq {{seq}} · employment #{{employment}}"
+    "timelineLine": "Unit #{{unit}} · FTE {{fte}} · seq {{seq}} · employment #{{employment}}",
+    "lifecycleTitle": "Lifecycle requests (legacy)",
+    "lifecycleEmpty": "No lifecycle requests. People without an account have none.",
+    "lifecycleReqNo": "Request no.",
+    "lifecycleType": "Type",
+    "lifecycleStatus": "Status",
+    "lifecycleEffective": "Effective date",
+    "lifecycleFlowNo": "Workflow no."
   }
 }

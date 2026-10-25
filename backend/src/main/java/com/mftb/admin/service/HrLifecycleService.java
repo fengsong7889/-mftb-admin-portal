@@ -44,6 +44,12 @@ public interface HrLifecycleService {
     void delete(Long id);
 
     /** 按员工ID查询发起单据时的员工概要回填 */
+    /**
+     * 按员工列出异动单据（只读）：供人员主档聚合展示，不替代异动菜单的完整列表与操作。
+     * <p>返回字段由调用方裁剪，避免把证件号/手机等敏感字段带到只读聚合里。
+     */
+    List<HrLifecycleVO> listByUser(Long userId, int limit);
+
     HrEmployeeBriefVO employeeBrief(Long userId);
 
     /** 员工搜索下拉（按单据类型菜单授权校验，供转正/调动/离职选人） */

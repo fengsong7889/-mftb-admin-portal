@@ -13848,6 +13848,13 @@
     "timelineTitle": "任職時間軸",
     "timelineEmpty": "暫無任職記錄",
     "timelineCurrent": "當前",
-    "timelineLine": "組織 #{{unit}} · FTE {{fte}} · 同日序號 {{seq}} · 雇傭 #{{employment}}"
+    "timelineLine": "組織 #{{unit}} · FTE {{fte}} · 同日序號 {{seq}} · 雇傭 #{{employment}}",
+    "lifecycleTitle": "人事異動（既有單據）",
+    "lifecycleEmpty": "暫無異動單據；無賬號人員不會有異動單據。",
+    "lifecycleReqNo": "單據編號",
+    "lifecycleType": "異動類型",
+    "lifecycleStatus": "狀態",
+    "lifecycleEffective": "生效日期",
+    "lifecycleFlowNo": "流程編號"
   }
 }
