@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 public class EmployeeContractServiceImpl implements EmployeeContractService {
 
     /** 合同状态：已终止（到期预警口径中排除，与前端 contractLedger.terminated 对应） */
+    private static final java.util.List<String> CHANGE_TYPES = java.util.List.of("NEW", "RENEW", "CHANGE");
     private static final String STATUS_TERMINATED = "已终止";
 
     /** 到期分桶：已过期未处理 */
@@ -192,9 +193,9 @@ public class EmployeeContractServiceImpl implements EmployeeContractService {
     @Override
     public EmpContract create(Long userId, EmpContract contract) {
         requireUser(userId);
-        validate(contract);
-        contract.setId(null);
         contract.setUserId(userId);
+        validate(contract, userId);
+        contract.setId(null);
         String operator = operatorResolver.currentOperatorName();
         contract.setCreatedBy(operator);
         contract.setUpdatedBy(operator);
@@ -204,7 +205,8 @@ public class EmployeeContractServiceImpl implements EmployeeContractService {
         // 合同本身是「一行一份」的台账，行号+号号+起止+主体已足以事后重建；字段级留痕等 P5 单据化后一并接入。
         hrAuditService.record(HrAuditEntry.of(HrAuditAction.CONTRACT_WRITE, userId)
                 .detail("新增合同 " + contract.getContractNo() + "［" + contract.getContractType() + "］ "
-                        + contract.getStartDate() + "~" + contract.getEndDate() + " 主体=" + contract.getCompany())
+                        + contract.getStartDate() + "~" + endDateLabel(contract.getEndDate())
+                        + " 主体=" + contract.getCompany())
                 .reason(contract.getRemark())
                 .effectiveDate(contract.getStartDate()));
         return contract;
@@ -214,7 +216,7 @@ public class EmployeeContractServiceImpl implements EmployeeContractService {
     public EmpContract update(Long userId, Long id, EmpContract contract) {
         requireUser(userId);
         EmpContract existing = requireOwned(userId, id);
-        validate(contract);
+        validate(contract, userId);
         existing.setContractNo(contract.getContractNo());
         existing.setContractType(contract.getContractType());
         existing.setCompany(contract.getCompany());
@@ -222,12 +224,19 @@ public class EmployeeContractServiceImpl implements EmployeeContractService {
         existing.setEndDate(contract.getEndDate());
         existing.setSignDate(contract.getSignDate());
         existing.setStatus(contract.getStatus());
+        existing.setChangeType(contract.getChangeType());
+        existing.setPreviousContractId(contract.getPreviousContractId());
+        existing.setTerminatedDate(contract.getTerminatedDate());
+        existing.setTerminateReason(contract.getTerminateReason());
+        existing.setEvidenceUrl(contract.getEvidenceUrl());
+        existing.setEvidenceName(contract.getEvidenceName());
         existing.setRemark(contract.getRemark());
         existing.setUpdatedBy(operatorResolver.currentOperatorName());
         contractMapper.updateById(existing);
         hrAuditService.record(HrAuditEntry.of(HrAuditAction.CONTRACT_WRITE, userId)
                 .detail("编辑合同 #" + id + " " + existing.getContractNo() + "［" + existing.getContractType() + "］ "
-                        + existing.getStartDate() + "~" + existing.getEndDate() + " 主体=" + existing.getCompany())
+                        + existing.getStartDate() + "~" + endDateLabel(existing.getEndDate())
+                        + " 主体=" + existing.getCompany())
                 .reason(existing.getRemark())
                 .effectiveDate(existing.getStartDate()));
         return existing;
@@ -241,17 +250,46 @@ public class EmployeeContractServiceImpl implements EmployeeContractService {
         // 删除后行只剩软删标记，审计是唯一能说「当时那份合同是什么」的地方
         hrAuditService.record(HrAuditEntry.of(HrAuditAction.CONTRACT_WRITE, userId)
                 .detail("删除合同 #" + id + " " + existing.getContractNo() + " "
-                        + existing.getStartDate() + "~" + existing.getEndDate())
+                        + existing.getStartDate() + "~"
+                        + (existing.getEndDate() == null ? "無固定期限" : existing.getEndDate()))
                 .effectiveDate(existing.getStartDate()));
     }
 
-    private void validate(EmpContract contract) {
+    /** 审计文案里的止日：为空时必须写“无固定期限”，否则日志里只剩一个 null */
+    private String endDateLabel(java.time.LocalDate endDate) {
+        return endDate == null ? "無固定期限" : endDate.toString();
+    }
+
+    private void validate(EmpContract contract, Long userId) {
         if (!StringUtils.hasText(contract.getContractNo())) throw new BusinessException("合同編號不能為空");
         if (!StringUtils.hasText(contract.getContractType())) throw new BusinessException("合同類型不能為空");
         if (contract.getStartDate() == null) throw new BusinessException("合同開始日期不能為空");
-        if (contract.getEndDate() == null) throw new BusinessException("合同結束日期不能為空");
-        if (contract.getEndDate().isBefore(contract.getStartDate())) {
+        // 无固定期限合同不强制填结束日期（方案 6.2）：endDate 为空即「无固定期限」，
+        // 不能再用「结束日期必填」把这类合同挡在门外；有值时仍校验不得早于开始日期
+        if (contract.getEndDate() != null && contract.getEndDate().isBefore(contract.getStartDate())) {
             throw new BusinessException("合同結束日期不能早於開始日期");
+        }
+        // 签续变解：每份合同一行，续签/变更必须指向同一人的上一份合同，否则链路会串到别人身上
+        String changeType = StringUtils.hasText(contract.getChangeType())
+                ? contract.getChangeType().toUpperCase() : "NEW";
+        if (!CHANGE_TYPES.contains(changeType)) {
+            throw new BusinessException("變更類型只能是 NEW / RENEW / CHANGE");
+        }
+        contract.setChangeType(changeType);
+        if (!"NEW".equals(changeType)) {
+            if (contract.getPreviousContractId() == null) {
+                throw new BusinessException("續簽/變更必須關聯上一份合同");
+            }
+            EmpContract previous = contractMapper.selectById(contract.getPreviousContractId());
+            if (previous == null || !userId.equals(previous.getUserId())) {
+                throw new BusinessException("關聯的上一份合同不屬於該員工");
+            }
+        }
+        if (contract.getTerminatedDate() != null && contract.getTerminatedDate().isBefore(contract.getStartDate())) {
+            throw new BusinessException("解除日期不能早於合同開始日期");
+        }
+        if (contract.getEvidenceUrl() != null && contract.getEvidenceUrl().length() > 500) {
+            throw new BusinessException("證據地址過長");
         }
     }
 

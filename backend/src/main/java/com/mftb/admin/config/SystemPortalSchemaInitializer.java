@@ -443,6 +443,9 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
                         "賬戶資金、收支明細與財務對賬，盡在掌握", "AccountBookOutlined", 40},
                 {SystemCode.AI.code(), "人工智能系統", "Artificial Intelligence",
                         "統一管理智能模型、使用配額與安全審計", "RobotOutlined", 50},
+                // 55：插在人力資源（60）之前——組織編制是人事上下游的主數據源，門戶上先看到“定組織再定人”
+                {SystemCode.ORGANIZATION.code(), "組織編制系統", "Organization & Headcount",
+                        "法人主體、管理組織、職位職級與崗位編制的主數據治理", "ApartmentOutlined", 55},
                 {SystemCode.HR.code(), "人力資源系統", "Human Resources",
                         "連接員工、組織與職位，掌握人事動態", "TeamOutlined", 60},
                 {SystemCode.ATTENDANCE.code(), "考勤假勤系統", "Workforce & Attendance",
@@ -493,7 +496,9 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
                 "ai-emp-permission", "ai-operation-auth", "ai-assistant-group", "ai-energy-billing", "ai-mcp-service",
                 "ai-conversation-audit", "ai-access-request"));
         updateMenuSystem(SystemCode.HR.code(),        List.of("hr-profile", "hr-lifecycle", "hr-config",
-                "org-center", "perf-center", "perf-report-center", "ess-center"));
+                "org-center", "perf-center", "perf-report-center", "ess-center", "hcm-person"));
+        updateMenuSystem(SystemCode.ORGANIZATION.code(), List.of("hcm-org-legal", "hcm-org-unit",
+                "hcm-org-job-family", "hcm-org-job-grade", "hcm-org-position"));
         updateMenuSystem(SystemCode.EAM.code(),       List.of("asset-dashboard", "consumable-ops", "asset-flow-ops",
                 "eam-procurement", "asset-basic"));
         updateMenuSystem(SystemCode.RDM.code(),       List.of("rdm-center", "rdm-dashboard", "rdm-efficiency",

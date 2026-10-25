@@ -7,7 +7,7 @@
 
 ---
 
-## 1. 系统清单（16 个业务系统 + 1 个公共入口）
+## 1. 系统清单（17 个业务系统 + 1 个公共入口）
 
 > **命名规范（2026-10 统一）**：中文显示名一律「4字域名 + 系統」= 6 字，全部以「系統」结尾。
 > 不再混用「中心 / 工作台 / 配置」——那类后缀属菜单级语义，会把独立系统降级成菜单。
@@ -22,8 +22,11 @@
 | `search` | 搜索運營系統 | Search Operations | `SearchOutlined` | 30 | 搜索词库、引导、策略、校验、报表 |
 | `finance` | 財務結算系統 | Finance & Settlement | `AccountBookOutlined` | 40 | 账户余额、批次、明细、对账、审批中心 |
 | `ai` | 人工智能系統 | Artificial Intelligence | `RobotOutlined` | 50 | 模型、配额、授权、MCP、审计、能耗 |
+| `organization` | 組織編制系統 | Organization & Headcount | `ApartmentOutlined` | 55 | 法人主體、管理組織、職位職級、崗位編制（v289 从 hr 拆出独立系统，先交付法人/組織兩頁） |
 | `hr` | 人力資源系統 | Human Resources | `TeamOutlined` | 60 | 员工、组织、职位、员工动态 |
 | `attendance` | 考勤假勤系統 | Workforce & Attendance | `ClockCircleOutlined` | 65 | 打卡/排班/班次/節假日/異常/請假額度/日報月報（v228 从 hr 拆出独立入口） |
+
+> **v289（2026-10）新增 `organization`**：组织/编制是主数据治理面，与员工档案（人事管理）责任不同。**不得复用 `hr` 准入**——`org-center` / `hr-profile` 等旧 key 仍归 `hr`，新系统的 `hcm-org-legal` / `hcm-org-unit` 是全新 menu_key，否则「看人事档案」的人会自动获得「改法人/改编制」的写权。
 | `eam` | 物資管理系統 | Asset Management | `InboxOutlined` | 70 | 资产、耗材、采购、库存、盘点 |
 | `rdm` | 產研交付系統 | R&D Delivery | `ProjectOutlined` | 75 | 需求提交、审批、分配、研发交付、验收上线与产出看板（菜单已拍平为一级，无 rdm-center 目录） |
 | `oa` | 流程審批系統 | Workflow Approval | `SolutionOutlined` | 80 | 流程中心、流程事项、审批配置、员工自助 |
@@ -81,6 +84,12 @@
 | ~~`permission`~~ | 權限管理 | `iam` | **v45 已物理删除** — v45 已退役；授權中心/角色管理/數據授權 提升为顶级 |
 | ~~`system-config`~~ | 系統配置 | `platform` | **v45 已物理删除** — v45 已退役；規則總覽/規則中心/版本管理/通知渠道配置 提升为顶级。`menu-config`（菜單配置）归 `iam` 治理面，不随 platform |
 | `i18n-center` | 多語言管理 | `platform` |  |
+| `hcm-org-legal` | 法人主體 | `organization` | 顶级菜单，sort 66；法人是雇佣关系的法律一方，未核实的法人不得用于正式计薪 |
+| `hcm-org-unit` | 管理組織 | `organization` | 顶级菜单，sort 67；`org_unit` 带法人外键与物化路径，禁止跨法人挂树 |
+| `hcm-org-job-family` | 職務族 | `organization` | 顶级菜单，sort 68；族决定能力模型与薪酬带宽，有职位时只能停用不能删 |
+| `hcm-org-job-grade` | 職位職級 | `organization` | 顶级菜单，sort 69；职位必须挂在启用中的族下，职级序号从 1 起 |
+| `hcm-org-position` | 崗位與編制 | `organization` | 顶级菜单，sort 70；本期只落核定编制数，在职占用待 C2 任职事实反算 |
+| `hcm-person` | 人員主檔 | `hr` | C3 新花名册（person 为事实源），与旧「員工管理」并存，C6 切换；不复用 hr-profile/employee-management 的写权 |
 | `attendance-workbench` | 假勤工作台 | `attendance` | 顶级菜单，sort 26；待办只跳转流程事项，不承载审批动作 |
 | `attendance-group` | 考勤組與規則 | `attendance` | 顶级菜单，sort 27；考勤结论的最小计算单位 |
 | `attendance-shift` | 班次管理 | `attendance` | 顶级菜单，sort 28 |

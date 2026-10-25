@@ -1064,6 +1064,41 @@ function AttendanceLeaveScene() {
   )
 }
 
+/**
+ * 組織編制（organization）：一张卡只讲一个动作「把组织定下来」。
+ * 元素预算：节点树（主体）＋ 编制人数条（辅助）＋ 品牌橙对勾（结果）= 3 组。
+ * 分镜：子节点入场（0-20%）→ 连线接上（20-55%）→ 编制条与对勾落地（55-80%）→ 静置呼吸。
+ */
+function OrganizationScene() {
+  return <g className="portal-org-scene">
+    <path className="portal-art-motion portal-org-link" pathLength="1"
+      d="M160 86v10M96 96h128M96 96v12M224 96v12"
+      fill="none" stroke="currentColor" strokeOpacity="0.35" strokeWidth="2" />
+    <g className="portal-art-motion portal-org-parent">
+      <rect x="112" y="44" width="96" height="42" rx="8" fill="currentColor" />
+      <rect x="124" y="58" width="48" height="5" rx="2.5" fill="#fff" opacity="0.85" />
+      <rect x="124" y="69" width="30" height="4" rx="2" fill="#fff" opacity="0.5" />
+    </g>
+    {[56, 184].map((x) => (
+      <g key={x} className="portal-art-motion portal-org-child">
+        <rect x={x} y={108} width={80} height={38} rx="8" fill="#fff" stroke="currentColor" strokeOpacity="0.35" />
+        <rect x={x + 12} y={120} width={34} height={4} rx="2" fill="currentColor" opacity="0.55" />
+        <rect x={x + 12} y={130} width={22} height={4} rx="2" fill="currentColor" opacity="0.3" />
+      </g>
+    ))}
+    <g className="portal-art-motion portal-org-headcount">
+      <rect x="112" y="152" width="96" height="18" rx="9" fill="currentColor" opacity="0.12" />
+      {[0, 1, 2].map((i) => (
+        <circle key={i} cx={132 + i * 16} cy="161" r="4" fill="currentColor" opacity={i === 2 ? 0.22 : 0.6} />
+      ))}
+    </g>
+    <g className="portal-art-motion portal-org-check">
+      <circle cx="214" cy="52" r="12" fill="#E8720C" />
+      <path d="m208 52 4.2 4.4 7.4-8.2" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+    </g>
+  </g>
+}
+
 const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
   finance: (
     <>
@@ -1347,6 +1382,7 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
     </>
   ),
   translation: null,
+  organization: <OrganizationScene />,
   /*
    * 考勤假勤：两套构图——「今日出勤动线」与「请假与额度」，进门户时逐档轮换。
    * 共用同一个 data-scene 场景色，不新增系统卡片也不会多出一个色。

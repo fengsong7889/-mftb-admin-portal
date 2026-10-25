@@ -280,6 +280,16 @@ export const keyToPath: Record<string, string> = {
   'vehicle-dispatch':     '/vehicle-dispatch',
   'vehicle-ledger':       '/vehicle-ledger',
   'vehicle-master-data':  '/vehicle-master-data',
+  // 組織編制系統（organization）—— 菜单真值由 HcmOrganizationMenuInitializer 写入 sys_menu。
+  // 本批只交付法人主体与管理组织两个真实页面；职位体系/岗位编制随后续批次登记，
+  // 不先写空壳路径，否则离线菜单门禁会当成「页面未接」报出来。
+  'hcm-org-legal':        '/hcm-org-legal',
+  'hcm-org-unit':         '/hcm-org-unit',
+  'hcm-org-job-family':   '/hcm-org-job-family',
+  'hcm-org-job-grade':    '/hcm-org-job-grade',
+  'hcm-org-position':     '/hcm-org-position',
+  // 人事管理（hr）· 人員主檔：菜單真值由 HcmPersonMenuInitializer 写入 sys_menu
+  'hcm-person':           '/hcm-person',
   // 考勤假勤系统（attendance）—— 独立入口，菜单真值由 AttendanceMenuInitializer 写入 sys_menu。
   'attendance-workbench':  '/attendance-workbench',
   'attendance-group':      '/attendance-group',
@@ -416,6 +426,20 @@ pathToKey['/vehicle-ledger/correct'] = 'vehicle-ledger'
 pathToKey['/vehicle-ledger/backfill'] = 'vehicle-ledger'
 
 // 考勤假勤子页（新增/编辑/详情/处理）均为对应菜单的子页面，非独立菜单，复用同一菜单授权
+pathToKey['/hcm-org-legal-form'] = 'hcm-org-legal'
+pathToKey['/hcm-org-legal-detail'] = 'hcm-org-legal'
+pathToKey['/hcm-org-unit-form'] = 'hcm-org-unit'
+pathToKey['/hcm-org-unit-detail'] = 'hcm-org-unit'
+pathToKey['/hcm-org-job-family-form'] = 'hcm-org-job-family'
+pathToKey['/hcm-org-job-family-detail'] = 'hcm-org-job-family'
+pathToKey['/hcm-org-job-grade-form'] = 'hcm-org-job-grade'
+pathToKey['/hcm-org-job-grade-detail'] = 'hcm-org-job-grade'
+pathToKey['/hcm-org-position-form'] = 'hcm-org-position'
+pathToKey['/hcm-org-position-detail'] = 'hcm-org-position'
+pathToKey['/hcm-person-form'] = 'hcm-person'
+pathToKey['/hcm-person-detail'] = 'hcm-person'
+pathToKey['/hcm-person-employment-form'] = 'hcm-person'
+pathToKey['/hcm-person-assignment-form'] = 'hcm-person'
 pathToKey['/attendance-group-form'] = 'attendance-group'
 pathToKey['/attendance-group-detail'] = 'attendance-group'
 pathToKey['/attendance-shift-form'] = 'attendance-shift'
@@ -615,6 +639,9 @@ export const BACKEND_CONNECTED_KEYS: Set<string> = new Set([
   'asset-flow', 'asset-inventory',
   // 用車管理（B1 已接真实 /api/vehicle/*，不再是前端原型，必须登记为已接入后端 ）
   'vehicle-files', 'vehicle-dispatch', 'vehicle-ledger', 'my-vehicle-use', 'vehicle-master-data',
+  // 組織編制系统：两个菜单及其表单/详情页全部走真实 /api/hcm/v1/organization/*，无前端 mock 回退
+  'hcm-org-legal', 'hcm-org-unit', 'hcm-org-job-family', 'hcm-org-job-grade', 'hcm-org-position',
+  'hcm-person',
   // 考勤假勤系统：菜单来自后端 sys_menu（阶段二 2A 已落种子），因此十个菜单全部必须登记：
   // 未登记会被 check-menu-consistency 判为「离线路由无法阻断」。
   // 2C 已完成：十个菜单及其子页（表单/详情/处理页）全部走真实 /api/attendance/*，

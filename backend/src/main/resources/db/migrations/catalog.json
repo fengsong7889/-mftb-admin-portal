@@ -2998,6 +2998,181 @@
       "author": "Qoder",
       "ticket": "rdm-schedule-required-fields",
       "comment": "归属体系改造把「项目+迭代」做成了排期硬闸门（applyProjectAndIteration required=true），但 204 种子里 schedule 的 required_fields 仍是 planDate。详情页动作弹窗按服务端 allowedActions 下发的 requiredFields 渲染字段，于是生产上排期弹窗没有项目/迭代选择器，而写侧又要求两者，用户只能看到「提交排期必須選擇所屬項目與迭代」却无处可选。本版只更新仍为旧值 planDate 的行，不覆盖管理员自定义；后置校验只要求旧值残留为 0，允许运营调整必填集合。同时后端闸门在请求未带归属时回退复核需求已有项目/迭代，避免「明明已挂好仍被要求重选」。288 脚本仅作参照文档，不进镜像。"
+    },
+    {
+      "versionKey": "hcm:org-schema:v1.0",
+      "module": "hcm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "hcmOrganizationSchemaInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "core:schema-v10"
+      ],
+      "scriptFiles": [
+        "289_hcm_organization_core.sql"
+      ],
+      "intent": "首期 HCM 階段 C1 第一批：建 org_legal_entity（法人主體）與 org_unit（管理組織）兩張主數據表",
+      "author": "Qoder",
+      "ticket": "hcm-c1-org",
+      "comment": "法人主體必須與 sys_hr_dict.EMPLOYER_COMPANY 分開：字典只是下拉選項，沒有法域、登記證照與核實狀態，也掛不了組織、合同與薪資規則；法人是雇傭關係的法律一方。org_unit 不動 sys_department：舊表被部門授權與數據範圍直接引用，切換期只能「舊域寫 + 新域影子校驗」，不能雙寫兩份主檔（方案 8.2）。org_unit.legal_entity_id 建外鍵而不是軟引用：跨法人掛樹會讓編制統計與薪資成本分攤同時錯帳，必須由數據庫兜住；path 物化祖先鏈讓子樹查詢一條 SQL 完成，移動時整體改寫子樹前綴。verify 只校驗兩張表存在，不校驗數據條數——管理員刪空業務數據不應阻塞啟動。289 腳本僅作參照文檔，不進鏡像。"
+    },
+    {
+      "versionKey": "hcm:org-legal-backfill:v1.0",
+      "module": "hcm",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "hcmOrganizationSchemaInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "hcm:org-schema:v1.0"
+      ],
+      "scriptFiles": [
+        "289_hcm_organization_core.sql"
+      ],
+      "intent": "把舊字典 sys_hr_dict.EMPLOYER_COMPANY 的法人回填進 org_legal_entity，統一標記待核實",
+      "author": "Qoder",
+      "ticket": "hcm-c1-org",
+      "comment": "舊字典沒有法域、登記證照與核實狀態，直接當已核實事實會把「猜測」寫成法定數據。因此回填行一律 verify_status=0（待核實）、jurisdiction 暫按 CN、remark 標明來源，由 HR 逐條核對後再改為已核實；未核實法人不得用於正式計薪。INSERT IGNORE 配合 uk_org_legal_code：已存在的法人在授權中心維護過後不會被回填覆蓋。後置校驗只要求法人表條數不少於字典條數（管理員可另行新建法人），不要求嚴格相等。"
+    },
+    {
+      "versionKey": "hcm:org-menu:v1.0",
+      "module": "hcm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "hcmOrganizationMenuInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "hcm:org-schema:v1.0",
+        "core:system-portal:v1.0"
+      ],
+      "intent": "組織編制系統首兩個菜單（法人主體 / 管理組織）+ admin 授權與角色/部門系統准入反推",
+      "author": "Qoder",
+      "ticket": "hcm-c1-org",
+      "comment": "只種兩個真實頁面，不先種職位體系/崗位的空殼菜單：側邊欄出現點進去 404 的幽靈入口比缺菜單更糟。system_code 必須顯式寫 organization，且不得復用 hr 的 org-center / hr-profile 等舊 key——授權行跟著 menu_id 走，復用舊 key 等於讓「看人事檔案」的人自動拿到「改法人/改組織」的寫權（方案 13.5 第 6 步禁止）。grantAdmin 用 INSERT IGNORE + 只補空動作集，管理員在授權中心主動收窄過的動作不得被啟動重放擴權。deriveSystemAccess 按菜單授權反推 sys_role_system/sys_department_system，否則普通角色上線當天會被 PermissionAspect 攔成 403。applyOnce 記住版本後每次啟動仍重放自愈（防生產庫回滾或菜單被手工刪行導致入口丟失）。"
+    },
+    {
+      "versionKey": "hcm:org-schema:v1.1",
+      "module": "hcm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "hcmOrganizationSchemaInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "hcm:org-schema:v1.0"
+      ],
+      "scriptFiles": [
+        "290_hcm_organization_job_catalog.sql"
+      ],
+      "intent": "職位體系第二批：建 org_job_family（職務族）與 org_job_grade（職位職級）",
+      "author": "Qoder",
+      "ticket": "hcm-c1-job",
+      "comment": "職務族/職位職級/崗位實例三層分開：族決定能力模型與發展通道，職級決定薪酬帶寬，崗位決定編制佔用，三者的變更節奏完全不同，合成一張萬能職位字典會讓每次調薪都變成改字典。org_job_grade.job_family_id 建外鍵：職位脫離族就套不上能力模型與薪酬帶寬。verify 只校驗兩張表存在，不校驗數據條數。290 腳本僅作參照文檔，不進鏡像。"
+    },
+    {
+      "versionKey": "hcm:org-menu:v1.1",
+      "module": "hcm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "hcmOrganizationMenuInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "hcm:org-schema:v1.1",
+        "hcm:org-menu:v1.0"
+      ],
+      "intent": "職位體系兩個菜單（職務族 / 職位職級）+ admin 授權",
+      "author": "Qoder",
+      "ticket": "hcm-c1-job",
+      "comment": "只種兩個真實頁面，崗位實例與編制預算留到下一批一起登記——空殼菜單點進去 404 比缺菜單更糟。新菜單 key 不復用既有 position-management（仍歸 hr）：那條是員工任職記錄的視角，本系統是職位/職級主數據的視角，責任不同、寫權不同。admin 授權只補空動作集，不擴寫管理員在授權中心收窄過的動作。"
+    },
+    {
+      "versionKey": "hcm:org-schema:v1.2",
+      "module": "hcm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "hcmOrganizationSchemaInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "hcm:org-schema:v1.1",
+        "hcm:org-schema:v1.0"
+      ],
+      "scriptFiles": [
+        "291_hcm_organization_position.sql"
+      ],
+      "intent": "岗位与编制第三批：建 org_position（岗位实例 + 核定编制数）",
+      "author": "Qoder",
+      "ticket": "hcm-c1-position",
+      "comment": "本期只落编制预算（headcount），不落占用数：占用必须由任职事实（Assignment）反算，而 Assignment 属 C2 人员主数据；先造一张手工维护的占用数会让界面上的超编变成人填的数字而不是事实（方案禁止用占位冒充闭环）。unit_id / job_grade_id 建外键，两个检查位都必须是启用态才允许挂岗位；headcount 加 CHECK(headcount>=0)，负数编制在任何报表里都无法解释。verify 只校验表存在。291 脚本仅作参照文档，不进镜像。"
+    },
+    {
+      "versionKey": "hcm:org-menu:v1.2",
+      "module": "hcm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "hcmOrganizationMenuInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "hcm:org-schema:v1.2",
+        "hcm:org-menu:v1.1"
+      ],
+      "intent": "岗位与编制菜单（hcm-org-position）+ admin 授权",
+      "author": "Qoder",
+      "ticket": "hcm-c1-position",
+      "comment": "只种一个真实页面。system_code 显式写 organization，不复用 hr 的 position-management：那条是员工任职记录的视角，本系统是岗位/编制主数据的视角，写权与责任不同。admin 授权只补空动作集。"
+    },
+    {
+      "versionKey": "hcm:person-schema:v1.0",
+      "module": "hcm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "hcmPersonSchemaInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "hcm:org-schema:v1.0",
+        "hcm:org-schema:v1.1",
+        "hcm:org-schema:v1.2"
+      ],
+      "scriptFiles": [
+        "292_hcm_person_core.sql"
+      ],
+      "intent": "C2 人员主数据：建 person / hr_employment / hr_assignment 三表（Person → Employment → Assignment 分层）",
+      "author": "Qoder",
+      "ticket": "hcm-c2-person",
+      "comment": "人员与账号解耦：person.sys_user_id 可空并唯一，无账号人员也能建档；凭据仍只在 IAM。雇佣按人+法人建关系，不同法人可并行（跨国兼岗），同一法人同期重叠由服务层拒绝。任职日期生效：effective_from/to 是业务区间，seq_no 只排序同日多次变更，不跨日期比较。主任职唯一不靠服务层：生成列 primary_effective 只对「未结束且未删除的主任职」取 employment_id，其余 NULL，唯一键 uk_hr_assignment_primary 因此只约束这一类行——并发提交两份主任职时服务层检查会同时通过，必须由数据库兜住。uk_hr_assignment_version(employment_id,effective_from,seq_no) 同时防止同一天写入两条完全相同版本的任职。本批不开放接口与菜单：C2 验收是无账号建档/返聘/跨法人/未来生效/同日多次这些数据级用例，API 与花名册界面随 C3 交付，避免出现没有页面的受控菜单。292 脚本仅作参照文档，不进镜像。"
+    },
+    {
+      "versionKey": "hcm:person-menu:v1.0",
+      "module": "hcm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "hcmPersonMenuInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "hcm:person-schema:v1.0",
+        "core:system-portal:v1.0"
+      ],
+      "intent": "人员主档菜单（hcm-person，归属 hr）+ admin 授权",
+      "author": "Qoder",
+      "ticket": "hcm-c3-roster",
+      "comment": "归属人事管理（hr），但用全新 menu_key hcm-person：旧「員工管理」仍以 sys_user 为事实源，新主档以 person 为事实源，C6 切换前并存，写权不能混在一个菜单里。只种一个菜单，不种雇佣/任职子页——它们是详情页内的维护动作，不是独立导航项。admin 授权只补空动作集；deriveSystemAccess 按菜单授权反推 hr 系统准入。"
+    },
+    {
+      "versionKey": "hr:contract-lifecycle:v1.0",
+      "module": "hr",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "empContractLifecycleInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "core:schema-v10"
+      ],
+      "scriptFiles": [
+        "294_emp_contract_lifecycle.sql"
+      ],
+      "intent": "C4 第二批：emp_contract 补 change_type / previous_contract_id / terminated_date / terminate_reason / evidence_url / evidence_name",
+      "author": "Qoder",
+      "ticket": "hcm-c4-contract",
+      "comment": "不新建合同事件表：emp_contract 已是「一人多份合同」台账，一行一份；续签只是新的一行，用 previous_contract_id 串成链即可，拆出事件表会让「当前有效合同」需要跨表推断。解除必须落 terminated_date + reason，不能只把 status 改成字符串——方案要求解除是可追溯事件。证据只存地址与文件名，不冒充已验证电子签。ALTER 逐列先查 information_schema 再补（ADD COLUMN 不可重放），后置校验六列齐全。294 脚本仅作参照文档，不进镜像。"
     }
   ]
 }

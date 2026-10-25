@@ -2,7 +2,7 @@ import type { TFunction } from 'i18next'
 
 /** 门户展示映射只选择文案与插画，不参与系统准入或导航判断。 */
 const PORTAL_SYSTEM_KEYS = [
-  'ads', 'merchant', 'search', 'finance', 'ai', 'hr', 'attendance', 'eam', 'rdm', 'oa', 'iam', 'platform',
+  'ads', 'merchant', 'search', 'finance', 'ai', 'organization', 'hr', 'attendance', 'eam', 'rdm', 'oa', 'iam', 'platform',
   'merchantWorkbench', 'translation', 'meeting', 'doc',
 ] as const
 
@@ -15,6 +15,7 @@ export const PORTAL_SYSTEM_ICONS: Record<PortalSystemKey, string> = {
   search: 'SearchOutlined',
   finance: 'AccountBookOutlined',
   ai: 'RobotOutlined',
+  organization: 'ApartmentOutlined',
   hr: 'TeamOutlined',
   attendance: 'ClockCircleOutlined',
   eam: 'InboxOutlined',

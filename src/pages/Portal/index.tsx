@@ -66,6 +66,10 @@ const PORTAL_SYSTEM_CATALOG: readonly PortalSystem[] = [
     description: '模型、配額、授權、MCP、審計、能耗', icon: 'RobotOutlined',
   },
   {
+    code: 'organization', name: '組織編制系統', nameEn: 'Organization & Headcount',
+    description: '法人主體、管理組織、職位職級與崗位編制', icon: 'ApartmentOutlined',
+  },
+  {
     code: 'hr', name: '人力資源系統', nameEn: 'Human Resources',
     description: '員工、組織、職位、員工動態', icon: 'TeamOutlined',
   },

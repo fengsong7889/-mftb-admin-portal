@@ -347,6 +347,7 @@ class SystemPortalSchemaInitializerTest {
                 Map.entry("search", "搜索運營系統"),
                 Map.entry("finance", "財務結算系統"),
                 Map.entry("ai", "人工智能系統"),
+                Map.entry("organization", "組織編制系統"),
                 Map.entry("hr", "人力資源系統"),
                 Map.entry("attendance", "考勤假勤系統"),
                 Map.entry("eam", "物資管理系統"),

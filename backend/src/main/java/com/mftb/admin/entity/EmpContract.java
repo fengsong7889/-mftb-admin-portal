@@ -50,6 +50,24 @@ public class EmpContract {
     /** 状态 (生效中 / 已终止 / 已过期) */
     private String status;
 
+    /** 变更类型：NEW=首签 RENEW=续签 CHANGE=变更（台账里每份合同一条，靠 previous_contract_id 串成链） */
+    private String changeType;
+
+    /** 上一份合同 ID（续签/变更时指向被接续的那条；首签为空） */
+    private Long previousContractId;
+
+    /** 解除/终止日期（方案 6.2：解除是事件，不能只改状态字符串） */
+    private LocalDate terminatedDate;
+
+    /** 解除原因 */
+    private String terminateReason;
+
+    /** 签署证据/扫描件地址（附件证据可追溯，不冒充已验证电子签） */
+    private String evidenceUrl;
+
+    /** 证据文件名 */
+    private String evidenceName;
+
     /** 备注 */
     private String remark;
 

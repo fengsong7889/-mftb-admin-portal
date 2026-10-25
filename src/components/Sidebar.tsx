@@ -627,6 +627,14 @@ const keyToIcon: Record<string, ReactNode> = {
   'vehicle-ledger':   <CompassOutlined />,
   'my-vehicle-use':   <LoginOutlined />,
   'vehicle-master-data': <ClusterOutlined />,
+  // 組織編制系统（独立入口，菜单归属 sys_menu.system_code=organization）
+  'hcm-org-legal':         <BankOutlined />,
+  'hcm-org-unit':          <ApartmentOutlined />,
+  'hcm-org-job-family':    <ClusterOutlined />,
+  'hcm-org-job-grade':     <TagsOutlined />,
+  'hcm-org-position':      <LayoutOutlined />,
+  // 人事管理 · 人員主檔（C3）：与旧「員工管理」并存，图标区分开
+  'hcm-person':            <IdcardOutlined />,
   // 考勤假勤系统（独立入口，菜单归属 sys_menu.system_code=attendance）
   'attendance-ops-group':     <ScheduleOutlined />,     // 考勤管理分组
   'attendance-basic-group':   <ControlOutlined />,      // 基礎設置分组

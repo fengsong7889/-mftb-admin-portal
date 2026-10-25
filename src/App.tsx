@@ -24,6 +24,8 @@ import './App.css'
 const Home = lazy(() => import('./pages/Home'))
 const Portal = lazy(() => import('./pages/Portal'))
 const AppPreview = lazy(() => import('./pages/AppPreview'))
+// HCM 階段 B 界面預覽：十系統骨架，未接通後端，只能靠網址進入（不進菜單）
+const HcmBlueprint = lazy(() => import('./pages/HcmBlueprint'))
 const AccountBalance = lazy(() => import('./pages/AccountBalance'))
 const RechargeAdd = lazy(() => import('./pages/AccountBalance/RechargeAdd'))
 const TransferAdd = lazy(() => import('./pages/AccountBalance/TransferAdd'))
@@ -62,6 +64,21 @@ const DimensionStrategy = lazy(() => import('./pages/SearchConfigNew/ChannelStra
 // 集團人事
 const EmployeeManagement = lazy(() => import('./pages/Permission/Employee'))
 const EmployeeDetail = lazy(() => import('./pages/Permission/Employee/EmployeeDetail'))
+const HcmOrgLegalEntityList = lazy(() => import('./pages/Hcm/Organization/LegalEntityList'))
+const HcmOrgLegalEntityForm = lazy(() => import('./pages/Hcm/Organization/LegalEntityForm'))
+const HcmOrgUnitList = lazy(() => import('./pages/Hcm/Organization/UnitList'))
+const HcmOrgUnitForm = lazy(() => import('./pages/Hcm/Organization/UnitForm'))
+const HcmOrgJobFamilyList = lazy(() => import('./pages/Hcm/Organization/JobFamilyList'))
+const HcmOrgJobFamilyForm = lazy(() => import('./pages/Hcm/Organization/JobFamilyForm'))
+const HcmOrgJobGradeList = lazy(() => import('./pages/Hcm/Organization/JobGradeList'))
+const HcmOrgJobGradeForm = lazy(() => import('./pages/Hcm/Organization/JobGradeForm'))
+const HcmOrgPositionList = lazy(() => import('./pages/Hcm/Organization/PositionList'))
+const HcmOrgPositionForm = lazy(() => import('./pages/Hcm/Organization/PositionForm'))
+// C3 人員主檔（hr 域，菜单 hcm-person）
+const HcmPersonList = lazy(() => import('./pages/Hcm/Person/PersonList'))
+const HcmPersonForm = lazy(() => import('./pages/Hcm/Person/PersonForm'))
+const HcmEmploymentForm = lazy(() => import('./pages/Hcm/Person/EmploymentForm'))
+const HcmAssignmentForm = lazy(() => import('./pages/Hcm/Person/AssignmentForm'))
 const OrganizationManagement = lazy(() => import('./pages/Permission/Organization'))
 const PositionManagement = lazy(() => import('./pages/Permission/Position'))
 const HrDictManagement = lazy(() => import('./pages/Permission/HrDict'))
@@ -424,6 +441,19 @@ function AuthenticatedLayout() {
     void ensureLanguageBundle(getSavedLanguage())
   }, [])
 
+  // HCM 階段 B 界面預覽：與 /app-preview 同級，走獨立全屏分支。
+  // 為什麼不能掛進後台菜單：十系統此刻沒有 sys_system 行與 sys_menu 種子，
+  // 進菜單會讓人誤以為已上線；本頁只做信息架構與原型評審。
+  if (location.pathname === '/hcm-blueprint') {
+    return (
+      <RouteErrorBoundary key={location.pathname}>
+        <Suspense fallback={<PageLoading />}>
+          <HcmBlueprint />
+        </Suspense>
+      </RouteErrorBoundary>
+    )
+  }
+
   // 移动 APP 原型预览：/app-preview 全屏设备外壳，不注入 Sidebar / MenuTabs / PortalTopBar，
   // 与 /portal 同级；入口来自企业门户「移動 APP 體驗」。
   if (location.pathname === '/app-preview') {
@@ -513,6 +543,27 @@ function AuthenticatedLayout() {
               <Route path="/employee-management" element={<EmployeeManagement />} />
               <Route path="/employee-detail" element={<EmployeeDetail />} />
               <Route path="/organization-management" element={<OrganizationManagement />} />
+              {/* 組織編制系統（organization）：菜單真值由 HcmOrganizationMenuInitializer 寫入 sys_menu */}
+              <Route path="/hcm-org-legal" element={<HcmOrgLegalEntityList />} />
+              <Route path="/hcm-org-legal-form" element={<HcmOrgLegalEntityForm />} />
+              <Route path="/hcm-org-legal-detail" element={<HcmOrgLegalEntityForm />} />
+              <Route path="/hcm-org-unit" element={<HcmOrgUnitList />} />
+              <Route path="/hcm-org-unit-form" element={<HcmOrgUnitForm />} />
+              <Route path="/hcm-org-unit-detail" element={<HcmOrgUnitForm />} />
+              <Route path="/hcm-org-job-family" element={<HcmOrgJobFamilyList />} />
+              <Route path="/hcm-org-job-family-form" element={<HcmOrgJobFamilyForm />} />
+              <Route path="/hcm-org-job-family-detail" element={<HcmOrgJobFamilyForm />} />
+              <Route path="/hcm-org-job-grade" element={<HcmOrgJobGradeList />} />
+              <Route path="/hcm-org-job-grade-form" element={<HcmOrgJobGradeForm />} />
+              <Route path="/hcm-org-job-grade-detail" element={<HcmOrgJobGradeForm />} />
+              <Route path="/hcm-org-position" element={<HcmOrgPositionList />} />
+              <Route path="/hcm-org-position-form" element={<HcmOrgPositionForm />} />
+              <Route path="/hcm-org-position-detail" element={<HcmOrgPositionForm />} />
+              <Route path="/hcm-person" element={<HcmPersonList />} />
+              <Route path="/hcm-person-form" element={<HcmPersonForm />} />
+              <Route path="/hcm-person-detail" element={<HcmPersonForm />} />
+              <Route path="/hcm-person-employment-form" element={<HcmEmploymentForm />} />
+              <Route path="/hcm-person-assignment-form" element={<HcmAssignmentForm />} />
               <Route path="/position-management" element={<PositionManagement />} />
               <Route path="/hr-dict" element={<HrDictManagement />} />
               <Route path="/hr-dict-edit" element={<HrDictForm />} />

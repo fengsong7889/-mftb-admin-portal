@@ -501,6 +501,13 @@ export interface ContractItem {
   endDate?: string
   signDate?: string
   status?: string
+  /** NEW=首签 RENEW=续签 CHANGE=变更 */
+  changeType?: string
+  previousContractId?: number | null
+  terminatedDate?: string
+  terminateReason?: string
+  evidenceUrl?: string
+  evidenceName?: string
   remark?: string
   createdBy?: string
   updatedBy?: string
@@ -517,6 +524,12 @@ export interface ContractPayload {
   endDate?: string
   signDate?: string
   status?: string
+  changeType?: string
+  previousContractId?: number | null
+  terminatedDate?: string
+  terminateReason?: string
+  evidenceUrl?: string
+  evidenceName?: string
   remark?: string
 }
 

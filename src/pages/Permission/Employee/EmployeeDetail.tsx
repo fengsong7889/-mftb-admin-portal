@@ -25,7 +25,6 @@ import { fetchPositions, POSITION_SEQUENCE_OPTIONS, POSITION_RANK_OPTIONS, type 
 import { fetchHrDictOptions, HR_DICT_TYPE, type HrDictOption } from '../../../api/hrDict'
 import { fetchRoles, type RoleItem } from '../../../api/role'
 import HrAuditTrail from './HrAuditTrail'
-import EmploymentPeriods from './EmploymentPeriods'
 import {
   HR_OPERATION,
   HR_OPERATION_LABEL_KEY,
@@ -127,6 +126,12 @@ interface ContractRecord {
   signDate: string
   company: string
   status: string
+  changeType?: string
+  previousContractId?: number | null
+  terminatedDate?: string
+  terminateReason?: string
+  evidenceUrl?: string
+  evidenceName?: string
   remark?: string
 }
 
@@ -228,6 +233,12 @@ function toContractRecord(c: ContractItem): ContractRecord {
     signDate: c.signDate ?? '',
     company: c.company ?? '',
     status: c.status ?? '',
+    changeType: c.changeType ?? 'NEW',
+    previousContractId: c.previousContractId ?? null,
+    terminatedDate: c.terminatedDate ?? '',
+    terminateReason: c.terminateReason ?? '',
+    evidenceUrl: c.evidenceUrl ?? '',
+    evidenceName: c.evidenceName ?? '',
     remark: c.remark,
   }
 }
@@ -1365,7 +1376,8 @@ export default function EmployeeDetail() {
     { title: t('employeeDetail.colContractNo'), dataIndex: 'contractNo', key: 'contractNo', width: 140 },
     { title: t('employeeDetail.colContractType'), dataIndex: 'contractType', key: 'contractType', width: 120 },
     { title: t('employeeDetail.colStartDate'), dataIndex: 'startDate', key: 'startDate', width: 120 },
-    { title: t('employeeDetail.colEndDate'), dataIndex: 'endDate', key: 'endDate', width: 120 },
+    { title: t('employeeDetail.colEndDate'), dataIndex: 'endDate', key: 'endDate', width: 130,
+      render: (value: string) => value || t('employeeDetail.openEnded') },
     { title: t('employeeDetail.colSignDate'), dataIndex: 'signDate', key: 'signDate', width: 120 },
     { title: t('employeeDetail.colCompany'), dataIndex: 'company', key: 'company', width: 220, render: (v: string) => <span style={{ whiteSpace: 'nowrap' }}>{v}</span> },
     { title: t('common.colStatus'), dataIndex: 'status', key: 'status', width: 100,
@@ -1397,6 +1409,12 @@ export default function EmployeeDetail() {
       contractType: record.contractType,
       company: record.company,
       status: record.status,
+      changeType: record.changeType ?? 'NEW',
+      previousContractId: record.previousContractId ?? undefined,
+      terminatedDate: record.terminatedDate ? dayjs(record.terminatedDate) : undefined,
+      terminateReason: record.terminateReason,
+      evidenceUrl: record.evidenceUrl,
+      evidenceName: record.evidenceName,
       remark: record.remark,
       startDate: record.startDate ? dayjs(record.startDate) : undefined,
       endDate: record.endDate ? dayjs(record.endDate) : undefined,
@@ -1416,6 +1434,12 @@ export default function EmployeeDetail() {
       endDate: toDateStr(values.endDate),
       signDate: toDateStr(values.signDate),
       status: values.status,
+      changeType: values.changeType,
+      previousContractId: values.previousContractId ?? null,
+      terminatedDate: toDateStr(values.terminatedDate),
+      terminateReason: values.terminateReason,
+      evidenceUrl: values.evidenceUrl,
+      evidenceName: values.evidenceName,
       remark: values.remark,
     }
     const numId = Number(empId)
@@ -1515,11 +1539,6 @@ export default function EmployeeDetail() {
   function renderPositionTab() {
     return (
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        {/* 雇佣期间先占满整行，再下接原有的「职务详情 + 异动时间轴」两列：
-            时间轴回答「发生过哪些异动」，雇佣期间回答「这段雇佣从哪天到哪天、是第几段」（方案 §7.1） */}
-        <div style={{ flexBasis: '100%', minWidth: 0 }}>
-          <EmploymentPeriods userId={Number(empId)} />
-        </div>
         {/* 左侧：當前选中节点的职务變动详情（各节点部門/职位可能不同） */}
         <div style={{ flex: 1, minWidth: 0, border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -2483,6 +2502,36 @@ export default function EmployeeDetail() {
               <InputNumber min={0} style={{ width: '100%' }} placeholder="0" />
             </Form.Item>
           </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
+            <Form.Item name="changeType" label={t('employeeDetail.colChangeType')} initialValue="NEW">
+              <Select options={[
+                { value: 'NEW', label: t('employeeDetail.changeNew') },
+                { value: 'RENEW', label: t('employeeDetail.changeRenew') },
+                { value: 'CHANGE', label: t('employeeDetail.changeChange') },
+              ]} />
+            </Form.Item>
+            <Form.Item name="previousContractId" label={t('employeeDetail.colPreviousContract')}>
+              <Select
+                allowClear
+                placeholder={t('employeeDetail.previousContractPh')}
+                options={contracts
+                  .filter(item => !editingContract || item.id !== editingContract.id)
+                  .map(item => ({ value: item.id, label: `${item.contractNo}（${item.contractType || '-'}）` }))}
+              />
+            </Form.Item>
+            <Form.Item name="terminatedDate" label={t('employeeDetail.colTerminatedDate')}>
+              <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" placeholder={t('employeeDetail.datePh')} />
+            </Form.Item>
+            <Form.Item name="terminateReason" label={t('employeeDetail.colTerminateReason')}>
+              <Input maxLength={255} />
+            </Form.Item>
+            <Form.Item name="evidenceUrl" label={t('employeeDetail.colEvidenceUrl')}>
+              <Input maxLength={500} placeholder={t('employeeDetail.evidenceUrlPh')} />
+            </Form.Item>
+            <Form.Item name="evidenceName" label={t('employeeDetail.colEvidenceName')}>
+              <Input maxLength={128} />
+            </Form.Item>
+          </div>
           <Form.Item name="remark" label={t('employeeDetail.colRemark')}>
             <Input.TextArea rows={2} placeholder={t('employeeDetail.remarkOptionalPh')} />
           </Form.Item>
@@ -2826,8 +2875,9 @@ export default function EmployeeDetail() {
             <Form.Item name="startDate" label={t('employeeDetail.colStartDate')} rules={[{ required: true }]}>
               <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" placeholder={t('employeeDetail.datePh')} />
             </Form.Item>
-            <Form.Item name="endDate" label={t('employeeDetail.colEndDate')} rules={[{ required: true }]}>
-              <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" placeholder={t('employeeDetail.datePh')} />
+            {/* 无固定期限合同不填止日：留空即表示无固定期限，不能再当必填拦人（方案 6.2） */}
+            <Form.Item name="endDate" label={t('employeeDetail.colEndDate')}>
+              <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" placeholder={t('employeeDetail.openEndedHint')} />
             </Form.Item>
             <Form.Item name="signDate" label={t('employeeDetail.colSignDate')} rules={[{ required: true }]}>
               <DatePicker style={{ width: '100%' }} format="YYYY-MM-DD" placeholder={t('employeeDetail.datePh')} />

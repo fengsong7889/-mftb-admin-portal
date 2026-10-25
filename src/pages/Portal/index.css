@@ -1578,3 +1578,33 @@
   height: 100%;
   object-fit: cover;
 }
+
+/* ===== 組織編制（organization）：节点树接上上级、编制条落位、结果对勾 ===== */
+.portal-card-artwork[data-scene='organization'] { color: #5E46D8; /* 靛蓝：组织与编制，与 AI 紫 / 权限紫 / 搜索电光蓝互斥 */ }
+.portal-card-artwork .portal-org-child { animation-name: portalOrgChild; }
+.portal-card-artwork .portal-org-link {
+  stroke-dasharray: 1;
+  animation-name: portalOrgLink;
+}
+.portal-card-artwork .portal-org-headcount { animation-name: portalOrgHeadcount; }
+.portal-card-artwork .portal-org-check {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation-name: portalOrgCheck;
+}
+@keyframes portalOrgChild {
+  0%, 14% { opacity: 0; transform: translateY(8px); }
+  34%, 100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes portalOrgLink {
+  0%, 26% { stroke-dashoffset: 1; }
+  50%, 100% { stroke-dashoffset: 0; }
+}
+@keyframes portalOrgHeadcount {
+  0%, 48% { opacity: 0; transform: translateY(4px); }
+  66%, 100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes portalOrgCheck {
+  0%, 55% { opacity: 0; transform: scale(0.6); }
+  72%, 100% { opacity: 1; transform: scale(1); }
+}
