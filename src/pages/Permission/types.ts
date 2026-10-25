@@ -1010,6 +1010,8 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'create', label: '新增人員' },
     { key: 'edit', label: '編輯人員/雇傭/任職' },
     { key: 'delete', label: '刪除' },
+    // 字段級：勾了才看得到手機/郵箱/出生日期明文，否則服務端返回掩碼
+    { key: 'viewSensitive', label: '查看敏感字段（手機/郵箱/出生日期）' },
   ],
   'attendance-shift': [
     { key: 'view', label: '查看' },

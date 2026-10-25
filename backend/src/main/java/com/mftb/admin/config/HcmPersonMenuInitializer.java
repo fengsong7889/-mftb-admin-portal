@@ -26,10 +26,21 @@ public class HcmPersonMenuInitializer implements CommandLineRunner {
 
     static final String VERSION_KEY = "hcm:person-menu:v1.0";
 
+    /**
+     * v1.1：给「人員主檔」补 {@code viewSensitive} 动作。
+     * <p>为什么单独一个版本键：ensureMenu 对已存在菜单不覆盖 actions，只改 v1.0 声明存量库拿不到新动作集；
+     * 缺该动作时授权中心勾不出来，字段级脱敏也就永远解不开。
+     */
+    static final String VERSION_KEY_SENSITIVE = "hcm:person-menu:v1.1";
+
     private static final String SYSTEM_CODE = SystemCode.HR.code();
     private static final String ADMIN_ROLE_CODE = "admin";
     private static final String MENU_KEY = "hcm-person";
     private static final String ACTIONS = "[\"view\",\"create\",\"edit\",\"delete\"]";
+
+    /** v1.1 动作集：在原有动作上增加敏感字段查看 */
+    private static final String ACTIONS_WITH_SENSITIVE =
+            "[\"view\",\"create\",\"edit\",\"delete\",\"viewSensitive\"]";
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
@@ -39,6 +50,32 @@ public class HcmPersonMenuInitializer implements CommandLineRunner {
     public void run(String... args) {
         if (!versionTracker.applyOnce(VERSION_KEY, this::migrate, this::verify)) {
             migrate();
+        }
+        if (!versionTracker.applyOnce(VERSION_KEY_SENSITIVE, this::grantSensitiveAction, this::verifySensitiveAction)) {
+            grantSensitiveAction();
+        }
+    }
+
+    /** 把 viewSensitive 补进菜单动作集并授给 admin（其他角色由授权中心按需勾选） */
+    private void grantSensitiveAction() {
+        jdbcTemplate.update(
+                "UPDATE sys_menu SET actions = ?, updated_by = 'system' "
+                        + "WHERE menu_key = ? AND deleted = 0 AND (actions IS NULL OR actions <> ?)",
+                ACTIONS_WITH_SENSITIVE, MENU_KEY, ACTIONS_WITH_SENSITIVE);
+        Long adminRoleId = queryAdminRoleId();
+        Long menuId = queryMenuId(MENU_KEY);
+        if (adminRoleId != null && menuId != null) {
+            jdbcTemplate.update("UPDATE sys_role_menu SET actions = ? WHERE role_id = ? AND menu_id = ?",
+                    ACTIONS_WITH_SENSITIVE, adminRoleId, menuId);
+        }
+    }
+
+    private void verifySensitiveAction() {
+        Integer wrong = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_menu WHERE menu_key = ? AND deleted = 0 AND actions NOT LIKE '%viewSensitive%'",
+                Integer.class, MENU_KEY);
+        if (wrong != null && wrong > 0) {
+            throw new IllegalStateException("人員主檔菜單缺少 viewSensitive 動作: " + MENU_KEY);
         }
     }
 

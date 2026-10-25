@@ -9,8 +9,10 @@ import com.mftb.admin.entity.HrEmployment;
 import com.mftb.admin.entity.HrProfileItem;
 import com.mftb.admin.entity.Person;
 import com.mftb.admin.service.HcmPersonService;
+import com.mftb.admin.service.HcmPersonPiiService;
 import com.mftb.admin.service.HrLifecycleService;
 import com.mftb.admin.service.HrProfileService;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -41,6 +43,7 @@ public class HcmPersonController {
     private final HcmPersonService personService;
     private final HrLifecycleService hrLifecycleService;
     private final HrProfileService hrProfileService;
+    private final HcmPersonPiiService personPiiService;
 
     /* ==================== 人员 ==================== */
 
@@ -50,13 +53,19 @@ public class HcmPersonController {
                                                   @RequestParam(defaultValue = "20") long size,
                                                   @RequestParam(required = false) String keyword,
                                                   @RequestParam(required = false) Integer status) {
-        return Result.success(personService.listPersons(page, size, keyword, status));
+        Result<PageResult<Person>> result = Result.success(personService.listPersons(page, size, keyword, status));
+        if (result.getData() != null) {
+            maskIfNeeded(result.getData().getRecords(), "list");
+        }
+        return result;
     }
 
     @GetMapping("/persons/{id}")
     @RequirePermission(menu = "hcm-person")
     public Result<Person> personDetail(@PathVariable Long id) {
-        return Result.success(personService.getPerson(id));
+        Person person = personService.getPerson(id);
+        personPiiService.applyMasking(person, "detail");
+        return Result.success(person);
     }
 
     /** 建档：允许不填账号（无账号人员），账号映射由服务层校验唯一 */
@@ -108,6 +117,19 @@ public class HcmPersonController {
                 })
                 .toList();
         return Result.success(summary);
+    }
+
+    /**
+     * 字段级脱敏与明文留痕统一交给 HcmPersonPiiService：
+     * 无 {@code viewSensitive} 返回掩码，有则保留明文并写一条查看留痕。
+     */
+    private void maskIfNeeded(Iterable<Person> persons, String scene) {
+        if (persons == null) {
+            return;
+        }
+        for (Person person : persons) {
+            personPiiService.applyMasking(person, scene);
+        }
     }
 
     /* ==================== 档案扩展（教育/履历/资质/奖惩） ==================== */
