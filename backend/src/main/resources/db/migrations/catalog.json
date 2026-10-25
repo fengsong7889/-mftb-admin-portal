@@ -3555,6 +3555,39 @@
       "author": "Qoder",
       "ticket": "hcm-d2-benefit-menu",
       "comment": "只開一個菜單而不是兩個：方案與人員參保是同一個業務動作的兩步，拆成兩個一級菜單會讓側邊欄在薪酬域下出現兩條互相依賴的入口。"
+    },
+    {
+      "versionKey": "hcm:payroll-benefit-schema:v1.1",
+      "module": "hcm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "payrollBenefitSchemaInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "hcm:payroll-benefit-schema:v1.0"
+      ],
+      "intent": "參保方案增加統籌區/城市維度",
+      "author": "Qoder",
+      "ticket": "hcm-d3-rule",
+      "comment": "內地社保基數由各統籌區每年單獨公布，方案不帶城市就無法匹配到正確的上下限；加列而非重建表，避免既有數據遷移風險。"
+    },
+    {
+      "versionKey": "hcm:payroll-rule-schema:v1.0",
+      "module": "hcm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "payrollRuleSchemaInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "hcm:payroll-schema:v1.0"
+      ],
+      "scriptFiles": [
+        "299_payroll_rule.sql"
+      ],
+      "intent": "D3 第一批：規則集（城市×期間）與個稅級距",
+      "author": "Qoder",
+      "ticket": "hcm-d3-rule",
+      "comment": "刻意不種任何默認稅率或社保參數：內地基數按統籌區每年公布，內置默認值必在某個城市算錯。resolveRuleSet 在缺配置或同城多套生效時直接拋錯（fail-closed），寧可算不出來也不發出錯的工資。級距用「下限+上限+稅率+速算扣除數」表達，是累計預扣法可直接使用的形式。299 腳本僅作參照文檔，不進鏡像。"
     }
   ]
 }

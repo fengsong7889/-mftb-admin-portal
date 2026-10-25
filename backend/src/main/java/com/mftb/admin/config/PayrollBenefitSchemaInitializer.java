@@ -21,13 +21,21 @@ public class PayrollBenefitSchemaInitializer implements CommandLineRunner {
 
     static final String VERSION_KEY = "hcm:payroll-benefit-schema:v1.0";
 
+    /** v1.1：方案加統籌區/城市維度——內地社保基數按城市公布，方案不帶城市就無法正確匹配 */
+    static final String VERSION_KEY_CITY = "hcm:payroll-benefit-schema:v1.1";
+
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
 
     @Override
     public void run(String... args) {
         try {
-            versionTracker.applyOnce(VERSION_KEY, this::migrate, this::verify);
+            if (!versionTracker.applyOnce(VERSION_KEY, this::migrate, this::verify)) {
+                migrate();
+            }
+            if (!versionTracker.applyOnce(VERSION_KEY_CITY, this::migrateCity, this::verifyCity)) {
+                migrateCity();
+            }
         } catch (Exception e) {
             log.error("福利參保建表失敗: {}", e.getMessage(), e);
         }
@@ -93,6 +101,28 @@ public class PayrollBenefitSchemaInitializer implements CommandLineRunner {
                         + "CONSTRAINT ck_payroll_enrollment_amount CHECK (base_amount >= 0 AND employee_amount >= 0 AND employer_amount >= 0), "
                         + "CONSTRAINT ck_payroll_enrollment_period CHECK (effective_to IS NULL OR effective_to >= effective_from)"
                         + ") COMMENT='人員參保記錄'");
+    }
+
+    private void migrateCity() {
+        Integer exists = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() "
+                        + "AND TABLE_NAME = 'payroll_benefit_plan' AND COLUMN_NAME = 'city_code'",
+                Integer.class);
+        if (exists == null || exists == 0) {
+            jdbcTemplate.execute("ALTER TABLE payroll_benefit_plan ADD COLUMN city_code VARCHAR(16) DEFAULT NULL "
+                    + "COMMENT '統籌區/城市代碼（內地如 4403，港澳填 HK / MO）' AFTER jurisdiction");
+            jdbcTemplate.execute("ALTER TABLE payroll_benefit_plan ADD KEY idx_payroll_benefit_plan_city (city_code)");
+        }
+    }
+
+    private void verifyCity() {
+        Integer exists = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() "
+                        + "AND TABLE_NAME = 'payroll_benefit_plan' AND COLUMN_NAME = 'city_code'",
+                Integer.class);
+        if (exists == null || exists == 0) {
+            throw new IllegalStateException("payroll_benefit_plan.city_code 列未就緒");
+        }
     }
 
     private void verify() {
