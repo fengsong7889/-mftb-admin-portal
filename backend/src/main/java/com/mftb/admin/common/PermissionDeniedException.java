@@ -29,6 +29,15 @@ public class PermissionDeniedException extends RuntimeException {
     }
 
     /**
+     * 未声明权限的受保护端点：HCM 路径级兜底拒绝时使用。
+     * <p>消息刻意与「缺菜单权限」不同——这是配置缺陷（端点没标注 @RequirePermission），
+     * 不是使用者没被授权，提示要能让运维一眼看出该改代码。
+     */
+    public static PermissionDeniedException unscopedEndpoint(String path) {
+        return new PermissionDeniedException("接口未声明权限，已按默认拒绝处理: " + path, true);
+    }
+
+    /**
      * 数据范围拒绝：用户持有菜单但目标数据不属于本人。
      * <p>提示必须与「缺菜单权限」区分，否则自助员工看到「没有 xx 权限」会误以为没被授权。
      *
