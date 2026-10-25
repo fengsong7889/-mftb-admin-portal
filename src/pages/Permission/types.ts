@@ -999,6 +999,13 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'edit', label: '編輯/啟停/級距' },
     { key: 'delete', label: '刪除' },
   ],
+  'hcm-payroll-run': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '建立批次' },
+    { key: 'edit', label: '試算/鎖定' },
+    { key: 'delete', label: '刪除草稿' },
+  ],
+
 
 
   'hcm-org-legal': [
@@ -1925,6 +1932,7 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'hcm-payroll-standard',
   'hcm-payroll-benefit',
   'hcm-payroll-rule',
+  'hcm-payroll-run',
   // 考勤假勤系统（后端 AttendanceMenuInitializer 已按菜单鉴权，前端同步纳入受控）
   'attendance-workbench',
   'attendance-group',
@@ -2305,6 +2313,8 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/hcm-payroll-enrollment-form': 'hcm-payroll-benefit',
   '/hcm-payroll-rule': 'hcm-payroll-rule',
   '/hcm-payroll-rule-form': 'hcm-payroll-rule',
+  '/hcm-payroll-run': 'hcm-payroll-run',
+  '/hcm-payroll-run-detail': 'hcm-payroll-run',
   '/hcm-org-position-detail': 'hcm-org-position',
   '/hcm-person': 'hcm-person',
   '/hcm-person-form': 'hcm-person',

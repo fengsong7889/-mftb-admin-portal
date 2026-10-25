@@ -292,3 +292,94 @@ export function listBrackets(ruleSetId: number) {
 export function saveBrackets(ruleSetId: number, brackets: PayrollTaxBracket[]) {
   return request.put<unknown, PayrollTaxBracket[]>(`/hcm/v1/payroll/rule-sets/${ruleSetId}/brackets`, brackets)
 }
+
+/* ==================== 核算批次與工資單（D3） ==================== */
+
+export interface PayrollRun {
+  id?: number
+  period: string
+  cityCode: string
+  ruleSetId?: number | null
+  currency: string
+  status?: string
+  calculatedAt?: string | null
+  lockedAt?: string | null
+  warnings?: string | null
+  remark?: string | null
+  updatedBy?: string | null
+}
+
+export interface PayrollPayslip {
+  id?: number
+  runId?: number
+  employmentId?: number
+  personId?: number | null
+  currency?: string
+  grossAmount?: string | number
+  deductionAmount?: string | number
+  employerCostAmount?: string | number
+  netAmount?: string | number
+  taxableBase?: string | number
+  taxAmount?: string | number
+  status?: string
+  personName?: string | null
+  personNo?: string | null
+  employmentNo?: string | null
+}
+
+export interface PayrollPayslipItem {
+  id?: number
+  payslipId?: number
+  itemType: string
+  componentId?: number | null
+  planId?: number | null
+  itemName: string
+  amount: string | number
+  taxable?: number
+  sortOrder?: number
+}
+
+export interface PayrollPayslipDetail {
+  payslip: PayrollPayslip
+  items: PayrollPayslipItem[]
+}
+
+export const PAYROLL_RUN_STATUS = ['DRAFT', 'CALCULATED', 'LOCKED'] as const
+
+export function listPayrollRuns(params: {
+  page: number
+  size: number
+  period?: string
+  cityCode?: string
+  status?: string
+}) {
+  return request.get<unknown, PageResult<PayrollRun>>('/hcm/v1/payroll/runs', { params })
+}
+
+export function getPayrollRun(id: number) {
+  return request.get<unknown, PayrollRun>(`/hcm/v1/payroll/runs/${id}`)
+}
+
+export function createPayrollRun(data: { period: string; cityCode: string; remark?: string }) {
+  return request.post<unknown, PayrollRun>('/hcm/v1/payroll/runs', data)
+}
+
+export function deletePayrollRun(id: number) {
+  return request.delete(`/hcm/v1/payroll/runs/${id}`)
+}
+
+export function calculatePayrollRun(id: number) {
+  return request.post<unknown, PayrollRun>(`/hcm/v1/payroll/runs/${id}/calculate`)
+}
+
+export function lockPayrollRun(id: number) {
+  return request.post<unknown, PayrollRun>(`/hcm/v1/payroll/runs/${id}/lock`)
+}
+
+export function listPayslips(runId: number, params: { page: number; size: number }) {
+  return request.get<unknown, PageResult<PayrollPayslip>>(`/hcm/v1/payroll/runs/${runId}/payslips`, { params })
+}
+
+export function getPayslipDetail(id: number) {
+  return request.get<unknown, PayrollPayslipDetail>(`/hcm/v1/payroll/payslips/${id}`)
+}

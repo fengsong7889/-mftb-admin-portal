@@ -15119,6 +15119,56 @@
       "bracketHint": "Rates are decimals (3% = 0.03); the server validates the whole set again on save.",
       "noDefaultHint": "No default rates are built in: social insurance bases are published per pooling area each year, so each city needs its own configuration",
       "zeroDefaultHint": "Create a rule set before configuring brackets; when configuration is missing the engine refuses to calculate instead of guessing."
+    },
+    "run": {
+      "add": "New Run",
+      "createSuccess": "Payroll run created",
+      "createHint": "One run per city per payroll month. The rule set is resolved on creation; missing configuration is rejected.",
+      "period": "Payroll Month",
+      "periodRequired": "Payroll month is required",
+      "cityCode": "City / Pooling Area",
+      "cityRequired": "City code is required",
+      "cityHint": "Must match the city code in payroll rules (e.g. 4403)",
+      "calculatedAt": "Calculated At",
+      "lockedAt": "Locked At",
+      "status": {
+        "DRAFT": "Draft",
+        "CALCULATED": "Calculated",
+        "LOCKED": "Locked"
+      },
+      "calculate": "Calculate",
+      "calculateSuccess": "Calculation finished",
+      "lock": "Lock",
+      "lockConfirm": "Lock this run?",
+      "lockHint": "Once locked it cannot be recalculated; payslips are kept as evidence.",
+      "lockSuccess": "Run locked",
+      "deleteConfirm": "Delete this draft run?",
+      "deleteSuccess": "Payroll run deleted",
+      "payslips": "Payslips",
+      "payslipSection": "Payslips",
+      "payslipDetailTitle": "Payslip Detail",
+      "warning": "View notes",
+      "warningTitle": "Calculation Notes",
+      "flowHint": "Create → Calculate (repeatable) → Lock (no recalculation)",
+      "gross": "Gross",
+      "deduction": "Deductions",
+      "tax": "Income Tax",
+      "employerCost": "Employer Cost",
+      "net": "Net Pay",
+      "taxableBase": "Taxable Base",
+      "amount": "Amount",
+      "viewDetail": "View",
+      "itemName": "Item",
+      "itemType": "Line Type",
+      "itemTypeMap": {
+        "BASE_SALARY": "Base Salary",
+        "SOCIAL_EMPLOYEE": "Employee Social",
+        "SOCIAL_EMPLOYER": "Employer Social",
+        "TAX": "Income Tax"
+      },
+      "summary": "Run Info",
+      "detailTitle": "Payroll Run Detail",
+      "missingId": "Missing run id; open from the list"
     }
   }
 }

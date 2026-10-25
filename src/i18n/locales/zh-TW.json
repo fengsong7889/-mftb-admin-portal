@@ -15121,6 +15121,56 @@
       "bracketHint": "稅率填小數（3% 填 0.03）；保存時服務端會再次整體校驗。",
       "noDefaultHint": "系統不內置任何默認費率：社保基數按統籌區每年公布，需按城市逐套配置",
       "zeroDefaultHint": "首次使用請先建立規則集再配置級距；缺少配置時試算會被直接拒絕，不會用猜測值出數。"
+    },
+    "run": {
+      "add": "建立批次",
+      "createSuccess": "核算批次已建立",
+      "createHint": "同一城市同一工資月只能有一個批次；建立時會按城市解析規則集，缺配置會直接拒絕。",
+      "period": "工資月",
+      "periodRequired": "請選擇工資月",
+      "cityCode": "統籌區/城市代碼",
+      "cityRequired": "請填寫城市代碼",
+      "cityHint": "必須與薪酬規則中的城市代碼一致（如 4403）",
+      "calculatedAt": "試算時間",
+      "lockedAt": "鎖定時間",
+      "status": {
+        "DRAFT": "草稿",
+        "CALCULATED": "已試算",
+        "LOCKED": "已鎖定"
+      },
+      "calculate": "試算",
+      "calculateSuccess": "試算完成",
+      "lock": "鎖定",
+      "lockConfirm": "確認鎖定該批次？",
+      "lockHint": "鎖定後不可重算，工資單將作為憑證保留。",
+      "lockSuccess": "批次已鎖定",
+      "deleteConfirm": "確認刪除該草稿批次？",
+      "deleteSuccess": "核算批次已刪除",
+      "payslips": "工資單",
+      "payslipSection": "工資單明細",
+      "payslipDetailTitle": "工資單詳情",
+      "warning": "查看提示",
+      "warningTitle": "試算提示",
+      "flowHint": "建批 → 試算（可重複）→ 鎖定（不可重算）",
+      "gross": "應發合計",
+      "deduction": "扣除合計",
+      "tax": "個稅",
+      "employerCost": "雇主成本",
+      "net": "實發",
+      "taxableBase": "應納稅所得額",
+      "amount": "金額",
+      "viewDetail": "查看明細",
+      "itemName": "項目名稱",
+      "itemType": "行類型",
+      "itemTypeMap": {
+        "BASE_SALARY": "基本工資",
+        "SOCIAL_EMPLOYEE": "個人社保",
+        "SOCIAL_EMPLOYER": "雇主社保",
+        "TAX": "個人所得稅"
+      },
+      "summary": "批次信息",
+      "detailTitle": "核算批次詳情",
+      "missingId": "缺少批次 ID，請從列表進入"
     }
   }
 }

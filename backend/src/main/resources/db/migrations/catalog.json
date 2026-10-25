@@ -3624,6 +3624,22 @@
       "author": "Qoder",
       "ticket": "hcm-d3-run",
       "comment": "工資單金額是結果快照而非視圖計算：工資單一旦生成必須能原樣重放，不能因後來調薪或改費率而變。批次狀態 DRAFT/CALCULATED/LOCKED 由 CHECK 約束，鎖定後服務層拒絕重算。同一批次同一雇傭只允許一張工資單（唯一鍵）。明細存名稱快照，避免薪酬項目改名後歷史工資單跟著變。300 腳本僅作參照文檔，不進鏡像。"
+    },
+    {
+      "versionKey": "hcm:payroll-menu:v1.3",
+      "module": "hcm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "hcmPayrollMenuInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "hcm:payroll-run-schema:v1.0",
+        "hcm:payroll-menu:v1.2"
+      ],
+      "intent": "新增薪酬核算菜單（批次試算與工資單）",
+      "author": "Qoder",
+      "ticket": "hcm-d3-run-menu",
+      "comment": "與批次頁同一批落地，避免出現無頁面的受控入口；核算與規則分開授權：能配規則的人不必自動能發工資。"
     }
   ]
 }

@@ -659,6 +659,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'hcm-payroll-standard':  <WalletOutlined />,
   'hcm-payroll-benefit':   <SafetyCertificateOutlined />,
   'hcm-payroll-rule':      <CalculatorOutlined />,
+  'hcm-payroll-run':       <AccountBookOutlined />,
   // 考勤假勤系统（独立入口，菜单归属 sys_menu.system_code=attendance）
   'attendance-ops-group':     <ScheduleOutlined />,     // 考勤管理分组
   'attendance-basic-group':   <ControlOutlined />,      // 基礎設置分组
