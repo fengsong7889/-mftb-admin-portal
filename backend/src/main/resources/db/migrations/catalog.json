@@ -3206,6 +3206,24 @@
       "author": "Qoder",
       "ticket": "hcm-c5-field",
       "comment": "为什么单独版本键：ensureMenu 对已存在菜单不覆盖 actions，只改 v1.0 声明存量库拿不到新动作集，授权中心勾不出来，字段级脱敏永远解不开。只动这一个菜单并显式授 admin（内置运维角色必须能看明文），其他角色保持默认拒绝——服务的脱敏逻辑是「没有 viewSensitive 就掩手机/邮箱/出生日期」，属于默认安全而不是默认放开。后置校验要求 actions 含 viewSensitive。"
+    },
+    {
+      "versionKey": "hcm:pii-access-log:v1.0",
+      "module": "hcm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "hcmPiiAccessLogSchemaInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "hcm:person-schema:v1.0"
+      ],
+      "scriptFiles": [
+        "296_hcm_pii_access_log.sql"
+      ],
+      "intent": "C5：敏感字段明文查看留痕表 hcm_pii_access_log",
+      "author": "Qoder",
+      "ticket": "hcm-c5-pii-log",
+      "comment": "为什么不复用人事审计：人事审计按 sys_user 记业务动作，本表按 person 记「谁在什么时候看了哪些字段组」，用于事后追责与合规应答。刻意不存字段值——日志落明文等于把泄露面再扩大一次。留痕失败只告警不阻断读取：把日志故障变成业务 500 会让花名册不可用，这是有意识的取舍，已在服务实现里写明。296 脚本仅作参照文档，不进镜像。"
     }
   ]
 }
