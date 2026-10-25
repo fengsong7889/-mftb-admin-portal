@@ -3224,6 +3224,24 @@
       "author": "Qoder",
       "ticket": "hcm-c5-pii-log",
       "comment": "为什么不复用人事审计：人事审计按 sys_user 记业务动作，本表按 person 记「谁在什么时候看了哪些字段组」，用于事后追责与合规应答。刻意不存字段值——日志落明文等于把泄露面再扩大一次。留痕失败只告警不阻断读取：把日志故障变成业务 500 会让花名册不可用，这是有意识的取舍，已在服务实现里写明。296 脚本仅作参照文档，不进镜像。"
+    },
+    {
+      "versionKey": "hcm:payroll-schema:v1.0",
+      "module": "hcm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "payrollSchemaInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "hcm:person-schema:v1.0"
+      ],
+      "scriptFiles": [
+        "297_payroll_basic.sql"
+      ],
+      "intent": "D2 第一批：建 payroll_component（薪酬項目）與 payroll_salary_standard（薪酬標準，日期生效）",
+      "author": "Qoder",
+      "ticket": "hcm-d2-basic",
+      "comment": "項目類型分 EARNING/DEDUCTION/EMPLOYER_COST 三類：雇主承擔的社保不進實發但進人力成本，混在一起工資單與成本報表必然對不上；taxable 是法定屬性不是界面開關。薪酬標準日期生效而不是「當前工資一個字段」：調薪必須能回答「2026-09 他在拿多少」，覆蓋式更新會讓歷史工資單無法重現。金額 DECIMAL(18,4) 且強制帶幣種。當前有效標準唯一不靠服務層：生成列 current_employment 只對未結束行取 employment_id，並發兩次定薪時服務層區間校驗會同時通過，必須由數據庫兜住。本批不開放接口與菜單，避免出現沒有頁面的受控入口；API 與頁面隨 D2 第二批。297 腳本僅作參照文檔，不進鏡像。"
     }
   ]
 }
