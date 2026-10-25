@@ -154,15 +154,30 @@ def action_smoke(api, results):
     if prepared.get("code") != 200:
         step(results, "提案建立", "SKIP", f"工具未開放或參數不符: {prepared.get('message')}")
         return
-    proposal_no = (prepared.get("data") or {}).get("proposal_no") or (prepared.get("data") or {}).get("proposalNo")
-    step(results, "提案建立", "PASS", proposal_no)
+    data = prepared.get("data") or {}
+    proposal_no = data.get("proposal_no") or data.get("proposalNo")
+    status = data.get("status") or "pending"
+    step(results, "提案建立", "PASS", f"{proposal_no} (status={status})")
 
-    approved = api.call("POST", f"/api/agent/platform/actions/{proposal_no}/approve",
-                        {"approvalRef": "pilot-approval-" + str(int(time.time()))})
-    if approved.get("code") != 200:
-        step(results, "提案審批", "FAIL", approved.get("message", ""))
+    # prepare 對「同人+同工具+同參數」是冪等的：重跑會拿回同一張提案。
+    # 已審批/已執行的提案不能再審批，這裡按狀態分流而不是一律 approve。
+    if status in ("pending", "draft"):
+        approved = api.call("POST", f"/api/agent/platform/actions/{proposal_no}/approve",
+                            {"approvalRef": "pilot-approval-" + str(int(time.time()))})
+        if approved.get("code") != 200:
+            step(results, "提案審批", "FAIL", approved.get("message", ""))
+            return
+        step(results, "提案審批", "PASS", "已綁定審批引用")
+    elif status == "approved":
+        step(results, "提案審批", "PASS", "復用上次已審批的提案")
+    else:
+        # executed / expired / rejected：直接驗證一次性消費契約
+        again = api.call("POST", f"/api/agent/platform/actions/{proposal_no}/execute")
+        if again.get("code") != 200:
+            step(results, "提案一次性消費", "PASS", f"已消費不可重放: {str(again.get('message'))[:60]}")
+        else:
+            step(results, "提案一次性消費", "FAIL", "已執行提案仍可重放")
         return
-    step(results, "提案審批", "PASS", "已綁定審批引用")
 
     executed = api.call("POST", f"/api/agent/platform/actions/{proposal_no}/execute")
     if executed.get("code") != 200:
@@ -182,7 +197,7 @@ def action_smoke(api, results):
 
 def knowledge_smoke(api, results):
     res = api.call("GET", "/api/ai/prompt-config/knowledge/search",
-                   query={"query": "Agent", "systemCode": "ai", "limit": 5})
+                   query={"query": "檢索", "systemCode": "ai", "limit": 5})
     if res.get("code") != 200:
         step(results, "知識檢索", "FAIL", res.get("message", ""))
         return
