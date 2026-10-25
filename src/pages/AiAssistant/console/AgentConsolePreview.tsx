@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Alert, Button, Descriptions, Input, Progress, Segmented, Select, Space, Steps, Table, Tabs, Tag } from 'antd'
+import { Alert, Button, Descriptions, Form, Input, InputNumber, Modal, Progress, Segmented, Select, Space, Steps, Table, Tabs, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
   AppstoreOutlined, CloudServerOutlined, DashboardOutlined, DatabaseOutlined, ExperimentOutlined,
@@ -22,7 +22,7 @@ import {
 } from './consoleModel'
 import { fetchActions, fetchApplications, fetchBudgetPools, fetchDataClasses, fetchEndpoints, fetchRuns } from '../../../api/agentPlatform'
 import type { AgentActionRow, AgentApplicationRow, AgentBudgetPoolRow, AgentDataClassRow, AgentEndpointRow, AgentRunRow } from '../../../api/agentPlatform'
-import { fetchEvalCases, fetchKnowledgeAcl, fetchReleases, fetchRunDetail, fetchReadiness, grantKnowledgeAcl, revokeKnowledgeAcl, runEval } from '../../../api/agentPlatform'
+import { approveAction, approveEndpoint, createApplicationVersion, executeAction, publishApplication, saveApplication, saveBudgetPool, saveDataClass, fetchEvalCases, fetchKnowledgeAcl, fetchReleases, fetchRunDetail, fetchReadiness, grantKnowledgeAcl, revokeKnowledgeAcl, runEval } from '../../../api/agentPlatform'
 import type { AgentAclRow, AgentEvalCaseRow, AgentReleaseRow } from '../../../api/agentPlatform'
 import { fetchKnowledgeDocs } from '../../../api/aiKnowledge'
 import { useConsoleRemote } from './useConsoleRemote'
@@ -111,7 +111,34 @@ function ReadinessPanel() {
 }
 
 function AppsPane() {
-  const { data, loading, error } = useConsoleRemote(() => fetchApplications(), [])
+  const { data, loading, error, reload } = useConsoleRemote(() => fetchApplications(), [])
+  const [appOpen, setAppOpen] = useState(false)
+  const [verRow, setVerRow] = useState<AgentApplicationRow | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [appForm] = Form.useForm()
+  const [verForm] = Form.useForm()
+  const createApp = async () => {
+    const v = await appForm.validateFields()
+    setSaving(true)
+    try {
+      await saveApplication({ appKey: v.appKey, name: v.name, systemCode: v.systemCode, ownerName: v.ownerName })
+      message.success('應用已登記')
+      setAppOpen(false); appForm.resetFields(); reload()
+    } catch { /* request.ts 已统一提示 */ } finally { setSaving(false) }
+  }
+  const publishVersion = async () => {
+    if (!verRow) return
+    const v = await verForm.validateFields()
+    setSaving(true)
+    try {
+      const tools = String(v.tools || '').split(',').map((x: string) => x.trim()).filter(Boolean)
+      const created: Record<string, unknown> = await createApplicationVersion(verRow.key, { toolWhitelist: tools, knowledgeScope: [] })
+      const versionNo = Number(created?.version_no ?? created?.versionNo ?? 1)
+      await publishApplication(verRow.key, versionNo, v.note)
+      message.success(`已發布 v${versionNo}`)
+      setVerRow(null); verForm.resetFields(); reload()
+    } catch { /* request.ts 已统一提示 */ } finally { setSaving(false) }
+  }
   const rows = data ?? []
   const columns: ColumnsType<AgentApplicationRow> = [
     {
@@ -136,10 +163,15 @@ function AppsPane() {
       key: 'state', title: tr('agentConsole.s54', '狀態'), width: 120,
       render: (_, row) => row.state === 'published' ? <Tag color="green">已發布</Tag> : <Tag color="orange">草稿</Tag>,
     },
+    {
+      key: 'ops', title: '操作', width: 140,
+      render: (_, row) => <Button type="link" size="small" onClick={() => setVerRow(row)}>發布新版本</Button>,
+    },
   ]
   const meta = [
     { key: 'name', title: tr('agentConsole.s32', '應用') }, { key: 'owner', title: tr('agentConsole.s78', '負責人') }, { key: 'version', title: tr('agentConsole.s55', '生產版本') },
     { key: 'tools', title: tr('agentConsole.s18', '工具白名單') }, { key: 'state', title: tr('agentConsole.s54', '狀態') },
+    { key: 'ops', title: '操作' },
   ]
   const { applyConfig, configComponent } = useColumnConfig('ai-console-apps', meta, [
     { key: 'name', visible: true, locked: 'head' as const },
@@ -152,14 +184,44 @@ function AppsPane() {
       { tone: 'warn', label: tr('agentConsole.s66', '空白名單'), body: tr('agentConsole.h12', '未發布或白名單為空的應用，不會下發任何業務工具。') },
     ]} /></h3>
     {error && <Alert type="error" showIcon message="應用列表加載失敗" description={error} />}
-    <div className="action-section"><div className="action-section-left"><Tag>接口數據</Tag></div><div className="action-section-right">{configComponent}</div></div>
+    <div className="action-section"><div className="action-section-left"><Tag>接口數據</Tag><Button type="primary" size="small" onClick={() => setAppOpen(true)}>新增應用</Button></div><div className="action-section-right">{configComponent}</div></div>
     <Table rowKey="key" size="middle" loading={loading} columns={applyConfig(columns)} dataSource={rows} scroll={{ x: 'max-content' }}
       pagination={paginationConfig(rows.length)} />
+    <Modal open={appOpen} title="新增應用" onCancel={() => setAppOpen(false)} onOk={createApp} confirmLoading={saving} okText="保存" destroyOnClose>
+      <Form form={appForm} layout="vertical" initialValues={{ systemCode: 'ai' }}>
+        <Form.Item name="appKey" label="應用標識" rules={[{ required: true, pattern: /^[a-z][a-z0-9-]{2,63}$/, message: '3-64 位小寫字母/數字/連字號，字母開頭' }]}>
+          <Input placeholder="例如 order-assistant" />
+        </Form.Item>
+        <Form.Item name="name" label="應用名稱" rules={[{ required: true, max: 128 }]}><Input /></Form.Item>
+        <Form.Item name="systemCode" label="歸屬系統" rules={[{ required: true }]}><Input /></Form.Item>
+        <Form.Item name="ownerName" label="負責人"><Input /></Form.Item>
+      </Form>
+    </Modal>
+    <Modal open={!!verRow} title={`發布新版本 · ${verRow?.key ?? ''}`} onCancel={() => setVerRow(null)} onOk={publishVersion} confirmLoading={saving} okText="建立並發布" destroyOnClose>
+      <Form form={verForm} layout="vertical">
+        <Form.Item name="tools" label="工具白名單（逗號分隔）" extra="留空則該版本不下發任何業務工具">
+          <Input placeholder="rdm.project.summary, query_approvals" />
+        </Form.Item>
+        <Form.Item name="note" label="發布說明"><Input /></Form.Item>
+      </Form>
+    </Modal>
   </section>
 }
 
 function BudgetPane() {
-  const { data, loading, error } = useConsoleRemote(() => fetchBudgetPools(), [])
+  const { data, loading, error, reload } = useConsoleRemote(() => fetchBudgetPools(), [])
+  const [open, setOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [form] = Form.useForm()
+  const submit = async () => {
+    const v = await form.validateFields()
+    setSaving(true)
+    try {
+      await saveBudgetPool({ scopeType: v.scopeType, scopeKey: v.scopeKey, period: v.period, limitAmount: v.limitAmount })
+      message.success('預算池已保存（同範圍同週期為覆蓋）')
+      setOpen(false); form.resetFields(); reload()
+    } catch { /* request.ts 已统一提示 */ } finally { setSaving(false) }
+  }
   const rows: AgentBudgetPoolRow[] = (data ?? []).map(item => ({ ...item, scopeLabel: item.scopeLabel }))
   const columns: ColumnsType<AgentBudgetPoolRow> = [
     { key: 'scope', title: tr('agentConsole.s67', '範圍'), render: (_, row) => <><b>{row.scopeLabel}</b><div className="agent-console__muted">{row.scopeType} · {row.period}</div></> },
@@ -191,15 +253,39 @@ function BudgetPane() {
       { tone: 'danger', label: tr('agentConsole.s35', '拒絕即不調用'), body: tr('agentConsole.h22', '預占失敗直接返回，不先調模型再補記帳。') },
     ]} /></h3>
     {error && <Alert type="error" showIcon message="預算池加載失敗" description={error} />}
-    <div className="action-section"><div className="action-section-left"><Tag>接口數據</Tag></div><div className="action-section-right">{configComponent}</div></div>
+    <div className="action-section"><div className="action-section-left"><Tag>接口數據</Tag><Button type="primary" size="small" onClick={() => setOpen(true)}>新增預算池</Button></div><div className="action-section-right">{configComponent}</div></div>
     <Table rowKey="key" size="middle" loading={loading} columns={applyConfig(columns)} dataSource={rows} scroll={{ x: 'max-content' }}
       pagination={paginationConfig(rows.length)} />
+    <Modal open={open} title="新增 / 調整預算池" onCancel={() => setOpen(false)} onOk={submit} confirmLoading={saving} okText="保存" destroyOnClose>
+      <Form form={form} layout="vertical" initialValues={{ scopeType: 'USER', period: new Date().toISOString().slice(0, 7) }}>
+        <Form.Item name="scopeType" label="範圍類型" rules={[{ required: true }]}>
+          <Select options={[{ value: 'USER', label: 'USER 員工' }, { value: 'DEPT', label: 'DEPT 部門' }, { value: 'APP', label: 'APP 應用' }]} />
+        </Form.Item>
+        <Form.Item name="scopeKey" label="範圍標識" rules={[{ required: true, max: 64 }]}><Input placeholder="工號 / 部門碼 / appKey" /></Form.Item>
+        <Form.Item name="period" label="週期" rules={[{ required: true, pattern: /^\d{4}-\d{2}$|^ALL$/, message: 'YYYY-MM 或 ALL' }]}><Input /></Form.Item>
+        <Form.Item name="limitAmount" label="上限" rules={[{ required: true }]}><InputNumber min={0} precision={2} style={{ width: '100%' }} /></Form.Item>
+      </Form>
+    </Modal>
   </section>
 }
 
 function ActionsPane() {
   const [status, setStatus] = useState<'all' | ActionState>('all')
-  const { data, loading, error } = useConsoleRemote(() => fetchActions(), [])
+  const { data, loading, error, reload } = useConsoleRemote(() => fetchActions(), [])
+  const [busy, setBusy] = useState<string | null>(null)
+  const approve = async (row: AgentActionRow) => {
+    setBusy(row.key)
+    try { await approveAction(row.key, `ui-${Date.now()}`); message.success('已通過審批'); reload() }
+    catch { /* request.ts 已统一提示 */ } finally { setBusy(null) }
+  }
+  const execute = async (row: AgentActionRow) => {
+    setBusy(row.key)
+    try {
+      const result: Record<string, unknown> = await executeAction(row.key)
+      message.success(result?.success === false ? '工具返回錯誤，已寫回執' : '已執行並寫回執')
+      reload()
+    } catch { /* request.ts 已统一提示 */ } finally { setBusy(null) }
+  }
   const rows: AgentActionRow[] = (data ?? []).filter(item => status === 'all' || item.status === status)
   const columns: ColumnsType<AgentActionRow> = [
     { key: 'no', title: tr('agentConsole.s41', '提案號'), width: 190, render: (_, row) => <><b>{row.key}</b><div className="agent-console__muted">{row.tool}</div></> },
@@ -208,6 +294,14 @@ function ActionsPane() {
     { key: 'status', title: tr('agentConsole.s54', '狀態'), width: 160, render: (_, row) => <Tag color={ACTION_TAG[row.status].color}>{ACTION_TAG[row.status].text}</Tag> },
     { key: 'approval', title: tr('agentConsole.s16', '審批引用'), width: 170, render: (_, row) => row.approvalRef ?? <span className="agent-console__muted">—</span> },
     { key: 'expires', title: tr('agentConsole.s48', '有效期至'), dataIndex: 'expiresAt', width: 170 },
+    {
+      key: 'ops', title: '操作', width: 160,
+      render: (_, row) => row.status === 'pending'
+        ? <Button type="link" size="small" loading={busy === row.key} onClick={() => approve(row)}>通過</Button>
+        : row.status === 'approved'
+          ? <Button type="link" size="small" loading={busy === row.key} onClick={() => execute(row)}>執行</Button>
+          : <span className="agent-console__muted">—</span>,
+    },
   ]
   const meta = [
     { key: 'no', title: tr('agentConsole.s41', '提案號') }, { key: 'target', title: tr('agentConsole.s63', '目標與影響') }, { key: 'requester', title: tr('agentConsole.s57', '申請人') },
@@ -229,7 +323,8 @@ function ActionsPane() {
       <Segmented aria-label="提案狀態篩選" value={status} onChange={value => setStatus(value as typeof status)}
         options={[
           { label: tr('agentConsole.s05', '全部'), value: 'all' }, { label: tr('agentConsole.s30', '待審批'), value: 'pending' },
-          { label: tr('agentConsole.s27', '已通過'), value: 'approved' }, { label: tr('agentConsole.s31', '待核實'), value: 'unknown' },
+          { label: tr('agentConsole.s27', '已通過'), value: 'approved' }, { label: '已執行', value: 'executed' },
+          { label: tr('agentConsole.s31', '待核實'), value: 'unknown' },
         ]} />
     </div>
     <div className="action-section"><div className="action-section-left"><Tag>接口數據</Tag></div><div className="action-section-right">{configComponent}</div></div>
@@ -308,6 +403,29 @@ function KnowledgeAclPane() {
 function DataEndpointsPane() {
   const classes = useConsoleRemote(() => fetchDataClasses(), [])
   const endpoints = useConsoleRemote(() => fetchEndpoints(), [])
+  const [classOpen, setClassOpen] = useState(false)
+  const [epOpen, setEpOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [classForm] = Form.useForm()
+  const [epForm] = Form.useForm()
+  const saveClass = async () => {
+    const v = await classForm.validateFields()
+    setSaving(true)
+    try {
+      await saveDataClass({ systemCode: v.systemCode, dataClass: v.dataClass, note: v.note })
+      message.success('分級已登記')
+      setClassOpen(false); classForm.resetFields(); classes.reload()
+    } catch { /* request.ts 已统一提示 */ } finally { setSaving(false) }
+  }
+  const saveEndpoint = async () => {
+    const v = await epForm.validateFields()
+    setSaving(true)
+    try {
+      await approveEndpoint({ modelKey: v.modelKey, maxDataClass: v.maxDataClass, residency: v.residency, days: v.days, note: v.note })
+      message.success('端點已批准')
+      setEpOpen(false); epForm.resetFields(); endpoints.reload()
+    } catch { /* request.ts 已统一提示 */ } finally { setSaving(false) }
+  }
   const classColumns: ColumnsType<AgentDataClassRow> = [
     { key: 'system', title: tr('agentConsole.s68', '系統'), dataIndex: 'system', width: 120 },
     { key: 'label', title: tr('agentConsole.s12', '名稱'), dataIndex: 'label', width: 160 },
@@ -327,12 +445,14 @@ function DataEndpointsPane() {
       <h3>系統資料分級<HelpPopover title="未分級=禁止外發" ariaLabel="資料分級說明" content="PUBLIC < INTERNAL < SENSITIVE < RESTRICTED。未登記分級的系統不允許發送模型；敏感與嚴格受限內容只能走已批准的私域端點。" /></h3>
       <Alert type="info" showIcon message="分級是業務決策，不由代碼推導" description="系統負責人確認等級後登記；調整等級會影響所有使用該系統的應用，需重新試算與回歸。" />
       {classes.error && <Alert type="error" showIcon message="資料分級加載失敗" description={classes.error} />}
+      <div className="agent-console__toolbar"><Button type="primary" size="small" onClick={() => setClassOpen(true)}>登記分級</Button></div>
       <Table className="agent-console__spaced" rowKey="system" size="middle" loading={classes.loading} columns={classColumns}
         dataSource={classes.data ?? []} pagination={paginationConfig((classes.data ?? []).length)} />
     </section>
     <section className="agent-console__card">
       <h3>模型端點批准<HelpPopover title="private 標籤不等於批准" ariaLabel="端點批准說明" content="必須由人明確登記可接收的最高資料等級與有效期；到期自動失效。內網地址或私有部署標籤本身不能作為放行依據。" /></h3>
       {endpoints.error && <Alert type="error" showIcon message="端點批准加載失敗" description={endpoints.error} />}
+      <div className="agent-console__toolbar"><Button type="primary" size="small" onClick={() => setEpOpen(true)}>批准端點</Button></div>
       <Table rowKey="model" size="middle" loading={endpoints.loading} columns={endpointColumns}
         dataSource={endpoints.data ?? []} pagination={paginationConfig((endpoints.data ?? []).length)} />
       <Descriptions className="agent-console__spaced" column={1} size="small" items={[
@@ -340,7 +460,29 @@ function DataEndpointsPane() {
         { key: 'revoke', label: tr('agentConsole.s44', '撤銷與到期'), children: tr('agentConsole.h08', '撤銷立即生效；到期後下一次調用即被拒，不會沿用舊批准。') },
       ]} />
     </section>
-  </>
+    <Modal open={classOpen} title="登記系統資料分級" onCancel={() => setClassOpen(false)} onOk={saveClass} confirmLoading={saving} okText="保存" destroyOnClose>
+        <Form form={classForm} layout="vertical" initialValues={{ systemCode: 'ai', dataClass: 'INTERNAL' }}>
+          <Form.Item name="systemCode" label="系統標識" rules={[{ required: true, pattern: /^[a-z][a-z0-9-]{1,31}$/, message: '小寫字母開頭，可含數字與連字號' }]}><Input placeholder="ai / rdm / hr" /></Form.Item>
+          <Form.Item name="dataClass" label="資料等級" rules={[{ required: true }]}>
+            <Select options={['PUBLIC', 'INTERNAL', 'SENSITIVE', 'RESTRICTED'].map(v => ({ value: v, label: v }))} />
+          </Form.Item>
+          <Form.Item name="note" label="說明"><Input /></Form.Item>
+        </Form>
+      </Modal>
+      <Modal open={epOpen} title="批准模型端點" onCancel={() => setEpOpen(false)} onOk={saveEndpoint} confirmLoading={saving} okText="批准" destroyOnClose>
+        <Form form={epForm} layout="vertical" initialValues={{ maxDataClass: 'INTERNAL', residency: 'external', days: 90 }}>
+          <Form.Item name="modelKey" label="模型標識" rules={[{ required: true, max: 128 }]}><Input placeholder="qwen3.7-flash" /></Form.Item>
+          <Form.Item name="maxDataClass" label="可接收最高等級" rules={[{ required: true }]}>
+            <Select options={['PUBLIC', 'INTERNAL', 'SENSITIVE', 'RESTRICTED'].map(v => ({ value: v, label: v }))} />
+          </Form.Item>
+          <Form.Item name="residency" label="駐留" rules={[{ required: true }]} extra="僅接受 private / external，其他值後端直接拒絕">
+            <Select options={[{ value: 'private', label: 'private 內網' }, { value: 'external', label: 'external 外部' }]} />
+          </Form.Item>
+          <Form.Item name="days" label="有效天數（1-365，預設 90）"><InputNumber min={1} max={365} style={{ width: '100%' }} /></Form.Item>
+          <Form.Item name="note" label="備註"><Input /></Form.Item>
+        </Form>
+      </Modal>
+    </>
 }
 
 function RunsPane() {
