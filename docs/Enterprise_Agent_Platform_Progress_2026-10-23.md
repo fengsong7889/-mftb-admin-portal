@@ -622,3 +622,42 @@ PASS 知識檢索      命中 1 條（query=檢索）
 腳本兩處修正：①`prepare` 冪等會返回同一張提案，已按 `status` 分流（pending→approve、approved→復用、executed→驗證不可重放）；②檢索詞改用中文片段（全文索引對純拉丁詞 `Agent` 與停用詞 `平台` 均不命中，屬索引分詞行為，非 ACL 問題）。
 
 環境已還原：`.env.local` 從備份恢復，執行器回到默認關閉，`ready=200`。
+
+## 二十四、瀏覽器深度走查（2026-10-25）
+
+用 admin 登入 → 切「人工智能系統」→ 走完 8 個面板，結論：**讀取側全綠，寫入側嚴重缺失**。
+
+| 面板 | 寫入入口 | 判定 |
+|---|---|---|
+| 平台總覽 | 無（僅視圖切換） | 只讀 |
+| 應用與版本 | 無 | **界面缺失**（API 層 `saveApplication/createVersion/publish` 已存在但未接線） |
+| 預算與配額 | 無 | **界面缺失**（`saveBudgetPool` 未接） |
+| 動作提案 | 無審批/執行 | 只讀（`approveAction/executeAction` 未接） |
+| 知識授權 | 授予/撤銷 | 可寫（唯一） |
+| 數據與端點 | 無 | **界面缺失**（`saveDataClass/approveEndpoint` 未接） |
+| 運行中心 | 無 | 只讀 |
+| 評測與發布 | 僅「運行回歸」 | 半可用：無錄入用例入口，`safety` 數據集恆返回「該數據集沒有用例」 |
+
+已即修（本輪）：
+
+1. **就緒「失敗即放行」**：原先 `blocking ?? []` 讓加載中/接口異常都顯示綠色「已滿足」；改為 loading → 提示讀取中、error → 明確顯示未就緒，只有成功且 blocking 為空才顯示滿足。
+2. 運行中心頂部 `示例資料` → `接口數據`，與「8 個面板均為真實數據」口徑一致；分頁文案去掉「示例」。
+3. 應用「工具白名單」列的「版本詳情中查看」是死文案（不可點、無詳情頁）→ 直接顯示工具標籤或 `—`。
+4. 運行開始時間、發布時間由 epoch 毫秒改為本地時間字串。
+
+待辦（按影響排序）：應用與版本、預算池、數據分級/端點批准、提案審批/執行四組寫入表單接線；評測用例錄入；總覽 4 次 readiness 請求收斂為 1 次。
+
+### 二十四（補）：寫入側接線（A–D 全做）
+
+| 組 | 面板 | 新增能力 |
+|---|---|---|
+| A | 應用與版本 | 「新增應用」表單（appKey/name/systemCode/owner）；行內「發布新版本」（工具白名單逗號分隔 → 建立版本並發布） |
+| B | 數據與端點 | 「登記分級」表單（systemCode/dataClass/note）；「批准端點」表單（modelKey/maxDataClass/residency 僅 private/external/days 1-365/note） |
+| C | 動作提案 | 行內「通過」（pending）/「執行」（approved），執行後刷新；篩選新增「已執行」 |
+| D | 預算與配額 | 「新增預算池」表單（USER/DEPT/APP、範圍標識、YYYY-MM 或 ALL、上限） |
+
+全部走 `src/api/agentPlatform.ts` 既有函數，錯誤提示由 `request.ts` 統一彈出，組件內不重複 message.error。
+
+驗證：`tsc --noEmit` 0 error、`eslint` 0 error、`check:menu` 通過。
+
+待辦：新增表單文案目前為繁中硬編碼（console 不在 i18n 硬編碼棘輪域內，未觸發門禁），下一輪補 `agentConsole.form.*` 詞條。
