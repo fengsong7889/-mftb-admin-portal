@@ -48,13 +48,21 @@ const RUN_TAG: Record<DemoRun['status'], { color: string; text: string }> = {
   unknown: { color: 'warning', text: tr('agentConsole.s70', '結果待核實') },
 }
 
+/** 後端時間欄位是 epoch 毫秒，直接輸出不可讀；非數字原樣返回。 */
+function fmtTs(value: unknown) {
+  const raw = String(value ?? '')
+  if (!/^\d{10,13}$/.test(raw)) return raw || '—'
+  const ms = raw.length === 10 ? Number(raw) * 1000 : Number(raw)
+  return new Date(ms).toLocaleString('zh-TW', { hour12: false })
+}
+
 function paginationConfig(total: number) {
   return {
     pageSize: 5,
     showSizeChanger: true,
     showQuickJumper: true,
     pageSizeOptions: ['5', '10', '20'],
-    showTotal: (count: number) => `共 ${count} 條示例`,
+    showTotal: (count: number) => `共 ${count} 條`,
     hideOnSinglePage: total <= 5,
   }
 }
@@ -73,8 +81,11 @@ function ReadinessPanel() {
       <HelpPopover title="就緒判斷口徑" ariaLabel="就緒判斷說明"
         content={tr('agentConsole.h10', '數據來自 GET /agent/platform/ops/readiness。\n缺任一項時，模型調用或知識檢索會被明確拒絕，而不是「靜默返回空結果」。')} />
     </div>
-    {readiness.error && <Alert type="error" showIcon message="就緒狀態加載失敗" description={readiness.error} />}
-    {blocking.length === 0 ? (
+    {readiness.loading ? (
+      <Alert type="info" showIcon message="正在讀取就緒狀態…" description="就緒未確認前不應視為放行。" />
+    ) : readiness.error ? (
+      <Alert type="error" showIcon message="就緒狀態加載失敗，視為未就緒" description={readiness.error} />
+    ) : blocking.length === 0 ? (
       <Alert type="success" showIcon message="模型調用與知識檢索的就緒條件已滿足"
         description="仍需在每次執行時複查急停、授權、額度、出域與會話歸屬；就緒不等於放行。" />
     ) : (
@@ -117,7 +128,9 @@ function AppsPane() {
     },
     {
       key: 'tools', title: tr('agentConsole.s18', '工具白名單'), width: 240,
-      render: () => <span className="agent-console__muted">版本詳情中查看</span>,
+      render: (_, row) => row.tools.length
+        ? row.tools.map(tool => <Tag key={tool}>{tool}</Tag>)
+        : <span className="agent-console__muted">—</span>,
     },
     {
       key: 'state', title: tr('agentConsole.s54', '狀態'), width: 120,
@@ -341,7 +354,7 @@ function RunsPane() {
     { key: 'app', title: tr('agentConsole.s32', '應用'), dataIndex: 'appName', width: 180 },
     { key: 'requester', title: tr('agentConsole.s57', '申請人'), dataIndex: 'requester', width: 170 },
     { key: 'status', title: tr('agentConsole.s54', '狀態'), width: 140, render: (_, row) => <Tag color={RUN_TAG[row.status].color}>{RUN_TAG[row.status].text}</Tag> },
-    { key: 'started', title: tr('agentConsole.s83', '開始時間'), dataIndex: 'startedAt', width: 170 },
+    { key: 'started', title: tr('agentConsole.s83', '開始時間'), width: 170, render: (_, row) => fmtTs(row.startedAt) },
   ]
   const { applyConfig, configComponent } = useColumnConfig('ai-console-runs', [
     { key: 'no', title: tr('agentConsole.s81', '運行') }, { key: 'app', title: tr('agentConsole.s32', '應用') }, { key: 'requester', title: tr('agentConsole.s57', '申請人') },
@@ -353,7 +366,7 @@ function RunsPane() {
       { tone: 'success', label: tr('agentConsole.s19', '已具備'), body: tr('agentConsole.h03', '受理即落庫、冪等鍵、步驟檢查點、取消標記、租約過期轉「待核實」。') },
       { tone: 'warn', label: tr('agentConsole.s17', '尚未具備'), body: tr('agentConsole.h21', '跨實例定時觸發、宕機自動續跑、外部動作撤回；取消只保證未開始的步驟不再啟動。') },
     ]} /></h3>
-    <div className="action-section"><div className="action-section-left"><Tag>示例資料</Tag></div><div className="action-section-right">{configComponent}</div></div>
+    <div className="action-section"><div className="action-section-left"><Tag color="green">接口數據</Tag></div><div className="action-section-right">{configComponent}</div></div>
     {runs.error && <Alert type="error" showIcon message="運行列表加載失敗" description={runs.error} />}
     <Table rowKey="key" size="middle" loading={runs.loading} columns={applyConfig(columns)} dataSource={runs.data ?? []}
       scroll={{ x: 'max-content' }} pagination={paginationConfig((runs.data ?? []).length)} />
@@ -397,7 +410,7 @@ function EvaluationPane() {
     { key: 'app', title: tr('agentConsole.s32', '應用'), dataIndex: 'app', width: 200 },
     { key: 'version', title: tr('agentConsole.s52', '版本'), dataIndex: 'version', width: 100 },
     { key: 'by', title: tr('agentConsole.s60', '發布人'), dataIndex: 'releasedBy', width: 120 },
-    { key: 'at', title: tr('agentConsole.s62', '發布時間'), dataIndex: 'releasedAt', width: 180 },
+    { key: 'at', title: tr('agentConsole.s62', '發布時間'), width: 180, render: (_, row) => fmtTs(row.releasedAt) },
     { key: 'state', title: tr('agentConsole.s54', '狀態'), width: 110, render: (_, row) => row.state === 'active'
       ? <Tag color="green">{tr('agentConsole.state.active', '生效')}</Tag>
       : <Tag color="orange">{tr('agentConsole.state.rolledBack', '已回滾')}</Tag> },
