@@ -3588,6 +3588,22 @@
       "author": "Qoder",
       "ticket": "hcm-d3-rule",
       "comment": "刻意不種任何默認稅率或社保參數：內地基數按統籌區每年公布，內置默認值必在某個城市算錯。resolveRuleSet 在缺配置或同城多套生效時直接拋錯（fail-closed），寧可算不出來也不發出錯的工資。級距用「下限+上限+稅率+速算扣除數」表達，是累計預扣法可直接使用的形式。299 腳本僅作參照文檔，不進鏡像。"
+    },
+    {
+      "versionKey": "hcm:payroll-menu:v1.2",
+      "module": "hcm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "hcmPayrollMenuInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "hcm:payroll-rule-schema:v1.0",
+        "hcm:payroll-menu:v1.1"
+      ],
+      "intent": "新增薪酬規則菜單（規則集 + 個稅級距配置）",
+      "author": "Qoder",
+      "ticket": "hcm-d3-rule-menu",
+      "comment": "規則集沒有默認值，必須有可視配置入口業務才能錄入；與 D3 第二批的配置頁同一批落地，避免出現無頁面的受控菜單。"
     }
   ]
 }

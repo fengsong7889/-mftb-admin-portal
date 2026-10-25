@@ -137,11 +137,56 @@ class PayrollRuleGuardTest {
         assertEquals(new BigDecimal("0.00"), service.monthlyTax(ruleSet(), new BigDecimal("4000.00")));
     }
 
+    @Test
+    @DisplayName("复制上一套规则：继承城市/币种/起征点，并整套复制级距")
+    void copiesRuleSetWithBrackets() {
+        PayrollRuleSet source = ruleSet();
+        when(ruleSetMapper.selectById(1L)).thenReturn(source);
+        when(ruleSetMapper.selectCount(any())).thenReturn(0L);
+        when(ruleSetMapper.selectList(any())).thenReturn(List.of());
+        when(ruleSetMapper.insert(any(PayrollRuleSet.class))).thenAnswer(invocation -> {
+            PayrollRuleSet saved = invocation.getArgument(0);
+            saved.setId(2L);
+            when(ruleSetMapper.selectById(2L)).thenReturn(saved);
+            return 1;
+        });
+        when(bracketMapper.selectList(any())).thenReturn(List.of(
+                bracket("0", "3000", "0.0300", "0"),
+                bracket("3000", null, "0.1000", "210")));
+
+        PayrollRuleSet copied = service.copyRuleSet(1L, "SZ-2027", "深圳 2027",
+                LocalDate.of(2027, 1, 1), null);
+
+        assertEquals("SZ-2027", copied.getCode());
+        assertEquals("4403", copied.getCityCode());
+        assertEquals(new BigDecimal("5000.0000"), copied.getBasicDeduction());
+        verify(bracketMapper, org.mockito.Mockito.times(2)).insert(any(PayrollTaxBracket.class));
+    }
+
+    @Test
+    @DisplayName("复制时新期间与现有规则重叠则拒绝（复制不能绕过同城唯一）")
+    void rejectsCopyWithOverlappingPeriod() {
+        when(ruleSetMapper.selectById(1L)).thenReturn(ruleSet());
+        when(ruleSetMapper.selectCount(any())).thenReturn(0L);
+        PayrollRuleSet existing = ruleSet();
+        existing.setId(9L);
+        existing.setEffectiveFrom(LocalDate.of(2027, 1, 1));
+        existing.setEffectiveTo(LocalDate.of(2027, 12, 31));
+        when(ruleSetMapper.selectList(any())).thenReturn(List.of(existing));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.copyRuleSet(
+                1L, "SZ-2027", "深圳 2027", LocalDate.of(2027, 6, 1), null));
+        assertEquals("城市 4403 的規則集期間重疊（#9），請先結束上一套規則", ex.getMessage());
+        verify(bracketMapper, never()).insert(any(PayrollTaxBracket.class));
+    }
+
     private PayrollRuleSet ruleSet() {
         PayrollRuleSet set = new PayrollRuleSet();
         set.setId(1L);
         set.setName("深圳 2026");
         set.setCityCode("4403");
+        set.setJurisdiction("CN");
+        set.setCurrency("CNY");
         set.setBasicDeduction(new BigDecimal("5000.0000"));
         set.setStatus(1);
         set.setEffectiveFrom(LocalDate.of(2026, 1, 1));

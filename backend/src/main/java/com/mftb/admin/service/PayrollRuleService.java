@@ -36,6 +36,13 @@ public interface PayrollRuleService {
      */
     PayrollRuleSet resolveRuleSet(String cityCode, LocalDate onDate);
 
+    /**
+     * 复制一套规则为新期间（城市参数年年只改几个数，从空白新建要重录十几档级距）。
+     * <p>复制只搬口径，不搬期间：编码/名称/生效区间必须由调用方给出。
+     */
+    PayrollRuleSet copyRuleSet(Long sourceId, String newCode, String newName,
+                              java.time.LocalDate effectiveFrom, java.time.LocalDate effectiveTo);
+
     /** 按规则集算月度个税：先减基本减除费用，再套超额累进 */
     BigDecimal monthlyTax(PayrollRuleSet ruleSet, BigDecimal taxableBase);
 }

@@ -26,6 +26,9 @@ public class HcmPayrollMenuInitializer implements CommandLineRunner {
     /** v1.1：補福利參保菜單（方案與人員參保同屬一頁的兩個頁籤，故只開一個菜單） */
     static final String VERSION_KEY_BENEFIT = "hcm:payroll-menu:v1.1";
 
+    /** v1.2：補薪酬規則菜單（城市×期間的規則集與個稅級距） */
+    static final String VERSION_KEY_RULE = "hcm:payroll-menu:v1.2";
+
     private static final String SYSTEM_CODE = SystemCode.PAYROLL.code();
     private static final String ADMIN_ROLE_CODE = "admin";
     private static final String ACTIONS_FULL = "[\"view\",\"create\",\"edit\",\"delete\"]";
@@ -43,6 +46,9 @@ public class HcmPayrollMenuInitializer implements CommandLineRunner {
             // 版本已记录但菜單可能被人工停用/軟刪：每次啟動補一次，保持與版本表一致
             migrateBenefit();
         }
+        if (!versionTracker.applyOnce(VERSION_KEY_RULE, this::migrateRule, this::verifyRule)) {
+            migrateRule();
+        }
     }
 
     private void migrateBenefit() {
@@ -52,6 +58,25 @@ public class HcmPayrollMenuInitializer implements CommandLineRunner {
         deriveSystemAccess();
         permissionService.evictAll();
         log.info("薪酬福利系統菜單 v1.1 已就緒: 福利參保");
+    }
+
+    private void migrateRule() {
+        ensureMenu(null, "hcm-payroll-rule", "薪酬規則", "/hcm-payroll-rule",
+                "HcmPayrollRuleList", "CalculatorOutlined", 74, "Payroll Rules");
+        grantAdminMenu("hcm-payroll-rule");
+        deriveSystemAccess();
+        permissionService.evictAll();
+        log.info("薪酬福利系統菜單 v1.2 已就緒: 薪酬規則");
+    }
+
+    private void verifyRule() {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_menu WHERE menu_key = 'hcm-payroll-rule' AND deleted = 0 "
+                        + "AND status = 1 AND system_code = ? AND path IS NOT NULL",
+                Integer.class, SYSTEM_CODE);
+        if (count == null || count == 0) {
+            throw new IllegalStateException("薪酬菜單未就緒: hcm-payroll-rule");
+        }
     }
 
     private void verifyBenefit() {

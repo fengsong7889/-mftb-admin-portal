@@ -212,6 +212,41 @@ public class PayrollRuleServiceImpl implements PayrollRuleService {
         return listBrackets(ruleSetId);
     }
 
+    @Override
+    @Transactional
+    public PayrollRuleSet copyRuleSet(Long sourceId, String newCode, String newName,
+                                     LocalDate effectiveFrom, LocalDate effectiveTo) {
+        PayrollRuleSet source = getRuleSet(sourceId);
+        if (!StringUtils.hasText(newCode) || !StringUtils.hasText(newName)) {
+            throw new BusinessException("新規則集的編碼與名稱不能為空");
+        }
+        if (effectiveFrom == null) {
+            throw new BusinessException("新生效日期不能為空");
+        }
+        PayrollRuleSet target = new PayrollRuleSet();
+        target.setCode(newCode.trim());
+        target.setName(newName.trim());
+        target.setJurisdiction(source.getJurisdiction());
+        target.setCityCode(source.getCityCode());
+        target.setCityName(source.getCityName());
+        target.setCurrency(source.getCurrency());
+        target.setBasicDeduction(source.getBasicDeduction());
+        target.setEffectiveFrom(effectiveFrom);
+        target.setEffectiveTo(effectiveTo);
+        target.setStatus(1);
+        target.setVersionLabel(source.getVersionLabel());
+        target.setRemark("複製自 " + source.getCode());
+        // 复用 saveRuleSet 的全部校验（编码唯一、同城期间不重叠、期间合法）
+        PayrollRuleSet saved = saveRuleSet(target);
+        List<PayrollTaxBracket> sourceBrackets = listBrackets(sourceId);
+        for (PayrollTaxBracket bracket : sourceBrackets) {
+            bracket.setId(null);
+            bracket.setRuleSetId(saved.getId());
+            bracketMapper.insert(bracket);
+        }
+        return ruleSetMapper.selectById(saved.getId());
+    }
+
     /* ==================== 解析與算稅 ==================== */
 
     @Override

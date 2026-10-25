@@ -217,3 +217,78 @@ export function updateEnrollment(id: number, data: PayrollEnrollment) {
 export function deleteEnrollment(id: number) {
   return request.delete(`/hcm/v1/payroll/enrollments/${id}`)
 }
+
+/* ==================== 薪酬規則（D3） ==================== */
+
+/** 規則集：城市 × 期間 */
+export interface PayrollRuleSet {
+  id?: number
+  code: string
+  name: string
+  jurisdiction: string
+  cityCode: string
+  cityName?: string | null
+  currency: string
+  basicDeduction: string | number
+  effectiveFrom: string
+  effectiveTo?: string | null
+  status?: number
+  versionLabel?: string | null
+  remark?: string | null
+  updatedBy?: string | null
+}
+
+/** 個稅級距 */
+export interface PayrollTaxBracket {
+  id?: number
+  ruleSetId?: number
+  levelNo?: number
+  lowerBound: string | number
+  upperBound?: string | number | null
+  rate: string | number
+  quickDeduction?: string | number | null
+}
+
+export function listRuleSets(params: {
+  page: number
+  size: number
+  keyword?: string
+  jurisdiction?: string
+  status?: number
+}) {
+  return request.get<unknown, PageResult<PayrollRuleSet>>('/hcm/v1/payroll/rule-sets', { params })
+}
+
+export function getRuleSet(id: number) {
+  return request.get<unknown, PayrollRuleSet>(`/hcm/v1/payroll/rule-sets/${id}`)
+}
+
+export function createRuleSet(data: PayrollRuleSet) {
+  return request.post<unknown, PayrollRuleSet>('/hcm/v1/payroll/rule-sets', data)
+}
+
+export function updateRuleSet(id: number, data: PayrollRuleSet) {
+  return request.put<unknown, PayrollRuleSet>(`/hcm/v1/payroll/rule-sets/${id}`, data)
+}
+
+export function deleteRuleSet(id: number) {
+  return request.delete(`/hcm/v1/payroll/rule-sets/${id}`)
+}
+
+/** 複製上一套規則：只帶新編碼/名稱/期間，其餘口徑從源規則集繼承 */
+export function copyRuleSet(id: number, data: {
+  newCode: string
+  newName: string
+  effectiveFrom: string
+  effectiveTo?: string | null
+}) {
+  return request.post<unknown, PayrollRuleSet>(`/hcm/v1/payroll/rule-sets/${id}/copy`, data)
+}
+
+export function listBrackets(ruleSetId: number) {
+  return request.get<unknown, PayrollTaxBracket[]>(`/hcm/v1/payroll/rule-sets/${ruleSetId}/brackets`)
+}
+
+export function saveBrackets(ruleSetId: number, brackets: PayrollTaxBracket[]) {
+  return request.put<unknown, PayrollTaxBracket[]>(`/hcm/v1/payroll/rule-sets/${ruleSetId}/brackets`, brackets)
+}
