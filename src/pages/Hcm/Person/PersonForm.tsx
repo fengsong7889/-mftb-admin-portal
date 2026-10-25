@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Alert, Button, DatePicker, Form, Input, Modal, Select, Space, Switch, Table, Tag, message } from 'antd'
+import { Alert, Button, DatePicker, Form, Input, Modal, Select, Space, Switch, Table, Tag, Timeline, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { SaveOutlined, IdcardOutlined, SafetyCertificateOutlined, PlusOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
@@ -41,6 +41,8 @@ export default function HcmPersonForm() {
   const [employments, setEmployments] = useState<HrEmployment[]>([])
   // 任职按雇佣懒加载：展开某段雇佣才取它的任职，避免一进详情就把所有任职拉回来
   const [assignments, setAssignments] = useState<Record<number, HrAssignment[]>>({})
+  // 全量任职（时间轴用）：与展开行的懒加载互不干扰
+  const [allAssignments, setAllAssignments] = useState<Array<{ item: HrAssignment; employmentId: number }>>([])
 
   const loadDetail = useCallback(async () => {
     if (!id) return
@@ -67,7 +69,20 @@ export default function HcmPersonForm() {
   useEffect(() => {
     if (!id) return
     listEmployments(id, { page: 1, size: 50 })
-      .then((res) => setEmployments(res.records ?? []))
+      .then(async (res) => {
+        const list = res.records ?? []
+        setEmployments(list)
+        // 时间轴要一次看全：逐段雇佣取任职后合并，件数是「人 × 雇佣段」，不是业务流水
+        const pairs = await Promise.all(list.map(async (emp) => {
+          try {
+            const page = await listAssignments(emp.id as number, { page: 1, size: 100 })
+            return (page.records ?? []).map((item) => ({ item, employmentId: emp.id as number }))
+          } catch {
+            return []
+          }
+        }))
+        setAllAssignments(pairs.flat())
+      })
       .catch(() => setEmployments([]))
   }, [id])
 
@@ -311,6 +326,47 @@ export default function HcmPersonForm() {
               ),
             }}
           />
+        </div>
+      )}
+
+      {isDetail && (
+        <div style={cardStyle}>
+          <CardTitle icon={<IdcardOutlined />} title={t('hcmPerson.timelineTitle')} />
+          {allAssignments.length === 0 ? (
+            <div style={{ fontSize: 13, color: '#8C8C8C' }}>{t('hcmPerson.timelineEmpty')}</div>
+          ) : (
+            <Timeline
+              items={allAssignments
+                .slice()
+                .sort((a, b) => String(b.item.effectiveFrom).localeCompare(String(a.item.effectiveFrom)))
+                .map(({ item, employmentId }) => {
+                  const today = dayjs().format('YYYY-MM-DD')
+                  const current = String(item.effectiveFrom) <= today
+                    && (!item.effectiveTo || String(item.effectiveTo) >= today)
+                  return {
+                    color: current ? 'blue' : 'gray',
+                    children: (
+                      <div>
+                        <div style={{ fontSize: 13, color: '#262626' }}>
+                          <span style={{ fontWeight: 600 }}>{String(item.effectiveFrom)}</span>
+                          {item.effectiveTo ? ` ~ ${item.effectiveTo}` : ` ~ ${t('hcmPerson.openEnded')}`}
+                          {current && <Tag color="blue" style={{ marginLeft: 8 }}>{t('hcmPerson.timelineCurrent')}</Tag>}
+                          {item.primaryFlag === 1 && <Tag style={{ marginLeft: 4 }}>{t('hcmPerson.primary')}</Tag>}
+                        </div>
+                        <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 2 }}>
+                          {t('hcmPerson.timelineLine', {
+                            unit: item.unitId,
+                            fte: Number(item.fte ?? 1).toFixed(2),
+                            seq: item.seqNo ?? 1,
+                            employment: employmentId,
+                          })}
+                        </div>
+                      </div>
+                    ),
+                  }
+                })}
+            />
+          )}
         </div>
       )}
 

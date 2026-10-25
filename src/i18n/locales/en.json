@@ -13842,6 +13842,10 @@
     "occupied": "Occupied",
     "vacancy": "Vacancy",
     "over": "Over by {{count}}",
-    "lifecycleNotice": "Onboarding, regularization, transfer and offboarding are still initiated in the legacy HR lifecycle menu. This page only maintains person, employment and assignment facts; lifecycle will be wired in at the C6 cut-over."
+    "lifecycleNotice": "Onboarding, regularization, transfer and offboarding are still initiated in the legacy HR lifecycle menu. This page only maintains person, employment and assignment facts; lifecycle will be wired in at the C6 cut-over.",
+    "timelineTitle": "Assignment timeline",
+    "timelineEmpty": "No assignment records",
+    "timelineCurrent": "Current",
+    "timelineLine": "Unit #{{unit}} · FTE {{fte}} · seq {{seq}} · employment #{{employment}}"
   }
 }

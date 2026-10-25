@@ -13844,6 +13844,10 @@
     "occupied": "當前佔用",
     "vacancy": "空缺",
     "over": "超編 {{count}} 人",
-    "lifecycleNotice": "入職/轉正/調動/離職等異動仍由人事管理下的『人事異動』菜單發起與審批；本頁只維護人員、雇傭與任職事實，切換（C6）後才會把異動接進來。"
+    "lifecycleNotice": "入職/轉正/調動/離職等異動仍由人事管理下的『人事異動』菜單發起與審批；本頁只維護人員、雇傭與任職事實，切換（C6）後才會把異動接進來。",
+    "timelineTitle": "任職時間軸",
+    "timelineEmpty": "暫無任職記錄",
+    "timelineCurrent": "當前",
+    "timelineLine": "組織 #{{unit}} · FTE {{fte}} · 同日序號 {{seq}} · 雇傭 #{{employment}}"
   }
 }
