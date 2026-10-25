@@ -91,6 +91,8 @@ public class DocSchemaMigrationInitializer implements CommandLineRunner {
     static final String VERSION_API_DOC = "doc:api-catalog-v1.1";
     /** 接口清單系統代碼歸一（舊路由前綴 → 16 個正式系統，名稱統一中文）。 */
     static final String VERSION_API_DOC_SYSTEMS = "doc:api-catalog-v1.2";
+    /** 接口出參結構與名稱來源（v1.3）：response_fields / api_name_source。 */
+    static final String VERSION_API_DOC_SCHEMA = "doc:api-catalog-v1.3";
     /** 系统方案库/接口管理两个新菜单。 */
     static final String VERSION_CATALOG_MENU = "doc:catalog-menu-v1.0";
     /** 學習路徑入口菜單（頂級「學習路徑」/doc-learning）；單獨版本鍵理由同 v1.1/v1.2 */
@@ -157,6 +159,9 @@ public class DocSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce(VERSION_API_DOC_SYSTEMS, () -> DocApiCatalogSchema.normalizeSystems(jdbcTemplate));
         // 歸一為冪等活邏輯：新環境/舊庫每次啟動都自癒，防止已記版本後再出現英文系統名
         DocApiCatalogSchema.normalizeSystems(jdbcTemplate);
+        versionTracker.applyOnce(VERSION_API_DOC_SCHEMA, () -> DocApiCatalogSchema.addSchemaColumns(jdbcTemplate),
+                () -> DocApiCatalogSchema.verifySchemaColumns(jdbcTemplate));
+        DocApiCatalogSchema.verifySchemaColumns(jdbcTemplate);
         versionTracker.applyOnce(VERSION_LEARNING, this::doLearningSchema, this::verifyLearningSchema);
         versionTracker.applyOnce(VERSION_SEED, this::doSeedSpaces, this::verifySpaces);
         // 菜單與會話域同口徑：版本已落地的庫仍重放 task，保持結構自癒

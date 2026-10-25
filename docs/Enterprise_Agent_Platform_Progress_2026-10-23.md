@@ -681,3 +681,24 @@ PASS 知識檢索      命中 1 條（query=檢索）
 2. **端點有效期 / 提案有效期仍顯示 epoch 毫秒**：統一走 `fmtTs` 格式化。
 
 驗證：後端 `mvn compile` 通過並重啟（ready=200）；`GET /applications` 三個應用均帶出白名單（ui-e2e/pilot-agent=`["query_approvals"]`、demo-agent=`["rdm.project.summary"]`）；`tsc` 0 error。
+
+### 二十四（補三）：提案審批/執行 UI 複驗 + 表單 i18n
+
+**修復的兩個真實缺陷**（均由瀏覽器複驗抓出）：
+
+1. **操作列被列配置過濾掉**：`ActionsPane` 的 `columns` 有 `ops`，但 `meta`（列配置白名單）漏了它；`applyColumnConfig` 按 config 的 key 做白名單過濾 → 「通過/執行」按鈕從未渲染。補進 meta 並鎖定尾部後，按鈕正常出現。
+2. **狀態標籤不隨語言刷新**：`ACTION_TAG`/`RUN_TAG` 在模組頂層調用 `tr()`，只在 import 時求值一次；改為 `actionTag(status)`/`runTag(status)` 渲染時求值，切語言即時生效。
+
+**UI 全鏈路複驗（5/5 通過）**：
+
+| 步驟 | 結果 |
+|---|---|
+| 操作列 + 「通過」按鈕 | ✅ |
+| 通過 → 已通過 · 待執行 + 「執行」 | ✅ `POST /approve` 200，審批引用 `ui-…` |
+| 執行 → 已執行 + 「—」+ 提示「已執行並寫回執」 | ✅ `POST /execute` 200，回執 `accepted/executed` |
+| 「已執行」篩選命中 | ✅ 刷新後保持終態 |
+| console / 網絡 | 無 5xx；僅 antd 靜態 `message` 的既有告警與一次首屏 401（reload 不復現） |
+
+**表單 i18n**：新增 `agentConsole.form.*` 共 **54 個 key**（中英雙份），覆蓋四組表單的標題、標籤、佔位符、按鈕與提示；瀏覽器實測英文界面下 `Add application` / `Add budget pool` 彈窗標籤全英，狀態標籤切換語言即時生效。
+
+驗證：`tsc` 0 error、`eslint` 0 error、`check:i18n` 引用 18067 條零缺失。

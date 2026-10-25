@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
 public final class DocApiCatalogSchema {
     public static final String SCRIPT = "299_doc_api_catalog.sql";
     public static final String SCRIPT_DOC = "300_doc_api_doc_fields.sql";
+    public static final String SCRIPT_RESPONSE = "301_doc_api_response_schema.sql";
     private static final String[][] DOC_COLUMNS = {
             {"api_name", "VARCHAR(200) NULL COMMENT '对外接口名称'"},
             {"description", "VARCHAR(1000) NULL COMMENT '接口说明'"},
@@ -28,6 +29,13 @@ public final class DocApiCatalogSchema {
             {"error_codes", "MEDIUMTEXT NULL COMMENT '错误码说明'"},
             {"changelog", "MEDIUMTEXT NULL COMMENT '变更记录'"},
             {"active", "TINYINT NOT NULL DEFAULT 1 COMMENT '代码扫描是否仍存在'"}
+    };
+    /**
+     * 出参结构与名称来源（v1.3）。由方法签名派生，只读：扫描回写，人工不编辑。
+     */
+    private static final String[][] SCHEMA_COLUMNS = {
+            {"response_fields", "MEDIUMTEXT NULL COMMENT '出參字段表 JSON（路徑/類型/必填/說明）'"},
+            {"api_name_source", "VARCHAR(16) NULL COMMENT '接口名称来源：operation/auto/manual'"}
     };
     private static final Pattern TABLE = Pattern.compile("CREATE TABLE IF NOT EXISTS ([a-z_]+)");
     private static final Pattern COLUMN = Pattern.compile(
@@ -70,6 +78,26 @@ public final class DocApiCatalogSchema {
                             + "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='doc_api_catalog' AND COLUMN_NAME=?",
                     Long.class, column[0]);
             if (count == null || count == 0) throw new IllegalStateException("接口文档字段未就绪: " + column[0]);
+        }
+    }
+
+    public static void addSchemaColumns(JdbcTemplate jdbc) {
+        for (String[] column : SCHEMA_COLUMNS) {
+            Long count = jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.COLUMNS "
+                            + "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='doc_api_catalog' AND COLUMN_NAME=?",
+                    Long.class, column[0]);
+            if (count == null || count == 0) {
+                jdbc.execute("ALTER TABLE doc_api_catalog ADD COLUMN " + column[0] + " " + column[1]);
+            }
+        }
+    }
+
+    public static void verifySchemaColumns(JdbcTemplate jdbc) {
+        for (String[] column : SCHEMA_COLUMNS) {
+            Long count = jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.COLUMNS "
+                            + "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='doc_api_catalog' AND COLUMN_NAME=?",
+                    Long.class, column[0]);
+            if (count == null || count == 0) throw new IllegalStateException("接口出参结构字段未就绪: " + column[0]);
         }
     }
 

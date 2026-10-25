@@ -497,9 +497,10 @@ public class DocKnowledgeController {
     @RequirePermission(menu = "doc-api-center", action = "view")
     public Result<ApiCatalogPage> apiCatalog(@RequestParam(required = false) String systemCode,
                                              @RequestParam(required = false) String keyword,
+                                             @RequestParam(required = false) String filter,
                                              @RequestParam(defaultValue = "1") int page,
                                              @RequestParam(defaultValue = "20") int size) {
-        return Result.success(apiCatalog.apis(systemCode, keyword, page, size));
+        return Result.success(apiCatalog.apis(systemCode, keyword, filter, page, size));
     }
 
     @GetMapping("/api-center/apis/{id}")

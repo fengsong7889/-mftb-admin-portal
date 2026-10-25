@@ -35,8 +35,12 @@ export interface DocApiCatalogEntry {
   handler: string
   requestSchema?: string | null
   responseSchema?: string | null
+  /** 出參字段表 JSON：{ raw, fields }，由方法签名派生，只读 */
+  responseFields?: string | null
   source: string
   apiName?: string | null
+  /** 接口名来源：operation / auto / manual */
+  apiNameSource?: string | null
   description?: string | null
   scenario?: string | null
   authType?: string | null
@@ -105,9 +109,22 @@ export function fetchDocApiCatalogSystems() {
   return request.get<unknown, DocApiCatalogSystem[]>('/doc/v3/api-center/systems')
 }
 
-export function fetchDocApiCatalog(params: { systemCode?: string; keyword?: string; page?: number; size?: number }) {
+export function fetchDocApiCatalog(params: {
+  systemCode?: string
+  keyword?: string
+  /** 文檔完整度篩選：draft / published / deprecated / incomplete，空=全部 */
+  filter?: string
+  page?: number
+  size?: number
+}) {
   return request.get<unknown, DocApiCatalogPage>('/doc/v3/api-center/apis', {
-    params: { systemCode: params.systemCode || undefined, keyword: params.keyword?.trim() || undefined, page: params.page ?? 1, size: params.size ?? 20 },
+    params: {
+      systemCode: params.systemCode || undefined,
+      keyword: params.keyword?.trim() || undefined,
+      filter: params.filter || undefined,
+      page: params.page ?? 1,
+      size: params.size ?? 20,
+    },
   })
 }
 

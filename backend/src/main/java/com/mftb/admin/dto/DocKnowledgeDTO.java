@@ -120,11 +120,12 @@ public final class DocKnowledgeDTO {
     public record SystemPlanPage(List<SystemPlan> records, long total, int page, int size) {}
 
     public record ApiCatalogEntry(Long id, String systemCode, String systemName, String method, String path,
-                                  String handler, String requestSchema, String responseSchema, String source,
-                                  String apiName, String description, String scenario, String authType,
-                                  String authScope, int visibility, int docStatus, Long ownerUserId, String version,
-                                  String baseUrl, String requestExample, String responseExample, String errorCodes,
-                                  String changelog, boolean active, LocalDateTime syncedAt) {}
+                                  String handler, String requestSchema, String responseSchema, String responseFields,
+                                  String source, String apiName, String apiNameSource, String description,
+                                  String scenario, String authType, String authScope, int visibility, int docStatus,
+                                  Long ownerUserId, String version, String baseUrl, String requestExample,
+                                  String responseExample, String errorCodes, String changelog, boolean active,
+                                  LocalDateTime syncedAt) {}
     public record ApiCatalogSystem(String systemCode, String systemName, long endpointCount) {}
     public record ApiCatalogPage(List<ApiCatalogEntry> records, long total, int page, int size) {}
     public record ApiCatalogSave(@Size(max=200) String apiName, @Size(max=1000) String description,
