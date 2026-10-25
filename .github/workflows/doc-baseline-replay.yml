@@ -50,8 +50,13 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Install python deps
-        run: python3 -m pip install --user pymysql cryptography
+        run: python -m pip install pymysql cryptography
 
       - name: Build jar (skip tests; backend-docker.yml owns full tests)
         run: mvn -B package -Dmaven.test.skip=true -f backend/pom.xml
@@ -63,7 +68,7 @@ jobs:
           BASELINE_TARGET_DB_PASSWORD: ''
         run: |
           set -euo pipefail
-          python3 scripts/doc-baseline/replay_check.py \
+          python scripts/doc-baseline/replay_check.py \
             --allow-reset \
             --jar backend/target/mftb-admin.jar \
             --work-dir "$RUNNER_TEMP/doc-baseline"
