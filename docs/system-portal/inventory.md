@@ -92,6 +92,7 @@
 | `hcm-org-position` | 崗位與編制 | `organization` | 顶级菜单，sort 70；本期只落核定编制数，在职占用待 C2 任职事实反算 |
 | `hcm-payroll-component` | 薪資項目 | `payroll` | 顶级菜单，sort 71；类型分應發/扣除/雇主成本，雇主成本不進員工實發 |
 | `hcm-payroll-standard` | 薪酬標準 | `payroll` | 顶级菜单，sort 72；挂在雇佣上日期生效，同雇佣区间不得重叠 |
+| `hcm-payroll-benefit` | 福利參保 | `payroll` | 顶级菜单，sort 73；同页两页签（方案 / 人員參保），费率分雇主/雇员，基数受方案上下限约束 |
 | `hcm-person` | 人員主檔 | `hr` | C3 新花名册（person 为事实源），与旧「員工管理」并存，C6 切换；不复用 hr-profile/employee-management 的写权 |
 | `attendance-workbench` | 假勤工作台 | `attendance` | 顶级菜单，sort 26；待办只跳转流程事项，不承载审批动作 |
 | `attendance-group` | 考勤組與規則 | `attendance` | 顶级菜单，sort 27；考勤结论的最小计算单位 |

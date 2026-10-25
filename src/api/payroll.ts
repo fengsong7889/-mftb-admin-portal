@@ -105,3 +105,115 @@ export function updateStandard(id: number, data: PayrollSalaryStandard) {
 export function deleteStandard(id: number) {
   return request.delete(`/hcm/v1/payroll/standards/${id}`)
 }
+
+/* ==================== 福利參保（D2 第三批） ==================== */
+
+/** 參保方案 */
+export interface PayrollBenefitPlan {
+  id?: number
+  code: string
+  name: string
+  nameEn?: string | null
+  planType: string
+  jurisdiction: string
+  employerRatio: string | number
+  employeeRatio: string | number
+  minBase?: string | number | null
+  maxBase?: string | number | null
+  currency: string
+  effectiveFrom: string
+  effectiveTo?: string | null
+  status?: number
+  remark?: string | null
+  updatedBy?: string | null
+}
+
+/** 人員參保 */
+export interface PayrollEnrollment {
+  id?: number
+  employmentId: number
+  planId: number
+  baseAmount: string | number
+  employeeAmount?: string | number | null
+  employerAmount?: string | number | null
+  currency?: string | null
+  effectiveFrom: string
+  effectiveTo?: string | null
+  seqNo?: number
+  stopReason?: string | null
+  updatedBy?: string | null
+  /* 以下为列表展示字段（后端 VO 批量补出，只读，不参与鉴权） */
+  personName?: string | null
+  personNo?: string | null
+  employmentNo?: string | null
+  planName?: string | null
+  planType?: string | null
+}
+
+export const PLAN_TYPE_OPTIONS = [
+  { value: 'SOCIAL_INSURANCE', label: '社會保險' },
+  { value: 'HOUSING_FUND', label: '住房公積金' },
+  { value: 'MEDICAL', label: '補充醫療' },
+  { value: 'GROUP_LIFE', label: '團體壽險' },
+  { value: 'OTHER', label: '其他' },
+] as const
+
+export const JURISDICTION_OPTIONS = [
+  { value: 'CN', label: 'CN 中國內地' },
+  { value: 'HK', label: 'HK 香港' },
+  { value: 'MO', label: 'MO 澳門' },
+] as const
+
+export function listBenefitPlans(params: {
+  page: number
+  size: number
+  keyword?: string
+  planType?: string
+  jurisdiction?: string
+  status?: number
+}) {
+  return request.get<unknown, PageResult<PayrollBenefitPlan>>('/hcm/v1/payroll/plans', { params })
+}
+
+export function getBenefitPlan(id: number) {
+  return request.get<unknown, PayrollBenefitPlan>(`/hcm/v1/payroll/plans/${id}`)
+}
+
+export function createBenefitPlan(data: PayrollBenefitPlan) {
+  return request.post<unknown, PayrollBenefitPlan>('/hcm/v1/payroll/plans', data)
+}
+
+export function updateBenefitPlan(id: number, data: PayrollBenefitPlan) {
+  return request.put<unknown, PayrollBenefitPlan>(`/hcm/v1/payroll/plans/${id}`, data)
+}
+
+export function deleteBenefitPlan(id: number) {
+  return request.delete(`/hcm/v1/payroll/plans/${id}`)
+}
+
+export function listEnrollments(params: {
+  page: number
+  size: number
+  employmentId?: number
+  planId?: number
+  asOf?: string
+  activeOnly?: boolean
+}) {
+  return request.get<unknown, PageResult<PayrollEnrollment>>('/hcm/v1/payroll/enrollments', { params })
+}
+
+export function getEnrollment(id: number) {
+  return request.get<unknown, PayrollEnrollment>(`/hcm/v1/payroll/enrollments/${id}`)
+}
+
+export function createEnrollment(data: PayrollEnrollment) {
+  return request.post<unknown, PayrollEnrollment>('/hcm/v1/payroll/enrollments', data)
+}
+
+export function updateEnrollment(id: number, data: PayrollEnrollment) {
+  return request.put<unknown, PayrollEnrollment>(`/hcm/v1/payroll/enrollments/${id}`, data)
+}
+
+export function deleteEnrollment(id: number) {
+  return request.delete(`/hcm/v1/payroll/enrollments/${id}`)
+}

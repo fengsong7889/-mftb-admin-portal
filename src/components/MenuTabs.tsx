@@ -145,6 +145,8 @@ const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
   // 薪酬福利：薪酬标准按雇佣进入，表单保留 query 以区分新增/编辑
   '/hcm-payroll-component-form': { add: 'i18n:payroll.component.addTitle', edit: 'i18n:payroll.component.editTitle' },
   '/hcm-payroll-standard-form': { add: 'i18n:payroll.standard.addTitle', edit: 'i18n:payroll.standard.editTitle' },
+  '/hcm-payroll-benefit-plan-form': { add: 'i18n:payroll.benefit.addPlanTitle', edit: 'i18n:payroll.benefit.editPlanTitle' },
+  '/hcm-payroll-enrollment-form': { add: 'i18n:payroll.enrollment.addTitle', edit: 'i18n:payroll.enrollment.editTitle' },
   '/attendance-group-form': { add: 'i18n:attendance.groupAdd', edit: 'i18n:attendance.groupEdit' },
   '/attendance-group-detail': { fixed: 'i18n:attendance.groupDetail' },
   '/attendance-holiday-form': { add: 'i18n:attendance.holidayAdd', edit: 'i18n:attendance.holidayEdit' },
@@ -461,6 +463,7 @@ const TAB_PATHS_WITH_QUERY = new Set([
   '/hcm-person-form', '/hcm-person-detail',
   '/hcm-person-employment-form', '/hcm-person-assignment-form', '/hcm-person-profile-form',
   '/hcm-payroll-component-form', '/hcm-payroll-standard-form',
+  '/hcm-payroll-benefit-plan-form', '/hcm-payroll-enrollment-form',
   '/attendance-shift-form', '/attendance-shift-detail',
   '/attendance-group-form', '/attendance-group-detail',
   '/attendance-holiday-form', '/attendance-holiday-detail',

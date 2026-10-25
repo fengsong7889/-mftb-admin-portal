@@ -987,6 +987,13 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'edit', label: '編輯' },
     { key: 'delete', label: '刪除' },
   ],
+  'hcm-payroll-benefit': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增方案/參保' },
+    { key: 'edit', label: '編輯/啟停' },
+    { key: 'delete', label: '刪除' },
+  ],
+
   'hcm-org-legal': [
     { key: 'view', label: '查看' },
     { key: 'create', label: '新增法人' },
@@ -1909,6 +1916,7 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'hcm-person',
   'hcm-payroll-component',
   'hcm-payroll-standard',
+  'hcm-payroll-benefit',
   // 考勤假勤系统（后端 AttendanceMenuInitializer 已按菜单鉴权，前端同步纳入受控）
   'attendance-workbench',
   'attendance-group',
@@ -2284,6 +2292,9 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/hcm-payroll-component-form': 'hcm-payroll-component',
   '/hcm-payroll-standard': 'hcm-payroll-standard',
   '/hcm-payroll-standard-form': 'hcm-payroll-standard',
+  '/hcm-payroll-benefit': 'hcm-payroll-benefit',
+  '/hcm-payroll-benefit-plan-form': 'hcm-payroll-benefit',
+  '/hcm-payroll-enrollment-form': 'hcm-payroll-benefit',
   '/hcm-org-position-detail': 'hcm-org-position',
   '/hcm-person': 'hcm-person',
   '/hcm-person-form': 'hcm-person',

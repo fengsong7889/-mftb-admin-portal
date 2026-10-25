@@ -3504,6 +3504,40 @@
       "author": "Qoder",
       "ticket": "hcm-d2-menu",
       "comment": "不复用 hr 菜单 key：薪酬是独立责任域，复用即让「看人事档案」的人自动获得看全员工资的授权。只种两个真实页面，核算批次与工资单（D3）落地时再追加，不先种空壳。admin 授权只补空动作集，deriveSystemAccess 按菜单授权反推薪酬系统准入。"
+    },
+    {
+      "versionKey": "hcm:payroll-benefit-schema:v1.0",
+      "module": "hcm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "payrollBenefitSchemaInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "hcm:payroll-schema:v1.0"
+      ],
+      "scriptFiles": [
+        "298_payroll_benefit.sql"
+      ],
+      "intent": "D2 第三批：建 payroll_benefit_plan（參保方案）與 payroll_enrollment（人員參保）",
+      "author": "Qoder",
+      "ticket": "hcm-d2-benefit",
+      "comment": "費率分雇主/雇員兩列而非只存合計：工資單要分別做雇主成本與個人扣除兩行，合成一個比率拆不回來。基數上下限放方案上，越界社保局會整批退回。參保金額是參保當時的快照（基數×當時費率），費率後續調整不改寫歷史，與薪酬標準同一思路。同一雇傭同一方案只允許一段在保，由生成列 active_key + 唯一鍵兜住並發。298 腳本僅作參照文檔，不進鏡像。"
+    },
+    {
+      "versionKey": "hcm:payroll-menu:v1.1",
+      "module": "hcm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "hcmPayrollMenuInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "hcm:payroll-benefit-schema:v1.0",
+        "hcm:payroll-menu:v1.0"
+      ],
+      "intent": "新增福利參保菜單（方案與人員參保同頁兩頁籤，只開一個菜單）",
+      "author": "Qoder",
+      "ticket": "hcm-d2-benefit-menu",
+      "comment": "只開一個菜單而不是兩個：方案與人員參保是同一個業務動作的兩步，拆成兩個一級菜單會讓側邊欄在薪酬域下出現兩條互相依賴的入口。"
     }
   ]
 }

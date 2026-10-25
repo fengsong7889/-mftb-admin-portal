@@ -23,6 +23,9 @@ public class HcmPayrollMenuInitializer implements CommandLineRunner {
 
     static final String VERSION_KEY = "hcm:payroll-menu:v1.0";
 
+    /** v1.1：補福利參保菜單（方案與人員參保同屬一頁的兩個頁籤，故只開一個菜單） */
+    static final String VERSION_KEY_BENEFIT = "hcm:payroll-menu:v1.1";
+
     private static final String SYSTEM_CODE = SystemCode.PAYROLL.code();
     private static final String ADMIN_ROLE_CODE = "admin";
     private static final String ACTIONS_FULL = "[\"view\",\"create\",\"edit\",\"delete\"]";
@@ -35,6 +38,29 @@ public class HcmPayrollMenuInitializer implements CommandLineRunner {
     public void run(String... args) {
         if (!versionTracker.applyOnce(VERSION_KEY, this::migrate, this::verify)) {
             migrate();
+        }
+        if (!versionTracker.applyOnce(VERSION_KEY_BENEFIT, this::migrateBenefit, this::verifyBenefit)) {
+            // 版本已记录但菜單可能被人工停用/軟刪：每次啟動補一次，保持與版本表一致
+            migrateBenefit();
+        }
+    }
+
+    private void migrateBenefit() {
+        ensureMenu(null, "hcm-payroll-benefit", "福利參保", "/hcm-payroll-benefit",
+                "HcmPayrollBenefitList", "SafetyCertificateOutlined", 73, "Benefits Enrollment");
+        grantAdminMenu("hcm-payroll-benefit");
+        deriveSystemAccess();
+        permissionService.evictAll();
+        log.info("薪酬福利系統菜單 v1.1 已就緒: 福利參保");
+    }
+
+    private void verifyBenefit() {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_menu WHERE menu_key = 'hcm-payroll-benefit' AND deleted = 0 "
+                        + "AND status = 1 AND system_code = ? AND path IS NOT NULL",
+                Integer.class, SYSTEM_CODE);
+        if (count == null || count == 0) {
+            throw new IllegalStateException("薪酬菜單未就緒: hcm-payroll-benefit");
         }
     }
 
@@ -69,12 +95,18 @@ public class HcmPayrollMenuInitializer implements CommandLineRunner {
     }
 
     private void grantAdmin() {
+        for (String key : new String[]{"hcm-payroll-component", "hcm-payroll-standard"}) {
+            grantAdminMenu(key);
+        }
+    }
+
+    private void grantAdminMenu(String menuKey) {
         Long adminRoleId = queryAdminRoleId();
         if (adminRoleId == null) {
             log.warn("admin 角色不存在，跳過薪酬菜單授權");
             return;
         }
-        for (String key : new String[]{"hcm-payroll-component", "hcm-payroll-standard"}) {
+        for (String key : new String[]{menuKey}) {
             Long menuId = queryMenuId(key);
             if (menuId == null) {
                 throw new IllegalStateException("薪酬菜單落地後仍查不到: " + key);
