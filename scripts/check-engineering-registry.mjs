@@ -63,7 +63,8 @@ function backendPrefixes() {
 function actualTestCounts(dirs, prefixes) {
   let fe = 0
   for (const d of dirs) {
-    const base = path.join(ROOT, 'src/pages', d)
+    let base = path.join(ROOT, 'src/pages', d)
+    if (!fs.existsSync(base)) base = path.join(ROOT, 'frontend/apps/rdm/src/pages', d)
     if (!fs.existsSync(base)) continue
     const walk = (abs) => {
       for (const e of fs.readdirSync(abs, { withFileTypes: true })) {
@@ -103,7 +104,10 @@ function main() {
   const unattrDirs = new Set((reg.unattributed?.frontendDirs ?? []).map((x) => x.dir))
 
   // ── C1 / C2 / C3：前端页面目录归属 ──
-  const pageDirs = listDirs('src/pages')
+  const pageDirs = [
+    ...listDirs('src/pages'),
+    ...listDirs('frontend/apps/rdm/src/pages'),
+  ]
   const ownerOf = new Map()
   for (const [code, sys] of Object.entries(systems)) {
     for (const dir of Object.keys(sys.frontendDirs ?? {})) {

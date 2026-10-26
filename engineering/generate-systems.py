@@ -156,6 +156,9 @@ def test_counts(dirs, prefixes):
     for d in dirs:
         base = os.path.join('src/pages', d)
         if not os.path.isdir(base):
+            base = next((os.path.join('frontend/apps', c, 'src/pages', d) for c in os.listdir('frontend/apps')
+                           if os.path.isdir(os.path.join('frontend/apps', c, 'src/pages', d))), None)
+        if not base or not os.path.isdir(base):
             continue
         for dp, _, fns in os.walk(base):
             fe += sum(1 for fn in fns if re.search(r'\.(test|spec)\.(ts|tsx)$', fn))
@@ -198,6 +201,19 @@ def main():
             derived[s][dv].append(key)
 
     page_dirs = sorted(d for d in os.listdir('src/pages') if os.path.isdir(f'src/pages/{d}'))
+    # 已拆出的应用：其 src/pages/<Dir> 直接归属该应用对应系统（构造即真值，不再靠菜单派生）
+    apps_root = 'frontend/apps'
+    app_dirs = {}
+    if os.path.isdir(apps_root):
+        for code in sorted(os.listdir(apps_root)):
+            pdir = os.path.join(apps_root, code, 'src', 'pages')
+            if not os.path.isdir(pdir):
+                continue
+            for d in sorted(os.listdir(pdir)):
+                if os.path.isdir(os.path.join(pdir, d)):
+                    page_dirs.append(d)
+                    app_dirs.setdefault(code, []).append(d)
+    page_dirs = sorted(set(page_dirs))
     pref_counts = backend_prefixes()
 
     claimed = set(SHARED_FRONTEND_DIRS)
@@ -211,6 +227,8 @@ def main():
             if dv in dirs:
                 continue
             dirs[dv] = {'evidence': 'naming', 'reason': why}
+        for d in app_dirs.get(code, []):
+            dirs.setdefault(d, {})['evidence'] = 'app-slice'
         claimed |= set(dirs)
         prefixes = {}
         for p in BACKEND_PREFIXES.get(code, []):

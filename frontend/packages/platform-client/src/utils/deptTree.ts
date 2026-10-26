@@ -1,9 +1,11 @@
 /**
- * 部门树构建（考勤假勤模块内共享）。
+ * 部门树构建（跨域共享：考勤假勤 + 产研交付的负责人/部门筛选都在用）。
  *
- * 为什么放模块内而不是 src/utils：这是 TreeSelect 的展示适配，只有考勤的
- * 考勤组表单与几个列表页的部门筛选在用；仓内其它模块各自有同形实现
- * （AssetList / AssetAdd / OaPurchaseRequest），跨模块统一属另一件事，不在本模块顺手改。
+ * 为什么从 src/pages/Attendance/ 上移到 platform-client：产研应用隔离后不允许
+ * app-rdm 反向依赖考勤页面目录（scripts/check-boundary.mjs 的包依赖白名单），
+ * 而两边需要同一棵树的构建口径，故下沉为共享工具。
+ * 仓内其它模块仍有同形实现（AssetList / AssetAdd / OaPurchaseRequest），
+ * 跨模块统一属另一件事，不在本文件顺手改。
  *
  * value 用**部门 id**（数字）：后端筛选参数 deptId 就是 id，用名称当 value
  * 会在部门改名后让筛选项与历史数据对不上。

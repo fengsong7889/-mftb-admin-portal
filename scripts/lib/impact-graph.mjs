@@ -47,7 +47,7 @@ export const isTestFile = (f) => /\.(test|spec)\.(ts|tsx)$/.test(f)
 
 /** 业务源码判定：排除测试与非逻辑资源，用于「有业务改动却选不到测试」的缺口检测 */
 export const isFrontendBusinessFile = (f) =>
-  (f.startsWith('src/') || f.startsWith('frontend/packages/')) && /\.(ts|tsx)$/.test(f) && !isTestFile(f)
+  (f.startsWith('src/') || f.startsWith('frontend/')) && /\.(ts|tsx)$/.test(f) && !isTestFile(f)
 
 export const isBackendBusinessFile = (f) =>
   f.startsWith(`${JAVA_ROOT}/main/java/`) && f.endsWith('.java') && !/Test\.java$/.test(f)
@@ -79,6 +79,7 @@ const RESOLVE_CANDIDATES = ['', '.ts', '.tsx', '.js', '.jsx', '.json', '/index.t
  * 否则影响域会漏选测试（这是拆包后最容易静默失效的地方）。
  */
 export const ALIAS_DIRS = [
+  ['@mftb/app-rdm/', 'frontend/apps/rdm/src/'],
   ['@mftb/contracts/', 'frontend/packages/contracts/src/'],
   ['@/api/', 'frontend/packages/platform-client/src/api/'],
   ['@/api', 'frontend/packages/platform-client/src/api'],
@@ -154,7 +155,7 @@ export function buildFrontendGraph(feFiles, read) {
 
 /** 从变更文件沿反向边扩散，收集受影响的测试文件 */
 export function frontendAffectedTests(changed, reverse) {
-  const seeds = changed.filter((f) => f.startsWith('src/') || f.startsWith('frontend/packages/'))
+  const seeds = changed.filter((f) => f.startsWith('src/') || f.startsWith('frontend/'))
   const selected = new Set()
   const visited = new Set()
   const queue = [...seeds]

@@ -94,7 +94,7 @@ import {
 import { fetchDepartments } from '@/api/department'
 import { fetchEmployeeIdOptions } from '@/api/employee'
 import { buildRdmSubmitPath } from '@/constants/menuDataSource'
-import { buildDeptTree, type DeptNode } from '../Attendance/deptTree'
+import { buildDeptTree, type DeptNode } from '@/utils/deptTree'
 import { exportRequirementRows } from './requirementExport'
 import {
   fallbackHandlerText,

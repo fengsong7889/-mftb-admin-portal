@@ -913,7 +913,7 @@
    "name": "产研交付系统",
    "priority": true,
    "isolation": {
-    "frontend": "pending",
+    "frontend": "isolated",
     "backend": "pending"
    },
    "planned": {
@@ -922,52 +922,14 @@
    },
    "frontendDirs": {
     "PagePRDView": {
-     "evidence": "naming",
+     "evidence": "app-slice",
      "reason": "PRD 免登查看"
     },
     "Rdm": {
-     "evidence": "menu-route",
-     "menuKeys": [
-      "rdm-acceptance",
-      "rdm-config-group",
-      "rdm-config-routing",
-      "rdm-config-score",
-      "rdm-config-sla",
-      "rdm-config-status",
-      "rdm-daily-report-group",
-      "rdm-daily-report-record",
-      "rdm-daily-report-rule",
-      "rdm-daily-report-template",
-      "rdm-daily-report-trigger",
-      "rdm-dashboard",
-      "rdm-dashboard-board",
-      "rdm-dashboard-project",
-      "rdm-dashboard-quality",
-      "rdm-dashboard-report",
-      "rdm-dashboard-risk",
-      "rdm-dashboard-score",
-      "rdm-dashboard-trend",
-      "rdm-dashboard-version",
-      "rdm-delivery",
-      "rdm-delivery-board",
-      "rdm-delivery-iteration",
-      "rdm-delivery-release",
-      "rdm-delivery-test",
-      "rdm-efficiency",
-      "rdm-efficiency-output",
-      "rdm-intake",
-      "rdm-intake-approval",
-      "rdm-pool-group",
-      "rdm-release-accept-group",
-      "rdm-requirement",
-      "rdm-resource-load",
-      "rdm-task-type-config",
-      "rdm-test-quality-group",
-      "rdm-workbench"
-     ]
+     "evidence": "app-slice"
     },
     "RdmDailyReportView": {
-     "evidence": "naming",
+     "evidence": "app-slice",
      "reason": "日报免登看板"
     }
    },

@@ -15,7 +15,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import RdmFormHeader from '../components/RdmFormHeader'
 import { fetchDepartments } from '@/api/department'
-import { buildDeptTree, type DeptNode } from '../../Attendance/deptTree'
+import { buildDeptTree, type DeptNode } from '@/utils/deptTree'
 import {
   fetchProductOptions,
   fetchRoutingRules,

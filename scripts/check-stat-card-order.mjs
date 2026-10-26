@@ -15,7 +15,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
 const ROOT = process.cwd()
-const SCAN_DIRS = ['src/pages', 'src/components']
+const SCAN_DIRS = ['src/pages', 'frontend/apps/rdm/src/pages', 'frontend/packages/ui/src/components']
 const QUIET = process.argv.includes('--quiet')
 
 /** 搜索区标记 */

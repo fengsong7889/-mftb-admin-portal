@@ -94,7 +94,9 @@ function systemCommands(registry, code, side) {
         `本期请按 npm run build:affected 构建单站点产物，不要伪装成按系统构建。`,
       )
     }
-    cmds.push({ argv: ['npm', 'run', 'build', '--workspace', sys.planned.frontendApp], cwd: ROOT })
+    // 应用壳（index.html/main.tsx）仍在 legacy，按应用独立打包待壳拆分切片；
+    // 现阶段的「按系统构建」= 该应用自己的类型检查，保证不拉入无关应用源码
+    cmds.push({ argv: ['npm', 'run', 'typecheck', '--workspace', sys.planned.frontendApp], cwd: ROOT })
   }
   if (side !== 'frontend') {
     if (!beIsolated) {

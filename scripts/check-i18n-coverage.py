@@ -62,7 +62,7 @@ DOMAINS = {
     # 只收页面层：frontend/packages/contracts/src/constants/rdm.ts 的枚举 label 表是模块顶层常量（求值早于 i18n 初始化），
     # 不能直接用 hook 版 t()，需先改成 getter/i18n.t 才能纳入，另批处理。
     'rdm': {
-        'dirs': ['src/pages/Rdm'],
+        'dirs': ['frontend/apps/rdm/src/pages/Rdm'],
         'namespaces': ['rdm'],
         'files_extra': [],
     },

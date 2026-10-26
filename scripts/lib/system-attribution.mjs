@@ -17,8 +17,9 @@ function javaPrefixOf(file) {
 }
 
 function frontendDirOf(file) {
-  if (!file.startsWith('src/pages/')) return null
-  return file.split('/')[2] ?? null
+  if (file.startsWith('src/pages/')) return file.split('/')[2] ?? null
+  const m = file.match(/^frontend\/apps\/[^/]+\/src\/pages\/([^/]+)/)
+  return m ? m[1] : null
 }
 
 /**
@@ -64,7 +65,7 @@ export function attributeFiles(changed, registry) {
       else shared.push({ file, reason: `公共页面层 ${dir}` })
       continue
     }
-    if (file.startsWith('src/') || file.startsWith('frontend/packages/')) {
+    if (file.startsWith('src/') || file.startsWith('frontend/')) {
       shared.push({ file, reason: file.startsWith('frontend/packages/') ? '共享 workspace 包' : '前端公共层' })
       continue
     }

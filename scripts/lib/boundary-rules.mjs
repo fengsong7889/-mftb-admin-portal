@@ -14,6 +14,7 @@ export const CONTRACT_FORBIDDEN = ['pages', 'components', 'contexts', 'hooks', '
 
 /** workspace 包前缀 → 包名（顺序即匹配优先级） */
 export const PACKAGE_PREFIXES = [
+  ['frontend/apps/rdm/', 'app-rdm'],
   ['frontend/packages/contracts/', 'contracts'],
   ['frontend/packages/i18n/', 'i18n'],
   ['frontend/packages/platform-client/', 'platform-client'],
@@ -29,7 +30,8 @@ export const PACKAGE_DEPS = {
   i18n: [],
   'platform-client': ['contracts', 'i18n'],
   ui: ['contracts', 'i18n', 'platform-client'],
-  legacy: ['contracts', 'i18n', 'platform-client', 'ui', 'legacy'],
+  legacy: ['contracts', 'i18n', 'platform-client', 'ui', 'legacy', 'app-rdm'],
+  'app-rdm': ['contracts', 'i18n', 'platform-client', 'ui'],
 }
 
 export function pkgOf(file) {
@@ -71,6 +73,7 @@ function joinPosix(fromDir, spec) {
 
 /** import 别名 → 仓库内目录（与 tsconfig/vite/vitest 的 alias 保持一致，长前缀在前） */
 const IMPORT_ALIASES = [
+  ['@mftb/app-rdm/', 'frontend/apps/rdm/src/'],
   ['@mftb/contracts/', 'frontend/packages/contracts/src/'],
   ['@/api/', 'frontend/packages/platform-client/src/api/'],
   ['@/api', 'frontend/packages/platform-client/src/api'],

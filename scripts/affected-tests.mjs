@@ -214,7 +214,7 @@ function main() {
   }
 
   const cls = classify(changed)
-  const isFeSource = (f) => f.startsWith('src/') || f.startsWith('frontend/packages/')
+  const isFeSource = (f) => f.startsWith('src/') || f.startsWith('frontend/')
   const feChanged = changed.filter(isFeSource)
   const beChanged = changed.filter((f) => f.startsWith('backend/'))
 
@@ -227,7 +227,11 @@ function main() {
       result.frontend.full = true
       result.escalate.push({ side: 'frontend', files: cls.feGlobal, why: '前端共享/契约层' })
     } else {
-      const allFe = [...walk('src', ['.ts', '.tsx']), ...walk('frontend/packages', ['.ts', '.tsx'])]
+      const allFe = [
+        ...walk('src', ['.ts', '.tsx']),
+        ...walk('frontend/packages', ['.ts', '.tsx']),
+        ...walk('frontend/apps', ['.ts', '.tsx']),
+      ]
       const reverse = buildFrontendGraph(allFe, readFile)
       const tests = frontendAffectedTests(changed, reverse)
       const totalTests = allFe.filter(isTestFile).length
@@ -288,7 +292,7 @@ function main() {
   // cmd 字段只用于展示；真正执行的是 argv + cwd。
   const push = (kind, argv, cwd = ROOT) =>
     result.commands.push({ kind, argv, cwd, cmd: `${cwd === ROOT ? '' : `cd ${cwd.replace(ROOT + '/', '')} && `}${argv.join(' ')}` })
-  const srcLint = changed.filter((f) => /^(src|frontend\/packages)\/.+\.(ts|tsx|js)$/.test(f))
+  const srcLint = changed.filter((f) => /^(src|frontend\/).+\.(ts|tsx|js)$/.test(f))
   const toolLint = changed.filter((f) => /^scripts\/.+\.(mjs|js|ts)$/.test(f))
   result.lintTargets = [...srcLint, ...toolLint]
   if (!opts.skipLint) {

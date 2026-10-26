@@ -21,6 +21,7 @@ export default defineConfig({
   resolve: {
     alias: {
       // 与 vite.config.ts 保持一致：共享层已拆为 workspace 包，别名保留旧写法
+      '@mftb/app-rdm': path.resolve(__dirname, './frontend/apps/rdm/src'),
       '@mftb/contracts': path.resolve(__dirname, './frontend/packages/contracts/src'),
       '@/api': path.resolve(__dirname, './frontend/packages/platform-client/src/api'),
       '@/contexts': path.resolve(__dirname, './frontend/packages/platform-client/src/contexts'),
@@ -62,6 +63,7 @@ export default defineConfig({
       'src/**/*.{test,spec}.{ts,tsx}',
       'scripts/**/*.test.mjs',
       'frontend/packages/**/*.{test,spec}.{ts,tsx}',
+      'frontend/apps/**/*.{test,spec}.{ts,tsx}',
     ],
     exclude: ['node_modules', 'dist'],
     coverage: {

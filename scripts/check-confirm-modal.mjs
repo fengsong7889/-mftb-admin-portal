@@ -23,7 +23,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
 const ROOT = process.cwd()
-const SCAN_DIRS = ['src']
+const SCAN_DIRS = ['src', 'frontend']
 const QUIET = process.argv.includes('--quiet')
 const CALL_RE = /Modal\.confirm\(\s*\{/g
 const EXEMPT_RE = /confirm-modal-exempt\s*:/

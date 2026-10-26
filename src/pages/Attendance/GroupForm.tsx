@@ -34,7 +34,7 @@ import {
 import { GROUP_TYPE_LABEL_KEY, SCOPE_TYPE_LABEL_KEY } from './meta'
 import { fetchDepartments } from '@/api/department'
 import { fetchEmployees } from '@/api/employee'
-import { buildDeptTree, type DeptNode } from './deptTree'
+import { buildDeptTree, type DeptNode } from '@/utils/deptTree'
 import '@/styles/components.css'
 
 const cardStyle: React.CSSProperties = {
