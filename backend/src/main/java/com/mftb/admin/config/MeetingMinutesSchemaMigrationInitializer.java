@@ -47,6 +47,34 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
     static final String VERSION_SCHEMA_V2 = "meeting:minutes:v1.1";
     private static final String SCHEMA_SCRIPT_V2 = "268_meeting_minutes_v2.sql";
 
+    /**
+     * v1.2：会议通知卡片版式重排（参会人反馈“样式丑、信息不突出”）。
+     *
+     * <p>为什么单独一个版本键：v1.1 的模板种子只在首次插入，已跑过的库不会重读脚本；
+     * 只改 268 脚本等于永远修不上现有环境。只更新 {@code updated_by='meeting-v2'} 的行，
+     * 管理员在「通知模板」页改过的文案（updated_by 已变）不会被发版打回。
+     */
+    static final String VERSION_TEMPLATE_COPY_V12 = "meeting:minutes:v1.2";
+
+    /** 新卡片文案：标题即会议名称，字段各自成段（钉钉 markdown 会把连续单换行归并成一行） */
+    private static final String CARD_COPY_INVITE = String.join("\n\n",
+            "**${meetingTitle}**",
+            "會議時間：**${startTime}**",
+            "會議室：**${roomName}**",
+            "組織者：${organizer}${delegateLine}${agendaLine}${onlineLine}${extraLine}");
+    private static final String CARD_COPY_REMIND = String.join("\n\n",
+            "**${meetingTitle}**",
+            "⏰ **會議即將開始**",
+            "會議時間：**${startTime}**",
+            "會議室：**${roomName}**",
+            "組織者：**${organizer}**${onlineLine}");
+    private static final String CARD_COPY_OPS = String.join("\n\n",
+            "**${meetingTitle}**",
+            "會議時間：**${startTime}**",
+            "會議室：**${roomName}**",
+            "原因：**${reason}**${extraLine}",
+            "如需使用，請重新預約。");
+
     /** v1.1 建的四张表（顺序即外键依赖顺序） */
     private static final List<String> TABLES_V2 = List.of(
             "biz_meeting_minutes_item", "biz_meeting_minutes_link",
@@ -139,6 +167,9 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
         // 放在同一个执行器里而不是另开一个 @Order(29) 的类：本版本的表有外键指向 v1 的纪要表，
         // 两个同序号的 Bean 执行顺序不确定，全新库上可能先建子表而 1215 失败。
         versionTracker.applyOnce(VERSION_SCHEMA_V2, this::doSchemaMigrateV2, this::verifySchemaV2);
+        // v1.2：卡片文案重排。必须在 v1.1 之后（模板表与种子先就绪）
+        versionTracker.applyOnce(VERSION_TEMPLATE_COPY_V12,
+                this::refreshMeetingCardCopyV12, this::verifyMeetingCardCopyV12);
         // 每次启动都跑的三步：不受 applyOnce 门控，改动才能落到已经跑过 v1.0 的环境
         syncSeqRule();
         ensureNotifyScenario();
@@ -189,6 +220,46 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
             if (!menuExists(menu[0])) {
                 throw new IllegalStateException("菜單未就緒: " + menu[0]);
             }
+        }
+    }
+
+    /* ==================== v1.2 卡片文案重排 ==================== */
+
+    /**
+     * 只改仍保持出厂文案（updated_by='meeting-v2'）的三条模板：
+     * 管理员改过的行不动，否则每次发版都会把他的措辞打回去。
+     */
+    private void refreshMeetingCardCopyV12() {
+        int invite = refreshMeetingTemplate(MeetingConstants.SCENARIO_INVITE, "會議邀約",
+                "${titlePrefix}${meetingTitle}", CARD_COPY_INVITE,
+                "${meetingTitle},${titlePrefix},${meetingNo},${startTime},${endTime},${roomName},"
+                        + "${roomLocation},${organizer},${delegateLine},${agendaLine},${onlineLine},"
+                        + "${extraLine},${viewUrl}");
+        int remind = refreshMeetingTemplate(MeetingConstants.SCENARIO_REMIND, "會議開始前提醒",
+                "【會議提醒】${meetingTitle}", CARD_COPY_REMIND,
+                "${meetingTitle},${startTime},${roomName},${organizer},${onlineLine},${viewUrl}");
+        int ops = refreshMeetingTemplate(MeetingConstants.SCENARIO_OPS, "會議室釋放告知",
+                "【會議室釋放】${meetingTitle}", CARD_COPY_OPS,
+                "${meetingTitle},${startTime},${roomName},${reason},${extraLine},${viewUrl}");
+        log.info("會議通知卡片文案已重排: invite={}, remind={}, ops={} 行", invite, remind, ops);
+    }
+
+    private int refreshMeetingTemplate(String sceneKey, String sceneName, String titleTpl,
+                                       String bodyTpl, String variables) {
+        return jdbcTemplate.update("UPDATE sys_notification_template SET scene_name = ?, title_tpl = ?, "
+                        + "body_tpl = ?, variables = ?, updated_by = 'meeting-v1.2' "
+                        + "WHERE scene_key = ? AND updated_by = 'meeting-v2'",
+                sceneName, titleTpl, bodyTpl, variables, sceneKey);
+    }
+
+    /** 出厂文案必须都已重排：残留旧种子说明 UPDATE 没命中（例如 updated_by 被意外改写） */
+    private void verifyMeetingCardCopyV12() {
+        Integer stale = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_notification_template WHERE scene_key IN (?, ?, ?) "
+                        + "AND updated_by = 'meeting-v2'", Integer.class,
+                MeetingConstants.SCENARIO_INVITE, MeetingConstants.SCENARIO_REMIND, MeetingConstants.SCENARIO_OPS);
+        if (stale != null && stale > 0) {
+            throw new IllegalStateException("會議通知模板仍有 " + stale + " 條舊版文案未重排");
         }
     }
 

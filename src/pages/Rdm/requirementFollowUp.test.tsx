@@ -86,3 +86,28 @@ describe('需求跟进清单（执行侧地板）', () => {
     expect(screen.getByText(/待分配（需求池）請到「認領\/分配」菜單/)).toBeInTheDocument()
   })
 })
+
+/**
+ * 交付看板「當前逾期」下钻（C2）。
+ *
+ * <p>口径合同：看板卡片 = 已准入 + overdue_flag=1（含待分配）；
+ * 所以落地页必须 scope=all 且不得带执行侧地板，否则待分配的逾期行会凭空少掉，
+ * 用户会判定「系统丢数」。同时过滤条件必须可见可清除。
+ */
+describe('交付看板「當前逾期」下钻', () => {
+  it('overdue=1 变成本页筛选，且不带执行侧地板', async () => {
+    vi.mocked(fetchRequirementPage).mockResolvedValue({ records: [assignedRow], total: 1 })
+    render(
+      <MemoryRouter initialEntries={['/rdm-intake?scope=all&overdue=1']}>
+        <RequirementList pageRole="management" defaultScope="pool" scopeTabs={[]} advancedFilters minimal />
+      </MemoryRouter>,
+    )
+    await screen.findByText('已分配執行中行')
+
+    expect(fetchRequirementPage).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: 'all', executionOnly: false, overdueOnly: true }),
+      expect.anything(),
+    )
+    expect(screen.getByText(/來自交付看板/)).toBeInTheDocument()
+  })
+})

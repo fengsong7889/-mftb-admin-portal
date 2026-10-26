@@ -11,6 +11,7 @@ import com.mftb.admin.mapper.MeetingBookingMapper;
 import com.mftb.admin.mapper.MeetingNotifyLogMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.util.DateTimeUtils;
+import com.mftb.admin.util.PublicLinkGuard;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -31,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * 会议通知投递器：登记留痕 → 事务提交后投递 → 失败退避重试。
@@ -73,6 +76,7 @@ public class MeetingNotifyDispatcher {
     private final NotificationAppService appService;
     private final DingTalkAppService dingTalkAppService;
     private final MeetingNotifyTemplateService templateService;
+    private final MeetingPublicViewService publicViewService;
 
     @Value("${meeting.notify.dry-run:false}")
     private boolean dryRun;
@@ -233,12 +237,17 @@ public class MeetingNotifyDispatcher {
             writeBackAttendee(task, MeetingConstants.NOTIFY_SKIPPED, "會議單據不存在");
             return;
         }
-        String title = buildTitle(booking, task.getEventCode());
-        String content = buildContent(booking, task.getEventCode(), app.getBaseUrl());
+        MeetingCard card = buildCard(booking, task.getEventCode(), app.getBaseUrl());
         try {
-            dingTalkAppService.sendWorkNotification(task.getScenario(), app.getId(),
-                            List.of(task.getReceiverDingtalkId()), title, content)
-                    .whenComplete((accepted, error) -> applyOutcome(task, attempts, accepted, error));
+            // 有按钮就走 action_card（与 OA 审批卡片同构）：正文给重点，跳转只留一个明确入口；
+            // 终态会议没有按钮，退回 markdown，卡片里也不保留任何可点链接
+            var accepted = card.buttonUrl() == null
+                    ? dingTalkAppService.sendWorkNotification(task.getScenario(), app.getId(),
+                            List.of(task.getReceiverDingtalkId()), card.title(), card.body())
+                    : dingTalkAppService.sendWorkActionCard(task.getScenario(), app.getId(),
+                            List.of(task.getReceiverDingtalkId()), card.title(), card.body(),
+                            card.buttonTitle(), card.buttonUrl());
+            accepted.whenComplete((ok, error) -> applyOutcome(task, attempts, ok, error));
         } catch (RuntimeException e) {
             // 提交动作本身异常（线程池拒绝等）：按失败退避，不能让任务永久停在投遞中
             applyOutcome(task, attempts, false, e);
@@ -318,17 +327,33 @@ public class MeetingNotifyDispatcher {
 
     /* ==================== 卡片内容 ==================== */
 
+    /** 旧模板在正文末尾写死的详情链接：链接改由 action_card 按钮承载后要摘掉，否则一张卡片两个入口 */
+    private static final Pattern DETAIL_LINK = Pattern.compile(
+            "\\[[^\\]]*\\]\\([^)]*(?:meeting-view|meeting-detail)[^)]*\\)");
+    /** 空目标链接（${viewUrl} 为空时的残留） */
+    private static final Pattern EMPTY_LINK = Pattern.compile("\\[[^\\]]*\\]\\(\\s*\\)");
+    /** 终态卡片不允许留任何可点链接（取消/释放后线上会议地址也不再有意义） */
+    private static final Pattern ANY_LINK = Pattern.compile("\\[[^\\]]*\\]\\([^)]*\\)");
+    private static final DateTimeFormatter CARD_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    /** 一次投递要用的卡片：按钮为空表示这张卡不提供跳转（会议已终态或缺站点地址） */
+    record MeetingCard(String title, String body, String buttonTitle, String buttonUrl) {
+    }
+
     /**
      * 事件 → 模板场景。
-     * <p>只有「邀約/變更」走 invite、「開始前提醒」走 remind，其余（取消/釋放/签退等）走 ops；
-     * 三个场景的默认模板里都留有 ${extraLine}，用来装“原定安排已失效”这类事件专属的一句话。
+     *
+     * <p>取消走邀约模板（与创建/变更同一张卡），由 {@code ${extraLine}} 说明“已取消”；
+     * 释放才是 ops。把取消也塞进 ops 会让卡片写「會議室已被釋放」而原因写「會議取消」，
+     * 两个事实互相否定。
      */
     private static String sceneOf(String eventCode) {
         if (eventCode == null) {
             return MeetingConstants.SCENARIO_OPS;
         }
         if (eventCode.startsWith(MeetingConstants.NOTIFY_EVT_UPDATED)
-                || MeetingConstants.NOTIFY_EVT_CREATED.equals(eventCode)) {
+                || MeetingConstants.NOTIFY_EVT_CREATED.equals(eventCode)
+                || MeetingConstants.NOTIFY_EVT_CANCELLED.equals(eventCode)) {
             return MeetingConstants.SCENARIO_INVITE;
         }
         if (MeetingConstants.NOTIFY_EVT_REMIND.equals(eventCode)) {
@@ -337,95 +362,154 @@ public class MeetingNotifyDispatcher {
         return MeetingConstants.SCENARIO_OPS;
     }
 
-    private String buildTitle(MeetingBooking booking, String eventCode) {
-        MeetingNotifyTemplateService.Rendered rendered =
-                templateService.render(sceneOf(eventCode), templateVars(booking, eventCode, null));
-        return rendered != null && StringUtils.hasText(rendered.title())
-                ? rendered.title() : eventLabel(eventCode) + "：" + booking.getTitle();
+    /** 会议已终态或已过结束时间：不再提供「查看詳情」按钮（用户对它已无任何可做的事） */
+    static boolean closedAtSend(MeetingBooking booking) {
+        if (booking == null || !StringUtils.hasText(booking.getStatus())) {
+            return true;
+        }
+        // List.of 的 contains(null) 会直接抛 NPE：状态缺失按“不可跳转”处理，不让通知因此发不出去
+        if (!MeetingConstants.OCCUPYING_STATUSES.contains(booking.getStatus())) {
+            return true;
+        }
+        return booking.getEndTime() != null && !booking.getEndTime().isAfter(LocalDateTime.now());
+    }
+
+    /**
+     * 组装卡片：模板优先，模板停用/缺失时用内置文案。
+     *
+     * <p>内容口径（2026-10 参会人反馈）：第一行就是会议名称；会议时间只写开始时间；
+     * 会议室只写名称（园区/楼层留给详情页）；会议单号不再进卡片。
+     */
+    MeetingCard buildCard(MeetingBooking booking, String eventCode, String baseUrl) {
+        boolean closed = closedAtSend(booking);
+        String viewUrl = null;
+        if (!closed) {
+            try {
+                viewUrl = publicViewService.detailUrl(baseUrl, booking);
+                if (viewUrl != null && !PublicLinkGuard.isPubliclyReachable(baseUrl)) {
+                    // 站点配成内网 IP 时开发机点得开、手机流量必然打不开：发之前先把风险留在日志里
+                    log.warn("會議詳情連結不是公網可達地址，手機端可能打不開: bookingNo={}", booking.getBookingNo());
+                }
+            } catch (RuntimeException e) {
+                // 密钥/站点未就绪时降级为纯文本卡片：宁可少一个按钮，不能把邀约卡在投递队列里
+                log.warn("會議詳情免登連結生成失敗，降級為純文字卡片: bookingNo={}, error={}",
+                        booking.getBookingNo(), e.getClass().getSimpleName());
+            }
+        }
+        Map<String, String> vars = templateVars(booking, eventCode, viewUrl, closed);
+        MeetingNotifyTemplateService.Rendered rendered = templateService.render(sceneOf(eventCode), vars);
+        String title = rendered != null && StringUtils.hasText(rendered.title())
+                ? rendered.title() : defaultTitle(booking, eventCode);
+        String body = rendered != null && StringUtils.hasText(rendered.body())
+                ? rendered.body() : builtinBody(booking, eventCode, vars);
+        return new MeetingCard(title, tidy(body, closed), viewUrl == null ? null : "查看會議詳情", viewUrl);
     }
 
     /** 模板变量：全部取自会议单，不接受调用方传自由正文（防止议程里的内部信息被拼进推送） */
-    private Map<String, String> templateVars(MeetingBooking booking, String eventCode, String baseUrl) {
+    private Map<String, String> templateVars(MeetingBooking booking, String eventCode,
+                                             String viewUrl, boolean closed) {
         Map<String, String> vars = new LinkedHashMap<>();
         vars.put("meetingTitle", Objects.toString(booking.getTitle(), ""));
+        vars.put("titlePrefix", titlePrefix(eventCode));
         vars.put("meetingNo", Objects.toString(booking.getBookingNo(), ""));
-        vars.put("startTime", DateTimeUtils.format(booking.getStartTime()));
-        vars.put("endTime", DateTimeUtils.format(booking.getEndTime()));
+        vars.put("startTime", cardTime(booking.getStartTime()));
+        vars.put("endTime", cardTime(booking.getEndTime()));
         vars.put("roomName", Objects.toString(booking.getRoomName(), ""));
         vars.put("roomLocation", StringUtils.hasText(booking.getRoomLocation())
                 ? "（" + booking.getRoomLocation() + "）" : "");
         vars.put("organizer", Objects.toString(booking.getOrganizerName(), ""));
-        vars.put("delegateLine", StringUtils.hasText(booking.getDelegateForName())
-                ? "實際使用人：**" + booking.getDelegateForName() + "**（由 "
-                        + Objects.toString(booking.getOrganizerName(), "") + " 代訂）\n" : "");
-        vars.put("agendaLine", StringUtils.hasText(booking.getDescription())
-                ? "議程：" + truncate(booking.getDescription(), 200) + "\n" : "");
-        vars.put("onlineLine", StringUtils.hasText(booking.getOnlineMeetingUrl())
-                ? "線上會議：[點擊進入](" + booking.getOnlineMeetingUrl() + ")\n" : "");
-        String extra = "";
-        if (isChange(eventCode)) {
-            extra = "\n**請以最新時間為準，原定安排已失效。**\n";
-        } else if (MeetingConstants.NOTIFY_EVT_CANCELLED.equals(eventCode)) {
-            extra = "\n**本場會議已取消，無需到場。**\n";
-        } else if (MeetingConstants.NOTIFY_EVT_RELEASED.equals(eventCode)) {
-            extra = "\n**會議室已被釋放，如需使用請重新預約。**\n";
-        }
-        vars.put("extraLine", extra);
-        vars.put("reason", MeetingConstants.NOTIFY_EVT_RELEASED.equals(eventCode)
-                ? "會議室已釋放" : eventLabel(eventCode));
-        String link = meetingDetailUrl(baseUrl, booking.getId());
-        vars.put("viewUrl", link == null ? "" : link);
+        // 每段自带前导空行：钉钉 markdown 会把连续单换行归并成一段，不加空行时几行会粘成一行
+        vars.put("delegateLine", !closed && StringUtils.hasText(booking.getDelegateForName())
+                ? "\n\n實際使用人：**" + booking.getDelegateForName() + "**（由 "
+                        + Objects.toString(booking.getOrganizerName(), "") + " 代訂）" : "");
+        vars.put("agendaLine", !closed && StringUtils.hasText(booking.getDescription())
+                ? "\n\n議程：" + truncate(booking.getDescription(), 200) : "");
+        vars.put("onlineLine", !closed && StringUtils.hasText(booking.getOnlineMeetingUrl())
+                ? "\n\n線上會議：[點擊進入](" + booking.getOnlineMeetingUrl() + ")" : "");
+        vars.put("extraLine", extraLine(booking, eventCode));
+        vars.put("reason", reasonOf(booking, eventCode));
+        vars.put("viewUrl", viewUrl == null ? "" : viewUrl);
         return vars;
     }
 
-    /**
-     * 渲染 Markdown 卡片。
-     *
-     * <p>字段全部取自会议单，不接受调用方传入的自由正文：通知一旦能带任意文本，
-     * 议程里的内部信息就会原样出现在钉钉推送日志里。
-     */
-    private String buildContent(MeetingBooking booking, String eventCode, String baseUrl) {
-        // 模板优先：管理员在「通知模板」页改完即生效；模板停用/缺失时回落到下面的内置文案
-        MeetingNotifyTemplateService.Rendered rendered =
-                templateService.render(sceneOf(eventCode), templateVars(booking, eventCode, baseUrl));
-        if (rendered != null && StringUtils.hasText(rendered.body())) {
-            return rendered.body();
-        }
-        StringBuilder sb = new StringBuilder();
-        sb.append("**").append(eventLabel(eventCode)).append("**<br><br>");
-        sb.append("會議主題：").append(booking.getTitle()).append("<br>");
-        sb.append("會議單號：").append(booking.getBookingNo()).append("<br>");
-        sb.append("開始時間：").append(DateTimeUtils.format(booking.getStartTime())).append("<br>");
-        sb.append("結束時間：").append(DateTimeUtils.format(booking.getEndTime())).append("<br>");
-        sb.append("會議室：").append(Objects.toString(booking.getRoomName(), "")).append("<br>");
-        if (StringUtils.hasText(booking.getRoomLocation())) {
-            sb.append("位置：").append(booking.getRoomLocation()).append("<br>");
-        }
-        sb.append("組織者：").append(Objects.toString(booking.getOrganizerName(), "")).append("<br>");
-        // 代订必须写明：参会人看到组织者是行政名字会以为是行政召集，
-        // 少了这一行真正的召集人（实际使用人）在通知里就隐身了
-        if (StringUtils.hasText(booking.getDelegateForName())) {
-            sb.append("實際使用人：").append(booking.getDelegateForName())
-                    .append("（由 ").append(Objects.toString(booking.getOrganizerName(), "")).append(" 代訂）<br>");
-        }
-        if (StringUtils.hasText(booking.getOnlineMeetingUrl())) {
-            sb.append("線上會議：[點擊進入](").append(booking.getOnlineMeetingUrl()).append(")<br>");
-        }
-        if (StringUtils.hasText(booking.getDescription())) {
-            sb.append("議程：").append(truncate(booking.getDescription(), 200)).append("<br>");
-        }
+    private static String extraLine(MeetingBooking booking, String eventCode) {
         if (isChange(eventCode)) {
-            sb.append("<br>請以最新時間為準，原定安排已失效。");
-        } else if (MeetingConstants.NOTIFY_EVT_CANCELLED.equals(eventCode)) {
-            sb.append("<br>本場會議已取消，無需到場。");
-        } else if (MeetingConstants.NOTIFY_EVT_RELEASED.equals(eventCode)) {
-            sb.append("<br>會議室已被釋放，如需使用請重新預約。");
+            return "\n\n**請以最新時間為準，原定安排已失效。**";
         }
-        String link = meetingDetailUrl(baseUrl, booking.getId());
-        if (link != null) {
-            sb.append("<br>[查看會議詳情](").append(link).append(")");
+        if (MeetingConstants.NOTIFY_EVT_CANCELLED.equals(eventCode)) {
+            return "\n\n**本場會議已取消，無需到場。**"
+                    + (StringUtils.hasText(booking.getCancelReason())
+                    ? "\n\n取消原因：" + truncate(booking.getCancelReason(), 200) : "");
         }
+        // 释放类事件已在 ops 模板里用「原因 + 如需使用请重新预约」说清，此处不再重复
+        return "";
+    }
+
+    private static String reasonOf(MeetingBooking booking, String eventCode) {
+        if (MeetingConstants.NOTIFY_EVT_RELEASED.equals(eventCode)) {
+            return StringUtils.hasText(booking.getReleaseReason())
+                    ? truncate(booking.getReleaseReason(), 200) : "會議室已釋放";
+        }
+        return eventLabel(eventCode);
+    }
+
+    private static String titlePrefix(String eventCode) {
+        if (isChange(eventCode)) {
+            return "【會議變更】";
+        }
+        return MeetingConstants.NOTIFY_EVT_CANCELLED.equals(eventCode) ? "【會議已取消】" : "";
+    }
+
+    private static String defaultTitle(MeetingBooking booking, String eventCode) {
+        String subject = Objects.toString(booking.getTitle(), "");
+        if (isChange(eventCode)) {
+            return "【會議變更】" + subject;
+        }
+        return switch (eventCode) {
+            case MeetingConstants.NOTIFY_EVT_CANCELLED -> "【會議已取消】" + subject;
+            case MeetingConstants.NOTIFY_EVT_REMIND -> "【會議提醒】" + subject;
+            case MeetingConstants.NOTIFY_EVT_RELEASED -> "【會議室釋放】" + subject;
+            default -> subject;
+        };
+    }
+
+    /** 内置兜底正文：与模板同一版式（标题 → 时间 → 会议室 → 组织者 → 补充） */
+    private static String builtinBody(MeetingBooking booking, String eventCode, Map<String, String> vars) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("**").append(Objects.toString(booking.getTitle(), "")).append("**\n\n");
+        if (MeetingConstants.NOTIFY_EVT_REMIND.equals(eventCode)) {
+            sb.append("⏰ **會議即將開始**\n\n");
+        }
+        sb.append("會議時間：**").append(cardTime(booking.getStartTime())).append("**\n\n");
+        sb.append("會議室：**").append(Objects.toString(booking.getRoomName(), "")).append("**\n\n");
+        sb.append("組織者：").append(Objects.toString(booking.getOrganizerName(), ""));
+        sb.append(vars.getOrDefault("delegateLine", ""));
+        sb.append(vars.getOrDefault("agendaLine", ""));
+        sb.append(vars.getOrDefault("onlineLine", ""));
+        if (MeetingConstants.NOTIFY_EVT_RELEASED.equals(eventCode)) {
+            sb.append("\n\n原因：**").append(vars.getOrDefault("reason", "")).append("**");
+            sb.append("\n\n如需使用，請重新預約。");
+        }
+        sb.append(vars.getOrDefault("extraLine", ""));
         return sb.toString();
+    }
+
+    /**
+     * 去噪：旧模板在正文末尾写死了「[查看會議詳情](${viewUrl})」，链接改由按钮承载后要摘掉；
+     * 终态卡片再摘掉所有外链（取消后线上会议地址已无意义）。
+     */
+    static String tidy(String body, boolean closed) {
+        String out = body == null ? "" : body;
+        out = DETAIL_LINK.matcher(out).replaceAll("");
+        out = EMPTY_LINK.matcher(out).replaceAll("");
+        if (closed) {
+            out = ANY_LINK.matcher(out).replaceAll("");
+        }
+        return out.replaceAll("\\n{3,}", "\n\n").trim();
+    }
+
+    private static String cardTime(LocalDateTime value) {
+        return value == null ? "" : CARD_TIME.format(value);
     }
 
     private static String eventLabel(String eventCode) {
@@ -446,18 +530,6 @@ public class MeetingNotifyDispatcher {
 
     private static boolean isChange(String eventCode) {
         return eventCode != null && eventCode.startsWith(MeetingConstants.NOTIFY_EVT_UPDATED);
-    }
-
-    /** 详情页跳转：管理后台是 HashRouter，query 必须写在 #/ 之内才会被路由识别 */
-    private static String meetingDetailUrl(String baseUrl, Long bookingId) {
-        if (!StringUtils.hasText(baseUrl) || bookingId == null) {
-            return null;
-        }
-        String base = baseUrl.trim();
-        while (base.endsWith("/") || base.endsWith("#")) {
-            base = base.substring(0, base.length() - 1);
-        }
-        return base + "/#/meeting-detail?id=" + bookingId;
     }
 
     private static String displayName(SysUser user) {

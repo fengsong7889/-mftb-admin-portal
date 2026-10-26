@@ -1,6 +1,7 @@
 import i18n from 'i18next'
 import type { Resource, ResourceLanguage } from 'i18next'
 import { initReactI18next } from 'react-i18next'
+import { TRANSLATION_BUNDLE_EVENT } from './bundleEvent'
 import zhTW from './locales/zh-TW.json'
 import en from './locales/en.json'
 import ja from './locales/ja.json'
@@ -9,6 +10,14 @@ import ru from './locales/ru.json'
 
 /** 語言持久化 key（localStorage） */
 export const LANGUAGE_STORAGE_KEY = 'app_language'
+
+/**
+ * 翻譯包注入事件：數據庫語言包（ensureLanguageBundle）是異步合併的，
+ * 合併後同一個 key 的取值會變（zh-CN 尤其明顯：注入前回退菜單原名，注入後返回語言包值）。
+ * 以 i18n.language 為依賴的 memo 不會因此重算，所以用事件通知視圖刷新。
+ * <p>事件名定義在 ./bundleEvent，避免訂閱方為了取常量而載入整個 i18n 實例。
+ */
+export { TRANSLATION_BUNDLE_EVENT } from './bundleEvent'
 
 /** 支持的语言（zh-TW/en 有靜態 JSON 兆底，ja/ko/ru/zh-CN 由數據庫語言包動態注入） */
 export const SUPPORTED_LANGUAGES = ['zh-TW', 'en', 'ja', 'ko', 'ru', 'zh-CN'] as const
@@ -103,6 +112,11 @@ export function injectTranslationBundle(lang: string, flat: Record<string, strin
     if (value && typeof value === 'object') {
       i18n.addResourceBundle(lang, section, value as Record<string, unknown>, true, false)
     }
+  }
+  // 菜單名/頁簽名等動態文案在注入前後取值不同，已掛載的視圖必須重算，
+  // 否則同一次刷新內會先渲染菜單原名、再顯示語言包譯名（表現為「兩套菜單」）
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(TRANSLATION_BUNDLE_EVENT))
   }
 }
 

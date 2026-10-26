@@ -33,6 +33,8 @@ export const MERCHANT_ROOT: Record<'home' | 'orders', MerchantScreen> = {
 /** 单栈导航对外 API（供各屏幕组件接收 nav prop） */
 export interface MobileNavApi<S> {
   current: S
+  /** 当前屏幕栈（search 覆盖层需要渲染其下方的页面作底） */
+  stack: S[]
   canGoBack: boolean
   push: (screen: S) => void
   back: () => void
@@ -115,5 +117,5 @@ export function useMobileNav<S>(root: S): MobileNavApi<S> {
   const current = stack[stack.length - 1]
   const canGoBack = stack.length > 1
 
-  return { current, canGoBack, push, back, reset, replace }
+  return { current, stack, canGoBack, push, back, reset, replace }
 }

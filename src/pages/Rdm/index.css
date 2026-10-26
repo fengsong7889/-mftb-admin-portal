@@ -1843,6 +1843,16 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
  * order 必须大于按钮默认的 0，否则 flex-basis:100% 仍会按 DOM 顺序插回按钮中间。
  */
 .form-footer.rdm-detail-actions {
+  /*
+   * 吸底：详情页很长，主流程动作原先只在页尾可见，用户得读一句提示再滚到底部找按钮。
+   * 吸底后任意滚动位置都能点到，且不改变「动作统一放底部」的全局规范。
+   */
+  position: sticky;
+  bottom: 0;
+  z-index: 6;
+  /* 抵消 .content-area 的 20/24 内边距：吸底条与卡片同宽、贴住底边，避免正文从两侧缝隙穿过 */
+  margin: 0 -24px -20px;
+  border-radius: 0 0 8px 8px;
   flex-wrap: wrap;
   row-gap: 8px;
 }

@@ -12231,6 +12231,29 @@
     "windowBothOrBothEmpty": "Set both daily booking times or clear both",
     "windowEndAfterStart": "The daily booking end time must be later than the start time",
     "seriesCreatedSkipped": "Created {{count}} recurring meetings; {{skipped}} attendee(s) have no DingTalk binding, so the first invitation was not delivered",
+    "viewPage": {
+      "pageTitle": "Meeting details",
+      "missingToken": "Missing view token. Please reopen the link from DingTalk.",
+      "loadFailed": "Failed to load meeting details",
+      "unableToOpen": "Unable to open meeting details",
+      "retry": "Retry",
+      "linkUnavailable": "This link is unavailable",
+      "linkUnavailableDesc": "The link has expired. Please request a new one from the organizer.",
+      "time": "Time",
+      "room": "Room",
+      "organizer": "Organizer",
+      "delegate": "Actual user",
+      "agenda": "Agenda",
+      "joinOnline": "Join online meeting",
+      "cancelReason": "Cancellation reason: {{reason}}",
+      "releaseReason": "Release reason: {{reason}}",
+      "publicHint": "No sign-in required. Only public meeting information is shown; anyone with the link can open it.",
+      "expireHint": "Link valid until {{time}}. Request a new one after it expires.",
+      "closedCancelled": "This meeting has been cancelled. No need to attend.",
+      "closedReleased": "The room for this meeting has been released.",
+      "closedFinished": "This meeting has ended.",
+      "closedEnded": "This meeting has ended. The information below is for reference only."
+    },
     "minutes": {
       "absentReasonPlaceholder": "Absence reason (optional)",
       "absentees": "Absentees",
@@ -13673,6 +13696,10 @@
       "hoursUnreported": "Unreported / {{plan}}h",
       "btnPrdPage": "PRD page",
       "btnReportDone": "Report completion"
+    },
+    "listDrill": {
+      "overdueFrom": "From delivery dashboard: {{source}} (admitted requirements only, same scope as the dashboard)",
+      "overdueLabel": "Currently overdue"
     },
     "deliveryBoard": {
       "btnTeamLoad": "Team Load",

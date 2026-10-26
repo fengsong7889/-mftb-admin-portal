@@ -91,10 +91,10 @@ export default function NotificationTemplate() {
             title={t('notification.template.varsTitle', { defaultValue: '可用變量' })}
             ariaLabel={t('notification.template.varsAria', { defaultValue: '模板變量說明' })}
             content={[
-              { tone: 'info', label: '會議邀約 / 提醒 / 釋放', body: '${meetingTitle} ${meetingNo} ${startTime} ${endTime} ${roomName} ${roomLocation} ${organizer} ${delegateLine} ${agendaLine} ${onlineLine} ${extraLine} ${reason} ${viewUrl}' },
+              { tone: 'info', label: '會議邀約 / 提醒 / 釋放', body: '${meetingTitle} ${titlePrefix} ${meetingNo} ${startTime} ${endTime} ${roomName} ${roomLocation} ${organizer} ${delegateLine} ${agendaLine} ${onlineLine} ${extraLine} ${reason} ${viewUrl}' },
               { tone: 'success', label: '會議紀要', body: '${minutesNo} ${meetingTime} ${recorder} ${absenteeLine} ${agenda} ${actions} ${followUps} ${nextMeetingLine} ${remarkLine} ${linksLine} ${batchNote}' },
               { tone: 'warn', label: '跟進事項', body: '${itemContent} ${dueDate} ${overdueDays} ${ownerName} ${ownerEmpNo} ${resultLabel} ${doneByName} ${noteLine}' },
-              { tone: 'danger', label: '注意', body: '釘釘 markdown 不支援表格與字體顏色；負責人用 👤 **姓名（工號）** 凸顯。變量寫錯會被清空，不會中斷發送。' },
+              { tone: 'danger', label: '注意', body: '釘釘 markdown 不支援表格與字體顏色；負責人用 👤 **姓名（工號）** 凸顯。變量寫錯會被清空，不會中斷發送。邀約/提醒/釋放的詳情鏈接由卡片按鈕承載，正文無需再寫 [查看會議詳情](${viewUrl})。' },
             ]}
           />
         </Space>

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Button, Form, Input, Select, Space, message, Table, Tag, Switch, Popover, Modal, Radio, Alert, Upload } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
-import { ArrowLeftOutlined, SaveOutlined, PlusOutlined, QuestionCircleOutlined, AppstoreOutlined, ShopOutlined, UploadOutlined, DownloadOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, SaveOutlined, PlusOutlined, QuestionCircleOutlined, AppstoreOutlined, UploadOutlined, DownloadOutlined } from '@ant-design/icons'
 import DetailPageHeader from '../components/DetailPageHeader'
 import {
   fetchAdAlgorithms, fetchWaterfallDetail, createWaterfall, updateWaterfall,
@@ -108,14 +108,19 @@ function PromotionSlotConfigForm() {
   const useAlgorithmSlots = !supportsContentConfig || displayCategoryMode === 'algorithm'
   /** 内容型频道（团购/超市百货）且非算法模式（分类/自定义）：走本地扩展保存 */
   const contentCategoryMode = supportsContentConfig && displayCategoryMode !== 'algorithm'
-  /** 分类兜底并入整体排序区块，不再独立成卡片 */
-  const inlineFallback = contentCategoryMode
+  /** 固定展示内容仅「自定义」模式可用；「门店类目/商品类目」只允许选择分类 */
+  const showFixedContentCard = supportsContentConfig && displayCategoryMode === 'custom'
+  /** 左列是否有内容卡片 */
+  const leftHasCard = showFixedContentCard || useAlgorithmSlots
+  /** 手机模型仅算法提供/自定义模式展示，门店类目/商品类目模式不展示 */
+  const showMobilePreview = !(supportsContentConfig && displayCategoryMode === 'category')
 
   const applyDraft = useCallback((d: WaterfallDraft) => {
+    const mode = getDisplayCategoryMode(d)
     form.setFieldsValue({ promotionName: d.strategyName, app: d.brand })
     setBusinessType(d.businessType)
     setContentType(d.contentType)
-    setDisplayCategoryMode(getDisplayCategoryMode(d))
+    setDisplayCategoryMode(mode)
     setSortMode(d.sortMode ?? DEFAULT_WATERFALL_SORT)
     setStrategyStatus(d.status ?? 1)
     setLayoutColumns(d.layoutColumns)
@@ -123,9 +128,10 @@ function PromotionSlotConfigForm() {
     setFilterDislike(d.filterDislike === 1)
     setNaturalAlgoId(d.naturalAlgoId ?? undefined)
     setNaturalAlgoName(d.naturalAlgoName)
-    setAlgoSlots(d.algoSlots)
-    setFallbackCategoryIds(d.fallbackCategoryIds)
-    setFixedSlots(d.fixedSlots)
+    setAlgoSlots(mode === 'algorithm' ? d.algoSlots : [])
+    // 各展示类目只保留自身允许的内容来源，避免历史数据残留串入预览与保存
+    setFallbackCategoryIds(mode === 'category' ? d.fallbackCategoryIds : [])
+    setFixedSlots(mode === 'custom' ? d.fixedSlots : [])
     setDraftKey(d.key)
   }, [form])
 
@@ -267,6 +273,31 @@ function PromotionSlotConfigForm() {
     })
   }
 
+  /** 展示类目切换：只保留新模式允许的内容来源，避免分类与固定内容混用 */
+  const handleChangeDisplayCategoryMode = (next: WaterfallDisplayCategoryMode) => {
+    if (next === displayCategoryMode || importBusyRef.current) return
+    const apply = () => {
+      setDisplayCategoryMode(next)
+      setImportIssues([])
+      // 门店类目/商品类目只用分类，自定义只用固定内容，算法提供两者都不用
+      if (next !== 'category') setFallbackCategoryIds([])
+      if (next !== 'custom') setFixedSlots([])
+      setHasUnsavedChanges(true)
+    }
+    const hasConfig = fallbackCategoryIds.length > 0 || fixedSlots.length > 0
+    if (!hasConfig) { apply(); return }
+    Modal.confirm({
+      icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
+      title: '切換展示類目？',
+      className: 'custom-confirm-modal',
+      // 待第二阶段统一迁入 i18n
+      content: '切換後將清空與新模式不兼容的內容配置（分類或固定展示內容），是否繼續？',
+      okText: t('common:confirm'),
+      cancelText: t('common:cancel'),
+      onOk: apply,
+    })
+  }
+
   /** 品牌切换（团购）：清理不兼容配置 */
   const handleChangeBrand = () => {
     if (!supportsContentConfig) return
@@ -346,7 +377,8 @@ function PromotionSlotConfigForm() {
       const values = await form.validateFields()
       if (useAlgorithmSlots && !naturalAlgoId) { message.warning(t('promotionSlotConfig:fallbackAlgoRequired')); return }
       if (contentCategoryMode && displayCategoryMode === 'category' && fallbackCategoryIds.length === 0) { message.warning(t('promotionSlotConfig:categoryFallbackRequired')); return }
-      if (contentCategoryMode && displayCategoryMode === 'custom' && fallbackCategoryIds.length === 0 && !fixedSlots.some(s => s.status === 1)) { message.warning(t('promotionSlotConfig:customContentRequired')); return }
+      // 自定义模式不提供分类兜底，必须至少配置一个启用的固定展示内容（待第二阶段迁入 i18n）
+      if (contentCategoryMode && displayCategoryMode === 'custom' && !fixedSlots.some(s => s.status === 1)) { message.warning('請至少配置一個啟用的門店／商品坑位'); return }
       setSaving(true)
 
       if (isServer && contentCategoryMode) {
@@ -430,14 +462,26 @@ function PromotionSlotConfigForm() {
   const tAppOptions = useMemo(() => APP_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
   const tAlgoTypeLabel = useCallback((v: number) => (ALGO_TYPE_LABEL[v] ? t(ALGO_TYPE_LABEL[v]) : t('promotionSlotConfig:algoTypeFallback', { type: v })), [t])
 
+  /** 展示类目说明：门店类目/商品类目只选分类，自定义只配固定内容（待第二阶段迁入 i18n） */
+  const displayCategoryHint = displayCategoryMode === 'category'
+    ? (contentType === 'store'
+      ? '僅按所選門店分類自動獲取內容，不支持固定展示內容配置。'
+      : '僅按所選商品分類自動獲取內容，不支持固定展示內容配置。')
+    : displayCategoryMode === 'custom'
+      ? '展示內容僅來自下方固定展示內容配置，不設分類兜底。'
+      : t('promotionSlotConfig:sourceHint_algorithm')
+
   const phoneTitle = t('promotionSlotConfig:waterfallPreview', { appName: t(APP_LABEL[brand ?? 'flashBee'] || 'common:flashBee') })
 
-  /** 团购预览卡片序列 */
+  /** 团购预览卡片序列：分类模式铺满 8 坑位，自定义模式只到最后一个已配置坑位 */
   const previewCards = useMemo<PreviewCard[]>(() => {
     if (!supportsContentConfig || useAlgorithmSlots) return []
-    const maxPos = Math.max(8, ...fixedSlots.map(s => s.position), 0)
+    const maxPos = displayCategoryMode === 'custom'
+      ? Math.max(0, ...fixedSlots.filter(s => s.status === 1).map(s => s.position))
+      : Math.max(8, ...fixedSlots.map(s => s.position), 0)
+    if (maxPos === 0) return []
     return buildGroupBuyPreview(fixedSlots, candidates, maxPos)
-  }, [supportsContentConfig, useAlgorithmSlots, fixedSlots, candidates])
+  }, [supportsContentConfig, useAlgorithmSlots, displayCategoryMode, fixedSlots, candidates])
 
   const cardShellStyle: React.CSSProperties = {
     border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
@@ -549,7 +593,8 @@ function PromotionSlotConfigForm() {
           <div>
             <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>
               {t('promotionSlotConfig:filterDislike')}
-              <Popover content={<div style={{ maxWidth: 300, fontSize: 12, lineHeight: '20px', color: '#595959' }}>{t('promotionSlotConfig:filterDislikePopover')}</div>} trigger="hover">
+              {/* 过滤逻辑已改为降权排序，文案待第二阶段迁入 i18n */}
+              <Popover content={<div style={{ maxWidth: 300, fontSize: 12, lineHeight: '20px', color: '#595959' }}>開啟後，用戶進入 APP 時，若推廣商家是用戶此前標記為「不喜歡」的商家，系統將自動降低排序，展示在瀑布流末尾。</div>} trigger="hover">
                 <QuestionCircleOutlined style={{ color: '#8c8c8c', fontSize: 13, cursor: 'pointer', marginLeft: 6 }} />
               </Popover>
             </div>
@@ -563,14 +608,14 @@ function PromotionSlotConfigForm() {
                 value={displayCategoryMode}
                 disabled={isDetailMode || importing}
                 style={{ width: '100%' }}
-                onChange={value => { setDisplayCategoryMode(value); setImportIssues([]); setHasUnsavedChanges(true) }}
+                onChange={handleChangeDisplayCategoryMode}
                 options={[
                   { value: 'algorithm', label: t('promotionSlotConfig:sourceAlgorithm') },
                   { value: 'category', label: t(contentType === 'store' ? 'promotionSlotConfig:storeCategories' : 'promotionSlotConfig:productCategories') },
                   { value: 'custom', label: t('promotionSlotConfig:sourceCustom') },
                 ]}
               />
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>{t(`promotionSlotConfig:sourceHint_${displayCategoryMode}`)}</div>
+              <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>{displayCategoryHint}</div>
             </div>
           )}
           {!supportsContentConfig && (
@@ -593,54 +638,43 @@ function PromotionSlotConfigForm() {
             </div>
           )}
         </div>
-        {supportsContentConfig && !useAlgorithmSlots && (
-          <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f0f0f0', display: 'flex', gap: 32, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-            {/* 左：整体排序 */}
-            <div style={{ flex: '0 0 auto' }}>
-              <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>{t('promotionSlotConfig:overallSort')}</div>
-              <Radio.Group name="waterfall-sort" aria-label={t('promotionSlotConfig:overallSort')} value={sortMode} disabled={isDetailMode || importing} onChange={event => { setSortMode(event.target.value as WaterfallSortMode); setHasUnsavedChanges(true) }}>
-                <Radio value="score">{t('promotionSlotConfig:sortScore')}</Radio>
-                <Radio value="sales">{t(contentType === 'store' ? 'promotionSlotConfig:sortStoreSales' : 'promotionSlotConfig:sortProductSales')}</Radio>
-                <Radio value="distance">{t('promotionSlotConfig:sortDistance')}</Radio>
-                <Radio value="random">{t('promotionSlotConfig:sortRandom')}</Radio>
-              </Radio.Group>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>{t('promotionSlotConfig:overallSortHint')}</div>
-            </div>
-            {/* 右：超市百货分类兜底并入整体排序区块，与排序并排展示 */}
-            {inlineFallback && (
-              <div style={{ flex: '1 1 320px', minWidth: 280 }}>
-                <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>
-                  {t('promotionSlotConfig:categoryFallback')}
-                  <Tag color={displayCategoryMode === 'custom' ? 'default' : 'orange'} style={{ margin: '0 0 0 8px' }}>{t(displayCategoryMode === 'custom' ? 'promotionSlotConfig:optionalFallback' : 'promotionSlotConfig:requiredFallback')}</Tag>
-                </div>
-                <Select
-                  mode="multiple"
-                  allowClear
-                  disabled={isDetailMode || importing || !brand}
-                  aria-label={t('promotionSlotConfig:categoryFallback')}
-                  style={{ width: '100%' }}
-                  placeholder={t(contentType === 'store' ? 'promotionSlotConfig:selectStoreCategories' : 'promotionSlotConfig:selectProductCategories')}
-                  value={fallbackCategoryIds}
-                  optionFilterProp="label"
-                  onChange={(vals: string[]) => { setFallbackCategoryIds(vals); setHasUnsavedChanges(true) }}
-                  options={categories.map(c => ({ label: c.name, value: c.id }))}
-                  maxTagCount="responsive"
-                />
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>
-                  {t(displayCategoryMode === 'custom' ? 'promotionSlotConfig:customFallbackHint' : 'promotionSlotConfig:categoryFallbackHint')}
-                  {fallbackCategoryIds.length > 0 && (
-                    <span style={{ marginLeft: 8, color: '#E8720C' }}>{t('promotionSlotConfig:matchedCount', { count: candidates.length + fixedSlots.filter(s => s.status === 1).length })}</span>
-                  )}
-                </div>
+        {/* 分类兜底：仅「门店类目 / 商品类目」模式，分类即唯一内容来源（无固定展示内容） */}
+        {supportsContentConfig && displayCategoryMode === 'category' && (
+          <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f0f0f0' }}>
+            <div style={{ maxWidth: 520 }}>
+              <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>
+                {t('promotionSlotConfig:categoryFallback')}
+                <Tag color="orange" style={{ margin: '0 0 0 8px' }}>{t('promotionSlotConfig:requiredFallback')}</Tag>
               </div>
-            )}
+              <Select
+                mode="multiple"
+                allowClear
+                disabled={isDetailMode || importing || !brand}
+                aria-label={t('promotionSlotConfig:categoryFallback')}
+                style={{ width: '100%' }}
+                placeholder={t(contentType === 'store' ? 'promotionSlotConfig:selectStoreCategories' : 'promotionSlotConfig:selectProductCategories')}
+                value={fallbackCategoryIds}
+                optionFilterProp="label"
+                onChange={(vals: string[]) => { setFallbackCategoryIds(vals); setHasUnsavedChanges(true) }}
+                options={categories.map(c => ({ label: c.name, value: c.id }))}
+                maxTagCount="responsive"
+              />
+              <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>
+                {t('promotionSlotConfig:categoryFallbackHint')}
+                {fallbackCategoryIds.length > 0 && (
+                  <span style={{ marginLeft: 8, color: '#E8720C' }}>{t('promotionSlotConfig:matchedCount', { count: candidates.length })}</span>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+      {(leftHasCard || showMobilePreview) && (
+      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: leftHasCard ? 'flex-start' : 'center' }}>
+        {leftHasCard && (
         <div style={{ flex: '1 1 480px', minWidth: 0 }}>
-          {/* 兜底区域（仅团购分类兜底；外卖自然流量兜底已移入上方展示与过滤设置） */}
+          {/* 兜底区域（仅团购/超市百货算法模式；外卖自然流量兜底已移入上方展示与过滤设置） */}
           {supportsContentConfig && useAlgorithmSlots && (
             <div style={cardShellStyle}>
               {cardTitle(<AppstoreOutlined style={{ fontSize: 14, color: '#FA8C16' }} />, '#FFF7F0', t('promotionSlotConfig:naturalFallback'))}
@@ -657,38 +691,15 @@ function PromotionSlotConfigForm() {
               <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>{t('promotionSlotConfig:channelAlgorithmHint')}</div>
             </div>
           )}
-          {supportsContentConfig && !useAlgorithmSlots && !inlineFallback && (
-            <div style={cardShellStyle}>
-              {cardTitle(<ShopOutlined style={{ fontSize: 14, color: '#E8720C' }} />, '#FFF7F0', t('promotionSlotConfig:categoryFallback'), (
-                <Tag color={displayCategoryMode === 'custom' ? 'default' : 'orange'} style={{ margin: 0 }}>{t(displayCategoryMode === 'custom' ? 'promotionSlotConfig:optionalFallback' : 'promotionSlotConfig:requiredFallback')}</Tag>
-              ))}
-              <Select
-                mode="multiple"
-                allowClear
-                disabled={isDetailMode || importing || !brand}
-                aria-label={t('promotionSlotConfig:categoryFallback')}
-                style={{ width: '100%' }}
-                placeholder={t(contentType === 'store' ? 'promotionSlotConfig:selectStoreCategories' : 'promotionSlotConfig:selectProductCategories')}
-                value={fallbackCategoryIds}
-                optionFilterProp="label"
-                onChange={(vals: string[]) => { setFallbackCategoryIds(vals); setHasUnsavedChanges(true) }}
-                options={categories.map(c => ({ label: c.name, value: c.id }))}
-                maxTagCount="responsive"
-              />
-              <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 8 }}>
-                {t(displayCategoryMode === 'custom' ? 'promotionSlotConfig:customFallbackHint' : 'promotionSlotConfig:categoryFallbackHint')}
-                {fallbackCategoryIds.length > 0 && (
-                  <span style={{ marginLeft: 8, color: '#E8720C' }}>{t('promotionSlotConfig:matchedCount', { count: candidates.length + fixedSlots.filter(s => s.status === 1).length })}</span>
-                )}
-              </div>
-            </div>
-          )}
 
-          {/* 坑位列表 */}
+          {/* 坑位列表：算法提供 = 算法坑位；自定义 = 固定展示内容（门店/商品） */}
           <div style={cardShellStyle}>
             {cardTitle(
               <AppstoreOutlined style={{ fontSize: 14, color: '#fa8c16' }} />, '#fff7e6',
               useAlgorithmSlots ? t('promotionSlotConfig:slotAlgoList') : t('promotionSlotConfig:fixedDisplayContent'),
+              useAlgorithmSlots ? undefined : (
+                <Tag color="orange" style={{ margin: 0 }}>{t(contentType === 'store' ? 'promotionSlotConfig:contentTypeStore' : 'promotionSlotConfig:contentTypeProduct')}</Tag>
+              ),
             )}
             {!isDetailMode && (
               <div className="action-section">
@@ -720,8 +731,10 @@ function PromotionSlotConfigForm() {
             )}
           </div>
         </div>
+        )}
 
-        {/* 右侧：手机预览 */}
+        {/* 右侧：手机预览（门店类目/商品类目模式隐藏） */}
+        {showMobilePreview && (
         <div>
         <WaterfallPreview
           businessType={businessType}
@@ -736,7 +749,9 @@ function PromotionSlotConfigForm() {
           phoneTime={phoneTime}
         />
         </div>
+        )}
       </div>
+      )}
 
       {!isDetailMode && (
         <div className="form-footer">

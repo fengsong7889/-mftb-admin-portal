@@ -350,6 +350,8 @@ const MeetingMinutesView = lazy(() => import('./pages/MeetingManagement/MeetingM
 const MeetingCheckin = lazy(() => import('./pages/MeetingCheckin'))
 // 纪要免登查看页（钉钉卡片直达，凭 HMAC 令牌鉴权，同样不套后台布局）
 const MeetingMinutesPage = lazy(() => import('./pages/MeetingMinutesView'))
+// 会议详情免登查看页（钉钉邀约卡片直达，凭 HMAC 令牌鉴权，不套后台布局）
+const MeetingViewPage = lazy(() => import('./pages/MeetingView'))
 const MeetingMinutesAdmin = lazy(() => import('./pages/MeetingMinutesAdmin'))
 const NotificationTemplateConfig = lazy(() => import('./pages/NotificationTemplate'))
 const NotificationSwitchConfig = lazy(() => import('./pages/NotificationSwitch'))
@@ -1129,13 +1131,15 @@ function AppRoutes() {
   const isPublicMeetingCheckin = location.pathname.startsWith('/meeting-checkin')
   // 纪要免登查看页同源：凭签名令牌鉴权，钉钉里点开的人可能没有后台账号
   const isPublicMeetingMinutes = location.pathname.startsWith('/meeting-minutes-view')
+  // 会议详情免登页：邀约卡片的「查看會議詳情」直达，不需要登录
+  const isPublicMeetingView = location.pathname.startsWith('/meeting-view')
   // 进度日报看板开放页：推送链接直接落地，未登录也要能看；令牌自带范围与有效期
   const isPublicRdmDailyView = location.pathname.startsWith('/rdm-daily-view')
 
   return (
     <Routes>
       {isPublicMobilePath || isPublicSignPath || isPublicMeetingCheckin || isPublicMeetingMinutes
-        || isPublicRdmDailyView ? (
+        || isPublicMeetingView || isPublicRdmDailyView ? (
         <>
           <Route path="/m/asset-tag-view" element={
             <Suspense fallback={<PageLoading />}><AssetTagView /></Suspense>
@@ -1148,6 +1152,9 @@ function AppRoutes() {
           } />
           <Route path="/meeting-minutes-view" element={
             <Suspense fallback={<PageLoading />}><MeetingMinutesPage /></Suspense>
+          } />
+          <Route path="/meeting-view" element={
+            <Suspense fallback={<PageLoading />}><MeetingViewPage /></Suspense>
           } />
           <Route path="/rdm-daily-view" element={
             <Suspense fallback={<PageLoading />}><RdmDailyReportView /></Suspense>

@@ -29,6 +29,7 @@ import {
   TeamOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../contexts/AuthContext'
 import StatCards from '../../components/StatCards'
 import { fetchDashboard, type RdmDashboardData } from '../../api/rdm'
 import { getRdmReqTypeLabel, RDM_STAGE_LABEL, type RdmStage } from '../../constants/rdm'
@@ -45,6 +46,12 @@ const stageLabel = (stage: RdmStage | string) => RDM_STAGE_LABEL[stage as RdmSta
 
 export default function RdmDashboard() {
   const navigate = useNavigate()
+  const { hasPermission } = useAuth()
+  /**
+   * 「當前逾期」下鑽權限：落地頁用 scope=all（治理側全量），
+   * 沒有 view_all 的人服務端會收緊到自己相關的行，點進去的條數就對不上，故不給入口。
+   */
+  const canDrillOverdue = hasPermission('rdm-requirement:view_all')
   const [period, setPeriod] = useState('month')
   const [data, setData] = useState<RdmDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -117,7 +124,14 @@ export default function RdmDashboard() {
             { key: 'cycle', icon: <ClockCircleOutlined />, value: overview.avgDeliveryDays, decimals: 1, suffix: ' 天', label: '平均交付週期', color: 'info' },
             { key: 'ontime', icon: <CheckCircleOutlined />, value: Math.round(overview.onTimeRate * 100), suffix: '%', label: '按時交付率', color: 'success' },
             { key: 'reject', icon: <AlertOutlined />, value: Math.round(overview.rejectRate * 100), suffix: '%', label: '需求駁回率', color: 'brand' },
-            { key: 'risk', icon: <AlertOutlined />, value: overview.overdueTotal, label: '當前逾期', color: 'system' },
+            {
+              key: 'risk', icon: <AlertOutlined />, value: overview.overdueTotal, label: '當前逾期', color: 'system',
+              /* 下鑽口徑必須與卡片一致：已准入（不含草稿/待審批/審批駁回）+ overdue_flag=1，含待分配；
+                 落地頁用 scope=all + overdue=1 復現同一批行，否則點 96 條只看到 60 條會判定丟數 */
+              onClick: canDrillOverdue
+                ? () => navigate('/rdm-intake?scope=all&overdue=1')
+                : undefined,
+            },
           ]}
         />
       </div>

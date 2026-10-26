@@ -42,6 +42,7 @@ class MeetingNotifyDispatcherOutcomeTest {
     private MeetingBookingMapper bookingMapper;
     private NotificationAppService appService;
     private DingTalkAppService dingTalkAppService;
+    private MeetingPublicViewService publicViewService;
     private MeetingNotifyDispatcher dispatcher;
 
     @BeforeEach
@@ -51,9 +52,10 @@ class MeetingNotifyDispatcherOutcomeTest {
         bookingMapper = mock(MeetingBookingMapper.class);
         appService = mock(NotificationAppService.class);
         dingTalkAppService = mock(DingTalkAppService.class);
+        publicViewService = mock(MeetingPublicViewService.class);
         dispatcher = new MeetingNotifyDispatcher(notifyMapper, attendeeMapper, bookingMapper,
                 mock(SysUserMapper.class), appService, dingTalkAppService,
-                mock(MeetingNotifyTemplateService.class));
+                mock(MeetingNotifyTemplateService.class), publicViewService);
     }
 
     private MeetingNotifyLog task() {
@@ -180,5 +182,113 @@ class MeetingNotifyDispatcherOutcomeTest {
         dispatcher.applyOutcome(task(), 1, Boolean.TRUE, null);
 
         verify(notifyMapper).markSuccess(45L);
+    }
+
+    @Test
+    @DisplayName("进行中的会：投递走 action_card，不再发纯 markdown")
+    void sendOpenMeetingUsesActionCard() {
+        MeetingNotifyLog row = task();
+        when(notifyMapper.claim(45L)).thenReturn(1);
+        when(notifyMapper.selectById(45L)).thenReturn(row);
+        when(appService.resolve(row.getScenario()))
+                .thenReturn(new NotificationAppService.Credentials(1L, "key", "secret", "4988071335",
+                        "https://portal.example.com", true));
+        MeetingBooking booking = new MeetingBooking();
+        booking.setId(22L);
+        booking.setBookingNo(row.getBookingNo());
+        booking.setTitle("产品周会");
+        booking.setRoomName("产品会议室");
+        booking.setOrganizerName("系統管理員");
+        booking.setStatus(MeetingConstants.STATUS_BOOKED);
+        booking.setStartTime(java.time.LocalDateTime.now().plusDays(1));
+        booking.setEndTime(booking.getStartTime().plusHours(1));
+        when(bookingMapper.selectById(22L)).thenReturn(booking);
+        when(publicViewService.detailUrl(anyString(), any(MeetingBooking.class)))
+                .thenReturn("https://portal.example.com/#/meeting-view?token=abc");
+        when(dingTalkAppService.sendWorkActionCard(anyString(), anyLong(), anyList(), anyString(),
+                anyString(), anyString(), anyString()))
+                .thenReturn(CompletableFuture.completedFuture(Boolean.TRUE));
+
+        dispatcher.send(45L);
+
+        verify(dingTalkAppService).sendWorkActionCard(eq(row.getScenario()), eq(1L), anyList(),
+                eq("产品周会"), anyString(), eq("查看會議詳情"),
+                eq("https://portal.example.com/#/meeting-view?token=abc"));
+        verify(dingTalkAppService, never()).sendWorkNotification(anyString(), anyLong(), anyList(),
+                anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("进行中的会：走 action_card，标题是会议名称，详情按钮指向免登链接")
+    void openMeetingUsesActionCardWithPublicLink() {
+        MeetingBooking booking = new MeetingBooking();
+        booking.setId(22L);
+        booking.setBookingNo("MT202610260001");
+        booking.setTitle("产品周会");
+        booking.setRoomName("产品会议室");
+        booking.setRoomLocation("珠海·A栋·21F");
+        booking.setOrganizerName("系統管理員");
+        booking.setStatus(MeetingConstants.STATUS_BOOKED);
+        booking.setStartTime(java.time.LocalDateTime.now().plusDays(1));
+        booking.setEndTime(booking.getStartTime().plusHours(1));
+        when(publicViewService.detailUrl(anyString(), any(MeetingBooking.class)))
+                .thenReturn("https://portal.example.com/#/meeting-view?token=abc");
+
+        MeetingNotifyDispatcher.MeetingCard card =
+                dispatcher.buildCard(booking, MeetingConstants.NOTIFY_EVT_CREATED, "https://portal.example.com");
+
+        org.junit.jupiter.api.Assertions.assertEquals("产品周会", card.title());
+        org.junit.jupiter.api.Assertions.assertTrue(card.body().contains("會議時間：**"),
+                "会议时间必须单独成段");
+        org.junit.jupiter.api.Assertions.assertFalse(card.body().contains("會議單號"),
+                "会议单号不再进卡片，避免挤占重点");
+        org.junit.jupiter.api.Assertions.assertEquals("查看會議詳情", card.buttonTitle());
+        org.junit.jupiter.api.Assertions.assertEquals("https://portal.example.com/#/meeting-view?token=abc",
+                card.buttonUrl());
+    }
+
+    @Test
+    @DisplayName("已取消的会：不挂按钮，正文说明已取消并带原因")
+    void cancelledMeetingHasNoButtonAndNoLink() {
+        MeetingBooking booking = new MeetingBooking();
+        booking.setId(22L);
+        booking.setTitle("产品周会");
+        booking.setRoomName("产品会议室");
+        booking.setOrganizerName("系統管理員");
+        booking.setStatus(MeetingConstants.STATUS_CANCELLED);
+        booking.setCancelReason("临时改期");
+        booking.setStartTime(java.time.LocalDateTime.now().plusDays(1));
+        booking.setEndTime(booking.getStartTime().plusHours(1));
+
+        MeetingNotifyDispatcher.MeetingCard card =
+                dispatcher.buildCard(booking, MeetingConstants.NOTIFY_EVT_CANCELLED, "https://portal.example.com");
+
+        org.junit.jupiter.api.Assertions.assertNull(card.buttonUrl(), "终态会议不得再给跳转入口");
+        org.junit.jupiter.api.Assertions.assertTrue(card.body().contains("本場會議已取消"), card.body());
+        org.junit.jupiter.api.Assertions.assertTrue(card.body().contains("臨时改期") || card.body().contains("临时改期"),
+                card.body());
+        org.junit.jupiter.api.Assertions.assertFalse(card.body().contains("會議室已被釋放"),
+                "取消不能复用释放模板，否则两个事实互相否定");
+        org.junit.jupiter.api.Assertions.assertFalse(card.body().contains("]("), "终态卡片不得留可点链接");
+        verify(publicViewService, never()).detailUrl(anyString(), any(MeetingBooking.class));
+    }
+
+    @Test
+    @DisplayName("已结束的会：同样不挂按钮，链接不生成")
+    void endedMeetingHasNoButton() {
+        MeetingBooking booking = new MeetingBooking();
+        booking.setId(22L);
+        booking.setTitle("产品周会");
+        booking.setRoomName("产品会议室");
+        booking.setOrganizerName("系統管理員");
+        booking.setStatus(MeetingConstants.STATUS_BOOKED);
+        booking.setStartTime(java.time.LocalDateTime.now().minusHours(2));
+        booking.setEndTime(java.time.LocalDateTime.now().minusHours(1));
+
+        MeetingNotifyDispatcher.MeetingCard card =
+                dispatcher.buildCard(booking, MeetingConstants.NOTIFY_EVT_CREATED, "https://portal.example.com");
+
+        org.junit.jupiter.api.Assertions.assertNull(card.buttonUrl());
+        verify(publicViewService, never()).detailUrl(anyString(), any(MeetingBooking.class));
     }
 }

@@ -12231,6 +12231,29 @@
     "windowBothOrBothEmpty": "每日可預約起止時間需一起填寫或一起清空",
     "windowEndAfterStart": "每日可預約結束時間必須晚於開始時間",
     "seriesCreatedSkipped": "已生成 {{count}} 場週期會議，{{skipped}} 人未綁定釘釘，首場邀約未送達",
+    "viewPage": {
+      "pageTitle": "會議詳情",
+      "missingToken": "缺少查看令牌，請從釘釘卡片重新進入",
+      "loadFailed": "會議詳情加載失敗",
+      "unableToOpen": "無法打開會議詳情",
+      "retry": "重試",
+      "linkUnavailable": "查看連結不可用",
+      "linkUnavailableDesc": "連結已過期，請向組織者重新索取",
+      "time": "會議時間",
+      "room": "會議室",
+      "organizer": "組織者",
+      "delegate": "實際使用人",
+      "agenda": "議程",
+      "joinOnline": "進入線上會議",
+      "cancelReason": "取消原因：{{reason}}",
+      "releaseReason": "釋放原因：{{reason}}",
+      "publicHint": "此連結免登查看，僅顯示會議公開資訊；轉發給他人同樣可打開",
+      "expireHint": "連結有效期至 {{time}}，逾期後請向組織者重新索取",
+      "closedCancelled": "這場會議已取消，無需到場",
+      "closedReleased": "這場會議的會議室已釋放",
+      "closedFinished": "這場會議已結束",
+      "closedEnded": "這場會議已結束，以下資訊僅供回看"
+    },
     "minutes": {
       "absentReasonPlaceholder": "缺席原因，選填",
       "absentees": "缺席 / 未到場人員",
@@ -13673,6 +13696,10 @@
       "hoursUnreported": "未填報 / {{plan}}h",
       "btnPrdPage": "PRD 頁面",
       "btnReportDone": "去上報完成"
+    },
+    "listDrill": {
+      "overdueFrom": "來自交付看板：{{source}}（僅已准入需求，與看板同口徑）",
+      "overdueLabel": "當前逾期"
     },
     "deliveryBoard": {
       "btnTeamLoad": "團隊負載",

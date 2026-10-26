@@ -304,4 +304,8 @@ public final class MeetingConstants {
     public static final String CFG_BLACKLIST_DAYS = "meeting_blacklist_days";
     /** 免登签到令牌的 HMAC 密钥（首次使用时懒生成，与领用签署密钥分开：换一把不该让另一类链接失效） */
     public static final String CFG_CHECKIN_TOKEN_SECRET = "meeting_checkin_token_secret";
+    /** 免登会议详情令牌的 HMAC 密钥（与签到/纪要分开：换一把不该让另一类链接同时失效） */
+    public static final String CFG_VIEW_TOKEN_SECRET = "meeting_view_token_secret";
+    /** 免登会议详情链接有效期（天）：会议结束后仍可回看，但不能无限期挂在网上 */
+    public static final int VIEW_LINK_TTL_DAYS = 30;
 }

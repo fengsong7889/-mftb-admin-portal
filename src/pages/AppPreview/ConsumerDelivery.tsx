@@ -7,7 +7,7 @@
  *
  * 说明：图片为 AI 占位图（src/assets/consumer-home/），文案暂硬编码繁中，待切图与 i18n 接入后替换。
  */
-import { useRef, useState } from 'react'
+import { useRef, useState, type KeyboardEvent } from 'react'
 import groupbuyHeroImg from '../../assets/consumer-home/groupbuy-hero.jpg'
 import bbqImg from '../../assets/consumer-home/bbq.jpg'
 import riceballImg from '../../assets/consumer-home/riceball.jpg'
@@ -35,6 +35,8 @@ const SERVICES = ['領券', '免配送', '免运費', '30分鐘', '可自取']
 /** 商家/商品卡：rail=左侧人气商家侧栏；products=商品缩略图；status=状态角标 */
 interface FeedCard {
   key: string
+  /** 对应搜索目录里的商家 id，整卡点击进店（店内提供店內搜尋） */
+  merchantId: string
   rail?: boolean
   name: string
   rating: string
@@ -49,7 +51,7 @@ interface FeedCard {
 }
 const FEED: FeedCard[] = [
   {
-    key: 'd1', rail: true, name: '招牌暴打檸檬茶', rating: '4.5', sold: '月售 1196', speed: '速送',
+    key: 'd1', merchantId: 'd-lemon', rail: true, name: '招牌暴打檸檬茶', rating: '4.5', sold: '月售 1196', speed: '速送',
     meta: '0配送費 · 30分鐘 · 2.5km', rank: '全澳西餐銷量第1名 · 私享好店',
     coupons: ['神會員 最高膨至$50', '125減50', '80減20'],
     products: [
@@ -59,13 +61,13 @@ const FEED: FeedCard[] = [
     ],
   },
   {
-    key: 'd2', name: '招牌暴打檸檬茶', rating: '4.5', sold: '月售 1196', speed: '速送',
+    key: 'd2', merchantId: 'd-lemon', name: '招牌暴打檸檬茶', rating: '4.5', sold: '月售 1196', speed: '速送',
     meta: '0配送費 · 30分鐘 · 2.5km',
     coupons: ['神會員 最高膨至$50', '80減20'],
     products: [{ key: 'p1', img: bbqImg, price: '$7.05起', origin: '$9.9', grab: true }],
   },
   {
-    key: 'd3', name: '麥當勞（威尼斯人店）', rating: '4.5', sold: '月售 1196', speed: '速送',
+    key: 'd3', merchantId: 'd-mcd', name: '麥當勞（威尼斯人店）', rating: '4.5', sold: '月售 1196', speed: '速送',
     meta: '0配送費 · 30分鐘 · 2.5km',
     coupons: ['神會員 最高膨至$50', '125減50', '80減20'],
     products: [
@@ -76,7 +78,7 @@ const FEED: FeedCard[] = [
     status: { text: '新店', tone: 'new' },
   },
   {
-    key: 'd4', rail: true, name: '招牌暴打檸檬茶', rating: '4.5', sold: '月售 1196', speed: '速送',
+    key: 'd4', merchantId: 'd-lemon', rail: true, name: '招牌暴打檸檬茶', rating: '4.5', sold: '月售 1196', speed: '速送',
     meta: '0配送費 · 30分鐘 · 2.5km', rank: '全澳西餐銷量第1名 · 私享好店',
     coupons: ['神會員 最高膨至$50', '125減50', '80減20'],
     products: [
@@ -86,14 +88,14 @@ const FEED: FeedCard[] = [
     ],
   },
   {
-    key: 'd5', name: '招牌暴打檸檬茶', rating: '4.5', sold: '月售 1196', speed: '速送',
+    key: 'd5', merchantId: 'd-lemon', name: '招牌暴打檸檬茶', rating: '4.5', sold: '月售 1196', speed: '速送',
     meta: '配沒$12 · 30分鐘 · 2.5km', rank: '爆單暫停接單',
     coupons: ['神會員 最高膨至$50', '125減50', '80減20'],
     products: [{ key: 'p1', img: lemonTeaImg, price: '$9.9起', origin: '$29.9', grab: true }],
     status: { text: '爆單暫停接單', tone: 'busy' },
   },
   {
-    key: 'd6', name: 'Organic Garden', rating: '4.5', sold: '月售 1196', speed: '速送',
+    key: 'd6', merchantId: 'd-organic', name: 'Organic Garden', rating: '4.5', sold: '月售 1196', speed: '速送',
     meta: '0配送費 · 30分鐘 · 2.5km',
     coupons: ['神會員 最高膨至$50', '125減50', '80減20'],
     products: [
@@ -104,7 +106,7 @@ const FEED: FeedCard[] = [
     note: '「親愛的用戶，商家目前已休息，可預約明日配送」',
   },
   {
-    key: 'd7', name: '招牌暴打檸檬茶', rating: '4.5', sold: '月售 1196', speed: '速送',
+    key: 'd7', merchantId: 'd-lemon', name: '招牌暴打檸檬茶', rating: '4.5', sold: '月售 1196', speed: '速送',
     meta: '0配送費 · 30分鐘 · 2.5km', rank: '威記斯新門口店',
     coupons: ['神會員 最高膨至$50', '125減50', '80減20'],
     products: [],
@@ -123,7 +125,15 @@ const BOTTOM_TABS = [
 
 const HOT_WORDS = ['小龍蝦', '珍珠奶茶', '叉燒', '海南雞飯', '螺螄粉', '漢堡', '甜點', '火鍋']
 
-export default function ConsumerDelivery({ onBack }: { onBack: () => void }) {
+export default function ConsumerDelivery({
+  onBack,
+  onSearch,
+  onOpenStore,
+}: {
+  onBack: () => void
+  onSearch: (keyword?: string) => void
+  onOpenStore?: (merchantId: string) => void
+}) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const [scrolled, setScrolled] = useState(false)
 
@@ -133,6 +143,15 @@ export default function ConsumerDelivery({ onBack }: { onBack: () => void }) {
     if (!el) return
     const next = el.scrollTop > 36
     setScrolled((prev) => (prev === next ? prev : next))
+  }
+
+  /** 键盘可达：原型里整卡是进店入口，Enter/Space 与点击等价 */
+  const handleCardKey = (event: KeyboardEvent<HTMLDivElement>, merchantId: string) => {
+    if (!onOpenStore) return
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onOpenStore(merchantId)
+    }
   }
 
   return (
@@ -149,11 +168,11 @@ export default function ConsumerDelivery({ onBack }: { onBack: () => void }) {
           {scrolled && (
             <button type="button" className="apg-back apd-back-inline" onClick={onBack} aria-label="返回">‹</button>
           )}
-          <div className="apd-searchrow">
+          <button type="button" className="apd-searchrow" onClick={() => onSearch()}>
             <span className="apc-search-ico" aria-hidden="true">🔍</span>
             <span className="apg-hot">太二酸菜鱼</span>
             <span className="apd-search-btn">搜索</span>
-          </div>
+          </button>
           {scrolled && (
             <span className="apd-header-loc"><span aria-hidden="true">📍</span><i>威尼斯人A座</i></span>
           )}
@@ -161,7 +180,7 @@ export default function ConsumerDelivery({ onBack }: { onBack: () => void }) {
 
         <div className="apd-header-chips">
           {HOT_WORDS.map((w) => (
-            <span key={w} className="apd-hot-chip">{w}</span>
+            <button key={w} type="button" className="apd-hot-chip" onClick={() => onSearch(w)}>{w}</button>
           ))}
         </div>
       </div>
@@ -230,7 +249,15 @@ export default function ConsumerDelivery({ onBack }: { onBack: () => void }) {
         {/* 商家/商品瀑布流 */}
         <div className="apd-list">
           {FEED.map((m) => (
-            <div key={m.key} className="apd-card">
+            <div
+              key={m.key}
+              className={`apd-card${onOpenStore ? ' is-clickable' : ''}`}
+              role={onOpenStore ? 'button' : undefined}
+              tabIndex={onOpenStore ? 0 : undefined}
+              aria-label={onOpenStore ? `進入店鋪：${m.name}` : undefined}
+              onClick={onOpenStore ? () => onOpenStore(m.merchantId) : undefined}
+              onKeyDown={onOpenStore ? (event) => handleCardKey(event, m.merchantId) : undefined}
+            >
               {m.rail && (
                 <div className="apd-rail">
                   <span className="apd-rail-emoji" aria-hidden="true">🐝</span>

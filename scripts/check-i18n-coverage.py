@@ -35,10 +35,11 @@ ALL_LANGS = ['zh-TW', 'en', 'ja', 'ko', 'ru']
 # 域定义：目录 + 该域自有命名空间（common 等公共 ns 单独放行，任何域都可引用）
 DOMAINS = {
     'meeting': {
-        'dirs': ['src/pages/MeetingManagement', 'src/pages/MeetingCheckin'],
+        'dirs': ['src/pages/MeetingManagement', 'src/pages/MeetingCheckin', 'src/pages/MeetingView'],
         'namespaces': ['meeting'],
-        # 免登签到页是扫码直达的公开页，页面说明文案与后台文案同属该域
-        'files_extra': ['src/pages/Home/TodayMeetingCard.tsx', 'src/api/meeting.ts', 'src/api/meetingCheckinPage.ts'],
+        # 免登签到/纪要/详情页是钉钉卡片直达的公开页，页面说明文案与后台文案同属该域
+        'files_extra': ['src/pages/Home/TodayMeetingCard.tsx', 'src/api/meeting.ts', 'src/api/meetingCheckinPage.ts',
+                        'src/api/meetingViewPage.ts'],
     },
     'attendance': {
         'dirs': ['src/pages/Attendance'],

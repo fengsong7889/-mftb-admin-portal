@@ -13,6 +13,7 @@ import {
   isBusinessSystemCode,
 } from '../hooks/useCurrentSystem'
 import { useSystemNavigation } from '../hooks/useSystemNavigation'
+import { useTranslationRevision } from '../hooks/useTranslationRevision'
 import type { MenuVO } from '../api/menu'
 import { fetchPortalContext, type PortalSystem } from '../api/portal'
 import { getBrandTitle, getPortalSystemKey, PORTAL_SYSTEM_ICONS } from '../constants/portalSystems'
@@ -803,6 +804,8 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   const { t, i18n: i18nInstance } = useTranslation()
   const { hasMenuPermission } = useAuth()
   const { menuTree, status: menuStatus } = useMenu()
+  /** 語言包異步注入完成後重算菜單名：否則同一次刷新內會出現兩套命名 */
+  const translationRevision = useTranslationRevision()
   const { currentSystemCode, setCurrentSystemCode } = useCurrentSystem()
   // Round 6：锁到业务系统时优先拉服务端剪枝导航（与后端 strict-mode 同源）；
   // 未锁 / 接口失败 → 降级到旧的全量 menuTree 客户端过滤，不阻断入口。
@@ -884,7 +887,10 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         .map((node) => buildOfflineMenuItem(node))
         .filter((item): item is MenuItem => item !== null)
     return withSystemHome(filterMenusByPermission(items, hasMenuPermission))
-  }, [menuTree, hasMenuPermission, i18nInstance.language, currentSystemCode, systemNavigation.tree, systemNavigation.loaded])
+    // translateMenuName 内部读 i18n.language，ESLint 看不到这层依赖；
+    // translationRevision 是语言包异步注入后的重算触发器，二者都必须保留（删了会回到「刷新出两套菜单名」）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menuTree, hasMenuPermission, i18nInstance.language, translationRevision, currentSystemCode, systemNavigation.tree, systemNavigation.loaded])
 
   /** 訂單列表 / 訂單詳情按來源歸屬菜單（from=ad-sales 歸屬「廣告銷售」，否則歸屬「店鋪推廣」）；
    *  與 currentSystemCode 反查共用同一個判定入口，避免高亮與系統歸屬口徑分裂。

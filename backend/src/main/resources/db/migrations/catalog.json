@@ -2706,6 +2706,21 @@
       "comment": "与 v1.0 共用同一个执行器（而不是另开一个 @Order(29) 的类）：新表的两个外键指向 biz_meeting_minutes，两个同序号 Bean 在全新库上的执行顺序不确定，可能先建子表而 1215 失败。事项从 content_json 搬到独立表，是因为它要按行更新状态、按行扫描逾期、按行去重提醒——JSON 只能整行覆盖，两个人同时更新必互相抹掉；唯一键 (minutes_id, kind, seq) 让保存成为“按位置 upsert”：组织者改措辞不会把负责人已填的处理结果清掉。关联表存 booking_no/title/time_text 快照而不是只存 id：被引用的纪要改期改名后，引用方仍要能说清“引自哪场会”。模板与开关分表：模板回答“怎么写”、开关回答“发不发”，使用者常常不是同一个人，合成一行会互相覆盖。模板只做 ${var} 字面替换，不引入模板引擎（配置页不应成为可执行逻辑入口）。历史事项回填只处理“该纪要还没有任何事项行”的行，且状态统一 pending：旧数据没有进度，凭空造一个“已完成”比空着更危险。菜单写入用“存在则不动”：管理员改过的名称/排序不能被每次启动重置。"
     },
     {
+      "versionKey": "meeting:minutes:v1.2",
+      "module": "meeting",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "meetingMinutesSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "meeting:minutes:v1.1"
+      ],
+      "intent": "会议通知卡片版式重排：标题改为会议名称、会议时间只写开始时间、会议室只写名称，正文按字段分段；邀约链接改为免登详情页",
+      "author": "Qoder",
+      "ticket": "meeting-notify-card-v2",
+      "comment": "v1.1 的模板种子只在 INSERT 时生效，已跑过的库不会重读 268 脚本，只改脚本等于线上永远还是旧文案，因此用独立版本键做 UPDATE。UPDATE 只命中 updated_by='meeting-v2' 的行（即保持出厂文案的），管理员在「通知模板」页改过的措辞不会被打回。钉钉 markdown 会把连续单换行归并成一段，所以每个字段之间必须留空行；旧模板末尾写死的 [查看會議詳情](${viewUrl}) 由投递层统一摘除，链接改由 action_card 按钮承载，避免同一张卡片两个入口。后置校验：不得残留 updated_by='meeting-v2' 的同场景模板，否则说明 UPDATE 未命中。"
+    },
+    {
       "versionKey": "rdm:schema:v3.20",
       "module": "rdm",
       "phase": "MODULE_STRUCTURE",

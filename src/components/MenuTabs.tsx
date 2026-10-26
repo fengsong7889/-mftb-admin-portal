@@ -9,6 +9,7 @@ import { isPathBackendConnected } from '../constants/menuDataSource'
 import { useMenu } from '../contexts/MenuContext'
 import { useConfirmLeave } from '../contexts/UnsavedChangesContext'
 import { useAuth } from '../contexts/AuthContext'
+import { useTranslationRevision } from '../hooks/useTranslationRevision'
 import { ROUTE_MENU_KEY_MAP } from '../pages/Permission/types'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
@@ -496,6 +497,8 @@ export default function MenuTabs() {
   const navigate = useNavigate()
   const { i18n: i18nInstance, t } = useTranslation()
   const { menuTree, status: menuStatus } = useMenu()
+  /** 語言包異步注入完成後重算頁簽名：否則同一次刷新內會出現兩套命名 */
+  const translationRevision = useTranslationRevision()
   /** 关闭/切换页签前先问未保存页面：返回 false 表示用户选择继续编辑 */
   const confirmLeave = useConfirmLeave()
   const { hasMenuPermission } = useAuth()
@@ -637,7 +640,7 @@ export default function MenuTabs() {
       ...tab,
       title: tab.path === '/' ? HOME_TAB.title : getMenuName(tab.fullPath ?? tab.path),
     })))
-  }, [i18nInstance.language, getMenuName])
+  }, [i18nInstance.language, translationRevision, getMenuName])
 
   /** 点击标签：导航到对应路径（离开当前页前先过未保存保护） */
   const handleTabClick = useCallback(async (path: string) => {

@@ -1,6 +1,7 @@
 package com.mftb.admin.service;
 
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.constant.RdmConstants;
 import com.mftb.admin.dto.RdmConfigVO;
 import com.mftb.admin.dto.RdmDashboardVO;
 import com.mftb.admin.dto.RdmQualityVO;
@@ -578,7 +579,13 @@ public class RdmAnalyticsService {
                         "SELECT COUNT(*) AS req_total, "
                                 + " SUM(CASE WHEN submit_time >= DATE_SUB(NOW(), INTERVAL " + periodDays + " DAY) THEN 1 ELSE 0 END) AS submitted, "
                                 + " SUM(CASE WHEN actual_release_date >= DATE_SUB(CURDATE(), INTERVAL " + periodDays + " DAY) THEN 1 ELSE 0 END) AS delivered, "
-                                + " SUM(CASE WHEN overdue_flag = 1 THEN 1 ELSE 0 END) AS overdue_total, "
+                                // 「當前逾期」必須與治理側「全部」同口徑，否則不可下鑽：
+                                // 原寫法只數 overdue_flag=1，把准入前（草稿/待審批/審批駁回）也算進去，
+                                // 而 scope=all 的列表看不到這三態 —— 看板顯示 96 條、點進去只有 60 條，
+                                // 用戶會判定系統丟數。下鑽地址 /rdm-intake?scope=all&overdue=1 復現同一批行。
+                                + " SUM(CASE WHEN overdue_flag = 1 AND status NOT IN ('"
+                                + RdmConstants.STATUS_DRAFT + "','" + RdmConstants.STATUS_INTAKE_PENDING
+                                + "','" + RdmConstants.STATUS_INTAKE_REJECTED + "') THEN 1 ELSE 0 END) AS overdue_total, "
                                 + " SUM(CASE WHEN blocked_flag = 1 THEN 1 ELSE 0 END) AS blocked_total, "
                                 + " SUM(CASE WHEN status = 'pool' THEN 1 ELSE 0 END) AS unassigned_total, "
                                 + " SUM(CASE WHEN status = 'intake_pending' THEN 1 ELSE 0 END) AS intake_stuck_total, "

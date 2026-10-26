@@ -390,4 +390,43 @@ public final class MeetingBookingDto {
         private PageResult<VO> page;
         private Stats stats;
     }
+
+    /**
+     * 免登会议详情页视图（令牌鉴权，无 JWT）。
+     *
+     * <p>字段刻意窄：只给"这场会是什么、现在是什么状态"。参会人名单/手机号/投递明细/
+     * 审计轨迹一律不在此视图里——免登链接可被转发，每一个字段的暴露都不受登录态保护。
+     * <p>{@code closed} 为真表示会议已取消/释放/结束：页面只能回看，不提供任何动作入口。
+     */
+    @Data
+    public static class PublicView {
+        /** 令牌是否有效（无效时只给结论与提示语，不说明是签名错还是过期） */
+        private Boolean valid;
+        private String message;
+        private Long bookingId;
+        private String bookingNo;
+        private String title;
+        private String status;
+        /** 派生展示态：pending/ongoing/ended/finished/cancelled/released */
+        private String phase;
+        /** 状态中文文案（服务端给，公开页不依赖后台 i18n 词典） */
+        private String statusText;
+        /** 已取消/已释放/已结束：页面不提供任何动作入口 */
+        private Boolean closed;
+        private String startTime;
+        private String endTime;
+        private String timeText;
+        private String roomName;
+        private String roomLocation;
+        private String organizerName;
+        private String delegateForName;
+        private String description;
+        private String onlineMeetingUrl;
+        /** 被取消的原因（仅 cancelled 时有值） */
+        private String cancelReason;
+        /** 被释放的原因（仅 released 时有值） */
+        private String releaseReason;
+        /** 令牌过期时刻（页面尾部提示） */
+        private String tokenExpireAt;
+    }
 }

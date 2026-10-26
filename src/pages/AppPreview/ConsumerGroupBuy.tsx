@@ -7,7 +7,7 @@
  *
  * 说明：图片为 AI 占位图（src/assets/consumer-home/），文案暂硬编码繁中，待切图与 i18n 接入后替换。
  */
-import { useRef, useState } from 'react'
+import { useRef, useState, type KeyboardEvent } from 'react'
 import groupbuyHeroImg from '../../assets/consumer-home/groupbuy-hero.jpg'
 import bbqImg from '../../assets/consumer-home/bbq.jpg'
 import riceballImg from '../../assets/consumer-home/riceball.jpg'
@@ -61,7 +61,15 @@ const PRODUCTS = [
   { key: 'p5', title: 'Pizza Lab西塔烤肉 | 甄選2人泥爐烤肉特惠套餐字太多點點貼...', img: bbqImg, sold: '半年售650', tag: '自定餐自定', price: '18.8', origin: '688.8', save: '帳值超77% 賺$20', dist: '1.5km 黑沙環', shop: 'Pizza Lab西塔烤肉（威尼斯人...）' },
 ]
 
-export default function ConsumerGroupBuy({ onBack }: { onBack: () => void }) {
+export default function ConsumerGroupBuy({
+  onBack,
+  onSearch,
+  onOpenStore,
+}: {
+  onBack: () => void
+  onSearch: () => void
+  onOpenStore?: (merchantId: string) => void
+}) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const [scrolled, setScrolled] = useState(false)
   const [filter, setFilter] = useState('特價')
@@ -72,6 +80,17 @@ export default function ConsumerGroupBuy({ onBack }: { onBack: () => void }) {
     if (!el) return
     const next = el.scrollTop > 36
     setScrolled((prev) => (prev === next ? prev : next))
+  }
+
+  const openStore = (merchantId: string) => () => onOpenStore?.(merchantId)
+
+  /** 整条团购商品是进店入口，Enter/Space 与点击等价 */
+  const handleItemKey = (event: KeyboardEvent<HTMLDivElement>, merchantId: string) => {
+    if (!onOpenStore) return
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onOpenStore(merchantId)
+    }
   }
 
   return (
@@ -89,12 +108,12 @@ export default function ConsumerGroupBuy({ onBack }: { onBack: () => void }) {
           {scrolled && (
             <button type="button" className="apg-back apg-back-inline" onClick={onBack} aria-label="返回">‹</button>
           )}
-          <div className="apg-searchrow">
+          <button type="button" className="apg-searchrow" onClick={onSearch}>
             <span className="apc-search-ico" aria-hidden="true">🔍</span>
             <span className="apg-hot">熱搜：滾動字體後台傳</span>
             <span className="apg-search-btn">搜索</span>
             <span className="apg-order-btn">訂單</span>
-          </div>
+          </button>
           {scrolled && (
             <span className="apg-header-loc"><span aria-hidden="true">📍</span><i>威尼斯人A座</i></span>
           )}
@@ -147,7 +166,7 @@ export default function ConsumerGroupBuy({ onBack }: { onBack: () => void }) {
           </header>
           <div className="apc-hscroll">
             {SMALL_ROW.map((it) => (
-              <button key={it.key} type="button" className="apc-hcard">
+              <button key={it.key} type="button" className="apc-hcard" onClick={openStore('g-pizza')}>
                 <img className="apc-thumb" src={it.img} alt={it.title} />
                 <span className="apc-hcard-title">{it.title}</span>
                 <span className="apg-price-origin">
@@ -168,7 +187,7 @@ export default function ConsumerGroupBuy({ onBack }: { onBack: () => void }) {
                 <span className="apc-sec-sub">低至3折</span>
               </header>
               {KFC_COL.map((it) => (
-                <button key={`${col}-${it.key}`} type="button" className="apc-gcard">
+                <button key={`${col}-${it.key}`} type="button" className="apc-gcard" onClick={openStore('g-kfc')}>
                   <span className="apg-gcard-kfc">
                     <img className="apg-gcard-img" src={it.img} alt={it.title} />
                     <span className="apg-gcard-info">
@@ -225,7 +244,15 @@ export default function ConsumerGroupBuy({ onBack }: { onBack: () => void }) {
         {/* 竖向商品列表 */}
         <div className="apg-list">
           {PRODUCTS.map((p) => (
-            <div key={p.key} className={`apg-item${p.hot ? ' is-hot' : ''}`}>
+            <div
+              key={p.key}
+              className={`apg-item${p.hot ? ' is-hot' : ''}${onOpenStore ? ' is-clickable' : ''}`}
+              role={onOpenStore ? 'button' : undefined}
+              tabIndex={onOpenStore ? 0 : undefined}
+              aria-label={onOpenStore ? `進入店鋪：${p.shop}` : undefined}
+              onClick={onOpenStore ? openStore('g-pizza') : undefined}
+              onKeyDown={onOpenStore ? (event) => handleItemKey(event, 'g-pizza') : undefined}
+            >
               <img className="apg-item-img" src={p.img} alt="" />
               <div className="apg-item-main">
                 <div className="apg-item-title">{p.title}</div>

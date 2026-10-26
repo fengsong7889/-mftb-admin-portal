@@ -65,6 +65,7 @@ const COUPONS = [
 /** 瀑布流商品卡 */
 interface FeedItem {
   key: string
+  merchantId: string
   channel: string
   dist: string
   time: string
@@ -80,13 +81,25 @@ interface FeedItem {
   fresh?: boolean
 }
 const FEED: FeedItem[] = [
-  { key: 'f1', channel: '外賣', dist: '1.2km', time: '20分鐘', title: '門店名太二酸菜魚（澳門店）', rating: '4.5', tags: ['等送', '可自取'], promo: ['特價券', '88折'], price: '198', origin: '125', off: '50', img: lemonTeaImg },
-  { key: 'f2', channel: '外賣', dist: '1.2km', time: '20分鐘', title: '門店名太二酸菜魚（葡京店）', rating: '4.5', tags: ['等送', '可自取'], promo: ['特價券', '88折'], price: '198', origin: '125', off: '50', img: burgerImg, hot: true },
-  { key: 'f3', channel: '外賣', dist: '1.2km', time: '20分鐘', title: '門店名太二酸菜魚（氹仔店）', rating: '4.5', tags: ['等送', '可自取'], promo: ['特價券', '88折'], price: '198', origin: '125', off: '50', img: fishPotImg },
-  { key: 'f4', channel: '外賣', dist: '1.2km', time: '20分鐘', title: '門店名太二酸菜魚（黑沙環店）', rating: '4.5', tags: ['等送', '可自取'], promo: ['特價券', '88折'], price: '198', origin: '125', off: '50', img: friedChickenImg, fresh: true },
+  { key: 'f1', merchantId: 'd-tai2', channel: '外賣', dist: '1.2km', time: '20分鐘', title: '門店名太二酸菜魚（澳門店）', rating: '4.5', tags: ['等送', '可自取'], promo: ['特價券', '88折'], price: '198', origin: '125', off: '50', img: lemonTeaImg },
+  { key: 'f2', merchantId: 'd-hotpot', channel: '外賣', dist: '1.2km', time: '20分鐘', title: '門店名太二酸菜魚（葡京店）', rating: '4.5', tags: ['等送', '可自取'], promo: ['特價券', '88折'], price: '198', origin: '125', off: '50', img: burgerImg, hot: true },
+  { key: 'f3', merchantId: 'd-sushi', channel: '外賣', dist: '1.2km', time: '20分鐘', title: '門店名太二酸菜魚（氹仔店）', rating: '4.5', tags: ['等送', '可自取'], promo: ['特價券', '88折'], price: '198', origin: '125', off: '50', img: fishPotImg },
+  { key: 'f4', merchantId: 'd-mcd', channel: '外賣', dist: '1.2km', time: '20分鐘', title: '門店名太二酸菜魚（黑沙環店）', rating: '4.5', tags: ['等送', '可自取'], promo: ['特價券', '88折'], price: '198', origin: '125', off: '50', img: friedChickenImg, fresh: true },
 ]
 
-export default function ConsumerHome({ onOpenGroupBuy, onOpenDelivery }: { onOpenGroupBuy?: () => void; onOpenDelivery?: () => void }) {
+export default function ConsumerHome({
+  onOpenGroupBuy,
+  onOpenDelivery,
+  onOpenMarket,
+  onSearch,
+  onOpenStore,
+}: {
+  onOpenGroupBuy?: () => void
+  onOpenDelivery?: () => void
+  onOpenMarket?: () => void
+  onSearch?: () => void
+  onOpenStore?: (merchantId: string) => void
+}) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const [cat, setCat] = useState('美食外賣')
   const [scrolled, setScrolled] = useState(false)
@@ -104,11 +117,11 @@ export default function ConsumerHome({ onOpenGroupBuy, onOpenDelivery }: { onOpe
       {/* 吸顶搜索（滚动后仅保留搜索行，定位并入其右侧） */}
       <div className={`apc-header${scrolled ? ' is-scrolled' : ''}`}>
         <div className="apc-header-search">
-          <div className="apc-search">
+          <button type="button" className="apc-search" onClick={onSearch}>
             <span className="apc-search-ico" aria-hidden="true">🔍</span>
-            <span className="apc-search-ph">招牌烏冬面</span>
+            <span className="apc-search-ph">搜尋商家、商品、團購</span>
             <span className="apc-search-btn">搜索</span>
-          </div>
+          </button>
           {scrolled && (
             <span className="apc-header-loc"><span aria-hidden="true">📍</span><i>澳門新八佰伴</i></span>
           )}
@@ -149,7 +162,7 @@ export default function ConsumerHome({ onOpenGroupBuy, onOpenDelivery }: { onOpe
               type="button"
               className="apc-tile apc-tile-sm"
               style={{ background: tl.bg }}
-              onClick={tl.key === 'group' ? onOpenGroupBuy : undefined}
+              onClick={tl.key === 'group' ? onOpenGroupBuy : tl.key === 'market' ? onOpenMarket : undefined}
             >
               <span className="apc-tile-badge">{tl.badge}</span>
               <span className="apc-tile-title">{tl.title}</span>
@@ -196,7 +209,7 @@ export default function ConsumerHome({ onOpenGroupBuy, onOpenDelivery }: { onOpe
         </header>
         <div className="apc-hscroll">
           {ONE_PRICE.map((it) => (
-            <button key={it.key} type="button" className="apc-hcard">
+            <button key={it.key} type="button" className="apc-hcard" onClick={() => onOpenStore?.('d-rice')}>
               <img className="apc-thumb" src={it.img} alt={it.title} />
               <span className="apc-hcard-title">{it.title}</span>
               <span className="apc-price"><i>¥</i>{it.price}<em>起</em></span>
@@ -213,7 +226,7 @@ export default function ConsumerHome({ onOpenGroupBuy, onOpenDelivery }: { onOpe
         </header>
         <div className="apc-grid2">
           {GRID_ITEMS.map((it) => (
-            <button key={it.key} type="button" className="apc-gcard">
+            <button key={it.key} type="button" className="apc-gcard" onClick={() => onOpenStore?.('d-kfc')}>
               <span className="apc-gcard-badge">{it.badge}</span>
               <img className="apc-thumb apc-thumb-lg" src={it.img} alt={it.title} />
               <span className="apc-gcard-title">{it.title}</span>
@@ -248,7 +261,7 @@ export default function ConsumerHome({ onOpenGroupBuy, onOpenDelivery }: { onOpe
       {/* 瀑布流商品 */}
       <div className="apc-feed">
         {FEED.map((it) => (
-          <button key={it.key} type="button" className="apc-fcard">
+          <button key={it.key} type="button" className="apc-fcard" onClick={() => onOpenStore?.(it.merchantId)}>
             <span className="apc-fcard-img">
               <img className="apc-fcard-photo" src={it.img} alt={it.title} />
               {it.hot && <span className="apc-rim apc-rim-hot">🔥HOT</span>}
@@ -275,7 +288,7 @@ export default function ConsumerHome({ onOpenGroupBuy, onOpenDelivery }: { onOpe
       </div>
 
       {/* 進入外賣頻道 */}
-      <button type="button" className="apc-channel-btn">進入外賣頻道</button>
+      <button type="button" className="apc-channel-btn" onClick={onOpenDelivery}>進入外賣頻道</button>
       </div>
     </>
   )

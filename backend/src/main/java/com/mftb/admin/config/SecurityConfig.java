@@ -65,6 +65,10 @@ public class SecurityConfig {
             "/api/meeting/minutes-page/**",
             "/api/public/meeting-minutes",
             "/api/public/meeting-minutes/**",
+            // 会议详情免登查看页（钉钉邀约卡片直达）：令牌绑「会议 + 到期」，HMAC 验签，
+            // 服务层仍要查会议单；输出不含参会人名单、手机号与投递明细
+            "/api/public/meeting-view",
+            "/api/public/meeting-view/**",
             // 进度日报看板开放页（钉钉通知直达）：令牌绑快照范围 + 有效期，HMAC 验签，
             // 服务层仍要查快照表；白名单只解决「没有 JWT 也能访问」，不等于放行
             "/api/public/rdm-daily-view",

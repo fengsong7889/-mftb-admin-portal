@@ -344,6 +344,14 @@ export default function RequirementList({
    */
   const drillStatuses = searchParams.get('statuses')?.trim() ?? ''
   const drillSource = searchParams.get('src')?.trim() ?? ''
+  /**
+   * 逾期下钻（来自交付看板「當前逾期」卡片）：URL 上 ?overdue=1。
+   * <p>口径必须与卡片一致：已准入（scope=all 已排除草稿/待審批/審批駁回）+ overdue_flag=1，含待分配。
+   * 落地页因此不能用执行侧地板（executionOnly），否则待分配的逾期行会凭空少掉。
+   */
+  const drillOverdue = searchParams.get('overdue') === '1'
+  /** 记录逾期勾选是否由下钻带入：地址上的参数消失时要一并清掉，否则筛选会悄悄留在页面上 */
+  const overdueFromDrillRef = useRef(false)
 
   const [rows, setRows] = useState<RdmRequirementRow[]>([])
   const [total, setTotal] = useState(0)
@@ -366,13 +374,15 @@ export default function RequirementList({
   const [backfillSaving, setBackfillSaving] = useState(false)
   const [filters, setFilters] = useState<RequirementFilters>(() => {
     const base = { ...(initialScene?.filters ?? {}) }
-    // 历史快照可能存过 statuses（旧版缓存）；下钻条件只认 URL，不从缓存继承
+    // 历史快照可能存过 statuses / overdueOnly（旧版缓存）；下钻条件只认 URL，不从缓存继承
     delete base.statuses
+    delete base.overdueOnly
     /*
-     * 看板列下钻的条件在 URL 上，优先级高于上次会话快照：
-     * 用户刚从看板某一列点进来，要看的就是这一列，不能被上次的筛选盖掉。
+     * 看板下钻的条件在 URL 上，优先级高于上次会话快照：
+     * 用户刚从看板某一列 / 某张卡点进来，要看的就是这一批，不能被上次的筛选盖掉。
      */
-    return drillStatuses ? { ...base, statuses: drillStatuses } : base
+    const withStatuses = drillStatuses ? { ...base, statuses: drillStatuses } : base
+    return drillOverdue ? { ...withStatuses, overdueOnly: true } : withStatuses
   })
 
   /**
@@ -384,11 +394,13 @@ export default function RequirementList({
     setFilters(prev => {
       const rest = { ...prev }
       delete rest.statuses
+      delete rest.overdueOnly
       return rest
     })
     setPage(1)
     const next = new URLSearchParams(searchParams)
     next.delete('statuses')
+    next.delete('overdue')
     next.delete('src')
     setSearchParams(next, { replace: true })
   }, [searchParams, setSearchParams])
@@ -400,16 +412,37 @@ export default function RequirementList({
    */
   useEffect(() => {
     setFilters(prev => {
-      if ((prev.statuses ?? '') === drillStatuses) return prev
       const next = { ...prev }
-      if (drillStatuses) {
-        next.statuses = drillStatuses
-      } else {
-        delete next.statuses
+      let changed = false
+      if ((prev.statuses ?? '') !== drillStatuses) {
+        if (drillStatuses) {
+          next.statuses = drillStatuses
+        } else {
+          delete next.statuses
+        }
+        changed = true
       }
-      return next
+      /*
+       * 逾期下钻只「加」不「减」：地址上还有 overdue=1 时把勾选补回来；
+       * 用户在搜索区手动取消勾选不改变 URL，这里不能反复把勾选盖回去。
+       */
+      if (drillOverdue) {
+        overdueFromDrillRef.current = true
+        if (!prev.overdueOnly) {
+          next.overdueOnly = true
+          changed = true
+        }
+      } else if (overdueFromDrillRef.current) {
+        // 从下钻地址回到菜单裸地址：清掉下钻带的勾选，不能留下一个看不见的过滤条件
+        overdueFromDrillRef.current = false
+        if (prev.overdueOnly) {
+          delete next.overdueOnly
+          changed = true
+        }
+      }
+      return changed ? next : prev
     })
-  }, [drillStatuses])
+  }, [drillStatuses, drillOverdue])
 
   /** 场景写回 + 滚动还原：数据就绪后才滚，避免表格还没撑开就滚到 0 */
   /**
@@ -420,6 +453,8 @@ export default function RequirementList({
   const sceneFilters = useMemo(() => {
     const rest = { ...filters }
     delete rest.statuses
+    // 同理：逾期勾选也属于跨页面的临时下钻条件，不能写进会话快照
+    delete rest.overdueOnly
     return rest
   }, [filters])
   useRdmListScene(sceneKey, { page, size, filters: sceneFilters }, location.pathname, sceneOwner)
@@ -1384,6 +1419,20 @@ export default function RequirementList({
               >
                 來自交付流水線：{drillSource || '看板列'}
                 （{(filters.statuses ?? '').split(',').filter(Boolean).length} 個狀態，統計卡與列表同口徑）
+              </Tag>
+            </div>
+          )}
+
+          {/* 逾期下钻条件：与看板卡片同口径（已准入 + overdue_flag=1，含待分配）。
+              过滤不可见会让人把「这一批」当成全量，所以必须显式标注并可一键清除 */}
+          {drillOverdue && filters.overdueOnly && (
+            <div style={{ marginBottom: 12 }}>
+              <Tag
+                color="error"
+                closable
+                onClose={e => { e.preventDefault(); clearDrillFilter() }}
+              >
+                {t('rdm.listDrill.overdueFrom', { source: drillSource || t('rdm.listDrill.overdueLabel') })}
               </Tag>
             </div>
           )}

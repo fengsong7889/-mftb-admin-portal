@@ -161,16 +161,39 @@ describe('团购瀑布流表单和路由往返', () => {
     await selectOption(document.querySelector('#app')!, '閃蜂')
     await waitFor(() => expect(document.querySelector('#app')!.closest('.ant-select')).toHaveTextContent('閃蜂'))
     await selectOption(screen.getByLabelText('展示類目'), '自定義')
-    expect(screen.getByRole('radio', { name: '銷量排序' })).toBeInTheDocument()
+    // 整体排序模块已下线，不再渲染排序选项
+    expect(screen.queryByText('整體排序')).not.toBeInTheDocument()
+    // 自定义模式只允许固定展示内容，不提供分类兜底
+    expect(screen.getByText(zh.promotionSlotConfig.fixedDisplayContent)).toBeInTheDocument()
+    expect(screen.queryByLabelText(zh.promotionSlotConfig.categoryFallback)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('radio', { name: '商品' }))
-    expect(screen.getByRole('radio', { name: '近30天銷量排序' })).toBeInTheDocument()
+    expect(screen.getAllByText(zh.promotionSlotConfig.colProduct).length).toBeGreaterThan(0)
+    expect(screen.queryByText(zh.promotionSlotConfig.colStore)).not.toBeInTheDocument()
+  }, 60000)
+
+  it('门店类目模式只允许选择分类，不展示固定展示内容配置', async () => {
+    const draft = { ...emptyDraft('groupBuy', 'flashBee'), key: 'new_groupBuy_category', strategyName: '驗證門店類目', displayCategoryMode: 'category' as const }
+    writeDraft(draft)
+    renderForm('/promotion-slot-config-add?biz=groupBuy&draftKey=new_groupBuy_category')
+    await screen.findByDisplayValue('驗證門店類目')
+    // 门店类目：分类兜底必填且可多选
+    expect(screen.getByRole('combobox', { name: zh.promotionSlotConfig.categoryFallback })).toBeInTheDocument()
+    expect(screen.getByText(zh.promotionSlotConfig.requiredFallback)).toBeInTheDocument()
+    // 不支持固定展示内容：无导入、模板下载与新增/编辑入口
+    expect(screen.queryByText(zh.promotionSlotConfig.fixedDisplayContent)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /批量導入/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /新增\/編輯/ })).not.toBeInTheDocument()
+    expect(screen.queryByText('整體排序')).not.toBeInTheDocument()
+    // 门店类目模式不展示手机模型
+    expect(screen.queryByText('預覽')).not.toBeInTheDocument()
   }, 60000)
 
   it('导入仅在主表单；独立编辑只搜索和分配位置，两次返回保留全部配置', async () => {
     customDraft()
     renderForm('/promotion-slot-config-add?biz=groupBuy&draftKey=new_groupBuy_test')
     expect(await screen.findByRole('button', { name: /批量導入/ })).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: '距離排序' })).toBeChecked()
+    expect(screen.queryByText('整體排序')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(zh.promotionSlotConfig.categoryFallback)).not.toBeInTheDocument()
     for (const [id, pos] of [['MD1001', 1], ['MD3001', 2]] as const) {
       fireEvent.click(screen.getByRole('button', { name: /新增\/編輯/ }))
       const search = await screen.findByRole('combobox', { name: '選擇門店' })
@@ -185,7 +208,6 @@ describe('团购瀑布流表单和路由往返', () => {
       fireEvent.click(screen.getByRole('button', { name: /應用並返回/ }))
       await screen.findByRole('button', { name: /批量導入/ })
       expect(screen.getByDisplayValue('验证自定义')).toBeInTheDocument()
-      expect(screen.getByRole('radio', { name: '距離排序' })).toBeChecked()
       expect(screen.getByText(id)).toBeInTheDocument()
     }
     fireEvent.click(screen.getByRole('button', { name: /保\s*存/ }))
@@ -195,15 +217,18 @@ describe('团购瀑布流表单和路由往返', () => {
     expect(saved.fixedSlots.map(slot => slot.position)).toEqual([1, 2])
   }, 120000)
 
-  it('超市百货同步内容模式和排序，美食外卖不显示扩展控件', async () => {
+  it('超市百货自定义模式只展示固定内容，不再提供排序与分类兜底', async () => {
     const draft = { ...emptyDraft('delivery', 'flashBee'), key: 'new_delivery_superTest', strategyName: '验证超市', bizChannel: 'supermarket' as const, displayCategoryMode: 'custom' as const, contentType: 'product' as const, sortMode: 'sales' as const }
     writeDraft(draft)
     renderForm('/promotion-slot-config-add?biz=delivery&draftKey=new_delivery_superTest')
     await screen.findByRole('button', { name: /批量導入/ })
     expect(screen.getByText('超市百貨')).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: '近30天銷量排序' })).toBeChecked()
+    expect(screen.queryByText('整體排序')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(zh.promotionSlotConfig.categoryFallback)).not.toBeInTheDocument()
+    // 自定义模式保留手机模型
+    expect(screen.getByText('預覽')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /新增\/編輯/ }))
-    const search = await screen.findByRole('combobox', { name: '選擇商品' })
+    const search = await screen.findByRole('combobox', { name: '選擇商品' }, { timeout: 15000 })
     await selectOption(search, 'SP1001')
     fireEvent.click(screen.getByRole('button', { name: '1號位' }))
     fireEvent.click(screen.getByRole('button', { name: /應用並返回/ }))
