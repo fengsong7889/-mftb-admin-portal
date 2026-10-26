@@ -20,7 +20,7 @@ import {
   fetchCategoryList, fetchParamTypeList, createParamType, updateParamType,
   fetchParamValuesByType, createParamValue, updateParamValue, deleteParamValue,
   type AssetCategory, type ParamType, type ParamValue,
-} from '../../../api/eam'
+} from '@/api/eam'
 
 interface FormValues {
   categoryCode: string

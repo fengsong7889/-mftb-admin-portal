@@ -3,11 +3,11 @@ import { Alert, Button, Input, Modal, Space, Table, Tabs, Tag, Typography, messa
 import type { TableColumnsType } from 'antd'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   ASSESS_STATUS, type PerfAssessment, fetchMyAssessments,
-} from '../../api/hrPerformance'
-import { type PerfAppeal, fetchMyAppeals, submitMyAppeal } from '../../api/hrPerfReport'
+} from '@/api/hrPerformance'
+import { type PerfAppeal, fetchMyAppeals, submitMyAppeal } from '@/api/hrPerfReport'
 import { APPEAL_STATUS_LABEL_KEY, APPEAL_STATUS_TAG_COLOR } from '../PerfReport/meta'
 import ScoreDrawer from '../Performance/ScoreDrawer'
 import {

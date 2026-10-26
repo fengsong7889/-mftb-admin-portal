@@ -2294,33 +2294,20 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 }
 
 /*
- * 搜索区按钮溢出修复（复验实测：折叠态下「更多篩選」右边缘被推到视口外，
- * 只能靠内容区横向滚动才点得到）。
- * 全局 .search-section 的 4 列 grid 用的是 repeat(4, 1fr)，1fr 的最小轨道宽度是
- * auto，会被三个并排按钮的固有宽度撑破整行；这里把轨道锁成 minmax(0,1fr)、
- * 让按钮组可换行，容器就不会再被内容顶宽。只作用于 RDM 工作区，不动全局样式。
+ * 搜索区（§E.1 强制规范）：列数与按钮位置一律沿用全局 .search-section 的
+ * repeat(4, 1fr) + 「按钮紧跟最后一个查询条件」，本工作区不得再改网格列数、
+ * 也不得让操作按钮独占整行——那会让同样的搜索区在不同菜单里长成两种样子。
  *
- * 续修（窄视口复验）：需求清单带左侧视图栏，内容区实测只剩 ~486px，
- * 固定 4 列会把每个条件压到 110px 左右、查询按钮被挤成两行。改用 auto-fit
- * 自适应列数后，窄屏自动落到 2 列/1 列；查询按钮组独占一整行并左对齐。
+ * 这里只保留窄容器下的兜底：条件允许收缩，按钮组内部允许换行，
+ * 避免「更多篩選」等按钮把 grid 轨道顶宽、被推到视口外。
  */
-.rdm-workspace .search-section .ant-form-inline {
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-}
-
 .rdm-workspace .search-section .ant-form-item {
   min-width: 0;
-}
-
-/* 操作按钮组是表单最后一个 Form.Item：独占整行，避免只占 1 列时被挤到换行居中 */
-.rdm-workspace .search-section .ant-form-inline > .ant-form-item:last-child {
-  grid-column: 1 / -1;
 }
 
 .rdm-workspace .search-section .search-actions {
   flex-wrap: wrap;
   row-gap: 8px;
-  justify-content: flex-start;
 }
 
 /*
@@ -2946,5 +2933,119 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   margin-top: 10px;
   font-size: 12px;
   color: #bfbfbf;
+}
+
+/*
+ * 需求计划上线：拆任务前必须先看到的唯一对外时间边界。
+ * 正常=品牌橙系；7 天内=加粗告警（urgent）；已逾期=红色（overdue）。
+ * 色值均取自 §A.1 已登记的橙/红令牌，不在调用处另定义。
+ */
+.rdm-plan-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 18px;
+  margin-bottom: 16px;
+  border-radius: 10px;
+  border: 1px solid #FFD591;
+  background: linear-gradient(90deg, #FFF7E6, #FFFBF0);
+  font-size: 13px;
+  color: #874D00;
+}
+
+.rdm-plan-banner--urgent {
+  border-color: #FFA940;
+  background: linear-gradient(90deg, #FFF2E0, #FFF9F0);
+}
+
+.rdm-plan-banner--overdue {
+  border-color: #FFA39E;
+  background: linear-gradient(90deg, #FFF1F0, #FFF8F7);
+  color: #A8071A;
+}
+
+.rdm-plan-banner-icon {
+  display: inline-flex;
+  font-size: 16px;
+  color: #E8720C;
+}
+
+.rdm-plan-banner--overdue .rdm-plan-banner-icon {
+  color: #CF1322;
+}
+
+.rdm-plan-banner-label {
+  font-weight: 500;
+}
+
+.rdm-plan-banner-date {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: #D46B08;
+}
+
+.rdm-plan-banner--overdue .rdm-plan-banner-date {
+  color: #CF1322;
+}
+
+.rdm-plan-banner-days {
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #FFE7BA;
+  color: #AD4E00;
+}
+
+.rdm-plan-banner--overdue .rdm-plan-banner-days {
+  background: #FFCCC7;
+  color: #A8071A;
+}
+
+.rdm-plan-banner-hint {
+  font-size: 12px;
+  color: #8C8C8C;
+}
+
+/* 详情页标题旁的「計劃上線」胶囊：比属性面板里的一行字更容易被看见 */
+.rdm-plan-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid #FFD591;
+  background: #FFF7E6;
+  font-size: 12px;
+  line-height: 20px;
+  color: #AD4E00;
+}
+
+.rdm-plan-chip b {
+  font-size: 13px;
+  color: #D46B08;
+}
+
+.rdm-plan-chip-days {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.rdm-plan-chip--urgent {
+  border-color: #FFA940;
+  background: #FFF2E0;
+}
+
+.rdm-plan-chip--overdue {
+  border-color: #FFA39E;
+  background: #FFF1F0;
+  color: #A8071A;
+}
+
+.rdm-plan-chip--overdue b {
+  color: #CF1322;
 }
 

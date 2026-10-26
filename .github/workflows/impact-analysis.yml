@@ -1,0 +1,74 @@
+name: Impact Analysis Report
+
+# 方案 §八 第一条：新增影响分析 job，输出系统 / 前后端 / 契约 / 迁移任务矩阵，
+# 测试范围与待发布产物范围分别输出。本 workflow 只做分析与报告，不构建也不部署。
+# 真正的门禁仍在 deploy.yml（前端全量）与 backend-docker.yml（后端 verify）执行。
+
+on:
+  push:
+    branches: ['main']
+  pull_request:
+    branches: ['main']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # 需要历史才能算出 merge-base / 上一次提交的差异
+          fetch-depth: 0
+
+      - name: Resolve comparison base
+        id: base
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          # 事件字段属于外部输入：先做形状校验再交给 git，不直接把 payload 拼进命令
+          if [ "$EVENT" = "pull_request" ] \
+             && printf '%s' "$BASE_REF" | grep -Eq '^[A-Za-z0-9._/-]+$' \
+             && git rev-parse --verify --quiet "origin/$BASE_REF" >/dev/null; then
+            echo "base=$(git merge-base HEAD "origin/$BASE_REF")" >> "$GITHUB_OUTPUT"
+          elif [ "$EVENT" = "push" ] && printf '%s' "${BEFORE:-}" | grep -Eq '^[0-9a-f]{40}$'; then
+            # push 用「前一个 SHA → 当前 SHA」，不能在干净 checkout 上跟 HEAD 自己比（会得出「无变更」）
+            echo "base=$BEFORE" >> "$GITHUB_OUTPUT"
+          else
+            echo "base=$(git rev-parse HEAD~1)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - run: npm ci --legacy-peer-deps
+
+      # 归属登记表本身要先自洽，否则矩阵会按过期清单给出错误的系统归属
+      - name: Engineering Registry
+        run: npm run check:registry
+
+      - name: Impact analysis (JSON)
+        id: impact
+        env:
+          BASE: ${{ steps.base.outputs.base }}
+        run: |
+          set -euo pipefail
+          node scripts/affected-tests.mjs --json --base "$BASE" > impact.json
+          node scripts/render-impact-summary.mjs impact.json >> "$GITHUB_STEP_SUMMARY"
+          echo "changed=$(python3 -c 'import json;print(json.load(open("impact.json"))["changedCount"])')" >> "$GITHUB_OUTPUT"
+
+      - name: Upload analysis result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: impact-analysis-${{ github.sha }}
+          path: impact.json
+          if-no-files-found: warn
+          retention-days: 14

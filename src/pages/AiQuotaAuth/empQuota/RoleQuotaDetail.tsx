@@ -3,10 +3,10 @@ import { useTranslation } from 'react-i18next'
 import { Button, Tag, Spin, Progress, Tooltip, message } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AppstoreOutlined, TeamOutlined, BarChartOutlined, FundOutlined, QuestionCircleOutlined } from '@ant-design/icons'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import AnimatedNumber from '../../../components/AnimatedNumber'
-import { fetchModels, type AiModel } from '../../../api'
-import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import AnimatedNumber from '@/components/AnimatedNumber'
+import { fetchModels, type AiModel } from '@/api'
+import { fetchEmployees, type EmployeeItem } from '@/api/employee'
 import {
   usagePercent,
   usageColor,
@@ -23,7 +23,7 @@ import {
 const PERIOD_KEYS: Record<string, string> = { daily: 'periodDaily', monthly: 'periodMonthly' }
 const TYPE_KEYS: Record<string, string> = { token: 'typeToken', cost: 'typeCost', request: 'typeRequest' }
 const OVER_LIMIT_KEYS: Record<string, string> = { reject: 'overLimitRejectAct', approve: 'overLimitApproveAct', downgrade: 'overLimitDowngradeAct' }
-import { fetchRoleQuotaDetail, type RoleQuotaVO } from '../../../api/empQuota'
+import { fetchRoleQuotaDetail, type RoleQuotaVO } from '@/api/empQuota'
 /**
  * 角色額度 — 詳情獨立頁
  * 分區：用量概览 → 綁定員工 → 額度配置 → 基础信息

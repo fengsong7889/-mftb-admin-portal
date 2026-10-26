@@ -5,12 +5,12 @@ import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
-import { useAuth } from '../../contexts/AuthContext'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   CERT_EDITABLE, CERT_FORM_PATH, CERT_LIST_PATH, deleteCertificate, fetchCertificateStats,
   fetchCertificates, type CertificateItem,
-} from '../../api/hrCertificate'
+} from '@/api/hrCertificate'
 import {
   CERT_STATUS_LABEL_KEY, CERT_STATUS_TABS, CERT_STATUS_TAG_COLOR, CERT_TYPE_LABEL_KEY,
 } from './meta'

@@ -29,10 +29,10 @@ import {
   TeamOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../../contexts/AuthContext'
-import StatCards from '../../components/StatCards'
-import { fetchDashboard, type RdmDashboardData } from '../../api/rdm'
-import { getRdmReqTypeLabel, RDM_STAGE_LABEL, type RdmStage } from '../../constants/rdm'
+import { useAuth } from '@/contexts/AuthContext'
+import StatCards from '@/components/StatCards'
+import { fetchDashboard, type RdmDashboardData } from '@/api/rdm'
+import { getRdmReqTypeLabel, RDM_STAGE_LABEL, type RdmStage } from '@/constants/rdm'
 import './index.css'
 
 /** 阶段耗时（小时 → 天，图表用） */

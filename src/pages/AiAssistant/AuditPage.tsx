@@ -4,7 +4,7 @@ import type { ColumnsType } from 'antd/es/table'
 import type { Dayjs } from 'dayjs'
 import { ReloadOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { fetchConfigChanges, type AiConfigChangeRow } from '../../api/aiAudit'
+import { fetchConfigChanges, type AiConfigChangeRow } from '@/api/aiAudit'
 import AiAssistantPageShell from './PageShell'
 
 const TYPE_LABEL: Record<string, string> = {

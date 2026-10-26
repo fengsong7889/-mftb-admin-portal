@@ -3,17 +3,17 @@ import { Table, Button, Input, Select, Form, Space, Tag, Modal, InputNumber, Aut
 import type { TableColumnsType } from 'antd'
 import { SearchOutlined, ReloadOutlined, ExportOutlined, ImportOutlined, PlusOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import FlashSaleTierCell from '../../../components/FlashSaleTierCell'
-import FlashSaleImportModal from '../../../components/FlashSaleImportModal'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import FlashSaleTierCell from '@/components/FlashSaleTierCell'
+import FlashSaleImportModal from '@/components/FlashSaleImportModal'
 import {
   fetchFlashSalePeriods,
   fetchFlashSaleRegisters,
   importFlashSaleRegisters,
-} from '../../../api/flashSale'
-import type { FlashSalePeriod, FlashSaleRegisterVO, FlashSaleTier } from '../../../api/flashSale'
-import { fetchStoreOptions } from '../../../api/store'
-import type { ParsedFlashSaleExcel } from '../../../utils/flashSaleImport'
+} from '@/api/flashSale'
+import type { FlashSalePeriod, FlashSaleRegisterVO, FlashSaleTier } from '@/api/flashSale'
+import { fetchStoreOptions } from '@/api/store'
+import type { ParsedFlashSaleExcel } from '@/utils/flashSaleImport'
 import {
   SUBSIDY_TYPE_LABEL,
   SUBSIDY_TYPE_TAG_COLOR,
@@ -22,7 +22,7 @@ import {
   FLASH_PRODUCT_TYPE_OPTIONS,
   FLASH_PRICE_TYPE,
   MAX_PURCHASE_PRESETS,
-} from '../../../constants/flashSale'
+} from '@/constants/flashSale'
 import { useFlashSalePage, flashSalePaginationConfig } from '../components/shared'
 
 /** 编辑/新增弹窗的阶梯行 */

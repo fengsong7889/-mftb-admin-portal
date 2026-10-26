@@ -13,22 +13,22 @@ import type { TableColumnsType } from 'antd'
 import {
   CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined,
   CopyOutlined, PlusOutlined,
-  ReloadOutlined, SyncOutlined,
+  ReloadOutlined, SearchOutlined, SyncOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import StatCards from '../../components/StatCards'
-import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import StatCards from '@/components/StatCards'
+import EmployeeSelect from '@/components/EmployeeSelect'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { rdmTableLocale } from './components/tableLocale'
 import {
   fetchTestBatches, acceptTestBatch, returnTestBatch,
   type RdmTestBatchListItem, type RdmTestBatchQuery,
-} from '../../api/rdm'
+} from '@/api/rdm'
 import {
   RDM_TEST_BATCH_STATUS, RDM_TEST_BATCH_STATUS_LABEL, RDM_TEST_BATCH_STATUS_COLOR,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import './index.css'
 
 const { RangePicker } = DatePicker
@@ -304,10 +304,12 @@ export default function TestWorkbench() {
               style={{ width: '100%' }}
             />
           </Form.Item>
-          <Form.Item label=" " colon={false}>
+          {/* 最后一个 Form.Item 不写 label：靠全局 §E.1 的 padding-top 与输入框对齐，
+              写 label=" " 会多占一个 label 行高，按钮整体下移到输入框下方 */}
+          <Form.Item>
             <div className="search-actions">
-              <Button type="primary" onClick={handleSearch}>查詢</Button>
-              <Button onClick={handleReset}>重置</Button>
+              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
             </div>
           </Form.Item>
         </Form>

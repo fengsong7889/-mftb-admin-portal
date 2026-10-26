@@ -6,8 +6,13 @@ import enUS from 'antd/locale/en_US'
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-tw'
 import App from './App'
-import i18n from './i18n'
-import './styles/global.css'
+import i18n, { registerRemoteBundleLoader } from '@/i18n'
+
+// i18n 包是叶子包，不反向依赖 api 层：远程语言包加载器在这里注入（方案 P2 包依赖方向）
+registerRemoteBundleLoader((lang) =>
+  import('@/api/translation').then((m) => m.fetchTranslationBundle(lang)),
+)
+import '@/styles/global.css'
 
 // antd DatePicker 的星期表头取自 dayjs locale，未设置时会显示英文（Sun/Mon…）；
 // 默认语言为繁中，这里同步把 dayjs locale 设为 zh-tw，语言切换时再跟随调整

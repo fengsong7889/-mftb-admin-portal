@@ -5,7 +5,7 @@ import { Alert, Button, Checkbox, Form, Input, Radio, Select, Space, Spin, Switc
 import { ArrowLeftOutlined, SaveOutlined, SettingOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   fetchDailyReportRules,
   fetchDailyReportTemplates,
@@ -13,8 +13,8 @@ import {
   saveDailyReportRule,
   type DailyReportRuleForm as RuleFormValues,
   type DailyReportTemplate,
-} from '../../../api/rdmDailyReport'
-import { fetchIterations, fetchProjectPage, type RdmIterationItem, type RdmProjectListItem } from '../../../api/rdm'
+} from '@/api/rdmDailyReport'
+import { fetchIterations, fetchProjectPage, type RdmIterationItem, type RdmProjectListItem } from '@/api/rdm'
 import '../index.css'
 
 /**

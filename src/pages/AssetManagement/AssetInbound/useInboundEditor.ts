@@ -14,7 +14,7 @@
  * - 草稿和未提交結果不修改後端累計量
  */
 import { useReducer, useCallback, useMemo } from 'react'
-import type { PurchaseOrderItem, PurchaseOrderSupplierGroup } from '../../../api/eam'
+import type { PurchaseOrderItem, PurchaseOrderSupplierGroup } from '@/api/eam'
 
 /* ==================== 類型定義 ==================== */
 

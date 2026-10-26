@@ -188,7 +188,7 @@ Controller：`DocNativeController.java`，**24 个端点**（`/api/doc/v2/*`）�
 
 | 登记项 | 实际修复位置 |
 |--------|---------|
-| `CONTROLLED_MENU_KEYS`、`ROUTE_MENU_KEY_MAP`、`MENU_ACTIONS_MAP` | `src/pages/Permission/types.ts`（并非 `App.tsx`） |
+| `CONTROLLED_MENU_KEYS`、`ROUTE_MENU_KEY_MAP`、`MENU_ACTIONS_MAP` | `src/contracts/menuPermission.ts`（并非 `App.tsx`） |
 | 三条新页面路由与懒加载 | `src/App.tsx` |
 | `keyToPath`、`pathToKey`、`BACKEND_CONNECTED_KEYS` | `src/constants/menuDataSource.ts` |
 | `FileTextOutlined` / `SafetyCertificateOutlined` 兜底图标 | `src/components/Sidebar.tsx` 的 `keyToIcon` |
@@ -354,7 +354,7 @@ npm run test:run -- --maxWorkers=2
 - `src/pages/DocCenter/index.tsx`（DEV 预览入口）
 
 **接手首批补充文件**
-- `src/App.tsx`、`src/constants/menuDataSource.ts`、`src/pages/Permission/types.ts`、`src/components/Sidebar.tsx`、`src/components/MenuTabs.tsx`（菜单、权限与页签登记）
+- `src/App.tsx`、`src/constants/menuDataSource.ts`、`src/contracts/menuPermission.ts`、`src/components/Sidebar.tsx`、`src/components/MenuTabs.tsx`（菜单、权限与页签登记）
 - `src/api/docNative.ts`、`src/pages/DocCenter/{DocPlans,DocPlanDetail,DocGovernance}.tsx`、`useDocNativeLoad.ts`、`DocNativeRoutes.test.tsx`
 - `src/constants/menuDataSource.test.ts`、`src/components/MenuPermissionGuard.test.tsx`、两份 locale 文件（只新增 docNative 命名空间）
 - `backend/src/test/java/com/mftb/admin/service/doc/{DocNativeServiceTest,DocIntegrationGrantServiceTest}.java`

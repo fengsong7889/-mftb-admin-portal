@@ -10,13 +10,13 @@
  */
 import { useState } from 'react'
 import { Alert, Button, DatePicker, Form, Input, Select, message } from 'antd'
-import RemarkTextArea from '../../../components/RemarkTextArea'
+import RemarkTextArea from '@/components/RemarkTextArea'
 import { FileProtectOutlined, SaveOutlined } from '@ant-design/icons'
 import type { Dayjs } from 'dayjs'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { LICENSE_CLASS_OPTIONS, LICENSE_REGION_OPTIONS } from '../vehicleMeta'
-import { newRequestKey, type QualificationSave } from '../../../api/vehicle'
+import { newRequestKey, type QualificationSave } from '@/api/vehicle'
 import { useVehicleEmployees } from '../vehicleOptions'
 import {
   VehicleFormPageHeader, VehicleSection,

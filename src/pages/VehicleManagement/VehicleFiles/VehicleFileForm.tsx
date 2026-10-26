@@ -14,8 +14,8 @@ import dayjs, { type Dayjs } from 'dayjs'
 import {
   BODY_TYPE_OPTIONS, ENERGY_TYPE_OPTIONS, VEHICLE_STATUS_LABEL, VEHICLE_STATUS_OPTIONS,
 } from '../vehicleMeta'
-import { fetchBrands, fetchModels, fetchSeries, type BrandVO, type ModelVO, type SeriesVO } from '../../../api/vehicleMaster'
-import RemarkTextArea from '../../../components/RemarkTextArea'
+import { fetchBrands, fetchModels, fetchSeries, type BrandVO, type ModelVO, type SeriesVO } from '@/api/vehicleMaster'
+import RemarkTextArea from '@/components/RemarkTextArea'
 import { validatePlate } from '../vehicleRules'
 import { PROVINCE_ABBREVIATIONS } from '../vehicleMeta'
 import { VEHICLE_STATUS, type VehicleFile, type VehicleFileFormValues } from '../vehicleTypes'

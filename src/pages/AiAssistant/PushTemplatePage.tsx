@@ -21,12 +21,12 @@ import {
   renderTemplate,
   savePushTemplate,
   type AiPushTemplate,
-} from '../../api/aiPushTemplate'
+} from '@/api/aiPushTemplate'
 import AiAssistantPageShell from './PageShell'
-import AiScopeSwitch from '../../components/AiScopeSwitch'
-import { aiScopeLabel, useAiScope } from '../../constants/aiScope'
-import { formatDateTime } from '../../utils/datetime'
-import { confirmDelete } from '../../utils/confirmDelete'
+import AiScopeSwitch from '@/components/AiScopeSwitch'
+import { aiScopeLabel, useAiScope } from '@/constants/aiScope'
+import { formatDateTime } from '@/utils/datetime'
+import { confirmDelete } from '@/utils/confirmDelete'
 
 const TYPE_LABEL: Record<string, string> = {
   group: '釘釘群',

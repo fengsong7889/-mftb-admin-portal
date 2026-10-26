@@ -15,17 +15,17 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import AiScopeSwitch from '../../components/AiScopeSwitch'
-import { useAiScope } from '../../constants/aiScope'
-import { formatDateTime } from '../../utils/datetime'
-import { confirmDelete } from '../../utils/confirmDelete'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import AiScopeSwitch from '@/components/AiScopeSwitch'
+import { useAiScope } from '@/constants/aiScope'
+import { formatDateTime } from '@/utils/datetime'
+import { confirmDelete } from '@/utils/confirmDelete'
 import {
   deleteQuickPrompt,
   fetchQuickPrompts,
   saveQuickPrompt,
   type AiQuickPrompt,
-} from '../../api/aiQuickPrompt'
+} from '@/api/aiQuickPrompt'
 import AiAssistantPageShell from './PageShell'
 
 /** 与后端 domain/system_code 约定一致；空值代表全系统可见 */

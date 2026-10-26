@@ -5,31 +5,31 @@ import { createInstance } from 'i18next'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConfigProvider } from 'antd'
 import enUS from 'antd/locale/en_US'
-import en from '../../../i18n/locales/en.json'
-import zh from '../../../i18n/locales/zh-TW.json'
-import * as dictApi from '../../../api/hrDict'
-import * as employeeApi from '../../../api/employee'
+import en from '@/i18n/locales/en.json'
+import zh from '@/i18n/locales/zh-TW.json'
+import * as dictApi from '@/api/hrDict'
+import * as employeeApi from '@/api/employee'
 import HrDictForm from './HrDictForm'
 import HrDictManagement from './index'
 import ContractLedger from '../ContractLedger'
-import MenuTabs from '../../../components/MenuTabs'
+import MenuTabs from '@/components/MenuTabs'
 
 const permissions = vi.hoisted(() => new Set(['hr-dict:view', 'hr-dict:edit', 'contract-ledger:view', 'employee-management:view']))
-vi.mock('../../../contexts/AuthContext', () => ({ useAuth: () => ({
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({
   hasPermission: (key: string) => permissions.has(key),
   hasMenuPermission: () => true,
 }) }))
-vi.mock('../../../contexts/MenuContext', () => ({ useMenu: () => ({ menuTree: null, status: 'online' }) }))
-vi.mock('../../../components/Sidebar', () => ({ pathToKey: {} }))
-vi.mock('../../../hooks/useColumnConfig', () => ({ useColumnConfig: () => ({ configComponent: null, applyConfig: (value: unknown) => value }) }))
-vi.mock('../../../api/hrDict', async importOriginal => ({
-  ...await importOriginal<typeof import('../../../api/hrDict')>(),
+vi.mock('@/contexts/MenuContext', () => ({ useMenu: () => ({ menuTree: null, status: 'online' }) }))
+vi.mock('@/components/Sidebar', () => ({ pathToKey: {} }))
+vi.mock('@/hooks/useColumnConfig', () => ({ useColumnConfig: () => ({ configComponent: null, applyConfig: (value: unknown) => value }) }))
+vi.mock('@/api/hrDict', async importOriginal => ({
+  ...await importOriginal<typeof import('@/api/hrDict')>(),
   fetchHrDict: vi.fn(), createHrDict: vi.fn(), updateHrDict: vi.fn(), fetchHrDictOptions: vi.fn(),
   updateHrDictStatus: vi.fn(), deleteHrDict: vi.fn(),
 }))
-vi.mock('../../../api/employee', async importOriginal => ({
+vi.mock('@/api/employee', async importOriginal => ({
   // 合同台账页新增到期预警（CONTRACT_EXPIRY_BUCKET / fetchContractExpirySummary），保留其余真实导出
-  ...await importOriginal<typeof import('../../../api/employee')>(),
+  ...await importOriginal<typeof import('@/api/employee')>(),
   fetchContractLedger: vi.fn(),
   fetchContractExpirySummary: vi.fn(),
 }))

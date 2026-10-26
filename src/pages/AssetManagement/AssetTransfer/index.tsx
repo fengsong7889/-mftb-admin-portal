@@ -17,9 +17,9 @@ import { Alert, Button, DatePicker, Descriptions, Form, Input, Modal, Select, Sp
 import { AppstoreOutlined, SaveOutlined, SwapOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
-import { fetchTransferAsset, fetchTransferEmployees, fetchTransferOptions, transferAsset, type TransferRegistration } from '../../../api/asset'
-import { useAuth } from '../../../contexts/AuthContext'
-import AssetParameters from '../../../components/AssetParameters'
+import { fetchTransferAsset, fetchTransferEmployees, fetchTransferOptions, transferAsset, type TransferRegistration } from '@/api/asset'
+import { useAuth } from '@/contexts/AuthContext'
+import AssetParameters from '@/components/AssetParameters'
 import { TransferError, TransferPageHeader, TransferSection } from './TransferLayout'
 import { useTransferData } from './useTransferData'
 import { buildTransferTree, ENABLED_DEPARTMENT, formatTransferUser, positiveId, resolveTransferFrom, TRANSFER_LIMITS, TRANSFER_MENU } from './transferUtils'
@@ -52,7 +52,7 @@ export default function AssetTransfer() {
   // 同一份 payload 复用幂等键；payload 变化则换新键（详见文件头说明）
   const requestIdentity = useRef<{ payload: string; key: string }>()
   const selectedId = Form.useWatch('toUserId', form)
-  const [selectedEmployee, setSelectedEmployee] = useState<import('../../../api/asset').TransferEmployee>()
+  const [selectedEmployee, setSelectedEmployee] = useState<import('@/api/asset').TransferEmployee>()
   const asset = assetState.data
   const options = optionsState.data
   // 已停用的部门仍展示在树上但置灰，防止历史数据找不到入口，同时阻止新调拨落入停用部门

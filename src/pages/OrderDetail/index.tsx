@@ -7,7 +7,7 @@ import {
   ExclamationCircleOutlined, RollbackOutlined, DownOutlined, RightOutlined,
   BarChartOutlined, EyeOutlined, AimOutlined, FireOutlined, HourglassOutlined,
 } from '@ant-design/icons'
-import DetailPageHeader from '../../components/DetailPageHeader'
+import DetailPageHeader from '@/components/DetailPageHeader'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   fetchAdOrderDetail,
@@ -16,13 +16,13 @@ import {
   fetchAdSignboardPricingActive,
   refundAdOrder,
   cancelAdOrder,
-} from '../../api/adPromotion'
-import { AlgorithmType, REGION_LABEL_KEY } from '../Recommend/constants'
-import { BIZ_CHANNEL } from '../../constants/bizChannel'
+} from '@/api/adPromotion'
+import { AlgorithmType, REGION_LABEL_KEY } from '@mftb/contracts/recommendConstants'
+import { BIZ_CHANNEL } from '@/constants/bizChannel'
 import { type TrafficChannelPricing } from '../AdSales/types'
 import { loadTrafficChannelPricing } from '../_shared/ad-promotion/trafficPricing'
-import { useCountUp } from '../../hooks/useCountUp'
-import AnimatedNumber from '../../components/AnimatedNumber'
+import { useCountUp } from '@/hooks/useCountUp'
+import AnimatedNumber from '@/components/AnimatedNumber'
 import { OrderStatus, AppType, RecommendChannel, RecommendType, MEAL_SLOT_LABEL, RECOMMEND_TYPE_ICON, ORDER_CHANNEL_TO_TRAFFIC_BIZ, getStageIndex, getStageTime, parseCancelFeeTiers, parseDiscountTiers, parseDayDiscountTiers } from './orderUtils'
 import type { OrderItem, SlotPriceItem, PromoRecord } from './orderUtils'
 import { toDetailOrder, REFUNDED_BEFORE_PROMO_IDS, TERMINAL_STATUSES } from './mockOrderData'

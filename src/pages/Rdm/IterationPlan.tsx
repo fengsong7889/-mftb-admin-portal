@@ -16,12 +16,12 @@ import {
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import dayjs from 'dayjs'
-import StatCards from '../../components/StatCards'
-import { useAuth } from '../../contexts/AuthContext'
-import { deleteIteration, fetchIterations, updateIterationStatus, type RdmIterationItem } from '../../api/rdm'
-import { formatEmployee } from '../../utils/employeeDisplay'
+import StatCards from '@/components/StatCards'
+import { useAuth } from '@/contexts/AuthContext'
+import { deleteIteration, fetchIterations, updateIterationStatus, type RdmIterationItem } from '@/api/rdm'
+import { formatEmployee } from '@/utils/employeeDisplay'
 import {
   RDM_ITERATION_STATUS,
   RDM_ITERATION_STATUS_COLOR,
@@ -31,7 +31,7 @@ import {
   RDM_ITERATION_TYPE_LABEL,
   type RdmIterationStatus,
   type RdmIterationType,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import './index.css'
 
 /** 负载率：已排工时 / 产能，无产能时视为 0（不参与超载判断） */
@@ -400,7 +400,7 @@ export default function IterationPlan() {
           <Form.Item colon={false}>
             <div className="search-actions">
               <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>{t('common.search')}</Button>
-              <Button onClick={() => { form.resetFields(); setFilters({}) }}>{t('common.reset')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={() => { form.resetFields(); setFilters({}) }}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>

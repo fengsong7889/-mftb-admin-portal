@@ -10,9 +10,9 @@ import { Button, Form, Input, Select, Table, Modal, message, Space } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { SearchOutlined, ReloadOutlined, PlusOutlined, ExportOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { fetchLocationList, deleteLocation, type AssetLocation } from '../../../api/eam'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { regionData, getProvinces, getCities, getDistricts } from '../../../constants/regionData'
+import { fetchLocationList, deleteLocation, type AssetLocation } from '@/api/eam'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { regionData, getProvinces, getCities, getDistricts } from '@/constants/regionData'
 import '../AssetCategory/index.css'
 
 type LocationRow = AssetLocation

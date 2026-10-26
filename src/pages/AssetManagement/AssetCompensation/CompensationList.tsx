@@ -7,10 +7,10 @@ import type { TableColumnsType } from 'antd'
 import { ReloadOutlined, SearchOutlined, PlusOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import BrandTag from '../../../components/BrandTag'
-import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
-import type { CompensationRow, CompensationQuery } from '../../../api/eamCompensation'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import BrandTag from '@/components/BrandTag'
+import { useCompanyBrand } from '@/contexts/CompanyBrandContext'
+import type { CompensationRow, CompensationQuery } from '@/api/eamCompensation'
 
 /* ----- 状态元数据 ----- */
 const DAMAGE_LABEL: Record<string, string> = { damage: '损坏', loss: '遗失' }

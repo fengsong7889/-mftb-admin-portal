@@ -33,13 +33,13 @@ import {
   type RdmHrSuggestionItem,
   type RdmMetricDefinition,
   type RdmScoreBudgetItem,
-} from '../../../api/rdm'
+} from '@/api/rdm'
 import {
   RDM_SUGGESTION_STATUS,
   RDM_SUGGESTION_STATUS_COLOR,
   RDM_SUGGESTION_STATUS_LABEL,
   type RdmSuggestionStatus,
-} from '../../../constants/rdm'
+} from '@/constants/rdm'
 
 interface GovernancePanelProps {
   /** 与看板共用当前周期，避免两处各选各的 */

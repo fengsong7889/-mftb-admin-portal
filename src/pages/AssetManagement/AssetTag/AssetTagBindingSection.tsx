@@ -17,9 +17,9 @@ import {
   bindAssetTag,
   unbindAssetTag,
   setPrimaryAssetTag,
-} from '../../../api/eam'
-import type { AssetTagBindingItem, AssetTagTemplate } from '../../../api/eam'
-import type { AssetItem } from '../../../api/asset'
+} from '@/api/eam'
+import type { AssetTagBindingItem, AssetTagTemplate } from '@/api/eam'
+import type { AssetItem } from '@/api/asset'
 import AssetTagPreview from './AssetTagPreview'
 import { buildTagValues } from './tagValues'
 

@@ -12,16 +12,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { fetchReleaseBatchDetail, fetchReleaseBatchActions } from '../../api/rdm'
+import { fetchReleaseBatchDetail, fetchReleaseBatchActions } from '@/api/rdm'
 import ReleaseBatchDetail from './ReleaseBatchDetail'
 
 // 可控的菜單權限開關（mock 讀取此變量）
 let canEdit = true
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => canEdit, user: { empId: 'TEST001' } }),
 }))
 
-vi.mock('../../api/rdm', () => ({
+vi.mock('@/api/rdm', () => ({
   fetchReleaseBatchDetail: vi.fn(),
   fetchReleaseBatchActions: vi.fn(),
   checkReleaseBatch: vi.fn(),

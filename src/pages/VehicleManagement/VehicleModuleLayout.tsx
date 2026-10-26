@@ -8,7 +8,7 @@
  */
 import type { ReactNode } from 'react'
 import { Button, Tag } from 'antd'
-import AnimatedNumber from '../../components/AnimatedNumber'
+import AnimatedNumber from '@/components/AnimatedNumber'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import { TRIP_FLAG_COLOR, TRIP_FLAG_LABEL } from './vehicleMeta'
 import type { TripFlag } from './vehicleTypes'

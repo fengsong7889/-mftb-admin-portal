@@ -33,10 +33,10 @@ import {
   checkMileage, driverQualified, isOverdue, vehicleDispatchable,
 } from '../vehicleRules'
 import { useDriverOptions } from '../vehicleOptions'
-import { fetchVehicleDetail, toIso } from '../../../api/vehicle'
+import { fetchVehicleDetail, toIso } from '@/api/vehicle'
 import { toVehicleFile } from '../vehicleAdapter'
 import { VehicleFormPageHeader, VehicleSection } from '../VehicleModuleLayout'
-import RemarkTextArea from '../../../components/RemarkTextArea'
+import RemarkTextArea from '@/components/RemarkTextArea'
 
 export type TripRegisterMode = 'depart' | 'return' | 'confirm'
 

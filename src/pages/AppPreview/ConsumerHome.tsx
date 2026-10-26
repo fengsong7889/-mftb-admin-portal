@@ -9,12 +9,12 @@
  * 文案暂硬编码繁中（与设计稿一致），后续随 i18n 解耦统一替换。
  */
 import { useRef, useState } from 'react'
-import bannerImg from '../../assets/consumer-home/banner.jpg'
-import riceballImg from '../../assets/consumer-home/riceball.jpg'
-import friedChickenImg from '../../assets/consumer-home/friedchicken.jpg'
-import fishPotImg from '../../assets/consumer-home/fishpot.jpg'
-import burgerImg from '../../assets/consumer-home/burger.jpg'
-import lemonTeaImg from '../../assets/consumer-home/lemontea.jpg'
+import bannerImg from '@/assets/consumer-home/banner.jpg'
+import riceballImg from '@/assets/consumer-home/riceball.jpg'
+import friedChickenImg from '@/assets/consumer-home/friedchicken.jpg'
+import fishPotImg from '@/assets/consumer-home/fishpot.jpg'
+import burgerImg from '@/assets/consumer-home/burger.jpg'
+import lemonTeaImg from '@/assets/consumer-home/lemontea.jpg'
 
 interface Tile {
   key: string

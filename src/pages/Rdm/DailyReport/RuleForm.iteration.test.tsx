@@ -9,25 +9,25 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import i18n from '../../../i18n'
-import { fetchIterations, fetchProjectPage } from '../../../api/rdm'
+import i18n from '@/i18n'
+import { fetchIterations, fetchProjectPage } from '@/api/rdm'
 import {
   fetchDailyReportRules,
   fetchDailyReportTemplates,
   saveDailyReportRule,
-} from '../../../api/rdmDailyReport'
+} from '@/api/rdmDailyReport'
 import DailyReportRuleForm from './RuleForm'
 
-vi.mock('../../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => true }),
 }))
 
-vi.mock('../../../api/rdm', () => ({
+vi.mock('@/api/rdm', () => ({
   fetchIterations: vi.fn(),
   fetchProjectPage: vi.fn(),
 }))
 
-vi.mock('../../../api/rdmDailyReport', () => ({
+vi.mock('@/api/rdmDailyReport', () => ({
   fetchDailyReportRules: vi.fn(),
   fetchDailyReportTemplates: vi.fn(),
   fetchDailyReportConfig: vi.fn(async () => ({ messageMode: 'template' })),

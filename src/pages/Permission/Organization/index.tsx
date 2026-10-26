@@ -4,8 +4,8 @@ import type { TableColumnsType, TreeDataNode } from 'antd'
 import { ApartmentOutlined, ExportOutlined, FolderOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, TeamOutlined, TranslationOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   DEPT_STATUS,
   createDepartment,
@@ -13,12 +13,12 @@ import {
   fetchDepartments,
   updateDepartment,
   updateDepartmentStatus,
-} from '../../../api/department'
-import type { DepartmentItem, DepartmentPayload } from '../../../api/department'
-import { fetchEmployees } from '../../../api/employee'
-import type { EmployeeItem } from '../../../api/employee'
-import { exportToCSV } from '../../../utils/exportCSV'
-import { translateText } from '../../../api/translation'
+} from '@/api/department'
+import type { DepartmentItem, DepartmentPayload } from '@/api/department'
+import { fetchEmployees } from '@/api/employee'
+import type { EmployeeItem } from '@/api/employee'
+import { exportToCSV } from '@/utils/exportCSV'
+import { translateText } from '@/api/translation'
 import { pinyin } from 'pinyin-pro'
 import './index.css'
 

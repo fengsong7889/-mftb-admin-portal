@@ -4,8 +4,8 @@ import type { TableColumnsType } from 'antd'
 import { SearchOutlined, ReloadOutlined, ExportOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import type { Dayjs } from 'dayjs'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { REGION_OPTIONS, REGION_LABEL_KEY, type Region } from '../../Recommend/constants'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { REGION_OPTIONS, REGION_LABEL_KEY, type Region } from '@mftb/contracts/recommendConstants'
 
 const { RangePicker } = DatePicker
 

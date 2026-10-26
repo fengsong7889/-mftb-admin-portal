@@ -9,8 +9,8 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import i18n from '../../i18n'
-import { fetchIterations } from '../../api/rdm'
+import i18n from '@/i18n'
+import { fetchIterations } from '@/api/rdm'
 import IterationForm from './IterationForm'
 
 const emp = vi.hoisted(() => ({
@@ -18,7 +18,7 @@ const emp = vi.hoisted(() => ({
   department: '產品部', functionRoleIds: [] as number[],
 }))
 
-vi.mock('../../api/employee', () => ({
+vi.mock('@/api/employee', () => ({
   fetchEmployees: vi.fn(async () => ({ records: [emp], total: 1 })),
   fetchEmployee: vi.fn(async () => emp),
 }))
@@ -26,8 +26,8 @@ vi.mock('../../api/employee', () => ({
 // 只覆盖本轮要打桩的两个接口，其余导出保留真实实现：
 // 整模块替换时，只要被间接导入的模块用到别的 rdm 导出，就会报
 // 「No xxx export is defined on the mock」（fetchProjectPage 就是这么挂的）
-vi.mock('../../api/rdm', async () => {
-  const actual = await vi.importActual<typeof import('../../api/rdm')>('../../api/rdm')
+vi.mock('@/api/rdm', async () => {
+  const actual = await vi.importActual<typeof import('@/api/rdm')>('@/api/rdm')
   return { ...actual, fetchIterations: vi.fn(), saveIteration: vi.fn() }
 })
 

@@ -21,18 +21,18 @@ import {
   fetchTestBatches,
   returnTestBatch,
   submitTestBatch,
-} from '../../api/rdm'
+} from '@/api/rdm'
 import TestWorkbench from './TestWorkbench'
 import ReleaseCenter from './ReleaseCenter'
 import TestBatchSubmit from './TestBatchSubmit'
 import ReleaseBatchCreate from './ReleaseBatchCreate'
 
-vi.mock('../../api/employee', () => ({
+vi.mock('@/api/employee', () => ({
   fetchEmployeeIdOptions: vi.fn(async () => [{ value: '21', label: '張三(MF00021)' }]),
   fetchEmployees: vi.fn(),
 }))
 
-vi.mock('../../api/rdm', () => ({
+vi.mock('@/api/rdm', () => ({
   fetchTestBatches: vi.fn(),
   acceptTestBatch: vi.fn(),
   returnTestBatch: vi.fn(),

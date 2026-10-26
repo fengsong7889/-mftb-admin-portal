@@ -4,12 +4,12 @@ import type { TableColumnsType } from 'antd'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import dayjs, { type Dayjs } from 'dayjs'
-import DetailPageHeader from '../../components/DetailPageHeader'
+import DetailPageHeader from '@/components/DetailPageHeader'
 import {
   CYCLE_STATUS, type PerfCycle, type PerfLaunchPreview, type PerfPlanLaunchPayload,
   type PerfTemplate, fetchPerfCycles, fetchPerfScopeOptions, fetchPerfTemplates, launchPerfPlan,
   parseGradeScheme, previewPerfLaunch, sortGrades,
-} from '../../api/hrPerformance'
+} from '@/api/hrPerformance'
 import { PERF_CYCLE_PATH, PERF_PLAN_PATH, CYCLE_TYPE_LABEL_KEY, planDetailPath } from './meta'
 
 interface FormValues {

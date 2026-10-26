@@ -13,7 +13,7 @@ import HcmBlueprint from './index'
 import { HCM_BLUEPRINTS } from './blueprint'
 
 // DetailPageHeader 內部按菜單權限門控編輯按鈕，這裡不需要真實登錄態
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => true }),
 }))
 

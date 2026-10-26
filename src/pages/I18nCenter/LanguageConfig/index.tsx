@@ -24,15 +24,15 @@ import {
   LANG_INFO,
   langSysName,
   langNamesOf,
-} from '../../../utils/translationConfig'
+} from '@/utils/translationConfig'
 import {
   fetchLanguages,
   fetchTranslations,
   createLanguage as createLanguageApi,
   deleteLanguage as deleteLanguageApi,
-} from '../../../api/translation'
-import type { LanguageVO, TranslationVO } from '../../../api/translation'
-import { useCountUp } from '../../../hooks/useCountUp'
+} from '@/api/translation'
+import type { LanguageVO, TranslationVO } from '@/api/translation'
+import { useCountUp } from '@/hooks/useCountUp'
 
 /* ---- 动画数字组件 ---- */
 function AnimatedNumber({ value }: { value: number }) {

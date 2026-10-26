@@ -16,7 +16,7 @@ import {
   RDM_STATUS_STAGE,
   type RdmStage,
   type RdmStatus,
-} from '../../../constants/rdm'
+} from '@/constants/rdm'
 
 interface StageBarProps {
   /** 当前状态码 */

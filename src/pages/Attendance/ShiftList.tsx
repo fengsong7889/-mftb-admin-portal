@@ -20,14 +20,14 @@ import {
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import StatCards from '../../components/StatCards'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { useServerSort } from '../../hooks/useServerSort'
-import { useAuth } from '../../contexts/AuthContext'
+import StatCards from '@/components/StatCards'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { useServerSort } from '@/hooks/useServerSort'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   ENABLE_STATUS, changeShiftStatus, deleteShift, fetchShiftStats, fetchShifts, type ShiftVO,
-} from '../../api/attendance'
-import { exportToCSV } from '../../utils/exportCSV'
+} from '@/api/attendance'
+import { exportToCSV } from '@/utils/exportCSV'
 import '@/styles/components.css'
 
 /** 列 key → i18n key：列标题唯一来源，表格与列配置面板共用 */

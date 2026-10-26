@@ -5,9 +5,9 @@ import dayjs from 'dayjs'
 import { PlusOutlined, ReloadOutlined, SearchOutlined, SyncOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { fetchVersionHistory, deleteVersion, syncVersionFromGit, renumberAllVersions } from '../../api/versionHistory'
-import type { VersionHistoryRecord } from '../../api/versionHistory'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { fetchVersionHistory, deleteVersion, syncVersionFromGit, renumberAllVersions } from '@/api/versionHistory'
+import type { VersionHistoryRecord } from '@/api/versionHistory'
 
 const { RangePicker } = DatePicker
 

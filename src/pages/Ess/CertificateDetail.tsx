@@ -4,13 +4,13 @@ import { DeleteOutlined, EditOutlined, SafetyCertificateOutlined, SendOutlined, 
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
-import DetailPageHeader from '../../components/DetailPageHeader'
-import { useAuth } from '../../contexts/AuthContext'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   CERT_DETAIL_PATH, CERT_EDITABLE, CERT_FORM_PATH, CERT_ISSUE_PATH, CERT_LEDGER_PATH, CERT_LIST_PATH,
   cancelCertificate, deleteCertificate, fetchCertificateDetail, submitCertificate,
   type CertificateItem,
-} from '../../api/hrCertificate'
+} from '@/api/hrCertificate'
 import {
   CERT_LANG_LABEL_KEY, CERT_PICKUP_LABEL_KEY, CERT_STATUS_LABEL_KEY, CERT_STATUS_TAG_COLOR,
   CERT_TYPE_LABEL_KEY,

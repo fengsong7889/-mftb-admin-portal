@@ -19,11 +19,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   fetchMockToolRegistry,
   TOOL_LEVEL_META,
-} from '../../api/mock/aiPlatformMock'
-import type { ToolDefinition, ToolLevel, ToolParam } from '../../api/mock/aiPlatformMock'
-import { fetchToolRegistry, updateToolPolicy, parseToolScope, serializeToolScope, type ToolPolicyRow } from '../../api/aiOperationAuth'
-import { fetchRoles } from '../../api/role'
-import { fetchDepartments } from '../../api/department'
+} from '@/api/mock/aiPlatformMock'
+import type { ToolDefinition, ToolLevel, ToolParam } from '@/api/mock/aiPlatformMock'
+import { fetchToolRegistry, updateToolPolicy, parseToolScope, serializeToolScope, type ToolPolicyRow } from '@/api/aiOperationAuth'
+import { fetchRoles } from '@/api/role'
+import { fetchDepartments } from '@/api/department'
 
 const TOOL_LEVELS: ToolLevel[] = ['L0', 'L1', 'L2', 'L3', 'L4']
 const EMPTY_PARAM: ToolParam = { name: '', type: 'string', required: false, whitelist: [], desc: '' }

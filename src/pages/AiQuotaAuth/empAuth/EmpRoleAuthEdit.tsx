@@ -2,14 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { Button, Form, Input, Switch, Tag, message, Spin } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, AppstoreOutlined, TeamOutlined, PoweroffOutlined } from '@ant-design/icons'
-import { fetchModels, type AiModel } from '../../../api'
-import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
+import { fetchModels, type AiModel } from '@/api'
+import { fetchEmployees, type EmployeeItem } from '@/api/employee'
 import { ModelAuthSection } from './ModelAuthSection'
 import {
   clampModelConfigs,
   type ModelAuthConfig,
 } from './modelAuthCapability'
-import { createRoleAuth, fetchRoleAuths, getRoleAuthByCode, updateRoleAuth } from '../../../api/empAuth'
+import { createRoleAuth, fetchRoleAuths, getRoleAuthByCode, updateRoleAuth } from '@/api/empAuth'
 import { useTranslation } from 'react-i18next'
 
 /**

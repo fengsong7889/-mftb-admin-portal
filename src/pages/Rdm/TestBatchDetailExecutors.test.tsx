@@ -9,10 +9,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { acceptTestBatch, fetchTestBatchDetail, fetchTestBatchSummary, retestBatch, returnTestBatch, submitTestExecution } from '../../api/rdm'
+import { acceptTestBatch, fetchTestBatchDetail, fetchTestBatchSummary, retestBatch, returnTestBatch, submitTestExecution } from '@/api/rdm'
 import TestBatchDetail from './TestBatchDetail'
 
-vi.mock('../../api/rdm', () => ({
+vi.mock('@/api/rdm', () => ({
   fetchTestBatchDetail: vi.fn(),
   fetchTestBatchSummary: vi.fn(),
   acceptTestBatch: vi.fn(),

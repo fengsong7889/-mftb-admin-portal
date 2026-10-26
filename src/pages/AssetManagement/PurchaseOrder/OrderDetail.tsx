@@ -14,12 +14,12 @@ import {
   fetchPurchaseOrderDetail, fetchAllParamTypes, updatePurchaseOrderExec,
   type PurchaseOrder, type ExecStatus,
   type PurchaseOrderSupplierGroup, type ParamType,
-} from '../../../api/eam'
-import { fetchEmployees } from '../../../api/employee'
-import { useAuth } from '../../../contexts/AuthContext'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import BrandTag from '../../../components/BrandTag'
-import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
+} from '@/api/eam'
+import { fetchEmployees } from '@/api/employee'
+import { useAuth } from '@/contexts/AuthContext'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import BrandTag from '@/components/BrandTag'
+import { useCompanyBrand } from '@/contexts/CompanyBrandContext'
 
 const EXEC_META: Record<ExecStatus, { key: string; color: string }> = {
   pending:    { key: 'asset.execPending',    color: 'default' },

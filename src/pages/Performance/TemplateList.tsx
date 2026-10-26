@@ -5,13 +5,13 @@ import {
 import type { TableColumnsType } from 'antd'
 import { DeleteOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { useAuth } from '../../contexts/AuthContext'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   CYCLE_TYPE, type PerfGradeRule, type PerfIndicator, type PerfTemplate,
   type PerfTemplatePayload, createPerfTemplate, fetchPerfTemplate, fetchPerfTemplates, updatePerfTemplate,
   matchGrade, parseGradeScheme, sortGrades,
-} from '../../api/hrPerformance'
+} from '@/api/hrPerformance'
 import {
   CYCLE_TYPE_LABEL_KEY, CYCLE_TYPE_ORDER, GRADE_LABEL_KEY, GRADE_ORDER, INDICATOR_TYPE_LABEL_KEY,
   INDICATOR_TYPE_ORDER, PERF_MENU,

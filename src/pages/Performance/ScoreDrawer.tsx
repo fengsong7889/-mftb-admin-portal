@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import {
   ASSESS_STATUS, INDICATOR_SCORE_MAX, type PerfAssessment, type PerfScoreItem,
   fetchMyAssessment, fetchPerfAssessment, previewWeighted, submitPerfScore,
-} from '../../api/hrPerformance'
+} from '@/api/hrPerformance'
 import { ASSESS_STATUS_LABEL_KEY, ASSESS_STATUS_TAG_COLOR } from './meta'
 
 /** 打分抽屉的四种视角：自评（可写）、上级评（可写）、员工自助查看（走 /my 端点、只读）、HR 查看（只读） */

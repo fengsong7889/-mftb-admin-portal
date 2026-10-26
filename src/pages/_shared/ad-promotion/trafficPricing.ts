@@ -7,7 +7,7 @@
  * 本模組把真值收斂到後端：讀取走 /api/ad/pricing/traffic，寫回走 create/update/status/delete，
  * 定價編號（DJTL + 年月日 + 3位自增）由後端 BizSeqService 按「編號生成規則」生成。
  */
-import { BIZ_CHANNEL, type BizChannelValue } from '../../../constants/bizChannel'
+import { BIZ_CHANNEL, type BizChannelValue } from '@/constants/bizChannel'
 import {
   fetchAdTrafficPricingList,
   type AdPricingTraffic,
@@ -15,7 +15,7 @@ import {
   type AdPricingTrafficRequest,
   type AdTrafficLadderRow,
   type AdTrafficTier,
-} from '../../../api/adPromotion'
+} from '@/api/adPromotion'
 import type { TrafficChannelPricing, TrafficPackageTier, TrafficPriceLadderRow } from './types'
 
 /** 前端業務頻道枚舉（字符串）→ 後端 bizChannel 碼值 */

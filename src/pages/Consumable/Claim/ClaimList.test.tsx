@@ -23,14 +23,14 @@ const api = vi.hoisted(() => ({
   fetchDepartments: vi.fn(),
 }))
 
-vi.mock('../../../api/consumable', () => ({
+vi.mock('@/api/consumable', () => ({
   fetchConsumableClaims: api.fetchClaims,
   fetchMyConsumableClaims: api.fetchMyClaims,
   cancelConsumableClaim: api.cancelClaim,
   issueConsumableClaim: api.issueClaim,
 }))
-vi.mock('../../../api/department', () => ({ fetchDepartments: api.fetchDepartments }))
-vi.mock('../../../contexts/AuthContext', () => ({
+vi.mock('@/api/department', () => ({ fetchDepartments: api.fetchDepartments }))
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => true }),
 }))
 // t 返回 key 本身：断言直接锁定文案键，语言切换测试不受译文措辞影响

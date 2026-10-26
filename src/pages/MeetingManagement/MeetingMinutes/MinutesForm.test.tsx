@@ -10,26 +10,26 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MinutesForm from './MinutesForm'
-import i18n from '../../../i18n'
+import i18n from '@/i18n'
 
 const hasPermission = vi.fn(() => true)
 
-vi.mock('../../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
     hasPermission,
     user: { id: 2, name: '李四', empId: 'MF00002', username: 'lisi' },
   }),
 }))
 
-vi.mock('../../../api/meeting', () => ({
+vi.mock('@/api/meeting', () => ({
   fetchMeetingDetail: vi.fn(),
   newMeetingRequestKey: vi.fn(() => 'mm-test-key'),
   toMeetingIso: (value: { format: (f: string) => string }) => value.format('YYYY-MM-DDTHH:mm:ss'),
   toMeetingIsoDate: (value: { format: (f: string) => string } | null) => (value ? value.format('YYYY-MM-DD') : undefined),
 }))
 
-vi.mock('../../../api/meetingMinutes', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../api/meetingMinutes')>()
+vi.mock('@/api/meetingMinutes', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/meetingMinutes')>()
   return {
     ...actual,
     fetchMinutes: vi.fn(),
@@ -41,12 +41,12 @@ vi.mock('../../../api/meetingMinutes', async (importOriginal) => {
 })
 
 // 员工选择器会自己去搜人，本用例不关心结果
-vi.mock('../../../api/employee', () => ({
+vi.mock('@/api/employee', () => ({
   fetchEmployees: vi.fn(async () => ({ records: [], total: 0 })),
 }))
 
-import { fetchMeetingDetail } from '../../../api/meeting'
-import { createMinutes, fetchMinutes } from '../../../api/meetingMinutes'
+import { fetchMeetingDetail } from '@/api/meeting'
+import { createMinutes, fetchMinutes } from '@/api/meetingMinutes'
 
 const MEETING = {
   id: 100,

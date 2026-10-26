@@ -5,9 +5,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   TeamOutlined,
 } from '@ant-design/icons'
-import { fetchModels, fetchDeptOptions, type AiModel, type DeptOption } from '../../../api'
+import { fetchModels, fetchDeptOptions, type AiModel, type DeptOption } from '@/api'
 import { fetchDeptQuotaDetail, saveDeptQuota, type DeptQuotaRequest,
-  type QuotaPeriod, type QuotaType, type OverLimitAction, type AllocateMode, type Currency } from '../../../api/deptQuota'
+  type QuotaPeriod, type QuotaType, type OverLimitAction, type AllocateMode, type Currency } from '@/api/deptQuota'
 import {
   buildDeptTree,
   QUOTA_PERIOD_LABEL,

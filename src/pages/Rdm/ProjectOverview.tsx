@@ -50,10 +50,10 @@ import { isCanceledError, readWithRetry, useRequestGate } from './useRequestGate
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import dayjs from 'dayjs'
-import StatCards from '../../components/StatCards'
+import StatCards from '@/components/StatCards'
 import { rdmTableLocale } from './components/tableLocale'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { useAuth } from '../../contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   fetchExportBundle,
   fetchProjectDetail,
@@ -65,14 +65,14 @@ import {
   type RdmProjectListItem,
   type RdmProjectQuery,
   type RdmProjectStatsCard,
-} from '../../api/rdm'
-import { fetchEmployees, type EmployeeItem } from '../../api/employee'
-import { formatEmployee } from '../../utils/employeeDisplay'
+} from '@/api/rdm'
+import { fetchEmployees, type EmployeeItem } from '@/api/employee'
+import { formatEmployee } from '@/utils/employeeDisplay'
 import { exportProjectBundle } from './projectExport'
 import {
   RDM_PROJECT_STATUS_COLOR,
   RDM_PROJECT_STATUS_LABEL,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import './index.css'
 
 /** 進度狀態下拉選項（從常量生成，禁止硬編碼） */

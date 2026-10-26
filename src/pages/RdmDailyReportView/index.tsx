@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { Button, Segmented, Spin } from 'antd'
-import GroupLogo from '../../components/GroupLogo'
+import GroupLogo from '@/components/GroupLogo'
 import {
   AppstoreOutlined,
   ClockCircleOutlined,
@@ -19,18 +19,18 @@ import {
   UnorderedListOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import AnimatedNumber from '../../components/AnimatedNumber'
-import HelpPopover, { type HelpSection } from '../../components/HelpPopover'
+import AnimatedNumber from '@/components/AnimatedNumber'
+import HelpPopover, { type HelpSection } from '@/components/HelpPopover'
 import GanttBoard, { type GanttDraft, type GanttRow, type GanttTask } from '../Rdm/components/GanttBoard'
-import { fetchDailyReportPublicView, type DailyReportPublicView } from '../../api/rdmDailyReportPublic'
-import { changeAppLanguage, LANGUAGE_STORAGE_KEY } from '../../i18n'
+import { fetchDailyReportPublicView, type DailyReportPublicView } from '@/api/rdmDailyReportPublic'
+import { changeAppLanguage, LANGUAGE_STORAGE_KEY } from '@/i18n'
 import type {
   DailyReportIteration,
   DailyReportProject,
   DailyReportRequirement,
   DailyReportSnapshot,
   DailyReportTask,
-} from '../../api/rdmDailyReport'
+} from '@/api/rdmDailyReport'
 import './index.css'
 // 复用「我的甘特圖」GanttBoard，其样式定义在 RDM 模块样式表中
 import '../Rdm/index.css'

@@ -9,9 +9,9 @@ import { FileTextOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import type { BorrowRow } from '../../../api/eamBorrow'
-import AssetParameters from '../../../components/AssetParameters'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import type { BorrowRow } from '@/api/eamBorrow'
+import AssetParameters from '@/components/AssetParameters'
 import { BORROW_STATUS_LABEL as STATUS_LABEL, BORROW_STATUS_COLOR as STATUS_COLOR } from './borrowStatus'
 
 /** 详情卡片统一样式（无边框，对齐采购订单详情） */

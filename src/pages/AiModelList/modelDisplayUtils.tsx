@@ -4,7 +4,7 @@
  */
 import { Tag, Tooltip, Space } from 'antd'
 import { EyeOutlined, ToolOutlined, CodeOutlined, ThunderboltOutlined, BulbOutlined } from '@ant-design/icons'
-import { parseModalities, type AiModel, type ModelType, type Modality } from '../../api'
+import { parseModalities, type AiModel, type ModelType, type Modality } from '@/api'
 
 /* ────────────────── 展示常量 ────────────────── */
 

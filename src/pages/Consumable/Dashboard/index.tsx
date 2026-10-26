@@ -11,8 +11,8 @@ import {
   AppstoreOutlined, DatabaseOutlined, DollarOutlined, AlertOutlined, ReloadOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import AnimatedNumber from '../../../components/AnimatedNumber'
-import { fetchConsumableDashboard, type ConsumableDashboard, type ConsumableItem, type ConsumableTxn } from '../../../api/consumable'
+import AnimatedNumber from '@/components/AnimatedNumber'
+import { fetchConsumableDashboard, type ConsumableDashboard, type ConsumableItem, type ConsumableTxn } from '@/api/consumable'
 import { TXN_TYPE_LABEL, TXN_TYPE_COLOR } from '../Claim/constants'
 
 export default function ConsumableDashboardPage() {

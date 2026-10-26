@@ -3,11 +3,11 @@ import { Button, Form, Input, InputNumber, Select, Switch, message } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   fetchHrDict, createHrDict, updateHrDict,
   HR_DICT_TYPE, type HrDictItem, type HrDictPayload,
-} from '../../../api/hrDict'
+} from '@/api/hrDict'
 
 /** 表单类型仅接受已登记的字典编码。 */
 const DICT_TYPES = Object.values(HR_DICT_TYPE)

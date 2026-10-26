@@ -14,8 +14,8 @@ import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import {
   fetchLocationList, createLocation, updateLocation,
-} from '../../../api/eam'
-import { regionData, getProvinces, getCities, getDistricts } from '../../../constants/regionData'
+} from '@/api/eam'
+import { regionData, getProvinces, getCities, getDistricts } from '@/constants/regionData'
 
 interface FormValues {
   code: string

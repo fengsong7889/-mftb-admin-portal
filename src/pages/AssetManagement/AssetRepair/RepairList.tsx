@@ -10,17 +10,17 @@ import { Button, Empty, Form, Input, Select, Table, Tag, message, Space, Modal, 
 import type { TableColumnsType } from 'antd'
 import { SearchOutlined, ReloadOutlined, ExportOutlined, PlusOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { exportToCSV } from '../../../utils/exportCSV'
-import BrandTag from '../../../components/BrandTag'
-import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { exportToCSV } from '@/utils/exportCSV'
+import BrandTag from '@/components/BrandTag'
+import { useCompanyBrand } from '@/contexts/CompanyBrandContext'
 import dayjs, { type Dayjs } from 'dayjs'
 import {
   fetchRepairList, deleteRepair,
   fetchAssetList,
   type AssetRepairRecord, type AssetItem,
-} from '../../../api/asset'
-import { fetchBrandList, type AssetBrand } from '../../../api/eam'
+} from '@/api/asset'
+import { fetchBrandList, type AssetBrand } from '@/api/eam'
 
 interface Props {
   onViewAsset: (assetNo: string) => void

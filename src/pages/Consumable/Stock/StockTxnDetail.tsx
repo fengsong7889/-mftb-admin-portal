@@ -12,9 +12,9 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   fetchConsumableTxns,
   type ConsumableTxn,
-} from '../../../api/consumable'
+} from '@/api/consumable'
 import { TXN_TYPE_LABEL, TXN_TYPE_COLOR } from '../Claim/constants'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 
 /** 流水類型選項 */
 const TXN_TYPE_OPTIONS = [

@@ -19,7 +19,7 @@ import {
   type PayrollPayslip,
   type PayrollPayslipDetail,
   type PayrollRun,
-} from '../../../api/payroll'
+} from '@/api/payroll'
 import { CardTitle, FormHeader, cardStyle } from '../Organization/shared'
 
 const STATUS_COLOR: Record<string, string> = {

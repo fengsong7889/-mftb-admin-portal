@@ -13,13 +13,13 @@ import { PlusOutlined, SearchOutlined, ReloadOutlined, ExportOutlined } from '@a
 import {
   fetchConsumableClaims, fetchMyConsumableClaims, cancelConsumableClaim, issueConsumableClaim,
   type ConsumableClaim,
-} from '../../../api/consumable'
-import { fetchDepartments, type DepartmentItem } from '../../../api/department'
-import { buildDeptTree } from '../../AssetManagement/AssetClaim/claimViewTypes'
-import { useAuth } from '../../../contexts/AuthContext'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+} from '@/api/consumable'
+import { fetchDepartments, type DepartmentItem } from '@/api/department'
+import { buildDeptTree } from '@/api/claimViewTypes'
+import { useAuth } from '@/contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { CLAIM_STATUS_LABEL_KEY, CLAIM_STATUS_ORDER, CLAIM_STATUS_COLOR, type ClaimStatus } from './constants'
-import { exportToCSV } from '../../../utils/exportCSV'
+import { exportToCSV } from '@/utils/exportCSV'
 
 interface Props {
   onAdd: () => void

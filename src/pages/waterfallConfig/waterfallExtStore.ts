@@ -19,9 +19,9 @@ import type {
   WaterfallDraft,
   WaterfallListView,
   FixedContentSlot,
-} from './types'
-import { serverKey, localKey, defaultExtension, getDisplayCategoryMode, DEFAULT_WATERFALL_SORT } from './types'
-import type { WaterfallStrategy } from '../../api/adPromotion'
+} from '@mftb/contracts/waterfallTypes'
+import { serverKey, localKey, defaultExtension, getDisplayCategoryMode, DEFAULT_WATERFALL_SORT } from '@mftb/contracts/waterfallTypes'
+import type { WaterfallStrategy } from '@/api/adPromotion'
 
 const SCHEMA_VERSION = 'v1'
 const EXT_PREFIX = 'wf_ext'

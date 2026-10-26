@@ -3,20 +3,20 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { Modal } from 'antd'
 import userEvent from '@testing-library/user-event'
 import HandoverForm from './HandoverForm'
-import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
-import { fetchDepartments } from '../../../api/department'
-import { createHandover, fetchUserAssets } from '../../../api/eam'
-import type { AssetItem } from '../../../api/asset'
+import { fetchEmployees, type EmployeeItem } from '@/api/employee'
+import { fetchDepartments } from '@/api/department'
+import { createHandover, fetchUserAssets } from '@/api/eam'
+import type { AssetItem } from '@/api/asset'
 
 const { t } = vi.hoisted(() => ({ t: (key: string) => key }))
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t }) }))
-vi.mock('../../../api/employee', () => ({ fetchEmployees: vi.fn(), fetchEmployeeOptions: vi.fn() }))
-vi.mock('../../../api/department', () => ({ fetchDepartments: vi.fn() }))
-vi.mock('../../../api/eam', () => ({ fetchUserAssets: vi.fn(), createHandover: vi.fn() }))
-vi.mock('../../../hooks/useAssetParameterCatalog', () => ({
+vi.mock('@/api/employee', () => ({ fetchEmployees: vi.fn(), fetchEmployeeOptions: vi.fn() }))
+vi.mock('@/api/department', () => ({ fetchDepartments: vi.fn() }))
+vi.mock('@/api/eam', () => ({ fetchUserAssets: vi.fn(), createHandover: vi.fn() }))
+vi.mock('@/hooks/useAssetParameterCatalog', () => ({
   useAssetParameterCatalog: () => ({ categories: [], types: [] }),
 }))
-vi.mock('../../../components/AssetParameters', () => ({ default: () => null }))
+vi.mock('@/components/AssetParameters', () => ({ default: () => null }))
 
 const employees: EmployeeItem[] = [
   { id: 2, username: 'MF00002', name: '冯松', empId: 'MF00002', department: '交接部門', role: 'employee', status: 1, functionRoleIds: [] },

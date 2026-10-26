@@ -1,8 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import i18n from '../../../i18n'
-import type { OaRequestVO } from '../../../api/oaRequest'
+import i18n from '@/i18n'
+import type { OaRequestVO } from '@/api/oaRequest'
 import HrFlowDetail from './HrFlowDetail'
 
 /**
@@ -14,24 +14,24 @@ const fetchOaRequestDetail = vi.fn()
 const fetchLifecycleRequest = vi.fn()
 const fetchLeaveDetail = vi.fn()
 
-vi.mock('../../../api/oaRequest', async importOriginal => ({
-  ...await importOriginal<typeof import('../../../api/oaRequest')>(),
+vi.mock('@/api/oaRequest', async importOriginal => ({
+  ...await importOriginal<typeof import('@/api/oaRequest')>(),
   fetchOaRequestDetail: (flowNo: string) => fetchOaRequestDetail(flowNo),
 }))
-vi.mock('../../../api/hrLifecycle', async importOriginal => ({
-  ...await importOriginal<typeof import('../../../api/hrLifecycle')>(),
+vi.mock('@/api/hrLifecycle', async importOriginal => ({
+  ...await importOriginal<typeof import('@/api/hrLifecycle')>(),
   fetchLifecycleRequest: (id: number) => fetchLifecycleRequest(id),
 }))
-vi.mock('../../../api/hrLeave', async importOriginal => ({
-  ...await importOriginal<typeof import('../../../api/hrLeave')>(),
+vi.mock('@/api/hrLeave', async importOriginal => ({
+  ...await importOriginal<typeof import('@/api/hrLeave')>(),
   fetchLeaveDetail: (id: number) => fetchLeaveDetail(id),
 }))
 const fetchCertificateDetail = vi.fn()
-vi.mock('../../../api/hrCertificate', async importOriginal => ({
-  ...await importOriginal<typeof import('../../../api/hrCertificate')>(),
+vi.mock('@/api/hrCertificate', async importOriginal => ({
+  ...await importOriginal<typeof import('@/api/hrCertificate')>(),
   fetchCertificateDetail: (id: number) => fetchCertificateDetail(id),
 }))
-vi.mock('../../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: { name: '管理員', role: 'admin', empId: 'MF00001' }, hasPermission: () => true }),
 }))
 

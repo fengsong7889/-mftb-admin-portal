@@ -22,12 +22,12 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import StatCards from '../../components/StatCards'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import StatCards from '@/components/StatCards'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { rdmTableLocale } from './components/tableLocale'
 import { deriveRdmColumnMeta } from './rdmColumnMeta'
 import GanttChart from './components/GanttChart'
-import { useAuth } from '../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   addCrossDeliveryDependency,
   fetchBlockedTasks,
@@ -38,7 +38,7 @@ import {
   type RdmBlockedTaskInfo,
   type RdmDeliveryItemListItem,
   type RdmTaskItem,
-} from '../../api/rdm'
+} from '@/api/rdm'
 import {
   RDM_BLOCK_POINT,
   RDM_BLOCK_POINT_COLOR,
@@ -56,8 +56,8 @@ import {
   type RdmTaskAction,
   type RdmTaskStatus,
   type RdmStatus,
-} from '../../constants/rdm'
-import { useTaskTypeDict } from '../../hooks/useTaskTypeDict'
+} from '@/constants/rdm'
+import { useTaskTypeDict } from '@/hooks/useTaskTypeDict'
 import { buildTaskReportPayload, displayTaskProgress } from './rdmTaskProgress'
 import './index.css'
 

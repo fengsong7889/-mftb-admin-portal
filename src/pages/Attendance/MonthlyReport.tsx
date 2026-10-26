@@ -20,19 +20,19 @@ import {
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useTranslation } from 'react-i18next'
-import StatCards from '../../components/StatCards'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { useAuth } from '../../contexts/AuthContext'
-import { useServerSort } from '../../hooks/useServerSort'
+import StatCards from '@/components/StatCards'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
+import { useServerSort } from '@/hooks/useServerSort'
 import {
   MONTHLY_STATUS, fetchMonthlyStats, fetchMonthlySummaries, freezeMonthly, generateMonthly,
   syncMonthlyToPayroll, type MonthlyVO,
-} from '../../api/attendance'
+} from '@/api/attendance'
 import { MONTHLY_STATUS_LABEL_KEY, MONTHLY_STATUS_TAG_COLOR } from './meta'
 import { useAttendanceOptions } from './useAttendanceOptions'
-import { exportToCSV } from '../../utils/exportCSV'
+import { exportToCSV } from '@/utils/exportCSV'
 import '@/styles/components.css'
-import OrgScopeNotice from '../../components/OrgScopeNotice'
+import OrgScopeNotice from '@/components/OrgScopeNotice'
 
 /** 列 key → i18n key：列标题唯一来源，表格与列配置面板共用 */
 const COL_KEY: Record<string, string> = {

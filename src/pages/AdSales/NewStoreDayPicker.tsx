@@ -12,9 +12,9 @@ import {
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
-import { fetchAdAlgorithms, fetchAdNewStoreInventory, placeAdNewStoreOrder } from '../../api/adPromotion'
-import type { AdNewStoreInventoryVO } from '../../api/adPromotion'
-import { fetchStores } from '../../api/store'
+import { fetchAdAlgorithms, fetchAdNewStoreInventory, placeAdNewStoreOrder } from '@/api/adPromotion'
+import type { AdNewStoreInventoryVO } from '@/api/adPromotion'
+import { fetchStores } from '@/api/store'
 import { useNewStoreCalendar, AnimatedNumber } from '../_shared/ad-promotion/useNewStoreCalendar'
 
 // algorithm/store/BD options from backend

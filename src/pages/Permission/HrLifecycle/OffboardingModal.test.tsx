@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import i18n from '@/i18n'
 import OffboardingModal from './OffboardingModal'
-import { fetchOffboardingTasks } from '../../../api/hrOffboarding'
-import type { OffboardingTaskItem } from '../../../api/hrOffboarding'
+import { fetchOffboardingTasks } from '@/api/hrOffboarding'
+import type { OffboardingTaskItem } from '@/api/hrOffboarding'
 
-vi.mock('../../../api/hrOffboarding', async () => {
-  const actual = await vi.importActual<typeof import('../../../api/hrOffboarding')>('../../../api/hrOffboarding')
+vi.mock('@/api/hrOffboarding', async () => {
+  const actual = await vi.importActual<typeof import('@/api/hrOffboarding')>('@/api/hrOffboarding')
   return { ...actual, fetchOffboardingTasks: vi.fn(), assignOffboardingReceiver: vi.fn(), retryOffboardingTask: vi.fn() }
 })
 

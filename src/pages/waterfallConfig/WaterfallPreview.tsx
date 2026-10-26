@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Tag } from 'antd'
-import type { WaterfallBusinessType, WaterfallContentType, WaterfallLayoutColumns, WaterfallDisplayCategoryMode, WaterfallBizChannel } from './types'
+import type { WaterfallBusinessType, WaterfallContentType, WaterfallLayoutColumns, WaterfallDisplayCategoryMode, WaterfallBizChannel } from '@mftb/contracts/waterfallTypes'
 import { toPreviewRows, type PreviewCard } from './previewLayout'
 
 /** 算法类型标签/配色（预览用，与算法库 algo_type 对齐） */

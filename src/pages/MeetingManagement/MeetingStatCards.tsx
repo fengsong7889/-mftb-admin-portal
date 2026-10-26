@@ -12,7 +12,7 @@
  * 且颜色无法跟随卡片主色）。现在图标 20px 取卡片主色，数值走 useCountUp 计数动画。
  */
 import type { ReactNode } from 'react'
-import AnimatedNumber from '../../components/AnimatedNumber'
+import AnimatedNumber from '@/components/AnimatedNumber'
 
 export interface StatItem {
   /** 语义图标（antd 图标组件），颜色自动取卡片主色 */

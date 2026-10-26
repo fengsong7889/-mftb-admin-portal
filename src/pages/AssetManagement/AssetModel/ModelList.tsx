@@ -14,8 +14,8 @@ import { useTranslation } from 'react-i18next'
 import {
   fetchModelList, fetchBrandList, fetchCategoryList, deleteModel, deleteBrand,
   type AssetModel, type AssetBrand, type AssetCategory, type BrandQuery,
-} from '../../../api/eam'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+} from '@/api/eam'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import '../AssetCategory/index.css'
 
 interface Props {

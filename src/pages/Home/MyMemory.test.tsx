@@ -7,7 +7,7 @@ import {
   fetchMemories,
   updateMemory,
   type AiUserMemory,
-} from '../../api/aiMemory'
+} from '@/api/aiMemory'
 
 const { translate } = vi.hoisted(() => ({
   translate: (key: string, options?: { defaultValue?: string } | string) =>
@@ -18,7 +18,7 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: translate }),
 }))
 
-vi.mock('../../api/aiMemory', () => ({
+vi.mock('@/api/aiMemory', () => ({
   fetchMemories: vi.fn(),
   createMemory: vi.fn(),
   updateMemory: vi.fn(),

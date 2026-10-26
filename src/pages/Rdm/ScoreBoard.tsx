@@ -22,14 +22,14 @@ import {
   TeamOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import StatCards from '../../components/StatCards'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import StatCards from '@/components/StatCards'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { rdmTableLocale } from './components/tableLocale'
 import { deriveRdmColumnMeta } from './rdmColumnMeta'
 /** 阶段 6：页内展开预算、HR 建议与指标口径（不新建路由，避开菜单页名兜底表上限） */
 import GovernancePanel from './components/GovernancePanel'
-import { formatEmployee } from '../../utils/employeeDisplay'
-import { useAuth } from '../../contexts/AuthContext'
+import { formatEmployee } from '@/utils/employeeDisplay'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   fetchScoreBoard,
   pushScoreToPerf,
@@ -37,7 +37,7 @@ import {
   type RdmPersonalScore,
   type RdmScoreBoardData,
   type RdmScoreRecord,
-} from '../../api/rdm'
+} from '@/api/rdm'
 import {
   RDM_REQ_TYPE_LABEL,
   RDM_ROLE_LABEL,
@@ -49,7 +49,7 @@ import {
   type RdmReqType,
   type RdmRoleCode,
   type RdmScorePushStatus,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import { ComplexityTag, PriorityTag } from './components/Tags'
 import './index.css'
 

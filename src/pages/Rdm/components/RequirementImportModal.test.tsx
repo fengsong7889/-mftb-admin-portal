@@ -8,8 +8,8 @@
  */
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import i18n from '../../../i18n'
-import { RDM_STATUS } from '../../../constants/rdm'
+import i18n from '@/i18n'
+import { RDM_STATUS } from '@/constants/rdm'
 import type { ParsedRdmImportRow, RdmImportRowError } from '../rdmImport'
 import RequirementImportModal from './RequirementImportModal'
 

@@ -8,8 +8,8 @@ import { useEffect, useState } from 'react'
 import { Descriptions, Spin, Table, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { useTranslation } from 'react-i18next'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import { fetchConsumableInboundOrderDetail, type ConsumableInboundItem, type ConsumableInboundOrder } from '../../../api/consumable'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import { fetchConsumableInboundOrderDetail, type ConsumableInboundItem, type ConsumableInboundOrder } from '@/api/consumable'
 import { INBOUND_TYPE_MAP } from './inboundMeta'
 
 interface Props {

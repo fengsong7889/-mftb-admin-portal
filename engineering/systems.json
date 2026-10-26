@@ -1,0 +1,1228 @@
+{
+ "$comment": [
+  "工程归属登记表（分系统独立工程改造方案 §4.1 / P0 产物）。",
+  "派生部分由 engineering/generate-systems.py 重跑生成；人工补充段在该脚本内维护。",
+  "isolation=isolated 只有在对应 app/module 目录真实存在时才会被写出，",
+  "scripts/check-engineering-registry.mjs 会拒绝「声称已独立但目录不存在」的假声明。",
+  "unattributed 是显式的未归属清单：新增未登记的前端目录或后端类名前缀都会让门禁失败，",
+  "已归属却未从这里移除同样失败 —— 与 boundary-baseline 相同的双向棘轮口径。"
+ ],
+ "generatedFrom": {
+  "menuSnapshotRows": 264,
+  "menuSnapshotNote": "sys_menu 中 deleted=0 且 status=1 的菜单；重跑方式见 engineering/README.md"
+ },
+ "sharedFrontendDirs": [
+  "_shared"
+ ],
+ "multiOwnerExceptions": {
+  "Permission": "权限管理页面群：菜单分属 hr / attendance / iam（员工授权、考勤授权、授权中心），物理上仍是同一个目录，P2 拆应用时需按系统拆到各自 app 或留公共壳",
+  "Hcm": "人事中心页面群：菜单分属 hr / organization / payroll，同 Permission 处理",
+  "LoginLog": "登录审计页：菜单同时挂在 HR（员工行为审计）与权限中心（账号安全）下，属两个系统共用的只读列表，P2 归入权限中心后由 HR 侧跳转"
+ },
+ "systems": {
+  "ads": {
+   "name": "广告与推广系统",
+   "priority": false,
+   "isolation": {
+    "frontend": "pending",
+    "backend": "pending"
+   },
+   "planned": {
+    "frontendApp": "frontend/apps/ads",
+    "backendModule": "backend/modules/ads"
+   },
+   "frontendDirs": {
+    "AdSales": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "ad-sales"
+     ]
+    },
+    "GiftManage": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "gift-consume-detail",
+      "gift-detail"
+     ]
+    },
+    "GroupPurchase": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "flash-sale-price",
+      "flash-sale-register",
+      "flash-sale-stats",
+      "group-purchase-dashboard"
+     ]
+    },
+    "OrderDetail": {
+     "evidence": "naming",
+     "reason": "推广订单详情，广告/团购订单子页面"
+    },
+    "PromotionOrderManage": {
+     "evidence": "naming",
+     "reason": "推广订单管理，广告销售子页面"
+    },
+    "PromotionOrderManageStandalone": {
+     "evidence": "naming",
+     "reason": "推广订单独立入口，同上"
+    },
+    "PromotionSlotConfig": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "promotion-slot-config"
+     ]
+    },
+    "PromotionWordLibrary": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "promotion-word-library"
+     ]
+    },
+    "Recommend": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "promotion-algorithm",
+      "promotion-dashboard",
+      "promotion-waterfall"
+     ]
+    },
+    "TrafficSandbox": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "algorithm-simulation",
+      "merchant-promotion-diagnose",
+      "merchant-score-insight",
+      "waterfall-simulation"
+     ]
+    },
+    "waterfallConfig": {
+     "evidence": "naming",
+     "reason": "瀑布流配置类型与组件，广告推荐域"
+    }
+   },
+   "backendPrefixes": {
+    "Ad": 125,
+    "Organic": 13,
+    "Gift": 7,
+    "Activity": 5,
+    "Flash": 4,
+    "Card": 4
+   },
+   "testCounts": {
+    "frontend": 10,
+    "backend": 4
+   }
+  },
+  "ai": {
+   "name": "AI 管理系统",
+   "priority": false,
+   "isolation": {
+    "frontend": "pending",
+    "backend": "pending"
+   },
+   "planned": {
+    "frontendApp": "frontend/apps/ai",
+    "backendModule": "backend/modules/ai"
+   },
+   "frontendDirs": {
+    "AiAccessApply": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "ai-access-request"
+     ]
+    },
+    "AiAssistant": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "ai-assistant-audit",
+      "ai-assistant-capability",
+      "ai-assistant-feedback",
+      "ai-assistant-glossary",
+      "ai-assistant-guardrail",
+      "ai-assistant-knowledge",
+      "ai-assistant-memory",
+      "ai-assistant-overview",
+      "ai-assistant-profile",
+      "ai-assistant-push-template",
+      "ai-assistant-quick-prompt"
+     ]
+    },
+    "AiAssistantConfig": {
+     "evidence": "naming",
+     "reason": "AI 助手提示词/能力配置，AI 管理域"
+    },
+    "AiConversationAudit": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "ai-conversation-audit"
+     ]
+    },
+    "AiEmpPermission": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "ai-emp-permission"
+     ]
+    },
+    "AiEnergyDetail": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "ai_energy_detail"
+     ]
+    },
+    "AiModelList": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "ai-model-list"
+     ]
+    },
+    "AiModelProvider": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "ai-model-provider"
+     ]
+    },
+    "AiOperationAuth": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "ai-operation-auth"
+     ]
+    },
+    "AiQuotaAuth": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "ai-dept-model-auth",
+      "ai-dept-quota",
+      "ai-emp-model-auth",
+      "ai-emp-quota"
+     ]
+    },
+    "AiUsageStats": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "ai_usage_stats"
+     ]
+    },
+    "McpService": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "ai-mcp-service"
+     ]
+    }
+   },
+   "backendPrefixes": {
+    "Ai": 167,
+    "Agent": 17,
+    "Llm": 11,
+    "Mcp": 11
+   },
+   "testCounts": {
+    "frontend": 7,
+    "backend": 36
+   }
+  },
+  "attendance": {
+   "name": "考勤系统",
+   "priority": false,
+   "isolation": {
+    "frontend": "pending",
+    "backend": "pending"
+   },
+   "planned": {
+    "frontendApp": "frontend/apps/attendance",
+    "backendModule": "backend/modules/attendance"
+   },
+   "frontendDirs": {
+    "Attendance": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "attendance-daily",
+      "attendance-exception",
+      "attendance-group",
+      "attendance-holiday",
+      "attendance-monthly",
+      "attendance-punch",
+      "attendance-schedule",
+      "attendance-setting",
+      "attendance-shift",
+      "attendance-workbench"
+     ]
+    },
+    "Permission": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "hr-leave",
+      "hr-leave-quota"
+     ]
+    }
+   },
+   "backendPrefixes": {
+    "Attendance": 51,
+    "Att": 18
+   },
+   "testCounts": {
+    "frontend": 8,
+    "backend": 15
+   }
+  },
+  "doc": {
+   "name": "文档中心",
+   "priority": false,
+   "isolation": {
+    "frontend": "pending",
+    "backend": "pending"
+   },
+   "planned": {
+    "frontendApp": "frontend/apps/doc",
+    "backendModule": "backend/modules/doc"
+   },
+   "frontendDirs": {
+    "DocCenter": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "doc-api-center",
+      "doc-governance",
+      "doc-learning",
+      "doc-library",
+      "doc-plans",
+      "doc-space",
+      "doc-stats",
+      "doc-system-plans"
+     ]
+    }
+   },
+   "backendPrefixes": {
+    "Doc": 64
+   },
+   "testCounts": {
+    "frontend": 4,
+    "backend": 16
+   }
+  },
+  "eam": {
+   "name": "物资管理系统",
+   "priority": true,
+   "isolation": {
+    "frontend": "pending",
+    "backend": "pending"
+   },
+   "planned": {
+    "frontendApp": "frontend/apps/eam",
+    "backendModule": "backend/modules/eam"
+   },
+   "frontendDirs": {
+    "AssetClaimSign": {
+     "evidence": "naming",
+     "reason": "资产领用签收（免登/扫码入口），资产域"
+    },
+    "AssetManagement": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "asset-borrow",
+      "asset-category",
+      "asset-claim",
+      "asset-compensation",
+      "asset-dashboard",
+      "asset-flow",
+      "asset-handover",
+      "asset-inbound",
+      "asset-inventory",
+      "asset-list",
+      "asset-location",
+      "asset-loss",
+      "asset-model",
+      "asset-repair",
+      "asset-return",
+      "asset-scrap",
+      "asset-supplier",
+      "asset-tag",
+      "asset-transfer-list",
+      "param-library",
+      "purchase-order"
+     ]
+    },
+    "AssetTagView": {
+     "evidence": "naming",
+     "reason": "资产标签打印预览，资产域子页面"
+    },
+    "BrandProductLibrary": {
+     "evidence": "naming",
+     "reason": "品牌产品库，资产基础数据"
+    },
+    "Consumable": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "consumable-alert",
+      "consumable-claim",
+      "consumable-dashboard",
+      "consumable-inbound",
+      "consumable-item",
+      "consumable-report",
+      "consumable-stock",
+      "consumable-stock-txn"
+     ]
+    },
+    "MyAssets": {
+     "evidence": "naming",
+     "reason": "我的资产（员工自助查看），数据属资产域"
+    },
+    "VehicleManagement": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "my-vehicle-use",
+      "vehicle-dispatch",
+      "vehicle-files",
+      "vehicle-ledger",
+      "vehicle-master-data"
+     ]
+    }
+   },
+   "backendPrefixes": {
+    "Eam": 268,
+    "Vehicle": 36,
+    "Consumable": 10
+   },
+   "testCounts": {
+    "frontend": 7,
+    "backend": 19
+   }
+  },
+  "finance": {
+   "name": "财务系统",
+   "priority": false,
+   "isolation": {
+    "frontend": "pending",
+    "backend": "pending"
+   },
+   "planned": {
+    "frontendApp": "frontend/apps/finance",
+    "backendModule": "backend/modules/finance"
+   },
+   "frontendDirs": {
+    "AccountBalance": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "account-balance"
+     ]
+    },
+    "ApprovalCenter": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "approval-center"
+     ]
+    },
+    "BatchQuery": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "batch-query"
+     ]
+    },
+    "ConsumeRisk": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "consume-risk"
+     ]
+    },
+    "DebtDetail": {
+     "evidence": "naming",
+     "reason": "欠款单明细，财务域子页面"
+    },
+    "DebtReconcile": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "debt-reconcile"
+     ]
+    },
+    "DetailQuery": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "detail-query"
+     ]
+    },
+    "WriteoffReconcile": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "writeoff-reconcile"
+     ]
+    }
+   },
+   "backendPrefixes": {
+    "Fin": 61
+   },
+   "testCounts": {
+    "frontend": 1,
+    "backend": 2
+   }
+  },
+  "hr": {
+   "name": "HR 系统",
+   "priority": true,
+   "isolation": {
+    "frontend": "pending",
+    "backend": "pending"
+   },
+   "planned": {
+    "frontendApp": "frontend/apps/hr",
+    "backendModule": "backend/modules/hr"
+   },
+   "frontendDirs": {
+    "Ess": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "ess-center",
+      "ess-certificate",
+      "ess-leave",
+      "ess-performance",
+      "ess-profile",
+      "ess-requests"
+     ]
+    },
+    "Hcm": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "hcm-person"
+     ]
+    },
+    "HcmBlueprint": {
+     "evidence": "naming",
+     "reason": "人事蓝图/组织可视化，HR 域子页面"
+    },
+    "LoginLog": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "login-log"
+     ]
+    },
+    "PerfReport": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "hr-perf-appeal",
+      "hr-perf-audit",
+      "hr-perf-ledger",
+      "perf-report-center"
+     ]
+    },
+    "Performance": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "hr-perf-admin",
+      "hr-perf-calibration",
+      "hr-perf-review",
+      "perf-center"
+     ]
+    },
+    "Permission": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "contract-ledger",
+      "employee-management",
+      "hr-certificate",
+      "hr-dict",
+      "hr-dimission",
+      "hr-onboarding",
+      "hr-regularization",
+      "hr-transfer",
+      "org-structure",
+      "position-management"
+     ]
+    }
+   },
+   "backendPrefixes": {
+    "Hr": 139,
+    "Hcm": 25,
+    "Emp": 17,
+    "Org": 17,
+    "Employee": 16,
+    "Position": 9,
+    "Emergency": 4,
+    "Contract": 4
+   },
+   "testCounts": {
+    "frontend": 11,
+    "backend": 41
+   }
+  },
+  "i18n": {
+   "name": "多语言系统",
+   "priority": false,
+   "isolation": {
+    "frontend": "pending",
+    "backend": "pending"
+   },
+   "planned": {
+    "frontendApp": "frontend/apps/i18n",
+    "backendModule": "backend/modules/i18n"
+   },
+   "frontendDirs": {
+    "I18nCenter": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "i18n-dashboard",
+      "i18n-import-export",
+      "i18n-language",
+      "i18n-mt-engine",
+      "translation-manage"
+     ]
+    },
+    "TranslationManage": {
+     "evidence": "naming",
+     "reason": "翻译管理"
+    }
+   },
+   "backendPrefixes": {},
+   "testCounts": {
+    "frontend": 0,
+    "backend": 0
+   }
+  },
+  "iam": {
+   "name": "权限中心",
+   "priority": false,
+   "isolation": {
+    "frontend": "pending",
+    "backend": "pending"
+   },
+   "planned": {
+    "frontendApp": "frontend/apps/iam",
+    "backendModule": "backend/modules/iam"
+   },
+   "frontendDirs": {
+    "LoginLog": {
+     "evidence": "naming",
+     "reason": "登录审计，方案 §三 归权限中心"
+    },
+    "MenuConfig": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "menu-config"
+     ]
+    },
+    "Permission": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "authorization-center",
+      "data-permission",
+      "role-management"
+     ]
+    }
+   },
+   "backendPrefixes": {
+    "Permission": 12,
+    "Data": 8,
+    "Role": 6,
+    "Menu": 6,
+    "Authorization": 3
+   },
+   "testCounts": {
+    "frontend": 8,
+    "backend": 8
+   }
+  },
+  "meeting": {
+   "name": "会议系统",
+   "priority": false,
+   "isolation": {
+    "frontend": "pending",
+    "backend": "pending"
+   },
+   "planned": {
+    "frontendApp": "frontend/apps/meeting",
+    "backendModule": "backend/modules/meeting"
+   },
+   "frontendDirs": {
+    "MeetingCheckin": {
+     "evidence": "naming",
+     "reason": "会议签到"
+    },
+    "MeetingManagement": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "meeting-booking",
+      "meeting-config",
+      "meeting-my",
+      "meeting-record",
+      "meeting-room"
+     ]
+    },
+    "MeetingMinutesAdmin": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "meeting-minutes-list"
+     ]
+    },
+    "MeetingMinutesView": {
+     "evidence": "naming",
+     "reason": "会议纪要免登查看"
+    },
+    "MeetingView": {
+     "evidence": "naming",
+     "reason": "会议免登查看"
+    }
+   },
+   "backendPrefixes": {
+    "Meeting": 68,
+    "Mt": 5
+   },
+   "testCounts": {
+    "frontend": 8,
+    "backend": 18
+   }
+  },
+  "merchant": {
+   "name": "商户运营系统",
+   "priority": false,
+   "isolation": {
+    "frontend": "pending",
+    "backend": "pending"
+   },
+   "planned": {
+    "frontendApp": "frontend/apps/merchant",
+    "backendModule": "backend/modules/merchant"
+   },
+   "frontendDirs": {
+    "MapPlanning": {
+     "evidence": "naming",
+     "reason": "地图规划，商户运营域"
+    },
+    "MerchantGroup": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "merchant-group-list",
+      "store-list"
+     ]
+    }
+   },
+   "backendPrefixes": {
+    "Biz": 29,
+    "Store": 13,
+    "Merchant": 6
+   },
+   "testCounts": {
+    "frontend": 0,
+    "backend": 2
+   }
+  },
+  "oa": {
+   "name": "流程审批系统",
+   "priority": false,
+   "isolation": {
+    "frontend": "pending",
+    "backend": "pending"
+   },
+   "planned": {
+    "frontendApp": "frontend/apps/oa",
+    "backendModule": "backend/modules/oa"
+   },
+   "frontendDirs": {
+    "OACenter": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "oa-requests",
+      "process-center"
+     ]
+    },
+    "WorkflowConfig": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "workflow-config"
+     ]
+    }
+   },
+   "backendPrefixes": {
+    "Oa": 20,
+    "Workflow": 8,
+    "Approver": 2
+   },
+   "testCounts": {
+    "frontend": 1,
+    "backend": 2
+   }
+  },
+  "organization": {
+   "name": "组织架构系统",
+   "priority": false,
+   "isolation": {
+    "frontend": "pending",
+    "backend": "pending"
+   },
+   "planned": {
+    "frontendApp": "frontend/apps/organization",
+    "backendModule": "backend/modules/organization"
+   },
+   "frontendDirs": {
+    "Hcm": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "hcm-org-job-family",
+      "hcm-org-job-grade",
+      "hcm-org-legal",
+      "hcm-org-position",
+      "hcm-org-unit"
+     ]
+    }
+   },
+   "backendPrefixes": {},
+   "testCounts": {
+    "frontend": 0,
+    "backend": 0
+   }
+  },
+  "payroll": {
+   "name": "薪酬系统",
+   "priority": false,
+   "isolation": {
+    "frontend": "pending",
+    "backend": "pending"
+   },
+   "planned": {
+    "frontendApp": "frontend/apps/payroll",
+    "backendModule": "backend/modules/payroll"
+   },
+   "frontendDirs": {
+    "Hcm": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "hcm-payroll-benefit",
+      "hcm-payroll-component",
+      "hcm-payroll-rule",
+      "hcm-payroll-run",
+      "hcm-payroll-standard"
+     ]
+    }
+   },
+   "backendPrefixes": {
+    "Payroll": 33,
+    "Salary": 6
+   },
+   "testCounts": {
+    "frontend": 0,
+    "backend": 4
+   }
+  },
+  "platform": {
+   "name": "平台支撑系统",
+   "priority": false,
+   "isolation": {
+    "frontend": "pending",
+    "backend": "pending"
+   },
+   "planned": {
+    "frontendApp": "frontend/apps/platform",
+    "backendModule": "backend/modules/platform"
+   },
+   "frontendDirs": {
+    "NotificationChannelForm": {
+     "evidence": "naming",
+     "reason": "通知渠道配置表单"
+    },
+    "NotificationConfig": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "notification-config"
+     ]
+    },
+    "NotificationSwitch": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "notification-switch"
+     ]
+    },
+    "NotificationTemplate": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "notification-template"
+     ]
+    },
+    "PageDescriptionEditor": {
+     "evidence": "naming",
+     "reason": "页面说明/帮助文案编辑器"
+    },
+    "RuleConfig": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "rule-ad-sales",
+      "rule-algorithm",
+      "rule-config",
+      "rule-gift",
+      "rule-security",
+      "rule-seq"
+     ]
+    },
+    "VersionHistory": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "version-history"
+     ]
+    }
+   },
+   "backendPrefixes": {
+    "Sys": 66,
+    "System": 23,
+    "Notification": 11,
+    "Translation": 7,
+    "Ding": 7,
+    "Word": 6,
+    "Version": 5,
+    "Schema": 5,
+    "Migration": 4,
+    "Api": 3,
+    "Avatar": 2,
+    "Batch": 2,
+    "Date": 2
+   },
+   "testCounts": {
+    "frontend": 1,
+    "backend": 20
+   }
+  },
+  "portal": {
+   "name": "企业门户",
+   "priority": false,
+   "isolation": {
+    "frontend": "pending",
+    "backend": "pending"
+   },
+   "planned": {
+    "frontendApp": "frontend/apps/portal",
+    "backendModule": "backend/modules/portal"
+   },
+   "frontendDirs": {
+    "Home": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "home"
+     ]
+    },
+    "Login": {
+     "evidence": "naming",
+     "reason": "登录入口，属门户公共壳"
+    },
+    "Portal": {
+     "evidence": "naming",
+     "reason": "集团门户首页"
+    }
+   },
+   "backendPrefixes": {
+    "Portal": 2
+   },
+   "testCounts": {
+    "frontend": 5,
+    "backend": 1
+   }
+  },
+  "rdm": {
+   "name": "产研交付系统",
+   "priority": true,
+   "isolation": {
+    "frontend": "pending",
+    "backend": "pending"
+   },
+   "planned": {
+    "frontendApp": "frontend/apps/rdm",
+    "backendModule": "backend/modules/rdm"
+   },
+   "frontendDirs": {
+    "PagePRDView": {
+     "evidence": "naming",
+     "reason": "PRD 免登查看"
+    },
+    "Rdm": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "rdm-acceptance",
+      "rdm-config-group",
+      "rdm-config-routing",
+      "rdm-config-score",
+      "rdm-config-sla",
+      "rdm-config-status",
+      "rdm-daily-report-group",
+      "rdm-daily-report-record",
+      "rdm-daily-report-rule",
+      "rdm-daily-report-template",
+      "rdm-daily-report-trigger",
+      "rdm-dashboard",
+      "rdm-dashboard-board",
+      "rdm-dashboard-project",
+      "rdm-dashboard-quality",
+      "rdm-dashboard-report",
+      "rdm-dashboard-risk",
+      "rdm-dashboard-score",
+      "rdm-dashboard-trend",
+      "rdm-dashboard-version",
+      "rdm-delivery",
+      "rdm-delivery-board",
+      "rdm-delivery-iteration",
+      "rdm-delivery-release",
+      "rdm-delivery-test",
+      "rdm-efficiency",
+      "rdm-efficiency-output",
+      "rdm-intake",
+      "rdm-intake-approval",
+      "rdm-pool-group",
+      "rdm-release-accept-group",
+      "rdm-requirement",
+      "rdm-resource-load",
+      "rdm-task-type-config",
+      "rdm-test-quality-group",
+      "rdm-workbench"
+     ]
+    },
+    "RdmDailyReportView": {
+     "evidence": "naming",
+     "reason": "日报免登看板"
+    }
+   },
+   "backendPrefixes": {
+    "Rdm": 267
+   },
+   "testCounts": {
+    "frontend": 49,
+    "backend": 85
+   }
+  },
+  "search": {
+   "name": "搜索运营系统",
+   "priority": false,
+   "isolation": {
+    "frontend": "pending",
+    "backend": "pending"
+   },
+   "planned": {
+    "frontendApp": "frontend/apps/search",
+    "backendModule": "backend/modules/search"
+   },
+   "frontendDirs": {
+    "HintConfig": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "hint-config"
+     ]
+    },
+    "HintCreate": {
+     "evidence": "naming",
+     "reason": "搜索提示新建"
+    },
+    "HintPreview": {
+     "evidence": "naming",
+     "reason": "搜索提示预览"
+    },
+    "HintReport": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "hint-report"
+     ]
+    },
+    "HintVerify": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "hint-verify"
+     ]
+    },
+    "HotSearchConfig": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "hot-search-config"
+     ]
+    },
+    "HotSearchLibrary": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "hot-search-library"
+     ]
+    },
+    "HotSearchPreview": {
+     "evidence": "naming",
+     "reason": "热词预览"
+    },
+    "HotSearchReport": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "hot-search-report"
+     ]
+    },
+    "HotSearchVerify": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "hot-search-verify"
+     ]
+    },
+    "SearchConfigNew": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "channel-strategy",
+      "global-config"
+     ]
+    },
+    "SearchVerify": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "search-verify"
+     ]
+    },
+    "SearchVerifyDetail": {
+     "evidence": "naming",
+     "reason": "效果校验详情"
+    },
+    "SearchWeightConfig": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "search-weight-config"
+     ]
+    },
+    "StopWords": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "stop-words"
+     ]
+    },
+    "SynonymConfig": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "synonym-config"
+     ]
+    },
+    "WordSegmentation": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "word-segmentation"
+     ]
+    }
+   },
+   "backendPrefixes": {
+    "Search": 1
+   },
+   "testCounts": {
+    "frontend": 0,
+    "backend": 1
+   }
+  },
+  "seller": {
+   "name": "店鋪經營系統",
+   "priority": false,
+   "isolation": {
+    "frontend": "pending",
+    "backend": "pending"
+   },
+   "planned": {
+    "frontendApp": "frontend/apps/seller",
+    "backendModule": "backend/modules/seller"
+   },
+   "frontendDirs": {
+    "PromotionReport": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "promotion-report-compare",
+      "promotion-report-order",
+      "promotion-report-overview"
+     ]
+    },
+    "PromotionSalesConfig": {
+     "evidence": "menu-route",
+     "menuKeys": [
+      "promotion-sales-config"
+     ]
+    }
+   },
+   "backendPrefixes": {},
+   "testCounts": {
+    "frontend": 0,
+    "backend": 0
+   }
+  }
+ },
+ "unattributed": {
+  "frontendDirs": [
+   {
+    "dir": "AppPreview",
+    "reason": "预览壳页面，调用方与菜单归属未逐条核实，待补证后登记"
+   },
+   {
+    "dir": "ApprovalDetail",
+    "reason": "跨系统审批详情共用页（财务/OA/RDM/系统权限均落入此页），P2 需决定归入门户公共壳还是按域拆分，不得强行归一个系统"
+   }
+  ],
+  "backendPrefixes": {
+   "Login": 6,
+   "Department": 5,
+   "Auth": 3,
+   "Query": 3,
+   "Profile": 2,
+   "User": 2,
+   "Approval": 2,
+   "Rule": 2,
+   "Scope": 2,
+   "Employment": 2,
+   "Jwt": 2,
+   "Password": 2,
+   "Prom": 2,
+   "Person": 2,
+   "Result": 2,
+   "Captcha": 2,
+   "Segmentation": 2,
+   "Budget": 2,
+   "Mftb": 1,
+   "Change": 1,
+   "Recharge": 1,
+   "Basic": 1,
+   "Machine": 1,
+   "Cross": 1,
+   "Option": 1,
+   "Segment": 1,
+   "Roster": 1,
+   "Debt": 1,
+   "Transfer": 1,
+   "Add": 1,
+   "Bind": 1,
+   "Session": 1,
+   "Merge": 1,
+   "Status": 1,
+   "Deduct": 1,
+   "Inventory": 1,
+   "Page": 1,
+   "Reset": 1,
+   "Remove": 1,
+   "Language": 1,
+   "Translate": 1,
+   "Audit": 1,
+   "Approve": 1,
+   "Public": 1,
+   "Operator": 1,
+   "Convert": 1,
+   "Provider": 1,
+   "Network": 1,
+   "File": 1,
+   "Sort": 1,
+   "Sign": 1,
+   "Hot": 1,
+   "Minutes": 1,
+   "Request": 1,
+   "Checkin": 1,
+   "Sql": 1,
+   "Sensitive": 1,
+   "Json": 1,
+   "Jackson": 1,
+   "Security": 1,
+   "Authz": 1,
+   "Access": 1,
+   "My": 1,
+   "Downgrade": 1,
+   "Rest": 1,
+   "Dept": 1,
+   "Database": 1,
+   "Require": 1,
+   "Ensure": 1,
+   "Iconfont": 1,
+   "Health": 1,
+   "Global": 1,
+   "Business": 1,
+   "Builtin": 1,
+   "Idempotent": 1,
+   "Evidence": 1,
+   "Email": 1,
+   "Abstract": 1,
+   "Conversation": 1,
+   "Lookup": 1,
+   "Local": 1,
+   "Tencent": 1
+  }
+ }
+}

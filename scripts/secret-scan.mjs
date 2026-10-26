@@ -165,6 +165,8 @@ console.log('🔍 扫描源码与工程脚本中的硬编码敏感信息...\n')
 
 try {
   scanDir(SRC_DIR, 'src')
+  // 共享层拆包后（方案 P2）也要纳入扫描，避免凭据藏进 workspace 包
+  scanDir(join(CWD, 'frontend'), 'frontend')
   for (const dir of INFRA_DIRS) scanDir(join(CWD, dir), 'infra')
 } catch (e) {
   console.error(`扫描失败: ${e.message}`)

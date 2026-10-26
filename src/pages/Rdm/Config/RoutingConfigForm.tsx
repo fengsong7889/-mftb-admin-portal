@@ -14,7 +14,7 @@ import { SaveOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import RdmFormHeader from '../components/RdmFormHeader'
-import { fetchDepartments } from '../../../api/department'
+import { fetchDepartments } from '@/api/department'
 import { buildDeptTree, type DeptNode } from '../../Attendance/deptTree'
 import {
   fetchProductOptions,
@@ -22,10 +22,10 @@ import {
   saveRoutingRule,
   type RdmProductOption,
   type RdmRoutingRow,
-} from '../../../api/rdm'
-import { RDM_REQ_TYPE_LABEL } from '../../../constants/rdm'
-import { PORTAL_SYSTEM_ICONS } from '../../../constants/portalSystems'
-import { keyToPath } from '../../../constants/menuDataSource'
+} from '@/api/rdm'
+import { RDM_REQ_TYPE_LABEL } from '@/constants/rdm'
+import { PORTAL_SYSTEM_ICONS } from '@/constants/portalSystems'
+import { keyToPath } from '@/constants/menuDataSource'
 import '../index.css'
 
 interface FormValues {

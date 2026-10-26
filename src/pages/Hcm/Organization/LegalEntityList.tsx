@@ -15,8 +15,8 @@ import {
   SafetyCertificateOutlined, GlobalOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import StatCards, { type StatCardItem } from '../../../components/StatCards'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import StatCards, { type StatCardItem } from '@/components/StatCards'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   JURISDICTION_OPTIONS,
   deleteLegalEntity,
@@ -25,7 +25,7 @@ import {
   updateLegalEntity,
   type OrgLegalEntity,
   type OrgLegalEntityStats,
-} from '../../../api/hcmOrganization'
+} from '@/api/hcmOrganization'
 
 interface Filters {
   keyword?: string

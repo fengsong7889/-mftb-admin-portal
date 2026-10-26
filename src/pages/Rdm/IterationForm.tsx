@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react'
 import { Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Select, message } from 'antd'
 import { CalendarOutlined, SaveOutlined, TeamOutlined } from '@ant-design/icons'
-import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
+import EmployeeSelect from '@/components/EmployeeSelect'
 import RdmFormHeader from './components/RdmFormHeader'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -20,7 +20,7 @@ import {
   type RdmIterationForm as RdmIterationPayload,
   type RdmIterationItem,
   type RdmProjectListItem,
-} from '../../api/rdm'
+} from '@/api/rdm'
 import {
   RDM_ITERATION_STATUS,
   RDM_ITERATION_STATUS_LABEL,
@@ -29,7 +29,7 @@ import {
   RDM_PROJECT_STATUS,
   type RdmIterationStatus,
   type RdmIterationType,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import './index.css'
 
 const { TextArea } = Input

@@ -1,7 +1,7 @@
 import { Tag, Button } from 'antd'
 import { ShoppingCartOutlined, OrderedListOutlined } from '@ant-design/icons'
-import { ALGO_CARD_COLOR_MAP } from '../../Recommend/constants'
-import type { useCardOrder } from '../../../hooks/useCardOrder'
+import { ALGO_CARD_COLOR_MAP } from '@mftb/contracts/recommendConstants'
+import type { useCardOrder } from '@/hooks/useCardOrder'
 import type { RecommendTypeConfig } from './types'
 
 /**

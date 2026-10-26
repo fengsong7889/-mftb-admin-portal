@@ -16,16 +16,16 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { I18nextProvider } from 'react-i18next'
 import { MemoryRouter } from 'react-router-dom'
 import { Modal, message } from 'antd'
-import i18n from '../../../i18n'
-import zh from '../../../i18n/locales/zh-TW.json'
-import { fetchMenuTree } from '../../../api/menu'
+import i18n from '@/i18n'
+import zh from '@/i18n/locales/zh-TW.json'
+import { fetchMenuTree } from '@/api/menu'
 import {
   fetchMySystemAccessRequests, fetchRequestableSystems, fetchSelfServiceRoles,
   submitSystemAccessRequest,
-} from '../../../api/systemAccessRequest'
+} from '@/api/systemAccessRequest'
 import SystemAccessApply from './index'
 
-vi.mock('../../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
     user: {
       username: 'tester', name: '测试员工', empId: 'MF00099', role: 'guest',
@@ -36,8 +36,8 @@ vi.mock('../../../contexts/AuthContext', () => ({
   }),
 }))
 // 菜单接口仍然 mock：本页已不该调用它，用例 1 正是靠「一次都没调」来钉死架构泄露的修复
-vi.mock('../../../api/menu', () => ({ fetchMenuTree: vi.fn() }))
-vi.mock('../../../api/systemAccessRequest', () => ({
+vi.mock('@/api/menu', () => ({ fetchMenuTree: vi.fn() }))
+vi.mock('@/api/systemAccessRequest', () => ({
   submitSystemAccessRequest: vi.fn(),
   fetchMySystemAccessRequests: vi.fn(),
   fetchRequestableSystems: vi.fn(),

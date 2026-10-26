@@ -12,10 +12,10 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { Modal } from 'antd'
-import i18n from '../../i18n'
+import i18n from '@/i18n'
 import {
   deleteProject, fetchExportBundle, fetchProjectDetail, fetchProjectPage, fetchProjectStats, updateProject,
-} from '../../api/rdm'
+} from '@/api/rdm'
 import { exportProjectBundle } from './projectExport'
 import ProjectOverview from './ProjectOverview'
 
@@ -29,7 +29,7 @@ beforeAll(async () => {
  * 权限收敛与删除用例只针对性地摘掉对应动作。
  */
 const deniedPermissions = vi.hoisted(() => new Set<string>())
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
     hasPermission: (key: string) => !deniedPermissions.has(key),
     hasMenuPermission: () => true,
@@ -38,9 +38,9 @@ vi.mock('../../contexts/AuthContext', () => ({
 
 vi.mock('./projectExport', () => ({ exportProjectBundle: vi.fn() }))
 
-vi.mock('../../api/employee', () => ({ fetchEmployees: vi.fn() }))
+vi.mock('@/api/employee', () => ({ fetchEmployees: vi.fn() }))
 
-vi.mock('../../api/rdm', () => ({
+vi.mock('@/api/rdm', () => ({
   fetchProjectPage: vi.fn(),
   fetchProjectStats: vi.fn(),
   fetchExportBundle: vi.fn(),

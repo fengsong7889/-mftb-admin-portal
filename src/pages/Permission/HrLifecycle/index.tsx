@@ -1,4 +1,4 @@
-import type { HrLifecycleType } from '../../../api/hrLifecycle'
+import type { HrLifecycleType } from '@/api/hrLifecycle'
 import LifecycleList from './LifecycleList'
 
 /**

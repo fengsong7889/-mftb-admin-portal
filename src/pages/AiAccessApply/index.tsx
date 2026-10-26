@@ -19,7 +19,7 @@ import {
   FileTextOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { submitOaRequest } from '../../api/oaRequest'
+import { submitOaRequest } from '@/api/oaRequest'
 
 /** 申請類型 */
 type AiRequestType = 'model_only' | 'model_and_quota' | 'quota_only'
@@ -53,11 +53,11 @@ function uploadAiCredential(file: File): Promise<AiCredentialItem> {
     reader.readAsDataURL(file)
   })
 }
-import { fetchModels, type AiModel } from '../../api/aiModel'
-import { fetchMyModels, type MyModel } from '../../api/aiMyCenter'
-import { addApprovalRecord, generateFlowNo, formatNow } from '../../utils/approvalStore'
-import type { ApprovalRecord } from '../../utils/approvalStore'
-import { useAuth } from '../../contexts/AuthContext'
+import { fetchModels, type AiModel } from '@/api/aiModel'
+import { fetchMyModels, type MyModel } from '@/api/aiMyCenter'
+import { addApprovalRecord, generateFlowNo, formatNow } from '@/utils/approvalStore'
+import type { ApprovalRecord } from '@/utils/approvalStore'
+import { useAuth } from '@/contexts/AuthContext'
 import dayjs from 'dayjs'
 
 const { TextArea } = Input

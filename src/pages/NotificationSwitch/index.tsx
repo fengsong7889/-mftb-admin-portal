@@ -10,8 +10,8 @@ import { Alert, Button, Modal, Space, Switch, Table, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import DetailPageHeader from '../../components/DetailPageHeader'
-import { fetchNotifySwitches, saveNotifySwitch, type NotifySwitchVO } from '../../api/meetingNotify'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import { fetchNotifySwitches, saveNotifySwitch, type NotifySwitchVO } from '@/api/meetingNotify'
 
 export default function NotificationSwitch() {
   const { t } = useTranslation()

@@ -5,8 +5,8 @@
  * 若在此處用無 ns 的 useTranslation() 查不到翻譯，界面會直接顯示原始 key。
  */
 import { Form, Select } from 'antd'
-import type { MerchantGroupItem } from '../../../api/merchantGroup'
-import type { StoreItem } from '../../../api/store'
+import type { MerchantGroupItem } from '@/api/merchantGroup'
+import type { StoreItem } from '@/api/store'
 
 type TFn = (key: string) => string
 

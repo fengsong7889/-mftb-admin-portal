@@ -1,6 +1,6 @@
 import dayjs from 'dayjs'
-import { AlgorithmType, Region, RecommendChannel, AppType } from '../../Recommend/constants'
-import { BIZ_CHANNEL, type BizChannelValue } from '../../../constants/bizChannel'
+import { AlgorithmType, Region, RecommendChannel, AppType } from '@mftb/contracts/recommendConstants'
+import { BIZ_CHANNEL, type BizChannelValue } from '@/constants/bizChannel'
 
 /** 时段状态枚举 */
 export enum TimeSlotStatus {

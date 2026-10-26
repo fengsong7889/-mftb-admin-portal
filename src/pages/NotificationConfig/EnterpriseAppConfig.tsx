@@ -5,9 +5,9 @@ import NotificationFormHeader, { notificationCardStyle as cardStyle } from './No
 import './index.css'
 import { ApiOutlined, SafetyCertificateOutlined, SaveOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { useAuth } from '../../contexts/AuthContext'
-import { fetchAppConfig, saveAppConfig, testAppConnection } from '../../api/notificationChannel'
-import type { AppNotificationConfig, AppNotificationConfigPayload } from '../../api/notificationChannel'
+import { useAuth } from '@/contexts/AuthContext'
+import { fetchAppConfig, saveAppConfig, testAppConnection } from '@/api/notificationChannel'
+import type { AppNotificationConfig, AppNotificationConfigPayload } from '@/api/notificationChannel'
 
 /** 独立应用表单；密钥只在编辑期间存在，不回填、不持久化到浏览器。 */
 export default function EnterpriseAppConfig() {

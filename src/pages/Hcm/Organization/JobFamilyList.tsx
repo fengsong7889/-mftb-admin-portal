@@ -10,13 +10,13 @@ import { Button, Form, Input, Modal, Select, Space, Table, Tag, message } from '
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   deleteJobFamily,
   listJobFamilies,
   updateJobFamily,
   type OrgJobFamily,
-} from '../../../api/hcmOrganization'
+} from '@/api/hcmOrganization'
 
 interface Filters {
   keyword?: string

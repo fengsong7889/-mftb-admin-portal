@@ -710,6 +710,21 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
     private static final String VERSION_PRD_ROW_VERSION = "rdm:schema:v3.34";
     private static final String PRD_ROW_VERSION_DDL =
             "ALTER TABLE rdm_prd ADD COLUMN row_version INT NOT NULL DEFAULT 0 COMMENT '并发版本号(乐观锁)'";
+    /**
+     * v3.35：执行任务新增「计划上线日」{@code rdm_work_task.plan_release_date}。
+     *
+     * <p><b>为何需要</b>：需求计划上线是拆任务时唯一对外承诺的时间边界。
+     * 原先任务只有计划起止，子任务可随便写到上线日之后，甘特图看着满、需求却交不出来。
+     * 独立成列而不是复用 {@code plan_finish_date}：开发完成日与上线日不同义，
+     * 上线还包含提测/验收/发布窗口，合在一起会让“完成”与“上线”无法分开考核。
+     *
+     * <p><b>幂等</b>：先查 INFORMATION_SCHEMA 再 ADD COLUMN，可重放；无 DROP、无数据改写，
+     * 存量行留 NULL（不悄悄补成需求上线日，那会把未排期的任务伪装成已排期）。
+     */
+    private static final String VERSION_TASK_PLAN_RELEASE = "rdm:schema:v3.35";
+    private static final String TASK_PLAN_RELEASE_DDL =
+            "ALTER TABLE rdm_work_task ADD COLUMN plan_release_date DATE DEFAULT NULL "
+                    + "COMMENT '計劃上線日（不得晚於需求計劃上線日）' AFTER plan_finish_date";
     /** 清姓名占位符（连同其后的中英文逗号/冒号与空格），顺序：长串优先，最后才是裸占位符 */
     private static final String[][] DAILY_REPORT_NO_NAME_PATTERNS = {
             {"{{userName}}，", ""},
@@ -1070,6 +1085,23 @@ public class RdmSchemaMigrationInitializer implements CommandLineRunner {
                 this::doScheduleRequiredFieldsSeed, this::verifyScheduleRequiredFieldsSeed);
         versionTracker.applyOnce(VERSION_PRD_ROW_VERSION,
                 this::doPrdRowVersionMigrate, this::verifyPrdRowVersionMigrate);
+        versionTracker.applyOnce(VERSION_TASK_PLAN_RELEASE,
+                this::doTaskPlanReleaseMigrate, this::verifyTaskPlanReleaseMigrate);
+    }
+
+    /** v3.35：给 rdm_work_task 补计划上线日（已存在则跳过，可重放） */
+    private void doTaskPlanReleaseMigrate() {
+        if (columnExists("rdm_work_task", "plan_release_date")) {
+            return;
+        }
+        jdbcTemplate.execute(TASK_PLAN_RELEASE_DDL);
+    }
+
+    /** v3.35 后置校验：列必须存在，否则保存时计划上线会被静默丢弃 */
+    private void verifyTaskPlanReleaseMigrate() {
+        if (!columnExists("rdm_work_task", "plan_release_date")) {
+            throw new IllegalStateException("RDM v3.35 核驗失敗：rdm_work_task.plan_release_date 列缺失");
+        }
     }
 
     /** v3.34：给 rdm_prd 补并发版本号列（已存在则跳过，可重放） */

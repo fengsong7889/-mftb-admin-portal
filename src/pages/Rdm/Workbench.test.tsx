@@ -22,7 +22,7 @@ import {
   fetchTodoBoard,
   fetchWorkbench,
   fetchWorkbenchSummary,
-} from '../../api/rdm'
+} from '@/api/rdm'
 import RdmWorkbench from './Workbench'
 
 /**
@@ -47,7 +47,7 @@ vi.mock('react-i18next', () => ({
   }),
 }))
 
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
     user: { empId: mockAuth.empId, role: 'guest', name: '張三' },
     hasMenuPermission: (menuKey: string) => mockAuth.menus.has(menuKey),
@@ -55,7 +55,7 @@ vi.mock('../../contexts/AuthContext', () => ({
   }),
 }))
 
-vi.mock('../../api/rdm', () => ({
+vi.mock('@/api/rdm', () => ({
   fetchWorkbench: vi.fn(),
   fetchRequirementPage: vi.fn(),
   fetchProjectPage: vi.fn(),

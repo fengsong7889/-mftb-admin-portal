@@ -11,17 +11,17 @@ import {
   QuestionCircleOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { useAuth } from '../../contexts/AuthContext'
-import BrandTag from '../../components/BrandTag'
-import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
+import BrandTag from '@/components/BrandTag'
+import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '@/constants/brand'
 import {
   fetchFinRiskPage,
   fetchFinAccounts,
   saveFinRiskConfig,
   saveFinRiskStatus,
-} from '../../api/finance'
-import type { FinRiskRow, FinAccount } from '../../api/finance'
+} from '@/api/finance'
+import type { FinRiskRow, FinAccount } from '@/api/finance'
 
 const { RangePicker } = DatePicker
 

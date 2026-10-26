@@ -3,28 +3,28 @@ import { MemoryRouter } from 'react-router-dom'
 import { I18nextProvider } from 'react-i18next'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ConfigProvider } from 'antd'
-import i18n from '../../i18n'
-import zhTW from '../../i18n/locales/zh-TW.json'
-import type { MenuVO } from '../../api/menu'
-import * as menuApi from '../../api/menu'
-import * as systemApi from '../../api/systemAuthorization'
+import i18n from '@/i18n'
+import zhTW from '@/i18n/locales/zh-TW.json'
+import type { MenuVO } from '@/api/menu'
+import * as menuApi from '@/api/menu'
+import * as systemApi from '@/api/systemAuthorization'
 import MenuConfig from './index'
 
 /** 当前登录角色：用例内切换以验证「高级设置/新增」仅超管可见 */
 const auth = vi.hoisted(() => ({ role: 'admin' as 'admin' | 'guest' }))
 
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: { role: auth.role }, hasMenuPermission: () => true }),
 }))
-vi.mock('../../hooks/useColumnConfig', () => ({
+vi.mock('@/hooks/useColumnConfig', () => ({
   useColumnConfig: () => ({ configComponent: null, applyConfig: (value: unknown) => value }),
 }))
-vi.mock('../../api/menu', async importOriginal => ({
-  ...await importOriginal<typeof import('../../api/menu')>(),
+vi.mock('@/api/menu', async importOriginal => ({
+  ...await importOriginal<typeof import('@/api/menu')>(),
   fetchMenuTree: vi.fn(), updateMenu: vi.fn(), updateMenuStatus: vi.fn(),
 }))
-vi.mock('../../api/systemAuthorization', async importOriginal => ({
-  ...await importOriginal<typeof import('../../api/systemAuthorization')>(),
+vi.mock('@/api/systemAuthorization', async importOriginal => ({
+  ...await importOriginal<typeof import('@/api/systemAuthorization')>(),
   fetchSystemsCatalog: vi.fn(),
 }))
 

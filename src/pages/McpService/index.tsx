@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Empty, Input, Modal, Segmented, Steps, Switch, Tabs, Tag, message } from 'antd'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { fetchMcpTools, installMcpTool, uninstallMcpTool, type McpTool } from '../../api/mcpService'
-import { fetchToolRegistry, type ToolPolicyRow } from '../../api/aiOperationAuth'
-import { TOOL_LEVEL_META, type ToolLevel } from '../../api/mock/aiPlatformMock'
-import { renderMenuIcon } from '../../components/MenuIcon'
+import { fetchMcpTools, installMcpTool, uninstallMcpTool, type McpTool } from '@/api/mcpService'
+import { fetchToolRegistry, type ToolPolicyRow } from '@/api/aiOperationAuth'
+import { TOOL_LEVEL_META, type ToolLevel } from '@/api/mock/aiPlatformMock'
+import { renderMenuIcon } from '@/components/MenuIcon'
 
 /** 內部分區分類（與後端 category 枚舉一致；notify 僅外部服務使用，內部分區不展示） */
 const CATEGORY_KEYS = ['all', 'finance', 'promotion', 'merchant', 'ai', 'rdm'] as const

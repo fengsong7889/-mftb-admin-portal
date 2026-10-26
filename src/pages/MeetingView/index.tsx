@@ -15,7 +15,7 @@ import type { ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Alert, Avatar, Button, Spin, Tag } from 'antd'
 import { CalendarOutlined, ClockCircleOutlined, EnvironmentOutlined, TeamOutlined } from '@ant-design/icons'
-import { fetchMeetingViewPage, type MeetingViewAttendee, type MeetingViewPage as MeetingView } from '../../api/meetingViewPage'
+import { fetchMeetingViewPage, type MeetingViewAttendee, type MeetingViewPage as MeetingView } from '@/api/meetingViewPage'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 

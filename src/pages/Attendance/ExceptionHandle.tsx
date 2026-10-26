@@ -23,11 +23,11 @@ import {
 import dayjs, { type Dayjs } from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import RemarkTextArea from '../../components/RemarkTextArea'
+import RemarkTextArea from '@/components/RemarkTextArea'
 import {
   EXCEPTION_STATUS, EXCEPTION_TYPE, confirmExceptions, deductExceptionByLeave, fetchExceptionDetail,
   fetchLeaveCandidates, reissuePunch, type ExceptionVO, type LeaveCandidate,
-} from '../../api/attendance'
+} from '@/api/attendance'
 import { EXCEPTION_STATUS_LABEL_KEY, EXCEPTION_STATUS_TAG_COLOR, EXCEPTION_TYPE_LABEL_KEY, EXCEPTION_TYPE_TAG_COLOR } from './meta'
 import '@/styles/components.css'
 

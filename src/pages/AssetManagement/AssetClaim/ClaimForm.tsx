@@ -21,9 +21,9 @@ import {
 import { Tag } from 'antd'
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
-import type { DepartmentItem } from '../../../api/department'
-import { AssetSummary } from '../../../components/AssetParameters'
-import { buildDeptTree, type ClaimAssetOption, type ClaimEmployee, type ClaimPage, type ClaimQuery, type ClaimRegistration } from './claimViewTypes'
+import type { DepartmentItem } from '@/api/department'
+import { AssetSummary } from '@/components/AssetParameters'
+import { buildDeptTree, type ClaimAssetOption, type ClaimEmployee, type ClaimPage, type ClaimQuery, type ClaimRegistration } from '@/api/claimViewTypes'
 
 const { TextArea } = Input
 

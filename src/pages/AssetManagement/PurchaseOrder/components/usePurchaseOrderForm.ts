@@ -12,8 +12,8 @@ import {
   type PurchaseOrderSupplierGroup, type PurchaseOrderItem,
   type AssetCategory, type AssetBrand, type AssetModel,
   type ParamType, type SupplierDropdownItem, type SupplierContactItem,
-} from '../../../../api/eam'
-import { fetchEmployees, type EmployeeItem } from '../../../../api/employee'
+} from '@/api/eam'
+import { fetchEmployees, type EmployeeItem } from '@/api/employee'
 import { type ItemRow } from './utils'
 
 /* ==================== Hook 返回值类型 ==================== */

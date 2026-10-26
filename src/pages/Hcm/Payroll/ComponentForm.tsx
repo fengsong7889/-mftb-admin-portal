@@ -16,7 +16,7 @@ import {
   getComponent,
   updateComponent,
   type PayrollComponent,
-} from '../../../api/payroll'
+} from '@/api/payroll'
 import { CardTitle, FormHeader, cardStyle, grid3 } from '../Organization/shared'
 
 export default function HcmPayrollComponentForm() {

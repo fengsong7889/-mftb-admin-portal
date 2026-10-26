@@ -18,7 +18,7 @@ import {
 } from './quotaShared'
 import type { QuotaType, OverLimitAction, Currency } from './quotaShared'
 import { getValueUnit } from './sharedUtils'
-import type { AiModel } from '../../../api'
+import type { AiModel } from '@/api'
 
 export interface QuotaConfigSectionProps {
   /** 額度解讀區塊的自定義前幾行（調用方提供） */

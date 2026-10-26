@@ -7,16 +7,16 @@ import PromotionSlotConfigAdd from '../PromotionSlotConfigAdd'
 import PromotionSlotConfigSlots from '../PromotionSlotConfigSlots'
 import { emptyDraft, listLocalStrategies, upsertLocalStrategy } from './waterfallExtStore'
 import { readDraft, writeDraft } from './waterfallDraft'
-import { fetchAdAlgorithms } from '../../api/adPromotion'
-import { AlgorithmType } from '../Recommend/constants'
-import { GROUP_BUY_CHANNEL, SUPERMARKET_CHANNEL } from './types'
-import zh from '../../i18n/locales/zh-TW.json'
+import { fetchAdAlgorithms } from '@/api/adPromotion'
+import { AlgorithmType } from '@mftb/contracts/recommendConstants'
+import { GROUP_BUY_CHANNEL, SUPERMARKET_CHANNEL } from '@mftb/contracts/waterfallTypes'
+import zh from '@/i18n/locales/zh-TW.json'
 
-vi.mock('../../api/adPromotion', () => ({
+vi.mock('@/api/adPromotion', () => ({
   fetchAdAlgorithms: vi.fn().mockResolvedValue({ records: [] }),
   fetchWaterfallDetail: vi.fn(), createWaterfall: vi.fn(), updateWaterfall: vi.fn(),
 }))
-vi.mock('../../components/DetailPageHeader', () => ({ default: () => <h2>瀑布流詳情</h2> }))
+vi.mock('@/components/DetailPageHeader', () => ({ default: () => <h2>瀑布流詳情</h2> }))
 vi.mock('./WaterfallPreview', () => ({ default: () => <div>預覽</div> }))
 
 const i18n = createInstance()

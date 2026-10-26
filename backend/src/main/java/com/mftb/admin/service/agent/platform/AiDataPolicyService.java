@@ -25,14 +25,22 @@ public class AiDataPolicyService {
 
     public static final List<String> LEVELS = List.of("PUBLIC", "INTERNAL", "SENSITIVE", "RESTRICTED");
 
+    /**
+     * 共用作用域：个人工作台/门户等无业务系统上下文的请求按此登记项判定。
+     * <p>早期实现对空 systemCode 直接返回未分级，导致该场景无法通过任何配置放行；
+     * 归一化后仍需显式登记 common，未登记依旧拒绝（fail-closed 不变）。
+     */
+    public static final String COMMON_SCOPE = "common";
+
     private final JdbcTemplate jdbc;
 
     public record Decision(boolean allowed, String errorKind, String message) { }
 
     public String dataClassOf(String systemCode) {
-        if (!StringUtils.hasText(systemCode)) return null;
+        // 空作用域（个人工作台/门户）归一为 common 再查：common 未登记仍然返回 null 并被拒绝。
+        String scope = StringUtils.hasText(systemCode) ? systemCode : COMMON_SCOPE;
         List<String> rows = jdbc.queryForList(
-                "SELECT data_class FROM ai_data_class_policy WHERE system_code=?", String.class, systemCode);
+                "SELECT data_class FROM ai_data_class_policy WHERE system_code=?", String.class, scope);
         return rows.isEmpty() ? null : rows.get(0);
     }
 
@@ -71,6 +79,21 @@ public class AiDataPolicyService {
     public List<Map<String, Object>> listEndpoints() {
         return jdbc.queryForList("SELECT id, model_key, max_data_class, residency, status, approved_by, approved_at, "
                 + "expires_at, note FROM ai_endpoint_approval ORDER BY id DESC LIMIT 200");
+    }
+
+    /**
+     * 系统下拉选项：复用门户/权限共用的 sys_system 清单，不在 AI 侧维护第二份系统字典。
+     * <p>只返回启用且未删除项；中文名由 name 提供，英文名用于非中文界面。
+     */
+    public List<Map<String, Object>> listSystemOptions() {
+        return jdbc.queryForList("SELECT code, name, name_en FROM sys_system "
+                + "WHERE status = 1 AND deleted = 0 ORDER BY sort_order ASC, code ASC");
+    }
+
+    /** 模型下拉选项：端点批准以 model_key 为唯一键，选项必须与「模型管理」同源（ai_model）。 */
+    public List<Map<String, Object>> listModelOptions() {
+        return jdbc.queryForList("SELECT model_key, name, deploy_type, status FROM ai_model "
+                + "WHERE deleted = 0 ORDER BY status DESC, sort_order ASC, id ASC");
     }
 
     @Transactional(rollbackFor = Exception.class)

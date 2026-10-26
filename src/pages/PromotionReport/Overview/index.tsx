@@ -10,7 +10,7 @@ import {
   LineChartOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   ReportApp,
   ReportChannel,

@@ -3,13 +3,13 @@ import { useTranslation } from 'react-i18next'
 import { Button, Tag, Spin, message } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AppstoreOutlined, IdcardOutlined, BarChartOutlined } from '@ant-design/icons'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import { fetchModels, type AiModel } from '../../../api'
-import { POSITION_SEQUENCE, POSITION_SEQUENCE_TAG_COLOR } from '../../../api/position'
-import AnimatedNumber from '../../../components/AnimatedNumber'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import { fetchModels, type AiModel } from '@/api'
+import { POSITION_SEQUENCE, POSITION_SEQUENCE_TAG_COLOR } from '@/api/position'
+import AnimatedNumber from '@/components/AnimatedNumber'
 import { ModelAuthSectionReadonly } from './ModelAuthSection'
 import { clampModelConfigs, type PosAuthRule } from './modelAuthCapability'
-import { getPosStrategyById } from '../../../api/empAuth'
+import { getPosStrategyById } from '@/api/empAuth'
 
 /**
  * 按職位授權 - 詳情獨立頁（參考部門模型權控詳情頁佈局）

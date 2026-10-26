@@ -24,8 +24,8 @@ import {
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../../../contexts/AuthContext'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   fetchBlacklist,
   fetchMeetingRules,
@@ -35,9 +35,9 @@ import {
   type BlacklistQuery,
   type BlacklistStats,
   type MeetingRuleForm,
-} from '../../../api/meeting'
+} from '@/api/meeting'
 import MeetingStatCards from '../MeetingStatCards'
-import CardTitle from '../../../components/CardTitle'
+import CardTitle from '@/components/CardTitle'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 

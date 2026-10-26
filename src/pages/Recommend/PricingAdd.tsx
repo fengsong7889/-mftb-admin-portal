@@ -17,7 +17,7 @@ import {
   AppType, AlgorithmType, RecommendChannel, ServiceStatus,
   APP_OPTIONS,
   REGION_TREE_DATA,
-} from './constants'
+} from '@mftb/contracts/recommendConstants'
 
 const CHANNEL_OPTIONS = [
   { labelKey: 'recommend.channelHomeWaterfall', value: RecommendChannel.HOME },

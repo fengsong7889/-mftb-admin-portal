@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react'
-import { Alert, Button, Descriptions, Form, Input, InputNumber, Modal, Progress, Segmented, Select, Space, Steps, Table, Tabs, Tag, message } from 'antd'
+import { useMemo, useState, type ReactNode } from 'react'
+import { Alert, AutoComplete, Button, Descriptions, Form, Input, InputNumber, Modal, Progress, Segmented, Select, Space, Steps, Table, Tabs, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
   AppstoreOutlined, CloudServerOutlined, DashboardOutlined, DatabaseOutlined, ExperimentOutlined,
@@ -7,24 +7,25 @@ import {
 } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import i18n from '../../../i18n'
+import i18n from '@/i18n'
+import { useAuth } from '@/contexts/AuthContext'
 
 /** 模組級翻譯：父層語言切換會重渲染，子元件重新計算即可。 */
 const tr = (key: string, zh: string) => i18n.t(key, { defaultValue: zh })
-import HelpPopover from '../../../components/HelpPopover'
-import StatCards from '../../../components/StatCards'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import HelpPopover from '@/components/HelpPopover'
+import StatCards from '@/components/StatCards'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import AiAssistantPageShell from '../PageShell'
 import {
   BLOCKING_LABELS, CONSOLE_PANES,
   readinessOf, usageRate,
   type ActionState, type ConsolePane, type DemoRun,
-} from './consoleModel'
-import { fetchActions, fetchApplications, fetchBudgetPools, fetchDataClasses, fetchEndpoints, fetchRuns } from '../../../api/agentPlatform'
-import type { AgentActionRow, AgentApplicationRow, AgentBudgetPoolRow, AgentDataClassRow, AgentEndpointRow, AgentRunRow } from '../../../api/agentPlatform'
-import { approveAction, approveEndpoint, createApplicationVersion, executeAction, publishApplication, saveApplication, saveBudgetPool, saveDataClass, fetchEvalCases, fetchKnowledgeAcl, fetchReleases, fetchRunDetail, fetchReadiness, grantKnowledgeAcl, revokeKnowledgeAcl, runEval } from '../../../api/agentPlatform'
-import type { AgentAclRow, AgentEvalCaseRow, AgentReleaseRow } from '../../../api/agentPlatform'
-import { fetchKnowledgeDocs } from '../../../api/aiKnowledge'
+} from '@mftb/contracts/aiConsoleModel'
+import { fetchActions, fetchApplications, fetchBudgetPools, fetchDataClasses, fetchEndpoints, fetchPlatformModels, fetchPlatformSystems, fetchRuns } from '@/api/agentPlatform'
+import type { AgentActionRow, AgentApplicationRow, AgentBudgetPoolRow, AgentDataClassRow, AgentEndpointRow, AgentRunRow } from '@/api/agentPlatform'
+import { approveAction, approveEndpoint, createApplicationVersion, executeAction, publishApplication, saveApplication, saveBudgetPool, saveDataClass, fetchEvalCases, fetchKnowledgeAcl, fetchReleases, fetchRunDetail, fetchReadiness, grantKnowledgeAcl, revokeKnowledgeAcl, runEval } from '@/api/agentPlatform'
+import type { AgentAclRow, AgentEvalCaseRow, AgentReleaseRow } from '@/api/agentPlatform'
+import { fetchKnowledgeDocs } from '@/api/aiKnowledge'
 import { useConsoleRemote } from './useConsoleRemote'
 import './console.css'
 
@@ -405,14 +406,69 @@ function KnowledgeAclPane() {
   </section>
 }
 
+/** 数据等级固定枚举与中文名：中文界面优先显示中文，括号内保留枚举值以便与文档/日志对照。 */
+const DATA_CLASS_LEVELS = ['PUBLIC', 'INTERNAL', 'SENSITIVE', 'RESTRICTED'] as const
+const DATA_CLASS_LABELS: Record<AgentDataClassRow['level'], string> = {
+  PUBLIC: '公開', INTERNAL: '企業內部', SENSITIVE: '敏感', RESTRICTED: '嚴格受限',
+}
+const dataClassLabel = (level: AgentDataClassRow['level']) => `${DATA_CLASS_LABELS[level]}（${level}）`
+
+/**
+ * 系统类型 → 建议数据等级：仅用作登记弹窗的预填值，必须由业务负责人确认后才保存。
+ * 口径：含薪资/资金明细 → RESTRICTED；含个人身份或经营数据 → SENSITIVE；内部流程数据 → INTERNAL。
+ */
+const SUGGESTED_CLASS: Record<string, AgentDataClassRow['level']> = {
+  payroll: 'RESTRICTED', finance: 'RESTRICTED',
+  hr: 'SENSITIVE', organization: 'SENSITIVE', eam: 'SENSITIVE', merchant: 'SENSITIVE', attendance: 'SENSITIVE',
+  common: 'INTERNAL',
+}
+
+const suggestedClassOf = (code: string): AgentDataClassRow['level'] => SUGGESTED_CLASS[code] ?? 'INTERNAL'
+
+/** 已登记与未登记合并后的行：level 为 null 表示该业务系统尚未登记分级。 */
+type ClassRow = { key: string; system: string; level: AgentDataClassRow['level'] | null; note: string }
+
 function DataEndpointsPane() {
   const classes = useConsoleRemote(() => fetchDataClasses(), [])
   const endpoints = useConsoleRemote(() => fetchEndpoints(), [])
+  /** 下拉选项与「系统目录 / 模型管理」同源：不让人手填系统编码与 model_key。 */
+  const systems = useConsoleRemote(() => fetchPlatformSystems(), [])
+  const models = useConsoleRemote(() => fetchPlatformModels(), [])
+  const isZh = i18n.language?.startsWith('zh')
+  const systemLabel = (s: { code: string; name: string; nameEn: string | null }) =>
+    `${isZh ? s.name : (s.nameEn || s.name)}（${s.code}）`
+  const modelLabel = (m: { modelKey: string; name: string; status: number }) =>
+    `${m.name}（${m.modelKey}）${m.status === 1 ? '' : ' · 已停用'}`
+  const systemNameOf = (code: string) => {
+    const hit = (systems.data ?? []).find(s => s.code === code)
+    return hit ? systemLabel(hit) : code
+  }
+  const modelNameOf = (key: string) => {
+    const hit = (models.data ?? []).find(m => m.modelKey === key)
+    return hit ? modelLabel(hit) : key
+  }
   const [classOpen, setClassOpen] = useState(false)
   const [epOpen, setEpOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [classForm] = Form.useForm()
   const [epForm] = Form.useForm()
+  const { hasPermission } = useAuth()
+  /** 登记分级（edit）与批准端点（approve）拆开授权：同一人不再默认兼做两件事。 */
+  const canEdit = hasPermission('agent-data:edit')
+  const canApprove = hasPermission('agent-data:approve')
+
+  /** 已登记 + 未登记合成一张表：未登记置顶，避免漏配系统被埋在列表底部。 */
+  const classRows = useMemo<ClassRow[]>(() => {
+    const registered = new Map((classes.data ?? []).map(row => [row.system, row]))
+    const fromCatalog = (systems.data ?? []).map(s => {
+      const hit = registered.get(s.code)
+      return { key: s.code, system: s.code, level: hit?.level ?? null, note: hit?.note ?? '' }
+    })
+    const orphans = (classes.data ?? [])
+      .filter(row => !(systems.data ?? []).some(s => s.code === row.system))
+      .map(row => ({ key: row.system, system: row.system, level: row.level, note: row.note }))
+    return [...fromCatalog, ...orphans].sort((a, b) => (a.level ? 1 : 0) - (b.level ? 1 : 0))
+  }, [classes.data, systems.data])
   const saveClass = async () => {
     const v = await classForm.validateFields()
     setSaving(true)
@@ -431,15 +487,27 @@ function DataEndpointsPane() {
       setEpOpen(false); epForm.resetFields(); endpoints.reload()
     } catch { /* request.ts 已统一提示 */ } finally { setSaving(false) }
   }
-  const classColumns: ColumnsType<AgentDataClassRow> = [
-    { key: 'system', title: tr('agentConsole.s68', '系統'), dataIndex: 'system', width: 120 },
-    { key: 'label', title: tr('agentConsole.s12', '名稱'), dataIndex: 'label', width: 160 },
-    { key: 'level', title: tr('agentConsole.s79', tr('agentConsole.form.dataClass', '資料等級')), width: 140, render: (_, row) => <Tag color={row.level === 'RESTRICTED' ? 'red' : row.level === 'SENSITIVE' ? 'volcano' : row.level === 'INTERNAL' ? 'blue' : 'green'}>{row.level}</Tag> },
-    { key: 'note', title: tr('agentConsole.s76', tr('agentConsole.form.note', '說明')), dataIndex: 'note' },
+  const classColumns: ColumnsType<ClassRow> = [
+    {
+      key: 'system', title: tr('agentConsole.s68', '系統'), width: 300,
+      render: (_, row) => (
+        <span>
+          {systemNameOf(row.system)}
+          {!row.level && <Tag color="red" style={{ marginLeft: 8 }}>{tr('agentConsole.s86', '未登記')}</Tag>}
+        </span>
+      ),
+    },
+    {
+      key: 'level', title: tr('agentConsole.s79', tr('agentConsole.form.dataClass', '資料等級')), width: 180,
+      render: (_, row) => row.level
+        ? <Tag color={row.level === 'RESTRICTED' ? 'red' : row.level === 'SENSITIVE' ? 'volcano' : row.level === 'INTERNAL' ? 'blue' : 'green'}>{isZh ? dataClassLabel(row.level) : row.level}</Tag>
+        : <Tag>—</Tag>,
+    },
+    { key: 'note', title: tr('agentConsole.s76', tr('agentConsole.form.note', '說明')), render: (_, row) => row.note || '—' },
   ]
   const endpointColumns: ColumnsType<AgentEndpointRow> = [
-    { key: 'model', title: tr('agentConsole.s51', '模型端點'), dataIndex: 'model', width: 200 },
-    { key: 'level', title: tr('agentConsole.s11', '可接收等級'), dataIndex: 'maxLevel', width: 140, render: (value: string) => <Tag color="purple">{value}</Tag> },
+    { key: 'model', title: tr('agentConsole.s51', '模型端點'), width: 260, render: (_, row) => modelNameOf(row.model) },
+    { key: 'level', title: tr('agentConsole.s11', '可接收等級'), dataIndex: 'maxLevel', width: 180, render: (value: string) => <Tag color="purple">{isZh ? dataClassLabel(value as AgentDataClassRow['level']) : value}</Tag> },
     { key: 'residency', title: tr('agentConsole.s85', tr('agentConsole.form.residency', '駐留')), width: 120, render: (_, row) => row.residency === 'private' ? <Tag color="green">內網</Tag> : <Tag>外部</Tag> },
     { key: 'expires', title: tr('agentConsole.s33', '批准有效期'), width: 170, render: (_, row) => fmtTs(row.expiresAt) },
     { key: 'note', title: tr('agentConsole.s04', tr('agentConsole.form.remark', '備註')), dataIndex: 'note' },
@@ -450,14 +518,14 @@ function DataEndpointsPane() {
       <h3>系統資料分級<HelpPopover title="未分級=禁止外發" ariaLabel="資料分級說明" content="PUBLIC < INTERNAL < SENSITIVE < RESTRICTED。未登記分級的系統不允許發送模型；敏感與嚴格受限內容只能走已批准的私域端點。" /></h3>
       <Alert type="info" showIcon message="分級是業務決策，不由代碼推導" description="系統負責人確認等級後登記；調整等級會影響所有使用該系統的應用，需重新試算與回歸。" />
       {classes.error && <Alert type="error" showIcon message="資料分級加載失敗" description={classes.error} />}
-      <div className="agent-console__toolbar"><Button type="primary" size="small" onClick={() => setClassOpen(true)}>{tr('agentConsole.form.addClass', '登記分級')}</Button></div>
-      <Table className="agent-console__spaced" rowKey="system" size="middle" loading={classes.loading} columns={classColumns}
-        dataSource={classes.data ?? []} pagination={paginationConfig((classes.data ?? []).length)} />
+      <div className="agent-console__toolbar">{canEdit && <Button type="primary" size="small" onClick={() => setClassOpen(true)}>{tr('agentConsole.form.addClass', '登記分級')}</Button>}</div>
+      <Table className="agent-console__spaced" rowKey="key" size="middle" loading={classes.loading || systems.loading} columns={classColumns}
+        dataSource={classRows} pagination={paginationConfig(classRows.length)} />
     </section>
     <section className="agent-console__card">
       <h3>模型端點批准<HelpPopover title="private 標籤不等於批准" ariaLabel="端點批准說明" content="必須由人明確登記可接收的最高資料等級與有效期；到期自動失效。內網地址或私有部署標籤本身不能作為放行依據。" /></h3>
       {endpoints.error && <Alert type="error" showIcon message="端點批准加載失敗" description={endpoints.error} />}
-      <div className="agent-console__toolbar"><Button type="primary" size="small" onClick={() => setEpOpen(true)}>{tr('agentConsole.form.approveEndpoint', '批准端點')}</Button></div>
+      <div className="agent-console__toolbar">{canApprove && <Button type="primary" size="small" onClick={() => setEpOpen(true)}>{tr('agentConsole.form.approveEndpoint', '批准端點')}</Button>}</div>
       <Table rowKey="model" size="middle" loading={endpoints.loading} columns={endpointColumns}
         dataSource={endpoints.data ?? []} pagination={paginationConfig((endpoints.data ?? []).length)} />
       <Descriptions className="agent-console__spaced" column={1} size="small" items={[
@@ -466,19 +534,31 @@ function DataEndpointsPane() {
       ]} />
     </section>
     <Modal open={classOpen} title={tr('agentConsole.form.addClassTitle', '登記系統資料分級')} onCancel={() => setClassOpen(false)} onOk={saveClass} confirmLoading={saving} okText={tr('agentConsole.form.save', '保存')} destroyOnClose>
-        <Form form={classForm} layout="vertical" initialValues={{ systemCode: 'ai', dataClass: 'INTERNAL' }}>
-          <Form.Item name="systemCode" label={tr('agentConsole.form.systemKey', '系統標識')} rules={[{ required: true, pattern: /^[a-z][a-z0-9-]{1,31}$/, message: tr('agentConsole.form.systemKeyHint', '小寫字母開頭，可含數字與連字號') }]}><Input placeholder={tr('agentConsole.form.phSystem', 'ai / rdm / hr')} /></Form.Item>
+        <Form form={classForm} layout="vertical" initialValues={{ dataClass: 'INTERNAL' }}>
+          <Form.Item name="systemCode" label={tr('agentConsole.form.systemKey', '系統標識')} rules={[{ required: true }]}
+            extra={tr('agentConsole.form.classHint', '資料等級依系統類型預填建議值，請由業務負責人確認後保存')}>
+            <Select showSearch optionFilterProp="label" loading={systems.loading}
+              placeholder={tr('agentConsole.form.phSystem', '請選擇業務系統')}
+              notFoundContent={tr('agentConsole.form.noSystem', '系統目錄為空或加載失敗')}
+              onChange={(code: string) => classForm.setFieldValue('dataClass', suggestedClassOf(code))}
+              options={(systems.data ?? []).map(s => ({ value: s.code, label: systemLabel(s) }))} />
+          </Form.Item>
           <Form.Item name="dataClass" label={tr('agentConsole.form.dataClass', '資料等級')} rules={[{ required: true }]}>
-            <Select options={['PUBLIC', 'INTERNAL', 'SENSITIVE', 'RESTRICTED'].map(v => ({ value: v, label: v }))} />
+            <Select options={DATA_CLASS_LEVELS.map(v => ({ value: v, label: isZh ? dataClassLabel(v) : v }))} />
           </Form.Item>
           <Form.Item name="note" label={tr('agentConsole.form.note', '說明')}><Input /></Form.Item>
         </Form>
       </Modal>
       <Modal open={epOpen} title={tr('agentConsole.form.approveEndpointTitle', '批准模型端點')} onCancel={() => setEpOpen(false)} onOk={saveEndpoint} confirmLoading={saving} okText={tr('agentConsole.form.approveOk', '批准')} destroyOnClose>
         <Form form={epForm} layout="vertical" initialValues={{ maxDataClass: 'INTERNAL', residency: 'external', days: 90 }}>
-          <Form.Item name="modelKey" label="模型標識" rules={[{ required: true, max: 128 }]}><Input placeholder={tr('agentConsole.form.phModel', 'qwen3.7-flash')} /></Form.Item>
+          <Form.Item name="modelKey" label={tr('agentConsole.form.modelKey', '模型標識')} rules={[{ required: true, max: 128 }]}
+            extra={tr('agentConsole.form.modelKeyHint', '選項來自「模型管理」；未登記的模型可直接輸入 model_key')}>
+            <AutoComplete placeholder={tr('agentConsole.form.phModel', 'qwen3.7-flash')}
+              options={(models.data ?? []).map(m => ({ value: m.modelKey, label: modelLabel(m) }))}
+              filterOption={(input, option) => String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())} />
+          </Form.Item>
           <Form.Item name="maxDataClass" label={tr('agentConsole.form.maxDataClass', '可接收最高等級')} rules={[{ required: true }]}>
-            <Select options={['PUBLIC', 'INTERNAL', 'SENSITIVE', 'RESTRICTED'].map(v => ({ value: v, label: v }))} />
+            <Select options={DATA_CLASS_LEVELS.map(v => ({ value: v, label: isZh ? dataClassLabel(v) : v }))} />
           </Form.Item>
           <Form.Item name="residency" label={tr('agentConsole.form.residency', '駐留')} rules={[{ required: true }]} extra={tr('agentConsole.form.residencyHint', '僅接受 private / external，其他值後端直接拒絕')}>
             <Select options={[{ value: 'private', label: 'private 內網' }, { value: 'external', label: 'external 外部' }]} />

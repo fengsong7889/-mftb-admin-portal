@@ -16,9 +16,9 @@ import type { Dayjs } from 'dayjs'
 import { CarOutlined, ExportOutlined, FieldTimeOutlined, InboxOutlined, ReloadOutlined, SearchOutlined, WarningOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { exportToCSV } from '../../../utils/exportCSV'
-import { fetchUses, toIso, type TodoStats, type UseQuery } from '../../../api/vehicle'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { exportToCSV } from '@/utils/exportCSV'
+import { fetchUses, toIso, type TodoStats, type UseQuery } from '@/api/vehicle'
 import { toOrders } from '../vehicleAdapter'
 import {
   APPROVAL_COLOR, APPROVAL_LABEL, TRIP_STATUS_COLOR, TRIP_STATUS_LABEL,

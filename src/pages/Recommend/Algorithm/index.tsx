@@ -5,11 +5,11 @@ import { PlusOutlined, ArrowLeftOutlined, AppstoreOutlined, ApartmentOutlined } 
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import { AlgorithmType, RecommendChannel, PlacementInterface, ServiceStatus, AppType, ALGO_CARD_COLOR_MAP } from '../constants'
-import { fetchAdAlgorithms, updateAdAlgorithmStatus, deleteAdAlgorithm, fetchAlgorithmWaterfallReferences, brandToAppType, type AdAlgorithm, type WaterfallReference } from '../../../api/adPromotion'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { useCardOrder, type CardDragProps } from '../../../hooks/useCardOrder'
-import BrandTag from '../../../components/BrandTag'
+import { AlgorithmType, RecommendChannel, PlacementInterface, ServiceStatus, AppType, ALGO_CARD_COLOR_MAP } from '@mftb/contracts/recommendConstants'
+import { fetchAdAlgorithms, updateAdAlgorithmStatus, deleteAdAlgorithm, fetchAlgorithmWaterfallReferences, brandToAppType, type AdAlgorithm, type WaterfallReference } from '@/api/adPromotion'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { useCardOrder, type CardDragProps } from '@/hooks/useCardOrder'
+import BrandTag from '@/components/BrandTag'
 
 /** 各业务类型对应的算法类型列表 */
 const TAB_ALGORITHM_MAP: Record<string, AlgorithmType[]> = {

@@ -8,8 +8,8 @@ import {
   fetchMemories,
   updateMemory,
   type AiUserMemory,
-} from '../../api/aiMemory'
-import { confirmDelete } from '../../utils/confirmDelete'
+} from '@/api/aiMemory'
+import { confirmDelete } from '@/utils/confirmDelete'
 
 /**
  * 我的記憶抽屉：用户显式保存的长期偏好/事实，可查看/编辑/停用/删除。

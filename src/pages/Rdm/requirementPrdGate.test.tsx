@@ -10,8 +10,8 @@ import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { PlanSection } from './components/RequirementSections'
-import type { RdmDeliverySummary, RdmPrdItem } from '../../api/rdm'
-import { RDM_STATUS } from '../../constants/rdm'
+import type { RdmDeliverySummary, RdmPrdItem } from '@/api/rdm'
+import { RDM_STATUS } from '@/constants/rdm'
 
 function prd(overrides: Partial<RdmPrdItem> = {}): RdmPrdItem {
   return {

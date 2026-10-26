@@ -18,7 +18,7 @@ import {
   fetchSupplierList, createSupplier, updateSupplier,
   fetchSupplierContacts,
   type SupplierSaveParams, type SupplierContactItem,
-} from '../../../api/eam'
+} from '@/api/eam'
 
 interface FormValues {
   /** 編碼：僅編輯時回填展示，不可修改；新增時由系統自動生成 */

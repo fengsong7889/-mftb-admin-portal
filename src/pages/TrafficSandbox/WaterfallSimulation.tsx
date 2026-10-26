@@ -11,17 +11,17 @@ import {
   SearchOutlined, SettingOutlined, ShopOutlined, ThunderboltOutlined,
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
-import StatCards, { type StatCardItem } from '../../components/StatCards'
+import StatCards, { type StatCardItem } from '@/components/StatCards'
 import {
   SANDBOX_ALGO_POOL, SlotKind, generateWaterfallSimulation,
   type SlotConfig, type WaterfallSimulationResult, type WaterfallSlotResult,
-} from '../../api/mock/trafficSandboxMock'
-import { BRAND_OPTIONS } from '../../constants/brand'
+} from '@/api/mock/trafficSandboxMock'
+import { BRAND_OPTIONS } from '@/constants/brand'
 import {
   ALGO_CARD_COLOR_MAP, ALGORITHM_TYPE_OPTIONS, PLACEMENT_INTERFACE_OPTIONS,
   RECOMMEND_CHANNEL_OPTIONS, REGION_OPTIONS, Region,
   ServiceStatus, TIME_SLOT_OPTIONS, TimeSlot,
-} from '../Recommend/constants'
+} from '@mftb/contracts/recommendConstants'
 
 /** 推演模式 */
 enum SandboxMode {

@@ -4,8 +4,8 @@ import type { TableColumnsType } from 'antd'
 import { PlusOutlined, ExportOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   POSITION_RANK_OPTIONS,
   POSITION_SEQUENCE_TAG_COLOR,
@@ -13,9 +13,9 @@ import {
   deletePosition,
   fetchPositions,
   updatePosition,
-} from '../../../api/position'
-import type { PositionItem, PositionPayload } from '../../../api/position'
-import { exportToCSV } from '../../../utils/exportCSV'
+} from '@/api/position'
+import type { PositionItem, PositionPayload } from '@/api/position'
+import { exportToCSV } from '@/utils/exportCSV'
 
 /** 每个序列的职级范围配置 */
 const JOB_LEVEL_CONFIG: Record<string, { start: number; end: number }> = {

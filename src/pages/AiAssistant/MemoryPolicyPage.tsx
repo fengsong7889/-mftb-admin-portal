@@ -17,9 +17,9 @@ import {
   saveRuntimeSettings,
   type AiMemoryStats,
   type AiRuntimeSettingRow,
-} from '../../api/aiRuntimeSetting'
-import StatCards, { type StatCardItem } from '../../components/StatCards'
-import { formatDateTime } from '../../utils/datetime'
+} from '@/api/aiRuntimeSetting'
+import StatCards, { type StatCardItem } from '@/components/StatCards'
+import { formatDateTime } from '@/utils/datetime'
 import AiAssistantPageShell from './PageShell'
 
 const KEY_LABEL: Record<string, string> = {

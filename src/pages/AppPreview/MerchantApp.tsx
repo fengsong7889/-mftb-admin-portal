@@ -12,8 +12,8 @@ import {
   fetchAdOrderDetail,
   type AdOrder,
   type AdOrderDetail,
-} from '../../api/adPromotion'
-import { useAuth } from '../../contexts/AuthContext'
+} from '@/api/adPromotion'
+import { useAuth } from '@/contexts/AuthContext'
 import { MOBILE_PRODUCTS, ORDER_STATUS_NAME, ORDER_STATUS_COLOR, regionName, mealSlotLabel } from './constants'
 import { MerchantProvider } from './merchantContext'
 import { useMobileNav, MERCHANT_ROOT, type MerchantScreen, type MobileNavApi } from './nav'

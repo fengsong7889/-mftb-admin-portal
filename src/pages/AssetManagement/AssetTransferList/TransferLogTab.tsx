@@ -11,15 +11,15 @@ import { Button, Empty, Form, Input, Select, Table, Tag, Space, DatePicker, Tree
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import { SearchOutlined, ReloadOutlined, ExportOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import AssetParameters from '../../../components/AssetParameters'
-import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalog'
-import { fetchTransferList, fetchAssetList, type AssetItem, type TransferRecord, type TransferQuery, type TransferOptions } from '../../../api/asset'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import AssetParameters from '@/components/AssetParameters'
+import { useAssetParameterCatalog } from '@/hooks/useAssetParameterCatalog'
+import { fetchTransferList, fetchAssetList, type AssetItem, type TransferRecord, type TransferQuery, type TransferOptions } from '@/api/asset'
+import { useAuth } from '@/contexts/AuthContext'
 import { useTransferData } from '../AssetTransfer/useTransferData'
 import { TransferError } from '../AssetTransfer/TransferLayout'
 import { buildTransferTree, positiveId, updateQuery, TRANSFER_STATUS, TRANSFER_MENU } from '../AssetTransfer/transferUtils'
-import { exportToCSV } from '../../../utils/exportCSV'
+import { exportToCSV } from '@/utils/exportCSV'
 
 interface Props {
   options?: TransferOptions

@@ -12,10 +12,10 @@ import { Switch, InputNumber, Select, Input, Tag, Button, message, Modal, Radio,
 import {
   SettingOutlined, EditOutlined, SaveOutlined, CloseOutlined, ReloadOutlined, SearchOutlined,
 } from '@ant-design/icons'
-import { useRuleGroup } from '../../hooks/useSystemRules'
-import { useAuth } from '../../contexts/AuthContext'
-import { fetchBizSeqRules, type BizSeqRuleVO } from '../../api/bizSeqRule'
-import { formatSeqExample, type RuleItem } from '../../constants/ruleConfig'
+import { useRuleGroup } from '@/hooks/useSystemRules'
+import { useAuth } from '@/contexts/AuthContext'
+import { fetchBizSeqRules, type BizSeqRuleVO } from '@/api/bizSeqRule'
+import { formatSeqExample, type RuleItem } from '@/constants/ruleConfig'
 
 /** 廣告類型子分組顯示名稱與配色 */
 const SUB_GROUP_META: Record<string, { label: string; color: string }> = {

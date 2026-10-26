@@ -7,14 +7,14 @@
  */
 import { useState, useEffect } from 'react'
 import { Button, Form, Input, InputNumber, Select, Modal, message, Space } from 'antd'
-import RemarkTextArea from '../../../components/RemarkTextArea'
+import RemarkTextArea from '@/components/RemarkTextArea'
 import { ArrowLeftOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import {
   fetchConsumableItemOptions, submitConsumableClaim, type ConsumableItem,
-} from '../../../api/consumable'
-import { fetchLocationList, type AssetLocation } from '../../../api/eam'
-import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
-import { useAuth } from '../../../contexts/AuthContext'
+} from '@/api/consumable'
+import { fetchLocationList, type AssetLocation } from '@/api/eam'
+import { fetchEmployees, type EmployeeItem } from '@/api/employee'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface LineForm {
   itemId?: number

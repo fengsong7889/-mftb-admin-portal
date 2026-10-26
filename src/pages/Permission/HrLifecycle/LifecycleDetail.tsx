@@ -6,8 +6,8 @@ import {
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import { useAuth } from '../../../contexts/AuthContext'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   HR_LIFECYCLE_LIST_PATH,
   HR_LIFECYCLE_MENU_KEY,
@@ -18,8 +18,8 @@ import {
   fetchLifecycleRequest,
   submitLifecycleRequest,
   type HrLifecycleItem,
-} from '../../../api/hrLifecycle'
-import { fetchOaRequestDetail, type OaRequestVO } from '../../../api/oaRequest'
+} from '@/api/hrLifecycle'
+import { fetchOaRequestDetail, type OaRequestVO } from '@/api/oaRequest'
 import {
   DIMISSION_TYPE_LABEL_KEY, EDITABLE_STATUSES, STATUS_LABEL_KEY, STATUS_TAG_COLOR,
   TYPE_LABEL_KEY, TYPE_TAG_COLOR,

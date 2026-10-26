@@ -17,14 +17,14 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import AssetParameters from '../../../components/AssetParameters'
-import BrandTag from '../../../components/BrandTag'
-import type { ReturnRow, ReturnDispositionDTO, ReturnRecoverDTO } from '../../../api/eamReturn'
-import { fetchClaimDetail } from '../../../api/eamClaim'
-import type { ClaimRow } from '../AssetClaim/claimViewTypes'
-import { fetchBorrowDetail, type BorrowRow } from '../../../api/eamBorrow'
-import { fetchAssetDetail, type AssetItem } from '../../../api/asset'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import AssetParameters from '@/components/AssetParameters'
+import BrandTag from '@/components/BrandTag'
+import type { ReturnRow, ReturnDispositionDTO, ReturnRecoverDTO } from '@/api/eamReturn'
+import { fetchClaimDetail } from '@/api/eamClaim'
+import type { ClaimRow } from '@/api/claimViewTypes'
+import { fetchBorrowDetail, type BorrowRow } from '@/api/eamBorrow'
+import { fetchAssetDetail, type AssetItem } from '@/api/asset'
 
 const ALL_DISPOSITION_OPTIONS = [
   { value: 'idle', label: '收回閒置（可再次使用）' },

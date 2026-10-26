@@ -27,7 +27,7 @@ import {
   getMissingPosterLanguages,
   POSTER_LANGUAGES,
   type PosterLocale,
-} from '../../../constants/popularSkinTemplates'
+} from '@/constants/popularSkinTemplates'
 import SkinTemplatePreview from './SkinTemplatePreview'
 import './SkinTemplateSection.css'
 

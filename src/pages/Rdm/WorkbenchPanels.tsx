@@ -14,7 +14,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useAuth } from '../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { Alert, Button, Select, Space, Spin, Tag } from 'antd'
 import { RightOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -30,7 +30,7 @@ import {
   type RdmTaskItem,
   type RdmTeamMember,
   type RdmTestBatchListItem,
-} from '../../api/rdm'
+} from '@/api/rdm'
 import {
   RDM_ISSUE_SEVERITY,
   RDM_ISSUE_SEVERITY_COLOR,
@@ -46,7 +46,7 @@ import {
   RDM_TEST_BATCH_STATUS,
   RDM_TEST_BATCH_STATUS_COLOR,
   RDM_TEST_BATCH_STATUS_LABEL,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import { RDM_SECTION_ICON } from './workbenchSectionIcons'
 import './index.css'
 

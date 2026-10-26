@@ -10,11 +10,11 @@ import {
   PlusOutlined,
   AuditOutlined,
 } from '@ant-design/icons'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { useAuth } from '../../contexts/AuthContext'
-import type { GiftRecordItem } from '../../api/gift'
-import { fetchGiftRecords, deductGiftDays } from '../../api/gift'
-import { getApprovalRecords } from '../../utils/approvalStore'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
+import type { GiftRecordItem } from '@/api/gift'
+import { fetchGiftRecords, deductGiftDays } from '@/api/gift'
+import { getApprovalRecords } from '@/utils/approvalStore'
 import {
   createAdTypeOptions, createAdTypeMap,
   brandOptions,

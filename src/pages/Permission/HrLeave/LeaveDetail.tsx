@@ -4,12 +4,12 @@ import { DeleteOutlined, EditOutlined, SendOutlined, UndoOutlined } from '@ant-d
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import { useAuth } from '../../../contexts/AuthContext'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   LEAVE_EDITABLE, cancelLeaveRequest, deleteLeaveRequest, fetchLeaveDetail, submitLeaveRequest,
   type LeaveRequestItem,
-} from '../../../api/hrLeave'
+} from '@/api/hrLeave'
 import {
   HR_LEAVE_SCOPE, LEAVE_STATUS_LABEL_KEY, LEAVE_STATUS_TAG_COLOR, LEAVE_TYPE_LABEL_KEY,
   leaveFormPath, leaveDetailPath, type LeaveScope,

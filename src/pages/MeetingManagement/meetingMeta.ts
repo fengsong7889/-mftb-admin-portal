@@ -11,7 +11,7 @@
  * 就把文案定成当时的语言，用户切换语言后组件重渲染也拿不到新词——比不接 i18n 更难查。
  * 因此所有对外导出都改成"调用时求值"的函数（bizTypeLabels() 等），调用点随之加一对括号。
  */
-import i18n from '../../i18n'
+import i18n from '@/i18n'
 import type { TagProps } from 'antd'
 
 type Meta = { label: string; color: NonNullable<TagProps['color']> }

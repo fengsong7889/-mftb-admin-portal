@@ -17,10 +17,10 @@ import {
   type InventoryItem,
   RECOMMEND_TYPE_CONFIGS,
 } from './types'
-import { Region, AlgorithmType } from '../Recommend/constants'
+import { Region, AlgorithmType } from '@mftb/contracts/recommendConstants'
 import GradientDiscountBanner from './GradientDiscountBanner'
 import NoRefundBadge from './NoRefundBadge'
-import { getSystemRuleValue } from '../../hooks/useSystemRules'
+import { getSystemRuleValue } from '@/hooks/useSystemRules'
 import {
   fetchAdAlgorithms,
   fetchAdInventory,
@@ -30,9 +30,9 @@ import {
   unlockAdCells,
   type AdInventoryCell,
   type AdInventoryVO,
-} from '../../api/adPromotion'
-import { fetchStores, type StoreItem } from '../../api/store'
-import { fetchFinAccountBalance } from '../../api/finance'
+} from '@/api/adPromotion'
+import { fetchStores, type StoreItem } from '@/api/store'
+import { fetchFinAccountBalance } from '@/api/finance'
 import {
   REGION_LIST,
   BACKEND_TO_UI_BRAND,

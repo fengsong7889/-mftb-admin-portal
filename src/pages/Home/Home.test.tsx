@@ -3,12 +3,12 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Home from './index'
 import { collectHomeMenus } from './homeUtils'
-import type { MenuVO } from '../../api/menu'
-import { fetchPortalContext } from '../../api/portal'
-import { fetchQuickFavorites, saveQuickFavorites } from '../../api/auth'
-import { fetchMyQuotaUsage } from '../../api/aiMyCenter'
-import { sendAgentMessage } from '../../api/agent'
-import { writeCurrentSystemCode } from '../../hooks/useCurrentSystem'
+import type { MenuVO } from '@/api/menu'
+import { fetchPortalContext } from '@/api/portal'
+import { fetchQuickFavorites, saveQuickFavorites } from '@/api/auth'
+import { fetchMyQuotaUsage } from '@/api/aiMyCenter'
+import { sendAgentMessage } from '@/api/agent'
+import { writeCurrentSystemCode } from '@/hooks/useCurrentSystem'
 
 const state = vi.hoisted(() => ({
   denied: new Set<string>(),
@@ -31,25 +31,25 @@ const t = (key: string, options?: { defaultValue?: string } | string) =>
   (typeof options === 'string' ? options : options?.defaultValue) ?? key
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t, i18n: { language: 'zh-TW' } }) }))
-vi.mock('../../i18n/menuNameEn', () => ({ translateMenuName: (_key: string, name: string) => name }))
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({
+vi.mock('@/i18n/menuNameEn', () => ({ translateMenuName: (_key: string, name: string) => name }))
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({
   user: { username: 'home-test', name: '測試員工', avatar: 'default', role: state.role },
   hasMenuPermission: (key: string) => !state.denied.has(key),
 }) }))
-vi.mock('../../contexts/MenuContext', () => ({ useMenu: () => ({ menuTree: menus, status: 'online', refresh: state.refetch }) }))
-vi.mock('../../hooks/useSystemNavigation', () => ({ useSystemNavigation: (code: string | null) => ({
+vi.mock('@/contexts/MenuContext', () => ({ useMenu: () => ({ menuTree: menus, status: 'online', refresh: state.refetch }) }))
+vi.mock('@/hooks/useSystemNavigation', () => ({ useSystemNavigation: (code: string | null) => ({
   ...state.navigation,
   tree: state.emptyNavigation ? [] : menus.filter(menu => menu.systemCode === code),
   refetch: state.refetch,
 }) }))
-vi.mock('../../api/portal', () => ({ fetchPortalContext: vi.fn() }))
-vi.mock('../../api/auth', () => ({
+vi.mock('@/api/portal', () => ({ fetchPortalContext: vi.fn() }))
+vi.mock('@/api/auth', () => ({
   fetchQuickFavorites: vi.fn(),
   saveQuickFavorites: vi.fn().mockResolvedValue(undefined),
   fetchAiSettings: vi.fn().mockResolvedValue(null),
   saveAiSettings: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('../../api/agent', () => ({
+vi.mock('@/api/agent', () => ({
   sendAgentMessage: vi.fn().mockResolvedValue({ text: '測試回答', tokens: 0, model: 'test' }),
   fetchEngineStatus: vi.fn().mockResolvedValue(null),
   probeEngineStatus: vi.fn().mockResolvedValue(null),
@@ -58,7 +58,7 @@ vi.mock('../../api/agent', () => ({
   getContextWindowOptions: () => [128_000],
   formatContextWindow: () => '128K',
 }))
-vi.mock('../../api/aiMyCenter', () => ({
+vi.mock('@/api/aiMyCenter', () => ({
   fetchMyQuotaUsage: vi.fn().mockRejectedValue(new Error('测试中不加载用量')),
   fetchMyModels: vi.fn().mockResolvedValue([{ modelKey: 'test', modelName: 'Test' }]),
   fetchQuotaCheck: vi.fn().mockResolvedValue({ action: 'allow' }),
@@ -66,7 +66,7 @@ vi.mock('../../api/aiMyCenter', () => ({
   formatNumber: String,
   formatCost: String,
 }))
-vi.mock('../../api/aiConversation', () => ({
+vi.mock('@/api/aiConversation', () => ({
   fetchConversations: vi.fn().mockResolvedValue([{ id: 1, title: '新對話', messages: '[]', totalTokens: 0, createdAt: '', updatedAt: '' }]),
   createConversation: vi.fn(),
   updateConversation: vi.fn().mockResolvedValue(undefined),
@@ -76,14 +76,14 @@ vi.mock('../../api/aiConversation', () => ({
   permanentDeleteConversation: vi.fn(),
 }))
 // 首页会议栏默认无会时不渲染；mock 掉避免测试向真实后端发请求
-vi.mock('../../api/meeting', () => ({
+vi.mock('@/api/meeting', () => ({
   fetchMyMeetingSummary: vi.fn().mockResolvedValue({
     todayCount: 0, upcomingCount: 0, pendingResponseCount: 0,
     nextTitle: null, nextStartTime: null, nextRoomName: null,
   }),
 }))
-vi.mock('../../components/PikachuFace', () => ({ default: () => null }))
-vi.mock('../../components/AiLogo', () => ({ default: () => null }))
+vi.mock('@/components/PikachuFace', () => ({ default: () => null }))
+vi.mock('@/components/AiLogo', () => ({ default: () => null }))
 
 function Location() {
   return <output data-testid="route">{useLocation().pathname}</output>

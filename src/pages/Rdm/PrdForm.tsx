@@ -12,7 +12,7 @@ import { BulbOutlined, LockOutlined, SaveOutlined } from '@ant-design/icons'
 import DOMPurify from 'dompurify'
 import { useTranslation } from 'react-i18next'
 import RdmFormHeader from './components/RdmFormHeader'
-import RichTextEditor from '../../components/RichTextEditor'
+import RichTextEditor from '@/components/RichTextEditor'
 import { useSearchParams } from 'react-router-dom'
 import {
   fetchDeliverySummary,
@@ -22,11 +22,11 @@ import {
   savePrd,
   type RdmPrdItem,
   type RdmPrdSnapshotItem,
-} from '../../api/rdm'
-import { formatRdmReqNo, RDM_STATUS } from '../../constants/rdm'
-import { buildRdmDetailPath } from '../../constants/menuDataSource'
-import { useAuth } from '../../contexts/AuthContext'
-import { useUnsavedGuard } from '../../contexts/UnsavedChangesContext'
+} from '@/api/rdm'
+import { formatRdmReqNo, RDM_STATUS } from '@/constants/rdm'
+import { buildRdmDetailPath } from '@/constants/menuDataSource'
+import { useAuth } from '@/contexts/AuthContext'
+import { useUnsavedGuard } from '@/contexts/UnsavedChangesContext'
 import { clearPrdDraft, loadPrdDraft, prdDraftOwner, savePrdDraft } from './prdDraftStore'
 import { useRdmBack } from './useRdmBack'
 import './index.css'

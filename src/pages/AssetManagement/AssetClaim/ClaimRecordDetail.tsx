@@ -8,14 +8,14 @@
 import { useEffect, useState } from 'react'
 import { Alert, Button, Descriptions, Empty, Modal, Spin, Space, Tag, message } from 'antd'
 import { FileProtectOutlined, FileTextOutlined, StopOutlined, RollbackOutlined, NotificationOutlined, AppstoreOutlined, InboxOutlined } from '@ant-design/icons'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import BrandTag from '../../../components/BrandTag'
-import AssetParameters from '../../../components/AssetParameters'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import BrandTag from '@/components/BrandTag'
+import AssetParameters from '@/components/AssetParameters'
 import { useTranslation } from 'react-i18next'
 import { ClaimStatusTag, SignatureStatusTag, canSignClaim } from './ClaimRecordTable'
-import { CLAIM_STATUS, SIGNATURE_STATUS, type ClaimRow } from './claimViewTypes'
-import { fetchReturnByClaim, type ReturnRow } from '../../../api/eamReturn'
-import { fetchAssetDetail, type AssetItem } from '../../../api/asset'
+import { CLAIM_STATUS, SIGNATURE_STATUS, type ClaimRow } from '@/api/claimViewTypes'
+import { fetchReturnByClaim, type ReturnRow } from '@/api/eamReturn'
+import { fetchAssetDetail, type AssetItem } from '@/api/asset'
 
 /** 詳情卡片統一樣式（無邊框，對齊採購訂單詳情） */
 const detailCardStyle: React.CSSProperties = {

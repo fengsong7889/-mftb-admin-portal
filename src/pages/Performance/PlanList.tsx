@@ -5,11 +5,11 @@ import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
-import { useAuth } from '../../contexts/AuthContext'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   type PerfCycle, type PerfPlan, fetchPerfCycles, fetchPerfPlans,
-} from '../../api/hrPerformance'
+} from '@/api/hrPerformance'
 import {
   PERF_MENU, PLAN_STATUS_LABEL_KEY, PLAN_STATUS_TABS, PLAN_STATUS_TAG_COLOR, planDetailPath, planFormPath,
 } from './meta'

@@ -4,9 +4,9 @@ import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Button, Tag, message, Input } from 'antd'
 import { ArrowLeftOutlined, EditOutlined, SaveOutlined, UndoOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons'
-import { getPagePRD, type PagePRD } from '../../components/PageDescriptions'
-import { getCustomTips, saveCustomTips, deleteCustomTips, type CustomPageTips } from '../../utils/customTipsStorage'
-import { useAuth } from '../../contexts/AuthContext'
+import { getPagePRD, type PagePRD } from '@/components/PageDescriptions'
+import { getCustomTips, saveCustomTips, deleteCustomTips, type CustomPageTips } from '@/utils/customTipsStorage'
+import { useAuth } from '@/contexts/AuthContext'
 
 /** 样式常量 */
 const thStyle: React.CSSProperties = { padding: '10px 14px', textAlign: 'left', borderBottom: '1px solid #E8E8E8', color: '#666', fontWeight: 600 }

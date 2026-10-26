@@ -11,7 +11,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Button, Modal, Result, Spin, Tag, message } from 'antd'
 import { AppstoreOutlined, EditOutlined, FileDoneOutlined, SafetyOutlined } from '@ant-design/icons'
-import { fetchSignPageDetail, submitSignPageSign, type SignPageClaimDetail } from '../../api/signPage'
+import { fetchSignPageDetail, submitSignPageSign, type SignPageClaimDetail } from '@/api/signPage'
 
 /** 頁面狀態機 */
 type PageState = 'loading' | 'ready' | 'signed' | 'success' | 'invalid' | 'error'

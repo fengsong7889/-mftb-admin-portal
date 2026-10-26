@@ -1,5 +1,5 @@
 // 推广通报表分析 - 类型定义
-import { AlgorithmType } from '../Recommend/constants'
+import { AlgorithmType } from '@mftb/contracts/recommendConstants'
 
 /** 推荐类型枚举（统一引用 AlgorithmType，避免重复定义导致枚举值不一致） */
 export type ReportRecommendType = AlgorithmType

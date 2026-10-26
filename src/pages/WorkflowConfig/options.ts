@@ -5,9 +5,9 @@
  * 後端不可用時降級到本地 Mock 數據。
  * 加載結果緩存在模塊級，`getApproverOptions` 同步讀取緩存。
  */
-import { fetchEmployees, type EmployeeItem } from '../../api/employee'
-import { fetchDepartments, type DepartmentItem } from '../../api/department'
-import { fetchWorkflowRoleOptions, type RoleOption } from '../../api/workflowConfig'
+import { fetchEmployees, type EmployeeItem } from '@/api/employee'
+import { fetchDepartments, type DepartmentItem } from '@/api/department'
+import { fetchWorkflowRoleOptions, type RoleOption } from '@/api/workflowConfig'
 
 /* ==================== 模塊級緩存 ==================== */
 

@@ -7,11 +7,11 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
-import { useAuth } from '../../../contexts/AuthContext'
-import { fetchDepartments, type DepartmentItem } from '../../../api/department'
-import { fetchPositions, type PositionItem } from '../../../api/position'
-import { fetchHrDictOptions, HR_DICT_TYPE, type HrDictOption } from '../../../api/hrDict'
-import { fetchContractLedger, type ContractLedgerItem } from '../../../api/employee'
+import { useAuth } from '@/contexts/AuthContext'
+import { fetchDepartments, type DepartmentItem } from '@/api/department'
+import { fetchPositions, type PositionItem } from '@/api/position'
+import { fetchHrDictOptions, HR_DICT_TYPE, type HrDictOption } from '@/api/hrDict'
+import { fetchContractLedger, type ContractLedgerItem } from '@/api/employee'
 import {
   HR_LIFECYCLE_LIST_PATH,
   HR_LIFECYCLE_MENU_KEY,
@@ -24,7 +24,7 @@ import {
   type HrEmployeeBrief,
   type HrLifecyclePayload,
   type HrLifecycleType,
-} from '../../../api/hrLifecycle'
+} from '@/api/hrLifecycle'
 import { buildDeptTree } from './meta'
 
 interface Props {

@@ -65,11 +65,11 @@ import {
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import StatCards from '../../components/StatCards'
-import RemarkTextArea from '../../components/RemarkTextArea'
-import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
-import { useAuth } from '../../contexts/AuthContext'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import StatCards from '@/components/StatCards'
+import RemarkTextArea from '@/components/RemarkTextArea'
+import EmployeeSelect from '@/components/EmployeeSelect'
+import { useAuth } from '@/contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { readRdmListScene, rdmSceneOwner, useRdmListScene, useRdmScrollRestore } from './useListSceneRestore'
 import { isCanceledError, readWithRetry, useRequestGate } from './useRequestGate'
 import { rdmTableLocale } from './components/tableLocale'
@@ -90,10 +90,10 @@ import {
   type RdmProjectListItem,
   type RdmHandlerPerson,
   type RdmRequirementRow,
-} from '../../api/rdm'
-import { fetchDepartments } from '../../api/department'
-import { fetchEmployeeIdOptions } from '../../api/employee'
-import { buildRdmSubmitPath } from '../../constants/menuDataSource'
+} from '@/api/rdm'
+import { fetchDepartments } from '@/api/department'
+import { fetchEmployeeIdOptions } from '@/api/employee'
+import { buildRdmSubmitPath } from '@/constants/menuDataSource'
 import { buildDeptTree, type DeptNode } from '../Attendance/deptTree'
 import { exportRequirementRows } from './requirementExport'
 import {
@@ -127,7 +127,7 @@ import {
   type RdmScope,
   type RdmStage,
   type RdmStatus,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import { ComplexityTag, PriorityTag, StatusTag, TypeTag } from './components/Tags'
 import { EXECUTION_SCOPES, PERSONAL_SCOPES, resolveActiveScope } from './requirementScopes'
 import './index.css'

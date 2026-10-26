@@ -13,7 +13,7 @@ import { Button, Form, Input, Select, Table, Tag, message, Space, DatePicker } f
 import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import { SearchOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { fetchAssetLogs, type AssetLog, type AssetOpType, type AssetLogQuery } from '../../../api/asset'
+import { fetchAssetLogs, type AssetLog, type AssetOpType, type AssetLogQuery } from '@/api/asset'
 import { OP_META, OP_TYPE_LIST } from '../opMeta'
 
 type Filters = Omit<AssetLogQuery, 'page' | 'size'>

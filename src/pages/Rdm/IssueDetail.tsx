@@ -20,7 +20,7 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
-import HelpPopover from '../../components/HelpPopover'
+import HelpPopover from '@/components/HelpPopover'
 import {
   createIssue, fetchIssueDetail, applyIssueDefer, decideIssueDefer, resolveIssue,
   bindIssueFollowUp, cancelIssue, mergeIssue, reassignIssue,
@@ -29,14 +29,14 @@ import {
   type RdmIssueCreateForm, type RdmIssueDeferApplyForm, type RdmIssueDeferDecisionForm,
   type RdmIssueResolveForm, type RdmIssueBindForm, type RdmIssueActionForm,
   type RdmDeliveryItemListItem,
-} from '../../api/rdm'
-import { fetchRequirementPage, type RdmRequirementRow } from '../../api/rdm'
+} from '@/api/rdm'
+import { fetchRequirementPage, type RdmRequirementRow } from '@/api/rdm'
 import {
   RDM_ISSUE_STATUS, RDM_ISSUE_STATUS_LABEL, RDM_ISSUE_STATUS_COLOR,
   RDM_ISSUE_SEVERITY_LABEL, RDM_ISSUE_SEVERITY_COLOR,
   RDM_DEFER_STATUS, RDM_DEFER_STATUS_LABEL, RDM_DEFER_STATUS_COLOR,
   RDM_ISSUE_SOURCE_TYPE_LABEL, RDM_DECISION,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import './index.css'
 
 const { TextArea } = Input

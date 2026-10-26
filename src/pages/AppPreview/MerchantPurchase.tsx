@@ -26,11 +26,11 @@ import {
   placeAdStarOrder,
   type AdAlgorithm,
   type AdInventoryCell,
-} from '../../api/adPromotion'
-import { fetchStores, type StoreItem } from '../../api/store'
-import { fetchFinAccountBalance } from '../../api/finance'
+} from '@/api/adPromotion'
+import { fetchStores, type StoreItem } from '@/api/store'
+import { fetchFinAccountBalance } from '@/api/finance'
 import { UI_TO_BACKEND_BRAND } from '../_shared/ad-promotion/gridConstants'
-import { AlgorithmType } from '../Recommend/constants'
+import { AlgorithmType } from '@mftb/contracts/recommendConstants'
 import {
   BRAND_OPTIONS,
   MEAL_SLOT_ORDER,

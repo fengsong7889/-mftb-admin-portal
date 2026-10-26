@@ -3,10 +3,10 @@ import { Button, Modal, Popconfirm, Space, Table, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import RemoteSearchSelect from '../../components/RemoteSearchSelect'
-import { fetchEmployeeOptions } from '../../api/employee'
-import { fetchStoreBds, addStoreBd, removeStoreBd } from '../../api/store'
-import type { StoreBdItem, StoreItem } from '../../api/store'
+import RemoteSearchSelect from '@/components/RemoteSearchSelect'
+import { fetchEmployeeOptions } from '@/api/employee'
+import { fetchStoreBds, addStoreBd, removeStoreBd } from '@/api/store'
+import type { StoreBdItem, StoreItem } from '@/api/store'
 
 interface StoreBindBdModalProps {
   open: boolean

@@ -11,20 +11,20 @@ import {
   RiseOutlined, SearchOutlined, ShopOutlined, TrophyOutlined,
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
-import RemoteSearchSelect from '../../components/RemoteSearchSelect'
-import StatCards, { type StatCardItem } from '../../components/StatCards'
-import type { OptionItem } from '../../api/types'
+import RemoteSearchSelect from '@/components/RemoteSearchSelect'
+import StatCards, { type StatCardItem } from '@/components/StatCards'
+import type { OptionItem } from '@/api/types'
 import {
   HitSource, SANDBOX_ALGO_POOL, findSandboxAlgorithm, generateAlgorithmSimulation,
   type AlgorithmHitMerchant, type AlgorithmMissMerchant, type AlgorithmSimulationResult,
   type AlgorithmTrialParams,
-} from '../../api/mock/trafficSandboxMock'
+} from '@/api/mock/trafficSandboxMock'
 import {
   ALGO_CARD_COLOR_MAP, ALGORITHM_TYPE_OPTIONS, BID_MODE_OPTIONS, BidMode,
   RANKING_STAGE_OPTIONS, RECALL_DIMENSION_COLOR, RECALL_DIMENSION_OPTIONS,
   RankingStage, RecallDimension, REGION_LABEL_KEY, REGION_OPTIONS, Region,
   ServiceStatus, TIME_SLOT_OPTIONS, TimeSlot,
-} from '../Recommend/constants'
+} from '@mftb/contracts/recommendConstants'
 
 /** 推演模式（與瀑布流推演頁保持一致） */
 enum SandboxMode {

@@ -2,12 +2,12 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import RdmDailyReportView from './index'
-import i18n from '../../i18n'
+import i18n from '@/i18n'
 
 const fetchView = vi.fn()
 
-vi.mock('../../api/rdmDailyReportPublic', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../api/rdmDailyReportPublic')>()
+vi.mock('@/api/rdmDailyReportPublic', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/rdmDailyReportPublic')>()
   return { ...actual, fetchDailyReportPublicView: (token: string) => fetchView(token) }
 })
 

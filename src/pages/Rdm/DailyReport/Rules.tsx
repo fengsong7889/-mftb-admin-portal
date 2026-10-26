@@ -15,8 +15,8 @@ import {
   SettingOutlined,
   TeamOutlined,
 } from '@ant-design/icons'
-import { useAuth } from '../../../contexts/AuthContext'
-import HelpPopover from '../../../components/HelpPopover'
+import { useAuth } from '@/contexts/AuthContext'
+import HelpPopover from '@/components/HelpPopover'
 import {
   deleteDailyReportRule,
   fetchDailyReportConfig,
@@ -31,7 +31,7 @@ import {
   type DailyReportReceiverPreview,
   type DailyReportRule,
   type DailyReportTemplate,
-} from '../../../api/rdmDailyReport'
+} from '@/api/rdmDailyReport'
 import '../index.css'
 
 /**

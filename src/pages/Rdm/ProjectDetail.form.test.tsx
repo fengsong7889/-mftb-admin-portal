@@ -11,12 +11,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { createProject, fetchProjectDetail, fetchProjectRequirementBoard, updateProject } from '../../api/rdm'
+import { createProject, fetchProjectDetail, fetchProjectRequirementBoard, updateProject } from '@/api/rdm'
 import ProjectDetail from './ProjectDetail'
 
 // 六个 EmployeeSelect 实例的 props 长一样（同一 placeholder），只能按 JSX 顺序定位：
 // [0]項目經理 [1]產品負責人 [2]技術負責人 [3]UI 設計 [4]測試 [5]運維
-vi.mock('../MeetingManagement/EmployeeSelect', () => ({
+vi.mock('@/components/EmployeeSelect', () => ({
   default: (props: { onChange?: (ids: number[]) => void; onPick?: (items: { id: number; name: string }[]) => void }) => (
     <button type="button" onClick={() => {
       props.onChange?.([7])
@@ -27,11 +27,11 @@ vi.mock('../MeetingManagement/EmployeeSelect', () => ({
 }))
 
 // 详情页按 rdm-dashboard-project:edit 收敛编辑入口；本文件测表单提交，需给全权限
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => true }),
 }))
 
-vi.mock('../../api/rdm', () => ({
+vi.mock('@/api/rdm', () => ({
   fetchProjectDetail: vi.fn(),
   fetchProjectRequirementBoard: vi.fn(),
   urgeProject: vi.fn(),

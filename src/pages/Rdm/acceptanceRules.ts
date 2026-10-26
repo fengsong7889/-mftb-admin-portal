@@ -10,8 +10,8 @@ import {
   RDM_BLOCKING_SEVERITIES,
   RDM_CASE_RESULT,
   type RdmAcceptResult,
-} from '../../constants/rdm'
-import type { RdmAcceptanceCaseForm } from '../../api/rdm'
+} from '@/constants/rdm'
+import type { RdmAcceptanceCaseForm } from '@/api/rdm'
 
 /** 用例统计结果 */
 export interface AcceptanceCaseStat {

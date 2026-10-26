@@ -10,14 +10,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { message } from 'antd'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   fetchBorrowList, fetchBorrowDetail, registerBorrow, renewBorrow,
   type BorrowRow, type BorrowQuery, type BorrowRegisterDTO,
-} from '../../../api/eamBorrow'
-import { fetchAssetList } from '../../../api/asset'
-import { fetchEmployees } from '../../../api/employee'
-import type { ClaimAssetOption, ClaimEmployee, ClaimPage, ClaimQuery } from '../AssetClaim/claimViewTypes'
+} from '@/api/eamBorrow'
+import { fetchAssetList } from '@/api/asset'
+import { fetchEmployees } from '@/api/employee'
+import type { ClaimAssetOption, ClaimEmployee, ClaimPage, ClaimQuery } from '@/api/claimViewTypes'
 import BorrowList from './BorrowList'
 import BorrowForm from './BorrowForm'
 import BorrowDetail from './BorrowDetail'

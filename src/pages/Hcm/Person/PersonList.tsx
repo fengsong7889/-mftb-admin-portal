@@ -11,8 +11,8 @@ import { Alert, Button, Form, Input, Modal, Select, Space, Table, Tag, message }
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { deletePerson, listPersons, type Person } from '../../../api/hcmPerson'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { deletePerson, listPersons, type Person } from '@/api/hcmPerson'
 
 interface Filters {
   keyword?: string

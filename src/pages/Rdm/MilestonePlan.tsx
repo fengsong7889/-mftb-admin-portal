@@ -22,8 +22,8 @@ import {
   freezeMilestones,
   saveMilestones,
   type RdmRequirementDetail,
-} from '../../api/rdm'
-import { fetchEmployees } from '../../api/employee'
+} from '@/api/rdm'
+import { fetchEmployees } from '@/api/employee'
 import {
   RDM_MILESTONE_NODES,
   RDM_MILESTONE_STATUS,
@@ -33,7 +33,7 @@ import {
   type RdmMilestoneStatus,
 
   canFreezeBaseline,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import './index.css'
 
 /** 页面内一行节点（日期用 dayjs，提交时统一转 yyyy-MM-dd） */

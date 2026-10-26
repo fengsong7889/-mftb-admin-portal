@@ -12,15 +12,15 @@ import { SendOutlined } from '@ant-design/icons'
 import RdmFormHeader from './components/RdmFormHeader'
 import { useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
-import { useAuth } from '../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   applyChange,
   fetchDeliverySummary,
   fetchRequirementDetail,
   type RdmPrdItem,
-} from '../../api/rdm'
-import { RDM_CHANGE_TYPE, RDM_CHANGE_TYPE_LABEL, formatRdmReqNo, type RdmChangeType } from '../../constants/rdm'
-import { buildRdmDetailPath } from '../../constants/menuDataSource'
+} from '@/api/rdm'
+import { RDM_CHANGE_TYPE, RDM_CHANGE_TYPE_LABEL, formatRdmReqNo, type RdmChangeType } from '@/constants/rdm'
+import { buildRdmDetailPath } from '@/constants/menuDataSource'
 import { useRdmBack } from './useRdmBack'
 import './index.css'
 

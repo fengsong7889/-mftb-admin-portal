@@ -3,12 +3,12 @@ import { Table, Button, Input, Select, Form, Space, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { SearchOutlined, ReloadOutlined, ExportOutlined, ImportOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import FlashSaleTierCell from '../../../components/FlashSaleTierCell'
-import FlashSaleImportModal from '../../../components/FlashSaleImportModal'
-import { fetchFlashSalePeriods, fetchFlashSaleStats, importFlashSaleStats } from '../../../api/flashSale'
-import type { FlashSalePeriod, FlashSaleStatsVO } from '../../../api/flashSale'
-import type { ParsedFlashSaleExcel } from '../../../utils/flashSaleImport'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import FlashSaleTierCell from '@/components/FlashSaleTierCell'
+import FlashSaleImportModal from '@/components/FlashSaleImportModal'
+import { fetchFlashSalePeriods, fetchFlashSaleStats, importFlashSaleStats } from '@/api/flashSale'
+import type { FlashSalePeriod, FlashSaleStatsVO } from '@/api/flashSale'
+import type { ParsedFlashSaleExcel } from '@/utils/flashSaleImport'
 import {
   SUBSIDY_TYPE_LABEL,
   SUBSIDY_TYPE_TAG_COLOR,
@@ -17,7 +17,7 @@ import {
   LAST_PERIOD_NONE_DATA,
   FLASH_PRICE_TYPE,
   FLASH_PRICE_TYPE_LABEL,
-} from '../../../constants/flashSale'
+} from '@/constants/flashSale'
 import { useFlashSalePage, flashSalePaginationConfig } from '../components/shared'
 
 /** 团购管理 - 秒杀商品统计 */

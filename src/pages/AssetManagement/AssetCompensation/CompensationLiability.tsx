@@ -4,9 +4,9 @@
 import { useState, useEffect } from 'react'
 import { Alert, Button, Form, Input, InputNumber, Select, Spin, TreeSelect, message } from 'antd'
 import { SaveOutlined } from '@ant-design/icons'
-import type { CompensationRow, LiabilityDTO } from '../../../api/eamCompensation'
-import { fetchDepartments } from '../../../api/department'
-import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
+import type { CompensationRow, LiabilityDTO } from '@/api/eamCompensation'
+import { fetchDepartments } from '@/api/department'
+import { fetchEmployees, type EmployeeItem } from '@/api/employee'
 import { ReturnHeader, ReturnSection } from '../AssetReturn/ReturnLayout'
 
 const CAUSE_OPTIONS = [

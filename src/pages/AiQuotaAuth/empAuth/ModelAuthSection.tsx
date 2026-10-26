@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Button, Select, Switch, Tag, Tooltip, message } from 'antd'
 import { PlusOutlined, DeleteOutlined, EyeOutlined, CheckCircleFilled, CloseCircleFilled } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import type { AiModel } from '../../../api'
+import type { AiModel } from '@/api'
 import {
   CAPABILITY_FIELDS,
   CAPABILITY_SHORT_FIELDS,

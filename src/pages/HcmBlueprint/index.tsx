@@ -12,7 +12,7 @@ import { useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Alert, Button, Collapse, Empty, Menu, Segmented, Tag } from 'antd'
 import { AppstoreOutlined, ArrowLeftOutlined, ExperimentOutlined } from '@ant-design/icons'
-import { renderMenuIcon } from '../../components/MenuIcon'
+import { renderMenuIcon } from '@/components/MenuIcon'
 import {
   HCM_BLUEPRINTS,
   HCM_OPEN_QUESTIONS,

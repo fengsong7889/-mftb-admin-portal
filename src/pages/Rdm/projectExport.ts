@@ -9,7 +9,7 @@
  * 避免「導出與頁面不一致」的扯皮；同時把 reconciliation 一併落一個 Sheet，留下對賬證據。
  */
 import ExcelJS from 'exceljs'
-import type { RdmExportBundle } from '../../api/rdm'
+import type { RdmExportBundle } from '@/api/rdm'
 
 /** 布爾 → 繁中是/否 */
 const yn = (v: boolean | null | undefined) => (v ? '是' : '否')

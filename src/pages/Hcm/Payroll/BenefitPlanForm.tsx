@@ -18,7 +18,7 @@ import {
   getBenefitPlan,
   updateBenefitPlan,
   type PayrollBenefitPlan,
-} from '../../../api/payroll'
+} from '@/api/payroll'
 import { CardTitle, FormHeader, cardStyle, grid3 } from '../Organization/shared'
 
 interface PlanFormValues {

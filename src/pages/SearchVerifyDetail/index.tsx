@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   Card, Tabs, Button, Table, Alert, Divider,
 } from 'antd'
-import DetailPageHeader from '../../components/DetailPageHeader'
+import DetailPageHeader from '@/components/DetailPageHeader'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 

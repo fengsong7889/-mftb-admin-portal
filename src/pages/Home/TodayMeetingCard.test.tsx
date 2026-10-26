@@ -15,7 +15,7 @@ const hasMenuPermission = vi.fn(() => true)
 
 /** 用真实 zh-TW 词条渲染：键缺失会直接暴露成键名，断言随之失败 */
 vi.mock('react-i18next', async () => {
-  const zhTW = (await import('../../i18n/locales/zh-TW.json')).default as Record<string, unknown>
+  const zhTW = (await import('@/i18n/locales/zh-TW.json')).default as Record<string, unknown>
   const lookup = (key: string): string => {
     let node: unknown = zhTW
     for (const part of key.split('.')) {
@@ -36,15 +36,15 @@ vi.mock('react-i18next', async () => {
   }
 })
 
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasMenuPermission, user: { username: 'test-user' } }),
 }))
 
-vi.mock('../../api/meeting', () => ({
+vi.mock('@/api/meeting', () => ({
   fetchMyMeetingSummary: vi.fn(),
 }))
 
-import { fetchMyMeetingSummary } from '../../api/meeting'
+import { fetchMyMeetingSummary } from '@/api/meeting'
 import TodayMeetingCard, { TodayMeetingRestoreChip } from './TodayMeetingCard'
 import { useTodayMeetingBar } from './useTodayMeetingBar'
 

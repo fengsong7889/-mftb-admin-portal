@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { RDM_SCOPE } from '../../constants/rdm'
+import { RDM_SCOPE } from '@/constants/rdm'
 import { resolveActiveScope } from './requirementScopes'
 
 /**

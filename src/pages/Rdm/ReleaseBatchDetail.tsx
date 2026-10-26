@@ -31,10 +31,10 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
-import HelpPopover from '../../components/HelpPopover'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import HelpPopover from '@/components/HelpPopover'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { deriveRdmColumnMeta } from './rdmColumnMeta'
-import { useAuth } from '../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   fetchReleaseBatchDetail,
   fetchReleaseBatchActions,
@@ -54,7 +54,7 @@ import {
   type RdmReleaseExemptionRecord,
   type RdmReleaseSupplementaryRecord,
   type RdmEntityAction,
-} from '../../api/rdm'
+} from '@/api/rdm'
 import {
   RDM_RELEASE_BATCH_STATUS,
   RDM_RELEASE_BATCH_STATUS_COLOR,
@@ -77,7 +77,7 @@ import {
   RDM_SUPPLEMENTARY_STATUS_COLOR,
   RDM_SUPPLEMENTARY_RESULT,
   RDM_SUPPLEMENTARY_RESULT_LABEL,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import './index.css'
 
 /** 后端契约动作码（与 RdmAllowedActionsService.computeReleaseBatchActions 逐字一致） */

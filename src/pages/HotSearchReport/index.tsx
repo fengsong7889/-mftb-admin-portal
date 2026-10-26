@@ -9,7 +9,7 @@ import {
   ArrowUpOutlined,
 } from '@ant-design/icons'
 import { Line, Column, Pie, Area } from '@ant-design/charts'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   createTerminalOptions, createRegionOptions,
   brandOptions,

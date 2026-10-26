@@ -2,7 +2,7 @@
 """只读门禁校验：按 Sidebar 的真实渲染算法反推「进入系统后实际可见的一级菜单」，
 与 DB 中的顶级菜单对比，差集即为菜单配置里能看到、但系统内根本不显示的幽灵一级目录。
 
-复刻 src/components/Sidebar.tsx 的 scopeMenusToSystem() + promoteSystemMenus() +
+复刻 frontend/packages/ui/src/components/Sidebar.tsx 的 scopeMenusToSystem() + promoteSystemMenus() +
 buildMenuItemsFromVO() 三步过滤，避免人工漏判。
 """
 import os

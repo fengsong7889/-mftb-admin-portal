@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { parseWaterfallRows, parseWaterfallExcel, resolveWaterfallImport, createWaterfallImportTemplate } from './waterfallImport'
-import { mockGetItemsByIds } from '../../api/mock/waterfallCatalogMock'
+import { mockGetItemsByIds } from '@/api/mock/waterfallCatalogMock'
 import { emptyDraft, getLocalStrategy, upsertLocalStrategy, buildDraftFromServer, setExtension, mergeServerToStrategies, type WaterfallExtension } from './waterfallExtStore'
 import { consumeDraft, readDraft, writeDraft } from './waterfallDraft'
-import { getDisplayCategoryMode, type FixedContentSlot } from './types'
+import { getDisplayCategoryMode, type FixedContentSlot } from '@mftb/contracts/waterfallTypes'
 
 const header = ['ID', '排序']
 

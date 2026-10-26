@@ -24,11 +24,11 @@ import {
   reassignPm,
   type RdmProductOption,
   type RdmRequirementDetail,
-} from '../../api/rdm'
-import { RDM_STATUS, RDM_STATUS_COLOR, RDM_STATUS_LABEL, formatRdmReqNo, type RdmStatus } from '../../constants/rdm'
+} from '@/api/rdm'
+import { RDM_STATUS, RDM_STATUS_COLOR, RDM_STATUS_LABEL, formatRdmReqNo, type RdmStatus } from '@/constants/rdm'
 import { PriorityTag } from './components/Tags'
 import { formatPerson } from './handlerDisplay'
-import { formatEmployee } from '../../utils/employeeDisplay'
+import { formatEmployee } from '@/utils/employeeDisplay'
 import './index.css'
 
 /** 选中的产品经理（确认框与提交都要用名字，避免提交后再去反查） */

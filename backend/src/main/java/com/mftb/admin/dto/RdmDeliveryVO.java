@@ -87,6 +87,8 @@ public class RdmDeliveryVO {
         private Boolean actualHoursReported;
         private String planStartDate;
         private String planFinishDate;
+        /** 任务计划上线日（默认继承需求计划上线，不得晚于需求计划上线） */
+        private String planReleaseDate;
         private String actualStartTime;
         private String actualFinishTime;
         private String blockedReason;

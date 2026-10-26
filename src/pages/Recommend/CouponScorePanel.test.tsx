@@ -3,7 +3,7 @@ import { ConfigProvider, Form, message } from 'antd'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import OrganicTrafficScoreConfig from './OrganicTrafficScoreConfig'
-import { AppType } from './constants'
+import { AppType } from '@mftb/contracts/recommendConstants'
 import { DEFAULT_COUPON_SCORE_CONFIG, validateCouponScoreConfig, computeCouponScore, couponScoreMonotonicHint } from './organicTrafficConfig'
 
 const api = vi.hoisted(() => ({ fetch: vi.fn(), update: vi.fn(), create: vi.fn(), toggle: vi.fn(), remove: vi.fn() }))

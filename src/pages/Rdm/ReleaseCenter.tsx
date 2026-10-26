@@ -19,19 +19,19 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import StatCards from '../../components/StatCards'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import StatCards from '@/components/StatCards'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { rdmTableLocale } from './components/tableLocale'
 import {
   fetchReleaseBatches,
   type RdmReleaseBatchListItem,
-} from '../../api/rdm'
-import { fetchEmployeeIdOptions } from '../../api/employee'
+} from '@/api/rdm'
+import { fetchEmployeeIdOptions } from '@/api/employee'
 import {
   RDM_RELEASE_BATCH_STATUS,
   RDM_RELEASE_BATCH_STATUS_COLOR,
   RDM_RELEASE_BATCH_STATUS_LABEL,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import './index.css'
 
 const { RangePicker } = DatePicker
@@ -232,7 +232,7 @@ export default function ReleaseCenter() {
 
       {/* ===== 搜索區：§E.1 控件宽度由 .search-section 统一给 100%，不得内联写死 ===== */}
       <div className="search-section">
-        <Form layout="inline" style={{ width: '100%' }}>
+        <Form layout="inline">
           <Form.Item label="關鍵字">
             <Input
               placeholder="版本標識 / 批次號"
@@ -276,7 +276,8 @@ export default function ReleaseCenter() {
               onChange={(dates) => setDateRange(dates as [dayjs.Dayjs | null, dayjs.Dayjs | null] | null)}
             />
           </Form.Item>
-          <Form.Item label=" " colon={false}>
+          {/* 最后一个 Form.Item 不写 label：靠全局 §E.1 的 padding-top 与输入框对齐 */}
+          <Form.Item>
             <div className="search-actions">
               <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button>
               <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>

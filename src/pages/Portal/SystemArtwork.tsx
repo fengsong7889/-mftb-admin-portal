@@ -4,8 +4,8 @@ import { feature, mesh } from 'topojson-client'
 import type { GeometryCollection, Topology } from 'topojson-specification'
 import worldSource from 'world-atlas/countries-110m.json?raw'
 import { useTranslation } from 'react-i18next'
-import { getPortalSystemKey, type PortalSystemKey } from '../../constants/portalSystems'
-import { RDM_STAGE, RDM_STAGE_LABEL, type RdmStage } from '../../constants/rdm'
+import { getPortalSystemKey, type PortalSystemKey } from '@/constants/portalSystems'
+import { RDM_STAGE, RDM_STAGE_LABEL, type RdmStage } from '@/constants/rdm'
 
 /** 自绘业务场景，不依赖外链；状态文案随门户语言切换。 */
 function Sheet({ x, y, width = 104, height = 112 }: { x: number; y: number; width?: number; height?: number }) {

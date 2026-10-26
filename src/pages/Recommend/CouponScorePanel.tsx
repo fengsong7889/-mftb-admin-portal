@@ -7,7 +7,7 @@ import {
 } from '@ant-design/icons'
 import AlgorithmSection from './AlgorithmForm/AlgorithmSection'
 import ScoreRow from './AlgorithmForm/ScoreRow'
-import HelpPopover, { type HelpSection } from '../../components/HelpPopover'
+import HelpPopover, { type HelpSection } from '@/components/HelpPopover'
 import {
   computeCouponScore, validateCouponScoreConfig, couponScoreMonotonicHint,
   thresholdBandLabel, discountBandLabel,

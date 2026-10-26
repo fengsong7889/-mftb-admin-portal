@@ -17,13 +17,13 @@ import {
   InboxOutlined, UserOutlined, ClockCircleOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import BrandTag from '../../../components/BrandTag'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import BrandTag from '@/components/BrandTag'
 import {
   fetchLossDetail, updateLoss, recoverLoss, inspectLoss, writeOffLoss, addLossEvent,
   type LossRow, type LossUpdateDTO,
-} from '../../../api/eamLoss'
-import { fetchAssetDetail, type AssetItem } from '../../../api/asset'
+} from '@/api/eamLoss'
+import { fetchAssetDetail, type AssetItem } from '@/api/asset'
 
 /** 模塊標題組件（對齊 EAM 詳情頁統一規範） */
 function SectionTitle({ icon, iconBg, title }: { icon: React.ReactNode; iconBg: string; title: string }) {

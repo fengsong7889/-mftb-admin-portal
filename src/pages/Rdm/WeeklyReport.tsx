@@ -19,12 +19,12 @@ import {
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
-import StatCards from '../../components/StatCards'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import StatCards from '@/components/StatCards'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { rdmTableLocale } from './components/tableLocale'
 import { deriveRdmColumnMeta } from './rdmColumnMeta'
-import { fetchIterations, fetchWeeklyReport, type RdmIterationItem, type RdmWeeklyReport } from '../../api/rdm'
-import { formatEmployee } from '../../utils/employeeDisplay'
+import { fetchIterations, fetchWeeklyReport, type RdmIterationItem, type RdmWeeklyReport } from '@/api/rdm'
+import { formatEmployee } from '@/utils/employeeDisplay'
 import { exportWeeklyReport } from './weeklyReportExport'
 import {
   RDM_RISK_COLOR,
@@ -33,7 +33,7 @@ import {
   formatRdmReqNo,
   type RdmRiskType,
   type RdmStatus,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import './index.css'
 
 const { RangePicker } = DatePicker

@@ -11,8 +11,8 @@ import {
   RocketOutlined, GiftOutlined, ShoppingOutlined, AppstoreOutlined,
 } from '@ant-design/icons'
 import { Tabs } from 'antd'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import BrandTag from '../../../components/BrandTag'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import BrandTag from '@/components/BrandTag'
 
 const { Text } = Typography
 

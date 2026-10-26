@@ -6,7 +6,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   fetchLeaveBalances, fetchLeaveEmployeeOptions, saveLeaveBalance,
   type LeaveEmployeeOption,
-} from '../../../api/hrLeave'
+} from '@/api/hrLeave'
 import { LEAVE_TYPE_LABEL_KEY, LEAVE_TYPE_ORDER } from './meta'
 
 interface FormValues {

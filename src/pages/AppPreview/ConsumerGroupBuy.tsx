@@ -8,13 +8,13 @@
  * 说明：图片为 AI 占位图（src/assets/consumer-home/），文案暂硬编码繁中，待切图与 i18n 接入后替换。
  */
 import { useRef, useState, type KeyboardEvent } from 'react'
-import groupbuyHeroImg from '../../assets/consumer-home/groupbuy-hero.jpg'
-import bbqImg from '../../assets/consumer-home/bbq.jpg'
-import riceballImg from '../../assets/consumer-home/riceball.jpg'
-import friedChickenImg from '../../assets/consumer-home/friedchicken.jpg'
-import fishPotImg from '../../assets/consumer-home/fishpot.jpg'
-import burgerImg from '../../assets/consumer-home/burger.jpg'
-import lemonTeaImg from '../../assets/consumer-home/lemontea.jpg'
+import groupbuyHeroImg from '@/assets/consumer-home/groupbuy-hero.jpg'
+import bbqImg from '@/assets/consumer-home/bbq.jpg'
+import riceballImg from '@/assets/consumer-home/riceball.jpg'
+import friedChickenImg from '@/assets/consumer-home/friedchicken.jpg'
+import fishPotImg from '@/assets/consumer-home/fishpot.jpg'
+import burgerImg from '@/assets/consumer-home/burger.jpg'
+import lemonTeaImg from '@/assets/consumer-home/lemontea.jpg'
 
 const CATS = [
   { label: '火鍋', img: fishPotImg },

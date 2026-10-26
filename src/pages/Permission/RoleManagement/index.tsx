@@ -4,8 +4,8 @@ import type { TableColumnsType } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   bindRoleUsers,
   createRole,
@@ -15,20 +15,20 @@ import {
   updateRole,
   updateRoleStatus,
   type RolePayload,
-} from '../../../api/role'
-import type { RoleItem } from '../../../api/role'
-import { copyRole } from '../../../api/authorizationCenter'
-import { fetchEmployees } from '../../../api/employee'
-import type { EmployeeItem } from '../../../api/employee'
-import { fetchDepartments, type DepartmentItem } from '../../../api/department'
+} from '@/api/role'
+import type { RoleItem } from '@/api/role'
+import { copyRole } from '@/api/authorizationCenter'
+import { fetchEmployees } from '@/api/employee'
+import type { EmployeeItem } from '@/api/employee'
+import { fetchDepartments, type DepartmentItem } from '@/api/department'
 import {
   DATA_SCOPE,
   DATA_SCOPE_HINT_KEY,
   DATA_SCOPE_LABEL_KEY,
   ALL_DATA_SCOPES,
   type DataScope,
-} from '../../../constants/dataScope'
-import HelpPopover from '../../../components/HelpPopover'
+} from '@/constants/dataScope'
+import HelpPopover from '@/components/HelpPopover'
 
 const { TextArea } = Input
 

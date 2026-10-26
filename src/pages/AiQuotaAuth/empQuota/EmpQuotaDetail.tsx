@@ -3,9 +3,9 @@ import { useTranslation } from 'react-i18next'
 import { Button, Tag, message } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { IdcardOutlined } from '@ant-design/icons'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import { fetchModels, type AiModel } from '../../../api'
-import { POSITION_SEQUENCE, POSITION_SEQUENCE_TAG_COLOR } from '../../../api/position'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import { fetchModels, type AiModel } from '@/api'
+import { POSITION_SEQUENCE, POSITION_SEQUENCE_TAG_COLOR } from '@/api/position'
 import {
   usagePercent,
   usageColor,
@@ -21,7 +21,7 @@ import { LoadingSpinner, SectionCard, UsageOverviewSection, BasicInfoDetailSecti
 const PERIOD_KEYS: Record<string, string> = { daily: 'periodDaily', monthly: 'periodMonthly' }
 const TYPE_KEYS: Record<string, string> = { token: 'typeToken', cost: 'typeCost', request: 'typeRequest' }
 const OVER_LIMIT_KEYS: Record<string, string> = { reject: 'overLimitRejectAct', approve: 'overLimitApproveAct', downgrade: 'overLimitDowngradeAct' }
-import { fetchPosQuotaDetail, type PosQuotaVO } from '../../../api/empQuota'
+import { fetchPosQuotaDetail, type PosQuotaVO } from '@/api/empQuota'
 
 /**
  * 員工額度 — 詳情獨立頁（參考部門額度詳情頁佈局）

@@ -9,7 +9,7 @@ import {
 import { Line, Column } from '@ant-design/charts'
 import dayjs from 'dayjs'
 import type { ColumnsType } from 'antd/es/table'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   OrderReportItem,
   ReportApp,

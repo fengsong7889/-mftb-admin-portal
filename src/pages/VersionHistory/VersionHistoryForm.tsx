@@ -9,7 +9,7 @@ import {
   createVersion,
   updateVersion,
   suggestNextVersion,
-} from '../../api/versionHistory'
+} from '@/api/versionHistory'
 
 const { TextArea } = Input
 

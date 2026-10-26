@@ -6,8 +6,8 @@ import {
   ApartmentOutlined,
   NodeIndexOutlined,
 } from '@ant-design/icons'
-import DetailPageHeader from '../../components/DetailPageHeader'
-import { useWorkflowConfig } from '../../hooks/useWorkflowConfig'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import { useWorkflowConfig } from '@/hooks/useWorkflowConfig'
 import {
   APPROVAL_TYPE_OPTIONS,
   APPROVER_TYPE_LABELS,

@@ -1,4 +1,4 @@
-import { AppType, RecommendChannel, AlgorithmType, Region, ServiceStatus, RecallDimension, RankingStage, TimeSlot } from './constants'
+import { AppType, RecommendChannel, AlgorithmType, Region, ServiceStatus, RecallDimension, RankingStage, TimeSlot } from '@mftb/contracts/recommendConstants'
 
 // ---- 召回层类型 ----
 

@@ -4,7 +4,7 @@ import { RiseOutlined, FundOutlined, EyeOutlined, DollarOutlined, EnvironmentOut
 import { Line, Column } from '@ant-design/charts'
 import { useTranslation } from 'react-i18next'
 import AppTabs from '../components/AppTabs'
-import { AppType } from '../constants'
+import { AppType } from '@mftb/contracts/recommendConstants'
 
 const { Option } = Select
 

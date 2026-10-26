@@ -6,8 +6,8 @@
  * 因此从展示组件中拆成独立 Hook，同时满足 react-refresh 只导出组件的约束。
  */
 import { useCallback, useEffect, useState } from 'react'
-import { useAuth } from '../../contexts/AuthContext'
-import { fetchMyMeetingSummary, type MeetingMySummary } from '../../api/meeting'
+import { useAuth } from '@/contexts/AuthContext'
+import { fetchMyMeetingSummary, type MeetingMySummary } from '@/api/meeting'
 
 type LoadState = 'loading' | 'ready' | 'failed'
 

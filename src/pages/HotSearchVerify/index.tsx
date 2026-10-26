@@ -8,8 +8,8 @@ import {
   SearchOutlined, ReloadOutlined, EyeOutlined,
   FireOutlined,
 } from '@ant-design/icons'
-import { BRAND_OPTIONS as BRAND_OPTIONS_IMPORT } from '../../constants/brand'
-import PhoneMockup from '../../components/PhoneMockup'
+import { BRAND_OPTIONS as BRAND_OPTIONS_IMPORT } from '@/constants/brand'
+import PhoneMockup from '@/components/PhoneMockup'
 
 // ============================
 // 類型定義

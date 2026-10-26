@@ -18,7 +18,7 @@ import {
   type OrgJobGrade,
   type OrgPosition,
   type OrgUnitNode,
-} from '../../../api/hcmOrganization'
+} from '@/api/hcmOrganization'
 import { CardTitle, FormHeader, UpdatedFooter, cardStyle, formatTimestamp, grid3 } from './shared'
 
 function flattenUnits(nodes: OrgUnitNode[], depth = 0): Array<{ value: number; label: string; disabled?: boolean }> {

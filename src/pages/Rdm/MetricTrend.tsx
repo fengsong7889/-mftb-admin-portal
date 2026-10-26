@@ -18,11 +18,11 @@ import {
 } from '@ant-design/icons'
 import { Line } from '@ant-design/charts'
 import dayjs from 'dayjs'
-import StatCards from '../../components/StatCards'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import StatCards from '@/components/StatCards'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { deriveRdmColumnMeta } from './rdmColumnMeta'
-import { fetchMetricTrend, type RdmMetricPoint } from '../../api/rdm'
-import { RDM_METRIC_DIM, RDM_METRIC_DIM_LABEL, type RdmMetricDim } from '../../constants/rdm'
+import { fetchMetricTrend, type RdmMetricPoint } from '@/api/rdm'
+import { RDM_METRIC_DIM, RDM_METRIC_DIM_LABEL, type RdmMetricDim } from '@/constants/rdm'
 import './index.css'
 
 /**

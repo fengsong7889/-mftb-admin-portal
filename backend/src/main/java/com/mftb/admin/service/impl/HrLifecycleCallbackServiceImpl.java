@@ -72,6 +72,8 @@ public class HrLifecycleCallbackServiceImpl implements HrLifecycleCallbackServic
     private final HrAuditService hrAuditService;
     private final HrOffboardingTaskService offboardingTaskService;
     private final com.mftb.admin.service.HrAssignmentQuery hrAssignmentQuery;
+    /** 调动/复职会改部门快照，数据范围随之变化：投影写入后必须失效权限缓存 */
+    private final com.mftb.admin.service.PermissionService permissionService;
 
     @Override
     public boolean isHrLifecycleProcess(String processCode) {
@@ -259,6 +261,8 @@ public class HrLifecycleCallbackServiceImpl implements HrLifecycleCallbackServic
         applyTargetAssignment(user, req);
         user.setUpdatedBy(operatorResolver.currentOperatorName());
         sysUserMapper.updateById(user);
+        // 部门变了等于数据范围变了：不失效权限缓存，调动后仍按旧部门放行，直到重启
+        permissionService.evictAll();
 
         EmpPositionRecord latest = latestPositionRecord(user.getId());
         EmpPositionRecord record = latest != null ? copyAppointment(latest) : new EmpPositionRecord();
@@ -365,6 +369,8 @@ public class HrLifecycleCallbackServiceImpl implements HrLifecycleCallbackServic
         applyTargetAssignment(user, req);
         user.setUpdatedBy(operatorResolver.currentOperatorName());
         sysUserMapper.updateById(user);
+        // 复职可能换了部门/职位，与调动同一个口径：投影写入后必须失效权限缓存
+        permissionService.evictAll();
 
         EmpPositionRecord latest = latestPositionRecord(user.getId());
         EmpPositionRecord record = latest != null ? copyAppointment(latest) : new EmpPositionRecord();

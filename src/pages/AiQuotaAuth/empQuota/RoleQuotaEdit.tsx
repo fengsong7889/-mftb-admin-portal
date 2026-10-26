@@ -5,8 +5,8 @@ import {
   ArrowLeftOutlined, SaveOutlined, AppstoreOutlined, TeamOutlined,
   FundOutlined, PoweroffOutlined,
 } from '@ant-design/icons'
-import { fetchModels, type AiModel } from '../../../api'
-import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
+import { fetchModels, type AiModel } from '@/api'
+import { fetchEmployees, type EmployeeItem } from '@/api/employee'
 import {
   QUOTA_PERIOD_LABEL,
   QUOTA_TYPE_LABEL,
@@ -16,7 +16,7 @@ import {
   CURRENCY_OPTIONS,
 } from './roleQuotaStore'
 import type { QuotaPeriod, QuotaType, OverLimitAction, Currency } from './empQuotaStore'
-import { fetchRoleQuotaDetail, saveRoleQuota, type RoleQuotaRequest } from '../../../api/empQuota'
+import { fetchRoleQuotaDetail, saveRoleQuota, type RoleQuotaRequest } from '@/api/empQuota'
 import { useTranslation } from 'react-i18next'
 
 const nowText = (): string => new Date().toISOString().slice(0, 19).replace('T', ' ')

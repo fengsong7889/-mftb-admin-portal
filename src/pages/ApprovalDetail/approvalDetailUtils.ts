@@ -1,11 +1,11 @@
-import type { FinApproval } from '../../api/finance'
+import type { FinApproval } from '@/api/finance'
 import type { AiGrantDraft } from './aiGrantDraft'
-import type { EmployeeItem } from '../../api/employee'
-import type { DepartmentItem } from '../../api/department'
-import type { RoleItem } from '../../api/role'
-import { resolveCurrentApprovers } from '../../utils/resolveCurrentApprover'
-import { WORKFLOW_STORAGE_KEY, getApproverSettingForBrand } from '../WorkflowConfig/types'
-import type { WorkflowDefinition } from '../WorkflowConfig/types'
+import type { EmployeeItem } from '@/api/employee'
+import type { DepartmentItem } from '@/api/department'
+import type { RoleItem } from '@/api/role'
+import { resolveCurrentApprovers } from '@/utils/resolveCurrentApprover'
+import { WORKFLOW_STORAGE_KEY, getApproverSettingForBrand } from '@mftb/contracts/workflowConfig'
+import type { WorkflowDefinition } from '@mftb/contracts/workflowConfig'
 
 /** 审批历史记录 */
 export interface ApprovalTimelineItem {

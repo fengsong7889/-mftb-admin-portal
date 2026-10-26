@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { message } from 'antd'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
-import { Region } from '../../Recommend/constants'
+import { Region } from '@mftb/contracts/recommendConstants'
 import {
   isPresaleDate,
   getPresaleOpenTime,

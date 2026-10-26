@@ -11,16 +11,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import en from '../../i18n/locales/en.json'
-import zhTW from '../../i18n/locales/zh-TW.json'
-import { fetchIterations } from '../../api/rdm'
+import en from '@/i18n/locales/en.json'
+import zhTW from '@/i18n/locales/zh-TW.json'
+import { fetchIterations } from '@/api/rdm'
 import IterationPlan, { COLUMN_META } from './IterationPlan'
 
-vi.mock('../../api/rdm', () => ({
+vi.mock('@/api/rdm', () => ({
   fetchIterations: vi.fn(),
   updateIterationStatus: vi.fn(),
 }))
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => true }),
 }))
 // t 直接回显 key：列顺序断言与语言无关，双语齐备由下面的语言包用例单独钉

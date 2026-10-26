@@ -33,20 +33,20 @@ import dayjs, { type Dayjs } from 'dayjs'
 import {
   createAsset, updateAsset, fetchAssetDetail, parseAssetImages,
   type AssetItem, type AssetSaveData,
-} from '../../../api/asset'
+} from '@/api/asset'
 import {
   fetchCategoryList, fetchBrandList, fetchModelList, fetchLocationList,
   fetchAllParamTypes, fetchParamValuesByType, fetchCategoryAccessories,
   type AssetCategory, type AssetBrand, type AssetModel, type AssetLocation,
   type ParamType, type CategoryAccessory,
-} from '../../../api/eam'
-import { fetchDepartments, type DepartmentItem } from '../../../api/department'
-import { fetchEmployeeOptions, fetchEmployees, type EmployeeItem } from '../../../api/employee'
-import type { OptionItem } from '../../../api/types'
+} from '@/api/eam'
+import { fetchDepartments, type DepartmentItem } from '@/api/department'
+import { fetchEmployeeOptions, fetchEmployees, type EmployeeItem } from '@/api/employee'
+import type { OptionItem } from '@/api/types'
 import AssetTagBindingSection from '../AssetTag/AssetTagBindingSection'
-import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
-import { assetParameterFields } from '../../../utils/assetParams'
-import '../../../components/AssetParameters.css'
+import { useCompanyBrand } from '@/contexts/CompanyBrandContext'
+import { assetParameterFields } from '@/utils/assetParams'
+import '@/components/AssetParameters.css'
 
 const { TextArea } = Input
 

@@ -10,8 +10,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Alert, Button, Space, Spin, Tag, Tooltip } from 'antd'
 import { CopyOutlined, EyeOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import { fetchSimilarRequirements, type RdmSimilarItem } from '../../../api/rdm'
-import { RDM_STATUS_LABEL, formatRdmReqNo, type RdmStatus } from '../../../constants/rdm'
+import { fetchSimilarRequirements, type RdmSimilarItem } from '@/api/rdm'
+import { RDM_STATUS_LABEL, formatRdmReqNo, type RdmStatus } from '@/constants/rdm'
 
 interface SimilarNoticeProps {
   /** 当前填写的标题 */

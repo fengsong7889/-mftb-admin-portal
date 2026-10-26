@@ -16,11 +16,11 @@ import {
   fetchPurchaseOrderList, fetchPurchaseOrderDetail, deletePurchaseOrder,
   updatePurchaseOrderExec,
   type PurchaseOrder, type ExecStatus,
-} from '../../../api/eam'
-import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
-import { useAuth } from '../../../contexts/AuthContext'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import BrandTag from '../../../components/BrandTag'
+} from '@/api/eam'
+import { fetchEmployees, type EmployeeItem } from '@/api/employee'
+import { useAuth } from '@/contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import BrandTag from '@/components/BrandTag'
 
 const EXEC_STATUS_LIST: ExecStatus[] = ['pending', 'purchasing', 'completed']
 

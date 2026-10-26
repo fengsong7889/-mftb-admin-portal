@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
-import { useCountUp } from '../../../hooks/useCountUp'
+import { useCountUp } from '@/hooks/useCountUp'
 
 /**
  * 新店广告 / 推广赠送天数 日历选择通用 Hook

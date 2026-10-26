@@ -14,12 +14,12 @@ import {
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import { fetchInboundList, fetchPurchaseOrderList, fetchInspectionRecords, type InboundBatch, type PurchaseOrder, type PurchaseOrderSupplierGroup, type InspectionRecord } from '../../../api/eam'
-import { fetchEmployeeOptions } from '../../../api/employee'
-import type { OptionItem } from '../../../api/types'
-import { exportToCSV } from '../../../utils/exportCSV'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import BrandTag from '../../../components/BrandTag'
+import { fetchInboundList, fetchPurchaseOrderList, fetchInspectionRecords, type InboundBatch, type PurchaseOrder, type PurchaseOrderSupplierGroup, type InspectionRecord } from '@/api/eam'
+import { fetchEmployeeOptions } from '@/api/employee'
+import type { OptionItem } from '@/api/types'
+import { exportToCSV } from '@/utils/exportCSV'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import BrandTag from '@/components/BrandTag'
 
 const { RangePicker } = DatePicker
 

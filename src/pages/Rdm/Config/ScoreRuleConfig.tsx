@@ -23,7 +23,7 @@ import {
   setScoreRuleEnabled,
   type RdmScoreRecord,
   type RdmScoreRule,
-} from '../../../api/rdm'
+} from '@/api/rdm'
 import {
   RDM_COMPLEXITY_LABEL,
   RDM_REQ_TYPE_LABEL,
@@ -34,8 +34,8 @@ import {
   type RdmComplexity,
   type RdmReqType,
   type RdmRoleCode,
-} from '../../../constants/rdm'
-import { computeScore, DEFAULT_SCORE_PARAMS, sumScorableRoleFactors } from '../../../utils/rdmScore'
+} from '@/constants/rdm'
+import { computeScore, DEFAULT_SCORE_PARAMS, sumScorableRoleFactors } from '@/utils/rdmScore'
 import '../index.css'
 
 const ALLOC_OPTIONS = Object.entries(RDM_SCORE_ALLOC_MODE_LABEL).map(([value, label]) => ({ value, label }))

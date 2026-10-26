@@ -30,7 +30,7 @@ vi.mock('@/api/consumable', () => ({
   fetchConsumableItemOptions: api.fetchItemOptions,
   fetchPurchaseCompanyOptions: api.fetchCompanies,
 }))
-vi.mock('../../../api/consumable', () => ({
+vi.mock('@/api/consumable', () => ({
   fetchConsumableInboundOrders: api.fetchOrders,
   fetchConsumableInboundOrderDetail: api.fetchDetail,
   createConsumableInboundOrder: api.createOrder,
@@ -38,11 +38,11 @@ vi.mock('../../../api/consumable', () => ({
   fetchPurchaseCompanyOptions: api.fetchCompanies,
 }))
 vi.mock('@/api/eam', () => ({ fetchLocationList: api.fetchLocations }))
-vi.mock('../../../api/eam', () => ({ fetchLocationList: api.fetchLocations }))
-vi.mock('../../../contexts/CompanyBrandContext', () => ({
+vi.mock('@/api/eam', () => ({ fetchLocationList: api.fetchLocations }))
+vi.mock('@/contexts/CompanyBrandContext', () => ({
   useCompanyBrand: () => ({ numericOptions: [] }),
 }))
-vi.mock('../../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => true }),
 }))
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t }) }))

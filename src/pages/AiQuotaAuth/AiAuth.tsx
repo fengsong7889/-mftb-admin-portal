@@ -11,8 +11,8 @@ import {
   toggleDeptAuthGroupStatus,
   type AiModel,
   type DeptAuthGroupItem,
-} from '../../api'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+} from '@/api'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { CAPABILITY_SHORT_FIELDS } from './empAuth/modelAuthCapability'
 
 export default function AiAuth() {

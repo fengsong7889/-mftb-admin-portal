@@ -1,19 +1,19 @@
 /**
  * 任务新增/编辑 —— 独立表单页（遵循「新增/编辑用独立页面，禁止弹窗」规范）
  *
- * 研发负责人/产品经理把一条需求拆成 UI设计/前端/后端/测试/数据 任务，
+ * 研发负责人/产品经理把一条需求拆成 UI设计/前端/后端/测试/数据任务，
  * 指派到人并登记计划工时与起止日期；已受理的需求拆任务后自动进入「開發中」。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Select, message } from 'antd'
-import { SaveOutlined } from '@ant-design/icons'
+import { CalendarOutlined, SaveOutlined } from '@ant-design/icons'
 import RdmFormHeader from './components/RdmFormHeader'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import RemoteSearchSelect from '../../components/RemoteSearchSelect'
-import type { OptionItem } from '../../api/types'
-import { fetchEmployees } from '../../api/employee'
+import RemoteSearchSelect from '@/components/RemoteSearchSelect'
+import type { OptionItem } from '@/api/types'
+import { fetchEmployees } from '@/api/employee'
 import {
   checkTaskOwner,
   fetchReqTasks,
@@ -22,10 +22,10 @@ import {
   saveTask,
   type RdmTaskForm as RdmTaskFormValues,
   type RdmTaskOwnerCheck,
-} from '../../api/rdm'
-import { formatRdmReqNo, RDM_STATUS } from '../../constants/rdm'
-import { buildRdmDetailPath } from '../../constants/menuDataSource'
-import { useTaskTypeDict } from '../../hooks/useTaskTypeDict'
+} from '@/api/rdm'
+import { formatRdmReqNo, RDM_STATUS } from '@/constants/rdm'
+import { buildRdmDetailPath } from '@/constants/menuDataSource'
+import { useTaskTypeDict } from '@/hooks/useTaskTypeDict'
 import { countWorkdays, HOURS_PER_WORKDAY, workdayHours } from './workdays'
 import { useRdmBack } from './useRdmBack'
 import './index.css'
@@ -55,6 +55,8 @@ interface FormValues {
   owner?: string
   planHours?: number
   planRange?: [dayjs.Dayjs, dayjs.Dayjs]
+  /** 任务计划上线日：默认继承需求计划上线，不得晚于它 */
+  planRelease?: dayjs.Dayjs
 }
 
 export default function TaskForm() {
@@ -90,17 +92,29 @@ export default function TaskForm() {
   const taskTypeOptions = currentTaskType && !manualTaskTypeOptions.some(o => o.value === currentTaskType)
     ? [{ value: currentTaskType, label: taskTypeLabelOf(currentTaskType) }, ...manualTaskTypeOptions]
     : manualTaskTypeOptions
-  const [requirement, setRequirement] = useState<{ reqNo: string; title: string; status: string; iterationCode?: string | null } | null>(null)
+  const [requirement, setRequirement] = useState<{ reqNo: string; title: string; status: string; iterationCode?: string | null; planReleaseDate?: string | null } | null>(null)
   /** 负责人显示名：表单值只有 userId，确认框光靠 id 没法核对派给了谁 */
   const [ownerLabel, setOwnerLabel] = useState<string>()
   /** 负责人资格预检：无研发交付权限只提醒、不阻断保存 */
   const [ownerCheck, setOwnerCheck] = useState<RdmTaskOwnerCheck | null>(null)
   /** 所属部门：负责人派生字段，不入库（任务上已存工号，部门随时可反查） */
   const [ownerDept, setOwnerDept] = useState<string>()
-  /** 员工 id → 部门：下拉数据带回来的，选完立刻回填，不等预检接口 */
+  /** 部门预检进行中：选择负责人后先等接口返回最新部门，不用员工列表里的旧快照抢显 */
+  const [ownerDeptLoading, setOwnerDeptLoading] = useState(false)
+  /** 员工 id → 部门：下拉数据带回来的，只在预检接口失败时做兜底 */
   const deptByIdRef = useRef<Record<string, string>>({})
   /** 预检请求序号：快速换人时丢弃过期响应，避免提醒对不上当前负责人 */
   const ownerCheckSeq = useRef(0)
+  /**
+   * 标题是否仍由系统自动带入：
+   * 大部分人建任务时直接把需求标题复制过来，自己起名反而容易漏掉业务关键词。
+   * 只在“未手改”时跟随需求标题与任务类型，一旦用户编辑过就不再覆盖。
+   */
+  const titleAutoRef = useRef(true)
+  /** 计划日期是否被手动改过：存量任务历史上可能超出需求上线，不在无关编辑时强拦 */
+  const planTouchedRef = useRef(false)
+  /** 计划上线是否仍由系统继承：切换需求时跟着新需求的计划上线同步，用户改过则保留 */
+  const planReleaseAutoRef = useRef(true)
   const [saving, setSaving] = useState(false)
 
   /**
@@ -120,6 +134,55 @@ export default function TaskForm() {
         : t('rdm.taskForm.planHoursAutoHint', { days: autoWorkdays, defaultValue: '{{days}} 個工作日 × 8h' }))
     : t('rdm.taskForm.planHoursAutoEmpty', { defaultValue: '選擇計劃起止後自動計算' })
 
+  /* ── 需求计划上线：拆任务时唯一对外承诺的时间边界，默认继承且禁止晚于它 ── */
+  const reqPlanRelease = requirement?.planReleaseDate ? dayjs(requirement.planReleaseDate) : null
+  const planReleaseDays = reqPlanRelease ? reqPlanRelease.startOf('day').diff(dayjs().startOf('day'), 'day') : null
+  const planReleaseTone = planReleaseDays == null ? 'normal' : planReleaseDays < 0 ? 'overdue' : planReleaseDays <= 7 ? 'urgent' : 'normal'
+  const planReleaseCountdown = planReleaseDays == null
+    ? ''
+    : planReleaseDays < 0
+      ? t('rdm.taskForm.planReleaseOverdue', { days: Math.abs(planReleaseDays), defaultValue: '已逾期 {{days}} 天' })
+      : planReleaseDays === 0
+        ? t('rdm.taskForm.planReleaseToday', { defaultValue: '今天上線' })
+        : t('rdm.taskForm.planReleaseRemain', { days: planReleaseDays, defaultValue: '距上線 {{days}} 天' })
+
+  /**
+   * 标题自动带入：需求标题（不含编号）+ 任务类型后缀。
+   * <p>大部分人建任务就是照抄需求名，自己起名反而容易丢掉业务关键词；
+   * 同需求多条任务靠「前端 / 后端 / 测试」后缀区分，不需要人再手写一遍。
+   */
+  const composeAutoTitle = useCallback((reqTitle: string, typeCode?: string) => {
+    const typeLabel = typeCode ? taskTypeLabelOf(typeCode) : ''
+    const suffix = typeLabel ? `（${typeLabel}）` : ''
+    const max = 120 - suffix.length
+    const base = reqTitle.length > max ? `${reqTitle.slice(0, Math.max(0, max - 1))}…` : reqTitle
+    return `${base}${suffix}`
+  }, [taskTypeLabelOf])
+
+  useEffect(() => {
+    if (!requirement) return
+    // 新建任务默认继承需求计划上线日：先给上限，用户只能往早改；切换需求时跟着新需求同步
+    if (!taskId && planReleaseAutoRef.current && requirement.planReleaseDate) {
+      form.setFieldValue('planRelease', dayjs(requirement.planReleaseDate))
+    }
+    // 编辑存量任务不改标题：保存的是原任务名，不能被需求标题顶掉
+    if (taskId || !titleAutoRef.current) return
+    form.setFieldValue('title', composeAutoTitle(requirement.title, form.getFieldValue('taskType')))
+  }, [requirement, taskId, form, composeAutoTitle, currentTaskType])
+
+  /** 计划日期不得晚于需求计划上线；只在用户本次改过日期时拦，为存量违规数据留出编辑其它字段的口子 */
+  const validateReqRelease = (field: 'planRelease' | 'planFinish') => (_: unknown, value?: unknown) => {
+    if (!planTouchedRef.current || !reqPlanRelease) return Promise.resolve()
+    const picked = field === 'planRelease'
+      ? (value as dayjs.Dayjs | undefined)
+      : (value as [dayjs.Dayjs, dayjs.Dayjs] | undefined)?.[1]
+    if (!picked || !picked.isAfter(reqPlanRelease, 'day')) return Promise.resolve()
+    const date = reqPlanRelease.format('YYYY-MM-DD')
+    return Promise.reject(new Error(field === 'planRelease'
+      ? t('rdm.taskForm.planReleaseExceedsReq', { date, defaultValue: '不得晚於需求計劃上線 {{date}}' })
+      : t('rdm.taskForm.planFinishExceedsReq', { date, defaultValue: '計劃完成日不得晚於需求計劃上線 {{date}}' })))
+  }
+
   /**
    * 选完人即预检负责人资格。
    * <p>预检失败不得阻断派活：拿不到结果就当无提醒，真正的硬约束（离职/停用）
@@ -130,16 +193,23 @@ export default function TaskForm() {
     if (!userId) {
       setOwnerCheck(null)
       setOwnerDept(undefined)
+      setOwnerDeptLoading(false)
       return
     }
+    const fallbackDept = deptByIdRef.current[userId]
+    setOwnerDeptLoading(true)
     try {
       const res = await checkTaskOwner(Number(userId))
       if (seq !== ownerCheckSeq.current) return
       setOwnerCheck(res)
-      // 接口没回部门时保留下拉带回来的值，不把已显示的部门清空
-      if (res.department) setOwnerDept(res.department)
+      // 部门以服务端（任职记录）为准；接口没给时才回退员工列表快照，避免把调动前旧部门当权威值
+      setOwnerDept(res.department ?? fallbackDept)
     } catch {
-      if (seq === ownerCheckSeq.current) setOwnerCheck(null)
+      if (seq !== ownerCheckSeq.current) return
+      setOwnerCheck(null)
+      setOwnerDept(fallbackDept)
+    } finally {
+      if (seq === ownerCheckSeq.current) setOwnerDeptLoading(false)
     }
   }, [])
 
@@ -147,7 +217,13 @@ export default function TaskForm() {
   useEffect(() => {
     if (!reqId) { setRequirement(null); return }
     fetchRequirementDetail(reqId)
-      .then(d => d && setRequirement({ reqNo: formatRdmReqNo(d.reqNo), title: d.title, status: d.status, iterationCode: d.iterationCode }))
+      .then(d => d && setRequirement({
+        reqNo: formatRdmReqNo(d.reqNo),
+        title: d.title,
+        status: d.status,
+        iterationCode: d.iterationCode,
+        planReleaseDate: d.planReleaseDate,
+      }))
       .catch(() => message.error('需求資訊載入失敗'))
     if (!taskId) return
     fetchReqTasks(reqId).then(tasks => {
@@ -161,6 +237,7 @@ export default function TaskForm() {
         planHours: task.planHours ?? undefined,
         planRange: task.planStartDate && task.planFinishDate
           ? [dayjs(task.planStartDate), dayjs(task.planFinishDate)] : undefined,
+        planRelease: task.planReleaseDate ? dayjs(task.planReleaseDate) : undefined,
       })
       if (task.deliveryItemId) setDeliveryItemId(task.deliveryItemId)
       if (task.ownerName) {
@@ -224,6 +301,7 @@ export default function TaskForm() {
           {ownerCheck?.warning && (
             <div className="confirm-info-row"><span>權限提醒：</span><b style={{ color: '#D46B08' }}>{ownerCheck.warning}</b></div>
           )}
+          <div className="confirm-info-row"><span>{t('rdm.attr.planReleaseDate')}：</span><b>{values.planRelease ? values.planRelease.format('YYYY-MM-DD') : '-'}</b></div>
           <div className="confirm-info-row"><span>計劃工時：</span><b>{values.planHours ?? '-'} h</b></div>
           {!taskId && <div className="confirm-info-row"><span>說明：</span><b>創建後負責人會收到待辦提醒</b></div>}
         </div>
@@ -251,6 +329,7 @@ export default function TaskForm() {
         planHours: values.planHours,
         planStartDate: values.planRange?.[0]?.format('YYYY-MM-DD'),
         planFinishDate: values.planRange?.[1]?.format('YYYY-MM-DD'),
+        planReleaseDate: values.planRelease?.format('YYYY-MM-DD'),
         // 归属体系改造：任务迭代由后端从需求继承（单一真值源），前端不再上送
       }
       await saveTask(payload)
@@ -272,6 +351,17 @@ export default function TaskForm() {
         onBack={goBack}
         meta={requirement ? `${requirement.reqNo} · ${requirement.title}` : '將需求拆成可執行任務並指派到人，工時用於產出量化'}
       />
+
+      {/* 需求計劃上線：拆任務前必須看到的時間邊界，放在表頭下方而不是折在屬性面板裏 */}
+      {requirement?.planReleaseDate && (
+        <div className={`rdm-plan-banner rdm-plan-banner--${planReleaseTone}`}>
+          <span className="rdm-plan-banner-icon"><CalendarOutlined /></span>
+          <span className="rdm-plan-banner-label">{t('rdm.taskForm.reqPlanReleaseLabel', { defaultValue: '需求計劃上線' })}</span>
+          <b className="rdm-plan-banner-date">{reqPlanRelease?.format('YYYY-MM-DD')}</b>
+          {planReleaseCountdown && <span className="rdm-plan-banner-days">{planReleaseCountdown}</span>}
+          <span className="rdm-plan-banner-hint">{t('rdm.taskForm.reqPlanReleaseHint', { defaultValue: '任務排期不得晚於該日期，否則需求無法按期上線' })}</span>
+        </div>
+      )}
 
       {deliveryItemId > 0 && (
         <Alert
@@ -311,9 +401,15 @@ export default function TaskForm() {
               label="任務標題"
               name="title"
               className="rdm-field-span2"
+              extra={!taskId ? t('rdm.taskForm.titleAutoHint', { defaultValue: '默認帶入需求標題（不含需求編號）；手改後不再自動覆蓋' }) : undefined}
               rules={[{ required: true, message: '請填寫任務標題' }, { max: 120, message: '不超過 120 字' }]}
             >
-              <Input placeholder="例：報表導出支持自定義時間區間（前端）" maxLength={120} showCount />
+              <Input
+                placeholder={t('rdm.taskForm.titlePlaceholder', { defaultValue: '例：報表導出支持自定義時間區間（前端）' })}
+                maxLength={120}
+                showCount
+                onChange={e => { titleAutoRef.current = !e.target.value.trim() }}
+              />
             </Form.Item>
             <Form.Item label="任務說明 / 技術方案" name="content" className="rdm-field-full">
               <TextArea rows={4} placeholder="寫清改動點、接口/組件、依賴與驗收要點，減少來回問" />
@@ -331,7 +427,8 @@ export default function TaskForm() {
                 initialOptions={ownerOptions}
                 onChange={(value, label) => {
                   setOwnerLabel(label)
-                  setOwnerDept(value ? deptByIdRef.current[value] : undefined)
+                  // 员工列表带回的是账号部门快照（人事调动后是旧值），先清空等预检接口回最新部门
+                  setOwnerDept(undefined)
                   void checkOwner(value)
                 }}
               />
@@ -341,7 +438,11 @@ export default function TaskForm() {
               <Input
                 disabled
                 value={ownerDept ?? ''}
-                placeholder={form.getFieldValue('owner') ? '該員工未配置部門' : '選擇負責人後自動帶出'}
+                placeholder={ownerDeptLoading
+                  ? t('rdm.taskForm.deptLoading', { defaultValue: '正在讀取最新部門…' })
+                  : form.getFieldValue('owner')
+                    ? t('rdm.taskForm.ownerNoDept', { defaultValue: '該員工未配置部門' })
+                    : t('rdm.taskForm.ownerDeptAuto', { defaultValue: '選擇負責人後自動帶出' })}
               />
             </Form.Item>
             <Form.Item
@@ -355,13 +456,33 @@ export default function TaskForm() {
             >
               <InputNumber min={0} step={1} style={{ width: '100%' }} placeholder="選日期後自動填入" />
             </Form.Item>
-            <Form.Item label="計劃起止" name="planRange">
+            <Form.Item label={t('rdm.taskForm.planRange', { defaultValue: '計劃起止' })} name="planRange" rules={[{ validator: validateReqRelease('planFinish') }]}>
               <DatePicker.RangePicker
                 style={{ width: '100%' }}
+                disabledDate={d => !!reqPlanRelease && d.isAfter(reqPlanRelease, 'day')}
                 onChange={dates => {
+                  planTouchedRef.current = true
                   // 日期一改就按系统口径覆盖工时；随后仍可手改（extra 会标注已手改）
                   const hours = workdayHours(dates?.[0], dates?.[1])
                   if (hours > 0) form.setFieldValue('planHours', hours)
+                }}
+              />
+            </Form.Item>
+            {/* 計劃上線：默認繼承需求上線日，只能往早改；與計劃完成日分開，避免“完成=上線”失真 */}
+            <Form.Item
+              label={t('rdm.attr.planReleaseDate')}
+              name="planRelease"
+              extra={reqPlanRelease
+                ? t('rdm.taskForm.planReleaseExtra', { date: reqPlanRelease.format('YYYY-MM-DD'), defaultValue: '默認繼承需求計劃上線 {{date}}，不能晚於該日期' })
+                : t('rdm.taskForm.planReleaseNoReq', { defaultValue: '需求尚未排定計劃上線' })}
+              rules={[{ validator: validateReqRelease('planRelease') }]}
+            >
+              <DatePicker
+                style={{ width: '100%' }}
+                disabledDate={d => !!reqPlanRelease && d.isAfter(reqPlanRelease, 'day')}
+                onChange={() => {
+                  planTouchedRef.current = true
+                  planReleaseAutoRef.current = false
                 }}
               />
             </Form.Item>

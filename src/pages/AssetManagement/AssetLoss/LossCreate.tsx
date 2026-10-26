@@ -17,15 +17,15 @@ import {
   AppstoreOutlined, UserOutlined, SearchOutlined, ReloadOutlined, InboxOutlined,
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import BrandTag from '../../../components/BrandTag'
-import AssetParameters from '../../../components/AssetParameters'
-import { useAuth } from '../../../contexts/AuthContext'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import BrandTag from '@/components/BrandTag'
+import AssetParameters from '@/components/AssetParameters'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   fetchAssetDetail,
   type AssetItem,
-} from '../../../api/asset'
-import { createLoss, type LossSaveDTO } from '../../../api/eamLoss'
+} from '@/api/asset'
+import { createLoss, type LossSaveDTO } from '@/api/eamLoss'
 import {
   ASSET_STATUS_COLOR,
   detailCardStyle,

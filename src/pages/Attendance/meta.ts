@@ -12,7 +12,7 @@
 import {
   EXCEPTION_STATUS, EXCEPTION_TYPE, GROUP_TYPE, HOLIDAY_TYPE, MONTHLY_STATUS,
   PUNCH_RESULT, PUNCH_SOURCE, PUNCH_TYPE, SCOPE_TYPE,
-} from '../../api/attendance'
+} from '@/api/attendance'
 
 /** 考勤制度 → i18n key */
 export const GROUP_TYPE_LABEL_KEY: Record<number, string> = {

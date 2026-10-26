@@ -17,7 +17,7 @@ import {
   type ConsumableCompanyStat, type ConsumableDeptStat, type ConsumableApplicantStat,
   type ConsumableItemStat, type PurchaseCompany,
 } from '@/api/consumable'
-import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
+import { useCompanyBrand } from '@/contexts/CompanyBrandContext'
 import '@/styles/components.css'
 
 const { RangePicker } = DatePicker

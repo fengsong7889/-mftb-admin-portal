@@ -19,7 +19,7 @@ import {
   fetchAcceptanceHistory,
   type RdmAcceptanceRecord,
   type RdmRequirementDetail,
-} from '../../../api/rdm'
+} from '@/api/rdm'
 import {
   RDM_ACCEPT_RESULT,
   RDM_ACCEPT_RESULT_COLOR,
@@ -29,7 +29,7 @@ import {
   RDM_TEST_ENV_LABEL,
   type RdmAcceptResult,
   type RdmTestEnv,
-} from '../../../constants/rdm'
+} from '@/constants/rdm'
 
 interface AcceptanceTraceCardProps {
   detail: RdmRequirementDetail

@@ -3,8 +3,8 @@
  */
 import { useState, useEffect, useCallback } from 'react'
 import { message } from 'antd'
-import type { FlashSalePeriod } from '../../../api/flashSale'
-import { fetchFlashSalePeriods } from '../../../api/flashSale'
+import type { FlashSalePeriod } from '@/api/flashSale'
+import { fetchFlashSalePeriods } from '@/api/flashSale'
 
 /** 秒殺分頁配置 */
 export interface FlashSalePagination {

@@ -9,9 +9,9 @@ import type { TableColumnsType } from 'antd'
 import { FileTextOutlined, ProfileOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import AssetParameters from '../../../components/AssetParameters'
-import type { CompensationRow } from '../../../api/eamCompensation'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import AssetParameters from '@/components/AssetParameters'
+import type { CompensationRow } from '@/api/eamCompensation'
 
 /* ----- 状态元数据 ----- */
 const DAMAGE_LABEL: Record<string, string> = { damage: '損壞', loss: '遺失' }

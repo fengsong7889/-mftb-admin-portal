@@ -5,7 +5,7 @@
  * 会让该文件同时导出组件与常量，破坏 React Fast Refresh（eslint react-refresh/only-export-components），
  * 开发时改一行页面就整页重载丢状态；抽出来后测试也能直接引纯函数，不必拖起整个组件。
  */
-import { RDM_SCOPE, type RdmScope } from '../../constants/rdm'
+import { RDM_SCOPE, type RdmScope } from '@/constants/rdm'
 
 /**
  * 全部合法视角（用于校验 URL 上的 ?scope=）。

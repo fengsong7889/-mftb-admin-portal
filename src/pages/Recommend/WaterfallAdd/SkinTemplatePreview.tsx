@@ -5,7 +5,7 @@ import {
   buildPosterSvgDataUrl, getFallbackPoster, getSmallTemplate,
   getCustomPosterImages, getPosterSource, getPosterLocale, POSTER_LANGUAGES,
   type LargeLayout, type SkinSaleConfig, type PosterLocale,
-} from '../../../constants/popularSkinTemplates'
+} from '@/constants/popularSkinTemplates'
 import './SkinTemplateSection.css'
 
 // 阶段一视觉确认文案，第二阶段统一接入 i18n；店铺与商品均为效果示意。

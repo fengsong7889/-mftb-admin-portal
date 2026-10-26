@@ -9,7 +9,7 @@ import { Alert, Button, InputNumber, Select, Space, Table, Tag, message } from '
 import type { TableColumnsType } from 'antd'
 import { ClockCircleOutlined } from '@ant-design/icons'
 import StatusSwitch from '../components/StatusSwitch'
-import { fetchSlaConfigs, saveSlaConfig, type RdmSlaRow } from '../../../api/rdm'
+import { fetchSlaConfigs, saveSlaConfig, type RdmSlaRow } from '@/api/rdm'
 import {
   RDM_PRIORITY_LABEL,
   getRdmPriorityLabel,
@@ -17,7 +17,7 @@ import {
   RDM_STATUS_LABEL,
   type RdmRoleCode,
   type RdmStatus,
-} from '../../../constants/rdm'
+} from '@/constants/rdm'
 import '../index.css'
 
 export default function SlaConfig() {

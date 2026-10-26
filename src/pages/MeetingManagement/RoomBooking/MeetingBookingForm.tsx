@@ -23,8 +23,8 @@ import {
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { useAuth } from '../../../contexts/AuthContext'
-import RemarkTextArea from '../../../components/RemarkTextArea'
+import { useAuth } from '@/contexts/AuthContext'
+import RemarkTextArea from '@/components/RemarkTextArea'
 import {
   createMeeting,
   createSeries,
@@ -35,13 +35,13 @@ import {
   type MeetingCreateForm,
   type MeetingRoomVO,
   type SeriesPreview,
-} from '../../../api/meeting'
+} from '@/api/meeting'
 import { bizTypeLabels } from '../meetingMeta'
 import { durationOptions, ruleForRoom, validateBookingWindow } from '../meetingRules'
-import EmployeeSelect from '../EmployeeSelect'
+import EmployeeSelect from '@/components/EmployeeSelect'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import CardTitle from '../../../components/CardTitle'
+import CardTitle from '@/components/CardTitle'
 
 /** 周期会议的跳过清单：只给一句 toast 等于让用户自己去数哪几天没订上 */
 interface SkippedItem { seq: number; startTime: string; endTime: string; reason: string }

@@ -9,15 +9,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { fetchMigrationBatchDetail, fetchMigrationBatches, rollbackMigrationBatch } from '../../api/rdm'
+import { fetchMigrationBatchDetail, fetchMigrationBatches, rollbackMigrationBatch } from '@/api/rdm'
 import StockMigration from './StockMigration'
 
 let canEdit = true
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => canEdit, hasMenuPermission: () => canEdit }),
 }))
 
-vi.mock('../../api/rdm', () => ({
+vi.mock('@/api/rdm', () => ({
   fetchMigrationBatches: vi.fn(),
   fetchMigrationBatchDetail: vi.fn(),
   previewStockMigration: vi.fn(),

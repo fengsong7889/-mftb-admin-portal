@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import EnterpriseAgentPreview from './EnterpriseAgentPreview'
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
-vi.mock('../../../components/DetailPageHeader', () => ({ default: ({ title }: { title: string }) => <h1>{title}</h1> }))
+vi.mock('@/components/DetailPageHeader', () => ({ default: ({ title }: { title: string }) => <h1>{title}</h1> }))
 
 function renderPane(pane: string) {
   return render(<MemoryRouter initialEntries={[`/ai-assistant?preview=enterprise&pane=${pane}`]}><EnterpriseAgentPreview /></MemoryRouter>)

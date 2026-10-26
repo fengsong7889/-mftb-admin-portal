@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { fetchRequirementPage } from '../../api/rdm'
-import { RDM_SCOPE } from '../../constants/rdm'
+import { fetchRequirementPage } from '@/api/rdm'
+import { RDM_SCOPE } from '@/constants/rdm'
 import RequirementList from './RequirementList'
 import AcceptanceList from './AcceptanceList'
 import { ComplexityTag, PriorityTag } from './components/Tags'
 
-vi.mock('../../api/rdm', () => ({
+vi.mock('@/api/rdm', () => ({
   fetchRequirementPage: vi.fn(),
   fetchScopeCounts: vi.fn().mockResolvedValue({ mine: 7, todo: 2, product: 1, delivery: 3 }),
   fetchRequirementStats: vi.fn().mockResolvedValue({}),
@@ -19,8 +19,8 @@ vi.mock('../../api/rdm', () => ({
   urgeRequirement: vi.fn(),
   withdrawRequirement: vi.fn(),
 }))
-vi.mock('../../api/department', () => ({ fetchDepartments: vi.fn().mockResolvedValue([]) }))
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('@/api/department', () => ({ fetchDepartments: vi.fn().mockResolvedValue([]) }))
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => false, user: { empId: 'TEST001' } }),
 }))
 vi.mock('./requirementExport', () => ({ exportRequirementRows: vi.fn() }))

@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import OverviewPage from './OverviewPage'
-import { fetchAssistantOverview } from '../../api/aiOverview'
+import { fetchAssistantOverview } from '@/api/aiOverview'
 
 const { translate } = vi.hoisted(() => ({
   translate: (key: string, options?: { defaultValue?: string } | string) =>
@@ -10,10 +10,10 @@ const { translate } = vi.hoisted(() => ({
 }))
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: translate }) }))
-vi.mock('../../components/DetailPageHeader', () => ({
+vi.mock('@/components/DetailPageHeader', () => ({
   default: ({ title }: { title: string }) => <div>{title}</div>,
 }))
-vi.mock('../../api/aiOverview', () => ({ fetchAssistantOverview: vi.fn() }))
+vi.mock('@/api/aiOverview', () => ({ fetchAssistantOverview: vi.fn() }))
 
 describe('AI 助手概览', () => {
   beforeEach(() => {

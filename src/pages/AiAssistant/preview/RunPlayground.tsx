@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Alert, Button, Descriptions, Input, Select, Space, Steps, Switch, Tag, Timeline } from 'antd'
 import { PlayCircleOutlined, ReloadOutlined } from '@ant-design/icons'
-import HelpPopover from '../../../components/HelpPopover'
+import HelpPopover from '@/components/HelpPopover'
 import { nextPreviewRunStatus, RUN_STATUS_LABEL, SCENARIOS, type PreviewRunStatus, type PreviewScenario } from './previewModel'
 
 interface Props {

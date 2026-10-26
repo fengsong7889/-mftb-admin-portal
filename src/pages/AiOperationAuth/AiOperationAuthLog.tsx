@@ -13,18 +13,18 @@ import {
   HistoryOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import DetailPageHeader from '../../components/DetailPageHeader'
+import DetailPageHeader from '@/components/DetailPageHeader'
 import {
   TOOL_LEVEL_META,
-} from '../../api/mock/aiPlatformMock'
-import type { ToolDefinition, ToolLevel } from '../../api/mock/aiPlatformMock'
+} from '@/api/mock/aiPlatformMock'
+import type { ToolDefinition, ToolLevel } from '@/api/mock/aiPlatformMock'
 import {
   fetchToolRegistry,
   fetchExecLogs,
   aggregateCallStats,
   type ExecLogRow,
-} from '../../api/aiOperationAuth'
-import { tablePagination, formatEpochOrDash } from '../../utils/tableDisplay'
+} from '@/api/aiOperationAuth'
+import { tablePagination, formatEpochOrDash } from '@/utils/tableDisplay'
 
 /** 将后端 ExecLogRow 映射为展示行（保留旧 UI 字段命名，但内容真实） */
 function toDisplayRow(row: ExecLogRow, t: TFunction): Record<string, string> {

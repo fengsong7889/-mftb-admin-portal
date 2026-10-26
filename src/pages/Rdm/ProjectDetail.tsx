@@ -50,9 +50,9 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { FormInstance } from 'antd'
-import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
+import EmployeeSelect from '@/components/EmployeeSelect'
 import RdmFormHeader from './components/RdmFormHeader'
-import { useAuth } from '../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   addProjectMember,
   createProject,
@@ -66,14 +66,14 @@ import {
   type RdmProjectRequirementBoard,
   type RdmProjectRequirementRow,
   type RdmProjectRequirementTodo,
-} from '../../api/rdm'
+} from '@/api/rdm'
 import {
   RDM_ITERATION_STATUS_LABEL,
   RDM_PROJECT_STATUS_COLOR,
   RDM_PROJECT_STATUS_LABEL,
   RDM_STATUS_COLOR,
   RDM_STATUS_LABEL,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import './index.css'
 
 /**

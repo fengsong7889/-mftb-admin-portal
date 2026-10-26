@@ -11,13 +11,13 @@ import { useEffect, useState } from 'react'
 import { Alert, Button, Select, Tag, message } from 'antd'
 import { UserOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import HelpPopover from '../../components/HelpPopover'
+import HelpPopover from '@/components/HelpPopover'
 import {
   AI_MODEL_ACCOUNT_RULE_KEYS,
   fetchAiModelAccounts,
   saveAiModelAccounts,
   type AiModelKey,
-} from '../../hooks/useSystemRules'
+} from '@/hooks/useSystemRules'
 
 export default function AccountWhitelistPanel() {
   const { t } = useTranslation()

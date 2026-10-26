@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Card, Empty, Space, Spin, Tag } from 'antd'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import { fetchLeaveBalances, type LeaveBalance } from '../../api/hrLeave'
+import { fetchLeaveBalances, type LeaveBalance } from '@/api/hrLeave'
 import LeaveList from '../Permission/HrLeave/LeaveList'
 import { ESS_LEAVE_SCOPE, LEAVE_TYPE_LABEL_KEY, LEAVE_TYPE_ORDER } from '../Permission/HrLeave/meta'
 

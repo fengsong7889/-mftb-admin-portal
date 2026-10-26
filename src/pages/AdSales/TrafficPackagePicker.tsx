@@ -3,11 +3,11 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, Empty, Form, InputNumber, Modal, Radio, Select, Space, Tag, message } from 'antd'
 import { ReloadOutlined, SearchOutlined, ShoppingCartOutlined, WalletOutlined } from '@ant-design/icons'
-import { BIZ_CHANNEL } from '../../constants/bizChannel'
-import { AlgorithmType } from '../Recommend/constants'
-import { fetchAdAlgorithms, type AdAlgorithm } from '../../api/adPromotion'
-import { usePaymentRule } from '../../hooks/usePaymentRule'
-import { getSystemRuleValue } from '../../hooks/useSystemRules'
+import { BIZ_CHANNEL } from '@/constants/bizChannel'
+import { AlgorithmType } from '@mftb/contracts/recommendConstants'
+import { fetchAdAlgorithms, type AdAlgorithm } from '@/api/adPromotion'
+import { usePaymentRule } from '@/hooks/usePaymentRule'
+import { getSystemRuleValue } from '@/hooks/useSystemRules'
 import {
   type TrafficPackageTier,
   type TrafficPackageOrder,

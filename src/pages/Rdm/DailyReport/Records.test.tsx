@@ -2,12 +2,12 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import DailyReportRecords from './Records'
-import i18n from '../../../i18n'
+import i18n from '@/i18n'
 
 const fetchRecords = vi.fn()
 
-vi.mock('../../../api/rdmDailyReport', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../api/rdmDailyReport')>()
+vi.mock('@/api/rdmDailyReport', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/rdmDailyReport')>()
   return { ...actual, fetchDailyReportRecords: (limit: number) => fetchRecords(limit) }
 })
 

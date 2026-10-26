@@ -21,9 +21,9 @@ import {
   ArrowLeftOutlined, FilePdfOutlined, PrinterOutlined, ReloadOutlined, TagOutlined,
 } from '@ant-design/icons'
 import QRCode from 'qrcode'
-import { fetchAssetTagList, fetchAssetIdsByTag, fetchAssetTagBindings } from '../../../api/eam'
-import type { AssetTagTemplate } from '../../../api/eam'
-import { fetchAssetDetail, type AssetItem } from '../../../api/asset'
+import { fetchAssetTagList, fetchAssetIdsByTag, fetchAssetTagBindings } from '@/api/eam'
+import type { AssetTagTemplate } from '@/api/eam'
+import { fetchAssetDetail, type AssetItem } from '@/api/asset'
 import AssetTagPreview from '../AssetTag/AssetTagPreview'
 import { buildTagValues } from '../AssetTag/tagValues'
 import './index.css'

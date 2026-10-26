@@ -25,7 +25,7 @@ import {
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useNavigate } from 'react-router-dom'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   cancelMeeting,
   checkinMeeting,
@@ -37,9 +37,9 @@ import {
   type MeetingQuery,
   type MeetingStats,
   type MeetingVO,
-} from '../../../api/meeting'
+} from '@/api/meeting'
 import { phaseMeta, statusMeta } from '../meetingMeta'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { deriveCanRecordMinutes, hasMinutesRecord, minutesPathOf } from '../MeetingMinutes/minutesAccess'
 import MeetingStatCards from '../MeetingStatCards'
 import { useTranslation } from 'react-i18next'

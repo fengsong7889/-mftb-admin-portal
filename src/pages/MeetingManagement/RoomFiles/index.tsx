@@ -21,8 +21,8 @@ import {
   ReloadOutlined, SearchOutlined, TeamOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../../../contexts/AuthContext'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   changeMeetingRoomStatus,
   deleteMeetingRoom,
@@ -34,7 +34,7 @@ import {
   type MeetingRoomQuery,
   type MeetingRoomStats,
   type MeetingRoomVO,
-} from '../../../api/meeting'
+} from '@/api/meeting'
 import { facilityLabels, facilityOptions, roomStatusMeta } from '../meetingMeta'
 import MeetingStatCards from '../MeetingStatCards'
 import { useTranslation } from 'react-i18next'

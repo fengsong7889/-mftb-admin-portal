@@ -2,8 +2,8 @@
  * 推廣訂單共享類型定義
  */
 
-import type { AppType, RecommendChannel, Region } from '../../Recommend/constants'
-import type { DateSlotGroup, LabelDateGroup } from '../../../api/adPromotion'
+import type { AppType, RecommendChannel, Region } from '@mftb/contracts/recommendConstants'
+import type { DateSlotGroup, LabelDateGroup } from '@/api/adPromotion'
 import type { RecommendType } from './constants'
 import type { OrderStatus, OrderOperatorType } from './enums'
 

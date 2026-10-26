@@ -8,8 +8,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button, Form, Input, Select, Table, Tag, message, Empty } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { AlertOutlined, ExportOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons'
-import { fetchConsumableAlerts, fetchConsumableCategoryOptions, type ConsumableItem, type ConsumableCategory } from '../../../api/consumable'
-import { exportToCSV } from '../../../utils/exportCSV'
+import { fetchConsumableAlerts, fetchConsumableCategoryOptions, type ConsumableItem, type ConsumableCategory } from '@/api/consumable'
+import { exportToCSV } from '@/utils/exportCSV'
 import InboundForm from '../components/InboundForm'
 
 type View = { mode: 'list' } | { mode: 'inbound'; itemId: number }

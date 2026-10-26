@@ -17,9 +17,9 @@ import { useTranslation } from 'react-i18next'
 import {
   fetchCategoryList, createCategory, updateCategory,
   type AssetCategory,
-} from '../../../api/eam'
+} from '@/api/eam'
 import { buildTree, toTreeSelectData } from '../eamUtils'
-import { generateCategoryCode } from '../../../utils/generateCode'
+import { generateCategoryCode } from '@/utils/generateCode'
 
 interface FormValues {
   code: string

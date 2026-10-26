@@ -74,6 +74,13 @@ public class RdmWorkTask {
     /** 计划完成 */
     private LocalDate planFinishDate;
 
+    /**
+     * 计划上线（任务级）：默认继承需求计划上线日，不得晚于需求计划上线。
+     * <p>存在理由：需求计划上线是拆任务时唯一的对外时间边界；只靠自由填写的计划起止，
+     * 子任务会被写成晚于上线日，甘特图看起来「排满了」但需求根本交不出来。
+     */
+    private LocalDate planReleaseDate;
+
     /** 实际开始 */
     private LocalDateTime actualStartTime;
 

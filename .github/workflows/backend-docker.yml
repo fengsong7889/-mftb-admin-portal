@@ -27,9 +27,13 @@ env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/mftb-admin-backend
 
 jobs:
-  # ── 后端测试门禁：真实执行单元/集成测试 + 迁移资源打包校验，失败即中断流水线 ──
-  test:
+  # ── 后端验证与打包：一次完整 Maven 生命周期完成编译 + 全量测试 + 打包 + 迁移资源校验 ──
+  # 旧实现分三步（mvn test → mvn package → Dockerfile 内再 package），同一份源码被完整编译 2~3 次，
+  # 且镜像里的 JAR 与被测试的 JAR 不是同一字节。现在只编译一次，制品用摘要传递给镜像构建。
+  verify:
     runs-on: ubuntu-latest
+    outputs:
+      jar_sha256: ${{ steps.digest.outputs.sha256 }}
     steps:
       - uses: actions/checkout@v5
 
@@ -40,14 +44,11 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # 真实执行测试（不再 -DskipTests）：迁移登记表一致性、执行器与契约校验的单测在此把关
-      - name: Run tests
-        run: mvn -B test -f backend/pom.xml
+      # verify = 编译 + 真实执行全部测试（不再 -DskipTests）+ 打 JAR + Jacoco 报告，一条生命周期完成
+      - name: Compile, test and package (single Maven lifecycle)
+        run: mvn -B verify -f backend/pom.xml
 
-      # 构建产物并断言迁移清单及其引用的 SQL 资源确实进入镜像（漏打包即失败）
-      - name: Build jar
-        run: mvn -B package -DskipTests -f backend/pom.xml
-
+      # 断言迁移清单及其引用的 SQL 资源确实进入制品（漏打包即失败）
       - name: Verify migration resources are packaged
         run: |
           set -euo pipefail
@@ -63,9 +64,27 @@ jobs:
           done
           echo "✅ 迁移资源完整性校验通过"
 
+      # 记录制品摘要：镜像阶段据此证明「装进镜像的就是刚跑过全量测试的那个 JAR」
+      - name: Record artifact digest
+        id: digest
+        run: |
+          set -euo pipefail
+          sha=$(sha256sum backend/target/mftb-admin.jar | cut -d' ' -f1)
+          test -n "$sha" || { echo "❌ 无法计算制品摘要"; exit 1; }
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+          echo "→ mftb-admin.jar sha256=$sha"
+
+      - name: Upload verified jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: mftb-admin-jar
+          path: backend/target/mftb-admin.jar
+          if-no-files-found: error
+          retention-days: 7
+
   build-and-push:
     if: github.event_name == 'push'
-    needs: test
+    needs: verify
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.tag.outputs.sha }}
@@ -74,6 +93,20 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      # 镜像不再编译源码：只消费 verify job 已测试过的制品（见 backend/Dockerfile）
+      - name: Download verified jar
+        uses: actions/download-artifact@v4
+        with:
+          name: mftb-admin-jar
+          path: backend/target
+
+      # 摘要不一致 = 制品被替换或下载损坏，拒绝发布；不允许退化为「重新编译一份」
+      - name: Verify artifact digest matches tested jar
+        run: |
+          set -euo pipefail
+          test -n "${{ needs.verify.outputs.jar_sha256 }}" || { echo "❌ 上游未输出制品摘要"; exit 1; }
+          echo "${{ needs.verify.outputs.jar_sha256 }}  backend/target/mftb-admin.jar" | sha256sum -c -
 
       - name: Resolve immutable image tag
         id: tag

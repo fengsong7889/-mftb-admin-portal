@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ASSESS_STATUS, INDICATOR_SCORE_MAX, matchGrade, parseGradeScheme, previewWeighted, sortGrades,
-} from '../../api/hrPerformance'
+} from '@/api/hrPerformance'
 import { ASSESS_STATUS_LABEL_KEY, GRADE_LABEL_KEY, PERF_MENU, PLAN_STAGES } from './meta'
 
 /**

@@ -5,7 +5,7 @@
  */
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AppType, RecommendChannel, Region } from '../../Recommend/constants'
+import { AppType, RecommendChannel, Region } from '@mftb/contracts/recommendConstants'
 import {
   OrderStatus,
   RecommendType,

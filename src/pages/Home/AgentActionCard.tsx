@@ -6,7 +6,7 @@ import {
   cancelAgentAction,
   confirmAgentAction,
   type AgentPendingAction,
-} from '../../api/agent'
+} from '@/api/agent'
 
 /**
  * 待确认动作卡（当前仅推送项目进度）。

@@ -13,11 +13,11 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Alert, Button, Tabs } from 'antd'
 import { PlusOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons'
-import DetailPageHeader from '../../../components/DetailPageHeader'
+import DetailPageHeader from '@/components/DetailPageHeader'
 import ClaimStats from './ClaimStats'
 import ClaimRecordTable from './ClaimRecordTable'
 import { ClaimSection } from './ClaimLayout'
-import { CLAIM_STATUS, type ClaimEmployee, type ClaimPage, type ClaimQuery, type ClaimRow, type ClaimStatsData, type ClaimStatus } from './claimViewTypes'
+import { CLAIM_STATUS, type ClaimEmployee, type ClaimPage, type ClaimQuery, type ClaimRow, type ClaimStatsData, type ClaimStatus } from '@/api/claimViewTypes'
 
 interface Props {
   employeeId: number

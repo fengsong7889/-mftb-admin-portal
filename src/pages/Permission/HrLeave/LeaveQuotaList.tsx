@@ -5,11 +5,11 @@ import { PlusOutlined, ReloadOutlined, SearchOutlined, ThunderboltOutlined } fro
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
-import { useAuth } from '../../../contexts/AuthContext'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   batchInitBalances, deleteLeaveBalance, fetchLeaveBalances, fetchLeaveOverdueCount, type LeaveBalance,
-} from '../../../api/hrLeave'
+} from '@/api/hrLeave'
 import { LEAVE_TYPE_LABEL_KEY, LEAVE_TYPE_ORDER } from './meta'
 
 /** 假期额度台账：年度筛选 + 批量初始化 + 剩余额度计算列 */

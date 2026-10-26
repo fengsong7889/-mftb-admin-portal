@@ -21,7 +21,7 @@ import {
   type RdmCalendarItem,
   type RdmWorkload,
   type RdmWorkloadPerson,
-} from '../../../api/rdm'
+} from '@/api/rdm'
 
 const { RangePicker } = DatePicker
 

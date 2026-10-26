@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { formatHandlers, formatPerson, splitHandlers } from './handlerDisplay'
-import type { RdmHandlerPerson } from '../../api/rdm'
+import type { RdmHandlerPerson } from '@/api/rdm'
 
 const p = (name: string, empNo?: string): RdmHandlerPerson => ({ userId: 1, name, empNo })
 

@@ -4,11 +4,11 @@ import { Table, Tag, Space, Select, Input, Button, Form, DatePicker, message, Po
 const { RangePicker } = DatePicker
 import { SearchOutlined, ExportOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import BrandTag from '../../components/BrandTag'
+import BrandTag from '@/components/BrandTag'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { AppType, RecommendChannel, Region } from '../Recommend/constants'
-import { fetchAdOrders, type AdOrder } from '../../api/adPromotion'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { AppType, RecommendChannel, Region } from '@mftb/contracts/recommendConstants'
+import { fetchAdOrders, type AdOrder } from '@/api/adPromotion'
 import {
   OrderStatus,
   OrderOperatorType,

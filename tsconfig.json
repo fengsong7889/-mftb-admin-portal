@@ -19,8 +19,33 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
+      "@mftb/contracts/*": ["frontend/packages/contracts/src/*"],
+      "@/api": ["frontend/packages/platform-client/src/api"],
+      "@/contexts": ["frontend/packages/platform-client/src/contexts"],
+      "@/utils": ["frontend/packages/platform-client/src/utils"],
+      "@/components": ["frontend/packages/ui/src/components"],
+      "@/hooks": ["frontend/packages/ui/src/hooks"],
+      "@/styles": ["frontend/packages/ui/src/styles"],
+      "@/constants": ["frontend/packages/contracts/src/constants"],
+      "@/assets/*": ["frontend/packages/ui/src/assets/*"],
+      "@/assets": ["frontend/packages/ui/src/assets"],
+      "@/api/*": ["frontend/packages/platform-client/src/api/*"],
+      "@/contexts/*": ["frontend/packages/platform-client/src/contexts/*"],
+      "@/utils/*": ["frontend/packages/platform-client/src/utils/*"],
+      "@/components/*": ["frontend/packages/ui/src/components/*"],
+      "@/hooks/*": ["frontend/packages/ui/src/hooks/*"],
+      "@/styles/*": ["frontend/packages/ui/src/styles/*"],
+      "@/i18n": ["frontend/packages/i18n/src/i18n"],
+      "@/i18n/*": ["frontend/packages/i18n/src/i18n/*"],
+      "@/constants/*": ["frontend/packages/contracts/src/constants/*"],
       "@/*": ["src/*"]
     }
   },
-  "include": ["src"]
+  "include": [
+    "src",
+    "frontend/packages/contracts/src",
+    "frontend/packages/i18n/src",
+    "frontend/packages/platform-client/src",
+    "frontend/packages/ui/src"
+  ]
 }

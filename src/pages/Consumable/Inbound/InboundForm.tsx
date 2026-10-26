@@ -12,9 +12,9 @@ import type { Dayjs } from 'dayjs'
 import {
   createConsumableInboundOrder, fetchConsumableItemOptions, fetchPurchaseCompanyOptions,
   type ConsumableInboundOrderSave, type ConsumableItem, type PurchaseCompany,
-} from '../../../api/consumable'
-import { fetchLocationList, type AssetLocation } from '../../../api/eam'
-import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
+} from '@/api/consumable'
+import { fetchLocationList, type AssetLocation } from '@/api/eam'
+import { useCompanyBrand } from '@/contexts/CompanyBrandContext'
 import { INBOUND_CREATE_TYPES, INBOUND_TYPE_MAP, type InboundLine } from './inboundMeta'
 
 interface FormValues {

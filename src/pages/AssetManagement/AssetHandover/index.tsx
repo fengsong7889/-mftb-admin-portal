@@ -10,8 +10,8 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { fetchHandoverDetail } from '../../../api/eam'
-import type { HandoverRecord } from '../../../api/eam'
+import { fetchHandoverDetail } from '@/api/eam'
+import type { HandoverRecord } from '@/api/eam'
 import HandoverList from './HandoverList'
 import HandoverForm from './HandoverForm'
 import HandoverDetail from './HandoverDetail'

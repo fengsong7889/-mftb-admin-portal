@@ -13,7 +13,7 @@ import {
   ShopOutlined, InfoCircleOutlined, EnvironmentOutlined,
   KeyOutlined, TagOutlined,
 } from '@ant-design/icons'
-import { BRAND_OPTIONS } from '../../constants/brand'
+import { BRAND_OPTIONS } from '@/constants/brand'
 
 // ============================
 // 類型定義

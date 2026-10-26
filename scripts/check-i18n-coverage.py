@@ -38,8 +38,8 @@ DOMAINS = {
         'dirs': ['src/pages/MeetingManagement', 'src/pages/MeetingCheckin', 'src/pages/MeetingView'],
         'namespaces': ['meeting'],
         # 免登签到/纪要/详情页是钉钉卡片直达的公开页，页面说明文案与后台文案同属该域
-        'files_extra': ['src/pages/Home/TodayMeetingCard.tsx', 'src/api/meeting.ts', 'src/api/meetingCheckinPage.ts',
-                        'src/api/meetingViewPage.ts'],
+        'files_extra': ['src/pages/Home/TodayMeetingCard.tsx', 'frontend/packages/platform-client/src/api/meeting.ts', 'frontend/packages/platform-client/src/api/meetingCheckinPage.ts',
+                        'frontend/packages/platform-client/src/api/meetingViewPage.ts'],
     },
     'attendance': {
         'dirs': ['src/pages/Attendance'],
@@ -59,7 +59,7 @@ DOMAINS = {
     },
     # 产研交付（RDM）：2026-10 深度测试时整个模块不在门禁里，「新增硬编码无人拦」是真实风险
     # （当时已存在 rdm 命名空间但只有 4 个 key、3 处引用）；登记后存量按批次下降，增量一律走 t()。
-    # 只收页面层：src/constants/rdm.ts 的枚举 label 表是模块顶层常量（求值早于 i18n 初始化），
+    # 只收页面层：frontend/packages/contracts/src/constants/rdm.ts 的枚举 label 表是模块顶层常量（求值早于 i18n 初始化），
     # 不能直接用 hook 版 t()，需先改成 getter/i18n.t 才能纳入，另批处理。
     'rdm': {
         'dirs': ['src/pages/Rdm'],
@@ -121,7 +121,7 @@ def snapshot_db_keys():
 
 
 def load_locale(lang):
-    path = os.path.join(ROOT, 'src', 'i18n', 'locales', f'{lang}.json')
+    path = os.path.join(ROOT, 'frontend', 'packages', 'i18n', 'src', 'i18n', 'locales', f'{lang}.json')
     return json.load(io.open(path, encoding='utf-8'))
 
 
@@ -148,12 +148,15 @@ def find_dotted_keys(node, prefix=''):
 
 def all_source_files():
     out = []
-    for root, _dirs, names in os.walk(os.path.join(ROOT, 'src')):
-        if os.sep + 'i18n' + os.sep in root + os.sep:
-            continue
-        for name in names:
-            if name.endswith(('.ts', '.tsx')) and '.test.' not in name:
-                out.append(os.path.join(root, name))
+    # 共享层拆包后（方案 P2）：src/ 与 frontend/packages/ 都要扫；
+    # i18n 资源目录自身跳过（含 'i18n' 路径段），避免把语言包当源码扫
+    for base in ('src', os.path.join('frontend', 'packages')):
+        for root, _dirs, names in os.walk(os.path.join(ROOT, base)):
+            if os.sep + 'i18n' + os.sep in root + os.sep:
+                continue
+            for name in names:
+                if name.endswith(('.ts', '.tsx')) and '.test.' not in name:
+                    out.append(os.path.join(root, name))
     return sorted(out)
 
 

@@ -21,7 +21,7 @@ import { useTranslation } from 'react-i18next'
 import StatusSwitch from '../components/StatusSwitch'
 import { rdmTableLocale } from '../components/tableLocale'
 import AdmitPolicyPanel from './AdmitPolicyPanel'
-import { deleteRoutingRule, fetchRoutingRules, saveRoutingRule, type RdmRoutingRow } from '../../../api/rdm'
+import { deleteRoutingRule, fetchRoutingRules, saveRoutingRule, type RdmRoutingRow } from '@/api/rdm'
 import '../index.css'
 
 /** 匹配范围类型 */

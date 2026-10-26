@@ -12,8 +12,8 @@ import {
   CarOutlined, SaveOutlined, SwapOutlined, TeamOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../../../contexts/AuthContext'
-import { fetchUses, toIso } from '../../../api/vehicle'
+import { useAuth } from '@/contexts/AuthContext'
+import { fetchUses, toIso } from '@/api/vehicle'
 import { toOrders } from '../vehicleAdapter'
 import {
   APPROVAL_COLOR, APPROVAL_LABEL, DRIVING_MODE_LABEL, USE_SOURCE_COLOR, USE_SOURCE_LABEL,

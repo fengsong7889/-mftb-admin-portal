@@ -1,12 +1,12 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import ExcelJS from 'exceljs'
-import i18n from '../../i18n'
+import i18n from '@/i18n'
 import {
   generateRequirementImportTemplate,
   parseRequirementImportExcel,
   resolveStatus,
 } from './rdmImport'
-import { RDM_STATUS } from '../../constants/rdm'
+import { RDM_STATUS } from '@/constants/rdm'
 
 /**
  * 存量导入解析与状态归一测试。

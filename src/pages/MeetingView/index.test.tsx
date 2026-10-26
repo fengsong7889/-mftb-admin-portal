@@ -11,12 +11,12 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MeetingViewPage from './index'
-import i18n from '../../i18n'
+import i18n from '@/i18n'
 
 const fetchMeetingViewPage = vi.fn()
 
-vi.mock('../../api/meetingViewPage', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../api/meetingViewPage')>()
+vi.mock('@/api/meetingViewPage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/meetingViewPage')>()
   return { ...actual, fetchMeetingViewPage: (token: string) => fetchMeetingViewPage(token) }
 })
 

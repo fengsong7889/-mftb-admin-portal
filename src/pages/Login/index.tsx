@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { resolveLoginLanding, sanitizeRedirectPath } from '../../utils/sanitizeRedirect'
+import { resolveLoginLanding, sanitizeRedirectPath } from '@/utils/sanitizeRedirect'
 import { Button, Tooltip, message, Modal, Select } from 'antd'
 import {
   UserOutlined,
@@ -10,22 +10,22 @@ import {
   WechatOutlined,
   AlipayCircleOutlined,
 } from '@ant-design/icons'
-import { useAuth } from '../../contexts/AuthContext'
-import { fetchCaptchaToken } from '../../api/auth'
-import { getBrandTitle } from '../../constants/portalSystems'
-import GroupLogo from '../../components/GroupLogo'
-import SliderCaptcha from '../../components/SliderCaptcha'
+import { useAuth } from '@/contexts/AuthContext'
+import { fetchCaptchaToken } from '@/api/auth'
+import { getBrandTitle } from '@/constants/portalSystems'
+import GroupLogo from '@/components/GroupLogo'
+import SliderCaptcha from '@/components/SliderCaptcha'
 import { useTranslation } from 'react-i18next'
-import { changeAppLanguage, SUPPORTED_LANGUAGES } from '../../i18n'
-import type { AppLanguage } from '../../i18n'
+import { changeAppLanguage, SUPPORTED_LANGUAGES } from '@/i18n'
+import type { AppLanguage } from '@/i18n'
 import {
   COUNTRY_INFO,
   countrySysName,
   getCountryOfLanguage,
   LANG_INFO,
   langSysName,
-} from '../../utils/translationConfig'
-import '../../styles/components.css'
+} from '@/utils/translationConfig'
+import '@/styles/components.css'
 
 /* ---- 视频源配置 ---- */
 // 本地视频(随项目构建部署到 GitHub Pages / 本地开发)

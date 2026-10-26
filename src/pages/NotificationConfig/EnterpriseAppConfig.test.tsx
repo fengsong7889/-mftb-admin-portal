@@ -5,14 +5,14 @@ import { message, Modal } from 'antd'
 import EnterpriseAppConfig from './EnterpriseAppConfig'
 import NotificationConfig from './index'
 import { fetchAppConfig, fetchChannels, saveAppConfig, testAppConnection, fetchNotificationApps,
-  fetchNotificationScenarios, toggleNotificationApp, saveNotificationScenario } from '../../api/notificationChannel'
-import type { AppNotificationConfig, NotificationScenario } from '../../api/notificationChannel'
+  fetchNotificationScenarios, toggleNotificationApp, saveNotificationScenario } from '@/api/notificationChannel'
+import type { AppNotificationConfig, NotificationScenario } from '@/api/notificationChannel'
 import NotificationScenarioForm from './NotificationScenarioForm'
 
 const permission = vi.hoisted(() => ({ edit: true }))
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () => permission.edit }) }))
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () => permission.edit }) }))
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
-vi.mock('../../api/notificationChannel', () => ({
+vi.mock('@/api/notificationChannel', () => ({
   fetchAppConfig: vi.fn(), saveAppConfig: vi.fn(), testAppConnection: vi.fn(),
   fetchChannels: vi.fn(), toggleChannel: vi.fn(), deleteChannel: vi.fn(), testChannel: vi.fn(),
   fetchNotificationApps: vi.fn(), fetchNotificationScenarios: vi.fn(), toggleNotificationApp: vi.fn(),

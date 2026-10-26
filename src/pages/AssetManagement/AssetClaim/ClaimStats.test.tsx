@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import ClaimStats from './ClaimStats'
-import type { ClaimStatsData } from './claimViewTypes'
+import type { ClaimStatsData } from '@/api/claimViewTypes'
 
 /**
  * 领用统计卡口径测试。

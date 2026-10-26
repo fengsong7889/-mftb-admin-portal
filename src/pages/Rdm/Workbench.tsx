@@ -38,11 +38,11 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import dayjs from 'dayjs'
-import StatCards from '../../components/StatCards'
-import HelpPopover, { type HelpSection } from '../../components/HelpPopover'
-import { useAuth } from '../../contexts/AuthContext'
-import { formatEmployee } from '../../utils/employeeDisplay'
-import { buildRdmSubmitPath } from '../../constants/menuDataSource'
+import StatCards from '@/components/StatCards'
+import HelpPopover, { type HelpSection } from '@/components/HelpPopover'
+import { useAuth } from '@/contexts/AuthContext'
+import { formatEmployee } from '@/utils/employeeDisplay'
+import { buildRdmSubmitPath } from '@/constants/menuDataSource'
 import { isCanceledError, readWithRetry, useRequestGate } from './useRequestGate'
 import {
   fetchProjectPage,
@@ -55,7 +55,7 @@ import {
   type RdmTodoBoard,
   type RdmWorkbenchData,
   type RdmWorkbenchSummary,
-} from '../../api/rdm'
+} from '@/api/rdm'
 import {
   RDM_PROJECT_STATUS_COLOR,
   RDM_PROJECT_STATUS_LABEL,
@@ -68,7 +68,7 @@ import {
   formatRdmReqNo,
   RDM_STATUS_STAGE,
   type RdmStatus,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import { PriorityTag, StatusTag, TypeTag } from './components/Tags'
 import {
   RDM_IDENTITY_LABEL,

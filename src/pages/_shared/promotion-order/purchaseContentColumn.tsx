@@ -5,7 +5,7 @@
  * purchaseContent 列渲染邏輯：金字招牌標籤日期、盤活復蘇天數、無敵星星時段、mealSlots 降級。
  */
 import { Tag, Space, Popover, Button } from 'antd'
-import { Region } from '../../Recommend/constants'
+import { Region } from '@mftb/contracts/recommendConstants'
 import { SIGNBOARD_LABEL_CN, RecommendType, formatSignboardLabel } from './constants'
 import type { BaseOrderItem } from './types'
 

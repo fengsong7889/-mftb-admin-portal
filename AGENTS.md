@@ -62,12 +62,17 @@ npm run check:stat-order
 
 # 确认弹窗门禁（所有 Modal.confirm 必须带 custom-confirm-modal + 规范图标，见 §B.1/§B.3）
 npm run check:confirm-modal
+
+# 依赖边界门禁（公共层不得 import src/pages/**；src/contracts/** 必须是叶子）
+npm run check:boundary
 ```
 
 ## 关键约束
 
 1. **安装必须使用 `--legacy-peer-deps`**：项目存在 peer dependency 冲突，不加此参数安装会失败。
-2. **类型检查**：`tsconfig.json` 启用 `strict: true`，CI 使用 `build:strict`（`tsc && vite build`）执行类型检查。
+2. **类型检查**：`tsconfig.json` 启用 `strict: true`。CI 先以独立步骤执行全量 `npm run typecheck`（不产出），
+   通过后再 `npm run build` 打包——同一次发布不再重复跑两遍 `tsc`。
+   本地单命令仍可用 `npm run build:strict`（`tsc && vite build`）。
 3. **环境变量**：前端 Mock 凭据通过 `.env.local`（已 gitignore）注入，参考 `.env.example`；
    后端运行时凭据（`DB_URL`/`DB_USERNAME`/`DB_PASSWORD`/`JWT_SECRET`）统一放 `backend/.env.local`（已 gitignore），
    参考 `backend/.env.local.example`。**任何受版本控制的文件禁止写入明文凭据**，由 `npm run secret-scan` 拦截。
@@ -75,7 +80,8 @@ npm run check:confirm-modal
    环境信息变动时必须同步更新该文件（见「参考文档索引 · 环境与运维」）。
 4. **路径别名**：`@/` 映射到 `src/`，在 `tsconfig.json` 和 `vite.config.ts` 中同步配置。
 5. **员工选择统一用 `EmployeeSelect` 组件**：凡表单中需要选择员工/人员的字段，一律使用
-   `src/pages/MeetingManagement/EmployeeSelect.tsx`（`single` 模式单选），禁止使用普通 `<Input>` 文本框。
+   `src/components/EmployeeSelect.tsx`（`single` 模式单选），禁止使用普通 `<Input>` 文本框。
+   （该组件原位于 `src/pages/MeetingManagement/`，已作为「公共层不得依赖业务页面」解环的一部分上移。）
    选项显示格式为 `姓名(工号)` 如 `张三(MF00001)`，数据源为在职员工远程搜索接口。
    **所有选员工的下拉框只显示「姓名 + 工号」，禁止拼部门**（含 `· 部门`、`（部门）` 等形式）：
    部门不能帮助消歧，还会把组织归属批量暴露给任何能打开该页的人。仅当用户明确要求带部门时
@@ -109,7 +115,7 @@ src/
 
 - **平台**：GitHub Actions → GitHub Pages
 - **触发**：push 到 main 分支
-- **质量门禁**：lint + typecheck + menu-consistency + stat-card-order + confirm-modal + i18n + secret-scan + test（任一失败中止部署）
+- **质量门禁**：lint + typecheck + menu-consistency + dependency-boundary + stat-card-order + confirm-modal + i18n + secret-scan + test（任一失败中止部署）
 - **部署**：`actions/deploy-pages@v4`
 
 ## 测试

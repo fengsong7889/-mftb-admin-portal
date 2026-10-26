@@ -14,7 +14,7 @@ import {
   getJobFamily,
   updateJobFamily,
   type OrgJobFamily,
-} from '../../../api/hcmOrganization'
+} from '@/api/hcmOrganization'
 import { CardTitle, FormHeader, UpdatedFooter, cardStyle, formatTimestamp, grid3 } from './shared'
 
 export default function HcmOrgJobFamilyForm() {

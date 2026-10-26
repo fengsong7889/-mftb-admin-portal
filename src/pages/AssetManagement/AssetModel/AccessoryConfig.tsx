@@ -14,7 +14,7 @@ import {
   fetchCategoryAccessories, createCategoryAccessory, updateCategoryAccessory,
   updateCategoryAccessoryStatus, deleteCategoryAccessory,
   type CategoryAccessory,
-} from '../../../api/eam'
+} from '@/api/eam'
 
 interface Props {
   categoryCode: string

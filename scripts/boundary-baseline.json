@@ -1,0 +1,12 @@
+{
+  "$comment": [
+    "依赖越界棘轮基线，由 scripts/check-boundary.mjs 校验。",
+    "规则：公共层生产代码不得 import src/pages/**；src/contracts/** 必须是叶子。",
+    "本文件只登记「已存在但尚未解环」的历史违规；新增违规会让门禁失败，",
+    "已修复却不在此移除同样会让门禁失败 —— 两个方向都必须同步，避免基线静默腐坏。",
+    "下列 5 条属分系统独立工程改造方案 §4.1 的后续解环批次（api 层引用页面内的视图类型/常量），",
+    "解环方式与 Permission/WorkflowConfig 一致：把纯类型/常量上移到 src/contracts/。",
+    "2026-10-26：原 5 条 src/api 到页面类型的历史越界，已随 P2 共享层拆包把类型模块上移到 @mftb/contracts 而清零。"
+  ],
+  "violations": []
+}

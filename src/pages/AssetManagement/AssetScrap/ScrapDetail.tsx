@@ -12,9 +12,9 @@ import {
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import BrandTag from '../../../components/BrandTag'
-import { fetchScrapDetail, deleteScrapRecord, type ScrapRecord } from '../../../api/asset'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import BrandTag from '@/components/BrandTag'
+import { fetchScrapDetail, deleteScrapRecord, type ScrapRecord } from '@/api/asset'
 
 interface Props {
   scrapId: number

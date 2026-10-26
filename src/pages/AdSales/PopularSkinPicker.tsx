@@ -18,11 +18,11 @@ import SkinTemplatePreview from '../Recommend/WaterfallAdd/SkinTemplatePreview'
 import {
   SMALL_SKIN_TEMPLATES, LARGE_SKIN_TEMPLATES, getSmallTemplate, getLargeTemplate,
   type DisplayMode, type LargeLayout, type SkinSaleConfig,
-} from '../../constants/popularSkinTemplates'
+} from '@/constants/popularSkinTemplates'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
-import { fetchGiftAvailableDays } from '../../api/gift'
-import { usePaymentRule } from '../../hooks/usePaymentRule'
+import { fetchGiftAvailableDays } from '@/api/gift'
+import { usePaymentRule } from '@/hooks/usePaymentRule'
 import {
   fetchAdHotPricingList,
   fetchAdHotInventory,
@@ -31,9 +31,9 @@ import {
   type AdHotInventoryVO,
   type AdHotInventoryCell,
   type AdHotQuote,
-} from '../../api/adPromotion'
-import { fetchStores, type StoreItem } from '../../api/store'
-import { fetchFinAccountBalance } from '../../api/finance'
+} from '@/api/adPromotion'
+import { fetchStores, type StoreItem } from '@/api/store'
+import { fetchFinAccountBalance } from '@/api/finance'
 import { MAX_BUY_DAYS, PRESALE_OPEN_HOUR, MONTHS_PER_PAGE, parseDayTiers, getPresaleOpenTime, PickerPresaleInfoModal, PickerPaymentSuccessModal } from './components/pickerShared'
 
 /** 人氣商家廣告類型標識（與後端一致） */

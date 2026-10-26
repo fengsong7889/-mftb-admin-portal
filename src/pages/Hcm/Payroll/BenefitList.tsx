@@ -11,7 +11,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, ReloadOutlined, SearchOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   JURISDICTION_OPTIONS,
   PLAN_TYPE_OPTIONS,
@@ -22,7 +22,7 @@ import {
   updateBenefitPlan,
   type PayrollBenefitPlan,
   type PayrollEnrollment,
-} from '../../../api/payroll'
+} from '@/api/payroll'
 
 const PLAN_TYPE_COLOR: Record<string, string> = {
   SOCIAL_INSURANCE: 'blue',

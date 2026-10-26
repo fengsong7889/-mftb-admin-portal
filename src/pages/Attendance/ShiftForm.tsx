@@ -20,11 +20,11 @@ import {
 import dayjs, { type Dayjs } from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import DetailPageHeader from '../../components/DetailPageHeader'
-import RemarkTextArea from '../../components/RemarkTextArea'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import RemarkTextArea from '@/components/RemarkTextArea'
 import {
   ENABLE_STATUS, createShift, fetchShiftDetail, updateShift, type ShiftPayload,
-} from '../../api/attendance'
+} from '@/api/attendance'
 import '@/styles/components.css'
 
 const cardStyle: React.CSSProperties = {

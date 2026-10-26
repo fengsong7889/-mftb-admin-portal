@@ -4,26 +4,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AssetAdd from './AssetAdd'
 import AssetDetail from './AssetDetail'
 import AssetClaim from './AssetClaim'
-import { fetchAssetDetail, fetchAssetList, updateAsset, type AssetItem } from '../../api/asset'
-import { fetchAllParamTypes, type ParamType } from '../../api/eam'
+import { fetchAssetDetail, fetchAssetList, updateAsset, type AssetItem } from '@/api/asset'
+import { fetchAllParamTypes, type ParamType } from '@/api/eam'
 
 const { t } = vi.hoisted(() => ({ t: (key: string) => key }))
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t }) }))
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () => false }) }))
-vi.mock('../../contexts/CompanyBrandContext', () => ({ useCompanyBrand: () => ({ numericOptions: [] }) }))
-vi.mock('../../components/DetailPageHeader', () => ({ default: () => null }))
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () => false }) }))
+vi.mock('@/contexts/CompanyBrandContext', () => ({ useCompanyBrand: () => ({ numericOptions: [] }) }))
+vi.mock('@/components/DetailPageHeader', () => ({ default: () => null }))
 vi.mock('./AssetTag/AssetTagBindingSection', () => ({ default: () => null }))
-vi.mock('../../api/asset', async importOriginal => ({
-  ...await importOriginal<typeof import('../../api/asset')>(),
+vi.mock('@/api/asset', async importOriginal => ({
+  ...await importOriginal<typeof import('@/api/asset')>(),
   fetchAssetDetail: vi.fn(), fetchAssetList: vi.fn(), updateAsset: vi.fn(),
 }))
-vi.mock('../../api/eam', () => ({
+vi.mock('@/api/eam', () => ({
   fetchCategoryList: vi.fn(async () => []), fetchLocationList: vi.fn(async () => []),
   fetchAllParamTypes: vi.fn(async () => []), fetchBrandList: vi.fn(async () => []),
   fetchModelList: vi.fn(async () => ({ records: [], total: 0 })), fetchParamValuesByType: vi.fn(async () => []),
 }))
-vi.mock('../../api/department', () => ({ fetchDepartments: vi.fn(async () => []) }))
-vi.mock('../../api/employee', () => ({ fetchEmployees: vi.fn(async () => ({ records: [], total: 0 })) }))
+vi.mock('@/api/department', () => ({ fetchDepartments: vi.fn(async () => []) }))
+vi.mock('@/api/employee', () => ({ fetchEmployees: vi.fn(async () => ({ records: [], total: 0 })) }))
 
 const asset: AssetItem = {
   id: 1, assetNo: 'TEST-001', assetName: '测试实物', assetType: '手机', categoryCode: '0101',

@@ -4,10 +4,10 @@ import type { TableColumnsType } from 'antd'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   ASSESS_STATUS, type PerfAssessment, fetchMyReviews,
-} from '../../api/hrPerformance'
+} from '@/api/hrPerformance'
 import {
   ASSESS_STATUS_LABEL_KEY, ASSESS_STATUS_TAG_COLOR, PERF_MENU, REVIEW_STATUS_TABS,
 } from './meta'

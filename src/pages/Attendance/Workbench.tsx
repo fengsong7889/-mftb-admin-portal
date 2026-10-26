@@ -21,18 +21,18 @@ import {
 import dayjs, { type Dayjs } from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import StatCards from '../../components/StatCards'
+import StatCards from '@/components/StatCards'
 import {
   EXCEPTION_STATUS, fetchExceptions, fetchWorkbenchOverview,
   type ExceptionVO, type WorkbenchAlert, type WorkbenchOverview,
-} from '../../api/attendance'
+} from '@/api/attendance'
 import {
   EXCEPTION_STATUS_LABEL_KEY, EXCEPTION_STATUS_TAG_COLOR, EXCEPTION_TYPE_LABEL_KEY,
   EXCEPTION_TYPE_TAG_COLOR, WORKBENCH_ALERT_KEY,
 } from './meta'
 import { useAttendanceOptions } from './useAttendanceOptions'
 import '@/styles/components.css'
-import OrgScopeNotice from '../../components/OrgScopeNotice'
+import OrgScopeNotice from '@/components/OrgScopeNotice'
 
 /** 待办异常只取最近 N 条：工作台是导航页，不是异常列表页，全量渲染会盖过指标 */
 const PENDING_LIMIT = 10

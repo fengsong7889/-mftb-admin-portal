@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Button, Card, Select, Space, Tag, Form, Input, Row, Col, Divider, Modal } from 'antd'
 import { SearchOutlined, ReloadOutlined, EyeOutlined, EnvironmentOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { BRAND_OPTIONS as brandOptions } from '../../constants/brand'
+import { BRAND_OPTIONS as brandOptions } from '@/constants/brand'
 
 /** 模擬底紋預覽數據 */
 interface HintPreviewItem {

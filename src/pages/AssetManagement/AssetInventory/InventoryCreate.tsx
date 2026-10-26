@@ -5,11 +5,11 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Button, Form, Input, Select, TreeSelect, Radio, Modal, message, Space } from 'antd'
 import { ArrowLeftOutlined, PlusOutlined, AimOutlined, FileSearchOutlined, InboxOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
+import { useCompanyBrand } from '@/contexts/CompanyBrandContext'
 import {
   fetchInventoryOptions, searchInventoryEmployees, previewInventory, createInventoryTask, newInventoryRequestKey,
   type InventoryOptions, type InventoryScope, type InventoryPreviewResult, type InventoryEmployeeOption,
-} from '../../../api/eamInventory'
+} from '@/api/eamInventory'
 import { ASSET_STATUS_LABEL } from './inventoryMeta'
 
 interface Props {

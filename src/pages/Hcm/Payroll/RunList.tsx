@@ -19,7 +19,7 @@ import {
 } from '@ant-design/icons'
 import { type Dayjs } from 'dayjs'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   calculatePayrollRun,
   createPayrollRun,
@@ -27,7 +27,7 @@ import {
   listPayrollRuns,
   lockPayrollRun,
   type PayrollRun,
-} from '../../../api/payroll'
+} from '@/api/payroll'
 
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'default',

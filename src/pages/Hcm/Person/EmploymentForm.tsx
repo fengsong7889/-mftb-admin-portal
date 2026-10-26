@@ -10,8 +10,8 @@ import { Button, DatePicker, Form, Input, Select, message } from 'antd'
 import { SaveOutlined, ApartmentOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useTranslation } from 'react-i18next'
-import { createEmployment, getEmployment, updateEmployment, EMPLOYMENT_TYPE_OPTIONS, type HrEmployment } from '../../../api/hcmPerson'
-import { JURISDICTION_OPTIONS, listLegalEntities, type OrgLegalEntity } from '../../../api/hcmOrganization'
+import { createEmployment, getEmployment, updateEmployment, EMPLOYMENT_TYPE_OPTIONS, type HrEmployment } from '@/api/hcmPerson'
+import { JURISDICTION_OPTIONS, listLegalEntities, type OrgLegalEntity } from '@/api/hcmOrganization'
 import { CardTitle, FormHeader, cardStyle, grid3 } from '../Organization/shared'
 
 interface EmploymentFormValues {

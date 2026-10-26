@@ -1,7 +1,7 @@
 import {
   ASSESS_STATUS, CYCLE_STATUS, CYCLE_TYPE, PLAN_STATUS,
   type AssessStatus, type CycleStatus, type PerfPlan, type PlanStatus,
-} from '../../api/hrPerformance'
+} from '@/api/hrPerformance'
 
 /**
  * 績效域展示口径：状态/等级的文案 key 与颜色，全部对齐后端常量。

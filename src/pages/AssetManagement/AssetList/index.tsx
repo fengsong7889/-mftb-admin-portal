@@ -28,15 +28,15 @@ import { useTranslation } from 'react-i18next'
 import {
   fetchAssetList, fetchAssetStatusCounts, deleteAsset, updateAsset,
   type AssetItem, type AssetStatus, type AssetSource, type AssetListQuery,
-} from '../../../api/asset'
-import { fetchAssetTagList, bindAssetTag, fetchCategoryList, fetchBrandList, type AssetCategory, type AssetBrand, type AssetTagTemplate } from '../../../api/eam'
-import { fetchDepartments, type DepartmentItem } from '../../../api/department'
-import { fetchEmployeeOptions } from '../../../api/employee'
-import type { OptionItem } from '../../../api/types'
-import { exportToCSV } from '../../../utils/exportCSV'
-import BrandTag from '../../../components/BrandTag'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { useAuth } from '../../../contexts/AuthContext'
+} from '@/api/asset'
+import { fetchAssetTagList, bindAssetTag, fetchCategoryList, fetchBrandList, type AssetCategory, type AssetBrand, type AssetTagTemplate } from '@/api/eam'
+import { fetchDepartments, type DepartmentItem } from '@/api/department'
+import { fetchEmployeeOptions } from '@/api/employee'
+import type { OptionItem } from '@/api/types'
+import { exportToCSV } from '@/utils/exportCSV'
+import BrandTag from '@/components/BrandTag'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
 
 /* ==================== 枚举映射 ==================== */
 

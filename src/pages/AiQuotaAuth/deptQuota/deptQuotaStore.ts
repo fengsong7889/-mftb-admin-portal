@@ -5,7 +5,7 @@
  *   - 部門樹構建 / 部門引用解析（供列表頁、編輯頁使用）
  *   - 對 quotaShared 的 re-export（保持既有 import 路徑不變）
  */
-import type { DeptOption } from '../../../api'
+import type { DeptOption } from '@/api'
 
 /* ────────────────── Re-export from quotaShared ────────────────── */
 

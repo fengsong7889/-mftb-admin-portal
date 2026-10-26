@@ -12,15 +12,15 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MeetingBookingForm from './MeetingBookingForm'
-import i18n from '../../../i18n'
+import i18n from '@/i18n'
 
 const hasPermission = vi.fn(() => false)
 
-vi.mock('../../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission }),
 }))
 
-vi.mock('../../../api/meeting', () => ({
+vi.mock('@/api/meeting', () => ({
   fetchMeetingRoomDetail: vi.fn(),
   previewSeries: vi.fn(),
   createMeeting: vi.fn(),
@@ -30,12 +30,12 @@ vi.mock('../../../api/meeting', () => ({
 }))
 
 // 员工选择器会自己去搜人，本用例不关心它的结果，给空列表即可
-vi.mock('../../../api/employee', () => ({
+vi.mock('@/api/employee', () => ({
   fetchEmployeesForSelect: vi.fn(async () => []),
   searchEmployees: vi.fn(async () => []),
 }))
 
-import { fetchMeetingRoomDetail, previewSeries } from '../../../api/meeting'
+import { fetchMeetingRoomDetail, previewSeries } from '@/api/meeting'
 
 const ROOM = {
   id: 1,

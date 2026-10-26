@@ -2,7 +2,7 @@
  * 推廣訂單共享常量
  */
 
-import { AlgorithmType } from '../../Recommend/constants'
+import { AlgorithmType } from '@mftb/contracts/recommendConstants'
 
 export type RecommendType = AlgorithmType
 export const RecommendType = AlgorithmType

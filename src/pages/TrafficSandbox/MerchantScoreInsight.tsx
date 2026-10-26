@@ -8,15 +8,15 @@ import {
   CalculatorOutlined, ExportOutlined, ReloadOutlined, SearchOutlined, TrophyOutlined,
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
-import RemoteSearchSelect from '../../components/RemoteSearchSelect'
-import AnimatedNumber from '../../components/AnimatedNumber'
-import type { OptionItem } from '../../api/types'
+import RemoteSearchSelect from '@/components/RemoteSearchSelect'
+import AnimatedNumber from '@/components/AnimatedNumber'
+import type { OptionItem } from '@/api/types'
 import {
   SANDBOX_STORE_POOL, ScoreDimension, ScoreMode, generateScoreInsight,
   type ScoreDimensionDetail, type ScoreInsightResult, type ScoreRuleDetail,
-} from '../../api/mock/trafficSandboxMock'
-import { BRAND_OPTIONS } from '../../constants/brand'
-import { RECOMMEND_CHANNEL_OPTIONS } from '../Recommend/constants'
+} from '@/api/mock/trafficSandboxMock'
+import { BRAND_OPTIONS } from '@/constants/brand'
+import { RECOMMEND_CHANNEL_OPTIONS } from '@mftb/contracts/recommendConstants'
 
 /** 維度 → 展示配色與文案 key */
 const DIMENSION_META: Record<ScoreDimension, { color: string; bg: string; key: string }> = {

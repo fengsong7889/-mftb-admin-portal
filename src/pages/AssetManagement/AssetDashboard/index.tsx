@@ -15,7 +15,7 @@ import {
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { Pie, Column } from '@ant-design/charts'
-import { fetchEamDashboard, type EamDashboard } from '../../../api/eam'
+import { fetchEamDashboard, type EamDashboard } from '@/api/eam'
 
 export default function AssetDashboard() {
   const { t } = useTranslation()

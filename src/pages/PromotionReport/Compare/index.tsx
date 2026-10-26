@@ -7,7 +7,7 @@ import {
 } from '@ant-design/charts'
 import dayjs from 'dayjs'
 import type { ColumnsType } from 'antd/es/table'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   ReportApp,
   ReportChannel,

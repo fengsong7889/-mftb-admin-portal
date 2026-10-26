@@ -1,25 +1,21 @@
-# ====== 构建阶段 ======
-FROM maven:3.9-eclipse-temurin-17 AS builder
-WORKDIR /app
-
-# 先复制 pom.xml，利用 Docker 缓存加速依赖下载
-COPY backend/pom.xml .
-RUN mvn dependency:go-offline -B
-
-# 复制源码并构建
-COPY backend/src src
-COPY backend/sql/165_notification_apps_and_scenarios.sql sql/165_notification_apps_and_scenarios.sql
-RUN mvn package -DskipTests -B && \
-    mv target/mftb-admin.jar app.jar
-
-# ====== 运行阶段 ======
+# ====== 运行阶段（镜像内不再编译源码）======
+# 制品来源：CI 的 verify job 用一次完整 Maven 生命周期（编译 + 全量测试 + 打包）产出的
+# backend/target/mftb-admin.jar，经 actions/upload-artifact 传给 build job 下载回同一位置。
+# 旧实现在镜像里再跑一次 `mvn package`，等于同一份源码在一条流水线被完整编译 2~3 次，
+# 且镜像内的 JAR 与被测试过的 JAR 不是同一个字节，无法用摘要证明「测的就是发的」。
+#
+# 本地手工构建镜像：先 `mvn -B -f backend/pom.xml package -DskipTests`，再
+# `docker build -f backend/Dockerfile .`（构建上下文是仓库根，需要 backend/target/ 与 .git）。
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
 # 创建非 root 用户
 RUN addgroup -S app && adduser -S app -G app
 
-COPY --from=builder /app/app.jar .
+# 只接受已验证制品：文件缺失时 COPY 直接失败，空文件（如制品下载中断）由下面的校验拦下，
+# 不允许静默退化成「镜像里再编译一次」的旧路径
+COPY backend/target/mftb-admin.jar app.jar
+RUN test -s app.jar || { echo "❌ app.jar 为空或缺失：请先由 CI/本地 Maven 产出制品再构建镜像"; exit 1; }
 
 # 复制 .git 目录，供「从 Git 同步版本记录」功能读取提交历史
 COPY .git .git

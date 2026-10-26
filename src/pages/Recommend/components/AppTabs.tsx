@@ -9,7 +9,7 @@
  */
 import { Tabs } from 'antd'
 import { useTranslation } from 'react-i18next'
-import { APP_OPTIONS, AppType } from '../constants'
+import { APP_OPTIONS, AppType } from '@mftb/contracts/recommendConstants'
 
 interface AppTabsProps {
   value?: AppType

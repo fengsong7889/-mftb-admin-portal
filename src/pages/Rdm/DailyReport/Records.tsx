@@ -5,7 +5,7 @@ import { Alert, Button, DatePicker, Form, Select, Space, Table, Tag } from 'antd
 import type { TableColumnsType } from 'antd'
 import { EyeOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { Dayjs } from 'dayjs'
-import { fetchDailyReportRecords, type DailyReportRecord } from '../../../api/rdmDailyReport'
+import { fetchDailyReportRecords, type DailyReportRecord } from '@/api/rdmDailyReport'
 import '../index.css'
 
 /**

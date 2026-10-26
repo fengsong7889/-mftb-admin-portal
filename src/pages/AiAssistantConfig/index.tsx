@@ -6,11 +6,11 @@ import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, ReloadOutlined, UndoOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { Navigate } from 'react-router-dom'
-import { formatDateTime } from '../../utils/datetime'
-import { confirmDelete } from '../../utils/confirmDelete'
-import AiScopeSwitch from '../../components/AiScopeSwitch'
-import { AI_SCOPE_OPTIONS, aiScopeLabel, useAiScope } from '../../constants/aiScope'
-import { fetchFeedback, fetchFeedbackStats, type AiFeedbackRow, type AiFeedbackStats } from '../../api/aiFeedback'
+import { formatDateTime } from '@/utils/datetime'
+import { confirmDelete } from '@/utils/confirmDelete'
+import AiScopeSwitch from '@/components/AiScopeSwitch'
+import { AI_SCOPE_OPTIONS, aiScopeLabel, useAiScope } from '@/constants/aiScope'
+import { fetchFeedback, fetchFeedbackStats, type AiFeedbackRow, type AiFeedbackStats } from '@/api/aiFeedback'
 import {
   deleteKnowledgeDoc,
   fetchKnowledgeDoc,
@@ -22,13 +22,13 @@ import {
   setKnowledgeStatus,
   type AiKnowledgeDoc,
   type KnowledgeHit,
-} from '../../api/aiKnowledge'
+} from '@/api/aiKnowledge'
 import {
   deleteGuardRule,
   fetchGuardRules,
   saveGuardRule,
   type AiGuardRule,
-} from '../../api/aiGuardrail'
+} from '@/api/aiGuardrail'
 import {
   deleteGlossary,
   fetchCapabilities,
@@ -44,7 +44,7 @@ import {
   type AiGlossary,
   type AiPromptProfile,
   type AiPromptTestRunResult,
-} from '../../api/aiPromptConfig'
+} from '@/api/aiPromptConfig'
 
 const DOMAIN_OPTIONS = [
   { value: 'common', label: '通用' },

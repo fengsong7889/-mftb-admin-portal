@@ -10,22 +10,22 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import SendMinutesModal from './SendMinutesModal'
-import i18n from '../../../i18n'
-import type { MinutesContent } from '../../../api/meetingMinutes'
+import i18n from '@/i18n'
+import type { MinutesContent } from '@/api/meetingMinutes'
 
 const sendMinutes = vi.fn()
 const fetchMinutesGroups = vi.fn()
 
-vi.mock('../../../api/meetingMinutes', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../api/meetingMinutes')>()
+vi.mock('@/api/meetingMinutes', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/meetingMinutes')>()
   return { ...actual, sendMinutes: (...args: unknown[]) => sendMinutes(...args), fetchMinutesGroups: (...args: unknown[]) => fetchMinutesGroups(...args) }
 })
 
-vi.mock('../../../api/employee', () => ({
+vi.mock('@/api/employee', () => ({
   fetchEmployees: vi.fn(async () => ({ records: [], total: 0 })),
 }))
 
-import type { MinutesSendResult } from '../../../api/meetingMinutes'
+import type { MinutesSendResult } from '@/api/meetingMinutes'
 
 const CONTENT: MinutesContent = {
   items: [{ topic: '分攤口徑', discussion: '財務主張按營收', conclusion: '按營收分攤' }],

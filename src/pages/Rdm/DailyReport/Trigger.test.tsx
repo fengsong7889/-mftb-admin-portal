@@ -4,17 +4,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Modal } from 'antd'
 import type { ModalFuncProps } from 'antd'
 import DailyReportTrigger from './Trigger'
-import i18n from '../../../i18n'
+import i18n from '@/i18n'
 
 const triggerReport = vi.fn()
 const boardPreview = vi.fn()
 
-vi.mock('../../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => true }),
 }))
 
-vi.mock('../../../api/rdm', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../api/rdm')>()
+vi.mock('@/api/rdm', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/rdm')>()
   return {
     ...actual,
     fetchProjectPage: vi.fn(async () => ({
@@ -25,8 +25,8 @@ vi.mock('../../../api/rdm', async (importOriginal) => {
   }
 })
 
-vi.mock('../../../api/rdmDailyReport', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../api/rdmDailyReport')>()
+vi.mock('@/api/rdmDailyReport', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/rdmDailyReport')>()
   return {
     ...actual,
     triggerDailyReport: (params: unknown) => triggerReport(params),

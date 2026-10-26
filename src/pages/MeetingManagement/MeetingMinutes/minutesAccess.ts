@@ -11,7 +11,7 @@
  *   3. 后端一旦下发 canMinutes，即以服务端结论为准，本函数只在字段缺省时兜底，
  *      避免旧版本后端还没返回该字段时界面无端丢入口。
  */
-import type { MeetingVO } from '../../../api/meeting'
+import type { MeetingVO } from '@/api/meeting'
 
 /** 已进入或已收尾的阶段/状态：与后端「可录入纪要」判定逐字同口径 */
 const MINUTES_ALLOWED_PHASES = new Set(['ongoing', 'ended', 'finished'])

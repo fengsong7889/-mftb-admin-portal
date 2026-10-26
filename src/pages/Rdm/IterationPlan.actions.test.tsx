@@ -10,8 +10,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { Modal } from 'antd'
-import i18n from '../../i18n'
-import { deleteIteration, fetchIterations } from '../../api/rdm'
+import i18n from '@/i18n'
+import { deleteIteration, fetchIterations } from '@/api/rdm'
 import IterationPlan from './IterationPlan'
 
 beforeAll(async () => {
@@ -21,11 +21,11 @@ beforeAll(async () => {
 /** 本用例授予的动作集；默认空集 = 只有查看权 */
 const granted = vi.hoisted(() => new Set<string>())
 
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: (key: string) => granted.has(key) }),
 }))
 
-vi.mock('../../api/rdm', () => ({
+vi.mock('@/api/rdm', () => ({
   fetchIterations: vi.fn(),
   updateIterationStatus: vi.fn(),
   deleteIteration: vi.fn(),

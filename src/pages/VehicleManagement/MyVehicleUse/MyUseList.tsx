@@ -14,8 +14,8 @@ import type { Dayjs } from 'dayjs'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { toIso } from '../../../api/vehicle'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { toIso } from '@/api/vehicle'
 import {
   APPROVAL_COLOR, APPROVAL_LABEL, TRIP_STATUS_COLOR, TRIP_STATUS_LABEL,
   USE_SOURCE_COLOR, USE_SOURCE_LABEL, USE_STATUS_COLOR, USE_STATUS_LABEL,

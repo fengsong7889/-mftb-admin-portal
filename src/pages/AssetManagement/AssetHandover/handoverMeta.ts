@@ -1,7 +1,7 @@
 /**
  * 交接模塊共享常量（列表 / 詳情頁復用）
  */
-import type { HandoverRecord } from '../../../api/eam'
+import type { HandoverRecord } from '@/api/eam'
 
 export type HandoverReason = HandoverRecord['reason']
 

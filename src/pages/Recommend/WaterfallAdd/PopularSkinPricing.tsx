@@ -28,7 +28,7 @@ import {
   RecommendChannel,
   ServiceStatus,
   APP_OPTIONS,
-} from '../constants'
+} from '@mftb/contracts/recommendConstants'
 import {
   fetchAdHotPricingDetail,
   createAdHotPricing,
@@ -38,7 +38,7 @@ import {
   type AdHotSkinPrice,
   type HotDiscountMode,
   type AdPricingHotRequest,
-} from '../../../api/adPromotion'
+} from '@/api/adPromotion'
 import SkinTemplateSection from './SkinTemplateSection'
 import DiscountTierEditor, {
   type DiscountTierRow,
@@ -54,7 +54,7 @@ import {
   createDefaultSmallSkins,
   createDefaultLargeSkins,
   getMissingPosterLanguages,
-} from '../../../constants/popularSkinTemplates'
+} from '@/constants/popularSkinTemplates'
 import { svgDataUrl, cardShellStyle, cardTitle, type CancelFeeRule } from './components/shared'
 
 /* ==================== 常量 ==================== */

@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Alert, Button, Form, Input, Select, Switch, Tag, Tooltip, message } from 'antd'
 import { ArrowLeftOutlined, EyeOutlined, FileTextOutlined, LinkOutlined, SaveOutlined } from '@ant-design/icons'
-import { useAuth } from '../../../contexts/AuthContext'
-import DailyReportBoardPreviewModal from '../../../components/DailyReportBoardPreviewModal'
+import { useAuth } from '@/contexts/AuthContext'
+import DailyReportBoardPreviewModal from './BoardPreviewModal'
 import DingTalkCardPreview from './DingTalkCardPreview'
 import {
   fetchDailyReportConfig,
@@ -13,7 +13,7 @@ import {
   saveDailyReportTemplate,
   type DailyReportPreviewResult,
   type DailyReportTemplate,
-} from '../../../api/rdmDailyReport'
+} from '@/api/rdmDailyReport'
 import '../index.css'
 
 /** 占位符说明：占位符 + 它到底取的是哪份数据（配置的人必须能看懂，否则等于没写文档） */

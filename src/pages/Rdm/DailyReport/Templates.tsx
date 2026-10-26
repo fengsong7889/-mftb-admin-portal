@@ -6,9 +6,9 @@ import { Alert, Button, DatePicker, Form, Input, Modal, Select, Space, Switch, T
 import type { TableColumnsType } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { Dayjs } from 'dayjs'
-import { useAuth } from '../../../contexts/AuthContext'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import RemoteSearchSelect from '../../../components/RemoteSearchSelect'
+import { useAuth } from '@/contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import RemoteSearchSelect from '@/components/RemoteSearchSelect'
 import {
   applyDailyReportTemplate,
   deleteDailyReportTemplate,
@@ -18,7 +18,7 @@ import {
   saveDailyReportTemplate,
   type DailyReportConfig,
   type DailyReportTemplate,
-} from '../../../api/rdmDailyReport'
+} from '@/api/rdmDailyReport'
 import '../index.css'
 
 /** 查询条件：全部为「不填即不过滤」，与后端返回的全量列表做本地过滤（模板数量少，无需分页请求） */

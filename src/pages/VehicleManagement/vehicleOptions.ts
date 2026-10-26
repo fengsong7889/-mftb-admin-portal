@@ -10,11 +10,11 @@
  * 否则用户会拿它做真实选择并提交了个不存在的 ID。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import request, { SILENT_HEADER } from '../../api/request'
-import { fetchDepartments, type DepartmentItem } from '../../api/department'
-import { fetchEmployees } from '../../api/employee'
-import { fetchEligibleDrivers } from '../../api/vehicle'
-import type { QualificationVO } from '../../api/vehicle'
+import request, { SILENT_HEADER } from '@/api/request'
+import { fetchDepartments, type DepartmentItem } from '@/api/department'
+import { fetchEmployees } from '@/api/employee'
+import { fetchEligibleDrivers } from '@/api/vehicle'
+import type { QualificationVO } from '@/api/vehicle'
 import { QUALIFICATION_RESULT } from './vehicleTypes'
 import { QUALIFICATION_LABEL } from './vehicleMeta'
 

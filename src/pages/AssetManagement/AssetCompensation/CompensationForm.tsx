@@ -21,16 +21,16 @@ import {
 import {
   SaveOutlined, ArrowLeftOutlined, AppstoreOutlined,
 } from '@ant-design/icons'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import BrandTag from '../../../components/BrandTag'
-import AssetParameters from '../../../components/AssetParameters'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import BrandTag from '@/components/BrandTag'
+import AssetParameters from '@/components/AssetParameters'
 import {
   createCompensation, type CompensationSaveDTO,
-} from '../../../api/eamCompensation'
+} from '@/api/eamCompensation'
 import {
   fetchAssetDetail, fetchAssetList,
   type AssetItem,
-} from '../../../api/asset'
+} from '@/api/asset'
 
 const CAUSE_OPTIONS = [
   { label: '人為', value: 'human' },

@@ -16,11 +16,11 @@ import { Spin, Result } from 'antd'
 import { QrcodeOutlined } from '@ant-design/icons'
 import {
   fetchAssetTagBindings,
-} from '../../api/eam'
-import type { AssetTagTemplate } from '../../api/eam'
-import { fetchAssetDetail, type AssetItem } from '../../api/asset'
+} from '@/api/eam'
+import type { AssetTagTemplate } from '@/api/eam'
+import { fetchAssetDetail, type AssetItem } from '@/api/asset'
 import { buildTagValues } from '../AssetManagement/AssetTag/tagValues'
-import { ASSET_DISPLAY_FIELDS } from '../../api/eam'
+import { ASSET_DISPLAY_FIELDS } from '@/api/eam'
 
 type LoadState = 'loading' | 'ok' | 'notfound' | 'error'
 

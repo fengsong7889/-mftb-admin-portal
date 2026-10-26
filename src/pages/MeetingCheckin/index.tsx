@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Alert, Button, Spin } from 'antd'
 import { CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons'
-import { fetchCheckinDetail, submitCheckin, type CheckinView } from '../../api/meetingCheckinPage'
+import { fetchCheckinDetail, submitCheckin, type CheckinView } from '@/api/meetingCheckinPage'
 import { attendeeTypeLabels } from '../MeetingManagement/meetingMeta'
 import { useTranslation } from 'react-i18next'
 

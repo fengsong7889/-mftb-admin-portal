@@ -6,9 +6,9 @@ import EnterpriseAppList from './EnterpriseAppList'
 import NotificationScenarioList from './NotificationScenarioList'
 import type { ColumnsType } from 'antd/es/table'
 import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons'
-import { fetchChannels, toggleChannel, deleteChannel, testChannel } from '../../api/notificationChannel'
-import type { ChannelItem, ChannelQuery } from '../../api/notificationChannel'
-import { toDateRangeParams } from '../../utils/dateRange'
+import { fetchChannels, toggleChannel, deleteChannel, testChannel } from '@/api/notificationChannel'
+import type { ChannelItem, ChannelQuery } from '@/api/notificationChannel'
+import { toDateRangeParams } from '@/utils/dateRange'
 import './index.css'
 
 /** 预定义场景 */

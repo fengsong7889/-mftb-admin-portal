@@ -4,8 +4,8 @@ import dayjs from 'dayjs'
 import { ArrowLeftOutlined, FileTextOutlined, CodeOutlined, DatabaseOutlined, InfoCircleOutlined, BranchesOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router-dom'
-import { fetchVersionDetail } from '../../api/versionHistory'
-import type { VersionHistoryRecord } from '../../api/versionHistory'
+import { fetchVersionDetail } from '@/api/versionHistory'
+import type { VersionHistoryRecord } from '@/api/versionHistory'
 
 const TYPE_COLOR: Record<string, string> = { major: 'red', minor: 'blue', patch: 'green', frontend: 'purple' }
 

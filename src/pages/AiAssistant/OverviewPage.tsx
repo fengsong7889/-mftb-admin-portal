@@ -3,7 +3,7 @@ import { Alert, Button, Empty, Space, Spin, Tag, message } from 'antd'
 import { ReloadOutlined, RightOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { fetchAssistantOverview, type AiAssistantOverview } from '../../api/aiOverview'
+import { fetchAssistantOverview, type AiAssistantOverview } from '@/api/aiOverview'
 import AiAssistantPageShell from './PageShell'
 
 const TYPE_LABEL: Record<string, string> = {

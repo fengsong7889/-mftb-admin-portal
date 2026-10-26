@@ -6,19 +6,19 @@ import { handleTableChangeFactory, renderTimestamp, renderValOrDash, SearchFormA
 import {
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { exportToCSV } from '../../utils/exportCSV'
+import { exportToCSV } from '@/utils/exportCSV'
 import { useNavigate } from 'react-router-dom'
-import RemoteSearchSelect from '../../components/RemoteSearchSelect'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { toDateRangeParams } from '../../utils/dateRange'
-import type { DateRangeValue } from '../../utils/dateRange'
-import type { MerchantGroupItem, MerchantGroupQueryParams } from '../../api/merchantGroup'
+import RemoteSearchSelect from '@/components/RemoteSearchSelect'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { toDateRangeParams } from '@/utils/dateRange'
+import type { DateRangeValue } from '@/utils/dateRange'
+import type { MerchantGroupItem, MerchantGroupQueryParams } from '@/api/merchantGroup'
 import {
   fetchMerchantGroups,
   fetchMerchantGroupOptions,
   fetchMerchantGroupUpdatedByOptions,
   deleteMerchantGroup,
-} from '../../api/merchantGroup'
+} from '@/api/merchantGroup'
 import GroupEditModal from './GroupEditModal'
 
 const { RangePicker } = DatePicker

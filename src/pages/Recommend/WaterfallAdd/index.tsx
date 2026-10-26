@@ -17,7 +17,7 @@ import {
   EditOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import DetailPageHeader from '../../../components/DetailPageHeader'
+import DetailPageHeader from '@/components/DetailPageHeader'
 import { MapContainer, TileLayer, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { 
@@ -31,13 +31,13 @@ import {
   REGION_TREE_DATA,
   AREA_TO_REGIONS,
   ALGORITHM_TYPE_OPTIONS,
-} from '../constants'
+} from '@mftb/contracts/recommendConstants'
 import dayjs from 'dayjs'
 import PopularSkinPricing from './PopularSkinPricing'
 import GoldenSignboardPricing from './GoldenSignboardPricing'
 import TrafficPackagePricing from './TrafficPackagePricing'
-import { fetchAdAlgorithms, fetchAdPricingDetail, createAdPricing, updateAdPricing, fetchAdRevivePricingDetail, createAdRevivePricing, updateAdRevivePricing, fetchAdPricingList, fetchAdRevivePricingList, appTypeToBrand, brandToAppType, type AdPricingStarRequest, type AdPricingReviveRequest } from '../../../api/adPromotion'
-import { fetchStores } from '../../../api/store'
+import { fetchAdAlgorithms, fetchAdPricingDetail, createAdPricing, updateAdPricing, fetchAdRevivePricingDetail, createAdRevivePricing, updateAdRevivePricing, fetchAdPricingList, fetchAdRevivePricingList, appTypeToBrand, brandToAppType, type AdPricingStarRequest, type AdPricingReviveRequest } from '@/api/adPromotion'
+import { fetchStores } from '@/api/store'
 
 /** 解析 JSON 數組字符串（折扣/扣費梯度），失敗返回空數組 */
 function parseJsonList(json?: string): Record<string, unknown>[] {

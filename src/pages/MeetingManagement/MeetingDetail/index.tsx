@@ -25,8 +25,8 @@ import {
   BellOutlined, FileTextOutlined, HistoryOutlined, ProfileOutlined, QrcodeOutlined, ReloadOutlined, SendOutlined, TeamOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import CardTitle from '../../../components/CardTitle'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import CardTitle from '@/components/CardTitle'
 import {
   cancelMeeting,
   checkinMeeting,
@@ -40,7 +40,7 @@ import {
   type MeetingNotifyVO,
   type MeetingAttendeeVO,
   type MeetingVO,
-} from '../../../api/meeting'
+} from '@/api/meeting'
 import {
   attendeeTypeLabels,
   bizTypeLabels,
@@ -52,10 +52,10 @@ import {
   phaseMeta,
   scenarioLabel,
 } from '../meetingMeta'
-import { fetchMinutes, type MinutesVO } from '../../../api/meetingMinutes'
+import { fetchMinutes, type MinutesVO } from '@/api/meetingMinutes'
 import MinutesContentCard from '../MeetingMinutes/MinutesContentCard'
 import { deriveCanRecordMinutes } from '../MeetingMinutes/minutesAccess'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { useTranslation } from 'react-i18next'
 
 /** 详情卡片（§D.3）：白底、8px 圆角、不加 border，阴影统一 0.06 */

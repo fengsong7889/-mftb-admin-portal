@@ -7,7 +7,7 @@
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import BorrowDetail from '../AssetManagement/AssetBorrow/BorrowDetail'
-import { fetchMyBorrowDetail } from '../../api/eamBorrow'
+import { fetchMyBorrowDetail } from '@/api/eamBorrow'
 import { useTransferData } from '../AssetManagement/AssetTransfer/useTransferData'
 
 interface Props {

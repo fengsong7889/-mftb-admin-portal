@@ -10,9 +10,9 @@ import {
   PlusOutlined,
   ExportOutlined,
 } from '@ant-design/icons'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import BrandTag from '../../components/BrandTag'
-import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import BrandTag from '@/components/BrandTag'
+import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '@/constants/brand'
 
 const { RangePicker } = DatePicker
 const { TextArea } = Input

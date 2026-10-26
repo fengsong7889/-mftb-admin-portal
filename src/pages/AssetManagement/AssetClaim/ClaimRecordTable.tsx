@@ -15,11 +15,11 @@
 import { Button, Empty, Table, Tag, Tooltip } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { useTranslation } from 'react-i18next'
-import BrandTag from '../../../components/BrandTag'
-import AssetParameters from '../../../components/AssetParameters'
-import { useAssetParameterCatalog } from '../../../hooks/useAssetParameterCatalog'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { CLAIM_STATUS, SIGNATURE_STATUS, type ClaimPage, type ClaimQuery, type ClaimRow, type ClaimStatus, type SignatureStatus } from './claimViewTypes'
+import BrandTag from '@/components/BrandTag'
+import AssetParameters from '@/components/AssetParameters'
+import { useAssetParameterCatalog } from '@/hooks/useAssetParameterCatalog'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { CLAIM_STATUS, SIGNATURE_STATUS, type ClaimPage, type ClaimQuery, type ClaimRow, type ClaimStatus, type SignatureStatus } from '@/api/claimViewTypes'
 
 const RETURN_CONDITION_LABEL: Record<string, string> = { normal: '正常', damaged: '損壞', lost: '遺失' }
 const RETURN_CONDITION_COLOR: Record<string, string> = { normal: 'success', damaged: 'warning', lost: 'error' }

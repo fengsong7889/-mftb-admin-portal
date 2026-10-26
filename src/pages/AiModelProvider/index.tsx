@@ -11,9 +11,9 @@ import {
   deleteProvider,
   type AiProvider,
   type ProviderQueryParams
-} from '../../api'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { tablePagination } from '../../utils/tableDisplay'
+} from '@/api'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { tablePagination } from '@/utils/tableDisplay'
 
 export default function AiModelProvider() {
   const { t } = useTranslation()

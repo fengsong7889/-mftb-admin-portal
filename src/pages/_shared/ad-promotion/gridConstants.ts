@@ -4,7 +4,7 @@
  */
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
-import { Region, AlgorithmType } from '../../Recommend/constants'
+import { Region, AlgorithmType } from '@mftb/contracts/recommendConstants'
 
 // ─── 商圈 ────────────────────────────────────────────────────────────────────
 

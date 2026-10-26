@@ -34,13 +34,13 @@ import {
   unlockAdReviveCells,
   type AdReviveInventoryVO,
   type AdReviveInventoryCell,
-} from '../../../../api/adPromotion'
-import { fetchStores, type StoreItem } from '../../../../api/store'
-import { fetchFinAccountBalance } from '../../../../api/finance'
-import { fetchGiftAvailableDays } from '../../../../api/gift'
-import { usePaymentRule } from '../../../../hooks/usePaymentRule'
-import { getSystemRuleValue } from '../../../../hooks/useSystemRules'
-import { AlgorithmType, REGION_LABEL_KEY } from '../../../Recommend/constants'
+} from '@/api/adPromotion'
+import { fetchStores, type StoreItem } from '@/api/store'
+import { fetchFinAccountBalance } from '@/api/finance'
+import { fetchGiftAvailableDays } from '@/api/gift'
+import { usePaymentRule } from '@/hooks/usePaymentRule'
+import { getSystemRuleValue } from '@/hooks/useSystemRules'
+import { AlgorithmType, REGION_LABEL_KEY } from '@mftb/contracts/recommendConstants'
 
 export interface UseDayPickerCommonOptions {
   inventoryItem: InventoryItem

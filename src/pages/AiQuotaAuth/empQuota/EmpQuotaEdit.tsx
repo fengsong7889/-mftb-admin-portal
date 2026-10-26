@@ -4,9 +4,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   IdcardOutlined,
 } from '@ant-design/icons'
-import { fetchModels, type AiModel } from '../../../api'
-import { POSITION_SEQUENCE_OPTIONS, POSITION_RANK_OPTIONS, POSITION_SEQUENCE, POSITION_SEQUENCE_TAG_COLOR } from '../../../api/position'
-import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
+import { fetchModels, type AiModel } from '@/api'
+import { POSITION_SEQUENCE_OPTIONS, POSITION_RANK_OPTIONS, POSITION_SEQUENCE, POSITION_SEQUENCE_TAG_COLOR } from '@/api/position'
+import { fetchEmployees, type EmployeeItem } from '@/api/employee'
 import {
   QUOTA_PERIOD_LABEL,
   type QuotaPeriod,
@@ -14,7 +14,7 @@ import {
   type OverLimitAction,
   type Currency,
 } from './empQuotaStore'
-import { fetchPosQuotaDetail, savePosQuota, type PosQuotaRequest } from '../../../api/empQuota'
+import { fetchPosQuotaDetail, savePosQuota, type PosQuotaRequest } from '@/api/empQuota'
 import { EditPageHeader, SectionCard, StatusConfigSection, FormFooter, LoadingSpinner, BasicInfoFormSection, QuotaConfigSection, nowText, fmtQuota } from '../components'
 import { useTranslation } from 'react-i18next'
 

@@ -17,7 +17,7 @@ import {
   fetchCategoryList, fetchBrandList, fetchModelDetail, createModel, updateModel,
   createBrand, updateBrand,
   type AssetCategory, type AssetBrand,
-} from '../../../api/eam'
+} from '@/api/eam'
 
 interface BrandFormValues {
   categoryCode: string

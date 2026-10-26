@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import RequirementStageBar from './RequirementStageBar'
-import { RDM_STATUS } from '../../../constants/rdm'
+import { RDM_STATUS } from '@/constants/rdm'
 
 describe('需求阶段条', () => {
   it('V1/V2：不传推导阶段时仍按需求状态映射（已受理 → PRD 產出）', () => {

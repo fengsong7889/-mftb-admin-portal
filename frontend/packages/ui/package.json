@@ -1,0 +1,12 @@
+{
+  "name": "@mftb/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "共享 UI：组件、与组件强绑定的 hooks、全局样式。只允许依赖 @mftb/contracts、@mftb/i18n、@mftb/platform-client（scripts/check-boundary.mjs 强制）。",
+  "dependencies": {
+    "@mftb/contracts": "*",
+    "@mftb/i18n": "*",
+    "@mftb/platform-client": "*"
+  }
+}

@@ -4,8 +4,8 @@
  * <p>表格、看板、导出三处都必须走这里：历史上看板把 PM 当处理人显示、表格显示流程推演值、
  * 导出又是另一套，同一需求在三个入口给出三个不同的「该找谁」，是口径分裂而非渲染差异。
  */
-import type { RdmHandlerPerson } from '../../api/rdm'
-import { formatEmployee } from '../../utils/employeeDisplay'
+import type { RdmHandlerPerson } from '@/api/rdm'
+import { formatEmployee } from '@/utils/employeeDisplay'
 
 /** 单人文本：姓名（工号）；无工号时只给姓名，不留空括号（admin 等系统账号不显示工号） */
 export function formatPerson(p: { name?: string | null; empNo?: string | null }): string {

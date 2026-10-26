@@ -8,7 +8,7 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
-import { useWorkflowConfig } from '../../hooks/useWorkflowConfig'
+import { useWorkflowConfig } from '@/hooks/useWorkflowConfig'
 import { APPROVAL_TYPE_OPTIONS } from './types'
 import type { WorkflowDefinition } from './types'
 

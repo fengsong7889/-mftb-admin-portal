@@ -3,14 +3,14 @@ import { useTranslation } from 'react-i18next'
 import { Button, Form, Input, InputNumber, Select, Switch, message, Spin, Tag } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, AppstoreOutlined, SettingOutlined, EyeOutlined, CodeOutlined, DollarOutlined, PoweroffOutlined } from '@ant-design/icons'
-import HelpPopover from '../../components/HelpPopover'
+import HelpPopover from '@/components/HelpPopover'
 import {
   getModelById,
   updateModel,
   parseModalities,
   type AiModel,
   type ModelType,
-} from '../../api'
+} from '@/api'
 
 /* ────────────────── 展示常量（与列表页一致） ────────────────── */
 

@@ -12,10 +12,10 @@ import { Button, Empty, Form, Input, Modal, Select, Space, Switch, Table, Tag, T
 import { ExportOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import BrandTag from '../../../components/BrandTag'
-import { exportToCSV } from '../../../utils/exportCSV'
-import type { VehicleQuery } from '../../../api/vehicle'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import BrandTag from '@/components/BrandTag'
+import { exportToCSV } from '@/utils/exportCSV'
+import type { VehicleQuery } from '@/api/vehicle'
 import {
   VEHICLE_STATUS_COLOR, VEHICLE_STATUS_LABEL, VEHICLE_STATUS_OPTIONS, VEHICLE_TYPE_OPTIONS,
 } from '../vehicleMeta'

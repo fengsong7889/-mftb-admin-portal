@@ -20,7 +20,7 @@ import {
 import dayjs from 'dayjs'
 import DetailPageHeader from '@/components/DetailPageHeader'
 import AiRichText from '@/pages/Home/AiRichText'
-import EmployeeSelect from '@/pages/MeetingManagement/EmployeeSelect'
+import EmployeeSelect from '@/components/EmployeeSelect'
 import { fetchDataAuthDepartmentOptions, fetchDataAuthRoleOptions } from '@/api/dataAuthorization'
 import {
   DOC_CONFIDENTIALITY_COLOR, ackDoc, downloadDocAckReceipts, downloadDocAsset, fetchDocAckCoverage,

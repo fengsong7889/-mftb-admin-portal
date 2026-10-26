@@ -20,7 +20,7 @@ import {
   updateUnit,
   type OrgLegalEntity,
   type OrgUnitNode,
-} from '../../../api/hcmOrganization'
+} from '@/api/hcmOrganization'
 
 interface UnitFormValues {
   legalEntityId: number

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button } from 'antd'
 import { useTranslation } from 'react-i18next'
-import { isDirectExec } from '../../../utils/workflowEnabled'
+import { isDirectExec } from '@/utils/workflowEnabled'
 
 interface SuccessModalProps {
   visible: boolean

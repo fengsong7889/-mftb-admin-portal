@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { toPreviewRows, buildGroupBuyPreview, countEmptySlots, type PreviewCandidate } from './previewLayout'
-import type { FixedContentSlot } from './types'
+import type { FixedContentSlot } from '@mftb/contracts/waterfallTypes'
 
 const cand = (id: string, name: string): PreviewCandidate => ({ id, name })
 

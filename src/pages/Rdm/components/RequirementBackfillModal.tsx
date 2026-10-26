@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Alert, DatePicker, Modal } from 'antd'
 import type { Dayjs } from 'dayjs'
-import RemarkTextArea from '../../../components/RemarkTextArea'
-import EmployeeSelect from '../../MeetingManagement/EmployeeSelect'
+import RemarkTextArea from '@/components/RemarkTextArea'
+import EmployeeSelect from '@/components/EmployeeSelect'
 
 /**
  * 存量導入需求批量補錄受理信息彈窗。

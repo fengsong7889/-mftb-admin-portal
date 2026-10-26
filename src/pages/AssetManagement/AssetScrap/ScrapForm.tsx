@@ -15,11 +15,11 @@ import {
 import { SaveOutlined, ExclamationCircleOutlined, InboxOutlined, UserOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import BrandTag from '../../../components/BrandTag'
-import { fetchAssetDetail, createScrapRecord, fetchRepairApplicantOptions, type AssetItem, type RepairApplicantOption } from '../../../api/asset'
-import AssetParameters from '../../../components/AssetParameters'
-import type { OptionItem } from '../../../api/types'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import BrandTag from '@/components/BrandTag'
+import { fetchAssetDetail, createScrapRecord, fetchRepairApplicantOptions, type AssetItem, type RepairApplicantOption } from '@/api/asset'
+import AssetParameters from '@/components/AssetParameters'
+import type { OptionItem } from '@/api/types'
 import {
   ASSET_STATUS_COLOR,
   detailCardStyle,

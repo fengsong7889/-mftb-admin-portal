@@ -26,12 +26,12 @@ import { DeleteOutlined, PlusOutlined, SendOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
-import HelpPopover from '../../components/HelpPopover'
+import HelpPopover from '@/components/HelpPopover'
 import {
   fetchDeliveryItemDetail, fetchAcceptanceRecords, submitAcceptanceRecord,
   type RdmDeliveryItemDetail, type RdmAcceptanceRecordListItem,
   type RdmAcceptanceRecordSubmitForm,
-} from '../../api/rdm'
+} from '@/api/rdm'
 import {
   RDM_ACCEPTANCE_TYPE, RDM_ACCEPTANCE_TYPE_LABEL, RDM_ACCEPTANCE_PATH_LABEL,
   RDM_ACCEPT_STAGE, RDM_ACCEPT_STAGE_LABEL,
@@ -39,7 +39,7 @@ import {
   RDM_DELIVERY_ITEM_STATUS_LABEL, RDM_DELIVERY_ITEM_STATUS_COLOR,
   RDM_SCORE_TIERS,
   RDM_TEST_ENV_LABEL,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import './index.css'
 
 const { TextArea } = Input

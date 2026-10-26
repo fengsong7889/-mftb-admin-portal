@@ -19,11 +19,11 @@ import { fetchEmployees, fetchEmployee, createEmployee, resetEmployeePassword, u
   type SalaryIncomeItem, type SalaryDeductionItem, type SalaryConfigItem,
   type PositionRecordItem, type PositionRecordPayload,
   type ContractItem, type ContractPayload,
-} from '../../../api/employee'
-import { fetchDepartments, DEPT_STATUS, type DepartmentItem } from '../../../api/department'
-import { fetchPositions, POSITION_SEQUENCE_OPTIONS, POSITION_RANK_OPTIONS, type PositionItem } from '../../../api/position'
-import { fetchHrDictOptions, HR_DICT_TYPE, type HrDictOption } from '../../../api/hrDict'
-import { fetchRoles, type RoleItem } from '../../../api/role'
+} from '@/api/employee'
+import { fetchDepartments, DEPT_STATUS, type DepartmentItem } from '@/api/department'
+import { fetchPositions, POSITION_SEQUENCE_OPTIONS, POSITION_RANK_OPTIONS, type PositionItem } from '@/api/position'
+import { fetchHrDictOptions, HR_DICT_TYPE, type HrDictOption } from '@/api/hrDict'
+import { fetchRoles, type RoleItem } from '@/api/role'
 import HrAuditTrail from './HrAuditTrail'
 import {
   HR_OPERATION,
@@ -32,9 +32,9 @@ import {
   hrOperationCodeFromName,
   hrOperationColor,
   hrOperationLabel,
-} from '../../../constants/hrOperation'
-import { useAuth } from '../../../contexts/AuthContext'
-import { countryOptions as permCountryOptions, locationOptions, countryLocationMap } from '../../Permission/types'
+} from '@/constants/hrOperation'
+import { useAuth } from '@/contexts/AuthContext'
+import { countryOptions as permCountryOptions, locationOptions, countryLocationMap } from '@mftb/contracts/menuPermission'
 
 /* ═══════════════════════════════════════════
    类型定义

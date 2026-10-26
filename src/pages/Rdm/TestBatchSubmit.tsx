@@ -18,7 +18,7 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
-import RemoteSearchSelect from '../../components/RemoteSearchSelect'
+import RemoteSearchSelect from '@/components/RemoteSearchSelect'
 import {
   fetchDeliveryItems,
   fetchReqTasks,
@@ -27,9 +27,9 @@ import {
   resolveTestBatchTaskScope,
   submitTestBatch,
   type RdmTestBatchSubmitForm,
-} from '../../api/rdm'
-import { fetchEmployeeIdOptions } from '../../api/employee'
-import { formatRdmReqNo } from '../../constants/rdm'
+} from '@/api/rdm'
+import { fetchEmployeeIdOptions } from '@/api/employee'
+import { formatRdmReqNo } from '@/constants/rdm'
 
 /** 测试环境选项（提测页唯一消费方，故随页定义，不进全局常量） */
 const TEST_ENV_OPTIONS = [

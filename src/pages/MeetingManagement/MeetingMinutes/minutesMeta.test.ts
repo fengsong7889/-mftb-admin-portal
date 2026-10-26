@@ -7,12 +7,12 @@
  * 而不是等下一次加状态时再由用户看见。
  */
 import { beforeEach, describe, expect, it } from 'vitest'
-import i18n from '../../../i18n'
+import i18n from '@/i18n'
 import { minutesStatusMeta, minutesTargetTypeLabels, notifyStatusMeta } from '../meetingMeta'
-import { minutesContentLength, minutesDeliveryTarget, emptyMinutesContent } from '../../../api/meetingMinutes'
-import type { MinutesDeliveryVO } from '../../../api/meetingMinutes'
-import i18nZh from '../../../i18n/locales/zh-TW.json'
-import i18nEn from '../../../i18n/locales/en.json'
+import { minutesContentLength, minutesDeliveryTarget, emptyMinutesContent } from '@/api/meetingMinutes'
+import type { MinutesDeliveryVO } from '@/api/meetingMinutes'
+import i18nZh from '@/i18n/locales/zh-TW.json'
+import i18nEn from '@/i18n/locales/en.json'
 
 /** 后端 MeetingConstants 里纪要批次与明细可能给出的全部取值（加状态必须同步这张表） */
 const SEND_STATUSES = ['pending', 'sending', 'success', 'partial', 'skipped', 'failed']

@@ -4,16 +4,16 @@ import type { TableColumnsType } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import HelpPopover from '../../../components/HelpPopover'
-import { fetchLifecycleEmployeeOptions, HR_LIFECYCLE_TYPE } from '../../../api/hrLifecycle'
-import type { HrEmployeeBrief } from '../../../api/hrLifecycle'
+import HelpPopover from '@/components/HelpPopover'
+import { fetchLifecycleEmployeeOptions, HR_LIFECYCLE_TYPE } from '@/api/hrLifecycle'
+import type { HrEmployeeBrief } from '@/api/hrLifecycle'
 import {
   OFFBOARDING_TASK_STATUS,
   assignOffboardingReceiver,
   fetchOffboardingTasks,
   retryOffboardingTask,
-} from '../../../api/hrOffboarding'
-import type { OffboardingTaskItem } from '../../../api/hrOffboarding'
+} from '@/api/hrOffboarding'
+import type { OffboardingTaskItem } from '@/api/hrOffboarding'
 
 const TASK_TYPE_LABEL_KEY: Record<string, string> = {
   EAM_ASSET_HANDOVER: 'hrOffboarding.type.EAM_ASSET_HANDOVER',

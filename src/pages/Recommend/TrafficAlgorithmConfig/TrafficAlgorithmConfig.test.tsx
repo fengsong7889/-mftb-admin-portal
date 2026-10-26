@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import TrafficAlgorithmConfig from './index'
 import useTrafficAlgorithmForm from './useTrafficAlgorithmForm'
 import { readTrafficParams, TRAFFIC_FIELD_NAMES } from './config'
-import type { AdAlgorithm } from '../../../api/adPromotion'
+import type { AdAlgorithm } from '@/api/adPromotion'
 
 const mocks = vi.hoisted(() => ({
   fetch: vi.fn(), create: vi.fn(), update: vi.fn(), saved: vi.fn(),
@@ -16,8 +16,8 @@ vi.mock('antd', async importOriginal => ({
   ...await importOriginal<typeof import('antd')>(),
   message: { success: vi.fn(), error: vi.fn() },
 }))
-vi.mock('../../../api/adPromotion', async importOriginal => ({
-  ...await importOriginal<typeof import('../../../api/adPromotion')>(),
+vi.mock('@/api/adPromotion', async importOriginal => ({
+  ...await importOriginal<typeof import('@/api/adPromotion')>(),
   fetchAdAlgorithmDetail: mocks.fetch, createAdAlgorithm: mocks.create, updateAdAlgorithm: mocks.update,
 }))
 

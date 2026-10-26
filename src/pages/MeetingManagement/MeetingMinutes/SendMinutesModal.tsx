@@ -14,12 +14,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Modal, Space, Select, Tag, message } from 'antd'
 import { SendOutlined, TeamOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import EmployeeSelect from '../EmployeeSelect'
+import EmployeeSelect from '@/components/EmployeeSelect'
 import {
   fetchMinutesGroups, sendMinutes,
   type MinutesContent, type MinutesGroupOption, type MinutesSendResult,
-} from '../../../api/meetingMinutes'
-import { newMeetingRequestKey, type MeetingVO } from '../../../api/meeting'
+} from '@/api/meetingMinutes'
+import { newMeetingRequestKey, type MeetingVO } from '@/api/meeting'
 import MinutesContentCard from './MinutesContentCard'
 import './minutes.css'
 

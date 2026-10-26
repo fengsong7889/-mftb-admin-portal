@@ -4,12 +4,12 @@ import type { TableColumnsType } from 'antd'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
-import DetailPageHeader from '../../components/DetailPageHeader'
-import { useAuth } from '../../contexts/AuthContext'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   ASSESS_STATUS, PLAN_STATUS, type PerfAssessment, type PerfPlan,
   fetchEvaluatorOptions, fetchPerfPlan, fetchPlanAssessments, reassignEvaluator, submitPerfConfirm,
-} from '../../api/hrPerformance'
+} from '@/api/hrPerformance'
 import {
   ASSESS_STATUS_LABEL_KEY, ASSESS_STATUS_TAG_COLOR, GRADE_LABEL_KEY, PERF_MENU, PLAN_STATUS_LABEL_KEY,
   PLAN_STATUS_TAG_COLOR, PLAN_STAGES, calibrationPath, planFormPath,

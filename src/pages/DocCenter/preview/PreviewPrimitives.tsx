@@ -4,7 +4,7 @@ import { Alert, Button, Empty, Table } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import { useColumnConfig } from '@/hooks/useColumnConfig'
-import EmployeeSelect from '@/pages/MeetingManagement/EmployeeSelect'
+import EmployeeSelect from '@/components/EmployeeSelect'
 import { PREVIEW_PEOPLE, type PreviewRevision } from './previewData'
 
 export function PreviewFormHeader({ title, subtitle, onBack }: { title: string; subtitle: string; onBack: () => void }) {

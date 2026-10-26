@@ -13,7 +13,7 @@ import {
   type DeptOption,
   type ModelConfigItem,
   type DeptAuthGroupDetail,
-} from '../../api'
+} from '@/api'
 import { EditPageHeader, SectionCard, StatusConfigSection, FormFooter, LoadingSpinner, BasicInfoFormSection } from './components'
 import { useTranslation } from 'react-i18next'
 

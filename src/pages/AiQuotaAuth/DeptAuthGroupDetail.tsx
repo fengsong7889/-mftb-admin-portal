@@ -3,13 +3,13 @@ import { useTranslation } from 'react-i18next'
 import { Button, Tag, Spin, Tooltip, message } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AppstoreOutlined, TeamOutlined, EyeOutlined, BarChartOutlined, CheckCircleFilled, CloseCircleFilled } from '@ant-design/icons'
-import DetailPageHeader from '../../components/DetailPageHeader'
+import DetailPageHeader from '@/components/DetailPageHeader'
 import {
   fetchModels,
   getDeptAuthGroupById,
   type AiModel,
   type DeptAuthGroupDetail,
-} from '../../api'
+} from '@/api'
 
 /* ────────────────── 能力常量 ────────────────── */
 

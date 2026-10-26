@@ -3,8 +3,8 @@ import { Button, Form, InputNumber, Spin, message } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { fetchStoreDataConfig, updateStoreDataConfig } from '../../api/store'
-import type { StoreDataConfigPayload } from '../../api/store'
+import { fetchStoreDataConfig, updateStoreDataConfig } from '@/api/store'
+import type { StoreDataConfigPayload } from '@/api/store'
 
 /** 金字招牌數據配置 — 獨立頁面 */
 export default function StoreDataConfig() {

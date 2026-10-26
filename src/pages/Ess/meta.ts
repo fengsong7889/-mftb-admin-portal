@@ -1,4 +1,4 @@
-import { CERT_PICKUP, CERT_STATUS, CERT_TYPE } from '../../api/hrCertificate'
+import { CERT_PICKUP, CERT_STATUS, CERT_TYPE } from '@/api/hrCertificate'
 
 /** 证明类型 → i18n key（与后端 HR 字典 CERT_TYPE code 一致） */
 export const CERT_TYPE_LABEL_KEY: Record<string, string> = {

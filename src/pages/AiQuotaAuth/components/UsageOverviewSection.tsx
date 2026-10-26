@@ -8,7 +8,7 @@ import type { ReactNode } from 'react'
 import { Tag, Progress } from 'antd'
 import { BarChartOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import AnimatedNumber from '../../../components/AnimatedNumber'
+import AnimatedNumber from '@/components/AnimatedNumber'
 import SectionCard from './SectionCard'
 
 interface UsageOverviewSectionProps {

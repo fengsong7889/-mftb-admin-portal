@@ -34,8 +34,10 @@ import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.OaRequestService;
 import com.mftb.admin.service.RdmAccessGuard;
 import com.mftb.admin.service.RdmConfigService;
-import com.mftb.admin.service.RdmDeliveryService;
 import com.mftb.admin.service.RdmDeliveryItemService;
+import com.mftb.admin.service.RdmDeliveryService;
+import com.mftb.admin.service.HrAssignmentQuery;
+import com.mftb.admin.entity.EmpPositionRecord;
 import com.mftb.admin.service.RdmNotifyService;
 import com.mftb.admin.service.RdmPrdTaskService;
 import com.mftb.admin.service.RdmRequirementService;
@@ -168,6 +170,12 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
     private final RdmTaskProgressLogMapper progressLogMapper;
     /** 团队任务视图的数据范围守卫：共同项目成员可见，避免任务台变成全量绩效看板 */
     private final com.mftb.admin.service.RdmTeamScopeService teamScopeService;
+    /**
+     * 当前任职的唯一 as-of 口径：表单「所屬部門」要显示员工最新所在部门。
+     * <p>不能再读 sys_user.department 快照——人事系统改部门只落任职记录（职务变动），
+     * 账号快照不会跟着变，RDM 会一直显示调动前的旧部门。
+     */
+    private final HrAssignmentQuery hrAssignmentQuery;
 
     /* ==================== PRD ==================== */
 
@@ -483,7 +491,7 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
     /**
      * 我的任務 / 管理員全量任務。
      * <p>管理員（{@code operatorResolver.isAdmin}）不受「只看自己」限制；
-     * 非管理員即使傳了 all 也仍按 owner=本人 收斂——数据范围由服务端裁决，前端传值不是授权。
+     * 非管理員即使傳了 all 也仍按 owner=本人收斂——数据范围由服务端裁决，前端传值不是授权。
      * <p>全量上限 500 条，避免一次把整个任务表拉进内存；按计划完成日排序取前 500。
      */
     @Override
@@ -583,7 +591,6 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
             throw new BusinessException("需求尚未通過審批（准入），不能創建或修改任務");
         }
         accessGuard.requireDeliveryWriter(req.getId(), "指派/維護任務");
-        validateTaskForm(dto);
         SysUser current = operatorResolver.currentUser();
         SysUser owner = dto.getOwnerUserId() == null ? null : userMapper.selectById(dto.getOwnerUserId());
         if (dto.getOwnerUserId() != null && owner == null) {
@@ -598,6 +605,9 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
             // 改已有任务时以任务上的需求为准，不信前端传的 reqId（否则可以把任务挂到别人需求下）
             accessGuard.requireDeliveryWriter(task.getReqId(), "編輯任務");
         }
+        // 日期校验放在任务加载之后：只有本次真的改动日期才拦，避免把存量任务的其它编辑
+        // （比如只换负责人）卡在一条历史超期数据上
+        validateTaskForm(dto, req, task);
         // 排期乐观锁快照：记录改前日期/负责人，用于判断是否需要自增 plan_version
         java.time.LocalDate oldPlanStart = task.getPlanStartDate();
         java.time.LocalDate oldPlanFinish = task.getPlanFinishDate();
@@ -623,6 +633,7 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         task.setPlanHours(dto.getPlanHours());
         task.setPlanStartDate(parseDate(dto.getPlanStartDate()));
         task.setPlanFinishDate(parseDate(dto.getPlanFinishDate()));
+        task.setPlanReleaseDate(parseDate(dto.getPlanReleaseDate()));
         /*
          * 归属体系改造：任务迭代继承需求（单一真值源），忽略前端独立传值。
          * 改造前任务表单可选自己的迭代，与需求迭代是两份独立字段——研发侧填的迭代
@@ -746,8 +757,8 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
             return check;
         }
         check.setOwnerName(owner.getName());
-        // 部门快照一并回传：表单的「所屬部門」是派生字段，编辑态也得能带出来
-        check.setDepartment(owner.getDepartment());
+        // 部门取员工最新所在部门（任职记录 as-of 口径）；账号快照只在人事侧不可用时兜底
+        check.setDepartment(resolveLatestDepartment(owner));
         if (isInactive(owner)) {
             check.setAble(false);
             check.setHardBlocked(true);
@@ -759,6 +770,25 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
             check.setWarning(ownerNoPermissionWarning(owner));
         }
         return check;
+    }
+
+    /**
+     * 员工最新所在部门：以任职记录（职务变动）为真值源，账号快照只做兜底。
+     * <p>人事系统调整部门只写 {@code emp_position_record.service_dept}，
+     * {@code sys_user.department} 是建档时的快照、不会随调动回写；
+     * 直接读快照会把调动前的旧部门一直显示在任务表单上（MF00015 实际案例）。
+     */
+    private String resolveLatestDepartment(SysUser user) {
+        try {
+            return hrAssignmentQuery.asOf(user.getId(), LocalDate.now())
+                    .map(EmpPositionRecord::getServiceDept)
+                    .filter(StringUtils::hasText)
+                    .orElse(user.getDepartment());
+        } catch (Exception e) {
+            // 人事侧查询失败不能拦住派活：退回账号快照，并留日志暴露口径降级
+            log.warn("讀取員工最新部門失敗，回退賬號部門快照: userId={}, err={}", user.getId(), e.getMessage());
+            return user.getDepartment();
+        }
     }
 
     @Override
@@ -1622,6 +1652,7 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         vo.setActualHoursReported(task.getActualHours() != null && task.getActualHours().signum() > 0);
         vo.setPlanStartDate(DateTimeUtils.format(task.getPlanStartDate()));
         vo.setPlanFinishDate(DateTimeUtils.format(task.getPlanFinishDate()));
+        vo.setPlanReleaseDate(DateTimeUtils.format(task.getPlanReleaseDate()));
         vo.setActualStartTime(DateTimeUtils.format(task.getActualStartTime()));
         vo.setActualFinishTime(DateTimeUtils.format(task.getActualFinishTime()));
         vo.setBlockedReason(task.getBlockedReason());
@@ -2210,7 +2241,7 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
     }
 
     /** 任务表单硬校验：这些都不拦的话，负载与产能对账会拿到永远对不上的数 */
-    private void validateTaskForm(RdmDeliveryDTO.Task dto) {
+    private void validateTaskForm(RdmDeliveryDTO.Task dto, RdmRequirement req, RdmWorkTask existing) {
         if (dto.getTitle() != null && dto.getTitle().length() > 200) {
             throw new BusinessException("任務標題最長 200 字");
         }
@@ -2227,6 +2258,27 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
         LocalDate finish = parseDate(dto.getPlanFinishDate());
         if (start != null && finish != null && start.isAfter(finish)) {
             throw new BusinessException("計劃開始日不能晚於計劃完成日");
+        }
+        /*
+         * 需求计划上线是拆任务时唯一对外承诺的时间边界。只判断“本次改动的日期”是否越界：
+         * 存量任务可能历史上就晚于上线日，把它挡在“只换负责人”这类无关编辑之外没有意义，
+         * 反而会让 PM 无法收拾旧数据。
+         */
+        LocalDate reqRelease = req == null ? null : req.getPlanReleaseDate();
+        if (reqRelease == null) {
+            return;
+        }
+        boolean newTask = existing == null || existing.getId() == null;
+        LocalDate planRelease = parseDate(dto.getPlanReleaseDate());
+        boolean releaseChanged = newTask || !Objects.equals(existing.getPlanReleaseDate(), planRelease);
+        if (planRelease != null && releaseChanged && planRelease.isAfter(reqRelease)) {
+            throw new BusinessException("任務計劃上線日不得晚於需求計劃上線日（" + reqRelease
+                    + "）；如需延後，請先調整需求計劃上線");
+        }
+        boolean finishChanged = newTask || !Objects.equals(existing.getPlanFinishDate(), finish);
+        if (finish != null && finishChanged && finish.isAfter(reqRelease)) {
+            throw new BusinessException("任務計劃完成日不得晚於需求計劃上線日（" + reqRelease
+                    + "）；如需延後，請先調整需求計劃上線");
         }
     }
 

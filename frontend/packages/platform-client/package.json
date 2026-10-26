@@ -1,0 +1,11 @@
+{
+  "name": "@mftb/platform-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "会话/请求/工具层：api 客户端、AuthContext 等会话上下文、纯工具函数。只允许依赖 @mftb/contracts 与 @mftb/i18n（scripts/check-boundary.mjs 强制）。",
+  "dependencies": {
+    "@mftb/contracts": "*",
+    "@mftb/i18n": "*"
+  }
+}

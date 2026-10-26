@@ -7,13 +7,13 @@ import type { TableColumnsType } from 'antd'
 import { SearchOutlined, ReloadOutlined, ExportOutlined, PlusOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { useAuth } from '../../../contexts/AuthContext'
-import RemoteSearchSelect from '../../../components/RemoteSearchSelect'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
+import RemoteSearchSelect from '@/components/RemoteSearchSelect'
 import {
   fetchInventoryTasks, downloadInventoryCsv, searchInventoryEmployees,
   type InventoryTaskRecord, type InventoryTaskQuery,
-} from '../../../api/eamInventory'
+} from '@/api/eamInventory'
 import { TASK_STATUS_LABEL_KEY, TASK_STATUS_COLOR } from './inventoryMeta'
 
 interface Props {

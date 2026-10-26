@@ -11,7 +11,7 @@ import React from 'react'
 import { Menu } from 'antd'
 import { useTranslation } from 'react-i18next'
 import { AppstoreOutlined, CoffeeOutlined, ShoppingOutlined, ShopOutlined } from '@ant-design/icons'
-import { RECOMMEND_CHANNEL_OPTIONS, RecommendChannel } from '../constants'
+import { RECOMMEND_CHANNEL_OPTIONS, RecommendChannel } from '@mftb/contracts/recommendConstants'
 
 interface ChannelSelectorProps {
   value?: RecommendChannel

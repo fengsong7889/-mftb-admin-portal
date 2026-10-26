@@ -20,12 +20,12 @@ import { Alert, Button, Form, Input, Segmented, Select, Space, Table, Tabs, Tag,
 import type { TableColumnsType } from 'antd'
 import { CheckCircleOutlined, ClockCircleOutlined, ExportOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { rdmTableLocale } from './components/tableLocale'
-import HelpPopover from '../../components/HelpPopover'
+import HelpPopover from '@/components/HelpPopover'
 import { PriorityTag, StatusTag, TypeTag } from './components/Tags'
 import { formatPerson } from './handlerDisplay'
-import { fetchDeliveryItems, fetchRequirementPage, fetchScopeCounts, type RdmDeliveryItemListItem, type RdmRequirementRow } from '../../api/rdm'
+import { fetchDeliveryItems, fetchRequirementPage, fetchScopeCounts, type RdmDeliveryItemListItem, type RdmRequirementRow } from '@/api/rdm'
 import { exportRequirementRows } from './requirementExport'
 import {
   RDM_ACCEPTANCE_PATH_LABEL,
@@ -41,7 +41,7 @@ import {
   RDM_SCOPE,
   RDM_STATUS,
   type RdmScope,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import './index.css'
 
 /** 页签 → 服务端 scope：一一对应，不在前端二次过滤（否则计数与列表必然分叉） */
@@ -518,7 +518,7 @@ export default function AcceptanceList() {
           <Form.Item colon={false}>
             <div className="search-actions">
               <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>{t('common.search')}</Button>
-              <Button onClick={() => { form.resetFields(); setFilters({}) }}>{t('common.reset')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={() => { form.resetFields(); setFilters({}) }}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>

@@ -11,9 +11,9 @@ import { Alert, Button, Form, Input, Modal, Space, Switch, Table, Tag, message }
 import type { TableColumnsType } from 'antd'
 import { EditOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import DetailPageHeader from '../../components/DetailPageHeader'
-import HelpPopover from '../../components/HelpPopover'
-import { fetchNotifyTemplates, saveNotifyTemplate, type NotifyTemplateVO } from '../../api/meetingNotify'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import HelpPopover from '@/components/HelpPopover'
+import { fetchNotifyTemplates, saveNotifyTemplate, type NotifyTemplateVO } from '@/api/meetingNotify'
 
 interface EditorValues {
   titleTpl: string

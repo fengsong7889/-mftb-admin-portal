@@ -1,5 +1,5 @@
 import { message, Upload, type UploadFile } from 'antd'
-import { useCountUp } from '../../../hooks/useCountUp'
+import { useCountUp } from '@/hooks/useCountUp'
 
 /** 数字金额转中文大写 */
 export function amountToChinese(num: number): string {

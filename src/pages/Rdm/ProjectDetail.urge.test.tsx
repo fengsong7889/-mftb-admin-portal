@@ -9,10 +9,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { urgeProject } from '../../api/rdm'
+import { urgeProject } from '@/api/rdm'
 import ProjectDetail from './ProjectDetail'
 
-vi.mock('../../api/rdm', () => ({
+vi.mock('@/api/rdm', () => ({
   fetchProjectDetail: vi.fn(),
   fetchProjectRequirementBoard: vi.fn(),
   urgeProject: vi.fn(),
@@ -23,11 +23,11 @@ vi.mock('../../api/rdm', () => ({
 }))
 
 // 「催辦待辦」按 rdm-dashboard-project:edit 收敛；本文件测催办结果，需给全权限
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => true }),
 }))
 
-import { fetchProjectDetail, fetchProjectRequirementBoard } from '../../api/rdm'
+import { fetchProjectDetail, fetchProjectRequirementBoard } from '@/api/rdm'
 
 const detail = {
   id: 5, projectNo: 'PJ-005', name: '演示項目', objective: '目標', status: 'in_progress',

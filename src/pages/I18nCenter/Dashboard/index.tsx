@@ -8,9 +8,9 @@ import {
   TranslationOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { fetchLanguages, fetchTranslations } from '../../../api/translation'
-import type { LanguageVO, TranslationVO } from '../../../api/translation'
-import { useCountUp } from '../../../hooks/useCountUp'
+import { fetchLanguages, fetchTranslations } from '@/api/translation'
+import type { LanguageVO, TranslationVO } from '@/api/translation'
+import { useCountUp } from '@/hooks/useCountUp'
 
 /* ---- 动画数字组件 ---- */
 function AnimatedNumber({ value }: { value: number }) {

@@ -5,8 +5,8 @@ import { Alert, Button, DatePicker, Descriptions, Form, InputNumber, Spin } from
 import { SaveOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useTranslation } from 'react-i18next'
-import type { BorrowRow } from '../../../api/eamBorrow'
-import AssetParameters from '../../../components/AssetParameters'
+import type { BorrowRow } from '@/api/eamBorrow'
+import AssetParameters from '@/components/AssetParameters'
 import { ReturnHeader, ReturnSection } from '../AssetReturn/ReturnLayout'
 
 interface Values { dueDate: Dayjs; extendDays: number }

@@ -9,9 +9,9 @@ import { Alert, Button, DatePicker, Form, Input, Select, Spin, Modal, message, R
 import { SaveOutlined, DatabaseOutlined, UserOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { ReturnHeader } from '../AssetReturn/ReturnLayout'
-import { AssetSummary } from '../../../components/AssetParameters'
-import type { BorrowRegisterDTO } from '../../../api/eamBorrow'
-import type { ClaimAssetOption, ClaimEmployee, ClaimPage, ClaimQuery } from '../AssetClaim/claimViewTypes'
+import { AssetSummary } from '@/components/AssetParameters'
+import type { BorrowRegisterDTO } from '@/api/eamBorrow'
+import type { ClaimAssetOption, ClaimEmployee, ClaimPage, ClaimQuery } from '@/api/claimViewTypes'
 
 interface Values { assetId: number; holderId: number; department: string; startDate: Dayjs; dueDate: Dayjs; purpose: string }
 

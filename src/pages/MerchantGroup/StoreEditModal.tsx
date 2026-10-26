@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Modal, Form, Input, Select, message, TreeSelect, Checkbox } from 'antd'
 import { useTranslation } from 'react-i18next'
-import type { StoreItem, StorePayload } from '../../api/store'
-import { createStore, updateStore } from '../../api/store'
-import type { MerchantGroupItem } from '../../api/merchantGroup'
-import { fetchAllMerchantGroups } from '../../api/merchantGroup'
-import { BIZ_CHANNEL_OPTIONS } from '../../constants/bizChannel'
-import { STORE_CATEGORY_OPTIONS } from '../../constants/storeCategory'
-import { REGION_TREE_DATA } from '../Recommend/constants'
+import type { StoreItem, StorePayload } from '@/api/store'
+import { createStore, updateStore } from '@/api/store'
+import type { MerchantGroupItem } from '@/api/merchantGroup'
+import { fetchAllMerchantGroups } from '@/api/merchantGroup'
+import { BIZ_CHANNEL_OPTIONS } from '@/constants/bizChannel'
+import { STORE_CATEGORY_OPTIONS } from '@/constants/storeCategory'
+import { REGION_TREE_DATA } from '@mftb/contracts/recommendConstants'
 
 /** 所在区域树：在组件内翻译 titleKey */
 

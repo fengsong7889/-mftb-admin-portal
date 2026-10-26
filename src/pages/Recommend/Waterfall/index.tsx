@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { Button, Space, Table, Tag, Badge, Input, Select, Form, Modal, message, InputNumber, Switch, Descriptions, Divider, Card, Checkbox, Alert, Tabs } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
-import BrandTag from '../../../components/BrandTag'
+import BrandTag from '@/components/BrandTag'
 import { PlusOutlined, SearchOutlined, ReloadOutlined, ArrowLeftOutlined, WalletOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -17,11 +17,11 @@ import {
   REGION_OPTIONS,
   REGION_LABEL_KEY,
   ALGO_CARD_COLOR_MAP,
-} from '../constants'
+} from '@mftb/contracts/recommendConstants'
 import type { WaterfallSlotConfig } from '../types'
-import { fetchAdPricingList, updateAdPricingStatus, deleteAdPricing, fetchAdRevivePricingList, updateAdRevivePricingStatus, deleteAdRevivePricing, fetchAdHotPricingList, updateAdHotPricingStatus, deleteAdHotPricing, updateAdSignboardPricingStatus, deleteAdSignboardPricing, fetchAdSignboardPricingList, fetchAdTrafficPricingList, updateAdTrafficPricingStatus, deleteAdTrafficPricing, fetchAdAlgorithms, brandToAppType, type AdPricingStar, type AdPricingHot, type AdPricingTraffic, type AdAlgorithm } from '../../../api/adPromotion'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { useCardOrder } from '../../../hooks/useCardOrder'
+import { fetchAdPricingList, updateAdPricingStatus, deleteAdPricing, fetchAdRevivePricingList, updateAdRevivePricingStatus, deleteAdRevivePricing, fetchAdHotPricingList, updateAdHotPricingStatus, deleteAdHotPricing, updateAdSignboardPricingStatus, deleteAdSignboardPricing, fetchAdSignboardPricingList, fetchAdTrafficPricingList, updateAdTrafficPricingStatus, deleteAdTrafficPricing, fetchAdAlgorithms, brandToAppType, type AdPricingStar, type AdPricingHot, type AdPricingTraffic, type AdAlgorithm } from '@/api/adPromotion'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { useCardOrder } from '@/hooks/useCardOrder'
 
 /** 投流廣告：後端業務頻道碼(1/2/3) → 列表行業務頻道值 */
 const TRAFFIC_CODE_TO_BIZ: Record<number, string> = {

@@ -9,8 +9,8 @@
  * 幂等由后端保证：唯一键 (user_id, punch_at, source)，重复导入不会长出重复打卡。
  */
 import ExcelJS from 'exceljs'
-import i18n from '../../i18n'
-import type { PunchImportRow } from '../../api/attendance'
+import i18n from '@/i18n'
+import type { PunchImportRow } from '@/api/attendance'
 
 export interface ParsedPunchExcel {
   rows: PunchImportRow[]

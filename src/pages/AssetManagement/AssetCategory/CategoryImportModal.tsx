@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Modal, Upload, Table, Button, Space, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { InboxOutlined, DownloadOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
-import { parseCategoryExcel, generateCategoryImportTemplate, type ParsedCategoryRow } from '../../../utils/categoryImport'
+import { parseCategoryExcel, generateCategoryImportTemplate, type ParsedCategoryRow } from '@/utils/categoryImport'
 
 /**
  * 资产分类批量导入弹窗

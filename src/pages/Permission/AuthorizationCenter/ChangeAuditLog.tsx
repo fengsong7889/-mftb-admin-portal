@@ -11,18 +11,18 @@ import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
-import { fetchRoles } from '../../../api/role'
-import { fetchDepartments } from '../../../api/department'
-import { fetchMenuTree } from '../../../api/menu'
-import type { MenuVO } from '../../../api/menu'
+import { fetchRoles } from '@/api/role'
+import { fetchDepartments } from '@/api/department'
+import { fetchMenuTree } from '@/api/menu'
+import type { MenuVO } from '@/api/menu'
 import {
   fetchPermissionAudit,
   AUDIT_CHANGE_TYPES,
   type PermissionAuditItem,
-} from '../../../api/authorizationCenter'
-import { fetchSystemsCatalog, type SystemCatalogItem } from '../../../api/systemAuthorization'
-import { getSystemDisplayName } from '../../../constants/portalSystems'
-import { translateMenuName } from '../../../i18n/menuNameEn'
+} from '@/api/authorizationCenter'
+import { fetchSystemsCatalog, type SystemCatalogItem } from '@/api/systemAuthorization'
+import { getSystemDisplayName } from '@/constants/portalSystems'
+import { translateMenuName } from '@/i18n/menuNameEn'
 
 const { RangePicker } = DatePicker
 

@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react'
 import { Button, Form, Input, Select, Switch, Tag, message, Spin } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, AppstoreOutlined, IdcardOutlined, PoweroffOutlined } from '@ant-design/icons'
-import { fetchModels, type AiModel } from '../../../api'
-import { POSITION_SEQUENCE_OPTIONS, POSITION_RANK_OPTIONS } from '../../../api/position'
+import { fetchModels, type AiModel } from '@/api'
+import { POSITION_SEQUENCE_OPTIONS, POSITION_RANK_OPTIONS } from '@/api/position'
 import { ModelAuthSection } from './ModelAuthSection'
 import {
   clampModelConfigs,
   type ModelAuthConfig,
 } from './modelAuthCapability'
-import { createPosStrategy, getPosStrategyById, updatePosStrategy } from '../../../api/empAuth'
+import { createPosStrategy, getPosStrategyById, updatePosStrategy } from '@/api/empAuth'
 import { useTranslation } from 'react-i18next'
 
 /**

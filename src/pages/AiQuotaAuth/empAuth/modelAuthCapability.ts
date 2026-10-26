@@ -1,4 +1,4 @@
-import type { AiModel } from '../../../api'
+import type { AiModel } from '@/api'
 
 /**
  * 员工模型权控 - 模型能力顆粒度授權共享模塊

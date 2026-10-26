@@ -8,8 +8,8 @@ import {
   SearchOutlined, ReloadOutlined, EyeOutlined,
   FontSizeOutlined, EnvironmentOutlined,
 } from '@ant-design/icons'
-import BrandTag from '../../components/BrandTag'
-import PhoneMockup from '../../components/PhoneMockup'
+import BrandTag from '@/components/BrandTag'
+import PhoneMockup from '@/components/PhoneMockup'
 
 // ============================
 // 類型定義

@@ -19,12 +19,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { Alert, Button, Result, Spin } from 'antd'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   assignVehicle, confirmTrip, departTrip, directRegister, fetchTodoStats, fetchUseDetail,
   fetchUses, fetchVehicles, returnTrip, toIso,
   type TodoStats,
-} from '../../../api/vehicle'
+} from '@/api/vehicle'
 import { toOrder, toOrders, toVehicleFiles } from '../vehicleAdapter'
 import {
   USE_STATUS,

@@ -1,6 +1,8 @@
 package com.mftb.admin.config;
 
 import com.mftb.admin.constant.SystemCode;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -8,7 +10,9 @@ import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 企業 Agent 控制台：一级「企業 Agent」+ 8 个二级菜单。
@@ -26,6 +30,9 @@ import java.util.List;
 public class AgentPlatformMenuInitializer implements CommandLineRunner {
 
     private static final String VERSION_KEY = "ai:agent-platform-menu-v1.0";
+    /** v1.1：端点批准拆成独立 approve 动作，历史 edit 授权需要一次性补齐。 */
+    static final String VERSION_KEY_APPROVE = "ai:agent-platform-menu-v1.1";
+    private static final ObjectMapper JSON = new ObjectMapper();
     private static final String GROUP_KEY = "agent-platform";
     private static final String MENU_PREFIX = "agent-";
 
@@ -43,7 +50,7 @@ public class AgentPlatformMenuInitializer implements CommandLineRunner {
             new MenuDef("agent-knowledge", "知識授權", "Knowledge ACL", "/agent-knowledge",
                     "ReadOutlined", 4, "[\"view\",\"edit\"]"),
             new MenuDef("agent-data", "數據與端點", "Data & Endpoints", "/agent-data",
-                    "DatabaseOutlined", 5, "[\"view\",\"edit\"]"),
+                    "DatabaseOutlined", 5, "[\"view\",\"edit\",\"approve\"]"),
             new MenuDef("agent-runs", "運行中心", "Runs", "/agent-runs",
                     "PlayCircleOutlined", 6, "[\"view\"]"),
             new MenuDef("agent-evaluation", "評測與發布", "Evaluation & Release", "/agent-evaluation",
@@ -60,6 +67,7 @@ public class AgentPlatformMenuInitializer implements CommandLineRunner {
         if (groupId == null) throw new IllegalStateException("企業 Agent 分组菜单未就绪: " + GROUP_KEY);
         for (MenuDef child : CHILDREN) ensureChild(groupId, child);
         versionTracker.applyOnce(VERSION_KEY, this::grantAdmin, this::verify);
+        versionTracker.applyOnce(VERSION_KEY_APPROVE, this::inheritApproveForEditHolders);
         // 每次启动都校验：verify 只在首次应用时执行，不能当回归闸门
         assertGrouped(groupId);
     }
@@ -99,6 +107,47 @@ public class AgentPlatformMenuInitializer implements CommandLineRunner {
                         + "ON m.menu_key LIKE 'agent-%' AND m.deleted = 0 AND m.status = 1 "
                         + "WHERE r.code = 'admin' AND r.status = 1");
         log.info("企業 Agent 控制台已就绪：{} 个子菜单，admin 授权 {} 行", CHILDREN.size(), roles);
+    }
+
+    /**
+     * 历史角色只被授予 view+edit：菜单 actions 会随种子升级，但角色授权是快照不会自动补，
+     * 不补的话升级后除 admin 外任何人都点不了「批准端點」。这里做一次性幂等补齐。
+     */
+    private void inheritApproveForEditHolders() {
+        Long menuId = jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_menu WHERE menu_key = 'agent-data' AND deleted = 0 LIMIT 1", Long.class);
+        if (menuId == null) return;
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT role_id, actions FROM sys_role_menu WHERE menu_id = ?", menuId);
+        int updated = 0;
+        for (Map<String, Object> row : rows) {
+            List<String> actions = readActions(row.get("actions"));
+            if (!actions.contains("edit") || actions.contains("approve")) continue;
+            List<String> next = new ArrayList<>(actions);
+            next.add("approve");
+            jdbcTemplate.update("UPDATE sys_role_menu SET actions = ? WHERE role_id = ? AND menu_id = ?",
+                    writeActions(next), ((Number) row.get("role_id")).longValue(), menuId);
+            updated++;
+        }
+        log.info("數據與端點已拆出 approve 動作，歷史 edit 授權補齊 {} 條", updated);
+    }
+
+    private static List<String> readActions(Object raw) {
+        if (raw == null) return List.of();
+        try {
+            return JSON.readValue(String.valueOf(raw), new TypeReference<List<String>>() { });
+        } catch (Exception e) {
+            log.warn("角色授權 actions 解析失敗，跳過該行: {}", raw);
+            return List.of();
+        }
+    }
+
+    private static String writeActions(List<String> actions) {
+        try {
+            return JSON.writeValueAsString(actions);
+        } catch (Exception e) {
+            return "[\"view\",\"edit\",\"approve\"]";
+        }
     }
 
     private void verify() {

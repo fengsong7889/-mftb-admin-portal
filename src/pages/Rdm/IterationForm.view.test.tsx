@@ -8,8 +8,8 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import i18n from '../../i18n'
-import { fetchIterations, fetchProjectPage } from '../../api/rdm'
+import i18n from '@/i18n'
+import { fetchIterations, fetchProjectPage } from '@/api/rdm'
 import IterationForm from './IterationForm'
 
 beforeAll(async () => {
@@ -17,11 +17,11 @@ beforeAll(async () => {
 })
 
 // 真实 EmployeeSelect 依赖员工接口；本文件只验证只读态，不需要选人交互
-vi.mock('../MeetingManagement/EmployeeSelect', () => ({
+vi.mock('@/components/EmployeeSelect', () => ({
   default: () => <div data-testid="employee-select" />,
 }))
 
-vi.mock('../../api/rdm', () => ({
+vi.mock('@/api/rdm', () => ({
   fetchIterations: vi.fn(),
   fetchProjectPage: vi.fn(),
   saveIteration: vi.fn(),

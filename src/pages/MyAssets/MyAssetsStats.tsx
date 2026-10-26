@@ -5,7 +5,7 @@
  * value 为 undefined 表示接口未成功返回，显示 — 而非伪造 0。
  */
 import type { ReactNode } from 'react'
-import AnimatedNumber from '../../components/AnimatedNumber'
+import AnimatedNumber from '@/components/AnimatedNumber'
 
 export interface MyAssetsStatItem {
   key: string

@@ -15,7 +15,7 @@ import {
   StopOutlined, ApartmentOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import StatCards, { type StatCardItem } from '../../../components/StatCards'
+import StatCards, { type StatCardItem } from '@/components/StatCards'
 import {
   UNIT_TYPE_OPTIONS,
   deleteUnit,
@@ -23,7 +23,7 @@ import {
   unitTree,
   type OrgLegalEntity,
   type OrgUnitNode,
-} from '../../../api/hcmOrganization'
+} from '@/api/hcmOrganization'
 
 interface Filters {
   legalEntityId?: number

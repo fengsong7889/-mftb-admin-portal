@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button, Card, Select, Tag, Empty, Form } from 'antd'
 import { SearchOutlined, ReloadOutlined, FireOutlined, WifiOutlined } from '@ant-design/icons'
-import { BRAND_OPTIONS as brandOptions } from '../../constants/brand'
+import { BRAND_OPTIONS as brandOptions } from '@/constants/brand'
 
 /** 預覽數據項 */
 interface HotSearchItem {

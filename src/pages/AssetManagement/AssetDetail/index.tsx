@@ -17,12 +17,12 @@ import {
 } from '@ant-design/icons'
 import {
   fetchAssetDetail, fetchTransferAsset, parseAssetImages, type AssetStatus, type AssetItem,
-} from '../../../api/asset'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import BrandTag from '../../../components/BrandTag'
+} from '@/api/asset'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import BrandTag from '@/components/BrandTag'
 import AssetTagBindingSection from '../AssetTag/AssetTagBindingSection'
-import AssetParameters from '../../../components/AssetParameters'
-import { useAuth } from '../../../contexts/AuthContext'
+import AssetParameters from '@/components/AssetParameters'
+import { useAuth } from '@/contexts/AuthContext'
 import { useTransferData } from '../AssetTransfer/useTransferData'
 import { TransferError } from '../AssetTransfer/TransferLayout'
 import { positiveId, resolveTransferFrom } from '../AssetTransfer/transferUtils'

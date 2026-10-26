@@ -1,4 +1,4 @@
-import { AppType, ServiceStatus } from './constants'
+import { AppType, ServiceStatus } from '@mftb/contracts/recommendConstants'
 
 /**
  * 自然流量算法評分配置

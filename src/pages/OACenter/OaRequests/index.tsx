@@ -17,13 +17,13 @@ import {
   PlusOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
-import { useAuth } from '../../../contexts/AuthContext'
-import { fetchOaRequests, checkIsDeptLeader, cancelOaRequest, type OaRequestVO, type OaFlowStatus } from '../../../api/oaRequest'
-import { getApprovalRecords, type ApprovalRecord } from '../../../utils/approvalStore'
-import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
-import { fetchDepartments, type DepartmentItem } from '../../../api/department'
-import { fetchRoles, type RoleItem } from '../../../api/role'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
+import { fetchOaRequests, checkIsDeptLeader, cancelOaRequest, type OaRequestVO, type OaFlowStatus } from '@/api/oaRequest'
+import { getApprovalRecords, type ApprovalRecord } from '@/utils/approvalStore'
+import { fetchEmployees, type EmployeeItem } from '@/api/employee'
+import { fetchDepartments, type DepartmentItem } from '@/api/department'
+import { fetchRoles, type RoleItem } from '@/api/role'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 
 const { RangePicker } = DatePicker
 

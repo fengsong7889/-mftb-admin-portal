@@ -4,12 +4,12 @@ import type { TableColumnsType } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   fetchHrDict, updateHrDictStatus, deleteHrDict,
   HR_DICT_TYPE, type HrDictItem,
-} from '../../../api/hrDict'
+} from '@/api/hrDict'
 
 /** 类型值保持后端编码不变，展示标签随语言切换。 */
 const DICT_TYPES = Object.values(HR_DICT_TYPE)

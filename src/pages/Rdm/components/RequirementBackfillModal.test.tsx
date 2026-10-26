@@ -7,11 +7,11 @@
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import i18n from '../../../i18n'
+import i18n from '@/i18n'
 import RequirementBackfillModal from './RequirementBackfillModal'
 
 // 選人組件會發遠程搜索請求；本測試只驗證補錄表單，不引入網絡依賴
-vi.mock('../../MeetingManagement/EmployeeSelect', () => ({
+vi.mock('@/components/EmployeeSelect', () => ({
   default: () => <input aria-label="employee-select" />,
 }))
 

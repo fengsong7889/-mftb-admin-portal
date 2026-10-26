@@ -4,18 +4,18 @@ import type { TableColumnsType } from 'antd'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
-import { useAuth } from '../../contexts/AuthContext'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   ASSESS_STATUS, INDICATOR_SCORE_MAX, PLAN_STATUS, type PerfAssessment, type PerfPlan,
   calibratePerfAssessment, fetchEvaluatorOptions, fetchPerfCalibration, fetchPerfPlans, fetchPlanGrades,
   reassignEvaluator, submitPerfConfirm,
-} from '../../api/hrPerformance'
+} from '@/api/hrPerformance'
 import {
   ASSESS_STATUS_LABEL_KEY, ASSESS_STATUS_TAG_COLOR, CALIBRATION_STATUS_TABS, GRADE_LABEL_KEY,
   GRADE_ORDER, PERF_MENU,
 } from './meta'
-import { type PerfGradeCount, fetchDistributionGap } from '../../api/hrPerfReport'
+import { type PerfGradeCount, fetchDistributionGap } from '@/api/hrPerfReport'
 import ScoreDrawer from './ScoreDrawer'
 
 interface EvaluatorOption { userId: number; empId: string; name: string; department?: string | null }

@@ -7,21 +7,21 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
-import i18n from '../../i18n'
-import { checkTaskOwner, fetchReqTasks, fetchRequirementDetail, fetchRequirementPage } from '../../api/rdm'
+import i18n from '@/i18n'
+import { checkTaskOwner, fetchReqTasks, fetchRequirementDetail, fetchRequirementPage } from '@/api/rdm'
 import TaskForm from './TaskForm'
 
-vi.mock('../../api/employee', () => ({
+vi.mock('@/api/employee', () => ({
   fetchEmployees: vi.fn(async () => ({ records: [], total: 0 })),
   fetchEmployee: vi.fn(),
 }))
 
-vi.mock('../../api/rdmTaskType', () => ({
+vi.mock('@/api/rdmTaskType', () => ({
   fetchTaskTypeOptions: vi.fn(async () => []),
 }))
 
-vi.mock('../../api/rdm', async () => {
-  const actual = await vi.importActual<typeof import('../../api/rdm')>('../../api/rdm')
+vi.mock('@/api/rdm', async () => {
+  const actual = await vi.importActual<typeof import('@/api/rdm')>('@/api/rdm')
   return {
     ...actual,
     fetchRequirementDetail: vi.fn(),

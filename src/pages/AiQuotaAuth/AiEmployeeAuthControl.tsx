@@ -4,9 +4,9 @@ import { Alert, Button, Form, Input, Modal, Popover, Select, Switch, Table, Tabs
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, SearchOutlined, ReloadOutlined, TeamOutlined, IdcardOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import { fetchModels, type AiModel } from '../../api'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { POSITION_SEQUENCE_OPTIONS, POSITION_RANK_OPTIONS, POSITION_SEQUENCE_TAG_COLOR } from '../../api/position'
+import { fetchModels, type AiModel } from '@/api'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { POSITION_SEQUENCE_OPTIONS, POSITION_RANK_OPTIONS, POSITION_SEQUENCE_TAG_COLOR } from '@/api/position'
 import {
   loadPosRules,
   loadRoleAuthConfigs,
@@ -29,7 +29,7 @@ import {
   deleteRoleAuth,
   type PosStrategyItem,
   type RoleAuthItem,
-} from '../../api/empAuth'
+} from '@/api/empAuth'
 
 /**
  * 员工模型权控 - 两种授权方式融合页

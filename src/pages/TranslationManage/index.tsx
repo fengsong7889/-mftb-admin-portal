@@ -25,12 +25,12 @@ import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
 } from '@ant-design/icons'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   LANG_INFO,
   langNamesOf,
   langSysName,
-} from '../../utils/translationConfig'
+} from '@/utils/translationConfig'
 import {
   fetchTranslations,
   fetchLanguages,
@@ -40,10 +40,10 @@ import {
   createLanguage as createLanguageApi,
   deleteLanguage as deleteLanguageApi,
   machineTranslate as machineTranslateApi,
-} from '../../api/translation'
-import type { TranslationVO, LanguageVO } from '../../api/translation'
+} from '@/api/translation'
+import type { TranslationVO, LanguageVO } from '@/api/translation'
 import { useTranslation } from 'react-i18next'
-import { useCountUp } from '../../hooks/useCountUp'
+import { useCountUp } from '@/hooks/useCountUp'
 
 /* ---- 动画数字组件 ---- */
 function AnimatedNumber({ value }: { value: number }) {

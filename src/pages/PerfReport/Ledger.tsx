@@ -6,17 +6,17 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Column, Pie } from '@ant-design/charts'
 import dayjs from 'dayjs'
-import { useAuth } from '../../contexts/AuthContext'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { exportToCSV } from '../../utils/exportCSV'
+import { useAuth } from '@/contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { exportToCSV } from '@/utils/exportCSV'
 import {
   type PerfAssessment, type PerfCycle, type PerfPlan,
   fetchPerfCycles, fetchPerfPlans,
-} from '../../api/hrPerformance'
+} from '@/api/hrPerformance'
 import {
   type PerfReport, type PerfReportFilter,
   fetchPerfReport, fetchPerfReportDepartments, fetchPerfReportRows,
-} from '../../api/hrPerfReport'
+} from '@/api/hrPerfReport'
 import { GRADE_LABEL_KEY, GRADE_ORDER, GRADE_TAG_COLOR } from '../Performance/meta'
 import { PERF_AUDIT_PATH, PERF_REPORT_MENU } from './meta'
 import ScoreDrawer from '../Performance/ScoreDrawer'

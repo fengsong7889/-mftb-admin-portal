@@ -18,17 +18,17 @@ import {
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import AssetParameters from '../../../components/AssetParameters'
-import RemoteSearchSelect from '../../../components/RemoteSearchSelect'
-import type { OptionItem } from '../../../api/types'
-import { useAuth } from '../../../contexts/AuthContext'
-import { fetchClaimDetail } from '../../../api/eamClaim'
-import type { ClaimRow } from '../AssetClaim/claimViewTypes'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import AssetParameters from '@/components/AssetParameters'
+import RemoteSearchSelect from '@/components/RemoteSearchSelect'
+import type { OptionItem } from '@/api/types'
+import { useAuth } from '@/contexts/AuthContext'
+import { fetchClaimDetail } from '@/api/eamClaim'
+import type { ClaimRow } from '@/api/claimViewTypes'
 import {
   fetchAssetDetail, fetchAssetList, repairAsset, fetchRepairerOptions,
   type AssetItem, type AssetStatus,
-} from '../../../api/asset'
+} from '@/api/asset'
 
 async function fetchRepairerOptionsForSelect(keyword: string): Promise<OptionItem[]> {
   const options = await fetchRepairerOptions(keyword)

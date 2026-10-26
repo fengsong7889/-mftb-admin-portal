@@ -22,8 +22,8 @@ import { Button, DatePicker, Input, InputNumber, Modal, Popover, Slider, Space, 
 import { CaretDownOutlined, CaretRightOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
-import { RDM_TASK_TYPE_COLOR, RDM_ROLE_LABEL, RDM_TASK_STATUS_LABEL, type RdmTaskType, type RdmRoleCode, type RdmTaskStatus } from '../../../constants/rdm'
-import { formatEmployee } from '../../../utils/employeeDisplay'
+import { RDM_TASK_TYPE_COLOR, RDM_ROLE_LABEL, RDM_TASK_STATUS_LABEL, type RdmTaskType, type RdmRoleCode, type RdmTaskStatus } from '@/constants/rdm'
+import { formatEmployee } from '@/utils/employeeDisplay'
 import { clampGanttProgress } from './ganttProgress'
 
 /**

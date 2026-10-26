@@ -15,7 +15,7 @@ import {
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useTranslation } from 'react-i18next'
-import { fetchModels, type AiModel } from '../../api/aiModel'
+import { fetchModels, type AiModel } from '@/api/aiModel'
 import { modelToConfig, type AiGrantDraft, type AiGrantModelConfig } from './aiGrantDraft'
 
 /** 能力字段类型（仅包含布尔能力开关） */

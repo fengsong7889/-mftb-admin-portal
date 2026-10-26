@@ -3,7 +3,7 @@
  * 根據標籤模板配置（配色方案 + 展示字段）實時渲染標籤最終呈現效果，
  * 復用於三處：新增/編輯頁實時預覽、列表卡片視圖、列表表格預覽列。
  */
-import { ASSET_DISPLAY_FIELDS, ASSET_FIELD_SAMPLE_VALUES } from '../../../api/eam'
+import { ASSET_DISPLAY_FIELDS, ASSET_FIELD_SAMPLE_VALUES } from '@/api/eam'
 
 export interface AssetTagPreviewData {
   name?: string

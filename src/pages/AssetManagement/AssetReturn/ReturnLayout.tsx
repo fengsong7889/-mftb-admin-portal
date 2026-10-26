@@ -13,7 +13,7 @@ import { Alert, Button, Descriptions, Empty, Image, Result, Select, Tag, Upload 
 import { FileTextOutlined, SaveOutlined, UploadOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { ClaimFormHeader, ClaimSection } from '../AssetClaim/ClaimLayout'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import type { Evidence } from './returnPreview'
 import '../AssetClaim/index.css'
 import './index.css'

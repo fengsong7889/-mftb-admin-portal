@@ -3,7 +3,7 @@
  */
 import { Alert, Button, Form, Input, Spin } from 'antd'
 import { SaveOutlined } from '@ant-design/icons'
-import type { CompensationRow, WaiveDTO } from '../../../api/eamCompensation'
+import type { CompensationRow, WaiveDTO } from '@/api/eamCompensation'
 import { ReturnHeader, ReturnSection } from '../AssetReturn/ReturnLayout'
 
 interface Values { reason: string }

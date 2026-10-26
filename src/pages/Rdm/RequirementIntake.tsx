@@ -24,7 +24,7 @@
  * 走独立入口（服务端只要求 create），不给员工开产品处理权 edit。
  */
 import RequirementList from './RequirementList'
-import { RDM_SCOPE } from '../../constants/rdm'
+import { RDM_SCOPE } from '@/constants/rdm'
 
 /**
  * 提交侧唯一视角：合并切片。

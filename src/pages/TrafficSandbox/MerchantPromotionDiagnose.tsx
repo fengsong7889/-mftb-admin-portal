@@ -11,15 +11,15 @@ import {
   TrophyOutlined, WarningOutlined,
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
-import RemoteSearchSelect from '../../components/RemoteSearchSelect'
-import StatCards, { type StatCardItem } from '../../components/StatCards'
-import type { OptionItem } from '../../api/types'
+import RemoteSearchSelect from '@/components/RemoteSearchSelect'
+import StatCards, { type StatCardItem } from '@/components/StatCards'
+import type { OptionItem } from '@/api/types'
 import {
   AdOrderStatus, DeliveryStatus, DiagnoseVerdict, SANDBOX_STORE_POOL,
   generateMerchantDiagnose,
   type DiagnoseCheckItem, type DisplayPosition, type MerchantDiagnoseResult, type PurchasedAd,
-} from '../../api/mock/trafficSandboxMock'
-import { REGION_LABEL_KEY, TIME_SLOT_OPTIONS } from '../Recommend/constants'
+} from '@/api/mock/trafficSandboxMock'
+import { REGION_LABEL_KEY, TIME_SLOT_OPTIONS } from '@mftb/contracts/recommendConstants'
 
 /** 訂單狀態 → Tag 顏色與文案 key */
 const ORDER_STATUS_META: Record<AdOrderStatus, { color: string; key: string }> = {

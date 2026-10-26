@@ -1,7 +1,7 @@
 /**
  * 報表頁面共享工具 —— HintReport 與 HotSearchReport 的公共邏輯
  */
-import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
+import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '@/constants/brand'
 
 /* ──────────── 公共選項 ──────────── */
 

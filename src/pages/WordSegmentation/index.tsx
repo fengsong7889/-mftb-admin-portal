@@ -9,7 +9,7 @@ import {
   ExportOutlined,
   ImportOutlined,
 } from '@ant-design/icons'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { useTranslation } from 'react-i18next'
 
 const { RangePicker } = DatePicker

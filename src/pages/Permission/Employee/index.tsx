@@ -5,23 +5,23 @@ import { DownOutlined, PlusOutlined, ExportOutlined, ReloadOutlined, SearchOutli
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import dayjs, { Dayjs } from 'dayjs'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   deleteEmployee,
   fetchRosterEmployees,
   fetchRosterExport,
   logRosterExport,
   resetEmployeePassword,
-} from '../../../api/employee'
-import type { EmployeeItem, EmployeeQuery } from '../../../api/employee'
-import { fetchRoles } from '../../../api/role'
-import type { RoleItem } from '../../../api/role'
-import { DEPT_STATUS, fetchDepartments } from '../../../api/department'
-import type { DepartmentItem } from '../../../api/department'
-import { fetchPositions, POSITION_RANK_OPTIONS, POSITION_SEQUENCE_TAG_COLOR } from '../../../api/position'
-import type { PositionItem } from '../../../api/position'
-import { exportToCSV } from '../../../utils/exportCSV'
+} from '@/api/employee'
+import type { EmployeeItem, EmployeeQuery } from '@/api/employee'
+import { fetchRoles } from '@/api/role'
+import type { RoleItem } from '@/api/role'
+import { DEPT_STATUS, fetchDepartments } from '@/api/department'
+import type { DepartmentItem } from '@/api/department'
+import { fetchPositions, POSITION_RANK_OPTIONS, POSITION_SEQUENCE_TAG_COLOR } from '@/api/position'
+import type { PositionItem } from '@/api/position'
+import { exportToCSV } from '@/utils/exportCSV'
 import EmploymentDiffModal from './EmploymentDiffModal'
 
 

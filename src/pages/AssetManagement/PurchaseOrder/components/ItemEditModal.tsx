@@ -12,7 +12,7 @@ import {
   fetchAllParamTypes, fetchParamValuesByType,
   type AssetModel, type AssetCategory, type AssetBrand,
   type ParamType, type ParamField,
-} from '../../../../api/eam'
+} from '@/api/eam'
 import { buildCategoryTree, type ItemRow } from './utils'
 
 /* ==================== Props ==================== */

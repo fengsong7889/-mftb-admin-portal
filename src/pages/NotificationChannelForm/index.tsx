@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Form, Input, Select, Button, Switch, Space, message, Spin } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
-import { getChannelDetail, createChannel, updateChannel } from '../../api/notificationChannel'
-import type { ChannelSaveDTO } from '../../api/notificationChannel'
+import { getChannelDetail, createChannel, updateChannel } from '@/api/notificationChannel'
+import type { ChannelSaveDTO } from '@/api/notificationChannel'
 
 /** 预定义场景选项 */
 const SCENARIO_OPTIONS = [

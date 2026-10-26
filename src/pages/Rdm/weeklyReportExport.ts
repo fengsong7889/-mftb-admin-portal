@@ -5,8 +5,8 @@
  * 且项目经理拿到的就是页面上确认过的数字 —— 避免「导出与页面不一致」的扯皮。
  */
 import ExcelJS from 'exceljs'
-import type { RdmWeeklyReport } from '../../api/rdm'
-import { formatRdmReqNo } from '../../constants/rdm'
+import type { RdmWeeklyReport } from '@/api/rdm'
+import { formatRdmReqNo } from '@/constants/rdm'
 
 /** 百分比文本 */
 const pct = (v: number) => `${Math.round(v * 100)}%`

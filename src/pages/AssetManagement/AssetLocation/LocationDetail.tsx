@@ -8,8 +8,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { Spin, Descriptions } from 'antd'
 import { HomeOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import { fetchLocationList, type AssetLocation } from '../../../api/eam'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import { fetchLocationList, type AssetLocation } from '@/api/eam'
 
 interface Props {
   id: number

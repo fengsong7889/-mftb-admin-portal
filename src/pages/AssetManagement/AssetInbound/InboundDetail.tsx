@@ -13,9 +13,9 @@ import {
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import BrandTag from '../../../components/BrandTag'
-import { fetchInboundDetail, fetchLocationList, registerExchangeShipment, type InboundBatch, type InboundBatchItem, type AssetLocation } from '../../../api/eam'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import BrandTag from '@/components/BrandTag'
+import { fetchInboundDetail, fetchLocationList, registerExchangeShipment, type InboundBatch, type InboundBatchItem, type AssetLocation } from '@/api/eam'
 
 interface Props {
   batchId: number

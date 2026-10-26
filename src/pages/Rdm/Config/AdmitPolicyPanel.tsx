@@ -21,7 +21,7 @@ import {
   SafetyCertificateOutlined,
   SaveOutlined,
 } from '@ant-design/icons'
-import HelpPopover from '../../../components/HelpPopover'
+import HelpPopover from '@/components/HelpPopover'
 import dayjs from 'dayjs'
 import StatusSwitch from '../components/StatusSwitch'
 import {
@@ -34,9 +34,9 @@ import {
   type RdmIntakeDecision,
   type RdmIntakeMode,
   type RdmIntakePolicy,
-} from '../../../api/rdm'
-import { fetchDepartments } from '../../../api/department'
-import { RDM_REQ_TYPE_LABEL } from '../../../constants/rdm'
+} from '@/api/rdm'
+import { fetchDepartments } from '@/api/department'
+import { RDM_REQ_TYPE_LABEL } from '@/constants/rdm'
 import '../index.css'
 
 const MODE_OPTIONS = (Object.keys(RDM_INTAKE_MODE_LABEL) as RdmIntakeMode[]).map(m => ({

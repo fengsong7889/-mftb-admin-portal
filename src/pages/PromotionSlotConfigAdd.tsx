@@ -4,22 +4,22 @@ import { Button, Form, Input, Select, Space, message, Table, Tag, Switch, Popove
 import type { ColumnsType } from 'antd/es/table'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, PlusOutlined, QuestionCircleOutlined, AppstoreOutlined, UploadOutlined, DownloadOutlined } from '@ant-design/icons'
-import DetailPageHeader from '../components/DetailPageHeader'
+import DetailPageHeader from '@/components/DetailPageHeader'
 import {
   fetchAdAlgorithms, fetchWaterfallDetail, createWaterfall, updateWaterfall,
-} from '../api/adPromotion'
-import { isBackendUnavailable } from '../api/request'
-import type { WaterfallStrategyRequest } from '../api/adPromotion'
-import { fetchWaterfallCategories, fetchCategoryCandidates, fetchCatalogByIds } from '../api/waterfallCatalog'
+} from '@/api/adPromotion'
+import { isBackendUnavailable } from '@/api/request'
+import type { WaterfallStrategyRequest } from '@/api/adPromotion'
+import { fetchWaterfallCategories, fetchCategoryCandidates, fetchCatalogByIds } from '@/api/waterfallCatalog'
 import { parseWaterfallExcel, resolveWaterfallImport, createWaterfallImportTemplate, type WaterfallImportIssue } from './waterfallConfig/waterfallImport'
-import type { WaterfallCategory } from '../api/waterfallCatalog'
+import type { WaterfallCategory } from '@/api/waterfallCatalog'
 import {
   type WaterfallBusinessType, type WaterfallContentType, type WaterfallLayoutColumns,
   type AlgoSlotDraft, type FixedContentSlot, type WaterfallDraft, type WaterfallBizChannel, type WaterfallDisplayCategoryMode, type WaterfallSortMode,
   ALGO_TYPE_LABEL, ALGO_TYPE_COLOR,
   CONTENT_TYPE_OPTIONS, LAYOUT_OPTIONS, BUSINESS_TYPE_LABEL_KEY, BIZ_CHANNEL_OPTIONS,
   serverKey, localKey, getDisplayCategoryMode, GROUP_BUY_CHANNEL, SUPERMARKET_CHANNEL, NATURAL_ALGORITHM_TYPE, DEFAULT_WATERFALL_SORT,
-} from './waterfallConfig/types'
+} from '@mftb/contracts/waterfallTypes'
 import {
   getExtension, setExtension, getLocalStrategy, upsertLocalStrategy,
   buildDraftFromServer, newLocalId,

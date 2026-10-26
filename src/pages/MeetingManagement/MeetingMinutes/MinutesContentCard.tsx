@@ -10,7 +10,7 @@
 import { Space, Tag, Timeline } from 'antd'
 import { useTranslation } from 'react-i18next'
 import type { CSSProperties, ReactNode } from 'react'
-import type { MinutesContent } from '../../../api/meetingMinutes'
+import type { MinutesContent } from '@/api/meetingMinutes'
 
 interface Props {
   content: MinutesContent

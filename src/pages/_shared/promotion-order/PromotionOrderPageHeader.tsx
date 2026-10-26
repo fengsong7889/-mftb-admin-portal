@@ -6,7 +6,7 @@
 import { Button } from 'antd'
 import { ArrowLeftOutlined, ShoppingCartOutlined } from '@ant-design/icons'
 import { RECOMMEND_TYPE_ICON, type RecommendType } from './constants'
-import type { AlgorithmType } from '../../Recommend/constants'
+import type { AlgorithmType } from '@mftb/contracts/recommendConstants'
 
 export interface PromotionOrderPageHeaderProps {
   t: (key: string, opts?: Record<string, unknown>) => string

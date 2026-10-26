@@ -4,10 +4,10 @@ import { Alert, Button, Form, Input, Modal, Popover, Progress, Select, Space, Sw
 import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, SearchOutlined, ReloadOutlined, IdcardOutlined, TeamOutlined, SettingOutlined } from '@ant-design/icons'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { fetchModels, type AiModel } from '../../../api'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { POSITION_SEQUENCE, POSITION_SEQUENCE_TAG_COLOR, POSITION_SEQUENCE_OPTIONS } from '../../../api/position'
-import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
+import { fetchModels, type AiModel } from '@/api'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { POSITION_SEQUENCE, POSITION_SEQUENCE_TAG_COLOR, POSITION_SEQUENCE_OPTIONS } from '@/api/position'
+import { fetchEmployees, type EmployeeItem } from '@/api/employee'
 import {
   usagePercent,
   usageColor,
@@ -29,8 +29,8 @@ import {
   fetchPosQuotas, savePosQuota, deletePosQuota, togglePosQuotaStatus,
   fetchRoleQuotas, deleteRoleQuota, toggleRoleQuotaStatus,
   type PosQuotaVO, type RoleQuotaVO,
-} from '../../../api/empQuota'
-import { fetchEmpQuotas, deleteQuota, type QuotaVO } from '../../../api/quotaConfig'
+} from '@/api/empQuota'
+import { fetchEmpQuotas, deleteQuota, type QuotaVO } from '@/api/quotaConfig'
 
 /**
  * 員工額度 - 兩種額度方式融合頁（對標員工模型權控 AiEmployeeAuthControl）

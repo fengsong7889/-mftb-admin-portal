@@ -12,15 +12,15 @@ import type { TableColumnsType } from 'antd'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useAuth } from '../../../contexts/AuthContext'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { invalidateTaskTypeDict } from '../../../hooks/useTaskTypeDict'
+import { useAuth } from '@/contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { invalidateTaskTypeDict } from '@/hooks/useTaskTypeDict'
 import {
   fetchTaskTypeAll,
   updateTaskTypeStatus,
   RDM_TASK_TYPE_CATEGORY,
   type RdmTaskTypeOption,
-} from '../../../api/rdmTaskType'
+} from '@/api/rdmTaskType'
 import '../index.css'
 
 /** 聚合桶标签（与后端 RdmTaskTypeConfig.CATEGORIES 同源；新增/编辑表单已移入独立页） */

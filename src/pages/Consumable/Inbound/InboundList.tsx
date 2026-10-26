@@ -16,7 +16,7 @@ import {
   type ConsumableInboundOrder, type PurchaseCompany
 } from '@/api/consumable'
 import { useColumnConfig } from '@/hooks/useColumnConfig'
-import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
+import { useCompanyBrand } from '@/contexts/CompanyBrandContext'
 import { INBOUND_TYPE_MAP } from './inboundMeta'
 
 interface Props {

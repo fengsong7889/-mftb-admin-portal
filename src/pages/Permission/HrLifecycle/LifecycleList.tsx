@@ -5,8 +5,8 @@ import { HistoryOutlined, PlusOutlined, ReloadOutlined, RollbackOutlined, Search
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
-import { useAuth } from '../../../contexts/AuthContext'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   HR_LIFECYCLE_LIST_PATH,
   HR_LIFECYCLE_MENU_KEY,
@@ -18,7 +18,7 @@ import {
   HR_LIFECYCLE_STATUS,
   type HrLifecycleItem,
   type HrLifecycleType,
-} from '../../../api/hrLifecycle'
+} from '@/api/hrLifecycle'
 import { STATUS_LABEL_KEY, STATUS_TABS, STATUS_TAG_COLOR, EDITABLE_STATUSES, DIMISSION_TYPE_LABEL_KEY, EXECUTION_LABEL_KEY, EXECUTION_TAG_COLOR } from './meta'
 import OffboardingModal from './OffboardingModal'
 

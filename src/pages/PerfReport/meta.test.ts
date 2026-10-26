@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { APPEAL_OPEN, APPEAL_STATUS, PERF_LOG_ACTION } from '../../api/hrPerfReport'
+import { APPEAL_OPEN, APPEAL_STATUS, PERF_LOG_ACTION } from '@/api/hrPerfReport'
 import {
   APPEAL_STATUS_LABEL_KEY, APPEAL_STATUS_TABS, LOG_ACTION_LABEL_KEY, LOG_ACTION_ORDER,
   PERF_REPORT_MENU, appealPathOfPlan, auditPathOfPlan,

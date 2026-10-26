@@ -13,10 +13,10 @@ import {
   ImportOutlined,
   WalletOutlined,
 } from '@ant-design/icons'
-import { fetchUsageSummary } from '../../api/llmUsage'
-import type { UsageSummary, UsageModelRow, UsageUserRow, CostEntry } from '../../api/llmUsage'
-import AnimatedNumber from '../../components/AnimatedNumber'
-import { tablePagination, costDecimals } from '../../utils/tableDisplay'
+import { fetchUsageSummary } from '@/api/llmUsage'
+import type { UsageSummary, UsageModelRow, UsageUserRow, CostEntry } from '@/api/llmUsage'
+import AnimatedNumber from '@/components/AnimatedNumber'
+import { tablePagination, costDecimals } from '@/utils/tableDisplay'
 
 
 const { RangePicker } = DatePicker

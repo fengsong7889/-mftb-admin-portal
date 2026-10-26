@@ -9,16 +9,16 @@ import {
   MergeCellsOutlined,
   ExportOutlined,
 } from '@ant-design/icons'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import BrandTag from '../../components/BrandTag'
-import { useAuth } from '../../contexts/AuthContext'
-import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import BrandTag from '@/components/BrandTag'
+import { useAuth } from '@/contexts/AuthContext'
+import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '@/constants/brand'
 import {
   fetchFinAccounts,
   freezeFinAccount,
   unfreezeFinAccount,
-} from '../../api/finance'
-import type { FinAccount, FinAccountQuery } from '../../api/finance'
+} from '@/api/finance'
+import type { FinAccount, FinAccountQuery } from '@/api/finance'
 
 /** 账户状态选项（label 为 i18n key，组件内按语言取词） */
 const STATUS_OPTION_KEYS = [

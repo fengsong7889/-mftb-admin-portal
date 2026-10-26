@@ -5,12 +5,12 @@ import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
-import { useAuth } from '../../contexts/AuthContext'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   APPEAL_STATUS, APPEAL_OPEN, type PerfAppeal, fetchPerfAppeals, handlePerfAppeal, revisePerfAppeal,
-} from '../../api/hrPerfReport'
-import { type PerfPlan, fetchPerfPlans, fetchPlanGrades } from '../../api/hrPerformance'
+} from '@/api/hrPerfReport'
+import { type PerfPlan, fetchPerfPlans, fetchPlanGrades } from '@/api/hrPerformance'
 import { GRADE_LABEL_KEY } from '../Performance/meta'
 import {
   APPEAL_STATUS_LABEL_KEY, APPEAL_STATUS_TABS, APPEAL_STATUS_TAG_COLOR, PERF_AUDIT_PATH, PERF_REPORT_MENU,

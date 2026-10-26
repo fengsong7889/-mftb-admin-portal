@@ -6,7 +6,7 @@ import {
   HR_LIFECYCLE_LIST_PATH,
   HR_LIFECYCLE_ROUTE,
   HR_LIFECYCLE_STATUS,
-} from '../../../api/hrLifecycle'
+} from '@/api/hrLifecycle'
 import { EDITABLE_STATUSES, STATUS_TABS, STATUS_TAG_COLOR, TYPE_LABEL_KEY, buildDeptTree } from './meta'
 
 /** 入转调离共享元数据：菜单/路由映射与状态机常量的自洽性（与后端 HrLifecycleConstants 同口径） */

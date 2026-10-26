@@ -19,14 +19,14 @@ import {
 } from 'antd'
 import { ClusterOutlined, ExportOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   createBrand, createModel, createSeries, deleteBrand, deleteModel, deleteSeries,
   fetchBrands, fetchModels, fetchSeries, updateBrand, updateModel, updateSeries,
   type BrandSave, type BrandVO, type ModelSave, type ModelVO, type SeriesSave, type SeriesVO,
-} from '../../../api/vehicleMaster'
+} from '@/api/vehicleMaster'
 import { BODY_TYPE_OPTIONS, ENERGY_TYPE_LABEL } from '../vehicleMeta'
-import RemarkTextArea from '../../../components/RemarkTextArea'
+import RemarkTextArea from '@/components/RemarkTextArea'
 
 type Level = 'brand' | 'series' | 'model'
 

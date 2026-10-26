@@ -14,14 +14,14 @@ import {
   type AiProvider,
   type ModelQueryParams,
   type ModelType,
-} from '../../api'
-import AnimatedNumber from '../../components/AnimatedNumber'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+} from '@/api'
+import AnimatedNumber from '@/components/AnimatedNumber'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   MODEL_TYPE_TAG, MODEL_TYPE_LABEL, MODALITY_TAG, CURRENCY_SYMBOL,
   contextLengthText, CapabilityMatrix, ModalityChips,
 } from './modelDisplayUtils'
-import { tablePagination } from '../../utils/tableDisplay'
+import { tablePagination } from '@/utils/tableDisplay'
 
 /** 统计卡（12.1 标准） */
 const StatCard = ({ icon, value, label, color, bg }: { icon: React.ReactNode; value: React.ReactNode; label: string; color: string; bg: string }) => (

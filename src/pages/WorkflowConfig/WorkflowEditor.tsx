@@ -14,7 +14,7 @@ import {
   SettingOutlined,
   NodeIndexOutlined,
 } from '@ant-design/icons'
-import { useWorkflowConfig } from '../../hooks/useWorkflowConfig'
+import { useWorkflowConfig } from '@/hooks/useWorkflowConfig'
 import {
   APPROVAL_TYPE_OPTIONS,
   APPROVER_TYPE_LABELS,
@@ -24,7 +24,7 @@ import {
 } from './types'
 import type { WorkflowNode, WorkflowDefinition, ApproverConfig, RoutingRule } from './types'
 import { getApproverOptions, loadApproverOptions, resolveApproverLabel } from './options'
-import { saveWorkflowConfig } from '../../api/workflowConfig'
+import { saveWorkflowConfig } from '@/api/workflowConfig'
 import ApproverConfigModal from './ApproverConfigModal'
 import RoutingRuleConfigModal from './RoutingRuleConfigModal'
 

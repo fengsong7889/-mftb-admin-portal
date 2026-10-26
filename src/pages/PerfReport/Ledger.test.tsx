@@ -1,34 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import PerfLedger from './Ledger'
-import { fetchPerfCycles, fetchPerfPlans } from '../../api/hrPerformance'
+import { fetchPerfCycles, fetchPerfPlans } from '@/api/hrPerformance'
 import {
   type PerfReport, fetchPerfReport, fetchPerfReportDepartments, fetchPerfReportRows,
-} from '../../api/hrPerfReport'
-import { exportToCSV } from '../../utils/exportCSV'
+} from '@/api/hrPerfReport'
+import { exportToCSV } from '@/utils/exportCSV'
 
 const { t } = vi.hoisted(() => ({ t: (key: string) => key }))
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t }) }))
 vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn(), useSearchParams: () => [new URLSearchParams()] }))
 vi.mock('@ant-design/charts', () => ({ Pie: () => null, Column: () => null }))
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: (key: string) => key === 'hr-perf-ledger:export' }),
 }))
-vi.mock('../../hooks/useColumnConfig', () => ({
+vi.mock('@/hooks/useColumnConfig', () => ({
   useColumnConfig: () => ({ configComponent: null, applyConfig: (cols: unknown[]) => cols }),
 }))
 vi.mock('../Performance/ScoreDrawer', () => ({ default: () => null }))
 // 两个 api 模块里都有页面依赖的枚举常量，整体替换会让常量变 undefined，
 // 因此保留原模块只覆盖网络函数
-vi.mock('../../api/hrPerformance', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../api/hrPerformance')>()),
+vi.mock('@/api/hrPerformance', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/api/hrPerformance')>()),
   fetchPerfCycles: vi.fn(), fetchPerfPlans: vi.fn(),
 }))
-vi.mock('../../api/hrPerfReport', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../api/hrPerfReport')>()),
+vi.mock('@/api/hrPerfReport', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/api/hrPerfReport')>()),
   fetchPerfReport: vi.fn(), fetchPerfReportRows: vi.fn(), fetchPerfReportDepartments: vi.fn(),
 }))
-vi.mock('../../utils/exportCSV', () => ({ exportToCSV: vi.fn() }))
+vi.mock('@/utils/exportCSV', () => ({ exportToCSV: vi.fn() }))
 
 const row = (id: number) => ({
   id, reqNo: `PH2026${id}`, planId: 3, planName: '2026Q3 复验', userId: id, empNo: `MF${id}`,

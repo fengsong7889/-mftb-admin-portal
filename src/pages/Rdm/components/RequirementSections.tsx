@@ -24,8 +24,8 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import { decideReview, type RdmChangeItem, type RdmDeliverySummary, type RdmPrdItem, type RdmReviewItem, type RdmTaskItem } from '../../../api/rdm'
-import { useTaskTypeDict } from '../../../hooks/useTaskTypeDict'
+import { decideReview, type RdmChangeItem, type RdmDeliverySummary, type RdmPrdItem, type RdmReviewItem, type RdmTaskItem } from '@/api/rdm'
+import { useTaskTypeDict } from '@/hooks/useTaskTypeDict'
 import { formatPerson } from '../handlerDisplay'
 import {
   RDM_CHANGE_STATUS_COLOR,
@@ -47,7 +47,7 @@ import {
   type RdmReviewConclusion,
   type RdmStatus,
   type RdmTaskStatus,
-} from '../../../constants/rdm'
+} from '@/constants/rdm'
 
 /**
  * PRD / 評審可寫的需求狀態：受理之後（含受理當下）、排期之前。
@@ -135,11 +135,13 @@ export function DeliverySummaryBar({ summary }: { summary: RdmDeliverySummary | 
  * <p>完成动作统一去研发交付工作台上报：服务端要求「完成必须带交付说明」，
  * 在这里静默发送只会拿到一个无证据的 100%。
  */
-export function TaskSection({ summary, editable, reqId, canCreate }: {
+export function TaskSection({ summary, editable, reqId, canCreate, reqPlanRelease }: {
   summary: RdmDeliverySummary | null
   editable: boolean
   reqId: number
   canCreate: boolean
+  /** 需求计划上线日：任务计划上线晚于它时标红，让“排到上线后还能交”的错觉当场暴露 */
+  reqPlanRelease?: string | null
 }) {
   const navigate = useNavigate()
   const { t } = useTranslation()
@@ -191,6 +193,18 @@ export function TaskSection({ summary, editable, reqId, canCreate }: {
         /* 逾期由服务端判定（未完成且计划完成日已过），这里只做红色提示，不另算一套口径 */
         <span style={{ whiteSpace: 'nowrap', color: v && r.overdue ? '#CF1322' : v ? '#595959' : '#BFBFBF' }}>{v ?? '-'}</span>
       ),
+    },
+    {
+      title: t('rdm.taskForm.planReleaseColumn', { defaultValue: '計劃上線' }),
+      dataIndex: 'planReleaseDate',
+      key: 'planReleaseDate',
+      width: 116,
+      render: (v: string | null | undefined) => {
+        if (!v) return <span style={{ color: '#BFBFBF' }}>-</span>
+        // 日期是 ISO 定长字符串，字典序即时间序；晚于需求上线说明这条子任务注定赶不上
+        const late = !!reqPlanRelease && v > reqPlanRelease
+        return <span style={{ whiteSpace: 'nowrap', color: late ? '#CF1322' : '#595959' }}>{v}</span>
+      },
     },
     {
       title: '狀態', dataIndex: 'status', key: 'status', width: 96,
@@ -268,7 +282,7 @@ export function TaskSection({ summary, editable, reqId, canCreate }: {
             实测在窄视口下撑破 .rdm-detail-grid 与 main，横向滚动条落到页面上而不是表格里。
             给固定值后表格容器保持父级宽度、由自身 overflow 滚动。
           */
-          <Table<RdmTaskItem> rowKey="id" size="small" columns={columns} dataSource={tasks} pagination={false} scroll={{ x: 1000 }} />
+          <Table<RdmTaskItem> rowKey="id" size="small" columns={columns} dataSource={tasks} pagination={false} scroll={{ x: 1120 }} />
         )}
     </>
   )

@@ -27,7 +27,7 @@ export {
   calcCustomAmount,
 } from '../_shared/ad-promotion/types'
 
-import { BizChannelValue } from '../../constants/bizChannel'
+import { BizChannelValue } from '@/constants/bizChannel'
 
 /** 流量包訂單 */
 export interface TrafficPackageOrder {

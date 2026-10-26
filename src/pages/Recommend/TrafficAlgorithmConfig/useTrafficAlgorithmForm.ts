@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { message, type FormInstance } from 'antd'
 import { useTranslation } from 'react-i18next'
-import { appTypeToBrand, brandToAppType, createAdAlgorithm, fetchAdAlgorithmDetail, updateAdAlgorithm, type AdAlgorithmRequest } from '../../../api/adPromotion'
-import { AlgorithmType } from '../constants'
+import { appTypeToBrand, brandToAppType, createAdAlgorithm, fetchAdAlgorithmDetail, updateAdAlgorithm, type AdAlgorithmRequest } from '@/api/adPromotion'
+import { AlgorithmType } from '@mftb/contracts/recommendConstants'
 import { isParamsObject, readTrafficParams, serializeTrafficParams, TRAFFIC_FIELD_NAMES, type TrafficFormIssue } from './config'
 
 interface Options {

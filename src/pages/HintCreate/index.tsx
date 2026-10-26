@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Modal, Form, Input, Select, Radio, Checkbox, DatePicker, Table, message, Divider } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { BRAND_SHANFENG_LABEL, BRAND_MFOOD_LABEL } from '../../constants/brand'
+import { BRAND_SHANFENG_LABEL, BRAND_MFOOD_LABEL } from '@/constants/brand'
 
 const { RangePicker } = DatePicker
 

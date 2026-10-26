@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import OrderDetail from './OrderDetail'
 import OrderEdit from './OrderEdit'
-import { fetchAllParamTypes, fetchBrandList, fetchCategoryList, fetchModelList, fetchPurchaseOrderDetail, fetchPurchaseRequestDetail, fetchSuppliersDropdown, type PurchaseOrder } from '../../../api/eam'
-import { fetchEmployees } from '../../../api/employee'
+import { fetchAllParamTypes, fetchBrandList, fetchCategoryList, fetchModelList, fetchPurchaseOrderDetail, fetchPurchaseRequestDetail, fetchSuppliersDropdown, type PurchaseOrder } from '@/api/eam'
+import { fetchEmployees } from '@/api/employee'
 
-vi.mock('../../../api/eam')
-vi.mock('../../../api/employee')
-vi.mock('../../../contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () => true }) }))
-vi.mock('../../../contexts/CompanyBrandContext', () => ({
+vi.mock('@/api/eam')
+vi.mock('@/api/employee')
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () => true }) }))
+vi.mock('@/contexts/CompanyBrandContext', () => ({
   useCompanyBrand: () => ({
     brands: [
       { id: 1, code: 'TB', labelZh: '閃蜂', labelEn: 'FlashBee' },

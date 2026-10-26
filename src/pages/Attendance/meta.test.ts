@@ -7,15 +7,15 @@
  * 这里把「码值 → 键 → 五语言译文」整条链锁住。
  */
 import { describe, expect, it } from 'vitest'
-import en from '../../i18n/locales/en.json'
-import ja from '../../i18n/locales/ja.json'
-import ko from '../../i18n/locales/ko.json'
-import ru from '../../i18n/locales/ru.json'
-import zhTW from '../../i18n/locales/zh-TW.json'
+import en from '@/i18n/locales/en.json'
+import ja from '@/i18n/locales/ja.json'
+import ko from '@/i18n/locales/ko.json'
+import ru from '@/i18n/locales/ru.json'
+import zhTW from '@/i18n/locales/zh-TW.json'
 import {
   EXCEPTION_STATUS, EXCEPTION_TYPE, GROUP_TYPE, HOLIDAY_TYPE, MONTHLY_STATUS,
   PUNCH_RESULT, PUNCH_SOURCE, PUNCH_TYPE, SCOPE_TYPE,
-} from '../../api/attendance'
+} from '@/api/attendance'
 import {
   ENABLE_STATUS_TAG_COLOR, EXCEPTION_STATUS_LABEL_KEY, EXCEPTION_STATUS_TAG_COLOR,
   EXCEPTION_TYPE_LABEL_KEY, EXCEPTION_TYPE_TAG_COLOR, GROUP_TYPE_LABEL_KEY,

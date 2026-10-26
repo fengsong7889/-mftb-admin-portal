@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AuditPage from './AuditPage'
-import { fetchConfigChanges } from '../../api/aiAudit'
+import { fetchConfigChanges } from '@/api/aiAudit'
 
 const { translate } = vi.hoisted(() => ({
   translate: (key: string, options?: { defaultValue?: string } | string) =>
@@ -10,10 +10,10 @@ const { translate } = vi.hoisted(() => ({
 }))
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: translate }) }))
-vi.mock('../../components/DetailPageHeader', () => ({
+vi.mock('@/components/DetailPageHeader', () => ({
   default: ({ title }: { title: string }) => <div>{title}</div>,
 }))
-vi.mock('../../api/aiAudit', () => ({ fetchConfigChanges: vi.fn() }))
+vi.mock('@/api/aiAudit', () => ({ fetchConfigChanges: vi.fn() }))
 
 describe('配置變更審計', () => {
   beforeEach(() => {

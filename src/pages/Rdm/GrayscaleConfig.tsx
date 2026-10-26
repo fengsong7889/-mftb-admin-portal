@@ -23,14 +23,14 @@ import { ControlOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/ic
 import { useTranslation } from 'react-i18next'
 import RdmFormHeader from './components/RdmFormHeader'
 import { formatRdmDateTime } from './datetime'
-import HelpPopover from '../../components/HelpPopover'
-import { useAuth } from '../../contexts/AuthContext'
+import HelpPopover from '@/components/HelpPopover'
+import { useAuth } from '@/contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import {
   fetchGrayscaleStatus, updateGlobalFlowFlags, updateProjectFlowFlags,
   type RdmGrayscaleStatus,
-} from '../../api/rdm'
-import { RDM_GRAYSCALE_FLAG_COLOR, RDM_GRAYSCALE_FLAG_LABEL } from '../../constants/rdm'
+} from '@/api/rdm'
+import { RDM_GRAYSCALE_FLAG_COLOR, RDM_GRAYSCALE_FLAG_LABEL } from '@/constants/rdm'
 import './index.css'
 
 /** 0/1/null → 布爾（null=缺行=關閉） */

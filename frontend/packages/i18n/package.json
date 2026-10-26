@@ -1,0 +1,12 @@
+{
+  "name": "@mftb/i18n",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "多语言资源与 i18next 初始化。叶子包：不得依赖任何业务或公共代码（scripts/check-boundary.mjs 强制）。",
+  "exports": {
+    ".": "./src/i18n/index.ts",
+    "./locales/*": "./src/i18n/locales/*",
+    "./package.json": "./package.json"
+  }
+}

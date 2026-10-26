@@ -31,7 +31,7 @@ import {
   RecommendChannel,
   ServiceStatus,
   APP_OPTIONS,
-} from '../constants'
+} from '@mftb/contracts/recommendConstants'
 import {
   fetchAdAlgorithms,
   appTypeToBrand,
@@ -40,7 +40,7 @@ import {
   createAdSignboardPricing,
   updateAdSignboardPricing,
   fetchAdSignboardPricingList,
-} from '../../../api/adPromotion'
+} from '@/api/adPromotion'
 import { svgDataUrl, cardShellStyle, cardTitle, type CancelFeeRule } from './components/shared'
 
 /* ──────────────── 常量 ──────────────── */

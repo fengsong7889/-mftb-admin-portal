@@ -4,7 +4,7 @@
 import { Alert, Button, DatePicker, Form, Input, InputNumber, Spin, message } from 'antd'
 import { SaveOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
-import type { CompensationRow, PaymentDTO } from '../../../api/eamCompensation'
+import type { CompensationRow, PaymentDTO } from '@/api/eamCompensation'
 import { ReturnHeader, ReturnSection } from '../AssetReturn/ReturnLayout'
 
 function formatMoney(cents: number): string {

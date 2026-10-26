@@ -11,11 +11,11 @@ import {
   SmileOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import BrandTag from '../../components/BrandTag'
-import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
-import { fetchAdAlgorithms } from '../../api/adPromotion'
-import { fetchStores } from '../../api/store'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import BrandTag from '@/components/BrandTag'
+import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '@/constants/brand'
+import { fetchAdAlgorithms } from '@/api/adPromotion'
+import { fetchStores } from '@/api/store'
 
 const { RangePicker } = DatePicker
 

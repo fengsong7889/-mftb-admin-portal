@@ -29,16 +29,16 @@ import {
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
-import { useAuth } from '../../../contexts/AuthContext'
-import type { PortalSystem } from '../../../api/portal'
+import { useAuth } from '@/contexts/AuthContext'
+import type { PortalSystem } from '@/api/portal'
 import {
   fetchMySystemAccessRequests, fetchRequestableSystems, fetchSelfServiceRoles,
   submitSystemAccessRequest,
   type SystemAccessAttachment, type SystemAccessDurationType, type SystemAccessRoleOption,
-} from '../../../api/systemAccessRequest'
-import { getSystemDisplayName } from '../../../constants/portalSystems'
-import { SYSTEM_ACCESS_SCENARIOS, getScenarioLabel } from '../../../constants/systemAccess'
-import HelpPopover from '../../../components/HelpPopover'
+} from '@/api/systemAccessRequest'
+import { getSystemDisplayName } from '@/constants/portalSystems'
+import { SYSTEM_ACCESS_SCENARIOS, getScenarioLabel } from '@/constants/systemAccess'
+import HelpPopover from '@/components/HelpPopover'
 
 /** 凭证数量上限（与后端 SystemAccessConstants.MAX_ATTACHMENTS 一致） */
 const ATTACHMENT_MAX_COUNT = 5

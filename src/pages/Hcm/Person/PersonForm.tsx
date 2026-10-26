@@ -29,7 +29,7 @@ import {
   type Person,
   type PersonLifecycleItem,
   type PersonProfileItem,
-} from '../../../api/hcmPerson'
+} from '@/api/hcmPerson'
 import { CardTitle, FormHeader, UpdatedFooter, cardStyle, formatTimestamp, grid3 } from '../Organization/shared'
 
 /** 异动类型标签（与后端 HrLifecycleConstants 的取值逐字对应） */

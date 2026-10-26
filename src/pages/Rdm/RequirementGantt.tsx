@@ -31,7 +31,7 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import { useAuth } from '../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   fetchRdmGantt,
   reportTask,
@@ -41,9 +41,9 @@ import {
   type RdmGanttRequirement,
   type RdmGanttTask,
   type RdmTaskPlanItem,
-} from '../../api/rdm'
-import { RDM_ROLE_LABEL, type RdmRoleCode } from '../../constants/rdm'
-import { useTaskTypeDict } from '../../hooks/useTaskTypeDict'
+} from '@/api/rdm'
+import { RDM_ROLE_LABEL, type RdmRoleCode } from '@/constants/rdm'
+import { useTaskTypeDict } from '@/hooks/useTaskTypeDict'
 import GanttBoard, { type GanttRow, type GanttDraft, type GanttTask } from './components/GanttBoard'
 import './index.css'
 

@@ -12,8 +12,8 @@ import { SearchOutlined, ReloadOutlined, PlusOutlined, ExportOutlined } from '@a
 import { useTranslation } from 'react-i18next'
 import {
   fetchSupplierList, deleteSupplier, toggleSupplierStatus, type EamSupplier,
-} from '../../../api/eam'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+} from '@/api/eam'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import '../AssetCategory/index.css'
 
 type SupplierRow = EamSupplier

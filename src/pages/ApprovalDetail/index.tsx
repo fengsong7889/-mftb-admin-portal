@@ -24,9 +24,9 @@ import {
   SafetyCertificateOutlined,
   ShoppingCartOutlined,
 } from '@ant-design/icons'
-import DetailPageHeader from '../../components/DetailPageHeader'
-import { translateMenuName } from '../../i18n/menuNameEn'
-import BrandTag from '../../components/BrandTag'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import { translateMenuName } from '@/i18n/menuNameEn'
+import BrandTag from '@/components/BrandTag'
 import './ApprovalDetail.css'
 import {
   approveCurrentNode,
@@ -37,34 +37,34 @@ import {
   hasNodeApprovalRole,
   getRequiredApprovalRole,
   APPROVAL_NODE_LABELS,
-} from '../../utils/approvalStore'
+} from '@/utils/approvalStore'
 import {
   fetchFinApprovalDetail,
   approveFinApproval,
   rejectFinApproval,
   cancelFinApproval,
-} from '../../api/finance'
-import type { FinApproval } from '../../api/finance'
-import { fetchOaRequestDetail, approveOaRequest, rejectOaRequest, cancelOaRequest, submitDraftOaRequest, type OaRequestVO } from '../../api/oaRequest'
-import { fetchCategoryList } from '../../api/eam'
+} from '@/api/finance'
+import type { FinApproval } from '@/api/finance'
+import { fetchOaRequestDetail, approveOaRequest, rejectOaRequest, cancelOaRequest, submitDraftOaRequest, type OaRequestVO } from '@/api/oaRequest'
+import { fetchCategoryList } from '@/api/eam'
 import AiApprovalActionPanel from './AiApprovalActionPanel'
 import SystemAccessApprovalPanel from './SystemAccessApprovalPanel'
-import { getDurationLabel, getScenarioLabel } from '../../constants/systemAccess'
+import { getDurationLabel, getScenarioLabel } from '@/constants/systemAccess'
 import {
   fetchSystemAccessRequestByFlow, fetchSystemAccessGrantOptions,
   type SystemAccessRequestVO, type SystemAccessGrantOption, type SystemAccessAttachment,
-} from '../../api/systemAccessRequest'
+} from '@/api/systemAccessRequest'
 import {
   type AiGrantDraft,
   emptyGrantDraft,
   validateGrantDraft,
   buildApprovePayload,
 } from './aiGrantDraft'
-import { fetchModels } from '../../api/aiModel'
+import { fetchModels } from '@/api/aiModel'
 import { useTranslation } from 'react-i18next'
-import type { EmployeeItem } from '../../api/employee'
-import type { DepartmentItem } from '../../api/department'
-import type { RoleItem } from '../../api/role'
+import type { EmployeeItem } from '@/api/employee'
+import type { DepartmentItem } from '@/api/department'
+import type { RoleItem } from '@/api/role'
 import { mockDetails, toDetailData, buildAiAccessTimeline, str } from './approvalDetailUtils'
 import type { ApprovalTimelineItem, ApprovalDetailData } from './approvalDetailUtils'
 
@@ -190,9 +190,9 @@ export default function ApprovalDetail() {
 
   useEffect(() => {
     Promise.all([
-      import('../../api/employee').then(m => m.fetchEmployees({ page: 1, size: 200, employmentStatus: 'active' })).catch(() => ({ records: [], total: 0 })),
-      import('../../api/department').then(m => m.fetchDepartments()).catch(() => []),
-      import('../../api/role').then(m => m.fetchRoles()).catch(() => []),
+      import('@/api/employee').then(m => m.fetchEmployees({ page: 1, size: 200, employmentStatus: 'active' })).catch(() => ({ records: [], total: 0 })),
+      import('@/api/department').then(m => m.fetchDepartments()).catch(() => []),
+      import('@/api/role').then(m => m.fetchRoles()).catch(() => []),
     ]).then(([empRes, depts, roles]) => {
       employeesRef.current = (empRes as { records: EmployeeItem[] }).records || []
       departmentsRef.current = (depts as DepartmentItem[]) || []

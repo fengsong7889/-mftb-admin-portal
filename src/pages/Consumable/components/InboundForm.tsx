@@ -6,12 +6,12 @@
  */
 import { useState, useEffect } from 'react'
 import { Button, Form, InputNumber, Select, Modal, message, Space, Spin } from 'antd'
-import RemarkTextArea from '../../../components/RemarkTextArea'
+import RemarkTextArea from '@/components/RemarkTextArea'
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
 import {
   fetchConsumableItemOptions, inboundConsumable, type ConsumableItem,
-} from '../../../api/consumable'
-import { fetchLocationList, type AssetLocation } from '../../../api/eam'
+} from '@/api/consumable'
+import { fetchLocationList, type AssetLocation } from '@/api/eam'
 
 interface FormValues {
   itemId: number

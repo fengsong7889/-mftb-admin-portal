@@ -6,9 +6,9 @@ import {
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import { useAuth } from '../../../contexts/AuthContext'
-import { approveOaRequest, cancelOaRequest, fetchOaRequestDetail, rejectOaRequest, type OaRequestVO } from '../../../api/oaRequest'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import { useAuth } from '@/contexts/AuthContext'
+import { approveOaRequest, cancelOaRequest, fetchOaRequestDetail, rejectOaRequest, type OaRequestVO } from '@/api/oaRequest'
 import {
   HR_LIFECYCLE_LIST_PATH,
   HR_LIFECYCLE_MENU_KEY,
@@ -16,14 +16,14 @@ import {
   fetchLifecycleRequest,
   type HrLifecycleItem,
   type HrLifecycleType,
-} from '../../../api/hrLifecycle'
+} from '@/api/hrLifecycle'
 import {
   LEAVE_DETAIL_PATH, LEAVE_PROCESS_CODE, fetchLeaveDetail, type LeaveRequestItem,
-} from '../../../api/hrLeave'
+} from '@/api/hrLeave'
 import {
   CERT_DETAIL_PATH, CERT_PROCESS_CODE, fetchCertificateDetail,
   type CertificateItem,
-} from '../../../api/hrCertificate'
+} from '@/api/hrCertificate'
 import {
   CERT_LANG_LABEL_KEY, CERT_STATUS_LABEL_KEY, CERT_STATUS_TAG_COLOR,
   CERT_TYPE_LABEL_KEY,

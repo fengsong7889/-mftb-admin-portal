@@ -1,7 +1,7 @@
 import { pinyin } from 'pinyin-pro'
-import type { QuotaSource } from '../../api/aiMyCenter'
-import type { MenuVO } from '../../api/menu'
-import { resolveMenuPath } from '../../constants/menuDataSource'
+import type { QuotaSource } from '@/api/aiMyCenter'
+import type { MenuVO } from '@/api/menu'
+import { resolveMenuPath } from '@/constants/menuDataSource'
 
 /* ── 类型定义 ── */
 

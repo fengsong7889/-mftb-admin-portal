@@ -80,6 +80,8 @@ public class RdmDeliveryDTO {
         private BigDecimal planHours;
         private String planStartDate;
         private String planFinishDate;
+        /** yyyy-MM-dd：任务计划上线日，不得晚于需求计划上线日 */
+        private String planReleaseDate;
         private String iterationCode;
     }
 

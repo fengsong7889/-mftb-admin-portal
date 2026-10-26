@@ -1,8 +1,8 @@
 import { useEffect } from 'react'
 import { Modal, Form, Input, message } from 'antd'
 import { useTranslation } from 'react-i18next'
-import type { MerchantGroupItem, MerchantGroupPayload } from '../../api/merchantGroup'
-import { createMerchantGroup, updateMerchantGroup } from '../../api/merchantGroup'
+import type { MerchantGroupItem, MerchantGroupPayload } from '@/api/merchantGroup'
+import { createMerchantGroup, updateMerchantGroup } from '@/api/merchantGroup'
 
 interface GroupEditModalProps {
   open: boolean

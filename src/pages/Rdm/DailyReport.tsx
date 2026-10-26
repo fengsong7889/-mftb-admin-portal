@@ -10,7 +10,7 @@ import {
   RightOutlined,
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
-import { fetchDailyReportSnapshot, type DailyReportSnapshot, type DailyReportProject, type DailyReportIteration } from '../../api/rdmDailyReport'
+import { fetchDailyReportSnapshot, type DailyReportSnapshot, type DailyReportProject, type DailyReportIteration } from '@/api/rdmDailyReport'
 
 /**
  * 移動端日報頁（釘釘通知連結的落地頁）。

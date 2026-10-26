@@ -10,7 +10,7 @@ import {
   AuditOutlined,
   BankOutlined,
 } from '@ant-design/icons'
-import DetailPageHeader from '../../components/DetailPageHeader'
+import DetailPageHeader from '@/components/DetailPageHeader'
 import type { HcmDemo, HcmSystemBlueprint } from './blueprint'
 
 const cardStyle: React.CSSProperties = {

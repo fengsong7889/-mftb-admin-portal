@@ -4,7 +4,7 @@
  * 從組件文件抽離的純邏輯：草稿構造 / 提交校驗 / 後端審批即授權請求體組裝，
  * 供 AiApprovalActionPanel 與 ApprovalDetail 頁面複用。
  */
-import type { AiModel } from '../../api/aiModel'
+import type { AiModel } from '@/api/aiModel'
 
 /** AI 審批授權請求體（與後端 OaRequestService.approve 的 formData 結構一致） */
 export interface ApproveAiRequest {

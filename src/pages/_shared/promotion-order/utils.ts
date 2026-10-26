@@ -3,8 +3,8 @@
  */
 
 import dayjs from 'dayjs'
-import { AppType, RecommendChannel, Region } from '../../Recommend/constants'
-import { fetchAdOrders, brandToAppType, MEAL_SLOT_TIME_LABEL, type AdOrder, type DateSlotGroup } from '../../../api/adPromotion'
+import { AppType, RecommendChannel, Region } from '@mftb/contracts/recommendConstants'
+import { fetchAdOrders, brandToAppType, MEAL_SLOT_TIME_LABEL, type AdOrder, type DateSlotGroup } from '@/api/adPromotion'
 import { RecommendType } from './constants'
 import { OrderStatus, type OrderOperatorType } from './enums'
 import type { BaseOrderItem } from './types'

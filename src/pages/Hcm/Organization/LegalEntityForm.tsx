@@ -16,7 +16,7 @@ import {
   getLegalEntity,
   updateLegalEntity,
   type OrgLegalEntity,
-} from '../../../api/hcmOrganization'
+} from '@/api/hcmOrganization'
 
 const cardStyle: React.CSSProperties = {
   border: '1px solid #e8eaed',

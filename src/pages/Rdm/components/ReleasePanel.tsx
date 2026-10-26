@@ -29,7 +29,7 @@ import {
   fetchReleases,
   type RdmReleaseCheck,
   type RdmReleaseGate,
-} from '../../../api/rdm'
+} from '@/api/rdm'
 import {
   RDM_RELEASE_ENV_LABEL,
   RDM_RELEASE_STATUS,
@@ -39,7 +39,7 @@ import {
   RDM_TERMINAL_STATUS,
   type RdmReleaseStatus,
   type RdmStatus,
-} from '../../../constants/rdm'
+} from '@/constants/rdm'
 
 interface ReleasePanelProps {
   reqId: number

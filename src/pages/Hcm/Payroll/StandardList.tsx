@@ -11,13 +11,13 @@ import type { ColumnsType } from 'antd/es/table'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   CHANGE_TYPE_OPTIONS,
   deleteStandard,
   listStandards,
   type PayrollSalaryStandard,
-} from '../../../api/payroll'
+} from '@/api/payroll'
 
 export default function HcmPayrollStandardList() {
   const { t } = useTranslation()

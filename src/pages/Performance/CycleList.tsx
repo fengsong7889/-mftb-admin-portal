@@ -5,11 +5,11 @@ import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import dayjs, { type Dayjs } from 'dayjs'
-import { useAuth } from '../../contexts/AuthContext'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   CYCLE_STATUS, CYCLE_TYPE, type PerfCycle, changePerfCycleStatus, createPerfCycle, fetchPerfCycles, updatePerfCycle,
-} from '../../api/hrPerformance'
+} from '@/api/hrPerformance'
 import {
   CYCLE_STATUS_LABEL_KEY, CYCLE_STATUS_TABS, CYCLE_STATUS_TAG_COLOR, CYCLE_TYPE_LABEL_KEY, CYCLE_TYPE_ORDER,
   PERF_MENU, PERF_PLAN_PATH, PERF_TEMPLATE_PATH,

@@ -6,11 +6,11 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   fetchLeaveDetail, fetchLeaveEmployeeOptions, fetchLeaveQuota, saveAndSubmitLeave, saveLeaveDraft,
   updateLeaveRequest, type LeaveEmployeeOption, type LeaveQuotaInfo,
-} from '../../../api/hrLeave'
+} from '@/api/hrLeave'
 import {
   HR_LEAVE_SCOPE, LEAVE_TYPE_LABEL_KEY, LEAVE_TYPE_ORDER, leaveDetailPath, type LeaveScope,
 } from './meta'

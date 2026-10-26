@@ -22,11 +22,11 @@ import {
   ReloadOutlined, RollbackOutlined, SafetyCertificateOutlined, ThunderboltOutlined,
 } from '@ant-design/icons'
 import RdmFormHeader from './components/RdmFormHeader'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { rdmTableLocale } from './components/tableLocale'
 import { deriveRdmColumnMeta } from './rdmColumnMeta'
 import { formatRdmDateTime } from './datetime'
-import { useAuth } from '../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import {
   confirmMigrationBatch, executeMigrationChunk, fetchMigrationBatchDetail, fetchMigrationBatches,
@@ -34,11 +34,11 @@ import {
   type RdmMigrationBatchDetail, type RdmMigrationChunkResult, type RdmMigrationItemDetail,
   type RdmMigrationItemPreview, type RdmMigrationPreviewResult, type RdmMigrationReconcileResult,
   type RdmMigrationRollbackResult,
-} from '../../api/rdm'
+} from '@/api/rdm'
 import {
   RDM_STOCK_MIGRATION_BATCH_STATUS, RDM_STOCK_MIGRATION_BATCH_STATUS_COLOR, RDM_STOCK_MIGRATION_BATCH_STATUS_LABEL,
   RDM_STOCK_MIGRATION_ITEM_STATUS_COLOR, RDM_STOCK_MIGRATION_ITEM_STATUS_LABEL,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import './index.css'
 
 const { TextArea } = Input

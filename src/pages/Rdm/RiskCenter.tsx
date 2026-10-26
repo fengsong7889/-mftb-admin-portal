@@ -24,10 +24,10 @@ import {
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import StatCards from '../../components/StatCards'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { fetchDashboard, fetchRiskSummary, type RdmDashboardData, type RdmRiskItem, type RdmRiskSummary } from '../../api/rdm'
-import { formatEmployee } from '../../utils/employeeDisplay'
+import StatCards from '@/components/StatCards'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { fetchDashboard, fetchRiskSummary, type RdmDashboardData, type RdmRiskItem, type RdmRiskSummary } from '@/api/rdm'
+import { formatEmployee } from '@/utils/employeeDisplay'
 import {
   RDM_RISK_COLOR,
   RDM_RISK_LABEL,
@@ -36,7 +36,7 @@ import {
   formatRdmReqNo,
   type RdmRiskType,
   type RdmStatus,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import './index.css'
 
 /** 停留天数阈值选项：0 表示看全部风险，不做时长筛选 */
@@ -250,7 +250,7 @@ export default function RiskCenter() {
           <Form.Item colon={false}>
             <div className="search-actions">
               <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>{t('common.search')}</Button>
-              <Button onClick={() => { form.resetFields(); setFilters({}) }}>{t('common.reset')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={() => { form.resetFields(); setFilters({}) }}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>

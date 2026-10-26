@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { fetchMerchantGroupOptions } from '../../../api/merchantGroup'
-import type { OptionItem } from '../../../api/types'
+import { fetchMerchantGroupOptions } from '@/api/merchantGroup'
+import type { OptionItem } from '@/api/types'
 import type { UploadFile } from 'antd'
 
 /**

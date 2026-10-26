@@ -11,7 +11,7 @@ import { useState } from 'react'
 import { Button, Image, Tooltip } from 'antd'
 import { FileOutlined, PictureOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { fetchAcceptanceEvidence, type RdmAcceptanceEvidenceMeta } from '../../../api/rdm'
+import { fetchAcceptanceEvidence, type RdmAcceptanceEvidenceMeta } from '@/api/rdm'
 
 interface EvidenceThumbProps {
   /** 证据所属需求 id：取正文接口按需求做可见权与归属校验 */

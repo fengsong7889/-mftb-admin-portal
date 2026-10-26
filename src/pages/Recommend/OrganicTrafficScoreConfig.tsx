@@ -7,7 +7,7 @@ import AlgorithmSection from './AlgorithmForm/AlgorithmSection'
 import ScoreRow from './AlgorithmForm/ScoreRow'
 import CouponScorePanel from './CouponScorePanel'
 import SignboardScorePanel from './SignboardScorePanel'
-import { ServiceStatus, AppType } from './constants'
+import { ServiceStatus, AppType } from '@mftb/contracts/recommendConstants'
 import { getSystemRuleValue } from '@/hooks/useSystemRules'
 import { getSystemConfig, updateSystemConfig } from '@/api/systemConfig'
 import {

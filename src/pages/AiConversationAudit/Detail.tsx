@@ -11,16 +11,16 @@ import {
   MessageOutlined,
   HistoryOutlined,
 } from '@ant-design/icons'
-import DetailPageHeader from '../../components/DetailPageHeader'
+import DetailPageHeader from '@/components/DetailPageHeader'
 import AiRichText from '../Home/AiRichText'
 import {
   fetchAuditConversation,
   fetchConversationEvents,
   parseConversation,
   type ConversationEvent,
-} from '../../api/aiConversation'
-import type { AiConversation } from '../../api/aiConversation'
-import type { ChatAttachment } from '../../api/agent'
+} from '@/api/aiConversation'
+import type { AiConversation } from '@/api/aiConversation'
+import type { ChatAttachment } from '@/api/agent'
 
 const { Text } = Typography
 

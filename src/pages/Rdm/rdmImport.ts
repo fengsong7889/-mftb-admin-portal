@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs'
-import i18n from '../../i18n'
-import { RDM_STATUS, RDM_STATUS_LABEL, RDM_STATUS_LABEL_SIMPLIFIED, type RdmStatus } from '../../constants/rdm'
+import i18n from '@/i18n'
+import { RDM_STATUS, RDM_STATUS_LABEL, RDM_STATUS_LABEL_SIMPLIFIED, type RdmStatus } from '@/constants/rdm'
 import {
   RDM_IMPORT_COLUMNS,
   RDM_IMPORT_CREATOR,
@@ -12,7 +12,7 @@ import {
   RDM_IMPORT_STATUS_DICT,
   RDM_IMPORT_STATUS_VALIDATION,
   type RdmImportColumn,
-} from '../../constants/rdmImport'
+} from '@/constants/rdmImport'
 
 /**
  * 产研交付（RDM）需求存量导入工具。

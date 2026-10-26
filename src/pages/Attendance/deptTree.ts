@@ -8,7 +8,7 @@
  * value 用**部门 id**（数字）：后端筛选参数 deptId 就是 id，用名称当 value
  * 会在部门改名后让筛选项与历史数据对不上。
  */
-import type { DepartmentItem } from '../../api/department'
+import type { DepartmentItem } from '@/api/department'
 
 export interface DeptNode {
   title: string

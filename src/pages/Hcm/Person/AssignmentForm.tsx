@@ -13,8 +13,8 @@ import { Button, DatePicker, Form, Input, InputNumber, Select, Switch, Tag, mess
 import { SaveOutlined, ApartmentOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useTranslation } from 'react-i18next'
-import { createAssignment, getAssignment, updateAssignment, type HrAssignment } from '../../../api/hcmPerson'
-import { listPositions, unitTree, type OrgPosition, type OrgUnitNode } from '../../../api/hcmOrganization'
+import { createAssignment, getAssignment, updateAssignment, type HrAssignment } from '@/api/hcmPerson'
+import { listPositions, unitTree, type OrgPosition, type OrgUnitNode } from '@/api/hcmOrganization'
 import { CardTitle, FormHeader, cardStyle, grid3 } from '../Organization/shared'
 
 interface AssignmentFormValues {

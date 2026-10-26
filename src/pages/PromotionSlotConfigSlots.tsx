@@ -3,15 +3,15 @@ import { useTranslation } from 'react-i18next'
 import { Button, Input, Select, Tag, message, Modal, Space } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined, AppstoreOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import BrandTag from '../components/BrandTag'
-import { fetchAdAlgorithms } from '../api/adPromotion'
-import { searchWaterfallCatalog } from '../api/waterfallCatalog'
-import type { WaterfallCatalogItem } from '../api/waterfallCatalog'
-import { getDisplayCategoryMode, GROUP_BUY_CHANNEL, SUPERMARKET_CHANNEL, NATURAL_ALGORITHM_TYPE, MAX_SLOT_POSITION } from './waterfallConfig/types'
+import BrandTag from '@/components/BrandTag'
+import { fetchAdAlgorithms } from '@/api/adPromotion'
+import { searchWaterfallCatalog } from '@/api/waterfallCatalog'
+import type { WaterfallCatalogItem } from '@/api/waterfallCatalog'
+import { getDisplayCategoryMode, GROUP_BUY_CHANNEL, SUPERMARKET_CHANNEL, NATURAL_ALGORITHM_TYPE, MAX_SLOT_POSITION } from '@mftb/contracts/waterfallTypes'
 import { readDraft, writeDraft } from './waterfallConfig/waterfallDraft'
 import type {
   WaterfallDraft, AlgoSlotDraft, FixedContentSlot, WaterfallContentType, WaterfallStatus,
-} from './waterfallConfig/types'
+} from '@mftb/contracts/waterfallTypes'
 
 /** 可选算法条目 */
 interface AlgorithmOption {

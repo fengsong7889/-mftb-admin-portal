@@ -14,9 +14,9 @@ import { beforeAll, describe, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { I18nextProvider } from 'react-i18next'
-import i18n from '../../i18n'
-import zh from '../../i18n/locales/zh-TW.json'
-import type { SystemAccessGrantOption } from '../../api/systemAccessRequest'
+import i18n from '@/i18n'
+import zh from '@/i18n/locales/zh-TW.json'
+import type { SystemAccessGrantOption } from '@/api/systemAccessRequest'
 import SystemAccessApprovalPanel from './SystemAccessApprovalPanel'
 
 const options: SystemAccessGrantOption[] = [

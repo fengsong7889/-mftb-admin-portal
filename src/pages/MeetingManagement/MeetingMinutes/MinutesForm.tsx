@@ -27,16 +27,16 @@ import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
-import CardTitle from '../../../components/CardTitle'
-import RemarkTextArea from '../../../components/RemarkTextArea'
-import { useAuth } from '../../../contexts/AuthContext'
+import CardTitle from '@/components/CardTitle'
+import RemarkTextArea from '@/components/RemarkTextArea'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   createMinutes, fetchMinutes, fetchMinutesById, searchMinutes, updateMinutes,
   MINUTES_CONTENT_MAX_LENGTH, emptyMinutesContent, minutesContentLength,
   type MinutesAbsentee, type MinutesContent, type MinutesLinkVO, type MinutesSeriesNode, type MinutesVO,
-} from '../../../api/meetingMinutes'
-import { fetchMeetingDetail, newMeetingRequestKey, toMeetingIsoDate, type MeetingAttendeeVO, type MeetingVO } from '../../../api/meeting'
-import EmployeeSelect from '../EmployeeSelect'
+} from '@/api/meetingMinutes'
+import { fetchMeetingDetail, newMeetingRequestKey, toMeetingIsoDate, type MeetingAttendeeVO, type MeetingVO } from '@/api/meeting'
+import EmployeeSelect from '@/components/EmployeeSelect'
 import { bizTypeLabels, minutesStatusMeta, phaseMeta } from '../meetingMeta'
 import SendMinutesModal from './SendMinutesModal'
 import './minutes.css'

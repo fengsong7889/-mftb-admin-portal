@@ -14,8 +14,8 @@
  * 两者语义必须区分。调用方在报错时传 data=undefined 就走同一分支。
  */
 import { AuditOutlined, CheckCircleOutlined, InboxOutlined, TeamOutlined } from '@ant-design/icons'
-import AnimatedNumber from '../../../components/AnimatedNumber'
-import type { ClaimStatsData } from './claimViewTypes'
+import AnimatedNumber from '@/components/AnimatedNumber'
+import type { ClaimStatsData } from '@/api/claimViewTypes'
 
 interface Props {
   data?: ClaimStatsData

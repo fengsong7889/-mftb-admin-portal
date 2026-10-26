@@ -1,4 +1,4 @@
-import { HR_LIFECYCLE_TYPE, HR_DIMISSION_TYPE, type HrLifecycleType, type HrLifecycleStatus } from '../../../api/hrLifecycle'
+import { HR_LIFECYCLE_TYPE, HR_DIMISSION_TYPE, type HrLifecycleType, type HrLifecycleStatus } from '@/api/hrLifecycle'
 
 /** 单据类型 → 名称 i18n key */
 export const TYPE_LABEL_KEY: Record<HrLifecycleType, string> = {

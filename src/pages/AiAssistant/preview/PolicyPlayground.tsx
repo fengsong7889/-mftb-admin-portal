@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Alert, Button, Form, InputNumber, Select, Space, Switch, Tag } from 'antd'
 import { ExperimentOutlined, ReloadOutlined } from '@ant-design/icons'
-import HelpPopover from '../../../components/HelpPopover'
+import HelpPopover from '@/components/HelpPopover'
 import { DEFAULT_PREVIEW_POLICY, evaluatePreviewPolicy, formatPreviewMoney, type PreviewPolicyInput } from './previewModel'
 
 const AMOUNT_FIELDS = [

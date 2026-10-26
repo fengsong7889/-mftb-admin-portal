@@ -11,7 +11,7 @@
  *
  * 校验项：
  *   1. 离线菜单清单的每个 key 都有路由映射，且都存在于后端种子菜单中
- *   2. 离线菜单清单只允许收录「页面仍依赖 mock」的菜单（反查 src/api/*.ts 的 mock 回退）
+ *   2. 离线菜单清单只允许收录「页面仍依赖 mock」的菜单（反查 frontend/packages/platform-client/src/api/*.ts 的 mock 回退）
  *   3. 受控菜单（CONTROLLED_MENU_KEYS）必须可路由，且不能是目录 key
  *   4. 路由守卫映射（ROUTE_MENU_KEY_MAP）中的路径必须已在 App.tsx 注册
  *   5. 后端种子里的叶子菜单必须有前端路由映射（新增菜单忘配 keyToPath 时立刻失败）
@@ -42,22 +42,22 @@ function extractStringMap(source, declRegex, label) {
 }
 
 // ────────── 前端：路由映射 / 离线清单 ──────────
-const sidebar = read('src/components/Sidebar.tsx')
-const menuDataSource = read('src/constants/menuDataSource.ts')
+const sidebar = read('frontend/packages/ui/src/components/Sidebar.tsx')
+const menuDataSource = read('frontend/packages/contracts/src/constants/menuDataSource.ts')
 const keyToPath = extractStringMap(
   menuDataSource,
   /export const keyToPath: Record<string, string> = \{([\s\S]*?)\n\}/,
   'menuDataSource.keyToPath',
 )
 
-const offlineSrc = read('src/constants/offlineMenus.ts')
+const offlineSrc = read('frontend/packages/contracts/src/constants/offlineMenus.ts')
 const offlineKeys = [...offlineSrc.matchAll(/key:\s*'([^']+)'/g)].map((m) => m[1])
 const offlineLabelByKeys = Object.fromEntries(
   [...offlineSrc.matchAll(/key:\s*'([^']+)',\s*label:\s*'([^']+)'/g)].map((m) => [m[1], m[2]]),
 )
 
 // ────────── 前端：受控菜单与路由守卫映射 ──────────
-const permTypes = read('src/pages/Permission/types.ts')
+const permTypes = read('frontend/packages/contracts/src/menuPermission.ts')
 const controlledBlock = permTypes.match(/export const CONTROLLED_MENU_KEYS: string\[\] = \[([\s\S]*?)\n\]/)
 const controlledKeys = controlledBlock
   ? [...controlledBlock[1].matchAll(/'([^']+)'/g)].map((m) => m[1])
@@ -77,7 +77,7 @@ const appRoutes = new Set(
 if (/^const menuItems: MenuItem\[\] = \{$/m.test(sidebar)) {
   fail('Sidebar.tsx 重新出现了整棵静态菜单树 menuItems（菜单真值应来自 /api/menus/tree）')
 }
-const menuTabs = read('src/components/MenuTabs.tsx')
+const menuTabs = read('frontend/packages/ui/src/components/MenuTabs.tsx')
 const subPageName = menuTabs.match(/const SUB_PAGE_NAME: Record<string, string> = \{([\s\S]*?)\n\}/)
 const subPageCount = subPageName ? [...subPageName[1].matchAll(/'[^']+':\s*'[^']+'/g)].length : 0
 // 棘轮上限：表内只允许详情页/独立页（无菜单记录的路由）；每新增一个合法独立页 +1 并在此登记原因
@@ -148,7 +148,7 @@ const backendKeysBlock = menuDataSource.match(/export const BACKEND_CONNECTED_KE
 const backendKeys = new Set(backendKeysBlock
   ? [...backendKeysBlock[1].matchAll(/'([^']+)'/g)].map((m) => m[1])
   : (fail('未能解析 BACKEND_CONNECTED_KEYS'), []))
-const registeredIcons = new Set([...read('src/components/MenuIcon.tsx')
+const registeredIcons = new Set([...read('frontend/packages/ui/src/components/MenuIcon.tsx')
   .matchAll(/'([^']+)':\s*\w+/g)].map((m) => m[1]))
 const fallbackIcons = Object.fromEntries([...sidebar.matchAll(/'([^']+)':\s*<(\w+)/g)]
   .map((m) => [m[1], m[2]]))
@@ -231,7 +231,7 @@ for (const comp of Object.keys(compDirs)) {
 for (const key of offlineKeys) {
   const isDirectory = parentKeys.has(key)
   if (!isDirectory && backendIntegratedMenuKeys.has(key)) {
-    fail(`离线菜单 ${key} 的页面已接入后端 API, 应从 src/constants/offlineMenus.ts 移除`)
+    fail(`离线菜单 ${key} 的页面已接入后端 API, 应从 frontend/packages/contracts/src/constants/offlineMenus.ts 移除`)
   }
 }
 

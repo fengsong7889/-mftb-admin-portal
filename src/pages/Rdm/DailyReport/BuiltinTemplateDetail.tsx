@@ -8,7 +8,7 @@ import {
   fetchDailyReportBuiltinLayout,
   type DailyReportBuiltinLayout,
   type DailyReportBuiltinLayoutType,
-} from '../../../api/rdmDailyReport'
+} from '@/api/rdmDailyReport'
 import '../index.css'
 
 /**

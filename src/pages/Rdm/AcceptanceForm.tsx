@@ -25,7 +25,7 @@ import {
 } from '@ant-design/icons'
 import RdmFormHeader from './components/RdmFormHeader'
 import EvidenceThumb from './components/CaseEvidenceThumb'
-import HelpPopover from '../../components/HelpPopover'
+import HelpPopover from '@/components/HelpPopover'
 import DeliveryItemAcceptanceForm from './DeliveryItemAcceptanceForm'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
@@ -40,7 +40,7 @@ import {
   type RdmAcceptanceEvidencePayload,
   type RdmAcceptanceRecord,
   type RdmRequirementDetail,
-} from '../../api/rdm'
+} from '@/api/rdm'
 import {
   RDM_ACCEPT_RESULT,
   RDM_ACCEPT_STAGE,
@@ -58,7 +58,7 @@ import {
   type RdmCaseResult,
   type RdmStatus,
   type RdmTestEnv,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import './index.css'
 import {
   canSelectResult,

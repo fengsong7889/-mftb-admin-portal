@@ -15,7 +15,7 @@ import {
   updateAssetTag,
   ASSET_DISPLAY_FIELDS,
   ASSET_FIELD_SAMPLE_VALUES,
-} from '../../../api/eam'
+} from '@/api/eam'
 import AssetTagPreview from './AssetTagPreview'
 import './index.css'
 

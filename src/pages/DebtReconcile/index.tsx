@@ -10,13 +10,13 @@ import {
   ExportOutlined,
   ImportOutlined,
 } from '@ant-design/icons'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { useAuth } from '../../contexts/AuthContext'
-import BrandTag from '../../components/BrandTag'
-import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
-import type { DebtStoreRecord } from '../../utils/approvalStore'
-import { fetchFinDebts } from '../../api/finance'
-import type { FinDebtBrandStats, FinDebtQuery } from '../../api/finance'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
+import BrandTag from '@/components/BrandTag'
+import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '@/constants/brand'
+import type { DebtStoreRecord } from '@/utils/approvalStore'
+import { fetchFinDebts } from '@/api/finance'
+import type { FinDebtBrandStats, FinDebtQuery } from '@/api/finance'
 
 const { RangePicker } = DatePicker
 
@@ -44,7 +44,7 @@ const sourceLabelMapKeys: Record<string, string> = {
 const fmtAmt = (val: number) => val.toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 /* ---- 數字加載動畫（遵循數據指標統計卡標準，支持兩位小數） ---- */
-import { useCountUp } from '../../hooks/useCountUp'
+import { useCountUp } from '@/hooks/useCountUp'
 
 function AnimatedAmount({ value }: { value: number }) {
   const animated = useCountUp(value, 1200, 2)

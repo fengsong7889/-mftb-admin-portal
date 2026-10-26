@@ -8,10 +8,10 @@ import {
   EditOutlined,
   SwapOutlined,
 } from '@ant-design/icons'
-import BrandTag from '../../components/BrandTag'
-import { fetchFinAccounts, submitTransferApply, fetchFinRiskConfig, checkFinTransferBatches } from '../../api/finance'
-import type { FinAccount, TransferApplyPayload, FinRiskRow, FinTransferBlock } from '../../api/finance'
-import { isWorkflowEnabled } from '../../utils/workflowEnabled'
+import BrandTag from '@/components/BrandTag'
+import { fetchFinAccounts, submitTransferApply, fetchFinRiskConfig, checkFinTransferBatches } from '@/api/finance'
+import type { FinAccount, TransferApplyPayload, FinRiskRow, FinTransferBlock } from '@/api/finance'
+import { isWorkflowEnabled } from '@/utils/workflowEnabled'
 import { amountToChinese, accountStatusMap } from './components/shared'
 import { useAccountFormCommon } from './components/useAccountFormCommon'
 import { showConfirmSubmit, handleFormSubmitError } from './components/ConfirmSubmitModal'

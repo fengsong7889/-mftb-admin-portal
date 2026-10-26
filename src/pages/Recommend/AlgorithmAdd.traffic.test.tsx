@@ -4,23 +4,23 @@ import { Link, MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AlgorithmAdd from './AlgorithmAdd'
 import { readTrafficParams } from './TrafficAlgorithmConfig/config'
-import { ALGORITHM_TYPE_OPTIONS, AlgorithmType } from './constants'
-import MenuTabs from '../../components/MenuTabs'
+import { ALGORITHM_TYPE_OPTIONS, AlgorithmType } from '@mftb/contracts/recommendConstants'
+import MenuTabs from '@/components/MenuTabs'
 
 const api = vi.hoisted(() => ({ fetch: vi.fn(), create: vi.fn(), update: vi.fn(), t: (key: string) => key, i18n: { language: 'zh-TW' } }))
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: api.t, i18n: api.i18n }) }))
-vi.mock('../../contexts/MenuContext', () => ({ useMenu: () => ({ menuTree: null, status: 'online' }) }))
-vi.mock('../../components/Sidebar', () => ({ pathToKey: {} }))
+vi.mock('@/contexts/MenuContext', () => ({ useMenu: () => ({ menuTree: null, status: 'online' }) }))
+vi.mock('@/components/Sidebar', () => ({ pathToKey: {} }))
 vi.mock('antd', async importOriginal => ({
   ...await importOriginal<typeof import('antd')>(), message: { success: vi.fn(), error: vi.fn() },
 }))
-vi.mock('../../api/adPromotion', async importOriginal => ({
-  ...await importOriginal<typeof import('../../api/adPromotion')>(),
+vi.mock('@/api/adPromotion', async importOriginal => ({
+  ...await importOriginal<typeof import('@/api/adPromotion')>(),
   fetchAdAlgorithmDetail: api.fetch, createAdAlgorithm: api.create, updateAdAlgorithm: api.update,
 }))
 vi.mock('./OrganicTrafficScoreConfig', () => ({ default: () => <section aria-label="自然流量评分配置" /> }))
-vi.mock('../../components/PopularLayoutPreviewModal', () => ({ default: () => null }))
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () => true, hasMenuPermission: () => true }) }))
+vi.mock('@/components/PopularLayoutPreviewModal', () => ({ default: () => null }))
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () => true, hasMenuPermission: () => true }) }))
 
 function LocationIndicator() {
   const location = useLocation()

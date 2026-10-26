@@ -9,11 +9,11 @@ import { Spin, Descriptions, Tag, Table } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { ContactsOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import DetailPageHeader from '../../../components/DetailPageHeader'
+import DetailPageHeader from '@/components/DetailPageHeader'
 import {
   fetchSupplierList, fetchSupplierContacts,
   type EamSupplier, type SupplierContactItem,
-} from '../../../api/eam'
+} from '@/api/eam'
 
 interface Props {
   id: number

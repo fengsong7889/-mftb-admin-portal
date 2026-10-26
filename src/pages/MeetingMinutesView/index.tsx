@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Alert, Button, Spin } from 'antd'
-import { fetchMinutesPage, type MinutesPageView } from '../../api/meetingMinutesPage'
+import { fetchMinutesPage, type MinutesPageView } from '@/api/meetingMinutesPage'
 import MinutesContentCard from '../MeetingManagement/MeetingMinutes/MinutesContentCard'
 import { useTranslation } from 'react-i18next'
 

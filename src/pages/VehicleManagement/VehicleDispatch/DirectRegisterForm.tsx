@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, DatePicker, Descriptions, Form, Input, InputNumber, Select, Tag, message, TreeSelect } from 'antd'
 import { CarOutlined, SafetyCertificateOutlined, SendOutlined, TeamOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { VEHICLE_STATUS_LABEL } from '../vehicleMeta'
 import {
   type VehicleFile, type VehicleUseOrder,
@@ -25,8 +25,8 @@ import {
 } from '../vehicleRules'
 import { useDriverOptions, useVehicleDeptTree, type DeptTreeNode } from '../vehicleOptions'
 import { VehicleFormPageHeader, VehicleSection } from '../VehicleModuleLayout'
-import RemarkTextArea from '../../../components/RemarkTextArea'
-import { fetchUses, toIso } from '../../../api/vehicle'
+import RemarkTextArea from '@/components/RemarkTextArea'
+import { fetchUses, toIso } from '@/api/vehicle'
 import { toOrders } from '../vehicleAdapter'
 
 interface FormState {

@@ -31,8 +31,8 @@ import {
   testMtEngineTranslate,
   type MtEngineVO,
   type MtEngineUpdatePayload,
-} from '../../../api/mtEngine'
-import { fetchLanguages, type LanguageVO } from '../../../api/translation'
+} from '@/api/mtEngine'
+import { fetchLanguages, type LanguageVO } from '@/api/translation'
 
 const { Title, Text, Paragraph } = Typography
 const { TextArea } = Input

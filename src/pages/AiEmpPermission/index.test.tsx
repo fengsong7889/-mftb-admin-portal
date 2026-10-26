@@ -15,7 +15,7 @@ import { StrictMode } from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { ConfigProvider, message } from 'antd'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { EmpPermissionSummary } from '../../api/empPermission'
+import type { EmpPermissionSummary } from '@/api/empPermission'
 import AiEmpPermission from './index'
 
 /** t 必须稳定引用：每次新建会让 useCallback 依赖抖动，effect 死循环表现为超时而非断言失败 */
@@ -26,17 +26,17 @@ const api = vi.hoisted(() => ({
   fetchDepartments: vi.fn(),
 }))
 
-vi.mock('../../api/empPermission', () => ({
+vi.mock('@/api/empPermission', () => ({
   fetchEmpPermissionList: api.fetchEmpPermissionList,
   calcQuotaStatus: () => 'normal',
   SOURCE_TAG_COLOR: { department: 'blue', position: 'green', role: 'orange', approval: 'purple' },
   QUOTA_STATUS_LABEL: { normal: '正常', exhausted: '已用完', frozen: '凍結' },
   QUOTA_STATUS_COLOR: { normal: 'green', exhausted: 'red', frozen: 'default' },
 }))
-vi.mock('../../api/department', () => ({ fetchDepartments: api.fetchDepartments }))
+vi.mock('@/api/department', () => ({ fetchDepartments: api.fetchDepartments }))
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: i18n.t, i18n: { language: 'zh-TW' } }) }))
 vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }))
-vi.mock('../../hooks/useColumnConfig', () => ({ useColumnConfig: () => ({ configComponent: null }) }))
+vi.mock('@/hooks/useColumnConfig', () => ({ useColumnConfig: () => ({ configComponent: null }) }))
 
 function row(employeeName: string, employeeId = 1): EmpPermissionSummary {
   return {

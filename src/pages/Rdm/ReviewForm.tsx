@@ -16,22 +16,22 @@ import RdmFormHeader from './components/RdmFormHeader'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
-import RemarkTextArea from '../../components/RemarkTextArea'
+import EmployeeSelect from '@/components/EmployeeSelect'
+import RemarkTextArea from '@/components/RemarkTextArea'
 import {
   createReview,
   fetchDeliverySummary,
   fetchRequirementDetail,
   type RdmPrdItem,
-} from '../../api/rdm'
+} from '@/api/rdm'
 import {
   RDM_REVIEW_TYPE_LABEL,
   RDM_STATUS,
   formatRdmReqNo,
   formatRdmReviewTypes,
   type RdmReviewType,
-} from '../../constants/rdm'
-import { buildRdmDetailPath } from '../../constants/menuDataSource'
+} from '@/constants/rdm'
+import { buildRdmDetailPath } from '@/constants/menuDataSource'
 import { useRdmBack } from './useRdmBack'
 import './index.css'
 

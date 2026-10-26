@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { Alert, Button, Modal, Space, Table, Tag, Tooltip, Upload, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { CheckCircleOutlined, CloseCircleOutlined, DownloadOutlined, InboxOutlined } from '@ant-design/icons'
-import { RDM_STATUS_LABEL } from '../../../constants/rdm'
-import { RDM_IMPORT_TEMPLATE_NAME } from '../../../constants/rdmImport'
+import { RDM_STATUS_LABEL } from '@/constants/rdm'
+import { RDM_IMPORT_TEMPLATE_NAME } from '@/constants/rdmImport'
 import {
   generateRequirementImportTemplate,
   parseRequirementImportExcel,

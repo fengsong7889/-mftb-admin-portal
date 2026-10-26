@@ -6,7 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { DOC_NATIVE_PERMISSION, fetchDocNativeMembers, parseDocNativeId, removeDocNativeMember, saveDocNativeMember } from '@/api/docNative'
 import type { DocNativeMember } from '@/api/docNative'
-import EmployeeSelect from '@/pages/MeetingManagement/EmployeeSelect'
+import EmployeeSelect from '@/components/EmployeeSelect'
 import { DocPlanFormHeader, DocPlanSectionTitle } from './docPlanUi'
 import { docPlanCardStyle } from './docPlanStyle'
 

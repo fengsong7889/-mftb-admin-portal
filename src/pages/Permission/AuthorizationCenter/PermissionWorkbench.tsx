@@ -14,16 +14,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Checkbox, Empty, Modal, Select, Space, Spin, Switch, Tag, Tooltip, Tree, message } from 'antd'
 import type { DataNode } from 'antd/es/tree'
 import { CopyOutlined, InfoCircleOutlined, SafetyCertificateOutlined, SaveOutlined } from '@ant-design/icons'
-import HelpPopover from '../../../components/HelpPopover'
+import HelpPopover from '@/components/HelpPopover'
 import { useTranslation } from 'react-i18next'
 import type { MenuPermission } from '../types'
 import { getMenuActions } from '../types'
-import { fetchMenuTree } from '../../../api/menu'
-import type { MenuVO } from '../../../api/menu'
-import { fetchRoles } from '../../../api/role'
-import type { RoleItem } from '../../../api/role'
-import { fetchDepartments } from '../../../api/department'
-import type { DepartmentItem } from '../../../api/department'
+import { fetchMenuTree } from '@/api/menu'
+import type { MenuVO } from '@/api/menu'
+import { fetchRoles } from '@/api/role'
+import type { RoleItem } from '@/api/role'
+import { fetchDepartments } from '@/api/department'
+import type { DepartmentItem } from '@/api/department'
 import {
   fetchSystemsCatalog,
   saveRoleAuthorization,
@@ -31,14 +31,14 @@ import {
   type AuthorizationTargetType,
   type SystemAuthorizationPayload,
   type SystemCatalogItem,
-} from '../../../api/systemAuthorization'
+} from '@/api/systemAuthorization'
 import {
   fetchRoleOverview,
   fetchDepartmentOverview,
-} from '../../../api/authorizationCenter'
-import { translateMenuName } from '../../../i18n/menuNameEn'
-import { getSystemDisplayName } from '../../../constants/portalSystems'
-import { invalidateSystemNavigation } from '../../../hooks/useSystemNavigation'
+} from '@/api/authorizationCenter'
+import { translateMenuName } from '@/i18n/menuNameEn'
+import { getSystemDisplayName } from '@/constants/portalSystems'
+import { invalidateSystemNavigation } from '@/hooks/useSystemNavigation'
 
 /** 目标类型：与后端 SystemAuthorizationService.TARGET_* 常量一致 */
 const TARGET_ROLE: AuthorizationTargetType = 'role'

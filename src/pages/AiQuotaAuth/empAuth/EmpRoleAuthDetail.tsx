@@ -3,12 +3,12 @@ import { useTranslation } from 'react-i18next'
 import { Button, Tag, Spin, message } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeftOutlined, EditOutlined, AppstoreOutlined, TeamOutlined, BarChartOutlined } from '@ant-design/icons'
-import { fetchModels, type AiModel } from '../../../api'
-import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
-import AnimatedNumber from '../../../components/AnimatedNumber'
+import { fetchModels, type AiModel } from '@/api'
+import { fetchEmployees, type EmployeeItem } from '@/api/employee'
+import AnimatedNumber from '@/components/AnimatedNumber'
 import { ModelAuthSectionReadonly } from './ModelAuthSection'
 import { clampModelConfigs, type RoleAuthConfig } from './modelAuthCapability'
-import { getRoleAuthByCode } from '../../../api/empAuth'
+import { getRoleAuthByCode } from '@/api/empAuth'
 
 /**
  * 角色授權 - 詳情獨立頁（參考部門模型權控詳情頁佈局）

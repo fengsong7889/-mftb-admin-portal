@@ -9,11 +9,11 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Button, Empty, Form, Input, Select, Table, Tag, DatePicker } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { type Dayjs } from 'dayjs'
-import BrandTag from '../../../components/BrandTag'
-import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
-import { fetchLossList, type LossRow, type LossQuery } from '../../../api/eamLoss'
+import BrandTag from '@/components/BrandTag'
+import { useCompanyBrand } from '@/contexts/CompanyBrandContext'
+import { fetchLossList, type LossRow, type LossQuery } from '@/api/eamLoss'
 
 interface Props {
   onViewDetail: (lossId: number) => void

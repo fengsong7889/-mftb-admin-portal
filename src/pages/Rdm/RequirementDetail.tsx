@@ -36,6 +36,7 @@ import {
   AuditOutlined,
   BellOutlined,
   BranchesOutlined,
+  CalendarOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
   CopyOutlined,
@@ -55,21 +56,21 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import DetailPageHeader from '../../components/DetailPageHeader'
-import HelpPopover from '../../components/HelpPopover'
-import RemarkTextArea from '../../components/RemarkTextArea'
-import { buildRdmDetailPath, resolveRdmDetailBackPath } from '../../constants/menuDataSource'
-import { useAuth } from '../../contexts/AuthContext'
-import { formatEmployee } from '../../utils/employeeDisplay'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import HelpPopover from '@/components/HelpPopover'
+import RemarkTextArea from '@/components/RemarkTextArea'
+import { buildRdmDetailPath, resolveRdmDetailBackPath } from '@/constants/menuDataSource'
+import { useAuth } from '@/contexts/AuthContext'
+import { formatEmployee } from '@/utils/employeeDisplay'
 import RequirementStageBar from './components/RequirementStageBar'
 import AcceptanceTraceCard from './components/AcceptanceTraceCard'
 import ReleasePanel from './components/ReleasePanel'
 import { useRdmBack } from './useRdmBack'
 import { ChangeSection, DeliverySummaryBar, PlanSection, TaskSection } from './components/RequirementSections'
 import { ComplexityTag, PriorityTag, StatusTag, TypeTag } from './components/Tags'
-import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
-import { fetchVersionHistory } from '../../api/versionHistory'
-import { fetchDocNodes, DOC_STATUS_COLOR, type DocNode, type DocStatus } from '../../api/docCenter'
+import EmployeeSelect from '@/components/EmployeeSelect'
+import { fetchVersionHistory } from '@/api/versionHistory'
+import { fetchDocNodes, DOC_STATUS_COLOR, type DocNode, type DocStatus } from '@/api/docCenter'
 import {
   RDM_INTAKE_MODE_LABEL,
   addComment,
@@ -100,7 +101,7 @@ import {
   type RdmRequirementDetail,
   type RdmStructureTreeNode,
   type RdmTransitionRow,
-} from '../../api/rdm'
+} from '@/api/rdm'
 import {
   RDM_ACTION,
   RDM_ACTION_LABEL,
@@ -140,7 +141,7 @@ import {
   type RdmStage,
   type RdmStatus,
   type RdmTaskType,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import './index.css'
 
 const { TextArea } = Input
@@ -734,6 +735,37 @@ export default function RequirementDetail() {
   }, [detail?.timeline, detail?.status])
 
   /**
+   * 計劃上線：每個人拆任務前都要知道的時間邊界。
+   * <p>原先只折在右側屬性面板的一行小字裡，建子任務的人往往不看，
+   * 結果任務寫到了上線日之後；這裡抬到標題旁與右下屬性行，並給出剩余天數：
+   * 已上線不再告警，逾期轉紅，7 天內轉深橙。
+   */
+  const planReleaseInfo = useMemo(() => {
+    const raw = detail?.planReleaseDate ?? detail?.expectDate ?? null
+    if (!raw) return null
+    const date = dayjs(raw)
+    if (!date.isValid()) return null
+    const released = !!detail?.actualReleaseDate
+      || RDM_TERMINAL_STATUS.includes(detail?.status as RdmStatus)
+    const days = date.startOf('day').diff(dayjs().startOf('day'), 'day')
+    return {
+      text: date.format('YYYY-MM-DD'),
+      days,
+      tone: released ? 'normal' : days < 0 ? 'overdue' : days <= 7 ? 'urgent' : 'normal',
+      released,
+    } as const
+  }, [detail?.planReleaseDate, detail?.expectDate, detail?.actualReleaseDate, detail?.status])
+
+  /** 計劃上線倒計時文案：已上線/已歸檔不再提醒，避免已完成需求還在報“逾期” */
+  const planReleaseCountdown = planReleaseInfo && !planReleaseInfo.released
+    ? planReleaseInfo.days < 0
+      ? t('rdm.detail.planReleaseOverdue', { days: Math.abs(planReleaseInfo.days), defaultValue: '已逾期 {{days}} 天' })
+      : planReleaseInfo.days === 0
+        ? t('rdm.detail.planReleaseToday', { defaultValue: '今天上線' })
+        : t('rdm.detail.planReleaseRemain', { days: planReleaseInfo.days, defaultValue: '剩 {{days}} 天' })
+    : ''
+
+  /**
    * V3 階段條的推導口徑（只讀投影）：
    * 交付項完成數 + 各狀態分佈 + 「需求狀態仍停在哪」。
    * <p>必須同時說清兩件事，否則是「進度條點在開發、狀態却寫已受理」的矛盾觀感。
@@ -1238,7 +1270,21 @@ export default function RequirementDetail() {
           <span className="rdm-detail-header-title" title={detail.title}>{detail.title}</span>
         }
         tags={
-          <Space size={6}>
+          <Space size={6} wrap>
+            {/* 計劃上線前置：它是建子任務時唯一的時間邊界，不能只藏在右側屬性面板 */}
+            {planReleaseInfo && (
+              <span
+                className={`rdm-plan-chip rdm-plan-chip--${planReleaseInfo.tone}`}
+                title={t('rdm.detail.planReleaseChipHint', { defaultValue: '需求計劃上線：子任務排期不得晚於該日期' })}
+              >
+                <CalendarOutlined />
+                {t('rdm.detail.planReleaseChip', { defaultValue: '計劃上線' })}
+                <b>{planReleaseInfo.text}</b>
+                {planReleaseCountdown && (
+                  <span className="rdm-plan-chip-days">{planReleaseCountdown}</span>
+                )}
+              </span>
+            )}
             <StatusTag status={detail.status} overdue={detail.overdueFlag ?? false} />
             <TypeTag reqType={detail.reqType} />
             <PriorityTag priority={detail.priority} />
@@ -1502,7 +1548,7 @@ export default function RequirementDetail() {
                   children: (
                     <>
                       <DeliverySummaryBar summary={summary} />
-                      <TaskSection summary={summary} editable={canEditDelivery && !closed} canCreate={canEditDelivery && !closed} reqId={detail.id} />
+                      <TaskSection summary={summary} editable={canEditDelivery && !closed} canCreate={canEditDelivery && !closed} reqId={detail.id} reqPlanRelease={detail.planReleaseDate} />
                     </>
                   ),
                 },
@@ -1889,7 +1935,14 @@ export default function RequirementDetail() {
               />
               <PropRow
                 label={t('rdm.attr.planReleaseDate')}
-                value={detail.planReleaseDate ?? <span style={{ color: '#8C8C8C' }}>{t('rdm.attr.tbdSchedule')}</span>}
+                value={detail.planReleaseDate ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                    <b style={{ fontSize: 13, color: planReleaseInfo?.tone === 'overdue' ? '#CF1322' : '#D46B08' }}>{detail.planReleaseDate}</b>
+                    {planReleaseCountdown && (
+                      <span style={{ fontSize: 12, color: planReleaseInfo?.tone === 'overdue' ? '#CF1322' : '#AD4E00' }}>{planReleaseCountdown}</span>
+                    )}
+                  </span>
+                ) : <span style={{ color: '#8C8C8C' }}>{t('rdm.attr.tbdSchedule')}</span>}
                 editing={inlineEditing && canEditDeliveryAttrs}
                 editor={
                   <DatePicker

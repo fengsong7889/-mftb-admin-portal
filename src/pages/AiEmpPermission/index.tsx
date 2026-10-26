@@ -5,7 +5,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { SearchOutlined, ReloadOutlined, ExportOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   SOURCE_TAG_COLOR,
   QUOTA_STATUS_LABEL,
@@ -16,8 +16,8 @@ import {
   type EmpQuotaGrant,
   type PermissionSource,
   type QuotaStatus,
-} from '../../api/empPermission'
-import { fetchDepartments, type DepartmentItem } from '../../api/department'
+} from '@/api/empPermission'
+import { fetchDepartments, type DepartmentItem } from '@/api/department'
 
 /* ══════════ 展示常量 ══════════ */
 

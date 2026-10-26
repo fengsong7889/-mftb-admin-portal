@@ -8,16 +8,16 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import i18n from '../../i18n'
-import { fetchIterations, fetchProjectPage } from '../../api/rdm'
+import i18n from '@/i18n'
+import { fetchIterations, fetchProjectPage } from '@/api/rdm'
 import IterationForm from './IterationForm'
 
-vi.mock('../../api/employee', () => ({
+vi.mock('@/api/employee', () => ({
   fetchEmployees: vi.fn(async () => ({ records: [], total: 0 })),
   fetchEmployee: vi.fn(),
 }))
 
-vi.mock('../../api/rdm', () => ({
+vi.mock('@/api/rdm', () => ({
   fetchIterations: vi.fn(),
   saveIteration: vi.fn(),
   fetchProjectPage: vi.fn(),

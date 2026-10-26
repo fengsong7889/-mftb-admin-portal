@@ -7,8 +7,8 @@
 import { Card, Tag, Empty, Button } from 'antd'
 import { SettingOutlined, RightOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../../contexts/AuthContext'
-import { RULE_CENTER_MENU_KEYS, getRuleGroupByMenu } from '../../constants/ruleConfig'
+import { useAuth } from '@/contexts/AuthContext'
+import { RULE_CENTER_MENU_KEYS, getRuleGroupByMenu } from '@/constants/ruleConfig'
 
 /** 子菜单 menuKey → 版塊编辑页路由 */
 const MENU_ROUTE: Record<string, string> = {

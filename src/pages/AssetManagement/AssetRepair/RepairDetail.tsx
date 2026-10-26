@@ -14,18 +14,18 @@ import {
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs, { type Dayjs } from 'dayjs'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import AssetParameters from '../../../components/AssetParameters'
-import BrandTag from '../../../components/BrandTag'
-import RemoteSearchSelect from '../../../components/RemoteSearchSelect'
-import type { OptionItem } from '../../../api/types'
-import { fetchClaimDetail } from '../../../api/eamClaim'
-import type { ClaimRow } from '../AssetClaim/claimViewTypes'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import AssetParameters from '@/components/AssetParameters'
+import BrandTag from '@/components/BrandTag'
+import RemoteSearchSelect from '@/components/RemoteSearchSelect'
+import type { OptionItem } from '@/api/types'
+import { fetchClaimDetail } from '@/api/eamClaim'
+import type { ClaimRow } from '@/api/claimViewTypes'
 import {
   fetchAssetDetail, fetchRepairList, fetchRepairApplicantOptions, fetchRepairerOptions,
   repairAsset, finishRepair, updateRepair, deleteRepair,
   type AssetItem, type AssetRepairRecord, type RepairApplicantOption,
-} from '../../../api/asset'
+} from '@/api/asset'
 
 interface FormValues {
   repairDate: Dayjs

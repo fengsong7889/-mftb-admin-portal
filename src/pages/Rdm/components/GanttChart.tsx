@@ -24,8 +24,8 @@ import {
   type RdmScheduleBar,
   type RdmScheduleDependency,
   type RdmSchedulePlan,
-} from '../../../api/rdm'
-import { RDM_TASK_STATUS, RDM_TASK_TYPE_COLOR, formatRdmReqNo, type RdmTaskType } from '../../../constants/rdm'
+} from '@/api/rdm'
+import { RDM_TASK_STATUS, RDM_TASK_TYPE_COLOR, formatRdmReqNo, type RdmTaskType } from '@/constants/rdm'
 
 /** 一天的像素宽度：太窄看不清依赖线，太宽一屏放不下一个月 */
 const DAY_W = 26

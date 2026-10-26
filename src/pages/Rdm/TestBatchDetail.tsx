@@ -22,9 +22,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
-import StatCards from '../../components/StatCards'
-import HelpPopover from '../../components/HelpPopover'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import StatCards from '@/components/StatCards'
+import HelpPopover from '@/components/HelpPopover'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { deriveRdmColumnMeta } from './rdmColumnMeta'
 import {
   fetchTestBatchDetail, fetchTestBatchSummary, acceptTestBatch, returnTestBatch,
@@ -32,11 +32,11 @@ import {
   type RdmTestBatchDetail as RdmTestBatchDetailType,
   type RdmTestBatchSummary, type RdmTestExecutionRecord, type RdmTestExecutionForm,
   type RdmTestBatchScopeItem,
-} from '../../api/rdm'
+} from '@/api/rdm'
 import {
   RDM_TEST_BATCH_STATUS, RDM_TEST_BATCH_STATUS_LABEL, RDM_TEST_BATCH_STATUS_COLOR,
   RDM_TEST_ENV_LABEL,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import './index.css'
 
 const { TextArea } = Input

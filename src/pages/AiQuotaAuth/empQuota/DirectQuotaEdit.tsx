@@ -12,9 +12,9 @@ import { Form, Input, InputNumber, Select, Switch, message } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ThunderboltOutlined, SettingOutlined, UserOutlined } from '@ant-design/icons'
-import { fetchModels, type AiModel } from '../../../api'
-import EmployeeSelect from '../../MeetingManagement/EmployeeSelect'
-import { fetchEmpQuotas, saveEmpQuotas, type QuotaConfigRequest } from '../../../api/quotaConfig'
+import { fetchModels, type AiModel } from '@/api'
+import EmployeeSelect from '@/components/EmployeeSelect'
+import { fetchEmpQuotas, saveEmpQuotas, type QuotaConfigRequest } from '@/api/quotaConfig'
 import { EditPageHeader, SectionCard, FormFooter, LoadingSpinner } from '../components'
 
 export default function DirectQuotaEdit() {

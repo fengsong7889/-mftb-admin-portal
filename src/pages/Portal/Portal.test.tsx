@@ -7,54 +7,54 @@ import { ConfigProvider } from 'antd'
 import enUS from 'antd/locale/en_US'
 import Portal from './index'
 import SystemArtwork from './SystemArtwork'
-import PortalTopBar from '../../components/PortalTopBar'
-import HeaderBar from '../../components/HeaderBar'
-import { fetchPortalContext, type PortalSystem } from '../../api/portal'
-import { fetchMySystemAccessRequests } from '../../api/systemAccessRequest'
-import { fetchPortalFavorites, savePortalFavorites } from '../../api/auth'
-import { fetchLanguages, LANGUAGES_CHANGED_EVENT, type LanguageVO } from '../../api/translation'
-import { loadSystemNavigation } from '../../hooks/useSystemNavigation'
-import i18n, { ensureLanguageBundle, getSavedLanguage, injectTranslationBundle, SUPPORTED_LANGUAGES } from '../../i18n'
-import en from '../../i18n/locales/en.json'
-import zh from '../../i18n/locales/zh-TW.json'
-import ja from '../../i18n/locales/ja.json'
-import ko from '../../i18n/locales/ko.json'
-import ru from '../../i18n/locales/ru.json'
+import PortalTopBar from '@/components/PortalTopBar'
+import HeaderBar from '@/components/HeaderBar'
+import { fetchPortalContext, type PortalSystem } from '@/api/portal'
+import { fetchMySystemAccessRequests } from '@/api/systemAccessRequest'
+import { fetchPortalFavorites, savePortalFavorites } from '@/api/auth'
+import { fetchLanguages, LANGUAGES_CHANGED_EVENT, type LanguageVO } from '@/api/translation'
+import { loadSystemNavigation } from '@/hooks/useSystemNavigation'
+import i18n, { ensureLanguageBundle, getSavedLanguage, injectTranslationBundle, SUPPORTED_LANGUAGES } from '@/i18n'
+import en from '@/i18n/locales/en.json'
+import zh from '@/i18n/locales/zh-TW.json'
+import ja from '@/i18n/locales/ja.json'
+import ko from '@/i18n/locales/ko.json'
+import ru from '@/i18n/locales/ru.json'
 
 /** 门户收藏按 username 隔离，默认不提供 username 以保持其余用例不受影响。 */
 const authState = vi.hoisted(() => ({ username: undefined as string | undefined }))
-vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({
   user: { name: '测试员工', empId: 'TEST', role: 'user', username: authState.username },
   hasMenuPermission: () => true,
   logout: vi.fn(),
 }) }))
-vi.mock('../../contexts/MenuContext', () => ({ useMenu: () => ({ menuTree: null }) }))
-vi.mock('../../api/portal', () => ({ fetchPortalContext: vi.fn() }))
+vi.mock('@/contexts/MenuContext', () => ({ useMenu: () => ({ menuTree: null }) }))
+vi.mock('@/api/portal', () => ({ fetchPortalContext: vi.fn() }))
 // 默认 null = 「该账号从未同步过」，门户保留 localStorage 缓存，不干扰既有用例
-vi.mock('../../api/auth', () => ({
+vi.mock('@/api/auth', () => ({
   fetchPortalFavorites: vi.fn().mockResolvedValue(null),
   savePortalFavorites: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('../../api/translation', async importOriginal => ({
-  ...await importOriginal<typeof import('../../api/translation')>(),
+vi.mock('@/api/translation', async importOriginal => ({
+  ...await importOriginal<typeof import('@/api/translation')>(),
   fetchLanguages: vi.fn(),
 }))
-vi.mock('../../api/notification', () => ({ fetchNotifications: vi.fn().mockResolvedValue({ items: [], unreadCount: 0 }) }))
+vi.mock('@/api/notification', () => ({ fetchNotifications: vi.fn().mockResolvedValue({ items: [], unreadCount: 0 }) }))
 // 门户多拉一个「我的在途权限申請」只为卡片标「審批中」，默认空列表：
 // 不 mock 会让每个门户用例都发一次真 axios 请求，而准入判定绝不允许依赖它。
-vi.mock('../../api/systemAccessRequest', () => ({
+vi.mock('@/api/systemAccessRequest', () => ({
   fetchMySystemAccessRequests: vi.fn(),
   submitSystemAccessRequest: vi.fn(),
   fetchRequestableSystems: vi.fn(),
   fetchSystemAccessRequestByFlow: vi.fn(),
   fetchSystemAccessGrantOptions: vi.fn(),
 }))
-vi.mock('../../hooks/useSystemNavigation', async importOriginal => ({
-  ...await importOriginal<typeof import('../../hooks/useSystemNavigation')>(),
+vi.mock('@/hooks/useSystemNavigation', async importOriginal => ({
+  ...await importOriginal<typeof import('@/hooks/useSystemNavigation')>(),
   loadSystemNavigation: vi.fn(),
 }))
-vi.mock('../../i18n', async importOriginal => ({
-  ...await importOriginal<typeof import('../../i18n')>(),
+vi.mock('@/i18n', async importOriginal => ({
+  ...await importOriginal<typeof import('@/i18n')>(),
   ensureLanguageBundle: vi.fn().mockResolvedValue(undefined),
 }))
 

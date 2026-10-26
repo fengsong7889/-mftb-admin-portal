@@ -1,0 +1,2533 @@
+/** 权限管理模块类型定义 */
+
+
+/** 功能操作枚举 */
+export const PERMISSION_ACTIONS = [
+  { key: 'view', label: '查看' },
+  { key: 'create', label: '新增' },
+  { key: 'edit', label: '編輯' },
+  { key: 'delete', label: '刪除' },
+  { key: 'import', label: '導入' },
+  { key: 'export', label: '導出' },
+  { key: 'enable', label: '啟用' },
+  { key: 'disable', label: '停用' },
+] as const
+
+/**
+ * 敏感能力专用动作（只挂在确实需要它的菜单上，不进 PERMISSION_ACTIONS）。
+ *
+ * 为什么不能把它们加进全局枚举：PERMISSION_ACTIONS 同时是「菜单没配 actions 时的默认动作集」
+ * 与「全部菜单·全部權限」批量勾选的展开源，把 salaryView/sensitiveView 这类能力放进去
+ * 等于给每个新菜单默认授予敏感读权 —— 与方案 §7.3「未显式授权默认拒绝」直接相反。
+ * 真值与后端 EmployeeConstants.GRANTABLE_ACTIONS 逐字对齐。
+ */
+export const SENSITIVE_ACTIONS = [
+  { key: 'salaryView', label: '薪酬查看' },
+  { key: 'salaryEdit', label: '薪酬編輯' },
+  { key: 'sensitiveView', label: '敏感明文' },
+  { key: 'accountEdit', label: '賬號操作' },
+  { key: 'authorize', label: '角色授權' },
+  { key: 'auditView', label: '人事審計查看' },
+] as const
+
+/**
+ * 業務專用動作（只掛在確實需要它的菜單上，不進 PERMISSION_ACTIONS）。
+ *
+ * 與 SENSITIVE_ACTIONS 同理：PERMISSION_ACTIONS 同時是「菜單未配 actions 時的默認動作集」
+ * 與「全部菜單·全部權限」批量勾選的展開源，把 trigger 放進去等於給每個新菜單默認授予
+ * 「向全公司釘釘群發消息」的能力——與「未顯式授權默認拒絕」直接相反。
+ * 真值與後端 RdmMenuInitializer.ACTION_ORDER 逐字對齊。
+ */
+export const BUSINESS_ACTIONS = [
+  { key: 'trigger', label: '手動觸發' },
+] as const
+
+/** 动作 key → 中文标签查找表（后端只下发 key 时渲染标签用） */
+export const ACTION_LABEL_MAP: Record<string, string> = Object.fromEntries(
+  [...PERMISSION_ACTIONS, ...SENSITIVE_ACTIONS, ...BUSINESS_ACTIONS].map(a => [a.key, a.label]),
+)
+
+/** 菜单功能映射（每个菜单实际包含的功能操作） */
+export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string }>> = {
+  // 首页
+  'home': [
+    { key: 'view', label: '查看' },
+  ],
+  // 商戶集團管理
+  'merchant-group-list': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 門店管理
+  'store-list': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'export', label: '導出' },
+  ],
+  // 商家推廣工具 - 數據看板
+  'promotion-dashboard': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 算法庫
+  'promotion-algorithm': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'enable', label: '啟用' },
+    { key: 'disable', label: '停用' },
+  ],
+  // 瀑布流策略
+  'promotion-slot-config': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'enable', label: '啟用' },
+    { key: 'disable', label: '停用' },
+  ],
+  // 銷售定價
+  'promotion-waterfall': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // 廣告銷售
+  'ad-sales': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'export', label: '導出' },
+  ],
+  // 詞庫管理（商家推廣工具）
+  'promotion-word-library': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'import', label: '導入' },
+    { key: 'export', label: '導出' },
+  ],
+  // 流量沙盤（商家推廣工具）：均為查詢型頁面，僅查看與導出
+  'waterfall-simulation': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'algorithm-simulation': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'merchant-score-insight': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'merchant-promotion-diagnose': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 店鋪推廣（推廣通）：「訂單管理」（promotion-order-manage）菜单已退役，
+  // 其路由 /promotion-order-manage 与后端 AdOrderController 均已归到本菜单授权，
+  // 因此本菜单必须保留 edit（退款/取消订单接口需要）
+  'promotion-sales-config': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'export', label: '導出' },
+  ],
+  // 推廣通 - 數據概覽
+  'promotion-report-overview': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 推廣通 - 訂單效果報表
+  'promotion-report-order': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 推廣通 - 推薦類型對比
+  'promotion-report-compare': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 全局配置
+  'global-config': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // 维度策略
+  'channel-strategy': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'enable', label: '啟用' },
+    { key: 'disable', label: '停用' },
+  ],
+  // 底纹配置
+  'hint-config': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'import', label: '導入' },
+    { key: 'export', label: '導出' },
+    { key: 'enable', label: '啟用' },
+    { key: 'disable', label: '停用' },
+  ],
+  // 热搜配置
+  'hot-search-config': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'import', label: '導入' },
+    { key: 'export', label: '導出' },
+    { key: 'enable', label: '啟用' },
+    { key: 'disable', label: '停用' },
+  ],
+  // 权重干预
+  'search-weight-config': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'enable', label: '啟用' },
+    { key: 'disable', label: '停用' },
+  ],
+  // 分词词库
+  'word-segmentation': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'import', label: '導入' },
+    { key: 'export', label: '導出' },
+  ],
+  // 同义词库
+  'synonym-config': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'import', label: '導入' },
+    { key: 'export', label: '導出' },
+  ],
+  // 热搜词库
+  'hot-search-library': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'import', label: '導入' },
+    { key: 'export', label: '導出' },
+  ],
+  // 停用词库
+  'stop-words': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'import', label: '導入' },
+    { key: 'export', label: '導出' },
+  ],
+  // 搜索校验
+  'search-verify': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 底纹校验
+  'hint-verify': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 热搜校验
+  'hot-search-verify': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 底纹报表
+  'hint-report': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 热搜报表
+  'hot-search-report': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 账户余额
+  'account-balance': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'export', label: '導出' },
+  ],
+  // 消费风控（推广金消费限额/白名单维护）
+  'consume-risk': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // 批次查询
+  'batch-query': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 明细查询
+  'detail-query': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 债务明细
+  'debt-detail': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 欠款对账
+  'debt-reconcile': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+    { key: 'import', label: '還款導入' },
+  ],
+  // 核销对账
+  'writeoff-reconcile': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 审批中心
+  'approval-center': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // 推广赠送（商家推广工具-赠送管理）
+  'gift-detail': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'export', label: '導出' },
+  ],
+  // 消费明细（商家推广工具-赠送管理）
+  'gift-consume-detail': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 权限管理
+  'permission': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 集团人事
+  'hr': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 登录日志
+  'login-log': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+    { key: 'forceLogout', label: '下線' },
+  ],
+  // 员工管理
+  // 动作拆分（方案 §7.3）：edit 不再隐含薪酬/明文/账号/授权四种能力，逐条单独授予
+  'employee-management': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'export', label: '導出' },
+    { key: 'salaryView', label: '薪酬查看' },
+    { key: 'salaryEdit', label: '薪酬編輯' },
+    { key: 'sensitiveView', label: '敏感明文' },
+    { key: 'accountEdit', label: '賬號操作' },
+    { key: 'authorize', label: '角色授權' },
+    // 审计查看单独一个动作：能看花名册不等于能看「谁动过花名册」（后端 HrAuditController 同值）
+    { key: 'auditView', label: '人事審計查看' },
+  ],
+  // 入轉調離（入職/轉正/調動/離職四菜单共享后端端点, 功能操作对齐员工管理）
+  'hr-onboarding': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'hr-regularization': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'hr-transfer': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'hr-dimission': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 請假管理 / 假期額度
+  'hr-leave': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'hr-leave-quota': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 員工自助（本人视角：可自助提单，单据与档案只读）
+  'ess-leave': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'ess-certificate': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 證明開具台账（人事）：跨员工查看与开具登记，不含删除以保留办理留痕
+  'hr-certificate': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // 績效考核（周期与计划=HR 全量动作；工作台=只评名下；校准=改判与整批提交）
+  'hr-perf-admin': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'hr-perf-review': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '評分' },
+  ],
+  'hr-perf-calibration': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '改判/提交' },
+  ],
+  'ess-performance': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '自評' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // 績效台账（M2）：台账要导出，留痕只读，申诉可受理与修订
+  'hr-perf-ledger': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'hr-perf-audit': [{ key: 'view', label: '查看' }],
+  'hr-perf-appeal': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '受理/修訂' },
+  ],
+  'ess-requests': [{ key: 'view', label: '查看' }],
+  'ess-profile': [{ key: 'view', label: '查看' }],
+  // 字典維護（集团人事独立菜单，可单独授权）
+  'hr-dict': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // 合同台賬（集团人事独立菜单：台账只读+导出；续签单据复用本菜单授权）
+  'contract-ledger': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'export', label: '導出' },
+  ],
+  // 部門架構（v44 起属一级域 org-center，key 由 organization-management 迁移为 org-structure）
+  'org-structure': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 职位管理
+  'position-management': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 角色管理
+  'role-management': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 功能权限（已合并入授权中心，菜单下线前保留回退映射）
+  'function-permission': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 授权中心（统一授权工作台：配置/透视/审计）
+  'authorization-center': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 数据权限
+  'data-permission': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 菜单管理
+  'menu-management': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 菜單配置
+  'menu-config': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 多語言配置
+  'translation-manage': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 多语言管理（i18n-center 独立模块）
+  'i18n-language': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'i18n-import-export': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'i18n-mt-engine': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'i18n-dashboard': [
+    { key: 'view', label: '查看' },
+  ],
+  // 規則配置（總覽）
+  'rule-config': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // 規則中心（目錄 + 5 版塊子菜單）
+  'rule-center': [
+    { key: 'view', label: '查看' },
+  ],
+  'rule-ad-sales': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'rule-gift': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'rule-security': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'rule-algorithm': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'rule-seq': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // 流程配置
+  'workflow-config': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 智能中心(AI) > 模型接入 / 授權與配額 / AI 操作授權
+  'ai_model_hub': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'ai-operation-auth': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'agent-overview': [
+    { key: 'view', label: '查看' },
+  ],
+  'agent-apps': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'agent-budget': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'agent-actions': [
+    { key: 'view', label: '查看' },
+    { key: 'approve', label: '審批' },
+    { key: 'execute', label: '執行' },
+  ],
+  'agent-knowledge': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'agent-data': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    // 端点批准与系统分级拆开动作：登记分级是业务决策（edit），批准端点是安全准入（approve）
+    { key: 'approve', label: '批准端點' },
+  ],
+  'agent-runs': [
+    { key: 'view', label: '查看' },
+  ],
+  'agent-evaluation': [
+    { key: 'view', label: '查看' },
+    { key: 'deploy', label: '發布' },
+  ],
+  'ai-assistant-overview': [
+    { key: 'view', label: '查看' },
+  ],
+  'ai-assistant-capability': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'ai-assistant-profile': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'ai-assistant-glossary': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'ai-assistant-knowledge': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'ai-assistant-guardrail': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'ai-assistant-quick-prompt': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'ai-assistant-push-template': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'ai-assistant-memory': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'ai-assistant-feedback': [
+    { key: 'view', label: '查看' },
+  ],
+  'ai-assistant-audit': [
+    { key: 'view', label: '查看' },
+  ],
+  // ── AI 菜单动作集（与后端 @RequirePermission 实测集一致）──
+  // 未在此表登记的菜单会回退成全部 8 个通用动作（導入/啟用 等无关项），必须逐菜单补齐
+  'ai-model-provider': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'ai-model-list': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'ai-dept-model-auth': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'ai-emp-model-auth': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 部门/员工额度：额度为策略调整，无「新增入口」，新增由覆盖规则表单承担（后端只有 edit/delete）
+  'ai-dept-quota': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'ai-emp-quota': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'ai-emp-permission': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // AI 能耗管理：能耗統計 / 能耗明細（刪除無用的能耗管控）→ 
+  'ai_usage_stats': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'ai_energy_detail': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // AI 使用申請
+  'ai-access-request': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // MCP 服務
+  'ai-mcp-service': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // 系统模板
+  'system-template': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 布局设置
+  'layout-settings': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // 基础设置
+  'basic-settings': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // 用户意见反馈
+  'user-feedback': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 用户列表
+  'user-list': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 用户头像管理
+  'user-avatar': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // 用户冻结列表
+  'user-frozen': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 设备号冻结列表
+  'device-frozen': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 用户收货地图特殊收录
+  'user-location-special': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 用户收货地图黑名单
+  'user-location-blacklist': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 白名单
+  'whitelist': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 运营平台工具
+  'operation-platform': [
+    { key: 'view', label: '查看' },
+  ],
+  // 投放列表
+  'delivery-list': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 商家入驻
+  'merchant-onboarding': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // 商家意见
+  'merchant-feedback': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 集团列表
+  'group-list': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 集团权限
+  'group-permission': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // 门店基础信息管理
+  'store-basic-info': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 合同管理
+  'contract-management': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // 集团门店品牌库管理
+  'group-brand-library': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 商品标签
+  'product-tags': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 商品参数
+  'product-params': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 门店管理
+  'store-management': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 门店营业品类
+  'store-categories': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 商品平台分类
+  'product-platform-categories': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 团购门店管理
+  'group-buy-store': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 团购商品管理
+  'group-buy-product': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 團購管理 - 秒殺數據總覽
+  'group-purchase-dashboard': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '批量導入' },
+  ],
+  // 團購管理 - 秒殺商品登記
+  'flash-sale-register': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '批量導入' },
+    { key: 'export', label: '導出' },
+  ],
+  // 團購管理 - 秒殺商品統計
+  'flash-sale-stats': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '批量導入' },
+    { key: 'export', label: '導出' },
+  ],
+  // 團購管理 - 澳覓秒殺價
+  'flash-sale-price': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 物資管理
+  // 資產看板：纯展示页，无导出/无编辑入口
+  'asset-dashboard': [
+    { key: 'view', label: '查看' },
+  ],
+  'asset-list': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '入庫' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'export', label: '導出' },
+  ],
+  'asset-scrap': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '申請' },
+    { key: 'edit', label: '審核' },
+  ],
+  'asset-repair': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '送修' },
+    { key: 'edit', label: '完修' },
+  ],
+  'asset-loss': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '報失' },
+    { key: 'edit', label: '找回/驗收' },
+  ],
+  'asset-inventory': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '發起' },
+    { key: 'export', label: '導出' },
+  ],
+  // 變更歷史（流轉流水）：只读台账，仅导出
+  'asset-flow': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // ── 用車管理（action key 严格对齐后端的 view/create/edit/export，
+  // 授权直接登记复用 create、补录复用 ledger 的 create、更正复用 edit，
+  // 不自定义动作名，否则 PermissionDeniedException 无法给出可读提示）──
+  'vehicle-files': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增/核驗資格' },
+    { key: 'edit', label: '編輯/狀態/開關' },
+    { key: 'export', label: '導出' },
+  ],
+  'vehicle-dispatch': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '安排/出還車/確認/直接登記' },
+  ],
+  'vehicle-ledger': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '事後補錄' },
+    { key: 'edit', label: '授權更正' },
+    { key: 'export', label: '導出' },
+  ],
+  'my-vehicle-use': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '發起申請' },
+  ],
+  // 车辆参数库：三级主数据维护；删除归到 edit（后端没有独立的 delete 动作名）
+  'vehicle-master-data': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增主數據' },
+    { key: 'edit', label: '編輯/停用/刪除' },
+  ],
+  // ── 考勤假勤系统（动作集必须与 sys_menu.actions 逐字对齐：少登记一个动作，
+  //  授权中心就勾不到该能力；多登记一个动作，就会授出接口并不存在的权限）──
+  'attendance-workbench': [
+    { key: 'view', label: '查看' },
+  ],
+  'attendance-group': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增考勤組' },
+    { key: 'edit', label: '編輯/啟停' },
+    { key: 'delete', label: '刪除' },
+    { key: 'export', label: '導出' },
+  ],
+  // 組織編制系統：動作集與後端 HcmOrganizationConstants.ACTIONS_FULL 逐字對齊，
+  // 少了任一動作，授權中心就勾不出對應能力（超管直通看不出來，普通角色線上才 403）
+  // 薪酬福利：viewSensitive 之外的金额可见性由 payroll 域自身的 action 控制
+  'hcm-payroll-component': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增項目' },
+    { key: 'edit', label: '編輯/啟停' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'hcm-payroll-standard': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增標準' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'hcm-payroll-benefit': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增方案/參保' },
+    { key: 'edit', label: '編輯/啟停' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'hcm-payroll-rule': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增/複製規則' },
+    { key: 'edit', label: '編輯/啟停/級距' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'hcm-payroll-run': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '建立批次' },
+    { key: 'edit', label: '試算/鎖定' },
+    { key: 'delete', label: '刪除草稿' },
+  ],
+
+
+
+  'hcm-org-legal': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增法人' },
+    { key: 'edit', label: '編輯/啟停' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'hcm-org-unit': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增組織' },
+    { key: 'edit', label: '編輯/移動' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'hcm-org-job-family': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增職務族' },
+    { key: 'edit', label: '編輯/啟停' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'hcm-org-job-grade': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增職位' },
+    { key: 'edit', label: '編輯/啟停' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'hcm-org-position': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增崗位' },
+    { key: 'edit', label: '編輯/啟停' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // 人事管理 · 人員主檔（C3）：与 HcmPersonMenuInitializer 的 actions 逐字对齐
+  'hcm-person': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增人員' },
+    { key: 'edit', label: '編輯人員/雇傭/任職' },
+    { key: 'delete', label: '刪除' },
+    // 字段級：勾了才看得到手機/郵箱/出生日期明文，否則服務端返回掩碼
+    { key: 'viewSensitive', label: '查看敏感字段（手機/郵箱/出生日期）' },
+  ],
+  'attendance-shift': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增班次' },
+    { key: 'edit', label: '編輯/啟停' },
+    { key: 'delete', label: '刪除' },
+    { key: 'export', label: '導出' },
+  ],
+  'attendance-holiday': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增節假日' },
+    { key: 'edit', label: '編輯/啟停' },
+    { key: 'delete', label: '刪除' },
+    { key: 'import', label: '導入年度日曆' },
+  ],
+  'attendance-schedule': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '排班/儲存' },
+    { key: 'import', label: '導入排班' },
+    { key: 'export', label: '導出' },
+  ],
+  'attendance-punch': [
+    { key: 'view', label: '查看' },
+    { key: 'import', label: '導入打卡' },
+    { key: 'export', label: '導出' },
+  ],
+  'attendance-exception': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '指派處理方式/確認異常' },
+    { key: 'export', label: '導出' },
+  ],
+  'attendance-daily': [
+    { key: 'view', label: '查看' },
+    // 重算會改日報、生成異常並回寫打卡判定，屬寫操作；動作集必須與後端
+    // sys_menu.actions（attendance:menu:v1.1 補齊）逐字對齊，少登記就勾不到該能力
+    { key: 'edit', label: '重算區間日報' },
+    { key: 'export', label: '導出' },
+  ],
+  'attendance-monthly': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '凍結/同步薪酬' },
+    { key: 'export', label: '導出' },
+  ],
+  'attendance-setting': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '修改口徑參數' },
+  ],
+  // ── 会议管理系统（动作集必须与 MeetingSchemaMigrationInitializer 写入的 sys_menu.actions 逐字对齐：
+  //  少登记一个动作，授权中心就勾不到该能力；多登记一个动作，就会授出接口并不存在的权限）──
+  'meeting-my': [
+    { key: 'view', label: '查看' },
+    // 响应邀约与取消自己发起的会议都是写操作，与后端 @RequirePermission(action=edit) 对齐
+    { key: 'edit', label: '響應/取消會議' },
+  ],
+  'meeting-booking': [
+    { key: 'view', label: '查看忙閒' },
+    { key: 'edit', label: '預約/改期/取消' },
+  ],
+  'meeting-room': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增會議室' },
+    { key: 'edit', label: '編輯/啟停/刪除' },
+  ],
+  'meeting-record': [
+    { key: 'view', label: '查看全部記錄' },
+    { key: 'edit', label: '代訂/手動釋放/取消' },
+  ],
+  // 預約規則：改全局規則與手動拉黑/撤銷都是寫操作，動作集與 sys_menu.actions 逐字對齊
+  'meeting-config': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '修改規則/黑名單' },
+  ],
+  // 行政側紀要檢索（會議治理 › 會議紀要）：只讀，匯出跟隨後端 export 動作
+  'meeting-minutes-list': [
+    { key: 'view', label: '查看全部紀要' },
+    { key: 'export', label: '匯出' },
+  ],
+  // 通知模板：改文案與停用模板都是寫操作
+  'notification-template': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯模板' },
+  ],
+  // 推送開關：臨時靜音/恢復
+  'notification-switch': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '開啟/靜音' },
+  ],
+  // 原生方案动作与后端菜单种子对齐；治理入口不隐含方案编辑或空间管理权。
+  'doc-plans': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'confirm', label: '確認版本' },
+    { key: 'export', label: '導出' },
+  ],
+  'doc-governance': [{ key: 'view', label: '查看' }],
+  'doc-system-plans': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '同步方案文件' },
+  ],
+  'doc-api-center': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '同步接口清单' },
+  ],
+  // ── 資產運營流轉（action key 與後端 @RequirePermission 對齊，僅列出該菜單實際使用的動作）──
+  'asset-claim': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '領用/審核' },
+  ],
+  'asset-borrow': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '借用/續借' },
+  ],
+  'asset-return': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '歸還/驗收' },
+  ],
+  'asset-handover': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '交接' },
+  ],
+  'asset-compensation': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '定責/處理' },
+  ],
+  'asset-transfer-list': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '調撥/撤銷' },
+  ],
+  // ── 採購與供應 / 基礎數據（view/edit/delete）──
+  'asset-inbound': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '驗收' },
+  ],
+  'purchase-order': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'asset-category': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'asset-model': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'asset-location': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'param-library': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'asset-supplier': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  'asset-tag': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // ── 僅查看 / 系統配置 / OA / AI ──
+  'consumable-stock-txn': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // ── 耗材管理（action 集與後端 EamConsumable*Controller @RequirePermission 對齊）──
+  'consumable-ops': [
+    { key: 'view', label: '查看' },
+  ],
+  'consumable-dashboard': [
+    { key: 'view', label: '查看' },
+  ],
+  'consumable-item': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'export', label: '導出' },
+  ],
+  'consumable-inbound': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '入庫' },
+  ],
+  'consumable-stock': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '調整' },
+    { key: 'export', label: '導出' },
+  ],
+  'consumable-alert': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'consumable-report': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 耗材領用：員工自助提單 + 管理側審核，無刪除以保留領用留痕
+  'consumable-claim': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '領用申請' },
+    { key: 'edit', label: '審核' },
+    { key: 'export', label: '導出' },
+  ],
+  'process-center': [
+    { key: 'view', label: '查看' },
+  ],
+  // 流程事項：員工發起申請單 + 本人撤銷/改單（後端 oa-requests 只有 view/create/edit）
+  'oa-requests': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '發起' },
+    { key: 'edit', label: '撤銷/催辦' },
+  ],
+  'ai-conversation-audit': [
+    { key: 'view', label: '查看' },
+  ],
+  'notification-config': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'version-history': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+  ],
+  // ── 產研交付（RDM）需求全生命周期 ──
+  'rdm-center': [
+    { key: 'view', label: '查看' },
+  ],
+  'rdm-workbench': [
+    { key: 'view', label: '查看' },
+  ],
+  // 需求清单：提需求（create）与需求侧处理（edit：受理/PRD/评审/变更）已从退役的提交需求/產品需求處理平移过来
+  // B2 新增 view_all（全量可见）/ dispatch（分配权）/ contribute（沟通附件）：过渡期与 rdm-intake 双锚点并行
+  'rdm-requirement': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'export', label: '導出' },
+    { key: 'view_all', label: '全量查看' },
+    { key: 'dispatch', label: '分配' },
+    { key: 'contribute', label: '溝通' },
+  ],
+  // v3.11 拆分：「需求池」升为一级分组，下挂提交需求（业务侧）与需求管理（分配侧）
+  'rdm-pool-group': [
+    { key: 'view', label: '查看' },
+  ],
+  // 提交需求：提出人看自己的单 + 审批人处理待审。只给 view：
+  // 审批动作由服务端按「OA 当前审批人=我」收敛，分配权仍只在 rdm-intake:edit
+  'rdm-intake-approval': [
+    { key: 'view', label: '查看' },
+  ],
+  // 需求管理（旧名需求池·分配）：分配侧窄权限菜单。view 就是全量可见（canSeeAll 认它），edit 就是分配权
+  'rdm-intake': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-delivery': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'delete', label: '刪除' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-delivery-board': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-delivery-iteration': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    // 删除迭代也从退役的 rdm-product 平移到这里，与后端 ITERATION_ACTIONS 保持一致
+    { key: 'delete', label: '刪除' },
+    { key: 'export', label: '導出' },
+  ],
+  // V3 分批交付：测试工作台 / 发布中心（与后端 DELIVERY_ACTIONS 逐字一致）
+  // 发布中心兼任灰度管理的写锚点（RdmFlowConfigController 校 rdm-delivery-release:edit）
+  'rdm-delivery-test': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-delivery-release': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'export', label: '導出' },
+  ],
+  // v3.13 新建分组
+  'rdm-test-quality-group': [
+    { key: 'view', label: '查看' },
+  ],
+  'rdm-release-accept-group': [
+    { key: 'view', label: '查看' },
+  ],
+  'rdm-acceptance': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+  ],
+  'rdm-dashboard': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-dashboard-board': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-dashboard-risk': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // 新分组：容器节点，只给查看（能进分组不等于能看子页，子页各自动作集单独控）
+  'rdm-efficiency': [
+    { key: 'view', label: '查看' },
+  ],
+  'rdm-efficiency-output': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-dashboard-quality': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-dashboard-version': [
+    { key: 'view', label: '查看' },
+  ],
+  'rdm-dashboard-report': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-dashboard-score': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'rdm-dashboard-trend': [
+    { key: 'view', label: '查看' },
+    { key: 'export', label: '導出' },
+  ],
+  // V3 分批交付「項目總覽」（与后端种子 PROJECT_ACTIONS 一致：新增挂 create、
+  // 编辑/暂停恢复挂 edit；后端真值源 sys_menu.actions 优先，本表只是它为空时的回退）
+  'rdm-dashboard-project': [
+    { key: 'view', label: '查看' },
+    { key: 'create', label: '新增' },
+    { key: 'edit', label: '編輯' },
+    { key: 'export', label: '導出' },
+  ],
+  // 团队负载（rdm-resource-load）：与后端种子 RESOURCE_LOAD_ACTIONS 一致
+  // view=查看本人；view_all=查看全员；edit=维护本人剩余工时/日历；dispatch=分派工作；manage=名册与容量维护；export=导出
+  'rdm-resource-load': [
+    { key: 'view', label: '查看' },
+    { key: 'view_all', label: '查看全员' },
+    { key: 'edit', label: '編輯' },
+    { key: 'dispatch', label: '分派' },
+    { key: 'manage', label: '名册维护' },
+    { key: 'export', label: '導出' },
+  ],
+  'rdm-config-score': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'rdm-config-group': [
+    { key: 'view', label: '查看' },
+  ],
+  'rdm-config-status': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'rdm-config-routing': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'rdm-config-sla': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'rdm-task-type-config': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  // 進度日報：四个二级菜单按职责拆权，trigger 只在「手動觸發」上
+  'rdm-daily-report-rule': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'rdm-daily-report-template': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+  ],
+  'rdm-daily-report-record': [
+    { key: 'view', label: '查看' },
+  ],
+  'rdm-daily-report-trigger': [
+    { key: 'view', label: '查看' },
+    { key: 'trigger', label: '手動觸發' },
+  ],
+}
+
+/** 获取菜单的功能操作（优先后端 sys_menu.actions 真值源，空时回退前端静态映射） */
+export const getMenuActions = (menuKey: string, backendActions?: string[] | null) => {
+  if (backendActions && backendActions.length > 0) {
+    return backendActions.map(key => ({ key, label: ACTION_LABEL_MAP[key] ?? key }))
+  }
+  return MENU_ACTIONS_MAP[menuKey] || PERMISSION_ACTIONS
+}
+
+/** 功能权限（菜单+操作） */
+export interface MenuPermission {
+  menuKey: string // 菜单key
+  actions: string[] // 允许的操作：view, create, edit, delete, import, export, enable, disable
+}
+
+/** 功能角色 */
+export interface Role {
+  id: string
+  name: string
+  description: string
+  permissions: MenuPermission[] // 菜单权限列表
+  userCount: number
+  createdAt: string
+  status: 'active' | 'inactive' // 状态：启用/停用
+}
+
+/** 员工账号 */
+export interface UserAccount {
+  empId: string
+  name: string
+  username: string
+  roles: string[] // 角色ID数组，支持多角色
+  department?: string
+}
+
+/** 地点数据组 */
+export interface LocationGroup {
+  id: string
+  name: string
+  description: string
+  country: string // 授权国家（单个）
+  locations: string[] // 地点key数组
+  userCount: number
+  createdAt: string
+  status: 'active' | 'inactive' // 状态：启用/停用
+}
+
+/** 商家数据组 */
+export interface MerchantGroup {
+  id: string
+  name: string
+  description: string
+  country: string // 授权国家（单个）
+  merchants: string[] // 商家ID数组
+  userCount: number
+  createdAt: string
+  status: 'active' | 'inactive' // 状态：启用/停用
+}
+
+/** 地点选项 */
+export const locationOptions = [
+  // 华南地区
+  { key: 'guangzhou', label: '广州' },
+  { key: 'shenzhen', label: '深圳' },
+  { key: 'zhuhai', label: '珠海' },
+  { key: 'dongguan', label: '东莞' },
+  { key: 'foshan', label: '佛山' },
+  { key: 'zhongshan', label: '中山' },
+  { key: 'huizhou', label: '惠州' },
+  { key: 'jiangmen', label: '江门' },
+  { key: 'zhaoqing', label: '肇庆' },
+  { key: 'qingyuan', label: '清远' },
+  // 华东地区
+  { key: 'shanghai', label: '上海' },
+  { key: 'hangzhou', label: '杭州' },
+  { key: 'nanjing', label: '南京' },
+  { key: 'suzhou', label: '苏州' },
+  { key: 'wuxi', label: '无锡' },
+  { key: 'ningbo', label: '宁波' },
+  { key: 'hefei', label: '合肥' },
+  { key: 'wenzhou', label: '温州' },
+  { key: 'changzhou', label: '常州' },
+  { key: 'nantong', label: '南通' },
+  { key: 'shaoxing', label: '绍兴' },
+  { key: 'jiaxing', label: '嘉兴' },
+  { key: 'taizhou_zj', label: '台州' },
+  // 华北地区
+  { key: 'beijing', label: '北京' },
+  { key: 'tianjin', label: '天津' },
+  { key: 'shijiazhuang', label: '石家庄' },
+  { key: 'taiyuan', label: '太原' },
+  { key: 'datong', label: '大同' },
+  { key: 'baoding', label: '保定' },
+  { key: 'tangshan', label: '唐山' },
+  { key: 'handan', label: '邯郸' },
+  { key: 'langfang', label: '廊坊' },
+  { key: 'cangzhou', label: '沧州' },
+  { key: 'chengde', label: '承德' },
+  { key: 'zhangjiakou', label: '张家口' },
+  // 西南地区
+  { key: 'chengdu', label: '成都' },
+  { key: 'chongqing', label: '重庆' },
+  { key: 'kunming', label: '昆明' },
+  { key: 'guiyang', label: '贵阳' },
+  { key: 'mianyang', label: '绵阳' },
+  { key: 'zunyi', label: '遵义' },
+  { key: 'dali', label: '大理' },
+  { key: 'liuzhou', label: '柳州' },
+  { key: 'nanning', label: '南宁' },
+  { key: 'deyang', label: '德阳' },
+  { key: 'meishan', label: '眉山' },
+  { key: 'leshan', label: '乐山' },
+  { key: 'zigong', label: '自贡' },
+  { key: 'yibin', label: '宜宾' },
+  { key: 'nanchong', label: '南充' },
+  // 华中地区
+  { key: 'wuhan', label: '武汉' },
+  { key: 'changsha', label: '长沙' },
+  { key: 'zhengzhou', label: '郑州' },
+  { key: 'nanchang', label: '南昌' },
+  { key: 'xiangyang', label: '襄阳' },
+  { key: 'yichang', label: '宜昌' },
+  { key: 'zhuzhou', label: '株洲' },
+  { key: 'luoyang', label: '洛阳' },
+  { key: 'kaifeng', label: '开封' },
+  // 东北地区
+  { key: 'shenyang', label: '沈阳' },
+  { key: 'dalian', label: '大连' },
+  { key: 'harbin', label: '哈尔滨' },
+  { key: 'changchun', label: '长春' },
+  { key: 'anjing', label: '安庆' },
+  { key: 'jilin', label: '吉林' },
+  { key: 'qiqihar', label: '齐齐哈尔' },
+  { key: 'mudanjiang', label: '牡丹江' },
+  { key: 'yingkou', label: '营口' },
+  // 西北地区
+  { key: 'xian', label: '西安' },
+  { key: 'lanzhou', label: '兰州' },
+  { key: 'yinchuan', label: '银川' },
+  { key: 'xining', label: '西宁' },
+  { key: 'wulumuqi', label: '乌鲁木齐' },
+  { key: 'tianshui', label: '天水' },
+  { key: 'yanan', label: '延安' },
+  { key: 'jiayuguan', label: '嘉峪关' },
+  { key: 'shihezi', label: '石河子' },
+  // 港澳台地区
+  { key: 'hongkong', label: '香港' },
+  { key: 'macau', label: '澳门' },
+  { key: 'taipa', label: '氹仔' },
+  { key: 'coloane', label: '路环' },
+  { key: 'kowloon', label: '九龙' },
+  { key: 'new_territories', label: '新界' },
+  { key: 'hong_kong_island', label: '香港岛' },
+  { key: 'taipa_cotai', label: '氹仔路氹' },
+  // 海外地区
+  { key: 'singapore', label: '新加坡' },
+  { key: 'tokyo', label: '东京' },
+  { key: 'seoul', label: '首尔' },
+  { key: 'bangkok', label: '曼谷' },
+  { key: 'kuala_lumpur', label: '吉隆坡' },
+  { key: 'jakarta', label: '雅加达' },
+  { key: 'manila', label: '马尼拉' },
+  { key: 'ho_chi_minh', label: '胡志明' },
+  { key: 'sydney', label: '悉尼' },
+  // 海峡西岸
+  { key: 'fuzhou', label: '福州' },
+  { key: 'xiamen', label: '厦门' },
+  { key: 'quanzhou', label: '泉州' },
+  { key: 'zhangzhou', label: '漳州' },
+  { key: 'putian', label: '莆田' },
+  { key: 'sanming', label: '三明' },
+]
+
+/** 国家选项 */
+export const countryOptions = [
+  { key: 'china', label: '中国' },
+  { key: 'hongkong', label: '香港' },
+  { key: 'macau', label: '澳门' },
+  { key: 'taiwan', label: '台湾' },
+  { key: 'japan', label: '日本' },
+  { key: 'south_korea', label: '韩国' },
+  { key: 'singapore', label: '新加坡' },
+  { key: 'malaysia', label: '马来西亚' },
+  { key: 'thailand', label: '泰国' },
+  { key: 'vietnam', label: '越南' },
+  { key: 'philippines', label: '菲律宾' },
+  { key: 'indonesia', label: '印度尼西亚' },
+  { key: 'usa', label: '美国' },
+  { key: 'uk', label: '英国' },
+  { key: 'australia', label: '澳大利亚' },
+]
+
+/** 国家与城市映射 */
+export const countryLocationMap: Record<string, string[]> = {
+  china: [
+    'guangzhou', 'shenzhen', 'zhuhai', 'dongguan', 'foshan', 'zhongshan', 'huizhou', 'jiangmen', 'zhaoqing', 'qingyuan',
+    'shanghai', 'hangzhou', 'nanjing', 'suzhou', 'wuxi', 'ningbo', 'hefei', 'wenzhou', 'changzhou', 'nantong', 'shaoxing', 'jiaxing', 'taizhou_zj',
+    'beijing', 'tianjin', 'shijiazhuang', 'taiyuan', 'datong', 'baoding', 'tangshan', 'handan', 'langfang', 'cangzhou', 'chengde', 'zhangjiakou',
+    'chengdu', 'chongqing', 'kunming', 'guiyang', 'mianyang', 'zunyi', 'dali', 'liuzhou', 'nanning', 'deyang', 'meishan', 'leshan', 'zigong', 'yibin', 'nanchong',
+    'wuhan', 'changsha', 'zhengzhou', 'nanchang', 'xiangyang', 'yichang', 'zhuzhou', 'luoyang', 'kaifeng',
+    'shenyang', 'dalian', 'harbin', 'changchun', 'anjing', 'jilin', 'qiqihar', 'mudanjiang', 'yingkou',
+    'xian', 'lanzhou', 'yinchuan', 'xining', 'wulumuqi', 'tianshui', 'yanan', 'jiayuguan', 'shihezi',
+    'fuzhou', 'xiamen', 'quanzhou', 'zhangzhou', 'putian', 'sanming',
+  ],
+  hongkong: ['hongkong', 'kowloon', 'new_territories', 'hong_kong_island'],
+  macau: ['macau', 'taipa', 'coloane', 'taipa_cotai'],
+  taiwan: ['taipei', 'kaohsiung', 'taichung', 'tainan'],
+  japan: ['tokyo', 'osaka', 'kyoto', 'nagoya', 'sapporo', 'fukuoka'],
+  south_korea: ['seoul', 'busan', 'incheon', 'daegu', 'daejeon'],
+  singapore: ['singapore'],
+  malaysia: ['kuala_lumpur', 'penang', 'johor_bahru', 'malacca'],
+  thailand: ['bangkok', 'chiang_mai', 'phuket', 'pattaya'],
+  vietnam: ['ho_chi_minh', 'hanoi', 'da_nang', 'hai_phong'],
+  philippines: ['manila', 'cebu', 'davao', 'quezon_city'],
+  indonesia: ['jakarta', 'surabaya', 'bandung', 'medan', 'bali'],
+  usa: ['new_york', 'los_angeles', 'chicago', 'houston', 'phoenix'],
+  uk: ['london', 'manchester', 'birmingham', 'edinburgh', 'glasgow'],
+  australia: ['sydney', 'melbourne', 'brisbane', 'perth', 'adelaide'],
+}
+
+/** 商家模拟数据 */
+export const merchantOptions = [
+  // 中国商家
+  { id: 'G10001', name: '美味集團有限公司', address: '廣東省廣州市', country: 'china' },
+  { id: 'G10002', name: '閃蜂科技有限公司', address: '廣東省深圳市', country: 'china' },
+  { id: 'G10005', name: '金龍餐飲管理公司', address: '廣東省珠海市', country: 'china' },
+  { id: 'G10006', name: '星輝餐飲集團', address: '珠海', country: 'china' },
+  { id: 'G10007', name: '佳味食品科技有限公司', address: '廣東省廣州市', country: 'china' },
+  { id: 'G10009', name: '雲端科技餐飲集團', address: '廣東省深圳市', country: 'china' },
+  // 港澳商家
+  { id: 'G10003', name: '鮮味餐飲集團', address: '澳門', country: 'macau' },
+  { id: 'G10004', name: '速達物流有限公司', address: '氹仔', country: 'macau' },
+  { id: 'G10008', name: '鵬程餐飲有限公司', address: '澳門', country: 'macau' },
+  { id: 'G10010', name: '合眾餐飲管理有限公司', address: '氹仔', country: 'macau' },
+  // 日本商家
+  { id: 'G10011', name: '東京餐飲株式会社', address: '東京都', country: 'japan' },
+  { id: 'G10012', name: '大阪美食集团', address: '大阪市', country: 'japan' },
+  { id: 'G10013', name: '京都料理公司', address: '京都市', country: 'japan' },
+  // 韩国商家
+  { id: 'G10014', name: '首尔餐饮集团', address: '首尔特别市', country: 'south_korea' },
+  { id: 'G10015', name: '釜山美食公司', address: '釜山广域市', country: 'south_korea' },
+  // 新加坡商家
+  { id: 'G10016', name: '新加坡美食中心', address: '新加坡', country: 'singapore' },
+  { id: 'G10017', name: '狮城餐饮集团', address: '新加坡', country: 'singapore' },
+  // 泰国商家
+  { id: 'G10018', name: '曼谷美食公司', address: '曼谷', country: 'thailand' },
+  { id: 'G10019', name: '清迈餐饮集团', address: '清迈', country: 'thailand' },
+  // 马来西亚商家
+  { id: 'G10020', name: '吉隆坡餐饮中心', address: '吉隆坡', country: 'malaysia' },
+  { id: 'G10021', name: '槟城美食集团', address: '槟城', country: 'malaysia' },
+  // 越南商家
+  { id: 'G10022', name: '胡志明餐饮公司', address: '胡志明市', country: 'vietnam' },
+  { id: 'G10023', name: '河内美食集团', address: '河内', country: 'vietnam' },
+  // 美国商家
+  { id: 'G10024', name: '纽约餐饮集团', address: '纽约', country: 'usa' },
+  { id: 'G10025', name: '洛杉矶美食公司', address: '洛杉矶', country: 'usa' },
+  // 英国商家
+  { id: 'G10026', name: '伦敦餐饮中心', address: '伦敦', country: 'uk' },
+  { id: 'G10027', name: '曼彻斯特美食集团', address: '曼彻斯特', country: 'uk' },
+  // 澳大利亚商家
+  { id: 'G10028', name: '悉尼餐饮集团', address: '悉尼', country: 'australia' },
+  { id: 'G10029', name: '墨尔本美食公司', address: '墨尔本', country: 'australia' },
+]
+
+/**
+ * 授权/展示用的菜单树不在前端维护静态副本：
+ * 唯一真值源为后端 sys_menu（/api/menus/tree）, 由「菜單配置」页管理,
+ * 需要菜单树的页面（功能授权、侧边栏、标签页）统一从接口构建。
+ */
+
+/**
+ * 已接入權限校驗的受控菜單 key（叶子菜单）
+ * 無對應菜單權限（任一 action）時：側邊欄隱藏該菜單、路由禁止訪問
+ * 其餘原型菜單暫不受控，所有登錄用戶可見
+ */
+export const CONTROLLED_MENU_KEYS: string[] = [
+  // 商戶集團管理
+  'merchant-group-list',
+  'store-list',
+  // 商家推廣工具
+  'promotion-dashboard',
+  'promotion-algorithm',
+  'promotion-slot-config',
+  'promotion-waterfall',
+  'ad-sales',
+  'promotion-word-library',
+  // 商家推廣工具 - 流量沙盤
+  'waterfall-simulation',
+  'algorithm-simulation',
+  'merchant-score-insight',
+  'merchant-promotion-diagnose',
+  // 商家推廣工具 - 贈送管理
+  'gift-detail',
+  'gift-consume-detail',
+  // 推廣通
+  'promotion-sales-config',
+  'promotion-report-overview',
+  'promotion-report-order',
+  'promotion-report-compare',
+  // 搜索管理 - 搜索配置
+  'global-config',
+  'channel-strategy',
+  // 搜索管理 - 搜索引導
+  'hint-config',
+  'hot-search-config',
+  'search-weight-config',
+  // 搜索管理 - 搜索詞庫
+  'word-segmentation',
+  'synonym-config',
+  'hot-search-library',
+  'stop-words',
+  // 搜索管理 - 效果校驗
+  'search-verify',
+  'hint-verify',
+  'hot-search-verify',
+  // 搜索管理 - 報表統計
+  'hint-report',
+  'hot-search-report',
+  // 財務管理
+  'account-balance',
+  'consume-risk',
+  'batch-query',
+  'detail-query',
+  'writeoff-reconcile',
+  'debt-reconcile',
+  'approval-center',
+  // 團購管理
+  'group-purchase-dashboard',
+  'flash-sale-register',
+  'flash-sale-stats',
+  'flash-sale-price',
+  // 集團人事
+  'employee-management',
+  'hr-onboarding',
+  'hr-regularization',
+  'hr-transfer',
+  'hr-dimission',
+  'hr-leave',
+  'hr-leave-quota',
+  // 員工自助（一级目录 ess-center 不进受控清单：目录不可路由）
+  'ess-leave',
+  'ess-requests',
+  'ess-profile',
+  'ess-certificate',
+  'hr-certificate',
+  // 績效考核（一级域 perf-center 不进受控清单：目录不可路由）
+  'hr-perf-admin',
+  'hr-perf-review',
+  'hr-perf-calibration',
+  'ess-performance',
+  // 績效台账（一级域 perf-report-center 不进受控清单：目录不可路由）
+  'hr-perf-ledger',
+  'hr-perf-audit',
+  'hr-perf-appeal',
+  'hr-dict',
+  'contract-ledger',
+  'org-structure',
+  'position-management',
+  'login-log',
+  // 權限管理（功能授權+系統授權已合并為授權中心，旧 key 迁移 iam:authz-center-menu:v1.0 后停用）
+  'role-management',
+  'authorization-center',
+  'data-permission',
+  // 系統配置
+  'menu-config',
+  'translation-manage',
+  'i18n-language',
+  'i18n-import-export',
+  'i18n-mt-engine',
+  'i18n-dashboard',
+  'rule-config',
+  'rule-ad-sales',
+  'rule-gift',
+  'rule-security',
+  'rule-algorithm',
+  'rule-seq',
+  // OA中心
+  'oa-requests',
+  'workflow-config',
+  // 產研交付（RDM）：受控菜单（已拍平为一级，无 rdm-center 目录），非授权角色不得进入（后端接口同口径收敛）
+  'rdm-workbench',
+  'rdm-requirement',
+  'rdm-pool-group',
+  'rdm-intake-approval',
+  'rdm-intake',
+  'rdm-delivery',
+  'rdm-delivery-board',
+  'rdm-delivery-iteration',
+  'rdm-delivery-test',
+  'rdm-delivery-release',
+  // v3.13 新建分组
+  'rdm-test-quality-group',
+  'rdm-release-accept-group',
+  'rdm-acceptance',
+  'rdm-dashboard',
+  'rdm-dashboard-board',
+  'rdm-dashboard-risk',
+  'rdm-efficiency',
+  'rdm-efficiency-output',
+  'rdm-dashboard-quality',
+  'rdm-dashboard-version',
+  'rdm-dashboard-report',
+  'rdm-dashboard-score',
+  'rdm-dashboard-trend',
+  'rdm-dashboard-project',
+  // 团队负载（rdm-resource-load）：从研发工作台资源负载 Tab 升级为独立菜单
+  'rdm-resource-load',
+  'rdm-config-score',
+  'rdm-config-group',
+  'rdm-config-status',
+  'rdm-config-routing',
+  'rdm-config-sla',
+  'rdm-daily-report-group',
+  'rdm-daily-report-rule',
+  'rdm-daily-report-template',
+  'rdm-daily-report-record',
+  'rdm-daily-report-trigger',
+  'rdm-task-type-config',
+  // 智能中心 (AI)
+  'ai-model-provider',
+  'ai-model-list',
+  'ai-dept-model-auth',
+  'ai-emp-model-auth',
+  'ai-pos-auth',
+  'ai-dept-quota',
+  'ai-emp-quota',
+  'ai-emp-permission',
+  'ai-operation-auth',
+  'agent-overview',
+  'agent-apps',
+  'agent-budget',
+  'agent-actions',
+  'agent-knowledge',
+  'agent-data',
+  'agent-runs',
+  'agent-evaluation',
+  'ai-assistant-overview',
+  'ai-assistant-capability',
+  'ai-assistant-profile',
+  'ai-assistant-glossary',
+  'ai-assistant-knowledge',
+  'ai-assistant-guardrail',
+  'ai-assistant-feedback',
+  'ai-assistant-audit',
+  'ai-assistant-quick-prompt',
+  'ai-assistant-push-template',
+  'ai-assistant-memory',
+  'ai_usage_stats',
+  'ai_energy_detail',
+  'ai-access-request',
+  'ai-mcp-service',
+  // 物資管理
+  'asset-list',
+  'asset-scrap',
+  'asset-repair',
+  'asset-loss',
+  'asset-inventory',
+  // 用車管理（後端已按菜单鉴权，必须同步纳入受控；否则「看得见菜单但接口 403」，
+  // 或反过来接口已控而菜单对所有人可见）
+  'vehicle-files',
+  'vehicle-dispatch',
+  'vehicle-ledger',
+  'my-vehicle-use',
+  'vehicle-master-data',
+  // 組織編制系統（后端 HcmOrganizationMenuInitializer 已按菜单鉴权，前端同步纳入受控）
+  'hcm-org-legal',
+  'hcm-org-unit',
+  'hcm-org-job-family',
+  'hcm-org-job-grade',
+  'hcm-org-position',
+  'hcm-person',
+  'hcm-payroll-component',
+  'hcm-payroll-standard',
+  'hcm-payroll-benefit',
+  'hcm-payroll-rule',
+  'hcm-payroll-run',
+  // 考勤假勤系统（后端 AttendanceMenuInitializer 已按菜单鉴权，前端同步纳入受控）
+  'attendance-workbench',
+  'attendance-group',
+  'attendance-shift',
+  'attendance-holiday',
+  'attendance-schedule',
+  'attendance-punch',
+  'attendance-exception',
+  'attendance-daily',
+  'attendance-monthly',
+  'attendance-setting',
+  // 会议管理（后端 MeetingSchemaMigrationInitializer 已按菜单鉴权，前端同步纳入受控）
+  'meeting-my',
+  'meeting-booking',
+  'meeting-room',
+  'meeting-record',
+  'meeting-config',
+  // 文檔中心（後端 DocSchemaMigrationInitializer 已種菜單，前端同步納入受控）
+  'doc-plans',
+  'doc-governance',
+  'doc-system-plans',
+  'doc-api-center',
+  'doc-library',
+  'doc-space',
+  'doc-stats',
+  'doc-learning',
+  // 資產運營流轉（後端按菜單鉴权，前端同步纳入受控，避免「看得见却 403」；台賬明細/入庫/詳情已歸 asset-list）
+  'asset-claim',
+  'asset-borrow',
+  'asset-return',
+  'asset-transfer-list',
+  'asset-handover',
+  'asset-compensation',
+  // 採購與供應 - 驗收入庫（後端 EamInboundController 按菜單鉴权）
+  'asset-inbound',
+  // 耗材管理（管理类菜单受控；耗材领用 consumable-claim 为全员自助，不受控）
+  // 注：consumable-category / consumable-brand / consumable-unit 菜单已下线（功能并入分类库/品牌产品库，
+  //     计量单位已改为产品/耗材表单上的文本属性），不再受控
+  'consumable-dashboard',
+  'consumable-item',
+  'consumable-inbound',
+  'consumable-report',
+  'consumable-stock',
+  'consumable-alert',
+  // 出入庫流水（後端按菜單鉴权）
+  'consumable-stock-txn',
+  // ── 补齐：後端已 @RequirePermission 鉴权、但此前未纳入受控的菜單（消除「看得见却 403」）──
+  // 基礎數據 / 採購與供應
+  'asset-category',
+  'asset-model',
+  'asset-location',
+  'param-library',
+  'asset-supplier',
+  'asset-tag',
+  'purchase-order',
+  // 系統配置 / OA / AI
+  'notification-config',
+  'version-history',
+  'process-center',
+  'ai-conversation-audit',
+]
+
+/**
+ * 受控路由路徑 → 菜單 key 映射（含二級頁面歸屬其入口菜單）
+ * 用於路由守衛判斷當前頁面所需的菜單權限
+ */
+export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
+  // 首頁
+  '/': 'home',
+  // 商戶集團管理
+  '/merchant-group-list': 'merchant-group-list',
+  '/store-list': 'store-list',
+  // 商家推廣工具
+  '/promotion-dashboard': 'promotion-dashboard',
+  '/promotion-algorithm': 'promotion-algorithm',
+  '/promotion-algorithm-add': 'promotion-algorithm',
+  '/promotion-algorithm-flow': 'promotion-algorithm',
+  '/promotion-slot-config': 'promotion-slot-config',
+  '/promotion-slot-config-add': 'promotion-slot-config',
+  '/promotion-slot-config-slots': 'promotion-slot-config',
+  '/promotion-waterfall': 'promotion-waterfall',
+  '/promotion-waterfall1': 'promotion-waterfall',
+  '/promotion-waterfall-add': 'promotion-waterfall',
+  '/ad-sales': 'ad-sales',
+  '/promotion-word-library': 'promotion-word-library',
+  // 商家推廣工具 - 流量沙盤
+  '/waterfall-simulation': 'waterfall-simulation',
+  '/algorithm-simulation': 'algorithm-simulation',
+  '/merchant-score-insight': 'merchant-score-insight',
+  '/merchant-promotion-diagnose': 'merchant-promotion-diagnose',
+  // 商家推廣工具 - 贈送管理
+  '/gift-detail': 'gift-detail',
+  '/gift-add': 'gift-detail',
+  '/gift-detail-view': 'gift-detail',
+  '/gift-consume-detail': 'gift-consume-detail',
+  // 推廣通
+  '/promotion-sales-config': 'promotion-sales-config',
+  '/promotion-order-manage': 'promotion-sales-config',
+  '/order-detail': 'promotion-sales-config',
+  '/promotion-report-overview': 'promotion-report-overview',
+  '/promotion-report-order': 'promotion-report-order',
+  '/promotion-report-compare': 'promotion-report-compare',
+  // 搜索管理 - 搜索配置
+  '/global-config': 'global-config',
+  '/channel-strategy': 'channel-strategy',
+  // 搜索管理 - 搜索引導
+  '/hint-config': 'hint-config',
+  '/hint-preview': 'hint-config',
+  '/hot-search-config': 'hot-search-config',
+  '/hot-search-preview': 'hot-search-config',
+  '/search-weight-config': 'search-weight-config',
+  // 搜索管理 - 搜索詞庫
+  '/word-segmentation': 'word-segmentation',
+  '/synonym-config': 'synonym-config',
+  '/hot-search-library': 'hot-search-library',
+  '/stop-words': 'stop-words',
+  // 搜索管理 - 效果校驗
+  '/search-verify': 'search-verify',
+  '/search-verify-detail/:id': 'search-verify',
+  '/hint-verify': 'hint-verify',
+  '/hot-search-verify': 'hot-search-verify',
+  // 搜索管理 - 報表統計
+  '/hint-report': 'hint-report',
+  '/hot-search-report': 'hot-search-report',
+  // 財務管理 - 推廣金管理
+  '/account-balance': 'account-balance',
+  '/consume-risk': 'consume-risk',
+  '/recharge-add': 'account-balance',
+  '/transfer-add': 'account-balance',
+  '/deduct-add': 'account-balance',
+  '/merge-add': 'account-balance',
+  '/batch-query': 'batch-query',
+  '/batch-detail': 'batch-query',
+  '/detail-query': 'detail-query',
+  // 財務管理 - 商戶通對賬
+  '/writeoff-reconcile': 'writeoff-reconcile',
+  '/debt-reconcile': 'debt-reconcile',
+  '/debt-detail': 'debt-reconcile',
+  // 財務管理 - 審批管理
+  '/approval-center': 'approval-center',
+  '/approval-detail': 'approval-center',
+  // 集團人事
+  '/employee-management': 'employee-management',
+  '/employee-detail': 'employee-management',
+  '/hr-onboarding': 'hr-onboarding',
+  '/hr-onboarding-form': 'hr-onboarding',
+  '/hr-onboarding-detail': 'hr-onboarding',
+  '/hr-regularization': 'hr-regularization',
+  '/hr-regularization-form': 'hr-regularization',
+  '/hr-regularization-detail': 'hr-regularization',
+  '/hr-transfer': 'hr-transfer',
+  '/hr-transfer-form': 'hr-transfer',
+  '/hr-transfer-detail': 'hr-transfer',
+  '/hr-dimission': 'hr-dimission',
+  '/hr-dimission-form': 'hr-dimission',
+  '/hr-dimission-detail': 'hr-dimission',
+  '/hr-leave': 'hr-leave',
+  '/hr-leave-form': 'hr-leave',
+  '/hr-leave-detail': 'hr-leave',
+  '/hr-leave-quota': 'hr-leave-quota',
+  '/hr-leave-quota-form': 'hr-leave-quota',
+  '/ess-leave': 'ess-leave',
+  '/ess-leave-form': 'ess-leave',
+  '/ess-leave-detail': 'ess-leave',
+  '/ess-requests': 'ess-requests',
+  '/ess-profile': 'ess-profile',
+  '/ess-certificate': 'ess-certificate',
+  '/ess-certificate-form': 'ess-certificate',
+  '/ess-certificate-detail': 'ess-certificate',
+  '/hr-certificate': 'hr-certificate',
+  '/hr-certificate-issue': 'hr-certificate',
+  '/hr-certificate-detail': 'hr-certificate',
+  '/hr-perf-cycle': 'hr-perf-admin',
+  '/hr-perf-plan': 'hr-perf-admin',
+  '/hr-perf-plan-form': 'hr-perf-admin',
+  '/hr-perf-plan-detail': 'hr-perf-admin',
+  '/hr-perf-template': 'hr-perf-admin',
+  '/hr-perf-review': 'hr-perf-review',
+  '/hr-perf-calibration': 'hr-perf-calibration',
+  '/ess-performance': 'ess-performance',
+  '/hr-perf-ledger': 'hr-perf-ledger',
+  '/hr-perf-audit': 'hr-perf-audit',
+  '/hr-perf-appeal': 'hr-perf-appeal',
+  '/hr-contract-renew-form': 'contract-ledger',
+  '/hr-contract-renew-detail': 'contract-ledger',
+  '/hr-dict': 'hr-dict',
+  '/hr-dict-edit': 'hr-dict',
+  '/contract-ledger': 'contract-ledger',
+  '/organization-management': 'org-structure',
+  '/position-management': 'position-management',
+  '/login-log': 'login-log',
+  // 權限管理（授权中心合并旧 功能授權/系統授權 两入口，旧路径由路由 redirect）
+  '/role-management': 'role-management',
+  '/authorization-center': 'authorization-center',
+  '/data-permission': 'data-permission',
+  // 系統配置
+  '/menu-config': 'menu-config',
+  '/menu-config/setting': 'menu-config',
+  '/translation-manage': 'translation-manage',
+  '/i18n-center/workbench': 'translation-manage',
+  '/i18n-center/language': 'i18n-language',
+  '/i18n-center/import-export': 'i18n-import-export',
+  '/i18n-center/mt-engine': 'i18n-mt-engine',
+  '/i18n-center/dashboard': 'i18n-dashboard',
+  '/rule-config': 'rule-config',
+    '/rule-center/ad-sales': 'rule-ad-sales',
+    '/rule-center/gift': 'rule-gift',
+    '/rule-center/security': 'rule-security',
+    '/rule-center/algorithm': 'rule-algorithm',
+    '/rule-center/seq': 'rule-seq',
+  '/notification-config': 'notification-config',
+  '/notification-channel-form': 'notification-config',
+  '/notification-app-form': 'notification-config',
+  '/notification-scenario-form': 'notification-config',
+  '/version-history': 'version-history',
+  // OA中心
+  '/oa-requests': 'oa-requests',
+  '/workflow-config': 'workflow-config',
+  // 產研交付（RDM）—— 子页（详情/验收入口/提交表单）归入其主菜单。
+  // 提交需求/產品需求處理/交付中需求退役后，这些路由必须改挂存活菜单：
+  // 它们原本的授权已随菜单清除，仍映射到退役 key 会让前端守卫把所有人都拦在门外。
+  '/rdm-workbench': 'rdm-workbench',
+  '/rdm-submit': 'rdm-requirement',
+  '/rdm-requirement': 'rdm-requirement',
+  '/rdm-intake': 'rdm-intake',
+  // 提交需求（业务侧提交 + 待我審批）：拆自需求池，不携带分配权
+  '/rdm-intake-approval': 'rdm-intake-approval',
+  // 需求查询已并回需求池；旧地址仍可达（重定向），所以映射到 rdm-intake 而不是删掉
+  '/rdm-query': 'rdm-intake',
+  '/rdm-delivery': 'rdm-delivery-board',
+  '/rdm-delivery-req': 'rdm-requirement',
+  '/rdm-task': 'rdm-delivery-board',
+  // 分配产品经理独立页：与后端 batch-assign 的鉴权菜单一致
+  '/rdm-assign': 'rdm-intake',
+  '/rdm-iteration': 'rdm-delivery-iteration',
+  '/rdm-iteration-form': 'rdm-delivery-iteration',
+  '/rdm-prd': 'rdm-requirement',
+  '/rdm-review': 'rdm-requirement',
+  '/rdm-change': 'rdm-requirement',
+  '/rdm-product': 'rdm-requirement',
+  '/rdm-acceptance': 'rdm-acceptance',
+  '/rdm-acceptance-form': 'rdm-acceptance',
+  '/rdm-detail': 'rdm-requirement',
+  // 需求甘特图：与需求跟进清单同一菜单锚点（全局视角的全量可见另由页内 canSeeAll 与后端收敛）
+  '/rdm-gantt': 'rdm-requirement',
+  '/rdm-dashboard': 'rdm-dashboard-board',
+  '/rdm-risk': 'rdm-dashboard-risk',
+  '/rdm-output': 'rdm-efficiency-output',
+  // 团队负载（项目与计划分组下）
+  '/rdm-resource-load': 'rdm-resource-load',
+  '/rdm-quality': 'rdm-dashboard-quality',
+  '/rdm-version-trace': 'rdm-dashboard-version',
+  '/rdm-weekly-report': 'rdm-dashboard-report',
+  '/rdm-score': 'rdm-dashboard-score',
+  '/rdm-metric-trend': 'rdm-dashboard-trend',
+  '/rdm-score-rule': 'rdm-config-score',
+  '/rdm-config-status': 'rdm-config-status',
+  '/rdm-config-routing': 'rdm-config-routing',
+  '/rdm-config-sla': 'rdm-config-sla',
+  '/rdm-task-type-config': 'rdm-task-type-config',
+  // 進度日報：四个二级页 + 两个独立表单页（表单页归属各自列表页）
+  '/rdm-daily-report-rules': 'rdm-daily-report-rule',
+  '/rdm-daily-report-rule-form': 'rdm-daily-report-rule',
+  '/rdm-daily-report-templates': 'rdm-daily-report-template',
+  '/rdm-daily-report-template-form': 'rdm-daily-report-template',
+  '/rdm-daily-report-records': 'rdm-daily-report-record',
+  '/rdm-daily-report-trigger': 'rdm-daily-report-trigger',
+  // 移動端日報頁（釘釘通知連結落地頁）：無獨立菜單，守衛錨到「推送配置」；
+  // 後端快照介面另以 anyOf 放行各 RDM 承載菜單，故 PM/產品負責人無配置權也能打開日報
+  '/rdm-daily': 'rdm-daily-report-rule',
+  // V3 分批交付：三个菜单及其子页（子页归属同 pathToKey，按后端 @RequirePermission 锚点）
+  '/rdm-project': 'rdm-dashboard-project',
+  '/rdm-project-detail': 'rdm-dashboard-project',
+  '/rdm-test': 'rdm-delivery-test',
+  '/rdm-test-submit': 'rdm-delivery-test',
+  '/rdm-test-detail': 'rdm-delivery-test',
+  '/rdm-issue': 'rdm-delivery-test',
+  '/rdm-release': 'rdm-delivery-release',
+  '/rdm-release-create': 'rdm-delivery-release',
+  '/rdm-release-detail': 'rdm-delivery-release',
+  '/rdm-grayscale': 'rdm-delivery-release',
+  '/rdm-delivery-item': 'rdm-delivery-board',
+  '/rdm-stock-migration': 'rdm-delivery',
+  // AI 智能中心（拆分后）
+  '/ai-model-provider': 'ai-model-provider',
+  '/ai-model-list': 'ai-model-list',
+  '/ai-dept-model-auth': 'ai-dept-model-auth',
+  '/ai-emp-model-auth': 'ai-emp-model-auth',
+  '/ai-pos-auth': 'ai-pos-auth',
+  '/ai-dept-quota': 'ai-dept-quota',
+  '/ai-dept-quota-edit': 'ai-dept-quota',
+  '/ai-dept-quota-detail': 'ai-dept-quota',
+  '/ai-emp-quota': 'ai-emp-quota',
+  '/ai-emp-permission': 'ai-emp-permission',
+  '/ai-emp-permission-detail': 'ai-emp-permission',
+  '/ai-operation-auth': 'ai-operation-auth',
+  '/agent-overview': 'agent-overview',
+  '/agent-apps': 'agent-apps',
+  '/agent-budget': 'agent-budget',
+  '/agent-actions': 'agent-actions',
+  '/agent-knowledge': 'agent-knowledge',
+  '/agent-data': 'agent-data',
+  '/agent-runs': 'agent-runs',
+  '/agent-evaluation': 'agent-evaluation',
+  '/ai-assistant': 'ai-assistant-overview',
+  '/ai-assistant/capability': 'ai-assistant-capability',
+  '/ai-assistant/profile': 'ai-assistant-profile',
+  '/ai-assistant/glossary': 'ai-assistant-glossary',
+  '/ai-assistant/knowledge': 'ai-assistant-knowledge',
+  '/ai-assistant/guardrail': 'ai-assistant-guardrail',
+  '/ai-assistant/feedback': 'ai-assistant-feedback',
+  '/ai-assistant/audit': 'ai-assistant-audit',
+  '/ai-assistant/quick-prompt': 'ai-assistant-quick-prompt',
+  '/ai-assistant/push-template': 'ai-assistant-push-template',
+  '/ai-assistant/memory': 'ai-assistant-memory',
+  '/ai-operation-auth-edit': 'ai-operation-auth',
+  '/ai-operation-auth-log': 'ai-operation-auth',
+  '/ai-usage-stats': 'ai_usage_stats',
+  '/ai-energy-detail': 'ai_energy_detail',
+  '/ai-access-apply': 'ai-access-request',
+  '/ai-mcp-service': 'ai-mcp-service',
+  // 物資管理（入庫/轉移為獨立頁面；詳情、領用、歸還、編輯、刪除都歸屬 asset-list 菜單）
+  '/asset-list': 'asset-list',
+  '/asset-add': 'asset-list',
+  '/asset-detail': 'asset-list',
+  '/asset-scrap': 'asset-scrap',
+  '/asset-repair': 'asset-repair',
+  '/asset-loss': 'asset-loss',
+  '/asset-transfer-list': 'asset-transfer-list',
+  '/asset-transfer': 'asset-transfer-list',
+  '/asset-transfer/detail': 'asset-transfer-list',
+  '/asset-transfer/cancel': 'asset-transfer-list',
+  '/asset-inventory': 'asset-inventory',
+  // 用車管理（子页归属各自菜单；详情/登记/更正都是同一菜单下的独立页）
+  '/vehicle-files': 'vehicle-files',
+  '/vehicle-files/add': 'vehicle-files',
+  '/vehicle-files/edit': 'vehicle-files',
+  '/vehicle-files/detail': 'vehicle-files',
+  '/vehicle-files/qualification': 'vehicle-files',
+  '/vehicle-dispatch': 'vehicle-dispatch',
+  '/vehicle-dispatch/assign': 'vehicle-dispatch',
+  '/vehicle-dispatch/direct': 'vehicle-dispatch',
+  '/vehicle-dispatch/depart': 'vehicle-dispatch',
+  '/vehicle-dispatch/return': 'vehicle-dispatch',
+  '/vehicle-dispatch/confirm': 'vehicle-dispatch',
+  '/vehicle-dispatch/detail': 'vehicle-dispatch',
+  '/vehicle-ledger': 'vehicle-ledger',
+  '/vehicle-ledger/detail': 'vehicle-ledger',
+  '/vehicle-ledger/correct': 'vehicle-ledger',
+  '/vehicle-master-data': 'vehicle-master-data',
+  '/vehicle-master-data/add': 'vehicle-master-data',
+  '/vehicle-master-data/edit': 'vehicle-master-data',
+  '/vehicle-ledger/backfill': 'vehicle-ledger',
+  '/my-vehicle-use': 'my-vehicle-use',
+  '/my-vehicle-use/apply': 'my-vehicle-use',
+  '/my-vehicle-use/detail': 'my-vehicle-use',
+  // 考勤假勤系统（列表页 + 子页同属一个菜单授权）
+  '/hcm-org-legal': 'hcm-org-legal',
+  '/hcm-org-legal-form': 'hcm-org-legal',
+  '/hcm-org-legal-detail': 'hcm-org-legal',
+  '/hcm-org-unit': 'hcm-org-unit',
+  '/hcm-org-unit-form': 'hcm-org-unit',
+  '/hcm-org-unit-detail': 'hcm-org-unit',
+  '/hcm-org-job-family': 'hcm-org-job-family',
+  '/hcm-org-job-family-form': 'hcm-org-job-family',
+  '/hcm-org-job-family-detail': 'hcm-org-job-family',
+  '/hcm-org-job-grade': 'hcm-org-job-grade',
+  '/hcm-org-job-grade-form': 'hcm-org-job-grade',
+  '/hcm-org-job-grade-detail': 'hcm-org-job-grade',
+  '/hcm-org-position': 'hcm-org-position',
+  '/hcm-org-position-form': 'hcm-org-position',
+  '/hcm-payroll-component': 'hcm-payroll-component',
+  '/hcm-payroll-component-form': 'hcm-payroll-component',
+  '/hcm-payroll-standard': 'hcm-payroll-standard',
+  '/hcm-payroll-standard-form': 'hcm-payroll-standard',
+  '/hcm-payroll-benefit': 'hcm-payroll-benefit',
+  '/hcm-payroll-benefit-plan-form': 'hcm-payroll-benefit',
+  '/hcm-payroll-enrollment-form': 'hcm-payroll-benefit',
+  '/hcm-payroll-rule': 'hcm-payroll-rule',
+  '/hcm-payroll-rule-form': 'hcm-payroll-rule',
+  '/hcm-payroll-run': 'hcm-payroll-run',
+  '/hcm-payroll-run-detail': 'hcm-payroll-run',
+  '/hcm-org-position-detail': 'hcm-org-position',
+  '/hcm-person': 'hcm-person',
+  '/hcm-person-form': 'hcm-person',
+  '/hcm-person-detail': 'hcm-person',
+  '/hcm-person-employment-form': 'hcm-person',
+  '/hcm-person-assignment-form': 'hcm-person',
+  '/hcm-person-profile-form': 'hcm-person',
+  '/attendance-workbench': 'attendance-workbench',
+  '/attendance-group': 'attendance-group',
+  '/attendance-group-form': 'attendance-group',
+  '/attendance-group-detail': 'attendance-group',
+  '/attendance-shift': 'attendance-shift',
+  '/attendance-shift-form': 'attendance-shift',
+  '/attendance-shift-detail': 'attendance-shift',
+  '/attendance-holiday': 'attendance-holiday',
+  '/attendance-holiday-form': 'attendance-holiday',
+  '/attendance-holiday-detail': 'attendance-holiday',
+  '/attendance-schedule': 'attendance-schedule',
+  '/attendance-punch': 'attendance-punch',
+  '/attendance-exception': 'attendance-exception',
+  '/attendance-exception-handle': 'attendance-exception',
+  '/attendance-daily': 'attendance-daily',
+  '/attendance-monthly': 'attendance-monthly',
+  '/attendance-setting': 'attendance-setting',
+  // 会议管理（/meeting-detail 不是菜单项，但从钉钉卡片与日程单元格跳进来，
+  // 必须归到 meeting-my 的菜单权限下，否则路由守卫拿不到菜单 key）
+  '/meeting-my': 'meeting-my',
+  '/meeting-detail': 'meeting-my',
+  '/meeting-booking': 'meeting-booking',
+  '/meeting-booking-form': 'meeting-booking',
+  '/meeting-room': 'meeting-room',
+  '/meeting-room-form': 'meeting-room',
+  '/meeting-record': 'meeting-record',
+  '/meeting-config': 'meeting-config',
+  '/meeting-blacklist-form': 'meeting-config',
+  // 会议纪要：表单页/查看页都不是菜单项，但都能从钉钉卡片与列表跳进来，
+  // 统一挂 meeting-my（纪要权限与「我与这场会的关系」同源，不另开一份菜单授权）
+  '/meeting-minutes': 'meeting-my',
+  '/meeting-minutes-list': 'meeting-minutes-list',
+  '/notification-template': 'notification-template',
+  '/notification-switch': 'notification-switch',
+  '/meeting-minutes-form': 'meeting-my',
+  // 文檔中心（詳情/登記/編輯為文檔庫非菜單子頁，空間表單為空間管理子頁）
+  '/doc-plans': 'doc-plans',
+  '/doc-plans/detail': 'doc-plans',
+  '/doc-plans/edit': 'doc-plans',
+  '/doc-plans/confirm': 'doc-plans',
+  '/doc-plans/handoff': 'doc-plans',
+  '/doc-plans/acl': 'doc-plans',
+  '/doc-plans/execution': 'doc-plans',
+  '/doc-governance': 'doc-governance',
+  '/doc-governance/members': 'doc-governance',
+  '/doc-governance/taxonomy': 'doc-governance',
+  '/doc-governance/clearance': 'doc-governance',
+  '/doc-center': 'doc-library',
+  '/doc-center/knowledge': 'doc-library',
+  '/doc-center/my-acks': 'doc-library',
+  '/doc-books': 'doc-library',
+  '/doc-archives': 'doc-library',
+  '/doc-system-plans': 'doc-system-plans',
+  '/doc-system-plans/detail': 'doc-system-plans',
+  '/doc-api-center': 'doc-api-center',
+  '/doc-center/detail': 'doc-library',
+  '/doc-center/register': 'doc-library',
+  '/doc-center/edit': 'doc-library',
+  '/doc-space': 'doc-space',
+  '/doc-space/form': 'doc-space',
+  '/doc-stats': 'doc-stats',
+  '/doc-learning': 'doc-learning',
+  '/doc-learning/detail': 'doc-learning',
+  '/doc-learning/form': 'doc-learning',
+  // 免登签到页（扫码直达）：不是菜单项，归到「我的會議」，没有登录态时由路由本身放行
+  '/meeting-checkin': 'meeting-my',
+  // 纪要免登查看页（钉钉卡片直达）：与签到页同构，凭签名令牌放行
+  '/meeting-minutes-view': 'meeting-my',
+  // 領用管理（子路由歸屬 asset-claim 菜單）
+  '/asset-claim': 'asset-claim',
+  '/asset-claim/add': 'asset-claim',
+  '/asset-claim/detail': 'asset-claim',
+  '/asset-claim/record': 'asset-claim',
+  // 借用管理（子路由歸屬 asset-borrow 菜單）
+  '/asset-borrow': 'asset-borrow',
+  '/asset-borrow/add': 'asset-borrow',
+  '/asset-borrow/detail': 'asset-borrow',
+  '/asset-borrow/renew': 'asset-borrow',
+  // 歸還管理（子路由歸屬 asset-return 菜單）
+  '/asset-return': 'asset-return',
+  '/asset-return/add': 'asset-return',
+  '/asset-return/detail': 'asset-return',
+  '/asset-return/dispose': 'asset-return',
+  '/asset-return/recover': 'asset-return',
+  // 損壞賠付（子路由歸屬 asset-compensation 菜單）
+  '/asset-compensation': 'asset-compensation',
+  '/asset-compensation/detail': 'asset-compensation',
+  '/asset-compensation/liability': 'asset-compensation',
+  '/asset-compensation/waive': 'asset-compensation',
+  '/asset-compensation/payment': 'asset-compensation',
+  '/asset-compensation/refund': 'asset-compensation',
+  '/asset-compensation/review': 'asset-compensation',
+  // 交接管理（子路由歸屬 asset-handover 菜單）
+  '/asset-handover': 'asset-handover',
+  '/asset-handover/add': 'asset-handover',
+  '/asset-handover/detail': 'asset-handover',
+  // 驗收入庫（歸屬 asset-inbound 菜單）
+  '/asset-inbound': 'asset-inbound',
+  // 基礎數據 / 採購與供應（纳入受控后补登路徑映射，供登录首站与守卫一致解析）
+  '/asset-category': 'asset-category',
+  '/asset-model': 'asset-model',
+  '/asset-location': 'asset-location',
+  '/param-library': 'param-library',
+  '/asset-supplier': 'asset-supplier',
+  '/asset-tag': 'asset-tag',
+  '/asset-tag-print': 'asset-tag',
+  '/purchase-order': 'purchase-order',
+  // 系統配置 / OA / AI / 耗材流水（notification-config / version-history 已在上方登记）
+  '/process-center': 'process-center',
+  '/ai-conversation-audit': 'ai-conversation-audit',
+  '/consumable-stock-txn': 'consumable-stock-txn',
+  '/consumable-stock/txn': 'consumable-stock-txn',
+  // 耗材管理（领用为全员自助，其余为管理类受控路由）
+  '/consumable-dashboard': 'consumable-dashboard',
+  '/consumable-item': 'consumable-item',
+  '/consumable-inbound': 'consumable-inbound',
+  '/consumable-report': 'consumable-report',
+  '/consumable-claim': 'consumable-claim',
+  '/consumable-stock': 'consumable-stock',
+  '/consumable-alert': 'consumable-alert',
+}
+
+/**
+ * 「任一菜单即可」豁免表：主映射命中且权限不足时，再查本表，持有其中任一菜单即放行。
+ *
+ * <p>为什么要这张表：一条路由被多个业务共用时，不能只认某一个系统的菜单。
+ * {@code /approval-detail} 历史上只挂在财务的 {@code approval-center} 下，但它是
+ * OA 流程事项、系统权限申请、AI 使用申请、RDM 变更等**所有审批类型统一的落地详情页**。
+ * 结果是申请人从「流程事項」点自己单据的「詳情」会被 403 拦住——而申请成功弹窗恰恰
+ * 就是把用户指向那里。后端 {@code detailByFlowNo} 与 OA 详情本来就已按
+ * 「申请人本人 / 当前节点审批人 / 超管 / 持查看权」收敛，前端路由不应比它更严。
+ *
+ * <p>注意：这里只放宽「能不能进这个页面」，不放宽任何数据接口——具体单据内容能否读到
+ * 仍由后端逐个判定；不要把本表当成权限模型的一部分。
+ */
+export const ROUTE_MENU_ANY_OF_MAP: Record<string, string[]> = {
+  // 审批详情页：财务审批中心与 OA 流程事项两侧都能进（其余审批类型同页展示）
+  '/approval-detail': ['approval-center', 'oa-requests'],
+  /*
+   * 移动端日报页：钉钉通知链接的落地页，读者是项目经理/产品负责人，
+   * 他们通常没有「推送配置」权限。主菜单 key 仍是 rdm-daily-report-rule（侧栏高亮用），
+   * 但这里必须与后端快照接口的 anyOf 同口径放行，否则点链接就是 403，推送等于白发。
+   */
+  '/rdm-daily': ['rdm-daily-report-rule', 'rdm-workbench', 'rdm-requirement',
+    'rdm-delivery-board', 'rdm-dashboard-board'],
+}
+
+/**
+ * 菜單 key → 路由路徑映射（從 ROUTE_MENU_KEY_MAP 反轉，每個菜單取第一個匹配的路徑）
+ * 用於登錄後智能跳轉：根據用戶權限找到第一個可訪問的菜單路徑
+ */
+export const MENU_KEY_PATH_MAP: Record<string, string> = {}
+for (const [route, menuKey] of Object.entries(ROUTE_MENU_KEY_MAP)) {
+  if (!(menuKey in MENU_KEY_PATH_MAP)) {
+    MENU_KEY_PATH_MAP[menuKey] = route
+  }
+}
+
+/**
+ * 根據用戶權限找到第一個可訪問的菜單路徑
+ * 按 CONTROLLED_MENU_KEYS 順序遍歷，返回第一個有權限的菜單對應的路徑
+ * admin 直接返回首頁；無任何權限時降級返回首頁
+ */
+export function resolveFirstAccessiblePath(
+  isAdmin: boolean,
+  hasMenuPermission: (menuKey: string) => boolean,
+): string {
+  if (isAdmin) return '/'
+  for (const key of CONTROLLED_MENU_KEYS) {
+    if (hasMenuPermission(key)) {
+      return MENU_KEY_PATH_MAP[key] || '/'
+    }
+  }
+  return '/'
+}
+
+/** localStorage Key */
+export const STORAGE_KEYS = {
+  ROLES: 'permission_roles',
+  USER_ACCOUNTS: 'permission_user_accounts',
+  LOCATION_GROUPS: 'permission_location_groups',
+  MERCHANT_GROUPS: 'permission_merchant_groups',
+  DATA_AUTHORIZATIONS: 'permission_data_authorizations',
+} as const
+
+/** 数据授权对象类型 */
+export const DATA_TARGET_TYPE = {
+  ROLE: 'role',
+  DEPARTMENT: 'department',
+} as const
+
+export type DataTargetType = typeof DATA_TARGET_TYPE[keyof typeof DATA_TARGET_TYPE]
+
+/** 数据授权记录（一条 = 角色/部门 → 一个商家集团） */
+export interface DataAuthorization {
+  id: number
+  targetType: DataTargetType
+  targetId: number
+  targetName?: string      // 角色/部门名称（后端填充）
+  groupCode: string        // 商家集团编码
+  groupName?: string       // 商家集团名称（后端填充）
+  status: number           // 1=启用 0=停用
+  createdBy?: string
+  updatedBy?: string
+  createdAt?: string
+  updatedAt?: string
+}

@@ -11,17 +11,17 @@ import { Button, Empty, Form, Input, Select, Table, Tag, message, Space, Modal, 
 import type { TableColumnsType } from 'antd'
 import { SearchOutlined, ReloadOutlined, ExportOutlined, PlusOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { exportToCSV } from '../../../utils/exportCSV'
-import BrandTag from '../../../components/BrandTag'
-import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { exportToCSV } from '@/utils/exportCSV'
+import BrandTag from '@/components/BrandTag'
+import { useCompanyBrand } from '@/contexts/CompanyBrandContext'
 import {
   fetchScrapList, deleteScrapRecord, fetchAssetList,
   type ScrapRecord, type ScrapQuery, type AssetItem,
-} from '../../../api/asset'
-import { fetchCategoryList, fetchBrandList, type AssetCategory, type AssetBrand } from '../../../api/eam'
-import { fetchEmployeeOptions } from '../../../api/employee'
-import type { OptionItem } from '../../../api/types'
+} from '@/api/asset'
+import { fetchCategoryList, fetchBrandList, type AssetCategory, type AssetBrand } from '@/api/eam'
+import { fetchEmployeeOptions } from '@/api/employee'
+import type { OptionItem } from '@/api/types'
 
 interface Props {
   /** 进入新建报废页（独立页面，Select 下拉选资产） */

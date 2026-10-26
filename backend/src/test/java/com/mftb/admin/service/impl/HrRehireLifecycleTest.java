@@ -74,7 +74,7 @@ class HrRehireLifecycleTest {
                 positionRecordMapper, mock(EmpContractMapper.class), employeeService, operatorResolver,
                 effectiveTaskService, mock(HrMasterDataResolver.class),
                 mock(HrEmploymentPeriodService.class), mock(HrAuditService.class),
-                mock(HrOffboardingTaskService.class), hrAssignmentQuery);
+                mock(HrOffboardingTaskService.class), hrAssignmentQuery, mock(com.mftb.admin.service.PermissionService.class));
     }
 
     @Test

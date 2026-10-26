@@ -17,10 +17,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  quality-gate:
+  # 质量门禁与构建合并为同一 job：旧实现 quality-gate 与 build 两个 job 各 `npm ci` 一次、
+  # 各跑一遍 tsc（Type Check 步骤 + build:strict 内的 tsc），属纯重复工作。
+  # 门禁清单一项不减；同一 job 内顺序执行，构建天然依赖全部门禁通过。
+  build:
     runs-on: ubuntu-latest
     steps:
+      # 取足够历史：构建期要把最近提交写进 version.json 供「版本更新弹窗」展示更新内容
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -32,6 +38,10 @@ jobs:
         run: npm run typecheck
       - name: Menu Consistency
         run: npm run check:menu
+      - name: Dependency Boundary
+        run: npm run check:boundary
+      - name: Engineering Registry
+        run: npm run check:registry
       - name: Stat Card Order
         run: npm run check:stat-order
       - name: Confirm Modal Style
@@ -44,23 +54,14 @@ jobs:
         run: npm run secret-scan
       - name: Test
         run: npm run test:run
-
-  build:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    needs: quality-gate
-    steps:
-      # 取足够历史：构建期要把最近提交写进 version.json 供「版本更新弹窗」展示更新内容
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 50
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-      - run: npm ci --legacy-peer-deps
-      - run: npm run build:strict
-      - uses: actions/upload-pages-artifact@v3
+      # 上面已跑过完整 typecheck，这里只打包，不再走 build:strict 重复执行 tsc；
+      # 本地仍保留 `npm run build:strict` 作为单命令入口。
+      - name: Build
+        if: github.event_name == 'push'
+        run: npm run build
+      - name: Upload Pages artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: './dist'
 

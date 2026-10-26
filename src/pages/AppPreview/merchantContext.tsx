@@ -10,8 +10,8 @@
  * 库存与价格刻意不落盘——必须每次重新取，避免拿旧库存下出已变化的单。
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { StoreItem } from '../../api/store'
-import type { AdAlgorithm, AdInventoryVO } from '../../api/adPromotion'
+import type { StoreItem } from '@/api/store'
+import type { AdAlgorithm, AdInventoryVO } from '@/api/adPromotion'
 import type { MobileBrand } from './constants'
 
 /** 购物车格子：字段命名与后端下单请求 cells 对齐（bizDate / region / mealSlot） */

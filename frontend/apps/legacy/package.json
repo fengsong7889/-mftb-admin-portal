@@ -1,0 +1,10 @@
+{
+  "name": "@mftb/app-legacy",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "过渡期承载尚未拆出的全部系统（方案 §4.1）。源码暂仍在仓库根 src/（类型检查沿用根 tsconfig.json），待 rdm/eam/hr 等域切片逐个迁出为独立 app 后，本包收敛为空壳并退役。",
+  "dependencies": {
+    "@mftb/contracts": "*"
+  }
+}

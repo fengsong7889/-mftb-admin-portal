@@ -6,10 +6,10 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   CERT_LEDGER_PATH, fetchCertificateDetail, issueCertificate, type CertificateItem,
-} from '../../../api/hrCertificate'
+} from '@/api/hrCertificate'
 import {
   CERT_LANG_LABEL_KEY, CERT_PICKUP_LABEL_KEY, CERT_PICKUP_ORDER, CERT_TYPE_LABEL_KEY,
 } from '../../Ess/meta'

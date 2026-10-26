@@ -6,8 +6,8 @@ import { SaveOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import type { ReturnRow } from '../../../api/eamReturn'
-import AssetParameters from '../../../components/AssetParameters'
+import type { ReturnRow } from '@/api/eamReturn'
+import AssetParameters from '@/components/AssetParameters'
 import { ReturnHeader, ReturnSection } from './ReturnLayout'
 
 const DISPOSITION_OPTIONS = [

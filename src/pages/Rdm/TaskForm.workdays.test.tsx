@@ -6,28 +6,28 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import i18n from '../../i18n'
+import i18n from '@/i18n'
 import {
   checkTaskOwner,
   fetchReqTasks,
   fetchRequirementDetail,
   fetchRequirementPage,
-} from '../../api/rdm'
+} from '@/api/rdm'
 import TaskForm from './TaskForm'
 
-vi.mock('../../api/employee', () => ({
+vi.mock('@/api/employee', () => ({
   fetchEmployees: vi.fn(async () => ({ records: [], total: 0 })),
   fetchEmployee: vi.fn(),
 }))
 
-vi.mock('../../api/rdmTaskType', () => ({
+vi.mock('@/api/rdmTaskType', () => ({
   fetchTaskTypeOptions: vi.fn(async () => [
     { code: 'frontend', label: '前端', color: '#1890FF', enabled: 1, sortOrder: 1 },
   ]),
 }))
 
-vi.mock('../../api/rdm', async () => {
-  const actual = await vi.importActual<typeof import('../../api/rdm')>('../../api/rdm')
+vi.mock('@/api/rdm', async () => {
+  const actual = await vi.importActual<typeof import('@/api/rdm')>('@/api/rdm')
   return {
     ...actual,
     fetchRequirementDetail: vi.fn(),
@@ -69,7 +69,8 @@ describe('TaskForm 计划起止自动折算工时', () => {
   it('选完计划起止后按工作日 × 8h 自动填入计划工时', async () => {
     render(<MemoryRouter initialEntries={['/rdm-task?reqId=9']}><TaskForm /></MemoryRouter>)
     const inputs = await waitFor(() => {
-      const found = document.querySelectorAll<HTMLInputElement>('.ant-picker-input input')
+      // 表单新增了「計劃上線」单日期选择，这里限定到计划起止的 RangePicker 容器，避免选错输入框
+      const found = document.querySelectorAll<HTMLInputElement>('.ant-picker-range .ant-picker-input input')
       expect(found.length).toBe(2)
       return found
     })

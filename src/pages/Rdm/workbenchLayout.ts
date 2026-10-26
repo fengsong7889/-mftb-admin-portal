@@ -15,8 +15,8 @@
  *   后端不可用时回退 localStorage，确保页面仍能正常展示。
  */
 import { useEffect, useRef, useState } from 'react'
-import { fetchWorkbenchLayout, saveWorkbenchLayout } from '../../api/auth'
-import type { WorkbenchLayoutData } from '../../api/auth'
+import { fetchWorkbenchLayout, saveWorkbenchLayout } from '@/api/auth'
+import type { WorkbenchLayoutData } from '@/api/auth'
 
 /* ==================== 工作身份 ==================== */
 

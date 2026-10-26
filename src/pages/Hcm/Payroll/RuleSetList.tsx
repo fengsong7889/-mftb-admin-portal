@@ -11,7 +11,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { CalculatorOutlined, CopyOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   JURISDICTION_OPTIONS,
   copyRuleSet,
@@ -19,7 +19,7 @@ import {
   listRuleSets,
   updateRuleSet,
   type PayrollRuleSet,
-} from '../../../api/payroll'
+} from '@/api/payroll'
 
 interface Filters { keyword?: string; jurisdiction?: string; status?: number }
 

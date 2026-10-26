@@ -3,7 +3,7 @@ import { Button, Input, InputNumber, Modal, Progress, Space, Spin, Switch, Table
 import type { ColumnsType } from 'antd/es/table'
 import { SafetyOutlined, WalletOutlined, HistoryOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import DetailPageHeader from '../../components/DetailPageHeader'
+import DetailPageHeader from '@/components/DetailPageHeader'
 import {
   SOURCE_LABEL,
   SOURCE_TAG_COLOR,
@@ -16,7 +16,7 @@ import {
   type EmpPermissionSummary,
   type EmpModelPermission,
   type EmpQuotaGrant,
-} from '../../api/empPermission'
+} from '@/api/empPermission'
 
 /* ══════════ 展示常量 ══════════ */
 

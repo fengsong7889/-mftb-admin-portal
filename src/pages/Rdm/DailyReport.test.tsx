@@ -11,16 +11,16 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import i18n from '../../i18n'
-import { fetchDailyReportSnapshot } from '../../api/rdmDailyReport'
-import type { DailyReportSnapshot } from '../../api/rdmDailyReport'
+import i18n from '@/i18n'
+import { fetchDailyReportSnapshot } from '@/api/rdmDailyReport'
+import type { DailyReportSnapshot } from '@/api/rdmDailyReport'
 import DailyReport from './DailyReport'
 
 beforeAll(async () => {
   await i18n.changeLanguage('zh-TW')
 })
 
-vi.mock('../../api/rdmDailyReport', () => ({
+vi.mock('@/api/rdmDailyReport', () => ({
   fetchDailyReportSnapshot: vi.fn(),
 }))
 

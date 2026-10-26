@@ -3,12 +3,12 @@ import dayjs from 'dayjs'
 import { Button, Tag, Tooltip, Space, Spin, message } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { EyeOutlined, DollarOutlined, SettingOutlined, PoweroffOutlined, AppstoreOutlined, GlobalOutlined } from '@ant-design/icons'
-import DetailPageHeader from '../../components/DetailPageHeader'
+import DetailPageHeader from '@/components/DetailPageHeader'
 import {
   getModelById,
   parseModalities,
   type AiModel,
-} from '../../api'
+} from '@/api'
 import {
   MODEL_TYPE_TAG, MODEL_TYPE_LABEL, MODALITY_TAG, API_COMPAT_LABEL, CURRENCY_SYMBOL,
   contextLengthText, CapabilityTag, CapabilityMatrix, ModalityChips,

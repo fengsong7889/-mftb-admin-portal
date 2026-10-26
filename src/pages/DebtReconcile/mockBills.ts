@@ -1,5 +1,5 @@
-import type { DebtStoreRecord } from '../../utils/approvalStore'
-import { getDebtRecords } from '../../utils/approvalStore'
+import type { DebtStoreRecord } from '@/utils/approvalStore'
+import { getDebtRecords } from '@/utils/approvalStore'
 
 /**
  * 欠款單 Mock 數據（演示用，覆蓋兩類來源與三種賬單狀態）

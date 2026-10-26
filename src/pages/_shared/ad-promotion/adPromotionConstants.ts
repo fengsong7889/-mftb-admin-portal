@@ -1,4 +1,4 @@
-import { AlgorithmType } from '../../Recommend/constants'
+import { AlgorithmType } from '@mftb/contracts/recommendConstants'
 
 /**
  * 广告推广 / 促销配置 各 Tab 展示的卡片默认类型顺序

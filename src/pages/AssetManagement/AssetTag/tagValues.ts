@@ -4,7 +4,7 @@
  * 將 AssetItem 轉為 AssetTagPreview values（鍵對齊 ASSET_DISPLAY_FIELDS），
  * 枚舉字段（狀態 / 採購形式）轉中文；複用於綁定區塊、批量列印、移動端 H5。
  */
-import type { AssetItem } from '../../../api/asset'
+import type { AssetItem } from '@/api/asset'
 
 const STATUS_LABELS: Record<string, string> = {
   idle: '閒置',

@@ -1,8 +1,8 @@
 import dayjs from 'dayjs'
-import { AlgorithmType } from '../Recommend/constants'
-import { BIZ_CHANNEL } from '../../constants/bizChannel'
+import { AlgorithmType } from '@mftb/contracts/recommendConstants'
+import { BIZ_CHANNEL } from '@/constants/bizChannel'
 import {
-} from '../../api/adPromotion'
+} from '@/api/adPromotion'
 
 /* ---- 枚举 ---- */
 export enum OrderStatus {

@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import os from 'os'
+import { buildMetaPlugin } from './vite-build-meta'
 
 /**
  * 并行 fork 预算：antd + jsdom 单个 fork 常驻数百 MB，
@@ -14,9 +15,29 @@ const memGB = os.totalmem() / 1024 ** 3
 const maxForks = Number(process.env.VITEST_MAX_FORKS) || Math.max(1, Math.min(cpus - 1, Math.floor(memGB / 2)))
 
 export default defineConfig({
-  plugins: [react()],
+  // buildMetaPlugin 必须同时在测试侧注册：`virtual:build-meta` 无真实文件，
+  // 任何间接引用 useVersionCheck 的组件测试都需要它能解析到同一套构建常量。
+  plugins: [react(), buildMetaPlugin()],
   resolve: {
     alias: {
+      // 与 vite.config.ts 保持一致：共享层已拆为 workspace 包，别名保留旧写法
+      '@mftb/contracts': path.resolve(__dirname, './frontend/packages/contracts/src'),
+      '@/api': path.resolve(__dirname, './frontend/packages/platform-client/src/api'),
+      '@/contexts': path.resolve(__dirname, './frontend/packages/platform-client/src/contexts'),
+      '@/utils': path.resolve(__dirname, './frontend/packages/platform-client/src/utils'),
+      '@/components': path.resolve(__dirname, './frontend/packages/ui/src/components'),
+      '@/hooks': path.resolve(__dirname, './frontend/packages/ui/src/hooks'),
+      '@/styles': path.resolve(__dirname, './frontend/packages/ui/src/styles'),
+      '@/constants': path.resolve(__dirname, './frontend/packages/contracts/src/constants'),
+      '@/assets': path.resolve(__dirname, './frontend/packages/ui/src/assets'),
+      '@/api': path.resolve(__dirname, './frontend/packages/platform-client/src/api'),
+      '@/contexts': path.resolve(__dirname, './frontend/packages/platform-client/src/contexts'),
+      '@/utils': path.resolve(__dirname, './frontend/packages/platform-client/src/utils'),
+      '@/components': path.resolve(__dirname, './frontend/packages/ui/src/components'),
+      '@/hooks': path.resolve(__dirname, './frontend/packages/ui/src/hooks'),
+      '@/styles': path.resolve(__dirname, './frontend/packages/ui/src/styles'),
+      '@/i18n': path.resolve(__dirname, './frontend/packages/i18n/src/i18n'),
+      '@/constants': path.resolve(__dirname, './frontend/packages/contracts/src/constants'),
       '@': path.resolve(__dirname, './src'),
     },
     dedupe: ['react', 'react-dom'],
@@ -35,7 +56,13 @@ export default defineConfig({
     pool: 'forks',
     // Vitest 4 已移除 poolOptions.forks，预算必须放到顶层才会生效。
     maxWorkers: maxForks,
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    // scripts/**\*.test.mjs：影响域分析与依赖边界门禁的纯函数单测（node 环境，文件内已声明）。
+    // 这些门禁直接决定「哪些代码需要被验证」，必须能在不跑真仓的情况下被固定住。
+    include: [
+      'src/**/*.{test,spec}.{ts,tsx}',
+      'scripts/**/*.test.mjs',
+      'frontend/packages/**/*.{test,spec}.{ts,tsx}',
+    ],
     exclude: ['node_modules', 'dist'],
     coverage: {
       provider: 'v8',

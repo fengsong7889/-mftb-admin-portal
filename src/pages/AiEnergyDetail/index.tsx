@@ -10,9 +10,9 @@ import {
   ReloadOutlined,
   ExportOutlined,
 } from '@ant-design/icons'
-import { fetchUsageSummary, fetchUsageRecords } from '../../api/llmUsage'
-import { tablePagination } from '../../utils/tableDisplay'
-import type { UsageRecord, UsageSummary } from '../../api/llmUsage'
+import { fetchUsageSummary, fetchUsageRecords } from '@/api/llmUsage'
+import { tablePagination } from '@/utils/tableDisplay'
+import type { UsageRecord, UsageSummary } from '@/api/llmUsage'
 
 const { RangePicker } = DatePicker
 

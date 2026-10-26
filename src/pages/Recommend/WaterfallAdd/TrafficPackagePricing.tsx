@@ -18,8 +18,8 @@ import { ArrowLeftOutlined, SaveOutlined, PlusOutlined, ShopOutlined, AppstoreOu
 import dayjs from 'dayjs'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { AlgorithmType, AppType, APP_OPTIONS } from '../constants'
-import { BIZ_CHANNEL, BIZ_CHANNEL_OPTIONS, type BizChannelValue } from '../../../constants/bizChannel'
+import { AlgorithmType, AppType, APP_OPTIONS } from '@mftb/contracts/recommendConstants'
+import { BIZ_CHANNEL, BIZ_CHANNEL_OPTIONS, type BizChannelValue } from '@/constants/bizChannel'
 import {
   fetchAdAlgorithms,
   fetchAdTrafficPricingDetail,
@@ -28,7 +28,7 @@ import {
   appTypeToBrand,
   brandToAppType,
   type AdAlgorithm,
-} from '../../../api/adPromotion'
+} from '@/api/adPromotion'
 import {
   type TrafficChannelPricing,
   type TrafficPackageTier,

@@ -5,8 +5,8 @@
  * 一次通过率与返工统计就会失真，绩效侧数据随之作废，所以必须有测试兜住。
  */
 import { describe, expect, it } from 'vitest'
-import { RDM_ACCEPT_RESULT, RDM_CASE_RESULT, RDM_DEFECT_SEVERITY, RDM_TEST_ENV } from '../../constants/rdm'
-import type { RdmAcceptanceCaseForm } from '../../api/rdm'
+import { RDM_ACCEPT_RESULT, RDM_CASE_RESULT, RDM_DEFECT_SEVERITY, RDM_TEST_ENV } from '@/constants/rdm'
+import type { RdmAcceptanceCaseForm } from '@/api/rdm'
 import { canSelectResult, draftIssuesText, statCases, validateAcceptance } from './acceptanceRules'
 
 /** 构造用例 */

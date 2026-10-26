@@ -1,13 +1,13 @@
 import i18n from 'i18next'
 import dayjs from 'dayjs'
-import { AlgorithmType, REGION_LABEL_KEY } from '../Recommend/constants'
+import { AlgorithmType, REGION_LABEL_KEY } from '@mftb/contracts/recommendConstants'
 import {
   OrderStatus, AppType, RecommendChannel,
   type OrderItem, type SlotPriceItem, type PromoRecord,
   RecommendType, MEAL_SLOT_LABEL,
   mapAdChannel, mapAdStatus,
 } from './orderUtils'
-import { brandToAppType, type AdOrderDetail } from '../../api/adPromotion'
+import { brandToAppType, type AdOrderDetail } from '@/api/adPromotion'
 
 /* ---- 推广数据 Mock ---- */
 const WATERFALL_NAMES = ['推荐瀑布流A', '推荐瀑布流B', '精选瀑布流C']

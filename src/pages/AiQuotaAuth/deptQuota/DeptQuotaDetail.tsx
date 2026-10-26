@@ -3,9 +3,9 @@ import { useTranslation } from 'react-i18next'
 import { Button, Tag, message } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { TeamOutlined } from '@ant-design/icons'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import { fetchModels, fetchDeptOptions, type AiModel, type DeptOption } from '../../../api'
-import { fetchDeptQuotaDetail, type DeptQuotaVO } from '../../../api/deptQuota'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import { fetchModels, fetchDeptOptions, type AiModel, type DeptOption } from '@/api'
+import { fetchDeptQuotaDetail, type DeptQuotaVO } from '@/api/deptQuota'
 import {
   usagePercent,
   usageColor,

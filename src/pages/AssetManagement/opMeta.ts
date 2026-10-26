@@ -3,7 +3,7 @@
  *
  * 台賬詳情「操作動態」與變更歷史頁共用，避免兩處重複維護
  */
-import type { AssetOpType } from '../../api/asset'
+import type { AssetOpType } from '@/api/asset'
 
 export const OP_META: Record<AssetOpType, { key: string; color: string }> = {
   create:       { key: 'asset.opCreate',       color: 'blue' },

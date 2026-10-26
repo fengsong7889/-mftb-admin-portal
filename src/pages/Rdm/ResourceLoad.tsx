@@ -47,9 +47,9 @@ import {
 import dayjs from 'dayjs'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import StatCards from '../../components/StatCards'
-import HelpPopover from '../../components/HelpPopover'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import StatCards from '@/components/StatCards'
+import HelpPopover from '@/components/HelpPopover'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { rdmTableLocale } from './components/tableLocale'
 import {
   fetchResourceWorkload,
@@ -62,9 +62,9 @@ import {
   type RdmResourceWorkload,
   type RdmResourceMember,
   type RdmUnassignedItem,
-} from '../../api/rdm'
-import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
-import { formatEmployee } from '../../utils/employeeDisplay'
+} from '@/api/rdm'
+import EmployeeSelect from '@/components/EmployeeSelect'
+import { formatEmployee } from '@/utils/employeeDisplay'
 import './index.css'
 
 const { RangePicker } = DatePicker
@@ -1298,7 +1298,8 @@ export default function ResourceLoad() {
           </Form.Item>
           <Form.Item>
             <div className="search-actions">
-              <Button type="primary" icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
+              {/* 搜索区里只有重置动作：按 §B.1 重置按钮用描边灰，不冒充主查询按钮 */}
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
             </div>
           </Form.Item>
         </Form>

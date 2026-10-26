@@ -15,7 +15,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Select, TreeSelect, message } from 'antd'
 import { SafetyCertificateOutlined, SendOutlined, TeamOutlined, TruckOutlined } from '@ant-design/icons'
 import type { Dayjs } from 'dayjs'
-import { backfillTrip, fetchVehicles, newRequestKey, toIso } from '../../../api/vehicle'
+import { backfillTrip, fetchVehicles, newRequestKey, toIso } from '@/api/vehicle'
 import { toVehicleFiles } from '../vehicleAdapter'
 import {
   passengerWithinSeatLimit, plannedRangeValid, vehicleDispatchable,
@@ -26,7 +26,7 @@ import { useDriverOptions, useVehicleDeptTree, type DeptTreeNode } from '../vehi
 import {
   VehicleFormPageHeader, VehicleSection,
 } from '../VehicleModuleLayout'
-import RemarkTextArea from '../../../components/RemarkTextArea'
+import RemarkTextArea from '@/components/RemarkTextArea'
 
 interface FormState {
   vehicleId?: number

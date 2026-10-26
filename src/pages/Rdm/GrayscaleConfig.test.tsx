@@ -11,15 +11,15 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { Modal, message } from 'antd'
-import { fetchGrayscaleStatus, updateGlobalFlowFlags, updateProjectFlowFlags } from '../../api/rdm'
+import { fetchGrayscaleStatus, updateGlobalFlowFlags, updateProjectFlowFlags } from '@/api/rdm'
 import GrayscaleConfig from './GrayscaleConfig'
 
 let canEdit = true
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => canEdit, hasMenuPermission: () => canEdit }),
 }))
 
-vi.mock('../../api/rdm', () => ({
+vi.mock('@/api/rdm', () => ({
   fetchGrayscaleStatus: vi.fn(),
   updateGlobalFlowFlags: vi.fn(),
   updateProjectFlowFlags: vi.fn(),

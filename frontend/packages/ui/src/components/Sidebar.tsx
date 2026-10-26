@@ -1,0 +1,965 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Layout, Menu, message } from 'antd'
+import type { MenuProps } from 'antd'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import GroupLogo from './GroupLogo'
+import { useAuth } from '@/contexts/AuthContext'
+import { useMenu } from '@/contexts/MenuContext'
+import {
+  useCurrentSystem,
+  resolveSystemFromPathname,
+  resolveOrderRouteMenuKey,
+  isBusinessSystemCode,
+} from '@/hooks/useCurrentSystem'
+import { useSystemNavigation } from '@/hooks/useSystemNavigation'
+import { useTranslationRevision } from '@/hooks/useTranslationRevision'
+import type { MenuVO } from '@/api/menu'
+import { fetchPortalContext, type PortalSystem } from '@/api/portal'
+import { getBrandTitle, getPortalSystemKey, PORTAL_SYSTEM_ICONS } from '@/constants/portalSystems'
+import { OFFLINE_MENUS } from '@/constants/offlineMenus'
+import { keyToPath, pathToKey, resolveRdmDetailMenuKey } from '@/constants/menuDataSource'
+import type { OfflineMenuNode } from '@/constants/offlineMenus'
+import { translateMenuName } from '@/i18n/menuNameEn'
+import { renderMenuIcon } from './MenuIcon'
+import type { ReactNode } from 'react'
+import {
+  AccountBookOutlined,
+  // 会议管理（meeting）菜单兜底图标：后端菜单树未返回 icon 时仍能渲染，
+  // check-menu-consistency 会逐字比对这里与 sys_menu.icon
+  UsergroupAddOutlined,
+  PlusSquareOutlined,
+  LayoutOutlined,
+  BookOutlined,
+  PropertySafetyOutlined,
+  WalletOutlined,
+  SearchOutlined,
+  FileSearchOutlined,
+  SwapOutlined,
+  AuditOutlined,
+  // 用車管理兜底图标：必须与後端 sys_menu.icon 完全一致，
+  // 否则 check:menu 会报「缺少与 X 一致的 Sidebar 兜底图标」
+  CarOutlined,
+  TruckOutlined,
+  CarryOutOutlined,
+  CompassOutlined,
+  LoginOutlined,
+  ClusterOutlined,
+  CheckCircleOutlined,
+  DatabaseOutlined,
+  ScissorOutlined,
+  FontSizeOutlined,
+  FireOutlined,
+  BarChartOutlined,
+  LineChartOutlined,
+  AimOutlined,
+  ReadOutlined,
+  PlayCircleOutlined,
+  HomeOutlined,
+  ColumnHeightOutlined,
+  SettingOutlined,
+  ControlOutlined,
+  GlobalOutlined,
+  ThunderboltOutlined,
+  BulbOutlined,
+  StopOutlined,
+  SafetyCertificateOutlined,
+  SafetyOutlined,
+  AppstoreOutlined,
+  PieChartOutlined,
+  GiftOutlined,
+  OrderedListOutlined,
+  DashboardOutlined,
+  TeamOutlined,
+  ShopOutlined,
+  MoneyCollectOutlined,
+  CrownOutlined,
+  LockOutlined,
+  FileTextOutlined,
+  ShoppingFilled,
+  RedEnvelopeOutlined,
+  UserOutlined,
+  ApartmentOutlined,
+  RobotOutlined,
+  MessageOutlined,
+  IdcardOutlined,
+  SolutionOutlined,
+  ScheduleOutlined,
+  MenuOutlined,
+  MonitorOutlined,
+  HistoryOutlined,
+  ExperimentOutlined,
+  NodeIndexOutlined,
+  RocketOutlined,
+  CalculatorOutlined,
+  BranchesOutlined,
+  DeploymentUnitOutlined,
+  TrophyOutlined,
+  MedicineBoxOutlined,
+  CloudServerOutlined,
+  CloudUploadOutlined, // 階段 A RDM 展示层「發布與驗收」合成分组图标
+  ToolOutlined,
+  DesktopOutlined, // AI 模型相关
+  KeyOutlined, // AI 使用申請
+  BlockOutlined, // MCP 服務
+  BankOutlined, // 权限管理相关
+  DollarOutlined, // 额度策略
+  UnlockOutlined, // 員工AI權額管理
+  InboxOutlined, // 物资管理一级菜单
+  ContainerOutlined, // 需求池一级分组（v3.11 拆分，图标全局唯一）
+  SendOutlined, // 提交需求（v3.11 从需求池拆出的业务侧菜单）
+  AppstoreAddOutlined, // 资产入库
+  UserAddOutlined, // 资产领用/归还
+  UserDeleteOutlined, // 離職管理
+  PartitionOutlined, // 入轉調離分组
+// 部門架構
+  HourglassOutlined, // 假期額度
+  UserSwitchOutlined, // 員工自助（一级域）
+  FieldTimeOutlined, // 我的假期
+  FormOutlined, // 我的申請單據
+  FolderOpenOutlined, // 我的檔案 / 系統方案庫
+  ApiOutlined, // 接口管理
+  FileProtectOutlined, // 證明開具（自助）
+  PrinterOutlined, // 證明開具（人事台账）
+  StarOutlined, // 績效考核（一级域）
+  RiseOutlined, // 周期與計劃
+  CheckSquareOutlined, // 評分工作台
+  SlidersOutlined, // 校準與確認
+  FlagOutlined, // 我的績效
+  FundProjectionScreenOutlined, // 績效台账（一级域）
+  TableOutlined, // 結果台賬
+  ExceptionOutlined, // 改判留痕
+  ReconciliationOutlined, // 申诉登記
+  FolderOutlined, // 員工檔案分组
+  RollbackOutlined, // 资产转移/归还
+  DeleteOutlined, // 报废
+  TagsOutlined, // 资产分类
+  TagOutlined, // 资产标签
+  ContactsOutlined, // 供应商管理
+  CalendarOutlined, // 請假管理
+  BarcodeOutlined, // 產品庫
+  EnvironmentOutlined, // 仓库维护
+  ShoppingCartOutlined, // 采购申请
+  FileDoneOutlined, // 采购订单
+  ImportOutlined, // 验收入库
+  BellOutlined, // 通知渠道配置
+  GoldOutlined, // 耗材管理分组
+  ProfileOutlined, // 耗材档案
+  FundOutlined, // 消耗统计
+  AlertOutlined, // 库存预警
+  TranslationOutlined, // 多语言管理
+  // 考勤假勤系统（菜单图标必须与后端 sys_menu.icon 一致，缺一处侧边栏就没图标）
+  ClockCircleOutlined, // 假勤工作台
+  GroupOutlined, // 考勤組與規則
+  RetweetOutlined, // 班次管理
+  SnippetsOutlined, // 節假日日曆
+  BorderOutlined, // 排班管理
+  ScanOutlined, // 打卡記錄
+  ExclamationCircleOutlined, // 異常處理
+  AreaChartOutlined, // 考勤日報
+  PayCircleOutlined, // 月度考勤匯總
+  FunctionOutlined, // 假勤設置
+} from '@ant-design/icons'
+
+const { Sider } = Layout
+
+type MenuItem = Required<MenuProps>['items'][number]
+
+// [keyToPath 已迁移至 constants/menuDataSource.ts]
+// [旧数据已删除，以下为占位注释]
+const _OLD_KEY_TO_PATH_REMOVED = {
+  _removed: true,
+  /*
+  'store-list': '/store-list',
+  // 财务管理 - 推广金管理
+  'account-balance': '/account-balance',
+  'consume-risk': '/consume-risk',
+  'batch-query': '/batch-query',
+  'detail-query': '/detail-query',
+  // 财务管理 - 商户通对账
+  'writeoff-reconcile': '/writeoff-reconcile',
+  'debt-reconcile': '/debt-reconcile',
+  // 财务管理 - 审批管理
+  'approval-center': '/approval-center',
+  // 搜索管理 - 搜索引导
+  'hint-config': '/hint-config',
+  'hint-preview': '/hint-preview',
+  'hot-search-config': '/hot-search-config',
+  'hot-search-preview': '/hot-search-preview',
+  'search-weight-config': '/search-weight-config',
+  // 搜索管理 - 搜索词库
+  'word-segmentation': '/word-segmentation',
+  'synonym-config': '/synonym-config',
+  'hot-search-library': '/hot-search-library',
+  'stop-words': '/stop-words',
+  // 搜索管理 - 报表统计
+  'hint-report': '/hint-report',
+  'hot-search-report': '/hot-search-report',
+  // 搜索配置管理(新系统)
+  'global-config': '/global-config',
+  'channel-strategy': '/channel-strategy',
+  // 搜索校驗
+  'search-verify': '/search-verify',
+  'search-verify-detail': '/search-verify-detail',
+  'hint-verify': '/hint-verify',
+  'hot-search-verify': '/hot-search-verify',
+
+  // 集團人事
+  'employee-management': '/employee-management',
+  'position-management': '/position-management',
+  'login-log': '/login-log',
+  // 組織管理（v44 一级域）
+  'ess-center': '/ess-leave',
+  'ess-leave': '/ess-leave',
+  'ess-requests': '/ess-requests',
+  'ess-profile': '/ess-profile',
+  'ess-certificate': '/ess-certificate',
+  'hr-certificate': '/hr-certificate',
+  // 績效考核（v46）
+  'perf-center': '/hr-perf-cycle',
+  'hr-perf-admin': '/hr-perf-cycle',
+  'hr-perf-review': '/hr-perf-review',
+  'hr-perf-calibration': '/hr-perf-calibration',
+  'ess-performance': '/ess-performance',
+  'perf-report-center': '/hr-perf-ledger',
+  'hr-perf-ledger': '/hr-perf-ledger',
+  'hr-perf-audit': '/hr-perf-audit',
+  'hr-perf-appeal': '/hr-perf-appeal',
+  'org-center': '/org-center',
+  'org-structure': '/organization-management',
+  // 權限管理（功能授權/系統授權已合并為授權中心；舊 key 直接重定向到授權中心）
+  'role-management': '/role-management',
+  'authorization-center': '/authorization-center',
+  'function-permission': '/authorization-center',
+  'data-permission': '/data-permission',
+  // 商家推广工具 - 词库管理
+  'promotion-word-library': '/promotion-word-library',
+  // 商家推广工具 - 流量沙盤
+  'waterfall-simulation': '/waterfall-simulation',
+  'algorithm-simulation': '/algorithm-simulation',
+  'merchant-score-insight': '/merchant-score-insight',
+  'merchant-promotion-diagnose': '/merchant-promotion-diagnose',
+  // 商家推广工具
+  'promotion-dashboard': '/promotion-dashboard',
+  'promotion-algorithm': '/promotion-algorithm',
+  'promotion-slot-config': '/promotion-slot-config',
+  'promotion-waterfall': '/promotion-waterfall',
+  'promotion-sales-config': '/promotion-sales-config',
+  // 广告销售（商家推广工具下，复用店铺推广页面）
+  'ad-sales': '/ad-sales',
+  // 推广赠送（一级菜单「赠送管理」下）
+  'gift-detail': '/gift-detail',
+  // 消费明细（一级菜单「赠送管理」下）
+  'gift-consume-detail': '/gift-consume-detail',
+  // 推广通 - 報表分析
+  'promotion-report-overview': '/promotion-report-overview',
+  'promotion-report-order': '/promotion-report-order',
+  'promotion-report-compare': '/promotion-report-compare',
+  // 團購管理
+  'group-purchase-dashboard': '/group-purchase-dashboard',
+  'flash-sale-register': '/flash-sale-register',
+  'flash-sale-stats': '/flash-sale-stats',
+  'flash-sale-price': '/flash-sale-price',
+  // 推广通(父菜单,无需映射)
+  // 'promotion-tool': '/promotion-tool',
+  // 系统配置
+  'menu-config': '/menu-config',
+  'translation-manage': '/i18n-center/workbench',
+  // 多语言管理（i18n-center 独立模块）
+  'i18n-language': '/i18n-center/language',
+  'i18n-import-export': '/i18n-center/import-export',
+  'i18n-mt-engine': '/i18n-center/mt-engine',
+  'i18n-dashboard': '/i18n-center/dashboard',
+  'rule-config': '/rule-config',
+  'rule-ad-sales': '/rule-center/ad-sales',
+  'rule-gift': '/rule-center/gift',
+  'rule-security': '/rule-center/security',
+  'rule-algorithm': '/rule-center/algorithm',
+  'rule-seq': '/rule-center/seq',
+  'notification-config': '/notification-config',
+  'workflow-config': '/workflow-config',
+    'version-history': '/version-history',
+  // 智能中心(AI)
+  'ai_model_hub': '/ai-model-hub',
+  'ai-operation-auth': '/ai-operation-auth',
+  'agent-overview': '/agent-overview',
+  'agent-apps': '/agent-apps',
+  'agent-budget': '/agent-budget',
+  'agent-actions': '/agent-actions',
+  'agent-knowledge': '/agent-knowledge',
+  'agent-data': '/agent-data',
+  'agent-runs': '/agent-runs',
+  'agent-evaluation': '/agent-evaluation',
+  'ai-assistant-overview': '/ai-assistant',
+  'ai-assistant-capability': '/ai-assistant/capability',
+  'ai-assistant-profile': '/ai-assistant/profile',
+  'ai-assistant-glossary': '/ai-assistant/glossary',
+  'ai-assistant-knowledge': '/ai-assistant/knowledge',
+  'ai-assistant-guardrail': '/ai-assistant/guardrail',
+  'ai-assistant-feedback': '/ai-assistant/feedback',
+  'ai-assistant-audit': '/ai-assistant/audit',
+  'ai-assistant-quick-prompt': '/ai-assistant/quick-prompt',
+  'ai-assistant-push-template': '/ai-assistant/push-template',
+  'ai-assistant-memory': '/ai-assistant/memory',
+  'ai-access-request': '/ai-access-apply',
+  'ai-mcp-service': '/ai-mcp-service',
+  'ai-conversation-audit': '/ai-conversation-audit',
+  'ai_usage_stats': '/ai-usage-stats',
+  'ai_energy_detail': '/ai-energy-detail',
+  // 智能中心(AI) - 拆分后的新菜单 key
+  'ai-model-provider': '/ai-model-provider',
+  'ai-model-list': '/ai-model-list',
+  'ai-auth': '/ai-auth',
+  // AI 模型授权管理 / 配额管理（二级菜单）
+  'ai-dept-model-auth': '/ai-dept-model-auth',
+  'ai-emp-model-auth': '/ai-emp-model-auth',
+  'ai-pos-auth': '/ai-pos-auth',
+  'ai-dept-quota': '/ai-dept-quota',
+  'ai-emp-quota': '/ai-emp-quota',
+  // OA中心
+  'oa-requests': '/oa-requests',
+  'process-center': '/process-center',
+  // 门店数据配置
+  'store-data-config': '/store-data-config',
+  // 地图規劃
+  'map-planning': '/map-planning',
+  // 赠送管理子页面
+  'gift-add': '/gift-add',
+  'gift-detail-view': '/gift-detail-view',
+  // AI 子页面（编辑/详情）
+  'ai-model-edit': '/ai-model-edit',
+  'ai-model-detail': '/ai-model-detail',
+  'ai-dept-auth-edit': '/ai-dept-auth-edit',
+  'ai-dept-auth-detail': '/ai-dept-auth-detail',
+  'ai-pos-auth-edit': '/ai-pos-auth-edit',
+  'ai-pos-auth-detail': '/ai-pos-auth-detail',
+  'ai-role-auth-edit': '/ai-role-auth-edit',
+  'ai-role-auth-detail': '/ai-role-auth-detail',
+  'ai-dept-quota-edit': '/ai-dept-quota-edit',
+  'ai-dept-quota-detail': '/ai-dept-quota-detail',
+  // 員工AI權額管理
+  'ai-emp-permission': '/ai-emp-permission',
+  'ai-emp-permission-detail': '/ai-emp-permission-detail',
+  // 物資管理（EAM 完整 19 個子菜單）
+  'asset-dashboard':     '/asset-dashboard',
+  'asset-supplier':      '/asset-supplier',
+  'asset-list':          '/asset-list',
+  'asset-category':      '/asset-category',
+  'asset-model':         '/asset-model',
+  'asset-location':      '/asset-location',
+  'param-library':       '/param-library',
+  'asset-tag':           '/asset-tag',
+  'asset-inbound':       '/asset-inbound',
+  'asset-claim':         '/asset-claim',
+  'asset-borrow':        '/asset-borrow',
+  'asset-return':        '/asset-return',
+  'asset-transfer-list': '/asset-transfer-list',
+  'asset-handover':      '/asset-handover',
+  'asset-repair':        '/asset-repair',
+  'asset-loss':          '/asset-loss',
+  'asset-compensation':  '/asset-compensation',
+  'asset-scrap':         '/asset-scrap',
+  'asset-flow':          '/asset-flow',
+  'asset-inventory':     '/asset-inventory',
+  // EAM 採購
+  'purchase-order':      '/purchase-order',
+  'purchase-request':    '/oa-purchase-request',
+  // 耗材管理（消耗品/MRO）
+  'consumable-dashboard': '/consumable-dashboard',
+  'consumable-item':      '/consumable-item',
+  'consumable-claim':     '/consumable-claim',
+  'consumable-stock':     '/consumable-stock',
+  'consumable-stock-txn': '/consumable-stock-txn',
+  'consumable-alert':     '/consumable-alert',
+  */
+}
+
+/** pathToKey 从 menuDataSource 导入（见上方 import），此处 re-export 保持外部消费者兼容 */
+export { pathToKey } from '@/constants/menuDataSource'
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+
+/**
+ * 离线菜单（前端唯一保留的本地菜单定义, 见 src/constants/offlineMenus.ts）
+ *
+ * 菜单名称/层级/排序/图标的唯一真值源是后端 sys_menu, 因此这里不再维护整棵静态菜单树：
+ * - 已对接真实后端的菜单：完全由后端菜单树提供, 后端不可用时不展示（避免本地副本与服务器不一致）；
+ * - 仍依赖 mock 的菜单：保留在 OFFLINE_MENUS, 后端不可用时照常展示, 可用时仅补挂 DB 中缺失的项。
+ */
+const buildOfflineMenuItem = (node: OfflineMenuNode, excludeKeys?: Set<string>): MenuItem | null => {
+  // 补挂时跳过 DB 已有的后代，否则同一 menuKey 会在不同层级重复出现（antd Menu duplicate key）
+  if (excludeKeys?.has(node.key)) return null
+  const children = (node.children ?? [])
+    .map((child) => buildOfflineMenuItem(child, excludeKeys))
+    .filter((child): child is MenuItem => child !== null)
+  return {
+    key: node.key,
+    icon: keyToIcon[node.key],
+    label: translateMenuName(node.key, node.label),
+    ...(children.length > 0 ? { children } : {}),
+  } as MenuItem
+}
+
+/** 收集后端菜单树全部 key（含停用项）：停用的菜单不得被本地副本"复活" */
+const collectMenuTreeKeys = (menus: MenuVO[], acc = new Set<string>()): Set<string> => {
+  for (const m of menus) {
+    acc.add(m.menuKey)
+    if (m.children?.length) collectMenuTreeKeys(m.children, acc)
+  }
+  return acc
+}
+
+/** 把离线菜单补挂进后端菜单树：DB 已有的 key 一律以 DB 为准, 仅追加 DB 中完全缺失的子项 */
+const attachOfflineMenus = (items: MenuItem[], dbKeys: Set<string>): MenuItem[] =>
+  items.map((item) => {
+    const key = String((item as { key?: string }).key ?? '')
+    const withChildren = item as MenuItem & { children?: MenuItem[] }
+    const offlineNode = OFFLINE_MENUS.find((n) => n.key === key)
+    if (!offlineNode?.children?.length) return withChildren
+    const children = withChildren.children
+      ? attachOfflineMenus(withChildren.children, dbKeys)
+      : []
+    const existing = new Set(children.map((c) => String((c as { key?: string }).key ?? '')))
+    const missing = offlineNode.children
+      .filter((c) => !existing.has(c.key) && !dbKeys.has(c.key))
+      .map((c) => buildOfflineMenuItem(c, dbKeys))
+      .filter((c): c is MenuItem => c !== null)
+    return { ...withChildren, children: [...children, ...missing] } as MenuItem
+  })
+
+interface SidebarProps {
+  collapsed: boolean
+}
+
+/** 菜单 key → 图标组件 映射（后端 icon 字段为空时按 key 匹配保持现有图标样式） */
+const keyToIcon: Record<string, ReactNode> = {
+  'home': <HomeOutlined />,
+  'merchant_group': <ShopOutlined />,
+  'merchant-group-list': <ShopOutlined />,
+  'store-list': <ShopOutlined />,
+  'merchant_promotion': <CrownOutlined />,
+  'promotion-dashboard': <PieChartOutlined />,
+  'promotion-algorithm': <AppstoreOutlined />,
+  'promotion-slot-config': <ColumnHeightOutlined />,
+  'promotion-waterfall': <WalletOutlined />,
+  'gift-manage': <GiftOutlined />,
+  'gift-detail': <RedEnvelopeOutlined />,
+  'gift-consume-detail': <FileTextOutlined />,
+  'ad-sales': <ShoppingFilled />,
+  'promotion-word-library': <ReadOutlined />,
+  // 商家推廣工具 - 流量沙盤
+  'traffic-sandbox': <ExperimentOutlined />,
+  'waterfall-simulation': <NodeIndexOutlined />,
+  'algorithm-simulation': <DeploymentUnitOutlined />,
+  'merchant-score-insight': <TrophyOutlined />,
+  'merchant-promotion-diagnose': <MedicineBoxOutlined />,
+  // 推廣通顶级菜单（后端 menu_key 为下划线命名 promotion_tool）
+  'promotion_tool': <ThunderboltOutlined />,
+  'promotion-sales-config': <ShoppingFilled />,
+  'promotion-report-group': <BarChartOutlined />,
+  'promotion-report-overview': <DashboardOutlined />,
+  'promotion-report-order': <LineChartOutlined />,
+  'promotion-report-compare': <PieChartOutlined />,
+  'search': <SearchOutlined />,
+  'search-config-new': <SettingOutlined />,
+  'global-config': <GlobalOutlined />,
+  'channel-strategy': <ThunderboltOutlined />,
+  'search-guide': <AimOutlined />,
+  'hint-config': <FontSizeOutlined />,
+  'hot-search-config': <FireOutlined />,
+  'search-weight-config': <ColumnHeightOutlined />,
+  'search-library': <ReadOutlined />,
+  'word-segmentation': <ScissorOutlined />,
+  'synonym-config': <SwapOutlined />,
+  'hot-search-library': <FireOutlined />,
+  'stop-words': <StopOutlined />,
+  'search-verify-group': <SafetyCertificateOutlined />,
+  'search-verify': <SearchOutlined />,
+  'hint-verify': <FontSizeOutlined />,
+  'hot-search-verify': <FireOutlined />,
+  'report': <BarChartOutlined />,
+  'hint-report': <LineChartOutlined />,
+  'hot-search-report': <LineChartOutlined />,
+  'finance': <MoneyCollectOutlined />,
+  'promotion': <WalletOutlined />,
+  'account-balance': <AccountBookOutlined />,
+  'consume-risk': <SafetyCertificateOutlined />,
+  'batch-query': <SearchOutlined />,
+  'detail-query': <FileSearchOutlined />,
+  'merchant-reconcile': <AuditOutlined />,
+  'writeoff-reconcile': <AuditOutlined />,
+  'debt-reconcile': <CheckCircleOutlined />,
+  'approval': <CheckCircleOutlined />,
+  'approval-center': <AuditOutlined />,
+  'hr': <TeamOutlined />,
+  'org-center': <ApartmentOutlined />,
+  'org-structure': <ClusterOutlined />,
+  'hr-profile': <FolderOutlined />,
+  'hr-lifecycle': <PartitionOutlined />,
+  'hr-config': <ControlOutlined />,
+  'hr-onboarding': <UserAddOutlined />,
+  'hr-regularization': <CheckCircleOutlined />,
+  'hr-transfer': <SwapOutlined />,
+  'hr-dimission': <UserDeleteOutlined />,
+  'ess-center': <UserSwitchOutlined />,
+  'ess-leave': <FieldTimeOutlined />,
+  'ess-requests': <FormOutlined />,
+  'ess-profile': <FolderOpenOutlined />,
+  'ess-certificate': <FileProtectOutlined />,
+  'hr-certificate': <PrinterOutlined />,
+  'perf-center': <StarOutlined />,
+  'hr-perf-admin': <RiseOutlined />,
+  'hr-perf-review': <CheckSquareOutlined />,
+  'hr-perf-calibration': <SlidersOutlined />,
+  'ess-performance': <FlagOutlined />,
+  'perf-report-center': <FundProjectionScreenOutlined />,
+  'hr-perf-ledger': <TableOutlined />,
+  'hr-perf-audit': <ExceptionOutlined />,
+  'hr-perf-appeal': <ReconciliationOutlined />,
+  'hr-leave': <CalendarOutlined />,
+  'hr-leave-quota': <HourglassOutlined />,
+  'employee-management': <UserOutlined />,
+  'position-management': <IdcardOutlined />,
+  'login-log': <ScheduleOutlined />,
+  // OA中心
+  'oa-center': <SolutionOutlined />,
+  'oa-requests': <FileTextOutlined />,
+  'process-center': <AppstoreOutlined />,
+  // 團購管理
+  'group-purchase': <ShoppingFilled />,
+  'group-purchase-dashboard': <DashboardOutlined />,
+  'flash-sale-register': <FileTextOutlined />,
+  'flash-sale-stats': <BarChartOutlined />,
+  'flash-sale-price': <MoneyCollectOutlined />,
+  'permission': <LockOutlined />,
+  'role-management': <SolutionOutlined />,
+  'authorization-center': <SafetyOutlined />,
+  'function-permission': <AppstoreOutlined />,
+  'data-permission': <DatabaseOutlined />,
+  'system-authorization': <SafetyCertificateOutlined />,
+  'system-config': <SettingOutlined />,
+  'menu-config': <MenuOutlined />,
+  'translation-manage': <TranslationOutlined />,
+  'i18n-center': <TranslationOutlined />,
+  'i18n-language': <GlobalOutlined />,
+  'i18n-import-export': <ImportOutlined />,
+  'i18n-mt-engine': <ToolOutlined />,
+  'i18n-dashboard': <DashboardOutlined />,
+  'rule-config': <SwapOutlined />,
+  'rule-center': <ApartmentOutlined />,
+  'rule-ad-sales': <ShoppingCartOutlined />,
+  'rule-gift': <GiftOutlined />,
+  'rule-security': <SafetyCertificateOutlined />,
+  'rule-algorithm': <ControlOutlined />,
+  'rule-seq': <OrderedListOutlined />,
+  'workflow-config': <ApartmentOutlined />,
+  'version-history': <HistoryOutlined />,
+  'notification-config': <BellOutlined />,
+  // 智能中心 (AI)
+  'agent-platform': <ControlOutlined />,
+  'agent-overview': <DashboardOutlined />,
+  'agent-apps': <AppstoreOutlined />,
+  'agent-budget': <ThunderboltOutlined />,
+  'agent-actions': <SafetyCertificateOutlined />,
+  'agent-knowledge': <ReadOutlined />,
+  'agent-data': <DatabaseOutlined />,
+  'agent-runs': <PlayCircleOutlined />,
+  'agent-evaluation': <ExperimentOutlined />,
+  'ai-assistant-group': <RobotOutlined />,
+  'ai_model_hub': <CloudServerOutlined />,
+  'ai-operation-auth': <ToolOutlined />,   // AI 权控管理
+  'ai-assistant-overview': <DashboardOutlined />,
+  'ai-assistant-capability': <AppstoreOutlined />,
+  'ai-assistant-profile': <FileTextOutlined />,
+  'ai-assistant-glossary': <BookOutlined />,
+  'ai-assistant-knowledge': <ReadOutlined />,
+  'ai-assistant-guardrail': <SafetyCertificateOutlined />,
+  'ai-assistant-feedback': <MessageOutlined />,
+  'ai-assistant-audit': <AuditOutlined />,
+  'ai-assistant-quick-prompt': <ThunderboltOutlined />,
+  'ai-assistant-push-template': <SendOutlined />,
+  'ai-assistant-memory': <BulbOutlined />,
+  'ai-access-request': <KeyOutlined />,    // AI 使用申請
+  'ai-mcp-service': <BlockOutlined />,     // MCP 服務
+  'ai-conversation-audit': <AuditOutlined />, // 对话审计
+  'ai-usage-stats': <LineChartOutlined />,
+  'ai_usage_stats': <LineChartOutlined />,
+  'ai-energy-detail': <FileSearchOutlined />,
+  'ai_energy_detail': <FileSearchOutlined />,
+  'ai-energy-billing': <ThunderboltOutlined />,
+  'ai-models': <DesktopOutlined />,        // AI 模型管理 - 电脑显示器
+  'models': <DesktopOutlined />,
+  'ai-auth-quota': <SafetyCertificateOutlined />, // 授权与配额 - 安全证书
+  'ai-model-provider': <CloudServerOutlined />,  // 供应商管理 - 云服务器
+  'model-provider': <CloudServerOutlined />,
+  'ai-model-list': <AppstoreOutlined />,   // 模型接入 - 应用商店
+  'model-list': <AppstoreOutlined />,
+  'ai-auth': <BankOutlined />,             // 权限管理 - 银行/金融机构
+  'ai-quota': <DollarOutlined />,          // 额度策略 - 金额符号（与授权与配额去重）
+  // AI 模型授权管理 / 配额管理（分组 + 子菜单图标）
+  'ai-dept-model-auth': <ApartmentOutlined />,    // 按部门配置模型 - 组织架构
+  'ai-emp-model-auth': <TeamOutlined />,          // 按员工/角色配置模型 - 团队
+  'ai-pos-auth': <IdcardOutlined />,             // 按职位授权 - 职位徽章
+  'ai-role-auth': <UserOutlined />,              // 角色授权 - 用户
+  'ai-auth-manage': <SafetyCertificateOutlined />, // 模型授权管理 - 安全认证
+  'ai-quota-manage': <DollarOutlined />,       // 配额管理 - 金额符号
+  'ai-dept-quota': <AccountBookOutlined />,    // 部门额度 - 账本
+  'ai-emp-quota': <MoneyCollectOutlined />,    // 员工额度 - 收款
+  'ai-emp-permission': <UnlockOutlined />,     // 員工AI權額管理 - 解鎖/權限管理
+  // 物資管理
+  'asset-management': <InboxOutlined />,
+  'asset-supplier':   <ContactsOutlined />, // 供應商管理
+  'asset-basic':      <ControlOutlined />, // 控制面板，与系統配置的齿轮区分
+  'eam-master-data':  <DatabaseOutlined />, // 基礎配置（替代 asset-basic）
+  'eam-procurement':  <ShoppingCartOutlined />, // 採購與供應
+  'asset-category':   <TagsOutlined />,      // 分類庫
+  'asset-model':      <BarcodeOutlined />,   // 品牌產品庫
+  'asset-location':   <EnvironmentOutlined />, // 倉庫管理
+  'asset-dashboard':  <DashboardOutlined />,
+  'asset-inbound':    <ImportOutlined />,
+  'asset-handover':   <TeamOutlined />,
+  'asset-compensation': <DollarOutlined />,
+  'asset-flow-ops':   <SwapOutlined />,
+  'asset-maintenance': <ToolOutlined />,
+  'asset-purchase':   <ShoppingCartOutlined />,
+  'consumable-ops':   <GoldOutlined />,
+  'consumable-dashboard': <DashboardOutlined />,
+  'consumable-item':  <ProfileOutlined />,
+  'consumable-inbound': <ImportOutlined />,
+  'consumable-report': <FundOutlined />,
+  'consumable-claim': <UserAddOutlined />,
+  'consumable-stock': <DatabaseOutlined />,
+  'consumable-stock-txn': <SwapOutlined />,
+  'consumable-alert': <AlertOutlined />,
+  'asset-list':       <AppstoreOutlined />,
+  'asset-add':        <AppstoreAddOutlined />,
+  'asset-claim':      <UserAddOutlined />,
+  'asset-transfer':   <SwapOutlined />,
+  'asset-return':     <RollbackOutlined />,
+  'asset-scrap':      <DeleteOutlined />,
+  'asset-repair':     <ToolOutlined />,
+  'asset-loss':       <SearchOutlined />,
+  'asset-inventory':  <AuditOutlined />,
+  'param-library':    <DatabaseOutlined />,
+  // 用車管理（物資管理下的「用車管理」分组）
+  'vehicle-management': <CarOutlined />,
+  'vehicle-files':    <TruckOutlined />,
+  'vehicle-dispatch': <CarryOutOutlined />,
+  'vehicle-ledger':   <CompassOutlined />,
+  'my-vehicle-use':   <LoginOutlined />,
+  'vehicle-master-data': <ClusterOutlined />,
+  // 組織編制系统（独立入口，菜单归属 sys_menu.system_code=organization）
+  'hcm-org-legal':         <BankOutlined />,
+  'hcm-org-unit':          <ApartmentOutlined />,
+  'hcm-org-job-family':    <ClusterOutlined />,
+  'hcm-org-job-grade':     <TagsOutlined />,
+  'hcm-org-position':      <LayoutOutlined />,
+  // 人事管理 · 人員主檔（C3）：与旧「員工管理」并存，图标区分开
+  'hcm-person':            <IdcardOutlined />,
+  // 薪酬福利系统（独立入口，菜单归属 sys_menu.system_code=payroll）
+  'hcm-payroll-component': <MoneyCollectOutlined />,
+  'hcm-payroll-standard':  <WalletOutlined />,
+  'hcm-payroll-benefit':   <SafetyCertificateOutlined />,
+  'hcm-payroll-rule':      <CalculatorOutlined />,
+  'hcm-payroll-run':       <AccountBookOutlined />,
+  // 考勤假勤系统（独立入口，菜单归属 sys_menu.system_code=attendance）
+  'attendance-ops-group':     <ScheduleOutlined />,     // 考勤管理分组
+  'attendance-basic-group':   <ControlOutlined />,      // 基礎設置分组
+  'attendance-leave-group':   <BarChartOutlined />,     // 請假管理分组
+  'attendance-report-group':  <PieChartOutlined />,     // 報表統計分组
+  'attendance-workbench':  <ClockCircleOutlined />,
+  'attendance-group':      <GroupOutlined />,
+  'attendance-shift':      <RetweetOutlined />,
+  'attendance-holiday':    <SnippetsOutlined />,
+  'attendance-schedule':   <BorderOutlined />,
+  'attendance-punch':      <ScanOutlined />,
+  'attendance-exception':  <ExclamationCircleOutlined />,
+  'attendance-daily':      <AreaChartOutlined />,
+  'attendance-monthly':    <PayCircleOutlined />,
+  'attendance-setting':    <FunctionOutlined />,
+  // 会议管理系统（独立入口，菜单归属 sys_menu.system_code=meeting）
+  // v1.3 拍平后使用侧两张一级菜单（我的會議/會議室預約）+ 會議治理分组，图标必须与后端迁移写入的一致
+  'meeting-admin':       <MonitorOutlined />,
+  'meeting-my':          <UsergroupAddOutlined />,
+  'meeting-booking':     <PlusSquareOutlined />,
+  'meeting-room':        <LayoutOutlined />,
+  'meeting-record':      <BookOutlined />,
+  'meeting-config':      <PropertySafetyOutlined />,
+  'asset-tag':        <TagOutlined />,
+  // 採購
+  'purchase-order':   <FileDoneOutlined />,
+  'purchase-request': <ShoppingCartOutlined />,
+  // 產研交付（RDM）—— 需求全生命周期（已拍平为一级菜单）
+  // 提交需求/產品需求處理/交付中需求三个菜单已收敛退役，兜底图标随之移除（需求清单复用 FileTextOutlined）
+  'rdm-workbench':    <DashboardOutlined />,
+  'rdm-requirement':  <FileTextOutlined />,
+  'rdm-intake':       <InboxOutlined />,
+  // v3.11 拆分：一级分组「需求池」用 Container、二级「提交需求」用 Send，
+  // 两个图标在本项目菜单里此前未被占用（菜单图标必须全局唯一）
+  'rdm-pool-group':   <ContainerOutlined />,
+  'rdm-intake-approval': <SendOutlined />,
+  'rdm-delivery':     <NodeIndexOutlined />,
+  'rdm-delivery-board': <RocketOutlined />,
+  'rdm-delivery-iteration': <ScheduleOutlined />,
+  'rdm-acceptance':   <CheckSquareOutlined />,
+  'rdm-dashboard':    <RiseOutlined />,
+  'rdm-dashboard-board': <BarChartOutlined />,
+  // v3.5：DB 里这三个 key 的图标（AlertOutlined / DashboardOutlined / TeamOutlined）必须与此一致，门禁会比对
+  'rdm-dashboard-risk': <AlertOutlined />,
+  'rdm-efficiency': <DashboardOutlined />,
+  'rdm-efficiency-output': <TeamOutlined />,
+  'rdm-dashboard-quality': <SafetyCertificateOutlined />,
+  'rdm-dashboard-version': <BranchesOutlined />,
+  'rdm-dashboard-report': <CalendarOutlined />,
+  'rdm-dashboard-score': <TrophyOutlined />,
+  'rdm-dashboard-trend': <LineChartOutlined />,
+  'rdm-config-score': <CalculatorOutlined />,
+  'rdm-config-group': <SettingOutlined />,
+  'rdm-config-status': <PartitionOutlined />,
+  'rdm-config-routing': <SwapOutlined />,
+  'rdm-config-sla':   <FieldTimeOutlined />,
+  // 進度日報：一级分组 + 四个二级页（与后端种子声明的图标保持一致）
+  'rdm-daily-report-group': <BellOutlined />,
+  'rdm-daily-report-rule': <SettingOutlined />,
+  'rdm-daily-report-template': <FileTextOutlined />,
+  'rdm-daily-report-record': <HistoryOutlined />,
+  'rdm-daily-report-trigger': <SendOutlined />,
+  // v3.13 新建分组图标
+  'rdm-test-quality-group':  <ExperimentOutlined />,
+  'rdm-release-accept-group': <CloudUploadOutlined />,
+  // 原生文档菜单图标与后端种子保持一致，名称仍以后端为准。
+  'doc-plans': <FileTextOutlined />,
+  'doc-governance': <SafetyCertificateOutlined />,
+  'doc-system-plans': <FolderOpenOutlined />,
+  'doc-api-center': <ApiOutlined />,
+}
+
+/** 按实际归属剪枝；跨系统挂载的节点提升到所属系统，不继承外层系统的入口。 */
+function scopeMenusToSystem(menus: MenuVO[], systemCode: string, inherited: string | null = null): MenuVO[] {
+  return menus.flatMap((menu) => {
+    if (menu.status !== 1) return []
+    const owner = menu.systemCode ?? inherited
+    const children = scopeMenusToSystem(menu.children ?? [], systemCode, owner)
+    if (owner !== systemCode) return children
+    if (menu.children?.length && children.length === 0) return []
+    return [{ ...menu, children }]
+  })
+}
+
+/** 需要隱藏的菜單項（不在側邊欄顯示，但路由和權限保留） */
+const HIDDEN_MENU_KEYS = new Set([
+  'ai-access-request', // AI 使用申請：功能入口已整合至智能中心其他菜單
+])
+
+/** 后端菜单树 → 侧边栏 Menu items（过滤停用项，名称/层级/排序实时同步；图标优先取后端 icon 字段，否则按 key 匹配） */
+const buildMenuItemsFromVO = (menus: MenuVO[]): MenuItem[] => {
+  return menus
+    .filter((m) => m.status === 1 && !HIDDEN_MENU_KEYS.has(m.menuKey))
+    .map((m) => {
+      const children = m.children?.length ? buildMenuItemsFromVO(m.children) : undefined
+      return {
+        key: m.menuKey,
+        icon: renderMenuIcon(m.icon) ?? keyToIcon[m.menuKey],
+        label: translateMenuName(m.menuKey, m.name, m.nameEn),
+        ...(children && children.length > 0 ? { children } : {}),
+      } as MenuItem
+    })
+}
+
+/** 按菜單權限遞歸過濾菜單：受控叶子菜單無授權則隱藏；父菜單子項全部隱藏時一併隱藏 */
+const filterMenusByPermission = (
+  items: MenuItem[],
+  hasMenuPermission: (menuKey: string) => boolean,
+): MenuItem[] => {
+  return items
+    .map((item) => {
+      if (!item) return null
+      const withChildren = item as MenuItem & { children?: MenuItem[] }
+      if (withChildren.children && withChildren.children.length > 0) {
+        const children = filterMenusByPermission(withChildren.children, hasMenuPermission)
+        if (children.length === 0) return null
+        return { ...withChildren, children }
+      }
+      return hasMenuPermission(String(item.key)) ? item : null
+    })
+    .filter((item): item is MenuItem => item !== null)
+}
+
+/** 遞歸查找目標 key 的所有祖先 key（從根到父，不含自身） */
+const findAncestorKeys = (items: MenuItem[], targetKey: string, path: string[] = []): string[] => {
+  for (const item of items) {
+    if (!item) continue
+    if (item.key === targetKey) return path
+    const children = (item as MenuItem & { children?: MenuItem[] }).children
+    if (children?.length) {
+      const found = findAncestorKeys(children, targetKey, [...path, String(item.key)])
+      if (found.length > 0) return found
+    }
+  }
+  return []
+}
+
+export default function Sidebar({ collapsed }: SidebarProps) {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { t, i18n: i18nInstance } = useTranslation()
+  const { hasMenuPermission } = useAuth()
+  const { menuTree, status: menuStatus } = useMenu()
+  /** 語言包異步注入完成後重算菜單名：否則同一次刷新內會出現兩套命名 */
+  const translationRevision = useTranslationRevision()
+  const { currentSystemCode, setCurrentSystemCode } = useCurrentSystem()
+  // Round 6：锁到业务系统时优先拉服务端剪枝导航（与后端 strict-mode 同源）；
+  // 未锁 / 接口失败 → 降级到旧的全量 menuTree 客户端过滤，不阻断入口。
+  const systemNavigation = useSystemNavigation(currentSystemCode)
+  const [openKeys, setOpenKeys] = useState<string[]>([])
+  const [systems, setSystems] = useState<PortalSystem[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    fetchPortalContext()
+      .then(context => { if (!cancelled) setSystems(context.systems ?? []) })
+      .catch(() => { if (!cancelled) setSystems([]) })
+    return () => { cancelled = true }
+  }, [])
+
+  const currentSystem = systems.find(system => system.code === currentSystemCode)
+  const systemKey = getPortalSystemKey(currentSystemCode ?? '', currentSystem?.name ?? '')
+  /** 系统名称统一走全局取名入口，保证与门户/切换器/首页同一真值 */
+  const currentSystemSource = currentSystemCode
+    ? { code: currentSystemCode, name: currentSystem?.name ?? currentSystemCode, nameEn: currentSystem?.nameEn }
+    : null
+  const brandTitle = getBrandTitle(t, i18nInstance.language, currentSystemSource)
+  // 系統圖標以 sys_system.icon 為準（搜索運營系統種子值為 'BrandLogo' 品牌搜索鏡），
+  // 缺失時回落系統默認圖標；代碼不對特定系統做例外，改圖標只需改 DB 配置。
+  const systemIcon = renderMenuIcon(currentSystem?.icon, 28)
+    ?? renderMenuIcon(systemKey ? PORTAL_SYSTEM_ICONS[systemKey] : 'AppstoreOutlined')
+
+  // 浏览器标签页标题与侧栏品牌名保持同一真值：index.html 的静态标题在切换系统后不会更新，
+  // 会出现“侧栏显示 MFTB<当前系统>、标签页仍是旧标题”的不一致
+  useEffect(() => {
+    document.title = brandTitle
+  }, [brandTitle])
+
+  /** 自动同步 currentSystemCode：
+   *  - 菜单树就绪后，若当前 pathname 属于某业务系统→写入；
+   *  - 当前处于门户/工作台等无系统上下文页面→保持旧值，不主动清空，避免刷新时 Sidebar 无菜单可展；
+   *  - 只在路径真正变化时反查：切换系统的写入与路由跳转不是同一帧提交时，
+   *    旧路径会把刚选中的系统反向覆盖（如从商家报表切广告系统后被写回商家工作台）；
+   *  - 去重键含 query：訂單列表/詳情是廣告銷售與店鋪隨心推共用路由，
+   *    同路徑只變 from 參數時也要重新判定歸屬系統。 */
+  const lastSystemSyncPathRef = useRef<string | null>(null)
+  useEffect(() => {
+    // 硬編碼歸屬的非菜單路由（我的資產 / 系統權限申請）不依賴菜單樹：
+    // 菜單樹未就緒時若直接 return，首屏側欄會先渲染一次全量菜單再收斂。
+    const overridden = resolveSystemFromPathname(location.pathname, null, location.search)
+    if (!overridden && !menuTree) return
+    const locationKey = `${location.pathname}${location.search}`
+    if (lastSystemSyncPathRef.current === locationKey) return
+    lastSystemSyncPathRef.current = locationKey
+    const sys = overridden ?? resolveSystemFromPathname(location.pathname, menuTree, location.search)
+    if (isBusinessSystemCode(sys) && sys !== currentSystemCode) {
+      setCurrentSystemCode(sys)
+    }
+  }, [menuTree, location.pathname, location.search, currentSystemCode, setCurrentSystemCode])
+
+  /** 按当前登录人权限过滤后的可见菜单：
+   *  1) currentSystemCode 已锁 + 服务端导航非空 → 直接用服务端剪枝树（已仅包含当前用户可访问菜单），
+   *     保留 filterMenusByPermission 作为本地 revision 无变更时的双重无洞防护；
+   *  2) 否则回退旧行为：后端菜单树可用 → 以 DB 为唯一真值 + 补挂离线菜单 + 客户端过滤；
+   *     后端不可用 → 只展离线清单；语言变化时重算菜单名称 */
+  const visibleMenuItems = useMemo(() => {
+    // 首页是各系统的公共回跳入口，不参与业务菜单剪枝；沿用当前系统上下文。
+    const withSystemHome = (items: MenuItem[]): MenuItem[] => currentSystemCode
+      ? [
+        { key: 'home', icon: <HomeOutlined />, label: translateMenuName('home', '首頁', 'Home') },
+        ...items.filter((item) => item?.key !== 'home'),
+      ]
+      : items
+    // 阶段 B 已完成（v3.13 落库），DB 直接返回正确结构，不再需要展示层重排。
+    if (currentSystemCode && systemNavigation.loaded) {
+      const serverItems = buildMenuItemsFromVO(scopeMenusToSystem(systemNavigation.tree, currentSystemCode, currentSystemCode))
+      return withSystemHome(filterMenusByPermission(serverItems, hasMenuPermission))
+    }
+    const scopedTree = menuTree && currentSystemCode ? scopeMenusToSystem(menuTree, currentSystemCode) : menuTree
+    const items = scopedTree
+      ? attachOfflineMenus(buildMenuItemsFromVO(scopedTree), collectMenuTreeKeys(menuTree ?? []))
+      : OFFLINE_MENUS
+        .filter((node) => !currentSystemCode || node.systemCode === currentSystemCode)
+        .map((node) => buildOfflineMenuItem(node))
+        .filter((item): item is MenuItem => item !== null)
+    return withSystemHome(filterMenusByPermission(items, hasMenuPermission))
+    // translateMenuName 内部读 i18n.language，ESLint 看不到这层依赖；
+    // translationRevision 是语言包异步注入后的重算触发器，二者都必须保留（删了会回到「刷新出两套菜单名」）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menuTree, hasMenuPermission, i18nInstance.language, translationRevision, currentSystemCode, systemNavigation.tree, systemNavigation.loaded])
+
+  /** 訂單列表 / 訂單詳情按來源歸屬菜單（from=ad-sales 歸屬「廣告銷售」，否則歸屬「店鋪推廣」）；
+   *  與 currentSystemCode 反查共用同一個判定入口，避免高亮與系統歸屬口徑分裂。
+   *  需求詳情同理：三張需求列表（提需求/認領分配/需求跟進清單）共用落地頁，
+   *  按 from 跟隨進入菜單，不得一律釘在默認歸屬上。 */
+  const orderRouteMenuKey = resolveOrderRouteMenuKey(location.pathname, location.search)
+  const rdmDetailMenuKey = resolveRdmDetailMenuKey(location.pathname, location.search)
+
+  const selectedKey = location.pathname === '/' ? 'home'
+    : location.pathname.startsWith('/search-verify-detail') ? 'search-verify'
+    // 充值頁面：高亮「賬戶餘額」
+    : location.pathname === '/recharge-add' ? 'account-balance'
+    // 審批流程編輯頁：高亮「審批流程」
+    : location.pathname.startsWith('/workflow-config/') ? 'workflow-config'
+    : location.pathname.startsWith('/version-history-detail') ? 'version-history'
+    : (orderRouteMenuKey || rdmDetailMenuKey || pathToKey[location.pathname] || 'home')
+
+  /** 路由變化時自動展開對應的父級菜單（刷新/直接跳轉均生效） */
+  useEffect(() => {
+    const ancestors = findAncestorKeys(visibleMenuItems, selectedKey)
+    if (ancestors.length > 0) {
+      setOpenKeys((prev) => {
+        const merged = new Set([...prev, ...ancestors])
+        return [...merged]
+      })
+    }
+  }, [selectedKey, visibleMenuItems])
+
+  const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
+    const path = keyToPath[key]
+    if (path) {
+      navigate(path)
+    } else {
+      message.info(t('sidebar.underDevelopment'))
+    }
+  }
+
+  return (
+    <Sider
+      trigger={null}
+      collapsible
+      collapsed={collapsed}
+      width={220}
+      collapsedWidth={64}
+      className="sidebar"
+      theme="dark"
+    >
+      <div className="sidebar-logo" title={brandTitle} aria-label={brandTitle}>
+        <span className="sidebar-system-icon" aria-hidden="true">
+          {currentSystemCode ? systemIcon : <GroupLogo size={28} />}
+        </span>
+        {!collapsed && <span className="logo-text-main">{brandTitle}</span>}
+      </div>
+      {menuStatus !== 'loading' && menuTree === null && (
+        <div className="sidebar-offline-tip" title={t('sidebar.offlineMenuTip')}>
+          {collapsed ? '!' : t('sidebar.offlineMenuTip')}
+        </div>
+      )}
+      <Menu
+        mode="inline"
+        theme="dark"
+        items={visibleMenuItems}
+        onClick={handleMenuClick}
+        selectedKeys={[selectedKey]}
+        openKeys={collapsed ? undefined : openKeys}
+        onOpenChange={setOpenKeys}
+        inlineCollapsed={collapsed}
+        className="sidebar-menu"
+      />
+    </Sider>
+  )
+}

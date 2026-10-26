@@ -3,10 +3,10 @@ import { Alert, Button, Form, Input, Select, Space, Table, Tabs, Tag, message } 
 import type { TableColumnsType } from 'antd'
 import { ExportOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   CONTRACT_EXPIRY_BUCKET,
   fetchContractExpirySummary,
@@ -15,9 +15,9 @@ import {
   type ContractExpirySummary,
   type ContractLedgerItem,
   type ContractLedgerQuery,
-} from '../../../api/employee'
-import { fetchHrDictOptions, HR_DICT_TYPE, type HrDictOption } from '../../../api/hrDict'
-import { exportToCSV } from '../../../utils/exportCSV'
+} from '@/api/employee'
+import { fetchHrDictOptions, HR_DICT_TYPE, type HrDictOption } from '@/api/hrDict'
+import { exportToCSV } from '@/utils/exportCSV'
 import LifecycleList from '../HrLifecycle/LifecycleList'
 
 /** 合同类型回退选项（HR 字典 CONTRACT_TYPE 不可用时） */

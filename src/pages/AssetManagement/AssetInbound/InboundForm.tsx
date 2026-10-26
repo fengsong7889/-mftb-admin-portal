@@ -16,16 +16,16 @@ import {
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import BrandTag from '../../../components/BrandTag'
+import BrandTag from '@/components/BrandTag'
 import {
   fetchPurchaseOrderDetail, fetchLocationList, createInboundBatch,
   saveInboundDraft, loadInboundDraft, deleteInboundDraft,
   uploadInboundPhoto, fetchCategoryAccessories, fetchInboundList,
   type PurchaseOrder, type PurchaseOrderSupplierGroup, type PurchaseOrderItem,
   type AssetLocation,
-} from '../../../api/eam'
-import { fetchEmployees, type EmployeeItem } from '../../../api/employee'
-import { fetchDepartments, type DepartmentItem } from '../../../api/department'
+} from '@/api/eam'
+import { fetchEmployees, type EmployeeItem } from '@/api/employee'
+import { fetchDepartments, type DepartmentItem } from '@/api/department'
 import { useInboundEditor, initEditorGroups, generateClientLineId } from './useInboundEditor'
 import type { InspectionAllocation, InspectionDisposition, InspectionRow } from './useInboundEditor'
 

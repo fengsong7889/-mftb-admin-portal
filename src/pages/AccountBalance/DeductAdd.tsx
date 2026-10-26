@@ -8,12 +8,12 @@ import {
   EditOutlined,
   QuestionCircleOutlined,
 } from '@ant-design/icons'
-import BrandTag from '../../components/BrandTag'
-import { fetchFinAccounts, fetchFinBatches, submitDeductApply, fetchFinRiskConfig } from '../../api/finance'
-import type { DeductApplyPayload, FinRiskRow } from '../../api/finance'
-import { fetchStoresByGroupCode, fetchStoreBds } from '../../api/store'
-import type { OptionItem } from '../../api/types'
-import { isWorkflowEnabled, isDirectExec } from '../../utils/workflowEnabled'
+import BrandTag from '@/components/BrandTag'
+import { fetchFinAccounts, fetchFinBatches, submitDeductApply, fetchFinRiskConfig } from '@/api/finance'
+import type { DeductApplyPayload, FinRiskRow } from '@/api/finance'
+import { fetchStoresByGroupCode, fetchStoreBds } from '@/api/store'
+import type { OptionItem } from '@/api/types'
+import { isWorkflowEnabled, isDirectExec } from '@/utils/workflowEnabled'
 import { amountToChinese } from './components/shared'
 import { useAccountFormCommon } from './components/useAccountFormCommon'
 import { showConfirmSubmit, handleFormSubmitError } from './components/ConfirmSubmitModal'

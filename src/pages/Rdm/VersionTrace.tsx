@@ -6,7 +6,7 @@
  * 从需求详情进来时（?reqId=）反向定位版本，并把该需求高亮置顶。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Select, Space, Spin, Table, Tag, Tooltip, message } from 'antd'
+import { Alert, Button, Form, Select, Space, Spin, Table, Tag, Tooltip, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
   BranchesOutlined,
@@ -14,16 +14,17 @@ import {
   ExportOutlined,
   ReloadOutlined,
   RollbackOutlined,
+  SearchOutlined,
   TagsOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { rdmTableLocale } from './components/tableLocale'
-import StatCards from '../../components/StatCards'
-import { fetchVersionHistory } from '../../api/versionHistory'
-import type { VersionHistoryRecord } from '../../api/versionHistory'
-import { fetchRequirementTrace, fetchVersionTrace, type RdmVersionTrace } from '../../api/rdm'
-import { formatEmployee } from '../../utils/employeeDisplay'
+import StatCards from '@/components/StatCards'
+import { fetchVersionHistory } from '@/api/versionHistory'
+import type { VersionHistoryRecord } from '@/api/versionHistory'
+import { fetchRequirementTrace, fetchVersionTrace, type RdmVersionTrace } from '@/api/rdm'
+import { formatEmployee } from '@/utils/employeeDisplay'
 import {
   RDM_ACCEPT_RESULT,
   RDM_ACCEPT_RESULT_COLOR,
@@ -33,7 +34,7 @@ import {
   type RdmAcceptResult,
   type RdmReqType,
   type RdmStatus,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import { PriorityTag } from './components/Tags'
 import './index.css'
 
@@ -99,6 +100,15 @@ export default function VersionTrace() {
   }, [sourceReqId, versionNo, versions, versionsLoaded])
 
   useEffect(() => { void load() }, [load])
+
+  /** 重置：退出需求视图并回到最新版本（不选版本时 load 会自动取 versions[0]） */
+  const handleReset = () => {
+    setSourceReqId(0)
+    setVersionNo(versions[0]?.versionNo ?? '')
+    if (searchParams.get('reqId') || searchParams.get('versionNo')) {
+      void navigate('/rdm-version-trace')
+    }
+  }
 
   const versionOptions = useMemo(() => (
     versions.length
@@ -200,23 +210,29 @@ export default function VersionTrace() {
             上線必須關聯版本，版本可反查需求，兩側都能追到源頭
           </span>
         </div>
-        <Space size={8} wrap>
-          <Select
-            style={{ width: 240 }}
-            value={versionNo || undefined}
-            placeholder="選擇版本"
-            options={versionOptions}
-            onChange={v => { setVersionNo(v); setSourceReqId(0) }}
-          />
-          <Button icon={<ReloadOutlined />} onClick={() => void load()}>刷新</Button>
-          {sourceReqId > 0 && (
-            <Button icon={<RollbackOutlined />} onClick={() => { setSourceReqId(0); void navigate('/rdm-version-trace') }}>
-              退出需求視圖
-            </Button>
-          )}
-          <Button icon={<ExportOutlined />} onClick={() => void navigate('/rdm-requirement')}>需求台賬</Button>
-          {configComponent}
-        </Space>
+      </div>
+
+      {/* 搜索區（§E.1）：版本切換是查詢條件，查詢/重置緊跟最後一個條件 */}
+      <div className="search-section">
+        <Form layout="inline">
+          <Form.Item label="版本">
+            <Select
+              placeholder="選擇版本"
+              value={versionNo || undefined}
+              options={versionOptions}
+              showSearch
+              optionFilterProp="label"
+              allowClear
+              onChange={v => { setVersionNo(v ?? ''); setSourceReqId(0) }}
+            />
+          </Form.Item>
+          <Form.Item>
+            <div className="search-actions">
+              <Button type="primary" icon={<SearchOutlined />} onClick={() => void load()}>查詢</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>重置</Button>
+            </div>
+          </Form.Item>
+        </Form>
       </div>
 
       {sourceReqId > 0 && (
@@ -258,6 +274,20 @@ export default function VersionTrace() {
             { key: 'score', icon: <CheckCircleOutlined />, value: Number(stats.avgScore.toFixed(1)), decimals: 1, suffix: ' / 5', label: '平均滿意度', color: 'system' },
           ]}
         />
+      </div>
+
+      {/* 操作區（§E.2）：中性動作在左，列配置在右 */}
+      <div className="action-section">
+        <div className="action-section-left">
+          <Button icon={<ReloadOutlined />} onClick={() => void load()}>刷新</Button>
+          {sourceReqId > 0 && (
+            <Button icon={<RollbackOutlined />} onClick={() => { setSourceReqId(0); void navigate('/rdm-version-trace') }}>
+              退出需求視圖
+            </Button>
+          )}
+          <Button icon={<ExportOutlined />} onClick={() => void navigate('/rdm-requirement')}>需求台賬</Button>
+        </div>
+        <div className="action-section-right">{configComponent}</div>
       </div>
 
       <div className="rdm-card">

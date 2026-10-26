@@ -17,8 +17,8 @@
 import { Alert, Radio, Tag } from 'antd'
 import { SafetyOutlined, TeamOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import type { SystemAccessGrantOption } from '../../api/systemAccessRequest'
-import HelpPopover from '../../components/HelpPopover'
+import type { SystemAccessGrantOption } from '@/api/systemAccessRequest'
+import HelpPopover from '@/components/HelpPopover'
 
 interface Props {
   /** 授权角色候选（后端已过滤为「持该系统准入的启用角色」，并把申请人建议项排在首位） */

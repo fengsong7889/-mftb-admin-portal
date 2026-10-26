@@ -3,30 +3,30 @@ import { MemoryRouter } from 'react-router-dom'
 import { I18nextProvider } from 'react-i18next'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Modal, message } from 'antd'
-import i18n from '../../../i18n'
-import type { MenuVO } from '../../../api/menu'
-import * as menuApi from '../../../api/menu'
-import * as roleApi from '../../../api/role'
-import * as deptApi from '../../../api/department'
-import * as sysApi from '../../../api/systemAuthorization'
-import * as centerApi from '../../../api/authorizationCenter'
+import i18n from '@/i18n'
+import type { MenuVO } from '@/api/menu'
+import * as menuApi from '@/api/menu'
+import * as roleApi from '@/api/role'
+import * as deptApi from '@/api/department'
+import * as sysApi from '@/api/systemAuthorization'
+import * as centerApi from '@/api/authorizationCenter'
 import PermissionWorkbench from './PermissionWorkbench'
 
-vi.mock('../../../api/menu', async importOriginal => ({
-  ...await importOriginal<typeof import('../../../api/menu')>(),
+vi.mock('@/api/menu', async importOriginal => ({
+  ...await importOriginal<typeof import('@/api/menu')>(),
   fetchMenuTree: vi.fn(),
 }))
-vi.mock('../../../api/role', () => ({ fetchRoles: vi.fn() }))
-vi.mock('../../../api/department', () => ({ fetchDepartments: vi.fn() }))
-vi.mock('../../../api/systemAuthorization', () => ({
+vi.mock('@/api/role', () => ({ fetchRoles: vi.fn() }))
+vi.mock('@/api/department', () => ({ fetchDepartments: vi.fn() }))
+vi.mock('@/api/systemAuthorization', () => ({
   fetchSystemsCatalog: vi.fn(), saveRoleAuthorization: vi.fn(), saveDepartmentAuthorization: vi.fn(),
 }))
-vi.mock('../../../api/authorizationCenter', () => ({
+vi.mock('@/api/authorizationCenter', () => ({
   fetchRoleOverview: vi.fn(), fetchDepartmentOverview: vi.fn(),
 }))
-vi.mock('../../../hooks/useSystemNavigation', () => ({ invalidateSystemNavigation: vi.fn() }))
+vi.mock('@/hooks/useSystemNavigation', () => ({ invalidateSystemNavigation: vi.fn() }))
 /** 菜单名保持后端原文：本用例只锁「批量授权」两个按钮的可辨识度，不测翻译回退 */
-vi.mock('../../../i18n/menuNameEn', () => ({
+vi.mock('@/i18n/menuNameEn', () => ({
   translateMenuName: (_menuKey: string, zhName: string) => zhName,
 }))
 

@@ -1,7 +1,9 @@
 # 排除大目录，加速 Docker 构建上下文传输
 node_modules/
 dist/
-backend/target/
+# 镜像不再编译源码，只需已验证的 JAR：排除 target 其余产物，单独放行制品
+backend/target/*
+!backend/target/mftb-admin.jar
 
 # IDE / 日志
 .idea/

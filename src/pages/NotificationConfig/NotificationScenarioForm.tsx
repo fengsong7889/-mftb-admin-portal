@@ -17,9 +17,9 @@ import { Alert, Button, Empty, Form, Input, Modal, Select, Spin, Switch, message
 import { ApiOutlined, SaveOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useAuth } from '../../contexts/AuthContext'
-import { fetchNotificationApps, fetchNotificationScenarios, saveNotificationScenario } from '../../api/notificationChannel'
-import type { AppNotificationConfig, NotificationScenario, NotificationScenarioPayload } from '../../api/notificationChannel'
+import { useAuth } from '@/contexts/AuthContext'
+import { fetchNotificationApps, fetchNotificationScenarios, saveNotificationScenario } from '@/api/notificationChannel'
+import type { AppNotificationConfig, NotificationScenario, NotificationScenarioPayload } from '@/api/notificationChannel'
 import NotificationFormHeader, { notificationCardStyle } from './NotificationFormHeader'
 import './index.css'
 

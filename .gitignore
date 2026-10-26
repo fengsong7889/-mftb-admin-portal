@@ -5,7 +5,8 @@ node_modules/
 dist/
 tsconfig.tsbuildinfo
 
-# Auto-generated version manifest (created by Vite plugin)
+# 构建元信息已改为虚拟模块 + 产物资产（见 vite-build-meta.ts），不再回写源码目录；
+# 以下两条为旧实现的遗留忽略项，保留仅为兼容他人本地残留的旧生成文件。
 public/version.json
 src/build-meta.ts
 

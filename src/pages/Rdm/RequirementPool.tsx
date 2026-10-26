@@ -11,7 +11,7 @@
  * 认领 = 受理权（由列表内部按 rdm-requirement:edit 判定）。
  */
 import RequirementList from './RequirementList'
-import { RDM_SCOPE } from '../../constants/rdm'
+import { RDM_SCOPE } from '@/constants/rdm'
 
 export default function RequirementPool() {
   return (

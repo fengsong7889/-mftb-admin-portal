@@ -11,7 +11,7 @@
  * - 只缓存编辑字段与版本基线，不缓存 token、权限或整页响应；
  * - 正式保存成功才清空；本地暂存不代表服务端已保存。
  */
-import { registerSessionCleaner } from '../../utils/sessionCaches'
+import { registerSessionCleaner } from '@/utils/sessionCaches'
 
 const PREFIX = 'rdm-prd-draft:v1:'
 const TTL_MS = 24 * 60 * 60 * 1000

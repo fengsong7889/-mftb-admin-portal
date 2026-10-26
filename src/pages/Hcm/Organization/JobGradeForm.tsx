@@ -17,7 +17,7 @@ import {
   updateJobGrade,
   type OrgJobFamily,
   type OrgJobGrade,
-} from '../../../api/hcmOrganization'
+} from '@/api/hcmOrganization'
 import { CardTitle, FormHeader, UpdatedFooter, cardStyle, formatTimestamp, grid3 } from './shared'
 
 export default function HcmOrgJobGradeForm() {

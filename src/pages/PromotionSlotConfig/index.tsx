@@ -2,19 +2,19 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { Button, Space, Table, Tag, Select, Form, Input, message, Modal, Switch, Tabs, DatePicker } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
-import BrandTag from '../../components/BrandTag'
+import BrandTag from '@/components/BrandTag'
 import { SearchOutlined, ReloadOutlined, PlusOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { fetchWaterfallList, updateWaterfallStatus, deleteWaterfall, fetchAdAlgorithms } from '../../api/adPromotion'
-import { isBackendUnavailable } from '../../api/request'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { fetchWaterfallList, updateWaterfallStatus, deleteWaterfall, fetchAdAlgorithms } from '@/api/adPromotion'
+import { isBackendUnavailable } from '@/api/request'
 import {
   mergeServerToStrategies, mergeLocalToStrategies, listLocalStrategies,
   getLocalStrategy, upsertLocalStrategy, removeLocalStrategy, removeExtension,
 } from '../waterfallConfig/waterfallExtStore'
-import type { WaterfallListView, WaterfallBusinessType, WaterfallBizChannel } from '../waterfallConfig/types'
-import { BUSINESS_TYPE_LABEL_KEY, BIZ_CHANNEL_OPTIONS } from '../waterfallConfig/types'
+import type { WaterfallListView, WaterfallBusinessType, WaterfallBizChannel } from '@mftb/contracts/waterfallTypes'
+import { BUSINESS_TYPE_LABEL_KEY, BIZ_CHANNEL_OPTIONS } from '@mftb/contracts/waterfallTypes'
 
 export default function PromotionSlotConfig() {
   const navigate = useNavigate()

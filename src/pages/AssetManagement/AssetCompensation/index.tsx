@@ -7,13 +7,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { message } from 'antd'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   fetchCompensationList, fetchCompensationDetail,
   setLiability, waiveCompensation, addPayment, reviewCompensation,
   type CompensationRow, type CompensationQuery,
   type LiabilityDTO, type WaiveDTO, type PaymentDTO, type ReviewDTO,
-} from '../../../api/eamCompensation'
+} from '@/api/eamCompensation'
 import CompensationList from './CompensationList'
 import CompensationDetail from './CompensationDetail'
 import CompensationLiability from './CompensationLiability'

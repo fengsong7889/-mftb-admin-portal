@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Alert } from 'antd'
 import { useNavigate } from 'react-router-dom'
-import DetailPageHeader from '../../components/DetailPageHeader'
+import DetailPageHeader from '@/components/DetailPageHeader'
 
 /**
  * AI 助手各配置页的统一外壳：详情页头部 + 可选页面说明。

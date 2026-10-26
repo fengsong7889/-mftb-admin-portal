@@ -12,11 +12,11 @@ import { useNavigate } from 'react-router-dom'
 import dayjs, { type Dayjs } from 'dayjs'
 import { buildCorrectionDiff, checkMileage } from '../vehicleRules'
 import { TRIP_STATUS, type VehicleUseOrder } from '../vehicleTypes'
-import { correctTrip, fetchUseDetail, newRequestKey, toIso } from '../../../api/vehicle'
+import { correctTrip, fetchUseDetail, newRequestKey, toIso } from '@/api/vehicle'
 import { toOrder } from '../vehicleAdapter'
 import { useDriverOptions } from '../vehicleOptions'
 import { VehicleFormPageHeader, VehicleSection } from '../VehicleModuleLayout'
-import RemarkTextArea from '../../../components/RemarkTextArea'
+import RemarkTextArea from '@/components/RemarkTextArea'
 
 interface CorrectState {
   driverEmpId?: number

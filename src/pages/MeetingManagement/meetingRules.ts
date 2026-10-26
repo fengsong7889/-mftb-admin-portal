@@ -8,7 +8,7 @@
  * <p>规则口径与后端逐字对齐（半开区间 [start, end)、粒度对齐、同日约束、容量含组织者）：
  * 两边任一处漂移，就会出现"前端放行、后端拒绝"或反过来"前端拦截了其实合法的时段"。
  */
-import type { MeetingRoomVO } from '../../api/meeting'
+import type { MeetingRoomVO } from '@/api/meeting'
 
 /** 与后端 MeetingConstants.OCCUPYING_STATUSES 一致：只有这两种状态占着窗口 */
 export const OCCUPYING_STATUSES = ['booked', 'checked_in']

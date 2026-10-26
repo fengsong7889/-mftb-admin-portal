@@ -11,15 +11,15 @@ import {
   CarOutlined, CheckCircleOutlined, FileProtectOutlined, TeamOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import BrandTag from '../../../components/BrandTag'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import BrandTag from '@/components/BrandTag'
 import {
   QUALIFICATION_COLOR, QUALIFICATION_LABEL, TRIP_STATUS_COLOR, TRIP_STATUS_LABEL,
   USE_STATUS_COLOR, USE_STATUS_LABEL, VEHICLE_STATUS_COLOR, VEHICLE_STATUS_LABEL,
 } from '../vehicleMeta'
 import { type DriverQualification, type VehicleFile, type VehicleUseOrder } from '../vehicleTypes'
 import { formatWindow } from '../vehicleRules'
-import { fetchQualifications, fetchUses } from '../../../api/vehicle'
+import { fetchQualifications, fetchUses } from '@/api/vehicle'
 import { toOrders, toQualifications } from '../vehicleAdapter'
 import { useVehicleDeptTree } from '../vehicleOptions'
 import { VehicleSection, VehicleUpdateFooter } from '../VehicleModuleLayout'

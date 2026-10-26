@@ -2,17 +2,17 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import DailyReportTemplateForm from './TemplateForm'
-import i18n from '../../../i18n'
+import i18n from '@/i18n'
 
 const fetchTemplates = vi.fn()
 const previewReport = vi.fn()
 
-vi.mock('../../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => true }),
 }))
 
-vi.mock('../../../api/rdmDailyReport', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../api/rdmDailyReport')>()
+vi.mock('@/api/rdmDailyReport', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/rdmDailyReport')>()
   return {
     ...actual,
     fetchDailyReportTemplates: () => fetchTemplates(),

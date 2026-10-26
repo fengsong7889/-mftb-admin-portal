@@ -1,5 +1,5 @@
-import type { WaterfallCatalogItem } from '../../api/waterfallCatalog'
-import { MAX_SLOT_POSITION, type FixedContentSlot, type WaterfallContentType } from './types'
+import type { WaterfallCatalogItem } from '@/api/waterfallCatalog'
+import { MAX_SLOT_POSITION, type FixedContentSlot, type WaterfallContentType } from '@mftb/contracts/waterfallTypes'
 
 export interface WaterfallImportRow {
   row: number

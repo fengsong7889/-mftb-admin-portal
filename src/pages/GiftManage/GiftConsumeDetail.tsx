@@ -8,10 +8,10 @@ import {
   ReloadOutlined,
   ExportOutlined,
 } from '@ant-design/icons'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { useAuth } from '../../contexts/AuthContext'
-import type { GiftConsumeItem } from '../../api/gift'
-import { fetchGiftConsume } from '../../api/gift'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
+import type { GiftConsumeItem } from '@/api/gift'
+import { fetchGiftConsume } from '@/api/gift'
 import dayjs from 'dayjs'
 import {
   createAdTypeOptions, createAdTypeMap,

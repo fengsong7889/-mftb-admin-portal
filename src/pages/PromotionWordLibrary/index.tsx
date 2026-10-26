@@ -8,7 +8,7 @@ import {
   ExportOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { useTranslation } from 'react-i18next'
 import {
   fetchWordLibraryList,
@@ -17,8 +17,8 @@ import {
   toggleWordLibraryStatus,
   deleteWordLibraryItem,
   segmentWords,
-} from '../../api/wordLibrary'
-import type { WordLibraryItem } from '../../api/wordLibrary'
+} from '@/api/wordLibrary'
+import type { WordLibraryItem } from '@/api/wordLibrary'
 
 const { RangePicker } = DatePicker
 const { TextArea } = Input

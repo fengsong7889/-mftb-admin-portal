@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
-import { fetchRequirementPage, fetchScopeCounts } from '../../api/rdm'
+import { fetchRequirementPage, fetchScopeCounts } from '@/api/rdm'
 import RequirementIntake from './RequirementIntake'
 
 /**
@@ -15,7 +15,7 @@ import RequirementIntake from './RequirementIntake'
  *  3. 旧链接 `?scope=approving` 不能把页面停在半个口径上（回落到合并视角）。
  */
 
-vi.mock('../../api/rdm', () => ({
+vi.mock('@/api/rdm', () => ({
   fetchRequirementPage: vi.fn(),
   fetchScopeCounts: vi.fn().mockResolvedValue({ mine: 2, approving: 1, intake: 3 }),
   fetchRequirementStats: vi.fn().mockResolvedValue({}),
@@ -27,8 +27,8 @@ vi.mock('../../api/rdm', () => ({
   urgeRequirement: vi.fn(),
   withdrawRequirement: vi.fn(),
 }))
-vi.mock('../../api/department', () => ({ fetchDepartments: vi.fn().mockResolvedValue([]) }))
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('@/api/department', () => ({ fetchDepartments: vi.fn().mockResolvedValue([]) }))
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => false, user: { empId: 'MF00011' } }),
 }))
 vi.mock('./requirementExport', () => ({ exportRequirementRows: vi.fn() }))

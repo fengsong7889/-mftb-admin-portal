@@ -2,8 +2,8 @@ import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button, Space, Input, Select, Table, Tag, Modal, Form, message, Upload, Switch } from 'antd'
 import type { TableColumnsType } from 'antd'
-import BrandTag from '../../components/BrandTag'
-import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
+import BrandTag from '@/components/BrandTag'
+import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '@/constants/brand'
 import {
   SearchOutlined,
   ReloadOutlined,

@@ -10,13 +10,13 @@ import {
   ExportOutlined,
   UserOutlined,
 } from '@ant-design/icons'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import BrandTag from '../../components/BrandTag'
-import { useAuth } from '../../contexts/AuthContext'
-import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
-import { getApprovalRecords, updateApprovalRecord } from '../../utils/approvalStore'
-import { fetchFinApprovals, cancelFinApproval } from '../../api/finance'
-import type { FinApprovalQuery, ApprovalNodeInstance } from '../../api/finance'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import BrandTag from '@/components/BrandTag'
+import { useAuth } from '@/contexts/AuthContext'
+import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '@/constants/brand'
+import { getApprovalRecords, updateApprovalRecord } from '@/utils/approvalStore'
+import { fetchFinApprovals, cancelFinApproval } from '@/api/finance'
+import type { FinApprovalQuery, ApprovalNodeInstance } from '@/api/finance'
 
 const { RangePicker } = DatePicker
 

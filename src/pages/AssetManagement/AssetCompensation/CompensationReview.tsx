@@ -3,7 +3,7 @@
  */
 import { Alert, Button, Form, Input, InputNumber, Spin } from 'antd'
 import { SaveOutlined } from '@ant-design/icons'
-import type { CompensationRow, ReviewDTO } from '../../../api/eamCompensation'
+import type { CompensationRow, ReviewDTO } from '@/api/eamCompensation'
 import { ReturnHeader, ReturnSection } from '../AssetReturn/ReturnLayout'
 
 function formatMoney(cents: number): string {

@@ -3,7 +3,7 @@ import type { ColumnsType } from 'antd/es/table'
 import { ArrowRightOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import type { AgentView, AgentViewColumn } from '../../api/agent'
+import type { AgentView, AgentViewColumn } from '@/api/agent'
 
 /**
  * AI 助手结构化视图：指标卡 + 表格 + 口径备注。

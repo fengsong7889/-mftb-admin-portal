@@ -1,4 +1,4 @@
-import { APPEAL_STATUS, PERF_LOG_ACTION } from '../../api/hrPerfReport'
+import { APPEAL_STATUS, PERF_LOG_ACTION } from '@/api/hrPerfReport'
 
 /**
  * 績效台账域（M2）的展示口径：留痕动作、申诉状态、路由与菜单 key。

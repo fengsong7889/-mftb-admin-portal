@@ -38,8 +38,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
-import EmployeeSelect from '../MeetingManagement/EmployeeSelect'
-import HelpPopover from '../../components/HelpPopover'
+import EmployeeSelect from '@/components/EmployeeSelect'
+import HelpPopover from '@/components/HelpPopover'
 import {
   createDeliveryItem,
   createNewScopeVersion,
@@ -51,13 +51,13 @@ import {
   type RdmDeliveryItemDetail,
   type RdmDeliveryItemSummary,
   type RdmScopeVersionEntry,
-} from '../../api/rdm'
+} from '@/api/rdm'
 import {
   RDM_ACCEPT_RESULT_LABEL,
   RDM_DELIVERY_ITEM_STATUS_COLOR,
   RDM_DELIVERY_ITEM_STATUS_LABEL,
   RDM_TEST_BATCH_STATUS_LABEL,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import './index.css'
 
 const { TextArea } = Input

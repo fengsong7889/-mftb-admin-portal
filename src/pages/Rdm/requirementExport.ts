@@ -6,8 +6,8 @@
  * 因此调用方必须把**当前已筛选、已分页加载的行**传进来，而不是让它自己去取数。
  */
 import ExcelJS from 'exceljs'
-import i18n from '../../i18n'
-import type { RdmRequirementRow } from '../../api/rdm'
+import i18n from '@/i18n'
+import type { RdmRequirementRow } from '@/api/rdm'
 import { fallbackHandlerText, formatHandlers, formatPerson } from './handlerDisplay'
 import {
   formatRdmReqNo,
@@ -19,7 +19,7 @@ import {
   type RdmReqType,
   type RdmStage,
   type RdmStatus,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 
 /** 取标签：查不到映射时回显原值，绝不静默留空（留空会让使用者以为没有该字段） */
 function label<T extends string>(map: Record<string, string>, value?: T | null): string {

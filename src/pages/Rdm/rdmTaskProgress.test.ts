@@ -6,7 +6,7 @@
  *  2. 100% 只屬於完成態，未完成任務列表顯示按 99% 封頂，避免「100% 卻還標逾期」。
  */
 import { describe, expect, it } from 'vitest'
-import { RDM_TASK_ACTION, RDM_TASK_STATUS } from '../../constants/rdm'
+import { RDM_TASK_ACTION, RDM_TASK_STATUS } from '@/constants/rdm'
 import { buildTaskReportPayload, displayTaskProgress } from './rdmTaskProgress'
 
 describe('buildTaskReportPayload', () => {

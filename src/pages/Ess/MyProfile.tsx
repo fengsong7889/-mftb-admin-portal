@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Alert, Card, Descriptions, Spin, Tag } from 'antd'
 import { useTranslation } from 'react-i18next'
-import { fetchMyProfile, type EssProfile } from '../../api/hrEss'
-import { useAuth } from '../../contexts/AuthContext'
-import DetailPageHeader from '../../components/DetailPageHeader'
+import { fetchMyProfile, type EssProfile } from '@/api/hrEss'
+import { useAuth } from '@/contexts/AuthContext'
+import DetailPageHeader from '@/components/DetailPageHeader'
 
 /** 空值统一展示占位符，避免自助页面出现空白单元格 */
 const show = (v?: string | null) => (v && String(v).trim() ? String(v) : '-')

@@ -12,25 +12,25 @@ import {
   Table, Tag, Modal, Upload, TreeSelect,
 } from 'antd'
 import type { TableColumnsType, UploadFile } from 'antd'
-import RemarkTextArea from '../../../components/RemarkTextArea'
+import RemarkTextArea from '@/components/RemarkTextArea'
 import {
   ArrowLeftOutlined, SendOutlined, SaveOutlined, PlusOutlined, ShoppingCartOutlined,
   FileTextOutlined, UploadOutlined, CheckCircleOutlined,
   FileImageOutlined, FilePdfOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import dayjs from 'dayjs'
 import {
   fetchModelList, fetchCategoryList, fetchBrandList,
   fetchAllParamTypes, fetchParamValuesByType,
   type AssetModel, type AssetCategory, type AssetBrand,
   type ParamType, type ParamField,
-} from '../../../api/eam'
-import { fetchDepartments, DEPT_STATUS, type DepartmentItem } from '../../../api/department'
-import { submitOaRequest } from '../../../api/oaRequest'
-import { useWorkflowConfig } from '../../../hooks/useWorkflowConfig'
-import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
+} from '@/api/eam'
+import { fetchDepartments, DEPT_STATUS, type DepartmentItem } from '@/api/department'
+import { submitOaRequest } from '@/api/oaRequest'
+import { useWorkflowConfig } from '@/hooks/useWorkflowConfig'
+import { useCompanyBrand } from '@/contexts/CompanyBrandContext'
 
 /** 流程標籤 → 顏色映射（與 WorkflowConfig 保持一致） */
 const FLOW_TAG_COLOR: Record<string, string> = {

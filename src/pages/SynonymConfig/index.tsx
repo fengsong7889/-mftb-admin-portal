@@ -11,7 +11,7 @@ import {
   ExportOutlined,
   DeleteOutlined,
 } from '@ant-design/icons'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 
 const { RangePicker } = DatePicker
 const { TextArea } = Input

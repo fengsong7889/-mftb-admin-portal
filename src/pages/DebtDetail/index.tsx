@@ -14,21 +14,21 @@ import {
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import BrandTag from '../../components/BrandTag'
-import DetailPageHeader from '../../components/DetailPageHeader'
-import { useAuth } from '../../contexts/AuthContext'
-import { isBackendUnavailable } from '../../api/request'
-import type { DebtRepaymentRecord } from '../../utils/approvalStore'
-import { addDebtRepayment, removeDebtRepayment } from '../../utils/approvalStore'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import BrandTag from '@/components/BrandTag'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import { useAuth } from '@/contexts/AuthContext'
+import { isBackendUnavailable } from '@/api/request'
+import type { DebtRepaymentRecord } from '@/utils/approvalStore'
+import { addDebtRepayment, removeDebtRepayment } from '@/utils/approvalStore'
 import {
   addFinDebtRepayment,
   deleteFinDebtRepayment,
   fetchFinDebtDetail,
-} from '../../api/finance'
-import type { DebtRepaymentPayload, FinDebtBill, FinDebtRepayment } from '../../api/finance'
+} from '@/api/finance'
+import type { DebtRepaymentPayload, FinDebtBill, FinDebtRepayment } from '@/api/finance'
 import { getAllDebtBills } from '../DebtReconcile/mockBills'
-import { useCountUp } from '../../hooks/useCountUp'
+import { useCountUp } from '@/hooks/useCountUp'
 
 /** 格式化金額（千分位 + 兩位小數） */
 const fmtAmt = (val: number) => val.toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

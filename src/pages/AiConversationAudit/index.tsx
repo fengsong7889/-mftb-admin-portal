@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Button, DatePicker, Form, Input, Pagination, Select, Table, Tag } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useTranslation } from 'react-i18next'
-import { PAGE_SIZE, PAGE_SIZE_OPTIONS } from '../../utils/tableDisplay'
+import { PAGE_SIZE, PAGE_SIZE_OPTIONS } from '@/utils/tableDisplay'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import {
@@ -16,8 +16,8 @@ import {
 import {
   fetchAuditConversations,
   fetchAuditModelKeys,
-} from '../../api/aiConversation'
-import type { AiConversation, AuditPageResult } from '../../api/aiConversation'
+} from '@/api/aiConversation'
+import type { AiConversation, AuditPageResult } from '@/api/aiConversation'
 
 const { RangePicker } = DatePicker
 

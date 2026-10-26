@@ -21,7 +21,7 @@ import {
   fetchRoomAvailability,
   toMeetingIso,
   type RoomAvailability,
-} from '../../../api/meeting'
+} from '@/api/meeting'
 import { facilityLabels, facilityOptions } from '../meetingMeta'
 import { minuteOfDateTimeText, toMinutesOfDay } from '../meetingRules'
 import MeetingStatCards from '../MeetingStatCards'

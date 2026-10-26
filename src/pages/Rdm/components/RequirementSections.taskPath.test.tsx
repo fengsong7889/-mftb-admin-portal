@@ -7,11 +7,11 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
-import i18n from '../../../i18n'
-import type { RdmDeliverySummary } from '../../../api/rdm'
+import i18n from '@/i18n'
+import type { RdmDeliverySummary } from '@/api/rdm'
 import { TaskSection } from './RequirementSections'
 
-vi.mock('../../../api/rdmTaskType', () => ({
+vi.mock('@/api/rdmTaskType', () => ({
   fetchTaskTypeOptions: vi.fn(async () => []),
 }))
 

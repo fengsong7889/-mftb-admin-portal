@@ -12,8 +12,8 @@ import { ArrowLeftOutlined } from '@ant-design/icons'
 import {
   fetchConsumableClaimDetail, fetchMyConsumableClaimDetail, approveConsumableClaim, issueConsumableClaim, cancelConsumableClaim,
   type ConsumableClaim, type ConsumableClaimItem,
-} from '../../../api/consumable'
-import { useAuth } from '../../../contexts/AuthContext'
+} from '@/api/consumable'
+import { useAuth } from '@/contexts/AuthContext'
 import { CLAIM_STATUS_LABEL_KEY, CLAIM_STATUS_COLOR, type ClaimStatus } from './constants'
 
 interface Props {

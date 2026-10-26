@@ -14,7 +14,7 @@ import {
   AuditOutlined, CarOutlined, FileTextOutlined, LoginOutlined,
   LogoutOutlined, SafetyCertificateOutlined, SwapOutlined,
 } from '@ant-design/icons'
-import DetailPageHeader from '../../components/DetailPageHeader'
+import DetailPageHeader from '@/components/DetailPageHeader'
 import {
   VehicleFlagTags, VehicleSection, VehicleUpdateFooter,
 } from './VehicleModuleLayout'

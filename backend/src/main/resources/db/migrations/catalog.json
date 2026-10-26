@@ -3226,6 +3226,21 @@
       "comment": "PRD 保存原为 updateById 全字段覆盖，两人同时编辑时后保存者会抹掉前者刚写的内容且双方都收到保存成功。本版只新增 rdm_prd.row_version（INT NOT NULL DEFAULT 0，先查 INFORMATION_SCHEMA 再 ADD，可重放、无 DROP），存量行默认 0；配合 savePrd 在传入期望版本时比对并递增，不传则保持旧行为，不阻断存量调用方。依赖指 v3.32：v3.33（日报去姓名）未在登记表立项，不自造悬空依赖。"
     },
     {
+      "versionKey": "rdm:schema:v3.35",
+      "module": "rdm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "rdmSchemaMigrationInitializer",
+      "dependencies": [
+        "rdm:schema:v3.34"
+      ],
+      "status": "ACTIVE",
+      "intent": "研发任务新增计划上线日：rdm_work_task.plan_release_date，默认继承需求计划上线并校验不得晚于它",
+      "author": "Qoder",
+      "ticket": "rdm-task-plan-release",
+      "comment": "子任务原先只有计划起止，拆任务时可以把完成日写到需求计划上线之后，甘特图看着排满但需求交不出来。本版只新增 rdm_work_task.plan_release_date（DATE NULL，先查 INFORMATION_SCHEMA 再 ADD，可重放、无 DROP），存量行留 NULL 而不是回填需求上线日——回填会把未排期的任务伪装成已排期。写侧只拦本次实际改动的日期，存量历史越界不影响换负责人等无关编辑。302 脚本仅作参照文档，不进镜像。"
+    },
+    {
       "versionKey": "rdm:transition:v1.1",
       "module": "rdm",
       "phase": "DATA_MIGRATION",

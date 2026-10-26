@@ -18,11 +18,11 @@ import {
 import dayjs, { type Dayjs } from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import DetailPageHeader from '../../components/DetailPageHeader'
-import RemarkTextArea from '../../components/RemarkTextArea'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import RemarkTextArea from '@/components/RemarkTextArea'
 import {
   ENABLE_STATUS, HOLIDAY_TYPE, createHoliday, fetchHolidayDetail, updateHoliday, type HolidayPayload,
-} from '../../api/attendance'
+} from '@/api/attendance'
 import { HOLIDAY_TYPE_LABEL_KEY } from './meta'
 import '@/styles/components.css'
 

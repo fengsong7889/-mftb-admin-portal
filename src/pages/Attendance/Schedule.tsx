@@ -25,16 +25,16 @@ import {
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
-import StatCards from '../../components/StatCards'
-import { useAuth } from '../../contexts/AuthContext'
+import StatCards from '@/components/StatCards'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   copyScheduleWeek, fetchHolidaysByYear, fetchScheduleStats, fetchScheduleWeek,
   fetchShiftOptions, saveSchedules, type HolidayVO, type ScheduleRow,
-} from '../../api/attendance'
+} from '@/api/attendance'
 import { useAttendanceOptions } from './useAttendanceOptions'
-import { exportToCSV } from '../../utils/exportCSV'
+import { exportToCSV } from '@/utils/exportCSV'
 import '@/styles/components.css'
-import OrgScopeNotice from '../../components/OrgScopeNotice'
+import OrgScopeNotice from '@/components/OrgScopeNotice'
 
 /** 「显式排休」在编辑控件里的哨兵值：不能与 shiftId（数字）冲突，故用字符串 */
 const REST_VALUE = '__rest__'

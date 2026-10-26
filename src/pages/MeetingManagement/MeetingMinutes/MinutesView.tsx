@@ -16,13 +16,13 @@ import type { TableColumnsType } from 'antd'
 import { EditOutlined, HistoryOutlined, ReloadOutlined, SafetyCertificateOutlined, SendOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import CardTitle from '../../../components/CardTitle'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import CardTitle from '@/components/CardTitle'
 import {
   fetchMinutesById, fetchMinutesSends, minutesDeliveryTarget, resolveMinutesItem, revokeMinutesLinks,
   type MinutesDeliveryVO, type MinutesItemView, type MinutesSendBatchVO, type MinutesVO,
-} from '../../../api/meetingMinutes'
-import { fetchMeetingDetail, type MeetingVO } from '../../../api/meeting'
+} from '@/api/meetingMinutes'
+import { fetchMeetingDetail, type MeetingVO } from '@/api/meeting'
 import { minutesStatusMeta, minutesTargetTypeLabels, notifyStatusMeta, phaseMeta } from '../meetingMeta'
 import MinutesContentCard from './MinutesContentCard'
 import SendMinutesModal from './SendMinutesModal'

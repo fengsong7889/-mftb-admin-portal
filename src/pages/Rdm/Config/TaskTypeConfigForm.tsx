@@ -10,14 +10,14 @@ import { SaveOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import RdmFormHeader from '../components/RdmFormHeader'
-import HelpPopover from '../../../components/HelpPopover'
-import { invalidateTaskTypeDict } from '../../../hooks/useTaskTypeDict'
+import HelpPopover from '@/components/HelpPopover'
+import { invalidateTaskTypeDict } from '@/hooks/useTaskTypeDict'
 import {
   createTaskType,
   fetchTaskTypeAll,
   updateTaskType,
   RDM_TASK_TYPE_CATEGORY,
-} from '../../../api/rdmTaskType'
+} from '@/api/rdmTaskType'
 import '../index.css'
 
 const CATEGORY_OPTIONS = [

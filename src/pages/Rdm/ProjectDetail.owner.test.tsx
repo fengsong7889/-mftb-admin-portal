@@ -10,8 +10,8 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import i18n from '../../i18n'
-import { createProject, fetchProjectDetail, fetchProjectRequirementBoard, updateProject } from '../../api/rdm'
+import i18n from '@/i18n'
+import { createProject, fetchProjectDetail, fetchProjectRequirementBoard, updateProject } from '@/api/rdm'
 import ProjectDetail from './ProjectDetail'
 
 /** 与后端 EmployeeVO 同形的在职员工桩（id 是 sys_user.id，empId 是工号） */
@@ -20,21 +20,21 @@ const emp = vi.hoisted(() => ({
   department: '產品部', functionRoleIds: [] as number[],
 }))
 
-vi.mock('../../api/employee', () => ({
+vi.mock('@/api/employee', () => ({
   fetchEmployees: vi.fn(async () => ({ records: [emp], total: 1 })),
   fetchEmployee: vi.fn(async () => emp),
 }))
 
 // 表单/详情入口按 rdm-dashboard-project:edit|create 收敛；本文件测提交契约，需给全权限
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => true }),
 }))
 
 // 只覆盖本页真正调用的八个写/读接口，其余导出保留真实实现：
 // 整模块替换时，只要被间接导入的模块用到别的 rdm 导出，就会报
 // 「No xxx export is defined on the mock」
-vi.mock('../../api/rdm', async () => {
-  const actual = await vi.importActual<typeof import('../../api/rdm')>('../../api/rdm')
+vi.mock('@/api/rdm', async () => {
+  const actual = await vi.importActual<typeof import('@/api/rdm')>('@/api/rdm')
   return {
     ...actual,
     fetchProjectDetail: vi.fn(),

@@ -16,7 +16,7 @@ import {
   getProfileItem,
   updateProfileItem,
   type PersonProfileItem,
-} from '../../../api/hcmPerson'
+} from '@/api/hcmPerson'
 import { CardTitle, FormHeader, cardStyle, grid3 } from '../Organization/shared'
 
 interface ProfileFormValues {

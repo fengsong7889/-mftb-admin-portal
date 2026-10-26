@@ -11,15 +11,15 @@ import {
   ExportOutlined, SaveOutlined, EditOutlined, FileSearchOutlined, ProfileOutlined,
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import DetailPageHeader from '../../../components/DetailPageHeader'
-import StatCards, { type StatCardItem } from '../../../components/StatCards'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import StatCards, { type StatCardItem } from '@/components/StatCards'
 import {
   fetchInventoryTask, fetchInventoryItems, fetchInventoryOptions, searchInventoryEmployees,
   saveInventoryItem, batchCheckInventory, prepareCloseInventory, completeInventory, cancelInventoryTask,
   downloadInventoryCsv, newInventoryRequestKey,
   type InventoryTaskRecord, type InventoryItemRecord, type InventoryItemQuery,
   type InventoryOptions, type InventoryEmployeeOption, type SaveItemPayload,
-} from '../../../api/eamInventory'
+} from '@/api/eamInventory'
 import {
   ITEM_STATUS_LABEL_KEY, ITEM_STATUS_COLOR, RESULT_LABEL_KEY, RESULT_COLOR,
   HOLDER_TYPE_LABEL_KEY, CHECK_METHOD_LABEL_KEY, TASK_STATUS_LABEL_KEY, TASK_STATUS_COLOR,

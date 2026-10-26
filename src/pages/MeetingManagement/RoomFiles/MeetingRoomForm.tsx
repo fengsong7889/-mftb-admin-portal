@@ -20,16 +20,16 @@ import {
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { useAuth } from '../../../contexts/AuthContext'
-import RemarkTextArea from '../../../components/RemarkTextArea'
+import { useAuth } from '@/contexts/AuthContext'
+import RemarkTextArea from '@/components/RemarkTextArea'
 import {
   createMeetingRoom, fetchCities, fetchMeetingRoomDetail, updateMeetingRoom,
   type MeetingRoomForm as MeetingRoomPayload, type MeetingRoomVO,
-} from '../../../api/meeting'
+} from '@/api/meeting'
 import { facilityOptions } from '../meetingMeta'
-import EmployeeSelect from '../EmployeeSelect'
+import EmployeeSelect from '@/components/EmployeeSelect'
 import { useTranslation } from 'react-i18next'
-import CardTitle from '../../../components/CardTitle'
+import CardTitle from '@/components/CardTitle'
 
 const MENU = 'meeting-room'
 

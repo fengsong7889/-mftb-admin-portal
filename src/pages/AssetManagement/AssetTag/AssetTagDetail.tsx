@@ -13,8 +13,8 @@ import {
   fetchAssetTagList,
   ASSET_DISPLAY_FIELDS,
   ASSET_FIELD_SAMPLE_VALUES,
-} from '../../../api/eam'
-import type { AssetTagTemplate } from '../../../api/eam'
+} from '@/api/eam'
+import type { AssetTagTemplate } from '@/api/eam'
 import AssetTagPreview from './AssetTagPreview'
 
 interface AssetTagDetailProps {

@@ -25,15 +25,15 @@ import {
 } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import DetailPageHeader from '../../components/DetailPageHeader'
-import RemarkTextArea from '../../components/RemarkTextArea'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import RemarkTextArea from '@/components/RemarkTextArea'
 import {
   ENABLE_STATUS, GROUP_TYPE, PUNCH_SOURCE, SCOPE_TYPE, createGroup, fetchGroupDetail, fetchGroupMembers,
   fetchShiftOptions, syncGroupMembers, updateGroup, type GroupPayload,
-} from '../../api/attendance'
+} from '@/api/attendance'
 import { GROUP_TYPE_LABEL_KEY, SCOPE_TYPE_LABEL_KEY } from './meta'
-import { fetchDepartments } from '../../api/department'
-import { fetchEmployees } from '../../api/employee'
+import { fetchDepartments } from '@/api/department'
+import { fetchEmployees } from '@/api/employee'
 import { buildDeptTree, type DeptNode } from './deptTree'
 import '@/styles/components.css'
 

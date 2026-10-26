@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { MeetingRoomVO } from '../../api/meeting'
+import type { MeetingRoomVO } from '@/api/meeting'
 import {
   DEFAULT_WINDOW_RULE,
   durationOptions,

@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import type { DataTargetType } from '../types'
 import { DATA_TARGET_TYPE } from '../types'
-import { DEPT_STATUS } from '../../../api/department'
+import { DEPT_STATUS } from '@/api/department'
 import {
   fetchDataAuthorizations,
   batchCreateAuthorizations,
@@ -14,15 +14,15 @@ import {
   fetchDataAuthRoleOptions,
   fetchDataAuthDepartmentOptions,
   fetchDataAuthMerchantGroupOptions,
-} from '../../../api/dataAuthorization'
+} from '@/api/dataAuthorization'
 import type {
   DataAuthorizationItem,
   DataAuthRoleOption,
   DataAuthDeptOption,
   DataAuthGroupOption,
-} from '../../../api/dataAuthorization'
-import { useAuth } from '../../../contexts/AuthContext'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+} from '@/api/dataAuthorization'
+import { useAuth } from '@/contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import './index.css'
 
 /** 分组后的列表行（一个角色/部门 = 一行） */

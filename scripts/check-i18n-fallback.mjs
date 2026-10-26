@@ -22,7 +22,7 @@ import { join, relative, extname } from 'node:path'
 
 const ROOT = process.cwd()
 const SRC_DIR = join(ROOT, 'src')
-const LOCALE_DIR = join(ROOT, 'src/i18n/locales')
+const LOCALE_DIR = join(ROOT, 'frontend/packages/i18n/src/i18n/locales')
 /** 基线：key 存在却仍写中文兜底的行数上限。只允许下降，新增即失败。 */
 const REDUNDANT_BASELINE = Number(readBaseline())
 

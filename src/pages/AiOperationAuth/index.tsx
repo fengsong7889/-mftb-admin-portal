@@ -24,8 +24,8 @@ import {
 } from '@ant-design/icons'
 import {
   TOOL_LEVEL_META,
-} from '../../api/mock/aiPlatformMock'
-import type { ToolLevel } from '../../api/mock/aiPlatformMock'
+} from '@/api/mock/aiPlatformMock'
+import type { ToolLevel } from '@/api/mock/aiPlatformMock'
 import {
   fetchToolRegistry,
   toggleToolStatus,
@@ -34,9 +34,9 @@ import {
   toggleKillSwitch,
   type KillSwitchStatus,
   type ToolPolicyRow,
-} from '../../api/aiOperationAuth'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { tablePagination, formatEpochOrDash } from '../../utils/tableDisplay'
+} from '@/api/aiOperationAuth'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { tablePagination, formatEpochOrDash } from '@/utils/tableDisplay'
 import AccountWhitelistPanel from './AccountWhitelistPanel'
 
 /* ────────────────── 展示常量 ────────────────── */

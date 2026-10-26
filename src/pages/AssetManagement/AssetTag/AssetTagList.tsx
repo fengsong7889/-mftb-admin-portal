@@ -15,9 +15,9 @@ import {
   AppstoreOutlined, DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined,
   ReloadOutlined, SearchOutlined, UnorderedListOutlined,
 } from '@ant-design/icons'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { fetchAssetTagList, deleteAssetTag, toggleAssetTagStatus } from '../../../api/eam'
-import type { AssetTagTemplate } from '../../../api/eam'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { fetchAssetTagList, deleteAssetTag, toggleAssetTagStatus } from '@/api/eam'
+import type { AssetTagTemplate } from '@/api/eam'
 import AssetTagPreview from './AssetTagPreview'
 import './index.css'
 

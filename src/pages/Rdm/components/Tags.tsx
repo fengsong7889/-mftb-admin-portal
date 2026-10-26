@@ -18,7 +18,7 @@ import {
   type RdmPriority,
   type RdmRiskType,
   type RdmStatus,
-} from '../../../constants/rdm'
+} from '@/constants/rdm'
 
 /**
  * 未知枚举兜底标签。

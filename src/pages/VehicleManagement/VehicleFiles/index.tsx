@@ -17,15 +17,15 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { message } from 'antd'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   changeDirectRegister, changeVehicleStatus, createVehicle, fetchVehicleDetail,
   fetchVehicles, saveQualification, updateVehicle,
   toIsoDate, type VehicleQuery,
-} from '../../../api/vehicle'
+} from '@/api/vehicle'
 import { toVehicleFile, toVehicleSavePayload } from '../vehicleAdapter'
 import type { VehicleFile, VehicleFileFormValues } from '../vehicleTypes'
-import type { QualificationSave } from '../../../api/vehicle'
+import type { QualificationSave } from '@/api/vehicle'
 import VehicleFileList from './VehicleFileList'
 import VehicleFileForm from './VehicleFileForm'
 import VehicleFileDetail from './VehicleFileDetail'

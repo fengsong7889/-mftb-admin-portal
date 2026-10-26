@@ -8,7 +8,7 @@
  * 界面文案第一阶段临时硬编码繁中（与后台默认语言一致），待 i18n 解耦后统一替换为 t() 调用。
  */
 import { REGION_LIST } from '../_shared/ad-promotion/gridConstants'
-import { MEAL_SLOT_TIME_LABEL } from '../../api/adPromotion'
+import { MEAL_SLOT_TIME_LABEL } from '@/api/adPromotion'
 
 /** 品牌 UI 值（与 gridConstants 的 UI_TO_BACKEND_BRAND 键一致） */
 export type MobileBrand = 'shanfeng' | 'mfood'

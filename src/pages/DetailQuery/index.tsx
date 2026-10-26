@@ -8,14 +8,14 @@ import {
   ReloadOutlined,
   ExportOutlined,
 } from '@ant-design/icons'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { useAuth } from '../../contexts/AuthContext'
-import BrandTag from '../../components/BrandTag'
-import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../constants/brand'
-import { BIZ_CHANNEL_LABEL_MAP } from '../../constants/bizChannel'
-import { getDetailRecords } from '../../utils/approvalStore'
-import { fetchFinDetails } from '../../api/finance'
-import type { FinDetailQuery } from '../../api/finance'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
+import BrandTag from '@/components/BrandTag'
+import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '@/constants/brand'
+import { BIZ_CHANNEL_LABEL_MAP } from '@/constants/bizChannel'
+import { getDetailRecords } from '@/utils/approvalStore'
+import { fetchFinDetails } from '@/api/finance'
+import type { FinDetailQuery } from '@/api/finance'
 
 const { RangePicker } = DatePicker
 

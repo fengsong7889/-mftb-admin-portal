@@ -7,7 +7,7 @@
  * 团购预览规则：可用固定内容优先占位 → 其余坑位由分类候选去重补位；
  * 停用/失效固定内容由分类候选补位；候选不足则提示不足，不混入其他分类或重复填满。
  */
-import type { FixedContentSlot, WaterfallLayoutColumns } from './types'
+import type { FixedContentSlot, WaterfallLayoutColumns } from '@mftb/contracts/waterfallTypes'
 
 /** 预览候选资源（仅取预览需要的字段，兼容 Mock 与未来真实资源） */
 export interface PreviewCandidate {

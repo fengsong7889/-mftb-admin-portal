@@ -9,7 +9,7 @@ import { Alert, Space, Table, Tabs, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { BranchesOutlined, UnorderedListOutlined } from '@ant-design/icons'
 import StatusSwitch from '../components/StatusSwitch'
-import { fetchStatusDefs, fetchTransitions, setTransitionEnabled, setStatusEnabled, type RdmStatusDefRow, type RdmTransitionRow } from '../../../api/rdm'
+import { fetchStatusDefs, fetchTransitions, setTransitionEnabled, setStatusEnabled, type RdmStatusDefRow, type RdmTransitionRow } from '@/api/rdm'
 import {
   RDM_ACTION_LABEL,
   RDM_REQUIRED_FIELD_LABEL,
@@ -20,7 +20,7 @@ import {
   type RdmRoleCode,
   type RdmStage,
   type RdmStatus,
-} from '../../../constants/rdm'
+} from '@/constants/rdm'
 import '../index.css'
 
 export default function StatusConfig() {

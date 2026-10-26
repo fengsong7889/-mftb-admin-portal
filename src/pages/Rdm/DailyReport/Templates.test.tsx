@@ -3,25 +3,25 @@ import { Modal } from 'antd'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import DailyReportTemplates from './Templates'
-import i18n from '../../../i18n'
+import i18n from '@/i18n'
 
 const fetchTemplates = vi.fn()
 const fetchConfig = vi.fn()
 const saveTemplate = vi.fn()
 
-vi.mock('../../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => true }),
 }))
 
 /** 查询条件里的选人控件：单测只验证「选中人 → 姓名过滤」链路，远程搜索组件本身有独立测试 */
-vi.mock('../../../components/RemoteSearchSelect', () => ({
+vi.mock('@/components/RemoteSearchSelect', () => ({
   default: ({ onChange }: { onChange?: (value?: string, label?: string) => void }) => (
     <button type="button" onClick={() => onChange?.('2', '李四(MF00002)')}>選李四</button>
   ),
 }))
 
-vi.mock('../../../api/rdmDailyReport', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../api/rdmDailyReport')>()
+vi.mock('@/api/rdmDailyReport', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/rdmDailyReport')>()
   return {
     ...actual,
     fetchDailyReportTemplates: () => fetchTemplates(),

@@ -9,7 +9,7 @@
  * 1. 100% 只屬於完成態：未完成的任務顯示按 99% 封頂；
  * 2. 「開始」只推狀態，永遠不帶進度；進度只能按實際填寫上報。
  */
-import { RDM_TASK_ACTION, RDM_TASK_STATUS, type RdmTaskAction } from '../../constants/rdm'
+import { RDM_TASK_ACTION, RDM_TASK_STATUS, type RdmTaskAction } from '@/constants/rdm'
 
 export interface RdmTaskReportPayload {
   action: RdmTaskAction

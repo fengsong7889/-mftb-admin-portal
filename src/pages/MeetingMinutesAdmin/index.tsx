@@ -11,9 +11,9 @@ import { ReloadOutlined, SearchOutlined, SolutionOutlined } from '@ant-design/ic
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import DetailPageHeader from '../../components/DetailPageHeader'
-import StatCards from '../../components/StatCards'
-import { fetchMinutesAdminPage, type MinutesAdminRow } from '../../api/meetingMinutes'
+import DetailPageHeader from '@/components/DetailPageHeader'
+import StatCards from '@/components/StatCards'
+import { fetchMinutesAdminPage, type MinutesAdminRow } from '@/api/meetingMinutes'
 import { minutesStatusMeta } from '../MeetingManagement/meetingMeta'
 
 export default function MeetingMinutesAdmin() {

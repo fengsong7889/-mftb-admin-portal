@@ -12,11 +12,11 @@ import type { TableColumnsType, TablePaginationConfig } from 'antd'
 import {
   SearchOutlined, ReloadOutlined, PlusOutlined, ExportOutlined,
 } from '@ant-design/icons'
-import type { DepartmentItem } from '../../../api/department'
-import { buildDeptTree, type ClaimEmployeeSummary, type ClaimQuery, type ClaimSummaryData } from './claimViewTypes'
+import type { DepartmentItem } from '@/api/department'
+import { buildDeptTree, type ClaimEmployeeSummary, type ClaimQuery, type ClaimSummaryData } from '@/api/claimViewTypes'
 import ClaimStats from './ClaimStats'
-import { exportToCSV } from '../../../utils/exportCSV'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { exportToCSV } from '@/utils/exportCSV'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 
 interface Props {
   onAdd: () => void

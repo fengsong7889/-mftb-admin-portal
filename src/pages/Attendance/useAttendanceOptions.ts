@@ -12,8 +12,8 @@
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ENABLE_STATUS, fetchGroups, type GroupVO } from '../../api/attendance'
-import { fetchDepartments } from '../../api/department'
+import { ENABLE_STATUS, fetchGroups, type GroupVO } from '@/api/attendance'
+import { fetchDepartments } from '@/api/department'
 import { buildDeptTree, type DeptNode } from './deptTree'
 
 export interface AttendanceOptions {

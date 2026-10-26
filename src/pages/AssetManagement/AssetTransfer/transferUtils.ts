@@ -1,4 +1,4 @@
-import { ROUTE_MENU_KEY_MAP } from '../../Permission/types'
+import { ROUTE_MENU_KEY_MAP } from '@mftb/contracts/menuPermission'
 
 export const TRANSFER_STATUS = { DONE: 'done', CANCELLED: 'cancelled' } as const
 export const HOLD_TYPE = { OWNED: 'owned', BORROWED: 'borrowed' } as const

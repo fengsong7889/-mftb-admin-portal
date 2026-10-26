@@ -6,8 +6,8 @@
  */
 import { Tag, Space } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import BrandTag from '../../../components/BrandTag'
-import { AppType, RecommendChannel } from '../../Recommend/constants'
+import BrandTag from '@/components/BrandTag'
+import { AppType, RecommendChannel } from '@mftb/contracts/recommendConstants'
 import type { BaseOrderItem } from './types'
 
 export interface SharedColumnDeps {

@@ -12,7 +12,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import RequirementSubmit from './RequirementSubmit'
 
-vi.mock('../../api/rdm', () => ({
+vi.mock('@/api/rdm', () => ({
   RDM_INTAKE_MODE_LABEL: { APPROVAL: '需審批', AUTO: '免審直送' },
   createRequirement: vi.fn(),
   fetchFunctionPoints: vi.fn().mockResolvedValue([]),
@@ -29,8 +29,8 @@ vi.mock('../../api/rdm', () => ({
   updateRequirement: vi.fn(),
   uploadAttachment: vi.fn(),
 }))
-vi.mock('../../api/employee', () => ({ fetchEmployees: vi.fn().mockResolvedValue({ records: [], total: 0 }) }))
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('@/api/employee', () => ({ fetchEmployees: vi.fn().mockResolvedValue({ records: [], total: 0 }) }))
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: { empId: 'MF00011', name: '測試提出人' }, hasPermission: () => true }),
 }))
 /** t 直接回 key（与 Workbench.test 同一口径）：断言的是「取的是哪个文案 key」，不是译文本身 */

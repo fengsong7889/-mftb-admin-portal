@@ -4,9 +4,9 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Button, Form, Input, message, Space, Card, Tag, Breadcrumb } from 'antd'
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons'
-import PRDEditor from '../../components/PRDEditor'
-import { getPagePRD } from '../../components/PageDescriptions'
-import { getCustomTips, saveCustomTips, deleteCustomTips, type CustomPageTips } from '../../utils/customTipsStorage'
+import PRDEditor from '@/components/PRDEditor'
+import { getPagePRD } from '@/components/PageDescriptions'
+import { getCustomTips, saveCustomTips, deleteCustomTips, type CustomPageTips } from '@/utils/customTipsStorage'
 import './index.css'
 
 export default function PageDescriptionEditor() {

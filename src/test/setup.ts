@@ -32,23 +32,28 @@ const localStorageMock = (() => {
   }
 })()
 
-Object.defineProperty(window, 'localStorage', {
-  value: localStorageMock,
-})
+// 以下两项都是浏览器全局对象，只对 jsdom 用例有意义。
+// scripts/lib 下的门禁纯函数单测跑在 node 环境（文件首行 @vitest-environment node），
+// 不加这道守卫会让它们在全局 setup 阶段就因 `window is not defined` 直接挂掉。
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'localStorage', {
+    value: localStorageMock,
+  })
 
-// Mock matchMedia
-Object.defineProperty(window, 'matchMedia', {
-  value: vi.fn().mockImplementation((query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })),
-})
+  // Mock matchMedia
+  Object.defineProperty(window, 'matchMedia', {
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  })
+}
 
 // jsdom 没有 ResizeObserver：甘特图等自适应组件在挂载时会用它测量容器宽度
 if (typeof globalThis.ResizeObserver === 'undefined') {

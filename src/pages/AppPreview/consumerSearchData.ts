@@ -8,12 +8,12 @@
  *
  * 数据为原型 Mock，字段与生产接口建议一一对应；接入后端时只需替换 searchCatalog 的数据源。
  */
-import bbqImg from '../../assets/consumer-home/bbq.jpg'
-import burgerImg from '../../assets/consumer-home/burger.jpg'
-import fishPotImg from '../../assets/consumer-home/fishpot.jpg'
-import friedChickenImg from '../../assets/consumer-home/friedchicken.jpg'
-import lemonTeaImg from '../../assets/consumer-home/lemontea.jpg'
-import riceballImg from '../../assets/consumer-home/riceball.jpg'
+import bbqImg from '@/assets/consumer-home/bbq.jpg'
+import burgerImg from '@/assets/consumer-home/burger.jpg'
+import fishPotImg from '@/assets/consumer-home/fishpot.jpg'
+import friedChickenImg from '@/assets/consumer-home/friedchicken.jpg'
+import lemonTeaImg from '@/assets/consumer-home/lemontea.jpg'
+import riceballImg from '@/assets/consumer-home/riceball.jpg'
 
 export type ConsumerChannel = 'delivery' | 'groupbuy' | 'market'
 export type SearchScope = 'global' | ConsumerChannel | 'store'

@@ -14,10 +14,10 @@ import {
 import {
   fetchConsumableTxnPage,
   type ConsumableTxn,
-} from '../../../api/consumable'
+} from '@/api/consumable'
 import { TXN_TYPE_LABEL, TXN_TYPE_COLOR } from '../Claim/constants'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { exportToCSV } from '../../../utils/exportCSV'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { exportToCSV } from '@/utils/exportCSV'
 
 const TXN_TYPE_OPTIONS = [
   { label: '採購入庫', value: 'in_purchase' },

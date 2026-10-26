@@ -4,12 +4,12 @@
 import { useState, useEffect } from 'react'
 import { Space, Tag, message } from 'antd'
 import type { TablePaginationConfig } from 'antd'
-import BrandTag from '../../../components/BrandTag'
-import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '../../../constants/brand'
-import type { MerchantGroupItem } from '../../../api/merchantGroup'
-import { fetchAllMerchantGroups } from '../../../api/merchantGroup'
-import type { StoreItem } from '../../../api/store'
-import { fetchStoresByGroup } from '../../../api/store'
+import BrandTag from '@/components/BrandTag'
+import { BRAND_OPTIONS_WITH_ALL as brandOptions } from '@/constants/brand'
+import type { MerchantGroupItem } from '@/api/merchantGroup'
+import { fetchAllMerchantGroups } from '@/api/merchantGroup'
+import type { StoreItem } from '@/api/store'
+import { fetchStoresByGroup } from '@/api/store'
 
 /* ──────────── 常量 ──────────── */
 

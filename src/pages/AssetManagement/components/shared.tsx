@@ -3,8 +3,8 @@
  */
 import { useState, useCallback, useRef } from 'react'
 import { Tag, message } from 'antd'
-import type { AssetItem, AssetStatus } from '../../../api/asset'
-import { fetchAssetDetail, fetchAssetList } from '../../../api/asset'
+import type { AssetItem, AssetStatus } from '@/api/asset'
+import { fetchAssetDetail, fetchAssetList } from '@/api/asset'
 
 /** 資產狀態 → 標籤顏色 */
 export const ASSET_STATUS_COLOR: Record<AssetStatus, string> = {

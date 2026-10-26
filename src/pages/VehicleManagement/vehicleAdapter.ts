@@ -12,7 +12,7 @@
 import type {
   DirectRegisterPayload, DraftPayload, QualificationVO, ReturnPayload,
   TripVO, UseVO, VehicleOption, VehicleSave, VehicleVO,
-} from '../../api/vehicle'
+} from '@/api/vehicle'
 import {
   APPROVAL_OUTCOME, DRIVING_MODE, QUALIFICATION_RESULT, TRIP_STATUS, USE_SOURCE, USE_STATUS,
   VEHICLE_STATUS,

@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { FeedbackTab, GuardrailTab, KnowledgeTab } from './index'
-import { fetchKnowledgeDocs, searchKnowledge } from '../../api/aiKnowledge'
-import { fetchGuardRules } from '../../api/aiGuardrail'
-import { fetchFeedbackStats } from '../../api/aiFeedback'
+import { fetchKnowledgeDocs, searchKnowledge } from '@/api/aiKnowledge'
+import { fetchGuardRules } from '@/api/aiGuardrail'
+import { fetchFeedbackStats } from '@/api/aiFeedback'
 
 const { translate } = vi.hoisted(() => ({
   translate: (key: string, options?: { defaultValue?: string } | string) =>
@@ -11,11 +11,11 @@ const { translate } = vi.hoisted(() => ({
 }))
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: translate }) }))
-vi.mock('../../components/DetailPageHeader', () => ({
+vi.mock('@/components/DetailPageHeader', () => ({
   default: ({ title }: { title: string }) => <div>{title}</div>,
 }))
 
-vi.mock('../../api/aiPromptConfig', () => ({
+vi.mock('@/api/aiPromptConfig', () => ({
   fetchCapabilities: vi.fn().mockResolvedValue([]),
   saveCapability: vi.fn(),
   fetchProfiles: vi.fn().mockResolvedValue([]),
@@ -28,12 +28,12 @@ vi.mock('../../api/aiPromptConfig', () => ({
   testRunPrompt: vi.fn(),
 }))
 
-vi.mock('../../api/aiFeedback', () => ({
+vi.mock('@/api/aiFeedback', () => ({
   fetchFeedback: vi.fn().mockResolvedValue([]),
   fetchFeedbackStats: vi.fn(),
 }))
 
-vi.mock('../../api/aiKnowledge', () => ({
+vi.mock('@/api/aiKnowledge', () => ({
   KNOWLEDGE_SYSTEMS: ['common', 'rdm', 'finance', 'eam', 'hr'],
   fetchKnowledgeDocs: vi.fn(),
   fetchKnowledgeDoc: vi.fn(),
@@ -44,7 +44,7 @@ vi.mock('../../api/aiKnowledge', () => ({
   searchKnowledge: vi.fn(),
 }))
 
-vi.mock('../../api/aiGuardrail', () => ({
+vi.mock('@/api/aiGuardrail', () => ({
   fetchGuardRules: vi.fn(),
   saveGuardRule: vi.fn(),
   deleteGuardRule: vi.fn(),

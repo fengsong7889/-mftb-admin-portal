@@ -13,8 +13,8 @@ import { useTranslation } from 'react-i18next'
 import {
   fetchModelDetail, fetchCategoryList, fetchBrandList,
   type AssetModel, type AssetCategory, type AssetBrand,
-} from '../../../api/eam'
-import DetailPageHeader from '../../../components/DetailPageHeader'
+} from '@/api/eam'
+import DetailPageHeader from '@/components/DetailPageHeader'
 
 interface Props {
   id: number

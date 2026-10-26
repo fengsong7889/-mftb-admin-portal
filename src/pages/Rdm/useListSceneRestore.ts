@@ -19,7 +19,7 @@
  * - TTL 24 小时 + 每账号最多 50 个场景，防止长期积累与陈旧位置反复出现。
  */
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import { registerSessionCleaner } from '../../utils/sessionCaches'
+import { registerSessionCleaner } from '@/utils/sessionCaches'
 
 /** 列表场景快照 */
 export interface RdmListScene<F = Record<string, unknown>> {

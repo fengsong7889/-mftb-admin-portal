@@ -18,7 +18,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
-import RemoteSearchSelect from '../../components/RemoteSearchSelect'
+import RemoteSearchSelect from '@/components/RemoteSearchSelect'
 import {
   createReleaseBatch,
   fetchDeliveryItems,
@@ -26,8 +26,8 @@ import {
   type RdmDeliveryItemListItem,
   type RdmProjectListItem,
   type RdmReleaseBatchCreateForm,
-} from '../../api/rdm'
-import { fetchEmployeeIdOptions } from '../../api/employee'
+} from '@/api/rdm'
+import { fetchEmployeeIdOptions } from '@/api/employee'
 
 /** 表单值形状 */
 interface CreateFormValues {

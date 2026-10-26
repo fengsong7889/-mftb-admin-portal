@@ -7,8 +7,8 @@ import type { TablePaginationConfig } from 'antd'
 import { SearchOutlined, ReloadOutlined, PlusOutlined, ExportOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import { toDateRangeParams } from '../../../utils/dateRange'
-import type { DateRangeValue } from '../../../utils/dateRange'
+import { toDateRangeParams } from '@/utils/dateRange'
+import type { DateRangeValue } from '@/utils/dateRange'
 
 /* ──────────── 通用處理函數 ──────────── */
 

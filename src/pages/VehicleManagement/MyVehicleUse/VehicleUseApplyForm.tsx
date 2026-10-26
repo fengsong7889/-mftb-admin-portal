@@ -22,9 +22,9 @@ import {
   passengerWithinSeatLimit,
 } from '../vehicleRules'
 import { useVehicleDeptTree } from '../vehicleOptions'
-import { fetchVehicles } from '../../../api/vehicle'
+import { fetchVehicles } from '@/api/vehicle'
 import { toVehicleFiles } from '../vehicleAdapter'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import type { ScheduleConflict } from '../vehicleRules'
 import {
   VehicleFormPageHeader, VehicleSection,

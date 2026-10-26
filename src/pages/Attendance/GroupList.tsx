@@ -20,16 +20,16 @@ import {
 import dayjs from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import StatCards from '../../components/StatCards'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
-import { useAuth } from '../../contexts/AuthContext'
-import { useServerSort } from '../../hooks/useServerSort'
+import StatCards from '@/components/StatCards'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
+import { useServerSort } from '@/hooks/useServerSort'
 import {
   ENABLE_STATUS, GROUP_TYPE, changeGroupStatus, deleteGroup, fetchGroupStats, fetchGroups,
   type GroupVO,
-} from '../../api/attendance'
+} from '@/api/attendance'
 import { GROUP_TYPE_LABEL_KEY, PUNCH_SOURCE_LABEL_KEY } from './meta'
-import { exportToCSV } from '../../utils/exportCSV'
+import { exportToCSV } from '@/utils/exportCSV'
 import '@/styles/components.css'
 
 /** 列 key → i18n key：列标题唯一来源，表格与列配置面板共用 */

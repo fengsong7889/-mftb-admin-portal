@@ -5,7 +5,7 @@ import { describe, it, expect, vi } from 'vitest'
  * 模擬後端 Jackson default-property-inclusion=non_null 的真實響應：
  * null 字段（如不限額集團的 availableAmount）會被省略，前端收到 undefined。
  */
-vi.mock('../../api/finance', () => ({
+vi.mock('@/api/finance', () => ({
   fetchFinRiskPage: vi.fn().mockResolvedValue({
     records: [{
       groupId: 'JT000001',
@@ -29,7 +29,7 @@ vi.mock('../../api/finance', () => ({
   saveFinRiskStatus: vi.fn().mockResolvedValue(undefined),
 }))
 
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => true }),
 }))
 

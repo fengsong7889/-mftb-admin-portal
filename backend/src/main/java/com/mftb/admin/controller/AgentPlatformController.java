@@ -227,6 +227,20 @@ public class AgentPlatformController {
 
     /* ────────────────── 数据分级与端点批准 ────────────────── */
 
+    @GetMapping("/systems")
+    @RequirePermission(menu = MENU_OPERATION, action = "view")
+    @Operation(summary = "登记分级可选的业务系统清单")
+    public Result<List<Map<String, Object>>> systemOptions() {
+        return Result.success(dataPolicy.listSystemOptions());
+    }
+
+    @GetMapping("/models")
+    @RequirePermission(menu = MENU_OPERATION, action = "view")
+    @Operation(summary = "端点批准可选的模型清单")
+    public Result<List<Map<String, Object>>> modelOptions() {
+        return Result.success(dataPolicy.listModelOptions());
+    }
+
     @GetMapping("/data-policies")
     @RequirePermission(menu = MENU_OPERATION, action = "view")
     @Operation(summary = "系统数据分级列表")
@@ -250,7 +264,7 @@ public class AgentPlatformController {
     }
 
     @PostMapping("/endpoints")
-    @RequirePermission(menu = MENU_OPERATION, action = "edit")
+    @RequirePermission(menu = MENU_OPERATION, action = "approve")
     @Operation(summary = "批准模型端点可接收的数据等级（需到期时间）")
     public Result<Map<String, Object>> approveEndpoint(@RequestBody Map<String, Object> body) {
         return Result.success(dataPolicy.approveEndpoint(text(body.get("modelKey")),
@@ -259,7 +273,7 @@ public class AgentPlatformController {
     }
 
     @DeleteMapping("/endpoints/{modelKey}")
-    @RequirePermission(menu = MENU_OPERATION, action = "edit")
+    @RequirePermission(menu = MENU_OPERATION, action = "approve")
     @Operation(summary = "撤销端点批准")
     public Result<Void> revokeEndpoint(@PathVariable String modelKey) {
         dataPolicy.revokeEndpoint(modelKey);

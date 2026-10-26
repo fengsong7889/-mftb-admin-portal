@@ -5,11 +5,11 @@ import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
-import { useAuth } from '../../../contexts/AuthContext'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
+import { useAuth } from '@/contexts/AuthContext'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   LEAVE_EDITABLE, deleteLeaveRequest, fetchLeaveRequests, fetchLeaveStats, type LeaveRequestItem,
-} from '../../../api/hrLeave'
+} from '@/api/hrLeave'
 import {
   HR_LEAVE_SCOPE, LEAVE_STATUS_LABEL_KEY, LEAVE_STATUS_TABS, LEAVE_STATUS_TAG_COLOR,
   LEAVE_TYPE_LABEL_KEY, leaveDetailPath, leaveFormPath, type LeaveScope,

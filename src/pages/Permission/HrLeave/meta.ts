@@ -1,4 +1,4 @@
-import { LEAVE_STATUS, LEAVE_TYPE } from '../../../api/hrLeave'
+import { LEAVE_STATUS, LEAVE_TYPE } from '@/api/hrLeave'
 
 /** 假期类型 → i18n key（与后端 HR 字典 LEAVE_TYPE code 一致） */
 export const LEAVE_TYPE_LABEL_KEY: Record<string, string> = {

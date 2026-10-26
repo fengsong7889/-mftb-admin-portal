@@ -9,11 +9,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { message } from 'antd'
-import { useAuth } from '../../../contexts/AuthContext'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   fetchReturnList, fetchReturnDetail, registerReturn, disposeReturn, recoverReturn,
   type ReturnRow, type ReturnQuery, type ReturnRegisterDTO, type ReturnDispositionDTO, type ReturnRecoverDTO,
-} from '../../../api/eamReturn'
+} from '@/api/eamReturn'
 import ReturnList from './ReturnList'
 import ReturnForm from './ReturnForm'
 import ReturnDetail from './ReturnDetail'

@@ -1,8 +1,8 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import i18n from '../../i18n'
-import { fetchRequirementPage, fetchScopeCounts } from '../../api/rdm'
+import i18n from '@/i18n'
+import { fetchRequirementPage, fetchScopeCounts } from '@/api/rdm'
 import RequirementList from './RequirementList'
 
 // 横幅文案已接入 i18n，用例固定走繁體語境（無 localStorage 記錄時默認 en）
@@ -20,7 +20,7 @@ beforeAll(async () => {
  *  3. 客户端双保险：即便后端未升级把准入前/需求池行透出来，前端也过滤掉并顶横幅告知去向。
  */
 
-vi.mock('../../api/rdm', () => ({
+vi.mock('@/api/rdm', () => ({
   fetchRequirementPage: vi.fn(),
   fetchScopeCounts: vi.fn().mockResolvedValue({}),
   fetchRequirementStats: vi.fn().mockResolvedValue({}),
@@ -32,9 +32,9 @@ vi.mock('../../api/rdm', () => ({
   urgeRequirement: vi.fn(),
   withdrawRequirement: vi.fn(),
 }))
-vi.mock('../../api/department', () => ({ fetchDepartments: vi.fn().mockResolvedValue([]) }))
-vi.mock('../../api/employee', () => ({ fetchEmployeeIdOptions: vi.fn().mockResolvedValue([]) }))
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('@/api/department', () => ({ fetchDepartments: vi.fn().mockResolvedValue([]) }))
+vi.mock('@/api/employee', () => ({ fetchEmployeeIdOptions: vi.fn().mockResolvedValue([]) }))
+vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ hasPermission: () => false, user: { empId: 'MF00011' } }),
 }))
 vi.mock('./requirementExport', () => ({ exportRequirementRows: vi.fn() }))

@@ -46,10 +46,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
-import HelpPopover from '../../components/HelpPopover'
-import { useAuth } from '../../contexts/AuthContext'
-import { keyToPath, resolveRdmSubmitBackMenuKey } from '../../constants/menuDataSource'
-import { fetchEmployees, type EmployeeItem } from '../../api/employee'
+import HelpPopover from '@/components/HelpPopover'
+import { useAuth } from '@/contexts/AuthContext'
+import { keyToPath, resolveRdmSubmitBackMenuKey } from '@/constants/menuDataSource'
+import { fetchEmployees, type EmployeeItem } from '@/api/employee'
 import {
   RDM_INTAKE_MODE_LABEL,
   createRequirement,
@@ -68,10 +68,10 @@ import {
   type RdmProductOption,
   type RdmRequirementForm,
   type RdmTargetRef,
-} from '../../api/rdm'
+} from '@/api/rdm'
 import SimilarNotice from './components/SimilarNotice'
-import { formatEmployee } from '../../utils/employeeDisplay'
-import { ACTION_LABEL_MAP } from '../Permission/types'
+import { formatEmployee } from '@/utils/employeeDisplay'
+import { ACTION_LABEL_MAP } from '@mftb/contracts/menuPermission'
 import {
   RDM_ANCHOR_TYPE,
   RDM_COMPLEXITY_LABEL,
@@ -87,7 +87,7 @@ import {
   type RdmComplexity,
   type RdmPriority,
   type RdmReqType,
-} from '../../constants/rdm'
+} from '@/constants/rdm'
 import './index.css'
 
 const { TextArea } = Input

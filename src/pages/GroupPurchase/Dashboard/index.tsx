@@ -12,11 +12,11 @@ import {
 } from '@ant-design/icons'
 import { Line } from '@ant-design/charts'
 import { useTranslation } from 'react-i18next'
-import FlashSaleImportModal from '../../../components/FlashSaleImportModal'
-import { fetchFlashSalePeriods, fetchFlashSaleOverview, importFlashSaleSummary } from '../../../api/flashSale'
-import type { FlashSalePeriod, FlashSaleOverviewVO, FlashSaleSummaryDayVO } from '../../../api/flashSale'
-import type { ParsedFlashSaleExcel } from '../../../utils/flashSaleImport'
-import { useCountUp } from '../../../hooks/useCountUp'
+import FlashSaleImportModal from '@/components/FlashSaleImportModal'
+import { fetchFlashSalePeriods, fetchFlashSaleOverview, importFlashSaleSummary } from '@/api/flashSale'
+import type { FlashSalePeriod, FlashSaleOverviewVO, FlashSaleSummaryDayVO } from '@/api/flashSale'
+import type { ParsedFlashSaleExcel } from '@/utils/flashSaleImport'
+import { useCountUp } from '@/hooks/useCountUp'
 
 /** 动效数字 */
 function AnimatedNumber({ value, decimals = 0, prefix = '', suffix = '' }: {

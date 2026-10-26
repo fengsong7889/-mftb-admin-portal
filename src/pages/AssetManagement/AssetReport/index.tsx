@@ -14,8 +14,8 @@ import type { TableColumnsType } from 'antd'
 import { useTranslation } from 'react-i18next'
 import {
   fetchAssetStatistics, type AssetStatistics, type AssetSource,
-} from '../../../api/asset'
-import AnimatedNumber from '../../../components/AnimatedNumber'
+} from '@/api/asset'
+import AnimatedNumber from '@/components/AnimatedNumber'
 
 interface DistRow { key: string; name: string; count: number; percent: number }
 

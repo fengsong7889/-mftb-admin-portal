@@ -3,7 +3,7 @@ import { ConfigProvider, Form } from 'antd'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import OrganicTrafficScoreConfig from './OrganicTrafficScoreConfig'
-import { AppType } from './constants'
+import { AppType } from '@mftb/contracts/recommendConstants'
 import { DEFAULT_ORGANIC_SCORE_RULES, ScoreDimension } from './organicTrafficConfig'
 import ScoreRow from './AlgorithmForm/ScoreRow'
 

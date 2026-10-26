@@ -21,8 +21,8 @@ import dayjs from 'dayjs'
 import {
   createPurchaseOrder, syncSupplierContact,
   type PurchaseOrderItem,
-} from '../../../api/eam'
-import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
+} from '@/api/eam'
+import { useCompanyBrand } from '@/contexts/CompanyBrandContext'
 import {
   usePurchaseOrderForm, ItemEditModal, groupSubtotal, grandTotal, showReceiveDate, showTrackingNo,
   type DeliveryMethod,

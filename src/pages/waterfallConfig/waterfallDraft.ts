@@ -4,7 +4,7 @@
  * 取代旧版仅传递算法坑位数组（slotConfigDraftSlots / slotConfigResultSlots）的方式：
  * 现在传递整个 WaterfallDraft，并按记录 key 隔离，避免不同策略草稿串用。
  */
-import type { WaterfallDraft } from './types'
+import type { WaterfallDraft } from '@mftb/contracts/waterfallTypes'
 
 const DRAFT_KEY = 'wf_slot_draft_v1'
 

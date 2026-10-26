@@ -12,12 +12,12 @@ import { Alert, AutoComplete, Button, Form, Input, InputNumber, Modal, Select, S
 import { ArrowLeftOutlined, DeleteOutlined, SaveOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { createMenu, deleteMenu, fetchMenuList, updateMenu } from '../../api/menu'
-import type { MenuPayload, MenuVO } from '../../api/menu'
-import { fetchSystemsCatalog, type SystemCatalogItem } from '../../api/systemAuthorization'
-import { getSystemDisplayName } from '../../constants/portalSystems'
-import { useAuth } from '../../contexts/AuthContext'
-import { getMenuIconOptions, renderMenuIcon } from '../../components/MenuIcon'
+import { createMenu, deleteMenu, fetchMenuList, updateMenu } from '@/api/menu'
+import type { MenuPayload, MenuVO } from '@/api/menu'
+import { fetchSystemsCatalog, type SystemCatalogItem } from '@/api/systemAuthorization'
+import { getSystemDisplayName } from '@/constants/portalSystems'
+import { useAuth } from '@/contexts/AuthContext'
+import { getMenuIconOptions, renderMenuIcon } from '@/components/MenuIcon'
 
 /** 菜单类型：与 sys_menu.type 一致（1=目录 2=菜单 3=按钮） */
 const MENU_TYPE = { DIRECTORY: 1, MENU: 2, BUTTON: 3 } as const

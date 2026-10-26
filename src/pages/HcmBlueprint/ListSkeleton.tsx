@@ -17,8 +17,8 @@ import {
   ClockCircleOutlined,
   ExclamationCircleOutlined,
 } from '@ant-design/icons'
-import StatCards, { type StatCardItem } from '../../components/StatCards'
-import { useColumnConfig } from '../../hooks/useColumnConfig'
+import StatCards, { type StatCardItem } from '@/components/StatCards'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import type { HcmDemo } from './blueprint'
 
 interface DemoRow {

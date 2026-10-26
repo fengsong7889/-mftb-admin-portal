@@ -13,11 +13,11 @@ import {
   fetchConsumableItems, deleteConsumableItem, toggleConsumableItemStatus,
   fetchConsumableCategoryOptions, fetchConsumableBrandOptions, fetchPurchaseCompanyOptions,
   type ConsumableItem, type ConsumableCategory, type ConsumableBrand, type PurchaseCompany,
-} from '../../../api/consumable'
-import { useColumnConfig } from '../../../hooks/useColumnConfig'
-import { exportToCSV } from '../../../utils/exportCSV'
-import { useCompanyBrand } from '../../../contexts/CompanyBrandContext'
-import BrandTag from '../../../components/BrandTag'
+} from '@/api/consumable'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
+import { exportToCSV } from '@/utils/exportCSV'
+import { useCompanyBrand } from '@/contexts/CompanyBrandContext'
+import BrandTag from '@/components/BrandTag'
 import { buildTree, toTreeSelectData } from '../../AssetManagement/eamUtils'
 
 const { RangePicker } = DatePicker

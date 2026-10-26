@@ -28,6 +28,7 @@ import com.mftb.admin.mapper.RdmWorkTaskMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.OaRequestService;
 import com.mftb.admin.service.PermissionService;
+import com.mftb.admin.service.HrAssignmentQuery;
 import com.mftb.admin.service.RdmAccessGuard;
 import com.mftb.admin.service.RdmConfigService;
 import com.mftb.admin.service.RdmDeliveryService;
@@ -102,6 +103,8 @@ class RdmDeliveryGuardTest {
     private PermissionService permissionService;
     private RdmTaskTypeService taskTypeService;
     private com.mftb.admin.mapper.RdmTaskProgressLogMapper progressLogMapper;
+    /** 当前任职口径：表单「所屬部門」回显最新部门用；没返回时服务端回退账号快照 */
+    private HrAssignmentQuery hrAssignmentQuery;
     private RdmDeliveryService service;
 
     @BeforeEach
@@ -119,6 +122,8 @@ class RdmDeliveryGuardTest {
         permissionService = mock(PermissionService.class);
         taskTypeService = mock(RdmTaskTypeService.class);
         progressLogMapper = mock(com.mftb.admin.mapper.RdmTaskProgressLogMapper.class);
+        hrAssignmentQuery = mock(HrAssignmentQuery.class);
+        when(hrAssignmentQuery.asOf(any(), any())).thenReturn(java.util.Optional.empty());
         // 任务类型字典 stub：六种内置 code 放行（resolveByCode 非 null），其余 null 被 validateTaskForm 拒绝；
         // categoryOf 按内置三桶兑底，保证 roleOfTaskType 的 switch 不落 null
         when(taskTypeService.resolveByCode(anyString())).thenAnswer(inv -> {
@@ -141,7 +146,8 @@ class RdmDeliveryGuardTest {
                 mock(com.mftb.admin.service.RdmPrdTaskService.class),
                 mock(com.mftb.admin.service.RdmDeliveryItemService.class),
                 progressLogMapper,
-                mock(com.mftb.admin.service.RdmTeamScopeService.class));
+                mock(com.mftb.admin.service.RdmTeamScopeService.class),
+                hrAssignmentQuery);
         when(accessGuard.requireDeliveryWriter(anyLong(), anyString())).thenReturn(requirement(RdmConstants.STATUS_ACCEPTED));
         when(accessGuard.requireVisible(anyLong(), anyString())).thenReturn(requirement(RdmConstants.STATUS_ACCEPTED));
         when(requirementMapper.selectById(any())).thenReturn(requirement(RdmConstants.STATUS_ACCEPTED));
@@ -460,6 +466,49 @@ class RdmDeliveryGuardTest {
         assertFalse(check.getAble());
         assertFalse(check.getHardBlocked(), "无权限属于可先派活、后补权限，不得硬拦");
         assertTrue(check.getWarning().contains("無研發交付權限"), check.getWarning());
+    }
+
+    @Test
+    @DisplayName("负责人部门取最新任职记录，不再读账号快照")
+    void ownerDepartmentUsesLatestAssignment() {
+        com.mftb.admin.entity.SysUser owner = owner41();
+        // 账号快照是调动前的旧部门：人事系统改部门只写任职记录，不会回写 sys_user
+        owner.setDepartment("後端研發部");
+        when(userMapper.selectById(41L)).thenReturn(owner);
+        com.mftb.admin.entity.EmpPositionRecord record = new com.mftb.admin.entity.EmpPositionRecord();
+        record.setServiceDept("前端研發部");
+        when(hrAssignmentQuery.asOf(any(), any())).thenReturn(java.util.Optional.of(record));
+
+        RdmDeliveryVO.OwnerCheck check = service.checkTaskOwner(41L);
+        assertTrue("前端研發部".equals(check.getDepartment()),
+                "部门应取任职记录的最新值，实际：" + check.getDepartment());
+    }
+
+    @Test
+    @DisplayName("任务计划上线不得晚于需求计划上线")
+    void taskPlanReleaseMustNotExceedRequirement() {
+        RdmRequirement req = requirement(RdmConstants.STATUS_ACCEPTED);
+        req.setPlanReleaseDate(java.time.LocalDate.of(2026, 12, 31));
+        when(accessGuard.requireDeliveryWriter(anyLong(), anyString())).thenReturn(req);
+        when(requirementMapper.selectById(any())).thenReturn(req);
+
+        RdmDeliveryDTO.Task dto = taskDto("backend", BigDecimal.TEN, "2026-12-01", "2026-12-10");
+        dto.setPlanReleaseDate("2027-01-05");
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.saveTask(dto));
+        assertTrue(ex.getMessage().contains("需求計劃上線"), ex.getMessage());
+    }
+
+    @Test
+    @DisplayName("任务计划完成日不得晚于需求计划上线")
+    void taskPlanFinishMustNotExceedRequirement() {
+        RdmRequirement req = requirement(RdmConstants.STATUS_ACCEPTED);
+        req.setPlanReleaseDate(java.time.LocalDate.of(2026, 12, 31));
+        when(accessGuard.requireDeliveryWriter(anyLong(), anyString())).thenReturn(req);
+        when(requirementMapper.selectById(any())).thenReturn(req);
+
+        RdmDeliveryDTO.Task dto = taskDto("backend", BigDecimal.TEN, "2026-12-20", "2027-01-10");
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.saveTask(dto));
+        assertTrue(ex.getMessage().contains("需求計劃上線"), ex.getMessage());
     }
 
     @Test

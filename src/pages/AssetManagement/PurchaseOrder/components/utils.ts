@@ -1,7 +1,7 @@
 /**
  * 采购订单录入/编辑共享工具函数与类型
  */
-import type { AssetCategory } from '../../../../api/eam'
+import type { AssetCategory } from '@/api/eam'
 
 /* ==================== 分类树（TreeSelect） ==================== */
 
@@ -62,7 +62,7 @@ export interface ItemRow {
 
 /* ==================== 分组小计 ==================== */
 
-import type { PurchaseOrderSupplierGroup } from '../../../../api/eam'
+import type { PurchaseOrderSupplierGroup } from '@/api/eam'
 
 /** 计算分组小计 */
 export const groupSubtotal = (group: PurchaseOrderSupplierGroup) =>
