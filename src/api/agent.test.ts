@@ -3,10 +3,14 @@ import { sendAgentMessage, type ChatMessage, type AgentReply } from './agent'
 import { confirmExternalCall } from '../components/McpExternalConfirm'
 
 // 用 vi.hoisted 让 mock 工厂能引用外部变量
-const { postMock } = vi.hoisted(() => ({ postMock: vi.fn() }))
+const { postMock, apiBaseMock } = vi.hoisted(() => ({
+  postMock: vi.fn(),
+  apiBaseMock: vi.fn(() => '/api'),
+}))
 vi.mock('./request', () => ({
   default: { post: postMock, get: vi.fn() },
   TOKEN_KEY: 'mftb_token',
+  resolveApiBaseUrl: apiBaseMock,
 }))
 vi.mock('../components/McpExternalConfirm', () => ({
   confirmExternalCall: vi.fn(),
@@ -29,6 +33,8 @@ describe('agent.sendAgentMessage (V0 §B.1 orchestrate)', () => {
   beforeEach(() => {
     localStorage.clear()
     postMock.mockReset()
+    apiBaseMock.mockClear()
+    apiBaseMock.mockReturnValue('/api')
     vi.mocked(confirmExternalCall).mockReset()
   })
   afterEach(() => { global.fetch = realFetch })
@@ -146,5 +152,21 @@ describe('agent.sendAgentMessage (V0 §B.1 orchestrate)', () => {
     const reply = await sendAgentMessage([chat('hi')])
     expect(reply.text).toMatch(/^⚠️ AI 服務異常/)
     expect(reply.tokens).toBe(0)
+  })
+
+  /**
+   * 生产前端是 GitHub Pages 静态托管、后端在 Sealos，两者不同源：
+   * 请求地址必须取自 VITE_API_BASE_URL（resolveApiBaseUrl）。
+   * 一旦拼 window.location.origin，POST 会落到静态服务器的 /api/... 并被 nginx 判 405。
+   */
+  it('请求地址取自统一 API 基地址，不使用前端站点 origin', async () => {
+    apiBaseMock.mockReturnValue('https://backend.example.com/api')
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      orchestrateResp({ text: 'ok', model: 'ds', tokens: 1, pendingExternalCalls: [] }),
+    )
+    global.fetch = fetchMock as unknown as typeof fetch
+
+    await sendAgentMessage([chat('hi')])
+    expect(fetchMock.mock.calls[0][0]).toBe('https://backend.example.com/api/agent/orchestrate')
   })
 })

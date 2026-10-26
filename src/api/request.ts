@@ -66,8 +66,11 @@ let unauthorizedHandled = false
  * 计算 API 基础地址: 统一保证以 /api 结尾
  * 开发环境通过 Vite proxy 代理到后端 (见 vite.config.ts)
  * 生产环境通过 VITE_API_BASE_URL 环境变量指定后端地址（可不带 /api 前缀, 此处自动补全）
+ *
+ * <p>必须 export：生产前端与后端不同源（GitHub Pages 静态托管 + Sealos 后端），
+ * 任何绕过 axios 的 fetch 直连都必须用它拼地址，否则请求会落到前端静态服务器并返回 405/404。
  */
-function resolveBaseURL(): string {
+export function resolveApiBaseUrl(): string {
   const raw = import.meta.env.VITE_API_BASE_URL as string | undefined
   if (!raw) return '/api'
   const trimmed = raw.replace(/\/+$/, '')
@@ -76,7 +79,7 @@ function resolveBaseURL(): string {
 
 /** 创建 axios 实例 */
 const request: AxiosInstance = axios.create({
-  baseURL: resolveBaseURL(),
+  baseURL: resolveApiBaseUrl(),
   timeout: 15000,
 })
 

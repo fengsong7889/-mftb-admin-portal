@@ -21,6 +21,7 @@ import { fetchAdAlgorithms, fetchAdSignboardInventory, placeAdSignboardOrder } f
 import { fetchStores, type StoreItem } from '../../api/store'
 import { fetchFinAccountBalance } from '../../api/finance'
 import { AlgorithmType, ServiceStatus, REGION_LABEL_KEY } from '../Recommend/constants'
+import { signboardTagText } from '../Recommend/signboardLabels'
 import { MAX_BUY_DAYS, PRESALE_OPEN_HOUR, MONTHS_PER_PAGE, parseDayTiers, getPresaleOpenTime, PickerPresaleInfoModal, PickerPaymentSuccessModal } from './components/pickerShared'
 
 /** 金字招牌廣告類型標識（與後端一致） */
@@ -72,51 +73,24 @@ function keyToScenario(key: string) {
 }
 
 /**
- * 生成標籤展示文案（與算法庫配置一致）
- * - 對比類標籤：
- *   - 熱門/人氣/好評：「{region}{category}{label}店鋪」
- *   - 銷量：「{region}{category}銷量第{rank}名」
- *   - 復購：「{region}{category}回頭率超高店鋪」
- * - 統計類標籤：
- *   - 收藏：「{count}人收藏好店」
- *   - 顧客數：「近期{count}人下單」
+ * 生成標籤展示文案（與算法庫預覽同源）。
+ * - 對比類：「{全澳｜商圈名}{品類}熱門店鋪」等；品類只在對比範圍含「品類」且門店已配置品類時出現
+ * - 統計類：「{人數}人收藏好店」「近期{人數}人下單」；優先用門店真实數據，取不到時用通用示例值
  */
 function getTagDisplayText(
   labelType: string,
   scenario: string | null,
   regionName: string,
-  t: (key: string) => string
+  pricing?: LabelPricingInfo
 ): string {
-  const labelCfg = SIGNBOARD_LABELS.find(l => l.value === labelType)
-  if (!labelCfg) return labelType
-
-  // 統計類標籤（無場景）
-  if (!scenario) {
-    if (labelType === 'favorites') return '千人收藏好店'
-    // 人數格式化口徑與算法庫一致：10~99 取起始整十、100+ 用中文大數（百/千/萬）
-    if (labelType === 'customers') return '近期百人下單'
-    return `${labelCfg.label}店鋪`
-  }
-
-  // 對比類標籤：構建區域前綴
-  const region = scenario === 'all_macau' ? '全澳' : (regionName || '商圈')
-  
-  // 品類佔位符（實際應從算法配置獲取，此處用佔位符示意）
-  // TODO: 從算法配置中讀取品類名稱
-  const category = '' // 暫時不顯示品類，待接入算法配置數據
-
-  // 銷量標籤：特殊文案「銷量第X名」
-  if (labelType === 'sales') {
-    return `${region}${category}銷量第1名`
-  }
-
-  // 復購標籤：特殊文案「回頭率超高店鋪」
-  if (labelType === 'repurchase') {
-    return `${region}${category}回頭率超高店鋪`
-  }
-
-  // 熱門/人氣/好評：「{region}{category}{label}店鋪」
-  return `${region}${category}${labelCfg.label}店鋪`
+  return signboardTagText({
+    labelType,
+    scenario,
+    regionName,
+    categoryName: pricing?.categoryName ?? null,
+    qualificationScope: pricing?.qualificationScope ?? null,
+    actualCount: pricing?.actualCount ?? null,
+  })
 }
 
 /** 標籤定價信息（從銷售定價配置加載） */
@@ -132,6 +106,12 @@ interface LabelPricingInfo {
   conditionDesc?: string | null
   /** 本門店實際情況（排名/數值） */
   actualDesc?: string | null
+  /** 資格條件對比範圍（含 Category 時文案帶品類） */
+  qualificationScope?: string | null
+  /** 門店品類名（如 火鍋） */
+  categoryName?: string | null
+  /** 統計類實際人數（收藏/顧客數） */
+  actualCount?: number | null
 }
 
 export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: boolean }) {
@@ -314,6 +294,9 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
         qualified: lp.qualified ?? true,
         conditionDesc: lp.conditionDesc ?? null,
         actualDesc: lp.actualDesc ?? null,
+        qualificationScope: lp.qualificationScope ?? null,
+        categoryName: lp.categoryName ?? null,
+        actualCount: lp.actualCount ?? null,
       }))
       setLabelPricings(pricings)
       setSellableDays(inventory.presaleDays ?? MAX_BUY_DAYS)
@@ -1097,8 +1080,9 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
                         const sc = keyToScenario(l)
                         const cfg = labelConfig[lt as LabelValue]
                         if (!cfg) return null
-                        // 使用算法庫配置的標籤文案規則
-                        const displayText = getTagDisplayText(lt, sc, storeRegionName, t)
+                        // 使用算法庫配置的標籤文案規則（品類/真實人數由後端隨庫存接口返回）
+                        const pricing = labelPricings.find(lp => lp.labelType === lt && (lp.scenario ?? null) === sc)
+                        const displayText = getTagDisplayText(lt, sc, storeRegionName, pricing)
                         return (
                           <span key={l} style={{
                             fontSize: 9, color: cfg.color, background: cfg.bg,

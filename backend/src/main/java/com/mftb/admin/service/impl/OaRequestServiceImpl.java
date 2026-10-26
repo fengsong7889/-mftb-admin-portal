@@ -516,7 +516,17 @@ public class OaRequestServiceImpl implements OaRequestService {
         OaApprovalTask first = tasks.get(0);
         first.setRequestId(oaRequest.getId());
         oaApprovalTaskMapper.insert(first);
-    
+
+        /*
+         * 第一节点没解析出审批人时流程会「静默僵死」：任务已 pending，但任何非超管都过不了
+         * requireNodeApprover，审批人在「待我审批」也永远看不到它。这里必须留下可定位的
+         * error 日志（含流程号/节点名/流程类型），否则线上只能看到「没人能批」的结果。
+         */
+        if (!StringUtils.hasText(first.getApprover())) {
+            log.error("OA流程第一節點未解析到審批人，流程將無人可批：flowNo={}, processCode={}, node={}",
+                    oaRequest.getFlowNo(), oaRequest.getProcessCode(), first.getNodeName());
+        }
+
         // 设置当前待审节点名称
         oaRequestMapper.update(null,
                 new LambdaUpdateWrapper<OaRequest>()
@@ -566,6 +576,10 @@ public class OaRequestServiceImpl implements OaRequestService {
         OaApprovalTask next = allNodes.get(nextSortOrder - 1);
         next.setRequestId(request.getId());
         next.setSortOrder(nextSortOrder);
+        if (!StringUtils.hasText(next.getApprover())) {
+            log.error("OA流程節點未解析到審批人，流程將無人可批：flowNo={}, processCode={}, node={}, sortOrder={}",
+                    request.getFlowNo(), request.getProcessCode(), next.getNodeName(), nextSortOrder);
+        }
         oaApprovalTaskMapper.insert(next);
         return next;
     }
@@ -732,14 +746,21 @@ public class OaRequestServiceImpl implements OaRequestService {
             oaApprovalTaskMapper.updateById(currentTask);
         }
 
-        // AI 申请审批：更新 formData 并处理审批即授权
+        /*
+         * AI 申请审批：把审批人配置的授权范围合并进 form_data（终审回调据此发放）。
+         * 只合并 approvedModels / approvedQuota* 等授权键：申请内容（申请理由、申请模型清单、
+         * 使用说明、凭证…）必须原样保留，审批接口不能成为改写申请事实的入口。
+         */
         if ("ai_access".equals(request.getProcessCode()) && formData != null) {
-            oaRequestMapper.update(null,
-                    new LambdaUpdateWrapper<OaRequest>()
-                            .eq(OaRequest::getId, request.getId())
-                            .set(OaRequest::getFormData, formData));
-            // TODO: 处理审批即授权逻辑（下发放型权限和额度）
-            log.info("AI 申请审批数据已更新：flowNo={}", flowNo);
+            String mergedFormData = aiGrantOnApprovalService.mergeGrantFormData(request, formData);
+            if (mergedFormData != null) {
+                oaRequestMapper.update(null,
+                        new LambdaUpdateWrapper<OaRequest>()
+                                .eq(OaRequest::getId, request.getId())
+                                .set(OaRequest::getFormData, mergedFormData));
+                request.setFormData(mergedFormData);
+            }
+            log.info("AI 申请审批授权配置已合并：flowNo={}", flowNo);
         }
 
         /*

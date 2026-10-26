@@ -506,6 +506,70 @@ class RdmDeliveryGuardTest {
     }
 
     @Test
+    @DisplayName("開始任務：不帶進度時只改狀態，不把進度寫滿")
+    void startKeepsProgressUntouched() {
+        RdmWorkTask t = task();
+        t.setStatus("todo");
+        t.setProgress(0);
+        when(taskMapper.selectById(any())).thenReturn(t);
+        when(taskMapper.update(any(), any())).thenReturn(1);
+        when(workLogMapper.selectList(any())).thenReturn(List.of());
+
+        RdmDeliveryDTO.TaskProgress dto = new RdmDeliveryDTO.TaskProgress();
+        dto.setAction("start");
+        service.updateTaskProgress(5L, dto);
+
+        assertEquals("doing", t.getStatus());
+        assertEquals(0, t.getProgress(), "「開始」不得替人填進度");
+        assertNotNull(t.getActualStartTime(), "開始必須留下實際開始時間");
+    }
+
+    /**
+     * 回歸場景：前端把上報面板裡殘留的 100 一起帶給「開始」，任務就被寫成
+     * 「進行中 + 100%」——100% 屬於完成態，任務永遠推不到完成，又因為未完成而一直算逾期。
+     * 這類矛盾數據必須從寫入側拦住，不能靠界面兜。
+     */
+    @Test
+    @DisplayName("開始任務：帶 100% 的進度一律拒絕，且不落庫")
+    void startRejectsHundredProgress() {
+        RdmWorkTask t = task();
+        t.setStatus("todo");
+        t.setProgress(0);
+        when(taskMapper.selectById(any())).thenReturn(t);
+
+        RdmDeliveryDTO.TaskProgress dto = new RdmDeliveryDTO.TaskProgress();
+        dto.setAction("start");
+        dto.setProgress(100);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.updateTaskProgress(5L, dto));
+        assertTrue(ex.getMessage().contains("100%"), ex.getMessage());
+        verify(taskMapper, org.mockito.Mockito.never()).update(any(), any());
+    }
+
+    @Test
+    @DisplayName("開始任務：兼容舊客戶端帶 1~99 進度，但只往前推")
+    void startAcceptsProgressWithoutRollingBack() {
+        RdmWorkTask t = task();
+        t.setStatus("todo");
+        t.setProgress(60);
+        when(taskMapper.selectById(any())).thenReturn(t);
+        when(taskMapper.update(any(), any())).thenReturn(1);
+        when(workLogMapper.selectList(any())).thenReturn(List.of());
+
+        RdmDeliveryDTO.TaskProgress lower = new RdmDeliveryDTO.TaskProgress();
+        lower.setAction("start");
+        lower.setProgress(20);
+        service.updateTaskProgress(5L, lower);
+        assertEquals(60, t.getProgress(), "「開始」不得把已報進度改小");
+
+        RdmDeliveryDTO.TaskProgress higher = new RdmDeliveryDTO.TaskProgress();
+        higher.setAction("start");
+        higher.setProgress(80);
+        service.updateTaskProgress(5L, higher);
+        assertEquals(80, t.getProgress());
+    }
+
+    @Test
     @DisplayName("甘特图拖进度：PRD 任务封顶 99%，100% 必须走提交评审")
     void prdProgressCannotReachHundred() {
         RdmWorkTask prd = task();

@@ -69,6 +69,30 @@ class AgentChatRequestTest {
                 "messages", List.of(Map.of("role", "user", "content", "hi")), "max_tokens", 512)));
     }
 
+    /**
+     * 前端传的是 token 数（档位 64K~2M），不是档位序号。
+     * 上限曾写成 200，导致生产每次问答都落 invalid_agent_request（2026-10 事故）。
+     */
+    @Test
+    void acceptsFrontendContextWindowTokenTiers() throws Exception {
+        for (int tokens : List.of(64_000, 128_000, 200_000, 400_000, 800_000, 1_000_000, 2_000_000, 10_000_000)) {
+            AgentChatRequest req = mapper.readValue(
+                    "{\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"contextWindow\":" + tokens + "}",
+                    AgentChatRequest.class);
+            assertDoesNotThrow(() -> req.toCommand(), "contextWindow=" + tokens);
+        }
+    }
+
+    @Test
+    void rejectsNonPositiveOrAbsurdContextWindow() throws Exception {
+        for (int bad : List.of(0, -1, 10_000_001)) {
+            AgentChatRequest req = mapper.readValue(
+                    "{\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"contextWindow\":" + bad + "}",
+                    AgentChatRequest.class);
+            assertThrows(BusinessException.class, () -> req.toCommand(), "contextWindow=" + bad);
+        }
+    }
+
     @Test
     void internalControlFieldCannotBeInjectedByJson() throws Exception {
         AgentChatRequest clean = mapper.readValue(

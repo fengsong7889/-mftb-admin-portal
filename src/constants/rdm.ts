@@ -1018,6 +1018,8 @@ export const RDM_TASK_STATUS_COLOR: Record<RdmTaskStatus, string> = {
 /** 任务进度动作 */
 export const RDM_TASK_ACTION = {
   START: 'start',
+  /** 按实际填写进度上报（不含 100%：100% 属于完成态，必须走 DONE） */
+  PROGRESS: 'progress',
   DONE: 'done',
   BLOCK: 'block',
   UNBLOCK: 'unblock',
@@ -1026,6 +1028,7 @@ export type RdmTaskAction = (typeof RDM_TASK_ACTION)[keyof typeof RDM_TASK_ACTIO
 
 export const RDM_TASK_ACTION_LABEL: Record<RdmTaskAction, string> = {
   [RDM_TASK_ACTION.START]: '開始任務',
+  [RDM_TASK_ACTION.PROGRESS]: '上報進度',
   [RDM_TASK_ACTION.DONE]: '完成任務',
   [RDM_TASK_ACTION.BLOCK]: '標記阻塞',
   [RDM_TASK_ACTION.UNBLOCK]: '解除阻塞',

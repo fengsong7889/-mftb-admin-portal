@@ -3,6 +3,7 @@ package com.mftb.admin.service.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mftb.admin.entity.AiEmployeeAuth;
 import com.mftb.admin.entity.AiGrantLog;
+import com.mftb.admin.entity.AiQuotaOverride;
 import com.mftb.admin.entity.OaRequest;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.AiEmployeeAuthMapper;
@@ -87,6 +88,130 @@ class AiGrantOnApprovalServiceTest {
         verify(grantLogMapper).insert(cap.capture());
         assertEquals("FAILED", cap.getValue().getStatus());
         assertNotNull(cap.getValue().getErrorMessage());
+    }
+
+    /**
+     * 真实单据的 applicant 是「姓名(工号)」签名（OperatorResolver.operatorSignature），
+     * 不能拿整串等值匹配 username/name —— 旧实现因此终审必抛「无法解析申请人」→ 「系統繁忙」。
+     */
+    @Test
+    void grantResolvesApplicantFromSignature() {
+        AiGrantOnApprovalServiceImpl service = newService();
+        when(grantLogMapper.selectOne(any())).thenReturn(null);
+        SysUser applicant = new SysUser();
+        applicant.setId(7L);
+        applicant.setUsername("MF00002");
+        applicant.setName("冯松");
+        applicant.setEmpId("MF00002");
+        when(sysUserMapper.selectOne(any())).thenReturn(applicant);
+        when(employeeAuthMapper.selectOne(any())).thenReturn(null);
+
+        OaRequest req = buildRequest();
+        req.setApplicant("冯松(MF00002)");
+        service.grant(req, "boss");
+
+        verify(employeeAuthMapper, times(2)).insert(any(AiEmployeeAuth.class));
+        assertEquals("MF00002", AiGrantOnApprovalServiceImpl.extractEmpId("冯松(MF00002)"));
+        assertEquals("冯松", AiGrantOnApprovalServiceImpl.stripSignature("冯松（MF00002）"));
+    }
+
+    /** 审批人勾选的 approvedModels 必须优先于申请人 requestedModels，否则审批裁定被忽略。 */
+    @Test
+    void grantPrefersApprovedModelsOverRequested() {
+        AiGrantOnApprovalServiceImpl service = newService();
+        when(grantLogMapper.selectOne(any())).thenReturn(null);
+        when(sysUserMapper.selectOne(any())).thenReturn(applier());
+        when(employeeAuthMapper.selectOne(any())).thenReturn(null);
+
+        OaRequest req = buildRequest();
+        req.setApplicant("alice");
+        req.setFormData("{\"requestedModels\":[11,22],\"approvedModels\":[33]}");
+        service.grant(req, "boss");
+
+        ArgumentCaptor<AiEmployeeAuth> cap = ArgumentCaptor.forClass(AiEmployeeAuth.class);
+        verify(employeeAuthMapper, times(1)).insert(cap.capture());
+        assertEquals(33L, cap.getValue().getModelId());
+    }
+
+    /** 当前前端发的是扁平额度字段，必须能落 ai_quota_override，且 requests 归一为 request。 */
+    @Test
+    void grantWritesFlatQuotaFieldsWithNormalizedType() {
+        AiGrantOnApprovalServiceImpl service = newService();
+        when(grantLogMapper.selectOne(any())).thenReturn(null);
+        when(sysUserMapper.selectOne(any())).thenReturn(applier());
+        when(employeeAuthMapper.selectOne(any())).thenReturn(null);
+
+        OaRequest req = buildRequest();
+        req.setApplicant("alice");
+        req.setFormData("{\"requestedModels\":[11],\"approvedQuotaType\":\"requests\","
+                + "\"approvedQuotaValue\":100,\"approvedQuotaPeriod\":\"monthly\","
+                + "\"quotaEffectiveType\":\"temporary\",\"quotaExpireAt\":\"2026-12-31\","
+                + "\"approvedOverLimitAction\":\"reject\"}");
+        service.grant(req, "boss");
+
+        ArgumentCaptor<AiQuotaOverride> cap = ArgumentCaptor.forClass(AiQuotaOverride.class);
+        verify(quotaOverrideMapper).insert(cap.capture());
+        AiQuotaOverride saved = cap.getValue();
+        assertEquals("request", saved.getQuotaType());
+        assertEquals("monthly", saved.getQuotaPeriod());
+        assertEquals("temporary", saved.getEffectiveType());
+        assertNotNull(saved.getExpireAt());
+        assertEquals(0, saved.getQuotaValue().compareTo(new java.math.BigDecimal("100")));
+    }
+
+    /** 历史 FAILED 记录必须复用同一行更新为 GRANTED，不能撞 uk_grant_flow 把审批再堵死。 */
+    @Test
+    void grantReusesFailedLogRowInsteadOfInsertingAgain() {
+        AiGrantOnApprovalServiceImpl service = newService();
+        AiGrantLog failed = new AiGrantLog();
+        failed.setId(555L);
+        failed.setFlowNo("AI202609230000001");
+        failed.setStatus("FAILED");
+        when(grantLogMapper.selectOne(any())).thenReturn(failed);
+        when(sysUserMapper.selectOne(any())).thenReturn(applier());
+        when(employeeAuthMapper.selectOne(any())).thenReturn(null);
+
+        service.grant(buildRequest(), "boss");
+
+        verify(grantLogMapper, never()).insert(any(AiGrantLog.class));
+        ArgumentCaptor<AiGrantLog> cap = ArgumentCaptor.forClass(AiGrantLog.class);
+        verify(grantLogMapper).updateById(cap.capture());
+        assertEquals("GRANTED", cap.getValue().getStatus());
+    }
+
+    /** 审批接口只能合并授权键：申请事实（applyReason/requestedModels）不得被改写。 */
+    @Test
+    void mergeGrantFormDataKeepsApplicationFacts() throws Exception {
+        AiGrantOnApprovalServiceImpl service = newService();
+        OaRequest req = buildRequest();
+        req.setFormData("{\"applyReason\":\"原申請理由\",\"requestedModels\":[11,22]}");
+
+        String merged = service.mergeGrantFormData(req,
+                "{\"approvedModels\":[33],\"applyReason\":\"被篡改\",\"approvedQuotaValue\":50}");
+
+        assertNotNull(merged);
+        var node = objectMapper.readTree(merged);
+        assertEquals("原申請理由", node.get("applyReason").asText());
+        assertEquals(2, node.get("requestedModels").size());
+        assertEquals(33, node.get("approvedModels").get(0).asInt());
+        assertEquals(50, node.get("approvedQuotaValue").asInt());
+    }
+
+    /** 只带非白名单键时不得动 form_data */
+    @Test
+    void mergeGrantFormDataReturnsNullWhenNoGrantKey() {
+        AiGrantOnApprovalServiceImpl service = newService();
+        OaRequest req = buildRequest();
+        req.setFormData("{\"applyReason\":\"原申請理由\"}");
+        assertNull(service.mergeGrantFormData(req, "{\"applyReason\":\"被篡改\"}"));
+    }
+
+    private SysUser applier() {
+        SysUser applicant = new SysUser();
+        applicant.setId(7L);
+        applicant.setUsername("alice");
+        applicant.setName("alice");
+        return applicant;
     }
 
     private AiGrantOnApprovalServiceImpl newService() {

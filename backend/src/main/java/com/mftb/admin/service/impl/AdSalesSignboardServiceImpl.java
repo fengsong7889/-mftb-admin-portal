@@ -2,6 +2,7 @@ package com.mftb.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.constant.StoreCategory;
 import com.mftb.admin.dto.AdOrderVO;
 import com.mftb.admin.dto.AdPricingSignboardVO;
 import com.mftb.admin.dto.AdSignboardInventoryVO;
@@ -104,6 +105,9 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
             lp.setDiscountTiers(label.getDiscountTiers());
             // 填充资格条件信息（按当前门店数据实时评估）
             fillQualificationInfo(lp, algoConditions, evalCtx);
+            // 文案数据：门店品类名（「{品類}」）+ 统计类标签实际人数
+            lp.setCategoryName(StoreCategory.labelOf(evalCtx.store != null ? evalCtx.store.getCategory() : null));
+            lp.setActualCount(actualCountOf(evalCtx.current, label.getLabelType()));
             vo.getLabels().add(lp);
         }
 
@@ -374,6 +378,8 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
     /** 场景资格条件（从算法配置解析） */
     private static class ScenarioCondition {
         String conditionDesc;
+        /** 对比范围（allMerchants/…CategoryMerchants）；含 Category 时标签文案需带品类 */
+        String qualificationScope;
         final List<Condition> conditions = new ArrayList<>();
     }
 
@@ -386,6 +392,8 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
 
     /** 评估上下文: 当前门店数据 + 按品牌/频道过滤后的对比组 */
     private static class EvalContext {
+        /** 当前门店（用于取品类等展示字段，缺失时 null） */
+        BizStore store;
         BizStoreDataConfig current;
         final List<BizStoreDataConfig> allMacauGroup = new ArrayList<>();
         final List<BizStoreDataConfig> districtGroup = new ArrayList<>();
@@ -431,6 +439,10 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
                             c.value = parseDouble(cMap.get("qualificationValue"));
                             c.nextOperator = "or".equals(String.valueOf(cMap.get("nextOperator"))) ? "or" : "and";
                             sc.conditions.add(c);
+                            // 同一场景内范围一致，取首条即可
+                            if (!StringUtils.hasText(sc.qualificationScope) && cMap.get("qualificationScope") != null) {
+                                sc.qualificationScope = String.valueOf(cMap.get("qualificationScope"));
+                            }
                         }
                     }
                     labelConditions.put(scenarioKey, sc);
@@ -469,6 +481,7 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
             ctx.storeMissing = true;
             return ctx;
         }
+        ctx.store = store;
         if (store.getRegion() == null) {
             ctx.regionMissing = true;
         }
@@ -731,8 +744,21 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
             return;
         }
         lp.setConditionDesc(sc.conditionDesc.isEmpty() ? null : sc.conditionDesc);
+        lp.setQualificationScope(sc.qualificationScope);
         QualificationResult r = evaluate(scenarioKey, sc, ctx);
         lp.setQualified(r.qualified);
         lp.setActualDesc(r.actualDesc);
+    }
+
+    /** 统计类标签展示用实际人数：收藏取门店收藏数、顾客数取近周期顾客数；其它标签无人数 */
+    private static Integer actualCountOf(BizStoreDataConfig config, String labelType) {
+        if (config == null) {
+            return null;
+        }
+        return switch (labelType) {
+            case "favorites" -> config.getStoreFavorites();
+            case "customers" -> config.getMonthlyCustomers();
+            default -> null;
+        };
     }
 }

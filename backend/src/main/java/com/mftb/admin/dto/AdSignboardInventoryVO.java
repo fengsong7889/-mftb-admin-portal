@@ -50,6 +50,12 @@ public class AdSignboardInventoryVO {
         private String conditionDesc;
         /** 本门店实际情况（排名/数值，用于前端弹窗展示） */
         private String actualDesc;
+        /** 资格条件对比范围（allMerchants/…CategoryMerchants）；含 Category 时文案需带品类 */
+        private String qualificationScope;
+        /** 门店品类名（如 火鍋）；门店未配置品类时为 null，文案降级为不带品类 */
+        private String categoryName;
+        /** 统计类标签展示用实际人数（favorites=门店收藏数；customers=顾客数；缺失时为 null） */
+        private Integer actualCount;
     }
 
     /** 单个格子（标签 x 场景 x 日期） */

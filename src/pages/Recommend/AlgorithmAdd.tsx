@@ -16,6 +16,7 @@ import { TRAFFIC_DEFAULTS } from './TrafficAlgorithmConfig/config'
 import PopularLayoutPreviewModal from '../../components/PopularLayoutPreviewModal'
 import DetailPageHeader from '../../components/DetailPageHeader'
 import HelpPopover from '../../components/HelpPopover'
+import { formatSignboardPeopleCount } from './signboardLabels'
 import './WeightSlider.css'
 
 /** 广告类型标签映射 - 使用 i18n key */
@@ -295,17 +296,6 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
       return { ...prev, [activeSignboardTab]: list.filter(c => c.id !== condId) }
     })
   }
-  /** 收藏／顧客人數格式化（1-9直接顯示，10-99取起始整十，100+用中文大數）；兩類統計標籤共用同一口徑 */
-  const formatPeopleCount = (n: number): string => {
-    if (n < 10) return `${n}`
-    if (n < 100) return `${Math.floor(n / 10) * 10}`
-    if (n < 1000) return '百'
-    if (n < 10000) return '千'
-    if (n < 100000) return '萬'
-    if (n < 1000000) return '十萬'
-    if (n < 10000000) return '百萬'
-    return '千萬'
-  }
   /** 範圍 → 地區（解析後，用於預覽文案） */
   const getRegion = (scope: string): string =>
     scope === 'districtMerchants' || scope === 'districtCategoryMerchants' ? '高仕德' : '全澳'
@@ -344,12 +334,12 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
     const suffix = hasShopSuffix(labelType) ? '店鋪' : ''
     // 收藏：{人數}人收藏好店
     if (labelType === 'favorites') {
-      if (cond.metric === 'storeFavorites' && cond.value) return `${formatPeopleCount(cond.value)}人收藏好店`
+      if (cond.metric === 'storeFavorites' && cond.value) return `${formatSignboardPeopleCount(cond.value)}人收藏好店`
       return `${labelText}好店`
     }
     // 顧客數：近期{人數}人下單（人數格式化與收藏一致：10→10、100→百、1000→千）
     if (labelType === 'customers') {
-      if (cond.metric === 'monthlyCustomers' && cond.value) return `近期${formatPeopleCount(cond.value)}人下單`
+      if (cond.metric === 'monthlyCustomers' && cond.value) return `近期${formatSignboardPeopleCount(cond.value)}人下單`
       return `近期${labelText}`
     }
     // 銷量：全澳/商圈+{品類}+銷量+{排名/百分比}

@@ -1,5 +1,6 @@
 package com.mftb.admin.config;
 
+import com.mftb.admin.config.migration.MigrationLock;
 import com.mftb.admin.dto.StoreDataConfigDTO;
 import com.mftb.admin.service.StoreDataConfigService;
 import com.mftb.admin.util.BizSeqService;
@@ -27,6 +28,7 @@ public class BizDataInitializer implements CommandLineRunner {
 
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
+    private final MigrationLock migrationLock;
     private final BizSeqService bizSeqService;
 
     /** 建表版本: 新增建表步骤时递增 minor 版本号 (格式: v{major}.{minor}) */
@@ -37,6 +39,8 @@ public class BizDataInitializer implements CommandLineRunner {
     private static final String V_SEED = "biz:seed-v3";
     /** AI 申请数据修复版本：修复 flow_no / current_node_name / current_approver */
     private static final String V_FIX_AI = "biz:fix-ai-access-v6";
+    /** 门店品类列（金字招牌「{品類}」文案数据源） */
+    private static final String V_STORE_CATEGORY = "biz:store-category-v1.0";
 
     @Override
     public void run(String... args) {
@@ -55,6 +59,10 @@ public class BizDataInitializer implements CommandLineRunner {
             createOaRequestTableIfAbsent();
             createOaApprovalTaskTableIfAbsent();
         });
+        // 门店品类列：结构类迁移，需持迁移锁 + 后置校验，未就绪则不记版本、下次启动重试
+        String schema = jdbcTemplate.queryForObject("SELECT DATABASE()", String.class);
+        migrationLock.runExclusive("mftb:schema:" + schema, 120, () ->
+                versionTracker.applyOnce(V_STORE_CATEGORY, this::addStoreCategoryColumn, this::verifyStoreCategoryColumn));
         versionTracker.applyOnce(V_LEGACY, () -> {
             migrateLegacyGroupCodes();
             migrateLegacyStoreCodes();
@@ -251,6 +259,7 @@ public class BizDataInitializer implements CommandLineRunner {
                         + "biz_channel VARCHAR(128) NULL COMMENT '业务频道（可多选逗号分隔）', "
                         + "login_account VARCHAR(64) NULL COMMENT '登录主账号', "
                         + "region INT NULL COMMENT '所在区域/商圈', "
+                        + "category VARCHAR(32) NULL COMMENT '门店品类编码（字典见 StoreCategory，如 hotpot=火鍋）', "
                         + "address VARCHAR(256) NULL COMMENT '门店地址', "
                         + "updated_by VARCHAR(64) NULL COMMENT '最后更新人', "
                         + "deleted TINYINT DEFAULT 0 COMMENT '逻辑删除', "
@@ -838,6 +847,23 @@ public class BizDataInitializer implements CommandLineRunner {
                 BizSeqService.RULE_AI_ACCESS_REQUEST);
         if (inserted > 0 || aiInserted > 0) {
             log.info("已写入OA/AI流程编号规则");
+        }
+    }
+
+    /** 存量库兼容：biz_store 补品类列（新库已包含在 CREATE TABLE 中）；失败直接抛出，不吞异常 */
+    private void addStoreCategoryColumn() {
+        if (columnExists("biz_store", "category")) {
+            return;
+        }
+        jdbcTemplate.execute("ALTER TABLE biz_store ADD COLUMN category VARCHAR(32) NULL"
+                + " COMMENT '门店品类编码（字典见 StoreCategory，如 hotpot=火鍋）' AFTER region");
+        log.info("已为 biz_store 添加 category 列");
+    }
+
+    /** 后置校验：列确实就绪才允许记录迁移版本 */
+    private void verifyStoreCategoryColumn() {
+        if (!columnExists("biz_store", "category")) {
+            throw new IllegalStateException("biz_store.category 列未就绪");
         }
     }
 

@@ -6,6 +6,7 @@ import { createStore, updateStore } from '../../api/store'
 import type { MerchantGroupItem } from '../../api/merchantGroup'
 import { fetchAllMerchantGroups } from '../../api/merchantGroup'
 import { BIZ_CHANNEL_OPTIONS } from '../../constants/bizChannel'
+import { STORE_CATEGORY_OPTIONS } from '../../constants/storeCategory'
 import { REGION_TREE_DATA } from '../Recommend/constants'
 
 /** 所在区域树：在组件内翻译 titleKey */
@@ -62,6 +63,7 @@ export default function StoreEditModal({
           storeName: editingRecord.storeName,
           loginAccount: editingRecord.loginAccount,
           region: editingRecord.region ?? undefined,
+          category: editingRecord.category ?? undefined,
           address: editingRecord.address ?? undefined,
         })
         // 品牌改為多選（Checkbox），值為逗號分隔字符串
@@ -156,6 +158,16 @@ export default function StoreEditModal({
             treeNodeFilterProp="title"
             treeDefaultExpandAll
             treeData={STORE_REGION_TREE}
+          />
+        </Form.Item>
+        {/* 門店品類：金字招牌「{品類}」標籤文案取此值（如 hotpot → 全澳火鍋熱門店鋪），不選則文案不帶品類 */}
+        <Form.Item name="category" label={t('categoryLabel')} extra={t('categoryHint')}>
+          <Select
+            placeholder={t('categoryPlaceholder')}
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            options={STORE_CATEGORY_OPTIONS}
           />
         </Form.Item>
         <Form.Item

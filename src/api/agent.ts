@@ -1,4 +1,4 @@
-import request, { TOKEN_KEY } from './request'
+import request, { TOKEN_KEY, resolveApiBaseUrl } from './request'
 import { confirmExternalCall } from '../components/McpExternalConfirm'
 
 /**
@@ -213,7 +213,7 @@ async function callOrchestrate(
   opts: LlmRequestOptions | undefined,
   mode: LlmEngineMode,
 ): Promise<OrchestrateResponse> {
-  const res = await fetch(`${window.location.origin}/api/agent/orchestrate`, {
+  const res = await fetch(`${resolveApiBaseUrl()}/agent/orchestrate`, {
     method: 'POST',
     headers: buildOrchestrateHeaders(),
     body: JSON.stringify({
@@ -376,7 +376,7 @@ export async function fetchEngineStatus(): Promise<LlmEngineStatus | null> {
 
 export async function probeEngineStatus(mode: LlmEngineMode): Promise<LlmEngineStatus | null> {
   try {
-    const res = await fetch(`${window.location.origin}/api/agent/status`, {
+    const res = await fetch(`${resolveApiBaseUrl()}/agent/status`, {
       headers: { 'x-llm-mode': mode, ...authHeader() },
     })
     if (!res.ok) return null

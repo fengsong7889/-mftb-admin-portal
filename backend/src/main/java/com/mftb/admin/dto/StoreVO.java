@@ -1,5 +1,6 @@
 package com.mftb.admin.dto;
 
+import com.mftb.admin.constant.StoreCategory;
 import com.mftb.admin.entity.BizStore;
 import lombok.Data;
 
@@ -23,6 +24,10 @@ public class StoreVO {
     private String loginAccount;
     /** 所在区域/商圈: 1=黑沙环区 … 11=黑沙滩区 */
     private Integer region;
+    /** 门店品类编码（字典见 StoreCategory） */
+    private String category;
+    /** 门店品类名称（如 火鍋；未配置品类时为 null） */
+    private String categoryName;
     /** 门店地址 */
     private String address;
     /** 已绑定的BD列表（一家门店可绑定多个） */
@@ -43,6 +48,8 @@ public class StoreVO {
         vo.setBizChannel(store.getBizChannel());
         vo.setLoginAccount(store.getLoginAccount());
         vo.setRegion(store.getRegion());
+        vo.setCategory(store.getCategory());
+        vo.setCategoryName(StoreCategory.labelOf(store.getCategory()));
         vo.setAddress(store.getAddress());
         vo.setUpdatedBy(store.getUpdatedBy());
         vo.setCreatedAt(store.getCreatedAt());

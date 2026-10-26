@@ -797,8 +797,21 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
             case "start" -> {
                 task.setStatus(TASK_DOING);
                 task.setActualStartTime(task.getActualStartTime() == null ? now : task.getActualStartTime());
+                /*
+                 * 「開始」只表达开工（状态 + 实际开始时间），不承担进度回写：进度只能按实际上报。
+                 * 之前这里无条件写入 dto.progress，前端把上报面板里残留的 100 一起带上来，
+                 * 于是出现「進行中 + 100%」的矛盾任务——100% 属于完成态，任务永远推不到完成，
+                 * 列表还会因为「未完成且已过计划完成日」一直标逾期。
+                 * 兼容旧客户端：仍接受 1~99 的进度，但只往前推（不得借「開始」把已报进度改小），
+                 * 100 一律拒绝并指向正确的入口。
+                 */
                 if (dto.getProgress() != null) {
-                    task.setProgress(dto.getProgress());
+                    if (dto.getProgress() >= 100) {
+                        throw new BusinessException("開始任務不會把進度寫成 100%，請用「上報進度」填寫實際進度，或改用「完成任務」");
+                    }
+                    if (dto.getProgress() > oldProgress) {
+                        task.setProgress(dto.getProgress());
+                    }
                 }
             }
             case "progress" -> {

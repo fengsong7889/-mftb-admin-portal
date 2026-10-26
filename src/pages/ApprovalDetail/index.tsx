@@ -753,8 +753,12 @@ export default function ApprovalDetail() {
   }, [type])
 
   const handleApprove = () => {
-    // 前端流程（贈送、AI 申請）需校驗當前人是否具備當前節點角色權限
-    if (type === 'gift' || type === 'ai_access') {
+    /*
+     * 贈送仍是本地流程，需按節點角色校驗；AI 申請已統一走 OA 引擎，
+     * 審批人是否為當前節點由後端 requireNodeApprover 判定（本地 localStorage 的角色編碼
+     * 與流程配置並不同源，再校驗一次只會把真正被指派的審批人擋在門外）。
+     */
+    if (type === 'gift') {
       const localRecord = getApprovalRecordByFlowNo(flowNo)
       if (localRecord) {
         const check = hasNodeApprovalRole(localRecord)
@@ -806,29 +810,17 @@ export default function ApprovalDetail() {
         setSubmitting(true)
         try {
           /**
-           * AI 申請（審批即授權）：
-           * - 最終節點（本地第二節點，或跨設備無本地記錄時後端為唯一權威）：調後端 approve API，
-           *   單事務寫入審批結果 + 下發模型權限（ai_employee_auth）+ 個人額度（ai_quota_override）；
-           * - 第一節點（業務主管）：將審批操作區配置保存為 draftGrant，供第二節點繼續調整。
-           * 後端調用失敗時中止（保持 pending 可重試），不推進本地，避免兩端狀態不一致。
+           * AI 申請（審批即授權）統一走後端 OA 引擎：
+           * - 每個節點都調 approve API，後端才是流程狀態的唯一真相源；
+           * - 審批人配置的授權範圍（approvedModels/approvedQuota*）由後端合併進 form_data，
+           *   終審時在同一事務內下發模型權限（ai_employee_auth）與個人額度（ai_quota_override）；
+           * - 不再用本地 localStorage 判定「是否最終節點」，那會讓第一節點審批不寫後端，
+           *   造成前端顯示已通過、後端仍停在原節點的兩套狀態；
+           * - 後端失敗時中止（保持 pending 可重試），不推進本地。
            */
-          if (type === 'ai_access' && grantDraft) {
-            const localRecord = getApprovalRecordByFlowNo(flowNo)
-            const isFinalNode = !localRecord
-              || (localRecord.bizApproveStatus === 'approved' && localRecord.opsApproveStatus === 'pending')
-            if (isFinalNode) {
-              const payload = JSON.stringify(buildApprovePayload(grantDraft, approvalComment))
-              await approveOaRequest(flowNo, approvalComment, payload)
-              message.success(t('approvalDetail.aiGrantDone'))
-            } else if (localRecord) {
-              updateApprovalRecord(flowNo, {
-                extra: { ...(localRecord.extra || {}), draftGrant: grantDraft },
-              })
-            }
-          }
-          // 三級逐級推進（業務→運營→財務），財務節點通過同時寫入批次/明細/欠款單；前端流程（贈送/AI 申請）直接本地審批；OA 採購走 OA 審批 API
-          const isFrontendFlow = type === 'gift' || type === 'ai_access'
-          const oaApproved = isOaEngineType(type)
+          const aiGrantPayload = type === 'ai_access' && grantDraft
+            ? JSON.stringify(buildApprovePayload(grantDraft, approvalComment))
+            : undefined
           /*
            * 系統權限申請：把审批人选定的授权角色随审批一并提交（复用 AI 申请的 formData 通道）。
            * 后端只取 approvedGrant 合并进 form_data，申请内容不会被审批接口改写；
@@ -843,14 +835,17 @@ export default function ApprovalDetail() {
                 },
               })
             : undefined
-          const result = oaApproved
-            ? ((await approveOaRequest(flowNo, approvalComment, saFormData)), null)
-            : isFrontendFlow
+          const isOaFlow = isOaEngineType(type) || type === 'ai_access'
+          const result = isOaFlow
+            ? await approveOaRequest(flowNo, approvalComment, type === 'ai_access' ? aiGrantPayload : saFormData)
+            : type === 'gift'
               ? approveCurrentNode(flowNo)
               : await approveFinApproval(flowNo)
-          if (oaApproved) {
-            // OA 引擎类接口无节点信息可回，不补提示就只剩页面跳转，用户不知道到底批成没有
-            message.success(t('approvalCenter.approveSuccess'))
+          // AI 申請：同步本地展示記錄（列表/看板仍以本地記錄補位時不至於停在 pending）
+          if (type === 'ai_access') {
+            updateApprovalRecord(flowNo, result?.finished
+              ? { flowStatus: 'approved' }
+              : { flowStatus: 'pending' })
           }
           if (result) {
             message.success(result.finished
@@ -858,9 +853,8 @@ export default function ApprovalDetail() {
                   nodeName: result.nodeName,
                   writtenDesc: type === 'gift' ? t('approvalDetail.giftWritten') : t('approvalDetail.dataWritten'),
                 })
-              : t('approvalDetail.approveNext', { nodeName: result.nodeName, nextNode: result.nextNode }))
+              : t('approvalDetail.approveNext', { nodeName: result.nodeName, nextNode: result.nextNode ?? '' }))
           }
-          const isOaFlow = isOaEngineType(type) || type === 'ai_access'
           navigate(isOaFlow ? '/oa-requests' : '/approval-center')
         } catch (err) {
           // 無審批權限（403）或審批即授權事務失敗等業務校驗失敗，展示後端給出的具體原因
@@ -880,8 +874,8 @@ export default function ApprovalDetail() {
     if (!rejectReason.trim()) {
       return
     }
-    // 前端流程（贈送、AI 申請）需校驗當前人是否具備當前節點角色權限
-    if (type === 'gift' || type === 'ai_access') {
+    // 贈送仍按本地節點角色校驗；AI 申請的節點身份由後端駁回接口判定
+    if (type === 'gift') {
       const localRecord = getApprovalRecordByFlowNo(flowNo)
       if (localRecord) {
         const check = hasNodeApprovalRole(localRecord)
@@ -894,20 +888,21 @@ export default function ApprovalDetail() {
     setSubmitting(true)
     try {
       /**
-       * AI 申請駁回：同步寫後端（審批人可跨設備操作），失敗時中止保持 pending 可重試；
-       * 駁回當前節點，流程結束（合併駁回時解凍雙方賬戶）；前端流程直接本地駁回；OA 採購走 OA 駁回 API
+       * AI 申請與其它 OA 引擎流程一樣：駁回只寫後端（審批人可跨設備操作），
+       * 失敗時中止保持 pending 可重試。本地記錄只做狀態同步，不再單獨推進節點。
        */
-      if (type === 'ai_access' && data.aiRequestId) {
-        await rejectOaRequest(flowNo, rejectReason)
-      } else if (isOaEngineType(type)) {
+      if (isOaEngineType(type) || type === 'ai_access') {
         await rejectOaRequest(flowNo, rejectReason)
       }
-      const isFrontendFlow = type === 'gift' || type === 'ai_access'
+      const isFrontendFlow = type === 'gift'
       const rejectedNode = isFrontendFlow
         ? rejectCurrentNode(flowNo, rejectReason)
-        : isOaEngineType(type)
+        : isOaEngineType(type) || type === 'ai_access'
           ? null
           : (await rejectFinApproval(flowNo, rejectReason), null)
+      if (type === 'ai_access') {
+        updateApprovalRecord(flowNo, { flowStatus: 'rejected', rejectReason })
+      }
       message.success(rejectedNode
         ? t('approvalDetail.rejectDone', { nodeName: rejectedNode })
         : t('approvalCenter.rejectSuccess'))

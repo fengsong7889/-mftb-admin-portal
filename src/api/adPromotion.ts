@@ -1255,6 +1255,12 @@ export interface AdSignboardLabelPrice {
   conditionDesc?: string | null
   /** 本門店實際情況（排名/數值，用於前端彈窗展示） */
   actualDesc?: string | null
+  /** 資格條件對比範圍（allMerchants/…CategoryMerchants）；含 Category 時標籤文案需帶品類 */
+  qualificationScope?: string | null
+  /** 門店品類名（如 火鍋）；門店未配置品類時為 null，文案降級為不帶品類 */
+  categoryName?: string | null
+  /** 統計類標籤展示用實際人數（收藏/顧客數；缺失時為 null，前端用通用示例值） */
+  actualCount?: number | null
 }
 
 /** 金字招牌庫存查詢響應 */

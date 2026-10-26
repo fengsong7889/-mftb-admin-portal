@@ -20,9 +20,16 @@ public class AgentChatRequest {
     private String systemCode;
     /** 应用标识：服务端据此加载发布版本的工具白名单，未发布直接拒绝。 */
     private String applicationKey;
-    /** 前端 UX 提示，不参与安全裁决；服务端仍按固定轮次与上限执行。 */
+    /** 前端 UX 提示，不参与安全裁决；服务端仍按固定轮次与上限执行。单位为 tokens（前端档位 64K~2M）。 */
     private Integer contextWindow;
     private String thinkingDepth;
+
+    /**
+     * 上下文窗口上限（tokens）。
+     * <p>必须与 AuthController 保存 AI 设置时的白名单口径一致，并对齐前端档位（64K~2M）。
+     * 该值仅作 UX 提示，不写入编排命令、不参与安全裁决，故只做数量级防呆而非业务限额。
+     */
+    private static final int MAX_CONTEXT_WINDOW_TOKENS = 10_000_000;
 
     @JsonAnySetter
     public void rejectUnknown(String key, Object value) {
@@ -35,7 +42,7 @@ public class AgentChatRequest {
         if (conversationPk != null && conversationPk <= 0) throw invalid();
         if (systemCode != null && (systemCode.length() > 32 || !systemCode.matches("[a-z][a-z0-9-]*"))) throw invalid();
         if (applicationKey != null && !applicationKey.matches("[a-z][a-z0-9-]{2,63}")) throw invalid();
-        if (contextWindow != null && (contextWindow < 1 || contextWindow > 200)) throw invalid();
+        if (contextWindow != null && (contextWindow < 1 || contextWindow > MAX_CONTEXT_WINDOW_TOKENS)) throw invalid();
         if (thinkingDepth != null && !Set.of("low", "medium", "high", "xhigh", "max").contains(thinkingDepth)) throw invalid();
         OrchestrateRequest command = new OrchestrateRequest();
         command.setMessages(messages);

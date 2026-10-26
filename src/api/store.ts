@@ -31,6 +31,10 @@ export interface StoreItem {
   loginAccount?: string
   /** 所在区域/商圈: 1=黑沙环区 … 11=黑沙滩区（盘活复苏按商圈售卖时跟随门店） */
   region?: number | null
+  /** 门店品类编码（字典见 constants/storeCategory，如 hotpot=火鍋；金字招牌「{品類}」文案取此值） */
+  category?: string | null
+  /** 门店品类名称（后端按字典翻译，未配置品类时为 null） */
+  categoryName?: string | null
   /** 门店地址（用户手动输入） */
   address?: string
   /** 已绑定的BD列表（一家门店可绑定多个） */
@@ -56,6 +60,8 @@ export interface StorePayload {
   loginAccount?: string
   /** 所在区域/商圈 */
   region?: number | null
+  /** 门店品类编码（可空，空则标签文案不带品类） */
+  category?: string | null
   /** 门店地址 */
   address?: string
 }

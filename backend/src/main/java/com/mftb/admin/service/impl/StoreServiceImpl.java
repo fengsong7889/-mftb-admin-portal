@@ -3,6 +3,7 @@ package com.mftb.admin.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.constant.StoreCategory;
 import com.mftb.admin.dto.OptionVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.dto.StoreBdVO;
@@ -186,6 +187,7 @@ public class StoreServiceImpl implements StoreService {
             store.setBizChannel(request.getBizChannel());
             store.setLoginAccount(request.getLoginAccount());
             store.setRegion(request.getRegion());
+            store.setCategory(normalizeCategory(request.getCategory()));
             store.setAddress(request.getAddress());
             store.setUpdatedBy(operatorResolver.currentOperatorName());
             store.setDeleted(0);
@@ -215,11 +217,24 @@ public class StoreServiceImpl implements StoreService {
         store.setBizChannel(request.getBizChannel());
         store.setLoginAccount(request.getLoginAccount());
         store.setRegion(request.getRegion());
+        store.setCategory(normalizeCategory(request.getCategory()));
         store.setAddress(request.getAddress());
         store.setUpdatedBy(operatorResolver.currentOperatorName());
         storeMapper.updateById(store);
         BizMerchantGroup group = groupMapper.selectById(request.getGroupId());
         return StoreVO.from(store, group.getGroupCode(), group.getGroupName());
+    }
+
+    /** 門店品類編碼規範化：空值允許（標籤文案不帶品類），非字典編碼直接拒絕，避免臟值落庫 */
+    private String normalizeCategory(String category) {
+        if (!StringUtils.hasText(category)) {
+            return null;
+        }
+        StoreCategory matched = StoreCategory.of(category);
+        if (matched == null) {
+            throw new BusinessException("門店品類不合法");
+        }
+        return matched.getCode();
     }
 
     @Override

@@ -2,7 +2,7 @@
  * AI 助手使用统计 API
  * 明细由开发环境 LLM 代理转发成功后回传落库，汇总按查询范围实时聚合
  */
-import request, { TOKEN_KEY } from './request'
+import request, { TOKEN_KEY, resolveApiBaseUrl } from './request'
 
 /** 单一币种的费用 */
 export interface CostEntry {
@@ -94,9 +94,13 @@ export interface LlmBalances {
   deepseek: { available: boolean; balance: number } | null
 }
 
-/** 查询供应商账户余额（经 LLM 代理，需登录态） */
+/**
+ * 查询供应商账户余额（经 LLM 代理，需登录态）
+ * <p>该端点由开发态 Vite LLM 代理提供，后端尚无同名实现；生产环境 404 时静默兜底为空余额。
+ * 地址必须走 resolveApiBaseUrl，不能拼 window.location.origin（会落到前端静态托管返回 405/404）。
+ */
 export function fetchLlmBalances(): Promise<LlmBalances> {
-  return fetch(`${window.location.origin}/api/llm/balances`, {
+  return fetch(`${resolveApiBaseUrl()}/llm/balances`, {
     headers: { 'x-llm-token': localStorage.getItem(TOKEN_KEY) ?? '' },
   })
     .then((res) => (res.ok ? (res.json() as Promise<LlmBalances>) : { deepseek: null }))

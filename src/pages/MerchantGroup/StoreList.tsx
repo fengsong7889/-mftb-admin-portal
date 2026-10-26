@@ -16,6 +16,7 @@ import type { StoreBdItem, StoreItem, StoreQueryParams } from '../../api/store'
 import { fetchStores, fetchStoreOptions, fetchStoreUpdatedByOptions, deleteStore } from '../../api/store'
 import { fetchMerchantGroupOptions } from '../../api/merchantGroup'
 import { BIZ_CHANNEL_OPTIONS, formatBizChannel } from '../../constants/bizChannel'
+import { formatStoreCategory } from '../../constants/storeCategory'
 import { REGION_LABEL_KEY } from '../Recommend/constants'
 import { exportToCSV } from '../../utils/exportCSV'
 import StoreEditModal from './StoreEditModal'
@@ -195,6 +196,7 @@ export default function StoreList() {
       { title: t('colBizChannel'), dataIndex: 'bizChannel', render: (v: string) => formatBizChannel(v) },
       { title: t('colLoginAccount'), dataIndex: 'loginAccount' },
       { title: t('colRegion'), dataIndex: 'region' },
+      { title: t('colCategory'), dataIndex: 'category', render: (v: string | null | undefined) => formatStoreCategory(v) },
       { title: t('colAddress'), dataIndex: 'address' },
       { title: t('colBindBd'), dataIndex: 'bdList', render: (v: unknown) => (Array.isArray(v) ? (v as StoreBdItem[]).map(b => `${b.bdName || b.bdEmpId}(${b.bdEmpId})`).join('、') : '') },
       { title: t('colUpdatedBy'), dataIndex: 'updatedBy' },
@@ -270,6 +272,13 @@ export default function StoreList() {
       width: 120,
       render: (val: number | null | undefined) =>
         val ? (REGION_LABEL_KEY[val] ? t(`translation:${REGION_LABEL_KEY[val]}`) : String(val)) : '-',
+    },
+    {
+      title: t('colCategory'),
+      dataIndex: 'category',
+      key: 'category',
+      width: 110,
+      render: (val: string | null | undefined) => formatStoreCategory(val),
     },
     {
       title: t('colAddress'),

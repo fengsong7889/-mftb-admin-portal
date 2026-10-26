@@ -58,6 +58,7 @@ import {
   type RdmStatus,
 } from '../../constants/rdm'
 import { useTaskTypeDict } from '../../hooks/useTaskTypeDict'
+import { buildTaskReportPayload, displayTaskProgress } from './rdmTaskProgress'
 import './index.css'
 
 /** 视角筛选 */
@@ -94,7 +95,7 @@ export default function DeliveryBoard() {
   const [rows, setRows] = useState<RdmTaskItem[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<number | null>(null)
-  const [progress, setProgress] = useState<number>(50)
+  const [progress, setProgress] = useState<number>(0)
   const [actualHours, setActualHours] = useState<number | null>(null)
   const [remark, setRemark] = useState('')
   const [saving, setSaving] = useState(false)
@@ -245,8 +246,33 @@ export default function DeliveryBoard() {
     hours: rows.reduce((sum, r) => sum + (r.actualHours ?? 0), 0),
   }), [rows])
 
-  /** 上报任务动作（开始/完成/阻塞/解除），完成后自动收起面板 */
+  /**
+   * 「開始」只記錄開工：狀態 → 進行中 + 實際開始時間，不寫進度。
+   * <p>之前這裡直接複用上報面板的進度狀態，而該狀態在完成一次 100% 之後不會歸零，
+   * 接著連點「開始」就把任務寫成「進行中 + 100%」——100% 屬於完成態，任務永遠到不了完成，
+   * 又因為未完成而持續算逾期，界面上就是「100% 卻還標逾期」。
+   */
+  const handleStart = async (task: RdmTaskItem) => {
+    setSaving(true)
+    try {
+      await reportTask(task.id, buildTaskReportPayload(RDM_TASK_ACTION.START, { progress }))
+      message.success(t('rdm.deliveryBoard.startSuccess', { taskNo: task.taskNo, defaultValue: '已開始：{{taskNo}}' }))
+      await load()
+    } catch {
+      // request.ts 已统一弹后端失败原因，此处不再双弹（§G.4）
+      console.error('rdm task start failed', task.id)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /** 上报任务动作（開始/进度/完成/阻塞/解除），完成后自动收起面板 */
   const handleReport = async (task: RdmTaskItem, action: RdmTaskAction) => {
+    // 進度上報必須有真實數值：0% 等於什麼都沒報，還會把「待開始 → 進行中」的推進繞過去
+    if (action === RDM_TASK_ACTION.PROGRESS && progress <= 0) {
+      message.warning(t('rdm.deliveryBoard.progressRequired', { defaultValue: '請填寫實際進度（1-99%）；完成請填 100% 後用「上報並完成」' }))
+      return
+    }
     /*
      * 完成与阻塞都必须先有说明：服务端本来就要求「完成必須填寫交付說明或交付物連結」，
      * 之前界面让「完成」按钮直发请求，用户点了只收到一句报错，
@@ -254,7 +280,7 @@ export default function DeliveryBoard() {
      */
     if ((action === RDM_TASK_ACTION.BLOCK || action === RDM_TASK_ACTION.DONE) && !remark.trim()) {
       setExpandedId(task.id)
-      setProgress(task.progress ?? 0)
+      setProgress(displayTaskProgress(task.status, task.progress))
       message.warning(action === RDM_TASK_ACTION.DONE
         ? '完成任務必須填寫交付說明或交付物連結（作為驗收與績效依據）'
         : '標記阻塞必須填寫阻塞原因')
@@ -294,16 +320,13 @@ export default function DeliveryBoard() {
     }
     setSaving(true)
     try {
-      await reportTask(task.id, {
-        action,
-        progress: action === RDM_TASK_ACTION.DONE ? 100 : progress,
-        actualHours: actualHours ?? undefined,
-        remark: remark || undefined,
-      })
+      await reportTask(task.id, buildTaskReportPayload(action, { progress, actualHours, remark }))
       message.success(`已上報：${RDM_TASK_ACTION_LABEL[action]}`)
       setExpandedId(null)
       setRemark('')
       setActualHours(null)
+      // 進度狀態必須歸零：留著上一次的 100 會被下一個任務誤用
+      setProgress(0)
       await load()
     } catch {
       // request.ts 已统一弹后端失败原因，此处不再双弹（§G.4）
@@ -369,9 +392,14 @@ export default function DeliveryBoard() {
     {
       title: '進度', key: 'progress', width: 140,
       render: (_, r) => {
-        const pct = r.progress ?? 0
         const done = r.status === RDM_TASK_STATUS.DONE
         const blocked = r.status === RDM_TASK_STATUS.BLOCKED
+        /*
+         * 100% 只屬於完成態：歷史上有任務被「開始」寫成了 100%（狀態仍是進行中），
+         * 列表原樣渲染會出現「進度 100% 卻仍逾期、又一直點不了完成」的自相矛盾。
+         * 未完成的任務按 99% 封頂（口徑見 rdmTaskProgress），真實值仍可從「上報進度」改。
+         */
+        const pct = displayTaskProgress(r.status, r.progress)
         return (
           <div className="rdm-task-progress">
             <div className="rdm-task-progress__line">
@@ -382,7 +410,12 @@ export default function DeliveryBoard() {
                 strokeColor={done ? '#52C41A' : blocked ? '#FA8C16' : r.overdue ? '#FF4D4F' : '#E8720C'}
                 style={{ width: 78, margin: 0 }}
               />
-              <span className="rdm-task-progress__pct">{pct}%</span>
+              <span className="rdm-task-progress__pct"
+                title={!done && (r.progress ?? 0) >= 100
+                  ? t('rdm.deliveryBoard.progressCapped', { defaultValue: '未完成任務按 99% 封頂；100% 需用「上報並完成」確認' })
+                  : undefined}>
+                {pct}%
+              </span>
             </div>
             {/* 缺报不等于 0：工时与进度必须分开展示，否则「0% 未填報」会被读成这活没花时间 */}
             <div className={`rdm-task-progress__hours${r.actualHoursReported ? '' : ' is-missing'}`}>
@@ -406,12 +439,12 @@ export default function DeliveryBoard() {
         const actions = [
           r.status !== RDM_TASK_STATUS.DONE && (
             <Button key="report" type="link" size="small"
-              onClick={() => { setExpandedId(expandedId === r.id ? null : r.id); setProgress(r.progress ?? 0); setActualHours(null); setRemark('') }}>
+              onClick={() => { setExpandedId(expandedId === r.id ? null : r.id); setProgress(displayTaskProgress(r.status, r.progress)); setActualHours(null); setRemark('') }}>
               上報進度
             </Button>
           ),
           r.status === RDM_TASK_STATUS.TODO && (
-            <Button key="start" type="link" size="small" onClick={() => handleReport(r, RDM_TASK_ACTION.START)}>開始</Button>
+            <Button key="start" type="link" size="small" onClick={() => handleStart(r)}>開始</Button>
           ),
           r.status === RDM_TASK_STATUS.BLOCKED ? (
             <Button key="unblock" type="link" size="small" onClick={() => handleReport(r, RDM_TASK_ACTION.UNBLOCK)}>解除阻塞</Button>
@@ -441,7 +474,8 @@ export default function DeliveryBoard() {
         <Space size={12} wrap align="end">
           <span>
             <span style={{ fontSize: 12, color: '#595959', marginRight: 6 }}>進度 %</span>
-            <InputNumber min={0} max={100} value={progress} onChange={v => setProgress(v ?? 0)} style={{ width: 80 }} />
+            {/* 進度下限 1%：0% 等於没上报，而 100% 是完成态的专属值，必须走「上報並完成」 */}
+            <InputNumber min={1} max={100} value={progress} onChange={v => setProgress(v ?? 0)} style={{ width: 80 }} />
           </span>
           <span>
             <span style={{ fontSize: 12, color: '#595959', marginRight: 6 }}>實際工時</span>
@@ -454,10 +488,12 @@ export default function DeliveryBoard() {
           {/*
            * 不再单独提供「完成」：进度填到 100% 并确认就是完成，避免同一个结果有两个入口，
            * 也避免两个按钮都能点、用户分不清该点哪个。计划起止时间属于排期修正，走编辑页。
+           * 未達 100% 走 progress 动作（按填写的数值上报），不得再用 start：start 只表「開工」，
+           * 曾经把面板里残留的 100 一起带上去，直接写出「進行中 + 100%」的脏数据。
            */}
           <Space>
             <Button type="primary" size="small" loading={saving}
-              onClick={() => handleReport(r, progress >= 100 ? RDM_TASK_ACTION.DONE : RDM_TASK_ACTION.START)}>
+              onClick={() => handleReport(r, progress >= 100 ? RDM_TASK_ACTION.DONE : RDM_TASK_ACTION.PROGRESS)}>
               {progress >= 100
                 ? t('rdm.deliveryBoard.reportAndDone', { defaultValue: '上報並完成' })
                 : t('rdm.deliveryBoard.reportProgress', { defaultValue: '開始 / 上報進度' })}

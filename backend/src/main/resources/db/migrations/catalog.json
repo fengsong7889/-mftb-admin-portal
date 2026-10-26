@@ -150,6 +150,18 @@
       "status": "ACTIVE"
     },
     {
+      "versionKey": "biz:store-category-v1.0",
+      "module": "biz",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "bizDataInitializer",
+      "dependencies": [
+        "biz:tables-v1"
+      ],
+      "status": "ACTIVE",
+      "comment": "门店新增品类列 biz_store.category（编码字典 StoreCategory）：金字招牌「{品類}」文案取门店自身品类，如「全澳火鍋熱門店鋪」；品类为空时文案降级为不带品类。持迁移命名锁 + 后置校验，列未就绪不记版本、下次启动重试。参考 SQL: sql/301_store_category.sql"
+    },
+    {
       "versionKey": "seq:init-v1",
       "module": "seq",
       "phase": "MODULE_STRUCTURE",

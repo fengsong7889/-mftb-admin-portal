@@ -30,6 +30,9 @@ public class StoreRequest {
     /** 所在区域/商圈: 1=黑沙环区 … 11=黑沙滩区（盘活复苏按商圈售卖时跟随门店） */
     private Integer region;
 
+    /** 门店品类编码（字典见 StoreCategory，如 hotpot=火鍋；可空，空则标签文案不带品类） */
+    private String category;
+
     /** 门店地址 */
     private String address;
 }
