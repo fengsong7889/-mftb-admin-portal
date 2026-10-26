@@ -93,7 +93,8 @@ function getTagDisplayText(
   // 統計類標籤（無場景）
   if (!scenario) {
     if (labelType === 'favorites') return '千人收藏好店'
-    if (labelType === 'customers') return '近期999人下單'
+    // 人數格式化口徑與算法庫一致：10~99 取起始整十、100+ 用中文大數（百/千/萬）
+    if (labelType === 'customers') return '近期百人下單'
     return `${labelCfg.label}店鋪`
   }
 

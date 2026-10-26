@@ -38,6 +38,12 @@ const VIEW = {
   description: '評審 Q4 需求優先級',
   onlineMeetingUrl: 'https://meeting.example.com/abc',
   tokenExpireAt: '2026-11-26 10:00:00',
+  attendees: [
+    { name: '系統管理員', role: 'organizer', roleText: '組織者', response: 'accepted', responseText: '已接受' },
+    { name: '張三', role: 'required', roleText: '必參', response: 'pending', responseText: '待響應' },
+    { name: '李四', role: 'optional', roleText: '選參', response: 'declined', responseText: '已婉拒' },
+    { name: '外部客戶A', role: 'external', roleText: '外部人員', response: null, responseText: null },
+  ],
 }
 
 function openPage(token = 'abc') {
@@ -63,10 +69,18 @@ describe('會議詳情免登頁', () => {
     expect(screen.getByText('待開始')).toBeInTheDocument()
     expect(screen.getByText('2026-10-27 10:00–11:00')).toBeInTheDocument()
     expect(screen.getByText(/產品會議室/)).toBeInTheDocument()
-    expect(screen.getByText('系統管理員')).toBeInTheDocument()
+    expect(screen.getAllByText('系統管理員').length).toBeGreaterThan(0)
     expect(screen.getByText('評審 Q4 需求優先級')).toBeInTheDocument()
     expect(screen.getByText('進入線上會議')).toBeInTheDocument()
     expect(screen.getByText(/連結有效期至 2026-11-26 10:00:00/)).toBeInTheDocument()
+    // 参会人：姓名 + 身份 + 响应态，便于会前沟通；不含工号/手机号/部门
+    expect(screen.getByText('參會人員')).toBeInTheDocument()
+    expect(screen.getByText('張三')).toBeInTheDocument()
+    expect(screen.getByText('待響應')).toBeInTheDocument()
+    expect(screen.getByText('已婉拒')).toBeInTheDocument()
+    expect(screen.getByText('外部客戶A')).toBeInTheDocument()
+    expect(screen.getByText('外部人員')).toBeInTheDocument()
+    expect(document.body.textContent).not.toMatch(/MF\d{5}|1[3-9]\d{9}/)
     // 免登链接可能被转发：整页不得出现手机号形态的值或渠道凭据
     expect(document.body.textContent).not.toMatch(/1[3-9]\d{9}/)
     expect(document.body.textContent).not.toMatch(/access_token|webhook|appSecret/i)

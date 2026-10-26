@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
+import type { CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Alert, Button, Form, Input, Select, message, Checkbox, InputNumber, Modal, Table, Popover, Tooltip, Switch, Spin } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -14,6 +15,7 @@ import useTrafficAlgorithmForm from './TrafficAlgorithmConfig/useTrafficAlgorith
 import { TRAFFIC_DEFAULTS } from './TrafficAlgorithmConfig/config'
 import PopularLayoutPreviewModal from '../../components/PopularLayoutPreviewModal'
 import DetailPageHeader from '../../components/DetailPageHeader'
+import HelpPopover from '../../components/HelpPopover'
 import './WeightSlider.css'
 
 /** 广告类型标签映射 - 使用 i18n key */
@@ -293,8 +295,8 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
       return { ...prev, [activeSignboardTab]: list.filter(c => c.id !== condId) }
     })
   }
-  /** 收藏人數格式化（1-9直接顯示，10-99取起始整十，100+用中文大數） */
-  const formatFavoritesCount = (n: number): string => {
+  /** 收藏／顧客人數格式化（1-9直接顯示，10-99取起始整十，100+用中文大數）；兩類統計標籤共用同一口徑 */
+  const formatPeopleCount = (n: number): string => {
     if (n < 10) return `${n}`
     if (n < 100) return `${Math.floor(n / 10) * 10}`
     if (n < 1000) return '百'
@@ -342,18 +344,19 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
     const suffix = hasShopSuffix(labelType) ? '店鋪' : ''
     // 收藏：{人數}人收藏好店
     if (labelType === 'favorites') {
-      if (cond.metric === 'storeFavorites' && cond.value) return `${formatFavoritesCount(cond.value)}人收藏好店`
+      if (cond.metric === 'storeFavorites' && cond.value) return `${formatPeopleCount(cond.value)}人收藏好店`
       return `${labelText}好店`
     }
-    // 顧客數：近期{人數}人下單
+    // 顧客數：近期{人數}人下單（人數格式化與收藏一致：10→10、100→百、1000→千）
     if (labelType === 'customers') {
-      if (cond.metric === 'monthlyCustomers' && cond.value) return `近期${cond.value}人下單`
+      if (cond.metric === 'monthlyCustomers' && cond.value) return `近期${formatPeopleCount(cond.value)}人下單`
       return `近期${labelText}`
     }
     // 銷量：全澳/商圈+{品類}+銷量+{排名/百分比}
     if (labelType === 'sales' && cond.value) {
       const rankText = cond.comparison === 'ranking' ? `第${cond.value}名` : `前${cond.value}%`
-      return `${region}${category}${labelText}·${rankText}`
+      // 不加中間點，與售賣側選購卡、APP 端實際文案（如「全澳西餐銷量第1名」）保持一致
+      return `${region}${category}${labelText}${rankText}`
     }
     // 熱門/人氣/好評/復購：全澳/商圈+{品類}+標籤+店鋪
     return `${region}${category}${labelText}${suffix}`
@@ -987,38 +990,23 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#E8720C' }} />
               <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>招牌標籤配置</span>
-              <Popover
-                trigger="hover"
+              <HelpPopover
+                ariaLabel="金字招牌標籤配置與全量文案說明"
+                title="📝 標籤配置與全量文案"
                 placement="right"
-                overlayStyle={{ maxWidth: 460 }}
-                title={<span style={{ fontSize: 13, fontWeight: 600 }}>📝 標籤配置說明</span>}
+                width={720}
                 content={
-                  <div style={{ maxWidth: 420, fontSize: 12, lineHeight: 2, maxHeight: '60vh', overflowY: 'auto' }}>
+                  <div style={{ fontSize: 12, lineHeight: 1.9, maxHeight: '62vh', overflowY: 'auto', paddingRight: 4 }}>
                     <div style={{ fontWeight: 600, marginBottom: 4, color: '#E8720C' }}>🔑 標籤分類與場景：</div>
-                    <div style={{ color: '#595959', marginBottom: 4 }}>
+                    <div style={{ color: '#595959', marginBottom: 10 }}>
                       對比類標籤（熱門/人氣/銷量/好評/復購）：每個標籤可同時配置「全澳對比」與「商圈對比」兩個場景<br />
                       ・各場景獨立啟用，場景內支持多條件組合（且/或關係）<br />
                       ・場景決定可選範圍：全澳場景限「全澳商家/全澳-品類商家」，商圈場景限「商圈商家/商圈-品類商家」<br />
                       ・商家只能購買達到條件的場景標籤；兩個場景都滿足時由商家自行挑選其一購買<br />
                       統計類標籤（收藏/顧客數）：統計全量數據門檻，不劃分場景
                     </div>
-                    <div style={{ fontWeight: 600, marginBottom: 4, color: '#262626' }}>各標籤文案：</div>
-                    <div style={{ color: '#595959' }}>
-                      🔥 熱門 → 全澳/商圈 + {`{品類}`} + 熱門 + 店鋪<br />
-                      👑 人氣 → 全澳/商圈 + {`{品類}`} + 人氣 + 店鋪<br />
-                      📈 銷量 → 全澳/商圈 + {`{品類}`} + 銷量 + {`{排名/百分比}`}<br />
-                      ⭐ 好評 → 全澳/商圈 + {`{品類}`} + 好評 + 店鋪<br />
-                      🔄 復購 → 全澳/商圈 + {`{品類}`} + 回頭率超高 + 店鋪<br />
-                      ❤️ 收藏 → {`{人數}`} + 收藏 + 好店<br />
-                      👥 顧客數 → 近期 + {`{人數}`} + 下單
-                    </div>
-                    <div style={{ fontWeight: 600, marginTop: 8, marginBottom: 4, color: '#262626' }}>收藏人數格式化：</div>
-                    <div style={{ color: '#595959' }}>
-                      1~9 → 直接顯示（如 5人）<br />
-                      10~99 → 取起始整十（如 15→10人、29→20人）<br />
-                      ≥100 → 中文大數（百/千/萬人，不用阿拉伯數字）
-                    </div>
-                    <div style={{ fontWeight: 600, marginTop: 8, marginBottom: 4, color: '#262626' }}>💡 人數說明：</div>
+                    <SignboardCopyReference />
+                    <div style={{ fontWeight: 600, marginTop: 10, marginBottom: 4, color: '#262626' }}>💡 人數說明：</div>
                     <div style={{ color: '#595959' }}>
                       ❤️ 收藏 和 👥 顧客數 文案中展示的{`{人數}`}是店鋪實際數據，配置的資格條件僅為門檻值（如配置 ≥1000人，實際展示該店鋪真實的收藏/顧客人數）
                     </div>
@@ -1030,9 +1018,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                     </div>
                   </div>
                 }
-              >
-                <QuestionCircleOutlined style={{ fontSize: 13, color: '#1890FF', cursor: 'help' }} />
-              </Popover>
+              />
               <span style={{ fontSize: 12, color: '#8c8c8c' }}>點擊標籤直接配置，開啟場景即自動啟用</span>
             </div>
 
@@ -2097,6 +2083,78 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
           }}
         />
       </Modal>
+    </div>
+  )
+}
+
+/** 對照表單元格樣式（只取設計令牌色值，不新增色） */
+const COPY_TH_STYLE: CSSProperties = { border: '1px solid #F0F0F0', background: '#FAFAFA', color: '#262626', fontWeight: 600, padding: '4px 8px', textAlign: 'left', whiteSpace: 'nowrap' }
+const COPY_TD_STYLE: CSSProperties = { border: '1px solid #F0F0F0', color: '#595959', padding: '4px 8px', textAlign: 'left', verticalAlign: 'top' }
+const COPY_TD_LABEL_STYLE: CSSProperties = { ...COPY_TD_STYLE, color: '#262626', whiteSpace: 'nowrap' }
+
+const SIGNBOARD_COPY_HEADERS = ['標籤', '全澳商家', '全澳-品類商家', '商圈商家', '商圈-品類商家']
+
+/** 對比類：場景 × 是否限定品類共 4 種範圍；銷量按排名/百分比拆兩行（第1名、前10% 為示例值） */
+const SIGNBOARD_COPY_ROWS: string[][] = [
+  ['🔥 熱門', '全澳熱門店鋪', '全澳{品類}熱門店鋪', '高仕德熱門店鋪', '高仕德{品類}熱門店鋪'],
+  ['👑 人氣', '全澳人氣店鋪', '全澳{品類}人氣店鋪', '高仕德人氣店鋪', '高仕德{品類}人氣店鋪'],
+  ['📈 銷量·排名', '全澳銷量第1名', '全澳{品類}銷量第1名', '高仕德銷量第1名', '高仕德{品類}銷量第1名'],
+  ['📈 銷量·百分比', '全澳銷量前10%', '全澳{品類}銷量前10%', '高仕德銷量前10%', '高仕德{品類}銷量前10%'],
+  ['⭐ 好評', '全澳好評店鋪', '全澳{品類}好評店鋪', '高仕德好評店鋪', '高仕德{品類}好評店鋪'],
+  ['🔄 復購', '全澳回頭率超高店鋪', '全澳{品類}回頭率超高店鋪', '高仕德回頭率超高店鋪', '高仕德{品類}回頭率超高店鋪'],
+]
+
+/** 統計類：無場景，按人數檔位格式化（1~9 原值、10~99 取起始整十、100+ 中文大數） */
+const SIGNBOARD_COUNT_ROWS: string[][] = [
+  ['1~9', '5人收藏好店', '近期5人下單'],
+  ['10~99', '10人收藏好店（15→10、29→20）', '近期10人下單（15→10、29→20）'],
+  ['100~999', '百人收藏好店', '近期百人下單'],
+  ['1,000~9,999', '千人收藏好店', '近期千人下單'],
+  ['10,000~99,999', '萬人收藏好店', '近期萬人下單'],
+  ['100,000~999,999', '十萬人收藏好店', '近期十萬人下單'],
+  ['1,000,000~9,999,999', '百萬人收藏好店', '近期百萬人下單'],
+  ['≥10,000,000', '千萬人收藏好店', '近期千萬人下單'],
+]
+
+/**
+ * 金字招牌全量文案對照表（說明彈層內使用）。
+ * 與 generatePreviewForCondition 同源：改文案規則時必須同步本表，
+ * 避免「配置頁預覽」與「說明對照表」兩處口徑不一致。
+ */
+function SignboardCopyReference() {
+  return (
+    <div>
+      <div style={{ fontWeight: 600, marginBottom: 4, color: '#262626' }}>📋 對比類全量文案（5 個標籤 / 24 條）：</div>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 4 }}>
+        <thead>
+          <tr>{SIGNBOARD_COPY_HEADERS.map(header => <th key={header} style={COPY_TH_STYLE}>{header}</th>)}</tr>
+        </thead>
+        <tbody>
+          {SIGNBOARD_COPY_ROWS.map(row => (
+            <tr key={row[0]}>
+              {row.map((cell, i) => <td key={i} style={i === 0 ? COPY_TD_LABEL_STYLE : COPY_TD_STYLE}>{cell}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div style={{ color: '#8C8C8C', marginBottom: 10 }}>
+        商圈列以「高仕德」為示例，實際顯示門店所在商圈名；{`{品類}`} 在配置頁為佔位符，實際顯示門店品類（如 火鍋）；第1名/前10% 為示例，實際取配置的排名或百分比。
+      </div>
+
+      <div style={{ fontWeight: 600, marginBottom: 4, color: '#262626' }}>📋 統計類全量文案（按人數檔位）：</div>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 4 }}>
+        <thead>
+          <tr>{['配置門檻（人）', '❤️ 收藏', '👥 顧客數'].map(header => <th key={header} style={COPY_TH_STYLE}>{header}</th>)}</tr>
+        </thead>
+        <tbody>
+          {SIGNBOARD_COUNT_ROWS.map(row => (
+            <tr key={row[0]}>
+              {row.map((cell, i) => <td key={i} style={i === 0 ? COPY_TD_LABEL_STYLE : COPY_TD_STYLE}>{cell}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div style={{ color: '#8C8C8C' }}>「5」代表 1~9 檔的任意值；10~99 檔取起始整十（15→10、29→20）。</div>
     </div>
   )
 }

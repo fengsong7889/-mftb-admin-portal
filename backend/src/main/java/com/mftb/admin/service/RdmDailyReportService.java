@@ -144,10 +144,10 @@ public class RdmDailyReportService {
 
     /**
      * 卡片按钮文案（钉钉限制 20 字符内）。
-     * <p>群报与个人用不同文案：同一个「查看完整日報」发给个人时，读者会以为点进了全公司报表。
+     * <p>群报与个人用不同文案：个人按钮明确写「項目進度詳情」，避免读者以为点进了全公司报表。
      */
     private static final String CARD_BTN_GROUP = "查看完整日報";
-    private static final String CARD_BTN_PERSONAL = "查看我的日報";
+    private static final String CARD_BTN_PERSONAL = "查看項目進度詳情";
 
     /** 手动触发节流窗口：同一档位+项目 1 分钟内只允许真发一次 */
     private static final long MANUAL_THROTTLE_MS = 60_000L;
@@ -1900,7 +1900,8 @@ public class RdmDailyReportService {
             }
             try {
                 if (useCard(cfg, myUrl)) {
-                    dingTalkAppService.sendWorkActionCard(NotificationAppService.RDM_DAILY_REPORT, app.getId(),
+                    // 个人日报用圆角按钮（独立跳转 ActionCard），与会议详情的按钮一致
+                    dingTalkAppService.sendWorkActionCardPill(NotificationAppService.RDM_DAILY_REPORT, app.getId(),
                             List.of(user.getDingtalkUserId()), r.title(), r.content(),
                             CARD_BTN_PERSONAL, myUrl);
                 } else {
@@ -1966,7 +1967,8 @@ public class RdmDailyReportService {
             }
             try {
                 if (useCard(cfg, detailUrl)) {
-                    dingTalkAppService.sendWorkActionCard(NotificationAppService.RDM_DAILY_REPORT, app.getId(),
+                    // 指定人补发同样用圆角按钮，避免两条入口样式不一致
+                    dingTalkAppService.sendWorkActionCardPill(NotificationAppService.RDM_DAILY_REPORT, app.getId(),
                             List.of(user.getDingtalkUserId()), r.title(), r.content(),
                             CARD_BTN_PERSONAL, detailUrl);
                 } else {

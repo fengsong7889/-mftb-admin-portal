@@ -2,7 +2,9 @@ package com.mftb.admin.service;
 
 import com.mftb.admin.constant.MeetingConstants;
 import com.mftb.admin.dto.MeetingBookingDto;
+import com.mftb.admin.entity.MeetingAttendee;
 import com.mftb.admin.entity.MeetingBooking;
+import com.mftb.admin.mapper.MeetingAttendeeMapper;
 import com.mftb.admin.mapper.MeetingBookingMapper;
 import com.mftb.admin.util.MeetingViewTokenUtil;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,6 +12,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -34,15 +37,17 @@ class MeetingPublicViewServiceTest {
     private static final String SECRET = "meeting-view:test-secret";
 
     private MeetingBookingMapper bookingMapper;
+    private MeetingAttendeeMapper attendeeMapper;
     private SysConfigService sysConfigService;
     private MeetingPublicViewService service;
 
     @BeforeEach
     void setUp() {
         bookingMapper = mock(MeetingBookingMapper.class);
+        attendeeMapper = mock(MeetingAttendeeMapper.class);
         sysConfigService = mock(SysConfigService.class);
         when(sysConfigService.getConfigValue(MeetingConstants.CFG_VIEW_TOKEN_SECRET)).thenReturn(SECRET);
-        service = new MeetingPublicViewService(bookingMapper, sysConfigService);
+        service = new MeetingPublicViewService(bookingMapper, attendeeMapper, sysConfigService);
     }
 
     private String token() {
@@ -127,5 +132,40 @@ class MeetingPublicViewServiceTest {
         MeetingBookingDto.PublicView view = service.view(token());
 
         assertFalse(view.getValid());
+    }
+
+    @Test
+    @DisplayName("参会人名单：组织者首位，含必参/选参/外部与响应态，过滤失效账号")
+    void exposesAttendeesWithoutContactInfo() {
+        MeetingBooking booking = booking(MeetingConstants.STATUS_BOOKED, LocalDateTime.now().plusHours(1));
+        booking.setExternalAttendees("外部客戶A");
+        when(bookingMapper.selectById(22L)).thenReturn(booking);
+        when(attendeeMapper.findByBooking(22L)).thenReturn(List.of(
+                attendee("organizer", "系統管理員", "accepted"),
+                attendee("required", "張三", "pending"),
+                attendee("optional", "李四", "declined"),
+                attendee("required", "離職員工", "invalid")));
+
+        MeetingBookingDto.PublicView view = service.view(token());
+
+        List<MeetingBookingDto.PublicAttendee> rows = view.getAttendees();
+        assertEquals(4, rows.size(), "组织者/必参/选参/外部各一，invalid 不列");
+        assertEquals("系統管理員", rows.get(0).getName());
+        assertEquals("組織者", rows.get(0).getRoleText());
+        assertEquals("張三", rows.get(1).getName());
+        assertEquals("待響應", rows.get(1).getResponseText());
+        assertEquals("已婉拒", rows.get(2).getResponseText());
+        assertEquals("外部人員", rows.get(3).getRoleText());
+        assertNull(rows.get(3).getResponse(), "外部人员没有系统响应态");
+        assertFalse(rows.stream().anyMatch(row -> "離職員工".equals(row.getName())));
+    }
+
+    private static MeetingAttendee attendee(String role, String name, String response) {
+        MeetingAttendee row = new MeetingAttendee();
+        row.setBookingId(22L);
+        row.setAttendeeType(role);
+        row.setName(name);
+        row.setResponse(response);
+        return row;
     }
 }

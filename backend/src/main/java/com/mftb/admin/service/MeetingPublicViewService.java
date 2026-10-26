@@ -2,7 +2,9 @@ package com.mftb.admin.service;
 
 import com.mftb.admin.constant.MeetingConstants;
 import com.mftb.admin.dto.MeetingBookingDto;
+import com.mftb.admin.entity.MeetingAttendee;
 import com.mftb.admin.entity.MeetingBooking;
+import com.mftb.admin.mapper.MeetingAttendeeMapper;
 import com.mftb.admin.mapper.MeetingBookingMapper;
 import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.MeetingViewTokenUtil;
@@ -15,7 +17,11 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * 会议详情免登链接：签发（邀约卡片）与读取（公开页）的唯一入口。
@@ -25,8 +31,8 @@ import java.util.Base64;
  *   <li><b>令牌只绑会议与有效期</b>：邀约发给 N 个人，逐人签发会让同一场会长出 N 条链接；
  *       这里只授予「这一场会的只读查看权」，与日报看板同一安全模型；</li>
  *   <li><b>密钥与签到/纪要分开</b>：换一把不该让另一类链接同时失效；</li>
- *   <li><b>响应里不出现内部字段</b>：免登链接可被转发，参会人名单、手机号、投递明细、
- *       审计轨迹一律不回；只回会议本身与状态。</li>
+ *   <li><b>响应里不出现内部字段</b>：免登链接可被转发，参会人只给姓名/身份/响应态，
+ *       工号、手机号、部门、投递明细、审计轨迹一律不回；只回会议本身与状态。</li>
  * </ol>
  *
  * <p>失败响应对"签名错/过期/会议不存在"统一给同一句提示：区分它们等于让攻击者
@@ -42,6 +48,7 @@ public class MeetingPublicViewService {
     private static final int SECRET_BYTES = 32;
 
     private final MeetingBookingMapper bookingMapper;
+    private final MeetingAttendeeMapper attendeeMapper;
     private final SysConfigService sysConfigService;
 
     /* ==================== 链接签发 ==================== */
@@ -112,10 +119,95 @@ public class MeetingPublicViewService {
         view.setReleaseReason(MeetingConstants.STATUS_RELEASED.equals(booking.getStatus())
                 ? booking.getReleaseReason() : null);
         view.setTokenExpireAt(DateTimeUtils.format(toLocal(parsed.expireAt())));
+        view.setAttendees(attendeesOf(booking));
         return view;
     }
 
     /* ==================== 内部 ==================== */
+
+    /**
+     * 参会人清单（只给姓名 + 身份 + 响应态）。
+     *
+     * <p>免登链接可被转发，联系方式与组织归属不下放；但"谁会来"是参会人最关心的信息，
+     * 没有它就无法会前沟通。失效账号（离职等）不再列出。
+     * <p>名单查询失败不让整页 500：会议主体仍可看，宁可少一块名单也不白屏。
+     */
+    private List<MeetingBookingDto.PublicAttendee> attendeesOf(MeetingBooking booking) {
+        List<MeetingBookingDto.PublicAttendee> out = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        try {
+            for (MeetingAttendee row : attendeeMapper.findByBooking(booking.getId())) {
+                if (row == null || !StringUtils.hasText(row.getName())) {
+                    continue;
+                }
+                if (MeetingConstants.RESPOND_INVALID.equals(row.getResponse())) {
+                    continue;
+                }
+                String name = row.getName().trim();
+                String role = StringUtils.hasText(row.getAttendeeType())
+                        ? row.getAttendeeType() : MeetingConstants.ATTENDEE_REQUIRED;
+                if (!seen.add(role + "|" + name)) {
+                    continue;
+                }
+                out.add(attendee(role, name, row.getResponse()));
+            }
+        } catch (RuntimeException e) {
+            log.warn("讀取會議參會人失敗，公開頁降級為無名單: bookingId={}, error={}",
+                    booking.getId(), e.getClass().getSimpleName());
+        }
+        // 单据快照兜底：历史数据可能存在外部参会人只在快照里、没有明细行
+        if (StringUtils.hasText(booking.getExternalAttendees())) {
+            for (String raw : booking.getExternalAttendees().split("[,，]")) {
+                String name = raw.trim();
+                if (!name.isEmpty() && seen.add(MeetingConstants.ATTENDEE_EXTERNAL + "|" + name)) {
+                    out.add(attendee(MeetingConstants.ATTENDEE_EXTERNAL, name, null));
+                }
+            }
+        }
+        // 组织者必须在首位：老数据的参会人行可能没有 organizer
+        boolean hasOrganizer = out.stream()
+                .anyMatch(row -> MeetingConstants.ATTENDEE_ORGANIZER.equals(row.getRole()));
+        if (!hasOrganizer && StringUtils.hasText(booking.getOrganizerName())) {
+            out.add(0, attendee(MeetingConstants.ATTENDEE_ORGANIZER,
+                    booking.getOrganizerName().trim(), MeetingConstants.RESPOND_ACCEPTED));
+        }
+        return out;
+    }
+
+    private static MeetingBookingDto.PublicAttendee attendee(String role, String name, String response) {
+        MeetingBookingDto.PublicAttendee row = new MeetingBookingDto.PublicAttendee();
+        row.setName(name);
+        row.setRole(role);
+        row.setRoleText(roleText(role));
+        row.setResponse(StringUtils.hasText(response) ? response : null);
+        row.setResponseText(responseText(response));
+        return row;
+    }
+
+    private static String roleText(String role) {
+        if (role == null) {
+            return "參會人";
+        }
+        return switch (role) {
+            case MeetingConstants.ATTENDEE_ORGANIZER -> "組織者";
+            case MeetingConstants.ATTENDEE_OPTIONAL -> "選參";
+            case MeetingConstants.ATTENDEE_EXTERNAL -> "外部人員";
+            default -> "必參";
+        };
+    }
+
+    private static String responseText(String response) {
+        if (response == null) {
+            return null;
+        }
+        return switch (response) {
+            case MeetingConstants.RESPOND_ACCEPTED -> "已接受";
+            case MeetingConstants.RESPOND_DECLINED -> "已婉拒";
+            case MeetingConstants.RESPOND_PENDING -> "待響應";
+            case MeetingConstants.RESPOND_INVALID -> "已失效";
+            default -> null;
+        };
+    }
 
     private static MeetingBookingDto.PublicView invalid() {
         MeetingBookingDto.PublicView view = new MeetingBookingDto.PublicView();

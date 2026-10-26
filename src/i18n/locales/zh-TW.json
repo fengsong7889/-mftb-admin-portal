@@ -12252,7 +12252,21 @@
       "closedCancelled": "這場會議已取消，無需到場",
       "closedReleased": "這場會議的會議室已釋放",
       "closedFinished": "這場會議已結束",
-      "closedEnded": "這場會議已結束，以下資訊僅供回看"
+      "closedEnded": "這場會議已結束，以下資訊僅供回看",
+      "attendees": "參會人員",
+      "attendeesHint": "僅顯示姓名與出席狀態",
+      "attendeesEmpty": "暫無參會人員",
+      "role": {
+        "organizer": "組織者",
+        "required": "必參",
+        "optional": "選參",
+        "external": "外部人員"
+      },
+      "response": {
+        "accepted": "已接受",
+        "declined": "已婉拒",
+        "pending": "待響應"
+      }
     },
     "minutes": {
       "absentReasonPlaceholder": "缺席原因，選填",

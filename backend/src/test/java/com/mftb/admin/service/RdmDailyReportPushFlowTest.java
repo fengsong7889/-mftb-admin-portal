@@ -191,7 +191,7 @@ class RdmDailyReportPushFlowTest {
 
         svc.push(ruleTarget(), false, null, true);
 
-        verify(dingTalkAppService, never()).sendWorkActionCard(anyString(), org.mockito.ArgumentMatchers.anyLong(),
+        verify(dingTalkAppService, never()).sendWorkActionCardPill(anyString(), org.mockito.ArgumentMatchers.anyLong(),
                 anyList(), anyString(), anyString(), anyString(), anyString());
     }
 
@@ -328,7 +328,7 @@ class RdmDailyReportPushFlowTest {
         assertTrue(r.isGroupDispatched(), "个人通道未就绪不得阻塞群报");
         verify(notifyService, times(1)).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
         assertEquals(0, r.getPersonalSent());
-        verify(dingTalkAppService, never()).sendWorkActionCard(anyString(), org.mockito.ArgumentMatchers.anyLong(),
+        verify(dingTalkAppService, never()).sendWorkActionCardPill(anyString(), org.mockito.ArgumentMatchers.anyLong(),
                 anyList(), anyString(), anyString(), anyString(), anyString());
     }
 
@@ -355,7 +355,7 @@ class RdmDailyReportPushFlowTest {
         verify(notifyService, never()).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
         assertFalse(r.isGroupDispatched(), "群报开关关闭时不得入队群消息");
         assertEquals(1, r.getPersonalSent(), "个人通知应独立发出");
-        verify(dingTalkAppService).sendWorkActionCard(eq(NotificationAppService.RDM_DAILY_REPORT), eq(9L),
+        verify(dingTalkAppService).sendWorkActionCardPill(eq(NotificationAppService.RDM_DAILY_REPORT), eq(9L),
                 eq(List.of("ding-77")), anyString(), anyString(), anyString(), anyString());
     }
 
@@ -379,7 +379,7 @@ class RdmDailyReportPushFlowTest {
 
         assertEquals(0, r.getPersonalSent());
         assertEquals(1, r.getPersonalSkipped(), "未绑定者应计入跳过，便于运维发现漏绑");
-        verify(dingTalkAppService, never()).sendWorkActionCard(anyString(), org.mockito.ArgumentMatchers.anyLong(),
+        verify(dingTalkAppService, never()).sendWorkActionCardPill(anyString(), org.mockito.ArgumentMatchers.anyLong(),
                 anyList(), anyString(), anyString(), anyString(), anyString());
     }
 
@@ -406,7 +406,7 @@ class RdmDailyReportPushFlowTest {
 
         assertTrue(r.isGroupDispatched());
         assertEquals(0, r.getPersonalSent(), "仅群聊不得发个人通知");
-        verify(dingTalkAppService, never()).sendWorkActionCard(anyString(), org.mockito.ArgumentMatchers.anyLong(),
+        verify(dingTalkAppService, never()).sendWorkActionCardPill(anyString(), org.mockito.ArgumentMatchers.anyLong(),
                 anyList(), anyString(), anyString(), anyString(), anyString());
         verify(dingTalkAppService, never()).sendWorkNotification(anyString(), org.mockito.ArgumentMatchers.anyLong(),
                 anyList(), anyString(), anyString());
@@ -439,7 +439,7 @@ class RdmDailyReportPushFlowTest {
         assertFalse(r.isGroupDispatched(), "仅指定人不得发群");
         assertEquals(1, r.getPersonalSent());
         org.mockito.ArgumentCaptor<List<String>> captor = org.mockito.ArgumentCaptor.forClass(List.class);
-        verify(dingTalkAppService).sendWorkActionCard(eq(NotificationAppService.RDM_DAILY_REPORT), eq(9L),
+        verify(dingTalkAppService).sendWorkActionCardPill(eq(NotificationAppService.RDM_DAILY_REPORT), eq(9L),
                 captor.capture(), anyString(), anyString(), anyString(), anyString());
         assertEquals(List.of("ding-88"), captor.getValue(), "只应发给被选中的人");
     }
@@ -454,7 +454,7 @@ class RdmDailyReportPushFlowTest {
                 () -> svc.push(manualTarget(null), true, "管理員", false,
                         new RdmDailyReportService.RecipientOverride("users", List.of(88L))));
         assertTrue(ex.getMessage().contains("個人通知渠道"), ex.getMessage());
-        verify(dingTalkAppService, never()).sendWorkActionCard(anyString(), org.mockito.ArgumentMatchers.anyLong(),
+        verify(dingTalkAppService, never()).sendWorkActionCardPill(anyString(), org.mockito.ArgumentMatchers.anyLong(),
                 anyList(), anyString(), anyString(), anyString(), anyString());
     }
 
@@ -662,7 +662,7 @@ class RdmDailyReportPushFlowTest {
         assertTrue(r.getMessage().contains("降噪"), "结果要能解释为什么没发: " + r.getMessage());
         verify(notifyService, never()).notifyUsers(anyString(), any(), anyList(), anyString(), anyString());
         verify(notifyService, never()).notifyActionCard(anyString(), anyString(), anyString(), anyString(), anyString());
-        verify(dingTalkAppService, never()).sendWorkActionCard(anyString(), org.mockito.ArgumentMatchers.anyLong(),
+        verify(dingTalkAppService, never()).sendWorkActionCardPill(anyString(), org.mockito.ArgumentMatchers.anyLong(),
                 anyList(), anyString(), anyString(), anyString(), anyString());
         // 快照仍要落库：不落快照，定时任务下次 tick 会重跑、详情页也没有内容
         verify(jdbc, atLeastOnce()).update(contains("INSERT INTO rdm_daily_report"), any(Object[].class));

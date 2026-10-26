@@ -12252,7 +12252,21 @@
       "closedCancelled": "This meeting has been cancelled. No need to attend.",
       "closedReleased": "The room for this meeting has been released.",
       "closedFinished": "This meeting has ended.",
-      "closedEnded": "This meeting has ended. The information below is for reference only."
+      "closedEnded": "This meeting has ended. The information below is for reference only.",
+      "attendees": "Attendees",
+      "attendeesHint": "Names and RSVP status only",
+      "attendeesEmpty": "No attendees",
+      "role": {
+        "organizer": "Organizer",
+        "required": "Required",
+        "optional": "Optional",
+        "external": "External"
+      },
+      "response": {
+        "accepted": "Accepted",
+        "declined": "Declined",
+        "pending": "Pending"
+      }
     },
     "minutes": {
       "absentReasonPlaceholder": "Absence reason (optional)",

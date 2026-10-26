@@ -244,7 +244,7 @@ public class MeetingNotifyDispatcher {
             var accepted = card.buttonUrl() == null
                     ? dingTalkAppService.sendWorkNotification(task.getScenario(), app.getId(),
                             List.of(task.getReceiverDingtalkId()), card.title(), card.body())
-                    : dingTalkAppService.sendWorkActionCard(task.getScenario(), app.getId(),
+                    : dingTalkAppService.sendWorkActionCardPill(task.getScenario(), app.getId(),
                             List.of(task.getReceiverDingtalkId()), card.title(), card.body(),
                             card.buttonTitle(), card.buttonUrl());
             accepted.whenComplete((ok, error) -> applyOutcome(task, attempts, ok, error));
@@ -335,6 +335,12 @@ public class MeetingNotifyDispatcher {
     /** 终态卡片不允许留任何可点链接（取消/释放后线上会议地址也不再有意义） */
     private static final Pattern ANY_LINK = Pattern.compile("\\[[^\\]]*\\]\\([^)]*\\)");
     private static final DateTimeFormatter CARD_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    /**
+     * 字段名用灰色、值用黑色：钉钉 markdown 不支持文字颜色，只能用 {@code <font color>} 标签；
+     * 色号必须用双引号包住，单引号在手机端不生效。
+     */
+    private static final String GRAY_OPEN = "<font color=\"#8C8C8C\">";
+    private static final String GRAY_CLOSE = "</font>";
 
     /** 一次投递要用的卡片：按钮为空表示这张卡不提供跳转（会议已终态或缺站点地址） */
     record MeetingCard(String title, String body, String buttonTitle, String buttonUrl) {
@@ -420,12 +426,12 @@ public class MeetingNotifyDispatcher {
         vars.put("organizer", Objects.toString(booking.getOrganizerName(), ""));
         // 每段自带前导空行：钉钉 markdown 会把连续单换行归并成一段，不加空行时几行会粘成一行
         vars.put("delegateLine", !closed && StringUtils.hasText(booking.getDelegateForName())
-                ? "\n\n實際使用人：**" + booking.getDelegateForName() + "**（由 "
+                ? "\n\n" + label("實際使用人：") + booking.getDelegateForName() + "（由 "
                         + Objects.toString(booking.getOrganizerName(), "") + " 代訂）" : "");
         vars.put("agendaLine", !closed && StringUtils.hasText(booking.getDescription())
-                ? "\n\n議程：" + truncate(booking.getDescription(), 200) : "");
+                ? "\n\n" + label("議程：") + truncate(booking.getDescription(), 200) : "");
         vars.put("onlineLine", !closed && StringUtils.hasText(booking.getOnlineMeetingUrl())
-                ? "\n\n線上會議：[點擊進入](" + booking.getOnlineMeetingUrl() + ")" : "");
+                ? "\n\n" + label("線上會議：") + "[點擊進入](" + booking.getOnlineMeetingUrl() + ")" : "");
         vars.put("extraLine", extraLine(booking, eventCode));
         vars.put("reason", reasonOf(booking, eventCode));
         vars.put("viewUrl", viewUrl == null ? "" : viewUrl);
@@ -439,7 +445,7 @@ public class MeetingNotifyDispatcher {
         if (MeetingConstants.NOTIFY_EVT_CANCELLED.equals(eventCode)) {
             return "\n\n**本場會議已取消，無需到場。**"
                     + (StringUtils.hasText(booking.getCancelReason())
-                    ? "\n\n取消原因：" + truncate(booking.getCancelReason(), 200) : "");
+                    ? "\n\n" + label("取消原因：") + truncate(booking.getCancelReason(), 200) : "");
         }
         // 释放类事件已在 ops 模板里用「原因 + 如需使用请重新预约」说清，此处不再重复
         return "";
@@ -480,14 +486,14 @@ public class MeetingNotifyDispatcher {
         if (MeetingConstants.NOTIFY_EVT_REMIND.equals(eventCode)) {
             sb.append("⏰ **會議即將開始**\n\n");
         }
-        sb.append("會議時間：**").append(cardTime(booking.getStartTime())).append("**\n\n");
-        sb.append("會議室：**").append(Objects.toString(booking.getRoomName(), "")).append("**\n\n");
-        sb.append("組織者：").append(Objects.toString(booking.getOrganizerName(), ""));
+        sb.append(label("會議時間：")).append(cardTime(booking.getStartTime())).append("\n\n");
+        sb.append(label("會議室：")).append(Objects.toString(booking.getRoomName(), "")).append("\n\n");
+        sb.append(label("組織者：")).append(Objects.toString(booking.getOrganizerName(), ""));
         sb.append(vars.getOrDefault("delegateLine", ""));
         sb.append(vars.getOrDefault("agendaLine", ""));
         sb.append(vars.getOrDefault("onlineLine", ""));
         if (MeetingConstants.NOTIFY_EVT_RELEASED.equals(eventCode)) {
-            sb.append("\n\n原因：**").append(vars.getOrDefault("reason", "")).append("**");
+            sb.append("\n\n").append(label("原因：")).append(vars.getOrDefault("reason", ""));
             sb.append("\n\n如需使用，請重新預約。");
         }
         sb.append(vars.getOrDefault("extraLine", ""));
@@ -510,6 +516,11 @@ public class MeetingNotifyDispatcher {
 
     private static String cardTime(LocalDateTime value) {
         return value == null ? "" : CARD_TIME.format(value);
+    }
+
+    /** 字段名灰色：与值（黑色）拉开层次，手机端用双引号色号才生效 */
+    private static String label(String text) {
+        return GRAY_OPEN + text + GRAY_CLOSE;
     }
 
     private static String eventLabel(String eventCode) {

@@ -12,7 +12,18 @@ import request, { SILENT_HEADER } from './request'
 
 const SILENT = { headers: { [SILENT_HEADER]: '1' } }
 
-/** 免登页视图：只含会议本身与状态，不返回参会人名单/手机号/投递明细 */
+/** 免登页的参会人：只含姓名 + 身份 + 响应态，不含工号/手机号/部门 */
+export interface MeetingViewAttendee {
+  name?: string | null
+  /** organizer/required/optional/external */
+  role?: string | null
+  roleText?: string | null
+  /** pending/accepted/declined；外部人员为空 */
+  response?: string | null
+  responseText?: string | null
+}
+
+/** 免登页视图：只含会议本身与状态，不返回手机号/投递明细 */
 export interface MeetingViewPage {
   valid: boolean
   message?: string | null
@@ -36,6 +47,8 @@ export interface MeetingViewPage {
   cancelReason?: string | null
   releaseReason?: string | null
   tokenExpireAt?: string | null
+  /** 参会人员（姓名 + 身份 + 响应态） */
+  attendees?: MeetingViewAttendee[] | null
 }
 
 export function fetchMeetingViewPage(token: string): Promise<MeetingViewPage> {

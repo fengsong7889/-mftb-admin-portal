@@ -2721,6 +2721,21 @@
       "comment": "v1.1 的模板种子只在 INSERT 时生效，已跑过的库不会重读 268 脚本，只改脚本等于线上永远还是旧文案，因此用独立版本键做 UPDATE。UPDATE 只命中 updated_by='meeting-v2' 的行（即保持出厂文案的），管理员在「通知模板」页改过的措辞不会被打回。钉钉 markdown 会把连续单换行归并成一段，所以每个字段之间必须留空行；旧模板末尾写死的 [查看會議詳情](${viewUrl}) 由投递层统一摘除，链接改由 action_card 按钮承载，避免同一张卡片两个入口。后置校验：不得残留 updated_by='meeting-v2' 的同场景模板，否则说明 UPDATE 未命中。"
     },
     {
+      "versionKey": "meeting:minutes:v1.3",
+      "module": "meeting",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "meetingMinutesSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "meeting:minutes:v1.2"
+      ],
+      "intent": "会议通知卡片字段名改为灰色（<font color>），值保持黑色，建立“标签-值”视觉层次",
+      "author": "Qoder",
+      "ticket": "meeting-notify-card-v3",
+      "comment": "钉钉 markdown 不支持文字颜色，只能用 <font color> 标签，且色号必须用双引号包住（单引号在手机端不生效）。只升级 updated_by='meeting-v1.2' 的行（即上一版出厂文案），管理员改过的模板不动。后置校验：不得残留 updated_by='meeting-v1.2' 的同场景模板。"
+    },
+    {
       "versionKey": "rdm:schema:v3.20",
       "module": "rdm",
       "phase": "MODULE_STRUCTURE",

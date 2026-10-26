@@ -13,10 +13,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Alert, Button, Spin, Tag } from 'antd'
+import { Alert, Avatar, Button, Spin, Tag } from 'antd'
 import { CalendarOutlined, ClockCircleOutlined, EnvironmentOutlined, TeamOutlined } from '@ant-design/icons'
-import { fetchMeetingViewPage, type MeetingViewPage as MeetingView } from '../../api/meetingViewPage'
+import { fetchMeetingViewPage, type MeetingViewAttendee, type MeetingViewPage as MeetingView } from '../../api/meetingViewPage'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 
 /** 状态 → Tag 颜色：与后台会议状态口径一致（蓝=进行中，绿=完成，灰=取消，橙=释放） */
 function statusColor(phase?: string | null) {
@@ -65,6 +66,7 @@ export default function MeetingViewPage() {
   const invalid = view != null && view.valid === false
   const closed = view?.closed === true
   const roomText = [view?.roomName, view?.roomLocation].filter(Boolean).join(' · ')
+  const attendees = view?.attendees ?? []
   // 终态提示：已取消/已释放/已结束分别说清，不给“可能还能进”的模糊话术
   const closedMessage = view?.status === 'cancelled'
     ? t('meeting.viewPage.closedCancelled', { defaultValue: '這場會議已取消，無需到場' })
@@ -132,6 +134,31 @@ export default function MeetingViewPage() {
               )}
             </div>
 
+            <div style={{ marginTop: 20, borderTop: '1px solid #f0f0f0', paddingTop: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>
+                  {t('meeting.viewPage.attendees', { defaultValue: '參會人員' })}
+                  <span style={{ marginLeft: 6, fontSize: 12, fontWeight: 400, color: '#8C8C8C' }}>
+                    （{attendees.length}）
+                  </span>
+                </div>
+                <span style={{ fontSize: 11, color: '#BFBFBF' }}>
+                  {t('meeting.viewPage.attendeesHint', { defaultValue: '僅顯示姓名與出席狀態' })}
+                </span>
+              </div>
+              {attendees.length === 0 ? (
+                <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+                  {t('meeting.viewPage.attendeesEmpty', { defaultValue: '暫無參會人員' })}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {attendees.map((row, index) => (
+                    <AttendeeRow key={`${row.role ?? 'role'}-${row.name ?? 'name'}-${index}`} row={row} />
+                  ))}
+                </div>
+              )}
+            </div>
+
             {closed && (
               <div style={{ marginTop: 20 }}>
                 <Alert
@@ -181,6 +208,56 @@ function Row({ icon, label, value }: { icon: ReactNode; label: string; value?: s
         {label}
       </span>
       <span style={{ color: '#262626', flex: 1, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{value || '-'}</span>
+    </div>
+  )
+}
+
+/** 头像底色：组织者用品牌橙，必参蓝，选参灰，外部青 */
+function roleColor(role?: string | null) {
+  switch (role) {
+    case 'organizer':
+      return '#E8720C'
+    case 'required':
+      return '#1677FF'
+    case 'external':
+      return '#13C2C2'
+    default:
+      return '#8C8C8C'
+  }
+}
+
+function roleLabel(t: TFunction, row: MeetingViewAttendee) {
+  const fallback = row.roleText || row.role || '-'
+  return row.role
+    ? t(`meeting.viewPage.role.${row.role}`, { defaultValue: fallback })
+    : fallback
+}
+
+function responseLabel(t: TFunction, row: MeetingViewAttendee) {
+  const fallback = row.responseText || row.response || ''
+  return row.response
+    ? t(`meeting.viewPage.response.${row.response}`, { defaultValue: fallback })
+    : fallback
+}
+
+/** 参会人行：首字头像 + 姓名 + 身份 + 响应态（不展示工号/手机号/部门） */
+function AttendeeRow({ row }: { row: MeetingViewAttendee }) {
+  const { t } = useTranslation()
+  const name = row.name ?? '-'
+  const roleTagColor = row.role === 'organizer' ? 'orange' : row.role === 'external' ? 'cyan' : 'blue'
+  const responseTagColor = row.response === 'accepted' ? 'green' : row.response === 'pending' ? 'orange' : 'default'
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <Avatar size={30} style={{ background: roleColor(row.role), fontSize: 13, flexShrink: 0 }}>
+        {name.slice(0, 1)}
+      </Avatar>
+      <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: '#262626', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {name}
+      </span>
+      <Tag color={roleTagColor} style={{ marginInlineEnd: 0 }}>{roleLabel(t, row)}</Tag>
+      {row.response && row.role !== 'organizer' && (
+        <Tag color={responseTagColor} style={{ marginInlineEnd: 0 }}>{responseLabel(t, row)}</Tag>
+      )}
     </div>
   )
 }

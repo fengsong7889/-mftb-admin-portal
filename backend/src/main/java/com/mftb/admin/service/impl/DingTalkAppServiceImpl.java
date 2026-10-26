@@ -84,6 +84,43 @@ public class DingTalkAppServiceImpl implements DingTalkAppService {
         return sendWork(scenario, appId, userIds, msg, title);
     }
 
+    /**
+     * 发送带圆角按钮的工作通知卡片（独立跳转 ActionCard）。
+     *
+     * <p>与 {@link #sendWorkActionCard} 的差别只在按钮协议：{@code single_title/single_url}
+     * 是“整体跳转”样式，移动端渲染成一行带箭头的文字；{@code btn_json_list + btn_orientation}
+     * 才会渲染成圆角按钮（与考勤/审批卡片的「查看详情」一致）。会议邀约用这一种。
+     */
+    @Override
+    @Async
+    public CompletableFuture<Boolean> sendWorkActionCardPill(String scenario, long appId, List<String> userIds,
+                                                             String title, String markdown, String btnTitle, String btnUrl) {
+        if (!StringUtils.hasText(markdown) || !StringUtils.hasText(btnTitle) || !StringUtils.hasText(btnUrl)) {
+            log.warn("钉钉工作通知卡片未发送：正文或按钮为空（卡片必须带跳转按钮）");
+            return CompletableFuture.completedFuture(false);
+        }
+        Map<String, Object> msg = buildPillActionCardMessage(title, markdown, btnTitle, btnUrl);
+        return sendWork(scenario, appId, userIds, msg, title);
+    }
+
+    /** 独立跳转 ActionCard 的消息体（独立成方法：单测直接断言按钮协议，不依赖网络） */
+    static Map<String, Object> buildPillActionCardMessage(String title, String markdown,
+                                                         String btnTitle, String btnUrl) {
+        Map<String, Object> button = new LinkedHashMap<>();
+        button.put("title", btnTitle);
+        button.put("action_url", btnUrl);
+        Map<String, Object> card = new LinkedHashMap<>();
+        card.put("title", title);
+        card.put("markdown", markdown);
+        // 0=竖直排列（单按钮占满一行），1=横向排列；会议只有一个入口，用竖直布局
+        card.put("btn_orientation", "0");
+        card.put("btn_json_list", List.of(button));
+        Map<String, Object> msg = new LinkedHashMap<>();
+        msg.put("msgtype", "action_card");
+        msg.put("action_card", card);
+        return msg;
+    }
+
     /** 工作通知公共链路：解析应用凭证 → 取 token → 投递 → 按 errcode 回报结果 */
     private CompletableFuture<Boolean> sendWork(String scenario, long appId, List<String> userIds,
                                                 Map<String, Object> msg, String title) {

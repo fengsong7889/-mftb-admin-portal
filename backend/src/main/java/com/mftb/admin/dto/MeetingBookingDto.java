@@ -428,5 +428,24 @@ public final class MeetingBookingDto {
         private String releaseReason;
         /** 令牌过期时刻（页面尾部提示） */
         private String tokenExpireAt;
+        /** 参会人员（只给姓名 + 身份 + 响应状态，不含工号/手机号/部门） */
+        private List<PublicAttendee> attendees;
+    }
+
+    /**
+     * 免登页的参会人视图。
+     *
+     * <p>字段刻意窄：公开链接可被转发，姓名之外的联系方式与组织归属一律不下放；
+     * 身份与响应态只用于让参会人知道「谁会来、来不来」，便于会前沟通。
+     */
+    @Data
+    public static class PublicAttendee {
+        private String name;
+        /** organizer/required/optional/external */
+        private String role;
+        private String roleText;
+        /** pending/accepted/declined；外部人员为 null */
+        private String response;
+        private String responseText;
     }
 }

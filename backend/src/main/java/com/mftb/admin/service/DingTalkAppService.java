@@ -34,14 +34,26 @@ public interface DingTalkAppService {
      * <p><b>与 markdown 的差别不是“好看”而是信息密度</b>：工作通知的 markdown 是一段长文本，
      * 手机上一屏只能看到前几行；卡片有独立标题区与底部按钮，读者能先看到结论、再决定是否点进详情。
      *
-     * <p><b>字段是工作通知协议</b>：正文 {@code markdown}、按钮 {@code single_title/single_url}（下划线），
-     * 与群机器人卡片的 {@code text/singleTitle/singleURL} 不同。
+     * <p><b>字段是工作通知协议</b>：正文 {@code markdown}，按钮走独立跳转
+     * {@code btn_json_list + btn_orientation}（下划线），与群机器人卡片的
+     * {@code text/singleTitle/singleURL} 不同。用独立跳转而不是 {@code single_title/single_url}：
+     * 后者在移动端渲染为一行带箭头的文字，前者才是圆角按钮。
      *
      * @param markdown 卡片正文（钉钉建议 ≤ 1000 字符，超出易被折叠）
      * @param btnTitle 按钮文案（≤ 20 字符）
      * @param btnUrl   按钮跳转地址（≤ 500 字符）
      */
     java.util.concurrent.CompletableFuture<Boolean> sendWorkActionCard(String scenario, long appId,
+            java.util.List<String> userIds, String title, String markdown, String btnTitle, String btnUrl);
+
+    /**
+     * 发送带圆角按钮的工作通知卡片（独立跳转 ActionCard，{@code btn_json_list}）。
+     *
+     * <p>与 {@link #sendWorkActionCard} 的差别只在按钮协议：后者用 {@code single_title/single_url}
+     * 的整体跳转样式，移动端渲染为一行带箭头的文字；本方法用独立跳转，渲染为圆角按钮。
+     * 会议邀约的「查看會議詳情」使用本方法，日报等既有场景保持原样式。
+     */
+    java.util.concurrent.CompletableFuture<Boolean> sendWorkActionCardPill(String scenario, long appId,
             java.util.List<String> userIds, String title, String markdown, String btnTitle, String btnUrl);
 
     /**

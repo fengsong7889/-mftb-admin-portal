@@ -145,9 +145,9 @@ class RdmDailyReportReceiverTest {
         TriggerResult r = svc.push(target(), false, null, false);
 
         assertEquals(1, r.getPersonalSent());
-        verify(dingTalkAppService).sendWorkActionCard(eq(NotificationAppService.RDM_DAILY_REPORT), eq(9L),
+        verify(dingTalkAppService).sendWorkActionCardPill(eq(NotificationAppService.RDM_DAILY_REPORT), eq(9L),
                 eq(List.of("ding-11")), anyString(), anyString(), anyString(), anyString());
-        verify(dingTalkAppService, never()).sendWorkActionCard(anyString(), anyLong(),
+        verify(dingTalkAppService, never()).sendWorkActionCardPill(anyString(), anyLong(),
                 eq(List.of("ding-77")), anyString(), anyString(), anyString(), anyString());
     }
 
@@ -164,7 +164,7 @@ class RdmDailyReportReceiverTest {
         TriggerResult r = svc.push(target(), false, null, false);
 
         assertEquals(1, r.getPersonalSent(), "一人一条，不能按角色各发一次");
-        verify(dingTalkAppService).sendWorkActionCard(eq(NotificationAppService.RDM_DAILY_REPORT), eq(9L),
+        verify(dingTalkAppService).sendWorkActionCardPill(eq(NotificationAppService.RDM_DAILY_REPORT), eq(9L),
                 eq(List.of("ding-77")), anyString(), anyString(), anyString(), anyString());
     }
 
@@ -181,7 +181,7 @@ class RdmDailyReportReceiverTest {
 
         assertEquals(1, r.getPersonalSent(), "追加收件人独立生效");
         ArgumentCaptor<String> content = ArgumentCaptor.forClass(String.class);
-        verify(dingTalkAppService).sendWorkActionCard(eq(NotificationAppService.RDM_DAILY_REPORT), eq(9L),
+        verify(dingTalkAppService).sendWorkActionCardPill(eq(NotificationAppService.RDM_DAILY_REPORT), eq(9L),
                 eq(List.of("ding-99")), anyString(), content.capture(), anyString(), anyString());
         assertTrue(content.getValue().contains("項目A"), "追加人应看到全部项目，实际: " + content.getValue());
         assertTrue(content.getValue().contains("項目B"), "追加人应看到全部项目，实际: " + content.getValue());
@@ -200,7 +200,7 @@ class RdmDailyReportReceiverTest {
 
         assertEquals(0, r.getPersonalSent());
         assertEquals(0, r.getPersonalSkipped(), "被排除不是异常，不应计入跳过");
-        verify(dingTalkAppService, never()).sendWorkActionCard(anyString(), anyLong(), anyList(),
+        verify(dingTalkAppService, never()).sendWorkActionCardPill(anyString(), anyLong(), anyList(),
                 anyString(), anyString(), anyString(), anyString());
     }
 
@@ -238,7 +238,7 @@ class RdmDailyReportReceiverTest {
         TriggerResult r = svc.push(target(), false, null, false);
 
         assertEquals(1, r.getPersonalSent());
-        verify(dingTalkAppService).sendWorkActionCard(eq(NotificationAppService.RDM_DAILY_REPORT), eq(9L),
+        verify(dingTalkAppService).sendWorkActionCardPill(eq(NotificationAppService.RDM_DAILY_REPORT), eq(9L),
                 eq(List.of("ding-55")), anyString(), anyString(), anyString(), anyString());
     }
 

@@ -205,13 +205,13 @@ class MeetingNotifyDispatcherOutcomeTest {
         when(bookingMapper.selectById(22L)).thenReturn(booking);
         when(publicViewService.detailUrl(anyString(), any(MeetingBooking.class)))
                 .thenReturn("https://portal.example.com/#/meeting-view?token=abc");
-        when(dingTalkAppService.sendWorkActionCard(anyString(), anyLong(), anyList(), anyString(),
+        when(dingTalkAppService.sendWorkActionCardPill(anyString(), anyLong(), anyList(), anyString(),
                 anyString(), anyString(), anyString()))
                 .thenReturn(CompletableFuture.completedFuture(Boolean.TRUE));
 
         dispatcher.send(45L);
 
-        verify(dingTalkAppService).sendWorkActionCard(eq(row.getScenario()), eq(1L), anyList(),
+        verify(dingTalkAppService).sendWorkActionCardPill(eq(row.getScenario()), eq(1L), anyList(),
                 eq("产品周会"), anyString(), eq("查看會議詳情"),
                 eq("https://portal.example.com/#/meeting-view?token=abc"));
         verify(dingTalkAppService, never()).sendWorkNotification(anyString(), anyLong(), anyList(),
@@ -238,8 +238,9 @@ class MeetingNotifyDispatcherOutcomeTest {
                 dispatcher.buildCard(booking, MeetingConstants.NOTIFY_EVT_CREATED, "https://portal.example.com");
 
         org.junit.jupiter.api.Assertions.assertEquals("产品周会", card.title());
-        org.junit.jupiter.api.Assertions.assertTrue(card.body().contains("會議時間：**"),
-                "会议时间必须单独成段");
+        org.junit.jupiter.api.Assertions.assertTrue(
+                card.body().contains("<font color=\"#8C8C8C\">會議時間：</font>2026-"),
+                "字段名必须是灰色、值黑色且单独成段，实际: " + card.body());
         org.junit.jupiter.api.Assertions.assertFalse(card.body().contains("會議單號"),
                 "会议单号不再进卡片，避免挤占重点");
         org.junit.jupiter.api.Assertions.assertEquals("查看會議詳情", card.buttonTitle());

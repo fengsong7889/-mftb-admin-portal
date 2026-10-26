@@ -75,6 +75,32 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
             "原因：**${reason}**${extraLine}",
             "如需使用，請重新預約。");
 
+    /**
+     * v1.3：字段名灰色、值黑色（与考勤卡片同层次的视觉）。
+     *
+     * <p>钉钉 markdown 不支持文字颜色，只能用 {@code <font color>}；色号必须双引号包住，
+     * 单引号在手机端不生效。只升级 v1.2 写过的行，管理员改过的文案不动。
+     */
+    static final String VERSION_TEMPLATE_COPY_V13 = "meeting:minutes:v1.3";
+
+    private static final String CARD_COPY_INVITE_V13 = String.join("\n\n",
+            "**${meetingTitle}**",
+            "<font color=\"#8C8C8C\">會議時間：</font>${startTime}",
+            "<font color=\"#8C8C8C\">會議室：</font>${roomName}",
+            "<font color=\"#8C8C8C\">組織者：</font>${organizer}${delegateLine}${agendaLine}${onlineLine}${extraLine}");
+    private static final String CARD_COPY_REMIND_V13 = String.join("\n\n",
+            "**${meetingTitle}**",
+            "⏰ **會議即將開始**",
+            "<font color=\"#8C8C8C\">會議時間：</font>${startTime}",
+            "<font color=\"#8C8C8C\">會議室：</font>${roomName}",
+            "<font color=\"#8C8C8C\">組織者：</font>${organizer}${onlineLine}");
+    private static final String CARD_COPY_OPS_V13 = String.join("\n\n",
+            "**${meetingTitle}**",
+            "<font color=\"#8C8C8C\">會議時間：</font>${startTime}",
+            "<font color=\"#8C8C8C\">會議室：</font>${roomName}",
+            "<font color=\"#8C8C8C\">原因：</font>${reason}${extraLine}",
+            "如需使用，請重新預約。");
+
     /** v1.1 建的四张表（顺序即外键依赖顺序） */
     private static final List<String> TABLES_V2 = List.of(
             "biz_meeting_minutes_item", "biz_meeting_minutes_link",
@@ -170,6 +196,9 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
         // v1.2：卡片文案重排。必须在 v1.1 之后（模板表与种子先就绪）
         versionTracker.applyOnce(VERSION_TEMPLATE_COPY_V12,
                 this::refreshMeetingCardCopyV12, this::verifyMeetingCardCopyV12);
+        // v1.3：字段名灰色/值黑色，只升级 v1.2 写过的行
+        versionTracker.applyOnce(VERSION_TEMPLATE_COPY_V13,
+                this::refreshMeetingCardCopyV13, this::verifyMeetingCardCopyV13);
         // 每次启动都跑的三步：不受 applyOnce 门控，改动才能落到已经跑过 v1.0 的环境
         syncSeqRule();
         ensureNotifyScenario();
@@ -260,6 +289,36 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
                 MeetingConstants.SCENARIO_INVITE, MeetingConstants.SCENARIO_REMIND, MeetingConstants.SCENARIO_OPS);
         if (stale != null && stale > 0) {
             throw new IllegalStateException("會議通知模板仍有 " + stale + " 條舊版文案未重排");
+        }
+    }
+
+    /* ==================== v1.3 字段名灰色 ==================== */
+
+    private void refreshMeetingCardCopyV13() {
+        int invite = refreshMeetingTemplateFromV12(MeetingConstants.SCENARIO_INVITE, "會議邀約",
+                "${titlePrefix}${meetingTitle}", CARD_COPY_INVITE_V13);
+        int remind = refreshMeetingTemplateFromV12(MeetingConstants.SCENARIO_REMIND, "會議開始前提醒",
+                "【會議提醒】${meetingTitle}", CARD_COPY_REMIND_V13);
+        int ops = refreshMeetingTemplateFromV12(MeetingConstants.SCENARIO_OPS, "會議室釋放告知",
+                "【會議室釋放】${meetingTitle}", CARD_COPY_OPS_V13);
+        log.info("會議通知字段名已改為灰色: invite={}, remind={}, ops={} 行", invite, remind, ops);
+    }
+
+    /** 只升级 v1.2 写过的行；管理员改过的行 updated_by 已变，不会被发版打回 */
+    private int refreshMeetingTemplateFromV12(String sceneKey, String sceneName, String titleTpl, String bodyTpl) {
+        return jdbcTemplate.update("UPDATE sys_notification_template SET scene_name = ?, title_tpl = ?, "
+                        + "body_tpl = ?, updated_by = 'meeting-v1.3' "
+                        + "WHERE scene_key = ? AND updated_by = 'meeting-v1.2'",
+                sceneName, titleTpl, bodyTpl, sceneKey);
+    }
+
+    private void verifyMeetingCardCopyV13() {
+        Integer stale = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_notification_template WHERE scene_key IN (?, ?, ?) "
+                        + "AND updated_by = 'meeting-v1.2'", Integer.class,
+                MeetingConstants.SCENARIO_INVITE, MeetingConstants.SCENARIO_REMIND, MeetingConstants.SCENARIO_OPS);
+        if (stale != null && stale > 0) {
+            throw new IllegalStateException("會議通知模板仍有 " + stale + " 條未升級為灰色字段名");
         }
     }
 
