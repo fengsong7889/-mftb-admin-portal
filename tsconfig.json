@@ -46,6 +46,9 @@
   },
   "include": [
     "src",
+    // 应用入口（方案 §4.1）：三个应用的入口只 import 根 bootstrap，由根 tsconfig 统一类型检查；
+    // 各应用 tsconfig 排除该文件，避免把根 src 拉进应用工程改变其 `@/*` 语义。
+    "frontend/apps/*/src/main.tsx",
     "frontend/packages/contracts/src",
     "frontend/packages/i18n/src",
     "frontend/packages/platform-client/src",

@@ -80,6 +80,34 @@ function routeBlocks(source) {
 
 const NEUTRAL = new Set(['Suspense', 'PageLoading', 'Navigate', 'Fragment'])
 
+/**
+ * 死代码守卫：App.tsx 里「声明了但没被引用」的应用页面 lazy 必须报错。
+ *
+ * 为什么：`lazy(() => import(...))` 是一次函数调用，打包器不能假定它无副作用，
+ * 即使变量没人用也会保留 → 动态 import 仍然进产物。
+ * 实测（方案 C.29）：157 条这种残留声明让 eam 产物多出 57 个 rdm chunk、60 个 hr chunk，
+ * 「按应用构建」直接失效。路由搬迁/删除后必须把不再引用的声明一起清掉。
+ *
+ * 判定前先去掉字符串字面量，避免 import 路径里的同名片段（如 `AssetTransfer/TransferDetail`）造成假引用。
+ */
+function unusedAppLazy() {
+  const stripped = lines.map((l) => l.replace(/'[^']*'/g, "''").replace(/"[^"]*"/g, '""'))
+  const declRe = /^const (\w+) = lazy\(\(\) => import\('@mftb\/app-(rdm|eam|hr)\/([^']+)'\)\)$/
+  const unused = []
+  lines.forEach((line, i) => {
+    const m = line.match(declRe)
+    if (!m) return
+    const name = m[1]
+    let refs = 0
+    stripped.forEach((s, j) => {
+      if (j === i) return
+      refs += (s.match(new RegExp(`\\b${name}\\b`, 'g')) ?? []).length
+    })
+    if (refs === 0) unused.push({ name, app: m[2], module: m[3] })
+  })
+  return unused
+}
+
 function inventoryFor(app) {
   const lazy = lazyOf(app)
   const appLines = appRoutesFile(app)
@@ -102,6 +130,20 @@ function inventoryFor(app) {
 }
 
 let failed = false
+const deadLazy = unusedAppLazy()
+if (deadLazy.length) {
+  if (checkOnly) {
+    console.error(
+      `❌ src/App.tsx 有 ${deadLazy.length} 条未被引用的应用页面 lazy 声明（会让所有应用的产物互相夹带）：\n` +
+      deadLazy.slice(0, 8).map((d) => `   - ${d.name} → @mftb/app-${d.app}/${d.module}`).join('\n') +
+      (deadLazy.length > 8 ? `\n   …其余 ${deadLazy.length - 8} 条` : ''),
+    )
+    failed = true
+  } else {
+    console.warn(`⚠️  src/App.tsx 仍有 ${deadLazy.length} 条未被引用的应用页面 lazy 声明（建议随路由搬迁一并删除）`)
+  }
+}
+
 for (const app of APPS) {
   const owned = inventoryFor(app)
   const target = path.join(ROOT, 'frontend', 'apps', app, 'src', 'routes.inventory.json')

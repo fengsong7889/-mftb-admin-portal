@@ -9,10 +9,13 @@
  *
  * 用法：
  *   node scripts/assemble-site.mjs --current dist/site-manifest.json [--previous prev.json] [--accept]
+ *   node scripts/assemble-site.mjs --dist-apps dist-apps [--previous prev.json] [--accept]
+ *     按应用产物装配：读每份 <app>/site-manifest.json，合并后整体比对（无需先手动合并）。
  * 退出码：0 通过；1 校验失败或需要显式确认；2 参数/文件问题。
  */
 import fs from 'node:fs'
 import path from 'node:path'
+import { mergeAppManifests } from './lib/app-manifests.mjs'
 import { planAssembly, validateManifest } from './lib/site-assembly.mjs'
 
 const args = process.argv.slice(2)
@@ -30,11 +33,47 @@ const readJson = (p) => {
 }
 
 const currentPath = valueOf('current')
-if (!currentPath) {
+const distApps = valueOf('dist-apps')
+if (!currentPath && !distApps) {
   console.error('用法：node scripts/assemble-site.mjs --current <manifest.json> [--previous <manifest.json>] [--accept]')
+  console.error('   或：node scripts/assemble-site.mjs --dist-apps <dir> [--previous <manifest.json>] [--accept]')
   process.exit(2)
 }
-const current = readJson(path.resolve(currentPath))
+
+/** `--dist-apps`：逐应用清单先各自校验，再合并成一份站点清单（方案 §4.2） */
+function loadFromDistApps(dir) {
+  const abs = path.resolve(dir)
+  if (!fs.existsSync(abs)) {
+    console.error(`❌ ${dir} 不存在。请先跑 npm run build:apps。`)
+    process.exit(2)
+  }
+  const apps = fs
+    .readdirSync(abs, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && fs.existsSync(path.join(abs, e.name, 'site-manifest.json')))
+    .map((e) => e.name)
+    .sort()
+  if (!apps.length) {
+    console.error(`❌ ${dir} 下没有任何 <app>/site-manifest.json。`)
+    process.exit(2)
+  }
+  const problems = []
+  const manifests = apps.map((app) => {
+    const m = readJson(path.join(abs, app, 'site-manifest.json'))
+    for (const p of validateManifest(m)) problems.push(`${app}: ${p}`)
+    if (!m?.document?.sha256) problems.push(`${app}: 缺少 index.html 摘要`)
+    return m
+  })
+  const { manifest, conflicts } = mergeAppManifests(manifests)
+  problems.push(...conflicts)
+  if (problems.length) {
+    console.error('❌ 按应用产物清单校验失败：')
+    for (const p of problems) console.error(`   - ${p}`)
+    process.exit(1)
+  }
+  return manifest
+}
+
+const current = distApps ? loadFromDistApps(distApps) : readJson(path.resolve(currentPath))
 const previous = valueOf('previous') ? readJson(path.resolve(valueOf('previous'))) : null
 
 const problems = validateManifest(current)

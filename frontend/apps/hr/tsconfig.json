@@ -95,5 +95,8 @@
   },
   "include": [
     "src"
+  ],
+  "exclude": [
+    "src/main.tsx"
   ]
 }

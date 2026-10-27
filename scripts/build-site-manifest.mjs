@@ -13,7 +13,10 @@
  * 注意边界：这是**装配清单**，不是「按应用独立构建」——
  * 独立构建还需要把路由拆到各应用（后续切片），本脚本不冒充已完成。
  *
- * 用法：node scripts/build-site-manifest.mjs [--dist dist] [--out dist/site-manifest.json]
+ * 用法：node scripts/build-site-manifest.mjs [--dist dist] [--out dist/site-manifest.json] [--app rdm]
+ *   --app：按应用构建（VITE_APP_ROOT）的产物资单必填。此时 Vite manifest 的 key 相对应用根
+ *          （形如 `src/pages/...`），无法用 `frontend/apps/<app>/` 前缀归属，
+ *          未命中前缀的 chunk 一律归到该应用（单应用产物里不存在「其它应用的代码」）。
  */
 import crypto from 'node:crypto'
 import fs from 'node:fs'
@@ -28,6 +31,7 @@ const valueOf = (name, fallback) => {
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
 const distDir = path.resolve(ROOT, valueOf('dist', 'dist'))
 const outFile = path.resolve(ROOT, valueOf('out', 'dist/site-manifest.json'))
+const scopedApp = valueOf('app', null)
 const viteManifestPath = path.join(distDir, '.vite', 'manifest.json')
 
 if (!fs.existsSync(viteManifestPath)) {
@@ -38,10 +42,11 @@ if (!fs.existsSync(viteManifestPath)) {
   process.exit(1)
 }
 
-/** 源码路径 → 应用名。只做前缀匹配，未命中一律 legacy（诚实标记，不猜）。 */
+/** 源码路径 → 应用名。只做前缀匹配，未命中时：按应用构建产物归该应用，整站产物归 legacy（诚实标记，不猜）。 */
 function appOfSource(src) {
   const m = /^frontend\/apps\/([a-z0-9-]+)\//.exec(src ?? '')
-  return m ? m[1] : 'legacy'
+  if (m) return m[1]
+  return scopedApp ?? 'legacy'
 }
 
 const viteManifest = JSON.parse(fs.readFileSync(viteManifestPath, 'utf8'))
@@ -69,15 +74,34 @@ for (const [key, chunk] of Object.entries(viteManifest)) {
   })
 }
 
+/**
+ * 入口文档摘要：只读 dist 根下的 index.html（应用构建时为该应用自己的文档）。
+ * 缺失不算错（整站调试产物可能没有），装配检查会单独报。
+ */
+function readDocument() {
+  const p = path.join(distDir, 'index.html')
+  if (!fs.existsSync(p)) return null
+  const buf = fs.readFileSync(p)
+  return {
+    file: 'index.html',
+    bytes: buf.length,
+    sha256: crypto.createHash('sha256').update(buf).digest('hex'),
+    title: (/<title>([^<]*)<\/title>/.exec(buf.toString('utf8')) ?? [])[1] ?? null,
+  }
+}
+
 const manifest = {
   $comment: [
     '站点装配清单（方案 §4.2）。由 scripts/build-site-manifest.mjs 生成。',
     'app = 源码路径前缀 frontend/apps/<app>；未命中的共享/legacy 代码统一记 legacy。',
     '装配与回滚按本清单的 sha256 校验，禁止用「最新构建」覆盖已验证产物。',
     '本清单只描述归属与摘要，不代表已实现按应用独立构建（路由拆分仍在后续切片）。',
+    '按应用构建产物（--app）另登记 index.html 摘要，装配时连文档一起校验。',
   ],
   buildTime: new Date().toISOString(),
   commit: process.env.GITHUB_SHA ?? null,
+  // 独立 index.html 的摘要：装配时先校文档再校资源，避免「文档与资产来自不同构建」
+  document: readDocument(),
   apps: Object.fromEntries(
     Object.entries(apps)
       .sort(([a], [b]) => a.localeCompare(b))

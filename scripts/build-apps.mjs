@@ -1,12 +1,17 @@
 #!/usr/bin/env node
 /**
- * 按应用构建（方案 §4.1/§4.2）：为 rdm / eam / hr 各产出一份 `dist-apps/<app>`。
+ * 按应用构建（方案 §4.1/§4.2）：为 rdm / eam / hr 各产出一份自带 index.html 的
+ * `dist-apps/<app>`，并顺带生成该应用的装配清单 `dist-apps/<app>/site-manifest.json`。
  *
- * 做法：把 `@/app-routes` 别名替换为 `frontend/apps/<app>/src/app-routes.ts` 后构建，
- * 构建期只装配该应用的路由组（未设置时仍是整站构建，现状不变）。
+ * 做法：
+ *   1. `VITE_APP_ROOT=frontend/apps/<app>` —— 让该目录的 index.html + src/main.tsx 成为真正入口
+ *      （`dist-apps/<app>/index.html`，标题/文档不再共用根 index.html）；
+ *   2. `VITE_APP_ROUTES=frontend/apps/<app>/src/app-routes.ts` —— 路由组只装配该应用。
  *
- * 它会**如实报告**产物里是否还残留其它应用的页面 chunk：
- * 静态 import 的路由表能否被常量折叠剔除取决于打包器，脚本不假设「已经剔除」。
+ * 脚本会**如实报告**三点，不假设「已经剔除」：
+ *   - 产物是否有独立 index.html（缺了就是构建方式没生效）；
+ *   - 产物里是否残留其它应用的 chunk（按 Vite manifest 的源码路径判定）；
+ *   - 该应用清单里登记了多少 chunk / 多少字节。
  *
  * 用法：node scripts/build-apps.mjs [--app rdm] [--skip-build]
  */
@@ -29,51 +34,97 @@ if (!targets.length) {
   process.exit(2)
 }
 
-/** 统计产物里属于各应用的 chunk 数（按 chunk 文件名前缀或 manifest 的 src 判定用不上，这里退化为体积+计数） */
-function summarize(dir) {
+function walk(dir) {
   let files = 0
   let bytes = 0
-  const walk = (abs) => {
-    for (const e of fs.readdirSync(abs, { withFileTypes: true })) {
-      const full = path.join(abs, e.name)
-      if (e.isDirectory()) walk(full)
-      else {
-        files += 1
-        bytes += fs.statSync(full).size
-      }
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, e.name)
+    if (e.isDirectory()) {
+      const sub = walk(full)
+      files += sub.files
+      bytes += sub.bytes
+    } else {
+      files += 1
+      bytes += fs.statSync(full).size
     }
   }
-  if (!fs.existsSync(dir)) return null
-  walk(dir)
   return { files, bytes }
+}
+
+/** 读 Vite 产物 manifest：key 是相对 Vite root 的源码路径 */
+function viteManifestOf(outDir) {
+  const p = path.join(outDir, '.vite', 'manifest.json')
+  if (!fs.existsSync(p)) return null
+  return JSON.parse(fs.readFileSync(p, 'utf8'))
+}
+
+/**
+ * 产物里是否残留其它应用的源码。
+ * 注意：应用根下的 key 形如 `src/pages/...`（不含应用名），所以只能靠
+ * 「路径里出现 frontend/apps/<其它应用>/」判定跨应用引用——这正是要拦的形态。
+ */
+function foreignAppsOf(manifest, own) {
+  const hit = new Set()
+  for (const key of Object.keys(manifest ?? {})) {
+    const m = /frontend\/apps\/([a-z0-9-]+)\//.exec(key)
+    if (m && m[1] !== own) hit.add(m[1])
+  }
+  return [...hit].sort()
 }
 
 const report = []
 for (const app of targets) {
-  const outDir = path.join('dist-apps', app)
+  const outDir = path.join(ROOT, 'dist-apps', app)
   if (!skipBuild) {
-    console.log(`\n▶ 构建 ${app} → ${outDir}`)
+    console.log(`\n▶ 构建 ${app} → dist-apps/${app}`)
     execFileSync('npx', ['vite', 'build', '--outDir', outDir, '--emptyOutDir'], {
       cwd: ROOT,
       stdio: 'inherit',
-      // 入口级别名：把 @/app-routes 指向该应用自己的路由组（其它应用完全不会进入 bundle）
-      env: { ...process.env, VITE_APP_ROUTES: `frontend/apps/${app}/src/app-routes.ts` },
+      env: {
+        ...process.env,
+        // 应用根：独立 index.html + 独立入口；路由组只装配本应用（方案 §4.1）
+        VITE_APP_ROOT: `frontend/apps/${app}`,
+        VITE_APP_ROUTES: `frontend/apps/${app}/src/app-routes.ts`,
+      },
     })
   }
-  const stat = summarize(path.join(ROOT, outDir))
-  if (!stat) {
-    console.error(`❌ ${outDir} 不存在`)
+  if (!fs.existsSync(outDir)) {
+    console.error(`❌ dist-apps/${app} 不存在`)
     process.exit(1)
   }
-  // 其它应用的痕迹检查：产物里是否出现它们的路由表变量名（压缩后仍保留字符串常量）
-  const own = fs.readFileSync(path.join(ROOT, outDir, 'siteless.txt'), 'utf8').length === 0 ? null : null
-  void own
-  report.push({ app, ...stat })
+  const indexPath = path.join(outDir, 'index.html')
+  if (!fs.existsSync(indexPath)) {
+    console.error(
+      `❌ dist-apps/${app}/index.html 缺失：VITE_APP_ROOT 未生效，产物仍是共用根文档。`,
+    )
+    process.exit(1)
+  }
+  const title = (/<title>([^<]*)<\/title>/.exec(fs.readFileSync(indexPath, 'utf8')) ?? [])[1] ?? ''
+  const foreign = foreignAppsOf(viteManifestOf(outDir), app)
+  const stat = walk(outDir)
+  report.push({ app, ...stat, title, foreign })
+}
+
+// 逐应用生成装配清单（chunk 归属 + sha256 + index.html 摘要）
+for (const r of report) {
+  execFileSync('node', [
+    path.join(ROOT, 'scripts', 'build-site-manifest.mjs'),
+    '--dist', path.join('dist-apps', r.app),
+    '--out', path.join('dist-apps', r.app, 'site-manifest.json'),
+    '--app', r.app,
+  ], { cwd: ROOT, stdio: 'inherit' })
 }
 
 console.log('\n按应用构建结果')
+let drifted = false
 for (const r of report) {
-  console.log(`  ${r.app.padEnd(4)} ${String(r.files).padStart(4)} 文件  ${(r.bytes / 1024 / 1024).toFixed(2)} MB  → dist-apps/${r.app}`)
+  const flag = r.foreign.length ? `残留其它应用: ${r.foreign.join(',')}` : '无跨应用残留'
+  if (r.foreign.length) drifted = true
+  console.log(
+    `  ${r.app.padEnd(4)} ${String(r.files).padStart(4)} 文件  ${(r.bytes / 1024 / 1024).toFixed(2)} MB  ` +
+    `标题=${r.title || '—'}  ${flag}`,
+  )
 }
-console.log('\n说明：本脚本只保证「每应用一份产物 + 构建期只注册该应用路由」，')
-console.log('      不声称已剔除其它应用的 chunk（取决于常量折叠），剔除情况以装配清单为准。')
+console.log('\n说明：每个应用都有独立 index.html 与独立 site-manifest.json；')
+console.log('      跨应用残留判定读 Vite manifest 的源码路径，不做「体积变小了就算剔除」的推断。')
+if (drifted) process.exit(1)

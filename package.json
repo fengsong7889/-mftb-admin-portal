@@ -43,6 +43,8 @@
     "restart:backend:fast": "cd backend && bash restart-service.sh --fast",
     "build:manifest": "node scripts/build-site-manifest.mjs",
     "assemble:check": "node scripts/assemble-site.mjs --current dist/site-manifest.json",
+    "manifest:apps": "node scripts/merge-app-manifests.mjs",
+    "assemble:check:apps": "node scripts/merge-app-manifests.mjs --check && node scripts/assemble-site.mjs --dist-apps dist-apps",
     "gen:routes": "node scripts/gen-app-route-inventory.mjs",
     "check:routes": "node scripts/gen-app-route-inventory.mjs --check",
     "build:apps": "node scripts/build-apps.mjs"

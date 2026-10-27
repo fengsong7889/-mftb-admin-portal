@@ -3,6 +3,7 @@ node_modules/
 
 # Build output
 dist/
+dist-apps/
 tsconfig.tsbuildinfo
 
 # 构建元信息已改为虚拟模块 + 产物资产（见 vite-build-meta.ts），不再回写源码目录；

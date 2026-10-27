@@ -482,7 +482,21 @@ function llmProxyPlugin(envDir: string): Plugin {
  * 不再在構建時回寫 `src/build-meta.ts` 與 `public/version.json`，避免污染受版本控制的源碼目錄。
  */
 
+/**
+ * 按应用构建的 Vite root（方案 §4.1）：设置 VITE_APP_ROOT 时以 `frontend/apps/<app>` 为根，
+ * 该目录的 `index.html` + `src/main.tsx` 才是真正入口，产物自带独立 index.html。
+ * publicDir / cacheDir 显式指回仓库级目录，避免共享静态资源与预构建缓存被拆散到应用目录。
+ */
+const APP_ROOT = process.env.VITE_APP_ROOT ? path.resolve(__dirname, process.env.VITE_APP_ROOT) : null
+
 export default defineConfig({
+  ...(APP_ROOT
+    ? {
+        root: APP_ROOT,
+        publicDir: path.resolve(__dirname, 'public'),
+        cacheDir: path.resolve(__dirname, 'node_modules/.vite'),
+      }
+    : {}),
   plugins: [react(), llmProxyPlugin(__dirname), buildMetaPlugin()],
   base: process.env.NODE_ENV === 'production' ? '/-mftb-admin-portal/' : '/',
   resolve: {
