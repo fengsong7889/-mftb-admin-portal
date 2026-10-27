@@ -13498,6 +13498,12 @@
       "copyOk": "Batch no. copied",
       "copyFail": "Copy failed, please select manually"
     },
+    "testBatchSubmit": {
+      "scopeHint": "Checking tasks auto-fills delivery items; tasks without one fall back to the requirement's default item",
+      "arrangeHint": "Lead and executors are picked by searching active employees",
+      "casesHint": "Frozen as the mandatory case set on acceptance; results are recorded case by case",
+      "buildHint": "Optional; record CI/CD build IDs for traceability"
+    },
     "workbench": {
       "submitRequirement": "Submit a Requirement",
       "refresh": "Refresh",

@@ -49,6 +49,7 @@ import {
   AlertOutlined,
   BarChartOutlined,
   CheckCircleOutlined,
+  ClockCircleOutlined,
   EditOutlined,
   ExportOutlined,
   FieldTimeOutlined,
@@ -1125,26 +1126,36 @@ export default function RequirementList({
     },
     {
       /*
-       * 當前狀態列只回答「需求狀態機停在哪」；V3 的交付推進另起一行給推導階段，
-       * 兩者同時展示，「已受理 + 開發中」才不會被讀成自相矛盾。
+       * 當前狀態列：分批交付（V3）需求採「進度優先」——徽章顯示推導階段，需求層狀態降為灰色副行。
+       * 原因：V3 受理後主狀態按設計停在 accepted（推進單位是交付項），徽章若繼續寫「已受理·待排期」，
+       * 業務方會誤讀成「還沒開始」（生產工單 XQ202610270025 即此誤報）；對調後徽章回答「現在卡在哪一段」，
+       * 與 PM 推節點時的問法一致。副行文案與狀態篩選選項逐字相同，篩選對照不丟；懸浮仍給完整推導口徑。
+       * 非 V3 行行為完全不變。
        */
       title: '當前狀態', dataIndex: 'status', key: 'status', width: 150,
       render: (v: string, r) => {
         const derived = r.flowVersion === 3 && r.deliveryStage
           ? RDM_STAGE_LABEL[r.deliveryStage as RdmStage] ?? r.deliveryStage
           : null
+        if (!derived) {
+          return <StatusTag status={v} overdue={r.overdueFlag ?? false} />
+        }
+        const done = r.deliveryDoneCount ?? 0
+        const total = r.deliveryItemCount ?? 0
+        const statusLabel = RDM_STATUS_LABEL[v as RdmStatus] ?? v
         return (
           <div>
-            <StatusTag status={v} overdue={r.overdueFlag ?? false} />
-            {derived && (
-              <Tooltip
-                title={`階段由交付項推導（${r.deliveryDoneCount ?? 0}/${r.deliveryItemCount ?? 0} 完成）；需求狀態仍為「${RDM_STATUS_LABEL[v as RdmStatus] ?? v}」`}
-              >
-                <div style={{ marginTop: 2, fontSize: 12, color: '#722ED1', whiteSpace: 'nowrap' }}>
-                  交付：{derived}{r.deliveryItemCount ? ` ${r.deliveryDoneCount ?? 0}/${r.deliveryItemCount}` : ''}
-                </div>
-              </Tooltip>
-            )}
+            <Tooltip
+              title={`分批交付：階段由交付項推導（${done}/${total} 完成）；需求狀態為「${statusLabel}」`}
+            >
+              <Tag style={{ margin: 0, color: '#722ED1', borderColor: '#722ED166', background: '#722ED112', fontWeight: 500 }}>
+                {(r.overdueFlag ?? false) && <ClockCircleOutlined style={{ marginRight: 4 }} />}
+                {derived}{total ? ` ${done}/${total}` : ''}
+              </Tag>
+            </Tooltip>
+            <div style={{ marginTop: 2, fontSize: 12, color: '#8C8C8C', whiteSpace: 'nowrap' }}>
+              需求狀態：{statusLabel}
+            </div>
           </div>
         )
       },
@@ -1672,6 +1683,7 @@ export default function RequirementList({
           value={submitterUserId}
           onChange={ids => setSubmitterUserId(ids[0])}
           placeholder={t('rdm.batchSubmitter.pickRequired')}
+          style={{ width: '100%' }}
         />
         <div className="rdm-action-modal-label" style={{ marginTop: 12 }}>{t('rdm.batchSubmitter.reason')}</div>
         <RemarkTextArea

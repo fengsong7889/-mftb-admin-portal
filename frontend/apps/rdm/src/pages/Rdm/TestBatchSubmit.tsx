@@ -11,11 +11,13 @@
  * 校验顺序：validateFields → 组装 payload → 调 API（§B.3 禁止先弹后校验）。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Alert, Button, DatePicker, Form, Input, Select, Space, message } from 'antd'
+import { Alert, Button, DatePicker, Form, Input, Select, message } from 'antd'
 import {
-  MinusCircleOutlined, PlusOutlined, SendOutlined,
+  AimOutlined, BuildOutlined, ExperimentOutlined,
+  MinusCircleOutlined, PlusOutlined, ScheduleOutlined, SendOutlined,
 } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import RdmFormHeader from './components/RdmFormHeader'
 import RemoteSearchSelect from '@/components/RemoteSearchSelect'
@@ -30,6 +32,8 @@ import {
 } from '@/api/rdm'
 import { fetchEmployeeIdOptions } from '@/api/employee'
 import { formatRdmReqNo } from '@/constants/rdm'
+/* 路由直达本页时按代码分割单独加载，不 import 就会丢卡片/网格样式（曾导致整页退化为裸文本） */
+import './index.css'
 
 /** 测试环境选项（提测页唯一消费方，故随页定义，不进全局常量） */
 const TEST_ENV_OPTIONS = [
@@ -61,6 +65,7 @@ const TESTABLE_REQ_STATUS = new Set([
 
 export default function TestBatchSubmit() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   /** 从交付项详情「提交提測」进入：预填需求与交付项，避免用户重新搜一遍 */
   const urlReqId = Number(searchParams.get('reqId') ?? 0)
@@ -263,12 +268,16 @@ export default function TestBatchSubmit() {
       >
         {/* ── 提測範圍 ── */}
         <div className="rdm-form-section">
-          <div className="rdm-form-section-title">提測範圍</div>
+          <div className="rdm-form-section-title">
+            <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><AimOutlined /></span>
+            提測範圍
+            <span className="rdm-card-title-split" />
+            <span className="rdm-todo-hint">{t('rdm.testBatchSubmit.scopeHint', { defaultValue: '勾選任務後自動帶出交付項；未拆交付項的任務歸入默認交付項' })}</span>
+          </div>
           <div className="rdm-task-fields">
             <Form.Item
               label="關聯需求"
               name="reqId"
-              className="rdm-field-full"
               rules={[{ required: true, message: '請選擇需求' }]}
             >
               <Select
@@ -284,8 +293,6 @@ export default function TestBatchSubmit() {
             <Form.Item
               label="按任務交付（可選）"
               name="taskIds"
-              className="rdm-field-full"
-              extra="勾選任務後自動帶出交付項；未拆交付項的任務會歸入該需求的默認交付項"
             >
               <Select
                 mode="multiple"
@@ -300,7 +307,6 @@ export default function TestBatchSubmit() {
             <Form.Item
               label="交付項（可多選）"
               name="deliveryItemIds"
-              className="rdm-field-full"
               rules={[{ required: true, message: '請選擇交付項' }]}
             >
               <Select
@@ -315,7 +321,12 @@ export default function TestBatchSubmit() {
 
         {/* ── 測試安排 ── */}
         <div className="rdm-form-section">
-          <div className="rdm-form-section-title">測試安排</div>
+          <div className="rdm-form-section-title">
+            <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#FA8C16' }}><ScheduleOutlined /></span>
+            測試安排
+            <span className="rdm-card-title-split" />
+            <span className="rdm-todo-hint">{t('rdm.testBatchSubmit.arrangeHint', { defaultValue: '負責人與執行人均從在職員工中搜索選擇' })}</span>
+          </div>
           <div className="rdm-task-fields">
             <Form.Item label="測試環境" name="testEnv" rules={[{ required: true, message: '請選擇環境' }]}>
               <Select placeholder="選擇環境" options={TEST_ENV_OPTIONS} />
@@ -352,7 +363,12 @@ export default function TestBatchSubmit() {
 
         {/* ── 測試用例（受理時凍結為必測用例集，不可為空）── */}
         <div className="rdm-form-section">
-          <div className="rdm-form-section-title">測試用例</div>
+          <div className="rdm-form-section-title">
+            <span className="rdm-icon-block" style={{ background: '#F6FFED', color: '#52C41A' }}><ExperimentOutlined /></span>
+            測試用例
+            <span className="rdm-card-title-split" />
+            <span className="rdm-todo-hint">{t('rdm.testBatchSubmit.casesHint', { defaultValue: '受理時凍結為必測用例集，逐條錄入結果' })}</span>
+          </div>
           <Alert
             type="info"
             showIcon
@@ -363,11 +379,15 @@ export default function TestBatchSubmit() {
             {(fields, { add, remove }) => (
               <>
                 {fields.map(({ key, name, ...restField }) => (
-                  <Space key={key} align="baseline" style={{ display: 'flex', marginBottom: 8 }} wrap>
+                  /* 与 §C.4 三列网格同宽：交付项占 1 列、用例标题长文本占 2 列、移除钮贴右 */
+                  <div
+                    key={key}
+                    style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr) auto', columnGap: 16, alignItems: 'start', marginBottom: 12 }}
+                  >
                     <Form.Item
                       {...restField}
                       name={[name, 'deliveryItemId']}
-                      style={{ marginBottom: 0, width: 300 }}
+                      style={{ marginBottom: 0 }}
                       rules={[{ required: true, message: '請選擇所屬交付項' }]}
                     >
                       <Select
@@ -380,7 +400,7 @@ export default function TestBatchSubmit() {
                     <Form.Item
                       {...restField}
                       name={[name, 'caseTitle']}
-                      style={{ marginBottom: 0, width: 360 }}
+                      style={{ marginBottom: 0, gridColumn: 'span 2' }}
                       rules={[{ required: true, message: '請輸入用例標題' }]}
                     >
                       <Input placeholder="用例標題，如：保存後列表即時刷新" maxLength={120} />
@@ -391,12 +411,13 @@ export default function TestBatchSubmit() {
                         size="small"
                         danger
                         icon={<MinusCircleOutlined />}
+                        style={{ alignSelf: 'center' }}
                         onClick={() => remove(name)}
                       >
                         移除
                       </Button>
                     )}
-                  </Space>
+                  </div>
                 ))}
                 <Button
                   type="dashed"
@@ -413,14 +434,22 @@ export default function TestBatchSubmit() {
 
         {/* ── 構建標識 ── */}
         <div className="rdm-form-section">
-          <div className="rdm-form-section-title">構建標識</div>
+          <div className="rdm-form-section-title">
+            <span className="rdm-icon-block" style={{ background: '#F9F0FF', color: '#722ED1' }}><BuildOutlined /></span>
+            構建標識
+            <span className="rdm-card-title-split" />
+            <span className="rdm-todo-hint">{t('rdm.testBatchSubmit.buildHint', { defaultValue: '選填；登記 CI/CD 構建產物標識便於回溯' })}</span>
+          </div>
           <Form.List name="buildIds">
             {(fields, { add, remove }) => (
               <>
                 {fields.map(({ key, name, ...restField }) => (
-                  <Space key={key} align="baseline" style={{ display: 'flex', marginBottom: 8 }}>
+                  <div
+                    key={key}
+                    style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr) auto', columnGap: 16, alignItems: 'start', marginBottom: 12 }}
+                  >
                     <Form.Item {...restField} name={[name, 'buildId']} style={{ marginBottom: 0 }}>
-                      <Input placeholder={`構建 ID ${fields.length ? name + 1 : 1}`} style={{ width: 320 }} />
+                      <Input placeholder={`構建 ID ${name + 1}`} maxLength={64} />
                     </Form.Item>
                     {fields.length > 1 && (
                       <Button
@@ -428,12 +457,13 @@ export default function TestBatchSubmit() {
                         size="small"
                         danger
                         icon={<MinusCircleOutlined />}
+                        style={{ alignSelf: 'center' }}
                         onClick={() => remove(name)}
                       >
                         移除
                       </Button>
                     )}
-                  </Space>
+                  </div>
                 ))}
                 <Form.Item>
                   <Button type="dashed" onClick={() => add({ buildId: '' })} block icon={<PlusOutlined />}>

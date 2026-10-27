@@ -1,5 +1,7 @@
 package com.mftb.admin.service.impl;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.RdmConstants;
 import com.mftb.admin.dto.RdmConfigVO;
@@ -21,21 +23,28 @@ import com.mftb.admin.service.RdmConfigService;
 import com.mftb.admin.service.RdmNotifyService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.OperatorResolver;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -54,7 +63,20 @@ class RdmTransitionGuardTest {
     private RdmRequirementMapper requirementMapper;
     private com.mftb.admin.mapper.RdmRequirementRoleMapper roleMapper;
     private RdmAccessGuard accessGuard;
+    private RdmConfigService configService;
+    private RdmNotifyService notifyService;
     private RdmRequirementServiceImpl service;
+
+    /**
+     * 完整流转链会用方法引用构造 LambdaQueryWrapper（activeRoles 查角色表、closeOpenStatusLog 查状态流水表）。
+     * 无 MyBatis 容器时必须先初始化 TableInfo，否则 lambda 列解析直接抛错。
+     */
+    @BeforeAll
+    static void initTableInfo() {
+        MapperBuilderAssistant assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "");
+        TableInfoHelper.initTableInfo(assistant, com.mftb.admin.entity.RdmRequirementRole.class);
+        TableInfoHelper.initTableInfo(assistant, com.mftb.admin.entity.RdmStatusLog.class);
+    }
 
     @BeforeEach
     void setUp() {
@@ -72,6 +94,8 @@ class RdmTransitionGuardTest {
                 mock(com.mftb.admin.mapper.RdmDeliveryItemMapper.class),
                 mock(com.mftb.admin.mapper.RdmTestBatchMapper.class),
                 mock(com.mftb.admin.mapper.RdmReleaseBatchMapper.class));
+        configService = mock(RdmConfigService.class);
+        notifyService = mock(RdmNotifyService.class);
         service = new RdmRequirementServiceImpl(
                 requirementMapper, mock(RdmRequirementTargetMapper.class),
                 roleMapper, mock(RdmStatusLogMapper.class),
@@ -79,8 +103,8 @@ class RdmTransitionGuardTest {
                 mock(RdmAcceptanceMapper.class), mock(com.mftb.admin.mapper.RdmAcceptanceCaseMapper.class),
                 mock(SysUserMapper.class),
                 mock(SysDepartmentMapper.class), mock(BizSeqService.class),
-                operatorResolver, mock(RdmConfigService.class),
-                mock(RdmNotifyService.class), mock(OaRequestService.class),
+                operatorResolver, configService,
+                notifyService, mock(OaRequestService.class),
                 mock(com.mftb.admin.service.RdmIntakeCallbackService.class),
                 permissionService, mock(JdbcTemplate.class), accessGuard,
                 mock(com.mftb.admin.mapper.RdmWorkTaskMapper.class),
@@ -314,5 +338,95 @@ class RdmTransitionGuardTest {
         when(permissionService.hasPermission(exporter, RdmConstants.MENU_REQUIREMENT, "delete")).thenReturn(true);
         assertThrows(BusinessException.class,
                 () -> service.requireVisible(requirement(4L, 11L, 11L), exporter, "查看詳情"));
+    }
+
+    /* ==================== 流转通知透传说明/理由（逆向动作理由可达性） ==================== */
+
+    private static RdmConfigVO.Transition transitionRule(String from, String to, String code, String name,
+                                                         List<String> roles, List<String> requiredFields) {
+        RdmConfigVO.Transition t = new RdmConfigVO.Transition();
+        t.setId(25L);
+        t.setFromStatus(from);
+        t.setToStatus(to);
+        t.setActionCode(code);
+        t.setActionName(name);
+        t.setAllowedRoles(roles);
+        t.setRequiredFields(requiredFields);
+        t.setEnabled(true);
+        return t;
+    }
+
+    private static com.mftb.admin.entity.RdmRequirement testingReq() {
+        com.mftb.admin.entity.RdmRequirement r = new com.mftb.admin.entity.RdmRequirement();
+        r.setId(1L);
+        r.setReqNo("XQ202610270024");
+        r.setTitle("【廣告】-無敵星星");
+        r.setStatus(RdmConstants.STATUS_TESTING);
+        r.setDevOwnerUserId(4L);
+        r.setDevOwnerName("李吉月");
+        return r;
+    }
+
+    /**
+     * 回归背景：测试退回/验收退回的通知此前只有动作/状态/操作人，
+     * 研发收到「測試退回開發」通知后还要进详情页才能看到退回原因；
+     * 理由本身已落流转记录，通知必须带同一份事实。
+     */
+    @Test
+    @DisplayName("測試退回開發：通知文案带退回理由，且理由仍落驳回字段")
+    void testRejectNotificationCarriesRemark() {
+        SysUser qa = user(3L, "MF00003", "黃嘉欣");
+        when(operatorResolver.currentUser()).thenReturn(qa);
+        when(operatorResolver.isAdmin(qa)).thenReturn(true);
+        when(operatorResolver.operatorSignature(qa)).thenReturn("MF00003|黃嘉欣");
+        com.mftb.admin.entity.RdmRequirement req = testingReq();
+        when(requirementMapper.selectById(1L)).thenReturn(req);
+        when(configService.findTransition(RdmConstants.STATUS_TESTING, RdmConstants.ACTION_TEST_REJECT))
+                .thenReturn(transitionRule(RdmConstants.STATUS_TESTING, RdmConstants.STATUS_DEVELOPING,
+                        RdmConstants.ACTION_TEST_REJECT, "測試退回開發",
+                        List.of(RdmConstants.ROLE_QA), List.of("remark")));
+        when(configService.stageMap()).thenReturn(Map.of());
+        when(configService.statusLabelMap()).thenReturn(Map.of());
+
+        RdmTransitionDTO dto = new RdmTransitionDTO();
+        dto.setActionCode(RdmConstants.ACTION_TEST_REJECT);
+        dto.setRemark("冒煙不通過：商戶端下單接口 500，明細見評論");
+
+        service.transition(1L, dto);
+
+        ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
+        verify(notifyService).notifyUserIds(eq(RdmConstants.EVENT_STATUS_CHANGED), any(), any(), anyString(), text.capture());
+        assertTrue(text.getValue().contains("說明/理由"), text.getValue());
+        assertTrue(text.getValue().contains("冒煙不通過：商戶端下單接口 500，明細見評論"), text.getValue());
+        // 通知只是多一个读取侧：驳回事实仍落主表，不替代流转记录
+        assertEquals("冒煙不通過：商戶端下單接口 500，明細見評論", req.getRejectReason());
+        assertEquals(1, req.getRejectCount());
+    }
+
+    @Test
+    @DisplayName("開發完成轉測試：无说明时通知不渲染空「說明/理由」行")
+    void forwardTransitionWithoutRemarkOmitsRemarkLine() {
+        SysUser dev = user(4L, "MF00004", "李吉月");
+        when(operatorResolver.currentUser()).thenReturn(dev);
+        when(operatorResolver.isAdmin(dev)).thenReturn(true);
+        when(operatorResolver.operatorSignature(dev)).thenReturn("MF00004|李吉月");
+        com.mftb.admin.entity.RdmRequirement req = testingReq();
+        req.setStatus(RdmConstants.STATUS_DEVELOPING);
+        when(requirementMapper.selectById(1L)).thenReturn(req);
+        when(configService.findTransition(RdmConstants.STATUS_DEVELOPING, RdmConstants.ACTION_DEV_DONE))
+                .thenReturn(transitionRule(RdmConstants.STATUS_DEVELOPING, RdmConstants.STATUS_TESTING,
+                        RdmConstants.ACTION_DEV_DONE, "開發完成轉測試",
+                        List.of(RdmConstants.ROLE_DEV, RdmConstants.ROLE_DEV_LEAD), List.of()));
+        when(configService.stageMap()).thenReturn(Map.of());
+        when(configService.statusLabelMap()).thenReturn(Map.of());
+
+        RdmTransitionDTO dto = new RdmTransitionDTO();
+        dto.setActionCode(RdmConstants.ACTION_DEV_DONE);
+
+        service.transition(1L, dto);
+
+        ArgumentCaptor<String> text = ArgumentCaptor.forClass(String.class);
+        verify(notifyService).notifyUserIds(eq(RdmConstants.EVENT_STATUS_CHANGED), any(), any(), anyString(), text.capture());
+        assertFalse(text.getValue().contains("說明/理由"), text.getValue());
     }
 }

@@ -6,7 +6,7 @@
  *
  * <p>不做前端"权限过滤"：可见范围与能否被选为参会人由服务端判定，这里只是取数与展示。
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { Select, Space, Tag } from 'antd'
 import { fetchEmployee, fetchEmployees } from '@/api/employee'
 import { useTranslation } from 'react-i18next'
@@ -46,6 +46,12 @@ interface Props {
    * 没垫底时，用户一打开编辑页就只看到一个数字，不选新的人就永远不知道那是谁。
    */
   seed?: { id: number; name: string; empId?: string | null }[]
+  /**
+   * 透传给 Select 的样式（如弹窗里的 `width: '100%'`）。
+   * <p>为什么要有：Select 默认宽度不撑满容器，弹窗里的选人框会窄到截断工号 Tag，
+   * 调用处需要能把它对齐到同级输入框的宽度。
+   */
+  style?: CSSProperties
 }
 
 interface Loaded { id: number; name: string; empId?: string }
@@ -64,7 +70,7 @@ function toIds(value?: number[] | number): number[] {
 }
 
 export default function EmployeeSelect({
-  value, onChange, placeholder, excludeIds = [], maxTagCount = 6, disabled, single, onPick, seed,
+  value, onChange, placeholder, excludeIds = [], maxTagCount = 6, disabled, single, onPick, seed, style,
 }: Props) {
   const { t } = useTranslation()
   const [searchResults, setSearchResults] = useState<Loaded[]>([])
@@ -190,6 +196,7 @@ export default function EmployeeSelect({
       mode={single ? undefined : 'multiple'}
       allowClear
       disabled={disabled}
+      style={style}
       // 远程搜索必须显式开 showSearch：只给 onSearch 时 antd 会告警且输入框只读，
       // 单选的负责人选择器就变成「只能从默认 30 人里点，搜不到人」
       showSearch

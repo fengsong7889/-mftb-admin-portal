@@ -541,7 +541,9 @@ describe('Sidebar 需求详情来源归属', () => {
  */
 const v3DeliveryMenus: MenuVO[] = [
   { id: 51, parentId: 50, menuKey: 'rdm-dashboard-project', name: '項目總覽', path: '/rdm-project', icon: 'ProjectOutlined', type: 2, status: 1, sort: 15 },
-  { id: 52, parentId: 50, menuKey: 'rdm-delivery-test', name: '測試工作台', path: '/rdm-test', icon: 'ExperimentOutlined', type: 2, status: 1, sort: 24 },
+  // icon 必须与 RdmMenuInitializer 种子真值一致（測試工作台为 BugOutlined）：
+  // 固件写别的名字会让 renderMenuIcon 断言假绿，生产缺图标却 CI 全绿。
+  { id: 52, parentId: 50, menuKey: 'rdm-delivery-test', name: '測試工作台', path: '/rdm-test', icon: 'BugOutlined', type: 2, status: 1, sort: 24 },
   { id: 53, parentId: 50, menuKey: 'rdm-delivery-release', name: '發布中心', path: '/rdm-release', icon: 'RocketOutlined', type: 2, status: 1, sort: 25 },
 ]
 

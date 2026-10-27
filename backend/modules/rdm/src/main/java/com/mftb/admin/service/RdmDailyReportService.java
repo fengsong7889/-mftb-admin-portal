@@ -2541,8 +2541,10 @@ public class RdmDailyReportService {
     }
 
     /**
-     * 内置版式的示例快照：一个风险项目 + 一个正常项目 + 一个逾期迭代 + 一个正常迭代。
+     * 内置版式的示例快照：一个风险项目 + 一个正常项目，迭代直接嵌在项目节点下。
      * <p>日期取今天，保证「今日到期」角标与相对时间在示例里真实可见。
+     * <p>新版式正文是「项目 → 迭代进度」两级清单，示例数据必须把迭代嵌进项目，
+     * 否则预览只会看到项目行、看不到迭代进度行，版式确认就失去意义。
      */
     private Snapshot demoSnapshot(boolean evening) {
         LocalDate day = LocalDate.now();
@@ -2598,10 +2600,24 @@ public class RdmDailyReportService {
         cleanIt.setCode("SP202610001");
         cleanIt.setName("11月第一版迭代");
         cleanIt.setStatus("planning");
+        cleanIt.setProgressPercent(30);
         cleanIt.setOwnerName("王五");
 
+        IterationNode internalIt = new IterationNode();
+        internalIt.setIterationId(-3L);
+        internalIt.setCode("SP2026-INT");
+        internalIt.setName("內部工具效率迭代");
+        internalIt.setStatus("active");
+        internalIt.setProgressPercent(100);
+        internalIt.setOwnerName("趙六");
+
+        attention.setIterations(new ArrayList<>(List.of(issue, cleanIt)));
+        normal.setIterations(new ArrayList<>(List.of(internalIt)));
+        normal.setIterationActiveCount(1);
+
         s.setProjects(new ArrayList<>(List.of(attention, normal)));
-        s.setUnassignedIterations(new ArrayList<>(List.of(issue, cleanIt)));
+        // 迭代都已挂到项目下：不再造未挂项目迭代分组，预览只展示规则定义的两级清单
+        s.setUnassignedIterations(new ArrayList<>());
         return s;
     }
 

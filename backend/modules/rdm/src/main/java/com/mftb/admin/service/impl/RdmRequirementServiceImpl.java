@@ -2355,7 +2355,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         appendStatusLog(req, fromStatus, actor, actionCode, dto == null ? null : dto.getRemark());
 
         if (!systemAlign) {
-            notifyOnTransition(req, rule, actor);
+            notifyOnTransition(req, rule, actor, dto == null ? null : dto.getRemark());
         }
         log.info("需求流轉: reqNo={}, {} -> {}, action={}, operator={}{}",
                 req.getReqNo(), fromStatus, req.getStatus(), actionCode, req.getUpdatedBy(),
@@ -3825,7 +3825,15 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
                         + "\n- **優先級**: " + req.getPriority());
     }
 
-    private void notifyOnTransition(RdmRequirement req, RdmConfigVO.Transition rule, SysUser actor) {
+    /**
+     * 流轉後通知：提出人 + 產品經理 + 研發負責人（進入驗收階段再補驗收人）。
+     * <p>說明/理由必須透傳：測試退回/驗收退回這類逆向動作此前通知裡只有動作/狀態/操作人，
+     * 研發收到退回通知後還要進詳情頁才能看到退回原因；理由本身已落流轉記錄，
+     * 通知帶上它只是讓兩側讀同一份事實，不再靠人記得進頁面找。
+     *
+     * @param remark 流轉說明/理由（選填字段；空白時不渲染該行，避免通知出現空「說明/理由」）
+     */
+    private void notifyOnTransition(RdmRequirement req, RdmConfigVO.Transition rule, SysUser actor, String remark) {
         Set<Long> receivers = new LinkedHashSet<>();
         if (req.getSubmitterUserId() != null) {
             receivers.add(req.getSubmitterUserId());
@@ -3851,6 +3859,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         String text = "### 🔁 需求狀態更新\n\n- **編號**: " + RdmConstants.displayReqNo(req.getReqNo()) + "\n- **標題**: " + req.getTitle()
                 + "\n- **動作**: " + rule.getActionName() + "\n- **當前狀態**: " + labelOf(req.getStatus())
                 + "\n- **操作人**: " + (actor == null ? "system" : actor.getName())
+                + (StringUtils.hasText(remark) ? "\n- **說明/理由**: " + remark.trim() : "")
                 + (req.getPlanReleaseDate() != null ? "\n- **計劃上線**: " + req.getPlanReleaseDate() : "");
         notifyService.notifyUserIds(event, req, receivers,
                 "需求狀態更新：" + RdmConstants.displayReqNo(req.getReqNo()), text);

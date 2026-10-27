@@ -13498,6 +13498,12 @@
       "copyOk": "批次號已複製",
       "copyFail": "複製失敗，請手動選取"
     },
+    "testBatchSubmit": {
+      "scopeHint": "勾選任務後自動帶出交付項；未拆交付項的任務歸入默認交付項",
+      "arrangeHint": "負責人與執行人均從在職員工中搜索選擇",
+      "casesHint": "受理時凍結為必測用例集，逐條錄入結果",
+      "buildHint": "選填；登記 CI/CD 構建產物標識便於回溯"
+    },
     "workbench": {
       "submitRequirement": "我要提需求",
       "refresh": "刷新",

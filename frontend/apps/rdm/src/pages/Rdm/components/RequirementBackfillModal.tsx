@@ -102,6 +102,7 @@ export default function RequirementBackfillModal({
         value={pmUserId}
         onChange={ids => setPmUserId(ids[0])}
         placeholder={t('rdm.batchBackfill.pmPlaceholder')}
+        style={{ width: '100%' }}
       />
       <div className="rdm-action-modal-label" style={{ marginTop: 12 }}>{t('rdm.batchBackfill.remark')}</div>
       <RemarkTextArea

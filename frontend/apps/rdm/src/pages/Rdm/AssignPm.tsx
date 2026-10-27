@@ -130,6 +130,18 @@ export default function AssignPm() {
   /** 「不在需求池」只对分配模式有意义：改派的 targets 本来就应该已有人受理 */
   const notInPool = mode === 'DISPATCH' ? rows.filter(r => r.status !== RDM_STATUS.POOL) : []
 
+  /** 已分配 = 有受理产品经理（ID 为准，姓名快照兜底）：改派只对这类需求有意义 */
+  const isAssigned = (r: RdmRequirementDetail) => r.assigneePmUserId != null || !!r.pmName
+  /** 所选需求全都未分配时「改派已分配需求」入口无意义：禁用，避免「没分配过也能点改派」的困惑 */
+  const reassignDisabled = !loading && rows.length > 0 && !rows.some(isAssigned)
+  /** 改派模式下混入的未分配需求：服务端 CAS 会逐条拒绝，界面上先把范围说清 */
+  const unassignedInReassign = mode === 'REASSIGN' ? rows.filter(r => !isAssigned(r)) : []
+
+  // 兜底：详情加载完发现所选全无受理人时，收回已点进的改派态（入口已禁用，这里只挡时序差）
+  useEffect(() => {
+    if (reassignDisabled && mode === 'REASSIGN') setMode('DISPATCH')
+  }, [reassignDisabled, mode])
+
   const columns: TableColumnsType<RdmRequirementDetail> = [
     { title: '需求編號', dataIndex: 'reqNo', key: 'reqNo', width: 150, render: (v?: string | null) => formatRdmReqNo(v) },
     { title: '標題', dataIndex: 'title', key: 'title', ellipsis: true },
@@ -171,6 +183,10 @@ export default function AssignPm() {
     }
     if (mode === 'DISPATCH' && notInPool.length > 0) {
       message.warning(`有 ${notInPool.length} 條需求已不在需求池，請刷新後重新選定`)
+      return
+    }
+    if (mode === 'REASSIGN' && unassignedInReassign.length > 0) {
+      message.warning(`有 ${unassignedInReassign.length} 條需求未分配，不適用改派，請返回列表調整選定`)
       return
     }
     const target = picked
@@ -258,6 +274,16 @@ export default function AssignPm() {
         />
       )}
 
+      {unassignedInReassign.length > 0 && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message={`所選需求中 ${unassignedInReassign.length} 條尚未分配（${unassignedInReassign.map(r => formatRdmReqNo(r.reqNo)).join('、')}）`}
+          description="改派只更換已有受理人的需求的受理人；未分配的需求請用「分配需求池需求」。"
+        />
+      )}
+
       <div className="rdm-form-section">
         <div className="rdm-form-section-title">
           <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><UserSwitchOutlined /></span>
@@ -272,9 +298,16 @@ export default function AssignPm() {
             onChange={(v: string | number) => setMode(v as AssignMode)}
             options={[
               { value: 'DISPATCH', label: '分配需求池需求' },
-              { value: 'REASSIGN', label: '改派已分配需求' },
+              { value: 'REASSIGN', label: '改派已分配需求', disabled: reassignDisabled },
             ]}
           />
+          {reassignDisabled && (
+            <div className="rdm-tip-card">
+              {t('rdm.assign.reassignDisabledHint', {
+                defaultValue: '「改派」的含義是更換已有受理人之需求的受理人（舊受理人保留歷史貢獻）；當前所選需求都還沒有受理人，請使用「分配需求池需求」。',
+              })}
+            </div>
+          )}
           {mode === 'REASSIGN' && (
             <>
               <div className="rdm-tip-card">

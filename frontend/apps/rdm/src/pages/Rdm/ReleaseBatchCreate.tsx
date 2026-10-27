@@ -28,6 +28,8 @@ import {
   type RdmReleaseBatchCreateForm,
 } from '@/api/rdm'
 import { fetchEmployeeIdOptions } from '@/api/employee'
+/* 路由直达本页时按代码分割单独加载，不 import 就会丢卡片/网格样式（与 TestBatchSubmit 同源缺陷） */
+import './index.css'
 
 /** 表单值形状 */
 interface CreateFormValues {

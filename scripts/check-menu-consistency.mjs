@@ -136,13 +136,26 @@ if (!domainSeedMenus.some((menu) => menu.file.endsWith('/ConsumableSchemaInitial
  * <p>背景：RdmMenuInitializer 这类初始化器不走 ensureMenu，历史上落在本脚本盲区——
  * 「項目總覽/測試工作台/發布中心」三个菜单上线时没同步 Sidebar.keyToPath，
  * 点击直接报「該功能模塊開發中」而 CI 全绿。此处把它们纳入校验 5/6 的叶子菜单集合。
- * <p>只补「路由映射 + 功能操作集」两项盲区；图标/离线阻断等更严的校验仍由校验 8 的 ensureMenu 路径负责。
+ * <p>只补「路由映射 + 功能操作集」两项盲区；离线阻断等更严的校验仍由校验 8 的 ensureMenu 路径负责；
+ * 图标盲区由 arraySeedIcons 在校验 5 补查（生产「測試工作台无图标」事故反补）。
  */
 const arraySeedMenus = initializerFiles
   .filter((file) => file.endsWith('Initializer.java'))
   .flatMap((file) => [...read(file).matchAll(
     /^\s*\{"([^"]+)",\s*"([^"]+)",\s*(?:"[^"]*"|null),\s*"(\/[^"\s]*)"/gm,
   )].map((m) => ({ key: m[1], name: m[2], path: m[3], file })))
+/**
+ * 数组式种子的图标列（第 6 列）：{key, 名, 英文名, "/path", 组件, "Icon", ...}。
+ * <p>事故反补盲区：「測試工作台」种子图标 BugOutlined 从未在 MenuIcon 注册，
+ * 侧边栏图标为空上了生产而 CI 全绿——此前本脚本只对 ensureMenu/MenuDef 路径查图标。
+ * <p>独立解析不并入 arraySeedMenus：图标列解析不到的行不能连带拖垮校验 5 的导航检查。
+ * <p>只收有路由的叶子菜单：目录行（path=null）的图标走 Sidebar keyToIcon 兜底，渲染路径不同。
+ */
+const arraySeedIcons = Object.fromEntries(initializerFiles
+  .filter((file) => file.endsWith('Initializer.java'))
+  .flatMap((file) => [...read(file).matchAll(
+    /^\s*\{"([^"]+)",\s*"([^"]+)",\s*(?:"[^"]*"|null),\s*"(\/[^"\s]*)",\s*(?:"[^"]*"|null),\s*"([^"]+)"/gm,
+  )].map((m) => [m[1], { icon: m[4], file }])))
 /**
  * record 式种子菜单（`new MenuDef("key", "名", "英文名", "/path", "Component", "Icon", ...)`）。
  * <p>背景：AI 助手配置中心由 AiAssistantConfigMenuInitializer 的 MenuDef 声明子菜单，
@@ -291,6 +304,13 @@ for (const { key, name, path, file } of arraySeedMenus) {
   if (keyToPath[key] !== path) {
     fail(`${file} 种子菜单 ${key}「${name}」缺少/不匹配 Sidebar.keyToPath 映射（应为 ${path}）, `
       + '点击菜单将落到“該功能模塊開發中”兜底提示')
+  }
+}
+// 数组式种子图标盲区补查（与校验 8 同档查注册表，但不要求 Sidebar 兜底图标：
+// 这些菜单的图标存在 DB icon 字段，运行时由 renderMenuIcon 按名称解析）。
+for (const [key, { icon, file }] of Object.entries(arraySeedIcons)) {
+  if (!registeredIcons.has(icon)) {
+    fail(`${file} 种子菜单 ${key} 的后端图标 ${icon} 未在 MenuIcon 注册, 侧边栏图标将为空`)
   }
 }
 for (const { key, path, file } of menuDefMenus) {

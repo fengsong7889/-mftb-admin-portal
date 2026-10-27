@@ -9,7 +9,7 @@
  * - 文案全部走 t()：rdm 域已纳入硬编码中文棘轮，新增文案必须带 defaultValue 兜底。
  */
 import { useEffect, useMemo, useState } from 'react'
-import { Radio, Space } from 'antd'
+import { Radio } from 'antd'
 import { useTranslation } from 'react-i18next'
 import HelpPopover, { type HelpSection } from '@/components/HelpPopover'
 import { RDM_DELIVERY_MODE, type RdmDeliveryMode } from '@/constants/rdm'
@@ -95,16 +95,17 @@ export default function DeliveryModePicker({
         onChange?.(next)
       }}
     >
-      <Space direction="vertical" size={8} style={{ width: '100%' }}>
+      {/* 两个选项并排省纵向空间；窄容器（确认弹窗）下靠 flexWrap 自动换行 */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, width: '100%' }}>
         {options.map(option => (
-          <Radio key={option.value} value={option.value} style={{ alignItems: 'flex-start' }}>
+          <Radio key={option.value} value={option.value} style={{ flex: '1 1 220px', marginRight: 0, alignItems: 'flex-start' }}>
             <span style={{ display: 'block', lineHeight: 1.6 }}>
               <span style={{ fontWeight: 600, color: '#262626' }}>{option.label}</span>
               <span style={{ display: 'block', fontSize: 12, color: '#8C8C8C' }}>{option.desc}</span>
             </span>
           </Radio>
         ))}
-      </Space>
+      </div>
     </Radio.Group>
   )
 }
