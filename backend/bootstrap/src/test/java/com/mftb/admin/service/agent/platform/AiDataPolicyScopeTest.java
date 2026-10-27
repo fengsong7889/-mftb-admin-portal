@@ -7,6 +7,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -69,6 +70,18 @@ class AiDataPolicyScopeTest {
         assertEquals("data_class_unclassified", decision.errorKind());
         // 两次查询都停在分级表（dataClassOf + evaluate 各一次）：未登记时不得继续读取端点批准
         verify(jdbc, times(2)).queryForList(anyString(), eq(String.class), any(Object[].class));
+    }
+
+    @Test
+    void listSystemOptionsPrependsSharedScope() {
+        when(jdbc.queryForList(anyString())).thenReturn(List.of(Map.of("code", "rdm", "name", "產研交付系統")));
+
+        List<Map<String, Object>> rows = service.listSystemOptions();
+
+        assertEquals(2, rows.size());
+        // common 不在 sys_system，却必须能登记：否则个人工作台/门户场景永远无配置入口
+        assertEquals(AiDataPolicyService.COMMON_SCOPE, rows.get(0).get("code"));
+        assertEquals("rdm", rows.get(1).get("code"));
     }
 
     @Test
