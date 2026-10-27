@@ -116,6 +116,30 @@ async function waitAutoplaySettled(container: HTMLElement) {
   )
 }
 
+/**
+ * 观察「挂载期间是否发生过入场自动播」。
+ *
+ * 为什么不直接断言「此刻还能查到 data-autoplay=1」：自动播是 6s 分镜，CI 负载下
+ * findByRole 返回时可能已经播完并移除了标记（实测偶发 0）。这里用 MutationObserver
+ * 盯住整个挂载过程，仍然要求「确实播过」，只是不再要求恰好抓到它在播的那一帧，
+ * 不断言卡片的静态/悬停语义（那是后面用例的事）。
+ */
+function watchAutoplay(container: HTMLElement) {
+  const state = { seen: false }
+  const check = () => {
+    if (container.querySelector('.portal-card-shell[data-autoplay="1"]')) state.seen = true
+  }
+  check()
+  const observer = new MutationObserver(check)
+  observer.observe(container, {
+    subtree: true,
+    childList: true,
+    attributes: true,
+    attributeFilter: ['data-autoplay'],
+  })
+  return { state, stop: () => observer.disconnect() }
+}
+
 async function selectLanguage(label: string) {
   fireEvent.mouseDown(screen.getByRole('combobox', { name: i18n.t('portal.language') }))
   fireEvent.click(await screen.findByText(label, { selector: '.ant-select-item-option-content' }))
@@ -409,13 +433,16 @@ describe('场景区分与低干扰动效', () => {
     vi.spyOn(document, 'hidden', 'get').mockReturnValue(false)
     vi.mocked(fetchPortalContext).mockResolvedValue({ systems: [finance, { code: 'search', name: '搜索運營系統' }], superAdmin: false })
     const { container, unmount } = mount()
+    // 入场自动播一旦发生就记为 true：不依赖「断言时机恰好还在播」（CI 负载下曾被误判）
+    const autoplay = watchAutoplay(container)
     const financeCard = await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
     const searchCard = screen.getByRole('button', { name: /搜索運營.*進入系統/ })
     const financeShell = financeCard.closest('.portal-card-shell')!
     const searchShell = searchCard.closest('.portal-card-shell')!
     // 入场自动播（评审 M3①）：首行卡片挂载后先自己播一遍，播完才归为静态
-    expect(container.querySelectorAll('.portal-card-shell[data-autoplay="1"]').length).toBeGreaterThan(0)
     await waitAutoplaySettled(container)
+    expect(autoplay.state.seen).toBe(true)
+    autoplay.stop()
     expect(container.querySelector('.portal-motion-toggle')).toBeNull()
     expect(container.querySelector('[data-motion="running"]')).toBeNull()
     fireEvent.pointerEnter(financeShell, { pointerType: 'mouse' })
