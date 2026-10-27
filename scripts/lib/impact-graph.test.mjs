@@ -101,14 +101,14 @@ describe('共享层升档', () => {
     const cls = classify([
       'frontend/packages/ui/src/components/EmployeeSelect.tsx',
       'frontend/packages/contracts/src/menuPermission.ts',
-      'backend/src/main/java/com/mftb/admin/entity/SysUser.java',
+      'backend/modules/shared/src/main/java/com/mftb/admin/entity/SysUser.java',
       'backend/sql/302_x.sql',
       '.github/workflows/deploy.yml',
       'src/pages/Rdm/List.tsx',
     ])
     expect(cls.feGlobal).toContain('frontend/packages/ui/src/components/EmployeeSelect.tsx')
     expect(cls.feGlobal).toContain('frontend/packages/contracts/src/menuPermission.ts')
-    expect(cls.beGlobal).toContain('backend/src/main/java/com/mftb/admin/entity/SysUser.java')
+    expect(cls.beGlobal).toContain('backend/modules/shared/src/main/java/com/mftb/admin/entity/SysUser.java')
     expect(cls.beGlobal).toContain('backend/sql/302_x.sql')
     expect(cls.bothGlobal).toContain('.github/workflows/deploy.yml')
     // 私有页面不属于任何共享层：不该被误升档
