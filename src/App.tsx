@@ -13,6 +13,7 @@ import MenuTabs from '@/components/MenuTabs'
 import PortalTopBar from '@/components/PortalTopBar'
 import PetMascot from '@/components/PetMascot'
 import Login from '@/pages/Login'
+import { appRoutes } from '@/app-routes'
 import RouteErrorBoundary from '@/components/RouteErrorBoundary'
 import MenuPermissionGuard from '@/components/MenuPermissionGuard'
 import ForcePasswordChangeGate from '@/components/ForcePasswordChangeGate'
@@ -218,9 +219,7 @@ const AiModelDetail = lazy(() => import('@/pages/AiModelList/AiModelDetail'))
 import AiDeptModelAuth from '@/pages/AiQuotaAuth/QuotaAndPolicy'
 import AiEmployeeAuthControl from '@/pages/AiQuotaAuth/AiEmployeeAuthControl'
 import EmpQuotaList from '@/pages/AiQuotaAuth/empQuota/EmpQuotaList'
-import { RDM_ROUTES } from '@mftb/app-rdm/routes'
-import { EAM_ROUTES } from '@mftb/app-eam/routes'
-import { HR_ROUTES } from '@mftb/app-hr/routes'
+
 const DeptAuthGroupEdit = lazy(() => import('@/pages/AiQuotaAuth/DeptAuthGroupEdit'))
 const DeptAuthGroupDetail = lazy(() => import('@/pages/AiQuotaAuth/DeptAuthGroupDetail'))
 // 部门额度 - 独立编辑页与详情页（列表 → 新增/编辑 → 详情，参考部门模型权控）
@@ -588,7 +587,7 @@ function AuthenticatedLayout() {
               <Route path="/organization-management" element={<OrganizationManagement />} />
               {/* 組織編制系統（organization）：菜單真值由 HcmOrganizationMenuInitializer 寫入 sys_menu */}
               {/* HR 应用路由：见 frontend/apps/hr/src/routes.tsx */}
-              {HR_ROUTES}
+              {appRoutes.hr}
               <Route path="/position-management" element={<PositionManagement />} />
               {/* 入轉調離：入職/轉正/調動/離職 */}
               {/* 返聘单：不新增侧边栏菜单，路由挂在入職菜单的授权下（见 menuDataSource pathToKey） */}
@@ -762,7 +761,7 @@ function AuthenticatedLayout() {
               <Route path="/system-access-apply" element={<SystemAccessApply />} />
               {/* 產研交付（RDM）—— 需求全生命周期：提交→審批→分配→受理→研發→驗收→上線 */}
               {/* RDM 应用路由：见 frontend/apps/rdm/src/routes.tsx */}
-              {RDM_ROUTES}
+              {appRoutes.rdm}
               {/* 需求池：分配与审批环节的总台（预选 pool 视角，带全量可见与分配权）；
                   产品需求处理/交付中需求已作为纯数据切片删除，旧地址保留重定向，
                   避免存量收藏、钉钉通知、已发出去的分享链接坏掉 */}
@@ -786,7 +785,7 @@ function AuthenticatedLayout() {
               {/* 发起提测 / 创建发布批次：独立页（§9.1 禁止用 Modal 承载新增表单） */}
               {/* 物資管理（EAM 完整路由）*/}
               {/* EAM 应用路由：见 frontend/apps/eam/src/routes.tsx */}
-              {EAM_ROUTES}
+              {appRoutes.eam}
               {/* EAM 基礎數據 */}
               {/* 耗材管理（消耗品/MRO）；方案二：分類/品牌已并入分類庫/品牌產品庫 */}
               {/* EAM 採購入庫 */}

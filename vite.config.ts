@@ -487,6 +487,11 @@ export default defineConfig({
   base: process.env.NODE_ENV === 'production' ? '/-mftb-admin-portal/' : '/',
   resolve: {
     alias: {
+      // 按应用构建（方案 §4.1）：设置 VITE_APP_ROUTES 时把「应用路由组」替换为该应用自己的入口模块，
+      // 其它应用的路由图完全不会进入 bundle。必须排在 '@/app-routes' 展开之前，长前缀优先。
+      ...(process.env.VITE_APP_ROUTES
+        ? { '@/app-routes': path.resolve(__dirname, process.env.VITE_APP_ROUTES) }
+        : {}),
       // 顺序敏感：长前缀必须在 '@' 之前，避免被短别名截走。
       // 共享层已拆为 workspace 包（方案 P2）；别名保留旧写法，使消费方零改写。
       '@mftb/app-rdm': path.resolve(__dirname, './frontend/apps/rdm/src'),
