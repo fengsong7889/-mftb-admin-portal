@@ -18,7 +18,6 @@ import com.mftb.admin.entity.AttMonthlySummary;
 import com.mftb.admin.entity.AttPunchLog;
 import com.mftb.admin.entity.AttSchedule;
 import com.mftb.admin.entity.AttShift;
-import com.mftb.admin.entity.HrLeaveRequest;
 import com.mftb.admin.mapper.AttDaySummaryMapper;
 import com.mftb.admin.mapper.AttExceptionMapper;
 import com.mftb.admin.mapper.AttGroupMapper;
@@ -28,7 +27,7 @@ import com.mftb.admin.mapper.AttMonthlySummaryMapper;
 import com.mftb.admin.mapper.AttPunchLogMapper;
 import com.mftb.admin.mapper.AttScheduleMapper;
 import com.mftb.admin.mapper.AttShiftMapper;
-import com.mftb.admin.mapper.HrLeaveRequestMapper;
+import com.mftb.admin.contracts.hr.HrLeaveQueryPort;
 import com.mftb.admin.service.AttendanceSummaryService;
 import com.mftb.admin.service.OrgScopeService;
 import com.mftb.admin.service.SysConfigService;
@@ -103,7 +102,7 @@ public class AttendanceSummaryServiceImpl implements AttendanceSummaryService {
     private final AttDaySummaryMapper dayMapper;
     private final AttMonthlySummaryMapper monthlyMapper;
     private final AttHolidayMapper holidayMapper;
-    private final HrLeaveRequestMapper leaveMapper;
+    private final HrLeaveQueryPort leaveQueryPort;
     private final BizSeqService bizSeqService;
     private final OperatorResolver operatorResolver;
     private final SysConfigService sysConfigService;
@@ -520,12 +519,8 @@ public class AttendanceSummaryServiceImpl implements AttendanceSummaryService {
                         .ne(AttPunchLog::getResult, AttPunchLog.RESULT_INVALID)
                         .orderByAsc(AttPunchLog::getPunchAt))
                 .stream().collect(Collectors.groupingBy(AttPunchLog::getUserId));
-        ctx.leaveUsers = leaveMapper.selectList(new LambdaQueryWrapper<HrLeaveRequest>()
-                        .in(HrLeaveRequest::getUserId, userIds)
-                        .le(HrLeaveRequest::getStartDate, date)
-                        .ge(HrLeaveRequest::getEndDate, date)
-                        .in(HrLeaveRequest::getStatus, List.of(HrLeaveConstants.STATUS_APPROVED, HrLeaveConstants.STATUS_COMPLETED)))
-                .stream().map(HrLeaveRequest::getUserId).filter(Objects::nonNull).collect(Collectors.toSet());
+        ctx.leaveUsers = leaveQueryPort.userIdsWithEffectiveLeave(userIds, date,
+                List.of(HrLeaveConstants.STATUS_APPROVED, HrLeaveConstants.STATUS_COMPLETED));
         Set<Long> shiftIds = new java.util.HashSet<>();
         ctx.scheduleByUser.values().forEach(s -> {
             if (s.getShiftId() != null) {

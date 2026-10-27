@@ -39,6 +39,11 @@
             <artifactId>mftb-admin-eam</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>com.mftb</groupId>
+            <artifactId>mftb-admin-hr</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
     <build>

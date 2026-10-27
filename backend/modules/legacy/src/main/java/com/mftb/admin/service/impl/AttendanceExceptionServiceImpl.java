@@ -10,9 +10,8 @@ import com.mftb.admin.dto.AttendanceExceptionVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.AttException;
 import com.mftb.admin.entity.AttPunchLog;
-import com.mftb.admin.entity.HrLeaveRequest;
 import com.mftb.admin.mapper.AttExceptionMapper;
-import com.mftb.admin.mapper.HrLeaveRequestMapper;
+import com.mftb.admin.contracts.hr.HrLeaveQueryPort;
 import com.mftb.admin.service.AttendanceExceptionService;
 import com.mftb.admin.service.AttendancePunchService;
 import com.mftb.admin.service.AttendanceSummaryService;
@@ -71,7 +70,7 @@ public class AttendanceExceptionServiceImpl implements AttendanceExceptionServic
             "updatedAt", AttException::getUpdatedAt);
 
     private final AttExceptionMapper exceptionMapper;
-    private final HrLeaveRequestMapper leaveMapper;
+    private final HrLeaveQueryPort leaveQueryPort;
     private final AttendancePunchService punchService;
     private final AttendanceSummaryService summaryService;
     private final OperatorResolver operatorResolver;
@@ -161,21 +160,21 @@ public class AttendanceExceptionServiceImpl implements AttendanceExceptionServic
             throw new BusinessException("只有缺卡與曠工可以用假單抵扣，遲到/早退請走確認或補卡");
         }
         requireMonthEditable(row.getWorkDate());
-        HrLeaveRequest leave = requireApprovedLeave(leaveId, row);
+        HrLeaveQueryPort.LeaveView leave = requireApprovedLeave(leaveId, row);
 
         String operator = operatorResolver.currentOperatorName();
         row.setStatus(AttException.STATUS_LEAVE);
-        row.setFlowNo(leave.getFlowNo());
+        row.setFlowNo(leave.flowNo());
         row.setHandler(operator);
         row.setHandledAt(LocalDateTime.now());
-        row.setHandleRemark("關聯假單 " + leave.getReqNo() + "（" + leave.getStartDate() + " ~ " + leave.getEndDate() + "）");
+        row.setHandleRemark("關聯假單 " + leave.reqNo() + "（" + leave.startDate() + " ~ " + leave.endDate() + "）");
         row.setUpdatedBy(operator);
         exceptionMapper.updateById(row);
 
         // 抵扣后当日结论必须重算，否则日报仍算旷工而异常页已显示已请假
         summaryService.recalculateDaily(row.getWorkDate(), row.getWorkDate(), row.getGroupId());
         log.info("考勤異常已關聯假單抵扣: 異常ID={}, 假單={}, 員工={}, 日期={}, 操作人={}",
-                exceptionId, leave.getReqNo(), row.getEmpNo(), row.getWorkDate(), operator);
+                exceptionId, leave.reqNo(), row.getEmpNo(), row.getWorkDate(), operator);
         return AttendanceExceptionVO.of(requireException(exceptionId));
     }
 
@@ -184,25 +183,25 @@ public class AttendanceExceptionServiceImpl implements AttendanceExceptionServic
      * <p>四条缺一不可：少了「同一人」就能用别人的假单抹自己的旷工，
      * 少了「区间覆盖」就能用上个月的假单抵扣今天的缺卡。
      */
-    private HrLeaveRequest requireApprovedLeave(Long leaveId, AttException row) {
+    private HrLeaveQueryPort.LeaveView requireApprovedLeave(Long leaveId, AttException row) {
         if (leaveId == null) {
             throw new BusinessException("請選擇要關聯的假單");
         }
-        HrLeaveRequest leave = leaveMapper.selectById(leaveId);
+        HrLeaveQueryPort.LeaveView leave = leaveQueryPort.findById(leaveId).orElse(null);
         if (leave == null) {
             throw new BusinessException("假單不存在或已刪除");
         }
-        if (!HrLeaveConstants.STATUS_APPROVED.equals(leave.getStatus())
-                && !HrLeaveConstants.STATUS_COMPLETED.equals(leave.getStatus())) {
-            throw new BusinessException("只有已核准的假單才能抵扣，當前狀態：" + leave.getStatus());
+        if (!HrLeaveConstants.STATUS_APPROVED.equals(leave.status())
+                && !HrLeaveConstants.STATUS_COMPLETED.equals(leave.status())) {
+            throw new BusinessException("只有已核准的假單才能抵扣，當前狀態：" + leave.status());
         }
-        if (!Objects.equals(leave.getUserId(), row.getUserId())) {
+        if (!Objects.equals(leave.userId(), row.getUserId())) {
             throw new BusinessException("假單當事人與異常當事人不一致，不得交叉抵扣");
         }
-        if (leave.getStartDate() == null || leave.getEndDate() == null
-                || row.getWorkDate().isBefore(leave.getStartDate())
-                || row.getWorkDate().isAfter(leave.getEndDate())) {
-            throw new BusinessException("假單區間 " + leave.getStartDate() + " ~ " + leave.getEndDate()
+        if (leave.startDate() == null || leave.endDate() == null
+                || row.getWorkDate().isBefore(leave.startDate())
+                || row.getWorkDate().isAfter(leave.endDate())) {
+            throw new BusinessException("假單區間 " + leave.startDate() + " ~ " + leave.endDate()
                     + " 未覆蓋考勤日 " + row.getWorkDate());
         }
         return leave;
@@ -215,21 +214,17 @@ public class AttendanceExceptionServiceImpl implements AttendanceExceptionServic
             return List.of();
         }
         // 条件与 requireApprovedLeave 的校验一致：候选列表里不该出现选了也会被拒的单据
-        return leaveMapper.selectList(new LambdaQueryWrapper<HrLeaveRequest>()
-                        .eq(HrLeaveRequest::getUserId, row.getUserId())
-                        .le(HrLeaveRequest::getStartDate, row.getWorkDate())
-                        .ge(HrLeaveRequest::getEndDate, row.getWorkDate())
-                        .in(HrLeaveRequest::getStatus,
-                                HrLeaveConstants.STATUS_APPROVED, HrLeaveConstants.STATUS_COMPLETED))
+        return leaveQueryPort.listEffectiveForUser(row.getUserId(), row.getWorkDate(),
+                        List.of(HrLeaveConstants.STATUS_APPROVED, HrLeaveConstants.STATUS_COMPLETED))
                 .stream().map(leave -> {
                     Map<String, Object> item = new LinkedHashMap<>();
-                    item.put("id", leave.getId());
-                    item.put("reqNo", leave.getReqNo());
-                    item.put("leaveType", leave.getLeaveType());
-                    item.put("startDate", leave.getStartDate() == null ? null : leave.getStartDate().toString());
-                    item.put("endDate", leave.getEndDate() == null ? null : leave.getEndDate().toString());
-                    item.put("days", leave.getDays());
-                    item.put("flowNo", leave.getFlowNo());
+                    item.put("id", leave.id());
+                    item.put("reqNo", leave.reqNo());
+                    item.put("leaveType", leave.leaveType());
+                    item.put("startDate", leave.startDate() == null ? null : leave.startDate().toString());
+                    item.put("endDate", leave.endDate() == null ? null : leave.endDate().toString());
+                    item.put("days", leave.days());
+                    item.put("flowNo", leave.flowNo());
                     return item;
                 }).toList();
     }

@@ -1,10 +1,10 @@
 package com.mftb.admin.config;
 
+import com.mftb.admin.contracts.hr.HrLifecycleCallbackService;
 import com.mftb.admin.entity.HrEffectiveTask;
 import com.mftb.admin.entity.HrLifecycleRequest;
 import com.mftb.admin.mapper.HrLifecycleRequestMapper;
 import com.mftb.admin.service.HrEffectiveTaskService;
-import com.mftb.admin.service.HrLifecycleCallbackService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;

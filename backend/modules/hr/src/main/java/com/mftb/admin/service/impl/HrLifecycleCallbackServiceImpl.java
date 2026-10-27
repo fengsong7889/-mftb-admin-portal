@@ -27,7 +27,7 @@ import com.mftb.admin.service.HrEffectiveTaskService;
 import com.mftb.admin.service.HrEmploymentPeriodService;
 import com.mftb.admin.service.HrMasterDataResolver;
 import com.mftb.admin.service.HrOffboardingTaskService;
-import com.mftb.admin.service.HrLifecycleCallbackService;
+import com.mftb.admin.contracts.hr.HrLifecycleCallbackService;
 import com.mftb.admin.util.ConvertUtils;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.OperatorResolver;

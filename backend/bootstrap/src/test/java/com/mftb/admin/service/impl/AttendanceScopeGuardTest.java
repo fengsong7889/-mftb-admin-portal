@@ -1,5 +1,6 @@
 package com.mftb.admin.service.impl;
 
+import com.mftb.admin.service.HrLeaveQueryAdapter;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
@@ -106,10 +107,10 @@ class AttendanceScopeGuardTest {
         punchService = new AttendancePunchServiceImpl(punchMapper, sysUserMapper, groupMapper, memberMapper,
                 scheduleMapper, shiftMapper, operatorResolver, orgScopeService);
         AttendanceSummaryService summaryMock = mock(AttendanceSummaryService.class);
-        exceptionService = new AttendanceExceptionServiceImpl(exceptionMapper, leaveMapper,
+        exceptionService = new AttendanceExceptionServiceImpl(exceptionMapper, new HrLeaveQueryAdapter(leaveMapper),
                 mock(AttendancePunchService.class), summaryMock, operatorResolver, orgScopeService);
         summaryService = new AttendanceSummaryServiceImpl(groupMapper, memberMapper, scheduleMapper, shiftMapper,
-                punchMapper, exceptionMapper, dayMapper, monthlyMapper, mock(AttHolidayMapper.class), leaveMapper,
+                punchMapper, exceptionMapper, dayMapper, monthlyMapper, mock(AttHolidayMapper.class), new HrLeaveQueryAdapter(leaveMapper),
                 mock(BizSeqService.class), operatorResolver, mock(SysConfigService.class), orgScopeService);
         scheduleService = new AttendanceScheduleServiceImpl(groupMapper, memberMapper, scheduleMapper,
                 shiftMapper, operatorResolver, orgScopeService);

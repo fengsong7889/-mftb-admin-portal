@@ -40,6 +40,12 @@
             <artifactId>mftb-admin-contracts-eam</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- 人事域契约：审批回调 + 请假单只读投影 -->
+        <dependency>
+            <groupId>com.mftb</groupId>
+            <artifactId>mftb-admin-contracts-hr</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- 共享平台层：主数据实体/Mapper、通用工具、平台能力服务 -->
         <dependency>
             <groupId>com.mftb</groupId>

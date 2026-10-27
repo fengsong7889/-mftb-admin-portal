@@ -1,4 +1,4 @@
-package com.mftb.admin.service;
+package com.mftb.admin.contracts.hr;
 
 /**
  * 證明開具的 OA 审批回调出口。

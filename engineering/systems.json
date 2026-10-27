@@ -410,7 +410,7 @@
    "priority": true,
    "isolation": {
     "frontend": "isolated",
-    "backend": "pending"
+    "backend": "isolated"
    },
    "planned": {
     "frontendApp": "frontend/apps/hr",
@@ -464,13 +464,13 @@
     }
    },
    "backendPrefixes": {
-    "Hr": 130,
+    "Hr": 127,
     "Hcm": 24,
-    "Org": 16,
     "Emp": 15,
     "Employee": 15,
     "Position": 9,
     "Emergency": 4,
+    "Org": 3,
     "Contract": 2
    },
    "testCounts": {
@@ -545,7 +545,7 @@
    "backendPrefixes": {
     "Permission": 8,
     "Data": 8,
-    "Role": 6,
+    "Role": 5,
     "Menu": 5,
     "Authorization": 3
    },
@@ -665,7 +665,7 @@
     }
    },
    "backendPrefixes": {
-    "Oa": 13,
+    "Oa": 12,
     "Workflow": 8,
     "Approver": 2
    },
@@ -770,7 +770,7 @@
     }
    },
    "backendPrefixes": {
-    "Sys": 50,
+    "Sys": 43,
     "System": 20,
     "Notification": 9,
     "Translation": 7,
@@ -1019,25 +1019,21 @@
    "Login": 6,
    "Auth": 3,
    "Query": 3,
-   "Profile": 2,
    "User": 2,
    "Approval": 2,
-   "Employment": 2,
    "Jwt": 2,
    "Password": 2,
    "Scope": 2,
    "Prom": 2,
-   "Person": 2,
    "Department": 2,
    "Captcha": 2,
    "Segmentation": 2,
+   "Employment": 2,
    "Change": 1,
    "Recharge": 1,
-   "Basic": 1,
    "Machine": 1,
    "Option": 1,
    "Segment": 1,
-   "Roster": 1,
    "Debt": 1,
    "Transfer": 1,
    "Bind": 1,
@@ -1046,7 +1042,6 @@
    "Merge": 1,
    "Status": 1,
    "Deduct": 1,
-   "Reset": 1,
    "Language": 1,
    "Translate": 1,
    "Audit": 1,
@@ -1056,7 +1051,6 @@
    "Minutes": 1,
    "Request": 1,
    "Checkin": 1,
-   "Sensitive": 1,
    "Jackson": 1,
    "Security": 1,
    "Authz": 1,
@@ -1080,7 +1074,8 @@
    "Idempotent": 1,
    "Evidence": 1,
    "Inventory": 1,
-   "Sign": 1
+   "Sign": 1,
+   "Basic": 1
   }
  }
 }

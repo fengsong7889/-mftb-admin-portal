@@ -11,7 +11,7 @@ import com.mftb.admin.mapper.SysPositionMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.HrAssignmentQuery;
 import com.mftb.admin.service.HrEffectiveTaskService;
-import com.mftb.admin.service.HrLifecycleCallbackService;
+import com.mftb.admin.contracts.hr.HrLifecycleCallbackService;
 import com.mftb.admin.service.OaRequestService;
 import com.mftb.admin.service.PermissionService;
 import com.mftb.admin.util.BizSeqService;

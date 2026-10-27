@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.mftb</groupId>
+        <artifactId>mftb-admin-parent</artifactId>
+        <version>1.0.0</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+    <artifactId>mftb-admin-hr</artifactId>
+    <packaging>jar</packaging>
+    <name>mftb-admin-hr</name>
+    <description>
+        人事域（HR）模块（方案 P3 第 5 步）：240 个类，含薪酬子域。
+        界定依据：方案 §三的 10 个系统无独立 payroll，且控制器命名已是 HcmPayroll*；
+        故 HR = 人事（Hr*/Hcm*/Employee*/Emp*/Position*/Contract*）+ 薪酬（Payroll*/Salary*）。
+        EmpPermissionTraceVO 留在 legacy —— 它是「授权追踪」响应模型，属 IAM。
+        依赖：platform-core / contracts-hr / contracts-eam / shared。
+        独立编译：mvn -pl modules/hr -am compile，reactor 不含 legacy。
+    </description>
+    <dependencies>
+        <dependency>
+            <groupId>com.mftb</groupId>
+            <artifactId>mftb-admin-platform-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.mftb</groupId>
+            <artifactId>mftb-admin-contracts-hr</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.mftb</groupId>
+            <artifactId>mftb-admin-contracts-eam</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.mftb</groupId>
+            <artifactId>mftb-admin-shared</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+    <build>
+        <finalName>mftb-admin-hr</finalName>
+    </build>
+</project>

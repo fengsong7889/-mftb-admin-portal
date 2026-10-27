@@ -1,4 +1,4 @@
-package com.mftb.admin.service;
+package com.mftb.admin.contracts.hr;
 
 /**
  * HR 入转调离单据的 OA 审批回调服务。

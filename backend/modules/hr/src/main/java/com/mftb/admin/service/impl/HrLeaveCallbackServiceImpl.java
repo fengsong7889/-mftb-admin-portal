@@ -6,7 +6,7 @@ import com.mftb.admin.entity.HrLeaveBalance;
 import com.mftb.admin.entity.HrLeaveRequest;
 import com.mftb.admin.mapper.HrLeaveBalanceMapper;
 import com.mftb.admin.mapper.HrLeaveRequestMapper;
-import com.mftb.admin.service.HrLeaveCallbackService;
+import com.mftb.admin.contracts.hr.HrLeaveCallbackService;
 import com.mftb.admin.service.SysHrDictService;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;

@@ -1,5 +1,6 @@
 package com.mftb.admin.service.impl;
 
+import com.mftb.admin.service.HrLeaveQueryAdapter;
 import com.mftb.admin.entity.HrLeaveRequest;
 import com.mftb.admin.mapper.HrLeaveRequestMapper;
 import com.mftb.admin.service.AttendanceCallbackService;
@@ -42,7 +43,7 @@ class AttendanceCallbackServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        callback = new AttendanceCallbackServiceImpl(leaveMapper, exceptionService, summaryService);
+        callback = new AttendanceCallbackServiceImpl(new HrLeaveQueryAdapter(leaveMapper), exceptionService, summaryService);
     }
 
     @Test

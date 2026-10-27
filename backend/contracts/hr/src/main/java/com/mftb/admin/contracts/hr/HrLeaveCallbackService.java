@@ -1,4 +1,4 @@
-package com.mftb.admin.service;
+package com.mftb.admin.contracts.hr;
 
 /**
  * 请假单据的 OA 审批回调服务。

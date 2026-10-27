@@ -1,5 +1,6 @@
 package com.mftb.admin.service.impl;
 
+import com.mftb.admin.service.HrLeaveQueryAdapter;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.entity.AttException;
 import com.mftb.admin.entity.AttPunchLog;
@@ -55,7 +56,7 @@ class AttendanceExceptionServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        service = new AttendanceExceptionServiceImpl(exceptionMapper, leaveMapper, punchService, summaryService,
+        service = new AttendanceExceptionServiceImpl(exceptionMapper, new HrLeaveQueryAdapter(leaveMapper), punchService, summaryService,
                 operatorResolver, org.mockito.Mockito.mock(com.mftb.admin.service.OrgScopeService.class));
         when(operatorResolver.currentOperatorName()).thenReturn("陳小紅");
     }

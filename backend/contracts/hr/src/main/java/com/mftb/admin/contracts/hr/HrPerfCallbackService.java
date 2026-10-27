@@ -1,4 +1,4 @@
-package com.mftb.admin.service;
+package com.mftb.admin.contracts.hr;
 
 /**
  * 績效考核的 OA 审批回调出口（整批确认）。

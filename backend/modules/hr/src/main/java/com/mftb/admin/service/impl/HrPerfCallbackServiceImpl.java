@@ -11,7 +11,7 @@ import com.mftb.admin.mapper.HrPerfAssessmentMapper;
 import com.mftb.admin.mapper.HrPerfPlanMapper;
 import com.mftb.admin.mapper.HrPerfScoreItemMapper;
 import com.mftb.admin.mapper.HrPerfTemplateMapper;
-import com.mftb.admin.service.HrPerfCallbackService;
+import com.mftb.admin.contracts.hr.HrPerfCallbackService;
 import com.mftb.admin.util.HrPerfGradeUtils;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;

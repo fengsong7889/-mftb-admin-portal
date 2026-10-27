@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.constant.HrCertificateConstants;
 import com.mftb.admin.entity.HrCertificateRequest;
 import com.mftb.admin.mapper.HrCertificateRequestMapper;
-import com.mftb.admin.service.HrCertificateCallbackService;
+import com.mftb.admin.contracts.hr.HrCertificateCallbackService;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

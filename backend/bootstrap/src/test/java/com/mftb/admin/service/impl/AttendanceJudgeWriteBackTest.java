@@ -1,5 +1,6 @@
 package com.mftb.admin.service.impl;
 
+import com.mftb.admin.service.HrLeaveQueryAdapter;
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.mftb.admin.entity.AttException;
@@ -97,7 +98,7 @@ class AttendanceJudgeWriteBackTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service = new AttendanceSummaryServiceImpl(groupMapper, memberMapper, scheduleMapper, shiftMapper,
-                punchMapper, exceptionMapper, dayMapper, monthlyMapper, holidayMapper, leaveMapper,
+                punchMapper, exceptionMapper, dayMapper, monthlyMapper, holidayMapper, new HrLeaveQueryAdapter(leaveMapper),
                 bizSeqService, operatorResolver, sysConfigService, org.mockito.Mockito.mock(com.mftb.admin.service.OrgScopeService.class));
         when(operatorResolver.currentOperatorName()).thenReturn("陳小紅");
         when(sysConfigService.getConfigValueCached(anyString())).thenReturn(null);

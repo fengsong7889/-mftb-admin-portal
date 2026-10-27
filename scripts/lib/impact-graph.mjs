@@ -17,7 +17,7 @@ export const JAVA_ROOT = 'backend/modules/legacy/src'
 export const JAVA_TEST_ROOT = 'backend/bootstrap/src'
 // 已拆出的域模块（方案 P3 第 3 步）：与 legacy 一起构成后端主源码
 // 注意：数组顺序即扫描顺序；新增域模块时同步追加，否则其测试类不会被选中。
-export const JAVA_DOMAIN_ROOTS = ['backend/modules/rdm/src', 'backend/modules/eam/src']
+export const JAVA_DOMAIN_ROOTS = ['backend/modules/rdm/src', 'backend/modules/eam/src', 'backend/modules/hr/src']
 
 // ───────────────────────── 共享层规则（命中即升档全量） ─────────────────────────
 // 这些文件被多个系统/菜单共用，任何改动都可能波及全量，必须跑全量。
