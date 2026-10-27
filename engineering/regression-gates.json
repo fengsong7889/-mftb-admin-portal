@@ -1,0 +1,185 @@
+{
+  "$comment": [
+    "方案 §六「稳定性与业务回归门槛」的可执行映射：每类保护对象必须能落到真实测试文件上。",
+    "由 scripts/check-regression-map.mjs 校验：类别命中数低于 require、或测试文件总数低于 floors，都直接失败。",
+    "floors 的意义：方案要求「测试数和安全门禁没有减少」。删/改测试必须同步下调 floors，并在评审里说明原因。",
+    "patterns 匹配的是小写化的相对路径（含类名/文件名），不分前后端写法；bucket 由路径前缀判定。"
+  ],
+  "floors": {
+    "backend": 303,
+    "frontend": 149,
+    "scripts": 6
+  },
+  "categories": [
+    {
+      "key": "session-permission",
+      "title": "会话与权限：登录→门户→目标系统；撤权、强制下线、停用、越权、旧链接、跨标签退出",
+      "require": {
+        "backend": 14,
+        "frontend": 5,
+        "scripts": 0
+      },
+      "patterns": {
+        "backend": [
+          "auth",
+          "permission",
+          "session",
+          "password",
+          "role",
+          "login"
+        ],
+        "frontend": [
+          "login",
+          "permission",
+          "authcontext",
+          "menutabs",
+          "portal"
+        ]
+      }
+    },
+    {
+      "key": "rdm",
+      "title": "RDM：提交/准入→认领分配→任务→提测/验收→交付；变更、日报、通知链接",
+      "require": {
+        "backend": 42,
+        "frontend": 24,
+        "scripts": 0
+      },
+      "patterns": {
+        "backend": [
+          "rdm"
+        ],
+        "frontend": [
+          "frontend/apps/rdm"
+        ]
+      }
+    },
+    {
+      "key": "eam",
+      "title": "EAM：采购审批→订单→入库→领用/归还；借用、调拨关联记录与权限；不重复库存动作",
+      "require": {
+        "backend": 8,
+        "frontend": 3,
+        "scripts": 0
+      },
+      "patterns": {
+        "backend": [
+          "eam"
+        ],
+        "frontend": [
+          "frontend/apps/eam"
+        ]
+      }
+    },
+    {
+      "key": "hr-attendance",
+      "title": "HR/考勤：员工资料与选人；入转调离；请假批准后考勤重算；隐私与账号边界不放宽",
+      "require": {
+        "backend": 28,
+        "frontend": 4,
+        "scripts": 0
+      },
+      "patterns": {
+        "backend": [
+          "hr",
+          "hcm",
+          "employee",
+          "payroll",
+          "attendance"
+        ],
+        "frontend": [
+          "frontend/apps/hr"
+        ]
+      }
+    },
+    {
+      "key": "oa-grant",
+      "title": "OA 授权：审批通过→权限/额度实际兑现；失败回滚与现行实现一致",
+      "require": {
+        "backend": 8,
+        "frontend": 0,
+        "scripts": 0
+      },
+      "patterns": {
+        "backend": [
+          "oa",
+          "grant",
+          "approval",
+          "quota"
+        ],
+        "frontend": []
+      }
+    },
+    {
+      "key": "ads-finance",
+      "title": "广告/财务：扣费、退款、并发重复提交与账本一致性",
+      "require": {
+        "backend": 4,
+        "frontend": 0,
+        "scripts": 0
+      },
+      "patterns": {
+        "backend": [
+          "adcalc",
+          "adpricing",
+          "adorder",
+          "adcell",
+          "ads",
+          "finance",
+          "fin",
+          "commission",
+          "settlement",
+          "refund"
+        ],
+        "frontend": []
+      }
+    },
+    {
+      "key": "migration-task",
+      "title": "迁移与任务：versionKey/catalog/资源/契约完整；同一任务单一执行；失败不就绪",
+      "require": {
+        "backend": 14,
+        "frontend": 0,
+        "scripts": 0
+      },
+      "patterns": {
+        "backend": [
+          "migration",
+          "schema",
+          "version",
+          "catalog",
+          "seed",
+          "initializer"
+        ],
+        "frontend": []
+      }
+    },
+    {
+      "key": "frontend-release",
+      "title": "前端版本：单应用更新、全站装配、旧页签加载、深链接、语言切换、回滚资源完整",
+      "require": {
+        "backend": 0,
+        "frontend": 4,
+        "scripts": 3
+      },
+      "patterns": {
+        "backend": [],
+        "frontend": [
+          "versionupdatenotification",
+          "portal",
+          "i18n",
+          "route"
+        ],
+        "scripts": [
+          "site-assembly",
+          "app-manifests",
+          "impact-graph",
+          "system-attribution"
+        ]
+      }
+    }
+  ],
+  "knownGaps": {
+    "ads-finance": "存量薄弱：现有 4 个测试集中在 AdCalcUtils/FinExtras/余额查询/权限，扣费、退款、并发重复提交与账本一致性缺少自动化回归；本期未移动这两个域，属基线缺口，需单独立项补测。"
+  }
+}
