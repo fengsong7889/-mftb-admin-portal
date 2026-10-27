@@ -52,6 +52,21 @@ function listDirs(rel) {
 }
 
 /** 后端类名前缀：与生成器保持同一口径（文件名首个大写字母段） */
+/** 递归收集 .java 绝对路径（域耦合棘轮 C7 使用） */
+function walkJava(abs) {
+  const out = []
+  const walk = (dir) => {
+    if (!fs.existsSync(dir)) return
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else if (entry.name.endsWith('.java')) out.push(full)
+    }
+  }
+  walk(abs)
+  return out
+}
+
 function backendPrefixes() {
   const counts = new Map()
   const walk = (abs) => {
@@ -206,6 +221,45 @@ function main() {
     }
     if (got.backend < want.backend) {
       fail.push(`C6 系统 ${code} 后端特征回归从 ${want.backend} 降到 ${got.backend}（搬迁/重构不得丢测试）`)
+    }
+  }
+
+  // ── C7：域耦合棘轮（方案 §4.1「检测重叠、遗漏、循环」+ §5.2）──
+  // RDM/EAM 拆出后，下一个候选域能不能拆必须靠数据：engineering/domain-coupling.json
+  // 登记了每个候选域的反向边基线。这里实时重算，**新增反向边即失败**——
+  // 新欠的跨域耦合必须显式复核并更新基线，而不是悄悄累积到“拆不动”为止。
+  const couplingFile = path.join(ROOT, 'engineering', 'domain-coupling.json')
+  if (fs.existsSync(couplingFile)) {
+    const coupling = JSON.parse(fs.readFileSync(couplingFile, 'utf8'))
+    const legacyRoot = path.join(ROOT, BACKEND_ROOTS[0])
+    const files = walkJava(legacyRoot)
+    const byName = new Map(files.map((abs) => [path.basename(abs, '.java'), abs]))
+    const strip = (code) =>
+      code.replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/"[^"\n]*"/g, '')
+    for (const [domain, data] of Object.entries(coupling.domains ?? {})) {
+      const prefixes = data.prefixes ?? []
+      if (!prefixes.length) continue
+      const inDomain = (name) => prefixes.some((p) => name.startsWith(p))
+      if (![...byName.keys()].some(inDomain)) continue
+      const baseline = new Set((data.reverseEdges ?? []).map((e) => e.class))
+      const current = new Set()
+      for (const [name, abs] of byName) {
+        if (inDomain(name)) continue
+        for (const id of strip(fs.readFileSync(abs, 'utf8')).match(/\b[A-Z][A-Za-z0-9_]*\b/g) ?? []) {
+          if (id !== name && byName.has(id) && inDomain(id)) current.add(id)
+        }
+      }
+      const added = [...current].filter((c) => !baseline.has(c))
+      const stale = [...baseline].filter((c) => !current.has(c))
+      if (added.length) {
+        fail.push(
+          `C7 域 ${domain} 新增跨域反向边：${added.join(', ')} —— 必须先把它们契约化；` +
+          `如果是有意引入，重跑 python3 engineering/analyze-domain-coupling.py 并说明理由`,
+        )
+      }
+      if (stale.length) {
+        info.push(`域耦合基线 ${domain} 中有 ${stale.length} 条已消失（可重跑分析脚本收紧基线）`)
+      }
     }
   }
 

@@ -1,0 +1,599 @@
+{
+  "$comment": [
+    "待拆域的双向引用面（方案 §4.1 归属清单的可执行版本）。",
+    "forward = 该域类引用了多少个非本域类；reverse = 非本域类引用了多少个该域类。",
+    "新增编码请重跑 python3 engineering/analyze-domain-coupling.py；",
+    "scripts/check-engineering-registry.mjs 会对 reverse 条目做棘轮比对（只允许减少）。"
+  ],
+  "domains": {
+    "hr": {
+      "prefixes": [
+        "Hr",
+        "Hcm",
+        "Employee",
+        "Position",
+        "Contract"
+      ],
+      "classCount": 180,
+      "forwardClasses": 63,
+      "reverseClasses": 9,
+      "reverseFiles": 8,
+      "reverseEdges": [
+        {
+          "class": "HrEmployment",
+          "referencingFiles": 3,
+          "examples": [
+            "PayrollBenefitServiceImpl",
+            "PayrollRunServiceImpl",
+            "PayrollServiceImpl"
+          ]
+        },
+        {
+          "class": "HrEmploymentMapper",
+          "referencingFiles": 3,
+          "examples": [
+            "PayrollBenefitServiceImpl",
+            "PayrollRunServiceImpl",
+            "PayrollServiceImpl"
+          ]
+        },
+        {
+          "class": "HrLeaveRequest",
+          "referencingFiles": 3,
+          "examples": [
+            "AttendanceCallbackServiceImpl",
+            "AttendanceExceptionServiceImpl",
+            "AttendanceSummaryServiceImpl"
+          ]
+        },
+        {
+          "class": "HrLeaveRequestMapper",
+          "referencingFiles": 3,
+          "examples": [
+            "AttendanceCallbackServiceImpl",
+            "AttendanceExceptionServiceImpl",
+            "AttendanceSummaryServiceImpl"
+          ]
+        },
+        {
+          "class": "HrCertificateCallbackService",
+          "referencingFiles": 1,
+          "examples": [
+            "OaRequestServiceImpl"
+          ]
+        },
+        {
+          "class": "HrEmploymentPeriod",
+          "referencingFiles": 1,
+          "examples": [
+            "EmploymentPeriodVO"
+          ]
+        },
+        {
+          "class": "HrLeaveCallbackService",
+          "referencingFiles": 1,
+          "examples": [
+            "OaRequestServiceImpl"
+          ]
+        },
+        {
+          "class": "HrLifecycleCallbackService",
+          "referencingFiles": 1,
+          "examples": [
+            "OaRequestServiceImpl"
+          ]
+        },
+        {
+          "class": "HrPerfCallbackService",
+          "referencingFiles": 1,
+          "examples": [
+            "OaRequestServiceImpl"
+          ]
+        }
+      ]
+    },
+    "attendance": {
+      "prefixes": [
+        "Attendance"
+      ],
+      "classCount": 50,
+      "forwardClasses": 24,
+      "reverseClasses": 1,
+      "reverseFiles": 1,
+      "reverseEdges": [
+        {
+          "class": "AttendanceCallbackService",
+          "referencingFiles": 1,
+          "examples": [
+            "OaRequestServiceImpl"
+          ]
+        }
+      ]
+    },
+    "payroll": {
+      "prefixes": [
+        "Payroll"
+      ],
+      "classCount": 33,
+      "forwardClasses": 4,
+      "reverseClasses": 14,
+      "reverseFiles": 4,
+      "reverseEdges": [
+        {
+          "class": "PayrollBenefitPlan",
+          "referencingFiles": 1,
+          "examples": [
+            "HcmPayrollBenefitController"
+          ]
+        },
+        {
+          "class": "PayrollBenefitService",
+          "referencingFiles": 1,
+          "examples": [
+            "HcmPayrollBenefitController"
+          ]
+        },
+        {
+          "class": "PayrollComponent",
+          "referencingFiles": 1,
+          "examples": [
+            "HcmPayrollController"
+          ]
+        },
+        {
+          "class": "PayrollEnrollment",
+          "referencingFiles": 1,
+          "examples": [
+            "HcmPayrollBenefitController"
+          ]
+        },
+        {
+          "class": "PayrollEnrollmentVO",
+          "referencingFiles": 1,
+          "examples": [
+            "HcmPayrollBenefitController"
+          ]
+        },
+        {
+          "class": "PayrollPayslipDetailVO",
+          "referencingFiles": 1,
+          "examples": [
+            "HcmPayrollRunController"
+          ]
+        },
+        {
+          "class": "PayrollPayslipVO",
+          "referencingFiles": 1,
+          "examples": [
+            "HcmPayrollRunController"
+          ]
+        },
+        {
+          "class": "PayrollRuleService",
+          "referencingFiles": 1,
+          "examples": [
+            "HcmPayrollRuleController"
+          ]
+        },
+        {
+          "class": "PayrollRuleSet",
+          "referencingFiles": 1,
+          "examples": [
+            "HcmPayrollRuleController"
+          ]
+        },
+        {
+          "class": "PayrollRun",
+          "referencingFiles": 1,
+          "examples": [
+            "HcmPayrollRunController"
+          ]
+        },
+        {
+          "class": "PayrollRunService",
+          "referencingFiles": 1,
+          "examples": [
+            "HcmPayrollRunController"
+          ]
+        },
+        {
+          "class": "PayrollSalaryStandard",
+          "referencingFiles": 1,
+          "examples": [
+            "HcmPayrollController"
+          ]
+        },
+        {
+          "class": "PayrollService",
+          "referencingFiles": 1,
+          "examples": [
+            "HcmPayrollController"
+          ]
+        },
+        {
+          "class": "PayrollTaxBracket",
+          "referencingFiles": 1,
+          "examples": [
+            "HcmPayrollRuleController"
+          ]
+        }
+      ]
+    },
+    "finance": {
+      "prefixes": [
+        "Fin",
+        "Finance"
+      ],
+      "classCount": 61,
+      "forwardClasses": 18,
+      "reverseClasses": 16,
+      "reverseFiles": 7,
+      "reverseEdges": [
+        {
+          "class": "FinAccountService",
+          "referencingFiles": 4,
+          "examples": [
+            "AdOrderServiceImpl",
+            "AdOrderSupport",
+            "AdSalesStarServiceImpl"
+          ]
+        },
+        {
+          "class": "FinAccount",
+          "referencingFiles": 3,
+          "examples": [
+            "AdOrderServiceImpl",
+            "AdOrderSupport",
+            "AdSalesStarServiceImpl"
+          ]
+        },
+        {
+          "class": "FinWriteChainService",
+          "referencingFiles": 3,
+          "examples": [
+            "AdOrderServiceImpl",
+            "AdOrderSupport",
+            "AdSalesStarServiceImpl"
+          ]
+        },
+        {
+          "class": "FinAccountQuery",
+          "referencingFiles": 1,
+          "examples": [
+            "QueryAccountBalanceTool"
+          ]
+        },
+        {
+          "class": "FinAccountVO",
+          "referencingFiles": 1,
+          "examples": [
+            "QueryAccountBalanceTool"
+          ]
+        },
+        {
+          "class": "FinApproval",
+          "referencingFiles": 1,
+          "examples": [
+            "GiftServiceImpl"
+          ]
+        },
+        {
+          "class": "FinApprovalMapper",
+          "referencingFiles": 1,
+          "examples": [
+            "GiftServiceImpl"
+          ]
+        },
+        {
+          "class": "FinApprovalQuery",
+          "referencingFiles": 1,
+          "examples": [
+            "QueryApprovalsTool"
+          ]
+        },
+        {
+          "class": "FinApprovalService",
+          "referencingFiles": 1,
+          "examples": [
+            "QueryApprovalsTool"
+          ]
+        },
+        {
+          "class": "FinApprovalVO",
+          "referencingFiles": 1,
+          "examples": [
+            "QueryApprovalsTool"
+          ]
+        },
+        {
+          "class": "FinBatchQuery",
+          "referencingFiles": 1,
+          "examples": [
+            "QueryBatchesTool"
+          ]
+        },
+        {
+          "class": "FinBatchService",
+          "referencingFiles": 1,
+          "examples": [
+            "QueryBatchesTool"
+          ]
+        },
+        {
+          "class": "FinBatchVO",
+          "referencingFiles": 1,
+          "examples": [
+            "QueryBatchesTool"
+          ]
+        },
+        {
+          "class": "FinDetail",
+          "referencingFiles": 1,
+          "examples": [
+            "AdOrderServiceImpl"
+          ]
+        },
+        {
+          "class": "FinDetailMapper",
+          "referencingFiles": 1,
+          "examples": [
+            "AdOrderServiceImpl"
+          ]
+        },
+        {
+          "class": "FinExtras",
+          "referencingFiles": 1,
+          "examples": [
+            "AdOrderServiceImpl"
+          ]
+        }
+      ]
+    },
+    "oa": {
+      "prefixes": [
+        "Oa"
+      ],
+      "classCount": 13,
+      "forwardClasses": 11,
+      "reverseClasses": 1,
+      "reverseFiles": 1,
+      "reverseEdges": [
+        {
+          "class": "OaApprovalTaskMapper",
+          "referencingFiles": 1,
+          "examples": [
+            "HrOffboardingTaskServiceImpl"
+          ]
+        }
+      ]
+    },
+    "ai": {
+      "prefixes": [
+        "Ai",
+        "Agent",
+        "Llm"
+      ],
+      "classCount": 159,
+      "forwardClasses": 4,
+      "reverseClasses": 13,
+      "reverseFiles": 6,
+      "reverseEdges": [
+        {
+          "class": "AiActionProposalService",
+          "referencingFiles": 1,
+          "examples": [
+            "McpExecServiceImpl"
+          ]
+        },
+        {
+          "class": "AiBudgetLedger",
+          "referencingFiles": 1,
+          "examples": [
+            "BudgetReservationServiceImpl"
+          ]
+        },
+        {
+          "class": "AiBudgetLedgerMapper",
+          "referencingFiles": 1,
+          "examples": [
+            "BudgetReservationServiceImpl"
+          ]
+        },
+        {
+          "class": "AiConversation",
+          "referencingFiles": 1,
+          "examples": [
+            "ConversationSummaryService"
+          ]
+        },
+        {
+          "class": "AiConversationEventService",
+          "referencingFiles": 1,
+          "examples": [
+            "McpExecServiceImpl"
+          ]
+        },
+        {
+          "class": "AiConversationMapper",
+          "referencingFiles": 1,
+          "examples": [
+            "ConversationSummaryService"
+          ]
+        },
+        {
+          "class": "AiConversationSummaryVO",
+          "referencingFiles": 1,
+          "examples": [
+            "ConversationSummaryService"
+          ]
+        },
+        {
+          "class": "AiGlossary",
+          "referencingFiles": 1,
+          "examples": [
+            "LookupGlossaryTool"
+          ]
+        },
+        {
+          "class": "AiGrantOnApprovalService",
+          "referencingFiles": 1,
+          "examples": [
+            "OaRequestServiceImpl"
+          ]
+        },
+        {
+          "class": "AiKnowledgeService",
+          "referencingFiles": 1,
+          "examples": [
+            "SearchKnowledgeTool"
+          ]
+        },
+        {
+          "class": "AiPromptConfigService",
+          "referencingFiles": 1,
+          "examples": [
+            "LookupGlossaryTool"
+          ]
+        },
+        {
+          "class": "AiToolExecLog",
+          "referencingFiles": 1,
+          "examples": [
+            "McpExecServiceImpl"
+          ]
+        },
+        {
+          "class": "AiToolPolicyService",
+          "referencingFiles": 1,
+          "examples": [
+            "McpExecServiceImpl"
+          ]
+        }
+      ]
+    },
+    "ads": {
+      "prefixes": [
+        "Ad"
+      ],
+      "classCount": 125,
+      "forwardClasses": 22,
+      "reverseClasses": 2,
+      "reverseFiles": 1,
+      "reverseEdges": [
+        {
+          "class": "AdDiscountTier",
+          "referencingFiles": 1,
+          "examples": [
+            "HotDiscountPolicy"
+          ]
+        },
+        {
+          "class": "AdPricingHotVO",
+          "referencingFiles": 1,
+          "examples": [
+            "HotDiscountPolicy"
+          ]
+        }
+      ]
+    },
+    "doc": {
+      "prefixes": [
+        "Doc"
+      ],
+      "classCount": 62,
+      "forwardClasses": 3,
+      "reverseClasses": 8,
+      "reverseFiles": 4,
+      "reverseEdges": [
+        {
+          "class": "DocAckSchema",
+          "referencingFiles": 1,
+          "examples": [
+            "LegacyCoreContracts"
+          ]
+        },
+        {
+          "class": "DocAckService",
+          "referencingFiles": 1,
+          "examples": [
+            "NotificationServiceImpl"
+          ]
+        },
+        {
+          "class": "DocClearanceSchema",
+          "referencingFiles": 1,
+          "examples": [
+            "LegacyCoreContracts"
+          ]
+        },
+        {
+          "class": "DocIntegrationGrantService",
+          "referencingFiles": 1,
+          "examples": [
+            "JwtAuthenticationFilter"
+          ]
+        },
+        {
+          "class": "DocKnowledgeDTO",
+          "referencingFiles": 1,
+          "examples": [
+            "NotificationServiceImpl"
+          ]
+        },
+        {
+          "class": "DocKnowledgeSchema",
+          "referencingFiles": 1,
+          "examples": [
+            "LegacyCoreContracts"
+          ]
+        },
+        {
+          "class": "DocNativeSchema",
+          "referencingFiles": 1,
+          "examples": [
+            "LegacyCoreContracts"
+          ]
+        },
+        {
+          "class": "DocObjectStorage",
+          "referencingFiles": 1,
+          "examples": [
+            "LocalDocObjectStorage"
+          ]
+        }
+      ]
+    },
+    "meeting": {
+      "prefixes": [
+        "Meeting"
+      ],
+      "classCount": 67,
+      "forwardClasses": 10,
+      "reverseClasses": 1,
+      "reverseFiles": 10,
+      "reverseEdges": [
+        {
+          "class": "MeetingMinutesSchema",
+          "referencingFiles": 10,
+          "examples": [
+            "DocAckSchema",
+            "DocApiCatalogSchema",
+            "DocApiSchema"
+          ]
+        }
+      ]
+    },
+    "search": {
+      "prefixes": [
+        "Search",
+        "Synonym",
+        "StopWord"
+      ],
+      "classCount": 1,
+      "forwardClasses": 1,
+      "reverseClasses": 0,
+      "reverseFiles": 0,
+      "reverseEdges": []
+    }
+  }
+}

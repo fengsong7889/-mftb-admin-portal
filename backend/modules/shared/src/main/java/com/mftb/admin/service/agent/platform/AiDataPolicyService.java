@@ -33,6 +33,8 @@ public class AiDataPolicyService {
      * 归一化后仍需显式登记 common，未登记依旧拒绝（fail-closed 不变）。
      */
     public static final String COMMON_SCOPE = "common";
+    /** 个人工作台哨兵（与前端 SystemCode.PORTAL 同值）：不属于业务系统，与空白同样按共用判定。 */
+    private static final String PORTAL_SENTINEL = "portal";
 
     private final JdbcTemplate jdbc;
 
@@ -40,16 +42,29 @@ public class AiDataPolicyService {
 
     public String dataClassOf(String systemCode) {
         // 空作用域（个人工作台/门户）归一为 common 再查：common 未登记仍然返回 null 并被拒绝。
-        String scope = StringUtils.hasText(systemCode) ? systemCode : COMMON_SCOPE;
+        String scope = scopeOf(systemCode);
         List<String> rows = jdbc.queryForList(
                 "SELECT data_class FROM ai_data_class_policy WHERE system_code=?", String.class, scope);
         return rows.isEmpty() ? null : rows.get(0);
     }
 
+    /**
+     * 作用域归一：空白与 portal 哨兵（不属于任何业务系统）统一按 common 判定。
+     * <p>不改变 fail-closed：common 未登记依旧返回 null 并被拒绝。
+     */
+    private static String scopeOf(String systemCode) {
+        if (!StringUtils.hasText(systemCode)) return COMMON_SCOPE;
+        return PORTAL_SENTINEL.equalsIgnoreCase(systemCode.trim()) ? COMMON_SCOPE : systemCode;
+    }
+
     public Decision evaluate(String systemCode, String modelKey) {
-        String dataClass = dataClassOf(systemCode);
+        String scope = scopeOf(systemCode);
+        String dataClass = dataClassOf(scope);
         if (dataClass == null) {
-            return new Decision(false, "data_class_unclassified", "該業務系統尚未分級，禁止發送模型");
+            // 拒绝是安全基线，但必须让管理员看到具体作用域，否则不知道去登记哪个系统。
+            log.warn("[DataPolicy] 拒绝外发：业务系统未登记分级 scope={} model={}", scope, modelKey);
+            return new Decision(false, "data_class_unclassified",
+                    "該業務系統尚未分級，禁止發送模型（作用域：" + scope + "）");
         }
         if (!StringUtils.hasText(modelKey)) {
             return new Decision(false, "endpoint_unknown", "無法確認模型端點，禁止發送");
