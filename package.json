@@ -41,7 +41,8 @@
     "verify:backend": "cd backend && bash restart-service.sh --rebuild",
     "restart:backend": "cd backend && bash restart-service.sh --rebuild",
     "restart:backend:fast": "cd backend && bash restart-service.sh --fast",
-    "build:manifest": "node scripts/build-site-manifest.mjs"
+    "build:manifest": "node scripts/build-site-manifest.mjs",
+    "assemble:check": "node scripts/assemble-site.mjs --current dist/site-manifest.json"
   },
   "dependencies": {
     "@ant-design/charts": "^2.6.7",

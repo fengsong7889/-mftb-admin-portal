@@ -64,6 +64,11 @@ jobs:
       - name: Site assembly manifest
         if: github.event_name == 'push'
         run: npm run build:manifest
+      # 清单自检（sha256 合法、无重复登记、每个应用都有产物）：
+      # 装配规则判错会把旧 chunk 混进新站点，所以它是发布门禁而不是提示
+      - name: Site assembly check
+        if: github.event_name == 'push'
+        run: npm run assemble:check
       - name: Upload Pages artifact
         if: github.event_name == 'push'
         uses: actions/upload-pages-artifact@v3
