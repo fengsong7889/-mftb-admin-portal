@@ -12,7 +12,7 @@ import {
 } from '@/api/hrCertificate'
 import {
   CERT_LANG_LABEL_KEY, CERT_PICKUP_LABEL_KEY, CERT_PICKUP_ORDER, CERT_TYPE_LABEL_KEY,
-} from '../../Ess/meta'
+} from '../Ess/meta'
 
 interface FormValues {
   certNo?: string

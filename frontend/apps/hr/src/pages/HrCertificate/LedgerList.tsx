@@ -14,7 +14,7 @@ import {
 import {
   CERT_LANG_LABEL_KEY, CERT_PICKUP_LABEL_KEY, CERT_STATUS_LABEL_KEY, CERT_STATUS_TABS,
   CERT_STATUS_TAG_COLOR, CERT_TYPE_LABEL_KEY, CERT_TYPE_ORDER,
-} from '../../Ess/meta'
+} from '../Ess/meta'
 
 /**
  * 證明開具台账（人事视角）：跨员工查看申请、筛选待开具、登记实际出具信息。

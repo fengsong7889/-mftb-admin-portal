@@ -85,10 +85,10 @@ BACKEND_PREFIXES = {
 }
 
 # ────────────── 已知多系统共享目录（重叠必须显式承认） ──────────────
+# 注：Hcm 已整体迁入 frontend/apps/hr（构造即归属 hr），故从多系统共享例外中移除
 MULTI_OWNER_EXCEPTIONS = {
     'Permission': '权限管理页面群：菜单分属 hr / attendance / iam（员工授权、考勤授权、授权中心），'
                   '物理上仍是同一个目录，P2 拆应用时需按系统拆到各自 app 或留公共壳',
-    'Hcm': '人事中心页面群：菜单分属 hr / organization / payroll，同 Permission 处理',
     'LoginLog': '登录审计页：菜单同时挂在 HR（员工行为审计）与权限中心（账号安全）下，'
                 '属两个系统共用的只读列表，P2 归入权限中心后由 HR 侧跳转',
 }

@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import { fetchMyRequestStats, fetchMyRequests } from '@/api/hrEss'
 import { HR_LIFECYCLE_TYPE, type HrLifecycleItem, type HrLifecycleType } from '@/api/hrLifecycle'
-import { STATUS_LABEL_KEY, STATUS_TAG_COLOR, TYPE_LABEL_KEY, TYPE_TAG_COLOR } from '../Permission/HrLifecycle/meta'
+import { STATUS_LABEL_KEY, STATUS_TAG_COLOR, TYPE_LABEL_KEY, TYPE_TAG_COLOR } from '../HrLifecycle/meta'
 
 /** 类型下拉顺序（与人事端入转调离四类 + 续签一致） */
 const TYPE_ORDER: HrLifecycleType[] = [

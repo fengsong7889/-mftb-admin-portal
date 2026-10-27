@@ -15,6 +15,8 @@ export const CONTRACT_FORBIDDEN = ['pages', 'components', 'contexts', 'hooks', '
 /** workspace 包前缀 → 包名（顺序即匹配优先级） */
 export const PACKAGE_PREFIXES = [
   ['frontend/apps/rdm/', 'app-rdm'],
+  ['frontend/apps/eam/', 'app-eam'],
+  ['frontend/apps/hr/', 'app-hr'],
   ['frontend/packages/contracts/', 'contracts'],
   ['frontend/packages/i18n/', 'i18n'],
   ['frontend/packages/platform-client/', 'platform-client'],
@@ -30,8 +32,10 @@ export const PACKAGE_DEPS = {
   i18n: [],
   'platform-client': ['contracts', 'i18n'],
   ui: ['contracts', 'i18n', 'platform-client'],
-  legacy: ['contracts', 'i18n', 'platform-client', 'ui', 'legacy', 'app-rdm'],
+  legacy: ['contracts', 'i18n', 'platform-client', 'ui', 'legacy', 'app-rdm', 'app-eam', 'app-hr'],
   'app-rdm': ['contracts', 'i18n', 'platform-client', 'ui'],
+  'app-eam': ['contracts', 'i18n', 'platform-client', 'ui'],
+  'app-hr': ['contracts', 'i18n', 'platform-client', 'ui'],
 }
 
 export function pkgOf(file) {

@@ -1,0 +1,16 @@
+{
+  "name": "@mftb/app-hr",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "HR 系统前端应用（方案 P2 域切片；Permission/LoginLog 仍留 legacy 待多归属裁决）。只依赖四个共享包，不得依赖 legacy(src/) 或其它应用；scripts/check-boundary.mjs 强制。",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@mftb/contracts": "*",
+    "@mftb/i18n": "*",
+    "@mftb/platform-client": "*",
+    "@mftb/ui": "*"
+  }
+}

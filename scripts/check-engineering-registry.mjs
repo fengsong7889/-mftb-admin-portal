@@ -33,6 +33,13 @@ function readJson(file) {
   return JSON.parse(fs.readFileSync(file, 'utf8'))
 }
 
+function listAppsPageDirs() {
+  const apps = listDirs('frontend/apps')
+  const out = []
+  for (const a of apps) out.push(...listDirs(`frontend/apps/${a}/src/pages`))
+  return out
+}
+
 function listDirs(rel) {
   const abs = path.join(ROOT, rel)
   if (!fs.existsSync(abs)) return []
@@ -64,7 +71,12 @@ function actualTestCounts(dirs, prefixes) {
   let fe = 0
   for (const d of dirs) {
     let base = path.join(ROOT, 'src/pages', d)
-    if (!fs.existsSync(base)) base = path.join(ROOT, 'frontend/apps/rdm/src/pages', d)
+    if (!fs.existsSync(base)) {
+      for (const a of listDirs('frontend/apps')) {
+        const cand = path.join(ROOT, 'frontend/apps', a, 'src/pages', d)
+        if (fs.existsSync(cand)) { base = cand; break }
+      }
+    }
     if (!fs.existsSync(base)) continue
     const walk = (abs) => {
       for (const e of fs.readdirSync(abs, { withFileTypes: true })) {
@@ -106,7 +118,7 @@ function main() {
   // ── C1 / C2 / C3：前端页面目录归属 ──
   const pageDirs = [
     ...listDirs('src/pages'),
-    ...listDirs('frontend/apps/rdm/src/pages'),
+    ...listAppsPageDirs(),
   ]
   const ownerOf = new Map()
   for (const [code, sys] of Object.entries(systems)) {

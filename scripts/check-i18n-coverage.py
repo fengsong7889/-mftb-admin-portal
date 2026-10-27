@@ -47,13 +47,14 @@ DOMAINS = {
         'files_extra': [],
     },
     'vehicle': {
-        'dirs': ['src/pages/VehicleManagement'],
+        'dirs': ['frontend/apps/eam/src/pages/VehicleManagement'],
         'namespaces': ['vehicle'],
         'files_extra': [],
     },
     'asset': {
-        'dirs': ['src/pages/AssetManagement', 'src/pages/AssetClaimSign', 'src/pages/AssetTagView',
-                 'src/pages/MyAssets', 'src/pages/BrandProductLibrary', 'src/pages/Consumable'],
+        'dirs': ['frontend/apps/eam/src/pages/AssetManagement', 'frontend/apps/eam/src/pages/AssetClaimSign', 'frontend/apps/eam/src/pages/AssetTagView',
+                 'frontend/apps/eam/src/pages/MyAssets', 'frontend/apps/eam/src/pages/BrandProductLibrary',
+                 'frontend/apps/eam/src/pages/Consumable'],
         'namespaces': ['asset', 'assetTag', 'consumable', 'myAssets'],
         'files_extra': [],
     },

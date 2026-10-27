@@ -22,6 +22,8 @@ export default defineConfig({
     alias: {
       // 与 vite.config.ts 保持一致：共享层已拆为 workspace 包，别名保留旧写法
       '@mftb/app-rdm': path.resolve(__dirname, './frontend/apps/rdm/src'),
+      '@mftb/app-eam': path.resolve(__dirname, './frontend/apps/eam/src'),
+      '@mftb/app-hr': path.resolve(__dirname, './frontend/apps/hr/src'),
       '@mftb/contracts': path.resolve(__dirname, './frontend/packages/contracts/src'),
       '@/api': path.resolve(__dirname, './frontend/packages/platform-client/src/api'),
       '@/contexts': path.resolve(__dirname, './frontend/packages/platform-client/src/contexts'),

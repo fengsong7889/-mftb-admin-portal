@@ -27,7 +27,7 @@ import {
 import {
   CERT_LANG_LABEL_KEY, CERT_STATUS_LABEL_KEY, CERT_STATUS_TAG_COLOR,
   CERT_TYPE_LABEL_KEY,
-} from '../../Ess/meta'
+} from '../Ess/meta'
 import { LEAVE_STATUS_LABEL_KEY, LEAVE_STATUS_TAG_COLOR, LEAVE_TYPE_LABEL_KEY } from '../HrLeave/meta'
 import { STATUS_LABEL_KEY, STATUS_TAG_COLOR, TYPE_LABEL_KEY, TYPE_TAG_COLOR } from './meta'
 

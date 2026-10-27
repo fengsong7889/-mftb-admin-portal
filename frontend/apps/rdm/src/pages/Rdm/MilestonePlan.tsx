@@ -121,7 +121,11 @@ export default function MilestonePlan() {
 
   useEffect(() => { void load() }, [load])
 
-  useEffect(() => () => searchTimer.current && clearTimeout(searchTimer.current), [])
+  // 清理函数必须返回 void：`x && clearTimeout(x)` 会把 number|undefined 当返回值，
+  // 应用级 tsconfig 下报 TS2322（根 tsconfig 未含本案时暴露不出来）
+  useEffect(() => () => {
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+  }, [])
 
   const searchOwner = (keyword: string) => {
     if (searchTimer.current) clearTimeout(searchTimer.current)

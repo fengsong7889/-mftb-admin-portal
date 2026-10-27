@@ -490,6 +490,8 @@ export default defineConfig({
       // 顺序敏感：长前缀必须在 '@' 之前，避免被短别名截走。
       // 共享层已拆为 workspace 包（方案 P2）；别名保留旧写法，使消费方零改写。
       '@mftb/app-rdm': path.resolve(__dirname, './frontend/apps/rdm/src'),
+      '@mftb/app-eam': path.resolve(__dirname, './frontend/apps/eam/src'),
+      '@mftb/app-hr': path.resolve(__dirname, './frontend/apps/hr/src'),
       '@mftb/contracts': path.resolve(__dirname, './frontend/packages/contracts/src'),
       '@/api': path.resolve(__dirname, './frontend/packages/platform-client/src/api'),
       '@/contexts': path.resolve(__dirname, './frontend/packages/platform-client/src/contexts'),

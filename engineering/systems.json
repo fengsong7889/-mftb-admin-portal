@@ -16,7 +16,6 @@
  ],
  "multiOwnerExceptions": {
   "Permission": "权限管理页面群：菜单分属 hr / attendance / iam（员工授权、考勤授权、授权中心），物理上仍是同一个目录，P2 拆应用时需按系统拆到各自 app 或留公共壳",
-  "Hcm": "人事中心页面群：菜单分属 hr / organization / payroll，同 Permission 处理",
   "LoginLog": "登录审计页：菜单同时挂在 HR（员工行为审计）与权限中心（账号安全）下，属两个系统共用的只读列表，P2 归入权限中心后由 HR 侧跳转"
  },
  "systems": {
@@ -246,13 +245,6 @@
       "attendance-shift",
       "attendance-workbench"
      ]
-    },
-    "Permission": {
-     "evidence": "menu-route",
-     "menuKeys": [
-      "hr-leave",
-      "hr-leave-quota"
-     ]
     }
    },
    "backendPrefixes": {
@@ -260,7 +252,7 @@
     "Att": 18
    },
    "testCounts": {
-    "frontend": 8,
+    "frontend": 1,
     "backend": 15
    }
   },
@@ -302,7 +294,7 @@
    "name": "物资管理系统",
    "priority": true,
    "isolation": {
-    "frontend": "pending",
+    "frontend": "isolated",
     "backend": "pending"
    },
    "planned": {
@@ -311,69 +303,29 @@
    },
    "frontendDirs": {
     "AssetClaimSign": {
-     "evidence": "naming",
+     "evidence": "app-slice",
      "reason": "资产领用签收（免登/扫码入口），资产域"
     },
     "AssetManagement": {
-     "evidence": "menu-route",
-     "menuKeys": [
-      "asset-borrow",
-      "asset-category",
-      "asset-claim",
-      "asset-compensation",
-      "asset-dashboard",
-      "asset-flow",
-      "asset-handover",
-      "asset-inbound",
-      "asset-inventory",
-      "asset-list",
-      "asset-location",
-      "asset-loss",
-      "asset-model",
-      "asset-repair",
-      "asset-return",
-      "asset-scrap",
-      "asset-supplier",
-      "asset-tag",
-      "asset-transfer-list",
-      "param-library",
-      "purchase-order"
-     ]
+     "evidence": "app-slice"
     },
     "AssetTagView": {
-     "evidence": "naming",
+     "evidence": "app-slice",
      "reason": "资产标签打印预览，资产域子页面"
     },
     "BrandProductLibrary": {
-     "evidence": "naming",
+     "evidence": "app-slice",
      "reason": "品牌产品库，资产基础数据"
     },
     "Consumable": {
-     "evidence": "menu-route",
-     "menuKeys": [
-      "consumable-alert",
-      "consumable-claim",
-      "consumable-dashboard",
-      "consumable-inbound",
-      "consumable-item",
-      "consumable-report",
-      "consumable-stock",
-      "consumable-stock-txn"
-     ]
+     "evidence": "app-slice"
     },
     "MyAssets": {
-     "evidence": "naming",
+     "evidence": "app-slice",
      "reason": "我的资产（员工自助查看），数据属资产域"
     },
     "VehicleManagement": {
-     "evidence": "menu-route",
-     "menuKeys": [
-      "my-vehicle-use",
-      "vehicle-dispatch",
-      "vehicle-files",
-      "vehicle-ledger",
-      "vehicle-master-data"
-     ]
+     "evidence": "app-slice"
     }
    },
    "backendPrefixes": {
@@ -457,7 +409,7 @@
    "name": "HR 系统",
    "priority": true,
    "isolation": {
-    "frontend": "pending",
+    "frontend": "isolated",
     "backend": "pending"
    },
    "planned": {
@@ -465,26 +417,30 @@
     "backendModule": "backend/modules/hr"
    },
    "frontendDirs": {
+    "ContractLedger": {
+     "evidence": "app-slice"
+    },
     "Ess": {
-     "evidence": "menu-route",
-     "menuKeys": [
-      "ess-center",
-      "ess-certificate",
-      "ess-leave",
-      "ess-performance",
-      "ess-profile",
-      "ess-requests"
-     ]
+     "evidence": "app-slice"
     },
     "Hcm": {
-     "evidence": "menu-route",
-     "menuKeys": [
-      "hcm-person"
-     ]
+     "evidence": "app-slice"
     },
     "HcmBlueprint": {
-     "evidence": "naming",
+     "evidence": "app-slice",
      "reason": "人事蓝图/组织可视化，HR 域子页面"
+    },
+    "HrCertificate": {
+     "evidence": "app-slice"
+    },
+    "HrDict": {
+     "evidence": "app-slice"
+    },
+    "HrLeave": {
+     "evidence": "app-slice"
+    },
+    "HrLifecycle": {
+     "evidence": "app-slice"
     },
     "LoginLog": {
      "evidence": "menu-route",
@@ -493,34 +449,15 @@
      ]
     },
     "PerfReport": {
-     "evidence": "menu-route",
-     "menuKeys": [
-      "hr-perf-appeal",
-      "hr-perf-audit",
-      "hr-perf-ledger",
-      "perf-report-center"
-     ]
+     "evidence": "app-slice"
     },
     "Performance": {
-     "evidence": "menu-route",
-     "menuKeys": [
-      "hr-perf-admin",
-      "hr-perf-calibration",
-      "hr-perf-review",
-      "perf-center"
-     ]
+     "evidence": "app-slice"
     },
     "Permission": {
      "evidence": "menu-route",
      "menuKeys": [
-      "contract-ledger",
       "employee-management",
-      "hr-certificate",
-      "hr-dict",
-      "hr-dimission",
-      "hr-onboarding",
-      "hr-regularization",
-      "hr-transfer",
       "org-structure",
       "position-management"
      ]
@@ -613,7 +550,7 @@
     "Authorization": 3
    },
    "testCounts": {
-    "frontend": 8,
+    "frontend": 4,
     "backend": 8
    }
   },
@@ -748,18 +685,7 @@
     "frontendApp": "frontend/apps/organization",
     "backendModule": "backend/modules/organization"
    },
-   "frontendDirs": {
-    "Hcm": {
-     "evidence": "menu-route",
-     "menuKeys": [
-      "hcm-org-job-family",
-      "hcm-org-job-grade",
-      "hcm-org-legal",
-      "hcm-org-position",
-      "hcm-org-unit"
-     ]
-    }
-   },
+   "frontendDirs": {},
    "backendPrefixes": {},
    "testCounts": {
     "frontend": 0,
@@ -777,18 +703,7 @@
     "frontendApp": "frontend/apps/payroll",
     "backendModule": "backend/modules/payroll"
    },
-   "frontendDirs": {
-    "Hcm": {
-     "evidence": "menu-route",
-     "menuKeys": [
-      "hcm-payroll-benefit",
-      "hcm-payroll-component",
-      "hcm-payroll-rule",
-      "hcm-payroll-run",
-      "hcm-payroll-standard"
-     ]
-    }
-   },
+   "frontendDirs": {},
    "backendPrefixes": {
     "Payroll": 33,
     "Salary": 6

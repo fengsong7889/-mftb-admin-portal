@@ -80,6 +80,8 @@ const RESOLVE_CANDIDATES = ['', '.ts', '.tsx', '.js', '.jsx', '.json', '/index.t
  */
 export const ALIAS_DIRS = [
   ['@mftb/app-rdm/', 'frontend/apps/rdm/src/'],
+  ['@mftb/app-eam/', 'frontend/apps/eam/src/'],
+  ['@mftb/app-hr/', 'frontend/apps/hr/src/'],
   ['@mftb/contracts/', 'frontend/packages/contracts/src/'],
   ['@/api/', 'frontend/packages/platform-client/src/api/'],
   ['@/api', 'frontend/packages/platform-client/src/api'],

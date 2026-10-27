@@ -1,0 +1,99 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true,
+    "types": [
+      "vite/client",
+      "@testing-library/jest-dom"
+    ],
+    "baseUrl": ".",
+    "paths": {
+      "@mftb/app-eam/*": [
+        "src/*"
+      ],
+      "@mftb/contracts/*": [
+        "../../packages/contracts/src/*"
+      ],
+      "@/api/*": [
+        "../../packages/platform-client/src/api/*"
+      ],
+      "@/api": [
+        "../../packages/platform-client/src/api"
+      ],
+      "@/contexts/*": [
+        "../../packages/platform-client/src/contexts/*"
+      ],
+      "@/contexts": [
+        "../../packages/platform-client/src/contexts"
+      ],
+      "@/utils/*": [
+        "../../packages/platform-client/src/utils/*"
+      ],
+      "@/utils": [
+        "../../packages/platform-client/src/utils"
+      ],
+      "@/components/*": [
+        "../../packages/ui/src/components/*"
+      ],
+      "@/components": [
+        "../../packages/ui/src/components"
+      ],
+      "@/hooks/*": [
+        "../../packages/ui/src/hooks/*"
+      ],
+      "@/hooks": [
+        "../../packages/ui/src/hooks"
+      ],
+      "@/styles/*": [
+        "../../packages/ui/src/styles/*"
+      ],
+      "@/styles": [
+        "../../packages/ui/src/styles"
+      ],
+      "@/assets/*": [
+        "../../packages/ui/src/assets/*"
+      ],
+      "@/assets": [
+        "../../packages/ui/src/assets"
+      ],
+      "@/i18n/*": [
+        "../../packages/i18n/src/i18n/*"
+      ],
+      "@/i18n": [
+        "../../packages/i18n/src/i18n"
+      ],
+      "@/constants/*": [
+        "../../packages/contracts/src/constants/*"
+      ],
+      "@/constants": [
+        "../../packages/contracts/src/constants"
+      ],
+      "@/pages/*": [
+        "src/pages/*"
+      ],
+      "@/*": [
+        "src/*"
+      ]
+    }
+  },
+  "include": [
+    "src"
+  ]
+}

@@ -3,8 +3,8 @@ import { Card, Empty, Space, Spin, Tag } from 'antd'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import { fetchLeaveBalances, type LeaveBalance } from '@/api/hrLeave'
-import LeaveList from '../Permission/HrLeave/LeaveList'
-import { ESS_LEAVE_SCOPE, LEAVE_TYPE_LABEL_KEY, LEAVE_TYPE_ORDER } from '../Permission/HrLeave/meta'
+import LeaveList from '../HrLeave/LeaveList'
+import { ESS_LEAVE_SCOPE, LEAVE_TYPE_LABEL_KEY, LEAVE_TYPE_ORDER } from '../HrLeave/meta'
 
 /**
  * 員工自助「我的假期」：本人各假别额度概览 + 我的请假单列表。
