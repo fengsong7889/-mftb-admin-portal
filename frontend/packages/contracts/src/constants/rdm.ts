@@ -1726,18 +1726,37 @@ export const RDM_REQUIREMENT_KIND_LABEL: Record<string, string> = {
   execution: '執行需求',
 }
 
-// ===== 流程版本 =====
-export const RDM_FLOW_VERSION = {
-  V1: 1,
-  V2: 2,
-  V3: 3,
+// ===== 交付流程 =====
+/**
+ * 交付流程（界面不再出现版本号）：
+ * - WHOLE 整單交付：整條需求一個交付單位，按需求狀態機逐段推進；
+ * - BATCH 分批交付：受理後拆成多個交付項，各自開發/測試/驗收/發布。
+ * 內部數值 2/3 只是存量數據契約；歷史導入值 1 與 2 同義，一律按整單交付展示。
+ */
+export const RDM_DELIVERY_MODE = {
+  WHOLE: 2,
+  BATCH: 3,
 } as const
 
-export const RDM_FLOW_VERSION_LABEL: Record<number, string> = {
-  1: '流程V1',
-  2: '流程V2',
-  3: '分批交付V3',
+export type RdmDeliveryMode = typeof RDM_DELIVERY_MODE[keyof typeof RDM_DELIVERY_MODE]
+
+export const RDM_DELIVERY_MODE_LABEL: Record<number, string> = {
+  2: '整單交付',
+  3: '分批交付',
 }
+
+/** 顯示用文案：任何非分批交付的值（含空值、歷史 1）都按整單交付展示 */
+export function rdmDeliveryModeLabel(flowVersion?: number | null): string {
+  return flowVersion === RDM_DELIVERY_MODE.BATCH
+    ? RDM_DELIVERY_MODE_LABEL[RDM_DELIVERY_MODE.BATCH]
+    : RDM_DELIVERY_MODE_LABEL[RDM_DELIVERY_MODE.WHOLE]
+}
+
+/** 列表筛选下拉选项（value 与后端 deliveryMode 参数同口径，不含版本号） */
+export const RDM_DELIVERY_MODE_FILTER_OPTIONS = [
+  { value: 'BATCH', label: '分批交付' },
+  { value: 'WHOLE', label: '整單交付' },
+] as const
 
 // ===== Batch2: 阻斷點 =====
 export const RDM_BLOCK_POINT = { START: 'start', TEST: 'test', RELEASE: 'release' } as const

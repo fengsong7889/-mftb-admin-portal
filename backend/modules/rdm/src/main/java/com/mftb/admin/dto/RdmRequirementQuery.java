@@ -89,6 +89,14 @@ public class RdmRequirementQuery {
     private Integer flowVersion;
 
     /**
+     * 交付流程过滤（界面口径，不带版本号）：BATCH=分批交付 / WHOLE=整单交付。
+     * <p>整单交付包含历史导入值 1 与新建占位值 2：两者业务语义相同（按整条需求推进），
+     * 只在发布闸门的宽松度上不同，界面不应把历史数据漏掉。
+     * <p>{@link #flowVersion} 保留给提测/发布等内部入口（必须精确等于 3）。
+     */
+    private String deliveryMode;
+
+    /**
      * 所属项目 ID / 需求种类（aggregate / execution）过滤。
      * <p>两个参数前端一直在传（RequirementSubmit 的聚合需求下拉、RequirementDetail 的执行需求列表），
      * 但本 DTO 从未声明，于是被 Spring 静默丢弃，只能靠前端再过滤一次兜底。
@@ -209,6 +217,14 @@ public class RdmRequirementQuery {
         }
         if (flowVersion != null) {
             wrapper.eq(RdmRequirement::getFlowVersion, flowVersion);
+        }
+        if (StringUtils.hasText(deliveryMode)) {
+            if ("BATCH".equalsIgnoreCase(deliveryMode.trim())) {
+                wrapper.eq(RdmRequirement::getFlowVersion, RdmConstants.FLOW_VERSION_3);
+            } else if ("WHOLE".equalsIgnoreCase(deliveryMode.trim())) {
+                wrapper.in(RdmRequirement::getFlowVersion, 1, RdmConstants.FLOW_VERSION_2);
+            }
+            // 未知值不收敛结果集：筛选参数写错不能把用户的需求全部藏起来
         }
         if (projectId != null) {
             wrapper.eq(RdmRequirement::getProjectId, projectId);

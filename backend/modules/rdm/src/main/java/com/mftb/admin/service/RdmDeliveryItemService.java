@@ -284,7 +284,7 @@ public class RdmDeliveryItemService {
         accessGuard.requireDeliveryWriter(item.getReqId(), "編輯交付項");
         // ② V3：交付项是 V3 分层链路语义，所属需求必须为 V3，挡住旧流程误入。
         if (!flowVersionGuard.isDeliveryItemFlowV3(id)) {
-            throw new BusinessException("交付項僅適用於分批交付流程（V3）");
+            throw new BusinessException("交付項僅適用於分批交付");
         }
         // ③ 乐观锁：expectedVersion 不匹配即拒（并发编辑保护）。
         if (dto.getExpectedVersion() == null || !dto.getExpectedVersion().equals(item.getVersion())) {

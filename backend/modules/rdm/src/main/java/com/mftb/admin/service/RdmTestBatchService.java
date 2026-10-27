@@ -1232,7 +1232,7 @@ public class RdmTestBatchService {
             throw new BusinessException("關聯需求不存在或已刪除");
         }
         if (req.getFlowVersion() == null || req.getFlowVersion() != RdmConstants.FLOW_VERSION_3) {
-            throw new BusinessException("該需求非新版交付流程（flow_version=3），無法使用提測批次");
+            throw new BusinessException("該需求不是分批交付，無法使用提測批次");
         }
     }
 

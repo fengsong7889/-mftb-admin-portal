@@ -112,7 +112,7 @@ public class RdmRequirementStructureService {
         }
         // 父子均须为 V3：结构主子关系是 V3 分层并行链路的语义，旧流程需求不得混挂。
         if (!isV3(parent.getFlowVersion()) || !isV3(child.getFlowVersion())) {
-            throw new BusinessException("結構主子關係僅適用於分批交付流程（V3），父子需求均須為 V3");
+            throw new BusinessException("結構主子關係僅適用於分批交付，父子需求均須為分批交付");
         }
         // 父子同项目：跨项目挂结构会让项目级聚合进度失真；两者均未关联项目（null）视为同属「未分配」放行。
         if (!java.util.Objects.equals(parent.getProjectId(), child.getProjectId())) {

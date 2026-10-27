@@ -14,9 +14,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Input, Modal, Segmented, Space, Table, Tag, message } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { CheckCircleOutlined, SendOutlined, UserSwitchOutlined } from '@ant-design/icons'
+import { ApartmentOutlined, CheckCircleOutlined, SendOutlined, UserSwitchOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import RdmFormHeader from './components/RdmFormHeader'
+import DeliveryModePicker, { DeliveryModeHelp } from './components/DeliveryModePicker'
 import {
   batchAssign,
   fetchProductOptions,
@@ -25,7 +27,7 @@ import {
   type RdmProductOption,
   type RdmRequirementDetail,
 } from '@/api/rdm'
-import { RDM_STATUS, RDM_STATUS_COLOR, RDM_STATUS_LABEL, formatRdmReqNo, type RdmStatus } from '@/constants/rdm'
+import { RDM_STATUS, RDM_STATUS_COLOR, RDM_STATUS_LABEL, RDM_DELIVERY_MODE, rdmDeliveryModeLabel, formatRdmReqNo, type RdmDeliveryMode, type RdmStatus } from '@/constants/rdm'
 import { PriorityTag } from './components/Tags'
 import { formatPerson } from './handlerDisplay'
 import { formatEmployee } from '@/utils/employeeDisplay'
@@ -44,6 +46,7 @@ type AssignMode = 'DISPATCH' | 'REASSIGN'
 
 export default function AssignPm() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const idsParam = searchParams.get('ids') ?? ''
   // useMemo 让 ids 引用稳定：它每次渲染重建会让下面的 useCallback 失效（依赖里必须能安全写 ids）
@@ -56,6 +59,8 @@ export default function AssignPm() {
   const [pmOptions, setPmOptions] = useState<RdmProductOption[]>([])
   const [picked, setPicked] = useState<PickedPm | null>(null)
   const [mode, setMode] = useState<AssignMode>('DISPATCH')
+  /** 交付流程：分配时确定（默认分批交付），改派不改流程 */
+  const [deliveryMode, setDeliveryMode] = useState<RdmDeliveryMode>(RDM_DELIVERY_MODE.BATCH)
   /** 改派原因：会写进状态流水并通知三方，不能省 */
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(true)
@@ -183,6 +188,12 @@ export default function AssignPm() {
           <div className="confirm-info-row"><span>狀態影響：</span><b>{mode === 'REASSIGN'
             ? '受理人更改為指定產品經理；舊受理人失去本單操作資格但保留歷史貢獻，雙方與提出人都會收到通知'
             : '需求直接進入「已分配·待受理」，並向對方發送待辦提醒'}</b></div>
+          {mode === 'DISPATCH' && (
+            <div className="confirm-info-row">
+              <span>{t('rdm.deliveryMode.confirmRow', { defaultValue: '交付流程：' })}</span>
+              <b>{rdmDeliveryModeLabel(deliveryMode)}</b>
+            </div>
+          )}
           {mode === 'REASSIGN' && (
             <div className="confirm-info-row"><span>改派原因：</span><b>{reason.trim()}</b></div>
           )}
@@ -204,7 +215,7 @@ export default function AssignPm() {
         }
         message.success(`已改派 ${ids.length} 條需求給 ${target.name}`)
       } else {
-        await batchAssign(ids, { userId: target.userId, name: target.name })
+        await batchAssign(ids, { userId: target.userId, name: target.name }, deliveryMode)
         message.success(`已分配 ${ids.length} 條需求給 ${target.name}`)
       }
       navigate(backPath)
@@ -331,6 +342,26 @@ export default function AssignPm() {
           </div>
         </Space>
       </div>
+
+      {/* 交付流程：只在分配时确定；改派只换受理人，不动已锁定的交付流程 */}
+      {mode === 'DISPATCH' && (
+        <div className="rdm-form-section">
+          <div className="rdm-form-section-title">
+            <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}><ApartmentOutlined /></span>
+            {t('rdm.deliveryMode.title', { defaultValue: '交付流程' })}
+            <span className="rdm-todo-hint">
+              {t('rdm.deliveryMode.assignSectionHint', { defaultValue: '分配後生效；受理前還能改，受理後鎖定' })}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 13, color: '#595959', marginBottom: 8 }}>
+            {t('rdm.deliveryMode.pickHint', { defaultValue: '分配後按哪種流程推進 *' })}<DeliveryModeHelp />
+          </div>
+          <DeliveryModePicker value={deliveryMode} onChange={setDeliveryMode} />
+          <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>
+            {t('rdm.deliveryMode.assignNote', { defaultValue: '選「分批交付」時系統會自動建立首個交付項；已建立任務的需求只能選「整單交付」。' })}
+          </div>
+        </div>
+      )}
 
       <div className="rdm-form-section">
         <div className="rdm-form-section-title">

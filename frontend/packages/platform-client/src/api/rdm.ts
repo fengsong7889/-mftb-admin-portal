@@ -406,6 +406,11 @@ export interface RdmTransitionForm {
   iterationCode?: string
   /** 所属项目（归属体系改造）：dispatch/accept 选填，schedule 必填；服务端校验与迭代项目一致 */
   projectId?: number | null
+  /**
+   * 交付流程（分配/认领时确定）：3=分批交付（服务端缺省）/ 2=整单交付。
+   * <p>只对分配、认领、评估窗口生效，且需求已有任务时不允许改成分批交付。
+   */
+  flowVersion?: number
 }
 
 /** 验收提交 */
@@ -763,8 +768,13 @@ export interface RdmRequirementQuery {
   /** V3：按需求种类过滤 aggregate/execution */
   requirementKind?: string
   /**
-   * 流程版本过滤（1/2/3）。
-   * 提测、发布等 V3 专属入口必须传 3：服务端准入会拒 flow_version != 3 的需求，
+   * 交付流程过滤（界面口径）：BATCH=分批交付 / WHOLE=整单交付（含历史导入值 1）。
+   * <p>界面只暴露这两个选项，不再让用户选 V1/V2/V3。
+   */
+  deliveryMode?: 'BATCH' | 'WHOLE'
+  /**
+   * 流程版本精确过滤（1/2/3）。
+   * 提测、发布等分批交付专属入口必须传 3：服务端准入会拒非分批交付的需求，
    * 候选列表不同源过滤会造成「选得到、提交被拒」。
    */
   flowVersion?: number
@@ -1076,10 +1086,19 @@ export async function importRequirements(rows: RdmRequirementImportRowInput[]): 
   })
 }
 
-/** 批量分配产品经理（需求池） */
-export async function batchAssign(ids: number[], pm: { userId: number; name: string }) {
+/**
+ * 批量分配产品经理（需求池）。
+ * <p>交付流程在分配这一刻确定：不传则服务端按分批交付默认。
+ */
+export async function batchAssign(
+  ids: number[],
+  pm: { userId: number; name: string },
+  flowVersion?: number,
+) {
   try {
-    return await request.post<unknown, void>('/rdm/requirement/batch-assign', { ids, pmUserId: pm.userId, pmName: pm.name }, SILENT)
+    return await request.post<unknown, void>('/rdm/requirement/batch-assign', {
+      ids, pmUserId: pm.userId, pmName: pm.name, flowVersion,
+    }, SILENT)
   } catch (err) {
     if (canMockWrite(err)) {
       mockBatchAssign(ids, pm.name)
@@ -1092,9 +1111,10 @@ export async function batchAssign(ids: number[], pm: { userId: number; name: str
 /**
  * 产品经理自需求池认领。
  * <p>服务端用条件更新保证只有一人抢成功，抢不到会回错文，界面上必须当成失败处理。
+ * <p>交付流程在认领这一刻确定：不传则服务端按分批交付默认。
  */
-export async function claimRequirement(id: number): Promise<void> {
-  return request.post<unknown, void>(`/rdm/requirement/${id}/claim`, {}, SILENT)
+export async function claimRequirement(id: number, flowVersion?: number): Promise<void> {
+  return request.post<unknown, void>(`/rdm/requirement/${id}/claim`, { flowVersion }, SILENT)
 }
 
 /** 改派产品经理（旧受理人保留历史贡献，仅失去本单操作资格） */

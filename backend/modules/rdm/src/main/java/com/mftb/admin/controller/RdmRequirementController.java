@@ -214,7 +214,7 @@ public class RdmRequirementController {
             anyPermissions = {RdmConstants.MENU_INTAKE + ":edit"})
     public Result<Integer> batchAssign(@RequestBody BatchAssignRequest request) {
         return Result.success("分配完成",
-                requirementService.batchAssign(request.ids(), request.pmUserId()));
+                requirementService.batchAssign(request.ids(), request.pmUserId(), request.flowVersion()));
     }
 
     /**
@@ -226,8 +226,10 @@ public class RdmRequirementController {
     @RequirePermission(menu = RdmConstants.MENU_REQUIREMENT, action = "edit",
             anyOf = {RdmConstants.MENU_INTAKE, RdmConstants.MENU_DELIVERY_BOARD},
             anyPermissions = {"rdm-requirement:dispatch"})
-    public Result<RdmRequirementVO> claim(@PathVariable Long id) {
-        return Result.success("已認領該需求", requirementService.claim(id));
+    public Result<RdmRequirementVO> claim(@PathVariable Long id,
+                                          @RequestBody(required = false) ClaimRequest request) {
+        return Result.success("已認領該需求",
+                requirementService.claim(id, request == null ? null : request.flowVersion()));
     }
 
     /** 改派产品经理（只有分配侧授权可用；旧受理人保留历史贡献） */
@@ -326,7 +328,11 @@ public class RdmRequirementController {
     }
 
     /** 批量分配请求体 */
-    public record BatchAssignRequest(List<Long> ids, Long pmUserId) {
+    public record BatchAssignRequest(List<Long> ids, Long pmUserId, Integer flowVersion) {
+    }
+
+    /** 认领请求体：交付流程（3=分批交付 / 2=整单交付，不传按分批交付） */
+    public record ClaimRequest(Integer flowVersion) {
     }
 
     /** 沟通记录请求体 */

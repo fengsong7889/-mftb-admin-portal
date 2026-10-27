@@ -2387,17 +2387,18 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
      * <p>包可见：与 {@link #canPerform}/{@link #applyRequiredGuard} 同构，供单测直接钉住闸门口径。
      */
     /**
-     * 分配/认领时确定交付流程（默认 V3 分批交付）。
+     * 分配/认领时确定交付流程（缺省分批交付）。
      *
-     * <p><b>为什么不在提交时选</b>：业务方不知道 V2/V3 是什么，也不该由他们决定；
-     * 提交时写入 V2 占位，到准入后的分配/认领才由产研确定。
+     * <p><b>为什么不在提交时选</b>：业务方不知道两种交付流程的差别，也不该由他们决定；
+     * 提交时写入整单交付占位，到准入后的分配/认领才由产研确定。
      *
      * <p><b>窗口与安全边界</b>：
      * <ul>
-     *   <li>仅 pool / assigned / evaluating 可确定；已受理或存量需求保持原版本；</li>
-     *   <li>已有未取消任务的一律不得升到 V3：那些任务没有交付项归属，
-     *       强行升级会出现「V2 任务 + V3 交付项」混合态；</li>
-     *   <li>升 V3 时补建默认交付项，需求种类缺省 execution。</li>
+     *   <li>仅 pool / assigned / evaluating 可确定；已受理或存量需求保持原值；</li>
+     *   <li>已有未取消任务的一律不得改成分批交付：那些任务没有交付项归属，
+     *       强行切换会出现「整单任务 + 分批交付项」混合态；</li>
+     *   <li>切到分批交付时补建默认交付项，需求种类缺省 execution；</li>
+     *   <li>整单交付对历史导入值 1 保持原值：1 在发布闸门上更宽松，写成 2 会凭空收紧历史需求。</li>
      * </ul>
      */
     private void applyFlowVersionOnAssignment(RdmRequirement req, RdmTransitionDTO dto, Long operatorId) {
@@ -2413,28 +2414,36 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
         }
         Integer explicit = dto == null ? null : dto.getFlowVersion();
         Integer requested = explicit == null ? RdmConstants.FLOW_VERSION_3 : explicit;
-        if (requested != RdmConstants.FLOW_VERSION_3 && requested != 2) {
-            throw new BusinessException("交付流程只能是 V2 或 V3");
+        if (requested != RdmConstants.FLOW_VERSION_3 && requested != RdmConstants.FLOW_VERSION_2) {
+            throw new BusinessException("交付流程只能是分批交付或整单交付");
         }
         Long openTasks = taskMapper.selectCount(new LambdaQueryWrapper<RdmWorkTask>()
                 .eq(RdmWorkTask::getReqId, req.getId())
                 .ne(RdmWorkTask::getStatus, "cancelled"));
         if (openTasks != null && openTasks > 0) {
-            // 已有任务：只有用户「明确」要求切 V3 才拒绝；默认升级（改派/存量重分配）
-            // 必须静默保持 V2，否则每次改派都会被流程选择拦住
+            // 已有任务：只有用户「明确」要求分批才拒绝；自动升级（改派/存量重分配）
+            // 必须静默保持原流程，否则每次改派都会被流程选择拦住
             if (explicit != null && explicit == RdmConstants.FLOW_VERSION_3) {
-                throw new BusinessException("需求已創建任務，不能再切換為分批交付（V3）");
+                throw new BusinessException("需求" + (StringUtils.hasText(req.getReqNo()) ? "（" + req.getReqNo() + "）" : "")
+                        + "已創建任務，不能改為分批交付；請選擇整單交付");
             }
             return;
         }
-        req.setFlowVersion(requested);
-        if (requested == RdmConstants.FLOW_VERSION_3) {
+        int target = requested == RdmConstants.FLOW_VERSION_2 && existing != null && existing == 1
+                ? 1 : requested;
+        if (existing != null && existing == target) {
+            return;
+        }
+        req.setFlowVersion(target);
+        if (target == RdmConstants.FLOW_VERSION_3) {
             if (!StringUtils.hasText(req.getRequirementKind())) {
                 req.setRequirementKind(RdmConstants.KIND_EXECUTION);
             }
             // 传快照而非 id：PM/项目刚写入内存、尚未落库，重读库会丢失默认验收人与项目归属
             deliveryItemService.getOrCreateDefaultItem(req, operatorId);
         }
+        log.info("交付流程已確定: reqNo={}, {} -> {}（{}）, operatorId={}", req.getReqNo(), existing, target,
+                target == RdmConstants.FLOW_VERSION_3 ? "分批交付" : "整單交付", operatorId);
     }
 
     /** 交付流程可确定的窗口：准入后、研发执行前（分配/认领/评估） */
@@ -2506,7 +2515,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public int batchAssign(List<Long> ids, Long pmUserId) {
+    public int batchAssign(List<Long> ids, Long pmUserId, Integer flowVersion) {
         if (ids == null || ids.isEmpty() || pmUserId == null) {
             throw new BusinessException("請選擇需求與產品經理");
         }
@@ -2523,6 +2532,8 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
             }
             RdmTransitionDTO dto = new RdmTransitionDTO();
             dto.setPmUserId(pmUserId);
+            // 分配是产研第一次确定交付流程的时点：界面选什么就落什么，未携带时服务端按分批交付默认
+            dto.setFlowVersion(flowVersion);
             transitionInternal(req, RdmConstants.ACTION_DISPATCH, dto, current, Set.of());
             count++;
         }
@@ -2534,7 +2545,7 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public RdmRequirementVO claim(Long id) {
+    public RdmRequirementVO claim(Long id, Integer flowVersion) {
         RdmRequirement req = requireRequirement(id);
         SysUser current = operatorResolver.currentUser();
         if (current == null) {
@@ -2571,16 +2582,23 @@ public class RdmRequirementServiceImpl implements RdmRequirementService {
             throw new BusinessException("該需求已被他人認領或狀態已變更，請刷新後重試");
         }
         RdmRequirement claimed = requireRequirement(id);
-        // 认领是产研接手的第一刻：默认确定交付流程（V3），已建过任务的需求保持原版本
+        /*
+         * 认领是产研接手的第一刻：按界面所选确定交付流程（缺省分批交付）；
+         * 已建过任务的需求保持原流程（不能出现整单任务 + 分批交付项混合态）。
+         */
+        RdmTransitionDTO flowDto = new RdmTransitionDTO();
+        flowDto.setFlowVersion(flowVersion);
         Integer flowBefore = claimed.getFlowVersion();
-        applyFlowVersionOnAssignment(claimed, null, current.getId());
+        applyFlowVersionOnAssignment(claimed, flowDto, current.getId());
         if (!java.util.Objects.equals(flowBefore, claimed.getFlowVersion())) {
             jdbcTemplate.update("UPDATE rdm_requirement SET flow_version = ?, requirement_kind = ? WHERE id = ?",
                     claimed.getFlowVersion(), claimed.getRequirementKind(), id);
         }
         upsertRole(id, current, RdmConstants.ROLE_PM);
+        String deliveryFlowLabel = claimed.getFlowVersion() != null
+                && claimed.getFlowVersion() == RdmConstants.FLOW_VERSION_3 ? "分批交付" : "整單交付";
         appendStatusLog(claimed, RdmConstants.STATUS_POOL, current, RdmConstants.ACTION_CLAIM,
-                "產品經理自需求池認領：" + current.getName());
+                "產品經理自需求池認領：" + current.getName() + "；交付流程：" + deliveryFlowLabel);
         notifyService.notifyUserIds(RdmConstants.EVENT_ASSIGNED, claimed,
                 List.of(claimed.getSubmitterUserId()), "需求已由產品經理認領",
                 "### 🙋 需求已被認領\n\n- **編號**: " + claimed.getReqNo() + "\n- **標題**: " + claimed.getTitle()

@@ -59,6 +59,7 @@ import dayjs from 'dayjs'
 import DetailPageHeader from '@/components/DetailPageHeader'
 import HelpPopover from '@/components/HelpPopover'
 import RemarkTextArea from '@/components/RemarkTextArea'
+import DeliveryModePicker, { DeliveryModeHelp } from './components/DeliveryModePicker'
 import { buildRdmDetailPath, resolveRdmDetailBackPath } from '@/constants/menuDataSource'
 import { useAuth } from '@/contexts/AuthContext'
 import { formatEmployee } from '@/utils/employeeDisplay'
@@ -109,6 +110,7 @@ import {
   RDM_ACTION_REQUIRED_FIELDS,
   RDM_ACTION_TONE,
   RDM_ANCHOR_LABEL,
+  RDM_DELIVERY_MODE,
   RDM_DELIVERY_ITEM_STATUS_COLOR,
   RDM_DELIVERY_ITEM_STATUS_LABEL,
   RDM_ITERATION_STATUS,
@@ -131,11 +133,13 @@ import {
   RDM_TERMINAL_STATUS,
   RDM_TEST_BATCH_STATUS_LABEL,
   formatRdmReqNo,
+  rdmDeliveryModeLabel,
   RDM_STATUS_STAGE,
   type RdmAcceptResult,
   type RdmAction,
   type RdmActionField,
   type RdmActionTone,
+  type RdmDeliveryMode,
   type RdmRoleCode,
   type RdmSourceChannel,
   type RdmStage,
@@ -343,6 +347,8 @@ export default function RequirementDetail() {
   const [iterationCode, setIterationCode] = useState<string>()
   /** 归属体系改造：动作弹窗里的所属项目（dispatch/accept 选填，schedule 必填） */
   const [actionProjectId, setActionProjectId] = useState<number | undefined>()
+  /** 交付流程（仅分配动作）：需求池/已分配/评估中可确定，默认分批交付 */
+  const [actionDeliveryMode, setActionDeliveryMode] = useState<RdmDeliveryMode>(RDM_DELIVERY_MODE.BATCH)
   const [projectOptions, setProjectOptions] = useState<RdmProjectListItem[]>([])
   /** 调整迭代弹窗（独立于流转动作：属性变更不走状态机） */
   const [iterModalOpen, setIterModalOpen] = useState(false)
@@ -620,6 +626,14 @@ export default function RequirementDetail() {
   const remarkRequired = requiredFields.includes('remark') || requiredFields.includes('blockReason')
 
   /**
+   * 交付流程可确定窗口：与服务端 FLOW_SELECTABLE_STATUSES 同口径（需求池/已分配/评估中），
+   * 且尚未是分批交付（已分批交付的不能退回整单，弹窗里只展示不提供选择）。
+   */
+  const canChooseDeliveryMode = activeAction === RDM_ACTION.DISPATCH && !!detail
+    && detail.flowVersion !== RDM_DELIVERY_MODE.BATCH
+    && ([RDM_STATUS.POOL, RDM_STATUS.ASSIGNED, RDM_STATUS.EVALUATING] as string[]).includes(detail.status)
+
+  /**
    * 当前动作的显示名。
    * <p>必须优先取流转配置里的 actionName，而不是静态 RDM_ACTION_LABEL：
    * 同一个 actionCode 在不同起始状态下名字不同（如 reassign 在已分配→需求池叫「退回需求池」，
@@ -644,11 +658,11 @@ export default function RequirementDetail() {
         ? RDM_STAGE_LABEL[detail.deliveryStage as RdmStage] ?? detail.deliveryStage
         : null
       if ((detail.deliveryItemCount ?? 0) > 0) {
-        return `V3 分批交付：交付項已推導至「${stageLabel}」（${detail.deliveryDoneCount ?? 0}/${detail.deliveryItemCount} 完成），下一步在交付項清單中推進`
+        return `分批交付：交付項已推導至「${stageLabel}」（${detail.deliveryDoneCount ?? 0}/${detail.deliveryItemCount} 完成），下一步在交付項清單中推進`
       }
       return prds.length > 0
-        ? `V3 分批交付：PRD 已就緒（${prds.length} 份${pendingReviews > 0 ? `，${pendingReviews} 個評審進行中` : ''}），下一步建立交付項或提交排期`
-        : 'V3 分批交付：已受理，等待產品經理編寫 PRD；設計/開發/測試/驗收按交付項推進'
+        ? `分批交付：PRD 已就緒（${prds.length} 份${pendingReviews > 0 ? `，${pendingReviews} 個評審進行中` : ''}），下一步建立交付項或提交排期`
+        : '分批交付：已受理，等待產品經理編寫 PRD；設計/開發/測試/驗收按交付項推進'
     }
     /*
      * 已受理但 PRD 已存在（V2）：不能再提示「去写 PRD」。
@@ -706,7 +720,7 @@ export default function RequirementDetail() {
       items.push({
         tone: 'warn',
         text: detail.flowVersion === 3
-          ? '尚未受理就已存在 PRD / 評審記錄：V3 分批交付按交付項推進，接受需求後即可繼續'
+          ? '尚未受理就已存在 PRD / 評審記錄：分批交付按交付項推進，接受需求後即可繼續'
           : '尚未受理就已存在 PRD / 評審記錄（歷史越級操作）：接受需求後會自動對齊到事實狀態',
       })
     }
@@ -777,12 +791,12 @@ export default function RequirementDetail() {
     const total = detail.deliveryItemCount ?? 0
     const done = detail.deliveryDoneCount ?? 0
     if (total === 0) {
-      return `V3 分批交付：階段由交付項推導，目前尚無交付項（需求狀態：${statusLabel}）`
+      return `分批交付：階段由交付項推導，目前尚無交付項（需求狀態：${statusLabel}）`
     }
     const dist = Object.entries(detail.deliveryItemStatusCounts ?? {})
       .map(([code, count]) => `${RDM_DELIVERY_ITEM_STATUS_LABEL[code] ?? code} ${count}`)
       .join(' · ')
-    return `V3 分批交付：階段由交付項推導 · ${done}/${total} 完成${dist ? `（${dist}）` : ''} · 需求狀態仍為「${statusLabel}」`
+    return `分批交付：階段由交付項推導 · ${done}/${total} 完成${dist ? `（${dist}）` : ''} · 需求狀態仍為「${statusLabel}」`
   }, [detail])
 
   /** 合并评论与流转记录成一条活动流（按时间倒序；内部记录的服务端可见性不变） */
@@ -889,6 +903,8 @@ export default function RequirementDetail() {
       pmName: pm?.name,
       iterationCode,
       projectId: actionProjectId ?? null,
+      // 交付流程只在分配动作上携带；其它动作服务端不消费
+      flowVersion: actionCode === RDM_ACTION.DISPATCH ? actionDeliveryMode : undefined,
     }
   }
 
@@ -947,6 +963,7 @@ export default function RequirementDetail() {
     setPmUserId(undefined)
     setIterationCode(undefined)
     setActionProjectId(undefined)
+    setActionDeliveryMode(RDM_DELIVERY_MODE.BATCH)
   }
 
   const resetActionForm = () => {
@@ -1039,6 +1056,10 @@ export default function RequirementDetail() {
     if (code === RDM_ACTION.SCHEDULE && detail) {
       setActionProjectId(detail.projectId ?? undefined)
       setIterationCode(detail.iterationCode ?? undefined)
+    }
+    // 分配弹窗的交付流程默认从分批交付开始选（已分批交付的不能再退回整单，弹窗里只展示不可改）
+    if (code === RDM_ACTION.DISPATCH) {
+      setActionDeliveryMode(RDM_DELIVERY_MODE.BATCH)
     }
     ensureActionOptions()
   }
@@ -2015,14 +2036,16 @@ export default function RequirementDetail() {
                   />
                 }
               />
-              {/* 交付流程：业务方提交时不选；准入后在分配/认领时由产研确定（默认 V3） */}
-              <PropRow label="交付流程" value={
-                detail.flowVersion === 3
-                  ? 'V3 分批交付'
-                  : (['pool', 'assigned', 'evaluating'].includes(detail.status)
-                    ? <span style={{ color: '#E8720C' }}>V2 待產研確認（分配/認領時確定）</span>
-                    : 'V2 整需求交付')
-              } />
+              {/* 交付流程：业务方提交时不选；准入后在分配/认领时由产研确定（默认分批交付） */}
+              <PropRow
+                label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>{t('rdm.deliveryMode.title', { defaultValue: '交付流程' })}<DeliveryModeHelp /></span>}
+                value={detail.flowVersion === RDM_DELIVERY_MODE.BATCH
+                  ? rdmDeliveryModeLabel(RDM_DELIVERY_MODE.BATCH)
+                  : ([RDM_STATUS.DRAFT, RDM_STATUS.INTAKE_PENDING, RDM_STATUS.INTAKE_REJECTED,
+                    RDM_STATUS.POOL, RDM_STATUS.ASSIGNED, RDM_STATUS.EVALUATING] as string[]).includes(detail.status)
+                    ? <span style={{ color: '#E8720C' }}>{t('rdm.deliveryMode.pendingValue', { defaultValue: '待確定（分配 / 認領時選擇，默認分批交付）' })}</span>
+                    : rdmDeliveryModeLabel(detail.flowVersion)}
+              />
               {showAllProps && (
                 <>
                   <PropRow label="項目負責人" value={detail.dispatcherName ?? '-'} />
@@ -2040,7 +2063,6 @@ export default function RequirementDetail() {
                   <PropRow label="返工 / 變更 / 駁回" value={`${detail.reworkCount ?? 0} / ${detail.changeCount ?? 0} / ${detail.rejectCount ?? 0} 次`} />
                   <PropRow label="掛起復審" value={detail.onHoldUntil ?? '-'} />
                   <PropRow label="來源渠道" value={RDM_SOURCE_CHANNEL_LABEL[detail.sourceChannel as RdmSourceChannel] ?? detail.sourceChannel ?? '-'} />
-                  <PropRow label="流程版本" value={detail.flowVersion ? `V${detail.flowVersion}` : '-'} />
                   {detail.parentReqNo && <PropRow label="來源需求" value={<span style={{ color: '#1890FF' }}>{detail.parentReqNo}</span>} />}
                   {/* V3 新增屬性 */}
                   {detail.requirementKind && (
@@ -2122,7 +2144,7 @@ export default function RequirementDetail() {
         {availableActions.length === 0 && (
           <div className="rdm-action-bar-locked">
             {detail.flowVersion === 3 && detail.status === RDM_STATUS.ACCEPTED
-              ? 'V3 分批交付：需求層已受理，後續動作在交付項 / 發布批次中執行'
+              ? '分批交付：需求層已受理，後續動作在交付項 / 發布批次中執行'
               : serverActions ? '你在這個環節沒有可執行動作' : '當前狀態無可執行動作'}
           </div>
         )}
@@ -2207,6 +2229,25 @@ export default function RequirementDetail() {
                     label: `${formatEmployee(pm.name, pm.empNo)} · 在途 ${pm.activeCount}/${pm.capacity}`,
                   }))}
                 />
+              </div>
+            )}
+            {canChooseDeliveryMode && (
+              <div>
+                <div className="rdm-action-modal-label" style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  {t('rdm.deliveryMode.title', { defaultValue: '交付流程' })} *<DeliveryModeHelp />
+                </div>
+                <DeliveryModePicker value={actionDeliveryMode} onChange={setActionDeliveryMode} />
+                <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 6 }}>
+                  {t('rdm.deliveryMode.assignNote', { defaultValue: '選「分批交付」時系統會自動建立首個交付項；已建立任務的需求只能選「整單交付」。' })}
+                </div>
+              </div>
+            )}
+            {activeAction === RDM_ACTION.DISPATCH && detail.flowVersion === RDM_DELIVERY_MODE.BATCH && (
+              <div>
+                <div className="rdm-action-modal-label">{t('rdm.deliveryMode.title', { defaultValue: '交付流程' })}</div>
+                <div style={{ fontSize: 13, color: '#595959' }}>
+                  {t('rdm.deliveryMode.lockedValue', { defaultValue: '分批交付（已鎖定：需求已按交付項推進，不能退回整單交付）' })}
+                </div>
               </div>
             )}
             {requiredFields.includes('promisedDate') && (
@@ -2507,7 +2548,7 @@ function IntakePolicySection({ detail, navigate }: {
 
 /** 属性行：整栏编辑态时右侧换成行内控件，否则显示只读值 */
 function PropRow({ label, value, editing, editor }: {
-  label: string
+  label: React.ReactNode
   value: React.ReactNode
   editing?: boolean
   editor?: React.ReactNode

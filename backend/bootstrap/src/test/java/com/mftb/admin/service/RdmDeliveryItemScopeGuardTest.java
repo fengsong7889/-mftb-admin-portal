@@ -111,7 +111,7 @@ class RdmDeliveryItemScopeGuardTest {
         when(flowVersionGuard.isDeliveryItemFlowV3(ITEM)).thenReturn(false);
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.updateItem(ITEM, update(5), OPERATOR));
-        assertTrue(ex.getMessage().contains("V3"), ex.getMessage());
+        assertTrue(ex.getMessage().contains("分批交付"), ex.getMessage());
     }
 
     @Test

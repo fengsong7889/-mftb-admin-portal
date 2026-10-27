@@ -737,7 +737,7 @@ public class RdmDeliveryServiceImpl implements RdmDeliveryService {
             throw new BusinessException("交付項不屬於該需求，不能把任務掛到其他需求的交付項下");
         }
         if (!flowVersionGuard.isDeliveryItemFlowV3(requestedId)) {
-            throw new BusinessException("僅分批交付流程（V3）的需求可把任務歸屬到交付項");
+            throw new BusinessException("僅分批交付的需求可把任務歸屬到交付項");
         }
         return requestedId;
     }

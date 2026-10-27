@@ -79,7 +79,7 @@ public class RdmFlowVersionGuard {
             throw new BusinessException("需求不存在或已刪除");
         }
         if (!isV3(req.getFlowVersion())) {
-            throw new BusinessException("此操作僅適用於分批交付流程（V3），當前需求為 V" + versionLabel(req.getFlowVersion()));
+            throw new BusinessException("此操作僅適用於分批交付，當前需求為整單交付");
         }
     }
     /**
@@ -92,7 +92,7 @@ public class RdmFlowVersionGuard {
         }
         RdmRequirement req = requirementMapper.selectById(reqId);
         if (req != null && isV3(req.getFlowVersion())) {
-            throw new BusinessException("V3 分批交付流程需求請使用新接口，不可使用舊整需求操作");
+            throw new BusinessException("分批交付需求請使用交付項接口，不可使用整單交付操作");
         }
     }
     /**
@@ -117,7 +117,7 @@ public class RdmFlowVersionGuard {
         if (actionCode != null && V3_TRANSITION_ALLOWED_ACTIONS.contains(actionCode)) {
             return;
         }
-        throw new BusinessException("V3 分批交付需求的交付/測試/驗收/發布以交付項為推進單位，"
+        throw new BusinessException("分批交付需求的交付/測試/驗收/發布以交付項為推進單位，"
                 + "不能通過整需求流轉執行動作「" + actionCode + "」，請使用交付項接口");
     }
 
@@ -173,7 +173,7 @@ public class RdmFlowVersionGuard {
         }
         log.info("V3 發布灰度未開啟（或已全局熔断），已拦截發布批次操作: batchId={}, projectId={}",
                 releaseBatchId, projectId);
-        throw new BusinessException("V3 分批交付流程的發布能力尚未對本項目開放（灰度未開啟或已全局熔断），"
+        throw new BusinessException("分批交付的發布能力尚未對本項目開放（灰度未開啟或已全局熔断），"
                 + "當前僅支持查看和準備");
     }
     /**
@@ -259,9 +259,5 @@ public class RdmFlowVersionGuard {
     /** 是否 V3 流程版本 */
     private boolean isV3(Integer flowVersion) {
         return flowVersion != null && flowVersion == RdmConstants.FLOW_VERSION_3;
-    }
-    /** 版本文案：空值代表最早的历史需求（V1/V2 之前），统一显示为 1/2 */
-    private String versionLabel(Integer flowVersion) {
-        return flowVersion == null ? "1/2" : String.valueOf(flowVersion);
     }
 }

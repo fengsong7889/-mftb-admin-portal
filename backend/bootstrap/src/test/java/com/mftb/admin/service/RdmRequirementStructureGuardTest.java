@@ -115,7 +115,7 @@ class RdmRequirementStructureGuardTest {
                 .thenReturn(req(CHILD, RdmConstants.KIND_EXECUTION, 2, PROJECT));
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.addChildRequirement(PARENT, CHILD, OPERATOR));
-        assertTrue(ex.getMessage().contains("V3"), ex.getMessage());
+        assertTrue(ex.getMessage().contains("分批交付"), ex.getMessage());
     }
 
     @Test

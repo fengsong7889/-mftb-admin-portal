@@ -105,10 +105,12 @@ import {
 import RequirementKanban from './components/RequirementKanban'
 import RequirementImportModal from './components/RequirementImportModal'
 import RequirementBackfillModal from './components/RequirementBackfillModal'
+import DeliveryModePicker, { DeliveryModeHelp } from './components/DeliveryModePicker'
 import type { RequirementBackfillPayload } from './components/RequirementBackfillModal'
 import type { ParsedRdmImportRow } from './rdmImport'
 import {
-  RDM_FLOW_VERSION_LABEL,
+  RDM_DELIVERY_MODE,
+  RDM_DELIVERY_MODE_FILTER_OPTIONS,
   RDM_ITERATION_STATUS,
   RDM_KANBAN_MAX_SIZE,
   RDM_KANBAN_SIZE,
@@ -189,8 +191,8 @@ interface RequirementFilters {
   iterationCode?: string
   /** V3：需求种类 */
   requirementKind?: string
-  /** V3：流程版本 */
-  flowVersion?: number
+  /** 交付流程（界面口径）：BATCH=分批交付 / WHOLE=整单交付（含历史导入值） */
+  deliveryMode?: 'BATCH' | 'WHOLE'
   /**
    * 看板列下钻：多个状态的逗号串（如 {@code pool,assigned}）。
    * <p>与后端 {@code statuses} 字段对齐；必须传逗号串，数组会被 axios 序列化成
@@ -514,16 +516,32 @@ export default function RequirementList({
 
   /** 认领：服务端条件更新保证只有一人成功，抢到前必须二次确认 */
   const handleClaim = (row: RdmRequirementRow) => {
+    // Modal.confirm 的内容是静态节点，选择值用闭包承接；默认分批交付（与服务端缺省一致）
+    let pickedMode: number = RDM_DELIVERY_MODE.BATCH
     Modal.confirm({
       title: '確認認領該需求？',
       className: 'custom-confirm-modal',
       icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
       content: (
-        <div className="confirm-info-card">
-          <div className="confirm-info-row"><span>需求編號：</span><b>{formatRdmReqNo(row.reqNo)}</b></div>
-          <div className="confirm-info-row"><span>標題：</span><b>{row.title}</b></div>
-          <div className="confirm-info-row">
-            <span>認領後：</span><b>你成為受理人，需求離開需求池並通知提出人；若已被他人搶先，會提示失敗</b>
+        <div>
+          <div className="confirm-info-card">
+            <div className="confirm-info-row"><span>需求編號：</span><b>{formatRdmReqNo(row.reqNo)}</b></div>
+            <div className="confirm-info-row"><span>標題：</span><b>{row.title}</b></div>
+            <div className="confirm-info-row">
+              <span>認領後：</span><b>你成為受理人，需求離開需求池並通知提出人；若已被他人搶先，會提示失敗</b>
+            </div>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 13, color: '#595959', marginBottom: 6 }}>
+              {t('rdm.deliveryMode.title', { defaultValue: '交付流程' })} *<DeliveryModeHelp />
+            </div>
+            <DeliveryModePicker
+              defaultValue={RDM_DELIVERY_MODE.BATCH}
+              onChange={v => { pickedMode = v }}
+            />
+            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 6 }}>
+              {t('rdm.deliveryMode.claimNote', { defaultValue: '認領後即鎖定；已建立任務的需求只能選「整單交付」。' })}
+            </div>
           </div>
         </div>
       ),
@@ -531,7 +549,7 @@ export default function RequirementList({
       cancelText: '取消',
       onOk: async () => {
         try {
-          await claimRequirement(row.id)
+          await claimRequirement(row.id, pickedMode)
           message.success('已認領該需求')
           void load()
         } catch (err) {
@@ -1778,8 +1796,8 @@ function SearchBar({ onSearch, onReset, advanced = false, minimal = false, expan
 
   /** 低频字段：收起时清空并立即重查，保证「看不见的条件」不存在 */
   const MORE_FIELDS: (keyof RequirementFilters)[] = advanced
-    ? ['reqType', 'deptId', 'pmUserId', 'submitterUserId', 'projectId', 'requirementKind', 'flowVersion']
-    : ['reqType', 'projectId', 'requirementKind', 'flowVersion']
+    ? ['reqType', 'deptId', 'pmUserId', 'submitterUserId', 'projectId', 'requirementKind', 'deliveryMode']
+    : ['reqType', 'projectId', 'requirementKind', 'deliveryMode']
 
   const toggleMore = () => {
     if (more) {
@@ -1876,11 +1894,11 @@ function SearchBar({ onSearch, onReset, advanced = false, minimal = false, expan
           </Form.Item>
         )}
         {more && (
-          <Form.Item label="流程版本" name="flowVersion">
+          <Form.Item label={t('rdm.deliveryMode.title', { defaultValue: '交付流程' })} name="deliveryMode">
             <Select
               allowClear
               placeholder="全部"
-              options={Object.entries(RDM_FLOW_VERSION_LABEL).map(([value, label]) => ({ value: Number(value), label }))}
+              options={[...RDM_DELIVERY_MODE_FILTER_OPTIONS]}
             />
           </Form.Item>
         )}

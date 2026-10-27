@@ -1,5 +1,6 @@
 package com.mftb.admin.service;
 
+import com.mftb.admin.constant.RdmConstants;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.dto.RdmAcceptanceDTO;
 import com.mftb.admin.dto.RdmAcceptanceVO;
@@ -127,15 +128,32 @@ public interface RdmRequirementService {
      */
     RdmBatchBackfillVO batchBackfillAccept(RdmBatchBackfillAcceptDTO dto);
 
-    /** 批量分配产品经理 */
-    int batchAssign(List<Long> ids, Long pmUserId);
+    /**
+     * 批量分配产品经理，并在分配这一刻确定交付流程。
+     *
+     * @param flowVersion 交付流程：{@link RdmConstants#FLOW_VERSION_3} 分批交付（缺省）/
+     *                    {@link RdmConstants#FLOW_VERSION_2} 整单交付；null 按分批交付处理
+     */
+    int batchAssign(List<Long> ids, Long pmUserId, Integer flowVersion);
+
+    /** 兼容入口：历史调用方未携带交付流程时按分批交付处理（与界面默认一致）。 */
+    default int batchAssign(List<Long> ids, Long pmUserId) {
+        return batchAssign(ids, pmUserId, null);
+    }
 
     /**
      * 产品经理认领需求池里的需求。
      * <p>原子抢单：用条件更新（status=pool 且尚无受理人）保证同一条需求只有一人抢成功，
      * 不靠「先查后改」的读后写（那个在并发下会两人都看到无人认领）。
+     *
+     * @param flowVersion 交付流程：分批交付（缺省）/ 整单交付；null 按分批交付处理
      */
-    RdmRequirementVO claim(Long id);
+    RdmRequirementVO claim(Long id, Integer flowVersion);
+
+    /** 兼容入口：认领时未携带交付流程的调用方按分批交付处理。 */
+    default RdmRequirementVO claim(Long id) {
+        return claim(id, null);
+    }
 
     /**
      * 改派产品经理（技术负责人/PMO）。
