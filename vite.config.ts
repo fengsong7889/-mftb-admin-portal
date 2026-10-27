@@ -536,6 +536,9 @@ export default defineConfig({
     // 生产构建移除 console/debugger，防止敏感信息泄露（SEC-009）
     minify: 'esbuild',
     target: 'es2020',
+    // 站点装配清单（方案 §4.2）：产物级 manifest 让「每个 chunk 属于哪个应用」可追溯，
+    // 装配与回滚都按清单+摘要走，而不是下载一个「最新版本」碰运气。
+    manifest: true,
   },
   esbuild: {
     drop: ['debugger'],

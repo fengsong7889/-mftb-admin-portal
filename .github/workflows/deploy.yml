@@ -59,6 +59,11 @@ jobs:
       - name: Build
         if: github.event_name == 'push'
         run: npm run build
+      # 站点装配清单（方案 §4.2）：产物 → 应用归属 + sha256，随 dist 一起发布，
+      # 后续「单应用回滚 / 复用已验证旧产物」全部按该清单校验，不靠「最新版本」猜。
+      - name: Site assembly manifest
+        if: github.event_name == 'push'
+        run: npm run build:manifest
       - name: Upload Pages artifact
         if: github.event_name == 'push'
         uses: actions/upload-pages-artifact@v3
