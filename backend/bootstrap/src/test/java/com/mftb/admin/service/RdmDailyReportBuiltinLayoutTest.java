@@ -32,36 +32,41 @@ class RdmDailyReportBuiltinLayoutTest {
             null, new RdmDailyReportRenderer(), null, null, null, null, null, null);
 
     @Test
-    @DisplayName("晨报示例：风险项目 + 异常迭代都要出现，且不得残留占位符")
+    @DisplayName("晨报示例：项目→迭代两级进度清单完整呈现，组间空行，且不得残留占位符")
     void morningDemoShowsAttention() {
         BuiltinLayout r = service.builtinLayout("group_morning");
 
         assertEquals("group_morning", r.type());
         assertEquals("fixed", r.messageMode());
         assertTrue(r.title().contains("晨報"), r.title());
-        assertTrue(r.content().contains("推廣金重構"), r.content());
-        assertTrue(r.content().contains("需關注"), r.content());
-        assertTrue(r.content().contains("逾期"), r.content());
+        assertTrue(r.title().contains("需求交付"), "标题新口径：日期+需求交付晨/晚报，实际: " + r.title());
+        assertTrue(r.content().contains("**推廣金重構**：迭代版本：2 個；"), r.content());
+        assertTrue(r.content().contains("- 迭代-交付鏈路：**進度 50%**"), r.content());
+        assertTrue(r.content().contains("- 11月第一版迭代：**進度 30%**"), r.content());
+        // 钉钉会把无空行的相邻行归并成同一段：示例必须钉住组间空行
+        assertTrue(r.content().contains("**進度 30%**\n\n**內部工具**"), r.content());
         assertFalse(r.content().contains("{{"), r.content());
     }
 
     @Test
-    @DisplayName("晚报示例：展示当日完成与明日到期，而不是晨报的今日到期口径")
+    @DisplayName("晚报示例：同版式清单，标题换晚报档位")
     void eveningDemoShowsReview() {
         BuiltinLayout r = service.builtinLayout("group_evening");
 
         assertTrue(r.title().contains("晚報"), r.title());
-        assertTrue(r.content().contains("今日完成 5 項"), r.content());
+        assertTrue(r.title().contains("需求交付"), r.title());
+        assertTrue(r.content().contains("**推廣金重構**：迭代版本：2 個；"), r.content());
+        assertTrue(r.content().contains("- 內部工具效率迭代：**進度 100%**"), r.content());
     }
 
     @Test
-    @DisplayName("个人示例：结论是「你有 3 項要處理」（1 逾期 + 2 今日到期）")
+    @DisplayName("个人示例：同版式清单收敛到收件人项目，标题同群报口径")
     void personalDemoShowsUrgentCount() {
         BuiltinLayout r = service.builtinLayout("personal");
 
         assertEquals("personal", r.type());
-        assertTrue(r.title().contains("你有 3 項要處理"), r.title());
-        assertTrue(r.content().contains("今天有 3 項交付要處理"), r.content());
+        assertTrue(r.title().contains("需求交付"), "个人标题同新口径，实际: " + r.title());
+        assertTrue(r.content().contains("**推廣金重構**：迭代版本：2 個；"), r.content());
     }
 
     @Test

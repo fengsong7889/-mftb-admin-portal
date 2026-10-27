@@ -164,8 +164,8 @@ class RdmDailyReportPushFlowTest {
         verify(jdbc, never()).update(anyString(), any(Object[].class));
         assertTrue(r.isDryRun(), "结果必须标明是干跑");
         assertFalse(r.isGroupDispatched(), "干跑不得声称群报已投递");
-        assertTrue(r.getGroupTitle() != null && r.getGroupTitle().contains("產研交付日報"),
-                "干跑应回显渲染后的群报标题，实际: " + r.getGroupTitle());
+        assertTrue(r.getGroupTitle() != null && r.getGroupTitle().contains("需求交付"),
+                "干跑应回显渲染后的群报标题（新口径：日期+需求交付晨/晚报），实际: " + r.getGroupTitle());
         assertTrue(r.getGroupContent() != null && !r.getGroupContent().isBlank(),
                 "干跑应回显渲染后的群报正文，实际: " + r.getGroupContent());
     }
@@ -643,7 +643,8 @@ class RdmDailyReportPushFlowTest {
         assertTrue(r.isGroupDispatched(), "brief 仍要发一条，不能静默");
         assertTrue(r.getGroupContent().contains("今日無異常"), r.getGroupContent());
         assertFalse(r.getGroupContent().contains("需關注"), "无异常日不应出现需关注块: " + r.getGroupContent());
-        assertTrue(r.getGroupTitle().contains("今日無異常"), r.getGroupTitle());
+        assertTrue(r.getGroupTitle().contains("需求交付"),
+                "brief 标题同新口径（日期+需求交付晨/晚报），实际: " + r.getGroupTitle());
     }
 
     @Test
@@ -681,7 +682,10 @@ class RdmDailyReportPushFlowTest {
         TriggerResult r = svc.push(ruleTarget(), false, null, false);
 
         assertTrue(r.isGroupDispatched(), "有逾期必须照常发");
-        assertTrue(r.getGroupContent().contains("逾期"), r.getGroupContent());
+        assertTrue(r.getGroupContent().contains("項目A"),
+                "异常日应发完整两级清单，实际: " + r.getGroupContent());
+        assertFalse(r.getGroupContent().startsWith("✅ **今日無異常**"),
+                "异常日不得收敛成一句话，实际: " + r.getGroupContent());
     }
 
     @Test
