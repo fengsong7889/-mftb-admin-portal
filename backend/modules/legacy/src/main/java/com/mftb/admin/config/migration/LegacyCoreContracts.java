@@ -5,19 +5,17 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 /**
- * 结构契约登记表。新增关键业务表结构时在此登记，由 {@link SchemaContractValidator}
- * 每次启动校验并在缺失时执行“可证明安全”的自愈 DDL。
+ * legacy 剩余域的结构契约登记表（方案 P3 第 3 步后：本类实现 {@link SchemaContractProvider}，
+ * 由 shared 模块的 {@code ContractRegistry} 统一聚合；RDM 域已迁到 RdmSchemaContracts）。
  * <p>
  * 契约保持克制：只登记事故相关/关键写入路径的表，避免对未知表误判 not-ready。
  */
 @Component
-public class ContractRegistry {
+public class LegacyCoreContracts implements SchemaContractProvider {
 
-    /** 各业务域自带的契约（域模块实现本接口，注册表只负责聚合，不反向依赖域实现） */
-    private final List<SchemaContractProvider> providers;
-
-    public ContractRegistry(List<SchemaContractProvider> providers) {
-        this.providers = providers;
+    @Override
+    public List<ContractSpec> contracts() {
+        return allContracts();
     }
 
     /**
@@ -51,11 +49,6 @@ public class ContractRegistry {
         combined.add(organicScoreRuleContract());
         // 通知底座兩表：165 腳本長期未接入遷移框架，生產缺表直接把會議域啟動打成崩潰循環
         combined.addAll(notificationContracts());
-        // 域模块自带的结构契约（方案 P3）：各域实现 SchemaContractProvider，此处统一聚合。
-        // 插入位置与拆分前一致，避免契约登记顺序变化影响自愈/校验的短路行为。
-        // RDM 的需求主表 req_no、日报推送配置/规则、通知投递队列，以及第三/四批 schema
-        // 均已随 RdmSchemaContracts 迁入 modules/rdm。
-        providers.forEach(provider -> combined.addAll(provider.contracts()));
         // 组织数据权限（数据范围）：SysRole 实体已带 dataScope 字段，缺列会让所有角色查询报错
         combined.addAll(orgScopeContracts());
         // HR 生效日引擎：在职/离职判定改成 code 驱动后，缺 operation_code 列会直接报错；

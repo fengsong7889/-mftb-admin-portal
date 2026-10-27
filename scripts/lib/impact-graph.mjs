@@ -35,17 +35,18 @@ export const GLOBAL_FE = [
 
 export const GLOBAL_BE = [
   /^backend\/pom\.xml$/,
-  /^backend\/src\/main\/resources\/application/,
-  /^backend\/src\/main\/resources\/db\/migrations\//,
+  // 多模块（P3）：模块 POM / 技术底座 / 共享平台层 / 启动配置 任一改动都必须升档全量
+  /^backend\/(libraries|contracts|modules|bootstrap)\/[^/]+\/pom\.xml$/,
+  /^backend\/libraries\/platform-core\//,
+  /^backend\/modules\/shared\//,
+  /^backend\/bootstrap\/src\/main\/resources\//,
+  /^backend\/modules\/legacy\/src\/main\/resources\/application/,
+  /^backend\/modules\/legacy\/src\/main\/resources\/db\/migrations\//,
   /^backend\/sql\//,
-  /^backend\/src\/main\/java\/com\/mftb\/admin\/common\//,
-  /^backend\/src\/main\/java\/com\/mftb\/admin\/config\//,
-  /^backend\/src\/main\/java\/com\/mftb\/admin\/aspect\//,
-  /^backend\/src\/main\/java\/com\/mftb\/admin\/util\//,
-  /^backend\/src\/main\/java\/com\/mftb\/admin\/constant\//,
-  /^backend\/src\/main\/java\/com\/mftb\/admin\/mapper\//,
-  /^backend\/src\/main\/java\/com\/mftb\/admin\/entity\//,
-  /^backend\/src\/test\/(resources|java\/com\/mftb\/admin\/security\/SecurityTestBase\.java)/,
+  // 跨域共享的技术层：改变会波及所有域，按全量处理
+  /^backend\/modules\/legacy\/src\/main\/java\/com\/mftb\/admin\/(config|aspect|util|constant|mapper|entity)\//,
+  /^backend\/modules\/rdm\/src\/main\/java\/com\/mftb\/admin\/(config|aspect|util|constant|mapper|entity)\//,
+  /^backend\/bootstrap\/src\/test\/java\/com\/mftb\/admin\/security\/SecurityTestBase\.java$/,
 ]
 
 export const GLOBAL_BOTH = [/^scripts\//, /^\.github\//, /^\.qoder\/rules\//, /^AGENTS\.md$/]

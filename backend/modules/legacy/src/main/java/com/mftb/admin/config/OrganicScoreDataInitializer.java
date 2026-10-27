@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
  * <b>新增列注意事项</b>：{@link #NEW_COLUMNS} 的补列步骤被 {@code organic:columns-v1} 版本门控，
  * 生产已记为成功后再往该表追加条目<b>不会</b>重新执行（历史事故：multiplier_tiers 等三列漏建导致
  * 规则列表查询 500）。本表关键结构已登记到
- * {@link com.mftb.admin.config.migration.ContractRegistry#organicScoreRuleContract()} 每次启动自愈，
+ * {@link com.mftb.admin.config.migration.LegacyCoreContracts#organicScoreRuleContract()} 每次启动自愈，
  * 后续给 {@code biz_organic_score_rule} 加列必须同步登记契约（并递增契约列清单）。
  */
 @Slf4j

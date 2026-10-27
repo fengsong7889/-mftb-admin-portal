@@ -23,7 +23,11 @@ import { fileURLToPath } from 'node:url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
 const REGISTRY = path.join(ROOT, 'engineering', 'systems.json')
-const BACKEND_ROOT = 'backend/modules/legacy/src/main/java/com/mftb/admin'
+// 后端业务源码根：legacy + 已拆出的域模块（platform-core / shared / contracts 属平台层，不计入业务归属）
+const BACKEND_ROOTS = [
+  'backend/modules/legacy/src/main/java/com/mftb/admin',
+  'backend/modules/rdm/src/main/java/com/mftb/admin',
+]
 const REGEN = 'python3 engineering/generate-systems.py'
 
 const fail = []
@@ -62,7 +66,7 @@ function backendPrefixes() {
       }
     }
   }
-  walk(path.join(ROOT, BACKEND_ROOT))
+  for (const root of BACKEND_ROOTS) walk(path.join(ROOT, root))
   return counts
 }
 

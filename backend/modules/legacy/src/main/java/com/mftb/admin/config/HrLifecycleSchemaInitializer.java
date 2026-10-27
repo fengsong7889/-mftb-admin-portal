@@ -22,7 +22,7 @@ public class HrLifecycleSchemaInitializer implements CommandLineRunner {
 
     private static final String VERSION_KEY = "hr:lifecycle-schema:v1.0";
 
-    /** 与 195_hr_lifecycle.sql / ContractRegistry.hrLifecycleRequestContract 保持同构 */
+    /** 与 195_hr_lifecycle.sql / LegacyCoreContracts.hrLifecycleRequestContract 保持同构 */
     private static final String CREATE_TABLE_SQL =
             "CREATE TABLE IF NOT EXISTS hr_lifecycle_request ("
                     + "id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID', "

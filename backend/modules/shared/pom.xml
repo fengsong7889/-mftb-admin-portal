@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.mftb</groupId>
+        <artifactId>mftb-admin-parent</artifactId>
+        <version>1.0.0</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mftb-admin-shared</artifactId>
+    <packaging>jar</packaging>
+    <name>mftb-admin-shared</name>
+    <description>
+        共享平台层（过渡形态，方案 P3 第 3 步的配套切片）：主数据实体/Mapper、通用工具、
+        平台能力服务（权限、审批、通知、LLM 路由、单号）。
+        迁入依据：对 modules/rdm 的 legacy 依赖做传递闭包，共 52 个类（util 8 / entity 12 /
+        dto 9 / mapper 9 / service 12 / constant 1 / config 1），闭包外的 legacy 类一个不搬。
+        为什么需要它：此前 rdm -> legacy，意味着「改 RDM 仍要先编其它域实现」，
+        不满足方案 P3「域模块独立编译不包含其它业务实现」。下沉后
+        rdm -> shared 且 legacy -> shared，域模块的上游只剩 platform-core / contracts / shared。
+        约束：shared 不得依赖 legacy 与任何域模块（否则立刻成环）。
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.mftb</groupId>
+            <artifactId>mftb-admin-platform-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- AgentActionService 的跨域可见性校验走 contracts/rdm 的接口 -->
+        <dependency>
+            <groupId>com.mftb</groupId>
+            <artifactId>mftb-admin-contracts-rdm</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>mftb-admin-shared</finalName>
+    </build>
+</project>

@@ -1,6 +1,6 @@
 package com.mftb.admin.config;
 
-import com.mftb.admin.config.migration.ContractRegistry;
+import com.mftb.admin.config.migration.LegacyCoreContracts;
 import com.mftb.admin.config.migration.ContractSpec;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -54,12 +54,12 @@ public class AiDeliveryLogInitializer implements CommandLineRunner {
             throw new IllegalStateException("执行迁移脚本失败 " + SCRIPT + ": " + e.getMessage(), e);
         }
         // 通过 ContractRegistry 提供启动自愈能力：注册到启动期校验列表
-        ContractRegistry.registerDeliveryLog();
+        LegacyCoreContracts.registerDeliveryLog();
         log.info("ai_delivery_log 迁移完成");
     }
 
     private void verifyMigration() {
-        ContractSpec spec = ContractRegistry.deliveryLogContract();
+        ContractSpec spec = LegacyCoreContracts.deliveryLogContract();
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?",
                 Integer.class, spec.table());

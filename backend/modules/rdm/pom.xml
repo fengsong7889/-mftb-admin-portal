@@ -19,7 +19,7 @@
         （controller 24 / service 48 + service/impl 7 + agent 工具 12 / entity 55 / mapper 55 / dto 53 / config 9 / util 1，
         另含 EvidenceValidityResolver 与 4 个 RDM 专用 DTO、IdempotentKey）。
         包名保持 com.mftb.admin.* 不变，Spring 组件扫描与 MyBatis Mapper 扫描行为完全不变。
-        依赖方向：rdm -> legacy（复用 util/dto/entity 等共享实现） -> platform-core；
+        依赖方向：rdm -> shared（主数据/工具/平台能力） -> platform-core；
         反向零依赖，靠 contracts/rdm 的单向接口解开。
         本模块能独立编译：`mvn -pl modules/rdm -am compile` 只需 platform-core + contracts + legacy，
         不会编译其它域模块。
@@ -38,7 +38,7 @@
         </dependency>
         <dependency>
             <groupId>com.mftb</groupId>
-            <artifactId>mftb-admin-legacy</artifactId>
+            <artifactId>mftb-admin-shared</artifactId>
             <version>${project.version}</version>
         </dependency>
     </dependencies>

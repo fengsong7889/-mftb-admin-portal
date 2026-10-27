@@ -135,14 +135,22 @@ def key_to_path():
     return dict(re.findall(r"'([a-zA-Z0-9_-]+)'\s*:\s*'(/[^']*)'", block.group(1) if block else ''))
 
 
+# 后端业务源码根：legacy（未拆出的域）+ 已拆出的域模块。
+# shared/platform-core/contracts 是平台层，不属于任何业务系统，故不计入前缀归属。
+BACKEND_DOMAIN_ROOTS = [
+    'backend/modules/legacy/src/main/java/com/mftb/admin',
+    'backend/modules/rdm/src/main/java/com/mftb/admin',
+]
+
+
 def backend_prefixes():
-    root = 'backend/modules/legacy/src/main/java/com/mftb/admin'
     counts = defaultdict(int)
-    for dp, _, fns in os.walk(root):
-        for fn in fns:
-            if fn.endswith('.java'):
-                m = re.match(r'([A-Z][a-z0-9]*)', fn[:-5])
-                counts[m.group(1) if m else 'unknown'] += 1
+    for root in BACKEND_DOMAIN_ROOTS:
+        for dp, _, fns in os.walk(root):
+            for fn in fns:
+                if fn.endswith('.java'):
+                    m = re.match(r'([A-Z][a-z0-9]*)', fn[:-5])
+                    counts[m.group(1) if m else 'unknown'] += 1
     return counts
 
 

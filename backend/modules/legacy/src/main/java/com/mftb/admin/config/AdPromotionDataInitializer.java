@@ -2,7 +2,7 @@ package com.mftb.admin.config;
 
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.ConvertUtils;
-import com.mftb.admin.config.migration.ContractRegistry;
+import com.mftb.admin.config.migration.LegacyCoreContracts;
 import com.mftb.admin.config.migration.ContractSpec;
 import com.mftb.admin.config.migration.MigrationLock;
 import lombok.RequiredArgsConstructor;
@@ -176,7 +176,7 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
 
     private void ensureHotDiscountColumns() {
         log.info("开始迁移人气商家大小图折扣结构");
-        for (ContractSpec contract : ContractRegistry.hotDiscountContracts()) {
+        for (ContractSpec contract : LegacyCoreContracts.hotDiscountContracts()) {
             for (ContractSpec.ColumnSpec column : contract.requiredColumns()) {
                 addColumnIfAbsent(contract.table(), column.column(), column.addColumnDdl());
             }
@@ -184,7 +184,7 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
     }
 
     private void verifyHotDiscountColumns() {
-        for (ContractSpec contract : ContractRegistry.hotDiscountContracts()) {
+        for (ContractSpec contract : LegacyCoreContracts.hotDiscountContracts()) {
             for (ContractSpec.ColumnSpec column : contract.requiredColumns()) {
                 if (!columnExists(contract.table(), column.column())) {
                     throw new IllegalStateException("人气商家折扣列未就绪: " + contract.table() + "." + column.column());

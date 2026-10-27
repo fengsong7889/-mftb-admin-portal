@@ -76,7 +76,7 @@ class NotificationSchemaOrderingTest {
     @DisplayName("两张表都登记了结构契约，且应用表排在场景表之前")
     void contractsAreRegisteredInForeignKeyOrder() {
         List<String> tables = new java.util.ArrayList<>();
-        for (ContractSpec spec : com.mftb.admin.config.migration.ContractRegistry.notificationContracts()) {
+        for (ContractSpec spec : com.mftb.admin.config.migration.LegacyCoreContracts.notificationContracts()) {
             tables.add(spec.table());
         }
         assertTrue(tables.indexOf("sys_notification_app") >= 0, "未登记 sys_notification_app 契约");

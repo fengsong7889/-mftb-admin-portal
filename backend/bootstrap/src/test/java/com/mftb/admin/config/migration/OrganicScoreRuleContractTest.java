@@ -27,7 +27,7 @@ class OrganicScoreRuleContractTest {
     @Test
     @DisplayName("契约表名与实体 @TableName 一致")
     void contractTargetsOrganicScoreRuleTable() {
-        ContractSpec spec = ContractRegistry.organicScoreRuleContract();
+        ContractSpec spec = LegacyCoreContracts.organicScoreRuleContract();
         assertEquals("biz_organic_score_rule", spec.table());
         assertNotNull(spec.createTableIfMissing(), "该表可能在全新环境首次创建，契约必须带自愈建表 DDL");
     }
@@ -35,7 +35,7 @@ class OrganicScoreRuleContractTest {
     @Test
     @DisplayName("实体每个字段都有对应的契约列（建表 DDL 或补列自愈）")
     void everyEntityFieldHasContractColumn() {
-        ContractSpec spec = ContractRegistry.organicScoreRuleContract();
+        ContractSpec spec = LegacyCoreContracts.organicScoreRuleContract();
         String createDdl = spec.createTableIfMissing().toLowerCase(Locale.ROOT);
 
         List<String> missing = new ArrayList<>();
@@ -57,7 +57,7 @@ class OrganicScoreRuleContractTest {
     @Test
     @DisplayName("事故三列必须可自愈补列")
     void incidentColumnsAreHealable() {
-        ContractSpec spec = ContractRegistry.organicScoreRuleContract();
+        ContractSpec spec = LegacyCoreContracts.organicScoreRuleContract();
         for (String column : List.of("multiplier_tiers", "threshold_score", "region_configs")) {
             assertTrue(spec.requiredColumns().stream()
                             .anyMatch(c -> c.column().equals(column) && c.healable()),

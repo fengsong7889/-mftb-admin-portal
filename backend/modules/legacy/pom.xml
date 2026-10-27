@@ -34,6 +34,12 @@
             <artifactId>mftb-admin-contracts-rdm</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- 共享平台层：主数据实体/Mapper、通用工具、平台能力服务 -->
+        <dependency>
+            <groupId>com.mftb</groupId>
+            <artifactId>mftb-admin-shared</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
     <build>

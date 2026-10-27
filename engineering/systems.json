@@ -209,10 +209,10 @@
     }
    },
    "backendPrefixes": {
-    "Ai": 167,
-    "Agent": 17,
+    "Ai": 143,
+    "Agent": 12,
     "Mcp": 11,
-    "Llm": 10
+    "Llm": 4
    },
    "testCounts": {
     "frontend": 7,
@@ -464,14 +464,14 @@
     }
    },
    "backendPrefixes": {
-    "Hr": 131,
+    "Hr": 130,
     "Hcm": 24,
-    "Emp": 17,
+    "Emp": 16,
     "Org": 16,
     "Employee": 15,
     "Position": 9,
     "Emergency": 4,
-    "Contract": 4
+    "Contract": 2
    },
    "testCounts": {
     "frontend": 11,
@@ -543,10 +543,10 @@
     }
    },
    "backendPrefixes": {
-    "Permission": 11,
+    "Permission": 8,
     "Data": 8,
     "Role": 6,
-    "Menu": 6,
+    "Menu": 5,
     "Authorization": 3
    },
    "testCounts": {
@@ -629,7 +629,7 @@
     }
    },
    "backendPrefixes": {
-    "Biz": 29,
+    "Biz": 27,
     "Store": 12,
     "Merchant": 6
    },
@@ -665,7 +665,7 @@
     }
    },
    "backendPrefixes": {
-    "Oa": 20,
+    "Oa": 14,
     "Workflow": 8,
     "Approver": 2
    },
@@ -770,23 +770,21 @@
     }
    },
    "backendPrefixes": {
-    "Sys": 66,
-    "System": 22,
-    "Notification": 11,
+    "Sys": 57,
+    "System": 20,
+    "Notification": 9,
     "Translation": 7,
-    "Ding": 7,
-    "Schema": 6,
     "Word": 6,
     "Version": 5,
-    "Migration": 4,
-    "Api": 3,
+    "Ding": 4,
+    "Api": 2,
     "Avatar": 2,
     "Batch": 2,
-    "Date": 2
+    "Date": 1
    },
    "testCounts": {
     "frontend": 1,
-    "backend": 20
+    "backend": 17
    }
   },
   "portal": {
@@ -848,10 +846,12 @@
      "reason": "日报免登看板"
     }
    },
-   "backendPrefixes": {},
+   "backendPrefixes": {
+    "Rdm": 265
+   },
    "testCounts": {
     "frontend": 49,
-    "backend": 0
+    "backend": 85
    }
   },
   "search": {
@@ -1026,11 +1026,11 @@
    "Employment": 2,
    "Jwt": 2,
    "Password": 2,
+   "Scope": 2,
    "Prom": 2,
    "Person": 2,
    "Captcha": 2,
    "Segmentation": 2,
-   "Budget": 2,
    "Change": 1,
    "Recharge": 1,
    "Basic": 1,
@@ -1047,28 +1047,19 @@
    "Status": 1,
    "Deduct": 1,
    "Inventory": 1,
-   "Page": 1,
    "Reset": 1,
    "Language": 1,
    "Translate": 1,
    "Audit": 1,
-   "Approve": 1,
    "Public": 1,
-   "Operator": 1,
    "Convert": 1,
-   "Provider": 1,
-   "Network": 1,
-   "File": 1,
    "Sort": 1,
    "Sign": 1,
    "Hot": 1,
    "Minutes": 1,
    "Request": 1,
    "Checkin": 1,
-   "Sql": 1,
    "Sensitive": 1,
-   "Json": 1,
-   "Scope": 1,
    "Jackson": 1,
    "Security": 1,
    "Authz": 1,
@@ -1077,14 +1068,20 @@
    "Downgrade": 1,
    "Rest": 1,
    "Dept": 1,
-   "Database": 1,
+   "Legacy": 1,
    "Iconfont": 1,
    "Health": 1,
    "Email": 1,
    "Abstract": 1,
    "Conversation": 1,
+   "Budget": 1,
    "Lookup": 1,
-   "Local": 1
+   "Local": 1,
+   "Cross": 1,
+   "Add": 1,
+   "Remove": 1,
+   "Idempotent": 1,
+   "Evidence": 1
   }
  }
 }
