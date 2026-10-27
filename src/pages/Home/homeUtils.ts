@@ -102,6 +102,21 @@ export function collectHomeMenus(
 /** localStorage key（按用户隔离） */
 export const FAV_KEY = (username: string) => `home_favorites:${username}`
 
+/** 快捷入口面板折叠态（全局偏好：聊天窗口宽度优先是首页级选择，不按用户区分） */
+export const QUICK_PANEL_COLLAPSED_KEY = 'home_quick_panel_collapsed'
+
+/** 快捷入口面板宽度（拖拽结果，单位 px） */
+export const QUICK_PANEL_WIDTH_KEY = 'home_quick_panel_width'
+
+/** 面板宽度边界：下限保证搜索框与收藏项不被压扁，上限保证聊天区始终是主角 */
+export const DEFAULT_QUICK_PANEL_WIDTH = 300
+export const MIN_QUICK_PANEL_WIDTH = 220
+export const MAX_QUICK_PANEL_WIDTH = 480
+
+/** 收藏为空时的一次性收起建议，提示过后不再打扰 */
+export const QUICK_PANEL_HINT_KEY = 'home_quick_panel_hint_shown'
+export const QUICK_PANEL_HINT_NOTIFICATION_ID = 'home-quick-collapse-hint'
+
 /** 从 localStorage 读取已保存的快捷入口 */
 export const loadFavorites = (username: string): string[] => {
   try {

@@ -159,12 +159,84 @@
    主区域网格：左 AI + 右快捷入口
    ───────────────────────────────────────── */
 .home-main-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 16px;
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  /* 两栅间距完全由分割条宽度（16px）承担，不叠 gap，避免变成 32px */
+  gap: 0;
   flex: 1;
   min-height: 0;
-  align-items: stretch;
+}
+
+/* 收起快捷入口：分割条与面板均不渲染，聊天卡片自然吃满整行 */
+.home-main-grid--quick-collapsed {
+  gap: 0;
+}
+/*
+ * 宽窄分割条：宽度即两栅间距，因此视觉间距与原先一致、但拖拽热区有 16px。
+ * 悬停/聚焦/拖拽时出现橙色引导线与中部抓手，平时完全隐形。
+ */
+.home-quick-splitter {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 16px;
+  width: 16px;
+  align-self: stretch;
+  border-radius: 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.home-quick-splitter::before {
+  content: '';
+  width: 2px;
+  height: 100%;
+  border-radius: 2px;
+  background: transparent;
+  transition: background 0.2s;
+}
+
+.home-quick-splitter::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 28px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(180deg, #d9d9d9 0 2px, transparent 2px 6px);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.home-quick-splitter:hover::before,
+.home-quick-splitter:focus-visible::before,
+.home-main-grid.is-resizing .home-quick-splitter::before {
+  background: #FFD591;
+}
+
+.home-quick-splitter:hover::after,
+.home-quick-splitter:focus-visible::after,
+.home-main-grid.is-resizing .home-quick-splitter::after {
+  opacity: 1;
+}
+
+.home-quick-splitter:focus-visible {
+  outline: 2px solid #E8720C;
+  outline-offset: -2px;
+}
+
+.home-main-grid.is-resizing {
+  user-select: none;
+}
+
+/* 拖拽期间关掉宽度过渡：否则每帧变化都带 280ms 缓动，手感发飘 */
+.home-main-grid.is-resizing .home-quick,
+.home-main-grid.is-resizing .home-ai {
+  transition: none;
 }
 
 /* ─────────────────────────────────────────
@@ -181,6 +253,7 @@
   height: 100%;
   min-height: 0;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 /* 头部 */
@@ -897,7 +970,83 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   overflow: visible;
+  flex: 0 0 var(--home-quick-width, 300px);
+  width: var(--home-quick-width, 300px);
+  max-width: 46%;
+  transition:
+    flex-basis 280ms cubic-bezier(0.4, 0, 0.2, 1),
+    width 280ms cubic-bezier(0.4, 0, 0.2, 1),
+    padding 280ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-width 280ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 180ms ease;
+}
+
+/* 收起态：宽度/内边距归零并裁切，聊天卡片自动接替这块面积 */
+.home-quick--collapsed {
+  flex-basis: 0;
+  width: 0;
+  padding: 0;
+  border-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    flex-basis 280ms cubic-bezier(0.4, 0, 0.2, 1),
+    width 280ms cubic-bezier(0.4, 0, 0.2, 1),
+    padding 280ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-width 280ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 180ms ease,
+    visibility 0s linear 280ms;
+}
+
+/* 收起后的贴边把手：不占布局宽度，垂直居中贴在聊天卡片右缘，就近召回 */
+.home-quick-handle {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  z-index: 5;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 24px;
+  padding: 12px 0;
+  border: 1px solid #FFE7BA;
+  border-right: none;
+  border-radius: 12px 0 0 12px;
+  background: linear-gradient(180deg, #FFF7E6, #FFFFFF);
+  color: #E8720C;
+  font-size: 11px;
+  cursor: pointer;
+  box-shadow: -2px 0 10px rgba(232, 114, 12, 0.12);
+  transform: translateY(-50%);
+  transition: background 0.2s, box-shadow 0.2s, color 0.2s;
+  animation: homeQuickHandleIn 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.home-quick-handle:hover {
+  background: #FFF7E6;
+  color: #D46B08;
+  box-shadow: -4px 0 14px rgba(232, 114, 12, 0.22);
+}
+
+.home-quick-handle:focus-visible {
+  outline: 2px solid #E8720C;
+  outline-offset: 2px;
+}
+
+.home-quick-handle-text {
+  writing-mode: vertical-rl;
+  letter-spacing: 2px;
+  line-height: 1;
+}
+
+@keyframes homeQuickHandleIn {
+  from { opacity: 0; transform: translateY(-50%) translateX(8px); }
+  to { opacity: 1; transform: translateY(-50%) translateX(0); }
 }
 
 .home-quick-head {
@@ -906,6 +1055,41 @@
   align-items: stretch;
   gap: 10px;
   margin-bottom: 12px;
+}
+
+/* 标题行：标题与收起按钮两端对齐，收起入口紧贴标题，不必去头部找 */
+.home-quick-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.home-quick-collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #8C8C8C;
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.home-quick-collapse:hover {
+  color: #E8720C;
+  background: #FFF7E6;
+}
+
+.home-quick-collapse:focus-visible {
+  outline: 2px solid #E8720C;
+  outline-offset: 2px;
 }
 
 .home-quick-label {
@@ -1729,6 +1913,12 @@
   background: #FFF7E6;
 }
 
+/* 快捷入口收起后，头部开关保持高亮，提示当前处于「面板已收起」状态 */
+.home-ai-panel-toggle.is-collapsed {
+  color: #E8720C;
+  background: #FFF7E6;
+}
+
 .home-ai-settings-panel {
   min-width: 180px;
   padding: 4px 0;
@@ -2266,9 +2456,36 @@
    响应式
    ──────────────────────────────────────── */
 @media (max-width: 992px) {
-  .home-main-grid { grid-template-columns: 1fr; }
+  /* 窄屏单列堆叠：分割条隐藏，折叠无收益（强制恢复面板），间距回到普通 gap */
+  .home-main-grid { flex-direction: column; gap: 16px; }
+  .home-quick,
+  .home-quick--collapsed {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: none;
+    padding: 16px;
+    border-width: 1px;
+    opacity: 1;
+    visibility: visible;
+    overflow: visible;
+    pointer-events: auto;
+    transition: none;
+  }
+  .home-quick-handle { display: none; }
+  /* 窄屏下分割条无意义（面板已整行置底） */
+  .home-quick-splitter { display: none; }
+  /* 窄屏下折叠被 CSS 强制失效，同步隐藏开关，避免「点了没反应」 */
+  .home-ai-panel-toggle { display: none; }
   .home-greeting { flex-direction: column; align-items: flex-start; gap: 12px; }
   .home-greeting-right { text-align: left; }
   .home-ai-suggest { grid-template-columns: 1fr; }
   .home-chat-bubble { max-width: 90%; }
+}
+
+/* 尊重系统「减少动效」偏好：宽度切换与把手入场直接到位 */
+@media (prefers-reduced-motion: reduce) {
+  .home-main-grid,
+  .home-quick,
+  .home-quick--collapsed { transition: none; }
+  .home-quick-handle { animation: none; }
 }

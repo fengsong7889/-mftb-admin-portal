@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { Button, Input, Tag, Empty, Dropdown, Modal, message, Drawer, Progress, Spin, Tooltip, Popover, Select } from 'antd'
+import { Button, Input, Tag, Empty, Dropdown, Modal, message, notification, Drawer, Progress, Spin, Tooltip, Popover, Select } from 'antd'
 import type { MenuProps } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -20,7 +20,7 @@ import AiLogo from '@/components/AiLogo'
 import ContextUsageIndicator from './ContextUsageIndicator'
 import TodayMeetingCard, { TodayMeetingRestoreChip } from './TodayMeetingCard'
 import { useTodayMeetingBar } from './useTodayMeetingBar'
-import { FAV_KEY, loadFavorites, defaultFavorites, MAX_FAVORITES, collectHomeMenus, chineseNameToPinyinEnglish, getGreeting, MAX_IMAGE_SIZE, MAX_FILE_SIZE, DIM_SOURCE_COLOR, DIM_SOURCE_LABEL_KEY } from './homeUtils'
+import { FAV_KEY, QUICK_PANEL_COLLAPSED_KEY, QUICK_PANEL_WIDTH_KEY, DEFAULT_QUICK_PANEL_WIDTH, MIN_QUICK_PANEL_WIDTH, MAX_QUICK_PANEL_WIDTH, QUICK_PANEL_HINT_KEY, QUICK_PANEL_HINT_NOTIFICATION_ID, loadFavorites, defaultFavorites, MAX_FAVORITES, collectHomeMenus, chineseNameToPinyinEnglish, getGreeting, MAX_IMAGE_SIZE, MAX_FILE_SIZE, DIM_SOURCE_COLOR, DIM_SOURCE_LABEL_KEY } from './homeUtils'
 import AiRichText from './AiRichText'
 import AgentViewCard from './AgentViewCard'
 import AgentActionCard from './AgentActionCard'
@@ -64,6 +64,10 @@ import {
   SaveOutlined,
   LikeOutlined,
   DislikeOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+  RightOutlined,
+  LeftOutlined,
 } from '@ant-design/icons'
 import { sendAgentMessage, fetchEngineStatus, probeEngineStatus, getEngineMode, setEngineMode, getContextWindowOptions, formatContextWindow } from '@/api/agent'
 import type { ChatMessage, ChatAttachment, LlmEngineStatus, LlmEngineMode, LlmRequestOptions, ThinkingDepth, AgentPendingAction } from '@/api/agent'
@@ -223,6 +227,100 @@ export default function Home() {
   }, [currentSystemCode])
   const [searchText, setSearchText] = useState('')
   const [favorites, setFavorites] = useState<string[]>(defaultFavorites)
+  /**
+   * 快捷入口折叠态：聊天窗口是首页主角，收起右侧面板可换回约 316px 阅读宽度。
+   * 偏好落 localStorage，避免每次进首页都要重新收起；写入失败（隐私模式）静默降级为会话内生效。
+   */
+  const [quickCollapsed, setQuickCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem(QUICK_PANEL_COLLAPSED_KEY) === '1' } catch { return false }
+  })
+  const toggleQuickPanel = useCallback(() => {
+    setQuickCollapsed((prev) => {
+      const next = !prev
+      try { localStorage.setItem(QUICK_PANEL_COLLAPSED_KEY, next ? '1' : '0') } catch { /* 忽略存储不可用 */ }
+      return next
+    })
+  }, [])
+
+  /** 面板宽度：拖拽分割条调整并写入 localStorage；历史值越界时回落到边界内 */
+  const [quickWidth, setQuickWidth] = useState<number>(() => {
+    try {
+      const saved = Number(localStorage.getItem(QUICK_PANEL_WIDTH_KEY))
+      if (Number.isFinite(saved) && saved > 0) {
+        return Math.min(MAX_QUICK_PANEL_WIDTH, Math.max(MIN_QUICK_PANEL_WIDTH, saved))
+      }
+    } catch { /* 忽略存储不可用 */ }
+    return DEFAULT_QUICK_PANEL_WIDTH
+  })
+  const [quickResizing, setQuickResizing] = useState(false)
+  const mainGridRef = useRef<HTMLDivElement | null>(null)
+  /** 拖拽过程中 state 可能滞后一帧，用 ref 保存最新宽度供 pointerup / 键盘读写 */
+  const quickWidthRef = useRef(quickWidth)
+  /** 单次拖拽的起点快照；非空表示正在拖拽 */
+  const quickDragRef = useRef<{ startX: number; startWidth: number; containerWidth: number } | null>(null)
+
+  /** 宽度收敛：既受绝对边界约束，也不让面板吃掉超过 46% 的可用宽度 */
+  const clampQuickWidth = useCallback((width: number, containerWidth = 0) => {
+    const containerLimit = containerWidth > 0 ? Math.floor(containerWidth * 0.46) : MAX_QUICK_PANEL_WIDTH
+    const upper = Math.min(MAX_QUICK_PANEL_WIDTH, containerLimit)
+    return Math.min(upper, Math.max(MIN_QUICK_PANEL_WIDTH, Math.round(width)))
+  }, [])
+
+  const persistQuickWidth = useCallback((width: number) => {
+    try { localStorage.setItem(QUICK_PANEL_WIDTH_KEY, String(width)) } catch { /* 忽略存储不可用 */ }
+  }, [])
+
+  const handleQuickResizeStart = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return
+    event.preventDefault()
+    quickDragRef.current = {
+      startX: event.clientX,
+      startWidth: quickWidthRef.current,
+      containerWidth: mainGridRef.current?.clientWidth ?? 0,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setQuickResizing(true)
+  }
+
+  const handleQuickResizeMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = quickDragRef.current
+    if (!drag) return
+    // 分割条在面板左侧：指针左移（clientX 变小）= 面板变宽
+    const next = clampQuickWidth(drag.startWidth + (drag.startX - event.clientX), drag.containerWidth)
+    quickWidthRef.current = next
+    setQuickWidth(next)
+  }
+
+  const handleQuickResizeEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!quickDragRef.current) return
+    quickDragRef.current = null
+    setQuickResizing(false)
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    persistQuickWidth(quickWidthRef.current)
+  }
+
+  /** 键盘调宽：与拖拽共用同一套收敛与持久化逻辑 */
+  const handleQuickResizeStep = (delta: number) => {
+    const next = clampQuickWidth(quickWidthRef.current + delta, mainGridRef.current?.clientWidth ?? 0)
+    quickWidthRef.current = next
+    setQuickWidth(next)
+    persistQuickWidth(next)
+  }
+
+  /** 拖拽中锁定全局光标与选中，避免指针移出分割条后光标回弹、文本被误选 */
+  useEffect(() => {
+    if (!quickResizing) return
+    const prevCursor = document.body.style.cursor
+    const prevUserSelect = document.body.style.userSelect
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    return () => {
+      document.body.style.cursor = prevCursor
+      document.body.style.userSelect = prevUserSelect
+    }
+  }, [quickResizing])
   /** 标记首次加载（后端/localStorage）是否已完成，防止挂载时默认值覆盖云端数据 */
   const favoritesLoadedRef = useRef(false)
   const [showAddMenu, setShowAddMenu] = useState(false)
@@ -720,6 +818,48 @@ export default function Home() {
     const menu = menuList.find((item) => item.key === key)
     return menu ? [menu] : []
   })
+
+  /**
+   * 收藏为空时提示一次「收起面板换宽度」：
+   * 仅当当前系统确实没有可见收藏时出现；用户点收起或关闭后写入标记，之后不再打扰。
+   */
+  useEffect(() => {
+    if (quickCollapsed || menusLoading || menusError) return
+    if (menuList.length === 0 || visibleFavorites.length > 0) return
+    try {
+      if (localStorage.getItem(QUICK_PANEL_HINT_KEY) === '1') return
+    } catch { return }
+    const timer = setTimeout(() => {
+      try { localStorage.setItem(QUICK_PANEL_HINT_KEY, '1') } catch { /* 忽略存储不可用 */ }
+      notification.open({
+        key: QUICK_PANEL_HINT_NOTIFICATION_ID,
+        placement: 'bottomRight',
+        message: t('home.quickEmptyHintTitle'),
+        description: t('home.quickEmptyHintDesc', { width: quickWidthRef.current }),
+        duration: 12,
+        btn: (
+          <Button
+            type="primary"
+            size="small"
+            onClick={() => {
+              notification.destroy(QUICK_PANEL_HINT_NOTIFICATION_ID)
+              toggleQuickPanel()
+            }}
+          >
+            {t('home.quickEmptyHintAction')}
+          </Button>
+        ),
+      })
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [quickCollapsed, menusLoading, menusError, menuList.length, visibleFavorites.length, toggleQuickPanel, t])
+
+  /** 收藏补齐或面板已收起后，立即撤掉尚未关闭的建议，避免提示与实际状态不符 */
+  useEffect(() => {
+    if (visibleFavorites.length > 0 || quickCollapsed) {
+      notification.destroy(QUICK_PANEL_HINT_NOTIFICATION_ID)
+    }
+  }, [visibleFavorites.length, quickCollapsed])
 
   /** 时钟 */
   useEffect(() => {
@@ -1383,8 +1523,12 @@ export default function Home() {
       {/* 今日會議概览：无 meeting-my 菜单、后端不可用、今日无会或用户已收起时整栏不渲染 */}
       <TodayMeetingCard bar={meetingBar} />
 
-      {/* 主区域：左 AI 助手 + 右快捷入口 */}
-      <div className="home-main-grid">
+      {/* 主区域：左 AI 助手 + 右快捷入口（快捷入口可收起，让聊天区吃满宽度） */}
+      <div
+        ref={mainGridRef}
+        className={`home-main-grid${quickCollapsed ? ' home-main-grid--quick-collapsed' : ''}${quickResizing ? ' is-resizing' : ''}`}
+        style={{ '--home-quick-width': `${quickWidth}px` } as React.CSSProperties}
+      >
       {/* AI 助手（核心） */}
       <div className="home-ai">
         <div className="home-ai-header">
@@ -1598,6 +1742,18 @@ export default function Home() {
                 </button>
               </Popover>
             )}
+            {/* 快捷入口收合开关：位置固定（不随状态出现/消失），收起后聊天区自动吃满宽度 */}
+            <button
+              type="button"
+              className={`home-ai-settings-btn home-ai-panel-toggle${quickCollapsed ? ' is-collapsed' : ''}`}
+              onClick={toggleQuickPanel}
+              title={quickCollapsed ? t('home.quickExpand') : t('home.quickCollapse')}
+              aria-label={quickCollapsed ? t('home.quickExpand') : t('home.quickCollapse')}
+              aria-expanded={!quickCollapsed}
+              aria-controls="home-quick-panel"
+            >
+              {quickCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            </button>
           </div>
         </div>
 
@@ -2011,10 +2167,51 @@ export default function Home() {
         </div>
       </div>
 
+      {/* 宽窄分割条：拖拽调宽、双击收起，键盘左右键也可调整 */}
+      {!quickCollapsed && (
+        <div
+          className="home-quick-splitter"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={t('home.quickResizeAria')}
+          aria-valuenow={quickWidth}
+          aria-valuemin={MIN_QUICK_PANEL_WIDTH}
+          aria-valuemax={MAX_QUICK_PANEL_WIDTH}
+          tabIndex={0}
+          title={t('home.quickResizeHint')}
+          onPointerDown={handleQuickResizeStart}
+          onPointerMove={handleQuickResizeMove}
+          onPointerUp={handleQuickResizeEnd}
+          onPointerCancel={handleQuickResizeEnd}
+          onDoubleClick={toggleQuickPanel}
+          onKeyDown={(event) => {
+            if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+            event.preventDefault()
+            // 面板在右侧：左移箭头 = 面板变宽
+            handleQuickResizeStep(event.key === 'ArrowLeft' ? 24 : -24)
+          }}
+        />
+      )}
+
       {/* 菜单搜索与收藏共用当前系统的可见菜单集。 */}
-      <div className="home-quick" aria-label="系統菜單">
+      <div
+        id="home-quick-panel"
+        className={`home-quick${quickCollapsed ? ' home-quick--collapsed' : ''}`}
+        aria-label="系統菜單"
+      >
         <div className="home-quick-head">
-          <span className="home-quick-label">{t('home.quickEntryLabel')}</span>
+          <div className="home-quick-head-row">
+            <span className="home-quick-label">{t('home.quickEntryLabel')}</span>
+            <button
+              type="button"
+              className="home-quick-collapse"
+              onClick={toggleQuickPanel}
+              title={t('home.quickCollapse')}
+              aria-label={t('home.quickCollapse')}
+            >
+              <RightOutlined />
+            </button>
+          </div>
           <span className="home-quick-scope">{currentSystemCode ? `${systemName} · 本系統菜單` : '已授權菜單'}</span>
           <div className="home-quick-search" onBlur={(event) => {
             if (!event.currentTarget.contains(event.relatedTarget)) setShowAddMenu(false)
@@ -2086,6 +2283,22 @@ export default function Home() {
           ))}
         </div>
       </div>
+
+      {/* 收起后的贴边把手：就近召回，避免快捷入口「一收起就找不到」 */}
+      {quickCollapsed && (
+        <button
+          type="button"
+          className="home-quick-handle"
+          onClick={toggleQuickPanel}
+          title={t('home.quickExpand')}
+          aria-label={t('home.quickExpand')}
+          aria-expanded={false}
+          aria-controls="home-quick-panel"
+        >
+          <LeftOutlined className="home-quick-handle-icon" />
+          <span className="home-quick-handle-text">{t('home.quickEntryLabel')}</span>
+        </button>
+      )}
       </div>
 
       {/* 我的用量抽屜（真實額度维度 + 實際用量，與能耗統計同源） */}
