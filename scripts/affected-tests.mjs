@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url'
 // 影响域算法的纯函数层（无 fs / 无 git），单测见 scripts/lib/impact-graph.test.mjs
 import {
   JAVA_ROOT,
+  JAVA_TEST_ROOT,
   isTestFile,
   isFrontendBusinessFile,
   isBackendBusinessFile,
@@ -260,11 +261,16 @@ function main() {
       result.backend.full = true
       result.escalate.push({ side: 'backend', files: [...cls.beGlobal, ...cls.bothGlobal], why: '后端共享/契约层、SQL/配置或工程脚本' })
     } else if (beJavaChanged.length) {
-      const javaFiles = walk(JAVA_ROOT, ['.java'], new Set(['target']))
+      // 多模块（P3）：业务实现在 modules/legacy，集成测试在 bootstrap，两侧都要进图，
+      // 否则测试类不会被识别，影响域会恒为空并把“没测到”伪装成“无需测试”。
+      const javaFiles = [
+        ...walk(JAVA_ROOT, ['.java'], new Set(['target'])),
+        ...walk(JAVA_TEST_ROOT, ['.java'], new Set(['target'])),
+      ]
       const graph = buildBackendGraph(javaFiles, readFile)
       const { selected, exploded } = backendAffectedTests(beChanged, graph, javaFiles, { hops: opts.beHops })
       const allTests = javaFiles.filter(
-        (f) => f.startsWith(`${JAVA_ROOT}/test/java/`) && /Test\.java$/.test(f),
+        (f) => f.startsWith(`${JAVA_TEST_ROOT}/test/java/`) && /Test\.java$/.test(f),
       )
       if (exploded || (allTests.length && selected.size / allTests.length > opts.escalateRatio)) {
         result.backend.full = true
@@ -313,17 +319,19 @@ function main() {
     const beJavaChanged = beChanged.filter((f) => f.endsWith('.java'))
     if (beJavaChanged.length || cls.beGlobal.length || cls.bothGlobal.length) {
       const backendCwd = path.join(ROOT, 'backend')
+      // 多模块（P3）：测试只在 bootstrap，-pl bootstrap -am 会连带构建 legacy，
+      // 避免在聚合根上跑一遍空测试并打印误导性的 “No tests to run”。
       if (result.backend.full) {
-        push('test', ['mvn', 'test', '-B'], backendCwd)
+        push('test', ['mvn', '-pl', 'bootstrap', '-am', 'test', '-B'], backendCwd)
       } else if (result.backend.tests.length) {
         const simpleNames = result.backend.tests.map((f) => path.basename(f, '.java'))
         push(
           'test',
-          ['mvn', 'test', '-B', `-Dtest=${simpleNames.join(',')}`, '-Dsurefire.failIfNoSpecifiedTests=false'],
+          ['mvn', '-pl', 'bootstrap', '-am', 'test', '-B', `-Dtest=${simpleNames.join(',')}`, '-Dsurefire.failIfNoSpecifiedTests=false'],
           backendCwd,
         )
       } else if (beJavaChanged.length) {
-        push('test', ['mvn', 'compile', '-q'], backendCwd)
+        push('test', ['mvn', '-pl', 'modules/legacy', '-am', 'compile', '-q'], backendCwd)
       }
     }
   }
@@ -371,7 +379,7 @@ function main() {
       for (const f of g.files.slice(0, 8)) console.warn(`      - ${f}`)
       if (g.files.length > 8) console.warn(`      …共 ${g.files.length} 个文件`)
     }
-    console.warn('   处置：补写受影响测试，或手工执行所属模块全量（npm run test:run / cd backend && mvn test -B）。')
+    console.warn('   处置：补写受影响测试，或手工执行所属模块全量（npm run test:run / cd backend && mvn -pl bootstrap -am test -B）。')
   }
 
   if (opts.run) runCommands(result)
@@ -411,7 +419,7 @@ function output(result) {
     for (const t of result.frontend.tests) line(`   · ${t}`)
   }
   if (result.backend.full) {
-    line(`后端测试：FULL（mvn test -B）`)
+    line(`后端测试：FULL（mvn -pl bootstrap -am test -B）`)
   } else if (result.backend.skipped) {
     line(`后端测试：跳过 —— ${result.backend.skipped}`)
   } else {

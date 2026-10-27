@@ -43,7 +43,7 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-JAR_PATH="target/mftb-admin.jar"
+JAR_PATH="bootstrap/target/mftb-admin.jar"
 LOG_FILE="backend-service.log"
 PID_FILE=".backend.pid"
 
@@ -239,7 +239,7 @@ build_jar() {
 
     # 编译失败必须立即中止：先删除旧 JAR，避免“编译失败但复用旧 JAR”造成假象
     rm -f "$JAR_PATH"
-    if ! mvn package -DskipTests -q; then
+    if ! mvn -q -DskipTests package; then
         echo -e "${RED}❌ 编译失败，已中止重启（不会复用旧 JAR）${NC}"
         echo -e "${YELLOW}   查看完整错误: mvn package -DskipTests${NC}"
         exit 1

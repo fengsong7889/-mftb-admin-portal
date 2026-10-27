@@ -11,7 +11,7 @@
 | 启动方式 | 耗时 | 说明 |
 |---------|------|------|
 | `mvn spring-boot:run`（旧方式） | 2~3 分钟 | **每次都重新编译**，包括依赖解析、源码编译、打包 |
-| `java -jar target/mftb-admin.jar`（新方式） | 30~60 秒 | **跳过编译**，直接跑已有 JAR |
+| `java -jar bootstrap/target/mftb-admin.jar`（新方式） | 30~60 秒 | **跳过编译**，直接跑已有 JAR |
 
 后端启动慢的三大瓶颈：
 
@@ -60,7 +60,7 @@
 
 **执行流程**：
 1. 停止端口 8080 上的旧进程
-2. 直接运行 `target/mftb-admin.jar`（不编译）
+2. 直接运行 `bootstrap/target/mftb-admin.jar`（不编译）
 3. 等待 HTTP 200 响应（最多 90 秒）
 
 **耗时**：~20-30 秒（取决于 Spring 容器初始化和 DB 迁移检查）
@@ -92,7 +92,7 @@
 **执行流程**：
 1. 通过 `git diff` 检测变更类型
 2. 根据变更类型自动选择 `--fast` 或 `--rebuild`
-3. 若 `target/mftb-admin.jar` 不存在，自动编译
+3. 若 `bootstrap/target/mftb-admin.jar` 不存在，自动编译
 
 ### 3.4 `bash restart-service.sh --stop`（仅停止）
 
@@ -230,7 +230,7 @@ SPRING_LAZY_INIT=true bash restart-service.sh --fast
 ## 八、FAQ
 
 **Q：首次使用 `restart-service.sh` 会怎样？**
-A：如果 `target/mftb-admin.jar` 不存在，脚本会自动执行 `mvn package -DskipTests` 编译 JAR，然后启动。后续重启根据变更类型选择是否重新编译。
+A：如果 `bootstrap/target/mftb-admin.jar` 不存在，脚本会自动执行 `mvn package -DskipTests` 编译 JAR，然后启动。后续重启根据变更类型选择是否重新编译。
 
 **Q：`--fast` 启动后发现代码修改没生效？**
 A：说明 JAR 是旧编译产物。改用 `--rebuild` 重新编译后再启动。

@@ -12,10 +12,24 @@
     </parent>
 
     <groupId>com.mftb</groupId>
-    <artifactId>mftb-admin</artifactId>
+    <artifactId>mftb-admin-parent</artifactId>
     <version>1.0.0</version>
-    <name>mftb-admin</name>
-    <description>MFTB 搜广推系统后端服务</description>
+    <packaging>pom</packaging>
+    <name>mftb-admin-parent</name>
+    <description>MFTB 搜广推系统后端服务（多模块聚合）</description>
+
+    <!--
+      多模块骨架（方案 P3 第 1 步）：
+        · modules/legacy — 尚未按域拆出的全部业务代码（包名不变），独立编译为普通 JAR
+        · bootstrap      — 唯一启动入口 + 配置 + 全部集成测试，产出可运行 JAR
+      本期部署单元仍是一个 JAR / 一个 Deployment（方案 §一），拆模块不等于拆服务。
+      后续 P3 切片会把 RDM/EAM/HR 从 legacy 挪到 modules/<domain>，
+      跨域依赖改为 contracts/* 里的最小接口，启动装配仍由 bootstrap 完成。
+    -->
+    <modules>
+        <module>modules/legacy</module>
+        <module>bootstrap</module>
+    </modules>
 
     <properties>
         <java.version>17</java.version>
@@ -156,15 +170,11 @@
     </dependencies>
 
     <build>
-        <finalName>mftb-admin</finalName>
-        <resources>
-            <resource><directory>src/main/resources</directory></resource>
-            <resource>
-                <directory>sql</directory>
-                <targetPath>db/migrations</targetPath>
-                <includes><include>165_notification_apps_and_scenarios.sql</include></includes>
-            </resource>
-        </resources>
+        <!--
+          父 POM 只放“所有模块都一样”的编译与覆盖率配置，不放 finalName / spring-boot-maven-plugin：
+          后者只能声明在有启动类的 bootstrap 上，否则 legacy 模块会在 repackage 阶段因无主类失败。
+          迁移 SQL 资源目录（backend/sql）也只属于 legacy，见 modules/legacy/pom.xml。
+        -->
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -179,18 +189,6 @@
                             <version>1.18.32</version>
                         </path>
                     </annotationProcessorPaths>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <excludes>
-                        <exclude>
-                            <groupId>org.projectlombok</groupId>
-                            <artifactId>lombok</artifactId>
-                        </exclude>
-                    </excludes>
                 </configuration>
             </plugin>
             <!-- Jacoco 测试覆盖率：mvn verify 时自动生成报告 target/site/jacoco/index.html -->

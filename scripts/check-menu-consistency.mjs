@@ -91,7 +91,7 @@ if (!subPageName) {
 }
 
 // ────────── 后端：种子菜单与目录判定 ──────────
-const dataInitializer = read('backend/src/main/java/com/mftb/admin/config/DataInitializer.java')
+const dataInitializer = read('backend/modules/legacy/src/main/java/com/mftb/admin/config/DataInitializer.java')
 const seedEntries = [...dataInitializer.matchAll(
   /menus\.put\("([^"]+)",\s*new String\[\]\{"([^"]*)",\s*(null|"[^"]*"),\s*"(\d+)"\}\)/g,
 )]
@@ -107,7 +107,7 @@ const SEEDED_ELSEWHERE = new Set(['consumable-ops', 'consumable-dashboard', 'con
   'consumable-claim', 'consumable-stock', 'consumable-stock-txn', 'consumable-alert'])
 
 // 域初始化器不经过 menus.put；直接解析 ensureMenu，避免新增菜单落在主种子门禁盲区。
-const initializerDir = 'backend/src/main/java/com/mftb/admin/config'
+const initializerDir = 'backend/modules/legacy/src/main/java/com/mftb/admin/config'
 const domainSeedMenus = readdirSync(join(ROOT, initializerDir))
   .filter((file) => file.endsWith('Initializer.java'))
   .flatMap((file) => [...read(`${initializerDir}/${file}`).matchAll(

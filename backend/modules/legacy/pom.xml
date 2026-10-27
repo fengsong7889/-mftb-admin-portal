@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.mftb</groupId>
+        <artifactId>mftb-admin-parent</artifactId>
+        <version>1.0.0</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mftb-admin-legacy</artifactId>
+    <packaging>jar</packaging>
+    <name>mftb-admin-legacy</name>
+    <description>
+        尚未按业务域拆出的全部业务实现（Controller/Service/Mapper/Entity/DTO）。
+        包名保持 com.mftb.admin.* 不变，因此 Spring 的组件扫描与 MyBatis 的类型别名行为完全不变；
+        依赖全部继承自父 POM，等 P3 逐域切片时再把 domain 专属依赖下移到各模块。
+        本模块不含启动类，只产出普通 JAR，由 bootstrap 装配成可运行制品。
+    </description>
+
+    <build>
+        <!-- 不叫 mftb-admin：避免与 bootstrap 产出的可运行 JAR 混淆 -->
+        <finalName>mftb-admin-legacy</finalName>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <!--
+              这一条 SQL 属于仓库根的 backend/sql，历史上靠 pom 的资源目录映射进 db/migrations。
+              资源文件路径（classpath 根 / db/migrations）必须与迁移框架的读取路径一致，
+              因此这里只改“在哪找”，不改“落到哪”。
+            -->
+            <resource>
+                <directory>${project.basedir}/../../sql</directory>
+                <targetPath>db/migrations</targetPath>
+                <includes>
+                    <include>165_notification_apps_and_scenarios.sql</include>
+                </includes>
+            </resource>
+        </resources>
+    </build>
+</project>

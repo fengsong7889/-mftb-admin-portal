@@ -59,7 +59,7 @@ ALTER TABLE 表名 ADD COLUMN 列名 VARCHAR(255) DEFAULT NULL COMMENT '说明';
 > 本项目已建立统一的迁移治理框架 `com.mftb.admin.config.migration`，解决"生产库迁移反复漏执行"。
 > 所有新增迁移必须遵循以下标准，不再把"某个初始化器"当唯一入口。
 
-- **登记先行**：任何启动期自动迁移，必须先在 `backend/src/main/resources/db/migrations/catalog.json` 登记
+- **登记先行**：任何启动期自动迁移，必须先在 `backend/modules/legacy/src/main/resources/db/migrations/catalog.json` 登记
   （`versionKey` / `module` / `phase` / `executionType` / `executor`|`resource` / `status` / `dependencies`）。
   未登记的脚本不参与自动执行；`backend/sql/` 下的历史文件仅为参考文档。CI 会校验清单一致性（唯一键、依赖存在且无环、资源已打包）。
 - **迁移入口按模块就近**：放在对应模块的初始化器（如广告 → `AdPromotionDataInitializer`、EAM → `EamSchemaMigrationInitializer`）。`@Order` 决定阶段顺序（`SchemaPhase`）。

@@ -45,7 +45,7 @@ const registry = {
 describe('attributeFiles', () => {
   it('前端页面目录与后端类名前缀分别归到对应系统', () => {
     const r = attributeFiles(
-      ['src/pages/Rdm/TaskForm.tsx', 'backend/src/main/java/com/mftb/admin/service/impl/EamPurchaseServiceImpl.java'],
+      ['src/pages/Rdm/TaskForm.tsx', 'backend/modules/legacy/src/main/java/com/mftb/admin/service/impl/EamPurchaseServiceImpl.java'],
       registry,
     )
     expect(r.touched.rdm).toEqual({ frontend: 1, backend: 0, files: ['src/pages/Rdm/TaskForm.tsx'] })
@@ -61,7 +61,7 @@ describe('attributeFiles', () => {
 
   it('未归属的页面目录/后端前缀必须显式落到 unattributed，而不是被忽略', () => {
     const r = attributeFiles(
-      ['src/pages/AppPreview/Index.tsx', 'backend/src/main/java/com/mftb/admin/service/impl/ZzzJob.java'],
+      ['src/pages/AppPreview/Index.tsx', 'backend/modules/legacy/src/main/java/com/mftb/admin/service/impl/ZzzJob.java'],
       registry,
     )
     expect(Object.keys(r.touched)).toEqual([])

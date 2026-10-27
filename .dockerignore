@@ -2,8 +2,10 @@
 node_modules/
 dist/
 # 镜像不再编译源码，只需已验证的 JAR：排除 target 其余产物，单独放行制品
-backend/target/*
-!backend/target/mftb-admin.jar
+backend/bootstrap/target/*
+!backend/bootstrap/target/mftb-admin.jar
+# 业务模块只需源码参与 Maven 编译，产物不进行镜像
+backend/modules/*/target/
 
 # IDE / 日志
 .idea/

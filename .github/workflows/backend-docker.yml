@@ -49,19 +49,29 @@ jobs:
         run: mvn -B verify -f backend/pom.xml
 
       # 断言迁移清单及其引用的 SQL 资源确实进入制品（漏打包即失败）
+      # 多模块后这些资源在嵌套的业务模块 JAR 里（BOOT-INF/lib/mftb-admin-legacy-*.jar），
+      # 不再直接出现在 BOOT-INF/classes/ 下；Spring 的 ClassPathResource 能穿透嵌套 jar 读取，
+      # 所以这里把嵌套 JAR 抽出来查，而不是因为路径变了就不再校验。
       - name: Verify migration resources are packaged
         run: |
           set -euo pipefail
-          JAR=backend/target/mftb-admin.jar
+          JAR=backend/bootstrap/target/mftb-admin.jar
           test -f "$JAR" || { echo "❌ 未生成 $JAR"; exit 1; }
-          echo "→ 校验迁移登记表随包分发"
-          unzip -l "$JAR" | grep -F 'BOOT-INF/classes/db/migrations/catalog.json' > /dev/null \
+          LEGACY=$(unzip -Z1 "$JAR" | grep -E '^BOOT-INF/lib/mftb-admin-legacy-[0-9.]+\.jar$' | head -1)
+          test -n "$LEGACY" || { echo "❌ 制品内未找到业务模块 JAR"; exit 1; }
+          TMP=$(mktemp -d)
+          unzip -o -q "$JAR" "$LEGACY" -d "$TMP"
+          INNER="$TMP/$LEGACY"
+          echo "→ 校验迁移登记表随包分发（$LEGACY）"
+          unzip -Z1 "$INNER" | grep -qx 'db/migrations/catalog.json' \
             || { echo "❌ catalog.json 未打包进镜像"; exit 1; }
           echo "→ 校验被登记的 SQL 资源存在"
           for res in 09_ad_promotion.sql 13_waterfall_strategy.sql 15_hot_merchant_ad.sql 63_card_order.sql; do
-            unzip -l "$JAR" | grep -F "BOOT-INF/classes/$res" > /dev/null \
+            unzip -Z1 "$INNER" | grep -qx "$res" \
               || { echo "❌ 迁移资源未打包: $res"; exit 1; }
           done
+          unzip -Z1 "$INNER" | grep -qx 'db/migrations/165_notification_apps_and_scenarios.sql' \
+            || { echo "❌ 仓库 sql/ 目录映射资源未打包"; exit 1; }
           echo "✅ 迁移资源完整性校验通过"
 
       # 记录制品摘要：镜像阶段据此证明「装进镜像的就是刚跑过全量测试的那个 JAR」
@@ -69,7 +79,7 @@ jobs:
         id: digest
         run: |
           set -euo pipefail
-          sha=$(sha256sum backend/target/mftb-admin.jar | cut -d' ' -f1)
+          sha=$(sha256sum backend/bootstrap/target/mftb-admin.jar | cut -d' ' -f1)
           test -n "$sha" || { echo "❌ 无法计算制品摘要"; exit 1; }
           echo "sha256=$sha" >> "$GITHUB_OUTPUT"
           echo "→ mftb-admin.jar sha256=$sha"
@@ -78,7 +88,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mftb-admin-jar
-          path: backend/target/mftb-admin.jar
+          path: backend/bootstrap/target/mftb-admin.jar
           if-no-files-found: error
           retention-days: 7
 
@@ -99,14 +109,14 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: mftb-admin-jar
-          path: backend/target
+          path: backend/bootstrap/target
 
       # 摘要不一致 = 制品被替换或下载损坏，拒绝发布；不允许退化为「重新编译一份」
       - name: Verify artifact digest matches tested jar
         run: |
           set -euo pipefail
           test -n "${{ needs.verify.outputs.jar_sha256 }}" || { echo "❌ 上游未输出制品摘要"; exit 1; }
-          echo "${{ needs.verify.outputs.jar_sha256 }}  backend/target/mftb-admin.jar" | sha256sum -c -
+          echo "${{ needs.verify.outputs.jar_sha256 }}  backend/bootstrap/target/mftb-admin.jar" | sha256sum -c -
 
       - name: Resolve immutable image tag
         id: tag

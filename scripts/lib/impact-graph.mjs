@@ -10,7 +10,11 @@
  * 需要判断文件存在性时注入 `isFile(relPath) => boolean`。真实脚本注入 fs，测试注入内存 map。
  */
 
-export const JAVA_ROOT = 'backend/src'
+// 多模块（方案 P3）：业务实现留在 modules/legacy，集成测试在 bootstrap。
+// 保留 JAVA_ROOT 作为兼容常量（= legacy 主源码根），新增测试根单独判断，
+// 否则“后端测试文件”会被判成业务源码，影响域会算错。
+export const JAVA_ROOT = 'backend/modules/legacy/src'
+export const JAVA_TEST_ROOT = 'backend/bootstrap/src'
 
 // ───────────────────────── 共享层规则（命中即升档全量） ─────────────────────────
 // 这些文件被多个系统/菜单共用，任何改动都可能波及全量，必须跑全量。
@@ -215,7 +219,7 @@ export function buildBackendGraph(javaFiles, read) {
  */
 export function backendAffectedTests(changed, graph, javaFiles, { hops = 2, explodeLimit = 400 } = {}) {
   const allTests = javaFiles.filter(
-    (f) => f.startsWith(`${JAVA_ROOT}/test/java/`) && /Test\.java$/.test(f),
+    (f) => f.startsWith(`${JAVA_TEST_ROOT}/test/java/`) && /Test\.java$/.test(f),
   )
   const testSet = new Set(allTests)
   const seeds = []

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.mftb</groupId>
+        <artifactId>mftb-admin-parent</artifactId>
+        <version>1.0.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mftb-admin-bootstrap</artifactId>
+    <packaging>jar</packaging>
+    <name>mftb-admin-bootstrap</name>
+    <description>
+        唯一启动与装配入口：MftbAdminApplication + application.yml + 全部集成测试。
+        依赖 modules/legacy 的业务实现，由 spring-boot-maven-plugin 打成可运行 JAR
+        （backend/bootstrap/target/mftb-admin.jar，CI 与镜像消费该路径）。
+        测试放在这里而不是 legacy：@SpringBootTest 需要在本模块内找到 @SpringBootConfiguration，
+        若测试留在 legacy，就会形成 legacy → bootstrap 的反向依赖。
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.mftb</groupId>
+            <artifactId>mftb-admin-legacy</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>mftb-admin</finalName>
+        <plugins>
+            <!--
+              测试的工作目录必须是 backend/（= 模块的上一级）：
+              仓内有一批“一致性校验”测试用相对路径读源码与 SQL（如
+              src/main/java/com/mftb/admin/config/MeetingSchemaMigrationInitializer.java、
+              sql/229_attendance_core_tables.sql）。多模块化后 surefire 默认在 bootstrap/ 下跑，
+              这些路径会全部变成 NoSuchFileException。固定回 backend/ 即完全恢复拆分前的语义，
+              比让 303 个测试类各自改相对深度更安全（不改断言、不改被测行为）。
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <workingDirectory>${project.basedir}/..</workingDirectory>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

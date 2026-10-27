@@ -35,8 +35,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class MeetingSchemaVerifyOrderingTest {
 
+    /**
+     * 被测源码的路径。多模块化（方案 P3）后业务实现位于 modules/legacy，
+     * 路径在原有基础上多两层；这不是放宽断言，仍然读同一份源码做顺序校验。
+     */
     private static final Path SOURCE = Path.of(
-            "src", "main", "java", "com", "mftb", "admin", "config", "MeetingSchemaMigrationInitializer.java");
+            "modules", "legacy", "src", "main", "java", "com", "mftb", "admin", "config",
+            "MeetingSchemaMigrationInitializer.java");
 
     private static String source() throws IOException {
         return Files.readString(SOURCE);

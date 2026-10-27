@@ -51,7 +51,7 @@ HIDDEN = {'ai-access-request'}  # Sidebar HIDDEN_MENU_KEYS
 
 # v45: 前端 Sidebar 的 SYSTEM_WRAPPER_KEYS 展平硬编码已删除，后端为唯一真值。
 # 诊断改为从 DataInitializer 读「已退役壳清单」，并断言它们确实已从库里消失。
-DATAINIT = 'backend/src/main/java/com/mftb/admin/config/DataInitializer.java'
+DATAINIT = 'backend/modules/legacy/src/main/java/com/mftb/admin/config/DataInitializer.java'
 
 
 def parse_retired_wrappers(root):

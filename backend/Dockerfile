@@ -1,6 +1,7 @@
 # ====== 运行阶段（镜像内不再编译源码）======
 # 制品来源：CI 的 verify job 用一次完整 Maven 生命周期（编译 + 全量测试 + 打包）产出的
-# backend/target/mftb-admin.jar，经 actions/upload-artifact 传给 build job 下载回同一位置。
+# backend/bootstrap/target/mftb-admin.jar（多模块 P3：bootstrap 装配 legacy 后打包），
+# 经 actions/upload-artifact 传给 build job 下载回同一位置。
 # 旧实现在镜像里再跑一次 `mvn package`，等于同一份源码在一条流水线被完整编译 2~3 次，
 # 且镜像内的 JAR 与被测试过的 JAR 不是同一个字节，无法用摘要证明「测的就是发的」。
 #
@@ -14,7 +15,7 @@ RUN addgroup -S app && adduser -S app -G app
 
 # 只接受已验证制品：文件缺失时 COPY 直接失败，空文件（如制品下载中断）由下面的校验拦下，
 # 不允许静默退化成「镜像里再编译一次」的旧路径
-COPY backend/target/mftb-admin.jar app.jar
+COPY backend/bootstrap/target/mftb-admin.jar app.jar
 RUN test -s app.jar || { echo "❌ app.jar 为空或缺失：请先由 CI/本地 Maven 产出制品再构建镜像"; exit 1; }
 
 # 复制 .git 目录，供「从 Git 同步版本记录」功能读取提交历史

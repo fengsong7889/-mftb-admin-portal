@@ -7,7 +7,7 @@
  * 与 check:registry 的双向棘轮配套，归属清单不会悄悄失真。
  */
 
-const JAVA_PKG = 'backend/src/main/java/com/mftb/admin/'
+const JAVA_PKG = 'backend/modules/legacy/src/main/java/com/mftb/admin/'
 
 /** 后端类名前缀：与 engineering 生成器同口径（文件名首个大写字母段） */
 function javaPrefixOf(file) {

@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..')
 const REGISTRY = path.join(ROOT, 'engineering', 'systems.json')
-const BACKEND_ROOT = 'backend/src/main/java/com/mftb/admin'
+const BACKEND_ROOT = 'backend/modules/legacy/src/main/java/com/mftb/admin'
 const REGEN = 'python3 engineering/generate-systems.py'
 
 const fail = []
@@ -88,7 +88,7 @@ function actualTestCounts(dirs, prefixes) {
     walk(base)
   }
   let be = 0
-  const testRoot = path.join(ROOT, 'backend/src/test/java/com/mftb/admin')
+  const testRoot = path.join(ROOT, 'backend/bootstrap/src/test/java/com/mftb/admin')
   const walk = (abs) => {
     if (!fs.existsSync(abs)) return
     for (const e of fs.readdirSync(abs, { withFileTypes: true })) {

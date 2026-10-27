@@ -39,8 +39,8 @@ function fixtureRepo() {
 }
 
 /** 后端 fixture 路径常量（跨 describe 共用） */
-const MAIN = 'backend/src/main/java/com/mftb/admin'
-const TEST = 'backend/src/test/java/com/mftb/admin'
+const MAIN = 'backend/modules/legacy/src/main/java/com/mftb/admin'
+const TEST = 'backend/bootstrap/src/test/java/com/mftb/admin'
 
 describe('resolveSpecifier / extractSpecifiers', () => {
   it('解析 @/ 别名与相对路径，忽略第三方包名', () => {

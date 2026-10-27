@@ -70,7 +70,7 @@ jobs:
           set -euo pipefail
           if ! python scripts/doc-baseline/replay_check.py \
             --allow-reset \
-            --jar backend/target/mftb-admin.jar \
+            --jar backend/bootstrap/target/mftb-admin.jar \
             --work-dir "$RUNNER_TEMP/doc-baseline" 2>&1 | tee "$RUNNER_TEMP/doc-baseline-console.log"; then
             msg=$(tail -8 "$RUNNER_TEMP/doc-baseline-console.log" | tr '\n' ' ' | cut -c1-900)
             echo "::error title=Doc baseline replay::${msg}"

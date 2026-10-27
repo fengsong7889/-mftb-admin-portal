@@ -136,7 +136,7 @@ def key_to_path():
 
 
 def backend_prefixes():
-    root = 'backend/src/main/java/com/mftb/admin'
+    root = 'backend/modules/legacy/src/main/java/com/mftb/admin'
     counts = defaultdict(int)
     for dp, _, fns in os.walk(root):
         for fn in fns:
@@ -163,7 +163,7 @@ def test_counts(dirs, prefixes):
         for dp, _, fns in os.walk(base):
             fe += sum(1 for fn in fns if re.search(r'\.(test|spec)\.(ts|tsx)$', fn))
     be = 0
-    root = 'backend/src/test/java/com/mftb/admin'
+    root = 'backend/bootstrap/src/test/java/com/mftb/admin'
     for dp, _, fns in os.walk(root):
         for fn in fns:
             if fn.endswith('Test.java'):
