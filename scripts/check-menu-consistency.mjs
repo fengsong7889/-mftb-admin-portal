@@ -69,9 +69,13 @@ const menuActionsBlock = permTypes.match(/export const MENU_ACTIONS_MAP[^=]*= \{
 const menuActionKeys = new Set(menuActionsBlock
   ? [...menuActionsBlock[1].matchAll(/^ {2}'([^']+)':\s*\[/gm)].map((m) => m[1])
   : (fail('未能解析 MENU_ACTIONS_MAP（结构变更请同步更新 scripts/check-menu-consistency.mjs）'), []))
-const appRoutes = new Set(
-  [...read('src/App.tsx').matchAll(/<Route path="([^"]+)"/g)].map((m) => m[1]),
-)
+// 路由真值 = 门户壳 + 各应用路由表（方案 P2 之后应用路由已搬进 frontend/apps/<app>/src/routes.tsx）
+// 用显式循环而不是 new Set(...flatMap(...)) 链式写法：后者在本仓的表达式嵌套下曾静默退化成 1 个元素。
+const appRoutePaths = []
+for (const routeFile of ['src/App.tsx', ...appRouteFiles()]) {
+  for (const m of read(routeFile).matchAll(/<Route path="([^"]+)"/g)) appRoutePaths.push(m[1])
+}
+const appRoutes = new Set(appRoutePaths)
 
 // ────────── 前端：静态副本回归检测 ──────────
 if (/^const menuItems: MenuItem\[\] = \{$/m.test(sidebar)) {
@@ -178,6 +182,14 @@ for (const key of offlineKeys) {
 
 // ────────── 校验 2：离线菜单必须确实未接入后端 API ──────────
 /** 检测页面文件是否调用了真实后端 API（通过 request 实例的 import） */
+function appRouteFiles() {
+  const base = join(ROOT, 'frontend', 'apps')
+  if (!existsSync(base)) return []
+  return readdirSync(base)
+    .map((code) => `frontend/apps/${code}/src/routes.tsx`)
+    .filter((rel) => existsSync(join(ROOT, rel)))
+}
+
 const app = read('src/App.tsx')
 const compDirs = {}
 for (const m of app.matchAll(/(?:const|import)\s+(\w+)\s*=\s*(?:lazy\(\(\)\s*=>\s*)?import\('([^']+)'\)/g)) {

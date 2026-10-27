@@ -24,51 +24,66 @@ const checkOnly = process.argv.includes('--check')
 
 const lines = fs.readFileSync(APP_SRC, 'utf8').split('\n')
 
+/**
+ * 应用内 rows.tsx（拆分后路由主体）。返回 { lines, lazyPrefix } 供解析：
+ * 这里的 import 是相对路径（'./pages/...'），模块名同样相对应用 src。
+ */
+function appRoutesFile(app) {
+  const p = path.join(ROOT, 'frontend', 'apps', app, 'src', 'routes.tsx')
+  return fs.existsSync(p) ? fs.readFileSync(p, 'utf8').split('\n') : null
+}
+
 /** 收集各应用的 lazy 声明：组件名 → 模块路径（相对应用 src） */
 function lazyOf(app) {
-  const re = new RegExp(`^const (\\w+) = lazy\\(\\(\\) => import\\('@mftb/app-${app}/(.+)'\\)\\)$`)
   const map = new Map()
+  const shellRe = new RegExp(`^const (\\w+) = lazy\\(\\(\\) => import\\('@mftb/app-${app}/(.+)'\\)\\)$`)
   for (const line of lines) {
-    const m = line.trim().match(re)
+    const m = line.trim().match(shellRe)
     if (m) map.set(m[1], m[2])
+  }
+  const appLines = appRoutesFile(app)
+  if (appLines) {
+    const localRe = /^const (\w+) = lazy\(\(\) => import\('\.\/(.+)'\)\)$/
+    for (const line of appLines) {
+      const m = line.trim().match(localRe)
+      if (m) map.set(m[1], m[2])
+    }
   }
   return map
 }
 
-/** 逐块扫描 <Route ...>，返回 { path, names, shareWrapped, raw } */
-function routeBlocks() {
+/** 逐块扫描 `<Route ...>`；source 决定用哪份源码（壳 or 应用 routes.tsx） */
+function routeBlocks(source) {
+  const src = source ?? lines
   const out = []
-  for (let i = 0; i < lines.length; i++) {
-    const first = lines[i].trim()
+  for (let i = 0; i < src.length; i++) {
+    const first = src[i].trim()
     if (!first.startsWith('<Route ')) continue
     let end = i
-    if (!first.endsWith('/>')) {
-      // 多行块：终止行形如 "} />"（历史写法），找不到就跳到下一个 Route 前
-      while (end + 1 < lines.length && !/^[}\s]*\/>$/.test(lines[end].trim())) end++
-      if (!/^[}\s]*\/>$/.test(lines[end].trim())) continue
+    if (!/\/>,?$/.test(first)) {
+      while (end + 1 < src.length && !/^[}\s]*\/>,?$/.test(src[end].trim())) end++
+      if (!/^[}\s]*\/>,?$/.test(src[end].trim())) continue
     }
-    const raw = lines.slice(i, end + 1).join('\n')
+    const raw = src.slice(i, end + 1).join('\n')
     const pathMatch = raw.match(/path="([^"]+)"/)
     if (!pathMatch) continue
     const names = new Set([
       ...[...raw.matchAll(/<([A-Z][A-Za-z0-9_]*)\s*\/>/g)].map((m) => m[1]),
       ...[...raw.matchAll(/element=\{<([A-Z][A-Za-z0-9_]*)/g)].map((m) => m[1]),
     ])
-    out.push({
-      path: pathMatch[1],
-      names,
-      shareWrapped: /<Suspense/.test(raw),
-    })
+    out.push({ path: pathMatch[1], names, shareWrapped: /<Suspense/.test(raw) })
     i = end
   }
   return out
 }
 
-const blocks = routeBlocks()
+
 const NEUTRAL = new Set(['Suspense', 'PageLoading', 'Navigate', 'Fragment'])
 
 function inventoryFor(app) {
   const lazy = lazyOf(app)
+  const appLines = appRoutesFile(app)
+  const blocks = [...routeBlocks(), ...(appLines ? routeBlocks(appLines) : [])]
   const owned = []
   for (const b of blocks) {
     const hit = [...b.names].filter((n) => lazy.has(n))

@@ -218,6 +218,9 @@ const AiModelDetail = lazy(() => import('@/pages/AiModelList/AiModelDetail'))
 import AiDeptModelAuth from '@/pages/AiQuotaAuth/QuotaAndPolicy'
 import AiEmployeeAuthControl from '@/pages/AiQuotaAuth/AiEmployeeAuthControl'
 import EmpQuotaList from '@/pages/AiQuotaAuth/empQuota/EmpQuotaList'
+import { RDM_ROUTES } from '@mftb/app-rdm/routes'
+import { EAM_ROUTES } from '@mftb/app-eam/routes'
+import { HR_ROUTES } from '@mftb/app-hr/routes'
 const DeptAuthGroupEdit = lazy(() => import('@/pages/AiQuotaAuth/DeptAuthGroupEdit'))
 const DeptAuthGroupDetail = lazy(() => import('@/pages/AiQuotaAuth/DeptAuthGroupDetail'))
 // 部门额度 - 独立编辑页与详情页（列表 → 新增/编辑 → 详情，参考部门模型权控）
@@ -584,97 +587,19 @@ function AuthenticatedLayout() {
               <Route path="/employee-detail" element={<EmployeeDetail />} />
               <Route path="/organization-management" element={<OrganizationManagement />} />
               {/* 組織編制系統（organization）：菜單真值由 HcmOrganizationMenuInitializer 寫入 sys_menu */}
-              <Route path="/hcm-org-legal" element={<HcmOrgLegalEntityList />} />
-              <Route path="/hcm-org-legal-form" element={<HcmOrgLegalEntityForm />} />
-              <Route path="/hcm-org-legal-detail" element={<HcmOrgLegalEntityForm />} />
-              <Route path="/hcm-org-unit" element={<HcmOrgUnitList />} />
-              <Route path="/hcm-org-unit-form" element={<HcmOrgUnitForm />} />
-              <Route path="/hcm-org-unit-detail" element={<HcmOrgUnitForm />} />
-              <Route path="/hcm-org-job-family" element={<HcmOrgJobFamilyList />} />
-              <Route path="/hcm-org-job-family-form" element={<HcmOrgJobFamilyForm />} />
-              <Route path="/hcm-org-job-family-detail" element={<HcmOrgJobFamilyForm />} />
-              <Route path="/hcm-org-job-grade" element={<HcmOrgJobGradeList />} />
-              <Route path="/hcm-org-job-grade-form" element={<HcmOrgJobGradeForm />} />
-              <Route path="/hcm-org-job-grade-detail" element={<HcmOrgJobGradeForm />} />
-              <Route path="/hcm-org-position" element={<HcmOrgPositionList />} />
-              <Route path="/hcm-org-position-form" element={<HcmOrgPositionForm />} />
-              <Route path="/hcm-payroll-component" element={<HcmPayrollComponentList />} />
-              <Route path="/hcm-payroll-component-form" element={<HcmPayrollComponentForm />} />
-              <Route path="/hcm-payroll-standard" element={<HcmPayrollStandardList />} />
-              <Route path="/hcm-payroll-standard-form" element={<HcmPayrollStandardForm />} />
-              <Route path="/hcm-payroll-benefit" element={<HcmPayrollBenefitList />} />
-              <Route path="/hcm-payroll-benefit-plan-form" element={<HcmPayrollBenefitPlanForm />} />
-              <Route path="/hcm-payroll-enrollment-form" element={<HcmPayrollEnrollmentForm />} />
-              <Route path="/hcm-payroll-rule" element={<HcmPayrollRuleList />} />
-              <Route path="/hcm-payroll-rule-form" element={<HcmPayrollRuleSetForm />} />
-              <Route path="/hcm-payroll-run" element={<HcmPayrollRunList />} />
-              <Route path="/hcm-payroll-run-detail" element={<HcmPayrollRunDetail />} />
-              <Route path="/hcm-org-position-detail" element={<HcmOrgPositionForm />} />
-              <Route path="/hcm-person" element={<HcmPersonList />} />
-              <Route path="/hcm-person-form" element={<HcmPersonForm />} />
-              <Route path="/hcm-person-detail" element={<HcmPersonForm />} />
-              <Route path="/hcm-person-employment-form" element={<HcmEmploymentForm />} />
-              <Route path="/hcm-person-assignment-form" element={<HcmAssignmentForm />} />
-              <Route path="/hcm-person-profile-form" element={<HcmProfileItemForm />} />
+              {/* HR 应用路由：见 frontend/apps/hr/src/routes.tsx */}
+              {HR_ROUTES}
               <Route path="/position-management" element={<PositionManagement />} />
-              <Route path="/hr-dict" element={<HrDictManagement />} />
-              <Route path="/hr-dict-edit" element={<HrDictForm />} />
               {/* 入轉調離：入職/轉正/調動/離職 */}
-              <Route path="/hr-onboarding" element={<HrLifecycle type="onboard" />} />
-              <Route path="/hr-onboarding-form" element={<LifecycleForm type="onboard" />} />
-              <Route path="/hr-onboarding-detail" element={<LifecycleDetail />} />
               {/* 返聘单：不新增侧边栏菜单，路由挂在入職菜单的授权下（见 menuDataSource pathToKey） */}
-              <Route path="/hr-rehire" element={<HrLifecycle type="rehire" />} />
-              <Route path="/hr-rehire-form" element={<LifecycleForm type="rehire" />} />
-              <Route path="/hr-rehire-detail" element={<LifecycleDetail />} />
-              <Route path="/hr-regularization" element={<HrLifecycle type="regular" />} />
-              <Route path="/hr-regularization-form" element={<LifecycleForm type="regular" />} />
-              <Route path="/hr-regularization-detail" element={<LifecycleDetail />} />
-              <Route path="/hr-transfer" element={<HrLifecycle type="transfer" />} />
-              <Route path="/hr-transfer-form" element={<LifecycleForm type="transfer" />} />
-              <Route path="/hr-transfer-detail" element={<LifecycleDetail />} />
-              <Route path="/hr-dimission" element={<HrLifecycle type="dimission" />} />
-              <Route path="/hr-dimission-form" element={<LifecycleForm type="dimission" />} />
-              <Route path="/hr-dimission-detail" element={<LifecycleDetail />} />
               {/* HR 審批流程詳情（OA 引擎落地页，不綁菜单独权，由流程事項/单据详情进入） */}
-              <Route path="/hr-flow-detail" element={<HrFlowDetail />} />
               {/* 請假管理與假期額度 */}
-              <Route path="/hr-leave" element={<LeaveList />} />
-              <Route path="/hr-leave-form" element={<LeaveForm />} />
-              <Route path="/hr-leave-detail" element={<LeaveDetail />} />
-              <Route path="/hr-leave-quota" element={<LeaveQuotaList />} />
-              <Route path="/hr-leave-quota-form" element={<LeaveQuotaForm />} />
               {/* 員工自助：我的假期/我的申請單據/我的檔案（数据范围固定为登录人） */}
-              <Route path="/ess-leave" element={<EssMyLeave />} />
-              <Route path="/ess-leave-form" element={<EssLeaveForm />} />
-              <Route path="/ess-leave-detail" element={<EssLeaveDetail />} />
-              <Route path="/ess-requests" element={<EssMyRequests />} />
-              <Route path="/ess-profile" element={<EssMyProfile />} />
               {/* 證明開具：员工自助申请，审批通过后由人事线下出具 */}
-              <Route path="/ess-certificate" element={<EssCertificateList />} />
-              <Route path="/ess-certificate-form" element={<EssCertificateForm />} />
-              <Route path="/ess-certificate-detail" element={<EssCertificateDetail />} />
               {/* 證明開具台账（人事）：待开具队列与开具登记，需 hr-certificate 菜单 */}
-              <Route path="/hr-certificate" element={<CertLedger />} />
-              <Route path="/hr-certificate-issue" element={<CertIssueForm />} />
-              <Route path="/hr-certificate-detail" element={<EssCertificateDetail ledgerMode />} />
               {/* 績效考核：週期與計劃同属 hr-perf-admin 菜单，计划表单/详情为其子页 */}
-              <Route path="/hr-perf-cycle" element={<PerfCycleList />} />
-              <Route path="/hr-perf-plan" element={<PerfPlanList />} />
-              <Route path="/hr-perf-template" element={<PerfTemplateList />} />
-              <Route path="/hr-perf-plan-form" element={<PerfPlanForm />} />
-              <Route path="/hr-perf-plan-detail" element={<PerfPlanDetail />} />
-              <Route path="/hr-perf-review" element={<PerfWorkbench />} />
-              <Route path="/hr-perf-calibration" element={<PerfCalibration />} />
-              <Route path="/ess-performance" element={<EssMyPerformance />} />
               {/* 績效台账（M2）：结果台账 / 改判留痕 / 申诉登记，各自独立授权 */}
-              <Route path="/hr-perf-ledger" element={<PerfLedger />} />
-              <Route path="/hr-perf-audit" element={<PerfAuditTrail />} />
-              <Route path="/hr-perf-appeal" element={<PerfAppeals />} />
               {/* 合同續簽：复用入转调离引擎，授权归合同台账菜单 */}
-              <Route path="/hr-contract-renew-form" element={<LifecycleForm type="renew" />} />
-              <Route path="/hr-contract-renew-detail" element={<LifecycleDetail />} />
-              <Route path="/contract-ledger" element={<ContractLedger />} />
               {/* 考勤假勤系统：考勤组/排班/打卡/异常，第二阶段会补 sys_menu 种子使其进入侧边栏 */}
               <Route path="/attendance-workbench" element={<AttendanceWorkbench />} />
               <Route path="/attendance-group" element={<AttendanceGroupList />} />
@@ -836,154 +761,42 @@ function AuthenticatedLayout() {
               {/* 系統權限申請（門戶自助入口，僅需登錄態；見上方 lazy 聲明的例外說明） */}
               <Route path="/system-access-apply" element={<SystemAccessApply />} />
               {/* 產研交付（RDM）—— 需求全生命周期：提交→審批→分配→受理→研發→驗收→上線 */}
-              <Route path="/rdm-workbench" element={<RdmWorkbench />} />
-              <Route path="/rdm-submit" element={<RdmRequirementSubmit />} />
-              <Route path="/rdm-requirement" element={<RdmRequirementList />} />
+              {/* RDM 应用路由：见 frontend/apps/rdm/src/routes.tsx */}
+              {RDM_ROUTES}
               {/* 需求池：分配与审批环节的总台（预选 pool 视角，带全量可见与分配权）；
                   产品需求处理/交付中需求已作为纯数据切片删除，旧地址保留重定向，
                   避免存量收藏、钉钉通知、已发出去的分享链接坏掉 */}
-              <Route path="/rdm-intake" element={<RdmRequirementPool />} />
               {/* 提交需求（业务侧）：我的提交 + 待我審批；从需求池拆出，不携带分配权 */}
-              <Route path="/rdm-intake-approval" element={<RdmRequirementIntake />} />
               {/* 需求查询已并回需求池（分配权必然蕴含可见权，不该拆成两个窄权限菜单） */}
               <Route path="/rdm-query" element={<Navigate to="/rdm-intake" replace />} />
-              <Route path="/rdm-detail" element={<RdmRequirementDetail />} />
               <Route path="/rdm-product" element={<Navigate to="/rdm-requirement?scope=product" replace />} />
-              <Route path="/rdm-delivery" element={<RdmDeliveryBoard />} />
               <Route path="/rdm-delivery-req" element={<Navigate to="/rdm-requirement?scope=delivery" replace />} />
-              <Route path="/rdm-task" element={<RdmTaskForm />} />
               {/* 需求甘特图（阶段一预览）：不新增侧栏菜单，归属需求跟进清单，用 ?mode= 区分个人/单需求/全局 */}
-              <Route path="/rdm-gantt" element={<RdmRequirementGantt />} />
               {/* 分配产品经理：独立页（取代需求池弹窗）。分配权现行锚点是 rdm-intake:edit，
                   菜单收敛后落到 rdm-requirement:dispatch（不是 :edit，那是需求侧受理权）；
                   过渡期两个锚点 OR 生效，口径以 RdmAccessGuard.canDispatch 为准 */}
-              <Route path="/rdm-assign" element={<RdmAssignPm />} />
-              <Route path="/rdm-iteration" element={<RdmIterationPlan />} />
-              <Route path="/rdm-iteration-form" element={<RdmIterationForm />} />
               <Route path="/rdm-prd" element={<PrdRoute />} />
-              <Route path="/rdm-review" element={<RdmReviewForm />} />
-              <Route path="/rdm-change" element={<RdmChangeForm />} />
               {/* 节点计划：受理后的五节点承诺与基线冻结 */}
-              <Route path="/rdm-milestone" element={<RdmMilestonePlan />} />
-              <Route path="/rdm-acceptance" element={<RdmAcceptanceList />} />
-              <Route path="/rdm-acceptance-form" element={<RdmAcceptanceForm />} />
-              <Route path="/rdm-dashboard" element={<RdmDashboard />} />
               {/* 風險中心 / 部門與人員產出：从总看板拆出的两个独立菜单页 */}
-              <Route path="/rdm-risk" element={<RdmRiskCenter />} />
-              <Route path="/rdm-output" element={<RdmTeamOutput />} />
               {/* 团队负载：从研发工作台资源负载 Tab 升级为独立菜单（项目与计划分组下） */}
-              <Route path="/rdm-resource-load" element={<RdmResourceLoad />} />
-              <Route path="/rdm-quality" element={<RdmQualityBoard />} />
-              <Route path="/rdm-version-trace" element={<RdmVersionTrace />} />
-              <Route path="/rdm-weekly-report" element={<RdmWeeklyReport />} />
-              <Route path="/rdm-score" element={<RdmScoreBoard />} />
-              <Route path="/rdm-score-budget-form" element={<RdmScoreBudgetForm />} />
-              <Route path="/rdm-metric-trend" element={<RdmMetricTrend />} />
-              <Route path="/rdm-score-rule" element={<RdmScoreRuleConfig />} />
-              <Route path="/rdm-config-status" element={<RdmConfigStatus />} />
-                            <Route path="/rdm-task-type-config" element={<RdmTaskTypeConfig />} />
-              <Route path="/rdm-task-type-config-form" element={<RdmTaskTypeConfigForm />} />
-              <Route path="/rdm-config-routing" element={<RdmConfigRouting />} />
-              <Route path="/rdm-config-routing-form" element={<RdmConfigRoutingForm />} />
-              <Route path="/rdm-config-sla" element={<RdmConfigSla />} />
               {/* 進度日報：四个二级页 + 两个独立表单页（表单不得用 Modal 承载） */}
-              <Route path="/rdm-daily-report-rules" element={<DailyReportRules />} />
-              <Route path="/rdm-daily-report-rule-form" element={<DailyReportRuleForm />} />
-              <Route path="/rdm-daily-report-templates" element={<DailyReportTemplates />} />
-              <Route path="/rdm-daily-report-template-form" element={<DailyReportTemplateForm />} />
-              <Route path="/rdm-daily-report-template-builtin" element={<DailyReportBuiltinTemplate />} />
-              <Route path="/rdm-daily-report-records" element={<DailyReportRecords />} />
-              <Route path="/rdm-daily-report-trigger" element={<DailyReportTrigger />} />
               {/* V3 分批交付：项目 / 提测 / 发布 / 交付项 / 问题 */}
-              <Route path="/rdm-project" element={<RdmProjectOverview />} />
-              <Route path="/rdm-project-detail" element={<RdmProjectDetail />} />
               {/* 存量遷移 / 灰度管理：無獨立菜單，入口在項目總覽操作區（僅有權限者可見）*/}
-              <Route path="/rdm-stock-migration" element={<RdmStockMigration />} />
-              <Route path="/rdm-grayscale" element={<RdmGrayscaleConfig />} />
               {/* 每日日報（釘釘通知連結落地頁）：無獨立菜單，守衛與側欄高亮錨到 rdm-daily-report-rule */}
-              <Route path="/rdm-daily" element={<RdmDailyReport />} />
-              <Route path="/rdm-test" element={<RdmTestWorkbench />} />
               {/* 发起提测 / 创建发布批次：独立页（§9.1 禁止用 Modal 承载新增表单） */}
-              <Route path="/rdm-test-submit" element={<RdmTestBatchSubmit />} />
-              <Route path="/rdm-test-detail" element={<RdmTestBatchDetail />} />
-              <Route path="/rdm-release" element={<RdmReleaseCenter />} />
-              <Route path="/rdm-release-create" element={<RdmReleaseBatchCreate />} />
-              <Route path="/rdm-release-detail" element={<RdmReleaseBatchDetail />} />
-              <Route path="/rdm-delivery-item" element={<RdmDeliveryItemForm />} />
-              <Route path="/rdm-issue" element={<RdmIssueDetail />} />
               {/* 物資管理（EAM 完整路由）*/}
-              <Route path="/asset-list"       element={<AssetList />} />
-              <Route path="/asset-add"        element={<AssetAdd />} />
-              <Route path="/asset-detail"     element={<AssetDetail />} />
-              <Route path="/asset-scrap"      element={<AssetScrap />} />
-              <Route path="/asset-repair"     element={<AssetRepair />} />
-                            <Route path="/asset-loss"      element={<AssetLoss />} />
-              <Route path="/asset-transfer"   element={<AssetTransfer />} />
-              <Route path="/asset-transfer/detail" element={<TransferDetail />} />
-              <Route path="/asset-transfer/cancel" element={<TransferCancel />} />
-              <Route path="/asset-inventory"  element={<AssetInventory />} />
-              <Route path="/asset-dashboard"  element={<AssetDashboard />} />
+              {/* EAM 应用路由：见 frontend/apps/eam/src/routes.tsx */}
+              {EAM_ROUTES}
               {/* EAM 基礎數據 */}
-              <Route path="/asset-category"   element={<AssetCategory />} />
-              <Route path="/asset-model"      element={<AssetModel />} />
-              <Route path="/asset-location"   element={<AssetLocation />} />
-              <Route path="/param-library"    element={<ParamLibrary />} />
-              <Route path="/asset-supplier"   element={<AssetSupplier />} />
-              <Route path="/asset-tag"      element={<AssetTag />} />
-              <Route path="/asset-tag-print" element={<AssetTagPrint />} />
               {/* 耗材管理（消耗品/MRO）；方案二：分類/品牌已并入分類庫/品牌產品庫 */}
-              <Route path="/consumable-dashboard" element={<ConsumableDashboard />} />
-              <Route path="/consumable-item"      element={<ConsumableItem />} />
-              <Route path="/consumable-claim"     element={<ConsumableClaim />} />
-              <Route path="/consumable-stock"     element={<ConsumableStock />} />
-              <Route path="/consumable-stock/txn" element={<ConsumableStockTxn />} />
-              <Route path="/consumable-stock-txn" element={<ConsumableStockTxnList />} />
-              <Route path="/consumable-alert"     element={<ConsumableAlert />} />
-              <Route path="/consumable-inbound"   element={<ConsumableInbound />} />
-              <Route path="/consumable-report"    element={<ConsumableReport />} />
               {/* EAM 採購入庫 */}
-              <Route path="/purchase-order"   element={<PurchaseOrder />} />
-              <Route path="/asset-inbound"    element={<AssetInbound />} />
               {/* EAM 領用借用 */}
-              <Route path="/asset-claim"      element={<AssetClaim />} />
-              <Route path="/asset-claim/add"    element={<AssetClaim />} />
-              <Route path="/asset-claim/detail" element={<AssetClaim />} />
-              <Route path="/asset-claim/record" element={<AssetClaim />} />
-              <Route path="/asset-borrow"     element={<AssetBorrow />} />
-              <Route path="/asset-borrow/add"   element={<AssetBorrow />} />
-              <Route path="/asset-borrow/detail" element={<AssetBorrow />} />
-              <Route path="/asset-borrow/renew" element={<AssetBorrow />} />
-              <Route path="/asset-return"     element={<AssetReturn />} />
-              <Route path="/asset-return/add"   element={<AssetReturn />} />
-              <Route path="/asset-return/detail" element={<AssetReturn />} />
-              <Route path="/asset-return/dispose" element={<AssetReturn />} />
-              <Route path="/asset-return/recover" element={<AssetReturn />} />
-              <Route path="/asset-compensation" element={<AssetCompensation />} />
-              <Route path="/asset-compensation/detail" element={<AssetCompensation />} />
-              <Route path="/asset-compensation/liability" element={<AssetCompensation />} />
-              <Route path="/asset-compensation/waive" element={<AssetCompensation />} />
-              <Route path="/asset-compensation/payment" element={<AssetCompensation />} />
-              <Route path="/asset-compensation/refund" element={<AssetCompensation />} />
-              <Route path="/asset-compensation/review" element={<AssetCompensation />} />
-              <Route path="/asset-compensation/add" element={<AssetCompensation />} />
               {/* 員工個人資產入口 */}
-              <Route path="/my-assets"        element={<MyAssets />} />
-              <Route path="/my-claims"        element={<MyClaims />} />
               {/* EAM 調撥交接 */}
-              <Route path="/asset-transfer-list" element={<AssetTransferList />} />
-              <Route path="/asset-handover"        element={<AssetHandover />} />
-              <Route path="/asset-handover/add"    element={<AssetHandover />} />
-              <Route path="/asset-handover/detail" element={<AssetHandover />} />
               {/* EAM 變更歷史 */}
-              <Route path="/asset-flow"       element={<AssetFlow />} />
               {/* 用車管理（階段 B1）：子视图由模块内部按 pathname 片段切换，
                   但路由必须逐条显式注册——ROUTE_MENU_KEY_MAP 的门禁按精确路径前缀校验，
                   splat(/*）不被识别，而且与项目内 asset-claim 等现有约定不一致 */}
-              <Route path="/vehicle-files" element={<VehicleFiles />} />
-              <Route path="/vehicle-files/add" element={<VehicleFiles />} />
-              <Route path="/vehicle-files/edit" element={<VehicleFiles />} />
-              <Route path="/vehicle-files/detail" element={<VehicleFiles />} />
-              <Route path="/vehicle-files/qualification" element={<VehicleFiles />} />
               {/* 会议管理：菜单真值由 MeetingSchemaMigrationInitializer 写入 sys_menu。
                   /meeting-detail 不是菜单项（从钉钉邀约卡片与日程单元格跳进来），
                   但仍需显式注册：路由守卫按精确路径校验 */}
@@ -1004,23 +817,6 @@ function AuthenticatedLayout() {
               {/* 通知模板 / 推送开关：紧邻「通知渠道配置」的两个独立菜单 */}
               <Route path="/notification-template" element={<NotificationTemplateConfig />} />
               <Route path="/notification-switch" element={<NotificationSwitchConfig />} />
-              <Route path="/my-vehicle-use" element={<MyVehicleUse />} />
-              <Route path="/my-vehicle-use/apply" element={<MyVehicleUse />} />
-              <Route path="/my-vehicle-use/detail" element={<MyVehicleUse />} />
-              <Route path="/vehicle-dispatch" element={<VehicleDispatch />} />
-              <Route path="/vehicle-dispatch/assign" element={<VehicleDispatch />} />
-              <Route path="/vehicle-dispatch/direct" element={<VehicleDispatch />} />
-              <Route path="/vehicle-dispatch/depart" element={<VehicleDispatch />} />
-              <Route path="/vehicle-dispatch/return" element={<VehicleDispatch />} />
-              <Route path="/vehicle-dispatch/confirm" element={<VehicleDispatch />} />
-              <Route path="/vehicle-dispatch/detail" element={<VehicleDispatch />} />
-              <Route path="/vehicle-ledger" element={<VehicleLedger />} />
-              <Route path="/vehicle-ledger/detail" element={<VehicleLedger />} />
-              <Route path="/vehicle-ledger/correct" element={<VehicleLedger />} />
-              <Route path="/vehicle-master-data" element={<VehicleMasterData />} />
-              <Route path="/vehicle-master-data/add" element={<VehicleMasterData />} />
-              <Route path="/vehicle-master-data/edit" element={<VehicleMasterData />} />
-              <Route path="/vehicle-ledger/backfill" element={<VehicleLedger />} />
               {/* 審批流程配置 */}
               <Route path="/workflow-config" element={<WorkflowConfig />} />
               <Route path="/workflow-config/detail/:id" element={<WorkflowDetail />} />
@@ -1028,7 +824,6 @@ function AuthenticatedLayout() {
               {/* 页面说明编辑 */}
               <Route path="/page-description-editor" element={<PageDescriptionEditor />} />
               {/* PRD需求查看 */}
-              <Route path="/page-prd-view" element={<PagePRDView />} />
               {/* 文檔中心：騰訊文檔為內容中台，本系統為索引與查閱入口；子視圖按 pathname 切換，
                   守衛按精確路徑校驗，三條路徑逐條顯式註冊 */}
               <Route path="/doc-center" element={<DocCenter />} />

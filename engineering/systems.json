@@ -307,7 +307,30 @@
      "reason": "资产领用签收（免登/扫码入口），资产域"
     },
     "AssetManagement": {
-     "evidence": "app-slice"
+     "evidence": "app-slice",
+     "menuKeys": [
+      "asset-borrow",
+      "asset-category",
+      "asset-claim",
+      "asset-compensation",
+      "asset-dashboard",
+      "asset-flow",
+      "asset-handover",
+      "asset-inbound",
+      "asset-inventory",
+      "asset-list",
+      "asset-location",
+      "asset-loss",
+      "asset-model",
+      "asset-repair",
+      "asset-return",
+      "asset-scrap",
+      "asset-supplier",
+      "asset-tag",
+      "asset-transfer-list",
+      "param-library",
+      "purchase-order"
+     ]
     },
     "AssetTagView": {
      "evidence": "app-slice",
@@ -318,14 +341,31 @@
      "reason": "品牌产品库，资产基础数据"
     },
     "Consumable": {
-     "evidence": "app-slice"
+     "evidence": "app-slice",
+     "menuKeys": [
+      "consumable-alert",
+      "consumable-claim",
+      "consumable-dashboard",
+      "consumable-inbound",
+      "consumable-item",
+      "consumable-report",
+      "consumable-stock",
+      "consumable-stock-txn"
+     ]
     },
     "MyAssets": {
      "evidence": "app-slice",
      "reason": "我的资产（员工自助查看），数据属资产域"
     },
     "VehicleManagement": {
-     "evidence": "app-slice"
+     "evidence": "app-slice",
+     "menuKeys": [
+      "my-vehicle-use",
+      "vehicle-dispatch",
+      "vehicle-files",
+      "vehicle-ledger",
+      "vehicle-master-data"
+     ]
     }
    },
    "backendPrefixes": {
@@ -418,29 +458,55 @@
    },
    "frontendDirs": {
     "ContractLedger": {
-     "evidence": "app-slice"
+     "evidence": "app-slice",
+     "menuKeys": [
+      "contract-ledger"
+     ]
     },
     "Ess": {
-     "evidence": "app-slice"
+     "evidence": "app-slice",
+     "menuKeys": [
+      "ess-center",
+      "ess-certificate",
+      "ess-leave",
+      "ess-performance",
+      "ess-profile",
+      "ess-requests"
+     ]
     },
     "Hcm": {
-     "evidence": "app-slice"
+     "evidence": "app-slice",
+     "menuKeys": [
+      "hcm-person"
+     ]
     },
     "HcmBlueprint": {
      "evidence": "app-slice",
      "reason": "人事蓝图/组织可视化，HR 域子页面"
     },
     "HrCertificate": {
-     "evidence": "app-slice"
+     "evidence": "app-slice",
+     "menuKeys": [
+      "hr-certificate"
+     ]
     },
     "HrDict": {
-     "evidence": "app-slice"
+     "evidence": "app-slice",
+     "menuKeys": [
+      "hr-dict"
+     ]
     },
     "HrLeave": {
      "evidence": "app-slice"
     },
     "HrLifecycle": {
-     "evidence": "app-slice"
+     "evidence": "app-slice",
+     "menuKeys": [
+      "hr-dimission",
+      "hr-onboarding",
+      "hr-regularization",
+      "hr-transfer"
+     ]
     },
     "LoginLog": {
      "evidence": "menu-route",
@@ -449,10 +515,22 @@
      ]
     },
     "PerfReport": {
-     "evidence": "app-slice"
+     "evidence": "app-slice",
+     "menuKeys": [
+      "hr-perf-appeal",
+      "hr-perf-audit",
+      "hr-perf-ledger",
+      "perf-report-center"
+     ]
     },
     "Performance": {
-     "evidence": "app-slice"
+     "evidence": "app-slice",
+     "menuKeys": [
+      "hr-perf-admin",
+      "hr-perf-calibration",
+      "hr-perf-review",
+      "perf-center"
+     ]
     },
     "Permission": {
      "evidence": "menu-route",
@@ -839,7 +917,45 @@
      "reason": "PRD 免登查看"
     },
     "Rdm": {
-     "evidence": "app-slice"
+     "evidence": "app-slice",
+     "menuKeys": [
+      "rdm-acceptance",
+      "rdm-config-group",
+      "rdm-config-routing",
+      "rdm-config-score",
+      "rdm-config-sla",
+      "rdm-config-status",
+      "rdm-daily-report-group",
+      "rdm-daily-report-record",
+      "rdm-daily-report-rule",
+      "rdm-daily-report-template",
+      "rdm-daily-report-trigger",
+      "rdm-dashboard",
+      "rdm-dashboard-board",
+      "rdm-dashboard-project",
+      "rdm-dashboard-quality",
+      "rdm-dashboard-report",
+      "rdm-dashboard-risk",
+      "rdm-dashboard-score",
+      "rdm-dashboard-trend",
+      "rdm-dashboard-version",
+      "rdm-delivery",
+      "rdm-delivery-board",
+      "rdm-delivery-iteration",
+      "rdm-delivery-release",
+      "rdm-delivery-test",
+      "rdm-efficiency",
+      "rdm-efficiency-output",
+      "rdm-intake",
+      "rdm-intake-approval",
+      "rdm-pool-group",
+      "rdm-release-accept-group",
+      "rdm-requirement",
+      "rdm-resource-load",
+      "rdm-task-type-config",
+      "rdm-test-quality-group",
+      "rdm-workbench"
+     ]
     },
     "RdmDailyReportView": {
      "evidence": "app-slice",

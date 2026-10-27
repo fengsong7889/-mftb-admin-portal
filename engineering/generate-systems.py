@@ -112,9 +112,21 @@ def load_snapshot():
 
 
 def route_to_dir():
+    """解析路由真值：门户壳 src/App.tsx + 各应用 frontend/apps/<app>/src/routes.tsx。
+
+    方案 P3/P2 之后，应用路由已从壳搬到应用内（rdm/eam/hr），只解析 App.tsx 会让
+    「路由 → 页面目录」的归属推导丢一大半，registry 会误报未登记。
+    """
     # 拆包后 App.tsx 的页面引用统一走 '@/pages/...' 别名（见 rewrite-package-relative-imports.mjs），
     # 因此 './pages/' 与 '@/pages/' 两种写法都要认
-    app = open('src/App.tsx', encoding='utf-8').read()
+    sources = ['src/App.tsx']
+    apps_dir = 'frontend/apps'
+    if os.path.isdir(apps_dir):
+        for code in sorted(os.listdir(apps_dir)):
+            p = os.path.join(apps_dir, code, 'src', 'routes.tsx')
+            if os.path.isfile(p):
+                sources.append(p)
+    app = '\n'.join(open(p, encoding='utf-8').read() for p in sources)
     var = {}
     for n, s in re.findall(r"const\s+(\w+)\s*=\s*lazy\(\(\)\s*=>\s*import\(['\"]@?/?(?:\./)?([^'\"]+)['\"]\)", app):
         var[n] = s.lstrip('/')
@@ -229,12 +241,22 @@ def main():
     claimed = set(SHARED_FRONTEND_DIRS)
     systems = {}
     codes = sorted(set(list(sys_by_key.values())) | set(systems) | set(EXTRA_FRONTEND_DIRS) | set(BACKEND_PREFIXES))
+    # 已搬进应用包的目录：归属以「物理位置」为准（方案 P2）。
+    # 菜单归属仍可能把它算给别的系统（例如 Hcm 的菜单分属 organization/payroll），
+    # 那种情况必须让位给应用，否则同一个目录会被判成多系统共享，C3 直接失败。
+    app_owned = {d: code for code, dirs in app_dirs.items() for d in dirs}
     for code in codes:
         dirs = {}
         for dv, keys in derived.get(code, {}).items():
+            owner = app_owned.get(dv)
+            if owner and owner != code:
+                continue
             dirs[dv] = {'evidence': 'menu-route', 'menuKeys': sorted(set(keys))}
         for dv, why in EXTRA_FRONTEND_DIRS.get(code, []):
             if dv in dirs:
+                continue
+            owner = app_owned.get(dv)
+            if owner and owner != code:
                 continue
             dirs[dv] = {'evidence': 'naming', 'reason': why}
         for d in app_dirs.get(code, []):
