@@ -11,11 +11,12 @@
  * 用法：
  *   node scripts/merge-app-manifests.mjs [--dir dist-apps] [--out dist-apps/site-manifest.json]
  *   node scripts/merge-app-manifests.mjs --check     # 只校验，不写文件
+ *   node scripts/merge-app-manifests.mjs --verify    # 额外校验清单 sha256 与磁盘文件一致
  * 退出码：0 通过；1 校验失败；2 参数/文件问题。
  */
 import fs from 'node:fs'
 import path from 'node:path'
-import { mergeAppManifests } from './lib/app-manifests.mjs'
+import { mergeAppManifests, verifyManifestFiles } from './lib/app-manifests.mjs'
 import { validateManifest } from './lib/site-assembly.mjs'
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
@@ -25,6 +26,7 @@ const valueOf = (name, fallback) => {
   return i >= 0 && args[i + 1] ? args[i + 1] : fallback
 }
 const checkOnly = args.includes('--check')
+const verifyFiles = args.includes('--verify')
 const dir = path.resolve(ROOT, valueOf('dir', 'dist-apps'))
 const outFile = path.resolve(ROOT, valueOf('out', path.join(dir, 'site-manifest.json')))
 
@@ -57,6 +59,16 @@ for (const app of apps) {
   }
   for (const p of validateManifest(m)) problems.push(`${app}: ${p}`)
   if (!m?.document?.sha256) problems.push(`${app}: 缺少 index.html 摘要（不是用应用自己的文档构建的？）`)
+  if (verifyFiles) {
+    // 文件校验：清单是构建时快照，产物目录被覆盖/拷坏/部分删除时必须在这里暴露，
+    // 否则「按旧清单回切」会把新文件当旧产物发布。
+    const appDir = path.join(dir, app)
+    const readFile = (rel) => {
+      const p = path.join(appDir, rel)
+      return fs.existsSync(p) ? fs.readFileSync(p) : null
+    }
+    for (const p of verifyManifestFiles(m, readFile)) problems.push(`${app}: ${p}`)
+  }
   manifests.push(m)
 }
 

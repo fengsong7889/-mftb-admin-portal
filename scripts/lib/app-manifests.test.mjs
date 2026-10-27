@@ -1,13 +1,15 @@
 /**
  * 多份按应用产物清单合并的纯函数单测（方案 §4.2）。
  *
- * 这些断言固定住三条装配安全规则：
+ * 这些断言固定住四条装配安全规则：
  *   1) 文件键必须按应用命名空间化（不同应用的 assets/index-*.js 不得互相覆盖）；
  *   2) 跨应用同名但摘要不同 → 冲突（禁止混装）；
- *   3) 合并后的清单能被 planAssembly 直接消费（复用与重建判定一致）。
+ *   3) 合并后的清单能被 planAssembly 直接消费（复用与重建判定一致）；
+ *   4) 清单登记的 sha256 必须与磁盘文件一致（文件被覆盖/缺失都要报）。
  */
 import { describe, expect, it } from 'vitest'
-import { mergeAppManifests } from './app-manifests.mjs'
+import crypto from 'node:crypto'
+import { mergeAppManifests, verifyManifestFiles } from './app-manifests.mjs'
 import { planAssembly } from './site-assembly.mjs'
 
 const sha = (c) => c.repeat(64)
@@ -81,5 +83,37 @@ describe('mergeAppManifests', () => {
     expect(changedPlan.rdm.rebuilt).toEqual(['rdm/assets/index-c.js'])
     expect(changedPlan.rdm.dropped).toEqual(['rdm/assets/index-a.js'])
     expect(changedPlan.eam.action).toBe('reuse')
+  })
+})
+
+describe('verifyManifestFiles', () => {
+  const shaOf = (s) => crypto.createHash('sha256').update(s).digest('hex')
+  const manifest = () => ({
+    apps: {
+      rdm: {
+        chunks: [{ file: 'assets/index-a.js', bytes: 5, sha256: shaOf('hello'), isEntry: true }],
+      },
+    },
+    document: { file: 'index.html', bytes: 3, sha256: shaOf('doc') },
+  })
+
+  it('文件与摘要一致 → 通过', () => {
+    const files = { 'assets/index-a.js': Buffer.from('hello'), 'index.html': Buffer.from('doc') }
+    expect(verifyManifestFiles(manifest(), (rel) => files[rel] ?? null)).toEqual([])
+  })
+
+  it('文件被覆盖 → 报摘要不符（不当成旧产物回切）', () => {
+    const files = { 'assets/index-a.js': Buffer.from('MUTATED'), 'index.html': Buffer.from('doc') }
+    const problems = verifyManifestFiles(manifest(), (rel) => files[rel] ?? null)
+    expect(problems).toHaveLength(1)
+    expect(problems[0]).toContain('assets/index-a.js')
+    expect(problems[0]).toContain('sha256')
+  })
+
+  it('文件缺失 → 报清单登记了但不存在', () => {
+    const problems = verifyManifestFiles(manifest(), (rel) =>
+      rel === 'index.html' ? Buffer.from('doc') : null,
+    )
+    expect(problems).toEqual(['assets/index-a.js: 清单登记了但文件不存在'])
   })
 })
