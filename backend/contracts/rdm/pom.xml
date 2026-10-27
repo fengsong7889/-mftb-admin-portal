@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.mftb</groupId>
+        <artifactId>mftb-admin-parent</artifactId>
+        <version>1.0.0</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mftb-admin-contracts-rdm</artifactId>
+    <packaging>jar</packaging>
+    <name>mftb-admin-contracts-rdm</name>
+    <description>
+        产研交付域的跨域契约（方案 P3 的 contracts 层）：只放接口与最小 DTO，
+        不含 Entity / Mapper / 业务规则。业务域实现它，legacy 依赖它，
+        由此打破「域模块 &lt;-&gt; legacy」的编译环。
+        叶子包：不得依赖任何业务模块（含 legacy）与 platform-core 之外的东西。
+    </description>
+</project>

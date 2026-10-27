@@ -16,7 +16,7 @@ import com.mftb.admin.service.DingTalkAppService;
 import com.mftb.admin.service.DingTalkService;
 import com.mftb.admin.service.NotificationAppService;
 import com.mftb.admin.service.PermissionService;
-import com.mftb.admin.service.RdmProjectFactService;
+import com.mftb.admin.contracts.rdm.RdmProjectVisibility;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -57,7 +57,7 @@ public class AgentActionService {
     private final ObjectMapper objectMapper;
     private final OperatorResolver operatorResolver;
     private final PermissionService permissionService;
-    private final RdmProjectFactService projectFactService;
+    private final RdmProjectVisibility projectFactService;
     private final DingTalkService dingTalkService;
     private final DingTalkAppService dingTalkAppService;
     private final NotificationAppService notificationAppService;
@@ -127,7 +127,7 @@ public class AgentActionService {
         }
         try {
             // 重新校验项目可见性：预览生成后权限可能被收回
-            projectFactService.requireProjectVisible(projectId, user.getId());
+            projectFactService.assertProjectVisible(projectId, user.getId());
         } catch (Exception e) {
             markFailed(row, "項目權限已變化");
             return failed(result, "您已無權查看該項目", "請聯繫項目管理員確認成員權限");

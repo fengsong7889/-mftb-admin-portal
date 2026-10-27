@@ -199,6 +199,9 @@ describe('覆盖缺口（0 测试不得当成已验证）', () => {
     expect(isFrontendBusinessFile('frontend/packages/ui/src/components/EmployeeSelect.test.tsx')).toBe(false)
     expect(isBackendBusinessFile(`${TEST}/AdOrderTest.java`)).toBe(false)
     expect(isBackendBusinessFile(`${MAIN}/service/impl/AdOrderServiceImpl.java`)).toBe(true)
+    // 域模块（方案 P3）同样是业务生产代码：漏算会让该模块改动的测试选中数恒为 0
+    expect(isBackendBusinessFile('backend/modules/rdm/src/main/java/com/mftb/admin/service/RdmTaskTypeService.java'))
+      .toBe(true)
   })
 
   it('后端同理：改了生产类却没有可选测试类 → 报缺口', () => {

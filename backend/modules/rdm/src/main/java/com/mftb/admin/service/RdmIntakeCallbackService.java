@@ -39,7 +39,7 @@ import java.util.List;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class RdmIntakeCallbackService {
+public class RdmIntakeCallbackService implements com.mftb.admin.contracts.rdm.RdmIntakeCallback {
 
     private final RdmRequirementMapper requirementMapper;
     private final RdmRequirementRoleMapper roleMapper;
@@ -58,11 +58,13 @@ public class RdmIntakeCallbackService {
     private final BizSeqService bizSeqService;
 
     /** 是否需求准入流程 */
+    @Override
     public boolean isIntakeProcess(String processCode) {
         return RdmConstants.INTAKE_PROCESS_CODE.equals(processCode);
     }
 
     /** 审批全部通过 → 有指定 PM 且仍有效则直达受理，否则进需求池等技术负责人分配 */
+    @Override
     public void onFlowApproved(String flowNo) {
         RdmIntakeRoundService.Round round = roundService.findByFlow(flowNo);
         // 轮次是闸门：拿不到 pending 就表示这一轮已被处理过（或属于已重提的旧轮），不能再看推需求
@@ -162,6 +164,7 @@ public class RdmIntakeCallbackService {
     }
 
     /** 审批驳回 → 需求回到「审批驳回」，提出人可修改后重提 */
+    @Override
     public void onFlowRejected(String flowNo, String reason) {
         RdmIntakeRoundService.Round round = roundService.findByFlow(flowNo);
         if (round != null && !roundService.isCurrentPending(flowNo)) {

@@ -775,9 +775,9 @@
     "Notification": 11,
     "Translation": 7,
     "Ding": 7,
+    "Schema": 6,
     "Word": 6,
     "Version": 5,
-    "Schema": 5,
     "Migration": 4,
     "Api": 3,
     "Avatar": 2,
@@ -829,7 +829,7 @@
    "priority": true,
    "isolation": {
     "frontend": "isolated",
-    "backend": "pending"
+    "backend": "isolated"
    },
    "planned": {
     "frontendApp": "frontend/apps/rdm",
@@ -848,12 +848,10 @@
      "reason": "日报免登看板"
     }
    },
-   "backendPrefixes": {
-    "Rdm": 264
-   },
+   "backendPrefixes": {},
    "testCounts": {
     "frontend": 49,
-    "backend": 85
+    "backend": 0
    }
   },
   "search": {
@@ -1025,7 +1023,6 @@
    "Profile": 2,
    "User": 2,
    "Approval": 2,
-   "Scope": 2,
    "Employment": 2,
    "Jwt": 2,
    "Password": 2,
@@ -1038,13 +1035,11 @@
    "Recharge": 1,
    "Basic": 1,
    "Machine": 1,
-   "Cross": 1,
    "Option": 1,
    "Segment": 1,
    "Roster": 1,
    "Debt": 1,
    "Transfer": 1,
-   "Add": 1,
    "Bind": 1,
    "Rule": 1,
    "Session": 1,
@@ -1054,7 +1049,6 @@
    "Inventory": 1,
    "Page": 1,
    "Reset": 1,
-   "Remove": 1,
    "Language": 1,
    "Translate": 1,
    "Audit": 1,
@@ -1074,6 +1068,7 @@
    "Sql": 1,
    "Sensitive": 1,
    "Json": 1,
+   "Scope": 1,
    "Jackson": 1,
    "Security": 1,
    "Authz": 1,
@@ -1085,8 +1080,6 @@
    "Database": 1,
    "Iconfont": 1,
    "Health": 1,
-   "Idempotent": 1,
-   "Evidence": 1,
    "Email": 1,
    "Abstract": 1,
    "Conversation": 1,

@@ -15,6 +15,9 @@
 // 否则“后端测试文件”会被判成业务源码，影响域会算错。
 export const JAVA_ROOT = 'backend/modules/legacy/src'
 export const JAVA_TEST_ROOT = 'backend/bootstrap/src'
+// 已拆出的域模块（方案 P3 第 3 步）：与 legacy 一起构成后端主源码
+// 注意：数组顺序即扫描顺序；新增域模块时同步追加，否则其测试类不会被选中。
+export const JAVA_DOMAIN_ROOTS = ['backend/modules/rdm/src']
 
 // ───────────────────────── 共享层规则（命中即升档全量） ─────────────────────────
 // 这些文件被多个系统/菜单共用，任何改动都可能波及全量，必须跑全量。
@@ -54,7 +57,8 @@ export const isFrontendBusinessFile = (f) =>
   (f.startsWith('src/') || f.startsWith('frontend/')) && /\.(ts|tsx)$/.test(f) && !isTestFile(f)
 
 export const isBackendBusinessFile = (f) =>
-  f.startsWith(`${JAVA_ROOT}/main/java/`) && f.endsWith('.java') && !/Test\.java$/.test(f)
+  [`${JAVA_ROOT}/main/java/`, ...JAVA_DOMAIN_ROOTS.map((r) => `${r}/main/java/`)].some((r) => f.startsWith(r)) &&
+  f.endsWith('.java') && !/Test\.java$/.test(f)
 
 // ───────────────────────── 前端依赖图 ─────────────────────────
 const SPEC_PATTERNS = [
@@ -191,7 +195,9 @@ export function extractIdentifiers(code) {
 const simpleName = (f) => f.split('/').pop().replace(/\.java$/, '')
 
 export function buildBackendGraph(javaFiles, read) {
-  const mainFiles = javaFiles.filter((f) => f.startsWith(`${JAVA_ROOT}/main/java/`))
+  // 主源码 = legacy + 已拆出的域模块（方案 P3）；只算 legacy 会让域模块改动无反向边
+  const mainRoots = [`${JAVA_ROOT}/main/java/`, ...JAVA_DOMAIN_ROOTS.map((r) => `${r}/main/java/`)]
+  const mainFiles = javaFiles.filter((f) => mainRoots.some((r) => f.startsWith(r)))
   const classNames = new Map()
   for (const f of mainFiles) {
     const simple = simpleName(f)
@@ -223,8 +229,12 @@ export function backendAffectedTests(changed, graph, javaFiles, { hops = 2, expl
   )
   const testSet = new Set(allTests)
   const seeds = []
+  // 种子来自 legacy 主源码与已拆出的域模块（方案 P3）：两者都是「业务生产代码」，
+  // 少算一侧会让域模块改动的测试选中数恒为 0（把“没测到”伪装成“无需测试”）。
+  const mainRoots = [JAVA_ROOT, ...JAVA_DOMAIN_ROOTS]
   for (const f of changed) {
-    if (!f.startsWith(`${JAVA_ROOT}/main/java/`) || !f.endsWith('.java')) continue
+    if (!f.endsWith('.java')) continue
+    if (!mainRoots.some((r) => f.startsWith(`${r}/main/java/`))) continue
     const simple = simpleName(f)
     if (graph.validNames.has(simple)) seeds.push(simple)
   }

@@ -28,6 +28,12 @@
             <artifactId>mftb-admin-platform-core</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- 跨域契约：只声明「我需要什么」，不依赖任何域模块的实现 -->
+        <dependency>
+            <groupId>com.mftb</groupId>
+            <artifactId>mftb-admin-contracts-rdm</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
     <build>

@@ -8,6 +8,8 @@
  */
 
 const JAVA_PKG = 'backend/modules/legacy/src/main/java/com/mftb/admin/'
+/** 已拆出的域模块：目录名即系统编码，归属不依赖类名前缀（方案 P3） */
+const DOMAIN_MODULES = [['backend/modules/rdm/', 'rdm']]
 
 /** 后端类名前缀：与 engineering 生成器同口径（文件名首个大写字母段） */
 function javaPrefixOf(file) {
@@ -67,6 +69,13 @@ export function attributeFiles(changed, registry) {
     }
     if (file.startsWith('src/') || file.startsWith('frontend/')) {
       shared.push({ file, reason: file.startsWith('frontend/packages/') ? '共享 workspace 包' : '前端公共层' })
+      continue
+    }
+    // 已拆出的域模块：目录即归属，不再看类名前缀
+    const domainHit = DOMAIN_MODULES.find(([prefix]) => file.startsWith(prefix))
+    if (domainHit) {
+      if (file.endsWith('.java')) bump(domainHit[1], 'backend', file)
+      else shared.push({ file, reason: `域模块资源（${domainHit[1]}）` })
       continue
     }
     if (file.startsWith(JAVA_PKG)) {

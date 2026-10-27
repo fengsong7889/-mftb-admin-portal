@@ -99,9 +99,9 @@ public class OaRequestServiceImpl implements OaRequestService {
     /** 績效考核整批确认回调 */
     private final HrPerfCallbackService hrPerfCallbackService;
     /** 需求准入审批回调：通过→进需求池，驳回→退回提出人 */
-    private final com.mftb.admin.service.RdmIntakeCallbackService rdmIntakeCallbackService;
+    private final com.mftb.admin.contracts.rdm.RdmIntakeCallback rdmIntakeCallbackService;
     /** 需求变更审批回调：通过→计变更次数并按需回填排期，驳回→变更单退回 */
-    private final com.mftb.admin.service.RdmChangeCallbackService rdmChangeCallbackService;
+    private final com.mftb.admin.contracts.rdm.RdmChangeCallback rdmChangeCallbackService;
     /**
      * 系統權限申請回调：节点审批时合并授权角色配置，终审通过→把角色绑定到申请人。
      * <p>兑现失败<b>不</b>吞异常：与 AI「审批即授权」同口径，让整个审批事务回滚，

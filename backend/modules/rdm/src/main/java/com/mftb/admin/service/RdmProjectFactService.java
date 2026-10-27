@@ -2,6 +2,7 @@ package com.mftb.admin.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.contracts.rdm.RdmProjectVisibility;
 import com.mftb.admin.constant.RdmConstants;
 import com.mftb.admin.dto.RdmFactVO;
 import com.mftb.admin.entity.RdmDeliveryItem;
@@ -96,7 +97,7 @@ import java.util.Set;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class RdmProjectFactService {
+public class RdmProjectFactService implements RdmProjectVisibility {
 
     /** 未指派 / 無責任人時的去重占位，与 {@link RdmTodoBoardService} 保持同一顆粒度 */
     private static final String TASK_STATUS_DONE = "done";
@@ -179,6 +180,15 @@ public class RdmProjectFactService {
      * 存量項目存在「建項目時未回填成員行」的情況，把他們鎖在外面等於讓項目無人可管。
      * 這是<b>擴大到責任人本人</b>，不是放寬到無關人。
      */
+    /**
+     * 契约实现：只保留「校验」语义，不把 RdmProject 实体暴露给跨域调用方
+     * （契约在 contracts/rdm，见 RdmProjectVisibility 的说明）。
+     */
+    @Override
+    public void assertProjectVisible(Long projectId, Long userId) {
+        requireProjectVisible(projectId, userId);
+    }
+
     public RdmProject requireProjectVisible(Long projectId, Long userId) {
         if (projectId == null) {
             throw new BusinessException("項目ID不能為空");

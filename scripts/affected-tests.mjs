@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url'
 import {
   JAVA_ROOT,
   JAVA_TEST_ROOT,
+  JAVA_DOMAIN_ROOTS,
   isTestFile,
   isFrontendBusinessFile,
   isBackendBusinessFile,
@@ -265,6 +266,7 @@ function main() {
       // 否则测试类不会被识别，影响域会恒为空并把“没测到”伪装成“无需测试”。
       const javaFiles = [
         ...walk(JAVA_ROOT, ['.java'], new Set(['target'])),
+        ...JAVA_DOMAIN_ROOTS.flatMap((root) => walk(root, ['.java'], new Set(['target']))),
         ...walk(JAVA_TEST_ROOT, ['.java'], new Set(['target'])),
       ]
       const graph = buildBackendGraph(javaFiles, readFile)
@@ -331,7 +333,11 @@ function main() {
           backendCwd,
         )
       } else if (beJavaChanged.length) {
-        push('test', ['mvn', '-pl', 'modules/legacy', '-am', 'compile', '-q'], backendCwd)
+        // 只编「改动所在的模块」：域模块改动不该把整个 legacy 也编一遍；
+        // 无法判定模块时退回 legacy（保守但不会漏编）。
+        const domain = beJavaChanged.map((f) => f.match(/^backend\/modules\/([a-z0-9-]+)\//)?.[1]).find(Boolean)
+        const target = domain ? `modules/${domain}` : 'modules/legacy'
+        push('test', ['mvn', '-pl', target, '-am', 'compile', '-q'], backendCwd)
       }
     }
   }

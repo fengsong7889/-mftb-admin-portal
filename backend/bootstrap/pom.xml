@@ -28,6 +28,12 @@
             <artifactId>mftb-admin-legacy</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- 域模块：启动入口负责把各域装配进同一个 Spring 上下文 -->
+        <dependency>
+            <groupId>com.mftb</groupId>
+            <artifactId>mftb-admin-rdm</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
     <build>

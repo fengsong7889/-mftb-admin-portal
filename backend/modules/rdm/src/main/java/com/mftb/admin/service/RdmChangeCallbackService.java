@@ -26,7 +26,7 @@ import java.util.Map;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class RdmChangeCallbackService {
+public class RdmChangeCallbackService implements com.mftb.admin.contracts.rdm.RdmChangeCallback {
 
     private final RdmChangeRequestMapper changeMapper;
     private final RdmRequirementMapper requirementMapper;
@@ -34,11 +34,13 @@ public class RdmChangeCallbackService {
     private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     /** 是否需求变更流程 */
+    @Override
     public boolean isChangeProcess(String processCode) {
         return RdmConstants.CHANGE_PROCESS_CODE.equals(processCode);
     }
 
     /** 变更审批通过：计变更次数，影响排期时回填新的计划上线日期 */
+    @Override
     public void onFlowApproved(String flowNo) {
         RdmChangeRequest change = findByFlow(flowNo);
         if (change == null) {
@@ -71,6 +73,7 @@ public class RdmChangeCallbackService {
     }
 
     /** 变更审批驳回：变更单退回，需求保持原状 */
+    @Override
     public void onFlowRejected(String flowNo, String reason) {
         RdmChangeRequest change = findByFlow(flowNo);
         if (change == null) {
