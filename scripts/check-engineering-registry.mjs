@@ -27,6 +27,7 @@ const REGISTRY = path.join(ROOT, 'engineering', 'systems.json')
 const BACKEND_ROOTS = [
   'backend/modules/legacy/src/main/java/com/mftb/admin',
   'backend/modules/rdm/src/main/java/com/mftb/admin',
+  'backend/modules/eam/src/main/java/com/mftb/admin',
 ]
 const REGEN = 'python3 engineering/generate-systems.py'
 

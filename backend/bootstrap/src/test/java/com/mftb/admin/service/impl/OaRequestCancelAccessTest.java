@@ -4,13 +4,13 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.contracts.eam.EamPurchaseOrderPort;
 import com.mftb.admin.controller.OaRequestController;
 import com.mftb.admin.dto.OaApproveDTO;
 import com.mftb.admin.dto.OaRejectDTO;
 import com.mftb.admin.entity.OaApprovalTask;
 import com.mftb.admin.entity.OaRequest;
 import com.mftb.admin.entity.SysUser;
-import com.mftb.admin.mapper.EamPurchaseRequestMapper;
 import com.mftb.admin.mapper.OaApprovalTaskMapper;
 import com.mftb.admin.mapper.OaProcessMapper;
 import com.mftb.admin.mapper.OaRequestMapper;
@@ -21,7 +21,6 @@ import com.mftb.admin.service.AiGrantOnApprovalService;
 import com.mftb.admin.service.ApproverResolverService;
 import com.mftb.admin.service.DataScopeService;
 import com.mftb.admin.service.DingTalkService;
-import com.mftb.admin.service.EamPurchaseService;
 import com.mftb.admin.service.HrCertificateCallbackService;
 import com.mftb.admin.service.HrLeaveCallbackService;
 import com.mftb.admin.service.HrPerfCallbackService;
@@ -96,7 +95,7 @@ class OaRequestCancelAccessTest {
                 oaRequestMapper, taskMapper, mock(OaProcessMapper.class),
                 mock(WorkflowConfigMapper.class), mock(SysUserMapper.class), mock(SysDepartmentMapper.class),
                 operatorResolver, mock(ApproverResolverService.class), mock(BizSeqService.class),
-                mock(EamPurchaseService.class), mock(EamPurchaseRequestMapper.class), mock(DingTalkService.class),
+                mock(EamPurchaseOrderPort.class), mock(DingTalkService.class),
                 mock(DataScopeService.class), mock(AiGrantOnApprovalService.class),
                 mock(HrLifecycleCallbackService.class), mock(HrLeaveCallbackService.class),
                 mock(com.mftb.admin.service.AttendanceCallbackService.class),

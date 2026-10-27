@@ -4,19 +4,15 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.mftb.admin.common.BusinessException;
-import com.mftb.admin.dto.EamHandoverSaveDTO;
-import com.mftb.admin.dto.EamHandoverVO;
-import com.mftb.admin.entity.EamAsset;
+import com.mftb.admin.contracts.eam.EamAssetReclaimPort;
 import com.mftb.admin.entity.HrLifecycleRequest;
 import com.mftb.admin.entity.HrOffboardingTask;
 import com.mftb.admin.entity.OaApprovalTask;
 import com.mftb.admin.entity.SysUser;
-import com.mftb.admin.mapper.EamAssetMapper;
 import com.mftb.admin.mapper.HrLifecycleRequestMapper;
 import com.mftb.admin.mapper.HrOffboardingTaskMapper;
 import com.mftb.admin.mapper.OaApprovalTaskMapper;
 import com.mftb.admin.mapper.SysUserMapper;
-import com.mftb.admin.service.EamHandoverService;
 import com.mftb.admin.service.OrgScopeService;
 import com.mftb.admin.util.OperatorResolver;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -28,6 +24,7 @@ import org.mockito.ArgumentCaptor;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -57,8 +54,7 @@ class HrOffboardingTaskServiceTest {
     private HrOffboardingTaskMapper taskMapper;
     private HrLifecycleRequestMapper lifecycleMapper;
     private SysUserMapper sysUserMapper;
-    private EamAssetMapper assetMapper;
-    private EamHandoverService handoverService;
+    private EamAssetReclaimPort assetReclaimPort;
     private OaApprovalTaskMapper approvalTaskMapper;
     private OrgScopeService orgScopeService;
     private final List<HrOffboardingTask> table = new ArrayList<>();
@@ -72,14 +68,12 @@ class HrOffboardingTaskServiceTest {
     void setUp() {
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "");
         TableInfoHelper.initTableInfo(assistant, HrOffboardingTask.class);
-        TableInfoHelper.initTableInfo(assistant, EamAsset.class);
         TableInfoHelper.initTableInfo(assistant, OaApprovalTask.class);
 
         taskMapper = mock(HrOffboardingTaskMapper.class);
         lifecycleMapper = mock(HrLifecycleRequestMapper.class);
         sysUserMapper = mock(SysUserMapper.class);
-        assetMapper = mock(EamAssetMapper.class);
-        handoverService = mock(EamHandoverService.class);
+        assetReclaimPort = mock(EamAssetReclaimPort.class);
         approvalTaskMapper = mock(OaApprovalTaskMapper.class);
         orgScopeService = mock(OrgScopeService.class);
         OperatorResolver operatorResolver = mock(OperatorResolver.class);
@@ -91,7 +85,7 @@ class HrOffboardingTaskServiceTest {
         });
 
         service = new HrOffboardingTaskServiceImpl(taskMapper, lifecycleMapper, sysUserMapper,
-                assetMapper, handoverService, approvalTaskMapper, operatorResolver, orgScopeService);
+                assetReclaimPort, approvalTaskMapper, operatorResolver, orgScopeService);
 
         // selectList 同样按 wrapper 条件过滤：否则「只拾取 PENDING」这类查询语义在测试里等于没被验证
         when(taskMapper.selectList(any(LambdaQueryWrapper.class))).thenAnswer(inv -> {
@@ -163,32 +157,30 @@ class HrOffboardingTaskServiceTest {
         assertEquals(HrOffboardingTask.STATUS_FAILED, table.get(0).getStatus());
         assertTrue(table.get(0).getLastError().contains("接收人"),
                 "失败原因必须告诉 HR 该做什么: " + table.get(0).getLastError());
-        verify(handoverService, never()).register(any());
+        verify(assetReclaimPort, never()).handoverInUseAssets(any(), any());
     }
 
     @Test
-    @DisplayName("资产交接：只为名下使用中的资产发起交接单，并回写交接单号")
+    @DisplayName("资产交接：HR 侧只发起一次并回写业务单号（资产筛选与交接单细节在 EAM 域内）")
     void assetHandoverRegistersOnce() {
         stored.setHandoverToUserId(RECEIVER_ID);
         service.scheduleForDimission(stored, EFFECTIVE, "HR專員");
-        when(assetMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(asset(1L), asset(2L)));
-        when(handoverService.register(any(EamHandoverSaveDTO.class))).thenReturn(777L);
-        EamHandoverVO created = new EamHandoverVO();
-        created.setHandoverNo("HO202610180001");
-        when(handoverService.detail(777L)).thenReturn(created);
+        when(assetReclaimPort.handoverInUseAssets(any(), any()))
+                .thenReturn(Optional.of(new EamAssetReclaimPort.HandoverResult(2, "HO202610180001")));
 
         boolean terminal = service.execute(table.get(0).getId(), "HR專員");
 
         assertEquals(true, terminal);
         assertEquals(HrOffboardingTask.STATUS_DONE, table.get(0).getStatus());
         assertEquals("HO202610180001", table.get(0).getTargetRef());
-        ArgumentCaptor<EamHandoverSaveDTO> captor = ArgumentCaptor.forClass(EamHandoverSaveDTO.class);
-        verify(handoverService).register(captor.capture());
-        EamHandoverSaveDTO dto = captor.getValue();
-        assertEquals("resign", dto.getReason());
-        assertEquals("employee", dto.getReceiverType());
-        assertEquals("王小美", dto.getToUserName());
-        assertEquals(List.of(1L, 2L), dto.getAssetIds());
+        assertTrue(table.get(0).getResultSummary().contains("2 項"), table.get(0).getResultSummary());
+
+        ArgumentCaptor<EamAssetReclaimPort.ResignationHandoverCommand> captor =
+                ArgumentCaptor.forClass(EamAssetReclaimPort.ResignationHandoverCommand.class);
+        verify(assetReclaimPort).handoverInUseAssets(any(), captor.capture());
+        assertEquals("resign", captor.getValue().reason());
+        assertEquals("employee", captor.getValue().receiverType());
+        assertEquals("王小美", captor.getValue().toUserName());
     }
 
     @Test
@@ -196,12 +188,13 @@ class HrOffboardingTaskServiceTest {
     void noAssetsIsSkippedNotDone() {
         stored.setHandoverToUserId(RECEIVER_ID);
         service.scheduleForDimission(stored, EFFECTIVE, "HR專員");
-        when(assetMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+        when(assetReclaimPort.handoverInUseAssets(any(), any())).thenReturn(Optional.empty());
 
         assertTrue(service.execute(table.get(0).getId(), "HR專員"));
         assertEquals(HrOffboardingTask.STATUS_SKIPPED, table.get(0).getStatus());
         assertTrue(table.get(0).getResultSummary().contains("無在冊"));
-        verify(handoverService, never()).register(any());
+        // 契约方法被调用一次是正常的：是 EAM 侧发现「无在用资产」，HR 才据此记 SKIPPED
+        verify(assetReclaimPort).handoverInUseAssets(any(), any());
     }
 
     @Test
@@ -209,13 +202,14 @@ class HrOffboardingTaskServiceTest {
     void terminalTaskCannotBeReplayed() {
         stored.setHandoverToUserId(RECEIVER_ID);
         service.scheduleForDimission(stored, EFFECTIVE, "HR專員");
-        when(assetMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+        when(assetReclaimPort.handoverInUseAssets(any(), any())).thenReturn(Optional.empty());
         service.execute(table.get(0).getId(), "HR專員");
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> service.execute(table.get(0).getId(), "HR專員"));
         assertTrue(ex.getMessage().contains("重複執行"), ex.getMessage());
-        verify(handoverService, never()).register(any());
+        // 重跑被闸门挡住：契约只被调用一次，不会重复建交接单
+        verify(assetReclaimPort, times(1)).handoverInUseAssets(any(), any());
     }
 
     @Test
@@ -337,12 +331,6 @@ class HrOffboardingTaskServiceTest {
         return user;
     }
 
-    private static EamAsset asset(Long id) {
-        EamAsset asset = new EamAsset();
-        asset.setId(id);
-        asset.setCurrentHolderId(LEAVING_ID);
-        return asset;
-    }
 
     private static OaApprovalTask pendingTask(Long id, String approver) {
         OaApprovalTask task = new OaApprovalTask();

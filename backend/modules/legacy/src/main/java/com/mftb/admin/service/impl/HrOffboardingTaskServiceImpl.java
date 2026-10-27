@@ -3,19 +3,15 @@ package com.mftb.admin.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.BuiltinAccounts;
-import com.mftb.admin.dto.EamHandoverSaveDTO;
-import com.mftb.admin.dto.EamHandoverVO;
-import com.mftb.admin.entity.EamAsset;
+import com.mftb.admin.contracts.eam.EamAssetReclaimPort;
 import com.mftb.admin.entity.HrLifecycleRequest;
 import com.mftb.admin.entity.HrOffboardingTask;
 import com.mftb.admin.entity.OaApprovalTask;
 import com.mftb.admin.entity.SysUser;
-import com.mftb.admin.mapper.EamAssetMapper;
 import com.mftb.admin.mapper.HrLifecycleRequestMapper;
 import com.mftb.admin.mapper.HrOffboardingTaskMapper;
 import com.mftb.admin.mapper.OaApprovalTaskMapper;
 import com.mftb.admin.mapper.SysUserMapper;
-import com.mftb.admin.service.EamHandoverService;
 import com.mftb.admin.service.HrOffboardingTaskService;
 import com.mftb.admin.service.OrgScopeService;
 import com.mftb.admin.util.OperatorResolver;
@@ -30,6 +26,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 离职联动任务实现。
@@ -63,8 +60,7 @@ public class HrOffboardingTaskServiceImpl implements HrOffboardingTaskService {
     private final HrOffboardingTaskMapper taskMapper;
     private final HrLifecycleRequestMapper lifecycleRequestMapper;
     private final SysUserMapper sysUserMapper;
-    private final EamAssetMapper assetMapper;
-    private final EamHandoverService handoverService;
+    private final EamAssetReclaimPort assetReclaimPort;
     private final OaApprovalTaskMapper approvalTaskMapper;
     private final OperatorResolver operatorResolver;
     private final OrgScopeService orgScopeService;
@@ -234,35 +230,26 @@ public class HrOffboardingTaskServiceImpl implements HrOffboardingTaskService {
         if (leaving == null) {
             throw new BusinessException("離職員工不存在，無法核對名下資產");
         }
-        List<EamAsset> assets = assetMapper.selectList(new LambdaQueryWrapper<EamAsset>()
-                .eq(EamAsset::getCurrentHolderId, leaving.getId())
-                .eq(EamAsset::getStatus, ASSET_STATUS_IN_USE));
-        if (assets.isEmpty()) {
+        // 资产查询、状态判定与交接单发起都在 EAM 域内完成（见 EamAssetReclaimAdapter），
+        // HR 侧只拿「几项资产 + 业务单号」，不 import EAM 的实体与 Mapper（方案 P3 域边界）。
+        EamAssetReclaimPort.ResignationHandoverCommand command = new EamAssetReclaimPort.ResignationHandoverCommand(
+                leaving.getName(),
+                leaving.getDepartment(),
+                receiver.getName(),
+                receiver.getDepartment(),
+                "employee",
+                String.valueOf(task.getEffectiveDate() == null ? LocalDate.now() : task.getEffectiveDate()),
+                "resign",
+                operator,
+                "離職單據 " + task.getReqNo() + " 聯動自動發起");
+        Optional<EamAssetReclaimPort.HandoverResult> result =
+                assetReclaimPort.handoverInUseAssets(leaving.getId(), command);
+        if (result.isEmpty()) {
             // SKIPPED 而不是 DONE：让界面能区分「本来就没资产」和「交接已完成」
             return Outcome.skipped("本人名下無在冊使用中的資產");
         }
-        List<Long> assetIds = assets.stream().map(EamAsset::getId).toList();
-
-        EamHandoverSaveDTO dto = new EamHandoverSaveDTO();
-        dto.setFromUserName(leaving.getName());
-        dto.setFromDepartment(leaving.getDepartment());
-        dto.setToUserName(receiver.getName());
-        dto.setToDepartment(receiver.getDepartment());
-        dto.setReceiverType("employee");
-        dto.setHandoverDate(String.valueOf(task.getEffectiveDate() == null ? LocalDate.now() : task.getEffectiveDate()));
-        dto.setAssetIds(assetIds);
-        dto.setReason("resign");
-        dto.setOperatorName(operator);
-        dto.setRemark("離職單據 " + task.getReqNo() + " 聯動自動發起");
-        long handoverId = handoverService.register(dto);
-
-        // 回读交接单号：targetRef 存业务单号而不是内部 id，人事侧的人看得懂
-        String handoverNo = String.valueOf(handoverId);
-        EamHandoverVO detail = handoverService.detail(handoverId);
-        if (detail != null && StringUtils.hasText(detail.getHandoverNo())) {
-            handoverNo = detail.getHandoverNo();
-        }
-        return Outcome.done("已發起資產交接：" + assetIds.size() + " 項 → " + receiver.getName(), handoverNo);
+        return Outcome.done("已發起資產交接：" + result.get().assetCount() + " 項 → " + receiver.getName(),
+                result.get().handoverNo());
     }
 
     /**

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.mftb</groupId>
+        <artifactId>mftb-admin-parent</artifactId>
+        <version>1.0.0</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mftb-admin-contracts-eam</artifactId>
+    <packaging>jar</packaging>
+    <name>mftb-admin-contracts-eam</name>
+    <description>
+        资产域（EAM）的跨域契约：只放接口与最小 command/record，不含 Entity / Mapper。
+        当前两条真反向边：HR 离职资产交接、OA 采购审批回调。
+        叶子包：不得依赖任何业务模块。
+    </description>
+</project>

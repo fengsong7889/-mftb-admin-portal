@@ -34,6 +34,12 @@
             <artifactId>mftb-admin-contracts-rdm</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- 资产域契约：HR 离职资产交接、OA 采购审批回调 -->
+        <dependency>
+            <groupId>com.mftb</groupId>
+            <artifactId>mftb-admin-contracts-eam</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- 共享平台层：主数据实体/Mapper、通用工具、平台能力服务 -->
         <dependency>
             <groupId>com.mftb</groupId>

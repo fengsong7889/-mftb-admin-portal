@@ -12,11 +12,9 @@ import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.OaApprovalTask;
 import com.mftb.admin.entity.OaProcess;
 import com.mftb.admin.entity.OaRequest;
-import com.mftb.admin.entity.EamPurchaseRequest;
 import com.mftb.admin.entity.SysDepartment;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.entity.WorkflowConfig;
-import com.mftb.admin.mapper.EamPurchaseRequestMapper;
 import com.mftb.admin.mapper.OaApprovalTaskMapper;
 import com.mftb.admin.mapper.OaProcessMapper;
 import com.mftb.admin.mapper.OaRequestMapper;
@@ -27,7 +25,7 @@ import com.mftb.admin.service.ApproverResolverService;
 import com.mftb.admin.service.AiGrantOnApprovalService;
 import com.mftb.admin.service.DataScopeService;
 import com.mftb.admin.service.DingTalkService;
-import com.mftb.admin.service.EamPurchaseService;
+import com.mftb.admin.contracts.eam.EamPurchaseOrderPort;
 import com.mftb.admin.service.HrCertificateCallbackService;
 import com.mftb.admin.service.HrLeaveCallbackService;
 import com.mftb.admin.service.HrPerfCallbackService;
@@ -78,8 +76,7 @@ public class OaRequestServiceImpl implements OaRequestService {
     private final OperatorResolver operatorResolver;
     private final ApproverResolverService approverResolverService;
     private final BizSeqService bizSeqService;
-    private final EamPurchaseService eamPurchaseService;
-    private final EamPurchaseRequestMapper eamPurchaseRequestMapper;
+    private final EamPurchaseOrderPort eamPurchaseOrderPort;
     private final DingTalkService dingTalkService;
     private final DataScopeService dataScopeService;
     /** V0 §B.4：AI 使用申请审批通过后自动发放模型/额度，幂等由 ai_grant_log 保证。 */
@@ -1237,20 +1234,7 @@ public class OaRequestServiceImpl implements OaRequestService {
             return;
         }
 
-        // 创建采购申请记录（flowNo 即 CG 编号，直接作为 reqNo）
-        EamPurchaseRequest pr = new EamPurchaseRequest();
-        pr.setFlowNo(oaRequest.getFlowNo());
-        pr.setReqNo(oaRequest.getFlowNo());
-        pr.setTitle(oaRequest.getTitle());
-        pr.setDepartment(ConvertUtils.str(formData, "department"));
-        pr.setDepartmentId(ConvertUtils.toLong(formData.get("departmentId"), null));
-        pr.setApplicant(ConvertUtils.str(formData, "applicant"));
-        pr.setApplicantEmpId(ConvertUtils.str(formData, "applicantEmpId"));
-        pr.setReason(ConvertUtils.str(formData, "reason"));
-        pr.setBrand(ConvertUtils.toInt(formData.get("brand"), null));
-        pr.setStatus("approved");
-
-        // 计算预算（items 合计）
+        // 预算按审批表单 items 合计（口径不变）；实体构造、插入与建单都在 EAM 域内完成
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> items = (List<Map<String, Object>>) formData.get("items");
         java.math.BigDecimal budget = java.math.BigDecimal.ZERO;
@@ -1262,11 +1246,20 @@ public class OaRequestServiceImpl implements OaRequestService {
                 budget = budget.add(price.multiply(java.math.BigDecimal.valueOf(qty)));
             }
         }
-        pr.setBudget(budget);
-        eamPurchaseRequestMapper.insert(pr);
-
-        // 自动创建采购订单（传入 formData items 以便复制到订单明细）
-        long orderId = eamPurchaseService.createOrderFromRequest(pr.getId(), items);
+        long orderId = eamPurchaseOrderPort.createFromApprovedPurchase(
+                new EamPurchaseOrderPort.ApprovedPurchaseCommand(
+                        oaRequest.getFlowNo(),
+                        // flowNo 即 CG 编号，直接作为 reqNo
+                        oaRequest.getFlowNo(),
+                        oaRequest.getTitle(),
+                        ConvertUtils.str(formData, "department"),
+                        ConvertUtils.toLong(formData.get("departmentId"), null),
+                        ConvertUtils.str(formData, "applicant"),
+                        ConvertUtils.str(formData, "applicantEmpId"),
+                        ConvertUtils.str(formData, "reason"),
+                        ConvertUtils.toInt(formData.get("brand"), null),
+                        budget,
+                        items));
         log.info("採購申請審批回調完成: flowNo={}, orderId={}",
                 oaRequest.getFlowNo(), orderId);
     }

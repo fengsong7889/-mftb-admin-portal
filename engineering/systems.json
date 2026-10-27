@@ -295,7 +295,7 @@
    "priority": true,
    "isolation": {
     "frontend": "isolated",
-    "backend": "pending"
+    "backend": "isolated"
    },
    "planned": {
     "frontendApp": "frontend/apps/eam",
@@ -329,13 +329,13 @@
     }
    },
    "backendPrefixes": {
-    "Eam": 268,
+    "Eam": 270,
     "Vehicle": 36,
     "Consumable": 10
    },
    "testCounts": {
     "frontend": 7,
-    "backend": 19
+    "backend": 20
    }
   },
   "finance": {
@@ -466,8 +466,8 @@
    "backendPrefixes": {
     "Hr": 130,
     "Hcm": 24,
-    "Emp": 16,
     "Org": 16,
+    "Emp": 15,
     "Employee": 15,
     "Position": 9,
     "Emergency": 4,
@@ -665,7 +665,7 @@
     }
    },
    "backendPrefixes": {
-    "Oa": 14,
+    "Oa": 13,
     "Workflow": 8,
     "Approver": 2
    },
@@ -770,7 +770,7 @@
     }
    },
    "backendPrefixes": {
-    "Sys": 57,
+    "Sys": 50,
     "System": 20,
     "Notification": 9,
     "Translation": 7,
@@ -1017,7 +1017,6 @@
   ],
   "backendPrefixes": {
    "Login": 6,
-   "Department": 5,
    "Auth": 3,
    "Query": 3,
    "Profile": 2,
@@ -1029,6 +1028,7 @@
    "Scope": 2,
    "Prom": 2,
    "Person": 2,
+   "Department": 2,
    "Captcha": 2,
    "Segmentation": 2,
    "Change": 1,
@@ -1046,15 +1046,12 @@
    "Merge": 1,
    "Status": 1,
    "Deduct": 1,
-   "Inventory": 1,
    "Reset": 1,
    "Language": 1,
    "Translate": 1,
    "Audit": 1,
    "Public": 1,
-   "Convert": 1,
    "Sort": 1,
-   "Sign": 1,
    "Hot": 1,
    "Minutes": 1,
    "Request": 1,
@@ -1081,7 +1078,9 @@
    "Add": 1,
    "Remove": 1,
    "Idempotent": 1,
-   "Evidence": 1
+   "Evidence": 1,
+   "Inventory": 1,
+   "Sign": 1
   }
  }
 }

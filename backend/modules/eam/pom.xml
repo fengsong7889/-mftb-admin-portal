@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.mftb</groupId>
+        <artifactId>mftb-admin-parent</artifactId>
+        <version>1.0.0</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mftb-admin-eam</artifactId>
+    <packaging>jar</packaging>
+    <name>mftb-admin-eam</name>
+    <description>
+        资产域（EAM）模块（方案 P3 第 3 步第二个域切片）：316 个类
+        （Eam* 268 + Vehicle* 36 + Consumable* 10 + InventoryScope + SignTokenUtil）。
+        包名保持 com.mftb.admin.* 不变，Spring 组件扫描与 MyBatis Mapper 扫描行为不变。
+        依赖方向：eam -> shared -> platform-core；跨域对外只通过 contracts/eam 暴露
+        （HR 离职资产交接、OA 采购审批回调两条反向边已契约化）。
+        独立编译：mvn -pl modules/eam -am compile，reactor 不含 legacy。
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.mftb</groupId>
+            <artifactId>mftb-admin-platform-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.mftb</groupId>
+            <artifactId>mftb-admin-contracts-eam</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.mftb</groupId>
+            <artifactId>mftb-admin-shared</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>mftb-admin-eam</finalName>
+    </build>
+</project>

@@ -25,6 +25,7 @@
         · modules/legacy — 尚未按域拆出的全部业务代码（包名不变），独立编译为普通 JAR
         · modules/shared — 共享平台层（主数据/工具/平台能力），legacy 与各域模块共同依赖它
         · modules/rdm — 产研交付域（首个域模块，只依赖 platform-core / contracts / shared）
+        · modules/eam — 资产域（只依赖 platform-core / contracts / shared）
         · bootstrap      — 唯一启动入口 + 配置 + 全部集成测试，产出可运行 JAR
       本期部署单元仍是一个 JAR / 一个 Deployment（方案 §一），拆模块不等于拆服务。
       后续 P3 切片会把 RDM/EAM/HR 从 legacy 挪到 modules/<domain>，
@@ -33,9 +34,11 @@
     <modules>
         <module>libraries/platform-core</module>
         <module>contracts/rdm</module>
+        <module>contracts/eam</module>
         <module>modules/shared</module>
         <module>modules/legacy</module>
         <module>modules/rdm</module>
+        <module>modules/eam</module>
         <module>bootstrap</module>
     </modules>
 

@@ -140,6 +140,7 @@ def key_to_path():
 BACKEND_DOMAIN_ROOTS = [
     'backend/modules/legacy/src/main/java/com/mftb/admin',
     'backend/modules/rdm/src/main/java/com/mftb/admin',
+    'backend/modules/eam/src/main/java/com/mftb/admin',
 ]
 
 

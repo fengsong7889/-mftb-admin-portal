@@ -9,7 +9,7 @@
 
 const JAVA_PKG = 'backend/modules/legacy/src/main/java/com/mftb/admin/'
 /** 已拆出的域模块：目录名即系统编码，归属不依赖类名前缀（方案 P3） */
-const DOMAIN_MODULES = [['backend/modules/rdm/', 'rdm']]
+const DOMAIN_MODULES = [['backend/modules/rdm/', 'rdm'], ['backend/modules/eam/', 'eam']]
 
 /** 后端类名前缀：与 engineering 生成器同口径（文件名首个大写字母段） */
 function javaPrefixOf(file) {

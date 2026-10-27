@@ -107,13 +107,23 @@ const SEEDED_ELSEWHERE = new Set(['consumable-ops', 'consumable-dashboard', 'con
   'consumable-claim', 'consumable-stock', 'consumable-stock-txn', 'consumable-alert'])
 
 // 域初始化器不经过 menus.put；直接解析 ensureMenu，避免新增菜单落在主种子门禁盲区。
-const initializerDir = 'backend/modules/legacy/src/main/java/com/mftb/admin/config'
-const domainSeedMenus = readdirSync(join(ROOT, initializerDir))
+// 多模块（方案 P3）：域模块各自持有初始化器（如耗材/资产菜单随 modules/eam），
+// 只扫 legacy 会把「域模块里新增的菜单」判成未登记，门禁会误报失败。
+const initializerDirs = [
+  'backend/modules/legacy/src/main/java/com/mftb/admin/config',
+  'backend/modules/rdm/src/main/java/com/mftb/admin/config',
+  'backend/modules/eam/src/main/java/com/mftb/admin/config',
+].filter((dir) => existsSync(join(ROOT, dir)))
+const initializerFiles = initializerDirs.flatMap((dir) =>
+  readdirSync(join(ROOT, dir)).map((file) => `${dir}/${file}`),
+)
+const domainSeedMenus = initializerFiles
   .filter((file) => file.endsWith('Initializer.java'))
-  .flatMap((file) => [...read(`${initializerDir}/${file}`).matchAll(
+  .flatMap((file) => [...read(file).matchAll(
     /\bensureMenu\(\s*\w+,\s*"([^"]+)",\s*"([^"]+)",\s*"(\/[^"\s]*)",\s*"([^"]+)",\s*"([^"]+)"/g,
   )].map((m) => ({ key: m[1], name: m[2], path: m[3], icon: m[5], file })))
-if (!domainSeedMenus.some((menu) => menu.file === 'ConsumableSchemaInitializer.java')) {
+// 注意：file 现在是「目录/文件名」完整相对路径（多模块后可能来自 legacy 或域模块）
+if (!domainSeedMenus.some((menu) => menu.file.endsWith('/ConsumableSchemaInitializer.java'))) {
   fail('未能解析耗材初始化器的 ensureMenu 种子，不能跳过域菜单检查')
 }
 
@@ -124,9 +134,9 @@ if (!domainSeedMenus.some((menu) => menu.file === 'ConsumableSchemaInitializer.j
  * 点击直接报「該功能模塊開發中」而 CI 全绿。此处把它们纳入校验 5/6 的叶子菜单集合。
  * <p>只补「路由映射 + 功能操作集」两项盲区；图标/离线阻断等更严的校验仍由校验 8 的 ensureMenu 路径负责。
  */
-const arraySeedMenus = readdirSync(join(ROOT, initializerDir))
+const arraySeedMenus = initializerFiles
   .filter((file) => file.endsWith('Initializer.java'))
-  .flatMap((file) => [...read(`${initializerDir}/${file}`).matchAll(
+  .flatMap((file) => [...read(file).matchAll(
     /^\s*\{"([^"]+)",\s*"([^"]+)",\s*(?:"[^"]*"|null),\s*"(\/[^"\s]*)"/gm,
   )].map((m) => ({ key: m[1], name: m[2], path: m[3], file })))
 /**
@@ -136,12 +146,12 @@ const arraySeedMenus = readdirSync(join(ROOT, initializerDir))
  * 新增子页漏配 keyToPath/权限/图标时 CI 全绿，但点击报“开发中”或授权中心少动作集。
  * <p>此处按 ensureMenu 同档检查（导航/页面/后端连接/权限路由/受控/图标/操作集）。
  */
-const menuDefMenus = readdirSync(join(ROOT, initializerDir))
+const menuDefMenus = initializerFiles
   .filter((file) => file.endsWith('.java'))
-  .flatMap((file) => [...read(`${initializerDir}/${file}`).matchAll(
+  .flatMap((file) => [...read(file).matchAll(
     /new MenuDef\(\s*"([^"]+)",\s*"[^"]*",\s*"[^"]*",\s*"(\/[^"\s]*)",\s*"[^"]*",\s*"([^"]+)"/g,
   )].map((m) => ({ key: m[1], path: m[2], icon: m[3], file })))
-if (!menuDefMenus.some((menu) => menu.file === 'AiAssistantConfigMenuInitializer.java')) {
+if (!menuDefMenus.some((menu) => menu.file.endsWith('/AiAssistantConfigMenuInitializer.java'))) {
   fail('未能解析 AI 助手配置中心的 MenuDef 种子，不能跳过该域菜单检查')
 }
 const backendKeysBlock = menuDataSource.match(/export const BACKEND_CONNECTED_KEYS[^=]*= new Set\(\[([\s\S]*?)\]\)/)
