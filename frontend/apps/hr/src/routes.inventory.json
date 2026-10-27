@@ -1,0 +1,411 @@
+{
+  "$comment": [
+    "由 scripts/gen-app-route-inventory.mjs 从 src/App.tsx 生成（方案 §4.1），请勿手改。",
+    "这是「该应用拥有哪些路由」的清单，用于后续把路由从门户壳搬到应用内时做对照。",
+    "shareWrapped=true 表示该路由被 Suspense 包裹（公开分享页），拆分时需单独处理。"
+  ],
+  "app": "hr",
+  "routeCount": 80,
+  "routes": [
+    {
+      "path": "/contract-ledger",
+      "module": "pages/ContractLedger",
+      "shareWrapped": false
+    },
+    {
+      "path": "/ess-certificate",
+      "module": "pages/Ess/CertificateList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/ess-certificate-detail",
+      "module": "pages/Ess/CertificateDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/ess-certificate-form",
+      "module": "pages/Ess/CertificateForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/ess-leave",
+      "module": "pages/Ess/MyLeave",
+      "shareWrapped": false
+    },
+    {
+      "path": "/ess-leave-detail",
+      "module": "pages/Ess/EssLeaveDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/ess-leave-form",
+      "module": "pages/Ess/EssLeaveForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/ess-performance",
+      "module": "pages/Ess/MyPerformance",
+      "shareWrapped": false
+    },
+    {
+      "path": "/ess-profile",
+      "module": "pages/Ess/MyProfile",
+      "shareWrapped": false
+    },
+    {
+      "path": "/ess-requests",
+      "module": "pages/Ess/MyRequests",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-org-job-family",
+      "module": "pages/Hcm/Organization/JobFamilyList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-org-job-family-detail",
+      "module": "pages/Hcm/Organization/JobFamilyForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-org-job-family-form",
+      "module": "pages/Hcm/Organization/JobFamilyForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-org-job-grade",
+      "module": "pages/Hcm/Organization/JobGradeList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-org-job-grade-detail",
+      "module": "pages/Hcm/Organization/JobGradeForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-org-job-grade-form",
+      "module": "pages/Hcm/Organization/JobGradeForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-org-legal",
+      "module": "pages/Hcm/Organization/LegalEntityList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-org-legal-detail",
+      "module": "pages/Hcm/Organization/LegalEntityForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-org-legal-form",
+      "module": "pages/Hcm/Organization/LegalEntityForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-org-position",
+      "module": "pages/Hcm/Organization/PositionList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-org-position-detail",
+      "module": "pages/Hcm/Organization/PositionForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-org-position-form",
+      "module": "pages/Hcm/Organization/PositionForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-org-unit",
+      "module": "pages/Hcm/Organization/UnitList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-org-unit-detail",
+      "module": "pages/Hcm/Organization/UnitForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-org-unit-form",
+      "module": "pages/Hcm/Organization/UnitForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-payroll-benefit",
+      "module": "pages/Hcm/Payroll/BenefitList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-payroll-benefit-plan-form",
+      "module": "pages/Hcm/Payroll/BenefitPlanForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-payroll-component",
+      "module": "pages/Hcm/Payroll/ComponentList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-payroll-component-form",
+      "module": "pages/Hcm/Payroll/ComponentForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-payroll-enrollment-form",
+      "module": "pages/Hcm/Payroll/EnrollmentForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-payroll-rule",
+      "module": "pages/Hcm/Payroll/RuleSetList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-payroll-rule-form",
+      "module": "pages/Hcm/Payroll/RuleSetForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-payroll-run",
+      "module": "pages/Hcm/Payroll/RunList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-payroll-run-detail",
+      "module": "pages/Hcm/Payroll/RunDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-payroll-standard",
+      "module": "pages/Hcm/Payroll/StandardList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-payroll-standard-form",
+      "module": "pages/Hcm/Payroll/StandardForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-person",
+      "module": "pages/Hcm/Person/PersonList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-person-assignment-form",
+      "module": "pages/Hcm/Person/AssignmentForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-person-detail",
+      "module": "pages/Hcm/Person/PersonForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-person-employment-form",
+      "module": "pages/Hcm/Person/EmploymentForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-person-form",
+      "module": "pages/Hcm/Person/PersonForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hcm-person-profile-form",
+      "module": "pages/Hcm/Person/ProfileItemForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-certificate",
+      "module": "pages/HrCertificate/LedgerList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-certificate-detail",
+      "module": "pages/Ess/CertificateDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-certificate-issue",
+      "module": "pages/HrCertificate/IssueForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-contract-renew-detail",
+      "module": "pages/HrLifecycle/LifecycleDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-contract-renew-form",
+      "module": "pages/HrLifecycle/LifecycleForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-dict",
+      "module": "pages/HrDict",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-dict-edit",
+      "module": "pages/HrDict/HrDictForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-dimission",
+      "module": "pages/HrLifecycle",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-dimission-detail",
+      "module": "pages/HrLifecycle/LifecycleDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-dimission-form",
+      "module": "pages/HrLifecycle/LifecycleForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-flow-detail",
+      "module": "pages/HrLifecycle/HrFlowDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-leave",
+      "module": "pages/HrLeave/LeaveList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-leave-detail",
+      "module": "pages/HrLeave/LeaveDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-leave-form",
+      "module": "pages/HrLeave/LeaveForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-leave-quota",
+      "module": "pages/HrLeave/LeaveQuotaList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-leave-quota-form",
+      "module": "pages/HrLeave/LeaveQuotaForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-onboarding",
+      "module": "pages/HrLifecycle",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-onboarding-detail",
+      "module": "pages/HrLifecycle/LifecycleDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-onboarding-form",
+      "module": "pages/HrLifecycle/LifecycleForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-perf-appeal",
+      "module": "pages/PerfReport/Appeals",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-perf-audit",
+      "module": "pages/PerfReport/AuditTrail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-perf-calibration",
+      "module": "pages/Performance/Calibration",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-perf-cycle",
+      "module": "pages/Performance/CycleList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-perf-ledger",
+      "module": "pages/PerfReport/Ledger",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-perf-plan",
+      "module": "pages/Performance/PlanList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-perf-plan-detail",
+      "module": "pages/Performance/PlanDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-perf-plan-form",
+      "module": "pages/Performance/PlanForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-perf-review",
+      "module": "pages/Performance/Workbench",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-perf-template",
+      "module": "pages/Performance/TemplateList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-regularization",
+      "module": "pages/HrLifecycle",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-regularization-detail",
+      "module": "pages/HrLifecycle/LifecycleDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-regularization-form",
+      "module": "pages/HrLifecycle/LifecycleForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-rehire",
+      "module": "pages/HrLifecycle",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-rehire-detail",
+      "module": "pages/HrLifecycle/LifecycleDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-rehire-form",
+      "module": "pages/HrLifecycle/LifecycleForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-transfer",
+      "module": "pages/HrLifecycle",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-transfer-detail",
+      "module": "pages/HrLifecycle/LifecycleDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/hr-transfer-form",
+      "module": "pages/HrLifecycle/LifecycleForm",
+      "shareWrapped": false
+    }
+  ]
+}

@@ -1,0 +1,416 @@
+{
+  "$comment": [
+    "由 scripts/gen-app-route-inventory.mjs 从 src/App.tsx 生成（方案 §4.1），请勿手改。",
+    "这是「该应用拥有哪些路由」的清单，用于后续把路由从门户壳搬到应用内时做对照。",
+    "shareWrapped=true 表示该路由被 Suspense 包裹（公开分享页），拆分时需单独处理。"
+  ],
+  "app": "eam",
+  "routeCount": 81,
+  "routes": [
+    {
+      "path": "/asset-add",
+      "module": "pages/AssetManagement/AssetAdd",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-borrow",
+      "module": "pages/AssetManagement/AssetBorrow",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-borrow/add",
+      "module": "pages/AssetManagement/AssetBorrow",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-borrow/detail",
+      "module": "pages/AssetManagement/AssetBorrow",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-borrow/renew",
+      "module": "pages/AssetManagement/AssetBorrow",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-category",
+      "module": "pages/AssetManagement/AssetCategory",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-claim",
+      "module": "pages/AssetManagement/AssetClaim",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-claim-sign",
+      "module": "pages/AssetClaimSign",
+      "shareWrapped": true
+    },
+    {
+      "path": "/asset-claim/add",
+      "module": "pages/AssetManagement/AssetClaim",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-claim/detail",
+      "module": "pages/AssetManagement/AssetClaim",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-claim/record",
+      "module": "pages/AssetManagement/AssetClaim",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-compensation",
+      "module": "pages/AssetManagement/AssetCompensation",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-compensation/add",
+      "module": "pages/AssetManagement/AssetCompensation",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-compensation/detail",
+      "module": "pages/AssetManagement/AssetCompensation",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-compensation/liability",
+      "module": "pages/AssetManagement/AssetCompensation",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-compensation/payment",
+      "module": "pages/AssetManagement/AssetCompensation",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-compensation/refund",
+      "module": "pages/AssetManagement/AssetCompensation",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-compensation/review",
+      "module": "pages/AssetManagement/AssetCompensation",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-compensation/waive",
+      "module": "pages/AssetManagement/AssetCompensation",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-dashboard",
+      "module": "pages/AssetManagement/AssetDashboard",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-detail",
+      "module": "pages/AssetManagement/AssetDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-flow",
+      "module": "pages/AssetManagement/AssetFlow",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-handover",
+      "module": "pages/AssetManagement/AssetHandover",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-handover/add",
+      "module": "pages/AssetManagement/AssetHandover",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-handover/detail",
+      "module": "pages/AssetManagement/AssetHandover",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-inbound",
+      "module": "pages/AssetManagement/AssetInbound",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-inventory",
+      "module": "pages/AssetManagement/AssetInventory",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-list",
+      "module": "pages/AssetManagement/AssetList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-location",
+      "module": "pages/AssetManagement/AssetLocation",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-loss",
+      "module": "pages/AssetManagement/AssetLoss",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-model",
+      "module": "pages/AssetManagement/AssetModel",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-repair",
+      "module": "pages/AssetManagement/AssetRepair",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-return",
+      "module": "pages/AssetManagement/AssetReturn",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-return/add",
+      "module": "pages/AssetManagement/AssetReturn",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-return/detail",
+      "module": "pages/AssetManagement/AssetReturn",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-return/dispose",
+      "module": "pages/AssetManagement/AssetReturn",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-return/recover",
+      "module": "pages/AssetManagement/AssetReturn",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-scrap",
+      "module": "pages/AssetManagement/AssetScrap",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-supplier",
+      "module": "pages/AssetManagement/AssetSupplier",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-tag",
+      "module": "pages/AssetManagement/AssetTag",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-tag-print",
+      "module": "pages/AssetManagement/AssetTagPrint",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-transfer",
+      "module": "pages/AssetManagement/AssetTransfer",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-transfer-list",
+      "module": "pages/AssetManagement/AssetTransferList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-transfer/cancel",
+      "module": "pages/AssetManagement/AssetTransfer/TransferCancel",
+      "shareWrapped": false
+    },
+    {
+      "path": "/asset-transfer/detail",
+      "module": "pages/AssetManagement/AssetTransfer/TransferDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/consumable-alert",
+      "module": "pages/Consumable/Alert",
+      "shareWrapped": false
+    },
+    {
+      "path": "/consumable-claim",
+      "module": "pages/Consumable/Claim",
+      "shareWrapped": false
+    },
+    {
+      "path": "/consumable-dashboard",
+      "module": "pages/Consumable/Dashboard",
+      "shareWrapped": false
+    },
+    {
+      "path": "/consumable-inbound",
+      "module": "pages/Consumable/Inbound",
+      "shareWrapped": false
+    },
+    {
+      "path": "/consumable-item",
+      "module": "pages/Consumable/Item",
+      "shareWrapped": false
+    },
+    {
+      "path": "/consumable-report",
+      "module": "pages/Consumable/Report",
+      "shareWrapped": false
+    },
+    {
+      "path": "/consumable-stock",
+      "module": "pages/Consumable/Stock",
+      "shareWrapped": false
+    },
+    {
+      "path": "/consumable-stock-txn",
+      "module": "pages/Consumable/Stock/StockTxnList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/consumable-stock/txn",
+      "module": "pages/Consumable/Stock/StockTxnDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/m/asset-tag-view",
+      "module": "pages/AssetTagView",
+      "shareWrapped": true
+    },
+    {
+      "path": "/my-assets",
+      "module": "pages/MyAssets",
+      "shareWrapped": false
+    },
+    {
+      "path": "/my-claims",
+      "module": "pages/AssetManagement/AssetClaim/MyClaims",
+      "shareWrapped": false
+    },
+    {
+      "path": "/my-vehicle-use",
+      "module": "pages/VehicleManagement/MyVehicleUse",
+      "shareWrapped": false
+    },
+    {
+      "path": "/my-vehicle-use/apply",
+      "module": "pages/VehicleManagement/MyVehicleUse",
+      "shareWrapped": false
+    },
+    {
+      "path": "/my-vehicle-use/detail",
+      "module": "pages/VehicleManagement/MyVehicleUse",
+      "shareWrapped": false
+    },
+    {
+      "path": "/param-library",
+      "module": "pages/AssetManagement/ParamLibrary",
+      "shareWrapped": false
+    },
+    {
+      "path": "/purchase-order",
+      "module": "pages/AssetManagement/PurchaseOrder",
+      "shareWrapped": false
+    },
+    {
+      "path": "/vehicle-dispatch",
+      "module": "pages/VehicleManagement/VehicleDispatch",
+      "shareWrapped": false
+    },
+    {
+      "path": "/vehicle-dispatch/assign",
+      "module": "pages/VehicleManagement/VehicleDispatch",
+      "shareWrapped": false
+    },
+    {
+      "path": "/vehicle-dispatch/confirm",
+      "module": "pages/VehicleManagement/VehicleDispatch",
+      "shareWrapped": false
+    },
+    {
+      "path": "/vehicle-dispatch/depart",
+      "module": "pages/VehicleManagement/VehicleDispatch",
+      "shareWrapped": false
+    },
+    {
+      "path": "/vehicle-dispatch/detail",
+      "module": "pages/VehicleManagement/VehicleDispatch",
+      "shareWrapped": false
+    },
+    {
+      "path": "/vehicle-dispatch/direct",
+      "module": "pages/VehicleManagement/VehicleDispatch",
+      "shareWrapped": false
+    },
+    {
+      "path": "/vehicle-dispatch/return",
+      "module": "pages/VehicleManagement/VehicleDispatch",
+      "shareWrapped": false
+    },
+    {
+      "path": "/vehicle-files",
+      "module": "pages/VehicleManagement/VehicleFiles",
+      "shareWrapped": false
+    },
+    {
+      "path": "/vehicle-files/add",
+      "module": "pages/VehicleManagement/VehicleFiles",
+      "shareWrapped": false
+    },
+    {
+      "path": "/vehicle-files/detail",
+      "module": "pages/VehicleManagement/VehicleFiles",
+      "shareWrapped": false
+    },
+    {
+      "path": "/vehicle-files/edit",
+      "module": "pages/VehicleManagement/VehicleFiles",
+      "shareWrapped": false
+    },
+    {
+      "path": "/vehicle-files/qualification",
+      "module": "pages/VehicleManagement/VehicleFiles",
+      "shareWrapped": false
+    },
+    {
+      "path": "/vehicle-ledger",
+      "module": "pages/VehicleManagement/VehicleLedger",
+      "shareWrapped": false
+    },
+    {
+      "path": "/vehicle-ledger/backfill",
+      "module": "pages/VehicleManagement/VehicleLedger",
+      "shareWrapped": false
+    },
+    {
+      "path": "/vehicle-ledger/correct",
+      "module": "pages/VehicleManagement/VehicleLedger",
+      "shareWrapped": false
+    },
+    {
+      "path": "/vehicle-ledger/detail",
+      "module": "pages/VehicleManagement/VehicleLedger",
+      "shareWrapped": false
+    },
+    {
+      "path": "/vehicle-master-data",
+      "module": "pages/VehicleManagement/VehicleMasterData",
+      "shareWrapped": false
+    },
+    {
+      "path": "/vehicle-master-data/add",
+      "module": "pages/VehicleManagement/VehicleMasterData",
+      "shareWrapped": false
+    },
+    {
+      "path": "/vehicle-master-data/edit",
+      "module": "pages/VehicleManagement/VehicleMasterData",
+      "shareWrapped": false
+    }
+  ]
+}

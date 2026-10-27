@@ -1,0 +1,291 @@
+{
+  "$comment": [
+    "由 scripts/gen-app-route-inventory.mjs 从 src/App.tsx 生成（方案 §4.1），请勿手改。",
+    "这是「该应用拥有哪些路由」的清单，用于后续把路由从门户壳搬到应用内时做对照。",
+    "shareWrapped=true 表示该路由被 Suspense 包裹（公开分享页），拆分时需单独处理。"
+  ],
+  "app": "rdm",
+  "routeCount": 56,
+  "routes": [
+    {
+      "path": "/page-prd-view",
+      "module": "pages/PagePRDView",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-acceptance",
+      "module": "pages/Rdm/AcceptanceList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-acceptance-form",
+      "module": "pages/Rdm/AcceptanceForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-assign",
+      "module": "pages/Rdm/AssignPm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-change",
+      "module": "pages/Rdm/ChangeForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-config-routing",
+      "module": "pages/Rdm/Config/RoutingConfig",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-config-routing-form",
+      "module": "pages/Rdm/Config/RoutingConfigForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-config-sla",
+      "module": "pages/Rdm/Config/SlaConfig",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-config-status",
+      "module": "pages/Rdm/Config/StatusConfig",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-daily",
+      "module": "pages/Rdm/DailyReport",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-daily-report-records",
+      "module": "pages/Rdm/DailyReport/Records",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-daily-report-rule-form",
+      "module": "pages/Rdm/DailyReport/RuleForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-daily-report-rules",
+      "module": "pages/Rdm/DailyReport/Rules",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-daily-report-template-builtin",
+      "module": "pages/Rdm/DailyReport/BuiltinTemplateDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-daily-report-template-form",
+      "module": "pages/Rdm/DailyReport/TemplateForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-daily-report-templates",
+      "module": "pages/Rdm/DailyReport/Templates",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-daily-report-trigger",
+      "module": "pages/Rdm/DailyReport/Trigger",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-daily-view",
+      "module": "pages/RdmDailyReportView",
+      "shareWrapped": true
+    },
+    {
+      "path": "/rdm-dashboard",
+      "module": "pages/Rdm/Dashboard",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-delivery",
+      "module": "pages/Rdm/DeliveryBoard",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-delivery-item",
+      "module": "pages/Rdm/DeliveryItemForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-detail",
+      "module": "pages/Rdm/RequirementDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-gantt",
+      "module": "pages/Rdm/RequirementGantt",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-grayscale",
+      "module": "pages/Rdm/GrayscaleConfig",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-intake",
+      "module": "pages/Rdm/RequirementPool",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-intake-approval",
+      "module": "pages/Rdm/RequirementIntake",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-issue",
+      "module": "pages/Rdm/IssueDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-iteration",
+      "module": "pages/Rdm/IterationPlan",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-iteration-form",
+      "module": "pages/Rdm/IterationForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-metric-trend",
+      "module": "pages/Rdm/MetricTrend",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-milestone",
+      "module": "pages/Rdm/MilestonePlan",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-output",
+      "module": "pages/Rdm/TeamOutput",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-project",
+      "module": "pages/Rdm/ProjectOverview",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-project-detail",
+      "module": "pages/Rdm/ProjectDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-quality",
+      "module": "pages/Rdm/QualityBoard",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-release",
+      "module": "pages/Rdm/ReleaseCenter",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-release-create",
+      "module": "pages/Rdm/ReleaseBatchCreate",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-release-detail",
+      "module": "pages/Rdm/ReleaseBatchDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-requirement",
+      "module": "pages/Rdm/RequirementList",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-resource-load",
+      "module": "pages/Rdm/ResourceLoad",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-review",
+      "module": "pages/Rdm/ReviewForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-risk",
+      "module": "pages/Rdm/RiskCenter",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-score",
+      "module": "pages/Rdm/ScoreBoard",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-score-budget-form",
+      "module": "pages/Rdm/ScoreBudgetForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-score-rule",
+      "module": "pages/Rdm/Config/ScoreRuleConfig",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-stock-migration",
+      "module": "pages/Rdm/StockMigration",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-submit",
+      "module": "pages/Rdm/RequirementSubmit",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-task",
+      "module": "pages/Rdm/TaskForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-task-type-config",
+      "module": "pages/Rdm/Config/TaskTypeConfig",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-task-type-config-form",
+      "module": "pages/Rdm/Config/TaskTypeConfigForm",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-test",
+      "module": "pages/Rdm/TestWorkbench",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-test-detail",
+      "module": "pages/Rdm/TestBatchDetail",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-test-submit",
+      "module": "pages/Rdm/TestBatchSubmit",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-version-trace",
+      "module": "pages/Rdm/VersionTrace",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-weekly-report",
+      "module": "pages/Rdm/WeeklyReport",
+      "shareWrapped": false
+    },
+    {
+      "path": "/rdm-workbench",
+      "module": "pages/Rdm/Workbench",
+      "shareWrapped": false
+    }
+  ]
+}

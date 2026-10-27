@@ -37,12 +37,14 @@
     "i18n:snapshot": "python3 scripts/check-i18n-coverage.py --snapshot-db",
     "preview": "vite preview",
     "deploy": "gh-pages -d dist",
-    "verify": "npm run lint && npm run typecheck && npm run check:menu && npm run check:boundary && npm run check:registry && npm run check:stat-order && npm run check:confirm-modal && npm run check:i18n && npm run check:i18n-fallback && npm run secret-scan && npm run test:run",
+    "verify": "npm run lint && npm run typecheck && npm run check:menu && npm run check:boundary && npm run check:registry && npm run check:routes && npm run check:stat-order && npm run check:confirm-modal && npm run check:i18n && npm run check:i18n-fallback && npm run secret-scan && npm run test:run",
     "verify:backend": "cd backend && bash restart-service.sh --rebuild",
     "restart:backend": "cd backend && bash restart-service.sh --rebuild",
     "restart:backend:fast": "cd backend && bash restart-service.sh --fast",
     "build:manifest": "node scripts/build-site-manifest.mjs",
-    "assemble:check": "node scripts/assemble-site.mjs --current dist/site-manifest.json"
+    "assemble:check": "node scripts/assemble-site.mjs --current dist/site-manifest.json",
+    "gen:routes": "node scripts/gen-app-route-inventory.mjs",
+    "check:routes": "node scripts/gen-app-route-inventory.mjs --check"
   },
   "dependencies": {
     "@ant-design/charts": "^2.6.7",

@@ -42,6 +42,9 @@ jobs:
         run: npm run check:boundary
       - name: Engineering Registry
         run: npm run check:registry
+      # 应用路由清单（§4.1 拆分基线）：App.tsx 里该应用的路由变了而清单没更新 → 失败
+      - name: App Route Inventory
+        run: npm run check:routes
       - name: Stat Card Order
         run: npm run check:stat-order
       - name: Confirm Modal Style
