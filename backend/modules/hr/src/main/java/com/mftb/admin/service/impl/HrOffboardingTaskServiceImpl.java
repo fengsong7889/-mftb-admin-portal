@@ -4,13 +4,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.BuiltinAccounts;
 import com.mftb.admin.contracts.eam.EamAssetReclaimPort;
+import com.mftb.admin.contracts.oa.OaApprovalTaskPort;
 import com.mftb.admin.entity.HrLifecycleRequest;
 import com.mftb.admin.entity.HrOffboardingTask;
-import com.mftb.admin.entity.OaApprovalTask;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.HrLifecycleRequestMapper;
 import com.mftb.admin.mapper.HrOffboardingTaskMapper;
-import com.mftb.admin.mapper.OaApprovalTaskMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.HrOffboardingTaskService;
 import com.mftb.admin.service.OrgScopeService;
@@ -48,8 +47,6 @@ public class HrOffboardingTaskServiceImpl implements HrOffboardingTaskService {
 
     /** 资产「在 use 中」状态字面量（与 EamBorrowServiceImpl 写入值同源）：只交接在人手里的那些 */
     private static final String ASSET_STATUS_IN_USE = "in_use";
-    /** OA 待办节点状态 */
-    private static final String TASK_STATUS_PENDING = "pending";
     private static final int MAX_REF_LENGTH = 64;
     private static final int MAX_SUMMARY_LENGTH = 500;
 
@@ -61,7 +58,7 @@ public class HrOffboardingTaskServiceImpl implements HrOffboardingTaskService {
     private final HrLifecycleRequestMapper lifecycleRequestMapper;
     private final SysUserMapper sysUserMapper;
     private final EamAssetReclaimPort assetReclaimPort;
-    private final OaApprovalTaskMapper approvalTaskMapper;
+    private final OaApprovalTaskPort approvalTaskPort;
     private final OperatorResolver operatorResolver;
     private final OrgScopeService orgScopeService;
 
@@ -268,24 +265,27 @@ public class HrOffboardingTaskServiceImpl implements HrOffboardingTaskService {
             throw new BusinessException("離職員工簽名無法解析，跳過待辦改派");
         }
 
-        List<OaApprovalTask> candidates = approvalTaskMapper.selectList(new LambdaQueryWrapper<OaApprovalTask>()
-                .eq(OaApprovalTask::getTaskStatus, TASK_STATUS_PENDING)
-                .like(OaApprovalTask::getApprover, leavingSignature));
-        List<OaApprovalTask> owned = candidates.stream()
-                .filter(t -> hasToken(t.getApprover(), leavingSignature))
+        List<OaApprovalTaskPort.PendingTask> candidates = approvalTaskPort.findPendingByApprover(leavingSignature);
+        List<OaApprovalTaskPort.PendingTask> owned = candidates.stream()
+                .filter(t -> hasToken(t.approver(), leavingSignature))
                 .toList();
         if (owned.isEmpty()) {
             return Outcome.skipped("本人無待辦審批節點");
         }
         List<String> ids = new ArrayList<>();
-        for (OaApprovalTask pending : owned) {
+        for (OaApprovalTaskPort.PendingTask pending : owned) {
             // 同长度替换：会签(all)模式按 approvedBy 数量判断是否审完，
             // 删除 token 会让审批人变少、剩余人一批次就凑够「全员已审」而提前通过
-            pending.setApprover(replaceToken(pending.getApprover(), leavingSignature, receiverSignature));
-            approvalTaskMapper.updateById(pending);
-            ids.add(String.valueOf(pending.getId()));
+            String nextApprover = replaceToken(pending.approver(), leavingSignature, receiverSignature);
+            // 条件改派：仍 pending 且审批人未被别人改过才写入；返回 0 说明该行已在并发中失效，不计数
+            if (approvalTaskPort.reassignPendingApprover(pending.id(), pending.approver(), nextApprover) > 0) {
+                ids.add(String.valueOf(pending.id()));
+            }
         }
-        return Outcome.done("已改派待辦 " + owned.size() + " 個節點 → " + receiver.getName(), String.join(",", ids));
+        if (ids.isEmpty()) {
+            return Outcome.skipped("待辦已被他人改派或審批完成");
+        }
+        return Outcome.done("已改派待辦 " + ids.size() + " 個節點 → " + receiver.getName(), String.join(",", ids));
     }
 
     // ==================== 小工具 ====================

@@ -90,14 +90,15 @@
             "OaRequestServiceImpl"
           ]
         }
-      ]
+      ],
+      "note": "独立模块 backend/modules/hr；本脚本不再统计，反向边由模块依赖与 check:boundary 约束。"
     },
     "attendance": {
       "prefixes": [
         "Attendance"
       ],
       "classCount": 50,
-      "forwardClasses": 24,
+      "forwardClasses": 21,
       "reverseClasses": 1,
       "reverseFiles": 1,
       "reverseEdges": [
@@ -217,7 +218,8 @@
             "HcmPayrollRuleController"
           ]
         }
-      ]
+      ],
+      "note": "已迁出 legacy（或并入其它域模块）；本脚本不再统计，反向边由模块依赖与 check:boundary 约束。"
     },
     "finance": {
       "prefixes": [
@@ -353,19 +355,11 @@
       "prefixes": [
         "Oa"
       ],
-      "classCount": 13,
-      "forwardClasses": 11,
-      "reverseClasses": 1,
-      "reverseFiles": 1,
-      "reverseEdges": [
-        {
-          "class": "OaApprovalTaskMapper",
-          "referencingFiles": 1,
-          "examples": [
-            "HrOffboardingTaskServiceImpl"
-          ]
-        }
-      ]
+      "classCount": 14,
+      "forwardClasses": 7,
+      "reverseClasses": 0,
+      "reverseFiles": 0,
+      "reverseEdges": []
     },
     "ai": {
       "prefixes": [

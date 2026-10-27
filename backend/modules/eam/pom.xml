@@ -34,6 +34,12 @@
             <artifactId>mftb-admin-contracts-eam</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- OA 采购申请表单只读投影（避免直接注入 OA 的 Mapper） -->
+        <dependency>
+            <groupId>com.mftb</groupId>
+            <artifactId>mftb-admin-contracts-oa</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.mftb</groupId>
             <artifactId>mftb-admin-shared</artifactId>

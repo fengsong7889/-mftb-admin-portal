@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.mftb</groupId>
+        <artifactId>mftb-admin-parent</artifactId>
+        <version>1.0.0</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mftb-admin-contracts-oa</artifactId>
+    <packaging>jar</packaging>
+    <name>mftb-admin-contracts-oa</name>
+    <description>
+        OA 域跨域契约：申请单只读投影 + 待办改派写端口。
+        背景（方案 C.31 遗留债务）：EAM / HR 原先直接注入 shared 里的 OaRequestMapper / OaApprovalTaskMapper
+        读改 OA 事务表，域边界上是「借别人的 Mapper 改别人的数据」。把这两类用法收敛为显式端口后：
+          - 契约在 contracts/oa（叶子包，无业务依赖）；
+          - 实现在 legacy（OA 引擎持有表与事务语义）；
+          - 域模块只依赖契约，不再 import OA 实体/Mapper。
+    </description>
+</project>

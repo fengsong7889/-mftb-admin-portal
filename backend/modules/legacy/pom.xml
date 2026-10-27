@@ -46,6 +46,12 @@
             <artifactId>mftb-admin-contracts-hr</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- OA 域契约：申请单只读投影 + 待办改派端口（实现在本模块 service/oa 下） -->
+        <dependency>
+            <groupId>com.mftb</groupId>
+            <artifactId>mftb-admin-contracts-oa</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- 共享平台层：主数据实体/Mapper、通用工具、平台能力服务 -->
         <dependency>
             <groupId>com.mftb</groupId>

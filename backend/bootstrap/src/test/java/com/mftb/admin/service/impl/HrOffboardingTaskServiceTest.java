@@ -5,13 +5,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.contracts.eam.EamAssetReclaimPort;
+import com.mftb.admin.contracts.oa.OaApprovalTaskPort;
 import com.mftb.admin.entity.HrLifecycleRequest;
 import com.mftb.admin.entity.HrOffboardingTask;
-import com.mftb.admin.entity.OaApprovalTask;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.HrLifecycleRequestMapper;
 import com.mftb.admin.mapper.HrOffboardingTaskMapper;
-import com.mftb.admin.mapper.OaApprovalTaskMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.OrgScopeService;
 import com.mftb.admin.util.OperatorResolver;
@@ -32,6 +31,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -55,7 +56,7 @@ class HrOffboardingTaskServiceTest {
     private HrLifecycleRequestMapper lifecycleMapper;
     private SysUserMapper sysUserMapper;
     private EamAssetReclaimPort assetReclaimPort;
-    private OaApprovalTaskMapper approvalTaskMapper;
+    private OaApprovalTaskPort approvalTaskPort;
     private OrgScopeService orgScopeService;
     private final List<HrOffboardingTask> table = new ArrayList<>();
     private final AtomicLong idSeq = new AtomicLong(500);
@@ -68,13 +69,12 @@ class HrOffboardingTaskServiceTest {
     void setUp() {
         MapperBuilderAssistant assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "");
         TableInfoHelper.initTableInfo(assistant, HrOffboardingTask.class);
-        TableInfoHelper.initTableInfo(assistant, OaApprovalTask.class);
 
         taskMapper = mock(HrOffboardingTaskMapper.class);
         lifecycleMapper = mock(HrLifecycleRequestMapper.class);
         sysUserMapper = mock(SysUserMapper.class);
         assetReclaimPort = mock(EamAssetReclaimPort.class);
-        approvalTaskMapper = mock(OaApprovalTaskMapper.class);
+        approvalTaskPort = mock(OaApprovalTaskPort.class);
         orgScopeService = mock(OrgScopeService.class);
         OperatorResolver operatorResolver = mock(OperatorResolver.class);
         when(operatorResolver.currentOperatorName()).thenReturn("HR專員");
@@ -85,7 +85,7 @@ class HrOffboardingTaskServiceTest {
         });
 
         service = new HrOffboardingTaskServiceImpl(taskMapper, lifecycleMapper, sysUserMapper,
-                assetReclaimPort, approvalTaskMapper, operatorResolver, orgScopeService);
+                assetReclaimPort, approvalTaskPort, operatorResolver, orgScopeService);
 
         // selectList 同样按 wrapper 条件过滤：否则「只拾取 PENDING」这类查询语义在测试里等于没被验证
         when(taskMapper.selectList(any(LambdaQueryWrapper.class))).thenAnswer(inv -> {
@@ -218,23 +218,21 @@ class HrOffboardingTaskServiceTest {
         stored.setHandoverToUserId(RECEIVER_ID);
         service.scheduleForDimission(stored, EFFECTIVE, "HR專員");
         String leavingSignature = "李大仁(MF00011)";
-        OaApprovalTask mine = pendingTask(1L, leavingSignature + ",陳大文(MF00033)");
+        OaApprovalTaskPort.PendingTask mine = pendingTask(1L, leavingSignature + ",陳大文(MF00033)");
         // 工号前缀相同的另一个人：like 查询会命中，但绝不能被改派
-        OaApprovalTask namesake = pendingTask(2L, "李大仁(MF000110)");
-        when(approvalTaskMapper.selectList(any(LambdaQueryWrapper.class)))
-                .thenReturn(List.of(mine, namesake));
+        OaApprovalTaskPort.PendingTask namesake = pendingTask(2L, "李大仁(MF000110)");
+        when(approvalTaskPort.findPendingByApprover(leavingSignature)).thenReturn(List.of(mine, namesake));
+        when(approvalTaskPort.reassignPendingApprover(1L, "李大仁(MF00011),陳大文(MF00033)",
+                "王小美(MF00022),陳大文(MF00033)")).thenReturn(1);
 
         boolean terminal = service.execute(table.get(1).getId(), "HR專員");
 
         assertEquals(true, terminal);
         assertEquals(HrOffboardingTask.STATUS_DONE, table.get(1).getStatus());
-        ArgumentCaptor<OaApprovalTask> captor = ArgumentCaptor.forClass(OaApprovalTask.class);
-        verify(approvalTaskMapper, times(1)).updateById(captor.capture());
-        OaApprovalTask updated = captor.getValue();
-        assertEquals(1L, updated.getId());
-        assertEquals("王小美(MF00022),陳大文(MF00033)", updated.getApprover());
         // 会签(all)按 approvedBy 数量判断是否审完，替换必须等长：不能把接收人列表改短
-        assertEquals(2, updated.getApprover().split(",").length);
+        verify(approvalTaskPort).reassignPendingApprover(1L, "李大仁(MF00011),陳大文(MF00033)",
+                "王小美(MF00022),陳大文(MF00033)");
+        verify(approvalTaskPort, never()).reassignPendingApprover(eq(2L), anyString(), anyString());
         assertEquals("1", table.get(1).getTargetRef());
     }
 
@@ -243,11 +241,11 @@ class HrOffboardingTaskServiceTest {
     void todoWithoutPendingIsSkipped() {
         stored.setHandoverToUserId(RECEIVER_ID);
         service.scheduleForDimission(stored, EFFECTIVE, "HR專員");
-        when(approvalTaskMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+        when(approvalTaskPort.findPendingByApprover(anyString())).thenReturn(List.of());
 
         assertTrue(service.execute(table.get(1).getId(), "HR專員"));
         assertEquals(HrOffboardingTask.STATUS_SKIPPED, table.get(1).getStatus());
-        verify(approvalTaskMapper, never()).updateById(any(OaApprovalTask.class));
+        verify(approvalTaskPort, never()).reassignPendingApprover(anyLong(), anyString(), anyString());
     }
 
     // ── 接收人与越权 ──
@@ -332,12 +330,8 @@ class HrOffboardingTaskServiceTest {
     }
 
 
-    private static OaApprovalTask pendingTask(Long id, String approver) {
-        OaApprovalTask task = new OaApprovalTask();
-        task.setId(id);
-        task.setTaskStatus("pending");
-        task.setApprover(approver);
-        return task;
+    private static OaApprovalTaskPort.PendingTask pendingTask(Long id, String approver) {
+        return new OaApprovalTaskPort.PendingTask(id, approver);
     }
 
     // ── 执行中任务不能抢跑（P0-6）──

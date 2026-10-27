@@ -4,14 +4,13 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.mftb.admin.contracts.oa.OaRequestFormPort;
 import com.mftb.admin.entity.EamPurchaseOrder;
 import com.mftb.admin.entity.EamPurchaseOrderItem;
 import com.mftb.admin.entity.EamPurchaseRequest;
-import com.mftb.admin.entity.OaRequest;
 import com.mftb.admin.mapper.EamPurchaseOrderItemMapper;
 import com.mftb.admin.mapper.EamPurchaseOrderMapper;
 import com.mftb.admin.mapper.EamPurchaseRequestMapper;
-import com.mftb.admin.mapper.OaRequestMapper;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.OperatorResolver;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -39,7 +38,7 @@ class EamPurchaseServiceImplTest {
     @Mock private EamPurchaseOrderMapper orderMapper;
     @Mock private EamPurchaseOrderItemMapper itemMapper;
     @Mock private EamPurchaseRequestMapper requestMapper;
-    @Mock private OaRequestMapper oaRequestMapper;
+    @Mock private OaRequestFormPort oaRequestFormPort;
     @Mock private OperatorResolver operatorResolver;
     @Mock private BizSeqService bizSeqService;
     @InjectMocks private EamPurchaseServiceImpl service;
@@ -50,7 +49,7 @@ class EamPurchaseServiceImplTest {
     @BeforeAll
     static void initTableMetadata() {
         for (Class<?> entity : List.of(EamPurchaseOrder.class, EamPurchaseOrderItem.class,
-                EamPurchaseRequest.class, OaRequest.class)) {
+                EamPurchaseRequest.class)) {
             TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), entity);
         }
     }
@@ -74,11 +73,8 @@ class EamPurchaseServiceImplTest {
         }
     }
 
-    private OaRequest oaRequest(String flowNo, String formData) {
-        OaRequest oa = new OaRequest();
-        oa.setFlowNo(flowNo);
-        oa.setFormData(formData);
-        return oa;
+    private Map<String, String> oaForm(String flowNo, String formData) {
+        return Map.of(flowNo, formData);
     }
 
     @Test
@@ -92,7 +88,7 @@ class EamPurchaseServiceImplTest {
         assertEquals("CG202609150002", detail.get("reqNo"));
         assertEquals(3L, detail.get("reqId"));
         assertEquals(2, detail.get("brand"));
-        verifyNoInteractions(oaRequestMapper);
+        verifyNoInteractions(oaRequestFormPort);
     }
 
     @Test
@@ -101,14 +97,15 @@ class EamPurchaseServiceImplTest {
         mockDetail();
 
         assertEquals(1, service.getOrderDetail(order.getId()).get("brand"));
-        verifyNoInteractions(oaRequestMapper);
+        verifyNoInteractions(oaRequestFormPort);
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"{\"brand\":1}", "{\"brand\":\"1\"}"})
     void legacyOrderUsesOriginalOaFormWithoutDatabaseWrites(String formData) {
         mockDetail();
-        when(oaRequestMapper.selectList(any())).thenReturn(List.of(oaRequest(request.getFlowNo(), formData)));
+        when(oaRequestFormPort.findFormDataByFlowNos(eq("oa_purchase"), anyCollection()))
+                .thenReturn(oaForm(request.getFlowNo(), formData));
 
         Map<String, Object> detail = service.getOrderDetail(order.getId());
 
@@ -118,18 +115,16 @@ class EamPurchaseServiceImplTest {
         verify(orderMapper).selectById(order.getId());
         verify(requestMapper).selectBatchIds(List.of(3L));
         verifyNoMoreInteractions(orderMapper, requestMapper);
-        verify(oaRequestMapper).selectList(argThat((LambdaQueryWrapper<OaRequest> query) -> {
-            query.getSqlSegment();
-            return query.getParamNameValuePairs().containsValue("oa_purchase")
-                    && query.getParamNameValuePairs().containsValue("CG202609150002");
-        }));
+        verify(oaRequestFormPort).findFormDataByFlowNos(eq("oa_purchase"), argThat(flows ->
+                flows.contains(request.getFlowNo())));
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"{}", "{\"brand\":null}", "{\"brand\":\"unknown\"}", "null", "invalid-json"})
     void missingOrInvalidOriginalBrandStaysEmpty(String formData) {
         mockDetail();
-        when(oaRequestMapper.selectList(any())).thenReturn(List.of(oaRequest(request.getFlowNo(), formData)));
+        when(oaRequestFormPort.findFormDataByFlowNos(eq("oa_purchase"), anyCollection()))
+                .thenReturn(oaForm(request.getFlowNo(), formData));
 
         assertNull(service.getOrderDetail(order.getId()).get("brand"));
     }
@@ -150,7 +145,7 @@ class EamPurchaseServiceImplTest {
 
         assertNull(detail.get("reqNo"));
         assertEquals(2, detail.get("brand"));
-        verifyNoInteractions(requestMapper, oaRequestMapper);
+        verifyNoInteractions(requestMapper, oaRequestFormPort);
     }
 
     @Test
@@ -161,13 +156,14 @@ class EamPurchaseServiceImplTest {
 
         assertNull(detail.get("reqNo"));
         assertNull(detail.get("brand"));
-        verifyNoInteractions(oaRequestMapper);
+        verifyNoInteractions(oaRequestFormPort);
     }
 
     @Test
     void pageAndDetailReturnTheSameBrandAndRequestNumber() {
         mockDetail();
-        when(oaRequestMapper.selectList(any())).thenReturn(List.of(oaRequest(request.getFlowNo(), "{\"brand\":2}")));
+        when(oaRequestFormPort.findFormDataByFlowNos(eq("oa_purchase"), anyCollection()))
+                .thenReturn(oaForm(request.getFlowNo(), "{\"brand\":2}"));
         Page<EamPurchaseOrder> page = new Page<>(1, 10, 1);
         page.setRecords(List.of(order));
         when(orderMapper.selectPage(org.mockito.ArgumentMatchers.<Page<EamPurchaseOrder>>any(), any())).thenReturn(page);
@@ -195,9 +191,9 @@ class EamPurchaseServiceImplTest {
         page.setRecords(List.of(order, other));
         when(orderMapper.selectPage(org.mockito.ArgumentMatchers.<Page<EamPurchaseOrder>>any(), any())).thenReturn(page);
         when(requestMapper.selectBatchIds(List.of(3L, 4L))).thenReturn(List.of(request, otherRequest));
-        when(oaRequestMapper.selectList(any())).thenReturn(List.of(
-                oaRequest(otherRequest.getFlowNo(), "{\"brand\":2}"),
-                oaRequest(request.getFlowNo(), "{\"brand\":1}")));
+        when(oaRequestFormPort.findFormDataByFlowNos(eq("oa_purchase"), anyCollection())).thenReturn(Map.of(
+                otherRequest.getFlowNo(), "{\"brand\":2}",
+                request.getFlowNo(), "{\"brand\":1}"));
 
         List<Map<String, Object>> records = service.pageOrders(1, 10, null, null, null, null,
                 null, null, null, null, null, null).getRecords();
@@ -205,7 +201,7 @@ class EamPurchaseServiceImplTest {
         assertEquals(1, records.get(0).get("brand"));
         assertEquals(2, records.get(1).get("brand"));
         assertEquals(otherRequest.getReqNo(), records.get(1).get("reqNo"));
-        verify(oaRequestMapper, times(1)).selectList(any());
+        verify(oaRequestFormPort, times(1)).findFormDataByFlowNos(eq("oa_purchase"), anyCollection());
         verify(requestMapper, times(1)).selectBatchIds(anyCollection());
     }
 

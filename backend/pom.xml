@@ -37,6 +37,7 @@
         <module>contracts/rdm</module>
         <module>contracts/eam</module>
         <module>contracts/hr</module>
+        <module>contracts/oa</module>
         <module>modules/shared</module>
         <module>modules/legacy</module>
         <module>modules/rdm</module>

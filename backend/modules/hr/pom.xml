@@ -36,6 +36,12 @@
             <artifactId>mftb-admin-contracts-eam</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- OA 待办改派端口（离职流程把待办整体移交给接收人） -->
+        <dependency>
+            <groupId>com.mftb</groupId>
+            <artifactId>mftb-admin-contracts-oa</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>com.mftb</groupId>
             <artifactId>mftb-admin-shared</artifactId>

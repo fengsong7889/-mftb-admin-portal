@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.contracts.oa.OaRequestFormPort;
 import com.mftb.admin.dto.EamPurchaseSaveDTO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.EamPurchaseOrder;
@@ -11,7 +12,6 @@ import com.mftb.admin.entity.EamPurchaseOrderItem;
 import com.mftb.admin.entity.EamPurchaseRequest;
 import com.mftb.admin.entity.EamModel;
 import com.mftb.admin.entity.EamCategory;
-import com.mftb.admin.entity.OaRequest;
 import com.mftb.admin.mapper.EamPurchaseOrderItemMapper;
 import com.mftb.admin.mapper.EamInboundBatchMapper;
 import com.mftb.admin.entity.EamInboundBatch;
@@ -19,7 +19,6 @@ import com.mftb.admin.mapper.EamPurchaseOrderMapper;
 import com.mftb.admin.mapper.EamPurchaseRequestMapper;
 import com.mftb.admin.mapper.EamModelMapper;
 import com.mftb.admin.mapper.EamCategoryMapper;
-import com.mftb.admin.mapper.OaRequestMapper;
 import com.mftb.admin.service.EamPurchaseService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.ConvertUtils;
@@ -43,7 +42,8 @@ import java.util.stream.Collectors;
  * <p>
  * 事务边界：createOrder, updateOrderExec, deleteOrder, createOrderFromRequest 标注 @Transactional(rollbackFor = Exception.class)，其余方法不开事务。
  * <p>
- * 协作依赖：EamPurchaseOrderMapper, EamPurchaseOrderItemMapper, EamInboundBatchMapper, EamPurchaseRequestMapper, OaRequestMapper。
+ * 協作依賴：EamPurchaseOrderMapper, EamPurchaseOrderItemMapper, EamInboundBatchMapper, EamPurchaseRequestMapper,
+ * OA 申请单只读投影（{@link OaRequestFormPort}）。
  */
 
 @Slf4j
@@ -57,7 +57,7 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
     private final EamPurchaseRequestMapper requestMapper;
     private final EamModelMapper modelMapper;
     private final EamCategoryMapper categoryMapper;
-    private final OaRequestMapper oaRequestMapper;
+    private final OaRequestFormPort oaRequestFormPort;
     private final OperatorResolver operatorResolver;
     private final BizSeqService bizSeqService;
 
@@ -561,14 +561,12 @@ public class EamPurchaseServiceImpl implements EamPurchaseService {
         if (missingBrandFlows.isEmpty()) return requests;
 
         Map<String, Integer> flowBrands = new HashMap<>();
-        oaRequestMapper.selectList(new LambdaQueryWrapper<OaRequest>()
-                        .eq(OaRequest::getProcessCode, "oa_purchase")
-                        .in(OaRequest::getFlowNo, missingBrandFlows)
-                        .select(OaRequest::getFlowNo, OaRequest::getFormData))
-                .forEach(oa -> {
-                    Map<String, Object> formData = JsonUtils.parseMap(oa.getFormData());
+        // 跨域取数走 OA 契约（只读投影），不再直接查 oa_request 表
+        oaRequestFormPort.findFormDataByFlowNos("oa_purchase", missingBrandFlows)
+                .forEach((flowNo, formDataJson) -> {
+                    Map<String, Object> formData = JsonUtils.parseMap(formDataJson);
                     if (formData != null) {
-                        flowBrands.put(oa.getFlowNo(), ConvertUtils.toInt(formData.get("brand"), null));
+                        flowBrands.put(flowNo, ConvertUtils.toInt(formData.get("brand"), null));
                     }
                 });
         requests.values().stream().filter(req -> req.getBrand() == null)
