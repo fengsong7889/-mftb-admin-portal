@@ -15,6 +15,7 @@
  */
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { classify } from './lib/impact-graph.mjs'
@@ -114,16 +115,52 @@ function systemCommands(registry, code, side) {
   return cmds
 }
 
+/**
+ * 解析 mvn 的可执行路径。
+ *
+ * 为什么需要：`mvn` 不一定在 PATH 上（本仓后端脚本都用 JAVA_HOME + 本地 maven 目录），
+ * 直接 execFileSync('mvn') 会以 `spawnSync mvn ENOENT` 失败——错误信息完全看不出该装什么。
+ * 这里按 MAVEN_HOME → 仓库内 .local/apache-maven-* → PATH 顺序解析，仍找不到就明确报错。
+ */
+function resolveMvn() {
+  const candidates = []
+  if (process.env.MAVEN_HOME) candidates.push(path.join(process.env.MAVEN_HOME, 'bin', 'mvn'))
+  // 仓库约定的本地 Maven（见 backend/restart-service.sh）
+  // 两处约定：仓库内 .local/apache-maven-*（CI/容器）与用户家目录 apache-maven-*（本机常用）
+  for (const base of [path.join(ROOT, '.local'), os.homedir()]) {
+    if (!fs.existsSync(base)) continue
+    for (const dir of fs.readdirSync(base).filter((d) => d.startsWith('apache-maven'))) {
+      candidates.push(path.join(base, dir, 'bin', 'mvn'))
+    }
+  }
+  const exec = candidates.find((p) => fs.existsSync(p))
+  return exec ?? 'mvn'
+}
+
 function execute(cmds, display) {
   console.log(`\n${display}`)
+  const mvn = resolveMvn()
   for (const c of cmds) {
+    const argv = c.argv[0] === 'mvn' ? [mvn, ...c.argv.slice(1)] : c.argv
     const shown = `${c.cwd === ROOT ? '' : `cd ${path.relative(ROOT, c.cwd) || '.'} && `}${c.argv.join(' ')}`
     if (!opts.run) {
       console.log(`   [dry-run] $ ${shown}`)
       continue
     }
     console.log(`   $ ${shown}`)
-    execFileSync(c.argv[0], c.argv.slice(1), { cwd: c.cwd, stdio: 'inherit' })
+    try {
+      execFileSync(argv[0], argv.slice(1), { cwd: c.cwd, stdio: 'inherit' })
+    } catch (err) {
+      if (err.code === 'ENOENT' && c.argv[0] === 'mvn') {
+        console.error(
+          `   ❌ 未找到 mvn（已尝试 MAVEN_HOME、.local/apache-maven-*、PATH）。\n` +
+          `      请设置 MAVEN_HOME 或把 mvn 加入 PATH 后重试；本仓约定见 backend/restart-service.sh。`,
+        )
+        process.exitCode = 1
+        return
+      }
+      throw err
+    }
   }
   if (!opts.run) console.log('   （加 -- --run 才会真正执行）')
 }
