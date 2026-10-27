@@ -20,6 +20,7 @@
 
     <!--
       多模块骨架（方案 P3 第 1 步）：
+        · libraries/platform-core — 技术底座（注解/通用返回体/常量枚举/LLM 客户端），不依赖业务包
         · modules/legacy — 尚未按域拆出的全部业务代码（包名不变），独立编译为普通 JAR
         · bootstrap      — 唯一启动入口 + 配置 + 全部集成测试，产出可运行 JAR
       本期部署单元仍是一个 JAR / 一个 Deployment（方案 §一），拆模块不等于拆服务。
@@ -27,6 +28,7 @@
       跨域依赖改为 contracts/* 里的最小接口，启动装配仍由 bootstrap 完成。
     -->
     <modules>
+        <module>libraries/platform-core</module>
         <module>modules/legacy</module>
         <module>bootstrap</module>
     </modules>

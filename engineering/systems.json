@@ -211,8 +211,8 @@
    "backendPrefixes": {
     "Ai": 167,
     "Agent": 17,
-    "Llm": 11,
-    "Mcp": 11
+    "Mcp": 11,
+    "Llm": 10
    },
    "testCounts": {
     "frontend": 7,
@@ -248,7 +248,7 @@
     }
    },
    "backendPrefixes": {
-    "Attendance": 51,
+    "Attendance": 50,
     "Att": 18
    },
    "testCounts": {
@@ -283,7 +283,7 @@
     }
    },
    "backendPrefixes": {
-    "Doc": 64
+    "Doc": 62
    },
    "testCounts": {
     "frontend": 4,
@@ -464,11 +464,11 @@
     }
    },
    "backendPrefixes": {
-    "Hr": 139,
-    "Hcm": 25,
+    "Hr": 131,
+    "Hcm": 24,
     "Emp": 17,
-    "Org": 17,
-    "Employee": 16,
+    "Org": 16,
+    "Employee": 15,
     "Position": 9,
     "Emergency": 4,
     "Contract": 4
@@ -543,7 +543,7 @@
     }
    },
    "backendPrefixes": {
-    "Permission": 12,
+    "Permission": 11,
     "Data": 8,
     "Role": 6,
     "Menu": 6,
@@ -596,7 +596,7 @@
     }
    },
    "backendPrefixes": {
-    "Meeting": 68,
+    "Meeting": 67,
     "Mt": 5
    },
    "testCounts": {
@@ -630,7 +630,7 @@
    },
    "backendPrefixes": {
     "Biz": 29,
-    "Store": 13,
+    "Store": 12,
     "Merchant": 6
    },
    "testCounts": {
@@ -771,7 +771,7 @@
    },
    "backendPrefixes": {
     "Sys": 66,
-    "System": 23,
+    "System": 22,
     "Notification": 11,
     "Translation": 7,
     "Ding": 7,
@@ -849,7 +849,7 @@
     }
    },
    "backendPrefixes": {
-    "Rdm": 267
+    "Rdm": 264
    },
    "testCounts": {
     "frontend": 49,
@@ -1025,14 +1025,12 @@
    "Profile": 2,
    "User": 2,
    "Approval": 2,
-   "Rule": 2,
    "Scope": 2,
    "Employment": 2,
    "Jwt": 2,
    "Password": 2,
    "Prom": 2,
    "Person": 2,
-   "Result": 2,
    "Captcha": 2,
    "Segmentation": 2,
    "Budget": 2,
@@ -1048,6 +1046,7 @@
    "Transfer": 1,
    "Add": 1,
    "Bind": 1,
+   "Rule": 1,
    "Session": 1,
    "Merge": 1,
    "Status": 1,
@@ -1084,21 +1083,15 @@
    "Rest": 1,
    "Dept": 1,
    "Database": 1,
-   "Require": 1,
-   "Ensure": 1,
    "Iconfont": 1,
    "Health": 1,
-   "Global": 1,
-   "Business": 1,
-   "Builtin": 1,
    "Idempotent": 1,
    "Evidence": 1,
    "Email": 1,
    "Abstract": 1,
    "Conversation": 1,
    "Lookup": 1,
-   "Local": 1,
-   "Tencent": 1
+   "Local": 1
   }
  }
 }

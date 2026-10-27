@@ -8,6 +8,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -86,8 +88,17 @@ public class AiDataPolicyService {
      * <p>只返回启用且未删除项；中文名由 name 提供，英文名用于非中文界面。
      */
     public List<Map<String, Object>> listSystemOptions() {
-        return jdbc.queryForList("SELECT code, name, name_en FROM sys_system "
-                + "WHERE status = 1 AND deleted = 0 ORDER BY sort_order ASC, code ASC");
+        List<Map<String, Object>> rows = new ArrayList<>(jdbc.queryForList(
+                "SELECT code, name, name_en FROM sys_system "
+                        + "WHERE status = 1 AND deleted = 0 ORDER BY sort_order ASC, code ASC"));
+        // common 不在 sys_system 里（它是「无业务系统上下文」的哨兵），但必须能登记分级，
+        // 否则个人工作台/门户问答永远被拒且没有配置入口。放首位，避免被忽略。
+        Map<String, Object> shared = new LinkedHashMap<>();
+        shared.put("code", COMMON_SCOPE);
+        shared.put("name", "共用（個人工作台/門戶）");
+        shared.put("name_en", "Shared (Personal Workbench)");
+        rows.add(0, shared);
+        return rows;
     }
 
     /** 模型下拉选项：端点批准以 model_key 为唯一键，选项必须与「模型管理」同源（ai_model）。 */

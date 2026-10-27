@@ -21,6 +21,15 @@
         本模块不含启动类，只产出普通 JAR，由 bootstrap 装配成可运行制品。
     </description>
 
+    <dependencies>
+        <!-- 技术底座：包名不变，因此源码无需任何 import 改动，仅建立编译期依赖方向 -->
+        <dependency>
+            <groupId>com.mftb</groupId>
+            <artifactId>mftb-admin-platform-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+    </dependencies>
+
     <build>
         <!-- 不叫 mftb-admin：避免与 bootstrap 产出的可运行 JAR 混淆 -->
         <finalName>mftb-admin-legacy</finalName>
