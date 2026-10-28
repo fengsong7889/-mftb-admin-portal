@@ -16,10 +16,33 @@ DB 快照已随表入库（engineering/menu-system-snapshot.json），刷新方�
 import json
 import os
 import re
+import subprocess
 from collections import defaultdict
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(ROOT)
+
+
+def _tracked_files():
+    """git 已跟踪的文件集合。
+
+    为什么必须过滤：本地未跟踪的新测试会把特征回归计数抬高，生成器写进 systems.json 后，
+    CI（chore 后端 checkout 不含未跟踪文件）重算就会低于基线，C6 直接失败（已实际发生）。
+    登记表必须能从已提交的代码复现。
+    """
+    try:
+        out = subprocess.run(['git', 'ls-files'], capture_output=True, text=True, check=True).stdout
+        return set(out.splitlines())
+    except Exception:
+        print('⚠ 无法读取 git 追踪清单：本次计数会包含未跟踪文件（与 CI 可能不一致）')
+        return None
+
+
+TRACKED = _tracked_files()
+
+
+def tracked(path):
+    return TRACKED is None or os.path.relpath(path, ROOT) in TRACKED
 
 SNAPSHOT = 'engineering/menu-system-snapshot.json'
 REGISTRY = 'engineering/systems.json'
@@ -169,7 +192,7 @@ def backend_prefixes():
     for root in BACKEND_DOMAIN_ROOTS:
         for dp, _, fns in os.walk(root):
             for fn in fns:
-                if fn.endswith('.java'):
+                if fn.endswith('.java') and tracked(os.path.join(dp, fn)):
                     m = re.match(r'([A-Z][a-z0-9]*)', fn[:-5])
                     counts[m.group(1) if m else 'unknown'] += 1
     return counts
@@ -190,12 +213,13 @@ def test_counts(dirs, prefixes):
         if not base or not os.path.isdir(base):
             continue
         for dp, _, fns in os.walk(base):
-            fe += sum(1 for fn in fns if re.search(r'\.(test|spec)\.(ts|tsx)$', fn))
+            fe += sum(1 for fn in fns
+                      if re.search(r'\.(test|spec)\.(ts|tsx)$', fn) and tracked(os.path.join(dp, fn)))
     be = 0
     root = 'backend/bootstrap/src/test/java/com/mftb/admin'
     for dp, _, fns in os.walk(root):
         for fn in fns:
-            if fn.endswith('Test.java'):
+            if fn.endswith('Test.java') and tracked(os.path.join(dp, fn)):
                 m = re.match(r'([A-Z][a-z0-9]*)', fn[:-len('Test.java')])
                 if m and m.group(1) in prefixes:
                     be += 1
