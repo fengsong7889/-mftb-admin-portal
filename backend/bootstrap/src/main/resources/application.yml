@@ -1,5 +1,9 @@
 server:
   port: 8080
+  # 优雅退出（方案 §六「发布保留就绪/存活检查、优雅退出和请求排空」）：
+  # 收到 SIGTERM 后停止接新请求，等在途请求完成后才退出；配合 K8s preStop 与
+  # terminationGracePeriodSeconds（需大于下面的超时）避免发布切断正在执行的写请求。
+  shutdown: graceful
   servlet:
     context-path: /
   tomcat:
@@ -11,6 +15,9 @@ server:
 spring:
   application:
     name: mftb-admin
+  lifecycle:
+    # 与 server.shutdown=graceful 配套：单次停机的在途请求最晚等 30s，避免长时间挂住节点
+    timeout-per-shutdown-phase: 30s
   main:
     # 懒初始化开关（高级选项，默认关闭）：开启后 Bean 延迟到首次使用时创建，可缩短启动时间；
     # 注意 CommandLineRunner（DataInitializer 等迁移逻辑）仍会在启动时执行，不受此开关影响；
