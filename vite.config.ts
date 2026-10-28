@@ -498,7 +498,9 @@ export default defineConfig({
       }
     : {}),
   plugins: [react(), llmProxyPlugin(__dirname), buildMetaPlugin()],
-  base: process.env.NODE_ENV === 'production' ? '/-mftb-admin-portal/' : '/',
+  // 前端托管基路径：默认整站门户子路径；按应用发布时用 VITE_APP_BASE 指定各自子路径/域名前缀，
+  // 产物里的资源 URL 会按该值生成（卷布前不需要改代码，发布侧先定路径即可）。
+  base: process.env.VITE_APP_BASE ?? (process.env.NODE_ENV === 'production' ? '/-mftb-admin-portal/' : '/'),
   resolve: {
     alias: {
       // 按应用构建（方案 §4.1）：设置 VITE_APP_ROUTES 时把「应用路由组」替换为该应用自己的入口模块，
