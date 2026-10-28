@@ -65,6 +65,24 @@ class OrganicScoreRuleContractTest {
         }
     }
 
+    @Test
+    @DisplayName("减免运费配置列必须可自愈补列")
+    void freeShippingConfigColumnIsHealable() {
+        ContractSpec spec = LegacyCoreContracts.organicScoreRuleContract();
+        assertTrue(spec.requiredColumns().stream()
+                        .anyMatch(c -> c.column().equals("free_shipping_config") && c.healable()),
+                "free_shipping_config 必须登记可自愈的 ADD COLUMN DDL");
+    }
+
+    @Test
+    @DisplayName("平台会员红包配置列必须可自愈补列")
+    void memberBonusConfigColumnIsHealable() {
+        ContractSpec spec = LegacyCoreContracts.organicScoreRuleContract();
+        assertTrue(spec.requiredColumns().stream()
+                        .anyMatch(c -> c.column().equals("member_bonus_config") && c.healable()),
+                "member_bonus_config 必须登记可自愈的 ADD COLUMN DDL");
+    }
+
     /** 驼峰 → 下划线（与 MyBatis-Plus 默认 map-underscore-to-camel-case 反向一致） */
     private String toSnakeCase(String name) {
         StringBuilder sb = new StringBuilder(name.length() + 8);

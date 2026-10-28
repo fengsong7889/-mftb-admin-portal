@@ -35,6 +35,8 @@ export interface OrganicRuleVO {
   blockedMerchants?: string
   regionConfigs?: string
   activityItems?: string
+  freeShippingConfig?: string
+  memberBonusConfig?: string
   status: number
   builtin: number
   sortOrder: number
@@ -73,6 +75,8 @@ export interface OrganicRulePayload {
   blockedMerchants?: string
   regionConfigs?: string
   activityItems?: string
+  freeShippingConfig?: string
+  memberBonusConfig?: string
   status: number
 }
 

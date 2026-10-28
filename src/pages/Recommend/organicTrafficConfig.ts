@@ -32,7 +32,7 @@ export enum ScoreMode {
   CONDITIONAL = 6,
   /** 倍數梯度計分：以門店客單價為基準，按倍數閾值分檔計分 */
   TIERED_MULTIPLIER = 7,
-  /** 優惠券力度計分：報名分 + 優惠比例檔位分 × 門檻可達係數（COM_03~COM_07 新方案） */
+  /** 優惠券力度計分：報名分 + 優惠比例檔位分 × 門檻可達係數（COM_01/03/04/05/07 新方案） */
   COUPON_INTENSITY = 8,
 }
 
@@ -214,28 +214,71 @@ export const REGION_COLORS: Record<RegionKey, { primary: string; bg: string; bor
   TAIPA: { primary: '#722ED1', bg: '#F9F0FF', border: '#D3ADF7' },
 }
 
-/** 條件計分子項（一組條件描述 → 分值） */
+/** 條件計分子項（一組條件描述 → 分值；部分規則用 condition 存語義標記，如準時率檔位） */
 export interface ScoreConditionItem {
-  /** 條件描述（如「報名免運費活動」） */
+  /** 條件描述/語義標記（如「報名免運費活動」、`ontime_rate`） */
   condition: string
   /** 該條件對應分值（正=加分，負=扣分） */
   score: number
+  /** 門檻百分比（0～100）：出餐準時率梯度檔位使用，其他規則不填 */
+  rate?: number
 }
 
 /**
  * 营业状态四档（索引与 STB_02 的 conditionItems 一一对应）。
  * filtered 档由系统直接过滤、不加载到瀑布流，因此不参与计分也不提供分值配置入口；
- * 库里对应槽位的 condition 固定为 'filtered'（见迁移 organic:stb02-filtered-v1），两边语义一致。
+ * bottom 档（休息一會 / 爆單暫停）不参与加减分，由系统垫底排序（排在可正常参与排序的商家之后），
+ * 同样不提供分值配置入口；库里对应槽位的 condition 固定为 'filtered'（见迁移 organic:stb02-filtered-v1），
+ * 两边语义一致。
  */
-export const BUSINESS_STATE_ITEMS: Array<{ key: string; label: string; desc: string; filtered?: boolean }> = [
+export const BUSINESS_STATE_ITEMS: Array<{ key: string; label: string; desc: string; filtered?: boolean; bottom?: boolean }> = [
   { key: 'operating', label: '營業中狀態', desc: '正常營業中' },
-  { key: 'shortBreak', label: '休息一會，馬上回來', desc: '短暫休息後恢復營業' },
-  { key: 'overload', label: '爆單了，暫停接單一會', desc: '訂單量超過承載能力' },
+  { key: 'shortBreak', label: '休息一會，馬上回來', desc: '短暫休息後恢復營業', bottom: true },
+  { key: 'overload', label: '爆單了，暫停接單一會', desc: '訂單量超過承載能力', bottom: true },
   { key: 'closed', label: '休息打烊', desc: '當日不再營業', filtered: true },
 ]
 
 /** 系統過濾檔在 conditionItems 裡的 condition 標記（與後端 FILTERED_CONDITION 一致） */
 export const FILTERED_STATE_CONDITION = 'filtered'
+
+/** 出餐準時率檔位（STB_05）：準時率下界 → 分值；按率從高到低匹配，命中一档即停、分數不累加 */
+export interface OntimeRateBand {
+  /** 準時率下界（%，0～100） */
+  rate: number
+  /** 該檔分值 */
+  score: number
+}
+
+/** 準時率檔位在 conditionItems 裡的 condition 標記 */
+export const ONTIME_RATE_CONDITION = 'ontime_rate'
+
+/** 默認梯度：滿準時率拿滿分，逐檔遞減；低於最低檔不得分 */
+export const DEFAULT_ONTIME_RATE_BANDS: OntimeRateBand[] = [
+  { rate: 100, score: 60 },
+  { rate: 95, score: 50 },
+  { rate: 90, score: 40 },
+  { rate: 80, score: 25 },
+  { rate: 70, score: 10 },
+]
+
+/**
+ * 從 conditionItems 讀出準時率梯度：只認 condition='ontime_rate' 且帶合法 rate 的項，
+ * 舊「超均值扣分」口徑會被過濾，調用方據空數組回退默認梯度。
+ */
+export function readOntimeRateBands(items?: Array<{ condition?: string; score?: number; rate?: number }>): OntimeRateBand[] {
+  return (items || [])
+    .filter(item => item.condition === ONTIME_RATE_CONDITION
+      && typeof item.rate === 'number' && Number.isFinite(item.rate))
+    .map(item => ({ rate: item.rate as number, score: Number(item.score) || 0 }))
+    .sort((a, b) => b.rate - a.rate)
+}
+
+/** 梯度 → conditionItems（入庫前按率降序收斂，保證匹配順序與界面展示一致） */
+export function toOntimeRateConditionItems(bands: OntimeRateBand[]): ScoreConditionItem[] {
+  return [...bands]
+    .sort((a, b) => b.rate - a.rate)
+    .map(band => ({ condition: ONTIME_RATE_CONDITION, rate: band.rate, score: band.score }))
+}
 
 /** 該檔是否為系統過濾檔：以數據標記為準，前端常量作為種子/舊數據未收斂時的兜底 */
 export const isFilteredBusinessState = (item: { filtered?: boolean }, condItem?: { condition?: string }): boolean =>
@@ -251,8 +294,8 @@ export interface ActivityScoreItem {
   score: number
 }
 
-/** 使用券類計分 v1 面板的規則編碼集合（COM_01 滿額立減 + COM_03~COM_07 五個券類活動） */
-export const COUPON_SCORE_RULE_IDS = ['COM_01', 'COM_03', 'COM_04', 'COM_05', 'COM_06', 'COM_07'] as const
+/** 使用券類計分 v1 面板的規則編碼集合（COM_01 滿額立減 + COM_03/04/05/07 券類活動；COM_06 已改用加碼梯度面板） */
+export const COUPON_SCORE_RULE_IDS = ['COM_01', 'COM_03', 'COM_04', 'COM_05', 'COM_07'] as const
 export type CouponScoreRuleId = typeof COUPON_SCORE_RULE_IDS[number]
 
 /** 判斷該計分項是否走券類計分 v1 面板；不改變後端已保存的計分模式。 */
@@ -262,7 +305,7 @@ export const isCouponScoreRule = (id?: string): boolean =>
 /** 已下架的計分項編碼：不再展示、不再作為新增模板（後端殘留數據由遷移清理） */
 export const RETIRED_ORGANIC_RULE_IDS: string[] = ['COM_09', 'STB_04']
 
-/** 品牌專屬計分項：所屬品牌命中該鍵時，對應編碼不展示（如 MFOOD 無閃蜂官方神券） */
+/** 品牌專屬計分項：所屬品牌命中該鍵時，對應編碼不展示（如 MFOOD 無平台官方神券） */
 export const BRAND_HIDDEN_ORGANIC_RULE_IDS: Partial<Record<AppType, string[]>> = {
   [AppType.MFOOD]: ['COM_07'],
 }
@@ -292,7 +335,7 @@ export interface DiscountBand {
 
 /**
  * 券類計分 v1 配置：得分 = 報名分 + 門檻分 + 力度分（三條獨立加分線查表後相加，無乘法/無降檔）。
- * COM_03~COM_07 五個券類活動各自獨立一份配置，互不影響。
+ * COM_01/03/04/05/07 各自獨立一份配置，互不影響。
  */
 export interface CouponScoreConfig {
   enrollmentEnabled: boolean
@@ -458,6 +501,285 @@ export function couponScoreMonotonicHint(cfg: CouponScoreConfig): string | null 
   return null
 }
 
+/* ============================ 減免運費計分（COM_02） ============================ */
+
+/** 使用減免運費計分面板的規則編碼 */
+export const FREE_SHIPPING_SCORE_RULE_IDS = ['COM_02'] as const
+export type FreeShippingScoreRuleId = typeof FREE_SHIPPING_SCORE_RULE_IDS[number]
+
+/** 判斷該計分項是否走減免運費計分面板 */
+export const isFreeShippingScoreRule = (id?: string): boolean =>
+  !!id && (FREE_SHIPPING_SCORE_RULE_IDS as readonly string[]).includes(id)
+
+/** 報名計分的後端前提條件值：存在即視為已報名（沿用既有 prerequisites 字段，報名即給分不可關閉） */
+export const FREE_SHIPPING_ENROLLMENT_PREREQUISITE = '報名減免運費'
+
+/**
+ * 減免運費門檻檔：運營人工配置的「使用門檻 → 分值」映射。
+ * 平台活動與商家自建活動的門檻口徑不統一，系統讀不到，因此只能用金額直接配置，
+ * 不像券類模組以「門店客單價」為基準自動換算倍數。
+ */
+export interface FreeShippingThresholdBand {
+  /** 使用門檻（元，0 表示無門檻） */
+  threshold: number
+  /** 命中該檔時給的分值 */
+  score: number
+}
+
+/** 減免運費計分配置：得分 = 報名分 + 門檻分（按生效活動的使用門檻查檔） */
+export interface FreeShippingScoreConfig {
+  /** 報名分：平台或商家自建活動最終只生效一個，報名即給分（不可關閉） */
+  enrollmentScore: number
+  /** 門檻計分模組開關：停用時該模組不計分 */
+  thresholdEnabled: boolean
+  /** 門檻檔位（按門檻升序，命中即停） */
+  thresholdBands: FreeShippingThresholdBand[]
+  /** 有效門檻上限（元）：不填表示跟隨檔位表末檔；超出上限視為空轉活動 */
+  guardThreshold?: number
+  /** 超過有效上限是否仍發報名分（預設停發，避免空轉活動白拿報名分） */
+  enrollWhenGuarded?: boolean
+}
+
+/** 默認檔位：0 元檔保底（無門檻活動），門檻越高分值越低；護欄默認跟隨末檔且超限停發報名分 */
+export const DEFAULT_FREE_SHIPPING_SCORE_CONFIG: FreeShippingScoreConfig = {
+  enrollmentScore: 20,
+  thresholdEnabled: true,
+  thresholdBands: [
+    { threshold: 0, score: 20 },
+    { threshold: 30, score: 15 },
+    { threshold: 50, score: 10 },
+    { threshold: 80, score: 5 },
+  ],
+  enrollWhenGuarded: false,
+}
+
+/** 門檻檔的整句條件文案（0 元即無門檻） */
+export function freeShippingBandLabel(band: FreeShippingThresholdBand): string {
+  return band.threshold > 0 ? `減免門檻 ≤ ${band.threshold} 元` : '無門檻（0 元）'
+}
+
+/** 報名分護欄的有效上限：優先取運營手動覆蓋值，否則跟隨檔位表末檔 */
+export function freeShippingGuardLimit(cfg: FreeShippingScoreConfig): number | undefined {
+  if (cfg.guardThreshold !== undefined && cfg.guardThreshold !== null) return cfg.guardThreshold
+  const last = cfg.thresholdBands[cfg.thresholdBands.length - 1]
+  return last?.threshold
+}
+
+/**
+ * 归一化后端已保存的配置：后端只透传 JSON 不做结构校验，因此读取时过滤非法档位、
+ * 收敛布尔与数值类型；报名分以规则 score 字段为准（历史数据可能只有 score）。
+ */
+export function normalizeFreeShippingScoreConfig(
+  raw: Partial<FreeShippingScoreConfig> | undefined,
+  score?: number,
+): FreeShippingScoreConfig {
+  const bands = Array.isArray(raw?.thresholdBands)
+    ? raw.thresholdBands
+        .filter(band => band && Number.isFinite(band.threshold) && Number.isFinite(band.score))
+        .map(band => ({ threshold: band.threshold, score: band.score }))
+    : DEFAULT_FREE_SHIPPING_SCORE_CONFIG.thresholdBands
+  return {
+    ...DEFAULT_FREE_SHIPPING_SCORE_CONFIG,
+    ...raw,
+    thresholdEnabled: raw?.thresholdEnabled !== false,
+    thresholdBands: bands,
+    guardThreshold: typeof raw?.guardThreshold === 'number' && Number.isFinite(raw.guardThreshold)
+      ? raw.guardThreshold
+      : undefined,
+    enrollWhenGuarded: raw?.enrollWhenGuarded === true,
+    enrollmentScore: typeof score === 'number'
+      ? score
+      : typeof raw?.enrollmentScore === 'number'
+        ? raw.enrollmentScore
+        : DEFAULT_FREE_SHIPPING_SCORE_CONFIG.enrollmentScore,
+  }
+}
+
+/** 減免運費計分結果 */
+export interface FreeShippingScoreResult {
+  /** 命中的門檻檔（未命中為空，不設兜底分） */
+  thresholdBand?: FreeShippingThresholdBand
+  thresholdScore: number
+  enrollmentScore: number
+  /** 是否超出有效門檻上限（超限視為空轉活動） */
+  guarded: boolean
+  /** 本次計算採用的有效門檻上限（元）；undefined 表示未設上限 */
+  limit?: number
+  total: number
+}
+
+/**
+ * 算分：報名分 + 門檻分。
+ * 門檻按運營配置的檔位由低到高查表，命中即停、分數不累加；匹配不到即 0 分。
+ * 超出有效上限時視為空轉活動：門檻分不發，報名分是否發由 enrollWhenGuarded 決定（預設停發）。
+ * 商家未填門檻（或無門檻活動）按 0 元處理，命中首檔。
+ */
+export function computeFreeShippingScore(cfg: FreeShippingScoreConfig, threshold: number): FreeShippingScoreResult {
+  const usedThreshold = Number.isFinite(threshold) && threshold > 0 ? threshold : 0
+  const band = cfg.thresholdBands.find(item => usedThreshold <= item.threshold)
+  const thresholdScore = cfg.thresholdEnabled ? band?.score ?? 0 : 0
+  const limit = freeShippingGuardLimit(cfg)
+  const guarded = limit !== undefined && usedThreshold > limit
+  const enrollmentScore = guarded && !cfg.enrollWhenGuarded ? 0 : cfg.enrollmentScore
+  return { thresholdBand: band, thresholdScore, enrollmentScore, guarded, limit, total: enrollmentScore + thresholdScore }
+}
+
+/** 配置校驗：返回錯誤文案，null 表示通過（停用的門檻模組跳過檔位校驗，但護欄仍需校驗） */
+export function validateFreeShippingScoreConfig(cfg: FreeShippingScoreConfig): string | null {
+  if (!Number.isInteger(cfg.enrollmentScore) || cfg.enrollmentScore < 0 || cfg.enrollmentScore > 100) {
+    return '報名分必須是 0～100 的整數'
+  }
+  if (cfg.guardThreshold !== undefined && cfg.guardThreshold !== null) {
+    if (!Number.isFinite(cfg.guardThreshold) || cfg.guardThreshold < 0) return '有效門檻上限必須大於或等於 0 元'
+    const maxThreshold = cfg.thresholdBands.length
+      ? Math.max(...cfg.thresholdBands.map(band => band.threshold))
+      : undefined
+    // 覆蓋上限低於末檔會出現「檔位有分但報名分停發」的矛盾區間，直接攔截
+    if (maxThreshold !== undefined && cfg.guardThreshold < maxThreshold) {
+      return `有效門檻上限不得低於末檔門檻（${maxThreshold} 元），否則會出現檔位有分但報名分停發`
+    }
+  }
+  if (!cfg.thresholdEnabled) return null
+  const bands = cfg.thresholdBands
+  if (!bands.length) return '門檻計分已啟用，至少需要一個門檻檔位'
+  for (let i = 0; i < bands.length; i++) {
+    if (!Number.isFinite(bands[i].threshold) || bands[i].threshold < 0) return `第 ${i + 1} 檔門檻必須大於或等於 0 元`
+    if (i > 0 && bands[i].threshold <= bands[i - 1].threshold) return '門檻金額必須嚴格遞增，不得重複或留空檔'
+    if (!Number.isInteger(bands[i].score) || bands[i].score < 0 || bands[i].score > 1000) {
+      return `門檻第 ${i + 1} 檔分值必須是 0～1000 的整數`
+    }
+    // 硬校驗：門檻越高分值不能越高，防止把高分誤填到高門檻檔
+    if (i > 0 && bands[i].score > bands[i - 1].score) {
+      return `門檻越高，分值必須不高於上一檔（第 ${i + 1} 檔 ${bands[i].score} 分 > 第 ${i} 檔 ${bands[i - 1].score} 分）`
+    }
+  }
+  return null
+}
+
+/** 配置軟提示：只提示不攔截（補 0 元檔 / 覆蓋上限高於末檔時只剩報名分） */
+export function freeShippingScoreHint(cfg: FreeShippingScoreConfig): string | null {
+  const hints: string[] = []
+  const first = cfg.thresholdBands[0]
+  if (cfg.thresholdEnabled && first && first.threshold > 0) {
+    hints.push('提醒：首檔門檻大於 0 元，無門檻的減免運費活動將拿不到門檻分，建議補一檔 0 元檔')
+  }
+  if (cfg.guardThreshold !== undefined && cfg.guardThreshold !== null && cfg.thresholdBands.length) {
+    const maxThreshold = Math.max(...cfg.thresholdBands.map(band => band.threshold))
+    if (cfg.guardThreshold > maxThreshold) {
+      hints.push(`提醒：有效上限 ${cfg.guardThreshold} 元高於末檔 ${maxThreshold} 元，超出末檔的區間只有報名分（門檻分為 0）`)
+    }
+  }
+  return hints.length ? hints.join(' ') : null
+}
+
+/* ============================ 平台會員紅包（COM_06） ============================ */
+
+/** 使用平台會員紅包計分面板的規則編碼 */
+export const MEMBER_BONUS_SCORE_RULE_IDS = ['COM_06'] as const
+export type MemberBonusScoreRuleId = typeof MEMBER_BONUS_SCORE_RULE_IDS[number]
+
+/** 判斷該計分項是否走平台會員紅包面板 */
+export const isMemberBonusScoreRule = (id?: string): boolean =>
+  !!id && (MEMBER_BONUS_SCORE_RULE_IDS as readonly string[]).includes(id)
+
+/**
+ * 平台會員紅包加碼檔：平台配置的出資金額由商家承擔，商家可自行額外加碼；
+ * 運營按「商家加碼金額 → 分值」配置梯度，加碼越多分越高。
+ */
+export interface MemberBonusTier {
+  /** 商家加碼金額（元），達到該金額即命中 */
+  amount: number
+  /** 該檔位對應分值 */
+  score: number
+}
+
+/** 平台會員紅包計分配置：得分 = 報名分 + 加碼分（按商家加碼金額查檔） */
+export interface MemberBonusScoreConfig {
+  /** 報名分：商家報名平台會員紅包即給分（不可關閉） */
+  enrollmentScore: number
+  /** 加碼梯度（按金額升序，命中即停） */
+  bonusTiers: MemberBonusTier[]
+}
+
+/** 默認模板：報名分 + 四檔加碼梯度（僅示例，運營按實際預算調整） */
+export const DEFAULT_MEMBER_BONUS_SCORE_CONFIG: MemberBonusScoreConfig = {
+  enrollmentScore: 10,
+  bonusTiers: [
+    { amount: 5, score: 5 },
+    { amount: 10, score: 10 },
+    { amount: 20, score: 20 },
+    { amount: 50, score: 50 },
+  ],
+}
+
+/** 加碼檔的整句條件文案 */
+export function memberBonusTierLabel(tier: MemberBonusTier): string {
+  return `商家加碼 ≥ ${tier.amount} 元`
+}
+
+/** 平台會員紅包計分結果 */
+export interface MemberBonusScoreResult {
+  /** 命中的加碼檔（未命中為空，不設兜底分） */
+  matchedTier?: MemberBonusTier
+  bonusScore: number
+  enrollmentScore: number
+  total: number
+}
+
+/**
+ * 算分：報名分 + 加碼分。
+ * 加碼金額按檔位由低到高匹配，取「達到的最後一檔」，命中即停、分數不累加；未達首檔即 0 分。
+ * 商家未加碼（0 元）只拿報名分。
+ */
+export function computeMemberBonusScore(cfg: MemberBonusScoreConfig, addAmount: number): MemberBonusScoreResult {
+  const amount = Number.isFinite(addAmount) && addAmount > 0 ? addAmount : 0
+  // 取「达到的最高金额档」，不依赖配置顺序；命中一档即停，不累加
+  const matchedTier = cfg.bonusTiers.reduce<MemberBonusTier | undefined>(
+    (best, tier) => amount >= tier.amount && (!best || tier.amount > best.amount) ? tier : best,
+    undefined,
+  )
+  const bonusScore = matchedTier?.score ?? 0
+  return { matchedTier, bonusScore, enrollmentScore: cfg.enrollmentScore, total: cfg.enrollmentScore + bonusScore }
+}
+
+/** 配置校驗：返回錯誤文案，null 表示通過 */
+export function validateMemberBonusScoreConfig(cfg: MemberBonusScoreConfig): string | null {
+  if (!Number.isInteger(cfg.enrollmentScore) || cfg.enrollmentScore < 0 || cfg.enrollmentScore > 100) {
+    return '報名分必須是 0～100 的整數'
+  }
+  if (!cfg.bonusTiers.length) return '至少需要一個加碼檔位'
+  for (let i = 0; i < cfg.bonusTiers.length; i++) {
+    const tier = cfg.bonusTiers[i]
+    if (!Number.isFinite(tier.amount) || tier.amount <= 0) return `第 ${i + 1} 檔加碼金額必須大於 0 元`
+    if (i > 0 && tier.amount <= cfg.bonusTiers[i - 1].amount) return '加碼金額必須嚴格遞增，不得重複或留空檔'
+    if (!Number.isInteger(tier.score) || tier.score < 0 || tier.score > 1000) {
+      return `加碼第 ${i + 1} 檔分值必須是 0～1000 的整數`
+    }
+    // 硬校驗：加碼越多分值不能越低，防止把低分誤填到高加碼檔
+    if (i > 0 && tier.score < cfg.bonusTiers[i - 1].score) {
+      return `加碼金額越高，分值不得低於上一檔（第 ${i + 1} 檔 ${tier.score} 分 < 第 ${i} 檔 ${cfg.bonusTiers[i - 1].score} 分）`
+    }
+  }
+  return null
+}
+
+/** 归一化后端已保存的配置：过滤非法档位与类型，缺失时回退默认模板 */
+export function normalizeMemberBonusScoreConfig(raw: Partial<MemberBonusScoreConfig> | undefined): MemberBonusScoreConfig {
+  const tiers = Array.isArray(raw?.bonusTiers)
+    ? raw.bonusTiers
+        .filter(tier => tier && Number.isFinite(tier.amount) && Number.isFinite(tier.score))
+        .map(tier => ({ amount: tier.amount, score: tier.score }))
+    : DEFAULT_MEMBER_BONUS_SCORE_CONFIG.bonusTiers
+  return {
+    ...DEFAULT_MEMBER_BONUS_SCORE_CONFIG,
+    ...raw,
+    bonusTiers: tiers,
+    enrollmentScore: typeof raw?.enrollmentScore === 'number' && Number.isFinite(raw.enrollmentScore)
+      ? raw.enrollmentScore
+      : DEFAULT_MEMBER_BONUS_SCORE_CONFIG.enrollmentScore,
+  }
+}
+
 /* ============================ 金字招牌標籤計分（COM_10） ============================ */
 
 /** 使用金字招牌標籤計分面板的規則編碼 */
@@ -560,11 +882,11 @@ export interface OrganicScoreRule {
   calcCycle?: CalcCycle
   /** 定時監控間隔小時數（僅 calcCycle=SCHEDULED 時使用，支持小數如 0.5） */
   calcIntervalHours?: number
-  /** 歷史基線天數（出餐速度等時間窗口對比規則使用） */
+  /** 統計天數（出餐準時率 STB_05 使用：統計過去 N 天準時率，不含當天） */
   statDaysTotal?: number
-  /** 近期對比天數（出餐速度等時間窗口對比規則使用） */
+  /** 近期對比天數（舊時間窗口對比規則遺留，STB_05 已不再使用） */
   statDaysRecent?: number
-  /** 高峰時段定義（出餐速度等規則使用） */
+  /** 高峰時段定義（舊出餐速度規則遺留） */
   peakTimeRanges?: PeakTimeRange[]
   /** 每單固定扣分（拒絕接單等按次計罰規則使用，正值存儲，顯示時加負號） */
   deductionPerOrder?: number
@@ -576,6 +898,10 @@ export interface OrganicScoreRule {
   regionConfigs?: Record<string, RegionSupportConfig | RegionOverheatConfig>
   /** 活動加分配置（僅 STB_ACT 規則使用；暫按算法庫算法ID配置，每個算法獨立計分） */
   activityItems?: ActivityScoreItem[]
+  /** 減免運費計分配置（僅 COM_02 規則使用：門檻檔位 + 報名分護欄） */
+  freeShippingConfig?: FreeShippingScoreConfig
+  /** 平台會員紅包計分配置（僅 COM_06 規則使用：報名分 + 加碼梯度） */
+  memberBonusConfig?: MemberBonusScoreConfig
   status: ServiceStatus
   /** 系統內置項不可刪除，僅可啟用/停用與調整分值 */
   builtin: boolean
@@ -605,12 +931,12 @@ export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
     { multiplier: 2, score: 20 },
     { multiplier: 3, score: 10 },
   ] },
-  { id: 'COM_02', dimension: ScoreDimension.COMMERCIAL, name: '減免運費', description: '商家減免配送運費加分', mode: ScoreMode.RULE_BONUS, score: 20, status: ENABLED, builtin: true, prerequisites: '報名減免運費' },
+  { id: 'COM_02', dimension: ScoreDimension.COMMERCIAL, name: '減免運費', description: '商家報名減免運費活動：報名分 + 門檻分（門檻由運營人工配置，按金額查檔）', mode: ScoreMode.RULE_BONUS, score: 20, status: ENABLED, builtin: true, prerequisites: FREE_SHIPPING_ENROLLMENT_PREREQUISITE },
   { id: 'COM_03', dimension: ScoreDimension.COMMERCIAL, name: '進店領券', description: '商家設置進店領券：報名分 + 門檻分（門檻 ÷ 門店客單價） + 力度分（券面 ÷ 計價基數）', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
-  { id: 'COM_04', dimension: ScoreDimension.COMMERCIAL, name: '新客立減', description: '商家參與新客立減：報名分 + 門檻分（門檻 ÷ 門店客單價） + 力度分（券面 ÷ 計價基數）', mode: ScoreMode.RULE_BONUS, score: 30, status: ENABLED, builtin: true },
+  { id: 'COM_04', dimension: ScoreDimension.COMMERCIAL, name: '門店新客券', description: '商家設置門店新客券：報名分 + 門檻分（門檻 ÷ 門店客單價） + 力度分（券面 ÷ 計價基數）', mode: ScoreMode.RULE_BONUS, score: 30, status: ENABLED, builtin: true },
   { id: 'COM_05', dimension: ScoreDimension.COMMERCIAL, name: '收藏送券', description: '商家設置收藏送券：報名分 + 門檻分（門檻 ÷ 門店客單價） + 力度分（券面 ÷ 計價基數）', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
-  { id: 'COM_06', dimension: ScoreDimension.COMMERCIAL, name: '會員紅包', description: '商家設置會員紅包：報名分 + 門檻分（門檻 ÷ 門店客單價） + 力度分（券面 ÷ 計價基數）', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
-  { id: 'COM_07', dimension: ScoreDimension.COMMERCIAL, name: '閃蜂官方神券', description: '商家設置閃蜂官方神券：報名分 + 門檻分（門檻 ÷ 門店客單價） + 力度分（券面 ÷ 計價基數）', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
+  { id: 'COM_06', dimension: ScoreDimension.COMMERCIAL, name: '平台會員紅包', description: '商家報名平台會員紅包：報名分 + 加碼分（按商家額外加碼出資金額梯度計分）', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
+  { id: 'COM_07', dimension: ScoreDimension.COMMERCIAL, name: '平台官方神券', description: '商家設置平台官方神券：報名分 + 門檻分（門檻 ÷ 門店客單價） + 力度分（券面 ÷ 計價基數）', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
   { id: 'COM_10', dimension: ScoreDimension.COMMERCIAL, name: '金字招牌(廣告)', description: '商家購買金字招牌標籤後，按已購買且在投放期內的標籤逐個累加計分', mode: ScoreMode.RULE_BONUS, score: 100, status: ENABLED, builtin: true },
 
   // ===== 店鋪維度（基礎信息 + 店鋪運營） =====
@@ -649,9 +975,7 @@ export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
       { threshold: 1000, direction: TierDirection.MORE_THAN, score: -60 },
     ] },
   } },
-  { id: 'STB_05', dimension: ScoreDimension.STORE, name: '出餐速度', description: '統計過去N天（不含當天）出餐均值，當天出餐時間超過均值即扣分', mode: ScoreMode.CONDITIONAL, score: 0, statDaysTotal: 7, conditionItems: [
-    { condition: 'over_avg_deduction', score: 30 },
-  ], status: ENABLED, builtin: true },
+  { id: 'STB_05', dimension: ScoreDimension.STORE, name: '出餐準時率', description: '統計過去N天（不含當天）出餐準時率，按準時率梯度計分：按率從高到低匹配，命中一檔即停、分數不累加，低於最低檔不得分', mode: ScoreMode.CONDITIONAL, score: 0, statDaysTotal: 7, conditionItems: toOntimeRateConditionItems(DEFAULT_ONTIME_RATE_BANDS), status: ENABLED, builtin: true },
   { id: 'STB_06', dimension: ScoreDimension.STORE, name: '拒絕接單', description: '統計天數內（含當天），每拒絕一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 80, status: ENABLED, builtin: true },
   { id: 'STB_07', dimension: ScoreDimension.STORE, name: '出餐超時', description: '統計天數內（不含當天），每超時一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 70, status: ENABLED, builtin: true },
   { id: 'STB_08', dimension: ScoreDimension.STORE, name: '取消訂單', description: '統計天數內（含當天），每取消一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 80, status: ENABLED, builtin: true },

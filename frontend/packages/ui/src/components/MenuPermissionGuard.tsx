@@ -1,4 +1,4 @@
-import { Button, Result } from 'antd'
+import { Button, Result, Space, Spin } from 'antd'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/contexts/AuthContext'
@@ -17,7 +17,7 @@ import { isBackendConnected, pathToKey } from '@/constants/menuDataSource'
 export default function MenuPermissionGuard({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation()
   const { hasMenuPermission, user } = useAuth()
-  const { status: menuStatus } = useMenu()
+  const { status: menuStatus, menuTree, issue, refreshing, refresh } = useMenu()
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -26,19 +26,37 @@ export default function MenuPermissionGuard({ children }: { children: React.Reac
     ? 'asset-transfer-list'
     : ROUTE_MENU_KEY_MAP[location.pathname] ?? pathToKey[location.pathname]
 
-  const isOffline = menuStatus === 'offline'
+  const waitingForMenu = menuStatus === 'loading' && !menuTree
+  const menuUnavailable = menuStatus === 'offline' || menuStatus === 'error'
+    || (menuStatus === 'degraded' && !menuTree)
 
-  // 離線阻斷：後端停服時，已接入後端的菜單不允許訪問
-  if (isOffline && menuKey && isBackendConnected(menuKey)) {
+  // 短暂刷新失败且已有本账号导航时保持页面挂载，避免清掉未保存表单；下方权限判断不豁免。
+  // 首次加载、连续失败及鉴权/业务错误仍阻断，不能回退到业务 Mock 页面。
+  if ((waitingForMenu || menuUnavailable) && menuKey && isBackendConnected(menuKey)) {
+    // 第一阶段繁中文案，待界面确认后补齐 i18n，不把浏览器请求失败冒充 HTTP 503。
+    const descriptions = {
+      network: '本機網路已中斷，請檢查網路連線。這不代表雲端服務已停止。',
+      timeout: '菜單請求逾時，服務仍可能運行中。請稍後重試。',
+      unreachable: '暫時無法連接菜單服務，請檢查網路連線或稍後重試。',
+      server: '菜單服務回應異常，請稍後重試。',
+    }
     return (
       <Result
-        status="500"
-        title="503"
-        subTitle={t('guard.offlineSub', '後端服務暫時不可用，該功能需要後端支持。原型頁面仍可訪問。')}
+        status={waitingForMenu ? 'info' : 'warning'}
+        icon={waitingForMenu ? <Spin size="large" /> : undefined}
+        title={waitingForMenu ? '正在載入菜單' : menuStatus === 'error' ? '菜單驗證失敗' : '菜單暫時無法載入'}
+        subTitle={waitingForMenu ? t('common.loading')
+          : menuStatus === 'error' ? '無法確認最新菜單授權，請重試或重新登入。'
+            : issue ? descriptions[issue] : '菜單連線尚未恢復，請稍後重試。'}
         extra={
-          <Button type="primary" onClick={() => navigate('/')}>
-            {t('guard.backHome', '返回首頁')}
-          </Button>
+          <Space>
+            <Button type="primary" aria-label="重新載入菜單" loading={refreshing} disabled={waitingForMenu} onClick={() => { void refresh() }}>
+              {t('common.retry', '重試')}
+            </Button>
+            <Button onClick={() => navigate('/')}>
+              {t('guard.backHome', '返回首頁')}
+            </Button>
+          </Space>
         }
       />
     )

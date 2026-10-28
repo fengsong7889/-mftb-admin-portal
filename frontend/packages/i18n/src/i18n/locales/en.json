@@ -3430,6 +3430,7 @@
     "underDevelopment": "Export is under development...",
     "basicInfo": "Basic Info",
     "loading": "Loading...",
+    "retry": "Retry",
     "requestTimeout": "The network response timed out. Please try again later.",
     "noData": "No Data",
     "confirm": "Confirm",
@@ -14613,13 +14614,15 @@
     "viewAll": "View all"
   },
   "agentConsole": {
-    "title": "Agent Console",
-    "previewTitle": "Agent Console · UI Preview",
+    "title": "AI System · Platform Governance",
+    "previewTitle": "AI System · Platform Governance (UI Preview)",
     "bannerTitle": "All panels wired to live data",
-    "bannerDesc": "Applications, budget, proposals, knowledge ACL, data & endpoints, runs, evaluation and readiness all read live APIs; the four overview cards use live ops/readiness counts. This page never calls a model or creates real requests.",
+    "bannerDesc": "Models & tools, knowledge, access & quota, runs & quality, and security & governance panels all read live APIs; the four overview cards use live ops/readiness counts. This page never calls a model or creates real requests.",
+    "budgetScopeTitle": "Effective scope: employee + calendar month",
+    "budgetScopeDesc": "A monetary budget only reserves before the call and settles after it. It grants no model permission and does not replace employee/department token or request quotas - both apply. When no pool is configured, the existing quota policies decide. Department/app scopes can be registered, but the current billing path does not enforce them yet; do not treat them as an effective department budget.",
     "notWired": "Sample",
     "wired": "Live",
-    "menuPlan": "Menu registered: one first-level “Agent Console” plus 8 children",
+    "menuPlan": "Function map: seven business groups and their entries (menu keys unchanged, grants unaffected)",
     "card": {
       "apps": "Published apps",
       "endpoints": "Approved endpoints",

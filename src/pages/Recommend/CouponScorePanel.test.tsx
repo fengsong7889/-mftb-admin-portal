@@ -32,7 +32,7 @@ async function mount(readOnly = false) {
   })
 }
 
-/** 展开指定券类计分项的 v1 面板（COM_03~COM_07 共用同一面板） */
+/** 展开指定券类计分项的 v1 面板（COM_01/03/04/05/07 共用同一面板） */
 function openPanel(id = 'COM_03', name = '進店領券') {
   fireEvent.click(screen.getByText(id))
   return within(screen.getByLabelText(`${name}計分配置`))
@@ -200,7 +200,7 @@ describe('进店领券方案 v1 面板', () => {
     expect(panel.getByText(/公式：券面金額 D ÷ 計價基數（B 與 T 取大）/)).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('報名分值'), { target: { value: '25' } })
     fireEvent.click(screen.getByRole('button', { hidden: true, name: /保\s*存/ }))
-    expect(panel.getByRole('switch', { hidden: true, name: '報名計分' }).closest('.organic-score-row')).toHaveTextContent('+25 分')
+    expect(panel.getByText('滿足條件才給分').closest('.organic-score-row')).toHaveTextContent('+25 分')
     expect(message.info).toHaveBeenCalledWith(expect.stringContaining('當前頁面草稿'))
     expect(api.update).not.toHaveBeenCalled()
 
@@ -246,11 +246,10 @@ describe('进店领券方案 v1 面板', () => {
     fireEvent.click(panel.getByRole('button', { hidden: true, name: /[编編]\s*[辑輯]/ }))
     fireEvent.click(panel.getByRole('switch', { name: '啟用報名分' }))
     fireEvent.click(screen.getByRole('button', { hidden: true, name: /保\s*存/ }))
-    const sw = panel.getByRole('switch', { hidden: true, name: '報名計分' })
-    expect(sw).not.toBeChecked()
-    expect(sw).toBeDisabled()
+    const tag = panel.getByText('報名分已停用')
+    expect(tag).toBeInTheDocument()
     // 灰显行仍展示原值 10 分，但试算里的报名分为 0，避免把停用值误读成生效加分
-    expect(sw.closest('.organic-score-row')?.querySelector('.organic-score-value--disabled')).toHaveTextContent('+10 分')
+    expect(tag.closest('.organic-score-row')?.querySelector('.organic-score-value--disabled')).toHaveTextContent('+10 分')
     fireEvent.click(panel.getByRole('button', { hidden: true, name: '試算與說明' }))
     const dialog = within(screen.getByRole('dialog'))
     expect(dialog.getByText('報名分')).toBeInTheDocument()
@@ -274,13 +273,13 @@ describe('进店领券方案 v1 面板', () => {
   }, 120000)
 })
 
-describe('滿額立減與五個券類活動統一使用 v1 面板', () => {
+describe('滿額立減與券類活動統一使用 v1 面板', () => {
   const couponRules = [
-    ['COM_01', '滿額立減'], ['COM_03', '進店領券'], ['COM_04', '新客立減'], ['COM_05', '收藏送券'],
-    ['COM_06', '會員紅包'], ['COM_07', '閃蜂官方神券'],
+    ['COM_01', '滿額立減'], ['COM_03', '進店領券'], ['COM_04', '門店新客券'], ['COM_05', '收藏送券'],
+    ['COM_07', '平台官方神券'],
   ] as const
 
-  it('COM_03~COM_07 都渲染 v1 面板，不再出现旧面板的比例档与折减系数', async () => {
+  it('COM_01/03/04/05/07 都渲染 v1 面板，不再出现旧面板的比例档与折减系数', async () => {
     await mount()
     for (const [id, name] of couponRules) {
       const panel = openPanel(id, name)
@@ -313,18 +312,18 @@ describe('滿額立減與五個券類活動統一使用 v1 面板', () => {
     expect(api.update).not.toHaveBeenCalled()
   }, 180000)
 
-  it('各活動草稿互相獨立，改一個不影響其他四項', async () => {
+  it('各活動草稿互相獨立，改一個不影響其他三項', async () => {
     await mount()
     const target = openPanel('COM_05', '收藏送券')
     fireEvent.click(target.getByRole('button', { hidden: true, name: /[编編]\s*[辑輯]/ }))
     fireEvent.change(target.getByLabelText('報名分值'), { target: { value: '30' } })
     fireEvent.click(screen.getByRole('button', { hidden: true, name: /保\s*存/ }))
-    expect(target.getByRole('switch', { hidden: true, name: '報名計分' }).closest('.organic-score-row')).toHaveTextContent('+30 分')
+    expect(target.getByText('滿足條件才給分').closest('.organic-score-row')).toHaveTextContent('+30 分')
     expect(target.getByText(/當前頁面草稿/)).toBeInTheDocument()
-    // 其他四項仍为默认模板 10 分，且不因一项展开而丢失自己的状态
-    for (const [id, name] of [['COM_03', '進店領券'], ['COM_04', '新客立減'], ['COM_06', '會員紅包'], ['COM_07', '閃蜂官方神券']] as const) {
+    // 其他三項仍为默认模板 10 分，且不因一项展开而丢失自己的状态
+    for (const [id, name] of [['COM_03', '進店領券'], ['COM_04', '門店新客券'], ['COM_07', '平台官方神券']] as const) {
       const other = openPanel(id, name)
-      expect(other.getByRole('switch', { hidden: true, name: '報名計分' }).closest('.organic-score-row'), id).toHaveTextContent('+10 分')
+      expect(other.getByText('滿足條件才給分').closest('.organic-score-row'), id).toHaveTextContent('+10 分')
       expect(other.getByText(/示例模板/), id).toBeInTheDocument()
     }
     expect(api.update).not.toHaveBeenCalled()
@@ -372,7 +371,7 @@ describe('券類面板的評分說明', () => {
     fireEvent.click(screen.getByRole('button', { hidden: true, name: /保\s*存/ }))
     expect(api.update).not.toHaveBeenCalled()
     expect(message.info).toHaveBeenCalledWith(expect.stringContaining('當前頁面草稿'))
-    expect(panel.getByRole('switch', { hidden: true, name: '報名計分' }).closest('.organic-score-row')).toHaveTextContent('+18 分')
+    expect(panel.getByText('滿足條件才給分').closest('.organic-score-row')).toHaveTextContent('+18 分')
 
     // 改说明后取消：不发请求、不保留输入
     fireEvent.click(panel.getByRole('button', { hidden: true, name: /[编編]\s*[辑輯]/ }))

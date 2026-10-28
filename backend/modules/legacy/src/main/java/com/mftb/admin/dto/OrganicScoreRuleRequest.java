@@ -85,6 +85,12 @@ public class OrganicScoreRuleRequest {
     /** 区域扶持配置 JSON 字符串（仅 PLT_03 商家扶持使用，按区域独立配置） */
     private String regionConfigs;
 
+    /** 减免运费计分配置 JSON 字符串（仅 COM_02 使用：门槛档位 + 报名分护栏） */
+    private String freeShippingConfig;
+
+    /** 平台会员红包计分配置 JSON 字符串（仅 COM_06 使用：报名分 + 商家加码梯度） */
+    private String memberBonusConfig;
+
     /** 服务状态: 1=启用 2=停用 */
     @NotNull(message = "狀態不能為空")
     private Integer status;

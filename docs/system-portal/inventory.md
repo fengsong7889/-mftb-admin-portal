@@ -122,6 +122,47 @@
 
 > 歷史分組 `doc-center-management` 已由 doc:menu:v1.1 解除（邏輯刪除+清授權）：系統視圖按 system_code 剪枝，一級分組沒有運行時職責只多一次展開。門戶業務域歸類：doc 屬「協作與交付」（collab），使用視角為全員查閱知識，空間治理入口留在系統內。
 
+### 2.1 人工智能系統 · 菜單信息架構（ai:menu-ia-v1）
+
+> 背景：2026-10 用户反映「配額管理」與「企業 Agent &gt; 預算與配額」並列却职责不清、
+> 「企業 Agent」不像系统菜单名、多数菜单不知道管什么。诊断结论：AI 域同时按
+> 技术组件（模型/MCP/Agent）、管理对象（员工/部门/知识）、配置动作（授权/配额/发布）、
+> 建设批次（原 AI 管理 / AI 助手 / 企业 Agent）四种方式分类，导致同一对象跨菜单配置。
+>
+> 目标态：**按业务任务分组、按管理对象配置、按动作独立授权**。
+> 唯一代码真值：`AiMenuLayout`（分组/归位/显示名） + `AiMenuLayoutInitializer`（每次启动幂等校正并断言）。
+
+| 一级分组 key | 顯示名 | 承載入口（menu_key 不變） |
+|---|---|---|
+| `ai-grp-overview` | 總覽 | `agent-overview` 平台總覽、`ai-assistant-overview` 助手總覽 |
+| `ai-grp-app` | 應用管理 | `agent-apps` 智能應用、`ai-assistant-profile` 回答規則、`ai-assistant-quick-prompt`、`ai-assistant-push-template` |
+| `ai-grp-model` | 模型與工具 | `ai-model-list`、`ai-model-provider`、`ai-mcp-service` 工具管理、`ai-assistant-capability` 工具能力說明、`ai-operation-auth` 工具與通道授權 |
+| `ai-grp-knowledge` | 知識管理 | `ai-assistant-knowledge`、`agent-knowledge` 知識授權、`ai-assistant-glossary` 業務術語 |
+| `ai-grp-grant` | 授權與額度 | `ai-emp-permission` 員工使用診斷、`ai-auth-manage` 模型授權（`ai-dept-model-auth`/`ai-emp-model-auth`）、`ai-quota-manage` 用量額度（`ai-dept-quota`/`ai-emp-quota`）、`agent-budget` 費用預算、`ai-energy-billing` 用量與費用（`ai_usage_stats`/`ai_energy_detail`）、`ai-access-request` 使用申請 |
+| `ai-grp-run` | 運行與質量 | `agent-runs` 運行記錄、`agent-actions` 操作審批、`agent-evaluation` 評測與發布記錄、`ai-assistant-feedback` 用戶反饋 |
+| `ai-grp-security` | 安全與治理 | `agent-data` 數據外發管理、`ai-assistant-guardrail` 內容安全規則、`ai-assistant-memory` 記憶策略、`ai-conversation-audit`、`ai-assistant-audit` 配置變更審計 |
+
+**歸位紀律（不得簡化）**
+
+1. **只改放置關係與顯示名**：`menu_key`、`path`、`actions` 一律不動，存量 `sys_role_menu` / `sys_department_menu`
+   授權掛在 menu_key 上，因此歸位不會造成靜默失權；也**不得**用 `deleted=1` 藏被合併的入口。
+2. **三種額度概念不合賬**：模型授權（能不能用） / 用量額度（週期內用多少） / 費用預算（金額預占結算）
+   同組展示但各自獨立判定；任何「合併成一個總額度」的改動必須另立賬本遷移項目。
+3. **執行順序**：主種子（@Order 5）→ 系統歸屬（15）→ AI 助手（16）→ 企業 Agent（31）→
+   `AiMenuLayoutInitializer`（60）。前兩者仍按歷史父子關係自愈，由最後一步每次啟動校正，
+   因此 `assertGrouped` 只守「不脫掛」，最終層級由 `AiMenuLayoutInitializer` 斷言。
+4. **歷史分組退役**：`agent-platform`、`ai-assistant-group`、`ai-models` 只軟刪目錄行，授權記錄保留；
+   新增一級分組必須同時登記到 `SystemPortalSchemaInitializer.AI_TOP_LEVEL_MENUS`。
+5. **命名口徑**：一級分組用「領域 + 管理/與」，二級用「對象 + 動作/範圍」；
+   禁止再用「權控/權額/骨架/動作提案/數據與端點」這類需要解釋的壓縮詞。
+6. **前端只保留展示副本**：`src/pages/AiAssistant/console/aiMenuMap.ts` 的功能地圖用於
+   「平台總覽」講清每個入口管什麼/誰用/對誰生效，不參與鑑權；分組或顯示名變更時必須同步。
+7. **落地狀態（2026-10-28）**：後端歸位（`AiMenuLayout`/`AiMenuLayoutInitializer`）、兩個歷史初始化器的
+   「不脫掛」斷言、前端圖標與英文兜底、平台總覽功能地圖已交付；已過 `check:menu`、`typecheck`、
+   `check:i18n`、`AiMenuLayoutTest`（5 條）與 AI 頁面測試（19 條）。**菜單層級需重啟後端後方可見**；
+   本輪未重啟，避免連帶執行工作區中尚未提交的其它遷移。頁籤合併、對象選擇器、運行狀態補齊（P3）
+   待界面確認後單獨推進。
+
 > **免登签到页 `/meeting-checkin?token=`（M2）不是菜单项**：它对应后端安全白名单里的 `/api/meeting/checkin-page/**`，
 > 身份由 HMAC 令牌（绑人 + 绑会议 + 会议结束后 2 小时失效）校验；前端把它登记进 `pathToKey` / `ROUTE_MENU_KEY_MAP`
 > 并归到 `meeting-my`，只是为了让页签与菜单高亮拿得到锚点，不代表该页需要登录态。

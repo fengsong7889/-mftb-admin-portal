@@ -136,21 +136,29 @@ export const MENU_NAME_EN: Record<string, string> = {
   'workflow-config': 'Workflow Config',
   'version-history': 'Version History',
   'ai-assistant-group': 'AI Assistant',
+  // ai:menu-ia-v1 业务分组（后端 AiMenuLayoutInitializer 维护 name_en，本表仅兜底）
+  'ai-grp-overview': 'Overview',
+  'ai-grp-app': 'Applications',
+  'ai-grp-model': 'Models & Tools',
+  'ai-grp-knowledge': 'Knowledge',
+  'ai-grp-grant': 'Access & Quota',
+  'ai-grp-run': 'Runs & Quality',
+  'ai-grp-security': 'Security & Governance',
   'ai_model_hub': 'Model Access',
-  'ai-operation-auth': 'AI Access Control',
+  'ai-operation-auth': 'Tool & Channel Access',
   'ai-assistant-overview': 'Assistant Overview',
-  'ai-assistant-capability': 'Capabilities',
-  'ai-assistant-profile': 'Answer Skeleton',
-  'ai-assistant-glossary': 'Glossary',
+  'ai-assistant-capability': 'Tool Capabilities',
+  'ai-assistant-profile': 'Answer Rules',
+  'ai-assistant-glossary': 'Business Glossary',
   'ai-assistant-knowledge': 'Knowledge Base',
-  'ai-assistant-guardrail': 'Guardrails',
-  'ai-assistant-feedback': 'Answer Quality',
-  'ai-assistant-audit': 'Config Audit',
+  'ai-assistant-guardrail': 'Content Safety Rules',
+  'ai-assistant-feedback': 'User Feedback',
+  'ai-assistant-audit': 'Config Change Audit',
   'ai-assistant-quick-prompt': 'Quick Prompts',
   'ai-assistant-push-template': 'Push Templates',
   'ai-assistant-memory': 'Memory Policy',
-  'ai_usage_stats': 'Energy Statistics',
-  'ai_energy_detail': 'Energy Detail',
+  'ai_usage_stats': 'Usage Summary',
+  'ai_energy_detail': 'Call Details',
   // 智能中心 (AI) - 拆分后的新菜单 key
   'ai-models': 'Model Management',
   'ai-model-provider': 'Model Provider',
@@ -159,21 +167,21 @@ export const MENU_NAME_EN: Record<string, string> = {
   'ai-auth': 'Model Authorization',
   'ai-quota': 'Quota Policy',
   // AI 配额与策略（拆分后的分组与子菜单）
-  'ai-auth-manage': 'Model Access Control',
-  'ai-quota-manage': 'Quota Management',
+  'ai-auth-manage': 'Model Authorization',
+  'ai-quota-manage': 'Usage Quota',
   'ai-dept-model-auth': 'Dept Model Access',
   'ai-emp-model-auth': 'Employee Model Access',
   'ai-pos-auth': 'Position-Based Authorization',    // 按职位授权
   'ai-role-auth': 'Role-Based Authorization',       // 角色授权
   'ai-dept-quota': 'Department Quota',
   'ai-emp-quota': 'Employee Quota',
-  'ai-emp-permission': 'Employee AI Quota Management',
-  // 能耗與賬單
-  'ai-energy-billing': 'Energy & Billing',
+  'ai-emp-permission': 'Employee AI Diagnosis',
+  // 用量與費用
+  'ai-energy-billing': 'Usage & Cost',
   // AI 使用申請（與 en.json aiApply.pageTitle 保持一致）
-  'ai-access-request': 'AI Access Application',
-  // MCP 服務
-  'ai-mcp-service': 'MCP Services',
+  'ai-access-request': 'Access Request',
+  // 工具管理
+  'ai-mcp-service': 'Tool Management',
   // OA中心
   'oa-center': 'OA Center',
   'oa-requests': 'Workflow Items',

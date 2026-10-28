@@ -6,12 +6,13 @@ import { useTranslation } from 'react-i18next'
 import { fetchAssistantOverview, type AiAssistantOverview } from '@/api/aiOverview'
 import AiAssistantPageShell from './PageShell'
 
+/** 配置类型枚举 → 与菜单同名的繁中文案；未知值原样展示，不丢信息 */
 const TYPE_LABEL: Record<string, string> = {
-  capability: '能力清單',
-  prompt: '回答骨架',
-  glossary: '術語與口徑',
+  capability: '工具能力說明',
+  prompt: '回答規則',
+  glossary: '業務術語',
   knowledge: '知識庫',
-  guardrail: '合規護欄',
+  guardrail: '內容安全規則',
   quick_prompt: '快捷提問',
   push_template: '推送模板',
   runtime_setting: '記憶策略',
@@ -76,8 +77,8 @@ function AssistantOverviewContent() {
       backTo="/"
     >
       <div className="action-section" style={{ marginBottom: 12 }}>
-        <Button onClick={() => navigate('/ai-assistant?preview=enterprise')}>企業 Agent 方案預覽</Button>
-        <Button onClick={() => navigate('/ai-assistant?preview=console')}>企業 Agent 控制台（預覽）</Button>
+        {/* 方案预览入口不再挂在生产导航：演示稿仍在 /ai-assistant?preview=... 供评审直接访问，
+            避免运营人员把模拟数据当真实能力。 */}
         <Button icon={<ReloadOutlined />} loading={loading} onClick={load}>
           {t('common.refresh', { defaultValue: '刷新' })}
         </Button>

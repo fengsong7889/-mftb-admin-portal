@@ -26,6 +26,7 @@ import type { AgentActionRow, AgentApplicationRow, AgentBudgetPoolRow, AgentData
 import { approveAction, approveEndpoint, createApplicationVersion, executeAction, publishApplication, saveApplication, saveBudgetPool, saveDataClass, fetchEvalCases, fetchKnowledgeAcl, fetchReleases, fetchRunDetail, fetchReadiness, grantKnowledgeAcl, revokeKnowledgeAcl, runEval } from '@/api/agentPlatform'
 import type { AgentAclRow, AgentEvalCaseRow, AgentReleaseRow } from '@/api/agentPlatform'
 import { fetchKnowledgeDocs } from '@/api/aiKnowledge'
+import { AI_MENU_ENTRY_COUNT, AI_MENU_MAP } from './aiMenuMap'
 import { useConsoleRemote } from './useConsoleRemote'
 import './console.css'
 
@@ -258,6 +259,10 @@ function BudgetPane() {
       { tone: 'danger', label: tr('agentConsole.s35', '拒絕即不調用'), body: tr('agentConsole.h22', '預占失敗直接返回，不先調模型再補記帳。') },
     ]} /></h3>
     {error && <Alert type="error" showIcon message="預算池加載失敗" description={error} />}
+    {/* 用户反馈「配额管理」与「预算与配额」分不清：本页只讲金额预占/结算，并如实标出当前生效范围 */}
+    <Alert type="warning" showIcon className="agent-console__spaced"
+      message={tr('agentConsole.budgetScopeTitle', '當前生效範圍：員工 + 自然月')}
+      description={tr('agentConsole.budgetScopeDesc', '金額預算只做「調用前預占、調用後結算」，不授予模型權限，也不替代員工/部門的 Tokens 與次數額度，兩者同時生效；未配置預算池時由既有額度策略判定。部門/應用範圍可先登記，但當前扣賬鏈路尚未按它們生效，不要把它當成已生效的部門總預算。')} />
     <div className="action-section"><div className="action-section-left"><Tag>{tr('agentConsole.wired', '接口數據')}</Tag><Button type="primary" size="small" onClick={() => setOpen(true)}>{tr('agentConsole.form.addPool', '新增預算池')}</Button></div><div className="action-section-right">{configComponent}</div></div>
     <Table rowKey="key" size="middle" loading={loading} columns={applyConfig(columns)} dataSource={rows} scroll={{ x: 'max-content' }}
       pagination={paginationConfig(rows.length)} />
@@ -679,6 +684,39 @@ function descriptionOf(pane: ConsolePane) {
   return CONSOLE_PANES.find(item => item.key === pane)?.description ?? ''
 }
 
+/**
+ * 功能地图：菜单树只能表达层级，表达不了「管什么、谁来用、对谁生效」。
+ * 数据与后端 AiMenuLayout 同源，纯展示，不参与鉴权。
+ */
+function MenuMap() {
+  return <Table
+    size="small"
+    rowKey="groupKey"
+    pagination={false}
+    dataSource={AI_MENU_MAP}
+    columns={[
+      {
+        key: 'group', title: '分組', width: 200,
+        render: (_, row) => <div>
+          <b>{row.group}</b>
+          <div className="agent-console__muted">{row.purpose}</div>
+          <div className="agent-console__muted">誰來用：{row.audience}</div>
+        </div>,
+      },
+      {
+        key: 'entries', title: '功能入口 · 管什麼 · 對誰生效',
+        render: (_, row) => <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {row.entries.map(entry => <div key={entry.key} style={{ lineHeight: 1.6 }}>
+            <Tag style={{ marginInlineEnd: 6 }}>{entry.name}</Tag>
+            <span>{entry.duty}</span>
+            <span className="agent-console__muted">（{entry.scope}）</span>
+          </div>)}
+        </div>,
+      },
+    ]}
+  />
+}
+
 /** 單一面板內容：預覽（頁籤）與正式路由共用，避免兩份 UI 漂移。 */
 /** 總覽四張卡：讀真實就緒統計；接口失敗時顯示 0 並由就緒面板提示錯誤。 */
 function OverviewCards() {
@@ -699,16 +737,14 @@ function PaneContent({ pane }: { pane: ConsolePane }) {
             <OverviewCards />
             <div className="agent-console__spaced"><ReadinessPanel /></div>
             <div className="agent-console__spaced">
-              <h4>菜單已登記：一級「企業 Agent」＋ 8 個二級</h4>
-              <p className="agent-console__muted">控制台屬於平台治理面，不放在「AI 助手」使用入口下；每個二級菜單獨立授權，審批人與審計只看到自己需要的頁面。</p>
-              <Table size="small" rowKey="key" pagination={false} dataSource={CONSOLE_PANES}
-                columns={[
-                  { key: 'label', title: tr('agentConsole.s02', '二級菜單'), width: 180, render: (_, row) => <b>{row.label}</b> },
-                  { key: 'menuKey', title: tr('agentConsole.s74', '菜單 key'), width: 180, render: (_, row) => <Tag>{row.menuKey}</Tag> },
-                  { key: 'desc', title: tr('agentConsole.s72', '職責'), dataIndex: 'description' },
-                ]} />
-              <Alert className="agent-console__spaced" type="info" showIcon message="建議的動作集"
-                description="總覽/運行/評測：view；應用/預算/數據分級：view + edit；提案：view + approve + execute；知識授權：view + edit；發布回滾另立 deploy 動作，避免「能改應用即可批端點」。" />
+              <h4>功能地圖：{AI_MENU_MAP.length} 個分組 · {AI_MENU_ENTRY_COUNT} 個功能入口</h4>
+              <p className="agent-console__muted">
+                按「先看總覽 → 建應用 → 選模型工具 → 管知識 → 配授權額度 → 看運行質量 → 管安全審計」排列。
+                看不到的入口代表當前帳號沒有該權限；括號內是生效範圍，選錯範圍是 AI 配置最常見的錯誤。
+              </p>
+              <MenuMap />
+              <Alert className="agent-console__spaced" type="info" showIcon message="三個最容易混的概念"
+                description="模型授權決定「能用哪個模型」；用量額度按週期限定 Tokens/次數；費用預算只做金額預占與結算，不授予任何模型權限。三者互不替代，也不相加成一個總額度。" />
             </div>
           </>}
           {pane === 'apps' && <AppsPane />}

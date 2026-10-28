@@ -159,11 +159,16 @@ public class AgentPlatformMenuInitializer implements CommandLineRunner {
         }
     }
 
+    /**
+     * 启动断言：受管子菜单必须挂在某个分组下（parent_id 为空会被侧栏平铺成一级）。
+     * <p>「企業 Agent」混合分组已退役，子菜单按业务职责迁往应用/授权/运行等分组；
+     * 最终归属由 {@link AiMenuLayoutInitializer} 校正并断言，这里只守「不脱挂」这一条。
+     */
     private void assertGrouped(Long groupId) {
         Integer detached = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM sys_menu WHERE menu_key LIKE ? AND menu_key <> ? "
-                        + "AND deleted = 0 AND (parent_id IS NULL OR parent_id <> ?)",
-                Integer.class, MENU_PREFIX + "%", GROUP_KEY, groupId);
+                        + "AND deleted = 0 AND parent_id IS NULL",
+                Integer.class, MENU_PREFIX + "%", GROUP_KEY);
         if (detached != null && detached > 0) {
             throw new IllegalStateException("企業 Agent 子菜单未挂到分组: " + detached);
         }

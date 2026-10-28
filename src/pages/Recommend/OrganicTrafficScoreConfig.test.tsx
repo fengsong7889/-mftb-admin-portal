@@ -50,27 +50,42 @@ beforeEach(() => {
 })
 
 describe('通用计分项：模块卡片与减免运费开关', () => {
-  it('减免运费以「报名计分」开关只读展示，配置包裹在计分明细模块卡片', async () => {
+  it('减免运费走专属面板：报名计分 + 人工配置的门槛档位', async () => {
     await mount()
     fireEvent.click(screen.getByText('COM_02'))
-    expect(screen.getByText('計分明細')).toBeInTheDocument()
-    const sw = screen.getByRole('switch', { name: '報名計分' })
-    expect(sw).toBeChecked()
-    expect(sw).toBeDisabled()
-    expect(screen.queryByText('前提條件')).not.toBeInTheDocument()
+    const panel = within(screen.getByLabelText('減免運費計分配置'))
+    // 报名计分：平台活动与商家自建活动最终只生效一个，报名即给分（不提供关闭）
+    expect(panel.getByText('滿足條件才給分')).toBeInTheDocument()
+    expect(panel.getByText('滿足條件才給分').closest('.organic-score-row')).toHaveTextContent('+20 分')
+    // 门槛档位按运营人工配置的金额展示，0 元档承接无门槛活动
+    expect(panel.getByText('門檻計分檔位')).toBeInTheDocument()
+    expect(panel.getByText('無門檻（0 元）').closest('.organic-score-row')).toHaveTextContent('+20 分')
+    expect(panel.getByText('減免門檻 ≤ 30 元').closest('.organic-score-row')).toHaveTextContent('+15 分')
+    // 减免门槛只能配置，不复用券类面板的客单价/力度口径，也不再出现通用前提条件输入
+    expect(panel.queryByText('力度計分檔位')).not.toBeInTheDocument()
+    expect(panel.queryByText('前提條件')).not.toBeInTheDocument()
+    // 報名分護欄：默认跟随末档，超限一併停发报名分
+    expect(panel.getByText('報名分護欄')).toBeInTheDocument()
+    expect(panel.getByText('一併停發')).toBeInTheDocument()
   })
 
-  it('减免运费编辑态可切换报名计分开关，未保存不写后端', async () => {
+  it('减免运费编辑态可调报名分与门槛档位，保存后回到只读', async () => {
+    api.update.mockResolvedValue({})
     await mount()
     fireEvent.click(screen.getByText('COM_02'))
-    fireEvent.click(screen.getByRole('button', { hidden: true, name: /[编編]\s*[辑輯]/ }))
-    expect(screen.getByText('計分配置')).toBeInTheDocument()
-    const sw = screen.getByRole('switch', { name: '報名計分' })
-    expect(sw).not.toBeDisabled()
-    expect(sw).toBeChecked()
-    fireEvent.click(sw)
-    expect(screen.getByRole('switch', { name: '報名計分' })).not.toBeChecked()
-    expect(api.update).not.toHaveBeenCalled()
+    const panel = within(screen.getByLabelText('減免運費計分配置'))
+    fireEvent.click(panel.getByRole('button', { hidden: true, name: /[编編]\s*[辑輯]/ }))
+    expect(panel.getByText('門檻得分條件')).toBeInTheDocument()
+    expect(panel.getAllByText('當減免門檻 ≤')).toHaveLength(4)
+    fireEvent.change(panel.getByLabelText('報名分值'), { target: { value: '30' } })
+    fireEvent.click(screen.getByRole('button', { hidden: true, name: /保\s*存/ }))
+    // 保存后回到只读态，报名分即时更新；报名分值与整份计分配置（含护欄）一并落库
+    expect(panel.getByText('滿足條件才給分').closest('.organic-score-row')).toHaveTextContent('+30 分')
+    expect(api.update).toHaveBeenCalledWith('COM_02', expect.objectContaining({ score: 30, prerequisites: '報名減免運費' }))
+    const saved = JSON.parse(api.update.mock.calls[0][1].freeShippingConfig)
+    expect(saved.enrollmentScore).toBe(30)
+    expect(saved.thresholdBands).toHaveLength(4)
+    expect(saved.enrollWhenGuarded).toBe(false)
   })
 
   it('其他计分项配置同样以模块卡片呈现', async () => {
@@ -107,7 +122,7 @@ describe('通用计分项：模块卡片与减免运费开关', () => {
     expect(screen.queryByText('店鋪標籤-金牌')).not.toBeInTheDocument()
   })
 
-  it('营业状态的休息打烊标记为系统过滤，不展示也不让配分值', async () => {
+  it('营业状态：打烊直接过滤、休息/爆单垫底排序，只有营业中可配分', async () => {
     await mount()
     fireEvent.click(screen.getByRole('tab', { name: /dimStore/ }))
     fireEvent.click(screen.getByText('STB_02'))
@@ -115,16 +130,31 @@ describe('通用计分项：模块卡片与减免运费开关', () => {
     const closedRow = screen.getByText('休息打烊').closest('.organic-score-row')
     expect(closedRow).toHaveTextContent('直接過濾')
     expect(closedRow).not.toHaveTextContent(/\d+ 分/)
-    // 其余三档仍按加减分展示
-    expect(screen.getByText('爆單了，暫停接單一會').closest('.organic-score-row')).toHaveTextContent('-50 分')
+    // 休息/爆单：不参与加减分，直接告知业务系统垫底排序
+    for (const label of ['休息一會，馬上回來', '爆單了，暫停接單一會']) {
+      const row = screen.getByText(label).closest('.organic-score-row')
+      expect(row, label).toHaveTextContent('自動墊底')
+      expect(row, label).not.toHaveTextContent(/\d+ 分/)
+    }
+    // 營業中仍按固定加分展示
+    expect(screen.getByText('營業中狀態').closest('.organic-score-row')).toHaveTextContent('+100 分')
 
-    // 编辑态：打烊档无下拉与数字输入，其余档保留配置入口
+    // 编辑态：打烊与垫底两档都无下拉与数字输入，只剩营业中一个分值输入
     fireEvent.click(screen.getByRole('button', { hidden: true, name: /[编編]\s*[辑輯]/ }))
     const editRow = screen.getByText('休息打烊').closest('.organic-score-edit-tier')
     expect(editRow).toHaveTextContent('由系統直接過濾，不加載到瀑布流，無需配置分值')
     expect(editRow!.querySelector('.ant-input-number')).toBeNull()
     expect(editRow!.querySelector('.ant-select')).toBeNull()
-    expect(screen.getAllByPlaceholderText('輸入分數').length).toBe(3)
+    for (const label of ['休息一會，馬上回來', '爆單了，暫停接單一會']) {
+      const bottomRow = screen.getByText(label).closest('.organic-score-edit-tier')
+      expect(bottomRow, label).toHaveTextContent('系統自動墊底排序，排在正常參與排序的商家之後，無需配置加減分')
+      expect(bottomRow!.querySelector('.ant-input-number'), label).toBeNull()
+      expect(bottomRow!.querySelector('.ant-select'), label).toBeNull()
+    }
+    expect(screen.getAllByPlaceholderText('輸入分數').length).toBe(1)
+    // 營業中：加/减分下拉鎖定固定加分，不允許改成減分
+    const operatingRow = screen.getByText('營業中狀態').closest('.organic-score-edit-tier')
+    expect(operatingRow!.querySelector('.ant-select')).toHaveClass('ant-select-disabled')
     expect(api.update).not.toHaveBeenCalled()
   }, 120000)
 
@@ -139,8 +169,25 @@ describe('通用计分项：模块卡片与减免运费开关', () => {
     fireEvent.click(screen.getByText('STB_02'))
     // 第 2 档（休息一會）因数据标记而展示为过滤档，不再显示分值
     expect(screen.getByText('休息一會，馬上回來').closest('.organic-score-row')).toHaveTextContent('直接過濾')
-    // 未标记的第 3 档仍按减分展示
-    expect(screen.getByText('爆單了，暫停接單一會').closest('.organic-score-row')).toHaveTextContent('-50 分')
+    // 第 3 档未标记过滤：即使库里存的是減分，也按垫底口径展示，不出现分值
+    expect(screen.getByText('爆單了，暫停接單一會').closest('.organic-score-row')).toHaveTextContent('自動墊底')
+  }, 120000)
+
+  it('出餐准时率按梯度配置：只读按率降序展示，编辑态可增删档', async () => {
+    await mount()
+    fireEvent.click(screen.getByRole('tab', { name: /dimStore/ }))
+    fireEvent.click(screen.getByText('STB_05'))
+    // 只读：按准时率档位展示分值，不再出现「超过均值即扣分」的旧口径
+    expect(screen.getByText('出餐準時率 ≥ 100%').closest('.organic-score-row')).toHaveTextContent('+60 分')
+    expect(screen.getByText('出餐準時率 ≥ 90%').closest('.organic-score-row')).toHaveTextContent('+40 分')
+    expect(screen.queryByText(/當日出餐時間/)).not.toBeInTheDocument()
+
+    // 编辑态：默认 5 档，可添加档位
+    fireEvent.click(screen.getByRole('button', { hidden: true, name: /[编編]\s*[辑輯]/ }))
+    expect(screen.getAllByLabelText(/檔準時率/).length).toBe(5)
+    fireEvent.click(screen.getByRole('button', { hidden: true, name: '添加檔位' }))
+    expect(screen.getAllByLabelText(/檔準時率/).length).toBe(6)
+    expect(api.update).not.toHaveBeenCalled()
   }, 120000)
 
   it('修改人与操作按钮同组靠右，通用计分项与券类面板位置一致', async () => {
@@ -182,9 +229,21 @@ describe('计分项名称与品牌可见性', () => {
       { id: 7, ruleCode: 'COM_07', dimension: 1, name: '閃蜂官方神券-按金額', description: '舊名称', mode: 4, score: 2, status: 1, builtin: 1 },
     ] })
     await mount(false, AppType.SHANFENG)
-    expect(screen.getByText('會員紅包')).toBeInTheDocument()
-    expect(screen.getByText('閃蜂官方神券')).toBeInTheDocument()
+    expect(screen.getByText('平台會員紅包')).toBeInTheDocument()
+    expect(screen.getByText('平台官方神券')).toBeInTheDocument()
     expect(screen.queryByText(/按金額/)).not.toBeInTheDocument()
+    // 旧显示名不得残留
+    expect(screen.queryByText('會員紅包')).not.toBeInTheDocument()
+    expect(screen.queryByText('閃蜂官方神券')).not.toBeInTheDocument()
+  })
+
+  it('新客立减计分项后端旧名称统一展示为「門店新客券」', async () => {
+    api.fetch.mockResolvedValue({ dimensions: [], rules: [
+      { id: 4, ruleCode: 'COM_04', dimension: 1, name: '新客立減', description: '舊名称', mode: 1, score: 30, status: 1, builtin: 1 },
+    ] })
+    await mount(false, AppType.SHANFENG)
+    expect(screen.getByText('門店新客券')).toBeInTheDocument()
+    expect(screen.queryByText('新客立減')).not.toBeInTheDocument()
   })
 
   it('金字招牌计分项后端旧名称带「購買廣告-」前缀，界面统一展示新名称', async () => {
@@ -196,13 +255,13 @@ describe('计分项名称与品牌可见性', () => {
     expect(screen.queryByText('購買廣告-金字招牌')).not.toBeInTheDocument()
   })
 
-  it('所屬品牌為 MFOOD 時不展示閃蜂官方神券，同維度其他計分项仍在', async () => {
+  it('所屬品牌為 MFOOD 時不展示平台官方神券，同維度其他計分项仍在', async () => {
     await mount(false, AppType.MFOOD)
     expect(screen.queryByText('COM_07')).not.toBeInTheDocument()
     expect(screen.getByText('COM_06')).toBeInTheDocument()
   })
 
-  it('所屬品牌為閃蜂時仍展示閃蜂官方神券', async () => {
+  it('所屬品牌為閃蜂時仍展示平台官方神券', async () => {
     await mount(false, AppType.SHANFENG)
     expect(screen.getByText('COM_07')).toBeInTheDocument()
   })

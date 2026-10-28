@@ -1725,6 +1725,48 @@
       "comment": "業務口徑已改為打烊不計分而是被召回側過濾，但該語義此前只存在於前端常量 BUSINESS_STATE_ITEMS 的第 4 檔 filtered，靠索引位置約定，看 condition_items 完全無法得知這一檔不計分，未來計分/召回側極易照舊扣分。遷移把 condition_items[3].condition 寫成 'filtered' 並將 score 歸 0，評分說明以舊文案片段作條件同步（管理員自定義過的不覆蓋）。用 Java 解析 JSON 後回寫而不是 MySQL JSON_SET，是為了能在 H2 單測裡驗證冪等與校驗；生產等價 SQL 見 sql/235_organic_stb02_filtered.sql。注意：本遷移只完成「數據側口徑」，商家營業狀態的寫入方（商家端上報接口）與召回側按 filtered 過濾都在本倉庫之外，尚未落地。"
     },
     {
+      "versionKey": "organic:com04-rename-v1",
+      "module": "organic",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "organicScoreDataInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "304_organic_com04_rename.sql"
+      ],
+      "intent": "自然流量商業維度計分項 COM_04 更名為「門店新客券」，並同步舊內置說明中的舊名稱",
+      "author": "Qoder",
+      "comment": "產品口徑調整：原「新客立減」統一更名為「門店新客券」。歷史種子 23_organic_score.sql 不得修改，故單獨登記版本鍵做一次性收斂；前端 organicTrafficConfig 與加載保底已同步新名稱。UPDATE 與校驗都以舊值本身作條件：管理員自定義過的 name/description 不會被覆蓋，舊值殘留則讓啟動暴露。參考 SQL: sql/304_organic_com04_rename.sql"
+    },
+    {
+      "versionKey": "organic:com06-com07-rename-v1",
+      "module": "organic",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "organicScoreDataInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "305_organic_com06_com07_rename.sql"
+      ],
+      "intent": "自然流量商業維度計分項 COM_06/COM_07 更名為「平台會員紅包」/「平台官方神券」，並同步舊內置說明",
+      "author": "Qoder",
+      "comment": "產品口徑調整：原「會員紅包」「閃蜂官方神券」統一加上平台前綴。歷史種子 23_organic_score.sql 不得修改，故單獨登記版本鍵做一次性收斂；前端 organicTrafficConfig 與加載保底已同步。名稱同時兼容種子的「-按金額」後綴與早期界面顯示的不帶後綴名稱；UPDATE 與校驗都以舊值本身作條件，管理員自定義過的 name/description 不會被覆蓋。參考 SQL: sql/305_organic_com06_com07_rename.sql"
+    },
+    {
+      "versionKey": "organic:stb05-ontime-rate-v1",
+      "module": "organic",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "organicScoreDataInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "307_organic_stb05_ontime_rate.sql"
+      ],
+      "intent": "STB_05 出餐計分由「當天出餐時間超過歷史均值即扣分」改為「出餐準時率梯度」計分（100%→60、95%→50、90%→40、80%→25、70%→10）",
+      "author": "Qoder",
+      "comment": "業務反饋均值基線不合理：只要比歷史均值慢一點就掉分，商家沒有可對標的目標。口徑改為按出餐準時率檔位給分（率越高分越多，命中一檔即停、不累加，低於最低檔不得分）。確認舊口徑沒有需要保留的歷史數據，因此不做兼容轉換，直接覆寫 name/description/condition_items（等同刪除舊檔位 over_avg_deduction / 主輔營達標），並把 stat_days_total 空值補為 7。前端 DEFAULT_ONTIME_RATE_BANDS 與本梯度一致，條件項以 condition='ontime_rate' + rate + score 存儲。校驗以「名稱等於新名且首檔是準時率梯度」為準；未播種（無 STB_05 行）不算失敗。注意：本遷移只落數據側口徑，準時率計算與召回側排序在本倉庫之外，尚未落地。參考 SQL: sql/307_organic_stb05_ontime_rate.sql"
+    },
+    {
       "versionKey": "doc:native-content-v2.0",
       "module": "doc",
       "phase": "MODULE_STRUCTURE",

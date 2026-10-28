@@ -806,7 +806,7 @@ export default function Home() {
     // 空导航是有效结果；加载中或失败时不回退到全量菜单，避免串入其他系统。
     const tree = currentSystemCode
       ? systemNavigation.loaded && !systemNavigation.error ? systemNavigation.tree : []
-      : menuStatus === 'online' ? menuTree ?? [] : []
+      : menuStatus === 'online' || menuStatus === 'degraded' ? menuTree ?? [] : []
     return collectHomeMenus(tree, hasMenuPermission, currentSystemCode).map((menu) => ({
       ...menu,
       icon: renderMenuIcon(menu.icon) ?? MENU_ICON_BY_KEY[menu.key] ?? <SearchOutlined />,

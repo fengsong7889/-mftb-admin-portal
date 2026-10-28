@@ -14,6 +14,7 @@ const state = vi.hoisted(() => ({
   denied: new Set<string>(),
   navigation: { loading: false, loaded: true, error: null as string | null },
   emptyNavigation: false,
+  menuStatus: 'online' as 'online' | 'degraded',
   refetch: vi.fn().mockResolvedValue(undefined),
   /** 当前登录人角色：admin 时后端会下发 unlimited，前端据此隐藏申请入口 */
   role: 'user' as 'user' | 'admin',
@@ -36,7 +37,7 @@ vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({
   user: { username: 'home-test', name: '測試員工', avatar: 'default', role: state.role },
   hasMenuPermission: (key: string) => !state.denied.has(key),
 }) }))
-vi.mock('@/contexts/MenuContext', () => ({ useMenu: () => ({ menuTree: menus, status: 'online', refresh: state.refetch }) }))
+vi.mock('@/contexts/MenuContext', () => ({ useMenu: () => ({ menuTree: menus, status: state.menuStatus, refresh: state.refetch }) }))
 vi.mock('@/hooks/useSystemNavigation', () => ({ useSystemNavigation: (code: string | null) => ({
   ...state.navigation,
   tree: state.emptyNavigation ? [] : menus.filter(menu => menu.systemCode === code),
@@ -99,12 +100,23 @@ beforeEach(() => {
   state.denied.clear()
   state.navigation = { loading: false, loaded: true, error: null }
   state.emptyNavigation = false
+  state.menuStatus = 'online'
   state.role = 'user'
   vi.mocked(fetchPortalContext).mockResolvedValue({ systems, superAdmin: false })
   vi.mocked(fetchQuickFavorites).mockResolvedValue(['finance-entry', 'ads-entry'])
 })
 
 describe('系统首页 AI 助手区域', () => {
+  it('未锁系统时短暂超时仍展示已加载导航，不放宽菜单权限', async () => {
+    localStorage.removeItem('current_system_code')
+    state.menuStatus = 'degraded'
+    state.denied.add('ads-entry')
+    mount()
+    expect(await screen.findByRole('button', { name: '財務測試菜單' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '廣告測試菜單' })).not.toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: '搜尋菜單' })).not.toBeDisabled()
+  })
+
   it('横幅、菜单搜索和收藏跟随当前系统，不覆盖其他系统收藏', async () => {
     const { container } = mount()
     await screen.findByRole('button', { name: '財務測試菜單' })

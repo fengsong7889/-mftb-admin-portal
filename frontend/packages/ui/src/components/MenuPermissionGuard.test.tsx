@@ -9,7 +9,9 @@
  *  3. 两个菜单都没有时仍然 403——放宽的是"跨业务可见"，不是把详情页变成公开页。
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import type { MenuConnectionIssue, MenuConnectionStatus } from '@/contexts/MenuContext'
+import type { MenuVO } from '@/api/menu'
 import { I18nextProvider } from 'react-i18next'
 import { MemoryRouter } from 'react-router-dom'
 import i18n from '@/i18n'
@@ -17,8 +19,20 @@ import zh from '@/i18n/locales/zh-TW.json'
 import MenuPermissionGuard from './MenuPermissionGuard'
 
 const mockAuth = { user: { role: 'guest' }, hasMenuPermission: vi.fn() }
-const mockMenu = { status: 'online' }
-beforeEach(() => { mockMenu.status = 'online' })
+const mockMenu = {
+  status: 'online' as MenuConnectionStatus,
+  menuTree: [] as MenuVO[] | null,
+  issue: null as MenuConnectionIssue | null,
+  refreshing: false,
+  refresh: vi.fn(async () => {}),
+}
+beforeEach(() => {
+  mockMenu.status = 'online'
+  mockMenu.menuTree = []
+  mockMenu.issue = null
+  mockMenu.refreshing = false
+  mockMenu.refresh.mockClear()
+})
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => mockAuth,
@@ -66,8 +80,62 @@ describe('Doc Native 路由权限与离线门禁', () => {
   it.each(['/doc-plans', '/doc-plans/detail?id=41&revision=83', '/doc-governance'])('离线时阻断 %s，不放行演示数据', path => {
     mockMenu.status = 'offline'
     mount(path, ['doc-plans', 'doc-governance'])
-    expect(screen.getByText('503')).toBeInTheDocument()
+    expect(screen.getByText('菜單暫時無法載入')).toBeInTheDocument()
+    expect(screen.queryByText('503')).not.toBeInTheDocument()
     expect(screen.queryByText('page-body')).not.toBeInTheDocument()
+  })
+})
+
+describe('连接反馈与权限边界', () => {
+  it('短暂超时不卸载已有页面、不丢失未保存内容', () => {
+    mockAuth.hasMenuPermission = vi.fn(() => true)
+    const view = () => <MemoryRouter initialEntries={['/doc-plans']}>
+      <MenuPermissionGuard><input aria-label="未保存草稿" defaultValue="" /></MenuPermissionGuard>
+    </MemoryRouter>
+    const { rerender } = render(view())
+    const input = screen.getByRole('textbox', { name: '未保存草稿' })
+    fireEvent.change(input, { target: { value: '待保存内容' } })
+    mockMenu.status = 'degraded'
+    mockMenu.issue = 'timeout'
+    rerender(view())
+    expect(screen.getByRole('textbox')).toBe(input)
+    expect(input).toHaveValue('待保存内容')
+  })
+
+  it('degraded 不豁免已有的菜单权限检查', () => {
+    mockMenu.status = 'degraded'
+    mount('/doc-plans', [])
+    expect(screen.getByText('403')).toBeInTheDocument()
+    expect(screen.queryByText('page-body')).not.toBeInTheDocument()
+  })
+
+  it.each(['loading', 'degraded', 'error'] as const)('无最新导航时 %s 不放行受保护页面', status => {
+    mockMenu.status = status
+    mockMenu.menuTree = null
+    mount('/doc-plans', ['doc-plans'])
+    expect(screen.queryByText('page-body')).not.toBeInTheDocument()
+    expect(screen.queryByText('503')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['network', '本機網路已中斷'], ['timeout', '菜單請求逾時'],
+    ['unreachable', '暫時無法連接菜單服務'], ['server', '菜單服務回應異常'],
+  ] as const)('%s 展示对应原因，并提供可操作重试', (issue, text) => {
+    mockMenu.status = 'offline'
+    mockMenu.issue = issue
+    mount('/doc-plans', ['doc-plans'])
+    expect(screen.getByText(new RegExp(text))).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '重新載入菜單' }))
+    expect(mockMenu.refresh).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText('page-body')).not.toBeInTheDocument()
+  })
+
+  it('重试中不重复派发点击', () => {
+    mockMenu.status = 'offline'
+    mockMenu.refreshing = true
+    mount('/doc-plans', ['doc-plans'])
+    fireEvent.click(screen.getByRole('button', { name: '重新載入菜單' }))
+    expect(mockMenu.refresh).not.toHaveBeenCalled()
   })
 })
 

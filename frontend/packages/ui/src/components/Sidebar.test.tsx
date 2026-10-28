@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { cleanup } from '@testing-library/react'
 import type { MenuVO } from '@/api/menu'
+import type { MenuConnectionIssue, MenuConnectionStatus } from '@/contexts/MenuContext'
 import { BACKEND_CONNECTED_KEYS, keyToPath, pathToKey } from '@/constants/menuDataSource'
 import { CONTROLLED_MENU_KEYS, ROUTE_MENU_KEY_MAP } from '@mftb/contracts/menuPermission'
 import { renderMenuIcon } from './MenuIcon'
@@ -26,13 +27,15 @@ import zh from '@/i18n/locales/zh-TW.json'
 
 /** 可控的菜单 Context mock */
 let mockMenuTree: MenuVO[] | null = null
-let mockMenuStatus: 'loading' | 'online' | 'offline' | 'error' = 'online'
+let mockMenuStatus: MenuConnectionStatus = 'online'
+let mockMenuIssue: MenuConnectionIssue | null = null
+const mockRefreshMenu = vi.fn(async () => {})
 let mockSystemNavigation: { tree: MenuVO[]; loaded: boolean } = { tree: [], loaded: false }
 const mockDeniedMenuKeys = new Set<string>()
 const hasMockMenuPermission = (key: string) => !CONTROLLED_MENU_KEYS.includes(key) || !mockDeniedMenuKeys.has(key)
 
 vi.mock('@/contexts/MenuContext', () => ({
-  useMenu: () => ({ menuTree: mockMenuTree, status: mockMenuStatus, refresh: vi.fn() }),
+  useMenu: () => ({ menuTree: mockMenuTree, status: mockMenuStatus, issue: mockMenuIssue, refreshing: false, refresh: mockRefreshMenu }),
 }))
 
 vi.mock('@/contexts/AuthContext', () => ({
@@ -62,7 +65,7 @@ beforeEach(async () => {
   vi.mocked(fetchPortalContext).mockResolvedValue({ systems: [], superAdmin: false })
 })
 
-const setMenuState = (tree: MenuVO[] | null, status: 'loading' | 'online' | 'offline' | 'error') => {
+const setMenuState = (tree: MenuVO[] | null, status: MenuConnectionStatus) => {
   mockMenuTree = tree
   mockMenuStatus = status
 }
@@ -95,8 +98,46 @@ afterEach(() => {
   cleanup()
   mockMenuTree = null
   mockMenuStatus = 'online'
+  mockMenuIssue = null
+  mockRefreshMenu.mockClear()
   mockSystemNavigation = { tree: [], loaded: false }
   mockDeniedMenuKeys.clear()
+})
+
+describe('菜单连接提示', () => {
+  it('短暂超时保留已有菜单并提供重试，不提示后端停服', async () => {
+    setMenuState(consumableMenus, 'degraded')
+    mockMenuIssue = 'timeout'
+    renderSidebar()
+    expect(await screen.findByText('耗材入庫')).toBeInTheDocument()
+    expect(screen.getByRole('status', { name: /菜單請求逾時/ })).toHaveTextContent('菜單請求逾時')
+    expect(screen.getByRole('status', { name: /菜單請求逾時/ })).toHaveTextContent('已保留目前菜單')
+    expect(screen.queryByText(zh.sidebar.offlineMenuTip)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '重新載入菜單' }))
+    expect(mockRefreshMenu).toHaveBeenCalledTimes(1)
+  })
+
+  it('鉴权失败不展示另一份系统导航缓存，也不冒充网络断开', async () => {
+    writeCurrentSystemCode('eam')
+    setMenuState(null, 'error')
+    mockSystemNavigation = { tree: consumableMenus, loaded: true }
+    renderSidebar()
+    expect(await screen.findByRole('status', { name: /菜單驗證失敗/ })).toHaveTextContent('菜單驗證失敗')
+    expect(screen.queryByText('耗材入庫')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('menuitem')).toHaveLength(1)
+  })
+
+  it('本机断网显示独立原因，恢复后移除提示', async () => {
+    setMenuState(consumableMenus, 'degraded')
+    mockMenuIssue = 'network'
+    const { rerender } = renderSidebar()
+    expect(await screen.findByRole('status', { name: /本機網路已中斷/ })).toHaveTextContent('本機網路已中斷')
+    setMenuState(consumableMenus, 'online')
+    mockMenuIssue = null
+    rerender(<MemoryRouter><Sidebar collapsed={false} /></MemoryRouter>)
+    expect(screen.queryByRole('status', { name: /本機網路已中斷/ })).not.toBeInTheDocument()
+    expect(screen.getByText('耗材入庫')).toBeInTheDocument()
+  })
 })
 
 describe('Sidebar 系统品牌', () => {
@@ -172,7 +213,7 @@ describe('Sidebar 系统首页与 AI 导航', () => {
     expect(readCurrentSystemCode()).toBe(code)
   })
 
-  it.each(['loading', 'online', 'offline', 'error'] as const)('菜单状态为 %s 时仍能返回系统首页', async (status) => {
+  it.each(['loading', 'online', 'degraded', 'offline', 'error'] as const)('菜单状态为 %s 时仍能返回系统首页', async (status) => {
     writeCurrentSystemCode('ai')
     setMenuState(status === 'online' ? [] : null, status)
     renderSidebar('/ai-model-list')
@@ -637,7 +678,8 @@ describe('Sidebar 菜单真值来源', () => {
         <MenuPermissionGuard><div>受保护的耗材页面</div></MenuPermissionGuard>
       </MemoryRouter>,
     )
-    expect(await screen.findByText('503')).toBeInTheDocument()
+    expect(await screen.findByText('菜單暫時無法載入')).toBeInTheDocument()
+    expect(screen.queryByText('503')).not.toBeInTheDocument()
     expect(screen.queryByText('受保护的耗材页面')).not.toBeInTheDocument()
   })
 

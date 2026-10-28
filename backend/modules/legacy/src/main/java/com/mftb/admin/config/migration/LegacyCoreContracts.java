@@ -514,6 +514,8 @@ public class LegacyCoreContracts implements SchemaContractProvider {
                         + "multiplier_tiers TEXT DEFAULT NULL COMMENT '倍數梯度計分配置 JSON', "
                         + "threshold_score INT DEFAULT NULL COMMENT '門檻≤客單價時固定加分', "
                         + "region_configs TEXT DEFAULT NULL COMMENT '區域配置 JSON', "
+                        + "free_shipping_config TEXT DEFAULT NULL COMMENT '減免運費計分配置 JSON（僅 COM_02）', "
+                        + "member_bonus_config TEXT DEFAULT NULL COMMENT '平台會員紅包計分配置 JSON（僅 COM_06）', "
                         + "status INT NOT NULL DEFAULT 1 COMMENT '服務狀態: 1=啟用 2=停用', "
                         + "builtin TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否系統內置', "
                         + "sort_order INT NOT NULL DEFAULT 0 COMMENT '排序號', "
@@ -532,7 +534,11 @@ public class LegacyCoreContracts implements SchemaContractProvider {
                         new ContractSpec.ColumnSpec("threshold_score",
                                 "ALTER TABLE biz_organic_score_rule ADD COLUMN threshold_score INT DEFAULT NULL COMMENT '門檻≤客單價時固定加分（僅 COM_01）'"),
                         new ContractSpec.ColumnSpec("region_configs",
-                                "ALTER TABLE biz_organic_score_rule ADD COLUMN region_configs TEXT DEFAULT NULL COMMENT '區域配置 JSON（PLT_03/PLT_04 共用）'")
+                                "ALTER TABLE biz_organic_score_rule ADD COLUMN region_configs TEXT DEFAULT NULL COMMENT '區域配置 JSON（PLT_03/PLT_04 共用）'"),
+                        new ContractSpec.ColumnSpec("free_shipping_config",
+                                "ALTER TABLE biz_organic_score_rule ADD COLUMN free_shipping_config TEXT DEFAULT NULL COMMENT '減免運費計分配置 JSON（門檻檔位 + 報名分護欄，僅 COM_02）'"),
+                        new ContractSpec.ColumnSpec("member_bonus_config",
+                                "ALTER TABLE biz_organic_score_rule ADD COLUMN member_bonus_config TEXT DEFAULT NULL COMMENT '平台會員紅包計分配置 JSON（報名分 + 商家加碼梯度，僅 COM_06）'")
                 ));
     }
 

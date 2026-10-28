@@ -141,6 +141,8 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         entity.setMultiplierTiers(request.getMultiplierTiers());
         entity.setThresholdScore(request.getThresholdScore());
         entity.setRegionConfigs(request.getRegionConfigs());
+        entity.setFreeShippingConfig(request.getFreeShippingConfig());
+        entity.setMemberBonusConfig(request.getMemberBonusConfig());
         entity.setPrerequisites(request.getPrerequisites());
         entity.setStatus(request.getStatus());
         entity.setBuiltin(0);
@@ -181,6 +183,8 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         entity.setMultiplierTiers(request.getMultiplierTiers());
         entity.setThresholdScore(request.getThresholdScore());
         entity.setRegionConfigs(request.getRegionConfigs());
+        entity.setFreeShippingConfig(request.getFreeShippingConfig());
+        entity.setMemberBonusConfig(request.getMemberBonusConfig());
         entity.setPrerequisites(request.getPrerequisites());
         entity.setStatus(request.getStatus());
         entity.setUpdatedBy(operatorResolver.currentOperatorName());
@@ -367,6 +371,8 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         vo.setMultiplierTiers(entity.getMultiplierTiers());
         vo.setThresholdScore(entity.getThresholdScore());
         vo.setRegionConfigs(entity.getRegionConfigs());
+        vo.setFreeShippingConfig(entity.getFreeShippingConfig());
+        vo.setMemberBonusConfig(entity.getMemberBonusConfig());
         vo.setStatus(entity.getStatus());
         vo.setBuiltin(entity.getBuiltin());
         vo.setSortOrder(entity.getSortOrder());

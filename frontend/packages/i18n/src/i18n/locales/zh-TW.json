@@ -3309,6 +3309,7 @@
     "searching": "搜索中...",
     "underDevelopment": "導出功能開發中...",
     "loading": "加載中...",
+    "retry": "重試",
     "requestTimeout": "網路回應逾時，請稍後重試",
     "noData": "暫無數據",
     "confirm": "確定",
@@ -14477,7 +14478,7 @@
     }
   },
   "aiAssistantConfig": {
-    "pageOverview": "助手概覽",
+    "pageOverview": "助手總覽",
     "introOverview": "只展示你有權限的模組；點擊卡片進入對應配置頁。",
     "pageCapability": "能力清單",
     "introCapability": "這裡只調整能力說明、適用場景與範例；工具啟停仍在「AI 操作授權」，資料權限仍由各業務選單控制。",
@@ -14615,13 +14616,15 @@
     "viewAll": "查看全部"
   },
   "agentConsole": {
-    "title": "企業 Agent 控制台",
-    "previewTitle": "企業 Agent 控制台 · 界面預覽",
-    "bannerTitle": "界面已接線｜8 個面板均為真實數據",
-    "bannerDesc": "應用與版本、預算與配額、動作提案、知識授權、數據與端點、運行中心、評測與發布、就緒校驗全部讀取真實接口；總覽四張卡取 ops/readiness 即時計數。本頁不調用模型、不建立真實申請。",
+    "title": "人工智能系統 · 平台治理",
+    "previewTitle": "人工智能系統 · 平台治理（界面預覽）",
+    "bannerTitle": "界面已接線｜各面板均為真實數據",
+    "bannerDesc": "模型與工具、知識、授權與額度、運行與質量、安全與治理各面板均讀取真實接口；總覽四張卡取 ops/readiness 即時計數。本頁不調用模型、不建立真實申請。",
+    "budgetScopeTitle": "當前生效範圍：員工 + 自然月",
+    "budgetScopeDesc": "金額預算只做「調用前預占、調用後結算」，不授予模型權限，也不替代員工/部門的 Tokens 與次數額度，兩者同時生效；未配置預算池時由既有額度策略判定。部門/應用範圍可先登記，但當前扣賬鏈路尚未按它們生效，不要把它當成已生效的部門總預算。",
     "notWired": "示例",
     "wired": "接口數據",
-    "menuPlan": "菜單已登記：一級「企業 Agent」＋ 8 個二級",
+    "menuPlan": "功能地圖：7 個業務分組與其功能入口（菜單 key 不變，授權不受影響）",
     "card": {
       "apps": "已發布應用",
       "endpoints": "已批准端點",

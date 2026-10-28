@@ -99,8 +99,9 @@ public class AiAssistantConfigMenuInitializer implements CommandLineRunner {
 
     /**
      * 启动断言：子菜单必须挂在分组下。
-     * <p>parent_id 为空会让侧栏把 11 个页面平铺成一级菜单，而分组本身被退役目录清理掉时
-     * 没有任何报错，只能靠重启后的侧栏发现；这里把它变成启动期失败，避免带病运行。
+     * <p>parent_id 为空会让侧栏把页面平铺成一级菜单。
+     * <p>「AI 助手」混合分组已退役，子菜单按业务职责迁往应用/知识/安全等分组；
+     * 最终归属由 {@link AiMenuLayoutInitializer} 校正并断言，这里只守「不脱挂」与「分组存在」两条。
      */
     private void assertGrouped() {
         Long groupId = jdbcTemplate.queryForObject(
@@ -111,8 +112,8 @@ public class AiAssistantConfigMenuInitializer implements CommandLineRunner {
         }
         Integer detached = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM sys_menu WHERE menu_key LIKE 'ai-assistant-%' "
-                        + "AND menu_key <> ? AND deleted = 0 AND (parent_id IS NULL OR parent_id <> ?)",
-                Integer.class, GROUP_KEY, groupId);
+                        + "AND menu_key <> ? AND deleted = 0 AND parent_id IS NULL",
+                Integer.class, GROUP_KEY);
         if (detached != null && detached > 0) {
             throw new IllegalStateException("AI 助手子菜单未挂到分组: " + detached);
         }
@@ -268,10 +269,10 @@ public class AiAssistantConfigMenuInitializer implements CommandLineRunner {
         }
         for (String key : EXTRA_MENU_KEYS) {
             Integer ready = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM sys_menu WHERE menu_key = ? AND parent_id = ? "
+                    "SELECT COUNT(*) FROM sys_menu WHERE menu_key = ? AND parent_id IS NOT NULL "
                             + "AND deleted = 0 AND status = 1 "
                             + "AND actions LIKE '%view%' AND actions LIKE '%edit%'",
-                    Integer.class, key, groupId);
+                    Integer.class, key);
             if (ready == null || ready == 0) {
                 throw new IllegalStateException("AI 助手补充菜单未就绪: " + key);
             }
@@ -292,17 +293,20 @@ public class AiAssistantConfigMenuInitializer implements CommandLineRunner {
         if (groupId == null) {
             throw new IllegalStateException("AI 助手分组菜单未就绪");
         }
+        // 子菜单齐备性：数量按 ai-assistant-% 全量统计；具体挂在哪个业务分组由
+        // AiMenuLayoutInitializer 负责并断言，这里不再绑定单个历史分组（分组已退役）。
         Integer children = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM sys_menu WHERE parent_id = ? AND deleted = 0 AND status = 1",
-                Integer.class, groupId);
+                "SELECT COUNT(*) FROM sys_menu WHERE menu_key LIKE 'ai-assistant-%' AND menu_key <> ? "
+                        + "AND deleted = 0 AND status = 1",
+                Integer.class, GROUP_KEY);
         if (children == null || children < CHILDREN.size()) {
             throw new IllegalStateException("AI 助手子菜单未全部就绪: " + children);
         }
-        // 防回归：子菜单必须挂在分组下；parent_id 为空会让侧栏把 11 个页面平铺成一级菜单
+        // 防回归：子菜单必须挂在某个父级下；parent_id 为空会让侧栏把它们平铺成一级菜单
         Integer detached = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM sys_menu WHERE menu_key LIKE 'ai-assistant-%' "
-                        + "AND menu_key <> ? AND deleted = 0 AND (parent_id IS NULL OR parent_id <> ?)",
-                Integer.class, GROUP_KEY, groupId);
+                        + "AND menu_key <> ? AND deleted = 0 AND parent_id IS NULL",
+                Integer.class, GROUP_KEY);
         if (detached != null && detached > 0) {
             throw new IllegalStateException("AI 助手子菜单未挂到分组: " + detached);
         }

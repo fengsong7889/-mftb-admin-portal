@@ -6,6 +6,7 @@ import {
   SafetyCertificateOutlined, CalculatorOutlined,
 } from '@ant-design/icons'
 import AlgorithmSection from './AlgorithmForm/AlgorithmSection'
+import EnrollmentScoreTag from './AlgorithmForm/EnrollmentScoreTag'
 import ScoreRow from './AlgorithmForm/ScoreRow'
 import HelpPopover, { type HelpSection } from '@/components/HelpPopover'
 import {
@@ -15,7 +16,7 @@ import {
 } from './organicTrafficConfig'
 
 /**
- * 券类计分 v1 面板（满额立减 + 五个券类活动）：得分 = 报名分 + 门槛分 + 力度分。
+ * 券类计分 v1 面板（满额立减 + 券类活动 COM_01/03/04/05/07）：得分 = 报名分 + 门槛分 + 力度分。
  * 基准直接取系统已有的「门店客单价」指标（与满减类活动共用），面板不再提供统计口径配置；
  * 力度分母为「计价基数 = 客单价与门槛取大」，高门槛券的分母被抬高，空转券力度分自动压低。
  * 公式与口径统一写在「試算與說明」弹窗的规则说明里，面板顶部不再重复展示，节省空间。
@@ -155,8 +156,7 @@ export default function CouponScorePanel({ ruleName, config, hasDraft, descripti
           extra={<FormulaHint formula="有效報名即給一次" example={`同活動多檔優惠也只給 ${view.enrollmentScore} 分`} />}>
           <div className="organic-score-panel organic-score-list">
             <ScoreRow label="報名計分" score={view.enrollmentScore} enabled={view.enrollmentEnabled}
-              control={<Switch size="small" aria-label="報名計分" checked={view.enrollmentEnabled} disabled />}
-              hint="每門店、每活動只計一次有效報名；多檔優惠不重複發報名分。" />
+              control={<EnrollmentScoreTag enabled={view.enrollmentEnabled} />} />
           </div>
         </AlgorithmSection>
 

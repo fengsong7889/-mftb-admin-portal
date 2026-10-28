@@ -30,7 +30,7 @@ class OrganicCom10RenameMigrationTest {
         jdbc.execute("INSERT INTO biz_organic_score_rule (id, rule_code, name) VALUES "
                 + "(10, 'COM_10', '購買廣告-金字招牌'), "
                 + "(9, 'COM_09', '購買廣告-點金廣告'), "
-                + "(6, 'COM_06', '會員紅包')");
+                + "(6, 'COM_06', '平台會員紅包')");
         initializer = new OrganicScoreDataInitializer(jdbc, new SchemaVersionTracker(jdbc));
     }
 
@@ -58,7 +58,7 @@ class OrganicCom10RenameMigrationTest {
                 "SELECT updated_by FROM biz_organic_score_rule WHERE rule_code = 'COM_10'", String.class));
         // 同前缀的已下架项与其他内置项零改动
         assertEquals("購買廣告-點金廣告", nameOf("COM_09"));
-        assertEquals("會員紅包", nameOf("COM_06"));
+        assertEquals("平台會員紅包", nameOf("COM_06"));
         verify();
     }
 

@@ -42,10 +42,6 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
     private static final List<String> PROMOTION_REPORT_KEYS = List.of(
             "promotion-report-overview", "promotion-report-order", "promotion-report-compare");
     /**
-     * AI 系统的顶级菜单。v45 起 ai-assistant 包装目录已退役，这 9 个菜单直接挂顶级，
-     * 归属修复与校验不能再以壳为锚点，否则退役后启动即失败。
-     */
-    /**
      * 翻译中心的顶级菜单。v45 起 i18n-center 包装目录已退役，这 5 个菜单直接挂顶级，
      * 归属自愈与校验不能再以壳为锚点。
      */
@@ -53,7 +49,15 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
             "translation-manage", "i18n-language", "i18n-import-export",
             "i18n-mt-engine", "i18n-dashboard");
 
+    /**
+     * AI 系统的顶级菜单。
+     * <p>ai:menu-ia-v1 起改为 7 个业务分组做顶级（总览/应用/模型工具/知识/授权额度/运行质量/安全治理），
+     * 由 {@code AiMenuLayoutInitializer} 每次启动校正。历史混合分组及其子菜单仍留在清单里，
+     * 因为归属自愈只对 parent_id 为空的行生效，保留旧 key 不会把已归位的菜单重新顶到一级。
+     */
     static final List<String> AI_TOP_LEVEL_MENUS = List.of(
+            "ai-grp-overview", "ai-grp-app", "ai-grp-model", "ai-grp-knowledge",
+            "ai-grp-grant", "ai-grp-run", "ai-grp-security",
             "ai-models", "ai-auth-manage", "ai-quota-manage", "ai-emp-permission",
             "ai-operation-auth", "ai-assistant-group", "ai-energy-billing", "ai-mcp-service",
             "ai-conversation-audit", "ai-access-request");
@@ -494,7 +498,9 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
         updateMenuSystem(SystemCode.SEARCH.code(),    List.of("search-config-new", "search-guide", "search-library",
                 "search-verify-group", "report"));
         updateMenuSystem(SystemCode.FINANCE.code(),   List.of("promotion", "merchant-reconcile", "approval"));
-        updateMenuSystem(SystemCode.AI.code(),        List.of("ai-models", "ai-auth-manage", "ai-quota-manage",
+        updateMenuSystem(SystemCode.AI.code(),        List.of("ai-grp-overview", "ai-grp-app", "ai-grp-model",
+                "ai-grp-knowledge", "ai-grp-grant", "ai-grp-run", "ai-grp-security",
+                "ai-models", "ai-auth-manage", "ai-quota-manage",
                 "ai-emp-permission", "ai-operation-auth", "ai-assistant-group", "ai-energy-billing", "ai-mcp-service",
                 "ai-conversation-audit", "ai-access-request"));
         updateMenuSystem(SystemCode.HR.code(),        List.of("hr-profile", "hr-lifecycle", "hr-config",

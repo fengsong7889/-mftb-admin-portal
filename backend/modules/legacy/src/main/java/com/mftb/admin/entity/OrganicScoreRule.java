@@ -92,6 +92,12 @@ public class OrganicScoreRule {
     /** 区域配置 JSON（PLT_03 商家扶持 / PLT_04 订单过热调控，按区域独立配置） */
     private String regionConfigs;
 
+    /** 减免运费计分配置 JSON（门槛档位 + 报名分护栏，仅 COM_02 规则使用） */
+    private String freeShippingConfig;
+
+    /** 平台会员红包计分配置 JSON（报名分 + 商家加码梯度，仅 COM_06 规则使用） */
+    private String memberBonusConfig;
+
     /** 服务状态: 1=启用 2=停用 */
     private Integer status;
 

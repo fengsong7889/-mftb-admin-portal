@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Layout, Menu, message } from 'antd'
+import { Button, Layout, Menu, message } from 'antd'
 import type { MenuProps } from 'antd'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -555,6 +555,14 @@ const keyToIcon: Record<string, ReactNode> = {
   'version-history': <HistoryOutlined />,
   'notification-config': <BellOutlined />,
   // 智能中心 (AI)
+  // ai:menu-ia-v1 业务分组：由后端 AiMenuLayoutInitializer 每次启动校正，图标与后端 sys_menu.icon 一致
+  'ai-grp-overview': <DashboardOutlined />,
+  'ai-grp-app': <AppstoreOutlined />,
+  'ai-grp-model': <DesktopOutlined />,
+  'ai-grp-knowledge': <ReadOutlined />,
+  'ai-grp-grant': <SafetyCertificateOutlined />,
+  'ai-grp-run': <PlayCircleOutlined />,
+  'ai-grp-security': <AuditOutlined />,
   'agent-platform': <ControlOutlined />,
   'agent-overview': <DashboardOutlined />,
   'agent-apps': <AppstoreOutlined />,
@@ -803,7 +811,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
   const location = useLocation()
   const { t, i18n: i18nInstance } = useTranslation()
   const { hasMenuPermission } = useAuth()
-  const { menuTree, status: menuStatus } = useMenu()
+  const { menuTree, status: menuStatus, issue, refreshing, refresh } = useMenu()
   /** 語言包異步注入完成後重算菜單名：否則同一次刷新內會出現兩套命名 */
   const translationRevision = useTranslationRevision()
   const { currentSystemCode, setCurrentSystemCode } = useCurrentSystem()
@@ -874,8 +882,10 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         ...items.filter((item) => item?.key !== 'home'),
       ]
       : items
+    // 鉴权/业务错误不能借另一份系统导航缓存继续展示已失效的菜单。
+    if (menuStatus === 'error') return withSystemHome([])
     // 阶段 B 已完成（v3.13 落库），DB 直接返回正确结构，不再需要展示层重排。
-    if (currentSystemCode && systemNavigation.loaded) {
+    if (menuStatus !== 'offline' && currentSystemCode && systemNavigation.loaded) {
       const serverItems = buildMenuItemsFromVO(scopeMenusToSystem(systemNavigation.tree, currentSystemCode, currentSystemCode))
       return withSystemHome(filterMenusByPermission(serverItems, hasMenuPermission))
     }
@@ -890,7 +900,7 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     // translateMenuName 内部读 i18n.language，ESLint 看不到这层依赖；
     // translationRevision 是语言包异步注入后的重算触发器，二者都必须保留（删了会回到「刷新出两套菜单名」）
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [menuTree, hasMenuPermission, i18nInstance.language, translationRevision, currentSystemCode, systemNavigation.tree, systemNavigation.loaded])
+  }, [menuTree, menuStatus, hasMenuPermission, i18nInstance.language, translationRevision, currentSystemCode, systemNavigation.tree, systemNavigation.loaded])
 
   /** 訂單列表 / 訂單詳情按來源歸屬菜單（from=ad-sales 歸屬「廣告銷售」，否則歸屬「店鋪推廣」）；
    *  與 currentSystemCode 反查共用同一個判定入口，避免高亮與系統歸屬口徑分裂。
@@ -919,6 +929,17 @@ export default function Sidebar({ collapsed }: SidebarProps) {
     }
   }, [selectedKey, visibleMenuItems])
 
+  // 第一阶段先区分连接状态文案，界面确认后补齐 i18n；不再把所有失败称为后端停服。
+  const connectionMessages = {
+    network: '本機網路已中斷，請檢查網路連線。',
+    timeout: '菜單請求逾時，請稍後重試。',
+    unreachable: '暫時無法連接菜單服務，請檢查網路或稍後重試。',
+    server: '菜單服務回應異常，請稍後重試。',
+  }
+  const connectionMessage = menuStatus === 'error' ? '菜單驗證失敗，請重試或重新登入。'
+    : issue ? connectionMessages[issue] : '菜單連線尚未恢復，請稍後重試。'
+  const showConnectionNotice = menuStatus === 'degraded' || menuStatus === 'offline' || menuStatus === 'error'
+
   const handleMenuClick: MenuProps['onClick'] = ({ key }) => {
     const path = keyToPath[key]
     if (path) {
@@ -944,9 +965,13 @@ export default function Sidebar({ collapsed }: SidebarProps) {
         </span>
         {!collapsed && <span className="logo-text-main">{brandTitle}</span>}
       </div>
-      {menuStatus !== 'loading' && menuTree === null && (
-        <div className="sidebar-offline-tip" title={t('sidebar.offlineMenuTip')}>
-          {collapsed ? '!' : t('sidebar.offlineMenuTip')}
+      {showConnectionNotice && (
+        <div className="sidebar-offline-tip" role="status" aria-live="polite" aria-label={connectionMessage}>
+          {!collapsed && <div>{connectionMessage}{menuStatus === 'degraded' && menuTree ? ' 已保留目前菜單，正在重新確認。' : ''}</div>}
+          <Button size="small" loading={refreshing} aria-label="重新載入菜單"
+            style={{ marginTop: collapsed ? 0 : 8 }} onClick={() => { void refresh() }}>
+            {collapsed ? '!' : t('common.retry', '重試')}
+          </Button>
         </div>
       )}
       <Menu
