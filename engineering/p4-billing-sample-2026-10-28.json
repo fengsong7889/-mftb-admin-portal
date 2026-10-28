@@ -1,0 +1,72 @@
+{
+  "$comment": [
+    "P4 容量与成本取证样本（方案 §8.1.7）。数据来源：Sealos 控制台「mftb-admin-backend → 账单与用量（按小时）」，",
+    "时间范围 2026-10-21 ~ 2026-10-28；本文件记录截图中可读的小时行（10-26 18:00 起、10-27 全天、10-28 00:00–09:00）。",
+    "单位：CPU 核（1 = 1000m）、内存 Gi；金额为人民币元/小时。",
+    "network 只有金额：截图中的网络列同时显示次数与金额，次数语义未在页面说明，故只登记金额，不推断单价。",
+    "为什么是样本而非全量：控制台共 151 行、16 页，本次只取得约 40 行；日均结论按「已读全天」的 10-27 汇总，",
+    "并用 10-28 前 10 小时与 10-26 后 6 小时做交叉验证，不把部分日外推成 7 日均值。"
+  ],
+  "app": "mftb-admin-backend",
+  "capturedAt": "2026-10-28",
+  "range": "2026-10-21..2026-10-28",
+  "unitPrices": {
+    "cpuPerCoreHour": 0.027671,
+    "memoryPerGiHour": 0.013956
+  },
+  "deployment": {
+    "replicas": 1,
+    "minReplicas": 1,
+    "maxReplicas": 3,
+    "requests": { "cpu": "100m", "memory": "102Mi" },
+    "limits": { "cpu": "1", "memory": "1Gi" },
+    "hpa": { "metric": "cpu", "averageUtilization": 700, "equivalentCpu": "700m" },
+    "strategy": "RollingUpdate maxUnavailable=0 maxSurge=1",
+    "probes": "none",
+    "lastRestart": "2026-10-28T00:16:04"
+  },
+  "rows": [
+    { "date": "2026-10-26", "hour": 18, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.020306, "total": 0.061933 },
+    { "date": "2026-10-26", "hour": 19, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.015620, "total": 0.057247 },
+    { "date": "2026-10-26", "hour": 20, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.007029, "total": 0.048656 },
+    { "date": "2026-10-26", "hour": 21, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.017963, "total": 0.059590 },
+    { "date": "2026-10-26", "hour": 22, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.007029, "total": 0.048656 },
+    { "date": "2026-10-26", "hour": 23, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.007029, "total": 0.048656 },
+
+    { "date": "2026-10-27", "hour": 0, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.010934, "total": 0.052561 },
+    { "date": "2026-10-27", "hour": 1, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.007810, "total": 0.049437 },
+    { "date": "2026-10-27", "hour": 2, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.007810, "total": 0.049437 },
+    { "date": "2026-10-27", "hour": 3, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.007810, "total": 0.049437 },
+    { "date": "2026-10-27", "hour": 4, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.006248, "total": 0.047875 },
+    { "date": "2026-10-27", "hour": 5, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.006248, "total": 0.047875 },
+    { "date": "2026-10-27", "hour": 6, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.007810, "total": 0.049437 },
+    { "date": "2026-10-27", "hour": 7, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.007029, "total": 0.048656 },
+    { "date": "2026-10-27", "hour": 8, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.007810, "total": 0.049437 },
+    { "date": "2026-10-27", "hour": 9, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.007029, "total": 0.048656 },
+    { "date": "2026-10-27", "hour": 10, "cpu": 1.1, "cpuAmount": 0.030438, "memGi": 1.1, "memAmount": 0.015347, "networkAmount": 0.016401, "total": 0.062186 },
+    { "date": "2026-10-27", "hour": 11, "cpu": 1.017, "cpuAmount": 0.028142, "memGi": 1.017, "memAmount": 0.014188, "networkAmount": 0.019525, "total": 0.061855 },
+    { "date": "2026-10-27", "hour": 12, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.017182, "total": 0.058809 },
+    { "date": "2026-10-27", "hour": 13, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.012496, "total": 0.054123 },
+    { "date": "2026-10-27", "hour": 14, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.009372, "total": 0.050999 },
+    { "date": "2026-10-27", "hour": 15, "cpu": 1.15, "cpuAmount": 0.031822, "memGi": 1.15, "memAmount": 0.016055, "networkAmount": 0.014839, "total": 0.062716 },
+    { "date": "2026-10-27", "hour": 16, "cpu": 1.033, "cpuAmount": 0.028584, "memGi": 1.033, "memAmount": 0.014420, "networkAmount": 0.016401, "total": 0.059405 },
+    { "date": "2026-10-27", "hour": 17, "cpu": 1.1, "cpuAmount": 0.030438, "memGi": 1.1, "memAmount": 0.015347, "networkAmount": 0.013277, "total": 0.059062 },
+    { "date": "2026-10-27", "hour": 18, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.011715, "total": 0.053342 },
+    { "date": "2026-10-27", "hour": 19, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.009372, "total": 0.050999 },
+    { "date": "2026-10-27", "hour": 20, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.002343, "total": 0.043970 },
+    { "date": "2026-10-27", "hour": 21, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.002343, "total": 0.043970 },
+    { "date": "2026-10-27", "hour": 22, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.008591, "total": 0.050218 },
+    { "date": "2026-10-27", "hour": 23, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.001562, "total": 0.043189 },
+
+    { "date": "2026-10-28", "hour": 0, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.007810, "total": 0.049437 },
+    { "date": "2026-10-28", "hour": 1, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.010934, "total": 0.052561 },
+    { "date": "2026-10-28", "hour": 2, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.006248, "total": 0.047875 },
+    { "date": "2026-10-28", "hour": 3, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.003905, "total": 0.045532 },
+    { "date": "2026-10-28", "hour": 4, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.003905, "total": 0.045532 },
+    { "date": "2026-10-28", "hour": 5, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.003905, "total": 0.045532 },
+    { "date": "2026-10-28", "hour": 6, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.000781, "total": 0.042408 },
+    { "date": "2026-10-28", "hour": 7, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.000781, "total": 0.042408 },
+    { "date": "2026-10-28", "hour": 8, "cpu": 1, "cpuAmount": 0.027671, "memGi": 1, "memAmount": 0.013956, "networkAmount": 0.000781, "total": 0.042408 },
+    { "date": "2026-10-28", "hour": 9, "cpu": 1.017, "cpuAmount": 0.028142, "memGi": 1.017, "memAmount": 0.014188, "networkAmount": 0.002343, "total": 0.044673 }
+  ]
+}
