@@ -1,0 +1,50 @@
+# 生产 Deployment 探针补丁（Strategic Merge Patch）
+#
+# 作用：给 mftb-admin-backend 补 startup/readiness/liveness 探针、preStop 与优雅退出宽限期，
+# 使 §8.1.6 的「启动就绪」可观测、滚动发布不把流量打到未就绪实例。
+#
+# 前置：后端镜像需包含 `server.shutdown=graceful`（本仓库已配置）。
+# 应用（需集群写权限，属生产变更，须另行授权）：
+#   kubectl -n <namespace> patch deploy mftb-admin-backend \
+#     --type=strategic --patch-file deploy/sealos/backend-probes.patch.yaml
+# 校验（只读）：
+#   KUBECONFIG=... npm run check:deploy
+#
+# 注意：探针走容器端口（集群内路径），不要写公网域名——公网 TLS 握手抖动会被误判为实例不健康。
+spec:
+  template:
+    spec:
+      # 要大于 spring.lifecycle.timeout-per-shutdown-phase(30s)，给请求排空留余量
+      terminationGracePeriodSeconds: 40
+      containers:
+        - name: mftb-admin-backend
+          # 启动阶段只探 live（不依赖数据库），迁移慢也不会被误杀；最多给 5 分钟
+          startupProbe:
+            httpGet:
+              path: /api/health/live
+              port: 8080
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 60
+          # ready 以迁移/结构校验通过为准；未就绪的实例不接流量
+          readinessProbe:
+            httpGet:
+              path: /api/health/ready
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+            successThreshold: 1
+          # live 只看进程存活：数据库瞬时故障不触发重启风暴
+          livenessProbe:
+            httpGet:
+              path: /api/health/live
+              port: 8080
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 5
+          lifecycle:
+            preStop:
+              exec:
+                # 先等 endpoints 摘除，再让 Spring 的优雅退出处理在途请求
+                command: ["sh", "-c", "sleep 5"]
