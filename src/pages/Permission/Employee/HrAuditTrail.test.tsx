@@ -98,9 +98,10 @@ describe('HrAuditTrail', () => {
 
     // 先翻到第 2 页，再换筛选条件：停在旧页码上会看到「没有数据」的假象
     // （antd 分页页码是 <li><a> 而不是 button，拿 role=button 定位不到）
-    const pageTwo = document.querySelector('.ant-pagination-item-2')
-    expect(pageTwo).toBeTruthy()
-    fireEvent.click(pageTwo!.querySelector('a') ?? pageTwo!)
+    // 注意：取数调用完成不等于分页已重渲染，CI 负载下直接同步断言会抓到上一帧（实测失败）。
+    await waitFor(() => expect(document.querySelector('.ant-pagination-item-2')).toBeTruthy())
+    const pageTwo = document.querySelector('.ant-pagination-item-2')!
+    fireEvent.click(pageTwo.querySelector('a') ?? pageTwo)
     await waitFor(() => expect(mockedFetch.mock.calls.at(-1)?.[0].page).toBe(2))
 
     // 工具条的动作筛选是第一个 combobox（分页的 pageSize 切换器也是 combobox）
