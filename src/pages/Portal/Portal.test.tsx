@@ -112,7 +112,9 @@ async function waitAutoplaySettled(container: HTMLElement) {
       expect(container.querySelector('.portal-card-shell[data-autoplay="1"]')).toBeNull()
       expect(container.querySelector('[data-motion="running"]')).toBeNull()
     },
-    { timeout: 9000 },
+    // 入场分镜 6s，但 CI 并发跑 jsdom 时定时器会被拖慢：9s 曾两度在 CI 到期失败
+    // （一次卡在 data-autoplay、一次卡在 running）。这里只是等真实时长，不放宽断言。
+    { timeout: 20000 },
   )
 }
 
