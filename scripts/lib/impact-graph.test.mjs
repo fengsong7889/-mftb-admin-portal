@@ -115,6 +115,27 @@ describe('共享层升档', () => {
     expect(cls.feGlobal.concat(cls.beGlobal, cls.bothGlobal)).not.toContain('src/pages/Rdm/List.tsx')
   })
 
+  it('新增的入口装配、应用入口、启动类与跨域契约都按全量处理', () => {
+    const cls = classify([
+      'src/bootstrap.tsx',
+      'src/app-routes.ts',
+      'frontend/apps/rdm/index.html',
+      'frontend/apps/hr/src/main.tsx',
+      'backend/bootstrap/src/main/java/com/mftb/admin/AdminApplication.java',
+      'backend/contracts/oa/src/main/java/com/mftb/admin/contracts/oa/OaApprovalTaskPort.java',
+    ])
+    expect(cls.feGlobal).toEqual(expect.arrayContaining([
+      'src/bootstrap.tsx',
+      'src/app-routes.ts',
+      'frontend/apps/rdm/index.html',
+      'frontend/apps/hr/src/main.tsx',
+    ]))
+    expect(cls.beGlobal).toEqual(expect.arrayContaining([
+      'backend/bootstrap/src/main/java/com/mftb/admin/AdminApplication.java',
+      'backend/contracts/oa/src/main/java/com/mftb/admin/contracts/oa/OaApprovalTaskPort.java',
+    ]))
+  })
+
   it('规则表本身不可被悄悄删空（安全网：删一条就会让这个门禁形同虚设）', () => {
     // 拆包后共享层收敛为「入口文件 + 整个 frontend/packages」，条目数变少但覆盖面不变
     expect(GLOBAL_FE.length).toBeGreaterThanOrEqual(8)

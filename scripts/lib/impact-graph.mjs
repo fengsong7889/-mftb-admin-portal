@@ -28,6 +28,11 @@ export const GLOBAL_FE = [
   /^src\/build-meta\.d\.ts$/,
   /^src\/test\//,
   /^src\/pages\/_shared\//,
+  // 入口装配（Providers/主题/i18n）与整站路由装配：改它们等于改变所有应用的启动与路由图
+  /^src\/bootstrap\.tsx$/,
+  /^src\/app-routes\.ts$/,
+  // 应用自己的入口文档/入口文件：算业务源码但不可能有单独测试，按全量验证避免误报覆盖缺口
+  /^frontend\/apps\/[^/]+\/(index\.html|src\/main\.tsx)$/,
   // 共享层已拆为 workspace 包：包内任何文件都是共享层，命中即升档全量
   /^frontend\/packages\//,
   /^(package\.json|package-lock\.json|tsconfig\.json|vite\.config\.ts|vitest\.config\.ts|eslint\.config\.js|index\.html)$/,
@@ -40,6 +45,10 @@ export const GLOBAL_BE = [
   /^backend\/libraries\/platform-core\//,
   /^backend\/modules\/shared\//,
   /^backend\/bootstrap\/src\/main\/resources\//,
+  // 启动入口（Application/装配配置）：改动影响所有域的启动与 Bean 接线
+  /^backend\/bootstrap\/src\/main\/java\//,
+  // 跨域契约：改接口会波及所有消费者；按全量处理，宁多跑不漏测
+  /^backend\/contracts\/[^/]+\/src\/main\/java\//,
   /^backend\/modules\/legacy\/src\/main\/resources\/application/,
   /^backend\/modules\/legacy\/src\/main\/resources\/db\/migrations\//,
   /^backend\/sql\//,
