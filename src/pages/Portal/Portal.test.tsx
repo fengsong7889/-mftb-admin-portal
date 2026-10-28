@@ -105,6 +105,15 @@ function mount(path = '/portal') {
  * 之后的 data-motion 变化才确定是悬停/指针引起的。
  */
 async function waitAutoplaySettled(container: HTMLElement) {
+  // 先等它「真的开始」：否则首个检查可能早于自动播 effect（卡片刚渲染、effect 未执行），
+  // 会把「还没开始」误判成「已结束」，随后自动播才启动——CI 上表现为把自动播的 running
+  // 当成悬停残留（两次不同的断言失败都是这个根因）。
+  // reduced-motion 场景自动播不会启动，所以这里允许超时后继续往下等「结束」。
+  await waitFor(
+    () => expect(container.querySelector('.portal-card-shell[data-autoplay="1"]')).not.toBeNull(),
+    { timeout: 3000 },
+  ).catch(() => undefined)
+
   await waitFor(
     () => {
       // data-autoplay 移除与 data-motion 回落是两次渲染；只等前者会在 CI 偶发把
@@ -112,8 +121,7 @@ async function waitAutoplaySettled(container: HTMLElement) {
       expect(container.querySelector('.portal-card-shell[data-autoplay="1"]')).toBeNull()
       expect(container.querySelector('[data-motion="running"]')).toBeNull()
     },
-    // 入场分镜 6s，但 CI 并发跑 jsdom 时定时器会被拖慢：9s 曾两度在 CI 到期失败
-    // （一次卡在 data-autoplay、一次卡在 running）。这里只是等真实时长，不放宽断言。
+    // 入场分镜 6s，但 CI 并发跑 jsdom 时定时器会被拖慢；这里只是等真实时长，不放宽断言。
     { timeout: 20000 },
   )
 }
@@ -454,10 +462,11 @@ describe('场景区分与低干扰动效', () => {
     expect(container.querySelectorAll('[data-motion="running"]')).toHaveLength(1)
     expect(financeCard.querySelector('svg[data-scene]')).toHaveAttribute('data-motion', 'idle')
     fireEvent.pointerLeave(searchShell, { pointerType: 'mouse' })
-    expect(container.querySelector('[data-motion="running"]')).toBeNull()
+    // running 由动画循环下一次 tick 才回落：CI 并发下同步断言会抓到上一帧
+    await waitFor(() => expect(container.querySelector('[data-motion="running"]')).toBeNull(), { timeout: 5000 })
     fireEvent.pointerEnter(financeShell, { pointerType: 'mouse' })
     fireEvent.click(screen.getByRole('tab', { name: /未獲得權限/ }))
-    expect(container.querySelector('[data-motion="running"]')).toBeNull()
+    await waitFor(() => expect(container.querySelector('[data-motion="running"]')).toBeNull(), { timeout: 5000 })
     const lockedCard = within(screen.getByRole('tabpanel')).getByRole('button', { name: /權限管理系統/ })
     expect(lockedCard).toHaveClass('is-locked')
     fireEvent.pointerEnter(lockedCard.closest('.portal-card-shell')!, { pointerType: 'mouse' })
@@ -483,10 +492,10 @@ describe('场景区分与低干扰动效', () => {
     expect(container.querySelector('[data-motion="running"]')).toBeNull()
     fireEvent.pointerEnter(shell, { pointerType: 'mouse' })
     fireEvent.pointerCancel(shell)
-    expect(container.querySelector('[data-motion="running"]')).toBeNull()
+    await waitFor(() => expect(container.querySelector('[data-motion="running"]')).toBeNull(), { timeout: 5000 })
     fireEvent.pointerEnter(shell, { pointerType: 'mouse' })
     fireEvent.change(screen.getByRole('textbox', { name: zh.portal.search }), { target: { value: '財務' } })
-    expect(container.querySelector('[data-motion="running"]')).toBeNull()
+    await waitFor(() => expect(container.querySelector('[data-motion="running"]')).toBeNull(), { timeout: 5000 })
   })
 
   it('翻译卡是平铺世界地图 + 随机地标，静态层自身完整且品牌橙只出现一次', () => {
