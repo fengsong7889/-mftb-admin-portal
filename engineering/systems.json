@@ -108,8 +108,8 @@
     "Card": 4
    },
    "testCounts": {
-    "frontend": 10,
-    "backend": 4
+    "frontend": 11,
+    "backend": 5
    }
   },
   "ai": {
@@ -543,17 +543,19 @@
    },
    "backendPrefixes": {
     "Hr": 127,
+    "Payroll": 33,
     "Hcm": 24,
     "Emp": 15,
     "Employee": 15,
     "Position": 9,
+    "Salary": 6,
     "Emergency": 4,
     "Org": 3,
     "Contract": 2
    },
    "testCounts": {
     "frontend": 11,
-    "backend": 41
+    "backend": 45
    }
   },
   "i18n": {
@@ -743,7 +745,7 @@
     }
    },
    "backendPrefixes": {
-    "Oa": 12,
+    "Oa": 14,
     "Workflow": 8,
     "Approver": 2
    },
@@ -777,19 +779,14 @@
     "frontend": "pending",
     "backend": "pending"
    },
-   "planned": {
-    "frontendApp": "frontend/apps/payroll",
-    "backendModule": "backend/modules/payroll"
-   },
+   "planned": null,
    "frontendDirs": {},
-   "backendPrefixes": {
-    "Payroll": 33,
-    "Salary": 6
-   },
+   "backendPrefixes": {},
    "testCounts": {
     "frontend": 0,
-    "backend": 4
-   }
+    "backend": 0
+   },
+   "mergedInto": "hr"
   },
   "platform": {
    "name": "平台支撑系统",

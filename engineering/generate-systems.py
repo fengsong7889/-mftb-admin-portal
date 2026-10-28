@@ -67,9 +67,11 @@ UNATTRIBUTED_DIR_NOTES = {
 BACKEND_PREFIXES = {
     'rdm': ['Rdm'],
     'eam': ['Eam', 'Vehicle', 'Consumable'],
-    'hr': ['Hr', 'Hcm', 'Emp', 'Employee', 'Position', 'Emergency', 'Contract', 'Org'],
+    'hr': ['Hr', 'Hcm', 'Emp', 'Employee', 'Position', 'Emergency', 'Contract', 'Org',
+           # 薪酬子域（方案 C.24：HR = 人事 + 薪酬）：类已进 modules/hr，登记也随之并入，
+           # 不再单列成「计划独立的系统」，否则同一批类被两处声称归属。
+           'Payroll', 'Salary'],
     'attendance': ['Attendance', 'Att'],
-    'payroll': ['Payroll', 'Salary'],
     'ads': ['Ad', 'Organic', 'Flash', 'Gift', 'Card', 'Activity'],
     'finance': ['Fin'],
     'ai': ['Ai', 'Agent', 'Llm', 'Mcp'],
@@ -82,6 +84,11 @@ BACKEND_PREFIXES = {
                  'Migration', 'Word', 'Ding', 'Api', 'Avatar', 'Batch', 'Date'],
     'search': ['Search', 'Hint', 'HotSearch', 'StopWord', 'Synonym'],
     'portal': ['Portal', 'Home'],
+}
+
+# 已并入其它系统、但业务菜单仍需保留名字的子域（工程归属跟随主系统）
+SUBDOMAIN_MERGED = {
+    'payroll': 'hr',
 }
 
 # ────────────── 已知多系统共享目录（重叠必须显式承认） ──────────────
@@ -240,7 +247,7 @@ def main():
 
     claimed = set(SHARED_FRONTEND_DIRS)
     systems = {}
-    codes = sorted(set(list(sys_by_key.values())) | set(systems) | set(EXTRA_FRONTEND_DIRS) | set(BACKEND_PREFIXES))
+    codes = sorted(set(list(sys_by_key.values())) | set(systems) | set(EXTRA_FRONTEND_DIRS) | set(BACKEND_PREFIXES) | set(SUBDOMAIN_MERGED))
     # 已搬进应用包的目录：归属以「物理位置」为准（方案 P2）。
     # 菜单归属仍可能把它算给别的系统（例如 Hcm 的菜单分属 organization/payroll），
     # 那种情况必须让位给应用，否则同一个目录会被判成多系统共享，C3 直接失败。
@@ -282,6 +289,10 @@ def main():
             'backendPrefixes': dict(sorted(prefixes.items(), key=lambda kv: -kv[1])),
             'testCounts': test_counts(list(dirs), set(prefixes)),
         }
+        if code in SUBDOMAIN_MERGED:
+            # 子域不单独立项：工程归属随主系统，planned 不再写（避免被误读成将要拆出去）
+            systems[code]['mergedInto'] = SUBDOMAIN_MERGED[code]
+            systems[code]['planned'] = None
 
     unclaimed_dirs = [{'dir': d, 'reason': UNATTRIBUTED_DIR_NOTES.get(d, '未登记：新增页面目录必须先声明归属')}
                       for d in page_dirs if d not in claimed]
