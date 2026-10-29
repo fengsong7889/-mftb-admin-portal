@@ -85,7 +85,7 @@ export default function DetailPageHeader({ title, tags, meta, onBack, onEdit, me
               transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
             }}
           >
-            編輯
+            {t('common.edit')}
           </Button>
         ))}
       </div>

@@ -87,6 +87,9 @@ public class MeetingMinutesDispatcher {
     @Value("${meeting.minutes.dry-run:false}")
     private boolean dryRun;
 
+    @Value("${meeting.minutes.card-enabled:true}")
+    private boolean cardEnabled;
+
     /** 登记结论：给前端三分支提示用（进了队列 / 被跳过 / 场景根本没开） */
     @Getter
     public static class RegisterResult {
@@ -152,6 +155,7 @@ public class MeetingMinutesDispatcher {
             receiverUserIds.stream().filter(Objects::nonNull).filter(id -> id > 0).forEach(ids::add);
         }
         if (ids.isEmpty()) {
+            sendMapper.refreshOutcome(send.getId());
             scheduleAfterCommit(send.getId());
             return result;
         }
@@ -244,6 +248,26 @@ public class MeetingMinutesDispatcher {
             finishFailure(row, attempts, "批次內容不存在", true);
             return;
         }
+        if (dryRun) {
+            complete(row.getId(), false, REASON_DRY_RUN);
+            return;
+        }
+        if ("action_card".equals(batch.getMessageType())) {
+            MeetingMinutes minutes = minutesMapper.selectById(batch.getMinutesId());
+            if (!cardEnabled || minutes == null || !Objects.equals(batch.getTokenVersion(), minutes.getTokenVersion())
+                    || batch.getLinkExpireAt() == null || !batch.getLinkExpireAt().isAfter(LocalDateTime.now())
+                    || batch.getRevisionId() == null || !StringUtils.hasText(batch.getButtonUrl())
+                    || !StringUtils.hasText(batch.getButtonTitle())) {
+                complete(row.getId(), false, "卡片通知已暫停或連結已失效");
+                return;
+            }
+        }
+        String targetChannel = MeetingConstants.MINUTES_TARGET_GROUP.equals(row.getTargetType())
+                ? SysNotificationSwitch.CHANNEL_GROUP : SysNotificationSwitch.CHANNEL_WORK;
+        if (!templateService.enabled(MeetingConstants.SCENARIO_MINUTES, targetChannel)) {
+            complete(row.getId(), false, REASON_SWITCH_OFF);
+            return;
+        }
         if (MeetingConstants.MINUTES_TARGET_GROUP.equals(row.getTargetType())) {
             sendToGroup(row, batch, attempts);
         } else {
@@ -257,8 +281,11 @@ public class MeetingMinutesDispatcher {
             return;
         }
         try {
-            SendOutcome outcome = dingTalkService.sendMarkdownSyncToChannel(row.getGroupChannelId(),
-                    batch.getTitle(), batch.getMarkdownSnapshot(), List.of(), false);
+            SendOutcome outcome = "action_card".equals(batch.getMessageType())
+                    ? dingTalkService.sendActionCardSyncToChannel(row.getGroupChannelId(), batch.getTitle(),
+                            batch.getMarkdownSnapshot(), batch.getButtonTitle(), batch.getButtonUrl())
+                    : dingTalkService.sendMarkdownSyncToChannel(row.getGroupChannelId(),
+                            batch.getTitle(), batch.getMarkdownSnapshot(), List.of(), false);
             if (outcome != null && outcome.channelAccepted()) {
                 complete(row.getId(), true, null);
                 return;
@@ -287,9 +314,13 @@ public class MeetingMinutesDispatcher {
             return;
         }
         try {
-            dingTalkAppService.sendWorkNotification(MeetingConstants.SCENARIO_MINUTES, app.getId(),
-                            List.of(row.getReceiverDingtalkId().trim()), batch.getTitle(), batch.getMarkdownSnapshot())
-                    .whenComplete((accepted, error) -> {
+            java.util.concurrent.CompletableFuture<Boolean> sending = "action_card".equals(batch.getMessageType())
+                    ? dingTalkAppService.sendWorkActionCardPill(MeetingConstants.SCENARIO_MINUTES, app.getId(),
+                            List.of(row.getReceiverDingtalkId().trim()), batch.getTitle(), batch.getMarkdownSnapshot(),
+                            batch.getButtonTitle(), batch.getButtonUrl())
+                    : dingTalkAppService.sendWorkNotification(MeetingConstants.SCENARIO_MINUTES, app.getId(),
+                            List.of(row.getReceiverDingtalkId().trim()), batch.getTitle(), batch.getMarkdownSnapshot());
+            sending.whenComplete((accepted, error) -> {
                         if (Boolean.TRUE.equals(accepted)) {
                             complete(row.getId(), true, null);
                         } else {
@@ -323,7 +354,9 @@ public class MeetingMinutesDispatcher {
             return;
         }
         String detail = truncate(message);
-        if (terminal || attempts >= MAX_ATTEMPTS) {
+        if (terminal) {
+            deliveryMapper.markTerminalFailure(deliveryId, detail, MAX_ATTEMPTS);
+        } else if (attempts >= MAX_ATTEMPTS) {
             deliveryMapper.markFailed(deliveryId, truncate("重試耗盡：" + message), null);
         } else {
             int waitMinutes = BACKOFF_MINUTES[Math.min(attempts - 1, BACKOFF_MINUTES.length - 1)];

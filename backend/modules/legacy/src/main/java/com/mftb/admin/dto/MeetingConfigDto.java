@@ -45,6 +45,21 @@ public final class MeetingConfigDto {
         @Max(value = 720, message = "單場最長時長最多 720 分鐘")
         private Integer maxDuration;
 
+        /** 單場最短時長（分鐘）：房間未配置時回落此值 */
+        @NotNull(message = "請填寫單場最短時長")
+        @Min(value = 1, message = "單場最短時長至少 1 分鐘")
+        @Max(value = 720, message = "單場最短時長最多 720 分鐘")
+        private Integer minDuration;
+
+        /** 默認是否需要簽到保留（0/1）：房間列為 NULL 時回落 */
+        @NotNull(message = "請選擇默認是否需要簽到保留")
+        @Min(value = 0, message = "簽到保留默認值只能為 0 或 1")
+        @Max(value = 1, message = "簽到保留默認值只能為 0 或 1")
+        private Integer checkinRequired;
+
+        /** 期望的規則集版本：與當前不一致說明別人先改過，必須先刷新（樂觀鎖） */
+        private Integer version;
+
         @NotNull(message = "請填寫時間粒度")
         @Min(value = 5, message = "時間粒度至少 5 分鐘")
         @Max(value = 60, message = "時間粒度最多 60 分鐘")
@@ -99,6 +114,101 @@ public final class MeetingConfigDto {
         private List<String> missingKeys;
         private String updatedBy;
         private String updatedAt;
+        /** 規則集版本（保存時帶回，防覆蓋他人修改） */
+        private Integer version;
+        /** 服務端判定的寫權限（前端按此禁用保存，不自行復算權限） */
+        private Boolean canEdit;
+    }
+
+    /* ==================== 會議室專屬規則 ==================== */
+
+    /**
+     * 房間規則的可空覆蓋集：null = 繼承通用；0/false 是明確值（如提醒 0=不提醒）。
+     * <p>同時復用於「生效值」回顯（此時應均非 null）。
+     */
+    @Data
+    public static class RoomRuleOverrides {
+        private Integer advanceDays;
+        private Integer minLeadMinutes;
+        private Integer granularityMinutes;
+        private Integer defaultDuration;
+        private Integer minDuration;
+        private Integer maxDuration;
+        private Integer remindMinutes;
+        private Integer checkinOpenMinutes;
+        private Integer releaseAfterMinutes;
+        /** 0/1；null=繼承通用 */
+        private Integer checkinRequired;
+        /** 'HH:mm'；兩個都 null 才算「時間窗繼承」 */
+        private String bookableStart;
+        private String bookableEnd;
+    }
+
+    @Data
+    public static class RoomRuleQuery {
+        private Integer page = 1;
+        private Integer size = 20;
+        /** 編號 / 名稱 / 位置 */
+        private String keyword;
+        /** all / inherit / custom */
+        private String source;
+    }
+
+    @Data
+    public static class RoomRuleRow {
+        private Long roomId;
+        private String roomNo;
+        private String roomName;
+        private String locationText;
+        /** inherit=全部繼承通用；custom=有專屬配置 */
+        private String source;
+        private String bookableStart;
+        private String bookableEnd;
+        private Integer minDuration;
+        private Integer maxDuration;
+        private Integer checkinRequired;
+        private Integer version;
+    }
+
+    @Data
+    public static class RoomRulePage {
+        private List<RoomRuleRow> records;
+        private long total;
+        /** 當前通用規則版本（列表頁切換詳情時攜帶，供保存校驗） */
+        private Integer configVersion;
+    }
+
+    @Data
+    public static class RoomRuleView {
+        private Long roomId;
+        private String roomNo;
+        private String roomName;
+        private String locationText;
+        /** 房間自身的覆蓋值（null=繼承） */
+        private RoomRuleOverrides overrides;
+        /** 已回落的生效值 */
+        private RoomRuleOverrides effective;
+        /** 逐字段來源：global / room */
+        private java.util.Map<String, String> sources;
+        private Integer roomVersion;
+        private Integer configVersion;
+        private Boolean canEdit;
+    }
+
+    @Data
+    public static class RoomRuleForm {
+        @NotNull(message = "缺少規則內容")
+        private RoomRuleOverrides overrides;
+
+        @NotBlank(message = "請填寫變更原因")
+        @Size(max = 300, message = "變更原因最長 300 字")
+        private String changeReason;
+
+        @NotNull(message = "缺少房間版本號，請刷新後重試")
+        private Integer expectRoomVersion;
+
+        @NotNull(message = "缺少通用規則版本，請刷新後重試")
+        private Integer expectConfigVersion;
     }
 
     /* ==================== 黑名单 ==================== */

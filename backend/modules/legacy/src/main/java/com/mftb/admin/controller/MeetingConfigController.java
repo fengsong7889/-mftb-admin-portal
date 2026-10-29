@@ -51,25 +51,50 @@ public class MeetingConfigController {
         return Result.success("預約規則已保存", null);
     }
 
+    /* ==================== 會議室專屬規則 ==================== */
+
+    /** 房間規則列表（來源=全部繼承/有專屬配置），帶當前通用版本 */
+    @GetMapping("/config/rooms")
+    @RequirePermission(menu = CONFIG)
+    public Result<MeetingConfigDto.RoomRulePage> roomRules(@ModelAttribute MeetingConfigDto.RoomRuleQuery query) {
+        return Result.success(configService.listRoomRules(query));
+    }
+
+    /** 單房間規則：覆蓋值 + 生效值 + 逐字段來源 + 版本 */
+    @GetMapping("/rooms/{id}/rules")
+    @RequirePermission(menu = MeetingConstants.MENU_ROOM)
+    public Result<MeetingConfigDto.RoomRuleView> viewRoomRules(@PathVariable long id) {
+        return Result.success(configService.viewRoomRules(id));
+    }
+
+    /** 保存房間規則（null=繼承，需雙版本樂觀鎖 + 變更原因） */
+    @PutMapping("/rooms/{id}/rules")
+    @RequirePermission(menu = MeetingConstants.MENU_ROOM, action = MeetingConstants.ACTION_EDIT)
+    public Result<Void> saveRoomRules(@PathVariable long id,
+                                      @RequestBody @Valid MeetingConfigDto.RoomRuleForm form) {
+        configService.saveRoomRules(id, form);
+        return Result.success("會議室規則已保存", null);
+    }
+
     /* ==================== 黑名单 ==================== */
 
     /** 黑名单清单 + 同口径统计卡 */
     @GetMapping("/blacklist")
-    @RequirePermission(menu = CONFIG)
+    @RequirePermission(menu = MeetingConstants.MENU_BLACKLIST)
     public Result<MeetingConfigDto.BlacklistPage> blacklist(@ModelAttribute MeetingConfigDto.BlacklistQuery query) {
         return Result.success(blacklistService.list(query));
     }
 
     /** 手动加入限制 */
     @PostMapping("/blacklist")
-    @RequirePermission(menu = CONFIG, action = MeetingConstants.ACTION_EDIT)
+    @RequirePermission(menu = MeetingConstants.MENU_BLACKLIST, action = MeetingConstants.ACTION_EDIT)
     public Result<Long> addBlacklist(@RequestBody @Valid MeetingConfigDto.BlacklistForm form) {
         return Result.success("已新增限制記錄", blacklistService.add(form));
     }
 
     /** 撤销限制：留行不留状态，删行等于毁掉处置记录 */
     @PostMapping("/blacklist/{id}/revoke")
-    @RequirePermission(menu = CONFIG, action = MeetingConstants.ACTION_EDIT)
+    @RequirePermission(menu = MeetingConstants.MENU_BLACKLIST, action = MeetingConstants.ACTION_EDIT)
     public Result<Void> revokeBlacklist(@PathVariable long id,
                                         @RequestBody @Valid MeetingConfigDto.RevokeForm form) {
         blacklistService.revoke(id, form);

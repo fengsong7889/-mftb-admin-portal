@@ -136,7 +136,7 @@ class MeetingRoomServiceImplTest {
     }
 
     @Test
-    @DisplayName("更新逐列显式 set：档案列带空串进 SET（P0 回归），规则列允许 NULL")
+    @DisplayName("更新逐列显式 set：档案列带空串进 SET，规则列不再由档案保存写入（唯一入口是专属规则接口）")
     void updateSetsProfileColumnsWithBlankNotNull() {
         when(roomMapper.selectById(9L)).thenReturn(storedRoom());
         when(roomMapper.update(isNull(), any())).thenReturn(1);
@@ -151,7 +151,7 @@ class MeetingRoomServiceImplTest {
         String setClause = wrapper.getSqlSet();
         // 显式 set 是"允许清空"的前提：少了列名，行政就只能改大不能改小
         for (String column : List.of("campus", "building", "floor_code", "location_desc",
-                "facilities", "admin_user_ids", "bookable_start_time", "min_duration")) {
+                "facilities", "admin_user_ids")) {
             assertTrue(setClause.contains(column + "="), column + " 应被显式 set：" + setClause);
         }
         // 档案列 DDL 是 NOT NULL DEFAULT ''：带着 null 进 SET 就是本次 P0 的现场
@@ -159,9 +159,12 @@ class MeetingRoomServiceImplTest {
                 "facilities", "admin_user_ids")) {
             assertEquals("", valueSetFor(wrapper, column), column + " 留空应以空串写入而不是 null");
         }
-        // 规则列反过来必须是 NULL：回落全局的语义不能被空串污染
-        assertNull(valueSetFor(wrapper, "bookable_start_time"));
-        assertNull(valueSetFor(wrapper, "min_duration"));
+        // 规则列已收口到「會議室專屬規則」接口：档案保存若还写这几列，
+        // 会把专属页配好的值在“只改了个备注”时静默清空。
+        for (String column : List.of("bookable_start_time", "bookable_end_time", "min_duration",
+                "max_duration", "checkin_required", "release_after_minutes")) {
+            assertFalse(setClause.contains(column + "="), column + " 不应再由档案保存写入：" + setClause);
+        }
     }
 
     /** 从 SET 片段里把 {@code column=#{ew.paramNameValuePairs.MPGENVALn}} 反查回实参，避开生成键名的顺序依赖 */

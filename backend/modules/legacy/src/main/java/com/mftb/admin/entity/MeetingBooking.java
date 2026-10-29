@@ -106,6 +106,25 @@ public class MeetingBooking {
 
     private Long checkinBy;
 
+    /**
+     * 预约时冻结的生效规则快照（JSON）：记录预约当时各行生效值与来源及配置版本。
+     * <p>为什么需要：规则一改就改历史会议，等于把已约好的会按新规则重判；
+     * 存量必须保持「预约时那一版」，所以快照由服务端写入、前端不传。
+     */
+    private String ruleSnapshot;
+
+    /** 提醒时刻（服务端按快照算好，0=不提醒则为 NULL）：提醒 Job 直接按此列取数，不再读最新配置 */
+    private LocalDateTime remindAt;
+
+    /** 签到开放时刻（服务端按快照算好）：签到窗口与详情页按钮一律读此列 */
+    private LocalDateTime checkinOpenAt;
+
+    /** 未签到自动释放截止时刻（不需要签到保留时为 NULL）：释放 Job 直接按此列取数 */
+    private LocalDateTime releaseDeadlineAt;
+
+    /** 预约时是否需签到保留（0/1 快照）：每日收尾判定爽约读此列，不读房间最新开关 */
+    private Integer checkinRequiredSnapshot;
+
     private LocalDateTime actualStartAt;
 
     private LocalDateTime actualEndAt;

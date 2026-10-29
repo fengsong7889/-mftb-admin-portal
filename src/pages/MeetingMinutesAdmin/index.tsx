@@ -4,21 +4,22 @@
  * 与「我的會議」的区别：那页回答"我的会"，这页回答"公司有哪些纪要、哪件事还没办完"。
  * 因此搜索区按 关键字/时间/记录人/待办状态 筛选，统计卡片跟随搜索条件（§E.8：统计在搜索区下方）。
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, Button, DatePicker, Input, Space, Table, Tag } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { ReloadOutlined, SearchOutlined, SolutionOutlined } from '@ant-design/icons'
-import { useNavigate } from 'react-router-dom'
+import useMinutesNavigation from '../MeetingManagement/MeetingMinutes/useMinutesNavigation'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import DetailPageHeader from '@/components/DetailPageHeader'
 import StatCards from '@/components/StatCards'
+import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { fetchMinutesAdminPage, type MinutesAdminRow } from '@/api/meetingMinutes'
 import { minutesStatusMeta } from '../MeetingManagement/meetingMeta'
 
 export default function MeetingMinutesAdmin() {
   const { t } = useTranslation()
-  const navigate = useNavigate()
+  const { open: navigate, back } = useMinutesNavigation()
   const [rows, setRows] = useState<MinutesAdminRow[]>([])
   const [total, setTotal] = useState(0)
   const [stats, setStats] = useState({ pendingItems: 0, overdueItems: 0, sentMinutes: 0 })
@@ -29,7 +30,9 @@ export default function MeetingMinutesAdmin() {
   const [filters, setFilters] = useState<{ keyword?: string; recorderKeyword?: string; itemState?: string }>({})
   const [range, setRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null)
 
+  const requestId = useRef(0)
   const load = useCallback(async () => {
+    const currentRequest = ++requestId.current
     setLoading(true)
     setError(undefined)
     try {
@@ -42,6 +45,7 @@ export default function MeetingMinutesAdmin() {
         page,
         size,
       })
+      if (currentRequest !== requestId.current) return
       setRows(result.list ?? [])
       setTotal(result.total ?? 0)
       setStats({
@@ -50,9 +54,10 @@ export default function MeetingMinutesAdmin() {
         sentMinutes: result.sentMinutes ?? 0,
       })
     } catch (e) {
+      if (currentRequest !== requestId.current) return
       setError(e instanceof Error ? e.message : t('meeting.failedToLoadThe2', { defaultValue: '會議詳情加載失敗' }))
     } finally {
-      setLoading(false)
+      if (currentRequest === requestId.current) setLoading(false)
     }
   }, [filters, page, size, range, t])
 
@@ -91,6 +96,9 @@ export default function MeetingMinutesAdmin() {
         </Space>
       ),
     },
+    { title: t('meeting.minutes.formalVersion', { defaultValue: '正式版本' }), key: 'revision', width: 130,
+      render: (_, row) => row.publishedRevisionNo ? <Tag color="blue">V{row.publishedRevisionNo}</Tag> : t('meeting.minutes.unpublished', { defaultValue: '未發布' }) },
+    { title: t('meeting.minutes.publishedAt', { defaultValue: '發布時間' }), dataIndex: 'publishedAt', key: 'publishedAt', width: 160, render: (value?: string) => value || '-' },
     {
       title: t('meeting.minutes.sendCount', { defaultValue: '發送次數' }), dataIndex: 'sendCount', key: 'sendCount', width: 110,
       render: (value: number, row) => (
@@ -108,21 +116,25 @@ export default function MeetingMinutesAdmin() {
     },
   ]
 
+  const { configComponent, applyConfig } = useColumnConfig('meeting-minutes-list',
+    columns.map(column => ({ key: String(column.key), title: String(column.title) })),
+    [{ key: 'minutesNo', visible: true, locked: 'head' }, { key: 'action', visible: true, locked: 'tail' }])
+
   return (
     <div className="content-area">
-      <DetailPageHeader title={t('meeting.minutes.adminTitle', { defaultValue: '會議紀要' })} onBack={() => navigate(-1)} />
+      <DetailPageHeader title={t('meeting.minutes.adminTitle', { defaultValue: '會議紀要' })} onBack={back} />
 
       {error && <Alert type="error" showIcon style={{ marginBottom: 16 }} message={t('meeting.loadFailed', { defaultValue: '加載失敗' })} description={error} />}
 
       <div className="search-section">
-        <Space wrap size={12}>
-          <Input allowClear style={{ width: 260 }} prefix={<SearchOutlined />}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(230px, 100%), 1fr))', gap: '16px 12px' }}>
+          <Input allowClear value={filters.keyword} style={{ width: '100%' }} prefix={<SearchOutlined />}
             placeholder={t('meeting.minutes.adminKeywordPlaceholder', { defaultValue: '紀要單號 / 會議單號 / 主題 / 結論' })}
             onChange={event => { setPage(1); setFilters(previous => ({ ...previous, keyword: event.target.value })) }} />
-          <Input allowClear style={{ width: 190 }}
+          <Input allowClear value={filters.recorderKeyword} style={{ width: '100%' }}
             placeholder={t('meeting.minutes.recorderPlaceholder', { defaultValue: '記錄人姓名或工號' })}
             onChange={event => { setPage(1); setFilters(previous => ({ ...previous, recorderKeyword: event.target.value })) }} />
-          <DatePicker.RangePicker
+          <DatePicker.RangePicker value={range} style={{ width: '100%' }}
             onChange={value => { setPage(1); setRange(value as [dayjs.Dayjs | null, dayjs.Dayjs | null] | null) }} />
           <Space.Compact>
             <Button type={filters.itemState === undefined ? 'primary' : 'default'} size="small"
@@ -132,13 +144,17 @@ export default function MeetingMinutesAdmin() {
             <Button type={filters.itemState === 'overdue' ? 'primary' : 'default'} size="small" danger={filters.itemState === 'overdue'}
               onClick={() => { setPage(1); setFilters(previous => ({ ...previous, itemState: 'overdue' })) }}>{t('meeting.minutes.overdue', { defaultValue: '已逾期' })}</Button>
           </Space.Compact>
-        </Space>
+          <div className="search-actions">
+            <Button type="primary" icon={<SearchOutlined />} onClick={() => void load()}>{t('common.search')}</Button>
+            <Button icon={<ReloadOutlined />} onClick={() => { setPage(1); setFilters({}); setRange(null) }}>{t('common.reset')}</Button>
+          </div>
+        </div>
       </div>
 
       {/* 统计卡片：必须在搜索区下方，且口径跟随筛选条件 */}
       <div style={{ margin: '16px 0' }}>
         <StatCards
-          animationKey={`${filters.keyword ?? ''}|${filters.recorderKeyword ?? ''}|${filters.itemState ?? ''}|${range?.[0]?.valueOf() ?? ''}`}
+          animationKey={`${filters.keyword ?? ''}|${filters.recorderKeyword ?? ''}|${filters.itemState ?? ''}|${range?.[0]?.valueOf() ?? ''}|${range?.[1]?.valueOf() ?? ''}`}
           columns={3}
           items={[
             { key: 'sent', icon: <SolutionOutlined />, value: stats.sentMinutes, label: t('meeting.minutes.statSent', { defaultValue: '已發送紀要' }), color: 'info' },
@@ -149,14 +165,15 @@ export default function MeetingMinutesAdmin() {
       </div>
 
       <div className="action-section">
-        <Button type="primary" icon={<ReloadOutlined />} onClick={() => void load()} loading={loading}>{t('meeting.refreshList', { defaultValue: '重新整理' })}</Button>
+        <div className="action-section-left"><Button icon={<ReloadOutlined />} onClick={() => void load()} loading={loading}>{t('meeting.refreshList', { defaultValue: '重新整理' })}</Button></div>
+        <div className="action-section-right">{configComponent}</div>
       </div>
 
       <Table<MinutesAdminRow>
         rowKey="minutesId"
         size="small"
         loading={loading}
-        columns={columns}
+        columns={applyConfig(columns)}
         dataSource={rows}
         scroll={{ x: 'max-content' }}
         pagination={{
@@ -164,8 +181,10 @@ export default function MeetingMinutesAdmin() {
           pageSize: size,
           total,
           showSizeChanger: true,
+          showQuickJumper: true,
+          pageSizeOptions: ['10', '20', '50', '100'],
           showTotal: value => t('meeting.totalRecords', { count: value, defaultValue: `共 ${value} 條` }),
-          onChange: (nextPage, nextSize) => { setPage(nextPage); setSize(nextSize) },
+          onChange: (nextPage, nextSize) => { setPage(nextSize !== size ? 1 : nextPage); setSize(nextSize) }
         }}
         locale={{ emptyText: t('meeting.minutes.noMinutes', { defaultValue: '暫無符合條件的紀要' }) }}
       />

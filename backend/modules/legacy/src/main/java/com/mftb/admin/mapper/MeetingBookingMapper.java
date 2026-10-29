@@ -230,16 +230,22 @@ public interface MeetingBookingMapper extends BaseMapper<MeetingBooking> {
      * <p>释放分钟数的回落口径在 SQL 里用 {@code COALESCE(房间列, 传入默认值)} 完成：
      * 与 {@code MeetingRuleService} 同一思路，但 Job 要批量取数，不可能逐条再走一次服务层回落。
      */
-    @Select("SELECT b.* FROM biz_meeting_booking b JOIN biz_meeting_room r ON r.id = b.room_id AND r.deleted = 0 "
-            + "WHERE b.deleted = 0 AND b.status = 'booked' AND r.checkin_required = 1 "
-            + "AND DATE_ADD(b.start_time, INTERVAL COALESCE(r.release_after_minutes, #{defaultReleaseMinutes}) MINUTE) <= NOW() "
-            + "AND b.start_time < NOW() ORDER BY b.start_time LIMIT #{limit}")
+    @Select("SELECT b.* FROM biz_meeting_booking b "
+            + "LEFT JOIN biz_meeting_room r ON r.id = b.room_id AND r.deleted = 0 "
+            + "WHERE b.deleted = 0 AND b.status = 'booked' AND b.start_time < NOW() "
+            + "AND ( (b.rule_snapshot IS NOT NULL AND b.checkin_required_snapshot = 1 "
+            + "       AND b.release_deadline_at IS NOT NULL AND b.release_deadline_at <= NOW()) "
+            + "   OR (b.rule_snapshot IS NULL AND r.checkin_required = 1 "
+            + "       AND DATE_ADD(b.start_time, INTERVAL COALESCE(r.release_after_minutes, #{defaultReleaseMinutes}) MINUTE) <= NOW()) ) "
+            + "ORDER BY b.start_time LIMIT #{limit}")
     List<MeetingBooking> findReleasable(@Param("defaultReleaseMinutes") int defaultReleaseMinutes,
                                         @Param("limit") int limit);
 
     /** 即将开始且未提醒的会议（提醒投递靠通知留痕表唯一键保证只发一次，本查询可以每轮重复命中） */
-    @Select("SELECT * FROM biz_meeting_booking WHERE deleted = 0 AND status = 'booked' "
-            + "AND start_time > NOW() AND start_time <= DATE_ADD(NOW(), INTERVAL #{remindMinutes} MINUTE) "
+    @Select("SELECT * FROM biz_meeting_booking WHERE deleted = 0 AND status = 'booked' AND start_time > NOW() "
+            + "AND ( (rule_snapshot IS NOT NULL AND remind_at IS NOT NULL AND remind_at <= NOW()) "
+            + "   OR (#{remindMinutes} > 0 AND rule_snapshot IS NULL "
+            + "       AND start_time <= DATE_ADD(NOW(), INTERVAL #{remindMinutes} MINUTE)) ) "
             + "ORDER BY start_time LIMIT #{limit}")
     List<MeetingBooking> findRemindDue(@Param("remindMinutes") int remindMinutes, @Param("limit") int limit);
 

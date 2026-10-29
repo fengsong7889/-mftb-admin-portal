@@ -6,6 +6,9 @@ import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.MeetingConstants;
 import com.mftb.admin.dto.MeetingMinutesContent;
 import com.mftb.admin.dto.MeetingMinutesDto;
+import com.mftb.admin.dto.MeetingMinutesDocument;
+import com.mftb.admin.entity.MeetingMinutesRevision;
+import com.mftb.admin.service.MeetingMinutesPublication;
 import com.mftb.admin.entity.MeetingAttendee;
 import com.mftb.admin.entity.MeetingBooking;
 import com.mftb.admin.entity.MeetingMinutes;
@@ -107,6 +110,13 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
     private final com.mftb.admin.service.DingTalkService dingTalkService;
     private final NotificationAppService appService;
     private final BizSeqService bizSeqService;
+    private final MeetingMinutesPublication publication;
+
+    @Value("${meeting.minutes.publication-enabled:true}")
+    private boolean publicationEnabled;
+
+    @Value("${meeting.minutes.card-enabled:true}")
+    private boolean cardEnabled;
 
     /**
      * 纪要能力开关：默认开，生产可用 {@code MEETING_MINUTES_ENABLED=false} 灰度关闭。
@@ -144,6 +154,9 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         if (!isReadable(minutes, booking, current)) {
             throw new BusinessException(NOT_FOUND);
         }
+        if (!bookingReadable(booking, current) && !isManager(minutes, booking, current)) {
+            return recipientView(minutes, current);
+        }
         return toVO(minutes, booking, current);
     }
 
@@ -156,6 +169,7 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         if (!isReadable(minutes, booking, current)) {
             throw new BusinessException(NOT_FOUND);
         }
+        requireWritable(minutes, current);
         List<MeetingMinutesSend> batches = sendMapper.findByMinutes(minutesId);
         if (batches.isEmpty()) {
             return List.of();
@@ -191,6 +205,10 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         MeetingBooking booking = requireBooking(form.getBookingId());
         requireRecordable(booking, current);
         MeetingMinutesContent content = requireContent(form);
+        if (content.versioned()) {
+            publication.normalize(content, null, current);
+            publication.validateItemIds(null, content);
+        }
         if (minutesMapper.findByBooking(booking.getId()) != null) {
             // 两个人同时打开录入页时，后提交者必须看见"已存在"而不是长出第二条纪要
             throw new BusinessException("這場會議已有紀要，請重新打開後再編輯");
@@ -235,9 +253,12 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
                 null, Map.of("minutesNo", minutes.getMinutesNo(), "digest", minutes.getDigest()),
                 current, trimToNull(form.getRequestKey()));
         // 事项/关联/参会补录跟正文同事务：纪要保存成功但待办没落库，等于发出去一张没人负责的空单
-        saveItems(minutes, form);
+        if (!content.versioned()) {
+            saveItems(minutes, form);
+            applyAttendance(booking, form, current);
+        }
         saveLinks(minutes, form);
-        applyAttendance(booking, form, current);
+        if (content.versioned()) refreshDraftHash(minutes, content);
         return toVO(minutes, booking, current);
     }
 
@@ -246,10 +267,16 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
     public MeetingMinutesDto.VO update(long minutesId, MeetingMinutesDto.Form form) {
         requireEnabled();
         SysUser current = guard.currentUser();
-        MeetingMinutes minutes = requireMinutes(minutesId);
+        MeetingMinutes minutes = requireLockedMinutes(minutesId);
         MeetingBooking booking = requireBooking(minutes.getBookingId());
         requireWritable(minutes, current);
         MeetingMinutesContent content = requireContent(form);
+        MeetingMinutesContent previous = decodeContent(minutes);
+        if (previous.versioned() && !content.versioned()) throw new BusinessException("請升級頁面後使用新版紀要模板");
+        if (content.versioned()) {
+            publication.normalize(content, previous, current);
+            publication.validateItemIds(minutes, content);
+        }
         int expectVersion = requireVersion(versionOf(form.getVersion(), form.getExpectVersion()));
         if (!Objects.equals(minutes.getVersion(), expectVersion)) {
             throw new BusinessException(CONFLICT);
@@ -268,9 +295,12 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
             throw new BusinessException(CONFLICT);
         }
         // 编辑正文不影响已有事项的状态：saveItems 按位置 upsert，只覆盖内容与负责人
-        saveItems(requireMinutes(minutesId), form);
-        saveLinks(requireMinutes(minutesId), form);
-        applyAttendance(booking, form, current);
+        if (!content.versioned()) {
+            saveItems(minutes, form);
+            applyAttendance(booking, form, current);
+        }
+        saveLinks(minutes, form);
+        if (content.versioned()) refreshDraftHash(minutes, content);
         audit.recordBooking(booking.getId(), booking.getRoomId(), booking.getBookingNo(),
                 MeetingConstants.EVENT_MINUTES_UPDATE, "修改會議紀要 " + minutes.getMinutesNo(),
                 Map.of("digest", nullToEmpty(before.getDigest())),
@@ -283,9 +313,12 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
     public MeetingMinutesDto.SendResult send(long minutesId, MeetingMinutesDto.SendForm form) {
         requireEnabled();
         SysUser current = guard.currentUser();
-        MeetingMinutes minutes = requireMinutes(minutesId);
+        MeetingMinutes minutes = requireLockedMinutes(minutesId);
         MeetingBooking booking = requireBooking(minutes.getBookingId());
         requireWritable(minutes, current);
+        if (form == null) throw new BusinessException("請填寫通知設定");
+        if (form.getRevisionId() != null) return sendPublished(minutes, booking, current, form);
+        if (decodeContent(minutes).versioned()) throw new BusinessException("請先發布紀要並選擇正式版本後通知");
         // 发送前先校版本：拿着一周前打开的页面点「發送」，发出去的其实是别人后来改过的正文，
         // 而用户在预览里看到的还是自己那份——版本不一致时拒绝，让他刷新后重看
         if (!Objects.equals(minutes.getVersion(),
@@ -400,12 +433,132 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         return result;
     }
 
+    /** 新版发送只登记正式快照，锁住主行保证同纪要批次与幂等裁决串行。 */
+    private MeetingMinutesDto.SendResult sendPublished(MeetingMinutes minutes, MeetingBooking booking,
+                                                        SysUser current, MeetingMinutesDto.SendForm form) {
+        if (!cardEnabled) throw new BusinessException("紀要卡片通知暫停，已發布版本仍可查看");
+        if (!Boolean.TRUE.equals(form.getAcknowledgePublicLink())) throw new BusinessException("請先確認免登連結可轉發風險");
+        String key = MeetingMinutesPublication.requestKey(form.getRequestKey());
+        List<Long> selected = form.getReceiverUserIds() == null ? List.of() : form.getReceiverUserIds();
+        if (selected.size() > 100 || selected.stream().anyMatch(id -> id == null || id <= 0)
+                || (form.getGroupChannelId() != null && form.getGroupChannelId() <= 0)) throw new BusinessException("通知對象不正確或超過 100 人");
+        String hash = MeetingMinutesPublication.hash(java.util.Arrays.asList(form.getRevisionId(), form.getGroupChannelId(),
+                selected.stream().distinct().sorted().toList(), Boolean.TRUE.equals(form.getAlsoNotifyAttendees()), current.getId()));
+        MeetingMinutesSend replay = sendMapper.findByRequest(minutes.getId(), key);
+        if (replay != null) {
+            if (!hash.equals(replay.getRequestHash())) throw new BusinessException("同一通知識別碼不可用於不同請求");
+            return sentResult(replay, minutes);
+        }
+        MeetingMinutesRevision revision = publication.requireRevision(minutes.getId(), form.getRevisionId());
+        MeetingMinutesDocument document = publication.decode(revision);
+        String base = baseUrl();
+        if (!publicHttpsBase(base)) throw new BusinessException("請先設定有效的公網 HTTPS 站點地址，再發送紀要通知");
+        SysNotificationChannel channel = dispatcher.usableChannel(form.getGroupChannelId());
+        if (form.getGroupChannelId() != null && channel == null) throw new BusinessException("釘釘群渠道不存在或已停用");
+        LinkedHashSet<Long> receivers = new LinkedHashSet<>(selected);
+        if (Boolean.TRUE.equals(form.getAlsoNotifyAttendees())) {
+            attendeeMapper.selectList(new LambdaQueryWrapper<MeetingAttendee>().eq(MeetingAttendee::getBookingId, booking.getId()))
+                    .stream().map(MeetingAttendee::getUserId).filter(Objects::nonNull).forEach(receivers::add);
+        }
+        if (receivers.size() > 100) throw new BusinessException("每批最多通知 100 人");
+        if (channel == null && receivers.isEmpty()) throw new BusinessException("請選擇釘釘群或至少一位收件人");
+        if (!receivers.isEmpty()) {
+            List<SysUser> users = userMapper.selectBatchIds(receivers);
+            if (users.size() != receivers.size() || users.stream().anyMatch(user -> !Integer.valueOf(1).equals(user.getStatus()))) {
+                throw new BusinessException("收件人不存在、已停用或離職，請重新選擇");
+            }
+        }
+        MeetingMinutesSend batch = new MeetingMinutesSend();
+        batch.setMinutesId(minutes.getId());
+        batch.setRevisionId(revision.getId());
+        batch.setMessageType("action_card");
+        batch.setBookingId(minutes.getBookingId());
+        batch.setBookingNo(document.getBookingNo());
+        batch.setMinutesNo(document.getMinutesNo());
+        batch.setBatchSeq(nextBatchSeq(minutes.getId()));
+        batch.setContentSnapshot(JsonUtils.toJson(document.getContent()));
+        batch.setScenario(MeetingConstants.SCENARIO_MINUTES);
+        batch.setGroupChannelId(channel == null ? null : channel.getId());
+        batch.setGroupChannelName(channel == null ? "" : channel.getName());
+        batch.setReceiverCount(receivers.size());
+        batch.setTokenVersion(minutes.getTokenVersion());
+        batch.setLinkExpireAt(LocalDateTime.now().plusDays(MeetingConstants.MINUTES_LINK_TTL_DAYS).withNano(0));
+        batch.setSendStatus(MeetingConstants.NOTIFY_PENDING);
+        batch.setSuccessCount(0);
+        batch.setFailedCount(0);
+        batch.setSkippedCount(0);
+        batch.setOperatorId(current.getId());
+        batch.setOperatorName(displayName(current));
+        batch.setOperatorEmpNo(Objects.toString(current.getEmpId(), ""));
+        batch.setSentAt(LocalDateTime.now().withNano(0));
+        batch.setRequestKey(key);
+        batch.setRequestHash(hash);
+        MeetingMinutesRenderer.Rendered rendered = MeetingMinutesRenderer.publishedCard(document, batch.getBatchSeq(), templateService);
+        batch.setTitle(rendered.title());
+        batch.setMarkdownSnapshot(rendered.markdown());
+        batch.setButtonTitle("查看紀要");
+        batch.setTemplateVersion("publication-v2:" + MeetingMinutesPublication.hash(List.of(rendered.title(), rendered.markdown())).substring(0, 32));
+        sendMapper.insert(batch);
+        String token = MinutesViewTokenUtil.generate(minutes.getId(), batch.getId(), batch.getTokenVersion(), batch.getLinkExpireAt(), tokenSecret());
+        String url = base + "/#/meeting-minutes-view?token=" + token;
+        if (url.length() > 500) throw new BusinessException("紀要站點地址過長，請聯繫管理員");
+        batch.setButtonUrl(url);
+        sendMapper.update(null, new LambdaUpdateWrapper<MeetingMinutesSend>().eq(MeetingMinutesSend::getId, batch.getId())
+                .set(MeetingMinutesSend::getButtonUrl, url));
+        MeetingMinutesDispatcher.RegisterResult registered = dispatcher.register(minutes, batch, receivers);
+        minutesMapper.markSent(minutes.getId(), batch.getSentAt());
+        audit.recordBooking(booking.getId(), booking.getRoomId(), booking.getBookingNo(), MeetingConstants.EVENT_MINUTES_SEND,
+                "提交紀要通知 " + minutes.getMinutesNo() + " V" + revision.getRevisionNo(), null,
+                Map.of("revisionId", revision.getId(), "batchSeq", batch.getBatchSeq(), "queued", registered.getQueued()), current, key);
+        MeetingMinutesDto.SendResult result = sentResult(batch, minutes);
+        result.setQueued(registered.getQueued());
+        result.setSkipped(registered.getSkipped());
+        result.setScenarioActive(registered.isScenarioActive());
+        result.setGroupQueued(registered.isGroupQueued());
+        result.setDeliveries(registered.getRows().stream().filter(Objects::nonNull).map(this::toDeliveryVO).toList());
+        return result;
+    }
+
+    private MeetingMinutesDto.SendResult sentResult(MeetingMinutesSend batch, MeetingMinutes minutes) {
+        List<MeetingMinutesDelivery> deliveries = deliveryMapper.findBySend(batch.getId());
+        MeetingMinutesDto.SendVO sent = toSendVO(batch, minutes, deliveries);
+        MeetingMinutesDto.SendResult result = new MeetingMinutesDto.SendResult();
+        result.setSendId(batch.getId());
+        result.setRevisionId(sent.getRevisionId());
+        result.setRevisionNo(sent.getRevisionNo());
+        result.setBatchSeq(batch.getBatchSeq());
+        result.setGroupChannelName(batch.getGroupChannelName());
+        result.setViewUrl(sent.getViewUrl());
+        result.setLinkBaseUrl(batch.getButtonUrl() == null ? null : batch.getButtonUrl().split("/#/", 2)[0]);
+        result.setLinkBasePublic(true);
+        result.setDeliveries(sent.getDeliveries());
+        result.setQueued((int) deliveries.stream().filter(row -> MeetingConstants.MINUTES_TARGET_USER.equals(row.getTargetType())
+                && !MeetingConstants.NOTIFY_SKIPPED.equals(row.getSendStatus())).count());
+        result.setSkipped((int) deliveries.stream().filter(row -> MeetingConstants.NOTIFY_SKIPPED.equals(row.getSendStatus())).count());
+        result.setScenarioActive(deliveries.stream().anyMatch(row -> MeetingConstants.MINUTES_TARGET_USER.equals(row.getTargetType())
+                && !"場景未啟用或未綁定企業應用".equals(row.getErrorMsg())));
+        result.setGroupQueued(deliveries.stream().anyMatch(row -> MeetingConstants.MINUTES_TARGET_GROUP.equals(row.getTargetType())
+                && !MeetingConstants.NOTIFY_SKIPPED.equals(row.getSendStatus())));
+        return result;
+    }
+
+    private static boolean publicHttpsBase(String base) {
+        if (!PublicLinkGuard.isPubliclyReachable(base)) return false;
+        try {
+            java.net.URI uri = java.net.URI.create(base);
+            return "https".equalsIgnoreCase(uri.getScheme()) && uri.getUserInfo() == null
+                    && uri.getQuery() == null && uri.getFragment() == null;
+        } catch (IllegalArgumentException ignored) {
+            return false;
+        }
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public MeetingMinutesDto.VO revokeLinks(long minutesId, MeetingMinutesDto.RevokeForm form) {
         requireEnabled();
         SysUser current = guard.currentUser();
-        MeetingMinutes minutes = requireMinutes(minutesId);
+        MeetingMinutes minutes = requireLockedMinutes(minutesId);
         MeetingBooking booking = requireBooking(minutes.getBookingId());
         requireWritable(minutes, current);
         int expectVersion = requireVersion(form == null ? null
@@ -422,6 +575,30 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
                 MeetingConstants.EVENT_MINUTES_REVOKE, "作廢紀要查看鏈接 " + minutes.getMinutesNo(),
                 null, Map.of("tokenVersion", tokenVersion + 1), current, null);
         return view(minutesId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void revokeBatchLink(long minutesId, long sendId) {
+        requireEnabled();
+        SysUser current = guard.currentUser();
+        MeetingMinutes minutes = requireLockedMinutes(minutesId);
+        MeetingBooking booking = requireBooking(minutes.getBookingId());
+        requireWritable(minutes, current);
+        MeetingMinutesSend batch = sendMapper.selectById(sendId);
+        if (batch == null || !Objects.equals(batch.getMinutesId(), minutesId)) {
+            throw new BusinessException("批次不存在或不属于该纪要");
+        }
+        if (Objects.equals(batch.getLinkRevoked(), 1)) {
+            throw new BusinessException("本批次链接已作废");
+        }
+        if (sendMapper.revokeBatchLink(minutesId, sendId) == 0) {
+            throw new BusinessException("作废失败，请刷新后重试");
+        }
+        audit.recordBooking(booking.getId(), booking.getRoomId(), booking.getBookingNo(),
+                MeetingConstants.EVENT_MINUTES_REVOKE,
+                "作废单批次查看链接 " + minutes.getMinutesNo() + " 第" + batch.getBatchSeq() + "次",
+                null, Map.of("sendId", sendId, "batchSeq", batch.getBatchSeq()), current, null);
     }
 
     /* ==================== 免登 ==================== */
@@ -443,7 +620,9 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         // 三个事实必须同时成立：令牌签发的批次存在、批次确实属于这份纪要、批次用的令牌版本仍是当前版本
         if (minutes == null || batch == null || !Objects.equals(batch.getMinutesId(), minutes.getId())
                 || batch.getTokenVersion() == null || batch.getTokenVersion() != parsed.tokenVersion()
-                || minutes.getTokenVersion() == null || minutes.getTokenVersion() != parsed.tokenVersion()) {
+                || minutes.getTokenVersion() == null || minutes.getTokenVersion() != parsed.tokenVersion()
+                || Objects.equals(batch.getLinkRevoked(), 1)
+                || batch.getLinkExpireAt() == null || !batch.getLinkExpireAt().isAfter(LocalDateTime.now())) {
             return invalid;
         }
         MeetingMinutesDto.PublicView view = new MeetingMinutesDto.PublicView();
@@ -463,6 +642,25 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         view.setExpireAt(DateTimeUtils.format(batch.getLinkExpireAt()));
         // 正文取批次快照，不取消极的当前版本：收件人点开必须还是"发给我的那一版"
         view.setContent(JsonUtils.parse(batch.getContentSnapshot(), MeetingMinutesContent.class));
+        if (batch.getRevisionId() != null) {
+            try {
+                MeetingMinutesRevision revision = publication.requireRevision(minutes.getId(), batch.getRevisionId());
+                MeetingMinutesDocument document = publication.decode(revision);
+                view.setDocument(document);
+                view.setRevisionNo(revision.getRevisionNo());
+                view.setContent(document.getContent());
+                view.setMinutesNo(document.getMinutesNo());
+                view.setBookingNo(document.getBookingNo());
+                view.setTitle(document.getMeetingTitle());
+                view.setMeetingTimeText(document.getMeetingTimeText());
+                view.setRoomText(document.getRoomText());
+                view.setOrganizerName(document.getOrganizerName());
+                view.setRecorderName(document.getRecorderName());
+                view.setRecorderEmpNo(document.getRecorderEmpNo());
+            } catch (BusinessException ignored) {
+                return invalid;
+            }
+        }
         return view;
     }
 
@@ -480,6 +678,103 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         }
         return minutesMapper.findByBookings(ids).stream()
                 .collect(Collectors.toMap(MeetingMinutes::getBookingId, Function.identity(), (a, b) -> a));
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public MeetingMinutesDto.RevisionVO publish(long minutesId, MeetingMinutesDto.PublishForm form) {
+        requireEnabled();
+        if (!publicationEnabled) throw new BusinessException("紀要發布暫停，草稿仍可保存");
+        SysUser current = guard.currentUser();
+        MeetingMinutes minutes = requireLockedMinutes(minutesId);
+        requireWritable(minutes, current);
+        if (!guard.canRecordMinutes(current) && !guard.canOperateRecords(current)) throw new BusinessException(NOT_FOUND);
+        return publication.toVO(publication.publish(minutes, requireBooking(minutes.getBookingId()), current, form), true);
+    }
+
+    @Override
+    public List<MeetingMinutesDto.RevisionVO> revisions(long minutesId) {
+        requireEnabled();
+        SysUser current = guard.currentUser();
+        MeetingMinutes minutes = requireMinutes(minutesId);
+        MeetingBooking booking = requireBooking(minutes.getBookingId());
+        if (isManager(minutes, booking, current) || bookingReadable(booking, current)) return publication.summaries(minutesId);
+        if (!isReadable(minutes, booking, current)) throw new BusinessException(NOT_FOUND);
+        Set<Long> received = new java.util.HashSet<>(sendMapper.revisionsForUser(minutesId, current.getId()));
+        return publication.summaries(minutesId).stream().filter(row -> received.contains(row.getId())).toList();
+    }
+
+    @Override
+    public MeetingMinutesDto.RevisionVO revision(long minutesId, long revisionId) {
+        requireEnabled();
+        SysUser current = guard.currentUser();
+        MeetingMinutes minutes = requireMinutes(minutesId);
+        MeetingBooking booking = requireBooking(minutes.getBookingId());
+        if (!isManager(minutes, booking, current) && !bookingReadable(booking, current)
+                && !sendMapper.revisionsForUser(minutesId, current.getId()).contains(revisionId)) throw new BusinessException(NOT_FOUND);
+        return publication.toVO(publication.requireRevision(minutesId, revisionId), true);
+    }
+
+    private void refreshDraftHash(MeetingMinutes minutes, MeetingMinutesContent content) {
+        String hash = publication.draftHash(content, publication.referenceIds(minutes.getId()));
+        minutesMapper.update(null, new LambdaUpdateWrapper<MeetingMinutes>().eq(MeetingMinutes::getId, minutes.getId())
+                .set(MeetingMinutes::getDraftHash, hash));
+        minutes.setDraftHash(hash);
+    }
+
+    private MeetingMinutes requireLockedMinutes(long id) {
+        MeetingMinutes minutes = minutesMapper.lockById(id);
+        if (minutes == null) throw new BusinessException(NOT_FOUND);
+        return minutes;
+    }
+
+    private boolean isManager(MeetingMinutes minutes, MeetingBooking booking, SysUser current) {
+        return Objects.equals(minutes.getRecorderUserId(), current.getId())
+                || guard.isOrganizer(booking, current) || guard.canOperateRecords(current);
+    }
+
+    private boolean bookingReadable(MeetingBooking booking, SysUser current) {
+        try {
+            guard.requireBookingReadable(booking, current);
+            return true;
+        } catch (BusinessException ignored) {
+            return false;
+        }
+    }
+
+    /** 仅作为收件人的用户只获得发给自己的快照，不能借此读取后续版本或工作草稿。 */
+    private MeetingMinutesDto.VO recipientView(MeetingMinutes minutes, SysUser current) {
+        MeetingMinutesSend batch = sendMapper.lastForUser(minutes.getId(), current.getId());
+        if (batch == null) throw new BusinessException(NOT_FOUND);
+        MeetingMinutesDto.VO vo = new MeetingMinutesDto.VO();
+        vo.setExists(true);
+        vo.setId(minutes.getId());
+        vo.setBookingId(minutes.getBookingId());
+        vo.setBookingNo(batch.getBookingNo());
+        vo.setMinutesNo(batch.getMinutesNo());
+        vo.setMeetingTitle(minutes.getMeetingTitle());
+        vo.setMeetingTimeText(minutes.getMeetingTimeText());
+        vo.setRoomText(minutes.getRoomText());
+        vo.setOrganizerName(minutes.getOrganizerName());
+        vo.setRecorderName(minutes.getRecorderName());
+        vo.setRecorderEmpNo(minutes.getRecorderEmpNo());
+        vo.setMinutesEnabled(minutesEnabled);
+        vo.setCanEdit(false);
+        vo.setCanSend(false);
+        vo.setCanPublish(false);
+        vo.setCanReadDraft(false);
+        vo.setCanManageSends(false);
+        if (batch.getRevisionId() != null) {
+            MeetingMinutesRevision revision = publication.requireRevision(minutes.getId(), batch.getRevisionId());
+            vo.setDocument(publication.decode(revision));
+            vo.setPublishedRevisionId(revision.getId());
+            vo.setPublishedRevisionNo(revision.getRevisionNo());
+            vo.setPublishedAt(DateTimeUtils.format(revision.getPublishedAt()));
+            vo.setDigest(revision.getDigest());
+        } else {
+            vo.setContent(JsonUtils.parse(batch.getContentSnapshot(), MeetingMinutesContent.class));
+        }
+        return vo;
     }
 
     /* ==================== 判定 ==================== */
@@ -648,8 +943,8 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
                 .collect(Collectors.toMap(MeetingMinutes::getId, Function.identity(), (a, b) -> a));
         for (Long id : ids) {
             MeetingMinutes target = targets.get(id);
-            if (target == null) {
-                continue;
+            if (target == null || !isReadable(target, requireBooking(target.getBookingId()), guard.currentUser())) {
+                throw new BusinessException("關聯紀要不存在或無權查看");
             }
             linkMapper.insertIgnore(minutes.getId(), target.getId(), target.getMinutesNo(), target.getBookingNo(),
                     target.getMeetingTitle(), target.getMeetingTimeText());
@@ -692,7 +987,13 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         if (item == null || Integer.valueOf(1).equals(item.getDeleted())) {
             throw new BusinessException("事項不存在或已被刪除");
         }
-        MeetingMinutes minutes = requireMinutes(item.getMinutesId());
+        MeetingMinutes minutes = requireLockedMinutes(item.getMinutesId());
+        item = itemMapper.selectById(itemId);
+        if (item == null || Integer.valueOf(1).equals(item.getDeleted())) throw new BusinessException("事項不存在或已被移除");
+        if (item.getPublishedRevisionId() != null && (form == null || !Objects.equals(item.getVersion(), form.getVersion()))) {
+            throw new BusinessException("事項已被重新發布或辦理，請刷新後重試");
+        }
+        if (MeetingMinutesItem.STATUS_DONE.equals(item.getStatus())) throw new BusinessException("事項已辦理，請刷新查看結果");
         MeetingBooking booking = requireBooking(minutes.getBookingId());
         boolean writable = Objects.equals(minutes.getRecorderUserId(), current.getId())
                 || guard.isOrganizer(booking, current) || guard.canOperateRecords(current);
@@ -712,8 +1013,8 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         if (note != null && note.length() > 500) {
             throw new BusinessException("說明最多 500 字");
         }
-        itemMapper.markResolved(item.getId(), MeetingMinutesItem.STATUS_DONE, result, note,
-                LocalDateTime.now(), current.getId(), displayName(current));
+        if (itemMapper.markResolvedVersioned(item.getId(), item.getVersion(), MeetingMinutesItem.STATUS_DONE, result, note,
+                LocalDateTime.now(), current.getId(), displayName(current)) != 1) throw new BusinessException("事項已變更，請刷新後重試");
         audit.recordBooking(booking.getId(), booking.getRoomId(), booking.getBookingNo(),
                 MeetingConstants.EVENT_MINUTES_UPDATE,
                 "更新跟進事項：" + truncate(item.getContent(), 40) + " → " + MeetingMinutesRenderer.resultLabel(result),
@@ -797,7 +1098,10 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
             MeetingMinutesDto.ItemVO vo = new MeetingMinutesDto.ItemVO();
             vo.setId(row.getId());
             vo.setKind(row.getKind());
-            vo.setSeq(row.getSeq());
+            vo.setSeq(row.getDisplayOrder() != null && row.getDisplayOrder() > 0 ? row.getDisplayOrder() : row.getSeq());
+            vo.setVersion(row.getVersion());
+            vo.setTopicKey(row.getTopicKey());
+            vo.setDeliverable(row.getDeliverable());
             vo.setContent(row.getContent());
             vo.setOwnerUserId(row.getOwnerUserId());
             vo.setOwnerName(row.getOwnerName());
@@ -832,9 +1136,15 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
     @Override
     public List<MeetingMinutesDto.LinkVO> search(String minutesIdOrKeyword, Long excludeId) {
         requireEnabled();
-        guard.currentUser();
+        SysUser current = guard.currentUser();
         StringBuilder sql = new StringBuilder("SELECT * FROM biz_meeting_minutes WHERE deleted = 0");
         List<Object> params = new ArrayList<>();
+        if (!guard.canSeeAll(current)) {
+            sql.append(" AND (recorder_user_id = ? OR booking_id IN (SELECT id FROM biz_meeting_booking WHERE organizer_id = ? AND deleted = 0)")
+                    .append(" OR booking_id IN (SELECT booking_id FROM biz_meeting_attendee WHERE user_id = ? AND deleted = 0)")
+                    .append(" OR id IN (SELECT minutes_id FROM biz_meeting_minutes_delivery WHERE receiver_user_id = ? AND target_type = 'USER' AND deleted = 0))");
+            for (int index = 0; index < 4; index++) params.add(current.getId());
+        }
         if (excludeId != null) {
             sql.append(" AND id <> ?");
             params.add(excludeId);
@@ -851,6 +1161,7 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
                 (rs, rowNum) -> {
                     MeetingMinutes minutes = new MeetingMinutes();
                     minutes.setId(rs.getLong("id"));
+                    minutes.setBookingId(rs.getLong("booking_id"));
                     minutes.setMinutesNo(rs.getString("minutes_no"));
                     minutes.setBookingNo(rs.getString("booking_no"));
                     minutes.setMeetingTitle(rs.getString("meeting_title"));
@@ -917,11 +1228,12 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
             where.append(" AND NOT EXISTS (SELECT 1 FROM biz_meeting_minutes_item i WHERE i.minutes_id = m.id ")
                     .append("AND i.deleted = 0)");
         }
-        String from = " FROM biz_meeting_minutes m LEFT JOIN biz_meeting_booking b ON b.id = m.booking_id";
+        String from = " FROM biz_meeting_minutes m LEFT JOIN biz_meeting_booking b ON b.id = m.booking_id"
+                + " LEFT JOIN biz_meeting_minutes_revision r ON r.minutes_id = m.id AND r.id = m.published_revision_id";
         Map<String, Object> stats = jdbc.queryForMap("SELECT COUNT(*) AS total, "
-                + "COALESCE(SUM(EXISTS (SELECT 1 FROM biz_meeting_minutes_item i WHERE i.minutes_id = m.id "
+                + "COALESCE(SUM((SELECT COUNT(*) FROM biz_meeting_minutes_item i WHERE i.minutes_id = m.id "
                 + "AND i.deleted = 0 AND i.status = 'pending')), 0) AS pending_items, "
-                + "COALESCE(SUM(EXISTS (SELECT 1 FROM biz_meeting_minutes_item i WHERE i.minutes_id = m.id "
+                + "COALESCE(SUM((SELECT COUNT(*) FROM biz_meeting_minutes_item i WHERE i.minutes_id = m.id "
                 + "AND i.deleted = 0 AND i.status = 'pending' AND i.due_date < CURDATE())), 0) AS overdue_items, "
                 + "COALESCE(SUM(CASE WHEN m.status = 'sent' THEN 1 ELSE 0 END), 0) AS sent_minutes"
                 + from + where, params.toArray());
@@ -933,7 +1245,9 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         listParams.add(size);
         List<MeetingMinutesDto.AdminRow> rows = jdbc.query("SELECT m.id, m.booking_id, m.minutes_no, m.booking_no, "
                 + "m.meeting_title, m.meeting_time_text, m.room_text, m.recorder_name, m.recorder_emp_no, "
-                + "m.status, m.send_count, m.last_send_at, m.digest, "
+                + "m.status, m.send_count, m.last_send_at, COALESCE(r.digest, m.digest) AS digest, "
+                                + "m.published_revision_id, r.revision_no, r.published_at, "
+                                + "CASE WHEN r.id IS NULL OR NOT (m.draft_hash <=> r.draft_hash) THEN 1 ELSE 0 END AS unpublished, "
                 + "(SELECT COUNT(*) FROM biz_meeting_minutes_item i WHERE i.minutes_id = m.id AND i.deleted = 0) AS item_total, "
                 + "(SELECT COUNT(*) FROM biz_meeting_minutes_item i WHERE i.minutes_id = m.id AND i.deleted = 0 "
                 + " AND i.status = 'pending') AS item_pending, "
@@ -957,6 +1271,11 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
                     row.setLastSendAt(lastSend == null ? null
                             : DateTimeUtils.format(lastSend.toLocalDateTime()));
                     row.setDigest(rs.getString("digest"));
+                    row.setPublishedRevisionId(rs.getObject("published_revision_id", Long.class));
+                    row.setPublishedRevisionNo(rs.getObject("revision_no", Integer.class));
+                    java.sql.Timestamp publishedAt = rs.getTimestamp("published_at");
+                    row.setPublishedAt(publishedAt == null ? null : DateTimeUtils.format(publishedAt.toLocalDateTime()));
+                    row.setHasUnpublishedChanges(rs.getBoolean("unpublished"));
                     row.setItemTotal(rs.getInt("item_total"));
                     row.setItemPending(rs.getInt("item_pending"));
                     row.setItemOverdue(rs.getInt("item_overdue"));
@@ -1003,8 +1322,9 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         if (content == null) {
             throw new BusinessException("請填寫紀要內容");
         }
+        content.validate();
         // 行动项负责人要按 id 回查姓名与工号：前端自报的名字进不了台账
-        resolveActionOwners(content);
+        if (!content.versioned()) resolveActionOwners(content);
         content.validate();
         return content;
     }
@@ -1057,10 +1377,12 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         vo.setBookingId(booking.getId());
         vo.setBookingNo(booking.getBookingNo());
         vo.setMinutesEnabled(minutesEnabled);
+        vo.setPublicationEnabled(publicationEnabled);
+        vo.setCardEnabled(cardEnabled);
         // 站点地址在打开页面时就告诉前端：内网地址要在“点发送之前”提示，不能等发完才发现
         String linkBase = baseUrl();
         vo.setLinkBaseUrl(linkBase);
-        vo.setLinkBasePublic(PublicLinkGuard.isPubliclyReachable(linkBase));
+        vo.setLinkBasePublic(publicHttpsBase(linkBase));
         if (minutes == null) {
             vo.setExists(false);
             vo.setMeetingTitle(booking.getTitle());
@@ -1103,6 +1425,27 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
                 || guard.isOrganizer(booking, current) || guard.canOperateRecords(current);
         vo.setCanEdit(writable);
         vo.setCanSend(writable);
+        vo.setCanReadDraft(writable);
+        vo.setCanManageSends(writable);
+        vo.setCanPublish(writable && publicationEnabled);
+        MeetingMinutesContent draft = vo.getContent();
+        if (draft != null && draft.versioned()) {
+            MeetingMinutesRevision revision = publication.current(minutes);
+            vo.setCanSend(writable && revision != null && cardEnabled);
+            vo.setHasUnpublishedChanges(revision == null || !Objects.equals(minutes.getDraftHash(), revision.getDraftHash()));
+            if (revision != null) {
+                vo.setDocument(publication.decode(revision));
+                vo.setPublishedRevisionId(revision.getId());
+                vo.setPublishedRevisionNo(revision.getRevisionNo());
+                vo.setPublishedAt(DateTimeUtils.format(revision.getPublishedAt()));
+                vo.setDigest(revision.getDigest());
+            }
+            if (!writable) {
+                vo.setContent(null);
+                vo.setVersion(null);
+                if (revision == null) vo.setDigest(null);
+            }
+        }
         // 已存在的纪要只被"谁记的/谁组织的/行政"管，与会议阶段无关
         vo.setEditLockReason(lockReason(writable, true));
         vo.setCreatedBy(minutes.getCreatedBy());
@@ -1111,7 +1454,9 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         vo.setUpdatedAt(DateTimeUtils.format(minutes.getUpdatedAt()));
         vo.setSeries(seriesNodes(booking, minutes));
         vo.setItems(toItemVOs(minutes, booking, current));
-        vo.setLinks(linkMapper.findByMinutes(minutes.getId()).stream().map(this::toLinkVO).toList());
+        if (writable || draft == null || !draft.versioned()) {
+            vo.setLinks(linkMapper.findByMinutes(minutes.getId()).stream().map(this::toLinkVO).toList());
+        }
         vo.setItemOwner(vo.getItems().stream()
                 .anyMatch(item -> Objects.equals(item.getOwnerUserId(), current.getId())));
         return vo;
@@ -1200,6 +1545,10 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
                                               List<MeetingMinutesDelivery> deliveries) {
         MeetingMinutesDto.SendVO vo = new MeetingMinutesDto.SendVO();
         vo.setId(batch.getId());
+        vo.setRevisionId(batch.getRevisionId());
+        vo.setMessageType(batch.getMessageType());
+        vo.setButtonTitle(batch.getButtonTitle());
+        if (batch.getRevisionId() != null) vo.setRevisionNo(publication.requireRevision(minutes.getId(), batch.getRevisionId()).getRevisionNo());
         vo.setMinutesId(batch.getMinutesId());
         vo.setBatchSeq(batch.getBatchSeq());
         vo.setMinutesNo(batch.getMinutesNo());
@@ -1219,7 +1568,8 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         vo.setOperatorEmpNo(batch.getOperatorEmpNo());
         vo.setSentAt(DateTimeUtils.format(batch.getSentAt()));
         vo.setLinkExpireAt(DateTimeUtils.format(batch.getLinkExpireAt()));
-        boolean revoked = !Objects.equals(batch.getTokenVersion(), minutes.getTokenVersion());
+        boolean revoked = !Objects.equals(batch.getTokenVersion(), minutes.getTokenVersion())
+                || Objects.equals(batch.getLinkRevoked(), 1);
         vo.setLinkRevoked(revoked);
         if (!revoked && batch.getTokenVersion() != null && batch.getLinkExpireAt() != null) {
             String token = MinutesViewTokenUtil.generate(minutes.getId(), batch.getId(), batch.getTokenVersion(),

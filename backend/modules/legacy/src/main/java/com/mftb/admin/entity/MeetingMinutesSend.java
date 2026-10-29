@@ -33,6 +33,15 @@ public class MeetingMinutesSend {
 
     private Long minutesId;
 
+    /** 新版卡片绑定正式版，旧批次保持 NULL 并继续读取原快照。 */
+    private Long revisionId;
+    private String messageType;
+    private String buttonTitle;
+    @lombok.ToString.Exclude
+    private String buttonUrl;
+    private String templateVersion;
+    private String requestHash;
+
     /** 冗余会议单ID：按会议查发送记录不必绕纪要表 */
     private Long bookingId;
 
@@ -64,6 +73,9 @@ public class MeetingMinutesSend {
     private Integer tokenVersion;
 
     private LocalDateTime linkExpireAt;
+
+    /** 单批次链接作废：0=有效 1=已作废（不影响其他批次） */
+    private Integer linkRevoked;
 
     /** pending/sending/success/partial/failed/skipped */
     private String sendStatus;

@@ -16,7 +16,14 @@ import request from './request'
 /* ==================== 模板结构 ==================== */
 
 /** 議程與結論：一条 = 一个议题（钉钉卡片按有序列表渲染，钉钉 markdown 不支持表格） */
+export type MinutesDecisionStatus = 'decided' | 'pending' | 'information'
+export type MinutesAttendanceStatus = 'present' | 'absent' | 'unverified'
+export const MINUTES_SCHEMA_VERSION = 2
+export const MINUTES_LIMITS = { topics: 20, actions: 30, follows: 20, attendance: 100, summary: 300, purpose: 1000, deliverable: 300 } as const
+
 export interface MinutesItem {
+  topicKey?: string
+  decisionStatus?: MinutesDecisionStatus
   topic: string
   discussion?: string
   conclusion?: string
@@ -24,6 +31,9 @@ export interface MinutesItem {
 
 /** 行動項：负责人存 sys_user.id + 姓名/工号快照（员工改名不得改写历史纪要） */
 export interface MinutesAction {
+  itemId?: number
+  topicKey?: string
+  deliverable?: string
   content: string
   ownerUserId?: number | null
   ownerName?: string
@@ -33,9 +43,51 @@ export interface MinutesAction {
 }
 
 /** 未決事項：需要后续决策的事项 */
-export interface MinutesOpenIssue {
-  content: string
+export interface MinutesOpenIssue extends MinutesAction {
   needDecisionBy?: string
+}
+
+export interface MinutesAttendance {
+  userId?: number | null
+  name: string
+  empNo?: string
+  status: MinutesAttendanceStatus
+  reason?: string
+  source?: string
+  confirmedByName?: string
+  confirmedAt?: string
+}
+
+export interface MinutesDocument {
+  schemaVersion: number
+  minutesNo?: string
+  bookingNo?: string
+  meetingTitle?: string
+  meetingTimeText?: string
+  roomText?: string
+  meetingType?: string
+  organizerName?: string
+  organizerEmpNo?: string
+  recorderName?: string
+  recorderEmpNo?: string
+  externalAttendees?: string
+  revisionNo?: number
+  publisherName?: string
+  publisherEmpNo?: string
+  publishedAt?: string
+  changeNote?: string
+  content: MinutesContent
+  references?: MinutesLinkVO[]
+}
+
+export interface MinutesRevision {
+  id: number
+  revisionNo: number
+  publisherName?: string
+  publisherEmpNo?: string
+  publishedAt?: string
+  changeNote?: string
+  document?: MinutesDocument
 }
 
 /** 缺席记录：录入时由参会人名单给出建议值，记录人可手工增删（开会迟到不等于缺席） */
@@ -49,6 +101,14 @@ export interface MinutesAbsentee {
 
 /** 纪要正文（落 biz_meeting_minutes.content_json） */
 export interface MinutesContent {
+  schemaVersion?: number
+  purpose?: string
+  /** 仅兼容历史纪要；新填写界面统一使用 purpose。 */
+  summary?: string
+  chairUserId?: number | null
+  chairName?: string
+  chairEmpNo?: string
+  attendance?: MinutesAttendance[]
   items: MinutesItem[]
   actions: MinutesAction[]
   openIssues: MinutesOpenIssue[]
@@ -59,7 +119,12 @@ export interface MinutesContent {
 }
 
 export function emptyMinutesContent(): MinutesContent {
-  return { items: [{ topic: '', discussion: '', conclusion: '' }], actions: [], openIssues: [], absentees: [] }
+  return { schemaVersion: MINUTES_SCHEMA_VERSION, items: [{ topicKey: crypto.randomUUID(), topic: '', discussion: '', conclusion: '' }], actions: [], openIssues: [], absentees: [], attendance: [] }
+}
+
+/** 目的和旧摘要合并为一个阅读／填写字段；仅去除完全重复文本，不截断或改写快照。 */
+export function minutesPurposeText(content: Pick<MinutesContent, 'purpose' | 'summary'>): string {
+  return [...new Set([content.purpose?.trim(), content.summary?.trim()].filter((value): value is string => Boolean(value)))].join('\n\n')
 }
 
 /**
@@ -67,9 +132,10 @@ export function emptyMinutesContent(): MinutesContent {
  * 上限校验以后端为准，这里只用于即时提示，避免提交后才报错。
  */
 export function minutesContentLength(content: MinutesContent): number {
-  const parts: Array<string | undefined | null> = [content.nextMeetingNote, content.remark]
+  const parts: Array<string | undefined | null> = [content.nextMeetingNote, content.remark, content.summary, content.purpose]
+  content.attendance?.forEach(person => parts.push(person.name, person.reason))
   content.items.forEach(item => parts.push(item.topic, item.discussion, item.conclusion))
-  content.actions.forEach(item => parts.push(item.content, item.ownerName))
+  content.actions.forEach(item => parts.push(item.content, item.ownerName, item.deliverable))
   content.openIssues.forEach(item => parts.push(item.content, item.needDecisionBy))
   content.absentees.forEach(item => parts.push(item.name, item.reason))
   return parts.reduce((sum, value) => sum + (value?.trim().length ?? 0), 0)
@@ -94,6 +160,20 @@ export interface MinutesSeriesNode {
 }
 
 export interface MinutesVO {
+  meetingTitle?: string
+  meetingTimeText?: string
+  roomText?: string
+  organizerName?: string
+  document?: MinutesDocument
+  publishedRevisionId?: number
+  publishedRevisionNo?: number
+  publishedAt?: string
+  hasUnpublishedChanges?: boolean
+  canReadDraft?: boolean
+  canPublish?: boolean
+  canManageSends?: boolean
+  publicationEnabled?: boolean
+  cardEnabled?: boolean
   /** false 表示这场会还没有纪要（不是错误，前端按"录入"态渲染） */
   exists: boolean
   id?: number
@@ -145,6 +225,9 @@ export interface MinutesVO {
 
 /** 事项（行动项 / 跟进事项）：状态与处理结果由负责人或记录人回填 */
 export interface MinutesItemView {
+  version?: number
+  topicKey?: string
+  deliverable?: string
   id: number
   /** ACTION=行動項 FOLLOW=跟進事項 */
   kind: 'ACTION' | 'FOLLOW'
@@ -177,6 +260,10 @@ export interface MinutesLinkVO {
 
 /** 行政侧纪要列表行 */
 export interface MinutesAdminRow {
+  publishedRevisionId?: number
+  publishedRevisionNo?: number
+  publishedAt?: string
+  hasUnpublishedChanges?: boolean
   minutesId: number
   bookingId: number
   minutesNo?: string
@@ -222,6 +309,10 @@ export interface MinutesDeliveryVO {
 }
 
 export interface MinutesSendBatchVO {
+  revisionId?: number
+  revisionNo?: number
+  messageType?: 'markdown' | 'action_card'
+  buttonTitle?: string
   id: number
   minutesId: number
   batchSeq: number
@@ -239,6 +330,8 @@ export interface MinutesSendBatchVO {
   /** 免登只读链接（相对路径，绝对地址由前端用自身 origin 拼，开发/生产域名不同） */
   viewUrl?: string | null
   linkExpireAt?: string | null
+  /** 链接是否已被作废（全局或单批次） */
+  linkRevoked?: boolean
   operatorName?: string
   operatorEmpNo?: string | null
   sentAt?: string | null
@@ -271,6 +364,9 @@ export interface MinutesSaveForm {
 }
 
 export interface MinutesSendForm {
+  revisionId?: number
+  acknowledgePublicLink?: boolean
+  alsoNotifyAttendees?: boolean
   groupChannelId?: number | null
   receiverUserIds: number[]
   requestKey: string
@@ -278,6 +374,8 @@ export interface MinutesSendForm {
 }
 
 export interface MinutesSendResult {
+  revisionId?: number
+  revisionNo?: number
   sendId: number
   batchSeq: number
   /** 本次真的进了投递队列的人数 */
@@ -301,6 +399,18 @@ export interface MinutesSendResult {
 export function minutesDeliveryTarget(row: MinutesDeliveryVO): string {
   if (row.targetType === 'GROUP') return row.groupName || '-'
   return `${row.receiverName || '-'}${row.receiverEmpNo ? `（${row.receiverEmpNo}）` : ''}`
+}
+
+export function publishMinutes(id: number, payload: { version: number; requestKey: string; changeNote?: string }): Promise<MinutesRevision> {
+  return request.post<unknown, MinutesRevision>(`/meeting/minutes/${id}/publish`, payload)
+}
+
+export function fetchMinutesRevisions(id: number): Promise<MinutesRevision[]> {
+  return request.get<unknown, MinutesRevision[]>(`/meeting/minutes/${id}/revisions`)
+}
+
+export function fetchMinutesRevision(id: number, revisionId: number): Promise<MinutesRevision> {
+  return request.get<unknown, MinutesRevision>(`/meeting/minutes/${id}/revisions/${revisionId}`)
 }
 
 /* ==================== 请求 ==================== */
@@ -338,6 +448,11 @@ export function revokeMinutesLinks(id: number, version: number): Promise<Minutes
   return request.post<unknown, MinutesVO>(`/meeting/minutes/${id}/revoke-links`, { version })
 }
 
+/** 单批次链接作废：只失效指定批次的免登链接，其他批次不受影响 */
+export function revokeBatchLink(minutesId: number, sendId: number): Promise<void> {
+  return request.post<unknown, void>(`/meeting/minutes/${minutesId}/sends/${sendId}/revoke-link`)
+}
+
 export function fetchMinutesGroups(): Promise<MinutesGroupOption[]> {
   return request.get<unknown, MinutesGroupOption[]>('/meeting/minutes/groups')
 }
@@ -345,7 +460,7 @@ export function fetchMinutesGroups(): Promise<MinutesGroupOption[]> {
 /* ==================== v2：事项跟踪 / 关联 / 行政检索 ==================== */
 
 /** 更新事项处理结果：部分完成/无法完成必须写原因（“为什么没办成”比“没办成”重要） */
-export function resolveMinutesItem(itemId: number, payload: { result: string; note?: string }): Promise<MinutesVO> {
+export function resolveMinutesItem(itemId: number, payload: { result: string; note?: string; version?: number }): Promise<MinutesVO> {
   return request.post<unknown, MinutesVO>(`/meeting/minutes/items/${itemId}/resolve`, payload)
 }
 

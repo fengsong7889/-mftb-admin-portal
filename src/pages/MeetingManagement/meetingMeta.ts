@@ -203,6 +203,7 @@ const EVENT_SOURCE: Record<string, string> = {
 
 export function eventLabel(code?: string | null): string {
   if (!code) return '-'
+  if (code === 'minutes_publish') return i18n.t('meeting.minutes.publish')
   const zh = EVENT_SOURCE[code]
   if (!zh) return code
   return tl(`meeting.meta.event.${code.replace(/_(\w)/g, (_, c: string) => c.toUpperCase())}`, zh)

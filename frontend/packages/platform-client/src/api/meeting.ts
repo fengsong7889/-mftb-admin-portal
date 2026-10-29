@@ -626,14 +626,20 @@ export interface MeetingRuleForm {
   minLeadMinutes: number
   defaultDuration: number
   maxDuration: number
+  /** 單場最短時長（房間未配置時回落此值） */
+  minDuration: number
   granularityMinutes: number
   bookableStart: string
   bookableEnd: string
   remindMinutes: number
   checkinOpenMinutes: number
   releaseAfterMinutes: number
+  /** 默認是否需要簽到保留（0/1） */
+  checkinRequired: number
   noShowThreshold: number
   blacklistDays: number
+  /** 期望的規則集版本（樂觀鎖，防覆蓋他人修改） */
+  version?: number
   changeReason?: string
 }
 
@@ -643,6 +649,79 @@ export interface MeetingRuleView {
   missingKeys?: string[]
   updatedBy?: string | null
   updatedAt?: string | null
+  /** 規則集版本 */
+  version?: number
+  /** 服務端判定的寫權限 */
+  canEdit?: boolean
+}
+
+/* ---------- 會議室專屬規則（繼承通用 / 單獨設定） ---------- */
+
+/** null=繼承通用；0/false 是明確值（如提醒 0=不提醒） */
+export interface RoomRuleOverrides {
+  advanceDays?: number | null
+  minLeadMinutes?: number | null
+  granularityMinutes?: number | null
+  defaultDuration?: number | null
+  minDuration?: number | null
+  maxDuration?: number | null
+  remindMinutes?: number | null
+  checkinOpenMinutes?: number | null
+  releaseAfterMinutes?: number | null
+  /** 0/1；null=繼承通用 */
+  checkinRequired?: number | null
+  bookableStart?: string | null
+  bookableEnd?: string | null
+}
+
+export interface RoomRuleRow {
+  roomId: number
+  roomNo: string
+  roomName: string
+  locationText?: string | null
+  /** inherit=全部繼承通用；custom=有專屬配置 */
+  source: 'inherit' | 'custom'
+  bookableStart?: string | null
+  bookableEnd?: string | null
+  minDuration?: number | null
+  maxDuration?: number | null
+  checkinRequired?: number | null
+  version: number
+}
+
+export interface RoomRulePage {
+  records: RoomRuleRow[]
+  total: number
+  configVersion: number
+}
+
+export interface RoomRuleView {
+  roomId: number
+  roomNo: string
+  roomName: string
+  locationText?: string | null
+  overrides: RoomRuleOverrides
+  effective: RoomRuleOverrides
+  /** 逐字段來源：global / room */
+  sources: Record<string, string>
+  roomVersion: number
+  configVersion: number
+  canEdit: boolean
+}
+
+export interface RoomRuleQuery {
+  page?: number
+  size?: number
+  keyword?: string
+  /** all / inherit / custom */
+  source?: string
+}
+
+export interface RoomRuleSaveForm {
+  overrides: RoomRuleOverrides
+  changeReason: string
+  expectRoomVersion: number
+  expectConfigVersion: number
 }
 
 export interface BlacklistItem {
@@ -690,6 +769,21 @@ export function fetchMeetingRules(): Promise<MeetingRuleView> {
 
 export function saveMeetingRules(payload: MeetingRuleForm) {
   return request.put('/meeting/config', payload)
+}
+
+/** 房間規則列表（帶當前通用版本） */
+export function fetchRoomRuleList(query: RoomRuleQuery): Promise<RoomRulePage> {
+  return request.get<unknown, RoomRulePage>('/meeting/config/rooms', { params: query })
+}
+
+/** 單房間規則：覆蓋值 + 生效值 + 逐字段來源 + 版本 */
+export function fetchRoomRules(roomId: number): Promise<RoomRuleView> {
+  return request.get<unknown, RoomRuleView>(`/meeting/rooms/${roomId}/rules`)
+}
+
+/** 保存房間規則（null=繼承；雙版本樂觀鎖） */
+export function saveRoomRules(roomId: number, payload: RoomRuleSaveForm) {
+  return request.put(`/meeting/rooms/${roomId}/rules`, payload)
 }
 
 export function fetchBlacklist(query: BlacklistQuery): Promise<PageWithStats<BlacklistItem, BlacklistStats>> {

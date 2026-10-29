@@ -64,6 +64,12 @@ public class MeetingMinutes {
     /** 纪要正文 JSON（见 MeetingMinutesContent） */
     private String contentJson;
 
+    /** 当前正式版是不可变文档，工作草稿仍保存在 contentJson。 */
+    private Long publishedRevisionId;
+
+    /** 工作内容与引用摘要；通知/作废链接不能改变此值。 */
+    private String draftHash;
+
     /** 摘要（首条结论或首条行动项），列表与钉钉卡片展示 */
     private String digest;
 

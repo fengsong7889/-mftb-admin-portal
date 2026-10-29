@@ -95,6 +95,10 @@ public interface DingTalkService {
     SendOutcome sendActionCardSync(String scenario, String title, String text, String singleTitle,
                                    String singleURL);
 
+    /** 精确投递到所选群渠道，不允许回落到场景默认群。 */
+    SendOutcome sendActionCardSyncToChannel(long channelId, String title, String text, String buttonTitle,
+                                            String buttonUrl);
+
     /**
      * 按渠道 id 精确同步发送 Markdown，返回渠道受理状态。
      *

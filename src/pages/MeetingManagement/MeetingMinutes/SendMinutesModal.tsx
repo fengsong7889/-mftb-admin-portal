@@ -10,23 +10,25 @@
  *   1. **群按所选精确投递，不回退默认群**——回退等于把纪要发进一个谁都没确认过的群；
  *   2. **钉钉对同一员工当天相同内容只投一条**，所以每次发送都带批次标记，重发不是"再点一次"。
  */
-import { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Modal, Space, Select, Tag, message } from 'antd'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, Button, Checkbox, Modal, Space, Select, Tag, message } from 'antd'
 import { SendOutlined, TeamOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import EmployeeSelect from '@/components/EmployeeSelect'
 import {
   fetchMinutesGroups, sendMinutes,
-  type MinutesContent, type MinutesGroupOption, type MinutesSendResult,
+  type MinutesContent, type MinutesDocument, type MinutesGroupOption, type MinutesSendResult,
 } from '@/api/meetingMinutes'
 import { newMeetingRequestKey, type MeetingVO } from '@/api/meeting'
-import MinutesContentCard from './MinutesContentCard'
+import { MinutesNoticePreview } from './MinutesContentCard'
 import './minutes.css'
 
 interface Props {
   minutesId: number
   meeting?: MeetingVO
   content: MinutesContent
+  document?: MinutesDocument
+  revisionId?: number
   /** 乐观锁：发送也算一次写动作，避免两个人同时改后覆盖彼此的收件人结论 */
   version: number
   /**
@@ -39,7 +41,7 @@ interface Props {
   onSent: (result: MinutesSendResult) => void
 }
 
-export default function SendMinutesModal({ minutesId, meeting, content, version,
+export default function SendMinutesModal({ minutesId, meeting, content, document, revisionId, version,
   linkBaseUrl, linkBasePublic, onClose, onSent }: Props) {
   const { t } = useTranslation()
   const [groups, setGroups] = useState<MinutesGroupOption[]>([])
@@ -48,6 +50,11 @@ export default function SendMinutesModal({ minutesId, meeting, content, version,
   const [channelId, setChannelId] = useState<number>()
   const [receiverIds, setReceiverIds] = useState<number[]>([])
   const [sending, setSending] = useState(false)
+  const [acknowledged, setAcknowledged] = useState(false)
+  const requestRef = useRef<{ signature: string; key: string }>()
+  const panelRef = useRef<HTMLDivElement>(null)
+  const canSend = !!revisionId && !!linkBasePublic && !!linkBaseUrl?.startsWith('https://')
+  useEffect(() => { panelRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }) }, [])
 
   useEffect(() => {
     let alive = true
@@ -74,13 +81,32 @@ export default function SendMinutesModal({ minutesId, meeting, content, version,
       message.warning(t('meeting.minutes.sendNeedTarget', { defaultValue: '請選擇釘釘群或至少一位收件人' }))
       return
     }
+    if (!canSend || !acknowledged || receiverIds.length > 100 || sending) {
+      message.warning(t('meeting.minutes.sendPrerequisites', { defaultValue: '請先選擇正式版本、確認公網 HTTPS 入口與連結轉發風險；每批最多 100 人。' }))
+      return
+    }
+    const signature = JSON.stringify([revisionId, channelId, receiverIds.slice().sort()])
+    if (requestRef.current?.signature !== signature) requestRef.current = { signature, key: newMeetingRequestKey('mms') }
+    const requestKey = requestRef.current.key
+    Modal.confirm({
+      title: t('meeting.minutes.confirmSend'),
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      content: <div className="confirm-info-card">
+        <p>{document?.minutesNo} · V{document?.revisionNo}</p><p>{selectedGroup?.name ?? t('meeting.minutes.groupNotSelected')} · {t('meeting.minutes.receiverCount', { count: receiverIds.length })}</p>
+        <p>{t('meeting.minutes.publicLinkRisk', { defaultValue: '連結可被轉發；持有者在有效期內可閱讀此版本，不能據此認定某人已讀。' })}</p>
+      </div>,
+      okText: t('meeting.minutes.confirmSend'), cancelText: t('common.cancel'),
+      onOk: async () => {
     setSending(true)
     try {
       const result = await sendMinutes(minutesId, {
+        revisionId,
+        acknowledgePublicLink: acknowledged,
         groupChannelId: channelId ?? null,
         receiverUserIds: receiverIds,
         version,
-        requestKey: newMeetingRequestKey('mms'),
+        requestKey,
       })
       // 提示只报个人工作通知条数：result.queued 不含群行（群只有一个 webhook，报成「2 条」会让人以为发给了两个人）
       const queued = result.queued ?? 0
@@ -94,30 +120,22 @@ export default function SendMinutesModal({ minutesId, meeting, content, version,
       onSent(result)
     } catch (e) {
       // request.ts 已统一弹错，这里只留日志，避免双弹
-      console.warn(t('meeting.minutes.sendFailed', { defaultValue: '紀要發送失敗' }), e instanceof Error ? e.message : e)
+      console.warn(t('meeting.minutes.sendFailed', { defaultValue: '紀要發送失敗' }))
+      throw e
     } finally {
       setSending(false)
     }
+      },
+    })
   }
 
   return (
-    <Modal
-      open
-      width={720}
-      title={t('meeting.minutes.sendModalTitle', { defaultValue: '發送會議紀要' })}
-      onCancel={onClose}
-      footer={(
-        <Space size={12}>
-          <Button onClick={onClose}>{t('meeting.cancel', { defaultValue: '取消' })}</Button>
-          <Button type="primary" icon={<SendOutlined />} loading={sending} onClick={() => void handleSend()}>
-            {t('meeting.minutes.confirmSend', { defaultValue: '確認發送' })}
-          </Button>
-        </Space>
-      )}
-    >
+    <div className="mm-send-settings detail-card" ref={panelRef}>
+      <h3>{t('meeting.minutes.sendModalTitle', { defaultValue: '發送會議紀要' })} · V{document?.revisionNo}</h3>
+      {!canSend && <Alert type="warning" showIcon message={t('meeting.minutes.sendPrerequisites', { defaultValue: '請先選擇正式版本、確認公網 HTTPS 入口與連結轉發風險；每批最多 100 人。' })} />}
       {/* 发往目标摘要：确认前必须看得见"发给谁"，这与取消/释放弹窗同一口径 */}
       <div className="mm-send-summary">
-        <div className="mm-send-row"><span>{t('meeting.minutes.labelTopic', { defaultValue: '會議主題：' })}</span><b>{meeting?.title ?? '-'}</b></div>
+        <div className="mm-send-row"><span>{t('meeting.minutes.labelTopic', { defaultValue: '會議主題：' })}</span><b>{document?.meetingTitle ?? meeting?.title ?? '-'}</b></div>
         <div className="mm-send-row"><span>{t('meeting.minutes.labelGroup', { defaultValue: '發往釘釘群：' })}</span><b>{selectedGroup?.name ?? t('meeting.minutes.groupNotSelected', { defaultValue: '未選擇' })}</b></div>
         <div className="mm-send-row"><span>{t('meeting.minutes.labelReceivers', { defaultValue: '發給個人：' })}</span><b>{`${receiverIds.length} ${t('meeting.personUnit', { defaultValue: '人' })}`}</b></div>
         <div className="mm-send-row"><span>{t('meeting.minutes.notice', { defaultValue: '提醒：' })}</span><b>{t('meeting.minutes.dedupeHint', { defaultValue: '釘釘對同一員工當天相同內容只投一條，本次會附批次標記' })}</b></div>
@@ -186,6 +204,9 @@ export default function SendMinutesModal({ minutesId, meeting, content, version,
             value={receiverIds}
             onChange={setReceiverIds}
             maxTagCount={8}
+            // 选人框必须撑满容器：EmployeeSelect 无默认宽度，不传 style 会缩成搜索框大小，
+            // 下拉面板又跟随触发器宽度，「姓名 + 工號」Tag 全被截断（用户反馈看不全员工信息）。
+            style={{ width: '100%' }}
             placeholder={t('meeting.minutes.receiversPlaceholder', { defaultValue: '搜尋姓名或工號，可選非參會人' })}
           />
           <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>
@@ -202,13 +223,24 @@ export default function SendMinutesModal({ minutesId, meeting, content, version,
         <div>
           <div style={{ fontSize: 13, color: '#595959', marginBottom: 6 }}>{t('meeting.minutes.previewLabel', { defaultValue: '發送內容預覽' })}</div>
           <div className="mm-send-preview">
-            <MinutesContentCard content={content} compact />
+            <MinutesNoticePreview title={document?.meetingTitle} timeText={document?.meetingTimeText} minutesNo={document?.minutesNo}
+              revisionNo={document?.revisionNo} publisher={document?.publisherName} topicCount={content.items.length}
+              actionCount={content.actions.length} followCount={content.openIssues.length} />
           </div>
           <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>
-            {t('meeting.minutes.previewHint', { defaultValue: '釘釘正文由後端按同一分區渲染，行動項以列表呈現（釘釘不支持表格）；超長時自動摺疊並附完整紀要鏈接' })}
+            {t('meeting.minutes.cardVersionBound', { defaultValue: '通知綁定所選正式版本；重發只增加通知批次，不產生新版本。' })}
           </div>
         </div>
+        <Checkbox checked={acknowledged} onChange={event => setAcknowledged(event.target.checked)}>
+          {t('meeting.minutes.publicLinkRisk', { defaultValue: '連結可被轉發；持有者在有效期內可閱讀此版本，不能據此認定某人已讀。' })}
+        </Checkbox>
       </Space>
-    </Modal>
+      <div className="form-footer">
+        <Button disabled={sending} onClick={onClose}>{t('common.cancel')}</Button>
+        <Button type="primary" icon={<SendOutlined />} loading={sending} disabled={!canSend || !acknowledged} onClick={() => void handleSend()}>
+          {t('meeting.minutes.confirmSend')}
+        </Button>
+      </div>
+    </div>
   )
 }

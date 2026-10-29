@@ -39,8 +39,12 @@ public final class MeetingConstants {
     public static final String MENU_RECORD = "meeting-record";
     /** 使用率看板（M3） */
     public static final String MENU_REPORT = "meeting-report";
-    /** 预约规则（M2） */
+    /** 预约规则（M2）；第一阶段拆为「預約管理」一级目录下的「預約規則」 */
     public static final String MENU_CONFIG = "meeting-config";
+    /** 预约黑名单（规则页拆出后的独立菜单） */
+    public static final String MENU_BLACKLIST = "meeting-blacklist";
+    /** 「預約管理」一级分组（规则与黑名单） */
+    public static final String MENU_GROUP_RESERVATION = "meeting-reservation";
 
     /* ==================== 授权动作 ==================== */
 
@@ -171,6 +175,8 @@ public final class MeetingConstants {
     public static final String EVENT_MINUTES_UPDATE = "minutes_update";
     public static final String EVENT_MINUTES_SEND = "minutes_send";
     public static final String EVENT_MINUTES_REVOKE = "minutes_revoke";
+    /** 正式发布：产生不可覆盖的 V1/V2，与「发送批次」是两回事 */
+    public static final String EVENT_MINUTES_PUBLISH = "minutes_publish";
 
     /** 系统触发的动作（自动释放/收尾），审计里必须与人工操作分得开 */
     public static final String OPERATOR_SYSTEM = "SYSTEM";
@@ -185,6 +191,8 @@ public final class MeetingConstants {
     public static final String SCENARIO_OPS = "meeting_ops";
     /** 会议纪要发给自选收件人（工作通知通道，可与邀约共用企业应用，开关独立） */
     public static final String SCENARIO_MINUTES = "meeting_minutes";
+    /** 新版发布通知卡片（独立模板场景：不覆盖管理员改过的旧长正文模板，卡片只给摘要+按钮） */
+    public static final String SCENARIO_MINUTES_PUBLISHED = "meeting_minutes_published";
     /** 跟进事项逾期提醒（发给负责人本人） */
     public static final String SCENARIO_FOLLOW_OVERDUE = "follow_overdue";
     /** 跟进事项完成通知（回到纪要群） */
@@ -220,6 +228,12 @@ public final class MeetingConstants {
     public static final String CFG_MINUTES_TOKEN_SECRET = "meeting_minutes_token_secret";
     /** 纪要能力总开关（灰度与回滚用，关闭时接口拒绝、前端入口隐藏） */
     public static final String CFG_MINUTES_ENABLED = "meeting_minutes_enabled";
+    /** 正式发布功能开关：关闭时只停「发布/新卡片」写入，旧链接与历史批次仍可读 */
+    public static final String CFG_MINUTES_PUBLISH_ENABLED = "meeting_minutes_publish_enabled";
+    /** 发布通知卡片开关：关闭时发送接口拒绝新版卡片，历史 markdown 通知不受影响 */
+    public static final String CFG_MINUTES_CARD_ENABLED = "meeting_minutes_card_enabled";
+    /** 发布通知卡片正文的应用侧预算：钉钉卡片约 4000 字符，卡片只给摘要与入口，留足余量 */
+    public static final int MINUTES_CARD_MAX_CHARS = 900;
     /** 免登链接有效期（天）：纪要要能回看，但无限期链接等于把内部结论长期挂在网上 */
     public static final int MINUTES_LINK_TTL_DAYS = 90;
     /** 钉钉 markdown 正文上限的保守值：机器人约 4000 字符，留出截断标记与链接的空间 */
@@ -294,6 +308,16 @@ public final class MeetingConstants {
     public static final String CFG_MIN_LEAD_MINUTES = "meeting_min_lead_minutes";
     public static final String CFG_DEFAULT_DURATION = "meeting_default_duration";
     public static final String CFG_MAX_DURATION = "meeting_max_duration_minutes";
+    /** 单场最短时长（分钟）：房间未配置时回落到这里；首次由升级时的粒度值初始化 */
+    public static final String CFG_MIN_DURATION = "meeting_min_duration_minutes";
+    /** 默认是否需要签到保留（房间未配置时回落；0/1） */
+    public static final String CFG_CHECKIN_REQUIRED = "meeting_checkin_required_default";
+    /**
+     * 规则集版本号（单调递增）：通用规则与房间专属规则共用一个版本。
+     * <p>房间保存时要比对「读到的通用版本」与「当前通用版本」，不一致则拒绝，
+     * 避免拿旧继承基准算出错误的有效组合。
+     */
+    public static final String CFG_RULE_VERSION = "meeting_rule_version";
     public static final String CFG_TIME_GRANULARITY = "meeting_time_granularity";
     public static final String CFG_BOOKABLE_START = "meeting_bookable_start_time";
     public static final String CFG_BOOKABLE_END = "meeting_bookable_end_time";

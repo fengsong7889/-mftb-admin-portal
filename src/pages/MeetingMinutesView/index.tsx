@@ -33,6 +33,7 @@ export default function MeetingMinutesView() {
     }
     setLoading(true)
     setError(undefined)
+    setView(undefined)
     try {
       setView(await fetchMinutesPage(token))
     } catch (e) {
@@ -47,19 +48,12 @@ export default function MeetingMinutesView() {
   const invalid = view != null && view.valid === false
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(180deg, #F7F9FC 0%, #EEF2F8 100%)',
-      padding: '24px 16px 40px',
-      display: 'flex',
-      justifyContent: 'center',
-    }}
-    >
-      <div style={{ width: '100%', maxWidth: 560 }}>
-        <div style={{ fontSize: 13, color: '#8C8C8C', marginBottom: 12 }}>{t('meeting.minutes.pageTitle', { defaultValue: '會議紀要' })}</div>
+    <div className="mm-public-page">
+      <div className="mm-public-page__inner">
+        <div className="mm-public-page__label"><span>{t('meeting.minutes.pageTitle', { defaultValue: '會議紀要' })}</span><span>{t('meeting.minutes.publicationText.readonlyDocument')}</span></div>
 
         {loading && (
-          <div style={{ textAlign: 'center', padding: '48px 0' }}><Spin size="large" /></div>
+          <div className="mm-public-page__loading"><Spin size="large" /></div>
         )}
 
         {error && !loading && (
@@ -72,42 +66,31 @@ export default function MeetingMinutesView() {
             description={view?.message ?? t('meeting.minutes.pageLinkUnavailableDesc', { defaultValue: '連結已過期或已被記錄人作廢，請向發送你紀要的人重新索取' })} />
         )}
 
-        {!loading && view?.valid && view.content && (
-          <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-            <div style={{ fontSize: 18, fontWeight: 600, lineHeight: 1.4 }}>{view.title}</div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{`${view.minutesNo ?? ''} · ${view.bookingNo ?? ''}`}</div>
+        {!loading && !error && view?.valid && view.content && (
+          <>
+            <MinutesContentCard content={view.content} snapshot={view.document} document={{
+              title: view.title || undefined,
+              minutesNo: view.minutesNo || undefined,
+              bookingNo: view.bookingNo || undefined,
+              editionLabel: t('meeting.minutes.legacyBatchTitle', { seq: view.batchSeq ?? 1 }),
+              meetingTime: view.meetingTimeText,
+              organizer: view.organizerName,
+              recorder: `${view.recorderName || t('meeting.minutes.notRecorded')}${view.recorderEmpNo ? `（${view.recorderEmpNo}）` : ''}`,
+              room: view.roomText,
+              footer: <><span>{t('meeting.minutes.recorderColumn')} {view.recorderName || t('meeting.minutes.notRecorded')}</span><span>{t('meeting.minutes.publicationText.sender')}{view.sentByName || t('meeting.minutes.notRecorded')}</span><span>{t('meeting.minutes.publicationText.batch')}{view.batchSeq ?? 1} {t('meeting.minutes.publicationText.historicalSnapshot')}</span></>,
+            }} />
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16, fontSize: 13 }}>
-              <Row label={t('meeting.minutes.pageTime', { defaultValue: '時間' })} value={view.meetingTimeText} />
-              <Row label={t('meeting.minutes.pageRoom', { defaultValue: '會議室' })} value={view.roomText} />
-              <Row label={t('meeting.minutes.pageOrganizer', { defaultValue: '組織者' })} value={view.organizerName} />
-              <Row label={t('meeting.minutes.pageRecorder', { defaultValue: '記錄人' })} value={`${view.recorderName ?? '-'}${view.recorderEmpNo ? `（${view.recorderEmpNo}）` : ''}`} />
-            </div>
-
-            <div style={{ marginTop: 16, borderTop: '1px solid #f0f0f0', paddingTop: 16 }}>
-              <MinutesContentCard content={view.content} />
-            </div>
-
-            <div style={{ marginTop: 16, fontSize: 11, color: '#BFBFBF', textAlign: 'center', lineHeight: 1.8 }}>
+            <div className="mm-public-page__footnote">
               {t('meeting.minutes.pageSentBy', {
                 defaultValue: '由 {{name}} 於 {{time}} 發送（第 {{seq}} 批）',
                 name: view.sentByName ?? '-', time: view.sentAt ?? '-', seq: view.batchSeq ?? 1,
               })}
               <br />
               {t('meeting.minutes.pageExpireHint', { defaultValue: '連結有效期至 {{time}}，逾期或被作廢後需重新索取', time: view.expireAt ?? '-' })}
-            </div>
-          </div>
+              <br />{t('meeting.minutes.publicationText.anyoneHoldingThisLinkCanReadThese')}</div>
+          </>
         )}
       </div>
-    </div>
-  )
-}
-
-function Row({ label, value }: { label: string; value?: string | null }) {
-  return (
-    <div style={{ display: 'flex', gap: 12 }}>
-      <span style={{ color: '#8C8C8C', width: 56, flexShrink: 0 }}>{label}</span>
-      <span style={{ color: '#262626' }}>{value || '-'}</span>
     </div>
   )
 }

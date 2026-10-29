@@ -126,6 +126,15 @@ public class MeetingRoomServiceImpl implements MeetingRoomService {
         MeetingRoom after = new MeetingRoom();
         applyForm(after, form);
         after.setStatus(defaultStatus(form.getStatus()));
+        // 规则列的唯一维护入口是「預約規則 › 會議室規則」（PUT /rooms/{id}/rules）。
+        // 档案保存不写这几列，否则一张只改备注的表单会把已配的专属值清空；
+        // 快照仍取库内原值，保证审计 diff 不出现“规则被清空”的假变更。
+        after.setBookableStartTime(before.getBookableStartTime());
+        after.setBookableEndTime(before.getBookableEndTime());
+        after.setMinDuration(before.getMinDuration());
+        after.setMaxDuration(before.getMaxDuration());
+        after.setCheckinRequired(before.getCheckinRequired());
+        after.setReleaseAfterMinutes(before.getReleaseAfterMinutes());
 
         LambdaUpdateWrapper<MeetingRoom> update = new LambdaUpdateWrapper<MeetingRoom>()
                 .eq(MeetingRoom::getId, id)
@@ -144,12 +153,7 @@ public class MeetingRoomServiceImpl implements MeetingRoomService {
                 .set(MeetingRoom::getPhotoUrls, after.getPhotoUrls())
                 .set(MeetingRoom::getStatus, after.getStatus())
                 .set(MeetingRoom::getBookable, after.getBookable())
-                .set(MeetingRoom::getBookableStartTime, after.getBookableStartTime())
-                .set(MeetingRoom::getBookableEndTime, after.getBookableEndTime())
-                .set(MeetingRoom::getMinDuration, after.getMinDuration())
-                .set(MeetingRoom::getMaxDuration, after.getMaxDuration())
-                .set(MeetingRoom::getCheckinRequired, after.getCheckinRequired())
-                .set(MeetingRoom::getReleaseAfterMinutes, after.getReleaseAfterMinutes())
+                // 规则列不在此写：见上方注释，唯一入口是會議室规则接口
                 .set(MeetingRoom::getHideTitle, after.getHideTitle())
                 .set(MeetingRoom::getAdminUserIds, after.getAdminUserIds())
                 .set(MeetingRoom::getRemark, after.getRemark())
@@ -453,7 +457,9 @@ public class MeetingRoomServiceImpl implements MeetingRoomService {
         room.setBookableEndTime(parseTime(form.getBookableEndTime(), "每日可預約結束時間"));
         room.setMinDuration(positiveOrEmpty(form.getMinDuration(), "最短會議時長"));
         room.setMaxDuration(positiveOrEmpty(form.getMaxDuration(), "最長會議時長"));
-        room.setCheckinRequired(Boolean.TRUE.equals(form.getCheckinRequired()) ? 1 : 0);
+        // 签到保留：表单未给出（新建档案页不再编辑规则）时落 NULL = 继承通用；给出时 1/0 为明确值
+        room.setCheckinRequired(form.getCheckinRequired() == null
+                ? null : (Boolean.TRUE.equals(form.getCheckinRequired()) ? 1 : 0));
         room.setReleaseAfterMinutes(positiveOrEmpty(form.getReleaseAfterMinutes(), "未簽到自動釋放分鐘數"));
         room.setHideTitle(Boolean.TRUE.equals(form.getHideTitle()) ? 1 : 0);
         room.setAdminUserIds(wrapIds(form.getAdminUserIds()));

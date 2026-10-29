@@ -87,6 +87,26 @@ public class MeetingMinutesController {
         return Result.success("紀要已更新", minutesService.update(id, form));
     }
 
+    /** 发布与通知分离，发布失败不会登记投递任务。 */
+    @PostMapping("/{id}/publish")
+    @RequirePermission(menu = MY, action = MeetingConstants.ACTION_EDIT, anyOf = {BOOKING, RECORD})
+    public Result<MeetingMinutesDto.RevisionVO> publish(@PathVariable long id,
+                                                       @RequestBody @Valid MeetingMinutesDto.PublishForm form) {
+        return Result.success("紀要已發布", minutesService.publish(id, form));
+    }
+
+    @GetMapping("/{id}/revisions")
+    @RequirePermission(menu = MY, anyOf = {BOOKING, RECORD})
+    public Result<List<MeetingMinutesDto.RevisionVO>> revisions(@PathVariable long id) {
+        return Result.success(minutesService.revisions(id));
+    }
+
+    @GetMapping("/{id}/revisions/{revisionId}")
+    @RequirePermission(menu = MY, anyOf = {BOOKING, RECORD})
+    public Result<MeetingMinutesDto.RevisionVO> revision(@PathVariable long id, @PathVariable long revisionId) {
+        return Result.success(minutesService.revision(id, revisionId));
+    }
+
     /** 发送一批纪要：接口只回"进了投递队列"的受理结论，最终送达状态看发送历史 */
     @PostMapping("/{id}/send")
     @RequirePermission(menu = MY, action = MeetingConstants.ACTION_EDIT, anyOf = {BOOKING, RECORD})
@@ -101,6 +121,14 @@ public class MeetingMinutesController {
     public Result<MeetingMinutesDto.VO> revokeLinks(@PathVariable long id,
                                                     @RequestBody @Valid MeetingMinutesDto.RevokeForm form) {
         return Result.success("查看鏈接已作廢", minutesService.revokeLinks(id, form));
+    }
+
+    /** 单批次链接作废：只失效指定批次的免登链接，其他批次不受影响 */
+    @PostMapping("/{id}/sends/{sendId}/revoke-link")
+    @RequirePermission(menu = MY, action = MeetingConstants.ACTION_EDIT, anyOf = {BOOKING, RECORD})
+    public Result<Void> revokeBatchLink(@PathVariable long id, @PathVariable long sendId) {
+        minutesService.revokeBatchLink(id, sendId);
+        return Result.success("本批次查看鏈接已作廢", null);
     }
 
     /**

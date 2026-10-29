@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import {
-  Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Spin, Switch, Table, Tag, message,
+  Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Spin, Switch, Table, Tag, TimePicker, message,
 } from 'antd'
 import {
   ArrowLeftOutlined, ClockCircleOutlined, EnvironmentOutlined, ProfileOutlined, SendOutlined, TeamOutlined,
@@ -42,6 +42,7 @@ import EmployeeSelect from '@/components/EmployeeSelect'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import CardTitle from '@/components/CardTitle'
+import HelpPopover from '@/components/HelpPopover'
 
 /** 周期会议的跳过清单：只给一句 toast 等于让用户自己去数哪几天没订上 */
 interface SkippedItem { seq: number; startTime: string; endTime: string; reason: string }
@@ -62,6 +63,8 @@ function pickerMinuteStep(granularity?: number): 5 | 10 | 15 | 20 | 30 {
 
 type FormShape = Omit<MeetingCreateForm,
   'startTime' | 'endTime' | 'attendeeUserIds' | 'optionalUserIds' | 'externalAttendees' | 'delegateForId'> & {
+  /** 日期是独立的界面字段，start 仍保存接口需要的完整日期时间。 */
+  startDate?: Dayjs
   start?: Dayjs
   duration?: number
   attendeeUserIds?: number[]
@@ -95,7 +98,11 @@ const cardStyle: CSSProperties = {
   padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
 }
 
-const gridStyle: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }
+const gridStyle: CSSProperties = {
+  display: 'grid', gap: 16,
+  gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, max(280px, calc((100% - 32px) / 3))), 1fr))',
+}
+
 
 export default function MeetingBookingForm() {
   const { t } = useTranslation()
@@ -133,6 +140,7 @@ export default function MeetingBookingForm() {
   // 传 ['start','duration',...] 会被当成 start.duration 这种嵌套取值，结果永远是 undefined，
   // 于是周期字段整块不展开、结束时间恒为「待选择」、人数恒为 1 而容量超额告警永不触发。
   // 多字段必须逐个 useWatch。
+  const startDate = Form.useWatch('startDate', form) as Dayjs | undefined
   const start = Form.useWatch('start', form) as Dayjs | undefined
   const duration = Form.useWatch('duration', form) as number | undefined
   const required = (Form.useWatch('attendeeUserIds', form) as number[] | undefined) ?? []
@@ -158,7 +166,7 @@ export default function MeetingBookingForm() {
       setDelegateName('')
     }
   }, [watchedDelegateEnabled, form])
-  const end = start && duration ? start.add(duration, 'minute') : undefined
+  const end = startDate && start && duration ? start.add(duration, 'minute') : undefined
 
   const goBack = useCallback(() => {
     navigate('/meeting-booking', { replace: true, state: { closeMenuTab: location.pathname + location.search } })
@@ -193,8 +201,16 @@ export default function MeetingBookingForm() {
   useEffect(() => {
     if (!room) return
     const roomRule = ruleForRoom(room)
+    const now = dayjs()
+    const earliest = now.add(30, 'minute')
+    const dayStart = earliest.startOf('day')
+    // 向后对齐预约粒度；跨午夜时同步进位日期，避免默认值落在过去。
+    const rounded = dayStart.add(Math.ceil(earliest.diff(dayStart, 'minute', true) / roomRule.granularity) * roomRule.granularity, 'minute')
+    const selectedStart = initialStart ?? (day.isSame(now, 'day')
+      ? rounded : day.startOf('day').hour(rounded.hour()).minute(rounded.minute()))
     form.setFieldsValue({
-      start: initialStart ?? day.hour(10).minute(0).second(0),
+      startDate: selectedStart.startOf('day'),
+      start: selectedStart,
       duration: roomRule.minDuration && roomRule.minDuration >= 30 ? roomRule.minDuration : 60,
       attendeeUserIds: [],
       optionalUserIds: [],
@@ -215,7 +231,7 @@ export default function MeetingBookingForm() {
   const doPreview = async () => {
     if (!room) return
     const values = form.getFieldsValue() as FormShape
-    if (!values.start || !values.duration) {
+    if (!values.startDate || !values.start || !values.duration) {
       setIssues([t('meeting.chooseTheStartTime', { defaultValue: '請先選擇開始時間與時長' })])
       return
     }
@@ -482,7 +498,14 @@ export default function MeetingBookingForm() {
         />
       )}
 
-      <Form form={form} layout="vertical" requiredMark="optional" disabled={!room || submitting}>
+      <Form form={form} layout="vertical" requiredMark="optional" disabled={!room || submitting}
+        onValuesChange={(changed: Partial<FormShape>) => {
+          const currentStart = form.getFieldValue('start') as Dayjs | undefined
+          if (changed.startDate && currentStart) {
+            form.setFieldValue('start', changed.startDate.startOf('day').hour(currentStart.hour()).minute(currentStart.minute()))
+          }
+          setPreview([])
+        }}>
         {/* 一、会议室与时间 */}
         <div style={cardStyle}>
           <CardTitle
@@ -494,14 +517,17 @@ export default function MeetingBookingForm() {
               defaultValue: `${room.locationText ?? ''} · 可預約 ${room.bookableStartTime ?? '08:00'}–${room.bookableEndTime ?? '22:00'} · 單場 ${room.minDuration ?? rule?.minDuration ?? 15}~${room.maxDuration ?? rule?.maxDuration ?? 240} 分鐘`,
             }) : undefined}
           />
-          <div style={gridStyle}>
-            <Form.Item label={t('meeting.startTime', { defaultValue: '開始時間' })} name="start" rules={[{ required: true, message: t('meeting.pleaseChooseTheStart', { defaultValue: '請選擇開始時間' }) }]}>
-              <DatePicker
-                showTime={{ format: 'HH:mm', minuteStep: pickerMinuteStep(rule?.granularity) }}
-                format="YYYY-MM-DD HH:mm"
-                style={{ width: '100%' }}
-                disabledDate={current => !!current && current < dayjs().startOf('day')}
-              />
+          <div className="meeting-booking-grid" style={gridStyle}>
+            <Form.Item label={t('meeting.startDate')} name="startDate" rules={[{ required: true, message: t('meeting.pleaseChooseTheStart') }]}>
+              <DatePicker aria-label={t('meeting.startDate')} format="YYYY-MM-DD" style={{ width: '100%' }}
+                disabledDate={current => !!current && current < dayjs().startOf('day')} />
+            </Form.Item>
+            <Form.Item label={t('meeting.startTime', { defaultValue: '開始時間' })} name="start"
+              rules={[{ required: true, message: t('meeting.pleaseChooseTheStart', { defaultValue: '請選擇開始時間' }) }]}
+              getValueFromEvent={(value: Dayjs | null) => value && startDate
+                ? startDate.startOf('day').hour(value.hour()).minute(value.minute()) : value}>
+              <TimePicker aria-label={t('meeting.startTime')} format="HH:mm" minuteStep={pickerMinuteStep(rule?.granularity)}
+                needConfirm={false} showNow={false} style={{ width: '100%' }} />
             </Form.Item>
             <Form.Item label={t('meeting.duration2', { defaultValue: '時長' })} name="duration" rules={[{ required: true, message: t('meeting.pleaseChooseTheDuration', { defaultValue: '請選擇時長' }) }]}
               extra={t('meeting.endTimeIsDerived', { defaultValue: '結束時間由時長算出，保證符合粒度與上下限' })}>
@@ -515,6 +541,8 @@ export default function MeetingBookingForm() {
                 }))}
               />
             </Form.Item>
+          </div>
+          <div className="meeting-booking-grid" style={gridStyle}>
             <Form.Item label={t('meeting.endTime', { defaultValue: '結束時間' })} extra={t('meeting.halfOpenIntervalBack', { defaultValue: '左閉右開：與下一場背靠背不衝突' })}>
               <div style={{
                 height: 32, lineHeight: '32px', padding: '0 11px', borderRadius: 6,
@@ -523,11 +551,10 @@ export default function MeetingBookingForm() {
                 {end ? end.format('YYYY-MM-DD HH:mm') : t('meeting.pendingChoice', { defaultValue: '待選擇' })}
               </div>
             </Form.Item>
-          </div>
-
-          <div style={{ ...gridStyle, gridTemplateColumns: 'repeat(2, 1fr)' }}>
-            <Form.Item label={t('meeting.recurrence', { defaultValue: '重複頻率' })} name="repeat"
-              extra={t('meeting.seriesSubmitHint', { defaultValue: '週期會議提交時一次性生成全部場次，衝突場次跳過並列明原因' })}>
+            <Form.Item label={<Space size={6}>{t('meeting.recurrence', { defaultValue: '重複頻率' })}
+              <HelpPopover title={t('meeting.recurrence')} ariaLabel={t('meeting.recurrence')}
+                content={t('meeting.seriesSubmitHint', { defaultValue: '週期會議提交時一次性生成全部場次，衝突場次跳過並列明原因' })} />
+            </Space>} name="repeat">
               <Select options={[
                 { value: 'none', label: t('meeting.noRepeatSingle', { defaultValue: '不重複（單場）' }) },
                 { value: 'daily', label: t('meeting.daily', { defaultValue: '每天重複' }) },
@@ -544,7 +571,7 @@ export default function MeetingBookingForm() {
 
           {watchedRepeat !== 'none' && (
             <>
-              <div style={gridStyle}>
+              <div className="meeting-booking-grid" style={gridStyle}>
                 <Form.Item label={t('meeting.repeatEvery', { defaultValue: '重複間隔' })} name="intervalN" rules={[{ required: true, message: t('meeting.pleaseEnterTheInterval', { defaultValue: '請填寫間隔' }) }]}
                   extra={watchedRepeat === 'weekly' ? t('meeting.everyNWeeks', { defaultValue: '每 N 週重複一次' }) : t('meeting.everyNDays', { defaultValue: '每 N 天重複一次' })}>
                   <InputNumber min={1} max={30} style={{ width: '100%' }}
@@ -592,22 +619,26 @@ export default function MeetingBookingForm() {
               只对 meeting-record:edit 开放——普通员工能替别人订会，等于能给别人强塞日程、
               也能替被黑名单的人绕开限制。 */}
           {canDelegate && (
-            <div style={{ ...gridStyle, gridTemplateColumns: 'repeat(2, 1fr)' }}>
-              <Form.Item label={t('meeting.bookForSomeoneElse', { defaultValue: '替他人預訂' })} name="delegateEnabled" valuePropName="checked"
-                extra={t('meeting.whenOnTheMeeting', { defaultValue: '開啟後這場會記在使用人名下' })}>
+            <div className="meeting-booking-grid" style={gridStyle}>
+              <Form.Item label={<Space size={6}>{t('meeting.bookForSomeoneElse', { defaultValue: '替他人預訂' })}
+                <HelpPopover title={t('meeting.bookForSomeoneElse')} ariaLabel={t('meeting.bookForSomeoneElse')}
+                  content={t('meeting.whenOnTheMeeting', { defaultValue: '開啟後這場會記在使用人名下' })} />
+              </Space>} name="delegateEnabled" valuePropName="checked">
                 <Switch checkedChildren={t('meeting.onBehalf', { defaultValue: '代訂' })} unCheckedChildren={t('meeting.self', { defaultValue: '自訂' })} />
               </Form.Item>
               {watchedDelegateEnabled && (
-                <Form.Item label={t('meeting.actualUser', { defaultValue: '實際使用人' })} name="delegateForId"
-                  rules={[{ required: true, message: t('meeting.pleaseChooseTheActual', { defaultValue: '請選擇實際使用人' }) }]}
-                  extra={t('meeting.countedAsRequiredAttendee', { defaultValue: '自動計入必參；衝突與名額按此人判定' })}>
-                  <EmployeeSelect single placeholder={t('meeting.searchByNameOr', { defaultValue: '搜尋姓名或工號' })}
+                <Form.Item label={<Space size={6}>{t('meeting.actualUser', { defaultValue: '實際使用人' })}
+                  <HelpPopover title={t('meeting.actualUser')} ariaLabel={t('meeting.actualUser')}
+                    content={t('meeting.countedAsRequiredAttendee', { defaultValue: '自動計入必參；衝突與名額按此人判定' })} />
+                </Space>} name="delegateForId"
+                  rules={[{ required: true, message: t('meeting.pleaseChooseTheActual', { defaultValue: '請選擇實際使用人' }) }]}>
+                  <EmployeeSelect single style={{ width: '100%' }} placeholder={t('meeting.searchByNameOr', { defaultValue: '搜尋姓名或工號' })}
                     onPick={items => setDelegateName(items[0]?.name ?? '')} />
                 </Form.Item>
               )}
             </div>
           )}
-          <div style={gridStyle}>
+          <div className="meeting-booking-grid" style={gridStyle}>
             <Form.Item label={t('meeting.requiredAttendees', { defaultValue: '必參人員' })} name="attendeeUserIds" extra={t('meeting.theOrganizerComesFrom', { defaultValue: '組織者由登入態確定，不需也不能選自己' })}>
               <EmployeeSelect placeholder={t('meeting.searchByNameOr3', { defaultValue: '搜尋姓名或工號（可多選）' })} />
             </Form.Item>
@@ -636,7 +667,7 @@ export default function MeetingBookingForm() {
         {/* 三、会议信息 */}
         <div style={cardStyle}>
           <CardTitle icon={<ProfileOutlined />} tone="warn" title={t('meeting.meetingInfo', { defaultValue: '會議信息' })} />
-          <div style={{ ...gridStyle, gridTemplateColumns: 'repeat(2, 1fr)' }}>
+          <div className="meeting-booking-grid" style={gridStyle}>
             <Form.Item label={t('meeting.meetingTopic', { defaultValue: '會議主題' })} name="title" rules={[
               { required: true, message: t('meeting.pleaseEnterTheMeeting', { defaultValue: '請填寫會議主題' }) },
               { max: 200, message: t('meeting.max200Characters', { defaultValue: '最長 200 字' }) },
@@ -646,14 +677,15 @@ export default function MeetingBookingForm() {
             <Form.Item label={t('meeting.meetingType', { defaultValue: '會議類型' })} name="bizType">
               <Select options={Object.entries(bizTypeLabels()).map(([value, label]) => ({ value, label }))} />
             </Form.Item>
+            <Form.Item label={t('meeting.onlineMeetingLink', { defaultValue: '線上會議鏈接' })} name="onlineMeetingUrl" rules={[{ max: 500, message: t('meeting.max500Characters', { defaultValue: '最長 500 字' }) }]}>
+              <Input placeholder="https://..." allowClear maxLength={500} />
+            </Form.Item>
+            {/* 议程独占一整行（§C.4.1 备注类长文本同款处理） */}
+            <Form.Item label={t('meeting.agenda', { defaultValue: '會議議程' })} name="description" style={{ gridColumn: '1 / -1' }}
+              rules={[{ max: 1000, message: t('meeting.max1000Characters', { defaultValue: '最長 1000 字' }) }]}>
+              <RemarkTextArea rows={4} maxLength={1000} placeholder={t('meeting.optionalTopicsAndMaterials', { defaultValue: '選填：議題、需要提前準備的材料' })} />
+            </Form.Item>
           </div>
-          <Form.Item label={t('meeting.onlineMeetingLink', { defaultValue: '線上會議鏈接' })} name="onlineMeetingUrl" rules={[{ max: 500, message: t('meeting.max500Characters', { defaultValue: '最長 500 字' }) }]}>
-            <Input placeholder="https://..." allowClear maxLength={500} />
-          </Form.Item>
-          {/* 议程独占一整行（§C.4.1 备注类长文本同款处理） */}
-          <Form.Item label={t('meeting.agenda', { defaultValue: '會議議程' })} name="description" rules={[{ max: 1000, message: t('meeting.max1000Characters', { defaultValue: '最長 1000 字' }) }]}>
-            <RemarkTextArea rows={4} maxLength={1000} placeholder={t('meeting.optionalTopicsAndMaterials', { defaultValue: '選填：議題、需要提前準備的材料' })} />
-          </Form.Item>
         </div>
       </Form>
 

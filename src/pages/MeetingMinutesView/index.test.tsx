@@ -65,10 +65,14 @@ describe('紀要免登查看頁', () => {
     fetchMinutesPage.mockResolvedValue(VIEW)
     openPage()
     await waitFor(() => expect(screen.getByText('Q4 預算復核')).toBeInTheDocument())
-    expect(screen.getByText(/按營收分攤/)).toBeInTheDocument()
+    expect(screen.getAllByText(/按營收分攤/)).toHaveLength(2)
     expect(screen.getByText('輸出預算明細表')).toBeInTheDocument()
     expect(screen.getByText(/張三（MF00007）/)).toBeInTheDocument()
-    expect(screen.getByText('缺席人員')).toBeInTheDocument()
+    const absentees = screen.getByText('缺席人員').nextElementSibling
+    expect(absentees).toHaveTextContent('李四（MF00002）')
+    expect(absentees).toHaveTextContent('缺席')
+    expect(absentees).not.toHaveTextContent('請假')
+    expect(VIEW.content.absentees[0].reason).toBe('請假')
     expect(screen.getByText(/由 李四 於 2026-10-19 20:05:00 發送（第 2 批）/)).toBeInTheDocument()
     expect(screen.getByText(/連結有效期至 2027-01-17 20:05:00/)).toBeInTheDocument()
     // 免登链接可能被转发：整页不得出现手机号形态的值或渠道凭据

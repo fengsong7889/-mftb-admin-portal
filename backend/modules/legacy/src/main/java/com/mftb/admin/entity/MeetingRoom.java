@@ -64,9 +64,31 @@ public class MeetingRoom {
 
     private LocalTime bookableEndTime;
 
+    /**
+     * 以下规则列均可空：NULL = 继承通用规则，非 NULL = 房间专属值。
+     * <p>注意 0 是明确值（如提醒 0 分钟=不提醒），不能用「>0」判断是否配置，只能判 NULL。
+     */
     private Integer minDuration;
 
     private Integer maxDuration;
+
+    /** 最远可预约天数（NULL=继承通用） */
+    private Integer advanceDays;
+
+    /** 最少提前分钟数（NULL=继承通用，0=允许即时预约） */
+    private Integer minLeadMinutes;
+
+    /** 时间粒度分钟（NULL=继承通用） */
+    private Integer granularityMinutes;
+
+    /** 默认时长分钟（NULL=继承通用） */
+    private Integer defaultDuration;
+
+    /** 开始前提醒分钟（NULL=继承通用，0=不提醒） */
+    private Integer remindMinutes;
+
+    /** 可提前签到分钟（NULL=继承通用） */
+    private Integer checkinOpenMinutes;
 
     /** 是否需要签到保留（M2 生效，本期只维护） */
     private Integer checkinRequired;

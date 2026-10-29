@@ -24,6 +24,14 @@ public interface MeetingMinutesService {
     /** 编辑纪要：乐观锁冲突时拒绝，不静默覆盖别人的修改 */
     MeetingMinutesDto.VO update(long minutesId, MeetingMinutesDto.Form form);
 
+    /** 发布已保存的草稿，正式版本只追加。 */
+    MeetingMinutesDto.RevisionVO publish(long minutesId, MeetingMinutesDto.PublishForm form);
+
+    /** 仅返回当前用户有权读取的正式版本。 */
+    List<MeetingMinutesDto.RevisionVO> revisions(long minutesId);
+
+    MeetingMinutesDto.RevisionVO revision(long minutesId, long revisionId);
+
     /** 发送一批纪要（群 + 自选收件人） */
     MeetingMinutesDto.SendResult send(long minutesId, MeetingMinutesDto.SendForm form);
 
@@ -32,6 +40,9 @@ public interface MeetingMinutesService {
 
     /** 作废历史免登链接：token_version 递增，已发出去的链接立刻读不到内容 */
     MeetingMinutesDto.VO revokeLinks(long minutesId, MeetingMinutesDto.RevokeForm form);
+
+    /** 单批次链接作废：只失效指定批次的免登链接，其他批次不受影响 */
+    void revokeBatchLink(long minutesId, long sendId);
 
     /** 可选的钉钉群候选（只回 id 与名称） */
     List<MeetingMinutesDto.GroupOptionVO> groupOptions();

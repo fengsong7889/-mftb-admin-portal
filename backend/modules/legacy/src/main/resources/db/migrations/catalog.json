@@ -1667,6 +1667,40 @@
       "comment": "使用侧只剩两项时分组层级是纯开销——员工每次都要展开分组才看得到自己的会。两个叶子继承分组原顶级 sort（S/S+1），治理分组仅在 sort <= S+1（即仍是 v1.2 默认紧邻形态）时后移到 S+2，管理员手动调过的顶级排序不被打回。分组行软删并物理清理 sys_role_menu/sys_department_menu 的授权行：留着会在授权中心列表出现幽灵菜单。MeetingAccessGrantInitializer 同步升 v1.1 把分组移出基线，否则基线校验会对已删菜单报「未就绪」导致启动崩溃。后置校验钉三件事：分组已删、两个叶子在一级且 system_code 归属正确、分组角色授权行无残留。"
     },
     {
+      "versionKey": "meeting:menu:v1.4",
+      "module": "meeting",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "meetingSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "meeting:menu:v1.3",
+        "meeting:schema:v1.1"
+      ],
+      "scriptFiles": [],
+      "intent": "新增「預約管理」一级目录：預約規則移入，黑名單拆为独立二级菜单，并将原规则菜单的角色授权逐条复制到黑名單",
+      "author": "Qoder",
+      "ticket": "meeting-reservation-split",
+      "comment": "只改展示层不建菜单会让权限链路悬空：黑名单路由与控制器已切到 meeting-blacklist，菜单未落地时 PermissionAnnotationValidator 会报未登记菜单。保留 meeting-config 的 menu id 只改父级，避免换 key 导致存量角色授权全丢；新叶子用 ensureMenu 声明，让 check-menu 门禁能扫到路由/受控/图标/动作集。授权迁移用 INSERT IGNORE 按角色逐条复制，保留显式收窄的动作集，不自动授普通员工。后置校验钉三件事：目录为顶级分组、两个叶子挂在其下、admin 已获分组授权。"
+    },
+    {
+      "versionKey": "meeting:rule-snapshot:v1.0",
+      "module": "meeting",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "meetingRuleSnapshotBackfillInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "meeting:schema:v1.1",
+        "meeting:menu:v1.4"
+      ],
+      "scriptFiles": [],
+      "intent": "按升级时生效规则冻结存量占用会议的规则快照（提醒/签到/释放时刻与签到开关）",
+      "author": "Qoder",
+      "ticket": "meeting-reservation-split",
+      "comment": "快照列只有新建/改期会写入；存量占用单若留 NULL，任务只能回落实时规则，改规则就会重判已约好的会。仅处理 rule_snapshot IS NULL，写完不再命中，重启幂等；UPDATE 再带 rule_snapshot IS NULL 防并发覆盖。"
+    },
+    {
       "versionKey": "meeting:access-grant:v1.1",
       "module": "meeting",
       "phase": "MENU_SEED",
@@ -2788,6 +2822,24 @@
       "author": "Qoder",
       "ticket": "meeting-notify-card-v3",
       "comment": "钉钉 markdown 不支持文字颜色，只能用 <font color> 标签，且色号必须用双引号包住（单引号在手机端不生效）。只升级 updated_by='meeting-v1.2' 的行（即上一版出厂文案），管理员改过的模板不动。后置校验：不得残留 updated_by='meeting-v1.2' 的同场景模板。"
+    },
+    {
+      "versionKey": "meeting:minutes-publication:v2.0",
+      "module": "meeting",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "meetingMinutesSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "meeting:minutes:v1.1"
+      ],
+      "scriptFiles": [
+        "308_meeting_minutes_publication.sql"
+      ],
+      "intent": "正式纪要版本：完整不可变文档快照、草稿与发布指针、稳定事项身份与独立排序、版本化卡片投递及独立通知模板",
+      "author": "Qoder",
+      "ticket": "meeting-minutes-publication",
+      "comment": "新增版本表及兼容列，不覆盖旧内容或批次。结构 DDL 从 classpath 脚本读取，ALTER 前查询 information_schema 保证幂等，并通过后置校验及结构契约复核。事项保留旧 seq 唯一键但新版按 id 更新，display_order 只负责展示排序。通知模板只新增独立场景，不覆盖管理员自定义旧模板。回滚保留版本表和已发布数据，仅停新发布及新卡片写入。"
     },
     {
       "versionKey": "rdm:schema:v3.20",

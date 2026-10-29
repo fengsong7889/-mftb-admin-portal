@@ -1,8 +1,8 @@
 /**
  * 预约规则与黑名单（会议管理 → 會議治理 → 預約規則）
  *
- * 两个 Tab 共用一页的理由：它们都是"行政治理会议预约"的开关，
- * 拆两页会让改规则的人还要另外记住黑名单在哪；但两者的授权动作与写入路径完全独立。
+ * 第一阶段将规则与黑名单拆为独立页面；规则页区分通用与会议室配置。
+ * 新规则仅供界面确认，保存暂禁用；黑名单仍沿用现有接口与权限。
  *
  * 四条界面口径：
  *   1. 规则改动必须填变更原因并二次确认——它影响全站所有人的预约结果，
@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import {
-  Alert, Button, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, Tabs, Tag, TimePicker, message,
+  Alert, Button, Form, Input, InputNumber, Modal, Radio, Select, Space, Spin, Table, Tabs, Tag, TimePicker, message,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
@@ -23,7 +23,7 @@ import {
   PlusOutlined, ReloadOutlined, SearchOutlined, StopOutlined, ThunderboltOutlined,
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
@@ -40,6 +40,9 @@ import MeetingStatCards from '../MeetingStatCards'
 import CardTitle from '@/components/CardTitle'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
+import { useConfirmLeave } from '@/contexts/UnsavedChangesContext'
+import HelpPopover from '@/components/HelpPopover'
+import { RoomRulesPanel, RulePageHeader, useRulePreviewGuard } from './RoomRulePreview'
 
 const MENU = 'meeting-config'
 
@@ -65,8 +68,6 @@ const cardStyle: CSSProperties = {
   padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
 }
 
-const gridStyle: CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }
-
 /** 黑名单列配置元数据（§E.3）：人员锁头、操作锁尾 */
 const COLUMN_META = (t: TFunction) => [
   { key: 'name', title: t('meeting.person', { defaultValue: '人員' }) },
@@ -81,26 +82,41 @@ const COLUMN_META = (t: TFunction) => [
   { key: 'action', title: t('meeting.actions', { defaultValue: '操作' }) },
 ]
 
-export default function MeetingConfig() {
+export default function MeetingConfig({ mode = 'rules' }: { mode?: 'rules' | 'blacklist' }) {
   const { t } = useTranslation()
-  return (
-    <div className="content-area">
-      <Alert
-        type="info"
-        showIcon
-        style={{ marginBottom: 16 }}
-        message={t('meeting.theseAreGlobalDefaults', { defaultValue: '這裡的規則是全域默認值：房間檔案留空時回落到這裡，房間自身配置過的欄位以房間為準' })}
-        description={t('meeting.rulesAffectEveryoneS', { defaultValue: '修改規則會影響所有人的預約結果（含已有會議的改期判定），因此必須填寫變更原因並二次確認；變更會寫入審計。' })}
-      />
-      <Tabs
-        defaultActiveKey="rules"
-        items={[
-          { key: 'rules', label: t('meeting.bookingRules', { defaultValue: '預約規則' }), children: <RulePanel /> },
-          { key: 'blacklist', label: t('meeting.blacklist', { defaultValue: '黑名單' }), children: <BlacklistPanel /> },
-        ]}
-      />
+  const [params, setParams] = useSearchParams()
+  const confirmLeave = useConfirmLeave()
+  const activeTab = params.get('tab') === 'rooms' ? 'rooms' : 'common'
+  const handleTabChange = async (tab: string) => {
+    const target = tab === 'rooms' ? '/meeting-config?tab=rooms' : '/meeting-config'
+    if (await confirmLeave(target)) setParams(tab === 'rooms' ? { tab: 'rooms' } : {})
+  }
+  if (mode === 'blacklist') return <div className="content-area mr-workspace">
+    <RulePageHeader title={t('meetingReservation.blacklistTitle', { defaultValue: '預約黑名單' })}
+      subtitle={t('meetingReservation.blacklistSubtitle', { defaultValue: '統一管理預約限制；到期自動解除，撤銷保留記錄' })} />
+    <BlacklistPanel />
+  </div>
+  return <div className="content-area mr-workspace">
+    <RulePageHeader title={t('meeting.bookingRules')}
+      subtitle={t('meetingReservation.pageSubtitle', { defaultValue: '預約管理 / 一套通用規則，按會議室設定差異' })} />
+    <div className="mr-rule-flow"><strong>{t('meetingReservation.flowCommon', { defaultValue: '通用規則兜底' })}</strong><span>→</span>
+      <strong>{t('meetingReservation.flowRoom', { defaultValue: '會議室專屬值優先' })}</strong><span>→</span>
+      <span>{t('meetingReservation.flowInherit', { defaultValue: '未設定項目自動繼承' })}</span>
+      <HelpPopover title={t('meetingReservation.flowHelpTitle', { defaultValue: '規則生效方式' })}
+        ariaLabel={t('meetingReservation.flowHelpAria', { defaultValue: '規則生效方式說明' })} content={[
+        { tone: 'info', label: t('meetingReservation.flowHelpCommonLabel', { defaultValue: '通用與專屬' }),
+          body: t('meetingReservation.flowHelpCommonBody', { defaultValue: '通用規則只有一套；每間會議室只設定不同的項目，其餘沿用通用值。' }) },
+        { tone: 'neutral', label: t('meetingReservation.flowHelpLegacyLabel', { defaultValue: '存量會議保護' }),
+          body: t('meetingReservation.flowHelpLegacyBody', { defaultValue: '新預約使用新規則；已預約會議保持預約時的規則，僅改期或換房時重新計算。' }) },
+        { tone: 'warn', label: t('meetingReservation.flowHelpSaveLabel', { defaultValue: '保存前置檢查' }),
+          body: t('meetingReservation.flowHelpSaveBody', { defaultValue: '修改通用值會先逐間預演繼承組合，衝突則整體拒絕；保存需填變更原因。' }) },
+      ]} />
     </div>
-  )
+    <Tabs activeKey={activeTab} onChange={tab => void handleTabChange(tab)} destroyInactiveTabPane items={[
+      { key: 'common', label: t('meetingReservation.tabCommon', { defaultValue: '通用規則' }), children: <RulePanel /> },
+      { key: 'rooms', label: t('meetingReservation.tabRooms', { defaultValue: '會議室規則' }), children: <RoomRulesPanel /> },
+    ]} />
+  </div>
 }
 
 /* ==================== 规则 Tab ==================== */
@@ -119,9 +135,13 @@ function RulePanel() {
   const [form] = Form.useForm<MeetingRuleForm>()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [dirty, setDirty] = useState(false)
+  useRulePreviewGuard(dirty, () => setDirty(false), '通用預約規則預覽')
   const [error, setError] = useState<string>()
   const [missing, setMissing] = useState<string[]>([])
   const [updated, setUpdated] = useState<{ by?: string | null; at?: string | null }>({})
+  /** 规则集版本：保存时带回，服务端不一致即拒绝（乐观锁） */
+  const [version, setVersion] = useState<number>()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -129,8 +149,10 @@ function RulePanel() {
     try {
       const view = await fetchMeetingRules()
       const rule = view.rule
-      form.setFieldsValue({ ...rule, bookableStart: dayjs(rule.bookableStart, 'HH:mm'),
-        bookableEnd: dayjs(rule.bookableEnd, 'HH:mm') } as never)
+      form.setFieldsValue({ ...rule, bookableStart: dayjs(`2000-01-01T${rule.bookableStart}`),
+        bookableEnd: dayjs(`2000-01-01T${rule.bookableEnd}`) } as never)
+      setDirty(false)
+      setVersion(view.version)
       setMissing(view.missingKeys ?? [])
       setUpdated({ by: view.updatedBy, at: view.updatedAt })
     } catch (e) {
@@ -143,6 +165,7 @@ function RulePanel() {
   useEffect(() => { void load() }, [load])
 
   const submit = async () => {
+    if (!canEdit || loading || saving || error) return
     let values: MeetingRuleForm
     try {
       values = await form.validateFields()
@@ -154,9 +177,11 @@ function RulePanel() {
       // TimePicker 存的是 dayjs，提交前定格式成 HH:mm：直接把 dayjs 对象发过去会变成 ISO 全时间串
       bookableStart: fmtTime(values.bookableStart as unknown as Dayjs),
       bookableEnd: fmtTime(values.bookableEnd as unknown as Dayjs),
+      version,
     }
-    if (payload.maxDuration < payload.minLeadMinutes) {
-      message.warning(t('meeting.maximumDurationShouldNot', { defaultValue: '單場最長時長不應小於最少提前分鐘數' }))
+    // 只校验真正相关的组合：提前量属于“何时开始能约”，与单场时长无因果关系
+    if (payload.minDuration > payload.defaultDuration || payload.defaultDuration > payload.maxDuration) {
+      message.warning(t('meetingReservation.durationOrder', { defaultValue: '需滿足：單場最短時長 ≤ 默認時長 ≤ 單場最長時長' }))
       return
     }
     reasonRef.value = ''
@@ -260,12 +285,14 @@ function RulePanel() {
         />
       )}
 
-      <Form form={form} layout="vertical" disabled={!canEdit}>
+      <Alert type="info" showIcon className="mr-notice" message={t('meetingReservation.commonBanner', { defaultValue: '通用規則為所有會議室提供兜底配置' })}
+        description={t('meetingReservation.commonBannerDesc', { defaultValue: '可直接保存；保存需填寫變更原因並二次確認。修改通用值時會先檢查各房間的繼承組合，衝突則拒絕保存。' })} />
+      <Form form={form} layout="vertical" disabled={!canEdit || !!error || saving} onValuesChange={() => setDirty(true)}>
         {/* 一、可预约窗口与时长 */}
         <div style={cardStyle}>
           <CardTitle icon={<ClockCircleOutlined />} tone="warn" title={t('meeting.bookableWindowDuration', { defaultValue: '可預約窗與時長' })}
             note={t('meeting.roomsFallBackHere', { defaultValue: '房間檔案留空時回落到這裡' })} />
-          <div style={gridStyle}>
+          <div className="mr-global-grid">
             <Form.Item label={t('meeting.maximumAdvanceDays', { defaultValue: '最遠可預約天數' })} name="advanceDays" rules={[{ required: true, message: t('meeting.pleaseEnterTheNumber', { defaultValue: '請填寫天數' }) }]}
               extra={t('meeting.laterOccurrencesOfA', { defaultValue: '週期會議的後續場次不受此限制' })}>
               <InputNumber min={1} max={365} style={{ width: '100%' }} addonAfter={t('meeting.days', { defaultValue: '天' })} />
@@ -287,6 +314,9 @@ function RulePanel() {
             <Form.Item label={t('meeting.defaultDuration', { defaultValue: '默認時長' })} name="defaultDuration" rules={[{ required: true, message: t('meeting.pleaseEnterTheDefault', { defaultValue: '請填寫默認時長' }) }]}>
               <InputNumber min={5} max={720} style={{ width: '100%' }} addonAfter={t('meeting.min', { defaultValue: '分鐘' })} />
             </Form.Item>
+            <Form.Item label={t('meetingReservation.field.minDuration', { defaultValue: '單場最短時長' })} name="minDuration">
+              <InputNumber min={1} max={720} precision={0} style={{ width: '100%' }} addonAfter={t('meetingReservation.minute', { defaultValue: '分鐘' })} />
+            </Form.Item>
             <Form.Item label={t('meeting.maximumDuration', { defaultValue: '單場最長時長' })} name="maxDuration" rules={[{ required: true, message: t('meeting.pleaseEnterTheMaximum', { defaultValue: '請填寫最長時長' }) }]}>
               <InputNumber min={15} max={720} style={{ width: '100%' }} addonAfter={t('meeting.min', { defaultValue: '分鐘' })} />
             </Form.Item>
@@ -295,9 +325,12 @@ function RulePanel() {
 
         {/* 二、提醒、签到与爽约治理 */}
         <div style={cardStyle}>
-          <CardTitle icon={<BellOutlined />} tone="warn" title={t('meeting.reminderCheckInAnd', { defaultValue: '提醒、簽到與爽約治理' })}
+          <CardTitle icon={<BellOutlined />} tone="info" title="提醒、簽到與自動釋放"
             note={t('meeting.eachMeetingIsReminded', { defaultValue: '同一場會只提醒一次' })} />
-          <div style={gridStyle}>
+          <div className="mr-global-grid">
+            <Form.Item label={t('meetingReservation.field.checkinRequired', { defaultValue: '需簽到保留' })} name="checkinRequired">
+              <Radio.Group buttonStyle="solid"><Radio.Button value={1}>是</Radio.Button><Radio.Button value={0}>否</Radio.Button></Radio.Group>
+            </Form.Item>
             <Form.Item label={t('meeting.reminderBeforeStart', { defaultValue: '開始前提醒' })} name="remindMinutes" rules={[{ required: true, message: t('meeting.pleaseEnterTheReminder', { defaultValue: '請填寫提醒分鐘數' }) }]}
               extra={t('meeting.0DisablesTheReminder', { defaultValue: '0 表示不發提醒' })}>
               <InputNumber min={0} max={1440} style={{ width: '100%' }} addonAfter={t('meeting.min', { defaultValue: '分鐘' })} />
@@ -309,6 +342,11 @@ function RulePanel() {
               extra={t('meeting.appliesOnlyToRooms', { defaultValue: '僅對開了「需簽到保留」的房間生效' })}>
               <InputNumber min={1} max={240} style={{ width: '100%' }} addonAfter={t('meeting.min', { defaultValue: '分鐘' })} />
             </Form.Item>
+          </div>
+        </div>
+        <div style={cardStyle}>
+          <CardTitle icon={<StopOutlined />} tone="warn" title="全局爽約治理" note="所有會議室統一使用，不可單獨覆蓋" />
+          <div className="mr-global-grid">
             <Form.Item label={t('meeting.noShowThresholdFor', { defaultValue: '爽約自動拉黑閾值' })} name="noShowThreshold" rules={[{ required: true, message: t('meeting.pleaseEnterTheCount', { defaultValue: '請填寫次數' }) }]}
               extra={t('meeting.noShowsIn30', { defaultValue: '近 30 天爽約達該次數即暫停預約；0 表示只做人工黑名單' })}>
               <InputNumber min={0} max={30} style={{ width: '100%' }} addonAfter={t('meeting.times', { defaultValue: '次' })} />
@@ -337,7 +375,7 @@ function RulePanel() {
       {canEdit && (
         <div className="form-footer">
           <Button onClick={() => void load()}>{t('meeting.revert', { defaultValue: '還原' })}</Button>
-          <Button type="primary" icon={<ThunderboltOutlined />} loading={saving} onClick={() => void submit()}>
+          <Button type="primary" icon={<ThunderboltOutlined />} disabled={!!error} loading={saving} onClick={() => void submit()}>
             {t('meeting.saveRules', { defaultValue: '保存規則' })}
           </Button>
         </div>
@@ -357,7 +395,8 @@ function BlacklistPanel() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { hasPermission } = useAuth()
-  const canEdit = hasPermission(`${MENU}:edit`)
+  // 黑名单已拆为独立菜单：写权限锚到 meeting-blacklist，不再借用规则页权限
+  const canEdit = hasPermission('meeting-blacklist:edit')
   const [rows, setRows] = useState<BlacklistItem[]>([])
   const [stats, setStats] = useState<BlacklistStats>(EMPTY_STATS)
   const [total, setTotal] = useState(0)

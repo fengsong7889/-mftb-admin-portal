@@ -692,6 +692,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'meeting-room':        <LayoutOutlined />,
   'meeting-record':      <BookOutlined />,
   'meeting-config':      <PropertySafetyOutlined />,
+  'meeting-blacklist':   <StopOutlined />,
   'asset-tag':        <TagOutlined />,
   // 採購
   'purchase-order':   <FileDoneOutlined />,

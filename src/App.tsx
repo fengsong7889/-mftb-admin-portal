@@ -241,6 +241,8 @@ const MeetingConfig = lazy(() => import('@/pages/MeetingManagement/MeetingConfig
 const MeetingRoomForm = lazy(() => import('@/pages/MeetingManagement/RoomFiles/MeetingRoomForm'))
 const MeetingBookingForm = lazy(() => import('@/pages/MeetingManagement/RoomBooking/MeetingBookingForm'))
 const MeetingBlacklistForm = lazy(() => import('@/pages/MeetingManagement/MeetingConfig/MeetingBlacklistForm'))
+// 会议室专属规则预览（预约管理第一阶段，非菜单项，权限挂 meeting-room）
+const MeetingRoomRulePreview = lazy(() => import('@/pages/MeetingManagement/MeetingConfig/RoomRulePreview'))
 // 会议纪要：录入/编辑页与站内只读查看页都不是菜单项（从会议列表、详情页与钉钉卡片跳进来），
 // 但必须显式注册：路由守卫按精确路径校验
 const MeetingMinutesForm = lazy(() => import('@/pages/MeetingManagement/MeetingMinutes/MinutesForm'))
@@ -650,6 +652,9 @@ function AuthenticatedLayout() {
               <Route path="/meeting-room-form" element={<MeetingRoomForm />} />
               <Route path="/meeting-record" element={<BookingRecords />} />
               <Route path="/meeting-config" element={<MeetingConfig />} />
+              {/* 预约管理第一阶段：黑名单独立页与会议室专属规则预览页（路由仍锚旧权限，第二阶段切独立授权） */}
+              <Route path="/meeting-blacklist" element={<MeetingConfig mode="blacklist" />} />
+              <Route path="/meeting-room-rules" element={<MeetingRoomRulePreview />} />
               <Route path="/meeting-blacklist-form" element={<MeetingBlacklistForm />} />
               {/* 会议纪要：表单页与只读查看页（菜单权限挂 meeting-my，同 meeting-detail） */}
               <Route path="/meeting-minutes-form" element={<MeetingMinutesForm />} />

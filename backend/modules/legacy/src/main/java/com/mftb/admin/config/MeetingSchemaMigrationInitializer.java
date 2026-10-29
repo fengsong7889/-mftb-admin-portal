@@ -83,6 +83,15 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
      */
     static final String VERSION_MENU_V13 = "meeting:menu:v1.3";
 
+    /**
+     * 預約管理拆分：新增「預約管理」一級目錄，規則移入、黑名單獨立為二級菜單。
+     * <p>為什麼保留 meeting-config 的 menu id：它已被角色授權，換 key 等於換 id，存量授權全丢。
+     */
+    static final String VERSION_MENU_V14 = "meeting:menu:v1.4";
+
+    /** 黑名單菜單 key（與 MeetingConstants.MENU_BLACKLIST 一致） */
+    private static final String MENU_BLACKLIST_KEY = MeetingConstants.MENU_BLACKLIST;
+
     private static final String SCHEMA_SCRIPT = "230_meeting_core_tables.sql";
     private static final String SCHEMA_SCRIPT_M2 = "231_meeting_series_blacklist.sql";
 
@@ -122,6 +131,30 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
             // 因为 update 逐列显式 set，实体里留 null 会撞约束（P0 踩过同一个坑）
             {"biz_meeting_room", "city",
                     "ADD COLUMN city VARCHAR(64) NOT NULL DEFAULT '' COMMENT '所在城市（如 深圳；跨城辦公防訂錯）' AFTER room_name"},
+            // 規則差異化：房間級專屬值，NULL=繼承通用（0 是明確值，不能當未配置）
+            {"biz_meeting_room", "advance_days",
+                    "ADD COLUMN advance_days INT NULL COMMENT '房間專屬：最遠可預約天數（NULL=繼承通用）' AFTER max_duration"},
+            {"biz_meeting_room", "min_lead_minutes",
+                    "ADD COLUMN min_lead_minutes INT NULL COMMENT '房間專屬：最少提前分鐘（NULL=繼承通用）' AFTER advance_days"},
+            {"biz_meeting_room", "granularity_minutes",
+                    "ADD COLUMN granularity_minutes INT NULL COMMENT '房間專屬：時間粒度（NULL=繼承通用）' AFTER min_lead_minutes"},
+            {"biz_meeting_room", "default_duration",
+                    "ADD COLUMN default_duration INT NULL COMMENT '房間專屬：默認時長（NULL=繼承通用）' AFTER granularity_minutes"},
+            {"biz_meeting_room", "remind_minutes",
+                    "ADD COLUMN remind_minutes INT NULL COMMENT '房間專屬：開始前提醒（NULL=繼承通用，0=不提醒）' AFTER default_duration"},
+            {"biz_meeting_room", "checkin_open_minutes",
+                    "ADD COLUMN checkin_open_minutes INT NULL COMMENT '房間專屬：可提前簽到（NULL=繼承通用）' AFTER remind_minutes"},
+            // 預約規則快照：存量保持「預約時那一版」，定時任務與簽到窗口只讀此處
+            {"biz_meeting_booking", "rule_snapshot",
+                    "ADD COLUMN rule_snapshot TEXT NULL COMMENT '預約時凍結的生效規則快照(JSON)' AFTER checkin_by"},
+            {"biz_meeting_booking", "remind_at",
+                    "ADD COLUMN remind_at DATETIME NULL COMMENT '提醒時刻(按快照計算；NULL=不提醒)' AFTER rule_snapshot"},
+            {"biz_meeting_booking", "checkin_open_at",
+                    "ADD COLUMN checkin_open_at DATETIME NULL COMMENT '簽到開放時刻(按快照計算)' AFTER remind_at"},
+            {"biz_meeting_booking", "release_deadline_at",
+                    "ADD COLUMN release_deadline_at DATETIME NULL COMMENT '未簽到自動釋放截止(按快照計算；NULL=不需簽到)' AFTER checkin_open_at"},
+            {"biz_meeting_booking", "checkin_required_snapshot",
+                    "ADD COLUMN checkin_required_snapshot TINYINT NULL COMMENT '預約時是否需簽到保留快照(0/1)' AFTER release_deadline_at"},
     };
 
     private static final String[][] REQUIRED_INDEXES = {
@@ -129,6 +162,10 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
                     "ADD INDEX idx_meeting_booking_cancel_scope (cancel_scope)"},
             {"biz_meeting_attendee", "idx_meeting_attendee_notify",
                     "ADD INDEX idx_meeting_attendee_notify (booking_id, notify_status)"},
+            {"biz_meeting_booking", "idx_meeting_booking_remind_at",
+                    "ADD INDEX idx_meeting_booking_remind_at (remind_at)"},
+            {"biz_meeting_booking", "idx_meeting_booking_release_deadline",
+                    "ADD INDEX idx_meeting_booking_release_deadline (release_deadline_at)"},
     };
 
     /**
@@ -194,6 +231,17 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
             {"biz_meeting_blacklist", "no_show_count"},
             {"biz_meeting_blacklist", "source"},
             {"biz_meeting_attendee", "checkin_at"},
+            {"biz_meeting_room", "advance_days"},
+            {"biz_meeting_room", "min_lead_minutes"},
+            {"biz_meeting_room", "granularity_minutes"},
+            {"biz_meeting_room", "default_duration"},
+            {"biz_meeting_room", "remind_minutes"},
+            {"biz_meeting_room", "checkin_open_minutes"},
+            {"biz_meeting_booking", "rule_snapshot"},
+            {"biz_meeting_booking", "remind_at"},
+            {"biz_meeting_booking", "checkin_open_at"},
+            {"biz_meeting_booking", "release_deadline_at"},
+            {"biz_meeting_booking", "checkin_required_snapshot"},
     };
 
     /** M1 菜单：{key, 中文名, 英文名, path, component, icon, 组内 sort, actions} */
@@ -238,6 +286,8 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
             {MeetingConstants.CFG_RELEASE_AFTER, "15", "開始後未簽到多少分鐘自動釋放"},
             {MeetingConstants.CFG_NO_SHOW_THRESHOLD, "3", "近30天爽約達該次數則自動限制預約（0=不自動拉黑）"},
             {MeetingConstants.CFG_BLACKLIST_DAYS, "7", "自動限制預約的天數"},
+            {MeetingConstants.CFG_MIN_DURATION, "15", "單場最短時長（分鐘，房間未配置時回落）"},
+            {MeetingConstants.CFG_CHECKIN_REQUIRED, "0", "默認是否需要簽到保留（0=否，房間未配置時回落）"},
     };
 
     private final JdbcTemplate jdbcTemplate;
@@ -255,6 +305,7 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce(VERSION_MENU_V12, this::doMenuRestructure, this::verifyMenuRestructure);
         versionTracker.applyOnce(VERSION_SEED_V11, this::doSeedCopyFix, this::verifySeedCopyFix);
         versionTracker.applyOnce(VERSION_MENU_V13, this::doMenuPromoteUsage, this::verifyMenuPromoteUsage);
+        versionTracker.applyOnce(VERSION_MENU_V14, this::doMenuReservationSplit, this::verifyMenuReservationSplit);
         // 移出 applyOnce 的部分每次启动重放：版本已记录的库不会重跑 task，
         // 编号规则/场景/配置的展示元数据若只写在 task 里，改动永远不会落到已有环境
         syncSeqRule();
@@ -262,6 +313,10 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
         // 补列必须放在 applyOnce 之外：CREATE TABLE IF NOT EXISTS 对已存在的表整体失效，
         // 只在 231 脚本里写 ADD COLUMN 的话，跑过 v1.1 的库再也拿不到后来新增的列
         repairSchema();
+        // 新增規則鍵的幂等補種：升級庫的 doSeed 已記版本，新鍵必須每次啟動補，否則永遠缺鍵
+        ensureRuleDefaults();
+        // checkin_required 允许 NULL 才能表达「继承通用」；既有 0/1 原样保留
+        ensureRoomCheckinNullable();
         bizSeqService.refreshRules();
         verifyColumns();
     }
@@ -561,7 +616,53 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
     }
 
     /**
-     * 通知场景登记。
+     * 新增規則鍵的幂等補種（每次啟動執行）：只補不存在的鍵，絕不覆蓋管理員已調值。
+     * <p>最短時長取升級時的時間粒度（保持升級前「最短=粒度」的實際行為），而不是寫死 15；
+     * 這樣粒度被調成 30 的庫升級後不會突然允許 15 分鐘的會。
+     */
+    private void ensureRuleDefaults() {
+        String granularity = jdbcTemplate.query(
+                "SELECT config_value FROM sys_config WHERE config_key = ? LIMIT 1",
+                rs -> rs.next() ? rs.getString(1) : null,
+                MeetingConstants.CFG_TIME_GRANULARITY);
+        String minDuration = granularity == null || granularity.isBlank() ? "15" : granularity.trim();
+        ensureConfig(MeetingConstants.CFG_MIN_DURATION, minDuration, "單場最短時長（分鐘，房間未配置時回落）");
+        ensureConfig(MeetingConstants.CFG_CHECKIN_REQUIRED, "0", "默認是否需要簽到保留（0=否，房間未配置時回落）");
+        ensureConfig(MeetingConstants.CFG_RULE_VERSION, "0", "規則集版本號（通用/房間共用，保存時樂觀鎖校驗）");
+    }
+    
+    private void ensureConfig(String key, String value, String description) {
+        Integer n = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_config WHERE config_key = ?", Integer.class, key);
+        if (n == null || n == 0) {
+            jdbcTemplate.update(
+                    "INSERT INTO sys_config (config_key, config_value, description) VALUES (?, ?, ?)",
+                    key, value, description);
+            log.info("已補種會議規則鍵: {}={}", key, value);
+        }
+    }
+
+    /**
+     * 把 checkin_required 改为可空：NULL 才代表「继承通用」。
+     * <p>只改可空性，不改既有值：已有房间的 0/1 原样保留（不把管理员的显式开关变成继承）。
+     */
+    private void ensureRoomCheckinNullable() {
+        String nullable = jdbcTemplate.query(
+                "SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() "
+                        + "AND TABLE_NAME = 'biz_meeting_room' AND COLUMN_NAME = 'checkin_required'",
+                rs -> rs.next() ? rs.getString(1) : null);
+        if (nullable == null) {
+            return; // 列还没建出来：交给 repairSchema 下次补齐
+        }
+        if ("NO".equalsIgnoreCase(nullable)) {
+            jdbcTemplate.execute("ALTER TABLE biz_meeting_room MODIFY COLUMN checkin_required TINYINT NULL "
+                    + "COMMENT '1=需簽到保留 0=不需 NULL=繼承通用'");
+            log.info("已把 biz_meeting_room.checkin_required 改为可空（支持继承通用）");
+        }
+    }
+
+    /**
+     * 通知場景登記。
      *
      * <p>{@code enabled} 只在首次插入时为 0，之后一律不动：行政在通知配置里开启的场景
      * 不能因为发版重跑被关闭；{@code app_id} 也不回填默认应用，路由必须由人显式绑定。
@@ -741,6 +842,93 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
                 MENU_GROUP_ADMIN, "會議治理", "Meeting Governance", MENU_TYPE_GROUP,
                 "MonitorOutlined", sortOrder, SYSTEM_CODE);
         log.info("已創建會議治理分組: sort={}", sortOrder);
+    }
+
+    /* ==================== 6. 預約管理拆分（v1.4） ==================== */
+
+    /**
+     * 新增「預約管理」一级目录，把「預約規則」移入，并新建独立的「預約黑名單」叶子。
+     * <p>黑名單用 ensureMenu 声明（不用裸 SQL）：check-menu 門禁需要能掃到它，
+     * 否则新增菜單会落在「漏配路由/權限/圖標」的盲区。
+     */
+    private void doMenuReservationSplit() {
+        Long reservationId = ensureReservationGroup();
+        if (reservationId == null) {
+            throw new IllegalStateException("預約管理分組創建失敗");
+        }
+        // 規則：只改掛載，保留原菜單 id 與既有授權行
+        moveTo(reservationId, MeetingConstants.MENU_CONFIG, 1);
+        ensureMenu(reservationId, "meeting-blacklist", "預約黑名單", "/meeting-blacklist",
+                "MeetingConfig", "StopOutlined", 2, MeetingConstants.ACTIONS_CONFIG,
+                "Reservation Blacklist");
+        // 授權遷移：把「預約規則」現有角色授權逐條複製到黑名單（保留顯式限制，不自動授普通員工）
+        Long blacklistId = queryMenuId(MENU_BLACKLIST_KEY);
+        if (blacklistId == null) {
+            throw new IllegalStateException("預約黑名單菜單落地失敗");
+        }
+        jdbcTemplate.update(
+                "INSERT IGNORE INTO sys_role_menu (role_id, menu_id, actions) "
+                        + "SELECT rm.role_id, ?, rm.actions FROM sys_role_menu rm "
+                        + "JOIN sys_menu m ON m.id = rm.menu_id AND m.menu_key = ? AND m.deleted = 0",
+                blacklistId, MeetingConstants.MENU_CONFIG);
+        Long adminRoleId = queryAdminRoleId();
+        if (adminRoleId != null) {
+            upsertGrant(adminRoleId, MeetingConstants.MENU_GROUP_RESERVATION, GROUP_ACTIONS);
+            upsertGrant(adminRoleId, MENU_BLACKLIST_KEY, MeetingConstants.ACTIONS_CONFIG);
+        }
+        deriveSystemAccess();
+        log.info("預約管理已拆分: 規則→預約管理, 黑名單獨立, 黑名單角色授權已從規則複製");
+    }
+
+    private Long ensureReservationGroup() {
+        Long id = queryMenuId(MeetingConstants.MENU_GROUP_RESERVATION);
+        if (id != null) {
+            jdbcTemplate.update(
+                    "UPDATE sys_menu SET type = ?, icon = ?, system_code = ?, parent_id = NULL, status = 1, "
+                            + "deleted = 0, updated_by = 'system' WHERE id = ?",
+                    MENU_TYPE_GROUP, "PropertySafetyOutlined", SYSTEM_CODE, id);
+            return id;
+        }
+        jdbcTemplate.update("DELETE FROM sys_menu WHERE menu_key = ? AND deleted = 1",
+                MeetingConstants.MENU_GROUP_RESERVATION);
+        Integer maxSort = jdbcTemplate.queryForObject(
+                "SELECT COALESCE(MAX(sort_order), 0) FROM sys_menu WHERE deleted = 0 AND parent_id IS NULL",
+                Integer.class);
+        int sortOrder = (maxSort == null ? 0 : maxSort) + 1;
+        jdbcTemplate.update(
+                "INSERT INTO sys_menu (parent_id, menu_key, name, name_en, type, icon, sort_order, actions, "
+                        + "status, system_code, updated_by, deleted) "
+                        + "VALUES (NULL, ?, ?, ?, ?, ?, ?, '', 1, ?, 'system', 0)",
+                MeetingConstants.MENU_GROUP_RESERVATION, "預約管理", "Reservation Management",
+                MENU_TYPE_GROUP, "PropertySafetyOutlined", sortOrder, SYSTEM_CODE);
+        log.info("已創建預約管理分組: sort={}", sortOrder);
+        return queryMenuId(MeetingConstants.MENU_GROUP_RESERVATION);
+    }
+
+    private void verifyMenuReservationSplit() {
+        Long reservationId = queryMenuId(MeetingConstants.MENU_GROUP_RESERVATION);
+        if (reservationId == null) {
+            throw new IllegalStateException("預約管理分組未就緒");
+        }
+        Integer top = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_menu WHERE id = ? AND parent_id IS NULL AND type = ? AND deleted = 0 AND status = 1",
+                Integer.class, reservationId, MENU_TYPE_GROUP);
+        if (top == null || top == 0) {
+            throw new IllegalStateException("預約管理需為頂級分組");
+        }
+        if (!reservationId.equals(parentIdOf(MeetingConstants.MENU_CONFIG))) {
+            throw new IllegalStateException("預約規則未掛到預約管理");
+        }
+        if (!reservationId.equals(parentIdOf(MENU_BLACKLIST_KEY))) {
+            throw new IllegalStateException("預約黑名單未掛到預約管理");
+        }
+        Integer grant = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_role_menu rm JOIN sys_role r ON r.id = rm.role_id AND r.code = ? "
+                        + "WHERE rm.menu_id = ?",
+                Integer.class, ADMIN_ROLE_CODE, reservationId);
+        if (grant == null || grant == 0) {
+            throw new IllegalStateException("admin 角色未獲得預約管理分組授權");
+        }
     }
 
     /** 只改分组显示名（中英），不碰图标与动作：图标/动作可能被行政在界面上调过，迁移不该覆盖 */

@@ -9,23 +9,24 @@
  * 三个模块固定顺序：纪要正文 → 发送历史（含每批投递明细）→ 最后更新收尾。
  * 发送历史是这一页存在的核心理由：纪要能改能重发，必须回答"哪一版在什么时候发给了谁"。
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Alert, Button, Input, Modal, Radio, Space, Spin, Table, Tag, Tooltip, message } from 'antd'
+import { Alert, Button, Input, Modal, Radio, Select, Space, Spin, Table, Tabs, Tag, Tooltip, message } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { EditOutlined, HistoryOutlined, ReloadOutlined, SafetyCertificateOutlined, SendOutlined } from '@ant-design/icons'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { ReloadOutlined, SafetyCertificateOutlined, SendOutlined } from '@ant-design/icons'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import DetailPageHeader from '@/components/DetailPageHeader'
 import CardTitle from '@/components/CardTitle'
 import {
-  fetchMinutesById, fetchMinutesSends, minutesDeliveryTarget, resolveMinutesItem, revokeMinutesLinks,
-  type MinutesDeliveryVO, type MinutesItemView, type MinutesSendBatchVO, type MinutesVO,
+  fetchMinutesById, fetchMinutesSends, fetchMinutesRevisions, fetchMinutesRevision, minutesDeliveryTarget, resolveMinutesItem, revokeMinutesLinks, revokeBatchLink,
+  type MinutesDeliveryVO, type MinutesDocument, type MinutesRevision, type MinutesItemView, type MinutesSendBatchVO, type MinutesVO,
 } from '@/api/meetingMinutes'
 import { fetchMeetingDetail, type MeetingVO } from '@/api/meeting'
-import { minutesStatusMeta, minutesTargetTypeLabels, notifyStatusMeta, phaseMeta } from '../meetingMeta'
-import MinutesContentCard from './MinutesContentCard'
+import { bizTypeLabels, minutesStatusMeta, minutesTargetTypeLabels, notifyStatusMeta, phaseMeta } from '../meetingMeta'
+import MinutesContentCard, { MinutesNoticePreview } from './MinutesContentCard'
 import SendMinutesModal from './SendMinutesModal'
+import useMinutesNavigation from './useMinutesNavigation'
 import './minutes.css'
 
 /** 事项处理结果的展示文案（与后端 MeetingMinutesRenderer.resultLabel 同词表） */
@@ -42,7 +43,7 @@ const cardStyle: CSSProperties = {
 
 export default function MinutesView() {
   const { t } = useTranslation()
-  const navigate = useNavigate()
+  const { open: navigate, back } = useMinutesNavigation()
   const [searchParams] = useSearchParams()
   const idParam = searchParams.get('id')
   const minutesId = idParam && /^[1-9]\d*$/.test(idParam) ? Number(idParam) : undefined
@@ -52,9 +53,14 @@ export default function MinutesView() {
   const [minutes, setMinutes] = useState<MinutesVO>()
   const [meeting, setMeeting] = useState<MeetingVO>()
   const [sends, setSends] = useState<MinutesSendBatchVO[]>([])
+  const [revisions, setRevisions] = useState<MinutesRevision[]>([])
+  const [selectedDocument, setSelectedDocument] = useState<MinutesDocument>()
+  const [selectedRevisionId, setSelectedRevisionId] = useState<number>()
+  const revisionRequest = useRef(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>()
   const [sendOpen, setSendOpen] = useState(false)
+  const [viewTab, setViewTab] = useState('document')
   /** 当前正在更新状态的事项（负责人/记录人/行政可操作） */
   const [resolving, setResolving] = useState<MinutesItemView>()
   const [resolveResult, setResolveResult] = useState('completed')
@@ -73,11 +79,14 @@ export default function MinutesView() {
       setMinutes(detail)
       // 会议单与发送历史都按纪要 id 反查：任一失败只影响对应模块，不让整页空白
       const [meetingResult, sendsResult] = await Promise.allSettled([
-        fetchMeetingDetail(detail.bookingId),
-        fetchMinutesSends(minutesId),
+        detail.canEdit ? fetchMeetingDetail(detail.bookingId) : Promise.resolve(undefined),
+        detail.canManageSends ? fetchMinutesSends(minutesId) : Promise.resolve([]),
       ])
       if (meetingResult.status === 'fulfilled') setMeeting(meetingResult.value)
       if (sendsResult.status === 'fulfilled') setSends(sendsResult.value ?? [])
+      setRevisions(await fetchMinutesRevisions(minutesId))
+      setSelectedDocument(undefined)
+      setSelectedRevisionId(detail.publishedRevisionId)
     } catch (e) {
       setError(e instanceof Error ? e.message : t('meeting.minutes.loadFailed', { defaultValue: '紀要載入失敗' }))
     } finally {
@@ -88,7 +97,7 @@ export default function MinutesView() {
   useEffect(() => { void load() }, [load])
 
   useEffect(() => {
-    if (autoSend && minutes?.canSend && minutes.content) setSendOpen(true)
+    if (autoSend && minutes?.canSend && minutes.document) { setSendOpen(true); setViewTab('notice') }
   }, [autoSend, minutes])
 
   const copyLink = async (url?: string | null) => {
@@ -135,11 +144,41 @@ export default function MinutesView() {
     })
   }
 
+  /** 单批次作废走独立接口：只失效本批次链接，不影响其他批次；后端会重验权限。 */
+  const handleRevokeBatch = (batch: MinutesSendBatchVO) => {
+    if (!minutes?.id || !minutes.canEdit || !minutes.canManageSends || !batch.viewUrl || loading) return
+    Modal.confirm({
+      title: t('meeting.minutes.revokeBatchTitle'),
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      okText: t('meeting.minutes.revokeBatchOk'),
+      okButtonProps: { danger: true },
+      cancelText: t('meeting.cancel', { defaultValue: '取消' }),
+      content: (
+        <>
+          <div className="confirm-info-card">
+            <div className="confirm-info-row"><span>{t('meeting.minutes.noLabel', { defaultValue: '紀要：' })}</span><b>{minutes.minutesNo ?? minutes.id}</b></div>
+            <div className="confirm-info-row"><span>{t('meeting.minutes.batch', { defaultValue: '批次' })}</span><b>{t('meeting.minutes.batchSeq', { seq: batch.batchSeq, defaultValue: '第 {{seq}} 次' })}</b></div>
+            <div className="confirm-info-row"><span>{t('meeting.minutes.formalVersion', { defaultValue: '正式版本' })}</span><b>{batch.revisionNo ? `V${batch.revisionNo}` : t('meeting.minutes.legacySnapshot', { defaultValue: '歷史發送快照' })}</b></div>
+            <div className="confirm-info-row"><span>{t('meeting.minutes.sentAt', { defaultValue: '發送時間' })}</span><b>{batch.sentAt || '-'}</b></div>
+            <div className="confirm-info-row"><span>{t('meeting.minutes.impact', { defaultValue: '影響：' })}</span><b>{t('meeting.minutes.revokeBatchImpact')}</b></div>
+          </div>
+        </>
+      ),
+      onOk: async () => {
+        await revokeBatchLink(minutes.id!, batch.id)
+        message.success(t('meeting.minutes.revokeBatchSuccess'))
+        await load()
+      },
+    })
+  }
+
   const batchColumns: TableColumnsType<MinutesSendBatchVO> = [
     {
       title: t('meeting.minutes.batch', { defaultValue: '批次' }), dataIndex: 'batchSeq', key: 'batchSeq', width: 90,
       render: (value: number) => t('meeting.minutes.batchSeq', { seq: value, defaultValue: '第 {{seq}} 次' }),
     },
+    { title: t('meeting.minutes.formalVersion', { defaultValue: '正式版本' }), key: 'revision', render: (_, row) => row.revisionNo ? `V${row.revisionNo}` : t('meeting.minutes.legacySnapshot', { defaultValue: '歷史發送快照' }) },
     { title: t('meeting.minutes.sentAt', { defaultValue: '發送時間' }), dataIndex: 'sentAt', key: 'sentAt', width: 160, render: (v?: string | null) => v || '-' },
     {
       title: t('meeting.minutes.sender', { defaultValue: '發送人' }), key: 'operator', width: 150,
@@ -177,12 +216,19 @@ export default function MinutesView() {
       },
     },
     {
-      title: t('meeting.actions', { defaultValue: '操作' }), key: 'action', width: 120, fixed: 'right',
-      // 操作列（§B.9）：复制链接是唯一动作，不做危险色
+      title: t('meeting.actions', { defaultValue: '操作' }), key: 'action', width: minutes?.canEdit ? 210 : 120, fixed: 'right',
+      // 单批次作废与复制并列，危险动作置后；权限展示仅负责 UX，后端接入时必须重验。
       render: (_, row) => (
-        <Button type="link" size="small" onClick={() => void copyLink(row.viewUrl)}>
-          {t('meeting.minutes.copyLink', { defaultValue: '複製鏈接' })}
-        </Button>
+        <Space size={0} split={<span className="action-split">|</span>}>
+          <Button type="link" size="small" onClick={() => void copyLink(row.viewUrl)}>
+            {t('meeting.minutes.copyLink', { defaultValue: '複製鏈接' })}
+          </Button>
+          {minutes?.canEdit && minutes.canManageSends && (
+            <Button type="link" size="small" danger disabled={!row.viewUrl || row.linkRevoked || loading} onClick={() => handleRevokeBatch(row)}>
+              {row.linkRevoked ? t('meeting.minutes.revokedTag', { defaultValue: '已作廢' }) : t('meeting.minutes.revokeBatchAction', { defaultValue: '作廢鏈接' })}
+            </Button>
+          )}
+        </Space>
       ),
     },
   ]
@@ -197,7 +243,8 @@ export default function MinutesView() {
 
   const status = minutes?.status ? minutesStatusMeta()[minutes.status] : undefined
   const phase = phaseMeta(meeting?.phase)
-  const content = minutes?.content
+  const document = selectedDocument ?? minutes?.document
+  const content = document?.content ?? minutes?.content
   const targetLabels = minutesTargetTypeLabels()
 
   return (
@@ -213,27 +260,8 @@ export default function MinutesView() {
         meta={minutes
           ? <>{minutes.minutesNo} · {meeting?.title ?? ''} {meeting?.timeText ? `· ${meeting.timeText}` : ''}</>
           : undefined}
-        onBack={() => (meeting ? navigate(`/meeting-detail?id=${meeting.id}`) : navigate('/meeting-my'))}
-        extra={minutes && (
-          <Space size={8} wrap>
-            <Button size="small" icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>{t('meeting.refresh', { defaultValue: '刷新' })}</Button>
-            {minutes.sendCount && minutes.sendCount > 0 && (
-              <Tooltip title={t('meeting.minutes.revokeHint', { defaultValue: '作廢後已發出的釘釘卡片鏈接立刻失效' })}>
-                <Button size="small" danger icon={<SafetyCertificateOutlined />} onClick={handleRevoke}>{t('meeting.minutes.revokeLinks', { defaultValue: '作廢查看鏈接' })}</Button>
-              </Tooltip>
-            )}
-            {minutes.canEdit && (
-              <Button size="small" icon={<EditOutlined />} onClick={() => navigate(`/meeting-minutes-form?id=${minutes.id}`)}>{t('meeting.minutes.edit', { defaultValue: '編輯紀要' })}</Button>
-            )}
-            {minutes.canSend && content && (
-              <Button size="small" type="primary" icon={<SendOutlined />} onClick={() => setSendOpen(true)}>
-                {(minutes.sendCount ?? 0) > 0
-                  ? t('meeting.minutes.sendAgain', { defaultValue: '再次發送' })
-                  : t('meeting.minutes.sendNow', { defaultValue: '立即發送' })}
-              </Button>
-            )}
-          </Space>
-        )}
+        onBack={back}
+        onEdit={minutes?.canEdit ? () => navigate(`/meeting-minutes-form?id=${minutes.id}`) : undefined}
       />
 
       {error && !minutes && (
@@ -241,18 +269,48 @@ export default function MinutesView() {
           action={<Button size="small" onClick={() => void load()}>{t('meeting.retry', { defaultValue: '重試' })}</Button>} />
       )}
 
-      {minutes?.content && (
-        <div style={cardStyle}>
-          <CardTitle icon={<HistoryOutlined />} tone="info" title={t('meeting.minutes.body', { defaultValue: '紀要正文' })}
-            note={minutes.recorderName
-              ? t('meeting.minutes.recorderNote', { defaultValue: '記錄人：{{name}}', name: `${minutes.recorderName}${minutes.recorderEmpNo ? `（${minutes.recorderEmpNo}）` : ''}` })
-              : undefined} />
-          {minutes.content && (
-            <MinutesContentCard content={minutes.content} hideTracked />
-          )}
+      {minutes && (
+        <>
+          <div className="mm-reader-tools">
+            <span className="mm-reader-tools__note">{minutes.hasUnpublishedChanges ? t('meeting.minutes.unpublishedChanges', { defaultValue: '存在未發布草稿；正式版本保持不變' }) : t('meeting.minutes.formalDocument', { defaultValue: '正式文檔與目前辦理進度分開閱讀' })}</span>
+            <Button size="small" icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>{t('meeting.refresh', { defaultValue: '刷新' })}</Button>
+          </div>
+          <Tabs className="mm-view-tabs" activeKey={viewTab} onChange={setViewTab} items={[
+            { key: 'document', label: t('meeting.minutes.body') },
+            { key: 'tracking', label: t('meeting.minutes.publicationText.itemTracking') },
+            { key: 'history', label: t('meeting.minutes.publicationText.versionsAndNotifications') },
+            { key: 'notice', label: t('meeting.minutes.publicationText.dingtalkCardPreview') },
+          ]} />
+        </>
+      )}
+
+      {minutes && content && (
+        <>
+          <div className="mm-reading-surface" hidden={viewTab !== 'document'}>
+            <MinutesContentCard content={content} snapshot={document} trackedItems={content.schemaVersion === 2 ? undefined : minutes.items}
+              document={{
+                title: minutes.meetingTitle ?? meeting?.title,
+                minutesNo: minutes.minutesNo,
+                bookingNo: minutes.bookingNo,
+                editionLabel: t('meeting.minutes.workingDraft', { defaultValue: '工作草稿 · 尚未發布' }),
+                meetingTime: minutes.meetingTimeText ?? meeting?.timeText,
+                meetingType: meeting ? (bizTypeLabels()[meeting.bizType] ?? meeting.bizType) : undefined,
+                organizer: minutes.organizerName ?? meeting?.organizerName,
+                recorder: `${minutes.recorderName || t('meeting.minutes.notRecorded')}${minutes.recorderEmpNo ? `（${minutes.recorderEmpNo}）` : ''}`,
+                room: minutes.roomText ?? (meeting ? `${meeting.roomName}${meeting.roomLocation ? ` · ${meeting.roomLocation}` : ''}` : undefined),
+                attendees: meeting?.attendees,
+                externalAttendees: meeting?.externalAttendees,
+                footer: <><span>{t('meeting.minutes.recorderColumn')} {minutes.recorderName}</span><span>{minutes.updatedAt}</span></>,
+              }}
+              references={(minutes.links ?? []).length > 0 ? <div className="mm-document__body">{(minutes.links ?? []).map(link => (
+                <p key={link.minutesId}>{t('meeting.minutes.quotedFrom')}<Button type="link" size="small" onClick={() => navigate(`/meeting-minutes?id=${link.minutesId}`)}>{link.title || link.minutesNo}</Button> · {link.minutesNo} · {link.timeText}</p>
+              ))}</div> : undefined}
+            />
+          </div>
 
           {/* 事项跟踪：行动项与跟进事项在正文之外单独呈现，因为有状态、负责人、时限要回答“谁还没办” */}
-          <div style={{ marginTop: 16 }}>
+          <div style={cardStyle} hidden={viewTab !== 'tracking'}>
+            <p className="mm-form-section-note">{t('meeting.minutes.publicationText.currentProgressIsShownSeparatelyFromThe')}</p>
             <CardTitle icon={<SafetyCertificateOutlined />} tone="warn"
               title={t('meeting.minutes.itemsTitle', { defaultValue: '行動項與跟進事項' })}
               note={t('meeting.minutes.itemsHint', { defaultValue: '負責人可在此回填處理結果；逾期會自動提醒' })} />
@@ -260,6 +318,7 @@ export default function MinutesView() {
               size="small"
               rowKey="id"
               pagination={false}
+              scroll={{ x: 'max-content' }}
               dataSource={minutes.items ?? []}
               locale={{ emptyText: t('meeting.minutes.noItems', { defaultValue: '本次會議沒有待跟進的事項' }) }}
               columns={[
@@ -300,34 +359,55 @@ export default function MinutesView() {
             />
           </div>
 
-          {/* 关联纪要：必须让读者一眼看到“这段结论引自另一场会”，否则会被误认为本次结论 */}
-          {(minutes.links ?? []).length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <CardTitle icon={<HistoryOutlined />} tone="info"
-                title={t('meeting.minutes.linksTitle', { defaultValue: '關聯紀要（引自其它會議）' })} />
-              <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                {(minutes.links ?? []).map(link => (
-                  <div key={link.minutesId} style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                    <Tag color="purple">{t('meeting.minutes.quotedFrom', { defaultValue: '引自' })}</Tag>
-                    <span style={{ fontWeight: 600 }}>{link.title}</span>
-                    <span style={{ color: '#8C8C8C', fontSize: 12 }}>
-                      {link.minutesNo} ｜ {link.bookingNo} ｜ {link.timeText}
-                    </span>
-                    <Button type="link" size="small" onClick={() => navigate(`/meeting-minutes?id=${link.minutesId}`)}>
-                      {t('meeting.minutes.openQuoted', { defaultValue: '查看來源紀要' })}
-                    </Button>
-                  </div>
-                ))}
-              </Space>
-            </div>
-          )}
+          {/* 关联纪要统一放在正文「后续安排与相关资料」，避免在每个标签页重复展示。 */}
+        </>
+      )}
+
+      {minutes && viewTab === 'notice' && (
+        <div style={cardStyle} className="mm-form-publish">
+          <div className="mm-form-publish__fields">
+            <CardTitle icon={<SendOutlined />} tone="info" title={t('meeting.minutes.publicationText.dingtalkNotificationCard')} />
+            <p>{t('meeting.minutes.publicationText.theCardShowsMeetingInformationAndA')}</p>
+            <p className="mm-form-section-note">{t('meeting.minutes.cardVersionBound', { defaultValue: '通知綁定所選正式版本；重發只增加通知批次，不產生新版本。' })}</p>
+            {minutes.canSend && document && <Button type="primary" onClick={() => setSendOpen(true)}>{t('meeting.minutes.sendNow')}</Button>}
+          </div>
+          <MinutesNoticePreview title={document?.meetingTitle ?? minutes.meetingTitle} timeText={document?.meetingTimeText ?? minutes.meetingTimeText} minutesNo={minutes.minutesNo}
+            revisionNo={document?.revisionNo} publisher={document?.publisherName}
+            topicCount={content?.items?.length ?? 0}
+            actionCount={content?.actions?.length ?? 0}
+            followCount={content?.openIssues?.length ?? 0}
+            onView={() => setViewTab('document')} />
         </div>
       )}
 
-      <div style={cardStyle}>
+      <div style={cardStyle} hidden={viewTab !== 'history'}>
+        <Select style={{ width: '100%', marginBottom: 16 }} value={selectedRevisionId} placeholder={t('meeting.minutes.formalVersion', { defaultValue: '正式版本' })}
+          options={revisions.map(revision => ({ value: revision.id, label: `V${revision.revisionNo} · ${revision.publisherName ?? ''} · ${revision.publishedAt ?? ''} ${revision.changeNote ?? ''}` }))}
+          onChange={async (revisionId: number) => {
+            const request = ++revisionRequest.current
+            try {
+              const selected = await fetchMinutesRevision(minutes!.id!, revisionId)
+              if (request !== revisionRequest.current) return
+              setSelectedDocument(selected.document); setSelectedRevisionId(revisionId); setViewTab('document')
+            } catch { /* 请求层已统一提示，保留原来阅读的版本。 */ }
+          }} />
+        <Alert type="info" showIcon style={{ marginBottom: 16 }} message={t('meeting.minutes.versionAndBatch', { defaultValue: '正式版本與通知批次各自獨立；沒有版本號的舊記錄為歷史發送快照。' })} />
+        <div className="mm-reader-tools">
+          <span className="mm-reader-tools__note">{t('meeting.minutes.sendHistory')}</span>
+          <Space size={8} wrap>
+            {minutes?.canEdit && (minutes.sendCount ?? 0) > 0 && (
+              <Tooltip title={t('meeting.minutes.revokeAllTooltip')}>
+                <Button size="small" danger icon={<SafetyCertificateOutlined />} onClick={handleRevoke}>{t('meeting.minutes.revokeAllAction')}</Button>
+              </Tooltip>
+            )}
+            {minutes?.canSend && document && <Button size="small" type="primary" icon={<SendOutlined />} onClick={() => { setSendOpen(true); setViewTab('notice') }}>
+              {(minutes.sendCount ?? 0) > 0 ? t('meeting.minutes.sendAgain', { defaultValue: '再次發送' }) : t('meeting.minutes.sendNow', { defaultValue: '立即發送' })}
+            </Button>}
+          </Space>
+        </div>
         <CardTitle icon={<SendOutlined />} tone="warn" title={t('meeting.minutes.sendHistory', { defaultValue: '發送歷史' })}
           note={t('meeting.minutes.sendHistoryNote', { defaultValue: '每一批都是「當時那一版正文」的一次投递，改正文不会追溯已发出的批次' })} />
-        <Table<MinutesSendBatchVO>
+        {minutes?.canManageSends && <Table<MinutesSendBatchVO>
           rowKey="id"
           size="small"
           columns={batchColumns}
@@ -370,7 +450,7 @@ export default function MinutesView() {
             rowExpandable: row => (row.deliveries?.length ?? 0) > 0,
           }}
           locale={{ emptyText: t('meeting.minutes.noSendHistory', { defaultValue: '尚未發送過紀要' }) }}
-        />
+        />}
       </div>
 
       {/* 操作记录（§D.4）：详情页以「最后更新人 + 最后更新时间」收尾 */}
@@ -402,7 +482,7 @@ export default function MinutesView() {
             }
             setResolveSaving(true)
             try {
-              await resolveMinutesItem(resolving.id, { result: resolveResult, note: resolveNote.trim() || undefined })
+              await resolveMinutesItem(resolving.id, { result: resolveResult, note: resolveNote.trim() || undefined, version: resolving.version })
               message.success(t('meeting.minutes.resolveSaved', { defaultValue: '處理結果已更新' }))
               setResolving(undefined)
               void load()
@@ -430,11 +510,13 @@ export default function MinutesView() {
         </Modal>
       )}
 
-      {sendOpen && minutes?.content && (
+      {sendOpen && minutes?.canSend && document && (
         <SendMinutesModal
           minutesId={minutes.id!}
           meeting={meeting}
-          content={minutes.content}
+          content={document.content}
+          document={document}
+          revisionId={selectedRevisionId ?? minutes.publishedRevisionId}
           version={minutes.version ?? 0}
           linkBaseUrl={minutes.linkBaseUrl}
           linkBasePublic={minutes.linkBasePublic}

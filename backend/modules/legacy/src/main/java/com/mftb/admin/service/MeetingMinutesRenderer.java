@@ -2,6 +2,7 @@ package com.mftb.admin.service;
 
 import com.mftb.admin.constant.MeetingConstants;
 import com.mftb.admin.dto.MeetingMinutesContent;
+import com.mftb.admin.dto.MeetingMinutesDocument;
 import com.mftb.admin.entity.MeetingMinutes;
 import com.mftb.admin.entity.MeetingMinutesItem;
 import com.mftb.admin.entity.MeetingMinutesLink;
@@ -77,6 +78,43 @@ public final class MeetingMinutesRenderer {
             return new Rendered(title(minutes), compact(minutes, content, items, vars), true, full.length());
         }
         return new Rendered(title(minutes), full, false, full.length());
+    }
+
+    /** 新通知只从正式文档生成，不提供正文、名单或缺席原因给模板。 */
+    public static Rendered publishedCard(MeetingMinutesDocument document, int batchSeq,
+                                          MeetingNotifyTemplateService templates) {
+        MeetingMinutesContent content = document.getContent();
+        Map<String, String> vars = new LinkedHashMap<>();
+        vars.put("meetingTitle", cardText(document.getMeetingTitle(), 100));
+        vars.put("meetingTime", cardText(document.getMeetingTimeText(), 80));
+        vars.put("minutesNo", cardText(document.getMinutesNo(), 40));
+        vars.put("revisionNo", String.valueOf(document.getRevisionNo()));
+        vars.put("publisher", cardText(document.getPublisherName(), 64));
+        vars.put("topicCount", String.valueOf(content.getItems() == null ? 0 : content.getItems().size()));
+        vars.put("actionCount", String.valueOf(content.getActions() == null ? 0 : content.getActions().size()));
+        vars.put("followCount", String.valueOf(content.getOpenIssues() == null ? 0 : content.getOpenIssues().size()));
+        vars.put("batchNote", "通知批次：" + batchSeq);
+        String title = "會議紀要已發布｜" + vars.get("meetingTitle");
+        String required = "**" + vars.get("minutesNo") + " · V" + vars.get("revisionNo") + "**\n\n";
+        String fallback = "會議時間：" + vars.get("meetingTime") + "\n\n發布人：" + vars.get("publisher")
+                + "\n\n議題 " + vars.get("topicCount") + " 項 · 行動 " + vars.get("actionCount")
+                + " 項 · 跟進 " + vars.get("followCount") + " 項";
+        MeetingNotifyTemplateService.Rendered custom = templates == null ? null
+                : templates.render(MeetingConstants.SCENARIO_MINUTES_PUBLISHED, vars);
+        String body = custom == null || !StringUtils.hasText(custom.body()) ? fallback : custom.body();
+        String suffix = "\n\n" + vars.get("batchNote");
+        int budget = MeetingConstants.MINUTES_CARD_MAX_CHARS - required.length() - suffix.length();
+        boolean shortened = body.length() > budget;
+        if (shortened) body = fallback;
+        String markdown = required + body + suffix;
+        return new Rendered(title, markdown, shortened, markdown.length());
+    }
+
+    /** 业务输入是纯文本，不能借会议主题注入链接、图片或 Markdown 层级。 */
+    private static String cardText(String value, int limit) {
+        String text = nullToEmpty(value).replaceAll("[\\r\\n\\t]", " ")
+                .replaceAll("[\\\\`*_{}\\[\\]<>#!]", " ");
+        return text.length() > limit ? text.substring(0, limit) : text;
     }
 
     /* ==================== 变量 ==================== */

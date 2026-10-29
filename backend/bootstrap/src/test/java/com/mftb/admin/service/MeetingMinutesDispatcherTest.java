@@ -442,7 +442,8 @@ class MeetingMinutesDispatcherTest {
 
         dispatcher.send(900L);
 
-        verify(deliveryMapper).markFailed(eq(900L), contains("批次內容不存在"), isNull());
+        verify(deliveryMapper).markTerminalFailure(eq(900L), contains("批次內容不存在"), eq(MeetingMinutesDispatcher.MAX_ATTEMPTS));
+        verify(deliveryMapper, never()).markFailed(anyLong(), anyString(), any());
         verify(dingTalkAppService, never()).sendWorkNotification(anyString(), anyLong(), any(), anyString(), anyString());
     }
 
@@ -464,5 +465,57 @@ class MeetingMinutesDispatcherTest {
         assertNull(dispatcher.usableChannel(2L));
 
         assertNull(dispatcher.usableChannel(null));
+    }
+
+    private MeetingMinutesSend publishedBatch(Long channelId) {
+        MeetingMinutesSend batch = batch(channelId, "測試群");
+        batch.setMessageType("action_card");
+        batch.setRevisionId(91L);
+        batch.setTokenVersion(0);
+        batch.setLinkExpireAt(LocalDateTime.now().plusDays(1));
+        batch.setButtonTitle("查看紀要");
+        batch.setButtonUrl("https://example.test/#/meeting-minutes-view?token=example");
+        MeetingMinutes minutes = minutes();
+        minutes.setTokenVersion(0);
+        when(minutesMapper.selectById(MINUTES_ID)).thenReturn(minutes);
+        when(sendMapper.selectById(SEND_ID)).thenReturn(batch);
+        ReflectionTestUtils.setField(dispatcher, "cardEnabled", true);
+        when(deliveryMapper.claim(900L)).thenReturn(1);
+        return batch;
+    }
+
+    @Test
+    void publishedGroupUsesExactChannelActionCardSnapshot() {
+        var batch = publishedBatch(88L);
+        when(deliveryMapper.selectById(900L)).thenReturn(row(MeetingConstants.MINUTES_TARGET_GROUP, 0L, "", 88L));
+        when(dingTalkService.sendActionCardSyncToChannel(eq(88L), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(SendOutcome.accepted("測試群"));
+        dispatcher.send(900L);
+        verify(dingTalkService).sendActionCardSyncToChannel(88L, batch.getTitle(), batch.getMarkdownSnapshot(), batch.getButtonTitle(), batch.getButtonUrl());
+        verify(dingTalkService, never()).sendMarkdownSyncToChannel(anyLong(), anyString(), anyString(), any(), org.mockito.ArgumentMatchers.anyBoolean());
+        verify(deliveryMapper).markSuccess(900L);
+    }
+
+    @Test
+    void publishedPersonalNotificationUsesPillProtocolAndSnapshot() {
+        var batch = publishedBatch(null);
+        when(deliveryMapper.selectById(900L)).thenReturn(row(MeetingConstants.MINUTES_TARGET_USER, 7L, "dt-7", null));
+        when(appService.resolve(MeetingConstants.SCENARIO_MINUTES)).thenReturn(app(1L));
+        when(dingTalkAppService.sendWorkActionCardPill(anyString(), anyLong(), any(), anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(CompletableFuture.completedFuture(true));
+        dispatcher.send(900L);
+        verify(dingTalkAppService).sendWorkActionCardPill(MeetingConstants.SCENARIO_MINUTES, 1L, List.of("dt-7"),
+                batch.getTitle(), batch.getMarkdownSnapshot(), batch.getButtonTitle(), batch.getButtonUrl());
+        verify(dingTalkAppService, never()).sendWorkNotification(anyString(), anyLong(), any(), anyString(), anyString());
+    }
+
+    @Test
+    void revokedCardIsNotDeliveredDuringRetry() {
+        var batch = publishedBatch(88L);
+        batch.setTokenVersion(9);
+        when(deliveryMapper.selectById(900L)).thenReturn(row(MeetingConstants.MINUTES_TARGET_GROUP, 0L, "", 88L));
+        dispatcher.send(900L);
+        verify(deliveryMapper).markSkipped(eq(900L), contains("失效"));
+        verify(dingTalkService, never()).sendActionCardSyncToChannel(anyLong(), anyString(), anyString(), anyString(), anyString());
     }
 }

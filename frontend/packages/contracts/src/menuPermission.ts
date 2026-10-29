@@ -1120,6 +1120,11 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'view', label: '查看' },
     { key: 'edit', label: '修改規則/黑名單' },
   ],
+  // 預約黑名單（規則頁拆出後的獨立菜單）：動作集與種子 actions 逐字對齊
+  'meeting-blacklist': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '手動拉黑/撤銷' },
+  ],
   // 行政側紀要檢索（會議治理 › 會議紀要）：只讀，匯出跟隨後端 export 動作
   'meeting-minutes-list': [
     { key: 'view', label: '查看全部紀要' },
@@ -1952,6 +1957,7 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'meeting-room',
   'meeting-record',
   'meeting-config',
+  'meeting-blacklist',
   // 文檔中心（後端 DocSchemaMigrationInitializer 已種菜單，前端同步納入受控）
   'doc-plans',
   'doc-governance',
@@ -2351,7 +2357,10 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/meeting-room-form': 'meeting-room',
   '/meeting-record': 'meeting-record',
   '/meeting-config': 'meeting-config',
-  '/meeting-blacklist-form': 'meeting-config',
+  // 黑名單已拆為獨立菜單（v1.4）：路由與表單均錨到新菜單，授權由種子從原規則菜單複製
+  '/meeting-blacklist': 'meeting-blacklist',
+  '/meeting-blacklist-form': 'meeting-blacklist',
+  '/meeting-room-rules': 'meeting-room',
   // 会议纪要：表单页/查看页都不是菜单项，但都能从钉钉卡片与列表跳进来，
   // 统一挂 meeting-my（纪要权限与「我与这场会的关系」同源，不另开一份菜单授权）
   '/meeting-minutes': 'meeting-my',

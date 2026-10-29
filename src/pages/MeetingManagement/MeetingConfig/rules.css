@@ -1,0 +1,32 @@
+/* 预约规则预览：作用域隔离，继承选择与具体数值分层，窄容器自动减列。 */
+.mr-workspace { min-width: 0; }
+.mr-header { margin-bottom: 16px; border-radius: 12px; overflow: hidden; background: #fff; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06); }
+.mr-header__accent { height: 3px; background: linear-gradient(90deg, #e8720c, #f59432, #ffb347, #f59432, #e8720c); background-size: 200% 100%; animation: headerGradientShift 4s ease infinite; }
+.mr-header__body { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 16px 24px; }
+.mr-header__body > div { flex: 1; min-width: 0; }
+.mr-header__body > .ant-btn { border-radius: 8px; height: 36px; box-shadow: 0 2px 6px rgba(232, 114, 12, 0.25); }
+.mr-header h2 { margin: 0; color: #1890ff; font-size: 18px; font-weight: 700; }
+.mr-header p { margin: 6px 0 0; color: #8c8c8c; font-size: 12px; overflow-wrap: anywhere; }
+.mr-notice { margin-bottom: 16px; }
+.mr-summary { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; font-size: 13px; color: #595959; }
+.mr-card { border: 1px solid #e8eaed; border-radius: 8px; background: #fff; padding: 20px 24px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); }
+.mr-rule-grid, .mr-global-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, max(280px, calc((100% - 32px) / 3))), 1fr)); gap: 16px; }
+.mr-rule-field { min-width: 0; padding: 14px 16px; border: 1px solid #f0f0f0; border-radius: 8px; }
+.mr-rule-field__heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; color: #262626; font-size: 13px; font-weight: 500; }
+.mr-rule-field__heading .ant-tag { margin: 0; font-size: 11px; font-weight: 400; }
+.mr-rule-field > .ant-radio-group { font-size: 12px; }
+.mr-rule-field__control { margin-top: 12px; }
+.mr-rule-field__control > .ant-input-number-group-wrapper, .mr-rule-field__control > .ant-select { width: 100%; }
+.mr-rule-field__control .ant-input-number { width: 100%; }
+.mr-rule-field__values { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; margin-top: 10px; font-size: 12px; line-height: 1.7; color: #8c8c8c; }
+.mr-rule-field__values strong { color: #595959; font-weight: 500; }
+.mr-time-range { display: flex; align-items: center; gap: 8px; }
+.mr-time-range .ant-picker { flex: 1; min-width: 0; }
+.mr-policy-note { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 12px 16px; border-radius: 8px; background: #fafafa; border: 1px solid #f0f0f0; color: #595959; font-size: 13px; }
+.mr-policy-note strong { color: #262626; font-weight: 500; }
+.mr-muted { color: #8c8c8c; font-size: 12px; }
+.mr-loading { display: flex; align-items: center; justify-content: center; min-height: 400px; }
+.mr-global-grid .ant-form-item { min-width: 0; }
+.mr-global-grid .ant-input-number-group-wrapper, .mr-global-grid .ant-select, .mr-global-grid .ant-picker { width: 100%; }
+.mr-rule-flow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 12px 16px; border-radius: 8px; border: 1px solid #ffe7d1; background: #fff7f0; margin-bottom: 16px; font-size: 13px; color: #595959; }
+.mr-rule-flow strong { color: #e8720c; font-weight: 500; }

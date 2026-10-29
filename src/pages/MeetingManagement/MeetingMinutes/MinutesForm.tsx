@@ -8,37 +8,38 @@
  *   1. **记录人 = 当前登录人，界面只读**：请求体里没有 recorderUserId 的位置，身份由后端从 JWT 取。
  *      允许前端传记录人等于允许任何人替别人署名记纪要；
  *   2. **会议資訊一律取自会议单**（真实接口 fetchMeetingDetail），本页不造会议数据；
- *      纪要接口尚未返回时按「本场会还没有纪要」渲染空表单，不回退假纪要；
+ *      只有纪要接口明确返回 exists=false 才按新建处理，读取失败时禁止保存；
  *   3. **已发送的纪要可以改，但改动不会追溯已发出的批次**：重发时后端生成新的批次与内容快照，
  *      收件人点开的永远是"发给我的那一版"，所以页面要显示发送历史而不是"改了就完事"。
  *
  * 界面遵循 form-page-style：橙渐变头 + 白色 div 模块卡片 + .form-footer 底部按钮。
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Alert, Button, DatePicker, Form, Input, Select, Space, Spin, Tag, message } from 'antd'
+import { Alert, Button, DatePicker, Empty, Form, Input, Modal, Radio, Segmented, Select, Space, Spin, Tag, message } from 'antd'
 import {
   ArrowLeftOutlined, CalendarOutlined, CheckCircleOutlined, DeleteOutlined, FileTextOutlined,
   LeftOutlined, PlusOutlined, ProfileOutlined, RightOutlined, SaveOutlined, SendOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import type { TFunction } from 'i18next'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import CardTitle from '@/components/CardTitle'
+import HelpPopover from '@/components/HelpPopover'
 import RemarkTextArea from '@/components/RemarkTextArea'
 import { useAuth } from '@/contexts/AuthContext'
 import {
-  createMinutes, fetchMinutes, fetchMinutesById, searchMinutes, updateMinutes,
-  MINUTES_CONTENT_MAX_LENGTH, emptyMinutesContent, minutesContentLength,
-  type MinutesAbsentee, type MinutesContent, type MinutesLinkVO, type MinutesSeriesNode, type MinutesVO,
+  createMinutes, fetchMinutes, fetchMinutesById, searchMinutes, updateMinutes, publishMinutes,
+  MINUTES_CONTENT_MAX_LENGTH, MINUTES_LIMITS, emptyMinutesContent, minutesContentLength, minutesPurposeText,
+  type MinutesAttendance, type MinutesContent, type MinutesDecisionStatus, type MinutesLinkVO, type MinutesSeriesNode, type MinutesVO,
 } from '@/api/meetingMinutes'
-import { fetchMeetingDetail, newMeetingRequestKey, toMeetingIsoDate, type MeetingAttendeeVO, type MeetingVO } from '@/api/meeting'
+import { fetchMeetingDetail, newMeetingRequestKey, toMeetingIsoDate, type MeetingVO } from '@/api/meeting'
 import EmployeeSelect from '@/components/EmployeeSelect'
 import { bizTypeLabels, minutesStatusMeta, phaseMeta } from '../meetingMeta'
-import SendMinutesModal from './SendMinutesModal'
+import MinutesContentCard, { MinutesNoticePreview } from './MinutesContentCard'
+import useMinutesNavigation from './useMinutesNavigation'
 import './minutes.css'
 
 const cardStyle: CSSProperties = {
@@ -47,35 +48,48 @@ const cardStyle: CSSProperties = {
 }
 
 /** 表单内部的扁平结构：嵌套对象在 antd Form 里读写都别扭，提交前再收成 MinutesContent */
+interface FormTask {
+  itemId?: number; topicKey?: string; content?: string; ownerIds?: number[]; dueDate?: Dayjs | null; deliverable?: string
+}
 interface FormValues {
-  items: { topic?: string; discussion?: string; conclusion?: string }[]
-  actions: { content?: string; ownerIds?: number[]; dueDate?: Dayjs | null }[]
-  followUps: { content?: string; ownerIds?: number[]; dueDate?: Dayjs | null }[]
+  purpose?: string
+  chairIds?: number[]
+  changeNote?: string
+  items: { topicKey?: string; decisionStatus?: MinutesDecisionStatus; topic?: string; discussion?: string; conclusion?: string }[]
+  actions: FormTask[]
+  followUps: FormTask[]
   nextMeetingAt?: Dayjs | null
   nextMeetingNote?: string
   remark?: string
 }
 
+/** 内部员工按 ID 区分；外部人员无 ID，按姓名匹配，不能将全部空 ID 合并成一个人。 */
+function attendanceKey(person: Pick<MinutesAttendance, 'userId' | 'name'>): string {
+  return person.userId != null ? `user:${person.userId}` : `external:${person.name.trim()}`
+}
+
 /**
- * 缺席建议值：已婉拒的人确定不来，未婉拒也没签到的人按"未签到缺席"提示。
- * 只作为初始值给记录人参考——开会迟到十分钟不该被系统写成缺席。
- *
- * <p>reason 存的是文案而不是枚举码：后端不解析这个字段，它就是要写进纪要正文给人看的，
- * 所以这里必须走 t() 取当时语言的原文，不能写死中文。
+ * 邀约名单始终带入，补齐旧草稿遗漏的人；保留已保存的确认结果及临时人员。
+ * 未确认人员按签到记录初始化是/否，仅作为纪要表单初值，不回写会议签到记录。
  */
-function suggestAbsentees(meeting: MeetingVO, t: TFunction): MinutesAbsentee[] {
-  const ended = meeting.phase === 'ended' || meeting.phase === 'finished' || meeting.phase === 'released'
-  return (meeting.attendees ?? [])
-    .filter((person: MeetingAttendeeVO) => person.attendeeType !== 'organizer'
-      && (person.response === 'declined' || (ended && !person.checkinAt)))
-    .map(person => ({
-      userId: person.userId ?? null,
-      name: person.name,
-      empNo: person.empNo ?? undefined,
-      reason: person.response === 'declined'
-        ? t('meeting.minutes.reasonDeclined', { defaultValue: '婉拒邀約' })
-        : (ended ? t('meeting.minutes.reasonNoCheckin', { defaultValue: '未簽到' }) : undefined),
-    }))
+function initialAttendance(meeting?: MeetingVO, content?: MinutesContent): MinutesAttendance[] {
+  const people = new Map<string, MinutesAttendance>()
+  for (const person of meeting?.attendees ?? []) {
+    people.set(attendanceKey(person), {
+      userId: person.userId, name: person.name, empNo: person.empNo ?? undefined,
+      status: person.checkinAt ? 'present' : 'absent',
+    })
+  }
+  const saved: MinutesAttendance[] = content?.attendance?.length
+    ? content.attendance : (content?.absentees ?? []).map(person => ({ ...person, status: 'absent' }))
+  for (const person of saved) {
+    const key = attendanceKey(person)
+    const invited = people.get(key)
+    const status = person.status === 'unverified' ? invited?.status ?? 'absent' : person.status
+    people.set(key, { ...person, empNo: person.empNo ?? invited?.empNo, status,
+      reason: status === 'absent' ? person.reason : undefined })
+  }
+  return [...people.values()]
 }
 
 /**
@@ -85,11 +99,15 @@ function suggestAbsentees(meeting: MeetingVO, t: TFunction): MinutesAbsentee[] {
  */
 function toContent(values: Partial<FormValues>): MinutesContent {
   return {
+    schemaVersion: 2,
+    purpose: values.purpose?.trim(),
+    chairUserId: values.chairIds?.[0],
     items: (values.items ?? [])
-      .map(item => ({ topic: item.topic?.trim() ?? '', discussion: item.discussion?.trim() ?? '', conclusion: item.conclusion?.trim() ?? '' }))
+      .map(item => ({ topicKey: item.topicKey, decisionStatus: item.decisionStatus, topic: item.topic?.trim() ?? '', discussion: item.discussion?.trim() ?? '', conclusion: item.conclusion?.trim() ?? '' }))
       .filter(item => item.topic || item.discussion || item.conclusion),
     actions: (values.actions ?? [])
       .map(action => ({
+        itemId: action.itemId, topicKey: action.topicKey, deliverable: action.deliverable?.trim(),
         content: action.content?.trim() ?? '',
         // 只传负责人 id：姓名与工号快照由服务端按 id 回查，前端不传名字（与行政代订同一口径，防伪造台账）
         ownerUserId: action.ownerIds?.[0] ?? null,
@@ -97,7 +115,8 @@ function toContent(values: Partial<FormValues>): MinutesContent {
       }))
       .filter(action => action.content),
     openIssues: (values.followUps ?? [])
-      .map(issue => ({ content: issue.content?.trim() ?? '' }))
+      .map(issue => ({ itemId: issue.itemId, topicKey: issue.topicKey, content: issue.content?.trim() ?? '',
+        ownerUserId: issue.ownerIds?.[0], dueDate: toMeetingIsoDate(issue.dueDate) }))
       .filter(issue => issue.content),
     absentees: [],
     nextMeetingAt: values.nextMeetingAt ? values.nextMeetingAt.format('YYYY-MM-DD HH:mm') : null,
@@ -107,13 +126,10 @@ function toContent(values: Partial<FormValues>): MinutesContent {
 }
 
 /** 缺席名单由组件外的 state 承载（人选集合，不是文本字段），提交时并入正文 */
-function withAbsentees(content: MinutesContent, absentees: MinutesAbsentee[]): MinutesContent {
-  return { ...content, absentees: absentees.filter(person => person.name?.trim()) }
-}
 
 export default function MinutesForm() {
-  const { t } = useTranslation()
-  const navigate = useNavigate()
+  const { t, i18n } = useTranslation()
+  const { open: navigate, back, finishEditing } = useMinutesNavigation()
   const { user } = useAuth()
   const [searchParams] = useSearchParams()
   const bookingIdParam = searchParams.get('bookingId')
@@ -126,19 +142,49 @@ export default function MinutesForm() {
   const watchedValues = Form.useWatch([], form) as Partial<FormValues> | undefined
   const [meeting, setMeeting] = useState<MeetingVO>()
   const [minutes, setMinutes] = useState<MinutesVO>()
-  const [absentees, setAbsentees] = useState<MinutesAbsentee[]>([])
+  const [attendance, setAttendance] = useState<MinutesAttendance[]>([])
   /** 行动项负责人的 id→姓名快照回显底账：没它时编辑页打开就是一排裸 ID */
   const [ownerSeed, setOwnerSeed] = useState<{ id: number; name: string; empId?: string }[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>()
   const [minutesLoadNote, setMinutesLoadNote] = useState<string>()
-  const [sendTargetId, setSendTargetId] = useState<number>()
+  const saveRequestKey = useRef(newMeetingRequestKey('mm'))
+  const publishRequest = useRef<{ signature: string; key: string }>()
   /** 关联纪要：只存 id，标题/时间由服务端回查做快照 */
   const [linkIds, setLinkIds] = useState<number[]>([])
   const [linkOptions, setLinkOptions] = useState<MinutesLinkVO[]>([])
   /** 签到补录：钉钉未签到但实际到会的人 */
-  const [presentIds, setPresentIds] = useState<number[]>([])
+  const [displayMode, setDisplayMode] = useState('edit')
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const modeRef = useRef<HTMLDivElement>(null)
+
+  // 新字段本阶段只展示禁用控件，避免填写了未接入字段后被旧保存接口静默丢弃。
+  const showDocumentPreview = () => {
+    setDisplayMode('preview')
+    modeRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })
+  }
+
+  const navigateSafely = (target?: string) => {
+    const leave = () => target ? navigate(target) : back()
+    if (!hasUnsavedChanges) { leave(); return }
+    Modal.confirm({
+      title: t('meeting.minutes.publicationText.discardUnsavedChangesBeforeLeaving'),
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      content: <div className="confirm-info-card">{t('meeting.minutes.publicationText.yourChangesHaveNotBeenSavedAnd')}</div>,
+      okText: t('meeting.minutes.publicationText.discardAndLeave'),
+      cancelText: t('meeting.minutes.publicationText.continueEditing'),
+      onOk: leave,
+    })
+  }
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return
+    const warnBeforeLeave = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', warnBeforeLeave)
+    return () => window.removeEventListener('beforeunload', warnBeforeLeave)
+  }, [hasUnsavedChanges])
 
   /** 编辑已有纪要时以服务端回传的记录人为准；新建时就是当前登录人 */
   const recorderText = useMemo(() => {
@@ -149,6 +195,7 @@ export default function MinutesForm() {
   }, [minutes, user])
 
   const load = useCallback(async () => {
+    const t = i18n.t.bind(i18n)
     if (!bookingId && !minutesId) {
       setError(t('meeting.minutes.missingMeetingId', { defaultValue: '缺少會議編號，請從會議列表或詳情頁進入' }))
       return
@@ -157,7 +204,7 @@ export default function MinutesForm() {
     setError(undefined)
     setMinutesLoadNote(undefined)
     try {
-      // 纪要与会议单分开取：纪要读不到仍可按"尚无纪要"继续录入，会议单读不到就没有会议可记
+      // 纪要与会议单分开取：失败保留对应错误，界面据此禁用编辑与保存，不把失败冒充尚无纪要
       // 编辑态只有纪要 id，会议单要等回包拿到 bookingId 再取；传 NaN 会打出一条
       // /api/meeting/bookings/NaN 的 400，并在打开页面时连弹两次“請求參數格式錯誤”
       const meetingPromise: Promise<MeetingVO | null> = minutesId
@@ -177,23 +224,37 @@ export default function MinutesForm() {
         const vo = minutesResult.value
         setMinutes(vo)
         const base = emptyMinutesContent()
-        if (vo?.exists && vo.content) {
-          const content = vo.content
+        const fullMeeting = meetingResult.status === 'fulfilled' && meetingResult.value
+          ? meetingResult.value : await fetchMeetingDetail(vo.bookingId)
+        setMeeting(fullMeeting)
+        if (vo?.exists && !vo.content) {
+          setMinutesLoadNote(t('meeting.minutes.noEditPermission'))
+          return
+        }
+        const content = vo.content
+        setAttendance(initialAttendance(fullMeeting, content))
+        if (vo?.exists && content) {
           form.setFieldsValue({
-            items: content.items?.length ? content.items : base.items,
-            actions: (vo.items ?? []).filter(item => item.kind === 'ACTION').length
+            purpose: minutesPurposeText(content),
+            chairIds: content.chairUserId ? [content.chairUserId] : [fullMeeting.organizerId],
+            items: content.items?.length ? content.items.map(item => ({ ...item, topicKey: item.topicKey || crypto.randomUUID() })) : base.items,
+            actions: content.schemaVersion !== 2 && (vo.items ?? []).filter(item => item.kind === 'ACTION').length
               ? (vo.items ?? []).filter(item => item.kind === 'ACTION').map(item => ({
+                  itemId: item.id, topicKey: item.topicKey, deliverable: item.deliverable,
                   content: item.content,
                   ownerIds: item.ownerUserId ? [item.ownerUserId] : [],
                   dueDate: item.dueDate ? dayjs(item.dueDate) : null,
                 }))
               : (content.actions ?? []).map(action => ({
+                  itemId: action.itemId, topicKey: action.topicKey, deliverable: action.deliverable,
                   content: action.content,
                   ownerIds: action.ownerUserId ? [action.ownerUserId] : [],
                   dueDate: action.dueDate ? dayjs(action.dueDate) : null,
                 })),
-            followUps: (vo.items ?? []).filter(item => item.kind === 'FOLLOW').map(item => ({
-              content: item.content,
+            followUps: content.schemaVersion === 2 ? content.openIssues.map(item => ({ ...item,
+              ownerIds: item.ownerUserId ? [item.ownerUserId] : [], dueDate: item.dueDate ? dayjs(item.dueDate) : null,
+            })) : (vo.items ?? []).filter(item => item.kind === 'FOLLOW').map(item => ({
+              itemId: item.id, topicKey: item.topicKey, content: item.content,
               ownerIds: item.ownerUserId ? [item.ownerUserId] : [],
               dueDate: item.dueDate ? dayjs(item.dueDate) : null,
             })),
@@ -201,10 +262,13 @@ export default function MinutesForm() {
             nextMeetingNote: content.nextMeetingNote,
             remark: content.remark,
           })
-          setAbsentees(content.absentees ?? [])
           setLinkIds((vo.links ?? []).map(link => link.minutesId))
           setLinkOptions(vo.links ?? [])
-          const seeds: { id: number; name: string; empId?: string }[] = []
+          const seeds: { id: number; name: string; empId?: string }[] = [
+            { id: fullMeeting.organizerId, name: fullMeeting.organizerName, empId: fullMeeting.organizerEmpNo ?? undefined },
+            ...(content.chairUserId ? [{ id: content.chairUserId, name: content.chairName || '', empId: content.chairEmpNo }] : []),
+            ...content.openIssues.filter(item => item.ownerUserId).map(item => ({ id: item.ownerUserId!, name: item.ownerName || '', empId: item.ownerEmpNo })),
+          ]
           for (const item of vo.items ?? []) {
             if (item.ownerUserId && item.ownerName) {
               seeds.push({ id: item.ownerUserId, name: item.ownerName, empId: item.ownerEmpNo || undefined })
@@ -217,34 +281,17 @@ export default function MinutesForm() {
           }
           setOwnerSeed(seeds.filter((person, index, all) => all.findIndex(other => other.id === person.id) === index))
         } else {
-          form.setFieldsValue({ items: base.items, actions: [], followUps: [] })
-          // 建议缺席只在"还没有纪要"时给，已有纪要以记录人写的内容为准。
-          // 优先用服务端骨架里的 suggestedAbsentees（原因码→当前语言），读不到再按会议详情兜底。
-          const suggested = (vo?.suggestedAbsentees ?? []).map(person => ({
-            userId: person.userId ?? null,
-            name: person.name,
-            empNo: person.empNo,
-            reason: person.reasonCode === 'DECLINED'
-              ? t('meeting.minutes.reasonDeclined', { defaultValue: '婉拒邀約' })
-              : t('meeting.minutes.reasonNoCheckin', { defaultValue: '未簽到' }),
-          }))
-          if (suggested.length > 0) {
-            setAbsentees(suggested)
-          } else if (meetingResult.status === 'fulfilled' && meetingResult.value) {
-            setAbsentees(suggestAbsentees(meetingResult.value, t))
-          }
+          form.setFieldsValue({ items: base.items, actions: [], followUps: [], chairIds: [fullMeeting.organizerId] })
+          setOwnerSeed([{ id: fullMeeting.organizerId, name: fullMeeting.organizerName, empId: fullMeeting.organizerEmpNo ?? undefined }])
         }
-        // 由纪要 id 进来时，会议单要从纪要的 bookingId 再补取一次
-        if (!bookingId && vo?.bookingId) {
-          try { setMeeting(await fetchMeetingDetail(vo.bookingId)) } catch { /* 会议单读取失败已在上方留痕，不重复弹错 */ }
-        }
+        setHasUnsavedChanges(false)
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : t('meeting.failedToLoadThe2', { defaultValue: '會議詳情加載失敗' }))
     } finally {
       setLoading(false)
     }
-  }, [bookingId, minutesId, form, t])
+  }, [bookingId, minutesId, form, i18n])
 
   useEffect(() => { void load() }, [load])
 
@@ -274,7 +321,7 @@ export default function MinutesForm() {
       message.warning(t('meeting.minutes.checkForm', { defaultValue: '請檢查表單填寫' }))
       return
     }
-    const content = withAbsentees(toContent(form.getFieldsValue()), absentees)
+    const content = { ...toContent(form.getFieldsValue(true)), attendance }
     const invalid = validateContent(content)
     if (invalid) {
       message.warning(invalid)
@@ -285,36 +332,47 @@ export default function MinutesForm() {
       return
     }
 
+    if (saving || !minutes || minutes.canEdit === false || error || minutesLoadNote) return
+    const changeNote = form.getFieldValue('changeNote')?.trim()
+    // 只提供即时反馈，发布完整性与资源权限仍由后端重新校验。
+    if (send && (!content.purpose || !content.chairUserId || content.items.some(item => !item.decisionStatus
+      || (item.decisionStatus !== 'information' && !item.conclusion)
+      || (item.decisionStatus === 'information' && !item.discussion && !item.conclusion))
+      || [...content.actions, ...content.openIssues].some(item => !item.ownerUserId || !item.dueDate)
+      || (!!minutes.publishedRevisionId && !changeNote))) {
+      message.warning(t('meeting.minutes.publicationRequired', { defaultValue: '發布前請補齊會議目的、主持人、決議狀態與內容、事項負責人及期限；修訂版需填寫修訂說明。' }))
+      return
+    }
     setSaving(true)
     try {
-      const values = form.getFieldsValue()
-      const items = [
-        ...(values.actions ?? []).filter(action => action.content?.trim()).map(action => ({
-          kind: 'ACTION' as const,
-          content: action.content!.trim(),
-          ownerUserId: action.ownerIds?.[0] ?? null,
-          dueDate: toMeetingIsoDate(action.dueDate),
-        })),
-        ...(values.followUps ?? []).filter(issue => issue.content?.trim()).map(issue => ({
-          kind: 'FOLLOW' as const,
-          content: issue.content!.trim(),
-          ownerUserId: issue.ownerIds?.[0] ?? null,
-          dueDate: toMeetingIsoDate(issue.dueDate),
-        })),
-      ]
       const saved = minutes?.exists && minutes.id
-        ? await updateMinutes(minutes.id, { content, items, linkedMinutesIds: linkIds, markPresentUserIds: presentIds, version: minutes.version ?? 0 })
-        : await createMinutes({ bookingId, content, items, linkedMinutesIds: linkIds, markPresentUserIds: presentIds, requestKey: newMeetingRequestKey('mm') })
+        ? await updateMinutes(minutes.id, { content, linkedMinutesIds: linkIds, version: minutes.version ?? 0 })
+        : await createMinutes({ bookingId, content, linkedMinutesIds: linkIds, requestKey: saveRequestKey.current })
       setMinutes(saved)
+      setHasUnsavedChanges(false)
       message.success(t('meeting.minutes.saveSuccess', { defaultValue: '紀要已保存' }))
       if (send && saved.id) {
-        setSendTargetId(saved.id)
+        const signature = JSON.stringify([saved.id, saved.version, changeNote])
+        if (publishRequest.current?.signature !== signature) publishRequest.current = { signature, key: newMeetingRequestKey('mmp') }
+        const key = publishRequest.current.key
+        Modal.confirm({
+          title: t('meeting.minutes.confirmPublication', { defaultValue: '確認發布正式紀要？' }),
+          className: 'custom-confirm-modal',
+          icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+          content: <div className="confirm-info-card">{saved.minutesNo} · V{(saved.publishedRevisionNo ?? 0) + 1}<p>{t('meeting.minutes.publicationImmutable', { defaultValue: '發布後保留不可覆蓋的版本；通知另行設定，本次不會發送訊息。' })}</p></div>,
+          okText: t('meeting.minutes.publish', { defaultValue: '正式發布' }), cancelText: t('common.cancel'),
+          onOk: async () => {
+            await publishMinutes(saved.id!, { version: saved.version ?? 0, requestKey: key, changeNote })
+            message.success(t('meeting.minutes.published', { defaultValue: '紀要已發布，可另行通知收件人' }))
+            finishEditing(saved.id!)
+          },
+        })
       } else if (saved.id) {
         // 保存后进纪要查看页而不是会议详情：那一页才是「正文 + 发送历史」的归属地，
-        // 也让用户立刻看到刚才那一版正文长什么样（需求 3：每次会议记录都可以查看）
-        navigate(`/meeting-minutes?id=${saved.id}`)
+        // 阅读页继续优先显示正式版，未发布修改不会覆盖已发布内容。
+        finishEditing(saved.id)
       } else {
-        navigate(`/meeting-detail?id=${saved.bookingId ?? meeting?.id}`)
+        back()
       }
     } catch (e) {
       // request.ts 已统一弹错，这里只留日志，避免双弹
@@ -331,7 +389,8 @@ export default function MinutesForm() {
   const previousNode = currentIndex > 0 ? series[currentIndex - 1] : undefined
   const nextNode = currentIndex >= 0 && currentIndex < series.length - 1 ? series[currentIndex + 1] : undefined
   /** 表单扁平值 → MinutesContent 的空壳（仅用于 useWatch 尚未回传时的计数基准） */
-  const charCount = minutesContentLength(withAbsentees(toContent(watchedValues ?? {}), absentees))
+  const previewContent = { ...toContent(watchedValues ?? {}), attendance }
+  const charCount = minutesContentLength(previewContent)
 
   if (loading && !meeting) {
     return (
@@ -355,7 +414,7 @@ export default function MinutesForm() {
             <Button
               type="primary"
               icon={<ArrowLeftOutlined />}
-              onClick={() => (meeting ? navigate(`/meeting-detail?id=${meeting.id}`) : navigate('/meeting-my'))}
+              onClick={() => navigateSafely()}
               style={{
                 backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px',
                 display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
@@ -372,7 +431,7 @@ export default function MinutesForm() {
           <Space size={8}>
             <span className="mm-char-counter">{t('meeting.minutes.charCount', { count: charCount, defaultValue: '已寫 {{count}} 字' })}</span>
             {minutes?.sendCount ? (
-              <Button size="small" onClick={() => navigate(`/meeting-minutes?id=${minutes.id}`)}>
+              <Button size="small" onClick={() => navigateSafely(`/meeting-minutes?id=${minutes.id}`)}>
                 {t('meeting.minutes.viewSends', { count: minutes.sendCount, defaultValue: '發送歷史（{{count}} 次）' })}
               </Button>
             ) : null}
@@ -391,12 +450,13 @@ export default function MinutesForm() {
         />
       )}
       {!error && minutesLoadNote && (
-        // 纪要读不到不阻断录入（可能是首次），但必须讲清楚原因，不能让用户以为"这就是空的"
+        // 读取失败保留表单结构和重试入口，但不能按新建放行保存
         <Alert
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
-          message={t('meeting.minutes.loadNote', { defaultValue: '未能讀取既有紀要，本次將按新錄入處理' })}
+          message={t('meeting.minutes.publicationText.couldNotLoadExistingMinutesRetryBefore')}
+          action={<Button size="small" onClick={() => void load()}>{t('meeting.retry', { defaultValue: '重試' })}</Button>}
           description={minutesLoadNote}
         />
       )}
@@ -405,7 +465,7 @@ export default function MinutesForm() {
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message={t('meeting.minutes.cancelledHint', { defaultValue: '這場會議已取消，一般不需要紀要；確有書面結論需要留檔時可繼續錄入' })}
+          message={t('meeting.minutes.publicationText.thisMeetingWasCancelledEditingDependsOn')}
         />
       )}
 
@@ -417,7 +477,7 @@ export default function MinutesForm() {
             <SeriesChip
               key={node.bookingId}
               node={node}
-              onOpen={(target) => navigate(`/meeting-minutes-form?bookingId=${target}`)}
+              onOpen={(target) => navigateSafely(`/meeting-minutes-form?bookingId=${target}`)}
             />
           ))}
           {/* 上一場/下一場：chip 适合跳指定一场，连续写纪要时靠这两个按钮而不是用眼睛找当前位置 */}
@@ -426,23 +486,58 @@ export default function MinutesForm() {
               size="small"
               disabled={!previousNode}
               icon={<LeftOutlined />}
-              onClick={() => previousNode && navigate(`/meeting-minutes-form?bookingId=${previousNode.bookingId}`)}
+              onClick={() => previousNode && navigateSafely(`/meeting-minutes-form?bookingId=${previousNode.bookingId}`)}
             >{t('meeting.minutes.prevSession', { defaultValue: '上一場' })}</Button>
             <Button
               size="small"
               disabled={!nextNode}
-              onClick={() => nextNode && navigate(`/meeting-minutes-form?bookingId=${nextNode.bookingId}`)}
+              onClick={() => nextNode && navigateSafely(`/meeting-minutes-form?bookingId=${nextNode.bookingId}`)}
             >{t('meeting.minutes.nextSession', { defaultValue: '下一場' })}<RightOutlined /></Button>
           </span>
         </div>
       )}
 
-      <Form form={form} layout="vertical" disabled={minutes?.canEdit === false}>
+      <div className="mm-form-mode" ref={modeRef}>
+        <Segmented value={displayMode} onChange={value => setDisplayMode(String(value))} options={[
+          { value: 'edit', label: t('meeting.minutes.publicationText.editMinutes') }, { value: 'preview', label: t('meeting.minutes.publicationText.fullPreview') },
+        ]} />
+        <span className="mm-form-mode__hint">{hasUnsavedChanges ? t('meeting.minutes.unsaved', { defaultValue: '有未保存的修改 · ' }) : ''}{t('meeting.minutes.draftIsolated', { defaultValue: '保存只更新草稿，正式發布後才更新跟進事項' })}</span>
+      </div>
+
+      {displayMode === 'preview' && (
+        <div className="mm-reading-surface">
+          <MinutesContentCard content={previewContent} people={ownerSeed}
+            followUpDetails={(watchedValues?.followUps ?? []).filter(item => item.content?.trim()).map(item => ({
+              content: item.content || '', ownerUserId: item.ownerIds?.[0], dueDate: item.dueDate?.format('YYYY-MM-DD'),
+            }))}
+            document={{
+              title: meeting?.title,
+              minutesNo: minutes?.minutesNo,
+              bookingNo: meeting?.bookingNo,
+              editionLabel: t('meeting.minutes.publicationText.draftPreviewUnpublished'),
+              meetingTime: meeting?.timeText,
+              chair: ownerSeed.find(person => person.id === watchedValues?.chairIds?.[0])?.name,
+              meetingType: meeting ? (bizTypeLabels()[meeting.bizType] ?? meeting.bizType) : undefined,
+              organizer: meeting?.organizerName,
+              recorder: recorderText,
+              room: meeting?.roomName,
+              attendees: meeting?.attendees,
+              externalAttendees: meeting?.externalAttendees,
+              footer: <><span>{t('meeting.minutes.recorderColumn')} {recorderText || t('meeting.minutes.notRecorded')}</span><span>{t('meeting.minutes.publicationText.previewDoesNotSaveOrSendMinutes')}</span></>,
+            }}
+            references={linkIds.length > 0 ? <div>{linkOptions.filter(link => linkIds.includes(link.minutesId)).map(link => <p key={link.minutesId}>{t('meeting.minutes.quotedFrom')}{link.title} · {link.minutesNo} · {link.timeText}</p>)}</div> : undefined}
+          />
+        </div>
+      )}
+
+      <div hidden={displayMode !== 'edit'}>
+      <Form form={form} layout="vertical" className="mm-editor-form" disabled={minutes?.canEdit === false || !!minutesLoadNote || !!error || loading}
+        onValuesChange={() => setHasUnsavedChanges(true)}>
         {/* 一、会议资讯（自动带出，只读） */}
         <div style={cardStyle}>
           <CardTitle icon={<ProfileOutlined />} tone="info" title={t('meeting.minutes.sectionMeeting', { defaultValue: '會議資訊' })}
             note={t('meeting.minutes.meetingReadonlyHint', { defaultValue: '由會議單自動帶出，不可修改' })} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          <div className="mm-form-grid">
             <InfoField label={t('meeting.labelTopic', { defaultValue: '會議主題：' })} value={meeting?.title ?? '-'} />
             <InfoField label={t('meeting.bookingNo2', { defaultValue: '單號：' })} value={meeting?.bookingNo ?? '-'} />
             <InfoField label={t('meeting.minutes.recorder', { defaultValue: '記錄人：' })} value={recorderText} tag={t('meeting.minutes.recorderLocked', { defaultValue: '自動取當前登錄人' })} />
@@ -456,35 +551,19 @@ export default function MinutesForm() {
             <InfoField label={t('meeting.meetingType', { defaultValue: '會議類型' })} value={meeting ? (bizTypeLabels()[meeting.bizType] ?? meeting.bizType) : '-'} />
             <InfoField label={t('meeting.status', { defaultValue: '狀態' })} value={meeting ? phaseMeta(meeting.phase).label : '-'} />
           </div>
-          <div style={{ marginTop: 12 }}>
-            <div style={{ fontSize: 13, color: '#595959', marginBottom: 6 }}>{t('meeting.minutes.attendeeList', { defaultValue: '參會人' })}</div>
-            <Space size={6} wrap>
-              {(meeting?.attendees ?? []).map(person => (
-                <Tag key={person.id} color={person.response === 'declined' ? 'default' : 'blue'}>{person.name}</Tag>
-              ))}
-              {meeting?.externalAttendees && <Tag color="purple">{`${t('meeting.externalAttendees', { defaultValue: '外部參會人' })}：${meeting.externalAttendees}`}</Tag>}
-            </Space>
+          {meeting?.externalAttendees && <div className="mm-attendance-hint">
+            <span>{t('meeting.externalAttendees', { defaultValue: '外部參會人' })}：{meeting.externalAttendees}</span>
+          </div>}
+          <div className="mm-form-grid" style={{ marginTop: 16 }}>
+            <Form.Item name="chairIds" label={<PreviewFieldLabel title={t('meeting.minutes.chair')} />}>
+              <EmployeeSelect single style={{ width: '100%' }} seed={ownerSeed}
+                onPick={picked => setOwnerSeed(previous => [...previous, ...picked.filter(person => !previous.some(known => known.id === person.id))])}
+                placeholder={t('meeting.minutes.ownerPlaceholder')} />
+            </Form.Item>
           </div>
-          <AbsenteeEditor value={absentees} onChange={setAbsentees} disabled={minutes?.canEdit === false} />
-          {/* 签到补录：有人到了但没点钉钉签到，缺席名单就会错；这里由记录人改成“已参会” */}
-          <div style={{ marginTop: 16 }}>
-            <div style={{ fontSize: 13, color: '#595959', marginBottom: 6 }}>
-              {t('meeting.minutes.markPresent', { defaultValue: '補錄實際參會（釘釘未簽到但已到場）' })}
-            </div>
-            <Select
-              mode="multiple"
-              allowClear
-              optionFilterProp="label"
-              disabled={minutes?.canEdit === false}
-              value={presentIds}
-              onChange={setPresentIds}
-              style={{ width: '100%' }}
-              placeholder={t('meeting.minutes.markPresentPlaceholder', { defaultValue: '選擇實際到場的員工；保存後他們會記為已參會' })}
-              options={(meeting?.attendees ?? [])
-                .filter(person => !person.checkinAt && person.userId)
-                .map(person => ({ value: person.userId as number, label: `${person.name}${person.empNo ? `（${person.empNo}）` : ''}` }))}
-            />
-          </div>
+          <AttendanceEditor value={attendance} invited={meeting?.attendees ?? []}
+            onChange={value => { setAttendance(value); setHasUnsavedChanges(true) }}
+            disabled={minutes?.canEdit === false || !!minutesLoadNote || !!error || loading} />
           {/* 关联其他会议纪要：只选 id，标题与时间由服务端回查快照，收件人才知道“引自哪场会” */}
           <div style={{ marginTop: 16 }}>
             <div style={{ fontSize: 13, color: '#595959', marginBottom: 6 }}>
@@ -495,9 +574,9 @@ export default function MinutesForm() {
               allowClear
               showSearch
               filterOption={false}
-              disabled={minutes?.canEdit === false}
+              disabled={minutes?.canEdit === false || !!minutesLoadNote || !!error || loading}
               value={linkIds}
-              onChange={setLinkIds}
+              onChange={value => { setLinkIds(value); setHasUnsavedChanges(true) }}
               style={{ width: '100%' }}
               placeholder={t('meeting.minutes.linkedMinutesPlaceholder', { defaultValue: '輸入紀要單號、會議單號或主題搜尋' })}
               onSearch={(keyword) => {
@@ -513,6 +592,14 @@ export default function MinutesForm() {
               }))}
             />
           </div>
+        </div>
+
+        <div style={cardStyle}>
+          <CardTitle icon={<FileTextOutlined />} tone="info" title={t('meeting.minutes.purpose')} />
+          <Form.Item name="purpose" style={{ marginBottom: 0 }} rules={[{ max: MINUTES_LIMITS.purpose }]}>
+            <Input.TextArea rows={4} showCount maxLength={MINUTES_LIMITS.purpose} aria-label={t('meeting.minutes.purpose')}
+              placeholder={t('meeting.minutes.publicationText.describeTheProblemAndExpectedOutcomeOptional')} />
+          </Form.Item>
         </div>
 
         {/* 二、议程与结论 */}
@@ -535,16 +622,22 @@ export default function MinutesForm() {
                       )}
                     </div>
                     <div className="mm-dyn-body">
+                      <Form.Item name={[field.name, 'topicKey']} hidden><Input /></Form.Item>
+                      <Form.Item name={[field.name, 'decisionStatus']} label={<PreviewFieldLabel title={t('meeting.minutes.publicationText.decisionStatus')} />}>
+                        <Select allowClear placeholder={t('meeting.minutes.publicationText.selectDecisionStatus')} options={[
+                          { value: 'decided', label: t('meeting.minutes.publicationText.decisionMade') }, { value: 'pending', label: t('meeting.minutes.publicationText.decisionPending') }, { value: 'information', label: t('meeting.minutes.publicationText.informationOnly') },
+                        ]} />
+                      </Form.Item>
                       <Form.Item label={t('meeting.minutes.discussion', { defaultValue: '討論要點' })} name={[field.name, 'discussion']}>
-                        <Input.TextArea autoSize={{ minRows: 3, maxRows: 10 }} maxLength={500} showCount placeholder={t('meeting.minutes.discussionPlaceholder', { defaultValue: '各方意見與數據' })} />
+                        <Input.TextArea rows={5} autoSize={{ minRows: 5, maxRows: 14 }} maxLength={500} showCount placeholder={t('meeting.minutes.discussionPlaceholder', { defaultValue: '各方意見與數據' })} />
                       </Form.Item>
                       <Form.Item label={t('meeting.minutes.conclusion', { defaultValue: '結論 / 決議' })} name={[field.name, 'conclusion']} style={{ marginBottom: 0 }}>
-                        <Input.TextArea autoSize={{ minRows: 3, maxRows: 10 }} maxLength={500} showCount placeholder={t('meeting.minutes.conclusionPlaceholder', { defaultValue: '定了什麼、誰負責、什么时候生效' })} />
+                        <Input.TextArea rows={5} autoSize={{ minRows: 5, maxRows: 14 }} maxLength={500} showCount placeholder={t('meeting.minutes.conclusionPlaceholder', { defaultValue: '定了什麼、誰負責、什么时候生效' })} />
                       </Form.Item>
                     </div>
                   </div>
                 ))}
-                <Button type="dashed" block icon={<PlusOutlined />} onClick={() => add({ topic: '', discussion: '', conclusion: '' })}>
+                <Button type="dashed" block icon={<PlusOutlined />} disabled={fields.length >= 20} onClick={() => add({ topicKey: crypto.randomUUID(), topic: '', discussion: '', conclusion: '' })}>
                   {t('meeting.minutes.addTopic', { defaultValue: '新增議題' })}
                 </Button>
               </>
@@ -564,24 +657,32 @@ export default function MinutesForm() {
                     <div className="mm-dyn-head">
                       <span className="mm-dyn-index">A{index + 1}</span>
                       <Form.Item name={[field.name, 'content']} noStyle rules={[{ max: 300, message: t('meeting.minutes.actionTooLong', { defaultValue: '行動項不超過 300 字' }) }]}>
-                        <Input.TextArea autoSize={{ minRows: 2, maxRows: 8 }} placeholder={t('meeting.minutes.actionPlaceholder', { defaultValue: '要做的事，例：輸出預算明細表' })} maxLength={300} />
+                        <Input.TextArea rows={3} autoSize={{ minRows: 3, maxRows: 10 }} placeholder={t('meeting.minutes.actionPlaceholder', { defaultValue: '要做的事，例：輸出預算明細表' })} maxLength={300} />
                       </Form.Item>
                       <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={() => remove(field.name)} aria-label={t('meeting.minutes.deleteAction', { defaultValue: '刪除行動項' })} />
                     </div>
                     <div className="mm-dyn-body">
+                      <Form.Item name={[field.name, 'itemId']} hidden><Input /></Form.Item>
                       {/* 负责人只存 sys_user.id：姓名/工号是服务端回查的快照，前端不自报 */}
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                      <div className="mm-form-grid">
                         <Form.Item label={t('meeting.minutes.owner', { defaultValue: '負責人' })} name={[field.name, 'ownerIds']} style={{ marginBottom: 0 }}>
-                          <EmployeeSelect single seed={ownerSeed} placeholder={t('meeting.minutes.ownerPlaceholder', { defaultValue: '搜尋姓名或工號' })} />
+                          <EmployeeSelect single seed={ownerSeed} style={{ width: '100%' }} placeholder={t('meeting.minutes.ownerPlaceholder', { defaultValue: '搜尋姓名或工號' })}
+                            onPick={picked => setOwnerSeed(previous => [...previous, ...picked.filter(person => !previous.some(known => known.id === person.id))])} />
                         </Form.Item>
                         <Form.Item label={t('meeting.minutes.dueDate', { defaultValue: '完成時限' })} name={[field.name, 'dueDate']} style={{ marginBottom: 0 }}>
                           <DatePicker style={{ width: '100%' }} placeholder={t('meeting.minutes.dueDatePlaceholder', { defaultValue: '選填' })} />
                         </Form.Item>
+                        <Form.Item name={[field.name, 'topicKey']} label={<PreviewFieldLabel title={t('meeting.minutes.publicationText.relatedTopic')} />} style={{ marginBottom: 0 }}>
+                          <Select allowClear placeholder={t('meeting.minutes.publicationText.selectTheRelatedTopic')} options={(watchedValues?.items ?? []).filter(item => item.topicKey).map(item => ({ value: item.topicKey, label: item.topic }))} />
+                        </Form.Item>
                       </div>
+                      <Form.Item name={[field.name, 'deliverable']} label={<PreviewFieldLabel title={t('meeting.minutes.publicationText.deliverableAcceptanceCriteria')} />} style={{ marginTop: 16, marginBottom: 0 }}>
+                        <Input.TextArea rows={3} showCount maxLength={300} placeholder={t('meeting.minutes.publicationText.describeTheDeliverableAndAcceptanceCriteriaEg')} />
+                      </Form.Item>
                     </div>
                   </div>
                 ))}
-                <Button type="dashed" block icon={<PlusOutlined />} onClick={() => add({ content: '', ownerIds: [], dueDate: null })}>
+                <Button type="dashed" block icon={<PlusOutlined />} disabled={fields.length >= 30} onClick={() => add({ content: '', ownerIds: [], dueDate: null })}>
                   {t('meeting.minutes.addAction', { defaultValue: '新增行動項' })}
                 </Button>
               </>
@@ -601,14 +702,17 @@ export default function MinutesForm() {
                     <div className="mm-dyn-head">
                       <span className="mm-dyn-index">F{index + 1}</span>
                       <Form.Item name={[field.name, 'content']} noStyle rules={[{ max: 300, message: t('meeting.minutes.actionTooLong', { defaultValue: '事項不超過 300 字' }) }]}>
-                        <Input.TextArea autoSize={{ minRows: 2, maxRows: 8 }} placeholder={t('meeting.minutes.followUpPlaceholder', { defaultValue: '待跟進的事項，例：確認 Q4 預算分攤口徑' })} maxLength={300} />
+                        <Input.TextArea rows={3} autoSize={{ minRows: 3, maxRows: 10 }} placeholder={t('meeting.minutes.followUpPlaceholder', { defaultValue: '待跟進的事項，例：確認 Q4 預算分攤口徑' })} maxLength={300} />
                       </Form.Item>
                       <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={() => remove(field.name)} aria-label={t('meeting.minutes.deleteIssue', { defaultValue: '刪除跟進事項' })} />
                     </div>
                     <div className="mm-dyn-body">
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                      <div className="mm-form-grid">
+                        <Form.Item name={[field.name, 'itemId']} hidden><Input /></Form.Item>
+                        <Form.Item name={[field.name, 'topicKey']} hidden><Input /></Form.Item>
                         <Form.Item label={t('meeting.minutes.followOwner', { defaultValue: '跟進人' })} name={[field.name, 'ownerIds']} style={{ marginBottom: 0 }}>
-                          <EmployeeSelect single seed={ownerSeed} placeholder={t('meeting.minutes.ownerPlaceholder', { defaultValue: '搜尋姓名或工號' })} />
+                          <EmployeeSelect single seed={ownerSeed} style={{ width: '100%' }} placeholder={t('meeting.minutes.ownerPlaceholder', { defaultValue: '搜尋姓名或工號' })}
+                            onPick={picked => setOwnerSeed(previous => [...previous, ...picked.filter(person => !previous.some(known => known.id === person.id))])} />
                         </Form.Item>
                         <Form.Item label={t('meeting.minutes.dueDate', { defaultValue: '完成時限' })} name={[field.name, 'dueDate']} style={{ marginBottom: 0 }}>
                           <DatePicker style={{ width: '100%' }} placeholder={t('meeting.minutes.dueDatePlaceholder', { defaultValue: '選填，逾期會提醒' })} />
@@ -617,7 +721,7 @@ export default function MinutesForm() {
                     </div>
                   </div>
                 ))}
-                <Button type="dashed" block icon={<PlusOutlined />} onClick={() => add({ content: '', ownerIds: [], dueDate: null })}>
+                <Button type="dashed" block icon={<PlusOutlined />} disabled={fields.length >= 20} onClick={() => add({ content: '', ownerIds: [], dueDate: null })}>
                   {t('meeting.minutes.addFollowUp', { defaultValue: '新增跟進事項' })}
                 </Button>
               </>
@@ -628,11 +732,11 @@ export default function MinutesForm() {
         {/* 五、下次会议 */}
         <div style={cardStyle}>
           <CardTitle icon={<CalendarOutlined />} tone="info" title={t('meeting.minutes.sectionNext', { defaultValue: '下次會議' })} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          <div className="mm-form-grid">
             <Form.Item label={t('meeting.minutes.nextMeetingAt', { defaultValue: '下次會議時間' })} name="nextMeetingAt">
               <DatePicker showTime={{ format: 'HH:mm' }} format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} placeholder={t('meeting.minutes.selectTime', { defaultValue: '選填' })} />
             </Form.Item>
-            <Form.Item label={t('meeting.minutes.nextMeetingNote', { defaultValue: '議程預告' })} name="nextMeetingNote" style={{ gridColumn: 'span 2' }}>
+            <Form.Item label={t('meeting.minutes.nextMeetingNote', { defaultValue: '議程預告' })} name="nextMeetingNote" style={{ gridColumn: '1 / -1' }}>
               <Input maxLength={200} placeholder={t('meeting.minutes.nextNotePlaceholder', { defaultValue: '例：帶預算明細表復核' })} />
             </Form.Item>
           </div>
@@ -645,17 +749,40 @@ export default function MinutesForm() {
             <RemarkTextArea placeholder={t('meeting.minutes.remarkPlaceholder', { defaultValue: '與會外的補充資訊，例：資料位置、後續對接群' })} />
           </Form.Item>
         </div>
+        <div style={cardStyle}>
+          <CardTitle icon={<SendOutlined />} tone="info" title={t('meeting.minutes.publicationText.publicationAndNotificationSettings')} />
+          <div className="mm-form-publish">
+            <div className="mm-form-publish__fields">
+              <p className="mm-form-section-note">{t('meeting.minutes.publicationImmutable', { defaultValue: '發布後保留不可覆蓋的版本；通知另行設定，本次不會發送訊息。' })}</p>
+              <div className="mm-form-grid mm-form-grid--two">
+                <Form.Item label={<PreviewFieldLabel title={t('meeting.minutes.publicationText.publishedVersion')} />}><Input disabled value={`V${(minutes?.publishedRevisionNo ?? 0) + 1}`} /></Form.Item>
+                <Form.Item label={<PreviewFieldLabel title={t('meeting.minutes.publisher')} />}><Input disabled value={user?.name} /></Form.Item>
+              </div>
+              <Form.Item name="changeNote" label={<PreviewFieldLabel title={t('meeting.minutes.changeNote')} />}><RemarkTextArea placeholder={t('meeting.minutes.publicationText.requiredForRevisionsDescribeChangesToDecisions')} /></Form.Item>
+              <p className="mm-form-section-note">{t('meeting.minutes.publicationText.publicLinksCanBeForwardedAnyoneHolding')}</p>
+            </div>
+            <div className="mm-form-publish__preview">
+              <MinutesNoticePreview title={meeting?.title} timeText={meeting?.timeText} minutesNo={minutes?.minutesNo}
+                topicCount={(watchedValues?.items ?? []).filter(item => item.topic?.trim()).length}
+                actionCount={(watchedValues?.actions ?? []).filter(item => item.content?.trim()).length}
+                followCount={(watchedValues?.followUps ?? []).filter(item => item.content?.trim()).length}
+                onView={showDocumentPreview} />
+            </div>
+          </div>
+        </div>
       </Form>
+      </div>
 
       {/* 底部操作（§C.5）：详情只读模式隐藏 */}
-      {minutes?.canEdit !== false && (
+      {minutes?.canEdit !== false && !minutesLoadNote && !error && !loading && (
         <div className="form-footer">
-          <Button onClick={() => navigate(meeting ? `/meeting-detail?id=${meeting.id}` : '/meeting-my')}>{t('meeting.cancel', { defaultValue: '取消' })}</Button>
+          <Button onClick={() => navigateSafely()}>{t('meeting.cancel', { defaultValue: '取消' })}</Button>
+          <Button onClick={() => displayMode === 'preview' ? setDisplayMode('edit') : showDocumentPreview()}>{displayMode === 'preview' ? t('meeting.minutes.publicationText.backToEditing') : t('meeting.minutes.publicationText.fullPreview')}</Button>
           <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={() => void handleSave(false)}>
             {t('meeting.minutes.saveDraft', { defaultValue: '保存紀要' })}
           </Button>
-          <Button type="primary" icon={<SendOutlined />} loading={saving} onClick={() => void handleSave(true)}>
-            {t('meeting.minutes.saveAndSend', { defaultValue: '保存並發送' })}
+          <Button icon={<SendOutlined />} disabled={minutes?.publicationEnabled === false} loading={saving} onClick={() => void handleSave(true)}>
+            {t('meeting.minutes.saveAndPublish', { defaultValue: '保存並發布' })}
           </Button>
         </div>
       )}
@@ -670,24 +797,14 @@ export default function MinutesForm() {
         />
       )}
 
-      {sendTargetId && (
-        <SendMinutesModal
-          minutesId={sendTargetId}
-          meeting={meeting}
-          content={withAbsentees(toContent(form.getFieldsValue()), absentees)}
-          version={minutes?.version ?? 0}
-          linkBaseUrl={minutes?.linkBaseUrl}
-          linkBasePublic={minutes?.linkBasePublic}
-          onClose={() => setSendTargetId(undefined)}
-          onSent={() => {
-            setSendTargetId(undefined)
-            if (minutes?.id) navigate(`/meeting-minutes?id=${minutes.id}`)
-            else if (meeting) navigate(`/meeting-detail?id=${meeting.id}`)
-          }}
-        />
-      )}
+
     </div>
   )
+}
+
+/** 预览字段不参与 Form 保存，统一标记未接入，避免用户误以为填写内容会落库。 */
+function PreviewFieldLabel({ title }: { title: string }) {
+  return <span className="mm-form-preview-label">{title}</span>
 }
 
 /** 只读行内字段（会议资讯模块）：标签在左、值在右，与全站详情页口径一致 */
@@ -703,50 +820,119 @@ function InfoField({ label, value, tag }: { label: string; value: string; tag?: 
   )
 }
 
-/**
- * 缺席名单编辑：建议值来自参会人（婉拒 / 未签到），记录人可删可加。
- * 用组件外函数而不是塞进 Form：这一份是"人选集合"而不是文本字段，Form.List 反而写不出来的更啰嗦。
- */
-function AbsenteeEditor({ value, onChange, disabled }: { value: MinutesAbsentee[]; onChange: (next: MinutesAbsentee[]) => void; disabled?: boolean }) {
+/** 出席确认采用限高表格式编辑，邀约人员不可移除，避免名单在反复编辑时丢失。 */
+function AttendanceEditor({ value, invited, onChange, disabled }: {
+  value: MinutesAttendance[]
+  invited: NonNullable<MeetingVO['attendees']>
+  onChange: (next: MinutesAttendance[]) => void
+  disabled?: boolean
+}) {
   const { t } = useTranslation()
+  const [adding, setAdding] = useState(false)
+  const [pickerVersion, setPickerVersion] = useState(0)
+  const invitedByKey = new Map(invited.map(person => [attendanceKey(person), person]))
+  const presentCount = value.filter(person => person.status === 'present').length
+  const temporaryCount = value.filter(person => !invitedByKey.has(attendanceKey(person))).length
+  const atLimit = value.length >= MINUTES_LIMITS.attendance
+
+  const handleStatusChange = (index: number, status: 'present' | 'absent') => {
+    if (disabled) return
+    onChange(value.map((person, i) => i === index
+      ? { ...person, status, reason: status === 'present' ? undefined : person.reason } : person))
+  }
+  const handleAdd = (picked: { id: number; name: string }[]) => {
+    const person = picked[0]
+    if (disabled || atLimit || !person || value.some(item => item.userId === person.id)) return
+    onChange([...value, { userId: person.id, name: person.name, status: 'present' }])
+    // 添加后重置选择器，避免上一个选择仍占据输入框，方便连续追加临时人员。
+    setPickerVersion(version => version + 1)
+  }
+
+  // 第一阶段先确认交互，新增繁中文案待界面确认后统一补齐 i18n。
   return (
-    <div style={{ marginTop: 12 }}>
-      <div style={{ fontSize: 13, color: '#595959', marginBottom: 6 }}>
-        {t('meeting.minutes.absentees', { defaultValue: '缺席 / 未到場人員' })}
-        <span style={{ marginLeft: 6, fontSize: 12, color: '#8C8C8C' }}>{t('meeting.minutes.absenteesHint', { defaultValue: '系統按邀約響應與簽到給出建議，可自由增刪' })}</span>
+    <section className="mm-attendance" aria-label={t('meeting.minutes.attendance')}>
+      <div className="mm-attendance__toolbar">
+        <div className="mm-attendance__heading">
+          <span className="mm-attendance__icon"><CheckCircleOutlined /></span>
+          <h3>{t('meeting.minutes.attendance', { defaultValue: '實際出席確認' })}</h3>
+          <HelpPopover title={t('meeting.minutes.attendanceHelpTitle')} ariaLabel={t('meeting.minutes.attendanceHelpTitle')} placement="topLeft" content={[
+            { tone: 'info', label: t('meeting.minutes.attendanceHelpAutoLabel'), body: t('meeting.minutes.attendanceHelpAutoBody') },
+            { tone: 'neutral', label: t('meeting.minutes.attendanceHelpRecordLabel'), body: t('meeting.minutes.attendanceHelpRecordBody') },
+            { tone: 'info', label: t('meeting.minutes.attendanceHelpTempLabel'), body: t('meeting.minutes.attendanceHelpTempBody') },
+          ]} />
+          <span className="mm-attendance__summary" aria-live="polite">
+            {t('meeting.minutes.attendanceSummary', { present: presentCount, total: value.length, temporary: temporaryCount })}
+          </span>
+        </div>
+        {!disabled && <Button icon={<PlusOutlined />} disabled={atLimit} onClick={() => setAdding(open => !open)}
+          aria-label={t('meeting.minutes.addTemporaryAttendee')} aria-expanded={adding} aria-controls="minutes-attendance-add">
+          {t('meeting.minutes.addTemporaryAttendee')}</Button>}
       </div>
-      <Space direction="vertical" size={8} style={{ width: '100%' }}>
-        {value.map((person, index) => (
-          <Space key={`${person.userId ?? person.name}-${index}`} size={8} wrap>
-            <Tag closable={!disabled} onClose={() => onChange(value.filter((_, i) => i !== index))}>
-              {`${person.name}${person.empNo ? `（${person.empNo}）` : ''}`}
-            </Tag>
-            <Input
-              size="small"
-              style={{ width: 180 }}
-              maxLength={40}
-              disabled={disabled}
-              placeholder={t('meeting.minutes.absentReasonPlaceholder', { defaultValue: '缺席原因，選填' })}
-              value={person.reason ?? ''}
-              onChange={e => onChange(value.map((item, i) => (i === index ? { ...item, reason: e.target.value } : item)))}
-            />
-          </Space>
-        ))}
-        {!disabled && (
-          <EmployeeSelect
-            single
-            placeholder={t('meeting.minutes.addAbsentee', { defaultValue: '追加缺席人員' })}
-            value={[]}
+      <p className="mm-attendance__hint">{t('meeting.minutes.attendanceHint')}</p>
+      {adding && !disabled && <div className="mm-attendance__add" id="minutes-attendance-add">
+        <span>{t('meeting.minutes.temporaryAttendee')}</span>
+        <div className="mm-attendance__picker">
+          <EmployeeSelect key={pickerVersion} single style={{ width: '100%' }} disabled={atLimit}
+            placeholder={t('meeting.minutes.ownerPlaceholder')} value={[]}
             excludeIds={value.map(person => person.userId).filter((id): id is number => id != null)}
-            onPick={(picked) => {
-              const person = picked[0]
-              if (!person) return
-              onChange([...value, { userId: person.id, name: person.name }])
-            }}
-          />
-        )}
-      </Space>
-    </div>
+            onPick={handleAdd} />
+        </div>
+        <span className="mm-attendance__hint">{t('meeting.minutes.temporaryPickHint')}</span>
+        <Button type="text" onClick={() => setAdding(false)}>{t('meeting.minutes.finishAdding')}</Button>
+      </div>}
+      <div className="mm-attendance__scroll" tabIndex={0} role="region" aria-label={t('meeting.minutes.attendanceListRegion')}>
+        <table className="mm-attendance__table" aria-label={t('meeting.minutes.attendanceListTable')}>
+          <colgroup>
+            <col className="mm-attendance__person-col" /><col className="mm-attendance__status-col" />
+            <col /><col className="mm-attendance__action-col" />
+          </colgroup>
+          <thead><tr>
+            <th scope="col">{t('meeting.minutes.colAttendee')}</th><th scope="col">{t('meeting.minutes.colAttendanceStatus')}</th>
+            <th scope="col">{t('meeting.minutes.colAbsentReason')}</th><th scope="col">{t('meeting.minutes.colAction')}</th>
+          </tr></thead>
+          <tbody>
+            {value.map((person, index) => {
+              const key = attendanceKey(person)
+              const invitation = invitedByKey.get(key)
+              const personLabel = `${person.name}${person.empNo ? `（${person.empNo}）` : ''}`
+              return <tr key={key}>
+                <th scope="row">
+                  <span className="mm-attendance__name">{personLabel}</span>
+                  <span className="mm-attendance__badges">
+                    <Tag color={invitation ? 'blue' : 'orange'}>{invitation ? t('meeting.minutes.invited') : t('meeting.minutes.temporaryTag')}</Tag>
+                    {invitation?.checkinAt && <Tag color="green">{t('meeting.checkedIn')}</Tag>}
+                  </span>
+                </th>
+                <td>
+                  <div role="radiogroup" aria-label={t('meeting.minutes.attendanceStatusAria', { name: personLabel })}>
+                    <Radio.Group name={`attendance-${key}`} value={person.status} disabled={disabled} buttonStyle="solid"
+                      onChange={event => handleStatusChange(index, event.target.value)}>
+                      <Radio.Button value="present">{t('common.yes')}</Radio.Button>
+                      <Radio.Button value="absent">{t('common.no')}</Radio.Button>
+                    </Radio.Group>
+                  </div>
+                </td>
+                <td>
+                  {person.status === 'absent' ? <Input
+                    maxLength={200} disabled={disabled} aria-label={t('meeting.minutes.absentReasonAria', { name: personLabel })}
+                    placeholder={t('meeting.minutes.absentReasonPlaceholder', { defaultValue: '缺席原因，選填' })}
+                    value={person.reason ?? ''}
+                    onChange={event => onChange(value.map((item, i) => i === index ? { ...item, reason: event.target.value } : item))}
+                  /> : <span className="mm-attendance__hint">{t('meeting.minutes.presentNoReason')}</span>}
+                </td>
+                <td>
+                  {!invitation && !disabled ? <Button type="link" size="small" danger aria-label={t('meeting.minutes.removeAttendeeAria', { name: personLabel })}
+                    onClick={() => onChange(value.filter((_, i) => i !== index))}>{t('common.remove')}</Button>
+                    : <span className="mm-attendance__hint">—</span>}
+                </td>
+              </tr>
+            })}
+          </tbody>
+        </table>
+        {value.length === 0 && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('meeting.minutes.attendanceEmpty')} />}
+      </div>
+      {atLimit && <p className="mm-attendance__hint">{t('meeting.minutes.attendanceLimit', { count: MINUTES_LIMITS.attendance })}</p>}
+    </section>
   )
 }
 

@@ -84,6 +84,9 @@ interface SubPageTitle {
 }
 
 const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
+  // 规则拆分第一阶段的临时标题；第二阶段使用独立菜单名及翻译。
+  '/meeting-blacklist': { fixed: '預約黑名單' },
+  '/meeting-room-rules': { fixed: '會議室專屬規則' },
   '/doc-plans/detail': { fixed: 'i18n:docNative.detailTitle' },
   '/doc-plans/edit': { add: 'i18n:docNative.createTitle', edit: 'i18n:docNative.editTitle' },
   '/doc-plans/confirm': { fixed: 'i18n:docNative.confirmTitle' },
