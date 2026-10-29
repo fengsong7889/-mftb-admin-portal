@@ -183,4 +183,37 @@ class DingTalkServiceImplChannelTest {
         // ActionCard 不支持 @ 人，不得发出一个看着 @ 了实际没 @ 的 at 节点
         assertFalse(body.getValue().containsKey("at"));
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void minutesCardUsesExactChannelAndRobotFields() {
+        when(channelMapper.selectById(3L)).thenReturn(channel(3L, "QA紀要群", "dingtalk", 1, SELECTED_HOOK));
+        when(restTemplate.postForObject(anyString(), any(), eq(Map.class))).thenReturn(Map.of("errcode", 0));
+        var outcome = service.sendActionCardSyncToChannel(3L, "會議紀要已發布", "MJ-1 · V1", "查看紀要", "https://example.test/minutes");
+        assertTrue(outcome.channelAccepted());
+        ArgumentCaptor<Map<String, Object>> body = ArgumentCaptor.forClass(Map.class);
+        ArgumentCaptor<String> url = ArgumentCaptor.forClass(String.class);
+        verify(restTemplate).postForObject(url.capture(), body.capture(), eq(Map.class));
+        assertTrue(url.getValue().contains("SELECTED"));
+        assertFalse(url.getValue().contains("DEFAULTGROUP"));
+        assertEquals("actionCard", body.getValue().get("msgtype"));
+        Map<String, String> card = (Map<String, String>) body.getValue().get("actionCard");
+        assertEquals("查看紀要", card.get("singleTitle"));
+        assertEquals("https://example.test/minutes", card.get("singleURL"));
+        assertEquals("MJ-1 · V1", card.get("text"));
+        assertFalse(card.containsKey("single_title"));
+        verify(channelService, never()).findDefault(anyString());
+    }
+
+    @Test
+    void invalidMinutesCardChannelsNeverFallbackOrCallNetwork() {
+        when(channelMapper.selectById(4L)).thenReturn(channel(4L, "停用", "dingtalk", 0, SELECTED_HOOK));
+        when(channelMapper.selectById(5L)).thenReturn(channel(5L, "其它平台", "feishu", 1, SELECTED_HOOK));
+        when(channelMapper.selectById(6L)).thenReturn(channel(6L, "無地址", "dingtalk", 1, ""));
+        for (long id : List.of(77L, 4L, 5L, 6L)) {
+            assertFalse(service.sendActionCardSyncToChannel(id, "標題", "正文", "查看紀要", "https://example.test").channelAccepted());
+        }
+        verify(restTemplate, never()).postForObject(anyString(), any(), any());
+        verify(channelService, never()).findDefault(anyString());
+    }
 }

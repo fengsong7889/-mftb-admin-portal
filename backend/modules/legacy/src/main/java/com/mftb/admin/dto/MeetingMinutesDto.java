@@ -1,6 +1,10 @@
 package com.mftb.admin.dto;
 
 import lombok.Data;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -50,6 +54,19 @@ public final class MeetingMinutesDto {
         private Integer expectVersion;
     }
 
+    /** 发布只引用已经保存的草稿版本，禁止客户端直接上传一份未经保存校验的正式文档。 */
+    @Data
+    public static class PublishForm {
+        @NotNull(message = "缺少草稿版本")
+        @Min(value = 0, message = "草稿版本不正確")
+        private Integer version;
+        @NotBlank(message = "缺少本次發布識別碼")
+        @Size(max = 64, message = "發布識別碼最多 64 字")
+        private String requestKey;
+        @Size(max = 200, message = "修訂說明最多 200 字")
+        private String changeNote;
+    }
+
     /** 事项入参：kind=ACTION 行动项 / FOLLOW 跟进事项 */
     @Data
     public static class ItemForm {
@@ -67,10 +84,16 @@ public final class MeetingMinutesDto {
         private String result;
         /** 结果说明；cannot 必填（“为什么没办成”比“没办成”本身更重要） */
         private String note;
+        /** 新版事项的并发校验，不能把办理结果覆盖到已被重新指派的事项。 */
+        private Integer version;
     }
 
     @Data
     public static class SendForm {
+        /** 正式发送必须显式绑定已发布版本，同一版本可有多个发送批次。 */
+        private Long revisionId;
+        /** 免登链接可转发风险必须由发送人确认。 */
+        private Boolean acknowledgePublicLink;
         /** 群机器人渠道 id；为空表示本批只发个人。服务端按 id 复核渠道存在且启用，不信前端结论 */
         private Long groupChannelId;
         /** 收件人 sys_user.id（可含非参会人） */
@@ -117,6 +140,17 @@ public final class MeetingMinutesDto {
         private Integer sendCount;
         private String lastSendAt;
         private Integer version;
+        private Long publishedRevisionId;
+        private Integer publishedRevisionNo;
+        private String publishedAt;
+        private Boolean hasUnpublishedChanges;
+        private Boolean canReadDraft;
+        private Boolean canPublish;
+        private Boolean canManageSends;
+        private Boolean publicationEnabled;
+        private Boolean cardEnabled;
+        /** 默认查看正式文档，content 仅在获准读草稿时返回工作内容。 */
+        private MeetingMinutesDocument document;
 
         /** 当前登录人能否编辑/发送（服务端算，前端不自己判身份） */
         private Boolean canEdit;
@@ -162,6 +196,18 @@ public final class MeetingMinutesDto {
         private String updatedAt;
     }
 
+    /** 发布版本历史不含草稿、幂等摘要或内部投递名单。 */
+    @Data
+    public static class RevisionVO {
+        private Long id;
+        private Integer revisionNo;
+        private String changeNote;
+        private String publisherName;
+        private String publisherEmpNo;
+        private String publishedAt;
+        private MeetingMinutesDocument document;
+    }
+
     /** 建议缺席人（原因码由前端翻译） */
     @Data
     public static class SuggestedAbsenteeVO {
@@ -195,6 +241,9 @@ public final class MeetingMinutesDto {
         private Boolean overdue;
         /** 当前登录人能否更新这条的状态（负责人本人 / 记录人 / 组织者 / 行政） */
         private Boolean canResolve;
+        private Integer version;
+        private String topicKey;
+        private String deliverable;
     }
 
     /** 关联纪要出参（展示一律用快照） */
@@ -243,6 +292,10 @@ public final class MeetingMinutesDto {
         private Integer itemPending;
         private Integer itemOverdue;
         private String digest;
+        private Long publishedRevisionId;
+        private Integer publishedRevisionNo;
+        private String publishedAt;
+        private Boolean hasUnpublishedChanges;
     }
 
     /** 列表 + 统计（统计口径必须跟搜索条件，否则用户会先看到全量数字） */
@@ -271,6 +324,10 @@ public final class MeetingMinutesDto {
     @Data
     public static class SendVO {
         private Long id;
+        private Long revisionId;
+        private Integer revisionNo;
+        private String messageType;
+        private String buttonTitle;
         private Long minutesId;
         private Integer batchSeq;
         private String minutesNo;
@@ -318,6 +375,8 @@ public final class MeetingMinutesDto {
     @Data
     public static class SendResult {
         private Long sendId;
+        private Long revisionId;
+        private Integer revisionNo;
         private Integer batchSeq;
         /** 进入投递队列的收件人数（不含群） */
         private int queued;
@@ -365,5 +424,7 @@ public final class MeetingMinutesDto {
         private String sentAt;
         private String expireAt;
         private MeetingMinutesContent content;
+        private Integer revisionNo;
+        private MeetingMinutesDocument document;
     }
 }

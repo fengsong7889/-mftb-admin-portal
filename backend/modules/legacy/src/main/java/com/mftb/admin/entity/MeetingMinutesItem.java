@@ -48,6 +48,13 @@ public class MeetingMinutesItem {
 
     private Integer seq;
 
+    /** 新版 seq 不再重排，排序独立于事项身份，删除中间行不能继承另一行的结果。 */
+    private Integer displayOrder;
+    private String topicKey;
+    private String deliverable;
+    private Integer version;
+    private Long publishedRevisionId;
+
     private String content;
 
     private Long ownerUserId;

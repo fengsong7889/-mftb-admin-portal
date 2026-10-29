@@ -27,14 +27,14 @@ import java.util.List;
 public interface MeetingMinutesItemMapper extends BaseMapper<MeetingMinutesItem> {
 
     @Select("SELECT * FROM biz_meeting_minutes_item WHERE deleted = 0 AND minutes_id = #{minutesId} "
-            + "ORDER BY kind, seq")
+            + "ORDER BY kind, COALESCE(NULLIF(display_order, 0), seq), id")
     List<MeetingMinutesItem> findByMinutes(@Param("minutesId") long minutesId);
 
     /** 批量取多份纪要的事项（列表页/渲染避免 N+1） */
     @Select("<script>"
             + "SELECT * FROM biz_meeting_minutes_item WHERE deleted = 0 AND minutes_id IN "
             + "<foreach collection='minutesIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
-            + " ORDER BY minutes_id, kind, seq"
+            + " ORDER BY minutes_id, kind, COALESCE(NULLIF(display_order, 0), seq), id"
             + "</script>")
     List<MeetingMinutesItem> findByMinutesIds(@Param("minutesIds") Collection<Long> minutesIds);
 
@@ -45,6 +45,31 @@ public interface MeetingMinutesItemMapper extends BaseMapper<MeetingMinutesItem>
             + "AND (last_notified_at IS NULL OR DATE(last_notified_at) < CURDATE()) "
             + "ORDER BY due_date, id LIMIT #{limit}")
     List<MeetingMinutesItem> findDueReminders(@Param("today") LocalDate today, @Param("limit") int limit);
+
+    /** 新版事项序号仅分配一次，已移除行也占用序号，绝不能复用其身份。 */
+    @Select("SELECT COALESCE(MAX(seq), 0) + 1 FROM biz_meeting_minutes_item "
+            + "WHERE minutes_id = #{minutesId} AND kind = #{kind}")
+    int nextStableSeq(@Param("minutesId") long minutesId, @Param("kind") String kind);
+
+    /** 更新约定不覆盖办理结果；父纪要行锁与此处版本条件共同保护并发。 */
+    @Update("UPDATE biz_meeting_minutes_item SET content = #{item.content}, owner_user_id = #{item.ownerUserId}, "
+            + "owner_name = #{item.ownerName}, owner_emp_no = #{item.ownerEmpNo}, due_date = #{item.dueDate}, "
+            + "topic_key = #{item.topicKey}, deliverable = #{item.deliverable}, display_order = #{item.displayOrder}, "
+            + "version = version + 1, updated_at = NOW() WHERE id = #{item.id} AND minutes_id = #{item.minutesId} "
+            + "AND kind = #{item.kind} AND version = #{item.version} AND deleted = 0")
+    int updateDefinition(@Param("item") MeetingMinutesItem item);
+
+    /** 发布事务内先建立稳定事项 ID，再插入包含这些 ID 的不可变快照，最后绑定发布版本。 */
+    @Update("<script>UPDATE biz_meeting_minutes_item SET published_revision_id = #{revisionId} "
+            + "WHERE minutes_id = #{minutesId} AND deleted = 0 AND id IN "
+            + "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach></script>")
+    int bindPublication(@Param("minutesId") long minutesId, @Param("ids") Collection<Long> ids,
+                        @Param("revisionId") long revisionId);
+
+    /** 已移除事项保留历史身份与办理证据，不再参与待办和催办。 */
+    @Update("UPDATE biz_meeting_minutes_item SET deleted = 1, version = version + 1, updated_at = NOW() "
+            + "WHERE id = #{id} AND minutes_id = #{minutesId} AND version = #{version} AND deleted = 0")
+    int retire(@Param("minutesId") long minutesId, @Param("id") long id, @Param("version") int version);
 
     /** 保存时按位置覆盖内容与负责人；状态/结果/完成人一律不覆盖（属于负责人的事实） */
     @Insert("INSERT INTO biz_meeting_minutes_item "
@@ -69,6 +94,16 @@ public interface MeetingMinutesItemMapper extends BaseMapper<MeetingMinutesItem>
     @Delete("DELETE FROM biz_meeting_minutes_item WHERE minutes_id = #{minutesId} AND kind = #{kind} "
             + "AND seq > #{keepSeq}")
     int deleteSurplus(@Param("minutesId") long minutesId, @Param("kind") String kind, @Param("keepSeq") int keepSeq);
+
+    /** 主行锁之后仍带事项版本，重新指派或重复办理时不能覆盖旧结果。 */
+    @Update("UPDATE biz_meeting_minutes_item SET status = #{status}, result = #{result}, "
+            + "resolution_note = #{note}, done_at = #{doneAt}, done_by = #{doneBy}, done_by_name = #{doneByName}, "
+            + "version = version + 1, updated_at = NOW() WHERE id = #{id} AND deleted = 0 "
+            + "AND version = #{version} AND status = 'pending'")
+    int markResolvedVersioned(@Param("id") long id, @Param("version") int version,
+                              @Param("status") String status, @Param("result") String result,
+                              @Param("note") String note, @Param("doneAt") LocalDateTime doneAt,
+                              @Param("doneBy") long doneBy, @Param("doneByName") String doneByName);
 
     /** 负责人/记录人/行政更新处理结果 */
     @Update("UPDATE biz_meeting_minutes_item SET status = #{status}, result = #{result}, "

@@ -331,6 +331,7 @@ export const keyToPath: Record<string, string> = {
   'meeting-room':          '/meeting-room',
   'meeting-record':        '/meeting-record',
   'meeting-config':        '/meeting-config',
+  'meeting-blacklist':     '/meeting-blacklist',
   // 行政側紀要檢索（會議治理 › 會議紀要）
   'meeting-minutes-list':  '/meeting-minutes-list',
   // 通知模板 / 推送開關：緊鄰「通知渠道配置」
@@ -481,7 +482,9 @@ pathToKey['/meeting-detail'] = 'meeting-my'
 // 会议室新增/编辑、预约新增都是独立页（非菜单项）：归到各自的父菜单，守卫与页签高亮才有锚点
 pathToKey['/meeting-room-form'] = 'meeting-room'
 pathToKey['/meeting-booking-form'] = 'meeting-booking'
-pathToKey['/meeting-blacklist-form'] = 'meeting-config'
+// 第一阶段拆展示入口；安全守卫仍以 ROUTE_MENU_KEY_MAP 的旧权限锚点为准。
+pathToKey['/meeting-blacklist-form'] = 'meeting-blacklist'
+pathToKey['/meeting-room-rules'] = 'meeting-config'
 // 签到二维码指向的独立免登页：不套后台布局，注册进 pathToKey 只为了菜单高亮不报错
 pathToKey['/meeting-checkin'] = 'meeting-my'
 // 文檔中心子頁（詳情/登記/編輯歸文檔庫，空間表單歸空間管理）：守衛與頁簽高亮才有錨點
@@ -698,7 +701,7 @@ export const BACKEND_CONNECTED_KEYS: Set<string> = new Set([
   'attendance-schedule', 'attendance-punch', 'attendance-exception', 'attendance-daily',
   'attendance-monthly', 'attendance-setting',
   // 会议管理：四个菜单及其详情页全部走真实 /api/meeting/*，无前端 mock 回退
-  'meeting-my', 'meeting-booking', 'meeting-room', 'meeting-record', 'meeting-config', 'meeting-minutes-list',
+  'meeting-my', 'meeting-booking', 'meeting-room', 'meeting-record', 'meeting-config', 'meeting-blacklist', 'meeting-minutes-list',
   'notification-template', 'notification-switch',
   // 文檔中心：四個菜單及子頁全部走真實 /api/doc/*，無前端 mock 回退
   'doc-library', 'doc-space', 'doc-stats', 'doc-learning',

@@ -12,7 +12,7 @@
  *   3. 时间的起止倒挂、上下限倒挂在前端就拦下（后端同样各有一道，那是安全边界）。
  */
 import { useCallback, useEffect, useState } from 'react'
-import { AutoComplete, Button, Form, Input, InputNumber, Select, Spin, Switch, TimePicker, message } from 'antd'
+import { AutoComplete, Button, Form, Input, InputNumber, Select, Spin, Switch, message } from 'antd'
 import type { CSSProperties } from 'react'
 import {
   ArrowLeftOutlined, ClockCircleOutlined, EnvironmentOutlined, HomeOutlined,
@@ -40,12 +40,6 @@ const MENU = 'meeting-room'
 type FormShape = Omit<MeetingRoomPayload, 'bookableStartTime' | 'bookableEndTime'> & {
   bookableStartTime?: Dayjs | string | null
   bookableEndTime?: Dayjs | string | null
-}
-
-/** dayjs 或已是 'HH:mm' 字串（编辑回填）→ 'HH:mm' */
-function hourMinute(value: Dayjs | string | null | undefined): string | undefined {
-  if (!value) return undefined
-  return dayjs.isDayjs(value) ? value.format('HH:mm') : value
 }
 
 /** 表单页模块卡片（§C.3）：白底 + 8px 圆角 + 图标色块标题行 */
@@ -138,27 +132,17 @@ export default function MeetingRoomForm() {
     } catch {
       return // antd 已在字段下方标出原因
     }
+    // 规则列已收口到「會議室規則」专属接口：档案提交显式置空（= 继承通用），
+    // 后端更新路径也不再写这几列，避免“只改了个备注”把专属页配好的值覆盖。
     const values: MeetingRoomPayload = {
       ...raw,
-      bookableStartTime: hourMinute(raw.bookableStartTime) ?? null,
-      bookableEndTime: hourMinute(raw.bookableEndTime) ?? null,
+      bookableStartTime: null,
+      bookableEndTime: null,
+      minDuration: null,
+      maxDuration: null,
+      releaseAfterMinutes: null,
+      checkinRequired: undefined,
       expectVersion: record?.version,
-    }
-    // 跨字段自洽性：这类错误 antd 的单字段规则表达不了，统一在校验后提示第一条
-    const errors: string[] = []
-    const start = values.bookableStartTime
-    const end = values.bookableEndTime
-    if ((start && !end) || (!start && end)) errors.push(t('meeting.windowBothOrBothEmpty', { defaultValue: '每日可預約起止時間需一起填寫或一起清空' }))
-    if (start && end && start >= end) errors.push(t('meeting.windowEndAfterStart', { defaultValue: '每日可預約結束時間必須晚於開始時間' }))
-    if (values.minDuration != null && values.maxDuration != null && values.maxDuration < values.minDuration) {
-      errors.push(t('meeting.maxDurationLessThanMin', { defaultValue: '單場最長時長不得小於最短時長' }))
-    }
-    if (values.checkinRequired && values.releaseAfterMinutes != null && values.releaseAfterMinutes < 1) {
-      errors.push(t('meeting.releaseMinutesMustBePositive', { defaultValue: '未簽到釋放分鐘必須大於 0' }))
-    }
-    if (errors.length > 0) {
-      message.warning(errors[0])
-      return
     }
     setSubmitting(true)
     try {
@@ -306,36 +290,24 @@ export default function MeetingRoomForm() {
           </div>
         </div>
 
-        {/* 三、预约规则（留空=沿用全局默认） */}
+        {/* 三、預約規則：唯一編輯入口是「預約管理 › 預約規則 › 會議室規則」，档案页不再另存一套 */}
         <div style={cardStyle}>
           <CardTitle icon={<ClockCircleOutlined />} tone="warn" title={t('meeting.bookingRules', { defaultValue: '預約規則' })}
-            note={record?.windowConfigured === false
-              ? t('meeting.windowAllGlobalNow', { defaultValue: '目前全部沿用全局默認' })
-              : t('meeting.windowBlankUsesGlobal', { defaultValue: '留空即沿用全局默認' })} />
-          <div style={gridStyle}>
-            <Form.Item label={t('meeting.dailyBookableStart', { defaultValue: '每日可預約開始' })} name="bookableStartTime" extra={t('meeting.emptyGlobal0800', { defaultValue: '留空＝全局 08:00' })}>
-              <TimePicker format="HH:mm" minuteStep={15 as const} style={{ width: '100%' }} />
-            </Form.Item>
-            <Form.Item label={t('meeting.bookableUntil', { defaultValue: '每日可預約結束' })} name="bookableEndTime" extra={t('meeting.emptyGlobal2200', { defaultValue: '留空＝全局 22:00' })}>
-              <TimePicker format="HH:mm" minuteStep={15 as const} style={{ width: '100%' }} />
-            </Form.Item>
-            <Form.Item label={t('meeting.minimumDuration', { defaultValue: '單場最短時長' })} name="minDuration" rules={[{ type: 'integer', min: 1, message: t('meeting.minDurationPositive', { defaultValue: '最短時長需為正整數' }) }]}
-              extra={t('meeting.empty15MinuteGranularity', { defaultValue: '留空＝按 15 分鐘粒度' })}>
-              <InputNumber min={1} max={1440} style={{ width: '100%' }} addonAfter={t('meeting.min', { defaultValue: '分鐘' })} />
-            </Form.Item>
-            <Form.Item label={t('meeting.maximumDuration', { defaultValue: '單場最長時長' })} name="maxDuration" rules={[{ type: 'integer', min: 1, message: t('meeting.maxDurationPositive', { defaultValue: '最長時長需為正整數' }) }]}
-              extra={t('meeting.emptyGlobal240Minutes', { defaultValue: '留空＝全局 240 分鐘' })}>
-              <InputNumber min={1} max={1440} style={{ width: '100%' }} addonAfter={t('meeting.min', { defaultValue: '分鐘' })} />
-            </Form.Item>
-            <Form.Item label={t('meeting.checkInHold', { defaultValue: '需簽到保留' })} name="checkinRequired" valuePropName="checked"
-              extra={t('meeting.whenOnTheSlot', { defaultValue: '開啟後超時未簽到自動釋放' })}>
-              <Switch checkedChildren={t('meeting.required2', { defaultValue: '需要' })} unCheckedChildren={t('meeting.notRequired', { defaultValue: '不需要' })} />
-            </Form.Item>
-            <Form.Item label={t('meeting.releaseAfterMinutes', { defaultValue: '未簽到釋放分鐘' })} name="releaseAfterMinutes"
-              rules={[{ type: 'integer', min: 1, message: t('meeting.releaseMinutesPositive', { defaultValue: '釋放分鐘需為正整數' }) }]} extra={t('meeting.emptyDefault15Minutes', { defaultValue: '留空＝默認 15 分鐘' })}>
-              <InputNumber min={1} max={240} style={{ width: '100%' }} addonAfter={t('meeting.min', { defaultValue: '分鐘' })} placeholder={t('meeting.default15', { defaultValue: '默認 15' })} />
-            </Form.Item>
-          </div>
+            note={t('meetingReservation.ownerNote', { defaultValue: '由「預約規則」統一配置，未設定項繼承通用' })} />
+          {isEdit && editId != null ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+                {t('meetingReservation.ownerDesc', { defaultValue: '可預約時段、時長、提醒與簽到按房間單獨設定；本頁儲存不會改動這些規則。' })}
+              </span>
+              <Button type="primary" onClick={() => navigate(`/meeting-room-rules?id=${editId}&from=room`)}>
+                {t('meetingReservation.ownerAction', { defaultValue: '配置會議室規則' })}
+              </Button>
+            </div>
+          ) : (
+            <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+              {t('meetingReservation.ownerCreateHint', { defaultValue: '新會議室默認繼承通用規則；建立後可在「預約管理 › 預約規則」單獨調整。' })}
+            </span>
+          )}
         </div>
 
         {/* 四、房间管理员与备注 */}

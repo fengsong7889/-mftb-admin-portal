@@ -47,6 +47,15 @@ public class MeetingMinutesPageController {
     private final MeetingMinutesService minutesService;
     private final ApiRateLimiter rateLimiter;
 
+    /** 令牌对应的文档不进入代理缓存，也不向外链泄露来源。 */
+    @org.springframework.web.bind.annotation.ModelAttribute
+    public void privateDocumentHeaders(jakarta.servlet.http.HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store, max-age=0");
+        response.setHeader("Pragma", "no-cache");
+        response.setHeader("Referrer-Policy", "no-referrer");
+        response.setHeader("X-Robots-Tag", "noindex, nofollow");
+    }
+
     /**
      * 方案文档里的免登契约路径：`GET /api/public/meeting-minutes?token=`。
      * <p>与 `/api/meeting/minutes-page/detail` 同一处理器、同一限流：两条路径都存在是为了

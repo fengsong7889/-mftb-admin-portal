@@ -163,6 +163,24 @@ public class DingTalkServiceImpl implements DingTalkService {
      * 抛出去只会把异步线程打断，留下一个停在「投递中」的死任务。
      */
     @Override
+    public SendOutcome sendActionCardSyncToChannel(long channelId, String title, String text,
+                                                   String buttonTitle, String buttonUrl) {
+        SysNotificationChannel channel = channelMapper.selectById(channelId);
+        if (channel == null) return SendOutcome.unknown("channel_not_found");
+        if (!"dingtalk".equals(channel.getChannel())) return SendOutcome.unknown("channel_platform_not_dingtalk");
+        if (!Integer.valueOf(1).equals(channel.getEnabled())) return SendOutcome.unknown("channel_disabled");
+        if (!StringUtils.hasText(channel.getWebhookUrl())) return SendOutcome.unknown("channel_webhook_missing");
+        if (!StringUtils.hasText(text) || !StringUtils.hasText(buttonTitle) || !StringUtils.hasText(buttonUrl)) {
+            return SendOutcome.unknown("channel_card_incomplete");
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("msgtype", "actionCard");
+        body.put("actionCard", Map.of("title", title, "text", text, "singleTitle", buttonTitle,
+                "singleURL", buttonUrl, "btnOrientation", "0"));
+        return doPostSync(channel, body);
+    }
+
+    @Override
     public SendOutcome sendMarkdownSyncToChannel(long channelId, String title, String text,
                                                  List<String> atMobiles, boolean isAtAll) {
         SysNotificationChannel channel = channelMapper.selectById(channelId);

@@ -5,8 +5,15 @@ import com.mftb.admin.common.BusinessException;
 import lombok.Data;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.ResolverStyle;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * 会议纪要正文（落 {@code biz_meeting_minutes.content_json} 的结构化模板）。
@@ -36,6 +43,30 @@ public class MeetingMinutesContent {
     public static final int NAME_MAX = 64;
     /** 正文总字数上限：列是 TEXT(65535)，留一半余量给 JSON 结构与人员快照 */
     public static final int CONTENT_MAX = 8000;
+    public static final int DOCUMENT_SCHEMA = 2;
+    public static final int SUMMARY_MAX = 300;
+    /** 合并旧目的（500 字）与摘要（300 字）时保留段落，仍受正文总长度约束。 */
+    public static final int PURPOSE_MAX = 1000;
+    public static final int MAX_ATTENDANCE = 100;
+    public static final String DECISION_DECIDED = "decided";
+    public static final String DECISION_PENDING = "pending";
+    public static final String DECISION_INFORMATION = "information";
+    public static final String ATTENDANCE_PRESENT = "present";
+    public static final String ATTENDANCE_ABSENT = "absent";
+    public static final String ATTENDANCE_UNVERIFIED = "unverified";
+    private static final Set<String> DECISION_STATES = Set.of(DECISION_DECIDED, DECISION_PENDING, DECISION_INFORMATION);
+    private static final Set<String> ATTENDANCE_STATES = Set.of(ATTENDANCE_PRESENT, ATTENDANCE_ABSENT, ATTENDANCE_UNVERIFIED);
+
+    /** 旧 JSON 没有结构版本时保持旧版，不追认历史发送为正式发布。 */
+    private Integer schemaVersion = 1;
+    private String purpose;
+    /** 历史兼容字段，新版填写统一写入 purpose；读取旧快照时不迁移或改写。 */
+    private String summary;
+    private Long chairUserId;
+    /** 人员快照必须由服务端回查，不能采信客户端署名。 */
+    private String chairName;
+    private String chairEmpNo;
+    private List<Attendance> attendance = new ArrayList<>();
 
     /** 议题与结论（至少一条，或行动项至少一条） */
     private List<Item> items = new ArrayList<>();
@@ -63,6 +94,23 @@ public class MeetingMinutesContent {
         private String topic;
         private String discussion;
         private String conclusion;
+        /** 议题关联使用稳定键，不使用数组下标。 */
+        private String topicKey;
+        private String decisionStatus;
+    }
+
+    /** 出席事实和签到证据分开保存，确认人及时间由后端赋值。 */
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Attendance {
+        private Long userId;
+        private String name;
+        private String empNo;
+        private String status;
+        private String reason;
+        private String source;
+        private String confirmedByName;
+        private String confirmedAt;
     }
 
     /**
@@ -73,6 +121,10 @@ public class MeetingMinutesContent {
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Action {
+        /** 新事项在发布前无主键，已发布事项必须携带原主键，不能按位置替换。 */
+        private Long itemId;
+        private String topicKey;
+        private String deliverable;
         private String content;
         private Long ownerUserId;
         private String ownerName;
@@ -86,6 +138,12 @@ public class MeetingMinutesContent {
     public static class OpenIssue {
         private String content;
         private String needDecisionBy;
+        private Long itemId;
+        private String topicKey;
+        private Long ownerUserId;
+        private String ownerName;
+        private String ownerEmpNo;
+        private String dueDate;
     }
 
     /** 缺席人员：可以是系统内员工（有 userId），也可以是只留姓名快照的外部人员 */
@@ -106,6 +164,9 @@ public class MeetingMinutesContent {
      * <p>失败信息面向业务（说清是哪一项超了），不回显整段正文。
      */
     public void validate() {
+        if (schemaVersion == null || (schemaVersion != 1 && schemaVersion != DOCUMENT_SCHEMA)) {
+            throw new BusinessException("不支援的紀要結構版本，請刷新後重試");
+        }
         List<Item> safeItems = items == null ? List.of() : items;
         List<Action> safeActions = actions == null ? List.of() : actions;
         if (safeItems.isEmpty() && safeActions.isEmpty()) {
@@ -123,6 +184,12 @@ public class MeetingMinutesContent {
         if (absentees != null && absentees.size() > MAX_ABSENTS) {
             throw new BusinessException("缺席人員最多 " + MAX_ABSENTS + " 位");
         }
+        if (safeItems.stream().anyMatch(Objects::isNull) || safeActions.stream().anyMatch(Objects::isNull)
+                || (openIssues != null && openIssues.stream().anyMatch(Objects::isNull))
+                || (absentees != null && absentees.stream().anyMatch(Objects::isNull))) {
+            throw new BusinessException("紀要內容不可包含空白資料項");
+        }
+        if (versioned()) validateVersionedFields();
         int index = 0;
         for (Item item : safeItems) {
             index++;
@@ -185,14 +252,33 @@ public class MeetingMinutesContent {
                 sum += length(absentee.getName()) + length(absentee.getReason());
             }
         }
+        if (versioned()) {
+            sum += length(purpose) + length(summary);
+            if (actions != null) {
+                for (Action action : actions) sum += length(action.getDeliverable());
+            }
+            if (attendance != null) {
+                for (Attendance person : attendance) sum += length(person.getName()) + length(person.getReason());
+            }
+        }
         return sum + length(nextMeetingNote) + length(remark);
     }
 
+    /** 只派生展示文本，不更改旧快照；仅去除两字段完全重复的内容。 */
+    public String purposeText() {
+        String current = purpose == null ? "" : purpose.trim();
+        String legacy = summary == null ? "" : summary.trim();
+        if (current.isEmpty()) return legacy;
+        if (legacy.isEmpty() || current.equals(legacy)) return current;
+        return current + "\n\n" + legacy;
+    }
+
     /**
-     * 摘要：首条结论，其次首条议题标题，都没有就是空串。
-     * 落独立列是为了列表页与钉钉卡片能直接读，不必在 SQL 里解析 JSON。
+     * 列表摘要优先取统一会议目的，再回退至首条结论、议题或行动项。
+     * 独立摘要列仍限制 300 字，不截断正文或历史快照。
      */
     public String digest() {
+        if (versioned() && StringUtils.hasText(purposeText())) return truncate(purposeText(), SUMMARY_MAX);
         if (items != null) {
             for (Item item : items) {
                 if (StringUtils.hasText(item.getConclusion())) {
@@ -211,6 +297,109 @@ public class MeetingMinutesContent {
         return "";
     }
 
+    public boolean versioned() {
+        return Integer.valueOf(DOCUMENT_SCHEMA).equals(schemaVersion);
+    }
+
+    /** 草稿允许逐步填写，发布时要求会议目的、主持人和完整责任分配；兼容旧摘要。 */
+    public void validateForPublication() {
+        validate();
+        if (!versioned()) throw new BusinessException("請先使用新版模板保存紀要");
+        if (!StringUtils.hasText(purposeText())) throw new BusinessException("發布前請填寫會議目的");
+        if (chairUserId == null) throw new BusinessException("發布前請指定主持人");
+        for (Item item : items == null ? List.<Item>of() : items) {
+            if (!StringUtils.hasText(item.getTopicKey())) throw new BusinessException("議題識別碼缺失，請重新保存");
+            if (!StringUtils.hasText(item.getDecisionStatus())) throw new BusinessException("發布前請確認每個議題的決議狀態");
+            if (!DECISION_INFORMATION.equals(item.getDecisionStatus()) && !StringUtils.hasText(item.getConclusion())) {
+                throw new BusinessException("已形成決議或待決策的議題必須填寫結論或待決策內容");
+            }
+            if (DECISION_INFORMATION.equals(item.getDecisionStatus())
+                    && !StringUtils.hasText(item.getDiscussion()) && !StringUtils.hasText(item.getConclusion())) {
+                throw new BusinessException("資訊同步議題必須填寫討論要點或結論");
+            }
+        }
+        for (Action action : actions == null ? List.<Action>of() : actions) {
+            requireResponsible(action.getOwnerUserId(), action.getDueDate(), "行動項");
+        }
+        for (OpenIssue issue : openIssues == null ? List.<OpenIssue>of() : openIssues) {
+            requireResponsible(issue.getOwnerUserId(), issue.getDueDate(), "跟進事項");
+        }
+    }
+
+    private void validateVersionedFields() {
+        requireWithin(purpose, PURPOSE_MAX, "會議目的");
+        requireWithin(summary, SUMMARY_MAX, "歷史會議摘要");
+        requireWithin(purposeText(), PURPOSE_MAX, "會議目的");
+        requirePositive(chairUserId, "主持人");
+        if (attachments != null && !attachments.isEmpty()) throw new BusinessException("本版紀要不支援附件上傳");
+        Set<String> topics = new HashSet<>();
+        for (Item item : items == null ? List.<Item>of() : items) {
+            if (StringUtils.hasText(item.getTopicKey())) {
+                requireKey(item.getTopicKey());
+                if (!topics.add(item.getTopicKey())) throw new BusinessException("議題識別碼不可重複");
+            }
+            if (item.getDecisionStatus() != null && !DECISION_STATES.contains(item.getDecisionStatus())) {
+                throw new BusinessException("不支援的決議狀態");
+            }
+        }
+        Set<Long> taskIds = new HashSet<>();
+        for (Action action : actions == null ? List.<Action>of() : actions) {
+            validateTask(action.getItemId(), action.getTopicKey(), action.getOwnerUserId(), action.getDueDate(), topics, taskIds);
+            requireWithin(action.getDeliverable(), ACTION_MAX, "交付物或驗收標準");
+        }
+        for (OpenIssue issue : openIssues == null ? List.<OpenIssue>of() : openIssues) {
+            if (!StringUtils.hasText(issue.getContent())) throw new BusinessException("跟進事項不可留空");
+            validateTask(issue.getItemId(), issue.getTopicKey(), issue.getOwnerUserId(), issue.getDueDate(), topics, taskIds);
+        }
+        if (attendance == null) return;
+        if (attendance.size() > MAX_ATTENDANCE) throw new BusinessException("參會資料最多 " + MAX_ATTENDANCE + " 人");
+        Set<String> attendees = new HashSet<>();
+        Set<Long> presentIds = new HashSet<>();
+        for (Attendance person : attendance) {
+            if (person == null) throw new BusinessException("參會資料不可包含空白項");
+            requirePositive(person.getUserId(), "參會人");
+            if (person.getUserId() == null && !StringUtils.hasText(person.getName())) {
+                throw new BusinessException("外部參會人姓名不可留空");
+            }
+            requireWithin(person.getName(), NAME_MAX, "參會人姓名");
+            requireWithin(person.getReason(), SHORT_MAX, "參會說明");
+            if (person.getStatus() == null || !ATTENDANCE_STATES.contains(person.getStatus())) {
+                throw new BusinessException("不支援的參會狀態");
+            }
+            String key = person.getUserId() == null ? "external:" + person.getName().trim() : "user:" + person.getUserId();
+            if (!attendees.add(key)) throw new BusinessException("同一參會人不可同時列入多個出席狀態");
+            if (ATTENDANCE_PRESENT.equals(person.getStatus()) && person.getUserId() != null) presentIds.add(person.getUserId());
+        }
+        for (Absentee person : absentees == null ? List.<Absentee>of() : absentees) {
+            if (person.getUserId() != null && presentIds.contains(person.getUserId())) {
+                throw new BusinessException("已出席人員不可同時列入缺席名單");
+            }
+        }
+    }
+
+    private static void validateTask(Long itemId, String topicKey, Long ownerId, String dueDate,
+                                     Set<String> topics, Set<Long> taskIds) {
+        requirePositive(itemId, "事項");
+        requirePositive(ownerId, "負責人");
+        if (itemId != null && !taskIds.add(itemId)) throw new BusinessException("事項識別碼不可重複");
+        if (StringUtils.hasText(topicKey) && !topics.contains(topicKey)) throw new BusinessException("行動項關聯的議題不存在");
+        requireDate(dueDate, "yyyy-MM-dd", "完成時限");
+    }
+
+    private static void requireResponsible(Long ownerId, String dueDate, String label) {
+        if (ownerId == null || !StringUtils.hasText(dueDate)) {
+            throw new BusinessException("發布前每條" + label + "都必須指定負責人及完成時限");
+        }
+    }
+
+    private static void requirePositive(Long value, String label) {
+        if (value != null && value <= 0) throw new BusinessException(label + "識別碼不正確");
+    }
+
+    private static void requireKey(String value) {
+        if (!value.matches("[A-Za-z0-9_-]{1,64}")) throw new BusinessException("議題識別碼格式不正確");
+    }
+
     private static void requireWithin(String value, int max, String label) {
         if (value != null && value.trim().length() > max) {
             throw new BusinessException(label + "不得超過 " + max + " 字");
@@ -226,6 +415,14 @@ public class MeetingMinutesContent {
                 : "\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}";
         if (!value.trim().matches(regex)) {
             throw new BusinessException(label + "格式應為 " + pattern);
+        }
+        try {
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern(pattern.replace("yyyy", "uuuu"))
+                    .withResolverStyle(ResolverStyle.STRICT);
+            if ("yyyy-MM-dd".equals(pattern)) LocalDate.parse(value.trim(), formatter);
+            else LocalDateTime.parse(value.trim(), formatter);
+        } catch (java.time.DateTimeException e) {
+            throw new BusinessException(label + "不是有效日期或時間");
         }
     }
 

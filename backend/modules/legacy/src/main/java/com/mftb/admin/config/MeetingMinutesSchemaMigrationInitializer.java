@@ -46,6 +46,9 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
     /** v1.1：可跟踪事项 / 关联纪要 / 通知模板 / 推送开关 + 三个菜单 */
     static final String VERSION_SCHEMA_V2 = "meeting:minutes:v1.1";
     private static final String SCHEMA_SCRIPT_V2 = "268_meeting_minutes_v2.sql";
+    static final String VERSION_PUBLICATION = "meeting:minutes-publication:v2.0";
+    /** v2.1：单批次链接作废（link_revoked 列） */
+    static final String VERSION_BATCH_REVOKE = "meeting:minutes:batch-revoke:v2.1";
 
     /**
      * v1.2：会议通知卡片版式重排（参会人反馈“样式丑、信息不突出”）。
@@ -193,6 +196,8 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
         // 放在同一个执行器里而不是另开一个 @Order(29) 的类：本版本的表有外键指向 v1 的纪要表，
         // 两个同序号的 Bean 执行顺序不确定，全新库上可能先建子表而 1215 失败。
         versionTracker.applyOnce(VERSION_SCHEMA_V2, this::doSchemaMigrateV2, this::verifySchemaV2);
+        versionTracker.applyOnce(VERSION_PUBLICATION, this::migratePublication, this::verifyPublication);
+        versionTracker.applyOnce(VERSION_BATCH_REVOKE, this::migrateBatchRevoke, this::verifyBatchRevoke);
         // v1.2：卡片文案重排。必须在 v1.1 之后（模板表与种子先就绪）
         versionTracker.applyOnce(VERSION_TEMPLATE_COPY_V12,
                 this::refreshMeetingCardCopyV12, this::verifyMeetingCardCopyV12);
@@ -207,6 +212,7 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
         // 只授 admin 会让新菜单入库了却没人看得见。
         syncMenuGrantsV2();
         verifyColumns();
+        verifyPublication();
     }
 
     /* ==================== 迁移任务 ==================== */
@@ -250,6 +256,76 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
                 throw new IllegalStateException("菜單未就緒: " + menu[0]);
             }
         }
+    }
+
+    /** 增量 DDL 的存在性查询只是幂等护栏，任何执行失败都必须抛出，不得记成功版本。 */
+    private void migratePublication() {
+        for (String sql : MeetingMinutesSchema.statements(MeetingMinutesSchema.SCRIPT_PUBLICATION)) {
+            if (sql.startsWith("ALTER TABLE ")) {
+                MeetingMinutesSchema.Addition addition = MeetingMinutesSchema.addition(sql);
+                boolean exists = addition.column() ? columnExists(addition.table(), addition.name())
+                        : constraintExists(addition.table(), addition.name());
+                if (exists) continue;
+            }
+            jdbcTemplate.execute(sql);
+        }
+        log.info("会议纪要正式版本结构和独立通知模板已就绪");
+    }
+
+    private void verifyPublication() {
+        if (!tableExists(MeetingMinutesSchema.REVISION_TABLE)) {
+            throw new IllegalStateException("会议纪要发布版本表未就绪");
+        }
+        for (com.mftb.admin.config.migration.ContractSpec contract : MeetingMinutesSchema.contracts()) {
+            if (!MeetingMinutesSchema.REVISION_TABLE.equals(contract.table())) continue;
+            for (com.mftb.admin.config.migration.ContractSpec.ColumnSpec column : contract.requiredColumns()) {
+                if (!columnExists(contract.table(), column.column())) {
+                    throw new IllegalStateException("纪要版本表缺少列：" + column.column());
+                }
+            }
+        }
+        for (String constraint : List.of("fk_meeting_minutes_revision_minutes", "fk_meeting_minutes_revision_publisher",
+                "ck_meeting_minutes_revision_no", "ck_meeting_minutes_revision_schema", "ck_meeting_minutes_revision_draft")) {
+            if (!constraintExists(MeetingMinutesSchema.REVISION_TABLE, constraint)) {
+                throw new IllegalStateException("纪要版本表约束未生效：" + constraint);
+            }
+        }
+        for (String key : List.of("uk_meeting_minutes_revision_no", "uk_meeting_minutes_revision_request",
+                "uk_meeting_minutes_revision_owner")) {
+            if (!indexExists(MeetingMinutesSchema.REVISION_TABLE, key)) {
+                throw new IllegalStateException("会议纪要正式版本缺少唯一键：" + key);
+            }
+        }
+        for (MeetingMinutesSchema.Addition addition : MeetingMinutesSchema.publicationAdditions()) {
+            boolean exists = addition.column() ? columnExists(addition.table(), addition.name())
+                    : constraintExists(addition.table(), addition.name());
+            if (!exists) throw new IllegalStateException("纪要发布结构未就绪：" + addition.table() + "." + addition.name());
+        }
+        Integer templates = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_notification_template WHERE scene_key = 'meeting_minutes_published'", Integer.class);
+        if (templates == null || templates != 1) throw new IllegalStateException("纪要发布通知模板未就绪");
+    }
+
+    /** v2.1：单批次链接作废——加 link_revoked 列，允许精确作废某一批的免登链接而不影响其他批次 */
+    private void migrateBatchRevoke() {
+        if (!columnExists("biz_meeting_minutes_send", "link_revoked")) {
+            jdbcTemplate.execute("ALTER TABLE biz_meeting_minutes_send ADD COLUMN link_revoked TINYINT NOT NULL DEFAULT 0"
+                    + " COMMENT '单批次链接作废：0=有效 1=已作废' AFTER link_expire_at");
+        }
+        log.info("会议纪要单批次链接作废列已就绪");
+    }
+
+    private void verifyBatchRevoke() {
+        if (!columnExists("biz_meeting_minutes_send", "link_revoked")) {
+            throw new IllegalStateException("biz_meeting_minutes_send 缺少 link_revoked 列");
+        }
+    }
+
+    private boolean constraintExists(String table, String name) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA = DATABASE() "
+                        + "AND TABLE_NAME = ? AND CONSTRAINT_NAME = ? AND ENFORCED = 'YES'", Integer.class, table, name);
+        return count != null && count > 0;
     }
 
     /* ==================== v1.2 卡片文案重排 ==================== */

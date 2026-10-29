@@ -6,6 +6,10 @@ import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.MeetingConstants;
 import com.mftb.admin.dto.MeetingMinutesContent;
 import com.mftb.admin.dto.MeetingMinutesDto;
+import com.mftb.admin.entity.MeetingMinutesRevision;
+import com.mftb.admin.entity.MeetingMinutesItem;
+import com.mftb.admin.mapper.MeetingMinutesRevisionMapper;
+import com.mftb.admin.service.MeetingMinutesPublication;
 import com.mftb.admin.entity.MeetingAttendee;
 import com.mftb.admin.entity.MeetingBooking;
 import com.mftb.admin.entity.MeetingMinutes;
@@ -47,6 +51,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -91,11 +96,13 @@ class MeetingMinutesServiceImplTest {
     private NotificationAppService appService;
     private BizSeqService bizSeqService;
     private MeetingMinutesServiceImpl service;
+    private MeetingMinutesRevisionMapper revisionMapper;
+    private MeetingMinutesPublication publication;
 
     @BeforeAll
     static void initTableMetadata() {
         for (Class<?> entity : List.of(MeetingBooking.class, MeetingAttendee.class, MeetingMinutes.class,
-                MeetingMinutesSend.class, SysUser.class)) {
+                MeetingMinutesSend.class, MeetingMinutesItem.class, SysUser.class)) {
             TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), entity);
         }
     }
@@ -112,6 +119,7 @@ class MeetingMinutesServiceImplTest {
         u.setName(name);
         u.setUsername(name);
         u.setDepartment("財務部");
+        u.setStatus(1);
         return u;
     }
 
@@ -196,9 +204,15 @@ class MeetingMinutesServiceImplTest {
             }
             return 1;
         });
+        revisionMapper = mock(MeetingMinutesRevisionMapper.class);
+        publication = new MeetingMinutesPublication(minutesMapper, revisionMapper, itemMapper, linkMapper, userMapper, audit);
+        when(minutesMapper.lockById(anyLong())).thenAnswer(call -> minutesMapper.selectById((long) call.getArgument(0)));
+        when(minutesMapper.update(any(), any())).thenReturn(1);
         service = new MeetingMinutesServiceImpl(minutesMapper, sendMapper, deliveryMapper, itemMapper, linkMapper,
                 bookingMapper, attendeeMapper, userMapper, jdbc, guard, audit, dispatcher, templateService,
-                mock(DingTalkService.class), appService, bizSeqService);
+                mock(DingTalkService.class), appService, bizSeqService, publication);
+        ReflectionTestUtils.setField(service, "publicationEnabled", true);
+        ReflectionTestUtils.setField(service, "cardEnabled", true);
         ReflectionTestUtils.setField(service, "minutesEnabled", true);
         ReflectionTestUtils.setField(service, "tokenSecretConfig", "unit-test-secret");
 
@@ -575,6 +589,10 @@ class MeetingMinutesServiceImplTest {
         org.mockito.Mockito.doThrow(new BusinessException("無權查看該會議"))
                 .when(guard).requireBookingReadable(any(), eq(STRANGER));
         when(deliveryMapper.countSentToUser(5L, STRANGER.getId())).thenReturn(1);
+        MeetingMinutesSend received = new MeetingMinutesSend();
+        received.setMinutesNo("MJ202610190001");
+        received.setContentSnapshot(JsonUtils.toJson(validContent()));
+        when(sendMapper.lastForUser(5L, STRANGER.getId())).thenReturn(received);
 
         MeetingMinutesDto.VO vo = service.view(5L);
         assertTrue(vo.isExists());
@@ -711,5 +729,219 @@ class MeetingMinutesServiceImplTest {
         assertEquals(1, byBooking.size());
         verify(minutesMapper).findByBookings(anyCollection());
         verify(minutesMapper, never()).findByBooking(anyLong());
+    }
+
+    private MeetingMinutesContent publicationContent() {
+        MeetingMinutesContent content = validContent();
+        content.setSchemaVersion(2);
+        content.setSummary("確認預算口徑");
+        content.setChairUserId(ORGANIZER.getId());
+        content.getItems().get(0).setTopicKey("topic-1");
+        content.getItems().get(0).setDecisionStatus("decided");
+        return content;
+    }
+
+    private MeetingMinutes preparePublication() {
+        MeetingMinutes minutes = minutes(5L, RECORDER.getId(), 0, 0);
+        minutes.setContentJson(JsonUtils.toJson(publicationContent()));
+        when(minutesMapper.selectById(5L)).thenReturn(minutes);
+        when(guard.canRecordMinutes(RECORDER)).thenReturn(true);
+        when(userMapper.selectBatchIds(any())).thenReturn(List.of(ORGANIZER, OWNER_OF_ACTION));
+        when(revisionMapper.nextRevisionNo(5L)).thenReturn(1);
+        when(itemMapper.nextStableSeq(anyLong(), anyString())).thenReturn(1);
+        when(revisionMapper.insert(any())).thenAnswer(call -> {
+            MeetingMinutesRevision revision = call.getArgument(0);
+            revision.setId(91L);
+            when(revisionMapper.find(5L, 91L)).thenReturn(revision);
+            when(revisionMapper.findByRequest(5L, revision.getRequestKey())).thenReturn(revision);
+            return 1;
+        });
+        return minutes;
+    }
+
+    private MeetingMinutesDto.PublishForm publishForm() {
+        MeetingMinutesDto.PublishForm form = new MeetingMinutesDto.PublishForm();
+        form.setVersion(0);
+        form.setRequestKey("publish-1");
+        return form;
+    }
+
+    @Test
+    void publicationIsImmutableAndIdempotentWithoutDispatch() {
+        MeetingMinutes minutes = preparePublication();
+        MeetingMinutesDto.PublishForm form = publishForm();
+        MeetingMinutesDto.RevisionVO first = service.publish(5L, form);
+        minutes.setVersion(1);
+        minutes.setContentJson(JsonUtils.toJson(validContent()));
+        MeetingMinutesDto.RevisionVO replay = service.publish(5L, form);
+        assertEquals(first.getId(), replay.getId());
+        assertEquals("確認預算口徑", replay.getDocument().getContent().getSummary());
+        assertEquals("李四", first.getPublisherName());
+        verify(revisionMapper).insert(any());
+        verify(dispatcher, never()).register(any(), any(), any());
+        form.setChangeNote("同鍵竄改");
+        assertThrows(BusinessException.class, () -> service.publish(5L, form));
+    }
+
+    @Test
+    void purposeOnlyDraftPublishesAndReplaysWithoutRequiringSummaryOrDispatching() {
+        MeetingMinutes minutes = preparePublication();
+        MeetingMinutesContent content = publicationContent();
+        String purpose = "目".repeat(500) + "\n\n" + "摘".repeat(300);
+        content.setPurpose(purpose);
+        content.setSummary(null);
+        minutes.setContentJson(JsonUtils.toJson(content));
+        MeetingMinutesDto.PublishForm form = publishForm();
+        MeetingMinutesDto.RevisionVO first = service.publish(5L, form);
+        assertEquals(purpose, first.getDocument().getContent().getPurpose());
+        assertNull(first.getDocument().getContent().getSummary());
+        minutes.setVersion(1);
+        minutes.setContentJson(JsonUtils.toJson(validContent()));
+        MeetingMinutesDto.RevisionVO replay = service.publish(5L, form);
+        assertEquals(first.getId(), replay.getId());
+        assertEquals(purpose, replay.getDocument().getContent().getPurpose());
+        verify(revisionMapper).insert(any());
+        verify(dispatcher, never()).register(any(), any(), any());
+    }
+
+    @Test
+    void publicationRejectsStaleVersionIncompleteContentAndUnauthorizedWriter() {
+        MeetingMinutes minutes = preparePublication();
+        minutes.setVersion(2);
+        assertThrows(BusinessException.class, () -> service.publish(5L, publishForm()));
+        minutes.setVersion(0);
+        MeetingMinutesContent content = publicationContent();
+        content.setSummary(null);
+        minutes.setContentJson(JsonUtils.toJson(content));
+        assertThrows(BusinessException.class, () -> service.publish(5L, publishForm()));
+        when(guard.currentUser()).thenReturn(STRANGER);
+        assertThrows(BusinessException.class, () -> service.publish(5L, publishForm()));
+        verify(revisionMapper, never()).insert(any());
+    }
+
+    @Test
+    void publicationRequiresRevisionNoteAndActualDraftChanges() {
+        MeetingMinutes minutes = preparePublication();
+        MeetingMinutesDto.RevisionVO first = service.publish(5L, publishForm());
+        minutes.setPublishedRevisionId(first.getId());
+        MeetingMinutesDto.PublishForm next = publishForm();
+        next.setRequestKey("publish-2");
+        next.setChangeNote("修訂說明");
+        assertThrows(BusinessException.class, () -> service.publish(5L, next));
+        MeetingMinutesContent changed = publicationContent();
+        changed.setSummary("修訂內容");
+        minutes.setContentJson(JsonUtils.toJson(changed));
+        next.setChangeNote(" ");
+        assertThrows(BusinessException.class, () -> service.publish(5L, next));
+    }
+
+    @Test
+    void savingNewDraftNeverMutatesTrackedItemsOrCheckin() {
+        preparePublication();
+        MeetingMinutesDto.Form form = new MeetingMinutesDto.Form();
+        form.setVersion(0);
+        form.setContent(publicationContent());
+        form.setMarkPresentUserIds(List.of(1L));
+        service.update(5L, form);
+        verify(itemMapper, never()).upsertRow(anyLong(), anyLong(), anyString(), org.mockito.ArgumentMatchers.anyInt(),
+                anyString(), any(), anyString(), anyString(), any());
+        verify(itemMapper, never()).updateDefinition(any());
+        verify(attendeeMapper, never()).update(any(), any());
+    }
+
+    @Test
+    void receivedRevisionDoesNotGrantDraftOtherRevisionOrSendManagement() {
+        MeetingMinutes minutes = preparePublication();
+        MeetingMinutesDto.RevisionVO first = service.publish(5L, publishForm());
+        minutes.setPublishedRevisionId(first.getId());
+        when(guard.currentUser()).thenReturn(STRANGER);
+        org.mockito.Mockito.doThrow(new BusinessException("無權查看該會議"))
+                .when(guard).requireBookingReadable(any(), eq(STRANGER));
+        when(deliveryMapper.countSentToUser(5L, STRANGER.getId())).thenReturn(1);
+        MeetingMinutesSend received = new MeetingMinutesSend();
+        received.setRevisionId(first.getId());
+        when(sendMapper.lastForUser(5L, STRANGER.getId())).thenReturn(received);
+        when(sendMapper.revisionsForUser(5L, STRANGER.getId())).thenReturn(List.of(first.getId()));
+        var view = service.view(5L);
+        org.junit.jupiter.api.Assertions.assertNull(view.getContent());
+        assertFalse(view.getCanManageSends());
+        assertEquals(first.getId(), service.revision(5L, first.getId()).getId());
+        assertThrows(BusinessException.class, () -> service.revision(5L, 92L));
+        assertThrows(BusinessException.class, () -> service.sends(5L));
+    }
+
+    @Test
+    void newSchemaCannotBeSentWithoutPublishingOrDowngraded() {
+        preparePublication();
+        MeetingMinutesDto.SendForm send = new MeetingMinutesDto.SendForm();
+        send.setVersion(0);
+        assertThrows(BusinessException.class, () -> service.send(5L, send));
+        MeetingMinutesDto.Form downgrade = new MeetingMinutesDto.Form();
+        downgrade.setVersion(0);
+        downgrade.setContent(validContent());
+        assertThrows(BusinessException.class, () -> service.update(5L, downgrade));
+    }
+
+    @Test
+    void stableIdsPreventMiddleDeletionAndReorderFromStealingCompletion() {
+        MeetingMinutes minutes = preparePublication();
+        MeetingMinutesItem kept = new MeetingMinutesItem();
+        kept.setId(40L); kept.setMinutesId(5L); kept.setKind("ACTION"); kept.setVersion(3);
+        kept.setContent("交付預算"); kept.setOwnerUserId(7L); kept.setOwnerName("張三");
+        kept.setDueDate(java.time.LocalDate.of(2026, 11, 1)); kept.setStatus("done");
+        MeetingMinutesItem removed = new MeetingMinutesItem();
+        removed.setId(39L); removed.setKind("ACTION"); removed.setVersion(2);
+        when(itemMapper.findByMinutes(5L)).thenReturn(List.of(removed, kept));
+        when(itemMapper.updateDefinition(any())).thenReturn(1);
+        when(itemMapper.retire(5L, 39L, 2)).thenReturn(1);
+        MeetingMinutesContent content = publicationContent();
+        MeetingMinutesContent.Action action = new MeetingMinutesContent.Action();
+        action.setItemId(40L); action.setContent("交付預算"); action.setOwnerUserId(7L);
+        action.setOwnerName("張三"); action.setDueDate("2026-11-01");
+        content.setActions(List.of(action));
+        minutes.setContentJson(JsonUtils.toJson(content));
+        var published = service.publish(5L, publishForm());
+        assertEquals(40L, published.getDocument().getContent().getActions().get(0).getItemId());
+        ArgumentCaptor<MeetingMinutesItem> definition = ArgumentCaptor.forClass(MeetingMinutesItem.class);
+        verify(itemMapper).updateDefinition(definition.capture());
+        assertEquals(40L, definition.getValue().getId());
+        assertEquals(1, definition.getValue().getDisplayOrder());
+        org.junit.jupiter.api.Assertions.assertNull(definition.getValue().getStatus());
+        verify(itemMapper).retire(5L, 39L, 2);
+    }
+
+    @Test
+    void cardSendUsesPublishedSnapshotAndSameRequestReturnsSameBatch() {
+        MeetingMinutes minutes = preparePublication();
+        long revisionId = service.publish(5L, publishForm()).getId();
+        minutes.setContentJson(JsonUtils.toJson(validContent()));
+        when(appService.resolve(MeetingConstants.SCENARIO_MINUTES)).thenReturn(app(1L));
+        when(userMapper.selectBatchIds(any())).thenReturn(List.of(OWNER_OF_ACTION));
+        when(sendMapper.nextBatchSeq(5L)).thenReturn(1);
+        when(dispatcher.register(any(), any(), any())).thenReturn(new MeetingMinutesDispatcher.RegisterResult());
+        when(sendMapper.insert(any(MeetingMinutesSend.class))).thenAnswer(call -> {
+            MeetingMinutesSend batch = call.getArgument(0);
+            batch.setId(77L);
+            when(sendMapper.findByRequest(5L, batch.getRequestKey())).thenReturn(batch);
+            when(sendMapper.selectById(77L)).thenReturn(batch);
+            return 1;
+        });
+        MeetingMinutesDto.SendForm send = new MeetingMinutesDto.SendForm();
+        send.setRevisionId(revisionId); send.setRequestKey("card-1"); send.setReceiverUserIds(List.of(7L));
+        assertThrows(BusinessException.class, () -> service.send(5L, send));
+        send.setAcknowledgePublicLink(true);
+        var first = service.send(5L, send);
+        var replay = service.send(5L, send);
+        assertEquals(first.getSendId(), replay.getSendId());
+        var batch = sendMapper.selectById(77L);
+        assertEquals("action_card", batch.getMessageType());
+        assertTrue(batch.getMarkdownSnapshot().length() <= 900);
+        assertFalse(batch.getMarkdownSnapshot().contains("確認預算口徑"));
+        assertEquals("確認預算口徑", JsonUtils.parse(batch.getContentSnapshot(), MeetingMinutesContent.class).getSummary());
+        String token = batch.getButtonUrl().split("token=", 2)[1];
+        assertEquals("確認預算口徑", service.publicView(token).getDocument().getContent().getSummary());
+        send.setReceiverUserIds(List.of(1L));
+        assertThrows(BusinessException.class, () -> service.send(5L, send));
+        verify(dispatcher).register(any(), any(), any());
     }
 }

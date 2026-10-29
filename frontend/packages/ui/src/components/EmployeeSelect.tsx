@@ -200,6 +200,9 @@ export default function EmployeeSelect({
       // 远程搜索必须显式开 showSearch：只给 onSearch 时 antd 会告警且输入框只读，
       // 单选的负责人选择器就变成「只能从默认 30 人里点，搜不到人」
       showSearch
+      // 面板不跟随触发器宽度：调用处容器窄时，「姓名 + 工號」Tag 会被截断；
+      // 按内容自适应后任何场景都能看全员工信息（宽容器下视觉仍是撑满的）
+      popupMatchSelectWidth={false}
       placeholder={placeholder ?? t('meeting.searchByNameOr', { defaultValue: '搜尋姓名或工號' })}
       value={single ? ids[0] : ids}
       onChange={next => {

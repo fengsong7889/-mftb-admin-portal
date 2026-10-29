@@ -111,6 +111,11 @@ public interface MeetingMinutesDeliveryMapper extends BaseMapper<MeetingMinutesD
             + "next_retry_at = NULL, updated_at = NOW() WHERE id = #{id} AND deleted = 0")
     int markSkipped(@Param("id") long id, @Param("reason") String reason);
 
+    /** 不可恢复的缺失快照直接耗尽尝试次数，避免 next_retry_at=NULL 被扫描器重新领取。 */
+    @Update("UPDATE biz_meeting_minutes_delivery SET send_status = 'failed', error_msg = #{reason}, "
+            + "retry_count = #{maxAttempts}, next_retry_at = NULL, updated_at = NOW() WHERE id = #{id} AND deleted = 0")
+    int markTerminalFailure(@Param("id") long id, @Param("reason") String reason, @Param("maxAttempts") int maxAttempts);
+
     /** 失败：递增重试次数并给出下次重试时间；退避由服务层计算，不在 SQL 里做算术 */
     @Update("UPDATE biz_meeting_minutes_delivery SET send_status = 'failed', error_msg = #{errorMsg}, "
             + "retry_count = retry_count + 1, next_retry_at = #{nextRetryAt}, updated_at = NOW() "

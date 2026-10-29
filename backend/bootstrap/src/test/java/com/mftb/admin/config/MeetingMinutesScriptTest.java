@@ -16,6 +16,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.dao.DataAccessResourceFailureException;
 
 /**
  * 会议纪要 DDL 与迁移登记的结构锁。
@@ -120,7 +133,8 @@ class MeetingMinutesScriptTest {
         List<ContractSpec> contracts = MeetingMinutesSchema.contracts();
         List<String> expected = new java.util.ArrayList<>(TABLES);
         expected.addAll(TABLES_V2);
-        assertEquals(expected.size(), contracts.size(), "契約數量必須與表數量一致（v1 三張 + v1.1 四張）");
+        expected.add(MeetingMinutesSchema.REVISION_TABLE);
+        assertEquals(expected.size(), contracts.size(), "契約數量必須與表數量一致（旧版七张 + 正式版本表）");
         for (int index = 0; index < expected.size(); index++) {
             ContractSpec spec = contracts.get(index);
             assertEquals(expected.get(index), spec.table());
@@ -150,6 +164,89 @@ class MeetingMinutesScriptTest {
         // 脚本必须真在 classpath 里：CI 会校验已打进镜像，这里先钉住文件名与初始化器用的是同一个常量
         assertNotNull(getClass().getClassLoader().getResource(MeetingMinutesSchema.SCRIPT),
                 "腳本未被打進 resources，迁移会在生产库上静默失败");
+    }
+
+    @Test
+    void publicationSchemaAndReferenceAreIdenticalAndRegistered() throws Exception {
+        String sql = MeetingMinutesSchema.raw(MeetingMinutesSchema.SCRIPT_PUBLICATION);
+        assertEquals(sql, Files.readString(Path.of("sql", MeetingMinutesSchema.SCRIPT_PUBLICATION)));
+        MigrationEntry entry = MigrationCatalog.readAll().stream()
+                .filter(item -> MeetingMinutesSchemaMigrationInitializer.VERSION_PUBLICATION.equals(item.getVersionKey()))
+                .findFirst().orElseThrow();
+        assertTrue(entry.getDependencies().contains("meeting:minutes:v1.1"));
+        assertEquals("meetingMinutesSchemaMigrationInitializer", entry.getExecutor());
+        assertNotNull(getClass().getClassLoader().getResource(MeetingMinutesSchema.SCRIPT_PUBLICATION));
+        String normalized = sql.replaceAll("\\s+", " ");
+        for (String required : List.of("document_snapshot JSON", "UNIQUE KEY uk_meeting_minutes_revision_no",
+                "UNIQUE KEY uk_meeting_minutes_revision_request", "FOREIGN KEY (minutes_id, revision_id)",
+                "FOREIGN KEY (id, published_revision_id)", "display_order", "request_hash", "template_version")) {
+            assertTrue(normalized.contains(required), required);
+        }
+        String executable = sql.replaceAll("(?m)^\\s*--.*$", "").toUpperCase();
+        for (String forbidden : List.of("DROP ", "TRUNCATE ", "DELETE FROM", "UPDATE SYS_NOTIFICATION_TEMPLATE")) {
+            assertFalse(executable.contains(forbidden), forbidden);
+        }
+        assertTrue(sql.contains("WHERE NOT EXISTS (SELECT 1 FROM sys_notification_template WHERE scene_key = 'meeting_minutes_published')"));
+    }
+
+    @Test
+    void everyPublicationColumnHasTheSameHealingDdlInTheContract() {
+        List<MeetingMinutesSchema.Addition> additions = MeetingMinutesSchema.publicationAdditions();
+        assertEquals(13, additions.stream().filter(MeetingMinutesSchema.Addition::column).count());
+        assertEquals(5, additions.stream().filter(addition -> !addition.column()).count());
+        for (MeetingMinutesSchema.Addition addition : additions) {
+            if (!addition.column()) continue;
+            ContractSpec table = MeetingMinutesSchema.contracts().stream().filter(spec -> spec.table().equals(addition.table()))
+                    .findFirst().orElseThrow();
+            ContractSpec.ColumnSpec column = table.requiredColumns().stream().filter(spec -> spec.column().equals(addition.name()))
+                    .findFirst().orElseThrow();
+            assertEquals(addition.ddl(), column.addColumnDdl());
+        }
+        assertThrows(IllegalStateException.class, () -> MeetingMinutesSchema.addition("ALTER TABLE sys_user ADD COLUMN x INT"));
+    }
+
+    @Test
+    void existingPublicationColumnsAndConstraintsAreNotAddedTwice() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.queryForObject(contains("information_schema.COLUMNS"), eq(Integer.class), anyString(), anyString())).thenReturn(1);
+        when(jdbc.queryForObject(contains("information_schema.TABLE_CONSTRAINTS"), eq(Integer.class), anyString(), anyString())).thenReturn(1);
+        MeetingMinutesSchemaMigrationInitializer initializer = new MeetingMinutesSchemaMigrationInitializer(jdbc, mock(SchemaVersionTracker.class));
+        ReflectionTestUtils.invokeMethod(initializer, "migratePublication");
+        verify(jdbc, never()).execute(contains("ALTER TABLE"));
+        verify(jdbc).execute(contains("CREATE TABLE IF NOT EXISTS biz_meeting_minutes_revision"));
+    }
+
+    @Test
+    void failedPublicationDdlIsNotSilentlyAccepted() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.queryForObject(contains("information_schema.COLUMNS"), eq(Integer.class), anyString(), anyString())).thenReturn(0);
+        doThrow(new DataAccessResourceFailureException("test failure")).when(jdbc)
+                .execute(contains("ALTER TABLE biz_meeting_minutes ADD COLUMN published_revision_id"));
+        MeetingMinutesSchemaMigrationInitializer initializer = new MeetingMinutesSchemaMigrationInitializer(jdbc, mock(SchemaVersionTracker.class));
+        assertThrows(DataAccessResourceFailureException.class, () -> ReflectionTestUtils.invokeMethod(initializer, "migratePublication"));
+    }
+
+    @Test
+    void publicationPostCheckRejectsMissingSnapshotColumn() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.queryForObject(contains("information_schema.TABLES"), eq(Integer.class), anyString())).thenReturn(1);
+        when(jdbc.queryForObject(contains("information_schema.COLUMNS"), eq(Integer.class), anyString(), anyString())).thenReturn(1);
+        when(jdbc.queryForObject(contains("information_schema.COLUMNS"), eq(Integer.class),
+                eq(MeetingMinutesSchema.REVISION_TABLE), eq("document_snapshot"))).thenReturn(0);
+        MeetingMinutesSchemaMigrationInitializer initializer = new MeetingMinutesSchemaMigrationInitializer(jdbc, mock(SchemaVersionTracker.class));
+        IllegalStateException failure = assertThrows(IllegalStateException.class,
+                () -> ReflectionTestUtils.invokeMethod(initializer, "verifyPublication"));
+        assertTrue(failure.getMessage().contains("document_snapshot"));
+    }
+
+    @Test
+    void revisionMapperDoesNotExposeUpdateOrDeleteOperations() {
+        Class<?> mapper = com.mftb.admin.mapper.MeetingMinutesRevisionMapper.class;
+        assertEquals(0, mapper.getInterfaces().length, "不可继承包含更新/删除的 BaseMapper");
+        for (java.lang.reflect.Method method : mapper.getDeclaredMethods()) {
+            assertFalse(method.isAnnotationPresent(org.apache.ibatis.annotations.Update.class));
+            assertFalse(method.isAnnotationPresent(org.apache.ibatis.annotations.Delete.class));
+        }
     }
 
     @Test

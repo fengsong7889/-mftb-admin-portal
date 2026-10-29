@@ -19,7 +19,7 @@ import { addBlacklist } from '@/api/meeting'
 import EmployeeSelect from '@/components/EmployeeSelect'
 import { useTranslation } from 'react-i18next'
 
-const MENU = 'meeting-config'
+const MENU = 'meeting-blacklist'
 
 const cardStyle: CSSProperties = {
   border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
@@ -46,7 +46,7 @@ export default function MeetingBlacklistForm() {
   const [results, setResults] = useState<{ ok: string[]; failed: string[] }>({ ok: [], failed: [] })
 
   const goBack = () => {
-    navigate('/meeting-config', { replace: true, state: { closeMenuTab: location.pathname + location.search } })
+    navigate('/meeting-blacklist', { replace: true, state: { closeMenuTab: location.pathname + location.search } })
   }
 
   const handleSubmit = async () => {

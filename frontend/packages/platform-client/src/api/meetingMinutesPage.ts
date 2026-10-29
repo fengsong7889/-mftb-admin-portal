@@ -9,7 +9,7 @@
  *   2. 刻意不带任何后台 JWT：免登页一旦依赖登录态，钉钉里点开的人就看不到内容。
  */
 import request, { SILENT_HEADER } from './request'
-import type { MinutesContent } from './meetingMinutes'
+import type { MinutesContent, MinutesDocument } from './meetingMinutes'
 
 const SILENT = { headers: { [SILENT_HEADER]: '1' } }
 
@@ -19,6 +19,8 @@ const SILENT = { headers: { [SILENT_HEADER]: '1' } }
  * 免登链接可能被转发，输出面越窄，外泄半径越小。
  */
 export interface MinutesPageView {
+  document?: MinutesDocument
+  revisionNo?: number
   valid: boolean
   message?: string | null
   minutesNo?: string | null

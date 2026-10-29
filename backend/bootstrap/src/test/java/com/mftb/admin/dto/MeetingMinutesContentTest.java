@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -142,5 +143,190 @@ class MeetingMinutesContentTest {
     void digestIsTruncated() {
         String digest = withItem("題", "論".repeat(400)).digest();
         assertEquals(300, digest.length());
+    }
+
+    private static MeetingMinutesContent publication() {
+        MeetingMinutesContent content = withItem("預算", "保持既有口徑");
+        content.setSchemaVersion(MeetingMinutesContent.DOCUMENT_SCHEMA);
+        content.setSummary("本次確認預算口徑與交付安排");
+        content.setChairUserId(1L);
+        content.getItems().get(0).setTopicKey("topic-a");
+        content.getItems().get(0).setDecisionStatus(MeetingMinutesContent.DECISION_DECIDED);
+        return content;
+    }
+
+    @Test
+    void draftMayBeIncompleteButPublicationMustHavePurposeOrLegacySummaryAndChair() {
+        MeetingMinutesContent content = publication();
+        content.setSummary(null);
+        content.setChairUserId(null);
+        assertDoesNotThrow(content::validate);
+        assertThrows(BusinessException.class, content::validateForPublication);
+        content.setSummary("確認交付安排");
+        assertThrows(BusinessException.class, content::validateForPublication);
+        content.setChairUserId(1L);
+        assertDoesNotThrow(content::validateForPublication);
+        assertEquals("確認交付安排", content.digest());
+    }
+
+    @Test
+    void purposeOnlyPublicationDoesNotRequireADuplicateSummary() {
+        MeetingMinutesContent content = publication();
+        content.setSummary(null);
+        content.setPurpose("確定本次會議的交付目標");
+        assertDoesNotThrow(content::validateForPublication);
+        assertEquals("確定本次會議的交付目標", content.digest());
+        assertEquals(null, content.getSummary());
+        content.setPurpose("  ");
+        assertEquals("發布前請填寫會議目的", assertThrows(BusinessException.class, content::validateForPublication).getMessage());
+    }
+
+    @Test
+    void purposeCombinesLegacyTextWithoutRewritingOrTruncatingIt() {
+        MeetingMinutesContent content = publication();
+        String purpose = "目".repeat(500);
+        String summary = "摘".repeat(300);
+        content.setPurpose(purpose);
+        content.setSummary(summary);
+        assertDoesNotThrow(content::validateForPublication);
+        assertEquals(purpose + "\n\n" + summary, content.purposeText());
+        assertEquals(purpose, content.getPurpose());
+        assertEquals(summary, content.getSummary());
+        assertEquals(300, content.digest().length());
+        content.setPurpose(content.purposeText());
+        content.setSummary(null);
+        assertDoesNotThrow(content::validateForPublication);
+        assertEquals(802, content.getPurpose().length());
+        content.setPurpose(" 同一段內容 ");
+        content.setSummary("同一段內容");
+        assertEquals("同一段內容", content.purposeText());
+    }
+
+    @Test
+    void unifiedPurposeRetainsBoundedLengthIncludingLegacySummary() {
+        MeetingMinutesContent content = publication();
+        content.setSummary(null);
+        content.setPurpose("目".repeat(MeetingMinutesContent.PURPOSE_MAX));
+        assertDoesNotThrow(content::validateForPublication);
+        content.setPurpose(content.getPurpose() + "目");
+        assertThrows(BusinessException.class, content::validate);
+        content.setPurpose("目".repeat(MeetingMinutesContent.PURPOSE_MAX));
+        content.setSummary("舊摘要");
+        assertThrows(BusinessException.class, content::validate);
+    }
+
+    @Test
+    void everyPublishedActionAndFollowUpNeedsAnOwnerAndDeadline() {
+        MeetingMinutesContent content = publication();
+        content.setActions(List.of(action("提交報表", null, null)));
+        assertDoesNotThrow(content::validate);
+        assertThrows(BusinessException.class, content::validateForPublication);
+        content.getActions().get(0).setOwnerUserId(2L);
+        assertThrows(BusinessException.class, content::validateForPublication);
+        content.getActions().get(0).setDueDate("2026-11-01");
+        assertDoesNotThrow(content::validateForPublication);
+        MeetingMinutesContent.OpenIssue follow = new MeetingMinutesContent.OpenIssue();
+        follow.setContent("確認預算池");
+        content.setOpenIssues(List.of(follow));
+        assertThrows(BusinessException.class, content::validateForPublication);
+        follow.setOwnerUserId(3L);
+        follow.setDueDate("2026-11-02");
+        assertDoesNotThrow(content::validateForPublication);
+    }
+
+    @Test
+    void decisionsCannotBeInventedFromAnEmptyConclusion() {
+        MeetingMinutesContent content = publication();
+        MeetingMinutesContent.Item topic = content.getItems().get(0);
+        topic.setDecisionStatus(null);
+        assertThrows(BusinessException.class, content::validateForPublication);
+        topic.setDecisionStatus(MeetingMinutesContent.DECISION_PENDING);
+        topic.setConclusion(null);
+        assertThrows(BusinessException.class, content::validateForPublication);
+        topic.setConclusion("待財務確認成本口徑");
+        assertDoesNotThrow(content::validateForPublication);
+        topic.setDecisionStatus(MeetingMinutesContent.DECISION_INFORMATION);
+        topic.setConclusion(null);
+        assertThrows(BusinessException.class, content::validateForPublication);
+        topic.setDiscussion("同步現有執行進度");
+        assertDoesNotThrow(content::validateForPublication);
+    }
+
+    @Test
+    void taskIdentityCannotBeDuplicatedOrLinkedToAnUnknownTopic() {
+        MeetingMinutesContent content = publication();
+        MeetingMinutesContent.Action action = action("提交報表", 2L, "2026-11-01");
+        action.setItemId(31L);
+        action.setTopicKey("topic-missing");
+        content.setActions(List.of(action));
+        assertThrows(BusinessException.class, content::validate);
+        action.setTopicKey("topic-a");
+        assertDoesNotThrow(content::validate);
+        MeetingMinutesContent.OpenIssue follow = new MeetingMinutesContent.OpenIssue();
+        follow.setContent("跟進資料");
+        follow.setItemId(31L);
+        content.setOpenIssues(List.of(follow));
+        assertThrows(BusinessException.class, content::validate);
+        follow.setItemId(-1L);
+        assertThrows(BusinessException.class, content::validate);
+    }
+
+    @Test
+    void attendanceRejectsConflictingStatesAndUnknownEnums() {
+        MeetingMinutesContent content = publication();
+        MeetingMinutesContent.Attendance present = new MeetingMinutesContent.Attendance();
+        present.setUserId(2L);
+        present.setStatus(MeetingMinutesContent.ATTENDANCE_PRESENT);
+        MeetingMinutesContent.Attendance absent = new MeetingMinutesContent.Attendance();
+        absent.setUserId(2L);
+        absent.setStatus(MeetingMinutesContent.ATTENDANCE_ABSENT);
+        content.setAttendance(List.of(present, absent));
+        assertThrows(BusinessException.class, content::validate);
+        content.setAttendance(List.of(present));
+        present.setStatus("unknown");
+        assertThrows(BusinessException.class, content::validate);
+        present.setStatus(MeetingMinutesContent.ATTENDANCE_UNVERIFIED);
+        assertDoesNotThrow(content::validate);
+        content.setSchemaVersion(99);
+        assertThrows(BusinessException.class, content::validate);
+    }
+
+    @Test
+    void impossibleCalendarDatesAndTimesAreRejected() {
+        MeetingMinutesContent content = publication();
+        content.setActions(List.of(action("事項", 2L, "2026-02-30")));
+        assertThrows(BusinessException.class, content::validate);
+        content.getActions().get(0).setDueDate("2028-02-29");
+        assertDoesNotThrow(content::validate);
+        content.setNextMeetingAt("2026-11-02 25:00");
+        assertThrows(BusinessException.class, content::validate);
+    }
+
+    @Test
+    void newFieldsRespectTheirLimitsAndParticipateInTotalLength() {
+        MeetingMinutesContent content = publication();
+        content.setPurpose("目".repeat(MeetingMinutesContent.PURPOSE_MAX + 1));
+        assertThrows(BusinessException.class, content::validate);
+        content.setPurpose("會議目的");
+        content.setSummary("摘".repeat(MeetingMinutesContent.SUMMARY_MAX + 1));
+        assertThrows(BusinessException.class, content::validate);
+        content.setSummary("摘要");
+        int before = content.contentLength();
+        MeetingMinutesContent.Action action = action("事項", 2L, "2026-11-02");
+        action.setDeliverable("验收".repeat(150));
+        content.setActions(List.of(action));
+        assertEquals(before + 2 + 300, content.contentLength());
+        action.setDeliverable("驗".repeat(MeetingMinutesContent.ACTION_MAX + 1));
+        assertThrows(BusinessException.class, content::validate);
+    }
+
+    @Test
+    void nullNestedElementsReturnBusinessErrorsInsteadOfServerErrors() {
+        MeetingMinutesContent content = publication();
+        content.setActions(java.util.Arrays.asList((MeetingMinutesContent.Action) null));
+        assertThrows(BusinessException.class, content::validate);
+        content.setActions(List.of());
+        content.setAttendance(java.util.Arrays.asList((MeetingMinutesContent.Attendance) null));
+        assertThrows(BusinessException.class, content::validate);
     }
 }

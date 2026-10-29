@@ -24,6 +24,11 @@ public interface MeetingMinutesSendMapper extends BaseMapper<MeetingMinutesSend>
             + "ORDER BY batch_seq DESC, id DESC")
     List<MeetingMinutesSend> findByMinutes(@Param("minutesId") long minutesId);
 
+    /** 同一请求重放必须回读原批次，而不是再次登记通知。 */
+    @Select("SELECT * FROM biz_meeting_minutes_send WHERE minutes_id = #{minutesId} "
+            + "AND request_key = #{requestKey} AND deleted = 0 LIMIT 1")
+    MeetingMinutesSend findByRequest(@Param("minutesId") long minutesId, @Param("requestKey") String requestKey);
+
     /**
      * 最近一批发过群的批次：事项完成通知要回到"当初发纪要的那个群"，没人会在处理一条待办时
      * 重新选一遍群；没有发过群则返回 null（此时不通知群，只留审计）。
@@ -31,6 +36,19 @@ public interface MeetingMinutesSendMapper extends BaseMapper<MeetingMinutesSend>
     @Select("SELECT * FROM biz_meeting_minutes_send WHERE minutes_id = #{minutesId} "
             + "AND group_channel_id IS NOT NULL AND deleted = 0 ORDER BY batch_seq DESC LIMIT 1")
     MeetingMinutesSend findLastGroupBatch(@Param("minutesId") long minutesId);
+
+    /** 收件身份只授权自己收到的版本，不因收到 V1 就能读后来发布的 V2。 */
+    @Select("SELECT DISTINCT s.revision_id FROM biz_meeting_minutes_send s "
+            + "JOIN biz_meeting_minutes_delivery d ON d.send_id = s.id AND d.minutes_id = s.minutes_id "
+            + "WHERE s.minutes_id = #{minutesId} AND s.deleted = 0 AND d.deleted = 0 "
+            + "AND d.target_type = 'USER' AND d.receiver_user_id = #{userId} AND s.revision_id IS NOT NULL")
+    List<Long> revisionsForUser(@Param("minutesId") long minutesId, @Param("userId") long userId);
+
+    @Select("SELECT s.* FROM biz_meeting_minutes_send s "
+            + "JOIN biz_meeting_minutes_delivery d ON d.send_id = s.id AND d.minutes_id = s.minutes_id "
+            + "WHERE s.minutes_id = #{minutesId} AND s.deleted = 0 AND d.deleted = 0 "
+            + "AND d.target_type = 'USER' AND d.receiver_user_id = #{userId} ORDER BY s.batch_seq DESC LIMIT 1")
+    MeetingMinutesSend lastForUser(@Param("minutesId") long minutesId, @Param("userId") long userId);
 
     /** 列表页批量取批次（纪要状态与「已發送 N 次」由主表冗余列提供，这里只服务详情页） */
     @Select("<script>"
@@ -85,4 +103,9 @@ public interface MeetingMinutesSendMapper extends BaseMapper<MeetingMinutesSend>
     @Update("UPDATE biz_meeting_minutes_send SET error_msg = #{errorMsg}, updated_at = NOW() "
             + "WHERE id = #{sendId} AND deleted = 0")
     int markError(@Param("sendId") long sendId, @Param("errorMsg") String errorMsg);
+
+    /** 单批次链接作废：只影响本批次，其他批次仍可读 */
+    @Update("UPDATE biz_meeting_minutes_send SET link_revoked = 1, updated_at = NOW() "
+            + "WHERE id = #{sendId} AND minutes_id = #{minutesId} AND deleted = 0 AND link_revoked = 0")
+    int revokeBatchLink(@Param("minutesId") long minutesId, @Param("sendId") long sendId);
 }

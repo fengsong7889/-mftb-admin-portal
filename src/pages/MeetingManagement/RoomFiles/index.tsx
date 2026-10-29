@@ -256,10 +256,10 @@ export default function RoomFiles() {
     {
       title: t('meeting.colBookableWindow', { defaultValue: '可預約窗' }), key: 'bookableWindow', width: 150,
       render: (_, record) => (record.bookableStartTime || record.bookableEndTime
-        ? `${record.bookableStartTime ?? '08:00'}–${record.bookableEndTime ?? '22:00'}`
-        // 两个都留空时必须显式说明来源，否则行政无法判断该改房间还是改全局规则
-        : <Tooltip title={t('meeting.notSetGlobalDefault', { defaultValue: '未單獨配置，沿用全局默認 08:00–22:00' })}>
-          <span style={{ color: '#8C8C8C' }}>{t('meeting.globalDefault', { defaultValue: '全局默認' })}</span>
+        ? `${record.bookableStartTime ?? '—'}–${record.bookableEndTime ?? '—'}`
+        // 两个都留空时必须显式说明来源，但不写死具体全局数字（真实值到预约规则页查看）
+        : <Tooltip title={t('meeting.inheritsCommonWindow', { defaultValue: '未單獨配置，沿用通用規則的每日可預約時段' })}>
+          <span style={{ color: '#8C8C8C' }}>{t('meeting.inheritsCommon', { defaultValue: '繼承通用' })}</span>
         </Tooltip>),
     },
     {
@@ -269,8 +269,8 @@ export default function RoomFiles() {
           min: record.minDuration ?? '-', max: record.maxDuration ?? '-',
           defaultValue: `${record.minDuration ?? '-'} ~ ${record.maxDuration ?? '-'} 分鐘`,
         })
-        : <Tooltip title={t('meeting.notSetGlobalDefault2', { defaultValue: '未單獨配置，沿用全局默認（最長 240 分鐘）' })}>
-          <span style={{ color: '#8C8C8C' }}>{t('meeting.globalDefault', { defaultValue: '全局默認' })}</span>
+        : <Tooltip title={t('meeting.inheritsCommonDuration', { defaultValue: '未單獨配置，沿用通用規則的時長上下限' })}>
+          <span style={{ color: '#8C8C8C' }}>{t('meeting.inheritsCommon', { defaultValue: '繼承通用' })}</span>
         </Tooltip>),
     },
     {

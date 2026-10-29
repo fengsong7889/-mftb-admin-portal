@@ -9,6 +9,8 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 会议纪要 DDL 的单一入口：脚本读取、语句切片、结构契约都由这一份 classpath 脚本派生。
@@ -28,6 +30,15 @@ public final class MeetingMinutesSchema {
 
     /** v1.1：事项 / 关联 / 模板 / 开关（同样是唯一真值，参考副本在 backend/sql/） */
     static final String SCRIPT_V2 = "268_meeting_minutes_v2.sql";
+    static final String SCRIPT_PUBLICATION = "308_meeting_minutes_publication.sql";
+    static final String REVISION_TABLE = "biz_meeting_minutes_revision";
+    private static final Pattern ADDITION = Pattern.compile(
+            "^ALTER TABLE (biz_meeting_minutes(?:_send|_item)?) ADD (COLUMN|CONSTRAINT) ([a-z0-9_]+) .+$",
+            Pattern.DOTALL);
+
+    /** 仅解析本模块受控资源的新增列与约束，不接收动态 SQL 或外部表名。 */
+    record Addition(String table, String name, boolean column, String ddl) {
+    }
 
     /** 契约登记顺序：被外键引用的表必须在前 */
     private static final List<String> TABLE_ORDER = List.of(
@@ -119,7 +130,7 @@ public final class MeetingMinutesSchema {
             if (ddl == null) {
                 throw new IllegalStateException("腳本 " + SCRIPT + " 找不到 " + table + " 的建表語句，契約無法登記");
             }
-            specs.add(new ContractSpec("meeting-minutes:" + table, table, ddl, List.of()));
+            specs.add(new ContractSpec("meeting-minutes:" + table, table, ddl, publicationColumns(table)));
         }
         // v1.1 的四张表（事项/关联/模板/开关）：同样从 268 脚本切片，不另写 DDL
         for (String table : TABLE_ORDER_V2) {
@@ -127,9 +138,31 @@ public final class MeetingMinutesSchema {
             if (ddl == null) {
                 throw new IllegalStateException("腳本 " + SCRIPT_V2 + " 找不到 " + table + " 的建表語句");
             }
-            specs.add(new ContractSpec("meeting-minutes-v2:" + table, table, ddl, List.of()));
+            specs.add(new ContractSpec("meeting-minutes-v2:" + table, table, ddl, publicationColumns(table)));
         }
+        specs.add(new ContractSpec("meeting-minutes-publication:" + REVISION_TABLE, REVISION_TABLE,
+                sliceCreate(SCRIPT_PUBLICATION, REVISION_TABLE),
+                List.of("id", "minutes_id", "revision_no", "schema_version", "document_snapshot", "digest",
+                        "change_note", "publisher_user_id", "publisher_name", "publisher_emp_no", "published_at",
+                        "draft_version", "draft_hash", "request_key", "request_hash", "created_by", "created_at",
+                        "updated_by", "updated_at").stream().map(name -> new ContractSpec.ColumnSpec(name, null)).toList()));
         return specs;
+    }
+
+    static List<Addition> publicationAdditions() {
+        return statements(SCRIPT_PUBLICATION).stream().filter(sql -> sql.startsWith("ALTER TABLE "))
+                .map(MeetingMinutesSchema::addition).toList();
+    }
+
+    static Addition addition(String sql) {
+        Matcher match = ADDITION.matcher(sql);
+        if (!match.matches()) throw new IllegalStateException("纪要版本迁移只允许受控的 ADD COLUMN/CONSTRAINT 语句");
+        return new Addition(match.group(1), match.group(3), "COLUMN".equals(match.group(2)), sql);
+    }
+
+    private static List<ContractSpec.ColumnSpec> publicationColumns(String table) {
+        return publicationAdditions().stream().filter(add -> add.column() && add.table().equals(table))
+                .map(add -> new ContractSpec.ColumnSpec(add.name(), add.ddl())).toList();
     }
 
     /** 从脚本里切出某张表的 CREATE TABLE 全文（到该表段落结束的 ENGINE 行为止） */

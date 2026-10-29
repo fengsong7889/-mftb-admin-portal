@@ -26,7 +26,7 @@ import type { TableColumnsType } from 'antd'
 import {
   BellOutlined, FileTextOutlined, HistoryOutlined, ProfileOutlined, QrcodeOutlined, ReloadOutlined, SaveOutlined, SendOutlined, TeamOutlined,
 } from '@ant-design/icons'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import DetailPageHeader from '@/components/DetailPageHeader'
 import CardTitle from '@/components/CardTitle'
 import {
@@ -64,6 +64,7 @@ import {
   type MinutesVO,
 } from '@/api/meetingMinutes'
 import MinutesContentCard from '../MeetingMinutes/MinutesContentCard'
+import useMinutesNavigation from '../MeetingMinutes/useMinutesNavigation'
 import { deriveCanRecordMinutes } from '../MeetingMinutes/minutesAccess'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTranslation } from 'react-i18next'
@@ -76,7 +77,7 @@ const cardStyle: CSSProperties = {
 
 export default function MeetingDetail() {
   const { t } = useTranslation()
-  const navigate = useNavigate()
+  const { open: navigate, back } = useMinutesNavigation()
   const { hasPermission } = useAuth()
   const [searchParams] = useSearchParams()
   const idParam = searchParams.get('id')
@@ -421,7 +422,7 @@ export default function MeetingDetail() {
         meta={record
           ? <>{record.bookingNo} · {record.roomName} · {record.timeText}</>
           : undefined}
-        onBack={() => (window.history.length > 1 ? navigate(-1) : navigate('/meeting-my'))}
+        onBack={back}
         extra={record && (
           <Space size={8} wrap>
             <Button size="small" icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>{t('meeting.refresh', { defaultValue: '刷新' })}</Button>
@@ -577,22 +578,35 @@ export default function MeetingDetail() {
                 return meta ? <Tag color={meta.color}>{meta.label}</Tag> : undefined
               })()}
             />
-            {minutes?.exists && minutes.content ? (
+            {minutes?.exists && (minutes.document?.content || minutes.content) ? (
               <>
-                <MinutesContentCard content={minutes.content} />
-                <Space size={8} wrap style={{ marginTop: 8 }}>
-                  <Button size="small" icon={<HistoryOutlined />} onClick={() => navigate(`/meeting-minutes?id=${minutes.id}`)}>
+                <MinutesContentCard content={(minutes.document?.content || minutes.content)!} snapshot={minutes.document} trackedItems={minutes.document ? undefined : minutes.items} document={{
+                  title: record.title,
+                  minutesNo: minutes.minutesNo,
+                  bookingNo: record.bookingNo,
+                  editionLabel: t('meeting.minutes.workingDraft'),
+                  meetingTime: record.timeText,
+                  meetingType: bizTypeLabels()[record.bizType] ?? record.bizType,
+                  organizer: record.organizerName,
+                  recorder: `${minutes.recorderName || t('meeting.minutes.notRecorded')}${minutes.recorderEmpNo ? `（${minutes.recorderEmpNo}）` : ''}`,
+                  room: record.roomName,
+                  attendees: record.attendees,
+                  externalAttendees: record.externalAttendees,
+                  footer: <><span>{t('meeting.minutes.recorderColumn')} {minutes.recorderName || t('meeting.minutes.notRecorded')}</span><span>{t('meeting.lastUpdatedAtLabel')}{minutes.updatedAt || t('meeting.minutes.notRecorded')}</span></>,
+                }} />
+                <div className="form-footer mm-detail-minutes-actions">
+                  <Button icon={<HistoryOutlined />} onClick={() => navigate(`/meeting-minutes?id=${minutes.id}`)}>
                     {t('meeting.minutes.viewMinutes', { defaultValue: '查看紀要與發送歷史' })}
                   </Button>
                   {minutes.canEdit && (
-                    <Button size="small" onClick={() => navigate(`/meeting-minutes-form?id=${minutes.id}`)}>{t('meeting.minutes.edit', { defaultValue: '編輯紀要' })}</Button>
+                    <Button onClick={() => navigate(`/meeting-minutes-form?id=${minutes.id}`)}>{t('meeting.minutes.edit', { defaultValue: '編輯紀要' })}</Button>
                   )}
                   {minutes.canSend && (
-                    <Button size="small" type="primary" icon={<SendOutlined />} onClick={() => navigate(`/meeting-minutes?id=${minutes.id}&send=1`)}>
+                    <Button type="primary" icon={<SendOutlined />} onClick={() => navigate(`/meeting-minutes?id=${minutes.id}&send=1`)}>
                       {t('meeting.minutes.sendNow', { defaultValue: '立即發送' })}
                     </Button>
                   )}
-                </Space>
+                </div>
               </>
             ) : (
               <Space direction="vertical" size={8} style={{ width: '100%' }}>

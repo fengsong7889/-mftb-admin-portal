@@ -296,6 +296,8 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
         booking.setNoShowFlag(0);
         booking.setRequestKey(requestKey);
         booking.setRequestHash(requestHash);
+        // 预约时冻结生效规则：存量会议此后不因规则调整而改变提醒/签到/释放行为
+        applyRuleSnapshot(booking, room);
         booking.setCreatedBy(organizer.getName());
         booking.setUpdatedBy(organizer.getName());
         booking.setVersion(0);
@@ -397,6 +399,8 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
         after.setBizId(form.getBizId());
         after.setBizNo(trimToEmpty(form.getBizNo()));
         after.setBizUrl(trimToNull(form.getBizUrl()));
+        // 改期/换房重新取规则：只更新本条快照，已开始/已结束的实例不改写
+        applyRuleSnapshot(after, room);
 
         LambdaUpdateWrapper<MeetingBooking> update = new LambdaUpdateWrapper<MeetingBooking>()
                 .eq(MeetingBooking::getId, id)
@@ -416,6 +420,11 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
                 .set(MeetingBooking::getBizId, after.getBizId())
                 .set(MeetingBooking::getBizNo, after.getBizNo())
                 .set(MeetingBooking::getBizUrl, after.getBizUrl())
+                .set(MeetingBooking::getRuleSnapshot, after.getRuleSnapshot())
+                .set(MeetingBooking::getRemindAt, after.getRemindAt())
+                .set(MeetingBooking::getCheckinOpenAt, after.getCheckinOpenAt())
+                .set(MeetingBooking::getReleaseDeadlineAt, after.getReleaseDeadlineAt())
+                .set(MeetingBooking::getCheckinRequiredSnapshot, after.getCheckinRequiredSnapshot())
                 .set(MeetingBooking::getUpdatedBy, current.getName())
                 .setSql("version = version + 1");
         if (bookingMapper.update(null, update) == 0) {
@@ -530,13 +539,10 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
 
     @Override
     public List<MeetingBooking> findRemindDue(int limit) {
-        int minutes = ruleService.globalRule().getRemindMinutes();
-        // 0 = 不提醒：这里必须返回空集而不是让 SQL 的 INTERVAL 0 MINUTE 去决定，
-        // 否则"关提醒"变成"提醒在开始时刻才发"，语义完全不同
-        if (minutes <= 0) {
-            return List.of();
-        }
-        return bookingMapper.findRemindDue(minutes, Math.max(1, limit));
+        // 一律交给快照列判断：新预约按各自快照提醒（房间可能配了独立提醒，不能因全局=0 就整体关掉）；
+        // 存量单（rule_snapshot 仍为空）由 SQL 用全局分钟数兜底
+        int legacyMinutes = Math.max(0, ruleService.globalRule().getRemindMinutes());
+        return bookingMapper.findRemindDue(legacyMinutes, Math.max(1, limit));
     }
 
     @Override
@@ -557,7 +563,10 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
     @Override
     public boolean finishAsSystem(MeetingBooking booking) {
         MeetingRoom room = roomMapper.selectById(booking.getRoomId());
-        boolean needCheckin = room != null && Integer.valueOf(1).equals(room.getCheckinRequired());
+        // 快照优先：存量会议按预约时是否需签到判定爽约，不随房间最新开关变化
+        boolean needCheckin = booking.getCheckinRequiredSnapshot() != null
+                ? booking.getCheckinRequiredSnapshot() == 1
+                : (room != null && Integer.valueOf(1).equals(room.getCheckinRequired()));
         boolean nobodyCame = booking.getCheckinAt() == null;
         if (needCheckin && nobodyCame) {
             return releaseAsNoShow(booking, "會議已結束且全程無人簽到，系統補記爽約並釋放會議室");
@@ -828,17 +837,65 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
         return true;
     }
 
+    /**
+     * 把「预约时生效的规则」冻结到预约单上。
+     *
+     * <p>提醒/签到/释放时刻由服务端算好落成 DATETIME 列（任务直接按此取数，不再读最新配置）；
+     * 同时保留一份 JSON 快照，事后能回答"这场会按哪一版规则办的"。
+     * 前端不参与，避免客户端自报规则绕过安全边界。
+     */
+    private void applyRuleSnapshot(MeetingBooking booking, MeetingRoom room) {
+        MeetingRuleService.GlobalRule global = ruleService.globalRule();
+        MeetingRuleService.Effective eff = ruleService.effectiveFor(room, global);
+        // 快照是附加信息：拿不到生效规则时不得阻断预约（真实实现恒非空，此防护避免异常实现/桩把预约打挂）
+        if (eff == null) {
+            return;
+        }
+        LocalDateTime start = booking.getStartTime();
+        booking.setRuleSnapshot(ruleSnapshotJson(eff));
+        // 0 = 不提醒：必须落 NULL 而不是"开始时刻"，两者语义完全不同
+        booking.setRemindAt(eff.getRemindMinutes() > 0 ? start.minusMinutes(eff.getRemindMinutes()) : null);
+        booking.setCheckinOpenAt(start.minusMinutes(Math.max(0, eff.getCheckinOpenMinutes())));
+        booking.setReleaseDeadlineAt(eff.isCheckinRequired()
+                ? start.plusMinutes(Math.max(1, eff.getReleaseAfterMinutes())) : null);
+        booking.setCheckinRequiredSnapshot(eff.isCheckinRequired() ? 1 : 0);
+    }
+
+    /** 规则快照 JSON：只含数字与 HH:mm，不含用户输入，无需额外转义 */
+    private static String ruleSnapshotJson(MeetingRuleService.Effective eff) {
+        return "{"
+                + "\"advanceDays\":" + eff.getAdvanceDays() + ","
+                + "\"minLeadMinutes\":" + eff.getMinLeadMinutes() + ","
+                + "\"granularityMinutes\":" + eff.getGranularityMinutes() + ","
+                + "\"defaultDuration\":" + eff.getDefaultDurationMinutes() + ","
+                + "\"minDuration\":" + eff.getMinDuration() + ","
+                + "\"maxDuration\":" + eff.getMaxDuration() + ","
+                + "\"bookableStart\":\"" + eff.getBookableStart() + "\","
+                + "\"bookableEnd\":\"" + eff.getBookableEnd() + "\","
+                + "\"remindMinutes\":" + eff.getRemindMinutes() + ","
+                + "\"checkinRequired\":" + eff.isCheckinRequired() + ","
+                + "\"checkinOpenMinutes\":" + eff.getCheckinOpenMinutes() + ","
+                + "\"releaseAfterMinutes\":" + eff.getReleaseAfterMinutes()
+                + "}";
+    }
+
     /** 签到窗口：开始前 checkin_open_minutes 至会议结束（未签到释放仅对启用签到的房间生效） */
     private LocalDateTime[] checkinWindow(MeetingBooking booking, MeetingRoom room,
                                           MeetingRuleService.GlobalRule global) {
-        return new LocalDateTime[]{
-                booking.getStartTime().minusMinutes(Math.max(0, global.getCheckinOpenMinutes())),
-                booking.getEndTime()};
+        // 快照优先：预约时已冻结签到开放时刻，事后改规则不得改变已有会议的签到窗口
+        LocalDateTime openAt = booking.getCheckinOpenAt() != null
+                ? booking.getCheckinOpenAt()
+                : booking.getStartTime().minusMinutes(Math.max(0, global.getCheckinOpenMinutes()));
+        return new LocalDateTime[]{openAt, booking.getEndTime()};
     }
 
     /** 超时未签到的释放截止时刻（房间列 NULL 时回落全局，与 MeetingRuleService 同口径） */
     private LocalDateTime releaseDeadline(MeetingBooking booking, MeetingRoom room,
                                           MeetingRuleService.GlobalRule global) {
+        // 快照优先：预约时已冻结释放截止；存量单回落到房间/全局
+        if (booking.getReleaseDeadlineAt() != null) {
+            return booking.getReleaseDeadlineAt();
+        }
         Integer configured = room == null ? null : room.getReleaseAfterMinutes();
         int minutes = configured != null && configured > 0 ? configured : global.getReleaseAfterMinutes();
         return booking.getStartTime().plusMinutes(Math.max(1, minutes));
@@ -1358,16 +1415,23 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
         // 释放必须与 release() 的护栏同口径：未开始的会不给“釋放房間”入口，否则点了只会碰壁
         vo.setCanRelease(occupying && !booking.getStartTime().isAfter(now) && guard.canOperateRecords(current));
         vo.setCanFinish(writable && occupying && !booking.getStartTime().isAfter(now));
-        vo.setCheckinRequired(room != null && Integer.valueOf(1).equals(room.getCheckinRequired()));
+        vo.setCheckinRequired(booking.getCheckinRequiredSnapshot() != null
+                ? booking.getCheckinRequiredSnapshot() == 1
+                : (room != null && Integer.valueOf(1).equals(room.getCheckinRequired())));
         if (occupying && booking.getStartTime() != null) {
-            LocalDateTime openAt = booking.getStartTime()
-                    .minusMinutes(Math.max(0, global.getCheckinOpenMinutes()));
+            // 快照优先：详情页的签到开放/截止时刻与 Job 同源，避免两套口径
+            LocalDateTime openAt = booking.getCheckinOpenAt() != null
+                    ? booking.getCheckinOpenAt()
+                    : booking.getStartTime().minusMinutes(Math.max(0, global.getCheckinOpenMinutes()));
             vo.setCheckinOpenAt(DateTimeUtils.format(openAt));
-            Integer configured = room == null ? null : room.getReleaseAfterMinutes();
-            int releaseAfter = configured != null && configured > 0
-                    ? configured : global.getReleaseAfterMinutes();
-            vo.setCheckinDeadlineAt(DateTimeUtils.format(
-                    booking.getStartTime().plusMinutes(Math.max(1, releaseAfter))));
+            LocalDateTime deadline = booking.getReleaseDeadlineAt();
+            if (deadline == null) {
+                Integer configured = room == null ? null : room.getReleaseAfterMinutes();
+                int releaseAfter = configured != null && configured > 0
+                        ? configured : global.getReleaseAfterMinutes();
+                deadline = booking.getStartTime().plusMinutes(Math.max(1, releaseAfter));
+            }
+            vo.setCheckinDeadlineAt(DateTimeUtils.format(deadline));
             boolean arrived = mine != null && mine.getCheckinAt() != null;
             vo.setCanCheckin(occupying && !arrived && mine != null
                     && !now.isBefore(openAt) && !now.isAfter(booking.getEndTime()));

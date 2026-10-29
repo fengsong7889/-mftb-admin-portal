@@ -7,14 +7,19 @@
  *      发错群是内部纪要外泄，这句话是用户唯一能看到的安全承诺。
  * 同时验证预览区渲染的是当前正文：确认前看不到自己要发什么，二次确认就只是走过场。
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Modal, message } from 'antd'
 import SendMinutesModal from './SendMinutesModal'
 import i18n from '@/i18n'
 import type { MinutesContent } from '@/api/meetingMinutes'
 
 const sendMinutes = vi.fn()
 const fetchMinutesGroups = vi.fn()
+const confirmWithMotion = Modal.confirm
+vi.spyOn(Modal, 'confirm').mockImplementation(options => confirmWithMotion({
+  ...options, transitionName: '', maskTransitionName: '',
+}))
 
 vi.mock('@/api/meetingMinutes', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/meetingMinutes')>()
@@ -58,6 +63,9 @@ function open(onSent = vi.fn(), linkBase: { linkBaseUrl?: string | null; linkBas
       meeting={MEETING}
       content={CONTENT}
       version={0}
+      revisionId={91}
+      document={{ schemaVersion: 2, revisionNo: 1, meetingTitle: 'Q4 預算復核', minutesNo: 'MJ-TEST', content: CONTENT }}
+      linkBaseUrl="https://example.test" linkBasePublic
       {...linkBase}
       onClose={vi.fn()}
       onSent={onSent}
@@ -67,6 +75,10 @@ function open(onSent = vi.fn(), linkBase: { linkBaseUrl?: string | null; linkBas
 }
 
 describe('紀要發送面板', () => {
+  afterEach(async () => {
+    await act(async () => { Modal.destroyAll(); message.destroy() })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
   beforeEach(async () => {
     vi.clearAllMocks()
     await i18n.changeLanguage('zh-TW')
@@ -83,6 +95,8 @@ describe('紀要發送面板', () => {
 
   it('未选群也未选人时拦住发送，并给出原因', async () => {
     open()
+    expect(screen.getByRole('button', { name: /確認發送/ })).toBeDisabled()
+    fireEvent.click(screen.getByRole('checkbox'))
     fireEvent.click(screen.getByRole('button', { name: /確認發送/ }))
     await waitFor(() => expect(sendMinutes).not.toHaveBeenCalled())
     // antd message 走独立容器异步挂载，同步 getByText 在 CI 冷启动下会扑空（曾红过流水线），必须 findBy 等待
@@ -91,20 +105,21 @@ describe('紀要發送面板', () => {
 
   it('带摘要与批次去重提示：确认前必须看得见"发给谁"和"为什么重发不会丢"', async () => {
     open()
-    expect(screen.getByText('Q4 預算復核')).toBeInTheDocument()
+    expect(screen.getAllByText('Q4 預算復核')).toHaveLength(2)
     expect(screen.getByText('未選擇')).toBeInTheDocument()
     expect(screen.getByText('0 人')).toBeInTheDocument()
     expect(screen.getByText(/釘釘對同一員工當天相同內容只投一條/)).toBeInTheDocument()
     expect(screen.getByText('只發選中的群，不會回退到默認群')).toBeInTheDocument()
   })
 
-  it('预览区渲染当前正文分区，而不是只给一句"将发送纪要"', async () => {
+  it('通知预览只展示正式版本及计数，不泄露正文、名单或缺席原因', async () => {
     open()
-    // 议题在卡片里带序号前缀、负责人带「負責人：」前缀，文本被拆开，用模糊匹配
-    expect(screen.getByText(/分攤口徑/)).toBeInTheDocument()
-    expect(screen.getByText(/輸出明細表/)).toBeInTheDocument()
-    expect(screen.getByText(/張三（MF00007）/)).toBeInTheDocument()
-    expect(screen.getByText(/預算池是否共用/)).toBeInTheDocument()
+    expect(screen.getByText('V1')).toBeInTheDocument()
+    expect(screen.getByText('議題 1 項 · 行動 1 項 · 跟進 1 項')).toBeInTheDocument()
+    expect(screen.queryByText(/分攤口徑/)).toBeNull()
+    expect(screen.queryByText(/輸出明細表/)).toBeNull()
+    expect(screen.queryByText(/預算池是否共用/)).toBeNull()
+    expect(screen.queryByText('請假')).toBeNull()
   })
 
   it('一键带入参会人只带系统内的人，外部参会人不会被算进收件人数', async () => {
@@ -118,13 +133,19 @@ describe('紀要發送面板', () => {
     sendMinutes.mockResolvedValue(RESULT())
     const onSent = open()
     fireEvent.click(screen.getByRole('button', { name: /一鍵帶入參會人/ }))
+    fireEvent.click(screen.getByRole('checkbox'))
     fireEvent.click(screen.getByRole('button', { name: /確認發送/ }))
+    const dialog = await screen.findByRole('dialog')
+    expect(sendMinutes).not.toHaveBeenCalled()
+    fireEvent.click(within(dialog).getByRole('button', { name: /確認發送/ }))
     await waitFor(() => expect(sendMinutes).toHaveBeenCalledTimes(1))
     const [id, payload] = sendMinutes.mock.calls[0]
     expect(id).toBe(9)
     expect(payload.receiverUserIds).toEqual([7])
     expect(payload.requestKey).toBeTruthy()
     expect(payload.version).toBe(0)
+    expect(payload.revisionId).toBe(91)
+    expect(payload.acknowledgePublicLink).toBe(true)
     await waitFor(() => expect(onSent).toHaveBeenCalledTimes(1))
   })
 
@@ -133,6 +154,7 @@ describe('紀要發送面板', () => {
     expect(screen.getByText(/192\.168\.31\.88:3000/)).toBeInTheDocument()
     expect(screen.getByText(/手機或釘釘將無法打開/)).toBeInTheDocument()
     expect(screen.getByText(/請到「通知配置 → 企業應用」把站點地址改為公網 HTTPS/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /確認發送/ })).toBeDisabled()
   })
 
   it('公网站点不出现链接警告', () => {
@@ -143,9 +165,10 @@ describe('紀要發送面板', () => {
     expect(screen.queryByText(/手機或釘釘將無法打開/)).not.toBeInTheDocument()
   })
 
-  it('未配置站点地址时提示卡片不会带查看链接', () => {
+  it('未配置站点地址时阻止无入口卡片发送', () => {
     open(vi.fn(), { linkBaseUrl: null })
-    expect(screen.getByText(/不會帶「查看完整紀要」連結/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /確認發送/ })).toBeDisabled()
+    expect(screen.getByText(/請先選擇正式版本、確認公網 HTTPS/)).toBeInTheDocument()
   })
 
   it('只发群、一个人都没发时不谎报"已提交 N 份个人通知"', async () => {
@@ -154,7 +177,11 @@ describe('紀要發送面板', () => {
     // antd Select 的 placeholder 不是表单控件名，只能点开下拉再选项
     fireEvent.mouseDown(document.querySelector('.ant-select-selector') as Element)
     fireEvent.click(await screen.findByText('行政通知群'))
+    fireEvent.click(screen.getByRole('checkbox'))
     fireEvent.click(screen.getByRole('button', { name: /確認發送/ }))
+    const dialog = await screen.findByRole('dialog')
+    expect(sendMinutes).not.toHaveBeenCalled()
+    fireEvent.click(within(dialog).getByRole('button', { name: /確認發送/ }))
     await waitFor(() => expect(sendMinutes).toHaveBeenCalledTimes(1))
     expect(sendMinutes.mock.calls[0][1].groupChannelId).toBe(88)
     expect(await screen.findByText(/已提交到釘釘群/)).toBeInTheDocument()

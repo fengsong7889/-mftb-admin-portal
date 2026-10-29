@@ -22,7 +22,7 @@ export interface UnsavedGuard {
    * 暂存到本机。返回 true 表示已写入；false 表示存储不可用/内容过大，
    * 此时不允许静默离开，必须停留在页面并提示用户先保存。
    */
-  stash: () => boolean
+  stash?: () => boolean
   /** 用户明确选择放弃时清理暂存 */
   discard: () => void
   /** 提示主体（如 PRD 标题），用于确认框上下文 */
@@ -96,6 +96,21 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
         resolve(value)
       }
 
+      // 不支持暂存的表单使用明确的放弃确认，不能借“暂存并离开”静默丢弃内容。
+      if (active.some(guard => !guard.stash)) {
+        const modal = Modal.confirm({
+          title: '離開前放棄未保存的修改？',
+          className: 'custom-confirm-modal',
+          icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+          content: <div className="confirm-info-card">{active.map(guard => guard.describe?.()).filter(Boolean).join('、')}<p>此頁不支援暫存，離開後將失去尚未保存的修改。</p></div>,
+          okText: '放棄並離開', cancelText: '繼續編輯',
+          onOk: () => { active.forEach(guard => guard.discard()); finish(true) },
+          onCancel: () => finish(false),
+        })
+        cancel = () => { modal.destroy(); finish(false) }
+        return
+      }
+
       let discardModal: ReturnType<typeof Modal.confirm> | null = null
       const modal = Modal.confirm({
         title: t('rdm.prd.leaveTitle'),
@@ -147,7 +162,7 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
         onOk: () => {
           if (settled) return
           let ok = false
-          try { ok = active.every(g => g.stash()) } catch { /* 存储异常也保持当前页面 */ }
+          try { ok = active.every(g => g.stash?.() === true) } catch { /* 存储异常也保持当前页面 */ }
           if (!ok) {
             // 不结束本次确认，用户释放空间后可重试，也可取消，不能留下永不解决的 Promise。
             modal.update({ content: t('rdm.prd.stashFailed') })

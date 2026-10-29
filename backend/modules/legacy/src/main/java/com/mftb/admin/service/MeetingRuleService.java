@@ -62,10 +62,15 @@ public class MeetingRuleService {
         private final int remindMinutes;
         private final int checkinOpenMinutes;
         private final int releaseAfterMinutes;
+        /** 单场最短时长（分钟）：房间未配置时回落此值；升级时按粒度初始化，保持旧行为 */
+        private final int minDurationMinutes;
+        /** 默认是否需要签到保留（0/1）：房间列为 NULL 时回落 */
+        private final int checkinRequired;
 
         GlobalRule(int advanceDays, int minLeadMinutes, int defaultDurationMinutes, int maxDurationMinutes,
                    int granularityMinutes, LocalTime bookableStart, LocalTime bookableEnd,
-                   int remindMinutes, int checkinOpenMinutes, int releaseAfterMinutes) {
+                   int remindMinutes, int checkinOpenMinutes, int releaseAfterMinutes,
+                   int minDurationMinutes, int checkinRequired) {
             this.advanceDays = advanceDays;
             this.minLeadMinutes = minLeadMinutes;
             this.defaultDurationMinutes = defaultDurationMinutes;
@@ -76,10 +81,12 @@ public class MeetingRuleService {
             this.remindMinutes = remindMinutes;
             this.checkinOpenMinutes = checkinOpenMinutes;
             this.releaseAfterMinutes = releaseAfterMinutes;
+            this.minDurationMinutes = minDurationMinutes;
+            this.checkinRequired = checkinRequired;
         }
     }
 
-    /** 房间级生效规则（已回落全局默认） */
+    /** 房间级生效规则（已回落全局默认）：所有字段均为已定稿的生效值 */
     @Getter
     public static class Effective {
         private final LocalTime bookableStart;
@@ -87,17 +94,33 @@ public class MeetingRuleService {
         private final int minDuration;
         private final int maxDuration;
         private final int granularityMinutes;
+        private final int defaultDurationMinutes;
+        private final int advanceDays;
+        private final int minLeadMinutes;
+        private final int remindMinutes;
+        private final int checkinOpenMinutes;
+        private final int releaseAfterMinutes;
+        private final boolean checkinRequired;
         /** 窗口是否来自房间自身（档案页要区分"行政真的配过"与"系统兜底值"） */
         private final boolean windowConfigured;
         private final boolean durationConfigured;
 
         Effective(LocalTime bookableStart, LocalTime bookableEnd, int minDuration, int maxDuration,
-                  int granularityMinutes, boolean windowConfigured, boolean durationConfigured) {
+                  int granularityMinutes, int defaultDurationMinutes, int advanceDays, int minLeadMinutes,
+                  int remindMinutes, int checkinOpenMinutes, int releaseAfterMinutes, boolean checkinRequired,
+                  boolean windowConfigured, boolean durationConfigured) {
             this.bookableStart = bookableStart;
             this.bookableEnd = bookableEnd;
             this.minDuration = minDuration;
             this.maxDuration = maxDuration;
             this.granularityMinutes = granularityMinutes;
+            this.defaultDurationMinutes = defaultDurationMinutes;
+            this.advanceDays = advanceDays;
+            this.minLeadMinutes = minLeadMinutes;
+            this.remindMinutes = remindMinutes;
+            this.checkinOpenMinutes = checkinOpenMinutes;
+            this.releaseAfterMinutes = releaseAfterMinutes;
+            this.checkinRequired = checkinRequired;
             this.windowConfigured = windowConfigured;
             this.durationConfigured = durationConfigured;
         }
@@ -110,7 +133,8 @@ public class MeetingRuleService {
                 MeetingConstants.CFG_DEFAULT_DURATION, MeetingConstants.CFG_MAX_DURATION,
                 MeetingConstants.CFG_TIME_GRANULARITY, MeetingConstants.CFG_BOOKABLE_START,
                 MeetingConstants.CFG_BOOKABLE_END, MeetingConstants.CFG_REMIND_MINUTES,
-                MeetingConstants.CFG_CHECKIN_OPEN_MINUTES, MeetingConstants.CFG_RELEASE_AFTER);
+                MeetingConstants.CFG_CHECKIN_OPEN_MINUTES, MeetingConstants.CFG_RELEASE_AFTER,
+                MeetingConstants.CFG_MIN_DURATION, MeetingConstants.CFG_CHECKIN_REQUIRED);
         Map<String, String> values = sysConfigService.getConfigValues(keys);
         return new GlobalRule(
                 parseInt(values.get(MeetingConstants.CFG_ADVANCE_DAYS), DEFAULT_ADVANCE_DAYS),
@@ -122,7 +146,9 @@ public class MeetingRuleService {
                 parseTime(values.get(MeetingConstants.CFG_BOOKABLE_END), DEFAULT_BOOKABLE_END),
                 parseInt(values.get(MeetingConstants.CFG_REMIND_MINUTES), DEFAULT_REMIND_MINUTES),
                 parseInt(values.get(MeetingConstants.CFG_CHECKIN_OPEN_MINUTES), DEFAULT_CHECKIN_OPEN_MINUTES),
-                parseInt(values.get(MeetingConstants.CFG_RELEASE_AFTER), DEFAULT_RELEASE_AFTER_MINUTES));
+                parseInt(values.get(MeetingConstants.CFG_RELEASE_AFTER), DEFAULT_RELEASE_AFTER_MINUTES),
+                parseInt(values.get(MeetingConstants.CFG_MIN_DURATION), DEFAULT_GRANULARITY_MINUTES),
+                parseInt(values.get(MeetingConstants.CFG_CHECKIN_REQUIRED), 0));
     }
 
     /** 求出某间房的生效规则（房间列为 NULL 时回落全局） */
@@ -131,7 +157,7 @@ public class MeetingRuleService {
         boolean durationConfigured = room.getMinDuration() != null || room.getMaxDuration() != null;
         LocalTime start = room.getBookableStartTime() != null ? room.getBookableStartTime() : global.getBookableStart();
         LocalTime end = room.getBookableEndTime() != null ? room.getBookableEndTime() : global.getBookableEnd();
-        int min = room.getMinDuration() != null ? room.getMinDuration() : global.getGranularityMinutes();
+        int min = room.getMinDuration() != null ? room.getMinDuration() : global.getMinDurationMinutes();
         int max = room.getMaxDuration() != null ? room.getMaxDuration() : global.getMaxDurationMinutes();
         // 上下限倒挂时以"能订出去"为准修正：档案页允许管理员先填一个再补另一个
         if (max < min) {
@@ -142,7 +168,20 @@ public class MeetingRuleService {
             start = global.getBookableStart();
             end = global.getBookableEnd();
         }
-        return new Effective(start, end, min, max, global.getGranularityMinutes(),
+        // 0 是明确值（提醒 0=不提醒），因此只能判 null，不能用 >0
+        int granularity = room.getGranularityMinutes() != null ? room.getGranularityMinutes() : global.getGranularityMinutes();
+        int defaultDuration = room.getDefaultDuration() != null ? room.getDefaultDuration() : global.getDefaultDurationMinutes();
+        int advanceDays = room.getAdvanceDays() != null ? room.getAdvanceDays() : global.getAdvanceDays();
+        int minLead = room.getMinLeadMinutes() != null ? room.getMinLeadMinutes() : global.getMinLeadMinutes();
+        int remind = room.getRemindMinutes() != null ? room.getRemindMinutes() : global.getRemindMinutes();
+        int checkinOpen = room.getCheckinOpenMinutes() != null ? room.getCheckinOpenMinutes() : global.getCheckinOpenMinutes();
+        int releaseAfter = room.getReleaseAfterMinutes() != null && room.getReleaseAfterMinutes() > 0
+                ? room.getReleaseAfterMinutes() : global.getReleaseAfterMinutes();
+        boolean checkinRequired = room.getCheckinRequired() != null
+                ? room.getCheckinRequired() == 1 : global.getCheckinRequired() == 1;
+        return new Effective(start, end, min, max, Math.max(1, granularity), defaultDuration,
+                Math.max(1, advanceDays), Math.max(0, minLead), Math.max(0, remind),
+                Math.max(0, checkinOpen), Math.max(1, releaseAfter), checkinRequired,
                 windowConfigured, durationConfigured);
     }
 
@@ -194,7 +233,8 @@ public class MeetingRuleService {
         }
 
         int minutes = (int) Duration.between(start, end).toMinutes();
-        int granularity = Math.max(1, global.getGranularityMinutes());
+        Effective eff = effectiveFor(room, global);
+        int granularity = Math.max(1, eff.getGranularityMinutes());
         if (start.getSecond() != 0 || start.getNano() != 0 || end.getSecond() != 0 || end.getNano() != 0) {
             throw new BusinessException("會議時間請精確到分鐘");
         }
@@ -202,7 +242,6 @@ public class MeetingRuleService {
             throw new BusinessException("會議時間需對齊 " + granularity + " 分鐘刻度");
         }
 
-        Effective eff = effectiveFor(room, global);
         if (minutes < eff.getMinDuration()) {
             throw new BusinessException("會議時長不得少於 " + eff.getMinDuration() + " 分鐘");
         }
@@ -216,14 +255,14 @@ public class MeetingRuleService {
         }
 
         LocalDateTime now = LocalDateTime.now();
-        if (start.isBefore(now.plusMinutes(global.getMinLeadMinutes()))) {
+        if (start.isBefore(now.plusMinutes(eff.getMinLeadMinutes()))) {
             // 提前量为 0 时“需提前 0 分鐘以上预约”读起来像 bug；那条规则当时的真实含义只是“不能约过去”
-            throw new BusinessException(global.getMinLeadMinutes() > 0
-                    ? "會議需提前 " + global.getMinLeadMinutes() + " 分鐘以上預約"
+            throw new BusinessException(eff.getMinLeadMinutes() > 0
+                    ? "會議需提前 " + eff.getMinLeadMinutes() + " 分鐘以上預約"
                     : "會議開始時間不能早於當前時間");
         }
-        if (enforceAdvanceDays && start.isAfter(now.plusDays(global.getAdvanceDays()))) {
-            throw new BusinessException("最多可提前 " + global.getAdvanceDays() + " 天預約");
+        if (enforceAdvanceDays && start.isAfter(now.plusDays(eff.getAdvanceDays()))) {
+            throw new BusinessException("最多可提前 " + eff.getAdvanceDays() + " 天預約");
         }
         // 参会人数不再与房间容量比对：容量是现场座位参考，邀约人数由组织者决定（含线上参会）。
         // 人数照常统计并落 attendee_count，超容量的提醒只在界面上给，不进规则层。

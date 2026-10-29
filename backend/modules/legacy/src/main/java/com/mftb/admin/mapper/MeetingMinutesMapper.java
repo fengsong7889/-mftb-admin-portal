@@ -24,6 +24,10 @@ public interface MeetingMinutesMapper extends BaseMapper<MeetingMinutes> {
     @Select("SELECT * FROM biz_meeting_minutes WHERE deleted = 0 AND booking_id = #{bookingId} LIMIT 1")
     MeetingMinutes findByBooking(@Param("bookingId") long bookingId);
 
+    /** 发布、编辑新版草稿和事项办理统一先锁纪要主行，避免版本与事项状态交叉覆盖。 */
+    @Select("SELECT * FROM biz_meeting_minutes WHERE id = #{id} AND deleted = 0 FOR UPDATE")
+    MeetingMinutes lockById(@Param("id") long id);
+
     /**
      * 批量按会议单取纪要：列表页要给每行标"已錄入紀要"，逐行查会变成 N+1 请求。
      * 空集合由调用方挡在门外（MyBatis 的 IN () 空列表是非法 SQL）。
