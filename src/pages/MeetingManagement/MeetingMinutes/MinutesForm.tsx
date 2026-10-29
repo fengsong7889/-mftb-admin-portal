@@ -326,7 +326,7 @@ export default function MinutesForm() {
   const handleSave = async (send: boolean) => {
     // 上传服务接入前不得静默丢掉附件后提示“保存成功”；无附件的原有流程不受影响。
     if (attachmentFiles.length > 0) {
-      message.warning('附件尚未上傳，暫不能隨紀要保存或發送；請先移除本地預覽附件。')
+      message.warning(t('meeting.minutes.attachmentNotUploadedBlock'))
       return
     }
     try {

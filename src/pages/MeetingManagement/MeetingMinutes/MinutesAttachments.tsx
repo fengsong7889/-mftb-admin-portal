@@ -50,23 +50,23 @@ export default function MinutesAttachmentEditor({ files, onChange, disabled }: E
             const valid = batch.filter(item => fileMime(item) && item.size > 0 && item.size <= MAX_FILE_BYTES)
             const remaining = MAX_FILES - files.length
             const errors: string[] = []
-            if (valid.length !== batch.length) errors.push('部分文件未加入：僅支持 Word、PDF、PNG/JPG/GIF/WebP，單個文件需大於 0 且不超過 10 MB。')
-            if (valid.length > remaining) errors.push('最多選擇 5 個附件，超出部分未加入。')
+            if (valid.length !== batch.length) errors.push(t('meeting.minutes.attachmentRejectedTypes'))
+            if (valid.length > remaining) errors.push(t('meeting.minutes.attachmentTooMany', { maxFiles: MAX_FILES }))
             setError(errors.join(' ') || undefined)
             onChange([...files, ...valid.slice(0, remaining)])
             return Upload.LIST_IGNORE
           }}
         >
-          <Button icon={<UploadOutlined />} disabled={disabled || files.length >= MAX_FILES}>選擇附件</Button>
+          <Button icon={<UploadOutlined />} disabled={disabled || files.length >= MAX_FILES}>{t('meeting.minutes.attachmentPick')}</Button>
         </Upload>
-        <span className="mm-attachments__hint">Word / PDF / 圖片 · 單個 ≤ 10 MB · 最多 {MAX_FILES} 個</span>
+        <span className="mm-attachments__hint">{t('meeting.minutes.attachmentTypesHint', { maxFiles: MAX_FILES })}</span>
       </div>
-      {/* 临时文案随界面确认后统一补 i18n；不能让“选了文件”被误认为已保存到纪要。 */}
+      {/* 附件文案已全部走 i18n；未接上传服务前仍要明说「只是本页预览」，不能让“选了文件”被误认为已存进纪要。 */}
       <Alert
         type="info"
         showIcon
-        message="附件功能預覽"
-        description="文件僅供本頁預覽，尚未上傳；接入附件服務後才能隨紀要保存、發送。離開頁面後需重新選擇。"
+        message={t('meeting.minutes.attachmentPreviewTitle')}
+        description={t('meeting.minutes.attachmentPreviewNote')}
       />
       {error && <Alert type="warning" showIcon message={error} />}
       <MinutesAttachmentList files={files} onRemove={disabled ? undefined : file => {
@@ -75,7 +75,7 @@ export default function MinutesAttachmentEditor({ files, onChange, disabled }: E
       }} />
       {files.length > 0 && (
         <div className="mm-attachments__hint">
-          圖片可點擊放大；PDF 可在瀏覽器查看。Word 若無法直接預覽，請點擊「{t('docKnowledge.download')}」後使用 Word 開啟。
+          {t('meeting.minutes.attachmentUsageHint', { downloadLabel: t('docKnowledge.download') })}
         </div>
       )}
     </div>
@@ -84,9 +84,11 @@ export default function MinutesAttachmentEditor({ files, onChange, disabled }: E
 
 /** 表单预览与纪要只读内容共用同一套附件布局，文件不交给第三方在线预览服务。 */
 export function MinutesAttachmentList({ files, onRemove }: { files: File[]; onRemove?: (file: File) => void }) {
+  // hook 必须在空列表早返回之前取，否则切换附件数量时会改变 hook 调用顺序。
+  const { t } = useTranslation()
   if (files.length === 0) return null
   return (
-    <div className="mm-attachments__list" role="list" aria-label="紀要附件">
+    <div className="mm-attachments__list" role="list" aria-label={t('meeting.minutes.attachmentListLabel')}>
       {files.map((file, index) => (
         <AttachmentRow key={`${file.name}-${file.size}-${file.lastModified}-${index}`} file={file} onRemove={onRemove} />
       ))}
@@ -128,24 +130,24 @@ function AttachmentRow({ file, onRemove }: { file: File; onRemove?: (file: File)
       <div className="mm-attachments__info">
         <div className="mm-attachments__name">{file.name}</div>
         <span className="mm-attachments__hint">
-          {file.size < 1024 * 1024 ? `${Math.max(1, Math.ceil(file.size / 1024))} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`} · 本地預覽
+          {file.size < 1024 * 1024 ? `${Math.max(1, Math.ceil(file.size / 1024))} KB` : `${(file.size / (1024 * 1024)).toFixed(1)} MB`} · {t('meeting.minutes.attachmentLocalPreview')}
         </span>
       </div>
       <Space size={4} wrap>
         {isImage ? (
-          <Button type="link" size="small" disabled={!url} aria-label={`查看 ${file.name}`} onClick={() => setPreviewOpen(true)}>
+          <Button type="link" size="small" disabled={!url} aria-label={t('meeting.minutes.attachmentViewImage', { name: file.name })} onClick={() => setPreviewOpen(true)}>
             {t('common.view')}
           </Button>
         ) : (
-          <Button type="link" size="small" disabled={!url} href={url || undefined} target="_blank" rel="noopener noreferrer" aria-label={`在瀏覽器查看 ${file.name}`}>
+          <Button type="link" size="small" disabled={!url} href={url || undefined} target="_blank" rel="noopener noreferrer" aria-label={t('meeting.minutes.attachmentViewInBrowser', { name: file.name })}>
             {t('common.view')}
           </Button>
         )}
-        <Button type="link" size="small" disabled={!url} href={url || undefined} download={file.name} aria-label={`下載 ${file.name}`}>
+        <Button type="link" size="small" disabled={!url} href={url || undefined} download={file.name} aria-label={t('meeting.minutes.attachmentDownloadFile', { name: file.name })}>
           {t('docKnowledge.download')}
         </Button>
         {onRemove && (
-          <Button type="link" size="small" danger aria-label={`移除 ${file.name}`} onClick={() => onRemove(file)}>
+          <Button type="link" size="small" danger aria-label={t('meeting.minutes.attachmentRemoveFile', { name: file.name })} onClick={() => onRemove(file)}>
             {t('common.remove')}
           </Button>
         )}
