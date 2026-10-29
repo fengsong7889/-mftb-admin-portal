@@ -180,3 +180,61 @@
 .mm-char-counter--warn {
   color: #fa8c16;
 }
+
+/* ---------- 补充说明附件：表单与窄屏查看页共用 ---------- */
+
+.mm-attachments,
+.mm-attachments__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mm-attachments__toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.mm-attachments__hint {
+  font-size: 12px;
+  color: #8c8c8c;
+  line-height: 1.7;
+}
+
+.mm-attachments__item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e8eaed;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.mm-attachments__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  color: #1890ff;
+  background: #e6f7ff;
+  font-size: 28px;
+}
+
+.mm-attachments__info {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.mm-attachments__name {
+  color: #262626;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+}

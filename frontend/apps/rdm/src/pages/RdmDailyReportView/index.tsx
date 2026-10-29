@@ -211,6 +211,14 @@ export default function RdmDailyReportView() {
     }
   }, [i18n])
 
+  // Keep page-specific copy local until UI confirmation; the embedded preview must not change the host title.
+  const pageTitle = i18n.language?.startsWith('zh') ? '項目進度匯報' : 'Project progress report'
+  useLayoutEffect(() => {
+    const previousTitle = document.title
+    document.title = pageTitle
+    return () => { document.title = previousTitle }
+  }, [pageTitle])
+
   const load = useCallback(async () => {
     if (!token) {
       setLoading(false)

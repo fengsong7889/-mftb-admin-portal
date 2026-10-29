@@ -45,7 +45,7 @@ public class MeetingRoom {
 
     private String locationDesc;
 
-    /** 容纳人数：预约人数上限的判定依据 */
+    /** 容纳人数：现场座位参考（列表/超容量提醒用），不作为邀约人数门槛——参会人可能线上加入 */
     private Integer capacity;
 
     /** 设备代码，前后带逗号的包裹格式：,PROJECTION,WHITEBOARD, */

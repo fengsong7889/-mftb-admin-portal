@@ -11,9 +11,12 @@ import { Space, Tag, Timeline } from 'antd'
 import { useTranslation } from 'react-i18next'
 import type { CSSProperties, ReactNode } from 'react'
 import type { MinutesContent } from '@/api/meetingMinutes'
+import { MinutesAttachmentList } from './MinutesAttachments'
 
 interface Props {
   content: MinutesContent
+  /** 界面预览附件；真实附件待受控上传和读取契约接入后提供，禁止把 File 塞进正文 JSON。 */
+  attachmentFiles?: File[]
   /** 紧凑模式（弹窗内摘要）：去掉模块标题的留白，只留内容 */
   compact?: boolean
   /**
@@ -44,7 +47,7 @@ function Section({ title, tag, compact, children }: { title: string; tag?: React
   )
 }
 
-export default function MinutesContentCard({ content, compact, hideTracked }: Props) {
+export default function MinutesContentCard({ content, attachmentFiles, compact, hideTracked }: Props) {
   const { t } = useTranslation()
   const items = content.items ?? []
   const actions = content.actions ?? []
@@ -147,9 +150,10 @@ export default function MinutesContentCard({ content, compact, hideTracked }: Pr
         </Section>
       )}
 
-      {content.remark?.trim() && (
+      {(content.remark?.trim() || Boolean(attachmentFiles?.length)) && (
         <Section title={t('meeting.minutes.sectionRemark', { defaultValue: '補充說明' })} compact={compact}>
-          <div style={bodyStyle}>{content.remark}</div>
+          {content.remark?.trim() && <div style={bodyStyle}>{content.remark}</div>}
+          {attachmentFiles && <MinutesAttachmentList files={attachmentFiles} />}
         </Section>
       )}
     </div>

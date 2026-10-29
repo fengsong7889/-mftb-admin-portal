@@ -16,6 +16,7 @@ import { Alert, Button, Spin } from 'antd'
 import { fetchMinutesPage, type MinutesPageView } from '@/api/meetingMinutesPage'
 import MinutesContentCard from '../MeetingManagement/MeetingMinutes/MinutesContentCard'
 import { useTranslation } from 'react-i18next'
+import MeetingPublicHeader from '../MeetingManagement/MeetingPublicHeader'
 
 export default function MeetingMinutesView() {
   const { t } = useTranslation()
@@ -56,7 +57,7 @@ export default function MeetingMinutesView() {
     }}
     >
       <div style={{ width: '100%', maxWidth: 560 }}>
-        <div style={{ fontSize: 13, color: '#8C8C8C', marginBottom: 12 }}>{t('meeting.minutes.pageTitle', { defaultValue: '會議紀要' })}</div>
+        <MeetingPublicHeader kind="minutes" />
 
         {loading && (
           <div style={{ textAlign: 'center', padding: '48px 0' }}><Spin size="large" /></div>

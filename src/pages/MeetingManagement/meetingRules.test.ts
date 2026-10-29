@@ -96,12 +96,19 @@ describe('预约窗口校验', () => {
     })).toEqual([])
   })
 
-  it('超出每日可预约窗与容量上限时给出具体数字', () => {
+  it('超出每日可预约窗给出具体时段；参会人数超过容量不再拦截', () => {
     const errors = validateBookingWindow({
       room: room({ capacity: 4 }), start: at('21:00:00'), end: at('23:00:00'), attendeeCount: 6, now: NOW,
     })
     expect(errors.join('|')).toContain('可預約時段為 08:00–22:00')
-    expect(errors.join('|')).toContain('參會人數 6 超過該會議室容納上限 4 人')
+    // 容量只是现场座位参考（线上参会不占座位），不能把它变成提交门槛
+    expect(errors.join('|')).not.toContain('容納')
+  })
+
+  it('参会人数不限：4 人房邀 20 人仍可通过窗口校验', () => {
+    expect(validateBookingWindow({
+      room: room({ capacity: 4 }), start: at('10:00:00'), end: at('11:00:00'), attendeeCount: 20, now: NOW,
+    })).toEqual([])
   })
 
   it('未对齐粒度的时间被拒绝', () => {
@@ -131,7 +138,7 @@ describe('预约窗口校验', () => {
 
   it('一次返回全部问题，不把用户推进"改一处报一处"的循环', () => {
     const errors = validateBookingWindow({
-      room: room({ capacity: 2 }), start: at('07:00:00'), end: at('23:30:00'), attendeeCount: 9, now: NOW,
+      room: room(), start: at('07:00:00'), end: at('23:30:00'), attendeeCount: 9, now: NOW,
     })
     expect(errors.length).toBeGreaterThan(1)
   })

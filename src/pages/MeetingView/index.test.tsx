@@ -7,11 +7,11 @@
  *   2. 会议已取消/释放/结束时只回看，不给线上会议入口（与终态卡片不挂按钮同口径）；
  *   3. 页面只显示公开信息，不得出现参会人手机号、投递明细等内部字段。
  */
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MeetingViewPage from './index'
-import i18n from '@/i18n'
+import i18n, { LANGUAGE_STORAGE_KEY } from '@/i18n'
 
 const fetchMeetingViewPage = vi.fn()
 
@@ -59,7 +59,95 @@ function openPage(token = 'abc') {
 describe('會議詳情免登頁', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
+    localStorage.removeItem(LANGUAGE_STORAGE_KEY)
+    fetchMeetingViewPage.mockResolvedValue(VIEW)
     await i18n.changeLanguage('zh-TW')
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+    localStorage.removeItem(LANGUAGE_STORAGE_KEY)
+    window.history.replaceState(null, '', '/')
+  })
+
+  it('defaults to Chinese without saving a preference and restores the host title', async () => {
+    await i18n.changeLanguage('en')
+    document.title = 'MFTB Group Portal'
+    const page = openPage()
+    await screen.findByText('會議邀約')
+    expect(document.title).toBe('會議邀約')
+    expect(i18n.language).toBe('zh-TW')
+    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBeNull()
+    page.unmount()
+    expect(document.title).toBe('MFTB Group Portal')
+  })
+
+  it('respects saved English and switches labels, status, and title in both directions', async () => {
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, 'en')
+    await i18n.changeLanguage('en')
+    openPage()
+    await screen.findByText('Attendees')
+    expect(document.title).toBe('Meeting invitation')
+    expect(screen.getByText('Upcoming')).toBeInTheDocument()
+    expect(screen.getByText('Required')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('radio', { name: '中文' }))
+    await screen.findByText('參會人員')
+    expect(document.title).toBe('會議邀約')
+    expect(screen.getByText('待開始')).toBeInTheDocument()
+    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('zh-TW')
+    fireEvent.click(screen.getByRole('radio', { name: 'EN' }))
+    await screen.findByText('Attendees')
+    expect(document.title).toBe('Meeting invitation')
+    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('en')
+  })
+
+  it('opens the complete current public link without exposing an opener', async () => {
+    window.history.replaceState(null, '', '/#/meeting-view?token=test-view-token')
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    openPage()
+    fireEvent.click(screen.getByRole('button', { name: /在瀏覽器打開/ }))
+    expect(open).toHaveBeenCalledWith(window.location.href, '_blank', 'noopener')
+    await screen.findByText('產品週會')
+  })
+
+  it('uses the DingTalk desktop browser protocol and preserves the signed URL', async () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (Macintosh) DingTalk/7.0')
+    window.history.replaceState(null, '', '/#/meeting-view?token=test-view-token&source=invite')
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    let href = ''
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      href = this.href
+    })
+    openPage()
+    fireEvent.click(screen.getByRole('button', { name: /在瀏覽器打開/ }))
+    const target = new URL(href)
+    expect(target.protocol).toBe('dingtalk:')
+    expect(target.searchParams.get('pc_slide')).toBe('false')
+    expect(target.searchParams.get('url')).toBe(window.location.href)
+    expect(open).not.toHaveBeenCalled()
+    expect(document.querySelector('a[href^="dingtalk:"]')).toBeNull()
+    await screen.findByText('產品週會')
+  })
+
+  it('copies the complete link and provides inline confirmation', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { userAgent: navigator.userAgent, clipboard: { writeText } })
+    window.history.replaceState(null, '', '/#/meeting-view?token=test-view-token')
+    openPage()
+    fireEvent.click(screen.getByRole('button', { name: /複製連結/ }))
+    await screen.findByRole('button', { name: /已複製連結/ })
+    expect(writeText).toHaveBeenCalledWith(window.location.href)
+  })
+
+  it('handles denied clipboard access without leaking a hidden link into the DOM', async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error('denied'))
+    vi.stubGlobal('navigator', { userAgent: navigator.userAgent, clipboard: { writeText } })
+    openPage()
+    fireEvent.click(screen.getByRole('button', { name: /複製連結/ }))
+    await screen.findByRole('button', { name: /請手動複製/ })
+    expect(document.querySelector('textarea')).toBeNull()
+    expect(document.querySelector('.ant-message')).toBeNull()
   })
 
   it('渲染会议重点信息与免登说明，不含内部字段', async () => {
@@ -119,6 +207,8 @@ describe('會議詳情免登頁', () => {
     openPage('expired')
     await waitFor(() => expect(screen.getByText('查看連結不可用')).toBeInTheDocument())
     expect(screen.getByText('連結無效或已過期')).toBeInTheDocument()
+    expect(document.title).toBe('會議邀約')
+    expect(screen.getByRole('radiogroup', { name: '切換語言' })).toBeInTheDocument()
   })
 
   it('没有 token 参数时不请求接口，直接说明缺令牌', async () => {

@@ -73,7 +73,9 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
     private static final int UPCOMING_DAYS = 7;
 
     /**
-     * 纪要入口的阶段口径：已进入或已收尾才谈得上纪要。
+     * 纪要入口的阶段口径：会议一到开始时间（ongoing）就给入口，不必等散会。
+     * <p>开会过程中就要开始记录才是实际场景（纪要本身就是边开边写的），
+     * 未开始的会没有结论可记，已取消/已释放的会不产生纪要。
      * <p>必须与 {@code MeetingMinutesServiceImpl.RECORDABLE_PHASES} 逐字一致：
      * 两边不一致时会出现"列表给了按钮、点进去被拒"，那比不给按钮更让人怀疑系统。
      */
@@ -140,7 +142,7 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
         vo.setNotifies(notifyMapper.findByBooking(id).stream().map(this::toNotifyVO).toList());
         vo.setNotifySkippedCount(notifyMapper.countInviteSkipped(id));
         applyMinutes(vo, minutesMapper.findByBooking(id),
-                guard.canRecordMinutes(current) || guard.canOperateRecords(current));
+                guard.canRecordMinutes(current), guard.canOperateRecords(current));
         return vo;
     }
 
@@ -1251,14 +1253,15 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
         // 纪要状态与入口一次批量取：逐行查会变成 20 行 × 1 次往返，而列表页每次切 Tab 都要重跑
         Map<Long, MeetingMinutes> minutesByBooking = minutesMapper.findByBookings(ids).stream()
                 .collect(Collectors.toMap(MeetingMinutes::getBookingId, row -> row, (left, right) -> left));
-        boolean mayRecordMinutes = guard.canRecordMinutes(current) || guard.canOperateRecords(current);
+        boolean mayRecordOwn = guard.canRecordMinutes(current);
+        boolean mayRecordAsAdmin = guard.canOperateRecords(current);
         List<MeetingBookingDto.VO> records = new ArrayList<>(bookings.size());
         for (MeetingBooking booking : bookings) {
             List<MeetingAttendee> attendees = byBooking.getOrDefault(booking.getId(), List.of());
             MeetingBookingDto.VO vo = toVO(booking, current,
                     rooms.get(booking.getRoomId()), global, findMyRow(attendees, current.getId()));
             vo.setAttendees(attendees.stream().map(this::toAttendeeVO).toList());
-            applyMinutes(vo, minutesByBooking.get(booking.getId()), mayRecordMinutes);
+            applyMinutes(vo, minutesByBooking.get(booking.getId()), mayRecordOwn, mayRecordAsAdmin);
             records.add(vo);
         }
         return records;
@@ -1270,14 +1273,22 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
      * <p>canMinutes 在服务端算而不是让前端复算：前端只看到 myRole/phase，看不到动作权与行政代录的分支，
      * 自己拼一份判定迟早与 {@code MeetingMinutesServiceImpl.requireRecordable} 漂移，
      * 结果是列表给了入口、点进去被拒——这种"按钮能点但一定失败"比没有按钮更糟。
+     *
+     * <p>谁能拿到入口同样要跟 requireRecordable 同口径：行政代录本来就不要求他是这场会的人
+     * （预约记录是全量台账，行政替他人补纪要与代取消/代释放同源）。早先这里再要求一次 related，
+     * 就会服务层允许、列表却不给入口，等于把行政代录能力锁在按钮后面。
+     *
+     * @param mayRecordOwn     持有使用侧 edit（meeting-my:edit）：只给自己相关的会记纪要
+     * @param mayRecordAsAdmin 持有行政侧 edit（meeting-record:edit）：可替任意一场会代录
      */
-    private void applyMinutes(MeetingBookingDto.VO vo, MeetingMinutes minutes, boolean mayRecordMinutes) {
+    private void applyMinutes(MeetingBookingDto.VO vo, MeetingMinutes minutes,
+                              boolean mayRecordOwn, boolean mayRecordAsAdmin) {
         vo.setMinutesId(minutes == null ? null : minutes.getId());
         vo.setMinutesStatus(minutes == null ? "none" : minutes.getStatus());
         boolean related = vo.getMyRole() != null && !"none".equals(vo.getMyRole());
         boolean phaseAllowed = !NON_RECORDABLE_STATUSES.contains(vo.getStatus())
                 && RECORDABLE_PHASES.contains(vo.getPhase());
-        vo.setCanMinutes(mayRecordMinutes && related && phaseAllowed);
+        vo.setCanMinutes((mayRecordAsAdmin || (related && mayRecordOwn)) && phaseAllowed);
     }
 
     /** 单行兜底入口（改期/响应等写后立即回显的路径）：自己补齐房间、规则与"我"的行 */

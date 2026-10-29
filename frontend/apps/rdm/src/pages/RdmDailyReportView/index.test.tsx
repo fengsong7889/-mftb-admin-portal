@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import RdmDailyReportView from './index'
-import i18n from '@/i18n'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import RdmDailyReportView, { RdmDailyReportBoard } from './index'
+import i18n, { LANGUAGE_STORAGE_KEY } from '@/i18n'
 
 const fetchView = vi.fn()
 
@@ -142,7 +142,37 @@ describe('進度日報看板（開放頁）', () => {
     // 上一个用例设的 mockRejectedValue 会泄漏到下一个用例，
     // 表现为「明明给了正常数据却报网络异常」的随机失败。
     fetchView.mockReset()
+    localStorage.removeItem(LANGUAGE_STORAGE_KEY)
     await i18n.changeLanguage('zh-TW')
+  })
+
+  afterEach(() => {
+    localStorage.removeItem(LANGUAGE_STORAGE_KEY)
+  })
+
+  it('sets the progress-report title before loading completes and restores it on exit', async () => {
+    await i18n.changeLanguage('en')
+    fetchView.mockReturnValue(new Promise(() => {}))
+    document.title = 'MFTB Group Portal'
+    const page = openPage()
+    await waitFor(() => expect(document.title).toBe('項目進度匯報'))
+    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBeNull()
+    fireEvent.click(screen.getByRole('radio', { name: 'EN' }))
+    await waitFor(() => expect(document.title).toBe('Project progress report'))
+    fireEvent.click(screen.getByRole('radio', { name: '中文' }))
+    await waitFor(() => expect(document.title).toBe('項目進度匯報'))
+    page.unmount()
+    expect(document.title).toBe('MFTB Group Portal')
+  })
+
+  it('does not replace the host title when rendering an embedded report preview', () => {
+    document.title = 'Report settings'
+    const page = render(<RdmDailyReportBoard preview view={{
+      valid: false, showRequirements: false, showOwners: false, showUnassigned: false,
+    }} />)
+    expect(document.title).toBe('Report settings')
+    page.unmount()
+    expect(document.title).toBe('Report settings')
   })
 
   it('有效令牌：渲染固定模板的项目、负责人与需求明细', async () => {
@@ -473,6 +503,7 @@ describe('進度日報看板（開放頁）', () => {
     openPage('/rdm-daily-view')
     await waitFor(() => expect(screen.getByText('缺少查看令牌')).toBeInTheDocument())
     expect(fetchView).not.toHaveBeenCalled()
+    expect(document.title).toBe('項目進度匯報')
   })
 
   it('令牌失效：展示后端返回的原因，而不是空白页', async () => {
@@ -486,6 +517,7 @@ describe('進度日報看板（開放頁）', () => {
     openPage('/rdm-daily-view?token=expired')
     await waitFor(() => expect(screen.getByText('連結不可用')).toBeInTheDocument())
     expect(screen.getByText('連結已過期，請聯繫推送人重新發送')).toBeInTheDocument()
+    expect(document.title).toBe('項目進度匯報')
   })
 
   it('接口异常：页面自己承接错误并给出重试入口', async () => {

@@ -253,6 +253,21 @@ class MeetingMinutesServiceImplTest {
     }
 
     @Test
+    @DisplayName("会议进行中就能录纪要：开会过程即开始记录，不必等散会")
+    void ongoingMeetingIsRecordable() {
+        when(bookingMapper.selectById(100L)).thenReturn(booking(MeetingConstants.STATUS_BOOKED,
+                LocalDateTime.now().minusMinutes(10), LocalDateTime.now().plusMinutes(50)));
+        when(guard.canOperateRecords(RECORDER)).thenReturn(true);
+        when(minutesMapper.findByBooking(100L)).thenReturn(null);
+
+        MeetingMinutesDto.VO vo = service.viewByBooking(100L);
+
+        assertFalse(vo.isExists());
+        // 阶段就是进行中（未到开始时间才给 MEETING_NOT_RECORDED）
+        assertTrue(Boolean.TRUE.equals(vo.getCanEdit()), "進行中的會要能錄入紀要，鎖定原因：" + vo.getEditLockReason());
+    }
+
+    @Test
     @DisplayName("这场会已有纪要时拒绝再建一条：并列纪要等于没人说得清哪条是结论")
     void rejectsSecondMinutesForSameBooking() {
         when(guard.canRecordMinutes(RECORDER)).thenReturn(true);

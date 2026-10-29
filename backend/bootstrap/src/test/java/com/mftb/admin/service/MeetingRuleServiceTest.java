@@ -22,8 +22,11 @@ import static org.mockito.Mockito.when;
  * 预约规则裁决测试（{@link MeetingRuleService} 是新建与改期共用的唯一入口）。
  *
  * <p>锁定的都是"漏在改期路径上就等于开绕过口"的规则：同日约束、粒度对齐、时长上下限、
- * 每日可预约窗、提前期与最远可订天数、容量。房间列 NULL 回落 sys_config 的两层口径也在此钉住：
+ * 每日可预约窗、提前期与最远可订天数。房间列 NULL 回落 sys_config 的两层口径也在此钉住：
  * 前端可以做同一套校验，但那是体验，这里才是边界。
+ *
+ * <p>反向也要钉住：会议室容量不是门槛（参会人可能线上加入），超容量必须能过。
+ * 否则"8 人房只能邀 8 个人"会把业务事实写错，而且新建与改期都会误拦。
  */
 class MeetingRuleServiceTest {
 
@@ -156,11 +159,12 @@ class MeetingRuleServiceTest {
     }
 
     @Test
-    @DisplayName("参会人数超过容量被拒，人数按含组织者与外部人的全量计")
-    void capacityIsCheckedAgainstFullHeadcount() {
+    @DisplayName("参会人数超过房间容量不再被拒：线上参会不占座位，容量只是现场参考")
+    void headcountAboveCapacityIsNotABlockingRule() {
         MeetingRoom r = room(4);
-        BusinessException ex = assertThrows(BusinessException.class, () -> validate(r, start(), start().plusMinutes(60), 5));
-        assertTrue(ex.getMessage().contains("超過"), ex.getMessage());
+        // 4 人房邀 12 个人（含线上参会）：规则层不得拒绝，人数仍由服务层统计并落库
+        validate(r, start(), start().plusMinutes(60), 12);
+        // 容量仍是房间档案属性（列表与超容量提醒都要用），只是不参与预约门槛判定
         assertEquals(4, r.getCapacity());
     }
 

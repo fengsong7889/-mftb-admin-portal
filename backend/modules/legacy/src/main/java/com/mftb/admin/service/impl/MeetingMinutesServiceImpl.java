@@ -75,7 +75,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MeetingMinutesServiceImpl implements MeetingMinutesService {
 
-    /** 纪要可读的会议阶段：与"会议结束后可以录入纪要"的需求一致，未开始的会不给入口 */
+    /**
+     * 纪要可录入的会议阶段：会议一到开始时间（ongoing）就能记，不必等散会。
+     * <p>开会过程中就要边讲边记才符合实际场景；未开始的会没有结论可记，
+     * 因此 pending 不在这里，与会议列表给不给入口（{@code MeetingBookingServiceImpl.RECORDABLE_PHASES}）同口径。
+     */
     private static final List<String> RECORDABLE_PHASES = List.of("ongoing", "ended", "finished");
     /** 已取消/已释放的会不产生纪要：没开成的会没有"结论"可记 */
     private static final List<String> NON_RECORDABLE_STATUSES = List.of(
