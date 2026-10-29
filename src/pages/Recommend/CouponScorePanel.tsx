@@ -155,8 +155,13 @@ export default function CouponScorePanel({ ruleName, config, hasDraft, descripti
         <AlgorithmSection title="報名計分" icon={<TrophyOutlined />} tone="info"
           extra={<FormulaHint formula="有效報名即給一次" example={`同活動多檔優惠也只給 ${view.enrollmentScore} 分`} />}>
           <div className="organic-score-panel organic-score-list">
+            {/* 只读态用禁用开关回显启用状态（与门槛/力度模块同款式），保存后状态不再「消失」 */}
             <ScoreRow label="報名計分" score={view.enrollmentScore} enabled={view.enrollmentEnabled}
-              control={<EnrollmentScoreTag enabled={view.enrollmentEnabled} />} />
+              control={<>
+                <Switch aria-label="啟用報名分" checkedChildren="啟用" unCheckedChildren="停用" checked={view.enrollmentEnabled} disabled />
+                <EnrollmentScoreTag enabled={view.enrollmentEnabled} />
+              </>}
+              hint="停用後報名分值保留，僅該模組不計入得分" />
           </div>
         </AlgorithmSection>
 
@@ -166,7 +171,7 @@ export default function CouponScorePanel({ ruleName, config, hasDraft, descripti
             <div className="organic-score-row">
               <div className="organic-score-row__condition">
                 <div className="organic-score-row__label">啟用門檻計分</div>
-                <Switch size="small" aria-label="門檻計分" checked={view.thresholdEnabled} disabled />
+                <Switch aria-label="門檻計分" checkedChildren="啟用" unCheckedChildren="停用" checked={view.thresholdEnabled} disabled />
               </div>
               <span className={`organic-score-value ${view.thresholdEnabled ? 'organic-score-value--bonus' : 'organic-score-value--disabled'}`}>
                 <span className="organic-score-value__badge">模組狀態</span>
@@ -186,7 +191,7 @@ export default function CouponScorePanel({ ruleName, config, hasDraft, descripti
             <div className="organic-score-row">
               <div className="organic-score-row__condition">
                 <div className="organic-score-row__label">啟用力度計分</div>
-                <Switch size="small" aria-label="力度計分" checked={view.discountEnabled} disabled />
+                <Switch aria-label="力度計分" checkedChildren="啟用" unCheckedChildren="停用" checked={view.discountEnabled} disabled />
               </div>
               <span className={`organic-score-value ${view.discountEnabled ? 'organic-score-value--bonus' : 'organic-score-value--disabled'}`}>
                 <span className="organic-score-value__badge">模組狀態</span>
@@ -234,16 +239,15 @@ export default function CouponScorePanel({ ruleName, config, hasDraft, descripti
       </> : <>
         <AlgorithmSection title="報名計分" icon={<TrophyOutlined />} tone="info"
           extra={<FormulaHint formula="有效報名即給一次" example={`同活動多檔優惠也只給 ${view.enrollmentScore} 分`} />}>
-          <div className="organic-score-panel" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* 开关与分值并排一行，避免竖排占空间 */}
+          <div className="organic-score-panel">
             <div className="organic-score-edit-row">
               <span className="organic-score-edit-row__label">啟用報名分</span>
               <Switch aria-label="啟用報名分" checkedChildren="啟用" unCheckedChildren="停用" checked={draft.enrollmentEnabled} onChange={v => patch({ enrollmentEnabled: v })} />
-              <span style={{ fontSize: 12, color: '#8C8C8C' }}>每門店、每活動只計一次有效報名</span>
-            </div>
-            <div className="organic-score-edit-row">
               <span className="organic-score-edit-row__label">報名分值</span>
               <InputNumber aria-label="報名分值" value={draft.enrollmentScore} min={0} max={100} disabled={!draft.enrollmentEnabled}
                 onChange={v => patch({ enrollmentScore: v ?? 0 })} style={{ width: 160 }} addonAfter="分" />
+              <span style={{ fontSize: 12, color: '#8C8C8C' }}>每門店、每活動只計一次有效報名</span>
             </div>
           </div>
         </AlgorithmSection>

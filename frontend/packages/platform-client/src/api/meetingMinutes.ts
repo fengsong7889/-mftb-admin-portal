@@ -11,7 +11,7 @@
  * 请求体里没有 recorderUserId / organizerId：记录人由后端从 JWT 取并写快照，
  * 前端传了也不认——否则任何人都能替别人署名记纪要。
  */
-import request from './request'
+import request, { resolveApiBaseUrl } from './request'
 
 /* ==================== 模板结构 ==================== */
 
@@ -78,6 +78,8 @@ export interface MinutesDocument {
   changeNote?: string
   content: MinutesContent
   references?: MinutesLinkVO[]
+  /** 发布时定格的附件引用快照：历史版本永远能说明当时发了哪几个文件 */
+  attachments?: MinutesAttachmentVO[]
 }
 
 export interface MinutesRevision {
@@ -116,6 +118,11 @@ export interface MinutesContent {
   nextMeetingAt?: string | null
   nextMeetingNote?: string
   remark?: string
+  /**
+   * 补充说明附件号列表（服务端签发，32 位 hex）。
+   * null=调用方不带附件字段（旧页面），保存时保留既有绑定；数组（含空）=正文就是这一组。
+   */
+  attachments?: string[] | null
 }
 
 export function emptyMinutesContent(): MinutesContent {
@@ -214,6 +221,8 @@ export interface MinutesVO {
   items?: MinutesItemView[]
   /** 关联的其他会议纪要（带来源快照） */
   links?: MinutesLinkVO[]
+  /** 当前草稿正文引用的附件元数据（仅可写者可见；非可写者看 document.attachments） */
+  attachments?: MinutesAttachmentVO[]
   /** 当前登录人是否对本次会议的某个事项负责（负责人回来更新状态不要求菜单写权限） */
   itemOwner?: boolean
   /**
@@ -256,6 +265,26 @@ export interface MinutesLinkVO {
   bookingNo?: string
   title?: string
   timeText?: string
+}
+
+/** 附件元数据：只回展示与访问需要的字段，对象键/路径不下发；previewKind 由服务端判定 */
+export interface MinutesAttachmentVO {
+  attachmentNo: string
+  fileName: string
+  mimeType: string
+  sizeBytes: number
+  /** image=站内放大，pdf=浏览器直开，office=查看时转 PDF，none=仅下载 */
+  previewKind: 'image' | 'pdf' | 'office' | 'none'
+  uploaderName?: string
+  uploadedAt?: string
+}
+
+/** 站内附件访问票据：新标签页/钉钉外部浏览器带不了 JWT，用 5 分钟短票换文件直链 */
+export interface MinutesAttachmentAccess {
+  attachmentNo: string
+  purpose: 'view' | 'download'
+  ticket: string
+  expiresAt: string
 }
 
 /** 行政侧纪要列表行 */
@@ -481,4 +510,41 @@ export function fetchMinutesAdminPage(params: {
   size?: number
 }): Promise<MinutesAdminPage> {
   return request.get<unknown, MinutesAdminPage>('/meeting/minutes/admin/page', { params })
+}
+
+/* ==================== 补充说明附件 ==================== */
+
+/**
+ * 原始字节流上传（不走 multipart，不为单个附件放宽全站限制）。
+ * requestKey 幂等：重试/双击不重复占用存储；类型/大小服务端重验，前端限制只是 UX。
+ */
+export function uploadMinutesAttachment(bookingId: number, file: File, requestKey: string): Promise<MinutesAttachmentVO> {
+  return request.post<unknown, MinutesAttachmentVO>('/meeting/minutes/attachments', file, {
+    params: { bookingId, fileName: file.name, requestKey },
+    headers: { 'Content-Type': file.type || 'application/octet-stream' },
+    timeout: 120000,
+  })
+}
+
+/** 删除尚未绑定的附件（仅上传人）；已随纪要保存的只能从正文移除引用 */
+export function deleteMinutesAttachment(attachmentNo: string): Promise<void> {
+  return request.delete<unknown, void>(`/meeting/minutes/attachments/${attachmentNo}`)
+}
+
+/** 签发访问票据：接口走 JWT，票据地址在白名单路径下，新标签页才能直接打开 */
+export function fetchMinutesAttachmentAccess(attachmentNo: string, purpose: 'view' | 'download'): Promise<MinutesAttachmentAccess> {
+  return request.get<unknown, MinutesAttachmentAccess>(`/meeting/minutes/attachments/${attachmentNo}/access`, { params: { purpose } })
+}
+
+/**
+ * 拼附件文件直链：生产前端与后端不同源，必须用 resolveApiBaseUrl 而不是站点 origin。
+ * 票据/令牌只出现在查询参数里，不拼进任何可被收藏的长期地址。
+ */
+export function minutesAttachmentFileUrl(params: { attachmentNo: string; ticket?: string; token?: string; purpose?: 'view' | 'download' }): string {
+  const base = `${resolveApiBaseUrl()}/public/meeting-minutes/attachment-file`
+  const query = new URLSearchParams({ attachmentNo: params.attachmentNo })
+  if (params.ticket) query.set('ticket', params.ticket)
+  if (params.token) query.set('token', params.token)
+  if (params.purpose) query.set('purpose', params.purpose)
+  return `${base}?${query.toString()}`
 }

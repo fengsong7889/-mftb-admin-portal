@@ -145,4 +145,27 @@ describe('紀要免登查看頁', () => {
     await waitFor(() => expect(screen.getByText('缺少查看令牌，請從釘釘卡片重新進入')).toBeInTheDocument())
     expect(fetchMinutesPage).not.toHaveBeenCalled()
   })
+
+  it('本批快照带附件时展示附件区，查看/下载地址复用页面令牌', async () => {
+    fetchMinutesPage.mockResolvedValue({
+      ...VIEW,
+      attachments: [
+        { attachmentNo: 'a'.repeat(32), fileName: '白板.png', mimeType: 'image/png', sizeBytes: 2048, previewKind: 'image' },
+        { attachmentNo: 'b'.repeat(32), fileName: '資料.pdf', mimeType: 'application/pdf', sizeBytes: 4096, previewKind: 'pdf' },
+      ],
+    })
+    openPage('abc')
+    await screen.findByRole('listitem', { name: '白板.png' })
+    const download = screen.getByRole('button', { name: '下載 資料.pdf' })
+    expect(download).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '查看 白板.png' }))
+    await waitFor(() => expect(document.querySelector('.ant-image-preview-img')).not.toBeNull())
+    // 图片预览地址同样必须带页面令牌：附件不能匿名裸读
+    const previewSrc = (document.querySelector('.ant-image-preview-img') as HTMLImageElement).src
+    expect(previewSrc).toContain(`attachmentNo=${'a'.repeat(32)}`)
+    expect(previewSrc).toContain('token=abc')
+    expect(previewSrc).toContain('purpose=view')
+    // 转发风险口径不变：页面不得出现对象键/存储路径
+    expect(document.body.textContent).not.toMatch(/object_key|meeting-minutes\/attachments\//)
+  })
 })

@@ -6693,7 +6693,7 @@
     "ruleBusinessStatus": "營業狀態",
     "ruleRatingScore": "評價得分",
     "ruleServingSpeed": "出餐速度",
-    "ruleRejectOrder": "拒絕接單",
+    "ruleRejectOrder": "自動接單",
     "ruleDistanceDecay": "距離衰減",
     "ruleDeliveryRange": "配送範圍",
     "ruleMerchantSupport": "商家扶持",

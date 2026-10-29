@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import DOMPurify from 'dompurify'
-import { Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Spin, Radio, Checkbox, Table, Alert, AutoComplete, Tooltip, Segmented } from 'antd'
+import { Button, Tag, Space, Modal, Form, Input, Select, InputNumber, message, Switch, Tabs, Spin, Radio, Checkbox, Table, Alert, Tooltip, Segmented, Rate } from 'antd'
 import { SettingOutlined, PlusOutlined, SaveOutlined, SearchOutlined, QuestionCircleOutlined, DeleteOutlined, DownOutlined, UpOutlined, EditOutlined, ShopOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import AlgorithmSection from './AlgorithmForm/AlgorithmSection'
@@ -9,6 +9,7 @@ import CouponScorePanel from './CouponScorePanel'
 import FreeShippingScorePanel from './FreeShippingScorePanel'
 import MemberBonusScorePanel from './MemberBonusScorePanel'
 import SignboardScorePanel from './SignboardScorePanel'
+import TrafficBalancePanel from './TrafficBalancePanel'
 import { ServiceStatus, AppType } from '@mftb/contracts/recommendConstants'
 import { getSystemRuleValue } from '@/hooks/useSystemRules'
 import { getSystemConfig, updateSystemConfig } from '@/api/systemConfig'
@@ -29,7 +30,11 @@ import {
   isMemberBonusScoreRule, normalizeMemberBonusScoreConfig,
   isOrganicRuleVisible, RETIRED_ORGANIC_RULE_IDS, DEFAULT_COUPON_SCORE_CONFIG, BUSINESS_STATE_ITEMS, isFilteredBusinessState,
   DEFAULT_ONTIME_RATE_BANDS, ONTIME_RATE_CONDITION, readOntimeRateBands, toOntimeRateConditionItems,
-  type CouponScoreConfig, type SignboardScoreConfig, type FreeShippingScoreConfig, type MemberBonusScoreConfig, type OntimeRateBand,
+  STAR_TIER_MAX, STAR_TIER_STEP, STAR_TIER_CONDITION, DEFAULT_STAR_TIER_BANDS, readStarTierBands, toStarTierConditionItems,
+  CANCEL_RATE_CONDITION, CANCEL_SAMPLE_CONDITION, DEFAULT_CANCEL_MIN_ORDERS, DEFAULT_CANCEL_RATE_BANDS, readCancelRateBands, readCancelMinOrders, toCancelRateConditionItems,
+  AUTO_ACCEPT_DEFAULT_SCORE, MEAL_TIME_DEFAULT_SCORE,
+  normalizeTrafficBalanceConfig, type TrafficBalanceConfig, MEAL_TIME_AUTO_CORRECT_ON, MEAL_TIME_AUTO_CORRECT_OFF, isMealTimeAutoCorrectEnabled,
+  type CouponScoreConfig, type SignboardScoreConfig, type FreeShippingScoreConfig, type MemberBonusScoreConfig, type OntimeRateBand, type StarTierBand, type CancelRateBand,
 } from './organicTrafficConfig'
 import {
   fetchOrganicScoreConfig, updateDimensionWeights as apiUpdateWeights,
@@ -38,7 +43,7 @@ import {
   type OrganicRuleVO, type OrganicRulePayload,
 } from '@/api/organicScore'
 import { fetchStores } from '@/api/store'
-import { fetchAdAlgorithms, fetchAdAlgorithmByCode, type AdAlgorithm } from '@/api/adPromotion'
+import { fetchAdAlgorithms, type AdAlgorithm } from '@/api/adPromotion'
 
 /** 維度順序（界面展示順序） */
 const DIMENSION_ORDER: ScoreDimension[] = [
@@ -92,7 +97,21 @@ const isDeliveryRange = (id?: string) => id === 'PLT_02A'
 const needsStatDays = (mode?: ScoreMode, id?: string) => {
   if (mode === ScoreMode.TIERED) return true
   if (!id) return false
-  return ['STB_03', 'PLT_03'].includes(id)
+  return ['PLT_03', 'STB_08'].includes(id)
+}
+
+/**
+ * 店鋪綜合分檔位的星星視覺（STB_03）：分數由業務系統實時傳遞，傳入多少分就比對多少分；1 星 = 1 分且支持半星。
+ * antd Rate 渲染為塊級 ul，外層 inline-flex 鎖同行；只讀展示因而顯式 disabled。
+ */
+function StarTierValue({ star, fontSize = 14 }: { star: number; fontSize?: number }) {
+  const { t } = useTranslation()
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
+      <Rate disabled allowHalf value={star} count={STAR_TIER_MAX} style={{ fontSize, lineHeight: 1 }} />
+      <span style={{ fontSize: 12, color: '#595959', fontWeight: 600 }}>{star.toFixed(1)} {t('organicTrafficScore.scoreUnit')}</span>
+    </span>
+  )
 }
 
 /** PLT_03 商家扶持 - 前提條件選項（可擴展） */
@@ -153,6 +172,7 @@ function voToRule(vo: OrganicRuleVO): OrganicScoreRule {
     activityItems: vo.activityItems ? (() => { try { return JSON.parse(vo.activityItems) as ActivityScoreItem[] } catch { return undefined } })() : undefined,
     freeShippingConfig,
     memberBonusConfig,
+    trafficBalanceConfig: vo.trafficBalanceConfig ? normalizeTrafficBalanceConfig(vo.trafficBalanceConfig) : undefined,
     status: vo.status as ServiceStatus,
     builtin: vo.builtin === 1,
     updatedBy: vo.updatedBy || undefined,
@@ -161,43 +181,23 @@ function voToRule(vo: OrganicRuleVO): OrganicScoreRule {
 }
 
 /**
- * 前端合併 STO_02A/STO_02B → STB_03（評價得分 - 5 星配置）
- * 數據庫尚未遷移時，在加載後自動合併；同時處理舊 2 檔格式升級為 5 星。
+ * 前端合併 STO_02A/STO_02B → STB_03（店鋪綜合分 - 梯度固定加分）
+ * 數據庫尚未遷移時，在加載後自動合併；STB_03 自身的新舊檔位格式收斂由 loadConfig 的保底分支負責。
+ * 名稱/說明/梯度一律取 DEFAULT_ORGANIC_SCORE_RULES 模板，避免兩處口徑漂移。
  */
 function mergeReviewRules(rules: OrganicScoreRule[]): OrganicScoreRule[] {
   const good = rules.find(r => r.id === 'STO_02A')
   const bad = rules.find(r => r.id === 'STO_02B')
+  if (!good && !bad) return rules // 無舊拆分數據，保持現有行
+  const template = DEFAULT_ORGANIC_SCORE_RULES.find(r => r.id === 'STB_03')
+  if (!template) return rules
   const existing = rules.find(r => r.id === 'STB_03')
-  const hasOldAB = !!(good || bad)
-  // 判斷現有 STB_03 是否為舊格式（只有 bonus/deduction 兩項）
-  const isOldFormat = existing && existing.conditionItems?.length === 2 &&
-    existing.conditionItems.every(i => i.condition === 'bonus' || i.condition === 'deduction')
-  if (!hasOldAB && !isOldFormat) return rules // 無舊數據且已是新格式
-  // 刪除舊的 A/B
-  let result = rules.filter(r => r.id !== 'STO_02A' && r.id !== 'STO_02B')
-  // 使用默認 5 星配置
-  const defaultSTB03 = DEFAULT_ORGANIC_SCORE_RULES.find(r => r.id === 'STB_03')
   const merged: OrganicScoreRule = {
-    id: 'STB_03',
-    dimension: ScoreDimension.STORE,
-    name: '評價得分',
-    description: '統計天數內顧客評價星級計分，支持固定加扣分或動態倍率',
-    mode: ScoreMode.CONDITIONAL,
-    score: 0,
-    statDays: existing?.statDays || good?.statDays || bad?.statDays || 30,
+    ...template,
     status: existing?.status || good?.status || ServiceStatus.ENABLED,
-    builtin: true,
-    conditionItems: defaultSTB03?.conditionItems || [
-      { condition: 'fixed_bonus', score: 50 },
-      { condition: 'fixed_bonus', score: 20 },
-      { condition: 'fixed_bonus', score: 0 },
-      { condition: 'fixed_deduction', score: 20 },
-      { condition: 'fixed_deduction', score: 50 },
-    ],
   }
-  // 移除舊 STB_03（如果有）
-  result = result.filter(r => r.id !== 'STB_03')
-  // 在原位置插入新 STB_03
+  // 刪除舊的 A/B 與舊 STB_03，在原位置插入合併後的梯度配置
+  const result = rules.filter(r => r.id !== 'STO_02A' && r.id !== 'STO_02B' && r.id !== 'STB_03')
   const insertIdx = rules.findIndex(r => r.id === 'STO_02A' || r.id === 'STB_03')
   result.splice(insertIdx >= 0 ? insertIdx : result.length, 0, merged)
   return result
@@ -225,19 +225,6 @@ function validateRegionTiers(
   return false
 }
 
-/** 按次計罰規則校驗（STB_06 ~ STB_09 共用） */
-function validateDeductionRule(values: RuleFormValues): boolean {
-  if (!values.statDays || values.statDays <= 0) {
-    message.warning('請配置統計天數')
-    return true
-  }
-  if (!(values as any).deductionPerOrder || (values as any).deductionPerOrder <= 0) {
-    message.warning('請配置每單扣分分值')
-    return true
-  }
-  return false
-}
-
 /** STB_02 營業狀態的系統口徑：庫內舊文案是「按檔降權」，與墊底排序口徑衝突，因此界面固定展示本句 */
 const STB02_RULE_NOTE = '營業中得滿分；休息一會、爆單暫停不參與加減分，由系統墊底排序（排在所有正常參與排序的商家之後）；休息打烊由系統直接過濾，不加載到瀑布流也不計分'
 
@@ -251,26 +238,26 @@ const RULE_TYPE_TAG_CONFIG: Record<string, { color: string; label: string }> = {
   COM_10: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
   STB_01: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
   STB_02: { color: 'purple', label: '四檔狀態計分' },
-  STB_03: { color: 'purple', label: '雙檔評價計分' },
+  STB_03: { color: 'purple', label: '分數梯度加分' },
   STB_04: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
   STB_05: { color: 'purple', label: '準時率梯度' },
-  STB_06: { color: 'purple', label: '按次計罰' },
-  STB_07: { color: 'purple', label: '按次計罰' },
-  STB_08: { color: 'purple', label: '按次計罰' },
-  STB_09: { color: 'purple', label: '按次計罰' },
+  STB_06: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
+  STB_07: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
+  STB_08: { color: 'purple', label: '取消率梯度加分' },
   STB_ACT: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
   PLT_01: { color: 'blue', label: '距離衰減' },
   PLT_02A: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
-  PLT_03: { color: 'purple', label: '梯度扶持計分' },
-  PLT_04: { color: 'purple', label: '梯度降權計分' },
+  PLT_03: { color: 'purple', label: '梯度均衡加分' },
 }
 
-/** 按次計罰規則配置（STB_06 ~ STB_09 共用，消除重複面板 JSX） */
-const DEDUCTION_RULES_CONFIG: Record<string, { label: string; editLabel: string; defaultPerOrder: number; note: string }> = {
-  STB_06: { label: '統計天數內每拒絕一單', editLabel: '每拒絕一單扣分', defaultPerOrder: 80, note: '備注：統計天數含當天，商家當天拒絕接單即即時扣分' },
-  STB_07: { label: '統計天數內每超時一單', editLabel: '每超時一單扣分', defaultPerOrder: 70, note: '備注：統計天數不含當天，統計期間內平均出餐時間作為基線（已固定），商家當天超時即即時扣分' },
-  STB_08: { label: '統計天數內每取消一單', editLabel: '每取消一單扣分', defaultPerOrder: 80, note: '備注：統計天數含當天，商家當天取消訂單即即時扣分' },
-  STB_09: { label: '統計天數內每超時一單', editLabel: '每超時一單扣分', defaultPerOrder: 60, note: '備注：統計天數含當天，商家當天超時接單即即時扣分' },
+/**
+ * 計分項取數口徑提示（只讀工具條展示）：寫清數據由業務系統怎麼傳、什麼節奏更新，
+ * 避免運營把本頁當成數據源，或誤以為改完檔位就能立刻看到排名變化。
+ */
+const RULE_DATA_SOURCE_HINT: Record<string, string> = {
+  STB_03: '數據來源：業務系統實時傳遞店鋪綜合分，以最新傳入值比對檔位加分',
+  STB_05: '數據來源：出餐準時率由業務系統定時任務計算後傳遞，非實時傳數；本頁僅配檔位與分值',
+  STB_ACT: '數據來源：活動清單由業務系統同步，下拉框選中即帶出名稱與狀態；只有進行中的活動計分',
 }
 
 /** 區域切換 Segmented 選項（PLT_03/PLT_04 共用，消除重複 JSX） */
@@ -300,23 +287,23 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
       const config = await fetchOrganicScoreConfig()
       if (config.rules.length > 0) {
         const loaded = config.rules.map(voToRule).filter(r => !RETIRED_ORGANIC_RULE_IDS.includes(r.id) && r.id !== 'COM_08' && r.id !== 'COM_11' && r.id !== 'PLT_02B' && r.id !== 'PLT_02C' && r.id !== 'PLT_02D' && r.id !== 'PLT_02E')
-        // 前端保底：確保 PLT_03/PLT_04 名稱與維度正確（SQLPub 複制延遲時生效）
+        // 前端保底：确保各计分项名称/维度/口径与界面一致（SQLPub 复制延迟时生效）；PLT_03 已是流量均衡，不再覆写回旧名
         loaded.forEach(r => {
-          if (r.id === 'PLT_03') {
-            r.name = '商家扶持'
-            r.dimension = ScoreDimension.PLATFORM
-          }
-          if (r.id === 'PLT_04') {
-            r.name = '訂單過熱調控'
-            r.dimension = ScoreDimension.PLATFORM
-            r.calcCycle = CalcCycle.SCHEDULED
-            if (!r.calcIntervalHours) r.calcIntervalHours = 1
+          if (r.id === 'STB_03') {
+            r.name = '店鋪綜合分'
+            r.dimension = ScoreDimension.STORE
+            // 計分口徑改為吃業務系統實時傳遞的綜合分、不再統計期間：舊行的 stat_days 不讀也不寫
+            r.statDays = undefined
+            // 舊「5 檔星級逐檔固定/動態加減分」口徑不再展示：庫內舊行由後端遷移 organic:stb03-star-tier-v1 整行覆寫，
+            // 前端只在沒讀到梯度檔位時（如未播種的新環境）用默認檔位兌底，不渲染舊樣式
+            const bands = readStarTierBands(r.conditionItems)
+            r.conditionItems = toStarTierConditionItems(bands.length ? bands : DEFAULT_STAR_TIER_BANDS)
           }
           if (r.id === 'STB_05') {
             r.name = '出餐準時率'
             r.dimension = ScoreDimension.STORE
-            if (!r.statDaysTotal) r.statDaysTotal = 7
-            // 清除舊版 statDaysRecent 與主/輔營條件項
+            // 統計窗口由業務系統定時任務決定，本項不再提供統計天數配置：舊行的 stat_days_total / stat_days_recent 不讀也不寫
+            r.statDaysTotal = undefined
             r.statDaysRecent = undefined
             // 舊「超均值扣分」口徑不再展示：庫內舊行由後端遷移 organic:stb05-ontime-rate-v1 整行覆寫，
             // 前端只在沒讀到準時率檔位時（如未播種的新環境）用默認梯度兌底，不渲染舊樣式
@@ -324,25 +311,40 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
             r.conditionItems = toOntimeRateConditionItems(bands.length ? bands : DEFAULT_ONTIME_RATE_BANDS)
           }
           if (r.id === 'STB_06') {
-            r.name = '拒絕接單'
-            if (!r.statDays) r.statDays = 7
-            if (!r.deductionPerOrder) r.deductionPerOrder = 80
+            // 口徑改造：原「拒絕接單・按次計罰扣分」更名為「自動接單・固定加分」，
+            // 舊行的 stat_days / deduction_per_order 不再讀也不寫，避免後端遷移前界面殘留舊口徑
+            r.name = '自動接單'
+            r.mode = ScoreMode.RULE_BONUS
+            r.statDays = undefined
+            r.deductionPerOrder = undefined
+            if (!r.score) r.score = AUTO_ACCEPT_DEFAULT_SCORE
           }
           if (r.id === 'STB_07') {
-            r.name = '出餐超時'
-            if (!r.statDays) r.statDays = 7
-            if (!r.deductionPerOrder) r.deductionPerOrder = 70
+            // 口径改造：原「出餐超時・按次计罚扣分」更名为「出餐時長・固定加分」，
+            // 旧行的 stat_days / deduction_per_order 不再读也不再写，避免后端迁移前界面残留旧口径
+            r.name = '出餐時長'
+            r.mode = ScoreMode.RULE_BONUS
+            r.statDays = undefined
+            r.deductionPerOrder = undefined
+            if (!r.score) r.score = MEAL_TIME_DEFAULT_SCORE
+            // 自动校正开关住在 prerequisites（与后端迁移播种值对齐）：旧行可能还写着按次计罚口径的前提文案，
+            // 只在空值时补默认开启；停用存显式停用值，保证运营关掉的开关不会被保底重新打开
+            if (!r.prerequisites) r.prerequisites = MEAL_TIME_AUTO_CORRECT_ON
           }
           if (r.id === 'STB_08') {
-            r.name = '取消訂單'
-            if (!r.statDays) r.statDays = 7
-            if (!r.deductionPerOrder) r.deductionPerOrder = 80
+            // 口徑改造：原「取消訂單・按次計罰扣分」更名為「訂單取消率・梯度加分」，
+            // 舊行的 deduction_per_order 不再讀也不寫，避免後端遷移前界面殘留舊口徑
+            r.name = '訂單取消率'
+            r.mode = ScoreMode.CONDITIONAL
+            if (!r.statDays) r.statDays = 30
+            r.deductionPerOrder = undefined
+            const cancelBands = readCancelRateBands(r.conditionItems)
+            r.conditionItems = toCancelRateConditionItems(
+              cancelBands.length ? cancelBands : DEFAULT_CANCEL_RATE_BANDS,
+              readCancelMinOrders(r.conditionItems) ?? DEFAULT_CANCEL_MIN_ORDERS,
+            )
           }
-          if (r.id === 'STB_09') {
-            r.name = '超時接單'
-            if (!r.statDays) r.statDays = 7
-            if (!r.deductionPerOrder) r.deductionPerOrder = 60
-          }
+          // STB_09「超時接單」已下架：不再展示，舊行由 loadConfig 的 RETIRED_ORGANIC_RULE_IDS 過濾屏蔽
           if (r.id === 'STB_01') {
             r.name = '主營時段加分'
           }
@@ -384,36 +386,6 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
           if (r.id === 'COM_07') r.name = '平台官方神券'
           // 計分項更名：後端舊名稱「購買廣告-金字招牌」統一為「金字招牌(廣告)」
           if (r.id === 'COM_10') r.name = '金字招牌(廣告)'
-          if (r.id === 'PLT_03') {
-            r.name = '商家扶持'
-            // 升級舊格式為區域配置
-            if (!r.regionConfigs) {
-              const defaultTier = { threshold: 50, direction: TierDirection.LESS_THAN, score: 20 }
-              r.regionConfigs = {
-                MACAU: { prerequisites: r.prerequisites || 'UNCONDITIONAL', statDays: r.statDays || 30, tiers: r.tiers?.length ? r.tiers : [defaultTier] },
-                TAIPA: { prerequisites: r.prerequisites || 'UNCONDITIONAL', statDays: r.statDays || 30, tiers: r.tiers?.length ? r.tiers : [defaultTier] },
-              }
-            }
-            if (!r.blockedMerchants) r.blockedMerchants = []
-          }
-          if (r.id === 'PLT_04') {
-            r.name = '訂單過熱調控'
-            r.dimension = ScoreDimension.PLATFORM
-            r.calcCycle = CalcCycle.SCHEDULED
-            if (!r.calcIntervalHours) r.calcIntervalHours = 1
-            // 升級舊格式為區域配置
-            if (!r.regionConfigs) {
-              const defaultTiers = r.tiers?.length ? r.tiers : [
-                { threshold: 200, direction: TierDirection.MORE_THAN, score: -10 },
-                { threshold: 500, direction: TierDirection.MORE_THAN, score: -30 },
-                { threshold: 1000, direction: TierDirection.MORE_THAN, score: -60 },
-              ]
-              r.regionConfigs = {
-                MACAU: { calcIntervalHours: r.calcIntervalHours || 1, tiers: defaultTiers },
-                TAIPA: { calcIntervalHours: r.calcIntervalHours || 1, tiers: defaultTiers },
-              }
-            }
-          }
         })
         // 保底：STB_ACT 活動加分尚未種子時，以前端默認模板補充（只讀展示不影響）
         if (!loaded.some(r => r.id === 'STB_ACT')) {
@@ -544,10 +516,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
   }, [])
 
   /* ---- 活動加分（STB_ACT）相關狀態（暫對接算法庫，後續切換為系統活動） ---- */
-  /** 算法庫列表（用於算法名稱/狀態展示與輸入聯想） */
+  /** 算法庫列表（活動下拉框候選與名稱/狀態的資料源） */
   const [algoOptions, setAlgoOptions] = useState<AdAlgorithm[]>([])
-  /** 按行索引記錄算法查詢加載態 */
-  const [algoFetching, setAlgoFetching] = useState<Record<number, boolean>>({})
 
   /** 加載算法庫列表 */
   useEffect(() => {
@@ -564,32 +534,6 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
       items[index] = { ...items[index], ...patch }
       return { ...prev, [ruleId]: { ...rule, activityItems: items } }
     })
-  }
-
-  /** 通過算法ID獲取算法名稱與狀態 */
-  const handleFetchAlgo = async (ruleId: string, index: number) => {
-    const items = (inlineForm[ruleId]?.activityItems || []) as ActivityScoreItem[]
-    const code = items[index]?.activityId?.trim()
-    if (!code) {
-      message.warning('請輸入算法ID')
-      return
-    }
-    setAlgoFetching(prev => ({ ...prev, [index]: true }))
-    try {
-      const algo = await fetchAdAlgorithmByCode(code)
-      if (algo) {
-        updateActivityItem(ruleId, index, { activityName: algo.algoName })
-        // 同步到選項緩存（保證名稱/狀態為實時值）
-        setAlgoOptions(prev => [algo, ...prev.filter(a => a.algoCode !== algo.algoCode)])
-        message.success(`已獲取算法：${algo.algoName}`)
-      } else {
-        message.error(`算法不存在：${code}`)
-      }
-    } catch (err) {
-      message.error(err instanceof Error && err.message ? err.message : '算法查詢失敗，請稍後重試')
-    } finally {
-      setAlgoFetching(prev => ({ ...prev, [index]: false }))
-    }
   }
 
   /** 門店搜索過濾 */
@@ -684,6 +628,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
     memberBonusConfig: (values as any).memberBonusConfig
       ? JSON.stringify((values as any).memberBonusConfig as MemberBonusScoreConfig)
       : undefined,
+    trafficBalanceConfig: (values as any).trafficBalanceConfig
+      ? JSON.stringify((values as any).trafficBalanceConfig as TrafficBalanceConfig)
+      : undefined,
     status: values.status!,
   })
   /** 保存內聯編輯 */
@@ -693,6 +640,17 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
     // STB_05 準時率檔位入庫前按率降序收斂，保證消費方匹配順序與界面一致
     if (ruleId === 'STB_05' && Array.isArray((values as any).conditionItems)) {
       (values as any).conditionItems = toOntimeRateConditionItems(readOntimeRateBands((values as any).conditionItems))
+    }
+    // STB_03 店鋪綜合分梯度檔位入庫前按分數下界降序收斂，保證消費方匹配順序與界面一致
+    if (ruleId === 'STB_03' && Array.isArray((values as any).conditionItems)) {
+      (values as any).conditionItems = toStarTierConditionItems(readStarTierBands((values as any).conditionItems))
+    }
+    // STB_08 訂單取消率檔位入庫前按上界升序收斂（門檻項固定放末位），保證消費方匹配順序與界面一致
+    if (ruleId === 'STB_08' && Array.isArray((values as any).conditionItems)) {
+      (values as any).conditionItems = toCancelRateConditionItems(
+        readCancelRateBands((values as any).conditionItems),
+        readCancelMinOrders((values as any).conditionItems) ?? DEFAULT_CANCEL_MIN_ORDERS,
+      )
     }
     // PLT_03 區域梯度配置校驗：每個區域不允許空梯度
     if (ruleId === 'PLT_03') {
@@ -746,12 +704,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
         if (validateRegionTiers(values.tiers, '減分分數')) return
       }
     }
-    // STB_05 出餐準時率校驗：統計天數 + 至少一档、率 0～100%、分值非負且隨率遞增
+    // STB_05 出餐準時率校驗：至少一檔、率 0～100%、分值非負且隨率遞增（統計天數已取消，不再校驗）
     if (ruleId === 'STB_05') {
-      if (!(values as any).statDaysTotal || (values as any).statDaysTotal <= 0) {
-        message.warning('請配置統計天數')
-        return
-      }
       const bands = readOntimeRateBands((values as any).conditionItems)
       if (!bands.length) {
         message.warning('請至少配置一個準時率檔位')
@@ -771,8 +725,74 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
         return
       }
     }
-    // STB_06 ~ STB_09 按次計罰校驗：統計天數 + 每單扣分
-    if (validateDeductionRule(values as RuleFormValues)) return
+    // STB_03 店鋪綜合分校驗：至少一檔、分數 0.5～5 且為半星步長、檔位不重複、加分非負且隨分數遞增
+    if (ruleId === 'STB_03') {
+      const bands = readStarTierBands((values as any).conditionItems)
+      if (!bands.length) {
+        message.warning('請至少配置一個梯度檔位')
+        return
+      }
+      if (bands.some(band => band.star < STAR_TIER_STEP || band.star > STAR_TIER_MAX)) {
+        message.warning(`店鋪綜合分需在 ${STAR_TIER_STEP}～${STAR_TIER_MAX} 分之間`)
+        return
+      }
+      if (bands.some(band => Math.round(band.star * 10) % Math.round(STAR_TIER_STEP * 10) !== 0)) {
+        message.warning('店鋪綜合分僅支持半星（0.5 分）步長')
+        return
+      }
+      if (new Set(bands.map(band => band.star)).size !== bands.length) {
+        message.warning('同一檔位不可重複配置')
+        return
+      }
+      if (bands.some(band => band.score < 0)) {
+        message.warning('固定加分不得為負')
+        return
+      }
+      // 已按分數降序：分數越高分值不得越低，擋住「分數越高反而少加分」的配置
+      if (bands.some((band, i) => i > 0 && band.score > bands[i - 1].score)) {
+        message.warning('店鋪綜合分越高，加分不得越低')
+        return
+      }
+    }
+    // STB_08 訂單取消率校驗：統計天數 + 納入門檻單量 + 至少一檔、率 0～100%、檔位不重複、加分非負且隨上界遞減
+    if (ruleId === 'STB_08') {
+      if (!(values as any).statDays || (values as any).statDays <= 0) {
+        message.warning('請配置統計天數')
+        return
+      }
+      const cancelMinOrders = readCancelMinOrders((values as any).conditionItems)
+      if (!cancelMinOrders || cancelMinOrders <= 0) {
+        message.warning('請配置納入計算的訂單量門檻')
+        return
+      }
+      const cancelBands = readCancelRateBands((values as any).conditionItems)
+      if (!cancelBands.length) {
+        message.warning('請至少配置一個取消率檔位')
+        return
+      }
+      if (cancelBands.some(band => band.maxRate < 0 || band.maxRate > 100)) {
+        message.warning('取消率需在 0～100% 之間')
+        return
+      }
+      if (new Set(cancelBands.map(band => band.maxRate)).size !== cancelBands.length) {
+        message.warning('同一取消率檔位不可重複配置')
+        return
+      }
+      if (cancelBands.some(band => band.score < 0)) {
+        message.warning('固定加分不得為負')
+        return
+      }
+      // 已按上界升序：上界越高（越寬鬆）的檔位不得給更多加分，擋住「取消率差反而多加分」的配置
+      if (cancelBands.some((band, i) => i > 0 && band.score > cancelBands[i - 1].score)) {
+        message.warning('取消率上界越高，加分不得越多')
+        return
+      }
+    }
+    // STB_07 出餐時長固定加分校驗：分值必填且為正
+    if (ruleId === 'STB_07' && (!(values as any).score || (values as any).score <= 0)) {
+      message.warning('請配置固定加分分值')
+      return
+    }
     // PLT_01 距離衰減校驗：滿分 + 衰減係數
     if (ruleId === 'PLT_01') {
       if (values.score === undefined || values.score < 0) {
@@ -792,18 +812,23 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
         return
       }
     }
-    // STB_ACT 活動加分校驗：每行需填活動ID與加分分值（分值 > 0）
+    // STB_ACT 活動加分校驗：每行需選到活動且加分分值 > 0，同一活動不得重複配置
     if (ruleId === 'STB_ACT') {
       const items: ActivityScoreItem[] = (values as any).activityItems || []
       if (items.length === 0) {
         message.warning('請至少配置一個活動')
         return
       }
+      const codes = items.map(it => it.activityId?.trim() ?? '')
+      if (codes.some(code => !code)) {
+        message.warning(`第 ${codes.findIndex(code => !code) + 1} 行請選擇活動`)
+        return
+      }
+      if (new Set(codes).size !== codes.length) {
+        message.warning('同一活動不可重複添加，請刪除多餘行')
+        return
+      }
       for (let i = 0; i < items.length; i++) {
-        if (!items[i].activityId?.trim()) {
-          message.warning(`第 ${i + 1} 行請輸入算法ID`)
-          return
-        }
         if (!items[i].score || items[i].score <= 0) {
           message.warning(`第 ${i + 1} 行請配置活動加分分值`)
           return
@@ -978,8 +1003,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
     }
   }
 
-  /** 按維度取規則（已下架與當前品牌不適用的計分項不展示） */
-  const getRules = (dimension: ScoreDimension) =>
+  /** 按維度取規則（已下架與當前品牌不適用的計分項不展示；流量均衡為真實 PLT_03 行，不再合成） */
+  const getRules = (dimension: ScoreDimension): OrganicScoreRule[] =>
     rules.filter(r => r.dimension === dimension && isOrganicRuleVisible(r.id, brand))
 
   /** 按維度取規則並疊加關鍵字 / 狀態篩選 */
@@ -1354,6 +1379,23 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                   const isEditingInline = !!inlineEditing[rule.id]
                   const form = inlineForm[rule.id] || rule
                   const tone = dimension === ScoreDimension.COMMERCIAL ? 'strategy' : dimension === ScoreDimension.PLATFORM ? 'advanced' : 'info'
+                  if (rule.id === 'PLT_03') {
+                    return <div className="algorithm-form__rule-body">
+                      <TrafficBalancePanel
+                        config={rule.trafficBalanceConfig ?? normalizeTrafficBalanceConfig(null)}
+                        readOnly={readOnly}
+                        stores={dbStores}
+                        status={rule.status}
+                        updatedBy={rule.updatedBy}
+                        updatedAt={rule.updatedAt}
+                        onSave={async (next, nextStatus) => {
+                          // 整行覆盖语义：以当前行为底，只改 trafficBalanceConfig 与 status；后端会重新校验
+                          const vo = await updateOrganicRule(rule.id as unknown as number, buildRulePayload({ ...rule, trafficBalanceConfig: next, status: nextStatus }))
+                          setRules(prev => prev.map(r => r.id === rule.id ? voToRule(vo) : r))
+                          message.success(t('organicTrafficScore.updateSuccess', { name: vo.name }))
+                        }} />
+                    </div>
+                  }
                   // 減免運費（COM_02）：報名分 + 人工配置的門檻分檔位
                   if (isFreeShippingScoreRule(rule.id)) {
                     const draft = freeShippingDrafts[rule.id]
@@ -1451,6 +1493,11 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             )
                           })()}
 
+                          {/* 店鋪綜合分的取數來源在明細上方就說清楚，避免往下翻才能看到口徑 */}
+                          {RULE_DATA_SOURCE_HINT[rule.id] && (
+                            <span className="algorithm-form__hint" style={{ margin: 0 }}>{RULE_DATA_SOURCE_HINT[rule.id]}</span>
+                          )}
+
 
                           {/* 最後更新信息 + 編輯按鈕：統一靠右成組（兩個 margin-left:auto 會把說明擠到中間） */}
                           <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
@@ -1476,7 +1523,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                     {!isEditingInline ? (
                       /* 顯示模式 */
                       <AlgorithmSection title="計分明細" icon={<SettingOutlined />} tone={tone}>
-                        {!['COM_01', 'STB_02', 'STB_03', 'STB_05', 'STB_06', 'STB_07', 'STB_08', 'STB_09', 'STB_ACT', 'PLT_01', 'PLT_02A', 'PLT_03', 'PLT_04'].includes(rule.id)
+                        {!['COM_01', 'STB_02', 'STB_03', 'STB_05', 'STB_06', 'STB_07', 'STB_08', 'STB_ACT', 'PLT_01', 'PLT_02A', 'PLT_03', 'PLT_04'].includes(rule.id)
                           && [ScoreMode.RULE_BONUS, ScoreMode.RULE_DEDUCTION, ScoreMode.DECAY, ScoreMode.AMOUNT_MULTIPLIER].includes(rule.mode) && (
                           <div className="organic-score-panel">
                             <ScoreRow label={rule.name} score={rule.score}
@@ -1484,7 +1531,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                               hint={rule.mode === ScoreMode.AMOUNT_MULTIPLIER ? '金額 × 倍率 = 得分' : undefined} />
                           </div>
                         )}
-                        {rule.mode === ScoreMode.CONDITIONAL && rule.conditionItems?.length && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'STB_05' && (
+                        {rule.mode === ScoreMode.CONDITIONAL && rule.conditionItems?.length && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'STB_05' && rule.id !== 'STB_08' && (
                           <div>
                             <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>條件分值明細（{rule.conditionItems.length} 組）</div>
                             <div className="organic-score-panel organic-score-list">
@@ -1494,13 +1541,13 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             </div>
                           </div>
                         )}
-                        {/* STB_ACT 活動加分配置只讀顯示（參考 STB_09 超時接單風格：信息與分數均居左） */}
+                        {/* STB_ACT 活動加分配置只讀顯示：活動ID + 名稱 + 計分狀態 */}
                         {rule.id === 'STB_ACT' && (() => {
                           const items = rule.activityItems || []
                           return (
                             <div className="organic-score-panel">
                               {items.length === 0 ? (
-                                <div style={{ fontSize: 12, color: '#8C8C8C' }}>尚未配置，請點擊編輯添加算法並配置固定加分</div>
+                                <div style={{ fontSize: 12, color: '#8C8C8C' }}>尚未配置活動，點擊右上角「編輯」後從下拉框選擇活動並設置固定加分</div>
                               ) : (
                                 <div className="organic-score-list">
                                   {items.map((item, idx) => {
@@ -1508,18 +1555,20 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                     const name = live?.algoName ?? item.activityName ?? '—'
                                     const status = live?.status
                                     return (
-                                      <ScoreRow key={item.activityId || idx} score={item.score} label={<>
-                                        <span style={{ color: '#1890FF', fontFamily: 'monospace' }}>{item.activityId}</span>
-                                        <div>{name}</div>
-                                      </>} hint={<Tag color={status === 1 ? 'success' : status === 2 ? 'warning' : 'default'} style={{ margin: 0 }}>
-                                        {status === 1 ? '啟用' : status === 2 ? '停用' : '未知'}
-                                      </Tag>} />
+                                      <ScoreRow key={item.activityId || idx} index={idx} score={item.score}
+                                        label={<span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6, minWidth: 0 }}>
+                                          <span style={{ color: '#262626', fontWeight: 500 }}>{name}</span>
+                                          <span style={{ color: '#8C8C8C', fontFamily: 'monospace', fontSize: 12 }}>（{item.activityId}）</span>
+                                        </span>}
+                                        hint={status === 1
+                                          ? <Tag color="success" style={{ margin: 0 }}>{t('organicTrafficScore.activityStatusActive')}</Tag>
+                                          : <Tag color={status === 2 ? 'warning' : 'default'} style={{ margin: 0 }}>{status === 2 ? t('organicTrafficScore.activityStatusExpired') : t('organicTrafficScore.activityStatusUnknown')}</Tag>} />
                                     )
                                   })}
                                 </div>
                               )}
                               <div className="organic-score-note">
-                                備注：暫以算法庫算法ID對接驗證（後續切換為系統活動）；店鋪報名參與即獲得對應固定加分，名稱與狀態與算法庫實時同步，停用後不再計分
+                                備注：活動資料由業務系統同步，只統計正常進行中的活動——已過期、已失效或未開始的活動一律不加分；店鋪報名進行中的活動即得該活動固定加分，多個活動獨立計分、可累加。
                               </div>
                             </div>
                           )
@@ -1570,40 +1619,28 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                           </div>
                           )
                         })()}
-                        {/* STB_03 評價得分配置只讀顯示（5 星） */}
+                        {/* STB_03 店鋪綜合分只讀顯示（梯度固定加分） */}
                         {rule.id === 'STB_03' && (() => {
-                          const defaultSTB03 = DEFAULT_ORGANIC_SCORE_RULES.find(r => r.id === 'STB_03')
-                          const items = rule.conditionItems?.length === 5 ? rule.conditionItems : (defaultSTB03?.conditionItems || [])
+                          const bands = readStarTierBands(rule.conditionItems)
+                          const view = bands.length ? bands : DEFAULT_STAR_TIER_BANDS
+                          const lowest = view[view.length - 1]?.star ?? 0
                           return (
-                          <div className="organic-score-panel">
-                            <div className="organic-score-list">
-                              {[5, 4, 3, 2, 1].map((star, idx) => {
-                                const condItem = items[idx] || { condition: 'fixed_bonus', score: 0 }
-                                const isDynamic = condItem.condition.startsWith('dynamic')
-                                const isDeduction = condItem.condition.endsWith('deduction')
-                                return (
-                                  <ScoreRow key={star} score={condItem.score}
-                                    kind={isDynamic ? (isDeduction ? 'dynamic-deduction' : 'dynamic-bonus') : (isDeduction ? 'deduction' : 'bonus')}
-                                    label={<div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
-                                      <span style={{ fontSize: 12, color: '#595959', fontWeight: 500 }}>{star}星</span>
-                                      <span style={{ fontSize: 18, letterSpacing: 2, lineHeight: 1 }}>
-                                        {Array.from({ length: 5 }, (_, i) => (
-                                          <span key={i} style={{
-                                            color: i < star ? '#FAAD14' : '#E8E8E8',
-                                            textShadow: i < star ? '0 1px 3px rgba(250,173,20,0.4)' : 'none',
-                                          }}>{i < star ? '★' : '☆'}</span>
-                                        ))}
-                                      </span>
-                                    </div>}>
-                                    {isDynamic ? `${star} × ${condItem.score} = ${isDeduction ? '-' : '+'}${star * condItem.score} 分` : undefined}
-                                  </ScoreRow>
-                                )
-                              })}
+                            <div className="organic-score-panel">
+                              <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>{t('organicTrafficScore.scoringRuleHeader')}</div>
+                              <div className="organic-score-list">
+                                {view.map((band, i) => (
+                                  <ScoreRow key={`${band.star}-${i}`} index={i}
+                                    label={<div style={{ display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
+                                      <span style={{ fontSize: 12, color: '#595959', fontWeight: 500 }}>{t('organicTrafficScore.compositeScoreAtLeast')}</span>
+                                      <StarTierValue star={band.star} />
+                                    </div>}
+                                    score={band.score} />
+                                ))}
+                              </div>
+                              <div className="organic-score-note">
+                                <span style={{ fontWeight: 600 }}>計分規則：</span>店鋪綜合分由業務系統實時傳遞，本項不做週期統計、以最新傳入值為準；傳入多少分就比對對應檔位加分（1 星 = 1 分，支持半星 0.5 分），按分數從高到低匹配，命中一檔即停、分數不累加，低於 {lowest} 分不加分。
+                              </div>
                             </div>
-                            <div className="organic-score-note">
-                              <span style={{ fontWeight: 600 }}>計分規則：</span>固定加分/減分 = 用戶評價訂單，所選的星級匹配對應配置分數，直接加/減分；動態加分/減分 = 用戶評價訂單，所選星級 × 配置倍數 = 最終分數，再根據規則加/減分。
-                            </div>
-                          </div>
                           )
                         })()}
                         {/* PLT_03 商家扶持自定義只讀顯示（區域維度） */}
@@ -1726,20 +1763,13 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             </div>
                           )
                         })()}
-                        {/* STB_05 出餐準時率只讀顯示：按準時率檔位查分，不再與歷史均值對比 */}
+                        {/* STB_05 出餐準時率只讀顯示：只按準時率檔位查分，統計窗口與取數由業務系統負責 */}
                         {rule.id === 'STB_05' && (() => {
-                          const totalDays = rule.statDaysTotal || 7
                           const bands = readOntimeRateBands(rule.conditionItems)
                           const view = bands.length ? bands : DEFAULT_ONTIME_RATE_BANDS
                           const lowest = view[view.length - 1]?.rate ?? 0
                           return (
                             <div className="organic-score-panel">
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 10, flexWrap: 'wrap' }}>
-                                <div style={{ fontSize: 13, color: '#595959' }}>
-                                  <span style={{ fontWeight: 600, color: '#262626' }}>統計天數：</span>
-                                  過去 <span style={{ fontWeight: 600, color: '#E8720C' }}>{totalDays}</span> 天（不含當天）
-                                </div>
-                              </div>
                               <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>計分規則</div>
                               <div className="organic-score-list">
                                 {view.map((band, i) => (
@@ -1748,26 +1778,78 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                 ))}
                               </div>
                               <div className="organic-score-note">
-                                備注：統計天數不含當天；按準時率從高到低匹配，命中一檔即停、分數不累加，低於 {lowest}% 不得分
+                                備注：準時率由業務系統定時任務計算後傳遞，非實時傳數，因此本項不提供統計天數；按準時率從高到低匹配，命中一檔即停、分數不累加，低於 {lowest}% 不得分
                               </div>
                             </div>
                           )
                         })()}
-                        {/* STB_06 ~ STB_09 按次計罰規則只讀顯示（配置驅動） */}
-                        {DEDUCTION_RULES_CONFIG[rule.id] && (() => {
-                          const cfg = DEDUCTION_RULES_CONFIG[rule.id]
-                          const days = rule.statDays || 7
-                          const perOrder = rule.deductionPerOrder || cfg.defaultPerOrder
+                        {/* STB_06 自動接單只讀顯示：「開啟自動接單」是固定前提條件（商家在店端設置），唯一可配項是加分分值 */}
+                        {rule.id === 'STB_06' && (
+                          <div className="organic-score-panel">
+                            <div className="organic-score-list">
+                              <ScoreRow
+                                label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
+                                  開啟自動接單
+                                  {/* 開關常開且禁用：只表達計分前提條件成立，本計分項的啟停由卡片頭部「狀態」開關負責 */}
+                                  <Switch checked disabled checkedChildren="啟用" unCheckedChildren="停用" aria-label="自動接單計分前提條件" />
+                                </span>}
+                                score={rule.score || AUTO_ACCEPT_DEFAULT_SCORE} kind="bonus"
+                                hint="商家在店端開啟自動接單即得分，未開啟不加分" />
+                            </div>
+                            <div className="organic-score-note">
+                              備注：自動接單由商家在店端設置開啟，系統只讀取開啟狀態作為計分前提；本項為固定加分、不累加，與出餐時長 / 訂單取消率等計分規則互不影響
+                            </div>
+                          </div>
+                        )}
+                        {/* STB_07 出餐時長只讀顯示：配置項為「開啟自動校正 + 固定加分」（開關狀態讀自 prerequisites，不再用本地状態） */}
+                        {rule.id === 'STB_07' && (
+                          <div className="organic-score-panel">
+                            <div className="organic-score-list">
+                              <ScoreRow
+                                label={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
+                                  {t('organicTrafficScore.mealTimeAutoCorrectLabel')}
+                                  <Switch checked={isMealTimeAutoCorrectEnabled(rule.prerequisites)}
+                                    disabled
+                                    checkedChildren="啟用" unCheckedChildren="停用"
+                                    aria-label={t('organicTrafficScore.mealTimeAutoCorrectAria')} />
+                                </span>}
+                                score={rule.score || MEAL_TIME_DEFAULT_SCORE} kind="bonus"
+                                hint={t('organicTrafficScore.mealTimeAutoCorrectHint')} />
+                            </div>
+                            <div className="organic-score-note">
+                              {t('organicTrafficScore.mealTimeAutoCorrectNote')}
+                            </div>
+                          </div>
+                        )}
+                        {/* STB_08 訂單取消率只讀顯示：統計天數 + 納入單量門檻 + 取消率梯度加分 */}
+                        {rule.id === 'STB_08' && (() => {
+                          const days = rule.statDays || 30
+                          const minOrders = readCancelMinOrders(rule.conditionItems) ?? DEFAULT_CANCEL_MIN_ORDERS
+                          const bands = readCancelRateBands(rule.conditionItems)
+                          const view = bands.length ? bands : DEFAULT_CANCEL_RATE_BANDS
+                          const highest = view[view.length - 1]?.maxRate ?? 0
                           return (
                             <div className="organic-score-panel">
                               <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 10, flexWrap: 'wrap' }}>
                                 <div style={{ fontSize: 13, color: '#595959' }}>
-                                  <span style={{ fontWeight: 600, color: '#262626' }}>統計天數：</span>
-                                  <span style={{ fontWeight: 600, color: '#E8720C' }}>{days}</span> 天（含當天）
+                                  <span style={{ fontWeight: 600, color: '#262626' }}>{t('organicTrafficScore.statDays')}：</span>
+                                  <span style={{ fontWeight: 600, color: '#E8720C' }}>{days}</span> {t('organicTrafficScore.daysUnit')}
+                                </div>
+                                <div style={{ fontSize: 13, color: '#595959' }}>
+                                  <span style={{ fontWeight: 600, color: '#262626' }}>{t('organicTrafficScore.includeThresholdLabel')}：</span>
+                                  統計期內 ≥ <span style={{ fontWeight: 600, color: '#1890FF' }}>{minOrders}</span> {t('organicTrafficScore.orderUnit')}
                                 </div>
                               </div>
-                              <ScoreRow label={cfg.label} score={perOrder} kind="deduction" />
-                              <div className="organic-score-note">{cfg.note}</div>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>{t('organicTrafficScore.scoringRuleHeader')}</div>
+                              <div className="organic-score-list">
+                                {view.map((band, i) => (
+                                  <ScoreRow key={`${band.maxRate}-${i}`} index={i}
+                                    label={<>{t('organicTrafficScore.cancelRateAtMost')} {band.maxRate}%</>} score={band.score} />
+                                ))}
+                              </div>
+                              <div className="organic-score-note">
+                                備注：只統計外賣單，自取單不納入計算；無論用戶取消還是商家取消，均計入取消率。統計期內單量低於 {minOrders} 單的商家不納入本項計算、不加分；達門檻者按取消率從低到高匹配，命中一檔即停、分數不累加，取消率高於 {highest}% 不加分。
+                              </div>
                             </div>
                           )
                         })()}
@@ -1847,7 +1929,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                       <AlgorithmSection title="計分配置" icon={<SettingOutlined />} tone={tone}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                         <div className="organic-score-config-grid">
-                          {(rule.id !== 'COM_01' && rule.id !== 'COM_03' && rule.id !== 'COM_04' && rule.id !== 'COM_05' && rule.id !== 'COM_06' && rule.id !== 'COM_07' && rule.id !== 'COM_10' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_ACT') && (
+                            {(rule.id !== 'COM_01' && rule.id !== 'COM_03' && rule.id !== 'COM_04' && rule.id !== 'COM_05' && rule.id !== 'COM_06' && rule.id !== 'COM_07' && rule.id !== 'COM_10' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_ACT') && (
                             <div>
                               <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>前提條件</div>
                               <Input value={form.prerequisites || ''} maxLength={60} showCount allowClear
@@ -2112,81 +2194,58 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             </div>
                           </div>
                         )}
-                        {/* STB_03 評價得分專屬配置（5 星） */}
-                        {rule.id === 'STB_03' && (
-                          <div className="organic-score-panel">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                              <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>統計天數</span>
-                              <InputNumber
-                                value={(form as any).statDays ?? 30}
-                                min={1}
-                                max={365}
-                                style={{ width: 100 }}
-                                addonAfter="天"
-                                onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], statDays: val ?? 30 } }) as any)}
-                              />
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                              {[5, 4, 3, 2, 1].map((star, idx) => {
-                                const items = (form as any).conditionItems || []
-                                const currentItem = items[idx] || { condition: 'fixed_bonus', score: 0 }
-                                const isDynamic = currentItem.condition?.startsWith('dynamic')
-                                return (
-                                  <div key={star} className="organic-score-edit-tier">
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
-                                      <span style={{ fontSize: 12, color: '#595959', fontWeight: 500 }}>{star}星</span>
-                                      <span style={{ fontSize: 18, letterSpacing: 2, lineHeight: 1 }}>
-                                        {Array.from({ length: 5 }, (_, i) => (
-                                          <span key={i} style={{
-                                            color: i < star ? '#FAAD14' : '#E8E8E8',
-                                            textShadow: i < star ? '0 1px 3px rgba(250,173,20,0.4)' : 'none',
-                                          }}>{i < star ? '★' : '☆'}</span>
-                                        ))}
-                                      </span>
-                                    </div>
-                                    <Select
-                                      value={currentItem.condition || 'fixed_bonus'}
-                                      style={{ width: 120 }}
-                                      options={[
-                                        { label: <span style={{ color: '#52C41A', fontWeight: 500 }}>固定加分</span>, value: 'fixed_bonus' },
-                                        { label: <span style={{ color: '#FF4D4F', fontWeight: 500 }}>固定減分</span>, value: 'fixed_deduction' },
-                                        { label: <span style={{ color: '#52C41A', fontWeight: 500 }}>動態加分</span>, value: 'dynamic_bonus' },
-                                        { label: <span style={{ color: '#FF4D4F', fontWeight: 500 }}>動態減分</span>, value: 'dynamic_deduction' },
-                                      ]}
-                                      labelRender={(props) => {
-                                        const v = props.value as string
-                                        const isBonus = v.includes('bonus')
-                                        const isDyn = v.startsWith('dynamic')
-                                        return <span style={{ color: isBonus ? '#52C41A' : '#FF4D4F', fontWeight: 500 }}>{isDyn ? (isBonus ? '動態加分' : '動態減分') : (isBonus ? '固定加分' : '固定減分')}</span>
-                                      }}
-                                      onChange={val => {
-                                        const newItems = [...(form as any).conditionItems || []]
-                                        newItems[idx] = { ...currentItem, condition: val }
-                                        setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], conditionItems: newItems } }) as any)
-                                      }}
-                                    />
-                                    <InputNumber
-                                      value={currentItem.score}
-                                      min={0}
-                                      max={isDynamic ? 10 : 100}
-                                      style={{ width: 130 }}
-                                      placeholder={isDynamic ? '輸入倍數' : '輸入分數'}
-                                      addonAfter={isDynamic ? undefined : '分'}
-                                      onChange={val => {
-                                        const newItems = [...(form as any).conditionItems || []]
-                                        newItems[idx] = { ...currentItem, score: val ?? 0 }
-                                        setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], conditionItems: newItems } }) as any)
-                                      }}
-                                    />
+                        {/* STB_03 店鋪綜合分專屬配置（梯度固定加分） */}
+                        {rule.id === 'STB_03' && (() => {
+                          const bands = readStarTierBands((form as any).conditionItems)
+                          const list = bands.length ? bands : DEFAULT_STAR_TIER_BANDS
+                          // 編輯中保持行序不跳（改分數時重排會丟焦點），入庫前再由 handleInlineSave 按分數降序收斂
+                          const patchBands = (next: StarTierBand[]) => setInlineForm(prev => ({
+                            ...prev,
+                            [rule.id!]: {
+                              ...prev[rule.id!],
+                              conditionItems: next.map(band => ({ condition: STAR_TIER_CONDITION, star: band.star, score: band.score })),
+                            },
+                          }) as any)
+                          const patchBand = (idx: number, patch: Partial<StarTierBand>) =>
+                            patchBands(list.map((band, j) => (j === idx ? { ...band, ...patch } : band)))
+                          const addBand = () => {
+                            const last = list[list.length - 1]
+                            patchBands([...list, {
+                              star: last ? Math.max(STAR_TIER_STEP, +(last.star - STAR_TIER_STEP).toFixed(1)) : STAR_TIER_MAX,
+                              score: last?.score ?? 0,
+                            }])
+                          }
+                          return (
+                            <div className="organic-score-panel">
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: '#262626' }}>{t('organicTrafficScore.tierConfig')}</span>
+                                <Button size="small" type="link" icon={<PlusOutlined aria-hidden="true" />} onClick={addBand}
+                                  style={{ color: '#E8720C' }}>{t('organicTrafficScore.addTier')}</Button>
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {list.map((band, idx) => (
+                                  <div key={idx} className="organic-score-edit-row" style={{ flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
+                                    <span style={{ fontSize: 13, color: '#262626', whiteSpace: 'nowrap' }}>{t('organicTrafficScore.compositeScoreAtLeast')}</span>
+                                    <Rate aria-label={`第 ${idx + 1} 檔店鋪綜合分`} allowHalf value={band.star} count={STAR_TIER_MAX}
+                                      style={{ fontSize: 18 }} onChange={val => patchBand(idx, { star: val > 0 ? val : STAR_TIER_STEP })} />
+                                    <span style={{ fontSize: 12, color: '#595959', fontWeight: 600 }}>{band.star.toFixed(1)} {t('organicTrafficScore.scoreUnit')}</span>
+                                    <span style={{ fontSize: 12, color: '#52C41A', fontWeight: 500, whiteSpace: 'nowrap' }}>{t('organicTrafficScore.fixedBonusLabel')}</span>
+                                    <InputNumber aria-label={`第 ${idx + 1} 檔加分`} value={band.score} min={0} max={1000}
+                                      style={{ width: 120 }} addonAfter={t('organicTrafficScore.scoreUnit')} placeholder={t('organicTrafficScore.scorePlaceholder')}
+                                      onChange={val => patchBand(idx, { score: val ?? 0 })} />
+                                    <Button aria-label={`刪除第 ${idx + 1} 檔`} size="small" type="text" danger icon={<DeleteOutlined />}
+                                      disabled={list.length <= 1} style={{ marginLeft: 'auto' }}
+                                      onClick={() => patchBands(list.filter((_, j) => j !== idx))} />
                                   </div>
-                                )
-                              })}
+                                ))}
+                              </div>
+                              <div className="organic-score-note">
+                                <span style={{ fontWeight: 600 }}>計分規則：</span>店鋪綜合分由業務系統實時傳遞，本項不做週期統計、以最新傳入值為準；傳入多少分就比對對應檔位加分（1 星 = 1 分，點擊星星可選半星 0.5 分），按分數從高到低匹配，命中一檔即停、分數不累加，低於最低檔不加分。
+                              </div>
                             </div>
-                            <div className="organic-score-note">
-                              <span style={{ fontWeight: 600 }}>計分規則：</span>固定加分/減分 = 用戶評價訂單，所選的星級匹配對應配置分數，直接加/減分；動態加分/減分 = 用戶評價訂單，所選星級 × 配置倍數 = 最終分數，再根據規則加/減分。
-                            </div>
-                          </div>
-                        )}
+                          )
+                        })()}
                         {/* PLT_04 訂單過熱調控自定義編輯（區域維度） */}
                         {rule.id === 'PLT_04' && (() => {
                           const activeRegion: RegionKey = plt04Region[rule.id] || 'MACAU'
@@ -2290,7 +2349,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             </div>
                           )
                         })()}
-                        {/* STB_05 出餐準時率編輯：按準時率檔位配置分值（率越高分越多） */}
+                        {/* STB_05 出餐準時率編輯：只配準時率檔位與分值（率越高分越多，統計窗口由業務系統定時任務負責） */}
                         {rule.id === 'STB_05' && (() => {
                           const bands = readOntimeRateBands((form as any).conditionItems)
                           const list = bands.length ? bands : DEFAULT_ONTIME_RATE_BANDS
@@ -2306,18 +2365,6 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                           }
                           return (
                             <div className="organic-score-panel">
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>統計天數</span>
-                                  <InputNumber
-                                    value={(form as any).statDaysTotal ?? 7}
-                                    min={1} max={365} style={{ width: 110 }}
-                                    addonAfter="天"
-                                    onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], statDaysTotal: val ?? 7 } }) as any)}
-                                  />
-                                  <span style={{ fontSize: 11, color: '#8C8C8C' }}>（不含當天）</span>
-                                </div>
-                              </div>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                                 <span style={{ fontSize: 12, fontWeight: 600, color: '#262626' }}>計分規則</span>
                                 <Button size="small" type="link" icon={<PlusOutlined aria-hidden="true" />} onClick={addBand}
@@ -2340,38 +2387,119 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                 ))}
                               </div>
                               <div className="organic-score-note">
-                                備注：統計天數不含當天；按準時率從高到低匹配，命中一檔即停、分數不累加，低於最低檔不得分
+                                備注：準時率由業務系統定時任務計算後傳遞，非實時傳數，因此本項不提供統計天數；按準時率從高到低匹配，命中一檔即停、分數不累加，低於最低檔不得分
                               </div>
                             </div>
                           )
                         })()}
-                        {/* STB_06 ~ STB_09 按次計罰規則編輯面板（配置驅動） */}
-                        {DEDUCTION_RULES_CONFIG[rule.id] && (() => {
-                          const cfg = DEDUCTION_RULES_CONFIG[rule.id]
-                          const days = (form as any).statDays ?? 7
-                          const perOrder = (form as any).deductionPerOrder ?? cfg.defaultPerOrder
+                        {/* STB_06 自動接單編輯面板：前提條件固定常開（唯讀展示），唯一可編輯項是固定加分分值 */}
+                        {rule.id === 'STB_06' && (
+                          <div className="organic-score-panel">
+                            <div className="organic-score-edit-tier">
+                              <span className="organic-score-edit-tier__label">開啟自動接單</span>
+                              <Switch checked disabled checkedChildren="啟用" unCheckedChildren="停用" aria-label="自動接單計分前提條件" />
+                              <span style={{ fontSize: 12, color: '#52C41A', fontWeight: 500 }}>固定加分</span>
+                              <InputNumber value={form.score} min={0} max={200} style={{ width: 130 }}
+                                addonAfter="分" placeholder="輸入分數"
+                                onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], score: val ?? 0 } }) as any)} />
+                            </div>
+                            <div className="organic-score-note">
+                              備注：「開啟自動接單」為固定計分前提（商家在店端設置），此處不需改動；本計分項的啟停使用卡片頭部「狀態」開關
+                            </div>
+                          </div>
+                        )}
+                        {/* STB_07 出餐時長編輯面板：開啟自動校正（寫 prerequisites 落庫）+ 固定加分（寫 score） */}
+                        {rule.id === 'STB_07' && (
+                          <div className="organic-score-panel">
+                            <div className="organic-score-edit-tier">
+                              <span className="organic-score-edit-tier__label">{t('organicTrafficScore.mealTimeAutoCorrectLabel')}</span>
+                              <Switch checked={isMealTimeAutoCorrectEnabled(form.prerequisites)}
+                                checkedChildren="啟用" unCheckedChildren="停用"
+                                aria-label={t('organicTrafficScore.mealTimeAutoCorrectAria')}
+                                onChange={checked => setInlineForm(prev => ({
+                                  ...prev,
+                                  [rule.id]: { ...prev[rule.id], prerequisites: checked ? MEAL_TIME_AUTO_CORRECT_ON : MEAL_TIME_AUTO_CORRECT_OFF },
+                                }) as any)} />
+                              <span style={{ fontSize: 12, color: '#52C41A', fontWeight: 500 }}>{t('organicTrafficScore.fixedBonusLabel')}</span>
+                              <InputNumber aria-label={t('organicTrafficScore.mealTimeScoreAria')} value={form.score ?? MEAL_TIME_DEFAULT_SCORE} min={1} max={500} style={{ width: 130 }}
+                                addonAfter={t('organicTrafficScore.scoreUnit')} placeholder={t('organicTrafficScore.scorePlaceholder')}
+                                onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], score: val ?? 0 } }) as any)} />
+                            </div>
+                            <div className="organic-score-note">
+                              {t('organicTrafficScore.mealTimeAutoCorrectEditNote')}
+                            </div>
+                          </div>
+                        )}
+                        {/* STB_08 訂單取消率編輯：取消率梯度加分（含統計天數、納入門檻、外賣單口徑） */}
+                        {rule.id === 'STB_08' && (() => {
+                          const bands = readCancelRateBands((form as any).conditionItems)
+                          const list = bands.length ? bands : DEFAULT_CANCEL_RATE_BANDS
+                          const minOrders = readCancelMinOrders((form as any).conditionItems) ?? DEFAULT_CANCEL_MIN_ORDERS
+                          const days = (form as any).statDays ?? 30
+                          // 編輯中保持行序不跳（改上界時重排會丟焦點），入庫前再由 handleInlineSave 按上界升序收斂
+                          // 檔位與門檻共用一個寫入器：兩者都重寫 conditionItems，避免只改門檻時丟檔位順序
+                          const writeItems = (nextBands: CancelRateBand[], nextMinOrders: number) =>
+                            setInlineForm(prev => ({ ...prev, [rule.id!]: {
+                              ...prev[rule.id!],
+                              conditionItems: [
+                                ...nextBands.map(band => ({ condition: CANCEL_RATE_CONDITION, rate: band.maxRate, score: band.score })),
+                                { condition: CANCEL_SAMPLE_CONDITION, minOrders: nextMinOrders, score: 0 },
+                              ],
+                            } }) as any)
+                          const patchBand = (idx: number, patch: Partial<CancelRateBand>) =>
+                            writeItems(list.map((band, j) => (j === idx ? { ...band, ...patch } : band)), minOrders)
+                          const addBand = () => {
+                            const last = list[list.length - 1]
+                            writeItems([...list, { maxRate: last ? last.maxRate + 2 : 1, score: last ? Math.max(0, last.score - 10) : 10 }], minOrders)
+                          }
                           return (
                             <div className="organic-score-panel">
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>統計天數</span>
+                                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{t('organicTrafficScore.statDays')}</span>
                                   <InputNumber
+                                    aria-label="訂單取消率統計天數"
                                     value={days}
                                     min={1} max={365} style={{ width: 110 }}
-                                    addonAfter="天"
-                                    onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], statDays: val ?? 7 } }) as any)}
+                                    addonAfter={t('organicTrafficScore.daysUnit')}
+                                    onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], statDays: val ?? 30 } }) as any)}
                                   />
-                                  <span style={{ fontSize: 11, color: '#8C8C8C' }}>（含當天）</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{t('organicTrafficScore.orderCountAtLeast')}</span>
+                                  <InputNumber
+                                    aria-label="納入門檻訂單量" value={minOrders}
+                                    min={1} max={100000} precision={0} style={{ width: 120 }}
+                                    addonAfter={t('organicTrafficScore.orderUnit')}
+                                    onChange={val => writeItems(list, val ?? DEFAULT_CANCEL_MIN_ORDERS)}
+                                  />
+                                  <span style={{ fontSize: 11, color: '#8C8C8C' }}>{t('organicTrafficScore.minOrderHint')}</span>
                                 </div>
                               </div>
-                              <div className="organic-score-edit-tier">
-                                <span className="organic-score-edit-tier__label">{cfg.editLabel}</span>
-                                <span style={{ fontSize: 12, color: '#FF4D4F', fontWeight: 500 }}>固定扣分</span>
-                                <InputNumber value={perOrder} min={1} max={500} style={{ width: 130 }}
-                                  addonAfter="分/單" placeholder="輸入分數"
-                                  onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], deductionPerOrder: val ?? cfg.defaultPerOrder } }) as any)} />
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: '#262626' }}>{t('organicTrafficScore.scoringRuleHeader')}</span>
+                                <Button size="small" type="link" icon={<PlusOutlined aria-hidden="true" />} onClick={addBand}
+                                  style={{ color: '#E8720C' }}>{t('organicTrafficScore.addTier')}</Button>
                               </div>
-                              <div className="organic-score-note">{cfg.note}</div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {list.map((band, i) => (
+                                  <div key={i} className="organic-score-edit-row" style={{ flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: 13, color: '#262626' }}>{t('organicTrafficScore.cancelRateAtMost')}</span>
+                                    <InputNumber aria-label={`第 ${i + 1} 檔取消率上限`} value={band.maxRate} min={0} max={100} precision={1}
+                                      onChange={val => patchBand(i, { maxRate: val ?? 0 })}
+                                      style={{ width: 140 }} addonAfter="%" />
+                                    <span style={{ fontSize: 13, color: '#595959' }}>→ {t('organicTrafficScore.fixedBonusLabel')}</span>
+                                    <InputNumber aria-label={`第 ${i + 1} 檔分值`} value={band.score} min={0} max={1000}
+                                      onChange={val => patchBand(i, { score: val ?? 0 })}
+                                      style={{ width: 120 }} addonAfter={t('organicTrafficScore.scoreUnit')} />
+                                    <Button aria-label={`刪除第 ${i + 1} 檔`} size="small" type="text" danger icon={<DeleteOutlined />}
+                                      disabled={list.length <= 1} onClick={() => writeItems(list.filter((_, j) => j !== i), minOrders)} />
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="organic-score-note">
+                                備注：只統計外賣單，自取單不納入計算；無論用戶取消還是商家取消，均計入取消率。按取消率從低到高匹配，命中一檔即停、分數不累加，高於最高檔不加分。
+                              </div>
                             </div>
                           )
                         })()}
@@ -2449,60 +2577,81 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             </div>
                           )
                         })()}
-                        {/* STB_ACT 活動加分自定義編輯（算法ID → 名稱/狀態 + 固定加分，暫對接算法庫） */}
+                        {/* STB_ACT 活動加分自定義編輯：下拉選中活動即帶出名與狀態，不需再點查詢（暫對接算法庫） */}
                         {rule.id === 'STB_ACT' && (() => {
                           const items: ActivityScoreItem[] = ((form as any).activityItems || [])
+                          const pickedCodes = new Set(items.map(it => it.activityId?.trim()).filter(Boolean))
+                          const activityChoices = algoOptions
+                            .filter(a => !!a.algoCode)
+                            .map(a => ({ value: a.algoCode as string, label: `${a.algoName ?? a.algoCode}（${a.algoCode}）` }))
                           return (
                             <div className="organic-score-panel">
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                {items.length === 0 && (
-                                  <div style={{ fontSize: 12, color: '#8C8C8C', textAlign: 'center', padding: '8px 0' }}>請點擊下方「添加算法」，輸入算法ID後系統自動獲取算法名稱與狀態</div>
-                                )}
-                                {items.map((item, idx) => {
-                                  const live = algoOptions.find(a => a.algoCode === item.activityId?.trim())
-                                  return (
-                                    <div key={idx} className="organic-score-edit-tier">
-                                      <AutoComplete
-                                        value={item.activityId}
-                                        style={{ width: 200 }}
-                                        placeholder="輸入/選擇算法ID"
-                                        options={algoOptions.filter(a => !!a.algoCode).map(a => ({ value: a.algoCode, label: `${a.algoCode} - ${a.algoName}` }))}
-                                        onChange={val => updateActivityItem(rule.id, idx, { activityId: val })}
-                                      />
-                                      <Button size="small" loading={algoFetching[idx]} onClick={() => handleFetchAlgo(rule.id, idx)}
-                                        style={{ borderRadius: 4 }}>查詢</Button>
-                                      <span style={{ fontSize: 13, color: '#262626', fontWeight: 500, minWidth: 110 }}>
-                                        {live?.algoName ?? item.activityName ?? '—'}
-                                      </span>
-                                      <Tag color={live?.status === 1 ? 'success' : live?.status === 2 ? 'warning' : 'default'} style={{ margin: 0 }}>
-                                        {live?.status === 1 ? '啟用' : live?.status === 2 ? '停用' : '未知'}
-                                      </Tag>
-                                      <span style={{ fontSize: 12, color: '#52C41A', fontWeight: 500 }}>固定加分</span>
-                                      <InputNumber value={item.score} min={1} max={500} style={{ width: 110 }}
-                                        addonAfter="分" placeholder="輸入分數"
-                                        onChange={val => updateActivityItem(rule.id, idx, { score: val ?? 0 })} />
-                                      <Button type="link" danger size="small" icon={<DeleteOutlined />}
-                                        onClick={() => {
-                                          setInlineForm(prev => {
-                                            const r = prev[rule.id] || {}
-                                            const next = ((r.activityItems || []) as ActivityScoreItem[]).filter((_, i) => i !== idx)
-                                            return { ...prev, [rule.id]: { ...r, activityItems: next } }
-                                          })
-                                        }} />
-                                    </div>
-                                  )
-                                })}
-                                <Button size="small" icon={<PlusOutlined />} style={{ alignSelf: 'flex-start', borderRadius: 4 }}
-                                  onClick={() => {
-                                    setInlineForm(prev => {
-                                      const r = prev[rule.id] || {}
-                                      const next = [...((r.activityItems || []) as ActivityScoreItem[]), { activityId: '', score: 0 }]
-                                      return { ...prev, [rule.id]: { ...r, activityItems: next } }
-                                    })
-                                  }}>添加算法</Button>
-                              </div>
+                              {items.length === 0 ? (
+                                <div style={{ fontSize: 12, color: '#8C8C8C', textAlign: 'center', padding: '10px 0' }}>尚未添加活動，點擊下方「添加活動」，從下拉框選中即自動帶出活動名稱與狀態</div>
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                  {items.map((item, idx) => {
+                                    const code = item.activityId?.trim()
+                                    const live = algoOptions.find(a => a.algoCode === code)
+                                    return (
+                                      <div key={idx} className="organic-score-edit-row" style={{ flexWrap: 'wrap' }}>
+                                        <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
+                                        <Select
+                                          aria-label={`第 ${idx + 1} 行活動`}
+                                          showSearch allowClear
+                                          value={code || undefined}
+                                          placeholder={t('organicTrafficScore.activitySelectPlaceholder')}
+                                          style={{ minWidth: 280, flex: '1 1 280px' }}
+                                          // 已被其他行選中的活動置灰，從入口避免同一活動重複加分
+                                          options={activityChoices.map(o => ({
+                                            ...o,
+                                            disabled: o.value !== code && pickedCodes.has(o.value),
+                                          }))}
+                                          filterOption={(input, option) => {
+                                            const kw = input.trim().toLowerCase()
+                                            return !kw
+                                              || String(option?.label ?? '').toLowerCase().includes(kw)
+                                              || String(option?.value ?? '').toLowerCase().includes(kw)
+                                          }}
+                                          onChange={(val?: string) => {
+                                            const picked = algoOptions.find(a => a.algoCode === val)
+                                            updateActivityItem(rule.id, idx, {
+                                              activityId: val ?? '',
+                                              activityName: picked?.algoName ?? val,
+                                            })
+                                          }}
+                                        />
+                                        <Tag color={live?.status === 1 ? 'success' : live?.status === 2 ? 'warning' : 'default'} style={{ margin: 0 }}>
+                                          {live?.status === 1 ? t('organicTrafficScore.activityStatusActive') : live?.status === 2 ? t('organicTrafficScore.activityStatusExpired') : t('organicTrafficScore.activityStatusUnknown')}
+                                        </Tag>
+                                        <span style={{ fontSize: 12, color: '#52C41A', fontWeight: 500, whiteSpace: 'nowrap' }}>{t('organicTrafficScore.fixedBonusLabel')}</span>
+                                        <InputNumber aria-label={`第 ${idx + 1} 行加分分值`} value={item.score || undefined} min={1} max={500}
+                                          style={{ width: 120 }} addonAfter={t('organicTrafficScore.scoreUnit')} placeholder={t('organicTrafficScore.scorePlaceholder')}
+                                          onChange={val => updateActivityItem(rule.id, idx, { score: val ?? 0 })} />
+                                        <Button aria-label={`刪除第 ${idx + 1} 行活動`} size="small" type="text" danger icon={<DeleteOutlined aria-hidden="true" />}
+                                          style={{ marginLeft: 'auto' }}
+                                          onClick={() => {
+                                            setInlineForm(prev => {
+                                              const r = prev[rule.id] || {}
+                                              const next = ((r.activityItems || []) as ActivityScoreItem[]).filter((_, i) => i !== idx)
+                                              return { ...prev, [rule.id]: { ...r, activityItems: next } }
+                                            })
+                                          }} />
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              )}
+                              <Button size="small" icon={<PlusOutlined aria-hidden="true" />} style={{ alignSelf: 'flex-start', borderRadius: 4, marginTop: 8 }}
+                                onClick={() => {
+                                  setInlineForm(prev => {
+                                    const r = prev[rule.id] || {}
+                                    const next = [...((r.activityItems || []) as ActivityScoreItem[]), { activityId: '', score: 0 }]
+                                    return { ...prev, [rule.id]: { ...r, activityItems: next } }
+                                  })
+                                }}>{t('organicTrafficScore.addActivity')}</Button>
                               <div className="organic-score-note">
-                                備注：暫以算法庫算法ID對接驗證，後續有活動功能後再切換為活動對接；輸入算法ID後系統自動獲取算法名稱與狀態，店鋪報名參與即得固定加分，每個獨立計分、可累加
+                                備注：活動資料由業務系統同步，只統計正常進行中的活動——已過期、已失效或未開始的活動一律不加分；店鋪報名進行中的活動即得該活動固定加分，多個活動獨立計分、可累加。
                               </div>
                             </div>
                           )
@@ -2517,8 +2666,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                               onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], score: val ?? 0 } }) as any)} />
                           </div>
                         )}
-                        {/* 非 STB_02/STB_03/PLT_03/PLT_04/STB_05/STB_06/STB_07/STB_08/STB_09/PLT_01/PLT_02A/STB_01/STB_04/STB_ACT/COM_01 顯示標準計分方式 */}
-                        {rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'STB_09' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_ACT' && rule.id !== 'COM_01' && (
+                        {/* 非 STB_02/STB_03/PLT_03/PLT_04/STB_05/STB_06/STB_07/STB_08/PLT_01/PLT_02A/STB_01/STB_04/STB_ACT/COM_01 顯示標準計分方式 */}
+                        {(rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_ACT' && rule.id !== 'COM_01') && (
                           <div className="organic-score-fields">
                             <div>
                               <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>計分方式</div>
@@ -2554,15 +2703,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                           <Input.TextArea value={form.description} rows={2} maxLength={120} showCount
                             onChange={e => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], description: e.target.value } }) as any)} />
                         </div>
-                        {/* 最後一排：狀態 + 取消/保存 */}
-                        <div className="organic-score-toolbar" style={{ paddingTop: 12, borderTop: '1px dashed #e8eaed', marginBottom: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: 12, color: '#595959' }}>狀態</span>
-                            <Switch checked={form.status === ServiceStatus.ENABLED}
-                              checkedChildren={t('common.enable')} unCheckedChildren={t('common.disable')}
-                              onChange={checked => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], status: checked ? ServiceStatus.ENABLED : ServiceStatus.DISABLED } }) as any)} />
-                          </div>
-                          <div className="organic-score-edit-actions organic-score-toolbar__actions">
+                        {/* 最後一排：取消/保存居中（狀態啟停統一由卡片頭部開關負責，底部不再重複） */}
+                        <div className="organic-score-toolbar" style={{ paddingTop: 12, borderTop: '1px dashed #e8eaed', marginBottom: 0, justifyContent: 'center' }}>
+                          <div className="organic-score-edit-actions">
                             <Button size="small" onClick={() => handleInlineCancel(rule.id)}>取消</Button>
                             <Button size="small" type="primary" icon={<SaveOutlined />} onClick={() => handleInlineSave(rule.id)}>保存</Button>
                           </div>

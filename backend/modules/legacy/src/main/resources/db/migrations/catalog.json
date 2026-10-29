@@ -1801,6 +1801,118 @@
       "comment": "業務反饋均值基線不合理：只要比歷史均值慢一點就掉分，商家沒有可對標的目標。口徑改為按出餐準時率檔位給分（率越高分越多，命中一檔即停、不累加，低於最低檔不得分）。確認舊口徑沒有需要保留的歷史數據，因此不做兼容轉換，直接覆寫 name/description/condition_items（等同刪除舊檔位 over_avg_deduction / 主輔營達標），並把 stat_days_total 空值補為 7。前端 DEFAULT_ONTIME_RATE_BANDS 與本梯度一致，條件項以 condition='ontime_rate' + rate + score 存儲。校驗以「名稱等於新名且首檔是準時率梯度」為準；未播種（無 STB_05 行）不算失敗。注意：本遷移只落數據側口徑，準時率計算與召回側排序在本倉庫之外，尚未落地。參考 SQL: sql/307_organic_stb05_ontime_rate.sql"
     },
     {
+      "versionKey": "organic:stb06-auto-accept-v1",
+      "module": "organic",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "organicScoreDataInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "310_organic_stb06_auto_accept.sql"
+      ],
+      "intent": "STB_06 接單計分由「拒絕接單 · 每拒一單按次扣分」改為「自動接單 · 開啟即得固定加分（默認 50 分）」",
+      "author": "Qoder",
+      "comment": "業務口徑翻轉：原項處罰拒單，現改為獎勵商家在店端開啟自動接單，計分主體從按次計罰變成一次性固定加分。因此 mode（3→1）/score/name/description 必須一起收斂，只改前端加載保底會讓看庫/對賬口徑與界面長期不一致。舊口徑沒有需要保留的歷史數據，因此不做兼容轉換；但 score 只在未配置（=0，舊界面從未寫 score）時補默認值，避免頂掉管理員已在界面調過的分值。舊口徑專用列 stat_days / deduction_per_order 置 NULL：留著會被誤讀為本項還在按次扣分（回滾方式見 310 腳本尾部的反向 UPDATE + 刪除版本行）。校驗以「名稱等新名且 mode=1 且 score>0 且兩個舊列已清空」為準；未播種（無 STB_06 行）不算失敗。注意：本遷移只落數據側口徑，「商家是否開啟自動接單」的讀取來源（店端設置上報）與召回側計分都在本倉庫之外，尚未落地。參考 SQL: sql/310_organic_stb06_auto_accept.sql"
+    },
+    {
+      "versionKey": "organic:stb03-star-tier-v1",
+      "module": "organic",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "organicScoreDataInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "311_organic_stb03_star_tier.sql"
+      ],
+      "intent": "STB_03 由「評價得分 · 逐檔星級固定/動態加減分」改為「店鋪綜合分 · 星級梯度加分」（綜合分 ≥ 下界即得該檔固定加分，1 星 = 1 分、支持半星 0.5），並清空 stat_days",
+      "author": "Qoder",
+      "comment": "業務改口徑：分數不再由本頁逐檔配置加減分，而是業務系統實時傳入一個綜合分，本页只配「≥ 某分 → 固定加分」的梯度。舊口徑是「星級恰好等於 N」的一檔一價，新口徑是「≥ 下界」的梯度查檔，兩者無法逐檔映射——把舊的 4 星檔分當「≥4」寫回，會把 4.5 星也按 4 星給分，屬於靜默改變計分行為，無人复盤就不能幹。因此不做兼容轉換，condition_items 整行覆寫為默認梯度（star=分數下界 + score），但只覆寫仍不是 star_tier 口徑的行：管理員已在界面配成新梯度的行原封不動，避免頂掉人工配置。name/description 以舊內置值（= 23_organic_score.sql 種子）作條件更新，自定義文案不命中舊值就不會被覆蓋。stat_days 置 NULL：本項不再統計期間，留著會被讀成「仍按 N 天滾動統計」。校驗以「不残舊內置名/舊內置說明、stat_days 為空、condition_items 若非空則必須全是 star_tier」為準；未播種（無 STB_03 行或檔位為空）不算失敗，由前端 DEFAULT_STAR_TIER_BANDS 兌底。注意：本遷移只落數據側口徑，「店鋪綜合分」的實時上報與召回側查檔邏輯都在本倉庫之外，尚未落地。參考 SQL: sql/311_organic_stb03_star_tier.sql"
+    },
+    {
+      "versionKey": "organic:stb05-timed-source-v1",
+      "module": "organic",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "organicScoreDataInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "312_organic_stb05_timed_source.sql"
+      ],
+      "intent": "STB_05 出餐準時率的統計窗口交給業務系統定時任務：界面移除統計天數配置，stat_days_total / stat_days_recent 置 NULL，評分說明同步為「定時任務計算、非實時傳數」",
+      "author": "Qoder",
+      "comment": "業務明確：準時率由業務系統定時任務算好後傳遞，不是實時傳數，也不由本页決定統計幾天；界面保留統計天數輸入框會讓運營误以為改這裡就能改窗口，因此配置項直接取消。舊行殘留的 stat_days_total（organic:stb05-ontime-rate-v1 曾補默認 7）與歷史上殘留的 stat_days_recent 一律置 NULL，避免看庫時误讀為「本項還在按 N 天統計」。評分說明只在这個已知内置值上收敛：种子原文與 organic:stb05-ontime-rate-v1 写回的文案都算舊值，管理員自定義的不顶。檔位（condition='ontime_rate' + rate + score）本步不改，上一個遷移已收斂。校驗以「不残兩個舊内置說明且兩個窗口列均為 NULL」為準；未播種不算失敗。注意：本遷移只落數據側口徑，定時任務的頻率與上報字段都在本倉庫之外，尚未落地。參考 SQL: sql/312_organic_stb05_timed_source.sql"
+    },
+    {
+      "versionKey": "organic:stb08-cancel-rate-v1",
+      "module": "organic",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "organicScoreDataInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "313_organic_stb08_cancel_rate.sql"
+      ],
+      "intent": "STB_08 由「取消訂單 · 每取消一單按次扣分」改為「訂單取消率 · 梯度加分」（取消率 ≤ 上界即得該檔固定加分，默認 1%→30、3%→20、5%→10，統計 30 天且單量 ≥ 30 才納入）",
+      "author": "Qoder",
+      "comment": "業務口徑翻轉：原項只罰取消行為，现改為奖励低取消率，計分主體從按次計罰變成查檔加分，因此 mode（3→6）/name/description/condition_items 必須一起收敛，只改前端加載保底會讓看庫/對賬口徑與界面長期不一致。新口徑三個要素全部住在 condition_items：檔位用 condition='cancel_rate_max' + rate（取消率上界 %）+ score（固定加分），樣本量門檻用 condition='cancel_min_orders' + minOrders（不足該單量的商家不納入計算，不加分）；上界升序即匹配順序，門檻項固定放末位，與前端 toCancelRateConditionItems 一致。stat_days 保留（新口徑仍按統計天數取數）但只在 NULL 或 ≤ 0 時補默認 30，不顶管理員已調的值；舊口徑專用列 deduction_per_order 置 NULL，留著會被误讀為本項還在按次扣分。舊口徑没有需要保留的歷史數據，且本步只覆寫不是 cancel_rate_max 口徑的行，界面已配成新梯度的保留。校驗以「不残留舊内置名稱與舊内置說明、mode=6、stat_days>0、deduction_per_order 已清空、condition_items 若非空則是取消率梯度」為準（名称只查是否还残留旧内置值，不要求必等于新名：管理员自定义过名的环境否则永远记不上版本）；未播种不算失败。注意：本遷移只落數據側口徑；「只統計外賣單、自取單不納入」與「用戶取消與商家取消均計入取消率」是業務系統取數口徑（已寫進評分說明與界面備注），本倉庫無計分代碼，尚未落地。參考 SQL: sql/313_organic_stb08_cancel_rate.sql"
+    },
+    {
+      "versionKey": "organic:stb-act-scope-v1",
+      "module": "organic",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "organicScoreDataInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "314_organic_stb_act_scope.sql"
+      ],
+      "intent": "STB_ACT 活動加分評分說明補上「僅正常進行中的活動計分；已過期、失效、未開始的活動不加分」的業務口径",
+      "author": "Qoder",
+      "comment": "界面已從「輸入算法ID + 點查詢」改為「下拉選活動即帶出名稱與狀態」，同時业务要求把計分範圍写清：只有進行中的活動才加分。該口径此前只存在於界面備注，库里 description 仍是种子原文案，看庫/對賬與界面兩套說法；本步把說明同步到庫。只在兩個已知内置值上收敛（种子原文、早期界面写回的「暂以算法库对接」文案），管理員自定義說明不命中舊值就不被顶掉；名稱本就是「活動加分」，不需改。activity_items（算法ID + 固定加分）的結構不改：進行中/已失效是業務系統侧的活動狀態，本倉庫只記配置與展示狀態標。校驗以「舊内置說明残留行數必須為 0」為準；未播種（無 STB_ACT 行）不算失敗，前端 loadConfig 已用默認模板兌底。注意：活動狀態（進行中/已過期/已失效）的取數源與是否計分的判定都在本倉庫之外，當前界面暫以算法庫的啟用/停用狀態做展示。參考 SQL: sql/314_organic_stb_act_scope.sql"
+    },
+    {
+      "versionKey": "organic:stb07-meal-time-v1",
+      "module": "organic",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "organicScoreDataInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "315_organic_stb07_meal_time.sql"
+      ],
+      "intent": "STB_07 由「出餐超時 · 每超時一單按次扣分」改為「出餐時長 · 固定加分」，配置項收斂為「開啟自動校正 + 固定加分」",
+      "author": "Qoder",
+      "comment": "計分主體翻轉（與 STB_06 自動接單同構）：原項只罰超時出餐，现改為按出餐時長給一次性固定加分，因此 mode（3→1）/name/description/score 必須一起收敛，只改前端加载保底會讓看庫/對賬口徑與界面長期不一致。「開啟自動校正」不新增列，沿用既有 prerequisites 列（與 COM_02 減免運費「報名即給分」同先例）：非空视为開啟、空视为关闭，新增列會同時遞增 LegacyCoreContracts 契约与契约测试，性价比低。播种值 '開啟自動校正' 必須與前端 MEAL_TIME_AUTO_CORRECT_PREREQUISITE 一致，否则迁移写入的行在界面会被读成未开启。score 只在 COALESCE(score,0) <= 0 时补默认 50（旧界面把分值住在 deduction_per_order、從未寫 score），不顶管理员已调的值；名称与说明以旧内置值为条件，管理员自定义的文案不顶。旧口径专用列 stat_days / deduction_per_order 置 NULL，留著会被读成「本项还在按 N 天统计、每单扣分」。校验以「不残留旧内置名称与旧内置说明、mode=1、score>0、旧口径两列为 NULL」为准；prerequisites 不校验：它是运营可随时关闭的开关，要求必等播种值会让管理员在记版本前关掉时永远记不上版本；未播种（无 STB_07 行）不算失败。注意：本迁移只落数据侧口径；「自動校正」的具体行为（校正什么、由谁校正）在召回侧/业务系统，本仓库无计分代码，尚未落地。参考 SQL: sql/315_organic_stb07_meal_time.sql"
+    },
+    {
+      "versionKey": "organic:retire-stb09-v1",
+      "module": "organic",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "organicScoreDataInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "316_organic_retire_stb09.sql"
+      ],
+      "intent": "下架店鋪維度計分項 STB_09「超時接單」，库内残留行逻辑删除",
+      "author": "Qoder",
+      "comment": "前端已从默认计分项移除并登记进 RETIRED_ORGANIC_RULE_IDS（读取侧过滤以覆盖历史库），但数据侧仍留着一个未删除、还带旧按次计罚配置的 STB_09 行，看库/对账与界面口径不一致。不能复用 organic:retire-rules-v1：该键只覆盖 COM_09/STB_04，且生产已记为成功后 applyOnce 门控下追加条目不会重跑（类注释里 multiplier_tiers 漏列的历史事故），因此用独立新键。用逻辑删除而非物理删除，与应用 deleteRule 的 @TableLogic 语义一致，保留历史可回滚；回滚需同时撤掉前端 RETIRED_ORGANIC_RULE_IDS 里的 'STB_09'，否则行虽复活仍被读取侧过滤。校验以「deleted=0 的 STB_09 残留行数必须为 0」为准；未播种（无 STB_09 行）不算失败。参考 SQL: sql/316_organic_retire_stb09.sql"
+    },
+    {
+      "versionKey": "organic:traffic-balance-v1",
+      "module": "organic",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "organicScoreDataInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "317_organic_traffic_balance.sql"
+      ],
+      "intent": "将平台维度 PLT_03 商家扶持与 PLT_04 订单过热调控合并为「流量均衡」，配置存进新列 traffic_balance_config，PLT_04 逻辑删除下架",
+      "author": "Qoder",
+      "comment": "ES 底座难以实现减分项：把「高单量扣分」翻转为「低单量多加分、高单量少加分」的非负梯度，统一商家扶持与订单过热调控为一个规则。新增专用列 traffic_balance_config（沿用 free_shipping_config/member_bonus_config 先例，已在 LegacyCoreContracts 登记可自愈补列）存合并配置：统计口径（statDays/refreshMinutes/orderTypes/includeRefunded）+ 排除商家 excludedStoreCodes + 区域梯度 regions{MACAU,TAIPA:[{maxOrders,score}]}。PLT_03 只在 traffic_balance_config IS NULL（尚未合并）时整行收敛，避免重放覆盖运营已配好的值；region_configs/blocked_merchants 置 NULL（旧区域格式与旧屏蔽名单不自动沿用，含义从“只取消额外扶持”变为“取消整项均衡奖励”）。PLT_04 用逻辑删除（deleted=1，同 COM_09/STB_04）下架，回滚需同时恢复 deleted=0 并撤前端 RETIRED 里的 'PLT_04'。校验以「PLT_03 已写入非空 traffic_balance_config 且 PLT_04 无 deleted=0 残留行」为准；未播种（无 PLT_03 行）不算失败。注意：本迁移只落配置存储侧，按 traffic_balance_config 真实算分/排名由外部业务系统消费，不在本仓库。参考 SQL: sql/317_organic_traffic_balance.sql"
+    },
+    {
       "versionKey": "doc:native-content-v2.0",
       "module": "doc",
       "phase": "MODULE_STRUCTURE",
@@ -2840,6 +2952,24 @@
       "author": "Qoder",
       "ticket": "meeting-minutes-publication",
       "comment": "新增版本表及兼容列，不覆盖旧内容或批次。结构 DDL 从 classpath 脚本读取，ALTER 前查询 information_schema 保证幂等，并通过后置校验及结构契约复核。事项保留旧 seq 唯一键但新版按 id 更新，display_order 只负责展示排序。通知模板只新增独立场景，不覆盖管理员自定义旧模板。回滚保留版本表和已发布数据，仅停新发布及新卡片写入。"
+    },
+    {
+      "versionKey": "meeting:minutes-attachments:v1.0",
+      "module": "meeting",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "meetingMinutesSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "meeting:minutes-publication:v2.0"
+      ],
+      "scriptFiles": [
+        "309_meeting_minutes_attachments.sql"
+      ],
+      "intent": "纪要补充说明附件：元数据表 biz_meeting_minutes_attachment（对外附件号/幂等键/状态机/对象键/SHA-256），二进制只入对象存储不入 MySQL；发布快照定格附件引用，历史版本永不缺文件",
+      "author": "Qoder",
+      "ticket": "meeting-minutes-attachments",
+      "comment": "纯新表，CREATE TABLE IF NOT EXISTS 可重放；三个唯一键分别钉住：附件号对外不可枚举自增 id、对象键不被两次登记覆盖、同幂等键不重复占存储。状态机 1=未绑定(仅上传人可删)/2=已绑定草稿/3=已发布(禁物理删除)，解绑只回退 2→1。清理作业回收超 24 小时未绑定行（解绑刷新 updated_at 防误删）。回滚保留附件表与对象文件，仅停新上传入口。上线前置：DOC_STORAGE_LOCAL_ROOT 必须指向持久卷，多实例共享同一存储。"
     },
     {
       "versionKey": "rdm:schema:v3.20",

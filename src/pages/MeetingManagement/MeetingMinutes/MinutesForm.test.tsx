@@ -40,6 +40,9 @@ vi.mock('@/api/meetingMinutes', async (importOriginal) => {
     updateMinutes: vi.fn(),
     publishMinutes: vi.fn(),
     fetchMinutesGroups: vi.fn(async () => []),
+    uploadMinutesAttachment: vi.fn(),
+    deleteMinutesAttachment: vi.fn(async () => undefined),
+    fetchMinutesAttachmentAccess: vi.fn(),
   }
 })
 
@@ -49,17 +52,22 @@ vi.mock('@/api/employee', () => ({
 }))
 
 import { fetchMeetingDetail } from '@/api/meeting'
-import { createMinutes, emptyMinutesContent, fetchMinutes, MINUTES_LIMITS, publishMinutes, updateMinutes } from '@/api/meetingMinutes'
+import {
+  createMinutes, deleteMinutesAttachment, emptyMinutesContent, fetchMinutes, fetchMinutesAttachmentAccess,
+  MINUTES_LIMITS, publishMinutes, updateMinutes, uploadMinutesAttachment,
+  type MinutesAttachmentVO,
+} from '@/api/meetingMinutes'
 import { fetchEmployees } from '@/api/employee'
-
-const NativeURL = URL
-const createObjectURL = vi.fn(() => 'blob:http://localhost/minutes-preview')
-const revokeObjectURL = vi.fn()
 
 function selectAttachments(files: File[]) {
   const input = document.querySelector<HTMLInputElement>('input[type="file"]')
   expect(input).not.toBeNull()
   fireEvent.change(input!, { target: { files } })
+}
+
+/** 服务端回传的附件元数据样行：attachmentNo 为 32 位 hex（与后端契约同形态） */
+function attVo(no: string, fileName: string, previewKind: MinutesAttachmentVO['previewKind']): MinutesAttachmentVO {
+  return { attachmentNo: no, fileName, mimeType: 'application/octet-stream', sizeBytes: 2048, previewKind, uploaderName: '李四', uploadedAt: '2026-10-29 10:00:00' }
 }
 
 const MEETING = {
@@ -111,10 +119,6 @@ describe('會議紀要表單', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks()
-    vi.stubGlobal('URL', class extends NativeURL {
-      static createObjectURL = createObjectURL
-      static revokeObjectURL = revokeObjectURL
-    })
     // 测试环境的默认语言不是繁中（i18n 初始化为 en），不显式切语言时断言的中文文案会全部命中英文分支
     await i18n.changeLanguage('zh-TW')
     vi.mocked(fetchMeetingDetail).mockResolvedValue(MEETING as never)
@@ -122,10 +126,11 @@ describe('會議紀要表單', () => {
     vi.mocked(createMinutes).mockResolvedValue({ exists: true, id: 9, bookingId: 100, version: 0 })
     vi.mocked(updateMinutes).mockResolvedValue({ exists: true, id: 9, bookingId: 100, version: 4 })
     vi.mocked(fetchEmployees).mockResolvedValue({ records: [], total: 0 } as never)
+    vi.mocked(deleteMinutesAttachment).mockResolvedValue(undefined)
   })
 
   afterEach(() => {
-    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
   })
 
   it('下次会议默认关闭，开启后显示字段，反复切换保留本次输入', async () => {
@@ -178,31 +183,50 @@ describe('會議紀要表單', () => {
     expect(vi.mocked(createMinutes).mock.calls[0][0].content.nextMeetingNote).toBe('討論下季度計劃')
   })
 
-  it('补充说明可多选 Word、PDF 和图片，本地预览附件不能被误保存或发送', async () => {
+  it('附件选择即上传：成功后进入列表，保存时随正文提交附件号', async () => {
+    vi.mocked(uploadMinutesAttachment)
+      .mockResolvedValueOnce(attVo('a'.repeat(32), '會議資料.pdf', 'pdf'))
+      .mockResolvedValueOnce(attVo('b'.repeat(32), '白板.png', 'image'))
     renderForm()
     await screen.findByRole('button', { name: /選擇附件/ })
     selectAttachments([
-      new File(['word'], '說明.doc', { type: 'application/msword' }),
-      new File(['word'], '資料.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }),
       new File(['%PDF-1.4'], '會議資料.pdf', { type: 'application/pdf' }),
       new File(['image'], '白板.png', { type: 'image/png' }),
     ])
     await screen.findByRole('listitem', { name: '白板.png' })
-    expect(screen.getAllByRole('listitem')).toHaveLength(4)
-    expect(screen.getByRole('button', { name: /保存紀要/ })).toBeDisabled()
-    expect(screen.getByRole('button', { name: /保存並發布/ })).toBeDisabled()
-    expect(screen.getByText(/尚未上傳/)).toBeInTheDocument()
-    expect(createMinutes).not.toHaveBeenCalled()
-    expect(updateMinutes).not.toHaveBeenCalled()
-    for (const name of ['說明.doc', '資料.docx', '會議資料.pdf', '白板.png']) {
-      fireEvent.click(screen.getByRole('button', { name: `移除 ${name}` }))
-    }
-    expect(screen.queryByRole('list', { name: '紀要附件' })).toBeNull()
+    expect(uploadMinutesAttachment).toHaveBeenCalledTimes(2)
+    expect(vi.mocked(uploadMinutesAttachment).mock.calls[0][0]).toBe(100)
+    expect(vi.mocked(uploadMinutesAttachment).mock.calls[0][1].name).toBe('會議資料.pdf')
+    expect(typeof vi.mocked(uploadMinutesAttachment).mock.calls[0][2]).toBe('string')
+    // 上传完成后保存不再被拦
     expect(screen.getByRole('button', { name: /保存紀要/ })).toBeEnabled()
-    expect(revokeObjectURL).toHaveBeenCalled()
+    fireEvent.change(screen.getByPlaceholderText('議題，例：Q4 預算分攤口徑'), { target: { value: '預算復核' } })
+    fireEvent.click(screen.getByRole('button', { name: /保存紀要/ }))
+    await waitFor(() => expect(createMinutes).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(createMinutes).mock.calls[0][0].content.attachments).toEqual(['a'.repeat(32), 'b'.repeat(32)])
   })
 
-  it('附件拒绝危险类型、MIME 不匹配、空文件和超限文件', async () => {
+  it('上传失败可原地重试：重试前保存/发布禁用，不会静默丢附件', async () => {
+    vi.mocked(uploadMinutesAttachment)
+      .mockRejectedValueOnce(new Error('存儲暫時不可用'))
+      .mockResolvedValueOnce(attVo('c'.repeat(32), '說明.doc', 'office'))
+    renderForm()
+    await screen.findByRole('button', { name: /選擇附件/ })
+    selectAttachments([new File(['word'], '說明.doc', { type: 'application/msword' })])
+    await screen.findByText('存儲暫時不可用')
+    expect(screen.getByRole('button', { name: /保存紀要/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /保存並發布/ })).toBeDisabled()
+    expect(createMinutes).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '重試' }))
+    await screen.findByRole('listitem', { name: '說明.doc' })
+    expect(screen.getByRole('button', { name: /保存紀要/ })).toBeEnabled()
+    // 重试复用同一幂等键：服务端不会因重试重复占用存储
+    expect(uploadMinutesAttachment).toHaveBeenCalledTimes(2)
+    expect(vi.mocked(uploadMinutesAttachment).mock.calls[0][2])
+      .toBe(vi.mocked(uploadMinutesAttachment).mock.calls[1][2])
+  })
+
+  it('客户端预检拒绝非白名单类型、MIME 不匹配、空文件与超限文件，不发起上传', async () => {
     renderForm()
     await screen.findByRole('button', { name: /選擇附件/ })
     const oversized = new File(['pdf'], '過大.pdf', { type: 'application/pdf' })
@@ -216,18 +240,39 @@ describe('會議紀要表單', () => {
     ])
     await screen.findByText(/部分文件未加入/)
     expect(screen.queryByRole('list', { name: '紀要附件' })).toBeNull()
-    expect(createObjectURL).not.toHaveBeenCalled()
+    expect(uploadMinutesAttachment).not.toHaveBeenCalled()
   })
 
-  it('附件数量上限明确提示，移除后允许继续选择', async () => {
+  it('附件超上限明确提示；移除后释放名额并通知服务端回收未绑定附件', async () => {
+    // 附件号按文件名首字符生成 32 位 hex，便于断言"移除的是哪一行"
+    vi.mocked(uploadMinutesAttachment).mockImplementation(async (_booking, file) =>
+      attVo(file.name.charAt(0).repeat(32), file.name, 'pdf'))
     renderForm()
     await screen.findByRole('button', { name: /選擇附件/ })
     selectAttachments(Array.from({ length: 6 }, (_, index) => new File(['%PDF'], `${index}.pdf`, { type: 'application/pdf' })))
     await screen.findByText(/超出部分未加入/)
-    expect(screen.getAllByRole('listitem')).toHaveLength(5)
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(5))
     expect(screen.getByRole('button', { name: /選擇附件/ })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: '移除 0.pdf' }))
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(4))
+    expect(deleteMinutesAttachment).toHaveBeenCalledWith('0'.repeat(32))
     expect(screen.getByRole('button', { name: /選擇附件/ })).toBeEnabled()
+  })
+
+  it('编辑既有纪要回显服务端附件元数据，删除只移除引用不伪造删除成功', async () => {
+    vi.mocked(fetchMinutes).mockResolvedValue({
+      exists: true, id: 9, bookingId: 100, canEdit: true, version: 3,
+      content: { ...emptyMinutesContent(), items: [{ topic: '預算復核' }], attachments: ['d'.repeat(32)] },
+      attachments: [attVo('d'.repeat(32), '紀要附件.docx', 'office')],
+    })
+    renderForm()
+    await screen.findByRole('listitem', { name: '紀要附件.docx' })
+    fireEvent.click(screen.getByRole('button', { name: '移除 紀要附件.docx' }))
+    await waitFor(() => expect(screen.queryByRole('list', { name: '紀要附件' })).toBeNull())
+    fireEvent.change(screen.getByPlaceholderText('議題，例：Q4 預算分攤口徑'), { target: { value: '口徑' } })
+    fireEvent.click(screen.getByRole('button', { name: /保存紀要/ }))
+    await waitFor(() => expect(updateMinutes).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(updateMinutes).mock.calls[0][1].content.attachments).toEqual([])
   })
 
   it('只读纪要不能操作下次会议开关或选择附件', async () => {
@@ -241,26 +286,27 @@ describe('會議紀要表單', () => {
     expect(screen.queryByRole('button', { name: /保存紀要/ })).toBeNull()
   })
 
-  it('只读附件支持图片放大、文档新窗口查看与下载，不提供移除动作', async () => {
-    const page = render(<MinutesContentCard content={emptyMinutesContent()} attachmentFiles={[
-      new File(['image'], '白板.png', { type: 'image/png' }),
-      new File(['%PDF'], '資料.pdf', { type: 'application/pdf' }),
-      new File(['word'], '說明.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }),
-    ]} />)
+  it('只读附件展示：图片站内放大，文档凭短票新窗口查看/下载，不提供移除动作', async () => {
+    vi.mocked(fetchMinutesAttachmentAccess).mockResolvedValue({
+      attachmentNo: 'e'.repeat(32), purpose: 'view', ticket: 'ticket-abc', expiresAt: '2026-10-29 10:05:00',
+    })
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+    render(<MinutesContentCard content={emptyMinutesContent()} attachments={[
+      attVo('e'.repeat(32), '白板.png', 'image'),
+      attVo('f'.repeat(32), '資料.pdf', 'pdf'),
+    ]} resolveAttachmentUrl={async (item, purpose) => {
+      await fetchMinutesAttachmentAccess(item.attachmentNo, purpose)
+      return `https://api.test/file?attachmentNo=${item.attachmentNo}&purpose=${purpose}`
+    }} />)
     expect(screen.getByText('補充說明')).toBeInTheDocument()
-    for (const name of ['資料.pdf', '說明.docx']) {
-      const view = await screen.findByRole('link', { name: `在瀏覽器查看 ${name}` })
-      expect(view).toHaveAttribute('href', 'blob:http://localhost/minutes-preview')
-      expect(view).toHaveAttribute('target', '_blank')
-      expect(view).toHaveAttribute('rel', 'noopener noreferrer')
-      expect(screen.getByRole('link', { name: `下載 ${name}` })).toHaveAttribute('download', name)
-    }
+    // 图片缩略图挂载即取 view 地址
+    await waitFor(() => expect(fetchMinutesAttachmentAccess).toHaveBeenCalledWith('e'.repeat(32), 'view'))
+    fireEvent.click(screen.getByRole('button', { name: '查看 資料.pdf' }))
+    await waitFor(() => expect(openSpy).toHaveBeenCalledWith(
+      `https://api.test/file?attachmentNo=${'f'.repeat(32)}&purpose=view`, '_blank', 'noopener'))
+    fireEvent.click(screen.getByRole('button', { name: '下載 白板.png' }))
+    await waitFor(() => expect(fetchMinutesAttachmentAccess).toHaveBeenCalledWith('e'.repeat(32), 'download'))
     expect(screen.queryByRole('button', { name: /移除/ })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '查看 白板.png' }))
-    await waitFor(() => expect(document.querySelector('.ant-image-preview-img')).not.toBeNull())
-    expect(screen.getByRole('link', { name: '下載 白板.png' })).toHaveAttribute('download', '白板.png')
-    page.unmount()
-    expect(revokeObjectURL).toHaveBeenCalledTimes(3)
   })
 
   it('模板分区齐全：會議資訊 / 議程與結論 / 行動項 / 未決事項 / 下次會議 / 補充說明', async () => {

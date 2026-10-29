@@ -52,6 +52,7 @@ public class MeetingMinutesPublication {
     private final MeetingMinutesLinkMapper linkMapper;
     private final SysUserMapper userMapper;
     private final MeetingAuditRecorder audit;
+    private final MeetingMinutesAttachmentService attachmentService;
 
     /** 先校结构再解引用，避免空数组成员造成 500；客户端署名和确认凭据不采信。 */
     public void normalize(MeetingMinutesContent content, MeetingMinutesContent previous, SysUser operator) {
@@ -159,6 +160,8 @@ public class MeetingMinutesPublication {
         if (previous != null && note.isEmpty()) throw new BusinessException("再次發布必須填寫修訂說明");
         // 保存与发布之间员工可能停用，重验可用性；已经保存的姓名和出席确认仍按草稿冻结。
         validatePeopleForPublish(content);
+        // 发布定格：正文引用的绑定附件进入不可物理删除状态，历史版本永不缺文件
+        attachmentService.markPublished(minutes, content, current);
         List<Long> itemIds = synchronizeItems(minutes, content);
         String draftHash = draftHash(content, referenceIds(minutes.getId()));
         int number = revisionMapper.nextRevisionNo(minutes.getId());
@@ -304,6 +307,17 @@ public class MeetingMinutesPublication {
             ref.setBookingNo(link.getLinkedBookingNo());
             ref.setTitle(link.getLinkedTitle());
             ref.setTimeText(link.getLinkedTimeText());
+            return ref;
+        }).toList());
+        // 附件元数据随发布定格：历史版本能说明"当时发的是哪几个文件、叫什么名、多大"，
+        // 后续草稿解绑/改名都不会改写已发布快照的阅读口径
+        document.setAttachments(attachmentService.resolve(content.getAttachments()).stream().map(row -> {
+            MeetingMinutesDocument.AttachmentRef ref = new MeetingMinutesDocument.AttachmentRef();
+            ref.setAttachmentNo(row.getAttachmentNo());
+            ref.setFileName(row.getFileName());
+            ref.setMimeType(row.getMimeType());
+            ref.setSizeBytes(row.getSizeBytes());
+            ref.setPreviewKind(row.getPreviewKind());
             return ref;
         }).toList());
         return document;

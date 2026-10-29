@@ -187,6 +187,8 @@ public final class MeetingMinutesDto {
         private List<ItemVO> items = new ArrayList<>();
         /** 关联纪要（带来源快照） */
         private List<LinkVO> links = new ArrayList<>();
+        /** 当前草稿正文引用的附件元数据（按引用顺序；已失效的号不展示，访问仍逐行裁决） */
+        private List<AttachmentVO> attachments = new ArrayList<>();
         /** 本人是否对本次会议的某个事项负责：负责人回来更新状态不要求菜单写权限 */
         private Boolean itemOwner;
 
@@ -254,6 +256,30 @@ public final class MeetingMinutesDto {
         private String bookingNo;
         private String title;
         private String timeText;
+    }
+
+    /**
+     * 附件元数据：只回展示与访问需要的字段，对象键/磁盘路径/存储凭据一律不下发。
+     * <p>previewKind：image=站内放大，pdf=浏览器直开，office=查看时转 PDF，none=仅下载。
+     */
+    @Data
+    public static class AttachmentVO {
+        private String attachmentNo;
+        private String fileName;
+        private String mimeType;
+        private Long sizeBytes;
+        private String previewKind;
+        private String uploaderName;
+        private String uploadedAt;
+    }
+
+    /** 站内附件访问票据：新标签页/钉钉外部浏览器带不了 Authorization，用短时效票据换文件。 */
+    @Data
+    public static class AttachmentAccess {
+        private String attachmentNo;
+        private String purpose;
+        private String ticket;
+        private String expiresAt;
     }
 
     /* ==================== 行政检索 ==================== */
@@ -426,5 +452,7 @@ public final class MeetingMinutesDto {
         private MeetingMinutesContent content;
         private Integer revisionNo;
         private MeetingMinutesDocument document;
+        /** 本批快照引用的附件元数据：免登页只展示这一组，访问时再按令牌复核 */
+        private List<AttachmentVO> attachments = new ArrayList<>();
     }
 }

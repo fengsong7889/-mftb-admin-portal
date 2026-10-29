@@ -367,7 +367,7 @@
         "Agent",
         "Llm"
       ],
-      "classCount": 159,
+      "classCount": 161,
       "forwardClasses": 4,
       "reverseClasses": 13,
       "reverseFiles": 6,
@@ -496,9 +496,17 @@
       ],
       "classCount": 62,
       "forwardClasses": 3,
-      "reverseClasses": 8,
-      "reverseFiles": 4,
+      "reverseClasses": 10,
+      "reverseFiles": 5,
       "reverseEdges": [
+        {
+          "class": "DocObjectStorage",
+          "referencingFiles": 2,
+          "examples": [
+            "LocalDocObjectStorage",
+            "MeetingMinutesAttachmentService"
+          ]
+        },
         {
           "class": "DocAckSchema",
           "referencingFiles": 1,
@@ -511,6 +519,13 @@
           "referencingFiles": 1,
           "examples": [
             "NotificationServiceImpl"
+          ]
+        },
+        {
+          "class": "DocAssetValidator",
+          "referencingFiles": 1,
+          "examples": [
+            "MeetingMinutesAttachmentService"
           ]
         },
         {
@@ -549,10 +564,10 @@
           ]
         },
         {
-          "class": "DocObjectStorage",
+          "class": "DocOfficeConverter",
           "referencingFiles": 1,
           "examples": [
-            "LocalDocObjectStorage"
+            "MeetingMinutesAttachmentService"
           ]
         }
       ]
@@ -561,8 +576,8 @@
       "prefixes": [
         "Meeting"
       ],
-      "classCount": 67,
-      "forwardClasses": 10,
+      "classCount": 76,
+      "forwardClasses": 14,
       "reverseClasses": 1,
       "reverseFiles": 10,
       "reverseEdges": [

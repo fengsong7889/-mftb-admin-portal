@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { Alert, Button, ConfigProvider, Input, InputNumber, Modal, Space, Tag, message } from 'antd'
+import { Alert, Button, ConfigProvider, Input, InputNumber, Modal, Space, Switch, Tag, message } from 'antd'
 import {
   EditOutlined, SaveOutlined, PlusOutlined, DeleteOutlined,
   QuestionCircleOutlined, TrophyOutlined, ThunderboltOutlined, CalculatorOutlined,
@@ -15,7 +15,7 @@ import {
 
 /**
  * 平台会员红包计分面板（COM_06）：得分 = 报名分 + 加码分。
- * 平台配置的会员红包出资金额由商家承担，商家报名即给报名分；
+ * 平台配置的会员红包出资金额由商家承担，商家报名即给报名分（可用「啟用報名分」开关停用）；
  * 商家觉得力度不够可额外加码，运营按「加码金额 → 分值」配置梯度，加码越多分越高。
  * 整份配置随保存写库（member_bonus_config）。
  * 文案暂沿用算法库自然流量面板的繁中硬编码风格（该域尚未纳入 i18n 门禁），待整域抽取时统一迁移。
@@ -128,8 +128,13 @@ export default function MemberBonusScorePanel({
         <AlgorithmSection title="報名計分" icon={<TrophyOutlined />} tone="info"
           extra={<FormulaHint formula="有效報名即給一次" example={`報名即得 ${view.enrollmentScore} 分`} />}>
           <div className="organic-score-panel organic-score-list">
-            <ScoreRow label="報名計分" score={view.enrollmentScore}
-              control={<EnrollmentScoreTag />} />
+            {/* 只读态用禁用开关回显启用状态（与券类面板同款式），保存后状态不再「消失」 */}
+            <ScoreRow label="報名計分" score={view.enrollmentScore} enabled={view.enrollmentEnabled}
+              control={<>
+                <Switch aria-label="啟用報名分" checkedChildren="啟用" unCheckedChildren="停用" checked={view.enrollmentEnabled} disabled />
+                <EnrollmentScoreTag enabled={view.enrollmentEnabled} />
+              </>}
+              hint="停用後報名分值保留，僅該模組不計入得分" />
           </div>
         </AlgorithmSection>
 
@@ -151,12 +156,16 @@ export default function MemberBonusScorePanel({
       </> : <>
         <AlgorithmSection title="報名計分" icon={<TrophyOutlined />} tone="info"
           extra={<FormulaHint formula="有效報名即給一次" example={`報名即得 ${draft.enrollmentScore} 分`} />}>
-          <div className="organic-score-panel" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* 开关与分值并排一行，避免竖排占空间 */}
+          <div className="organic-score-panel">
             <div className="organic-score-edit-row">
+              <span className="organic-score-edit-row__label">啟用報名分</span>
+              <Switch aria-label="啟用報名分" checkedChildren="啟用" unCheckedChildren="停用" checked={draft.enrollmentEnabled}
+                onChange={v => patch({ enrollmentEnabled: v })} />
               <span className="organic-score-edit-row__label">報名分值</span>
-              <InputNumber aria-label="報名分值" value={draft.enrollmentScore} min={0} max={100}
+              <InputNumber aria-label="報名分值" value={draft.enrollmentScore} min={0} max={100} disabled={!draft.enrollmentEnabled}
                 onChange={v => patch({ enrollmentScore: v ?? 0 })} style={{ width: 160 }} addonAfter="分" />
-              <span style={{ fontSize: 12, color: '#8C8C8C' }}>報名即計分，不可關閉</span>
+              <span style={{ fontSize: 12, color: '#8C8C8C' }}>每商家只計一次有效報名</span>
             </div>
           </div>
         </AlgorithmSection>

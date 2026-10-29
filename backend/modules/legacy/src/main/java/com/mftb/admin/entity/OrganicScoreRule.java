@@ -98,6 +98,9 @@ public class OrganicScoreRule {
     /** 平台会员红包计分配置 JSON（报名分 + 商家加码梯度，仅 COM_06 规则使用） */
     private String memberBonusConfig;
 
+    /** 流量均衡合并配置 JSON（统一商家扶持与订单过热调控，统计口径 + 区域梯度，仅 PLT_03 使用） */
+    private String trafficBalanceConfig;
+
     /** 服务状态: 1=启用 2=停用 */
     private Integer status;
 

@@ -37,6 +37,7 @@ export interface OrganicRuleVO {
   activityItems?: string
   freeShippingConfig?: string
   memberBonusConfig?: string
+  trafficBalanceConfig?: string
   status: number
   builtin: number
   sortOrder: number
@@ -77,6 +78,7 @@ export interface OrganicRulePayload {
   activityItems?: string
   freeShippingConfig?: string
   memberBonusConfig?: string
+  trafficBalanceConfig?: string
   status: number
 }
 

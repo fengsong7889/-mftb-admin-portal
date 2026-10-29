@@ -13,6 +13,7 @@ import com.mftb.admin.service.MeetingMinutesPublication;
 import com.mftb.admin.entity.MeetingAttendee;
 import com.mftb.admin.entity.MeetingBooking;
 import com.mftb.admin.entity.MeetingMinutes;
+import com.mftb.admin.entity.MeetingMinutesAttachment;
 import com.mftb.admin.entity.MeetingMinutesSend;
 import com.mftb.admin.entity.SysNotificationChannel;
 import com.mftb.admin.entity.SysUser;
@@ -98,6 +99,7 @@ class MeetingMinutesServiceImplTest {
     private MeetingMinutesServiceImpl service;
     private MeetingMinutesRevisionMapper revisionMapper;
     private MeetingMinutesPublication publication;
+    private com.mftb.admin.service.MeetingMinutesAttachmentService attachmentService;
 
     @BeforeAll
     static void initTableMetadata() {
@@ -205,12 +207,13 @@ class MeetingMinutesServiceImplTest {
             return 1;
         });
         revisionMapper = mock(MeetingMinutesRevisionMapper.class);
-        publication = new MeetingMinutesPublication(minutesMapper, revisionMapper, itemMapper, linkMapper, userMapper, audit);
+        attachmentService = mock(com.mftb.admin.service.MeetingMinutesAttachmentService.class);
+        publication = new MeetingMinutesPublication(minutesMapper, revisionMapper, itemMapper, linkMapper, userMapper, audit, attachmentService);
         when(minutesMapper.lockById(anyLong())).thenAnswer(call -> minutesMapper.selectById((long) call.getArgument(0)));
         when(minutesMapper.update(any(), any())).thenReturn(1);
         service = new MeetingMinutesServiceImpl(minutesMapper, sendMapper, deliveryMapper, itemMapper, linkMapper,
                 bookingMapper, attendeeMapper, userMapper, jdbc, guard, audit, dispatcher, templateService,
-                mock(DingTalkService.class), appService, bizSeqService, publication);
+                mock(DingTalkService.class), appService, bizSeqService, publication, attachmentService);
         ReflectionTestUtils.setField(service, "publicationEnabled", true);
         ReflectionTestUtils.setField(service, "cardEnabled", true);
         ReflectionTestUtils.setField(service, "minutesEnabled", true);
@@ -529,6 +532,116 @@ class MeetingMinutesServiceImplTest {
         String text = String.valueOf(json);
         assertFalse(text.matches(".*1[3-9]\\d{9}.*"), "免登視圖不得出現手機號：" + text);
         assertFalse(text.contains("webhook"), "免登視圖不得出現渠道配置：" + text);
+    }
+
+    /* ==================== 补充说明附件 ==================== */
+
+    /** 批次快照带附件号的发送记录：免登附件访问的固定前提 */
+    private String issuedTokenWithAttachmentSnapshot(String attachmentNo) {
+        MeetingMinutes current = minutes(5L, RECORDER.getId(), 0, 1);
+        when(minutesMapper.selectById(5L)).thenReturn(current);
+        MeetingMinutesContent snapshot = validContent();
+        snapshot.setAttachments(attachmentNo == null ? List.of() : List.of(attachmentNo));
+        MeetingMinutesSend batch = new MeetingMinutesSend();
+        batch.setId(77L);
+        batch.setMinutesId(5L);
+        batch.setBatchSeq(1);
+        batch.setTokenVersion(1);
+        batch.setLinkExpireAt(LocalDateTime.now().plusDays(10));
+        batch.setContentSnapshot(JsonUtils.toJson(snapshot));
+        when(sendMapper.selectById(77L)).thenReturn(batch);
+        return MinutesViewTokenUtil.generate(5L, 77L, 1, LocalDateTime.now().plusDays(10), "unit-test-secret");
+    }
+
+    private static MeetingMinutesAttachment attachmentRow(String no, int status, Long minutesId, long uploaderId) {
+        MeetingMinutesAttachment row = new MeetingMinutesAttachment();
+        row.setAttachmentNo(no);
+        row.setBookingId(100L);
+        row.setMinutesId(minutesId);
+        row.setUploadUserId(uploaderId);
+        row.setStatus(status);
+        row.setOriginalName(no + ".pdf");
+        row.setMime("application/pdf");
+        row.setSizeBytes(1024L);
+        return row;
+    }
+
+    @Test
+    @DisplayName("免登页附件：令牌有效但附件不属于本批快照时一律拒绝")
+    void publicAttachmentRejectsForeignNumber() {
+        String no = "a".repeat(32);
+        String token = issuedTokenWithAttachmentSnapshot(no);
+        MeetingMinutesAttachment target = attachmentRow(no, MeetingMinutesAttachment.STATUS_PUBLISHED, 5L, 7L);
+        when(attachmentService.requireRow(no)).thenReturn(target);
+        when(attachmentService.file(eq(target), anyString()))
+                .thenReturn(org.springframework.http.ResponseEntity.ok().build());
+        assertNotNull(service.attachmentFileByPublicToken(no, token, "view"));
+        // 拿着有效令牌要别的附件号：跨批次/跨会议探测在这里拦住，且不碰存储
+        assertThrows(BusinessException.class,
+                () -> service.attachmentFileByPublicToken("b".repeat(32), token, "view"));
+        verify(attachmentService, never()).requireRow("b".repeat(32));
+    }
+
+    @Test
+    @DisplayName("免登附件同样受作废与过期约束：抬升令牌版本后旧链接拿不到文件")
+    void publicAttachmentRespectsRevocation() {
+        String no = "a".repeat(32);
+        String token = issuedTokenWithAttachmentSnapshot(no);
+        MeetingMinutes current = minutesMapper.selectById(5L);
+        current.setTokenVersion(2);
+        assertThrows(BusinessException.class, () -> service.attachmentFileByPublicToken(no, token, "view"));
+    }
+
+    @Test
+    @DisplayName("站内访问票据只给可读的人：未绑定附件认上传人，别人的直接拒")
+    void accessTicketOnlyForUploaderOfUnbound() {
+        String mine = "a".repeat(32);
+        String theirs = "b".repeat(32);
+        when(attachmentService.requireRow(mine)).thenReturn(attachmentRow(mine, MeetingMinutesAttachment.STATUS_UNBOUND, null, RECORDER.getId()));
+        when(attachmentService.requireRow(theirs)).thenReturn(attachmentRow(theirs, MeetingMinutesAttachment.STATUS_UNBOUND, null, 8L));
+        assertNotNull(service.attachmentAccess(mine, "view").getTicket());
+        assertThrows(BusinessException.class, () -> service.attachmentAccess(theirs, "view"));
+    }
+
+    @Test
+    @DisplayName("票据兑换时复核用户状态：签票后被停用的人旧票据立刻失效")
+    void ticketRedeemRechecksUserState() {
+        String no = "a".repeat(32);
+        String ticket = com.mftb.admin.util.MinutesAttachmentTokenUtil.generate(no, "view", 9L, "unit-test-secret");
+        SysUser disabled = user(9L, "MF00009", "孫七");
+        disabled.setStatus(0);
+        when(userMapper.selectById(9L)).thenReturn(disabled);
+        assertThrows(BusinessException.class, () -> service.attachmentFileByTicket(no, ticket));
+        when(userMapper.selectById(9L)).thenReturn(null);
+        assertThrows(BusinessException.class, () -> service.attachmentFileByTicket(no, ticket));
+    }
+
+    @Test
+    @DisplayName("新建保存把附件绑定交给状态机；旧客户端不带字段时按既有绑定保留")
+    void saveDelegatesAttachmentBindings() {
+        when(guard.canOperateRecords(RECORDER)).thenReturn(true);
+        when(minutesMapper.findByBooking(100L)).thenReturn(null);
+        MeetingMinutesDto.Form form = new MeetingMinutesDto.Form();
+        form.setBookingId(100L);
+        MeetingMinutesContent content = validContent();
+        String no = "a".repeat(32);
+        content.setAttachments(List.of(no));
+        form.setContent(content);
+        form.setRequestKey("mm-att-1");
+        service.create(form);
+        verify(attachmentService).applyBindings(any(MeetingMinutes.class), eq(100L), eq(content), eq(List.of()), eq(RECORDER));
+
+        // 编辑：旧正文有附件、新请求不带字段 → 把既有绑定传回状态机保留
+        MeetingMinutes existing = minutes(5L, RECORDER.getId(), 0, 0);
+        existing.setContentJson(JsonUtils.toJson(content));
+        when(minutesMapper.selectById(5L)).thenReturn(existing);
+        MeetingMinutesDto.Form legacy = new MeetingMinutesDto.Form();
+        MeetingMinutesContent legacyContent = validContent();
+        legacyContent.setAttachments(null);
+        legacy.setContent(legacyContent);
+        legacy.setVersion(0);
+        service.update(5L, legacy);
+        verify(attachmentService).applyBindings(any(MeetingMinutes.class), eq(100L), eq(legacyContent), eq(List.of(no)), eq(RECORDER));
     }
 
     @Test

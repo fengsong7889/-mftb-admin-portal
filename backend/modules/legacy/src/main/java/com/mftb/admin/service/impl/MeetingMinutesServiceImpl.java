@@ -16,6 +16,7 @@ import com.mftb.admin.entity.MeetingMinutesDelivery;
 import com.mftb.admin.entity.MeetingMinutesItem;
 import com.mftb.admin.entity.MeetingMinutesLink;
 import com.mftb.admin.entity.MeetingMinutesSend;
+import com.mftb.admin.entity.MeetingMinutesAttachment;
 import com.mftb.admin.entity.SysNotificationChannel;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.MeetingAttendeeMapper;
@@ -28,6 +29,7 @@ import com.mftb.admin.mapper.MeetingMinutesSendMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.MeetingAccessGuard;
 import com.mftb.admin.service.MeetingAuditRecorder;
+import com.mftb.admin.service.MeetingMinutesAttachmentService;
 import com.mftb.admin.service.MeetingMinutesDispatcher;
 import com.mftb.admin.service.MeetingMinutesRenderer;
 import com.mftb.admin.service.MeetingMinutesService;
@@ -36,17 +38,21 @@ import com.mftb.admin.service.NotificationAppService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.DateTimeUtils;
 import com.mftb.admin.util.JsonUtils;
+import com.mftb.admin.util.MinutesAttachmentTokenUtil;
 import com.mftb.admin.util.MinutesViewTokenUtil;
 import com.mftb.admin.util.PublicLinkGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -115,6 +121,7 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
     private final NotificationAppService appService;
     private final BizSeqService bizSeqService;
     private final MeetingMinutesPublication publication;
+    private final MeetingMinutesAttachmentService attachmentService;
 
     @Value("${meeting.minutes.publication-enabled:true}")
     private boolean publicationEnabled;
@@ -256,6 +263,8 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
                 MeetingConstants.EVENT_MINUTES_CREATE, "錄入會議紀要 " + minutes.getMinutesNo(),
                 null, Map.of("minutesNo", minutes.getMinutesNo(), "digest", minutes.getDigest()),
                 current, trimToNull(form.getRequestKey()));
+        // 附件绑定与正文同事务：正文引用了绑不上的号时整次保存回滚，不留悬空引用
+        attachmentService.applyBindings(minutes, booking.getId(), content, List.of(), current);
         // 事项/关联/参会补录跟正文同事务：纪要保存成功但待办没落库，等于发出去一张没人负责的空单
         if (!content.versioned()) {
             saveItems(minutes, form);
@@ -285,6 +294,10 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         if (!Objects.equals(minutes.getVersion(), expectVersion)) {
             throw new BusinessException(CONFLICT);
         }
+        // 附件绑定先于正文写入：旧客户端不带附件字段时把既有绑定回填进正文，
+        // 否则正文 JSON 会静默丢掉 attachments 键，下次保存就把已绑文件当成从未存在。
+        attachmentService.applyBindings(minutes, minutes.getBookingId(), content,
+                previous.getAttachments(), current);
         MeetingMinutes before = snapshot(minutes);
         // 正文与摘要一起改：摘要是列表与卡片的第一眼内容，只改正文会让两处读到不同的结论
         int changed = minutesMapper.update(null, new LambdaUpdateWrapper<MeetingMinutes>()
@@ -665,7 +678,106 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
                 return invalid;
             }
         }
+        // 附件元数据同样取快照口径：免登页展示的是"发给我的那一版"引用了哪几个文件
+        view.setAttachments(attachmentService.resolve(
+                view.getContent() == null ? List.of() : view.getContent().getAttachments()));
         return view;
+    }
+
+    /* ==================== 补充说明附件 ==================== */
+
+    @Override
+    public MeetingMinutesDto.AttachmentVO uploadAttachment(long bookingId, String fileName, long contentLength,
+                                                            InputStream input, String requestKey) {
+        requireEnabled();
+        SysUser current = guard.currentUser();
+        MeetingBooking booking = requireBooking(bookingId);
+        // 上传权限与录入纪要同源：能往这场会里塞文件的人，必须本来就是写得了纪要的人
+        requireRecordable(booking, current);
+        return attachmentService.toVO(
+                attachmentService.upload(bookingId, fileName, contentLength, input, requestKey, current));
+    }
+
+    @Override
+    public void deleteAttachment(String attachmentNo) {
+        requireEnabled();
+        SysUser current = guard.currentUser();
+        attachmentService.deleteUnbound(attachmentNo, current);
+    }
+
+    @Override
+    public MeetingMinutesDto.AttachmentAccess attachmentAccess(String attachmentNo, String purpose) {
+        requireEnabled();
+        SysUser current = guard.currentUser();
+        if (!MinutesAttachmentTokenUtil.PURPOSE_VIEW.equals(purpose)
+                && !MinutesAttachmentTokenUtil.PURPOSE_DOWNLOAD.equals(purpose)) {
+            throw new BusinessException("不支持的附件操作");
+        }
+        requireAttachmentReadable(attachmentService.requireRow(attachmentNo), current);
+        MeetingMinutesDto.AttachmentAccess access = new MeetingMinutesDto.AttachmentAccess();
+        access.setAttachmentNo(attachmentNo);
+        access.setPurpose(purpose);
+        access.setTicket(MinutesAttachmentTokenUtil.generate(attachmentNo, purpose, current.getId(), tokenSecret()));
+        access.setExpiresAt(DateTimeUtils.format(LocalDateTime.now().plus(MinutesAttachmentTokenUtil.TTL)));
+        return access;
+    }
+
+    @Override
+    public ResponseEntity<InputStreamResource> attachmentFileByTicket(String attachmentNo, String ticket) {
+        requireEnabled();
+        MinutesAttachmentTokenUtil.Ticket parsed = MinutesAttachmentTokenUtil.parse(ticket, tokenSecret());
+        String no = attachmentNo == null ? "" : attachmentNo.trim();
+        // 票据不匹配一律同一句：区分"过期/篡改/换了附件"等于给探测者递线索
+        if (parsed == null || !parsed.attachmentNo().equals(no)) {
+            throw new BusinessException(TOKEN_INVALID);
+        }
+        SysUser user = userMapper.selectById(parsed.userId());
+        if (user == null || !Integer.valueOf(1).equals(user.getStatus())) {
+            throw new BusinessException(TOKEN_INVALID);
+        }
+        // 票据只免掉"带不动的 Authorization 头"，不免权限复核：签出后被人撤了权，旧票据立刻失效
+        MeetingMinutesAttachment row = attachmentService.requireRow(no);
+        requireAttachmentReadable(row, user);
+        return attachmentService.file(row, parsed.purpose());
+    }
+
+    @Override
+    public ResponseEntity<InputStreamResource> attachmentFileByPublicToken(String attachmentNo, String token, String purpose) {
+        MeetingMinutesDto.PublicView view = publicView(token);
+        if (!view.isValid()) {
+            throw new BusinessException(TOKEN_INVALID);
+        }
+        if (!MinutesAttachmentTokenUtil.PURPOSE_VIEW.equals(purpose)
+                && !MinutesAttachmentTokenUtil.PURPOSE_DOWNLOAD.equals(purpose)) {
+            throw new BusinessException(TOKEN_INVALID);
+        }
+        List<String> snapshotNos = view.getContent() == null || view.getContent().getAttachments() == null
+                ? List.of() : view.getContent().getAttachments();
+        String no = attachmentNo == null ? "" : attachmentNo.trim();
+        // 令牌有效≠能拿任意附件：号必须在本批快照的引用集内，否则跨会议/跨批次探测全部在这里拦住
+        if (!snapshotNos.contains(no)) {
+            throw new BusinessException(TOKEN_INVALID);
+        }
+        return attachmentService.file(attachmentService.requireRow(no), purpose);
+    }
+
+    @Override
+    public int cleanupAttachments() {
+        return attachmentService.cleanupStaleUnbound();
+    }
+
+    /** 附件可读判定：未绑定只认上传人；已绑定的跟着纪要可读范围（含被发送过的收件人）。 */
+    private void requireAttachmentReadable(MeetingMinutesAttachment row, SysUser current) {
+        if (row.getMinutesId() == null) {
+            if (!Objects.equals(row.getUploadUserId(), current.getId())) {
+                throw new BusinessException("附件不存在或已刪除");
+            }
+            return;
+        }
+        MeetingMinutes minutes = minutesMapper.selectById(row.getMinutesId());
+        if (minutes == null || !isReadable(minutes, requireBooking(minutes.getBookingId()), current)) {
+            throw new BusinessException(NOT_FOUND);
+        }
     }
 
     @Override
@@ -777,6 +889,9 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
             vo.setDigest(revision.getDigest());
         } else {
             vo.setContent(JsonUtils.parse(batch.getContentSnapshot(), MeetingMinutesContent.class));
+            // 历史发送快照的附件同样按引用列表回查元数据：收件人看得懂"发给我的是哪几个文件"
+            vo.setAttachments(attachmentService.resolve(
+                    vo.getContent() == null ? List.of() : vo.getContent().getAttachments()));
         }
         return vo;
     }
@@ -1452,6 +1567,10 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         }
         // 已存在的纪要只被"谁记的/谁组织的/行政"管，与会议阶段无关
         vo.setEditLockReason(lockReason(writable, true));
+        // 附件元数据跟着可见的正文走：草稿只对可写者展示，非可写者看正式文档自带的引用快照
+        if (vo.getContent() != null) {
+            vo.setAttachments(attachmentService.resolve(vo.getContent().getAttachments()));
+        }
         vo.setCreatedBy(minutes.getCreatedBy());
         vo.setCreatedAt(DateTimeUtils.format(minutes.getCreatedAt()));
         vo.setUpdatedBy(minutes.getUpdatedBy());

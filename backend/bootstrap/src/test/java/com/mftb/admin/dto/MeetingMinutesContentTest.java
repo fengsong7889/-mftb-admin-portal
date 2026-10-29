@@ -329,4 +329,24 @@ class MeetingMinutesContentTest {
         content.setAttendance(java.util.Arrays.asList((MeetingMinutesContent.Attendance) null));
         assertThrows(BusinessException.class, content::validate);
     }
+
+    @Test
+    @DisplayName("附件字段：条数上限、号形态与去重在服务端拦住；存在性/归属另由服务层回查")
+    void attachmentNumbersAreShapeCheckedHere() {
+        MeetingMinutesContent content = publication();
+        content.setAttachments(List.of("a".repeat(32)));
+        assertDoesNotThrow(content::validate);
+        content.setAttachments(List.of("a".repeat(32), "b".repeat(32), "c".repeat(32), "d".repeat(32), "e".repeat(32), "f".repeat(32)));
+        assertThrows(BusinessException.class, content::validate);
+        content.setAttachments(List.of("not-a-hex-no"));
+        assertThrows(BusinessException.class, content::validate);
+        content.setAttachments(List.of("A".repeat(32)));
+        assertThrows(BusinessException.class, content::validate);
+        content.setAttachments(List.of("a".repeat(32), "a".repeat(32)));
+        assertThrows(BusinessException.class, content::validate);
+        content.setAttachments(List.of());
+        assertDoesNotThrow(content::validate);
+        content.setAttachments(null);
+        assertDoesNotThrow(content::validate);
+    }
 }

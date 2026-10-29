@@ -14,7 +14,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Alert, Button, Spin } from 'antd'
 import { fetchMinutesPage, type MinutesPageView } from '@/api/meetingMinutesPage'
+import { minutesAttachmentFileUrl } from '@/api/meetingMinutes'
 import MinutesContentCard from '../MeetingManagement/MeetingMinutes/MinutesContentCard'
+import type { AttachmentUrlResolver } from '../MeetingManagement/MeetingMinutes/MinutesAttachments'
 import { useTranslation } from 'react-i18next'
 import MeetingPublicHeader from '../MeetingManagement/MeetingPublicHeader'
 
@@ -48,6 +50,11 @@ export default function MeetingMinutesView() {
 
   const invalid = view != null && view.valid === false
 
+  /** 免登页附件地址：直接复用页面自带的纪要令牌（查看/下载同一令牌不同用途），
+   *  后端会验证附件属于本批快照才放行 */
+  const resolveAttachmentUrl: AttachmentUrlResolver = (item, purpose) =>
+    minutesAttachmentFileUrl({ attachmentNo: item.attachmentNo, token, purpose })
+
   return (
     <div className="mm-public-page">
       <div className="mm-public-page__inner">
@@ -72,7 +79,7 @@ export default function MeetingMinutesView() {
 
         {!loading && !error && view?.valid && view.content && (
           <>
-            <MinutesContentCard content={view.content} snapshot={view.document} document={{
+            <MinutesContentCard content={view.content} snapshot={view.document} attachments={view.document?.attachments ?? view.attachments ?? undefined} resolveAttachmentUrl={resolveAttachmentUrl} document={{
               title: view.title || undefined,
               minutesNo: view.minutesNo || undefined,
               bookingNo: view.bookingNo || undefined,

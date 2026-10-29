@@ -516,6 +516,7 @@ public class LegacyCoreContracts implements SchemaContractProvider {
                         + "region_configs TEXT DEFAULT NULL COMMENT '區域配置 JSON', "
                         + "free_shipping_config TEXT DEFAULT NULL COMMENT '減免運費計分配置 JSON（僅 COM_02）', "
                         + "member_bonus_config TEXT DEFAULT NULL COMMENT '平台會員紅包計分配置 JSON（僅 COM_06）', "
+                        + "traffic_balance_config TEXT DEFAULT NULL COMMENT '流量均衡合併配置 JSON（僅 PLT_03）', "
                         + "status INT NOT NULL DEFAULT 1 COMMENT '服務狀態: 1=啟用 2=停用', "
                         + "builtin TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否系統內置', "
                         + "sort_order INT NOT NULL DEFAULT 0 COMMENT '排序號', "
@@ -538,7 +539,9 @@ public class LegacyCoreContracts implements SchemaContractProvider {
                         new ContractSpec.ColumnSpec("free_shipping_config",
                                 "ALTER TABLE biz_organic_score_rule ADD COLUMN free_shipping_config TEXT DEFAULT NULL COMMENT '減免運費計分配置 JSON（門檻檔位 + 報名分護欄，僅 COM_02）'"),
                         new ContractSpec.ColumnSpec("member_bonus_config",
-                                "ALTER TABLE biz_organic_score_rule ADD COLUMN member_bonus_config TEXT DEFAULT NULL COMMENT '平台會員紅包計分配置 JSON（報名分 + 商家加碼梯度，僅 COM_06）'")
+                                "ALTER TABLE biz_organic_score_rule ADD COLUMN member_bonus_config TEXT DEFAULT NULL COMMENT '平台會員紅包計分配置 JSON（報名分 + 商家加碼梯度，僅 COM_06）'"),
+                        new ContractSpec.ColumnSpec("traffic_balance_config",
+                                "ALTER TABLE biz_organic_score_rule ADD COLUMN traffic_balance_config TEXT DEFAULT NULL COMMENT '流量均衡合併配置 JSON（統計口徑 + 區域梯度，僅 PLT_03）'")
                 ));
     }
 

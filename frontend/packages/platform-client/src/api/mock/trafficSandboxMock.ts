@@ -661,7 +661,9 @@ const SCORE_RULE_CONFIG: Array<{
   { dimension: ScoreDimension.STORE, ruleCode: 'STB_03', nameKey: 'scoreInsight.ruleBusinessStatus', mode: ScoreMode.RULE_ADD, statDays: 7, baseScore: 12 },
   { dimension: ScoreDimension.STORE, ruleCode: 'STB_04', nameKey: 'scoreInsight.ruleRatingScore', mode: ScoreMode.TIER, statDays: 30, baseScore: 25 },
   { dimension: ScoreDimension.STORE, ruleCode: 'STB_05', nameKey: 'scoreInsight.ruleServingSpeed', mode: ScoreMode.TIER, statDays: 14, baseScore: 18 },
-  { dimension: ScoreDimension.STORE, ruleCode: 'STB_06', nameKey: 'scoreInsight.ruleRejectOrder', mode: ScoreMode.RULE_DEDUCT, statDays: 14, baseScore: -20 },
+  // STB_06 已改為「自動接單 · 固定加分」，nameKey 仍是舊標識符 ruleRejectOrder：
+  // 該 key 已進入後端 sys_translation 登記表（ja/ko/ru 靠它供文案），改 key 會丟掉已有譯文，因此只改取值不改 key。
+  { dimension: ScoreDimension.STORE, ruleCode: 'STB_06', nameKey: 'scoreInsight.ruleRejectOrder', mode: ScoreMode.RULE_ADD, statDays: 30, baseScore: 50 },
   // 平台維度
   { dimension: ScoreDimension.PLATFORM, ruleCode: 'PLT_01', nameKey: 'scoreInsight.ruleDistanceDecay', mode: ScoreMode.DECAY, statDays: 1, baseScore: 30 },
   { dimension: ScoreDimension.PLATFORM, ruleCode: 'PLT_02', nameKey: 'scoreInsight.ruleDeliveryRange', mode: ScoreMode.CONDITION, statDays: 1, baseScore: 15 },

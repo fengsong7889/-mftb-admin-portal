@@ -32,6 +32,9 @@ public final class MeetingMinutesSchema {
     static final String SCRIPT_V2 = "268_meeting_minutes_v2.sql";
     static final String SCRIPT_PUBLICATION = "308_meeting_minutes_publication.sql";
     static final String REVISION_TABLE = "biz_meeting_minutes_revision";
+    /** 补充说明附件元数据表（二进制入对象存储，本表只存元数据） */
+    static final String SCRIPT_ATTACHMENTS = "309_meeting_minutes_attachments.sql";
+    static final String ATTACHMENT_TABLE = "biz_meeting_minutes_attachment";
     private static final Pattern ADDITION = Pattern.compile(
             "^ALTER TABLE (biz_meeting_minutes(?:_send|_item)?) ADD (COLUMN|CONSTRAINT) ([a-z0-9_]+) .+$",
             Pattern.DOTALL);
@@ -146,6 +149,9 @@ public final class MeetingMinutesSchema {
                         "change_note", "publisher_user_id", "publisher_name", "publisher_emp_no", "published_at",
                         "draft_version", "draft_hash", "request_key", "request_hash", "created_by", "created_at",
                         "updated_by", "updated_at").stream().map(name -> new ContractSpec.ColumnSpec(name, null)).toList()));
+        // 附件元数据表：外键指向会议单与纪要，自愈顺序排在它们之后；同样不给 ADD COLUMN 自愈，列漂移交给启动校验卡住
+        specs.add(new ContractSpec("meeting-minutes-attachments:" + ATTACHMENT_TABLE, ATTACHMENT_TABLE,
+                sliceCreate(SCRIPT_ATTACHMENTS, ATTACHMENT_TABLE), List.of()));
         return specs;
     }
 
