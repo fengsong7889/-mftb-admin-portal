@@ -5,17 +5,21 @@ import com.mftb.admin.common.Result;
 import com.mftb.admin.constant.MeetingConstants;
 import com.mftb.admin.dto.MeetingMinutesDto;
 import com.mftb.admin.service.MeetingMinutesService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.io.IOException;
 import java.util.List;
 
 /**
@@ -160,5 +164,42 @@ public class MeetingMinutesController {
     public Result<List<MeetingMinutesDto.LinkVO>> search(@RequestParam(value = "keyword", required = false) String keyword,
                                                         @RequestParam(value = "excludeId", required = false) Long excludeId) {
         return Result.success(minutesService.search(keyword, excludeId));
+    }
+
+    /* ==================== 补充说明附件 ==================== */
+
+    /**
+     * 原始字节流上传（不走 multipart）：不为单个附件放宽全站 2MB 限制；
+     * 类型/大小/幂等全部在服务端重验，前端限制只是 UX。
+     */
+    @PostMapping("/attachments")
+    @RequirePermission(menu = MY, action = MeetingConstants.ACTION_EDIT, anyOf = {BOOKING, RECORD})
+    public Result<MeetingMinutesDto.AttachmentVO> uploadAttachment(@RequestParam("bookingId") long bookingId,
+                                                                   @RequestParam("fileName") String fileName,
+                                                                   @RequestParam("requestKey") String requestKey,
+                                                                   @RequestHeader(value = "Content-Length", required = false) Long contentLength,
+                                                                   HttpServletRequest request) throws IOException {
+        long length = contentLength == null ? request.getContentLengthLong() : contentLength;
+        return Result.success("附件已上傳", minutesService.uploadAttachment(
+                bookingId, fileName, length, request.getInputStream(), requestKey));
+    }
+
+    /** 删除尚未绑定的附件：仅上传人本人；已随纪要保存的只能从正文移除引用，不物理删除 */
+    @DeleteMapping("/attachments/{attachmentNo}")
+    @RequirePermission(menu = MY, action = MeetingConstants.ACTION_EDIT, anyOf = {BOOKING, RECORD})
+    public Result<Void> deleteAttachment(@PathVariable String attachmentNo) {
+        minutesService.deleteAttachment(attachmentNo);
+        return Result.success("附件已移除", null);
+    }
+
+    /**
+     * 签发附件访问票据（view/download）：接口本身走 JWT，拿到的票据地址在
+     * {@code /api/public/meeting-minutes} 白名单下，新标签页/钉钉外部浏览器才能直接打开。
+     */
+    @GetMapping("/attachments/{attachmentNo}/access")
+    @RequirePermission(menu = MY, anyOf = {BOOKING, RECORD})
+    public Result<MeetingMinutesDto.AttachmentAccess> attachmentAccess(@PathVariable String attachmentNo,
+                                                                       @RequestParam("purpose") String purpose) {
+        return Result.success(minutesService.attachmentAccess(attachmentNo, purpose));
     }
 }

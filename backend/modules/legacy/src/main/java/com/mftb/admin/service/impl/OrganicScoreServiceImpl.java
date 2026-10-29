@@ -35,6 +35,9 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
     private static final Set<Integer> VALID_MODES = Set.of(1, 2, 3, 4, 5, 6, 7);
     private static final Set<Integer> VALID_STATUS = Set.of(1, 2);
 
+    /** 计分方式存储编码：1=规则加分（与前端 ScoreMode.RULE_BONUS 一致），用于加分规则的分值符号校验 */
+    private static final int MODE_RULE_BONUS = 1;
+
     /** 维度 → 编码前缀映射 */
     private static final String PREFIX_COM = "COM";
     private static final String PREFIX_STB = "STB";
@@ -143,6 +146,7 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         entity.setRegionConfigs(request.getRegionConfigs());
         entity.setFreeShippingConfig(request.getFreeShippingConfig());
         entity.setMemberBonusConfig(request.getMemberBonusConfig());
+        entity.setTrafficBalanceConfig(request.getTrafficBalanceConfig());
         entity.setPrerequisites(request.getPrerequisites());
         entity.setStatus(request.getStatus());
         entity.setBuiltin(0);
@@ -185,6 +189,7 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         entity.setRegionConfigs(request.getRegionConfigs());
         entity.setFreeShippingConfig(request.getFreeShippingConfig());
         entity.setMemberBonusConfig(request.getMemberBonusConfig());
+        entity.setTrafficBalanceConfig(request.getTrafficBalanceConfig());
         entity.setPrerequisites(request.getPrerequisites());
         entity.setStatus(request.getStatus());
         entity.setUpdatedBy(operatorResolver.currentOperatorName());
@@ -294,6 +299,13 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         if (!VALID_STATUS.contains(request.getStatus())) {
             throw new BusinessException("無效的狀態值: " + request.getStatus());
         }
+        // 加分規則分值不得為負：mode=1 的語義是「命中即加分」，負值會讓同一份配置在計分側被讀成扣分，
+        // 與界面的「固定加分」標籤互相矛盾；前端的 0~200 只是 UX，符號邊界必須在後端裁決。
+        // score 為 null 時不拦（新增/編輯路径均按未配置處理，createRule 會補 0）。
+        if (Integer.valueOf(MODE_RULE_BONUS).equals(request.getMode())
+                && request.getScore() != null && request.getScore() < 0) {
+            throw new BusinessException("規則加分計分方式的分值不得為負: " + request.getScore());
+        }
     }
 
     /**
@@ -373,6 +385,7 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         vo.setRegionConfigs(entity.getRegionConfigs());
         vo.setFreeShippingConfig(entity.getFreeShippingConfig());
         vo.setMemberBonusConfig(entity.getMemberBonusConfig());
+        vo.setTrafficBalanceConfig(entity.getTrafficBalanceConfig());
         vo.setStatus(entity.getStatus());
         vo.setBuiltin(entity.getBuiltin());
         vo.setSortOrder(entity.getSortOrder());

@@ -48,6 +48,8 @@ public class MeetingMinutesContent {
     /** 合并旧目的（500 字）与摘要（300 字）时保留段落，仍受正文总长度约束。 */
     public static final int PURPOSE_MAX = 1000;
     public static final int MAX_ATTENDANCE = 100;
+    /** 补充说明附件上限：与 MeetingMinutesAttachmentService.MAX_FILES 同口径 */
+    public static final int MAX_ATTACHMENTS = 5;
     public static final String DECISION_DECIDED = "decided";
     public static final String DECISION_PENDING = "pending";
     public static final String DECISION_INFORMATION = "information";
@@ -83,8 +85,10 @@ public class MeetingMinutesContent {
     private String remark;
 
     /**
-     * 附件预留位（一期不启用）：方案明确“一期不做附件/图片”，但预留字段避免后续加附件时
-     * 改 content_json 的结构版本。任何一期代码都不读写它。
+     * 补充说明附件：存服务端签发的附件号（32 位 hex），二进制永不入正文 JSON。
+     * <p>null 与空数组语义不同：null=调用方不带附件字段（旧客户端），保存时保留既有绑定；
+     * 数组（含空）=正文就该是这一组，多退少绑。落库前由服务层逐号回查真实元数据，
+     * 客户端伪造的号一律拒绝——这里只校形态与条数。
      */
     private List<String> attachments;
 
@@ -224,6 +228,7 @@ public class MeetingMinutesContent {
         requireDate(nextMeetingAt, "yyyy-MM-dd HH:mm", "下次會議時間");
         requireWithin(nextMeetingNote, SHORT_MAX, "下次會議議程預告");
         requireWithin(remark, SHORT_MAX, "補充說明");
+        validateAttachments();
         if (contentLength() > CONTENT_MAX) {
             throw new BusinessException("紀要正文 " + contentLength() + " 字，已超過 " + CONTENT_MAX + " 字上限");
         }
@@ -331,7 +336,6 @@ public class MeetingMinutesContent {
         requireWithin(summary, SUMMARY_MAX, "歷史會議摘要");
         requireWithin(purposeText(), PURPOSE_MAX, "會議目的");
         requirePositive(chairUserId, "主持人");
-        if (attachments != null && !attachments.isEmpty()) throw new BusinessException("本版紀要不支援附件上傳");
         Set<String> topics = new HashSet<>();
         for (Item item : items == null ? List.<Item>of() : items) {
             if (StringUtils.hasText(item.getTopicKey())) {
@@ -398,6 +402,17 @@ public class MeetingMinutesContent {
 
     private static void requireKey(String value) {
         if (!value.matches("[A-Za-z0-9_-]{1,64}")) throw new BusinessException("議題識別碼格式不正確");
+    }
+
+    /** 附件号形态与条数校验：存在性/归属/状态由服务层按号回查数据库裁决，不信前端结论。 */
+    private void validateAttachments() {
+        if (attachments == null) return;
+        if (attachments.size() > MAX_ATTACHMENTS) throw new BusinessException("附件最多 " + MAX_ATTACHMENTS + " 個");
+        Set<String> seen = new HashSet<>();
+        for (String no : attachments) {
+            if (no == null || !no.matches("[0-9a-f]{32}")) throw new BusinessException("附件標識不正確，請重新上傳");
+            if (!seen.add(no)) throw new BusinessException("附件不可重複綁定");
+        }
     }
 
     private static void requireWithin(String value, int max, String label) {

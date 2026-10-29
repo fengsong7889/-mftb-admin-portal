@@ -20,11 +20,13 @@ import DetailPageHeader from '@/components/DetailPageHeader'
 import CardTitle from '@/components/CardTitle'
 import {
   fetchMinutesById, fetchMinutesSends, fetchMinutesRevisions, fetchMinutesRevision, minutesDeliveryTarget, resolveMinutesItem, revokeMinutesLinks, revokeBatchLink,
+  fetchMinutesAttachmentAccess, minutesAttachmentFileUrl,
   type MinutesDeliveryVO, type MinutesDocument, type MinutesRevision, type MinutesItemView, type MinutesSendBatchVO, type MinutesVO,
 } from '@/api/meetingMinutes'
 import { fetchMeetingDetail, type MeetingVO } from '@/api/meeting'
 import { bizTypeLabels, minutesStatusMeta, minutesTargetTypeLabels, notifyStatusMeta, phaseMeta } from '../meetingMeta'
 import MinutesContentCard, { MinutesNoticePreview } from './MinutesContentCard'
+import type { AttachmentUrlResolver } from './MinutesAttachments'
 import SendMinutesModal from './SendMinutesModal'
 import useMinutesNavigation from './useMinutesNavigation'
 import './minutes.css'
@@ -246,6 +248,13 @@ export default function MinutesView() {
   const document = selectedDocument ?? minutes?.document
   const content = document?.content ?? minutes?.content
   const targetLabels = minutesTargetTypeLabels()
+  /** 附件阅读口径：正在看的版本自带的引用（正式版看快照，草稿看当前绑定） */
+  const viewingAttachments = document?.attachments ?? minutes?.attachments
+  /** 站内附件地址：每次现取 5 分钟票据；后端兑换时还会复核用户与读权限 */
+  const resolveAttachmentUrl: AttachmentUrlResolver = async (item, purpose) => {
+    const access = await fetchMinutesAttachmentAccess(item.attachmentNo, purpose)
+    return minutesAttachmentFileUrl({ attachmentNo: item.attachmentNo, ticket: access.ticket })
+  }
 
   return (
     <div className="content-area">
@@ -288,6 +297,7 @@ export default function MinutesView() {
         <>
           <div className="mm-reading-surface" hidden={viewTab !== 'document'}>
             <MinutesContentCard content={content} snapshot={document} trackedItems={content.schemaVersion === 2 ? undefined : minutes.items}
+              attachments={viewingAttachments} resolveAttachmentUrl={resolveAttachmentUrl}
               document={{
                 title: minutes.meetingTitle ?? meeting?.title,
                 minutesNo: minutes.minutesNo,

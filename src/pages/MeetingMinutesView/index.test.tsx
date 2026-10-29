@@ -7,11 +7,11 @@
  *   2. 正文取的是该批次快照，不是纪要当前版本；
  *   3. 页面上不能出现手机号、投递明细、webhook 等内部信息（链接可能被转发）。
  */
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MeetingMinutesView from './index'
-import i18n from '@/i18n'
+import i18n, { LANGUAGE_STORAGE_KEY } from '@/i18n'
 
 const fetchMinutesPage = vi.fn()
 
@@ -58,7 +58,41 @@ function openPage(token = 'abc') {
 describe('紀要免登查看頁', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
+    localStorage.removeItem(LANGUAGE_STORAGE_KEY)
     await i18n.changeLanguage('zh-TW')
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    localStorage.removeItem(LANGUAGE_STORAGE_KEY)
+  })
+
+  it('defaults to Chinese and uses a minutes-specific title even while loading', async () => {
+    await i18n.changeLanguage('en')
+    fetchMinutesPage.mockReturnValue(new Promise(() => {}))
+    document.title = 'MFTB Group Portal'
+    const page = openPage()
+    await screen.findByText('會議紀要')
+    expect(document.title).toBe('會議紀要')
+    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBeNull()
+    page.unmount()
+    expect(document.title).toBe('MFTB Group Portal')
+  })
+
+  it('supports English, Chinese, and opening the current minutes link in a browser', async () => {
+    fetchMinutesPage.mockResolvedValue(VIEW)
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, 'en')
+    await i18n.changeLanguage('en')
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    openPage()
+    await screen.findByText('Recorder')
+    expect(document.title).toBe('Meeting minutes')
+    fireEvent.click(screen.getByRole('button', { name: /Open in browser/ }))
+    expect(open).toHaveBeenCalledWith(window.location.href, '_blank', 'noopener')
+    fireEvent.click(screen.getByRole('radio', { name: '中文' }))
+    await screen.findByText('記錄人')
+    expect(document.title).toBe('會議紀要')
+    expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('zh-TW')
   })
 
   it('渲染批次快照正文与发送信息，不含手机号等内部字段', async () => {
@@ -85,6 +119,7 @@ describe('紀要免登查看頁', () => {
     openPage('expired')
     await waitFor(() => expect(screen.getByText('查看連結不可用')).toBeInTheDocument())
     expect(screen.getByText('連結已過期或已被記錄人作廢')).toBeInTheDocument()
+    expect(document.title).toBe('會議紀要')
   })
 
   it('接口异常时用页面自己的错误态承接，不依赖后台全局 message', async () => {
@@ -109,5 +144,28 @@ describe('紀要免登查看頁', () => {
     )
     await waitFor(() => expect(screen.getByText('缺少查看令牌，請從釘釘卡片重新進入')).toBeInTheDocument())
     expect(fetchMinutesPage).not.toHaveBeenCalled()
+  })
+
+  it('本批快照带附件时展示附件区，查看/下载地址复用页面令牌', async () => {
+    fetchMinutesPage.mockResolvedValue({
+      ...VIEW,
+      attachments: [
+        { attachmentNo: 'a'.repeat(32), fileName: '白板.png', mimeType: 'image/png', sizeBytes: 2048, previewKind: 'image' },
+        { attachmentNo: 'b'.repeat(32), fileName: '資料.pdf', mimeType: 'application/pdf', sizeBytes: 4096, previewKind: 'pdf' },
+      ],
+    })
+    openPage('abc')
+    await screen.findByRole('listitem', { name: '白板.png' })
+    const download = screen.getByRole('button', { name: '下載 資料.pdf' })
+    expect(download).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '查看 白板.png' }))
+    await waitFor(() => expect(document.querySelector('.ant-image-preview-img')).not.toBeNull())
+    // 图片预览地址同样必须带页面令牌：附件不能匿名裸读
+    const previewSrc = (document.querySelector('.ant-image-preview-img') as HTMLImageElement).src
+    expect(previewSrc).toContain(`attachmentNo=${'a'.repeat(32)}`)
+    expect(previewSrc).toContain('token=abc')
+    expect(previewSrc).toContain('purpose=view')
+    // 转发风险口径不变：页面不得出现对象键/存储路径
+    expect(document.body.textContent).not.toMatch(/object_key|meeting-minutes\/attachments\//)
   })
 })

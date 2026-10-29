@@ -30,6 +30,18 @@ public class MeetingMinutesDocument {
     private String changeNote;
     private MeetingMinutesContent content;
     private List<Reference> references = new ArrayList<>();
+    /** 附件元数据随发布定格：历史版本永远能说明“当时发的是哪几个文件、叫什么名、多大”。 */
+    private List<AttachmentRef> attachments = new ArrayList<>();
+
+    /** 附件引用快照：只存展示字段，对象键/凭据不进文档；文件本体按 attachmentNo 受控读取。 */
+    @Data
+    public static class AttachmentRef {
+        private String attachmentNo;
+        private String fileName;
+        private String mimeType;
+        private Long sizeBytes;
+        private String previewKind;
+    }
 
     /** 来源信息同样冻结；公开页只展示引用，不以当前文档的令牌授权来源全文。 */
     @Data

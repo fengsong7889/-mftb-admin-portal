@@ -11,9 +11,10 @@ import { Button } from 'antd'
 import { FileTextOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
-import { minutesPurposeText, type MinutesAction, type MinutesAttendance, type MinutesContent, type MinutesDocument, type MinutesItemView } from '@/api/meetingMinutes'
+import { minutesPurposeText, type MinutesAction, type MinutesAttachmentVO, type MinutesAttendance, type MinutesContent, type MinutesDocument, type MinutesItemView } from '@/api/meetingMinutes'
 import GroupLogo from '@/components/GroupLogo'
 import { bizTypeLabels } from '../meetingMeta'
+import { MinutesAttachmentList, type AttachmentUrlResolver } from './MinutesAttachments'
 import './minutes.css'
 
 /** 仅承载展示信息；正式发布快照接入前，不用编辑锁版本冒充文档版本。 */
@@ -36,6 +37,10 @@ interface DocumentInfo {
 interface Props {
   content: MinutesContent
   snapshot?: MinutesDocument
+  /** 服务端回传的附件元数据（正文/快照引用的那一组）；不传或空则不渲染附件区 */
+  attachments?: MinutesAttachmentVO[]
+  /** 附件地址解析：站内用票据，免登页用页面自带令牌；不传则只展示不可操作（发送预览） */
+  resolveAttachmentUrl?: AttachmentUrlResolver
   /** 紧凑模式（弹窗内摘要）：去掉模块标题的留白，只留内容 */
   compact?: boolean
   /**
@@ -108,7 +113,7 @@ function AttendanceNames({ people }: { people: MinutesAttendance[] }) {
   })}</div>
 }
 
-export default function MinutesContentCard({ content: suppliedContent, compact, hideTracked, document: suppliedInfo, snapshot, trackedItems, followUpDetails, references: suppliedReferences, people = [] }: Props) {
+export default function MinutesContentCard({ content: suppliedContent, attachments, resolveAttachmentUrl, compact, hideTracked, document: suppliedInfo, snapshot, trackedItems, followUpDetails, references: suppliedReferences, people = [] }: Props) {
   const { t } = useTranslation()
   const content = snapshot?.content ?? suppliedContent
   const purpose = minutesPurposeText(content)
@@ -280,11 +285,11 @@ export default function MinutesContentCard({ content: suppliedContent, compact, 
         </div>
       )}
 
-      {(content.nextMeetingAt || content.nextMeetingNote || content.remark?.trim() || references) && (
+      {(content.nextMeetingAt || content.nextMeetingNote || content.remark?.trim() || references || attachments?.length) && (
         <Section title={t('meeting.minutes.publicationText.nextStepsAndReferences')} number="05">
           {(content.nextMeetingAt || content.nextMeetingNote) && <div className="mm-document__body"><span className="mm-document__label">{t('meeting.minutes.sectionNext', { defaultValue: '下次會議' })}</span><p>{[content.nextMeetingAt, content.nextMeetingNote].filter(Boolean).join(' · ')}</p></div>}
           {references && <div className="mm-document__body"><span className="mm-document__label">{t('meeting.minutes.publicationText.relatedMinutes')}</span>{references}</div>}
-          {content.remark?.trim() && <div className="mm-document__body"><span className="mm-document__label">{t('meeting.minutes.sectionRemark', { defaultValue: '補充說明' })}</span><p>{content.remark}</p></div>}
+          {(content.remark?.trim() || attachments?.length) && <div className="mm-document__body"><span className="mm-document__label">{t('meeting.minutes.sectionRemark', { defaultValue: '補充說明' })}</span>{content.remark?.trim() && <p>{content.remark}</p>}{attachments?.length ? <MinutesAttachmentList attachments={attachments} resolveUrl={resolveAttachmentUrl} /> : null}</div>}
         </Section>
       )}
       {info?.footer && <footer className="mm-document__footer">{info.footer}</footer>}

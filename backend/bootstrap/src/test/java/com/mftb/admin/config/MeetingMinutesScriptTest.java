@@ -134,7 +134,8 @@ class MeetingMinutesScriptTest {
         List<String> expected = new java.util.ArrayList<>(TABLES);
         expected.addAll(TABLES_V2);
         expected.add(MeetingMinutesSchema.REVISION_TABLE);
-        assertEquals(expected.size(), contracts.size(), "契約數量必須與表數量一致（旧版七张 + 正式版本表）");
+        expected.add(MeetingMinutesSchema.ATTACHMENT_TABLE);
+        assertEquals(expected.size(), contracts.size(), "契約數量必須與表數量一致（旧版七张 + 正式版本表 + 附件表）");
         for (int index = 0; index < expected.size(); index++) {
             ContractSpec spec = contracts.get(index);
             assertEquals(expected.get(index), spec.table());
@@ -203,6 +204,35 @@ class MeetingMinutesScriptTest {
             assertEquals(addition.ddl(), column.addColumnDdl());
         }
         assertThrows(IllegalStateException.class, () -> MeetingMinutesSchema.addition("ALTER TABLE sys_user ADD COLUMN x INT"));
+    }
+
+    @Test
+    void attachmentSchemaAndReferenceAreIdenticalAndRegistered() throws Exception {
+        String sql = MeetingMinutesSchema.raw(MeetingMinutesSchema.SCRIPT_ATTACHMENTS);
+        assertEquals(sql, Files.readString(Path.of("sql", MeetingMinutesSchema.SCRIPT_ATTACHMENTS)));
+        MigrationEntry entry = MigrationCatalog.readAll().stream()
+                .filter(item -> MeetingMinutesSchemaMigrationInitializer.VERSION_ATTACHMENTS.equals(item.getVersionKey()))
+                .findFirst().orElseThrow();
+        assertTrue(entry.getDependencies().contains("meeting:minutes-publication:v2.0"),
+                "附件表外键指向纪要主表，必须晚于纪要底座执行");
+        assertEquals("meetingMinutesSchemaMigrationInitializer", entry.getExecutor());
+        assertNotNull(getClass().getClassLoader().getResource(MeetingMinutesSchema.SCRIPT_ATTACHMENTS));
+        String normalized = sql.replaceAll("\\s+", " ");
+        for (String required : List.of("CREATE TABLE IF NOT EXISTS biz_meeting_minutes_attachment",
+                "UNIQUE KEY uk_meeting_minutes_attachment_no", "UNIQUE KEY uk_meeting_minutes_attachment_object",
+                "UNIQUE KEY uk_meeting_minutes_attachment_request",
+                "ck_meeting_minutes_attachment_size CHECK (size_bytes > 0 AND size_bytes <= 10485760)",
+                "ck_meeting_minutes_attachment_status CHECK (status IN (1, 2, 3))")) {
+            assertTrue(normalized.contains(required), required);
+        }
+        String executable = sql.replaceAll("(?m)^\\s*--.*$", "").toUpperCase();
+        for (String forbidden : List.of("DROP ", "TRUNCATE ", "DELETE FROM")) {
+            assertFalse(executable.contains(forbidden), forbidden);
+        }
+        // 二进制不得入库：附件表只允许元数据列，出现大字段类型就是写错了方向
+        for (String banned : List.of("BLOB", "MEDIUMTEXT", "LONGTEXT")) {
+            assertFalse(executable.contains(banned), "附件内容禁止入 MySQL，出现了大字段列: " + banned);
+        }
     }
 
     @Test

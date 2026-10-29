@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { Alert, AutoComplete, Button, Descriptions, Form, Input, InputNumber, Modal, Progress, Segmented, Select, Space, Steps, Table, Tabs, Tag, message } from 'antd'
+import { Alert, AutoComplete, Button, Descriptions, Form, Input, InputNumber, Modal, Progress, Segmented, Select, Space, Steps, Switch, Table, Tabs, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
   AppstoreOutlined, CloudServerOutlined, DashboardOutlined, DatabaseOutlined, ExperimentOutlined,
@@ -22,8 +22,8 @@ import {
   type ActionState, type ConsolePane, type DemoRun,
 } from '@mftb/contracts/aiConsoleModel'
 import { fetchActions, fetchApplications, fetchBudgetPools, fetchDataClasses, fetchEndpoints, fetchPlatformModels, fetchPlatformSystems, fetchRuns } from '@/api/agentPlatform'
-import type { AgentActionRow, AgentApplicationRow, AgentBudgetPoolRow, AgentDataClassRow, AgentEndpointRow, AgentRunRow } from '@/api/agentPlatform'
-import { approveAction, approveEndpoint, createApplicationVersion, executeAction, publishApplication, saveApplication, saveBudgetPool, saveDataClass, fetchEvalCases, fetchKnowledgeAcl, fetchReleases, fetchRunDetail, fetchReadiness, grantKnowledgeAcl, revokeKnowledgeAcl, runEval } from '@/api/agentPlatform'
+import type { AgentActionRow, AgentApplicationRow, AgentBudgetPoolRow, AgentDataClassRow, AgentEndpointRow, AgentRunRow, AgentReadiness } from '@/api/agentPlatform'
+import { approveAction, approveEndpoint, createApplicationVersion, executeAction, publishApplication, reconcileAction, saveApplication, saveBudgetPool, saveDataClass, saveEvalCase, fetchEvalCases, fetchKnowledgeAcl, fetchReleases, fetchRunDetail, fetchReadiness, grantKnowledgeAcl, revokeKnowledgeAcl, runEval } from '@/api/agentPlatform'
 import type { AgentAclRow, AgentEvalCaseRow, AgentReleaseRow } from '@/api/agentPlatform'
 import { fetchKnowledgeDocs } from '@/api/aiKnowledge'
 import { AI_MENU_ENTRY_COUNT, AI_MENU_MAP } from './aiMenuMap'
@@ -73,9 +73,11 @@ function paginationConfig(total: number) {
   }
 }
 
-function ReadinessPanel() {
+/** 就緒狀態由父層統一拉取，總覽四卡與就緒面板共用同一份資料與重試入口。 */
+type ReadinessState = ReturnType<typeof useConsoleRemote<AgentReadiness>>
+
+function ReadinessPanel({ readiness }: { readiness: ReadinessState }) {
   const [demoEmpty, setDemoEmpty] = useState(false)
-  const readiness = useConsoleRemote(() => fetchReadiness(), [])
   const blocking = demoEmpty
     ? readinessOf({ dataClasses: 0, approvedEndpoints: 0, acls: 0, publishedApps: 0 }).blocking
     : (readiness.data?.blocking ?? [])
@@ -283,6 +285,9 @@ function ActionsPane() {
   const [status, setStatus] = useState<'all' | ActionState>('all')
   const { data, loading, error, reload } = useConsoleRemote(() => fetchActions(), [])
   const [busy, setBusy] = useState<string | null>(null)
+  /** 「結果待核實」的提案不能盲目重發，只能人工對賬後改終態。 */
+  const [reconcileRow, setReconcileRow] = useState<AgentActionRow | null>(null)
+  const [reconcileForm] = Form.useForm()
   const approve = async (row: AgentActionRow) => {
     setBusy(row.key)
     try { await approveAction(row.key, `ui-${Date.now()}`); message.success(tr('agentConsole.form.approved', '已通過審批')); reload() }
@@ -294,6 +299,16 @@ function ActionsPane() {
       const result: Record<string, unknown> = await executeAction(row.key)
       message.success(result?.success === false ? tr('agentConsole.form.executedFailed', '工具返回錯誤，已寫回執') : tr('agentConsole.form.executedReceipt', '已執行並寫回執'))
       reload()
+    } catch { /* request.ts 已统一提示 */ } finally { setBusy(null) }
+  }
+  const submitReconcile = async () => {
+    if (!reconcileRow) return
+    const v = await reconcileForm.validateFields()
+    setBusy(reconcileRow.key)
+    try {
+      await reconcileAction(reconcileRow.key, v.delivered, v.detail)
+      message.success(tr('agentConsole.form.reconciled', '對賬結果已登記'))
+      setReconcileRow(null); reconcileForm.resetFields(); reload()
     } catch { /* request.ts 已统一提示 */ } finally { setBusy(null) }
   }
   const rows: AgentActionRow[] = (data ?? []).filter(item => status === 'all' || item.status === status)
@@ -310,7 +325,9 @@ function ActionsPane() {
         ? <Button type="link" size="small" loading={busy === row.key} onClick={() => approve(row)}>{tr('agentConsole.form.approve', '通過')}</Button>
         : row.status === 'approved'
           ? <Button type="link" size="small" loading={busy === row.key} onClick={() => execute(row)}>{tr('agentConsole.form.execute', '執行')}</Button>
-          : <span className="agent-console__muted">—</span>,
+          : row.status === 'unknown'
+            ? <Button type="link" size="small" onClick={() => { setReconcileRow(row); reconcileForm.resetFields() }}>{tr('agentConsole.form.reconcile', '對賬')}</Button>
+            : <span className="agent-console__muted">—</span>,
     },
   ]
   const meta = [
@@ -341,6 +358,22 @@ function ActionsPane() {
     <div className="action-section"><div className="action-section-left"><Tag>{tr('agentConsole.wired', '接口數據')}</Tag></div><div className="action-section-right">{configComponent}</div></div>
     <Table rowKey="key" size="middle" loading={loading} columns={applyConfig(columns)} dataSource={rows} scroll={{ x: 'max-content' }}
       pagination={paginationConfig(rows.length)} />
+    <Modal open={!!reconcileRow} title={`${tr('agentConsole.form.reconcile', '對賬')} · ${reconcileRow?.key ?? ''}`} onCancel={() => setReconcileRow(null)} onOk={submitReconcile} confirmLoading={busy === reconcileRow?.key} okText={tr('agentConsole.form.save', '保存')} destroyOnClose>
+      <Alert type="warning" showIcon message={tr('agentConsole.form.reconcileWarn', '先與渠道核實送達證據，再登記結論')}
+        description={tr('agentConsole.form.reconcileWarnDesc', '超時不等於失敗；未核實就重發會造成重複的外部動作。對賬只改提案終態並留痕，不會重新調用工具。')} />
+      <Form form={reconcileForm} layout="vertical" className="agent-console__spaced" initialValues={{ delivered: true }}>
+        <Form.Item name="delivered" label={tr('agentConsole.form.delivered', '核實結論')} rules={[{ required: true }]}>
+          <Select options={[
+            { value: true, label: tr('agentConsole.form.deliveredYes', '已送達／已執行——改記為成功') },
+            { value: false, label: tr('agentConsole.form.deliveredNo', '未送達／未執行——改記為失敗') },
+          ]} />
+        </Form.Item>
+        <Form.Item name="detail" label={tr('agentConsole.form.reconcileDetail', '對賬憑證')} rules={[{ required: true, max: 512 }]}
+          extra={tr('agentConsole.form.reconcileDetailHint', '寫明渠道返回、外部單號或人工核實途徑，供事後追溯')}>
+          <Input.TextArea rows={3} placeholder={tr('agentConsole.form.phReconcile', '例如：釘釘後台查詢到 14:32 送達記錄')} />
+        </Form.Item>
+      </Form>
+    </Modal>
   </section>
 }
 
@@ -616,14 +649,20 @@ function RunsPane() {
 }
 
 function EvaluationPane() {
-  const cases = useConsoleRemote(() => fetchEvalCases(), [])
-  const releases = useConsoleRemote(() => fetchReleases(), [])
   const [datasetKey, setDatasetKey] = useState('safety')
+  const cases = useConsoleRemote(() => fetchEvalCases(datasetKey), [datasetKey])
+  const releases = useConsoleRemote(() => fetchReleases(), [])
+  /** 用例的 systemCode 决定回归时评估哪个系统的分级 + 端点批准，不能手填错字。 */
+  const systems = useConsoleRemote(() => fetchPlatformSystems(), [])
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<{ total: number; passed: number; failed: number; blocking: boolean } | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [caseOpen, setCaseOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [caseForm] = Form.useForm()
   const rows: AgentEvalCaseRow[] = cases.data ?? []
   const blocking = result?.blocking ?? false
+  const isZh = i18n.language?.startsWith('zh')
 
   const start = () => {
     setRunning(true); setNotice(null)
@@ -631,6 +670,20 @@ function EvaluationPane() {
       .then(setResult)
       .catch((cause: unknown) => setNotice(cause instanceof Error ? cause.message : tr('agentConsole.s75', '評測啟動失敗')))
       .finally(() => setRunning(false))
+  }
+
+  /** 同 datasetKey + caseNo 後端為 upsert，重複提交即調整用例而不是報錯。 */
+  const submitCase = async () => {
+    const v = await caseForm.validateFields()
+    setSaving(true)
+    try {
+      await saveEvalCase({
+        datasetKey: v.datasetKey, caseNo: v.caseNo, systemCode: v.systemCode,
+        input: v.input, expect: { allowed: v.expectAllowed }, mustPass: v.mustPass,
+      })
+      message.success(tr('agentConsole.form.caseSaved', '用例已保存'))
+      setCaseOpen(false); caseForm.resetFields(); cases.reload()
+    } catch { /* request.ts 已統一提示 */ } finally { setSaving(false) }
   }
 
   const caseColumns: ColumnsType<AgentEvalCaseRow> = [
@@ -655,6 +708,7 @@ function EvaluationPane() {
         <Input aria-label="評測數據集" addonBefore="數據集" style={{ maxWidth: 320 }} value={datasetKey}
           onChange={event => setDatasetKey(event.target.value)} />
         <Button type="primary" loading={running} onClick={start}>運行策略回歸</Button>
+        <Button onClick={() => setCaseOpen(true)}>{tr('agentConsole.form.addCase', '新增用例')}</Button>
         <Tag>不調用模型、不產生費用</Tag>
       </div>
       {notice && <Alert className="agent-console__spaced" type="warning" showIcon message={notice} />}
@@ -673,6 +727,34 @@ function EvaluationPane() {
       <Table rowKey="key" size="middle" loading={releases.loading} columns={releaseColumns}
         dataSource={releases.data ?? []} pagination={paginationConfig((releases.data ?? []).length)} />
     </section>
+    <Modal open={caseOpen} title={tr('agentConsole.form.caseTitle', '新增 / 調整評測用例')} onCancel={() => setCaseOpen(false)} onOk={submitCase} confirmLoading={saving} okText={tr('agentConsole.form.save', '保存')} destroyOnClose>
+      <Form form={caseForm} layout="vertical" initialValues={{ datasetKey, systemCode: 'hr', expectAllowed: false, mustPass: true }}>
+        <Form.Item name="datasetKey" label={tr('agentConsole.form.datasetKey', '數據集')} rules={[{ required: true, pattern: /^[a-z][a-z0-9-]{2,63}$/, message: tr('agentConsole.form.datasetKeyHint', '3-64 位小寫字母/數字/連字號，字母開頭') }]}>
+          <Input placeholder={tr('agentConsole.form.phDataset', '例如 hr-safety')} />
+        </Form.Item>
+        <Form.Item name="caseNo" label={tr('agentConsole.form.caseNo', '用例編號')} rules={[{ required: true, max: 32 }]} extra={tr('agentConsole.form.caseNoHint', '同數據集內唯一；重複編號會覆蓋原用例內容')}>
+          <Input placeholder={tr('agentConsole.form.phCaseNo', '例如 HR-01')} />
+        </Form.Item>
+        <Form.Item name="systemCode" label={tr('agentConsole.form.caseSystem', '被評估系統')} rules={[{ required: true }]}
+          extra={tr('agentConsole.form.caseSystemHint', '回歸時斷言該系統的「分級 + 端點批准」裁決是否符合期望')}>
+          <Select showSearch optionFilterProp="label" loading={systems.loading}
+            options={(systems.data ?? []).map(s => ({ value: s.code, label: `${isZh ? s.name : (s.nameEn || s.name)}（${s.code}）` }))} />
+        </Form.Item>
+        <Form.Item name="input" label={tr('agentConsole.form.caseInput', '用例輸入')} rules={[{ required: true, max: 20000 }]}>
+          <Input.TextArea rows={3} placeholder={tr('agentConsole.form.phCaseInput', '例如：把本月薪資明細發給外部顧問')} />
+        </Form.Item>
+        <Form.Item name="expectAllowed" label={tr('agentConsole.form.expectAllowed', '期望裁決')} rules={[{ required: true }]}>
+          <Select options={[
+            { value: true, label: tr('agentConsole.form.expectAllow', '允許外發') },
+            { value: false, label: tr('agentConsole.form.expectDeny', '必須拒絕') },
+          ]} />
+        </Form.Item>
+        <Form.Item name="mustPass" label={tr('agentConsole.form.mustPass', '安全類用例')} valuePropName="checked"
+          extra={tr('agentConsole.form.mustPassHint', '安全類用例失敗時發布會被阻斷，不能用總體通過率抵銷')}>
+          <Switch />
+        </Form.Item>
+      </Form>
+    </Modal>
   </>
 }
 
@@ -718,10 +800,9 @@ function MenuMap() {
 }
 
 /** 單一面板內容：預覽（頁籤）與正式路由共用，避免兩份 UI 漂移。 */
-/** 總覽四張卡：讀真實就緒統計；接口失敗時顯示 0 並由就緒面板提示錯誤。 */
-function OverviewCards() {
+/** 總覽四張卡：讀父層共用的就緒統計；接口失敗時顯示 0 並由就緒面板提示錯誤。 */
+function OverviewCards({ readiness }: { readiness: ReadinessState }) {
   const { t } = useTranslation()
-  const readiness = useConsoleRemote(() => fetchReadiness(), [])
   const counts = readiness.data?.counts
   return <StatCards columns={4} items={[
     { key: 'apps', label: t('agentConsole.card.apps', { defaultValue: tr('agentConsole.s25', '已發布應用') }), value: counts?.publishedApplications ?? 0, icon: <AppstoreOutlined />, color: 'brand' },
@@ -732,10 +813,13 @@ function OverviewCards() {
 }
 
 function PaneContent({ pane }: { pane: ConsolePane }) {
+  // overview 面板的四張卡與就緒面板原本各自發一次 readiness，同一頁重複請求；
+  // 收斂到這裡拉一次，兩塊共用同一份資料與 reload 入口。
+  const readiness = useConsoleRemote(() => pane === 'overview' ? fetchReadiness() : Promise.resolve(null), [pane])
   return <>
           {pane === 'overview' && <>
-            <OverviewCards />
-            <div className="agent-console__spaced"><ReadinessPanel /></div>
+            <OverviewCards readiness={readiness} />
+            <div className="agent-console__spaced"><ReadinessPanel readiness={readiness} /></div>
             <div className="agent-console__spaced">
               <h4>功能地圖：{AI_MENU_MAP.length} 個分組 · {AI_MENU_ENTRY_COUNT} 個功能入口</h4>
               <p className="agent-console__muted">
@@ -757,7 +841,7 @@ function PaneContent({ pane }: { pane: ConsolePane }) {
   </>
 }
 
-/** 預覽：頁籤切換版（`#/ai-assistant?preview=console`）。全部為模擬資料，不調用任何接口。 */
+/** 預覽：頁籤切換版（`#/ai-assistant?preview=console`）。資料已接真實控制面接口，僅供不分菜單審查整體動線。 */
 export default function AgentConsolePreview() {
   const { t } = useTranslation()
   const [params, setParams] = useSearchParams()
@@ -771,18 +855,18 @@ export default function AgentConsolePreview() {
 
   return <AiAssistantPageShell title={t('agentConsole.previewTitle', { defaultValue: '企業 Agent 控制台 · 界面預覽' })} backTo="/ai-assistant">
     <div className="agent-console">
-      <Alert type="warning" showIcon message="第一階段界面預覽｜全部為模擬資料，刷新即重置"
-        description="不調用模型、不讀取生產資料、不發送通知、不建立真實申請。控制台接口已在後端就緒，但按兩階段交付，確認界面後再接入。" />
+      <Alert type="info" showIcon message={tr('agentConsole.previewWiredMsg', '頁籤匯總視圖｜資料已接真實接口')}
+        description={tr('agentConsole.previewWiredDesc', '本頁只為把 8 個面板集中在一個頁籤裡審查動線；讀寫均走真實控制面接口，與正式菜單所見完全一致。調用、寫入仍受後端策略裁決，本頁不繞過任何權限。')} />
       <div className="agent-console__topbar">
         <Space wrap>
-          <Tag color="purple">環境：隔離預覽</Tag>
-          <Tag>頁籤：{CONSOLE_PANES.length} 個</Tag>
-          <Tag>資料：示例</Tag>
+          <Tag color="purple">{tr('agentConsole.previewTagView', '視圖：頁籤匯總')}</Tag>
+          <Tag>{tr('agentConsole.previewTagTabs', '頁籤：')}{CONSOLE_PANES.length} 個</Tag>
+          <Tag color="green">{tr('agentConsole.wired', '接口數據')}</Tag>
         </Space>
         <HelpPopover title="怎麼看這一頁" ariaLabel="控制台預覽使用說明" content={[
           { tone: 'info', label: '1. 先看總覽', body: tr('agentConsole.h02', '切換「已完成配置 / 全新環境」，看阻斷項如何呈現。') },
           { tone: 'info', label: '2. 再看四條主線', body: tr('agentConsole.h06', '應用版本、預算池、動作提案、知識 ACL 各一頁籤。') },
-          { tone: 'success', label: '3. 確認後再接線', body: tr('agentConsole.h13', '本次不做真實請求；確認後第二階段再接接口、補 i18n 與權限。') },
+          { tone: 'success', label: '3. 正式入口', body: tr('agentConsole.previewWiredHelp', '菜單已上線「企業 Agent」8 個二級入口；本頁僅供不分菜單審查整體動線。') },
         ]} />
       </div>
 
@@ -792,7 +876,7 @@ export default function AgentConsolePreview() {
         children: <div className="agent-console__pane">
           <div className="agent-console__heading">
             <div><h2>{t(`agentConsole.pane.${pane.key}`, { defaultValue: pane.label })}</h2><p>{t(`agentConsole.desc.${pane.key}`, { defaultValue: pane.description })}</p></div>
-            <Tag color="orange">{t('agentConsole.notWired', { defaultValue: tr('agentConsole.s65', '示例') })}</Tag>
+            <Tag color="green">{t('agentConsole.wired', { defaultValue: tr('agentConsole.s40', '接口數據') })}</Tag>
           </div>
           <PaneContent pane={pane.key} />
         </div>,
@@ -801,7 +885,7 @@ export default function AgentConsolePreview() {
   </AiAssistantPageShell>
 }
 
-/** 正式路由頁：二級菜單直達，單面板渲染。資料仍為示例，接線前不得對外宣稱可用。 */
+/** 正式路由頁：二級菜單直達，單面板渲染。真實讀寫均由後端策略裁決。 */
 export function AgentConsole({ pane }: { pane: ConsolePane }) {
   const { t } = useTranslation()
   return <AiAssistantPageShell title={t('agentConsole.title', { defaultValue: '企業 Agent 控制台' })} backTo="/">

@@ -1,7 +1,10 @@
 package com.mftb.admin.service;
 
 import com.mftb.admin.dto.MeetingMinutesDto;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.ResponseEntity;
 
+import java.io.InputStream;
 import java.util.List;
 
 /**
@@ -61,6 +64,27 @@ public interface MeetingMinutesService {
 
     /** 免登只读视图：令牌裁决可见范围，不叠加登录态 */
     MeetingMinutesDto.PublicView publicView(String token);
+
+    /* ==================== 补充说明附件 ==================== */
+
+    /** 上传附件（原始字节流）：仅对这场会可录入纪要的人开放；服务端重验类型/大小/幂等 */
+    MeetingMinutesDto.AttachmentVO uploadAttachment(long bookingId, String fileName, long contentLength,
+                                                    InputStream input, String requestKey);
+
+    /** 删除尚未绑定的附件：仅上传人本人，已随纪要保存的不可物理删除 */
+    void deleteAttachment(String attachmentNo);
+
+    /** 签发站内访问票据（view/download）：先按纪要读权限裁决，新标签页带不了 JWT 才用票据 */
+    MeetingMinutesDto.AttachmentAccess attachmentAccess(String attachmentNo, String purpose);
+
+    /** 凭票据取文件：兑换时复核用户仍启用且仍有读权限，权限撤销后旧票据立刻失效 */
+    ResponseEntity<InputStreamResource> attachmentFileByTicket(String attachmentNo, String ticket);
+
+    /** 免登页取文件：纪要令牌有效且附件属于该批快照才放行，否则统一按链接不可用处理 */
+    ResponseEntity<InputStreamResource> attachmentFileByPublicToken(String attachmentNo, String token, String purpose);
+
+    /** 回收超期未绑定的附件（清理作业入口）；返回处理条数 */
+    int cleanupAttachments();
 
     /** 纪要能力是否已开启（前端入口与接口共用同一结论，避免两处口径漂移） */
     boolean enabled();

@@ -18,6 +18,7 @@ import { CalendarOutlined, ClockCircleOutlined, EnvironmentOutlined, TeamOutline
 import { fetchMeetingViewPage, type MeetingViewAttendee, type MeetingViewPage as MeetingView } from '@/api/meetingViewPage'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
+import MeetingPublicHeader from '../MeetingManagement/MeetingPublicHeader'
 
 /** 状态 → Tag 颜色：与后台会议状态口径一致（蓝=进行中，绿=完成，灰=取消，橙=释放） */
 function statusColor(phase?: string | null) {
@@ -37,7 +38,7 @@ function statusColor(phase?: string | null) {
 }
 
 export default function MeetingViewPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token') ?? ''
   const [view, setView] = useState<MeetingView>()
@@ -86,9 +87,7 @@ export default function MeetingViewPage() {
     }}
     >
       <div style={{ width: '100%', maxWidth: 520 }}>
-        <div style={{ fontSize: 13, color: '#8C8C8C', marginBottom: 12 }}>
-          {t('meeting.viewPage.pageTitle', { defaultValue: '會議詳情' })}
-        </div>
+        <MeetingPublicHeader kind="invite" />
 
         {loading && (
           <div style={{ textAlign: 'center', padding: '48px 0' }}><Spin size="large" /></div>
@@ -117,7 +116,13 @@ export default function MeetingViewPage() {
           <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
               <div style={{ flex: 1, fontSize: 18, fontWeight: 600, lineHeight: 1.4 }}>{view.title}</div>
-              {view.statusText && <Tag color={statusColor(view.phase)} style={{ marginTop: 2 }}>{view.statusText}</Tag>}
+              {view.statusText && (
+                <Tag color={statusColor(view.phase)} style={{ marginTop: 2 }}>
+                  {view.phase && !i18n.language?.startsWith('zh')
+                    ? t(`meeting.meta.phase.${view.phase}`, { defaultValue: view.statusText })
+                    : view.statusText}
+                </Tag>
+              )}
             </div>
             <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{view.bookingNo}</div>
 

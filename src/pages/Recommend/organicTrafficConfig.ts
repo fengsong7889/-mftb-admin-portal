@@ -214,6 +214,72 @@ export const REGION_COLORS: Record<RegionKey, { primary: string; bg: string; bor
   TAIPA: { primary: '#722ED1', bg: '#F9F0FF', border: '#D3ADF7' },
 }
 
+/** 流量均衡订单类型（前端展示枚举；第二阶段后端不信任此值，重验） */
+export const TRAFFIC_BALANCE_ORDER_TYPES = ['DELIVERY', 'PICKUP'] as const
+export type TrafficBalanceOrderType = typeof TRAFFIC_BALANCE_ORDER_TYPES[number]
+
+/** 流量均衡单档梯度：订单量上界（null=待运营校准）→ 非负固定加分 */
+export interface TrafficBalanceBand {
+  maxOrders: number | null
+  score: number | null
+}
+
+/** 流量均衡合并配置（PLT_03）：统计口径 + 排除商家 + 区域梯度 */
+export interface TrafficBalanceConfig {
+  statDays: number
+  refreshMinutes: number
+  orderTypes: TrafficBalanceOrderType[]
+  includeRefunded: boolean
+  excludedStoreCodes: string[]
+  regions: Record<RegionKey, TrafficBalanceBand[]>
+}
+
+const trafficBalanceDefaultBands = (): TrafficBalanceBand[] => [80, 60, 50, 30].map(score => ({ maxOrders: null, score }))
+
+/** 默认配置：旧规则统计窗口不同，不套用旧门槛；订单量上界留空由运营按新口径校准 */
+export const DEFAULT_TRAFFIC_BALANCE_CONFIG: TrafficBalanceConfig = {
+  statDays: 7,
+  refreshMinutes: 60,
+  orderTypes: ['DELIVERY', 'PICKUP'],
+  includeRefunded: false,
+  excludedStoreCodes: [],
+  regions: { MACAU: trafficBalanceDefaultBands(), TAIPA: trafficBalanceDefaultBands() },
+}
+
+/** 归一化后端 traffic_balance_config（字符串或对象）：过滤非法值，缺失字段回退默认 */
+export function normalizeTrafficBalanceConfig(raw?: string | TrafficBalanceConfig | null): TrafficBalanceConfig {
+  const base = structuredClone(DEFAULT_TRAFFIC_BALANCE_CONFIG)
+  let parsed: Partial<TrafficBalanceConfig> | null = null
+  if (typeof raw === 'string') {
+    try { parsed = JSON.parse(raw) as Partial<TrafficBalanceConfig> } catch { parsed = null }
+  } else if (raw && typeof raw === 'object') {
+    parsed = raw
+  }
+  if (!parsed) return base
+  const num = (v: unknown, fb: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fb)
+  const bool = (v: unknown, fb: boolean) => (typeof v === 'boolean' ? v : fb)
+  const strArr = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [])
+  const orderTypes = Array.isArray(parsed.orderTypes)
+    ? parsed.orderTypes.filter((x): x is TrafficBalanceOrderType => (TRAFFIC_BALANCE_ORDER_TYPES as readonly string[]).includes(x))
+    : base.orderTypes
+  const bands = (v: unknown): TrafficBalanceBand[] => {
+    if (!Array.isArray(v) || v.length === 0) return base.regions.MACAU.map(b => ({ ...b }))
+    return v.map(item => ({
+      maxOrders: item && typeof item.maxOrders === 'number' && Number.isFinite(item.maxOrders) ? item.maxOrders : null,
+      score: item && typeof item.score === 'number' && Number.isFinite(item.score) ? item.score : null,
+    }))
+  }
+  const regions = (parsed.regions ?? {}) as Partial<Record<RegionKey, TrafficBalanceBand[]>>
+  return {
+    statDays: num(parsed.statDays, base.statDays),
+    refreshMinutes: num(parsed.refreshMinutes, base.refreshMinutes),
+    orderTypes: orderTypes.length ? orderTypes : base.orderTypes,
+    includeRefunded: bool(parsed.includeRefunded, base.includeRefunded),
+    excludedStoreCodes: strArr(parsed.excludedStoreCodes),
+    regions: { MACAU: bands(regions.MACAU), TAIPA: bands(regions.TAIPA) },
+  }
+}
+
 /** 條件計分子項（一組條件描述 → 分值；部分規則用 condition 存語義標記，如準時率檔位） */
 export interface ScoreConditionItem {
   /** 條件描述/語義標記（如「報名免運費活動」、`ontime_rate`） */
@@ -222,6 +288,10 @@ export interface ScoreConditionItem {
   score: number
   /** 門檻百分比（0～100）：出餐準時率梯度檔位使用，其他規則不填 */
   rate?: number
+  /** 店鋪綜合分下界（以星級勾選，0.5～5，步長 0.5）：店鋪綜合分梯度檔位（STB_03）使用，其他規則不填 */
+  star?: number
+  /** 最少統計單數（納入計算的樣本量門檻）：訂單取消率（STB_08）使用，其他規則不填 */
+  minOrders?: number
 }
 
 /**
@@ -280,6 +350,107 @@ export function toOntimeRateConditionItems(bands: OntimeRateBand[]): ScoreCondit
     .map(band => ({ condition: ONTIME_RATE_CONDITION, rate: band.rate, score: band.score }))
 }
 
+/**
+ * 店鋪綜合分檔位（STB_03）：分數下界 → 固定加分。
+ * 分數由業務系統實時傳遞，本項不做週期統計、以最新傳入值為準；換算口徑固定 1 星 = 1 分且支持半星，
+ * 因此界面上用星星勾選下界、無需另設換算表。
+ * 按分數從高到低匹配，命中一檔即停、分數不累加；低於最低檔不加分。
+ */
+export interface StarTierBand {
+  /** 店鋪綜合分下界（以星級勾選，0.5～5，步長 0.5） */
+  star: number
+  /** 該檔固定加分 */
+  score: number
+}
+
+/** 店鋪綜合分梯度檔位在 conditionItems 裡的 condition 標記（與後端遷移寫回的標記一致） */
+export const STAR_TIER_CONDITION = 'star_tier'
+
+/** 星星個數（勾選滿分上限，1 星 = 1 分） */
+export const STAR_TIER_MAX = 5
+/** 檔位步長：支持半星 0.5 分 */
+export const STAR_TIER_STEP = 0.5
+
+/** 默認梯度：5 星拿滿分，逐檔遞減；低於 3 星不加分 */
+export const DEFAULT_STAR_TIER_BANDS: StarTierBand[] = [
+  { star: 5, score: 50 },
+  { star: 4.5, score: 40 },
+  { star: 4, score: 30 },
+  { star: 3.5, score: 15 },
+  { star: 3, score: 5 },
+]
+
+/**
+ * 從 conditionItems 讀出店鋪綜合分梯度：只認 condition='star_tier' 且帶合法 star 的項，
+ * 舊「按星級逐檔加減分」口徑會被過濾，調用方據空數組回退默認梯度。
+ */
+export function readStarTierBands(items?: Array<{ condition?: string; score?: number; star?: number }>): StarTierBand[] {
+  return (items || [])
+    .filter(item => item.condition === STAR_TIER_CONDITION
+      && typeof item.star === 'number' && Number.isFinite(item.star))
+    .map(item => ({ star: item.star as number, score: Number(item.score) || 0 }))
+    .sort((a, b) => b.star - a.star)
+}
+
+/** 梯度 → conditionItems（入庫前按分數下界降序收斂，保證匹配順序與界面展示一致） */
+export function toStarTierConditionItems(bands: StarTierBand[]): ScoreConditionItem[] {
+  return [...bands]
+    .sort((a, b) => b.star - a.star)
+    .map(band => ({ condition: STAR_TIER_CONDITION, star: band.star, score: band.score }))
+}
+
+/**
+ * 訂單取消率檔位（STB_08）：取消率上界（%）→ 固定加分。
+ * 只統計外賣單，自取單不納入；用戶取消與商家取消均計入取消率。
+ * 統計期內單量未達最低樣本門檻（minOrders）的商家不參與本項計分；
+ * 達門檻者按取消率從低到高匹配，命中一檔即停、分數不累加，高於最高檔不加分。
+ */
+export interface CancelRateBand {
+  /** 取消率上界（%，0～100）：取消率 ≤ 本值即命中該檔 */
+  maxRate: number
+  /** 該檔固定加分 */
+  score: number
+}
+
+/** 取消率檔位在 conditionItems 裡的 condition 標記 */
+export const CANCEL_RATE_CONDITION = 'cancel_rate_max'
+/** 樣本量門檻在 conditionItems 裡的 condition 標記（不計分，只攜帶 minOrders） */
+export const CANCEL_SAMPLE_CONDITION = 'cancel_min_orders'
+
+/** 默認樣本量門檻：統計期內不足 30 單不納入計算 */
+export const DEFAULT_CANCEL_MIN_ORDERS = 30
+
+/** 默認梯度：取消率越低加分越多，高於最高檔不加分 */
+export const DEFAULT_CANCEL_RATE_BANDS: CancelRateBand[] = [
+  { maxRate: 1, score: 30 },
+  { maxRate: 3, score: 20 },
+  { maxRate: 5, score: 10 },
+]
+
+/** 讀出取消率梯度（按上界升序，第一檔即最優惠檔）；非本口徑的舊項被過濾 */
+export function readCancelRateBands(items?: Array<{ condition?: string; score?: number; rate?: number }>): CancelRateBand[] {
+  return (items || [])
+    .filter(item => item.condition === CANCEL_RATE_CONDITION
+      && typeof item.rate === 'number' && Number.isFinite(item.rate))
+    .map(item => ({ maxRate: item.rate as number, score: Number(item.score) || 0 }))
+    .sort((a, b) => a.maxRate - b.maxRate)
+}
+
+/** 讀出樣本量門檻；未配置或舊數據無本標記時返回 undefined，由調用方回退默認值 */
+export function readCancelMinOrders(items?: Array<{ condition?: string; minOrders?: number }>): number | undefined {
+  const item = (items || []).find(i => i.condition === CANCEL_SAMPLE_CONDITION && typeof i.minOrders === 'number')
+  return item ? item.minOrders : undefined
+}
+
+/** 梯度 + 門檻 → conditionItems（按上界升序收斂，門檻固定放末位，保證匹配順序與界面一致） */
+export function toCancelRateConditionItems(bands: CancelRateBand[], minOrders?: number): ScoreConditionItem[] {
+  const items: ScoreConditionItem[] = [...bands]
+    .sort((a, b) => a.maxRate - b.maxRate)
+    .map(band => ({ condition: CANCEL_RATE_CONDITION, rate: band.maxRate, score: band.score }))
+  if (typeof minOrders === 'number') items.push({ condition: CANCEL_SAMPLE_CONDITION, minOrders, score: 0 })
+  return items
+}
+
 /** 該檔是否為系統過濾檔：以數據標記為準，前端常量作為種子/舊數據未收斂時的兜底 */
 export const isFilteredBusinessState = (item: { filtered?: boolean }, condItem?: { condition?: string }): boolean =>
   condItem?.condition === FILTERED_STATE_CONDITION || !!item.filtered
@@ -302,8 +473,8 @@ export type CouponScoreRuleId = typeof COUPON_SCORE_RULE_IDS[number]
 export const isCouponScoreRule = (id?: string): boolean =>
   !!id && (COUPON_SCORE_RULE_IDS as readonly string[]).includes(id)
 
-/** 已下架的計分項編碼：不再展示、不再作為新增模板（後端殘留數據由遷移清理） */
-export const RETIRED_ORGANIC_RULE_IDS: string[] = ['COM_09', 'STB_04']
+/** 已下架的計分項編碼：不再展示、不再作為新增模板（後端殘留數據由遷移清理）。PLT_04 已合并進流量均衡（PLT_03） */
+export const RETIRED_ORGANIC_RULE_IDS: string[] = ['COM_09', 'STB_04', 'STB_09', 'PLT_04']
 
 /** 品牌專屬計分項：所屬品牌命中該鍵時，對應編碼不展示（如 MFOOD 無平台官方神券） */
 export const BRAND_HIDDEN_ORGANIC_RULE_IDS: Partial<Record<AppType, string[]>> = {
@@ -511,7 +682,7 @@ export type FreeShippingScoreRuleId = typeof FREE_SHIPPING_SCORE_RULE_IDS[number
 export const isFreeShippingScoreRule = (id?: string): boolean =>
   !!id && (FREE_SHIPPING_SCORE_RULE_IDS as readonly string[]).includes(id)
 
-/** 報名計分的後端前提條件值：存在即視為已報名（沿用既有 prerequisites 字段，報名即給分不可關閉） */
+/** 報名計分的後端前提條件值：存在即視為已報名（沿用既有 prerequisites 字段；是否計分由面板 enrollmentEnabled 開關控制） */
 export const FREE_SHIPPING_ENROLLMENT_PREREQUISITE = '報名減免運費'
 
 /**
@@ -528,7 +699,9 @@ export interface FreeShippingThresholdBand {
 
 /** 減免運費計分配置：得分 = 報名分 + 門檻分（按生效活動的使用門檻查檔） */
 export interface FreeShippingScoreConfig {
-  /** 報名分：平台或商家自建活動最終只生效一個，報名即給分（不可關閉） */
+  /** 報名分開關：停用時報名分模組不計分（分值配置保留） */
+  enrollmentEnabled: boolean
+  /** 報名分：平台或商家自建活動最終只生效一個，報名即給分 */
   enrollmentScore: number
   /** 門檻計分模組開關：停用時該模組不計分 */
   thresholdEnabled: boolean
@@ -542,6 +715,7 @@ export interface FreeShippingScoreConfig {
 
 /** 默認檔位：0 元檔保底（無門檻活動），門檻越高分值越低；護欄默認跟隨末檔且超限停發報名分 */
 export const DEFAULT_FREE_SHIPPING_SCORE_CONFIG: FreeShippingScoreConfig = {
+  enrollmentEnabled: true,
   enrollmentScore: 20,
   thresholdEnabled: true,
   thresholdBands: [
@@ -581,6 +755,7 @@ export function normalizeFreeShippingScoreConfig(
   return {
     ...DEFAULT_FREE_SHIPPING_SCORE_CONFIG,
     ...raw,
+    enrollmentEnabled: raw?.enrollmentEnabled !== false,
     thresholdEnabled: raw?.thresholdEnabled !== false,
     thresholdBands: bands,
     guardThreshold: typeof raw?.guardThreshold === 'number' && Number.isFinite(raw.guardThreshold)
@@ -620,7 +795,7 @@ export function computeFreeShippingScore(cfg: FreeShippingScoreConfig, threshold
   const thresholdScore = cfg.thresholdEnabled ? band?.score ?? 0 : 0
   const limit = freeShippingGuardLimit(cfg)
   const guarded = limit !== undefined && usedThreshold > limit
-  const enrollmentScore = guarded && !cfg.enrollWhenGuarded ? 0 : cfg.enrollmentScore
+  const enrollmentScore = guarded && !cfg.enrollWhenGuarded ? 0 : cfg.enrollmentEnabled ? cfg.enrollmentScore : 0
   return { thresholdBand: band, thresholdScore, enrollmentScore, guarded, limit, total: enrollmentScore + thresholdScore }
 }
 
@@ -695,7 +870,9 @@ export interface MemberBonusTier {
 
 /** 平台會員紅包計分配置：得分 = 報名分 + 加碼分（按商家加碼金額查檔） */
 export interface MemberBonusScoreConfig {
-  /** 報名分：商家報名平台會員紅包即給分（不可關閉） */
+  /** 報名分開關：停用時報名分模組不計分（分值配置保留） */
+  enrollmentEnabled: boolean
+  /** 報名分：商家報名平台會員紅包即給分 */
   enrollmentScore: number
   /** 加碼梯度（按金額升序，命中即停） */
   bonusTiers: MemberBonusTier[]
@@ -703,6 +880,7 @@ export interface MemberBonusScoreConfig {
 
 /** 默認模板：報名分 + 四檔加碼梯度（僅示例，運營按實際預算調整） */
 export const DEFAULT_MEMBER_BONUS_SCORE_CONFIG: MemberBonusScoreConfig = {
+  enrollmentEnabled: true,
   enrollmentScore: 10,
   bonusTiers: [
     { amount: 5, score: 5 },
@@ -739,7 +917,8 @@ export function computeMemberBonusScore(cfg: MemberBonusScoreConfig, addAmount: 
     undefined,
   )
   const bonusScore = matchedTier?.score ?? 0
-  return { matchedTier, bonusScore, enrollmentScore: cfg.enrollmentScore, total: cfg.enrollmentScore + bonusScore }
+  const enrollmentScore = cfg.enrollmentEnabled ? cfg.enrollmentScore : 0
+  return { matchedTier, bonusScore, enrollmentScore, total: enrollmentScore + bonusScore }
 }
 
 /** 配置校驗：返回錯誤文案，null 表示通過 */
@@ -773,6 +952,7 @@ export function normalizeMemberBonusScoreConfig(raw: Partial<MemberBonusScoreCon
   return {
     ...DEFAULT_MEMBER_BONUS_SCORE_CONFIG,
     ...raw,
+    enrollmentEnabled: raw?.enrollmentEnabled !== false,
     bonusTiers: tiers,
     enrollmentScore: typeof raw?.enrollmentScore === 'number' && Number.isFinite(raw.enrollmentScore)
       ? raw.enrollmentScore
@@ -882,13 +1062,13 @@ export interface OrganicScoreRule {
   calcCycle?: CalcCycle
   /** 定時監控間隔小時數（僅 calcCycle=SCHEDULED 時使用，支持小數如 0.5） */
   calcIntervalHours?: number
-  /** 統計天數（出餐準時率 STB_05 使用：統計過去 N 天準時率，不含當天） */
+  /** 歷史基線天數（出餐準時率 STB_05 已不再配置：統計窗口由業務系統定時任務決定，本頁只配檔位與分值） */
   statDaysTotal?: number
   /** 近期對比天數（舊時間窗口對比規則遺留，STB_05 已不再使用） */
   statDaysRecent?: number
   /** 高峰時段定義（舊出餐速度規則遺留） */
   peakTimeRanges?: PeakTimeRange[]
-  /** 每單固定扣分（拒絕接單等按次計罰規則使用，正值存儲，顯示時加負號） */
+  /** 每單固定扣分（舊按次計罰口徑殘留：STB_06 已改為自動接單、STB_07 已改為出餐時長、STB_08 已改為訂單取消率梯度加分、STB_09 已下架，現已無規則使用，僅保留讀取兼容舊庫行） */
   deductionPerOrder?: number
   /** 衰减系数（距離衰減規則使用，每公里扣除的分數） */
   decayCoefficient?: number
@@ -902,6 +1082,8 @@ export interface OrganicScoreRule {
   freeShippingConfig?: FreeShippingScoreConfig
   /** 平台會員紅包計分配置（僅 COM_06 規則使用：報名分 + 加碼梯度） */
   memberBonusConfig?: MemberBonusScoreConfig
+  /** 流量均衡合併配置（僅 PLT_03 使用：統一商家扶持與訂單過熱調控，統計口徑 + 區域梯度） */
+  trafficBalanceConfig?: TrafficBalanceConfig
   status: ServiceStatus
   /** 系統內置項不可刪除，僅可啟用/停用與調整分值 */
   builtin: boolean
@@ -920,6 +1102,32 @@ export const DEFAULT_DIMENSION_WEIGHT: Record<ScoreDimension, number> = {
 
 /** 維度權重總和校驗值 */
 export const DIMENSION_WEIGHT_TOTAL = 100
+
+/**
+ * 自動接單加分（STB_06）默認分值：商家在店端開啟自動接單即得的一次性固定加分。
+ * 只作未播種環境的兌底，真實分值以規則行 score 為準並可在面板編輯。
+ */
+export const AUTO_ACCEPT_DEFAULT_SCORE = 50
+
+/**
+ * 出餐時長加分（STB_07）默認分值：開啟自動校正後的固定加分。
+ * 只作未播種環境的兌底，真實分值以規則行 score 為準並可在面板編輯。
+ */
+export const MEAL_TIME_DEFAULT_SCORE = 50
+
+/**
+ * 出餐时长（STB_07）「開啟自動校正」的开/关存储值：沿用既有 prerequisites 字段（与 COM_02 减免运费同先例）。
+ * 必须显式存两个值，而不是「非空=开、空=关」：loadConfig 对空值有「默认开启」兜底（为了未播种环境），
+ * 若「关」也存空，运营关掉开关保存后下次加载会被兜底重新打开，停用就永久存不住。
+ * ON 值必须与后端 OrganicScoreDataInitializer.STB07_AUTO_CORRECT_PREREQUISITE 一致，
+ * 否则迁移播种的行在界面会被读成「未开启」。
+ */
+export const MEAL_TIME_AUTO_CORRECT_ON = '開啟自動校正'
+export const MEAL_TIME_AUTO_CORRECT_OFF = '停用自動校正'
+
+/** 出餐时长自动校正是否开启：空值（未播种/旧按次计罚残留文案）按默认开启处理，仅显式停用值算关 */
+export const isMealTimeAutoCorrectEnabled = (prerequisites?: string): boolean =>
+  prerequisites !== MEAL_TIME_AUTO_CORRECT_OFF
 
 const { ENABLED, DISABLED: _DISABLED } = ServiceStatus
 
@@ -948,39 +1156,16 @@ export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
       // 休息打烊为系统过滤档：condition 固定 filtered、分值 0，与后端迁移写回的口径一致
       { condition: 'filtered', score: 0 },
     ] },
-  { id: 'STB_03', dimension: ScoreDimension.STORE, name: '評價得分', description: '統計天數內顧客評價星級計分，支持固定加扣分或動態倍率', mode: ScoreMode.CONDITIONAL, score: 0, statDays: 30, status: ENABLED, builtin: true, conditionItems: [
-    { condition: 'fixed_bonus', score: 50 },
-    { condition: 'fixed_bonus', score: 20 },
-    { condition: 'fixed_bonus', score: 0 },
-    { condition: 'fixed_deduction', score: 20 },
-    { condition: 'fixed_deduction', score: 50 },
-  ] },
-  { id: 'PLT_03', dimension: ScoreDimension.PLATFORM, name: '商家扶持', description: '按區域配置商家扶持：每個區域獨立設置前提條件、統計天數與梯度加分，屏蔽商家全局統一', mode: ScoreMode.TIERED, score: 0, status: ENABLED, builtin: true, blockedMerchants: [], regionConfigs: {
-    MACAU: { prerequisites: 'UNCONDITIONAL', statDays: 30, tiers: [
-      { threshold: 50, direction: TierDirection.LESS_THAN, score: 20 },
-    ] },
-    TAIPA: { prerequisites: 'UNCONDITIONAL', statDays: 30, tiers: [
-      { threshold: 50, direction: TierDirection.LESS_THAN, score: 20 },
-    ] },
-  } },
-  { id: 'PLT_04', dimension: ScoreDimension.PLATFORM, name: '訂單過熱調控', description: '按區域配置訂單過熱調控：每個區域獨立設置校驗間隔與梯度降權，平衡流量分配給其他商家機會', mode: ScoreMode.TIERED, score: 0, calcCycle: CalcCycle.SCHEDULED, calcIntervalHours: 1, status: ENABLED, builtin: true, regionConfigs: {
-    MACAU: { calcIntervalHours: 1, tiers: [
-      { threshold: 200, direction: TierDirection.MORE_THAN, score: -10 },
-      { threshold: 500, direction: TierDirection.MORE_THAN, score: -30 },
-      { threshold: 1000, direction: TierDirection.MORE_THAN, score: -60 },
-    ] },
-    TAIPA: { calcIntervalHours: 1, tiers: [
-      { threshold: 200, direction: TierDirection.MORE_THAN, score: -10 },
-      { threshold: 500, direction: TierDirection.MORE_THAN, score: -30 },
-      { threshold: 1000, direction: TierDirection.MORE_THAN, score: -60 },
-    ] },
-  } },
-  { id: 'STB_05', dimension: ScoreDimension.STORE, name: '出餐準時率', description: '統計過去N天（不含當天）出餐準時率，按準時率梯度計分：按率從高到低匹配，命中一檔即停、分數不累加，低於最低檔不得分', mode: ScoreMode.CONDITIONAL, score: 0, statDaysTotal: 7, conditionItems: toOntimeRateConditionItems(DEFAULT_ONTIME_RATE_BANDS), status: ENABLED, builtin: true },
-  { id: 'STB_06', dimension: ScoreDimension.STORE, name: '拒絕接單', description: '統計天數內（含當天），每拒絕一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 80, status: ENABLED, builtin: true },
-  { id: 'STB_07', dimension: ScoreDimension.STORE, name: '出餐超時', description: '統計天數內（不含當天），每超時一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 70, status: ENABLED, builtin: true },
-  { id: 'STB_08', dimension: ScoreDimension.STORE, name: '取消訂單', description: '統計天數內（含當天），每取消一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 80, status: ENABLED, builtin: true },
-  { id: 'STB_09', dimension: ScoreDimension.STORE, name: '超時接單', description: '統計天數內（含當天），每超時一單固定扣分，即時生效', mode: ScoreMode.RULE_DEDUCTION, score: 0, statDays: 7, deductionPerOrder: 60, status: ENABLED, builtin: true },
-  { id: 'STB_ACT', dimension: ScoreDimension.STORE, name: '活動加分', description: '店鋪報名參與活動即得固定加分；暫以算法庫算法ID配置驗證（後續對接系統活動），系統自動獲取名稱與狀態，每個獨立計分', mode: ScoreMode.RULE_BONUS, score: 0, activityItems: [], status: ENABLED, builtin: true },
+  { id: 'STB_03', dimension: ScoreDimension.STORE, name: '店鋪綜合分', description: '店鋪綜合分由業務系統實時傳遞，以最新傳入值比對梯度檔位固定加分：分數越高加分越多，命中一檔即停、分數不累加，低於最低檔不加分', mode: ScoreMode.CONDITIONAL, score: 0, status: ENABLED, builtin: true, conditionItems: toStarTierConditionItems(DEFAULT_STAR_TIER_BANDS) },
+  { id: 'PLT_03', dimension: ScoreDimension.PLATFORM, name: '流量均衡', description: '統一商家扶持與訂單過熱調控：按滾動過去 N 天的外賣/自取訂單量梯度非負加分，訂單量越高加分越少；已取消訂單不納入，退款是否計入可配。本頁僅配檔位，算分由業務系統消費 traffic_balance_config', mode: ScoreMode.TIERED, score: 0, statDays: 7, calcCycle: CalcCycle.SCHEDULED, calcIntervalHours: 1, status: ENABLED, builtin: true, trafficBalanceConfig: structuredClone(DEFAULT_TRAFFIC_BALANCE_CONFIG) },
+  { id: 'STB_05', dimension: ScoreDimension.STORE, name: '出餐準時率', description: '出餐準時率由業務系統定時任務計算後傳遞（非實時傳數），本項只配置檔位與分值：按準時率從高到低匹配，命中一檔即停、分數不累加，低於最低檔不得分', mode: ScoreMode.CONDITIONAL, score: 0, conditionItems: toOntimeRateConditionItems(DEFAULT_ONTIME_RATE_BANDS), status: ENABLED, builtin: true },
+  { id: 'STB_06', dimension: ScoreDimension.STORE, name: '自動接單', description: '商家在店端開啟自動接單即得固定加分，未開啟不加分；不再按拒絕單量計罰', mode: ScoreMode.RULE_BONUS, score: AUTO_ACCEPT_DEFAULT_SCORE, status: ENABLED, builtin: true },
+  // 口径改造：原「出餐超時・按次计罚扣分」更名为「出餐時長・固定加分」（配置项为开启自动校正 + 固定加分），
+  // 旧 stat_days / deduction_per_order 不再使用，由后端迁移 organic:stb07-meal-time-v1 覆写库内旧行
+  { id: 'STB_07', dimension: ScoreDimension.STORE, name: '出餐時長', description: '開啟自動校正後按出餐時長計分，命中即得固定加分，不累加', mode: ScoreMode.RULE_BONUS, score: MEAL_TIME_DEFAULT_SCORE, status: ENABLED, builtin: true, prerequisites: MEAL_TIME_AUTO_CORRECT_ON },
+  { id: 'STB_08', dimension: ScoreDimension.STORE, name: '訂單取消率', description: '統計期內外賣單的取消率（自取單不納入，用戶取消與商家取消均計入），單量達門檻才納入，按取消率梯度加分：取消率越低加分越多，命中一檔即停、不累加，高於最高檔不加分', mode: ScoreMode.CONDITIONAL, score: 0, statDays: 30, status: ENABLED, builtin: true, conditionItems: toCancelRateConditionItems(DEFAULT_CANCEL_RATE_BANDS, DEFAULT_CANCEL_MIN_ORDERS) },
+  // STB_09「超時接單」已下架：从默认计分项移除并加入 RETIRED_ORGANIC_RULE_IDS，后端残留行由库内数据过滤屏蔽
+  { id: 'STB_ACT', dimension: ScoreDimension.STORE, name: '活動加分', description: '活動資料由業務系統同步，僅正常進行中的活動計分；已過期、失效或未開始的活動不加分。店鋪報名進行中的活動即得固定加分，多個活動獨立計分、可累加', mode: ScoreMode.RULE_BONUS, score: 0, activityItems: [], status: ENABLED, builtin: true },
 
   // ===== 平台維度 =====
   { id: 'PLT_01', dimension: ScoreDimension.PLATFORM, name: '距離衰減', description: '滿分按衰減係數×距離遞減，距離越遠得分越低', mode: ScoreMode.DECAY, score: 100, decayCoefficient: 5, status: ENABLED, builtin: true },

@@ -9,6 +9,8 @@ import com.mftb.admin.util.NetworkUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.ResponseEntity;
 import org.springframework.util.DigestUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -77,6 +79,28 @@ public class MeetingMinutesPageController {
             return Result.success("紀要已載入", view);
         }
         return Result.success(StringUtils.hasText(view.getMessage()) ? view.getMessage() : "連結不可用", view);
+    }
+
+    /**
+     * 附件文件直链（新标签页/钉钉外部浏览器/免登页都带不了 Authorization 头）。
+     *
+     * <p>两种凭据同一路径、同一限流：
+     * {@code ticket}=站内签发的 5 分钟短票（兑换时复核用户与读权限）；
+     * {@code token}=纪要免登令牌（附件必须属于该批快照）。
+     * 两者都无效时统一按链接不可用处理，不区分原因。
+     */
+    @GetMapping("/attachment-file")
+    public ResponseEntity<InputStreamResource> attachmentFile(
+            @RequestParam(name = "attachmentNo") String attachmentNo,
+            @RequestParam(name = "ticket", required = false) String ticket,
+            @RequestParam(name = "token", required = false) String token,
+            @RequestParam(name = "purpose", required = false) String purpose,
+            HttpServletRequest request) {
+        throttle(StringUtils.hasText(ticket) ? ticket : token, request);
+        if (StringUtils.hasText(ticket)) {
+            return minutesService.attachmentFileByTicket(attachmentNo, ticket);
+        }
+        return minutesService.attachmentFileByPublicToken(attachmentNo, token, purpose);
     }
 
     /**

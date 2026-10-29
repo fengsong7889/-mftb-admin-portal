@@ -6813,7 +6813,7 @@
     "ruleBusinessStatus": "Business Status",
     "ruleRatingScore": "Rating Score",
     "ruleServingSpeed": "Serving Speed",
-    "ruleRejectOrder": "Order Rejection",
+    "ruleRejectOrder": "Auto Order Acceptance",
     "ruleDistanceDecay": "Distance Decay",
     "ruleDeliveryRange": "Delivery Range",
     "ruleMerchantSupport": "Merchant Support",

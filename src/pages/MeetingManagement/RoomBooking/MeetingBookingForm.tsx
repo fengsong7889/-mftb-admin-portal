@@ -152,8 +152,8 @@ export default function MeetingBookingForm() {
   const delegateUserId = watchedDelegateEnabled ? watchedDelegateIds[0] : undefined
 
   const rule = useMemo(() => (room ? ruleForRoom(room) : undefined), [room])
-  // 后端会把实际使用人并入必参名单，前端必须同口径：少算一个就会出现
-  // 「页面说 6 人刚好、提交被容量拒」，且超额告警也不会亮
+  // 后端会把实际使用人并入必参名单，前端必须同口径算人数：人数不当容量门槛了，
+  // 但它仍是预约单上的參會人數（详情/纪要/统计都拿它），少算一个就是单据写错
   const delegateExtra = delegateUserId != null
     && !required.includes(delegateUserId) && !optional.includes(delegateUserId) ? 1 : 0
   const attendeeCount = 1 + required.length + optional.length + externals.filter(Boolean).length + delegateExtra
@@ -469,7 +469,7 @@ export default function MeetingBookingForm() {
               <Tag>{room.roomName}</Tag>
               {/* 提交前最后一道提醒：跨城/跨大厦会议室同名常态，位置带上避免订错 */}
               {room.locationText && <Tag color="orange" icon={<EnvironmentOutlined />}>{room.locationText}</Tag>}
-              <Tag color={attendeeCount > room.capacity ? 'red' : 'green'}>
+              <Tag color={attendeeCount > room.capacity ? 'orange' : 'green'}>
                 {t('meeting.currentCapacityNote', { count: attendeeCount, capacity: room.capacity, defaultValue: `當前 ${attendeeCount} 人／容納 ${room.capacity} 人` })}
               </Tag>
             </Space>
@@ -642,24 +642,24 @@ export default function MeetingBookingForm() {
             <Form.Item label={t('meeting.requiredAttendees', { defaultValue: '必參人員' })} name="attendeeUserIds" extra={t('meeting.theOrganizerComesFrom', { defaultValue: '組織者由登入態確定，不需也不能選自己' })}>
               <EmployeeSelect placeholder={t('meeting.searchByNameOr3', { defaultValue: '搜尋姓名或工號（可多選）' })} />
             </Form.Item>
-            <Form.Item label={t('meeting.optionalAttendees', { defaultValue: '選參人員' })} name="optionalUserIds" extra={t('meeting.reminderOnlyStillCounted', { defaultValue: '只提醒不強制出席，同樣計入容量' })}>
+            <Form.Item label={t('meeting.optionalAttendees', { defaultValue: '選參人員' })} name="optionalUserIds" extra={t('meeting.reminderOnlyStillCounted', { defaultValue: '只提醒不強制出席，同樣計入參會人數' })}>
               <EmployeeSelect placeholder={t('meeting.searchByNameOr3', { defaultValue: '搜尋姓名或工號（可多選）' })} />
             </Form.Item>
             <Form.Item label={t('meeting.externalAttendees', { defaultValue: '外部參會人' })} name="externalAttendees" extra={t('meeting.guestsOrCandidatesName', { defaultValue: '訪客／面試者，只留姓名快照，收不到釘釘邀約' })}>
               <Select mode="tags" allowClear open={false} placeholder={t('meeting.typeANameAnd', { defaultValue: '輸入姓名後回車' })} tokenSeparators={[',', '、']} />
             </Form.Item>
           </div>
-          {/* 容量告警只在已经选出房间后给出：没房时容量是未知的，
-              拿 ?? 0 参与比较会让空白表单刚打开就报「超過容納 undefined 人」 */}
+          {/* 超容量只做提示、不做拦截（会议室容量指的是现场座位数，线上参会的人不占座）：
+              没选出房间时容量未知，拿 ?? 0 参与比较会让空白表单刚打开就弹提醒 */}
           {room != null && attendeeCount > room.capacity && (
             <Alert
-              type="warning"
+              type="info"
               showIcon
               message={t('meeting.attendeeExceedsCapacity', {
                 count: attendeeCount, capacity: room.capacity,
                 defaultValue: '參會人數 {{count}} 人已超過該會議室容納 {{capacity}} 人',
               })}
-              description={t('meeting.reduceTheAttendeesOr', { defaultValue: '請減少參會人，或返回預約頁改選容納更多的會議室。' })}
+              description={t('meeting.capacityIsOfflineSeats', { defaultValue: '容量只指現場座位數，線上參會不受影響，可繼續邀約。若需全部人到場，可改選容納更多的會議室。' })}
             />
           )}
         </div>

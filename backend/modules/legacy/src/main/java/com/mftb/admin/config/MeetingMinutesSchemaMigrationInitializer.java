@@ -47,6 +47,9 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
     static final String VERSION_SCHEMA_V2 = "meeting:minutes:v1.1";
     private static final String SCHEMA_SCRIPT_V2 = "268_meeting_minutes_v2.sql";
     static final String VERSION_PUBLICATION = "meeting:minutes-publication:v2.0";
+
+    /** 补充说明附件：元数据表（二进制入对象存储，不入 MySQL） */
+    static final String VERSION_ATTACHMENTS = "meeting:minutes-attachments:v1.0";
     /** v2.1：单批次链接作废（link_revoked 列） */
     static final String VERSION_BATCH_REVOKE = "meeting:minutes:batch-revoke:v2.1";
 
@@ -198,6 +201,7 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
         versionTracker.applyOnce(VERSION_SCHEMA_V2, this::doSchemaMigrateV2, this::verifySchemaV2);
         versionTracker.applyOnce(VERSION_PUBLICATION, this::migratePublication, this::verifyPublication);
         versionTracker.applyOnce(VERSION_BATCH_REVOKE, this::migrateBatchRevoke, this::verifyBatchRevoke);
+        versionTracker.applyOnce(VERSION_ATTACHMENTS, this::migrateAttachments, this::verifyAttachments);
         // v1.2：卡片文案重排。必须在 v1.1 之后（模板表与种子先就绪）
         versionTracker.applyOnce(VERSION_TEMPLATE_COPY_V12,
                 this::refreshMeetingCardCopyV12, this::verifyMeetingCardCopyV12);
@@ -213,6 +217,7 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
         syncMenuGrantsV2();
         verifyColumns();
         verifyPublication();
+        verifyAttachments();
     }
 
     /* ==================== 迁移任务 ==================== */
@@ -313,6 +318,33 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
                     + " COMMENT '单批次链接作废：0=有效 1=已作废' AFTER link_expire_at");
         }
         log.info("会议纪要单批次链接作废列已就绪");
+    }
+
+    /** 附件元数据表：纯新表、CREATE IF NOT EXISTS 可重放，失败必须抛出，不得记成功版本。 */
+    private void migrateAttachments() {
+        List<String> statements = MeetingMinutesSchema.statements(MeetingMinutesSchema.SCRIPT_ATTACHMENTS);
+        for (String statement : statements) {
+            jdbcTemplate.execute(statement);
+        }
+        log.info("会议纪要附件元数据表已执行: {} 条语句（{}）", statements.size(), MeetingMinutesSchema.SCRIPT_ATTACHMENTS);
+    }
+
+    /** 每次启动都校验：实体有字段而库里没列，表现是"能写不能读"，不能只靠 applyOnce 门控。 */
+    private void verifyAttachments() {
+        if (!tableExists(MeetingMinutesSchema.ATTACHMENT_TABLE)) {
+            throw new IllegalStateException("biz_meeting_minutes_attachment 表未就绪，纪要附件无法保存");
+        }
+        for (String key : List.of("uk_meeting_minutes_attachment_no", "uk_meeting_minutes_attachment_object",
+                "uk_meeting_minutes_attachment_request")) {
+            if (!indexExists(MeetingMinutesSchema.ATTACHMENT_TABLE, key)) {
+                throw new IllegalStateException("附件表缺少 " + key + "：重复上传/对象覆盖/幂等重放都会长脏数据");
+            }
+        }
+        for (String column : List.of("attachment_no", "booking_id", "minutes_id", "object_key", "status", "sha256")) {
+            if (!columnExists(MeetingMinutesSchema.ATTACHMENT_TABLE, column)) {
+                throw new IllegalStateException("附件表缺少列：" + column);
+            }
+        }
     }
 
     private void verifyBatchRevoke() {

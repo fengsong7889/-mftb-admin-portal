@@ -702,3 +702,32 @@ PASS 知識檢索      命中 1 條（query=檢索）
 **表單 i18n**：新增 `agentConsole.form.*` 共 **54 個 key**（中英雙份），覆蓋四組表單的標題、標籤、佔位符、按鈕與提示；瀏覽器實測英文界面下 `Add application` / `Add budget pool` 彈窗標籤全英，狀態標籤切換語言即時生效。
 
 驗證：`tsc` 0 error、`eslint` 0 error、`check:i18n` 引用 18067 條零缺失。
+
+## 二十五、信息架構重構後的收尾（2026-10-29）
+
+> 前置：`AiMenuLayoutInitializer`（@Order 60）已把 AI 域全部菜單收斂到截圖中的 7 個一級分組
+> （總覽 / 應用管理 / 模型與工具 / 知識管理 / 授權與額度 / 運行與質量 / 安全與治理），
+> 32 個葉子入口與 `aiMenuMap.ts` 功能地圖同源。本節只補「菜單已重構、功能未收尾」的尾巴。
+
+### 本輪完成
+
+| 項 | 內容 |
+|---|---|
+| 重複請求收斂 | 總覽面板的 `OverviewCards` 與 `ReadinessPanel` 原本各自發一次 `GET /ops/readiness`；上提到 `PaneContent` 拉一次、兩塊共用同一份資料與 reload 入口（即二十四待辦的「readiness 收斂」） |
+| 評測用例錄入 | 「評測與發布」補「新增用例」表單（數據集 / 用例編號 / 被評估系統 / 輸入 / 期望裁決 / 安全類開關），接既有 `POST /eval/cases`；`systemCode` 改為從系統目錄選，不讓人手填錯字；用例列表改為隨數據集篩選 |
+| 提案人工對賬 | 「操作審批」的 `unknown`（結果待核實）行補「對賬」按鈕，接既有 `POST /actions/{no}/reconcile`；彈窗內明確提示「超時不等於失敗，未核實不得重發」 |
+| 預覽橫幅更正 | `?preview=console` 仍寫「全部為模擬資料、確認後再接口」，與已接線事實矛盾；改為「頁籤匯總視圖・資料已接真實接口」，並說明本頁不繞過任何權限 |
+| i18n | 新增 `agentConsole.form.*` 31 個 + 頂層 5 個 key，中英雙份 |
+
+### 驗證
+
+`eslint` 0 error（全庫 607 warning 為歷史基線）、`tsc --noEmit` 0 error（需 `NODE_OPTIONS=--max-old-space-size=6144`，默認堆在本機 OOM）、`check:i18n` 11618 條引用零缺失、`check:menu` / `check:stat-order` / `check:confirm-modal` / `secret-scan` / `check:boundary` 全通過、`AiAssistant` + `aiConsoleModel` 共 25 條測試全綠。
+
+### 仍未完成（外部條件或需獨立排期）
+
+| 項 | 性質 |
+|---|---|
+| Temporal 真持久化執行（跨實例定時觸發、宕機自動續跑） | 需企業內網部署與獨立數據庫；當前 `AgentRunWorker` 仍是單庫輪詢，重啟後 running 一律轉 `unknown` 人工對賬 |
+| WP12 試點驗收 | 需真實環境、真實知識 ACL 數據與業務負責人簽核 |
+| 對話主線接後端運行 API | `?preview=enterprise` 那套交互藍圖仍為內存模擬（僅供方案評審）；正式控制檯 8 個面板已接線，兩者不要混淆 |
+| 瀏覽器人工視覺確認 | 本輪只做到靜態門禁 + jsdom 測試；新增的兩個表單尚未在真實登入環境走過一遍 |

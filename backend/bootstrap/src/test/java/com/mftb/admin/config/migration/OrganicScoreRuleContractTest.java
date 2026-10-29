@@ -83,6 +83,15 @@ class OrganicScoreRuleContractTest {
                 "member_bonus_config 必须登记可自愈的 ADD COLUMN DDL");
     }
 
+    @Test
+    @DisplayName("流量均衡合并配置列必须可自愈补列")
+    void trafficBalanceConfigColumnIsHealable() {
+        ContractSpec spec = LegacyCoreContracts.organicScoreRuleContract();
+        assertTrue(spec.requiredColumns().stream()
+                        .anyMatch(c -> c.column().equals("traffic_balance_config") && c.healable()),
+                "traffic_balance_config 必须登记可自愈的 ADD COLUMN DDL");
+    }
+
     /** 驼峰 → 下划线（与 MyBatis-Plus 默认 map-underscore-to-camel-case 反向一致） */
     private String toSnakeCase(String name) {
         StringBuilder sb = new StringBuilder(name.length() + 8);

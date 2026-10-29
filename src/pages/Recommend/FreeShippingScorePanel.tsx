@@ -16,7 +16,7 @@ import {
 
 /**
  * 减免运费计分面板（COM_02）：得分 = 报名分 + 门槛分。
- * 平台配置与商家自建的减免运费活动最终只生效一个，商家报名即给报名分；
+ * 平台配置与商家自建的减免运费活动最终只生效一个，商家报名即给报名分（可用「啟用報名分」开关停用）；
  * 活动门槛口径不统一、系统读不到，因此门槛只能由运营在档位表里人工配置（不像券类以客单价换算倍数）。
  * 报名分护栏：有效上限默认跟随末档，活动门槛超出上限视为空转，报名分默认一并停发。
  * 评分说明与整份配置随保存写库（free_shipping_config）。
@@ -135,8 +135,13 @@ export default function FreeShippingScorePanel({
         <AlgorithmSection title="報名計分" icon={<TrophyOutlined />} tone="info"
           extra={<FormulaHint formula="有效報名即給一次" example={`同商家多個活動也只給 ${view.enrollmentScore} 分`} />}>
           <div className="organic-score-panel organic-score-list">
-            <ScoreRow label="報名計分" score={view.enrollmentScore}
-              control={<EnrollmentScoreTag />} />
+            {/* 只读态用禁用开关回显启用状态（与门槛模块同款式），保存后状态不再「消失」 */}
+            <ScoreRow label="報名計分" score={view.enrollmentScore} enabled={view.enrollmentEnabled}
+              control={<>
+                <Switch aria-label="啟用報名分" checkedChildren="啟用" unCheckedChildren="停用" checked={view.enrollmentEnabled} disabled />
+                <EnrollmentScoreTag enabled={view.enrollmentEnabled} />
+              </>}
+              hint="停用後報名分值保留，僅該模組不計入得分" />
           </div>
         </AlgorithmSection>
 
@@ -150,7 +155,7 @@ export default function FreeShippingScorePanel({
             <div className="organic-score-row">
               <div className="organic-score-row__condition">
                 <div className="organic-score-row__label">啟用門檻計分</div>
-                <Switch size="small" aria-label="門檻計分" checked={view.thresholdEnabled} disabled />
+                <Switch aria-label="門檻計分" checkedChildren="啟用" unCheckedChildren="停用" checked={view.thresholdEnabled} disabled />
               </div>
               <span className={`organic-score-value ${view.thresholdEnabled ? 'organic-score-value--bonus' : 'organic-score-value--disabled'}`}>
                 <span className="organic-score-value__badge">模組狀態</span>
@@ -205,12 +210,16 @@ export default function FreeShippingScorePanel({
       </> : <>
         <AlgorithmSection title="報名計分" icon={<TrophyOutlined />} tone="info"
           extra={<FormulaHint formula="有效報名即給一次" example={`同商家多個活動也只給 ${draft.enrollmentScore} 分`} />}>
-          <div className="organic-score-panel" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* 开关与分值并排一行，避免竖排占空间 */}
+          <div className="organic-score-panel">
             <div className="organic-score-edit-row">
+              <span className="organic-score-edit-row__label">啟用報名分</span>
+              <Switch aria-label="啟用報名分" checkedChildren="啟用" unCheckedChildren="停用" checked={draft.enrollmentEnabled}
+                onChange={v => patch({ enrollmentEnabled: v })} />
               <span className="organic-score-edit-row__label">報名分值</span>
-              <InputNumber aria-label="報名分值" value={draft.enrollmentScore} min={0} max={100}
+              <InputNumber aria-label="報名分值" value={draft.enrollmentScore} min={0} max={100} disabled={!draft.enrollmentEnabled}
                 onChange={v => patch({ enrollmentScore: v ?? 0 })} style={{ width: 160 }} addonAfter="分" />
-              <span style={{ fontSize: 12, color: '#8C8C8C' }}>報名即計分，不可關閉；多個活動也只計一次</span>
+              <span style={{ fontSize: 12, color: '#8C8C8C' }}>多個活動也只計一次有效報名</span>
             </div>
           </div>
         </AlgorithmSection>

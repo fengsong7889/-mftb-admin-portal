@@ -9,7 +9,7 @@
  *   2. 刻意不带任何后台 JWT：免登页一旦依赖登录态，钉钉里点开的人就看不到内容。
  */
 import request, { SILENT_HEADER } from './request'
-import type { MinutesContent, MinutesDocument } from './meetingMinutes'
+import type { MinutesAttachmentVO, MinutesContent, MinutesDocument } from './meetingMinutes'
 
 const SILENT = { headers: { [SILENT_HEADER]: '1' } }
 
@@ -36,6 +36,8 @@ export interface MinutesPageView {
   sentAt?: string | null
   expireAt?: string | null
   content?: MinutesContent | null
+  /** 本批快照引用的附件元数据；文件本体凭页面自带的免登令牌在同源接口受控读取 */
+  attachments?: MinutesAttachmentVO[] | null
 }
 
 export function fetchMinutesPage(token: string): Promise<MinutesPageView> {

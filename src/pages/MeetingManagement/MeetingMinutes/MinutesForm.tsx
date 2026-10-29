@@ -16,7 +16,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Alert, Button, DatePicker, Empty, Form, Input, Modal, Radio, Segmented, Select, Space, Spin, Tag, message } from 'antd'
+import { Alert, Button, DatePicker, Empty, Form, Input, Modal, Radio, Segmented, Select, Space, Spin, Switch, Tag, message } from 'antd'
 import {
   ArrowLeftOutlined, CalendarOutlined, CheckCircleOutlined, DeleteOutlined, FileTextOutlined,
   LeftOutlined, PlusOutlined, ProfileOutlined, RightOutlined, SaveOutlined, SendOutlined,
@@ -40,6 +40,8 @@ import EmployeeSelect from '@/components/EmployeeSelect'
 import { bizTypeLabels, minutesStatusMeta, phaseMeta } from '../meetingMeta'
 import MinutesContentCard, { MinutesNoticePreview } from './MinutesContentCard'
 import useMinutesNavigation from './useMinutesNavigation'
+import MinutesAttachmentEditor, { type AttachmentPendingState, type AttachmentUrlResolver } from './MinutesAttachments'
+import { fetchMinutesAttachmentAccess, minutesAttachmentFileUrl, type MinutesAttachmentVO } from '@/api/meetingMinutes'
 import './minutes.css'
 
 const cardStyle: CSSProperties = {
@@ -151,6 +153,16 @@ export default function MinutesForm() {
   const [minutesLoadNote, setMinutesLoadNote] = useState<string>()
   const saveRequestKey = useRef(newMeetingRequestKey('mm'))
   const publishRequest = useRef<{ signature: string; key: string }>()
+  const [nextMeetingEnabled, setNextMeetingEnabled] = useState(false)
+  /** 附件是组件外 state（对象集合不是文本字段）：保存时按号写进正文 attachments，与正文同事务绑定 */
+  const [attachmentList, setAttachmentList] = useState<MinutesAttachmentVO[]>([])
+  const [attachmentPending, setAttachmentPending] = useState<AttachmentPendingState>({ uploading: 0, failed: 0 })
+
+  /** 站内附件地址：每次现取 5 分钟票据，不拼任何可收藏的长期地址 */
+  const resolveAttachmentUrl: AttachmentUrlResolver = async (item, purpose) => {
+    const access = await fetchMinutesAttachmentAccess(item.attachmentNo, purpose)
+    return minutesAttachmentFileUrl({ attachmentNo: item.attachmentNo, ticket: access.ticket })
+  }
   /** 关联纪要：只存 id，标题/时间由服务端回查做快照 */
   const [linkIds, setLinkIds] = useState<number[]>([])
   const [linkOptions, setLinkOptions] = useState<MinutesLinkVO[]>([])
@@ -262,6 +274,10 @@ export default function MinutesForm() {
             nextMeetingNote: content.nextMeetingNote,
             remark: content.remark,
           })
+          // 旧纪要已经写了下次会议 → 开关自动开，不能让用户以为这场会没安排
+          setNextMeetingEnabled(Boolean(content.nextMeetingAt || content.nextMeetingNote?.trim()))
+          // 附件回显用服务端按号回查的元数据（不是前端自报名字）；读不到的号不展示，保存时自然移除
+          setAttachmentList(vo.attachments ?? [])
           setLinkIds((vo.links ?? []).map(link => link.minutesId))
           setLinkOptions(vo.links ?? [])
           const seeds: { id: number; name: string; empId?: string }[] = [
@@ -282,6 +298,8 @@ export default function MinutesForm() {
           setOwnerSeed(seeds.filter((person, index, all) => all.findIndex(other => other.id === person.id) === index))
         } else {
           form.setFieldsValue({ items: base.items, actions: [], followUps: [], chairIds: [fullMeeting.organizerId] })
+          setNextMeetingEnabled(false)
+          setAttachmentList([])
           setOwnerSeed([{ id: fullMeeting.organizerId, name: fullMeeting.organizerName, empId: fullMeeting.organizerEmpNo ?? undefined }])
         }
         setHasUnsavedChanges(false)
@@ -315,13 +333,31 @@ export default function MinutesForm() {
 
   /** 保存：send=true 时保存成功后直接打开发送面板（一次点击只做一件事，但动线不断） */
   const handleSave = async (send: boolean) => {
+    // 附件未传完/有失败时拦住保存：不能静默丢附件后提示"保存成功"，也不能把失败项当没发生
+    if (attachmentPending.uploading > 0) {
+      message.warning(t('meeting.minutes.attachmentUploadingBlock'))
+      return
+    }
+    if (attachmentPending.failed > 0) {
+      message.warning(t('meeting.minutes.attachmentFailedBlock'))
+      return
+    }
     try {
       await form.validateFields()
     } catch {
       message.warning(t('meeting.minutes.checkForm', { defaultValue: '請檢查表單填寫' }))
       return
     }
-    const content = { ...toContent(form.getFieldsValue(true)), attendance }
+    /** 全文预览需要保留已卸载字段的草稿值，所以取数用 getFieldsValue(true)；
+     *  但「下次会议」开关关掉等于这场会不安排下次会议，必须显式清空，
+     *  否则隐藏控件里的旧值会被一起提交，开关就成了纯粹的视觉摆设。 */
+    const values = form.getFieldsValue(true)
+    if (!nextMeetingEnabled) {
+      values.nextMeetingAt = null
+      values.nextMeetingNote = ''
+    }
+    // 附件号列表永远随正文一起提交（含空数组）：服务端据此完成绑定/解绑，旧字段语义不丢
+    const content = { ...toContent(values), attendance, attachments: attachmentList.map(item => item.attachmentNo) }
     const invalid = validateContent(content)
     if (invalid) {
       message.warning(invalid)
@@ -389,7 +425,7 @@ export default function MinutesForm() {
   const previousNode = currentIndex > 0 ? series[currentIndex - 1] : undefined
   const nextNode = currentIndex >= 0 && currentIndex < series.length - 1 ? series[currentIndex + 1] : undefined
   /** 表单扁平值 → MinutesContent 的空壳（仅用于 useWatch 尚未回传时的计数基准） */
-  const previewContent = { ...toContent(watchedValues ?? {}), attendance }
+  const previewContent = { ...toContent(watchedValues ?? {}), attendance, attachments: attachmentList.map(item => item.attachmentNo) }
   const charCount = minutesContentLength(previewContent)
 
   if (loading && !meeting) {
@@ -506,7 +542,7 @@ export default function MinutesForm() {
 
       {displayMode === 'preview' && (
         <div className="mm-reading-surface">
-          <MinutesContentCard content={previewContent} people={ownerSeed}
+          <MinutesContentCard content={previewContent} people={ownerSeed} attachments={attachmentList} resolveAttachmentUrl={resolveAttachmentUrl}
             followUpDetails={(watchedValues?.followUps ?? []).filter(item => item.content?.trim()).map(item => ({
               content: item.content || '', ownerUserId: item.ownerIds?.[0], dueDate: item.dueDate?.format('YYYY-MM-DD'),
             }))}
@@ -731,15 +767,26 @@ export default function MinutesForm() {
 
         {/* 五、下次会议 */}
         <div style={cardStyle}>
-          <CardTitle icon={<CalendarOutlined />} tone="info" title={t('meeting.minutes.sectionNext', { defaultValue: '下次會議' })} />
-          <div className="mm-form-grid">
-            <Form.Item label={t('meeting.minutes.nextMeetingAt', { defaultValue: '下次會議時間' })} name="nextMeetingAt">
-              <DatePicker showTime={{ format: 'HH:mm' }} format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} placeholder={t('meeting.minutes.selectTime', { defaultValue: '選填' })} />
-            </Form.Item>
-            <Form.Item label={t('meeting.minutes.nextMeetingNote', { defaultValue: '議程預告' })} name="nextMeetingNote" style={{ gridColumn: '1 / -1' }}>
-              <Input maxLength={200} placeholder={t('meeting.minutes.nextNotePlaceholder', { defaultValue: '例：帶預算明細表復核' })} />
-            </Form.Item>
-          </div>
+          <CardTitle icon={<CalendarOutlined />} tone="info" title={t('meeting.minutes.sectionNext', { defaultValue: '下次會議' })}
+            tag={<Switch
+              checked={nextMeetingEnabled}
+              disabled={saving || minutes?.canEdit === false}
+              aria-label={t('meeting.minutes.sectionNext', { defaultValue: '下次會議' })}
+              checkedChildren={t('common.enable')}
+              unCheckedChildren={t('common.close')}
+              onChange={setNextMeetingEnabled}
+            />} />
+          {/* 卸载字段后 getFieldsValue 不会提交隐藏值；Form 保留草稿，重新开启可恢复本次输入。 */}
+          {nextMeetingEnabled && (
+            <div className="mm-form-grid">
+              <Form.Item label={t('meeting.minutes.nextMeetingAt', { defaultValue: '下次會議時間' })} name="nextMeetingAt">
+                <DatePicker showTime={{ format: 'HH:mm' }} format="YYYY-MM-DD HH:mm" style={{ width: '100%' }} placeholder={t('meeting.minutes.selectTime', { defaultValue: '選填' })} />
+              </Form.Item>
+              <Form.Item label={t('meeting.minutes.nextMeetingNote', { defaultValue: '議程預告' })} name="nextMeetingNote" style={{ gridColumn: '1 / -1' }}>
+                <Input maxLength={200} placeholder={t('meeting.minutes.nextNotePlaceholder', { defaultValue: '例：帶預算明細表復核' })} />
+              </Form.Item>
+            </div>
+          )}
         </div>
 
         {/* 六、补充说明（备注独占整行，见 §C.4.1） */}
@@ -748,6 +795,16 @@ export default function MinutesForm() {
           <Form.Item label={t('meeting.minutes.remarkLabel', { defaultValue: '備註' })} name="remark" style={{ marginBottom: 0 }}>
             <RemarkTextArea placeholder={t('meeting.minutes.remarkPlaceholder', { defaultValue: '與會外的補充資訊，例：資料位置、後續對接群' })} />
           </Form.Item>
+          <div style={{ marginTop: 24 }}>
+            <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>{t('docKnowledge.attachments')}</div>
+            <MinutesAttachmentEditor
+              bookingId={meeting?.id ?? minutes?.bookingId}
+              value={attachmentList}
+              onChange={next => { setAttachmentList(next); setHasUnsavedChanges(true) }}
+              onPendingChange={setAttachmentPending}
+              disabled={loading || saving || minutes?.canEdit === false}
+            />
+          </div>
         </div>
         <div style={cardStyle}>
           <CardTitle icon={<SendOutlined />} tone="info" title={t('meeting.minutes.publicationText.publicationAndNotificationSettings')} />
@@ -778,10 +835,11 @@ export default function MinutesForm() {
         <div className="form-footer">
           <Button onClick={() => navigateSafely()}>{t('meeting.cancel', { defaultValue: '取消' })}</Button>
           <Button onClick={() => displayMode === 'preview' ? setDisplayMode('edit') : showDocumentPreview()}>{displayMode === 'preview' ? t('meeting.minutes.publicationText.backToEditing') : t('meeting.minutes.publicationText.fullPreview')}</Button>
-          <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={() => void handleSave(false)}>
+          {/* 附件上传中/有失败时禁用保存与发布：比"点了再弹一次错"少一次失败往返。 */}
+          <Button type="primary" icon={<SaveOutlined />} loading={saving} disabled={attachmentPending.uploading > 0 || attachmentPending.failed > 0} onClick={() => void handleSave(false)}>
             {t('meeting.minutes.saveDraft', { defaultValue: '保存紀要' })}
           </Button>
-          <Button icon={<SendOutlined />} disabled={minutes?.publicationEnabled === false} loading={saving} onClick={() => void handleSave(true)}>
+          <Button icon={<SendOutlined />} disabled={minutes?.publicationEnabled === false || attachmentPending.uploading > 0 || attachmentPending.failed > 0} loading={saving} onClick={() => void handleSave(true)}>
             {t('meeting.minutes.saveAndPublish', { defaultValue: '保存並發布' })}
           </Button>
         </div>

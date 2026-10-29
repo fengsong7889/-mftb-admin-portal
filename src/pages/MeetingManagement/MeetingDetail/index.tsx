@@ -9,7 +9,9 @@
  *
  * 五个模块固定顺序：基本信息 → 参会人与响应 → 邀约投递状态 → 会议纪要 → 会议轨迹。
  * 「N 人未綁定釘釘」的提示必须出现在基本信息附近：组织者最关心的是"人到底知不知道"。
- * 纪要模块永远排在投递状态之后：先看清"人到没到、邀约送没送"，再谈"会开完了记了什么"。
+ * 纪要模块永远排在投递状态之后：先看清"人到没到、邀约送没送"，再谈"会开了什么"。
+ * 纪要 Tab 不只是回看：会议一到开始时间就能在页内直接记录（服务端 canEdit 为准），
+ * 完整模板编辑与发送仍然走纪要表单页，两处共用同一份正文结构。
  *
  * 界面口径：
  *   1. 头部统一用 DetailPageHeader（§D.1），业务动作放它的 extra 槽，不自己手写返回按钮；
@@ -22,7 +24,7 @@ import type { CSSProperties } from 'react'
 import { Alert, Button, Descriptions, Input, Modal, QRCode, Space, Spin, Table, Tabs, Tag, Timeline, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
-  BellOutlined, FileTextOutlined, HistoryOutlined, ProfileOutlined, QrcodeOutlined, ReloadOutlined, SendOutlined, TeamOutlined,
+  BellOutlined, FileTextOutlined, HistoryOutlined, ProfileOutlined, QrcodeOutlined, ReloadOutlined, SaveOutlined, SendOutlined, TeamOutlined,
 } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
 import DetailPageHeader from '@/components/DetailPageHeader'
@@ -34,6 +36,7 @@ import {
   fetchMeetingEvents,
   finishMeeting,
   issueCheckinToken,
+  newMeetingRequestKey,
   releaseMeeting,
   respondMeeting,
   type MeetingEventVO,
@@ -52,7 +55,14 @@ import {
   phaseMeta,
   scenarioLabel,
 } from '../meetingMeta'
-import { fetchMinutes, type MinutesVO } from '@/api/meetingMinutes'
+import {
+  createMinutes,
+  emptyMinutesContent,
+  fetchMinutes,
+  updateMinutes,
+  type MinutesContent,
+  type MinutesVO,
+} from '@/api/meetingMinutes'
 import MinutesContentCard from '../MeetingMinutes/MinutesContentCard'
 import useMinutesNavigation from '../MeetingMinutes/useMinutesNavigation'
 import { deriveCanRecordMinutes } from '../MeetingMinutes/minutesAccess'
@@ -88,6 +98,10 @@ export default function MeetingDetail() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>()
   const [qr, setQr] = useState<{ url: string; expireAt: string }>()
+  /** 纪要快速记录（边开会边记）：只补「议题 + 过程要点」，行动项与发送仍走完整表单 */
+  const [quickTopic, setQuickTopic] = useState('')
+  const [quickNote, setQuickNote] = useState('')
+  const [quickSaving, setQuickSaving] = useState(false)
 
   const load = useCallback(async () => {
     if (!bookingId) {
@@ -265,6 +279,59 @@ export default function MeetingDetail() {
       setQr({ url: base, expireAt: issued.expireAt })
     } catch (e) {
       message.error(e instanceof Error ? e.message : t('meeting.failedToGenerateThe', { defaultValue: '生成簽到碼失敗' }))
+    }
+  }
+
+  /**
+   * 纪要能不能就地录入，一律听服务端：minutes.canEdit 已经合成了
+   * 「相关人/行政身份 + 会议已进入（开始后就能记）」两个判定，前端不再自己拼一份。
+   */
+  const canQuickRecord = minutes?.canEdit === true && minutes?.minutesEnabled !== false
+
+  /** 快速保存一条议题：已存正文逐字原样带回，只追加新的一条，避免覆写别人的记录 */
+  const saveQuickRecord = async () => {
+    if (!record || !minutes) return
+    const topic = quickTopic.trim()
+    const note = quickNote.trim()
+    if (!topic) {
+      message.warning(t('meeting.minutes.quickTopicRequired', { defaultValue: '請填寫議題標題' }))
+      return
+    }
+    const base = minutes.content ?? emptyMinutesContent()
+    // 空行是骨架里的占位议题（emptyMinutesContent 给一行空白的），不滤掉就会多出一条无标题议题
+    const filledItems = (base.items ?? []).filter(
+      item => item.topic?.trim() || item.discussion?.trim() || item.conclusion?.trim(),
+    )
+    const content: MinutesContent = { ...base, items: [...filledItems, { topic, discussion: note }] }
+    // 行动项/跟进事项按原序回传：后端拿 (kind, seq) 当行身份，漏传会被当成"这场会没事项"而删掉
+    const items = (minutes.items ?? []).map(row => ({
+      kind: row.kind,
+      content: row.content,
+      ownerUserId: row.ownerUserId ?? null,
+      dueDate: row.dueDate ?? null,
+    }))
+    // 关联纪要也是"按提交内容重建"：不带回去就等于记录一条要点就把别人挂好的关联清了
+    const linkedMinutesIds = (minutes.links ?? []).map(link => link.minutesId)
+
+    setQuickSaving(true)
+    try {
+      if (minutes.exists && minutes.id) {
+        await updateMinutes(minutes.id, { content, items, linkedMinutesIds, version: minutes.version ?? 0 })
+      } else {
+        await createMinutes({
+          bookingId: record.id, content, items, linkedMinutesIds,
+          requestKey: newMeetingRequestKey('mm'),
+        })
+      }
+      setQuickTopic('')
+      setQuickNote('')
+      message.success(t('meeting.minutes.quickSaved', { defaultValue: '已記錄，可繼續補充' }))
+      void load()
+    } catch (e) {
+      // request.ts 已统一弹错，这里只留日志，避免双弹
+      console.warn(t('meeting.minutes.quickSaveFailed', { defaultValue: '紀要記錄保存失敗' }), e instanceof Error ? e.message : e)
+    } finally {
+      setQuickSaving(false)
     }
   }
 
@@ -547,7 +614,7 @@ export default function MeetingDetail() {
                 {minutesError && (
                   <span style={{ fontSize: 12, color: '#FF4D4F' }}>{`${t('meeting.minutes.loadFailedShort', { defaultValue: '紀要讀取失敗：' })}${minutesError}`}</span>
                 )}
-                {record && deriveCanRecordMinutes(record, minutesCapability) && (
+                {record && deriveCanRecordMinutes(record, minutesCapability) && !canQuickRecord && (
                   <div>
                     <Button size="small" type="primary" icon={<FileTextOutlined />} onClick={() => navigate(`/meeting-minutes-form?bookingId=${record.id}`)}>
                       {t('meeting.minutes.recordNow', { defaultValue: '錄入紀要' })}
@@ -555,6 +622,47 @@ export default function MeetingDetail() {
                   </div>
                 )}
               </Space>
+            )}
+
+            {/* 就地记录（会议开始就能记）：只读卡会跟着刷新，记录与回看不换来换页 */}
+            {canQuickRecord && (
+              <div style={{
+                marginTop: 16, paddingTop: 12, borderTop: '1px dashed #E8E8E8',
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>
+                  {t('meeting.minutes.quickTitle', { defaultValue: '邊開會邊記錄' })}
+                  <span style={{ marginLeft: 8, fontWeight: 400, fontSize: 12, color: '#8C8C8C' }}>
+                    {t('meeting.minutes.quickHint', { defaultValue: '每保存一次追加一條議題；行動項、缺席與發送請用「完整表單編輯」' })}
+                  </span>
+                </div>
+                <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                  <Input
+                    value={quickTopic}
+                    onChange={event => setQuickTopic(event.target.value)}
+                    maxLength={100}
+                    disabled={quickSaving}
+                    placeholder={t('meeting.minutes.quickTopicPlaceholder', { defaultValue: '議題標題，例：Q4 預算缺口分攤口徑' })}
+                  />
+                  <Input.TextArea
+                    value={quickNote}
+                    onChange={event => setQuickNote(event.target.value)}
+                    maxLength={500}
+                    autoSize={{ minRows: 2, maxRows: 6 }}
+                    disabled={quickSaving}
+                    placeholder={t('meeting.minutes.quickNotePlaceholder', { defaultValue: '討論要點與結論（可隨時保存，會後再補充完）' })}
+                  />
+                  <Space size={8}>
+                    <Button size="small" type="primary" icon={<SaveOutlined />} loading={quickSaving} onClick={() => void saveQuickRecord()}>
+                      {t('meeting.minutes.quickSave', { defaultValue: '保存記錄' })}
+                    </Button>
+                    <Button size="small" onClick={() => navigate(minutes?.exists && minutes.id
+                      ? `/meeting-minutes-form?id=${minutes.id}`
+                      : `/meeting-minutes-form?bookingId=${record?.id}`)}>
+                      {t('meeting.minutes.openFullForm', { defaultValue: '完整表單編輯' })}
+                    </Button>
+                  </Space>
+                </Space>
+              </div>
             )}
           </div>
           )}

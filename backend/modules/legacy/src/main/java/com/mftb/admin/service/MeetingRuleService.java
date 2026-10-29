@@ -17,10 +17,14 @@ import java.util.Map;
 /**
  * 会议预约规则裁决的唯一入口。
  *
- * <p><b>为什么必须集中在一处</b>：预约校验有 7 条规则（时长上下限、时间粒度、提前期、
- * 最远可订天数、每日可预约窗、同日约束、容量上限），分散实现的结果是「新建预约挡了、
+ * <p><b>为什么必须集中在一处</b>：预约校验有 6 条门槛规则（时长上下限、时间粒度、提前期、
+ * 最远可订天数、每日可预约窗、同日约束）+ 房间可约状态，分散实现的结果是「新建预约挡了、
  * 改期没挡」——改期本质也是一次窗口占用，任何一条规则漏在改期路径上，
  * 就等于给一个绕过口开了绿灯。所有写入路径（新建/改期/换房）都必须走 {@link #validate}。
+ *
+ * <p><b>会议室容量不是门槛</b>：容量只描述「现场能坐多少人」，而参会邀约里混着线上参会的人，
+ * 拿它挡邀约人数会把"8 人房不能邀 12 个人"这种业务事实写进系统。因此
+ * {@code attendeeCount} 仍按全量统计并落库（使用率与超卖统计要用），但规则层不再据此拒绝。
  *
  * <p><b>规则两层</b>：房间级列存 NULL 表示"未单独配置"，回落到 sys_config 的 {@code meeting_*} 默认值；
  * 回落动作只发生在这里，服务层拿到的 {@link Effective} 永远是已定稿的生效值。
@@ -187,7 +191,8 @@ public class MeetingRuleService {
      * @param room          会议室（必须已加锁读取，规则列取当前值）
      * @param start         开始时间
      * @param end           结束时间（左闭右开的开区间右端）
-     * @param attendeeCount 参会人数（含组织者与外部人员）
+     * @param attendeeCount 参会人数（含组织者与外部人员）：只作为统计口径保留，
+     *                      不构成门槛——线上参会的人不占房间座位，容量挡邀约是错的
      */
     public void validate(MeetingRoom room, LocalDateTime start, LocalDateTime end, int attendeeCount) {
         GlobalRule global = globalRule();
@@ -205,7 +210,7 @@ public class MeetingRuleService {
      *
      * <p>为什么周期会议要放宽它：按 30 天上限，一个「每周三例会 × 12 周」的系列必然只能建出
      * 前 4 场，剩下 8 场静默缺失，比一次性建完更有害（参会人日程上根本看不到后续场次）。
-     * 但每日可预约窗、时长上下限、粒度、同日约束与容量**一律照旧**，那些是房间真实承载力与
+     * 但每日可预约窗、时长上下限、粒度与同日约束**一律照旧**，那些是房间真实承载力与
      * 作息约束，不会因为"它是周期会"就失效。
      */
     public void validate(MeetingRoom room, LocalDateTime start, LocalDateTime end, int attendeeCount,
@@ -259,12 +264,8 @@ public class MeetingRuleService {
         if (enforceAdvanceDays && start.isAfter(now.plusDays(eff.getAdvanceDays()))) {
             throw new BusinessException("最多可提前 " + eff.getAdvanceDays() + " 天預約");
         }
-
-        int capacity = room.getCapacity() == null ? 0 : room.getCapacity();
-        if (attendeeCount > capacity) {
-            throw new BusinessException("參會人數 " + attendeeCount + " 超過該會議室容納上限 "
-                    + capacity + " 人");
-        }
+        // 参会人数不再与房间容量比对：容量是现场座位参考，邀约人数由组织者决定（含线上参会）。
+        // 人数照常统计并落 attendee_count，超容量的提醒只在界面上给，不进规则层。
     }
 
     private static String trimToHourMinute(LocalTime time) {

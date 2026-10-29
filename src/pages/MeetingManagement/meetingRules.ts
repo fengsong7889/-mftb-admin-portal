@@ -2,11 +2,15 @@
  * 会议预约前端校验规则（纯函数，可单测）。
  *
  * <b>定位：这是体验，不是安全边界。</b>目的是少一次往返——用户点提交前就告诉他哪里不对。
- * 后端 MeetingRuleService 独立执行同一套规则（提前期/粒度/时长/每日窗/容量/冲突），
+ * 后端 MeetingRuleService 独立执行同一套规则（提前期/粒度/时长/每日窗/冲突），
  * 绕过本文件直接调接口必须照样被拒。
  *
- * <p>规则口径与后端逐字对齐（半开区间 [start, end)、粒度对齐、同日约束、容量含组织者）：
+ * <p>规则口径与后端逐字对齐（半开区间 [start, end)、粒度对齐、同日约束）：
  * 两边任一处漂移，就会出现"前端放行、后端拒绝"或反过来"前端拦截了其实合法的时段"。
+ *
+ * <p><b>会议室容量不在这里</b>：容量只描述现场能坐多少人，邀约名单里还有线上参会的人，
+ * 拿它当提交门槛等于把"8 人房不能邀 12 人"写进系统。超容量只做提醒（见预约页的提示条），
+ * 不做拦截；后端 MeetingRuleService 同口径不拦。
  */
 import type { MeetingRoomVO } from '@/api/meeting'
 
@@ -89,12 +93,12 @@ export function validateBookingWindow(params: {
   room?: MeetingRoomVO | null
   start?: Date | null
   end?: Date | null
-  /** 参会人数（含组织者与外部人员） */
+  /** 参会人数（含组织者与外部人员）：仍要传，但只用于展示与落库口径，不构成门槛 */
   attendeeCount: number
   now?: Date
   global?: WindowRule
 }): string[] {
-  const { room, start, end, attendeeCount } = params
+  const { room, start, end } = params
   const now = params.now ?? new Date()
   const errors: string[] = []
 
@@ -153,10 +157,7 @@ export function validateBookingWindow(params: {
   if (start.getTime() > farthest.getTime()) {
     errors.push(`最多可提前 ${rule.advanceDays} 天預約`)
   }
-
-  if (attendeeCount > (room.capacity ?? 0)) {
-    errors.push(`參會人數 ${attendeeCount} 超過該會議室容納上限 ${room.capacity ?? 0} 人`)
-  }
+  // 参会人数（含组织者与外部人员）不再与容量比对：容量是现场座位参考，不是邀约上限
   return errors
 }
 

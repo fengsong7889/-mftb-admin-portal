@@ -37,6 +37,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -521,8 +522,8 @@ class MeetingBookingSecurityTest {
     /* ==================== 规则联动 ==================== */
 
     @Test
-    @DisplayName("容量校验以服务端统计的人数为准（含组织者与外部人员）")
-    void capacityUsesFullHeadcount() {
+    @DisplayName("参会人数按服务端统计的全量传给规则层（容量已不再是门槛，人数仍要算准）")
+    void headcountIsComputedFromFullRoster() {
         MeetingBookingDto.CreateForm form = createForm("k-cap");
         form.setExternalAttendees(List.of("訪客甲", "訪客乙"));
         service.create(form);
@@ -533,6 +534,43 @@ class MeetingBookingSecurityTest {
         verify(ruleService).validate(any(MeetingRoom.class), any(), any(), count.capture(),
                 any(MeetingRuleService.GlobalRule.class), eq(true));
         assertEquals(4, count.getValue(), "組織者 1 + 必參 1 + 外部 2");
+    }
+
+    /**
+     * 纪要入口的阶段与身份口径。
+     *
+     * <p>为什么在预约服务这里也钉一份：入口按钮渲不渲只靠 {@code canMinutes}，
+     * 它与纪要服务 requireRecordable 一旦漂移，预约记录列表就会出现
+     * “服务层允许行政代录、列表连按钮都不给”或反过来“点了必被拒”。
+     */
+    @Test
+    @DisplayName("会议一到开始时间就给纪要入口，行政在预约记录也能代他人录")
+    void minutesEntryOpensAtMeetingStart() {
+        when(guard.currentUser()).thenReturn(ADMIN);
+        MeetingBooking ongoing = booking(70L, MeetingConstants.STATUS_BOOKED, ORGANIZER.getId());
+        ongoing.setStartTime(LocalDateTime.now().minusMinutes(10));
+        ongoing.setEndTime(LocalDateTime.now().plusMinutes(50));
+        when(bookingMapper.selectById(70L)).thenReturn(ongoing);
+        // 行政不是这场会的相关人（guard.myRole 未桩→ null），但持有 meeting-record:edit
+        when(guard.canOperateRecords(ADMIN)).thenReturn(true);
+
+        MeetingBookingDto.VO vo = service.detail(70L);
+
+        assertEquals("ongoing", vo.getPhase(), vo.getStartTime() + " ~ " + vo.getEndTime());
+        assertTrue(Boolean.TRUE.equals(vo.getCanMinutes()), "進行中的會必須給錄入入口");
+    }
+
+    @Test
+    @DisplayName("还没开始的会不给纪要入口：没有结论可记，行政也一样")
+    void minutesEntryStaysClosedBeforeStart() {
+        when(guard.currentUser()).thenReturn(ADMIN);
+        MeetingBooking pending = booking(71L, MeetingConstants.STATUS_BOOKED, ORGANIZER.getId());
+        pending.setStartTime(LocalDateTime.now().plusHours(2));
+        pending.setEndTime(LocalDateTime.now().plusHours(3));
+        when(bookingMapper.selectById(71L)).thenReturn(pending);
+        when(guard.canOperateRecords(ADMIN)).thenReturn(true);
+
+        assertFalse(Boolean.TRUE.equals(service.detail(71L).getCanMinutes()));
     }
 
     @Test
