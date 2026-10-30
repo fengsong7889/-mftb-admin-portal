@@ -12,7 +12,7 @@ vi.mock('@/api/organicScore', () => ({
   createOrganicRule: api.create, toggleOrganicRuleStatus: api.toggle, deleteOrganicRule: api.remove,
   updateDimensionWeights: vi.fn(),
 }))
-vi.mock('@/api/systemConfig', () => ({ getSystemConfig: vi.fn().mockResolvedValue(null), updateSystemConfig: vi.fn() }))
+vi.mock('@/api/systemConfig', () => ({ getSystemConfig: vi.fn().mockResolvedValue(null), getSystemConfigSilent: vi.fn().mockResolvedValue(null), updateSystemConfig: vi.fn() }))
 vi.mock('@/api/store', () => ({ fetchStores: vi.fn().mockResolvedValue({ records: [] }) }))
 vi.mock('@/api/adPromotion', () => ({ fetchAdAlgorithms: vi.fn().mockResolvedValue({ records: [] }), fetchAdAlgorithmByCode: vi.fn() }))
 vi.mock('@/hooks/useSystemRules', () => ({ getSystemRuleValue: () => false }))

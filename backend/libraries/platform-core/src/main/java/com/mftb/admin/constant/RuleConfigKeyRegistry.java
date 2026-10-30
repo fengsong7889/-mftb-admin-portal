@@ -47,8 +47,14 @@ public final class RuleConfigKeyRegistry {
             "session_idle_timeout_ms"
     );
 
+    /**
+     * 算法配置規則版块持久化 key。
+     * <p>{@code organic_traffic_weight_collapsed}（維度權重卡折疊態）也登記在此：算法庫頁面渲染時會一併讀它，
+     * 未登記前會落到 {@code rule-config} 兜底鑒權上，普通算法庫用戶一個都讀不到（GET 403）。
+     */
     private static final Set<String> ALGORITHM_KEYS = Set.of(
-            "organic_traffic_show_dimension_weight"
+            "organic_traffic_show_dimension_weight",
+            "organic_traffic_weight_collapsed"
     );
 
     /**
@@ -108,9 +114,17 @@ public final class RuleConfigKeyRegistry {
      * 「廣告銷售-購買廣告」下單頁需讀取支付方式規則（{@code payment_mode_*}）決定現金/贈送抵扣呈現，
      * 但該 key 歸屬的 {@code rule-ad-sales} 是平台配置系統的規則維護菜單，不該成為下單的前置權限。
      * 故對這些版塊的只讀請求允許持消費方菜單（如 {@code ad-sales}）者讀取；寫入（edit）一律不走回退。
+     * <p>
+     * 算法配置規則同理：開關的真值是「自然流量參數頁要不要渲染維度權重卡」，讀它的人正是持有
+     * 算法庫（{@code promotion-algorithm}）的運營同學。沒有回退時他們 GET 403，前端只能保持默認「顯示」，
+     * 表現為「管理員已關閉、其他人照樣看得到」的 fail-open。回退只放 view，改開關仍需 rule-algorithm:edit。
+     * <p>
+     * ⚠️ 回退以版塊為粒度：登記進 ALGORITHM_KEYS 的 key 都會被算法庫用戶可讀，
+     * 後續往該版塊加 key 前先確認它不是敏感配置。
      */
     private static final Map<String, String> RUNTIME_READER_MENU = Map.of(
-            MENU_AD_SALES, "ad-sales"
+            MENU_AD_SALES, "ad-sales",
+            MENU_ALGORITHM, "promotion-algorithm"
     );
 
     /**

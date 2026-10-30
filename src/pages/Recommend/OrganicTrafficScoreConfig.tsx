@@ -12,7 +12,7 @@ import SignboardScorePanel from './SignboardScorePanel'
 import TrafficBalancePanel from './TrafficBalancePanel'
 import { ServiceStatus, AppType } from '@mftb/contracts/recommendConstants'
 import { getSystemRuleValue } from '@/hooks/useSystemRules'
-import { getSystemConfig, updateSystemConfig } from '@/api/systemConfig'
+import { getSystemConfigSilent, updateSystemConfig } from '@/api/systemConfig'
 import {
   ScoreDimension, ScoreMode, TierDirection, CalcCycle,
   SCORE_DIMENSION_ICON, SCORE_DIMENSION_COLOR,
@@ -460,20 +460,23 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
   const WEIGHT_COLLAPSED_KEY = 'organic_traffic_weight_collapsed'
   const [weightConfigCollapsed, setWeightConfigCollapsed] = useState(false)
 
-  /** 從數據庫加載折叠狀態 */
+  /**
+   * 從數據庫加載折叠狀態（靜默讀：讀不到就保持默認展開）。
+   * 折疊態是 UI 偏好，不應因權限/網絡問題彈錯；早期用 getSystemConfig 會讓無 rule-algorithm 權限的
+   * 算法庫用戶每次進頁都被頂一句 403 提示。
+   */
   useEffect(() => {
-    getSystemConfig(WEIGHT_COLLAPSED_KEY).then(res => {
-      if (res?.value === 'true') setWeightConfigCollapsed(true)
-    }).catch(() => { /* 靜默：首次無數據時保持默認展開 */ })
+    getSystemConfigSilent(WEIGHT_COLLAPSED_KEY)
+      .then(value => setWeightConfigCollapsed(value === 'true'))
   }, [])
 
-  /** 切换折叠狀態時同步到數據庫 */
+  /** 切换折叠狀態時同步到數據庫（失敗只降級為本次會話內生效，不打擾用戶） */
   const handleToggleWeightCollapsed = () => {
     const next = !weightConfigCollapsed
     setWeightConfigCollapsed(next)
     if (readOnly) return
     updateSystemConfig(WEIGHT_COLLAPSED_KEY, String(next)).catch(() => {
-      message.warning('配置保存失敗，請重試')
+      // 折疊偏好寫不進去只影響下次進頁的默認態，本地狀態已生效
     })
   }
   /** 內聯編輯中的規則 ID 集合 */
@@ -2725,17 +2728,24 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
   }
 
 
-  /** 是否顯示維度權重與計算配置區（由規則配置菜單控制；後端 DB 優先，localStorage 兜底） */
+  /**
+   * 是否顯示維度權重與計算配置區（由「平台支持系統 - 算法配置規則」的開關控制）。
+   * <p>口徑：後端 sys_config 為唯一真值 —— 只有明確讀到 'false' 才隱藏；讀不到（key 未落庫 / 後端不可用）
+   * 時退回 localStorage 快取，最後才是默認「顯示」。
+   * <p>必須用静默讀：這個 key 歸屬 rule-algorithm 菜單，消費者是算法庫用戶，
+   * 早期用 getSystemConfig 一旦 403 就會既彈錯又退回默認「顯示」（管理員已關閉、其他人照樣看得到）。
+   * 後端已為該版塊登記運行時只讀回退菜單（RuleConfigKeyRegistry.RUNTIME_READER_MENU → promotion-algorithm），
+   * 持有算法庫即可讀；這裡再保證讀失敗時不刷屏。
+   */
   const [showDimensionWeight, setShowDimensionWeight] = useState(
     () => getSystemRuleValue<boolean>('organic_traffic_show_dimension_weight') !== false,
   )
   useEffect(() => {
-    getSystemConfig('organic_traffic_show_dimension_weight')
-      .then(res => {
-        if (res?.value === 'true') setShowDimensionWeight(true)
-        else if (res?.value === 'false') setShowDimensionWeight(false)
+    getSystemConfigSilent('organic_traffic_show_dimension_weight')
+      .then(value => {
+        if (value === 'false') setShowDimensionWeight(false)
+        else if (value === 'true') setShowDimensionWeight(true)
       })
-      .catch(() => { /* 後端不可用時保持本地值 */ })
   }, [])
 
   return (

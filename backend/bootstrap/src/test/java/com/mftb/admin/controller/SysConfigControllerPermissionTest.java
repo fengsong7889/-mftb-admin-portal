@@ -95,7 +95,7 @@ class SysConfigControllerPermissionTest {
     }
 
     @Test
-    @DisplayName("非廣告銷售版块 key 不回退：gift 规则需 rule-gift 或 rule-config")
+    @DisplayName("非廣告銷售/算法版塊 key 不回退：gift 規則需 rule-gift 或 rule-config")
     void otherOwnerMenuHasNoReaderFallback() {
         grant("ad-sales", "view");
 
@@ -104,10 +104,31 @@ class SysConfigControllerPermissionTest {
     }
 
     @Test
+    @DisplayName("仅持算法庫菜單：可讀自然流量顯示開關（算法版塊運行時只讀回退）")
+    void readAllowedForAlgorithmRuntimeReaderMenu() {
+        grant("promotion-algorithm", "view");
+        when(sysConfigService.getConfigValue("organic_traffic_show_dimension_weight")).thenReturn("false");
+
+        // 持有算法庫即可讀開關, 否則無 rule-algorithm 的運營同學 GET 403 → 前端 fail-open 默認顯示
+        assertDoesNotThrow(() -> controller.get("organic_traffic_show_dimension_weight"));
+    }
+
+    @Test
+    @DisplayName("算法版塊只讀回退不适用于写：仅持算法庫不可改顯示開關")
+    void algorithmWriteNotFallbackToReaderMenu() {
+        grant("promotion-algorithm", "edit");
+        com.mftb.admin.dto.SysConfigUpdateDTO dto = new com.mftb.admin.dto.SysConfigUpdateDTO();
+        dto.setValue("false");
+
+        assertThrows(PermissionDeniedException.class,
+                () -> controller.update("organic_traffic_show_dimension_weight", dto));
+    }
+
+    @Test
     @DisplayName("无法归类 key 回退旧 rule-config 菜单（保持拆分前行为）")
     void unknownKeyRequiresLegacyMenu() {
         grant("rule-config", "view");
 
-        assertDoesNotThrow(() -> controller.get("organic_traffic_weight_collapsed"));
+        assertDoesNotThrow(() -> controller.get("product_version"));
     }
 }

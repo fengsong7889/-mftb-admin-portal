@@ -13,15 +13,19 @@ import ScoreRow from './AlgorithmForm/ScoreRow'
  */
 
 const api = vi.hoisted(() => ({ fetch: vi.fn(), update: vi.fn(), create: vi.fn(), toggle: vi.fn(), remove: vi.fn(), algorithms: vi.fn() }))
+/** localStorage 快取层的規則值（本页初始態）; 单测按用例改写, 以验证「後端真值覆盖本地快取」 */
+const ruleValueMock = vi.hoisted(() => vi.fn(() => true))
 vi.mock('@/api/organicScore', () => ({
   fetchOrganicScoreConfig: api.fetch, updateOrganicRule: api.update,
   createOrganicRule: api.create, toggleOrganicRuleStatus: api.toggle, deleteOrganicRule: api.remove,
   updateDimensionWeights: vi.fn(),
 }))
-vi.mock('@/api/systemConfig', () => ({ getSystemConfig: vi.fn().mockResolvedValue(null), updateSystemConfig: vi.fn() }))
+/** 後端 sys_config 開關：默認 null（讀不到=走默認態），單測按用例改寫返回值 */
+const sysConfigMock = vi.hoisted(() => vi.fn().mockResolvedValue(null))
+vi.mock('@/api/systemConfig', () => ({ getSystemConfig: sysConfigMock, getSystemConfigSilent: sysConfigMock, updateSystemConfig: vi.fn() }))
 vi.mock('@/api/store', () => ({ fetchStores: vi.fn().mockResolvedValue({ records: [] }) }))
 vi.mock('@/api/adPromotion', () => ({ fetchAdAlgorithms: api.algorithms, fetchAdAlgorithmByCode: vi.fn() }))
-vi.mock('@/hooks/useSystemRules', () => ({ getSystemRuleValue: () => false }))
+vi.mock('@/hooks/useSystemRules', () => ({ getSystemRuleValue: ruleValueMock }))
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
 vi.mock('antd', async importOriginal => ({
   ...await importOriginal<typeof import('antd')>(),
@@ -51,6 +55,43 @@ beforeEach(() => {
   vi.clearAllMocks()
   api.fetch.mockResolvedValue({ rules: [], dimensions: [] })
   api.algorithms.mockResolvedValue({ records: [] })
+  sysConfigMock.mockResolvedValue(null)
+  ruleValueMock.mockReturnValue(true)
+})
+
+describe('維度權重與計算配置區：受「算法配置規則」開關控制', () => {
+  /** 開關 key（後端 sys_config），關閉後整卡不得渲染 */
+  const WEIGHT_KEY = 'organic_traffic_show_dimension_weight'
+  const weightSectionLabel = 'organicTrafficScore.dimensionWeightConfig'
+
+  it('本地快取還是開、後端已回 false → 必須以對端為準隐藏', async () => {
+    ruleValueMock.mockReturnValue(true)
+    sysConfigMock.mockImplementation((key: string) =>
+      Promise.resolve(key === WEIGHT_KEY ? 'false' : null))
+    await mount()
+    // 折疊卡以带 aria-label 的按钮为标题; 隐藏后该按钮与整卡均不应存在
+    await waitFor(() => expect(screen.queryByRole('button', { name: weightSectionLabel })).not.toBeInTheDocument())
+    expect(screen.queryByText('organicTrafficScore.saveWeight')).not.toBeInTheDocument()
+    // 其余維度評分項配置照常展示，開關只藏高級配置區
+    expect(screen.getByText('organicTrafficScore.pageTitle')).toBeInTheDocument()
+  })
+
+  it('本地快取是舊的關、後端已回 true → 照常顯示', async () => {
+    ruleValueMock.mockReturnValue(false)
+    sysConfigMock.mockImplementation((key: string) =>
+      Promise.resolve(key === WEIGHT_KEY ? 'true' : null))
+    await mount()
+    await waitFor(() => expect(screen.getByRole('button', { name: weightSectionLabel })).toBeInTheDocument())
+  })
+
+  it('讀不到對端值時走本地快取, 不强制隐藏也不弹错', async () => {
+    // 必须走静默讀(getSystemConfigSilent): 持有算法庫但无 rule-algorithm 权限时不能每次进页弹一句 403
+    ruleValueMock.mockReturnValue(true)
+    sysConfigMock.mockResolvedValue(null)
+    await mount()
+    await waitFor(() => expect(sysConfigMock).toHaveBeenCalledWith(WEIGHT_KEY))
+    expect(screen.getByRole('button', { name: weightSectionLabel })).toBeInTheDocument()
+  })
 })
 
 describe('通用计分项：模块卡片与减免运费开关', () => {

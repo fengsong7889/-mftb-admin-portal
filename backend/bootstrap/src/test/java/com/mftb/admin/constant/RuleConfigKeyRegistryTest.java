@@ -39,6 +39,8 @@ class RuleConfigKeyRegistryTest {
     void securityAndAlgorithm() {
         assertEquals(RuleConfigKeyRegistry.MENU_SECURITY, RuleConfigKeyRegistry.resolveOwnerMenu("session_idle_timeout_ms"));
         assertEquals(RuleConfigKeyRegistry.MENU_ALGORITHM, RuleConfigKeyRegistry.resolveOwnerMenu("organic_traffic_show_dimension_weight"));
+        // 折疊態與開關同屬算法配置版塊: 頁面渲染時一併讀, 不登記就會落到 rule-config 兜底讓普通用戶 403
+        assertEquals(RuleConfigKeyRegistry.MENU_ALGORITHM, RuleConfigKeyRegistry.resolveOwnerMenu("organic_traffic_weight_collapsed"));
     }
 
     /**
@@ -59,16 +61,19 @@ class RuleConfigKeyRegistryTest {
     @Test
     @DisplayName("未知 key 不歸屬任何版塊")
     void unknownKeys() {
-        assertNull(RuleConfigKeyRegistry.resolveOwnerMenu("organic_traffic_weight_collapsed"));
+        assertNull(RuleConfigKeyRegistry.resolveOwnerMenu("organic_traffic_weight_something_else"));
         assertNull(RuleConfigKeyRegistry.resolveOwnerMenu("product_version"));
         assertNull(RuleConfigKeyRegistry.resolveOwnerMenu(null));
         assertNull(RuleConfigKeyRegistry.resolveOwnerMenu("  "));
     }
 
     @Test
-    @DisplayName("廣告銷售版塊只讀回退到消費方菜單 ad-sales, 其它版塊無回退")
-    void runtimeReaderMenuOnlyForAdSales() {
+    @DisplayName("廣告銷售/算法配置版塊只讀回退到消費方菜單, 其它版塊無回退")
+    void runtimeReaderMenu() {
         assertEquals("ad-sales", RuleConfigKeyRegistry.resolveRuntimeReaderMenu(RuleConfigKeyRegistry.MENU_AD_SALES));
+        // 算法庫用戶必須能讀顯示開關, 否則「已關閉」對他們永遠不生效(fail-open)
+        assertEquals("promotion-algorithm",
+                RuleConfigKeyRegistry.resolveRuntimeReaderMenu(RuleConfigKeyRegistry.MENU_ALGORITHM));
         assertNull(RuleConfigKeyRegistry.resolveRuntimeReaderMenu(RuleConfigKeyRegistry.MENU_GIFT));
         assertNull(RuleConfigKeyRegistry.resolveRuntimeReaderMenu(RuleConfigKeyRegistry.MENU_SECURITY));
         assertNull(RuleConfigKeyRegistry.resolveRuntimeReaderMenu(null));
