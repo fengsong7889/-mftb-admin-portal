@@ -1,6 +1,7 @@
 package com.mftb.admin.service;
 
 import com.mftb.admin.dto.AiMyCenterDTO;
+import com.mftb.admin.entity.SysUser;
 
 import java.util.List;
 
@@ -39,4 +40,18 @@ public interface AiMyCenterService {
      * @param modelKey 目标模型标识
      */
     AiMyCenterDTO.QuotaCheckVO checkQuota(Long modelId, String modelKey);
+
+    /* ==================== 显式员工求值（管理员诊断专用，只读） ==================== */
+
+    /**
+     * 指定员工的授权模型列表（与 {@link #myModels()} 同源口径，但作用于传入员工而非当前登录人）。
+     * <p>只读诊断专用：调用方必须传入服务端加载的 {@link SysUser}，不得用前端自报身份伪造或切换会话。
+     */
+    List<AiMyCenterDTO.MyModelVO> modelsOf(SysUser user);
+
+    /** 指定员工是否被授权使用某模型（与 {@link #modelsOf} 同源）。 */
+    boolean hasModelAccess(SysUser user, String modelKey);
+
+    /** 指定员工的额度校验（与 {@link #checkQuota} 同源口径，作用于传入员工）。 */
+    AiMyCenterDTO.QuotaCheckVO checkQuotaFor(SysUser user, Long modelId, String modelKey);
 }

@@ -158,4 +158,62 @@ describe('系统导航异步隔离', () => {
     expect(result.current.tree).toEqual([])
     expect(result.current.loaded).toBe(false)
   })
+
+  it('窗口聚焦风暴只发一次导航请求，不每次事件都拉整棵树', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.mocked(request.get).mockResolvedValue([finance])
+      const { result } = renderHook(() => useSystemNavigation('ads'))
+      await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+      expect(result.current.tree).toEqual([finance])
+
+      const callsForAds = () => vi.mocked(request.get).mock.calls.filter(c => String(c[0]).includes('/ads/')).length
+      const before = callsForAds()
+      // 事件之间留出 120ms 让上一发请求落地，绕开模块级 in-flight 合并：
+      // 真实焦点抖动就是这种「串行」形态（间隔大于单次耗时），只有最小间隔限流能挡住。
+      for (let i = 0; i < 10; i += 1) {
+        await act(async () => {
+          window.dispatchEvent(new Event('focus'))
+          await vi.advanceTimersByTimeAsync(120)
+        })
+      }
+      // 10 个事件总跳度 1.2s，远小于 10s 最小间隔：只允许首个事件补一发。
+      expect(callsForAds() - before).toBeLessThanOrEqual(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('已有导航树时聚焦刷新不清空也不进 loading，避免面板闪「加載中」', async () => {
+    const refresh = deferred<MenuVO[]>()
+    vi.mocked(request.get).mockResolvedValueOnce([finance]).mockReturnValueOnce(refresh.promise)
+    const { result } = renderHook(() => useSystemNavigation('seller'))
+    await act(async () => {})
+    expect(result.current).toMatchObject({ tree: [finance], loading: false, loaded: true })
+
+    act(() => { window.dispatchEvent(new Event('focus')) })
+
+    // 刷新在途，界面必须继续显示旧树：这里不能清 tree 也不能置 loading。
+    expect(result.current.tree).toEqual([finance])
+    expect(result.current.loading).toBe(false)
+
+    await act(async () => { refresh.resolve([]) })
+    expect(result.current.tree).toEqual([])
+    expect(result.current.loaded).toBe(true)
+  })
+
+  it('静默刷新失败时保留己展示的导航，不把后台失败渲染成数据消失', async () => {
+    vi.mocked(request.get)
+      .mockResolvedValueOnce([finance])
+      .mockRejectedValueOnce(new Error('timeout of 15000ms exceeded'))
+    const { result } = renderHook(() => useSystemNavigation('payroll'))
+    await act(async () => {})
+    expect(result.current.tree).toEqual([finance])
+
+    await act(async () => { window.dispatchEvent(new Event('focus')) })
+
+    expect(result.current.tree).toEqual([finance])
+    expect(result.current.error).toBeNull()
+    expect(result.current.loading).toBe(false)
+  })
 })

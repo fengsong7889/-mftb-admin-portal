@@ -573,6 +573,39 @@ class MeetingBookingSecurityTest {
         assertFalse(Boolean.TRUE.equals(service.detail(71L).getCanMinutes()));
     }
 
+    /**
+     * 「編輯」按钮与 update() 护栏同口径。
+     *
+     * <p>为什么单独钉一条：canEdit 早先是按 occupying（已預約 + 已簽到）算的，
+     * 而 update 只接受「已預約且尚未開始」——已签到又未到点的会因此拿到按钮，
+     * 用户填完整张表单才被拒。按钮能给≠改得动，这类错位只能靠断言钉住。
+     */
+    @Test
+    @DisplayName("只有已預約且尚未開始的会才给编辑入口：已签到不给，已开始也不给")
+    void editEntryOpensOnlyForNotStartedBookedMeeting() {
+        LocalDateTime futureStart = LocalDateTime.now().plusHours(2);
+        MeetingBooking booked = booking(72L, MeetingConstants.STATUS_BOOKED, ORGANIZER.getId());
+        booked.setStartTime(futureStart);
+        booked.setEndTime(futureStart.plusHours(1));
+        when(bookingMapper.selectById(72L)).thenReturn(booked);
+        when(guard.isOrganizer(booked, ORGANIZER)).thenReturn(true);
+        assertTrue(Boolean.TRUE.equals(service.detail(72L).getCanEdit()), "未開始的預約必須給編輯入口");
+
+        MeetingBooking checkedIn = booking(73L, MeetingConstants.STATUS_CHECKED_IN, ORGANIZER.getId());
+        checkedIn.setStartTime(futureStart);
+        checkedIn.setEndTime(futureStart.plusHours(1));
+        when(bookingMapper.selectById(73L)).thenReturn(checkedIn);
+        when(guard.isOrganizer(checkedIn, ORGANIZER)).thenReturn(true);
+        assertFalse(Boolean.TRUE.equals(service.detail(73L).getCanEdit()), "已簽到的會改不了，不給必敗的按鈕");
+
+        MeetingBooking started = booking(74L, MeetingConstants.STATUS_BOOKED, ORGANIZER.getId());
+        started.setStartTime(LocalDateTime.now().minusMinutes(5));
+        started.setEndTime(LocalDateTime.now().plusMinutes(55));
+        when(bookingMapper.selectById(74L)).thenReturn(started);
+        when(guard.isOrganizer(started, ORGANIZER)).thenReturn(true);
+        assertFalse(Boolean.TRUE.equals(service.detail(74L).getCanEdit()), "已開始的會只能取消重訂");
+    }
+
     @Test
     @DisplayName("bizType 白名单之外的取值被拒，不写入未知枚举")
     void unknownBizTypeIsRejected() {

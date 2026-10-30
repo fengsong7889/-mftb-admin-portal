@@ -323,6 +323,13 @@ export default function Home() {
   }, [quickResizing])
   /** 标记首次加载（后端/localStorage）是否已完成，防止挂载时默认值覆盖云端数据 */
   const favoritesLoadedRef = useRef(false)
+  /**
+   * 标记用户是否真的改过快捷入口。仅有 loaded 守卫拦不住无谓写入：
+   * 加载是 `.then(setFavorites).finally(置 loaded)`，React 18 批处理后
+   * 持久化 effect 看到的 loaded 已是 true，于是把刚读回来的值又写回去
+   * （实测冷加载即发一次 PUT quick-favorites）。
+   */
+  const favoritesDirtyRef = useRef(false)
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
   const { menuTree, status: menuStatus, refresh: refreshMenus } = useMenu()
@@ -569,6 +576,15 @@ export default function Home() {
   const [quickOpen, setQuickOpen] = useState(false)
   /** 标记 AI 设置首次加载（后端/localStorage）是否已完成，防止挂载时默认值覆盖云端数据 */
   const aiSettingsLoadedRef = useRef(false)
+  /**
+   * 标记用户是否真的改过 AI 设置。持久化 effect 的 deps 含 engine?.mode，
+   * 而它是 60 秒引擎轮询回来的派生值——用户什么都没动它也会变，
+   * 旧实现因此每分钟把同一份设置原样 PUT 一次（实测冷加载 20s 内已发 2 次）。
+   * 这是用户偏好数据，无脏判断的回写在多标签页/多设备下会把旧值覆盖到新值之上。
+   */
+  const aiSettingsDirtyRef = useRef(false)
+  /** 上一次已落库的载荷签名；dirty 为真后靠它拦住轮询带来的相同内容重复 PUT。 */
+  const aiSettingsSyncedRef = useRef<string | null>(null)
   const aiSettingsSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   /* ── 我的用量 ── */
@@ -750,21 +766,33 @@ export default function Home() {
     return () => { cancelled = true }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** 持久化 AI 设置：防抖写后端 + localStorage */
+  /**
+   * 持久化 AI 设置：防抖写后端 + localStorage。
+   *
+   * <p>两道判断缺一不可：
+   * - dirty：没有任何用户改动时（hydration、引擎轮询）一律不写；
+   * - signature：engine?.mode 必须留在 deps 里（引擎切换靠它触发），
+   *   因此脏过一次之后每轮轮询仍会重跑本 effect；靠「与上次已落库内容相同则跳过」
+   *   拦住重复 PUT，比依赖某个清零动作更不容易遗漏。
+   */
   useEffect(() => {
     if (!aiSettingsLoadedRef.current) return // 首次加载未完成前不写回
+    if (!aiSettingsDirtyRef.current) return // 未发生用户改动：引擎轮询等派生变更不得写库
     if (!user?.username) return
+    const settings: AiSettings = {
+      engineMode: getEngineMode(),
+      contextWindow,
+      thinkingEnabled,
+      thinkingDepth,
+    }
+    const signature = JSON.stringify(settings)
+    if (signature === aiSettingsSyncedRef.current) return
     // 防抖 1 秒，避免用户快速切换时频繁请求
     if (aiSettingsSaveTimerRef.current) clearTimeout(aiSettingsSaveTimerRef.current)
     aiSettingsSaveTimerRef.current = setTimeout(() => {
-      const settings: AiSettings = {
-        engineMode: getEngineMode(),
-        contextWindow,
-        thinkingEnabled,
-        thinkingDepth,
-      }
+      aiSettingsSyncedRef.current = signature
       // 同时写 localStorage 作为离线缓存
-      localStorage.setItem(`ai_settings:${user.username}`, JSON.stringify(settings))
+      localStorage.setItem(`ai_settings:${user.username}`, signature)
       saveAiSettings(settings).catch(() => { /* 后端不可用时仅保留 localStorage */ })
     }, 1000)
     return () => {
@@ -974,6 +1002,7 @@ export default function Home() {
         message.warning(`最多收藏 ${MAX_FAVORITES} 個菜單，請先移除不常用的項目`)
         return
       }
+      favoritesDirtyRef.current = true
       setFavorites([...favorites, key])
     }
     setShowAddMenu(false)
@@ -981,12 +1010,14 @@ export default function Home() {
   }
 
   const removeFavorite = (key: string) => {
+    favoritesDirtyRef.current = true
     setFavorites(favorites.filter((k) => k !== key))
   }
 
-  /** 持久化快捷入口：优先存后端，同时写 localStorage 作为离线缓存 */
+  /** 持久化快捷入口：优先存后端，同时写 localStorage 作为离线缓存（仅用户真改过才写） */
   useEffect(() => {
     if (!favoritesLoadedRef.current) return // 首次加载未完成前不写回，避免默认值覆盖云端数据
+    if (!favoritesDirtyRef.current) return // 刚读回来的值不得原样写回
     if (user?.username) {
       localStorage.setItem(FAV_KEY(user.username), JSON.stringify(favorites))
       saveQuickFavorites(favorites).catch(() => { /* 后端不可用时仅保留 localStorage */ })
@@ -1480,6 +1511,7 @@ export default function Home() {
       return
     }
     setEngineMode(next)
+    aiSettingsDirtyRef.current = true
     fetchEngineStatus().then(setEngine)
     if (next === 'auto' && deniedChannels.length > 0) {
       showAutoLimitedModal(deniedChannels)
@@ -1492,6 +1524,7 @@ export default function Home() {
   useEffect(() => {
     if ((engineMode === 'primary' || engineMode === 'off-peak') && deniedChannels.includes(engineMode)) {
       setEngineMode('auto')
+      aiSettingsDirtyRef.current = true
       fetchEngineStatus().then(setEngine)
       message.info(t('home.engineAutoSwitchMsg', { model: modelDisplayName(modeModelKey(engineMode)) ?? engineMode }))
     }
@@ -1654,7 +1687,7 @@ export default function Home() {
                           <div
                             key={cw}
                             className={`home-ai-settings-option${contextWindow === cw ? ' active' : ''}`}
-                            onClick={() => setContextWindow(cw)}
+                            onClick={() => { aiSettingsDirtyRef.current = true; setContextWindow(cw) }}
                           >
                             {formatContextWindow(cw)}
                             {contextWindow === cw && <CheckOutlined className="home-ai-settings-check" />}
@@ -1670,7 +1703,7 @@ export default function Home() {
                           <button
                             type="button"
                             className={`home-ai-thinking-toggle${thinkingEnabled ? ' on' : ' off'}`}
-                            onClick={() => setThinkingEnabled(!thinkingEnabled)}
+                            onClick={() => { aiSettingsDirtyRef.current = true; setThinkingEnabled(!thinkingEnabled) }}
                           >
                             <span className="home-ai-thinking-toggle-dot" />
                           </button>
@@ -1681,7 +1714,7 @@ export default function Home() {
                               <div
                                 key={d}
                                 className={`home-ai-settings-option${thinkingDepth === d ? ' active' : ''}`}
-                                onClick={() => setThinkingDepth(d)}
+                                onClick={() => { aiSettingsDirtyRef.current = true; setThinkingDepth(d) }}
                               >
                                 {t(`home.thinkingDepth${d.charAt(0).toUpperCase() + d.slice(1)}`)}
                                 {thinkingDepth === d && <CheckOutlined className="home-ai-settings-check" />}

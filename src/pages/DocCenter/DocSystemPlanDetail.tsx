@@ -61,8 +61,19 @@ export default function DocSystemPlanDetail() {
           <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{plan.title}</h2>
           <Tag color="blue">{plan.planType}</Tag>
           {plan.systemCode && <Tag>{plan.systemCode}</Tag>}
+          {plan.status === 0
+            ? <Tag color="red">{t('docKnowledge.systemPlanStatusDeprecated')}</Tag>
+            : <Tag color="green">{t('docKnowledge.systemPlanStatusActive')}</Tag>}
         </div>
       </div>
+
+      {/* 已停用方案仍可打开：目的正是让人看到「这份已被判定为不再适用」，
+          而不是抹掉历史。警示条必须放在正文之前，不能只靠列表页的标签。 */}
+      {plan.status === 0 && (
+        <Alert type="warning" showIcon style={{ marginBottom: 16 }}
+          message={t('docKnowledge.systemPlanDeprecatedBanner')}
+          description={t('docKnowledge.systemPlanDeprecatedBannerDesc')} />
+      )}
 
       <DocSectionCard icon={<FileTextOutlined />} color="#1890ff" bg="#e6f7ff" title={t('docKnowledge.systemPlanMeta')}>
         <Descriptions bordered size="small" column={2} items={[

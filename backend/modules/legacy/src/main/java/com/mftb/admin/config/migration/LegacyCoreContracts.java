@@ -65,6 +65,9 @@ public class LegacyCoreContracts implements SchemaContractProvider {
         // 会议纪要三表（主表/发送批次/投递队列）：发送是关键写入路径，缺表会让纪要发不出去且无留痕；
         // DDL 从 classpath 脚本切片，不在这里重抄一份，避免两份真值漂移
         combined.addAll(com.mftb.admin.config.MeetingMinutesSchema.contracts());
+        // 业务 AI 场景开关（试点）：会议 AI 执行前必读该表判启用，缺表会把预检与执行一起打成异常；
+        // 自愈只保证表存在（不带 FK/CHECK，权威 DDL 由 319 脚本的 applyOnce 负责），避免与脚本双份真值。
+        combined.add(aiSceneConfigContract());
         return combined;
     }
 
@@ -662,6 +665,28 @@ public class LegacyCoreContracts implements SchemaContractProvider {
                         + "KEY idx_delivery_status (status, created_at), "
                         + "KEY idx_delivery_conv (conversation_pk)"
                         + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='AI 通知外部投递日志'",
+                java.util.List.of());
+    }
+
+    /**
+     * 业务 AI 场景开关表启动自愈契约：只保证表与关键列存在（不带 FK/CHECK），
+     * 权威 DDL（含 CHECK 与外键、默认登记的 meeting_minutes 行）由 319 脚本的 applyOnce 负责。
+     */
+    private static ContractSpec aiSceneConfigContract() {
+        return new ContractSpec(
+                "ai-scene-config",
+                "ai_scene_config",
+                "CREATE TABLE IF NOT EXISTS ai_scene_config ("
+                        + "scene_key VARCHAR(64) NOT NULL COMMENT '场景标识', "
+                        + "enabled TINYINT NOT NULL DEFAULT 0 COMMENT '1=启用 0=停用', "
+                        + "version BIGINT NOT NULL DEFAULT 0 COMMENT '乐观锁版本', "
+                        + "reason VARCHAR(255) DEFAULT NULL COMMENT '最近变更原因', "
+                        + "created_by BIGINT DEFAULT NULL COMMENT '创建人(sys_user.id)', "
+                        + "updated_by BIGINT DEFAULT NULL COMMENT '最后更新人(sys_user.id)', "
+                        + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                        + "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, "
+                        + "PRIMARY KEY (scene_key)"
+                        + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='业务 AI 场景开关'",
                 java.util.List.of());
     }
 

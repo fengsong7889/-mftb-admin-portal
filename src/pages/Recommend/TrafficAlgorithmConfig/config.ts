@@ -95,7 +95,6 @@ interface FieldDefinition {
   dependencies?: TrafficFieldName[]
   disabled?: boolean
 }
-const statsOptions = [{ label: '全部历史', value: 'all' }, { label: '自定义周期', value: 'custom' }]
 const priorityOptions = [
   { label: '匹配度优先', value: 'matchFirst' },
   { label: '剩余流量包优先（历史策略）', value: 'trafficBalance' },
@@ -113,9 +112,11 @@ export const TRAFFIC_FIELDS: Record<TrafficFieldName, FieldDefinition> = {
   consistencyCheckInterval: numberField('数据一致性检查周期', 'advanced', 1, 1440, '分钟'),
   productCheckInterval: numberField('商品可用性检查周期', 'advanced', 1, 60, '分钟', ['soldOutFilterEnabled']),
   merchantExposureStrategy: { label: '当前保存的曝光策略', group: 'matching', kind: 'hidden' },
-  merchantKeywordStatsMode: { label: '商家标签统计范围', group: 'matching', kind: 'select', options: statsOptions },
+  // 统计范围固定为全部历史（自定义周期因技术实现难度取消）：以下 4 个键不再渲染选择器，
+  // 仅保留在契约白名单中透传存量参数，兴趣匹配模块以固定口径卡展示（见 sections.tsx）。
+  merchantKeywordStatsMode: { label: '商家标签统计范围', group: 'matching', kind: 'select', options: [] },
   merchantKeywordStatsDays: numberField('商家统计周期', 'matching', 1, 365, '天', ['merchantKeywordStatsMode']),
-  userKeywordStatsMode: { label: '用户标签统计范围', group: 'matching', kind: 'select', options: statsOptions },
+  userKeywordStatsMode: { label: '用户标签统计范围', group: 'matching', kind: 'select', options: [] },
   userKeywordStatsDays: numberField('用户统计周期', 'matching', 1, 365, '天', ['userKeywordStatsMode']),
   userPreferenceMinScore: numberField('偏好识别最低分', 'matching', 1, 100, '分'),
   matchThreshold: numberField('偏好标签覆盖率门槛', 'matching', 1, 100, '%'),
@@ -165,6 +166,10 @@ export const TRAFFIC_FIELDS: Record<TrafficFieldName, FieldDefinition> = {
 }
 
 export const TRAFFIC_FIELD_NAMES = Object.keys(TRAFFIC_DEFAULTS) as TrafficFieldName[]
+/** 已固定为全部历史的废弃选择项（仅透传兼容存量参数，UI 不再提供选择）。 */
+export const TRAFFIC_FIXED_STATS_FIELDS = [
+  'merchantKeywordStatsMode', 'merchantKeywordStatsDays', 'userKeywordStatsMode', 'userKeywordStatsDays',
+] as const
 export const isParamsObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 
@@ -189,12 +194,17 @@ export function readTrafficParams(raw: unknown): TrafficAlgorithmValues {
 }
 
 export function serializeTrafficParams(values: unknown): TrafficAlgorithmValues {
-  return readTrafficParams(values)
+  const result = readTrafficParams(values)
+  // 统计范围已固定为全部历史：选择器字段不再挂载，存量 custom 值在保存时统一归一，
+  // 避免旧记录的自定义周期透传回参数、误导后续接入的执行服务。
+  const fix = <K extends TrafficFieldName>(name: K) => { result[name] = TRAFFIC_DEFAULTS[name] }
+  for (const name of TRAFFIC_FIXED_STATS_FIELDS) fix(name)
+  return result
 }
 
 export function isTrafficFieldActive(name: TrafficFieldName, values: Partial<TrafficAlgorithmValues>): boolean {
-  if (name === 'merchantKeywordStatsDays') return values.merchantKeywordStatsMode === 'custom'
-  if (name === 'userKeywordStatsDays') return values.userKeywordStatsMode === 'custom'
+  // 统计范围/周期已固定为全部历史，不再是可编辑字段，永不参与展示与校验；存储值保留原样。
+  if (['merchantKeywordStatsMode', 'merchantKeywordStatsDays', 'userKeywordStatsMode', 'userKeywordStatsDays'].includes(name)) return false
   if (name === 'productCheckInterval') return values.soldOutFilterEnabled === true
   if (name === 'qualityScoreThreshold') return values.newUserDimensions?.includes('qualityScore') === true
   if (['regionPopularStatsDays', 'popularityMetrics', 'regionPopularTopPercent'].includes(name)) return values.newUserDimensions?.includes('regionPopular') === true

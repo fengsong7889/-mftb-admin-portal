@@ -1,8 +1,10 @@
 package com.mftb.admin.controller;
 
 import com.mftb.admin.annotation.RequirePermission;
+import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.DocKnowledgeDTO.*;
+import com.mftb.admin.dto.DocSystemPlanQuery;
 import com.mftb.admin.service.doc.DocAckService;
 import com.mftb.admin.service.doc.DocAssetService;
 import com.mftb.admin.service.doc.DocClearanceService;
@@ -461,17 +463,21 @@ public class DocKnowledgeController {
     @GetMapping("/system-plans")
     @RequirePermission(menu = "doc-system-plans", action = "view")
     @Operation(summary = "系统方案库列表")
-    public Result<SystemPlanPage> systemPlans(@RequestParam(required = false) String keyword,
-                                              @RequestParam(required = false) String system,
-                                              @RequestParam(defaultValue = "1") int page,
-                                              @RequestParam(defaultValue = "20") int size) {
-        return Result.success(systemPlans.list(keyword, system, page, size));
+    public Result<SystemPlanPage> systemPlans(@ModelAttribute DocSystemPlanQuery query) {
+        return Result.success(systemPlans.list(query));
     }
 
     @GetMapping("/system-plans/systems")
     @RequirePermission(menu = "doc-system-plans", action = "view")
     public Result<List<String>> systemPlanSystems() {
         return Result.success(systemPlans.systems());
+    }
+
+    @GetMapping("/system-plans/plan-types")
+    @RequirePermission(menu = "doc-system-plans", action = "view")
+    @Operation(summary = "方案类型候选（跨全部状态，否则停用筛选下会缺项）")
+    public Result<List<String>> systemPlanTypes() {
+        return Result.success(systemPlans.planTypes());
     }
 
     @GetMapping("/system-plans/{id}")
@@ -485,6 +491,15 @@ public class DocKnowledgeController {
     @Operation(summary = "同步系统生成的 MD 方案文件")
     public Result<Map<String, Object>> scanSystemPlans() {
         return Result.success(systemPlans.scan());
+    }
+
+    @PostMapping("/system-plans/{id}/status")
+    @RequirePermission(menu = "doc-system-plans", action = "edit")
+    @Operation(summary = "停用/启用方案（停用仅限制默认展示与参考，不删除归档）")
+    public Result<SystemPlan> updateSystemPlanStatus(@PathVariable long id, @RequestBody Map<String, Object> body) {
+        Object status = body.get("status");
+        if (!(status instanceof Number number)) throw new BusinessException(400, "缺少 status");
+        return Result.success(systemPlans.updateStatus(id, number.intValue()));
     }
 
     @GetMapping("/api-center/systems")

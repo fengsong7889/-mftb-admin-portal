@@ -1,4 +1,5 @@
 import { Checkbox, Form, Input, InputNumber, Select, Switch } from 'antd'
+import { LockOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import MerchantStatusFields from '../AlgorithmForm/MerchantStatusFields'
 import { getTrafficFieldError, isTrafficFieldActive, TRAFFIC_FIELDS, trafficStrategyLabel, type TrafficAlgorithmValues, type TrafficFieldName } from './config'
@@ -66,12 +67,37 @@ export function AvailabilitySection(props: TrafficSectionProps) {
   )
 }
 
+/** 统计范围已固定为全部历史，不再提供选择器，仅以只读口径卡展示。 */
+function FixedStatsCard({ staleCustom }: { staleCustom: boolean }) {
+  const items = [
+    { key: 'merchant', label: '商家标签统计范围' },
+    { key: 'user', label: '用户标签统计范围' },
+  ]
+  return (
+    <div className="traffic-config__fixed-stats" role="note" aria-label="标签统计范围固定口径">
+      <div className="traffic-config__fixed-stats-items">
+        {items.map(item => (
+          <div key={item.key} className="traffic-config__fixed-stats-item">
+            <span>{item.label}</span>
+            <strong>全部历史 <LockOutlined aria-hidden /> 固定口径</strong>
+          </div>
+        ))}
+      </div>
+      <p>自定义周期因技术实现难度已取消，标签统计一律基于全部历史订单，无需也无法选择。</p>
+      {staleCustom && (
+        <p className="traffic-config__warning">历史记录中保存的自定义周期已不再生效，保存后统一按全部历史口径执行。</p>
+      )}
+    </div>
+  )
+}
+
 export function MatchingSection(props: TrafficSectionProps) {
   const { t } = useTranslation()
+  const staleCustom = props.values.merchantKeywordStatsMode === 'custom' || props.values.userKeywordStatsMode === 'custom'
   return (
     <>
       <p className="traffic-config__hint">已确认计数口径：同一订单内，同一标准标签商家和用户各加 1；多份商品不重复计数。原始订单计数与推荐有效分分开。</p>
-      <Fields {...props} names={['merchantKeywordStatsMode', 'merchantKeywordStatsDays', 'userKeywordStatsMode', 'userKeywordStatsDays']} />
+      <FixedStatsCard staleCustom={staleCustom} />
       <Fields {...props} names={['userPreferenceMinScore', 'matchThreshold', 'maxUserTags', 'explorationSlots', 'merchantExposureStrategy']} />
       <div className="traffic-config__note">
         <strong>现有覆盖率口径</strong>

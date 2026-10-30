@@ -1,5 +1,10 @@
 /**
- * 新建会议预约（独立页面，路由 /meeting-booking-form?roomId=&date=&start=）。
+ * 会议预约表单（独立页面）：新建 `/meeting-booking-form?roomId=&date=&start=`，
+ * 编辑 `/meeting-booking-form?bookingId=<id>&from=<回跳地址>`。
+ *
+ * <p>为什么新建与编辑共用一页：两条路径要吃同一套口径（预约粒度、单场时长上下限、
+ * 容量、参会人名单算法）。各写一份表单，迟早出现「新建校验了容量、改期没校验」这类
+ * 同构漏洞；后端 create/update 也刻意共用同一条 occupy 实现，前端跟着同一取舍。
  *
  * <p>为什么是独立页面而不是弹窗（§9.1）：预约要同时决定"哪间房、哪段时间、谁参加、是否周期"，
  * 周期设置还会展开出 4~5 个字段与场次预览；弹窗里这些内容只能滚动查看，
@@ -28,12 +33,16 @@ import RemarkTextArea from '@/components/RemarkTextArea'
 import {
   createMeeting,
   createSeries,
+  fetchMeetingDetail,
   fetchMeetingRoomDetail,
   newMeetingRequestKey,
   previewSeries,
   toMeetingIso,
+  updateMeeting,
   type MeetingCreateForm,
   type MeetingRoomVO,
+  type MeetingUpdateForm,
+  type MeetingVO,
   type SeriesPreview,
 } from '@/api/meeting'
 import { bizTypeLabels } from '../meetingMeta'
@@ -114,12 +123,20 @@ export default function MeetingBookingForm() {
   const roomId = Number(searchParams.get('roomId'))
   const dateParam = searchParams.get('date')
   const startParam = searchParams.get('start')
+  // 编辑入口只带单号：房间、名单、时间全部按 id 回查，靠 URL 传值会被手改成别人的会
+  const bookingIdParam = searchParams.get('bookingId')
+  const editId = bookingIdParam ? Number(bookingIdParam) : undefined
+  const isEdit = editId != null && Number.isFinite(editId) && editId > 0
+  /** 保存/返回后的落点：预约记录与详情页都从这里进来，回到来处才不会把人丢在别的菜单 */
+  const backTarget = searchParams.get('from') || (isEdit ? `/meeting-detail?id=${editId}` : '/meeting-booking')
   const day = dateParam && dayjs(dateParam).isValid() ? dayjs(dateParam) : dayjs()
   const initialStart = startParam && dayjs(`${day.format('YYYY-MM-DD')} ${startParam}`).isValid()
     ? dayjs(`${day.format('YYYY-MM-DD')} ${startParam}`)
     : undefined
 
   const [room, setRoom] = useState<MeetingRoomVO>()
+  /** 编辑模式的原始单据：版本号（乐观锁）、变更前的时间/房间、业务单归属都取自它 */
+  const [booking, setBooking] = useState<MeetingVO>()
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string>()
   const [submitting, setSubmitting] = useState(false)
@@ -169,11 +186,13 @@ export default function MeetingBookingForm() {
   const end = startDate && start && duration ? start.add(duration, 'minute') : undefined
 
   const goBack = useCallback(() => {
-    navigate('/meeting-booking', { replace: true, state: { closeMenuTab: location.pathname + location.search } })
-  }, [navigate, location.pathname, location.search])
+    navigate(backTarget, { replace: true, state: { closeMenuTab: location.pathname + location.search } })
+  }, [navigate, backTarget, location.pathname, location.search])
 
   /** 按 roomId 回查房间档案：忙闲页只带展示字段，容量与生效规则必须从档案接口取 */
   useEffect(() => {
+    // 编辑模式的房间由单据带出，这里不抢跑（否则会先报“缺少會議室參數”）
+    if (isEdit) return
     if (!roomId || Number.isNaN(roomId)) {
       setLoading(false)
       setLoadError(t('meeting.missingRoomParameterPlease', { defaultValue: '缺少會議室參數，請從「會議室預約」頁重新進入' }))
@@ -195,13 +214,93 @@ export default function MeetingBookingForm() {
       })
       .finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
-  }, [roomId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomId, isEdit])
 
-  /** 房间规则到手后才能算默认时长，因此初始化放在 room 之后（否则默认值会先按无规则算一次） */
+  /**
+   * 编辑模式按单号回查原单：房间、名单、时间全部从服务端取，不吃 URL 与列表行缓存。
+   *
+   * <p>房间档案单独再拉一次：单据里的 roomId 只是快照，容量与生效预约窗要以当前档案为准，
+   * 否则“表单说能坐 8 人、提交被拒”的漂移又会回来。
+   */
   useEffect(() => {
-    if (!room) return
-    const roomRule = ruleForRoom(room)
+    if (!isEdit || editId == null) return
+    let alive = true
+    setLoading(true)
+    setLoadError(undefined)
+    void (async () => {
+      try {
+        const detail = await fetchMeetingDetail(editId)
+        if (!alive) return
+        setBooking(detail)
+        const roomDetail = await fetchMeetingRoomDetail(detail.roomId)
+        if (!alive) return
+        setRoom(roomDetail)
+        // 原会议已开始/已结束时给明确结论，不要让保存按钮默默吃掉一个注定失败的请求
+        if (!detail.canEdit) {
+          setLoadError(t('meeting.thisMeetingCanNo', { defaultValue: '這場會議已開始、已結束或已終止，無法再編輯；如需調整請取消後重新預約' }))
+        }
+        initFormFor(detail, roomDetail)
+      } catch (e) {
+        if (alive) setLoadError(e instanceof Error ? e.message : t('meeting.failedToLoadThe', { defaultValue: '會議加載失敗' }))
+      } finally {
+        if (alive) setLoading(false)
+      }
+    })()
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId])
+
+  /**
+   * 表单初值：新建按房间规则推默认时段，编辑按原单回填。
+   *
+   * <p>回填必须把「必參/選參/外部」三类名单拆开：后端 update 是整张名单重建，
+   * 漏回哪一类，保存后那一类人就静默从会议里消失。
+   */
+  const initFormFor = (detail: MeetingVO | undefined, target: MeetingRoomVO) => {
+    const roomRule = ruleForRoom(target)
     const now = dayjs()
+    if (detail) {
+      const originStart = dayjs(detail.startTime)
+      const originEnd = dayjs(detail.endTime)
+      // 时长直接按原单起止算，不用“舍入后的开始时间”反推：粒度舍入会把 60 分钟算成 45
+      const originDuration = originStart.isValid() && originEnd.isValid()
+        ? originEnd.diff(originStart, 'minute')
+        : roomRule.minDuration && roomRule.minDuration >= 30 ? roomRule.minDuration : 60
+      const startValue = initialStart ?? (originStart.isValid() ? originStart : now)
+      // 外部参会人服务端只存顿号拼接的姓名快照，attendee 行里的 external 与它重叠，只取一路
+      const externalNames = (detail.externalAttendees ?? '')
+        .split('、').map(name => name.trim()).filter(Boolean)
+      // 代订场景下实际使用人被后端并进必参名单，回填后必须原样带回：
+      // update 重建名单时不会再补他，漏了就把人从自己会议室的日程里删掉
+      const requiredIds = (detail.attendees ?? [])
+        .filter(row => row.attendeeType === 'required' && row.userId != null)
+        .map(row => row.userId as number)
+      const optionalIds = (detail.attendees ?? [])
+        .filter(row => row.attendeeType === 'optional' && row.userId != null)
+        .map(row => row.userId as number)
+      form.setFieldsValue({
+        startDate: startValue.startOf('day'),
+        start: startValue,
+        duration: originDuration,
+        title: detail.title,
+        description: detail.description ?? undefined,
+        onlineMeetingUrl: detail.onlineMeetingUrl ?? undefined,
+        bizType: detail.bizType || 'general',
+        attendeeUserIds: requiredIds,
+        optionalUserIds: optionalIds,
+        externalAttendees: externalNames,
+        // 周期字段在编辑态不开放（只改当次），但初值保持与新建一致以免展开时为空
+        repeat: 'none',
+        intervalN: 1,
+        byWeekday: [],
+        occurrenceLimit: 12,
+        delegateEnabled: false,
+        delegateForId: [],
+      })
+      setPreview([])
+      return
+    }
     const earliest = now.add(30, 'minute')
     const dayStart = earliest.startOf('day')
     // 向后对齐预约粒度；跨午夜时同步进位日期，避免默认值落在过去。
@@ -224,8 +323,14 @@ export default function MeetingBookingForm() {
       occurrenceLimit: 12,
     })
     setPreview([])
+  }
+
+  /** 房间到手后初始化（仅新建）：规则到手才能算默认时长，因此初始化放在 room 之后 */
+  useEffect(() => {
+    if (!room || isEdit) return
+    initFormFor(undefined, room)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [room, form])
+  }, [room, form, isEdit])
 
   /** 预览周期场次：与后端 occurrences 同一算法，只算不写库 */
   const doPreview = async () => {
@@ -356,6 +461,25 @@ export default function MeetingBookingForm() {
     const startValue = raw.start as Dayjs
     const durationValue = raw.duration as number
     const endValue = startValue.add(durationValue, 'minute')
+
+    // 周期场景只对"第一场"做前端校验：后续场次都落在同一星期几与同一时段，
+    // 每日窗/时长/粒度/容量的结论与之完全相同，逐场重复校验只会给出同一个答案
+    const errors = validateBookingWindow({ room, start: startValue.toDate(), end: endValue.toDate(), attendeeCount })
+    if (errors.length > 0) {
+      setIssues(errors)
+      return
+    }
+    if (raw.repeat === 'weekly' && !(raw.byWeekday ?? []).length) {
+      setIssues([t('meeting.weeklyRecurrenceNeedsAt', { defaultValue: '每週重複請至少選擇一個星期' })])
+      return
+    }
+    setIssues([])
+
+    if (isEdit && booking) {
+      openUpdateConfirm(booking, raw, startValue, endValue, durationValue)
+      return
+    }
+
     const payload: MeetingCreateForm = {
       title: (raw.title ?? '').trim(),
       roomId: room.id,
@@ -372,19 +496,6 @@ export default function MeetingBookingForm() {
       // 幂等键：一次进入页面生成一次，重复点击提交不会长出第二场会
       requestKey: raw.requestKey ?? newMeetingRequestKey('book'),
     }
-
-    // 周期场景只对"第一场"做前端校验：后续场次都落在同一星期几与同一时段，
-    // 每日窗/时长/粒度/容量的结论与之完全相同，逐场重复校验只会给出同一个答案
-    const errors = validateBookingWindow({ room, start: startValue.toDate(), end: endValue.toDate(), attendeeCount })
-    if (errors.length > 0) {
-      setIssues(errors)
-      return
-    }
-    if (raw.repeat === 'weekly' && !(raw.byWeekday ?? []).length) {
-      setIssues([t('meeting.weeklyRecurrenceNeedsAt', { defaultValue: '每週重複請至少選擇一個星期' })])
-      return
-    }
-    setIssues([])
 
     const everyText = raw.repeat === 'weekly'
       ? t('meeting.everyNWeeksValue', { n: raw.intervalN ?? 1, defaultValue: `每 ${raw.intervalN ?? 1} 週` })
@@ -433,10 +544,108 @@ export default function MeetingBookingForm() {
     })
   }
 
+  /**
+   * 变更会议：二次确认 + 变更说明。
+   *
+   * <p>为什么改期必须比新建多一道确认：新建只占用一个空窗口，改期会把已收到邀约的
+   * 全体参会人的日程搬走（后端并在时间/房间变更时重置表态）。确认框里把
+   * 「原时间/房间 → 新时间/房间」并排写清楚，才有人能对自己点下的按钮负责。
+   */
+  const openUpdateConfirm = (origin: MeetingVO, raw: FormShape, startValue: Dayjs, endValue: Dayjs, durationValue: number) => {
+    if (confirmOpen.current) return
+    const payload: MeetingUpdateForm = {
+      title: (raw.title ?? '').trim(),
+      roomId: room?.id ?? origin.roomId,
+      startTime: toMeetingIso(startValue) ?? '',
+      endTime: toMeetingIso(endValue) ?? '',
+      attendeeUserIds: raw.attendeeUserIds ?? [],
+      optionalUserIds: raw.optionalUserIds ?? [],
+      externalAttendees: (raw.externalAttendees ?? []).filter(Boolean),
+      description: raw.description?.trim() || undefined,
+      onlineMeetingUrl: raw.onlineMeetingUrl?.trim() || undefined,
+      // 业务单归属原样带回：后端 update 会重写这几个字段，不传等于把关联单据解绑
+      bizType: origin.bizType,
+      bizId: origin.bizId ?? undefined,
+      bizNo: origin.bizNo || undefined,
+      bizUrl: origin.bizUrl ?? undefined,
+      // 乐观锁：拿进页时的版本，期间被人改过就拒，不静默覆盖别人的修改
+      version: origin.version,
+    }
+    const slotChanged = payload.startTime !== toMeetingIso(dayjs(origin.startTime))
+      || payload.endTime !== toMeetingIso(dayjs(origin.endTime))
+      || payload.roomId !== origin.roomId
+    let changeNote = ''
+    confirmOpen.current = true
+    Modal.confirm({
+      title: t('meeting.confirmSaveChanges', { defaultValue: '確認保存會議變更？' }),
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      okText: t('meeting.confirmSave', { defaultValue: '確認保存' }),
+      cancelText: t('meeting.cancel', { defaultValue: '取消' }),
+      afterClose: () => { confirmOpen.current = false },
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>{t('meeting.bookingNo2', { defaultValue: '單號：' })}</span><b>{origin.bookingNo}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelTopic', { defaultValue: '會議主題：' })}</span><b>{payload.title}</b></div>
+          <div className="confirm-info-row">
+            <span>{t('meeting.originalTime', { defaultValue: '原時間：' })}</span><b>{origin.timeText}</b>
+          </div>
+          <div className="confirm-info-row">
+            <span>{t('meeting.newTime2', { defaultValue: '新時間：' })}</span>
+            {/* 两个已登记的双语 key 直接复用（不写 defaultValue：它们两语已齐） */}
+            <b>{t('meeting.confirmTimeValue', {
+              start: startValue.format('YYYY-MM-DD HH:mm'), end: endValue.format('HH:mm'), count: durationValue,
+            })}</b>
+          </div>
+          <div className="confirm-info-row">
+            <span>{t('meeting.labelRoom', { defaultValue: '會議室：' })}</span>
+            <b>{room ? `${room.roomNo} · ${room.roomName}${room.locationText ? ` · ${room.locationText}` : ''}` : origin.roomName}</b>
+          </div>
+          <div className="confirm-info-row">
+            <span>{t('meeting.attendees4', { defaultValue: '參會人數：' })}</span>
+            <b>{t('meeting.confirmAttendeeValue', { count: attendeeCount, capacity: room?.capacity ?? origin.attendeeCount })}</b>
+          </div>
+          {slotChanged && (
+            <div className="confirm-info-row"><span>{t('meeting.impact', { defaultValue: '影響：' })}</span><b>{t('meeting.changingTimeRoom', { defaultValue: '改時間或換房間會重置全體參會人的表態，並重新送達變更通知' })}</b></div>
+          )}
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('meeting.changeNoteOptional', { defaultValue: '變更說明（選填，會寫入審計並附在通知裡）' })}</div>
+            <Input.TextArea
+              rows={3}
+              maxLength={200}
+              showCount
+              style={{ resize: 'none' }}
+              placeholder={t('meeting.eGLeaderChange', { defaultValue: '例：主持人改期／換到更大的會議室' })}
+              onChange={(e) => { changeNote = e.target.value }}
+            />
+          </div>
+        </div>
+      ),
+      onOk: () => doUpdate(payload, changeNote),
+    })
+  }
+
+  /** 提交变更：失败留在本页（冲突与版本冲突原因已由 request.ts 弹出） */
+  const doUpdate = async (payload: MeetingUpdateForm, changeNote: string) => {
+    if (editId == null) return
+    setSubmitting(true)
+    try {
+      const saved = await updateMeeting(editId, { ...payload, changeNote: changeNote.trim() || undefined })
+      message.success(t('meeting.meetingUpdated', { no: saved?.bookingNo ?? payload.title, defaultValue: '會議已更新，參會人已收到變更通知' }))
+      goBack()
+    } catch (e) {
+      setIssues([e instanceof Error ? e.message : t('meeting.saveFailed', { defaultValue: '保存失敗' })])
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="content-area" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <Spin size="large" tip={t('meeting.loadingRoom', { defaultValue: '載入會議室...' })} />
+        <Spin size="large" tip={isEdit
+          ? t('meeting.loadingMeeting', { defaultValue: '載入會議...' })
+          : t('meeting.loadingRoom', { defaultValue: '載入會議室...' })} />
       </div>
     )
   }
@@ -461,10 +670,15 @@ export default function MeetingBookingForm() {
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
               }}>{t('meeting.back', { defaultValue: '返回' })}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('meeting.bookAMeetingRoom', { defaultValue: '預約會議室' })}</h2>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+              {isEdit
+                ? t('meeting.editMeeting', { defaultValue: '編輯會議' })
+                : t('meeting.bookAMeetingRoom', { defaultValue: '預約會議室' })}
+            </h2>
           </div>
           {room && (
             <Space size={6} wrap>
+              {booking && <Tag color="geekblue">{booking.bookingNo}</Tag>}
               <Tag color="blue">{room.roomNo}</Tag>
               <Tag>{room.roomName}</Tag>
               {/* 提交前最后一道提醒：跨城/跨大厦会议室同名常态，位置带上避免订错 */}
@@ -481,10 +695,14 @@ export default function MeetingBookingForm() {
         <Alert
           type="error"
           showIcon
-          message={t('meeting.cannotBook', { defaultValue: '無法預約' })}
+          message={isEdit
+            ? t('meeting.cannotEdit', { defaultValue: '無法編輯' })
+            : t('meeting.cannotBook', { defaultValue: '無法預約' })}
           description={loadError}
           style={{ marginBottom: 16 }}
-          action={<Button size="small" onClick={goBack}>{t('meeting.backToBooking', { defaultValue: '返回預約頁' })}</Button>}
+          action={<Button size="small" onClick={goBack}>{isEdit
+            ? t('meeting.backToDetail', { defaultValue: '返回詳情' })
+            : t('meeting.backToBooking', { defaultValue: '返回預約頁' })}</Button>}
         />
       )}
 
@@ -498,7 +716,8 @@ export default function MeetingBookingForm() {
         />
       )}
 
-      <Form form={form} layout="vertical" requiredMark="optional" disabled={!room || submitting}
+      <Form form={form} layout="vertical" requiredMark="optional"
+        disabled={!room || submitting || (isEdit && booking != null && !booking.canEdit)}
         onValuesChange={(changed: Partial<FormShape>) => {
           const currentStart = form.getFieldValue('start') as Dayjs | undefined
           if (changed.startDate && currentStart) {
@@ -520,7 +739,9 @@ export default function MeetingBookingForm() {
           <div className="meeting-booking-grid" style={gridStyle}>
             <Form.Item label={t('meeting.startDate')} name="startDate" rules={[{ required: true, message: t('meeting.pleaseChooseTheStart') }]}>
               <DatePicker aria-label={t('meeting.startDate')} format="YYYY-MM-DD" style={{ width: '100%' }}
-                disabledDate={current => !!current && current < dayjs().startOf('day')} />
+                // 编辑时原会议日期可能已是今天之前（例如补录的会），不能把“保持原日期”也锁死
+                disabledDate={current => !!current && current < (isEdit && booking && dayjs(booking.startTime).isValid()
+                  ? dayjs(booking.startTime).startOf('day') : dayjs().startOf('day'))} />
             </Form.Item>
             <Form.Item label={t('meeting.startTime', { defaultValue: '開始時間' })} name="start"
               rules={[{ required: true, message: t('meeting.pleaseChooseTheStart', { defaultValue: '請選擇開始時間' }) }]}
@@ -554,8 +775,9 @@ export default function MeetingBookingForm() {
             <Form.Item label={<Space size={6}>{t('meeting.recurrence', { defaultValue: '重複頻率' })}
               <HelpPopover title={t('meeting.recurrence')} ariaLabel={t('meeting.recurrence')}
                 content={t('meeting.seriesSubmitHint', { defaultValue: '週期會議提交時一次性生成全部場次，衝突場次跳過並列明原因' })} />
-            </Space>} name="repeat">
-              <Select options={[
+            </Space>} name="repeat"
+              extra={isEdit ? t('meeting.seriesEditHint', { defaultValue: '調整週期會議只影響當次場次；週期規則本身請取消該系列後重建' }) : undefined}>
+              <Select disabled={isEdit} options={[
                 { value: 'none', label: t('meeting.noRepeatSingle', { defaultValue: '不重複（單場）' }) },
                 { value: 'daily', label: t('meeting.daily', { defaultValue: '每天重複' }) },
                 { value: 'weekly', label: t('meeting.weekly', { defaultValue: '每週重複' }) },
@@ -622,9 +844,12 @@ export default function MeetingBookingForm() {
             <div className="meeting-booking-grid" style={gridStyle}>
               <Form.Item label={<Space size={6}>{t('meeting.bookForSomeoneElse', { defaultValue: '替他人預訂' })}
                 <HelpPopover title={t('meeting.bookForSomeoneElse')} ariaLabel={t('meeting.bookForSomeoneElse')}
-                  content={t('meeting.whenOnTheMeeting', { defaultValue: '開啟後這場會記在使用人名下' })} />
+                  content={isEdit
+                    ? t('meeting.delegateEditHint', { defaultValue: '實際使用人不隨改期遷移：要換人只能取消後重新預約，才留得下完整的問責軌跡' })
+                    : t('meeting.whenOnTheMeeting', { defaultValue: '開啟後這場會記在使用人名下' })}
+                />
               </Space>} name="delegateEnabled" valuePropName="checked">
-                <Switch checkedChildren={t('meeting.onBehalf', { defaultValue: '代訂' })} unCheckedChildren={t('meeting.self', { defaultValue: '自訂' })} />
+                <Switch disabled={isEdit} checkedChildren={t('meeting.onBehalf', { defaultValue: '代訂' })} unCheckedChildren={t('meeting.self', { defaultValue: '自訂' })} />
               </Form.Item>
               {watchedDelegateEnabled && (
                 <Form.Item label={<Space size={6}>{t('meeting.actualUser', { defaultValue: '實際使用人' })}
@@ -692,17 +917,31 @@ export default function MeetingBookingForm() {
       {/* 规则说明：把"免审批先到先得"这类容易被追问的口径写在页面上，而不是等用户踩到再解释 */}
       <div style={{ ...cardStyle, background: '#FAFAFA', border: '1px solid #f0f0f0', boxShadow: 'none' }}>
         <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: '#8C8C8C', lineHeight: 1.9 }}>
-          <li>{t('meeting.noApprovalNeededSubmitting', { defaultValue: '免審批先到先得：提交即佔用時段，行政不再二次審核。' })}</li>
-          <li>{t('meeting.invitationsAreSentVia', { defaultValue: '邀約經釘釘工作通知發給必參與會人與選參與會人；未綁定釘釘的人會在會議詳情頁列明。' })}</li>
-          <li>{t('meeting.reschedulingIsNotAllowed', { defaultValue: '會議開始後不可改期，需取消後重新預約；開啟簽到保留的房間，超時未簽到將被自動釋放。' })}</li>
+          {isEdit ? (
+            <>
+              <li>{t('meeting.editRuleLeadTime', { defaultValue: '只有尚未開始的會議可以改期：改後的時段同樣要服從最遲提前量與會議室預約窗。' })}</li>
+              <li>{t('meeting.editRuleNotify', { defaultValue: '保存後更動會寫入審計，並向全體參會人重發變更通知；改時間或換房間時每個人的接受/婉拒會重置。' })}</li>
+              <li>{t('meeting.editRuleScope', { defaultValue: '實際使用人與業務單歸屬不隨編輯變更；需換人請取消後重新預約。' })}</li>
+            </>
+          ) : (
+            <>
+              <li>{t('meeting.noApprovalNeededSubmitting', { defaultValue: '免審批先到先得：提交即佔用時段，行政不再二次審核。' })}</li>
+              <li>{t('meeting.invitationsAreSentVia', { defaultValue: '邀約經釘釘工作通知發給必參與會人與選參與會人；未綁定釘釘的人會在會議詳情頁列明。' })}</li>
+              <li>{t('meeting.reschedulingIsNotAllowed', { defaultValue: '會議開始後不可改期，需取消後重新預約；開啟簽到保留的房間，超時未簽到將被自動釋放。' })}</li>
+            </>
+          )}
         </ul>
       </div>
 
       {/* 底部操作栏（§C.5） */}
       <div className="form-footer">
         <Button onClick={goBack}>{t('meeting.cancel', { defaultValue: '取消' })}</Button>
-        <Button type="primary" icon={<SendOutlined />} loading={submitting} disabled={!room}
-          onClick={() => void handleSubmit()}>{t('meeting.submitBooking', { defaultValue: '提交預約' })}</Button>
+        <Button type="primary" icon={<SendOutlined />} loading={submitting} disabled={!room || (isEdit && booking != null && !booking.canEdit)}
+          onClick={() => void handleSubmit()}>
+          {isEdit
+            ? t('meeting.saveChanges', { defaultValue: '保存變更' })
+            : t('meeting.submitBooking', { defaultValue: '提交預約' })}
+        </Button>
       </div>
 
       {/* 周期会议被跳过的场次：纯展示型提示（§9.1 允许 Modal），逐条列明原因而不是只给一句 toast */}

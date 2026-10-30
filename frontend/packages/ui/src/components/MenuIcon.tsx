@@ -142,6 +142,9 @@ import {
   BankOutlined,
   DollarOutlined,
   ControlOutlined,
+  // 人工智能系統歸位後新增的叶子图标（AiMenuLayout 写入 sys_menu.icon，缺一处菜单图标就为空）
+  SafetyOutlined,
+  OrderedListOutlined,
   // 物资管理菜单图标
   InboxOutlined,
   UserAddOutlined,
@@ -295,6 +298,8 @@ const ICON_COMPONENTS: Record<string, ComponentType> = {
   'BankOutlined': BankOutlined,
   'DollarOutlined': DollarOutlined,
   'ControlOutlined': ControlOutlined,
+  'SafetyOutlined': SafetyOutlined,
+  'OrderedListOutlined': OrderedListOutlined,
   // 物资管理菜单图标
   'InboxOutlined': InboxOutlined,
   // 用車管理（物資管理下的「用車管理」分组）

@@ -40,6 +40,11 @@ export const SENSITIVE_ACTIONS = [
  */
 export const BUSINESS_ACTIONS = [
   { key: 'trigger', label: '手動觸發' },
+  // 会议 AI 整理纪要试点：ai_minutes 挂在三个会议菜单，manage/diagnose 挂在 ai-operation-auth；
+  // 真值与后端 MeetingConstants.ACTION_AI_MINUTES 及 AiSceneConfigSchemaInitializer 追加的动作逐字对齐。
+  { key: 'ai_minutes', label: 'AI 整理紀要' },
+  { key: 'meeting_ai_manage', label: '管理會議AI開關' },
+  { key: 'meeting_ai_diagnose', label: '診斷會議AI可用性' },
 ] as const
 
 /** 动作 key → 中文标签查找表（后端只下发 key 时渲染标签用） */
@@ -576,6 +581,9 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
   'ai-operation-auth': [
     { key: 'view', label: '查看' },
     { key: 'edit', label: '編輯' },
+    // 会议 AI 试点：改场景开关与诊断员工各自独立授权，不与全局急停/工具编辑混用
+    { key: 'meeting_ai_manage', label: '管理會議AI開關' },
+    { key: 'meeting_ai_diagnose', label: '診斷會議AI可用性' },
   ],
   'agent-overview': [
     { key: 'view', label: '查看' },
@@ -1101,10 +1109,13 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'view', label: '查看' },
     // 响应邀约与取消自己发起的会议都是写操作，与后端 @RequirePermission(action=edit) 对齐
     { key: 'edit', label: '響應/取消會議' },
+    // 会议 AI 整理纪要（试点）：与 edit 成对授予，能编辑不等于能让 AI 读笔记调模型
+    { key: 'ai_minutes', label: 'AI 整理紀要' },
   ],
   'meeting-booking': [
     { key: 'view', label: '查看忙閒' },
     { key: 'edit', label: '預約/改期/取消' },
+    { key: 'ai_minutes', label: 'AI 整理紀要' },
   ],
   'meeting-room': [
     { key: 'view', label: '查看' },
@@ -1114,6 +1125,7 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
   'meeting-record': [
     { key: 'view', label: '查看全部記錄' },
     { key: 'edit', label: '代訂/手動釋放/取消' },
+    { key: 'ai_minutes', label: 'AI 整理紀要' },
   ],
   // 預約規則：改全局規則與手動拉黑/撤銷都是寫操作，動作集與 sys_menu.actions 逐字對齊
   'meeting-config': [
@@ -2478,6 +2490,13 @@ export const ROUTE_MENU_ANY_OF_MAP: Record<string, string[]> = {
    */
   '/rdm-daily': ['rdm-daily-report-rule', 'rdm-workbench', 'rdm-requirement',
     'rdm-delivery-board', 'rdm-dashboard-board'],
+  /*
+   * 会议预约表单页兼作「编辑会议」页（?bookingId=）：组织者从「我的會議」进来改
+   * 自己未开始的会，行政从「預約記錄」进来改他人的会。后端 PUT /meeting/bookings/{id}
+   * 的菜单锚就是 booking anyOf RECORD（且 requireBookingWritable 已把组织者限定在自己单上），
+   * 前端必须同口径放行，否则只有 meeting-my 的普通组织者点「編輯」就是 403。
+   */
+  '/meeting-booking-form': ['meeting-booking', 'meeting-record', 'meeting-my'],
 }
 
 /**

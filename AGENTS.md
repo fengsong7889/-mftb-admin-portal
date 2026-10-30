@@ -190,6 +190,7 @@ src/
 | `docs/RDM_Batch34_Handoff.md` | RDM 第三、四批改造的进度与交接说明（工作区状态、剩余待办、关键契约签名、安全约束） |
 | `docs/ATTENDANCE_FOLLOWUP_2026-10.md` | 考勤假勤系统深度测试后续批次与跟进项 |
 | `docs/code-comment-audit_2026-10.md` | 代码注释覆盖度审计与例外登记 |
+| `docs/HOME_REQUEST_STORM_2026-10.md` | 首页请求风暴与自动写库的**独立立项记录**：修复前后实测数据表、dev/prod 与 StrictMode 的**判读口径**、`agent/status` 合并接口等剩余待办。**复测首页或任何取数/限流类改动前先读本文件第二节**，否则会误把 StrictMode 双调用当成缺陷；对「不应该发生」型断言必须先做变异验证。 |
 
 ### 本地工具文档（未入库，仅本机有效）
 
@@ -247,6 +248,7 @@ AI 禁止：
 - 错误返回堆栈、SQL、内部路径。
 - **列表页把统计卡片放在搜索区上方**（见下方「列表页统计卡片位置」）。
 - **用 `Tooltip` 承载多句/长文本的字段或规则说明**（白底无层次、移开即消失，阅读体验差）；此类说明必须改用 `HelpPopover`（见下方「问号/提示说明规范」）。
+- **同一系统内多个菜单使用重复图标**（父子、兄弟之间都不行；见下方「菜单图标唯一性规范」）。
 
 ---
 
@@ -318,6 +320,26 @@ import HelpPopover from '@/components/HelpPopover'   // 或相对路径
 5. 参考实现：`src/pages/Recommend/CouponScorePanel.tsx`（力度口径，结构化分区）、`src/pages/AiModelList/AiModelEdit.tsx`（字段释义，标题+正文）。
 
 自检：`python3 scripts/scan-help-tooltips.py src` 扫描「长说明型 `Tooltip`」候选，命中数应持续下降；新增解释性问号必须走 `HelpPopover`。
+
+---
+
+## 菜单图标唯一性规范（前端 UI 强制规范）
+
+> 背景：人工智能系统曾出现「總覽（一级分组）/ 平台總覽 / 助手總覽」三处同用 `DashboardOutlined`，
+> 侧边栏三个相同图标叠在一起，用户无法靠图标区分层级与入口。已统一收敛为全系统不重复。
+
+**同一业务系统内，所有菜单图标（一级分组、二级目录、叶子页面）必须互不重复**，含父子之间；不同系统之间允许复用。
+
+**强制约束：**
+1. 新增或调整菜单时，先核对该系统已用图标，再选图标；禁止复用本系统任何层级已用的图标名。
+2. 图标名必须是 `frontend/packages/ui/src/components/MenuIcon.tsx` 注册表内已登记的组件；
+   需要新图标时同步在注册表补登记（import + `ICON_COMPONENTS` 两处），否则侧边栏图标渲染为空。
+3. 图标语义要贴切菜单职责（如「助手總覽」用 `RobotOutlined`、「費用預算」用 `DollarOutlined`），禁止随机填充。
+4. 菜单图标真值写在启动期种子/布局初始化器（如 AI 系统的 `AiMenuLayout`），由启动幂等 upsert 校正存量库，
+   不得只靠手工改库或新增一次性迁移脚本。
+
+自检：`AiMenuLayoutTest.全系统菜单图标不得重复`（AI 系统启动期静态断言）+ `npm run check:menu-consistency`（图标注册表门禁）；
+其它系统新增菜单时按本规则人工核对，后续可纳入统一门禁脚本。
 
 ---
 

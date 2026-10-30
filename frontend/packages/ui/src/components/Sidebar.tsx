@@ -101,7 +101,6 @@ import {
   ToolOutlined,
   DesktopOutlined, // AI 模型相关
   KeyOutlined, // AI 使用申請
-  BlockOutlined, // MCP 服務
   BankOutlined, // 权限管理相关
   DollarOutlined, // 额度策略
   UnlockOutlined, // 員工AI權額管理
@@ -112,6 +111,9 @@ import {
   UserAddOutlined, // 资产领用/归还
   UserDeleteOutlined, // 離職管理
   PartitionOutlined, // 入轉調離分组
+  FileAddOutlined, // 使用申請（AI）
+  LinkOutlined, // 模型接入（AI）
+  ExportOutlined, // 數據外發管理（AI）
 // 部門架構
   HourglassOutlined, // 假期額度
   UserSwitchOutlined, // 員工自助（一级域）
@@ -555,7 +557,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'version-history': <HistoryOutlined />,
   'notification-config': <BellOutlined />,
   // 智能中心 (AI)
-  // ai:menu-ia-v1 业务分组：由后端 AiMenuLayoutInitializer 每次启动校正，图标与后端 sys_menu.icon 一致
+  // ai:menu-ia-v1 业务分组：由后端 AiMenuLayoutInitializer 每次启动校正，图标与 AiMenuLayout 登记的 sys_menu.icon 一致（全系统不重复）
   'ai-grp-overview': <DashboardOutlined />,
   'ai-grp-app': <AppstoreOutlined />,
   'ai-grp-model': <DesktopOutlined />,
@@ -564,42 +566,42 @@ const keyToIcon: Record<string, ReactNode> = {
   'ai-grp-run': <PlayCircleOutlined />,
   'ai-grp-security': <AuditOutlined />,
   'agent-platform': <ControlOutlined />,
-  'agent-overview': <DashboardOutlined />,
-  'agent-apps': <AppstoreOutlined />,
-  'agent-budget': <ThunderboltOutlined />,
-  'agent-actions': <SafetyCertificateOutlined />,
-  'agent-knowledge': <ReadOutlined />,
-  'agent-data': <DatabaseOutlined />,
-  'agent-runs': <PlayCircleOutlined />,
+  'agent-overview': <FundOutlined />,
+  'agent-apps': <PartitionOutlined />,
+  'agent-budget': <DollarOutlined />,
+  'agent-actions': <CheckCircleOutlined />,
+  'agent-knowledge': <FolderOpenOutlined />,
+  'agent-data': <ExportOutlined />,
+  'agent-runs': <HistoryOutlined />,
   'agent-evaluation': <ExperimentOutlined />,
   'ai-assistant-group': <RobotOutlined />,
   'ai_model_hub': <CloudServerOutlined />,
-  'ai-operation-auth': <ToolOutlined />,   // AI 权控管理
-  'ai-assistant-overview': <DashboardOutlined />,
-  'ai-assistant-capability': <AppstoreOutlined />,
+  'ai-operation-auth': <KeyOutlined />,   // AI 权控管理（工具與通道授權）
+  'ai-assistant-overview': <RobotOutlined />,
+  'ai-assistant-capability': <ProfileOutlined />,
   'ai-assistant-profile': <FileTextOutlined />,
-  'ai-assistant-glossary': <BookOutlined />,
-  'ai-assistant-knowledge': <ReadOutlined />,
-  'ai-assistant-guardrail': <SafetyCertificateOutlined />,
+  'ai-assistant-glossary': <TagsOutlined />,
+  'ai-assistant-knowledge': <BookOutlined />,
+  'ai-assistant-guardrail': <SafetyOutlined />,
   'ai-assistant-feedback': <MessageOutlined />,
-  'ai-assistant-audit': <AuditOutlined />,
+  'ai-assistant-audit': <SnippetsOutlined />,
   'ai-assistant-quick-prompt': <ThunderboltOutlined />,
   'ai-assistant-push-template': <SendOutlined />,
   'ai-assistant-memory': <BulbOutlined />,
-  'ai-access-request': <KeyOutlined />,    // AI 使用申請
-  'ai-mcp-service': <BlockOutlined />,     // MCP 服務
-  'ai-conversation-audit': <AuditOutlined />, // 对话审计
+  'ai-access-request': <FileAddOutlined />,    // AI 使用申請
+  'ai-mcp-service': <ToolOutlined />,     // 工具管理
+  'ai-conversation-audit': <FileSearchOutlined />, // 对话审计
   'ai-usage-stats': <LineChartOutlined />,
-  'ai_usage_stats': <LineChartOutlined />,
+  'ai_usage_stats': <AreaChartOutlined />,
   'ai-energy-detail': <FileSearchOutlined />,
-  'ai_energy_detail': <FileSearchOutlined />,
-  'ai-energy-billing': <ThunderboltOutlined />,
+  'ai_energy_detail': <OrderedListOutlined />,
+  'ai-energy-billing': <PayCircleOutlined />,
   'ai-models': <DesktopOutlined />,        // AI 模型管理 - 电脑显示器
   'models': <DesktopOutlined />,
   'ai-auth-quota': <SafetyCertificateOutlined />, // 授权与配额 - 安全证书
   'ai-model-provider': <CloudServerOutlined />,  // 供应商管理 - 云服务器
   'model-provider': <CloudServerOutlined />,
-  'ai-model-list': <AppstoreOutlined />,   // 模型接入 - 应用商店
+  'ai-model-list': <LinkOutlined />,       // 模型接入 - 链路
   'model-list': <AppstoreOutlined />,
   'ai-auth': <BankOutlined />,             // 权限管理 - 银行/金融机构
   'ai-quota': <DollarOutlined />,          // 额度策略 - 金额符号（与授权与配额去重）

@@ -61,6 +61,12 @@ public final class MeetingMinutesAiDto {
         private int maxInputChars;
         /** 灰度开关：false 时前端隐藏 AI 入口，手动录入不受影响 */
         private boolean enabled;
+        /** 当前登录人是否具备会议 AI 整理权限（与 available 分开：能记笔记不等于能调 AI）。 */
+        private boolean authorized;
+        /** 可读原因（已映射，不直接回显内部 reasonCode）。 */
+        private String message;
+        /** 就绪检查项，供界面展示「为什么不可用」与处理入口。 */
+        private java.util.List<AiSceneDto.Check> checks;
     }
 
     /* ==================== 提取 ==================== */

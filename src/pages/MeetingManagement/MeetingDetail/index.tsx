@@ -24,7 +24,7 @@ import type { CSSProperties } from 'react'
 import { Alert, Button, Descriptions, Input, Modal, QRCode, Space, Spin, Table, Tabs, Tag, Timeline, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
-  BellOutlined, FileTextOutlined, HistoryOutlined, ProfileOutlined, QrcodeOutlined, ReloadOutlined, RobotOutlined, SaveOutlined, SendOutlined, TeamOutlined,
+  BellOutlined, EditOutlined, FileTextOutlined, HistoryOutlined, ProfileOutlined, QrcodeOutlined, ReloadOutlined, RobotOutlined, SaveOutlined, SendOutlined, TeamOutlined,
 } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
 import DetailPageHeader from '@/components/DetailPageHeader'
@@ -426,6 +426,14 @@ export default function MeetingDetail() {
         extra={record && (
           <Space size={8} wrap>
             <Button size="small" icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>{t('meeting.refresh', { defaultValue: '刷新' })}</Button>
+            {/* 编辑：未开始的会可改时间/换房/补参会人；按钮只看服务端 canEdit，
+                与预约记录页同源，不出现“详情能改、列表不能改”的两套口径 */}
+            {record.canEdit && (
+              <Button size="small" type="primary" icon={<EditOutlined />}
+                onClick={() => navigate(`/meeting-booking-form?bookingId=${record.id}&from=${encodeURIComponent(`/meeting-detail?id=${record.id}`)}`)}>
+                {t('meeting.edit', { defaultValue: '編輯' })}
+              </Button>
+            )}
             {record.myRole && record.myRole !== 'none' && record.status !== 'finished'
               && record.status !== 'cancelled' && (
               <Button size="small" icon={<QrcodeOutlined />} onClick={() => void showQr()}>{t('meeting.myCheckInCode', { defaultValue: '我的簽到碼' })}</Button>

@@ -50,16 +50,28 @@
   background: #fff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
-.mm-ai__input-label { display: block; color: #595959; font-size: 13px; margin-bottom: 8px; }
-.mm-ai__input-card > .ant-input-textarea { width: 100%; margin-bottom: 12px; }
-.mm-ai__input-card textarea.ant-input { padding: 14px 16px; line-height: 1.9; resize: none; }
-.mm-ai__input-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-top: 12px; }
+.mm-ai__description { color: #595959; font-size: 13px; line-height: 1.8; margin: 0 0 20px; }
+.mm-ai__editor-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 8px; }
+.mm-ai__input-label { color: #262626; font-size: 13px; font-weight: 500; margin-right: auto; }
+.mm-ai__editor-heading > .mm-ai__hint { margin: 0; }
+.mm-ai__editor { width: 100%; border-radius: 8px; }
+/* 测量层必须和 textarea 同排版，否则 @ 弹层会偏离光标。 */
+.mm-ai__editor textarea, .mm-ai__editor .ant-mentions-measure { padding: 14px 16px; line-height: 1.9; font-size: 14px; }
+.mm-ai__editor textarea { resize: none; }
+.mm-ai__input-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-top: 10px; }
+.mm-ai__count { color: #8c8c8c; font-size: 12px; font-variant-numeric: tabular-nums; }
+.mm-ai__people-popup { max-width: min(360px, calc(100vw - 48px)); }
+.mm-ai__person { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-width: 160px; }
+.mm-ai__person small { color: #8c8c8c; font-size: 12px; }
+.mm-ai__availability { margin-top: 16px; border-radius: 8px; flex-wrap: wrap; gap: 8px; }
+.mm-ai__availability .ant-alert-content { min-width: 160px; flex: 1; }
 .mm-ai__save-state { display: inline-flex; align-items: center; gap: 8px; margin-right: auto; color: #595959; font-size: 12px; }
 .mm-ai__hint { margin: 8px 0; color: #595959; font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
 .mm-ai__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding-top: 12px; border-top: 1px solid #f0f0f0; margin-top: 16px; }
 .mm-ai__actions > .mm-ai__hint { margin: 0; }
 .mm-ai__mention { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 12px; border: 1px solid #ffe7d1; border-radius: 8px; margin-top: 12px; }
 .mm-ai__mention > .ant-select { flex: 0 1 320px; min-width: 0; }
+.mm-ai__mention > .mm-ai__hint { flex: 1 1 240px; margin: 0; }
 .mm-ai__demo-settings { margin: 16px 0; border: 1px dashed #d9d9d9; padding: 12px 16px; border-radius: 8px; font-size: 12px; color: #595959; }
 .mm-ai__demo-settings > summary { cursor: pointer; font-weight: 500; }
 .mm-ai__demo-settings > summary:focus-visible { outline: 2px solid #e8720c; outline-offset: 4px; }

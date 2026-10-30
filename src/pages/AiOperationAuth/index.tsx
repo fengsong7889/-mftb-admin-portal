@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Alert,
@@ -38,6 +38,8 @@ import {
 import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { tablePagination, formatEpochOrDash } from '@/utils/tableDisplay'
 import AccountWhitelistPanel from './AccountWhitelistPanel'
+import BusinessAiScenePanel from './BusinessAiScenePanel'
+import { useAuth } from '@/contexts/AuthContext'
 
 /* ────────────────── 展示常量 ────────────────── */
 
@@ -46,7 +48,20 @@ const TOOL_LEVELS: ToolLevel[] = ['L0', 'L1', 'L2', 'L3', 'L4']
 
 export default function AiOperationAuth() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { hasPermission } = useAuth()
+  // 工具启停/编辑/新增与全局急停都是 edit 能力；仅有会议场景 manage/diagnose 的人不应看到可操作的全局按钮。
+  const canEdit = hasPermission('ai-operation-auth:edit')
   const { t } = useTranslation()
+  const requestedTab = searchParams.get('tab')
+  const activeTab = requestedTab === 'scenes' || requestedTab === 'whitelist' ? requestedTab : 'tools'
+  const handleTabChange = (key: string) => {
+    setSearchParams(previous => {
+      const next = new URLSearchParams(previous)
+      next.set('tab', key)
+      return next
+    })
+  }
   /* ── 數據 ── */
   const [tools, setTools] = useState<ToolPolicyRow[]>([])
   const [loading, setLoading] = useState(false)
@@ -245,6 +260,7 @@ export default function AiOperationAuth() {
       render: (_: unknown, row: ToolPolicyRow) => (
         <Switch
           checked={row.status === 1}
+          disabled={!canEdit}
           checkedChildren={t('aiOperationAuth.enableAction')}
           unCheckedChildren={t('aiOperationAuth.disableAction')}
           onChange={() => handleToggleStatus(row)}
@@ -258,7 +274,7 @@ export default function AiOperationAuth() {
       title: t('common.action'), key: 'action', width: 140, align: 'center',
       render: (_, row) => (
         <Space size={0} split={<span className="action-split">|</span>}>
-          <Button type="link" onClick={() => navigate(`/ai-operation-auth-edit?toolKey=${encodeURIComponent(row.code)}`)}>{t('common.edit')}</Button>
+          {canEdit && <Button type="link" onClick={() => navigate(`/ai-operation-auth-edit?toolKey=${encodeURIComponent(row.code)}`)}>{t('common.edit')}</Button>}
           <Button type="link" onClick={() => navigate(`/ai-operation-auth-log?toolKey=${encodeURIComponent(row.code)}`)}>{t('aiOperationAuth.toolCallLog')}</Button>
         </Space>
       ),
@@ -323,6 +339,7 @@ export default function AiOperationAuth() {
         <Space>
           <Switch
             checked={!!killSwitch?.engaged}
+            disabled={!canEdit}
             checkedChildren={t('aiOperationAuth.killSwitchOn')}
             unCheckedChildren={t('aiOperationAuth.killSwitchOff')}
             loading={killSwitchSaving}
@@ -373,7 +390,7 @@ export default function AiOperationAuth() {
       {/* 操作區：右側新增 + 列配置 */}
       <div className="action-section">
         <div className="action-section-right">
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/ai-operation-auth-edit')}>{t('common.add')}</Button>
+          {canEdit && <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/ai-operation-auth-edit')}>{t('common.add')}</Button>}
           {configComponent}
         </div>
       </div>
@@ -393,10 +410,13 @@ export default function AiOperationAuth() {
     <div className="content-area">
       {/* 賬號白名單按決策口徑歸屬本菜單：此前它只存在於無菜單入口的 /ai-quota-auth，管理員無處可改 */}
       <Tabs
-        defaultActiveKey="tools"
+        activeKey={activeTab}
+        onChange={handleTabChange}
         items={[
           { key: 'tools', label: t('aiOperationAuth.toolAuthTab'), children: toolContent },
           { key: 'whitelist', label: t('aiOperationAuth.whitelistTab'), children: <AccountWhitelistPanel /> },
+          { key: 'scenes', label: '業務 AI 場景', children: <BusinessAiScenePanel
+            onOpenAuthorization={hasPermission('authorization-center:view') ? () => navigate('/authorization-center') : undefined} /> },
         ]}
       />
     </div>

@@ -510,8 +510,12 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
 
     @Override
     public AiMyCenterDTO.QuotaCheckVO checkQuota(Long modelId, String modelKey) {
+        return checkQuotaFor(currentUser(), modelId, modelKey);
+    }
+
+    @Override
+    public AiMyCenterDTO.QuotaCheckVO checkQuotaFor(SysUser user, Long modelId, String modelKey) {
         AiMyCenterDTO.QuotaCheckVO vo = new AiMyCenterDTO.QuotaCheckVO();
-        SysUser user = currentUser();
         if (user == null) {
             vo.setAllowed(false);
             vo.setAction("reject");
@@ -709,18 +713,24 @@ public class AiMyCenterServiceImpl implements AiMyCenterService {
 
     @Override
     public boolean hasModelAccess(String modelKey) {
-        if (modelKey == null || modelKey.isBlank()) {
+        return hasModelAccess(currentUser(), modelKey);
+    }
+
+    @Override
+    public boolean hasModelAccess(SysUser user, String modelKey) {
+        if (modelKey == null || modelKey.isBlank() || user == null) {
             return false;
         }
-        if (currentUser() == null) {
-            return false;
-        }
-        return myModels().stream().anyMatch(m -> modelKey.equals(m.getModelKey()));
+        return modelsOf(user).stream().anyMatch(m -> modelKey.equals(m.getModelKey()));
     }
 
     @Override
     public List<AiMyCenterDTO.MyModelVO> myModels() {
-        SysUser user = currentUser();
+        return modelsOf(currentUser());
+    }
+
+    @Override
+    public List<AiMyCenterDTO.MyModelVO> modelsOf(SysUser user) {
         if (user == null) {
             return List.of();
         }

@@ -14,7 +14,9 @@
  *      后端 respond 接口本就允许覆盖响应，前端只收窄按钮展示窗口、不放宽；
  *   4. 取消必填原因，写入审计并附在通知里；
  *   5. 纪要么入口与详情页同一口径（deriveCanRecordMinutes）：已进入或已收尾的相关会议才给按钮，
- *      已录入过的直接跳查看页，避免两个页面对同一场会给出不同结论。
+ *      已录入过的直接跳查看页，避免两个页面对同一场会给出不同结论；
+ *   6. 只要会议还没开始（服务端 canEdit），发起人在这里就能改时间/换房/补参会人，
+ *      不必取消重订。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Empty, Form, Input, Modal, Segmented, Select, Space, Spin, Table, Tabs, Tag, message } from 'antd'
@@ -311,6 +313,11 @@ export default function MyMeeting() {
     // 操作列（§B.9）：纯文本 + action-split 分隔，详情在前、危险操作（取消）在最后
     <Space size={0} wrap split={<span className="action-split">|</span>}>
       <Button type="link" size="small" onClick={() => navigate(`/meeting-detail?id=${record.id}`)}>{t('meeting.detail', { defaultValue: '詳情' })}</Button>
+      {/* 编辑：未开始的会可改时间/换房/补参会人；与取消同源只看服务端 canEdit，
+          列表与日历共用本函数，两个入口的按钮口径不会漂移 */}
+      {hasPermission('meeting-my:edit') && record.canEdit && (
+        <Button type="link" size="small" onClick={() => navigate(`/meeting-booking-form?bookingId=${record.id}&from=${encodeURIComponent('/meeting-my')}`)}>{t('meeting.edit', { defaultValue: '編輯' })}</Button>
+      )}
       {/* 纪要：已录入跳查看页，未录入跳录入页；按钮位不变，文案随状态变 */}
       {deriveCanRecordMinutes(record, minutesCapability) && (
         <Button type="link" size="small" onClick={() => navigate(minutesPathOf(record))}>

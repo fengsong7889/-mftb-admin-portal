@@ -36,7 +36,22 @@ export interface PortalContext {
  */
 const SILENT = { headers: { [SILENT_HEADER]: '1' } }
 
+/**
+ * 在途去重：门户上下文被 Home / Sidebar / SystemSwitcher / Portal 四个组件各自拉取，
+ * 一次首屏会打出 3~4 个完全相同的请求。
+ *
+ * <p>只合并「同时在途」的请求，**不做 TTL 缓存**：本接口是授权派生数据，
+ * 缓存会把后端已撤销的系统继续展示成「幽灵入口」（见文件头注释），
+ * 因此后发生的挂载仍必须重新拉取。
+ */
+let pending: Promise<PortalContext> | null = null
+
 /** 拉取当前登录用户可进入的系统列表（后端已按 sort 排序） */
-export function fetchPortalContext() {
-  return request.get<unknown, PortalContext>('/portal/context', SILENT)
+export function fetchPortalContext(): Promise<PortalContext> {
+  if (pending) return pending
+  const inflight = request.get<unknown, PortalContext>('/portal/context', SILENT)
+  pending = inflight
+  // 内部链单独吞掉异常，避免无人 catch 的派生 Promise 报 unhandled rejection。
+  void inflight.catch(() => undefined).finally(() => { if (pending === inflight) pending = null })
+  return inflight
 }

@@ -27,8 +27,9 @@ import java.util.Set;
  *
  * <p>安全边界：
  * <ul>
- *   <li>只改 parent_id / sort_order / name / name_en / system_code / deleted，
- *       不动 menu_key、path、actions 与 status —— 存量授权与「停用」语义都不受影响；</li>
+ *   <li>只改 parent_id / sort_order / name / name_en / icon / system_code / deleted，
+ *       不动 menu_key、path、actions 与 status —— 存量授权与「停用」语义都不受影响；
+ *       icon 仅在布局登记了图标时覆写（用于收敛 AI 系统内的重复图标）；</li>
  *   <li>改名只在库里仍是历史名时生效，管理员在菜单配置里的自定义名不会被覆盖；</li>
  *   <li>历史分组只软删目录行，不删任何授权记录，也不删任何功能菜单；</li>
  *   <li>启动末尾断言最终父级，结构回退直接失败，避免「菜单看起来对、权限却挂在旧树上」。</li>
@@ -93,8 +94,8 @@ public class AiMenuLayoutInitializer implements CommandLineRunner {
             }
             jdbcTemplate.update(
                     "UPDATE sys_menu SET parent_id = ?, sort_order = ?, system_code = ?, deleted = 0, "
-                            + "updated_by = 'system' WHERE id = ?",
-                    parentId, placement.sort(), SystemCode.AI.code(), id);
+                            + "icon = COALESCE(?, icon), updated_by = 'system' WHERE id = ?",
+                    parentId, placement.sort(), SystemCode.AI.code(), placement.icon(), id);
             if (forceRename) {
                 jdbcTemplate.update("UPDATE sys_menu SET name = ?, name_en = ? WHERE id = ?",
                         placement.name(), placement.nameEn(), id);

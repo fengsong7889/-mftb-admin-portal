@@ -52,6 +52,12 @@ interface Props {
    * 调用处需要能把它对齐到同级输入框的宽度。
    */
   style?: CSSProperties
+  /**
+   * 可选数据源适配：传入时用它替代默认的在职员工分页接口取候选。
+   * <p>为什么要有：某些受控管理页（如会议 AI 诊断）只能按本场景权限查最小字段，
+   * 不能放宽通用 /api/employees；给一个可选取数入口即可复用选择器而不改其默认行为。
+   */
+  searchSource?: (keyword: string) => Promise<{ id: number; name: string; empId?: string | null }[]>
 }
 
 interface Loaded { id: number; name: string; empId?: string }
@@ -70,7 +76,7 @@ function toIds(value?: number[] | number): number[] {
 }
 
 export default function EmployeeSelect({
-  value, onChange, placeholder, excludeIds = [], maxTagCount = 6, disabled, single, onPick, seed, style,
+  value, onChange, placeholder, excludeIds = [], maxTagCount = 6, disabled, single, onPick, seed, style, searchSource,
 }: Props) {
   const { t } = useTranslation()
   const [searchResults, setSearchResults] = useState<Loaded[]>([])
@@ -111,17 +117,15 @@ export default function EmployeeSelect({
   const search = useCallback(async (keyword: string) => {
     setFetching(true)
     try {
-      const res = await fetchEmployees({
-        page: 1,
-        size: 30,
-        keyword: keyword.trim() || undefined,
-        employmentStatus: 'active',
-      })
-      const loaded = (res.records ?? []).map(item => ({
-        id: item.id,
-        name: item.name || item.username,
-        empId: item.empId,
-      }))
+      const loaded = searchSource
+        // 受控场景数据源：由调用方保证只返回本场景权限内的最小字段（姓名 + 工号）
+        ? (await searchSource(keyword.trim())).map(item => ({ id: item.id, name: item.name, empId: item.empId ?? undefined }))
+        : (await fetchEmployees({
+          page: 1,
+          size: 30,
+          keyword: keyword.trim() || undefined,
+          employmentStatus: 'active',
+        })).records.map(item => ({ id: item.id, name: item.name || item.username, empId: item.empId }))
       loaded.forEach(item => archive.current.set(item.id, item))
       setSearchResults(loaded)
     } catch {
@@ -130,7 +134,7 @@ export default function EmployeeSelect({
     } finally {
       setFetching(false)
     }
-  }, [])
+  }, [searchSource])
 
   /**
    * 编辑态回显：Select 的 value 若不在 options 里，antd 会把裸 ID 当文案渲染

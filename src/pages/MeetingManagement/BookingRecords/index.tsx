@@ -10,7 +10,9 @@
  *      后者是主动撤销（窗口已还给他人），共用一个按钮会让行政在事后无法解释数字；
  *   2. 两个操作都必填原因，原因写入审计并附在通知里——那是事后唯一能回答
  *      "这场会为什么没了"的凭据；
- *   3. 统计卡片在搜索区下方且随筛选条件变化（§E.8）。
+ *   3. 统计卡片在搜索区下方且随筛选条件变化（§E.8）；
+ *   4. 未开始的会议给「編輯」入口：改时间/换房/补参会人走同一张预约表单页，
+ *      按钮可见性只看服务端 canEdit，不在前端复算“是否已开始”。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, DatePicker, Form, Input, Modal, Select, Space, Table, Tag, message } from 'antd'
@@ -303,6 +305,10 @@ export default function BookingRecords() {
       render: (_, record) => (
         <Space size={0} wrap split={<span className="action-split">|</span>}>
           <Button type="link" size="small" onClick={() => navigate(`/meeting-detail?id=${record.id}`)}>{t('meeting.detail', { defaultValue: '詳情' })}</Button>
+          {/* 编辑：只看服务端 canEdit（未开始 + 可写身份），前端不复算窗口口径 */}
+          {canEdit && record.canEdit && (
+            <Button type="link" size="small" onClick={() => navigate(`/meeting-booking-form?bookingId=${record.id}&from=${encodeURIComponent('/meeting-record')}`)}>{t('meeting.edit', { defaultValue: '編輯' })}</Button>
+          )}
           {/* 纪要：行政可代录，口径与详情页一致（不能出现详情有、记录列没有） */}
           {deriveCanRecordMinutes(record, minutesCapability) && (
             <Button type="link" size="small" onClick={() => navigate(minutesPathOf(record))}>

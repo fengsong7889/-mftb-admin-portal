@@ -7,11 +7,15 @@ export interface DocSystemPlan {
   systemName: string
   systemCode?: string | null
   planType: string
+  /** 该文件在 git 里的首次提交时间（不是文件 mtime，跨机器稳定） */
   generatedAt: string | number
   sourcePath: string
   contentHash: string
   fileSize: number
+  /** 该文件在 git 里最后一次提交的时间 */
   updatedAt: string | number
+  /** 1=生效、0=停用（停用仅退出默认列表与参考，不删除归档） */
+  status: number
 }
 
 export interface DocSystemPlanPage {
@@ -87,14 +91,43 @@ export interface DocApiCatalogPage {
   size: number
 }
 
-export function fetchDocSystemPlans(params: { keyword?: string; system?: string; page?: number; size?: number }) {
+/** 查询条件。日期传 `YYYY-MM-DD`，后端展开为当天起止时刻；status 不传即全部。 */
+export interface DocSystemPlanQuery {
+  title?: string
+  systemName?: string
+  planType?: string
+  status?: number
+  generatedFrom?: string
+  generatedTo?: string
+  updatedFrom?: string
+  updatedTo?: string
+  page?: number
+  size?: number
+}
+
+export function fetchDocSystemPlans(params: DocSystemPlanQuery = {}) {
   return request.get<unknown, DocSystemPlanPage>('/doc/v3/system-plans', {
-    params: { keyword: params.keyword?.trim() || undefined, system: params.system || undefined, page: params.page ?? 1, size: params.size ?? 20 },
+    params: {
+      title: params.title?.trim() || undefined,
+      systemName: params.systemName || undefined,
+      planType: params.planType || undefined,
+      status: params.status,
+      generatedFrom: params.generatedFrom || undefined,
+      generatedTo: params.generatedTo || undefined,
+      updatedFrom: params.updatedFrom || undefined,
+      updatedTo: params.updatedTo || undefined,
+      page: params.page ?? 1,
+      size: params.size ?? 20,
+    },
   })
 }
 
 export function fetchDocSystemPlanSystems() {
   return request.get<unknown, string[]>('/doc/v3/system-plans/systems')
+}
+
+export function fetchDocSystemPlanTypes() {
+  return request.get<unknown, string[]>('/doc/v3/system-plans/plan-types')
 }
 
 export function fetchDocSystemPlanDetail(id: number) {
@@ -103,6 +136,11 @@ export function fetchDocSystemPlanDetail(id: number) {
 
 export function scanDocSystemPlans() {
   return request.post<unknown, Record<string, number | string>>('/doc/v3/system-plans/scan')
+}
+
+/** 停用/启用。后端不存停用原因（表无对应列），因此只传目标状态。 */
+export function updateDocSystemPlanStatus(id: number, status: number) {
+  return request.post<unknown, DocSystemPlan>(`/doc/v3/system-plans/${id}/status`, { status })
 }
 
 export function fetchDocApiCatalogSystems() {

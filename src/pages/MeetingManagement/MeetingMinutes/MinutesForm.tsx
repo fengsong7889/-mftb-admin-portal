@@ -723,8 +723,11 @@ export default function MinutesForm() {
               mentions={noteDraft.mentions} onMentionsChange={noteDraft.setMentions}
               saveState={noteDraft.saveState} maxChars={noteDraft.maxChars}
               aiStatus={aiAssist.status} phase={aiAssist.phase} result={aiAssist.result} errorCode={aiAssist.errorCode}
-              stale={aiStale} disabled={saving} people={ownerSeed}
+              stale={aiStale} disabled={saving}
+              people={[...ownerSeed, ...attendance.flatMap(person => person.userId
+                ? [{ id: person.userId, name: person.name, empId: person.empNo }] : [])]}
               onExtract={() => void handleExtract()} onManual={() => setInputMode('manual')}
+              onRefreshAiStatus={() => { if (aiBookingId) void aiAssist.checkStatus(aiBookingId) }}
               onApply={handleApply} onDiscard={handleDiscard} onReload={() => void noteDraft.flush()} />
           </div>
           {inputMode === 'manual' && (noteDraft.saveState === 'unsynced' || noteDraft.saveState === 'conflict') && (

@@ -2986,6 +2986,33 @@
       "comment": "新增两表及外键、唯一键和CHECK约束；活动用户生成列保证每用户仅一个处理中提取。原文快照与结果保留7天，计量元数据保留180天。开启AI前必须配置数据分级和端点批准，本迁移不授予模型权限。回滚关闭新能力并保留表及数据。"
     },
     {
+      "versionKey": "ai:scene-config-v1.0",
+      "module": "ai",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "aiSceneConfigSchemaInitializer",
+      "status": "ACTIVE",
+      "dependencies": ["ai:governance:v1.0"],
+      "scriptFiles": ["319_ai_scene_config.sql"],
+      "intent": "业务 AI 场景开关表（试点 meeting_minutes）：把会议 AI 的日常启停从启动配置迁为可持久化、可即时启停且带乐观锁与严格审计的治理面；默认关闭",
+      "author": "Qoder",
+      "ticket": "meeting-ai-scene-pilot",
+      "comment": "新表 ai_scene_config，scene_key 主键、enabled CHECK(0/1)、version 乐观锁、created_by/updated_by 外键引用 sys_user.id。仅 INSERT IGNORE 登记 meeting_minutes 一行且 enabled=0，迁移不会自动开放 AI。缺行/非法状态/读取失败一律按停用（默认拒绝）。回滚保留表与数据，仅停新写入口。"
+    },
+    {
+      "versionKey": "ai:scene-menu-actions-v1.0",
+      "module": "ai",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "aiSceneConfigSchemaInitializer",
+      "status": "ACTIVE",
+      "dependencies": ["meeting:minutes:v1.1"],
+      "intent": "给 meeting-my/meeting-booking/meeting-record 的 sys_menu.actions 追加 ai_minutes 动作，让授权中心能勾选会议 AI 整理",
+      "author": "Qoder",
+      "ticket": "meeting-ai-scene-pilot",
+      "comment": "只改 sys_menu 菜单定义，绝不改 sys_role_menu/sys_department_menu 授权行，因此默认无人获得 ai_minutes，重启也不自动扩发；发起会议 AI 整理需 edit+ai_minutes 成对授予。后置校验用 JSON_CONTAINS 确认三个菜单都已登记，否则不记版本下次重试。回滚=从 actions 移除 ai_minutes（授权行本就没动）。"
+    },
+    {
       "versionKey": "rdm:schema:v3.20",
       "module": "rdm",
       "phase": "MODULE_STRUCTURE",

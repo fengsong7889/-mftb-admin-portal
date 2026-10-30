@@ -113,6 +113,8 @@ SCHEMA_STRICT=true      # 存在无法自愈的结构漂移时中止启动（配
 APP_BUILD_TAG=<git-sha> # 迁移审计表记录本次部署版本，便于追溯
 ```
 
+**会议 AI 整理纪要（试点）——环境级上限开关**：`MEETING_MINUTES_AI_ENABLED`（映射 `meeting.minutes.ai-enabled`，默认 `true`）。它只是环境级上限：显式 `false` 会整体禁用会议 AI（优先级高于管理台开关，用于联调/灰度/紧急降级）；`true` 既不代表场景已启用、也不代表员工已授权。日常启停在「AI 操作授权 · 业务 AI 场景」页管理（`ai_scene_config` 表，默认停用），员工权限在「授权中心」按 `meeting-my/booking/record` 的 `edit` + `ai_minutes` 成对授予。改此环境变量需重启后端生效。
+
 **发布验收**（凭据通过环境变量注入，脚本不落盘任何密钥）：
 
 ```bash

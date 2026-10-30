@@ -27,6 +27,14 @@ const pendingBySystem = new Map<string, Promise<MenuVO[]>>()
 /** TTL：与 MenuContext 30s 定时刷新对齐；窗口聚焦/权限变更后强制刷新 */
 const NAVIGATION_TTL_MS = 30_000
 
+/**
+ * focus 刷新的最小间隔，与 MenuContext 保持同一策略。
+ * <p>focus 只表示「回到前台，该补一次了」；一次导航树约 12.5KB，而单次请求
+ * 耗时往往大于焦点抖动间隔，模块级 in-flight 只能合并「同时在途」的请求，
+ * 没有限流时每次 IDE↔浏览器切换都会实打实拉一发。实测与 my-tree 同属一类风暴。
+ */
+const FOCUS_REFRESH_MIN_INTERVAL_MS = 10_000
+
 async function fetchNavigation(systemCode: string): Promise<MenuVO[]> {
   // 合并同 code 的并发请求，避免 Tab 切换抖动时重复打接口
   const inflight = pendingBySystem.get(systemCode)
@@ -77,6 +85,10 @@ export function useSystemNavigation(systemCode: string | null): UseSystemNavigat
     systemCode: string | null; tree: MenuVO[]; loading: boolean; error: string | null; loaded: boolean
   }>({ systemCode, tree: [], loading: false, error: null, loaded: false })
   const requestId = useRef(0)
+  /** 读当前展示态用，不进 useCallback deps，避免身份抖动导致重挂载与重复请求。 */
+  const stateRef = useRef(state)
+  stateRef.current = state
+  const lastFocusRefreshAt = useRef(0)
 
   const load = useCallback(async (force = false) => {
     const ticket = ++requestId.current
@@ -90,13 +102,23 @@ export function useSystemNavigation(systemCode: string | null): UseSystemNavigat
       setState({ systemCode, tree: cached.tree, error: null, loading: false, loaded: true })
       return
     }
-    setState({ systemCode, tree: [], error: null, loading: true, loaded: false })
+    // 后台静默刷新：已有可展示的树时不清空、不进 loading。否则每次窗口聚焦都会
+    // 让首页快捷入口闪一帧「加載中...」——用户看到的是数据消失，而不是在刷新。
+    const silent = force && stateRef.current.systemCode === systemCode && stateRef.current.tree.length > 0
+    if (!silent) {
+      setState({ systemCode, tree: [], error: null, loading: true, loaded: false })
+    }
     try {
       const tree = await fetchNavigation(systemCode)
       if (ticket !== requestId.current) return
       setState({ systemCode, tree, error: null, loading: false, loaded: true })
     } catch (err) {
       if (ticket !== requestId.current) return
+      // 静默刷新失败不得抹掉正在展示的导航；把「后台没更新成功」渲染成数据消失是误伤。
+      if (silent && stateRef.current.systemCode === systemCode) {
+        setState(prev => ({ ...prev, loading: false }))
+        return
+      }
       setState({ systemCode, tree: [], error: err instanceof Error ? err.message : '載入系統選單失敗', loading: false, loaded: false })
     }
   }, [systemCode])
@@ -106,10 +128,14 @@ export function useSystemNavigation(systemCode: string | null): UseSystemNavigat
     return () => { requestId.current += 1 }
   }, [load])
 
-  /** 窗口重新聚焦时刷新，与 MenuContext 的策略保持一致 */
+  /** 窗口重新聚焦时刷新，与 MenuContext 的策略保持一致（含最小间隔限流） */
   useEffect(() => {
     if (!systemCode) return
-    const onFocus = () => { void load(true) }
+    const onFocus = () => {
+      if (Date.now() - lastFocusRefreshAt.current < FOCUS_REFRESH_MIN_INTERVAL_MS) return
+      lastFocusRefreshAt.current = Date.now()
+      void load(true)
+    }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
   }, [systemCode, load])

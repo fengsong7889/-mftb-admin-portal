@@ -52,6 +52,14 @@ public final class MeetingConstants {
     public static final String ACTION_CREATE = "create";
     public static final String ACTION_EDIT = "edit";
     public static final String ACTION_EXPORT = "export";
+    /**
+     * 会议 AI 整理纪要（试点）：与 edit 成对出现的独立动作。
+     * <p>能编辑纪要不等于能让 AI 读笔记并调模型——后者涉及出域与计费，必须单独授予。
+     */
+    public static final String ACTION_AI_MINUTES = "ai_minutes";
+
+    /** 业务 AI 场景标识（与 ai_scene_config.scene_key 一致）。 */
+    public static final String SCENE_MEETING_MINUTES = "meeting_minutes";
 
     /** sys_menu.actions 种子真值 */
     public static final String ACTIONS_VIEW_EDIT = "[\"view\",\"edit\"]";

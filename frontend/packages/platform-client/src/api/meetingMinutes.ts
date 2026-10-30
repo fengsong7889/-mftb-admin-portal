@@ -588,6 +588,12 @@ export interface MinutesAiStatusVO {
   reasonCode?: string | null
   maxInputChars: number
   enabled: boolean
+  /** 当前登录人是否具备会议 AI 整理权限（能记笔记不等于能调 AI）。 */
+  authorized?: boolean
+  /** 后端映射后的可读原因。 */
+  message?: string | null
+  /** 就绪检查项，供界面展示「为什么不可用」。 */
+  checks?: { key: string; status: 'passed' | 'blocked' | 'not_checked'; reasonCode?: string | null; message?: string | null }[]
 }
 
 export interface MinutesAiExtractionForm {

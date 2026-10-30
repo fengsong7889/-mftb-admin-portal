@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mftb.admin.client.LlmHttpClient;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.constant.MeetingConstants;
 import com.mftb.admin.dto.MeetingMinutesAiDto;
 import com.mftb.admin.entity.MeetingAttendee;
 import com.mftb.admin.entity.MeetingBooking;
@@ -19,6 +20,7 @@ import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.MeetingAccessGuard;
 import com.mftb.admin.service.MeetingMinutesPublication;
 import com.mftb.admin.service.agent.AiModelAdmissionService;
+import com.mftb.admin.service.agent.AiSceneService;
 import com.mftb.admin.service.agent.AiOutboundPolicyService;
 import com.mftb.admin.service.agent.BudgetReservationService;
 import com.mftb.admin.service.agent.LlmChannelRouter;
@@ -86,12 +88,9 @@ public class MeetingMinutesAiService {
     private final LlmHttpClient llmClient;
     private final LlmMeteringService metering;
     private final BudgetReservationService budgetService;
+    private final AiSceneService sceneService;
     private final ObjectMapper objectMapper;
 
-    @Value("${meeting.minutes.enabled:true}")
-    private boolean minutesEnabled;
-    @Value("${meeting.minutes.ai-enabled:false}")
-    private boolean aiEnabled;
     @Value("${meeting.minutes.business-timezone:Asia/Shanghai}")
     private String businessTimezone;
 
@@ -101,34 +100,18 @@ public class MeetingMinutesAiService {
         SysUser current = guard.currentUser();
         MeetingMinutesAiDto.AiStatusVO vo = new MeetingMinutesAiDto.AiStatusVO();
         vo.setMaxInputChars(MinutesAiPrompt.MAX_INPUT_CHARS);
-        vo.setEnabled(aiEnabled);
-        if (!minutesEnabled || !aiEnabled) {
-            vo.setAvailable(false);
-            vo.setReasonCode("feature_off");
-            return vo;
-        }
+        vo.setEnabled(sceneService.isSceneEnabled(MeetingConstants.SCENE_MEETING_MINUTES));
+        // 预检与执行同源：直接复用场景就绪判定（含环境/急停/权限/模型/额度/数据准入）。
+        // 先校会议可读，无权读会议的人不能借预检探测场景配置。
         MeetingBooking booking = authorizer.requireBooking(bookingId);
         authorizer.requireBookingReadable(booking, current);
-        try {
-            AiModelAdmissionService.Decision ctx = admissionService.checkContext(current.getUsername(), "meeting");
-            if (!ctx.allowed()) {
-                vo.setAvailable(false);
-                vo.setReasonCode(ctx.errorKind());
-                return vo;
-            }
-            LlmChannelRouter.Channel channel = resolveChannel(current.getUsername());
-            if (channel == null) {
-                vo.setAvailable(false);
-                vo.setReasonCode("no_channel");
-                return vo;
-            }
-            AiModelAdmissionService.Decision check = admissionService.check(current.getUsername(), channel.getDefaultModelKey());
-            vo.setAvailable(check.allowed());
-            vo.setReasonCode(check.allowed() ? null : check.errorKind());
-        } catch (RuntimeException e) {
-            vo.setAvailable(false);
-            vo.setReasonCode("admission_unavailable");
-        }
+        com.mftb.admin.dto.AiSceneDto.DiagnosisVO readiness =
+                sceneService.evaluate(MeetingConstants.SCENE_MEETING_MINUTES, current);
+        vo.setAvailable(readiness.isReady());
+        vo.setAuthorized(readiness.isAuthorized());
+        vo.setReasonCode(readiness.getReasonCode());
+        vo.setMessage(readiness.getMessage());
+        vo.setChecks(readiness.getChecks());
         return vo;
     }
 
@@ -136,7 +119,8 @@ public class MeetingMinutesAiService {
 
     public MeetingMinutesAiDto.ExtractionVO extract(MeetingMinutesAiDto.ExtractionForm form) {
         SysUser current = guard.currentUser();
-        requireEnabled();
+        // 独立 AI 动作 + 场景 + 环境 + 急停 + 模型/额度/数据准入，与预检同源；不就绪直接拒绝。
+        sceneService.assertExecutable(MeetingConstants.SCENE_MEETING_MINUTES, current);
         if (form.getBookingId() == null || form.getNoteVersion() == null) {
             throw new BusinessException("缺少會議或筆記版本");
         }
@@ -473,15 +457,6 @@ public class MeetingMinutesAiService {
         int stale = extractionMapper.expireStaleProcessing(LocalDateTime.now(java.time.ZoneOffset.UTC).minusMinutes(2));
         int cleared = extractionMapper.clearExpiredPayloads();
         return stale + cleared;
-    }
-
-    private void requireEnabled() {
-        if (!minutesEnabled) {
-            throw new BusinessException("會議紀要功能尚未啟用");
-        }
-        if (!aiEnabled) {
-            throw new BusinessException("AI 輔助錄入尚未啟用，請聯繫管理員開啟");
-        }
     }
 
     private LlmChannelRouter.Channel resolveChannel(String account) {

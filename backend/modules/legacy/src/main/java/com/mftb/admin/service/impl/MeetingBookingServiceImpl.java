@@ -1409,7 +1409,11 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
         vo.setSeriesSeq(booking.getSeriesSeq());
         boolean writable = guard.isOrganizer(booking, current) || guard.canOperateRecords(current);
         boolean occupying = MeetingConstants.OCCUPYING_STATUSES.contains(booking.getStatus());
-        vo.setCanEdit(writable && occupying && booking.getStartTime().isAfter(now));
+        // canEdit 必须与 update() 的护栏同口径：只有「已預約且尚未開始」真能改。
+        // 早前用 occupying（含已簽到）算，已签到又未到点的会会给出「編輯」按钮，
+        // 点进去填完一整张表单才被服务端拒——这种"按钮能点但一定失败"比没有按钮更糟
+        vo.setCanEdit(writable && MeetingConstants.STATUS_EDITABLE.contains(booking.getStatus())
+                && booking.getStartTime().isAfter(now));
         vo.setCanCancel(writable && occupying && booking.getEndTime().isAfter(now));
         // 按钮可见性只看服务端结论：前端拿 canXxx 决定渲不渲染，不再自己复算一遍窗口口径
         // 释放必须与 release() 的护栏同口径：未开始的会不给“釋放房間”入口，否则点了只会碰壁

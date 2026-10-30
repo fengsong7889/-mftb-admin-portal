@@ -5,9 +5,9 @@ import Home from './index'
 import { collectHomeMenus } from './homeUtils'
 import type { MenuVO } from '@/api/menu'
 import { fetchPortalContext } from '@/api/portal'
-import { fetchQuickFavorites, saveQuickFavorites } from '@/api/auth'
+import { fetchQuickFavorites, saveQuickFavorites, saveAiSettings } from '@/api/auth'
 import { fetchMyQuotaUsage } from '@/api/aiMyCenter'
-import { sendAgentMessage } from '@/api/agent'
+import { sendAgentMessage, fetchEngineStatus } from '@/api/agent'
 import { writeCurrentSystemCode } from '@/hooks/useCurrentSystem'
 
 const state = vi.hoisted(() => ({
@@ -191,6 +191,42 @@ describe('系统首页 AI 助手区域', () => {
     fireEvent.click(within(dropdown).getByRole('button', { name: '財務測試菜單' }))
     expect(screen.getByTestId('route')).toHaveTextContent('/finance-entry')
     expect(sendAgentMessage).not.toHaveBeenCalled()
+  })
+
+  it('引擎轮询带来的派生变更不得写回 AI 设置（只有用户改动才写）', async () => {
+    // 旧实现的持久化 deps 含 engine?.mode，而写入载荷用的是 getEngineMode()（本地选择）：
+    // 轮询回来的 mode 一变就 PUT 一份完全相同的设置（实测每分钟一次）。
+    // jsdom 下 loaded 时序与真实浏览器不同，只能靠「驱动 deps 变化」复现。
+    vi.useFakeTimers()
+    try {
+      vi.mocked(fetchEngineStatus)
+        .mockResolvedValueOnce({ ok: true, mode: 'auto', channel: 'primary', model: 'm1' })
+        .mockResolvedValueOnce({ ok: true, mode: 'off-peak', channel: 'off-peak', model: 'm2' })
+      mount()
+      await act(async () => { await vi.advanceTimersByTimeAsync(1500) })
+      // 触发 60s 引擎轮询：engine.mode 由 auto 变 off-peak，但用户从未改过设置。
+      await act(async () => { await vi.advanceTimersByTimeAsync(60_000) })
+      await act(async () => { await vi.advanceTimersByTimeAsync(1500) })
+      expect(saveAiSettings).not.toHaveBeenCalled()
+      expect(saveQuickFavorites).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('用户真的改过收藏后才回写，且不被后续轮询重复触发', async () => {
+    mount()
+    await screen.findByRole('button', { name: '財務測試菜單' })
+    expect(saveQuickFavorites).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: '移除收藏 財務測試菜單' }))
+    await waitFor(() => expect(saveQuickFavorites).toHaveBeenCalledTimes(1))
+    expect(saveQuickFavorites).toHaveBeenCalledWith(['ads-entry'])
+
+    // 引擎状态轮询等派生变更不得再写库（旧实现每分钟 PUT 一次）。
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 1300)) })
+    expect(saveQuickFavorites).toHaveBeenCalledTimes(1)
+    expect(saveAiSettings).not.toHaveBeenCalled()
   })
 
   it('AI 中心系统首页不再渲染范围预览模块，聊天区保持完整', async () => {

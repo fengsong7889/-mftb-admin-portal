@@ -717,17 +717,37 @@ PASS 知識檢索      命中 1 條（query=檢索）
 | 評測用例錄入 | 「評測與發布」補「新增用例」表單（數據集 / 用例編號 / 被評估系統 / 輸入 / 期望裁決 / 安全類開關），接既有 `POST /eval/cases`；`systemCode` 改為從系統目錄選，不讓人手填錯字；用例列表改為隨數據集篩選 |
 | 提案人工對賬 | 「操作審批」的 `unknown`（結果待核實）行補「對賬」按鈕，接既有 `POST /actions/{no}/reconcile`；彈窗內明確提示「超時不等於失敗，未核實不得重發」 |
 | 預覽橫幅更正 | `?preview=console` 仍寫「全部為模擬資料、確認後再接口」，與已接線事實矛盾；改為「頁籤匯總視圖・資料已接真實接口」，並說明本頁不繞過任何權限 |
-| i18n | 新增 `agentConsole.form.*` 31 個 + 頂層 5 個 key，中英雙份 |
+| i18n | 新增 `agentConsole.form.*` 31 個 + 頂層多個 key（經三輪瀏覽器複測後共約 100 個，中英雙份） |
+
+### 瀏覽器實測（三輪）與自身引入的回帰
+
+本輪改動經瀏覽器實測三輪。**第一輪的修復自身引入一個 P0 回歸**，如實記錄以免後人重踏：
+
+| 輪次 | 發現 | 處置 |
+|---|---|---|
+| 一 | ① readiness 在 dev 下仍 2 次（調用點已合併，但 React 18 StrictMode 雙調用 mount effect）；② 控制台仍有大量裸中文（區塊標題 / HelpPopover 標題 / 狀態 Tag / 加載失敗 Alert），與第十六節「所有用戶可見文案均有雙語詞條」的口徑**不符**；③ 新增用例表單 UI 全項通過，但提交被後端 RBAC 拒（需 `ai-conversation-audit:edit`） | ① 給 `useConsoleRemote` 加去重守衛（→ 引入 P0）；② 補 `sec.*` / `tag.*` / `hp01-11` / `a01-a26` / `block.*` 等 key；③ 歸因為權限數據問題 |
+| 二 | **⚠️ P0：所有面板永久 loading、數據永不渲染**。根因：去重守衛與 effect cleanup 競態——被跳過的那次 setup 沒返回新的清理函數，而第一次 setup 返回的 cleanup 仍會被 React 執行，於是唯一那次請求的結果被 `cancelled` 吞掉。特徵症狀就是「**請求數達標但數據全丟**」 | 重寫 `useConsoleRemote`：不再用 cleanup 做取消，改為「最新請求勝出」（遞增序號 + `mountedRef`）。同時修掉另一個本輪引入的缺陷：數據集輸入框無防抖，**逐字符打接口（實測 13 字符 13 次）** → 改 400ms 延遲提交 |
+| 三 | 全部閉合 | 7 個頁簽逐項對平「接口返回 N 條 vs 界面渲染 M 行」（apps 3/3、actions 2/2、budget 1/1、releases 3/3、data 20 行）；spinner 殘留數 0；readiness 四次實測均 **1 次**；防抖後 9 字符僅 **1 次** `eval/cases`；寫後 `reload()` 正常（新增應用後列表 3→4 行） |
+
+**沉澱（適用於本倉所有自定義取數 hook）**：給 StrictMode 加 setup 去重守衛時，**不得把「取消」綁在 effect cleanup 上**，否則被跳過的那次 setup 會連帶抹掉首次請求的結果；必須改用「最新序號勝出 + 掛載標記」。另：靜態門禁（lint / tsc / vitest）全綠**不能**證明取數類改動正確，必須瀏覽器實測數據渲染。
+
+### 庫內遺留的測試數據
+
+瀏覽器驗收在庫內建了一條草稿應用 `e2e-r3-test`（另第二輪留有 `ui-e2e` 應用/預算池/分級/端點）。控制面未暴露刪除接口，未手動改庫，待確認後可清理。
 
 ### 驗證
 
-`eslint` 0 error（全庫 607 warning 為歷史基線）、`tsc --noEmit` 0 error（需 `NODE_OPTIONS=--max-old-space-size=6144`，默認堆在本機 OOM）、`check:i18n` 11618 條引用零缺失、`check:menu` / `check:stat-order` / `check:confirm-modal` / `secret-scan` / `check:boundary` 全通過、`AiAssistant` + `aiConsoleModel` 共 25 條測試全綠。
+`eslint` 0 error（全庫 607 warning 為歷史基線）、`tsc --noEmit` 0 error（需 `NODE_OPTIONS=--max-old-space-size=6144`，默認堆在本機 OOM；以輸出正文無 crash trace 且無 `error TS` 為判據，不看管道退出碼）、`check:i18n` 12089 條引用零缺失、`check:menu` / `check:stat-order` / `check:confirm-modal` / `secret-scan` / `check:boundary` 全通過、`AiAssistant` + `aiConsoleModel` 共 25 條測試全綠、瀏覽器三輪實測最終全項通過。
 
 ### 仍未完成（外部條件或需獨立排期）
 
 | 項 | 性質 |
 |---|---|
 | Temporal 真持久化執行（跨實例定時觸發、宕機自動續跑） | 需企業內網部署與獨立數據庫；當前 `AgentRunWorker` 仍是單庫輪詢，重啟後 running 一律轉 `unknown` 人工對賬 |
+| **側欄入口與寫鏈路的權限數據** | `agent-*` 8 個菜單僅對內置 `admin` 兜底授權；`MF00001` 已被 `core:builtin-admin-account-v1` 降級為 `FIN_BIZ_APPROVER`，訪問 `#/agent-*` 全 403。本輪均走 `?preview=console` 同構入口完成驗證，**側欄本身與寫鏈路未在真實授權賬號下跑通**；需到「授權中心 → 人工智能系統」給角色補授後重驗 |
+| 功能地圖表英文檔 | `aiMenuMap.ts` 的 7 個分組 + 32 個入口（實測 126 個中文文本段，且存在大量**簡體**殘留）仍為硬編碼，無英文檔；屬獨立翻譯批次 |
+| aria-label 英文檔 | 各面板 `ariaLabel` 仍為中文（不影響視覺，但英文態讀屏與測試定位會拿到中文） |
 | WP12 試點驗收 | 需真實環境、真實知識 ACL 數據與業務負責人簽核 |
 | 對話主線接後端運行 API | `?preview=enterprise` 那套交互藍圖仍為內存模擬（僅供方案評審）；正式控制檯 8 個面板已接線，兩者不要混淆 |
-| 瀏覽器人工視覺確認 | 本輪只做到靜態門禁 + jsdom 測試；新增的兩個表單尚未在真實登入環境走過一遍 |
+| 瀏覽器人工視覺確認 | 本輪已完成三輪實測（見上節）；剩餘為上表的權限數據與功能地圖翻譯兩項 |
+| 本輪順帶觀測到的首頁請求異常 | 走查中發現 `/api/menus/my-tree`、`/api/portal/context`、`/api/agent/status` 與首頁自動 PUT 等異常，**已獨立立項並修復完成**，數據與判讀口徑見 `docs/HOME_REQUEST_STORM_2026-10.md`；與企業 Agent 控制台改動無因果關係 |

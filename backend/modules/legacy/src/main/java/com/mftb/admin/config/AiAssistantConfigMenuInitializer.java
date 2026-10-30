@@ -52,18 +52,19 @@ public class AiAssistantConfigMenuInitializer implements CommandLineRunner {
     }
 
     private static final List<MenuDef> CHILDREN = List.of(
+            // 图标不得与「總覽」分组（DashboardOutlined）重复；最终真值见 AiMenuLayout
             new MenuDef("ai-assistant-overview", "助手概覽", "Assistant Overview",
-                    "/ai-assistant", "AiAssistantOverview", "DashboardOutlined", 0, "[\"view\"]"),
+                    "/ai-assistant", "AiAssistantOverview", "RobotOutlined", 0, "[\"view\"]"),
             new MenuDef("ai-assistant-capability", "能力清單", "Capabilities",
-                    "/ai-assistant/capability", "AiAssistantCapability", "AppstoreOutlined", 1, "[\"view\",\"edit\"]"),
+                    "/ai-assistant/capability", "AiAssistantCapability", "ProfileOutlined", 1, "[\"view\",\"edit\"]"),
             new MenuDef("ai-assistant-profile", "回答骨架", "Answer Skeleton",
                     "/ai-assistant/profile", "AiAssistantProfile", "FileTextOutlined", 2, "[\"view\",\"edit\"]"),
             new MenuDef("ai-assistant-glossary", "術語與口徑", "Glossary",
-                    "/ai-assistant/glossary", "AiAssistantGlossary", "BookOutlined", 3, "[\"view\",\"edit\"]"),
+                    "/ai-assistant/glossary", "AiAssistantGlossary", "TagsOutlined", 3, "[\"view\",\"edit\"]"),
             new MenuDef("ai-assistant-knowledge", "知識庫", "Knowledge Base",
-                    "/ai-assistant/knowledge", "AiAssistantKnowledge", "ReadOutlined", 4, "[\"view\",\"edit\"]"),
+                    "/ai-assistant/knowledge", "AiAssistantKnowledge", "BookOutlined", 4, "[\"view\",\"edit\"]"),
             new MenuDef("ai-assistant-guardrail", "合規護欄", "Guardrails",
-                    "/ai-assistant/guardrail", "AiAssistantGuardrail", "SafetyCertificateOutlined", 5, "[\"view\",\"edit\"]"),
+                    "/ai-assistant/guardrail", "AiAssistantGuardrail", "SafetyOutlined", 5, "[\"view\",\"edit\"]"),
             new MenuDef("ai-assistant-quick-prompt", "快捷提問", "Quick Prompts",
                     "/ai-assistant/quick-prompt", "AiAssistantQuickPrompt", "ThunderboltOutlined", 6, "[\"view\",\"edit\"]"),
             new MenuDef("ai-assistant-push-template", "推送模板", "Push Templates",
@@ -73,7 +74,7 @@ public class AiAssistantConfigMenuInitializer implements CommandLineRunner {
             new MenuDef("ai-assistant-feedback", "回答質量", "Answer Quality",
                     "/ai-assistant/feedback", "AiAssistantFeedback", "MessageOutlined", 9, "[\"view\"]"),
             new MenuDef("ai-assistant-audit", "變更審計", "Config Audit",
-                    "/ai-assistant/audit", "AiAssistantAudit", "AuditOutlined", 10, "[\"view\"]")
+                    "/ai-assistant/audit", "AiAssistantAudit", "SnippetsOutlined", 10, "[\"view\"]")
     );
 
     private final JdbcTemplate jdbcTemplate;

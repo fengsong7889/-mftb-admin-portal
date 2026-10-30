@@ -52,6 +52,8 @@ class AiMenuLayoutTest {
                     "父级必须是已登记的分组或二级目录：" + placement.key() + " → " + placement.parentKey());
             assertFalse(placement.name().isBlank(), "缺少中文名：" + placement.key());
             assertFalse(placement.nameEn().isBlank(), "缺少英文名：" + placement.key());
+            assertFalse(placement.icon() == null || placement.icon().isBlank(),
+                    "菜单缺少图标：" + placement.key());
             for (String legacy : placement.legacyNames()) {
                 assertFalse(legacy.equals(placement.name()),
                         "历史名与新名相同会导致无条件改名：" + placement.key());
@@ -64,6 +66,21 @@ class AiMenuLayoutTest {
         for (AiMenuLayout.Placement sub : AiMenuLayout.SUB_GROUPS) {
             assertTrue(GROUP_KEYS.contains(sub.parentKey()),
                     "二级目录必须直接挂一级分组：" + sub.key() + " → " + sub.parentKey());
+        }
+    }
+
+    @Test
+    void 全系统菜单图标不得重复() {
+        // 背景：曾出现「總覽/平台總覽/助手總覽」三处同用 DashboardOutlined，用户无法靠图标区分层级。
+        // 新增/改图标时若命中本断言，换一个语义贴切且未在 AI 系统用过的注册图标（见 MenuIcon.tsx）。
+        Set<String> icons = new HashSet<>();
+        for (AiMenuLayout.Group group : AiMenuLayout.GROUPS) {
+            assertTrue(icons.add(group.icon()), "菜单图标重复：" + group.icon()
+                    + "（分组 " + group.key() + "）");
+        }
+        for (AiMenuLayout.Placement placement : allPlacements()) {
+            assertTrue(icons.add(placement.icon()), "菜单图标重复：" + placement.icon()
+                    + "（菜单 " + placement.key() + "）");
         }
     }
 

@@ -17,8 +17,9 @@ const GROUP_ICONS: Record<TrafficGroup, ReactNode> = {
   recommendations: <UserOutlined />, advanced: <SettingOutlined />,
 }
 const amount = (value: number | null | undefined) => value == null ? '待配置' : String(value)
-const statsRange = (mode: string | undefined, days: number | null | undefined) =>
-  mode === 'all' ? '全部历史' : mode === 'custom' ? `近 ${amount(days)} 天` : '待配置'
+/** 旧记录可能仍存有已废弃的自定义周期值，展示口径统一为全部历史。 */
+const hasLegacyCustomStats = (values: Partial<TrafficAlgorithmValues>) =>
+  values.merchantKeywordStatsMode === 'custom' || values.userKeywordStatsMode === 'custom'
 
 /** 仅负责配置展示，不模拟推荐结果，也不将目标规则标记为已上线。 */
 export default function TrafficAlgorithmConfig({ form, readOnly = false, errors }: Props) {
@@ -78,7 +79,7 @@ export default function TrafficAlgorithmConfig({ form, readOnly = false, errors 
           <strong>投流配置概览</strong><Tag color="orange">外卖到家</Tag><span>当前为管理端配置，推荐执行待接入</span>
         </div>
         <dl className="traffic-config__summary">
-          <div><dt>标签统计</dt><dd>商家：{statsRange(values.merchantKeywordStatsMode, values.merchantKeywordStatsDays)}；用户：{statsRange(values.userKeywordStatsMode, values.userKeywordStatsDays)}</dd></div>
+          <div><dt>标签统计</dt><dd>商家与用户均为：全部历史（固定口径）{hasLegacyCustomStats(values) && <span className="traffic-config__secondary">· 旧自定义周期已失效</span>}</dd></div>
           <div><dt>兴趣门槛</dt><dd>偏好 ≥ {amount(values.userPreferenceMinScore)} 分；覆盖率 ≥ {amount(values.matchThreshold)}%</dd></div>
           <div><dt>单用户频控</dt><dd>同店 {amount(values.merchantFreqHours)} 小时 / {amount(values.merchantFreqTimes)} 次；同标签 {amount(values.keywordFreqHours)} 小时 / {amount(values.keywordFreqTimes)} 次</dd></div>
           <div><dt>浏览后相似推荐</dt><dd>{values.generativeRecommendEnabled === undefined ? '待配置' : values.generativeRecommendEnabled ? `开启 · 每次 ${amount(values.generativeMerchantCount)} 家` : '关闭 · 子配置已保留'}</dd></div>

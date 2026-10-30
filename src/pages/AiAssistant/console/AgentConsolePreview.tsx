@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Alert, AutoComplete, Button, Descriptions, Form, Input, InputNumber, Modal, Progress, Segmented, Select, Space, Steps, Switch, Table, Tabs, Tag, message } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import {
@@ -10,8 +10,8 @@ import { useTranslation } from 'react-i18next'
 import i18n from '@/i18n'
 import { useAuth } from '@/contexts/AuthContext'
 
-/** 模組級翻譯：父層語言切換會重渲染，子元件重新計算即可。 */
-const tr = (key: string, zh: string) => i18n.t(key, { defaultValue: zh })
+/** 模組級翻譯：父層語言切換會重渲染，子元件重新計算即可；第三參數供 i18next 插值。 */
+const tr = (key: string, zh: string, options?: Record<string, unknown>) => i18n.t(key, { defaultValue: zh, ...options })
 import HelpPopover from '@/components/HelpPopover'
 import StatCards from '@/components/StatCards'
 import { useColumnConfig } from '@/hooks/useColumnConfig'
@@ -68,7 +68,7 @@ function paginationConfig(total: number) {
     showSizeChanger: true,
     showQuickJumper: true,
     pageSizeOptions: ['5', '10', '20'],
-    showTotal: (count: number) => `共 ${count} 條`,
+    showTotal: (count: number) => tr('agentConsole.tag.total', '共 {{count}} 條', { count }),
     hideOnSinglePage: total <= 5,
   }
 }
@@ -86,30 +86,30 @@ function ReadinessPanel({ readiness }: { readiness: ReadinessState }) {
     <div className="agent-console__toolbar">
       <Segmented aria-label="就緒狀態模擬" value={demoEmpty ? 'empty' : 'real'} onChange={value => setDemoEmpty(value === 'empty')}
         options={[{ label: tr('agentConsole.s15', '實際配置'), value: 'real' }, { label: tr('agentConsole.s84', '預覽：全新環境'), value: 'empty' }]} />
-      <HelpPopover title="就緒判斷口徑" ariaLabel="就緒判斷說明"
+      <HelpPopover title={tr('agentConsole.hp10', '就緒判斷口徑')} ariaLabel="就緒判斷說明"
         content={tr('agentConsole.h10', '數據來自 GET /agent/platform/ops/readiness。\n缺任一項時，模型調用或知識檢索會被明確拒絕，而不是「靜默返回空結果」。')} />
     </div>
     {readiness.loading ? (
-      <Alert type="info" showIcon message="正在讀取就緒狀態…" description="就緒未確認前不應視為放行。" />
+      <Alert type="info" showIcon message={tr('agentConsole.a01', '正在讀取就緒狀態…')} description={tr('agentConsole.a02', '就緒未確認前不應視為放行。')} />
     ) : readiness.error ? (
-      <Alert type="error" showIcon message="就緒狀態加載失敗，視為未就緒" description={readiness.error} />
+      <Alert type="error" showIcon message={tr('agentConsole.a03', '就緒狀態加載失敗，視為未就緒')} description={readiness.error} />
     ) : blocking.length === 0 ? (
-      <Alert type="success" showIcon message="模型調用與知識檢索的就緒條件已滿足"
-        description="仍需在每次執行時複查急停、授權、額度、出域與會話歸屬；就緒不等於放行。" />
+      <Alert type="success" showIcon message={tr('agentConsole.a04', '模型調用與知識檢索的就緒條件已滿足')}
+        description={tr('agentConsole.a05', '仍需在每次執行時複查急停、授權、額度、出域與會話歸屬；就緒不等於放行。')} />
     ) : (
-      <Alert type="warning" showIcon message={`尚缺 ${blocking.length} 項配置，相關能力會被拒絕`}
-        description={<ul className="agent-console__blocking">{blocking.map(key => <li key={key}>{BLOCKING_LABELS[key] ?? key}</li>)}</ul>} />
+      <Alert type="warning" showIcon message={tr('agentConsole.a06', '尚缺 {{count}} 項配置，相關能力會被拒絕', { count: blocking.length })}
+        description={<ul className="agent-console__blocking">{blocking.map(key => <li key={key}>{tr(`agentConsole.block.${key}`, BLOCKING_LABELS[key] ?? key)}</li>)}</ul>} />
     )}
     <Descriptions className="agent-console__spaced" column={4} size="small" items={[
-      { key: 'class', label: tr('agentConsole.s20', '已分級系統'), children: `${readiness.data?.counts.dataClasses ?? 0} 個` },
-      { key: 'endpoint', label: tr('agentConsole.s23', '已批准端點'), children: `${readiness.data?.counts.approvedEndpoints ?? 0} 個` },
-      { key: 'acl', label: tr('agentConsole.s64', '知識 ACL'), children: `${readiness.data?.counts.knowledgeAcls ?? 0} 份` },
-      { key: 'app', label: tr('agentConsole.s25', '已發布應用'), children: `${readiness.data?.counts.publishedApplications ?? 0} 個` },
+      { key: 'class', label: tr('agentConsole.s20', '已分級系統'), children: tr('agentConsole.unitCount', '{{n}} 個', { n: readiness.data?.counts.dataClasses ?? 0 }) },
+      { key: 'endpoint', label: tr('agentConsole.s23', '已批准端點'), children: tr('agentConsole.unitCount', '{{n}} 個', { n: readiness.data?.counts.approvedEndpoints ?? 0 }) },
+      { key: 'acl', label: tr('agentConsole.s64', '知識 ACL'), children: tr('agentConsole.unitCopy', '{{n}} 份', { n: readiness.data?.counts.knowledgeAcls ?? 0 }) },
+      { key: 'app', label: tr('agentConsole.s25', '已發布應用'), children: tr('agentConsole.unitCount', '{{n}} 個', { n: readiness.data?.counts.publishedApplications ?? 0 }) },
     ]} />
     <div className="agent-console__spaced">
-      <h4>上線順序（不可跳步）</h4>
+      <h4>{tr('agentConsole.launchOrder', '上線順序（不可跳步）')}</h4>
       <Steps size="small" current={readiness.data?.readyForModelCalls ? 3 : blocking.length === 0 ? 2 : 0} items={[
-        { title: tr('agentConsole.s59', '登記資料分級'), description: '業務負責人確認每個系統的等級' },
+        { title: tr('agentConsole.s59', '登記資料分級'), description: tr('agentConsole.a07', '業務負責人確認每個系統的等級') },
         { title: tr('agentConsole.s34', '批准模型端點'), description: tr('agentConsole.h19', '等級 + 駐留 + 有效期，到期自動失效') },
         { title: tr('agentConsole.s61', '發布應用版本'), description: tr('agentConsole.s08', '凍結工具白名單與知識範圍') },
         { title: tr('agentConsole.s82', '開啟執行器'), description: tr('agentConsole.s09', '前端接線且前兩項就緒後再開') },
@@ -143,7 +143,7 @@ function AppsPane() {
       const created: Record<string, unknown> = await createApplicationVersion(verRow.key, { toolWhitelist: tools, knowledgeScope: [] })
       const versionNo = Number(created?.version_no ?? created?.versionNo ?? 1)
       await publishApplication(verRow.key, versionNo, v.note)
-      message.success(`已發布 v${versionNo}`)
+      message.success(tr('agentConsole.publishedVersion', '已發布 v{{version}}', { version: versionNo }))
       setVerRow(null); verForm.resetFields(); reload()
     } catch { /* request.ts 已统一提示 */ } finally { setSaving(false) }
   }
@@ -159,7 +159,7 @@ function AppsPane() {
     { key: 'owner', title: tr('agentConsole.s78', tr('agentConsole.form.owner', '負責人')), dataIndex: 'owner', width: 180 },
     {
       key: 'version', title: tr('agentConsole.s55', '生產版本'), width: 120,
-      render: (_, row) => row.publishedVersion > 0 ? <Tag color="green">v{row.publishedVersion}</Tag> : <Tag>未發布</Tag>,
+      render: (_, row) => row.publishedVersion > 0 ? <Tag color="green">v{row.publishedVersion}</Tag> : <Tag>{tr('agentConsole.tag.unpublished', '未發布')}</Tag>,
     },
     {
       key: 'tools', title: tr('agentConsole.s18', '工具白名單'), width: 240,
@@ -169,7 +169,7 @@ function AppsPane() {
     },
     {
       key: 'state', title: tr('agentConsole.s54', '狀態'), width: 120,
-      render: (_, row) => row.state === 'published' ? <Tag color="green">已發布</Tag> : <Tag color="orange">草稿</Tag>,
+      render: (_, row) => row.state === 'published' ? <Tag color="green">{tr('agentConsole.tag.published', '已發布')}</Tag> : <Tag color="orange">{tr('agentConsole.tag.draft', '草稿')}</Tag>,
     },
     {
       key: 'ops', title: tr('agentConsole.form.actions', '操作'), width: 140,
@@ -187,11 +187,11 @@ function AppsPane() {
   ])
 
   return <section className="agent-console__card">
-    <h3>應用與版本<HelpPopover title="應用是授權主線" ariaLabel="應用與版本說明" content={[
+    <h3>{tr('agentConsole.pane.apps', '應用與版本')}<HelpPopover title={tr('agentConsole.hp01', '應用是授權主線')} ariaLabel="應用與版本說明" content={[
       { tone: 'info', label: tr('agentConsole.s53', '版本凍結'), body: tr('agentConsole.h18', '發布後不再改版本內容；改工具或知識範圍請發新版本，回滾等於重新指向舊版本。') },
       { tone: 'warn', label: tr('agentConsole.s66', '空白名單'), body: tr('agentConsole.h12', '未發布或白名單為空的應用，不會下發任何業務工具。') },
     ]} /></h3>
-    {error && <Alert type="error" showIcon message="應用列表加載失敗" description={error} />}
+    {error && <Alert type="error" showIcon message={tr('agentConsole.a08', '應用列表加載失敗')} description={error} />}
     <div className="action-section"><div className="action-section-left"><Tag>{tr('agentConsole.wired', '接口數據')}</Tag><Button type="primary" size="small" onClick={() => setAppOpen(true)}>{tr('agentConsole.form.addApp', '新增應用')}</Button></div><div className="action-section-right">{configComponent}</div></div>
     <Table rowKey="key" size="middle" loading={loading} columns={applyConfig(columns)} dataSource={rows} scroll={{ x: 'max-content' }}
       pagination={paginationConfig(rows.length)} />
@@ -243,7 +243,7 @@ function BudgetPane() {
         return <Progress percent={rate} size="small" strokeColor={rate >= 90 ? '#FF4D4F' : '#E8720C'} />
       },
     },
-    { key: 'gate', title: tr('agentConsole.s06', '准入'), width: 180, render: (_, row) => usageRate(row) >= 100 ? <Tag color="red">拒絕新預占</Tag> : <Tag color="green">可預占</Tag> },
+    { key: 'gate', title: tr('agentConsole.s06', '准入'), width: 180, render: (_, row) => usageRate(row) >= 100 ? <Tag color="red">{tr('agentConsole.tag.denyReserve', '拒絕新預占')}</Tag> : <Tag color="green">{tr('agentConsole.tag.canReserve', '可預占')}</Tag> },
   ]
   const meta = [
     { key: 'scope', title: tr('agentConsole.s67', '範圍') }, { key: 'limit', title: tr('agentConsole.s01', tr('agentConsole.form.limit', '上限')) }, { key: 'reserved', title: tr('agentConsole.s29', '已預占') },
@@ -255,12 +255,12 @@ function BudgetPane() {
   ])
 
   return <section className="agent-console__card">
-    <h3>預算池與原子准入<HelpPopover title="為什麼不是「先查再寫」" ariaLabel="預算原子性說明" content={[
+    <h3>{tr('agentConsole.sec.budget', '預算池與原子准入')}<HelpPopover title={tr('agentConsole.hp02', '為什麼不是「先查再寫」')} ariaLabel="預算原子性說明" content={[
       { tone: 'info', label: tr('agentConsole.s00', '一條 SQL 裁決'), body: tr('agentConsole.h05', '已結算 + 已預占 + 本次估算 ≤ 上限，由條件更新一次完成。') },
       { tone: 'warn', label: tr('agentConsole.s50', '未配置=沿用既有額度'), body: tr('agentConsole.h15', '沒有預算池時由既有部門/員工額度策略判定；配置後池即硬上限。') },
       { tone: 'danger', label: tr('agentConsole.s35', '拒絕即不調用'), body: tr('agentConsole.h22', '預占失敗直接返回，不先調模型再補記帳。') },
     ]} /></h3>
-    {error && <Alert type="error" showIcon message="預算池加載失敗" description={error} />}
+    {error && <Alert type="error" showIcon message={tr('agentConsole.a09', '預算池加載失敗')} description={error} />}
     {/* 用户反馈「配额管理」与「预算与配额」分不清：本页只讲金额预占/结算，并如实标出当前生效范围 */}
     <Alert type="warning" showIcon className="agent-console__spaced"
       message={tr('agentConsole.budgetScopeTitle', '當前生效範圍：員工 + 自然月')}
@@ -341,12 +341,12 @@ function ActionsPane() {
   ])
 
   return <section className="agent-console__card">
-    <h3>動作提案與一次性消費<HelpPopover title="審批綁定的是這一份參數" ariaLabel="動作提案說明" content={[
+    <h3>{tr('agentConsole.sec.actions', '動作提案與一次性消費')}<HelpPopover title={tr('agentConsole.hp03', '審批綁定的是這一份參數')} ariaLabel="動作提案說明" content={[
       { tone: 'info', label: tr('agentConsole.s07', '凍結內容'), body: tr('agentConsole.h17', '申請人、工具與版本、參數哈希、目標資源版本、影響範圍、到期時間、冪等鍵。') },
       { tone: 'warn', label: tr('agentConsole.s10', '參數變了就要重批'), body: tr('agentConsole.h04', '執行前比對參數哈希與資源版本；不一致、過期、已消費或非本人一律拒絕。') },
       { tone: 'danger', label: tr('agentConsole.s71', '結果未知不重發'), body: tr('agentConsole.h16', '渠道超時可能已送達，標記「待核實」，人工對賬後才能改終態。') },
     ]} /></h3>
-    {error && <Alert type="error" showIcon message="提案列表加載失敗" description={error} />}
+    {error && <Alert type="error" showIcon message={tr('agentConsole.a10', '提案列表加載失敗')} description={error} />}
     <div className="search-section">
       <Segmented aria-label="提案狀態篩選" value={status} onChange={value => setStatus(value as typeof status)}
         options={[
@@ -411,30 +411,30 @@ function KnowledgeAclPane() {
   ]
 
   return <section className="agent-console__card">
-    <h3>知識文檔授權（ACL）<HelpPopover title="沒有 ACL 就不能檢索" ariaLabel="知識 ACL 說明" content={[
+    <h3>{tr('agentConsole.sec.knowledge', '知識文檔授權（ACL）')}<HelpPopover title={tr('agentConsole.hp04', '沒有 ACL 就不能檢索')} ariaLabel="知識 ACL 說明" content={[
       { tone: 'info', label: 'fail-closed', body: tr('agentConsole.h11', '文檔沒有匹配的授權行時不參與檢索、不返回標題、片段、計數或排名。') },
       { tone: 'warn', label: tr('agentConsole.s69', '系統標籤不是授權'), body: tr('agentConsole.h00', 'systemCode、啟用狀態、上傳人、管理員身份都不能代替 ACL。') },
       { tone: 'danger', label: tr('agentConsole.s42', '撤權立即生效'), body: tr('agentConsole.h07', '撤權後下一次檢索即不可見，不依賴重新索引。') },
     ]} /></h3>
     <div className="search-section">
-      <label>選擇文檔
-        <Select aria-label="選擇知識文檔" style={{ minWidth: 280 }} placeholder="選擇後查看授權"
+      <label>{tr('agentConsole.pickDoc', '選擇文檔')}
+        <Select aria-label="選擇知識文檔" style={{ minWidth: 280 }} placeholder={tr('agentConsole.pickDocPh', '選擇後查看授權')}
           loading={docs.loading} value={docId ?? undefined} onChange={value => setDocId(value)}
           options={docOptions} showSearch optionFilterProp="label" />
       </label>
-      <label>主體類型
+      <label>{tr('agentConsole.subjectType', '主體類型')}
         <Select aria-label="授權主體類型" style={{ width: 150 }} value={subjectType} onChange={setSubjectType}
           options={['USER', 'DEPT', 'ROLE', 'ROLE_CODE'].map(value => ({ label: value, value }))} />
       </label>
-      <label>主體標識
+      <label>{tr('agentConsole.subjectId', '主體標識')}
         <Input aria-label="授權主體標識" style={{ width: 160 }} value={subjectId} onChange={event => setSubjectId(event.target.value)} />
       </label>
-      <Button type="primary" loading={granting} disabled={docId === null} onClick={grant}>授予 read</Button>
+      <Button type="primary" loading={granting} disabled={docId === null} onClick={grant}>{tr('agentConsole.btn.grantRead', '授予 read')}</Button>
     </div>
     {notice && <Alert className="agent-console__spaced" type="info" showIcon message={notice} />}
-    {acl.error && <Alert type="error" showIcon message="ACL 加載失敗" description={acl.error} />}
+    {acl.error && <Alert type="error" showIcon message={tr('agentConsole.a11', 'ACL 加載失敗')} description={acl.error} />}
     {docId === null
-      ? <Alert className="agent-console__spaced" type="info" showIcon message="請選擇一份文檔查看或維護授權" />
+      ? <Alert className="agent-console__spaced" type="info" showIcon message={tr('agentConsole.a12', '請選擇一份文檔查看或維護授權')} />
       : <Table className="agent-console__spaced" rowKey="subjects" size="middle" loading={acl.loading}
           columns={aclColumns} dataSource={acl.data ?? []} pagination={paginationConfig((acl.data ?? []).length)} />}
     <Descriptions className="agent-console__spaced" column={1} size="small" items={[
@@ -546,23 +546,23 @@ function DataEndpointsPane() {
   const endpointColumns: ColumnsType<AgentEndpointRow> = [
     { key: 'model', title: tr('agentConsole.s51', '模型端點'), width: 260, render: (_, row) => modelNameOf(row.model) },
     { key: 'level', title: tr('agentConsole.s11', '可接收等級'), dataIndex: 'maxLevel', width: 180, render: (value: string) => <Tag color="purple">{isZh ? dataClassLabel(value as AgentDataClassRow['level']) : value}</Tag> },
-    { key: 'residency', title: tr('agentConsole.s85', tr('agentConsole.form.residency', '駐留')), width: 120, render: (_, row) => row.residency === 'private' ? <Tag color="green">內網</Tag> : <Tag>外部</Tag> },
+    { key: 'residency', title: tr('agentConsole.s85', tr('agentConsole.form.residency', '駐留')), width: 120, render: (_, row) => row.residency === 'private' ? <Tag color="green">{tr('agentConsole.tag.residencyPrivate', '內網')}</Tag> : <Tag>{tr('agentConsole.tag.residencyExternal', '外部')}</Tag> },
     { key: 'expires', title: tr('agentConsole.s33', '批准有效期'), width: 170, render: (_, row) => fmtTs(row.expiresAt) },
     { key: 'note', title: tr('agentConsole.s04', tr('agentConsole.form.remark', '備註')), dataIndex: 'note' },
   ]
 
   return <>
     <section className="agent-console__card">
-      <h3>系統資料分級<HelpPopover title="未分級=禁止外發" ariaLabel="資料分級說明" content="PUBLIC < INTERNAL < SENSITIVE < RESTRICTED。未登記分級的系統不允許發送模型；敏感與嚴格受限內容只能走已批准的私域端點。" /></h3>
-      <Alert type="info" showIcon message="分級是業務決策，不由代碼推導" description="系統負責人確認等級後登記；調整等級會影響所有使用該系統的應用，需重新試算與回歸。" />
-      {classes.error && <Alert type="error" showIcon message="資料分級加載失敗" description={classes.error} />}
+      <h3>{tr('agentConsole.sec.dataClass', '系統資料分級')}<HelpPopover title={tr('agentConsole.hp05', '未分級=禁止外發')} ariaLabel="資料分級說明" content="PUBLIC < INTERNAL < SENSITIVE < RESTRICTED。未登記分級的系統不允許發送模型；敏感與嚴格受限內容只能走已批准的私域端點。" /></h3>
+      <Alert type="info" showIcon message={tr('agentConsole.a13', '分級是業務決策，不由代碼推導')} description={tr('agentConsole.a14', '系統負責人確認等級後登記；調整等級會影響所有使用該系統的應用，需重新試算與回歸。')} />
+      {classes.error && <Alert type="error" showIcon message={tr('agentConsole.a15', '資料分級加載失敗')} description={classes.error} />}
       <div className="agent-console__toolbar">{canEdit && <Button type="primary" size="small" onClick={() => setClassOpen(true)}>{tr('agentConsole.form.addClass', '登記分級')}</Button>}</div>
       <Table className="agent-console__spaced" rowKey="key" size="middle" loading={classes.loading || systems.loading} columns={classColumns}
         dataSource={classRows} pagination={paginationConfig(classRows.length)} />
     </section>
     <section className="agent-console__card">
-      <h3>模型端點批准<HelpPopover title="private 標籤不等於批准" ariaLabel="端點批准說明" content="必須由人明確登記可接收的最高資料等級與有效期；到期自動失效。內網地址或私有部署標籤本身不能作為放行依據。" /></h3>
-      {endpoints.error && <Alert type="error" showIcon message="端點批准加載失敗" description={endpoints.error} />}
+      <h3>{tr('agentConsole.sec.endpoints', '模型端點批准')}<HelpPopover title={tr('agentConsole.hp06', 'private 標籤不等於批准')} ariaLabel="端點批准說明" content="必須由人明確登記可接收的最高資料等級與有效期；到期自動失效。內網地址或私有部署標籤本身不能作為放行依據。" /></h3>
+      {endpoints.error && <Alert type="error" showIcon message={tr('agentConsole.a16', '端點批准加載失敗')} description={endpoints.error} />}
       <div className="agent-console__toolbar">{canApprove && <Button type="primary" size="small" onClick={() => setEpOpen(true)}>{tr('agentConsole.form.approveEndpoint', '批准端點')}</Button>}</div>
       <Table rowKey="model" size="middle" loading={endpoints.loading} columns={endpointColumns}
         dataSource={endpoints.data ?? []} pagination={paginationConfig((endpoints.data ?? []).length)} />
@@ -599,7 +599,7 @@ function DataEndpointsPane() {
             <Select options={DATA_CLASS_LEVELS.map(v => ({ value: v, label: isZh ? dataClassLabel(v) : v }))} />
           </Form.Item>
           <Form.Item name="residency" label={tr('agentConsole.form.residency', '駐留')} rules={[{ required: true }]} extra={tr('agentConsole.form.residencyHint', '僅接受 private / external，其他值後端直接拒絕')}>
-            <Select options={[{ value: 'private', label: 'private 內網' }, { value: 'external', label: 'external 外部' }]} />
+            <Select options={[{ value: 'private', label: `private ${tr('agentConsole.tag.residencyPrivate', '內網')}` }, { value: 'external', label: `external ${tr('agentConsole.tag.residencyExternal', '外部')}` }]} />
           </Form.Item>
           <Form.Item name="days" label={tr('agentConsole.form.days', '有效天數（1-365，預設 90）')}><InputNumber min={1} max={365} style={{ width: '100%' }} /></Form.Item>
           <Form.Item name="note" label={tr('agentConsole.form.remark', '備註')}><Input /></Form.Item>
@@ -627,16 +627,16 @@ function RunsPane() {
   ], [{ key: 'no', visible: true, locked: 'head' as const }, { key: 'status', visible: true, locked: 'tail' as const }])
 
   return <section className="agent-console__card">
-    <h3>運行中心<HelpPopover title="可靠的邊界" ariaLabel="運行中心說明" content={[
+    <h3>{tr('agentConsole.pane.runs', '運行中心')}<HelpPopover title={tr('agentConsole.hp07', '可靠的邊界')} ariaLabel="運行中心說明" content={[
       { tone: 'success', label: tr('agentConsole.s19', '已具備'), body: tr('agentConsole.h03', '受理即落庫、冪等鍵、步驟檢查點、取消標記、租約過期轉「待核實」。') },
       { tone: 'warn', label: tr('agentConsole.s17', '尚未具備'), body: tr('agentConsole.h21', '跨實例定時觸發、宕機自動續跑、外部動作撤回；取消只保證未開始的步驟不再啟動。') },
     ]} /></h3>
     <div className="action-section"><div className="action-section-left"><Tag color="green">{tr('agentConsole.wired', '接口數據')}</Tag></div><div className="action-section-right">{configComponent}</div></div>
-    {runs.error && <Alert type="error" showIcon message="運行列表加載失敗" description={runs.error} />}
+    {runs.error && <Alert type="error" showIcon message={tr('agentConsole.a17', '運行列表加載失敗')} description={runs.error} />}
     <Table rowKey="key" size="middle" loading={runs.loading} columns={applyConfig(columns)} dataSource={runs.data ?? []}
       scroll={{ x: 'max-content' }} pagination={paginationConfig((runs.data ?? []).length)} />
     {detail && <div className="agent-console__spaced">
-      <h4>{detail.runNo} · 步驟</h4>
+      <h4>{detail.runNo} · {tr('agentConsole.steps', '步驟')}</h4>
       <Steps direction="vertical" size="small" current={detail.steps.findIndex(step => step.state === 'process')}
         status={detail.status === 'unknown' ? 'error' : undefined}
         items={detail.steps.map(step => ({
@@ -650,7 +650,13 @@ function RunsPane() {
 
 function EvaluationPane() {
   const [datasetKey, setDatasetKey] = useState('safety')
-  const cases = useConsoleRemote(() => fetchEvalCases(datasetKey), [datasetKey])
+  /** 输入直接驱动取数会逐字符打接口（实测 13 字符发 13 次）；延后 400ms 合并成一次。 */
+  const [appliedDataset, setAppliedDataset] = useState('safety')
+  useEffect(() => {
+    const timer = setTimeout(() => setAppliedDataset(datasetKey), 400)
+    return () => clearTimeout(timer)
+  }, [datasetKey])
+  const cases = useConsoleRemote(() => fetchEvalCases(appliedDataset), [appliedDataset])
   const releases = useConsoleRemote(() => fetchReleases(), [])
   /** 用例的 systemCode 决定回归时评估哪个系统的分级 + 端点批准，不能手填错字。 */
   const systems = useConsoleRemote(() => fetchPlatformSystems(), [])
@@ -689,7 +695,7 @@ function EvaluationPane() {
   const caseColumns: ColumnsType<AgentEvalCaseRow> = [
     { key: 'no', title: tr('agentConsole.s56', '用例'), dataIndex: 'caseNo', width: 110 },
     { key: 'title', title: tr('agentConsole.s80', '輸入摘要'), dataIndex: 'title' },
-    { key: 'mustPass', title: tr('agentConsole.s14', '安全類'), width: 100, render: (_, row) => row.passed ? <Tag color="red">必須通過</Tag> : <Tag>一般</Tag> },
+    { key: 'mustPass', title: tr('agentConsole.s14', '安全類'), width: 100, render: (_, row) => row.passed ? <Tag color="red">{tr('agentConsole.tag.mustPass', '必須通過')}</Tag> : <Tag>{tr('agentConsole.tag.normal', '一般')}</Tag> },
   ]
   const releaseColumns: ColumnsType<AgentReleaseRow> = [
     { key: 'app', title: tr('agentConsole.s32', '應用'), dataIndex: 'app', width: 200 },
@@ -703,27 +709,27 @@ function EvaluationPane() {
 
   return <>
     <section className="agent-console__card">
-      <h3>安全回歸門禁<HelpPopover title="安全類必須零失敗" ariaLabel="回歸門禁說明" content="高風險用例失敗即阻斷發布，不能用總體通過率抵銷越權或未審批寫入；模型評分只能輔助，不作為放行依據。" /></h3>
+      <h3>{tr('agentConsole.sec.evalGate', '安全回歸門禁')}<HelpPopover title={tr('agentConsole.hp08', '安全類必須零失敗')} ariaLabel="回歸門禁說明" content="高風險用例失敗即阻斷發布，不能用總體通過率抵銷越權或未審批寫入；模型評分只能輔助，不作為放行依據。" /></h3>
       <div className="search-section">
-        <Input aria-label="評測數據集" addonBefore="數據集" style={{ maxWidth: 320 }} value={datasetKey}
+        <Input aria-label="評測數據集" addonBefore={tr('agentConsole.form.datasetKey', '數據集')} style={{ maxWidth: 320 }} value={datasetKey}
           onChange={event => setDatasetKey(event.target.value)} />
-        <Button type="primary" loading={running} onClick={start}>運行策略回歸</Button>
+        <Button type="primary" loading={running} onClick={start}>{tr('agentConsole.btn.runRegression', '運行策略回歸')}</Button>
         <Button onClick={() => setCaseOpen(true)}>{tr('agentConsole.form.addCase', '新增用例')}</Button>
-        <Tag>不調用模型、不產生費用</Tag>
+        <Tag>{tr('agentConsole.tag.noCost', '不調用模型、不產生費用')}</Tag>
       </div>
       {notice && <Alert className="agent-console__spaced" type="warning" showIcon message={notice} />}
       {result && (blocking
-        ? <Alert className="agent-console__spaced" type="error" showIcon message={`${result.failed} 條失敗，發布被阻斷`}
-            description={`共 ${result.total} 條，通過 ${result.passed} 條。`} />
-        : <Alert className="agent-console__spaced" type="success" showIcon message={`${result.passed}/${result.total} 通過`}
-            description="仍不代表生產驗收通過；試點驗收需真實環境與業務負責人。" />)}
-      {cases.error && <Alert type="error" showIcon message="評測用例加載失敗" description={cases.error} />}
+        ? <Alert className="agent-console__spaced" type="error" showIcon message={tr('agentConsole.a23', '{{failed}} 條失敗，發布被阻斷', { failed: result.failed })}
+            description={tr('agentConsole.a24', '共 {{total}} 條，通過 {{passed}} 條。', { total: result.total, passed: result.passed })} />
+        : <Alert className="agent-console__spaced" type="success" showIcon message={tr('agentConsole.a25', '{{passed}}/{{total}} 通過', { passed: result.passed, total: result.total })}
+            description={tr('agentConsole.a26', '仍不代表生產驗收通過；試點驗收需真實環境與業務負責人。')} />)}
+      {cases.error && <Alert type="error" showIcon message={tr('agentConsole.a18', '評測用例加載失敗')} description={cases.error} />}
       <Table className="agent-console__spaced" rowKey="caseNo" size="middle" loading={cases.loading}
         columns={caseColumns} dataSource={rows} pagination={paginationConfig(rows.length)} />
     </section>
     <section className="agent-console__card">
-      <h3>發布快照與回滾<HelpPopover title="快照不可變" ariaLabel="發布快照說明" content="每次發布凍結應用、Prompt、工具、知識與策略版本；回滾是重新指向舊版本並留新記錄，不會刪除已執行任務的歷史。" /></h3>
-      {releases.error && <Alert type="error" showIcon message="發布記錄加載失敗" description={releases.error} />}
+      <h3>{tr('agentConsole.sec.releases', '發布快照與回滾')}<HelpPopover title={tr('agentConsole.hp09', '快照不可變')} ariaLabel="發布快照說明" content="每次發布凍結應用、Prompt、工具、知識與策略版本；回滾是重新指向舊版本並留新記錄，不會刪除已執行任務的歷史。" /></h3>
+      {releases.error && <Alert type="error" showIcon message={tr('agentConsole.a19', '發布記錄加載失敗')} description={releases.error} />}
       <Table rowKey="key" size="middle" loading={releases.loading} columns={releaseColumns}
         dataSource={releases.data ?? []} pagination={paginationConfig((releases.data ?? []).length)} />
     </section>
@@ -821,14 +827,11 @@ function PaneContent({ pane }: { pane: ConsolePane }) {
             <OverviewCards readiness={readiness} />
             <div className="agent-console__spaced"><ReadinessPanel readiness={readiness} /></div>
             <div className="agent-console__spaced">
-              <h4>功能地圖：{AI_MENU_MAP.length} 個分組 · {AI_MENU_ENTRY_COUNT} 個功能入口</h4>
-              <p className="agent-console__muted">
-                按「先看總覽 → 建應用 → 選模型工具 → 管知識 → 配授權額度 → 看運行質量 → 管安全審計」排列。
-                看不到的入口代表當前帳號沒有該權限；括號內是生效範圍，選錯範圍是 AI 配置最常見的錯誤。
-              </p>
+              <h4>{tr('agentConsole.menuMapHead', '功能地圖：{{groups}} 個分組 · {{entries}} 個功能入口', { groups: AI_MENU_MAP.length, entries: AI_MENU_ENTRY_COUNT })}</h4>
+              <p className="agent-console__muted">{tr('agentConsole.a20', '按「先看總覽 → 建應用 → 選模型工具 → 管知識 → 配授權額度 → 看運行質量 → 管安全審計」排列。看不到的入口代表當前帳號沒有該權限；括號內是生效範圍，選錯範圍是 AI 配置最常見的錯誤。')}</p>
               <MenuMap />
-              <Alert className="agent-console__spaced" type="info" showIcon message="三個最容易混的概念"
-                description="模型授權決定「能用哪個模型」；用量額度按週期限定 Tokens/次數；費用預算只做金額預占與結算，不授予任何模型權限。三者互不替代，也不相加成一個總額度。" />
+              <Alert className="agent-console__spaced" type="info" showIcon message={tr('agentConsole.a21', '三個最容易混的概念')}
+                description={tr('agentConsole.a22', '模型授權決定「能用哪個模型」；用量額度按週期限定 Tokens/次數；費用預算只做金額預占與結算，不授予任何模型權限。三者互不替代，也不相加成一個總額度。')} />
             </div>
           </>}
           {pane === 'apps' && <AppsPane />}
@@ -860,13 +863,13 @@ export default function AgentConsolePreview() {
       <div className="agent-console__topbar">
         <Space wrap>
           <Tag color="purple">{tr('agentConsole.previewTagView', '視圖：頁籤匯總')}</Tag>
-          <Tag>{tr('agentConsole.previewTagTabs', '頁籤：')}{CONSOLE_PANES.length} 個</Tag>
+          <Tag>{tr('agentConsole.previewTagTabs', '頁籤：{{count}} 個', { count: CONSOLE_PANES.length })}</Tag>
           <Tag color="green">{tr('agentConsole.wired', '接口數據')}</Tag>
         </Space>
-        <HelpPopover title="怎麼看這一頁" ariaLabel="控制台預覽使用說明" content={[
-          { tone: 'info', label: '1. 先看總覽', body: tr('agentConsole.h02', '切換「已完成配置 / 全新環境」，看阻斷項如何呈現。') },
-          { tone: 'info', label: '2. 再看四條主線', body: tr('agentConsole.h06', '應用版本、預算池、動作提案、知識 ACL 各一頁籤。') },
-          { tone: 'success', label: '3. 正式入口', body: tr('agentConsole.previewWiredHelp', '菜單已上線「企業 Agent」8 個二級入口；本頁僅供不分菜單審查整體動線。') },
+        <HelpPopover title={tr('agentConsole.hp11', '怎麼看這一頁')} ariaLabel="控制台預覽使用說明" content={[
+          { tone: 'info', label: tr('agentConsole.guide1', '1. 先看總覽'), body: tr('agentConsole.h02', '切換「已完成配置 / 全新環境」，看阻斷項如何呈現。') },
+          { tone: 'info', label: tr('agentConsole.guide2', '2. 再看四條主線'), body: tr('agentConsole.h06', '應用版本、預算池、動作提案、知識 ACL 各一頁籤。') },
+          { tone: 'success', label: tr('agentConsole.guide3', '3. 正式入口'), body: tr('agentConsole.previewWiredHelp', '菜單已上線「企業 Agent」8 個二級入口；本頁僅供不分菜單審查整體動線。') },
         ]} />
       </div>
 

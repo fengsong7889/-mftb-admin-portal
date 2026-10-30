@@ -115,7 +115,7 @@ public final class DocKnowledgeDTO {
 
     public record SystemPlan(Long id, String fileName, String title, String systemName, String systemCode,
                              String planType, LocalDateTime generatedAt, String sourcePath, String contentHash,
-                             long fileSize, LocalDateTime updatedAt) {}
+                             long fileSize, LocalDateTime updatedAt, int status) {}
     public record SystemPlanDetail(SystemPlan plan, String content) {}
     public record SystemPlanPage(List<SystemPlan> records, long total, int page, int size) {}
 

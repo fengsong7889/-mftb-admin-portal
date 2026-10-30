@@ -39,8 +39,9 @@ public class AgentPlatformMenuInitializer implements CommandLineRunner {
     private record MenuDef(String key, String name, String nameEn, String path, String icon, int sort, String actions) { }
 
     private static final List<MenuDef> CHILDREN = List.of(
+            // 图标不得与「總覽」分组（DashboardOutlined）重复；最终真值见 AiMenuLayout
             new MenuDef("agent-overview", "平台總覽", "Platform Overview", "/agent-overview",
-                    "DashboardOutlined", 0, "[\"view\"]"),
+                    "FundOutlined", 0, "[\"view\"]"),
             new MenuDef("agent-apps", "應用與版本", "Applications & Versions", "/agent-apps",
                     "AppstoreOutlined", 1, "[\"view\",\"edit\"]"),
             new MenuDef("agent-budget", "預算與配額", "Budget & Quota", "/agent-budget",

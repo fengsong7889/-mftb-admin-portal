@@ -22,9 +22,11 @@ vi.mock('@/contexts/AuthContext', () => ({
 
 vi.mock('@/api/meeting', () => ({
   fetchMeetingRoomDetail: vi.fn(),
+  fetchMeetingDetail: vi.fn(),
   previewSeries: vi.fn(),
   createMeeting: vi.fn(),
   createSeries: vi.fn(),
+  updateMeeting: vi.fn(),
   newMeetingRequestKey: vi.fn(() => 'book-test-key'),
   toMeetingIso: (value: { format: (f: string) => string }) => value.format('YYYY-MM-DDTHH:mm:ss'),
 }))
@@ -36,7 +38,7 @@ vi.mock('@/api/employee', () => ({
   searchEmployees: vi.fn(async () => []),
 }))
 
-import { createMeeting, fetchMeetingRoomDetail, previewSeries } from '@/api/meeting'
+import { createMeeting, fetchMeetingDetail, fetchMeetingRoomDetail, previewSeries, updateMeeting } from '@/api/meeting'
 
 const ROOM = {
   id: 1,
@@ -69,6 +71,42 @@ function mount(path = '/meeting-booking-form?roomId=1&date=2026-11-05&start=10:0
   )
 }
 
+/** 编辑态原单：时间/名单/版本均由服务端回查，前端不吃 URL 与列表行缓存 */
+const BOOKING = {
+  id: 77,
+  bookingNo: 'MT2026110500001',
+  title: '改期驗證',
+  status: 'booked',
+  phase: 'pending',
+  startTime: '2026-11-05 10:00:00',
+  endTime: '2026-11-05 11:00:00',
+  timeText: '2026-11-05 10:00–11:00',
+  durationMinutes: 60,
+  roomId: 1,
+  roomNo: 'MR-2F-01',
+  roomName: '大會議室',
+  roomLocation: '總部 1 棟 2F',
+  organizerId: 9,
+  organizerName: '系統管理員',
+  attendeeCount: 3,
+  bizType: 'general',
+  description: '原議程',
+  externalAttendees: '訪客甲、面試者乙',
+  myRole: 'organizer',
+  canEdit: true,
+  canCancel: true,
+  canRelease: false,
+  canCheckin: false,
+  canFinish: false,
+  checkinRequired: false,
+  version: 4,
+  attendees: [
+    { id: 1, userId: 9, name: '系統管理員', attendeeType: 'organizer', response: 'accepted' },
+    { id: 2, userId: 11, name: '張三', attendeeType: 'required', response: 'pending' },
+    { id: 3, userId: 12, name: '李四', attendeeType: 'optional', response: 'pending' },
+  ],
+}
+
 describe('會議預約表单联动', () => {
   beforeEach(async () => {
     // 组件文案已 i18n 化：测试必须钉住语言，否则 jsdom 无 localStorage 时走 fallbackLng=en
@@ -76,8 +114,10 @@ describe('會議預約表单联动', () => {
     vi.clearAllMocks()
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(new Date('2026-11-01T10:00:00'))
-    hasPermission.mockReturnValue(false)
+    hasPermission.mockImplementation(((code: string) => code === 'meeting-record:edit') as never)
     vi.mocked(fetchMeetingRoomDetail).mockResolvedValue(ROOM as never)
+    vi.mocked(fetchMeetingDetail).mockResolvedValue(BOOKING as never)
+    vi.mocked(updateMeeting).mockResolvedValue(BOOKING as never)
     vi.mocked(createMeeting).mockResolvedValue({ bookingNo: 'MT-TEST-01', notifySkippedCount: 0, scenarioActive: true } as never)
     vi.mocked(previewSeries).mockResolvedValue([
       { date: '2026-11-05', weekdayText: '四' },
@@ -231,5 +271,67 @@ describe('會議預約表单联动', () => {
     const preview = await screen.findByRole('button', { name: /預覽場次/ })
     fireEvent.click(preview)
     await screen.findByText(/共 2 場/)
+  })
+
+  it('带 bookingId 进入即回填原单：主题、时长、名单与外部参会人保持原值', async () => {
+    mount('/meeting-booking-form?bookingId=77&from=%2Fmeeting-record')
+    await screen.findByRole('heading', { name: '編輯會議' })
+    const title = await screen.findByDisplayValue('改期驗證')
+    expect(title).toBeInTheDocument()
+    // 时长按原单起止算（粒度舍入不会把 60 分算成 45 分）
+    const durationItem = [...document.querySelectorAll('.ant-form-item')]
+      .find(item => item.querySelector('.ant-form-item-label')?.textContent?.includes('時長'))!
+    expect(durationItem.textContent).toContain('1 小時')
+    expect(screen.getByDisplayValue('原議程')).toBeInTheDocument()
+    // 外部参会人是 tags 型 Select，姓名以 chip 呈现而不是输入框的 displayValue
+    const externalItem = [...document.querySelectorAll('.ant-form-item')]
+      .find(item => item.querySelector('.ant-form-item-label')?.textContent?.includes('外部參會人'))!
+    expect(externalItem.textContent).toContain('訪客甲')
+    expect(externalItem.textContent).toContain('面試者乙')
+    // 必参/选参名单各自回填（合并成一类就会把选参人变成强制出席）；
+    // 员工接口在本用例里被 mock 成空列表，Select 只能回显 id，正好验证“谁被分到哪一类”
+    const requiredItem = [...document.querySelectorAll('.ant-form-item')]
+      .find(item => item.querySelector('.ant-form-item-label')?.textContent?.includes('必參人員'))!
+    const optionalItem = [...document.querySelectorAll('.ant-form-item')]
+      .find(item => item.querySelector('.ant-form-item-label')?.textContent?.includes('選參人員'))!
+    expect(requiredItem.querySelector('.ant-select-selection-item')?.textContent).toBe('11')
+    expect(optionalItem.querySelector('.ant-select-selection-item')?.textContent).toBe('12')
+    // 实际使用人不随改期迁移，代订开关在编辑态锁住
+    expect(screen.getByRole('switch')).toBeDisabled()
+  })
+
+  it('保存变更走 PUT：带回原版本号、业务单归属与拆开回传的名单', async () => {
+    mount('/meeting-booking-form?bookingId=77&from=%2Fmeeting-record')
+    await screen.findByDisplayValue('改期驗證')
+    fireEvent.click(screen.getByRole('button', { name: /保存變更/ }))
+    fireEvent.click(await screen.findByRole('button', { name: '確認保存' }))
+    await waitFor(() => expect(updateMeeting).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(updateMeeting).mock.calls[0][0]).toBe(77)
+    expect(vi.mocked(updateMeeting).mock.calls[0][1]).toMatchObject({
+      version: 4,
+      title: '改期驗證',
+      roomId: 1,
+      startTime: '2026-11-05T10:00:00',
+      endTime: '2026-11-05T11:00:00',
+      attendeeUserIds: [11],
+      optionalUserIds: [12],
+      externalAttendees: ['訪客甲', '面試者乙'],
+      bizType: 'general',
+    })
+    // 幂等键与代订人不属于 update 契约（后端不接收 delegateForId / requestKey）
+    expect(vi.mocked(updateMeeting).mock.calls[0][1]).not.toHaveProperty('requestKey')
+    expect(vi.mocked(updateMeeting).mock.calls[0][1]).not.toHaveProperty('delegateForId')
+    expect(createMeeting).not.toHaveBeenCalled()
+  })
+
+  it('服务端判定不可编辑时锁住表单并给出原因，不发出注定失败的保存', async () => {
+    vi.mocked(fetchMeetingDetail).mockResolvedValue({ ...BOOKING, canEdit: false, status: 'checked_in' } as never)
+    mount('/meeting-booking-form?bookingId=77&from=%2Fmeeting-record')
+    await screen.findByRole('alert')
+    expect(screen.getByText('無法編輯')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /保存變更/ })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: /保存變更/ }))
+    expect(updateMeeting).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: '確認保存' })).toBeNull()
   })
 })

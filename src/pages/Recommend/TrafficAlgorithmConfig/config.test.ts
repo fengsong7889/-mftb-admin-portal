@@ -47,14 +47,27 @@ describe('投流参数契约', () => {
       soldOutFilterEnabled: false, productCheckInterval: null,
       generativeRecommendEnabled: false, dwellTimeThreshold: null, generativeDailyLimit: null,
       newUserDimensions: ['distance'], popularityMetrics: [],
-      merchantKeywordStatsMode: 'all', merchantKeywordStatsDays: null,
     })
-    for (const name of ['productCheckInterval', 'dwellTimeThreshold', 'generativeDailyLimit', 'popularityMetrics', 'merchantKeywordStatsDays'] as const) {
+    for (const name of ['productCheckInterval', 'dwellTimeThreshold', 'generativeDailyLimit', 'popularityMetrics'] as const) {
       expect(isTrafficFieldActive(name, values)).toBe(false)
       expect(getTrafficFieldError(name, values[name], values)).toBeUndefined()
     }
     expect(serializeTrafficParams(values).productCheckInterval).toBeNull()
     expect(getTrafficFieldError('productCheckInterval', null, { ...values, soldOutFilterEnabled: true })).toBeDefined()
+  })
+
+  it('标签统计范围固定为全部历史，四个废弃键永不参与校验且保存时归一为固定口径', () => {
+    const values = readTrafficParams({ merchantKeywordStatsMode: 'custom', merchantKeywordStatsDays: null })
+    for (const name of ['merchantKeywordStatsMode', 'merchantKeywordStatsDays', 'userKeywordStatsMode', 'userKeywordStatsDays'] as const) {
+      expect(isTrafficFieldActive(name, values)).toBe(false)
+      expect(getTrafficFieldError(name, undefined, values)).toBeUndefined()
+    }
+    // 加载保留存量原值，保存时统一归一，不把已废弃的自定义周期写回参数。
+    expect(values.merchantKeywordStatsMode).toBe('custom')
+    const roundTrip = serializeTrafficParams(values)
+    expect(roundTrip.merchantKeywordStatsMode).toBe('all')
+    expect(roundTrip.merchantKeywordStatsDays).toBe(30)
+    expect(roundTrip.userKeywordStatsMode).toBe('all')
   })
 
   it('校验探索上限、空冷启动维度和空热门指标', () => {

@@ -36,17 +36,30 @@ public class AiConfigAuditService {
 
     public void record(String type, String key, String action, Object before, Object after) {
         try {
-            AiConfigChangeLog row = new AiConfigChangeLog();
-            row.setConfigType(type);
-            row.setConfigKey(truncate(key, 128));
-            row.setAction(action);
-            row.setBeforeJson(truncate(toJson(before), MAX_JSON_CHARS));
-            row.setAfterJson(truncate(toJson(after), MAX_JSON_CHARS));
-            row.setOperator(operatorResolver.currentOperatorName());
-            changeLogMapper.insert(row);
+            insert(type, key, action, before, after);
         } catch (Exception e) {
             log.warn("[AiConfigAudit] 审计写入失败 type={} key={}: {}", type, key, e.getMessage());
         }
+    }
+
+    /**
+     * 严格审计写入（场景开关等安全配置专用）：审计失败直接抛出，让调用方的事务回滚。
+     * <p>与 {@link #record} 的区别：普通配置"审计不能反过来把保存打挂"，但安全开关的
+     * "谁在什么时候把它打开"是事后唯一能回答越权问题的证据，宁可保存失败也不能失联。
+     */
+    public void recordStrict(String type, String key, String action, Object before, Object after) {
+        insert(type, key, action, before, after);
+    }
+
+    private void insert(String type, String key, String action, Object before, Object after) {
+        AiConfigChangeLog row = new AiConfigChangeLog();
+        row.setConfigType(type);
+        row.setConfigKey(truncate(key, 128));
+        row.setAction(action);
+        row.setBeforeJson(truncate(toJson(before), MAX_JSON_CHARS));
+        row.setAfterJson(truncate(toJson(after), MAX_JSON_CHARS));
+        row.setOperator(operatorResolver.currentOperatorName());
+        changeLogMapper.insert(row);
     }
 
     /** 分页查询：支持类型/动作/操作人/对象关键字/时间范围；默认按时间倒序。 */

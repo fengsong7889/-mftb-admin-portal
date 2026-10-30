@@ -160,6 +160,23 @@ describe('菜单连接失败分级与恢复', () => {
     expect(result.current.refreshing).toBe(false)
   })
 
+  it('焦点抖动成串时只拉一次菜单树，不超过最小间隔反复补拉', async () => {
+    const { result } = await mountOnline()
+    const before = vi.mocked(fetchMyMenuTree).mock.calls.length
+    // 每 500ms 一轮 focus + visibilitychange，共 6 轮（3 秒）。请求串行返回，
+    // inFlightRef 合并不了，只有真正的限流能挡住；未限流时会打 12 次。
+    for (let i = 0; i < 6; i += 1) {
+      await act(async () => {
+        window.dispatchEvent(new Event('focus'))
+        document.dispatchEvent(new Event('visibilitychange'))
+        await vi.advanceTimersByTimeAsync(500)
+      })
+    }
+    // 3 秒总跨度远小于 10s 最小间隔：首个事件可以补一次，后续必须全部合并。
+    expect(vi.mocked(fetchMyMenuTree).mock.calls.length - before).toBeLessThanOrEqual(1)
+    expect(result.current.status).toBe('online')
+  })
+
   it('同步抛错也释放在途状态，允许下一次重试', async () => {
     const { result } = await mountOnline()
     vi.mocked(fetchMyMenuTree).mockImplementationOnce(() => { throw new Error('请求初始化失败') })

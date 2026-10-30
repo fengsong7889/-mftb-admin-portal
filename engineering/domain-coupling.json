@@ -367,11 +367,19 @@
         "Agent",
         "Llm"
       ],
-      "classCount": 161,
-      "forwardClasses": 4,
-      "reverseClasses": 13,
-      "reverseFiles": 6,
+      "classCount": 167,
+      "forwardClasses": 7,
+      "reverseClasses": 15,
+      "reverseFiles": 8,
       "reverseEdges": [
+        {
+          "class": "AiSceneDto",
+          "referencingFiles": 2,
+          "examples": [
+            "MeetingMinutesAiDto",
+            "MeetingMinutesAiService"
+          ]
+        },
         {
           "class": "AiActionProposalService",
           "referencingFiles": 1,
@@ -447,6 +455,13 @@
           "referencingFiles": 1,
           "examples": [
             "LookupGlossaryTool"
+          ]
+        },
+        {
+          "class": "AiSceneService",
+          "referencingFiles": 1,
+          "examples": [
+            "MeetingMinutesAiService"
           ]
         },
         {
@@ -576,18 +591,18 @@
       "prefixes": [
         "Meeting"
       ],
-      "classCount": 76,
-      "forwardClasses": 14,
+      "classCount": 86,
+      "forwardClasses": 20,
       "reverseClasses": 1,
-      "reverseFiles": 10,
+      "reverseFiles": 11,
       "reverseEdges": [
         {
           "class": "MeetingMinutesSchema",
-          "referencingFiles": 10,
+          "referencingFiles": 11,
           "examples": [
+            "AiSceneConfigSchemaInitializer",
             "DocAckSchema",
-            "DocApiCatalogSchema",
-            "DocApiSchema"
+            "DocApiCatalogSchema"
           ]
         }
       ]

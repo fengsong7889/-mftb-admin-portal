@@ -15,6 +15,14 @@
  * - 窗口重新聚焦时刷新
  * - 可见页面每 30 秒刷新
  * - 合并并发请求，短暂失败后有界重试；只有登出/换账号/卸载才取消在途请求
+ *
+ * <p>focus / visibilitychange 必须限流：两者都是「回到前台补一次」的语义，
+ * 但一次菜单树响应约 300~700ms，inFlightRef 只能合并在途请求；焦点抖动
+ * （IDE 预览↔浏览器、Alt-Tab、CDP 附着、多窗口）会让事件间隔大于耗时，
+ * 每个事件都打一整棵 56KB 菜单树——实测静置时达设计轮询的 5~12 倍。
+ * 因此事件驱动的刷新额外受 EVENT_REFRESH_MIN_INTERVAL_MS 约束；
+ * online/offline（真实连通性跳变，稀疏且语义强）、30s 轮询、失败重试与
+ * 用户手动重试均**不受**该限流影响，不能一并压掉。
  */
 import { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo, type ReactNode } from 'react'
 import { isAxiosError, isCancel } from 'axios'
@@ -30,6 +38,8 @@ export type MenuConnectionIssue = 'network' | 'timeout' | 'unreachable' | 'serve
 const REFRESH_INTERVAL_MS = 30_000
 const RETRY_DELAY_MS = 3_000
 const FAILURE_THRESHOLD = 3
+/** focus / visibilitychange 两次刷新之间的最小间隔；大于单次请求耗时才能起到合并风暴的作用。 */
+const EVENT_REFRESH_MIN_INTERVAL_MS = 10_000
 
 interface MenuContextValue {
   /** 仅 online/degraded 保留当前账号的服务端菜单树，不持久化缓存 */
@@ -79,12 +89,15 @@ export function MenuProvider({ children }: { children: ReactNode }) {
   const controllerRef = useRef<AbortController | null>(null)
   const inFlightRef = useRef<Promise<void> | null>(null)
   const failuresRef = useRef(0)
+  /** 最近一次真实发起请求的时刻，供 focus / visibilitychange 限流判定。 */
+  const lastFetchAtRef = useRef(0)
 
   const fetchMenu = useCallback((silent = false): Promise<void> => {
     if (!isAuthenticated || userId == null) return Promise.resolve()
     // focus/visibilitychange/轮询/手动重试共用在途请求，避免弱网请求不断被自己取消。
     if (inFlightRef.current) return inFlightRef.current
     const thisFetch = ++fetchIdRef.current
+    lastFetchAtRef.current = Date.now()
     const controller = new AbortController()
     controllerRef.current = controller
     setSnapshot(prev => ({ ...prev, refreshing: true, status: silent ? prev.status : 'loading' }))
@@ -166,27 +179,34 @@ export function MenuProvider({ children }: { children: ReactNode }) {
       if (document.visibilityState === 'visible') void fetchMenu(true)
     }, REFRESH_INTERVAL_MS)
 
-    // 窗口聚焦
-    const onFocus = () => { void fetchMenu(true) }
-    window.addEventListener('focus', onFocus)
+    // 焦点/可见性只表示「回到前台，该补一次了」，按最小间隔合并抖动；
+    // 刚被轮询或上一个事件刷新过时，本次数据已经足够新，不能因此再拉整棵菜单树。
+    const refreshOnForeground = () => {
+      if (Date.now() - lastFetchAtRef.current < EVENT_REFRESH_MIN_INTERVAL_MS) return
+      void fetchMenu(true)
+    }
+
+    window.addEventListener('focus', refreshOnForeground)
     // 浏览器网络标记只作提示，不能据此拒绝 localhost/LAN 请求；恢复后立即验证。
     const onOffline = () => {
       setSnapshot(prev => prev.status === 'error' ? prev : { ...prev, status: 'degraded', issue: 'network' })
       void fetchMenu(true)
     }
-    window.addEventListener('online', onFocus)
+    // online 是真实连通性跳变（稀疏且语义强），必须立即重试，不走前台限流。
+    const onOnline = () => { void fetchMenu(true) }
+    window.addEventListener('online', onOnline)
     window.addEventListener('offline', onOffline)
 
     // 页面可见性变化（从后台切回前台）
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') fetchMenu(true)
+      if (document.visibilityState === 'visible') refreshOnForeground()
     }
     document.addEventListener('visibilitychange', onVisibility)
 
     return () => {
       clearInterval(timer)
-      window.removeEventListener('focus', onFocus)
-      window.removeEventListener('online', onFocus)
+      window.removeEventListener('focus', refreshOnForeground)
+      window.removeEventListener('online', onOnline)
       window.removeEventListener('offline', onOffline)
       document.removeEventListener('visibilitychange', onVisibility)
     }

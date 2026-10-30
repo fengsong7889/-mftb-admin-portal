@@ -4,7 +4,7 @@ import { Button, ConfigProvider, Form, Input, InputNumber, type FormInstance } f
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import TrafficAlgorithmConfig from './index'
 import useTrafficAlgorithmForm from './useTrafficAlgorithmForm'
-import { readTrafficParams, TRAFFIC_FIELD_NAMES } from './config'
+import { readTrafficParams, TRAFFIC_FIELD_NAMES, type TrafficFieldName } from './config'
 import type { AdAlgorithm } from '@/api/adPromotion'
 
 const mocks = vi.hoisted(() => ({
@@ -78,7 +78,11 @@ describe('投流配置交互与保存', () => {
     const view = mountConfig()
     const heading = screen.getByRole('button', { name: '高级策略', expanded: false })
     expect(heading).toHaveAttribute('aria-expanded', 'false')
-    expect(view.form.getFieldsError().map(field => field.name[0])).toEqual(expect.arrayContaining(TRAFFIC_FIELD_NAMES))
+    // 标签统计范围已固定为全部历史，不再挂载表单控件，其余字段仍全部注册。
+    const fixedStats: TrafficFieldName[] = ['merchantKeywordStatsMode', 'merchantKeywordStatsDays', 'userKeywordStatsMode', 'userKeywordStatsDays']
+    expect(view.form.getFieldsError().map(field => field.name[0])).toEqual(expect.arrayContaining(
+      TRAFFIC_FIELD_NAMES.filter(name => !fixedStats.includes(name)),
+    ))
     fireEvent.change(screen.getByRole('spinbutton', { name: '同商家最多展示' }), { target: { value: '7' } })
     await waitFor(() => expect(screen.getByLabelText('投流配置概览')).toHaveTextContent('同店 2 小时 / 7 次'))
     fireEvent.click(heading)
@@ -179,6 +183,25 @@ describe('投流配置交互与保存', () => {
     await act(async () => { resolveRequest(fixture()) })
     await waitFor(() => expect(view.controller.saving).toBe(false))
     expect(mocks.saved).toHaveBeenCalledTimes(1)
+  })
+
+  it('标签统计范围不再提供选择器，固定口径卡展示且旧自定义周期保存时归一', async () => {
+    mocks.fetch.mockResolvedValue(fixture({ merchantKeywordStatsMode: 'custom', merchantKeywordStatsDays: 30 }))
+    mountConfig({ id: '7' })
+    await waitFor(() => expect(screen.getByLabelText('加载状态')).toHaveTextContent('ready'))
+    expect(screen.queryByRole('combobox', { name: '商家标签统计范围' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: '用户标签统计范围' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('标签统计范围固定口径')).toHaveTextContent('全部历史')
+    expect(screen.getByRole('note', { name: '标签统计范围固定口径' })).toHaveTextContent('自定义周期因技术实现难度已取消')
+    expect(screen.getByLabelText('投流配置概览')).toHaveTextContent('全部历史（固定口径）')
+    expect(screen.getByLabelText('投流配置概览')).toHaveTextContent('旧自定义周期已失效')
+    expect(screen.getByText('历史记录中保存的自定义周期已不再生效，保存后统一按全部历史口径执行。')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /保存配置/ }))
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledTimes(1))
+    expect(mocks.update.mock.calls[0][1].params).toMatchObject({
+      merchantKeywordStatsMode: 'all', merchantKeywordStatsDays: 30,
+      userKeywordStatsMode: 'all', userKeywordStatsDays: 30,
+    })
   })
 
   it('详情模式只读，无保存入口，仍可展开高级分组', async () => {
