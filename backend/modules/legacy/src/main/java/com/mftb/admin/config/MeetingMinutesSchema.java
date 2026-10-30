@@ -35,6 +35,17 @@ public final class MeetingMinutesSchema {
     /** 补充说明附件元数据表（二进制入对象存储，本表只存元数据） */
     static final String SCRIPT_ATTACHMENTS = "309_meeting_minutes_attachments.sql";
     static final String ATTACHMENT_TABLE = "biz_meeting_minutes_attachment";
+    static final String SCRIPT_AI = "318_meeting_minutes_ai.sql";
+    static final List<String> AI_TABLES = List.of("biz_meeting_minutes_note", "biz_meeting_minutes_ai_extraction");
+    static final java.util.Map<String, List<String>> AI_COLUMNS = java.util.Map.of(
+            AI_TABLES.get(0), List.of("id", "booking_id", "owner_user_id", "raw_text", "mentions_json", "version",
+                    "content_hash", "last_request_key", "last_request_hash", "created_by", "created_at", "updated_by", "updated_at"),
+            AI_TABLES.get(1), List.of("id", "booking_id", "note_id", "operator_user_id", "request_key", "request_hash",
+                    "note_version", "source_hash", "source_snapshot", "base_minutes_id", "base_minutes_version",
+                    "meeting_date", "timezone", "status", "active_operator_id", "prompt_version", "schema_version",
+                    "model_key", "result_json", "error_code", "billing_status", "billing_context_json", "usage_json",
+                    "applied_minutes_id", "applied_minutes_version", "applied_keys_json", "applied_at", "started_at",
+                    "finished_at", "result_expires_at", "metadata_expires_at", "created_by", "created_at", "updated_by", "updated_at"));
     private static final Pattern ADDITION = Pattern.compile(
             "^ALTER TABLE (biz_meeting_minutes(?:_send|_item)?) ADD (COLUMN|CONSTRAINT) ([a-z0-9_]+) .+$",
             Pattern.DOTALL);
@@ -152,6 +163,10 @@ public final class MeetingMinutesSchema {
         // 附件元数据表：外键指向会议单与纪要，自愈顺序排在它们之后；同样不给 ADD COLUMN 自愈，列漂移交给启动校验卡住
         specs.add(new ContractSpec("meeting-minutes-attachments:" + ATTACHMENT_TABLE, ATTACHMENT_TABLE,
                 sliceCreate(SCRIPT_ATTACHMENTS, ATTACHMENT_TABLE), List.of()));
+        for (String table : AI_TABLES) {
+            specs.add(new ContractSpec("meeting-minutes-ai:" + table, table, sliceCreate(SCRIPT_AI, table),
+                    AI_COLUMNS.get(table).stream().map(name -> new ContractSpec.ColumnSpec(name, null)).toList()));
+        }
         return specs;
     }
 

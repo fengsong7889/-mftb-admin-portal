@@ -7,7 +7,7 @@
  *      后端把「事项」与「关联」都当成按提交内容重建，漏传等于把别人的记录清掉。
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MeetingDetail from './index'
 import i18n from '@/i18n'
@@ -104,11 +104,17 @@ const FILLED_MINUTES = {
   links: [{ minutesId: 66, minutesNo: 'MJ202610220001', title: '前次会议' }],
 }
 
+function AiFormDestination() {
+  const location = useLocation()
+  return <div data-testid="ai-form-destination">{location.search}</div>
+}
+
 function renderDetail() {
   return render(
     <MemoryRouter initialEntries={['/meeting-detail?id=100']}>
       <Routes>
         <Route path="/meeting-detail" element={<MeetingDetail />} />
+        <Route path="/meeting-minutes-form" element={<AiFormDestination />} />
       </Routes>
     </MemoryRouter>,
   )
@@ -174,6 +180,28 @@ describe('會議詳情 › 會議紀要就地錄入', () => {
     expect(payload.content.items.map(item => item.topic)).toEqual(['分攤口徑', '追加議題'])
   })
 
+  it.each([
+    [EMPTY_MINUTES, '?bookingId=100&input=notes'],
+    [FILLED_MINUTES, '?id=7&input=notes'],
+  ])('AI 预览入口按已有纪要状态跳转，不写入业务数据', async (minutes, query) => {
+    vi.mocked(fetchMinutes).mockResolvedValue(minutes as never)
+    renderDetail()
+    await openMinutesTab()
+    fireEvent.click(await screen.findByRole('button', { name: 'AI 輔助（介面預覽）' }))
+    expect(await screen.findByTestId('ai-form-destination')).toHaveTextContent(query)
+    expect(createMinutes).not.toHaveBeenCalled()
+    expect(updateMinutes).not.toHaveBeenCalled()
+  })
+
+  it('现场记录未保存时不允许通过新入口跳转丢失输入', async () => {
+    vi.mocked(fetchMinutes).mockResolvedValue(EMPTY_MINUTES as never)
+    renderDetail()
+    await openMinutesTab()
+    fireEvent.change(await screen.findByPlaceholderText(/議題標題/), { target: { value: '尚未保存的會議討論' } })
+    expect(screen.getByRole('button', { name: 'AI 輔助（介面預覽）' })).toBeDisabled()
+    expect(screen.getByPlaceholderText(/議題標題/)).toHaveValue('尚未保存的會議討論')
+  })
+
   it('服务端说不能编辑（身份或阶段不合格）时不提供记录区，也不给录入按钮', async () => {
     vi.mocked(fetchMinutes).mockResolvedValue({
       ...EMPTY_MINUTES, canEdit: false, editLockReason: 'MEETING_NOT_RECORDED',
@@ -185,5 +213,6 @@ describe('會議詳情 › 會議紀要就地錄入', () => {
     await screen.findByText('本場會尚未錄入紀要')
     expect(screen.queryByText('邊開會邊記錄')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /錄入紀要/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'AI 輔助（介面預覽）' })).toBeNull()
   })
 })

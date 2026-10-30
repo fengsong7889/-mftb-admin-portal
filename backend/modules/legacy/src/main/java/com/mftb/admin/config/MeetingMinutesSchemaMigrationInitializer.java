@@ -50,6 +50,7 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
 
     /** 补充说明附件：元数据表（二进制入对象存储，不入 MySQL） */
     static final String VERSION_ATTACHMENTS = "meeting:minutes-attachments:v1.0";
+    static final String VERSION_AI = "meeting:minutes-ai-v1.0";
     /** v2.1：单批次链接作废（link_revoked 列） */
     static final String VERSION_BATCH_REVOKE = "meeting:minutes:batch-revoke:v2.1";
 
@@ -202,6 +203,7 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
         versionTracker.applyOnce(VERSION_PUBLICATION, this::migratePublication, this::verifyPublication);
         versionTracker.applyOnce(VERSION_BATCH_REVOKE, this::migrateBatchRevoke, this::verifyBatchRevoke);
         versionTracker.applyOnce(VERSION_ATTACHMENTS, this::migrateAttachments, this::verifyAttachments);
+        versionTracker.applyOnce(VERSION_AI, this::migrateAiNotes, this::verifyAiNotes);
         // v1.2：卡片文案重排。必须在 v1.1 之后（模板表与种子先就绪）
         versionTracker.applyOnce(VERSION_TEMPLATE_COPY_V12,
                 this::refreshMeetingCardCopyV12, this::verifyMeetingCardCopyV12);
@@ -218,6 +220,7 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
         verifyColumns();
         verifyPublication();
         verifyAttachments();
+        verifyAiNotes();
     }
 
     /* ==================== 迁移任务 ==================== */
@@ -228,6 +231,44 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
             jdbcTemplate.execute(statement);
         }
         log.info("會議紀要建表腳本已執行: {} 條語句（{}）", statements.size(), SCHEMA_SCRIPT);
+    }
+
+    /** 仅运行受控 classpath 资源，不登记模型授权或自动批准会议数据出域。 */
+    private void migrateAiNotes() {
+        log.info("开始迁移会议个人笔记及AI提取记录");
+        for (String sql : MeetingMinutesSchema.statements(MeetingMinutesSchema.SCRIPT_AI)) jdbcTemplate.execute(sql);
+        log.info("会议个人笔记及AI提取记录迁移完成");
+    }
+
+    void verifyAiNotes() {
+        for (String table : MeetingMinutesSchema.AI_TABLES) {
+            if (!tableExists(table)) throw new IllegalStateException("会议AI表未就绪: " + table);
+            for (String column : MeetingMinutesSchema.AI_COLUMNS.get(table)) {
+                if (!columnExists(table, column)) throw new IllegalStateException("会议AI列未就绪: " + table + "." + column);
+            }
+        }
+        for (String[] key : List.of(
+                new String[]{"biz_meeting_minutes_note", "uk_minutes_note_owner"},
+                new String[]{"biz_meeting_minutes_ai_extraction", "uk_minutes_ai_request"},
+                new String[]{"biz_meeting_minutes_ai_extraction", "uk_minutes_ai_running"})) {
+            Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM information_schema.STATISTICS "
+                    + "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND INDEX_NAME=? AND NON_UNIQUE=0",
+                    Integer.class, key[0], key[1]);
+            if (count == null || count == 0) throw new IllegalStateException("会议AI唯一约束缺失: " + key[1]);
+        }
+        for (String constraint : List.of("fk_minutes_note_booking", "fk_minutes_note_owner", "ck_minutes_note_version",
+                "ck_minutes_note_length", "ck_minutes_note_mentions", "fk_minutes_ai_booking", "fk_minutes_ai_note",
+                "fk_minutes_ai_operator", "fk_minutes_ai_base", "fk_minutes_ai_applied", "ck_minutes_ai_status",
+                "ck_minutes_ai_billing", "ck_minutes_ai_versions", "ck_minutes_ai_expiry")) {
+            Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS "
+                    + "WHERE CONSTRAINT_SCHEMA=DATABASE() AND CONSTRAINT_NAME=?", Integer.class, constraint);
+            if (count == null || count == 0) throw new IllegalStateException("会议AI数据约束缺失: " + constraint);
+        }
+        String expression = jdbcTemplate.queryForObject("SELECT GENERATION_EXPRESSION FROM information_schema.COLUMNS "
+                + "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='biz_meeting_minutes_ai_extraction' AND COLUMN_NAME='active_operator_id'", String.class);
+        if (expression == null || !expression.contains("status") || !expression.contains("operator_user_id")) {
+            throw new IllegalStateException("会议AI并发活动用户列不是生成列");
+        }
     }
 
     /* ==================== v1.1 迁移 ==================== */

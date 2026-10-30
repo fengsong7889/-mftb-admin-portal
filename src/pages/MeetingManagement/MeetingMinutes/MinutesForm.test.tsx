@@ -6,7 +6,7 @@
  *   2. 记录人是当前登录人且不可改（请求体里没有这个字段的位置），渲染成只读文本而不是输入框；
  *   3. 纪要读取失败保留错误与重试入口，但不能冒充不存在并允许保存。
  */
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { Modal } from 'antd'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -15,6 +15,7 @@ import MinutesContentCard from './MinutesContentCard'
 import i18n from '@/i18n'
 
 const hasPermission = vi.fn(() => true)
+const realModalConfirm = Modal.confirm
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
@@ -43,6 +44,12 @@ vi.mock('@/api/meetingMinutes', async (importOriginal) => {
     uploadMinutesAttachment: vi.fn(),
     deleteMinutesAttachment: vi.fn(async () => undefined),
     fetchMinutesAttachmentAccess: vi.fn(),
+    // AI 辅助录入：笔记/提取接口默认返回空态，具体用例按需覆盖
+    fetchMinutesNote: vi.fn(async () => ({ exists: false, rawText: '', mentions: [], noteVersion: 0, maxChars: 20000 })),
+    saveMinutesNote: vi.fn(async (payload: { noteVersion: number }) => ({ exists: true, rawText: '', mentions: [], noteVersion: (payload?.noteVersion ?? 0) + 1, maxChars: 20000 })),
+    fetchMinutesAiStatus: vi.fn(async () => ({ available: false, reasonCode: 'feature_off', maxInputChars: 20000, enabled: false })),
+    extractMinutesAi: vi.fn(),
+    fetchMinutesAiExtraction: vi.fn(),
   }
 })
 
@@ -54,6 +61,7 @@ vi.mock('@/api/employee', () => ({
 import { fetchMeetingDetail } from '@/api/meeting'
 import {
   createMinutes, deleteMinutesAttachment, emptyMinutesContent, fetchMinutes, fetchMinutesAttachmentAccess,
+  extractMinutesAi, fetchMinutesAiStatus, saveMinutesNote,
   MINUTES_LIMITS, publishMinutes, updateMinutes, uploadMinutesAttachment,
   type MinutesAttachmentVO,
 } from '@/api/meetingMinutes'
@@ -103,9 +111,9 @@ const MEETING = {
   ],
 }
 
-function renderForm() {
+function renderForm(initialEntry = '/meeting-minutes-form?bookingId=100') {
   return render(
-    <MemoryRouter initialEntries={['/meeting-minutes-form?bookingId=100']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/meeting-minutes-form" element={<MinutesForm />} />
       </Routes>
@@ -115,10 +123,15 @@ function renderForm() {
 
 describe('會議紀要表單', () => {
   // Modal.confirm 是静态实例，退场后仍可能留在 body；不清掉会多一个「取消」按钮干扰下个用例
-  afterEach(() => Modal.destroyAll())
+  afterEach(async () => {
+    await act(async () => { Modal.destroyAll() })
+    await waitFor(() => expect(document.querySelector('.ant-modal-confirm')).toBeNull())
+  })
 
   beforeEach(async () => {
     vi.clearAllMocks()
+    // jsdom 不触发 CSS 动画结束事件；仅取消测试内动效，保留真实弹窗和确认回调。
+    vi.spyOn(Modal, 'confirm').mockImplementation(options => realModalConfirm({ ...options, transitionName: '', maskTransitionName: '' }))
     // 测试环境的默认语言不是繁中（i18n 初始化为 en），不显式切语言时断言的中文文案会全部命中英文分支
     await i18n.changeLanguage('zh-TW')
     vi.mocked(fetchMeetingDetail).mockResolvedValue(MEETING as never)
@@ -642,6 +655,111 @@ describe('會議紀要表單', () => {
     expect(add).toBeDisabled()
     expect(screen.getByText(`最多記錄 ${MINUTES_LIMITS.attendance} 位參會人員`)).toBeInTheDocument()
     expect(within(screen.getByRole('table', { name: '出席確認名單' })).getAllByRole('row')).toHaveLength(MINUTES_LIMITS.attendance + 1)
+  })
+
+  it('有编辑权限的新纪要默认自由笔记，切换及全文预览保留两套输入', async () => {
+    vi.mocked(fetchMinutes).mockResolvedValue({ exists: false, bookingId: 100, canEdit: true })
+    renderForm()
+    const note = await screen.findByRole('textbox', { name: '原始筆記' })
+    expect(screen.getByRole('radio', { name: '自由筆記' })).toBeChecked()
+    expect(screen.queryByRole('button', { name: /保存紀要/ })).toBeNull()
+    fireEvent.change(note, { target: { value: '現場自由筆記不應丟失' } })
+    fireEvent.click(screen.getByRole('radio', { name: '手動填寫' }))
+    fireEvent.change(screen.getByPlaceholderText('議題，例：Q4 預算分攤口徑'), { target: { value: '人工整理的議題' } })
+    fireEvent.click(screen.getByRole('radio', { name: '自由筆記' }))
+    expect(screen.getByRole('textbox', { name: '原始筆記' })).toHaveValue('現場自由筆記不應丟失')
+    fireEvent.click(screen.getByRole('radio', { name: '全文預覽' }))
+    expect(screen.getByRole('article', { name: '會議紀要正文' })).toHaveTextContent('人工整理的議題')
+    expect(screen.getByRole('article', { name: '會議紀要正文' })).not.toHaveTextContent('現場自由筆記不應丟失')
+    fireEvent.click(screen.getByRole('radio', { name: '填寫紀要' }))
+    expect(screen.getByRole('textbox', { name: '原始筆記' })).toHaveValue('現場自由筆記不應丟失')
+    fireEvent.click(screen.getByRole('radio', { name: '手動填寫' }))
+    expect(screen.getByPlaceholderText('議題，例：Q4 預算分攤口徑')).toHaveValue('人工整理的議題')
+    expect(createMinutes).not.toHaveBeenCalled()
+  })
+
+  it('自由笔记自动保存到服务器，但保存纪要不会把笔记文本写进正文', async () => {
+    vi.mocked(fetchMinutes).mockResolvedValue({ exists: false, bookingId: 100, canEdit: true })
+    renderForm()
+    fireEvent.change(await screen.findByRole('textbox', { name: '原始筆記' }), { target: { value: '一段不应进入正文的私人笔记' } })
+    await waitFor(() => expect(saveMinutesNote).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole('radio', { name: '手動填寫' }))
+    fireEvent.change(screen.getByPlaceholderText('議題，例：Q4 預算分攤口徑'), { target: { value: '可保存議題' } })
+    fireEvent.click(screen.getByRole('button', { name: /保存紀要/ }))
+    await waitFor(() => expect(createMinutes).toHaveBeenCalledTimes(1))
+    const payload = vi.mocked(createMinutes).mock.calls[0][0]
+    expect(payload.content.items[0].topic).toBe('可保存議題')
+    expect(JSON.stringify(payload)).not.toContain('一段不应进入正文的私人笔记')
+  })
+
+  it('末次编辑必须被完整自动保存（回归陈旧闭包丢尾字）', async () => {
+    vi.mocked(fetchMinutes).mockResolvedValue({ exists: false, bookingId: 100, canEdit: true })
+    renderForm()
+    const note = await screen.findByRole('textbox', { name: '原始筆記' })
+    fireEvent.change(note, { target: { value: '第一段' } })
+    await waitFor(() => expect(saveMinutesNote).toHaveBeenCalled())
+    // 再改一次，最后一次保存必须带完整最新值，不能只存旧值
+    fireEvent.change(note, { target: { value: '第一段加上尾字' } })
+    await waitFor(() => {
+      const last = vi.mocked(saveMinutesNote).mock.calls.at(-1)![0]
+      expect(last.rawText).toBe('第一段加上尾字')
+    })
+  })
+
+  it('AI 提取成功后套用：议题/负责人/时限带入草稿，保存时随正文提交', async () => {
+    vi.mocked(fetchMinutes).mockResolvedValue({ exists: false, bookingId: 100, canEdit: true })
+    vi.mocked(fetchMinutesAiStatus).mockResolvedValue({ available: true, maxInputChars: 20000, enabled: true })
+    vi.mocked(extractMinutesAi).mockResolvedValue({
+      requestKey: 'k1', status: 'succeeded', extractionSchemaVersion: 1,
+      source: { noteVersion: 1, sourceHash: 'h' },
+      proposal: {
+        items: [{ ref: 't1', topic: '無敵星星項目進度討論', discussion: '當前進度 90%；前端因後端接口未提供而阻塞。', sourceRefs: ['s1'] }],
+        actions: [{ ref: 'a1', topicRef: 't1', content: '後端提供無敵星星接口', ownerUserId: 7, ownerName: '劉衛', dueDate: '2026-11-06', sourceRefs: ['s1'] }],
+        openIssues: [],
+      },
+      issues: [],
+    })
+    renderForm()
+    fireEvent.change(await screen.findByRole('textbox', { name: '原始筆記' }), { target: { value: '關於無敵星星項目，當前進度90%。需要 @劉衛 提供接口，預計本週五交付。' } })
+    await waitFor(() => expect(saveMinutesNote).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole('button', { name: 'AI 輔助' }))
+    const review = await screen.findByRole('region', { name: 'AI 提取結果核對' })
+    fireEvent.click(within(review).getByRole('button', { name: '套用到紀要表單' }))
+    await waitFor(() => expect(screen.getAllByPlaceholderText('議題，例：Q4 預算分攤口徑').some(input => (input as HTMLInputElement).value === '無敵星星項目進度討論')).toBe(true))
+    fireEvent.click(screen.getByRole('button', { name: /保存紀要/ }))
+    await waitFor(() => expect(createMinutes).toHaveBeenCalledTimes(1))
+    const payload = vi.mocked(createMinutes).mock.calls[0][0]
+    expect(payload.content.items[0].topic).toBe('無敵星星項目進度討論')
+    expect(payload.content.actions[0]).toMatchObject({ content: '後端提供無敵星星接口', ownerUserId: 7, dueDate: '2026-11-06' })
+    // 保存同事务登记 AI 来源：携带本次套用的提取请求号与采用条目
+    expect(payload.aiExtractionRequestKey).toBe('k1')
+    expect(payload.appliedKeys).toEqual(expect.arrayContaining(['t1', 'a1']))
+  })
+
+  it('已有纪要默认手动，显式 AI 入口可切到自由笔记且不修改原文', async () => {
+    vi.mocked(fetchMinutes).mockResolvedValue({ exists: true, id: 9, bookingId: 100, canEdit: true,
+      content: { ...emptyMinutesContent(), items: [{ topic: '保留原有議題' }] } })
+    const view = renderForm()
+    expect(await screen.findByRole('radio', { name: '手動填寫' })).toBeChecked()
+    expect(screen.getByPlaceholderText('議題，例：Q4 預算分攤口徑')).toHaveValue('保留原有議題')
+    view.unmount()
+    renderForm('/meeting-minutes-form?bookingId=100&input=notes')
+    expect(await screen.findByRole('radio', { name: '自由筆記' })).toBeChecked()
+    expect(screen.getByRole('textbox', { name: '原始筆記' })).toHaveValue('')
+    expect(updateMinutes).not.toHaveBeenCalled()
+  })
+
+  it('只读或读取失败不通过 input 参数开放 AI 原型', async () => {
+    vi.mocked(fetchMinutes).mockResolvedValue({ exists: true, id: 9, bookingId: 100, canEdit: false,
+      content: emptyMinutesContent() })
+    const view = renderForm('/meeting-minutes-form?bookingId=100&input=notes')
+    await screen.findByRole('switch', { name: '下次會議' })
+    expect(screen.queryByRole('textbox', { name: '原始筆記' })).toBeNull()
+    view.unmount()
+    vi.mocked(fetchMinutes).mockRejectedValue(new Error('資源無法讀取'))
+    renderForm('/meeting-minutes-form?bookingId=100&input=notes')
+    await screen.findByText('未能讀取既有紀要，請重試後再編輯或保存')
+    expect(screen.queryByRole('textbox', { name: '原始筆記' })).toBeNull()
   })
 
   it('有未保存内容时，页内返回需确认且可继续填写', async () => {

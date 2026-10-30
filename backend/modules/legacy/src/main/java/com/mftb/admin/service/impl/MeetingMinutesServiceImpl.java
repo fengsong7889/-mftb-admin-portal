@@ -26,6 +26,7 @@ import com.mftb.admin.mapper.MeetingMinutesItemMapper;
 import com.mftb.admin.mapper.MeetingMinutesLinkMapper;
 import com.mftb.admin.mapper.MeetingMinutesMapper;
 import com.mftb.admin.mapper.MeetingMinutesSendMapper;
+import com.mftb.admin.mapper.MeetingMinutesAiExtractionMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.MeetingAccessGuard;
 import com.mftb.admin.service.MeetingAuditRecorder;
@@ -122,6 +123,7 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
     private final BizSeqService bizSeqService;
     private final MeetingMinutesPublication publication;
     private final MeetingMinutesAttachmentService attachmentService;
+    private final MeetingMinutesAiExtractionMapper extractionMapper;
 
     @Value("${meeting.minutes.publication-enabled:true}")
     private boolean publicationEnabled;
@@ -272,6 +274,7 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         }
         saveLinks(minutes, form);
         if (content.versioned()) refreshDraftHash(minutes, content);
+        markAiApplied(form, minutes.getId(), minutes.getVersion() == null ? 0 : minutes.getVersion(), current);
         return toVO(minutes, booking, current);
     }
 
@@ -318,6 +321,7 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         }
         saveLinks(minutes, form);
         if (content.versioned()) refreshDraftHash(minutes, content);
+        markAiApplied(form, minutesId, expectVersion + 1, current);
         audit.recordBooking(booking.getId(), booking.getRoomId(), booking.getBookingNo(),
                 MeetingConstants.EVENT_MINUTES_UPDATE, "修改會議紀要 " + minutes.getMinutesNo(),
                 Map.of("digest", nullToEmpty(before.getDigest())),
@@ -1434,6 +1438,21 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
             throw new BusinessException("會議記錄不存在或已刪除");
         }
         return booking;
+    }
+
+    /**
+     * 保存同事务登记 AI 来源：仅当本次保存带 aiExtractionRequestKey 时生效。
+     * <p>markAppliedByRequest 靠「本人 + status=成功 + 未应用过」的条件更新收敛，
+     * 影响 0 行（已登记/无权/非本人）静默忽略，不阻断已成功的保存。
+     */
+    private void markAiApplied(MeetingMinutesDto.Form form, long minutesId, Integer minutesVersion, SysUser current) {
+        String requestKey = trimToNull(form.getAiExtractionRequestKey());
+        if (requestKey == null) {
+            return;
+        }
+        List<String> keys = form.getAppliedKeys() == null ? List.of() : form.getAppliedKeys();
+        extractionMapper.markAppliedByRequest(current.getId(), requestKey, minutesId,
+                minutesVersion == null ? 0 : minutesVersion, JsonUtils.toJson(keys), current.getName());
     }
 
     private MeetingMinutesContent requireContent(MeetingMinutesDto.Form form) {

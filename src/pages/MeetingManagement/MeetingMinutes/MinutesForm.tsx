@@ -39,6 +39,10 @@ import { fetchMeetingDetail, newMeetingRequestKey, toMeetingIsoDate, type Meetin
 import EmployeeSelect from '@/components/EmployeeSelect'
 import { bizTypeLabels, minutesStatusMeta, phaseMeta } from '../meetingMeta'
 import MinutesContentCard, { MinutesNoticePreview } from './MinutesContentCard'
+import MinutesAiInputPanel from './MinutesAiInputPanel'
+import { useMinutesNoteDraft } from './useMinutesNoteDraft'
+import { useMinutesAiAssist } from './useMinutesAiAssist'
+import { mergeProposal, type MergeInput, type MergeSelection, type MergeTask } from './minutesAiMapper'
 import useMinutesNavigation from './useMinutesNavigation'
 import MinutesAttachmentEditor, { type AttachmentPendingState, type AttachmentUrlResolver } from './MinutesAttachments'
 import { fetchMinutesAttachmentAccess, minutesAttachmentFileUrl, type MinutesAttachmentVO } from '@/api/meetingMinutes'
@@ -152,6 +156,8 @@ export default function MinutesForm() {
   const [error, setError] = useState<string>()
   const [minutesLoadNote, setMinutesLoadNote] = useState<string>()
   const saveRequestKey = useRef(newMeetingRequestKey('mm'))
+  /** 本次待登记的 AI 来源（应用时写入，保存成功后清除），供服务端同事务标「已应用」 */
+  const appliedAi = useRef<{ requestKey: string; keys: string[] } | null>(null)
   const publishRequest = useRef<{ signature: string; key: string }>()
   const [nextMeetingEnabled, setNextMeetingEnabled] = useState(false)
   /** 附件是组件外 state（对象集合不是文本字段）：保存时按号写进正文 attachments，与正文同事务绑定 */
@@ -170,6 +176,22 @@ export default function MinutesForm() {
   const [displayMode, setDisplayMode] = useState('edit')
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const modeRef = useRef<HTMLDivElement>(null)
+  // AI 辅助录入：笔记自动保存 + 提取，与正式草稿链路隔离（保存仍走 handleSave）。
+  const aiBookingId = minutes?.bookingId ?? bookingId
+  const canUseAi = minutes?.canEdit === true && minutes.minutesEnabled !== false && !minutesLoadNote && !error && !loading
+  const noteDraft = useMinutesNoteDraft(aiBookingId, canUseAi)
+  const aiAssist = useMinutesAiAssist()
+  const [inputMode, setInputMode] = useState<'notes' | 'manual'>('manual')
+  // 首次拿到可编辑态时定默认：新建走自由笔记，编辑已有纪要走手动，显式 ?input=notes 强制自由笔记。
+  const inputModeInit = useRef(false)
+  useEffect(() => {
+    if (!canUseAi || inputModeInit.current) return
+    inputModeInit.current = true
+    setInputMode(searchParams.get('input') === 'notes' || !minutes?.exists ? 'notes' : 'manual')
+    if (aiBookingId) void aiAssist.checkStatus(aiBookingId)
+  }, [canUseAi, minutes?.exists, searchParams, aiBookingId, aiAssist])
+  const noteDirty = noteDraft.text.trim().length > 0 && (noteDraft.saveState === 'saving' || noteDraft.saveState === 'unsynced' || noteDraft.saveState === 'conflict' || noteDraft.saveState === 'idle')
+  const aiStale = !!aiAssist.result && aiAssist.resultNoteVersion != null && aiAssist.resultNoteVersion !== noteDraft.noteVersion
 
   // 新字段本阶段只展示禁用控件，避免填写了未接入字段后被旧保存接口静默丢弃。
   const showDocumentPreview = () => {
@@ -179,7 +201,7 @@ export default function MinutesForm() {
 
   const navigateSafely = (target?: string) => {
     const leave = () => target ? navigate(target) : back()
-    if (!hasUnsavedChanges) { leave(); return }
+    if (!hasUnsavedChanges && !noteDirty) { leave(); return }
     Modal.confirm({
       title: t('meeting.minutes.publicationText.discardUnsavedChangesBeforeLeaving'),
       className: 'custom-confirm-modal',
@@ -192,11 +214,11 @@ export default function MinutesForm() {
   }
 
   useEffect(() => {
-    if (!hasUnsavedChanges) return
+    if (!hasUnsavedChanges && !noteDirty) return
     const warnBeforeLeave = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
     window.addEventListener('beforeunload', warnBeforeLeave)
     return () => window.removeEventListener('beforeunload', warnBeforeLeave)
-  }, [hasUnsavedChanges])
+  }, [hasUnsavedChanges, noteDirty])
 
   /** 编辑已有纪要时以服务端回传的记录人为准；新建时就是当前登录人 */
   const recorderText = useMemo(() => {
@@ -382,8 +404,12 @@ export default function MinutesForm() {
     setSaving(true)
     try {
       const saved = minutes?.exists && minutes.id
-        ? await updateMinutes(minutes.id, { content, linkedMinutesIds: linkIds, version: minutes.version ?? 0 })
-        : await createMinutes({ bookingId, content, linkedMinutesIds: linkIds, requestKey: saveRequestKey.current })
+        ? await updateMinutes(minutes.id, { content, linkedMinutesIds: linkIds, version: minutes.version ?? 0,
+          aiExtractionRequestKey: appliedAi.current?.requestKey ?? null, appliedKeys: appliedAi.current?.keys })
+        : await createMinutes({ bookingId, content, linkedMinutesIds: linkIds, requestKey: saveRequestKey.current,
+          aiExtractionRequestKey: appliedAi.current?.requestKey ?? null, appliedKeys: appliedAi.current?.keys })
+      appliedAi.current = null
+      saveRequestKey.current = newMeetingRequestKey('mm')
       setMinutes(saved)
       setHasUnsavedChanges(false)
       message.success(t('meeting.minutes.saveSuccess', { defaultValue: '紀要已保存' }))
@@ -417,6 +443,59 @@ export default function MinutesForm() {
       setSaving(false)
     }
   }
+
+  /** 点 AI 辅助：先把最新笔记同步到服务器，再按已确认版本发起提取（同 requestKey 幂等） */
+  const handleExtract = async () => {
+    if (!aiBookingId) return
+    const version = await noteDraft.flush()
+    await aiAssist.run({
+      bookingId: aiBookingId, noteVersion: version,
+      baseMinutesId: minutes?.exists ? minutes.id : null,
+      baseMinutesVersion: minutes?.exists ? minutes.version ?? 0 : null,
+    })
+  }
+
+  /** 应用选中的建议：从当前表单值出发，只追加选中项 + 填充空目的，保留既有 itemId/topicKey */
+  const handleApply = (selection: MergeSelection) => {
+    if (!aiAssist.result?.proposal) return
+    const values = form.getFieldsValue(true) as FormValues
+    const current: MergeInput = {
+      purpose: values.purpose,
+      items: (values.items ?? []).map(item => ({ topicKey: item.topicKey ?? '', topic: item.topic ?? '', discussion: item.discussion, conclusion: item.conclusion, decisionStatus: item.decisionStatus })),
+      actions: (values.actions ?? []).map(task => ({ itemId: task.itemId, topicKey: task.topicKey, content: task.content ?? '', ownerUserId: task.ownerIds?.[0] ?? null, dueDate: task.dueDate ? task.dueDate.format('YYYY-MM-DD') : null, deliverable: task.deliverable })),
+      followUps: (values.followUps ?? []).map(task => ({ itemId: task.itemId, topicKey: task.topicKey, content: task.content ?? '', ownerUserId: task.ownerIds?.[0] ?? null, dueDate: task.dueDate ? task.dueDate.format('YYYY-MM-DD') : null })),
+    }
+    const merged = mergeProposal(current, aiAssist.result!.proposal!, selection)
+    const seeds = [...ownerSeed]
+    const toTask = (task: MergeTask): FormTask => {
+      if (task.ownerUserId) {
+        const known = seeds.find(person => person.id === task.ownerUserId)
+        if (!known) {
+          const matched = (aiAssist.result!.proposal!.actions ?? []).find(action => action.ownerUserId === task.ownerUserId)
+          if (matched?.ownerName) seeds.push({ id: task.ownerUserId, name: matched.ownerName, empId: matched.ownerEmpNo ?? undefined })
+        }
+      }
+      return { itemId: task.itemId, topicKey: task.topicKey, content: task.content, ownerIds: task.ownerUserId ? [task.ownerUserId] : [], dueDate: task.dueDate ? dayjs(task.dueDate) : null, deliverable: task.deliverable }
+    }
+    setOwnerSeed(seeds)
+    appliedAi.current = {
+      requestKey: aiAssist.result!.requestKey,
+      keys: [...selection.itemRefs, ...selection.actionRefs, ...selection.openIssueRefs],
+    }
+    form.setFieldsValue({
+      purpose: merged.purpose,
+      items: merged.items.map(item => ({ topicKey: item.topicKey, decisionStatus: item.decisionStatus as MinutesDecisionStatus | undefined, topic: item.topic, discussion: item.discussion, conclusion: item.conclusion })),
+      actions: merged.actions.map(toTask),
+      followUps: merged.followUps.map(toTask),
+    })
+    setHasUnsavedChanges(true)
+    aiAssist.reset()
+    setInputMode('manual')
+    setDisplayMode('edit')
+    message.success(t('meeting.minutes.aiApplied', { defaultValue: '已套用選中建議，請核對後保存' }))
+  }
+
+  const handleDiscard = () => { aiAssist.reset() }
 
   const status = minutes?.status ? minutesStatusMeta()[minutes.status] : undefined
   const series = minutes?.series ?? []
@@ -630,6 +709,32 @@ export default function MinutesForm() {
           </div>
         </div>
 
+        {/* AI 辅助录入：仅在服务端明确可编辑时展示；保存与发布仍走下方既有链路 */}
+        {canUseAi && <>
+          <div className="mm-ai-entry">
+            <strong>{t('meeting.minutes.ai.inputMode')}</strong>
+            <Segmented aria-label={t('meeting.minutes.ai.inputModeAria')} value={inputMode}
+              onChange={value => setInputMode(value === 'notes' ? 'notes' : 'manual')}
+              options={[{ value: 'notes', label: t('meeting.minutes.ai.modeNotes') }, { value: 'manual', label: t('meeting.minutes.ai.modeManual') }]} />
+            <small>{inputMode === 'notes' ? t('meeting.minutes.ai.modeNotesHint') : t('meeting.minutes.ai.modeManualHint')}</small>
+          </div>
+          <div hidden={inputMode !== 'notes'}>
+            <MinutesAiInputPanel text={noteDraft.text} onTextChange={noteDraft.setText}
+              mentions={noteDraft.mentions} onMentionsChange={noteDraft.setMentions}
+              saveState={noteDraft.saveState} maxChars={noteDraft.maxChars}
+              aiStatus={aiAssist.status} phase={aiAssist.phase} result={aiAssist.result} errorCode={aiAssist.errorCode}
+              stale={aiStale} disabled={saving} people={ownerSeed}
+              onExtract={() => void handleExtract()} onManual={() => setInputMode('manual')}
+              onApply={handleApply} onDiscard={handleDiscard} onReload={() => void noteDraft.flush()} />
+          </div>
+          {inputMode === 'manual' && (noteDraft.saveState === 'unsynced' || noteDraft.saveState === 'conflict') && (
+            <Alert type="warning" showIcon style={{ marginBottom: 16 }}
+              message={t('meeting.minutes.ai.unsyncedTitle')}
+              description={t('meeting.minutes.ai.unsyncedHint')}
+              action={<Button onClick={() => setInputMode('notes')}>{t('meeting.minutes.ai.backToNotes')}</Button>} />)}
+        </>}
+
+        <div hidden={inputMode !== 'manual'}>
         <div style={cardStyle}>
           <CardTitle icon={<FileTextOutlined />} tone="info" title={t('meeting.minutes.purpose')} />
           <Form.Item name="purpose" style={{ marginBottom: 0 }} rules={[{ max: MINUTES_LIMITS.purpose }]}>
@@ -827,6 +932,7 @@ export default function MinutesForm() {
             </div>
           </div>
         </div>
+        </div>
       </Form>
       </div>
 
@@ -834,6 +940,7 @@ export default function MinutesForm() {
       {minutes?.canEdit !== false && !minutesLoadNote && !error && !loading && (
         <div className="form-footer">
           <Button onClick={() => navigateSafely()}>{t('meeting.cancel', { defaultValue: '取消' })}</Button>
+          {inputMode === 'notes' && displayMode === 'edit' ? <Button type="primary" onClick={() => setInputMode('manual')}>{t('meeting.minutes.ai.goToManualForm')}</Button> : <>
           <Button onClick={() => displayMode === 'preview' ? setDisplayMode('edit') : showDocumentPreview()}>{displayMode === 'preview' ? t('meeting.minutes.publicationText.backToEditing') : t('meeting.minutes.publicationText.fullPreview')}</Button>
           {/* 附件上传中/有失败时禁用保存与发布：比"点了再弹一次错"少一次失败往返。 */}
           <Button type="primary" icon={<SaveOutlined />} loading={saving} disabled={attachmentPending.uploading > 0 || attachmentPending.failed > 0} onClick={() => void handleSave(false)}>
@@ -842,6 +949,7 @@ export default function MinutesForm() {
           <Button icon={<SendOutlined />} disabled={minutes?.publicationEnabled === false || attachmentPending.uploading > 0 || attachmentPending.failed > 0} loading={saving} onClick={() => void handleSave(true)}>
             {t('meeting.minutes.saveAndPublish', { defaultValue: '保存並發布' })}
           </Button>
+          </>}
         </div>
       )}
       {minutes?.canEdit === false && (

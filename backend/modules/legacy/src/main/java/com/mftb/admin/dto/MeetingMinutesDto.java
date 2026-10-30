@@ -52,6 +52,13 @@ public final class MeetingMinutesDto {
          * 老页面继续传 version，按方案文档接入的调用方传 expectVersion，不因字段名把请求判成 0。
          */
         private Integer expectVersion;
+        /**
+         * 可选：本次保存所套用的 AI 提取请求号。保存成功时与服务端登记的「已应用」处于同一事务，
+         * 用于跨会话防重复套用与审计；不传即与旧客户端行为一致，不影响既有保存链路。
+         */
+        private String aiExtractionRequestKey;
+        /** 可选：本次采用的条目键（ref 列表），与 aiExtractionRequestKey 一起登记 */
+        private List<String> appliedKeys = new ArrayList<>();
     }
 
     /** 发布只引用已经保存的草稿版本，禁止客户端直接上传一份未经保存校验的正式文档。 */

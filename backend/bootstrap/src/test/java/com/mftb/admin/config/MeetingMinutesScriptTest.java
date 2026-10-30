@@ -135,7 +135,8 @@ class MeetingMinutesScriptTest {
         expected.addAll(TABLES_V2);
         expected.add(MeetingMinutesSchema.REVISION_TABLE);
         expected.add(MeetingMinutesSchema.ATTACHMENT_TABLE);
-        assertEquals(expected.size(), contracts.size(), "契約數量必須與表數量一致（旧版七张 + 正式版本表 + 附件表）");
+        expected.addAll(MeetingMinutesSchema.AI_TABLES);
+        assertEquals(expected.size(), contracts.size(), "契約數量必須與表數量一致（旧版七张 + 正式版本表 + 附件表 + AI 两表）");
         for (int index = 0; index < expected.size(); index++) {
             ContractSpec spec = contracts.get(index);
             assertEquals(expected.get(index), spec.table());
@@ -290,5 +291,40 @@ class MeetingMinutesScriptTest {
                 "紀要表外鍵指向 biz_meeting_booking，早於會議底座建表會直接 1215");
         assertTrue(minutes.value() < validator.value(),
                 "晚於校驗器會讓紀要接口上的菜單注解被判定為不存在，非超管永久 403");
+    }
+
+    @Test
+    @DisplayName("AI 笔记/提取表：classpath 真值与参考副本逐字一致、catalog 已登记、关键约束齐备")
+    void aiSchemaAndReferenceAreIdenticalAndRegistered() throws Exception {
+        String sql = MeetingMinutesSchema.raw(MeetingMinutesSchema.SCRIPT_AI);
+        assertEquals(sql, Files.readString(Path.of("sql", MeetingMinutesSchema.SCRIPT_AI)));
+        MigrationEntry entry = MigrationCatalog.readAll().stream()
+                .filter(item -> MeetingMinutesSchemaMigrationInitializer.VERSION_AI.equals(item.getVersionKey()))
+                .findFirst().orElseThrow(() -> new AssertionError("meeting:minutes-ai-v1.0 未登记进 catalog"));
+        assertTrue(entry.getDependencies().contains("meeting:minutes-publication:v2.0"), "AI 表外键指向纪要主表，必须晚于纪要底座");
+        assertEquals("meetingMinutesSchemaMigrationInitializer", entry.getExecutor());
+        assertNotNull(getClass().getClassLoader().getResource(MeetingMinutesSchema.SCRIPT_AI));
+        String normalized = sql.replaceAll("\\s+", " ");
+        for (String required : List.of(
+                "CREATE TABLE IF NOT EXISTS biz_meeting_minutes_note",
+                "CREATE TABLE IF NOT EXISTS biz_meeting_minutes_ai_extraction",
+                "UNIQUE KEY uk_minutes_note_owner (booking_id, owner_user_id)",
+                "UNIQUE KEY uk_minutes_ai_request (operator_user_id, request_key)",
+                "UNIQUE KEY uk_minutes_ai_running (active_operator_id)",
+                "active_operator_id BIGINT GENERATED ALWAYS AS",
+                "ck_minutes_note_length CHECK (CHAR_LENGTH(raw_text) <= 20000)",
+                "ck_minutes_ai_status CHECK (status IN (0,1,2,3,4))")) {
+            assertTrue(normalized.contains(required), "缺少结构事实: " + required);
+        }
+        // 契约必须登记两张 AI 表（可自愈），且列清单非空
+        for (String table : MeetingMinutesSchema.AI_TABLES) {
+            ContractSpec spec = MeetingMinutesSchema.contracts().stream()
+                    .filter(item -> item.table().equals(table)).findFirst().orElseThrow();
+            assertFalse(spec.requiredColumns().isEmpty(), table + " 契约应登记实体依赖列");
+        }
+        String executable = sql.replaceAll("(?m)^\\s*--.*$", "").toUpperCase();
+        for (String forbidden : List.of("DROP ", "TRUNCATE ", "DELETE FROM")) {
+            assertFalse(executable.contains(forbidden), forbidden);
+        }
     }
 }

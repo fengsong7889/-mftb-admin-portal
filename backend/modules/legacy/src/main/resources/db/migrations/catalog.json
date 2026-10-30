@@ -2972,6 +2972,20 @@
       "comment": "纯新表，CREATE TABLE IF NOT EXISTS 可重放；三个唯一键分别钉住：附件号对外不可枚举自增 id、对象键不被两次登记覆盖、同幂等键不重复占存储。状态机 1=未绑定(仅上传人可删)/2=已绑定草稿/3=已发布(禁物理删除)，解绑只回退 2→1。清理作业回收超 24 小时未绑定行（解绑刷新 updated_at 防误删）。回滚保留附件表与对象文件，仅停新上传入口。上线前置：DOC_STORAGE_LOCAL_ROOT 必须指向持久卷，多实例共享同一存储。"
     },
     {
+      "versionKey": "meeting:minutes-ai-v1.0",
+      "module": "meeting",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "meetingMinutesSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": ["meeting:minutes-publication:v2.0"],
+      "scriptFiles": ["318_meeting_minutes_ai.sql"],
+      "intent": "个人原始笔记自动保存与AI提取恢复、幂等、并发和计量审计，不改正式纪要",
+      "author": "Qoder",
+      "ticket": "meeting-minutes-ai",
+      "comment": "新增两表及外键、唯一键和CHECK约束；活动用户生成列保证每用户仅一个处理中提取。原文快照与结果保留7天，计量元数据保留180天。开启AI前必须配置数据分级和端点批准，本迁移不授予模型权限。回滚关闭新能力并保留表及数据。"
+    },
+    {
       "versionKey": "rdm:schema:v3.20",
       "module": "rdm",
       "phase": "MODULE_STRUCTURE",

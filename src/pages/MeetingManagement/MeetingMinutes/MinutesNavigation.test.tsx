@@ -20,6 +20,11 @@ vi.mock('@/api/meetingMinutes', async original => ({
   updateMinutes: api.update, createMinutes: api.create, publishMinutes: api.publish,
   fetchMinutesSends: vi.fn(async () => []), fetchMinutesRevisions: vi.fn(async () => []),
   fetchMinutesGroups: vi.fn(async () => []),
+  fetchMinutesNote: vi.fn(async () => ({ exists: false, rawText: '', mentions: [], noteVersion: 0, maxChars: 20000 })),
+  saveMinutesNote: vi.fn(async (payload: { noteVersion: number }) => ({ exists: true, rawText: '', mentions: [], noteVersion: (payload?.noteVersion ?? 0) + 1, maxChars: 20000 })),
+  fetchMinutesAiStatus: vi.fn(async () => ({ available: false, reasonCode: 'feature_off', maxInputChars: 20000, enabled: false })),
+  extractMinutesAi: vi.fn(async () => { throw new Error('nav test: no ai') }),
+  fetchMinutesAiExtraction: vi.fn(async () => { throw new Error('nav test: no ai') }),
 }))
 vi.mock('@/api/meeting', async original => ({
   ...await original<typeof import('@/api/meeting')>(),

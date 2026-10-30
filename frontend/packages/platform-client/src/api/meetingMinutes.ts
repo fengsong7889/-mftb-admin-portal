@@ -388,6 +388,10 @@ export interface MinutesSaveForm {
   markPresentUserIds?: number[]
   /** 幂等键：一次提交生成一个，重放不会长出第二条纪要 */
   requestKey?: string
+  /** 可选：本次保存所套用的 AI 提取请求号，服务端同事务登记「已应用」，防跨会话重复套用 */
+  aiExtractionRequestKey?: string | null
+  /** 可选：本次采用的条目键（ref 列表） */
+  appliedKeys?: string[]
   /** 编辑必填：乐观锁，冲突时后端拒绝而不是静默覆盖 */
   version?: number
 }
@@ -547,4 +551,148 @@ export function minutesAttachmentFileUrl(params: { attachmentNo: string; ticket?
   if (params.token) query.set('token', params.token)
   if (params.purpose) query.set('purpose', params.purpose)
   return `${base}?${query.toString()}`
+}
+
+/* ==================== AI 辅助录入（笔记 + 提取） ==================== */
+
+/** @员工标记：mentionRef 是临时别名，真实 userId 由服务端回查，前端不自报身份。 */
+export interface MinutesNoteMention {
+  mentionRef?: string
+  userId?: number | null
+  name: string
+  start?: number | null
+  end?: number | null
+}
+
+export interface MinutesNoteForm {
+  bookingId: number
+  rawText: string
+  mentions: MinutesNoteMention[]
+  /** 乐观锁：新建传 0，编辑传上次读到的版本 */
+  noteVersion: number
+  requestKey: string
+}
+
+export interface MinutesNoteVO {
+  exists: boolean
+  rawText: string
+  mentions: MinutesNoteMention[]
+  noteVersion: number
+  updatedAt?: string | null
+  lastExtractionRequestKey?: string | null
+  maxChars: number
+}
+
+export interface MinutesAiStatusVO {
+  available: boolean
+  reasonCode?: string | null
+  maxInputChars: number
+  enabled: boolean
+}
+
+export interface MinutesAiExtractionForm {
+  bookingId: number
+  noteVersion: number
+  baseMinutesId?: number | null
+  baseMinutesVersion?: number | null
+  requestKey: string
+}
+
+export interface MinutesAiProposalItem {
+  ref?: string
+  topic: string
+  discussion?: string | null
+  conclusion?: string | null
+  decisionStatus?: MinutesDecisionStatus | null
+  sourceRefs: string[]
+}
+
+export interface MinutesAiProposalAction {
+  ref?: string
+  topicRef?: string | null
+  content: string
+  ownerUserId?: number | null
+  ownerName?: string | null
+  ownerEmpNo?: string | null
+  dueDate?: string | null
+  deliverable?: string | null
+  sourceRefs: string[]
+}
+
+export interface MinutesAiProposalOpenIssue {
+  ref?: string
+  topicRef?: string | null
+  content: string
+  ownerUserId?: number | null
+  ownerName?: string | null
+  dueDate?: string | null
+  sourceRefs: string[]
+}
+
+export interface MinutesAiProposal {
+  purpose?: string | null
+  items: MinutesAiProposalItem[]
+  actions: MinutesAiProposalAction[]
+  openIssues: MinutesAiProposalOpenIssue[]
+}
+
+export interface MinutesAiAnnotation {
+  proposalKey: string
+  field: string
+  sourceRefs: string[]
+  rawText?: string | null
+  parseStatus?: string | null
+}
+
+export interface MinutesAiCandidate { userId: number; name: string; empNo?: string | null }
+
+export interface MinutesAiIssue {
+  code: string
+  proposalKey: string
+  field: string
+  severity: string
+  candidates: MinutesAiCandidate[]
+}
+
+export interface MinutesAiUsage { model?: string; promptTokens?: number; completionTokens?: number; meteringStatus?: string }
+
+export type MinutesAiExtractionStatus = 'processing' | 'succeeded' | 'failed' | 'unknown' | 'expired'
+
+export interface MinutesAiExtractionVO {
+  requestKey: string
+  status: MinutesAiExtractionStatus
+  extractionSchemaVersion: number
+  promptVersion?: string
+  source?: { noteVersion: number; sourceHash: string; baseMinutesId?: number | null; baseMinutesVersion?: number | null }
+  context?: { meetingDate?: string; timezone?: string }
+  proposal?: MinutesAiProposal
+  annotations?: MinutesAiAnnotation[]
+  issues?: MinutesAiIssue[]
+  usage?: MinutesAiUsage
+  errorCode?: string | null
+}
+
+/** 读个人笔记（含最近可恢复的提取请求号） */
+export function fetchMinutesNote(bookingId: number): Promise<MinutesNoteVO> {
+  return request.get<unknown, MinutesNoteVO>('/meeting/minutes/notes', { params: { bookingId } })
+}
+
+/** 自动保存个人笔记（不触发模型、不动正式草稿版本） */
+export function saveMinutesNote(payload: MinutesNoteForm): Promise<MinutesNoteVO> {
+  return request.put<unknown, MinutesNoteVO>('/meeting/minutes/notes', payload)
+}
+
+/** AI 可用性预检（不预占、不扣费） */
+export function fetchMinutesAiStatus(bookingId: number): Promise<MinutesAiStatusVO> {
+  return request.get<unknown, MinutesAiStatusVO>('/meeting/minutes/ai/status', { params: { bookingId } })
+}
+
+/** 执行一次提取（幂等：同 requestKey 重放返回原结果）；模型可能较慢，超时放宽到 75s */
+export function extractMinutesAi(payload: MinutesAiExtractionForm): Promise<MinutesAiExtractionVO> {
+  return request.post<unknown, MinutesAiExtractionVO>('/meeting/minutes/ai/extractions', payload, { timeout: 75000 })
+}
+
+/** 重连后按请求号查询本次结果（只读，不重调模型） */
+export function fetchMinutesAiExtraction(requestKey: string): Promise<MinutesAiExtractionVO> {
+  return request.get<unknown, MinutesAiExtractionVO>(`/meeting/minutes/ai/extractions/${requestKey}`)
 }

@@ -213,7 +213,8 @@ class MeetingMinutesServiceImplTest {
         when(minutesMapper.update(any(), any())).thenReturn(1);
         service = new MeetingMinutesServiceImpl(minutesMapper, sendMapper, deliveryMapper, itemMapper, linkMapper,
                 bookingMapper, attendeeMapper, userMapper, jdbc, guard, audit, dispatcher, templateService,
-                mock(DingTalkService.class), appService, bizSeqService, publication, attachmentService);
+                mock(DingTalkService.class), appService, bizSeqService, publication, attachmentService,
+                mock(com.mftb.admin.mapper.MeetingMinutesAiExtractionMapper.class));
         ReflectionTestUtils.setField(service, "publicationEnabled", true);
         ReflectionTestUtils.setField(service, "cardEnabled", true);
         ReflectionTestUtils.setField(service, "minutesEnabled", true);

@@ -24,7 +24,7 @@ import type { CSSProperties } from 'react'
 import { Alert, Button, Descriptions, Input, Modal, QRCode, Space, Spin, Table, Tabs, Tag, Timeline, message } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
-  BellOutlined, FileTextOutlined, HistoryOutlined, ProfileOutlined, QrcodeOutlined, ReloadOutlined, SaveOutlined, SendOutlined, TeamOutlined,
+  BellOutlined, FileTextOutlined, HistoryOutlined, ProfileOutlined, QrcodeOutlined, ReloadOutlined, RobotOutlined, SaveOutlined, SendOutlined, TeamOutlined,
 } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
 import DetailPageHeader from '@/components/DetailPageHeader'
@@ -651,7 +651,7 @@ export default function MeetingDetail() {
                     disabled={quickSaving}
                     placeholder={t('meeting.minutes.quickNotePlaceholder', { defaultValue: '討論要點與結論（可隨時保存，會後再補充完）' })}
                   />
-                  <Space size={8}>
+                  <Space size={8} wrap>
                     <Button size="small" type="primary" icon={<SaveOutlined />} loading={quickSaving} onClick={() => void saveQuickRecord()}>
                       {t('meeting.minutes.quickSave', { defaultValue: '保存記錄' })}
                     </Button>
@@ -660,6 +660,12 @@ export default function MeetingDetail() {
                       : `/meeting-minutes-form?bookingId=${record?.id}`)}>
                       {t('meeting.minutes.openFullForm', { defaultValue: '完整表單編輯' })}
                     </Button>
+                    {/* 仅跳转录入页的自由笔记模式，不携带会议正文或触发模型请求 */}
+                    <Button size="small" icon={<RobotOutlined aria-hidden="true" />} disabled={quickSaving || Boolean(quickTopic.trim() || quickNote.trim())}
+                      title={quickTopic.trim() || quickNote.trim() ? t('meeting.minutes.aiEntryBlockedHint', { defaultValue: '請先保存現場記錄，再開啟 AI 輔助錄入' }) : undefined}
+                      onClick={() => navigate(minutes?.exists && minutes.id
+                      ? `/meeting-minutes-form?id=${minutes.id}&input=notes`
+                      : `/meeting-minutes-form?bookingId=${record.id}&input=notes`)}>{t('meeting.minutes.aiEntryButton', { defaultValue: 'AI 輔助（介面預覽）' })}</Button>
                   </Space>
                 </Space>
               </div>
