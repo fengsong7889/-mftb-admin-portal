@@ -1,10 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { MENU_ICON_NAMES } from '@/components/MenuIcon'
-import { createSampleRecords, FIELD_SCHEMAS, isPane, PANES, prototypeUrl, validateDraft, type RecordPane } from './prototypeData'
+import { CHANNELS, createSampleRecords, FIELD_SCHEMAS, isPane, PANES, prototypeUrl, SCENE_LABEL_KEY, SCENES, SEARCH_SCENES, validateDraft, type RecordPane } from './prototypeData'
 import { getPreviewCards, PREVIEW_CARDS, type PreviewContext } from './previewFixtures'
 
 const context: PreviewContext = { scene: 'delivery', region: '澳門', query: '漢堡', sort: 'relevance', showAds: true }
 describe('搜索 U1 样本与原型边界', () => {
+  it('搜索场景为系统级枚举：值存 code，显示走 i18n key，不直出中文字面量', () => {
+    expect(CHANNELS).toEqual(['all', 'home', 'delivery', 'market', 'groupbuy', 'store'])
+    expect(CHANNELS).not.toContain('美食外賣')
+    expect(SCENE_LABEL_KEY(SEARCH_SCENES.DELIVERY)).toBe('searchV2.enum.scene.delivery')
+    // 五个真实场景均只携带 descriptionKey，不得残留 label/description 中文常量
+    expect(SCENES.every(s => !('label' in s) && !('description' in s) && s.descriptionKey.startsWith('searchV2.enum.scene.'))).toBe(true)
+    // 示例记录的作用域也必须存 code
+    createSampleRecords().forEach(r => expect(CHANNELS).toContain(r.channel))
+  })
   it('九个导航图标唯一且已注册，不增加真实菜单', () => {
     expect(PANES).toHaveLength(9)
     expect(new Set(PANES.map(p => p.icon)).size).toBe(9)

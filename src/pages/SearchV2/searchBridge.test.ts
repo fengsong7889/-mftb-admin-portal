@@ -12,11 +12,11 @@ const api = vi.hoisted(() => ({
 vi.mock('@/api/searchConfig', () => api)
 
 import { advanceStatus, loadConfigPanes, saveConfigRecord, WIRED_PANES } from './searchBridge'
-import { STATUS, type PrototypeRecord } from './prototypeData'
+import { SEARCH_SCENES, STATUS, type PrototypeRecord } from './prototypeData'
 
 function rec(over: Partial<PrototypeRecord>): PrototypeRecord {
   return {
-    id: 'x', pane: 'guidance', name: '午餐', channel: '美食外賣', region: '全城',
+    id: 'x', pane: 'guidance', name: '午餐', channel: SEARCH_SCENES.DELIVERY, region: '全城',
     kind: '底紋詞', status: STATUS.DRAFT, values: {}, updatedAt: '', ...over,
   }
 }

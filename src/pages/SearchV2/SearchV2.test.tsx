@@ -117,7 +117,7 @@ describe('搜索 U1 原型交互', () => {
     await select('searchV2.lab.fieldSort', 'searchV2.lab.sortPrice')
     fireEvent.click(screen.getByRole('button', { name: 'searchV2.lab.btnLoad' }))
     await waitFor(() => expect(screen.getAllByTestId('preview-card').every(card => card.dataset.ad === 'false')).toBe(true))
-    await select('searchV2.lab.fieldScene', '店內搜索')
+    await select('searchV2.lab.fieldScene', 'searchV2.enum.scene.store')
     fireEvent.click(screen.getByRole('button', { name: 'searchV2.lab.btnLoad' }))
     await waitFor(() => expect(screen.getAllByTestId('preview-card')).toHaveLength(3))
     expect(screen.getAllByTestId('preview-card').every(card => card.dataset.ad === 'false')).toBe(true)

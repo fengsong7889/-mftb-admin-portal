@@ -12,16 +12,29 @@ export const PANES = [
 ] as const
 export type Pane = typeof PANES[number]['key']
 export type RecordPane = Exclude<Pane, 'overview' | 'lab' | 'analytics'>
+/**
+ * 搜索场景为系统级枚举（业务数据字典）：前端一律存 code，显示走 i18n（searchV2.enum.scene.*），
+ * 后端按 surface／bizChannel 整型存储（见 searchBridge 映射）。code 与 previewFixtures 的
+ * 卡片 channel token 保持一致（delivery／market／groupbuy），避免两套命名。
+ */
+export const SEARCH_SCENES = { ALL: 'all', HOME: 'home', DELIVERY: 'delivery', MARKET: 'market', GROUPBUY: 'groupbuy', STORE: 'store' } as const
+export type SearchSceneCode = typeof SEARCH_SCENES[keyof typeof SEARCH_SCENES]
+export const SCENE_LABEL_KEY = (code: string) => `searchV2.enum.scene.${code}`
+/** code → 繁中标签。仅供后端映射与无 i18n 上下文的桥接使用；界面显示必须走 t(SCENE_LABEL_KEY(code))。 */
+export const SCENE_LABEL: Record<SearchSceneCode, string> = { all: '全部場景', home: '大首頁', delivery: '美食外賣', market: '超市百貨', groupbuy: '團購到店', store: '店內搜索' }
 export const SCENES = [
-  { value: 'home', label: '大首頁', description: '按頻道分組，不直接比較不同對象得分', query: '漢堡' },
-  { value: 'delivery', label: '美食外賣', description: '商家卡與匹配菜品，強調配送與可售', query: '漢堡' },
-  { value: 'market', label: '超市百貨', description: '商品卡與規格，強調價格和庫存', query: '紙巾' },
-  { value: 'groupbuy', label: '團購到店', description: '套餐卡與適用門店，不使用配送門檻', query: '雙人餐' },
-  { value: 'store', label: '店內搜索', description: '鎖定本店商品，不展示跨商家廣告', query: '漢堡' },
+  { value: SEARCH_SCENES.HOME, query: '漢堡', descriptionKey: 'searchV2.enum.scene.homeDesc', demoName: '大首頁基準策略' },
+  { value: SEARCH_SCENES.DELIVERY, query: '漢堡', descriptionKey: 'searchV2.enum.scene.deliveryDesc', demoName: '外賣基準策略' },
+  { value: SEARCH_SCENES.MARKET, query: '紙巾', descriptionKey: 'searchV2.enum.scene.marketDesc', demoName: '超市基準策略' },
+  { value: SEARCH_SCENES.GROUPBUY, query: '雙人餐', descriptionKey: 'searchV2.enum.scene.groupbuyDesc', demoName: '團購基準策略' },
+  { value: SEARCH_SCENES.STORE, query: '漢堡', descriptionKey: 'searchV2.enum.scene.storeDesc', demoName: '店內基準策略' },
 ] as const
 export type Scene = typeof SCENES[number]['value']
 export const options = (labels: readonly string[]) => labels.map(value => ({ label: value, value }))
-export const CHANNELS = ['全部場景', '大首頁', '美食外賣', '超市百貨', '團購到店', '店內搜索']
+const CHANNEL_CODES: SearchSceneCode[] = [SEARCH_SCENES.ALL, SEARCH_SCENES.HOME, SEARCH_SCENES.DELIVERY, SEARCH_SCENES.MARKET, SEARCH_SCENES.GROUPBUY, SEARCH_SCENES.STORE]
+/** 场景下拉选项：value 为 code，label 为当前语言译文（由调用方注入 t）。 */
+export const sceneChoices = (tr: (key: string) => string) => CHANNEL_CODES.map(code => ({ value: code, label: tr(SCENE_LABEL_KEY(code)) }))
+export const CHANNELS = CHANNEL_CODES
 export const REGIONS = ['全城', '澳門', '氹仔']
 export const STATUS = { DRAFT: '草稿', REVIEW: '待審核', APPROVED: '已批准', SCHEDULED: '待生效', LIVE: '生效示意', PAUSED: '已暫停' } as const
 export type PrototypeStatus = typeof STATUS[keyof typeof STATUS]
@@ -109,22 +122,22 @@ const record = (id: string, pane: RecordPane, name: string, channel: string, kin
 const dates = { start: '2026-11-01', end: '2026-11-07' }
 export function createSampleRecords(): PrototypeRecord[] {
   return [
-    record('G01', 'guidance', '午餐想吃什麼', '美食外賣', '底紋詞', { text: '午餐想吃什麼', target: '午餐', priority: 1, source: '人工策劃', ...dates }, STATUS.APPROVED),
-    record('G02', 'guidance', '紙巾日常補貨', '超市百貨', '自然熱搜', { text: '紙巾', target: '紙巾', priority: 2, source: '去重搜索趨勢', ...dates }, STATUS.REVIEW),
-    record('G03', 'guidance', '週末雙人餐', '團購到店', '推廣搜索', { text: '週末雙人餐', target: '雙人餐', priority: 1, source: '商業計劃', ...dates }, STATUS.SCHEDULED, '氹仔'),
-    record('G04', 'guidance', '下午茶趨勢候選', '美食外賣', '候選熱詞', { text: '奶茶', target: '奶茶', priority: 3, source: '去重搜索趨勢', ...dates }),
-    record('L01', 'lexicon', '漢堡英文同義', '美食外賣', '有向同義詞', { source: 'burger', target: '漢堡', category: '餐飲', evidence: '商品品類詞表樣例' }, STATUS.APPROVED),
-    record('L02', 'lexicon', '星港品牌別名', '美食外賣', '實體別名', { source: '星港', target: '示例星港漢堡集團', category: '餐飲', evidence: '虛構品牌唯一別名示例' }, STATUS.REVIEW),
-    record('L03', 'lexicon', '紙巾錯詞候選', '超市百貨', '糾錯詞', { source: '紙斤', target: '紙巾', category: '日用品', evidence: '人工糾錯樣例' }),
-    ...SCENES.map((s, i) => record(`S0${i + 1}`, 'scenarios', `${s.label}基準策略`, s.label, '場景策略', {
-      relevance: [65, 65, 75, 70, 90][i], quality: [15, 15, 10, 15, 0][i], distance: [15, 15, 10, 10, 0][i], heat: [5, 5, 5, 5, 10][i], window: 200, ads: s.value === 'store' ? 0 : s.value === 'home' ? 2 : 4,
+    record('G01', 'guidance', '午餐想吃什麼', SEARCH_SCENES.DELIVERY, '底紋詞', { text: '午餐想吃什麼', target: '午餐', priority: 1, source: '人工策劃', ...dates }, STATUS.APPROVED),
+    record('G02', 'guidance', '紙巾日常補貨', SEARCH_SCENES.MARKET, '自然熱搜', { text: '紙巾', target: '紙巾', priority: 2, source: '去重搜索趨勢', ...dates }, STATUS.REVIEW),
+    record('G03', 'guidance', '週末雙人餐', SEARCH_SCENES.GROUPBUY, '推廣搜索', { text: '週末雙人餐', target: '雙人餐', priority: 1, source: '商業計劃', ...dates }, STATUS.SCHEDULED, '氹仔'),
+    record('G04', 'guidance', '下午茶趨勢候選', SEARCH_SCENES.DELIVERY, '候選熱詞', { text: '奶茶', target: '奶茶', priority: 3, source: '去重搜索趨勢', ...dates }),
+    record('L01', 'lexicon', '漢堡英文同義', SEARCH_SCENES.DELIVERY, '有向同義詞', { source: 'burger', target: '漢堡', category: '餐飲', evidence: '商品品類詞表樣例' }, STATUS.APPROVED),
+    record('L02', 'lexicon', '星港品牌別名', SEARCH_SCENES.DELIVERY, '實體別名', { source: '星港', target: '示例星港漢堡集團', category: '餐飲', evidence: '虛構品牌唯一別名示例' }, STATUS.REVIEW),
+    record('L03', 'lexicon', '紙巾錯詞候選', SEARCH_SCENES.MARKET, '糾錯詞', { source: '紙斤', target: '紙巾', category: '日用品', evidence: '人工糾錯樣例' }),
+    ...SCENES.map((s, i) => record(`S0${i + 1}`, 'scenarios', s.demoName, s.value, '場景策略', {
+      relevance: [65, 65, 75, 70, 90][i], quality: [15, 15, 10, 15, 0][i], distance: [15, 15, 10, 10, 0][i], heat: [5, 5, 5, 5, 10][i], window: 200, ads: s.value === SEARCH_SCENES.STORE ? 0 : s.value === SEARCH_SCENES.HOME ? 2 : 4,
     }, STATUS.APPROVED)),
-    record('I01', 'interventions', '星港泛詞流量均衡', '美食外賣', '泛詞降權', { merchant: '示例星港漢堡集團', terms: '漢堡、午餐', factor: 0.8, days: 7, reason: '流量集中度觀察實驗；不影響精確找店。' }, STATUS.REVIEW),
-    record('I02', 'interventions', '品牌精確準入樣例', '美食外賣', '精確準入', { merchant: '示例星港漢堡集團', terms: '星港、星港漢堡', factor: 1, days: 14, reason: '僅用於展示精確詞與泛詞的差異。' }),
-    record('A01', 'ads', '南灣午餐搜索投流', '美食外賣', '搜索投流包', { merchant: '示例南灣小廚', terms: '漢堡', match: '真實供給自動匹配', quota: 1000, daily: 100, consumed: 320, reserved: 12, slot: '搜索結果首屏', ...dates }, STATUS.APPROVED, '澳門'),
-    record('A02', 'ads', '雙人餐週末推廣詞', '團購到店', '推廣搜索週期位', { merchant: '示例氹仔雙人套餐', terms: '雙人餐', match: '精確關鍵詞', slot: '搜索激活頁推廣區', ...dates }, STATUS.SCHEDULED, '氹仔'),
-    record('R01', 'releases', '外賣相關性基準', '美食外賣', '配置版本', { version: 'DEMO-1.0', changes: '詞庫與自然排序基準；示例快照，不代表線上已載入。', rollback: 'DEMO-0.9' }, STATUS.LIVE),
-    record('R02', 'releases', '搜索商業化首屏護欄', '全部場景', '配置版本', { version: 'DEMO-1.1', changes: '首張自然結果；顯式排序無廣告；精確找店保護。', rollback: 'DEMO-1.0' }, STATUS.REVIEW),
+    record('I01', 'interventions', '星港泛詞流量均衡', SEARCH_SCENES.DELIVERY, '泛詞降權', { merchant: '示例星港漢堡集團', terms: '漢堡、午餐', factor: 0.8, days: 7, reason: '流量集中度觀察實驗；不影響精確找店。' }, STATUS.REVIEW),
+    record('I02', 'interventions', '品牌精確準入樣例', SEARCH_SCENES.DELIVERY, '精確準入', { merchant: '示例星港漢堡集團', terms: '星港、星港漢堡', factor: 1, days: 14, reason: '僅用於展示精確詞與泛詞的差異。' }),
+    record('A01', 'ads', '南灣午餐搜索投流', SEARCH_SCENES.DELIVERY, '搜索投流包', { merchant: '示例南灣小廚', terms: '漢堡', match: '真實供給自動匹配', quota: 1000, daily: 100, consumed: 320, reserved: 12, slot: '搜索結果首屏', ...dates }, STATUS.APPROVED, '澳門'),
+    record('A02', 'ads', '雙人餐週末推廣詞', SEARCH_SCENES.GROUPBUY, '推廣搜索週期位', { merchant: '示例氹仔雙人套餐', terms: '雙人餐', match: '精確關鍵詞', slot: '搜索激活頁推廣區', ...dates }, STATUS.SCHEDULED, '氹仔'),
+    record('R01', 'releases', '外賣相關性基準', SEARCH_SCENES.DELIVERY, '配置版本', { version: 'DEMO-1.0', changes: '詞庫與自然排序基準；示例快照，不代表線上已載入。', rollback: 'DEMO-0.9' }, STATUS.LIVE),
+    record('R02', 'releases', '搜索商業化首屏護欄', SEARCH_SCENES.ALL, '配置版本', { version: 'DEMO-1.1', changes: '首張自然結果；顯式排序無廣告；精確找店保護。', rollback: 'DEMO-1.0' }, STATUS.REVIEW),
   ]
 }
 
@@ -150,10 +163,10 @@ export function validateDraft(pane: RecordPane, kind: string, values: DraftValue
 }
 
 export const SAMPLE_METRICS = [
-  { id: 'M01', channel: '美食外賣', region: '澳門', query: '漢堡', searches: 2400, clicks: 1480, orders: 410, empty: 38, impressions: 520, revenue: 104 },
-  { id: 'M02', channel: '超市百貨', region: '澳門', query: '紙巾', searches: 1260, clicks: 810, orders: 240, empty: 24, impressions: 210, revenue: 42 },
-  { id: 'M03', channel: '團購到店', region: '氹仔', query: '雙人餐', searches: 980, clicks: 540, orders: 125, empty: 42, impressions: 160, revenue: 32 },
-  { id: 'M04', channel: '美食外賣', region: '氹仔', query: '奶茶', searches: 1820, clicks: 1020, orders: 320, empty: 29, impressions: 360, revenue: 72 },
+  { id: 'M01', channel: SEARCH_SCENES.DELIVERY, region: '澳門', query: '漢堡', searches: 2400, clicks: 1480, orders: 410, empty: 38, impressions: 520, revenue: 104 },
+  { id: 'M02', channel: SEARCH_SCENES.MARKET, region: '澳門', query: '紙巾', searches: 1260, clicks: 810, orders: 240, empty: 24, impressions: 210, revenue: 42 },
+  { id: 'M03', channel: SEARCH_SCENES.GROUPBUY, region: '氹仔', query: '雙人餐', searches: 980, clicks: 540, orders: 125, empty: 42, impressions: 160, revenue: 32 },
+  { id: 'M04', channel: SEARCH_SCENES.DELIVERY, region: '氹仔', query: '奶茶', searches: 1820, clicks: 1020, orders: 320, empty: 29, impressions: 360, revenue: 72 },
 ]
 export const DEPENDENCIES = [
   ['ES 接入', '版本、Mapping、分析器、容量與只讀測試環境', '搜索／運維'],

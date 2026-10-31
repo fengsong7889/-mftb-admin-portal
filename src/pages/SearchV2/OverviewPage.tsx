@@ -4,22 +4,22 @@ import { Alert, Button, Empty, Progress, Space, Tag, type TableColumnsType } fro
 import { ArrowRightOutlined, CheckCircleOutlined, DatabaseOutlined, DollarOutlined, EyeOutlined, SearchOutlined } from '@ant-design/icons'
 import StatCards from '@/components/StatCards'
 import HelpPopover from '@/components/HelpPopover'
-import { DEPENDENCIES, SAMPLE_METRICS, SCENES, type Pane, type PrototypeRecord } from './prototypeData'
+import { DEPENDENCIES, SAMPLE_METRICS, SCENE_LABEL_KEY, SCENES, SEARCH_SCENES, type Pane, type PrototypeRecord } from './prototypeData'
 import { SampleTable, ScopeFilters } from './PrototypeTable'
 
 export default function OverviewPage({ analytics = false, records, onNavigate }: {
   analytics?: boolean; records: PrototypeRecord[]; onNavigate: (pane: Pane, view?: string, id?: string) => void
 }) {
   const { t } = useTranslation()
-  const [filters, setFilters] = useState({ keyword: '', channel: '全部場景', region: '全城' })
-  const rows = SAMPLE_METRICS.filter(r => (filters.channel === '全部場景' || r.channel === filters.channel)
+  const [filters, setFilters] = useState({ keyword: '', channel: SEARCH_SCENES.ALL as string, region: '全城' })
+  const rows = SAMPLE_METRICS.filter(r => (filters.channel === SEARCH_SCENES.ALL || r.channel === filters.channel)
     && (filters.region === '全城' || r.region === filters.region) && r.query.includes(filters.keyword.trim()))
   const sum = (key: 'searches' | 'clicks' | 'orders' | 'empty' | 'impressions' | 'revenue') => rows.reduce((n, r) => n + r[key], 0)
   const searches = sum('searches')
   const percent = (n: number, total: number) => total ? `${(100 * n / total).toFixed(1)}%` : '—'
   const columns: TableColumnsType<typeof SAMPLE_METRICS[number]> = [
     { key: 'id', title: t('searchV2.overview.colSample'), dataIndex: 'id' }, { key: 'query', title: t('searchV2.overview.colQuery'), dataIndex: 'query' },
-    { key: 'channel', title: t('searchV2.overview.colScene'), dataIndex: 'channel' }, { key: 'region', title: t('searchV2.overview.colRegion'), dataIndex: 'region' },
+    { key: 'channel', title: t('searchV2.overview.colScene'), dataIndex: 'channel', render: (value: string) => t(SCENE_LABEL_KEY(value)) }, { key: 'region', title: t('searchV2.overview.colRegion'), dataIndex: 'region' },
     { key: 'searches', title: t('searchV2.overview.colSearches'), dataIndex: 'searches' }, { key: 'empty', title: t('searchV2.overview.colEmpty'), render: (_, r) => percent(r.empty, r.searches) },
     { key: 'clicks', title: t('searchV2.overview.colClicks'), dataIndex: 'clicks' }, { key: 'orders', title: t('searchV2.overview.colOrders'), dataIndex: 'orders' },
     { key: 'impressions', title: t('searchV2.overview.colImpressions'), dataIndex: 'impressions' },
@@ -46,10 +46,10 @@ export default function OverviewPage({ analytics = false, records, onNavigate }:
     </> : <>
       <div className="sv2__split"><section className="detail-card"><h3>{t('searchV2.overview.sceneTitle')}</h3>
         <div className="sv2__scene-links">{SCENES.map(scene => <button key={scene.value} onClick={() => onNavigate('lab')}>
-          <span className="sv2__scene-index">{SCENES.indexOf(scene) + 1}</span><div><strong>{scene.label}</strong><small>{scene.description}</small></div><ArrowRightOutlined />
+          <span className="sv2__scene-index">{SCENES.indexOf(scene) + 1}</span><div><strong>{t(SCENE_LABEL_KEY(scene.value))}</strong><small>{t(scene.descriptionKey)}</small></div><ArrowRightOutlined />
         </button>)}</div>
       </section><section className="detail-card"><h3>{t('searchV2.overview.demandTitle')} <Tag>{t('searchV2.overview.demandTag')}</Tag></h3>
-        {rows.length ? rows.map(row => <div className="sv2__demand" key={row.id}><div><strong>{row.query}</strong><span>{row.region} · {row.channel}</span></div>
+        {rows.length ? rows.map(row => <div className="sv2__demand" key={row.id}><div><strong>{row.query}</strong><span>{row.region} · {t(SCENE_LABEL_KEY(row.channel))}</span></div>
           <Progress percent={row.searches / searches * 100} strokeColor="#1890FF" format={() => row.searches.toLocaleString()} /></div>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('searchV2.overview.demandEmpty')} />}
         <Button type="link" onClick={() => onNavigate('analytics')}>{t('searchV2.overview.viewFunnel')} <ArrowRightOutlined /></Button>
       </section></div>

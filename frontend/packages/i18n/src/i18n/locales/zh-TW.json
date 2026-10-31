@@ -16231,6 +16231,21 @@
       "resultTitle": "結果示例",
       "resultCount": "{{total}} 張 · 非線上總量",
       "footnote": "展示用例 · 不計曝光 · 不扣費"
+    },
+    "enum": {
+      "scene": {
+        "all": "全部場景",
+        "home": "大首頁",
+        "delivery": "美食外賣",
+        "market": "超市百貨",
+        "groupbuy": "團購到店",
+        "store": "店內搜索",
+        "homeDesc": "按頻道分組，不直接比較不同對象得分",
+        "deliveryDesc": "商家卡與匹配菜品，強調配送與可售",
+        "marketDesc": "商品卡與規格，強調價格和庫存",
+        "groupbuyDesc": "套餐卡與適用門店，不使用配送門檻",
+        "storeDesc": "鎖定本店商品，不展示跨商家廣告"
+      }
     }
   }
 }

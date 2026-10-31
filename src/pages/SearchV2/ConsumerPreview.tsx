@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Alert, Button, Empty, Input, Skeleton, Tag } from 'antd'
 import { ArrowLeftOutlined, EnvironmentOutlined, GiftOutlined, SearchOutlined, ShopOutlined, ShoppingOutlined, StarFilled } from '@ant-design/icons'
 import HelpPopover from '@/components/HelpPopover'
-import { SCENES } from './prototypeData'
+import { SCENE_LABEL_KEY, SCENES } from './prototypeData'
 import type { DisplayState, PreviewCard, PreviewContext } from './previewFixtures'
 
 interface Props {
@@ -27,7 +27,7 @@ export default function ConsumerPreview({ context, cards, state, onQuery, onRetr
     setSelected(null)
     onQuery(input.trim())
   }
-  const channelLabel = (channel: PreviewCard['channel']) => channel === 'delivery' ? '美食外賣' : channel === 'market' ? '超市百貨' : '團購到店'
+  const channelLabel = (channel: PreviewCard['channel']) => t(SCENE_LABEL_KEY(channel))
   const renderCard = (card: PreviewCard) => <article className="sv2-phone__card" key={card.id} data-testid="preview-card" data-ad={Boolean(card.isAd)}>
     <button className={`sv2-phone__art sv2-phone__art--${card.channel}`} aria-label={`${t('searchV2.preview.cardDetailAria')}${card.title}`} onClick={() => setSelected(card)}>
       {card.channel === 'delivery' ? <ShopOutlined /> : card.channel === 'market' ? <ShoppingOutlined /> : <GiftOutlined />}
@@ -48,7 +48,7 @@ export default function ConsumerPreview({ context, cards, state, onQuery, onRetr
     <div className="sv2-phone__location"><EnvironmentOutlined /> {context.region} {t('searchV2.preview.locationSuffix')}</div>
     <div className="sv2-phone__search"><Input disabled={readOnly} aria-label={t('searchV2.preview.searchAria')} prefix={<SearchOutlined />} value={input} onChange={event => setInput(event.target.value)} onPressEnter={handleSubmit} maxLength={60} allowClear />
       <Button type="text" disabled={readOnly} onClick={handleSubmit}>{t('searchV2.preview.btnSearch')}</Button></div>
-    <div className="sv2-phone__scope">{scene.label}{context.scene === 'store' ? ` ${t('searchV2.preview.storeSuffix')}` : ''}<Tag>{t('searchV2.preview.scopeTag')}</Tag></div>
+    <div className="sv2-phone__scope">{t(SCENE_LABEL_KEY(scene.value))}{context.scene === 'store' ? ` ${t('searchV2.preview.storeSuffix')}` : ''}<Tag>{t('searchV2.preview.scopeTag')}</Tag></div>
     <div className="sv2-phone__body">
       {suggesting && <div className="sv2-phone__suggest" aria-label={t('searchV2.preview.suggestAria')}><Button type="text" onClick={handleSubmit}>{t('searchV2.preview.suggestSearch', { query: input })}</Button>
         {suggestions.map(word => <Button type="text" key={word} onClick={() => onQuery(word)}>{word} <Tag>{t('searchV2.preview.suggestWordTag')}</Tag></Button>)}

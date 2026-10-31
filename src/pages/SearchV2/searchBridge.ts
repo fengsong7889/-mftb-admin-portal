@@ -11,7 +11,7 @@ import {
   type SearchGuidanceItem, type SearchLexiconItem, type SearchScenarioItem,
   type SearchInterventionItem, type SearchReleaseItem,
 } from '@/api/searchConfig'
-import { STATUS, type Pane, type PrototypeRecord, type PrototypeStatus } from './prototypeData'
+import { STATUS, SCENE_LABEL, SEARCH_SCENES, type Pane, type PrototypeRecord, type PrototypeStatus, type SearchSceneCode } from './prototypeData'
 
 /** 已接后端的配置面板（ads 属 B3 未接；overview/lab/analytics 非记录域）。 */
 export const WIRED_PANES: Pane[] = ['guidance', 'lexicon', 'scenarios', 'interventions', 'releases']
@@ -30,16 +30,16 @@ const ACTION_TYPE: Record<string, number> = { '泛詞降權': 1, '精確準入':
 const ACTION_TYPE_L: Record<number, string> = { 1: '泛詞降權', 2: '精確準入', 3: '臨時扶持', 4: '同集團打散' }
 const REL_STATUS_L: Record<number, PrototypeStatus> = { 0: STATUS.DRAFT, 1: STATUS.REVIEW, 2: STATUS.APPROVED, 3: STATUS.SCHEDULED, 4: STATUS.LIVE, 5: STATUS.PAUSED, 6: STATUS.PAUSED }
 
-function channelFrom(surface: number, biz?: number): string {
-  if (surface === 1) return '大首頁'
-  if (surface === 3) return '店內搜索'
-  return biz === 2 ? '超市百貨' : biz === 3 ? '團購到店' : '美食外賣'
+function channelFrom(surface: number, biz?: number): SearchSceneCode {
+  if (surface === 1) return SEARCH_SCENES.HOME
+  if (surface === 3) return SEARCH_SCENES.STORE
+  return biz === 2 ? SEARCH_SCENES.MARKET : biz === 3 ? SEARCH_SCENES.GROUPBUY : SEARCH_SCENES.DELIVERY
 }
 function surfaceFrom(channel: string): number {
-  return channel === '大首頁' ? 1 : channel === '店內搜索' ? 3 : 2
+  return channel === SEARCH_SCENES.HOME ? 1 : channel === SEARCH_SCENES.STORE ? 3 : 2
 }
 function bizFrom(channel: string): number | undefined {
-  return channel === '美食外賣' ? 1 : channel === '超市百貨' ? 2 : channel === '團購到店' ? 3 : undefined
+  return channel === SEARCH_SCENES.DELIVERY ? 1 : channel === SEARCH_SCENES.MARKET ? 2 : channel === SEARCH_SCENES.GROUPBUY ? 3 : undefined
 }
 function regionOf(code?: string): string {
   return (code && REGION_LABEL[code]) || '全城'
@@ -82,7 +82,7 @@ function recordToGuidance(r: PrototypeRecord): SearchGuidanceItem {
 function lexiconToRecord(item: SearchLexiconItem): PrototypeRecord {
   return {
     id: String(item.id), pane: 'lexicon', name: `${item.sourceTerm} → ${item.targetTerm}`,
-    channel: '全部場景', region: '全城', kind: LEX_TYPE_L[item.wordType] ?? '業務詞',
+    channel: SEARCH_SCENES.ALL, region: '全城', kind: LEX_TYPE_L[item.wordType] ?? '業務詞',
     status: item.status === 2 ? STATUS.PAUSED : STATUS.LIVE,
     values: { source: item.sourceTerm, target: item.targetTerm, category: item.categoryId, evidence: item.evidence },
     updatedAt: item.updatedAt ? `後端 · ${item.updatedAt}` : '後端真值',
@@ -99,7 +99,7 @@ function recordToLexicon(r: PrototypeRecord): SearchLexiconItem {
 // ── scenario ─
 function scenarioToRecord(item: SearchScenarioItem): PrototypeRecord {
   return {
-    id: String(item.id), pane: 'scenarios', name: `${channelFrom(item.surface, item.bizChannel)}基準策略`,
+    id: String(item.id), pane: 'scenarios', name: `${SCENE_LABEL[channelFrom(item.surface, item.bizChannel)]}基準策略`,
     channel: channelFrom(item.surface, item.bizChannel), region: '全城', kind: '場景策略',
     status: item.status === 2 ? STATUS.PAUSED : STATUS.LIVE,
     values: { relevance: item.weightRelevance, quality: item.weightQuality, distance: item.weightDistance, heat: item.weightHeat, window: item.candidateWindow, ads: item.adLimitPerPage },
@@ -140,7 +140,7 @@ function recordToIntervention(r: PrototypeRecord): SearchInterventionItem {
 // ── release ──
 function releaseToRecord(item: SearchReleaseItem): PrototypeRecord {
   return {
-    id: String(item.id), pane: 'releases', name: item.versionNo, channel: '全部場景', region: '全城', kind: '配置版本',
+    id: String(item.id), pane: 'releases', name: item.versionNo, channel: SEARCH_SCENES.ALL, region: '全城', kind: '配置版本',
     status: REL_STATUS_L[item.status ?? 0] ?? STATUS.DRAFT,
     values: { version: item.versionNo, changes: item.changeSummary, rollback: item.rollbackVersion },
     updatedAt: item.updatedAt ? `後端 · ${item.updatedAt}` : '後端真值',

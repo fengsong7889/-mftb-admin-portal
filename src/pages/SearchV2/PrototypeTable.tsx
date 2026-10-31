@@ -4,7 +4,7 @@ import { Button, Empty, Form, Input, Select, Space, Table, Tag, type TableColumn
 import { DatabaseOutlined, EditOutlined, ExportOutlined, EyeOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useColumnConfig } from '@/hooks/useColumnConfig'
 import StatCards from '@/components/StatCards'
-import { CHANNELS, KINDS, REGIONS, STATUS, options, type Pane, type PrototypeRecord, type RecordPane } from './prototypeData'
+import { KINDS, REGIONS, SCENE_LABEL_KEY, SEARCH_SCENES, STATUS, options, sceneChoices, type Pane, type PrototypeRecord, type RecordPane } from './prototypeData'
 
 const LOCKED_COLUMNS = [{ key: 'id', locked: 'head' as const }, { key: 'action', locked: 'tail' as const }]
 export function StatusTag({ status }: { status: string }) {
@@ -40,11 +40,11 @@ export function ScopeFilters({ onChange, keywordLabel }: {
   const { t } = useTranslation()
   const [form] = Form.useForm<{ keyword: string; channel: string; region: string }>()
   const name = keywordLabel ?? t('searchV2.list.labelName')
-  const initial = { keyword: '', channel: '全部場景', region: '全城' }
+  const initial = { keyword: '', channel: SEARCH_SCENES.ALL, region: '全城' }
   return <div className="search-section">
     <Form form={form} layout="vertical" initialValues={initial} onFinish={onChange} className="sv2__filters">
       <Form.Item name="keyword" label={name}><Input allowClear maxLength={80} placeholder={`搜尋${name}`} /></Form.Item>
-      <Form.Item name="channel" label={t('searchV2.list.labelScene')}><Select options={options(CHANNELS)} /></Form.Item>
+      <Form.Item name="channel" label={t('searchV2.list.labelScene')}><Select options={sceneChoices(t)} /></Form.Item>
       <Form.Item name="region" label={t('searchV2.list.labelRegion')}><Select options={options(REGIONS)} /></Form.Item>
       <div className="search-actions"><Button type="primary" aria-label={t('searchV2.list.btnQuery')} icon={<SearchOutlined />} htmlType="submit">{t('searchV2.list.btnQuery')}</Button>
         <Button aria-label={t('searchV2.list.btnReset')} icon={<ReloadOutlined />} onClick={() => { form.resetFields(); onChange(initial) }}>{t('searchV2.list.btnReset')}</Button></div>
@@ -56,17 +56,17 @@ export function RecordList({ pane, records, onNavigate }: {
   pane: RecordPane; records: PrototypeRecord[]; onNavigate: (pane: Pane, view?: string, id?: string) => void
 }) {
   const { t } = useTranslation()
-  const [filters, setFilters] = useState({ keyword: '', channel: '全部場景', region: '全城' })
+  const [filters, setFilters] = useState({ keyword: '', channel: SEARCH_SCENES.ALL as string, region: '全城' })
   const [kind, setKind] = useState('全部類型')
   const rows = records.filter(r => r.pane === pane && (kind === '全部類型' || r.kind === kind)
-    && (filters.channel === '全部場景' || r.channel === filters.channel)
+    && (filters.channel === SEARCH_SCENES.ALL || r.channel === filters.channel)
     && (filters.region === '全城' || r.region === filters.region)
     && `${r.name} ${r.id} ${Object.values(r.values).join(' ')}`.toLowerCase().includes(filters.keyword.trim().toLowerCase()))
   const columns: TableColumnsType<PrototypeRecord> = [
     { key: 'id', title: t('searchV2.list.colId'), dataIndex: 'id', width: 130 },
     { key: 'name', title: t('searchV2.list.colName'), dataIndex: 'name', width: 215 },
     { key: 'kind', title: t('searchV2.list.colType'), dataIndex: 'kind', width: 150, render: (value: string) => <Tag>{value}</Tag> },
-    { key: 'channel', title: t('searchV2.list.colScene'), dataIndex: 'channel', width: 120 },
+    { key: 'channel', title: t('searchV2.list.colScene'), dataIndex: 'channel', width: 120, render: (value: string) => t(SCENE_LABEL_KEY(value)) },
     { key: 'region', title: t('searchV2.list.colRegion'), dataIndex: 'region', width: 85 },
     { key: 'summary', title: pane === 'ads' ? t('searchV2.list.colSummaryAds') : t('searchV2.list.colSummaryRule'), width: 240, render: (_, r) => summary(r) },
     { key: 'status', title: t('searchV2.list.colFlowStatus'), dataIndex: 'status', width: 165, render: (value: string) => <StatusTag status={value} /> },

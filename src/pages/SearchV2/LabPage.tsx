@@ -5,7 +5,7 @@ import { ExperimentOutlined, SearchOutlined, SwapOutlined } from '@ant-design/ic
 import HelpPopover from '@/components/HelpPopover'
 import ConsumerPreview from './ConsumerPreview'
 import { SampleTable } from './PrototypeTable'
-import { SCENES, options } from './prototypeData'
+import { SCENE_LABEL_KEY, SCENES, options } from './prototypeData'
 import { getPreviewCards, type DisplayState, type PreviewCard, type PreviewContext } from './previewFixtures'
 
 const INITIAL: PreviewContext = { scene: 'delivery', region: '澳門', query: '漢堡', sort: 'relevance', showAds: true }
@@ -63,7 +63,7 @@ export default function LabPage() {
           <Form form={form} layout="vertical" initialValues={INITIAL} onFinish={values => handleApply({ ...values, query: values.query.trim() })}
             onValuesChange={changed => { if (changed.scene) { form.setFieldValue('query', SCENES.find(s => s.value === changed.scene)?.query ?? ''); form.setFieldValue('sort', 'relevance') } }}>
             <div className="sv2__form-grid sv2__form-grid--two">
-              <Form.Item name="scene" label={t('searchV2.lab.fieldScene')}><Select options={[...SCENES]} /></Form.Item>
+              <Form.Item name="scene" label={t('searchV2.lab.fieldScene')}><Select options={SCENES.map(s => ({ value: s.value, label: t(SCENE_LABEL_KEY(s.value)) }))} /></Form.Item>
               <Form.Item name="region" label={t('searchV2.lab.fieldRegion')}><Select options={options(['澳門', '氹仔'])} /></Form.Item>
               <Form.Item name="query" label={t('searchV2.lab.fieldKeyword')} rules={[{ required: true, whitespace: true, message: t('searchV2.lab.keywordRequired') }]}><Input maxLength={60} /></Form.Item>
               <Form.Item name="sort" label={t('searchV2.lab.fieldSort')}><Select options={[
@@ -77,7 +77,7 @@ export default function LabPage() {
           </Form>
         </section>}
         <section className="detail-card"><h3>{t('searchV2.lab.contextH3')}</h3><Descriptions column={1} size="small" items={[
-          { key: 'scene', label: t('searchV2.lab.ctxScene'), children: SCENES.find(s => s.value === activeContext.scene)?.label },
+          { key: 'scene', label: t('searchV2.lab.ctxScene'), children: t(SCENE_LABEL_KEY(activeContext.scene)) },
           { key: 'region', label: t('searchV2.lab.ctxRegion'), children: `${activeContext.region} ${t('searchV2.lab.ctxRegionSuffix')}` },
           { key: 'word', label: t('searchV2.lab.ctxWord'), children: activeContext.query },
           { key: 'time', label: t('searchV2.lab.ctxSource'), children: historyMode ? t('searchV2.lab.ctxSourceHistory') : t('searchV2.lab.ctxSourceBuiltin') },

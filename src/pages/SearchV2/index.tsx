@@ -9,7 +9,7 @@ import OverviewPage from './OverviewPage'
 import { RecordList } from './PrototypeTable'
 import RecordPage from './RecordPage'
 import LabPage from './LabPage'
-import { createSampleRecords, isPane, isRecordPane, PANES, prototypeUrl, SCENES, type Pane, type PrototypeRecord } from './prototypeData'
+import { createSampleRecords, isPane, isRecordPane, PANES, prototypeUrl, SCENE_LABEL_KEY, SCENES, type Pane, type PrototypeRecord } from './prototypeData'
 import { loadConfigPanes, saveConfigRecord, advanceStatus, WIRED_PANES } from './searchBridge'
 import './prototype.css'
 
@@ -89,7 +89,7 @@ export default function SearchV2Prototype() {
         : pane === 'overview' || pane === 'analytics' ? <OverviewPage key={pane} analytics={pane === 'analytics'} records={records} onNavigate={handleNavigate} />
           : pane === 'lab' ? <LabPage />
             : isRecordPane(pane) ? <>
-              {pane === 'scenarios' && <div className="sv2__scenario-strip">{SCENES.map((scene, i) => <button key={scene.value} onClick={() => handleNavigate('scenarios', 'edit', `DEMO-S0${i + 1}`)}><strong>{scene.label}</strong><small>{scene.description}</small><span>查看參數 →</span></button>)}</div>}
+              {pane === 'scenarios' && <div className="sv2__scenario-strip">{SCENES.map((scene, i) => <button key={scene.value} onClick={() => handleNavigate('scenarios', 'edit', `DEMO-S0${i + 1}`)}><strong>{t(SCENE_LABEL_KEY(scene.value))}</strong><small>{t(scene.descriptionKey)}</small><span>查看參數 →</span></button>)}</div>}
               {pane === 'guidance' && <Alert type="info" showIcon message={t('searchV2.guidanceNote')} />}
               {pane === 'interventions' && <Alert type="warning" showIcon message={t('searchV2.interventionNote')} />}
               {pane === 'ads' && <div className="sv2__product-strip"><div><Tag color="orange">{t('searchV2.productMainTag')}</Tag><strong>{t('searchV2.productMainName')}</strong><p>{t('searchV2.productMainDesc')}</p></div><div><Tag color="blue">{t('searchV2.productAuxTag')}</Tag><strong>{t('searchV2.productAuxName')}</strong><p>{t('searchV2.productAuxDesc')}</p></div></div>}

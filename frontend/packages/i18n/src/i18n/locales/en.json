@@ -16229,6 +16229,21 @@
       "resultTitle": "Result samples",
       "resultCount": "{{total}} cards · not the online total",
       "footnote": "Display case · impressions not counted · no billing"
+    },
+    "enum": {
+      "scene": {
+        "all": "All scenes",
+        "home": "Home search",
+        "delivery": "Food delivery",
+        "market": "Supermarket",
+        "groupbuy": "Group buy & in-store",
+        "store": "In-store search",
+        "homeDesc": "Grouped by channel; scores are never compared across channels",
+        "deliveryDesc": "Merchant cards with matched dishes, emphasising delivery and availability",
+        "marketDesc": "Product cards with specs, emphasising price and stock",
+        "groupbuyDesc": "Bundle cards with applicable stores, without delivery thresholds",
+        "storeDesc": "Locked to this store's items; no cross-merchant ads shown"
+      }
     }
   }
 }
