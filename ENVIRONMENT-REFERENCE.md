@@ -107,12 +107,21 @@ spring.datasource.password: ${DB_PASSWORD}
 # JWT 密钥（无默认值，必须外部注入；HS256 要求至少 32 字节）
 jwt.secret: ${JWT_SECRET}
 jwt.expiration: 86400000  # 24 小时
+
+# AI 供应商 API Key 的静态加密密钥（无默认值；未注入时 ProviderKeyCipher 回退复用 ${jwt.secret}）
+# 属性本身不在 application.yml 里声明，靠 Spring relaxed binding 读环境变量 AI_PROVIDER_CRYPTO_KEY
+ai.provider.crypto-key: ${AI_PROVIDER_CRYPTO_KEY}
 ```
 
 > ⚠️ **连接串完全由环境变量决定，仓内不内置任何可用数据库**：
 > 不配 `DB_URL`/`DB_USERNAME`/`DB_PASSWORD`/`JWT_SECRET` 四项，后端直接启动失败
 > （`run-local.sh` 会先校验缺失项并报错退出）。这是有意设计：
 > 拉代码不等于能跑，运行资产只走线下交付（见 README「代码 ≠ 可运行系统」）。
+>
+> ⚠️ **`JWT_SECRET` 与 `AI_PROVIDER_CRYPTO_KEY` 必须各自独立配置**：后者缺省时，
+> AI 供应商 API Key 的 AES-256-GCM 加密会回退复用签名密钥，于是每次轮换 `JWT_SECRET`
+> 都会让已入库的 `ai_provider.api_key` 全部解不开（2026-10-31 实测事故）。
+> 启动日志出现「未独立配置…当前复用 JWT_SECRET」即为此状态，见 Q6。
 >
 > ⚠️ **`DB_URL` 格式硬约束**：必须已带查询参数（`?useUnicode=true&...`），
 > 因为 yml 是 `${DB_URL}&socketTimeout=...` 字面拼接——末尾无 `?` 参数时会拼出非法连接串。
@@ -284,6 +293,8 @@ npm run secret-scan   # 硬编码敏感信息扫描
 - [ ] 安装 Maven 3.9.x
 - [ ] 准备 MySQL 8：本机跑 docker 容器，或线下获取 SQLPub 开发库口令（见 3.0）
 - [ ] 后端：`cp backend/.env.local.example backend/.env.local`，填 `DB_URL`/`DB_USERNAME`/`DB_PASSWORD`/`JWT_SECRET`（四项缺一不可，`JWT_SECRET` ≥ 32 字节）
+- [ ] 后端：同一份 `.env.local` 再补 `AI_PROVIDER_CRYPTO_KEY`（≥ 32 字节随机值，与 `JWT_SECRET` 不同）——
+      不配也能启动，但供应商 API Key 会跟着 `JWT_SECRET` 一起作废（见 2.3 与 Q6）
 - [ ] 前端：**本地开发无需 `.env.local`**（Vite proxy 已把 `/api` 转发到 `localhost:8080`）；如需指向远程后端才 `cp .env.example .env.local` 并填 `VITE_API_BASE_URL`
 - [ ] 后端：`cd backend && bash run-local.sh`（本机已有此脚本）；
       新拉仓库无此脚本时用 `cd backend && mvn -pl bootstrap -am spring-boot:run`（先 export 四个变量）
@@ -301,7 +312,8 @@ npm run secret-scan   # 硬编码敏感信息扫描
 | 后端登录（系统管理员） | `admin`（`BuiltinAccounts.ADMIN_USERNAME`） | 值不入库。全新库首次启动时按优先级取引导口令：`ADMIN_BOOTSTRAP_PASSWORD` 环境变量 &gt; `.local/admin-bootstrap-password.txt` &gt; 随机生成并落盘（权限 600，已 gitignore），并置 `must_change_password=1`，**首登必须改密**；存量库则继承原超管哈希，不强制重置 |
 | 后端登录（员工） | 工号 `MF*****` | 历史上 `MF00001` 曾是超管，现已降级为普通员工账号（不能再当管理员入口用） |
 | SQLPub 开发库 | `fengsong_mftb` | 唯一存放处：`backend/.env.local` 的 `DB_PASSWORD`（gitignore，禁止复制到本文件；**已于 2026-10-31 轮换**，旧值随 git 历史永久作废） |
-| JWT 密钥 | — | 无默认值。必须在 `backend/.env.local` 设 `JWT_SECRET`（≥ 32 字节）；开发/生产各自独立，禁止复用示例值 |
+| JWT 密钥 | — | 无默认值。必须在 `backend/.env.local` 设 `JWT_SECRET`（≥ 32 字 节）；开发/生产各自独立，禁止复用示例值 |
+| AI 供应商加密密钥 | — | 无默认值。`backend/.env.local` 的 `AI_PROVIDER_CRYPTO_KEY`（≥ 32 字节）；缺省时回退复用 `JWT_SECRET`（不建议）。只用于 `ai_provider.api_key` 的 AES-256-GCM，**长期不变**，改动等于让存量密文全部作废 |
 | 生产后端地址 | — | `https://dacnhtyrpxhc.sealoshzh.site`（属公开信息，已随仓库暴露，需当作真实攻击面加固） |
 | 生产前端地址 | — | `https://fengsong7889.github.io/-mftb-admin-portal/` |
 | GitHub 仓库 | `fengsong7889/-mftb-admin-portal` | — |
@@ -338,6 +350,31 @@ npm run secret-scan   # 硬编码敏感信息扫描
 运行资产只走线下书面交付（见根目录 `LICENSE` 第五条与 `README.md`）。
 如需进一步卡住「拿到全部源码也自建成可运行系统」，可评估引入后端 License 激活门
 （方案与优先级记在本地未入库台账，对外交付前必须走 `docs/OFFLINE_DELIVERY_CHECKLIST_2026-10.md`）。
+
+### Q6：「模型供应商」里明明填过 API Key，列表又显示「未配置 / 密鑰已失效」？
+
+**A**：先确认库里有没有值，别怀疑保存链路。`ai_provider.api_key` 是密文入库
+（`enc:v1:<keyId>:<base64>`），列表页的 `apiKeyMasked` 由后端现场解密得出：
+
+```sql
+SELECT provider_key,
+       CASE WHEN api_key IS NULL THEN 'NULL'
+            WHEN LEFT(api_key,7)='enc:v1:' THEN 'ENC_V1'
+            WHEN LEFT(api_key,4)='enc:'    THEN 'ENC_LEGACY'
+            ELSE 'PLAIN' END AS kind,
+       CHAR_LENGTH(COALESCE(api_key,'')) AS len, updated_at
+  FROM ai_provider ORDER BY id;
+```
+
+- 有密文但 `updated_at` 就是你保存的时间 → 数据在，**是解不开**，不是没存。
+  后端日志会伴随 `API Key 解密失败…Tag mismatch!` 或「密文由另一把加密密钥写入」。
+- 根因几乎总是加密密钥变了：`AI_PROVIDER_CRYPTO_KEY` 未独立配置时，加密密钥等于
+  `JWT_SECRET`，轮换签名密钥就顺带销毁供应商密文。
+- 处置：① 先按 2.3 配好独立的 `AI_PROVIDER_CRYPTO_KEY` 并重启（启动日志不应再有
+  「当前复用 JWT_SECRET」告警）；② 到「模型供应商」逐个编辑，重新粘贴 API Key 并保存
+  （旧密文不可逆，没有任何自动恢复手段）；③ 以后轮换 `JWT_SECRET` 不再影响供应商 Key。
+- 三态口径：`apiKeyStatus` 0=未配置、1=已配置、2=密钥已失效（需重填）。**2 不等于没配过**，
+  看到「密鑰已失效」直接去重填，不要再去查保存接口。
 
 ---
 

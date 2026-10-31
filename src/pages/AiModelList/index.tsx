@@ -10,6 +10,8 @@ import {
   fetchProviders,
   updateModel,
   deleteModel,
+  AI_API_KEY_STATUS,
+  resolveApiKeyStatus,
   type AiModel,
   type AiProvider,
   type ModelQueryParams,
@@ -93,7 +95,8 @@ export default function AiModelList() {
   const connectedProviderIds = useMemo((): Set<number> => {
     return new Set(
       providers
-        .filter((p) => p.apiKeyMasked && p.apiKeyMasked.length > 0 && p.status === 1)
+        // 只看服务端实算的三态：STALE（密钥轮换后解不开）不能算已接通，否则模型会显示可调用而实际必挂
+        .filter((p) => resolveApiKeyStatus(p) === AI_API_KEY_STATUS.OK && p.status === 1)
         .map((p) => p.id),
     )
   }, [providers])
