@@ -4,7 +4,7 @@ import { Button, Empty, Form, Input, Select, Space, Table, Tag, type TableColumn
 import { DatabaseOutlined, EditOutlined, ExportOutlined, EyeOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useColumnConfig } from '@/hooks/useColumnConfig'
 import StatCards from '@/components/StatCards'
-import { KIND_LABEL_KEY, REGIONS, SCENE_LABEL_KEY, SEARCH_SCENES, STATUS, STATUS_LABEL_KEY, kindChoices, options, sceneChoices, type Pane, type PrototypeRecord, type RecordPane } from './prototypeData'
+import { KIND_LABEL_KEY, KINDS, REGIONS, SCENE_LABEL_KEY, SEARCH_SCENES, STATUS, STATUS_LABEL_KEY, options, sceneChoices, type Pane, type PrototypeRecord, type RecordPane } from './prototypeData'
 
 const LOCKED_COLUMNS = [{ key: 'id', locked: 'head' as const }, { key: 'action', locked: 'tail' as const }]
 /** 类型筛选的「不限」哨兵：用空串而非中文常量，避免未选值与业务数据同形。 */
@@ -55,13 +55,17 @@ export function ScopeFilters({ onChange, keywordLabel }: {
   </div>
 }
 
-export function RecordList({ pane, records, onNavigate }: {
-  pane: RecordPane; records: PrototypeRecord[]; onNavigate: (pane: Pane, view?: string, id?: string) => void
+export function RecordList({ pane, kinds, records, onNavigate }: {
+  pane: RecordPane; kinds?: string[]; records: PrototypeRecord[]; onNavigate: (pane: Pane, view?: string, id?: string) => void
 }) {
   const { t } = useTranslation()
+  // 叶子模式可限定本菜单允许的类型（多菜单共用一张配置表时的边界）。
+  const allowedKinds = kinds ?? KINDS[pane]
+  const kindOptions = allowedKinds.map(code => ({ value: code, label: t(KIND_LABEL_KEY(code)) }))
   const [filters, setFilters] = useState({ keyword: '', channel: SEARCH_SCENES.ALL as string, region: '全城' })
   const [kind, setKind] = useState(ALL_TYPES)
-  const rows = records.filter(r => r.pane === pane && (kind === ALL_TYPES || r.kind === kind)
+  const rows = records.filter(r => r.pane === pane && allowedKinds.includes(r.kind)
+    && (kind === ALL_TYPES || r.kind === kind)
     && (filters.channel === SEARCH_SCENES.ALL || r.channel === filters.channel)
     && (filters.region === '全城' || r.region === filters.region)
     && `${r.name} ${r.id} ${Object.values(r.values).join(' ')}`.toLowerCase().includes(filters.keyword.trim().toLowerCase()))
@@ -80,7 +84,7 @@ export function RecordList({ pane, records, onNavigate }: {
   ]
   return <>
     <ScopeFilters onChange={setFilters} />
-    <div className="sv2__type-filter"><Select aria-label={t('searchV2.list.typeFilterAria')} value={kind} options={[{ value: ALL_TYPES, label: t('searchV2.list.allTypes') }, ...kindChoices(pane, t)]} onChange={setKind} />
+    <div className="sv2__type-filter">{allowedKinds.length > 1 && <Select aria-label={t('searchV2.list.typeFilterAria')} value={kind} options={[{ value: ALL_TYPES, label: t('searchV2.list.allTypes') }, ...kindOptions]} onChange={setKind} />}
       <span>{t('searchV2.list.switchNote')}</span></div>
     <div className="sv2__stats"><StatCards animationKey={JSON.stringify({ ...filters, kind })} items={[
       { key: 'all', icon: <DatabaseOutlined />, label: t('searchV2.list.statAll'), value: rows.length, color: 'info' },

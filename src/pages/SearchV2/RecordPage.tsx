@@ -7,12 +7,14 @@ import RemarkTextArea from '@/components/RemarkTextArea'
 import HelpPopover from '@/components/HelpPopover'
 import StatCards from '@/components/StatCards'
 import { useUnsavedGuard } from '@/contexts/UnsavedChangesContext'
-import { SEARCH_SCENES, STATUS, STATUS_LABEL_KEY, FIELD_SCHEMAS, KINDS, PANES, REGIONS, validateDraft, kindChoices, options, sceneChoices, type DraftValues, type PrototypeRecord, type RecordPane } from './prototypeData'
+import { SEARCH_SCENES, STATUS, KIND_LABEL_KEY, STATUS_LABEL_KEY, FIELD_SCHEMAS, KINDS, PANES, REGIONS, validateDraft, options, sceneChoices, type DraftValues, type PrototypeRecord, type RecordPane } from './prototypeData'
 import { StatusTag } from './PrototypeTable'
 
 interface RecordFormValues { name: string; channel: string; region: string; kind: string; values: DraftValues }
 interface Props {
   pane: RecordPane
+  /** 叶子模式下本菜单允许的类型；单类型时锁定选择，避免跨菜单误建。 */
+  kinds?: string[]
   record?: PrototypeRecord
   readOnly: boolean
   onBack: () => void
@@ -20,10 +22,12 @@ interface Props {
   onStatus: (id: string, status: PrototypeRecord['status']) => void
 }
 
-export default function RecordPage({ pane, record, readOnly, onBack, onSave, onStatus }: Props) {
+export default function RecordPage({ pane, kinds, record, readOnly, onBack, onSave, onStatus }: Props) {
   const { t } = useTranslation()
+  const allowedKinds = kinds ?? KINDS[pane]
+  const kindOptions = allowedKinds.map(code => ({ value: code, label: t(KIND_LABEL_KEY(code)) }))
   const [form] = Form.useForm<RecordFormValues>()
-  const kind = Form.useWatch('kind', form) ?? record?.kind ?? KINDS[pane][0]
+  const kind = Form.useWatch('kind', form) ?? record?.kind ?? allowedKinds[0]
   const channel = Form.useWatch('channel', form) ?? record?.channel ?? SEARCH_SCENES.DELIVERY
   const [issue, setIssue] = useState('')
   const dirty = useRef(false)
@@ -41,7 +45,7 @@ export default function RecordPage({ pane, record, readOnly, onBack, onSave, onS
     || (pane === 'ads' && kind === 'cycleSlot' && ['quota', 'daily', 'match', 'negative'].includes(field.key))
   ))
   const initial: RecordFormValues = {
-    name: record?.name ?? '', channel: record?.channel ?? SEARCH_SCENES.DELIVERY, region: record?.region ?? '全城', kind: record?.kind ?? KINDS[pane][0],
+    name: record?.name ?? '', channel: record?.channel ?? SEARCH_SCENES.DELIVERY, region: record?.region ?? '全城', kind: record?.kind ?? allowedKinds[0],
     values: { ...Object.fromEntries(FIELD_SCHEMAS[pane].map(f => [f.key, f.initial])), ...record?.values },
   }
   const handleSave = (values: RecordFormValues) => {
@@ -80,7 +84,7 @@ export default function RecordPage({ pane, record, readOnly, onBack, onSave, onS
       <section className="detail-card sv2__form-card"><h3><DatabaseOutlined /> {t('searchV2.form.sectionBase')}</h3>
         <div className="sv2__form-grid">
           <Form.Item name="name" label={t('searchV2.form.fieldName')} rules={[{ required: true, whitespace: true, message: t('searchV2.form.nameRequired') }, { max: 60, message: t('searchV2.form.nameMax') }]}><Input maxLength={60} /></Form.Item>
-          <Form.Item name="kind" label={t('searchV2.form.fieldType')} rules={[{ required: true }]}><Select options={kindChoices(pane, t)} /></Form.Item>
+          <Form.Item name="kind" label={t('searchV2.form.fieldType')} rules={[{ required: true }]}><Select options={kindOptions} disabled={allowedKinds.length === 1} /></Form.Item>
           <Form.Item name="channel" label={t('searchV2.form.fieldScene')} rules={[{ required: true }]}><Select options={sceneChoices(t)} /></Form.Item>
           <Form.Item name="region" label={t('searchV2.form.fieldRegion')} rules={[{ required: true }]}><Select options={options(REGIONS)} /></Form.Item>
           <Form.Item label={t('searchV2.form.fieldAppBrand')}><Input value={t('searchV2.form.appBrandValue')} disabled /></Form.Item>

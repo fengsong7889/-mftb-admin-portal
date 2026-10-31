@@ -160,6 +160,16 @@ export function prototypeUrl(pane: Pane, view = 'list', id?: string): string {
   return `/global-config?${query}`
 }
 
+/**
+ * 叶子模式 URL（菜单融合第一阶段）：能力已融入某个既有菜单叶子时，
+ * 列表/详情用该叶子自身路径 + view/id 表达，不再依赖横线 tab。
+ */
+export function leafUrl(path: string, view = 'list', id?: string): string {
+  const query = new URLSearchParams({ view })
+  if (id) query.set('id', id)
+  return `${path}?${query}`
+}
+
 /** 仅用于表单体验校验；不替代第二阶段后端的安全及业务校验。返回值为 i18n key，由调用方 t() 后展示。 */
 export function validateDraft(pane: RecordPane, kind: string, values: DraftValues): string | undefined {
   if (pane === 'scenarios' && ['relevance', 'quality', 'distance', 'heat'].reduce((sum, key) => sum + Number(values[key] ?? 0), 0) !== 100) return 'searchV2.validate.weights'

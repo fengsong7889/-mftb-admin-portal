@@ -39,27 +39,22 @@ const WriteoffReconcile = lazy(() => import('@/pages/WriteoffReconcile'))
 const DebtReconcile = lazy(() => import('@/pages/DebtReconcile'))
 const DebtDetail = lazy(() => import('@/pages/DebtDetail'))
 const ConsumeRisk = lazy(() => import('@/pages/ConsumeRisk'))
-const WordSegmentation = lazy(() => import('@/pages/WordSegmentation'))
-const HintConfig = lazy(() => import('@/pages/HintConfig'))
 const HintPreview = lazy(() => import('@/pages/HintPreview'))
-const HotSearchConfig = lazy(() => import('@/pages/HotSearchConfig'))
 const HotSearchPreview = lazy(() => import('@/pages/HotSearchPreview'))
 const HintReport = lazy(() => import('@/pages/HintReport'))
 const HotSearchReport = lazy(() => import('@/pages/HotSearchReport'))
-const SynonymConfig = lazy(() => import('@/pages/SynonymConfig'))
-const SearchWeightConfig = lazy(() => import('@/pages/SearchWeightConfig'))
 const HotSearchLibrary = lazy(() => import('@/pages/HotSearchLibrary'))
-const StopWords = lazy(() => import('@/pages/StopWords'))
 const ApprovalCenter = lazy(() => import('@/pages/ApprovalCenter'))
 const ApprovalDetail = lazy(() => import('@/pages/ApprovalDetail'))
-const SearchVerify = lazy(() => import('@/pages/SearchVerify'))
 const SearchVerifyDetail = lazy(() => import('@/pages/SearchVerifyDetail'))
 const HintVerify = lazy(() => import('@/pages/HintVerify'))
 const HotSearchVerify = lazy(() => import('@/pages/HotSearchVerify'))
 const PageDescriptionEditor = lazy(() => import('@/pages/PageDescriptionEditor'))
 // 搜索配置管理(新系统)
 const GlobalConfig = lazy(() => import('@/pages/SearchConfigNew/GlobalConfig'))
-const DimensionStrategy = lazy(() => import('@/pages/SearchConfigNew/ChannelStrategy'))
+// 菜单融合第一阶段（方案 §18）：已融入的既有叶子统一渲染 SearchV2 工作台对应能力域，
+// 旧 mock 页面文件暂保留作为回退，待新页验收通过后一次性删除。
+const SearchV2Leaf = lazy(() => import('@/pages/SearchV2/SearchV2Leaf'))
 
 // 集團人事
 const EmployeeManagement = lazy(() => import('@/pages/Permission/Employee'))
@@ -405,26 +400,26 @@ function AuthenticatedLayout() {
               <Route path="/approval-center" element={<ApprovalCenter />} />
               <Route path="/approval-detail" element={<ApprovalDetail />} />
               {/* 搜索管理 */}
-              <Route path="/word-segmentation" element={<WordSegmentation />} />
-              <Route path="/synonym-config" element={<SynonymConfig />} />
-              <Route path="/hint-config" element={<HintConfig />} />
+              <Route path="/word-segmentation" element={<SearchV2Leaf />} />
+              <Route path="/synonym-config" element={<SearchV2Leaf />} />
+              <Route path="/hint-config" element={<SearchV2Leaf />} />
               <Route path="/hint-preview" element={<HintPreview />} />
-              <Route path="/hot-search-config" element={<HotSearchConfig />} />
+              <Route path="/hot-search-config" element={<SearchV2Leaf />} />
               <Route path="/hot-search-preview" element={<HotSearchPreview />} />
-              <Route path="/search-weight-config" element={<SearchWeightConfig />} />
+              <Route path="/search-weight-config" element={<SearchV2Leaf />} />
               
               <Route path="/hot-search-library" element={<HotSearchLibrary />} />
-              <Route path="/stop-words" element={<StopWords />} />
+              <Route path="/stop-words" element={<SearchV2Leaf />} />
               <Route path="/hint-report" element={<HintReport />} />
               <Route path="/hot-search-report" element={<HotSearchReport />} />
               {/* 搜索配置校驗 */}
-              <Route path="/search-verify" element={<SearchVerify />} />
+              <Route path="/search-verify" element={<SearchV2Leaf />} />
               <Route path="/search-verify-detail/:id" element={<SearchVerifyDetail />} />
               <Route path="/hint-verify" element={<HintVerify />} />
               <Route path="/hot-search-verify" element={<HotSearchVerify />} />
               {/* 搜索配置管理(新系统) */}
               <Route path="/global-config" element={<GlobalConfig />} />
-              <Route path="/channel-strategy" element={<DimensionStrategy />} />
+              <Route path="/channel-strategy" element={<SearchV2Leaf />} />
 
               {/* 集團人事 */}
               <Route path="/employee-management" element={<EmployeeManagement />} />
