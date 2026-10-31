@@ -151,6 +151,25 @@ VERIFY_USER=<最小权限账号> VERIFY_PASS=<密码> \
 bash scripts/verify-deploy.sh   # 先校验 ready 探针，再断言关键接口业务码，任一失败非零退出
 ```
 
+**无凭据快速探测**（改完环境变量但不想动账号口令时，先跑这个）：
+
+```bash
+bash scripts/verify-sealos-env.sh   # 只发匿名请求，5 项全过退出 0；任一项失败退出 1
+```
+
+它与 `verify-deploy.sh` 的分工：
+
+| 脚本 | 需要凭据 | 验证内容 |
+|------|:---:|---------|
+| `verify-sealos-env.sh` | 否 | live/ready 探针、前端来源 CORS 预检放行且精确回显 `access-control-allow-origin`、**非白名单来源必须 403**（防 CORS 退化成 `*`）、未认证请求必须 401 |
+| `verify-deploy.sh` | 是 | 在探针结果之上再断言关键接口的**业务码** |
+
+> 目标地址不写默认值：未指定 `BASE_URL` 时自动取 `.env.production` 的 `VITE_API_BASE_URL`，
+> 未指定 `EXPECT_CORS_ORIGIN` 时由 `package.json` 的 `homepage` 推导 origin（避免仓内出现第二份环境副本）。
+>
+> ⚠️ 两个脚本都无法证明的事：**轮换 `JWT_SECRET` 后旧 token 真的失效了**。那需要人工拿一个
+> 轮换前的旧 token 请求受保护接口并确认返回 401。`ready=200` 不等于旧密钥已作废。
+
 ---
 
 

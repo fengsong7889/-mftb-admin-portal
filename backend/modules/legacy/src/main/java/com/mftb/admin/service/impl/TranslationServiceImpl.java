@@ -72,8 +72,22 @@ public class TranslationServiceImpl implements TranslationService {
     /** MyMemory 请求超时 */
     private static final Duration MT_TIMEOUT = Duration.ofSeconds(10);
 
-    /** MyMemory 免费额度: 匿名 5000 字符/天, 带 email 可提升至 50000 */
-    private static final int DAILY_CHAR_LIMIT = 50000;
+    /**
+     * MyMemory 免费额度（字符/天）：匿名 5000，带 email 提升至 50000。
+     * 两个值都必须与官方口径一致：只留一个 50000 常量会让未配置 email 的部署
+     * 以为自己还有额度，一路打到服务端返回额度警告（见 {@link #looksLikeQuotaWarning}）。
+     */
+    private static final int DAILY_CHAR_LIMIT_WITH_EMAIL = 50000;
+    private static final int DAILY_CHAR_LIMIT_ANONYMOUS = 5000;
+
+    /**
+     * MyMemory 额度耗尽的响应特征：它不把超额表达成 HTTP 错误码，而是返回
+     * 200 + responseStatus=200，并把警告文案塞进 responseData.translatedText。
+     * 不识别就会把这句警告当译文写进 sys_translation（静默数据污染）。
+     */
+    private static final String[] QUOTA_WARNING_MARKERS = {
+            "MYMEMORY WARNING", "YOU USED ALL AVAILABLE FREE TRANSLATIONS", "QUOTA EXCEEDED"
+    };
 
     /** MyMemory 单次请求最大字符数 */
     private static final int MAX_REQUEST_CHARS = 500;
@@ -332,9 +346,12 @@ public class TranslationServiceImpl implements TranslationService {
                     continue;
                 }
 
-                // 配额检查
-                if (dailyCharUsed.get() >= DAILY_CHAR_LIMIT) {
-                    log.warn("MyMemory 每日字符配额已用尽 ({}/{}), 跳过剩余翻译", dailyCharUsed.get(), DAILY_CHAR_LIMIT);
+                // 配额检查：上限按当前是否配置了 MYMEMORY_EMAIL 取值，不能拿 50000 去自我评估匿名额度
+                int dailyLimit = effectiveDailyCharLimit();
+                if (dailyCharUsed.get() >= dailyLimit) {
+                    log.warn("MyMemory 每日字符配额已用尽 ({}/{}), 跳过剩余翻译；"
+                                    + "如需提升额度请配置 MYMEMORY_EMAIL（匿名上限 {}）",
+                            dailyCharUsed.get(), dailyLimit, DAILY_CHAR_LIMIT_ANONYMOUS);
                     return totalFilled;
                 }
 
@@ -371,6 +388,31 @@ public class TranslationServiceImpl implements TranslationService {
                 .stream()
                 .map(SysLanguage::getCode)
                 .toList();
+    }
+
+    /**
+     * 当前有效日额度：未配置 {@code MYMEMORY_EMAIL} 时服务端只给 5000 字符/天，
+     * 本地计数必须按同一个上限自我评估，否则会在超额后持续外呼并拿到警告文案。
+     */
+    private int effectiveDailyCharLimit() {
+        return StringUtils.hasText(myMemoryEmail) ? DAILY_CHAR_LIMIT_WITH_EMAIL : DAILY_CHAR_LIMIT_ANONYMOUS;
+    }
+
+    /**
+     * 判断"译文"是否其实是 MyMemory 的额度/滥用警告文案（大小写不敏感，只要包含即命中）。
+     * 只匹配固定警告短语，不做泛化关键词判断，避免把含类似字样的正常译文误杀。
+     */
+    private boolean looksLikeQuotaWarning(String text) {
+        if (text == null || text.isEmpty()) {
+            return false;
+        }
+        String upper = text.toUpperCase(Locale.ROOT);
+        for (String marker : QUOTA_WARNING_MARKERS) {
+            if (upper.contains(marker)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -451,6 +493,17 @@ public class TranslationServiceImpl implements TranslationService {
 
                 Object translated = responseData.get("translatedText");
                 String resultText = translated != null ? translated.toString() : null;
+
+                // 额度耗尽会被服务端当成"正常译文"返回：必须当场丢弃，绝不能入库
+                if (looksLikeQuotaWarning(resultText)) {
+                    // 触顶短路：复用既有日额度闸门，今天不再继续外呼烧额度
+                    dailyCharUsed.set(effectiveDailyCharLimit());
+                    String snippet = resultText.length() > 120 ? resultText.substring(0, 120) + "…" : resultText;
+                    log.warn("MyMemory 返回额度警告，本次不入库并已停用当日剩余翻译。"
+                                    + "服务端按日重置，次日自动恢复；如需提额度请配置 MYMEMORY_EMAIL。警告原文: {}",
+                            snippet);
+                    return null;
+                }
 
                 // 智能去重: 若顶部翻译结果与源文本相同，从 matches 中寻找更优翻译
                 if (StringUtils.hasText(resultText) && resultText.equals(sourceText)) {
