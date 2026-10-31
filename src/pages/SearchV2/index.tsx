@@ -68,7 +68,7 @@ export default function SearchV2Prototype() {
       <div className="sv2__header-actions"><Tag color="orange">{t('searchV2.badgePrototype')}</Tag><Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/global-config')}>{t('searchV2.backLegacy')}</Button></div>
     </header>
     <Alert type="info" showIcon message={t('searchV2.alertTitle')} description={t('searchV2.alertDesc')} />
-    <nav className="sv2__navigation" aria-label="搜索新版原型導航">
+    <nav className="sv2__navigation" aria-label={t('searchV2.chrome.navAria')}>
       {PANES.map(item => <button key={item.key} aria-current={pane === item.key ? 'page' : undefined} onClick={() => handleNavigate(item.key)}>
         <span className="sv2__nav-icon">{renderMenuIcon(item.icon)}</span><span><strong>{t(item.title)}</strong><small>{t(item.subtitle)}</small></span>
       </button>)}

@@ -4,12 +4,15 @@ import { Button, Empty, Form, Input, Select, Space, Table, Tag, type TableColumn
 import { DatabaseOutlined, EditOutlined, ExportOutlined, EyeOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useColumnConfig } from '@/hooks/useColumnConfig'
 import StatCards from '@/components/StatCards'
-import { KINDS, REGIONS, SCENE_LABEL_KEY, SEARCH_SCENES, STATUS, options, sceneChoices, type Pane, type PrototypeRecord, type RecordPane } from './prototypeData'
+import { KINDS, REGIONS, SCENE_LABEL_KEY, SEARCH_SCENES, STATUS, STATUS_LABEL_KEY, options, sceneChoices, type Pane, type PrototypeRecord, type RecordPane } from './prototypeData'
 
 const LOCKED_COLUMNS = [{ key: 'id', locked: 'head' as const }, { key: 'action', locked: 'tail' as const }]
+/** 类型筛选的「不限」哨兵：用空串而非中文常量，避免未选值与业务数据同形。 */
+const ALL_TYPES = ''
 export function StatusTag({ status }: { status: string }) {
+  const { t } = useTranslation()
   const color = status === STATUS.DRAFT ? 'default' : status === STATUS.REVIEW ? 'orange' : status === STATUS.PAUSED ? 'red' : 'blue'
-  return <Tag color={color}>{status} · 示例</Tag>
+  return <Tag color={color}>{t('searchV2.list.statusSample', { status: t(STATUS_LABEL_KEY(status)) })}</Tag>
 }
 
 /** 共用表格只负责显示，不在原型中接入任何管理或计费接口。 */
@@ -29,7 +32,7 @@ export function SampleTable<T extends { id: string }>({ pageKey, rows, columns, 
     <Table<T> size="middle" rowKey="id" dataSource={rows} columns={applyConfig(columns) as TableColumnsType<T>}
       scroll={{ x: 'max-content' }} locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('searchV2.list.noSampleData')} /> }}
       pagination={{ current, pageSize: pagination.size, total: rows.length, showSizeChanger: true, showQuickJumper: true,
-        pageSizeOptions: [10, 20, 50], showTotal: count => `共 ${count} 條示例`,
+        pageSizeOptions: [10, 20, 50], showTotal: count => t('searchV2.list.totalSamples', { total: count }),
         onChange: (page, size) => setPagination({ page: size === pagination.size ? page : 1, size }) }} />
   </>
 }
@@ -57,8 +60,8 @@ export function RecordList({ pane, records, onNavigate }: {
 }) {
   const { t } = useTranslation()
   const [filters, setFilters] = useState({ keyword: '', channel: SEARCH_SCENES.ALL as string, region: '全城' })
-  const [kind, setKind] = useState('全部類型')
-  const rows = records.filter(r => r.pane === pane && (kind === '全部類型' || r.kind === kind)
+  const [kind, setKind] = useState(ALL_TYPES)
+  const rows = records.filter(r => r.pane === pane && (kind === ALL_TYPES || r.kind === kind)
     && (filters.channel === SEARCH_SCENES.ALL || r.channel === filters.channel)
     && (filters.region === '全城' || r.region === filters.region)
     && `${r.name} ${r.id} ${Object.values(r.values).join(' ')}`.toLowerCase().includes(filters.keyword.trim().toLowerCase()))
@@ -68,7 +71,7 @@ export function RecordList({ pane, records, onNavigate }: {
     { key: 'kind', title: t('searchV2.list.colType'), dataIndex: 'kind', width: 150, render: (value: string) => <Tag>{value}</Tag> },
     { key: 'channel', title: t('searchV2.list.colScene'), dataIndex: 'channel', width: 120, render: (value: string) => t(SCENE_LABEL_KEY(value)) },
     { key: 'region', title: t('searchV2.list.colRegion'), dataIndex: 'region', width: 85 },
-    { key: 'summary', title: pane === 'ads' ? t('searchV2.list.colSummaryAds') : t('searchV2.list.colSummaryRule'), width: 240, render: (_, r) => summary(r) },
+    { key: 'summary', title: pane === 'ads' ? t('searchV2.list.colSummaryAds') : t('searchV2.list.colSummaryRule'), width: 240, render: (_, r) => summary(r, t) },
     { key: 'status', title: t('searchV2.list.colFlowStatus'), dataIndex: 'status', width: 165, render: (value: string) => <StatusTag status={value} /> },
     { key: 'action', title: t('searchV2.list.colAction'), width: 135, render: (_, r) => <Space size={0} split={<span className="action-split">|</span>}>
       <Button type="link" size="small" onClick={() => onNavigate(pane, 'detail', r.id)}>{t('searchV2.list.actDetail')}</Button>
@@ -77,7 +80,7 @@ export function RecordList({ pane, records, onNavigate }: {
   ]
   return <>
     <ScopeFilters onChange={setFilters} />
-    <div className="sv2__type-filter"><Select aria-label="示例類型" value={kind} options={options(['全部類型', ...KINDS[pane]])} onChange={setKind} />
+    <div className="sv2__type-filter"><Select aria-label={t('searchV2.list.typeFilterAria')} value={kind} options={[{ value: ALL_TYPES, label: t('searchV2.list.allTypes') }, ...options(KINDS[pane])]} onChange={setKind} />
       <span>{t('searchV2.list.switchNote')}</span></div>
     <div className="sv2__stats"><StatCards animationKey={JSON.stringify({ ...filters, kind })} items={[
       { key: 'all', icon: <DatabaseOutlined />, label: t('searchV2.list.statAll'), value: rows.length, color: 'info' },
@@ -90,12 +93,13 @@ export function RecordList({ pane, records, onNavigate }: {
   </>
 }
 
-function summary(row: PrototypeRecord): string {
+/** 规则摘要：纯展示拼装，文案走 i18n（由调用方注入 t）；数据值（原词/标准词/乘数值）保持原样。 */
+function summary(row: PrototypeRecord, tr: (key: string, options?: Record<string, unknown>) => string): string {
   const v = row.values
   if (row.pane === 'lexicon') return `${v.source} → ${v.target}`
-  if (row.pane === 'interventions') return `${v.terms} · ${row.kind === '精確準入' ? '僅精確意圖' : `乘數 ${v.factor ?? '—'}`} · ${v.days} 天`
-  if (row.pane === 'scenarios') return `R ${v.relevance}% / Q ${v.quality}% / D ${v.distance}% / H ${v.heat}%`
-  if (row.pane === 'ads') return row.kind === '搜索投流包' ? `${v.quota} 次 · ${v.daily} 次／日` : `${v.start} ～ ${v.end}`
-  if (row.pane === 'releases') return `${v.version} → 回退 ${v.rollback}`
-  return `${v.text} → 搜索「${v.target}」`
+  if (row.pane === 'interventions') return `${v.terms} · ${row.kind === '精確準入' ? tr('searchV2.list.sumExactOnly') : tr('searchV2.list.sumMultiplier', { value: v.factor ?? '—' })} · ${tr('searchV2.list.sumDays', { days: v.days })}`
+  if (row.pane === 'scenarios') return tr('searchV2.list.sumWeights', { r: v.relevance, q: v.quality, d: v.distance, h: v.heat })
+  if (row.pane === 'ads') return row.kind === '搜索投流包' ? tr('searchV2.list.sumAdsQuota', { quota: v.quota, daily: v.daily }) : `${v.start} ～ ${v.end}`
+  if (row.pane === 'releases') return tr('searchV2.list.sumRelease', { version: v.version, rollback: v.rollback })
+  return tr('searchV2.list.sumGuidance', { text: v.text, target: v.target })
 }

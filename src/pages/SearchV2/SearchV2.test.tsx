@@ -48,7 +48,7 @@ describe('搜索 U1 原型交互', () => {
   })
   it('既有全局配置路由可懒加载原型，九个导航可达', async () => {
     const router = mount('overview', 'list', undefined, true)
-    const nav = await screen.findByRole('navigation', { name: '搜索新版原型導航' })
+    const nav = await screen.findByRole('navigation', { name: 'searchV2.chrome.navAria' })
     expect(within(nav).getAllByRole('button')).toHaveLength(9)
     for (const pane of PANES) {
       fireEvent.click(within(nav).getByRole('button', { name: new RegExp(pane.title) }))
@@ -88,7 +88,7 @@ describe('搜索 U1 原型交互', () => {
     const router = mount('scenarios', 'edit', 'DEMO-S02')
     fireEvent.change(screen.getByLabelText('相關性 R（%）'), { target: { value: '80' } })
     fireEvent.click(screen.getByRole('button', { name: 'searchV2.form.saveDraft' }))
-    expect(await screen.findByText('四項權重合計必須為 100%')).toBeInTheDocument()
+    expect(await screen.findByText('searchV2.validate.weights')).toBeInTheDocument()
     expect(router.state.location.search).toContain('view=edit')
   })
   it('过滤样例列表，重置恢复，统计在搜索之后', async () => {
@@ -139,7 +139,7 @@ describe('搜索 U1 原型交互', () => {
     expect(screen.getByRole('button', { name: 'searchV2.form.rollbackOnline' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: 'searchV2.form.demoNext' }))
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'searchV2.form.demoConfirmOk' }))
-    expect(await screen.findByText('已批准 · 示例')).toBeInTheDocument()
+    expect(await screen.findByText('searchV2.list.statusSample')).toBeInTheDocument()
     expect(mocks.request).not.toHaveBeenCalled()
   })
   it('错误 ID 不能自动落入新增模式', () => {

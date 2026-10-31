@@ -7,7 +7,7 @@ import RemarkTextArea from '@/components/RemarkTextArea'
 import HelpPopover from '@/components/HelpPopover'
 import StatCards from '@/components/StatCards'
 import { useUnsavedGuard } from '@/contexts/UnsavedChangesContext'
-import { FIELD_SCHEMAS, KINDS, PANES, REGIONS, SEARCH_SCENES, STATUS, validateDraft, options, sceneChoices, type DraftValues, type PrototypeRecord, type RecordPane } from './prototypeData'
+import { SEARCH_SCENES, STATUS, STATUS_LABEL_KEY, FIELD_SCHEMAS, KINDS, PANES, REGIONS, validateDraft, options, sceneChoices, type DraftValues, type PrototypeRecord, type RecordPane } from './prototypeData'
 import { StatusTag } from './PrototypeTable'
 
 interface RecordFormValues { name: string; channel: string; region: string; kind: string; values: DraftValues }
@@ -28,8 +28,8 @@ export default function RecordPage({ pane, record, readOnly, onBack, onSave, onS
   const [issue, setIssue] = useState('')
   const dirty = useRef(false)
   const { register } = useUnsavedGuard()
-  const [updatedAt] = useState(record?.updatedAt ?? '未保存')
-  const title = `${readOnly ? '查看' : record ? '編輯' : '新增'}${t(PANES.find(p => p.key === pane)!.title)}示例`
+  const [updatedAt] = useState(record?.updatedAt ?? t('searchV2.form.notSaved'))
+  const title = `${t(readOnly ? 'searchV2.form.titleView' : record ? 'searchV2.form.titleEdit' : 'searchV2.form.titleAdd')}${t(PANES.find(p => p.key === pane)!.title)}${t('searchV2.form.titleSampleSuffix')}`
   useEffect(() => register({ isDirty: () => dirty.current, discard: () => { dirty.current = false }, describe: () => title }), [register, title])
   useEffect(() => {
     const handleUnload = (event: BeforeUnloadEvent) => { if (dirty.current) { event.preventDefault(); event.returnValue = '' } }
@@ -46,8 +46,8 @@ export default function RecordPage({ pane, record, readOnly, onBack, onSave, onS
   }
   const handleSave = (values: RecordFormValues) => {
     const error = validateDraft(pane, values.kind, values.values)
-      ?? (pane === 'scenarios' && channel === SEARCH_SCENES.STORE && Number(values.values.ads) !== 0 ? '店內搜索不允許跨商家廣告' : undefined)
-      ?? (pane === 'scenarios' && channel === SEARCH_SCENES.HOME && Number(values.values.ads) > 2 ? '大首頁廣告上限為 2 張' : undefined)
+      ?? (pane === 'scenarios' && channel === SEARCH_SCENES.STORE && Number(values.values.ads) !== 0 ? 'searchV2.validate.storeNoAd' : undefined)
+      ?? (pane === 'scenarios' && channel === SEARCH_SCENES.HOME && Number(values.values.ads) > 2 ? 'searchV2.validate.homeAdLimit' : undefined)
     if (error) { setIssue(error); return }
     dirty.current = false
     const visibleValues: DraftValues = Object.fromEntries(fields.map(field => [field.key, values.values[field.key]]))
@@ -60,7 +60,7 @@ export default function RecordPage({ pane, record, readOnly, onBack, onSave, onS
     Modal.confirm({
       title: t('searchV2.form.demoConfirmTitle'), className: 'custom-confirm-modal',
       icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
-      content: <div className="confirm-info-card"><b>{record.name}</b><p>{record.status} → {next}</p><p>{t('searchV2.form.demoConfirmBody')}</p></div>,
+      content: <div className="confirm-info-card"><b>{record.name}</b><p>{t('searchV2.form.demoStatusFlow', { from: t(STATUS_LABEL_KEY(record.status)), to: t(STATUS_LABEL_KEY(next)) })}</p><p>{t('searchV2.form.demoConfirmBody')}</p></div>,
       okText: t('searchV2.form.demoConfirmOk'), cancelText: t('searchV2.form.cancel'),
       onOk: () => { onStatus(record.id, next); message.info(t('searchV2.form.demoDone')) },
     })
@@ -88,7 +88,7 @@ export default function RecordPage({ pane, record, readOnly, onBack, onSave, onS
         </div>
       </section>
       <section className="detail-card sv2__form-card"><h3><SettingOutlined /> {pane === 'ads' ? t('searchV2.form.sectionAd') : t('searchV2.form.sectionRule')}
-        <HelpPopover title="原型與正式校驗" ariaLabel="原型校驗說明" content="此階段只校驗表單體驗；真實權限、資源歸屬、衝突、庫存與金額均須由第二階段後端重驗。" /></h3>
+        <HelpPopover title={t('searchV2.form.protoValidateTitle')} ariaLabel={t('searchV2.form.protoValidateAria')} content={t('searchV2.form.protoValidateBody')} /></h3>
         <div className="sv2__form-grid">
           {fields.map(field => <Form.Item key={field.key} name={['values', field.key]} className={field.type === 'remark' ? 'sv2__full-row' : undefined}
             label={<>{field.label}{field.help && <HelpPopover title={field.label} ariaLabel={`${field.label}說明`} content={field.help} />}</>}
@@ -104,25 +104,25 @@ export default function RecordPage({ pane, record, readOnly, onBack, onSave, onS
         {pane === 'guidance' && <Alert type="info" showIcon message={kind === '推廣搜索' ? t('searchV2.form.guidancePaid') : t('searchV2.form.guidanceNatural')} />}
         {pane === 'ads' && <Alert type="warning" showIcon message={kind === '搜索投流包' ? t('searchV2.form.adsPlan') : t('searchV2.form.adsCycle')} />}
       </section>
-      {issue && <Alert type="error" showIcon message={issue} />}
+      {issue && <Alert type="error" showIcon message={t(issue)} />}
       {!readOnly && <div className="form-footer"><Button onClick={onBack}>{t('searchV2.form.cancel')}</Button><Button type="primary" htmlType="submit" aria-label={t('searchV2.form.saveDraft')} icon={<SaveOutlined />}>{t('searchV2.form.saveDraft')}</Button></div>}
     </Form>
     {pane === 'ads' && readOnly && record?.kind === '搜索投流包' && <section className="detail-card">
       <h3>{t('searchV2.form.entitlementTitle')}</h3><StatCards items={[
-        { key: 'q', label: '示例購買額度 Q', value: Number(record.values.quota ?? 0), color: 'info', icon: <DatabaseOutlined /> },
-        { key: 'c', label: '示例有效消耗 C', value: Number(record.values.consumed ?? 0), color: 'brand', icon: <EyeOutlined /> },
-        { key: 'r', label: '示例暫占 R', value: Number(record.values.reserved ?? 0), color: 'system', icon: <EditOutlined /> },
-        { key: 'left', label: '示例可用餘額 Q−C−R', value: Number(record.values.quota ?? 0) - Number(record.values.consumed ?? 0) - Number(record.values.reserved ?? 0), color: 'success', icon: <CheckCircleOutlined /> },
-      ]} /><p className="sv2__footnote">50% 面積連續可見 1 秒，通過服務端校驗才消耗；退款需先結清暫占。本原型不簽發回執。</p>
+        { key: 'q', label: t('searchV2.form.entQuota'), value: Number(record.values.quota ?? 0), color: 'info', icon: <DatabaseOutlined /> },
+        { key: 'c', label: t('searchV2.form.entConsumed'), value: Number(record.values.consumed ?? 0), color: 'brand', icon: <EyeOutlined /> },
+        { key: 'r', label: t('searchV2.form.entReserved'), value: Number(record.values.reserved ?? 0), color: 'system', icon: <EditOutlined /> },
+        { key: 'left', label: t('searchV2.form.entAvailable'), value: Number(record.values.quota ?? 0) - Number(record.values.consumed ?? 0) - Number(record.values.reserved ?? 0), color: 'success', icon: <CheckCircleOutlined /> },
+      ]} /><p className="sv2__footnote">{t('searchV2.form.entFootnote')}</p>
       <Space><Button disabled>{t('searchV2.form.buyPackage')}</Button><Button disabled>{t('searchV2.form.refund')}</Button></Space>
     </section>}
     {pane === 'releases' && readOnly && record && <section className="detail-card">
       <h3>{t('searchV2.form.lifecycleTitle')}</h3>
       <Steps size="small" current={[STATUS.DRAFT, STATUS.REVIEW, STATUS.APPROVED, STATUS.SCHEDULED, STATUS.LIVE].findIndex(status => status === record.status)}
-        items={['草稿', '待審核', '已批准', '待生效', '實例確認'].map(label => ({ title: label }))} />
+        items={[t('searchV2.form.stepDraft'), t('searchV2.form.stepReview'), t('searchV2.form.stepApproved'), t('searchV2.form.stepScheduled'), t('searchV2.form.stepConfirm')].map(label => ({ title: label }))} />
       <Descriptions className="sv2__release-meta" column={2} items={[
-        { key: 'code', label: '代碼／詞庫／索引版本', children: '未接入，不可校驗兼容性' },
-        { key: 'instances', label: '真實服務實例', children: '未接入，不代表 100% 已載入' },
+        { key: 'code', label: t('searchV2.form.relMetaCode'), children: t('searchV2.form.relMetaCodeValue') },
+        { key: 'instances', label: t('searchV2.form.relMetaInstances'), children: t('searchV2.form.relMetaInstancesValue') },
       ]} />
       <Space wrap>{[STATUS.DRAFT, STATUS.REVIEW, STATUS.APPROVED].some(status => status === record.status) && <Button onClick={handleDemoReview}>{t('searchV2.form.demoNext')}</Button>}
         <Button disabled>{t('searchV2.form.publishOnline')}</Button><Button disabled>{t('searchV2.form.rollbackOnline')}</Button></Space>

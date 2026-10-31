@@ -16020,7 +16020,18 @@
       "statReview": "待審核示例",
       "statOnline": "真實線上狀態",
       "onlineNotConnected": "未接入",
-      "footnote": "匯入、匯出及正式啟停將在資料契約確認後接入，本階段不匯出示例冒充業務報表。"
+      "footnote": "匯入、匯出及正式啟停將在資料契約確認後接入，本階段不匯出示例冒充業務報表。",
+      "statusSample": "{{status}} · 示例",
+      "totalSamples": "共 {{total}} 條示例",
+      "allTypes": "全部類型",
+      "typeFilterAria": "示例類型",
+      "sumExactOnly": "僅精確意圖",
+      "sumMultiplier": "乘數 {{value}}",
+      "sumDays": "{{days}} 天",
+      "sumWeights": "R {{r}}% / Q {{q}}% / D {{d}}% / H {{h}}%",
+      "sumAdsQuota": "{{quota}} 次 · {{daily}} 次／日",
+      "sumRelease": "{{version}} → 回退 {{rollback}}",
+      "sumGuidance": "{{text}} → 搜索「{{target}}」"
     },
     "form": {
       "sectionBase": "基礎與作用域",
@@ -16060,7 +16071,30 @@
       "updatedBy": "最後更新人：原型示例",
       "updatedPrefix": "最後更新：",
       "nameRequired": "請輸入名稱",
-      "nameMax": "名稱最多 60 字"
+      "nameMax": "名稱最多 60 字",
+      "notSaved": "未保存",
+      "demoStatusFlow": "{{from}} → {{to}}",
+      "titleView": "查看",
+      "titleEdit": "編輯",
+      "titleAdd": "新增",
+      "titleSampleSuffix": "示例",
+      "stepDraft": "草稿",
+      "stepReview": "待審核",
+      "stepApproved": "已批准",
+      "stepScheduled": "待生效",
+      "stepConfirm": "實例確認",
+      "entQuota": "示例購買額度 Q",
+      "entConsumed": "示例有效消耗 C",
+      "entReserved": "示例暫占 R",
+      "entAvailable": "示例可用餘額 Q−C−R",
+      "entFootnote": "50% 面積連續可見 1 秒，通過服務端校驗才消耗；退款需先結清暫占。本原型不簽發回執。",
+      "relMetaCode": "代碼／詞庫／索引版本",
+      "relMetaCodeValue": "未接入，不可校驗兼容性",
+      "relMetaInstances": "真實服務實例",
+      "relMetaInstancesValue": "未接入，不代表 100% 已載入",
+      "protoValidateTitle": "原型與正式校驗",
+      "protoValidateAria": "原型校驗說明",
+      "protoValidateBody": "此階段只校驗表單體驗；真實權限、資源歸屬、衝突、庫存與金額均須由第二階段後端重驗。"
     },
     "overview": {
       "colSample": "樣本",
@@ -16242,7 +16276,29 @@
         "marketDesc": "商品卡與規格，強調價格和庫存",
         "groupbuyDesc": "套餐卡與適用門店，不使用配送門檻",
         "storeDesc": "鎖定本店商品，不展示跨商家廣告"
+      },
+      "status": {
+        "draft": "草稿",
+        "review": "待審核",
+        "approved": "已批准",
+        "scheduled": "待生效",
+        "live": "生效示意",
+        "paused": "已暫停"
       }
+    },
+    "validate": {
+      "weights": "四項權重合計必須為 100%",
+      "dates": "結束日期不得早於開始日期",
+      "demoteFactor": "泛詞降權乘數不得超過 1",
+      "supportFactor": "臨時扶持乘數不得低於 1",
+      "daysNormal": "普通干預有效期不得超過 7 天",
+      "daysExact": "精確準入有效期不得超過 14 天",
+      "sameTerm": "原詞與標準詞不得相同",
+      "storeNoAd": "店內搜索不允許跨商家廣告",
+      "homeAdLimit": "大首頁廣告上限為 2 張"
+    },
+    "chrome": {
+      "navAria": "搜索新版原型導航"
     }
   }
 }

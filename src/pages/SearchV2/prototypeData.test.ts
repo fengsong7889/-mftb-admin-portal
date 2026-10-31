@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MENU_ICON_NAMES } from '@/components/MenuIcon'
-import { CHANNELS, createSampleRecords, FIELD_SCHEMAS, isPane, PANES, prototypeUrl, SCENE_LABEL_KEY, SCENES, SEARCH_SCENES, validateDraft, type RecordPane } from './prototypeData'
+import { CHANNELS, createSampleRecords, FIELD_SCHEMAS, isPane, PANES, prototypeUrl, SCENE_LABEL_KEY, SCENES, SEARCH_SCENES, STATUS, STATUS_LABEL_KEY, validateDraft, type RecordPane } from './prototypeData'
 import { getPreviewCards, PREVIEW_CARDS, type PreviewContext } from './previewFixtures'
 
 const context: PreviewContext = { scene: 'delivery', region: '澳門', query: '漢堡', sort: 'relevance', showAds: true }
@@ -13,6 +13,13 @@ describe('搜索 U1 样本与原型边界', () => {
     expect(SCENES.every(s => !('label' in s) && !('description' in s) && s.descriptionKey.startsWith('searchV2.enum.scene.'))).toBe(true)
     // 示例记录的作用域也必须存 code
     createSampleRecords().forEach(r => expect(CHANNELS).toContain(r.channel))
+  })
+  it('流程状态为系统级枚举：存 code，显示走 i18n key；示例记录状态均合法', () => {
+    expect(Object.values(STATUS)).toEqual(['draft', 'review', 'approved', 'scheduled', 'live', 'paused'])
+    expect(STATUS.LIVE).not.toBe('生效示意')
+    expect(STATUS_LABEL_KEY(STATUS.APPROVED)).toBe('searchV2.enum.status.approved')
+    const codes = Object.values(STATUS)
+    createSampleRecords().forEach(r => expect(codes).toContain(r.status))
   })
   it('九个导航图标唯一且已注册，不增加真实菜单', () => {
     expect(PANES).toHaveLength(9)
@@ -70,14 +77,15 @@ describe('搜索 U1 样本与原型边界', () => {
     expect(getPreviewCards({ ...context, query: ' ' })).toEqual([])
   })
   it.each([
-    ['scenarios', '場景策略', { relevance: 65, quality: 15, distance: 15, heat: 10 }, '四項權重'],
-    ['interventions', '泛詞降權', { factor: 1.2, days: 7 }, '不得超過 1'],
-    ['interventions', '臨時扶持', { factor: 0.8, days: 7 }, '不得低於 1'],
-    ['interventions', '泛詞降權', { factor: 0.8, days: 14 }, '不得超過 7 天'],
-    ['interventions', '精確準入', { days: 15 }, '不得超過 14 天'],
-    ['guidance', '底紋詞', { start: '2026-11-07', end: '2026-11-01' }, '不得早於'],
-    ['lexicon', '有向同義詞', { source: '漢堡', target: '漢堡' }, '不得相同'],
+    ['scenarios', '場景策略', { relevance: 65, quality: 15, distance: 15, heat: 10 }, 'searchV2.validate.weights'],
+    ['interventions', '泛詞降權', { factor: 1.2, days: 7 }, 'searchV2.validate.demoteFactor'],
+    ['interventions', '臨時扶持', { factor: 0.8, days: 7 }, 'searchV2.validate.supportFactor'],
+    ['interventions', '泛詞降權', { factor: 0.8, days: 14 }, 'searchV2.validate.daysNormal'],
+    ['interventions', '精確準入', { days: 15 }, 'searchV2.validate.daysExact'],
+    ['guidance', '底紋詞', { start: '2026-11-07', end: '2026-11-01' }, 'searchV2.validate.dates'],
+    ['lexicon', '有向同義詞', { source: '漢堡', target: '漢堡' }, 'searchV2.validate.sameTerm'],
   ] as const)('表单边界：%s %s', (pane, kind, values, expected) => {
-    expect(validateDraft(pane as RecordPane, kind, values)).toContain(expected)
+    // 校验消息改为返回 i18n key（由 RecordPage t() 后展示），故此处精确比对 key
+    expect(validateDraft(pane as RecordPane, kind, values)).toBe(expected)
   })
 })

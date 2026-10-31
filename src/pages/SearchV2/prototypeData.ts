@@ -36,8 +36,12 @@ const CHANNEL_CODES: SearchSceneCode[] = [SEARCH_SCENES.ALL, SEARCH_SCENES.HOME,
 export const sceneChoices = (tr: (key: string) => string) => CHANNEL_CODES.map(code => ({ value: code, label: tr(SCENE_LABEL_KEY(code)) }))
 export const CHANNELS = CHANNEL_CODES
 export const REGIONS = ['全城', '澳門', '氹仔']
-export const STATUS = { DRAFT: '草稿', REVIEW: '待審核', APPROVED: '已批准', SCHEDULED: '待生效', LIVE: '生效示意', PAUSED: '已暫停' } as const
+/** 流程状态为系统级枚举：存 code，显示走 i18n（searchV2.enum.status.*）；后端映射见 searchBridge 的 approval_status。 */
+export const SEARCH_STATUS = { DRAFT: 'draft', REVIEW: 'review', APPROVED: 'approved', SCHEDULED: 'scheduled', LIVE: 'live', PAUSED: 'paused' } as const
+/** 保留原有引用别名（全局 40 处均用 STATUS.X，改值不影响调用点）。 */
+export const STATUS = SEARCH_STATUS
 export type PrototypeStatus = typeof STATUS[keyof typeof STATUS]
+export const STATUS_LABEL_KEY = (code: string) => `searchV2.enum.status.${code}`
 export type DraftValues = Record<string, string | number | undefined>
 export interface PrototypeRecord {
   id: string
@@ -149,17 +153,17 @@ export function prototypeUrl(pane: Pane, view = 'list', id?: string): string {
   return `/global-config?${query}`
 }
 
-/** 仅用于表单体验校验；不替代第二阶段后端的安全及业务校验。 */
+/** 仅用于表单体验校验；不替代第二阶段后端的安全及业务校验。返回值为 i18n key，由调用方 t() 后展示。 */
 export function validateDraft(pane: RecordPane, kind: string, values: DraftValues): string | undefined {
-  if (pane === 'scenarios' && ['relevance', 'quality', 'distance', 'heat'].reduce((sum, key) => sum + Number(values[key] ?? 0), 0) !== 100) return '四項權重合計必須為 100%'
-  if (values.start && values.end && String(values.start) > String(values.end)) return '結束日期不得早於開始日期'
+  if (pane === 'scenarios' && ['relevance', 'quality', 'distance', 'heat'].reduce((sum, key) => sum + Number(values[key] ?? 0), 0) !== 100) return 'searchV2.validate.weights'
+  if (values.start && values.end && String(values.start) > String(values.end)) return 'searchV2.validate.dates'
   if (pane === 'interventions') {
-    if (kind === '泛詞降權' && Number(values.factor) > 1) return '泛詞降權乘數不得超過 1'
-    if (kind === '臨時扶持' && Number(values.factor) < 1) return '臨時扶持乘數不得低於 1'
-    if (kind !== '精確準入' && Number(values.days) > 7) return '普通干預有效期不得超過 7 天'
-    if (kind === '精確準入' && Number(values.days) > 14) return '精確準入有效期不得超過 14 天'
+    if (kind === '泛詞降權' && Number(values.factor) > 1) return 'searchV2.validate.demoteFactor'
+    if (kind === '臨時扶持' && Number(values.factor) < 1) return 'searchV2.validate.supportFactor'
+    if (kind !== '精確準入' && Number(values.days) > 7) return 'searchV2.validate.daysNormal'
+    if (kind === '精確準入' && Number(values.days) > 14) return 'searchV2.validate.daysExact'
   }
-  if (pane === 'lexicon' && values.source?.toString().trim() === values.target?.toString().trim()) return '原詞與標準詞不得相同'
+  if (pane === 'lexicon' && values.source?.toString().trim() === values.target?.toString().trim()) return 'searchV2.validate.sameTerm'
 }
 
 export const SAMPLE_METRICS = [

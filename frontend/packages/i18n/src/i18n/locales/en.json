@@ -16018,7 +16018,18 @@
       "statReview": "Pending-review samples",
       "statOnline": "Real online status",
       "onlineNotConnected": "Not connected",
-      "footnote": "Import/export and real enable/disable connect after data contracts are confirmed; this stage does not export samples as business reports."
+      "footnote": "Import/export and real enable/disable connect after data contracts are confirmed; this stage does not export samples as business reports.",
+      "statusSample": "{{status}} · sample",
+      "totalSamples": "{{total}} samples in total",
+      "allTypes": "All types",
+      "typeFilterAria": "Sample type",
+      "sumExactOnly": "exact intent only",
+      "sumMultiplier": "multiplier {{value}}",
+      "sumDays": "{{days}} d",
+      "sumWeights": "R {{r}}% / Q {{q}}% / D {{d}}% / H {{h}}%",
+      "sumAdsQuota": "{{quota}} impressions · {{daily}}/day",
+      "sumRelease": "{{version}} → rollback {{rollback}}",
+      "sumGuidance": "{{text}} → searches \"{{target}}\""
     },
     "form": {
       "sectionBase": "Scope & Basics",
@@ -16058,7 +16069,30 @@
       "updatedBy": "Last updated by: prototype sample",
       "updatedPrefix": "Last updated: ",
       "nameRequired": "Please enter a name",
-      "nameMax": "Name is at most 60 characters"
+      "nameMax": "Name is at most 60 characters",
+      "notSaved": "Not saved",
+      "demoStatusFlow": "{{from}} → {{to}}",
+      "titleView": "View",
+      "titleEdit": "Edit",
+      "titleAdd": "Add",
+      "titleSampleSuffix": " sample",
+      "stepDraft": "Draft",
+      "stepReview": "Pending review",
+      "stepApproved": "Approved",
+      "stepScheduled": "Scheduled",
+      "stepConfirm": "Instance confirmed",
+      "entQuota": "Sample purchased quota Q",
+      "entConsumed": "Sample valid consumption C",
+      "entReserved": "Sample reserved R",
+      "entAvailable": "Sample available balance Q−C−R",
+      "entFootnote": "Counted only after 50% area is continuously visible for 1 second and server-side validation passes; a refund must first settle reservations. This prototype issues no receipt.",
+      "relMetaCode": "Code / lexicon / index version",
+      "relMetaCodeValue": "Not connected; compatibility cannot be validated",
+      "relMetaInstances": "Real service instances",
+      "relMetaInstancesValue": "Not connected; does not mean 100% loaded",
+      "protoValidateTitle": "Prototype vs production validation",
+      "protoValidateAria": "Prototype validation note",
+      "protoValidateBody": "This stage validates form experience only; real permissions, resource ownership, conflicts, inventory and amounts must be revalidated by the phase-2 backend."
     },
     "overview": {
       "colSample": "Sample",
@@ -16240,7 +16274,29 @@
         "marketDesc": "Product cards with specs, emphasising price and stock",
         "groupbuyDesc": "Bundle cards with applicable stores, without delivery thresholds",
         "storeDesc": "Locked to this store's items; no cross-merchant ads shown"
+      },
+      "status": {
+        "draft": "Draft",
+        "review": "Pending review",
+        "approved": "Approved",
+        "scheduled": "Scheduled",
+        "live": "Live (illustrative)",
+        "paused": "Paused"
       }
+    },
+    "validate": {
+      "weights": "The four relevance weights must add up to 100%",
+      "dates": "The end date cannot be earlier than the start date",
+      "demoteFactor": "The generic-term demotion multiplier cannot exceed 1",
+      "supportFactor": "The temporary boost multiplier cannot be below 1",
+      "daysNormal": "A standard intervention cannot last longer than 7 days",
+      "daysExact": "Exact admission cannot last longer than 14 days",
+      "sameTerm": "The source term and the standard term must differ",
+      "storeNoAd": "In-store search does not allow cross-merchant ads",
+      "homeAdLimit": "The home page allows at most 2 ads"
+    },
+    "chrome": {
+      "navAria": "New search prototype navigation"
     }
   }
 }
