@@ -205,7 +205,7 @@ public class DataInitializer implements CommandLineRunner {
             seedSystemMenus();
             adjustAiCenterMenus();
         });
-        // 319: 「商家評分透視」→「商家權重分排名」。占比（權重）配置模塊已停用，
+        // 321: 「商家評分透視」→「商家權重分排名」。占比（權重）配置模塊已停用，
         // 頁面只展示三維度得分合計；種子不會覆蓋存量名稱，故用一次性遷移改名。
         versionTracker.applyOnce("ads:merchant-score-menu-rename-v1", this::renameMerchantScoreInsightMenu);
         // 旧版 JSON 权限迁移必须晚于菜单种子化执行:
