@@ -52,9 +52,12 @@ export const GLOBAL_BE = [
   /^backend\/modules\/legacy\/src\/main\/resources\/application/,
   /^backend\/modules\/legacy\/src\/main\/resources\/db\/migrations\//,
   /^backend\/sql\//,
-  // 跨域共享的技术层：改变会波及所有域，按全量处理
-  /^backend\/modules\/legacy\/src\/main\/java\/com\/mftb\/admin\/(config|aspect|util|constant|mapper|entity)\//,
-  /^backend\/modules\/rdm\/src\/main\/java\/com\/mftb\/admin\/(config|aspect|util|constant|mapper|entity)\//,
+  // 各后端模块内的技术层（配置/切面/工具/常量/Mapper/实体）：改动波及该域全部业务，按全量处理。
+  // 必须按模块通配而不是逐个列举 —— P3 拆域时这里只补了 legacy/rdm，导致
+  // `modules/eam` 的 Mapper 改动被判成「影响域内无测试用例（仅做 compile）」，
+  // 只有 CI 才会拦（本地 `check:affected` 仅告警），正是方案 §5.2 禁止的「显示为无影响」。
+  // 新增域模块时不再需要改这里。
+  /^backend\/modules\/[^/]+\/src\/main\/java\/com\/mftb\/admin\/(config|aspect|util|constant|mapper|entity)\//,
   /^backend\/bootstrap\/src\/test\/java\/com\/mftb\/admin\/security\/SecurityTestBase\.java$/,
 ]
 

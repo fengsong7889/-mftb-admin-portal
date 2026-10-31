@@ -73,7 +73,7 @@ cd backend && mvn test -B
 | 提交 / 推送 / 部署前 | 任何档位改动收尾时 |
 | 前端共享/契约层 | `src/App.tsx`、`src/main.tsx`、**`src/bootstrap.tsx`（入口装配）**、**`src/app-routes.ts`（整站路由装配）**、`frontend/packages/**`（共享包）、`frontend/apps/*/index.html`、`frontend/apps/*/src/main.tsx`、`src/test/**`、`src/pages/_shared/**` |
 | 前端工程配置 | `package.json`、`tsconfig.json`、`vite.config.ts`、`vitest.config.ts`、`eslint.config.js`、`index.html` |
-| 后端共享/契约层 | `backend/libraries/platform-core/**`、`backend/modules/shared/**`、**`backend/contracts/*/src/main/java/**`**、**`backend/bootstrap/src/main/java/**`**、`SecurityTestBase.java`；legacy/rdm 的 `config/aspect/util/constant/mapper/entity` 包 |
+| 后端共享/契约层 | `backend/libraries/platform-core/**`、`backend/modules/shared/**`、**`backend/contracts/*/src/main/java/**`**、**`backend/bootstrap/src/main/java/**`**、`SecurityTestBase.java`；**各后端模块（`modules/*`：legacy/rdm/eam/hr 及后续新域）的 `config/aspect/util/constant/mapper/entity` 包** |
 | 后端配置与数据库 | `backend/pom.xml`、各模块 `pom.xml`、`backend/bootstrap/src/main/resources/**`、`application*.yml`、`db/migrations/**`、`backend/sql/**` |
 | 工程链路 | `scripts/**`、`.github/**`、`.qoder/rules/**`、`AGENTS.md` |
 | 业务判定 | 菜单/权限（`sys_menu`、`menuDataSource.ts`、`portalSystems.ts`）、数据字典枚举、金额/配额计算 |
