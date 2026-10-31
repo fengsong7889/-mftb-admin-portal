@@ -1040,6 +1040,10 @@
       "global-config"
      ]
     },
+    "SearchV2": {
+     "evidence": "naming",
+     "reason": "搜索运营系统重构 U1 工作空间（借用 global-config 入口，专属菜单待注册）"
+    },
     "SearchVerify": {
      "evidence": "menu-route",
      "menuKeys": [

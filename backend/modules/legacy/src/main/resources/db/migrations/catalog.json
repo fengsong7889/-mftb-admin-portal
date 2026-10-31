@@ -162,6 +162,15 @@
       "comment": "门店新增品类列 biz_store.category（编码字典 StoreCategory）：金字招牌「{品類}」文案取门店自身品类，如「全澳火鍋熱門店鋪」；品类为空时文案降级为不带品类。持迁移命名锁 + 后置校验，列未就绪不记版本、下次启动重试。参考 SQL: sql/301_store_category.sql"
     },
     {
+      "versionKey": "search:config-tables-v1.0",
+      "module": "search",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "searchConfigSchemaInitializer",
+      "status": "ACTIVE",
+      "comment": "搜索运营系统重构 · 配置管理域建表（方案 §11.1）：biz_search_guidance/lexicon/scenario/intervention/release 五表。CREATE TABLE IF NOT EXISTS 幂等 + applyOnce 后置校验（缺任一表不记版本、下次启动重试），持迁移命名锁串行化多副本 DDL，严禁吞异常。金额/乘数用 DECIMAL 禁 float。真实 ES 索引、投流交付账本属 B1/B3，依赖 D0 资料与另行授权，本批不建。参考 SQL: sql/319_search_config.sql"
+    },
+    {
       "versionKey": "seq:init-v1",
       "module": "seq",
       "phase": "MODULE_STRUCTURE",

@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react'
+import { lazy, Suspense, useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, Tabs, Form, Switch, InputNumber, Button, Table, Tag, Space, Alert, message, Select, Modal } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { SaveOutlined, EditOutlined, DeleteOutlined, PlusOutlined, QuestionCircleOutlined } from '@ant-design/icons'
@@ -80,7 +80,17 @@ const defaultChannelMixingPriority: ChannelMixingPriorityConfig = {
 }
 
 
+const SearchV2Prototype = lazy(() => import('../../SearchV2'))
+
+/** 原型借用现有路由与权限，不修改生产菜单；旧版仍可随时返回。 */
 export default function GlobalConfig() {
+  const [params] = useSearchParams()
+  return params.get('prototype') === 'search-v2'
+    ? <Suspense fallback={<div role="status">正在載入搜索原型…</div>}><SearchV2Prototype /></Suspense>
+    : <LegacyGlobalConfig />
+}
+
+function LegacyGlobalConfig() {
   const navigate = useNavigate()
   const { t } = useTranslation()
 
@@ -1082,6 +1092,9 @@ export default function GlobalConfig() {
 
   return (
     <div className="content-area">
+      <Alert type="info" showIcon style={{ marginBottom: 16 }} message="搜索運營新版原型已開放預覽"
+        description="九個功能模組與五類 APP 搜索場景，僅供界面確認，不修改線上配置。"
+        action={<Button onClick={() => navigate('/global-config?prototype=search-v2&pane=overview&view=list')}>查看新版原型</Button>} />
       {/* 頁面描述 */}
       <Card
         size="small"
