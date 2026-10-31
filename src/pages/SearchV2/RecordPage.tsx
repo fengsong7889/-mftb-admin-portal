@@ -8,7 +8,6 @@ import HelpPopover from '@/components/HelpPopover'
 import StatCards from '@/components/StatCards'
 import { useUnsavedGuard } from '@/contexts/UnsavedChangesContext'
 import { FIELD_SCHEMAS, KINDS, PANES, REGIONS, SEARCH_SCENES, STATUS, validateDraft, options, sceneChoices, type DraftValues, type PrototypeRecord, type RecordPane } from './prototypeData'
-import { WIRED_PANES } from './searchBridge'
 import { StatusTag } from './PrototypeTable'
 
 interface RecordFormValues { name: string; channel: string; region: string; kind: string; values: DraftValues }
@@ -80,7 +79,7 @@ export default function RecordPage({ pane, record, readOnly, onBack, onSave, onS
       }}>
       <section className="detail-card sv2__form-card"><h3><DatabaseOutlined /> {t('searchV2.form.sectionBase')}</h3>
         <div className="sv2__form-grid">
-          <Form.Item name="name" label={<>{t('searchV2.form.fieldName')}{WIRED_PANES.includes(pane) && <HelpPopover title={t('searchV2.form.nameHelpTitle')} ariaLabel={t('searchV2.form.nameHelpAria')} content={t('searchV2.form.nameHelpBody')} />}</>} rules={[{ required: true, whitespace: true, message: t('searchV2.form.nameRequired') }, { max: 60, message: t('searchV2.form.nameMax') }]}><Input maxLength={60} /></Form.Item>
+          <Form.Item name="name" label={t('searchV2.form.fieldName')} rules={[{ required: true, whitespace: true, message: t('searchV2.form.nameRequired') }, { max: 60, message: t('searchV2.form.nameMax') }]}><Input maxLength={60} /></Form.Item>
           <Form.Item name="kind" label={t('searchV2.form.fieldType')} rules={[{ required: true }]}><Select options={options(KINDS[pane])} /></Form.Item>
           <Form.Item name="channel" label={t('searchV2.form.fieldScene')} rules={[{ required: true }]}><Select options={sceneChoices(t)} /></Form.Item>
           <Form.Item name="region" label={t('searchV2.form.fieldRegion')} rules={[{ required: true }]}><Select options={options(REGIONS)} /></Form.Item>

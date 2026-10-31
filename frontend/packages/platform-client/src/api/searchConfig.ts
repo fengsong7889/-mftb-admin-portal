@@ -12,6 +12,8 @@ const SILENT = { headers: { [SILENT_HEADER]: '1' } }
 export interface SearchGuidanceItem {
   id?: number
   configNo?: string
+  /** 配置名称（方案 §11.1 定版的权威业务字段）：写入必填且 ≤60 字；DDL 可空，故存量行可能为 undefined */
+  configName?: string
   wordType: number
   displayText: string
   targetQuery: string
@@ -33,6 +35,8 @@ export interface SearchGuidanceItem {
 export interface SearchLexiconItem {
   id?: number
   entryNo?: string
+  /** 词条名称（权威业务字段）：写入必填且 ≤60 字；DDL 可空，故存量行可能为 undefined */
+  entryName?: string
   wordType: number
   sourceTerm: string
   targetTerm: string
@@ -49,6 +53,8 @@ export interface SearchLexiconItem {
 export interface SearchScenarioItem {
   id?: number
   scenarioNo?: string
+  /** 策略名称（权威业务字段）：写入必填且 ≤60 字；DDL 可空，故存量行可能为 undefined */
+  scenarioName?: string
   surface: number
   bizChannel?: number
   objectType?: number
@@ -67,6 +73,8 @@ export interface SearchScenarioItem {
 export interface SearchInterventionItem {
   id?: number
   ruleNo?: string
+  /** 干预规则名称（权威业务字段）：与 targetName（被干预对象名）语义不同；写入必填且 ≤60 字 */
+  ruleName?: string
   targetType: number
   targetId: string
   targetName?: string
@@ -90,6 +98,8 @@ export interface SearchInterventionItem {
 export interface SearchReleaseItem {
   id?: number
   versionNo: string
+  /** 版本名称（权威业务字段）：写入必填且 ≤60 字；DDL 可空，故存量行可能为 undefined */
+  releaseName?: string
   changeSummary: string
   snapshot?: string
   checksum?: string

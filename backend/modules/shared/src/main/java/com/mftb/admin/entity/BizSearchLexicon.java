@@ -19,6 +19,9 @@ public class BizSearchLexicon {
 
     private String entryNo;
 
+    /** 词条名称（人类可读标识，方案 §11.1 定版的权威业务字段；服务层强制必填且 ≤60 字） */
+    private String entryName;
+
     /** 类型: 1=业务词 2=实体别名 3=有向同义 4=纠错 5=禁限 */
     private Integer wordType;
 

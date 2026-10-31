@@ -82,6 +82,8 @@ public class BizSearchLexiconServiceImpl implements BizSearchLexiconService {
     }
 
     private void validate(BizSearchLexicon e) {
+        if (!StringUtils.hasText(e.getEntryName())) throw new BusinessException("词条名称不能为空");
+        if (e.getEntryName().trim().length() > 60) throw new BusinessException("词条名称最多 60 字");
         if (!StringUtils.hasText(e.getSourceTerm())) throw new BusinessException("原词/别名不能为空");
         if (!StringUtils.hasText(e.getTargetTerm())) throw new BusinessException("标准词/实体不能为空");
         if (e.getSourceTerm().length() > 64 || e.getTargetTerm().length() > 64) {

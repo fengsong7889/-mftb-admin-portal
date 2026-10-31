@@ -12,7 +12,7 @@ const api = vi.hoisted(() => ({
 vi.mock('@/api/searchConfig', () => api)
 
 import { advanceStatus, loadConfigPanes, saveConfigRecord, WIRED_PANES } from './searchBridge'
-import { SEARCH_SCENES, STATUS, type PrototypeRecord } from './prototypeData'
+import { SEARCH_SCENES, STATUS, type RecordPane, type PrototypeRecord } from './prototypeData'
 
 function rec(over: Partial<PrototypeRecord>): PrototypeRecord {
   return {
@@ -80,7 +80,38 @@ describe('searchBridge 保存映射 saveConfigRecord', () => {
     api.createGuidance.mockResolvedValue(9)
     const id = await saveConfigRecord(rec({ values: { text: '午餐', target: '午', priority: 1, source: '人工策劃', start: '2026-11-01', end: '2026-11-07' } }), 'guidance')
     expect(id).toBe('9')
-    expect(api.createGuidance).toHaveBeenCalledWith(expect.objectContaining({ wordType: 1, displayText: '午餐', targetQuery: '午', surface: 2, bizChannel: 1 }))
+    expect(api.createGuidance).toHaveBeenCalledWith(expect.objectContaining({ wordType: 1, configName: '午餐', displayText: '午餐', targetQuery: '午', surface: 2, bizChannel: 1 }))
+  })
+
+  /** 方案 §11.1 定版：表单「名稱」为权威业务字段，五个域均必须随载荷下发到后端，不得静默丢弃。 */
+  it('五个配置域保存时都把名称下发到各自的 *_name 字段', async () => {
+    const cases: [RecordPane, string, string][] = [
+      ['guidance', 'createGuidance', 'configName'],
+      ['lexicon', 'createLexicon', 'entryName'],
+      ['scenarios', 'createScenario', 'scenarioName'],
+      ['interventions', 'createIntervention', 'ruleName'],
+      ['releases', 'createRelease', 'releaseName'],
+    ]
+    for (const [pane, method, key] of cases) {
+      vi.clearAllMocks()
+      const spy = api[method as keyof typeof api] as ReturnType<typeof vi.fn>
+      spy.mockResolvedValue(1)
+      await saveConfigRecord(rec({ pane, name: '人類可讀名稱', values: pane === 'releases' ? { version: 'V9', changes: 'x', rollback: 'V8' } : {} }), pane)
+      expect(spy).toHaveBeenCalledWith(expect.objectContaining({ [key]: '人類可讀名稱' }))
+    }
+  })
+
+  /** 存量行名称列为 NULL（补列前写入）：读取必须回退到业务字段组合，不得显示空白。 */
+  it('后端行有名称那么用名称，无名称那么回退为业务字段组合', async () => {
+    api.fetchLexicon.mockResolvedValue([
+      { id: 11, entryName: '英文同義詞對', wordType: 3, sourceTerm: 'burger', targetTerm: '漢堡', status: 1 },
+      { id: 12, wordType: 3, sourceTerm: '奶茶', targetTerm: '鮮奶茶', status: 1 },
+    ])
+    const { records } = await loadConfigPanes()
+    const named = records.find(r => r.id === '11')
+    const legacy = records.find(r => r.id === '12')
+    expect(named?.name).toBe('英文同義詞對')
+    expect(legacy?.name).toBe('奶茶 → 鮮奶茶')
   })
 
   it('更新（数字 id）走 update，不重复 create', async () => {
@@ -101,6 +132,6 @@ describe('searchBridge 保存映射 saveConfigRecord', () => {
     api.createRelease.mockResolvedValue(4)
     const id = await saveConfigRecord(rec({ pane: 'releases', name: 'V1', values: { version: 'DEMO-1.0', changes: '基準', rollback: 'DEMO-0.9' } }), 'releases')
     expect(id).toBe('4')
-    expect(api.createRelease).toHaveBeenCalledWith({ versionNo: 'DEMO-1.0', changeSummary: '基準', rollbackVersion: 'DEMO-0.9' })
+    expect(api.createRelease).toHaveBeenCalledWith({ versionNo: 'DEMO-1.0', releaseName: 'V1', changeSummary: '基準', rollbackVersion: 'DEMO-0.9' })
   })
 })

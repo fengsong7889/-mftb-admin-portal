@@ -35,6 +35,8 @@ public class BizSearchReleaseServiceImpl implements BizSearchReleaseService {
 
     @Override
     public long createDraft(BizSearchRelease release) {
+        if (!StringUtils.hasText(release.getReleaseName())) throw new BusinessException("版本名称不能为空");
+        if (release.getReleaseName().trim().length() > 60) throw new BusinessException("版本名称最多 60 字");
         if (!StringUtils.hasText(release.getVersionNo())) throw new BusinessException("版本号不能为空");
         if (!StringUtils.hasText(release.getChangeSummary())) throw new BusinessException("变更摘要不能为空");
         if (!StringUtils.hasText(release.getRollbackVersion())) throw new BusinessException("兼容回退版本不能为空");

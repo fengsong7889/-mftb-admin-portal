@@ -30,6 +30,26 @@ public class SearchConfigSchemaInitializer implements CommandLineRunner {
     /** 版本键：结构变更递增 major，增量补列/种子递增 minor。 */
     static final String VERSION_KEY = "search:config-tables-v1.0";
 
+    /**
+     * 增量版本：为五个配置域补「名称」权威字段（方案 §11.1 定版，参考 sql/320_search_config_name.sql）。
+     * 干预域的 target_name 是「被干预对象名」，与表单的规则名稱语义不同，故另补 rule_name。
+     */
+    static final String NAME_VERSION_KEY = "search:config-name-v1.1";
+
+    /** 需补名称列的表及其列名与 DDL；与 CREATE_STATEMENTS 中的 {@code *_no} 命名成套。 */
+    static final String[][] NAME_COLUMNS = {
+            {"biz_search_guidance", "config_name",
+                    "ALTER TABLE biz_search_guidance ADD COLUMN config_name VARCHAR(60) DEFAULT NULL COMMENT '配置名称(人类可读标识,服务层强制必填)'"},
+            {"biz_search_lexicon", "entry_name",
+                    "ALTER TABLE biz_search_lexicon ADD COLUMN entry_name VARCHAR(60) DEFAULT NULL COMMENT '词条名称(人类可读标识,服务层强制必填)'"},
+            {"biz_search_scenario", "scenario_name",
+                    "ALTER TABLE biz_search_scenario ADD COLUMN scenario_name VARCHAR(60) DEFAULT NULL COMMENT '策略名称(人类可读标识,服务层强制必填)'"},
+            {"biz_search_intervention", "rule_name",
+                    "ALTER TABLE biz_search_intervention ADD COLUMN rule_name VARCHAR(60) DEFAULT NULL COMMENT '干预规则名称(人类可读标识,与target_name语义不同)'"},
+            {"biz_search_release", "release_name",
+                    "ALTER TABLE biz_search_release ADD COLUMN release_name VARCHAR(60) DEFAULT NULL COMMENT '版本名称(人类可读标识,服务层强制必填)'"},
+    };
+
     /** 配置管理域全部表；后置校验逐一确认存在，缺任一即视为未就绪。 */
     static final String[] TABLES = {
             "biz_search_guidance", "biz_search_lexicon", "biz_search_scenario",
@@ -44,8 +64,39 @@ public class SearchConfigSchemaInitializer implements CommandLineRunner {
 
     public void migrate() {
         String schema = jdbcTemplate.queryForObject("SELECT DATABASE()", String.class);
-        migrationLock.runExclusive("mftb:schema:" + schema, 120, () ->
-                versionTracker.applyOnce(VERSION_KEY, this::createTables, this::verifyTables));
+        migrationLock.runExclusive("mftb:schema:" + schema, 120, () -> {
+            versionTracker.applyOnce(VERSION_KEY, this::createTables, this::verifyTables);
+            // 建表 DDL 不含名称列，因此存量库与新建库统一经由本增量获得名称列。
+            versionTracker.applyOnce(NAME_VERSION_KEY, this::addNameColumns, this::verifyNameColumns);
+        });
+    }
+
+    /** 幂等补列：先查 INFORMATION_SCHEMA（MySQL 不支持 ADD COLUMN IF NOT EXISTS），缺列才 ALTER；失败上抛不吞异常。 */
+    private void addNameColumns() {
+        log.info("开始为搜索配置域补「名称」权威字段");
+        for (String[] column : NAME_COLUMNS) {
+            if (columnExists(column[0], column[1])) {
+                log.info("搜索配置列已存在，跳过: {}.{}", column[0], column[1]);
+                continue;
+            }
+            jdbcTemplate.execute(column[2]);
+        }
+    }
+
+    private void verifyNameColumns() {
+        for (String[] column : NAME_COLUMNS) {
+            if (!columnExists(column[0], column[1])) {
+                throw new IllegalStateException("搜索配置名称列未就绪: " + column[0] + "." + column[1]);
+            }
+        }
+        log.info("搜索配置域名称列就绪: {} 列", NAME_COLUMNS.length);
+    }
+
+    private boolean columnExists(String table, String column) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?",
+                Integer.class, table, column);
+        return count != null && count > 0;
     }
 
     private void createTables() {

@@ -81,6 +81,8 @@ public class BizSearchScenarioServiceImpl implements BizSearchScenarioService {
     }
 
     private void validate(BizSearchScenario s) {
+        if (!StringUtils.hasText(s.getScenarioName())) throw new BusinessException("策略名称不能为空");
+        if (s.getScenarioName().trim().length() > 60) throw new BusinessException("策略名称最多 60 字");
         if (s.getSurface() == null || !SURFACES.contains(s.getSurface())) throw new BusinessException("非法的场景");
         if (s.getBizChannel() != null && !BIZ_CHANNELS.contains(s.getBizChannel())) throw new BusinessException("非法的业务频道");
         if (s.getObjectType() != null && !OBJECT_TYPES.contains(s.getObjectType())) throw new BusinessException("非法的对象类型");

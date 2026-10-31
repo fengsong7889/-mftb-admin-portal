@@ -59,7 +59,7 @@ function daysBetween(start?: string, end?: string): number {
 // ── guidance ──
 function guidanceToRecord(item: SearchGuidanceItem): PrototypeRecord {
   return {
-    id: String(item.id), pane: 'guidance', name: item.displayText,
+    id: String(item.id), pane: 'guidance', name: item.configName ?? item.displayText,
     channel: channelFrom(item.surface, item.bizChannel), region: regionOf(item.regionCode),
     kind: GUID_TYPE_L[item.wordType] ?? '底紋詞',
     status: APPROVAL_LABEL[item.approvalStatus ?? 1] ?? STATUS.DRAFT,
@@ -70,7 +70,7 @@ function guidanceToRecord(item: SearchGuidanceItem): PrototypeRecord {
 function recordToGuidance(r: PrototypeRecord): SearchGuidanceItem {
   const v = r.values
   return {
-    wordType: GUID_TYPE[r.kind] ?? 1, displayText: String(v.text ?? r.name), targetQuery: String(v.target ?? v.text ?? r.name),
+    wordType: GUID_TYPE[r.kind] ?? 1, configName: r.name, displayText: String(v.text ?? r.name), targetQuery: String(v.target ?? v.text ?? r.name),
     brand: 'flashBee', surface: surfaceFrom(r.channel), bizChannel: bizFrom(r.channel), regionCode: REGION_CODE[r.region],
     priority: v.priority != null ? Number(v.priority) : 1, source: typeof v.source === 'string' ? SOURCE_CODE[v.source] : 1,
     startDate: v.start ? String(v.start) : undefined, endDate: v.end ? String(v.end) : undefined,
@@ -81,7 +81,7 @@ function recordToGuidance(r: PrototypeRecord): SearchGuidanceItem {
 // ── lexicon ──
 function lexiconToRecord(item: SearchLexiconItem): PrototypeRecord {
   return {
-    id: String(item.id), pane: 'lexicon', name: `${item.sourceTerm} → ${item.targetTerm}`,
+    id: String(item.id), pane: 'lexicon', name: item.entryName ?? `${item.sourceTerm} → ${item.targetTerm}`,
     channel: SEARCH_SCENES.ALL, region: '全城', kind: LEX_TYPE_L[item.wordType] ?? '業務詞',
     status: item.status === 2 ? STATUS.PAUSED : STATUS.LIVE,
     values: { source: item.sourceTerm, target: item.targetTerm, category: item.categoryId, evidence: item.evidence },
@@ -91,7 +91,7 @@ function lexiconToRecord(item: SearchLexiconItem): PrototypeRecord {
 function recordToLexicon(r: PrototypeRecord): SearchLexiconItem {
   const v = r.values
   return {
-    wordType: LEX_TYPE[r.kind] ?? 1, sourceTerm: String(v.source ?? ''), targetTerm: String(v.target ?? ''),
+    wordType: LEX_TYPE[r.kind] ?? 1, entryName: r.name, sourceTerm: String(v.source ?? ''), targetTerm: String(v.target ?? ''),
     categoryId: v.category ? String(v.category) : undefined, brand: 'flashBee', evidence: v.evidence ? String(v.evidence) : '人工審核樣例', status: 1,
   }
 }
@@ -99,7 +99,7 @@ function recordToLexicon(r: PrototypeRecord): SearchLexiconItem {
 // ── scenario ─
 function scenarioToRecord(item: SearchScenarioItem): PrototypeRecord {
   return {
-    id: String(item.id), pane: 'scenarios', name: `${SCENE_LABEL[channelFrom(item.surface, item.bizChannel)]}基準策略`,
+    id: String(item.id), pane: 'scenarios', name: item.scenarioName ?? `${SCENE_LABEL[channelFrom(item.surface, item.bizChannel)]}基準策略`,
     channel: channelFrom(item.surface, item.bizChannel), region: '全城', kind: '場景策略',
     status: item.status === 2 ? STATUS.PAUSED : STATUS.LIVE,
     values: { relevance: item.weightRelevance, quality: item.weightQuality, distance: item.weightDistance, heat: item.weightHeat, window: item.candidateWindow, ads: item.adLimitPerPage },
@@ -109,6 +109,7 @@ function scenarioToRecord(item: SearchScenarioItem): PrototypeRecord {
 function recordToScenario(r: PrototypeRecord): SearchScenarioItem {
   const v = r.values
   return {
+    scenarioName: r.name,
     surface: surfaceFrom(r.channel), bizChannel: bizFrom(r.channel),
     weightRelevance: Number(v.relevance ?? 65), weightQuality: Number(v.quality ?? 15), weightDistance: Number(v.distance ?? 15), weightHeat: Number(v.heat ?? 5),
     candidateWindow: v.window != null ? Number(v.window) : 200, adLimitPerPage: Number(v.ads ?? 0), status: 1,
@@ -118,7 +119,7 @@ function recordToScenario(r: PrototypeRecord): SearchScenarioItem {
 // ── intervention ──
 function interventionToRecord(item: SearchInterventionItem): PrototypeRecord {
   return {
-    id: String(item.id), pane: 'interventions', name: `${item.targetName ?? item.targetId} · ${ACTION_TYPE_L[item.actionType] ?? ''}`,
+    id: String(item.id), pane: 'interventions', name: item.ruleName ?? `${item.targetName ?? item.targetId} · ${ACTION_TYPE_L[item.actionType] ?? ''}`,
     channel: channelFrom(item.surface ?? 2, item.bizChannel), region: regionOf(item.regionCode), kind: ACTION_TYPE_L[item.actionType] ?? '泛詞降權',
     status: APPROVAL_LABEL[item.approvalStatus ?? 1] ?? STATUS.DRAFT,
     values: { merchant: item.targetName ?? item.targetId, terms: item.scopeTerms, factor: item.multiplier, days: daysBetween(item.startDate, item.endDate), reason: item.reason },
@@ -131,7 +132,9 @@ function recordToIntervention(r: PrototypeRecord): SearchInterventionItem {
   const noMultiplier = action === 2 || action === 4
   const days = v.days != null ? Number(v.days) : 7
   return {
-    targetType: 1, targetId: String(v.merchant ?? r.name), targetName: String(v.merchant ?? r.name),
+    ruleName: r.name,
+    // targetName 取“被干预对象名”，与上方 ruleName（规则名稱）语义不同；targetId 应存实体 ID 而暂仍取名称（已登记缺陷）
+    targetType: 1, targetId: String(v.merchant ?? r.name), targetName: String(v.merchant ?? ''),
     actionType: action, scopeTerms: v.terms ? String(v.terms) : undefined, multiplier: noMultiplier ? 1 : Number(v.factor ?? 1),
     reason: String(v.reason ?? '流量治理'), startDate: TODAY(), endDate: todayPlus(days), approvalStatus: APPROVAL_CODE[r.status] ?? 1, status: 1,
   }
@@ -140,7 +143,7 @@ function recordToIntervention(r: PrototypeRecord): SearchInterventionItem {
 // ── release ──
 function releaseToRecord(item: SearchReleaseItem): PrototypeRecord {
   return {
-    id: String(item.id), pane: 'releases', name: item.versionNo, channel: SEARCH_SCENES.ALL, region: '全城', kind: '配置版本',
+    id: String(item.id), pane: 'releases', name: item.releaseName ?? item.versionNo, channel: SEARCH_SCENES.ALL, region: '全城', kind: '配置版本',
     status: REL_STATUS_L[item.status ?? 0] ?? STATUS.DRAFT,
     values: { version: item.versionNo, changes: item.changeSummary, rollback: item.rollbackVersion },
     updatedAt: item.updatedAt ? `後端 · ${item.updatedAt}` : '後端真值',
@@ -148,7 +151,7 @@ function releaseToRecord(item: SearchReleaseItem): PrototypeRecord {
 }
 function recordToRelease(r: PrototypeRecord): SearchReleaseItem {
   const v = r.values
-  return { versionNo: String(v.version ?? r.name), changeSummary: String(v.changes ?? ''), rollbackVersion: String(v.rollback ?? '') }
+  return { versionNo: String(v.version ?? r.name), releaseName: r.name, changeSummary: String(v.changes ?? ''), rollbackVersion: String(v.rollback ?? '') }
 }
 
 const TO_RECORD: Record<string, (raw: never) => PrototypeRecord> = {

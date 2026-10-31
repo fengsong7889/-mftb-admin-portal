@@ -18,6 +18,9 @@ public class BizSearchRelease {
 
     private String versionNo;
 
+    /** 版本名称（人类可读标识，方案 §11.1 定版的权威业务字段；服务层强制必填且 ≤60 字） */
+    private String releaseName;
+
     private String changeSummary;
 
     /** 发布快照(JSON) */

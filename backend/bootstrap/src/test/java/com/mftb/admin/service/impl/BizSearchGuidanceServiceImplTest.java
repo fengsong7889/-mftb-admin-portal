@@ -43,7 +43,7 @@ class BizSearchGuidanceServiceImplTest {
         try (var statement = session.getConnection().createStatement()) {
             statement.execute("""
                     CREATE TABLE biz_search_guidance (
-                        id BIGINT PRIMARY KEY, config_no VARCHAR(32), word_type INT, display_text VARCHAR(64),
+                        id BIGINT PRIMARY KEY, config_no VARCHAR(32), config_name VARCHAR(60), word_type INT, display_text VARCHAR(64),
                         target_query VARCHAR(64), brand VARCHAR(32), surface INT, biz_channel INT,
                         region_code VARCHAR(32), priority INT, source INT, start_date DATE, end_date DATE,
                         approval_status INT, status INT, remark VARCHAR(255), created_by VARCHAR(64),
@@ -62,6 +62,7 @@ class BizSearchGuidanceServiceImplTest {
 
     private BizSearchGuidance valid() {
         BizSearchGuidance g = new BizSearchGuidance();
+        g.setConfigName("午餐底紋詞示例");
         g.setWordType(1);
         g.setDisplayText("午餐想吃什麼");
         g.setTargetQuery("午餐");

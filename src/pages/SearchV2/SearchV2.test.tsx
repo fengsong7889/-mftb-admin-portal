@@ -71,14 +71,6 @@ describe('搜索 U1 原型交互', () => {
     expect(screen.getByLabelText('searchV2.form.fieldName')).toHaveValue('測試同義詞草稿')
     expect(mocks.request).not.toHaveBeenCalled()
   })
-  it('已接后端的配置域必须明示「名稱不落庫」口径，未接后端的 ads 域不提示', async () => {
-    mount('lexicon', 'add')
-    expect(await screen.findByLabelText('searchV2.form.nameHelpAria')).toBeInTheDocument()
-    cleanup()
-    mount('ads', 'add')
-    await waitFor(() => expect(screen.getByLabelText('searchV2.form.fieldName')).toBeInTheDocument())
-    expect(screen.queryByLabelText('searchV2.form.nameHelpAria')).not.toBeInTheDocument()
-  })
   it('未保存改动切导航，取消保留输入，放弃才离开', async () => {
     const router = mount('lexicon', 'edit', 'DEMO-L01')
     fireEvent.change(screen.getByLabelText('searchV2.form.fieldName'), { target: { value: '尚未保存' } })

@@ -89,6 +89,8 @@ public class BizSearchInterventionServiceImpl implements BizSearchInterventionSe
     }
 
     private void validate(BizSearchIntervention r) {
+        if (!StringUtils.hasText(r.getRuleName())) throw new BusinessException("干预规则名称不能为空");
+        if (r.getRuleName().trim().length() > 60) throw new BusinessException("干预规则名称最多 60 字");
         if (r.getTargetType() == null || !TARGET_TYPES.contains(r.getTargetType())) throw new BusinessException("非法的目标类型");
         if (!StringUtils.hasText(r.getTargetId())) throw new BusinessException("目标集团/门店不能为空");
         if (r.getActionType() == null || !ACTION_TYPES.contains(r.getActionType())) throw new BusinessException("非法的干预动作");

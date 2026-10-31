@@ -93,6 +93,8 @@ public class BizSearchGuidanceServiceImpl implements BizSearchGuidanceService {
 
     /** 后端安全校验：必填、长度、枚举、范围、日期区间。 */
     private void validate(BizSearchGuidance g) {
+        if (!StringUtils.hasText(g.getConfigName())) throw new BusinessException("配置名称不能为空");
+        if (g.getConfigName().trim().length() > 60) throw new BusinessException("配置名称最多 60 字");
         if (!StringUtils.hasText(g.getDisplayText())) throw new BusinessException("展示词不能为空");
         if (g.getDisplayText().length() > 64) throw new BusinessException("展示词最多 64 字");
         if (!StringUtils.hasText(g.getTargetQuery())) throw new BusinessException("提交搜索词不能为空");

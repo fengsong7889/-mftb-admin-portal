@@ -16058,10 +16058,7 @@
       "updatedBy": "Last updated by: prototype sample",
       "updatedPrefix": "Last updated: ",
       "nameRequired": "Please enter a name",
-      "nameMax": "Name is at most 60 characters",
-      "nameHelpTitle": "Will the name be persisted",
-      "nameHelpAria": "Name persistence note",
-      "nameHelpBody": "This domain is backed by the real config tables, where identity is the entry number plus the business fields (e.g. source term to standard term for the lexicon, the version number for a release). The name typed here only labels the list and detail within this session; it is not written to the backend, and after saving the row is shown as a composition of the business fields. Making the name a real business field requires settling the contract first and adding a migration."
+      "nameMax": "Name is at most 60 characters"
     },
     "overview": {
       "colSample": "Sample",

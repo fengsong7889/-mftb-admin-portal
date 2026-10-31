@@ -38,7 +38,7 @@ class BizSearchReleaseServiceImplTest {
         try (var st = session.getConnection().createStatement()) {
             st.execute("""
                     CREATE TABLE biz_search_release (
-                        id BIGINT PRIMARY KEY, version_no VARCHAR(32), change_summary VARCHAR(500), snapshot VARCHAR(2000),
+                        id BIGINT PRIMARY KEY, version_no VARCHAR(32), release_name VARCHAR(60), change_summary VARCHAR(500), snapshot VARCHAR(2000),
                         checksum VARCHAR(64), status INT, rollback_version VARCHAR(32), approver VARCHAR(64),
                         approve_time TIMESTAMP, published_at TIMESTAMP,
                         created_by VARCHAR(64), updated_by VARCHAR(64), created_at TIMESTAMP, updated_at TIMESTAMP, deleted INT DEFAULT 0)
@@ -56,6 +56,7 @@ class BizSearchReleaseServiceImplTest {
 
     private BizSearchRelease release(String version) {
         BizSearchRelease r = new BizSearchRelease();
+        r.setReleaseName(version + " 基準發佈");
         r.setVersionNo(version);
         r.setChangeSummary("外賣相關性基準");
         r.setRollbackVersion("DEMO-0.9");

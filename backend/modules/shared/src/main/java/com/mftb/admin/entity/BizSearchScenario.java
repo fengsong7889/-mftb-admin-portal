@@ -19,6 +19,9 @@ public class BizSearchScenario {
 
     private String scenarioNo;
 
+    /** 策略名称（人类可读标识，方案 §11.1 定版的权威业务字段；服务层强制必填且 ≤60 字） */
+    private String scenarioName;
+
     /** 场景: 1=首页 2=频道 3=店内 */
     private Integer surface;
 

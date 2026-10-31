@@ -21,6 +21,9 @@ public class BizSearchGuidance {
     /** 配置编号（BizSeqService 取号， interim 由服务层生成） */
     private String configNo;
 
+    /** 配置名称（人类可读标识，方案 §11.1 定版的权威业务字段；服务层强制必填且 ≤60 字） */
+    private String configName;
+
     /** 类型: 1=底纹词 2=自然热搜 3=推广搜索 4=候选热词 */
     private Integer wordType;
 

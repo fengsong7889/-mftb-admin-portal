@@ -38,7 +38,7 @@ class BizSearchLexiconServiceImplTest {
         try (var st = session.getConnection().createStatement()) {
             st.execute("""
                     CREATE TABLE biz_search_lexicon (
-                        id BIGINT PRIMARY KEY, entry_no VARCHAR(32), word_type INT, source_term VARCHAR(64), target_term VARCHAR(64),
+                        id BIGINT PRIMARY KEY, entry_no VARCHAR(32), entry_name VARCHAR(60), word_type INT, source_term VARCHAR(64), target_term VARCHAR(64),
                         entity_id BIGINT, entity_type INT, category_id VARCHAR(32), brand VARCHAR(32), evidence VARCHAR(255), status INT,
                         created_by VARCHAR(64), updated_by VARCHAR(64), created_at TIMESTAMP, updated_at TIMESTAMP, deleted INT DEFAULT 0)
                     """);
@@ -55,6 +55,7 @@ class BizSearchLexiconServiceImplTest {
 
     private BizSearchLexicon entry(int type, String src, String tgt) {
         BizSearchLexicon e = new BizSearchLexicon();
+        e.setEntryName("詞條 " + src);
         e.setWordType(type);
         e.setSourceTerm(src);
         e.setTargetTerm(tgt);
@@ -65,6 +66,14 @@ class BizSearchLexiconServiceImplTest {
     @Test
     void validSynonymPersists() {
         assertTrue(service.create(entry(3, "burger", "漢堡")) > 0);
+    }
+
+    /** 名称为方案 §11.1 定版的权威业务字段：缺失必须拒绝，不得静默丢弃前端输入。 */
+    @Test
+    void rejectsMissingEntryName() {
+        BizSearchLexicon e = entry(3, "burger", "漢堡");
+        e.setEntryName("  ");
+        assertThrows(BusinessException.class, () -> service.create(e));
     }
 
     @Test

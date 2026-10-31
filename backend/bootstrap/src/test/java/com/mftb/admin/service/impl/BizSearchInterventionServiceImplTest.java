@@ -40,7 +40,7 @@ class BizSearchInterventionServiceImplTest {
         try (var st = session.getConnection().createStatement()) {
             st.execute("""
                     CREATE TABLE biz_search_intervention (
-                        id BIGINT PRIMARY KEY, rule_no VARCHAR(32), target_type INT, target_id VARCHAR(64), target_name VARCHAR(128),
+                        id BIGINT PRIMARY KEY, rule_no VARCHAR(32), rule_name VARCHAR(60), target_type INT, target_id VARCHAR(64), target_name VARCHAR(128),
                         action_type INT, scope_terms VARCHAR(255), exact_terms VARCHAR(255), multiplier DECIMAL(5,2),
                         region_code VARCHAR(32), surface INT, biz_channel INT, reason VARCHAR(255), start_date DATE, end_date DATE,
                         approval_status INT, approver VARCHAR(64), status INT,
@@ -59,6 +59,7 @@ class BizSearchInterventionServiceImplTest {
 
     private BizSearchIntervention rule(int action, BigDecimal multiplier, int days) {
         BizSearchIntervention r = new BizSearchIntervention();
+        r.setRuleName("示例干预规则");
         r.setTargetType(1);
         r.setTargetId("M10001");
         r.setActionType(action);

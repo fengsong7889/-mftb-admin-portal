@@ -38,7 +38,7 @@ class BizSearchScenarioServiceImplTest {
         try (var st = session.getConnection().createStatement()) {
             st.execute("""
                     CREATE TABLE biz_search_scenario (
-                        id BIGINT PRIMARY KEY, scenario_no VARCHAR(32), surface INT, biz_channel INT, object_type INT,
+                        id BIGINT PRIMARY KEY, scenario_no VARCHAR(32), scenario_name VARCHAR(60), surface INT, biz_channel INT, object_type INT,
                         weight_relevance INT, weight_quality INT, weight_distance INT, weight_heat INT,
                         candidate_window INT, ad_limit_per_page INT, filter_rule VARCHAR(255), status INT,
                         created_by VARCHAR(64), updated_by VARCHAR(64), created_at TIMESTAMP, updated_at TIMESTAMP, deleted INT DEFAULT 0)
@@ -56,6 +56,7 @@ class BizSearchScenarioServiceImplTest {
 
     private BizSearchScenario base(int surface, int r, int q, int d, int h, int ad) {
         BizSearchScenario s = new BizSearchScenario();
+        s.setScenarioName("場景基準策略");
         s.setSurface(surface);
         s.setWeightRelevance(r);
         s.setWeightQuality(q);

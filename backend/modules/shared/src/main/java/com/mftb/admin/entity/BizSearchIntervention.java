@@ -21,6 +21,9 @@ public class BizSearchIntervention {
 
     private String ruleNo;
 
+    /** 干预规则名称（人类可读标识，方案 §11.1 定版的权威业务字段）：与 {@code targetName}（被干预对象名）语义不同 */
+    private String ruleName;
+
     /** 1=集团 2=门店 */
     private Integer targetType;
 
