@@ -5,7 +5,7 @@
 
 ## 项目概述
 
-闪蜂推广管理后台（admin-portal）— 基于 React 18 + Vite 6 + Ant Design 5 的管理后台系统。
+MFTB 企业一体化管理平台软件（admin-portal）— 基于 React 18 + Vite 6 + Ant Design 5 的多系统企业管理平台。
 
 > ⚠️ **权属声明**：本仓库为**自然人个人作品，专有许可，保留所有权利**（著作权人：笔名 `fengsong7889`，
 > 与 GitHub 账号同名；无公司主体，见根目录 `LICENSE` 第十条）。源代码公开仅供
