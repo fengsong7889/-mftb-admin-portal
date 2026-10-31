@@ -162,6 +162,29 @@
       "comment": "门店新增品类列 biz_store.category（编码字典 StoreCategory）：金字招牌「{品類}」文案取门店自身品类，如「全澳火鍋熱門店鋪」；品类为空时文案降级为不带品类。持迁移命名锁 + 后置校验，列未就绪不记版本、下次启动重试。参考 SQL: sql/301_store_category.sql"
     },
     {
+      "versionKey": "search:config-tables-v1.0",
+      "module": "search",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "searchConfigSchemaInitializer",
+      "status": "ACTIVE",
+      "comment": "搜索运营系统重构 · 配置管理域建表（方案 §11.1）：biz_search_guidance/lexicon/scenario/intervention/release 五表。CREATE TABLE IF NOT EXISTS 幂等 + applyOnce 后置校验（缺任一表不记版本、下次启动重试），持迁移命名锁串行化多副本 DDL，严禁吞异常。金额/乘数用 DECIMAL 禁 float。真实 ES 索引、投流交付账本属 B1/B3，依赖 D0 资料与另行授权，本批不建。参考 SQL: sql/319_search_config.sql"
+    },
+    {
+      "versionKey": "search:config-name-v1.1",
+      "module": "search",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "searchConfigSchemaInitializer",
+      "dependencies": [
+        "search:config-tables-v1.0"
+      ],
+      "status": "ACTIVE",
+      "intent": "搜索配置域补「名称」权威字段：biz_search_guidance.config_name / lexicon.entry_name / scenario.scenario_name / release.release_name",
+      "author": "Qoder",
+      "comment": "方案 §11.1 定版：319 建表按『身份=编号+业务字段』设计未含名称列，实测前端可填『名稱』但后端不消费导致输入静默丢失。列可为 NULL（存量行无法回溯名称），由服务层新增/更新时强制非空且 ≤60 字。干预域已有 target_name 承担同名职责，不重复加列。先查 INFORMATION_SCHEMA.COLUMNS 再 ALTER（MySQL 无 ADD COLUMN IF NOT EXISTS），applyOnce 后置校验四列齐备，失败上抛不吞异常。参考 SQL: sql/320_search_config_name.sql"
+    },
+    {
       "versionKey": "seq:init-v1",
       "module": "seq",
       "phase": "MODULE_STRUCTURE",
@@ -2978,8 +3001,12 @@
       "executionType": "JAVA",
       "executor": "meetingMinutesSchemaMigrationInitializer",
       "status": "ACTIVE",
-      "dependencies": ["meeting:minutes-publication:v2.0"],
-      "scriptFiles": ["318_meeting_minutes_ai.sql"],
+      "dependencies": [
+        "meeting:minutes-publication:v2.0"
+      ],
+      "scriptFiles": [
+        "318_meeting_minutes_ai.sql"
+      ],
       "intent": "个人原始笔记自动保存与AI提取恢复、幂等、并发和计量审计，不改正式纪要",
       "author": "Qoder",
       "ticket": "meeting-minutes-ai",
@@ -2992,8 +3019,12 @@
       "executionType": "JAVA",
       "executor": "aiSceneConfigSchemaInitializer",
       "status": "ACTIVE",
-      "dependencies": ["ai:governance:v1.0"],
-      "scriptFiles": ["319_ai_scene_config.sql"],
+      "dependencies": [
+        "ai:governance:v1.0"
+      ],
+      "scriptFiles": [
+        "319_ai_scene_config.sql"
+      ],
       "intent": "业务 AI 场景开关表（试点 meeting_minutes）：把会议 AI 的日常启停从启动配置迁为可持久化、可即时启停且带乐观锁与严格审计的治理面；默认关闭",
       "author": "Qoder",
       "ticket": "meeting-ai-scene-pilot",
@@ -3006,7 +3037,9 @@
       "executionType": "JAVA",
       "executor": "aiSceneConfigSchemaInitializer",
       "status": "ACTIVE",
-      "dependencies": ["meeting:minutes:v1.1"],
+      "dependencies": [
+        "meeting:minutes:v1.1"
+      ],
       "intent": "给 meeting-my/meeting-booking/meeting-record 的 sys_menu.actions 追加 ai_minutes 动作，让授权中心能勾选会议 AI 整理",
       "author": "Qoder",
       "ticket": "meeting-ai-scene-pilot",

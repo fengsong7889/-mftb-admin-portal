@@ -1,0 +1,100 @@
+import { describe, expect, it } from 'vitest'
+import { MENU_ICON_NAMES } from '@/components/MenuIcon'
+import { CHANNELS, createSampleRecords, FIELD_SCHEMAS, isPane, KIND_LABEL_KEY, KINDS, PANES, prototypeUrl, SCENE_LABEL_KEY, SCENES, SEARCH_SCENES, STATUS, STATUS_LABEL_KEY, validateDraft, type RecordPane } from './prototypeData'
+import { getPreviewCards, PREVIEW_CARDS, type PreviewContext } from './previewFixtures'
+
+const context: PreviewContext = { scene: 'delivery', region: '澳門', query: '漢堡', sort: 'relevance', showAds: true }
+describe('搜索 U1 样本与原型边界', () => {
+  it('搜索场景为系统级枚举：值存 code，显示走 i18n key，不直出中文字面量', () => {
+    expect(CHANNELS).toEqual(['all', 'home', 'delivery', 'market', 'groupbuy', 'store'])
+    expect(CHANNELS).not.toContain('美食外賣')
+    expect(SCENE_LABEL_KEY(SEARCH_SCENES.DELIVERY)).toBe('searchV2.enum.scene.delivery')
+    // 五个真实场景均只携带 descriptionKey，不得残留 label/description 中文常量
+    expect(SCENES.every(s => !('label' in s) && !('description' in s) && s.descriptionKey.startsWith('searchV2.enum.scene.'))).toBe(true)
+    // 示例记录的作用域也必须存 code
+    createSampleRecords().forEach(r => expect(CHANNELS).toContain(r.channel))
+  })
+  it('流程状态为系统级枚举：存 code，显示走 i18n key；示例记录状态均合法', () => {
+    expect(Object.values(STATUS)).toEqual(['draft', 'review', 'approved', 'scheduled', 'live', 'paused'])
+    expect(STATUS.LIVE).not.toBe('生效示意')
+    expect(STATUS_LABEL_KEY(STATUS.APPROVED)).toBe('searchV2.enum.status.approved')
+    const codes = Object.values(STATUS)
+    createSampleRecords().forEach(r => expect(codes).toContain(r.status))
+  })
+  it('配置类型为系统级枚举：各域存 code，label 走 i18n key；示例记录 kind 必属本域枚举', () => {
+    expect(KINDS.guidance).toEqual(['placeholder', 'hotNatural', 'promoted', 'candidate'])
+    expect(KINDS.interventions).toEqual(['demote', 'exactAdmit', 'boost', 'spread'])
+    expect(KIND_LABEL_KEY('trafficPackage')).toBe('searchV2.enum.kind.trafficPackage')
+    // code 全局唯一，避免跳域比较时同形
+    const all = Object.values(KINDS).flat()
+    expect(new Set(all).size).toBe(all.length)
+    createSampleRecords().forEach(r => expect(KINDS[r.pane]).toContain(r.kind))
+  })
+  it('九个导航图标唯一且已注册，不增加真实菜单', () => {
+    expect(PANES).toHaveLength(9)
+    expect(new Set(PANES.map(p => p.icon)).size).toBe(9)
+    PANES.forEach(p => expect(MENU_ICON_NAMES).toContain(p.icon))
+    expect(isPane('__proto__')).toBe(false)
+    expect(prototypeUrl('lexicon', 'edit', 'DEMO-A&B')).toBe('/global-config?prototype=search-v2&pane=lexicon&view=edit&id=DEMO-A%26B')
+  })
+  it('每个配置模块有独立字段，工厂不共享样本状态', () => {
+    const a = createSampleRecords()
+    const b = createSampleRecords()
+    a[0].name = '不应串入另一会话'
+    expect(b[0].name).not.toBe(a[0].name)
+    expect(new Set(a.map(r => r.id)).size).toBe(a.length)
+    Object.entries(FIELD_SCHEMAS).forEach(([pane, fields]) => {
+      expect(fields.length).toBeGreaterThan(0)
+      expect(b.some(record => record.pane === pane)).toBe(true)
+    })
+  })
+  it.each(['market', 'groupbuy'] as const)('外卖词不会进入不相关的 %s 结果', scene => {
+    const rows = getPreviewCards({ ...context, scene, query: scene === 'market' ? '紙巾' : '雙人餐' })
+    expect(rows.length).toBeGreaterThan(0)
+    expect(rows.every(row => row.channel === scene)).toBe(true)
+  })
+  it('首页分组各不超过四张，且有三类相关供给示例', () => {
+    const rows = getPreviewCards({ ...context, scene: 'home' })
+    expect(new Set(rows.map(row => row.channel)).size).toBe(3)
+    for (const channel of ['delivery', 'market', 'groupbuy']) expect(rows.filter(row => row.channel === channel).length).toBeLessThanOrEqual(4)
+    expect(rows.filter(row => row.isAd).length).toBeLessThanOrEqual(2)
+  })
+  it.each(['澳門', '氹仔'])('店内强隔离且无广告：%s', region => {
+    const rows = getPreviewCards({ ...context, scene: 'store', region })
+    expect(rows).toHaveLength(3)
+    expect(new Set(rows.map(row => row.storeId)).size).toBe(1)
+    expect(rows.every(row => row.id.startsWith('DEMO-IN') && row.region === region && !row.isAd)).toBe(true)
+  })
+  it.each(['price', 'distance', 'sales'] as const)('显式排序 %s 无广告且遵循排序', sort => {
+    const rows = getPreviewCards({ ...context, sort })
+    expect(rows.every(row => !row.isAd)).toBe(true)
+    const values = rows.map(row => row[sort])
+    expect(values).toEqual([...values].sort((a, b) => sort === 'sales' ? b - a : a - b))
+  })
+  it('样例广告只在第三卡，提升而非重复已有商家', () => {
+    const rows = getPreviewCards(context)
+    expect(rows.map((row, i) => row.isAd ? i + 1 : 0).filter(Boolean)).toEqual([3])
+    expect(new Set(rows.map(row => row.id)).size).toBe(rows.length)
+    expect(rows[2].id).toBe(getPreviewCards({ ...context, showAds: false })[4].id)
+    expect(PREVIEW_CARDS.some(row => row.isAd)).toBe(false)
+  })
+  it('明确找店返回自然结果，未知词和空词不编造命中', () => {
+    const exact = getPreviewCards({ ...context, query: '星港' })
+    expect(exact).toHaveLength(1)
+    expect(exact[0].isAd).not.toBe(true)
+    expect(getPreviewCards({ ...context, query: '不存在的搜索样本' })).toEqual([])
+    expect(getPreviewCards({ ...context, query: ' ' })).toEqual([])
+  })
+  it.each([
+    ['scenarios', 'policy', { relevance: 65, quality: 15, distance: 15, heat: 10 }, 'searchV2.validate.weights'],
+    ['interventions', 'demote', { factor: 1.2, days: 7 }, 'searchV2.validate.demoteFactor'],
+    ['interventions', 'boost', { factor: 0.8, days: 7 }, 'searchV2.validate.supportFactor'],
+    ['interventions', 'demote', { factor: 0.8, days: 14 }, 'searchV2.validate.daysNormal'],
+    ['interventions', 'exactAdmit', { days: 15 }, 'searchV2.validate.daysExact'],
+    ['guidance', 'placeholder', { start: '2026-11-07', end: '2026-11-01' }, 'searchV2.validate.dates'],
+    ['lexicon', 'directionSynonym', { source: '漢堡', target: '漢堡' }, 'searchV2.validate.sameTerm'],
+  ] as const)('表单边界：%s %s', (pane, kind, values, expected) => {
+    // 校验消息改为返回 i18n key（由 RecordPage t() 后展示），故此处精确比对 key
+    expect(validateDraft(pane as RecordPane, kind, values)).toBe(expected)
+  })
+})
