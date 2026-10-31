@@ -91,9 +91,9 @@ describe('searchBridge 保存映射 saveConfigRecord', () => {
     expect(api.createLexicon).not.toHaveBeenCalled()
   })
 
-  it('精確准入/打散强制乘数为 1（无商业加权）', async () => {
+  it('精確準入/打散强制乘数为 1（无商业加权）', async () => {
     api.createIntervention.mockResolvedValue(2)
-    await saveConfigRecord(rec({ pane: 'interventions', kind: '精確准入', values: { merchant: '示例集團', terms: '星港', factor: 0.9, reason: '精確保護' } }), 'interventions')
+    await saveConfigRecord(rec({ pane: 'interventions', kind: '精確準入', values: { merchant: '示例集團', terms: '星港', factor: 0.9, reason: '精確保護' } }), 'interventions')
     expect(api.createIntervention).toHaveBeenCalledWith(expect.objectContaining({ actionType: 2, multiplier: 1 }))
   })
 

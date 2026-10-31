@@ -93,7 +93,7 @@ export function RecordList({ pane, records, onNavigate }: {
 function summary(row: PrototypeRecord): string {
   const v = row.values
   if (row.pane === 'lexicon') return `${v.source} → ${v.target}`
-  if (row.pane === 'interventions') return `${v.terms} · ${row.kind === '精確准入' ? '僅精確意圖' : `乘數 ${v.factor ?? '—'}`} · ${v.days} 天`
+  if (row.pane === 'interventions') return `${v.terms} · ${row.kind === '精確準入' ? '僅精確意圖' : `乘數 ${v.factor ?? '—'}`} · ${v.days} 天`
   if (row.pane === 'scenarios') return `R ${v.relevance}% / Q ${v.quality}% / D ${v.distance}% / H ${v.heat}%`
   if (row.pane === 'ads') return row.kind === '搜索投流包' ? `${v.quota} 次 · ${v.daily} 次／日` : `${v.start} ～ ${v.end}`
   if (row.pane === 'releases') return `${v.version} → 回退 ${v.rollback}`

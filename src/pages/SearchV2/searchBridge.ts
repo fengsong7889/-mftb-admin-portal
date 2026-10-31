@@ -26,8 +26,8 @@ const APPROVAL_CODE: Record<string, number> = { [STATUS.DRAFT]: 1, [STATUS.APPRO
 const APPROVAL_LABEL: Record<number, PrototypeStatus> = { 1: STATUS.DRAFT, 2: STATUS.APPROVED, 3: STATUS.PAUSED }
 const LEX_TYPE: Record<string, number> = { '業務詞': 1, '實體別名': 2, '有向同義詞': 3, '糾錯詞': 4, '禁限詞': 5 }
 const LEX_TYPE_L: Record<number, string> = { 1: '業務詞', 2: '實體別名', 3: '有向同義詞', 4: '糾錯詞', 5: '禁限詞' }
-const ACTION_TYPE: Record<string, number> = { '泛詞降權': 1, '精確准入': 2, '臨時扶持': 3, '同集團打散': 4 }
-const ACTION_TYPE_L: Record<number, string> = { 1: '泛詞降權', 2: '精確准入', 3: '臨時扶持', 4: '同集團打散' }
+const ACTION_TYPE: Record<string, number> = { '泛詞降權': 1, '精確準入': 2, '臨時扶持': 3, '同集團打散': 4 }
+const ACTION_TYPE_L: Record<number, string> = { 1: '泛詞降權', 2: '精確準入', 3: '臨時扶持', 4: '同集團打散' }
 const REL_STATUS_L: Record<number, PrototypeStatus> = { 0: STATUS.DRAFT, 1: STATUS.REVIEW, 2: STATUS.APPROVED, 3: STATUS.SCHEDULED, 4: STATUS.LIVE, 5: STATUS.PAUSED, 6: STATUS.PAUSED }
 
 function channelFrom(surface: number, biz?: number): string {

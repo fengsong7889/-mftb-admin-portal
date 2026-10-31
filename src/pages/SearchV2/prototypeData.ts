@@ -52,7 +52,7 @@ export const KINDS: Record<RecordPane, string[]> = {
   guidance: ['底紋詞', '自然熱搜', '推廣搜索', '候選熱詞'],
   lexicon: ['業務詞', '實體別名', '有向同義詞', '糾錯詞', '禁限詞'],
   scenarios: ['場景策略'],
-  interventions: ['泛詞降權', '精確准入', '臨時扶持', '同集團打散'],
+  interventions: ['泛詞降權', '精確準入', '臨時扶持', '同集團打散'],
   ads: ['搜索投流包', '推廣搜索週期位'],
   releases: ['配置版本'],
 }
@@ -81,7 +81,7 @@ export const FIELD_SCHEMAS: Record<RecordPane, FieldDefinition[]> = {
   ],
   interventions: [
     { key: 'merchant', label: '目標商家（虛構樣例）', type: 'select', options: ['示例星港漢堡集團', '示例南灣小廚', '示例海風生活超市'], required: true },
-    { key: 'terms', label: '適用詞／精確准入詞', required: true, help: '精確准入只接受審核後的店名、品牌或唯一別名；泛詞如「漢堡」不能自動獲得豁免。' },
+    { key: 'terms', label: '適用詞／精確準入詞', required: true, help: '精確準入只接受審核後的店名、品牌或唯一別名；泛詞如「漢堡」不能自動獲得豁免。' },
     { key: 'factor', label: '干預乘數 B', type: 'number', min: 0.3, max: 1.2, initial: 0.8 },
     { key: 'days', label: '有效天數', type: 'number', min: 1, max: 14, initial: 7 },
     { key: 'reason', label: '干預原因', type: 'remark', required: true },
@@ -120,7 +120,7 @@ export function createSampleRecords(): PrototypeRecord[] {
       relevance: [65, 65, 75, 70, 90][i], quality: [15, 15, 10, 15, 0][i], distance: [15, 15, 10, 10, 0][i], heat: [5, 5, 5, 5, 10][i], window: 200, ads: s.value === 'store' ? 0 : s.value === 'home' ? 2 : 4,
     }, STATUS.APPROVED)),
     record('I01', 'interventions', '星港泛詞流量均衡', '美食外賣', '泛詞降權', { merchant: '示例星港漢堡集團', terms: '漢堡、午餐', factor: 0.8, days: 7, reason: '流量集中度觀察實驗；不影響精確找店。' }, STATUS.REVIEW),
-    record('I02', 'interventions', '品牌精確准入樣例', '美食外賣', '精確准入', { merchant: '示例星港漢堡集團', terms: '星港、星港漢堡', factor: 1, days: 14, reason: '僅用於展示精確詞與泛詞的差異。' }),
+    record('I02', 'interventions', '品牌精確準入樣例', '美食外賣', '精確準入', { merchant: '示例星港漢堡集團', terms: '星港、星港漢堡', factor: 1, days: 14, reason: '僅用於展示精確詞與泛詞的差異。' }),
     record('A01', 'ads', '南灣午餐搜索投流', '美食外賣', '搜索投流包', { merchant: '示例南灣小廚', terms: '漢堡', match: '真實供給自動匹配', quota: 1000, daily: 100, consumed: 320, reserved: 12, slot: '搜索結果首屏', ...dates }, STATUS.APPROVED, '澳門'),
     record('A02', 'ads', '雙人餐週末推廣詞', '團購到店', '推廣搜索週期位', { merchant: '示例氹仔雙人套餐', terms: '雙人餐', match: '精確關鍵詞', slot: '搜索激活頁推廣區', ...dates }, STATUS.SCHEDULED, '氹仔'),
     record('R01', 'releases', '外賣相關性基準', '美食外賣', '配置版本', { version: 'DEMO-1.0', changes: '詞庫與自然排序基準；示例快照，不代表線上已載入。', rollback: 'DEMO-0.9' }, STATUS.LIVE),
@@ -143,8 +143,8 @@ export function validateDraft(pane: RecordPane, kind: string, values: DraftValue
   if (pane === 'interventions') {
     if (kind === '泛詞降權' && Number(values.factor) > 1) return '泛詞降權乘數不得超過 1'
     if (kind === '臨時扶持' && Number(values.factor) < 1) return '臨時扶持乘數不得低於 1'
-    if (kind !== '精確准入' && Number(values.days) > 7) return '普通干預有效期不得超過 7 天'
-    if (kind === '精確准入' && Number(values.days) > 14) return '精確准入有效期不得超過 14 天'
+    if (kind !== '精確準入' && Number(values.days) > 7) return '普通干預有效期不得超過 7 天'
+    if (kind === '精確準入' && Number(values.days) > 14) return '精確準入有效期不得超過 14 天'
   }
   if (pane === 'lexicon' && values.source?.toString().trim() === values.target?.toString().trim()) return '原詞與標準詞不得相同'
 }

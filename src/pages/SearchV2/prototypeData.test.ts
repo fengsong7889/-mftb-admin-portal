@@ -65,7 +65,7 @@ describe('搜索 U1 样本与原型边界', () => {
     ['interventions', '泛詞降權', { factor: 1.2, days: 7 }, '不得超過 1'],
     ['interventions', '臨時扶持', { factor: 0.8, days: 7 }, '不得低於 1'],
     ['interventions', '泛詞降權', { factor: 0.8, days: 14 }, '不得超過 7 天'],
-    ['interventions', '精確准入', { days: 15 }, '不得超過 14 天'],
+    ['interventions', '精確準入', { days: 15 }, '不得超過 14 天'],
     ['guidance', '底紋詞', { start: '2026-11-07', end: '2026-11-01' }, '不得早於'],
     ['lexicon', '有向同義詞', { source: '漢堡', target: '漢堡' }, '不得相同'],
   ] as const)('表单边界：%s %s', (pane, kind, values, expected) => {
