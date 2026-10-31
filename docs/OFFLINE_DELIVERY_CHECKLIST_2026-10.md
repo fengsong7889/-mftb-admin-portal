@@ -55,6 +55,7 @@
 | `CORS_ALLOWED_ORIGINS` | 回退内置开发白名单并打警告 | 默认值面向本机开发端口；对外必须换成对方真实域名 |
 | `SCHEMA_STRICT` | `false` | 建议 `true`：存在无法自愈的结构漂移时中止启动，配合 `maxUnavailable: 0` 保旧实例 |
 | `APP_BUILD_TAG` | `unknown` | 填本次交付的 git SHA，让迁移审计可追溯到版本 |
+| `ADMIN_BOOTSTRAP_PASSWORD` | 留空（无硬编码默认值） | 内置管理员引导口令。留空时后端随机生成并落盘到 `.local/admin-bootstrap-password.txt`，**文件会随容器重建丢失**，所以对外部署必须显式设置 |
 | `LOG_LEVEL` | `info` | 保持 `info`；`debug` 逐请求打印会推高 CPU 并增加日志泄露面 |
 
 ### 3.3 可选集成（默认关闭或留空，**按对方实际需要单独开通**）
@@ -70,7 +71,7 @@
 | RDM 日报 | `RDM_DAILY_REPORT_ENABLED`（默认 `false`）/ `RDM_DAILY_REPORT_TICK_CRON` | 默认关闭 |
 | 会议 AI 纪要上限开关 | 见 `ENVIRONMENT-REFERENCE.md` §2.4（`MEETING_MINUTES_AI_ENABLED`） | ⚠️ 本次在 `application.yml` 中**未检索到该键**，交付前需确认其实际绑定方式，不要照文档写了就当它生效 |
 | 会话与运维 | `SESSION_IDLE_TIMEOUT`（默认 60 分钟）/ `SCHEMA_CHECK_ONLY` / `SPRING_LAZY_INIT` / `MYBATIS_LOG_IMPL` | 按需 |
-| 翻译服务标识 | `MYMEMORY_EMAIL` | ⚠️ 默认值是一个**个人邮箱**（见第七节第 4 项），交付前必须改 |
+| 翻译服务标识 | `MYMEMORY_EMAIL` | 默认已清空（仓内不再内嵌任何个人邮箱）；留空即以匿名身份调用，额度 5000 字符/天 |
 
 ---
 
@@ -83,7 +84,7 @@
 | 3 | 空结构 schema dump | 见第五节命令 | 否 | 结构 + 白名单种子表，**禁止含业务数据** |
 | 4 | 启动脚本 | `run-local.sh` 未入库，需线下提供 | 否 | ⚠️ 该脚本含本机 JDK/Maven 绝对路径，交付前**必须改造为无路径依赖版本**（用 `java_home -v 17` / `mvn` 探测），否则对方一定起不来 |
 | 5 | 工具链要求说明 | 一页纸：Node 20、**JDK 17（21+/25+ 会因 Lombok 不兼容报错）**、Maven 3.9.x、MySQL 8.0+ | 否 | 直接引用 `ENVIRONMENT-REFERENCE.md` §五 |
-| 6 | 初始管理员账号 | 用户名 `admin`；密码为 `DataInitializer` 引导密码，首登强制改密 | 🔴 是 | 交付后要求对方**立即改密**；改密前不算交付完成 |
+| 6 | 初始管理员账号 | 用户名 `admin`；引导口令由 `ADMIN_BOOTSTRAP_PASSWORD` 交付（不写进包内文件），首登强制改密 | 🔴 是 | 交付后要求对方**立即改密**；改密前不算交付完成。若采用随机生成+落盘方式，交付后必须删除该临时文件 |
 | 7 | 文档 | `ENVIRONMENT-REFERENCE.md`、`backend/README.md`、`backend/SERVICE-RESTART-GUIDE.md`、`AGENTS.md` + `.qoder/rules/` | 否 | 已入库，可直接指仓库；包内附快照以便版本追溯 |
 | 8 | `RECIPIENT.txt` | 接收方名称、日期、许可范围、包版本号、唯一编号 | 否 | 🔵 **溯源用的关键件**：日后主张违约时的指向性证据 |
 | 9 | 许可文书 | NDA / 软件许可协议（书面，另行签署） | 否 | 协议优先于 `LICENSE`（`LICENSE` 第五条已写明） |
@@ -149,6 +150,7 @@ grep -nE "sys_user|biz_store|biz_merchant_group|biz_gift_record|biz_fin_|1[3-9][
 - [ ] `RECIPIENT.txt` 已填写唯一编号与许可到期日
 - [ ] 台账（第八节）已登记；到期撤销流程已写明负责人
 - [ ] 已提醒对方：**首登必须改密**，且改密前不算交付完成
+- [ ] `ADMIN_BOOTSTRAP_PASSWORD` 走一次性渠道传递，未写进包内任何文件；若依赖随机生成+落盘，交付后已删除 `.local/admin-bootstrap-password.txt`
 
 ---
 

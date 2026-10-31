@@ -46,8 +46,25 @@ public class SecurityConfig {
         this.objectMapper = objectMapper;
     }
 
-    /** CORS 允许的域名（逗号分隔），通过环境变量 CORS_ALLOWED_ORIGINS 注入 */
-    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008,http://localhost:3009,http://localhost:3010,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,http://127.0.0.1:3003,http://127.0.0.1:3004,http://127.0.0.1:3005,http://127.0.0.1:3006,http://127.0.0.1:3007,http://127.0.0.1:3008,http://127.0.0.1:3009,http://127.0.0.1:3010,http://127.0.0.1:5173,https://fengsong7889.github.io,http://192.168.31.88:3000,http://192.168.31.88:3001,http://192.168.31.88:3002,http://192.168.31.88:3003,http://192.168.31.88:3004,http://192.168.31.88:3005,http://192.168.31.88:3006,http://192.168.31.88:3007,http://192.168.31.88:3008,http://192.168.31.88:3009,http://192.168.31.88:3010,http://192.168.31.88:5173,http://192.168.6.174:3000,http://192.168.6.174:3001,http://192.168.6.174:3002,http://192.168.6.174:3003,http://192.168.6.174:3004,http://192.168.6.174:3005,http://192.168.6.174:3006,http://192.168.6.174:3007,http://192.168.6.174:3008,http://192.168.6.174:3009,http://192.168.6.174:3010,http://192.168.6.174:5173}")
+    /**
+     * CORS 默认白名单——本类内的单一真值源（{@code @Value} 默认串与空值回退共用它，
+     * 并需与 {@code application.yml} 的 {@code cors.allowed-origins} 默认值保持一致）。
+     * 历史上它在 yml、本类默认串与旧常量三处重复定义，逐次叠加后膨胀到 51 条、没人敢动。
+     * <p>
+     * 仅保留确实需要的入口：本仓前端 dev 固定用 3000（实测无任何页面直连 :8080，
+     * 均经 Vite proxy 同源转发，不触发 CORS）；保留 5173 以防 Vite 默认端口直接联调；
+     * 保留 GitHub Pages 域名，因为无法确认生产是否显式设了 {@code CORS_ALLOWED_ORIGINS}，
+     * 删掉它会当场把线上前端锁在 403。
+     * <p>
+     * 已删除：本机开发端口 3001~3010 与两个内网 IP（写入公开仓库即泄露内部拓扑，且无使用证据）。
+     * 新增来源一律走环境变量 {@code CORS_ALLOWED_ORIGINS}，不再往默认值里加。
+     */
+    private static final String DEFAULT_CORS_ORIGINS =
+            "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,"
+                    + "https://fengsong7889.github.io";
+
+    /** CORS 允许的域名（逗号分隔），通过环境变量 CORS_ALLOWED_ORIGINS 注入；默认值复用上面的常量 */
+    @Value("${cors.allowed-origins:" + DEFAULT_CORS_ORIGINS + "}")
     private String allowedOrigins;
 
     /** 白名单: 无需认证即可访问 */
@@ -121,15 +138,7 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 
-    /** CORS 默认白名单：环境变量未设置或解析后为空时回退使用（避免空名单拒绝所有跨域请求） */
-    private static final String DEFAULT_CORS_ORIGINS =
-            "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008,http://localhost:3009,http://localhost:3010,http://localhost:5173,"
-                    + "http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,http://127.0.0.1:3003,http://127.0.0.1:3004,http://127.0.0.1:3005,http://127.0.0.1:3006,http://127.0.0.1:3007,http://127.0.0.1:3008,http://127.0.0.1:3009,http://127.0.0.1:3010,http://127.0.0.1:5173,"
-                    + "https://fengsong7889.github.io,"
-                    + "http://192.168.31.88:3000,http://192.168.31.88:3001,http://192.168.31.88:3002,http://192.168.31.88:3003,http://192.168.31.88:3004,http://192.168.31.88:3005,http://192.168.31.88:3006,http://192.168.31.88:3007,http://192.168.31.88:3008,http://192.168.31.88:3009,http://192.168.31.88:3010,http://192.168.31.88:5173,"
-                    + "http://192.168.6.174:3000,http://192.168.6.174:3001,http://192.168.6.174:3002,http://192.168.6.174:3003,http://192.168.6.174:3004,http://192.168.6.174:3005,http://192.168.6.174:3006,http://192.168.6.174:3007,http://192.168.6.174:3008,http://192.168.6.174:3009,http://192.168.6.174:3010,http://192.168.6.174:5173";
-
-    /** CORS 跨域配置 */
+    /** CORS 访问控制配置（默认值真值源见 {@link #DEFAULT_CORS_ORIGINS}） */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();

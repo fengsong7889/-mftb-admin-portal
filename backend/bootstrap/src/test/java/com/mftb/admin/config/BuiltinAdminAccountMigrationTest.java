@@ -7,16 +7,22 @@ import com.mftb.admin.constant.BuiltinAccounts;
 import com.mftb.admin.service.PermissionService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -38,6 +44,9 @@ import static org.mockito.Mockito.when;
  *   <li><b>不新增硬编码密钥</b>：存量库继承超管的 BCrypt 哈希，只有全新库的占位符才用引导密码兜底；</li>
  *   <li><b>系统账号不被工号迁移吞掉</b>：{@code migrateEmpIdToMF()} 每次启动执行，
  *       未排除 {@code admin} 会在下次重启把它改名成 MFxxxxx —— 这正是历史上 admin 变成 MF00001 的原因。</li>
+ *   <li><b>引导口令不硬编码</b>：来源优先级为 {@code ADMIN_BOOTSTRAP_PASSWORD} &gt; 已落盘文件 &gt;
+ *       随机生成+落盘（权限 600）；三条路径都不输出口令明文，落盘失败也只报错不回退常量。
+ *       测试必须把落盘路径指向临时目录，避免给仓库留下带真实凭据的文件。</li>
  * </ol>
  */
 class BuiltinAdminAccountMigrationTest {
@@ -47,10 +56,21 @@ class BuiltinAdminAccountMigrationTest {
     /** 01_init_system.sql 里的占位符：形态不合法，必须被引导密码覆盖 */
     private static final String PLACEHOLDER_HASH = "$2a$10$placeholder";
     private static final String BOOTSTRAP_ENCODED = "$2a$10$" + "b".repeat(53);
+    /** 落盘文件里的键名前缀，与 {@code DataInitializer} 实现保持一致 */
+    private static final String PERSIST_KEY = "ADMIN_BOOTSTRAP_PASSWORD=";
 
     private JdbcTemplate jdbc;
     private DataInitializer initializer;
     private PermissionService permissionService;
+
+    /** 每个测试独立的临时目录：引导口令落盘必须留在里面，不得写进源码树 */
+    @TempDir
+    Path tempBootstrapDir;
+
+    /** 本次测试的引导口令落盘路径（与 setUpSchema 注入给 DataInitializer 的一致） */
+    private Path bootstrapFile() {
+        return tempBootstrapDir.resolve("admin-bootstrap-password.txt");
+    }
 
     private void setUpSchema() {
         jdbc = new JdbcTemplate(new DriverManagerDataSource(
@@ -70,6 +90,9 @@ class BuiltinAdminAccountMigrationTest {
         when(encoder.encode(anyString())).thenReturn(BOOTSTRAP_ENCODED);
         initializer = new DataInitializer(mock(com.mftb.admin.mapper.SysUserMapper.class),
                 encoder, jdbc, tracker, permissionService);
+        // 引导口令在测试里显式给定：既让断言可预测，也避免走「随机生成+落盘」分支在仓库里造文件
+        ReflectionTestUtils.setField(initializer, "configuredBootstrapPassword", "unit-test-bootstrap-secret");
+        ReflectionTestUtils.setField(initializer, "bootstrapPasswordFilePath", bootstrapFile().toString());
     }
 
     /** 存量库：MF00001 是当前超管，且 function_roles 里还绑着 admin 角色（双重直通路径） */
@@ -347,5 +370,63 @@ class BuiltinAdminAccountMigrationTest {
         assertEquals(0, jdbc.queryForObject(
                 "SELECT COUNT(*) FROM sys_user WHERE username = 'admin'", Integer.class),
                 "多个存活超管属异常态, 自愈不得擅自选一个改成 admin");
+    }
+
+    @Test
+    @DisplayName("引导口令优先取环境变量：命中时不再落盘，也不生成新口令")
+    void envVarTakesPrecedenceAndWritesNoFile() {
+        setUpSchema();
+        seedFreshDb();
+
+        migrate();
+
+        assertEquals(BOOTSTRAP_ENCODED, jdbc.queryForObject(
+                "SELECT password FROM sys_user WHERE username = 'admin'", String.class),
+                "环境变量已给定口令时仍必须覆盖 SQL 占位符，否则谁都登录不进来");
+        assertFalse(Files.exists(bootstrapFile()), "环境变量分支绝不能再落盘一份凭据文件");
+    }
+
+    @Test
+    @DisplayName("无环境变量时：随机生成并落盘(600)，重启复用同一口令而不覆盖管理员密码")
+    void generatesPersistsAndReusesAcrossRestart() throws Exception {
+        setUpSchema();
+        ReflectionTestUtils.setField(initializer, "configuredBootstrapPassword", "");
+        seedFreshDb();
+
+        migrate();
+
+        Path file = bootstrapFile();
+        assertTrue(Files.isRegularFile(file), "随机口令必须落盘，否则没人能首次登录");
+        String password = Files.readString(file).lines()
+                .filter(l -> l.startsWith(PERSIST_KEY))
+                .findFirst().orElseThrow().substring(PERSIST_KEY.length());
+        assertTrue(password.length() >= 16, "引导口令强度下限：至少 16 位随机字符，实际 " + password.length());
+        assertNotEquals("111222", password, "历史硬编码引导密码不得以任何形式回流");
+        assertEquals("rw-------", PosixFilePermissions.toString(Files.getPosixFilePermissions(file)),
+                "凭据文件必须只允许属主读写，不能是默认的 644");
+
+        // 模拟进程重启：清空缓存后必须复用已落盘口令，而不是再生成一个把管理员密码覆盖掉
+        ReflectionTestUtils.setField(initializer, "resolvedBootstrapPassword", null);
+        String afterRestart = ReflectionTestUtils.invokeMethod(initializer, "resolveBootstrapPassword");
+        assertEquals(password, afterRestart, "重启必须复用已落盘口令，否则首次登录口令会失效");
+    }
+
+    @Test
+    @DisplayName("落盘失败时：不抛异常中断启动，也不回退到任何硬编码口令")
+    void writeFailureNeitherThrowsNorFallsBack() throws Exception {
+        setUpSchema();
+        ReflectionTestUtils.setField(initializer, "configuredBootstrapPassword", "");
+        // 在本应作为父目录的位置先放一个普通文件 → createDirectories 必然失败
+        Path blocker = tempBootstrapDir.resolve("blocker");
+        Files.writeString(blocker, "x");
+        ReflectionTestUtils.setField(initializer, "bootstrapPasswordFilePath",
+                blocker.resolve("nested").resolve("pw.txt").toString());
+        seedFreshDb();
+
+        assertDoesNotThrow(this::migrate, "落盘失败不应中断启动（否则会连带阻塞全部启动期迁移）");
+
+        String password = ReflectionTestUtils.invokeMethod(initializer, "resolveBootstrapPassword");
+        assertNotNull(password, "即使无法落盘，仍必须写入一个强随机口令以保证账号口径一致");
+        assertNotEquals("111222", password, "落盘失败也不允许退回到硬编码口令");
     }
 }

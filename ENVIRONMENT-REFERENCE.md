@@ -279,7 +279,7 @@ npm run secret-scan   # 硬编码敏感信息扫描
 
 | 用途 | 账号/值 | 密码/密钥 |
 |------|---------|----------|
-| 后端登录（系统管理员） | `admin`（`BuiltinAccounts.ADMIN_USERNAME`） | 值不入库。全新库首次启动时由 `DataInitializer` 落引导密码并置 `must_change_password=1`，**首登必须改密**；存量库则继承原超管哈希，不强制重置 |
+| 后端登录（系统管理员） | `admin`（`BuiltinAccounts.ADMIN_USERNAME`） | 值不入库。全新库首次启动时按优先级取引导口令：`ADMIN_BOOTSTRAP_PASSWORD` 环境变量 &gt; `.local/admin-bootstrap-password.txt` &gt; 随机生成并落盘（权限 600，已 gitignore），并置 `must_change_password=1`，**首登必须改密**；存量库则继承原超管哈希，不强制重置 |
 | 后端登录（员工） | 工号 `MF*****` | 历史上 `MF00001` 曾是超管，现已降级为普通员工账号（不能再当管理员入口用） |
 | SQLPub 开发库 | `fengsong_mftb` | 唯一存放处：`backend/.env.local` 的 `DB_PASSWORD`（gitignore，禁止复制到本文件；**已于 2026-10-31 轮换**，旧值随 git 历史永久作废） |
 | JWT 密钥 | — | 无默认值。必须在 `backend/.env.local` 设 `JWT_SECRET`（≥ 32 字节）；开发/生产各自独立，禁止复用示例值 |
@@ -287,11 +287,12 @@ npm run secret-scan   # 硬编码敏感信息扫描
 | 生产前端地址 | — | `https://fengsong7889.github.io/-mftb-admin-portal/` |
 | GitHub 仓库 | `fengsong7889/-mftb-admin-portal` | — |
 
-> 🔎 **内置管理员的密码来源**（只写位置与类型，不回显值）：全新库首次启动时，
-> `DataInitializer` 会写入一个引导密码并置 `must_change_password=1`，因此**首登必须改密**；
-> 存量库则继承原有合法哈希，不重置不强制。
-> 该引导常量的进一步收敛（去硬编码 / 首启随机生成）已登记在本地未入库台账，
-> 不在本公开文件里跟踪状态。对外交付前必须确认对方已完成首登改密。
+> 🔎 **内置管理员的口令来源**（已去硬编码）：仅当密码列不是合法 BCrypt（即全新库）时写入，
+> 优先级：环境变量 `ADMIN_BOOTSTRAP_PASSWORD` &gt; 已存在的 `.local/admin-bootstrap-password.txt`
+> &gt; 随机生成 20 位并落盘（权限 600）。三条路径都不输出口令明文；写入时同步置
+> `must_change_password=1`，因此**首登必须改密**；存量库继承原有合法哈希，不重置不强制。
+> 对外交付前必须确认对方已完成首登改密并删除临时落盘文件；生产请显式设环境变量，
+> 因为落盘文件会随容器重建丢失。
 
 ---
 

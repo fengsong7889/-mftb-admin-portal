@@ -10,6 +10,7 @@ import com.mftb.admin.service.PermissionService;
 import com.mftb.admin.util.JsonUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -17,6 +18,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -54,11 +60,31 @@ public class DataInitializer implements CommandLineRunner {
     public static final String PRODUCT_VERSION = "1.0.0";
 
     /**
-     * 内置账号引导密码: 仅当密码列不是合法 BCrypt 值(全新库执行 01_init_system.sql 留下的占位符)时写入,
-     * 同时置 must_change_password=1 强制首次登录改密。与 {@link #resetPasswordIfNeeded} 同一口径,
-     * 属既有历史约定(非本次新增密钥); 存量库走「继承超管密码哈希」路径, 不会用到该值。
+     * 内置账号引导口令的**环境变量来源**: 设置后优先使用(生产与对外部署应显式设置)。
+     * 未设置时不再回退到任何硬编码值, 而是随机生成并落盘, 见 {@link #resolveBootstrapPassword()}。
      */
-    private static final String BUILTIN_BOOTSTRAP_PASSWORD = "111222";
+    @Value("${security.admin-bootstrap-password:}")
+    private String configuredBootstrapPassword;
+
+    /** 随机引导口令的默认落盘位置: 位于已 gitignore 的 {@code .local/} 下, 权限 600, 供本地/新库首登读取 */
+    private static final String BOOTSTRAP_PASSWORD_FILE = ".local/admin-bootstrap-password.txt";
+
+    /**
+     * 实际使用的落盘路径。抽成字段是为了可测: 单元测试必须指向临时目录,
+     * 否则每跑一次测试, 工作区里就会多出一个带真实凭据的文件（测试不应给仓库产生副作用）。
+     */
+    private String bootstrapPasswordFilePath = BOOTSTRAP_PASSWORD_FILE;
+
+    /** 落盘文件里的键名前缀, 兼作「这是我们写的文件」的识别标记 */
+    private static final String BOOTSTRAP_PASSWORD_FILE_KEY = "ADMIN_BOOTSTRAP_PASSWORD=";
+
+    /** 引导口令字符集与长度: 20 位字母数字 ≈ 119 bit 熵, 满足离线攻击下的口令强度要求 */
+    private static final String BOOTSTRAP_ALPHABET =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    private static final int BOOTSTRAP_PASSWORD_LENGTH = 20;
+
+    /** 本进程已解析出的引导口令: 两处写入必须同值, 否则后一次会把管理员密码覆盖成无人可知的新值 */
+    private volatile String resolvedBootstrapPassword;
 
     /** 内置账号迁移的 updated_by 签名, 便于事后区分「系统迁移改动」与「人工改动」 */
     private static final String BUILTIN_ADMIN_OPERATOR = "system-builtin-admin";
@@ -231,7 +257,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         // 每次启动兜底恢复。必须紧随 migrateEmpIdToMF 之后、resetPasswordIfNeeded(按 username='admin' 查)之前
         reconcileBuiltinAdminAccount();
         migrateDeptCodeToBM();
-        resetPasswordIfNeeded(BuiltinAccounts.ADMIN_USERNAME, BUILTIN_BOOTSTRAP_PASSWORD);
+        resetPasswordIfNeeded(BuiltinAccounts.ADMIN_USERNAME, resolveBootstrapPassword());
         ensureDeptAdSalesPermission();
         fixAssetMenuGrouping();
         // v40: 菜单真值自愈（每次启动幂等）——名称正名/繁体化、空目录清理、sort 唯一化、
@@ -458,10 +484,110 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
     private void bootstrapPassword(long userId, boolean mustChangePassword) {
         int updated = jdbcTemplate.update(
                 "UPDATE sys_user SET password = ?, must_change_password = ?, updated_by = ? WHERE id = ?",
-                passwordEncoder.encode(BUILTIN_BOOTSTRAP_PASSWORD), mustChangePassword ? 1 : 0,
+                passwordEncoder.encode(resolveBootstrapPassword()), mustChangePassword ? 1 : 0,
                 BUILTIN_ADMIN_OPERATOR, userId);
         if (updated != 1) {
             throw new IllegalStateException("内置系统管理员账号引导密码写入失败: id=" + userId);
+        }
+    }
+
+    /**
+     * 解析内置管理员引导口令, 优先级: {@code ADMIN_BOOTSTRAP_PASSWORD} 环境变量 &gt;
+     * 已存在的落盘文件 &gt; 新生成的随机口令(写入文件, 权限 600)。
+     * <p>
+     * 同一进程内只解析一次并缓存: {@link #resetPasswordIfNeeded} 与 {@link #bootstrapPassword}
+     * 都会在启动期触发, 若每次重新随机, 后一次写入会把前一次的口令覆盖成无人可知的新值。
+     * <p>
+     * 刻意不把口令写进日志: 日志会进采集、备份与第三方管道, 等于把凭据扩散到更多地方。
+     * 若连落盘也失败, 只报错不打印口令 —— 宁可管理员账号暂时不可用(设置环境变量后重启即可恢复),
+     * 也不把凭据落到公开面上。安全优先于便利。
+     */
+    private String resolveBootstrapPassword() {
+        String cached = resolvedBootstrapPassword;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (this) {
+            if (resolvedBootstrapPassword == null) {
+                resolvedBootstrapPassword = loadOrGenerateBootstrapPassword();
+            }
+            return resolvedBootstrapPassword;
+        }
+    }
+
+    /** 按环境变量 &gt; 已落盘文件 &gt; 新生成随机口令 的顺序解析; 全部路径均不打印口令值 */
+    private String loadOrGenerateBootstrapPassword() {
+        if (StringUtils.hasText(configuredBootstrapPassword)) {
+            log.info("内置管理员引导口令来自 ADMIN_BOOTSTRAP_PASSWORD 环境变量(值不记录日志)");
+            return configuredBootstrapPassword.trim();
+        }
+        Path file = Path.of(bootstrapPasswordFilePath);
+        String existing = readBootstrapPasswordFile(file);
+        if (existing != null) {
+            log.warn("复用 {} 中已生成的引导口令; 该文件仍含可用凭据, 首登改密后请立即删除", file.toAbsolutePath());
+            return existing;
+        }
+        String generated = randomBootstrapPassword();
+        if (writeBootstrapPasswordFile(file, generated)) {
+            log.warn("已为内置管理员生成随机引导口令并写入 {}(权限 600)。"
+                            + "请读取该文件完成首次登录、立即改密并删除文件; 或改用 ADMIN_BOOTSTRAP_PASSWORD 环境变量",
+                    file.toAbsolutePath());
+        } else {
+            log.error("无法写入引导口令文件 {}, 且不打印口令值: 本次启动写入的内置管理员口令无人可知, "
+                    + "该账号将暂时无法登录。请设置 ADMIN_BOOTSTRAP_PASSWORD 环境变量后重启后端。", file.toAbsolutePath());
+        }
+        return generated;
+    }
+
+    /** 生成强随机引导口令(每位由 SecureRandom 从 62 个字符中等概率抽取) */
+    private String randomBootstrapPassword() {
+        SecureRandom random = new SecureRandom();
+        StringBuilder sb = new StringBuilder(BOOTSTRAP_PASSWORD_LENGTH);
+        for (int i = 0; i < BOOTSTRAP_PASSWORD_LENGTH; i++) {
+            sb.append(BOOTSTRAP_ALPHABET.charAt(random.nextInt(BOOTSTRAP_ALPHABET.length())));
+        }
+        return sb.toString();
+    }
+
+    /** 读取已落盘的引导口令; 文件不存在、格式不符或值为空均返回 null */
+    private String readBootstrapPasswordFile(Path file) {
+        if (!Files.isRegularFile(file)) {
+            return null;
+        }
+        try {
+            for (String line : Files.readAllLines(file)) {
+                String trimmed = line.trim();
+                if (trimmed.startsWith(BOOTSTRAP_PASSWORD_FILE_KEY)) {
+                    String value = trimmed.substring(BOOTSTRAP_PASSWORD_FILE_KEY.length()).trim();
+                    if (!value.isEmpty()) {
+                        return value;
+                    }
+                }
+            }
+        } catch (IOException e) {
+            log.warn("读取引导口令文件失败: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    /** 以 600 权限落盘引导口令; 失败返回 false(调用方不会转为打印口令) */
+    private boolean writeBootstrapPasswordFile(Path file, String password) {
+        try {
+            Path parent = file.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            Files.writeString(file, "# 由后端启动期生成, 仅供内置管理员首次登录; 改密后请立即删除本文件\n"
+                    + BOOTSTRAP_PASSWORD_FILE_KEY + password + "\n");
+            try {
+                Files.setPosixFilePermissions(file, PosixFilePermissions.fromString("rw-------"));
+            } catch (UnsupportedOperationException e) {
+                log.warn("当前文件系统不支持 POSIX 权限, 未收紧 {} 权限; 请尽快改密并删除该文件", file);
+            }
+            return true;
+        } catch (IOException e) {
+            log.warn("写入引导口令文件 {} 失败: {}", file, e.getMessage());
+            return false;
         }
     }
 
