@@ -16284,6 +16284,25 @@
         "scheduled": "待生效",
         "live": "生效示意",
         "paused": "已暫停"
+      },
+      "kind": {
+        "placeholder": "底紋詞",
+        "hotNatural": "自然熱搜",
+        "promoted": "推廣搜索",
+        "candidate": "候選熱詞",
+        "business": "業務詞",
+        "alias": "實體別名",
+        "directionSynonym": "有向同義詞",
+        "correction": "糾錯詞",
+        "banned": "禁限詞",
+        "policy": "場景策略",
+        "demote": "泛詞降權",
+        "exactAdmit": "精確準入",
+        "boost": "臨時扶持",
+        "spread": "同集團打散",
+        "trafficPackage": "搜索投流包",
+        "cycleSlot": "推廣搜索週期位",
+        "configVersion": "配置版本"
       }
     },
     "validate": {

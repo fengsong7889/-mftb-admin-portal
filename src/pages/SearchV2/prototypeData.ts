@@ -65,14 +65,21 @@ export interface FieldDefinition {
   initial?: string | number
   help?: string
 }
+/**
+ * 配置类型为系统级枚举（业务数据字典）：存 code，显示走 i18n（searchV2.enum.kind.*），
+ * 后端存整型 word_type/action_type/surface（见 searchBridge）；code 全局唯一，避免跳域比较时同形。
+ */
 export const KINDS: Record<RecordPane, string[]> = {
-  guidance: ['底紋詞', '自然熱搜', '推廣搜索', '候選熱詞'],
-  lexicon: ['業務詞', '實體別名', '有向同義詞', '糾錯詞', '禁限詞'],
-  scenarios: ['場景策略'],
-  interventions: ['泛詞降權', '精確準入', '臨時扶持', '同集團打散'],
-  ads: ['搜索投流包', '推廣搜索週期位'],
-  releases: ['配置版本'],
+  guidance: ['placeholder', 'hotNatural', 'promoted', 'candidate'],
+  lexicon: ['business', 'alias', 'directionSynonym', 'correction', 'banned'],
+  scenarios: ['policy'],
+  interventions: ['demote', 'exactAdmit', 'boost', 'spread'],
+  ads: ['trafficPackage', 'cycleSlot'],
+  releases: ['configVersion'],
 }
+export const KIND_LABEL_KEY = (code: string) => `searchV2.enum.kind.${code}`
+/** 类型下拉选项：value 存 code，label 走当前语言译文。 */
+export const kindChoices = (pane: RecordPane, tr: (key: string) => string) => KINDS[pane].map(code => ({ value: code, label: tr(KIND_LABEL_KEY(code)) }))
 export const FIELD_SCHEMAS: Record<RecordPane, FieldDefinition[]> = {
   guidance: [
     { key: 'text', label: '展示詞', required: true },
@@ -126,22 +133,22 @@ const record = (id: string, pane: RecordPane, name: string, channel: string, kin
 const dates = { start: '2026-11-01', end: '2026-11-07' }
 export function createSampleRecords(): PrototypeRecord[] {
   return [
-    record('G01', 'guidance', '午餐想吃什麼', SEARCH_SCENES.DELIVERY, '底紋詞', { text: '午餐想吃什麼', target: '午餐', priority: 1, source: '人工策劃', ...dates }, STATUS.APPROVED),
-    record('G02', 'guidance', '紙巾日常補貨', SEARCH_SCENES.MARKET, '自然熱搜', { text: '紙巾', target: '紙巾', priority: 2, source: '去重搜索趨勢', ...dates }, STATUS.REVIEW),
-    record('G03', 'guidance', '週末雙人餐', SEARCH_SCENES.GROUPBUY, '推廣搜索', { text: '週末雙人餐', target: '雙人餐', priority: 1, source: '商業計劃', ...dates }, STATUS.SCHEDULED, '氹仔'),
-    record('G04', 'guidance', '下午茶趨勢候選', SEARCH_SCENES.DELIVERY, '候選熱詞', { text: '奶茶', target: '奶茶', priority: 3, source: '去重搜索趨勢', ...dates }),
-    record('L01', 'lexicon', '漢堡英文同義', SEARCH_SCENES.DELIVERY, '有向同義詞', { source: 'burger', target: '漢堡', category: '餐飲', evidence: '商品品類詞表樣例' }, STATUS.APPROVED),
-    record('L02', 'lexicon', '星港品牌別名', SEARCH_SCENES.DELIVERY, '實體別名', { source: '星港', target: '示例星港漢堡集團', category: '餐飲', evidence: '虛構品牌唯一別名示例' }, STATUS.REVIEW),
-    record('L03', 'lexicon', '紙巾錯詞候選', SEARCH_SCENES.MARKET, '糾錯詞', { source: '紙斤', target: '紙巾', category: '日用品', evidence: '人工糾錯樣例' }),
-    ...SCENES.map((s, i) => record(`S0${i + 1}`, 'scenarios', s.demoName, s.value, '場景策略', {
+    record('G01', 'guidance', '午餐想吃什麼', SEARCH_SCENES.DELIVERY, 'placeholder', { text: '午餐想吃什麼', target: '午餐', priority: 1, source: '人工策劃', ...dates }, STATUS.APPROVED),
+    record('G02', 'guidance', '紙巾日常補貨', SEARCH_SCENES.MARKET, 'hotNatural', { text: '紙巾', target: '紙巾', priority: 2, source: '去重搜索趨勢', ...dates }, STATUS.REVIEW),
+    record('G03', 'guidance', '週末雙人餐', SEARCH_SCENES.GROUPBUY, 'promoted', { text: '週末雙人餐', target: '雙人餐', priority: 1, source: '商業計劃', ...dates }, STATUS.SCHEDULED, '氹仔'),
+    record('G04', 'guidance', '下午茶趨勢候選', SEARCH_SCENES.DELIVERY, 'candidate', { text: '奶茶', target: '奶茶', priority: 3, source: '去重搜索趨勢', ...dates }),
+    record('L01', 'lexicon', '漢堡英文同義', SEARCH_SCENES.DELIVERY, 'directionSynonym', { source: 'burger', target: '漢堡', category: '餐飲', evidence: '商品品類詞表樣例' }, STATUS.APPROVED),
+    record('L02', 'lexicon', '星港品牌別名', SEARCH_SCENES.DELIVERY, 'alias', { source: '星港', target: '示例星港漢堡集團', category: '餐飲', evidence: '虛構品牌唯一別名示例' }, STATUS.REVIEW),
+    record('L03', 'lexicon', '紙巾錯詞候選', SEARCH_SCENES.MARKET, 'correction', { source: '紙斤', target: '紙巾', category: '日用品', evidence: '人工糾錯樣例' }),
+    ...SCENES.map((s, i) => record(`S0${i + 1}`, 'scenarios', s.demoName, s.value, 'policy', {
       relevance: [65, 65, 75, 70, 90][i], quality: [15, 15, 10, 15, 0][i], distance: [15, 15, 10, 10, 0][i], heat: [5, 5, 5, 5, 10][i], window: 200, ads: s.value === SEARCH_SCENES.STORE ? 0 : s.value === SEARCH_SCENES.HOME ? 2 : 4,
     }, STATUS.APPROVED)),
-    record('I01', 'interventions', '星港泛詞流量均衡', SEARCH_SCENES.DELIVERY, '泛詞降權', { merchant: '示例星港漢堡集團', terms: '漢堡、午餐', factor: 0.8, days: 7, reason: '流量集中度觀察實驗；不影響精確找店。' }, STATUS.REVIEW),
-    record('I02', 'interventions', '品牌精確準入樣例', SEARCH_SCENES.DELIVERY, '精確準入', { merchant: '示例星港漢堡集團', terms: '星港、星港漢堡', factor: 1, days: 14, reason: '僅用於展示精確詞與泛詞的差異。' }),
-    record('A01', 'ads', '南灣午餐搜索投流', SEARCH_SCENES.DELIVERY, '搜索投流包', { merchant: '示例南灣小廚', terms: '漢堡', match: '真實供給自動匹配', quota: 1000, daily: 100, consumed: 320, reserved: 12, slot: '搜索結果首屏', ...dates }, STATUS.APPROVED, '澳門'),
-    record('A02', 'ads', '雙人餐週末推廣詞', SEARCH_SCENES.GROUPBUY, '推廣搜索週期位', { merchant: '示例氹仔雙人套餐', terms: '雙人餐', match: '精確關鍵詞', slot: '搜索激活頁推廣區', ...dates }, STATUS.SCHEDULED, '氹仔'),
-    record('R01', 'releases', '外賣相關性基準', SEARCH_SCENES.DELIVERY, '配置版本', { version: 'DEMO-1.0', changes: '詞庫與自然排序基準；示例快照，不代表線上已載入。', rollback: 'DEMO-0.9' }, STATUS.LIVE),
-    record('R02', 'releases', '搜索商業化首屏護欄', SEARCH_SCENES.ALL, '配置版本', { version: 'DEMO-1.1', changes: '首張自然結果；顯式排序無廣告；精確找店保護。', rollback: 'DEMO-1.0' }, STATUS.REVIEW),
+    record('I01', 'interventions', '星港泛詞流量均衡', SEARCH_SCENES.DELIVERY, 'demote', { merchant: '示例星港漢堡集團', terms: '漢堡、午餐', factor: 0.8, days: 7, reason: '流量集中度觀察實驗；不影響精確找店。' }, STATUS.REVIEW),
+    record('I02', 'interventions', '品牌精確準入樣例', SEARCH_SCENES.DELIVERY, 'exactAdmit', { merchant: '示例星港漢堡集團', terms: '星港、星港漢堡', factor: 1, days: 14, reason: '僅用於展示精確詞與泛詞的差異。' }),
+    record('A01', 'ads', '南灣午餐搜索投流', SEARCH_SCENES.DELIVERY, 'trafficPackage', { merchant: '示例南灣小廚', terms: '漢堡', match: '真實供給自動匹配', quota: 1000, daily: 100, consumed: 320, reserved: 12, slot: '搜索結果首屏', ...dates }, STATUS.APPROVED, '澳門'),
+    record('A02', 'ads', '雙人餐週末推廣詞', SEARCH_SCENES.GROUPBUY, 'cycleSlot', { merchant: '示例氹仔雙人套餐', terms: '雙人餐', match: '精確關鍵詞', slot: '搜索激活頁推廣區', ...dates }, STATUS.SCHEDULED, '氹仔'),
+    record('R01', 'releases', '外賣相關性基準', SEARCH_SCENES.DELIVERY, 'configVersion', { version: 'DEMO-1.0', changes: '詞庫與自然排序基準；示例快照，不代表線上已載入。', rollback: 'DEMO-0.9' }, STATUS.LIVE),
+    record('R02', 'releases', '搜索商業化首屏護欄', SEARCH_SCENES.ALL, 'configVersion', { version: 'DEMO-1.1', changes: '首張自然結果；顯式排序無廣告；精確找店保護。', rollback: 'DEMO-1.0' }, STATUS.REVIEW),
   ]
 }
 
@@ -158,10 +165,10 @@ export function validateDraft(pane: RecordPane, kind: string, values: DraftValue
   if (pane === 'scenarios' && ['relevance', 'quality', 'distance', 'heat'].reduce((sum, key) => sum + Number(values[key] ?? 0), 0) !== 100) return 'searchV2.validate.weights'
   if (values.start && values.end && String(values.start) > String(values.end)) return 'searchV2.validate.dates'
   if (pane === 'interventions') {
-    if (kind === '泛詞降權' && Number(values.factor) > 1) return 'searchV2.validate.demoteFactor'
-    if (kind === '臨時扶持' && Number(values.factor) < 1) return 'searchV2.validate.supportFactor'
-    if (kind !== '精確準入' && Number(values.days) > 7) return 'searchV2.validate.daysNormal'
-    if (kind === '精確準入' && Number(values.days) > 14) return 'searchV2.validate.daysExact'
+    if (kind === 'demote' && Number(values.factor) > 1) return 'searchV2.validate.demoteFactor'
+    if (kind === 'boost' && Number(values.factor) < 1) return 'searchV2.validate.supportFactor'
+    if (kind !== 'exactAdmit' && Number(values.days) > 7) return 'searchV2.validate.daysNormal'
+    if (kind === 'exactAdmit' && Number(values.days) > 14) return 'searchV2.validate.daysExact'
   }
   if (pane === 'lexicon' && values.source?.toString().trim() === values.target?.toString().trim()) return 'searchV2.validate.sameTerm'
 }

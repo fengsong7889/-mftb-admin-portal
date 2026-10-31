@@ -16282,6 +16282,25 @@
         "scheduled": "Scheduled",
         "live": "Live (illustrative)",
         "paused": "Paused"
+      },
+      "kind": {
+        "placeholder": "Search placeholder",
+        "hotNatural": "Organic trending",
+        "promoted": "Promoted search",
+        "candidate": "Candidate trending",
+        "business": "Business term",
+        "alias": "Entity alias",
+        "directionSynonym": "Directional synonym",
+        "correction": "Spelling correction",
+        "banned": "Blocked term",
+        "policy": "Scene policy",
+        "demote": "Generic-term demotion",
+        "exactAdmit": "Exact admission",
+        "boost": "Temporary boost",
+        "spread": "Same-group spread",
+        "trafficPackage": "Search traffic package",
+        "cycleSlot": "Promoted search cycle slot",
+        "configVersion": "Config version"
       }
     },
     "validate": {

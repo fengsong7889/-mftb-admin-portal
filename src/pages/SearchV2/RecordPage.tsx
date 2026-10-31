@@ -7,7 +7,7 @@ import RemarkTextArea from '@/components/RemarkTextArea'
 import HelpPopover from '@/components/HelpPopover'
 import StatCards from '@/components/StatCards'
 import { useUnsavedGuard } from '@/contexts/UnsavedChangesContext'
-import { SEARCH_SCENES, STATUS, STATUS_LABEL_KEY, FIELD_SCHEMAS, KINDS, PANES, REGIONS, validateDraft, options, sceneChoices, type DraftValues, type PrototypeRecord, type RecordPane } from './prototypeData'
+import { SEARCH_SCENES, STATUS, STATUS_LABEL_KEY, FIELD_SCHEMAS, KINDS, PANES, REGIONS, validateDraft, kindChoices, options, sceneChoices, type DraftValues, type PrototypeRecord, type RecordPane } from './prototypeData'
 import { StatusTag } from './PrototypeTable'
 
 interface RecordFormValues { name: string; channel: string; region: string; kind: string; values: DraftValues }
@@ -37,8 +37,8 @@ export default function RecordPage({ pane, record, readOnly, onBack, onSave, onS
     return () => window.removeEventListener('beforeunload', handleUnload)
   }, [])
   const fields = FIELD_SCHEMAS[pane].filter(field => !(
-    (pane === 'interventions' && ['精確準入', '同集團打散'].includes(kind) && field.key === 'factor')
-    || (pane === 'ads' && kind === '推廣搜索週期位' && ['quota', 'daily', 'match', 'negative'].includes(field.key))
+    (pane === 'interventions' && ['exactAdmit', 'spread'].includes(kind) && field.key === 'factor')
+    || (pane === 'ads' && kind === 'cycleSlot' && ['quota', 'daily', 'match', 'negative'].includes(field.key))
   ))
   const initial: RecordFormValues = {
     name: record?.name ?? '', channel: record?.channel ?? SEARCH_SCENES.DELIVERY, region: record?.region ?? '全城', kind: record?.kind ?? KINDS[pane][0],
@@ -75,12 +75,12 @@ export default function RecordPage({ pane, record, readOnly, onBack, onSave, onS
     <Form form={form} layout="vertical" initialValues={initial} disabled={readOnly} onFinish={handleSave}
       onValuesChange={changed => {
         dirty.current = true; setIssue('')
-        if (pane === 'ads' && changed.kind) form.setFieldValue(['values', 'slot'], changed.kind === '搜索投流包' ? '搜索結果首屏' : '搜索激活頁推廣區')
+        if (pane === 'ads' && changed.kind) form.setFieldValue(['values', 'slot'], changed.kind === 'trafficPackage' ? '搜索結果首屏' : '搜索激活頁推廣區')
       }}>
       <section className="detail-card sv2__form-card"><h3><DatabaseOutlined /> {t('searchV2.form.sectionBase')}</h3>
         <div className="sv2__form-grid">
           <Form.Item name="name" label={t('searchV2.form.fieldName')} rules={[{ required: true, whitespace: true, message: t('searchV2.form.nameRequired') }, { max: 60, message: t('searchV2.form.nameMax') }]}><Input maxLength={60} /></Form.Item>
-          <Form.Item name="kind" label={t('searchV2.form.fieldType')} rules={[{ required: true }]}><Select options={options(KINDS[pane])} /></Form.Item>
+          <Form.Item name="kind" label={t('searchV2.form.fieldType')} rules={[{ required: true }]}><Select options={kindChoices(pane, t)} /></Form.Item>
           <Form.Item name="channel" label={t('searchV2.form.fieldScene')} rules={[{ required: true }]}><Select options={sceneChoices(t)} /></Form.Item>
           <Form.Item name="region" label={t('searchV2.form.fieldRegion')} rules={[{ required: true }]}><Select options={options(REGIONS)} /></Form.Item>
           <Form.Item label={t('searchV2.form.fieldAppBrand')}><Input value={t('searchV2.form.appBrandValue')} disabled /></Form.Item>
@@ -101,13 +101,13 @@ export default function RecordPage({ pane, record, readOnly, onBack, onSave, onS
         </div>
         {pane === 'scenarios' && <div className="sv2__rule-note">{t('searchV2.form.scenarioNote')}</div>}
         {pane === 'interventions' && <Alert type="warning" showIcon message={t('searchV2.form.interventionNote')} />}
-        {pane === 'guidance' && <Alert type="info" showIcon message={kind === '推廣搜索' ? t('searchV2.form.guidancePaid') : t('searchV2.form.guidanceNatural')} />}
-        {pane === 'ads' && <Alert type="warning" showIcon message={kind === '搜索投流包' ? t('searchV2.form.adsPlan') : t('searchV2.form.adsCycle')} />}
+        {pane === 'guidance' && <Alert type="info" showIcon message={kind === 'promoted' ? t('searchV2.form.guidancePaid') : t('searchV2.form.guidanceNatural')} />}
+        {pane === 'ads' && <Alert type="warning" showIcon message={kind === 'trafficPackage' ? t('searchV2.form.adsPlan') : t('searchV2.form.adsCycle')} />}
       </section>
       {issue && <Alert type="error" showIcon message={t(issue)} />}
       {!readOnly && <div className="form-footer"><Button onClick={onBack}>{t('searchV2.form.cancel')}</Button><Button type="primary" htmlType="submit" aria-label={t('searchV2.form.saveDraft')} icon={<SaveOutlined />}>{t('searchV2.form.saveDraft')}</Button></div>}
     </Form>
-    {pane === 'ads' && readOnly && record?.kind === '搜索投流包' && <section className="detail-card">
+    {pane === 'ads' && readOnly && record?.kind === 'trafficPackage' && <section className="detail-card">
       <h3>{t('searchV2.form.entitlementTitle')}</h3><StatCards items={[
         { key: 'q', label: t('searchV2.form.entQuota'), value: Number(record.values.quota ?? 0), color: 'info', icon: <DatabaseOutlined /> },
         { key: 'c', label: t('searchV2.form.entConsumed'), value: Number(record.values.consumed ?? 0), color: 'brand', icon: <EyeOutlined /> },

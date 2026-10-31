@@ -16,18 +16,19 @@ import { STATUS, SCENE_LABEL, SEARCH_SCENES, type Pane, type PrototypeRecord, ty
 /** 已接后端的配置面板（ads 属 B3 未接；overview/lab/analytics 非记录域）。 */
 export const WIRED_PANES: Pane[] = ['guidance', 'lexicon', 'scenarios', 'interventions', 'releases']
 
-const GUID_TYPE: Record<string, number> = { '底紋詞': 1, '自然熱搜': 2, '推廣搜索': 3, '候選熱詞': 4 }
-const GUID_TYPE_L: Record<number, string> = { 1: '底紋詞', 2: '自然熱搜', 3: '推廣搜索', 4: '候選熱詞' }
+// 类型枚举映射：前端存 code（显示走 searchV2.enum.kind.*），后端存整型；双向表必须一一对应。
+const GUID_TYPE: Record<string, number> = { placeholder: 1, hotNatural: 2, promoted: 3, candidate: 4 }
+const GUID_TYPE_L: Record<number, string> = { 1: 'placeholder', 2: 'hotNatural', 3: 'promoted', 4: 'candidate' }
 const SOURCE_CODE: Record<string, number> = { '人工策劃': 1, '去重搜索趨勢': 2, '商業計劃': 3 }
 const SOURCE_LABEL: Record<number, string> = { 1: '人工策劃', 2: '去重搜索趨勢', 3: '商業計劃' }
 const REGION_CODE: Record<string, string | undefined> = { '全城': undefined, '澳門': 'MACAU', '氹仔': 'TAIPA' }
 const REGION_LABEL: Record<string, string> = { MACAU: '澳門', TAIPA: '氹仔' }
 const APPROVAL_CODE: Record<string, number> = { [STATUS.DRAFT]: 1, [STATUS.APPROVED]: 2, [STATUS.PAUSED]: 3 }
 const APPROVAL_LABEL: Record<number, PrototypeStatus> = { 1: STATUS.DRAFT, 2: STATUS.APPROVED, 3: STATUS.PAUSED }
-const LEX_TYPE: Record<string, number> = { '業務詞': 1, '實體別名': 2, '有向同義詞': 3, '糾錯詞': 4, '禁限詞': 5 }
-const LEX_TYPE_L: Record<number, string> = { 1: '業務詞', 2: '實體別名', 3: '有向同義詞', 4: '糾錯詞', 5: '禁限詞' }
-const ACTION_TYPE: Record<string, number> = { '泛詞降權': 1, '精確準入': 2, '臨時扶持': 3, '同集團打散': 4 }
-const ACTION_TYPE_L: Record<number, string> = { 1: '泛詞降權', 2: '精確準入', 3: '臨時扶持', 4: '同集團打散' }
+const LEX_TYPE: Record<string, number> = { business: 1, alias: 2, directionSynonym: 3, correction: 4, banned: 5 }
+const LEX_TYPE_L: Record<number, string> = { 1: 'business', 2: 'alias', 3: 'directionSynonym', 4: 'correction', 5: 'banned' }
+const ACTION_TYPE: Record<string, number> = { demote: 1, exactAdmit: 2, boost: 3, spread: 4 }
+const ACTION_TYPE_L: Record<number, string> = { 1: 'demote', 2: 'exactAdmit', 3: 'boost', 4: 'spread' }
 const REL_STATUS_L: Record<number, PrototypeStatus> = { 0: STATUS.DRAFT, 1: STATUS.REVIEW, 2: STATUS.APPROVED, 3: STATUS.SCHEDULED, 4: STATUS.LIVE, 5: STATUS.PAUSED, 6: STATUS.PAUSED }
 
 function channelFrom(surface: number, biz?: number): SearchSceneCode {
@@ -61,7 +62,7 @@ function guidanceToRecord(item: SearchGuidanceItem): PrototypeRecord {
   return {
     id: String(item.id), pane: 'guidance', name: item.configName ?? item.displayText,
     channel: channelFrom(item.surface, item.bizChannel), region: regionOf(item.regionCode),
-    kind: GUID_TYPE_L[item.wordType] ?? '底紋詞',
+    kind: GUID_TYPE_L[item.wordType] ?? 'placeholder',
     status: APPROVAL_LABEL[item.approvalStatus ?? 1] ?? STATUS.DRAFT,
     values: { text: item.displayText, target: item.targetQuery, priority: item.priority, source: SOURCE_LABEL[item.source ?? 1], start: item.startDate, end: item.endDate },
     updatedAt: item.updatedAt ? `後端 · ${item.updatedAt}` : '後端真值',
@@ -82,7 +83,7 @@ function recordToGuidance(r: PrototypeRecord): SearchGuidanceItem {
 function lexiconToRecord(item: SearchLexiconItem): PrototypeRecord {
   return {
     id: String(item.id), pane: 'lexicon', name: item.entryName ?? `${item.sourceTerm} → ${item.targetTerm}`,
-    channel: SEARCH_SCENES.ALL, region: '全城', kind: LEX_TYPE_L[item.wordType] ?? '業務詞',
+    channel: SEARCH_SCENES.ALL, region: '全城', kind: LEX_TYPE_L[item.wordType] ?? 'business',
     status: item.status === 2 ? STATUS.PAUSED : STATUS.LIVE,
     values: { source: item.sourceTerm, target: item.targetTerm, category: item.categoryId, evidence: item.evidence },
     updatedAt: item.updatedAt ? `後端 · ${item.updatedAt}` : '後端真值',
@@ -100,7 +101,7 @@ function recordToLexicon(r: PrototypeRecord): SearchLexiconItem {
 function scenarioToRecord(item: SearchScenarioItem): PrototypeRecord {
   return {
     id: String(item.id), pane: 'scenarios', name: item.scenarioName ?? `${SCENE_LABEL[channelFrom(item.surface, item.bizChannel)]}基準策略`,
-    channel: channelFrom(item.surface, item.bizChannel), region: '全城', kind: '場景策略',
+    channel: channelFrom(item.surface, item.bizChannel), region: '全城', kind: 'policy',
     status: item.status === 2 ? STATUS.PAUSED : STATUS.LIVE,
     values: { relevance: item.weightRelevance, quality: item.weightQuality, distance: item.weightDistance, heat: item.weightHeat, window: item.candidateWindow, ads: item.adLimitPerPage },
     updatedAt: item.updatedAt ? `後端 · ${item.updatedAt}` : '後端真值',
@@ -120,7 +121,7 @@ function recordToScenario(r: PrototypeRecord): SearchScenarioItem {
 function interventionToRecord(item: SearchInterventionItem): PrototypeRecord {
   return {
     id: String(item.id), pane: 'interventions', name: item.ruleName ?? `${item.targetName ?? item.targetId} · ${ACTION_TYPE_L[item.actionType] ?? ''}`,
-    channel: channelFrom(item.surface ?? 2, item.bizChannel), region: regionOf(item.regionCode), kind: ACTION_TYPE_L[item.actionType] ?? '泛詞降權',
+    channel: channelFrom(item.surface ?? 2, item.bizChannel), region: regionOf(item.regionCode), kind: ACTION_TYPE_L[item.actionType] ?? 'demote',
     status: APPROVAL_LABEL[item.approvalStatus ?? 1] ?? STATUS.DRAFT,
     values: { merchant: item.targetName ?? item.targetId, terms: item.scopeTerms, factor: item.multiplier, days: daysBetween(item.startDate, item.endDate), reason: item.reason },
     updatedAt: item.updatedAt ? `後端 · ${item.updatedAt}` : '後端真值',
@@ -143,7 +144,7 @@ function recordToIntervention(r: PrototypeRecord): SearchInterventionItem {
 // ── release ──
 function releaseToRecord(item: SearchReleaseItem): PrototypeRecord {
   return {
-    id: String(item.id), pane: 'releases', name: item.releaseName ?? item.versionNo, channel: SEARCH_SCENES.ALL, region: '全城', kind: '配置版本',
+    id: String(item.id), pane: 'releases', name: item.releaseName ?? item.versionNo, channel: SEARCH_SCENES.ALL, region: '全城', kind: 'configVersion',
     status: REL_STATUS_L[item.status ?? 0] ?? STATUS.DRAFT,
     values: { version: item.versionNo, changes: item.changeSummary, rollback: item.rollbackVersion },
     updatedAt: item.updatedAt ? `後端 · ${item.updatedAt}` : '後端真值',

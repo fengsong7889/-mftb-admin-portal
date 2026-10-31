@@ -17,7 +17,7 @@ import { SEARCH_SCENES, STATUS, type RecordPane, type PrototypeRecord } from './
 function rec(over: Partial<PrototypeRecord>): PrototypeRecord {
   return {
     id: 'x', pane: 'guidance', name: '午餐', channel: SEARCH_SCENES.DELIVERY, region: '全城',
-    kind: '底紋詞', status: STATUS.DRAFT, values: {}, updatedAt: '', ...over,
+    kind: 'placeholder', status: STATUS.DRAFT, values: {}, updatedAt: '', ...over,
   }
 }
 
@@ -71,7 +71,7 @@ describe('searchBridge 加载降级 loadConfigPanes', () => {
     api.fetchGuidance.mockResolvedValue([{ id: 1, wordType: 1, displayText: '午餐', targetQuery: '午餐', surface: 2, bizChannel: 1, approvalStatus: 1 }])
     const { records } = await loadConfigPanes()
     expect(records).toHaveLength(1)
-    expect(records[0]).toMatchObject({ pane: 'guidance', id: '1', name: '午餐', kind: '底紋詞', status: STATUS.DRAFT })
+    expect(records[0]).toMatchObject({ pane: 'guidance', id: '1', name: '午餐', kind: 'placeholder', status: STATUS.DRAFT })
   })
 })
 
@@ -116,7 +116,7 @@ describe('searchBridge 保存映射 saveConfigRecord', () => {
 
   it('更新（数字 id）走 update，不重复 create', async () => {
     api.updateLexicon.mockResolvedValue(undefined)
-    const id = await saveConfigRecord(rec({ pane: 'lexicon', kind: '有向同義詞', values: { source: '漢堡', target: 'burger' } }), 'lexicon', '5')
+    const id = await saveConfigRecord(rec({ pane: 'lexicon', kind: 'directionSynonym', values: { source: '漢堡', target: 'burger' } }), 'lexicon', '5')
     expect(id).toBe('5')
     expect(api.updateLexicon).toHaveBeenCalledWith(5, expect.objectContaining({ wordType: 3, sourceTerm: '漢堡', targetTerm: 'burger' }))
     expect(api.createLexicon).not.toHaveBeenCalled()
@@ -124,7 +124,7 @@ describe('searchBridge 保存映射 saveConfigRecord', () => {
 
   it('精確準入/打散强制乘数为 1（无商业加权）', async () => {
     api.createIntervention.mockResolvedValue(2)
-    await saveConfigRecord(rec({ pane: 'interventions', kind: '精確準入', values: { merchant: '示例集團', terms: '星港', factor: 0.9, reason: '精確保護' } }), 'interventions')
+    await saveConfigRecord(rec({ pane: 'interventions', kind: 'exactAdmit', values: { merchant: '示例集團', terms: '星港', factor: 0.9, reason: '精確保護' } }), 'interventions')
     expect(api.createIntervention).toHaveBeenCalledWith(expect.objectContaining({ actionType: 2, multiplier: 1 }))
   })
 

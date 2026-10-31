@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MENU_ICON_NAMES } from '@/components/MenuIcon'
-import { CHANNELS, createSampleRecords, FIELD_SCHEMAS, isPane, PANES, prototypeUrl, SCENE_LABEL_KEY, SCENES, SEARCH_SCENES, STATUS, STATUS_LABEL_KEY, validateDraft, type RecordPane } from './prototypeData'
+import { CHANNELS, createSampleRecords, FIELD_SCHEMAS, isPane, KIND_LABEL_KEY, KINDS, PANES, prototypeUrl, SCENE_LABEL_KEY, SCENES, SEARCH_SCENES, STATUS, STATUS_LABEL_KEY, validateDraft, type RecordPane } from './prototypeData'
 import { getPreviewCards, PREVIEW_CARDS, type PreviewContext } from './previewFixtures'
 
 const context: PreviewContext = { scene: 'delivery', region: '澳門', query: '漢堡', sort: 'relevance', showAds: true }
@@ -20,6 +20,15 @@ describe('搜索 U1 样本与原型边界', () => {
     expect(STATUS_LABEL_KEY(STATUS.APPROVED)).toBe('searchV2.enum.status.approved')
     const codes = Object.values(STATUS)
     createSampleRecords().forEach(r => expect(codes).toContain(r.status))
+  })
+  it('配置类型为系统级枚举：各域存 code，label 走 i18n key；示例记录 kind 必属本域枚举', () => {
+    expect(KINDS.guidance).toEqual(['placeholder', 'hotNatural', 'promoted', 'candidate'])
+    expect(KINDS.interventions).toEqual(['demote', 'exactAdmit', 'boost', 'spread'])
+    expect(KIND_LABEL_KEY('trafficPackage')).toBe('searchV2.enum.kind.trafficPackage')
+    // code 全局唯一，避免跳域比较时同形
+    const all = Object.values(KINDS).flat()
+    expect(new Set(all).size).toBe(all.length)
+    createSampleRecords().forEach(r => expect(KINDS[r.pane]).toContain(r.kind))
   })
   it('九个导航图标唯一且已注册，不增加真实菜单', () => {
     expect(PANES).toHaveLength(9)
@@ -77,13 +86,13 @@ describe('搜索 U1 样本与原型边界', () => {
     expect(getPreviewCards({ ...context, query: ' ' })).toEqual([])
   })
   it.each([
-    ['scenarios', '場景策略', { relevance: 65, quality: 15, distance: 15, heat: 10 }, 'searchV2.validate.weights'],
-    ['interventions', '泛詞降權', { factor: 1.2, days: 7 }, 'searchV2.validate.demoteFactor'],
-    ['interventions', '臨時扶持', { factor: 0.8, days: 7 }, 'searchV2.validate.supportFactor'],
-    ['interventions', '泛詞降權', { factor: 0.8, days: 14 }, 'searchV2.validate.daysNormal'],
-    ['interventions', '精確準入', { days: 15 }, 'searchV2.validate.daysExact'],
-    ['guidance', '底紋詞', { start: '2026-11-07', end: '2026-11-01' }, 'searchV2.validate.dates'],
-    ['lexicon', '有向同義詞', { source: '漢堡', target: '漢堡' }, 'searchV2.validate.sameTerm'],
+    ['scenarios', 'policy', { relevance: 65, quality: 15, distance: 15, heat: 10 }, 'searchV2.validate.weights'],
+    ['interventions', 'demote', { factor: 1.2, days: 7 }, 'searchV2.validate.demoteFactor'],
+    ['interventions', 'boost', { factor: 0.8, days: 7 }, 'searchV2.validate.supportFactor'],
+    ['interventions', 'demote', { factor: 0.8, days: 14 }, 'searchV2.validate.daysNormal'],
+    ['interventions', 'exactAdmit', { days: 15 }, 'searchV2.validate.daysExact'],
+    ['guidance', 'placeholder', { start: '2026-11-07', end: '2026-11-01' }, 'searchV2.validate.dates'],
+    ['lexicon', 'directionSynonym', { source: '漢堡', target: '漢堡' }, 'searchV2.validate.sameTerm'],
   ] as const)('表单边界：%s %s', (pane, kind, values, expected) => {
     // 校验消息改为返回 i18n key（由 RecordPage t() 后展示），故此处精确比对 key
     expect(validateDraft(pane as RecordPane, kind, values)).toBe(expected)
