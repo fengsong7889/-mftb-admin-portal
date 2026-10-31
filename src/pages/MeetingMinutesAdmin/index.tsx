@@ -3,23 +3,32 @@
  *
  * 与「我的會議」的区别：那页回答"我的会"，这页回答"公司有哪些纪要、哪件事还没办完"。
  * 因此搜索区按 关键字/时间/记录人/待办状态 筛选，统计卡片跟随搜索条件（§E.8：统计在搜索区下方）。
+ * 本页是菜单列表页（非详情/表单页），按 §E.7 不渲染顶部返回栏与页面标题。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Alert, Button, DatePicker, Input, Space, Table, Tag } from 'antd'
+import { Alert, Button, DatePicker, Form, Input, Select, Space, Table, Tag } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { ReloadOutlined, SearchOutlined, SolutionOutlined } from '@ant-design/icons'
+import { FileTextOutlined, ReloadOutlined, SearchOutlined, SolutionOutlined } from '@ant-design/icons'
 import useMinutesNavigation from '../MeetingManagement/MeetingMinutes/useMinutesNavigation'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import DetailPageHeader from '@/components/DetailPageHeader'
-import StatCards from '@/components/StatCards'
+import MeetingStatCards from '../MeetingManagement/MeetingStatCards'
 import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { fetchMinutesAdminPage, type MinutesAdminRow } from '@/api/meetingMinutes'
 import { minutesStatusMeta } from '../MeetingManagement/meetingMeta'
 
+/** 搜索区表单值：与 §E.1 的查询条件一一对应 */
+interface SearchValues {
+  keyword?: string
+  recorderKeyword?: string
+  itemState?: string
+  range?: [dayjs.Dayjs | null, dayjs.Dayjs | null] | null
+}
+
 export default function MeetingMinutesAdmin() {
   const { t } = useTranslation()
-  const { open: navigate, back } = useMinutesNavigation()
+  const { open: navigate } = useMinutesNavigation()
+  const [form] = Form.useForm<SearchValues>()
   const [rows, setRows] = useState<MinutesAdminRow[]>([])
   const [total, setTotal] = useState(0)
   const [stats, setStats] = useState({ pendingItems: 0, overdueItems: 0, sentMinutes: 0 })
@@ -27,21 +36,22 @@ export default function MeetingMinutesAdmin() {
   const [error, setError] = useState<string>()
   const [page, setPage] = useState(1)
   const [size, setSize] = useState(20)
-  const [filters, setFilters] = useState<{ keyword?: string; recorderKeyword?: string; itemState?: string }>({})
-  const [range, setRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null)
+  /** 已提交的筛选口径快照：统计卡片据此重挂并重新触发计数动画（§E.8） */
+  const [applied, setApplied] = useState<SearchValues>({})
 
   const requestId = useRef(0)
   const load = useCallback(async () => {
     const currentRequest = ++requestId.current
     setLoading(true)
     setError(undefined)
+    const values = form.getFieldsValue()
     try {
       const result = await fetchMinutesAdminPage({
-        keyword: filters.keyword,
-        recorderKeyword: filters.recorderKeyword,
-        itemState: filters.itemState,
-        startDate: range?.[0]?.format('YYYY-MM-DD'),
-        endDate: range?.[1]?.format('YYYY-MM-DD'),
+        keyword: values.keyword?.trim() || undefined,
+        recorderKeyword: values.recorderKeyword?.trim() || undefined,
+        itemState: values.itemState,
+        startDate: values.range?.[0]?.format('YYYY-MM-DD'),
+        endDate: values.range?.[1]?.format('YYYY-MM-DD'),
         page,
         size,
       })
@@ -53,15 +63,26 @@ export default function MeetingMinutesAdmin() {
         overdueItems: result.overdueItems ?? 0,
         sentMinutes: result.sentMinutes ?? 0,
       })
+      setApplied(values)
     } catch (e) {
       if (currentRequest !== requestId.current) return
       setError(e instanceof Error ? e.message : t('meeting.failedToLoadThe2', { defaultValue: '會議詳情加載失敗' }))
     } finally {
       if (currentRequest === requestId.current) setLoading(false)
     }
-  }, [filters, page, size, range, t])
+  }, [form, page, size, t])
 
   useEffect(() => { void load() }, [load])
+
+  /** 查询：条件变更后回到第 1 页，避免停留在过滤后不存在的页码 */
+  const search = () => { setPage(1); void load() }
+
+  const reset = () => { form.resetFields(); setPage(1); void load() }
+
+  const statsKey = [
+    applied.keyword ?? '', applied.recorderKeyword ?? '', applied.itemState ?? '',
+    applied.range?.[0]?.valueOf() ?? '', applied.range?.[1]?.valueOf() ?? '',
+  ].join('|')
 
   const columns: TableColumnsType<MinutesAdminRow> = [
     { title: t('meeting.minutes.minutesNo', { defaultValue: '紀要單號' }), dataIndex: 'minutesNo', key: 'minutesNo', width: 150 },
@@ -122,47 +143,46 @@ export default function MeetingMinutesAdmin() {
 
   return (
     <div className="content-area">
-      <DetailPageHeader title={t('meeting.minutes.adminTitle', { defaultValue: '會議紀要' })} onBack={back} />
-
       {error && <Alert type="error" showIcon style={{ marginBottom: 16 }} message={t('meeting.loadFailed', { defaultValue: '加載失敗' })} description={error} />}
 
+      {/* 搜索区（§E.1）：4 列 grid 由 .search-section 统一接管，控件一律 width:100% */}
       <div className="search-section">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(230px, 100%), 1fr))', gap: '16px 12px' }}>
-          <Input allowClear value={filters.keyword} style={{ width: '100%' }} prefix={<SearchOutlined />}
-            placeholder={t('meeting.minutes.adminKeywordPlaceholder', { defaultValue: '紀要單號 / 會議單號 / 主題 / 結論' })}
-            onChange={event => { setPage(1); setFilters(previous => ({ ...previous, keyword: event.target.value })) }} />
-          <Input allowClear value={filters.recorderKeyword} style={{ width: '100%' }}
-            placeholder={t('meeting.minutes.recorderPlaceholder', { defaultValue: '記錄人姓名或工號' })}
-            onChange={event => { setPage(1); setFilters(previous => ({ ...previous, recorderKeyword: event.target.value })) }} />
-          <DatePicker.RangePicker value={range} style={{ width: '100%' }}
-            onChange={value => { setPage(1); setRange(value as [dayjs.Dayjs | null, dayjs.Dayjs | null] | null) }} />
-          <Space.Compact>
-            <Button type={filters.itemState === undefined ? 'primary' : 'default'} size="small"
-              onClick={() => { setPage(1); setFilters(previous => ({ ...previous, itemState: undefined })) }}>{t('meeting.all2', { defaultValue: '全部' })}</Button>
-            <Button type={filters.itemState === 'pending' ? 'primary' : 'default'} size="small"
-              onClick={() => { setPage(1); setFilters(previous => ({ ...previous, itemState: 'pending' })) }}>{t('meeting.minutes.pending', { defaultValue: '待處理' })}</Button>
-            <Button type={filters.itemState === 'overdue' ? 'primary' : 'default'} size="small" danger={filters.itemState === 'overdue'}
-              onClick={() => { setPage(1); setFilters(previous => ({ ...previous, itemState: 'overdue' })) }}>{t('meeting.minutes.overdue', { defaultValue: '已逾期' })}</Button>
-          </Space.Compact>
-          <div className="search-actions">
-            <Button type="primary" icon={<SearchOutlined />} onClick={() => void load()}>{t('common.search')}</Button>
-            <Button icon={<ReloadOutlined />} onClick={() => { setPage(1); setFilters({}); setRange(null) }}>{t('common.reset')}</Button>
-          </div>
-        </div>
+        <Form form={form} layout="inline">
+          <Form.Item label={t('meeting.keyword', { defaultValue: '關鍵字' })} name="keyword">
+            <Input allowClear style={{ width: '100%' }} prefix={<SearchOutlined />}
+              placeholder={t('meeting.minutes.adminKeywordPlaceholder', { defaultValue: '紀要單號 / 會議單號 / 主題 / 結論' })}
+              onPressEnter={search} />
+          </Form.Item>
+          <Form.Item label={t('meeting.minutes.recorderColumn', { defaultValue: '記錄人' })} name="recorderKeyword">
+            <Input allowClear style={{ width: '100%' }}
+              placeholder={t('meeting.minutes.recorderPlaceholder', { defaultValue: '記錄人姓名或工號' })}
+              onPressEnter={search} />
+          </Form.Item>
+          <Form.Item label={t('meeting.minutes.publishedAt', { defaultValue: '發布時間' })} name="range">
+            <DatePicker.RangePicker style={{ width: '100%' }} allowClear />
+          </Form.Item>
+          <Form.Item label={t('meeting.minutes.itemState', { defaultValue: '待辦' })} name="itemState">
+            <Select allowClear style={{ width: '100%' }} placeholder={t('meeting.all2', { defaultValue: '全部' })}
+              options={[
+                { value: 'pending', label: t('meeting.minutes.pending', { defaultValue: '待處理' }) },
+                { value: 'overdue', label: t('meeting.minutes.overdue', { defaultValue: '已逾期' }) },
+              ]} />
+          </Form.Item>
+          <Form.Item>
+            <div className="search-actions">
+              <Button type="primary" icon={<SearchOutlined />} onClick={search}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={reset}>{t('common.reset')}</Button>
+            </div>
+          </Form.Item>
+        </Form>
       </div>
 
-      {/* 统计卡片：必须在搜索区下方，且口径跟随筛选条件 */}
-      <div style={{ margin: '16px 0' }}>
-        <StatCards
-          animationKey={`${filters.keyword ?? ''}|${filters.recorderKeyword ?? ''}|${filters.itemState ?? ''}|${range?.[0]?.valueOf() ?? ''}|${range?.[1]?.valueOf() ?? ''}`}
-          columns={3}
-          items={[
-            { key: 'sent', icon: <SolutionOutlined />, value: stats.sentMinutes, label: t('meeting.minutes.statSent', { defaultValue: '已發送紀要' }), color: 'info' },
-            { key: 'pending', icon: <SolutionOutlined />, value: stats.pendingItems, label: t('meeting.minutes.statPending', { defaultValue: '待辦事項' }), color: 'brand' },
-            { key: 'overdue', icon: <SolutionOutlined />, value: stats.overdueItems, label: t('meeting.minutes.statOverdue', { defaultValue: '逾期事項' }), color: 'danger' },
-          ]}
-        />
-      </div>
+      {/* 统计卡片：必须在搜索区下方（§E.8），key 为口径快照，条件一变重跑计数动画 */}
+      <MeetingStatCards key={statsKey} loading={loading} items={[
+        { icon: <FileTextOutlined />, color: '#1890FF', bg: '#E6F7FF', value: stats.sentMinutes, label: t('meeting.minutes.statSent', { defaultValue: '已發送紀要' }) },
+        { icon: <SolutionOutlined />, color: '#E8720C', bg: '#FFF7E6', value: stats.pendingItems, label: t('meeting.minutes.statPending', { defaultValue: '待辦事項' }) },
+        { icon: <SolutionOutlined />, color: '#FF4D4F', bg: '#FFF1F0', value: stats.overdueItems, label: t('meeting.minutes.statOverdue', { defaultValue: '逾期事項' }) },
+      ]} />
 
       <div className="action-section">
         <div className="action-section-left"><Button icon={<ReloadOutlined />} onClick={() => void load()} loading={loading}>{t('meeting.refreshList', { defaultValue: '重新整理' })}</Button></div>

@@ -91,9 +91,8 @@ export default function MeetingConfig({ mode = 'rules' }: { mode?: 'rules' | 'bl
     const target = tab === 'rooms' ? '/meeting-config?tab=rooms' : '/meeting-config'
     if (await confirmLeave(target)) setParams(tab === 'rooms' ? { tab: 'rooms' } : {})
   }
-  if (mode === 'blacklist') return <div className="content-area mr-workspace">
-    <RulePageHeader title={t('meetingReservation.blacklistTitle', { defaultValue: '預約黑名單' })}
-      subtitle={t('meetingReservation.blacklistSubtitle', { defaultValue: '統一管理預約限制；到期自動解除，撤銷保留記錄' })} />
+  // 黑名单已拆为独立菜单：按普通列表菜单界面呈现（无顶部标题横幅），与其他列表页一致
+  if (mode === 'blacklist') return <div className="content-area">
     <BlacklistPanel />
   </div>
   return <div className="content-area mr-workspace">

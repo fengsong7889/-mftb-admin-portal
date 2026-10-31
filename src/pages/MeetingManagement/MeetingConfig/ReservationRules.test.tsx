@@ -98,9 +98,16 @@ describe('預約規則頁（通用 / 會議室兩 Tab）', () => {
 })
 
 describe('預約黑名單獨立頁', () => {
-  it('mode=blacklist 渲染獨立頁與新增入口，且不混入規則 Tab', async () => {
+  /**
+   * 黑名单已拆为独立菜单，界面按普通列表页呈现（搜索区 → 统计卡 → 操作区 → 表格），
+   * 不再自带顶部标题横幅——页面名由菜单提供，重复写一遍只会与菜单改名脱钩。
+   * 因此本用例钉的是「无标题横幅 + 新增入口在 + 不混入規則 Tab」，
+   * 并用黑名单独有的统计卡标签确认渲染的确实是黑名单列表而非规则页。
+   */
+  it('mode=blacklist 按普通列表页渲染（无顶部标题横幅），保留新增入口且不混入規則 Tab', async () => {
     render(<MemoryRouter initialEntries={['/meeting-blacklist']}><MeetingConfig mode="blacklist" /></MemoryRouter>)
-    expect(await screen.findByText('預約黑名單')).toBeInTheDocument()
+    expect(await screen.findByText('限制記錄總數')).toBeInTheDocument()
+    expect(screen.queryByText('預約黑名單')).toBeNull()
     expect(screen.getByRole('button', { name: /手動加入黑名單/ })).toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: '通用規則' })).toBeNull()
   })

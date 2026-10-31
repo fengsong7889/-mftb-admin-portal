@@ -100,15 +100,6 @@ export default function RoomBooking() {
 
   return (
     <div className="content-area">
-      {/* 页面说明横幅：忙闲口径与脱敏规则写在最前面，避免用户把「已占用」误读成系统故障 */}
-      <Alert
-        type="info"
-        showIcon
-        style={{ marginBottom: 16 }}
-        message={t('meeting.seeWhoOccupiesWhich', { defaultValue: '先看誰佔用了哪一段，再決定訂哪間；點擊空白時段即可帶出開始時間' })}
-        description={t('meeting.adjacentSlotsDoNot', { defaultValue: '相鄰時段不衝突（10:00–11:00 與 11:00–12:00 可背靠背）。部分會議室已開啟主題脫敏，忙閒條只顯示「已佔用」，不顯示主題與組織者。' })}
-      />
-
       {error && (
         <Alert
           type="error"

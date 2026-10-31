@@ -64,6 +64,30 @@ const AI_REASON_KEYS: Record<string, string> = {
   no_permission: 'meeting.minutes.ai.reason.no_permission',
   admission_unavailable: 'meeting.minutes.ai.reason.unavailable',
   check_failed: 'meeting.minutes.ai.reason.unavailable',
+  channel_misconfigured: 'meeting.minutes.ai.reason.misconfigured',
+  upstream_error: 'meeting.minutes.ai.reason.unavailable',
+  upstream_network: 'meeting.minutes.ai.reason.unavailable',
+  upstream_bad_json: 'meeting.minutes.ai.reason.unavailable',
+  upstream_timeout: 'meeting.minutes.ai.reason.timeout',
+  upstream_arrearage: 'meeting.minutes.ai.reason.arrearage',
+  upstream_invalid_key: 'meeting.minutes.ai.reason.invalid_key',
+  upstream_model_not_found: 'meeting.minutes.ai.reason.model_not_found',
+  upstream_rate_limited: 'meeting.minutes.ai.reason.rate_limited',
+  upstream_content_filter: 'meeting.minutes.ai.reason.content_filter',
+  upstream_quota_exhausted: 'meeting.minutes.ai.reason.quota_exhausted',
+}
+
+/** 提取失败时按错误码显示用户可读提示，而不是展示原始错误码。 */
+const AI_FAILED_HINT_KEYS: Record<string, string> = {
+  upstream_arrearage: 'meeting.minutes.ai.failed.arrearage',
+  upstream_invalid_key: 'meeting.minutes.ai.failed.invalid_key',
+  upstream_model_not_found: 'meeting.minutes.ai.failed.model_not_found',
+  upstream_rate_limited: 'meeting.minutes.ai.failed.rate_limited',
+  upstream_content_filter: 'meeting.minutes.ai.failed.content_filter',
+  upstream_quota_exhausted: 'meeting.minutes.ai.failed.quota_exhausted',
+  upstream_timeout: 'meeting.minutes.ai.failed.timeout',
+  upstream_network: 'meeting.minutes.ai.failed.network',
+  channel_misconfigured: 'meeting.minutes.ai.failed.misconfigured',
 }
 
 export default function MinutesAiInputPanel(props: Props) {
@@ -209,7 +233,12 @@ export default function MinutesAiInputPanel(props: Props) {
       </div>}
 
       {failed && <Alert className="mm-ai__failure" type="warning" showIcon
-        message={t('meeting.minutes.ai.failedTitle')} description={t('meeting.minutes.ai.failedHint', { code: errorCode ?? 'unknown' })}
+        message={t('meeting.minutes.ai.failedTitle')}
+        description={
+          errorCode && AI_FAILED_HINT_KEYS[errorCode]
+            ? t(AI_FAILED_HINT_KEYS[errorCode], { defaultValue: '原因碼：' + errorCode + '。筆記與手動表單均保持原樣。' })
+            : t('meeting.minutes.ai.failedHint', { code: errorCode ?? 'unknown' })
+        }
         action={<Button onClick={onManual} disabled={disabled}>{t('meeting.minutes.ai.continueManual')}</Button>} />}
 
       {result && (phase === 'succeeded' || stale) && <MinutesAiReviewPanel result={result} noteText={text} stale={stale}

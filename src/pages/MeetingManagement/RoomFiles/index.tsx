@@ -328,15 +328,6 @@ export default function RoomFiles() {
 
   return (
     <div className="content-area">
-      {/* 页面说明横幅（§E.8：说明横幅留在搜索区上方，不属于统计卡片） */}
-      <Alert
-        type="info"
-        showIcon
-        style={{ marginBottom: 16 }}
-        message={t('meeting.roomFilesBanner', { defaultValue: '會議室檔案全員可查，僅行政可新增與修改' })}
-        description={t('meeting.roomFilesBannerDesc', { defaultValue: '「可預約窗」與「單場時長」留空表示沿用全局默認規則；需要單獨調整某間房時，在編輯頁填入即以房間配置為準。停用的房間不再接受新預約，歷史會議不受影響。' })}
-      />
-
       {error && (
         <Alert
           type="error"
