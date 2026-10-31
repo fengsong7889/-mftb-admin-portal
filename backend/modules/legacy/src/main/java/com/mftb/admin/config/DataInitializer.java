@@ -205,6 +205,9 @@ public class DataInitializer implements CommandLineRunner {
             seedSystemMenus();
             adjustAiCenterMenus();
         });
+        // 319: 「商家評分透視」→「商家權重分排名」。占比（權重）配置模塊已停用，
+        // 頁面只展示三維度得分合計；種子不會覆蓋存量名稱，故用一次性遷移改名。
+        versionTracker.applyOnce("ads:merchant-score-menu-rename-v1", this::renameMerchantScoreInsightMenu);
         // 旧版 JSON 权限迁移必须晚于菜单种子化执行:
         // 否则 resolveMenuId 会为尚未种子的菜单键创建占位菜单(name=menu_key, parent_id=NULL),
         // 被菜单树 buildTree 的孤儿兜底逻辑顶成一级菜单(生产事故: 实验沙盘子菜单顶到一级)
@@ -2279,7 +2282,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 Map.entry("traffic-sandbox", "Experiment Sandbox"),
                 Map.entry("waterfall-simulation", "Waterfall Simulation"),
                 Map.entry("algorithm-simulation", "Algorithm Simulation"),
-                Map.entry("merchant-score-insight", "Merchant Score Insight"),
+                Map.entry("merchant-score-insight", "Merchant Weighted Score Ranking"),
                 Map.entry("merchant-promotion-diagnose", "Promotion Diagnosis"),
                 Map.entry("promotion-tool", "Promotion Pass"),
                 Map.entry("promotion_tool", "Promotion Pass"),
@@ -2433,6 +2436,15 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                     "UPDATE sys_menu SET name_en = ? WHERE menu_key = ? AND (name_en IS NULL OR name_en = '')",
                     entry.getValue(), entry.getKey());
         }
+    }
+
+    /**
+     * 僅把歷史默認名改為新名，運營在菜單配置裡自定義過的名稱不覆蓋；
+     * 由 versionTracker.applyOnce 保証每個環境只執行一次。
+     */
+    private void renameMerchantScoreInsightMenu() {
+        jdbcTemplate.update("UPDATE sys_menu SET name = '商家權重分排名' WHERE menu_key = 'merchant-score-insight' AND name = '商家評分透視'");
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Merchant Weighted Score Ranking' WHERE menu_key = 'merchant-score-insight' AND (name_en IS NULL OR name_en = 'Merchant Score Insight')");
     }
 
     /**
@@ -2737,7 +2749,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("traffic-sandbox",          new String[]{"實驗沙盤",     "merchant_promotion", "8"});
         menus.put("waterfall-simulation",     new String[]{"瀑布流推演",   "traffic-sandbox",    "1"});
         menus.put("algorithm-simulation",     new String[]{"算法推演",     "traffic-sandbox",    "2"});
-        menus.put("merchant-score-insight",   new String[]{"商家評分透視", "traffic-sandbox",    "3"});
+        menus.put("merchant-score-insight",   new String[]{"商家權重分排名", "traffic-sandbox",    "3"});
         menus.put("merchant-promotion-diagnose", new String[]{"商家推廣診斷", "traffic-sandbox", "4"});
         // ── 商家推广工具 > 赠送管理 ──
         menus.put("gift-detail",         new String[]{"推廣贈送",         "gift-manage",        "1"});

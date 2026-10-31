@@ -210,6 +210,7 @@ export default function WaterfallSimulation() {
 
   return (
     <div className="content-area">
+      <Alert type="info" showIcon style={{ marginBottom: 16 }} message="演示資料 · 非真實瀑布流執行結果" description="兩種模式均使用固定演示資料，不代表正式配置已接入投放。展示位次與自然流量排名是不同口徑。" />
       {/* 頁面標題 */}
       <div style={{
         background: '#fff', padding: '12px 20px', marginBottom: 12,
@@ -231,7 +232,7 @@ export default function WaterfallSimulation() {
           value={mode}
           onChange={handleModeChange}
           options={[
-            { label: t('trafficSandbox.modeOfficial'), value: SandboxMode.OFFICIAL },
+            { label: '已啟用配置（演示）', value: SandboxMode.OFFICIAL },
             { label: t('trafficSandbox.modeSandbox'), value: SandboxMode.SANDBOX },
           ]}
         />

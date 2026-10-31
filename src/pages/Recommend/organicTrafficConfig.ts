@@ -1023,6 +1023,96 @@ export function validateSignboardScoreConfig(cfg: SignboardScoreConfig): string 
   return null
 }
 
+/* ============================ 門店標籤計分（STB_LABEL） ============================ */
+
+/**
+ * 门店标签枚举（店铺维度 STB_LABEL 的计分依据）。
+ * 标签由运营在门店资料中手动指定，一家门店同时只有一个标签，因此本项是「命中一檔即停」，
+ * 不同于 COM_10 金字招牌的多标签逐个累加。存储值与第二阶段后端字典保持一致，界面只认本清单。
+ */
+export const STORE_LABELS = [
+  { value: 'exclusive', label: '獨家' },
+  { value: 'brand', label: '品牌' },
+  { value: 'chain', label: '連鎖' },
+  { value: 'gold', label: '金牌' },
+] as const
+
+export type StoreLabelValue = typeof STORE_LABELS[number]['value']
+
+/** 按存储值取标签元数据（找不到返回 undefined，由调用方决定兜底展示） */
+export const storeLabelMeta = (value?: string) => STORE_LABELS.find(item => item.value === value)
+/** 标签展示文案；未知编码退回原始值，避免界面出现空白 */
+export const storeLabelText = (value?: string): string => storeLabelMeta(value)?.label ?? value ?? ''
+
+/** 使用门店标签计分面板的规则编码 */
+export const STORE_LABEL_SCORE_RULE_IDS = ['STB_LABEL'] as const
+export type StoreLabelScoreRuleId = typeof STORE_LABEL_SCORE_RULE_IDS[number]
+
+/** 判断该计分项是否走门店标签计分面板 */
+export const isStoreLabelScoreRule = (id?: string): boolean =>
+  !!id && (STORE_LABEL_SCORE_RULE_IDS as readonly string[]).includes(id)
+
+/** 单个门店标签的计分配置 */
+export interface StoreLabelScore {
+  /** 标签存储值（枚举见 STORE_LABELS） */
+  labelValue: string
+  /** 标签名称快照：保存时从枚举带出，枚举调整后历史数据仍可读 */
+  labelName: string
+  /** 该标签分值：门店当前标签命中即得分 */
+  score: number
+}
+
+/** 门店标签计分配置（与券类 v1 面板互斥，不共用结构） */
+export interface StoreLabelScoreConfig {
+  items: StoreLabelScore[]
+}
+
+/** 默认配置：空清单，标签与分值全部由运营自行增删（对齐 COM_10 口径） */
+export const DEFAULT_STORE_LABEL_SCORE_CONFIG: StoreLabelScoreConfig = { items: [] }
+
+/** 门店标签计分结果 */
+export interface StoreLabelScoreResult {
+  /** 命中的标签档（未配置即为空） */
+  matched?: StoreLabelScore
+  /** 门店有标签但后台未配分值：不计分，供界面提示补配 */
+  unconfigured: boolean
+  total: number
+}
+
+/**
+ * 算分：以门店当前标签为准，命中一檔即停、不累加。
+ * 未配置该标签、或门店尚未指定标签，都按 0 分处理（不设兜底分）。
+ */
+export function computeStoreLabelScore(cfg: StoreLabelScoreConfig, labelValue?: string): StoreLabelScoreResult {
+  const matched = labelValue ? cfg.items.find(item => item.labelValue === labelValue) : undefined
+  return { matched, unconfigured: !!labelValue && !matched, total: matched?.score ?? 0 }
+}
+
+/** 配置校驗：返回錯誤文案，null 表示通過（同一標籤不得重複，分值必須是 0～1000 整數） */
+export function validateStoreLabelScoreConfig(cfg: StoreLabelScoreConfig): string | null {
+  const seen = new Set<string>()
+  for (let i = 0; i < cfg.items.length; i++) {
+    const item = cfg.items[i]
+    const name = item.labelName || item.labelValue || `第 ${i + 1} 行`
+    if (!item.labelValue) return `${name}請選擇門店標籤`
+    if (seen.has(item.labelValue)) return `標籤「${name}」重複配置，同一標籤只能有一檔分值`
+    seen.add(item.labelValue)
+    if (!Number.isInteger(item.score) || item.score < 0 || item.score > 1000) return `標籤「${name}」的分值必須是 0～1000 的整數`
+  }
+  return null
+}
+
+/** 时段推荐计分的前提条件标记：与 COM_02「報名即給分」同先例，住 prerequisites 字段供后端计分侧识读 */
+export const TIME_SLOT_AD_PREREQUISITE = '購買時段推薦'
+
+/**
+ * 时段推荐默认分值：商家购买时段推荐广告后得的一次性固定加分。
+ * 只作未播种环境的兜底，真实分值以规则行 score 为准并可在界面编辑。
+ * 编码用语义后缀而非 COM_11/COM_12：后端自动编号只取现有行最大序号 +1，
+ * 数字编码可能在自定义计分项上撞车（STB_ACT 同此先例）。
+ */
+export const TIME_SLOT_AD_DEFAULT_SCORE = 50
+
 /** 高峰時段定義 */
 export interface PeakTimeRange {
   /** 標籤（如「午高峰」） */
@@ -1146,9 +1236,13 @@ export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
   { id: 'COM_06', dimension: ScoreDimension.COMMERCIAL, name: '平台會員紅包', description: '商家報名平台會員紅包：報名分 + 加碼分（按商家額外加碼出資金額梯度計分）', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
   { id: 'COM_07', dimension: ScoreDimension.COMMERCIAL, name: '平台官方神券', description: '商家設置平台官方神券：報名分 + 門檻分（門檻 ÷ 門店客單價） + 力度分（券面 ÷ 計價基數）', mode: ScoreMode.AMOUNT_MULTIPLIER, score: 2, status: ENABLED, builtin: true },
   { id: 'COM_10', dimension: ScoreDimension.COMMERCIAL, name: '金字招牌(廣告)', description: '商家購買金字招牌標籤後，按已購買且在投放期內的標籤逐個累加計分', mode: ScoreMode.RULE_BONUS, score: 100, status: ENABLED, builtin: true },
+  // 时段推荐：与 STB_06/STB_07 同型的「购买即给固定分」计分项，不分购买时段数量、不累加
+  { id: 'COM_SLOT', dimension: ScoreDimension.COMMERCIAL, name: '時段推薦', description: '商家購買時段推薦廣告，投放期內即得固定加分，不區分購買時段數量、不累加；未購買或已過期不加分', mode: ScoreMode.RULE_BONUS, score: TIME_SLOT_AD_DEFAULT_SCORE, status: ENABLED, builtin: true, prerequisites: TIME_SLOT_AD_PREREQUISITE },
 
   // ===== 店鋪維度（基礎信息 + 店鋪運營） =====
   { id: 'STB_01', dimension: ScoreDimension.STORE, name: '主營時段加分', description: '主營時段配置完整，當前處於主營時段內加分', mode: ScoreMode.RULE_BONUS, score: 60, status: ENABLED, builtin: true },
+  // 门店标签：原 STB_04「店鋪標籤-金牌」只支持金牌单一身份，已下架；本项改为独家/品牌/连锁/金牌四选一的标签分值表
+  { id: 'STB_LABEL', dimension: ScoreDimension.STORE, name: '門店標籤', description: '門店標籤由門店資料手動指定，獨家／品牌／連鎖／金牌四選一；按當前標籤命中對應分值，命中一檔即停、不累加，未配置該標籤不加分', mode: ScoreMode.RULE_BONUS, score: 0, status: ENABLED, builtin: true },
   { id: 'STB_02', dimension: ScoreDimension.STORE, name: '營業狀態', description: '營業中滿分；休息一會（2小時自動恢復）、爆單暫停（2小時自動恢復）降權；休息打烊由系統直接過濾，不加載到瀑布流也不計分', mode: ScoreMode.CONDITIONAL, score: 0, status: ENABLED, builtin: true, conditionItems: [
       { condition: 'bonus', score: 100 },
       { condition: 'deduction', score: 20 },

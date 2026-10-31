@@ -189,6 +189,7 @@ export default function MerchantPromotionDiagnose() {
 
   return (
     <div className="content-area">
+      <Alert type="info" showIcon style={{ marginBottom: 16 }} message="演示資料 · 非真實推廣診斷" description="訂單、投放及診斷結論均為樣例。真實報名與匹配資料待商戶運營系統接入，不可據此調整商家業務。" />
       {/* 頁面標題 */}
       <div style={{
         background: '#fff', padding: '12px 20px', marginBottom: 12,
