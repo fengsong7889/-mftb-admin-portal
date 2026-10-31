@@ -183,6 +183,47 @@ describe('通用计分项：模块卡片与减免运费开关', () => {
     expect(panel.queryByText('固定加分')).not.toBeInTheDocument()
   }, 120000)
 
+  it('時段推薦走商業維度固定加分，後端未種子時保底插在金字招牌之後', async () => {
+    api.fetch.mockResolvedValue({ dimensions: [], rules: [
+      { id: 31, ruleCode: 'COM_10', dimension: 1, name: '金字招牌(廣告)', description: '標籤逐個累加', mode: 1, score: 100, status: 1, builtin: 1 },
+      { id: 32, ruleCode: 'COM_01', dimension: 1, name: '滿額立減', description: '券類力度計分', mode: 5, score: 0, status: 1, builtin: 1 },
+    ] })
+    await mount()
+    const codes = screen.getAllByText(/^COM_/).map(el => el.textContent)
+    // 保底项紧跟锚点金字招牌，不附在列表末尾
+    expect(codes.slice(0, 2)).toEqual(['COM_10', 'COM_SLOT'])
+    fireEvent.click(screen.getByText('COM_SLOT'))
+    const body = screen.getByText('COM_SLOT').parentElement?.parentElement?.querySelector('.algorithm-form__rule-body')
+    // 一个模块一个配置：只有一行「购买时段推荐 → 固定加分」，不复用通用前提条件/计分方式入口
+    expect(body!.querySelectorAll('.organic-score-row')).toHaveLength(1)
+    expect(body).toHaveTextContent('購買時段推薦')
+    expect(body).toHaveTextContent('固定加分')
+    expect(body).toHaveTextContent('+50 分')
+  }, 120000)
+
+  it('門店標籤走標籤計分面板（獨家/品牌/連鎖/金牌），後端未種子時也保底展示', async () => {
+    await mount()
+    fireEvent.click(screen.getByRole('tab', { name: /dimStore/ }))
+    fireEvent.click(screen.getByText('STB_LABEL'))
+    const panel = within(screen.getByLabelText('門店標籤計分配置'))
+    expect(panel.getByText('標籤計分 · 按門店當前標籤命中一檔即停')).toBeInTheDocument()
+    expect(panel.getByText('標籤分值明細')).toBeInTheDocument()
+    // 未配置時的空態引導（對齊 COM_10 的配置方式）
+    expect(panel.getByText(/尚未配置任何標籤分值/)).toBeInTheDocument()
+  }, 120000)
+
+  it('後端已返回店鋪維度規則時，門店標籤仍保底插入主營時段之後', async () => {
+    api.fetch.mockResolvedValue({ dimensions: [], rules: [
+      { id: 21, ruleCode: 'STB_01', dimension: 2, name: '主營時段加分', description: '主營時段加分', mode: 1, score: 60, status: 1, builtin: 1 },
+      { id: 22, ruleCode: 'STB_02', dimension: 2, name: '營業狀態', description: '營業狀態計分', mode: 6, score: 0, status: 1, builtin: 1 },
+    ] })
+    await mount()
+    fireEvent.click(screen.getByRole('tab', { name: /dimStore/ }))
+    const codes = screen.getAllByText(/^STB_/).map(el => el.textContent)
+    // 保底项紧跟主營時段加分，不附在列表末尾
+    expect(codes.slice(0, 2)).toEqual(['STB_01', 'STB_LABEL'])
+  }, 120000)
+
   it('点金广告计分项已下架，后端残留数据也不再展示', async () => {
     api.fetch.mockResolvedValue({ dimensions: [], rules: [{ id: 9, ruleCode: 'COM_09', dimension: 1,
       name: '購買廣告-點金廣告', description: '購買點金廣告投放期內加分', mode: 1, score: 80, status: 1, builtin: 1 }] })
@@ -359,8 +400,8 @@ describe('自然流量计分展示一致性', () => {
       fireEvent.click(screen.getByText(rule.id))
       const body = screen.getByText(rule.id).parentElement?.parentElement?.querySelector('.algorithm-form__rule-body')
       expect(body, rule.id).toBeTruthy()
-      if (rule.id === 'STB_ACT' || rule.id === 'COM_10') {
-        // 两者都靠运营自行增删条目，未配置时以空态引导而非统一行结构
+      if (rule.id === 'STB_ACT' || rule.id === 'COM_10' || rule.id === 'STB_LABEL') {
+        // 三者都靠运营自行增删条目，未配置时以空态引导而非统一行结构
         expect(body, rule.id).toHaveTextContent('尚未配置')
       } else {
         const rows = body!.querySelectorAll('.organic-score-row')

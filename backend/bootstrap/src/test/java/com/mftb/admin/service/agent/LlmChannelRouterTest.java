@@ -92,14 +92,28 @@ class LlmChannelRouterTest {
     }
 
     @Test
-    @DisplayName("密文解密失败（换过加密密钥）同样视为不可用，而不是带 null Key 打上游")
+    @DisplayName("密文解密失败（换过加密密钥）同样不可用，diagnose 给出 key_stale 而不是 no_api_key")
     void undecryptableKeyIsNotUsableChannel() {
         when(sysConfigService.getConfigValueCached(any())).thenReturn(null);
-        when(providerMapper.selectList(any())).thenReturn(java.util.List.of(provider("enc:xxxx")));
-        when(keyCipher.decrypt("enc:xxxx")).thenReturn(null);
+        when(providerMapper.selectList(any())).thenReturn(java.util.List.of(provider("enc:v1:deadbeef:xxxx")));
+        when(keyCipher.inspect("enc:v1:deadbeef:xxxx")).thenReturn(ProviderKeyCipher.Outcome.STALE);
+        when(keyCipher.decrypt("enc:v1:deadbeef:xxxx")).thenReturn(null);
 
         assertNull(router.resolveChannel(LlmChannelRouter.CHANNEL_PRIMARY, "MF00001"));
-        assertEquals(LlmChannelRouter.REASON_NO_API_KEY, router.diagnose(LlmChannelRouter.CHANNEL_PRIMARY, "MF00001"));
+        // 旧行为把「配过但解不开」也报成 no_api_key，运维会去「配 Key」而不是「重填」，定位错方向
+        assertEquals(LlmChannelRouter.REASON_KEY_STALE, router.diagnose(LlmChannelRouter.CHANNEL_PRIMARY, "MF00001"));
+    }
+
+    /** 密钥可用时不能被新增的三态判定误伤：否则密钥轮换修复会把本来正常的通道报成不可用。 */
+    @Test
+    @DisplayName("Key 可解密：diagnose 给出 ok")
+    void usableKeyDiagnosesOk() {
+        when(sysConfigService.getConfigValueCached(any())).thenReturn(null);
+        when(providerMapper.selectList(any())).thenReturn(java.util.List.of(provider("sk-plain-key")));
+        when(keyCipher.inspect("sk-plain-key")).thenReturn(ProviderKeyCipher.Outcome.OK);
+        when(keyCipher.decrypt("sk-plain-key")).thenReturn("sk-plain-key");
+
+        assertEquals(LlmChannelRouter.REASON_OK, router.diagnose(LlmChannelRouter.CHANNEL_PRIMARY, "MF00001"));
     }
 
     @Test

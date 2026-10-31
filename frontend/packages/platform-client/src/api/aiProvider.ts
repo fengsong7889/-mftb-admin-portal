@@ -10,6 +10,28 @@ export type ProviderType = 'cloud' | 'private'
 /** 启用状态 */
 export type EnabledStatus = 0 | 1
 
+/**
+ * API Key 可用状态——与后端 AiProviderDTO.API_KEY_* 常量一一对应。
+ *
+ * STALE 是本次改造新增的第三态：库里存过密文、但当前加密密钥解不开
+ * （典型成因是轮换 JWT_SECRET 后旧密文作废）。它和 UNSET 的处置动作完全不同——
+ * 前者要「重填」，后者要「去配」，合并显示会让管理员误判为「没保存成功」。
+ */
+export const AI_API_KEY_STATUS = {
+  /** 从未配置 */
+  UNSET: 0,
+  /** 已配置且可正常使用 */
+  OK: 1,
+  /** 配过但当前加密密钥解不开，需重新填写 */
+  STALE: 2,
+} as const
+
+/** 解析列表行的 Key 状态；旧后端未回 apiKeyStatus 时按脱敏串兜底，避免升级顺序导致全部显示未配置 */
+export function resolveApiKeyStatus(row: Pick<AiProvider, 'apiKeyStatus' | 'apiKeyMasked'>): number {
+  if (row.apiKeyStatus != null) return row.apiKeyStatus
+  return row.apiKeyMasked && row.apiKeyMasked.length > 0 ? AI_API_KEY_STATUS.OK : AI_API_KEY_STATUS.UNSET
+}
+
 /** 供应商响应对象 - 与后端 AiProviderDTO.ProviderVO 对应 */
 export interface AiProvider {
   id: number
@@ -18,6 +40,8 @@ export interface AiProvider {
   description?: string
   apiUrlBase?: string
   apiKeyMasked?: string
+  /** 0=未配置 1=已配置 2=密钥已失效（解不开，需重填）；由服务端实算，不信前端传值 */
+  apiKeyStatus?: number
   status: EnabledStatus
   isDefault?: number
   configJson?: string

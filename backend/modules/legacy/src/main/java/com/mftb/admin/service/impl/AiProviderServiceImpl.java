@@ -146,8 +146,15 @@ public class AiProviderServiceImpl implements AiProviderService {
         AiProviderDTO.ProviderVO vo = new AiProviderDTO.ProviderVO();
         BeanUtils.copyProperties(entity, vo);
 
-        // API Key 脱敏显示（先解密再脱敏，密文/历史明文均适用）
-        String plainKey = keyCipher.decrypt(entity.getApiKey());
+        // API Key 三态：先判定可用性，再脱敏（先解密再脱敏，密文/历史明文均适用）
+        // 「配过但当前密钥解不开」必须与「从未配置」分开回给前端，否则密钥轮换会被误读成保存失败
+        ProviderKeyCipher.Outcome outcome = keyCipher.inspect(entity.getApiKey());
+        vo.setApiKeyStatus(switch (outcome) {
+            case OK -> AiProviderDTO.API_KEY_OK;
+            case STALE -> AiProviderDTO.API_KEY_STALE;
+            case UNSET -> AiProviderDTO.API_KEY_UNSET;
+        });
+        String plainKey = outcome == ProviderKeyCipher.Outcome.OK ? keyCipher.decrypt(entity.getApiKey()) : null;
         if (plainKey != null && plainKey.length() > 8) {
             String maskedKey = plainKey.substring(0, 4) + "****" +
                               plainKey.substring(plainKey.length() - 4);

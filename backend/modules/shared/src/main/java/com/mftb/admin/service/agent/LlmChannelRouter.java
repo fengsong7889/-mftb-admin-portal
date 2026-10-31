@@ -45,6 +45,8 @@ public class LlmChannelRouter {
     public static final String REASON_ACCOUNT_RESTRICTED = "account_restricted";
     public static final String REASON_NO_PROVIDER = "no_provider";
     public static final String REASON_NO_API_KEY = "no_api_key";
+    /** 供应商存过 Key，但当前加密密钥解不开（密钥轮换后的旧密文）：与「从未配置」处置动作不同，必须分开报。 */
+    public static final String REASON_KEY_STALE = "key_stale";
 
     @Data
     public static class Channel {
@@ -70,7 +72,15 @@ public class LlmChannelRouter {
         if (provider == null) {
             return REASON_NO_PROVIDER;
         }
-        if (!StringUtils.hasText(provider.getApiKey()) || !StringUtils.hasText(keyCipher.decrypt(provider.getApiKey()))) {
+        if (!StringUtils.hasText(provider.getApiKey())) {
+            return REASON_NO_API_KEY;
+        }
+        // 密钥轮换后的旧密文：告诉运维「重填 Key」而不是「去配 Key」，两者处置完全不同
+        ProviderKeyCipher.Outcome outcome = keyCipher.inspect(provider.getApiKey());
+        if (outcome == ProviderKeyCipher.Outcome.STALE) {
+            return REASON_KEY_STALE;
+        }
+        if (outcome != ProviderKeyCipher.Outcome.OK) {
             return REASON_NO_API_KEY;
         }
         return REASON_OK;

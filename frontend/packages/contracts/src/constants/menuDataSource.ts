@@ -94,11 +94,11 @@ export const keyToPath: Record<string, string> = {
   'data-permission': '/data-permission',
   // 商家推广工具 - 词库管理
   'promotion-word-library': '/promotion-word-library',
-  // 商家推广工具 - 流量沙盤（prototype — 纯前端 mock）
-  // 'waterfall-simulation': '/waterfall-simulation',
-  // 'algorithm-simulation': '/algorithm-simulation',
-  // 'merchant-score-insight': '/merchant-score-insight',
-  // 'merchant-promotion-diagnose': '/merchant-promotion-diagnose',
+  // 商家推广工具 - 流量沙盤（实验沙盘：页面为固定演示数据，但路由已注册，必须可点击跳转）
+  'waterfall-simulation': '/waterfall-simulation',
+  'algorithm-simulation': '/algorithm-simulation',
+  'merchant-score-insight': '/merchant-score-insight',
+  'merchant-promotion-diagnose': '/merchant-promotion-diagnose',
   // 商家推广工具
   'promotion-dashboard': '/promotion-dashboard',
   'promotion-algorithm': '/promotion-algorithm',

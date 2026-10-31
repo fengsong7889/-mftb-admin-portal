@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { lazy, Suspense, useMemo, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Alert, Button, Card, Col, Collapse, DatePicker, Descriptions, Row,
-  Segmented, Select, Space, Table, Tag,
+  Segmented, Select, Space, Spin, Table, Tag,
 } from 'antd'
 import type { TableColumnsType } from 'antd'
 import {
@@ -11,6 +11,9 @@ import {
   RiseOutlined, SearchOutlined, ShopOutlined, TrophyOutlined,
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
+import './organic/organic.css'
+
+const LocationSimulation = lazy(() => import('./organic/LocationSimulation'))
 import RemoteSearchSelect from '@/components/RemoteSearchSelect'
 import StatCards, { type StatCardItem } from '@/components/StatCards'
 import type { OptionItem } from '@/api/types'
@@ -33,6 +36,18 @@ enum SandboxMode {
 }
 
 export default function AlgorithmSimulation() {
+  const [params, setParams] = useSearchParams()
+  const view = params.get('view') === 'other' ? 'other' : 'organic-location'
+  return <>
+    <div className="organic__mode-nav"><Segmented value={view} options={[
+      { value: 'organic-location', label: '自然流量 · 定位排名模擬' },
+      { value: 'other', label: '其他算法演示' },
+    ]} onChange={next => { const query = new URLSearchParams(params); query.set('view', next); setParams(query) }} /></div>
+    {view === 'organic-location' ? <Suspense fallback={<div className="organic__loading"><Spin /></div>}><LocationSimulation /></Suspense> : <LegacyAlgorithmSimulation />}
+  </>
+}
+
+function LegacyAlgorithmSimulation() {
   const { t } = useTranslation()
   const navigate = useNavigate()
 
@@ -227,6 +242,7 @@ export default function AlgorithmSimulation() {
 
   return (
     <div className="content-area">
+      <Alert type="info" showIcon style={{ marginBottom: 16 }} message="演示資料 · 非真實算法執行結果" description="此視圖保留舊算法樣例；分數與參數變化不可作為真實排名或投放依據。" />
       {/* 頁面標題 */}
       <div style={{
         background: '#fff', padding: '12px 20px', marginBottom: 12,
@@ -248,7 +264,7 @@ export default function AlgorithmSimulation() {
           value={mode}
           onChange={handleModeChange}
           options={[
-            { label: t('trafficSandbox.modeOfficial'), value: SandboxMode.OFFICIAL },
+            { label: '已啟用配置（演示）', value: SandboxMode.OFFICIAL },
             { label: t('trafficSandbox.modeSandbox'), value: SandboxMode.SANDBOX },
           ]}
         />

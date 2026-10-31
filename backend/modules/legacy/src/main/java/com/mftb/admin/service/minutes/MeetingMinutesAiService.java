@@ -27,6 +27,7 @@ import com.mftb.admin.service.agent.LlmChannelRouter;
 import com.mftb.admin.service.agent.LlmMeteringService;
 import com.mftb.admin.service.agent.platform.AiBudgetPoolService;
 import com.mftb.admin.util.JsonUtils;
+import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -89,6 +90,7 @@ public class MeetingMinutesAiService {
     private final LlmMeteringService metering;
     private final BudgetReservationService budgetService;
     private final AiSceneService sceneService;
+    private final OperatorResolver operatorResolver;
     private final ObjectMapper objectMapper;
 
     @Value("${meeting.minutes.business-timezone:Asia/Shanghai}")
@@ -105,6 +107,15 @@ public class MeetingMinutesAiService {
         // 先校会议可读，无权读会议的人不能借预检探测场景配置。
         MeetingBooking booking = authorizer.requireBooking(bookingId);
         authorizer.requireBookingReadable(booking, current);
+        // 管理员不受 AI 场景权限限制：超管默认拥有全部能力，无需逐条过场景评估。
+        if (operatorResolver.isAdmin(current)) {
+            vo.setAvailable(true);
+            vo.setAuthorized(true);
+            vo.setReasonCode(null);
+            vo.setMessage(null);
+            vo.setChecks(null);
+            return vo;
+        }
         com.mftb.admin.dto.AiSceneDto.DiagnosisVO readiness =
                 sceneService.evaluate(MeetingConstants.SCENE_MEETING_MINUTES, current);
         vo.setAvailable(readiness.isReady());
@@ -119,8 +130,11 @@ public class MeetingMinutesAiService {
 
     public MeetingMinutesAiDto.ExtractionVO extract(MeetingMinutesAiDto.ExtractionForm form) {
         SysUser current = guard.currentUser();
-        // 独立 AI 动作 + 场景 + 环境 + 急停 + 模型/额度/数据准入，与预检同源；不就绪直接拒绝。
-        sceneService.assertExecutable(MeetingConstants.SCENE_MEETING_MINUTES, current);
+        // 管理员不受 AI 场景权限限制：超管默认拥有全部能力，无需逐条过场景评估。
+        if (!operatorResolver.isAdmin(current)) {
+            // 独立 AI 动作 + 场景 + 环境 + 急停 + 模型/额度/数据准入，与预检同源；不就绪直接拒绝。
+            sceneService.assertExecutable(MeetingConstants.SCENE_MEETING_MINUTES, current);
+        }
         if (form.getBookingId() == null || form.getNoteVersion() == null) {
             throw new BusinessException("缺少會議或筆記版本");
         }
@@ -213,6 +227,7 @@ public class MeetingMinutesAiService {
     private MeetingMinutesAiDto.ExtractionVO runExtraction(MeetingMinutesAiExtraction row, MeetingBooking booking,
                                                            MeetingMinutesNote note, String rawText, LocalDate meetingDate, SysUser current) {
         String account = current.getUsername();
+        boolean admin = operatorResolver.isAdmin(current);
         Map<String, String> segments = prompt.segment(rawText);
         Set<String> validRefs = segments.keySet();
         Map<String, String> mentionAliases = mentionAliases(note);
@@ -223,11 +238,14 @@ public class MeetingMinutesAiService {
             extractionMapper.markFailed(row.getId(), "no_channel", null, MeetingMinutesAiExtraction.BILLING_NONE, current.getName());
             return toVO(reload(row.getId(), current.getId()));
         }
-        AiModelAdmissionService.Decision check = admissionService.check(account, channel.getDefaultModelKey());
-        if (!check.allowed()) {
-            extractionMapper.markFailed(row.getId(), check.errorKind(), channel.getDefaultModelKey(),
-                    MeetingMinutesAiExtraction.BILLING_NONE, current.getName());
-            return toVO(reload(row.getId(), current.getId()));
+        // 管理员不受准入、额度、预算限制
+        if (!admin) {
+            AiModelAdmissionService.Decision check = admissionService.check(account, channel.getDefaultModelKey());
+            if (!check.allowed()) {
+                extractionMapper.markFailed(row.getId(), check.errorKind(), channel.getDefaultModelKey(),
+                        MeetingMinutesAiExtraction.BILLING_NONE, current.getName());
+                return toVO(reload(row.getId(), current.getId()));
+            }
         }
         String userPrompt = prompt.userPrompt(segments, booking.getTitle(), meetingDate, businessTimezone, mentionAliases);
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -238,7 +256,8 @@ public class MeetingMinutesAiService {
         payload.put("messages", List.of(
                 Map.of("role", "system", "content", prompt.systemPrompt()),
                 Map.of("role", "user", "content", userPrompt)));
-        AiOutboundPrepared prepared = preparePayload(account, channel, payload);
+        AiOutboundPrepared prepared = admin ? new AiOutboundPrepared(true, null, payload)
+                : preparePayload(account, channel, payload);
         if (!prepared.allowed()) {
             extractionMapper.markFailed(row.getId(), prepared.errorKind(), channel.getDefaultModelKey(),
                     MeetingMinutesAiExtraction.BILLING_NONE, current.getName());
@@ -247,32 +266,29 @@ public class MeetingMinutesAiService {
 
         String requestId = "mm-ai-" + row.getRequestKey();
         int promptEst = Math.max(1, (prompt.systemPrompt().length() + userPrompt.length()) / 4);
-        // 严格预占：任何无法确认的预占故障都阻止调用
-        try {
-            budgetService.reserve(requestId, account, channel.getDefaultModelKey(), promptEst,
-                    MinutesAiPrompt.OUTPUT_MAX_TOKENS, channel.getInputPrice(), channel.getOutputPrice(), channel.getCurrency());
-        } catch (AiBudgetPoolService.BudgetDeniedException denied) {
-            extractionMapper.markFailed(row.getId(), "budget_exceeded", channel.getDefaultModelKey(),
-                    MeetingMinutesAiExtraction.BILLING_RELEASED, current.getName());
-            return toVO(reload(row.getId(), current.getId()));
-        } catch (RuntimeException e) {
-            log.warn("[MinutesAi] 預算預占失敗，未發起調用 request={}: {}", requestId, e.getMessage());
-            extractionMapper.markFailed(row.getId(), "reserve_failed", channel.getDefaultModelKey(),
-                    MeetingMinutesAiExtraction.BILLING_NONE, current.getName());
-            return toVO(reload(row.getId(), current.getId()));
+        // 严格预占：任何无法确认的预占故障都阻止调用（管理员跳过预算检查）
+        if (!admin) {
+            try {
+                budgetService.reserve(requestId, account, channel.getDefaultModelKey(), promptEst,
+                        MinutesAiPrompt.OUTPUT_MAX_TOKENS, channel.getInputPrice(), channel.getOutputPrice(), channel.getCurrency());
+            } catch (AiBudgetPoolService.BudgetDeniedException denied) {
+                extractionMapper.markFailed(row.getId(), "budget_exceeded", channel.getDefaultModelKey(),
+                        MeetingMinutesAiExtraction.BILLING_RELEASED, current.getName());
+                return toVO(reload(row.getId(), current.getId()));
+            } catch (RuntimeException e) {
+                log.warn("[MinutesAi] 預算預占失敗，未發起調用 request={}: {}", requestId, e.getMessage());
+                extractionMapper.markFailed(row.getId(), "reserve_failed", channel.getDefaultModelKey(),
+                        MeetingMinutesAiExtraction.BILLING_NONE, current.getName());
+                return toVO(reload(row.getId(), current.getId()));
+            }
+            extractionMapper.updateBilling(row.getId(), MeetingMinutesAiExtraction.BILLING_RESERVED, null);
         }
-        extractionMapper.updateBilling(row.getId(), MeetingMinutesAiExtraction.BILLING_RESERVED, null);
 
         Future<JsonNode> future = null;
         JsonNode resp;
         try {
-            Callable<JsonNode> call = () -> llmClient.chatCompletion(channel.getBaseUrl(), channel.getApiKey(), prepared.payload());
-            future = POOL.submit(call);
-            resp = future.get(MODEL_BUDGET_MS, TimeUnit.MILLISECONDS);
+            resp = callWithFallback(channel, prepared.payload(), account, requestId, admin);
         } catch (TimeoutException e) {
-            if (future != null) {
-                future.cancel(true);
-            }
             metering.release(requestId, "TIMEOUT");
             extractionMapper.markUnknown(row.getId(), "upstream_timeout", channel.getDefaultModelKey(),
                     MeetingMinutesAiExtraction.BILLING_RELEASED, current.getName());
@@ -281,7 +297,8 @@ public class MeetingMinutesAiService {
             Throwable cause = e.getCause() instanceof LlmHttpClient.LlmCallException le ? le : e;
             metering.release(requestId, "call_error");
             log.warn("[MinutesAi] 調用失敗 request={}: {}", requestId, cause.getMessage());
-            extractionMapper.markUnknown(row.getId(), "upstream_error", channel.getDefaultModelKey(),
+            String errorCode = resolveUpstreamErrorCode(cause);
+            extractionMapper.markUnknown(row.getId(), errorCode, channel.getDefaultModelKey(),
                     MeetingMinutesAiExtraction.BILLING_RELEASED, current.getName());
             return toVO(reload(row.getId(), current.getId()));
         }
@@ -292,8 +309,8 @@ public class MeetingMinutesAiService {
             return toVO(reload(row.getId(), current.getId()));
         }
 
-        // 有真实 usage 就先结算计量（即使随后结构校验失败也不假装未消耗）
-        long tokens = metering.settle(requestId, account, "auto", channel, resp);
+        // 有真实 usage 就先结算计量（即使随后结构校验失败也不假装未消耗）；管理员跳过计量
+        long tokens = admin ? 0 : metering.settle(requestId, account, "auto", channel, resp);
         String usageJson = usageJson(resp, tokens);
         String model = resp.path("model").asText(channel.getDefaultModelKey());
 
@@ -464,6 +481,74 @@ public class MeetingMinutesAiService {
         return primary != null ? primary : channelRouter.resolveChannel(LlmChannelRouter.CHANNEL_OFF_PEAK, account);
     }
 
+    /**
+     * 调用 LLM，主通道失败时自动尝试备选通道。
+     * <p>「永久性错误」（欠费、密钥无效、模型不存在）触发备选；超时/网络错误不重试。
+     * 备选通道用 payload 里的 model 替换为其默认模型。
+     */
+    private JsonNode callWithFallback(LlmChannelRouter.Channel primary, Map<String, Object> payload,
+                                      String account, String requestId, boolean admin)
+            throws Exception {
+        try {
+            return submitCall(primary, payload);
+        } catch (Exception e) {
+            Throwable cause = e.getCause() instanceof LlmHttpClient.LlmCallException le ? le : e;
+            if (!(cause instanceof LlmHttpClient.LlmCallException le) || !isPermanentError(le)) {
+                throw e;
+            }
+            // 主通道永久性失败，尝试备选通道
+            LlmChannelRouter.Channel fallback = resolveFallbackChannel(account, primary);
+            if (fallback == null) {
+                log.warn("[MinutesAi] 主通道失败且无可用备选: {}", le.getMessage());
+                throw e;
+            }
+            log.info("[MinutesAi] 主通道永久性失败，自动切换到备选通道: {}", fallback.getLabel());
+            Map<String, Object> retryPayload = new java.util.LinkedHashMap<>(payload);
+            if (fallback.getDefaultModelKey() != null) {
+                retryPayload.put("model", fallback.getDefaultModelKey());
+            }
+            return submitCall(fallback, retryPayload);
+        }
+    }
+
+    private JsonNode submitCall(LlmChannelRouter.Channel ch, Map<String, Object> payload) throws Exception {
+        Future<JsonNode> future = POOL.submit(
+                () -> llmClient.chatCompletion(ch.getBaseUrl(), ch.getApiKey(), payload));
+        try {
+            return future.get(MODEL_BUDGET_MS, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException te) {
+            future.cancel(true);
+            throw te;
+        } catch (java.util.concurrent.ExecutionException ee) {
+            throw (ee.getCause() instanceof Exception ex) ? ex : ee;
+        }
+    }
+
+    /** 永久性错误：重试同一通道无意义，应切换到备选。 */
+    private static boolean isPermanentError(LlmHttpClient.LlmCallException le) {
+        if (le.getCategory() == LlmHttpClient.Category.MISSING_KEY
+                || le.getCategory() == LlmHttpClient.Category.MISSING_BASE_URL) {
+            return true;
+        }
+        String msg = le.getMessage() == null ? "" : le.getMessage().toLowerCase();
+        return msg.contains("arrearage") || msg.contains("invalid_api_key")
+                || msg.contains("incorrect api key") || msg.contains("model_not_found")
+                || msg.contains("does not exist") || msg.contains("not supported");
+    }
+
+    /** 获取与主通道不同的备选通道。 */
+    private LlmChannelRouter.Channel resolveFallbackChannel(String account, LlmChannelRouter.Channel primary) {
+        // 主通道是 primary，备选尝试 off-peak；反之亦然
+        String fallbackLabel = LlmChannelRouter.CHANNEL_PRIMARY.equals(primary.getLabel())
+                ? LlmChannelRouter.CHANNEL_OFF_PEAK : LlmChannelRouter.CHANNEL_PRIMARY;
+        LlmChannelRouter.Channel fallback = channelRouter.resolveChannel(fallbackLabel, account);
+        // 确保备选与主通道不是同一个
+        if (fallback != null && !Objects.equals(fallback.getBaseUrl(), primary.getBaseUrl())) {
+            return fallback;
+        }
+        return null;
+    }
+
     private AiOutboundPrepared preparePayload(String account, LlmChannelRouter.Channel channel, Map<String, Object> payload) {
         AiOutboundPolicyService.Prepared prepared = admissionService.prepare(account, channel, payload, "meeting");
         AiModelAdmissionService.Decision decision = prepared.decision();
@@ -471,6 +556,62 @@ public class MeetingMinutesAiService {
         return new AiOutboundPrepared(decision != null && decision.allowed(),
                 decision == null ? "outbound_unavailable" : decision.errorKind(),
                 checked == null || checked.isEmpty() ? payload : checked);
+    }
+
+    /**
+     * 解析上游 LLM 响应体，映射为用户可直接行动的错误码。
+     * <p>前端通过 AI_REASON_KEYS 映射为友好提示，用户无需查日志即可知道原因。
+     */
+    private static String resolveUpstreamErrorCode(Throwable cause) {
+        if (!(cause instanceof LlmHttpClient.LlmCallException le)) {
+            return "upstream_error";
+        }
+        return switch (le.getCategory()) {
+            case MISSING_KEY, MISSING_BASE_URL -> "channel_misconfigured";
+            case UPSTREAM_HTTP -> parseHttpErrorBody(le.getMessage(), le.getUpstreamStatus());
+            case TIMEOUT -> "upstream_timeout";
+            case NETWORK -> "upstream_network";
+            case BAD_JSON -> "upstream_bad_json";
+        };
+    }
+
+    /** 从上游 HTTP 错误响应体中识别常见错误类型（欠费、密钥无效、模型不存在、限流等）。 */
+    private static String parseHttpErrorBody(String message, Integer status) {
+        if (message == null) {
+            return "upstream_http_error";
+        }
+        String lower = message.toLowerCase();
+        // 阿里云欠费 / 账户异常
+        if (lower.contains("arrearage") || lower.contains("overdue-payment") || lower.contains("欠费")) {
+            return "upstream_arrearage";
+        }
+        // API Key 无效 / 过期
+        if (lower.contains("invalid_api_key") || lower.contains("incorrect api key")
+                || lower.contains("invalid api key") || lower.contains("unauthorized")) {
+            return "upstream_invalid_key";
+        }
+        // 模型不存在 / 不支持
+        if (lower.contains("model_not_found") || lower.contains("invalid model")
+                || lower.contains("does not exist") || lower.contains("not supported")) {
+            return "upstream_model_not_found";
+        }
+        // 限流
+        if (lower.contains("rate_limit") || lower.contains("too many requests")
+                || (status != null && status == 429)) {
+            return "upstream_rate_limited";
+        }
+        // 内容安全过滤
+        if (lower.contains("content_filter") || lower.contains("content_policy")
+                || lower.contains("data_inspection_failed")) {
+            return "upstream_content_filter";
+        }
+        // 配额耗尽
+        if (lower.contains("quota") || lower.contains("insufficient_quota")
+                || lower.contains("exceeded") || lower.contains("limit reached")) {
+            return "upstream_quota_exhausted";
+        }
+        // 其他 HTTP 错误保留状态码
+        return "upstream_http_" + (status != null ? status : "error");
     }
 
     private MinutesAiModelOutput parseOutput(String content) {

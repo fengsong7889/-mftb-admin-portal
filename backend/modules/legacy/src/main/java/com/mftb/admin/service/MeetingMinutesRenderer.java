@@ -80,34 +80,36 @@ public final class MeetingMinutesRenderer {
         return new Rendered(title(minutes), full, false, full.length());
     }
 
-    /** 新通知只从正式文档生成，不提供正文、名单或缺席原因给模板。 */
+    /** 新通知只从正式文档生成，不提供正文、名单或缺席原因给模板。
+     *
+     * <p>格式与会议邀约推送保持一致：标题灰色、正文黑色；标题为「会议名称(会议纪要)」，
+     * 正文简洁只写重点：会议时间、记录人、议题/行动/跟进数量。
+     */
     public static Rendered publishedCard(MeetingMinutesDocument document, int batchSeq,
                                           MeetingNotifyTemplateService templates) {
         MeetingMinutesContent content = document.getContent();
         Map<String, String> vars = new LinkedHashMap<>();
         vars.put("meetingTitle", cardText(document.getMeetingTitle(), 100));
         vars.put("meetingTime", cardText(document.getMeetingTimeText(), 80));
+        vars.put("recorder", cardText(document.getRecorderName(), 64));
         vars.put("minutesNo", cardText(document.getMinutesNo(), 40));
         vars.put("revisionNo", String.valueOf(document.getRevisionNo()));
-        vars.put("publisher", cardText(document.getPublisherName(), 64));
         vars.put("topicCount", String.valueOf(content.getItems() == null ? 0 : content.getItems().size()));
         vars.put("actionCount", String.valueOf(content.getActions() == null ? 0 : content.getActions().size()));
         vars.put("followCount", String.valueOf(content.getOpenIssues() == null ? 0 : content.getOpenIssues().size()));
-        vars.put("batchNote", "通知批次：" + batchSeq);
-        String title = "會議紀要已發布｜" + vars.get("meetingTitle");
-        String required = "**" + vars.get("minutesNo") + " · V" + vars.get("revisionNo") + "**\n\n";
-        String fallback = "會議時間：" + vars.get("meetingTime") + "\n\n發布人：" + vars.get("publisher")
-                + "\n\n議題 " + vars.get("topicCount") + " 項 · 行動 " + vars.get("actionCount")
+        // 标题格式：会议名称(会议纪要)，与会议邀约推送风格一致（灰色标题）
+        String title = vars.get("meetingTitle") + "(会议纪要)";
+        // 正文简洁：会议时间 + 记录人 + 议题/行动/跟进数量
+        String fallback = "會議時間：" + vars.get("meetingTime") + "\n"
+                + "記錄人：" + vars.get("recorder") + "\n\n"
+                + "議題 " + vars.get("topicCount") + " 項 · 行動 " + vars.get("actionCount")
                 + " 項 · 跟進 " + vars.get("followCount") + " 項";
         MeetingNotifyTemplateService.Rendered custom = templates == null ? null
                 : templates.render(MeetingConstants.SCENARIO_MINUTES_PUBLISHED, vars);
         String body = custom == null || !StringUtils.hasText(custom.body()) ? fallback : custom.body();
-        String suffix = "\n\n" + vars.get("batchNote");
-        int budget = MeetingConstants.MINUTES_CARD_MAX_CHARS - required.length() - suffix.length();
-        boolean shortened = body.length() > budget;
+        boolean shortened = body.length() > MeetingConstants.MINUTES_CARD_MAX_CHARS;
         if (shortened) body = fallback;
-        String markdown = required + body + suffix;
-        return new Rendered(title, markdown, shortened, markdown.length());
+        return new Rendered(title, body, shortened, body.length());
     }
 
     /** 业务输入是纯文本，不能借会议主题注入链接、图片或 Markdown 层级。 */

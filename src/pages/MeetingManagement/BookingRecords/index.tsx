@@ -330,15 +330,6 @@ export default function BookingRecords() {
 
   return (
     <div className="content-area">
-      {/* 页面说明横幅：把"释放 vs 取消"的口径写在最前面，避免行政用错按钮 */}
-      <Alert
-        type="info"
-        showIcon
-        style={{ marginBottom: 16 }}
-        message={t('meeting.releasedAndCancelledAre', { defaultValue: '「已釋放」與「已取消」分開統計，操作也分開' })}
-        description={t('meeting.releaseAppliesToStarted', { defaultValue: '釋放針對「已開始卻無人到場」的會議，會計入爽約；代取消針對尚未開始的會議，窗口立刻還給他人。兩者都必填原因，原因會寫入審計並附在通知裡。若你未持有全量查看權限，這裡只顯示與你相關的會議。' })}
-      />
-
       {error && (
         <Alert
           type="error"

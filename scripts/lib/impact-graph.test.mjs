@@ -136,6 +136,22 @@ describe('共享层升档', () => {
     ]))
   })
 
+  it('所有后端模块的技术层都升档，不只 rdm（防止新域模块静默逃过影响域）', () => {
+    const techLayer = [
+      'backend/modules/legacy/src/main/java/com/mftb/admin/util/AdCalcUtils.java',
+      'backend/modules/rdm/src/main/java/com/mftb/admin/mapper/RdmReleaseMapper.java',
+      'backend/modules/eam/src/main/java/com/mftb/admin/mapper/EamCategoryAccessoryMapper.java',
+      'backend/modules/hr/src/main/java/com/mftb/admin/entity/HrPerfCycle.java',
+      'backend/modules/hr/src/main/java/com/mftb/admin/config/HrAsyncConfig.java',
+    ]
+    const cls = classify(techLayer)
+    expect(cls.beGlobal).toEqual(expect.arrayContaining(techLayer))
+    // 域内私有业务类（service / controller）不属技术层，不得无谓升档全量
+    expect(cls.beGlobal).not.toContain(
+      'backend/modules/eam/src/main/java/com/mftb/admin/service/impl/EamPurchaseServiceImpl.java',
+    )
+  })
+
   it('规则表本身不可被悄悄删空（安全网：删一条就会让这个门禁形同虚设）', () => {
     // 拆包后共享层收敛为「入口文件 + 整个 frontend/packages」，条目数变少但覆盖面不变
     expect(GLOBAL_FE.length).toBeGreaterThanOrEqual(8)

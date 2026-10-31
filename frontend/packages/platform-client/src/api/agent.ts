@@ -366,7 +366,8 @@ export interface LlmEngineStatus {
   denied?: string[]
   /** 服务端全局熍断态：不透出来时，急停期间首页仍会显示「在線」 */
   killSwitch?: boolean
-  /** 不可用原因（ok=false 时）：no_api_key / account_restricted / no_model_auth / no_provider */
+  /** 不可用原因（ok=false 时）：no_api_key / key_stale / account_restricted / no_model_auth / no_provider
+   *  （key_stale = 供应商存过 Key 但当前加密密钥解不开，需重填；与 no_api_key「从未配置」处置不同） */
   reason?: string
 }
 

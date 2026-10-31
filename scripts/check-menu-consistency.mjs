@@ -31,6 +31,16 @@ const warnings = []
 const fail = (msg) => failures.push(msg)
 const warn = (msg) => warnings.push(msg)
 
+/**
+ * 剔除块内以 `//` 开头的整行。
+ * <p>历史事故：流量沙盤四个菜单在 keyToPath 里被整段注释掉，点击提示「开发中」，
+ * 而本脚本用纯正则匹配 `'k': 'v'` 时把注释行也算作已登记，CI 全绿。注释掉的映射
+ * 在运行时并不存在，门禁必须与运行时口径一致。
+ */
+function stripLineComments(block) {
+  return block.split('\n').filter((line) => !line.trim().startsWith('//')).join('\n')
+}
+
 /** 提取 `const X = { 'k': 'v', ... }` 形式的字符串字面量映射 */
 function extractStringMap(source, declRegex, label) {
   const match = source.match(declRegex)
@@ -38,7 +48,7 @@ function extractStringMap(source, declRegex, label) {
     fail(`未能解析 ${label}（结构变更请同步更新 scripts/check-menu-consistency.mjs）`)
     return {}
   }
-  return Object.fromEntries([...match[1].matchAll(/'([^']+)':\s*'([^']+)'/g)].map((m) => [m[1], m[2]]))
+  return Object.fromEntries([...stripLineComments(match[1]).matchAll(/'([^']+)':\s*'([^']+)'/g)].map((m) => [m[1], m[2]]))
 }
 
 // ────────── 前端：路由映射 / 离线清单 ──────────
@@ -173,7 +183,7 @@ if (!menuDefMenus.some((menu) => menu.file.endsWith('/AiAssistantConfigMenuIniti
 }
 const backendKeysBlock = menuDataSource.match(/export const BACKEND_CONNECTED_KEYS[^=]*= new Set\(\[([\s\S]*?)\]\)/)
 const backendKeys = new Set(backendKeysBlock
-  ? [...backendKeysBlock[1].matchAll(/'([^']+)'/g)].map((m) => m[1])
+  ? [...stripLineComments(backendKeysBlock[1]).matchAll(/'([^']+)'/g)].map((m) => m[1])
   : (fail('未能解析 BACKEND_CONNECTED_KEYS'), []))
 const registeredIcons = new Set([...read('frontend/packages/ui/src/components/MenuIcon.tsx')
   .matchAll(/'([^']+)':\s*\w+/g)].map((m) => m[1]))

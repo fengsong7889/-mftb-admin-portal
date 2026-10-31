@@ -3,12 +3,15 @@ import { useTranslation } from 'react-i18next'
 import { Button, Modal, Form, Input, Select, Space, Table, Switch, message } from 'antd'
 import dayjs from 'dayjs'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, SearchOutlined, ReloadOutlined, KeyOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons'
+import { PlusOutlined, SearchOutlined, ReloadOutlined, KeyOutlined, CheckCircleOutlined, CloseCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
+import HelpPopover from '@/components/HelpPopover'
 import {
   fetchProviders,
   createProvider,
   updateProvider,
   deleteProvider,
+  AI_API_KEY_STATUS,
+  resolveApiKeyStatus,
   type AiProvider,
   type ProviderQueryParams
 } from '@/api'
@@ -60,6 +63,10 @@ export default function AiModelProvider() {
   const [editingProvider, setEditingProvider] = useState<AiProvider | null>(null)
   const [providerForm] = Form.useForm()
 
+  /** 当前编辑行的 Key 是否已失效（存过密文但解不开）：决定弹窗提示与是否强制重填 */
+  const editingKeyStale = editingProvider !== null
+    && resolveApiKeyStatus(editingProvider) === AI_API_KEY_STATUS.STALE
+
   const handleProviderEdit = (row: AiProvider) => {
     setEditingProvider(row)
     providerForm.setFieldsValue({ 
@@ -74,6 +81,13 @@ export default function AiModelProvider() {
 
   const handleProviderSave = async () => {
     const values = await providerForm.validateFields()
+
+    // 纯 UX 拦截：旧密文已解不开，留空保存等于什么都没改，用户会以为已修复
+    // （后端语义不变：空值仍保留旧 Key，因此这里不传空值给后端做判断）
+    if (editingKeyStale && !String(values.apiKey ?? '').trim()) {
+      message.warning('原密鑰已無法解密，請重新輸入 API Key 後再保存')
+      return
+    }
     
     try {
       if (editingProvider) {
@@ -206,10 +220,32 @@ export default function AiModelProvider() {
     {
       title: 'API Key',
       key: 'apiKeyStatus',
-      width: 160,
+      width: 200,
       align: 'center',
       render: (_: unknown, row: AiProvider) => {
-        const hasKey = row.apiKeyMasked && row.apiKeyMasked.length > 0
+        const keyStatus = resolveApiKeyStatus(row)
+        // 三态各回各的：密钥轮换后旧密文解不开，若仍显示「未配置」，管理员会反复重填也定位不到根因
+        if (keyStatus === AI_API_KEY_STATUS.STALE) {
+          return (
+            <span style={{ color: '#FA8C16', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <ExclamationCircleOutlined />
+              密鑰已失效
+              <HelpPopover
+                title="為什麼顯示「密鑰已失效」"
+                ariaLabel="密鑰已失效說明"
+                placement="left"
+                width={420}
+                content={[
+                  { tone: 'info', label: '含義', body: 'API Key 已存在資料庫，但當前加密密鑰解不開它，所以無法顯示脫敏串。' },
+                  { tone: 'warn', label: '成因', body: '加密密鑰發生變更（例如輪換了 JWT_SECRET 或 AI_PROVIDER_CRYPTO_KEY）。' },
+                  { tone: 'danger', label: '後果', body: '該供應商的模型調用會直接失敗，與從未配置時表現相同。' },
+                  { tone: 'success', label: '處置', body: '點「編輯」重新貼上 API Key 並保存，系統會用當前密鑰重新加密。' },
+                ]}
+              />
+            </span>
+          )
+        }
+        const hasKey = keyStatus === AI_API_KEY_STATUS.OK
         return hasKey ? (
           <span style={{ color: '#52C41A', fontSize: 12 }}>
             <CheckCircleOutlined style={{ marginRight: 4 }} />
@@ -351,11 +387,18 @@ export default function AiModelProvider() {
                     當前：{editingProvider.apiKeyMasked}
                   </span>
                 )}
+                {editingKeyStale && (
+                  <span style={{ fontSize: 11, color: '#FA8C16', marginLeft: 8 }}>
+                    原密鑰已失效，請重新輸入
+                  </span>
+                )}
               </span>
             }
           >
             <Input.Password 
-              placeholder={editingProvider ? '留空保留原 Key，輸入新值則覆蓋' : '請輸入 API Key'} 
+              placeholder={editingProvider
+                ? (editingKeyStale ? '原密鑰已失效，請重新輸入後保存' : '留空保留原 Key，輸入新值則覆蓋')
+                : '請輸入 API Key'}
               visibilityToggle
             />
           </Form.Item>

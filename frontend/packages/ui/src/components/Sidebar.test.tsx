@@ -5,7 +5,7 @@ import { cleanup } from '@testing-library/react'
 import type { MenuVO } from '@/api/menu'
 import type { MenuConnectionIssue, MenuConnectionStatus } from '@/contexts/MenuContext'
 import { BACKEND_CONNECTED_KEYS, keyToPath, pathToKey } from '@/constants/menuDataSource'
-import { CONTROLLED_MENU_KEYS, ROUTE_MENU_KEY_MAP } from '@mftb/contracts/menuPermission'
+import { CONTROLLED_MENU_KEYS, MENU_ACTIONS_MAP, ROUTE_MENU_KEY_MAP } from '@mftb/contracts/menuPermission'
 import { renderMenuIcon } from './MenuIcon'
 import MenuPermissionGuard from './MenuPermissionGuard'
 import { fetchPortalContext } from '@/api/portal'
@@ -626,6 +626,61 @@ describe('Sidebar V3 分批交付菜单（項目總覽/測試工作台/發布中
   })
 })
 
+/**
+ * 實驗沙盤四个菜单（后端种子见 DataInitializer「商家推广工具 > 流量沙盘」）。
+ * <p>回归现场：页面与 /waterfall-simulation 等四条路由早已在 App.tsx 注册，但 menuDataSource.keyToPath
+ * 里这四个映射被整段注释掉，点击落到 Sidebar 的 keyToPath 兜底、误报「該功能模塊開發中」；
+ * 而菜单门禁用正则提取 keyToPath 时把注释行也算作已登记，CI 全绿（已在
+ * check-menu-consistency.mjs 补 stripLineComments 消除该盲区）。这里把「点击必须进页面」钉成用例，
+ * 并锁定它们仍是未接后端的原型菜单（不得被当成已接入而隐藏）。
+ */
+const sandboxMenus: MenuVO[] = [
+  { id: 71, parentId: 70, menuKey: 'waterfall-simulation', name: '瀑布流推演', path: '/waterfall-simulation', icon: 'NodeIndexOutlined', type: 2, status: 1, sort: 1 },
+  { id: 72, parentId: 70, menuKey: 'algorithm-simulation', name: '算法推演', path: '/algorithm-simulation', icon: 'DeploymentUnitOutlined', type: 2, status: 1, sort: 2 },
+  { id: 73, parentId: 70, menuKey: 'merchant-score-insight', name: '商家權重分排名', path: '/merchant-score-insight', icon: 'TrophyOutlined', type: 2, status: 1, sort: 3 },
+  { id: 74, parentId: 70, menuKey: 'merchant-promotion-diagnose', name: '商家推廣診斷', path: '/merchant-promotion-diagnose', icon: 'MedicineBoxOutlined', type: 2, status: 1, sort: 4 },
+]
+
+function setSandboxMenus() {
+  setMenuState([{
+    id: 70, parentId: null, menuKey: 'traffic-sandbox', name: '實驗沙盤', type: 1, status: 1, sort: 8,
+    children: sandboxMenus,
+  }], 'online')
+}
+
+describe('Sidebar 實驗沙盤菜單（瀑布流推演/算法推演/商家權重分排名/商家推廣診斷）', () => {
+  it.each(sandboxMenus)('$menuKey：路由与权限真值表登记完整', (menu) => {
+    expect(keyToPath[menu.menuKey]).toBe(menu.path)
+    expect(pathToKey[menu.path!]).toBe(menu.menuKey)
+    expect(CONTROLLED_MENU_KEYS).toContain(menu.menuKey)
+    expect(ROUTE_MENU_KEY_MAP[menu.path!]).toBe(menu.menuKey)
+    expect(MENU_ACTIONS_MAP[menu.menuKey]?.map((action) => action.key)).toContain('view')
+    expect(renderMenuIcon(menu.icon)).not.toBeNull()
+  })
+
+  it.each(sandboxMenus)('$menuKey：点击后进入真实页面，不再误报「開發中」', async (menu) => {
+    setSandboxMenus()
+    renderSidebar()
+    fireEvent.click(await screen.findByText('實驗沙盤'))
+    const item = await screen.findByRole('menuitem', { name: new RegExp(menu.name) })
+    fireEvent.click(item)
+    await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent(menu.path!))
+    expect(screen.queryByText(zh.sidebar.underDevelopment)).not.toBeInTheDocument()
+  })
+
+  it.each(sandboxMenus)('$menuKey：直接打开时高亮并展开父菜单', async (menu) => {
+    setSandboxMenus()
+    renderSidebar(menu.path)
+    const item = await screen.findByRole('menuitem', { name: new RegExp(menu.name) })
+    expect(item).toHaveClass('ant-menu-item-selected')
+    expect(item.querySelector('.anticon')).not.toBeNull()
+  })
+
+  it.each(sandboxMenus)('$menuKey：仍是未接后端的原型菜单，不得被当成已接入菜单隐藏', (menu) => {
+    expect(BACKEND_CONNECTED_KEYS.has(menu.menuKey)).toBe(false)
+  })
+})
+
 describe('Sidebar 菜单真值来源', () => {
   it.each(consumableMenus)('$menuKey：导航、后端连接、权限与图标登记完整', (menu) => {
     expect(keyToPath[menu.menuKey]).toBe(menu.path)
@@ -718,7 +773,7 @@ describe('Sidebar 菜单真值来源', () => {
     const children: MenuVO[] = [
       { id: 2, parentId: 1, menuKey: 'waterfall-simulation', name: '瀑布流推演', type: 2, status: 1, sort: 1 },
       { id: 3, parentId: 1, menuKey: 'algorithm-simulation', name: '算法推演', type: 2, status: 1, sort: 2 },
-      { id: 4, parentId: 1, menuKey: 'merchant-score-insight', name: '商家評分透視', type: 2, status: 1, sort: 3 },
+      { id: 4, parentId: 1, menuKey: 'merchant-score-insight', name: '商家權重分排名', type: 2, status: 1, sort: 3 },
       { id: 5, parentId: 1, menuKey: 'merchant-promotion-diagnose', name: '商家推廣診斷', type: 2, status: 1, sort: 4 },
     ]
     setMenuState([{

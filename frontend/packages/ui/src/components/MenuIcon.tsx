@@ -130,6 +130,10 @@ import {
   BranchesOutlined,
   NodeIndexOutlined,
   ProjectOutlined,
+  // 實驗沙盤叶子图标：DataInitializer 给「算法推演」「商家推廣診斷」种子写入的名字。
+  // 未在此注册时侧边栏不渲染图标（生产已出现），只能补前端注册表，不能改存量库的 icon。
+  DeploymentUnitOutlined,
+  MedicineBoxOutlined,
   // 產研交付「測試工作台」种子图标（RdmMenuInitializer 数组式种子写入 sys_menu.icon）。
   // 与后端 sys_menu.icon 同名注册，缺一处侧边栏就不渲染图标；upsert 不改存量行 icon，
   // 故生产库已是 BugOutlined，只能在前端注册表补齐，不能靠改种子修复。
@@ -288,6 +292,9 @@ const ICON_COMPONENTS: Record<string, ComponentType> = {
   // 產研交付：系统入口图标与「研發交付」分组图标按名称渲染，未登记会退回默认兜底图标
   'NodeIndexOutlined': NodeIndexOutlined,
   'ProjectOutlined': ProjectOutlined,
+  // 實驗沙盤：算法推演 / 商家推廣診斷（未登记会退回默认兜底图标）
+  'DeploymentUnitOutlined': DeploymentUnitOutlined,
+  'MedicineBoxOutlined': MedicineBoxOutlined,
   // 測試工作台种子图标（生产库 sys_menu.icon 真值，见 import 处注释）
   'BugOutlined': BugOutlined,
   // 智能中心 (AI) 菜单图标
