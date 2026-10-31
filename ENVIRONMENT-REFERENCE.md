@@ -6,29 +6,45 @@
 
 ---
 
-## 一、Mock 降级机制（本地无后端也能跑）
+## 一、Mock 降级机制（仅限已登录会话期间的数据接口兜底）
 
-项目已实现「后端不可用时自动降级到本地 Mock 数据」的统一机制，本地开发**无需启动后端也能完整验证**前端功能。
+项目实现了「后端不可用时部分业务数据接口自动降级到本地 Mock」的机制。
+
+> ⚠️ **它不能让你跳过登录**。认证已全部收回后端（安全边界：禁止前端自授 admin 权限），
+> 登录不存在任何 Mock 降级；后端未启动时前端会提示「無法連接後端服務」并停在登录页。
+> 因此本节的实际用途是：**已登录会话期间后端短暂不可用/重启中时，页面不崩、不出现假成功**。
+> 想在本地「完整跑通业务」必须自备后端 + 数据库（见第二、三节）。
 
 ### 1.1 降级触发条件
 
-- 文件：`src/api/request.ts` 中的 `isBackendUnavailable(error)`
+- 文件：`frontend/packages/platform-client/src/api/request.ts` 中的 `isBackendUnavailable(error)`
 - 触发场景：网络异常（无响应）、HTTP 404、HTTP 5xx
 - 不触发：后端返回的业务错误（如参数校验失败）会正常抛出
 
-### 1.2 已接入 Mock 降级的模块
+### 1.2 已接入 Mock 降级的接口（只给取真值的命令，不维护静态表）
 
-| 模块 | API 文件 | Mock 文件 | 覆盖接口 |
-|------|---------|----------|---------|
-| 商户集团 | `src/api/merchantGroup.ts` | `src/api/mock/merchantMock.ts` | 分页/全量/下拉/新增/编辑/删除 |
-| 门店管理 | `src/api/store.ts` | `src/api/mock/merchantMock.ts` | 分页/按集团/下拉/新增/编辑/删除 |
-| 赠送管理 | `src/api/gift.ts` | `src/api/mock/giftMock.ts` | 列表/详情/新增/扣除/消费流水 |
-| 登录认证 | `src/contexts/AuthContext.tsx` | Mock 登录（MT0001/111222） | 登录/登出/获取用户信息 |
+静态表已腐化过一次（商户集团/门店的降级已收回真实接口，`merchantMock.ts` 现为无人引用的死文件）。
+**要当前真值，跑这两条命令**：
+
+```bash
+# 哪些 api 文件带降级分支（这是「能降级」的权威口径）
+grep -rl isBackendUnavailable frontend/packages/platform-client/src/api/*.ts | grep -v test
+
+# 现存 mock 数据文件
+ls frontend/packages/platform-client/src/api/mock/*.ts | grep -v '\.test\.'
+```
+
+两个集合**并不完全重合**（如 `eamCategory`/`eamSupplier` 有 mock 文件但调用方未接降级），
+新增模块时以「api 文件里有 `isBackendUnavailable` 分支」为接入完成的判定。
+
+> 登录 Mock 降级机制已彻底移除，当前实现以 `frontend/packages/platform-client/src/contexts/AuthContext.tsx`
+> 为准（原 `src/contexts/AuthContext.tsx` 与 `VITE_ADMIN_PASSWORD` 环境变量机制已不存在）。
+> 部分 api 路径已从 `src/` 迁至 `frontend/packages/platform-client/src/`，旧路径不存在。
 
 ### 1.3 新增模块接入 Mock 的标准步骤
 
-1. 在 `src/api/mock/` 下新建 `xxxMock.ts`，实现与后端接口同名的 mock 函数（基于 localStorage + 种子数据）
-2. 在 `src/api/xxx.ts` 中每个接口函数加 try/catch，用 `isBackendUnavailable(err)` 判断后降级
+1. 在 `frontend/packages/platform-client/src/api/mock/` 下新建 `xxxMock.ts`，实现与后端接口同名的 mock 函数（基于 localStorage + 种子数据）
+2. 在 `frontend/packages/platform-client/src/api/xxx.ts` 中每个接口函数加 try/catch，用 `isBackendUnavailable(err)` 判断后降级
 3. 所有请求带 `SILENT_HEADER` 静默头，避免降级时弹全局错误提示
 
 ### 1.4 Mock 数据存储位置
@@ -37,14 +53,14 @@
 - 清除浏览器数据会重置为种子数据（首次访问自动初始化）
 - 种子数据定义在各 mock 文件的 `SEED_*` 常量中
 
-### 1.5 本地登录凭据（Mock 模式）
+### 1.5 本地登录凭据
 
-| 角色 | 工号 | 密码 | 说明 |
-|------|------|------|------|
-| 管理员 | `MT0001` | `111222` | 来自 `.env.local` 的 `VITE_ADMIN_PASSWORD` |
-| 访客 | `MT0002` | `123456` | 来自 `.env.local` 的 `VITE_GUEST_PASSWORD` |
-
-> 注意：`.env.local` 已被 gitignore，换电脑需手动重建（参考 `.env.example`）。
+> ❌ **不存在「Mock 登录账号」**。历史上曾有 `MT0001`/`MT0002` 一对纯前端演示口令，
+> 该机制已因安全边界问题删除（任何前端自授的 admin 会话都等于绕过鉴权）。
+> 现在登录只能走后端，账号见第六节「后端登录（系统管理员）/（员工）」两行；
+> 密码值**只写在本地 `backend/.env.local` 与交付记录里**，不得回显到本文件或任何入库文件。
+>
+> 未入库的 `quick-login-hack.js`（见 `.gitignore`）属同类风险，禁止在任何部署产物中携带。
 
 ---
 
@@ -58,8 +74,10 @@
 | 上下文路径 | `/`（根路径） |
 | API 基础路径 | `/api`（前端 Vite proxy 代理） |
 | 前端代理配置 | `vite.config.ts` → `server.proxy./api` → `http://localhost:8080` |
-| 启动命令 | `cd backend && bash run-local.sh`（推荐，自动设置 JDK 17 + 环境变量） |
-| 备选启动 | `cd backend && mvn spring-boot:run`（`application.yml` 默认已指向开发库） |
+| 启动命令（本机） | `cd backend && bash run-local.sh`（自动设 JDK 17 + source `.env.local`） |
+| 启动命令（新拉仓库） | `cd backend && mvn -pl bootstrap -am spring-boot:run`（需先自行 export 四个必填变量） |
+| ⚠️ 脚本入库情况 | `backend/run-local.sh` 被 `backend/.gitignore` 忽略（历史上含凭据）；`restart-service.sh` / `restart-after-migration.sh` **已入库**且只从 `.env.local` 读变量，不带明文 |
+| 启动类位置 | `backend/bootstrap/src/main/java/com/mftb/admin/MftbAdminApplication.java`；**在聚合根直接跑 `mvn spring-boot:run` 会因父 POM 无启动类而失败**，必须带 `-pl bootstrap -am` |
 | Java 版本要求 | **JDK 17**（Lombok 与 Java 25 不兼容，必须用 17） |
 | Maven 版本 | 3.9.x（推荐 3.9.6） |
 
@@ -80,18 +98,28 @@
 ### 2.3 后端关键配置（application.yml）
 
 ```yaml
-# 数据库连接（默认值已指向开发库 fengsong，生产环境通过环境变量覆盖）
-spring.datasource.url: jdbc:mysql://mysql3.sqlpub.com:3308/fengsong
-spring.datasource.username: fengsong_mftb
-spring.datasource.password: bBMzwCsHPYDhi4my
+# 数据库连接：无任何默认值，四项必须从环境变量注入（本地读 gitignore 的 backend/.env.local）
+spring.datasource.url: ${DB_URL}&socketTimeout=15000&connectTimeout=10000
+spring.datasource.username: ${DB_USERNAME}
+spring.datasource.password: ${DB_PASSWORD}
 
 # 生产环境由 Sealos 注入 DB_URL / DB_USERNAME / DB_PASSWORD 指向阿里云 RDS 生产库
-# JWT 密钥（生产环境务必通过环境变量 JWT_SECRET 注入）
-jwt.secret: ${JWT_SECRET}（无默认值，必须外部注入）
+# JWT 密钥（无默认值，必须外部注入；HS256 要求至少 32 字节）
+jwt.secret: ${JWT_SECRET}
 jwt.expiration: 86400000  # 24 小时
 ```
 
-> ⚠️ **数据库默认值已统一为开发库 `fengsong`（SQLPub 开发版付费库）**：无论通过 `run-local.sh`、IDE 直接运行、还是 `mvn spring-boot:run`，默认都连开发库，不再需要手动设置环境变量。生产环境由 Sealos 平台通过 `DB_URL` 环境变量覆盖指向阿里云 RDS。
+> ⚠️ **连接串完全由环境变量决定，仓内不内置任何可用数据库**：
+> 不配 `DB_URL`/`DB_USERNAME`/`DB_PASSWORD`/`JWT_SECRET` 四项，后端直接启动失败
+> （`run-local.sh` 会先校验缺失项并报错退出）。这是有意设计：
+> 拉代码不等于能跑，运行资产只走线下交付（见 README「代码 ≠ 可运行系统」）。
+>
+> ⚠️ **`DB_URL` 格式硬约束**：必须已带查询参数（`?useUnicode=true&...`），
+> 因为 yml 是 `${DB_URL}&socketTimeout=...` 字面拼接——末尾无 `?` 参数时会拼出非法连接串。
+> 可直接参照 `backend/.env.local.example` 第 10 行的模板格式。
+>
+> ℹ️ 历史上确曾把 SQLPub 开发库写进 `application.yml` 默认值（已移除）；
+> 网上/旧文档里「无需设置环境变量直接启动」的说法均已失效。
 
 ### 2.4 数据库迁移治理与发布验收（兼容式）
 
@@ -139,7 +167,7 @@ bash scripts/verify-deploy.sh   # 先校验 ready 探针，再断言关键接口
 | Host:Port | 阿里云 RDS（Sealos DB_URL 注入） | `mysql3.sqlpub.com:3308` |
 | Database | `fengsong` | `fengsong` |
 | Username | Sealos 环境变量注入 | `fengsong_mftb` |
-| Password | Sealos 环境变量注入 | 见 `backend/run-local.sh`（已 gitignore） |
+| Password | Sealos 环境变量注入 | 唯一存放处：`backend/.env.local` 的 `DB_PASSWORD`（gitignore） |
 | 套餐 | 阿里云 RDS（付费） | 开发版 ¥9.9/年（1GB/50连接/自动备份） |
 | MySQL 版本 | 8.x | 8.4.3 |
 | 使用方 | Sealos 生产后端 | 本地 `backend/run-local.sh` |
@@ -148,15 +176,17 @@ bash scripts/verify-deploy.sh   # 先校验 ready 探针，再断言关键接口
 > 执行 SQL 的正式入口：开发库用任意 MySQL 客户端（`mysql -h mysql3.sqlpub.com -P 3308 -u <用户> -p`）或 SQLPub 网页控制台；
 > 生产库（阿里云 RDS）的整库结构导入用 `scripts/import_schema_to_rds.py`（需 export `RDS_HOST`/`RDS_USER`，密码作为第一个参数传入，凭据不得写入仓库；脚本内 `SQL_FILE` 为硬编码的 `fengsong_schema.sql` 路径，执行前按本机位置调整）。
 
-### 3.1 本地 MySQL（已废弃，不再需要）
+### 3.1 本地 MySQL（新环境必备）
 
-> ✅ 自 `application.yml` 默认值改为 SQLPub 开发库后，本地无需安装 MySQL。
-> 以下信息仅作参考保留：
+> ⚠️ **修正**：`application.yml` 已不再内置任何库地址，所以下面两种情形必须自备 MySQL 8：
+> ① 本机未拿到 SQLPub 开发库口令；② 协作者/外部人员从公开仓库拉代码后想跑起来。
 
 | 项 | 值 | 说明 |
 |----|-----|------|
-| 状态 | **已废弃** | `application.yml` 默认已指向 SQLPub 开发库 |
-| 原默认值 | `localhost:3306/mftb_admin` / `root:root` | 仅历史记录，不再使用 |
+| 推荐方式 | `docker run` 一个 MySQL 8.4 容器 | 10 分钟内可交付一个空库，与生产隔离 |
+| 必需版本 | MySQL 8.0+ | 依赖 8.x 语法与字符集（utf8mb4） |
+| 建库 | 自行命名（如 `mftb_admin`） | 由 `DB_URL` 连接串指定，脚本不建库 |
+| 历史方式 | `localhost:3306/mftb_admin` / `root:root` | 旧默认值，**现已不再生效**，仅作历史参考 |
 
 ### 3.2 开发库初始化步骤（换电脑后）
 
@@ -233,11 +263,12 @@ npm run secret-scan   # 硬编码敏感信息扫描
 - [ ] 安装 Node 20（`nvm install 20`）
 - [ ] 安装 JDK 17（**不要装 25+，Lombok 不兼容**）
 - [ ] 安装 Maven 3.9.x
-- [ ] ~~安装 MySQL 8.0+~~（已不需要，默认连 SQLPub 开发库）
-- [ ] ~~创建数据库 `mftb_admin`~~（已不需要）
-- [ ] 复制 `.env.example` 为 `.env.local`，填写密码
-- [ ] 前端：`npm ci --legacy-peer-deps`
-- [ ] 后端：`cd backend && bash run-local.sh`（推荐）或直接 `mvn spring-boot:run`
+- [ ] 准备 MySQL 8：本机跑 docker 容器，或线下获取 SQLPub 开发库口令（见 3.0）
+- [ ] 后端：`cp backend/.env.local.example backend/.env.local`，填 `DB_URL`/`DB_USERNAME`/`DB_PASSWORD`/`JWT_SECRET`（四项缺一不可，`JWT_SECRET` ≥ 32 字节）
+- [ ] 前端：**本地开发无需 `.env.local`**（Vite proxy 已把 `/api` 转发到 `localhost:8080`）；如需指向远程后端才 `cp .env.example .env.local` 并填 `VITE_API_BASE_URL`
+- [ ] 后端：`cd backend && bash run-local.sh`（本机已有此脚本）；
+      新拉仓库无此脚本时用 `cd backend && mvn -pl bootstrap -am spring-boot:run`（先 export 四个变量）
+- [ ] 前端：`npm ci --legacy-peer-deps`（**必须带此参数**）
 - [ ] 前端：`npm run dev`（访问 `http://localhost:3000`）
 
 ---
@@ -248,14 +279,19 @@ npm run secret-scan   # 硬编码敏感信息扫描
 
 | 用途 | 账号/值 | 密码/密钥 |
 |------|---------|----------|
-| 前端管理员登录（Mock） | `MT0001` | `111222` |
-| 前端访客登录（Mock） | `MT0002` | `123456` |
-| 后端登录（真实库） | `MF00001` | `111222`（DataInitializer 首次启动自动重置） |
-| SQLPub 开发库 | `fengsong_mftb` | 见 `backend/run-local.sh`（`application.yml` 默认值已内置） |
-| JWT 默认密钥 | — | 无默认值，`run-local.sh` 已内置本地开发密钥 |
-| 生产后端地址 | — | `https://dacnhtyrpxhc.sealoshzh.site` |
+| 后端登录（系统管理员） | `admin`（`BuiltinAccounts.ADMIN_USERNAME`） | 值不入库。全新库首次启动时由 `DataInitializer` 落引导密码并置 `must_change_password=1`，**首登必须改密**；存量库则继承原超管哈希，不强制重置 |
+| 后端登录（员工） | 工号 `MF*****` | 历史上 `MF00001` 曾是超管，现已降级为普通员工账号（不能再当管理员入口用） |
+| SQLPub 开发库 | `fengsong_mftb` | 唯一存放处：`backend/.env.local` 的 `DB_PASSWORD`（gitignore，禁止复制到本文件；**已于 2026-10-31 轮换**，旧值随 git 历史永久作废） |
+| JWT 密钥 | — | 无默认值。必须在 `backend/.env.local` 设 `JWT_SECRET`（≥ 32 字节）；开发/生产各自独立，禁止复用示例值 |
+| 生产后端地址 | — | `https://dacnhtyrpxhc.sealoshzh.site`（属公开信息，已随仓库暴露，需当作真实攻击面加固） |
 | 生产前端地址 | — | `https://fengsong7889.github.io/-mftb-admin-portal/` |
 | GitHub 仓库 | `fengsong7889/-mftb-admin-portal` | — |
+
+> 🔎 **内置管理员的密码来源**（只写位置与类型，不回显值）：全新库首次启动时，
+> `DataInitializer` 会写入一个引导密码并置 `must_change_password=1`，因此**首登必须改密**；
+> 存量库则继承原有合法哈希，不重置不强制。
+> 该引导常量的进一步收敛（去硬编码 / 首启随机生成）已登记在本地未入库台账，
+> 不在本公开文件里跟踪状态。对外交付前必须确认对方已完成首登改密。
 
 ---
 
@@ -264,8 +300,10 @@ npm run secret-scan   # 硬编码敏感信息扫描
 ### Q1：本地启动后端报 Lombok 找不到 getter/setter？
 **A**：Java 版本不对，必须用 JDK 17。检查 `java -version`，若为 25+ 需切换。
 
-### Q2：本地前端打开后「服务器异常」？
-**A**：正常现象——后端未启动时会自动降级到 Mock 数据，**不应**出现错误提示。若仍报错，检查对应 API 是否已接入 Mock 降级（见第一节表格）。
+### Q2：本地前端打开后提「無法連接後端服務」、登不进去？
+**A**：这是预期行为，**不是缺陷**。登录不存在 Mock 降级，后端未启动就是进不了系统。
+正确做法：启动后端 + 数据库（第二/三节），或只改纯 UI 时对着登录页以外的静态样式调。
+若已登录会话中某个页面白屏/报错，才需检查对应 API 是否已接入 Mock 降级（见第一节命令重新取真值）。
 
 ### Q3：Mock 数据被改乱了，如何重置？
 **A**：浏览器 DevTools → Application → Local Storage → 删除所有 `mftb_mock_*` 键，刷新页面即可恢复种子数据。
@@ -273,11 +311,28 @@ npm run secret-scan   # 硬编码敏感信息扫描
 ### Q4：换电脑后如何恢复完整环境？
 **A**：按第五节「换电脑必做清单」逐项执行即可。
 
+### Q5：别人从公开仓库拉了代码，能跑起来吗？
+**A**：**不能**，这是有意设计的边界。仓内不含 `backend/.env.local`（凭据）、
+不含 `run-local.sh`，`application.yml` 也没有任何可用默认值，
+缺四项环境变量后端直接启动失败；且即使自己装了 MySQL，仓内也没有真实业务库。
+运行资产只走线下书面交付（见根目录 `LICENSE` 第五条与 `README.md`）。
+如需进一步卡住「拿到全部源码也自建成可运行系统」，可评估引入后端 License 激活门
+（方案与优先级记在本地未入库台账，对外交付前必须走 `docs/OFFLINE_DELIVERY_CHECKLIST_2026-10.md`）。
+
 ---
 
 ## 八、维护约定（重要）
 
 > ⚠️ **本文件是换电脑 / 重装环境的唯一参考，务必保持最新。**
+> ⚠️ **凭据红线**：本文件受版本控制，禁止写入任何真实数据库口令/JWT 密钥等凭据值，只允许写「位置和类型」（如「见 backend/.env.local 的 DB_PASSWORD」）。
+> 原先允许的「本地 Mock 演示口令（MT0001/MT0002）」例外已作废——该登录机制已删除，相应口令不再存在。
+>
+> 🔓 **凭据泄露处置**：历史旧值不可回收，只能作废旧凭据。
+> - [x] SQLPub 开发库口令已于 2026-10-31 轮换（历史里的旧值已失效）
+> - 其余待处置项（包括其他凭据的作废进度、历史清洗时机）**不列在本公开文件里**——
+>   在公开仓库里逐项标注“哪条密钥现在仍然有效”，本身就是额外的暴露。
+>   实况台账存于本地未入库文件 `.qoder/security-followups-2026-10.md`（被 `.gitignore` 忽略，请仓库外备份），
+>   流程性要求见 `docs/OFFLINE_DELIVERY_CHECKLIST_2026-10.md` 第七节。
 
 以下场景**必须**同步更新本文件，否则换电脑后前功尽弃：
 
@@ -288,9 +343,10 @@ npm run secret-scan   # 硬编码敏感信息扫描
 | 修改环境变量（`.env*` 或 `application.yml`） | 二 / 三 / 四 对应章节 |
 | 修改登录账号密码 | 六、关键账号与凭据 |
 | 更换工具链版本要求（Node/Java/Maven/MySQL） | 五、工具链版本速查 |
-| 新增业务模块接入 Mock 降级 | 一、Mock 降级机制（表格） |
+| 新增业务模块接入 Mock 降级 | 一、Mock 降级机制（改为命令取真值，不再维护静态表） |
 | 更换部署平台或 CI/CD 流程 | 二 / 四 部署信息 |
 | 换电脑后验证出的新配置项 | 对应章节 |
+| **轮换任何凭据** | 六、关键账号与凭据（只写位置与类型）+ 本节处置台账 |
 
 **自检清单**（每次环境变更后勾选）：
 
@@ -303,3 +359,8 @@ npm run secret-scan   # 硬编码敏感信息扫描
 - [ ] Mock 降级模块清单是否最新？
 
 **AI 协作约定**：凡是涉及上述变更的任务，AI 在任务结束前会主动询问是否同步更新本文件。
+
+---
+
+Copyright (c) 2026 fengsong7889. All Rights Reserved.
+本文档属作者个人所有的专有软件组成部分，未经著作权人书面许可不得使用、复制或再分发。许可条款见仓库根目录 `LICENSE`。

@@ -63,6 +63,11 @@ backend/.backend.pid
 docs/test_*.png
 docs/verify_*.png
 
+# 权属存证与软著登记材料（身份证/登记证书扫描件、实名声明、首发截图等 PII），
+# 只提交给版权中心或线下留存，禁止进入公开仓库（见 docs/AUTHORSHIP_EVIDENCE_CHECKLIST_2026-10.md）
+docs/registration/
+docs/evidence/
+
 # 独立验证临时产物（javac 输出/日志/类文件），仅供本地验证，禁止入库
 .*-verify/
 
