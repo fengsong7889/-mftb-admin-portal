@@ -201,6 +201,37 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
     /** STB_09「超時接單」下架編碼：現有 organic:retire-rules-v1 只覆蓋 COM_09/STB_04 且生產已記成功，故用獨立新鍵收斂 */
     static final String RETIRED_STB09_RULE_CODE = "STB_09";
 
+    /**
+     * 新增内置计分项 STB_LABEL（店鋪維度）：独家/品牌/连锁/金牌四选一，按门店当前标签命中一档即停。
+     * 名称与说明与前端 organicTrafficConfig 模板逐字一致（存繁中，与全库文案口径一致），避免看库与界面两套口径。
+     */
+    static final String STB_LABEL_RULE_CODE = "STB_LABEL";
+    static final String STB_LABEL_NAME = "門店標籤";
+    static final String STB_LABEL_DESCRIPTION =
+            "門店標籤由門店資料手動指定，獨家／品牌／連鎖／金牌四選一；按當前標籤命中對應分值，命中一檔即停、不累加，未配置該標籤不加分";
+    /**
+     * 新增内置计分项 COM_SLOT「時段推薦」（商業維度）：商家购买时段推荐即得一次固定加分。
+     * 编码用语义后缀而非 COM_11/COM_12：后端自动编号只取现有行最大序号 +1，
+     * 数字编码会与运营自建计分项撞车（STB_ACT 同此先例）。
+     */
+    static final String COM_SLOT_RULE_CODE = "COM_SLOT";
+    static final String COM_SLOT_NAME = "時段推薦";
+    static final String COM_SLOT_DESCRIPTION =
+            "商家購買時段推薦廣告，投放期內即得固定加分，不區分購買時段數量、不累加；未購買或已過期不加分";
+    /** 时段推荐的计分前提标记：与 COM_02「報名減免運費」同先例，住 prerequisites 列供计分侧识读 */
+    static final String COM_SLOT_PREREQUISITE = "購買時段推薦";
+    /** 时段推荐默认固定加分：与前端 TIME_SLOT_AD_DEFAULT_SCORE 一致 */
+    static final int COM_SLOT_DEFAULT_SCORE = 50;
+    /**
+     * 排序号：STB_LABEL 顶替已下架 STB_04（店鋪標籤-金牌）的 2 号位（同为身份标签、同行位置，STB_04 已 deleted=1 不占位），
+     * COM_SLOT 接在金字招牌（9）之后；列表按 dimension + sort_order 排序，与前端模板顺序对齐。
+     */
+    static final int STB_LABEL_SORT_ORDER = 2;
+    static final int COM_SLOT_SORT_ORDER = 10;
+    /** 维度存储编码（1=商業 2=店鋪 4=平台，与前端 ScoreDimension 一致） */
+    static final int DIMENSION_COMMERCIAL = 1;
+    static final int DIMENSION_STORE = 2;
+
     /** condition_items JSON 读写用；不注入容器 bean，避免迁移依赖全局 Jackson 配置 */
     private static final ObjectMapper CONDITION_JSON = new ObjectMapper();
 
@@ -407,6 +438,19 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
             versionTracker.applyOnce("organic:traffic-balance-v1", this::migrateTrafficBalance, this::verifyTrafficBalance);
         } catch (Exception e) {
             log.error("流量均衡合并迁移失败：{}", e.getMessage(), e);
+        }
+
+        // Step 21: 补种两个内置计分项：店鋪維度 STB_LABEL（門店標籤）+ 商業維度 COM_SLOT（時段推薦） (一次性, 版本化, 带后置校验)
+        // 两项此前只存在于前端模板（读不到时走 loadConfig 保底），库里没行会让启用/停用开关与编辑保存直接报「評分規則不存在」，
+        // 必须落库。只按 rule_code 缺失时插入，不覆盖运营改过的名称/分值/启停；
+        // 本步只写建表即有的列，不写 store_label_config（该列由 SchemaContractValidator 在本 Runner 之后才自愈，
+        // 首启写入会报 Unknown column）：标签分值清单默认留空，运营在界面配好后经 updateRule 落库。
+        // 参考 SQL: sql/322_organic_store_label_time_slot.sql
+        try {
+            versionTracker.applyOnce("organic:add-store-label-time-slot-v1",
+                    this::seedStoreLabelAndTimeSlotRules, this::verifyStoreLabelAndTimeSlotSeeded);
+        } catch (Exception e) {
+            log.error("门店标签/时段推荐内置计分项补种失败：{}", e.getMessage(), e);
         }
     }
 
@@ -1047,6 +1091,50 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
                 "SELECT COUNT(*) FROM biz_organic_score_rule WHERE rule_code = 'PLT_04' AND deleted = 0", Integer.class);
         if (plt04 != null && plt04 > 0) {
             throw new IllegalStateException("PLT_04 訂單過熱調控仍有未刪除殘留行，下架未生效");
+        }
+    }
+
+    /**
+     * 补种两个内置计分项：店鋪維度 STB_LABEL（門店標籤）与商業維度 COM_SLOT（時段推薦）。
+     * <p>
+     * 按 rule_code 幂等插入：已存在（含 deleted=1）就一行不动，因此重跑零副作用，
+     * 也不会覆盖运营改过的名称/分值/启停。不擅自复活管理员删掉的行——真有那种场景
+     * 由后置校验报错暴露，人工确认后再决定是恢复还是登记下架。
+     * <p>
+     * 只写建表即有的列：store_label_config 由 SchemaContractValidator（排在本 Runner 之后）自愈补列，
+     * 首启写入会报 Unknown column；标签分值清单以 NULL 起步，界面按空清单兜底，运营配好后经 updateRule 落库。
+     */
+    private void seedStoreLabelAndTimeSlotRules() {
+        int label = insertBuiltinRuleIfAbsent(STB_LABEL_RULE_CODE, DIMENSION_STORE, STB_LABEL_NAME, STB_LABEL_DESCRIPTION,
+                MODE_RULE_BONUS, 0, null, STB_LABEL_SORT_ORDER);
+        int slot = insertBuiltinRuleIfAbsent(COM_SLOT_RULE_CODE, DIMENSION_COMMERCIAL, COM_SLOT_NAME, COM_SLOT_DESCRIPTION,
+                MODE_RULE_BONUS, COM_SLOT_DEFAULT_SCORE, COM_SLOT_PREREQUISITE, COM_SLOT_SORT_ORDER);
+        log.info("已補種內置計分项：STB_LABEL 門店標籤 {} 行，COM_SLOT 時段推薦 {} 行", label, slot);
+    }
+
+    /** 按 rule_code 幂等插入内置计分项（status=1 啟用、builtin=1）；已存在时返回 0 行，不做任何覆写。 */
+    private int insertBuiltinRuleIfAbsent(String ruleCode, int dimension, String name, String description,
+                                          int mode, int score, String prerequisites, int sortOrder) {
+        return jdbcTemplate.update(
+                "INSERT INTO biz_organic_score_rule (rule_code, dimension, name, description, mode, score, "
+                        + "prerequisites, status, builtin, sort_order, updated_by) "
+                        + "SELECT ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, 'system' FROM DUAL "
+                        + "WHERE NOT EXISTS (SELECT 1 FROM biz_organic_score_rule WHERE rule_code = ?)",
+                ruleCode, dimension, name, description, mode, score, prerequisites, sortOrder, ruleCode);
+    }
+
+    /**
+     * 后置校验：两个编码都必须有未删除的内置行。
+     * 与多数迁移「未播种不算失败」相反：本步就是补种，插不进去就是没生效，必须让启动暴露并不记版本。
+     */
+    private void verifyStoreLabelAndTimeSlotSeeded() {
+        for (String ruleCode : List.of(STB_LABEL_RULE_CODE, COM_SLOT_RULE_CODE)) {
+            Integer seeded = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM biz_organic_score_rule WHERE rule_code = ? AND deleted = 0",
+                    Integer.class, ruleCode);
+            if (seeded == null || seeded == 0) {
+                throw new IllegalStateException("内置计分项 " + ruleCode + " 未补种成功，界面开关与保存会报规则不存在");
+            }
         }
     }
 

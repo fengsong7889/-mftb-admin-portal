@@ -1936,6 +1936,20 @@
       "comment": "ES 底座难以实现减分项：把「高单量扣分」翻转为「低单量多加分、高单量少加分」的非负梯度，统一商家扶持与订单过热调控为一个规则。新增专用列 traffic_balance_config（沿用 free_shipping_config/member_bonus_config 先例，已在 LegacyCoreContracts 登记可自愈补列）存合并配置：统计口径（statDays/refreshMinutes/orderTypes/includeRefunded）+ 排除商家 excludedStoreCodes + 区域梯度 regions{MACAU,TAIPA:[{maxOrders,score}]}。PLT_03 只在 traffic_balance_config IS NULL（尚未合并）时整行收敛，避免重放覆盖运营已配好的值；region_configs/blocked_merchants 置 NULL（旧区域格式与旧屏蔽名单不自动沿用，含义从“只取消额外扶持”变为“取消整项均衡奖励”）。PLT_04 用逻辑删除（deleted=1，同 COM_09/STB_04）下架，回滚需同时恢复 deleted=0 并撤前端 RETIRED 里的 'PLT_04'。校验以「PLT_03 已写入非空 traffic_balance_config 且 PLT_04 无 deleted=0 残留行」为准；未播种（无 PLT_03 行）不算失败。注意：本迁移只落配置存储侧，按 traffic_balance_config 真实算分/排名由外部业务系统消费，不在本仓库。参考 SQL: sql/317_organic_traffic_balance.sql"
     },
     {
+      "versionKey": "organic:add-store-label-time-slot-v1",
+      "module": "organic",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "organicScoreDataInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "322_organic_store_label_time_slot.sql"
+      ],
+      "intent": "补种两个自然流量内置计分项：店鋪維度 STB_LABEL（門店標籤，独家/品牌/连锁/金牌分值表）与商業維度 COM_SLOT（時段推薦，购买即固定加分），并新增 store_label_config 列存标签分值清单",
+      "author": "Qoder",
+      "comment": "两项计分项此前只存在于前端模板 organicTrafficConfig（loadConfig 读不到时按锚点保底插入），库里没有行会让卡片头部的启用/停用开关与「編輯 → 保存」直接报「評分規則不存在」，因此必须落库。STB_LABEL 顶替已下架的 STB_04「店鋪標籤-金牌」（只支持金牌单一身份），改为四选一标签分值表，配置方式对齐 COM_10；其「標籤 → 分值」清单沿用 free_shipping_config / member_bonus_config 先例新增专用列 store_label_config（已登记到 LegacyCoreContracts 可自愈补列），不复用 condition_items——那是条件计分子项口径，混用会让消费方把固定加分项误读成条件计分档。COM_SLOT 用语义后缀而非 COM_11/COM_12：后端 generateNextRuleCode 只取现有行最大序号 +1，数字编码会与运营自建计分项撞车（STB_ACT 同此先例）。按 rule_code 幂等插入（含 deleted=1 也视为已存在），重跑零副作用，也不覆盖运营改过的名称/分值/启停。关键顺序约束：SchemaContractValidator 排在所有 CommandLineRunner 之后（@Order 最大值）才自愈补列，因此本迁移只写建表即有的列、不写 store_label_config（首启写入会报 Unknown column）；标签清单以 NULL 起步由界面空清单兜底，运营配好后经 updateRule 落库。校验以「两个编码都必须有 deleted=0 的内置行」为准，与多数迁移「未播种不算失败」相反——本步就是补种，插不进去就是没生效，不记版本、下次启动重试。注意：本迁移只落配置存储侧，门店标签的赋值与「是否购买时段推荐」的判定都在本仓库之外，由外部业务系统读取配置消费。参考 SQL: sql/322_organic_store_label_time_slot.sql"
+    },
+    {
       "versionKey": "doc:native-content-v2.0",
       "module": "doc",
       "phase": "MODULE_STRUCTURE",

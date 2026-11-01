@@ -39,6 +39,8 @@ function LocationIndicator() {
 
 /** 流量均衡面板文案已接 i18n；测试的 t mock 返回 key，故断言用 key 串（与 STB_07 用例一致）。 */
 const TB = (k: string) => `organicTrafficScore.trafficBalance.${k}`
+/** 门店标签面板文案已接 i18n；测试的 t mock 返回 key，故断言用 key 串（与 TB 同惯例）。 */
+const SL = (k: string) => `organicTrafficScore.storeLabel.${k}`
 
 async function mount(readOnly = false, brand?: AppType) {
   await act(async () => {
@@ -205,11 +207,11 @@ describe('通用计分项：模块卡片与减免运费开关', () => {
     await mount()
     fireEvent.click(screen.getByRole('tab', { name: /dimStore/ }))
     fireEvent.click(screen.getByText('STB_LABEL'))
-    const panel = within(screen.getByLabelText('門店標籤計分配置'))
-    expect(panel.getByText('標籤計分 · 按門店當前標籤命中一檔即停')).toBeInTheDocument()
-    expect(panel.getByText('標籤分值明細')).toBeInTheDocument()
+    const panel = within(screen.getByLabelText(SL('panelAria')))
+    expect(panel.getByText(SL('tag'))).toBeInTheDocument()
+    expect(panel.getByText(SL('sectionDetail'))).toBeInTheDocument()
     // 未配置時的空態引導（對齊 COM_10 的配置方式）
-    expect(panel.getByText(/尚未配置任何標籤分值/)).toBeInTheDocument()
+    expect(panel.getByText(SL('empty'))).toBeInTheDocument()
   }, 120000)
 
   it('後端已返回店鋪維度規則時，門店標籤仍保底插入主營時段之後', async () => {
@@ -222,6 +224,34 @@ describe('通用计分项：模块卡片与减免运费开关', () => {
     const codes = screen.getAllByText(/^STB_/).map(el => el.textContent)
     // 保底项紧跟主營時段加分，不附在列表末尾
     expect(codes.slice(0, 2)).toEqual(['STB_01', 'STB_LABEL'])
+  }, 120000)
+
+  it('門店標籤配置隨規則落庫：讀取過濾非法行、保存回寫 storeLabelConfig', async () => {
+    api.fetch.mockResolvedValue({ dimensions: [], rules: [
+      { id: 41, ruleCode: 'STB_LABEL', dimension: 2, name: '門店標籤', description: '標籤分值', mode: 1, score: 0, status: 1, builtin: 1,
+        storeLabelConfig: JSON.stringify({ items: [
+          { labelValue: 'exclusive', labelName: '獨家', score: 40 },
+          { labelValue: 'gold', labelName: '金牌', score: 20 },
+          // 脏数据（缺 labelValue）：读取时必须被过滤，不能渲染成空标签行
+          { labelValue: '', labelName: '', score: 5 },
+        ] }) },
+    ] })
+    api.update.mockResolvedValue({ updatedBy: 'tester', updateTime: '2026-10-31 18:00:00' })
+    await mount()
+    fireEvent.click(screen.getByRole('tab', { name: /dimStore/ }))
+    fireEvent.click(screen.getByText('STB_LABEL'))
+    const panel = within(screen.getByLabelText(SL('panelAria')))
+    // 非法行被过滤，只渲染两条合法标签；分值按库里的值回显
+    expect(panel.getByText('獨家').closest('.organic-score-row')).toHaveTextContent('+40 分')
+    expect(panel.getByText('金牌').closest('.organic-score-row')).toHaveTextContent('+20 分')
+    fireEvent.click(panel.getByRole('button', { hidden: true, name: SL('edit') }))
+    // 行的 aria-label 带插值参数，简单 mock 下两行同名，取第一行（獨家）改分
+    fireEvent.change(screen.getAllByLabelText(SL('rowScoreAria'))[0], { target: { value: '50' } })
+    fireEvent.click(screen.getByRole('button', { hidden: true, name: SL('save') }))
+    await waitFor(() => expect(api.update).toHaveBeenCalled())
+    const [id, payload] = api.update.mock.calls[0]
+    expect(id).toBe('STB_LABEL')
+    expect(JSON.parse(payload.storeLabelConfig).items[0]).toEqual({ labelValue: 'exclusive', labelName: '獨家', score: 50 })
   }, 120000)
 
   it('点金广告计分项已下架，后端残留数据也不再展示', async () => {
@@ -401,8 +431,8 @@ describe('自然流量计分展示一致性', () => {
       const body = screen.getByText(rule.id).parentElement?.parentElement?.querySelector('.algorithm-form__rule-body')
       expect(body, rule.id).toBeTruthy()
       if (rule.id === 'STB_ACT' || rule.id === 'COM_10' || rule.id === 'STB_LABEL') {
-        // 三者都靠运营自行增删条目，未配置时以空态引导而非统一行结构
-        expect(body, rule.id).toHaveTextContent('尚未配置')
+        // 三者都靠运营自行增删条目，未配置时以空态引导而非统一行结构；STB_LABEL 空态文案已接 i18n
+        expect(body, rule.id).toHaveTextContent(rule.id === 'STB_LABEL' ? SL('empty') : '尚未配置')
       } else {
         const rows = body!.querySelectorAll('.organic-score-row')
         expect(rows.length, rule.id).toBeGreaterThan(0)
@@ -605,7 +635,7 @@ describe('店鋪綜合分／訂單取消率／活動加分：新計分口径', (
     // 旧口径不再出现：统计天数、逐档固定/動態扣分
     expect(screen.queryByText('organicTrafficScore.statDays')).not.toBeInTheDocument()
     expect(screen.queryByText(/-20 分|-50 分/)).not.toBeInTheDocument()
-    expect(screen.getByText(/業務系統實時傳遞店鋪綜合分/)).toBeInTheDocument()
+    expect(screen.getByText('organicTrafficScore.dataSourceStb03')).toBeInTheDocument()
   }, 120000)
 
   it('店鋪綜合分编辑态：可增删档位、无统计天数，梯度反向被拦截且不写库', async () => {

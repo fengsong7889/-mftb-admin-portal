@@ -14,7 +14,17 @@ import {
   type StoreLabelScoreConfig,
 } from './organicTrafficConfig'
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
+// 用真实 zh-TW 文案渲染：既验证 t() 确实接到了语言包，也让断言读得懂而不是一串 key
+type LocaleNode = string | { [key: string]: LocaleNode }
+vi.mock('react-i18next', async () => {
+  const zh = (await import('@/i18n/locales/zh-TW.json')).default as unknown as LocaleNode
+  const resolve = (key: string, vars?: Record<string, unknown>): string => {
+    const node = key.split('.').reduce<LocaleNode | undefined>((acc, part) => (acc && typeof acc === 'object' ? acc[part] : undefined), zh)
+    const text = typeof node === 'string' ? node : key
+    return vars ? text.replace(/\{\{(\w+)\}\}/g, (_m, name: string) => String(vars[name] ?? '')) : text
+  }
+  return { useTranslation: () => ({ t: resolve }) }
+})
 vi.mock('antd', async importOriginal => ({
   ...await importOriginal<typeof import('antd')>(),
   message: { success: vi.fn(), info: vi.fn(), warning: vi.fn(), error: vi.fn() },
@@ -30,7 +40,7 @@ const DESCRIPTION = '門店標籤由門店資料手動指定，命中當前標�
 
 function mount(props: Partial<React.ComponentProps<typeof StoreLabelScorePanel>> = {}) {
   render(<ConfigProvider theme={{ token: { motion: false } }}>
-    <StoreLabelScorePanel ruleName="門店標籤" config={CONFIG} hasDraft={false} description={DESCRIPTION}
+    <StoreLabelScorePanel ruleName="門店標籤" config={CONFIG} hasSavedConfig={false} description={DESCRIPTION}
       onSave={() => undefined} {...props} />
   </ConfigProvider>)
   return within(screen.getByLabelText('門店標籤計分配置'))
@@ -153,7 +163,7 @@ describe('門店標籤計分面板', () => {
   it('详情只读模式（父级 Form disabled）下仍可试算，且无编辑入口', () => {
     render(<ConfigProvider theme={{ token: { motion: false } }}>
       <Form disabled>
-        <StoreLabelScorePanel ruleName="門店標籤" config={CONFIG} hasDraft={false} description={DESCRIPTION}
+        <StoreLabelScorePanel ruleName="門店標籤" config={CONFIG} hasSavedConfig={false} description={DESCRIPTION}
           readOnly updatedBy="system" onSave={() => undefined} />
       </Form>
     </ConfigProvider>)

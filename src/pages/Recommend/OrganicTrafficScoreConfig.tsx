@@ -27,7 +27,7 @@ import {
   REGION_KEYS, REGION_LABELS, REGION_COLORS,
   isCouponScoreRule,
   isSignboardScoreRule, DEFAULT_SIGNBOARD_SCORE_CONFIG,
-  isStoreLabelScoreRule, DEFAULT_STORE_LABEL_SCORE_CONFIG,
+  isStoreLabelScoreRule, normalizeStoreLabelScoreConfig,
   isFreeShippingScoreRule, FREE_SHIPPING_ENROLLMENT_PREREQUISITE, normalizeFreeShippingScoreConfig,
   isMemberBonusScoreRule, normalizeMemberBonusScoreConfig,
   isOrganicRuleVisible, RETIRED_ORGANIC_RULE_IDS, DEFAULT_COUPON_SCORE_CONFIG, BUSINESS_STATE_ITEMS, isFilteredBusinessState,
@@ -148,6 +148,8 @@ function voToRule(vo: OrganicRuleVO): OrganicScoreRule {
   try { multiplierTiers = vo.multiplierTiers ? JSON.parse(vo.multiplierTiers) : undefined } catch { multiplierTiers = undefined }
   try { freeShippingConfig = vo.freeShippingConfig ? JSON.parse(vo.freeShippingConfig) : undefined } catch { freeShippingConfig = undefined }
   try { memberBonusConfig = vo.memberBonusConfig ? JSON.parse(vo.memberBonusConfig) : undefined } catch { memberBonusConfig = undefined }
+  // 门店标签配置：后端只透传 JSON，读取时由 normalize 过滤非法行；其他计分项不写这个字段，避免污染它们自己的列
+  const storeLabelConfig = vo.storeLabelConfig ? normalizeStoreLabelScoreConfig(vo.storeLabelConfig) : undefined
   return {
     id: vo.ruleCode,
     dimension: vo.dimension as ScoreDimension,
@@ -175,6 +177,7 @@ function voToRule(vo: OrganicRuleVO): OrganicScoreRule {
     activityItems: vo.activityItems ? (() => { try { return JSON.parse(vo.activityItems) as ActivityScoreItem[] } catch { return undefined } })() : undefined,
     freeShippingConfig,
     memberBonusConfig,
+    storeLabelConfig,
     trafficBalanceConfig: vo.trafficBalanceConfig ? normalizeTrafficBalanceConfig(vo.trafficBalanceConfig) : undefined,
     status: vo.status as ServiceStatus,
     builtin: vo.builtin === 1,
@@ -255,15 +258,16 @@ const RULE_TYPE_TAG_CONFIG: Record<string, { color: string; label: string }> = {
 }
 
 /**
- * 計分項取數口徑提示（只讀工具條展示）：寫清數據由業務系統怎麼傳、什麼節奏更新，
+ * 計分項取數口径提示（只讀工具條展示）：寫清數據由業務系統怎麼傳、什麼節奏更新，
  * 避免運營把本頁當成數據源，或誤以為改完檔位就能立刻看到排名變化。
+ * 值存 i18n key（不是文案）：语言切換時提示要跟隨，渲染處统一 t()。
  */
 const RULE_DATA_SOURCE_HINT: Record<string, string> = {
-  STB_03: '數據來源：業務系統實時傳遞店鋪綜合分，以最新傳入值比對檔位加分',
-  STB_05: '數據來源：出餐準時率由業務系統定時任務計算後傳遞，非實時傳數；本頁僅配檔位與分值',
-  STB_ACT: '數據來源：活動清單由業務系統同步，下拉框選中即帶出名稱與狀態；只有進行中的活動計分',
-  STB_LABEL: '數據來源：門店標籤由門店資料手動指定（四選一），本頁僅配標籤分值',
-  COM_SLOT: '數據來源：時段推薦購買記錄與投放期由廣告訂單系統提供（待接），本頁僅配固定加分',
+  STB_03: 'organicTrafficScore.dataSourceStb03',
+  STB_05: 'organicTrafficScore.dataSourceStb05',
+  STB_ACT: 'organicTrafficScore.dataSourceStbAct',
+  STB_LABEL: 'organicTrafficScore.dataSourceStbLabel',
+  COM_SLOT: 'organicTrafficScore.dataSourceComSlot',
 }
 
 /** 區域切換 Segmented 選項（PLT_03/PLT_04 共用，消除重複 JSX） */
@@ -660,6 +664,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
     memberBonusConfig: (values as any).memberBonusConfig
       ? JSON.stringify((values as any).memberBonusConfig as MemberBonusScoreConfig)
       : undefined,
+    storeLabelConfig: (values as any).storeLabelConfig
+      ? JSON.stringify((values as any).storeLabelConfig as StoreLabelScoreConfig)
+      : undefined,
     trafficBalanceConfig: (values as any).trafficBalanceConfig
       ? JSON.stringify((values as any).trafficBalanceConfig as TrafficBalanceConfig)
       : undefined,
@@ -943,11 +950,25 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
     await savePanelDescription(rule, description, '標籤分值')
   }
 
-  /** 门店标签面板保存：与 COM_10 同先例，标签分值只进页面草稿（后端尚无对应列），评分说明写库 */
+  /** 门店标签面板保存：四选一标签分值清单随规则落库（storeLabelConfig），评分说明同步写库 */
   const handleSaveStoreLabelPanel = async (rule: OrganicScoreRule, next: StoreLabelScoreConfig, description: string) => {
     if (readOnly) return
     setStoreLabelDrafts(prev => ({ ...prev, [rule.id]: next }))
-    await savePanelDescription(rule, description, '標籤分值')
+    try {
+      const vo = await updateOrganicRule(rule.id as unknown as number,
+        buildRulePayload({ ...rule, description, storeLabelConfig: next }))
+      setRules(prev => prev.map(r => (r.id === rule.id ? {
+        ...r,
+        description,
+        storeLabelConfig: next,
+        updatedBy: vo?.updatedBy ?? r.updatedBy,
+        updatedAt: vo?.updateTime ?? r.updatedAt,
+      } : r)))
+      message.success('門店標籤計分配置已保存')
+    } catch {
+      // request 層已彈錯，這裡只回滾頁面草稿，避免未落庫的配置被讀成已保存
+      setStoreLabelDrafts(prev => { const n = { ...prev }; delete n[rule.id]; return n })
+    }
   }
 
   /**
@@ -1510,15 +1531,16 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                       </div>
                     )
                   }
-                  // 门店标签（STB_LABEL）：按门店当前标签（独家/品牌/连锁/金牌）命中一檔即停
+                  // 门店标签（STB_LABEL）：按门店当前标签（独家/品牌/连锁/金牌）命中一档即停
                   if (isStoreLabelScoreRule(rule.id)) {
                     const draft = storeLabelDrafts[rule.id]
+                    const saved = normalizeStoreLabelScoreConfig(rule.storeLabelConfig)
                     return (
                       <div className="algorithm-form__rule-body">
                         <StoreLabelScorePanel
                           ruleName={rule.name}
-                          config={draft ?? DEFAULT_STORE_LABEL_SCORE_CONFIG}
-                          hasDraft={!!draft}
+                          config={draft ?? saved}
+                          hasSavedConfig={!!rule.storeLabelConfig?.items?.length}
                           description={rule.description}
                           updatedBy={rule.updatedBy}
                           updatedAt={rule.updatedAt}
@@ -1552,7 +1574,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
 
                           {/* 店鋪綜合分的取數來源在明細上方就說清楚，避免往下翻才能看到口徑 */}
                           {RULE_DATA_SOURCE_HINT[rule.id] && (
-                            <span className="algorithm-form__hint" style={{ margin: 0 }}>{RULE_DATA_SOURCE_HINT[rule.id]}</span>
+                            <span className="algorithm-form__hint" style={{ margin: 0 }}>{t(RULE_DATA_SOURCE_HINT[rule.id])}</span>
                           )}
 
 
@@ -1883,10 +1905,10 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                           <div className="organic-score-panel">
                             <div className="organic-score-list">
                               <ScoreRow label={TIME_SLOT_AD_PREREQUISITE} score={rule.score || TIME_SLOT_AD_DEFAULT_SCORE} kind="bonus"
-                                hint="商家購買時段推薦廣告即得分，不區分購買時段數量、不累加" />
+                                hint={t('organicTrafficScore.timeSlotHint')} />
                             </div>
                             <div className="organic-score-note">
-                              備注：購買記錄與投放期由廣告訂單系統提供；未購買或已過期不加分，本計分項的啟停使用卡片頭部「狀態」開關
+                              {t('organicTrafficScore.timeSlotNote')}
                             </div>
                           </div>
                         )}
@@ -2505,12 +2527,12 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             <div className="organic-score-edit-tier">
                               <span className="organic-score-edit-tier__label">{TIME_SLOT_AD_PREREQUISITE}</span>
                               <span style={{ fontSize: 12, color: '#52C41A', fontWeight: 500 }}>固定加分</span>
-                              <InputNumber aria-label="時段推薦分值" value={form.score ?? TIME_SLOT_AD_DEFAULT_SCORE} min={0} max={200} style={{ width: 130 }}
+                              <InputNumber aria-label={t('organicTrafficScore.timeSlotScoreAria')} value={form.score ?? TIME_SLOT_AD_DEFAULT_SCORE} min={0} max={200} style={{ width: 130 }}
                                 addonAfter="分" placeholder="輸入分數"
                                 onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], score: val ?? 0 } }) as any)} />
                             </div>
                             <div className="organic-score-note">
-                              備注：「{TIME_SLOT_AD_PREREQUISITE}」為固定計分前提（由廣告訂單系統判定），此處不需改動；本計分項的啟停使用卡片頭部「狀態」開關
+                              {t('organicTrafficScore.timeSlotEditNote', { label: TIME_SLOT_AD_PREREQUISITE })}
                             </div>
                           </div>
                         )}
