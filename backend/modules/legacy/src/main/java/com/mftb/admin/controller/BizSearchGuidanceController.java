@@ -27,7 +27,7 @@ public class BizSearchGuidanceController {
     private final BizSearchGuidanceService guidanceService;
 
     @GetMapping
-    @RequirePermission(menu = MENU, anyOf = {"hint-config", "hot-search-config"})
+    @RequirePermission(menu = MENU, anyOf = {"hint-config", "hot-search-config", "hot-search-library"})
     @Operation(summary = "查询搜索引导配置")
     public Result<List<BizSearchGuidance>> list(@RequestParam(required = false) Integer wordType,
                                                 @RequestParam(required = false) String brand,
@@ -37,14 +37,14 @@ public class BizSearchGuidanceController {
     }
 
     @PostMapping
-    @RequirePermission(menu = MENU, action = "edit", anyOf = {"hint-config", "hot-search-config"})
+    @RequirePermission(menu = MENU, action = "edit", anyOf = {"hint-config", "hot-search-config", "hot-search-library"})
     @Operation(summary = "新增搜索引导配置")
     public Result<Long> create(@RequestBody BizSearchGuidance guidance) {
         return Result.success("創建成功", guidanceService.create(guidance));
     }
 
     @PutMapping("/{id}")
-    @RequirePermission(menu = MENU, action = "edit", anyOf = {"hint-config", "hot-search-config"})
+    @RequirePermission(menu = MENU, action = "edit", anyOf = {"hint-config", "hot-search-config", "hot-search-library"})
     @Operation(summary = "更新搜索引导配置")
     public Result<Void> update(@PathVariable Long id, @RequestBody BizSearchGuidance guidance) {
         guidanceService.update(id, guidance);
@@ -52,7 +52,7 @@ public class BizSearchGuidanceController {
     }
 
     @PutMapping("/{id}/status")
-    @RequirePermission(menu = MENU, action = "edit", anyOf = {"hint-config", "hot-search-config"})
+    @RequirePermission(menu = MENU, action = "edit", anyOf = {"hint-config", "hot-search-config", "hot-search-library"})
     @Operation(summary = "启用/停用搜索引导配置")
     public Result<Void> updateStatus(@PathVariable Long id, @RequestParam Integer status) {
         guidanceService.updateStatus(id, status);
@@ -60,7 +60,7 @@ public class BizSearchGuidanceController {
     }
 
     @DeleteMapping("/{id}")
-    @RequirePermission(menu = MENU, action = "edit", anyOf = {"hint-config", "hot-search-config"})
+    @RequirePermission(menu = MENU, action = "edit", anyOf = {"hint-config", "hot-search-config", "hot-search-library"})
     @Operation(summary = "删除搜索引导配置（逻辑删除）")
     public Result<Void> delete(@PathVariable Long id) {
         guidanceService.delete(id);

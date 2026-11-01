@@ -133,7 +133,7 @@ public class DataInitializer implements CommandLineRunner {
     // v44: 規則配置拆分——新增「規則中心」目录(rule-center) + 廣告銷售/贈送管理/系統安全/算法配置/編號生成 5 個子菜單，
     //      舊 rule-config 保留並改名「規則總覽」；将存量 rule-config 角色/部门 授权笛卡尔复制到新子菜單与 asset-basic。
     // v45: 退役「拆分系统前的一级包装目录」——12 个壳菜单不再种子化，其子菜单直接挂顶级（见 RETIRED_SYSTEM_WRAPPERS）。
-    private static final String V_MENU_SEED = "core:menu-seed-v45";
+    private static final String V_MENU_SEED = "core:menu-seed-v46";
     
     /**
      * 已退役的一级包装目录（拆分业务系统前的壳）。
@@ -2300,6 +2300,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 Map.entry("hot-search-config", "Hot Search Config"),
                 Map.entry("search-weight-config", "Weight Control"),
                 Map.entry("search-library", "Search Library"),
+                Map.entry("config-release", "Config Release"),
                 Map.entry("word-segmentation", "Word Segmentation"),
                 Map.entry("synonym-config", "Synonym Library"),
                 Map.entry("hot-search-library", "Hot Search Library"),
@@ -2764,6 +2765,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         menus.put("search-config-new",   new String[]{"搜索配置",         null,             "1"});
         menus.put("global-config",       new String[]{"全局配置",         "search-config-new",  "1"});
         menus.put("channel-strategy",    new String[]{"維度策略",         "search-config-new",  "2"});
+        // 配置发布：搜索运营系统重构方案 §18.4，后端配置变更的版本/审核/回退能力（原仅能经落地页进入）。
+        menus.put("config-release",      new String[]{"配置發佈",         "search-config-new",  "3"});
         menus.put("search-guide",        new String[]{"搜索引導",         null,             "2"});
         menus.put("hint-config",         new String[]{"底紋配置",         "search-guide",       "1"});
         menus.put("hot-search-config",   new String[]{"熱搜配置",         "search-guide",       "2"});
@@ -3646,6 +3649,8 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
             Map.entry("gift-detail", "RedEnvelopeOutlined"),
             Map.entry("gift-manage", "GiftOutlined"),
             Map.entry("global-config", "GlobalOutlined"),
+            // 配置发布：图标取版本分支语义；已核对 search 系统 14 叶未用过 BranchesOutlined，满足同系统图标唯一
+            Map.entry("config-release", "BranchesOutlined"),
             Map.entry("group-purchase-dashboard", "DashboardOutlined"),
             Map.entry("hint-config", "FontSizeOutlined"),
             Map.entry("hint-report", "LineChartOutlined"),

@@ -91,8 +91,21 @@
       "dependencies": [
         "core:schema-v10"
       ],
-      "status": "ACTIVE",
+      "status": "SUPERSEDED",
+      "supersededBy": "core:menu-seed-v46",
       "comment": "v45: 退役一级包装目录（merchant_group/promotion_tool/seller-center/search/finance/ai-assistant/hr/asset-management/oa-center/permission/system-config/i18n-center）。seedSystemMenus 不再种子化这 12 个壳，其子菜单 parent 改为顶级；菜单类型改按『是否被子引用』推导；retireSystemWrapperDirectories() 每次启动幂等地把子菜单提升为顶级、清理壳的角色/部门授权并物理删除壳行（含软删残留，避免 uk_menu_key 撞唯一键）。SystemPortalSchemaInitializer 的 seller 校验与顶级归属表同步改为扁平结构。"
+    },
+    {
+      "versionKey": "core:menu-seed-v46",
+      "module": "core",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "dataInitializer",
+      "dependencies": [
+        "core:schema-v10"
+      ],
+      "status": "ACTIVE",
+      "comment": "v46: 搜索运营系统新增「配置發佈」叶子 config-release（挂 search-config-new 下，sort=3，图标 DeploymentUnitOutlined，英文名 Config Release）。源自搜索运营系统重构方案 §18.4 第二阶段：配置发布能力此前只能经原型落地页横线入口进入，无正式菜单与权限锚点；本次注册后 release 控制器可将其纳入 anyOf。SystemPortalSchemaInitializer 的 search 归属只列根节点、级联到子节点，故无需改归属表。"
     },
     {
       "versionKey": "core:hr-menu-groups-v44",

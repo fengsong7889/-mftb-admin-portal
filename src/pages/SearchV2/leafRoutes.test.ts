@@ -32,7 +32,12 @@ describe('SearchV2 菜单叶子融合映射', () => {
 
   it('leafConfigFor 只命中已融合路径，未融合叶子返回 undefined 以保留原页面', () => {
     expect(leafConfigFor('/hint-config')?.pane).toBe('guidance')
-    expect(leafConfigFor('/hot-search-library')).toBeUndefined()
+    // 熱搜詞庫已按「候选热词池」口径融入引导表；配置发布为第二阶段新叶子
+    expect(leafConfigFor('/hot-search-library')?.pane).toBe('guidance')
+    expect(leafConfigFor('/config-release')?.pane).toBe('releases')
+    // 诊断与报表类叶子能力不重叠，仍未融合
+    expect(leafConfigFor('/hint-verify')).toBeUndefined()
+    expect(leafConfigFor('/hint-report')).toBeUndefined()
     expect(leafConfigFor('/global-config')).toBeUndefined()
   })
 

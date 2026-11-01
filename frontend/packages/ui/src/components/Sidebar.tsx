@@ -200,6 +200,7 @@ const _OLD_KEY_TO_PATH_REMOVED = {
   // 搜索配置管理(新系统)
   'global-config': '/global-config',
   'channel-strategy': '/channel-strategy',
+  'config-release': '/config-release',
   // 搜索校驗
   'search-verify': '/search-verify',
   'search-verify-detail': '/search-verify-detail',
@@ -465,6 +466,7 @@ const keyToIcon: Record<string, ReactNode> = {
   'search-config-new': <SettingOutlined />,
   'global-config': <GlobalOutlined />,
   'channel-strategy': <ThunderboltOutlined />,
+  'config-release': <BranchesOutlined />,
   'search-guide': <AimOutlined />,
   'hint-config': <FontSizeOutlined />,
   'hot-search-config': <FireOutlined />,

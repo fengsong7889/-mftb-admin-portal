@@ -19,7 +19,7 @@
 | `ads` | 廣告推薦系統 | Advertising & Recommendations | `AimOutlined` | 10 | 广告销售 / 商家推广 / 团购秒杀（店铺随心推已迁出） |
 | `merchant` | 商戶運營系統 | Merchant Operations | `ShopOutlined` | 20 | 商户集团、门店、门店数据、地图规划（内部 BD/运营侧） |
 | `seller` | 店鋪經營系統 | Store Operations | `ShopOutlined` | 25 | 店铺随心推购买入口与推广报表（商家自助侧，v199 从 ads 拆出） |
-| `search` | 搜索運營系統 | Search Operations | `SearchOutlined` | 30 | 搜索词库、引导、策略、校验、报表 |
+| `search` | 搜索運營系統 | Search Operations | `SearchOutlined` | 30 | 搜索词库、引导、策略、校验、报表、配置发布（v46 新增 config-release 叶子） |
 | `finance` | 財務結算系統 | Finance & Settlement | `AccountBookOutlined` | 40 | 账户余额、批次、明细、对账、审批中心 |
 | `ai` | 人工智能系統 | Artificial Intelligence | `RobotOutlined` | 50 | 模型、配额、授权、MCP、审计、能耗 |
 | `organization` | 組織編制系統 | Organization & Headcount | `ApartmentOutlined` | 55 | 法人主體、管理組織、職位職級、崗位編制（v289 从 hr 拆出独立系统，先交付法人/組織兩頁） |

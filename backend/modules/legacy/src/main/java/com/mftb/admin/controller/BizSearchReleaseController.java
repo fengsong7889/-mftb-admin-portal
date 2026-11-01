@@ -27,21 +27,21 @@ public class BizSearchReleaseController {
     private final OperatorResolver operatorResolver;
 
     @GetMapping
-    @RequirePermission(menu = MENU, anyOf = {})
+    @RequirePermission(menu = MENU, anyOf = {"config-release"})
     @Operation(summary = "查询发布版本")
     public Result<List<BizSearchRelease>> list(@RequestParam(required = false) Integer status) {
         return Result.success(releaseService.list(status));
     }
 
     @PostMapping
-    @RequirePermission(menu = MENU, action = "edit", anyOf = {})
+    @RequirePermission(menu = MENU, action = "edit", anyOf = {"config-release"})
     @Operation(summary = "新建发布草稿")
     public Result<Long> create(@RequestBody BizSearchRelease release) {
         return Result.success("草稿已保存", releaseService.createDraft(release));
     }
 
     @PostMapping("/{id}/submit")
-    @RequirePermission(menu = MENU, action = "edit", anyOf = {})
+    @RequirePermission(menu = MENU, action = "edit", anyOf = {"config-release"})
     @Operation(summary = "提交审核")
     public Result<Void> submit(@PathVariable Long id) {
         releaseService.submitForReview(id);
@@ -49,7 +49,7 @@ public class BizSearchReleaseController {
     }
 
     @PostMapping("/{id}/approve")
-    @RequirePermission(menu = MENU, action = "approve", anyOf = {})
+    @RequirePermission(menu = MENU, action = "approve", anyOf = {"config-release"})
     @Operation(summary = "审批通过发布版本")
     public Result<Void> approve(@PathVariable Long id) {
         releaseService.approve(id, operatorResolver.currentOperatorName());
@@ -57,7 +57,7 @@ public class BizSearchReleaseController {
     }
 
     @DeleteMapping("/{id}")
-    @RequirePermission(menu = MENU, action = "edit", anyOf = {})
+    @RequirePermission(menu = MENU, action = "edit", anyOf = {"config-release"})
     @Operation(summary = "删除草稿/待审版本")
     public Result<Void> delete(@PathVariable Long id) {
         releaseService.delete(id);

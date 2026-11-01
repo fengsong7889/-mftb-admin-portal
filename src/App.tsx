@@ -420,6 +420,7 @@ function AuthenticatedLayout() {
               {/* 搜索配置管理(新系统) */}
               <Route path="/global-config" element={<GlobalConfig />} />
               <Route path="/channel-strategy" element={<SearchV2Leaf />} />
+              <Route path="/config-release" element={<SearchV2Leaf />} />
 
               {/* 集團人事 */}
               <Route path="/employee-management" element={<EmployeeManagement />} />

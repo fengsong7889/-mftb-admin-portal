@@ -49,6 +49,9 @@ export const keyToPath: Record<string, string> = {
   // 搜索配置管理(新系统)
   'global-config': '/global-config',
   'channel-strategy': '/channel-strategy',
+  // 配置发布（方案 §18.4）：暂不列入 BACKEND_CONNECTED_KEYS —— 该分类决定停服时是否隐藏菜单，
+  // 而 SearchV2 叶子带离线样例回退，归类会改变离线可见性，属需单独定版的策略（已记待办）。
+  'config-release': '/config-release',
   // 搜索校驗
   'search-verify': '/search-verify',
   'search-verify-detail': '/search-verify-detail',

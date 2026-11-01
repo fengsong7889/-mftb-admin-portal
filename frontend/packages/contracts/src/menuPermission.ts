@@ -174,6 +174,13 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'enable', label: '啟用' },
     { key: 'disable', label: '停用' },
   ],
+  // 配置发布：只声明 BizSearchReleaseController 实际校验的动作（view / edit / approve），
+  // 不预先造后端不检查的幻影权限。
+  'config-release': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '編輯' },
+    { key: 'approve', label: '審批' },
+  ],
   // 底纹配置
   'hint-config': [
     { key: 'view', label: '查看' },
@@ -1778,6 +1785,7 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   // 搜索管理 - 搜索配置
   'global-config',
   'channel-strategy',
+  'config-release',
   // 搜索管理 - 搜索引導
   'hint-config',
   'hot-search-config',
@@ -2058,6 +2066,7 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   // 搜索管理 - 搜索配置
   '/global-config': 'global-config',
   '/channel-strategy': 'channel-strategy',
+  '/config-release': 'config-release',
   // 搜索管理 - 搜索引導
   '/hint-config': 'hint-config',
   '/hint-preview': 'hint-config',
