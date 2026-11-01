@@ -16401,6 +16401,20 @@
         "trafficPackage": "Search traffic package",
         "cycleSlot": "Promoted search cycle slot",
         "configVersion": "Config version"
+      },
+      "terminal": {
+        "app": "APP",
+        "mini": "Mini program",
+        "h5": "H5",
+        "all": "All terminals"
+      },
+      "timeslot": {
+        "all": "All day",
+        "breakfast": "Breakfast",
+        "lunch": "Lunch",
+        "tea": "Afternoon tea",
+        "dinner": "Dinner",
+        "night": "Late night"
       }
     },
     "validate": {
@@ -16416,6 +16430,10 @@
     },
     "chrome": {
       "navAria": "New search prototype navigation"
+    },
+    "field": {
+      "guidanceTerminal": "Terminal",
+      "guidanceTimeSlot": "Time slot"
     }
   }
 }

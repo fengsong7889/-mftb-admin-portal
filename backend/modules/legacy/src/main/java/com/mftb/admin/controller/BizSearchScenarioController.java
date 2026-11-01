@@ -25,7 +25,7 @@ public class BizSearchScenarioController {
     private final BizSearchScenarioService scenarioService;
 
     @GetMapping
-    @RequirePermission(menu = MENU)
+    @RequirePermission(menu = MENU, anyOf = {"channel-strategy"})
     @Operation(summary = "查询场景策略")
     public Result<List<BizSearchScenario>> list(@RequestParam(required = false) Integer surface,
                                                 @RequestParam(required = false) Integer bizChannel,
@@ -34,14 +34,14 @@ public class BizSearchScenarioController {
     }
 
     @PostMapping
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU, action = "edit", anyOf = {"channel-strategy"})
     @Operation(summary = "新增场景策略")
     public Result<Long> create(@RequestBody BizSearchScenario scenario) {
         return Result.success("創建成功", scenarioService.create(scenario));
     }
 
     @PutMapping("/{id}")
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU, action = "edit", anyOf = {"channel-strategy"})
     @Operation(summary = "更新场景策略")
     public Result<Void> update(@PathVariable Long id, @RequestBody BizSearchScenario scenario) {
         scenarioService.update(id, scenario);
@@ -49,7 +49,7 @@ public class BizSearchScenarioController {
     }
 
     @PutMapping("/{id}/status")
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU, action = "edit", anyOf = {"channel-strategy"})
     @Operation(summary = "启用/停用场景策略")
     public Result<Void> updateStatus(@PathVariable Long id, @RequestParam Integer status) {
         scenarioService.updateStatus(id, status);
@@ -57,7 +57,7 @@ public class BizSearchScenarioController {
     }
 
     @DeleteMapping("/{id}")
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU, action = "edit", anyOf = {"channel-strategy"})
     @Operation(summary = "删除场景策略（逻辑删除）")
     public Result<Void> delete(@PathVariable Long id) {
         scenarioService.delete(id);

@@ -25,7 +25,7 @@ public class BizSearchLexiconController {
     private final BizSearchLexiconService lexiconService;
 
     @GetMapping
-    @RequirePermission(menu = MENU)
+    @RequirePermission(menu = MENU, anyOf = {"word-segmentation", "synonym-config", "stop-words"})
     @Operation(summary = "查询搜索词库")
     public Result<List<BizSearchLexicon>> list(@RequestParam(required = false) Integer wordType,
                                                @RequestParam(required = false) String brand,
@@ -34,14 +34,14 @@ public class BizSearchLexiconController {
     }
 
     @PostMapping
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU, action = "edit", anyOf = {"word-segmentation", "synonym-config", "stop-words"})
     @Operation(summary = "新增词条")
     public Result<Long> create(@RequestBody BizSearchLexicon entry) {
         return Result.success("創建成功", lexiconService.create(entry));
     }
 
     @PutMapping("/{id}")
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU, action = "edit", anyOf = {"word-segmentation", "synonym-config", "stop-words"})
     @Operation(summary = "更新词条")
     public Result<Void> update(@PathVariable Long id, @RequestBody BizSearchLexicon entry) {
         lexiconService.update(id, entry);
@@ -49,7 +49,7 @@ public class BizSearchLexiconController {
     }
 
     @PutMapping("/{id}/status")
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU, action = "edit", anyOf = {"word-segmentation", "synonym-config", "stop-words"})
     @Operation(summary = "启用/停用词条")
     public Result<Void> updateStatus(@PathVariable Long id, @RequestParam Integer status) {
         lexiconService.updateStatus(id, status);
@@ -57,7 +57,7 @@ public class BizSearchLexiconController {
     }
 
     @DeleteMapping("/{id}")
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU, action = "edit", anyOf = {"word-segmentation", "synonym-config", "stop-words"})
     @Operation(summary = "删除词条（逻辑删除）")
     public Result<Void> delete(@PathVariable Long id) {
         lexiconService.delete(id);

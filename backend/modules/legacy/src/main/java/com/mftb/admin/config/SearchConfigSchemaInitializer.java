@@ -36,6 +36,20 @@ public class SearchConfigSchemaInitializer implements CommandLineRunner {
      */
     static final String NAME_VERSION_KEY = "search:config-name-v1.1";
 
+    /**
+     * 增量版本：引导域补「终端 / 时段」作用域列（方案 §18.4 第二阶段，参考 sql/321_search_guidance_scope.sql）。
+     * 默认值即「不限」，存量行无需回填；服务层校验枚举取值。
+     */
+    static final String SCOPE_VERSION_KEY = "search:config-guidance-scope-v1.2";
+
+    /** 引导域作用域列：{表, 列, DDL}；整型枚举遵循业务数据字典。 */
+    static final String[][] SCOPE_COLUMNS = {
+            {"biz_search_guidance", "terminal",
+                    "ALTER TABLE biz_search_guidance ADD COLUMN terminal INT NOT NULL DEFAULT 4 COMMENT '终端: 1=APP 2=小程序 3=H5 4=全终端'"},
+            {"biz_search_guidance", "time_slot",
+                    "ALTER TABLE biz_search_guidance ADD COLUMN time_slot INT NOT NULL DEFAULT 0 COMMENT '时段: 0=全时段 1=早餐 2=午餐 3=下午茶 4=晚餐 5=夜宵'"},
+    };
+
     /** 需补名称列的表及其列名与 DDL；与 CREATE_STATEMENTS 中的 {@code *_no} 命名成套。 */
     static final String[][] NAME_COLUMNS = {
             {"biz_search_guidance", "config_name",
@@ -68,7 +82,29 @@ public class SearchConfigSchemaInitializer implements CommandLineRunner {
             versionTracker.applyOnce(VERSION_KEY, this::createTables, this::verifyTables);
             // 建表 DDL 不含名称列，因此存量库与新建库统一经由本增量获得名称列。
             versionTracker.applyOnce(NAME_VERSION_KEY, this::addNameColumns, this::verifyNameColumns);
+            // 引导域作用域列：与名称列同理，统一经由增量获得。
+            versionTracker.applyOnce(SCOPE_VERSION_KEY, this::addScopeColumns, this::verifyScopeColumns);
         });
+    }
+
+    private void addScopeColumns() {
+        log.info("开始为搜索引导域补终端/时段作用域列");
+        for (String[] column : SCOPE_COLUMNS) {
+            if (columnExists(column[0], column[1])) {
+                log.info("搜索配置列已存在，跳过: {}.{}", column[0], column[1]);
+                continue;
+            }
+            jdbcTemplate.execute(column[2]);
+        }
+    }
+
+    private void verifyScopeColumns() {
+        for (String[] column : SCOPE_COLUMNS) {
+            if (!columnExists(column[0], column[1])) {
+                throw new IllegalStateException("搜索引导作用域列未就绪: " + column[0] + "." + column[1]);
+            }
+        }
+        log.info("搜索引导域作用域列就绪: {} 列", SCOPE_COLUMNS.length);
     }
 
     /** 幂等补列：先查 INFORMATION_SCHEMA（MySQL 不支持 ADD COLUMN IF NOT EXISTS），缺列才 ALTER；失败上抛不吞异常。 */

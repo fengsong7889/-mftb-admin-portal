@@ -16403,6 +16403,20 @@
         "trafficPackage": "搜索投流包",
         "cycleSlot": "推廣搜索週期位",
         "configVersion": "配置版本"
+      },
+      "terminal": {
+        "app": "APP",
+        "mini": "小程序",
+        "h5": "H5",
+        "all": "全終端"
+      },
+      "timeslot": {
+        "all": "全時段",
+        "breakfast": "早餐",
+        "lunch": "午餐",
+        "tea": "下午茶",
+        "dinner": "晚餐",
+        "night": "夜宵"
       }
     },
     "validate": {
@@ -16418,6 +16432,10 @@
     },
     "chrome": {
       "navAria": "搜索新版原型導航"
+    },
+    "field": {
+      "guidanceTerminal": "終端",
+      "guidanceTimeSlot": "時段"
     }
   }
 }

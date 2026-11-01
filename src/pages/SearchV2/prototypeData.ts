@@ -57,8 +57,12 @@ export interface PrototypeRecord {
 export interface FieldDefinition {
   key: string
   label: string
+  /** 优先于 label 的 i18n key：新增字段一律走 key，避免把标签硬抄进 schema。 */
+  labelKey?: string
   type?: 'number' | 'select' | 'date' | 'remark'
   options?: string[]
+  /** 优先于 options 的 code+labelKey 选项：枚举型选择器走这里，显示经 i18n。 */
+  choiceKeys?: { value: string; labelKey: string }[]
   required?: boolean
   min?: number
   max?: number
@@ -84,6 +88,13 @@ export const FIELD_SCHEMAS: Record<RecordPane, FieldDefinition[]> = {
   guidance: [
     { key: 'text', label: '展示詞', required: true },
     { key: 'target', label: '提交搜索詞', required: true, help: '點擊推薦詞才提交搜索；不支援任意外鏈。付費詞在獨立推廣區展示「廣告」。' },
+    { key: 'terminal', label: '', labelKey: 'searchV2.field.guidanceTerminal', type: 'select', initial: 'all',
+      choiceKeys: [{ value: 'all', labelKey: 'searchV2.enum.terminal.all' }, { value: 'app', labelKey: 'searchV2.enum.terminal.app' },
+        { value: 'mini', labelKey: 'searchV2.enum.terminal.mini' }, { value: 'h5', labelKey: 'searchV2.enum.terminal.h5' }] },
+    { key: 'timeSlot', label: '', labelKey: 'searchV2.field.guidanceTimeSlot', type: 'select', initial: 'all',
+      choiceKeys: [{ value: 'all', labelKey: 'searchV2.enum.timeslot.all' }, { value: 'breakfast', labelKey: 'searchV2.enum.timeslot.breakfast' },
+        { value: 'lunch', labelKey: 'searchV2.enum.timeslot.lunch' }, { value: 'tea', labelKey: 'searchV2.enum.timeslot.tea' },
+        { value: 'dinner', labelKey: 'searchV2.enum.timeslot.dinner' }, { value: 'night', labelKey: 'searchV2.enum.timeslot.night' }] },
     { key: 'priority', label: '展示次序', type: 'number', min: 1, max: 20, initial: 1 },
     { key: 'source', label: '候選來源', type: 'select', options: ['人工策劃', '去重搜索趨勢', '商業計劃'], initial: '人工策劃' },
     { key: 'start', label: '開始日期', type: 'date', required: true },

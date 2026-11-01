@@ -94,14 +94,16 @@ export default function RecordPage({ pane, kinds, record, readOnly, onBack, onSa
       <section className="detail-card sv2__form-card"><h3><SettingOutlined /> {pane === 'ads' ? t('searchV2.form.sectionAd') : t('searchV2.form.sectionRule')}
         <HelpPopover title={t('searchV2.form.protoValidateTitle')} ariaLabel={t('searchV2.form.protoValidateAria')} content={t('searchV2.form.protoValidateBody')} /></h3>
         <div className="sv2__form-grid">
-          {fields.map(field => <Form.Item key={field.key} name={['values', field.key]} className={field.type === 'remark' ? 'sv2__full-row' : undefined}
-            label={<>{field.label}{field.help && <HelpPopover title={field.label} ariaLabel={`${field.label}說明`} content={field.help} />}</>}
+          {fields.map(field => {
+            const fieldLabel = field.labelKey ? t(field.labelKey) : field.label
+            return <Form.Item key={field.key} name={['values', field.key]} className={field.type === 'remark' ? 'sv2__full-row' : undefined}
+            label={<>{fieldLabel}{field.help && <HelpPopover title={fieldLabel} ariaLabel={`${fieldLabel}說明`} content={field.help} />}</>}
             rules={field.type === 'number' ? [{ required: true, type: 'number', min: field.min, max: field.max, message: `請填寫 ${field.min}～${field.max}` }]
-              : [{ required: field.required, whitespace: true, message: `請填寫${field.label}` }]}>
+              : [{ required: field.required, whitespace: true, message: `請填寫${fieldLabel}` }]}>
             {field.type === 'number' ? <InputNumber min={field.min} max={field.max} precision={field.key === 'factor' ? 1 : 0} step={field.key === 'factor' ? 0.1 : 1} />
-              : field.type === 'select' ? <Select disabled={readOnly || (pane === 'ads' && field.key === 'slot')} options={options(field.options ?? [])} />
+              : field.type === 'select' ? <Select disabled={readOnly || (pane === 'ads' && field.key === 'slot')} options={field.choiceKeys ? field.choiceKeys.map(c => ({ value: c.value, label: t(c.labelKey) })) : options(field.options ?? [])} />
                 : field.type === 'remark' ? <RemarkTextArea /> : <Input type={field.type === 'date' ? 'date' : 'text'} maxLength={field.key === 'evidence' ? 200 : 120} />}
-          </Form.Item>)}
+          </Form.Item> })}
         </div>
         {pane === 'scenarios' && <div className="sv2__rule-note">{t('searchV2.form.scenarioNote')}</div>}
         {pane === 'interventions' && <Alert type="warning" showIcon message={t('searchV2.form.interventionNote')} />}

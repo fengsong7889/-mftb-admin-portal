@@ -28,7 +28,7 @@ public class BizSearchInterventionController {
     private final OperatorResolver operatorResolver;
 
     @GetMapping
-    @RequirePermission(menu = MENU)
+    @RequirePermission(menu = MENU, anyOf = {"search-weight-config"})
     @Operation(summary = "查询干预规则")
     public Result<List<BizSearchIntervention>> list(@RequestParam(required = false) Integer actionType,
                                                     @RequestParam(required = false) Integer approvalStatus,
@@ -37,14 +37,14 @@ public class BizSearchInterventionController {
     }
 
     @PostMapping
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU, action = "edit", anyOf = {"search-weight-config"})
     @Operation(summary = "新增干预规则")
     public Result<Long> create(@RequestBody BizSearchIntervention rule) {
         return Result.success("創建成功", interventionService.create(rule));
     }
 
     @PutMapping("/{id}")
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU, action = "edit", anyOf = {"search-weight-config"})
     @Operation(summary = "更新干预规则（改内容需重新审批）")
     public Result<Void> update(@PathVariable Long id, @RequestBody BizSearchIntervention rule) {
         interventionService.update(id, rule);
@@ -52,7 +52,7 @@ public class BizSearchInterventionController {
     }
 
     @PostMapping("/{id}/approve")
-    @RequirePermission(menu = MENU, action = "approve")
+    @RequirePermission(menu = MENU, action = "approve", anyOf = {"search-weight-config"})
     @Operation(summary = "审批通过/驳回干预规则")
     public Result<Void> approve(@PathVariable Long id, @RequestBody Map<String, Boolean> body) {
         boolean approved = Boolean.TRUE.equals(body.get("approved"));
@@ -61,7 +61,7 @@ public class BizSearchInterventionController {
     }
 
     @DeleteMapping("/{id}")
-    @RequirePermission(menu = MENU, action = "edit")
+    @RequirePermission(menu = MENU, action = "edit", anyOf = {"search-weight-config"})
     @Operation(summary = "删除干预规则（逻辑删除）")
     public Result<Void> delete(@PathVariable Long id) {
         interventionService.delete(id);

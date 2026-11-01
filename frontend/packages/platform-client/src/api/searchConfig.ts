@@ -14,6 +14,10 @@ export interface SearchGuidanceItem {
   configNo?: string
   /** 配置名称（方案 §11.1 定版的权威业务字段）：写入必填且 ≤60 字；DDL 可空，故存量行可能为 undefined */
   configName?: string
+  /** 终端: 1=APP 2=小程序 3=H5 4=全终端（方案 §18.4 第二阶段） */
+  terminal?: number
+  /** 时段: 0=全时段 1=早餐 2=午餐 3=下午茶 4=晚餐 5=夜宵 */
+  timeSlot?: number
   wordType: number
   displayText: string
   targetQuery: string

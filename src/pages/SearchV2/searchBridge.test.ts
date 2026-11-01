@@ -114,6 +114,21 @@ describe('searchBridge 保存映射 saveConfigRecord', () => {
     expect(legacy?.name).toBe('奶茶 → 鮮奶茶')
   })
 
+  /** 方案 §18.4：终端/时段为系统级枚举，前端存 code、后端存整型，缺省即「不限」。 */
+  it('引导域终端/时段按枚举编码双向映射，缺省回退为不限', async () => {
+    api.createGuidance.mockResolvedValue(20)
+    await saveConfigRecord(rec({ values: { text: '午', target: '午', terminal: 'mini', timeSlot: 'dinner' } }), 'guidance')
+    expect(api.createGuidance).toHaveBeenCalledWith(expect.objectContaining({ terminal: 2, timeSlot: 4 }))
+    api.fetchGuidance.mockResolvedValue([
+      { id: 31, wordType: 1, displayText: 'x', targetQuery: 'x', surface: 2, bizChannel: 1, terminal: 3, timeSlot: 2 },
+      { id: 32, wordType: 1, displayText: 'y', targetQuery: 'y', surface: 2, bizChannel: 1 },
+    ])
+    const { records } = await loadConfigPanes()
+    expect(records.find(r => r.id === '31')?.values).toMatchObject({ terminal: 'h5', timeSlot: 'lunch' })
+    // 存量行无该两列值时回退「不限」，不得显示空白
+    expect(records.find(r => r.id === '32')?.values).toMatchObject({ terminal: 'all', timeSlot: 'all' })
+  })
+
   it('更新（数字 id）走 update，不重复 create', async () => {
     api.updateLexicon.mockResolvedValue(undefined)
     const id = await saveConfigRecord(rec({ pane: 'lexicon', kind: 'directionSynonym', values: { source: '漢堡', target: 'burger' } }), 'lexicon', '5')

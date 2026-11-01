@@ -43,7 +43,7 @@ class BizSearchGuidanceServiceImplTest {
         try (var statement = session.getConnection().createStatement()) {
             statement.execute("""
                     CREATE TABLE biz_search_guidance (
-                        id BIGINT PRIMARY KEY, config_no VARCHAR(32), config_name VARCHAR(60), word_type INT, display_text VARCHAR(64),
+                        id BIGINT PRIMARY KEY, config_no VARCHAR(32), config_name VARCHAR(60), terminal INT, time_slot INT, word_type INT, display_text VARCHAR(64),
                         target_query VARCHAR(64), brand VARCHAR(32), surface INT, biz_channel INT,
                         region_code VARCHAR(32), priority INT, source INT, start_date DATE, end_date DATE,
                         approval_status INT, status INT, remark VARCHAR(255), created_by VARCHAR(64),
@@ -78,7 +78,11 @@ class BizSearchGuidanceServiceImplTest {
 
     @Test
     void createValidPersistsAndAutoGeneratesConfigNo() {
-        long id = service.create(valid());
+        BizSearchGuidance draft = valid();
+        // 终端/时段（方案 §18.4 取优吸收维度）必须真实落库并读回，不能只过校验
+        draft.setTerminal(2);
+        draft.setTimeSlot(4);
+        long id = service.create(draft);
         assertTrue(id > 0);
         BizSearchGuidance saved = session.getMapper(BizSearchGuidanceMapper.class).selectById(id);
         assertNotNull(saved);
@@ -87,6 +91,8 @@ class BizSearchGuidanceServiceImplTest {
         assertEquals("測試員(001)", saved.getCreatedBy());
         assertEquals(1, saved.getStatus());
         assertEquals(1, saved.getApprovalStatus());
+        assertEquals(2, saved.getTerminal());
+        assertEquals(4, saved.getTimeSlot());
     }
 
     @Test
@@ -111,6 +117,14 @@ class BizSearchGuidanceServiceImplTest {
         hotAd.setWordType(4);
         hotAd.setSource(3);
         assertThrows(BusinessException.class, () -> service.create(hotAd));
+
+        BizSearchGuidance badTerminal = valid();
+        badTerminal.setTerminal(9);
+        assertThrows(BusinessException.class, () -> service.create(badTerminal));
+
+        BizSearchGuidance badSlot = valid();
+        badSlot.setTimeSlot(6);
+        assertThrows(BusinessException.class, () -> service.create(badSlot));
     }
 
     @Test

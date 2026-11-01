@@ -24,6 +24,12 @@ public class BizSearchGuidance {
     /** 配置名称（人类可读标识，方案 §11.1 定版的权威业务字段；服务层强制必填且 ≤60 字） */
     private String configName;
 
+    /** 终端: 1=APP 2=小程序 3=H5 4=全终端（方案 §18.4 取优吸收既有底紋配置维度） */
+    private Integer terminal;
+
+    /** 时段: 0=全时段 1=早餐 2=午餐 3=下午茶 4=晚餐 5=夜宵 */
+    private Integer timeSlot;
+
     /** 类型: 1=底纹词 2=自然热搜 3=推广搜索 4=候选热词 */
     private Integer wordType;
 

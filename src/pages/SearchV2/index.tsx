@@ -52,9 +52,10 @@ export default function SearchV2Prototype({ pane: fixedPane, kinds, leafPath, me
   // 叶子模式用自身路径 + view/id；落地页模式沿用 prototype=search-v2&pane= 查询参数。
   const handleNavigate = (nextPane: Pane, nextView = 'list', nextId?: string) =>
     navigate(leafPath ? leafUrl(leafPath, nextView, nextId) : prototypeUrl(nextPane, nextView, nextId))
-  // 第一阶段暂沿用 global-config 门禁，与融合前行为一致；后端控制器仍绑该 key，
-  // 若此处改成叶子 key 会出现「前端放行、接口 403」，重定与角色授予属第二阶段（方案 §18.4）。
-  if (!hasMenuPermission('global-config')) return <Result status="403" title={t('searchV2.deniedTitle')} subTitle={t('searchV2.deniedSub')} />
+  // 第二阶段（已做）：后端 anyOf 已把权限加宽到融合叶子，故前端同步加宽为
+  // 「global-config 或 叶子 key」——只加宽不收紧，既有持有者不会失权。
+  const leafAllowed = menuKey ? hasMenuPermission(menuKey) : false
+  if (!hasMenuPermission('global-config') && !leafAllowed) return <Result status="403" title={t('searchV2.deniedTitle')} subTitle={t('searchV2.deniedSub')} />
   if (!isPane(paneValue) || !['list', 'add', 'edit', 'detail'].includes(view)) {
     return <Result status="404" title={t('searchV2.notFoundTitle')} extra={<Button onClick={() => (leafPath ? navigate(leafUrl(leafPath)) : handleNavigate('overview'))}>{leafPath ? t('searchV2.backList') : t('searchV2.backOverview')}</Button>} />
   }

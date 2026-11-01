@@ -185,6 +185,20 @@
       "comment": "方案 §11.1 定版：319 建表按『身份=编号+业务字段』设计未含名称列，实测前端可填『名稱』但后端不消费导致输入静默丢失。列可为 NULL（存量行无法回溯名称），由服务层新增/更新时强制非空且 ≤60 字。干预域已有 target_name 承担同名职责，不重复加列。先查 INFORMATION_SCHEMA.COLUMNS 再 ALTER（MySQL 无 ADD COLUMN IF NOT EXISTS），applyOnce 后置校验四列齐备，失败上抛不吞异常。参考 SQL: sql/320_search_config_name.sql"
     },
     {
+      "versionKey": "search:config-guidance-scope-v1.2",
+      "module": "search",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "searchConfigSchemaInitializer",
+      "dependencies": [
+        "search:config-name-v1.1"
+      ],
+      "status": "ACTIVE",
+      "intent": "引导域补终端/时段作用域列：biz_search_guidance.terminal(1=APP 2=小程序 3=H5 4=全终端) 与 time_slot(0=全时段 1~5=餐段)",
+      "author": "Qoder",
+      "comment": "方案 §18.4 第二阶段：既有底紋配置页比新引导域多 terminal/timeSlot 两维，融合取优需真实落库；按「不落库就不给字段」纪律与前端控件同批。整型枚举遵循业务数据字典；NOT NULL DEFAULT（4/0）即「不限」，存量行无需回填。先查 INFORMATION_SCHEMA.COLUMNS 再 ALTER，applyOnce 后置校验两列齐备，失败上抛。参考 SQL: sql/321_search_guidance_scope.sql"
+    },
+    {
       "versionKey": "seq:init-v1",
       "module": "seq",
       "phase": "MODULE_STRUCTURE",

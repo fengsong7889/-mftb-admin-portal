@@ -28,6 +28,10 @@ public class BizSearchGuidanceServiceImpl implements BizSearchGuidanceService {
     private static final Set<Integer> SOURCES = Set.of(1, 2, 3);
     private static final Set<Integer> SURFACES = Set.of(1, 2, 3);
     private static final Set<Integer> BIZ_CHANNELS = Set.of(1, 2, 3);
+    /** 终端: 1=APP 2=小程序 3=H5 4=全终端 */
+    private static final Set<Integer> TERMINALS = Set.of(1, 2, 3, 4);
+    /** 时段: 0=全时段 1=早餐 2=午餐 3=下午茶 4=晚餐 5=夜宵 */
+    private static final Set<Integer> TIME_SLOTS = Set.of(0, 1, 2, 3, 4, 5);
 
     private final BizSearchGuidanceMapper mapper;
     private final OperatorResolver operatorResolver;
@@ -95,6 +99,8 @@ public class BizSearchGuidanceServiceImpl implements BizSearchGuidanceService {
     private void validate(BizSearchGuidance g) {
         if (!StringUtils.hasText(g.getConfigName())) throw new BusinessException("配置名称不能为空");
         if (g.getConfigName().trim().length() > 60) throw new BusinessException("配置名称最多 60 字");
+        if (g.getTerminal() != null && !TERMINALS.contains(g.getTerminal())) throw new BusinessException("非法的终端");
+        if (g.getTimeSlot() != null && !TIME_SLOTS.contains(g.getTimeSlot())) throw new BusinessException("非法的时段");
         if (!StringUtils.hasText(g.getDisplayText())) throw new BusinessException("展示词不能为空");
         if (g.getDisplayText().length() > 64) throw new BusinessException("展示词最多 64 字");
         if (!StringUtils.hasText(g.getTargetQuery())) throw new BusinessException("提交搜索词不能为空");

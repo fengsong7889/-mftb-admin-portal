@@ -25,6 +25,11 @@ const REGION_CODE: Record<string, string | undefined> = { '全城': undefined, '
 const REGION_LABEL: Record<string, string> = { MACAU: '澳門', TAIPA: '氹仔' }
 const APPROVAL_CODE: Record<string, number> = { [STATUS.DRAFT]: 1, [STATUS.APPROVED]: 2, [STATUS.PAUSED]: 3 }
 const APPROVAL_LABEL: Record<number, PrototypeStatus> = { 1: STATUS.DRAFT, 2: STATUS.APPROVED, 3: STATUS.PAUSED }
+// 终端/时段：前端存 code，后端存整型（方案 §18.4）；缺省即「不限」。
+const TERMINAL_CODE: Record<string, number> = { app: 1, mini: 2, h5: 3, all: 4 }
+const TERMINAL_LABEL: Record<number, string> = { 1: 'app', 2: 'mini', 3: 'h5', 4: 'all' }
+const SLOT_CODE: Record<string, number> = { all: 0, breakfast: 1, lunch: 2, tea: 3, dinner: 4, night: 5 }
+const SLOT_LABEL: Record<number, string> = { 0: 'all', 1: 'breakfast', 2: 'lunch', 3: 'tea', 4: 'dinner', 5: 'night' }
 const LEX_TYPE: Record<string, number> = { business: 1, alias: 2, directionSynonym: 3, correction: 4, banned: 5 }
 const LEX_TYPE_L: Record<number, string> = { 1: 'business', 2: 'alias', 3: 'directionSynonym', 4: 'correction', 5: 'banned' }
 const ACTION_TYPE: Record<string, number> = { demote: 1, exactAdmit: 2, boost: 3, spread: 4 }
@@ -64,7 +69,7 @@ function guidanceToRecord(item: SearchGuidanceItem): PrototypeRecord {
     channel: channelFrom(item.surface, item.bizChannel), region: regionOf(item.regionCode),
     kind: GUID_TYPE_L[item.wordType] ?? 'placeholder',
     status: APPROVAL_LABEL[item.approvalStatus ?? 1] ?? STATUS.DRAFT,
-    values: { text: item.displayText, target: item.targetQuery, priority: item.priority, source: SOURCE_LABEL[item.source ?? 1], start: item.startDate, end: item.endDate },
+    values: { text: item.displayText, target: item.targetQuery, priority: item.priority, source: SOURCE_LABEL[item.source ?? 1], terminal: TERMINAL_LABEL[item.terminal ?? 4], timeSlot: SLOT_LABEL[item.timeSlot ?? 0], start: item.startDate, end: item.endDate },
     updatedAt: item.updatedAt ? `後端 · ${item.updatedAt}` : '後端真值',
   }
 }
@@ -72,6 +77,7 @@ function recordToGuidance(r: PrototypeRecord): SearchGuidanceItem {
   const v = r.values
   return {
     wordType: GUID_TYPE[r.kind] ?? 1, configName: r.name, displayText: String(v.text ?? r.name), targetQuery: String(v.target ?? v.text ?? r.name),
+    terminal: TERMINAL_CODE[String(v.terminal ?? 'all')] ?? 4, timeSlot: SLOT_CODE[String(v.timeSlot ?? 'all')] ?? 0,
     brand: 'flashBee', surface: surfaceFrom(r.channel), bizChannel: bizFrom(r.channel), regionCode: REGION_CODE[r.region],
     priority: v.priority != null ? Number(v.priority) : 1, source: typeof v.source === 'string' ? SOURCE_CODE[v.source] : 1,
     startDate: v.start ? String(v.start) : undefined, endDate: v.end ? String(v.end) : undefined,
