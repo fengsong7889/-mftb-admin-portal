@@ -123,6 +123,24 @@ describe('搜索 U1 原型交互', () => {
     expect(mocks.fetch).not.toHaveBeenCalled()
     expect(mocks.request).not.toHaveBeenCalled()
   })
+  it('实验室吸收排查上下文：地图选点、用户代入可用，维度得分标注非线上算法', async () => {
+    mount('lab')
+    // 地图选点：只读输入点开弹窗，选点后回写坐标
+    fireEvent.click(screen.getByLabelText('searchV2.lab.fieldMapPoint'))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('searchV2.lab.mapTitle')).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: /大三巴/ }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'searchV2.lab.mapConfirm' }))
+    await waitFor(() => expect(screen.getByLabelText('searchV2.lab.fieldMapPoint')).toHaveValue('大三巴牌坊（22.1956, 113.5409）'))
+    // 维度面板：开启对比后才渲染；未代入用户时提示用户维度无示例值
+    fireEvent.click(screen.getByRole('button', { name: /compareSuffix/ }))
+    expect(await screen.findByText('searchV2.lab.dimTitle')).toBeInTheDocument()
+    expect(screen.getAllByText('searchV2.lab.dimNotOnline').length).toBeGreaterThan(0)
+    expect(screen.getAllByText(text => text.includes('searchV2.lab.dimMatch')).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('searchV2.lab.dimUserNeedsUser').length).toBeGreaterThan(0)
+    fireEvent.change(screen.getByLabelText('searchV2.lab.fieldUserId'), { target: { value: 'MF00001' } })
+    expect(screen.queryAllByText('searchV2.lab.dimUserNeedsUser')).toHaveLength(0)
+  })
   it('历史快照只载入固定示例，不能冒用真实用户查询', async () => {
     mount('lab')
     fireEvent.click(screen.getByRole('tab', { name: 'searchV2.lab.tabHistory' }))

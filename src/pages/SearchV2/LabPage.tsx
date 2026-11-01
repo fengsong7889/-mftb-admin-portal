@@ -1,12 +1,18 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Alert, Button, Descriptions, Empty, Form, Input, Select, Space, Switch, Tabs, Tag, type TableColumnsType } from 'antd'
-import { ExperimentOutlined, SearchOutlined, SwapOutlined } from '@ant-design/icons'
+import { Alert, Button, Descriptions, Empty, Form, Input, Modal, Select, Space, Switch, Tabs, Tag, type TableColumnsType } from 'antd'
+import { EnvironmentOutlined, ExperimentOutlined, SearchOutlined, SwapOutlined } from '@ant-design/icons'
 import HelpPopover from '@/components/HelpPopover'
 import ConsumerPreview from './ConsumerPreview'
 import { SampleTable } from './PrototypeTable'
 import { SCENE_LABEL_KEY, SCENES, options } from './prototypeData'
-import { getPreviewCards, type DisplayState, type PreviewCard, type PreviewContext } from './previewFixtures'
+import { DEMO_MAP_POINTS, getPreviewCards, sampleDimensionScores, weightedTotal, type DemoMapPoint, type DisplayState, type PreviewCard, type PreviewContext } from './previewFixtures'
+
+/** 维度示例分的标签键：与 previewFixtures.sampleDimensionScores 的 key 一一对应。 */
+const DIM_LABEL_KEY: Record<'match' | 'business' | 'store' | 'user' | 'platform', string> = {
+  match: 'searchV2.lab.dimMatch', business: 'searchV2.lab.dimBusiness', store: 'searchV2.lab.dimStore',
+  user: 'searchV2.lab.dimUser', platform: 'searchV2.lab.dimPlatform',
+}
 
 const INITIAL: PreviewContext = { scene: 'delivery', region: '澳門', query: '漢堡', sort: 'relevance', showAds: true }
 const DISPLAY_OPTIONS: { value: DisplayState; labelKey: string }[] = [
@@ -23,6 +29,14 @@ export default function LabPage() {
   const [compare, setCompare] = useState(false)
   const [historyLoaded, setHistoryLoaded] = useState(false)
   const [histories, setHistories] = useState<Record<string, string[]>>({})
+  // 排查上下文（方案 §18.3 取优吸收项）：用户代入与地图选点，仅影响示例归因与展示，不接真实服务
+  const [userId, setUserId] = useState('')
+  const [location, setLocation] = useState<DemoMapPoint>(DEMO_MAP_POINTS[0])
+  const [mapOpen, setMapOpen] = useState(false)
+  const [selectedPoint, setSelectedPoint] = useState<DemoMapPoint | null>(null)
+  const [mapSearch, setMapSearch] = useState('')
+  const hasUser = Boolean(userId.trim())
+  const mapPoints = DEMO_MAP_POINTS.filter(p => p.name.includes(mapSearch.trim()))
   const sceneValue = Form.useWatch('scene', form) ?? INITIAL.scene
   const historyMode = mode === 'history'
   const activeContext = historyMode ? INITIAL : context
@@ -76,6 +90,15 @@ export default function LabPage() {
             <div className="sv2__lab-actions"><Button type="primary" aria-label={t('searchV2.lab.btnLoad')} icon={<SearchOutlined />} htmlType="submit">{t('searchV2.lab.btnLoad')}</Button><Button onClick={() => { form.resetFields(); setContext(INITIAL); setDisplayState('results'); setCompare(false) }}>{t('searchV2.lab.btnReset')}</Button></div>
           </Form>
         </section>}
+        {!historyMode && <section className="detail-card"><h3><EnvironmentOutlined /> {t('searchV2.lab.ctxTitle')}</h3>
+          <div className="sv2__form-grid sv2__form-grid--two">
+            {/* 无 name 的 Form.Item 不会为子控件生成 id，故用显式 htmlFor/id 保证标签关联 */}
+            <div><label htmlFor="sv2-lab-user">{t('searchV2.lab.fieldUserId')}</label>
+              <Input id="sv2-lab-user" allowClear maxLength={40} value={userId} onChange={event => setUserId(event.target.value)} placeholder={t('searchV2.lab.userIdPlaceholder')} /></div>
+            <div><label htmlFor="sv2-lab-map">{t('searchV2.lab.fieldMapPoint')}</label>
+              <Input id="sv2-lab-map" readOnly value={`${location.name}（${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}）`} prefix={<EnvironmentOutlined />} onClick={() => { setSelectedPoint(null); setMapSearch(''); setMapOpen(true) }} /></div>
+          </div>
+        </section>}
         <section className="detail-card"><h3>{t('searchV2.lab.contextH3')}</h3><Descriptions column={1} size="small" items={[
           { key: 'scene', label: t('searchV2.lab.ctxScene'), children: t(SCENE_LABEL_KEY(activeContext.scene)) },
           { key: 'region', label: t('searchV2.lab.ctxRegion'), children: `${activeContext.region} ${t('searchV2.lab.ctxRegionSuffix')}` },
@@ -95,11 +118,31 @@ export default function LabPage() {
     </div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('searchV2.lab.historyEmpty')} />}
     {(!historyMode || historyLoaded) && <>
       {(compare || historyMode) && <section><h3>{t('searchV2.lab.comparisonH3')} <Tag>{t('searchV2.lab.tagNonAlgo')}</Tag></h3><SampleTable pageKey="lab-comparison" rows={cards} columns={columns} /></section>}
+      {(compare || historyMode) && cards.length > 0 && <section className="detail-card">
+        <h3>{t('searchV2.lab.dimTitle')} <Tag>{t('searchV2.lab.dimNotOnline')}</Tag></h3>
+        <p className="sv2__footnote">{t('searchV2.lab.dimNote')}</p>
+        <div className="sv2__dim-list">{cards.slice(0, 3).map(card => {
+          const dims = sampleDimensionScores(card, hasUser)
+          return <div className="sv2__dim-card" key={card.id}>
+            <strong>{card.title}</strong>
+            <div className="sv2__dim-rows">{dims.map(d => <span key={d.key}>{t(DIM_LABEL_KEY[d.key])} {d.score}/{d.maxScore} ×{d.weight}% → {Math.round(d.score * d.weight / 100)}</span>)}
+              <b>{t('searchV2.lab.dimWeighted')}：{weightedTotal(dims)}</b></div>
+            {!hasUser && <small>{t('searchV2.lab.dimUserNeedsUser')}</small>}
+          </div>
+        })}</div>
+      </section>}
       <div className="sv2__split"><section className="detail-card"><h3>{t('searchV2.lab.missH3')} <HelpPopover title={t('searchV2.lab.missHelpTitle')} ariaLabel={t('searchV2.lab.missHelpAria')} content={t('searchV2.lab.missHelpBody')} /></h3>
         <div className="sv2__pipeline">{PIPELINE_KEYS.map(key => <Tag key={key}>{t(key)} · {t('searchV2.lab.pipelinePending')}</Tag>)}</div>
       </section><section className="detail-card"><h3>{t('searchV2.lab.serverH3')}</h3><p>{t('searchV2.lab.serverBody')}</p>
         <Space wrap><Button disabled>{t('searchV2.lab.btnEsExplain')}</Button><Button disabled>{t('searchV2.lab.btnSaveRegression')}</Button></Space>
       </section></div>
     </>}
+    <Modal open={mapOpen} title={t('searchV2.lab.mapTitle')} width={640} onCancel={() => setMapOpen(false)}
+      footer={<Space><Button onClick={() => setMapOpen(false)}>{t('searchV2.form.cancel')}</Button>
+        <Button type="primary" disabled={!selectedPoint} onClick={() => { if (selectedPoint) { setLocation(selectedPoint); setMapOpen(false) } }}>{t('searchV2.lab.mapConfirm')}</Button></Space>}>
+      <Input allowClear prefix={<SearchOutlined />} placeholder={t('searchV2.lab.mapSearchPlaceholder')} value={mapSearch} onChange={event => setMapSearch(event.target.value)} />
+      <div className="sv2__map-points">{mapPoints.length ? mapPoints.map(point => <Button key={point.name} type={selectedPoint?.name === point.name ? 'primary' : 'default'}
+        onClick={() => setSelectedPoint(point)}>{point.name}（{point.lat.toFixed(4)}, {point.lng.toFixed(4)}）</Button>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('searchV2.lab.mapEmpty')} />}</div>
+    </Modal>
   </>
 }

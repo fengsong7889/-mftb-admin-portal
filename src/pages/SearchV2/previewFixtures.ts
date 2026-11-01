@@ -63,3 +63,55 @@ export function getPreviewCards(context: PreviewContext): PreviewCard[] {
     ? (['delivery', 'market', 'groupbuy'] as const).flatMap(channel => rows.filter(row => row.channel === channel).slice(0, 4))
     : rows
 }
+
+/** 演示地图点位：与既有「搜索校验」页同源，仅用于实验室选点，不代表真实地理服务。 */
+export interface DemoMapPoint {
+  name: string
+  lat: number
+  lng: number
+}
+export const DEMO_MAP_POINTS: DemoMapPoint[] = [
+  { name: '澳門旅遊塔', lat: 22.1853, lng: 113.5368 },
+  { name: '大三巴牌坊', lat: 22.1956, lng: 113.5409 },
+  { name: '威尼斯人度假村', lat: 22.1355, lng: 113.5645 },
+  { name: '澳門大學', lat: 22.13, lng: 113.545 },
+  { name: '珠海市拱北口岸', lat: 22.217, lng: 113.55 },
+  { name: '橫琴口岸', lat: 22.12, lng: 113.54 },
+  { name: '氹仔市中心', lat: 22.155, lng: 113.558 },
+]
+
+export interface DimensionSample {
+  key: 'match' | 'business' | 'store' | 'user' | 'platform'
+  weight: number
+  maxScore: number
+  score: number
+}
+
+/**
+ * 维度得分的示例推导（方案 §18.3「取优」吸收项）。
+ *
+ * 刻意不做的事：这里**不是**排序算法，也不声称复现线上打分 —— 真实分数字段、
+ * 相关分数与规则来源要等 B1 接 ES 后由服务端 explain 提供（见 LabPage「服務端解釋能力」）。
+ * 刻意做的事：把 explain 视图的**结构**（维度/权重/满分/加权合计）先呈现给运营，
+ * 分数由卡片既有展示字段线性推导，确定可复现，且界面统一标注「非線上算法」。
+ * 用户维度只有在代入用户后才有示例值，避免暗示匿名请求也有个性化分。
+ */
+export function sampleDimensionScores(card: PreviewCard, hasUser: boolean): DimensionSample[] {
+  const match = Math.min(400, Math.round(Number(card.rating) * 64))
+  const business = Math.min(400, Math.round(card.sales / 2))
+  const store = Math.max(0, Math.min(400, Math.round(400 - card.distance * 100)))
+  const user = hasUser ? 120 : 0
+  const platform = 60
+  return [
+    { key: 'match', weight: 32, maxScore: 400, score: match },
+    { key: 'business', weight: 26, maxScore: 400, score: business },
+    { key: 'store', weight: 22, maxScore: 400, score: store },
+    { key: 'user', weight: 12, maxScore: 200, score: user },
+    { key: 'platform', weight: 8, maxScore: 100, score: platform },
+  ]
+}
+
+/** 加权合计：与各维度同一口径，仅用于示例展示。 */
+export function weightedTotal(dims: DimensionSample[]): number {
+  return dims.reduce((sum, d) => sum + Math.round(d.score * d.weight / 100), 0)
+}
