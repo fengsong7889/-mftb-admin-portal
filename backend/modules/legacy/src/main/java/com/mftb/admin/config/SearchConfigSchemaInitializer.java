@@ -37,7 +37,7 @@ public class SearchConfigSchemaInitializer implements CommandLineRunner {
     static final String NAME_VERSION_KEY = "search:config-name-v1.1";
 
     /**
-     * 增量版本：引导域补「终端 / 时段」作用域列（方案 §18.4 第二阶段，参考 sql/321_search_guidance_scope.sql）。
+     * 增量版本：引导域补「终端 / 时段」作用域列（方案 §18.4 第二阶段，参考 sql/323_search_guidance_scope.sql）。
      * 默认值即「不限」，存量行无需回填；服务层校验枚举取值。
      */
     static final String SCOPE_VERSION_KEY = "search:config-guidance-scope-v1.2";

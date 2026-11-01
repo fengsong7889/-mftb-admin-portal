@@ -209,7 +209,7 @@
       "status": "ACTIVE",
       "intent": "引导域补终端/时段作用域列：biz_search_guidance.terminal(1=APP 2=小程序 3=H5 4=全终端) 与 time_slot(0=全时段 1~5=餐段)",
       "author": "Qoder",
-      "comment": "方案 §18.4 第二阶段：既有底紋配置页比新引导域多 terminal/timeSlot 两维，融合取优需真实落库；按「不落库就不给字段」纪律与前端控件同批。整型枚举遵循业务数据字典；NOT NULL DEFAULT（4/0）即「不限」，存量行无需回填。先查 INFORMATION_SCHEMA.COLUMNS 再 ALTER，applyOnce 后置校验两列齐备，失败上抛。参考 SQL: sql/321_search_guidance_scope.sql"
+      "comment": "方案 §18.4 第二阶段：既有底紋配置页比新引导域多 terminal/timeSlot 两维，融合取优需真实落库；按「不落库就不给字段」纪律与前端控件同批。整型枚举遵循业务数据字典；NOT NULL DEFAULT（4/0）即「不限」，存量行无需回填。先查 INFORMATION_SCHEMA.COLUMNS 再 ALTER，applyOnce 后置校验两列齐备，失败上抛。参考 SQL: sql/323_search_guidance_scope.sql"
     },
     {
       "versionKey": "seq:init-v1",
