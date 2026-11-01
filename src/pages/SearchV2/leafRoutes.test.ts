@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { LEAF_ROUTES, leafConfigFor, leafMenuName } from './leafRoutes'
 import type { MenuVO } from '@/api/menu'
@@ -39,6 +41,17 @@ describe('SearchV2 菜单叶子融合映射', () => {
     expect(leafConfigFor('/hint-verify')).toBeUndefined()
     expect(leafConfigFor('/hint-report')).toBeUndefined()
     expect(leafConfigFor('/global-config')).toBeUndefined()
+  })
+
+  /**
+   * 漂移守卫：映射表加了叶子但忘改 App.tsx 路由时，页面会静默回退到旧 mock 组件，
+   * 而上面的映射测试仍然全绿——真实发生过。路由与映射必须双向一致。
+   */
+  it('LEAF_ROUTES 中每个 path 都已挂到 App.tsx 的 SearchV2Leaf', () => {
+    const app = readFileSync(resolve(__dirname, '../../App.tsx'), 'utf-8')
+    LEAF_ROUTES.forEach(leaf => {
+      expect(app, `路由未接线：${leaf.path}`).toContain(`<Route path="${leaf.path}" element={<SearchV2Leaf />} />`)
+    })
   })
 
   it('leafMenuName 按 menuKey 取菜单真值；取不到时返回 null 而非编造名称', () => {

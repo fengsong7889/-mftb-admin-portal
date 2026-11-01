@@ -43,7 +43,6 @@ const HintPreview = lazy(() => import('@/pages/HintPreview'))
 const HotSearchPreview = lazy(() => import('@/pages/HotSearchPreview'))
 const HintReport = lazy(() => import('@/pages/HintReport'))
 const HotSearchReport = lazy(() => import('@/pages/HotSearchReport'))
-const HotSearchLibrary = lazy(() => import('@/pages/HotSearchLibrary'))
 const ApprovalCenter = lazy(() => import('@/pages/ApprovalCenter'))
 const ApprovalDetail = lazy(() => import('@/pages/ApprovalDetail'))
 const SearchVerifyDetail = lazy(() => import('@/pages/SearchVerifyDetail'))
@@ -408,7 +407,7 @@ function AuthenticatedLayout() {
               <Route path="/hot-search-preview" element={<HotSearchPreview />} />
               <Route path="/search-weight-config" element={<SearchV2Leaf />} />
               
-              <Route path="/hot-search-library" element={<HotSearchLibrary />} />
+              <Route path="/hot-search-library" element={<SearchV2Leaf />} />
               <Route path="/stop-words" element={<SearchV2Leaf />} />
               <Route path="/hint-report" element={<HintReport />} />
               <Route path="/hot-search-report" element={<HotSearchReport />} />
