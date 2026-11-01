@@ -147,6 +147,7 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         entity.setFreeShippingConfig(request.getFreeShippingConfig());
         entity.setMemberBonusConfig(request.getMemberBonusConfig());
         entity.setTrafficBalanceConfig(request.getTrafficBalanceConfig());
+        entity.setStoreLabelConfig(request.getStoreLabelConfig());
         entity.setPrerequisites(request.getPrerequisites());
         entity.setStatus(request.getStatus());
         entity.setBuiltin(0);
@@ -190,6 +191,7 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         entity.setFreeShippingConfig(request.getFreeShippingConfig());
         entity.setMemberBonusConfig(request.getMemberBonusConfig());
         entity.setTrafficBalanceConfig(request.getTrafficBalanceConfig());
+        entity.setStoreLabelConfig(request.getStoreLabelConfig());
         entity.setPrerequisites(request.getPrerequisites());
         entity.setStatus(request.getStatus());
         entity.setUpdatedBy(operatorResolver.currentOperatorName());
@@ -386,6 +388,7 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         vo.setFreeShippingConfig(entity.getFreeShippingConfig());
         vo.setMemberBonusConfig(entity.getMemberBonusConfig());
         vo.setTrafficBalanceConfig(entity.getTrafficBalanceConfig());
+        vo.setStoreLabelConfig(entity.getStoreLabelConfig());
         vo.setStatus(entity.getStatus());
         vo.setBuiltin(entity.getBuiltin());
         vo.setSortOrder(entity.getSortOrder());

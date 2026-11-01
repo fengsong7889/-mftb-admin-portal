@@ -101,6 +101,9 @@ public class OrganicScoreRule {
     /** 流量均衡合并配置 JSON（统一商家扶持与订单过热调控，统计口径 + 区域梯度，仅 PLT_03 使用） */
     private String trafficBalanceConfig;
 
+    /** 门店标签计分配置 JSON（[{labelValue, labelName, score}]，仅 STB_LABEL 使用） */
+    private String storeLabelConfig;
+
     /** 服务状态: 1=启用 2=停用 */
     private Integer status;
 

@@ -93,6 +93,9 @@ public class OrganicScoreRuleVO {
     /** 流量均衡合并配置 JSON 字符串（仅 PLT_03 使用：统计口径 + 区域梯度） */
     private String trafficBalanceConfig;
 
+    /** 门店标签计分配置 JSON 字符串（仅 STB_LABEL 使用：[{labelValue, labelName, score}]） */
+    private String storeLabelConfig;
+
     /** 服务状态: 1=启用 2=停用 */
     private Integer status;
 
