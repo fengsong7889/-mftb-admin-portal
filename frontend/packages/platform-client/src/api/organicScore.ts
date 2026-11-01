@@ -38,6 +38,8 @@ export interface OrganicRuleVO {
   freeShippingConfig?: string
   memberBonusConfig?: string
   trafficBalanceConfig?: string
+  /** 门店标签计分配置 JSON（[{labelValue,labelName,score}]，仅 STB_LABEL） */
+  storeLabelConfig?: string
   status: number
   builtin: number
   sortOrder: number
@@ -79,6 +81,8 @@ export interface OrganicRulePayload {
   freeShippingConfig?: string
   memberBonusConfig?: string
   trafficBalanceConfig?: string
+  /** 门店标签计分配置 JSON（[{labelValue,labelName,score}]，仅 STB_LABEL） */
+  storeLabelConfig?: string
   status: number
 }
 

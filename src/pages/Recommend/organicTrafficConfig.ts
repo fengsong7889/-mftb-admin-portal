@@ -1113,6 +1113,30 @@ export const TIME_SLOT_AD_PREREQUISITE = '購買時段推薦'
  */
 export const TIME_SLOT_AD_DEFAULT_SCORE = 50
 
+/** 归一化后端已保存的配置：后端只透传 JSON 不做结构校验，因此读取时过滤非法行、收敛类型 */
+export function normalizeStoreLabelScoreConfig(
+  raw: Partial<StoreLabelScoreConfig> | string | undefined | null,
+): StoreLabelScoreConfig {
+  let parsed: Partial<StoreLabelScoreConfig> | null = null
+  if (typeof raw === 'string') {
+    try { parsed = JSON.parse(raw) as Partial<StoreLabelScoreConfig> } catch { parsed = null }
+  } else if (raw && typeof raw === 'object') {
+    parsed = raw
+  }
+  const items = Array.isArray(parsed?.items)
+    ? parsed.items
+        .filter(item => item && typeof item.labelValue === 'string' && item.labelValue
+          && Number.isFinite(Number(item.score)))
+        .map(item => ({
+          labelValue: item.labelValue,
+          // 名称快照缺失时回查枚举，不让界面出现空标签
+          labelName: typeof item.labelName === 'string' && item.labelName ? item.labelName : storeLabelText(item.labelValue),
+          score: Math.trunc(Number(item.score)),
+        }))
+    : []
+  return { items }
+}
+
 /** 高峰時段定義 */
 export interface PeakTimeRange {
   /** 標籤（如「午高峰」） */
@@ -1172,6 +1196,8 @@ export interface OrganicScoreRule {
   freeShippingConfig?: FreeShippingScoreConfig
   /** 平台會員紅包計分配置（僅 COM_06 規則使用：報名分 + 加碼梯度） */
   memberBonusConfig?: MemberBonusScoreConfig
+  /** 門店標籤計分配置（僅 STB_LABEL 規則使用：標籤 → 分值清單，命中一檔即停） */
+  storeLabelConfig?: StoreLabelScoreConfig
   /** 流量均衡合併配置（僅 PLT_03 使用：統一商家扶持與訂單過熱調控，統計口徑 + 區域梯度） */
   trafficBalanceConfig?: TrafficBalanceConfig
   status: ServiceStatus
