@@ -208,6 +208,8 @@ public class DataInitializer implements CommandLineRunner {
         // 321: 「商家評分透視」→「商家權重分排名」。占比（權重）配置模塊已停用，
         // 頁面只展示三維度得分合計；種子不會覆蓋存量名稱，故用一次性遷移改名。
         versionTracker.applyOnce("ads:merchant-score-menu-rename-v1", this::renameMerchantScoreInsightMenu);
+        // 325: 「商家權重分排名」调整到「實驗沙盤」分组第一位。种子不覆盖存量 sort_order，存量库需一次性重排；新库由种子直接按新顺序写入。
+        versionTracker.applyOnce("ads:merchant-score-menu-first-v1", this::moveMerchantScoreInsightMenuFirst);
         // 旧版 JSON 权限迁移必须晚于菜单种子化执行:
         // 否则 resolveMenuId 会为尚未种子的菜单键创建占位菜单(name=menu_key, parent_id=NULL),
         // 被菜单树 buildTree 的孤儿兜底逻辑顶成一级菜单(生产事故: 实验沙盘子菜单顶到一级)
@@ -2449,6 +2451,22 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
     }
 
     /**
+     * 一次性迁移 (325): 「商家權重分排名」调整到「實驗沙盤」分组第一位，其余子菜单顺延。
+     * seedSystemMenus 不覆盖存量 sort_order，故存量库在此强制重排；同时校正 parent，
+     * 防某些环境该菜单未挂沙盘分组。只改层级与排序，不碰运营自定义名称。
+     */
+    private void moveMerchantScoreInsightMenuFirst() {
+        Long sandboxId = queryMenuIdByKey("traffic-sandbox");
+        if (sandboxId != null) {
+            jdbcTemplate.update("UPDATE sys_menu SET parent_id = ? WHERE menu_key = 'merchant-score-insight' AND deleted = 0 AND parent_id != ?", sandboxId, sandboxId);
+        }
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 1 WHERE menu_key = 'merchant-score-insight' AND deleted = 0 AND sort_order != 1");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 2 WHERE menu_key = 'waterfall-simulation' AND deleted = 0 AND sort_order != 2");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 3 WHERE menu_key = 'algorithm-simulation' AND deleted = 0 AND sort_order != 3");
+        jdbcTemplate.update("UPDATE sys_menu SET sort_order = 4 WHERE menu_key = 'merchant-promotion-diagnose' AND deleted = 0 AND sort_order != 4");
+    }
+
+    /**
      * 一次性调整 (随 V_MENU_SEED v6 执行):
      * - 新增「能耗与账单」二级目录，将能耗统计/能耗明细降级为三级
      * - 硬删除 ai_energy_control 菜单及角色/部门关联权限（seedSystemMenus 只增不删，需在此显式清理）
@@ -2748,9 +2766,9 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         // v28: merchant-order-manage（订单管理）已移除——所有订单入口统一至广告类型卡片上的「查看订单」按钮
         // ── 商家推广工具 > 流量沙盘 ──
         menus.put("traffic-sandbox",          new String[]{"實驗沙盤",     "merchant_promotion", "8"});
-        menus.put("waterfall-simulation",     new String[]{"瀑布流推演",   "traffic-sandbox",    "1"});
-        menus.put("algorithm-simulation",     new String[]{"算法推演",     "traffic-sandbox",    "2"});
-        menus.put("merchant-score-insight",   new String[]{"商家權重分排名", "traffic-sandbox",    "3"});
+        menus.put("merchant-score-insight",   new String[]{"商家權重分排名", "traffic-sandbox",    "1"});
+        menus.put("waterfall-simulation",     new String[]{"瀑布流推演",   "traffic-sandbox",    "2"});
+        menus.put("algorithm-simulation",     new String[]{"算法推演",     "traffic-sandbox",    "3"});
         menus.put("merchant-promotion-diagnose", new String[]{"商家推廣診斷", "traffic-sandbox", "4"});
         // ── 商家推广工具 > 赠送管理 ──
         menus.put("gift-detail",         new String[]{"推廣贈送",         "gift-manage",        "1"});
