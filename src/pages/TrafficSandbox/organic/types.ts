@@ -30,6 +30,25 @@ export interface RulePart {
   validFrom?: string
   validTo?: string
 }
+/** 活动平台回传的生效活动梯度（满减条件） */
+export interface ActivityTier { threshold: number; discount: number }
+export interface ActivityInfo {
+  activityId: string
+  activityName: string
+  /** 业务配置满减梯度列表，计分取优惠最高的一档 */
+  tiers: ActivityTier[]
+  matchedTier: ActivityTier
+  /** 命中档展示文案（红包等非满减类活动用它替代「满X减Y」渲染） */
+  matchedText?: string
+  validFrom: string
+  validTo: string
+}
+/** 围栏校验：触发后报名分可被停发 */
+export interface GuardInfo {
+  triggered: boolean
+  rule: string
+  enrollScoreSuspended: boolean
+}
 export interface RuleResult {
   ruleCode: string
   name: string
@@ -53,6 +72,8 @@ export interface RuleResult {
   observedAt: string
   expression: string
   parts?: RulePart[]
+  activity?: ActivityInfo
+  guard?: GuardInfo
 }
 export interface DimensionResult {
   dimension: Dimension

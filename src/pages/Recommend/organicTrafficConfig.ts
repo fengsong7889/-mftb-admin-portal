@@ -455,7 +455,7 @@ export function toCancelRateConditionItems(bands: CancelRateBand[], minOrders?: 
 export const isFilteredBusinessState = (item: { filtered?: boolean }, condItem?: { condition?: string }): boolean =>
   condItem?.condition === FILTERED_STATE_CONDITION || !!item.filtered
 
-/** 活動加分子項（一個對象 → 固定加分，僅 STB_ACT 規則使用；暫以算法庫算法ID對接驗證，後續切換為系統活動） */
+/** 活動加分子項（一個對象 → 固定加分，僅 STB_09 規則使用；暫以算法庫算法ID對接驗證，後續切換為系統活動） */
 export interface ActivityScoreItem {
   /** 對象ID（暫存算法庫算法ID，如 SFWD20260812000；後續切換為活動ID） */
   activityId: string
@@ -473,8 +473,25 @@ export type CouponScoreRuleId = typeof COUPON_SCORE_RULE_IDS[number]
 export const isCouponScoreRule = (id?: string): boolean =>
   !!id && (COUPON_SCORE_RULE_IDS as readonly string[]).includes(id)
 
-/** 已下架的計分項編碼：不再展示、不再作為新增模板（後端殘留數據由遷移清理）。PLT_04 已合并進流量均衡（PLT_03） */
-export const RETIRED_ORGANIC_RULE_IDS: string[] = ['COM_09', 'STB_04', 'STB_09', 'PLT_04']
+/** 已下架的計分項編碼：不再展示、不再作為新增模板（後端殘留數據由遷移清理）。PLT_04 已合并進流量均衡（PLT_03）。
+ * STB_04 / STB_09 已從本清單移出：兩個下架項讓出號位後，該兩個編碼現由內置項「門店標籤 / 活動加分」收编使用
+ * （後端遷移 organic:rename-stb-code-numeric-v1）。 */
+export const RETIRED_ORGANIC_RULE_IDS: string[] = ['COM_09', 'PLT_04']
+
+/**
+ * 舊語義編碼 → 現行數字編碼的讀取別名。
+ * 前端（Pages）與後端（Sealos）各自獨立發布，存在「新界面 + 未遷移庫」的窗口：
+ * 若不映射，界面會把 STB_LABEL/STB_ACT 當成未知項，同時又按模板保底插入 STB_04/STB_09，出現重複行。
+ * 遷移完成後本表不再命中，僅作部署窗口兼容；新增舊編碼時必須同時登記後端遷移鍵。
+ */
+export const LEGACY_ORGANIC_RULE_ID_ALIASES: Record<string, string> = {
+  STB_LABEL: 'STB_04',
+  STB_ACT: 'STB_09',
+}
+
+/** 後端下发的編碼 → 界面口徑編碼：命中別名則歸一到現行數字編碼，否則原樣返回 */
+export const normalizeOrganicRuleId = (id?: string): string | undefined =>
+  id ? LEGACY_ORGANIC_RULE_ID_ALIASES[id] ?? id : undefined
 
 /** 品牌專屬計分項：所屬品牌命中該鍵時，對應編碼不展示（如 MFOOD 無平台官方神券） */
 export const BRAND_HIDDEN_ORGANIC_RULE_IDS: Partial<Record<AppType, string[]>> = {
@@ -1023,10 +1040,10 @@ export function validateSignboardScoreConfig(cfg: SignboardScoreConfig): string 
   return null
 }
 
-/* ============================ 門店標籤計分（STB_LABEL） ============================ */
+/* ============================ 門店標籤計分（STB_04） ============================ */
 
 /**
- * 门店标签枚举（店铺维度 STB_LABEL 的计分依据）。
+ * 门店标签枚举（店铺维度 STB_04 的计分依据）。
  * 标签由运营在门店资料中手动指定，一家门店同时只有一个标签，因此本项是「命中一檔即停」，
  * 不同于 COM_10 金字招牌的多标签逐个累加。存储值与第二阶段后端字典保持一致，界面只认本清单。
  */
@@ -1044,8 +1061,8 @@ export const storeLabelMeta = (value?: string) => STORE_LABELS.find(item => item
 /** 标签展示文案；未知编码退回原始值，避免界面出现空白 */
 export const storeLabelText = (value?: string): string => storeLabelMeta(value)?.label ?? value ?? ''
 
-/** 使用门店标签计分面板的规则编码 */
-export const STORE_LABEL_SCORE_RULE_IDS = ['STB_LABEL'] as const
+/** 使用门店标签计分面板的规则编码（門店標籤，原语义编码 STB_LABEL） */
+export const STORE_LABEL_SCORE_RULE_IDS = ['STB_04'] as const
 export type StoreLabelScoreRuleId = typeof STORE_LABEL_SCORE_RULE_IDS[number]
 
 /** 判断该计分项是否走门店标签计分面板 */
@@ -1108,8 +1125,8 @@ export const TIME_SLOT_AD_PREREQUISITE = '購買時段推薦'
 /**
  * 时段推荐默认分值：商家购买时段推荐广告后得的一次性固定加分。
  * 只作未播种环境的兜底，真实分值以规则行 score 为准并可在界面编辑。
- * 编码用语义后缀而非 COM_11/COM_12：后端自动编号只取现有行最大序号 +1，
- * 数字编码可能在自定义计分项上撞车（STB_ACT 同此先例）。
+ * 编码用语义后缀而非 COM_11：后端自动编号只取现有行最大序号 +1，
+ * 数字编码可能在自定义计分项上撞车（店鋪維度的 STB_04/STB_09 因为占的是下架项让出的空号位，已收编为数字编码）。
  */
 export const TIME_SLOT_AD_DEFAULT_SCORE = 50
 
@@ -1190,13 +1207,13 @@ export interface OrganicScoreRule {
   blockedMerchants?: string[]
   /** 區域配置（PLT_03 商家扶持用 RegionSupportConfig，PLT_04 訂單過熱調控用 RegionOverheatConfig） */
   regionConfigs?: Record<string, RegionSupportConfig | RegionOverheatConfig>
-  /** 活動加分配置（僅 STB_ACT 規則使用；暫按算法庫算法ID配置，每個算法獨立計分） */
+  /** 活動加分配置（僅 STB_09 規則使用；暫按算法庫算法ID配置，每個算法獨立計分） */
   activityItems?: ActivityScoreItem[]
   /** 減免運費計分配置（僅 COM_02 規則使用：門檻檔位 + 報名分護欄） */
   freeShippingConfig?: FreeShippingScoreConfig
   /** 平台會員紅包計分配置（僅 COM_06 規則使用：報名分 + 加碼梯度） */
   memberBonusConfig?: MemberBonusScoreConfig
-  /** 門店標籤計分配置（僅 STB_LABEL 規則使用：標籤 → 分值清單，命中一檔即停） */
+  /** 門店標籤計分配置（僅 STB_04 規則使用：標籤 → 分值清單，命中一檔即停） */
   storeLabelConfig?: StoreLabelScoreConfig
   /** 流量均衡合併配置（僅 PLT_03 使用：統一商家扶持與訂單過熱調控，統計口徑 + 區域梯度） */
   trafficBalanceConfig?: TrafficBalanceConfig
@@ -1267,8 +1284,9 @@ export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
 
   // ===== 店鋪維度（基礎信息 + 店鋪運營） =====
   { id: 'STB_01', dimension: ScoreDimension.STORE, name: '主營時段加分', description: '主營時段配置完整，當前處於主營時段內加分', mode: ScoreMode.RULE_BONUS, score: 60, status: ENABLED, builtin: true },
-  // 门店标签：原 STB_04「店鋪標籤-金牌」只支持金牌单一身份，已下架；本项改为独家/品牌/连锁/金牌四选一的标签分值表
-  { id: 'STB_LABEL', dimension: ScoreDimension.STORE, name: '門店標籤', description: '門店標籤由門店資料手動指定，獨家／品牌／連鎖／金牌四選一；按當前標籤命中對應分值，命中一檔即停、不累加，未配置該標籤不加分', mode: ScoreMode.RULE_BONUS, score: 0, status: ENABLED, builtin: true },
+  // 門店標籤（STB_04）：原 STB_04「店鋪標籤-金牌」只支持金牌单一身份已下架，本項改為獨家/品牌/連鎖/金牌四選一的標籤分值表；
+  // 建項時曾用語義編碼 STB_LABEL，現由後端遷移 organic:rename-stb-code-numeric-v1 收编回讓出的 STB_04 號位
+  { id: 'STB_04', dimension: ScoreDimension.STORE, name: '門店標籤', description: '門店標籤由門店資料手動指定，獨家／品牌／連鎖／金牌四選一；按當前標籤命中對應分值，命中一檔即停、不累加，未配置該標籤不加分', mode: ScoreMode.RULE_BONUS, score: 0, status: ENABLED, builtin: true },
   { id: 'STB_02', dimension: ScoreDimension.STORE, name: '營業狀態', description: '營業中滿分；休息一會（2小時自動恢復）、爆單暫停（2小時自動恢復）降權；休息打烊由系統直接過濾，不加載到瀑布流也不計分', mode: ScoreMode.CONDITIONAL, score: 0, status: ENABLED, builtin: true, conditionItems: [
       { condition: 'bonus', score: 100 },
       { condition: 'deduction', score: 20 },
@@ -1284,8 +1302,9 @@ export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
   // 旧 stat_days / deduction_per_order 不再使用，由后端迁移 organic:stb07-meal-time-v1 覆写库内旧行
   { id: 'STB_07', dimension: ScoreDimension.STORE, name: '出餐時長', description: '開啟自動校正後按出餐時長計分，命中即得固定加分，不累加', mode: ScoreMode.RULE_BONUS, score: MEAL_TIME_DEFAULT_SCORE, status: ENABLED, builtin: true, prerequisites: MEAL_TIME_AUTO_CORRECT_ON },
   { id: 'STB_08', dimension: ScoreDimension.STORE, name: '訂單取消率', description: '統計期內外賣單的取消率（自取單不納入，用戶取消與商家取消均計入），單量達門檻才納入，按取消率梯度加分：取消率越低加分越多，命中一檔即停、不累加，高於最高檔不加分', mode: ScoreMode.CONDITIONAL, score: 0, statDays: 30, status: ENABLED, builtin: true, conditionItems: toCancelRateConditionItems(DEFAULT_CANCEL_RATE_BANDS, DEFAULT_CANCEL_MIN_ORDERS) },
-  // STB_09「超時接單」已下架：从默认计分项移除并加入 RETIRED_ORGANIC_RULE_IDS，后端残留行由库内数据过滤屏蔽
-  { id: 'STB_ACT', dimension: ScoreDimension.STORE, name: '活動加分', description: '活動資料由業務系統同步，僅正常進行中的活動計分；已過期、失效或未開始的活動不加分。店鋪報名進行中的活動即得固定加分，多個活動獨立計分、可累加', mode: ScoreMode.RULE_BONUS, score: 0, activityItems: [], status: ENABLED, builtin: true },
+  // 活動加分（STB_09）：原 STB_09「超時接單」已下架讓位（從默認計分項移除、後端殘留行逻辑删除），
+  // 本項建項時曾用語義編碼 STB_ACT，現由 organic:rename-stb-code-numeric-v1 收编到該號位
+  { id: 'STB_09', dimension: ScoreDimension.STORE, name: '活動加分', description: '活動資料由業務系統同步，僅正常進行中的活動計分；已過期、失效或未開始的活動不加分。店鋪報名進行中的活動即得固定加分，多個活動獨立計分、可累加', mode: ScoreMode.RULE_BONUS, score: 0, activityItems: [], status: ENABLED, builtin: true },
 
   // ===== 平台維度 =====
   { id: 'PLT_01', dimension: ScoreDimension.PLATFORM, name: '距離衰減', description: '滿分按衰減係數×距離遞減，距離越遠得分越低', mode: ScoreMode.DECAY, score: 100, decayCoefficient: 5, status: ENABLED, builtin: true },

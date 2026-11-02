@@ -17,10 +17,10 @@ import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import { fetchGiftAvailableDays } from '@/api/gift'
 import { usePaymentRule } from '@/hooks/usePaymentRule'
-import { fetchAdAlgorithms, fetchAdSignboardInventory, placeAdSignboardOrder } from '@/api/adPromotion'
+import { fetchAdAlgorithms, fetchAdSignboardInventory, fetchAdPricingChannels, placeAdSignboardOrder } from '@/api/adPromotion'
 import { fetchStores, type StoreItem } from '@/api/store'
 import { fetchFinAccountBalance } from '@/api/finance'
-import { AlgorithmType, ServiceStatus, REGION_LABEL_KEY } from '@mftb/contracts/recommendConstants'
+import { AlgorithmType, ServiceStatus, REGION_LABEL_KEY, RecommendChannel } from '@mftb/contracts/recommendConstants'
 import { signboardTagText } from '../Recommend/signboardLabels'
 import { MAX_BUY_DAYS, PRESALE_OPEN_HOUR, MONTHS_PER_PAGE, parseDayTiers, getPresaleOpenTime, PickerPresaleInfoModal, PickerPaymentSuccessModal } from './components/pickerShared'
 
@@ -124,6 +124,8 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
   // 查詢條件
   const [searchAlgorithm, setSearchAlgorithm] = useState<string | null>(null)
   const [searchBrand, setSearchBrand] = useState<string | null>(null)
+  /** 業務頻道（查询区第二位，先選頻道再選算法）：真值来自金字招牌定價表 */
+  const [searchChannel, setSearchChannel] = useState<number | null>(null)
   const [searchStoreName, setSearchStoreName] = useState<string | null>(null)
   const [searchBD, setSearchBD] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
@@ -223,6 +225,32 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
 
   // 招牌名稱下拉：先選品牌，再按品牌加載算法（金字招牌 algoType=13，僅返回有啟用定價配置的算法）
 
+  /* ── 業務頻道級聯：品牌 → 頻道 → 算法（與銷售定價「算法×頻道」口径一致） ── */
+  const backendBrand = searchBrand === 'shanfeng' ? 'flashBee' : searchBrand === 'mfood' ? 'mFood' : searchBrand ?? undefined
+  const [pricedChannels, setPricedChannels] = useState<number[]>([])
+  useEffect(() => {
+    if (!searchBrand) { setPricedChannels([]); setSearchChannel(null); return }
+    let cancelled = false
+    fetchAdPricingChannels(AlgorithmType.GOLDEN_SIGNBOARD, backendBrand)
+      .then(list => { if (!cancelled) setPricedChannels(Array.isArray(list) ? list : []) })
+      .catch(() => { if (!cancelled) setPricedChannels([]) })
+    return () => { cancelled = true }
+  }, [searchBrand, backendBrand])
+
+  /* 頻道不再可用（品牌切換/定價停用）時重置；只剩唯一候選時自動帶出，不打扰用户 */
+  useEffect(() => {
+    if (searchChannel != null && !pricedChannels.includes(searchChannel)) setSearchChannel(null)
+    if (searchChannel == null && pricedChannels.length === 1) setSearchChannel(pricedChannels[0])
+  }, [pricedChannels, searchChannel])
+
+  const channelSelectOptions = useMemo(() => pricedChannels.map(code => ({
+    label: code === RecommendChannel.SUPERMARKET ? tr('recommend.channelSupermarket')
+      : code === RecommendChannel.GROUP_BUY ? tr('recommend.channelGroupBuy')
+        : code === RecommendChannel.HOME ? tr('recommend.channelHome')
+          : tr('recommend.channelDelivery'),
+    value: code,
+  })), [pricedChannels, tr])
+
   // 加載門店下拉
   useEffect(() => {
     fetchStores({ page: 1, size: 500 })
@@ -241,6 +269,8 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
   const handleBrandChange = (value: string | null) => {
     setSearchBrand(value)
     setSearchAlgorithm(null)
+    // 頻道候選随品牌重算，先清空已選（加載完成後由频道 onChange 自動落到唯一候選）
+    setSearchChannel(null)
     // 品牌變更後重新加載算法下拉
     if (value) {
       const backendBrand = value === 'shanfeng' ? 'flashBee' : value === 'mfood' ? 'mFood' : value
@@ -262,6 +292,12 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
     setSearchAlgorithm(value)
   }
 
+  /** 頻道變更：重算算法候选並清空已選（不同頻道的定價屬於不同算法配置集） */
+  const handleChannelChange = (value: number | null) => {
+    setSearchChannel(value)
+    setSearchAlgorithm(null)
+  }
+
   // 門店變更：自動帶出BD
   const handleStoreChange = (value: string | null) => {
     setSearchStoreName(value)
@@ -275,6 +311,7 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
   const handleSearch = async () => {
     if (!searchAlgorithm) { message.warning(t('selectAlgorithm')); return }
     if (!searchBrand) { message.warning(t('selectBrand')); return }
+    if (searchChannel == null) { message.warning(t('channelRequired')); return }
     if (!storeMode && !searchStoreName) { message.warning(t('selectStore')); return }
 
     const algoId = Number(searchAlgorithm)
@@ -283,7 +320,7 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
     const storeCode = store?.storeCode
 
     try {
-      const inventory = await fetchAdSignboardInventory(algoId, storeCode, groupCode)
+      const inventory = await fetchAdSignboardInventory(algoId, storeCode, groupCode, searchChannel)
       // 從後端響應構建標籤定價列表（含場景）
       const pricings: LabelPricingInfo[] = (inventory.labels ?? []).map(lp => ({
         labelType: lp.labelType,
@@ -327,6 +364,7 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
 
   const handleReset = () => {
     setSearchAlgorithm(null); setSearchBrand(null)
+    setSearchChannel(null); setPricedChannels([])
     setSearchStoreName(null); setSearchBD(null)
     setHasSearched(false); setSelectedLabels([])
     setLabelPricings([]); setLabelDates({}); setActiveDateLabel(null)
@@ -542,6 +580,7 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
         groupCode: store?.groupCode ?? '',
         storeCode: store?.storeCode ?? '',
         bdEmpId: searchBD ? Number(searchBD) : null,
+        channel: searchChannel ?? undefined,
         giftDays: effectiveGiftDays,
         cells,
       })
@@ -616,9 +655,13 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
             <Select placeholder={t('brandAutoHint')} value={searchBrand} onChange={handleBrandChange} allowClear
               options={[{ label: '閃蜂', value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} />
           </Form.Item>
+          <Form.Item label={t('channelLabel')}>
+            <Select placeholder={searchBrand ? t('channelLabel') : t('selectBrandFirst')} value={searchChannel} onChange={handleChannelChange} allowClear
+              options={channelSelectOptions} disabled={!searchBrand || channelSelectOptions.length === 0} />
+          </Form.Item>
           <Form.Item label="算法名稱">
             <Select placeholder={searchBrand ? '請選擇算法名稱' : t('selectBrandFirst')} value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
-              options={pricingOptions} disabled={!searchBrand} />
+              options={pricingOptions} disabled={!searchBrand || searchChannel == null} />
           </Form.Item>
           {!storeMode && (
             <Form.Item label={t('storeNameLabel')}>

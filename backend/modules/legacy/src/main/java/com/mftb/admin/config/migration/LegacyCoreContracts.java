@@ -520,7 +520,7 @@ public class LegacyCoreContracts implements SchemaContractProvider {
                         + "free_shipping_config TEXT DEFAULT NULL COMMENT '減免運費計分配置 JSON（僅 COM_02）', "
                         + "member_bonus_config TEXT DEFAULT NULL COMMENT '平台會員紅包計分配置 JSON（僅 COM_06）', "
                         + "traffic_balance_config TEXT DEFAULT NULL COMMENT '流量均衡合併配置 JSON（僅 PLT_03）', "
-                        + "store_label_config TEXT DEFAULT NULL COMMENT '門店標籤計分配置 JSON（僅 STB_LABEL）', "
+                        + "store_label_config TEXT DEFAULT NULL COMMENT '門店標籤計分配置 JSON（僅 STB_04）', "
                         + "status INT NOT NULL DEFAULT 1 COMMENT '服務狀態: 1=啟用 2=停用', "
                         + "builtin TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否系統內置', "
                         + "sort_order INT NOT NULL DEFAULT 0 COMMENT '排序號', "
@@ -546,10 +546,10 @@ public class LegacyCoreContracts implements SchemaContractProvider {
                                 "ALTER TABLE biz_organic_score_rule ADD COLUMN member_bonus_config TEXT DEFAULT NULL COMMENT '平台會員紅包計分配置 JSON（報名分 + 商家加碼梯度，僅 COM_06）'"),
                         new ContractSpec.ColumnSpec("traffic_balance_config",
                                 "ALTER TABLE biz_organic_score_rule ADD COLUMN traffic_balance_config TEXT DEFAULT NULL COMMENT '流量均衡合併配置 JSON（統計口徑 + 區域梯度，僅 PLT_03）'"),
-                        // 门店标签（STB_LABEL）的「标签 → 分值」清单沿用 free_shipping_config / member_bonus_config
+                        // 门店标签（STB_04，原语义编码 STB_LABEL）的「标签 → 分值」清单沿用 free_shipping_config / member_bonus_config
                         // 先例单独建列：不复用 condition_items，避免消费方把固定加分项误读成条件计分子项
                         new ContractSpec.ColumnSpec("store_label_config",
-                                "ALTER TABLE biz_organic_score_rule ADD COLUMN store_label_config TEXT DEFAULT NULL COMMENT '門店標籤計分配置 JSON（[{labelValue,labelName,score}]，僅 STB_LABEL）'")
+                                "ALTER TABLE biz_organic_score_rule ADD COLUMN store_label_config TEXT DEFAULT NULL COMMENT '門店標籤計分配置 JSON（[{labelValue,labelName,score}]，僅 STB_04）'")
                 ));
     }
 

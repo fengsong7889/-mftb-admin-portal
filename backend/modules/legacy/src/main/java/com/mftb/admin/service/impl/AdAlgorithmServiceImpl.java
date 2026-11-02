@@ -35,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,7 +63,8 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
 
     @Override
     public PageResult<AdAlgorithmVO> page(long page, long size, Integer algoType, String brand,
-                                          Integer channel, Integer status, String keyword, String storeCode, Boolean hasPricing) {
+                                          Integer channel, Integer status, String keyword, String storeCode,
+                                          Boolean hasPricing, Integer pricingChannel) {
         page = PageResult.normalizePage(page);
         size = PageResult.normalizeSize(size);
         LambdaQueryWrapper<AdAlgorithm> wrapper = new LambdaQueryWrapper<>();
@@ -80,53 +82,67 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
         List<AdAlgorithmVO> records = result.getRecords().stream()
                 .map(AdAlgorithmVO::from)
                 .toList();
+        long total = result.getTotal();
         // 销售菜单场景: 过滤掉对该门店屏蔽的算法（规则6）
         if (StringUtils.hasText(storeCode)) {
             int before = records.size();
             records = records.stream()
                     .filter(algo -> !isBlockedForStore(algo.getId(), storeCode))
                     .toList();
-            long adjustedTotal = Math.max(0, result.getTotal() - (before - records.size()));
-            // hasPricing: 进一步过滤无启用定价的算法
-            if (Boolean.TRUE.equals(hasPricing)) {
-                int beforePricing = records.size();
-                records = records.stream()
-                        .filter(algo -> hasActivePricing(algo.getId(), algo.getAlgoType()))
-                        .toList();
-                adjustedTotal = Math.max(0, adjustedTotal - (beforePricing - records.size()));
-            }
-            return new PageResult<>(records, adjustedTotal);
+            total = Math.max(0, total - (before - records.size()));
         }
-        // hasPricing: 过滤无启用定价的算法
+        // hasPricing: 过滤无启用定价的算法；pricingChannel 非空时按「算法×頻道」定位定價，
+        // 避免同算法多頻道时退化成「任一頻道有定价就放出」而取错价
         if (Boolean.TRUE.equals(hasPricing)) {
             int before = records.size();
             records = records.stream()
-                    .filter(algo -> hasActivePricing(algo.getId(), algo.getAlgoType()))
+                    .filter(algo -> hasActivePricing(algo.getId(), algo.getAlgoType(), pricingChannel))
                     .toList();
-            long adjustedTotal = Math.max(0, result.getTotal() - (before - records.size()));
-            return new PageResult<>(records, adjustedTotal);
+            total = Math.max(0, total - (before - records.size()));
         }
-        return new PageResult<>(records, result.getTotal());
+        return new PageResult<>(records, total);
     }
 
-    /** 判断算法是否有启用中的定价配置 */
-    private boolean hasActivePricing(Long algoId, Integer algoType) {
+    @Override
+    public List<Integer> listActiveChannels(Integer algoType, String brand) {
+        if (algoType == null) {
+            return Collections.emptyList();
+        }
+        if (algoType == 3) {
+            return revivePricingService.listActiveChannels(algoType, brand);
+        } else if (algoType == 5) {
+            return hotPricingService.listActiveChannels(algoType, brand);
+        } else if (algoType == 13) {
+            return signboardPricingService.listActiveChannels(algoType, brand);
+        } else if (algoType == 15) {
+            return trafficPricingService.listActiveChannels(algoType, brand);
+        } else if (algoType == 1) {
+            return pricingService.listActiveChannels(algoType, brand);
+        }
+        // 其余算法类型无独立定價表（如新店廣告不按頻道定价）
+        return Collections.emptyList();
+    }
+
+    /** 判断算法是否有启用中的定价配置（pricingChannel 非空时进一步限定業務頻道） */
+    private boolean hasActivePricing(Long algoId, Integer algoType, Integer pricingChannel) {
         if (algoId == null || algoType == null) return false;
         if (algoType == 3) {
-            return revivePricingService.activeByAlgo(algoId) != null;
+            return revivePricingService.activeByAlgoAndChannel(algoId, pricingChannel) != null;
         } else if (algoType == 5) {
-            return hotPricingService.activeByAlgo(algoId) != null;
+            return hotPricingService.activeByAlgoAndChannel(algoId, pricingChannel) != null;
         } else if (algoType == 13) {
             // 金字招牌：查独立计价表，且需至少有一个启用的标签定价
-            var pricing = signboardPricingService.activeByAlgo(algoId);
+            var pricing = signboardPricingService.activeByAlgoAndChannel(algoId, pricingChannel);
             if (pricing == null) return false;
             return pricing.getSignboardItems() != null && pricing.getSignboardItems().stream()
                     .anyMatch(item -> Boolean.TRUE.equals(item.getEnabled()) && item.getPrice() != null && item.getPrice().doubleValue() > 0);
         } else if (algoType == 15) {
-            // 投流广告：任一业务频道存在启用中的定价配置即可售
-            return trafficPricingService.hasActivePricing(algoId);
+            // 投流广告：未选频道时任一频道有定价即可售；选了频道则按该频道定位
+            return pricingChannel == null
+                    ? trafficPricingService.hasActivePricing(algoId)
+                    : trafficPricingService.activeByAlgo(algoId, pricingChannel) != null;
         } else {
-            return pricingService.activeByAlgo(algoId) != null;
+            return pricingService.activeByAlgoAndChannel(algoId, pricingChannel) != null;
         }
     }
 

@@ -26,6 +26,9 @@ public interface AdPricingTrafficService {
     /** 算法是否存在启用中的投流定价（任一业务频道） */
     boolean hasActivePricing(Long algoId);
 
+    /** 指定算法类型下存在启用中投流定价的业务频道（去重升序；brand 非空时再按品牌过滤） */
+    List<Integer> listActiveChannels(Integer algoType, String brand);
+
     /** 新增计价配置（同一算法同一业务频道仅允许一条配置） */
     AdPricingTrafficVO create(AdPricingTrafficRequest request);
 

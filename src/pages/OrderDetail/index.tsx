@@ -407,6 +407,14 @@ export default function OrderDetail() {
   // 支付方式检测：直接使用后端存储的 actualAmount 判断，避免 slot 价格反推精度误差
   const payMode: 'promo' | 'gift' | 'mixed' = giftDays > 0 ? (order.actualPrice > 0 ? 'mixed' : 'gift') : 'promo'
 
+  /** 投流廣告贈送名額以曝光次數計（非天數）：抵扣相關展示文案與單位按口徑切換 */
+  const giftDeductLabel = isTrafficAd ? '贈送曝光次數抵扣' : t('orderDetail.giftDeductDaysLabel')
+  const giftDeductTipText = isTrafficAd
+    ? `使用 ${giftDays.toLocaleString()} 次贈送曝光次數抵扣訂單金額`
+    : t('orderDetail.giftDeductTip', { days: giftDays })
+  const giftCountSuffix = isTrafficAd ? '次' : t('orderDetail.daysSuffix')
+  const giftOnlyPaidLabel = isTrafficAd ? '贈送曝光次數抵扣' : t('orderDetail.giftDeductLabel')
+
   // 已退款：以「實付推廣金額」(actualPaid) 為基準計算退款，保證與費用明細一致，一目了然
   const refundAmountByPaid = Math.round(actualPaid * (1 - (refundInfo?.feePercent ?? 0) / 100))
 
@@ -1232,14 +1240,14 @@ export default function OrderDetail() {
                 {/* 使用赠送天数抵扣 */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: '#262626' }}>{t('orderDetail.giftDeductDaysLabel')}</span>
-                    <span style={{ fontSize: 11, color: '#8C8C8C' }}>{t('orderDetail.giftDeductTip', { days: giftDays })}</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#262626' }}>{giftDeductLabel}</span>
+                    <span style={{ fontSize: 11, color: '#8C8C8C' }}>{giftDeductTipText}</span>
                   </div>
                   <div style={{
                     padding: '4px 16px', background: '#FFF7E6', border: '1px solid #FFD591',
                     borderRadius: 8,
                   }}>
-                    <span style={{ fontSize: 18, fontWeight: 700, color: '#E8720C' }}>{giftDays} {t('orderDetail.daysSuffix')}</span>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: '#E8720C' }}>{giftDays.toLocaleString()} {giftCountSuffix}</span>
                   </div>
                 </div>
                 {/* 赠送天数抵扣现金（仅人气商家定价配置了现金价值） */}
@@ -1260,7 +1268,7 @@ export default function OrderDetail() {
             {/* 最终实付 */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 14, fontWeight: 700, color: '#262626' }}>{payMode === 'gift' ? t('orderDetail.giftDeductLabel') : t('orderDetail.actualPaid')}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#262626' }}>{payMode === 'gift' ? giftOnlyPaidLabel : t('orderDetail.actualPaid')}</span>
                 {payMode !== 'gift' && <span style={{ fontSize: 11, color: '#8C8C8C' }}>
                   {order.gradientDiscount
                     ? ((isPopular || isRevive)
@@ -1275,7 +1283,7 @@ export default function OrderDetail() {
                   padding: '6px 20px', background: 'linear-gradient(135deg, #E8720C, #F59432)',
                   borderRadius: 8, boxShadow: '0 2px 8px rgba(232,114,12,0.3)',
                 }}>
-                  <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>{giftDays} {t('orderDetail.daysSuffix')}</span>
+                  <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>{giftDays.toLocaleString()} {giftCountSuffix}</span>
                 </div>
               ) : isRefunded ? (
                 <div style={{

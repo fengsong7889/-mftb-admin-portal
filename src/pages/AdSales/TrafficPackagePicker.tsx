@@ -5,9 +5,8 @@ import { Button, Card, Empty, Form, InputNumber, Modal, Radio, Select, Space, Ta
 import { ReloadOutlined, SearchOutlined, ShoppingCartOutlined, WalletOutlined } from '@ant-design/icons'
 import { BIZ_CHANNEL } from '@/constants/bizChannel'
 import { AlgorithmType } from '@mftb/contracts/recommendConstants'
-import { fetchAdAlgorithms, type AdAlgorithm } from '@/api/adPromotion'
+import { fetchAdAlgorithms, fetchAdPricingChannels, type AdAlgorithm } from '@/api/adPromotion'
 import { usePaymentRule } from '@/hooks/usePaymentRule'
-import { getSystemRuleValue } from '@/hooks/useSystemRules'
 import {
   type TrafficPackageTier,
   type TrafficPackageOrder,
@@ -15,20 +14,15 @@ import {
   findLadderUnitPrice,
   calcCustomAmount,
   saveTrafficOrder,
-  MOCK_TRAFFIC_MERCHANTS,
 } from './types'
 import { loadTrafficChannelPricing } from '../_shared/ad-promotion/trafficPricing'
+import { fetchStores, type StoreItem } from '@/api/store'
+import { fetchGiftAvailableDays } from '@/api/gift'
+import { fetchFinAccountBalance } from '@/api/finance'
+import { UI_TO_BACKEND_BRAND } from '../_shared/ad-promotion/gridConstants'
 
 /** 投流廣告廣告類型標識（規則配置/贈送管理一致） */
 const GIFT_AD_TYPE_TRAFFIC = 'traffic_ad'
-
-/** BD 選項（與其它購買頁面保持一致） */
-const BD_OPTIONS = [
-  { label: '張偉', value: 'bd-001' },
-  { label: '李娜', value: 'bd-002' },
-  { label: '王強', value: 'bd-003' },
-  { label: '劉敏', value: 'bd-004' },
-]
 
 /**
  * 投流廣告購買頁（廣告銷售）
@@ -40,12 +34,12 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
   const navigate = useNavigate()
   // 僅展示啟用中的頻道定價（停用頻道停止售賣）：真值來自後端 biz_ad_pricing_traffic
   const [pricing, setPricing] = useState<TrafficChannelPricing[]>([])
-  /** 業務頻道 i18n 標籤映射 */
-  const BIZ_CHANNEL_I18N_MAP: Record<string, string> = {
+  /** 業務頻道 i18n 標籤映射（useMemo 保持引用穩定，供下級 useMemo 作為依賴） */
+  const BIZ_CHANNEL_I18N_MAP = useMemo<Record<string, string>>(() => ({
     [BIZ_CHANNEL.FOOD_DELIVERY]: t('bizChannelFoodDelivery'),
     [BIZ_CHANNEL.SUPERMARKET]: t('bizChannelSupermarket'),
     [BIZ_CHANNEL.GROUP_BUY]: t('bizChannelGroupBuy'),
-  }
+  }), [t])
 
   /* ── 查詢區狀態 ── */
   const [searchBrand, setSearchBrand] = useState<string | undefined>('shanfeng')
@@ -53,8 +47,14 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
   const [algorithmOptions, setAlgorithmOptions] = useState<AdAlgorithm[]>([])
   const [searchStoreName, setSearchStoreName] = useState<string | null>(null)
   const [searchBD, setSearchBD] = useState<string | null>(null)
-  const [bizChannel, setBizChannel] = useState<string>(BIZ_CHANNEL.FOOD_DELIVERY)
+  /** 查詢區業務頻道（1=美食外賣 2=超市百貨 3=團購到店）：先選頻道再選算法，與銷售定價同口径 */
+  const [searchChannel, setSearchChannel] = useState<number | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
+  /** 門店下拉（真實門店，value=storeCode）與 storeCode → 門店實例映射 */
+  const [storeOptions, setStoreOptions] = useState<Array<{ label: string; value: string }>>([])
+  const [storeMap, setStoreMap] = useState<Record<string, StoreItem>>({})
+  /** BD 選項：選門店後由門店已綁定 BD 帶出（與金字招牌/人氣商家一致） */
+  const [bdOptions, setBdOptions] = useState<Array<{ label: string; value: string }>>([])
 
   /* ── 選購狀態（預設檔位與自定義數量同屏展示，二者互斥選擇） ── */
   const [selectedTierId, setSelectedTierId] = useState<string | null>(null)
@@ -68,13 +68,13 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
   const [merchantBalance, setMerchantBalance] = useState<number | null>(null)
 
   /* ── 支付方式（與金字招牌/人氣商家/盤活復蘇結算區一致） ── */
-  // Mock數據 - 贈送天數餘額（門店為 Mock 數據，暫用固定值展示）
-  const [giftDaysBalance] = useState(8)
-  const [giftDaysUsed, setGiftDaysUsed] = useState(0)
+  // 贈送曝光次數餘額：選擇門店後讀取赠送管理真實餘額（投流廣告贈送名額以曝光次數計）
+  const [giftExposureBalance, setGiftExposureBalance] = useState(0)
+  const [giftExposureUsed, setGiftExposureUsed] = useState(0)
   const { mixedPayment, switchable, mode } = usePaymentRule(GIFT_AD_TYPE_TRAFFIC)
-  // 非混合支付時的選擇模式：'promo' = 推廣金支付, 'gift' = 贈送天數抵扣
+  // 非混合支付時的選擇模式：'promo' = 推廣金支付, 'gift' = 贈送曝光次數抵扣
   const [paymentMode, setPaymentMode] = useState<'promo' | 'gift'>('promo')
-  // 強制模式：僅推廣金/僅贈送天數時固定支付方式，否則跟隨用戶切換
+  // 強制模式：僅推廣金/僅贈送抵扣時固定支付方式，否則跟隨用戶切換
   const activeMode: 'promo' | 'gift' = mode === 'promo_only' ? 'promo' : mode === 'gift_only' ? 'gift' : paymentMode
 
   /* ── 加載投流廣告算法下拉 ── */
@@ -83,6 +83,53 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
       .then(res => setAlgorithmOptions((res.records ?? []).filter(a => a.algoType === AlgorithmType.TRAFFIC_AD)))
       .catch(() => { /* 算法庫不可用時允許跳過 */ })
   }, [])
+
+  /** 算法下拉只展示「已配置啟用中流量包定價」的算法：與其它購買頁 hasPricing 口徑一致，未定價算法不可售賣 */
+  const pricedAlgorithmOptions = useMemo(
+    () => {
+      const pricedAlgoIds = new Set(pricing.map(p => p.algoId))
+      return algorithmOptions.filter(a => pricedAlgoIds.has(a.id))
+    },
+    [algorithmOptions, pricing],
+  )
+
+  /* 已選算法的定價被停用/下架後不再出現在下拉中時，同步清空選擇 */
+  useEffect(() => {
+    if (searchAlgorithm == null) return
+    if (!pricedAlgorithmOptions.some(a => a.id === searchAlgorithm)) setSearchAlgorithm(null)
+  }, [pricedAlgorithmOptions, searchAlgorithm])
+
+  /* 業務頻道候选：与其它購買頁同一规则——真值走 /ad/algorithms/channels（投流定價表），只列出已有啟用定價的頻道 */
+  const [pricedChannels, setPricedChannels] = useState<number[]>([])
+  useEffect(() => {
+    if (!searchBrand) { setPricedChannels([]); setSearchChannel(null); return }
+    let cancelled = false
+    fetchAdPricingChannels(AlgorithmType.TRAFFIC_AD, UI_TO_BACKEND_BRAND[searchBrand])
+      .then(list => { if (!cancelled) setPricedChannels(Array.isArray(list) ? [...list].sort((a, b) => a - b) : []) })
+      .catch(() => { if (!cancelled) setPricedChannels([]) })
+    return () => { cancelled = true }
+  }, [searchBrand])
+
+  const channelOptions = useMemo(
+    () => pricedChannels.map(code => ({ label: BIZ_CHANNEL_I18N_MAP[String(code)] ?? String(code), value: code })),
+    [pricedChannels, BIZ_CHANNEL_I18N_MAP],
+  )
+
+  /* 頻道失效時重置；只剩唯一候選時自動帶出（与其它購買頁一致，多頻道時不默认） */
+  useEffect(() => {
+    if (searchChannel != null && !pricedChannels.includes(searchChannel)) setSearchChannel(null)
+    if (searchChannel == null && pricedChannels.length === 1) setSearchChannel(pricedChannels[0])
+  }, [pricedChannels, searchChannel])
+
+  /* 頻道變更後只保留在該頻道下有啟用定價的算法；已選算法不再可用時清空 */
+  const channelAlgorithmOptions = useMemo(
+    () => (searchChannel == null ? [] : pricedAlgorithmOptions.filter(a => pricing.some(p => p.bizChannel === String(searchChannel) && p.algoId === a.id))),
+    [pricedAlgorithmOptions, pricing, searchChannel],
+  )
+  useEffect(() => {
+    if (searchAlgorithm == null || searchChannel == null) return
+    if (!channelAlgorithmOptions.some(a => a.id === searchAlgorithm)) setSearchAlgorithm(null)
+  }, [channelAlgorithmOptions, searchAlgorithm, searchChannel])
 
   /* ── 載入頻道定價配置（僅啟用中：停用頻道停止售賣） ── */
   useEffect(() => {
@@ -94,30 +141,87 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
     return () => { cancelled = true }
   }, [])
 
-  /* 默認落到第一個有定價配置的頻道（後端可能只配置了部分頻道） */
+  /* ── 門店下拉（真實門店，含集團編碼與已綁定BD）：選品牌後按品牌過濾 ── */
   useEffect(() => {
-    if (pricing.length === 0) return
-    if (!pricing.some(p => p.bizChannel === bizChannel)) setBizChannel(pricing[0].bizChannel)
-  }, [pricing, bizChannel])
+    const backendBrand = searchBrand ? UI_TO_BACKEND_BRAND[searchBrand] : undefined
+    fetchStores({ page: 1, size: 500 })
+      .then(res => {
+        const stores = (res.records ?? []).filter(s => {
+          if (!backendBrand) return true
+          // 未配置品牌的門店不隱藏，避免門店數據缺失導致無法查詢
+          if (!s.brand) return true
+          return s.brand.split(',').some(b => b.trim() === backendBrand)
+        })
+        const map: Record<string, StoreItem> = {}
+        stores.forEach(s => { if (s.storeCode) map[s.storeCode] = s })
+        setStoreMap(map)
+        setStoreOptions(stores.map(s => ({ label: `${s.storeName}（${s.storeCode}）`, value: s.storeCode })))
+      })
+      .catch(() => { setStoreOptions([]); setStoreMap({}) })
+  }, [searchBrand])
+
+  /* 品牌切換後已選門店不在當前品牌範圍時清空（連同帶出的BD與贈送餘額） */
+  useEffect(() => {
+    if (!searchStoreName || Object.keys(storeMap).length === 0) return
+    if (!storeMap[searchStoreName]) {
+      setSearchStoreName(null)
+      setSearchBD(null)
+      setBdOptions([])
+      setGiftExposureBalance(0)
+      setGiftExposureUsed(0)
+    }
+  }, [storeMap, searchStoreName])
 
   /* ── 查詢 / 重置 ── */
   const handleSearch = () => {
+    if (searchChannel == null) {
+      message.warning(t('channelRequired'))
+      return
+    }
     if (!storeMode && !searchStoreName) {
       message.warning(t('trafficSelectStoreFirst'))
       return
     }
+    // 推廣金餘額（集團+品牌）：取不到時保持 null 顯示 '--'，不得用假餘額誤導下單判斷
+    const store = searchStoreName ? storeMap[searchStoreName] : undefined
+    if (store?.groupCode && searchBrand) {
+      fetchFinAccountBalance(store.groupCode, UI_TO_BACKEND_BRAND[searchBrand])
+        .then(bal => setMerchantBalance(bal ? Number(bal.virtualBalance) : null))
+        .catch(() => setMerchantBalance(null))
+    } else {
+      setMerchantBalance(null)
+    }
     setHasSearched(true)
+  }
+
+  /** 門店變更：帶出BD與贈送曝光次數餘額（真實數據，不再使用固定值） */
+  const handleStoreChange = (value: string | null) => {
+    setSearchStoreName(value)
+    setGiftExposureUsed(0)
+    const store = value ? storeMap[value] : undefined
+    const bds = (store?.bdList ?? []).map(b => ({ label: b.bdName || b.bdEmpId, value: b.bdEmpId }))
+    setBdOptions(bds)
+    setSearchBD(bds[0]?.value ?? null)
+    if (!store) { setGiftExposureBalance(0); return }
+    fetchGiftAvailableDays(store.id, GIFT_AD_TYPE_TRAFFIC)
+      .then(setGiftExposureBalance)
+      .catch(() => setGiftExposureBalance(0))
   }
 
   const handleReset = () => {
     setSearchAlgorithm(null)
+    setSearchChannel(null)
     setSearchStoreName(null)
     setSearchBD(null)
+    setBdOptions([])
     setSelectedTierId(null)
     setCustomQtyDraft(null)
     setCustomQty(null)
     setDeliverySlot('business')
     setHasSearched(false)
+    setGiftExposureBalance(0)
+    setGiftExposureUsed(0)
+    setMerchantBalance(null)
   }
 
   /** 確認自定義數量：草稿值計入當前所選（與檔位選擇互斥） */
@@ -130,7 +234,7 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
 
   /* ── 計價 ── */
   // 投流定價按「算法 × 業務頻道」存儲：選定算法時必須命中該算法在該頻道的定價
-  const current = pricing.find(p => p.bizChannel === bizChannel
+  const current = searchChannel == null ? undefined : pricing.find(p => p.bizChannel === String(searchChannel)
     && (searchAlgorithm == null || p.algoId === searchAlgorithm))
   const onSaleTiers = (current?.tiers ?? []).filter(tier => tier.onSale).sort((a, b) => a.sort - b.sort)
   const selectedTier: TrafficPackageTier | null = onSaleTiers.find(tier => tier.id === selectedTierId) ?? null
@@ -161,19 +265,22 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
   const discountAmount = summary ? Math.round((summary.original - summary.amount) * 100) / 100 : 0
   const canSubmit = (storeMode || !!searchStoreName) && !!summary
 
-  /* ── 贈送天數抵扣（投流按曝光計價無天數維度，按規則配置的每日折算金額抵扣） ── */
-  const giftDayValue = Number(getSystemRuleValue<number>('payment_traffic_gift_day_value')) || 150
+  /* ── 贈送曝光次數抵扣（投流按曝光計價：1 個贈送名額 = 1 次曝光，按訂單折算單價抵扣） ── */
+  // 每次曝光折算金額：訂單金額 ÷ 購買曝光數（下單前以檔位/自定義原價折算；未選檔位時兜底 0.05）
   const orderAmount = summary?.amount ?? 0
-  // 最多可抵扣天數 = min(贈送餘額, 覆蓋訂單金額所需天數)
-  const maxGiftDaysUsable = orderAmount > 0 ? Math.min(giftDaysBalance, Math.ceil(orderAmount / giftDayValue)) : 0
-  // 非混合支付選擇贈送天數抵扣時自動全部抵扣；混合支付時才允許用戶手動選擇抵扣天數
-  const effectiveGiftDays = useMemo(() => {
-    if (!mixedPayment && activeMode === 'promo') return 0
-    if (!mixedPayment && activeMode === 'gift') return maxGiftDaysUsable
-    return Math.min(giftDaysUsed, maxGiftDaysUsable)
-  }, [mixedPayment, activeMode, maxGiftDaysUsable, giftDaysUsed])
-  // 贈送天數抵扣金額（不超過訂單金額）
-  const giftDeductAmount = Math.min(effectiveGiftDays * giftDayValue, orderAmount)
+  const giftUnitValue = summary && summary.impressions > 0
+    ? (orderAmount > 0 ? Math.round((orderAmount / summary.impressions) * 10000) / 10000 : 0)
+    : 0.05
+  // 最多可抵扣曝光次數 = min(贈送餘額, 本次訂單的曝光數)
+  const maxGiftExposuresUsable = orderAmount > 0 && summary ? Math.min(giftExposureBalance, summary.impressions) : 0
+  // 非混合支付選擇贈送抵扣時自動全部抵扣；混合支付時才允許用戶手動選擇抵扣數量
+  const effectiveGiftExposures = !mixedPayment && activeMode === 'promo'
+    ? 0
+    : !mixedPayment && activeMode === 'gift'
+      ? maxGiftExposuresUsable
+      : Math.min(giftExposureUsed, maxGiftExposuresUsable)
+  // 贈送抵扣金額（不超過訂單金額）
+  const giftDeductAmount = Math.min(effectiveGiftExposures * giftUnitValue, orderAmount)
   // 實付金額（推廣金部分）
   const payableAmount = Math.max(0, Math.round((orderAmount - giftDeductAmount) * 100) / 100)
 
@@ -181,8 +288,8 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
   const handlePayment = () => {
     if (!summary) return
     if (!mixedPayment && activeMode === 'gift') {
-      if (giftDaysBalance * giftDayValue < orderAmount) {
-        message.error('贈送天數餘額不足，無法全額抵扣')
+      if (giftExposureBalance * giftUnitValue < orderAmount) {
+        message.error('贈送曝光次數餘額不足，無法全額抵扣')
         return
       }
     } else if (merchantBalance != null && payableAmount > merchantBalance) {
@@ -197,7 +304,7 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
     if (!searchStoreName || !summary || !current) return
     const order: TrafficPackageOrder = {
       orderNo: `TP${Date.now()}`,
-      merchantName: MOCK_TRAFFIC_MERCHANTS.find(m => m.value === searchStoreName)?.label ?? searchStoreName,
+      merchantName: storeMap[searchStoreName]?.storeName ?? searchStoreName,
       bizChannel: current.bizChannel,
       mode: summary.tierName ? 'tier' : 'custom',
       tierName: summary.tierName,
@@ -208,7 +315,7 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
       createTime: new Date().toISOString(),
     }
     saveTrafficOrder(order)
-    // Mock：扣減推廣金餘額（贈送天數抵扣部分不扣推廣金）
+    // Mock：扣減推廣金餘額（贈送曝光次數抵扣部分不扣推廣金）
     if (payableAmount > 0) setMerchantBalance(prev => (prev == null ? null : Math.round((prev - payableAmount) * 100) / 100))
     setConfirmOpen(false)
     message.success(t('trafficOrderSuccess'))
@@ -270,9 +377,18 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
             <Select
               placeholder={t('brandAutoHint')}
               value={searchBrand}
-              onChange={v => { setSearchBrand(v); setSearchAlgorithm(null) }}
+              onChange={v => { setSearchBrand(v); setSearchAlgorithm(null); setSearchChannel(null); setPricedChannels([]) }}
               allowClear
               options={[{ label: '閃蜂', value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]}
+            />
+          </Form.Item>
+          <Form.Item label={t('channelLabel')}>
+            <Select
+              placeholder={searchBrand ? t('channelLabel') : t('selectBrandFirst')}
+              value={searchChannel}
+              onChange={v => { setSearchChannel(v); setSearchAlgorithm(null) }}
+              allowClear
+              options={channelOptions}
             />
           </Form.Item>
           <Form.Item label={t('algoNameLabel')}>
@@ -283,8 +399,8 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
               allowClear
               showSearch
               optionFilterProp="label"
-              disabled={!searchBrand}
-              options={algorithmOptions.map(a => ({
+              disabled={!searchBrand || searchChannel == null}
+              options={channelAlgorithmOptions.map(a => ({
                 label: a.algoCode ? `${a.algoName}(${a.algoCode})` : a.algoName,
                 value: a.id,
               }))}
@@ -295,11 +411,11 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
               <Select
                 placeholder={t('storeSearchHint')}
                 value={searchStoreName}
-                onChange={setSearchStoreName}
+                onChange={handleStoreChange}
                 allowClear
                 showSearch
                 optionFilterProp="label"
-                options={MOCK_TRAFFIC_MERCHANTS}
+                options={storeOptions}
               />
             </Form.Item>
           )}
@@ -316,7 +432,7 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
                   const label = (option?.label ?? '').toString().toLowerCase()
                   return label.includes(keyword)
                 }}
-                options={BD_OPTIONS}
+                options={bdOptions}
               />
             </Form.Item>
           )}
@@ -420,13 +536,13 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: '#8c8c8c' }}>{t('storeNameLabel')}</span>
                       <span style={{ fontWeight: 600, color: '#262626', maxWidth: 230, textAlign: 'right' }}>
-                        {MOCK_TRAFFIC_MERCHANTS.find(m => m.value === searchStoreName)?.label}
+                        {storeMap[searchStoreName]?.storeName ?? searchStoreName}
                       </span>
                     </div>
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#8c8c8c' }}>{t('trafficSelectChannel')}</span>
-                    <span style={{ fontWeight: 600, color: '#262626' }}>{BIZ_CHANNEL_I18N_MAP[bizChannel]}</span>
+                    <span style={{ color: '#8c8c8c' }}>{t('channelLabel')}</span>
+                    <span style={{ fontWeight: 600, color: '#262626' }}>{searchChannel != null ? (BIZ_CHANNEL_I18N_MAP[String(searchChannel)] ?? String(searchChannel)) : '-'}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: '#8c8c8c' }}>{t('trafficPackageNameLabel')}</span>
@@ -487,7 +603,7 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
                   <div style={{ fontSize: 12, color: '#595959', marginBottom: 8, fontWeight: 500 }}>支付方式選擇</div>
                   <Radio.Group value={paymentMode} onChange={e => setPaymentMode(e.target.value)}>
                     <Radio value="promo">推廣金支付</Radio>
-                    <Radio value="gift">贈送天數抵扣</Radio>
+                    <Radio value="gift">贈送曝光次數抵扣</Radio>
                   </Radio.Group>
                 </div>
               )}
@@ -506,7 +622,7 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
                   <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>{merchantBalance == null ? '--' : `$${merchantBalance.toLocaleString()}`}</span>
                 </div>
               )}
-              {/* 贈送天數餘額 */}
+              {/* 贈送曝光次數餘額 */}
               {(mixedPayment || activeMode === 'gift') && (
                 <div style={{
                   padding: '12px 16px',
@@ -517,8 +633,8 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
                   justifyContent: 'space-between',
                   alignItems: 'center',
                 }}>
-                  <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>剩餘贈送天數</span>
-                  <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>{giftDaysBalance} 天</span>
+                  <span style={{ fontSize: 13, color: '#fff', opacity: 0.9 }}>剩餘贈送曝光次數</span>
+                  <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>{giftExposureBalance.toLocaleString()} {t('trafficImpressionsUnit')}</span>
                 </div>
               )}
               {/* 價格明細 */}
@@ -539,40 +655,40 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
                   <span>{t('orderDiscount')}：</span>
                   <span style={{ fontWeight: 600 }}>-${discountAmount.toLocaleString()}</span>
                 </div>
-                {/* 贈送天數抵扣金額 */}
+                {/* 贈送曝光次數抵扣金額 */}
                 {giftDeductAmount > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
-                    <span>贈送天數抵扣（${giftDayValue}/天）：</span>
+                    <span>贈送曝光次數抵扣（${giftUnitValue}/{t('trafficImpressionsUnit')}）：</span>
                     <span style={{ fontWeight: 600 }}>-${giftDeductAmount.toLocaleString()}</span>
                   </div>
                 )}
-                {/* 混合支付：抵扣天數手動輸入 */}
+                {/* 混合支付：抵扣曝光次數手動輸入 */}
                 {mixedPayment && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
-                    <span style={{ fontWeight: 600 }}>抵扣天數：</span>
+                    <span style={{ fontWeight: 600 }}>抵扣曝光次數：</span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {giftDaysBalance === 0 || !summary ? (
-                        <span style={{ fontWeight: 700 }}>{effectiveGiftDays}天</span>
+                      {giftExposureBalance === 0 || !summary ? (
+                        <span style={{ fontWeight: 700 }}>{effectiveGiftExposures.toLocaleString()}{t('trafficImpressionsUnit')}</span>
                       ) : (
                         <>
                           <InputNumber
-                            size="small" min={0} max={maxGiftDaysUsable} value={effectiveGiftDays} precision={0}
-                            onChange={v => setGiftDaysUsed(typeof v === 'number' ? v : 0)}
-                            style={{ width: 64 }}
+                            size="small" min={0} max={maxGiftExposuresUsable} value={effectiveGiftExposures} precision={0}
+                            onChange={v => setGiftExposureUsed(typeof v === 'number' ? v : 0)}
+                            style={{ width: 90 }}
                           />
-                          <span style={{ fontSize: 12, color: '#8c8c8c' }}>天</span>
+                          <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('trafficImpressionsUnit')}</span>
                           <Button size="small" type="link" style={{ padding: 0, fontSize: 12 }}
-                            onClick={() => setGiftDaysUsed(maxGiftDaysUsable)}>全部抵扣</Button>
+                            onClick={() => setGiftExposureUsed(maxGiftExposuresUsable)}>全部抵扣</Button>
                         </>
                       )}
                     </span>
                   </div>
                 )}
-                {/* 非混合支付 + 贈送天數抵扣模式 */}
+                {/* 非混合支付 + 贈送曝光次數抵扣模式 */}
                 {!mixedPayment && activeMode === 'gift' && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
-                    <span style={{ fontWeight: 600 }}>抵扣天數：</span>
-                    <span style={{ fontWeight: 700 }}>{effectiveGiftDays}天</span>
+                    <span style={{ fontWeight: 600 }}>抵扣曝光次數：</span>
+                    <span style={{ fontWeight: 700 }}>{effectiveGiftExposures.toLocaleString()}{t('trafficImpressionsUnit')}</span>
                   </div>
                 )}
                 {/* 實付總額（推廣金 / 混合支付顯示） */}
@@ -614,8 +730,8 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
         {summary && (
           <div style={{ fontSize: 13, color: '#595959', lineHeight: '24px' }}>
             <h4 style={{ marginBottom: 8, fontSize: 14, color: '#595959' }}>{t('purchaseDetail')}</h4>
-            {!storeMode && <div>{t('storeNameLabel')}：{MOCK_TRAFFIC_MERCHANTS.find(m => m.value === searchStoreName)?.label}</div>}
-            <div>{t('trafficSelectChannel')}：{BIZ_CHANNEL_I18N_MAP[bizChannel]}</div>
+            {!storeMode && <div>{t('storeNameLabel')}：{searchStoreName ? (storeMap[searchStoreName]?.storeName ?? searchStoreName) : '-'}</div>}
+            <div>{t('channelLabel')}：{searchChannel != null ? (BIZ_CHANNEL_I18N_MAP[String(searchChannel)] ?? String(searchChannel)) : '-'}</div>
             <div>{t('trafficPackageNameLabel')}：{summary.tierName ?? t('trafficCustomPackageName')}</div>
             <div>{t('trafficImpressions')}：{summary.impressions.toLocaleString()} {t('trafficImpressionsUnit')}</div>
             <div>{t('trafficDeliverySlot')}：{deliverySlot === 'allday' ? t('trafficSlotAllDay') : t('trafficSlotBusiness')}</div>
@@ -634,14 +750,14 @@ export default function TrafficPackagePicker({ storeMode }: { storeMode?: boolea
               )}
               {giftDeductAmount > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, color: '#fa8c16' }}>
-                  <span>贈送天數抵扣（{effectiveGiftDays}天 × ${giftDayValue}）：</span>
+                  <span>贈送曝光次數抵扣（{effectiveGiftExposures.toLocaleString()}{t('trafficImpressionsUnit')} × ${giftUnitValue}）：</span>
                   <span style={{ fontWeight: 600 }}>-${giftDeductAmount.toLocaleString()}</span>
                 </div>
               )}
               {!mixedPayment && activeMode === 'gift' && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#ff4d4f', borderTop: '1px solid #d9d9d9', paddingTop: 8, marginTop: 8 }}>
-                  <span style={{ fontWeight: 600 }}>抵扣天數：</span>
-                  <span style={{ fontWeight: 700 }}>{effectiveGiftDays}天</span>
+                  <span style={{ fontWeight: 600 }}>抵扣曝光次數：</span>
+                  <span style={{ fontWeight: 700 }}>{effectiveGiftExposures.toLocaleString()}{t('trafficImpressionsUnit')}</span>
                 </div>
               )}
               {(mixedPayment || activeMode === 'promo') && (

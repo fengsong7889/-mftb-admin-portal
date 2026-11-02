@@ -72,9 +72,9 @@ public class AdSalesReviveServiceImpl implements AdSalesReviveService {
     /* ==================== 库存查询 ==================== */
 
     @Override
-    public AdReviveInventoryVO inventory(Long algoId, String storeCode, String groupCode) {
+    public AdReviveInventoryVO inventory(Long algoId, String storeCode, String groupCode, Integer channel) {
         requireActiveAlgorithm(algoId);
-        AdPricingReviveVO pricing = requireActivePricing(algoId);
+        AdPricingReviveVO pricing = requireActivePricing(algoId, channel);
         if (pricing.getRegionPrices().isEmpty()) {
             throw new BusinessException("該算法未配置商圈計價");
         }
@@ -119,7 +119,7 @@ public class AdSalesReviveServiceImpl implements AdSalesReviveService {
     @Transactional(rollbackFor = Exception.class)
     public AdOrderVO placeOrder(AdReviveOrderRequest request) {
         AdAlgorithm algorithm = requireActiveAlgorithm(request.getAlgoId());
-        AdPricingReviveVO pricing = requireActivePricing(request.getAlgoId());
+        AdPricingReviveVO pricing = requireActivePricing(request.getAlgoId(), request.getChannel());
         if (pricing.getRegionPrices().isEmpty()) {
             throw new BusinessException("該算法未配置商圈計價");
         }
@@ -203,7 +203,8 @@ public class AdSalesReviveServiceImpl implements AdSalesReviveService {
         order.setAlgoName(algorithm.getAlgoName());
         order.setAlgoCode(algorithm.getAlgoCode());
         order.setBrand(brand);
-        order.setChannel(algorithm.getChannel());
+        // 频道以命中定价为准：算法自身的頻道字段存量大量为空，直接取会把订单写成无频道
+        order.setChannel(pricing.getChannel() != null ? pricing.getChannel() : algorithm.getChannel());
         order.setGroupCode(request.getGroupCode());
         order.setGroupName(orderSupport.resolveGroupName(request.getGroupCode()));
         order.setStoreCode(store != null ? store.getStoreCode() : request.getStoreCode());
@@ -278,7 +279,7 @@ public class AdSalesReviveServiceImpl implements AdSalesReviveService {
     @Transactional(rollbackFor = Exception.class)
     public void lockCells(AdReviveOrderRequest request) {
         requireActiveAlgorithm(request.getAlgoId());
-        AdPricingReviveVO pricing = requireActivePricing(request.getAlgoId());
+        AdPricingReviveVO pricing = requireActivePricing(request.getAlgoId(), request.getChannel());
         if (pricing.getRegionPrices().isEmpty()) {
             throw new BusinessException("該算法未配置商圈計價");
         }
@@ -370,10 +371,15 @@ public class AdSalesReviveServiceImpl implements AdSalesReviveService {
         return algorithm;
     }
 
-    private AdPricingReviveVO requireActivePricing(Long algoId) {
-        AdPricingReviveVO pricing = pricingService.activeByAlgo(algoId);
+    /**
+     * 取算法在指定業務頻道下启用中的定價（同算法多頻道时必须指定頻道，否则价格会错配）。
+     */
+    private AdPricingReviveVO requireActivePricing(Long algoId, Integer channel) {
+        AdPricingReviveVO pricing = pricingService.activeByAlgoAndChannel(algoId, channel);
         if (pricing == null) {
-            throw new BusinessException("該算法未配置銷售定價");
+            throw new BusinessException(channel == null
+                    ? "該算法未配置銷售定價"
+                    : "該算法在所选業務頻道未配置銷售定價");
         }
         return pricing;
     }

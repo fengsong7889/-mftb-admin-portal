@@ -17,7 +17,7 @@ import {
   type InventoryItem,
   RECOMMEND_TYPE_CONFIGS,
 } from './types'
-import { Region, AlgorithmType } from '@mftb/contracts/recommendConstants'
+import { Region, AlgorithmType, RecommendChannel } from '@mftb/contracts/recommendConstants'
 import GradientDiscountBanner from './GradientDiscountBanner'
 import NoRefundBadge from './NoRefundBadge'
 import { getSystemRuleValue } from '@/hooks/useSystemRules'
@@ -25,6 +25,7 @@ import {
   fetchAdAlgorithms,
   fetchAdInventory,
   fetchAdPricingActive,
+  fetchAdPricingChannels,
   placeAdStarOrder,
   lockAdCells,
   unlockAdCells,
@@ -123,6 +124,7 @@ const DEFAULT_LOCK_SECONDS = 60
 
 export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridProps) {
   const { t } = useTranslation('adSales')
+  const { t: tr } = useTranslation()
   const navigate = useNavigate()
   // 从规则配置动态读取锁定时长
   const LOCK_DURATION_SECONDS = getSystemRuleValue<number>('ad_click_cart_lock_seconds') || DEFAULT_LOCK_SECONDS
@@ -230,6 +232,10 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
     handleDateClick, handleConfirmSwitch, handleCancelSwitch, autoSelectFirstDate,
   } = common
 
+  /** 業務頻道（品牌 → 頻道 → 算法）：無敵星星定價按「算法×頻道」配置 */
+  const [searchChannel, setSearchChannel] = useState<number | null>(null)
+  const [pricedChannels, setPricedChannels] = useState<number[]>([])
+
   const activeDate = common.activeDate
   const activeDateStr = common.activeDateStr
 
@@ -246,7 +252,7 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
       return
     }
     const backendBrand = UI_TO_BACKEND_BRAND[searchBrand]
-    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.INVINCIBLE_STAR, brand: backendBrand, status: 1, hasPricing: true, storeCode: searchStoreName || undefined })
+    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.INVINCIBLE_STAR, brand: backendBrand, status: 1, hasPricing: true, storeCode: searchStoreName || undefined, pricingChannel: searchChannel ?? undefined })
     .then(res => {
       if (!res) return
       const meta: Record<string, { apiId: number }> = {}
@@ -269,7 +275,31 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
       }
     }).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchBrand, searchStoreName])
+  }, [searchBrand, searchStoreName, searchChannel])
+
+  /* 頻道候選：真值取無敵星星定價表（/ad/algorithms/channels） */
+  useEffect(() => {
+    if (!searchBrand) { setPricedChannels([]); setSearchChannel(null); return }
+    let cancelled = false
+    fetchAdPricingChannels(AlgorithmType.INVINCIBLE_STAR, UI_TO_BACKEND_BRAND[searchBrand])
+      .then(list => { if (!cancelled) setPricedChannels(Array.isArray(list) ? list : []) })
+      .catch(() => { if (!cancelled) setPricedChannels([]) })
+    return () => { cancelled = true }
+  }, [searchBrand])
+
+  /* 頻道失效時重置；只剩唯一候選時自動帶出 */
+  useEffect(() => {
+    if (searchChannel != null && !pricedChannels.includes(searchChannel)) setSearchChannel(null)
+    if (searchChannel == null && pricedChannels.length === 1) setSearchChannel(pricedChannels[0])
+  }, [pricedChannels, searchChannel])
+
+  const channelSelectOptions = useMemo(() => pricedChannels.map(code => ({
+    label: code === RecommendChannel.SUPERMARKET ? tr('recommend.channelSupermarket')
+      : code === RecommendChannel.GROUP_BUY ? tr('recommend.channelGroupBuy')
+        : code === RecommendChannel.HOME ? tr('recommend.channelHome')
+          : tr('recommend.channelDelivery'),
+    value: code,
+  })), [pricedChannels, tr])
 
   // 真实门店下拉：加载门店列表（含集团编码与已绑定BD），选择品牌后按品牌过滤
   useEffect(() => {
@@ -311,11 +341,11 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
       const apiId = searchAlgorithm ? algorithmMetaMap[searchAlgorithm]?.apiId : undefined
       const store = searchStoreName ? storeMap[searchStoreName] : undefined
       if (apiId && store) {
-        fetchAdInventory(apiId, store.storeCode, store.groupCode).then(setInventoryData).catch(() => {})
+        fetchAdInventory(apiId, store.storeCode, store.groupCode, searchChannel ?? undefined).then(setInventoryData).catch(() => {})
         loadMerchantBalance(store.groupCode, searchBrand)
       }
     }
-  }, [cartItems, isPaymentModalVisible, searchAlgorithm, searchStoreName, searchBrand])
+  }, [cartItems, isPaymentModalVisible, searchAlgorithm, searchStoreName, searchBrand, searchChannel])
   // 多时段折扣梯度（默认演示配置，查询后由定价配置覆盖）—— label 由翻译生成
   const [multiSlotTiers, setMultiSlotTiers] = useState(() =>
     DEFAULT_MULTI_SLOT_DISCOUNT_TIERS.map(tier => ({ ...tier, label: `${tier.discount > 10 ? tier.discount / 10 : tier.discount}${t('discountUnit')}` }))
@@ -430,8 +460,26 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
   const handleBrandChange = (value: string | null) => {
     setSearchBrand(value)
     setSearchAlgorithm(null)
+    setSearchChannel(null)
+    setPricedChannels([])
     setAlgorithmOptions([])
     applyAlgorithmMeta(null)
+  }
+
+  /** 頻道變更：重算算法候选並清空已選（不同頻道的定價屬於不同算法配置集） */
+  const handleChannelChange = (value: number | null) => {
+    const apply = () => {
+      setSearchChannel(value)
+      setSearchAlgorithm(null)
+      applyAlgorithmMeta(null)
+      setAlgorithmOptions([])
+    }
+    if (hasCartItems && value !== searchChannel) {
+      setPendingAction(apply)
+      setIsConflictModalVisible(true)
+      return
+    }
+    apply()
   }
 
   // 算法名称变更处理：检查购物车冲突（品牌已由用户预先选择）
@@ -469,13 +517,14 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
   const handleSearch = async () => {
     if (!searchAlgorithm) { message.warning(t('adSales.selectAlgoName')); return }
     if (!searchBrand) { message.warning(t('adSales.selectBrand')); return }
+    if (searchChannel == null) { message.warning(t('channelRequired')); return }
     if (!searchStoreName) { message.warning(t('adSales.selectStoreName')); return }
     // 真实算法：加载库存（售罄状态 + 预售窗口 + 折扣梯度；携带门店/集团编码供屏蔽商家拦截）
     const apiId = algorithmMetaMap[searchAlgorithm]?.apiId
     if (apiId) {
       try {
         const store = storeMap[searchStoreName]
-        const inv = await fetchAdInventory(apiId, store?.storeCode, store?.groupCode).catch(() => null)
+        const inv = await fetchAdInventory(apiId, store?.storeCode, store?.groupCode, searchChannel ?? undefined).catch(() => null)
         if (inv) {
           setInventoryData(inv)
           const tiers = parseDiscountTiers(inv.discountTiers)
@@ -507,6 +556,8 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
   const handleReset = () => {
     setSearchBrand(null)
     setSearchAlgorithm(null)
+    setSearchChannel(null)
+    setPricedChannels([])
     setSearchStoreName(null)
     setSearchBD(null)
     setHasSearched(false)
@@ -536,6 +587,7 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
           groupCode: store.groupCode,
           storeCode: store.storeCode,
           bdEmpId: searchBD || undefined,
+          channel: searchChannel ?? undefined,
           cells: cartItems.map(item => ({ bizDate: item.date, region: Number(item.region), mealSlot: item.mealSlotKey || '' })),
         })
         setIsPaymentModalVisible(false)
@@ -543,14 +595,14 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
         setLastPaidAmount(order.actualAmount)
         setIsSuccessModalVisible(true)
         // 刷新庫存（已購格子變為售罄）與推廣金餘額
-        fetchAdInventory(apiId, store.storeCode, store.groupCode).then(setInventoryData).catch(() => {})
+        fetchAdInventory(apiId, store.storeCode, store.groupCode, searchChannel ?? undefined).then(setInventoryData).catch(() => {})
         loadMerchantBalance(store.groupCode, searchBrand)
       } catch (err) {
         const errMsg = (err as Error).message || '下單失敗，請稍後再試'
         message.error(errMsg)
         // 下單失敗（如額度不足）：關閉彈窗，保留購物車讓用戶自行刪減，刷新庫存與餘額
         setIsPaymentModalVisible(false)
-        fetchAdInventory(apiId, store.storeCode, store.groupCode).then(setInventoryData).catch(() => {})
+        fetchAdInventory(apiId, store.storeCode, store.groupCode, searchChannel ?? undefined).then(setInventoryData).catch(() => {})
         loadMerchantBalance(store.groupCode, searchBrand)
       } finally {
         setPaying(false)
@@ -700,6 +752,16 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
                 ]}
               />
             </Form.Item>
+            <Form.Item label={t('channelLabel')}>
+              <Select
+                placeholder={searchBrand ? t('channelLabel') : t('selectBrandFirst')}
+                value={searchChannel}
+                onChange={handleChannelChange}
+                allowClear
+                options={channelSelectOptions}
+                disabled={!searchBrand || channelSelectOptions.length === 0}
+              />
+            </Form.Item>
             <Form.Item label={t('algoNameLabel')}>
               <Select
                 placeholder={searchBrand ? t('algoSearchPlaceholder') : t('selectBrandFirst')}
@@ -709,7 +771,7 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
                 showSearch
                 optionFilterProp="label"
                 options={algorithmOptions}
-                disabled={!searchBrand}
+                disabled={!searchBrand || searchChannel == null}
               />
             </Form.Item>
             {!storeMode && (
@@ -1210,11 +1272,12 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
                               algoId: lockApiId,
                               groupCode: lockStore.groupCode,
                               storeCode: lockStore.storeCode,
+                              channel: searchChannel ?? undefined,
                               cells: finalItems.map(fi => ({ bizDate: fi.item.date, region: Number(fi.item.region), mealSlot: fi.item.mealSlotKey || '' })),
                             }).catch(() => {
                               message.error(t('slotLockedByOthers'))
                               setCartItems(prev => prev.filter(item => !finalItems.some(fi => fi.item.key === item.key)))
-                              fetchAdInventory(lockApiId, lockStore.storeCode, lockStore.groupCode).then(setInventoryData).catch(() => {})
+                              fetchAdInventory(lockApiId, lockStore.storeCode, lockStore.groupCode, searchChannel ?? undefined).then(setInventoryData).catch(() => {})
                             })
                           }
                           setCartItems(prev => [...prev, ...finalItems.map(fi => fi.item)])
@@ -1336,6 +1399,7 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
                           algoId: unlockApiId,
                           groupCode: unlockStore.groupCode,
                           storeCode: unlockStore.storeCode,
+                          channel: searchChannel ?? undefined,
                           cells: [{ bizDate: record.date, region: Number(record.region), mealSlot: record.mealSlotKey || '' }],
                         }).catch(() => {})
                       }

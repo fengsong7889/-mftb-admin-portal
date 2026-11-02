@@ -12,9 +12,22 @@ import java.util.Map;
  */
 public interface AdAlgorithmService {
 
-    /** 算法分页查询（storeCode 非空时过滤掉对该门店屏蔽的算法，供销售菜单下拉使用；hasPricing=true 时仅返回有启用定价的算法） */
+    /**
+     * 算法分页查询（storeCode 非空时过滤掉对该门店屏蔽的算法，供销售菜单下拉使用；hasPricing=true 时仅返回有启用定价的算法）
+     *
+     * @param channel       算法库自身的業務頻道字段（算法库列表页筛选）
+     * @param pricingChannel 定價配置维度的業務頻道：舆 hasPricing 配合使用，
+     *                       仅返回在该頻道下有启用中定价配置的算法（購買页「品牌→頻道→算法」级联）
+     */
     PageResult<AdAlgorithmVO> page(long page, long size, Integer algoType, String brand,
-                                   Integer channel, Integer status, String keyword, String storeCode, Boolean hasPricing);
+                                   Integer channel, Integer status, String keyword, String storeCode,
+                                   Boolean hasPricing, Integer pricingChannel);
+
+    /**
+     * 某算法类型下「存在启用中定價配置」的業務頻道集合，供購買页频道下拉使用。
+     * <p>真值来自各定價表（而非算法自身的頻道字段，存量算法该字段大量为空）。
+     */
+    List<Integer> listActiveChannels(Integer algoType, String brand);
 
     /** 算法详情 */
     AdAlgorithmVO detail(Long id);

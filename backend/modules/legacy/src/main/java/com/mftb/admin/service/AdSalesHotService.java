@@ -10,8 +10,13 @@ import com.mftb.admin.dto.AdHotQuoteVO;
  */
 public interface AdSalesHotService {
 
-    /** 查询可购买格子（皮肤 x 日期, 不限库存, 标记本商家已购买格子） */
-    AdHotInventoryVO inventory(Long algoId, String storeCode, String groupCode);
+    /**
+     * 查询可购买格子（皮膚 x 日期，不限库存，标记本商家已购买格子）。
+     *
+     * @param pricingId 定價配置主键（biz_ad_pricing_hot.id）。人气商家已与算法解耦，
+     *                  购买页下拉选的就是定價配置，订单也会把该ID写入 biz_ad_order.algo_id（与投流广告同口径）
+     */
+    AdHotInventoryVO inventory(Long pricingId, String storeCode, String groupCode);
 
     /** 提交订单并从推广金账户扣款（同商家已购买的皮肤x日期不可重复购买） */
     AdOrderVO placeOrder(AdHotOrderRequest request);

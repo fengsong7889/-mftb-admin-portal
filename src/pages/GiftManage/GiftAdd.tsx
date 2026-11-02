@@ -49,6 +49,9 @@ export default function GiftAdd() {
   // 监控广告类型选择，动态读取规则配置
   const selectedAdType = Form.useWatch('adType', form) as string | undefined
 
+  /** 投流廣告賣的是曝光次數：贈送名額口徑為「贈送曝光次數」，其餘廣告類型仍為「贈送天數」 */
+  const isTrafficAd = selectedAdType === 'traffic_ad'
+
   /** 当前广告类型是否需要审批 */
   const needApproval = useMemo(() => {
     if (!selectedAdType) return true
@@ -188,8 +191,8 @@ export default function GiftAdd() {
                 <span className="confirm-info-value">{adLabel}</span>
               </div>
               <div className="confirm-info-row">
-                <span className="confirm-info-label">{t('giftDays')}</span>
-                <span className="confirm-info-value highlight">{values.giftDays} {t('dayUnit')}</span>
+                <span className="confirm-info-label">{isTrafficAd ? '贈送曝光次數' : t('giftDays')}</span>
+                <span className="confirm-info-value highlight">{values.giftDays} {isTrafficAd ? '次' : t('dayUnit')}</span>
               </div>
               <div className="confirm-info-row">
                 <span className="confirm-info-label">{t('validDays')}</span>
@@ -418,7 +421,9 @@ export default function GiftAdd() {
           <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('giftConfig')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           <span style={{ fontSize: 12, color: '#8C6D1F' }}>
-            {t('approvalTip')}
+            {isTrafficAd
+              ? '📋 提交後將進入審批中心，審核通過後系統自動為商戶增加對應廣告曝光次數。'
+              : t('approvalTip')}
           </span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 24px' }}>
@@ -435,16 +440,16 @@ export default function GiftAdd() {
           </Form.Item>
 
           <Form.Item
-            label={t('giftDays')}
+            label={isTrafficAd ? '贈送曝光次數' : t('giftDays')}
             name="giftDays"
-            rules={[{ required: true, message: t('inputGiftDays') }]}
+            rules={[{ required: true, message: isTrafficAd ? '請輸入贈送曝光次數' : t('inputGiftDays') }]}
           >
             <InputNumber
-              placeholder={t('inputGiftDays')}
+              placeholder={isTrafficAd ? '請輸入贈送曝光次數' : t('inputGiftDays')}
               min={1}
-              max={giftMaxDays}
+              max={isTrafficAd ? Math.max(giftMaxDays, 100000) : giftMaxDays}
               style={{ width: '100%' }}
-              addonAfter={t('dayUnit')}
+              addonAfter={isTrafficAd ? '次' : t('dayUnit')}
             />
           </Form.Item>
 

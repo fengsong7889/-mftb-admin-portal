@@ -9,8 +9,13 @@ import com.mftb.admin.dto.AdStarOrderRequest;
  */
 public interface AdSalesStarService {
 
-    /** 查询可购买格子（商圈 x 日期 x 餐段，预售窗口内；storeCode/groupCode 用于屏蔽商家拦截） */
-    AdInventoryVO inventory(Long algoId, String storeCode, String groupCode);
+    /**
+     * 查询可购买格子（商圈 x 日期 x 餐段，预售窗口内；storeCode/groupCode 用于屏蔽商家拦截）
+     *
+     * @param channel 業務頻道：定價按「算法×頻道」配置，非空时只取该頻道的定價；
+     *                为空时退回旧口径（取最新一条）仅供未升级调用方
+     */
+    AdInventoryVO inventory(Long algoId, String storeCode, String groupCode, Integer channel);
 
     /** 提交订单并从推广金账户扣款 */
     AdOrderVO placeOrder(AdStarOrderRequest request);

@@ -34,6 +34,8 @@ import {
 } from '@/api/adPromotion'
 import { fetchStores, type StoreItem } from '@/api/store'
 import { fetchFinAccountBalance } from '@/api/finance'
+import { fetchAdPricingChannels } from '@/api/adPromotion'
+import { AlgorithmType, RecommendChannel } from '@mftb/contracts/recommendConstants'
 import { MAX_BUY_DAYS, PRESALE_OPEN_HOUR, MONTHS_PER_PAGE, parseDayTiers, getPresaleOpenTime, PickerPresaleInfoModal, PickerPaymentSuccessModal } from './components/pickerShared'
 
 /** 人氣商家廣告類型標識（與後端一致） */
@@ -235,6 +237,10 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
   // 查詢條件（算法名稱 / 所屬品牌 / 門店名稱 / 歸屬BD，與其它購買界面保持一致）
   const [searchAlgorithm, setSearchAlgorithm] = useState<string | null>(null)
   const [searchBrand, setSearchBrand] = useState<string | null>(null)
+  /** 業務頻道（查询区第二位，先選頻道再選名稱）：定價按「算法×頻道」配置 */
+  const [searchChannel, setSearchChannel] = useState<number | null>(null)
+  /** 當前品牌下「有啟用定價」的業務頻道候選（来自 /ad/algorithms/channels） */
+  const [pricedChannels, setPricedChannels] = useState<number[]>([])
   const [searchStoreName, setSearchStoreName] = useState<string | null>(null)
   const [searchBD, setSearchBD] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
@@ -427,9 +433,10 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
   }, [])
 
   // 人氣名稱下拉：從銷售定價配置加載（按品牌過濾，僅顯示啟用且有皮膚的定價）
+  const [allPricingOptions, setAllPricingOptions] = useState<Array<{ label: string; value: string; channel?: number }>>([])
   useEffect(() => {
     if (!searchBrand) {
-      setPricingOptions([])
+      setAllPricingOptions([])
       return
     }
     const UI_TO_BACKEND_BRAND: Record<string, string> = { shanfeng: 'flashBee', mfood: 'mFood' }
@@ -440,10 +447,44 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
         const options = (res.records ?? [])
           .filter(p => p.skins && p.skins.length > 0)
           // 名稱後追加配置ID（定價編號，如 DJRQxxxxxxxx）
-          .map(p => ({ label: p.algoName && p.pricingNo ? `${p.algoName}(${p.pricingNo})` : (p.algoName || p.pricingNo || '-'), value: String(p.id) }))
-        setPricingOptions(options)
-      }).catch(() => {})
+          .map(p => ({
+            label: p.algoName && p.pricingNo ? `${p.algoName}(${p.pricingNo})` : (p.algoName || p.pricingNo || '-'),
+            value: String(p.id),
+            channel: p.channel,
+          }))
+        setAllPricingOptions(options)
+      }).catch(() => setAllPricingOptions([]))
   }, [searchBrand])
+
+  /* 頻道候選：真值取定價表（與金字招牌/無敵星星同一接口口径） */
+  useEffect(() => {
+    if (!searchBrand) { setPricedChannels([]); setSearchChannel(null); return }
+    const UI_TO_BACKEND_BRAND: Record<string, string> = { shanfeng: 'flashBee', mfood: 'mFood' }
+    let cancelled = false
+    fetchAdPricingChannels(AlgorithmType.POPULAR_MERCHANT_KA, UI_TO_BACKEND_BRAND[searchBrand])
+      .then(list => { if (!cancelled) setPricedChannels(Array.isArray(list) ? list : []) })
+      .catch(() => { if (!cancelled) setPricedChannels([]) })
+    return () => { cancelled = true }
+  }, [searchBrand])
+
+  /* 頻道失效時重置；只剩唯一候選時自動帶出 */
+  useEffect(() => {
+    if (searchChannel != null && !pricedChannels.includes(searchChannel)) setSearchChannel(null)
+    if (searchChannel == null && pricedChannels.length === 1) setSearchChannel(pricedChannels[0])
+  }, [pricedChannels, searchChannel])
+
+  const channelSelectOptions = useMemo(() => pricedChannels.map(code => ({
+    label: code === RecommendChannel.SUPERMARKET ? tr('recommend.channelSupermarket')
+      : code === RecommendChannel.GROUP_BUY ? tr('recommend.channelGroupBuy')
+        : code === RecommendChannel.HOME ? tr('recommend.channelHome')
+          : tr('recommend.channelDelivery'),
+    value: code,
+  })), [pricedChannels, tr])
+
+  /* 名稱下拉只列出所选頻道下的定價 */
+  useEffect(() => {
+    setPricingOptions(searchChannel == null ? [] : allPricingOptions.filter(o => o.channel === searchChannel))
+  }, [allPricingOptions, searchChannel])
 
   // 贈送天數餘額：選擇門店後加載
   useEffect(() => {
@@ -557,11 +598,19 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
   }, [customDates])
 
   // 算法變更：自動帶出品牌
-  // 品牌变更处理：清空已选算法
+  // 品牌变更处理：清空已选算法与頻道候选
   const handleBrandChange = (value: string | null) => {
     setSearchBrand(value)
     setSearchAlgorithm(null)
+    setSearchChannel(null)
+    setPricedChannels([])
     setPricingOptions([])
+  }
+
+  /** 頻道變更：重算名稱候选並清空已選 */
+  const handleChannelChange = (value: number | null) => {
+    setSearchChannel(value)
+    setSearchAlgorithm(null)
   }
 
   const handleAlgorithmChange = (value: string | null) => {
@@ -579,6 +628,7 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
   const handleSearch = () => {
     if (!searchAlgorithm) { message.warning(t('selectAlgorithm')); return }
     if (!searchBrand) { message.warning(t('selectBrand')); return }
+    if (searchChannel == null) { message.warning(t('channelRequired')); return }
     if (!searchStoreName) { message.warning(t('selectStore')); return }
     const store = storeMap[searchStoreName]
     const algoId = Number(searchAlgorithm)
@@ -599,6 +649,7 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
   }
   const handleReset = () => {
     setSearchAlgorithm(null); setSearchBrand(null)
+    setSearchChannel(null); setPricedChannels([]); setAllPricingOptions([])
     setSearchStoreName(null); setSearchBD(null)
     setHasSearched(false); setSelectedSkinId(null)
     setSkinModeFilter('small')
@@ -802,9 +853,13 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
             <Select placeholder={t('brandAutoHint')} value={searchBrand} onChange={handleBrandChange} allowClear
               options={[{ label: '閃蜂', value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} />
           </Form.Item>
+          <Form.Item label={t('channelLabel')}>
+            <Select placeholder={searchBrand ? t('channelLabel') : t('selectBrandFirst')} value={searchChannel} onChange={handleChannelChange} allowClear
+              options={channelSelectOptions} disabled={!searchBrand || channelSelectOptions.length === 0} />
+          </Form.Item>
           <Form.Item label={tr('recommend.popularSkin.popularNameLabel')}>
             <Select placeholder={searchBrand ? tr('recommend.popularSkin.popularNamePlaceholder') : t('selectBrandFirst')} value={searchAlgorithm} onChange={handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
-              options={pricingOptions} disabled={!searchBrand} />
+              options={pricingOptions} disabled={!searchBrand || searchChannel == null} />
           </Form.Item>
           {!storeMode && (
             <Form.Item label={t('storeNameLabel')}>

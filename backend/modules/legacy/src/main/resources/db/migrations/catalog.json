@@ -1977,6 +1977,23 @@
       "comment": "两项计分项此前只存在于前端模板 organicTrafficConfig（loadConfig 读不到时按锚点保底插入），库里没有行会让卡片头部的启用/停用开关与「編輯 → 保存」直接报「評分規則不存在」，因此必须落库。STB_LABEL 顶替已下架的 STB_04「店鋪標籤-金牌」（只支持金牌单一身份），改为四选一标签分值表，配置方式对齐 COM_10；其「標籤 → 分值」清单沿用 free_shipping_config / member_bonus_config 先例新增专用列 store_label_config（已登记到 LegacyCoreContracts 可自愈补列），不复用 condition_items——那是条件计分子项口径，混用会让消费方把固定加分项误读成条件计分档。COM_SLOT 用语义后缀而非 COM_11/COM_12：后端 generateNextRuleCode 只取现有行最大序号 +1，数字编码会与运营自建计分项撞车（STB_ACT 同此先例）。按 rule_code 幂等插入（含 deleted=1 也视为已存在），重跑零副作用，也不覆盖运营改过的名称/分值/启停。关键顺序约束：SchemaContractValidator 排在所有 CommandLineRunner 之后（@Order 最大值）才自愈补列，因此本迁移只写建表即有的列、不写 store_label_config（首启写入会报 Unknown column）；标签清单以 NULL 起步由界面空清单兜底，运营配好后经 updateRule 落库。校验以「两个编码都必须有 deleted=0 的内置行」为准，与多数迁移「未播种不算失败」相反——本步就是补种，插不进去就是没生效，不记版本、下次启动重试。注意：本迁移只落配置存储侧，门店标签的赋值与「是否购买时段推荐」的判定都在本仓库之外，由外部业务系统读取配置消费。参考 SQL: sql/322_organic_store_label_time_slot.sql"
     },
     {
+      "versionKey": "organic:rename-stb-code-numeric-v1",
+      "module": "organic",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "organicScoreDataInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "organic:add-store-label-time-slot-v1"
+      ],
+      "scriptFiles": [
+        "324_organic_rename_stb_codes.sql"
+      ],
+      "intent": "店鋪維度内置计分项编码收编：STB_LABEL → STB_04（門店標籤）、STB_ACT → STB_09（活動加分），与 STB_01~STB_08 数字编号口径一致",
+      "author": "Qoder",
+      "comment": "两项建项时用语义后缀是怕数字序号与运营自建项撞号（generateNextRuleCode 取现有行最大序号 +1），但店鋪維度其余项都是数字编号，算法库配置页与门店计分详情都要多记一套编码。STB_04/STB_09 号位已由下架项让出，内置行本身是未删除行会被自动编号计入，因此收编不会再撞号。硬约束：uk_rule_code 唯一键不含 deleted，两条下架残留行（deleted=1）仍物理占用目标编码，必须先把它们改挂 *_RETIRED 让位再改在用行；残留行只改编码，内容与 deleted 标记不动，历史仍可回滚。目标编码若被未删除的行占用（运营自建撞号）则抛异常不记版本，绝不移动运营数据。必须跑在 organic:add-store-label-time-slot-v1 之后：该键生产已记账不会重跑，改其常量对存量库无效，只能靠本独立新键收编。参考 SQL: sql/324_organic_rename_stb_codes.sql"
+    },
+    {
       "versionKey": "doc:native-content-v2.0",
       "module": "doc",
       "phase": "MODULE_STRUCTURE",

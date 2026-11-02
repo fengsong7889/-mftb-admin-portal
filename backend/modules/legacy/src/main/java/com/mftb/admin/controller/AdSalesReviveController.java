@@ -30,8 +30,9 @@ public class AdSalesReviveController {
     @RequirePermission(menu = "ad-sales")
     public Result<AdReviveInventoryVO> inventory(@RequestParam Long algoId,
                                                  @RequestParam(required = false) String storeCode,
-                                                 @RequestParam(required = false) String groupCode) {
-        return Result.success(salesService.inventory(algoId, storeCode, groupCode));
+                                                 @RequestParam(required = false) String groupCode,
+                                                 @RequestParam(required = false) Integer channel) {
+        return Result.success(salesService.inventory(algoId, storeCode, groupCode, channel));
     }
 
     /** 加购锁定格子 60 秒（占用库存额度，到期自动释放） */

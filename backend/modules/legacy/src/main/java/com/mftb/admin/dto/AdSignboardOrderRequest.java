@@ -28,6 +28,9 @@ public class AdSignboardOrderRequest {
     /** 归属BD */
     private String bdEmpId;
 
+    /** 業務頻道（1=大首頁 2=外賣頻道 3=超市百貨 4=團購到店）：定價按「算法×頻道」配置，下單必須指定 */
+    private Integer channel;
+
     /** 备注 */
     private String remark;
 

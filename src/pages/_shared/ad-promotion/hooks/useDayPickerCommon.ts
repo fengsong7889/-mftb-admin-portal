@@ -29,6 +29,7 @@ import {
 import {
   fetchAdAlgorithms,
   fetchAdReviveInventory,
+  fetchAdPricingChannels,
   placeAdReviveOrder,
   lockAdReviveCells,
   unlockAdReviveCells,
@@ -40,7 +41,7 @@ import { fetchFinAccountBalance } from '@/api/finance'
 import { fetchGiftAvailableDays } from '@/api/gift'
 import { usePaymentRule } from '@/hooks/usePaymentRule'
 import { getSystemRuleValue } from '@/hooks/useSystemRules'
-import { AlgorithmType, REGION_LABEL_KEY } from '@mftb/contracts/recommendConstants'
+import { AlgorithmType, REGION_LABEL_KEY, RecommendChannel } from '@mftb/contracts/recommendConstants'
 
 export interface UseDayPickerCommonOptions {
   inventoryItem: InventoryItem
@@ -52,6 +53,7 @@ export interface UseDayPickerCommonOptions {
 
 export function useDayPickerCommon({ inventoryItem, storeMode, showAlgoCode }: UseDayPickerCommonOptions) {
   const { t } = useTranslation('adSales')
+  const { t: tr } = useTranslation()
   const navigate = useNavigate()
 
   // 从规则配置动态读取锁定时长
@@ -84,6 +86,10 @@ export function useDayPickerCommon({ inventoryItem, storeMode, showAlgoCode }: U
 
   // ===== 查询条件 =====
   const [searchBrand, setSearchBrand] = useState<string | null>(null)
+  /** 業務頻道（品牌 → 頻道 → 算法）：定價按「算法×頻道」配置 */
+  const [searchChannel, setSearchChannel] = useState<number | null>(null)
+  /** 当前品牌下「有啟用定價」的業務頻道候選 */
+  const [pricedChannels, setPricedChannels] = useState<number[]>([])
   const [searchAlgorithm, setSearchAlgorithm] = useState<string | null>(null)
   const [searchStoreName, setSearchStoreName] = useState<string | null>(null)
   const [searchBD, setSearchBD] = useState<string | null>(null)
@@ -235,7 +241,7 @@ export function useDayPickerCommon({ inventoryItem, storeMode, showAlgoCode }: U
       return
     }
     const backendBrand = UI_TO_BACKEND_BRAND[searchBrand]
-    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.HOT_REVIVE_AD, brand: backendBrand, status: 1, hasPricing: true, storeCode: searchStoreName || undefined })
+    fetchAdAlgorithms({ page: 1, size: 200, algoType: AlgorithmType.HOT_REVIVE_AD, brand: backendBrand, status: 1, hasPricing: true, storeCode: searchStoreName || undefined, pricingChannel: searchChannel ?? undefined })
       .then(res => {
         if (!res) return
         const records = res.records.filter(a => a.updatedBy !== '系統')
@@ -254,7 +260,32 @@ export function useDayPickerCommon({ inventoryItem, storeMode, showAlgoCode }: U
           message.warning(t('currentAlgorithmBlocked'))
         }
       }).catch(() => {})
-  }, [searchBrand, searchStoreName])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchBrand, searchStoreName, searchChannel])
+
+  /* 頻道候選：真值取盤活復蘇定價表（/ad/algorithms/channels） */
+  useEffect(() => {
+    if (!searchBrand) { setPricedChannels([]); setSearchChannel(null); return }
+    let cancelled = false
+    fetchAdPricingChannels(AlgorithmType.HOT_REVIVE_AD, UI_TO_BACKEND_BRAND[searchBrand])
+      .then(list => { if (!cancelled) setPricedChannels(Array.isArray(list) ? list : []) })
+      .catch(() => { if (!cancelled) setPricedChannels([]) })
+    return () => { cancelled = true }
+  }, [searchBrand])
+
+  /* 頻道失效時重置；只剩唯一候選時自動帶出 */
+  useEffect(() => {
+    if (searchChannel != null && !pricedChannels.includes(searchChannel)) setSearchChannel(null)
+    if (searchChannel == null && pricedChannels.length === 1) setSearchChannel(pricedChannels[0])
+  }, [pricedChannels, searchChannel])
+
+  const channelSelectOptions = useMemo(() => pricedChannels.map(code => ({
+    label: code === RecommendChannel.SUPERMARKET ? tr('recommend.channelSupermarket')
+      : code === RecommendChannel.GROUP_BUY ? tr('recommend.channelGroupBuy')
+        : code === RecommendChannel.HOME ? tr('recommend.channelHome')
+          : tr('recommend.channelDelivery'),
+    value: code,
+  })), [pricedChannels, tr])
 
   useEffect(() => {
     if (!searchStoreName || !storeMap[searchStoreName]) {
@@ -286,7 +317,20 @@ export function useDayPickerCommon({ inventoryItem, storeMode, showAlgoCode }: U
   const handleBrandChange = (value: string | null) => {
     setSearchBrand(value)
     setSearchAlgorithm(null)
+    setSearchChannel(null)
+    setPricedChannels([])
     setAlgorithmOptions([])
+  }
+
+  /** 頻道變更：重算算法候选並清空已選（不同頻道的定價屬於不同算法配置集） */
+  const handleChannelChange = (value: number | null) => {
+    const apply = () => { setSearchChannel(value); setSearchAlgorithm(null) }
+    if (hasCartItems && value !== searchChannel) {
+      setPendingAction(apply)
+      setIsConflictModalVisible(true)
+      return
+    }
+    apply()
   }
 
   const handleAlgorithmChange = (value: string | null) => {
@@ -336,6 +380,7 @@ export function useDayPickerCommon({ inventoryItem, storeMode, showAlgoCode }: U
   const handleSearch = () => {
     if (!searchAlgorithm) { message.warning(t('selectAlgorithm')); return }
     if (!searchBrand) { message.warning(t('selectBrand')); return }
+    if (searchChannel == null) { message.warning(t('channelRequired')); return }
     if (!searchStoreName) { message.warning(t('selectStore')); return }
     const store = storeMap[searchStoreName]
     if (store && !store.region) {
@@ -343,7 +388,7 @@ export function useDayPickerCommon({ inventoryItem, storeMode, showAlgoCode }: U
       return
     }
     const algoId = Number(searchAlgorithm)
-    fetchAdReviveInventory(algoId, store?.storeCode, store?.groupCode)
+    fetchAdReviveInventory(algoId, store?.storeCode, store?.groupCode, searchChannel ?? undefined)
       .then(inv => {
         setInventoryData(inv)
         setHasSearched(true)
@@ -360,6 +405,7 @@ export function useDayPickerCommon({ inventoryItem, storeMode, showAlgoCode }: U
 
   const handleReset = () => {
     setSearchBrand(null); setSearchAlgorithm(null)
+    setSearchChannel(null); setPricedChannels([])
     setSearchStoreName(null); setSearchBD(null)
     setHasSearched(false)
     setInventoryData(null)
@@ -401,11 +447,12 @@ export function useDayPickerCommon({ inventoryItem, storeMode, showAlgoCode }: U
         algoId,
         groupCode: store?.groupCode || '',
         storeCode: store?.storeCode,
+        channel: searchChannel ?? undefined,
         cells,
       })
     } catch (err) {
       message.error(err instanceof Error ? err.message : t('lockFailed'))
-      fetchAdReviveInventory(algoId, store?.storeCode, store?.groupCode).then(setInventoryData).catch(() => {})
+      fetchAdReviveInventory(algoId, store?.storeCode, store?.groupCode, searchChannel ?? undefined).then(setInventoryData).catch(() => {})
       setLocking(false)
       return
     }
@@ -473,6 +520,7 @@ export function useDayPickerCommon({ inventoryItem, storeMode, showAlgoCode }: U
         groupCode: store?.groupCode || '',
         storeCode: store?.storeCode,
         bdEmpId: searchBD || undefined,
+        channel: searchChannel ?? undefined,
         giftDays: effectiveGiftDays > 0 ? effectiveGiftDays : undefined,
         cells,
       })
@@ -481,7 +529,7 @@ export function useDayPickerCommon({ inventoryItem, storeMode, showAlgoCode }: U
       setIsPaymentModalVisible(false)
       setCartItems([])
       setIsSuccessModalVisible(true)
-      fetchAdReviveInventory(algoId, store?.storeCode, store?.groupCode).then(setInventoryData).catch(() => {})
+      fetchAdReviveInventory(algoId, store?.storeCode, store?.groupCode, searchChannel ?? undefined).then(setInventoryData).catch(() => {})
       if (store) {
         fetchFinAccountBalance(store.groupCode, UI_TO_BACKEND_BRAND[searchBrand || ''] || searchBrand)
           .then(bal => setMerchantBalance(bal ? Number(bal.virtualBalance) : null))
@@ -489,7 +537,7 @@ export function useDayPickerCommon({ inventoryItem, storeMode, showAlgoCode }: U
       }
     } catch (err) {
       message.error(err instanceof Error ? err.message : t('orderFailed'))
-      fetchAdReviveInventory(algoId, store?.storeCode, store?.groupCode).then(setInventoryData).catch(() => {})
+      fetchAdReviveInventory(algoId, store?.storeCode, store?.groupCode, searchChannel ?? undefined).then(setInventoryData).catch(() => {})
     } finally {
       setPaying(false)
     }
@@ -520,6 +568,7 @@ export function useDayPickerCommon({ inventoryItem, storeMode, showAlgoCode }: U
         algoId: Number(searchAlgorithm),
         groupCode: store?.groupCode || '',
         storeCode: store?.storeCode,
+        channel: searchChannel ?? undefined,
         cells: [{ bizDate: date, region: storeRegion }],
       }).catch(() => {})
       const remaining = item.dates.filter(d => d !== date)
@@ -528,6 +577,7 @@ export function useDayPickerCommon({ inventoryItem, storeMode, showAlgoCode }: U
           algoId: Number(searchAlgorithm),
           groupCode: store?.groupCode || '',
           storeCode: store?.storeCode,
+          channel: searchChannel ?? undefined,
           cells: remaining.map(d => ({ bizDate: d, region: storeRegion })),
         }).catch(() => {})
       }
@@ -564,6 +614,9 @@ export function useDayPickerCommon({ inventoryItem, storeMode, showAlgoCode }: U
     presaleInfo,
     setPresaleInfo,
     searchBrand,
+    searchChannel,
+    channelSelectOptions,
+    handleChannelChange,
     searchAlgorithm,
     searchStoreName,
     searchBD,

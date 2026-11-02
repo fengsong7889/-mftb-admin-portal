@@ -198,12 +198,15 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
      */
     static final String STB07_AUTO_CORRECT_PREREQUISITE = "開啟自動校正";
 
-    /** STB_09「超時接單」下架編碼：現有 organic:retire-rules-v1 只覆蓋 COM_09/STB_04 且生產已記成功，故用獨立新鍵收斂 */
+    /** STB_09「超時接單」下架編碼：現有 organic:retire-rules-v1 只覆蓋 COM_09/STB_04 且生產已記成功，故用獨立新鍵收斂。
+     * 该编码后来被「活動加分」收编使用（organic:rename-stb-code-numeric-v1 先把本残留行改挂 STB_09_RETIRED 让位），
+     * 因此本步必须继续跑在新库的收编步骤之前，不能删。*/
     static final String RETIRED_STB09_RULE_CODE = "STB_09";
 
     /**
      * 新增内置计分项 STB_LABEL（店鋪維度）：独家/品牌/连锁/金牌四选一，按门店当前标签命中一档即停。
      * 名称与说明与前端 organicTrafficConfig 模板逐字一致（存繁中，与全库文案口径一致），避免看库与界面两套口径。
+     * 本编码只是补种时用的初始编码，启动末期由 organic:rename-stb-code-numeric-v1 收编为 STB_04（见 {@link #STORE_LABEL_TARGET_CODE}）。
      */
     static final String STB_LABEL_RULE_CODE = "STB_LABEL";
     static final String STB_LABEL_NAME = "門店標籤";
@@ -211,8 +214,9 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
             "門店標籤由門店資料手動指定，獨家／品牌／連鎖／金牌四選一；按當前標籤命中對應分值，命中一檔即停、不累加，未配置該標籤不加分";
     /**
      * 新增内置计分项 COM_SLOT「時段推薦」（商業維度）：商家购买时段推荐即得一次固定加分。
-     * 编码用语义后缀而非 COM_11/COM_12：后端自动编号只取现有行最大序号 +1，
-     * 数字编码会与运营自建计分项撞车（STB_ACT 同此先例）。
+     * 编码用语义后缀而非 COM_11：后端自动编号只取现有行最大序号 +1，商业维度没有空号位可占，
+     * 数字编码会与运营自建计分项撞车。店鋪維度的 STB_04/STB_09 是已下架项让出的空号位，
+     * 因此那两项可以收编为数字编码（见 organic:rename-stb-code-numeric-v1）。
      */
     static final String COM_SLOT_RULE_CODE = "COM_SLOT";
     static final String COM_SLOT_NAME = "時段推薦";
@@ -223,11 +227,26 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
     /** 时段推荐默认固定加分：与前端 TIME_SLOT_AD_DEFAULT_SCORE 一致 */
     static final int COM_SLOT_DEFAULT_SCORE = 50;
     /**
-     * 排序号：STB_LABEL 顶替已下架 STB_04（店鋪標籤-金牌）的 2 号位（同为身份标签、同行位置，STB_04 已 deleted=1 不占位），
+     * 排序号：STB_LABEL 顶替已下架 STB_04（店鋪標籤-金牌）的 2 号位（同为身份标签、同行位置；残留行 deleted=1，
+     * 但 rule_code 上有唯一键，因此编码收编时先把残留行改挂 *_RETIRED 让位），
      * COM_SLOT 接在金字招牌（9）之后；列表按 dimension + sort_order 排序，与前端模板顺序对齐。
      */
     static final int STB_LABEL_SORT_ORDER = 2;
     static final int COM_SLOT_SORT_ORDER = 10;
+
+    /**
+     * 店鋪維度两个内置计分项的语义编码收编为数字编码：STB_LABEL → STB_04、STB_ACT → STB_09。
+     * 语义后缀是初建时的权宜（怕数字序号与运营自建项撞号），但店鋪維度其余 8 项都是 STB_01~STB_08，
+     * 界面与看库都要多记一套编码；收编后撞号由 generateNextRuleCode 取现有行最大序号 +1 自然避开（内置行是未删除行，会被计入）。
+     */
+    static final String LEGACY_STB_LABEL_CODE = "STB_LABEL";
+    static final String LEGACY_STB_ACT_CODE = "STB_ACT";
+    /** 門店標籤收编後的目標編碼：頂替已下架 STB_04（店鋪標籤-金牌）的號位，同為身份標籤 */
+    static final String STORE_LABEL_TARGET_CODE = "STB_04";
+    /** 活動加分收编後的目標編碼：順延在 STB_08 訂單取消率之後（原 STB_09 超時接單已下架讓位） */
+    static final String STORE_ACTIVITY_TARGET_CODE = "STB_09";
+    /** 讓位用的歷史殘留後綴：已下架行只改編碼讓出號位，內容與 deleted 標記原封不動 */
+    static final String RETIRED_CODE_SUFFIX = "_RETIRED";
     /** 维度存储编码（1=商業 2=店鋪 4=平台，与前端 ScoreDimension 一致） */
     static final int DIMENSION_COMMERCIAL = 1;
     static final int DIMENSION_STORE = 2;
@@ -451,6 +470,18 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
                     this::seedStoreLabelAndTimeSlotRules, this::verifyStoreLabelAndTimeSlotSeeded);
         } catch (Exception e) {
             log.error("门店标签/时段推荐内置计分项补种失败：{}", e.getMessage(), e);
+        }
+
+        // Step 22: 店鋪維度內置项语义编码收编为数字编码（STB_LABEL → STB_04，STB_ACT → STB_09） (一次性, 版本化, 带后置校验)
+        // 界面其余店铺项都是 STB_01~STB_08 连续编号，两项用语义后缀看着像编号错乱；且编码会同时出现在
+        // 算法库配置页与门店计分详情，多一套口径就多一处漂移。本步必须跑在 Step 21 之后：
+        // Step 21 仍按原编码补种（版本已记账的环境不会重跑，改常量也不会让存量库生效），本步统一收编。
+        // 参考 SQL: sql/324_organic_rename_stb_codes.sql
+        try {
+            versionTracker.applyOnce("organic:rename-stb-code-numeric-v1",
+                    this::renameStbCodesToNumeric, this::verifyStbCodesRenamed);
+        } catch (Exception e) {
+            log.error("店鋪維度內置计分项编码收编失败：{}", e.getMessage(), e);
         }
     }
 
@@ -924,6 +955,7 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
     /**
      * STB_ACT 评分说明补「仅正常进行中的活动计分」口径：只在这两个已知内置值上同步，
      * 管理员自定义过的说明不命中旧值、不会被顶掉。名称本就是「活動加分」，不需改。
+     * 按种子编码 STB_ACT 定位是成立的：本步跑在 Step 22 编码收编之前，存量库当时仍是 STB_ACT。
      */
     private void migrateStbActScope() {
         int descChanged = jdbcTemplate.update(
@@ -1134,6 +1166,68 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
                     Integer.class, ruleCode);
             if (seeded == null || seeded == 0) {
                 throw new IllegalStateException("内置计分项 " + ruleCode + " 未补种成功，界面开关与保存会报规则不存在");
+            }
+        }
+    }
+
+    /**
+     * 把店鋪維度两个语义编码的内置项收编为数字编码：STB_LABEL → STB_04、STB_ACT → STB_09。
+     * <p>
+     * 目标编码在库里被**已下架的残留行**占着（STB_04 店鋪標籤-金牌、STB_09 超時接單，均 deleted=1），
+     * 而 rule_code 上有唯一键 uk_rule_code，因此先把残留行改挂到 *_RETIRED 让出编码，再把在用行改名。
+     * 残留行只改编码不改内容也不改 deleted 标记，历史配置仍可回滚。
+     * <p>
+     * 若目标编码仍被**未删除**的行占用（运营自建项撞上同一序号），绝不动运营数据：直接抛异常，
+     * 本步不记版本、下次启动重试，由人工确认占用行后再放行。
+     * <p>
+     * 源编码不存在时整对跳过（幂等重跑零副作用，不会把自己刚改好的行再当成残留扫走）。
+     */
+    private void renameStbCodesToNumeric() {
+        renameBuiltinRuleCode(LEGACY_STB_LABEL_CODE, STORE_LABEL_TARGET_CODE);
+        renameBuiltinRuleCode(LEGACY_STB_ACT_CODE, STORE_ACTIVITY_TARGET_CODE);
+    }
+
+    /** 单对编码改名：先让已下架残留行让位，再将在用行改到目标编码；源编码不存在时不做任何事。 */
+    private void renameBuiltinRuleCode(String from, String to) {
+        Integer source = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM biz_organic_score_rule WHERE rule_code = ?", Integer.class, from);
+        if (source == null || source == 0) {
+            log.info("内置计分项编码 {} 已不存在，跳过改名 → {}", from, to);
+            return;
+        }
+        int moved = jdbcTemplate.update(
+                "UPDATE biz_organic_score_rule SET rule_code = ?, updated_by = 'system' "
+                        + "WHERE rule_code = ? AND deleted = 1",
+                to + RETIRED_CODE_SUFFIX, to);
+        Integer blocked = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM biz_organic_score_rule WHERE rule_code = ? AND deleted = 0",
+                Integer.class, to);
+        if (blocked != null && blocked > 0) {
+            throw new IllegalStateException("目标编码 " + to + " 已被未删除的计分项占用（可能为运营自建项），"
+                    + "内置项 " + from + " 改名已中止；请人工处置占用行后重启重试");
+        }
+        int renamed = jdbcTemplate.update(
+                "UPDATE biz_organic_score_rule SET rule_code = ?, updated_by = 'system' WHERE rule_code = ?",
+                to, from);
+        log.info("已將內置计分项编码 {} → {}：{} 行（下架残留让位 {} 行）", from, to, renamed, moved);
+    }
+
+    /**
+     * 后置校验：旧语义编码不得有任何残留行（不论启停），且两个目标编码都必须有行。
+     * 任一不满即说明改名未打中，必须让启动暴露并不记版本；但目标行被运营后续停用/删除不算失败（那是业务决定）。
+     */
+    private void verifyStbCodesRenamed() {
+        Integer remains = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM biz_organic_score_rule WHERE rule_code IN (?, ?)",
+                Integer.class, LEGACY_STB_LABEL_CODE, LEGACY_STB_ACT_CODE);
+        if (remains != null && remains > 0) {
+            throw new IllegalStateException("旧语义编码 STB_LABEL / STB_ACT 仍有 " + remains + " 行未收编");
+        }
+        for (String code : List.of(STORE_LABEL_TARGET_CODE, STORE_ACTIVITY_TARGET_CODE)) {
+            Integer present = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM biz_organic_score_rule WHERE rule_code = ?", Integer.class, code);
+            if (present == null || present == 0) {
+                throw new IllegalStateException("内置计分项 " + code + " 不存在，编码收编未生效");
             }
         }
     }
