@@ -74,8 +74,8 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
     /* ==================== 库存查询 ==================== */
 
     @Override
-    public AdSignboardInventoryVO inventory(Long algoId, String storeCode, String groupCode) {
-        AdPricingSignboardVO pricing = requireActivePricing(algoId);
+    public AdSignboardInventoryVO inventory(Long algoId, String storeCode, String groupCode, Integer channel) {
+        AdPricingSignboardVO pricing = requireActivePricing(algoId, channel);
         if (pricing.getSignboardItems().isEmpty()) {
             throw new BusinessException("該算法未配置標籤計價");
         }
@@ -139,7 +139,7 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AdOrderVO placeOrder(AdSignboardOrderRequest request) {
-        AdPricingSignboardVO pricing = requireActivePricing(request.getAlgoId());
+        AdPricingSignboardVO pricing = requireActivePricing(request.getAlgoId(), request.getChannel());
         if (pricing.getSignboardItems().isEmpty()) {
             throw new BusinessException("該算法未配置標籤計價");
         }
@@ -317,11 +317,13 @@ public class AdSalesSignboardServiceImpl implements AdSalesSignboardService {
 
     /* ==================== 内部方法 ==================== */
 
-    private AdPricingSignboardVO requireActivePricing(Long algoId) {
-        // activeByAlgo 按 algo_id 字段查找已启用的定价配置（与 DayPicker/Revive 保持一致）
-        AdPricingSignboardVO pricing = pricingService.activeByAlgo(algoId);
+    private AdPricingSignboardVO requireActivePricing(Long algoId, Integer channel) {
+        // 按「算法+業務頻道」定位启用中的定價配置（同算法多頻道时避免取错价）
+        AdPricingSignboardVO pricing = pricingService.activeByAlgoAndChannel(algoId, channel);
         if (pricing == null) {
-            throw new BusinessException("該算法未配置銷售定價或定價未啟用");
+            throw new BusinessException(channel == null
+                    ? "該算法未配置銷售定價或定價未啟用"
+                    : "該算法在所选業務頻道未配置銷售定價或定價未啟用");
         }
         return pricing;
     }

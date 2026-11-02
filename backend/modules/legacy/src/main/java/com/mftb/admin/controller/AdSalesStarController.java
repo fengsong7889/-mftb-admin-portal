@@ -25,13 +25,14 @@ public class AdSalesStarController {
 
     private final AdSalesStarService salesService;
 
-    /** 查询可购买格子（商圈 x 日期 x 餐段；storeCode/groupCode 用于屏蔽商家拦截） */
+    /** 查询可购买格子（商圈 x 日期 x 餐段；storeCode/groupCode 用于屏蔽商家拦截，channel 定位「算法×頻道」定價） */
     @GetMapping("/inventory")
     @RequirePermission(menu = "ad-sales")
     public Result<AdInventoryVO> inventory(@RequestParam Long algoId,
                                            @RequestParam(required = false) String storeCode,
-                                           @RequestParam(required = false) String groupCode) {
-        return Result.success(salesService.inventory(algoId, storeCode, groupCode));
+                                           @RequestParam(required = false) String groupCode,
+                                           @RequestParam(required = false) Integer channel) {
+        return Result.success(salesService.inventory(algoId, storeCode, groupCode, channel));
     }
 
     /** 加购锁定格子 60 秒（其它商家看到已售罄，到期自动释放） */

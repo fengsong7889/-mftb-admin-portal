@@ -44,8 +44,22 @@ public class AdAlgorithmController {
             @RequestParam(required = false) Integer status,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String storeCode,
-            @RequestParam(required = false) Boolean hasPricing) {
-        return Result.success(algorithmService.page(page, size, algoType, brand, channel, status, keyword, storeCode, hasPricing));
+            @RequestParam(required = false) Boolean hasPricing,
+            @RequestParam(required = false) Integer pricingChannel) {
+        return Result.success(algorithmService.page(page, size, algoType, brand, channel, status,
+                keyword, storeCode, hasPricing, pricingChannel));
+    }
+
+    /**
+     * 某算法类型下「已配置启用中定价」的業務頻道列表（購買页「品牌→頻道→算法」级联用）。
+     * <p>真值来自各定價表，算法自身的頻道字段存量大量为空，不能当数据源。
+     */
+    @GetMapping("/channels")
+    @RequirePermission(menu = "promotion-algorithm")
+    public Result<List<Integer>> activeChannels(
+            @RequestParam Integer algoType,
+            @RequestParam(required = false) String brand) {
+        return Result.success(algorithmService.listActiveChannels(algoType, brand));
     }
 
     /** 算法详情 */

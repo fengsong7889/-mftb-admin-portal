@@ -20,6 +20,7 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -74,6 +75,77 @@ public class AdPricingSignboardServiceImpl extends
                         .orderByDesc(AdPricingSignboard::getId)
                         .last("LIMIT 1"));
         return pricing == null ? null : toVO(pricing);
+    }
+
+    /** 按「算法 + 業務頻道」取价；頻道為 null 時退回舊口徑（仅兼容未升級調用方） */
+    @Override
+    public AdPricingSignboardVO activeByAlgoAndChannel(Long algoId, Integer channel) {
+        if (channel == null) {
+            return activeByAlgo(algoId);
+        }
+        AdPricingSignboard pricing = pricingMapper.selectOne(
+                new LambdaQueryWrapper<AdPricingSignboard>()
+                        .eq(AdPricingSignboard::getAlgoId, algoId)
+                        .eq(AdPricingSignboard::getChannel, channel)
+                        .eq(AdPricingSignboard::getStatus, 1)
+                        .orderByDesc(AdPricingSignboard::getId)
+                        .last("LIMIT 1"));
+        return pricing == null ? null : toVO(pricing);
+    }
+
+    @Override
+    public AdPricingSignboardVO detailOrNull(Long id) {
+        if (id == null) {
+            return null;
+        }
+        AdPricingSignboard entity = pricingMapper.selectById(id);
+        return entity == null ? null : toVO(entity);
+    }
+
+    @Override
+    public List<Integer> listActiveChannels(Integer algoType, String brand) {
+        LambdaQueryWrapper<AdPricingSignboard> wrapper = new LambdaQueryWrapper<AdPricingSignboard>()
+                .select(AdPricingSignboard::getChannel)
+                .eq(AdPricingSignboard::getStatus, 1)
+                .groupBy(AdPricingSignboard::getChannel)
+                .orderByAsc(AdPricingSignboard::getChannel);
+        if (StringUtils.hasText(brand)) {
+            wrapper.eq(AdPricingSignboard::getBrand, brand);
+        }
+        return pricingMapper.selectList(wrapper).stream()
+                .map(AdPricingSignboard::getChannel)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+    }
+
+    /* ==================== 创建/更新前校验钩子 ==================== */
+
+    @Override
+    protected void preCreate(AdPricingSignboardRequest request) {
+        requireChannelUnique(request.getAlgoId(), request.getChannel(), null);
+    }
+
+    @Override
+    protected void preUpdate(Long id, AdPricingSignboardRequest request) {
+        requireChannelUnique(request.getAlgoId(), request.getChannel(), id);
+    }
+
+    /** 同一算法同一業務頻道只允許一條定價配置（與投流廣告同口径） */
+    private void requireChannelUnique(Long algoId, Integer channel, Long excludeId) {
+        if (algoId == null || channel == null) {
+            return;
+        }
+        LambdaQueryWrapper<AdPricingSignboard> wrapper = new LambdaQueryWrapper<AdPricingSignboard>()
+                .eq(AdPricingSignboard::getAlgoId, algoId)
+                .eq(AdPricingSignboard::getChannel, channel);
+        if (excludeId != null) {
+            wrapper.ne(AdPricingSignboard::getId, excludeId);
+        }
+        Long duplicated = pricingMapper.selectCount(wrapper);
+        if (duplicated != null && duplicated > 0) {
+            throw new BusinessException("該算法在此業務頻道已存在定價配置，請直接編輯");
+        }
     }
 
     /* ==================== 抽象方法实现 ==================== */

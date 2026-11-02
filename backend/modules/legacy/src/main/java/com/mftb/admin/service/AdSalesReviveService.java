@@ -9,8 +9,12 @@ import com.mftb.admin.dto.AdReviveOrderRequest;
  */
 public interface AdSalesReviveService {
 
-    /** 查询可购买格子（商圈 x 日期；storeCode/groupCode 用于屏蔽商家拦截） */
-    AdReviveInventoryVO inventory(Long algoId, String storeCode, String groupCode);
+    /**
+     * 查询可购买格子（商圈 x 日期；storeCode/groupCode 用于屏蔽商家拦截）
+     *
+     * @param channel 業務頻道：定價按「算法×頻道」配置，非空时只取该頻道的定價；为空退回旧口径
+     */
+    AdReviveInventoryVO inventory(Long algoId, String storeCode, String groupCode, Integer channel);
 
     /** 加购锁定格子 60 秒（占用库存额度，到期自动释放） */
     void lockCells(AdReviveOrderRequest request);

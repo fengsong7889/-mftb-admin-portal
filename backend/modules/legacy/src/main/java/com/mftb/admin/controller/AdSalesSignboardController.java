@@ -30,8 +30,9 @@ public class AdSalesSignboardController {
     @RequirePermission(menu = "ad-sales")
     public Result<AdSignboardInventoryVO> inventory(@RequestParam Long algoId,
                                                     @RequestParam(required = false) String storeCode,
-                                                    @RequestParam(required = false) String groupCode) {
-        return Result.success(salesService.inventory(algoId, storeCode, groupCode));
+                                                    @RequestParam(required = false) String groupCode,
+                                                    @RequestParam(required = false) Integer channel) {
+        return Result.success(salesService.inventory(algoId, storeCode, groupCode, channel));
     }
 
     /** 提交订单并从推广金账户扣款 */

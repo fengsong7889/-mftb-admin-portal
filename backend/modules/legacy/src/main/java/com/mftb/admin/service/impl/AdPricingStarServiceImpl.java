@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiConsumer;
 
@@ -77,16 +78,71 @@ public class AdPricingStarServiceImpl extends
         return pricing == null ? null : toVO(pricing);
     }
 
+    /**
+     * 按「算法 + 業務頻道」取价：頻道為 null 時退回舊口徑（取最新一條），
+     * 僅供未升級的調用方兼容；購買鏈路必須傳頻道，否則同算法多頻道時會错配價格。
+     */
+    @Override
+    public AdPricingStarVO activeByAlgoAndChannel(Long algoId, Integer channel) {
+        if (channel == null) {
+            return activeByAlgo(algoId);
+        }
+        AdPricingStar pricing = pricingMapper.selectOne(
+                new LambdaQueryWrapper<AdPricingStar>()
+                        .eq(AdPricingStar::getAlgoId, algoId)
+                        .eq(AdPricingStar::getChannel, channel)
+                        .eq(AdPricingStar::getStatus, 1)
+                        .orderByDesc(AdPricingStar::getId)
+                        .last("LIMIT 1"));
+        return pricing == null ? null : toVO(pricing);
+    }
+
+    @Override
+    public List<Integer> listActiveChannels(Integer algoType, String brand) {
+        LambdaQueryWrapper<AdPricingStar> wrapper = new LambdaQueryWrapper<AdPricingStar>()
+                .select(AdPricingStar::getChannel)
+                .eq(AdPricingStar::getStatus, 1)
+                .groupBy(AdPricingStar::getChannel)
+                .orderByAsc(AdPricingStar::getChannel);
+        if (StringUtils.hasText(brand)) {
+            wrapper.eq(AdPricingStar::getBrand, brand);
+        }
+        return pricingMapper.selectList(wrapper).stream()
+                .map(AdPricingStar::getChannel)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+    }
+
     /* ==================== 创建/更新前校验钩子 ==================== */
 
     @Override
     protected void preCreate(AdPricingStarRequest request) {
         requireAlgorithm(request.getAlgoId());
+        requireChannelUnique(request.getAlgoId(), request.getChannel(), null);
     }
 
     @Override
     protected void preUpdate(Long id, AdPricingStarRequest request) {
         requireAlgorithm(request.getAlgoId());
+        requireChannelUnique(request.getAlgoId(), request.getChannel(), id);
+    }
+
+    /** 同一算法同一業務頻道只允許一條定價配置（與投流廣告同口径，避免購買页取价歧義） */
+    private void requireChannelUnique(Long algoId, Integer channel, Long excludeId) {
+        if (algoId == null || channel == null) {
+            return;
+        }
+        LambdaQueryWrapper<AdPricingStar> wrapper = new LambdaQueryWrapper<AdPricingStar>()
+                .eq(AdPricingStar::getAlgoId, algoId)
+                .eq(AdPricingStar::getChannel, channel);
+        if (excludeId != null) {
+            wrapper.ne(AdPricingStar::getId, excludeId);
+        }
+        Long duplicated = pricingMapper.selectCount(wrapper);
+        if (duplicated != null && duplicated > 0) {
+            throw new BusinessException("該算法在此業務頻道已存在定價配置，請直接編輯");
+        }
     }
 
     /* ==================== 抽象方法实现 ==================== */

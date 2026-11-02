@@ -21,6 +21,7 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -75,8 +76,68 @@ public class AdPricingHotServiceImpl extends
     }
 
     @Override
+    public AdPricingHotVO detailOrNull(Long id) {
+        if (id == null) {
+            return null;
+        }
+        AdPricingHot entity = pricingMapper.selectById(id);
+        return entity == null ? null : toVO(entity);
+    }
+
+    /** 按「算法 + 業務頻道」取价；頻道為 null 時退回舊口徑（仅兼容未升級調用方） */
+    @Override
+    public AdPricingHotVO activeByAlgoAndChannel(Long algoId, Integer channel) {
+        if (channel == null) {
+            return activeByAlgo(algoId);
+        }
+        AdPricingHot pricing = pricingMapper.selectOne(
+                new LambdaQueryWrapper<AdPricingHot>()
+                        .eq(AdPricingHot::getAlgoId, algoId)
+                        .eq(AdPricingHot::getChannel, channel)
+                        .eq(AdPricingHot::getStatus, 1)
+                        .orderByDesc(AdPricingHot::getId)
+                        .last("LIMIT 1"));
+        return pricing == null ? null : toVO(pricing);
+    }
+
+    @Override
+    public List<Integer> listActiveChannels(Integer algoType, String brand) {
+        LambdaQueryWrapper<AdPricingHot> wrapper = new LambdaQueryWrapper<AdPricingHot>()
+                .select(AdPricingHot::getChannel)
+                .eq(AdPricingHot::getStatus, 1)
+                .groupBy(AdPricingHot::getChannel)
+                .orderByAsc(AdPricingHot::getChannel);
+        if (StringUtils.hasText(brand)) {
+            wrapper.eq(AdPricingHot::getBrand, brand);
+        }
+        return pricingMapper.selectList(wrapper).stream()
+                .map(AdPricingHot::getChannel)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+    }
+
+    /** 同一算法同一業務頻道只允許一條定價配置（與投流廣告同口径） */
+    private void requireChannelUnique(Long algoId, Integer channel, Long excludeId) {
+        if (algoId == null || channel == null) {
+            return;
+        }
+        LambdaQueryWrapper<AdPricingHot> wrapper = new LambdaQueryWrapper<AdPricingHot>()
+                .eq(AdPricingHot::getAlgoId, algoId)
+                .eq(AdPricingHot::getChannel, channel);
+        if (excludeId != null) {
+            wrapper.ne(AdPricingHot::getId, excludeId);
+        }
+        Long duplicated = pricingMapper.selectCount(wrapper);
+        if (duplicated != null && duplicated > 0) {
+            throw new BusinessException("該算法在此業務頻道已存在定價配置，請直接編輯");
+        }
+    }
+
+    @Override
     protected void preCreate(AdPricingHotRequest request) {
         validateRequest(request);
+        requireChannelUnique(request.getAlgoId(), request.getChannel(), null);
     }
 
     @Override
@@ -98,6 +159,7 @@ public class AdPricingHotServiceImpl extends
             }
         }
         validateRequest(request);
+        requireChannelUnique(request.getAlgoId(), request.getChannel(), id);
     }
 
     private void validateRequest(AdPricingHotRequest request) {

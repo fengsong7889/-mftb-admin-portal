@@ -22,6 +22,7 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 投流广告销售定价服务实现
@@ -100,6 +101,23 @@ public class AdPricingTrafficServiceImpl extends
                 .eq(AdPricingTraffic::getAlgoId, algoId)
                 .eq(AdPricingTraffic::getStatus, 1));
         return count != null && count > 0;
+    }
+
+    @Override
+    public List<Integer> listActiveChannels(Integer algoType, String brand) {
+        LambdaQueryWrapper<AdPricingTraffic> wrapper = new LambdaQueryWrapper<AdPricingTraffic>()
+                .select(AdPricingTraffic::getBizChannel)
+                .eq(AdPricingTraffic::getStatus, 1)
+                .groupBy(AdPricingTraffic::getBizChannel)
+                .orderByAsc(AdPricingTraffic::getBizChannel);
+        if (StringUtils.hasText(brand)) {
+            wrapper.eq(AdPricingTraffic::getBrand, brand);
+        }
+        return pricingMapper.selectList(wrapper).stream()
+                .map(AdPricingTraffic::getBizChannel)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
     }
 
     /* ==================== 创建/更新前校验钩子 ==================== */

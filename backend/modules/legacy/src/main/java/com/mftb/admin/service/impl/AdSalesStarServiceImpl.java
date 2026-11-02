@@ -85,9 +85,9 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
     /* ==================== 库存查询 ==================== */
 
     @Override
-    public AdInventoryVO inventory(Long algoId, String storeCode, String groupCode) {
+    public AdInventoryVO inventory(Long algoId, String storeCode, String groupCode, Integer channel) {
         AdAlgorithm algorithm = requireActiveAlgorithm(algoId);
-        AdPricingStarVO pricing = requireActivePricing(algoId);
+        AdPricingStarVO pricing = requireActivePricing(algoId, channel);
         if (pricing.getRegionPrices().isEmpty()) {
             throw new BusinessException("該算法未配置商圈計價");
         }
@@ -162,7 +162,7 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
     @Transactional(rollbackFor = Exception.class)
     public AdOrderVO placeOrder(AdStarOrderRequest request) {
         AdAlgorithm algorithm = requireActiveAlgorithm(request.getAlgoId());
-        AdPricingStarVO pricing = requireActivePricing(request.getAlgoId());
+        AdPricingStarVO pricing = requireActivePricing(request.getAlgoId(), request.getChannel());
         if (pricing.getRegionPrices().isEmpty()) {
             throw new BusinessException("該算法未配置商圈計價");
         }
@@ -281,7 +281,8 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         order.setAlgoName(algorithm.getAlgoName());
         order.setAlgoCode(algorithm.getAlgoCode());
         order.setBrand(brand);
-        order.setChannel(algorithm.getChannel());
+        // 频道以命中定价为准：算法自身的頻道字段存量大量为空，直接取会把订单写成无频道
+        order.setChannel(pricing.getChannel() != null ? pricing.getChannel() : algorithm.getChannel());
         order.setGroupCode(request.getGroupCode());
         order.setGroupName(orderSupport.resolveGroupName(request.getGroupCode()));
         order.setStoreCode(store != null ? store.getStoreCode() : request.getStoreCode());
@@ -356,7 +357,7 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
     @Transactional(rollbackFor = Exception.class)
     public void lockCells(AdStarOrderRequest request) {
         requireActiveAlgorithm(request.getAlgoId());
-        AdPricingStarVO pricing = requireActivePricing(request.getAlgoId());
+        AdPricingStarVO pricing = requireActivePricing(request.getAlgoId(), request.getChannel());
         if (pricing.getRegionPrices().isEmpty()) {
             throw new BusinessException("該算法未配置商圈計價");
         }
@@ -458,10 +459,16 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         return algorithm;
     }
 
-    private AdPricingStarVO requireActivePricing(Long algoId) {
-        AdPricingStarVO pricing = pricingService.activeByAlgo(algoId);
+    /**
+     * 取算法在指定業務頻道下启用中的定價。
+     * <p>定價按「算法×頻道」配置，同算法多頻道时必须指定頻道，否则退化成取最新一条会错配价格。
+     */
+    private AdPricingStarVO requireActivePricing(Long algoId, Integer channel) {
+        AdPricingStarVO pricing = pricingService.activeByAlgoAndChannel(algoId, channel);
         if (pricing == null) {
-            throw new BusinessException("該算法未配置銷售定價");
+            throw new BusinessException(channel == null
+                    ? "該算法未配置銷售定價"
+                    : "該算法在所选業務頻道未配置銷售定價");
         }
         return pricing;
     }
