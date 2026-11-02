@@ -9,7 +9,7 @@
 .organic__notice { margin-bottom: 16px; }
 .organic__search { display: block !important; }
 .organic__filter-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px 16px; }
-/* 商家權重分排名搜索区：名次区间左右并列 */
+/* 商家權重分搜索区：名次区间左右并列 */
 .organic__rank-range { display: flex; align-items: center; gap: 6px; }
 .organic__rank-range .ant-input-number { flex: 1; width: auto; min-width: 0; }
 .organic__rank-range span { color: #8C8C8C; }

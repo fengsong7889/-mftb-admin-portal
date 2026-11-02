@@ -28,7 +28,7 @@ export const MENU_NAME_EN: Record<string, string> = {
   'traffic-sandbox': 'Experiment Sandbox',
   'waterfall-simulation': 'Waterfall Simulation',
   'algorithm-simulation': 'Algorithm Simulation',
-  'merchant-score-insight': 'Merchant Weighted Score Ranking',
+  'merchant-score-insight': 'Merchant Weighted Score',
   'merchant-promotion-diagnose': 'Promotion Diagnosis',
   // 推广通（后端 menu_key：promotion_tool）
   'promotion_tool': 'Promotion Pass',

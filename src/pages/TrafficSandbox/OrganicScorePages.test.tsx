@@ -50,7 +50,7 @@ beforeEach(() => {
   ], total: 2 })
 })
 
-describe('商家權重分排名', () => {
+describe('商家權重分', () => {
   it('列表页标准结构：无定制页头，搜索条件与十二列齐全', async () => {
     await mount()
     // 列表设计规范 §E.7：搜索区置顶，不允许 hero 式定制页头；顶部说明横条已按需求移除
@@ -63,8 +63,15 @@ describe('商家權重分排名', () => {
     expect(screen.getByRole('combobox', { name: '所屬品牌' })).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: '業務頻道' })).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: '算法名稱' })).toBeInTheDocument()
-    // 算法名称必选且排第一位（红星标记）
-    expect(document.querySelector('.organic__filter-grid > label:first-child .organic__label--required')).toBeInTheDocument()
+    // 業務頻道按系統數據字典只列三個頻道：大首頁是混排聚合層，不是一種業務頻道
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '業務頻道' }))
+    expect(await screen.findByText('美食外賣')).toBeInTheDocument()
+    expect(screen.getByText('超市百貨')).toBeInTheDocument()
+    expect(screen.getByText('團購到店')).toBeInTheDocument()
+    expect(screen.queryByText('大首頁')).not.toBeInTheDocument()
+    // 自然流量按業務頻道配置：頻道排首位，算法名稱退到第二位但仍必選（红星标记）
+    expect(document.querySelector('.organic__filter-grid > label:first-child .organic__label--required')).toBeNull()
+    expect(document.querySelector('.organic__filter-grid > label:nth-child(2) .organic__label--required')).toBeInTheDocument()
     expect(screen.queryByLabelText('門店搜尋')).not.toBeInTheDocument()
     const headers = Array.from(document.querySelectorAll('.ant-table-thead th')).map(th => th.textContent?.trim())
     expect(headers).toEqual(['排名', '算法ID/名稱', '集團ID/名稱', '門店ID/名稱', '所屬品牌', '業務頻道', '運營商圈', '商業維度分', '店鋪維度分', '平台維度分', '綜合得分', '操作'])
@@ -88,6 +95,33 @@ describe('商家權重分排名', () => {
     fireEvent.click(screen.getByRole('button', { name: /查\s*詢/ }))
     expect(await screen.findByText('算法名稱為必選條件，請先選擇算法')).toBeInTheDocument()
   })
+  it('業務頻道聯動算法下拉：只列該頻道與未定頻道的算法，換頻道後已選算法被清空', async () => {
+    algorithmsMock.mockResolvedValue({ records: [
+      { id: 1, algoCode: 'ZRL001', algoName: '外賣自然流量', algoType: 7, status: 1, channel: 2 },
+      { id: 2, algoCode: 'ZRL002', algoName: '超市自然流量', algoType: 7, status: 1, channel: 3 },
+      // 存量算法大多未填頻道：按「通用」处理，不得被频道筛选误杀
+      { id: 3, algoCode: 'ZRL003', algoName: '未定頻道算法', algoType: 7, status: 1 },
+    ], total: 3 })
+    await mount('board', '?algo=ZRL001')
+    await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0))
+
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '業務頻道' }))
+    let dropdown = document.querySelector<HTMLElement>('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+    expect(dropdown, '頻道下拉未展開').toBeTruthy()
+    fireEvent.click(within(dropdown as HTMLElement).getByText('超市百貨'))
+
+    // 原算法属外賣頻道，换频道后必须重选；直接查询被必选拦截而不是给出空榜
+    // （antd message 挂在 body 上不随组件卸载，同一文件内多个用例会叠加同一提示，故用 findAll）
+    fireEvent.click(screen.getByRole('button', { name: /查\s*詢/ }))
+    expect((await screen.findAllByText('算法名稱為必選條件，請先選擇算法')).length).toBeGreaterThan(0)
+
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '算法名稱' }))
+    dropdown = document.querySelector<HTMLElement>('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+    expect(dropdown, '算法下拉未展開').toBeTruthy()
+    expect(Array.from(dropdown!.querySelectorAll('.ant-select-item-option')).map(el => el.textContent))
+      .toEqual(['超市自然流量(ZRL002)', '未定頻道算法(ZRL003)'])
+  })
+
   it('排名按筛选结果从1连续编号，展示品牌频道与三个维度的得分', async () => {
     await mount('board', '?algo=ZRL001')
     await waitFor(() => expect(bodyRows()).toHaveLength(20))
@@ -95,7 +129,7 @@ describe('商家權重分排名', () => {
     expect(within(first).getByText('1')).toBeInTheDocument()
     expect(within(first).getByText('DEMO-001')).toBeInTheDocument()
     expect(within(first).getByText('閃蜂')).toBeInTheDocument()
-    expect(within(first).getByText('大首頁')).toBeInTheDocument()
+    expect(within(first).getByText('美食外賣')).toBeInTheDocument()
     const scoreCells = first.querySelectorAll('td')
     for (const index of [7, 8, 9, 10]) expect(scoreCells[index].textContent).toMatch(/^\d+\.\d{2}$/)
     // 算法库加载后按门店序号轮转归属：DEMO-001 → 第一家算法

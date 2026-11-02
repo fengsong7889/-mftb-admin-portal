@@ -637,7 +637,7 @@ describe('Sidebar V3 分批交付菜单（項目總覽/測試工作台/發布中
 const sandboxMenus: MenuVO[] = [
   { id: 71, parentId: 70, menuKey: 'waterfall-simulation', name: '瀑布流推演', path: '/waterfall-simulation', icon: 'NodeIndexOutlined', type: 2, status: 1, sort: 1 },
   { id: 72, parentId: 70, menuKey: 'algorithm-simulation', name: '算法推演', path: '/algorithm-simulation', icon: 'DeploymentUnitOutlined', type: 2, status: 1, sort: 2 },
-  { id: 73, parentId: 70, menuKey: 'merchant-score-insight', name: '商家權重分排名', path: '/merchant-score-insight', icon: 'TrophyOutlined', type: 2, status: 1, sort: 3 },
+  { id: 73, parentId: 70, menuKey: 'merchant-score-insight', name: '商家權重分', path: '/merchant-score-insight', icon: 'TrophyOutlined', type: 2, status: 1, sort: 3 },
   { id: 74, parentId: 70, menuKey: 'merchant-promotion-diagnose', name: '商家推廣診斷', path: '/merchant-promotion-diagnose', icon: 'MedicineBoxOutlined', type: 2, status: 1, sort: 4 },
 ]
 
@@ -648,7 +648,7 @@ function setSandboxMenus() {
   }], 'online')
 }
 
-describe('Sidebar 實驗沙盤菜單（瀑布流推演/算法推演/商家權重分排名/商家推廣診斷）', () => {
+describe('Sidebar 實驗沙盤菜單（瀑布流推演/算法推演/商家權重分/商家推廣診斷）', () => {
   it.each(sandboxMenus)('$menuKey：路由与权限真值表登记完整', (menu) => {
     expect(keyToPath[menu.menuKey]).toBe(menu.path)
     expect(pathToKey[menu.path!]).toBe(menu.menuKey)
@@ -773,7 +773,7 @@ describe('Sidebar 菜单真值来源', () => {
     const children: MenuVO[] = [
       { id: 2, parentId: 1, menuKey: 'waterfall-simulation', name: '瀑布流推演', type: 2, status: 1, sort: 1 },
       { id: 3, parentId: 1, menuKey: 'algorithm-simulation', name: '算法推演', type: 2, status: 1, sort: 2 },
-      { id: 4, parentId: 1, menuKey: 'merchant-score-insight', name: '商家權重分排名', type: 2, status: 1, sort: 3 },
+      { id: 4, parentId: 1, menuKey: 'merchant-score-insight', name: '商家權重分', type: 2, status: 1, sort: 3 },
       { id: 5, parentId: 1, menuKey: 'merchant-promotion-diagnose', name: '商家推廣診斷', type: 2, status: 1, sort: 4 },
     ]
     setMenuState([{

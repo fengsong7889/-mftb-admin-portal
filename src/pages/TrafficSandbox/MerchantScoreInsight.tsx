@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Button, Empty, InputNumber, message, Result, Select, Table, TreeSelect } from 'antd'
 import type { TableColumnsType } from 'antd'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons'
-import { APP_OPTIONS, AlgorithmType, AppType, RECOMMEND_CHANNEL_OPTIONS, REGION_LABEL_KEY, REGION_TREE_DATA, ServiceStatus, type Region } from '@mftb/contracts/recommendConstants'
+import { APP_OPTIONS, AlgorithmType, AppType, RECOMMEND_CHANNEL_OPTIONS, RecommendChannel, REGION_LABEL_KEY, REGION_TREE_DATA, ServiceStatus, type Region } from '@mftb/contracts/recommendConstants'
 import { useAuth } from '@/contexts/AuthContext'
 import BrandTag from '@/components/BrandTag'
 import HelpPopover from '@/components/HelpPopover'
@@ -19,7 +19,13 @@ interface RankedRow { store: StoreResult; brand: AppType; channel: number; algo?
 interface Filters { rankMin: number | null; rankMax: number | null; merchant: string; store: string; brand: AppType | null; channel: number | null; algo: string; regions: Region[] }
 
 const PAGE_SIZES = [10, 20, 50, 100]
-const CHANNEL_CYCLE: number[] = RECOMMEND_CHANNEL_OPTIONS.map(option => option.value)
+// 業務頻道口径依系統數據字典（美食外賣／超市百貨／團購到店）：大首頁是跨頻道的混排聚合層，不是一種業務頻道，
+// 本頁的篩選與演示歸屬都排除它；以「投放界面」取數的其他沙盘頁（瀑布流推演等）仍可用 HOME。
+const SCORE_CHANNEL_OPTIONS = RECOMMEND_CHANNEL_OPTIONS.filter(option => option.value !== RecommendChannel.HOME)
+const CHANNEL_CYCLE: number[] = SCORE_CHANNEL_OPTIONS.map(option => option.value)
+// 算法是否落在该频道下：存量算法大多未填 channel（新增算法表单此前不收这一项），按「通用」处理，
+// 不臆造归属也不让回填前的下拉直接空掉；一旦算法定了频道，就只在对应频道下出现
+const algoInChannel = (algo: AdAlgorithm, channel: number | null) => !channel || algo.channel == null || algo.channel === channel
 const EMPTY_FILTERS: Filters = { rankMin: null, rankMax: null, merchant: '', store: '', brand: null, channel: null, algo: '', regions: [] }
 const dimensionScore = (store: StoreResult, dimension: Dimension) => store.dimensions.find(d => d.dimension === dimension)?.rawScore
 // 名次徽章：前 3 名金/银/铜圆形奖牌，4-10 名浅橙胶囊，其余纯数字
@@ -51,7 +57,7 @@ const readFilters = (params: URLSearchParams): Filters => {
 }
 
 /**
- * 商家權重分排名：列表页标准结构（搜索区 → 表格），支持排名/集团/门店/品牌/频道/区域筛选。
+ * 商家權重分：列表页标准结构（搜索区 → 表格），支持排名/集团/门店/品牌/频道/区域筛选。
  * 占比（權重）配置模塊已停用並將刪除，頁面不再計算占比、歸一或加權貢獻，
  * 綜合得分＝商業＋店鋪＋平台三個維度得分直接相加。
  */
@@ -75,11 +81,16 @@ export default function MerchantScoreInsight() {
     return () => { active = false }
   }, [])
   const view = params.get('view') === 'detail' ? 'detail' : 'overview'
+  // 算法候选跟随頻道收窄（先定頻道、再選該頻道下的算法）；未選頻道時列全量
+  const algoChoices = useMemo(() => algorithms.filter(algo => algoInChannel(algo, draft.channel)), [algorithms, draft.channel])
   const rows = useMemo<RankedRow[]>(() => {
     // 算法必选：不同算法的计分项与分数配置不同，未选算法时不展示全量榜单
     if (!filters.algo) return []
-    // 演示口径：算法按门店序号轮转归属到启用中的自然流量算法，接真实计分接口后改读库内归属
-    const algoOf = (store: StoreResult) => algorithms.length ? algorithms[(Number(store.storeId.slice(-3)) - 1) % algorithms.length] : undefined
+    // 演示口径：算法按门店序号在「该门店频道可用的算法」里轮转归属，接真实计分接口后改读库内归属
+    const algoOf = (store: StoreResult) => {
+      const pool = algorithms.filter(algo => algoInChannel(algo, demoChannelOf(store)))
+      return pool.length ? pool[(Number(store.storeId.slice(-3)) - 1) % pool.length] : undefined
+    }
     const list = snapshot.stores
       .filter(s => s.totalScore != null && (!filters.regions.length || filters.regions.includes(s.regionId)))
       .filter(s => !filters.merchant || s.merchantId === filters.merchant)
@@ -117,6 +128,12 @@ export default function MerchantScoreInsight() {
     apply({ ...draft, page: 1 })
   }
   const channelText = (channel: number) => t(RECOMMEND_CHANNEL_OPTIONS.find(option => option.value === channel)?.labelKey ?? 'recommend.channelDelivery')
+  // 換頻道後原算法可能已不在候選里，直接清空，避免「選了頻道卻查不到榜」的假空结果
+  const handleChannelChange = (value: number | null) => setDraft(prev => {
+    const channel = value ?? null
+    const stillAvailable = !!prev.algo && algorithms.some(algo => algo.algoCode === prev.algo && algoInChannel(algo, channel))
+    return { ...prev, channel, algo: stillAvailable ? prev.algo : '' }
+  })
   const idNameCell = (id: string, name: string) => <div className="organic__id-name"><b>{id}</b><span>{name}</span></div>
   // 集团/门店下拉选项：选项文案「ID/名稱」，支持按 ID 或名称搜索，选中后按 ID 精确筛选
   const merchantOptions = useMemo(() => { const seen = new Map<string, string>(); snapshot.stores.forEach(s => seen.set(s.merchantId, `${s.merchantId}/${s.merchantName}`)); return [...seen.entries()].map(([value, label]) => ({ value, label })) }, [snapshot])
@@ -139,7 +156,7 @@ export default function MerchantScoreInsight() {
     { key: 'total', title: '綜合得分', width: 130, align: 'right', render: (_, r) => <b className="organic__total-score">{scoreText(r.store.totalScore)}</b> },
     { key: 'action', title: '操作', width: 96, fixed: 'right', render: (_, r) => <Button type="link" size="small" onClick={() => openDetail(r.store)}>詳情</Button> },
   ]
-  if (!hasMenuPermission('merchant-score-insight')) return <Result status="403" title="沒有查看權限" subTitle="請聯絡管理員授予商家權重分排名查看權限。" />
+  if (!hasMenuPermission('merchant-score-insight')) return <Result status="403" title="沒有查看權限" subTitle="請聯絡管理員授予商家權重分查看權限。" />
   if (view === 'detail') {
     const store = snapshot.stores.find(s => s.storeId === params.get('storeId'))
     return store ? <StoreScoreDetail key={store.storeId} store={store} snapshot={snapshot} onBack={handleBack} />
@@ -148,12 +165,13 @@ export default function MerchantScoreInsight() {
   return <div className="content-area organic">
     <div className="search-section organic__search">
       <div className="organic__filter-grid">
-        <label><span className="organic__label--required">算法名稱</span><Select aria-label="算法名稱" allowClear showSearch optionFilterProp="label" placeholder="必選，請選擇算法" value={draft.algo || undefined} onChange={value => setDraft({ ...draft, algo: value ?? '' })} options={algorithms.map(algo => ({ value: algo.algoCode, label: `${algo.algoName}(${algo.algoCode})` }))} /></label>
+        {/* 自然流量按業務頻道配置，頻道放首位：先定頻道，算法下拉只列该频道下的算法 */}
+        <label>業務頻道<Select aria-label="業務頻道" allowClear placeholder="全部" value={draft.channel} onChange={handleChannelChange} options={SCORE_CHANNEL_OPTIONS.map(option => ({ value: option.value, label: t(option.labelKey) }))} /></label>
+        <label><span className="organic__label--required">算法名稱</span><Select aria-label="算法名稱" allowClear showSearch optionFilterProp="label" placeholder="必選，請選擇算法" value={draft.algo || undefined} onChange={value => setDraft({ ...draft, algo: value ?? '' })} options={algoChoices.map(algo => ({ value: algo.algoCode, label: `${algo.algoName}(${algo.algoCode})` }))} /></label>
         <label>排名<div className="organic__rank-range"><InputNumber aria-label="排名下限" min={1} precision={0} placeholder="最低名次" value={draft.rankMin} onChange={value => setDraft({ ...draft, rankMin: value })} /><span>–</span><InputNumber aria-label="排名上限" min={1} precision={0} placeholder="最高名次" value={draft.rankMax} onChange={value => setDraft({ ...draft, rankMax: value })} /></div></label>
         <label>集團ID/名稱<Select aria-label="集團ID/名稱" showSearch allowClear optionFilterProp="label" placeholder="全部" value={draft.merchant || undefined} onChange={value => setDraft({ ...draft, merchant: value ?? '' })} options={merchantOptions} /></label>
         <label>門店ID/名稱<Select aria-label="門店ID/名稱" showSearch allowClear optionFilterProp="label" placeholder="全部" value={draft.store || undefined} onChange={value => setDraft({ ...draft, store: value ?? '' })} options={storeOptions} /></label>
         <label>所屬品牌<Select aria-label="所屬品牌" allowClear placeholder="全部" value={draft.brand} onChange={value => setDraft({ ...draft, brand: value ?? null })} options={APP_OPTIONS.map(option => ({ value: option.value, label: t(option.labelKey) }))} /></label>
-        <label>業務頻道<Select aria-label="業務頻道" allowClear placeholder="全部" value={draft.channel} onChange={value => setDraft({ ...draft, channel: value ?? null })} options={RECOMMEND_CHANNEL_OPTIONS.map(option => ({ value: option.value, label: t(option.labelKey) }))} /></label>
         <label>運營商圈<TreeSelect aria-label="運營商圈" treeCheckable showSearch treeNodeFilterProp="title" maxTagCount={2} placeholder="全澳門（不含珠海）" value={draft.regions} onChange={(value: (string | number)[]) => setDraft({ ...draft, regions: expandRegions(value) })} treeData={REGION_TREE_DATA.slice(0, 2).map(node => ({ value: node.value, title: t(node.titleKey), children: node.children.map(child => ({ value: child.value, title: t(child.titleKey) })) }))} allowClear /></label>
         {/* 标準列表页：操作按钮紧跟最后一个查询条件（§E.1） */}
         <div className="search-actions"><Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>查詢</Button><Button icon={<ReloadOutlined />} onClick={() => { setDraft(EMPTY_FILTERS); apply({ ...EMPTY_FILTERS, page: 1 }) }}>重置</Button></div>

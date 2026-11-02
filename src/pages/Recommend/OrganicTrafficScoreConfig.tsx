@@ -153,6 +153,8 @@ function voToRule(vo: OrganicRuleVO): OrganicScoreRule {
   return {
     // 舊語義編碼收编到數字編碼（STB_LABEL→STB_04、STB_ACT→STB_09）：後端遷移未生效的窗口内仍能按現行口径渲染
     id: normalizeOrganicRuleId(vo.ruleCode) ?? vo.ruleCode,
+    // 寫請求另存原始編碼：展示走現行編碼，落庫走後端實際那套，两边都不会因发布顺序而坏
+    sourceRuleCode: vo.ruleCode,
     dimension: vo.dimension as ScoreDimension,
     name: vo.name,
     description: vo.description,
@@ -672,6 +674,15 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
       : undefined,
     status: values.status!,
   })
+  /**
+   * 寫請求用的規則標識：優先取後端下發的原始 ruleCode。
+   * 界面内部用收编後的數字編碼匹配模板與面板，但遷移未生效的環境库里仍是舊語義編碼，
+   * 直接拿別名 PUT/toggle/delete 會命中 resolveRuleId 的「評分規則不存在」。
+   * 模板保底行（後端尚未種子）沒有 sourceRuleCode，退回 id 保持原有行為。
+   */
+  const ruleIdentifier = (rule?: Pick<OrganicScoreRule, 'id' | 'sourceRuleCode'>) =>
+    ((rule?.sourceRuleCode ?? rule?.id) ?? '') as unknown as number
+
   /** 保存內聯編輯 */
   const handleInlineSave = async (ruleId: string) => {
     const values = inlineForm[ruleId]
@@ -877,7 +888,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
     // COM_01 已改用券類計分 v1 面板（檔位由面板自管頁面草稿），不再走內聯編輯的舊倍率梯度校驗
     const payload = buildRulePayload(values)
     try {
-      const vo = await updateOrganicRule(ruleId as unknown as number, payload)
+      const vo = await updateOrganicRule(ruleIdentifier(rules.find(r => r.id === ruleId)), payload)
       // 保留前端編輯過的前提條件（API 可能未返回該字段）
       const savedRule = voToRule(vo)
       if (values.prerequisites !== undefined) {
@@ -922,7 +933,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
       return
     }
     try {
-      const vo = await updateOrganicRule(rule.id as unknown as number, buildRulePayload({ ...rule, description }))
+      const vo = await updateOrganicRule(ruleIdentifier(rule), buildRulePayload({ ...rule, description }))
       // 後端 Jackson non_null 可能省略空字段，因此僅採用 VO 實際返回的更新人與更新時間
       setRules(prev => prev.map(r => (r.id === rule.id ? {
         ...r,
@@ -955,7 +966,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
     if (readOnly) return
     setStoreLabelDrafts(prev => ({ ...prev, [rule.id]: next }))
     try {
-      const vo = await updateOrganicRule(rule.id as unknown as number,
+      const vo = await updateOrganicRule(ruleIdentifier(rule),
         buildRulePayload({ ...rule, description, storeLabelConfig: next }))
       setRules(prev => prev.map(r => (r.id === rule.id ? {
         ...r,
@@ -979,7 +990,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
     if (readOnly) return
     setFreeShippingDrafts(prev => ({ ...prev, [rule.id]: next }))
     try {
-      const vo = await updateOrganicRule(rule.id as unknown as number,
+      const vo = await updateOrganicRule(ruleIdentifier(rule),
         buildRulePayload({ ...rule, description, score: next.enrollmentScore, freeShippingConfig: next }))
       setRules(prev => prev.map(r => (r.id === rule.id ? {
         ...r,
@@ -1003,7 +1014,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
     if (readOnly) return
     setMemberBonusDrafts(prev => ({ ...prev, [rule.id]: next }))
     try {
-      const vo = await updateOrganicRule(rule.id as unknown as number,
+      const vo = await updateOrganicRule(ruleIdentifier(rule),
         buildRulePayload({ ...rule, description, score: next.enrollmentScore, memberBonusConfig: next }))
       setRules(prev => prev.map(r => (r.id === rule.id ? {
         ...r,
@@ -1043,6 +1054,12 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
     () => DIMENSION_ORDER.reduce((sum, d) => sum + (dimensionWeight[d] || 0), 0),
     [dimensionWeight],
   )
+
+  /**
+   * 占比条的归一分母：合计超过 100 时按比例压缩各段，避免溢出被裁切看不清结构；
+   * 差额不由条子解释，由右上角合计徽标（绿/红）与底部规则行提示。
+   */
+  const weightBarScale = Math.max(weightTotal, DIMENSION_WEIGHT_TOTAL)
 
   /** 保存維度權重 */
   const handleSaveWeights = async () => {
@@ -1246,7 +1263,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
     }
     try {
       if (editingRule) {
-        const vo = await updateOrganicRule(editingRule.id as unknown as number, payload)
+        const vo = await updateOrganicRule(ruleIdentifier(editingRule), payload)
         setRules(prev => prev.map(r => r.id === editingRule.id ? voToRule(vo) : r))
         message.success(t('organicTrafficScore.updateSuccess', { name: values.name }))
       } else {
@@ -1294,7 +1311,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
       cancelText: t('common.cancel'),
       onOk: async () => {
         try {
-          await toggleOrganicRuleStatus(record.id as unknown as number)
+          await toggleOrganicRuleStatus(ruleIdentifier(record))
         } catch { /* 後端不可用時靜默回退 */ }
         setRules(prev => prev.map(r => r.id === record.id ? { ...r, status: newStatus } : r))
         message.success(t('organicTrafficScore.toggleSuccess', { action: actionText, name: record.name }))
@@ -1314,7 +1331,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
       okButtonProps: { danger: true },
       onOk: async () => {
         try {
-          await deleteOrganicRule(record.id as unknown as number)
+          await deleteOrganicRule(ruleIdentifier(record))
         } catch { /* 後端不可用時靜默回退 */ }
         setRules(prev => prev.filter(r => r.id !== record.id))
         message.success(t('common.deleteSuccess'))
@@ -1450,7 +1467,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                         updatedAt={rule.updatedAt}
                         onSave={async (next, nextStatus) => {
                           // 整行覆盖语义：以当前行为底，只改 trafficBalanceConfig 与 status；后端会重新校验
-                          const vo = await updateOrganicRule(rule.id as unknown as number, buildRulePayload({ ...rule, trafficBalanceConfig: next, status: nextStatus }))
+                          const vo = await updateOrganicRule(ruleIdentifier(rule), buildRulePayload({ ...rule, trafficBalanceConfig: next, status: nextStatus }))
                           setRules(prev => prev.map(r => r.id === rule.id ? voToRule(vo) : r))
                           message.success(t('organicTrafficScore.updateSuccess', { name: vo.name }))
                         }} />
@@ -2855,33 +2872,65 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
   return (
     <Spin spinning={loading}>
     <div className="algorithm-form__organic">
-      {/* 維度權重配置（可收起） */}
+      {/* 維度權重配置（可收起）：占比条直观呈现三个维度的结构，输入卡与条子同色对应 */}
       {showDimensionWeight && (
         <AlgorithmSection title={t('organicTrafficScore.dimensionWeightConfig')} readOnly={readOnly}
           expanded={!weightConfigCollapsed} onExpandedChange={handleToggleWeightCollapsed}
-          extra={<>
-            <span style={{ color: weightTotal === DIMENSION_WEIGHT_TOTAL ? '#52C41A' : '#FF4D4F' }}>
-              {t('organicTrafficScore.currentTotal', { total: weightTotal })}{weightTotal === DIMENSION_WEIGHT_TOTAL ? '' : `（${t('organicTrafficScore.needEqual', { total: DIMENSION_WEIGHT_TOTAL })}）`}
-            </span>
-            {DIMENSION_ORDER.map(d => <Tag key={d} color={SCORE_DIMENSION_COLOR[d].color}>{DIM_LABEL[d]} {dimensionWeight[d]}%</Tag>)}
-          </>}>
-            <div className="algorithm-fields">
-              {DIMENSION_ORDER.map(dimension => (
-                <div key={dimension} style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>{DIM_LABEL[dimension]}</div>
-                  <InputNumber value={dimensionWeight[dimension]} min={0} max={DIMENSION_WEIGHT_TOTAL}
-                    suffix="%" style={{ width: '100%' }} disabled={readOnly}
-                    onChange={val => setDimensionWeight(prev => ({ ...prev, [dimension]: val ?? 0 }))} />
+          extra={<span className={`algorithm-weight-sum${weightTotal === DIMENSION_WEIGHT_TOTAL ? ' algorithm-weight-sum--ok' : ' algorithm-weight-sum--warn'}`}>
+            {t('organicTrafficScore.currentTotal', { total: weightTotal })}
+            {weightTotal !== DIMENSION_WEIGHT_TOTAL && ` · ${t('organicTrafficScore.needEqual', { total: DIMENSION_WEIGHT_TOTAL })}`}
+          </span>}>
+          {/* 占比条：改任一维度即实时重排，未分配部分留斜纹灰底，避免“看起来已经凑齐” */}
+          <div className="algorithm-weight-bar" role="img" aria-label={t('organicTrafficScore.currentTotal', { total: weightTotal })}>
+            {DIMENSION_ORDER.map(dimension => {
+              const weight = dimensionWeight[dimension] || 0
+              return (
+                <div key={dimension} className="algorithm-weight-bar__seg"
+                  style={{ width: `${weight / weightBarScale * 100}%`, background: SCORE_DIMENSION_COLOR[dimension].color }}
+                  title={`${DIM_LABEL[dimension]} ${weight}%`}>
+                  {weight > 0 && <span className="algorithm-weight-bar__label">{DIM_LABEL[dimension]} {weight}%</span>}
                 </div>
-              ))}
-              {!readOnly && (
-                <Button type="primary" size="small" icon={<SaveOutlined />}
-                  disabled={weightTotal !== DIMENSION_WEIGHT_TOTAL} loading={savingWeights}
-                  onClick={handleSaveWeights} style={{ marginTop: 18 }}>
-                  {t('organicTrafficScore.saveWeight')}
-                </Button>
-              )}
-            </div>
+              )
+            })}
+            {weightTotal < DIMENSION_WEIGHT_TOTAL && (
+              <div className="algorithm-weight-bar__rest" style={{ width: `${(DIMENSION_WEIGHT_TOTAL - weightTotal) / weightBarScale * 100}%` }} />
+            )}
+          </div>
+
+          <div className="algorithm-weight-grid">
+            {DIMENSION_ORDER.map(dimension => {
+              const { color, bg } = SCORE_DIMENSION_COLOR[dimension]
+              const dimRules = getRules(dimension)
+              const dimEnabled = dimRules.filter(r => r.status === ServiceStatus.ENABLED).length
+              return (
+                <div key={dimension} className="algorithm-weight-card" style={{ borderColor: `${color}33` }}>
+                  <span aria-hidden="true" className="algorithm-weight-card__accent" style={{ background: color }} />
+                  <div className="algorithm-weight-card__head">
+                    <span aria-hidden="true" className="algorithm-weight-card__icon" style={{ background: bg }}>{SCORE_DIMENSION_ICON[dimension]}</span>
+                    <span className="algorithm-weight-card__name">{DIM_LABEL[dimension]}</span>
+                  </div>
+                  <InputNumber value={dimensionWeight[dimension]} min={0} max={DIMENSION_WEIGHT_TOTAL} step={5}
+                    size="large" suffix="%" style={{ width: '100%' }} disabled={readOnly}
+                    aria-label={`${DIM_LABEL[dimension]} ${t('organicTrafficScore.weightLabel')}`}
+                    onChange={val => setDimensionWeight(prev => ({ ...prev, [dimension]: val ?? 0 }))} />
+                  <div className="algorithm-weight-card__meta">
+                    {t('organicTrafficScore.statsTotal', { total: dimRules.length, enabled: dimEnabled })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="algorithm-weight-footer">
+            <span className="algorithm-weight-footer__hint">{t('organicTrafficScore.rule4', { total: DIMENSION_WEIGHT_TOTAL })}</span>
+            {!readOnly && (
+              <Button type="primary" icon={<SaveOutlined />}
+                disabled={weightTotal !== DIMENSION_WEIGHT_TOTAL} loading={savingWeights}
+                onClick={handleSaveWeights}>
+                {t('organicTrafficScore.saveWeight')}
+              </Button>
+            )}
+          </div>
         </AlgorithmSection>
       )}
 
