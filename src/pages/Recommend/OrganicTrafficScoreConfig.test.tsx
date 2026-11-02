@@ -206,7 +206,7 @@ describe('通用计分项：模块卡片与减免运费开关', () => {
   it('門店標籤走標籤計分面板（獨家/品牌/連鎖/金牌），後端未種子時也保底展示', async () => {
     await mount()
     fireEvent.click(screen.getByRole('tab', { name: /dimStore/ }))
-    fireEvent.click(screen.getByText('STB_LABEL'))
+    fireEvent.click(screen.getByText('STB_04'))
     const panel = within(screen.getByLabelText(SL('panelAria')))
     expect(panel.getByText(SL('tag'))).toBeInTheDocument()
     expect(panel.getByText(SL('sectionDetail'))).toBeInTheDocument()
@@ -223,12 +223,12 @@ describe('通用计分项：模块卡片与减免运费开关', () => {
     fireEvent.click(screen.getByRole('tab', { name: /dimStore/ }))
     const codes = screen.getAllByText(/^STB_/).map(el => el.textContent)
     // 保底项紧跟主營時段加分，不附在列表末尾
-    expect(codes.slice(0, 2)).toEqual(['STB_01', 'STB_LABEL'])
+    expect(codes.slice(0, 2)).toEqual(['STB_01', 'STB_04'])
   }, 120000)
 
   it('門店標籤配置隨規則落庫：讀取過濾非法行、保存回寫 storeLabelConfig', async () => {
     api.fetch.mockResolvedValue({ dimensions: [], rules: [
-      { id: 41, ruleCode: 'STB_LABEL', dimension: 2, name: '門店標籤', description: '標籤分值', mode: 1, score: 0, status: 1, builtin: 1,
+      { id: 41, ruleCode: 'STB_04', dimension: 2, name: '門店標籤', description: '標籤分值', mode: 1, score: 0, status: 1, builtin: 1,
         storeLabelConfig: JSON.stringify({ items: [
           { labelValue: 'exclusive', labelName: '獨家', score: 40 },
           { labelValue: 'gold', labelName: '金牌', score: 20 },
@@ -239,7 +239,7 @@ describe('通用计分项：模块卡片与减免运费开关', () => {
     api.update.mockResolvedValue({ updatedBy: 'tester', updateTime: '2026-10-31 18:00:00' })
     await mount()
     fireEvent.click(screen.getByRole('tab', { name: /dimStore/ }))
-    fireEvent.click(screen.getByText('STB_LABEL'))
+    fireEvent.click(screen.getByText('STB_04'))
     const panel = within(screen.getByLabelText(SL('panelAria')))
     // 非法行被过滤，只渲染两条合法标签；分值按库里的值回显
     expect(panel.getByText('獨家').closest('.organic-score-row')).toHaveTextContent('+40 分')
@@ -250,7 +250,7 @@ describe('通用计分项：模块卡片与减免运费开关', () => {
     fireEvent.click(screen.getByRole('button', { hidden: true, name: SL('save') }))
     await waitFor(() => expect(api.update).toHaveBeenCalled())
     const [id, payload] = api.update.mock.calls[0]
-    expect(id).toBe('STB_LABEL')
+    expect(id).toBe('STB_04')
     expect(JSON.parse(payload.storeLabelConfig).items[0]).toEqual({ labelValue: 'exclusive', labelName: '獨家', score: 50 })
   }, 120000)
 
@@ -262,14 +262,34 @@ describe('通用计分项：模块卡片与减免运费开关', () => {
     expect(screen.queryByText('購買廣告-點金廣告')).not.toBeInTheDocument()
   })
 
-  it('店铺标签-金牌计分项已下架，后端残留数据也不再展示', async () => {
+  it('門店標籤收编為 STB_04：後端以數字編碼下發行時走標籤計分面板，舊金牌名稱被界面口径覆蓋', async () => {
+    // 收编前的库里 STB_04 是已下架的「店鋪標籤-金牌」（deleted=1，不会下发）；
+    // 收编后同一编码代的是門店標籤，因此界面不得再按旧金牌口径渲染该项
     api.fetch.mockResolvedValue({ dimensions: [], rules: [{ id: 4, ruleCode: 'STB_04', dimension: 2,
       name: '店鋪標籤-金牌', description: '金牌店鋪身份標籤加分', mode: 1, score: 60, status: 1, builtin: 1 }] })
     await mount()
     fireEvent.click(screen.getByRole('tab', { name: /dimStore/ }))
-    expect(screen.queryByText('STB_04')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('STB_04'))
+    expect(screen.getByText('門店標籤')).toBeInTheDocument()
     expect(screen.queryByText('店鋪標籤-金牌')).not.toBeInTheDocument()
-  })
+    // 走門店標籤專屬面板（而非旧的固定加分入口）
+    expect(within(screen.getByLabelText(SL('panelAria'))).getByText(SL('empty'))).toBeInTheDocument()
+  }, 120000)
+
+  it('部署窗口兼容：後端仍下发舊語義編碼時界面歸一到數字編碼，不出現重複项', async () => {
+    // 前端（Pages）與後端（Sealos）各自獨立發布，存在「新界面 + 未遷移庫」窗口
+    api.fetch.mockResolvedValue({ dimensions: [], rules: [
+      { id: 41, ruleCode: 'STB_LABEL', dimension: 2, name: '門店標籤', description: '標籤分值', mode: 1, score: 0, status: 1, builtin: 1 },
+      { id: 42, ruleCode: 'STB_ACT', dimension: 2, name: '活動加分', description: '活動加分', mode: 1, score: 0, status: 1, builtin: 1 },
+    ] })
+    await mount()
+    fireEvent.click(screen.getByRole('tab', { name: /dimStore/ }))
+    expect(screen.queryByText('STB_LABEL')).not.toBeInTheDocument()
+    expect(screen.queryByText('STB_ACT')).not.toBeInTheDocument()
+    // 各只出现一次：既能被读成现行编码，也不会另插一行模板保底项
+    expect(screen.getByText('STB_04')).toBeInTheDocument()
+    expect(screen.getByText('STB_09')).toBeInTheDocument()
+  }, 120000)
 
   it('营业状态：打烊直接过滤、休息/爆单垫底排序，只有营业中可配分', async () => {
     await mount()
@@ -430,9 +450,9 @@ describe('自然流量计分展示一致性', () => {
       fireEvent.click(screen.getByText(rule.id))
       const body = screen.getByText(rule.id).parentElement?.parentElement?.querySelector('.algorithm-form__rule-body')
       expect(body, rule.id).toBeTruthy()
-      if (rule.id === 'STB_ACT' || rule.id === 'COM_10' || rule.id === 'STB_LABEL') {
-        // 三者都靠运营自行增删条目，未配置时以空态引导而非统一行结构；STB_LABEL 空态文案已接 i18n
-        expect(body, rule.id).toHaveTextContent(rule.id === 'STB_LABEL' ? SL('empty') : '尚未配置')
+      if (rule.id === 'STB_09' || rule.id === 'COM_10' || rule.id === 'STB_04') {
+        // 三者都靠运营自行增删条目，未配置时以空态引导而非统一行结构；STB_04 空态文案已接 i18n
+        expect(body, rule.id).toHaveTextContent(rule.id === 'STB_04' ? SL('empty') : '尚未配置')
       } else {
         const rows = body!.querySelectorAll('.organic-score-row')
         expect(rows.length, rule.id).toBeGreaterThan(0)
@@ -684,7 +704,7 @@ describe('店鋪綜合分／訂單取消率／活動加分：新計分口径', (
     ] })
     api.update.mockResolvedValue({})
     await mount()
-    openStoreRule('STB_ACT')
+    openStoreRule('STB_09')
     expect(screen.getByText(/尚未配置活動/)).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { hidden: true, name: /[编編]\s*[辑輯]/ }))
@@ -711,11 +731,11 @@ describe('店鋪綜合分／訂單取消率／活動加分：新計分口径', (
     api.algorithms.mockResolvedValue({ records: [
       { algoCode: 'SFWD20261029002', algoName: '無敵星星', status: 2 },
     ] })
-    api.fetch.mockResolvedValue({ dimensions: [], rules: [{ id: 99, ruleCode: 'STB_ACT', dimension: 2,
+    api.fetch.mockResolvedValue({ dimensions: [], rules: [{ id: 99, ruleCode: 'STB_09', dimension: 2,
       name: '活動加分', description: '活動加分', mode: 1, score: 0, status: 1, builtin: 1,
       activityItems: JSON.stringify([{ activityId: 'SFWD20261029002', activityName: '無敵星星', score: 30 }]) }] })
     await mount()
-    openStoreRule('STB_ACT')
+    openStoreRule('STB_09')
     // 状态非「進行中」的行直接告诉运营：本项不加分
     expect(screen.getByText('organicTrafficScore.activityStatusExpired')).toBeInTheDocument()
     expect(screen.getByText('無敵星星')).toBeInTheDocument()
@@ -733,14 +753,9 @@ describe('出餐時長（STB_07）：固定加分 + 自動校正開關落庫', (
     fireEvent.click(screen.getByText(code))
   }
 
-  it('旧按次计罚行改走「開啟自動校正 + 固定加分」面板，超时接单不再展示', async () => {
-    api.fetch.mockResolvedValue({ dimensions: [], rules: [legacyMealTimeRule,
-      { id: 9, ruleCode: 'STB_09', dimension: 2, name: '超時接單', description: '每超時一單扣分',
-        mode: 3, score: 0, statDays: 7, deductionPerOrder: 60, status: 1, builtin: 1 }] })
+  it('旧按次计罚行改走「開啟自動校正 + 固定加分」面板', async () => {
+    api.fetch.mockResolvedValue({ dimensions: [], rules: [legacyMealTimeRule] })
     await mount()
-    // 已下架的超時接單：后端残留数据也不再展示
-    expect(screen.queryByText('STB_09')).not.toBeInTheDocument()
-    expect(screen.queryByText('超時接單')).not.toBeInTheDocument()
 
     openStoreRule('STB_07')
     expect(screen.getByText('出餐時長')).toBeInTheDocument()

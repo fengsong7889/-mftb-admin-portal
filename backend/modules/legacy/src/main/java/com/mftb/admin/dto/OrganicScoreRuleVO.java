@@ -72,7 +72,7 @@ public class OrganicScoreRuleVO {
     /** 屏蔽商家列表 JSON 字符串 */
     private String blockedMerchants;
 
-    /** 活动加分配置 JSON 字符串（STB_ACT 活动加分规则使用） */
+    /** 活动加分配置 JSON 字符串（STB_09 活动加分规则使用） */
     private String activityItems;
 
     /** 倍数梯度计分配置 JSON 字符串（COM_01 满额立减规则使用，以门店客单价为基准） */
@@ -93,7 +93,7 @@ public class OrganicScoreRuleVO {
     /** 流量均衡合并配置 JSON 字符串（仅 PLT_03 使用：统计口径 + 区域梯度） */
     private String trafficBalanceConfig;
 
-    /** 门店标签计分配置 JSON 字符串（仅 STB_LABEL 使用：[{labelValue, labelName, score}]） */
+    /** 门店标签计分配置 JSON 字符串（仅 STB_04 使用：[{labelValue, labelName, score}]） */
     private String storeLabelConfig;
 
     /** 服务状态: 1=启用 2=停用 */

@@ -27,7 +27,7 @@ import {
   REGION_KEYS, REGION_LABELS, REGION_COLORS,
   isCouponScoreRule,
   isSignboardScoreRule, DEFAULT_SIGNBOARD_SCORE_CONFIG,
-  isStoreLabelScoreRule, normalizeStoreLabelScoreConfig,
+  isStoreLabelScoreRule, normalizeStoreLabelScoreConfig, normalizeOrganicRuleId,
   isFreeShippingScoreRule, FREE_SHIPPING_ENROLLMENT_PREREQUISITE, normalizeFreeShippingScoreConfig,
   isMemberBonusScoreRule, normalizeMemberBonusScoreConfig,
   isOrganicRuleVisible, RETIRED_ORGANIC_RULE_IDS, DEFAULT_COUPON_SCORE_CONFIG, BUSINESS_STATE_ITEMS, isFilteredBusinessState,
@@ -151,7 +151,8 @@ function voToRule(vo: OrganicRuleVO): OrganicScoreRule {
   // 门店标签配置：后端只透传 JSON，读取时由 normalize 过滤非法行；其他计分项不写这个字段，避免污染它们自己的列
   const storeLabelConfig = vo.storeLabelConfig ? normalizeStoreLabelScoreConfig(vo.storeLabelConfig) : undefined
   return {
-    id: vo.ruleCode,
+    // 舊語義編碼收编到數字編碼（STB_LABEL→STB_04、STB_ACT→STB_09）：後端遷移未生效的窗口内仍能按現行口径渲染
+    id: normalizeOrganicRuleId(vo.ruleCode) ?? vo.ruleCode,
     dimension: vo.dimension as ScoreDimension,
     name: vo.name,
     description: vo.description,
@@ -246,12 +247,11 @@ const RULE_TYPE_TAG_CONFIG: Record<string, { color: string; label: string }> = {
   STB_01: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
   STB_02: { color: 'purple', label: '四檔狀態計分' },
   STB_03: { color: 'purple', label: '分數梯度加分' },
-  STB_04: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
   STB_05: { color: 'purple', label: '準時率梯度' },
   STB_06: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
   STB_07: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
   STB_08: { color: 'purple', label: '取消率梯度加分' },
-  STB_ACT: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
+  STB_09: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
   PLT_01: { color: 'blue', label: '距離衰減' },
   PLT_02A: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
   PLT_03: { color: 'purple', label: '梯度均衡加分' },
@@ -265,8 +265,8 @@ const RULE_TYPE_TAG_CONFIG: Record<string, { color: string; label: string }> = {
 const RULE_DATA_SOURCE_HINT: Record<string, string> = {
   STB_03: 'organicTrafficScore.dataSourceStb03',
   STB_05: 'organicTrafficScore.dataSourceStb05',
-  STB_ACT: 'organicTrafficScore.dataSourceStbAct',
-  STB_LABEL: 'organicTrafficScore.dataSourceStbLabel',
+  STB_09: 'organicTrafficScore.dataSourceStbAct',
+  STB_04: 'organicTrafficScore.dataSourceStbLabel',
   COM_SLOT: 'organicTrafficScore.dataSourceComSlot',
 }
 
@@ -354,11 +354,11 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
               readCancelMinOrders(r.conditionItems) ?? DEFAULT_CANCEL_MIN_ORDERS,
             )
           }
-          // STB_09「超時接單」已下架：不再展示，舊行由 loadConfig 的 RETIRED_ORGANIC_RULE_IDS 過濾屏蔽
           if (r.id === 'STB_01') {
             r.name = '主營時段加分'
           }
-          if (r.id === 'STB_ACT') {
+          // 原下架項「超時接單」让出 STB_09 號位後，本編碼已是內置項「活動加分」（见 organic:rename-stb-code-numeric-v1）
+          if (r.id === 'STB_09') {
             r.name = '活動加分'
             r.dimension = ScoreDimension.STORE
             if (!r.activityItems) r.activityItems = []
@@ -397,7 +397,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
           // 計分項更名：後端舊名稱「購買廣告-金字招牌」統一為「金字招牌(廣告)」
           if (r.id === 'COM_10') r.name = '金字招牌(廣告)'
           // 计分项名称保底：后端尚未种子本项时，界面口径仍以模板为准
-          if (r.id === 'STB_LABEL') {
+          if (r.id === 'STB_04') {
             r.name = '門店標籤'
             r.dimension = ScoreDimension.STORE
           }
@@ -412,8 +412,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
         })
         // 保底：模板已收但后端尚未种子的计分项，按锚点插入（只读展示不影响写库）
         const MISSING_RULE_FALLBACKS: Array<{ id: string; anchor?: string }> = [
-          { id: 'STB_ACT' },
-          { id: 'STB_LABEL', anchor: 'STB_01' },
+          { id: 'STB_09' },
+          { id: 'STB_04', anchor: 'STB_01' },
           { id: 'COM_SLOT', anchor: 'COM_10' },
         ]
         MISSING_RULE_FALLBACKS.forEach(({ id, anchor }) => {
@@ -518,7 +518,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
   const [schemeDrafts, setSchemeDrafts] = useState<Record<string, CouponScoreConfig>>({})
   /** 金字招牌標籤計分（COM_10）頁面草稿 */
   const [signboardDrafts, setSignboardDrafts] = useState<Record<string, SignboardScoreConfig>>({})
-  /** 门店标签计分（STB_LABEL）页面草稿 */
+  /** 门店标签计分（STB_04）页面草稿 */
   const [storeLabelDrafts, setStoreLabelDrafts] = useState<Record<string, StoreLabelScoreConfig>>({})
   /** 減免運費計分（COM_02）頁面草稿 */
   const [freeShippingDrafts, setFreeShippingDrafts] = useState<Record<string, FreeShippingScoreConfig>>({})
@@ -551,7 +551,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
     }).catch(() => { /* 靜默請求 */ })
   }, [])
 
-  /* ---- 活動加分（STB_ACT）相關狀態（暫對接算法庫，後續切換為系統活動） ---- */
+  /* ---- 活動加分（STB_09）相關狀態（暫對接算法庫，後續切換為系統活動） ---- */
   /** 算法庫列表（活動下拉框候選與名稱/狀態的資料源） */
   const [algoOptions, setAlgoOptions] = useState<AdAlgorithm[]>([])
 
@@ -851,8 +851,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
         return
       }
     }
-    // STB_ACT 活動加分校驗：每行需選到活動且加分分值 > 0，同一活動不得重複配置
-    if (ruleId === 'STB_ACT') {
+    // STB_09 活動加分校驗：每行需選到活動且加分分值 > 0，同一活動不得重複配置
+    if (ruleId === 'STB_09') {
       const items: ActivityScoreItem[] = (values as any).activityItems || []
       if (items.length === 0) {
         message.warning('請至少配置一個活動')
@@ -1229,8 +1229,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
       deductionPerOrder: (values as any).deductionPerOrder,
       decayCoefficient: (values as any).decayCoefficient,
       timeRangeScores: (values as any).timeRangeScores ? JSON.stringify((values as any).timeRangeScores) : undefined,
-      // STB_ACT 活動加分：保留已有配置（彈窗路徑不編輯活動明細）
-      activityItems: editingRule?.id === 'STB_ACT'
+      // STB_09 活動加分：保留已有配置（彈窗路徑不編輯活動明細）
+      activityItems: editingRule?.id === 'STB_09'
         ? JSON.stringify(editingRule.activityItems || [])
         : undefined,
       // COM_01 門檻≤客單價加分：新增時取模板預填值，編輯時保留已有配置
@@ -1531,7 +1531,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                       </div>
                     )
                   }
-                  // 门店标签（STB_LABEL）：按门店当前标签（独家/品牌/连锁/金牌）命中一档即停
+                  // 门店标签（STB_04）：按门店当前标签（独家/品牌/连锁/金牌）命中一档即停
                   if (isStoreLabelScoreRule(rule.id)) {
                     const draft = storeLabelDrafts[rule.id]
                     const saved = normalizeStoreLabelScoreConfig(rule.storeLabelConfig)
@@ -1560,9 +1560,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                           {(() => {
                             const tagEntry = RULE_TYPE_TAG_CONFIG[rule.id]
                             if (tagEntry) {
-                              // COM_03~COM_10/STB_01/STB_04/PLT_02A/STB_ACT 根據 mode 動態切換標籤
+                              // COM_03~COM_10/STB_01/PLT_02A/STB_09 根據 mode 動態切換標籤
                               const isDynamic = rule.mode === ScoreMode.AMOUNT_MULTIPLIER
-                                && ['COM_03','COM_04','COM_05','COM_07','COM_10','STB_01','STB_04','PLT_02A','STB_ACT'].includes(rule.id)
+                                && ['COM_03','COM_04','COM_05','COM_07','COM_10','STB_01','PLT_02A','STB_09'].includes(rule.id)
                               return <Tag color={tagEntry.color} style={{ fontSize: 11, margin: 0 }}>{isDynamic ? '動態加分' : tagEntry.label}</Tag>
                             }
                             return (
@@ -1602,7 +1602,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                     {!isEditingInline ? (
                       /* 顯示模式 */
                       <AlgorithmSection title="計分明細" icon={<SettingOutlined />} tone={tone}>
-                        {!['COM_01', 'COM_SLOT', 'STB_02', 'STB_03', 'STB_05', 'STB_06', 'STB_07', 'STB_08', 'STB_ACT', 'PLT_01', 'PLT_02A', 'PLT_03', 'PLT_04'].includes(rule.id)
+                        {!['COM_01', 'COM_SLOT', 'STB_02', 'STB_03', 'STB_05', 'STB_06', 'STB_07', 'STB_08', 'STB_09', 'PLT_01', 'PLT_02A', 'PLT_03', 'PLT_04'].includes(rule.id)
                           && [ScoreMode.RULE_BONUS, ScoreMode.RULE_DEDUCTION, ScoreMode.DECAY, ScoreMode.AMOUNT_MULTIPLIER].includes(rule.mode) && (
                           <div className="organic-score-panel">
                             <ScoreRow label={rule.name} score={rule.score}
@@ -1620,8 +1620,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             </div>
                           </div>
                         )}
-                        {/* STB_ACT 活動加分配置只讀顯示：活動ID + 名稱 + 計分狀態 */}
-                        {rule.id === 'STB_ACT' && (() => {
+                        {/* STB_09 活動加分配置只讀顯示：活動ID + 名稱 + 計分狀態 */}
+                        {rule.id === 'STB_09' && (() => {
                           const items = rule.activityItems || []
                           return (
                             <div className="organic-score-panel">
@@ -2020,7 +2020,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                       <AlgorithmSection title="計分配置" icon={<SettingOutlined />} tone={tone}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                         <div className="organic-score-config-grid">
-                            {(rule.id !== 'COM_01' && rule.id !== 'COM_03' && rule.id !== 'COM_04' && rule.id !== 'COM_05' && rule.id !== 'COM_06' && rule.id !== 'COM_07' && rule.id !== 'COM_10' && rule.id !== 'COM_SLOT' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_ACT') && (
+                            {(rule.id !== 'COM_01' && rule.id !== 'COM_03' && rule.id !== 'COM_04' && rule.id !== 'COM_05' && rule.id !== 'COM_06' && rule.id !== 'COM_07' && rule.id !== 'COM_10' && rule.id !== 'COM_SLOT' && rule.id !== 'STB_01' && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_09') && (
                             <div>
                               <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>前提條件</div>
                               <Input value={form.prerequisites || ''} maxLength={60} showCount allowClear
@@ -2683,8 +2683,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             </div>
                           )
                         })()}
-                        {/* STB_ACT 活動加分自定義編輯：下拉選中活動即帶出名與狀態，不需再點查詢（暫對接算法庫） */}
-                        {rule.id === 'STB_ACT' && (() => {
+                        {/* STB_09 活動加分自定義編輯：下拉選中活動即帶出名與狀態，不需再點查詢（暫對接算法庫） */}
+                        {rule.id === 'STB_09' && (() => {
                           const items: ActivityScoreItem[] = ((form as any).activityItems || [])
                           const pickedCodes = new Set(items.map(it => it.activityId?.trim()).filter(Boolean))
                           const activityChoices = algoOptions
@@ -2762,23 +2762,24 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             </div>
                           )
                         })()}
-                        {/* STB_01/STB_04 主營時段/店鋪標籤自定義編輯（固定加分，無下拉框） */}
-                        {(rule.id === 'STB_01' || rule.id === 'STB_04') && (
+                        {/* STB_01 主營時段自定義編輯（固定加分，無下拉框）；原同位置的 STB_04「店鋪標籤-金牌」已下架，
+                            该编码现由門店標籤（走 StoreLabelScorePanel）使用，不得再走本固定分入口 */}
+                        {rule.id === 'STB_01' && (
                           <div className="organic-score-edit-tier">
-                            <span className="organic-score-edit-tier__label">{rule.id === 'STB_01' ? '主營時段加分' : '金牌店鋪身份標籤'}</span>
+                            <span className="organic-score-edit-tier__label">主營時段加分</span>
                             <span style={{ fontSize: 12, color: '#52C41A', fontWeight: 500 }}>固定加分</span>
                             <InputNumber value={form.score} min={0} max={200} style={{ width: 130 }}
                               addonAfter="分" placeholder="輸入分數"
                               onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], score: val ?? 0 } }) as any)} />
                           </div>
                         )}
-                        {/* 非 STB_02/STB_03/PLT_03/PLT_04/STB_05/STB_06/STB_07/STB_08/PLT_01/PLT_02A/STB_01/STB_04/STB_ACT/COM_01 顯示標準計分方式 */}
-                        {(rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_01' && rule.id !== 'STB_04' && rule.id !== 'STB_ACT' && rule.id !== 'COM_01' && rule.id !== 'COM_SLOT') && (
+                        {/* 非 STB_02/STB_03/PLT_03/PLT_04/STB_05/STB_06/STB_07/STB_08/PLT_01/PLT_02A/STB_01/STB_09/COM_01 顯示標準計分方式 */}
+                        {(rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_01' && rule.id !== 'STB_09' && rule.id !== 'COM_01' && rule.id !== 'COM_SLOT') && (
                           <div className="organic-score-fields">
                             <div>
                               <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>計分方式</div>
                               <Select value={form.mode} style={{ width: '100%' }}
-                                options={rule.id === 'STB_01' || rule.id === 'STB_04' ? [
+                                options={rule.id === 'STB_01' ? [
                                   { label: '固定加分', value: ScoreMode.RULE_BONUS },
                                 ] : (rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_10') ? [
                                   { label: '固定加分', value: ScoreMode.RULE_BONUS },

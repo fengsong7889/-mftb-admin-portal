@@ -80,7 +80,7 @@ public class OrganicScoreRule {
     /** 屏蔽商家列表 JSON（店铺代码数组） */
     private String blockedMerchants;
 
-    /** 活动加分配置 JSON（[{activityId, activityName, score}]，仅 STB_ACT 规则使用） */
+    /** 活动加分配置 JSON（[{activityId, activityName, score}]，仅 STB_09 规则使用） */
     private String activityItems;
 
     /** 倍数梯度计分配置 JSON（[{multiplier, score}]，仅 COM_01 满额立减规则使用，以门店客单价为基准） */
@@ -101,7 +101,7 @@ public class OrganicScoreRule {
     /** 流量均衡合并配置 JSON（统一商家扶持与订单过热调控，统计口径 + 区域梯度，仅 PLT_03 使用） */
     private String trafficBalanceConfig;
 
-    /** 门店标签计分配置 JSON（[{labelValue, labelName, score}]，仅 STB_LABEL 使用） */
+    /** 门店标签计分配置 JSON（[{labelValue, labelName, score}]，仅 STB_04 使用） */
     private String storeLabelConfig;
 
     /** 服务状态: 1=启用 2=停用 */
