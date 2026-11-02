@@ -1167,6 +1167,12 @@ export interface PeakTimeRange {
 /** 單條評分規則 */
 export interface OrganicScoreRule {
   id: string
+  /**
+   * 後端實際下發的 ruleCode（僅在與現行 id 不同的舊編碼時期有意義）。
+   * 界面匹配模板/面板一律用 id（已收编的數字編碼），但新增/編輯/啟停/刪除的寫請求必須用這個原始編碼，
+   * 否則「新界面 + 後端遷移未生效」的窗口內會命中 resolveRuleId 報「評分規則不存在」。
+   */
+  sourceRuleCode?: string
   dimension: ScoreDimension
   name: string
   description: string

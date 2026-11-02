@@ -291,6 +291,24 @@ describe('通用计分项：模块卡片与减免运费开关', () => {
     expect(screen.getByText('STB_09')).toBeInTheDocument()
   }, 120000)
 
+  it('窗口内保存用後端實際編碼落庫，不因别名报「評分規則不存在」', async () => {
+    // 展示走現行數字編碼，寫請求必须回到库里真实的 STB_LABEL（resolveRuleId 按 rule_code 查行）
+    api.fetch.mockResolvedValue({ dimensions: [], rules: [
+      { id: 41, ruleCode: 'STB_LABEL', dimension: 2, name: '門店標籤', description: '標籤分值', mode: 1, score: 0, status: 1, builtin: 1,
+        storeLabelConfig: JSON.stringify({ items: [{ labelValue: 'gold', labelName: '金牌', score: 20 }] }) },
+    ] })
+    api.update.mockResolvedValue({ id: 41, ruleCode: 'STB_LABEL', dimension: 2, name: '門店標籤', description: '標籤分值', mode: 1, score: 0, status: 1, builtin: 1 })
+    await mount()
+    fireEvent.click(screen.getByRole('tab', { name: /dimStore/ }))
+    fireEvent.click(screen.getByText('STB_04'))
+    const panel = within(screen.getByLabelText(SL('panelAria')))
+    fireEvent.click(panel.getByRole('button', { hidden: true, name: SL('edit') }))
+    fireEvent.change(screen.getAllByLabelText(SL('rowScoreAria'))[0], { target: { value: '40' } })
+    fireEvent.click(screen.getByRole('button', { hidden: true, name: SL('save') }))
+    await waitFor(() => expect(api.update).toHaveBeenCalled())
+    expect(api.update.mock.calls[0][0]).toBe('STB_LABEL')
+  }, 120000)
+
   it('营业状态：打烊直接过滤、休息/爆单垫底排序，只有营业中可配分', async () => {
     await mount()
     fireEvent.click(screen.getByRole('tab', { name: /dimStore/ }))
