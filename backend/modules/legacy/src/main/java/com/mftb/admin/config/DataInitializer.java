@@ -210,6 +210,8 @@ public class DataInitializer implements CommandLineRunner {
         versionTracker.applyOnce("ads:merchant-score-menu-rename-v1", this::renameMerchantScoreInsightMenu);
         // 325: 「商家權重分排名」调整到「實驗沙盤」分组第一位。种子不覆盖存量 sort_order，存量库需一次性重排；新库由种子直接按新顺序写入。
         versionTracker.applyOnce("ads:merchant-score-menu-first-v1", this::moveMerchantScoreInsightMenuFirst);
+        // 326: 「商家權重分排名」→「商家權重分」。菜单名只留实体名、不带页面后缀；同样因种子只增不改存量名称，用一次性迁移收敛。
+        versionTracker.applyOnce("ads:merchant-score-menu-rename-v2", this::renameMerchantScoreInsightMenuV2);
         // 旧版 JSON 权限迁移必须晚于菜单种子化执行:
         // 否则 resolveMenuId 会为尚未种子的菜单键创建占位菜单(name=menu_key, parent_id=NULL),
         // 被菜单树 buildTree 的孤儿兜底逻辑顶成一级菜单(生产事故: 实验沙盘子菜单顶到一级)
@@ -2284,7 +2286,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
                 Map.entry("traffic-sandbox", "Experiment Sandbox"),
                 Map.entry("waterfall-simulation", "Waterfall Simulation"),
                 Map.entry("algorithm-simulation", "Algorithm Simulation"),
-                Map.entry("merchant-score-insight", "Merchant Weighted Score Ranking"),
+                Map.entry("merchant-score-insight", "Merchant Weighted Score"),
                 Map.entry("merchant-promotion-diagnose", "Promotion Diagnosis"),
                 Map.entry("promotion-tool", "Promotion Pass"),
                 Map.entry("promotion_tool", "Promotion Pass"),
@@ -2448,6 +2450,16 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
     private void renameMerchantScoreInsightMenu() {
         jdbcTemplate.update("UPDATE sys_menu SET name = '商家權重分排名' WHERE menu_key = 'merchant-score-insight' AND name = '商家評分透視'");
         jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Merchant Weighted Score Ranking' WHERE menu_key = 'merchant-score-insight' AND (name_en IS NULL OR name_en = 'Merchant Score Insight')");
+    }
+
+    /**
+     * 一次性迁移 (326): 「商家權重分排名」→「商家權重分」。
+     * 同样只改历史默认名（上一步留下的「商家權重分排名」），運營在菜單配置裡自定義過的名稱不覆盖；
+     * 英文名同理只接管上一版的默认英文名与空值。参考 SQL: sql/326_merchant_score_menu_shorten.sql
+     */
+    private void renameMerchantScoreInsightMenuV2() {
+        jdbcTemplate.update("UPDATE sys_menu SET name = '商家權重分' WHERE menu_key = 'merchant-score-insight' AND name = '商家權重分排名'");
+        jdbcTemplate.update("UPDATE sys_menu SET name_en = 'Merchant Weighted Score' WHERE menu_key = 'merchant-score-insight' AND (name_en IS NULL OR name_en = 'Merchant Weighted Score Ranking')");
     }
 
     /**
@@ -2766,7 +2778,7 @@ versionTracker.applyOnce("core:eam-rename-claim-v1", this::renameAssetClaimMenu)
         // v28: merchant-order-manage（订单管理）已移除——所有订单入口统一至广告类型卡片上的「查看订单」按钮
         // ── 商家推广工具 > 流量沙盘 ──
         menus.put("traffic-sandbox",          new String[]{"實驗沙盤",     "merchant_promotion", "8"});
-        menus.put("merchant-score-insight",   new String[]{"商家權重分排名", "traffic-sandbox",    "1"});
+        menus.put("merchant-score-insight",   new String[]{"商家權重分",     "traffic-sandbox",    "1"});
         menus.put("waterfall-simulation",     new String[]{"瀑布流推演",   "traffic-sandbox",    "2"});
         menus.put("algorithm-simulation",     new String[]{"算法推演",     "traffic-sandbox",    "3"});
         menus.put("merchant-promotion-diagnose", new String[]{"商家推廣診斷", "traffic-sandbox", "4"});
