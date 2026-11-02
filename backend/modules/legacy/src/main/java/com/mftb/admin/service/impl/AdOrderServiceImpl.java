@@ -20,6 +20,7 @@ import com.mftb.admin.entity.AdOrderItemTraffic;
 import com.mftb.admin.entity.AdAlgorithm;
 import com.mftb.admin.entity.AdPricingHot;
 import com.mftb.admin.entity.AdPricingHotSkin;
+import com.mftb.admin.entity.AdPricingSignboard;
 import com.mftb.admin.entity.AdPricingTraffic;
 import com.mftb.admin.entity.BizStore;
 import com.mftb.admin.entity.FinAccount;
@@ -34,6 +35,7 @@ import com.mftb.admin.mapper.AdOrderItemTrafficMapper;
 import com.mftb.admin.mapper.AdOrderMapper;
 import com.mftb.admin.mapper.AdPricingHotMapper;
 import com.mftb.admin.mapper.AdPricingHotSkinMapper;
+import com.mftb.admin.mapper.AdPricingSignboardMapper;
 import com.mftb.admin.mapper.AdPricingTrafficMapper;
 import com.mftb.admin.mapper.BizStoreMapper;
 import com.mftb.admin.mapper.FinDetailMapper;
@@ -88,6 +90,7 @@ public class AdOrderServiceImpl implements AdOrderService {
     private final AdAlgorithmMapper algorithmMapper;
     private final AdPricingHotMapper hotPricingMapper;
     private final AdPricingHotSkinMapper hotSkinMapper;
+    private final AdPricingSignboardMapper signboardPricingMapper;
     private final AdPricingTrafficMapper trafficPricingMapper;
     private final FinDetailMapper finDetailMapper;
     private final AdPricingStarService pricingService;
@@ -817,8 +820,10 @@ public class AdOrderServiceImpl implements AdOrderService {
             });
         }
         // 存量订单无 algo_code 快照 → 回查算法表补齐
+        // 人气商家(5)/金字招牌(13)/投流(15) 的 algo_id 存的是定价配置ID，与算法表主键空间重叠，
+        // 必须排除，否则会拿到无关算法的编号（下方各自按定价表回填）
         List<Long> missingAlgoIds = records.stream()
-                .filter(r -> !StringUtils.hasText(r.getAlgoCode()) && r.getAlgoId() != null)
+                .filter(r -> !StringUtils.hasText(r.getAlgoCode()) && r.getAlgoId() != null && !storesPricingId(r.getAlgoType()))
                 .map(AdOrderVO::getAlgoId).distinct().toList();
         if (!missingAlgoIds.isEmpty()) {
             Map<Long, String> codeMap = algorithmMapper.selectList(
@@ -845,6 +850,25 @@ public class AdOrderServiceImpl implements AdOrderService {
                 }
             });
         }
+        // 金字招牌订单(algoType=13): algoId指向定价配置表，从 biz_ad_pricing_signboard 回填pricingNo
+        List<Long> signMissingIds = records.stream()
+                .filter(r -> !StringUtils.hasText(r.getAlgoCode()) && r.getAlgoId() != null && isSignboardType(r.getAlgoType()))
+                .map(AdOrderVO::getAlgoId).distinct().toList();
+        if (!signMissingIds.isEmpty()) {
+            Map<Long, String> signCodeMap = signboardPricingMapper.selectBatchIds(signMissingIds)
+                    .stream().filter(p -> StringUtils.hasText(p.getPricingNo()))
+                    .collect(Collectors.toMap(AdPricingSignboard::getId, AdPricingSignboard::getPricingNo, (a, b) -> a));
+            records.forEach(r -> {
+                if (!StringUtils.hasText(r.getAlgoCode()) && r.getAlgoId() != null && isSignboardType(r.getAlgoType())) {
+                    r.setAlgoCode(signCodeMap.get(r.getAlgoId()));
+                }
+            });
+        }
+    }
+
+    /** 该算法类型的订单 algo_id 存的是定价配置ID（而非算法表主键）：人气商家/金字招牌/投流广告 */
+    private static boolean storesPricingId(Integer algoType) {
+        return algoType != null && (algoType == 5 || algoType == 13 || algoType == 15);
     }
 
     private AdOrder require(String orderNo) {
@@ -922,13 +946,16 @@ public class AdOrderServiceImpl implements AdOrderService {
                 cancelFeeTiersJson = pricing.getCancelFeeTiers();
             }
         } else if (isHot(order)) {
-            AdPricingHotVO pricing = hotPricingService.activeByAlgo(order.getAlgoId());
+            // 人气商家订单的 algoId 存的是定价配置ID（解耦后口径），必须按主键回查；
+            // 若当成算法ID去查 algo_id 维度永远查不到，取消扣费梯度会静默丢失导致全额退款
+            AdPricingHotVO pricing = hotPricingService.detailOrNull(order.getAlgoId());
             if (pricing != null) {
                 if (refundEnabled == null) refundEnabled = pricing.getRefundEnabled();
                 cancelFeeTiersJson = pricing.getCancelFeeTiers();
             }
         } else if (isSignboard(order)) {
-            AdPricingSignboardVO pricing = signboardPricingService.activeByAlgo(order.getAlgoId());
+            // 金字招牌同口径：algoId 即定价配置ID
+            AdPricingSignboardVO pricing = signboardPricingService.detailOrNull(order.getAlgoId());
             if (pricing != null) {
                 if (refundEnabled == null) refundEnabled = pricing.getRefundEnabled();
                 cancelFeeTiersJson = pricing.getCancelFeeTiers();

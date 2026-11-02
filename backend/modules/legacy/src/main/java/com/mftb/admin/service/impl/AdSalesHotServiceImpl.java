@@ -66,8 +66,8 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
     /* ==================== 库存查询 ==================== */
 
     @Override
-    public AdHotInventoryVO inventory(Long algoId, String storeCode, String groupCode) {
-        AdPricingHotVO pricing = requireActivePricing(algoId);
+    public AdHotInventoryVO inventory(Long pricingId, String storeCode, String groupCode) {
+        AdPricingHotVO pricing = requireActivePricing(pricingId);
         if (StringUtils.hasText(groupCode)) requireGroupAccess(groupCode);
         if (pricing.getSkins().isEmpty()) {
             throw new BusinessException("該算法未配置皮膚計價");
@@ -78,10 +78,10 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
         LocalDate today = LocalDate.now();
         // 仅预售期内可售
         LocalDate endDate = today.plusDays(pricing.getPresaleDays() - 1L);
-        Set<String> purchased = purchasedCells(algoId, groupCode, today, endDate);
+        Set<String> purchased = purchasedCells(pricingId, groupCode, today, endDate);
 
         AdHotInventoryVO vo = new AdHotInventoryVO();
-        vo.setAlgoId(algoId);
+        vo.setAlgoId(pricingId);
         vo.setPresaleDays(pricing.getPresaleDays());
         vo.setGiftCashValue(pricing.getGiftCashValue());
         vo.setDiscountTiers(pricing.getDiscountTiers());
@@ -112,7 +112,7 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
         vo.getCells().sort(Comparator.comparing(AdHotInventoryVO.Cell::getBizDate)
                 .thenComparing(AdHotInventoryVO.Cell::getSkinName));
         // 皮肤销量统计: 有效订单(未退款未取消)每单每个皮肤记一次
-        vo.setSkinSoldCounts(skinSoldCounts(algoId));
+        vo.setSkinSoldCounts(skinSoldCounts(pricingId));
         return vo;
     }
 
@@ -280,6 +280,10 @@ public class AdSalesHotServiceImpl implements AdSalesHotService {
 
     /* ==================== 内部方法 ==================== */
 
+    /**
+     * 人气商家已与算法解耦：入参是定價配置主键（不是算法ID），按主键取配置。
+     * <p>下单时该ID会写进 biz_ad_order.algo_id，退款/展示回查也按同一口径（详 AdOrderServiceImpl）。
+     */
     private AdPricingHotVO requireActivePricing(Long pricingId) {
         AdPricingHotVO pricing = pricingService.detail(pricingId);
         if (pricing == null) {

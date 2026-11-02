@@ -27,26 +27,17 @@ public class AdPricingTrafficTier {
     /** 档位名称（如：基础版/标准版/进阶版） */
     private String tierName;
 
-    /** 档位编码 */
-    private String tierCode;
-
     /** 曝光次数 */
     private Integer impressions;
 
     /** 档位价格 (MOP) */
     private BigDecimal price;
 
-    /** 销售周期（多少天内有效） */
-    private Integer sellDays;
-
     /** 售卖状态：1=在售 2=下架 */
     private Integer onSale;
 
     /** 排序号（从小到大） */
     private Integer sort;
-
-    /** 备注 */
-    private String remark;
 
     /** 有效天数 */
     private Integer validityDays;
