@@ -4,7 +4,7 @@ import { Link, MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AlgorithmAdd from './AlgorithmAdd'
 import { readTrafficParams } from './TrafficAlgorithmConfig/config'
-import { ALGORITHM_TYPE_OPTIONS, AlgorithmType } from '@mftb/contracts/recommendConstants'
+import { ALGORITHM_TYPE_OPTIONS, AlgorithmType, RecommendChannel } from '@mftb/contracts/recommendConstants'
 import MenuTabs from '@/components/MenuTabs'
 
 const api = vi.hoisted(() => ({ fetch: vi.fn(), create: vi.fn(), update: vi.fn(), t: (key: string) => key, i18n: { language: 'zh-TW' } }))
@@ -157,6 +157,62 @@ describe('算法库统一表单样式', () => {
     const { container } = mountPage(`type=${type}`)
     expect(container.querySelector('.algorithm-section')).toBeInTheDocument()
     expect(screen.queryByTestId('algorithm-merchant-status')).not.toBeInTheDocument()
+  })
+})
+
+describe('自然流量算法業務頻道歸屬', () => {
+  const organicType = AlgorithmType.ORGANIC_TRAFFIC
+  const openSelect = (name: string) => {
+    fireEvent.mouseDown(screen.getByRole('combobox', { name }))
+    const dropdown = document.querySelector<HTMLElement>('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+    expect(dropdown, `下拉未展開：${name}`).toBeTruthy()
+    return within(dropdown as HTMLElement)
+  }
+
+  it('新增自然流量：業務頻道只列三個真實頻道（不含大首頁），未選不得提交', async () => {
+    await act(async () => { mountPage(`type=${organicType}`) })
+    const options = openSelect('common:channel')
+    expect(options.getByText('recommend.channelDeliveryName')).toBeInTheDocument()
+    expect(options.getByText('recommend.channelSupermarketName')).toBeInTheDocument()
+    expect(options.getByText('recommend.channelGroupBuyName')).toBeInTheDocument()
+    expect(options.queryByText('recommend.channelHomeName')).not.toBeInTheDocument()
+    // antd 虚拟列表的 role="option" 节点不等于可见选项数，按渲染出的 option 容器计数
+    expect(document.querySelectorAll('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option')).toHaveLength(3)
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'recommend.algoName' }), { target: { value: '超市百貨自然流量' } })
+    fireEvent.click(openSelect('common:brand').getByText('recommend.appShanfeng'))
+    fireEvent.click(screen.getByRole('button', { name: /common:save/ }))
+    expect(await screen.findByText('common:selectChannel')).toBeInTheDocument()
+    expect(api.create).not.toHaveBeenCalled()
+  })
+
+  it('選定頻道後按「算法×頻道」落庫，payload 带上所選 channel', async () => {
+    await act(async () => { mountPage(`type=${organicType}`) })
+    fireEvent.change(screen.getByRole('textbox', { name: 'recommend.algoName' }), { target: { value: '超市百貨自然流量' } })
+    fireEvent.click(openSelect('common:brand').getByText('recommend.appShanfeng'))
+    fireEvent.click(openSelect('common:channel').getByText('recommend.channelSupermarketName'))
+    fireEvent.click(screen.getByRole('button', { name: /common:save/ }))
+    await waitFor(() => expect(api.create).toHaveBeenCalledTimes(1))
+    expect(api.create.mock.calls[0][0]).toMatchObject({
+      algoName: '超市百貨自然流量', algoType: organicType, brand: 'flashBee', channel: RecommendChannel.SUPERMARKET,
+    })
+  })
+
+  it('编辑自然流量回填已有頻道，保存原样回传不被抹空', async () => {
+    api.fetch.mockResolvedValueOnce({ id: 9, algoCode: 'SFZR0009', algoName: '存量自然流量', algoType: organicType,
+      brand: 'flashBee', channel: RecommendChannel.GROUP_BUY, params: '{}' })
+    await act(async () => { mountPage(`type=${organicType}&id=9`) })
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'recommend.algoName' })).toHaveValue('存量自然流量'))
+    const channelItem = screen.getByRole('combobox', { name: 'common:channel' }).closest('.ant-form-item')
+    expect(channelItem).toHaveTextContent('recommend.channelGroupBuyName')
+    fireEvent.click(screen.getByRole('button', { name: /common:save/ }))
+    await waitFor(() => expect(api.update).toHaveBeenCalledTimes(1))
+    expect(api.update.mock.calls[0][1]).toMatchObject({ channel: RecommendChannel.GROUP_BUY })
+  })
+
+  it('非自然流量类型不展示業務頻道（其頻道真值住定價表，不在此回写）', async () => {
+    await act(async () => { mountPage(`type=${AlgorithmType.INVINCIBLE_STAR}`) })
+    expect(screen.queryByRole('combobox', { name: 'common:channel' })).not.toBeInTheDocument()
   })
 })
 
