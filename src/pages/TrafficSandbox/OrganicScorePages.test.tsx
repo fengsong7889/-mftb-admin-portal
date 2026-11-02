@@ -16,9 +16,11 @@ import type { Coordinate } from './organic/types'
 
 const permissions = vi.hoisted(() => ({ view: true, export: true }))
 const exportMock = vi.hoisted(() => vi.fn())
+const algorithmsMock = vi.hoisted(() => vi.fn())
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ hasMenuPermission: () => permissions.view, hasPermission: (key: string) => key.endsWith(':export') ? permissions.export : permissions.view }) }))
 vi.mock('@/utils/exportCSV', () => ({ exportToCSV: exportMock }))
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key === 'common.back' ? '返回' : key === 'recommend.channelDelivery' ? '美食外賣' : key }) }))
+vi.mock('@/api/adPromotion', () => ({ fetchAdAlgorithms: algorithmsMock }))
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => (({ 'common.back': '返回', 'recommend.channelDelivery': '美食外賣', 'recommend.channelHome': '大首頁', 'recommend.channelSupermarket': '超市百貨', 'recommend.channelGroupBuy': '團購到店', 'recommend.appShanfeng': '閃蜂', 'recommend.appMfood': 'mFood' }) as Record<string, string>)[key] ?? key }) }))
 vi.mock('@ant-design/charts', () => ({ Line: () => <div aria-label="距離曲線" /> }))
 vi.mock('./organic/LocationMap', () => ({ default: ({ onPick }: { onPick: (p: Coordinate) => void }) => <button onClick={() => onPick({ lat: 22.18, lng: 113.56 })}>地圖點選新位置</button> }))
 
@@ -42,17 +44,30 @@ const routeParam = (name: string) => {
 beforeEach(() => {
   permissions.view = true; permissions.export = true
   localStorage.clear(); exportMock.mockClear()
+  algorithmsMock.mockReset().mockResolvedValue({ records: [
+    { id: 1, algoCode: 'ZRL001', algoName: '自然流量算法甲', algoType: 7, status: 1 },
+    { id: 2, algoCode: 'ZRL002', algoName: '自然流量算法乙', algoType: 7, status: 1 },
+  ], total: 2 })
 })
 
 describe('商家權重分排名', () => {
-  it('只保留區域搜索與排名列表，表格列为规定的八列', async () => {
+  it('列表页标准结构：无定制页头，搜索条件与十二列齐全', async () => {
     await mount()
-    expect(screen.getByRole('heading', { name: '商家權重分排名' })).toBeInTheDocument()
-    expect(screen.getByText('演示資料 · 未接入門店真實報名與計分')).toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: '運營區域' })).toBeInTheDocument()
+    // 列表设计规范 §E.7：搜索区置顶，不允许 hero 式定制页头；顶部说明横条已按需求移除
+    expect(document.querySelector('.organic__header')).toBeNull()
+    expect(document.querySelector('.organic__notice')).toBeNull()
+    expect(screen.getByRole('combobox', { name: '運營商圈' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: '集團ID/名稱' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: '門店ID/名稱' })).toBeInTheDocument()
+    expect(screen.getByRole('spinbutton', { name: '排名下限' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: '所屬品牌' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: '業務頻道' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: '算法名稱' })).toBeInTheDocument()
+    // 算法名称必选且排第一位（红星标记）
+    expect(document.querySelector('.organic__filter-grid > label:first-child .organic__label--required')).toBeInTheDocument()
     expect(screen.queryByLabelText('門店搜尋')).not.toBeInTheDocument()
     const headers = Array.from(document.querySelectorAll('.ant-table-thead th')).map(th => th.textContent?.trim())
-    expect(headers).toEqual(['排名', '門店ID', '門店名稱', '業務頻道', '商業維度分', '店鋪維度分', '平台維度分', '操作'])
+    expect(headers).toEqual(['排名', '算法ID/名稱', '集團ID/名稱', '門店ID/名稱', '所屬品牌', '業務頻道', '運營商圈', '商業維度分', '店鋪維度分', '平台維度分', '綜合得分', '操作'])
     // 統計卡、圖表、覆蓋矩陣、對比與導出均已移除
     expect(document.querySelector('.organic__stats')).toBeNull()
     expect(screen.queryByText('計分覆蓋')).not.toBeInTheDocument()
@@ -66,51 +81,107 @@ describe('商家權重分排名', () => {
     expect(await screen.findByRole('heading', { name: '門店計分詳情' })).toBeInTheDocument()
     expect(document.body.textContent).not.toMatch(/占比|加權|權重\s*\d/)
   })
-  it('排名按区域重新从1连续编号，展示三个维度的得分', async () => {
+  it('未選算法時不展示榜單，查詢提示必選', async () => {
     await mount()
+    expect(bodyRows()).toHaveLength(0)
+    expect(screen.getByText('請先選擇算法後再查看排名')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /查\s*詢/ }))
+    expect(await screen.findByText('算法名稱為必選條件，請先選擇算法')).toBeInTheDocument()
+  })
+  it('排名按筛选结果从1连续编号，展示品牌频道与三个维度的得分', async () => {
+    await mount('board', '?algo=ZRL001')
+    await waitFor(() => expect(bodyRows()).toHaveLength(20))
     const first = bodyRows()[0]
     expect(within(first).getByText('1')).toBeInTheDocument()
     expect(within(first).getByText('DEMO-001')).toBeInTheDocument()
-    expect(within(first).getByText('美食外賣')).toBeInTheDocument()
+    expect(within(first).getByText('閃蜂')).toBeInTheDocument()
+    expect(within(first).getByText('大首頁')).toBeInTheDocument()
     const scoreCells = first.querySelectorAll('td')
-    for (const index of [4, 5, 6]) expect(scoreCells[index].textContent).toMatch(/^\d+\.\d{2}$/)
+    for (const index of [7, 8, 9, 10]) expect(scoreCells[index].textContent).toMatch(/^\d+\.\d{2}$/)
+    // 算法库加载后按门店序号轮转归属：DEMO-001 → 第一家算法
+    expect(await within(first).findByText('ZRL001')).toBeInTheDocument()
     expect(within(bodyRows()[1]).getByText('2')).toBeInTheDocument()
+    // 名次徽章：金银铜奖牌与 4-10 名胶囊，第 11 名起纯数字
+    expect(bodyRows()[0].querySelector('.organic__rank-medal--gold')).toBeTruthy()
+    expect(bodyRows()[1].querySelector('.organic__rank-medal--silver')).toBeTruthy()
+    expect(bodyRows()[2].querySelector('.organic__rank-medal--bronze')).toBeTruthy()
+    expect(bodyRows()[9].querySelector('.organic__rank-pill')).toBeTruthy()
+    expect(bodyRows()[10].querySelector('.organic__rank-medal, .organic__rank-pill')).toBeNull()
     const snapshot = getSampleSnapshot()
-    const ranked = snapshot.stores.filter(s => s.totalScore != null)
+    // 算法必选：ZRL001 按轮转只覆盖奇数序号门店
+    const ranked = snapshot.stores.filter(s => s.totalScore != null && Number(s.storeId.slice(-3)) % 2 === 1)
     expect(screen.getByText(`共 ${ranked.length} 家參排名門店`)).toBeInTheDocument()
   })
   it('区域筛选只收窄榜单并重置名次，不出现非本区域门店', async () => {
     const snapshot = getSampleSnapshot()
-    const expected = snapshot.stores.filter(s => s.totalScore != null && [1, 6].includes(s.regionId))
-    await mount('board', '?regions=1,6')
+    const expected = snapshot.stores.filter(s => s.totalScore != null && [1, 6].includes(s.regionId) && Number(s.storeId.slice(-3)) % 2 === 1)
+    await mount('board', '?algo=ZRL001&regions=1,6')
+    await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0))
     expect(screen.getByText(`共 ${expected.length} 家參排名門店`)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /查\s*詢/ }))
     await waitFor(() => expect(routeParam('regions')).toBe('1,6'))
     expect(bodyRows()[0].textContent).toContain(expected[0].storeId)
   })
+  it('门店下拉筛选按ID精确收窄并重新编号，重置后回到必选引导', async () => {
+    await mount('board', '?algo=ZRL001&store=DEMO-003')
+    await waitFor(() => expect(bodyRows()).toHaveLength(1))
+    expect(within(bodyRows()[0]).getByText('DEMO-003')).toBeInTheDocument()
+    expect(within(bodyRows()[0]).getByText('1')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /重\s*置/ }))
+    await waitFor(() => expect(bodyRows()).toHaveLength(0))
+    expect(screen.getByText('請先選擇算法後再查看排名')).toBeInTheDocument()
+    expect(routeParam('store')).toBeNull()
+  })
+  it('集团下拉筛选按ID精确收窄', async () => {
+    await mount('board', '?algo=ZRL001&merchant=GROUP-3')
+    await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0))
+    for (const row of bodyRows()) expect(row.textContent).toContain('GROUP-3')
+  })
+  it('品牌筛选与名次区间叠加：先重新编号再按区间收窄', async () => {
+    await mount('board', '?algo=ZRL002&brand=2&rankMin=2&rankMax=3')
+    await waitFor(() => expect(bodyRows()).toHaveLength(2))
+    expect(within(bodyRows()[0]).getByText('DEMO-006')).toBeInTheDocument()
+    expect(within(bodyRows()[0]).getByText('2')).toBeInTheDocument()
+    for (const row of bodyRows()) expect(within(row).getByText('mFood')).toBeInTheDocument()
+  })
+  it('算法名称筛选只保留该算法的门店并重新编号', async () => {
+    await mount('board', '?algo=ZRL002')
+    await waitFor(() => expect(within(bodyRows()[0]).getByText('DEMO-002')).toBeInTheDocument())
+    expect(bodyRows()).toHaveLength(20)
+    for (const row of bodyRows()) expect(within(row).getByText('ZRL002')).toBeInTheDocument()
+    expect(within(bodyRows()[0]).getByText('1')).toBeInTheDocument()
+  })
   it('詳情展示三个维度得分与逐项原因，返回后保留区域筛选', async () => {
-    await mount('board', '?regions=1,6')
+    await mount('board', '?algo=ZRL001&regions=1,6')
+    await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0))
     fireEvent.click(screen.getAllByRole('button', { name: '詳情' })[0])
     expect(await screen.findByRole('heading', { name: '門店計分詳情' })).toBeInTheDocument()
     expect(screen.getByText('綜合得分＝商業維度＋店鋪維度＋平台維度')).toBeInTheDocument()
     expect(screen.getAllByText('商業維度').length).toBeGreaterThan(0)
     expect(screen.getAllByText('店鋪維度').length).toBeGreaterThan(0)
     expect(screen.getAllByText('平台維度').length).toBeGreaterThan(0)
-    expect(screen.getAllByRole('table')).toHaveLength(3)
+    // 逐項得分改为维度页签（无全部维度），默认只展示当前维度的 1 张规则表
+    expect(screen.getAllByRole('table')).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: /返\s*回/ }))
-    expect(await screen.findByRole('heading', { name: '商家權重分排名' })).toBeInTheDocument()
+    expect(await screen.findByRole('combobox', { name: '門店ID/名稱' })).toBeInTheDocument()
     expect(routeParam('regions')).toBe('1,6')
   })
-  it('展开券类计分项可核对子项与业务指标，未得分项给出原因', async () => {
+  it('展开券类计分项可核对子项与业务指标，未得分项在展开行给出原因', async () => {
     await mount('board', '?view=detail&storeId=DEMO-090')
     await screen.findByRole('heading', { name: '門店計分詳情' })
-    expect(screen.getByText('樣例門店未報名收藏送券')).toBeInTheDocument()
+    // 原因列已移除，未得分原因改为展开行内的「匹配原因」描述
+    const missedRow = bodyRows().find(row => row.textContent?.includes('COM_05'))!
+    fireEvent.click(missedRow.querySelector('.ant-table-row-expand-icon')!)
+    expect(await screen.findByText('樣例門店未報名收藏送券')).toBeInTheDocument()
     const couponRow = bodyRows().find(row => row.textContent?.includes('COM_03'))!
     fireEvent.click(couponRow.querySelector('.ant-table-row-expand-icon')!)
     const evidence = document.querySelector<HTMLElement>('.organic__rule-evidence')!
     expect(within(evidence).getByText('報名分').parentElement).toHaveTextContent('+10.00')
-    expect(within(evidence).getByText('門店客單價').parentElement).toHaveTextContent('50 MOP')
+    // 资料依据块已删除，子项卡内展示算法库命中梯度与公式；活动匹配梯度渲染为金额而非参数名
+    expect(within(evidence).getByText('滿25減10')).toBeInTheDocument()
+    expect(within(evidence).getByText('使用門檻 ÷ 門店客單價 = 25 ÷ 50 = 0.5倍 → 命中#2梯度 (+16)')).toBeInTheDocument()
     expect(within(evidence).getByText('本項合計 56.00 分')).toBeInTheDocument()
+    expect(within(evidence).queryByText('資料依據')).toBeNull()
   })
   it('资料不全门店不给总分和名次，只展示已知分项', async () => {
     await mount('board', '?view=detail&storeId=DEMO-109')

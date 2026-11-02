@@ -25,37 +25,32 @@ export function attachSampleEvidence(store: StoreResult, userPoint: Coordinate):
 
     if (couponCodes.has(rule.ruleCode)) {
       const guarded = rule.reasonCode === 'GUARD_EXCEEDED'
-      rule.inputs = [input('報名狀態', rule.reasonCode !== 'NOT_ENROLLED'), input('門店客單價', 50, 'MOP'), input('使用門檻', guarded ? 150 : 25, 'MOP'), input('優惠金額', 10, 'MOP'), input('硬護欄', 2, '倍客單價'), input('護欄觸發仍發報名分', false)]
-      // COM_03保留精确的10+16+30示例；其余子项只拆解预制原始分，不冒充真实档位。
-      if (rule.ruleCode !== 'COM_03' || !usable) {
+      const fullReduction = rule.ruleCode === 'COM_01'
+      rule.inputs = [input('報名狀態', rule.reasonCode !== 'NOT_ENROLLED'), input('門店客單價', 50, 'MOP'), input('使用門檻', guarded ? 150 : fullReduction ? 100 : 25, 'MOP'), input('優惠金額', guarded ? 70 : fullReduction ? 45 : 10, 'MOP'), input('硬護欄', 2, '倍客單價'), input('護欄觸發仍發報名分', false)]
+      // 夹具已给活动/券类规则显式子项（含命中梯度与停发/未报名归零）时不再拆解覆盖；其余子项只拆解预制原始分，不冒充真实档位。
+      if (!rule.parts) {
         rule.parts = [{ label: '報名分', score: Math.min(10, raw) }, { label: '門檻分', score: Math.max(0, raw - 10) / 3 }, { label: '力度分', score: Math.max(0, raw - 10) * 2 / 3 }]
       }
       if (rule.ruleCode === 'COM_03' && usable) rule.matchedTier = '門檻 ≤ 0.5倍（16分）；力度 ≥ 20%（30分）；報名10分'
     }
     if (rule.ruleCode === 'COM_02') {
-      rule.inputs = [input('報名狀態', usable), input('免運門檻', 30, 'MOP'), input('有效門檻上限', 60, 'MOP'), input('超限保留報名分', false)]
-      rule.parts = [{ label: '報名分', score: Math.min(20, raw) }, { label: '門檻分', score: Math.max(0, raw - 20) }]
+      rule.inputs = [input('報名狀態', usable), input('減免運費門檻', 30, '元'), input('有效門檻上限', 80, '元'), input('超限保留報名分', false)]
+      // 减免运费保留显式子项示例（报名分+门槛分查档），不再拆解覆盖；口径对齐 organicTrafficConfig 的 FreeShippingScoreConfig
     }
     if (rule.ruleCode === 'COM_06') {
-      rule.inputs = [input('報名狀態', usable), input('商家額外出資', 30, 'MOP'), input('檔位匹配方式', '取最高命中檔，不累加低檔')]
-      rule.parts = [{ label: '報名分', score: Math.min(10, raw) }, { label: '最高命中檔加碼分', score: Math.max(0, raw - 10) }]
+      rule.inputs = [input('報名狀態', usable), input('商家額外加碼', 20, '元'), input('檔位匹配方式', '由低到高取達到的最後一檔，命中即停不累加')]
+      // 会员红包保留显式子项（报名分+加码分查档），不再拆解覆盖；口径对齐 organicTrafficConfig 的 MemberBonusScoreConfig
     }
     if (rule.ruleCode === 'COM_10') {
-      rule.inputs = [input('投放中去重標籤', 2, '個'), input('失效、退款與重複記錄', '不計分')]
-      rule.parts = [
-        { label: '人氣招牌', score: raw * 0.6, status: '投放中', reference: '演示購買記錄A（非真實訂單）', validFrom: '2026-10-01', validTo: '2026-10-31' },
-        { label: '品類招牌', score: raw * 0.4, status: '投放中', reference: '演示購買記錄B（非真實訂單）', validFrom: '2026-10-01', validTo: '2026-10-31' },
-        { label: '人氣招牌重複記錄', score: 0, status: '重複，已去重', reference: '演示購買記錄A（非真實訂單）' },
-        { label: '期間限定招牌', score: 0, status: '已失效', reference: '演示購買記錄C（非真實訂單）', validFrom: '2026-09-01', validTo: '2026-09-30' },
-        { label: '推薦招牌', score: 0, status: '已退款', reference: '演示退款記錄（非真實訂單）' },
-      ]
+      rule.inputs = [input('有效期內訂單', 2, '筆'), input('計分方式', '只抓取有效期内訂單，過期不抓取不加分，多標籤逐個累加'), input('失效、退款與重複記錄', '不計分')]
+      // 金字招牌保留夹具显式子项（每个已购标签带订单号与投放起止），不再拆解覆盖；口径对齐 SignboardScoreConfig
     }
     if (rule.ruleCode === 'COM_SLOT') {
-      rule.inputs = [input('購買狀態', usable), input('投放期', '2026-10-01 ～ 2026-10-31（演示）'), input('計分方式', '購買即固定加分，不區分時段數量、不累加')]
-      rule.parts = [{ label: '時段推薦固定加分', score: raw }]
+      rule.inputs = [input('生效日期內訂單', usable ? 1 : 0, '筆'), input('投放期', '2026-10-28 ～ 2026-11-27（演示）'), input('計分方式', '只抓取生效日期內訂單；購買即固定加分，不區分時段數量、不累加')]
+      // 时段推荐保留夹具显式子项（带订单号与投放起止），不再拆解覆盖
     }
     if (rule.ruleCode === 'STB_01') rule.inputs = [input('評估時刻', '2026-10-30 12:00:00（澳門）'), input('主營時段', '11:00–14:00（演示）'), input('是否命中', usable)]
-    if (rule.ruleCode === 'STB_LABEL') rule.inputs = [input('門店當前標籤', '金牌（演示）'), input('匹配方式', '四選一，命中一檔即停不累加'), input('標籤賦值來源', '門店資料手動更新（待接）')]
+    if (rule.ruleCode === 'STB_04') rule.inputs = [input('有效期內購買訂單', usable ? 1 : 0, '筆'), input('當前標籤', '金牌（演示）'), input('計分方式', '與金字招牌同口径：買標籤生成訂單，只抓取支付成功且已生效的有效期内訂單加分')]
     if (rule.ruleCode === 'STB_02') rule.inputs = [input('營業狀態', store.eligibility === 'ranked' || store.eligibility === 'pending' ? '營業中' : store.eligibilityReason), input('排序分組', store.rankingBucket)]
     if (rule.ruleCode === 'STB_03') {
       rule.metricValue = store.shopRating; rule.unit = '分'
@@ -73,14 +68,9 @@ export function attachSampleEvidence(store: StoreResult, userPoint: Coordinate):
       rule.metric = enough ? '取消2單 / 外賣樣本120單 = 1.67%' : '外賣樣本12單，不滿足最低30單'
       rule.inputs = [input('統計訂單類型', '外賣，不含自取'), input('取消量', enough ? 2 : null, '單'), input('有效樣本量', rule.sampleSize, '單'), input('最低樣本門檻', 30, '單'), input('取消歸因', '用戶取消與商家取消均納入')]
     }
-    if (rule.ruleCode === 'STB_ACT') {
-      rule.inputs = [input('已報名且進行中', usable ? 2 : 0, '個活動'), input('匹配策略', '各活動獨立計分；未開始或過期不計分')]
-      rule.parts = [
-        { label: '午餐好店（演示活動）', score: raw / 2, status: usable ? '已報名，進行中' : '規則停用或未命中', reference: '演示報名A（無真實活動ID）', validFrom: '2026-10-01', validTo: '2026-10-31' },
-        { label: '秋日餐飲節（演示活動）', score: raw / 2, status: usable ? '已報名，進行中' : '規則停用或未命中', reference: '演示報名B（無真實活動ID）', validFrom: '2026-10-20', validTo: '2026-11-05' },
-        { label: '冬日預熱（演示活動）', score: 0, status: '未開始', reference: '演示報名C（無真實活動ID）', validFrom: '2026-11-01', validTo: '2026-11-30' },
-        { label: '上期活動（演示活動）', score: 0, status: '已過期', validFrom: '2026-10-01', validTo: '2026-10-20' },
-      ]
+    if (rule.ruleCode === 'STB_09') {
+      rule.inputs = [input('已報名且進行中', usable ? 2 : 0, '個活動'), input('匹配策略', '各活動獨立計分可累加；報名未開始不加分；已過期與已取消不抓取不展示')]
+      // 活动加分保留夹具显式子项（活动名/ID/生效日期/状态/得分），不再拆解覆盖；已过期活动不再展示
     }
     if (rule.ruleCode === 'PLT_01') {
       rule.metricValue = store.distanceKm; rule.unit = 'km'
