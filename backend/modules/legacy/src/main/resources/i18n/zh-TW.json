@@ -5685,6 +5685,8 @@
     "trafficMerchantPlaceholder": "請搜索或選擇商家",
     "trafficMerchantSelected": "已選定商家，請在左側選擇流量包",
     "trafficSelectChannel": "選擇業務頻道",
+    "channelLabel": "業務頻道",
+    "channelRequired": "請先選擇業務頻道",
     "bizChannelFoodDelivery": "美食外賣",
     "bizChannelSupermarket": "超市百貨",
     "bizChannelGroupBuy": "團購到店",

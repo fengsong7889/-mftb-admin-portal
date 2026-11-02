@@ -8138,6 +8138,8 @@
     "trafficMerchantPlaceholder": "Search or select a merchant",
     "trafficMerchantSelected": "Merchant selected — pick a traffic package on the left",
     "trafficSelectChannel": "Select Business Channel",
+    "channelLabel": "Business Channel",
+    "channelRequired": "Please select a business channel first",
     "bizChannelFoodDelivery": "Food Delivery",
     "bizChannelSupermarket": "Supermarket",
     "bizChannelGroupBuy": "Group Buy In-Store",
