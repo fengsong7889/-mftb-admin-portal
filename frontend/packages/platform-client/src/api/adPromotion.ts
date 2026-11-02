@@ -1,4 +1,4 @@
-import request, { SILENT_HEADER } from './request'
+import request, { SILENT_HEADER, isBackendUnavailable } from './request'
 
 /**
  * 推廣廣告（無敵星星）接口封装
@@ -85,11 +85,27 @@ export interface AdAlgorithmQuery {
   storeCode?: string
   /** 銷售菜單場景: true 時僅返回有啟用定價的算法 */
   hasPricing?: boolean
+  /** 銷售菜單場景：配合 hasPricing，僅返回在該業務頻下有啟用定價的算法（定價按「算法×頻」配置） */
+  pricingChannel?: number
 }
 
 /** 算法分頁查詢 */
 export function fetchAdAlgorithms(params: AdAlgorithmQuery) {
   return request.get<unknown, AdPageResult<AdAlgorithm>>('/ad/algorithms', { params, ...SILENT })
+}
+
+/**
+ * 某算法類型下「已配置啟用中定價」的業務頻道列表（購買頁「品牌→頻→算法」級聯）。
+ * <p>真值來自各定價表；算法自身的 channel 字段存量大量為空，不能當數據源。
+ * 後端不可用或該類型無頻道維度（如新店廣告）時返回空數組。
+ */
+export async function fetchAdPricingChannels(algoType: number, brand?: string): Promise<number[]> {
+  try {
+    return await request.get<unknown, number[]>('/ad/algorithms/channels', { params: { algoType, brand }, ...SILENT })
+  } catch (err) {
+    if (isBackendUnavailable(err)) return []
+    throw err
+  }
 }
 
 /** 算法詳情 */
@@ -298,8 +314,8 @@ export interface AdInventoryVO {
 }
 
 /** 查詢可購買格子（storeCode/groupCode 用於屏蔽商家攔截） */
-export function fetchAdInventory(algoId: number, storeCode?: string, groupCode?: string) {
-  return request.get<unknown, AdInventoryVO>('/ad/sales/star/inventory', { params: { algoId, storeCode, groupCode }, ...SILENT })
+export function fetchAdInventory(algoId: number, storeCode?: string, groupCode?: string, channel?: number) {
+  return request.get<unknown, AdInventoryVO>('/ad/sales/star/inventory', { params: { algoId, storeCode, groupCode, channel }, ...SILENT })
 }
 
 /** 下單請求（從推廣金賬戶扣款） */
@@ -309,6 +325,8 @@ export interface AdStarOrderRequest {
   groupCode: string
   storeCode?: string
   bdEmpId?: string
+  /** 業務頻道：定價按「算法×頻道」配置，不傳则後端退回「取最新一條」的旧口径 */
+  channel?: number
   remark?: string
   /** 選購的格子列表（組合商圈在前端拆解後傳入） */
   cells: { bizDate: string; region: number; mealSlot: string }[]
@@ -597,8 +615,8 @@ export interface AdReviveInventoryVO {
 }
 
 /** 查詢盤活復蘇可購買格子 */
-export function fetchAdReviveInventory(algoId: number, storeCode?: string, groupCode?: string) {
-  return request.get<unknown, AdReviveInventoryVO>('/ad/sales/revive/inventory', { params: { algoId, storeCode, groupCode }, ...SILENT })
+export function fetchAdReviveInventory(algoId: number, storeCode?: string, groupCode?: string, channel?: number) {
+  return request.get<unknown, AdReviveInventoryVO>('/ad/sales/revive/inventory', { params: { algoId, storeCode, groupCode, channel }, ...SILENT })
 }
 
 /** 盤活復蘇下單請求（從推廣金賬戶扣款，支持贈送天數抵扣） */
@@ -607,6 +625,8 @@ export interface AdReviveOrderRequest {
   groupCode: string
   storeCode?: string
   bdEmpId?: string
+  /** 業務頻道：定價按「算法×頻道」配置，不傳则後端退回「取最新一條」的旧口径 */
+  channel?: number
   remark?: string
   /** 贈送天數抵扣（來自贈送管理發放的余額） */
   giftDays?: number
@@ -849,7 +869,10 @@ export interface AdHotInventoryVO extends HotDiscountFields {
   cells: AdHotInventoryCell[]
 }
 
-/** 查詢人氣商家可購買格子（皮膚 x 日期） */
+/**
+ * 查詢人氣商家可購買格子（皮膚 x 日期）。
+ * @param algoId 传的是**定價配置ID**（biz_ad_pricing_hot.id），后端参数名仍沿用 algoId（历史契约，与投流广告同口径）
+ */
 export function fetchAdHotInventory(algoId: number, storeCode?: string, groupCode?: string) {
   return request.get<unknown, AdHotInventoryVO>('/ad/sales/hot/inventory', { params: { algoId, storeCode, groupCode }, ...SILENT })
 }
@@ -857,6 +880,7 @@ export function fetchAdHotInventory(algoId: number, storeCode?: string, groupCod
 /** 人氣商家下單請求（從推廣金賬戶扣款） */
 export interface AdHotOrderRequest {
   expectedAmount?: number
+  /** **定價配置ID**（biz_ad_pricing_hot.id），下单后写入订单 algo_id */
   algoId: number
   groupCode: string
   storeCode?: string
@@ -1275,18 +1299,21 @@ export interface AdSignboardInventoryVO {
 
 /** 金字招牌下單請求 */
 export interface AdSignboardOrderRequest {
+  /** 算法库真实主键（biz_ad_algorithm.id）——与人气商家不同，金字招牌这里不是定價配置ID */
   algoId: number
   groupCode: string
   storeCode: string
   bdEmpId?: number | null
+  /** 業務頻道：定價按「算法×頻道」配置，不傳则後端退回「取最新一條」的旧口径 */
+  channel?: number
   giftDays?: number
   cells: Array<{ bizDate: string; labelType: string; scenario?: string | null }>
 }
 
 /** 金字招牌 - 庫存查詢（標籤定價 + 可售格子） */
-export function fetchAdSignboardInventory(algoId: number, storeCode?: string, groupCode?: string) {
+export function fetchAdSignboardInventory(algoId: number, storeCode?: string, groupCode?: string, channel?: number) {
   return request.get<unknown, AdSignboardInventoryVO>('/ad/sales/signboard/inventory', {
-    params: { algoId, storeCode, groupCode },
+    params: { algoId, storeCode, groupCode, channel },
     ...SILENT,
   })
 }

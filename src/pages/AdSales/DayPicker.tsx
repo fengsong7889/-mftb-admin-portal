@@ -63,9 +63,13 @@ export default function DayPicker({ inventoryItem, storeMode }: DayPickerProps) 
               <Select placeholder={t('brandAutoHint')} value={common.searchBrand} onChange={common.handleBrandChange} allowClear
                 options={[{ label: t('flashBee'), value: 'shanfeng' }, { label: 'mFood', value: 'mfood' }]} />
             </Form.Item>
+            <Form.Item label={t('channelLabel')}>
+              <Select placeholder={common.searchBrand ? t('channelLabel') : t('selectBrandFirst')} value={common.searchChannel} onChange={common.handleChannelChange} allowClear
+                options={common.channelSelectOptions} disabled={!common.searchBrand || common.channelSelectOptions.length === 0} />
+            </Form.Item>
             <Form.Item label={t('algoNameLabel')}>
               <Select placeholder={common.searchBrand ? t('dpAlgoPlaceholder') : t('selectBrandFirst')} value={common.searchAlgorithm} onChange={common.handleAlgorithmChange} allowClear showSearch optionFilterProp="label"
-                options={common.algorithmOptions} disabled={!common.searchBrand} />
+                options={common.algorithmOptions} disabled={!common.searchBrand || common.searchChannel == null} />
             </Form.Item>
             {!storeMode && (
               <Form.Item label={t('storeNameLabel')}>
