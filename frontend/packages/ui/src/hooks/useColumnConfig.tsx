@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import TableColumnConfig, {
   type ColumnConfig,
   applyColumnConfig,
@@ -85,14 +85,25 @@ export function useColumnConfig(
     loadSavedConfig(pageKey, initialConfig)
   )
 
-  // 当可用列发生变化时（如新增/删除列、语言切换改标题），同步更新 config 状态：
-  // 合并口径统一走 mergeColumnConfigs，保留用户已保存的顺序与显隐
+  /**
+   * 当可用列发生变化时（如新增/删除列、语言切换改标题），同步更新 config 状态。
+   * <p>依赖必须用内容签名而不是 initialConfig 引用：页面几乎都把 defaultConfig 写成内联数组字面量，
+   * 引用每帧都在变，直接依赖会把本 effect 变成「每次渲染都重跑合并」，
+   * 用户刚拖出锁定区（locked 改成 null）的列会立刻被默认值弹回锁定区。
+   * 合并口径统一走 mergeColumnConfigs，保留用户已保存的顺序、显隐与解除的锁定。
+   */
+  const initialSignature = useMemo(
+    () => initialConfig.map(c => `${c.key}:${c.title}:${c.visible}:${c.locked ?? ''}`).join('|'),
+    [initialConfig],
+  )
+  const initialRef = useRef(initialConfig)
+  initialRef.current = initialConfig
   useEffect(() => {
     setConfig(prev => {
-      const next = mergeColumnConfigs(prev, initialConfig)
+      const next = mergeColumnConfigs(prev, initialRef.current)
       return isSameColumnConfig(prev, next) ? prev : next
     })
-  }, [initialConfig])
+  }, [initialSignature])
 
   const handleChange = useCallback((newConfig: ColumnConfig[]) => {
     setConfig(newConfig)
