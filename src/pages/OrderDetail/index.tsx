@@ -55,12 +55,12 @@ function CardTitle({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <div style={{
-        width: 24, height: 24, borderRadius: 6, background: '#e6f7ff',
+        width: 24, height: 24, borderRadius: 6, background: 'var(--info-soft)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {icon}
       </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{text}</span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{text}</span>
     </div>
   )
 }
@@ -292,11 +292,11 @@ export default function OrderDetail() {
 
   /** 金字招牌標籤類型 → 中文翻譯映射 */
   const SIGNBOARD_LABEL_CN: Record<string, { label: string; icon: string; color: string }> = {
-    hot: { label: '熱門', icon: '\uD83D\uDD25', color: '#FF4D4F' },
+    hot: { label: '熱門', icon: '\uD83D\uDD25', color: 'var(--danger)' },
     popular: { label: '人氣', icon: '\uD83D\uDC51', color: '#FAAD14' },
-    sales: { label: '銷量', icon: '\uD83D\uDCC8', color: '#1890FF' },
-    rating: { label: '好評', icon: '\u2B50', color: '#52C41A' },
-    repurchase: { label: '復購', icon: '\uD83D\uDD04', color: '#722ED1' },
+    sales: { label: '銷量', icon: '\uD83D\uDCC8', color: 'var(--info)' },
+    rating: { label: '好評', icon: '\u2B50', color: 'var(--success)' },
+    repurchase: { label: '復購', icon: '\uD83D\uDD04', color: 'var(--purple)' },
     favorites: { label: '收藏', icon: '\u2764\uFE0F', color: '#EB2F96' },
     customers: { label: '顧客數', icon: '\uD83D\uDC65', color: '#13C2C2' },
   }
@@ -485,7 +485,7 @@ export default function OrderDetail() {
 
       {/* 订单状态流程 */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
         overflow: 'hidden',
       }}>
@@ -513,11 +513,11 @@ export default function OrderDetail() {
                 if (isPast) return <CheckOutlined style={{ fontSize: 15, color: '#fff' }} />
                 if (isCurrent) return (
                   <div style={{
-                    width: 10, height: 10, borderRadius: '50%', background: '#fff',
+                    width: 10, height: 10, borderRadius: '50%', background: 'var(--surface-2)',
                     animation: 'nodeBreath 1.5s ease-in-out infinite',
                   }} />
                 )
-                return <ClockCircleOutlined style={{ fontSize: 14, color: '#BFBFBF' }} />
+                return <ClockCircleOutlined style={{ fontSize: 14, color: 'var(--text-4)' }} />
               }
 
               /** 阶段背景渐变 */
@@ -579,9 +579,9 @@ export default function OrderDetail() {
                     {/* 时间信息 */}
                     {stageTime && (
                       <div style={{
-                        fontSize: 11, color: '#8C8C8C',
+                        fontSize: 11, color: 'var(--text-3)',
                         whiteSpace: 'nowrap', textAlign: 'center',
-                        padding: '2px 8px', background: '#FAFAFA',
+                        padding: '2px 8px', background: 'var(--surface-3)',
                         borderRadius: 4, marginTop: 6,
                       }}>
                         {stageTime}
@@ -591,7 +591,7 @@ export default function OrderDetail() {
                     {showActor && (
                       <div style={{
                         marginTop: 6, textAlign: 'center', whiteSpace: 'nowrap',
-                        padding: '3px 10px', background: '#FFF1F0',
+                        padding: '3px 10px', background: 'var(--danger-soft)',
                         border: '1px solid #FFCCC7', borderRadius: 4,
                       }}>
                         <div style={{ fontSize: 11, fontWeight: 600, color: '#cf1322', marginBottom: 2 }}>
@@ -599,19 +599,19 @@ export default function OrderDetail() {
                         </div>
                         {isMerchantActor ? (
                           <>
-                            <div style={{ fontSize: 11, color: '#595959' }}>
+                            <div style={{ fontSize: 11, color: 'var(--text-2)' }}>
                               {t('orderDetail.storeLabel', { name: order.storeName })}
                             </div>
-                            <div style={{ fontSize: 11, color: '#8C8C8C' }}>
+                            <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
                               {t('orderDetail.storeIdLabel', { id: order.storeId })}
                             </div>
                           </>
                         ) : (
                           <>
-                            <div style={{ fontSize: 11, color: '#595959' }}>
+                            <div style={{ fontSize: 11, color: 'var(--text-2)' }}>
                               {t('orderDetail.operatorLabel', { name: order.operatorName })}
                             </div>
-                            <div style={{ fontSize: 11, color: '#8C8C8C' }}>
+                            <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
                               {t('orderDetail.empIdLabel', { id: order.operatorId })}
                             </div>
                           </>
@@ -686,7 +686,7 @@ export default function OrderDetail() {
 
       {/* Tab 切换区域 */}
       <div style={{
-        background: '#fff', borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+        background: 'var(--surface-2)', borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
         overflow: 'hidden', marginBottom: 16,
       }}>
         <Tabs
@@ -698,25 +698,25 @@ export default function OrderDetail() {
               key: 'orderInfo',
               label: (
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600 }}>
-                  <FileTextOutlined style={{ color: '#1890ff' }} /> {t('orderDetail.tabOrderInfo')}
+                  <FileTextOutlined style={{ color: 'var(--info)' }} /> {t('orderDetail.tabOrderInfo')}
                 </span>
               ),
               children: (
                 <div style={{ padding: '8px 0 0' }}>
                   {/* 购买商家信息 */}
-                  <Card title={<CardTitle icon={<ShopOutlined style={{ fontSize: 12, color: '#1890ff' }} />} text={t('orderDetail.buyMerchantInfo')} />}
+                  <Card title={<CardTitle icon={<ShopOutlined style={{ fontSize: 12, color: 'var(--info)' }} />} text={t('orderDetail.buyMerchantInfo')} />}
                     style={{ marginBottom: 16, borderRadius: 8, border: 'none' }} styles={{ body: { padding: '16px 24px' } }}>
-        <Descriptions column={3} labelStyle={{ color: '#8c8c8c', fontSize: 13 }} contentStyle={{ fontSize: 13 }}>
+        <Descriptions column={3} labelStyle={{ color: 'var(--text-3)', fontSize: 13 }} contentStyle={{ fontSize: 13 }}>
           <Descriptions.Item label={t('orderDetail.colGroup')}>
             <span>{order.groupName}</span>
-            <span style={{ color: '#8C8C8C', fontSize: 12 }}>{t('orderDetail.idSuffix', { id: order.groupId })}</span>
+            <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{t('orderDetail.idSuffix', { id: order.groupId })}</span>
           </Descriptions.Item>
           <Descriptions.Item label={t('orderDetail.colStore')}>
             <span>{order.storeName}</span>
-            <span style={{ color: '#8C8C8C', fontSize: 12 }}>{t('orderDetail.idSuffix', { id: order.storeId })}</span>
+            <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{t('orderDetail.idSuffix', { id: order.storeId })}</span>
           </Descriptions.Item>
           <Descriptions.Item label={t('orderDetail.colStoreRegion')}>
-            {order.storeAddress || <span style={{ color: '#BFBFBF' }}>—</span>}
+            {order.storeAddress || <span style={{ color: 'var(--text-4)' }}>—</span>}
           </Descriptions.Item>
         </Descriptions>
                   </Card>
@@ -724,29 +724,29 @@ export default function OrderDetail() {
                   {/* 订单信息 */}
       <Card title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <CardTitle icon={<FileTextOutlined style={{ fontSize: 12, color: '#1890ff' }} />} text={t('orderDetail.orderInfo')} />
+          <CardTitle icon={<FileTextOutlined style={{ fontSize: 12, color: 'var(--info)' }} />} text={t('orderDetail.orderInfo')} />
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
-            padding: '4px 12px', background: '#FFF7E6',
+            padding: '4px 12px', background: 'var(--warning-soft)',
             borderRadius: 4, border: '1px solid #FFD591',
             marginLeft: 4,
           }}>
-            <span style={{ fontSize: 11, color: '#E8720C', fontWeight: 600 }}>{t('orderDetail.orderNo')}</span>
-            <span style={{ fontSize: 13, color: '#262626', fontWeight: 700, letterSpacing: 0.5 }}>
+            <span style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}>{t('orderDetail.orderNo')}</span>
+            <span style={{ fontSize: 13, color: 'var(--text-1)', fontWeight: 700, letterSpacing: 0.5 }}>
               {order.orderNo}
             </span>
           </div>
         </div>
       }
         style={{ marginBottom: 16, borderRadius: 8, border: 'none' }} styles={{ body: { padding: '16px 24px' } }}>
-        <Descriptions column={3} labelStyle={{ color: '#8c8c8c', fontSize: 13 }} contentStyle={{ fontSize: 13 }}>
+        <Descriptions column={3} labelStyle={{ color: 'var(--text-3)', fontSize: 13 }} contentStyle={{ fontSize: 13 }}>
           <Descriptions.Item label={t('orderDetail.colAdType')}>
             <Tag color="gold">{RECOMMEND_TYPE_ICON[order.recommendType]} {recommendTypeLabel(order.recommendType)}</Tag>
           </Descriptions.Item>
           <Descriptions.Item label={t('common.colBrand')}>{appLabel(order.app)}</Descriptions.Item>
           <Descriptions.Item label={t('common.colChannel')}>{channelLabel(order.channel)}</Descriptions.Item>
           <Descriptions.Item label={isPopular ? '配置ID' : t('orderDetail.colAlgorithmId')}>
-            <span style={{ color: '#8C8C8C', fontSize: 12 }}>{order.algorithmId}</span>
+            <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{order.algorithmId}</span>
           </Descriptions.Item>
           <Descriptions.Item label={isPopular ? '人氣名稱' : t('orderDetail.colAlgorithmName')}>{order.promotionName}</Descriptions.Item>
           {isGoldenSignboard ? (
@@ -772,7 +772,7 @@ export default function OrderDetail() {
                 <Tag color={order.trafficMode === 'custom' ? 'purple' : 'orange'} style={{ margin: 0 }}>
                   {order.trafficMode === 'custom' ? '自定義' : (order.trafficPackageName || '-')}
                 </Tag>
-                <span style={{ fontSize: 13, color: '#595959' }}>
+                <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
                   {(order.trafficImpressions ?? 0).toLocaleString()} 次曝光
                 </span>
               </Space>
@@ -790,11 +790,11 @@ export default function OrderDetail() {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
             onClick={() => setSlotsCollapsed(!slotsCollapsed)}>
-            <CardTitle icon={<DollarOutlined style={{ fontSize: 12, color: '#1890ff' }} />} text={isNewStore ? t('orderDetail.slotTitleNewStore') : (isPopular || isRevive) ? t('orderDetail.slotTitlePopular') : isGoldenSignboard ? t('orderDetail.slotTitleGoldenSignboard') : isTrafficAd ? '購買流量包' : t('orderDetail.slotTitleStar')} />
-            <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 4 }}>
+            <CardTitle icon={<DollarOutlined style={{ fontSize: 12, color: 'var(--info)' }} />} text={isNewStore ? t('orderDetail.slotTitleNewStore') : (isPopular || isRevive) ? t('orderDetail.slotTitlePopular') : isGoldenSignboard ? t('orderDetail.slotTitleGoldenSignboard') : isTrafficAd ? '購買流量包' : t('orderDetail.slotTitleStar')} />
+            <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 4 }}>
               {slotsCollapsed ? <RightOutlined /> : <DownOutlined />}
             </span>
-            <span style={{ fontSize: 12, color: '#8C8C8C' }}>{slotsCollapsed ? t('orderDetail.expand') : t('orderDetail.collapse')}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{slotsCollapsed ? t('orderDetail.expand') : t('orderDetail.collapse')}</span>
           </div>
         }
         style={{ marginBottom: 16, borderRadius: 8, border: 'none' }} styles={{ body: { padding: slotsCollapsed ? '0 24px' : '16px 24px' } }}>
@@ -802,16 +802,16 @@ export default function OrderDetail() {
         {!slotsCollapsed && (<>
         {/* 投流廣告：流量包購買信息（按曝光計價，無日期/時段明細） */}
         {isTrafficAd && (
-          <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
+          <div style={{ border: '1px solid var(--border-2)', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
             <div style={{
-              background: '#FAFAFA', padding: '8px 16px', borderBottom: '1px solid #f0f0f0',
-              fontSize: 13, fontWeight: 600, color: '#262626',
+              background: 'var(--surface-3)', padding: '8px 16px', borderBottom: '1px solid var(--border-2)',
+              fontSize: 13, fontWeight: 600, color: 'var(--text-1)',
             }}>
               {order.trafficMode === 'custom' ? '自定義曝光次數' : (order.trafficPackageName || '流量包')}
             </div>
             <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 16, fontSize: 13 }}>
-              <span style={{ color: '#8C8C8C' }}>購買曝光次數：</span>
-              <span style={{ fontWeight: 700, color: '#E8720C', fontSize: 16 }}>
+              <span style={{ color: 'var(--text-3)' }}>購買曝光次數：</span>
+              <span style={{ fontWeight: 700, color: 'var(--brand)', fontSize: 16 }}>
                 {(order.trafficImpressions ?? 0).toLocaleString()} 次
               </span>
             </div>
@@ -820,11 +820,11 @@ export default function OrderDetail() {
         {/* 无敌星星：按日期分组，每天展示商圈、时段、原价、折扣、折后价 */}
         {order.recommendType === RecommendType.INVINCIBLE_STAR && slotsByDate.map(([date, slots]) => (
           <div key={date} style={{
-            border: '1px solid #f0f0f0', borderRadius: 8, marginBottom: 12, overflow: 'hidden',
+            border: '1px solid var(--border-2)', borderRadius: 8, marginBottom: 12, overflow: 'hidden',
           }}>
             <div style={{
-              background: '#FAFAFA', padding: '8px 16px', borderBottom: '1px solid #f0f0f0',
-              fontSize: 13, fontWeight: 600, color: '#262626',
+              background: 'var(--surface-3)', padding: '8px 16px', borderBottom: '1px solid var(--border-2)',
+              fontSize: 13, fontWeight: 600, color: 'var(--text-1)',
             }}>
               {date}
             </div>
@@ -837,12 +837,12 @@ export default function OrderDetail() {
                 <col style={{ width: '28%' }} />
               </colgroup>
               <thead>
-                <tr style={{ background: '#FAFAFA' }}>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('promotionOrderManage.colRegion')}</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colSlot')}</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colOriginalPrice')}</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colDiscount')}</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colFinalPrice')}</th>
+                <tr style={{ background: 'var(--surface-3)' }}>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('promotionOrderManage.colRegion')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colSlot')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colOriginalPrice')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colDiscount')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colFinalPrice')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -876,11 +876,11 @@ export default function OrderDetail() {
                             </td>
                           )}
                           <td style={{ padding: '8px 16px', textAlign: 'center' }}>{slotLabel(sp.slot)}</td>
-                          <td style={{ padding: '8px 16px', textAlign: 'center', color: '#595959' }}>{sp.originalPrice}</td>
+                          <td style={{ padding: '8px 16px', textAlign: 'center', color: 'var(--text-2)' }}>{sp.originalPrice}</td>
                           <td style={{ padding: '8px 16px', textAlign: 'center' }}>
-                            {sp.discount < 10 ? <Tag color="green">{t('orderDetail.discountFold', { n: sp.discount })}</Tag> : <span style={{ color: '#8C8C8C' }}>{t('orderDetail.noDiscount')}</span>}
+                            {sp.discount < 10 ? <Tag color="green">{t('orderDetail.discountFold', { n: sp.discount })}</Tag> : <span style={{ color: 'var(--text-3)' }}>{t('orderDetail.noDiscount')}</span>}
                           </td>
-                          <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500, color: '#E8720C' }}>{sp.actualPrice}</td>
+                          <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500, color: 'var(--brand)' }}>{sp.actualPrice}</td>
                         </tr>
                       )
                     })
@@ -895,22 +895,22 @@ export default function OrderDetail() {
         {(order.recommendType === RecommendType.HOT_REVIVE_AD || isPopular) && (() => {
           const regionVal = Array.isArray(order.region) ? order.region[0] : order.region
           return (
-            <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
+            <div style={{ border: '1px solid var(--border-2)', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
               <div style={{
-                background: '#FAFAFA', padding: '8px 16px', borderBottom: '1px solid #f0f0f0',
-                fontSize: 13, fontWeight: 600, color: '#262626', display: 'flex', alignItems: 'center', gap: 8,
+                background: 'var(--surface-3)', padding: '8px 16px', borderBottom: '1px solid var(--border-2)',
+                fontSize: 13, fontWeight: 600, color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 8,
               }}>
                 {isPopular ? (
                   <>
                     {/* 人氣商家：購買皮膚，無推廣商圈，只展示皮膚名稱 */}
-                    <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('orderDetail.skinKit')}</span>
-                    <Tag style={{ margin: 0, color: '#E8720C', background: '#FFF7E6', borderColor: '#FFD591' }}>🎨 {order.skinName}</Tag>
-                    <span style={{ marginLeft: 'auto', fontSize: 11, color: '#8C8C8C', fontWeight: 400 }}>{t('orderDetail.skinDailyNote')}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>{t('orderDetail.skinKit')}</span>
+                    <Tag style={{ margin: 0, color: 'var(--brand)', background: 'var(--warning-soft)', borderColor: '#FFD591' }}>🎨 {order.skinName}</Tag>
+                    <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-3)', fontWeight: 400 }}>{t('orderDetail.skinDailyNote')}</span>
                   </>
                 ) : (
                   <>
                     {/* 盤活復蘇：同樣標註投放商圈字段前綴，與人氣商家保持一致 */}
-                    <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('orderDetail.investRegion')}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>{t('orderDetail.investRegion')}</span>
                     <Tag color="blue" style={{ margin: 0 }}>{t(REGION_LABEL_KEY[regionVal])}</Tag>
                   </>
                 )}
@@ -933,23 +933,23 @@ export default function OrderDetail() {
                   )}
                 </colgroup>
                 <thead>
-                  <tr style={{ background: '#FAFAFA' }}>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{(isPopular || isRevive) ? t('orderDetail.promoDate') : t('orderDetail.colSlot')}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{isPopular ? t('orderDetail.dailyPrice') : isRevive ? t('orderDetail.dayPrice') : t('orderDetail.colOriginalPrice')}</th>
-                    {!isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colDiscount')}</th>}
-                    {!isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colFinalPrice')}</th>}
-                    {isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoStatus')}</th>}
+                  <tr style={{ background: 'var(--surface-3)' }}>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{(isPopular || isRevive) ? t('orderDetail.promoDate') : t('orderDetail.colSlot')}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{isPopular ? t('orderDetail.dailyPrice') : isRevive ? t('orderDetail.dayPrice') : t('orderDetail.colOriginalPrice')}</th>
+                    {!isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colDiscount')}</th>}
+                    {!isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colFinalPrice')}</th>}
+                    {isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoStatus')}</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {order.slotPrices.map((sp, i) => (
                     <tr key={i} style={{ borderTop: i > 0 ? '1px solid #f0f0f0' : 'none' }}>
                       <td style={{ padding: '8px 16px', textAlign: 'center' }}>{(isPopular || isRevive) ? sp.date : slotLabel(sp.slot)}</td>
-                      <td style={{ padding: '8px 16px', textAlign: 'center', color: '#595959' }}>{sp.originalPrice}</td>
+                      <td style={{ padding: '8px 16px', textAlign: 'center', color: 'var(--text-2)' }}>{sp.originalPrice}</td>
                       {!isPopular && <td style={{ padding: '8px 16px', textAlign: 'center' }}>
-                        {sp.discount < 10 ? <Tag color="green">{t('orderDetail.discountFold', { n: sp.discount })}</Tag> : <span style={{ color: '#8C8C8C' }}>{t('orderDetail.noDiscount')}</span>}
+                        {sp.discount < 10 ? <Tag color="green">{t('orderDetail.discountFold', { n: sp.discount })}</Tag> : <span style={{ color: 'var(--text-3)' }}>{t('orderDetail.noDiscount')}</span>}
                       </td>}
-                      {!isPopular && <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500, color: '#E8720C' }}>{sp.actualPrice}</td>}
+                      {!isPopular && <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500, color: 'var(--brand)' }}>{sp.actualPrice}</td>}
                       {isPopular && (() => {
                         const dayStatus = getDayStatus(sp.date)
                         return (
@@ -972,13 +972,13 @@ export default function OrderDetail() {
         {isNewStore && (() => {
           const regionVal = Array.isArray(order.region) ? order.region[0] : order.region
           return (
-            <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
+            <div style={{ border: '1px solid var(--border-2)', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
               <div style={{
-                background: '#FAFAFA', padding: '8px 16px', borderBottom: '1px solid #f0f0f0',
-                fontSize: 13, fontWeight: 600, color: '#262626', display: 'flex', alignItems: 'center', gap: 8,
+                background: 'var(--surface-3)', padding: '8px 16px', borderBottom: '1px solid var(--border-2)',
+                fontSize: 13, fontWeight: 600, color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 8,
               }}>
                 {/* 新店廣告：同樣標註投放商圈字段前綴，與人氣商家保持一致 */}
-                <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('orderDetail.investRegion')}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>{t('orderDetail.investRegion')}</span>
                 <Tag color="blue" style={{ margin: 0 }}>{t(REGION_LABEL_KEY[regionVal])}</Tag>
               </div>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
@@ -988,10 +988,10 @@ export default function OrderDetail() {
                   <col style={{ width: '30%' }} />
                 </colgroup>
                 <thead>
-                  <tr style={{ background: '#FAFAFA' }}>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.deductDays')}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoStatus')}</th>
+                  <tr style={{ background: 'var(--surface-3)' }}>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.deductDays')}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoStatus')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1000,7 +1000,7 @@ export default function OrderDetail() {
                     return (
                       <tr key={i} style={{ borderTop: i > 0 ? '1px solid #f0f0f0' : 'none' }}>
                         <td style={{ padding: '8px 16px', textAlign: 'center' }}>{day}</td>
-                        <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500, color: '#E8720C' }}>1</td>
+                        <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500, color: 'var(--brand)' }}>1</td>
                         <td style={{ padding: '8px 16px', textAlign: 'center' }}>
                           <Tag color={statusLabel(dayStatus).color} style={{ margin: 0 }}>
                             {statusLabel(dayStatus).label}
@@ -1040,10 +1040,10 @@ export default function OrderDetail() {
             return span
           })
           return (
-            <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
+            <div style={{ border: '1px solid var(--border-2)', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
               <div style={{
-                background: '#FAFAFA', padding: '8px 16px', borderBottom: '1px solid #f0f0f0',
-                fontSize: 13, fontWeight: 600, color: '#262626',
+                background: 'var(--surface-3)', padding: '8px 16px', borderBottom: '1px solid var(--border-2)',
+                fontSize: 13, fontWeight: 600, color: 'var(--text-1)',
               }}>
                 {t('orderDetail.slotTitleGoldenSignboard')}
               </div>
@@ -1056,12 +1056,12 @@ export default function OrderDetail() {
                   <col style={{ width: '25%' }} />
                 </colgroup>
                 <thead>
-                  <tr style={{ background: '#FAFAFA' }}>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{'標籤名稱'}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{'推廣商圈'}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.dailyPrice')}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoStatus')}</th>
+                  <tr style={{ background: 'var(--surface-3)' }}>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{'標籤名稱'}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{'推廣商圈'}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.dailyPrice')}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoStatus')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1082,7 +1082,7 @@ export default function OrderDetail() {
                               <Tag style={{ margin: 0, color: labelCfg.color, background: `${labelCfg.color}10`, borderColor: `${labelCfg.color}40` }}>
                                 {labelCfg.icon} {fmtSignboardLabel(labelInfo!.label, labelInfo!.scenario)}
                               </Tag>
-                            ) : <span style={{ color: '#8C8C8C' }}>—</span>}
+                            ) : <span style={{ color: 'var(--text-3)' }}>—</span>}
                           </td>
                         )}
                         {rs > 0 && (
@@ -1095,7 +1095,7 @@ export default function OrderDetail() {
                           </td>
                         )}
                         <td style={{ padding: '8px 16px', textAlign: 'center' }}>{sp.date}</td>
-                        <td style={{ padding: '8px 16px', textAlign: 'center', color: '#595959' }}>{sp.originalPrice}</td>
+                        <td style={{ padding: '8px 16px', textAlign: 'center', color: 'var(--text-2)' }}>{sp.originalPrice}</td>
                         <td style={{ padding: '8px 16px', textAlign: 'center' }}>
                           <Tag color={statusLabel(dayStatus).color} style={{ margin: 0 }}>
                             {statusLabel(dayStatus).label}
@@ -1120,17 +1120,17 @@ export default function OrderDetail() {
               border: '1px solid #FFE0B2',
             }}>
               {/* 标题 */}
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#E8720C', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--brand)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ fontSize: 16 }}>💰</span> {t('orderDetail.feeDetail')}
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {/* 推廣天數 */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>{t('orderDetail.promoDays')}</span>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('orderDetail.daysUnit', { count: deductDays })}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 90 }}>{t('orderDetail.promoDays')}</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{t('orderDetail.daysUnit', { count: deductDays })}</span>
                   {deductDays > 0 && (
-                    <span style={{ fontSize: 11, color: '#BFBFBF' }}>{t('orderDetail.dateRangeTip', { start: days[0], end: days[deductDays - 1] })}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{t('orderDetail.dateRangeTip', { start: days[0], end: days[deductDays - 1] })}</span>
                   )}
                 </div>
 
@@ -1140,11 +1140,11 @@ export default function OrderDetail() {
                 {/* 使用抵扣天數 */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: '#262626' }}>{t('orderDetail.useDeductDays')}</span>
-                    <span style={{ fontSize: 11, color: '#8C8C8C' }}>{t('orderDetail.deductRule')}</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{t('orderDetail.useDeductDays')}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{t('orderDetail.deductRule')}</span>
                   </div>
                   <div style={{
-                    padding: '6px 20px', background: 'linear-gradient(135deg, #E8720C, #F59432)',
+                    padding: '6px 20px', background: 'linear-gradient(135deg, var(--brand), #F59432)',
                     borderRadius: 8, boxShadow: '0 2px 8px rgba(232,114,12,0.3)',
                   }}>
                     <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>{t('orderDetail.daysUnit', { count: deductDays })}</span>
@@ -1154,12 +1154,12 @@ export default function OrderDetail() {
 
               {/* 计算公式详解 */}
               <div style={{
-                marginTop: 16, padding: '10px 14px', background: '#fff', borderRadius: 8,
-                border: '1px dashed #FFD591', fontSize: 12, color: '#8C8C8C', lineHeight: 2,
+                marginTop: 16, padding: '10px 14px', background: 'var(--surface-2)', borderRadius: 8,
+                border: '1px dashed #FFD591', fontSize: 12, color: 'var(--text-3)', lineHeight: 2,
               }}>
-                <div style={{ fontWeight: 600, color: '#595959', marginBottom: 4 }}>{t('orderDetail.calcFormula')}</div>
-                {t('orderDetail.perDayCalc', { count: deductDays })}<strong style={{ color: '#E8720C' }}>{deductDays}</strong>
-                <span style={{ color: '#BFBFBF' }}>{t('orderDetail.dayUnit')}</span>
+                <div style={{ fontWeight: 600, color: 'var(--text-2)', marginBottom: 4 }}>{t('orderDetail.calcFormula')}</div>
+                {t('orderDetail.perDayCalc', { count: deductDays })}<strong style={{ color: 'var(--brand)' }}>{deductDays}</strong>
+                <span style={{ color: 'var(--text-4)' }}>{t('orderDetail.dayUnit')}</span>
               </div>
             </div>
           )
@@ -1171,7 +1171,7 @@ export default function OrderDetail() {
           border: '1px solid #FFE0B2',
         }}>
           {/* 标题 */}
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#E8720C', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--brand)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 16 }}>💰</span> {t('orderDetail.feeDetail')}
             {/* 盤活復蘇/人氣商家：標註支付方式（純推廣金 / 純贈送抵扣 / 混合支付） */}
             {(isRevive || isPopular) && (
@@ -1185,23 +1185,23 @@ export default function OrderDetail() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {/* 第1步：时段小计 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>{(isPopular || isRevive) ? t('orderDetail.step1DailyTotal') : t('orderDetail.step1SlotTotal')}</span>
-              <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>MOP {totalOriginal}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 90 }}>{(isPopular || isRevive) ? t('orderDetail.step1DailyTotal') : t('orderDetail.step1SlotTotal')}</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>MOP {totalOriginal}</span>
             </div>
 
             {/* ② 梯度折扣（所有訂單類型統一展示，固定第二步） */}
             {!order.gradientDiscount && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>{'②'} {t('orderDetail.gradientDiscountLabel')}</span>
-                <span style={{ fontSize: 13, color: '#8C8C8C' }}>{t('orderDetail.noDiscount')}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 90 }}>{'②'} {t('orderDetail.gradientDiscountLabel')}</span>
+                <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{t('orderDetail.noDiscount')}</span>
               </div>
             )}
 
             {order.gradientDiscount && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>{'②'} {t('orderDetail.gradientDiscountLabel')}</span>
-                <span style={{ fontSize: 13, color: '#595959' }}>
-                  {t('orderDetail.gradientRulePrefix', { count: order.gradientDiscount.count, unit: (isPopular || isRevive) ? t('orderDetail.daysSuffix') : t('orderDetail.slotsSuffix') })} <strong style={{ color: '#E8720C' }}>{order.gradientDiscount.discount}{t('orderDetail.foldSuffix')}</strong>
+                <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 90 }}>{'②'} {t('orderDetail.gradientDiscountLabel')}</span>
+                <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
+                  {t('orderDetail.gradientRulePrefix', { count: order.gradientDiscount.count, unit: (isPopular || isRevive) ? t('orderDetail.daysSuffix') : t('orderDetail.slotsSuffix') })} <strong style={{ color: 'var(--brand)' }}>{order.gradientDiscount.discount}{t('orderDetail.foldSuffix')}</strong>
                 </span>
               </div>
             )}
@@ -1209,8 +1209,8 @@ export default function OrderDetail() {
             {/* ③ 訂單優惠（折扣金額，無折扣時顯示 0） */}
             {!isNewStore && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>{'③'} {t('orderDetail.orderDiscountLabel')}</span>
-                <span style={{ fontSize: 14, fontWeight: 600, color: '#fa8c16' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 90 }}>{'③'} {t('orderDetail.orderDiscountLabel')}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--warning)' }}>
                   {order.gradientDiscount ? `MOP ${totalOriginal - finalPrice}` : 'MOP 0'}
                 </span>
               </div>
@@ -1219,10 +1219,10 @@ export default function OrderDetail() {
             {/* ④ 折後價格（所有訂單類型統一展示） */}
             {!isNewStore && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 90 }}>{'④'} {t('orderDetail.step3FinalPrice')}</span>
-                <span style={{ fontSize: 14, fontWeight: 600, color: '#E8720C' }}>MOP {order.gradientDiscount ? finalPrice : totalOriginal}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 90 }}>{'④'} {t('orderDetail.step3FinalPrice')}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--brand)' }}>MOP {order.gradientDiscount ? finalPrice : totalOriginal}</span>
                 {(order.gradientDiscount ? totalSaved > 0 : false) && (
-                  <span style={{ fontSize: 11, color: '#52C41A', background: '#F6FFED', padding: '1px 8px', borderRadius: 4, border: '1px solid #B7EB8F' }}>
+                  <span style={{ fontSize: 11, color: 'var(--success)', background: 'var(--success-soft)', padding: '1px 8px', borderRadius: 4, border: '1px solid #B7EB8F' }}>
                     {t('orderDetail.savedAmount', { amount: totalSaved })}
                   </span>
                 )}
@@ -1240,26 +1240,26 @@ export default function OrderDetail() {
                 {/* 使用赠送天数抵扣 */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: '#262626' }}>{giftDeductLabel}</span>
-                    <span style={{ fontSize: 11, color: '#8C8C8C' }}>{giftDeductTipText}</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{giftDeductLabel}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{giftDeductTipText}</span>
                   </div>
                   <div style={{
-                    padding: '4px 16px', background: '#FFF7E6', border: '1px solid #FFD591',
+                    padding: '4px 16px', background: 'var(--warning-soft)', border: '1px solid #FFD591',
                     borderRadius: 8,
                   }}>
-                    <span style={{ fontSize: 18, fontWeight: 700, color: '#E8720C' }}>{giftDays.toLocaleString()} {giftCountSuffix}</span>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--brand)' }}>{giftDays.toLocaleString()} {giftCountSuffix}</span>
                   </div>
                 </div>
                 {/* 赠送天数抵扣现金（仅人气商家定价配置了现金价值） */}
                 {isPopular && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: '#262626' }}>{t('orderDetail.giftDeductCashLabel')}</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{t('orderDetail.giftDeductCashLabel')}</span>
                   </div>
                   <div style={{
-                    padding: '4px 16px', background: '#FFF7E6', border: '1px solid #FFD591',
+                    padding: '4px 16px', background: 'var(--warning-soft)', border: '1px solid #FFD591',
                     borderRadius: 8,
                   }}>
-                    <span style={{ fontSize: 18, fontWeight: 700, color: '#E8720C' }}>MOP {giftAmount}</span>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--brand)' }}>MOP {giftAmount}</span>
                   </div>
                 </div>}
               </div>
@@ -1268,8 +1268,8 @@ export default function OrderDetail() {
             {/* 最终实付 */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 14, fontWeight: 700, color: '#262626' }}>{payMode === 'gift' ? giftOnlyPaidLabel : t('orderDetail.actualPaid')}</span>
-                {payMode !== 'gift' && <span style={{ fontSize: 11, color: '#8C8C8C' }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{payMode === 'gift' ? giftOnlyPaidLabel : t('orderDetail.actualPaid')}</span>
+                {payMode !== 'gift' && <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
                   {order.gradientDiscount
                     ? ((isPopular || isRevive)
                       ? t(order.gradientDiscount.count > order.slotPrices.length ? 'orderDetail.paidCalcDetailNoGrad' : 'orderDetail.paidCalcDetailGrad', { count: order.slotPrices.length, discount: order.gradientDiscount.discount })
@@ -1280,21 +1280,21 @@ export default function OrderDetail() {
               </div>
               {payMode === 'gift' ? (
                 <div style={{
-                  padding: '6px 20px', background: 'linear-gradient(135deg, #E8720C, #F59432)',
+                  padding: '6px 20px', background: 'linear-gradient(135deg, var(--brand), #F59432)',
                   borderRadius: 8, boxShadow: '0 2px 8px rgba(232,114,12,0.3)',
                 }}>
                   <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>{giftDays.toLocaleString()} {giftCountSuffix}</span>
                 </div>
               ) : isRefunded ? (
                 <div style={{
-                  padding: '5px 18px', background: '#FFF7E6', border: '1px solid #FFD591',
+                  padding: '5px 18px', background: 'var(--warning-soft)', border: '1px solid #FFD591',
                   borderRadius: 8,
                 }}>
-                  <span style={{ fontSize: 20, fontWeight: 700, color: '#E8720C' }}>MOP {actualPaid}</span>
+                  <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--brand)' }}>MOP {actualPaid}</span>
                 </div>
               ) : (
                 <div style={{
-                  padding: '6px 20px', background: 'linear-gradient(135deg, #E8720C, #F59432)',
+                  padding: '6px 20px', background: 'linear-gradient(135deg, var(--brand), #F59432)',
                   borderRadius: 8, boxShadow: '0 2px 8px rgba(232,114,12,0.3)',
                 }}>
                   <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>MOP {actualPaid}</span>
@@ -1305,22 +1305,22 @@ export default function OrderDetail() {
 
           {/* 计算公式详解 */}
           <div style={{
-            marginTop: 16, padding: '10px 14px', background: '#fff', borderRadius: 8,
-            border: '1px dashed #FFD591', fontSize: 12, color: '#8C8C8C', lineHeight: 2,
+            marginTop: 16, padding: '10px 14px', background: 'var(--surface-2)', borderRadius: 8,
+            border: '1px dashed #FFD591', fontSize: 12, color: 'var(--text-3)', lineHeight: 2,
           }}>
-            <div style={{ fontWeight: 600, color: '#595959', marginBottom: 4 }}>{t('orderDetail.calcFormula')}</div>
+            <div style={{ fontWeight: 600, color: 'var(--text-2)', marginBottom: 4 }}>{t('orderDetail.calcFormula')}</div>
             {(isPopular || isRevive) ? (
               // 人氣商家/盤活復蘇：按天計價
               <>
-                {t('orderDetail.dailyCalc', { count: order.slotPrices.length, price: order.slotPrices[0]?.originalPrice || 0 })}<strong style={{ color: '#262626' }}>{totalOriginal}</strong>
+                {t('orderDetail.dailyCalc', { count: order.slotPrices.length, price: order.slotPrices[0]?.originalPrice || 0 })}<strong style={{ color: 'var(--text-1)' }}>{totalOriginal}</strong>
                 {order.gradientDiscount && (
-                  <> × {order.gradientDiscount.discount / 10} = <strong style={{ color: '#E8720C' }}>{finalPrice}</strong>
+                  <> × {order.gradientDiscount.discount / 10} = <strong style={{ color: 'var(--brand)' }}>{finalPrice}</strong>
                     {giftDays > 0 && (
                       <> → {t('orderDetail.giftDeductShort', { days: giftDays })}
                         {payMode === 'mixed' && isPopular ? (
-                          <> <strong style={{ color: '#E8720C' }}>{giftDays} {t('orderDetail.daysSuffix')}</strong> + <strong style={{ color: '#FF4D4F' }}>MOP {actualPaid}</strong></>
+                          <> <strong style={{ color: 'var(--brand)' }}>{giftDays} {t('orderDetail.daysSuffix')}</strong> + <strong style={{ color: 'var(--danger)' }}>MOP {actualPaid}</strong></>
                         ) : (
-                          <> <strong style={{ color: '#E8720C' }}>{giftDays} {t('orderDetail.daysSuffix')}</strong></>
+                          <> <strong style={{ color: 'var(--brand)' }}>{giftDays} {t('orderDetail.daysSuffix')}</strong></>
                         )}
                       </>
                     )}
@@ -1329,13 +1329,13 @@ export default function OrderDetail() {
                 {!order.gradientDiscount && giftDays > 0 && (
                   <> → {t('orderDetail.giftDeductShort', { days: giftDays })}
                     {payMode === 'mixed' && isPopular ? (
-                      <> <strong style={{ color: '#E8720C' }}>{giftDays} {t('orderDetail.daysSuffix')}</strong> + <strong style={{ color: '#FF4D4F' }}>MOP {actualPaid}</strong></>
+                      <> <strong style={{ color: 'var(--brand)' }}>{giftDays} {t('orderDetail.daysSuffix')}</strong> + <strong style={{ color: 'var(--danger)' }}>MOP {actualPaid}</strong></>
                     ) : (
-                      <> <strong style={{ color: '#E8720C' }}>{giftDays} {t('orderDetail.daysSuffix')}</strong></>
+                      <> <strong style={{ color: 'var(--brand)' }}>{giftDays} {t('orderDetail.daysSuffix')}</strong></>
                     )}
                   </>
                 )}
-                <span style={{ color: '#BFBFBF' }}>{t('orderDetail.mopUnit')}</span>
+                <span style={{ color: 'var(--text-4)' }}>{t('orderDetail.mopUnit')}</span>
               </>
             ) : (
               // 其他類型：顯示各時段明細
@@ -1346,11 +1346,11 @@ export default function OrderDetail() {
                   </span>
                 ))}
                 {' = '}
-                <strong style={{ color: '#52C41A' }}>{slotSubtotal}</strong>
+                <strong style={{ color: 'var(--success)' }}>{slotSubtotal}</strong>
                 {order.gradientDiscount && (
-                  <> × {order.gradientDiscount.discount / 10} = <strong style={{ color: '#E8720C' }}>{finalPrice}</strong></>
+                  <> × {order.gradientDiscount.discount / 10} = <strong style={{ color: 'var(--brand)' }}>{finalPrice}</strong></>
                 )}
-                <span style={{ color: '#BFBFBF' }}>{t('orderDetail.mopUnit')}</span>
+                <span style={{ color: 'var(--text-4)' }}>{t('orderDetail.mopUnit')}</span>
               </>
             )}
           </div>
@@ -1366,7 +1366,7 @@ export default function OrderDetail() {
                     background: order.refundEnabled === false ? '#fff2f0' : '#FAFAFA',
                     border: order.refundEnabled === false ? '1px solid #ffccc7' : '1px solid #F0F0F0',
                   }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ width: 4, height: 14, background: '#FF4D4F', borderRadius: 2, display: 'inline-block' }} />
                       {t('orderDetail.refundRuleTitle')}
                       {order.refundEnabled === false && (
@@ -1386,7 +1386,7 @@ export default function OrderDetail() {
                         fontWeight: 600,
                         color: '#cf1322',
                         padding: '12px 16px',
-                        background: '#fff1f0',
+                        background: 'var(--danger-soft)',
                         borderRadius: 6,
                         border: '1px solid #ffa39e',
                         display: 'flex',
@@ -1398,7 +1398,7 @@ export default function OrderDetail() {
                       </div>
                     ) : (
                       <>
-                        <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
                           {order.cancelFeeRules.map((rule, i) => (
                             <span key={i}>
                               {i > 0 && ' | '}
@@ -1414,7 +1414,7 @@ export default function OrderDetail() {
                             display: 'flex', flexDirection: 'column', gap: 8,
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('orderDetail.matchedRule')}</span>
+                              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('orderDetail.matchedRule')}</span>
                               <span style={{ fontSize: 13, fontWeight: 600, color: '#cf1322' }}>
                                 {refundInfo?.matchedRule
                                   ? t('orderDetail.refundRuleText', { days: refundInfo.matchedRule.maxDays, percent: refundInfo.matchedRule.feePercent })
@@ -1422,8 +1422,8 @@ export default function OrderDetail() {
                               </span>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('orderDetail.feePercentLabel')}</span>
-                              <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{refundInfo?.feePercent ?? 0}%</span>
+                              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('orderDetail.feePercentLabel')}</span>
+                              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{refundInfo?.feePercent ?? 0}%</span>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px dashed #ffccc7', paddingTop: 12, marginTop: 4 }}>
                               <span style={{ fontSize: 14, fontWeight: 700, color: '#cf1322' }}>{t('orderDetail.refundAmountLabel')}</span>
@@ -1434,7 +1434,7 @@ export default function OrderDetail() {
                                 <span style={{ fontSize: 22, fontWeight: 700, color: '#fff' }}>MOP {refundAmountByPaid}</span>
                               </div>
                             </div>
-                            <div style={{ fontSize: 11, color: '#bfbfbf' }}>
+                            <div style={{ fontSize: 11, color: 'var(--text-4)' }}>
                               {t('orderDetail.refundFormula', { paid: finalPrice, percent: refundInfo?.feePercent ?? 0, amount: refundAmountByPaid })}
                             </div>
                           </div>
@@ -1449,7 +1449,7 @@ export default function OrderDetail() {
               key: 'promoData',
               label: (
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 600 }}>
-                  <BarChartOutlined style={{ color: '#E8720C' }} /> {t('orderDetail.tabPromoData')}
+                  <BarChartOutlined style={{ color: 'var(--brand)' }} /> {t('orderDetail.tabPromoData')}
                 </span>
               ),
               children: (
@@ -1475,16 +1475,16 @@ export default function OrderDetail() {
                       const totalClicks = data.reduce((s, d) => s + d.clicks, 0)
                       // 投流廣告：購買曝光量 / 已消耗曝光量 / 剩余曝光量 / 平均點擊率
                       const trafficStats = isTrafficAd ? [
-                        { label: '購買曝光量', value: <AnimatedNumber value={order.trafficImpressions ?? 0} />, icon: <EyeOutlined />, color: '#1890ff', bg: '#E6F7FF' },
-                        { label: '已消耗曝光量', value: <AnimatedNumber value={totalImpressions} />, icon: <FireOutlined />, color: '#E8720C', bg: '#FFF7E6' },
-                        { label: '剩余曝光量', value: <AnimatedNumber value={Math.max(0, (order.trafficImpressions ?? 0) - totalImpressions)} />, icon: <HourglassOutlined />, color: '#52C41A', bg: '#F6FFED' },
-                        { label: t('orderDetail.statAvgCtr'), value: data.length > 0 ? <AnimatedPercent values={data.map(d => d.clickRate)} /> : <span>0%</span>, icon: <BarChartOutlined />, color: '#722ED1', bg: '#F9F0FF' },
+                        { label: '購買曝光量', value: <AnimatedNumber value={order.trafficImpressions ?? 0} />, icon: <EyeOutlined />, color: 'var(--info)', bg: '#E6F7FF' },
+                        { label: '已消耗曝光量', value: <AnimatedNumber value={totalImpressions} />, icon: <FireOutlined />, color: 'var(--brand)', bg: '#FFF7E6' },
+                        { label: '剩余曝光量', value: <AnimatedNumber value={Math.max(0, (order.trafficImpressions ?? 0) - totalImpressions)} />, icon: <HourglassOutlined />, color: 'var(--success)', bg: '#F6FFED' },
+                        { label: t('orderDetail.statAvgCtr'), value: data.length > 0 ? <AnimatedPercent values={data.map(d => d.clickRate)} /> : <span>0%</span>, icon: <BarChartOutlined />, color: 'var(--purple)', bg: '#F9F0FF' },
                       ] : null
                       const stats = trafficStats ?? [
-                        { label: t('orderDetail.statTotalImpressions'), value: <AnimatedNumber value={totalImpressions} />, icon: <EyeOutlined />, color: '#1890ff', bg: '#E6F7FF' },
-                        { label: t('orderDetail.statTotalClicks'), value: <AnimatedNumber value={totalClicks} />, icon: <AimOutlined />, color: '#52C41A', bg: '#F6FFED' },
-                        { label: isStar ? t('orderDetail.statPromoSlots') : t('orderDetail.statPromoDays'), value: isStar ? <AnimatedNumber value={uniqueSlots} suffix={t('orderDetail.slotsSuffix')} /> : <AnimatedNumber value={uniqueDates} suffix={t('orderDetail.daysSuffix')} />, icon: <ClockCircleOutlined />, color: '#722ED1', bg: '#F9F0FF' },
-                        { label: t('orderDetail.statAvgCtr'), value: data.length > 0 ? <AnimatedPercent values={data.map(d => d.clickRate)} /> : <span>0%</span>, icon: <BarChartOutlined />, color: '#E8720C', bg: '#FFF7E6' },
+                        { label: t('orderDetail.statTotalImpressions'), value: <AnimatedNumber value={totalImpressions} />, icon: <EyeOutlined />, color: 'var(--info)', bg: '#E6F7FF' },
+                        { label: t('orderDetail.statTotalClicks'), value: <AnimatedNumber value={totalClicks} />, icon: <AimOutlined />, color: 'var(--success)', bg: '#F6FFED' },
+                        { label: isStar ? t('orderDetail.statPromoSlots') : t('orderDetail.statPromoDays'), value: isStar ? <AnimatedNumber value={uniqueSlots} suffix={t('orderDetail.slotsSuffix')} /> : <AnimatedNumber value={uniqueDates} suffix={t('orderDetail.daysSuffix')} />, icon: <ClockCircleOutlined />, color: 'var(--purple)', bg: '#F9F0FF' },
+                        { label: t('orderDetail.statAvgCtr'), value: data.length > 0 ? <AnimatedPercent values={data.map(d => d.clickRate)} /> : <span>0%</span>, icon: <BarChartOutlined />, color: 'var(--brand)', bg: '#FFF7E6' },
                       ]
                       return stats.map((stat, i) => (
                         <div key={i} style={{
@@ -1504,19 +1504,19 @@ export default function OrderDetail() {
                         >
                           <div style={{ fontSize: 20, color: stat.color, marginBottom: 6 }}>{stat.icon}</div>
                           <div style={{ fontSize: 22, fontWeight: 700, color: stat.color }}>{stat.value}</div>
-                          <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 2 }}>{stat.label}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{stat.label}</div>
                         </div>
                       ))
                     })()}
                   </div>
 
                   {/* 推广数据明细 - 按日期分组，商圈 rowSpan 合并 */}
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 4, height: 14, background: '#E8720C', borderRadius: 2, display: 'inline-block' }} />
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 4, height: 14, background: 'var(--brand)', borderRadius: 2, display: 'inline-block' }} />
                     {RECOMMEND_TYPE_ICON[order.recommendType]} {recommendTypeLabel(order.recommendType)} · {t('orderDetail.promoDetailTitle')}
                   </div>
                   {(order.promoData || []).length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '24px 0', color: '#8C8C8C', fontSize: 13 }}>{t('orderDetail.noPromoData')}</div>
+                    <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-3)', fontSize: 13 }}>{t('orderDetail.noPromoData')}</div>
                   ) : isGoldenSignboard ? (
                     /* 金字招牌：按標籤分組，標籤名稱 + 推廣商圈 + 日期明細 */
                     (() => {
@@ -1537,7 +1537,7 @@ export default function OrderDetail() {
                         const labelText = fmtSignboardLabel(lbl, sc)
                         const regionDisplay = getSignboardRegionDisplay(sc)
                         return (
-                          <div key={gi} style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
+                          <div key={gi} style={{ border: '1px solid var(--border-2)', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
                               <colgroup>
                                 <col style={{ width: '18%' }} />
@@ -1548,13 +1548,13 @@ export default function OrderDetail() {
                                 <col style={{ width: '18%' }} />
                               </colgroup>
                               <thead>
-                                <tr style={{ background: '#FAFAFA' }}>
-                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{'標籤名稱'}</th>
-                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{'推廣商圈'}</th>
-                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
-                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colImpressions')}</th>
-                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colClicks')}</th>
-                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colCtr')}</th>
+                                <tr style={{ background: 'var(--surface-3)' }}>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{'標籤名稱'}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{'推廣商圈'}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colImpressions')}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colClicks')}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colCtr')}</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -1570,7 +1570,7 @@ export default function OrderDetail() {
                                           <Tag style={{ margin: 0, color: labelCfg.color, background: `${labelCfg.color}10`, borderColor: `${labelCfg.color}40` }}>
                                             {labelCfg.icon} {labelText}
                                           </Tag>
-                                        ) : <span style={{ color: '#8C8C8C' }}>{labelText || '—'}</span>}
+                                        ) : <span style={{ color: 'var(--text-3)' }}>{labelText || '—'}</span>}
                                       </td>
                                     )}
                                     {ri === 0 && (
@@ -1583,7 +1583,7 @@ export default function OrderDetail() {
                                     )}
                                     <td style={{ padding: '8px 16px', textAlign: 'center' }}>{rec.date}</td>
                                     <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500 }}>{rec.impressions.toLocaleString()}</td>
-                                    <td style={{ padding: '8px 16px', textAlign: 'center', color: '#52C41A', fontWeight: 500 }}>{rec.clicks}</td>
+                                    <td style={{ padding: '8px 16px', textAlign: 'center', color: 'var(--success)', fontWeight: 500 }}>{rec.clicks}</td>
                                     <td style={{ padding: '8px 16px', textAlign: 'center' }}>
                                       <span style={{
                                         color: rec.clickRate >= 8 ? '#52C41A' : rec.clickRate >= 5 ? '#E8720C' : '#FF4D4F',
@@ -1604,19 +1604,19 @@ export default function OrderDetail() {
                       const regionVal = Array.isArray(order.region) ? order.region[0] : order.region
                       const data = order.promoData || []
                       return (
-                        <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
+                        <div style={{ border: '1px solid var(--border-2)', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
                           <div style={{
-                            background: '#FAFAFA', padding: '8px 16px', borderBottom: '1px solid #f0f0f0',
-                            fontSize: 13, fontWeight: 600, color: '#262626', display: 'flex', alignItems: 'center', gap: 8,
+                            background: 'var(--surface-3)', padding: '8px 16px', borderBottom: '1px solid var(--border-2)',
+                            fontSize: 13, fontWeight: 600, color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 8,
                           }}>
                             {isPopular ? (
                               <>
-                                <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('orderDetail.skinKit')}</span>
-                                <Tag style={{ margin: 0, color: '#E8720C', background: '#FFF7E6', borderColor: '#FFD591' }}>🎨 {order.skinName}</Tag>
+                                <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>{t('orderDetail.skinKit')}</span>
+                                <Tag style={{ margin: 0, color: 'var(--brand)', background: 'var(--warning-soft)', borderColor: '#FFD591' }}>🎨 {order.skinName}</Tag>
                               </>
                             ) : isTrafficAd ? (
                               <>
-                                <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>流量包</span>
+                                <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>流量包</span>
                                 <Tag style={{
                                   margin: 0,
                                   color: order.trafficMode === 'custom' ? '#722ED1' : '#E8720C',
@@ -1625,7 +1625,7 @@ export default function OrderDetail() {
                                 }}>
                                   📊 {order.trafficMode === 'custom' ? '自定義' : (order.trafficPackageName || '-')}
                                 </Tag>
-                                <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>
+                                <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>
                                   {(order.trafficImpressions ?? 0).toLocaleString()} 次曝光
                                 </span>
                               </>
@@ -1653,14 +1653,14 @@ export default function OrderDetail() {
                               )}
                             </colgroup>
                             <thead>
-                              <tr style={{ background: '#FAFAFA' }}>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colImpressions')}</th>
+                              <tr style={{ background: 'var(--surface-3)' }}>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colImpressions')}</th>
                                 {isTrafficAd && (
-                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>消耗金額</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>消耗金額</th>
                                 )}
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colClicks')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colCtr')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colClicks')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colCtr')}</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -1669,11 +1669,11 @@ export default function OrderDetail() {
                                   <td style={{ padding: '8px 16px', textAlign: 'center' }}>{rec.date}</td>
                                   <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500 }}>{rec.impressions.toLocaleString()}</td>
                                   {isTrafficAd && (
-                                    <td style={{ padding: '8px 16px', textAlign: 'center', color: '#E8720C', fontWeight: 500 }}>
+                                    <td style={{ padding: '8px 16px', textAlign: 'center', color: 'var(--brand)', fontWeight: 500 }}>
                                       MOP {(rec.impressions * (trafficRefund?.unitPrice ?? 0)).toFixed(2)}
                                     </td>
                                   )}
-                                  <td style={{ padding: '8px 16px', textAlign: 'center', color: '#52C41A', fontWeight: 500 }}>{rec.clicks}</td>
+                                  <td style={{ padding: '8px 16px', textAlign: 'center', color: 'var(--success)', fontWeight: 500 }}>{rec.clicks}</td>
                                   <td style={{ padding: '8px 16px', textAlign: 'center' }}>
                                     <span style={{
                                       color: rec.clickRate >= 8 ? '#52C41A' : rec.clickRate >= 5 ? '#E8720C' : '#FF4D4F',
@@ -1697,10 +1697,10 @@ export default function OrderDetail() {
                         dateGroups.get(rec.date)!.push(rec)
                       })
                       return Array.from(dateGroups.entries()).map(([date, recs]) => (
-                        <div key={date} style={{ border: '1px solid #f0f0f0', borderRadius: 8, marginBottom: 12, overflow: 'hidden' }}>
+                        <div key={date} style={{ border: '1px solid var(--border-2)', borderRadius: 8, marginBottom: 12, overflow: 'hidden' }}>
                           <div style={{
-                            background: '#FAFAFA', padding: '8px 16px', borderBottom: '1px solid #f0f0f0',
-                            fontSize: 13, fontWeight: 600, color: '#262626',
+                            background: 'var(--surface-3)', padding: '8px 16px', borderBottom: '1px solid var(--border-2)',
+                            fontSize: 13, fontWeight: 600, color: 'var(--text-1)',
                           }}>
                             {date}
                           </div>
@@ -1713,12 +1713,12 @@ export default function OrderDetail() {
                               <col style={{ width: '16%' }} />
                             </colgroup>
                             <thead>
-                              <tr style={{ background: '#FAFAFA' }}>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('promotionOrderManage.colRegion')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colSlot')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colImpressions')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colClicks')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: '#262626', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colCtr')}</th>
+                              <tr style={{ background: 'var(--surface-3)' }}>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('promotionOrderManage.colRegion')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colSlot')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colImpressions')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colClicks')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colCtr')}</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -1754,7 +1754,7 @@ export default function OrderDetail() {
                                           {si === 0 && slotIdx === 0 && (
                                             <td rowSpan={regionRowCount} style={{
                                               padding: '8px 16px', textAlign: 'center', verticalAlign: 'middle',
-                                              background: '#FAFAFA', borderRight: '1px solid #f0f0f0',
+                                              background: 'var(--surface-3)', borderRight: '1px solid var(--border-2)',
                                             }}>
                                               <Tag color="blue" style={{ margin: 0 }}>{r}</Tag>
                                             </td>
@@ -1762,13 +1762,13 @@ export default function OrderDetail() {
                                           {si === 0 && (
                                             <td rowSpan={sRecs.length} style={{
                                               padding: '8px 16px', textAlign: 'center', verticalAlign: 'middle',
-                                              borderRight: '1px solid #f0f0f0',
+                                              borderRight: '1px solid var(--border-2)',
                                             }}>
                                               <Tag color="default" style={{ margin: 0 }}>{s}</Tag>
                                             </td>
                                           )}
                                           <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500 }}>{rec.impressions.toLocaleString()}</td>
-                                          <td style={{ padding: '8px 16px', textAlign: 'center', color: '#52C41A', fontWeight: 500 }}>{rec.clicks}</td>
+                                          <td style={{ padding: '8px 16px', textAlign: 'center', color: 'var(--success)', fontWeight: 500 }}>{rec.clicks}</td>
                                           <td style={{ padding: '8px 16px', textAlign: 'center' }}>
                                             <span style={{
                                               color: rec.clickRate >= 8 ? '#52C41A' : rec.clickRate >= 5 ? '#E8720C' : '#FF4D4F',
@@ -1812,8 +1812,8 @@ export default function OrderDetail() {
       <Modal
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ExclamationCircleOutlined style={{ color: '#FF4D4F', fontSize: 18 }} />
-            <span style={{ fontSize: 16, fontWeight: 600, color: '#262626' }}>{isNewStore ? t('orderDetail.confirmCancelTitle') : t('orderDetail.confirmRefundTitle')}</span>
+            <ExclamationCircleOutlined style={{ color: 'var(--danger)', fontSize: 18 }} />
+            <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-1)' }}>{isNewStore ? t('orderDetail.confirmCancelTitle') : t('orderDetail.confirmRefundTitle')}</span>
           </div>
         }
         open={refundModalVisible}
@@ -1826,12 +1826,12 @@ export default function OrderDetail() {
         {isNewStore ? (
           <div>
             <div style={{
-              background: '#FFF7E6', border: '1px solid #FFD591', borderRadius: 8,
+              background: 'var(--warning-soft)', border: '1px solid #FFD591', borderRadius: 8,
               padding: 16, marginBottom: 16,
             }}>
-              <div style={{ fontSize: 13, color: '#595959', lineHeight: 2 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 2 }}>
                 <div style={{ marginBottom: 8 }}>
-                  {t('orderDetail.newStoreTip1Prefix')}<strong style={{ color: '#E8720C' }}>{t('orderDetail.daysUnit', { count: 60 })}</strong>{t('orderDetail.newStoreTip1Suffix')}
+                  {t('orderDetail.newStoreTip1Prefix')}<strong style={{ color: 'var(--brand)' }}>{t('orderDetail.daysUnit', { count: 60 })}</strong>{t('orderDetail.newStoreTip1Suffix')}
                 </div>
                 <div style={{ paddingLeft: 8 }}>
                   {t('orderDetail.newStoreTip2')}<br />
@@ -1841,17 +1841,17 @@ export default function OrderDetail() {
               </div>
             </div>
             <div style={{
-              background: '#FFF1F0', border: '1px solid #FFA39E', borderRadius: 8,
+              background: 'var(--danger-soft)', border: '1px solid #FFA39E', borderRadius: 8,
               padding: 12, marginBottom: 12,
             }}>
-              <div style={{ fontSize: 13, color: '#FF4D4F', fontWeight: 600 }}>
+              <div style={{ fontSize: 13, color: 'var(--danger)', fontWeight: 600 }}>
                 ⚠️ {t('orderDetail.newStoreWarn')}
               </div>
             </div>
-            <Descriptions column={1} size="small" labelStyle={{ color: '#8C8C8C' }} contentStyle={{ fontWeight: 500 }}>
+            <Descriptions column={1} size="small" labelStyle={{ color: 'var(--text-3)' }} contentStyle={{ fontWeight: 500 }}>
               <Descriptions.Item label={t('orderDetail.orderNo')}>{order.orderNo}</Descriptions.Item>
               <Descriptions.Item label={t('orderDetail.remainingDays')}>
-                <span style={{ color: '#E8720C', fontWeight: 600 }}>{t('orderDetail.daysUnit', { count: order.purchaseDays?.length || 0 })}</span>
+                <span style={{ color: 'var(--brand)', fontWeight: 600 }}>{t('orderDetail.daysUnit', { count: order.purchaseDays?.length || 0 })}</span>
               </Descriptions.Item>
             </Descriptions>
           </div>
@@ -1859,10 +1859,10 @@ export default function OrderDetail() {
           <div>
             {/* 投流廣告：按定價配置的計算公式退款（退還剩餘未消耗曝光價值 − 手續費） */}
             <div style={{
-              background: '#FFF7E6', border: '1px solid #FFD591', borderRadius: 8,
+              background: 'var(--warning-soft)', border: '1px solid #FFD591', borderRadius: 8,
               padding: 16, marginBottom: 16,
             }}>
-              <div style={{ fontSize: 13, color: '#595959', lineHeight: 1.8 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.8 }}>
                 投流廣告按曝光次數計費：已消耗曝光按實際單價扣除不予退還，剩餘未消耗曝光折算金額退還至推廣金餘額
                 <br />
                 · 發起退款後，該訂單立即停止投放
@@ -1870,26 +1870,26 @@ export default function OrderDetail() {
                 · 僅退還實付部分，贈送曝光（如有）不予退款
               </div>
             </div>
-            <Descriptions column={1} size="small" labelStyle={{ color: '#8C8C8C' }} contentStyle={{ fontWeight: 500 }}>
+            <Descriptions column={1} size="small" labelStyle={{ color: 'var(--text-3)' }} contentStyle={{ fontWeight: 500 }}>
               <Descriptions.Item label={t('orderDetail.orderNo')}>{order.orderNo}</Descriptions.Item>
               <Descriptions.Item label="購買曝光量">{trafficRefund.purchased.toLocaleString()} 次</Descriptions.Item>
               <Descriptions.Item label="已消耗曝光量">
-                <span style={{ color: '#E8720C', fontWeight: 600 }}>{trafficRefund.consumed.toLocaleString()} 次</span>
+                <span style={{ color: 'var(--brand)', fontWeight: 600 }}>{trafficRefund.consumed.toLocaleString()} 次</span>
               </Descriptions.Item>
               <Descriptions.Item label="剩餘未消耗曝光">
-                <span style={{ color: '#52C41A', fontWeight: 600 }}>{trafficRefund.remaining.toLocaleString()} 次</span>
+                <span style={{ color: 'var(--success)', fontWeight: 600 }}>{trafficRefund.remaining.toLocaleString()} 次</span>
               </Descriptions.Item>
               <Descriptions.Item label="訂單實際單價">MOP {trafficRefund.unitPrice.toFixed(4)} / 次</Descriptions.Item>
               <Descriptions.Item label="退款手續費">
                 {trafficRefund.feePercent}% · MOP {trafficRefund.feeAmount.toFixed(2)}
               </Descriptions.Item>
               <Descriptions.Item label={t('orderDetail.refundAmountLabel')}>
-                <span style={{ color: '#52C41A', fontSize: 16, fontWeight: 700 }}>
+                <span style={{ color: 'var(--success)', fontSize: 16, fontWeight: 700 }}>
                   MOP {trafficRefund.refundAmount.toFixed(2)}
                 </span>
               </Descriptions.Item>
             </Descriptions>
-            <div style={{ marginTop: 12, fontSize: 12, color: '#8C8C8C', background: '#FAFAFA', padding: '8px 12px', borderRadius: 6 }}>
+            <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-3)', background: 'var(--surface-3)', padding: '8px 12px', borderRadius: 6 }}>
               退款金額 = 剩餘未消耗曝光 {trafficRefund.remaining.toLocaleString()} × 實際單價 {trafficRefund.unitPrice.toFixed(4)} − 手續費 {trafficRefund.feePercent}% = MOP {trafficRefund.refundAmount.toFixed(2)}
               <br />（實際單價 = 實付金額 MOP {order.actualPrice} ÷ 購買曝光 {trafficRefund.purchased.toLocaleString()} 次）
             </div>
@@ -1897,99 +1897,99 @@ export default function OrderDetail() {
         ) : payMode === 'gift' && refundInfo?.isPromoting ? (
           <div>
             <div style={{
-              background: '#FFF1F0', border: '1px solid #FFA39E', borderRadius: 8,
+              background: 'var(--danger-soft)', border: '1px solid #FFA39E', borderRadius: 8,
               padding: 16, marginBottom: 16,
             }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#FF4D4F', marginBottom: 8 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--danger)', marginBottom: 8 }}>
                 {t('orderDetail.refundGiftZeroTitle')}
               </div>
-              <div style={{ fontSize: 13, color: '#595959', lineHeight: 1.8 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.8 }}>
                 {t('orderDetail.refundGiftPromotingTip')}
               </div>
             </div>
-            <Descriptions column={1} size="small" labelStyle={{ color: '#8C8C8C' }} contentStyle={{ fontWeight: 500 }}>
+            <Descriptions column={1} size="small" labelStyle={{ color: 'var(--text-3)' }} contentStyle={{ fontWeight: 500 }}>
               <Descriptions.Item label={t('orderDetail.orderNo')}>{order.orderNo}</Descriptions.Item>
               <Descriptions.Item label={t('orderDetail.giftDeductLabel')}>
-                <span style={{ color: '#E8720C', fontWeight: 600 }}>{giftDays} {t('orderDetail.daysSuffix')}</span>
+                <span style={{ color: 'var(--brand)', fontWeight: 600 }}>{giftDays} {t('orderDetail.daysSuffix')}</span>
               </Descriptions.Item>
-              <Descriptions.Item label={t('orderDetail.refundGiftDaysLabel')}><span style={{ color: '#FF4D4F', fontSize: 16, fontWeight: 700 }}>0 {t('orderDetail.daysSuffix')}</span></Descriptions.Item>
+              <Descriptions.Item label={t('orderDetail.refundGiftDaysLabel')}><span style={{ color: 'var(--danger)', fontSize: 16, fontWeight: 700 }}>0 {t('orderDetail.daysSuffix')}</span></Descriptions.Item>
             </Descriptions>
           </div>
         ) : payMode === 'gift' ? (
           <div>
             <div style={{
-              background: '#F6FFED', border: '1px solid #B7EB8F', borderRadius: 8,
+              background: 'var(--success-soft)', border: '1px solid #B7EB8F', borderRadius: 8,
               padding: 16, marginBottom: 16,
             }}>
-              <div style={{ fontSize: 13, color: '#595959', lineHeight: 1.8 }}>
-                {t('orderDetail.refundGiftDaysTip')}<strong style={{ color: '#52C41A' }}>{t('orderDetail.daysUnit', { count: refundInfo?.refundGiftDays ?? 0 })}</strong>
+              <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.8 }}>
+                {t('orderDetail.refundGiftDaysTip')}<strong style={{ color: 'var(--success)' }}>{t('orderDetail.daysUnit', { count: refundInfo?.refundGiftDays ?? 0 })}</strong>
               </div>
             </div>
-            <Descriptions column={1} size="small" labelStyle={{ color: '#8C8C8C' }} contentStyle={{ fontWeight: 500 }}>
+            <Descriptions column={1} size="small" labelStyle={{ color: 'var(--text-3)' }} contentStyle={{ fontWeight: 500 }}>
               <Descriptions.Item label={t('orderDetail.orderNo')}>{order.orderNo}</Descriptions.Item>
               <Descriptions.Item label={t('orderDetail.giftDeductLabel')}>
-                <span style={{ color: '#E8720C', fontWeight: 600 }}>{giftDays} {t('orderDetail.daysSuffix')}</span>
+                <span style={{ color: 'var(--brand)', fontWeight: 600 }}>{giftDays} {t('orderDetail.daysSuffix')}</span>
               </Descriptions.Item>
               <Descriptions.Item label={t('orderDetail.feePercentLabel')}>{refundInfo?.feePercent ?? 0}%</Descriptions.Item>
               <Descriptions.Item label={t('orderDetail.refundGiftDaysLabel')}>
-                <span style={{ color: '#52C41A', fontSize: 16, fontWeight: 700 }}>
+                <span style={{ color: 'var(--success)', fontSize: 16, fontWeight: 700 }}>
                   {refundInfo?.refundGiftDays ?? 0} {t('orderDetail.daysSuffix')}
                 </span>
               </Descriptions.Item>
             </Descriptions>
-            <div style={{ marginTop: 12, fontSize: 12, color: '#8C8C8C', background: '#FAFAFA', padding: '8px 12px', borderRadius: 6 }}>
+            <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-3)', background: 'var(--surface-3)', padding: '8px 12px', borderRadius: 6 }}>
               {t('orderDetail.refundGiftFormula', { total: giftDays, percent: refundInfo?.feePercent ?? 0, days: refundInfo?.refundGiftDays ?? 0 })}
             </div>
           </div>
         ) : refundInfo?.isPromoting ? (
           <div>
             <div style={{
-              background: '#FFF1F0', border: '1px solid #FFA39E', borderRadius: 8,
+              background: 'var(--danger-soft)', border: '1px solid #FFA39E', borderRadius: 8,
               padding: 16, marginBottom: 16,
             }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#FF4D4F', marginBottom: 8 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--danger)', marginBottom: 8 }}>
                 {t('orderDetail.refundZeroTitle')}
               </div>
-              <div style={{ fontSize: 13, color: '#595959', lineHeight: 1.8 }}>
-                {t('orderDetail.refundPromotingTip1')}<strong style={{ color: '#FF4D4F' }}>{t('orderDetail.refundPromotingTip1Strong')}</strong>{t('orderDetail.refundPromotingTip2')}
+              <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.8 }}>
+                {t('orderDetail.refundPromotingTip1')}<strong style={{ color: 'var(--danger)' }}>{t('orderDetail.refundPromotingTip1Strong')}</strong>{t('orderDetail.refundPromotingTip2')}
                 <br />
                 <strong>{t('orderDetail.refundPromotingTip3')}</strong>
               </div>
             </div>
-            <Descriptions column={1} size="small" labelStyle={{ color: '#8C8C8C' }} contentStyle={{ fontWeight: 500 }}>
+            <Descriptions column={1} size="small" labelStyle={{ color: 'var(--text-3)' }} contentStyle={{ fontWeight: 500 }}>
               <Descriptions.Item label={t('orderDetail.orderNo')}>{order.orderNo}</Descriptions.Item>
               <Descriptions.Item label={t('orderDetail.paidAmount')}>MOP {order.actualPrice}</Descriptions.Item>
-              <Descriptions.Item label={t('orderDetail.refundAmountLabel')}><span style={{ color: '#FF4D4F', fontSize: 16, fontWeight: 700 }}>MOP 0</span></Descriptions.Item>
+              <Descriptions.Item label={t('orderDetail.refundAmountLabel')}><span style={{ color: 'var(--danger)', fontSize: 16, fontWeight: 700 }}>MOP 0</span></Descriptions.Item>
             </Descriptions>
           </div>
         ) : (
           <div>
             <div style={{
-              background: '#FFF7E6', border: '1px solid #FFD591', borderRadius: 8,
+              background: 'var(--warning-soft)', border: '1px solid #FFD591', borderRadius: 8,
               padding: 16, marginBottom: 16,
             }}>
-              <div style={{ fontSize: 13, color: '#595959', lineHeight: 1.8 }}>
-                {t('orderDetail.refundPendingTip1')}<strong style={{ color: '#E8720C' }}>{t('orderDetail.daysUnit', { count: refundInfo?.daysBefore ?? 0 })}</strong>{t('orderDetail.refundPendingTip2', { percent: refundInfo?.feePercent ?? 0 })}
+              <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.8 }}>
+                {t('orderDetail.refundPendingTip1')}<strong style={{ color: 'var(--brand)' }}>{t('orderDetail.daysUnit', { count: refundInfo?.daysBefore ?? 0 })}</strong>{t('orderDetail.refundPendingTip2', { percent: refundInfo?.feePercent ?? 0 })}
               </div>
             </div>
-            <Descriptions column={1} size="small" labelStyle={{ color: '#8C8C8C' }} contentStyle={{ fontWeight: 500 }}>
+            <Descriptions column={1} size="small" labelStyle={{ color: 'var(--text-3)' }} contentStyle={{ fontWeight: 500 }}>
               <Descriptions.Item label={t('orderDetail.orderNo')}>{order.orderNo}</Descriptions.Item>
               <Descriptions.Item label={t('orderDetail.paidAmount')}>MOP {order.actualPrice}</Descriptions.Item>
               <Descriptions.Item label={t('orderDetail.feePercentLabel')}>{refundInfo?.feePercent ?? 0}%</Descriptions.Item>
               <Descriptions.Item label={t('orderDetail.refundAmountLabel')}>
-                <span style={{ color: '#52C41A', fontSize: 16, fontWeight: 700 }}>
+                <span style={{ color: 'var(--success)', fontSize: 16, fontWeight: 700 }}>
                   MOP {refundInfo?.refundAmount ?? 0}
                 </span>
               </Descriptions.Item>
               {payMode === 'mixed' && (
                 <Descriptions.Item label={t('orderDetail.refundGiftDaysLabel')}>
-                  <span style={{ color: '#E8720C', fontSize: 16, fontWeight: 700 }}>
+                  <span style={{ color: 'var(--brand)', fontSize: 16, fontWeight: 700 }}>
                     {refundInfo?.refundGiftDays ?? 0} {t('orderDetail.daysSuffix')}
                   </span>
                 </Descriptions.Item>
               )}
             </Descriptions>
-            <div style={{ marginTop: 12, fontSize: 12, color: '#8C8C8C', background: '#FAFAFA', padding: '8px 12px', borderRadius: 6 }}>
+            <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-3)', background: 'var(--surface-3)', padding: '8px 12px', borderRadius: 6 }}>
               {t('orderDetail.refundFormula2', { paid: order.actualPrice, percent: refundInfo?.feePercent ?? 0, amount: refundInfo?.refundAmount ?? 0 })}
               {payMode === 'mixed' && (
                 <> <br />{t('orderDetail.refundGiftFormula', { total: giftDays, percent: refundInfo?.feePercent ?? 0, days: refundInfo?.refundGiftDays ?? 0 })}</>

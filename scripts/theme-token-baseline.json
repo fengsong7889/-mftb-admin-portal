@@ -9,9 +9,9 @@
     "expectThemeFiles：theme.css 与 themeTokens.ts 是否应已存在；置 true 后文件缺失即判失败，防止门禁长期 SKIP。"
   ],
   "cssHex": 2911,
-  "inlineHex": 9016,
+  "inlineHex": 8784,
   "rgbaBlack": 576,
-  "tokenized": 303,
+  "tokenized": 555,
   "expectThemeFiles": true,
   "updatedAt": "2026-11-03"
 }
