@@ -10,7 +10,11 @@ alwaysApply: false
 版本：1.1
 状态：强制
 适用范围：所有新建/修改的前端页面、组件、交互、提醒、样式。
-基准来源：`.qoder/rules/form-page-style.md`、`src/styles/components.css`、`src/styles/global.css`、`src/hooks/useColumnConfig.tsx`、`src/api/request.ts`。
+基准来源：`.qoder/rules/form-page-style.md`、`frontend/packages/ui/src/styles/components.css`、`frontend/packages/ui/src/styles/global.css`、`frontend/packages/ui/src/hooks/useColumnConfig.tsx`、`frontend/packages/platform-client/src/api/request.ts`。
+
+> ⚠️ 路径修正（2026-11-03）：共享层已拆为 workspace 包，`src/styles/`、`src/components/`、`src/hooks/`、`src/api/`
+> 均已不存在，真源在 `frontend/packages/{ui,platform-client,i18n,contracts}/`，通过别名 `@/styles`、`@/components` 等消费。
+> 旧路径写法会误导人改错文件（改了不生效，因为构建读的是包内那份）。
 
 > **AI 元规则**：每次涉及新界面 / 新交互 / 新提醒 / 新样式，必须先阅读本章；开发完成后必须逐条自检 §L「前端 UI 检查清单」，未通过不得提交。
 
@@ -31,23 +35,43 @@ alwaysApply: false
 
 ### A.1 色彩系统
 
-| 类别 | 色值 | 用途 |
-|------|------|------|
-| **主品牌色** | `#E8720C` | 主按钮、选中态、菜单高亮、Logo、链接、Tab 激活 |
-| **主色 hover** | `#F59432` | 悬停态 |
-| **成功 / 导出** | `#52C41A` | `.btn-export` 绿色描边 |
-| **信息 / 导入** | `#1890FF` | `.btn-import` 蓝色描边、基础信息图标 |
-| **警告 / 参数** | `#FA8C16` | 参数/策略/配置类模块图标 |
-| **高级 / 特殊** | `#722ED1` | 高级/特殊类模块图标 |
-| **危险 / 删除** | `#FF4D4F` | antd `danger`、删除/驳回 |
-| **中性边框** | `#D9D9D9` / `#f0f0f0` / `#e8eaed` | 描边、分隔线、卡片边框 |
-| **文本主色** | `#262626` | 卡片标题 |
-| **文本次色** | `#595959` | 表单标签、副标题 |
-| **文本弱色** | `#8C8C8C` | 说明文字、灰字提示 |
-| **深色侧边栏** | `#001529` / `#1E1E1E` | 侧边栏背景 |
-| **暖橙面板** | `#FFF7F0` + 边框 `#FFE7D1` | Modal 二次确认信息面板 |
+> **色值真源与双主题**：全站支持浅色/深色双主题，令牌取值由 `scripts/lib/theme-token-map.mjs` 的 `TOKEN_VALUES`
+> 统一定义（唯一真源），并由它生成 `frontend/packages/ui/src/styles/theme.css`（`:root` 与 `html[data-theme='dark']`）
+> 与 antd 侧的 `themeTokens.ts`。
+> **本表只登记浅色值与语义用途，不复制深色值**：规则文件里再抄一份必然与代码漂移，漂移后没人知道哪份是真的。
+> 深色值请查 `theme.css`；改值必须改 `TOKEN_VALUES`，由门禁 `npm run check:theme-tokens` 校验三方一致。
+> 方案与深色取值依据（含 WCAG 对比度实测矩阵）：`docs/design/深浅色主题切换_可落地实施方案_2026-11-03.md` §4。
 
-**禁止**：随意引入上述之外的新色值；如需扩展必须在本表登记并说明语义。
+| 语义令牌 | 类别 | 浅色值 | 用途 |
+|------|------|------|------|
+| `--brand` | **主品牌色** | `#E8720C` | 主按钮、选中态、菜单高亮、Logo、链接、Tab 激活 |
+| `--brand-hover` | **主色 hover** | `#F59432` | 悬停态 |
+| `--success` | **成功 / 导出** | `#52C41A` | `.btn-export` 绿色描边 |
+| `--info` | **信息 / 导入** | `#1890FF` | `.btn-import` 蓝色描边、基础信息图标 |
+| `--warning` | **警告 / 参数** | `#FA8C16` | 参数/策略/配置类模块图标 |
+| `--purple` | **高级 / 特殊** | `#722ED1` | 高级/特殊类模块图标 |
+| `--danger` | **危险 / 删除** | `#FF4D4F` | antd `danger`、删除/驳回 |
+| `--border-1` / `--border-2` / `--border-3` | **中性边框** | `#D9D9D9` / `#F0F0F0` / `#E8EAED` | 描边、分隔线、卡片边框 |
+| `--border-input` | **输入控件边框** | `#D9D9D9` | Input/Select/DatePicker 专用（深色下比 `--border-1` 亮一档，保证可辨识） |
+| `--text-1` | **文本主色** | `#262626` | 卡片标题 |
+| `--text-2` | **文本次色** | `#595959` | 表单标签、副标题 |
+| `--text-3` | **文本弱色** | `#8C8C8C` | 说明文字、灰字提示 |
+| `--text-4` | **禁用/最弱** | `#BFBFBF` | 禁用态文字、滚动条滑块（**禁止承载提示文案**，见 §N.4） |
+| `--text-inverse` | **反色文字** | `#FFFFFF` | 品牌橙实心底上的文字 |
+| `--text-brand` | **标题蓝** | `#1890FF` | 表单页/详情页标题（§C.2、§D.1 规定的蓝色标题） |
+| `--surface-1` / `--surface-2` / `--surface-3` | **表面三阶** | `#F5F5F5` / `#FFFFFF` / `#FAFAFA` | 页面底 / 卡片底 / 表头与只读块底 |
+| `--surface-sunken` | **凹陷面** | `#FAFBFC` | 内嵌区（代码块、预览区） |
+| `--sidebar-bg` 等组件层 | **深色侧边栏** | `#1E1E1E`（遗留 `#001529`） | 侧边栏背景；组件层令牌只允许壳层 CSS 引用 |
+| `--brand-soft` + `--brand-border` | **暖橙面板** | `#FFF7F0` + `#FFE7D1` | Modal 二次确认信息面板 |
+| `--shadow-1..3` / `--shadow-brand` / `--card-outline` | **阴影与描边补偿** | 见 §A.2 | 深色下阴影失效，必须与 `--card-outline` 成对使用 |
+
+**禁止**：
+1. 随意引入上述之外的新色值；如需扩展必须先在 `TOKEN_VALUES` 补令牌（浅色值 + 深色值 + 实测对比度），再登记到本表。
+2. 在 CSS 与 JSX 里写**裸色值**（如 `color: '#262626'`、`background: #fff`）；必须写 `var(--text-1)` / `var(--surface-2)`。
+   存量裸色值按棘轮基线 `scripts/theme-token-baseline.json` 分批清理（只降不升），新增即门禁失败。
+3. 引用 primitive 层令牌（`--gray-*` / `--orange-*`）：那一层只允许 `theme.css` 内部使用。
+4. 在业务代码里用 `if (isDark)` 分支决定颜色：颜色差异一律由令牌承担。
+   仅三处允许读当前主题——`@ant-design/charts` 的 `theme` 配置、leaflet 瓦片降亮、`html-to-image` 导出锁浅色。
 
 #### A.1.1 插画场景色板（门户系统卡）
 
@@ -162,6 +186,32 @@ alwaysApply: false
 
 **尺寸约束**：搜索区/操作区按钮 `height: 32px`，字号 `13px`，圆角 `6px`，`font-weight: 500`。
 
+#### B.1.1 列表内可点元素色彩统一 ⚠️ 强制标准
+
+> 背景：商家权重分「綁定瀑布流」的 `+N` 展开入口一度被做成描边胶囊，与同一行右边的「詳情」不是同一套颜色，
+> 用户无法从颜色判断哪些东西能点。结论：**可点的东西就长得一样，hover 就给可点颜色。**
+
+表格单元格内的一切可点元素（操作列按钮、展开入口如 `+N`、行内链接文字、可点击图标）必须沿用操作列的色彩语言，
+即全局 `frontend/packages/ui/src/styles/components.css` 的 `.ant-table .ant-btn-link`：
+
+| 状态 | 非危险类 | 危险类（删除/撤销） |
+|------|-----------|------------------|
+| 静态 | `#E8720C` 品牌橙文字 | `#FF4D4F` |
+| hover | `#F59432` + 浅橙底 `rgba(232,114,12,0.06)` + `scale(1.05)` | `#FF7875` + 浅红底 |
+
+**做法（唯一允许）**：用 `<Button type="link" size="small">`，让全局规则生效；页面自有 CSS 只允许补**形态与布局属性**
+（`border` / `border-radius` / `padding` / `flex-shrink` / `font-weight` 等），**不得**为该元素重写 `color`、`background`、
+`box-shadow` 或 hover 文字色。需要描边时，选择器要叠到 `.ant-table .ant-btn-link.<自己的类>` 一级以覆盖全局的
+`padding`/`border-radius`，描边取**同一主色的透明度阶**（如 `rgba(232,114,12,0.35)`，hover `rgba(245,148,50,0.65)`）。
+
+**禁止**：
+- 用实心块、渐变底或**新色相**来“突出可点”（描边胶囊本身允许，但只能按上面的取色方式）；
+- 同一个单元格/行内出现两种不同橙色的可点元素（文字色必须同源，否则就是两套色彩语言）；
+- 可点元素只靠 `cursor: pointer` 而 hover 无任何反馈。
+
+**自检**：断言可点元素 `className` 含 `ant-btn-link`，且页面 CSS 未给它手写 `color`；参考实现
+`src/pages/TrafficSandbox/MerchantScoreInsight.tsx` 的 `.organic__wf-more`（只加描边/圆角/布局，文字色全继承）。
+
 ### B.2 全局 hover 微动效
 
 - 所有非 link/text 按钮：`transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1)`，hover `translateY(-1px)`，active `translateY(0)`
@@ -246,7 +296,7 @@ Modal.confirm({
 | 场景 | 强制组件 | 禁止 |
 |------|---------|------|
 | 部门选择（所在部门/申请部门/组织树） | `TreeSelect`（配 `fetchDepartments()` + `buildDeptTree()`） | Input / 普通 Select |
-| 列显隐/顺序配置 | `useColumnConfig(pageKey, columnMeta, defaultConfig)` | 自行实现 |
+| 列显隐/顺序配置 | `useColumnConfig(pageKey, columnMeta, defaultConfig)`（三区外观，但锁定可拖入非锁定区或 × 解除） | 自行实现 |
 | 提交申请类按钮 | `Modal.confirm` + `custom-confirm-modal` | 直接调 API / `window.confirm` |
 | 模块分组卡片 | 白色 `div` + 内联样式 | antd `Card title=... headStyle=...` 彩色标题头 |
 | 富文本渲染 | 必须净化（DOMPurify 等） | `dangerouslySetInnerHTML` 直传 |
@@ -709,7 +759,7 @@ const cardStyle: React.CSSProperties = {
 
 ### E.3 列配置（`useColumnConfig`）
 
-**所有列表页必须**使用 `useColumnConfig(pageKey, columnMeta, defaultConfig)`：
+**所有列表页必须**使用 `useColumnConfig(pageKey, columnMeta, defaultConfig)`，且**锁定只能是可以解除的默认值，不能是硬限制**：
 
 ```tsx
 const { configComponent, applyConfig } = useColumnConfig('page-key', columnMeta, [
@@ -719,10 +769,16 @@ const { configComponent, applyConfig } = useColumnConfig('page-key', columnMeta,
 ```
 
 - `pageKey`：页面唯一标识（kebab-case），用于 localStorage 存储 key = `table-config-${pageKey}`
-- 字段锁定：`locked: 'head'` 固定在最前，`'tail'` 固定在最后
+- 三区外观（頭部鎖定／非鎖定／尾部鎖定）**保留**；`locked: 'head'/'tail'` 只是默认贴哪一侧，不是禁止排序：
+  锁定字段拖进非锁定区即 `locked = null`，每行另有 ×「解除鎖定」按钮
+- **非锁定区容器本身必须是 drop 目标**：空白处（及本区无字段时）可放置，拖到末尾即追加到自由区最后，
+  拖拽经过时给容器级反馈（`.tcc-zone-drop-end`）；只给字段行做落点等于实际不可用
+- 子项与区域容器的 dragOver/drop 必须 `stopPropagation`，避免同一次 drop 被处理两次
+- 兜底：可见列少于 2 列时回退默认配置，避免用户把列表清空后无法恢复
 - 自动同步列变更：新增列插入到第一个 `locked:'tail'` 之前，删除列自动清理
 - 标题跟随最新 i18n（语言切换时不丢顺序）
 - `configComponent` 渲染在操作区右侧
+- 参考实现：`src/pages/TrafficSandbox/MerchantScoreInsight.tsx`；自检：`frontend/packages/ui/src/components/TableColumnConfig.test.tsx`
 
 ### E.4 分页规范（强制）
 
@@ -990,22 +1046,39 @@ try {
 
 ### K.1 文件组织
 
+> 路径已按 2026-11-03 实测校正：共享层已拆为 workspace 包，`src/styles/` 与 `src/components/` 均已不存在。
+
 | 文件 | 职责 |
 |------|------|
-| `src/styles/global.css` | 全局入口，`@import components.css`，reset、滚动条、字体、全局 keyframes |
-| `src/styles/components.css` | 全项目共享样式中心（~2400 行）：侧边栏、Header、详情页头部、搜索区、操作区、按钮语义、弹窗底部、表单页脚 |
+| `frontend/packages/ui/src/styles/theme.css` | **主题令牌层**：`:root`（浅色）+ `html[data-theme='dark']`（深色）+ `@media print`（锁浅色）；值由 `TOKEN_VALUES` 生成 |
+| `frontend/packages/ui/src/styles/global.css` | 全局入口，`@import theme.css` 后 `@import components.css`（令牌必须先于消费者加载），reset、滚动条、字体、全局 keyframes |
+| `frontend/packages/ui/src/styles/components.css` | 全项目共享样式中心（~2400 行）：侧边栏、Header、详情页头部、搜索区、操作区、按钮语义、弹窗底部、表单页脚 |
 | `src/App.css` | 应用布局容器、页面淡入、空态/加载态美化 |
-| `src/components/*.css` | 复杂组件自有样式（MenuTabs、PetMascot、TableColumnConfig、PRDEditor） |
-| `src/pages/**/*.css` | 页面级样式（Home、OACenter、NotificationConfig、ParamLibrary 等） |
+| `frontend/packages/ui/src/components/*.css` | 复杂组件自有样式（MenuTabs、PetMascot、TableColumnConfig、PRDEditor、PortalTopBar、SystemSwitcher 等） |
+| `src/pages/**/*.css` | 主站页面级样式（Home、Portal、OACenter、NotificationConfig、DocCenter 等 29 个文件） |
+| `frontend/apps/{eam,hr,rdm}/src/pages/**/*.css` | 子系统页面级样式（9 个文件） |
+| `scripts/lib/theme-token-map.mjs` | 令牌取值、色值→令牌映射表、排除清单的**单一真源**（codemod 与门禁共用，禁止各自内嵌副本） |
 
 ### K.2 技术约束
 
-- **无** SCSS / Less / PostCSS / Tailwind / CSS-in-JS / styled-components
-- **无** CSS Variables / Design Token 文件（色值硬编码在 CSS 中）
+- **无** SCSS / Less / PostCSS / Tailwind / CSS-in-JS / styled-components（这五项仍禁止）
+- **色值统一走语义令牌**（`var(--*)`）：令牌定义在 `@/styles/theme.css`，分三层——
+  primitive（`--gray-*` / `--orange-*`，仅 theme.css 内部可用）、semantic（业务代码**只用这层**）、
+  component（`--sidebar-*` 等，仅壳层组件 CSS 可用）。**禁止在 CSS 与 JSX 新增裸色值**。
+  > 2026-11-03 修订：原条文「**无** CSS Variables / Design Token 文件」已作废。深色模式需要一套能在运行时切换、
+  > 且能被 22718 行 CSS 与 9987 处内联 style 共同消费的色值真源；双份 CSS 必然漂移，纯 antd `darkAlgorithm`
+  > 又盖不住内联 style（会出现白斑）。例外登记见 §M.1；先例依据：`PetMascot.css` 早已有 70 处 `--*` 动效参数变量。
 - 纯原生 CSS + **BEM 风格类名**（`block__element--modifier`）
-- 覆盖 antd 默认样式用**直接选择器**（如 `.sidebar-menu .ant-menu-item`），**非** ConfigProvider theme token
-- 主题 token 通过 `ConfigProvider` 在 `main.tsx` 注入（仅主色、Menu/Button/Table 组件级覆盖）
-- **无响应式断点**（不用 `@media`），靠 Flex / Grid 自适应
+- 覆盖 antd 默认样式用**直接选择器**（如 `.sidebar-menu .ant-menu-item`）；开启 `cssVar` 后需留意优先级变化，
+  改动壳层样式时必须双主题各看一遍
+- 主题 token 通过 `ConfigProvider`（`cssVar: true`）在 **`src/bootstrap.tsx`** 注入（非 `main.tsx`），
+  值取自 `packages/ui/src/theme/themeTokens.ts`，与 `theme.css` 构成双源，
+  由 `themeTokens.test.ts` 与 `check:theme-tokens` 钉住一致性。
+  ⚠️ antd 的 token 会经 derivative 算法派生，**禁止向 token 传 `var(--x)` 字符串**（会让派生色全错），必须传真实色值。
+- 入口唯一：`src/bootstrap.tsx` 的 `mountApp()` 被根 `src/main.tsx` 与 `frontend/apps/{eam,hr,rdm}/src/main.tsx` 共同复用，
+  因此主题/全局 Provider 只改这一处即对主站与三个子系统同时生效；禁止在子应用重复装配
+- **不用 `@media` 做布局响应式**（靠 Flex / Grid 自适应）；但 `prefers-color-scheme`、`prefers-reduced-motion`、`print`
+  三类**非布局**媒体查询允许且必须保留（主题跟随、动效降级、打印锁浅色）
 
 ### K.3 组件级样式隔离
 
@@ -1086,6 +1159,7 @@ try {
 - [ ] 所有输入控件 `width: 100%`？
 - [ ] 操作区 `.action-section` 左右分组正确（导出/批量在左，新增/列配置在右）？
 - [ ] 使用 `useColumnConfig(pageKey, columnMeta, defaultConfig)`？
+- [ ] 锁定字段能拖进非锁定区（容器空白处也是落点）或用 × 解除，而不是只能待在锁定区？
 - [ ] `locked: 'head'/'tail'` 字段正确（如 flowNo 锁头、action 锁尾）？
 - [ ] 分页 `showSizeChanger + showQuickJumper + showTotal` 三件套齐全？
 - [ ] `showTotal` 插值变量用 `count`（**不是** `total`）？
@@ -1094,6 +1168,7 @@ try {
 
 **按钮**：
 - [ ] 查询/新增 = 主色实心？
+- [ ] 表格内一切可点元素（含展开入口/+N）都用 `type="link"`，色彩与操作列一致，页面 CSS 未手写其颜色？
 - [ ] 重置/取消 = 描边灰？
 - [ ] 导出 = `.btn-export` 绿色描边？
 - [ ] 导入 = `.btn-import` 蓝色描边？
@@ -1133,16 +1208,21 @@ try {
 
 **样式**：
 - [ ] **没有**引入新的 CSS 框架 / 预处理器？
-- [ ] **没有**用 CSS Variables / Design Token？
+- [ ] 新增颜色是否**只用 `var(--*)` 语义令牌**（无裸色值）？
+- [ ] 新令牌是否已在 `TOKEN_VALUES` 登记浅色值 + 深色值 + **实测**对比度，并补到 §A.1？
+- [ ] 是否只引用 semantic / component 层令牌（**没有**用 `--gray-*` / `--orange-*` primitive）？
+- [ ] 深色下卡片层次是否靠 `--card-outline` 描边而非仅靠阴影？
+- [ ] 是否**没有**在业务代码里写 `if (isDark)` 颜色分支？
 - [ ] 类名 BEM 风格？
 - [ ] 复杂组件独立 CSS 文件？
-- [ ] **没有**用 `@media` 响应式断点？
+- [ ] **没有**用 `@media` 做**布局**响应式（非布局的 `prefers-color-scheme` / `print` 除外）？
 
 ### L.3 开发后（自检阶段）
 
 - [ ] `npm run typecheck` 通过？
 - [ ] `npm run lint` 通过（无新增 error）？
 - [ ] `npm run test:run` 通过（如涉测试文件）？
+- [ ] `npm run check:theme-tokens` 通过（裸色值棘轮未上升）？
 - [ ] 浏览器实际验证：新增/编辑/详情三模式布局一致？
 - [ ] 浏览器实际验证：列表页搜索、列配置、分页、导出全链路？
 - [ ] 浏览器实际验证：Modal 二次确认上下文信息完整？
@@ -1159,6 +1239,18 @@ try {
 - 新增代码必须 100% 符合本规范
 - CI 门禁 + Code Review 双重拦截
 
+### M.1 已登记例外
+
+| # | 例外事项 | 原因 | 风险 | 补偿措施 | 负责人 | 到期 |
+|---|---|---|---|---|---|---|
+| E-01 | 引入 CSS Variables 作为主题令牌层（原 §K.2 明文「无 CSS Variables」、禁止清单亦列明） | 深浅色切换需要一套可运行时切换、且能被 22718 行 CSS 与 9987 处内联 style 共同消费的色值真源；复制双份 CSS 必然漂移，纯 antd `darkAlgorithm` 盖不住内联 style（会出现白斑） | ①双源（CSS ↔ antd token）漂移；②codemod 误改业务语义色；③令牌层被滥用为「随手加变量」 | ①`TOKEN_VALUES` 单一真源 + `themeTokens.test.ts` + `check:theme-tokens` 三重校验；②白名单映射（**严格等值**判据由单测自动守）+ dry-run + 排除清单 + 分批 PR；③新令牌必须登记浅色值/深色值/实测对比度，primitive 层禁止业务引用并由门禁扫描 | `fengsong7889` | Phase 4 长尾收敛完成（棘轮归零）时关闭；若棘轮连续两个迭代不降，重新评审 |
+| E-02 | 深色下静态边框对比度 1.25~2.39:1，低于 WCAG 1.4.11 的 3:1 | 要达 3:1 需把边框提到约 `#6E6E6E`，会让深色界面布满亮线、噪声压过内容；antd 官方 `darkAlgorithm` 的 `colorBorder` 同为 `#424242`，属业界通行取舍 | 输入控件边界在深色下辨识困难 | ①分隔线属装饰性，1.4.11 本身豁免；②输入控件改用更亮的 `--border-input`；③控件底色与容器底色错开一档；④focus 环用品牌橙（5.37:1）且加粗到 2px | `fengsong7889` | Phase 3 视觉核对时复评 |
+| E-03 | 存量裸色值（CSS 3037 处 + 内联 9042 处 + 黑色 rgba 阴影 586 处）未按新规则立即清理 | 一次性改完会覆盖全仓，无法 review、与所有并行分支冲突 | 深色下未清理区域出现白底/黑字斑块 | 棘轮基线 `scripts/theme-token-baseline.json` 只降不升；按方案 §5.3 分 6 批推进；Phase 1 用 feature flag 关闭入口，避免半成品深色暴露给用户 | `fengsong7889` | Phase 4 归零 |
+| E-04 | 浅色现状 4 项对比度债务：`--text-3` 3.36:1、品牌橙作文字 3.07:1、主按钮白字 3.07:1、`--text-4` 1.84:1 | 存量既有，非本次改造引入；其中 `--text-3` 全站 347 处依赖 | 被误认为主题改造引入的回归；浅色下弱文字可读性偏低 | 已在方案 §4.5 逐项登记为「独立议题」，禁止夹带进主题 PR；若要修必须先重定义 §N.4 的「≥3.4:1」口径（与 WCAG AA 正文 4.5:1 不一致） | `fengsong7889` | 单独立项 |
+
+> 例外登记口径：**不在入库文件里写未关闭的安全缺口实况**（AGENTS.md「凭据泄露处置口径」同理），
+> 本表只登记已评估、已给出补偿措施的**规范例外**，不包含任何凭据/密钥/未修复漏洞信息。
+
 ---
 
 ## 9.1 前端 UI 禁止清单（补充）
@@ -1169,6 +1261,8 @@ try {
 - 禁止详情页顶部放操作按钮（只读模式）。
 - 禁止详情页底部显示完整操作日志表格（只允许「最后更新人 + 最后更新时间」）。
 - 禁止列表页不用 `useColumnConfig` 自行实现列配置。
+- 禁止把 `locked` 当硬限制：锁定字段必须能拖进非锁定区（非锁定区容器空白处需为 drop 目标）或用 × 解除锁定；
+  也禁止为了放开排序而改掉三区外观或改成每行固定端下拉（外观变更需产品确认）。
 - 禁止列表页把统计卡片放在搜索区 `.search-section` 上方（必须：搜索区 → 统计卡片 → 操作区 → 表格，见 §E.8）。
 - 禁止分页 `showTotal` 插值变量用 `total`（必须用 `count`）。
 - 禁止 pageSize 变化时不重置到第 1 页。
@@ -1179,11 +1273,26 @@ try {
 - 禁止用 `alert()` / `window.confirm()`。
 - 禁止硬编码「暂无数据」等空态文案（必须用 `<Empty description={t('xxx.empty')} />`）。
 - 禁止新增 i18n key 只加一个语言文件（必须 `zh-TW.json` + `en.json` 同步）。
-- 禁止引入 SCSS / Less / Tailwind / CSS-in-JS / styled-components / CSS Variables。
-- 禁止用 `@media` 响应式断点（靠 Flex/Grid 自适应）。
+- 禁止引入 SCSS / Less / Tailwind / CSS-in-JS / styled-components。
+  > 2026-11-03：原本列在本条的「CSS Variables」已移除——它现为主题令牌层的必需设施（例外登记见 §M.1 E-01）。
+- 禁止用 `@media` 做**布局**响应式断点（靠 Flex/Grid 自适应）；`prefers-color-scheme` / `prefers-reduced-motion` / `print` 三类非布局查询不在此限。
 - 禁止在组件内重复定义全局 keyframes（必须复用 `global.css` 已注册的）。
 - 禁止随意引入 §A.1 之外的新色值。
+- **禁止在 CSS 与 JSX 新增裸色值**（`color: '#262626'`、`background: #fff`、`boxShadow: '0 2px 8px rgba(0,0,0,0.06)'`）；
+  必须写 `var(--text-1)` / `var(--surface-2)` / `var(--shadow-1)`。新语义需先在 `TOKEN_VALUES` 登记再使用。
+- **禁止引用 primitive 层令牌**（`--gray-*` / `--orange-*`）：它们只允许 `theme.css` 内部使用，业务代码只用 semantic / component 层。
+- **禁止在业务代码里用 `if (isDark)` / 三元式决定颜色**：颜色差异一律由令牌承担，否则两套颜色会随页面数量线性膨胀且无法审计。
+  仅三处例外：`@ant-design/charts` 的 `theme` 配置、leaflet 瓦片降亮、`html-to-image` 导出锁浅色。
+- **禁止在深色下仅靠阴影表达卡片层次**（`rgba(0,0,0,x)` 在深底几乎不可见），必须同时应用 `--card-outline` 描边。
+- **禁止手工在 4 个 `index.html` 各自维护主题防闪烁脚本**：必须走 vite `transformIndexHtml` 插件 +
+  `scripts/lib/theme-boot-script.mjs` 单一真源（手工四份必然漂移，后果是刷新白闪）。
+- **禁止向 antd `ConfigProvider` 的 token 传 `var(--x)` 字符串**：token 会经 derivative 算法派生，传变量会让派生色全错；必须传真实色值。
+- **禁止在子应用（`frontend/apps/*`）重复装配主题或 Provider**：`mountApp()` 已是唯一装配点，重复装配会造成两套主题状态不同步。
+- **禁止将令牌取值写进规则/方案文档当作真源**：文档只写语义与口径，取值一律指向 `TOKEN_VALUES`（多源必漂移）。
 - 禁止按钮不用语义化 class（`.btn-export` / `.btn-import` / `.ant-btn-dangerous`）。
+- 禁止给表格内可点元素另套配色：必须沿用操作列 `.ant-table .ant-btn-link` 的色彩语言
+  （静态 `#E8720C`、hover `#F59432` + 浅橙底），页面 CSS 不得重写其文字色/背景；允许加描边，
+  但描边只能取同一主色的透明度阶且不得引入新色相（见 §B.1.1）。
 - 禁止用内联样式覆盖 `.form-footer` / `.detail-header` / `.detail-card` 全局类。
 - 禁止新增/编辑/详情使用 Modal 弹窗（必须使用独立页面，路由跳转 `/add`、`/edit?id=xxx`、`/detail?id=xxx`）。
   - 仅以下简单操作允许使用 Modal：确认删除/批量操作等二次确认弹窗（`Modal.confirm`）、简单设置面板（如列配置 `ColumnConfig`）、纯展示型信息提示（`Modal.info` / `Modal.success`）。
