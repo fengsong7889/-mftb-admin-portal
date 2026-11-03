@@ -10,9 +10,11 @@
   flex-shrink: 0;
   padding: 0;
   line-height: normal;
-  background: rgba(255, 255, 255, 0.92);
+  /* 顶栏毛玻璃：与 --header-text 成对。深色下必须跟着转暗，
+   * 否则浅色的顶栏文字会落在白色背板上（白底白字，对比度 1.04）。 */
+  background: var(--header-glass);
   backdrop-filter: blur(10px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-card-soft);
 }
 
 /* 底部品牌渐变条复用全局 headerGradientShift，与表单页头部顶条保持同一语言 */
@@ -23,7 +25,7 @@
   right: 0;
   bottom: 0;
   height: 3px;
-  background: linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C);
+  background: linear-gradient(90deg, var(--brand), #F59432, #FFB347, #F59432, var(--brand));
   background-size: 200% 100%;
   animation: headerGradientShift 4s ease infinite;
 }
@@ -78,13 +80,13 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #595959;
+  color: var(--text-2);
   font-size: 12px;
   white-space: nowrap;
 }
 
 .portal-locale-field label .anticon {
-  color: #8c8c8c;
+  color: var(--text-3);
   font-size: 14px;
 }
 
@@ -99,7 +101,7 @@
 .portal-top-bar-title {
   font-size: 18px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
   letter-spacing: 0.5px;
   white-space: nowrap;
 }
@@ -110,5 +112,5 @@
 .app-content.app-content-portal {
   margin: 0;
   padding: 0;
-  background: linear-gradient(180deg, #FAFAFA 0%, #F5F5F5 100%);
+  background: linear-gradient(180deg, var(--surface-3) 0%, var(--surface-1) 100%);
 }

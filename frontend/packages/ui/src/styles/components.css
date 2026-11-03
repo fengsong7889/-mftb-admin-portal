@@ -4,7 +4,7 @@
 .sidebar {
   height: 100vh;
   overflow: hidden;
-  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--sidebar-shadow);
   display: flex;
   flex-direction: column;
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -35,7 +35,7 @@
   flex-shrink: 0;
   width: 28px;
   height: 28px;
-  color: #E8720C;
+  color: var(--brand);
   font-size: 26px;
   line-height: 1;
 }
@@ -131,7 +131,7 @@
   top: 8px;
   bottom: 8px;
   width: 3px;
-  background: #E8720C;
+  background: var(--brand);
   border-radius: 0 3px 3px 0;
 }
 /* 优化滚动条外观 */
@@ -167,15 +167,15 @@
 /* 系統設置 - 银灰 */
 .sidebar-menu > .ant-menu-item:nth-child(2) > .anticon,
 .sidebar-menu > .ant-menu-submenu:nth-child(2) > .ant-menu-submenu-title > .anticon {
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 /* 用戶管理 - 蓝色 */
 .sidebar-menu > .ant-menu-submenu:nth-child(3) > .ant-menu-submenu-title > .anticon {
-  color: #1890FF;
+  color: var(--info);
 }
 /* 運營平台工具 - 紫色 */
 .sidebar-menu > .ant-menu-item:nth-child(4) > .anticon {
-  color: #722ED1;
+  color: var(--purple);
 }
 /* 運營投放管理 - 青绿 */
 .sidebar-menu > .ant-menu-submenu:nth-child(5) > .ant-menu-submenu-title > .anticon {
@@ -183,11 +183,11 @@
 }
 /* 商戶集團管理 - 橙色 */
 .sidebar-menu > .ant-menu-submenu:nth-child(6) > .ant-menu-submenu-title > .anticon {
-  color: #FA8C16;
+  color: var(--warning);
 }
 /* 到家業務 - 绿色 */
 .sidebar-menu > .ant-menu-submenu:nth-child(7) > .ant-menu-submenu-title > .anticon {
-  color: #52C41A;
+  color: var(--success);
 }
 /* 到店業務 - 红色 */
 .sidebar-menu > .ant-menu-submenu:nth-child(8) > .ant-menu-submenu-title > .anticon {
@@ -203,7 +203,7 @@
 }
 /* 搜索管理 - 搜索蓝 */
 .sidebar-menu > .ant-menu-submenu:nth-child(11) > .ant-menu-submenu-title > .anticon {
-  color: #1890FF;
+  color: var(--info);
 }
 /* 財務管理 - 金色 */
 .sidebar-menu > .ant-menu-submenu:nth-child(12) > .ant-menu-submenu-title > .anticon {
@@ -211,15 +211,15 @@
 }
 /* 權限管理 - 安全绿 */
 .sidebar-menu > .ant-menu-submenu:nth-child(13) > .ant-menu-submenu-title > .anticon {
-  color: #52C41A;
+  color: var(--success);
 }
 /* 推薦管理 - 紫色 */
 .sidebar-menu > .ant-menu-submenu:nth-child(14) > .ant-menu-submenu-title > .anticon {
-  color: #722ED1;
+  color: var(--purple);
 }
 /* 选中状态图标覆盖 */
 .sidebar-menu .ant-menu-item-selected > .anticon {
-  color: #E8720C !important;
+  color: var(--brand) !important;
 }
 /* hover 图标微放大 */
 .sidebar-menu .ant-menu-item:hover > .anticon,
@@ -231,7 +231,7 @@
    Header 顶部导航栏
    ======================================================================== */
 .header-bar {
-  background: #fff;
+  background: var(--surface-2);
   padding: 12px 24px;
   display: flex;
   align-items: center;
@@ -240,7 +240,10 @@
   gap: 12px 16px;
   flex-shrink: 0;
   line-height: normal;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  /* 叠 var(--card-outline)：深色下 0.06 黑阴影几乎不可见，顶栏与内容区的分隔靠 1px 描边建立。
+   * 注意本块原本就有两条 box-shadow（后者覆盖前者），浏览器只取最后一条——
+   * 描边必须合并到生效的那一条上，单独加一条会被静默吞掉（已踩过）。 */
+  box-shadow: var(--shadow-1), var(--card-outline);
   min-height: 64px;
   height: auto;
   z-index: 10;
@@ -260,7 +263,7 @@
 }
 .trigger-icon:hover {
   background: #F0F0F0;
-  color: #E8720C;
+  color: var(--brand);
 }
 .header-right {
   display: flex;
@@ -280,8 +283,8 @@
   position: relative;
 }
 .header-bell:hover {
-  background: #F0F0F0;
-  color: #E8720C;
+  background: var(--surface-hover);
+  color: var(--brand);
 }
 /* 铃铛微动画 */
 .header-bell:hover .anticon {
@@ -295,6 +298,26 @@
   80% { transform: rotate(-5deg); }
   100% { transform: rotate(0); }
 }
+/* 主题切换：与铃铛同一套尺寸与 hover 语言，但不带 bellRing 动画（切换不是提醒动作） */
+.header-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 8px;
+  transition: all 0.25s;
+  position: relative;
+}
+.header-theme-toggle:hover {
+  background: var(--surface-hover);
+  color: var(--brand);
+}
+/* 键盘可达：自定义控件不是 antd Button，没有默认 focus 环，必须自己给出（方案 §七） */
+.header-theme-toggle:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
 .header-user-info {
   display: flex;
   align-items: center;
@@ -305,11 +328,11 @@
   transition: all 0.25s;
 }
 .header-user-info:hover {
-  background: #F5F5F5;
+  background: var(--surface-1);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
 }
 .header-avatar {
-  background: linear-gradient(135deg, #E8720C, #FFB347);
+  background: linear-gradient(135deg, var(--brand), #FFB347);
   border-radius: 50%;
   overflow: hidden;
   box-shadow: 0 2px 6px rgba(232, 114, 12, 0.25);
@@ -322,7 +345,7 @@
 .header-user-name {
   font-size: 13px;
   font-weight: 600;
-  color: #2D3436;
+  color: var(--header-text);
 }
 .header-user-department {
   font-size: 11px;
@@ -337,23 +360,23 @@
 /* ===== 修改密码弹窗（强度条 + 规则清单，对齐企业身份系统交互） ===== */
 .pwd-form { display: flex; flex-direction: column; gap: 16px; padding: 8px 0 0; }
 .pwd-field { display: flex; flex-direction: column; min-width: 0; }
-.pwd-label { font-size: 13px; font-weight: 500; color: #595959; margin-bottom: 6px; }
+.pwd-label { font-size: 13px; font-weight: 500; color: var(--text-2); margin-bottom: 6px; }
 .pwd-strength { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
 .pwd-strength-bars { display: flex; gap: 4px; flex: 1; }
 .pwd-strength-bar { flex: 1; height: 4px; border-radius: 2px; background: #f0f0f0; transition: background 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
 .pwd-strength-label { font-size: 12px; min-width: 40px; text-align: right; white-space: nowrap; }
 .pwd-rules { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; }
-.pwd-rule { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 1.6; color: #8C8C8C; transition: color 0.25s; }
+.pwd-rule { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 1.6; color: var(--text-3); transition: color 0.25s; }
 .pwd-rule .anticon { font-size: 12px; }
-.pwd-rule.is-passed { color: #52C41A; }
+.pwd-rule.is-passed { color: var(--success); }
 .pwd-match { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-top: 6px; }
-.pwd-match.is-passed { color: #52C41A; }
-.pwd-match.is-failed { color: #FF4D4F; }
-.pwd-note { font-size: 12px; line-height: 1.6; color: #8C8C8C; background: #FFF7F0; border: 1px solid #FFE7D1; border-radius: 6px; padding: 8px 12px; }
+.pwd-match.is-passed { color: var(--success); }
+.pwd-match.is-failed { color: var(--danger); }
+.pwd-note { font-size: 12px; line-height: 1.6; color: var(--text-3); background: var(--brand-soft); border: 1px solid var(--brand-border); border-radius: 6px; padding: 8px 12px; }
 /* 表单自带底部操作区：对齐 antd Modal footer 的间距与分隔线（宿主用 footer={null}） */
-.pwd-actions { display: flex; justify-content: flex-end; gap: 8px; margin: 16px -24px -24px; padding: 12px 24px; border-top: 1px solid #f0f0f0; }
+.pwd-actions { display: flex; justify-content: flex-end; gap: 8px; margin: 16px -24px -24px; padding: 12px 24px; border-top: 1px solid var(--border-2); }
 .pwd-actions .ant-btn { border-radius: 8px; min-width: 88px; height: 36px; }
-.pwd-actions .ant-btn-primary { box-shadow: 0 2px 4px rgba(232, 114, 12, 0.25); }
+.pwd-actions .ant-btn-primary { box-shadow: var(--shadow-brand); }
 /* 强制改密门禁：遮罩不可关闭，层级压过顶栏与通知弹窗 */
 .pwd-force-modal .ant-modal-body { padding-top: 8px; }
 .pwd-force-alert { margin-bottom: 16px; }
@@ -368,9 +391,9 @@
 .header-notification-title {
   font-size: 15px;
   font-weight: 600;
-  color: #2D3436;
+  color: var(--header-text);
   padding-bottom: 12px;
-  border-bottom: 1px solid #F0F0F0;
+  border-bottom: 1px solid var(--border-2);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -381,12 +404,12 @@
   border-radius: 6px;
 }
 .header-notification-item:hover {
-  background: #FAFAFA;
+  background: var(--surface-3);
 }
 .header-notification-item-title {
   font-size: 13px;
   font-weight: 600;
-  color: #2D3436;
+  color: var(--header-text);
 }
 .header-notification-item-desc {
   font-size: 12px;
@@ -396,7 +419,7 @@
 }
 .header-notification-item-time {
   font-size: 11px;
-  color: #BFBFBF;
+  color: var(--text-4);
   margin-top: 4px;
   display: flex;
   align-items: center;
@@ -423,7 +446,7 @@
   align-items: center;
 }
 .home-welcome--orange {
-  background: linear-gradient(135deg, #E8720C 0%, #F39C12 100%);
+  background: linear-gradient(135deg, var(--brand) 0%, #F39C12 100%);
 }
 .home-welcome-left {
   flex: 1;
@@ -482,9 +505,9 @@
   top: 50px;
   left: 0;
   right: 0;
-  background: #fff;
+  background: var(--surface-2);
   border-radius: 10px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-popover);
   z-index: 20;
   max-height: 300px;
   overflow-y: auto;
@@ -500,7 +523,7 @@
   transition: background 0.15s;
 }
 .home-search-item:hover {
-  background: #F5F5F5;
+  background: var(--surface-1);
 }
 .home-search-item.is-added {
   opacity: 0.6;
@@ -534,10 +557,10 @@
   grid-column: 1 / -1;
 }
 .home-section {
-  background: #fff;
+  background: var(--surface-2);
   border-radius: 12px;
   padding: 20px 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-card-soft), var(--card-outline);
 }
 .home-section-header {
   display: flex;
@@ -548,7 +571,7 @@
 .home-section-header h3 {
   font-size: 15px;
   font-weight: 600;
-  color: #2D3436;
+  color: var(--header-text);
   margin: 0;
 }
 
@@ -606,7 +629,7 @@
   border: none;
   cursor: pointer;
   font-size: 12px;
-  color: #BFBFBF;
+  color: var(--text-4);
   opacity: 0;
   transition: all 0.2s;
   padding: 2px;
@@ -653,7 +676,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  background: #FAFAFA;
+  background: var(--surface-3);
   border-radius: 8px;
   transition: background 0.15s;
 }
@@ -665,7 +688,7 @@
   align-items: center;
   gap: 10px;
   font-size: 14px;
-  color: #2D3436;
+  color: var(--header-text);
 }
 
 /* 系统通知 */
@@ -676,7 +699,7 @@
 }
 .home-notification-item {
   padding: 12px 16px;
-  background: #FAFAFA;
+  background: var(--surface-3);
   border-radius: 8px;
   border-left: 3px solid transparent;
   transition: all 0.15s;
@@ -688,7 +711,7 @@
 .home-notification-title {
   font-size: 14px;
   font-weight: 600;
-  color: #2D3436;
+  color: var(--header-text);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -707,7 +730,7 @@
 }
 .home-notification-time {
   font-size: 11px;
-  color: #BFBFBF;
+  color: var(--text-4);
   margin-top: 4px;
 }
 
@@ -744,9 +767,12 @@
    Content Area 通用内容区域
    ======================================================================== */
 .content-area {
-  background: #fff;
+  background: var(--surface-2);
   border-radius: 8px;
   padding: 20px 24px;
+  /* 深色描边补偿：浅色为 transparent（原本无阴影，不能凭空给它加一层），
+   * 深色下靠 1px 描边与 --surface-1 页面底区分（两者仅 3% 亮度差，单靠底色认不出来）。 */
+  box-shadow: var(--card-outline);
 }
 
 /* ========================================================================
@@ -758,11 +784,11 @@
      - 详情页为只读模式，不在顶部放置操作按钮（需要时放Descriptions内或独立区块）
    ======================================================================== */
 .detail-header {
-  background: #fff;
+  background: var(--surface-2);
   border-radius: 8px;
   padding: 20px 24px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  box-shadow: var(--shadow-1), var(--card-outline);
 }
 .detail-header-row {
   display: flex;
@@ -779,7 +805,7 @@
   margin: 0;
   font-size: 17px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 .detail-header-subtitle {
   display: flex;
@@ -789,15 +815,15 @@
   padding-top: 12px;
   border-top: 1px dashed rgba(0,0,0,0.08);
   font-size: 13px;
-  color: #595959;
+  color: var(--text-2);
 }
 /* 详情页内容卡片（基本信息、参数模板等模块） */
 .detail-card {
-  background: #fff;
+  background: var(--surface-2);
   border-radius: 8px;
   padding: 20px 24px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  box-shadow: var(--shadow-1), var(--card-outline);
 }
 /* 查询区域样式 */
 .search-section {
@@ -896,16 +922,16 @@
 }
 .search-section .ant-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-btn-hover);
 }
 .search-section .ant-btn:active {
   transform: translateY(0);
 }
 /* 查询按钮 - 主色实心 */
 .search-section .ant-btn-primary {
-  background: #E8720C;
-  border-color: #E8720C;
-  box-shadow: 0 2px 4px rgba(232, 114, 12, 0.25);
+  background: var(--brand);
+  border-color: var(--brand);
+  box-shadow: var(--shadow-brand);
 }
 .search-section .ant-btn-primary:hover {
   background: #F59432;
@@ -914,12 +940,12 @@
 }
 /* 重置按钮 - 默认描边 */
 .search-section .ant-btn-default {
-  border-color: #D9D9D9;
-  color: #595959;
+  border-color: var(--border-1);
+  color: var(--text-2);
 }
 .search-section .ant-btn-default:hover {
-  border-color: #E8720C;
-  color: #E8720C;
+  border-color: var(--brand);
+  color: var(--brand);
 }
 
 /* --- 操作区按钮（新增/导出/批量修改） --- */
@@ -933,16 +959,16 @@
 }
 .action-section .ant-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-btn-hover);
 }
 .action-section .ant-btn:active {
   transform: translateY(0);
 }
 /* 新增按钮 - 主色实心 + 加号图标 */
 .action-section .ant-btn-primary {
-  background: #E8720C;
-  border-color: #E8720C;
-  box-shadow: 0 2px 4px rgba(232, 114, 12, 0.25);
+  background: var(--brand);
+  border-color: var(--brand);
+  box-shadow: var(--shadow-brand);
 }
 .action-section .ant-btn-primary:hover {
   background: #F59432;
@@ -951,18 +977,18 @@
 }
 /* 中性描边按钮（效果预览/审批人通知/商户合并等）默认灰、hover 品牌橙 */
 .action-section .ant-btn-default {
-  border-color: #D9D9D9;
-  color: #595959;
+  border-color: var(--border-1);
+  color: var(--text-2);
 }
 .action-section .ant-btn-default:hover {
-  border-color: #E8720C;
-  color: #E8720C;
+  border-color: var(--brand);
+  color: var(--brand);
 }
 /* 语义操作按钮：导出（绿 #52C41A） - 常显绿色描边 + 绿字 */
 .action-section .ant-btn.btn-export,
 .btn-export.ant-btn {
-  border-color: #52C41A !important;
-  color: #52C41A !important;
+  border-color: var(--success) !important;
+  color: var(--success) !important;
 }
 .action-section .ant-btn.btn-export:hover,
 .action-section .ant-btn.btn-export:focus,
@@ -974,8 +1000,8 @@
 /* 语义操作按钮：批量导入/上传（蓝 #1890FF） - 常显蓝色描边 + 蓝字 */
 .action-section .ant-btn.btn-import,
 .btn-import.ant-btn {
-  border-color: #1890FF !important;
-  color: #1890FF !important;
+  border-color: var(--info) !important;
+  color: var(--info) !important;
 }
 .action-section .ant-btn.btn-import:hover,
 .action-section .ant-btn.btn-import:focus,
@@ -1000,14 +1026,14 @@
 }
 /* 表格链接按钮 - 主色 */
 .ant-table .ant-btn-link:not(.ant-btn-dangerous) {
-  color: #E8720C;
+  color: var(--brand);
 }
 .ant-table .ant-btn-link:not(.ant-btn-dangerous):hover {
-  color: #F59432;
+  color: var(--brand-hover);
 }
 /* 表格危险按钮 - 删除/撤销 */
 .ant-table .ant-btn-link.ant-btn-dangerous {
-  color: #FF4D4F;
+  color: var(--danger);
 }
 .ant-table .ant-btn-link.ant-btn-dangerous:hover {
   color: #FF7875;
@@ -1022,7 +1048,7 @@
 /* --- 弹窗/表单底部按钮（确认/取消/返回） --- */
 .ant-modal-footer {
   padding: 12px 24px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--border-2);
 }
 .ant-modal-footer .ant-btn {
   font-size: 14px;
@@ -1043,8 +1069,8 @@
 }
 /* 弹窗确认按钮 - 主色实心 */
 .ant-modal-footer .ant-btn-primary {
-  background: #E8720C;
-  border-color: #E8720C;
+  background: var(--brand);
+  border-color: var(--brand);
   box-shadow: 0 2px 6px rgba(232, 114, 12, 0.3);
 }
 .ant-modal-footer .ant-btn-primary:hover {
@@ -1055,7 +1081,7 @@
 /* 弹窗危险确认（okButtonProps.danger / okType='danger'）保持红色，不能被主色规则盖掉 */
 .ant-modal-footer .ant-btn-primary.ant-btn-dangerous {
   background: #FF4D4F;
-  border-color: #FF4D4F;
+  border-color: var(--danger);
   box-shadow: 0 2px 6px rgba(255, 77, 79, 0.3);
 }
 .ant-modal-footer .ant-btn-primary.ant-btn-dangerous:hover {
@@ -1065,12 +1091,12 @@
 }
 /* 弹窗取消按钮 - 描边柔和 */
 .ant-modal-footer .ant-btn-default {
-  border-color: #D9D9D9;
-  color: #595959;
+  border-color: var(--border-1);
+  color: var(--text-2);
 }
 .ant-modal-footer .ant-btn-default:hover {
-  border-color: #E8720C;
-  color: #E8720C;
+  border-color: var(--brand);
+  color: var(--brand);
 }
 /* 弹窗危险按钮 */
 .ant-modal-footer .ant-btn-dangerous {
@@ -1086,8 +1112,8 @@
   align-items: center;
   gap: 12px;
   padding: 16px 24px;
-  background: #fff;
-  border-top: 1px solid #f0f0f0;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border-2);
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04);
 }
 .form-footer .ant-btn,
@@ -1105,7 +1131,7 @@
 .approval-detail-footer .ant-btn:hover,
 .recharge-footer .ant-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-btn-active);
 }
 .form-footer .ant-btn:active,
 .approval-detail-footer .ant-btn:active,
@@ -1117,8 +1143,8 @@
 .form-footer .ant-btn-primary,
 .approval-detail-footer .ant-btn-primary,
 .recharge-footer .ant-btn-primary {
-  background: #E8720C;
-  border-color: #E8720C;
+  background: var(--brand);
+  border-color: var(--brand);
   box-shadow: 0 2px 8px rgba(232, 114, 12, 0.3);
 }
 .form-footer .ant-btn-primary:hover,
@@ -1132,15 +1158,15 @@
 .form-footer .ant-btn-default,
 .approval-detail-footer .ant-btn-default,
 .recharge-footer .ant-btn-default {
-  border-color: #D9D9D9;
-  color: #595959;
-  background: #fff;
+  border-color: var(--border-1);
+  color: var(--text-2);
+  background: var(--surface-2);
 }
 .form-footer .ant-btn-default:hover,
 .approval-detail-footer .ant-btn-default:hover,
 .recharge-footer .ant-btn-default:hover {
-  border-color: #E8720C;
-  color: #E8720C;
+  border-color: var(--brand);
+  color: var(--brand);
 }
 /* 页面底部 - 驳回/删除等危险按钮 */
 .form-footer .ant-btn-dangerous,
@@ -1184,7 +1210,7 @@
 }
 .ant-btn-dangerous.ant-btn-primary {
   background: #FF4D4F;
-  border-color: #FF4D4F;
+  border-color: var(--danger);
 }
 .ant-btn-dangerous.ant-btn-primary:hover {
   background: #FF7875;
@@ -1214,7 +1240,7 @@
 .reconcile-summary-card {
   border-radius: 12px;
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-1);
 }
 .reconcile-card-title {
   display: flex;
@@ -1222,7 +1248,7 @@
   gap: 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #2D3436;
+  color: var(--header-text);
   margin-bottom: 16px;
   padding-bottom: 12px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
@@ -1299,7 +1325,7 @@
   gap: 12px;
   padding: 20px 24px;
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-1);
 }
 .debt-brand-card-icon {
   font-size: 32px;
@@ -1312,11 +1338,11 @@
 .debt-brand-card-label {
   font-size: 13px;
   font-weight: 600;
-  color: #2D3436;
+  color: var(--header-text);
 }
 .debt-brand-card-sub {
   font-size: 11px;
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 .debt-brand-card-value {
   font-size: 24px;
@@ -2454,7 +2480,7 @@
 
 .debt-detail-stat-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-3);
 }
 
 .debt-detail-stat-value {
@@ -2465,7 +2491,7 @@
 
 .debt-detail-stat-label {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 
 /* ========================================================================
@@ -2508,14 +2534,14 @@
 .algo-card-wrapper--magenta::before { background: linear-gradient(90deg, #eb2f96, #ff85c0); }
 .algo-card-wrapper--red::before { background: linear-gradient(90deg, #ff4d4f, #ff7875); }
 .algo-card-wrapper--geekblue::before { background: linear-gradient(90deg, #2f54eb, #85a5ff); }
-.algo-card-wrapper--orange::before { background: linear-gradient(90deg, #E8720C, #FFB347); }
+.algo-card-wrapper--orange::before { background: linear-gradient(90deg, var(--brand), #FFB347); }
 .algo-card-wrapper--yellow::before { background: linear-gradient(90deg, #fadb14, #fff566); }
 .algo-card-wrapper--teal::before { background: linear-gradient(90deg, #08979c, #36cfc9); }
 
 /* Card lift + shadow on hover */
 .algo-card-wrapper:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-3);
 }
 
 /* Disabled state - no hover */
@@ -2537,11 +2563,11 @@
 .algo-card-inner {
   position: relative;
   z-index: 1;
-  background: #fff;
+  background: var(--surface-2);
   border-radius: 12px;
   padding: 24px 20px;
   text-align: center;
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--border-2);
 }
 
 /* Icon container */
@@ -2561,18 +2587,18 @@
   margin: 0 0 8px;
   font-size: 18px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
   transition: color 0.3s ease;
 }
 
 .algo-card-wrapper:hover .algo-card-title {
-  color: #E8720C;
+  color: var(--brand);
 }
 
 /* Card description */
 .algo-card-desc {
   margin: 0;
-  color: #8c8c8c;
+  color: var(--text-3);
   font-size: 13px;
   line-height: 1.6;
 }
@@ -2624,7 +2650,7 @@
   height: 26px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: linear-gradient(135deg, #FFA940 0%, #E8720C 100%);
+  background: linear-gradient(135deg, #FFA940 0%, var(--brand) 100%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2644,12 +2670,12 @@
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  color: #8C8C8C;
+  color: var(--text-3);
   transition: all 0.2s ease;
 }
 .custom-confirm-modal .ant-modal-close:hover {
-  background: #F5F5F5;
-  color: #595959;
+  background: var(--surface-1);
+  color: var(--text-2);
 }
 
 /* 内容区：四周留白（优先级 (0,4,0) 覆盖 antd confirm 默认 padding: 0） */
@@ -2662,22 +2688,22 @@
 .custom-confirm-modal .ant-modal-confirm-content {
   margin-top: 16px;
   font-size: 14px;
-  color: #595959;
+  color: var(--text-2);
 }
 
 /* 暖橙色调信息面板 */
 .custom-confirm-modal .confirm-info-card {
-  background: #FFF7F0;
+  background: var(--brand-soft);
   border-radius: 10px;
   padding: 12px 16px;
-  border: 1px solid #FFE7D1;
+  border: 1px solid var(--brand-border);
 }
 .custom-confirm-modal .confirm-info-card .confirm-info-row {
   display: flex;
   align-items: center;
   font-size: 13px;
   line-height: 2.4;
-  color: #595959;
+  color: var(--text-2);
 }
 /* 行内标签不得换行：label 折成两行会把右侧值顶错位，整屏看起来像布局坏了。
    已经统一成 `.confirm-info-label` 的调用方不受影响，这里兜住直接写 <span> 的页面。 */
@@ -2689,23 +2715,23 @@
   border-top: 1px dashed rgba(232, 114, 12, 0.12);
 }
 .custom-confirm-modal .confirm-info-card .confirm-info-label {
-  color: #8C8C8C;
+  color: var(--text-3);
   min-width: 80px;
   flex-shrink: 0;
   font-size: 13px;
 }
 .custom-confirm-modal .confirm-info-card .confirm-info-value {
-  color: #262626;
+  color: var(--text-1);
   font-weight: 500;
   word-break: break-all;
 }
 .custom-confirm-modal .confirm-info-card .confirm-info-value.highlight {
-  color: #E8720C;
+  color: var(--brand);
   font-weight: 700;
   font-size: 14px;
 }
 .custom-confirm-modal .confirm-info-card .confirm-info-value.danger {
-  color: #FF4D4F;
+  color: var(--danger);
   font-weight: 700;
   font-size: 14px;
 }
@@ -2725,8 +2751,8 @@
  * 让漏加类名的确认弹窗也不会漏色（历史上这里写过蓝色，与规范冲突）。
  */
 .ant-modal-confirm .ant-modal-confirm-btns .ant-btn-primary {
-  background: #E8720C;
-  border-color: #E8720C;
+  background: var(--brand);
+  border-color: var(--brand);
   color: #fff;
   box-shadow: 0 2px 6px rgba(232, 114, 12, 0.3);
 }
@@ -2738,7 +2764,7 @@
 /* 危险确认（okType: 'danger'）保持红色，不能被上面的主色规则盖掉 */
 .ant-modal-confirm .ant-modal-confirm-btns .ant-btn-primary.ant-btn-dangerous {
   background: #FF4D4F;
-  border-color: #FF4D4F;
+  border-color: var(--danger);
   box-shadow: 0 2px 6px rgba(255, 77, 79, 0.3);
 }
 .ant-modal-confirm .ant-modal-confirm-btns .ant-btn-primary.ant-btn-dangerous:hover {
@@ -2753,7 +2779,7 @@
  */
 .ant-modal-confirm .ant-modal-confirm-btns .ant-btn-dangerous {
   background: #FF4D4F;
-  border-color: #FF4D4F;
+  border-color: var(--danger);
   color: #fff;
   box-shadow: 0 2px 6px rgba(255, 77, 79, 0.3);
 }
@@ -2787,17 +2813,17 @@
   padding: 0 24px;
   min-width: 96px;
   border-radius: 8px;
-  border: 1px solid #D9D9D9;
+  border: 1px solid var(--border-1);
   font-weight: 500;
   font-size: 14px;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  background: #fff;
-  color: #595959;
+  background: var(--surface-2);
+  color: var(--text-2);
 }
 /* 取消按钮 hover 跟随品牌橙（与 .ant-modal-footer 同一口径） */
 .custom-confirm-modal .ant-modal-confirm-btns .ant-btn-default:hover {
-  border-color: #E8720C;
-  color: #E8720C;
+  border-color: var(--brand);
+  color: var(--brand);
 }
 /*
  * 危险确认按钮必须排在「取消按钮白底」规则之后：
@@ -2806,7 +2832,7 @@
  */
 .custom-confirm-modal .ant-modal-confirm-btns .ant-btn-dangerous {
   background: #FF4D4F;
-  border: 1px solid #FF4D4F;
+  border: 1px solid var(--danger);
   color: #fff;
   box-shadow: 0 2px 6px rgba(255, 77, 79, 0.3);
 }
@@ -2825,20 +2851,20 @@
 }
 .label-tip .label-tip-icon {
   font-size: 13px;
-  color: #8C8C8C;
+  color: var(--text-3);
   cursor: help;
   transition: color 0.2s;
 }
 .label-tip .label-tip-icon:hover {
-  color: #E8720C;
+  color: var(--brand);
 }
 
 /* ========================================================================
    Tooltip 全局白底黑字
    ======================================================================== */
 .ant-tooltip .ant-tooltip-inner {
-  background: #ffffff !important;
-  color: #262626 !important;
+  background: var(--surface-2) !important;
+  color: var(--text-1) !important;
   border: 1px solid #e8e8e8;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   font-size: 13px !important;
@@ -2848,7 +2874,7 @@
   line-height: 1.5 !important;
 }
 .ant-tooltip .ant-tooltip-arrow::before {
-  background: #ffffff !important;
+  background: var(--surface-2) !important;
 }
 
 /* ========================================================================
@@ -2872,10 +2898,10 @@
    验收入库 - 历史已完全验收行：绿底 + 左侧绿边标记（不参与本次操作）
    ======================================================================== */
 .inbound-accepted-row > td {
-  background: #f6ffed !important;
+  background: var(--success-soft) !important;
 }
 .inbound-accepted-row > td:first-child {
-  border-left: 3px solid #52C41A;
+  border-left: 3px solid var(--success);
 }
 .inbound-accepted-row:hover > td {
   background: #efffe8 !important;
@@ -2885,11 +2911,11 @@
    验收入库 - 历史已退货行：灰底 + 左侧红边（终态，不再验收）
    ======================================================================== */
 .inbound-returned-row > td {
-  background: #f5f5f5 !important;
-  color: #8C8C8C;
+  background: var(--surface-1) !important;
+  color: var(--text-3);
 }
 .inbound-returned-row > td:first-child {
-  border-left: 3px solid #FF4D4F;
+  border-left: 3px solid var(--danger);
 }
 .inbound-returned-row:hover > td {
   background: #ededed !important;
@@ -2899,10 +2925,10 @@
    验收入库 - 历史换货在途行：橙底 + 左侧橙边（等待二次发货）
    ======================================================================== */
 .inbound-exchanged-row > td {
-  background: #fff7e6 !important;
+  background: var(--warning-soft) !important;
 }
 .inbound-exchanged-row > td:first-child {
-  border-left: 3px solid #FA8C16;
+  border-left: 3px solid var(--warning);
 }
 .inbound-exchanged-row:hover > td {
   background: #fff1d6 !important;
@@ -2917,8 +2943,8 @@ body:has(.ai-assistant-page) .pet-mascot-wrapper {
 /* ── 表单页底部主按钮禁用态：不再保留品牌橙底，保证文字对比度 ── */
 .form-footer .ant-btn-primary[disabled],
 .form-footer .ant-btn-primary.ant-btn-disabled {
-  background: #f5f5f5 !important;
-  border-color: #d9d9d9 !important;
+  background: var(--surface-1) !important;
+  border-color: var(--border-1) !important;
   color: rgba(0, 0, 0, 0.25) !important;
   box-shadow: none !important;
 }

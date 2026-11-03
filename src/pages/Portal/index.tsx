@@ -794,12 +794,15 @@ export default function Portal() {
    * 四种格子三种量纲，其中「0 可申请」与「16 平台接入」没有对比基准就无从解读。
    * 「可申请 0」额外给一句微文案，让 0 看起来是「无待办」而不是「加载坏了」。
    */
+  // 统计卡取色全部走语义令牌（浅色值与旧硬编码逐项相等，切换主题时才会跟着变）。
+  // 旧写法 `borderColor: `${tone}22`` 是字符串拼 alpha，tone 改成 var() 后会拼出非法值，
+  // 所以描边改用 stat-border-* 专用令牌（值即「主色 + 13%」）。
   const stats = [
-    { key: 'authorized', icon: <AppstoreOutlined />, tone: '#1890FF', bg: '#E6F7FF', value: systems.length, suffix: ` / ${totalSystemCount}`, label: t('portal.statAuthorized', '已授權系統'), hint: '' },
+    { key: 'authorized', icon: <AppstoreOutlined />, tone: 'var(--info)', border: 'var(--stat-border-info)', bg: 'var(--info-soft)', value: systems.length, suffix: ` / ${totalSystemCount}`, label: t('portal.statAuthorized', '已授權系統'), hint: '' },
     // 可申請 0 → 灰显（评审 L4）：0 是「无待办」，不该跟其它三格的彩色数字抢注意力
-    { key: 'requestable', icon: <SafetyCertificateOutlined />, tone: unauthorizedSystems.length === 0 ? '#BFBFBF' : '#E8720C', bg: unauthorizedSystems.length === 0 ? '#FAFAFA' : '#FFF7E6', value: unauthorizedSystems.length, suffix: ` / ${totalSystemCount}`, label: t('portal.statRequestable', '可申請系統'), hint: unauthorizedSystems.length === 0 ? t('portal.statAllGranted', '全部已開通') : '' },
-    { key: 'domain', icon: <PartitionOutlined />, tone: '#52C41A', bg: '#F6FFED', value: authorizedDomainCount, suffix: ` / ${PORTAL_DOMAINS.length}`, label: t('portal.statDomain', '覆蓋業務板塊'), hint: '' },
-    { key: 'total', icon: <DeploymentUnitOutlined />, tone: '#722ED1', bg: '#F9F0FF', value: totalSystemCount, suffix: '', label: t('portal.statTotal', '平台接入應用'), hint: '' },
+    { key: 'requestable', icon: <SafetyCertificateOutlined />, tone: unauthorizedSystems.length === 0 ? 'var(--text-4)' : 'var(--brand)', border: unauthorizedSystems.length === 0 ? 'var(--stat-border-neutral)' : 'var(--stat-border-brand)', bg: unauthorizedSystems.length === 0 ? 'var(--surface-3)' : 'var(--warning-soft)', value: unauthorizedSystems.length, suffix: ` / ${totalSystemCount}`, label: t('portal.statRequestable', '可申請系統'), hint: unauthorizedSystems.length === 0 ? t('portal.statAllGranted', '全部已開通') : '' },
+    { key: 'domain', icon: <PartitionOutlined />, tone: 'var(--success)', border: 'var(--stat-border-success)', bg: 'var(--success-soft)', value: authorizedDomainCount, suffix: ` / ${PORTAL_DOMAINS.length}`, label: t('portal.statDomain', '覆蓋業務板塊'), hint: '' },
+    { key: 'total', icon: <DeploymentUnitOutlined />, tone: 'var(--purple)', border: 'var(--stat-border-purple)', bg: 'var(--purple-soft)', value: totalSystemCount, suffix: '', label: t('portal.statTotal', '平台接入應用'), hint: '' },
   ]
 
   return (
@@ -848,7 +851,7 @@ export default function Portal() {
       {/* 概览指标带：上提叠在横幅下沿，建立页面第一层视觉重心 */}
       <div className="portal-stats" key={`${systems.length}-${unauthorizedSystems.length}-${loading}`}>
         {stats.map((item) => (
-          <div key={item.key} className="portal-stat" style={{ background: item.bg, borderColor: `${item.tone}22` }}>
+          <div key={item.key} className="portal-stat" style={{ background: item.bg, borderColor: item.border }}>
             <span className="portal-stat-icon" style={{ color: item.tone }}>{item.icon}</span>
             <b className="portal-stat-value" style={{ color: item.tone }}>
               {loading || loadError ? '—' : <AnimatedNumber value={item.value} suffix={item.suffix} />}
