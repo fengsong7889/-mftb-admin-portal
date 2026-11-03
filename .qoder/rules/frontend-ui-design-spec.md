@@ -57,7 +57,7 @@ alwaysApply: false
 | `--text-2` | **文本次色** | `#595959` | 表单标签、副标题 |
 | `--text-3` | **文本弱色** | `#8C8C8C` | 说明文字、灰字提示 |
 | `--text-4` | **禁用/最弱** | `#BFBFBF` | 禁用态文字、滚动条滑块（**禁止承载提示文案**，见 §N.4） |
-| `--text-inverse` | **反色文字** | `#FFFFFF` | 品牌橙实心底上的文字 |
+| `--on-brand` | **品牌底前景** | `#FFFFFF` | 品牌橙实底上的文字**与图标**：主按钮文字、Checkbox 勾号、Radio 内圆点、Menu 选中项、Switch 选中文字。深色主题取 `#141414`（橙底上 6.00:1，白字仅 3.07:1） |
 | `--text-brand` | **标题蓝** | `#1890FF` | 表单页/详情页标题（§C.2、§D.1 规定的蓝色标题） |
 | `--surface-1` / `--surface-2` / `--surface-3` | **表面三阶** | `#F5F5F5` / `#FFFFFF` / `#FAFAFA` | 页面底 / 卡片底 / 表头与只读块底 |
 | `--surface-sunken` | **凹陷面** | `#FAFBFC` | 内嵌区（代码块、预览区） |
@@ -70,6 +70,9 @@ alwaysApply: false
 2. 在 CSS 与 JSX 里写**裸色值**（如 `color: '#262626'`、`background: #fff`）；必须写 `var(--text-1)` / `var(--surface-2)`。
    存量裸色值按棘轮基线 `scripts/theme-token-baseline.json` 分批清理（只降不升），新增即门禁失败。
 3. 引用 primitive 层令牌（`--gray-*` / `--orange-*`）：那一层只允许 `theme.css` 内部使用。
+   同理，**禁止拿 `--surface-2`（卡片白底）当品牌橙底上的文字色**：两者浅色系同值，
+   但语义相反，混用后令牌调值时会互相牵连（品牌底前景该改黑，卡片底当然不能改黑）。
+   品牌色实底上的前景一律用 `--on-brand`。
 4. 在业务代码里用 `if (isDark)` 分支决定颜色：颜色差异一律由令牌承担。
    仅三处允许读当前主题——`@ant-design/charts` 的 `theme` 配置、leaflet 瓦片降亮、`html-to-image` 导出锁浅色。
 
@@ -96,6 +99,12 @@ alwaysApply: false
 | `iam` | `#9254DE` | 紫：权限与账号安全（原 #001529 近黑已按约束②整改） |
 | `platform` | `#096DD9` | 信息蓝深阶：平台配置与发布（原 `#595959` 整卡偏灰，被读成「禁用」，按 §S6 整改） |
 | `translation` | `#19888B` | 深青：地球与多语言 |
+| `payroll` | `#2BCA65` | 翠绿：薪酬与发放（与考勤青、HR 天蓝、组织靛蓝互斥） |
+| `organization` | `#5E46D8` | 靛蓝：组织与编制（与 AI 紫 / 权限紫 / 搜索电光蓝互斥） |
+
+> 上表共 18 个 scene，与 `src/pages/Portal/index.css` 的 `[data-scene='xxx']` 逐字对应；
+> 由 `npm run check:theme-tokens` 第 6 条断言比对基线 `SCENE_COLOR_BASELINE`，两边不一致当场失败。
+> scene 色**不参与主题切换**（浅色/深色同值），它只负责「一系统一色」的识别。
 
 **硬约束**（摘自《企业门户界面设计评审 2026-10-24》§S2）：
 
