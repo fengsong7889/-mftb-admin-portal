@@ -12,7 +12,7 @@ function Sheet({ x, y, width = 104, height = 112 }: { x: number; y: number; widt
   return (
     <g>
       <rect x={x + 5} y={y + 5} width={width} height={height} rx="8" fill="currentColor" opacity="0.1" />
-      <rect x={x} y={y} width={width} height={height} rx="8" fill="#fff" stroke="currentColor" strokeOpacity="0.2" />
+      <rect x={x} y={y} width={width} height={height} rx="8" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.2" />
       <rect x={x + 14} y={y + 15} width={width * 0.4} height="5" rx="2.5" fill="currentColor" opacity="0.6" />
       <path d={`M${x + 14} ${y + 31}h${width - 28}`} stroke="currentColor" strokeOpacity="0.15" strokeWidth="2" />
     </g>
@@ -22,10 +22,10 @@ function Sheet({ x, y, width = 104, height = 112 }: { x: number; y: number; widt
 function Person({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) {
   return (
     <g transform={`translate(${x} ${y}) scale(${scale})`}>
-      <circle cy="-12" r="13" fill="#fff" />
+      <circle cy="-12" r="13" fill="var(--art-surface)" />
       <circle cy="-12" r="9" fill="currentColor" opacity="0.65" />
       <path d="M-23 26v-7a23 23 0 0 1 46 0v7Z" fill="currentColor" />
-      <path d="m-8-1 8 13 8-13" fill="#fff" opacity="0.9" />
+      <path d="m-8-1 8 13 8-13" fill="var(--art-surface)" opacity="0.9" />
     </g>
   )
 }
@@ -41,11 +41,11 @@ function AssetScene() {
     <g className="portal-eam-laptop">
       <rect x="46" y="55" width="112" height="78" rx="8" fill="currentColor" opacity="0.12" />
       <rect x="41" y="50" width="112" height="78" rx="8" fill="currentColor" />
-      <rect x="48" y="57" width="98" height="63" rx="4" fill="#fff" />
+      <rect x="48" y="57" width="98" height="63" rx="4" fill="var(--art-surface)" />
       <path d="M58 70h35m-35 5h23" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
-      <circle cx="97" cy="53.5" r="1.5" fill="#fff" />
+      <circle cx="97" cy="53.5" r="1.5" fill="var(--art-surface)" />
       <path d="M41 128h112l14 11q-2 5-10 5H37q-8 0-10-5Z" fill="currentColor" />
-      <path d="M83 129h28l5 7H78Z" fill="#fff" opacity="0.65" />
+      <path d="M83 129h28l5 7H78Z" fill="var(--art-surface)" opacity="0.65" />
       <g className="portal-art-motion portal-eam-asset-tag">
         <path d="m59 89 9-8h61v28H68l-9-8Z" fill="#FFF7F0" stroke="currentColor" strokeOpacity="0.4" />
         <circle cx="69" cy="95" r="2.5" fill="currentColor" />
@@ -62,7 +62,7 @@ function AssetScene() {
 
     <g className="portal-eam-custodian">
       <rect x="211" y="51" width="80" height="115" rx="9" fill="currentColor" opacity="0.1" />
-      <rect x="206" y="46" width="80" height="115" rx="9" fill="#fff" stroke="currentColor" strokeOpacity="0.25" />
+      <rect x="206" y="46" width="80" height="115" rx="9" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.25" />
       <rect x="233" y="42" width="26" height="8" rx="4" fill="currentColor" />
       <g color="#1890FF"><Person x={227} y={72} scale={0.45} /></g>
       <path d="M244 64h29m-29 9h21" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
@@ -87,12 +87,12 @@ function AssetScene() {
 
     <g className="portal-eam-stationery">
       <path d="m42 151-4-24m10 24 5-27m-7 25 1-19" stroke="#1890FF" strokeWidth="3" />
-      <path d="M34 147h23l-3 23H37Z" fill="#fff" stroke="#1890FF" strokeWidth="1.5" />
+      <path d="M34 147h23l-3 23H37Z" fill="var(--art-surface)" stroke="#1890FF" strokeWidth="1.5" />
       <path d="M41 153v11m8-11v11" stroke="#1890FF" strokeOpacity="0.3" strokeWidth="2" />
-      <rect x="70" y="145" width="29" height="30" rx="3" fill="#fff" stroke="currentColor" strokeOpacity="0.3" />
+      <rect x="70" y="145" width="29" height="30" rx="3" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.3" />
       <rect x="74" y="141" width="29" height="30" rx="3" fill="#FFF7F0" stroke="currentColor" strokeOpacity="0.4" />
       <g className="portal-eam-supply-balance">
-        <rect x="119" y="151" width="63" height="24" rx="7" fill="#fff" stroke="currentColor" strokeOpacity="0.2" />
+        <rect x="119" y="151" width="63" height="24" rx="7" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.2" />
         <path d="M129 157h10v12h-10Zm3 4h4m-4 4h4" fill="none" stroke="currentColor" strokeWidth="1.5" />
         <text className="portal-art-motion portal-eam-count-full portal-art-static" x="160" y="169" textAnchor="middle" fontSize="16" fontWeight="700" fill="currentColor">12</text>
         <text className="portal-art-motion portal-eam-count-issued" x="160" y="169" textAnchor="middle" fontSize="16" fontWeight="700" fill="currentColor" opacity="0">11</text>
@@ -102,7 +102,7 @@ function AssetScene() {
     <g className="portal-art-motion portal-eam-supply">
       <rect x="78" y="138" width="28" height="32" rx="3" fill="currentColor" stroke="currentColor" />
       <path d="M84 139v30" stroke="#fff" strokeOpacity="0.65" strokeWidth="2" />
-      <rect x="88" y="145" width="13" height="10" rx="2" fill="#fff" />
+      <rect x="88" y="145" width="13" height="10" rx="2" fill="var(--art-surface)" />
       <path d="M91 150h7" stroke="currentColor" strokeWidth="1.5" />
     </g>
   </g>
@@ -213,7 +213,7 @@ function RdmBoardFrame({ laneBottom }: { laneBottom: number }) {
   const lane = `v${laneBottom - 38}`
   return (
     <g>
-      <rect x="14" y="14" width="292" height="148" rx="10" fill="#fff" stroke="currentColor" strokeOpacity="0.18" />
+      <rect x="14" y="14" width="292" height="148" rx="10" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.18" />
       <path d="M14 24a10 10 0 0 1 10-10h272a10 10 0 0 1 10 10v10H14Z" fill="currentColor" opacity="0.1" />
       <g fill="currentColor">
         <circle cx="26" cy="23" r="2.2" opacity="0.5" />
@@ -237,8 +237,8 @@ function RdmRequestPool({ x, y, inflow }: { x: number; y: number; inflow: string
   return (
     <g>
       <rect x={x} y={y} width="48" height="42" rx="6" fill="currentColor" opacity="0.08" />
-      <rect x={x + 6} y={y + 6} width="36" height="9" rx="2.5" fill="#fff" stroke="currentColor" strokeOpacity="0.38" />
-      <rect x={x + 6} y={y + 19} width="36" height="9" rx="2.5" fill="#fff" stroke="currentColor" strokeOpacity="0.3" />
+      <rect x={x + 6} y={y + 6} width="36" height="9" rx="2.5" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.38" />
+      <rect x={x + 6} y={y + 19} width="36" height="9" rx="2.5" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.3" />
       <rect x={x + 6} y={y + 32} width="22" height="6" rx="3" fill="currentColor" opacity="0.26" />
       <path
         className="portal-art-motion portal-art-flow"
@@ -274,7 +274,7 @@ function RdmFlow({ dy, dx = 0 }: { dy: number; dx?: number }) {
       {RDM_ARTWORK_STAGES.map((stage, index) => {
         const station = stations[index]
         return <g key={stage}>
-          <circle cx={station.x} cy={station.y} r="13" fill="#fff" stroke="currentColor" strokeOpacity="0.35" />
+          <circle cx={station.x} cy={station.y} r="13" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.35" />
           <g transform={`translate(${station.x} ${station.y})`} opacity="0.6"><StageGlyph stage={stage} /></g>
           <g className={`portal-art-motion portal-rdm-stage-${index}`} opacity="0">
             <circle cx={station.x} cy={station.y} r="13" fill="currentColor" />
@@ -311,7 +311,7 @@ function RdmLaunch({ trail, sparks, rocket }: {
       <g className="portal-art-motion portal-rdm-launch" opacity="0">
         <g transform={`translate(${rocket.x} ${rocket.y})`}>
           <path d="M0-10c4.6 3.2 5.8 8.6 4.4 14l-3 2.4h-2.8l-3-2.4C-5.8-1.4-4.6-6.8 0-10Z" fill="#E8720C" />
-          <circle cy="-2.4" r="2" fill="#fff" />
+          <circle cy="-2.4" r="2" fill="var(--art-surface)" />
           <path d="M-4.2 4-8 9l3.6-1.2M4.2 4 8 9l-3.6-1.2" fill="currentColor" />
           <path d="M-1.8 9h3.6L0 17Z" fill="#FA8C16" opacity="0.9" />
         </g>
@@ -359,11 +359,11 @@ function RdmPipelineScene() {
         strokeWidth="1.6"
         strokeDasharray="3 5"
       />
-      <circle cx="158" cy="52" r="11" fill="#fff" stroke="#FA8C16" strokeOpacity="0.85" strokeWidth="1.6" />
+      <circle cx="158" cy="52" r="11" fill="var(--art-surface)" stroke="#FA8C16" strokeOpacity="0.85" strokeWidth="1.6" />
       <path d="M154.5 47.5v9m7-9v9" fill="none" stroke="#FA8C16" strokeWidth="1.8" />
 
       {/* 交付速率图：填满顶部中右区，给右侧火箭轨迹让位 */}
-      <rect x="196" y="36" width="62" height="32" rx="6" fill="#fff" stroke="currentColor" strokeOpacity="0.2" />
+      <rect x="196" y="36" width="62" height="32" rx="6" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.2" />
       <path d="M203 62h48" stroke="currentColor" strokeOpacity="0.18" />
       <g fill="currentColor" opacity="0.16">
         <rect x="205" y="53" width="6" height="9" rx="2" />
@@ -418,7 +418,7 @@ function RdmGanttScene() {
         strokeWidth="1.6"
         strokeDasharray="3 5"
       />
-      <circle cx="168" cy="46" r="11" fill="#fff" stroke="#FA8C16" strokeOpacity="0.85" strokeWidth="1.6" />
+      <circle cx="168" cy="46" r="11" fill="var(--art-surface)" stroke="#FA8C16" strokeOpacity="0.85" strokeWidth="1.6" />
       <path d="M164.5 41.5v9m7-9v9" fill="none" stroke="#FA8C16" strokeWidth="1.8" />
 
       {/* 看板三列：待办 → 進行中 → 已交付；整体左移避开末站圆 */}
@@ -426,7 +426,7 @@ function RdmGanttScene() {
         <rect x="184" y="34" width="20" height="38" rx="5" fill="currentColor" opacity="0.07" />
         <rect x="208" y="34" width="20" height="38" rx="5" fill="currentColor" opacity="0.07" />
         <rect x="232" y="34" width="20" height="38" rx="5" fill="currentColor" opacity="0.07" />
-        <g fill="#fff" stroke="currentColor" strokeOpacity="0.3">
+        <g fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.3">
           <rect x="187" y="38" width="14" height="6" rx="2" />
           <rect x="187" y="47" width="14" height="6" rx="2" />
           <rect x="187" y="56" width="14" height="6" rx="2" />
@@ -580,7 +580,7 @@ function TranslationScene({ playing }: { playing: boolean }) {
         stroke="currentColor" strokeOpacity="0.35" strokeWidth="1.2" strokeDasharray="3 3"
       />
       <g transform={`translate(${Math.round(bubbleX)} ${Math.round(bubbleY)})`}>
-        <rect width="128" height="36" rx="10" fill="#fff" stroke="currentColor" strokeOpacity="0.22" />
+        <rect width="128" height="36" rx="10" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.22" />
         <text x="12" y="16" fontSize="12.5" fontWeight="700" fill="currentColor">{greeting.text}</text>
         <text x="12" y="29" fontSize="9" fill="currentColor" opacity="0.55">{countryName}</text>
       </g>
@@ -590,7 +590,7 @@ function TranslationScene({ playing }: { playing: boolean }) {
 
 function Storefront({ x, y }: { x: number; y: number }) {
   return <g transform={`translate(${x} ${y})`}>
-    <rect x="-23" y="-3" width="46" height="31" rx="4" fill="#fff" stroke="currentColor" strokeWidth="1.5" />
+    <rect x="-23" y="-3" width="46" height="31" rx="4" fill="var(--art-surface)" stroke="currentColor" strokeWidth="1.5" />
     <path d="m-26-3 6-15h40l6 15Z" fill="currentColor" />
     {[-26, -13, 0, 13].map((left, index) => <path key={left} d={`M${left}-3h13v5a6.5 6.5 0 0 1-13 0Z`} fill={index % 2 ? '#fff' : 'currentColor'} />)}
     <path d="M-13 28V11h12v17m8-15h9v7H7Z" fill="currentColor" opacity="0.45" />
@@ -643,13 +643,13 @@ function AdsTrafficScene() {
         <circle cx="50" cy="74" r="9" /><path d="M34 100v-5a16 16 0 0 1 32 0v5Z" />
       </g>
       {interestTags.map((tag, index) => <g key={index} className="portal-art-motion portal-ads-tag">
-        <rect x={tag.x} y={tag.y} width={tag.width} height="15" rx="7.5" fill="#fff" stroke="currentColor" strokeWidth="1.3" />
+        <rect x={tag.x} y={tag.y} width={tag.width} height="15" rx="7.5" fill="var(--art-surface)" stroke="currentColor" strokeWidth="1.3" />
         {tag.glyph}
       </g>)}
       <path d="M25 39l5 15M61 29l-5 25M70 122l-4-8" fill="none" stroke="currentColor" strokeOpacity="0.28" strokeWidth="1.2" strokeDasharray="3 3" />
 
       {/* ② 算法引擎：面板顶部直接写竞价公式，扫描线逐行评估，底部给出率曲线 */}
-      <rect x="104" y="34" width="86" height="118" rx="10" fill="#fff" stroke="currentColor" strokeOpacity="0.35" />
+      <rect x="104" y="34" width="86" height="118" rx="10" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.35" />
       <path d="M104 52h86" stroke="currentColor" strokeOpacity="0.15" />
       <g transform="translate(112 38)" fill="currentColor" stroke="currentColor" strokeWidth="1.3">
         <circle cx="2" cy="6" r="2" /><circle cx="12" cy="1" r="2" fill="none" /><circle cx="12" cy="11" r="2" fill="none" />
@@ -661,7 +661,7 @@ function AdsTrafficScene() {
         <MerchantGlyph x={114} y={row.y + 5} opacity={1 - index * 0.55} />
         <rect x="132" y={row.y + 8} width={row.width} height="6" rx="3" fill="currentColor" opacity={1 - index * 0.55} />
         {index === 0
-          ? <><circle cx="176" cy={row.y + 11} r="6.5" fill="#E8720C" /><text x="176" y={row.y + 14.2} textAnchor="middle" fontSize="8.5" fontWeight="700" fill="#fff">1</text></>
+          ? <><circle cx="176" cy={row.y + 11} r="6.5" fill="#E8720C" /><text x="176" y={row.y + 14.2} textAnchor="middle" fontSize="8.5" fontWeight="700" fill="var(--art-surface)">1</text></>
           : <><circle cx="176" cy={row.y + 11} r="6.5" fill="none" stroke="currentColor" strokeOpacity={0.3 - index * 0.05} /><text x="176" y={row.y + 14.2} textAnchor="middle" fontSize="8.5" fontWeight="700" fill="currentColor" opacity={0.45 - index * 0.15}>{row.rank}</text></>}
       </g>)}
       {/* 特征加权求和→过激活函数得到预估点击率 */}
@@ -674,7 +674,7 @@ function AdsTrafficScene() {
 
       {/* ③ 用户 APP 首屏：首坑为已匹配的商家美食，下方为待刷新的信息流 */}
       <rect x="208" y="20" width="92" height="144" rx="13" fill="currentColor" />
-      <rect x="214" y="28" width="80" height="128" rx="7" fill="#fff" />
+      <rect x="214" y="28" width="80" height="128" rx="7" fill="var(--art-surface)" />
       <path d="M244 24h20" stroke="#fff" strokeOpacity="0.55" strokeWidth="3" strokeLinecap="round" />
       <g className="portal-art-motion portal-ads-feed">
         <rect x="220" y="34" width="48" height="8" rx="4" fill="currentColor" opacity="0.16" />
@@ -694,7 +694,7 @@ function AdsTrafficScene() {
       <rect className="portal-art-motion portal-ads-slot" x="217" y="45" width="74" height="40" rx="7" fill="none" stroke="currentColor" strokeWidth="2.2" opacity="0" />
       <g className="portal-art-motion portal-ads-heart" opacity="0">
         <circle cx="286" cy="48" r="7.5" fill="currentColor" />
-        <path d="M286 51.8c-2.9-2-4.2-3.3-4.2-4.8a2 2 0 0 1 4.2-1 2 2 0 0 1 4.2 1c0 1.5-1.3 2.8-4.2 4.8Z" fill="#fff" />
+        <path d="M286 51.8c-2.9-2-4.2-3.3-4.2-4.8a2 2 0 0 1 4.2-1 2 2 0 0 1 4.2 1c0 1.5-1.3 2.8-4.2 4.8Z" fill="var(--art-surface)" />
       </g>
 
       {/* ④ 链路与回流：人群入模、Top1 出模入首坑、曝光数据回流调权 */}
@@ -711,11 +711,11 @@ function AdsTrafficScene() {
       <path d="M152 154l-1-6m1 6 5-3" fill="none" stroke="currentColor" strokeOpacity="0.4" strokeWidth="1.5" />
       {/* 回流不是装饰：弧线上标梯度下降公式，表示曝光点击样本回流后重算权重 */}
       <g className="portal-art-motion portal-ads-loop">
-        <rect x="163" y="156" width="50" height="13" rx="3" fill="#fff" opacity="0.92" />
+        <rect x="163" y="156" width="50" height="13" rx="3" fill="var(--art-surface)" opacity="0.92" />
         <MathText x={188} y={165.5} size={8} anchor="middle" opacity={0.9}>w←w−η∇L</MathText>
       </g>
       <g className="portal-art-motion portal-ads-result" opacity="0">
-        <rect x="84" y="6" width="122" height="24" rx="8" fill="#fff" />
+        <rect x="84" y="6" width="122" height="24" rx="8" fill="var(--art-surface)" />
         <ArtworkText label="recommendMatched" x={145} y={22} width={110} />
       </g>
     </g>
@@ -762,7 +762,7 @@ function AdsModelScene() {
           <rect x={cx - 10} y="137" width="20" height="5" rx="1.5" fill="currentColor" opacity="0.25" />
         </g>
         <g className="portal-art-motion portal-ads-token">
-          <circle cx={cx} cy="154" r="11" fill="#fff" stroke="currentColor" strokeOpacity="0.6" />
+          <circle cx={cx} cy="154" r="11" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.6" />
           {index === 0 && <g fill="currentColor"><circle cx={cx} cy="151" r="3" /><path d={`M${cx - 5} 159a5 5 0 0 1 10 0Z`} /></g>}
           {index === 1 && <g fill="none" stroke="currentColor" strokeWidth="1.2"><path d={`M${cx - 5} 159v-6h10v6Z`} /><path d={`M${cx - 6} 153l2-3h8l2 3`} /></g>}
           {index === 2 && <g fill="none" stroke="currentColor" strokeWidth="1.2"><path d={`M${cx - 5} 156a5 5 0 0 1 10 0Z`} /><path d={`M${cx} 149v-2`} /></g>}
@@ -772,18 +772,18 @@ function AdsModelScene() {
 
       {/* 二号层：双层交互网络 */}
       {columns.map(cx => <g key={`l${cx}`} className="portal-art-motion portal-ads-node">
-        <ellipse cx={cx} cy="108" rx="12" ry="7" fill="#fff" stroke="currentColor" strokeOpacity="0.6" />
+        <ellipse cx={cx} cy="108" rx="12" ry="7" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.6" />
         <ellipse cx={cx} cy="108" rx="6" ry="3.2" fill="currentColor" opacity="0.35" />
       </g>)}
       {upper.map(cx => <g key={`u${cx}`} className="portal-art-motion portal-ads-node portal-ads-node-late">
-        <ellipse cx={cx} cy="84" rx="12" ry="7" fill="#fff" stroke="currentColor" strokeOpacity="0.6" />
+        <ellipse cx={cx} cy="84" rx="12" ry="7" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.6" />
         <ellipse cx={cx} cy="84" rx="6" ry="3.2" fill="currentColor" opacity="0.35" />
       </g>)}
 
       {/* 三号层：多目标预估头（三路并行）与对应的打分柱 */}
       {upper.map((cx, index) => <g key={`h${cx}`}>
         <g className="portal-art-motion portal-ads-head">
-          <rect x={cx - 16} y="58" width="32" height="13" rx="6.5" fill="#fff" stroke="currentColor" strokeWidth="1.5" strokeOpacity="0.75" />
+          <rect x={cx - 16} y="58" width="32" height="13" rx="6.5" fill="var(--art-surface)" stroke="currentColor" strokeWidth="1.5" strokeOpacity="0.75" />
           {[-8, 0, 8].map(offset => <circle key={offset} cx={cx + offset} cy="64.5" r="2.6" fill="currentColor" />)}
         </g>
         <g className="portal-art-motion portal-ads-bar">
@@ -818,7 +818,7 @@ function AdsModelScene() {
       <rect className="portal-art-motion portal-ads-slot" x="235" y="33" width="80" height="38" rx="7" fill="none" stroke="currentColor" strokeWidth="2.2" opacity="0" />
       <g className="portal-art-motion portal-ads-heart" opacity="0">
         <circle cx="308" cy="38" r="7" fill="currentColor" />
-        <path d="M308 41.5c-2.7-1.9-3.9-3-3.9-4.4a1.85 1.85 0 0 1 3.9-.9 1.85 1.85 0 0 1 3.9.9c0 1.4-1.2 2.5-3.9 4.4Z" fill="#fff" />
+        <path d="M308 41.5c-2.7-1.9-3.9-3-3.9-4.4a1.85 1.85 0 0 1 3.9-.9 1.85 1.85 0 0 1 3.9.9c0 1.4-1.2 2.5-3.9 4.4Z" fill="var(--art-surface)" />
       </g>
 
       {/* 在线学习：曝光点击回流后按梯度公式更新层间权重 */}
@@ -831,7 +831,7 @@ function AdsModelScene() {
 
       {/* 结果胶囊：与链路版共用同一文案，保证两套构图都能独立收尾 */}
       <g className="portal-art-motion portal-ads-result" opacity="0">
-        <rect x="100" y="6" width="122" height="24" rx="8" fill="#fff" />
+        <rect x="100" y="6" width="122" height="24" rx="8" fill="var(--art-surface)" />
         <ArtworkText label="recommendMatched" x={161} y={22} width={110} />
       </g>
     </g>
@@ -865,7 +865,7 @@ function AttendancePunchScene() {
     <>
       {/* 地面线与顶部状态胶囊 */}
       <path d="M18 158h286" stroke="currentColor" strokeOpacity="0.12" strokeWidth="2" />
-      <rect x="84" y="6" width="152" height="24" rx="12" fill="#fff" stroke="currentColor" strokeOpacity="0.2" />
+      <rect x="84" y="6" width="152" height="24" rx="12" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.2" />
       <g className="portal-art-motion portal-attendance-check">
         <circle cx="98" cy="18" r="8" fill="#52C41A" />
         <path d="m94.5 18 2.6 2.8 5-5.6" fill="none" stroke="#fff" strokeWidth="2" />
@@ -874,7 +874,7 @@ function AttendancePunchScene() {
 
       {/* ① 打卡机：屏幕扫描 + 指纹波 */}
       <rect x="26" y="62" width="44" height="66" rx="7" fill="currentColor" opacity="0.12" />
-      <rect x="26" y="62" width="44" height="66" rx="7" fill="#fff" stroke="currentColor" strokeOpacity="0.4" />
+      <rect x="26" y="62" width="44" height="66" rx="7" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.4" />
       <rect x="33" y="70" width="30" height="20" rx="3" fill="currentColor" opacity="0.1" />
       <path className="portal-art-motion portal-attendance-scan" d="M35 80h26" stroke="currentColor" strokeWidth="2" />
       <g stroke="currentColor" fill="none" strokeWidth="1.6" strokeOpacity="0.7">
@@ -884,7 +884,7 @@ function AttendancePunchScene() {
       <circle cx="48" cy="121" r="2.5" fill="currentColor" />
 
       {/* 时钟盘与指针（分针逐拍转动）；圆心右移到 96，避开打卡机右边缘 */}
-      <circle cx="96" cy="50" r="21" fill="#fff" stroke="currentColor" strokeOpacity="0.4" strokeWidth="2" />
+      <circle cx="96" cy="50" r="21" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.4" strokeWidth="2" />
       {Array.from({ length: 12 }, (_, i) => {
         const angle = (i * 30 * Math.PI) / 180
         return (
@@ -909,7 +909,7 @@ function AttendancePunchScene() {
       <path d="M74 146h30" stroke="currentColor" strokeOpacity="0.5" strokeWidth="2" strokeDasharray="4 4" />
 
       {/* ② 周排班日历：七列两行，今日格打勾 + 迟到格警示 */}
-      <rect x="118" y="56" width="104" height="76" rx="8" fill="#fff" stroke="currentColor" strokeOpacity="0.3" />
+      <rect x="118" y="56" width="104" height="76" rx="8" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.3" />
       <rect x="118" y="56" width="104" height="14" rx="7" fill="currentColor" opacity="0.14" />
       {Array.from({ length: 7 }, (_, col) => (
         <rect key={col} x={124 + col * 14} y={60} width="8" height="5" rx="2.5" fill="currentColor" opacity="0.4" />
@@ -943,7 +943,7 @@ function AttendancePunchScene() {
       </g>
 
       {/* ③ 工时报表：柱子必须等连线到位才上升，线回退后跟着回落 */}
-      <rect x="232" y="62" width="64" height="82" rx="8" fill="#fff" stroke="currentColor" strokeOpacity="0.3" />
+      <rect x="232" y="62" width="64" height="82" rx="8" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.3" />
       <path d="M240 72h40" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
       {[26, 40, 32, 52].map((height, index) => (
         <rect
@@ -978,7 +978,7 @@ function AttendanceLeaveScene() {
   return (
     <>
       <path d="M18 158h286" stroke="currentColor" strokeOpacity="0.12" strokeWidth="2" />
-      <rect x="80" y="6" width="160" height="24" rx="12" fill="#fff" stroke="currentColor" strokeOpacity="0.2" />
+      <rect x="80" y="6" width="160" height="24" rx="12" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.2" />
       <TypedArtworkLabel label="leaveApproved" x={160} y={22} width={132} />
 
       {/* ① 假单 + 审批人 + 核准章 */}
@@ -989,12 +989,12 @@ function AttendanceLeaveScene() {
       {/* 核准章不能写 opacity="0"：静止态（[data-motion=idle]）会 animation:none，
           静态层必须自己把“已核准”说完整，出现/落下动作只由 keyframes 在悬停时叠加。 */}
       <g className="portal-art-motion portal-attendance-stamp">
-        <circle cx="82" cy="122" r="12" fill="#fff" stroke="#52C41A" strokeWidth="2" />
+        <circle cx="82" cy="122" r="12" fill="var(--art-surface)" stroke="#52C41A" strokeWidth="2" />
         <path d="m77 122 3.6 3.8 7-8" fill="none" stroke="#52C41A" strokeWidth="2.2" />
       </g>
 
       {/* ② 月历：被圈出的休假日 + 遮阳伞与太阳 */}
-      <rect x="116" y="52" width="112" height="92" rx="8" fill="#fff" stroke="currentColor" strokeOpacity="0.3" />
+      <rect x="116" y="52" width="112" height="92" rx="8" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.3" />
       <rect x="116" y="52" width="112" height="15" rx="7" fill="currentColor" opacity="0.14" />
       <path d="M130 50v8m32-8v8m32-8v8m32-8v8" stroke="currentColor" strokeOpacity="0.5" strokeWidth="2" />
       {Array.from({ length: 21 }, (_, index) => {
@@ -1051,7 +1051,7 @@ function AttendanceLeaveScene() {
       />
       <circle className="portal-art-motion portal-attendance-orbit" cx="268" cy="61" r="3.2" fill="#722ED1" />
       <g className="portal-art-motion portal-attendance-hourglass">
-        <path d="M262 76h12l-6 9 6 9h-12l6-9Z" fill="#fff" stroke="currentColor" strokeWidth="1.8" />
+        <path d="M262 76h12l-6 9 6 9h-12l6-9Z" fill="var(--art-surface)" stroke="currentColor" strokeWidth="1.8" />
         <path className="portal-art-motion portal-attendance-sand" d="M268 94l4 6h-8Z" fill="currentColor" />
       </g>
       <path className="portal-art-motion portal-attendance-legend" d="M248 122h40" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
@@ -1076,12 +1076,12 @@ function OrganizationScene() {
       fill="none" stroke="currentColor" strokeOpacity="0.35" strokeWidth="2" />
     <g className="portal-art-motion portal-org-parent">
       <rect x="112" y="44" width="96" height="42" rx="8" fill="currentColor" />
-      <rect x="124" y="58" width="48" height="5" rx="2.5" fill="#fff" opacity="0.85" />
-      <rect x="124" y="69" width="30" height="4" rx="2" fill="#fff" opacity="0.5" />
+      <rect x="124" y="58" width="48" height="5" rx="2.5" fill="var(--art-surface)" opacity="0.85" />
+      <rect x="124" y="69" width="30" height="4" rx="2" fill="var(--art-surface)" opacity="0.5" />
     </g>
     {[56, 184].map((x) => (
       <g key={x} className="portal-art-motion portal-org-child">
-        <rect x={x} y={108} width={80} height={38} rx="8" fill="#fff" stroke="currentColor" strokeOpacity="0.35" />
+        <rect x={x} y={108} width={80} height={38} rx="8" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.35" />
         <rect x={x + 12} y={120} width={34} height={4} rx="2" fill="currentColor" opacity="0.55" />
         <rect x={x + 12} y={130} width={22} height={4} rx="2" fill="currentColor" opacity="0.3" />
       </g>
@@ -1103,7 +1103,7 @@ function PayrollScene() {
   return <g className="portal-payroll-scene">
     {/* 工资单：三行明细逐行落数，合计条压底 */}
     <g className="portal-art-motion portal-payroll-rows">
-      <rect x="72" y="40" width="112" height="128" rx="10" fill="#fff" stroke="currentColor" strokeOpacity="0.32" strokeWidth="2" />
+      <rect x="72" y="40" width="112" height="128" rx="10" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.32" strokeWidth="2" />
       {[0, 1, 2].map((row) => (
         <g key={row}>
           <rect x="88" y={62 + row * 20} width={row === 2 ? 40 : 62} height="5" rx="2.5" fill="currentColor" opacity={row === 2 ? 0.42 : 0.28} />
@@ -1155,17 +1155,17 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
       </g>
       <g transform="rotate(8 235 108)">
         <rect x="194" y="49" width="82" height="113" rx="10" fill="currentColor" />
-        <rect x="202" y="59" width="66" height="30" rx="4" fill="#fff" />
+        <rect x="202" y="59" width="66" height="30" rx="4" fill="var(--art-surface)" />
         <TypedReveal x={208} y={63} width={54}>
           <text className="portal-finance-display" x="208" y="80" fontSize="18" fontFamily="monospace" fill="currentColor" textLength="54" lengthAdjust="spacingAndGlyphs">ROI=F/PV</text>
         </TypedReveal>
-        {[0, 1, 2, 3].map(row => [0, 1, 2].map(col => <rect key={`${row}-${col}`} className={col === 2 ? 'portal-art-motion portal-finance-key' : undefined} x={204 + col * 21} y={99 + row * 14} width="15" height="9" rx="2" fill="#fff" opacity={col === 2 ? 0.9 : 0.45} />))}
+        {[0, 1, 2, 3].map(row => [0, 1, 2].map(col => <rect key={`${row}-${col}`} className={col === 2 ? 'portal-art-motion portal-finance-key' : undefined} x={204 + col * 21} y={99 + row * 14} width="15" height="9" rx="2" fill="var(--art-surface)" opacity={col === 2 ? 0.9 : 0.45} />))}
       </g>
     </>
   ),
   merchant: (
     <>
-      <path d="m37 47 79-17 89 13 78-14v124l-78 15-89-13-79 16Z" fill="#fff" stroke="currentColor" strokeOpacity="0.2" />
+      <path d="m37 47 79-17 89 13 78-14v124l-78 15-89-13-79 16Z" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.2" />
       <path d="M116 31v123m89-110v123M40 88l239-25M41 140l238-23M65 45l52 109m69-110 59 114" fill="none" stroke="currentColor" strokeOpacity="0.12" strokeWidth="4" />
       <path d="m76 119 84-61 84 61" fill="none" stroke="currentColor" strokeOpacity="0.2" strokeWidth="3" />
       <path className="portal-art-motion portal-merchant-route" pathLength="1" d="m76 119 84-61 84 61" fill="none" stroke="currentColor" strokeWidth="3" />
@@ -1174,9 +1174,9 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
         <Storefront x={x} y={y} />
         <circle className={`portal-art-motion portal-merchant-pin-${index}`} cx={x + 24} cy={y - 16} r="6" fill="#52C41A" opacity="0" />
       </g>)}
-      <rect x="126" y="116" width="68" height="43" rx="6" fill="#fff" stroke="currentColor" strokeOpacity="0.25" />
+      <rect x="126" y="116" width="68" height="43" rx="6" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.25" />
       {[0, 1, 2].map(index => <rect key={index} className="portal-art-motion portal-merchant-metric" x={138 + index * 16} y={139 - index * 7} width="9" height={12 + index * 7} rx="2" fill="currentColor" />)}
-      <g className="portal-art-motion portal-merchant-summary" opacity="0"><rect x="87" y="7" width="146" height="24" rx="8" fill="#fff" /><ArtworkText label="storesSynced" x={160} y={24} width={134} /></g>
+      <g className="portal-art-motion portal-merchant-summary" opacity="0"><rect x="87" y="7" width="146" height="24" rx="8" fill="var(--art-surface)" /><ArtworkText label="storesSynced" x={160} y={24} width={134} /></g>
     </>
   ),
   search: (
@@ -1186,7 +1186,7 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
       <rect className="portal-art-motion portal-search-result" x="72" y="88" width="145" height="24" rx="12" fill="#52C41A" fillOpacity="0.15" stroke="#52C41A" strokeWidth="2" opacity="0" />
       <path d="M86 100h73M75 125h73m-73 13h105m-105 12h84" stroke="currentColor" strokeOpacity="0.3" strokeWidth="4" />
       <g className="portal-art-motion portal-search-lens">
-        <circle cx="212" cy="105" r="32" fill="#fff" fillOpacity="0.85" stroke="currentColor" strokeWidth="8" />
+        <circle cx="212" cy="105" r="32" fill="var(--art-surface)" fillOpacity="0.85" stroke="currentColor" strokeWidth="8" />
         <path d="m236 130 24 25" stroke="currentColor" strokeWidth="13" />
         <path className="portal-art-motion portal-search-query portal-art-static" d="M195 98h31m-31 10h23m-23 10h16" stroke="currentColor" strokeWidth="3" />
         <g className="portal-art-motion portal-search-success-mark" opacity="0">
@@ -1194,8 +1194,8 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
           <path className="portal-art-motion portal-search-check" pathLength="1" d="m202 105 7 7 14-16" fill="none" stroke="#fff" strokeWidth="4" />
           <path d="M172 80l-5-5m-1 30h-7m91-25 5-5m2 29h7" stroke="#52C41A" strokeWidth="2" />
         </g>
-        <rect x="126" y="29" width="158" height="28" rx="8" fill="#fff" stroke="currentColor" strokeOpacity="0.25" />
-        <path d="m200 57 7 7 7-7" fill="#fff" />
+        <rect x="126" y="29" width="158" height="28" rx="8" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.25" />
+        <path d="m200 57 7 7 7-7" fill="var(--art-surface)" />
         <g className="portal-art-motion portal-search-query portal-art-static"><TypedReveal x={134} y={33} width={142}><ArtworkText label="searching" x={205} y={48} width={142} /></TypedReveal></g>
         <g className="portal-art-motion portal-search-success-label" opacity="0"><ArtworkText label="searchMatched" x={205} y={48} width={142} /></g>
       </g>
@@ -1207,16 +1207,16 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
       <path d="M89 76H61V45h37m133 30h30V43h-28M85 129H56v25h41m133-26h31v25h-29" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" fill="none" />
       {[ [98, 45], [233, 43], [97, 154], [232, 153] ].map(([cx, cy]) => <circle key={cx} cx={cx} cy={cy} r="6" fill="currentColor" opacity="0.5" />)}
       <rect x="89" y="52" width="139" height="99" rx="28" fill="currentColor" opacity="0.16" />
-      <rect x="82" y="45" width="139" height="99" rx="28" fill="#fff" stroke="currentColor" strokeOpacity="0.3" />
+      <rect x="82" y="45" width="139" height="99" rx="28" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.3" />
       <path d="M152 45V30" stroke="currentColor" strokeWidth="4" />
       <circle className="portal-art-motion portal-robot-signal" cx="152" cy="27" r="7" fill="currentColor" />
       <path className="portal-art-motion portal-robot-signal" d="M139 21q13-12 26 0m-32-6q19-17 38 0" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.5" />
       <rect x="102" y="68" width="99" height="44" rx="17" fill="currentColor" />
       {[125, 178].map(x => <g key={x} className="portal-art-motion portal-robot-eye">
-        <ellipse cx={x} cy="89" rx="10" ry="12" fill="#fff" />
+        <ellipse cx={x} cy="89" rx="10" ry="12" fill="var(--art-surface)" />
         <g className="portal-art-motion portal-robot-pupil">
           <circle cx={x} cy="90" r="5" fill="currentColor" />
-          <circle cx={x + 1.5} cy="88" r="1.5" fill="#fff" />
+          <circle cx={x + 1.5} cy="88" r="1.5" fill="var(--art-surface)" />
         </g>
       </g>)}
       <path className="portal-art-motion portal-robot-smile" d="M140 124q12 12 24 0" stroke="currentColor" strokeWidth="3" fill="none" />
@@ -1227,7 +1227,7 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
   ),
   hr: (
     <>
-      <rect x="159" y="43" width="127" height="119" rx="10" fill="#fff" stroke="currentColor" strokeOpacity="0.25" />
+      <rect x="159" y="43" width="127" height="119" rx="10" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.25" />
       <path d="M176 53h35m-35 5h22" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
       <path d="M222 89v14h-31v19m31-19h29v19" fill="none" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" />
       <path className="portal-art-motion portal-hr-connection" pathLength="1" d="M222 89v14h29v19" fill="none" stroke="currentColor" strokeWidth="3" />
@@ -1240,7 +1240,7 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
       <g className="portal-art-motion portal-hr-member" opacity="0"><Person x={251} y={134} scale={0.4} /></g>
       <path className="portal-art-motion portal-hr-match-path" pathLength="1" d="M137 97h19q12 0 12 12v20h3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeDasharray="1" />
       <g className="portal-art-motion portal-hr-profile">
-        <rect x="43" y="45" width="94" height="112" rx="10" fill="#fff" stroke="currentColor" strokeOpacity="0.3" />
+        <rect x="43" y="45" width="94" height="112" rx="10" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.3" />
         <rect x="72" y="40" width="35" height="10" rx="5" fill="currentColor" />
         <circle cx="90" cy="78" r="21" fill="currentColor" opacity="0.08" />
         <Person x={90} y={80} scale={0.65} />
@@ -1250,7 +1250,7 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
         <path className="portal-art-motion portal-hr-profile-check" d="m118 54 3 3 6-7" fill="none" stroke="#fff" strokeWidth="2" opacity="0" />
       </g>
       <g className="portal-art-motion portal-hr-welcome" opacity="0"><circle cx="272" cy="148" r="10" fill="#52C41A" /><path d="m267 148 3 3 6-7" fill="none" stroke="#fff" strokeWidth="2" /></g>
-      <rect x="68" y="7" width="184" height="25" rx="8" fill="#fff" />
+      <rect x="68" y="7" width="184" height="25" rx="8" fill="var(--art-surface)" />
       <g className="portal-art-motion portal-hr-matching portal-art-static"><ArtworkText label="hrMatching" x={160} y={24} width={170} /></g>
       <g className="portal-art-motion portal-hr-assigned" opacity="0"><ArtworkText label="hrAssigned" x={160} y={24} width={170} /></g>
     </>
@@ -1262,22 +1262,22 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
       <path d="M72 40h176" stroke="currentColor" strokeOpacity="0.2" strokeWidth="3" />
       <path className="portal-art-motion portal-office-progress" pathLength="1" d="M72 40h176" stroke="currentColor" strokeWidth="3" />
       {['start', 'review', 'approved'].map((label, index) => <g key={label}>
-        <circle cx={72 + index * 88} cy="40" r="8" fill="#fff" stroke="currentColor" strokeWidth="2" />
+        <circle cx={72 + index * 88} cy="40" r="8" fill="var(--art-surface)" stroke="currentColor" strokeWidth="2" />
         <circle className={`portal-art-motion portal-workflow-stage-${index}`} cx={72 + index * 88} cy="40" r="5" fill="currentColor" opacity="0" />
         <ArtworkText label={label} x={72 + index * 88} y={163} width={80} />
       </g>)}
       <path className="portal-art-motion portal-art-flow" d="M94 119q20 15 42 0m45 0q19 15 41 0" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="3 6" />
       <rect x="38" y="72" width="67" height="47" rx="6" fill="currentColor" />
-      <rect x="43" y="78" width="57" height="33" rx="3" fill="#fff" />
+      <rect x="43" y="78" width="57" height="33" rx="3" fill="var(--art-surface)" />
       <path d="M31 122h81l-9 9H40Z" fill="currentColor" opacity="0.4" />
-      <rect x="129" y="73" width="63" height="59" rx="7" fill="#fff" stroke="currentColor" strokeOpacity="0.25" />
+      <rect x="129" y="73" width="63" height="59" rx="7" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.25" />
       <path d="M137 123h47" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
       <path d="M224 89v-9h20l7 9h27v48h-54Z" fill="#FFF7F0" stroke="currentColor" strokeWidth="2" />
       <g className="portal-art-motion portal-workflow-paper">
-        <path d="M53 76h25l10 10v39H53Z" fill="#fff" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M53 76h25l10 10v39H53Z" fill="var(--art-surface)" stroke="currentColor" strokeWidth="1.5" />
         <path d="M78 76v10h10M60 92h20m-20 7h15" fill="none" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
         <path className="portal-art-motion portal-office-signature" pathLength="1" d="m59 111 5-7-1 9 6-5 3 3 8-4" fill="none" stroke="#1890FF" strokeWidth="2" opacity="0" />
-        <g className="portal-art-motion portal-office-seal" opacity="0"><circle cx="77" cy="115" r="8" fill="#fff" stroke="#52C41A" strokeWidth="1.5" /><path d="m73 115 3 3 5-6" fill="none" stroke="#52C41A" strokeWidth="2" /></g>
+        <g className="portal-art-motion portal-office-seal" opacity="0"><circle cx="77" cy="115" r="8" fill="var(--art-surface)" stroke="#52C41A" strokeWidth="1.5" /><path d="m73 115 3 3 5-6" fill="none" stroke="#52C41A" strokeWidth="2" /></g>
       </g>
       <g className="portal-art-motion portal-office-stamp">
         <rect x="156" y="56" width="13" height="17" rx="5" fill="#722ED1" />
@@ -1287,12 +1287,12 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
       <path d="M220 102h63l-5 36h-54Z" fill="currentColor" stroke="currentColor" strokeWidth="1.5" />
       <path d="M235 111h31" stroke="#fff" strokeOpacity="0.7" strokeWidth="3" />
       <g className="portal-art-motion portal-office-archived" opacity="0"><circle cx="269" cy="132" r="12" fill="#52C41A" /><path d="m263 132 4 4 8-9" fill="none" stroke="#fff" strokeWidth="3" /></g>
-      <g className="portal-art-motion portal-office-archived" opacity="0"><rect x="67" y="6" width="186" height="23" rx="8" fill="#fff" /><ArtworkText label="workflowArchived" x={160} y={22} width={174} /></g>
+      <g className="portal-art-motion portal-office-archived" opacity="0"><rect x="67" y="6" width="186" height="23" rx="8" fill="var(--art-surface)" /><ArtworkText label="workflowArchived" x={160} y={22} width={174} /></g>
     </>
   ),
   iam: (
     <>
-      <rect x="34" y="22" width="252" height="123" rx="12" fill="#fff" stroke="currentColor" strokeOpacity="0.2" />
+      <rect x="34" y="22" width="252" height="123" rx="12" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.2" />
       <path d="M35 39h250" stroke="currentColor" strokeOpacity="0.15" />
       {[46, 55, 64].map(x => <circle key={x} cx={x} cy="31" r="2" fill="currentColor" opacity="0.4" />)}
 
@@ -1328,11 +1328,11 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
         <path d="M196 47h10v89h-10Z" fill="#E8720C" />
       </g>
       <g className="portal-art-motion portal-access-door-left">
-        <rect x="160" y="47" width="42" height="89" rx="5" fill="#fff" stroke="currentColor" strokeOpacity="0.38" strokeWidth="2" />
+        <rect x="160" y="47" width="42" height="89" rx="5" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.38" strokeWidth="2" />
         <path d="M168 55v71" stroke="currentColor" strokeOpacity="0.15" />
       </g>
       <g className="portal-art-motion portal-access-door-right">
-        <rect x="202" y="47" width="43" height="89" rx="5" fill="#fff" stroke="currentColor" strokeOpacity="0.38" strokeWidth="2" />
+        <rect x="202" y="47" width="43" height="89" rx="5" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.38" strokeWidth="2" />
         <path d="M237 55v71" stroke="currentColor" strokeOpacity="0.15" />
       </g>
 
@@ -1340,14 +1340,14 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
       <g className="portal-art-motion portal-lock-body">
         <path className="portal-art-motion portal-lock-shackle" d="M189 87V71a13 13 0 0 1 26 0v16" stroke="currentColor" strokeWidth="6" fill="none" />
         <rect x="182" y="85" width="40" height="35" rx="8" fill="currentColor" />
-        <circle cx="202" cy="99" r="5" fill="#fff" />
+        <circle cx="202" cy="99" r="5" fill="var(--art-surface)" />
         <path d="M202 101v8" stroke="#fff" strokeWidth="3.4" />
       </g>
 
       {/* 锁体：抖动表示拒绝；门开时淡出，把门缝让给光柱 */}
       <g className="portal-art-motion portal-lock-alarm" opacity="0" stroke="#FF4D4F" strokeWidth="3" fill="none">
         <path d="M168 57l-9-8m8 23h-12m83-15 9-8m-8 23h12" />
-        <circle cx="264" cy="106" r="14" fill="#fff" />
+        <circle cx="264" cy="106" r="14" fill="var(--art-surface)" />
         <path d="M264 98v10m0 6v1" />
       </g>
 
@@ -1363,21 +1363,21 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
       <rect x="48" y="31" width="115" height="116" rx="10" fill="currentColor" opacity="0.12" />
       {[40, 74, 108].map((y, index) => (
         <g key={y}>
-          <rect x="56" y={y} width="99" height="29" rx="5" fill="#fff" stroke="currentColor" strokeOpacity="0.2" />
+          <rect x="56" y={y} width="99" height="29" rx="5" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.2" />
           <path d={`M68 ${y + 10}h34m-34 8h23`} stroke="currentColor" strokeWidth="3" strokeOpacity="0.3" />
           <circle className={`portal-art-motion portal-config-node-${index}`} cx="139" cy={y + 15} r="4" fill="currentColor" opacity="0.55" />
         </g>
       ))}
-      <rect x="174" y="49" width="95" height="99" rx="9" fill="#fff" stroke="currentColor" strokeOpacity="0.25" />
+      <rect x="174" y="49" width="95" height="99" rx="9" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.25" />
       <rect x="185" y="61" width="32" height="5" rx="2.5" fill="currentColor" opacity="0.6" />
       {[86, 108, 130].map((y, index) => (
         <g key={y}>
           <path d={`M187 ${y}h67`} stroke="currentColor" strokeWidth="3" strokeOpacity="0.2" />
-          <circle className={`portal-art-motion portal-config-slider-${index}`} cx={203 + index * 15} cy={y} r="6" fill="#fff" stroke="currentColor" strokeWidth="3" />
+          <circle className={`portal-art-motion portal-config-slider-${index}`} cx={203 + index * 15} cy={y} r="6" fill="var(--art-surface)" stroke="currentColor" strokeWidth="3" />
         </g>
       ))}
       <circle className="portal-art-motion portal-config-packet" cx="241" cy="153" r="5" fill="currentColor" opacity="0" />
-      <g className="portal-art-motion portal-config-published" opacity="0"><rect x="82" y="6" width="156" height="25" rx="8" fill="#fff" /><ArtworkText label="configPublished" x={160} y={23} width={144} /></g>
+      <g className="portal-art-motion portal-config-published" opacity="0"><rect x="82" y="6" width="156" height="25" rx="8" fill="var(--art-surface)" /><ArtworkText label="configPublished" x={160} y={23} width={144} /></g>
       {/* 发布动作：配置改完要「推出去」，画面才有一个事件（评审 S6 点名平台卡只有静态零件） */}
       <g transform="translate(252 40)">
         <g className="portal-art-motion portal-config-publish">
@@ -1390,26 +1390,26 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
   merchantWorkbench: (
     <>
       <rect x="47" y="43" width="172" height="108" rx="8" fill="currentColor" />
-      <rect x="54" y="50" width="158" height="90" rx="4" fill="#fff" />
+      <rect x="54" y="50" width="158" height="90" rx="4" fill="var(--art-surface)" />
       <path d="M35 153h196l-11 12H47Z" fill="currentColor" opacity="0.3" />
       <rect x="69" y="86" width="65" height="42" rx="3" fill="currentColor" opacity="0.1" />
       {/* 店铺雨棚跟系统身份色走，不写死品牌橙；否则金色卡里夹一块橙色，与广告推荐卡又读成同族 */}
       <path d="m66 84 8-20h55l8 20Z" fill="currentColor" />
       {[0, 1, 2, 3].map(index => <path key={index} d={`M${66 + index * 18} 84h18v5a9 9 0 0 1-18 0Z`} fill={index % 2 ? '#fff' : 'currentColor'} />)}
       <rect x="81" y="103" width="18" height="25" rx="2" fill="currentColor" opacity="0.4" />
-      <rect x="107" y="103" width="18" height="14" rx="2" fill="#fff" />
+      <rect x="107" y="103" width="18" height="14" rx="2" fill="var(--art-surface)" />
       <path d="M153 72h41m-41 10h25" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
       <rect x="155" y="111" width="8" height="17" rx="2" fill="currentColor" opacity="0.35" />
       <rect x="168" y="102" width="8" height="26" rx="2" fill="currentColor" opacity="0.6" />
       <rect className="portal-art-motion portal-order-growth" x="181" y="94" width="8" height="34" rx="2" fill="currentColor" />
       <g className="portal-art-motion portal-order-receipt">
-        <path d="M231 30h54v111l-7-4-7 4-7-4-7 4-7-4-7 4-12-5Z" fill="#fff" stroke="currentColor" strokeOpacity="0.25" />
+        <path d="M231 30h54v111l-7-4-7 4-7-4-7 4-7-4-7 4-12-5Z" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.25" />
         <path d="M242 45h29m-29 8h19m-19 17h29m-29 10h29m-29 10h20" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" />
         <g className="portal-art-motion portal-order-stamp" opacity="0"><circle cx="258" cy="115" r="11" fill="#52C41A" /><path d="m252 114 4 4 8-8" fill="none" stroke="#fff" strokeWidth="2" /></g>
       </g>
       <path className="portal-art-motion portal-order-cursor" d="m180 90 1 22 6-7 7 9 5-4-7-8 9-4Z" fill="#595959" stroke="#fff" strokeWidth="1.5" />
-      <g className="portal-art-motion portal-order-arrival" opacity="0"><rect x="63" y="8" width="142" height="25" rx="8" fill="#fff" /><ArtworkText label="newOrder" x={134} y={25} width={130} /></g>
-      <g className="portal-art-motion portal-order-done" opacity="0"><rect x="63" y="8" width="142" height="25" rx="8" fill="#fff" /><ArtworkText label="orderCompleted" x={134} y={25} width={130} /></g>
+      <g className="portal-art-motion portal-order-arrival" opacity="0"><rect x="63" y="8" width="142" height="25" rx="8" fill="var(--art-surface)" /><ArtworkText label="newOrder" x={134} y={25} width={130} /></g>
+      <g className="portal-art-motion portal-order-done" opacity="0"><rect x="63" y="8" width="142" height="25" rx="8" fill="var(--art-surface)" /><ArtworkText label="orderCompleted" x={134} y={25} width={130} /></g>
     </>
   ),
   translation: null,
@@ -1431,7 +1431,7 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
   generic: (
     <>
       <path d="M95 65h130v67H95Z" fill="none" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" />
-      {[[66, 39], [198, 39], [66, 113], [198, 113]].map(([x, y]) => <rect key={`${x}-${y}`} x={x} y={y} width="54" height="39" rx="8" fill="#fff" stroke="currentColor" strokeOpacity="0.3" />)}
+      {[[66, 39], [198, 39], [66, 113], [198, 113]].map(([x, y]) => <rect key={`${x}-${y}`} x={x} y={y} width="54" height="39" rx="8" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.3" />)}
       <path d="m160 57 36 21v41l-36 21-36-21V78Z" fill="currentColor" />
       <path d="m144 95 12 12 21-24" className="portal-art-motion portal-art-draw" pathLength="1" fill="none" stroke="#fff" strokeWidth="4" />
     </>
@@ -1454,7 +1454,7 @@ function MeetingTable({ x, y }: { x: number; y: number }) {
       <rect x={x} y={y} width="56" height="34" rx="17" fill="currentColor" fillOpacity="0.16" stroke="currentColor" strokeOpacity="0.45" strokeWidth="2" />
       {/* 六把椅子：桌子四角 + 上下各一，俯视视角下椅子比人更容易读成"座位数=容量" */}
       {[[x - 7, y + 8], [x - 7, y + 26], [x + 63, y + 8], [x + 63, y + 26], [x + 21, y - 8], [x + 35, y + 42]].map(([cx, cy], i) => (
-        <circle key={i} cx={cx} cy={cy} r="5" fill="#fff" stroke="currentColor" strokeOpacity="0.45" strokeWidth="1.8" />
+        <circle key={i} cx={cx} cy={cy} r="5" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.45" strokeWidth="1.8" />
       ))}
       {/* 桌面中线：读作"桌子"而不是"胶囊按钮"的关键一笔 */}
       <path d={`M${x + 12} ${y + 17}h32`} stroke="currentColor" strokeOpacity="0.28" strokeWidth="2" />
@@ -1478,7 +1478,7 @@ function MeetingRoomScene() {
     <>
       <path d="M18 158h286" stroke="currentColor" strokeOpacity="0.12" strokeWidth="2" />
       {/* 顶部状态胶囊：预订成功 */}
-      <rect x="84" y="6" width="152" height="24" rx="12" fill="#fff" stroke="currentColor" strokeOpacity="0.2" />
+      <rect x="84" y="6" width="152" height="24" rx="12" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.2" />
       <g className="portal-art-motion portal-meeting-badge">
         <circle cx="98" cy="18" r="8" fill="#52C41A" />
         <path d="m94.5 18 2.6 2.8 5-5.6" fill="none" stroke="#fff" strokeWidth="2" />
@@ -1487,7 +1487,7 @@ function MeetingRoomScene() {
       <MeetingLabel label="meetingBooked" x={170} y={22} width={116} />
 
       {/* ① 房间：门牌 + 墙体（右下留门洞）+ 俯视会议桌 */}
-      <rect x="22" y="46" width="100" height="96" rx="9" fill="#fff" stroke="currentColor" strokeOpacity="0.35" strokeWidth="2" />
+      <rect x="22" y="46" width="100" height="96" rx="9" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.35" strokeWidth="2" />
       <path d="M122 118v24" stroke="#fff" strokeWidth="5" />
       <path className="portal-art-motion portal-meeting-door" d="M118 118h8v24h-8" fill="none" stroke="currentColor" strokeWidth="2" />
       <g className="portal-art-motion portal-meeting-plate">
@@ -1500,7 +1500,7 @@ function MeetingRoomScene() {
       <path d="M112 150q-14 2-26-8" fill="none" stroke="currentColor" strokeOpacity="0.45" strokeWidth="2" strokeDasharray="4 4" />
 
       {/* ② 忙闲大屏：时间轴 + 占用块 + 游标 + 选中空闲段 */}
-      <rect x="136" y="42" width="160" height="82" rx="9" fill="#fff" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
+      <rect x="136" y="42" width="160" height="82" rx="9" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
       <rect x="136" y="42" width="160" height="14" rx="7" fill="currentColor" fillOpacity="0.12" />
       {[143, 149, 155].map(cx => <circle key={cx} cx={cx} cy="49" r="2" fill="currentColor" fillOpacity="0.4" />)}
       <path d="M146 106h140" stroke="currentColor" strokeOpacity="0.35" strokeWidth="2" />
@@ -1522,7 +1522,7 @@ function MeetingRoomScene() {
       <path d="M256 66h30m-30 8h20" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
 
       {/* ③ 时钟：分针线性转动（会议是按时间占用的资源） */}
-      <circle cx="272" cy="140" r="17" fill="#fff" stroke="currentColor" strokeOpacity="0.4" strokeWidth="2" />
+      <circle cx="272" cy="140" r="17" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.4" strokeWidth="2" />
       {Array.from({ length: 12 }, (_, i) => {
         const angle = (i * 30 * Math.PI) / 180
         return (
@@ -1555,7 +1555,7 @@ function MeetingInviteScene() {
   return (
     <>
       <path d="M18 158h286" stroke="currentColor" strokeOpacity="0.12" strokeWidth="2" />
-      <rect x="80" y="6" width="160" height="24" rx="12" fill="#fff" stroke="currentColor" strokeOpacity="0.2" />
+      <rect x="80" y="6" width="160" height="24" rx="12" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.2" />
       <g className="portal-art-motion portal-meeting-badge">
         <circle cx="94" cy="18" r="8" fill="#52C41A" />
         <path d="m90.5 18 2.6 2.8 5-5.6" fill="none" stroke="#fff" strokeWidth="2" />
@@ -1564,7 +1564,7 @@ function MeetingInviteScene() {
 
       {/* ① 邀约卡片：主题条 + 时间片 + 房间/组织者三行，一眼是"一张会议邀约"而不是普通文档 */}
       <g className="portal-art-motion portal-meeting-card">
-        <rect x="24" y="52" width="92" height="86" rx="9" fill="#fff" stroke="currentColor" strokeOpacity="0.35" strokeWidth="2" />
+        <rect x="24" y="52" width="92" height="86" rx="9" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.35" strokeWidth="2" />
         <rect x="24" y="52" width="92" height="16" rx="8" fill="currentColor" fillOpacity="0.14" />
         <circle cx="36" cy="60" r="4" fill="currentColor" />
         <path d="M46 60h58" stroke="currentColor" strokeOpacity="0.4" strokeWidth="2.4" />
@@ -1595,7 +1595,7 @@ function MeetingInviteScene() {
 
       {/* ③ 签到二维码 + 扫描线 + 已签到绿章 */}
       <g>
-        <rect x="248" y="52" width="50" height="50" rx="6" fill="#fff" stroke="currentColor" strokeOpacity="0.4" strokeWidth="2" />
+        <rect x="248" y="52" width="50" height="50" rx="6" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.4" strokeWidth="2" />
         {/* 三个定位角 + 数据点：这是二维码能被认出来的最小要素 */}
         {[[254, 58], [280, 58], [254, 84]].map(([qx, qy]) => (
           <g key={`${qx}-${qy}`}>
@@ -1634,7 +1634,7 @@ function DocKnowledgeScene() {
     {/* 色条只用本卡主色深绿与令牌色；原 #722ED1 属「高级/特殊」语义，在暖色卡上跳色（P0-2） */}
     {[[38, 100, '#1890FF'], [46, 90, '#52C41A'], [54, 80, '#E8720C'], [62, 70, '#B381E9']].map(([x, y, tone], i) => (
       <g key={i} className="portal-art-motion portal-doc-stack" style={{ animationDelay: `${i * 0.5}s` }}>
-        <rect x={x as number} y={y as number} width="62" height="44" rx="6" fill="#fff" stroke="currentColor" strokeOpacity="0.25" />
+        <rect x={x as number} y={y as number} width="62" height="44" rx="6" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.25" />
         <rect x={(x as number) + 8} y={(y as number) + 8} width="18" height="4" rx="2" fill={tone as string} />
         <path d={`M${(x as number) + 8} ${(y as number) + 21}h46M${(x as number) + 8} ${(y as number) + 29}h30`} stroke="currentColor" strokeOpacity="0.18" strokeWidth="2" />
       </g>
@@ -1646,7 +1646,7 @@ function DocKnowledgeScene() {
 
     {/* 中间：统一索引卡 */}
     <rect x="142" y="56" width="78" height="94" rx="9" fill="currentColor" opacity="0.08" transform="translate(4 4)" />
-    <rect x="142" y="56" width="78" height="94" rx="9" fill="#fff" stroke="currentColor" strokeOpacity="0.25" />
+    <rect x="142" y="56" width="78" height="94" rx="9" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.25" />
     <circle cx="160" cy="76" r="7" fill="none" stroke="#1890FF" strokeWidth="2.5" />
     <path d="m165 81 5 5" stroke="#1890FF" strokeWidth="2.5" strokeLinecap="round" />
     {/*
@@ -1670,7 +1670,7 @@ function DocKnowledgeScene() {
       <path d="M252 46a16 16 0 0 1 31 6 11 11 0 0 1 3 22h-38a10 10 0 0 1 4-28Z" fill="currentColor" opacity="0.8" />
     </g>
     <g className="portal-art-motion portal-doc-window">
-      <rect x="242" y="88" width="58" height="46" rx="6" fill="#fff" stroke="currentColor" strokeOpacity="0.3" />
+      <rect x="242" y="88" width="58" height="46" rx="6" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.3" />
       <path d="M242 98h58" stroke="currentColor" strokeOpacity="0.55" strokeWidth="6" strokeLinecap="round" />
       <path d="M250 112h42M250 122h26" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2" />
     </g>
@@ -1692,7 +1692,7 @@ function DocKnowledgeVaultScene() {
 
     {/* 左側：新資料入庫 */}
     <g className="portal-art-motion portal-doc-window">
-      <rect x="26" y="86" width="40" height="34" rx="5" fill="#fff" stroke="currentColor" strokeOpacity="0.3" />
+      <rect x="26" y="86" width="40" height="34" rx="5" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.3" />
       <path d="M33 96h26M33 104h16" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
     </g>
     <path d="M70 103h18" stroke="currentColor" strokeOpacity="0.2" strokeWidth="2" strokeDasharray="3 5" />
@@ -1700,13 +1700,13 @@ function DocKnowledgeVaultScene() {
 
     {/* 主體：三層檔案櫃，分類資料夾依次入櫃（色標籤區分知識域） */}
     <rect x="92" y="44" width="150" height="112" rx="10" fill="currentColor" opacity="0.07" transform="translate(4 4)" />
-    <rect x="92" y="44" width="150" height="112" rx="10" fill="#fff" stroke="currentColor" strokeOpacity="0.28" strokeWidth="2" />
+    <rect x="92" y="44" width="150" height="112" rx="10" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.28" strokeWidth="2" />
     <path d="M92 82h150M92 118h150" stroke="currentColor" strokeOpacity="0.18" strokeWidth="2" />
     {[[102, 56], [132, 56], [162, 56], [192, 56], [222, 56],
       [102, 92], [132, 92], [162, 92], [192, 92], [222, 92],
       [102, 128], [132, 128], [222, 128]].map(([x, y], i) => (
       <g key={i} className="portal-art-motion portal-doc-stack" style={{ animationDelay: `${(i % 5) * 0.4}s` }}>
-        <rect x={x as number} y={y as number} width="22" height="22" rx="3" fill="#fff" stroke="currentColor" strokeOpacity="0.25" />
+        <rect x={x as number} y={y as number} width="22" height="22" rx="3" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.25" />
         <rect x={(x as number) + 4} y={y as number} width="10" height="4" rx="2" fill={(['#1890FF', '#52C41A', '#E8720C', '#722ED1', '#20B5B5'] as const)[i % 5]} />
       </g>
     ))}
