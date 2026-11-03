@@ -6,7 +6,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined, ShopOutlined } from '@ant-design/icons'
 import AlgorithmSection from './AlgorithmForm/AlgorithmSection'
 import MerchantStatusFields, { ConsistencyCheckField } from './AlgorithmForm/MerchantStatusFields'
-import { AlgorithmType, AppType, APP_OPTIONS, RecommendChannel } from '@mftb/contracts/recommendConstants'
+import { AlgorithmType, AppType, APP_OPTIONS } from '@mftb/contracts/recommendConstants'
 import dayjs from 'dayjs'
 import { fetchAdAlgorithmDetail, createAdAlgorithm, updateAdAlgorithm, appTypeToBrand, brandToAppType, type AdAlgorithmRequest } from '@/api/adPromotion'
 import OrganicTrafficScoreConfig from './OrganicTrafficScoreConfig'
@@ -19,14 +19,9 @@ import HelpPopover from '@/components/HelpPopover'
 import { formatSignboardPeopleCount } from './signboardLabels'
 import './WeightSlider.css'
 
-/** 自然流量算法可選業務頻道：按系統數據字典只列三個真實頻道（大首頁是跨頻道混排聚合層，不是一種業務頻道）。
- * 算法必須歸屬其中一個且只歸屬一個（單值字段）：商家權重分榜單直接取該算法綁定的品牌與頻道作口徑，
- * 因此頻道/品牌在榜單頁不再是獨立篩選條件。*/
-const ORGANIC_CHANNEL_OPTIONS = [
-  { value: RecommendChannel.DELIVERY, labelKey: 'recommend.channelDeliveryName' },
-  { value: RecommendChannel.SUPERMARKET, labelKey: 'recommend.channelSupermarketName' },
-  { value: RecommendChannel.GROUP_BUY, labelKey: 'recommend.channelGroupBuyName' },
-]
+/** 業務頻道不在本表单收集：算法只负责计分参数，「哪个业务频道用这条算法」是在「瀑布流策略」
+ * 配置时把算法归类到具体频道的——同一條算法可被不同频道的瀑布流引用，因此算法上的單值頻道字段
+ * 不能當业务真值（後端 channel 列仅保留兼容存量，本表单不再读写）。*/
 
 /** 广告类型标签映射 - 使用 i18n key */
 const TYPE_LABEL_KEY: Record<number, string> = {
@@ -455,8 +450,6 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
         form.setFieldsValue({
           name: detail.algoName,
           brand: brandToAppType(detail.brand),
-          // 自然流量算法的业务频道归属（存量大量為空）：空值回填保持空，由编辑时补选，不臆造默认频道
-          channel: detail.channel ?? undefined,
         })
         // 解析 params JSON 字符串，回填算法特有参数
         if (detail.params) {
@@ -636,9 +629,6 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
         algoName: values.name,
         algoType: Number(algorithmTypeParam),
         brand: appTypeToBrand(values.brand),
-        // 只有自然流量在本表单收業務頻道；其他类型的频道真值住定價表（算法×頻道），
-        // 不在此回写避免把已有 channel 抹成 null
-        ...(selectedAlgorithmType === AlgorithmType.ORGANIC_TRAFFIC ? { channel: values.channel } : {}),
         params: {
           presaleMode,
           continuousPurchase,
@@ -813,23 +803,6 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
               disabled={isEditMode || isDetailMode}
             />
           </Form.Item>
-
-          {/* 自然流量：算法必須歸屬一個業務頻道（單值；榜單的品牌/頻道口徑直接取這裡的配置）；
-              编辑模式允许改，存量未填的算法可在此补选 */}
-          {selectedAlgorithmType === AlgorithmType.ORGANIC_TRAFFIC && (
-            <Form.Item
-              label={t('common:channel')}
-              name="channel"
-              rules={[{ required: true, message: t('common:selectChannel') }]}
-              style={{ marginBottom: 0 }}
-            >
-              <Select
-                placeholder={t('common:selectChannel')}
-                options={ORGANIC_CHANNEL_OPTIONS.map(option => ({ value: option.value, label: t(option.labelKey) }))}
-                disabled={isDetailMode}
-              />
-            </Form.Item>
-          )}
         </div>
       </AlgorithmSection>
 

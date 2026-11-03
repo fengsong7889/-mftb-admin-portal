@@ -1009,5 +1009,8 @@
     "reqList": {
       "btnBatchImport": "일괄 가져오기"
     }
+  },
+  "algorithm": {
+    "btnScoreResult": "점수 결과"
   }
 }

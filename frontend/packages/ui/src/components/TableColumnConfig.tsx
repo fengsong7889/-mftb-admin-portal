@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { Drawer, Checkbox, Button, Space } from 'antd'
 import { useTranslation } from 'react-i18next'
 import {
@@ -36,7 +36,8 @@ interface TableColumnConfigProps {
  *
  * <p>合并口径：
  * - 保留用户已保存的顺序、显隐与锁定（用户显式关闭的列不会因补齐被重新打开）；
- * - 剔除已下线的列，标题/默认锁定跟随最新定义（语言切换、锁定调整）；
+ * - 剔除已下线的列，标题跟随最新定义（语言切换）；默认锁定只在存量配置**从未声明过**该列时兜底；
+ * - 用户主动解除锁定后存的是 `locked: null`，必须当作显式值尊重（`??` 会把 null 误当缺值而弹回锁定区）；
  * - 新增列插在默认顺序中「前一个已存在列」之后，避免新列永远沉到表格最右侧；
  *   前驱列也找不到时才退回尾部锁定列之前。
  */
@@ -54,7 +55,8 @@ export function mergeColumnConfigs(
         ...item,
         title: def.title,
         visible: item.visible ?? def.visible,
-        locked: item.locked ?? def.locked ?? null,
+        // 不能用 ??：null 是用户显式解除锁定的结果，不是「没配过」
+        locked: item.locked === undefined ? def.locked ?? null : item.locked,
       })
     }
   }
@@ -92,13 +94,13 @@ export function isSameColumnConfig(a: ColumnConfig[], b: ColumnConfig[]): boolea
 
 /** 默认字段配置（从 localStorage 恢复，并与最新列定义合并） */
 function loadConfig(storageKey: string | undefined, defaults: ColumnConfig[]): ColumnConfig[] {
-  if (!storageKey) return defaults
+  if (!storageKey) return defaults.map(c => ({ ...c }))
   try {
     const saved = localStorage.getItem(`table-config-${storageKey}`)
-    if (!saved) return defaults
+    if (!saved) return defaults.map(c => ({ ...c }))
     return mergeColumnConfigs(JSON.parse(saved) as ColumnConfig[], defaults)
   } catch { /* ignore */ }
-  return defaults
+  return defaults.map(c => ({ ...c }))
 }
 
 function saveConfig(storageKey: string | undefined, config: ColumnConfig[]) {
@@ -116,15 +118,20 @@ export default function TableColumnConfig({ columns, onChange, storageKey }: Tab
   /**
    * 列定义发生变化（新增列 / 删除列 / 语言切换改标题）时同步草稿。
    * <p>draft 只在挂载时读取一次，页面热更新或角色切换后 columns 已变、draft 还是旧的，
-   * 抽屉里就会缺列；此时点任意开关都会把旧草稿写回，等于把新列从表格上抹掉。
-   * 合并口径见 mergeColumnConfigs：保留用户已有顺序与显隐，只补新列、剔旧列、刷新标题。
+   * 抽屉里就会缺列；此时点任意开关都会把缺失新列的旧配置写回，新列随之消失。
+   * <p>依赖必须用内容签名而不是 columns 引用：调用方常传内联数组，引用每帧都在变，
+   * 会把本 effect 变成「每次渲染都重跑合并」，用户刚拖出锁定区的列会被立刻弹回去。
+   * 合并口径见 mergeColumnConfigs：保留用户已有顺序与显隐/解除的锁定，只补新列、剔旧列、刷新标题。
    */
+  const columnsSignature = useMemo(() => columns.map(c => `${c.key}:${c.title}:${c.locked ?? ''}`).join('|'), [columns])
+  const columnsRef = useRef(columns)
+  columnsRef.current = columns
   useEffect(() => {
     setDraft(prev => {
-      const next = mergeColumnConfigs(prev, columns)
+      const next = mergeColumnConfigs(prev, columnsRef.current)
       return isSameColumnConfig(prev, next) ? prev : next
     })
-  }, [columns])
+  }, [columnsSignature])
 
   // 保存到 localStorage 并通知父组件
   const applyConfig = useCallback((newConfig: ColumnConfig[]) => {
@@ -161,17 +168,21 @@ export default function TableColumnConfig({ columns, onChange, storageKey }: Tab
 
   /** 拖拽经过 */
   const handleDragOver = (e: React.DragEvent, zone: string, index: number) => {
+    // 子项与区域容器是嵌套关系：不阻断冒泡会让同一次 drop 被处理两次（子项落点随后又被容器落点覆盖）
     e.preventDefault()
+    e.stopPropagation()
     e.dataTransfer.dropEffect = 'move'
     setDragOver({ zone, index })
   }
 
-  /** 拖拽放置 - 非锁定区域内排序 */
+  /** 拖拽放置 - 允许跨区：锁定字段拖进非锁定区即解除锁定，实现任意字段自由排序 */
   const handleDrop = (e: React.DragEvent, dropZone: string, dropIndex: number) => {
     e.preventDefault()
+    e.stopPropagation()
     if (dragIndex === null) return
 
-    const item = draft[dragIndex]
+    // 必须拷一份：下面会改 item.locked，直接引用 draft 会原地污染调用方传入的 columns（页面 useMemo 默认值）
+    const item = { ...draft[dragIndex] }
     const newDraft = [...draft]
     newDraft.splice(dragIndex, 1)
 
@@ -304,7 +315,15 @@ export default function TableColumnConfig({ columns, onChange, storageKey }: Tab
         {/* 非锁定区域 */}
         <div className="tcc-zone">
           <div className="tcc-zone-label">{t('columnConfig.unlockedZone')}</div>
-          <div className="tcc-zone-content tcc-zone-main">
+          {/* 容器级落点：空白处（或本区无字段时）也能放置，否则锁定字段只能靠准头砸在某个字段行上才能拖进来 */}
+          <div
+            className={`tcc-zone-content tcc-zone-main ${unlocked.length === 0 ? 'tcc-zone-empty' : ''} ${dragOver?.zone === 'unlocked' && dragOver?.index === unlocked.length && dragIndex !== null ? 'tcc-zone-drop-end' : ''}`}
+            onDragOver={(e) => handleDragOver(e, 'unlocked', unlocked.length)}
+            onDrop={(e) => handleDrop(e, 'unlocked', unlocked.length)}
+          >
+            {unlocked.length === 0 && (
+              <div className="tcc-zone-placeholder">{t('columnConfig.zoneEmpty')}</div>
+            )}
             {unlocked.map((col, idx) => (
               <div
                 key={col.key}

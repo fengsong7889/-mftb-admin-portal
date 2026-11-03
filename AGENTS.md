@@ -70,6 +70,11 @@ npm run check:confirm-modal
 
 # 依赖边界门禁（公共层不得 import src/pages/**；src/contracts/** 必须是叶子）
 npm run check:boundary
+
+# 主题令牌门禁（裸色值棘轮只降不升 + theme.css 深浅令牌齐备 + 排除区未被污染）
+npm run check:theme-tokens
+node scripts/check-theme-tokens.mjs --report     # 看待人工判定与长尾色值分布
+node scripts/check-theme-tokens.mjs --snapshot   # 清理完一批后下调棘轮基线
 ```
 
 ## 关键约束
@@ -103,30 +108,42 @@ npm run check:boundary
 
 ## 项目结构
 
+> ⚠️ 共享层已拆为 workspace 包：`src/styles/`、`src/components/`、`src/hooks/`、`src/api/`、`src/contexts/`
+> **均已不存在**。按旧路径找文件会改错地方（改了不生效，构建读的是 `frontend/packages/` 下那份）。
+
 ```
-src/
-├── components/       # 共享组件（HeaderBar, Sidebar, ContentArea 等）
-├── constants/        # 常量定义（品牌、枚举）
-├── contexts/         # React Context（AuthContext）
-├── hooks/            # 自定义 Hooks（useColumnConfig）
+src/                  # 主站壳（legacy 应用）：路由装配 + 尚未拆分的业务页面
 ├── pages/            # 页面组件（按功能模块分目录）
 │   ├── Home/         # 首页工作台
-│   ├── Login/        # 登录页
+│   ├── Login/        # 登录页（品牌固定样式，不参与主题切换）
+│   ├── Portal/       # 企业门户（插画 scene 色板为唯一真源）
 │   ├── Recommend/    # 推荐管理
-│   ├── SearchConfigNew/  # 搜索配置
-│   ├── PromotionReport/  # 推广报表
-│   ├── Permission/   # 权限管理
 │   └── ...
-├── styles/           # 全局样式（components.css, global.css）
 ├── App.tsx           # 根组件（路由配置）
-└── main.tsx          # 入口文件
+├── app-routes.ts     # 路由组（构建期可被各子应用的 app-routes 替掉）
+├── bootstrap.tsx     # ⭐ 唯一装配点：mountApp() 注入 ConfigProvider / 主题 / i18n
+└── main.tsx          # 主站入口（只调 mountApp）
+
+frontend/
+├── apps/{eam,hr,rdm}/  # 子系统独立工程：各自 index.html + main.tsx（同样只调 mountApp）+ app-routes.ts + pages/
+└── packages/           # 共享层（workspace 包），通过别名 @/* 消费
+    ├── ui/               # @/components @/hooks @/styles @/assets
+    │   └── src/styles/   # ⭐ theme.css（主题令牌层）/ global.css / components.css 真源在此
+    ├── platform-client/  # @/api @/contexts @/utils
+    ├── i18n/             # @/i18n：5 个语言包 + 全局偏好常量（如 LANGUAGE_STORAGE_KEY）
+    └── contracts/        # @/constants @mftb/contracts：契约与常量（叶子包）
 ```
+
+**入口唯一带来的约束**：四个 `main.tsx` 全部复用 `src/bootstrap.tsx` 的 `mountApp()`，
+且 `scripts/build-apps.mjs` 复用同一份 `vite.config.ts`（靠 `VITE_APP_ROOT` 切入口）。
+因此全局性改动（主题、Provider、全局样式、`transformIndexHtml` 插件）**只改一处**即对主站与三个子系统同时生效；
+反之，禁止在子应用重复装配（会造成两套状态不同步）。
 
 ## CI/CD
 
 - **平台**：GitHub Actions → GitHub Pages
 - **触发**：push 到 main 分支
-- **质量门禁**：lint + typecheck + menu-consistency + dependency-boundary + stat-card-order + confirm-modal + i18n + secret-scan + test（任一失败中止部署）
+- **质量门禁**：lint + typecheck + menu-consistency + dependency-boundary + stat-card-order + confirm-modal + theme-tokens + i18n + secret-scan + test（任一失败中止部署）
 - **部署**：`actions/deploy-pages@v4`
 
 ## 测试
@@ -305,6 +322,64 @@ AI 禁止：
 5. 参考实现：`src/pages/Consumable/Report/index.tsx`（消耗统计）。
 
 自检：`npm run check:stat-order` 扫描列表页，统计卡片渲染在搜索区之前则报告并阻断。
+
+---
+
+## 列表页字段配置可自由排序（前端 UI 强制规范）
+
+> 详细规则：`.qoder/rules/frontend-ui-design-spec.md` §E.3。
+> 共享实现：`frontend/packages/ui/src/components/TableColumnConfig.tsx` + `frontend/packages/ui/src/hooks/useColumnConfig.tsx`。
+> 背景：抽屉保留「頭部鎖定區域／非鎖定區域／尾部鎖定區域」三区外观，但旧实现里非锁定区只有字段行本身是 drop 目标，
+> 容器空白处（以及本区无字段时）完全没有落点，导致锁定字段实际上拖不进自由区——用户感知为「排名/操作不能移动」。
+> 已修复：保留三区外观，只补齐跨区拖拽能力。**不得为了放开排序而改掉三区外观或改成每行下拉选择器。**
+
+**所有列表页的「表格字段設置」必须能让任意字段参与自由排序（含排名、ID、操作列）；锁定只能是可以解除的默认值，不能是硬限制。**
+
+```tsx
+// 页面只声明「默认布局」：locked 是默认固定端，用户可拖进非锁定区解除
+const { configComponent, applyConfig } = useColumnConfig('page-key', columnMeta, [
+  { key: 'rank', visible: true, locked: 'head' as const },
+  { key: 'action', visible: true, locked: 'tail' as const },
+])
+```
+
+**强制约束：**
+1. 三区外观保留（頭部鎖定／非鎖定／尾部鎖定），但必须支持把锁定字段拖进非锁定区：落点命中即 `locked = null`。
+2. **非锁定区容器本身必须是 drop 目标**：空白处（及本区无字段时）可放置，拖到末尾即追加到自由区最后；
+   拖拽经过时要给容器级反馈（`.tcc-zone-drop-end`），让用户看出空白处也是落点。
+3. 每个锁定字段行保留 ×「解除鎖定」按钮，作为拖拽之外的第二个出口；`locked` 仅表示默认贴哪一侧。
+4. 子项与区域容器的事件必须 `stopPropagation`，否则同一次 drop 会被处理两次，落点被子项或容器互相覆盖。
+5. 页面不得自行实现列配置或另造组件；`defaultConfig` 只用来给定默认顺序与默认固定端。
+6. 兜底不得删：可见列少于 2 列时 `useColumnConfig` 仍回退默认配置；存量本地配置（含旧 `locked` 值）必须继续生效，
+   不得因改动丢用户的排序与显隐。
+7. 参考实现：`src/pages/TrafficSandbox/MerchantScoreInsight.tsx`（商家權重分）。
+
+自检：`frontend/packages/ui/src/components/TableColumnConfig.test.tsx`（三区外观仍在、锁定字段可拖入非锁定区并解除锁定、
+空白处落点可拖到末尾、× 解除锁定、事件不双处理）+ `frontend/packages/ui/src/hooks/useColumnConfig.test.tsx`（存量配置合并口径）。
+
+---
+
+## 列表内可点元素色彩统一（前端 UI 强制规范）
+
+> 详细规则：`.qoder/rules/frontend-ui-design-spec.md` §B.1.1。
+> 背景：商家权重分「綁定瀑布流」的 `+N` 展开入口被做成描边胶囊，与同一行右边的「詳情」不是同一套颜色，
+> 用户无法从颜色判断哪些东西能点。已统一为操作列同一套色彩语言。
+
+**表格单元格内一切可点元素（操作列按钮、展开入口如 `+N`、行内链接文字、可点击图标）必须与操作列同色：
+静态品牌橙 `#E8720C`，鼠标移入变 `#F59432` + 浅橙底 + `scale(1.05)`。**
+
+**强制约束：**
+1. 实现只能用 `<Button type="link" size="small">`，让全局 `.ant-table .ant-btn-link` 规则生效。
+2. 页面自有 CSS 只允许补**形态与布局属性**（`border` / `border-radius` / `padding` / `flex-shrink` / `font-weight`），
+   **不得**重写其 `color`、`background`、`box-shadow` 或 hover 文字色；需要描边时选择器叠到
+   `.ant-table .ant-btn-link.<自己的类>` 一级，才能覆盖全局的 `padding`/`border-radius`。
+3. 描边只能取**同一主色的透明度阶**（如 `rgba(232,114,12,0.35)`，hover `rgba(245,148,50,0.65)`）；
+   禁止用实心块、渐变底或新色相来“突出可点”；要提示可点，用描边/尖角（如 `+N ▾`）+ 上述 hover 变色。
+4. 同一行/单元格内不得出现两种橙色的可点元素；危险操作仍用 `danger`（`#FF4D4F` / hover `#FF7875`）。
+5. 参考实现：`src/pages/TrafficSandbox/MerchantScoreInsight.tsx` 的 `.organic__wf-more`（只加描边与布局，文字色全继承）。
+
+自检：`src/pages/TrafficSandbox/OrganicScorePages.test.tsx` 断言展开入口 `className` 同时含 `ant-btn-link` 与页面自有类，
+且只校内容（`+N ▾`），不校颜色。
 
 ---
 

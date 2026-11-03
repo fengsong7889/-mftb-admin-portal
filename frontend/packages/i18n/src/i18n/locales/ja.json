@@ -1009,5 +1009,8 @@
     "reqList": {
       "btnBatchImport": "一括インポート"
     }
+  },
+  "algorithm": {
+    "btnScoreResult": "採点結果"
   }
 }

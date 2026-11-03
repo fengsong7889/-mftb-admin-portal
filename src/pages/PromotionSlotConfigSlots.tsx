@@ -7,7 +7,7 @@ import BrandTag from '@/components/BrandTag'
 import { fetchAdAlgorithms } from '@/api/adPromotion'
 import { searchWaterfallCatalog } from '@/api/waterfallCatalog'
 import type { WaterfallCatalogItem } from '@/api/waterfallCatalog'
-import { getDisplayCategoryMode, GROUP_BUY_CHANNEL, SUPERMARKET_CHANNEL, NATURAL_ALGORITHM_TYPE, MAX_SLOT_POSITION } from '@mftb/contracts/waterfallTypes'
+import { getDisplayCategoryMode, NATURAL_ALGORITHM_TYPE, MAX_SLOT_POSITION } from '@mftb/contracts/waterfallTypes'
 import { readDraft, writeDraft } from './waterfallConfig/waterfallDraft'
 import type {
   WaterfallDraft, AlgoSlotDraft, FixedContentSlot, WaterfallContentType, WaterfallStatus,
@@ -97,7 +97,6 @@ export default function PromotionSlotConfigSlots() {
   const isSupermarket = !isGroupBuy && draft?.bizChannel === 'supermarket'
   const supportsContentConfig = isGroupBuy || isSupermarket
   const catalogChannel = isSupermarket ? 'supermarket' : 'groupBuy'
-  const algorithmChannel = isGroupBuy ? GROUP_BUY_CHANNEL : isSupermarket ? SUPERMARKET_CHANNEL : undefined
   const isContentMode = !!draft && supportsContentConfig && getDisplayCategoryMode(draft) !== 'algorithm'
   const contentType = draft?.contentType ?? 'store'
   const brand = draft?.brand
@@ -132,23 +131,24 @@ export default function PromotionSlotConfigSlots() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  /** 加载可选算法（delivery：排除自然流量/人气商家/金字招牌） */
+  /** 加载可选算法（delivery：排除自然流量/人气商家/金字招牌）
+   * 只按品牌匹配，不按算法自身的 channel 过滤：頻道归属在本條瀑布流决定，算法库不收录頻道 */
   useEffect(() => {
     if (isContentMode) return
     let active = true
-    fetchAdAlgorithms({ page: 1, size: 200, status: 1, ...(supportsContentConfig ? { brand, channel: algorithmChannel } : {}) })
+    fetchAdAlgorithms({ page: 1, size: 200, status: 1, ...(supportsContentConfig ? { brand } : {}) })
       .then(res => {
         if (active && res.records.length > 0) {
           setAlgorithmOptions(
             res.records
-              .filter(a => a.algoCode && a.algoType !== NATURAL_ALGORITHM_TYPE && a.algoType !== 5 && !a.algoCode.startsWith('SFJZ') && (!supportsContentConfig || (a.brand === brand && a.channel === algorithmChannel)))
+              .filter(a => a.algoCode && a.algoType !== NATURAL_ALGORITHM_TYPE && a.algoType !== 5 && !a.algoCode.startsWith('SFJZ') && (!supportsContentConfig || a.brand === brand))
               .map(a => ({ label: a.algoName, value: a.algoCode as string, type: a.algoType, brand: a.brand as string | undefined })),
           )
         }
       })
       .catch(() => { /* 保留空选项 */ })
     return () => { active = false }
-  }, [isContentMode, supportsContentConfig, algorithmChannel, brand])
+  }, [isContentMode, supportsContentConfig, brand])
 
   /** 搜索团购资源（groupBuy，防抖） */
   const doSearchResource = useCallback((keyword?: string) => {

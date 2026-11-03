@@ -87,6 +87,12 @@
   overflow-y: auto;
 }
 
+/* 拖到非锁定区空白处时的容器反馈（否则用户不知道空白处也是落点） */
+.tcc-zone-main.tcc-zone-drop-end {
+  border-color: #1890ff;
+  background: #f0f7ff;
+}
+
 /* 空占位 */
 .tcc-zone-placeholder {
   text-align: center;

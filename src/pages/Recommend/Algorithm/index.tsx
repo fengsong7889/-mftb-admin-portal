@@ -9,6 +9,7 @@ import { AlgorithmType, RecommendChannel, PlacementInterface, ServiceStatus, App
 import { fetchAdAlgorithms, updateAdAlgorithmStatus, deleteAdAlgorithm, fetchAlgorithmWaterfallReferences, brandToAppType, type AdAlgorithm, type WaterfallReference } from '@/api/adPromotion'
 import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { useCardOrder, type CardDragProps } from '@/hooks/useCardOrder'
+import { useAuth } from '@/contexts/AuthContext'
 import BrandTag from '@/components/BrandTag'
 
 /** 各业务类型对应的算法类型列表 */
@@ -63,6 +64,9 @@ const toAlgorithmRecord = (vo: AdAlgorithm): AlgorithmRecord => ({
 export default function Algorithm() {
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const { hasMenuPermission } = useAuth()
+  // 自然流量算法可直达商家权重分榜单；无榜单查看权限时不渲染该入口，避免点进去吃 403
+  const canViewScoreBoard = hasMenuPermission('merchant-score-insight')
   const [searchParams, setSearchParams] = useSearchParams()
 
   // 从 URL 参数恢复列表状态（从新增页返回时）
@@ -361,9 +365,13 @@ export default function Algorithm() {
       render: (v: string) => <span style={{ whiteSpace: 'nowrap' }}>{v || '-'}</span>,
     },
     {
-      title: t('common.colAction'), key: 'action', width: 220,
+      title: t('common.colAction'), key: 'action', width: 260,
       render: (_, record) => (
         <Space size={0} split={<span className="action-split">|</span>}>
+          {/* 自然流量算法的计分结果在商家权重分查看：无论是否已绑定瀑布流都可出榜 */}
+          {record.type === AlgorithmType.ORGANIC_TRAFFIC && canViewScoreBoard && (
+            <Button type="link" size="small" onClick={() => navigate(`/merchant-score-insight?algo=${encodeURIComponent(record.code)}`)}>{t('algorithm.btnScoreResult')}</Button>
+          )}
           <Button type="link" size="small" onClick={() => handleViewDetail(record)}>{t('common.detail')}</Button>
           <Button type="link" size="small" onClick={() => navigate(`/promotion-algorithm-add?type=${record.type}&id=${record.id}&tab=${businessType}`)}>{t('common.edit')}</Button>
           <Button type="link" size="small" danger onClick={() => handleDelete(record)}>

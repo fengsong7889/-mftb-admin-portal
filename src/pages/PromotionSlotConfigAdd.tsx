@@ -18,7 +18,7 @@ import {
   type AlgoSlotDraft, type FixedContentSlot, type WaterfallDraft, type WaterfallBizChannel, type WaterfallDisplayCategoryMode, type WaterfallSortMode,
   ALGO_TYPE_LABEL, ALGO_TYPE_COLOR,
   CONTENT_TYPE_OPTIONS, LAYOUT_OPTIONS, BUSINESS_TYPE_LABEL_KEY, BIZ_CHANNEL_OPTIONS,
-  serverKey, localKey, getDisplayCategoryMode, GROUP_BUY_CHANNEL, SUPERMARKET_CHANNEL, NATURAL_ALGORITHM_TYPE, DEFAULT_WATERFALL_SORT,
+  serverKey, localKey, getDisplayCategoryMode, NATURAL_ALGORITHM_TYPE, DEFAULT_WATERFALL_SORT,
 } from '@mftb/contracts/waterfallTypes'
 import {
   getExtension, setExtension, getLocalStrategy, upsertLocalStrategy,
@@ -104,7 +104,6 @@ function PromotionSlotConfigForm() {
   const isSupermarket = !isGroupBuy && bizChannel === 'supermarket'
   const supportsContentConfig = isGroupBuy || isSupermarket
   const catalogChannel = isSupermarket ? 'supermarket' : 'groupBuy'
-  const algorithmChannel = isGroupBuy ? GROUP_BUY_CHANNEL : isSupermarket ? SUPERMARKET_CHANNEL : undefined
   const useAlgorithmSlots = !supportsContentConfig || displayCategoryMode === 'algorithm'
   /** 内容型频道（团购/超市百货）且非算法模式（分类/自定义）：走本地扩展保存 */
   const contentCategoryMode = supportsContentConfig && displayCategoryMode !== 'algorithm'
@@ -152,18 +151,20 @@ function PromotionSlotConfigForm() {
     return () => clearInterval(id)
   }, [])
 
-  /** 加载算法库（外卖兜底/坑位；团购不使用假算法） */
+  /** 加载算法库（外卖兜底/坑位；团购不使用假算法）
+   * 候选只按品牌匹配，不按算法自身的 channel 字段过滤：業務頻道是「本條瀑布流」的属性，
+   * 算法库不收录频道（其他广告类型也没有该字段），同一條算法可以被不同频道的瀑布流复用。*/
   useEffect(() => {
     let active = true
     setAlgorithmOptions([])
-    fetchAdAlgorithms({ page: 1, size: 200, status: 1, ...(supportsContentConfig ? { brand, channel: algorithmChannel } : {}) })
+    fetchAdAlgorithms({ page: 1, size: 200, status: 1, ...(supportsContentConfig ? { brand } : {}) })
       .then(res => {
-        const filtered = (res.records ?? []).filter(a => a.algoCode && !a.algoCode.startsWith('SFJZ') && (!supportsContentConfig || (a.channel === algorithmChannel && a.brand === brand)))
+        const filtered = (res.records ?? []).filter(a => a.algoCode && !a.algoCode.startsWith('SFJZ') && (!supportsContentConfig || a.brand === brand))
         if (active) setAlgorithmOptions(filtered.map(a => ({ label: a.algoName, value: a.algoCode, type: a.algoType, brand: a.brand })))
       })
       .catch(() => { /* 保留降级空选项 */ })
     return () => { active = false }
-  }, [supportsContentConfig, algorithmChannel, brand])
+  }, [supportsContentConfig, brand])
 
   /** 团购分类 */
   useEffect(() => {
