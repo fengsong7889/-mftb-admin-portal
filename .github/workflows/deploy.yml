@@ -54,6 +54,9 @@ jobs:
         run: npm run check:stat-order
       - name: Confirm Modal Style
         run: npm run check:confirm-modal
+      # 主题令牌棘轮门禁（方案 §8.2）：裸色值只减不增 + 令牌双源一致，与本地 npm run verify 同序（confirm-modal 之后、i18n 之前）
+      - name: Theme Tokens
+        run: npm run check:theme-tokens
       - name: i18n Coverage
         run: npm run check:i18n
       - name: i18n Fallback Copy
