@@ -91,6 +91,10 @@ const IMPORT_ALIASES = [
   ['@/hooks', 'frontend/packages/ui/src/hooks'],
   ['@/styles/', 'frontend/packages/ui/src/styles/'],
   ['@/styles', 'frontend/packages/ui/src/styles'],
+  // 主题层（深浅色主题方案 §3）。不登记的后果：`@/theme/xxx` 会回退到 `@` → 根 src/，
+  // 于是 ui 包引自己包内的 theme 目录被误判为「公共层依赖业务页面」，check:boundary 直接报错。
+  ['@/theme/', 'frontend/packages/ui/src/theme/'],
+  ['@/theme', 'frontend/packages/ui/src/theme'],
   ['@/assets/', 'frontend/packages/ui/src/assets/'],
   ['@/assets', 'frontend/packages/ui/src/assets'],
   ['@/i18n/', 'frontend/packages/i18n/src/i18n/'],

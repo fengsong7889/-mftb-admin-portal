@@ -1,0 +1,17 @@
+{
+  "$comment": [
+    "主题令牌化棘轮基线，由 scripts/check-theme-tokens.mjs 校验（方案 §5.2 / §8.2）。",
+    "规则：三项裸色值计数只允许下降。清理完一批就用 --snapshot 下调一次；",
+    "新增裸色值会让门禁失败 —— 新代码必须直接用 var(--*) 语义令牌。",
+    "cssHex = CSS 文件里的十六进制裸色值；inlineHex = TSX/TS 引号内的十六进制裸色值；",
+    "rgbaBlack = rgba(0,0,0,*) 形式的黑色阴影（深色下几乎不可见，需换成 --shadow-* + --card-outline）。",
+    "统计已排除方案 §5.4 的排除区（登录页 / 门户插画 scene / PetMascot 动效变量 / 测试断言）。",
+    "expectThemeFiles：theme.css 与 themeTokens.ts 是否应已存在；置 true 后文件缺失即判失败，防止门禁长期 SKIP。"
+  ],
+  "cssHex": 2911,
+  "inlineHex": 9016,
+  "rgbaBlack": 576,
+  "tokenized": 303,
+  "expectThemeFiles": true,
+  "updatedAt": "2026-11-03"
+}

@@ -1,0 +1,520 @@
+/**
+ * Copyright (c) 2026 fengsong7889. All Rights Reserved.
+ *
+ * 本文件为「MFTB 企业一体化管理平台软件」的组成部分。
+ * 未经著作权人书面许可，不得使用、复制、修改、再分发或用于任何商业目的。
+ * 完整许可条款见仓库根目录 LICENSE 文件。
+ */
+
+/**
+ * 主题令牌映射表与裸色值统计口径 —— codemod 与门禁共用的**单一真源**。
+ *
+ * 背景（方案：docs/design/深浅色主题切换_可落地实施方案_2026-11-03.md）：
+ * 全站 CSS 有 3218 处裸色值（242 个独立值）、TSX 内联 style 有 9987 处，
+ * 深色模式必须把它们收敛到语义令牌。两个 codemod（CSS / 内联）与门禁
+ * `check-theme-tokens` 都从本文件读取映射与排除清单，禁止各自内嵌副本——
+ * 三份映射表必然漂移，漂移的后果是同一色值在不同目录被替换成不同令牌。
+ *
+ * 两条硬判据（决定一个色值能否进 COLOR_TO_TOKEN）：
+ *
+ * 1. **严格等值**：色值必须与目标令牌的**浅色值完全相同**。
+ *    因为 `:root` 的浅色令牌值 = 现状裸色值，等值替换在浅色主题下才是
+ *    「视觉恒等变换」。像 `#CF1322`（深红）虽语义接近 `--danger`(#FF4D4F)，
+ *    但替换后浅色下红会明显变浅 —— 这类一律进 REVIEW_REQUIRED，交人工判定。
+ *
+ * 2. **语义单一**：同一色值在全站只承担一种语义。
+ *    反例 `#333333`：既是侧边栏菜单激活底（`Menu.itemActiveBg`），
+ *    又是表头文字色（`Table.headerColor`），还散落在一批页面里当正文深色。
+ *    机械替换无法区分上下文，错了就是跨模块的视觉回归，因此也进 REVIEW_REQUIRED。
+ *
+ * 属性上下文：白色 `#FFFFFF` 作卡片底是 `--surface-2`，作文字时却不能机械定为 `--on-brand`
+ * （橙底该转深色，侧边栏/蓝横幅/登录页必须保持白色），因此白字不纳入自动映射。
+ * 所以映射表按属性分 bg / fg / border 三段，
+ * 由 classifyProperty() 判定当前声明属于哪一段，**不得**退化成单一色值映射。
+ */
+
+/**
+ * 语义令牌清单（与 packages/ui/src/styles/theme.css 的 `:root` 一一对应）。
+ * 门禁用它校验 theme.css 的 `:root` 与 `[data-theme='dark']` 两块 key 集合是否一致：
+ * 漏定义深色值不会报错，只会静默 fallback 到浅色值，是最难发现的一类缺陷。
+ */
+export const SEMANTIC_TOKENS = [
+  // 表面
+  'surface-1', 'surface-2', 'surface-3', 'surface-hover', 'surface-sunken', 'header-glass',
+  // 文字
+  'text-1', 'text-2', 'text-3', 'text-4', 'on-brand', 'text-brand', 'header-text',
+  // 边框
+  'border-1', 'border-2', 'border-3', 'border-input',
+  // 品牌
+  'brand', 'brand-hover', 'brand-active', 'brand-soft', 'brand-border',
+  // 统计卡描边族（主色 + 13% alpha，不能由 var() 拼接得到）
+  'stat-border-info', 'stat-border-brand', 'stat-border-success', 'stat-border-purple', 'stat-border-neutral',
+  // 语义色
+  'success', 'success-soft', 'info', 'info-soft',
+  'warning', 'warning-soft', 'danger', 'danger-soft', 'purple', 'purple-soft',
+  // 阴影与描边补偿
+  'shadow-1', 'shadow-2', 'shadow-3', 'shadow-card-soft',
+  'shadow-btn-hover', 'shadow-btn-active', 'shadow-popover',
+  'shadow-brand', 'card-outline',
+]
+
+/** 组件层令牌：仅壳层组件自有 CSS 可引用，业务页面禁止使用 */
+export const COMPONENT_TOKENS = [
+  'sidebar-bg', 'sidebar-item-color', 'sidebar-item-hover-bg',
+  'sidebar-item-active-bg', 'sidebar-shadow',
+]
+
+/**
+ * 令牌的双主题取值 —— **唯一真源**。
+ *
+ * 为什么放在这里而不是只写在 theme.css：同一套值有三个消费方（theme.css 的
+ * `:root`/`[data-theme='dark']`、themeTokens.ts 的 antd token、以及本文件映射表的
+ * 「严格等值」判据）。写在 CSS 里就只能靠人眼逐项比对，三处必然漂移。
+ * 以本表为真源后：Phase 1 可由它生成 theme.css，themeTokens.ts 由它派生，
+ * 单测（theme-token-map.test.mjs）用它自动校验映射表的等值判据。
+ *
+ * 深色值均经 WCAG 相对亮度实测（方案 §4.5 矩阵），禁止凭估算修改。
+ * 非颜色类令牌（shadow-* / card-outline / sidebar-shadow）不在此表，单独列于 NON_COLOR_TOKENS。
+ */
+export const TOKEN_VALUES = {
+  'surface-1': { light: '#F5F5F5', dark: '#141414' },
+  'surface-2': { light: '#FFFFFF', dark: '#1F1F1F' },
+  'surface-3': { light: '#FAFAFA', dark: '#262626' },
+  'surface-hover': { light: '#F5F5F5', dark: '#2A2A2A' },
+  'surface-sunken': { light: '#FAFBFC', dark: '#0F0F0F' },
+  // 顶栏毛玻璃：必须与 --header-text 成对改动。只令牌化文字而漏了背板会得到「白底白字」
+  // （实踩：门户顶栏从 1.04 的「深字白底」变成同为 1.04 的「浅字白底」，看起来没修其实更糟）。
+  // 两侧都保留 alpha 以维持 backdrop-filter 的毛玻璃质感，不换成不透明实底。
+  'header-glass': { light: 'rgba(255,255,255,0.92)', dark: 'rgba(31,31,31,0.92)' },
+  'text-1': { light: '#262626', dark: '#E8E8E8' },
+  'text-2': { light: '#595959', dark: '#B0B0B0' },
+  // 深色提亮：#8C8C8C 在 #262626 表头底实测仅 4.50:1 卡线，#9A9A9A 为 5.38:1
+  'text-3': { light: '#8C8C8C', dark: '#9A9A9A' },
+  // 深色不可沿用浅色低对比：#595959 实测仅 2.35:1，#737373 为 3.48:1
+  'text-4': { light: '#BFBFBF', dark: '#737373' },
+  // 品牌色实底之上的前景（文字**与图标**）：浅底上白字 3.07:1、黑字 6.00:1。
+  // 命名取 Material 的 on-X 语义：它同时覆盖按钮文字、Checkbox 勾号、Radio 内圆点，
+  // 而不只是文字（旧名 --text-inverse 只暗示文字，且「inverse」容易被读成「深色主题反色」）。
+  // 深色取 #141414 而非纯黑 #000：纯黑在橙底上 6.84:1 虽更高，但与正文令牌体系（#141414）不一致，且 OLED 下偏硬。
+  'on-brand': { light: '#FFFFFF', dark: '#141414' },
+  'text-brand': { light: '#1890FF', dark: '#40A9FF' },
+  // 顶栏文字族（系统名/用户名/页签）：全站 9 处用 #2D3436，与 --text-1 的 #262626 不等值。
+  // 单独建令牌而不是收敛到 --text-1，是为了守住「替换不得改变浅色观感」这条硬约束。
+  'header-text': { light: '#2D3436', dark: '#E8E8E8' },
+  'border-1': { light: '#D9D9D9', dark: '#424242' },
+  'border-2': { light: '#F0F0F0', dark: '#303030' },
+  'border-3': { light: '#E8EAED', dark: '#303030' },
+  'border-input': { light: '#D9D9D9', dark: '#5A5A5A' },
+  brand: { light: '#E8720C', dark: '#E8720C' },
+  'brand-hover': { light: '#F59432', dark: '#F59432' },
+  'brand-active': { light: '#CC6200', dark: '#D4670A' },
+  'brand-soft': { light: '#FFF7F0', dark: 'rgba(232,114,12,0.14)' },
+  'brand-border': { light: '#FFE7D1', dark: 'rgba(232,114,12,0.32)' },
+  /*
+   * 统计卡描边专用令牌族。它们存在的唯一理由：内联 style 里写的是
+   * `borderColor: `${tone}22``——把主色字符串与 alpha 后缀拼接。
+   * 一旦 tone 改成 var(--info)，拼出 `var(--info)22` 就是非法值，描边会静默消失。
+   * 所以下列每个浅色值都严格等于「对应主色 + 13% alpha」，保证令牌化后浅色不变；
+   * 深色侧不能沿用 13%（在深底上几乎不可见），一律提到 28~30%。
+   * 不得复用 --brand-border：它是 #FFE7D1 实色浅橙，与 13% alpha 橙的合成结果不等值。
+   */
+  'stat-border-info': { light: 'rgba(24,144,255,0.13)', dark: 'rgba(64,169,255,0.30)' },
+  'stat-border-brand': { light: 'rgba(232,114,12,0.13)', dark: 'rgba(232,114,12,0.30)' },
+  'stat-border-success': { light: 'rgba(82,196,26,0.13)', dark: 'rgba(106,190,57,0.30)' },
+  'stat-border-purple': { light: 'rgba(114,46,209,0.13)', dark: 'rgba(163,113,231,0.30)' },
+  'stat-border-neutral': { light: 'rgba(191,191,191,0.13)', dark: 'rgba(115,115,115,0.34)' },
+  success: { light: '#52C41A', dark: '#6ABE39' },
+  'success-soft': { light: '#F6FFED', dark: 'rgba(82,196,26,0.16)' },
+  info: { light: '#1890FF', dark: '#40A9FF' },
+  'info-soft': { light: '#E6F7FF', dark: 'rgba(24,144,255,0.16)' },
+  warning: { light: '#FA8C16', dark: '#FAA03D' },
+  'warning-soft': { light: '#FFF7E6', dark: 'rgba(250,140,22,0.16)' },
+  danger: { light: '#FF4D4F', dark: '#FF7875' },
+  'danger-soft': { light: '#FFF1F0', dark: 'rgba(255,77,79,0.16)' },
+  // 深色多提半档：antd 的 #9254DE 实测仅 3.57:1，作正文不达标；#A371E7 为 4.77:1
+  purple: { light: '#722ED1', dark: '#A371E7' },
+  'purple-soft': { light: '#F9F0FF', dark: 'rgba(114,46,209,0.18)' },
+  // 组件层
+  'sidebar-bg': { light: '#1E1E1E', dark: '#1A1A1A' },
+  'sidebar-item-color': { light: '#B0B0B0', dark: '#A6A6A6' },
+  'sidebar-item-hover-bg': { light: '#2A2A2A', dark: '#2E2E2E' },
+  'sidebar-item-active-bg': { light: '#333333', dark: '#383838' },
+}
+
+/**
+ * 有意让浅深两值都与另一令牌完全相同的别名对：[令牌A, 令牌B, 为什么保留两个名字]。
+ *
+ * 两个令牌浅深值全同时，codemod 映射到任一侧**渲染结果完全一样**（不同于 #333333 那种
+ * 「一个色值对应多个不同深色值」的真歧义），所以不阻止，但必须显式登记：
+ * 未登记的重复会被单测拦下，逼作者当场决定「合并」还是「做别名」——
+ * 本次 --text-inverse 重命名为 --on-brand 就是因为没先做这一步，差点新增一个与现有令牌全同值的重复项。
+ */
+export const INTENTIONAL_VALUE_DUPLICATES = [
+  [
+    'info',
+    'text-brand',
+    '表单/详情页标题蓝（§C.2 / §D.1 规定的 #1890ff）与语义 info 色当前浅深全同；'
+    + '保留两个名字是为了让标题规范不被后来人读成「信息色」而随手改动',
+  ],
+]
+
+/**
+ * 非颜色类令牌（阴影与描边补偿）。深色下阴影几乎不可见，
+ * 因此 --card-outline 在深色必须给出 1px 描边，与 --shadow-* 成对使用（方案 §4.3 规则 4）。
+ */
+export const NON_COLOR_TOKENS = {
+  'shadow-1': { light: '0 2px 8px rgba(0,0,0,0.06)', dark: '0 2px 8px rgba(0,0,0,0.45)' },
+  'shadow-2': { light: '0 2px 12px rgba(0,0,0,0.06)', dark: '0 2px 12px rgba(0,0,0,0.5)' },
+  'shadow-3': { light: '0 8px 24px rgba(0,0,0,0.1)', dark: '0 8px 24px rgba(0,0,0,0.6)' },
+  // 以下四档由实测频次决定收录（规范 §A.2 里「0.04~0.06」是个范围，严格等值下必须拆成两个令牌，
+  // 合并不仅会改浅色观感，还会让 codemod 的「只换完全相等项」判据失效）。
+  'shadow-card-soft': { light: '0 2px 8px rgba(0,0,0,0.04)', dark: '0 2px 8px rgba(0,0,0,0.4)' },
+  'shadow-btn-hover': { light: '0 2px 6px rgba(0,0,0,0.1)', dark: '0 2px 6px rgba(0,0,0,0.5)' },
+  'shadow-btn-active': { light: '0 4px 12px rgba(0,0,0,0.12)', dark: '0 4px 12px rgba(0,0,0,0.6)' },
+  'shadow-popover': { light: '0 6px 24px rgba(0,0,0,0.12)', dark: '0 6px 24px rgba(0,0,0,0.65)' },
+  'shadow-brand': { light: '0 2px 4px rgba(232,114,12,0.25)', dark: '0 2px 6px rgba(232,114,12,0.35)' },
+  /*
+   * 描边补偿。必须写成 **可叠加的 box-shadow 形式**，不能写成 `1px solid ...` 的 border 简写：
+   * border 会改变盒模型尺寸（+2px）造成布局位移；而 `0 0 0 1px` 作为 box-shadow 第二层
+   * 叠在使用处（`box-shadow: var(--shadow-1), var(--card-outline)`）不改尺寸、不改事件区。
+   * 浅色取 transparent 而不是 none：none 会让整条 box-shadow 声明非法，连前面的阴影一起丢弃。
+   * 深色下 `rgba(0,0,0,x)` 阴影几乎不可见，卡片层次全靠这一层描边建立（方案 §4.3 规则 4）。
+   */
+  'card-outline': { light: '0 0 0 1px transparent', dark: '0 0 0 1px var(--border-2)' },
+  'sidebar-shadow': { light: '2px 0 12px rgba(0,0,0,0.15)', dark: '2px 0 12px rgba(0,0,0,0.55)' },
+}
+
+/**
+ * 严格等值 + 语义单一的映射表，按属性上下文分三段。
+ * 键为归一化后的小写 6 位十六进制（不带 #），值为目标令牌名（不带 --）。
+ */
+export const COLOR_TO_TOKEN = {
+  /** background / background-color / fill */
+  bg: {
+    ffffff: 'surface-2',
+    fafafa: 'surface-3',
+    f5f5f5: 'surface-1',
+    fafbfc: 'surface-sunken',
+    fff7f0: 'brand-soft',
+    f6ffed: 'success-soft',
+    e6f7ff: 'info-soft',
+    fff7e6: 'warning-soft',
+    fff1f0: 'danger-soft',
+    f9f0ff: 'purple-soft',
+    e8720c: 'brand',
+  },
+  /** color / -webkit-text-fill-color */
+  fg: {
+    '262626': 'text-1',
+    '2d3436': 'header-text',
+    '595959': 'text-2',
+    '8c8c8c': 'text-3',
+    bfbfbf: 'text-4',
+    // ⚠️ 故意**不**映射 #ffffff：白字的语义取决于「背板是什么」，而属性名给不出这个信息。
+    // 橙底白字该用 --on-brand（深色会变近黑），但深色侧边栏上的白字、蓝色渐变横幅、
+    // 登录页毛玻璃上的白字都必须保持白色——机械替换会让这些字在深色主题下直接看不见。
+    // 实测教训：首版 codemod 把 .logo-text / .home-welcome / 12 处登录页样式全刷成了 --on-brand。
+    // 白字一律走人工判定（搜 `color: #fff` 逐处看背板）。
+    e8720c: 'brand',
+    f59432: 'brand-hover',
+    '52c41a': 'success',
+    '1890ff': 'info',
+    fa8c16: 'warning',
+    ff4d4f: 'danger',
+    '722ed1': 'purple',
+  },
+  /** border* / outline / stroke */
+  border: {
+    d9d9d9: 'border-1',
+    f0f0f0: 'border-2',
+    e8eaed: 'border-3',
+    ffe7d1: 'brand-border',
+    e8720c: 'brand',
+    '52c41a': 'success',
+    '1890ff': 'info',
+    fa8c16: 'warning',
+    ff4d4f: 'danger',
+    '722ed1': 'purple',
+  },
+}
+
+/**
+ * 需人工判定的色值：语义接近某令牌但**不严格等值**，或**同值多语义**。
+ * 这些值不计入映射，codemod 会原样保留并计入 baseline 债务。
+ * 值为「为什么不能机械替换」的理由，供 --report 输出与人工分批时参考。
+ */
+export const REVIEW_REQUIRED = {
+  fff7ed: '接近 --brand-soft(#FFF7F0) 但不等值；它是 Table.rowHoverBg，需先定义 --brand-hover-soft 令牌再映射',
+  '333333': '同值多语义：侧边栏 itemActiveBg / 表头 headerColor / 页面正文深色',
+  '666666': '接近 --text-2(#595959) 但不等值，替换会让浅色文字变深',
+  e8e8e8: '接近 --border-2(#F0F0F0) 但不等值',
+  eef0f3: '接近 --surface-1(#F5F5F5) 但不等值',
+  f58a2e: '接近 --brand-hover(#F59432) 但不等值；且它是 bootstrap.tsx 的 antd token，不应被 codemod 触碰',
+  ffb347: '品牌渐变装饰条（headerGradientShift）专用色，深色下应保留以维持品牌识别',
+  ffd591: '接近 --brand-border(#FFE7D1) 但不等值',
+  ffe7ba: '接近 --warning-soft 的描边阶，需新增 --warning-border 令牌后再映射',
+  faad14: 'antd gold，与 --warning(#FA8C16) 并存，需确认是否收敛',
+  ffccc7: 'danger 描边阶，需新增 --danger-border 令牌后再映射',
+  ff7875: 'danger hover 阶；注意它同时是 --danger 的**深色值**，跨主题同值需人工确认',
+  d46b08: 'RDM 深度测试报告已建议收敛到 #FF4D4F/#FA8C16 体系，属既有债务',
+  cf1322: 'RDM 深度测试报告已建议收敛，属既有债务',
+  ad4e00: '接近 --brand-active(#CC6200) 但不等值',
+  f39c12: '登录页品牌橙（登录页已整体排除，见 EXCLUDE_PATHS）',
+  '9254de': '紫浅色阶；注意它同时是门户 iam 场景色，受 §A.1.1 唯一真源约束',
+  '73d13d': 'success hover 阶（.btn-export hover），需新增 --success-hover 令牌后再映射',
+  '40a9ff': 'info hover 阶；注意它同时是 --info/--text-brand 的**深色值**',
+  '001529': '侧边栏遗留深色，与 #1E1E1E 并存，需确认收敛到哪一档',
+  '1e1e1e': '侧边栏底色，属组件层 --sidebar-bg，只在壳层 CSS 内替换',
+  '2a2a2a': '侧边栏 hover 底，属组件层 --sidebar-item-hover-bg',
+}
+
+/**
+ * codemod 与统计都必须跳过的路径（相对仓库根，前缀匹配）。
+ * 门禁第 4 条断言会反向校验：这些路径内不得出现 var(--surface / var(--text 的替换痕迹。
+ */
+export const EXCLUDE_PATHS = [
+  // 主题令牌定义处本身允许裸色值
+  'frontend/packages/ui/src/styles/theme.css',
+  // 主题基础设施（TOKEN_VALUES 的 TS 侧消费地：antd token 必顶传真实色值，否则派生全错）
+  'frontend/packages/ui/src/theme/',
+  // 登录页保持品牌固定样式（决策：视频背景 + 毛玻璃 + 霓虹文字不参与主题切换）
+  'src/pages/Login/',
+  'frontend/packages/ui/src/components/SliderCaptcha',
+  // 门户插画本体（scene 派生明度阶与 currentColor 零件）：整文件仍排除
+  'src/pages/Portal/SystemArtwork.tsx',
+  // 动效参数变量，非颜色
+  'frontend/packages/ui/src/components/PetMascot.css',
+  // 测试内的色值断言是防漂移锚点，需人工判断
+  '.test.tsx',
+  '.test.ts',
+  // 构建产物与本机资产
+  'dist/',
+  'dist-apps/',
+  'node_modules/',
+  '.qoder/',
+]
+
+/**
+ * 选择器块级排除前缀（决策：登录页保持品牌固定样式，不参与主题切换）。
+ *
+ * 为什么目录级 EXCLUDE_PATHS 不够：登录页样式并不全在 `src/pages/Login/`，
+ * 相当一部分住在共享的 `components.css` 里（.login-card-v2 / .login-input /
+ * .corner-triangle-* / .biz-* 插画区）。只排除目录的话，codemod 会把这些段刷成令牌，
+ * 用户一开深色登录页就跟着变，直接违反已拍板的决策。
+ * 实测教训：首版就漏了，把登录页的 caret-color 与 border-color 一起刷掉了。
+ */
+export const EXCLUDE_SELECTOR_PREFIXES = [
+  '.login-',
+  '.corner-triangle',
+  '.back-to-pwd',
+  '.captcha',
+  '.slider-captcha',
+  '.biz-',
+  '.bee-',
+  '.cyber-',
+  // 门户插画 scene 色板：§A.1.1 的唯一真源，被 Portal.test.tsx 色调用例钉死，不得参主题切换。
+  // 以前把整个 Portal/index.css 归入目录排除，结果连卡片底/描边/文字也无法令牌化（深色下满屏白斑）；
+  // 改为只排除 `[data-scene=` 块，其余段正常令牌化，并由 SCENE_COLOR_BASELINE 守住 scene 色没被误改。
+  '[data-scene=',
+]
+
+/**
+ * 门户 16 个 scene 色的基线（与规则 §A.1.1 表格逐字对应）。
+ * 门禁用它校验 scene 色板未被 codemod 或手改动过——比「整文件排除」更细且更强：
+ * 排除只能防工具改，基线能同时防住人与工具。
+ */
+export const SCENE_COLOR_BASELINE = {
+  ads: '#E8720C',
+  search: '#3D5DDD',
+  merchant: '#20B5B5',
+  merchantWorkbench: '#DBA333',
+  finance: '#52C41A',
+  eam: '#BB6C21',
+  hr: '#1890FF',
+  attendance: '#1C9F9F',
+  oa: '#FA8C16',
+  rdm: '#DD3D95',
+  meeting: '#225EC0',
+  doc: '#2A6913',
+  ai: '#722ED1',
+  iam: '#9254DE',
+  platform: '#096DD9',
+  translation: '#19888B',
+  // 以下两项是断言 6 上线当场从代码里扫出来的：门户实际已有 18 个 scene，
+  // 而规则 §A.1.1 只登了 16 个（两个新场景色带「与考勤青/HR 天蓝/组织靛蓝互斥」的注释，
+  // 说明是有心添加、只是没同步文档）。补录后两边回到一致。
+  payroll: '#2BCA65',
+  organization: '#5E46D8',
+}
+
+/**
+ * 当前规则块的选择器是否属于排除区。
+ * 用子串包含而不是前缀匹配：实际选择器多为 `.login-locale-corner .ant-select-selector` 这种复合形式，
+ * 只要链上任一环落在排除区，整条规则就不该被令牌化。
+ */
+export function isExcludedSelector(selectorText) {
+  const s = String(selectorText)
+  return EXCLUDE_SELECTOR_PREFIXES.some((prefix) => s.includes(prefix))
+}
+
+/**
+ * 完整阴影串 → 阴影令牌名的映射表。**严格等值到整个 box-shadow 值**，不是只看颜色。
+ *
+ * 为什么不复用 COLOR_TO_TOKEN：同一个 `rgba(0,0,0,0.06)` 既可能配 `0 2px 8px`（卡片）
+ * 也可能配 `0 2px 12px`（页头），只替色值会把不同阴影档位弄混，而令牌的深色值是按档位定的。
+ * 键为去空格后的小写完整值（CSS 里 `rgba(0, 0, 0, 0.04)` 与 `rgba(0,0,0,0.04)` 是同一个）。
+ *
+ * 收录标准：黑色阴影只要出现就收（深色必须改它们），彩色阴影**不收**——
+ * 品牌橙/红/绿阴影在深色底上色相仍在，强行建令牌只会得到一堆浅深同值的无效令牌。
+ */
+export const SHADOW_VALUE_TO_TOKEN = {
+  '0 2px 8px rgba(0,0,0,0.06)': 'shadow-1',
+  '0 2px 12px rgba(0,0,0,0.06)': 'shadow-2',
+  '0 8px 24px rgba(0,0,0,0.1)': 'shadow-3',
+  '0 2px 8px rgba(0,0,0,0.04)': 'shadow-card-soft',
+  '0 2px 6px rgba(0,0,0,0.1)': 'shadow-btn-hover',
+  '0 4px 12px rgba(0,0,0,0.12)': 'shadow-btn-active',
+  '0 6px 24px rgba(0,0,0,0.12)': 'shadow-popover',
+  '0 2px 4px rgba(232,114,12,0.25)': 'shadow-brand',
+  '2px 0 12px rgba(0,0,0,0.15)': 'sidebar-shadow',
+}
+
+/** 归一化阴影值：空格归一 + 去空格后的比对形式 + 小写 */
+export function normalizeShadowValue(value) {
+  return String(value).replace(/\s+/g, ' ').replace(/,\s*/g, ',').trim().toLowerCase()
+}
+
+/** 统计范围：只扫这些根目录下的源文件 */
+export const SCAN_ROOTS = ['src', 'frontend/apps', 'frontend/packages']
+
+const HEX_RE = /#([0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/g
+/** TSX 只匹配引号内的色值：注释里的色值通常不带引号，天然规避误计 */
+const HEX_QUOTED_RE = /['"]#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})['"]/g
+const RGBA_BLACK_RE = /rgba?\(\s*0\s*,\s*0\s*,\s*0\s*[,)]/g
+const VAR_RE = /var\(\s*--/g
+const CSS_COMMENT_RE = /\/\*[\s\S]*?\*\//g
+
+/**
+ * 归一化十六进制色值：去 #、转小写、3 位展开为 6 位、8 位（带 alpha）截前 6 位并标记。
+ * 返回 { hex, hasAlpha }；非法输入返回 null。
+ *
+ * 3 位必须展开：`#FFF` 与 `#ffffff` 是同一个颜色，不展开会让同一语义色
+ * 在统计里裂成两项，棘轮基线随之失真。
+ */
+export function normalizeHex(raw) {
+  const body = String(raw).replace(/^#/, '')
+  if (!/^[0-9a-fA-F]{3}([0-9a-fA-F]{3}([0-9a-fA-F]{2})?)?$/.test(body)) return null
+  let hex = body.toLowerCase()
+  const hasAlpha = hex.length === 8
+  if (hasAlpha) hex = hex.slice(0, 6)
+  if (hex.length === 3) hex = hex.split('').map((c) => c + c).join('')
+  return { hex, hasAlpha }
+}
+
+/**
+ * 把 CSS 属性名或 React style 键归入 bg / fg / border 三段之一。
+ * 返回 null 表示该属性不承载颜色语义（如 width、transition），调用方应跳过。
+ *
+ * box-shadow 归 border 段：阴影里的色值语义是「描边/分隔」而非填充或文字。
+ *
+ * 必须同时认 CSS 连字符式与 React 驼峰式：内联 style 写的是 `backgroundColor`、
+ * `boxShadow`、`borderTopColor`。只做小写匹配会让它们全部落到 null 被跳过，
+ * 表现为「codemod 跑完 0 报错、但 9042 处内联色值一处未改」的静默失效。
+ * vendor 前缀（WebkitTextFillColor）需先补回前导连字符再转 kebab。
+ */
+export function classifyProperty(prop) {
+  const name = String(prop)
+    .replace(/^(Webkit|Moz|Ms|O)([A-Z])/, (_, prefix, head) => `-${prefix.toLowerCase()}-${head.toLowerCase()}`)
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/^[-\s]+|[-\s]+$/g, '')
+    .toLowerCase()
+  if (/^(background|background-color|fill)$/.test(name)) return 'bg'
+  // caret-color 不纳入自动映射：它承载的是「光标前景色」，与 background 语义无关；
+  // 登录页输入框的 caret 是白色，归入 bg 段会被刷成 --surface-2、深色下变成几乎看不见。
+  // 与白字同理，需人工判定。（实测教训：首版把它当作背景色处理过）
+  // 前导连字符已被上面的修剪步骤剥除，故此处写 webkit-… 而非 -webkit-…（写带连字符的形式永远匹配不到）
+  if (/^(color|webkit-text-fill-color)$/.test(name)) return 'fg'
+  if (/^(outline|stroke|box-shadow)/.test(name)) return 'border'
+  // border / border-top 等简写属性可含色值；border-radius 不含，不能归入本段（否则语义失真）
+  if (/^border(-(top|right|bottom|left))?$/.test(name) || /-color$/.test(name)) return 'border'
+  return null
+}
+
+/**
+ * 路径是否落在排除清单内。
+ *
+ * 规则分两类，判法必须不同：
+ * - 以 `.` 开头的是**扩展名/后缀规则**（如 `.test.tsx`），只能 endsWith。
+ *   用 includes 会误伤：`'a.tsx'.includes('.ts')` 为 true，会让整个前端被排除、统计恒为 0。
+ * - 其余是**路径片段规则**（目录或具体文件），用 includes 以便同时匹配相对/绝对写法。
+ */
+export function isExcluded(relPath) {
+  const p = String(relPath).replace(/\\/g, '/')
+  return EXCLUDE_PATHS.some((rule) => (rule.startsWith('.') ? p.endsWith(rule) : p.includes(rule)))
+}
+
+/**
+ * WCAG 2.1 相对亮度（sRGB 线性化后按 0.2126 / 0.7152 / 0.0722 加权）。
+ * 只接受十六进制色值；rgba() 类半透令牌需要背景合成，不在本函数职责内（那类令牌靠人工核底色）。
+ */
+export function relativeLuminance(hex) {
+  const normalized = normalizeHex(hex)
+  if (!normalized) return null
+  const n = parseInt(normalized.hex, 16)
+  const channel = (v) => {
+    const s = v / 255
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+  }
+  return 0.2126 * channel((n >> 16) & 255) + 0.7152 * channel((n >> 8) & 255) + 0.0722 * channel(n & 255)
+}
+
+/** WCAG 对比度比值；任一输入非法返回 null */
+export function contrastRatio(foreground, background) {
+  const a = relativeLuminance(foreground)
+  const b = relativeLuminance(background)
+  if (a === null || b === null) return null
+  const [hi, lo] = a >= b ? [a, b] : [b, a]
+  return (hi + 0.05) / (lo + 0.05)
+}
+
+/**
+ * 统计一段源码里的裸色值与已令牌化用量。
+ *
+ * @param text 文件内容
+ * @param kind 'css' | 'inline'（决定用哪套正则：CSS 剥注释后全量匹配，TSX 只匹配引号内）
+ * @returns {{hex:number, rgbaBlack:number, tokenized:number, hits:Map<string,number>, unmapped:Map<string,number>}}
+ *
+ * hits 是**归一化后**全部色值的计数（含重复），调用方由它派生各类报表，
+ * 不要为了统计另一类而重新跑一轮正则：全仓数千个文件 × 数十个待查色值
+ * 会让门禁从秒级退化到分钟级。
+ *
+ * unmapped 只收「不在任何映射段、且不在 REVIEW_REQUIRED 里」的值，
+ * 用于 --report 找出映射表尚未覆盖的长尾色值；REVIEW_REQUIRED 已知需人工处理，
+ * 混进来会把报告淹掉。
+ */
+export function countBareColors(text, kind) {
+  const source = kind === 'css' ? String(text).replace(CSS_COMMENT_RE, '') : String(text)
+  const re = kind === 'css' ? HEX_RE : HEX_QUOTED_RE
+  const hits = new Map()
+  const unmapped = new Map()
+  let hex = 0
+
+  for (const match of source.matchAll(re)) {
+    const normalized = normalizeHex(match[1])
+    if (!normalized) continue
+    hex += 1
+    const { hex: value } = normalized
+    hits.set(value, (hits.get(value) ?? 0) + 1)
+    const known =
+      Object.values(COLOR_TO_TOKEN).some((seg) => value in seg) || value in REVIEW_REQUIRED
+    if (!known) unmapped.set(value, (unmapped.get(value) ?? 0) + 1)
+  }
+
+  return {
+    hex,
+    rgbaBlack: (source.match(RGBA_BLACK_RE) ?? []).length,
+    tokenized: (source.match(VAR_RE) ?? []).length,
+    hits,
+    unmapped,
+  }
+}
