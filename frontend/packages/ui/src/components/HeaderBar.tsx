@@ -167,9 +167,6 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
       <div className="header-right">
         <PortalLocaleControls />
 
-        {/* 主题切换：与企业门户顶栏同一份实现，避开了两处各写一套后偏好逻辑漂移 */}
-        <ThemeControls />
-
         {/* 通知铃铛 */}
         <Popover
           content={notificationContent}
@@ -183,6 +180,10 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
             </span>
           </Badge>
         </Popover>
+
+        {/* 主题切换：与企业门户顶栏同一份实现，避开了两处各写一套后偏好逻辑漂移。
+            位置必须排在通知铃铛**之后**：铃铛是既有消息入口，新控件不得插到它前面把它挤走。 */}
+        <ThemeControls />
 
         {/* 用户头像+下拉（与企业门户顶栏同一份实现） */}
         <UserMenu />
