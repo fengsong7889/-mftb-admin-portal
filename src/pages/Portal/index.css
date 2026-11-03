@@ -349,6 +349,19 @@
   border: 1px solid transparent;
   border-radius: 15px;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  /* 收藏条目淡底由 TSX 注入 --chip-tone-bg（值即原 toneBg，浅色零变化）；
+     最近使用不注入，回落到 transparent，符合 §N.4「无底色 + 1px 描边」的只读形态。 */
+  background: var(--chip-tone-bg, transparent);
+}
+
+/*
+ * 深色下收藏条目必须改走暗色淡染：原淡底是 #FFF7E6 这类浅底，
+ * 而条目文字已随主题变亮，浅底配亮字等于看不见（用户报障）。
+ * color-mix 把该系统的 scene 主色与卡片底混合，既压暗又保留「一系统一色」的色相识别。
+ * 排除 --recent：最近使用本就无底色，不该被染色。
+ */
+html[data-theme='dark'] .portal-quick-item:not(.portal-quick-item--recent) {
+  background: color-mix(in srgb, var(--chip-tone) 16%, var(--surface-2));
 }
 
 .portal-quick-item:hover {
