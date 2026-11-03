@@ -8,13 +8,18 @@
  * 商品/门店图当前为 AI 生成的统一风格占位图（src/assets/consumer-home/），待设计切图接入后按同名文件替换即可。
  * 文案暂硬编码繁中（与设计稿一致），后续随 i18n 解耦统一替换。
  */
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import bannerImg from '@/assets/consumer-home/banner.jpg'
 import riceballImg from '@/assets/consumer-home/riceball.jpg'
 import friedChickenImg from '@/assets/consumer-home/friedchicken.jpg'
 import fishPotImg from '@/assets/consumer-home/fishpot.jpg'
 import burgerImg from '@/assets/consumer-home/burger.jpg'
 import lemonTeaImg from '@/assets/consumer-home/lemontea.jpg'
+import { hotWordsFor } from './consumerSearchData'
+
+/** 搜索底纹词：轮播全站热搜前 5 个（美团式引导，需求 1.1），点搜索框后进激活页仍可换词 */
+const SHADE_WORDS = hotWordsFor('global').slice(0, 5)
+const SHADE_INTERVAL_MS = 3000
 
 interface Tile {
   key: string
@@ -103,6 +108,16 @@ export default function ConsumerHome({
   const bodyRef = useRef<HTMLDivElement>(null)
   const [cat, setCat] = useState('美食外賣')
   const [scrolled, setScrolled] = useState(false)
+  const [shadeIndex, setShadeIndex] = useState(0)
+
+  /** 底纹词每 3 秒轮换；key 变化重触发淡入动画 */
+  useEffect(() => {
+    const timer = window.setInterval(
+      () => setShadeIndex((index) => (index + 1) % SHADE_WORDS.length),
+      SHADE_INTERVAL_MS,
+    )
+    return () => window.clearInterval(timer)
+  }, [])
 
   /** 内容区上滑过阈值后折叠定位行，搜索行吸顶固定（与美食外賣页一致） */
   const handleScroll = () => {
@@ -119,7 +134,7 @@ export default function ConsumerHome({
         <div className="apc-header-search">
           <button type="button" className="apc-search" onClick={onSearch}>
             <span className="apc-search-ico" aria-hidden="true">🔍</span>
-            <span className="apc-search-ph">搜尋商家、商品、團購</span>
+            <span className="apc-search-ph" key={shadeIndex}>{SHADE_WORDS[shadeIndex]}</span>
             <span className="apc-search-btn">搜索</span>
           </button>
           {scrolled && (

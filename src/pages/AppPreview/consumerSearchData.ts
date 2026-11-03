@@ -33,6 +33,8 @@ export interface SearchMerchant {
   rating: number
   monthlySales: number
   distanceKm: number
+  /** 门店地址：联想行与结果卡展示（截断），帮助同名店铺消歧 */
+  address: string
   /** 外卖 / 超市的履约信息；团购商家为空 */
   deliveryMinutes?: number
   deliveryFee?: number
@@ -217,92 +219,92 @@ export const SCOPE_CONFIG: Record<SearchScope, ScopeConfig> = {
 export const SEARCH_MERCHANTS: SearchMerchant[] = [
   {
     kind: 'merchant', id: 'd-tai2', name: '太二酸菜魚（澳門店）', channel: 'delivery', image: fishPotImg, emoji: '🐟',
-    rating: 4.5, monthlySales: 1196, distanceKm: 1.2, deliveryMinutes: 30, deliveryFee: 0, minOrder: 30,
+    rating: 4.5, monthlySales: 1196, distanceKm: 1.2, address: '澳門新馬路88號海冠居地下', deliveryMinutes: 30, deliveryFee: 0, minOrder: 30,
     coupons: ['125減50', '80減20'], tags: ['神會員', '免配送費', '可自取'], categories: ['酸菜魚', '川菜', '中餐'], status: 'open',
   },
   {
     kind: 'merchant', id: 'd-rice', name: '米飯糰（威尼斯人店）', channel: 'delivery', image: riceballImg, emoji: '🍙',
-    rating: 4.6, monthlySales: 860, distanceKm: 0.9, deliveryMinutes: 20, deliveryFee: 3, minOrder: 20,
+    rating: 4.6, monthlySales: 860, distanceKm: 0.9, address: '氹仔威尼斯人購物中心3樓302', deliveryMinutes: 20, deliveryFee: 3, minOrder: 20,
     coupons: ['新客減10'], tags: ['可自取'], categories: ['飯糰', '日式', '早餐'], status: 'open',
   },
   {
     kind: 'merchant', id: 'd-mcd', name: '麥當勞（威尼斯人店）', channel: 'delivery', image: burgerImg, emoji: '🍔',
-    rating: 4.5, monthlySales: 1896, distanceKm: 0.8, deliveryMinutes: 25, deliveryFee: 5, minOrder: 20,
+    rating: 4.5, monthlySales: 1896, distanceKm: 0.8, address: '氹仔威尼斯人大运河街15號舖', deliveryMinutes: 25, deliveryFee: 5, minOrder: 20,
     coupons: ['滿50減8'], tags: ['神會員'], categories: ['漢堡', '炸雞', '快餐'], status: 'new',
   },
   {
     kind: 'merchant', id: 'd-kfc', name: '肯德基KFC（氹仔店）', channel: 'delivery', image: friedChickenImg, emoji: '🍗',
-    rating: 4.4, monthlySales: 980, distanceKm: 1.8, deliveryMinutes: 30, deliveryFee: 6, minOrder: 25,
+    rating: 4.4, monthlySales: 980, distanceKm: 1.8, address: '氹仔哥英布拉街180號地下', deliveryMinutes: 30, deliveryFee: 6, minOrder: 25,
     coupons: ['88折'], tags: ['可自取'], categories: ['炸雞', '漢堡', '快餐'], status: 'open',
   },
   {
     kind: 'merchant', id: 'd-lemon', name: '招牌暴打檸檬茶（黑沙環店）', channel: 'delivery', image: lemonTeaImg, emoji: '🍋',
-    rating: 4.6, monthlySales: 2400, distanceKm: 1.5, deliveryMinutes: 20, deliveryFee: 0, minOrder: 15,
+    rating: 4.6, monthlySales: 2400, distanceKm: 1.5, address: '澳門黑沙環中街47號地下', deliveryMinutes: 20, deliveryFee: 0, minOrder: 15,
     coupons: ['$9.9起', '第二杯半價'], tags: ['神會員', '免配送費'], categories: ['飲品', '奶茶', '檸檬茶'], status: 'open',
   },
   {
     kind: 'merchant', id: 'd-organic', name: 'Organic Garden（氹仔店）', channel: 'delivery', image: burgerImg, emoji: '🥗',
-    rating: 4.7, monthlySales: 620, distanceKm: 2.5, deliveryMinutes: 35, deliveryFee: 8, minOrder: 40,
+    rating: 4.7, monthlySales: 620, distanceKm: 2.5, address: '氹仔布拉干薩街92號濠景花園', deliveryMinutes: 35, deliveryFee: 8, minOrder: 40,
     coupons: [], tags: ['健康輕食'], categories: ['輕食', '沙拉', '西餐'], status: 'open',
   },
   {
     kind: 'merchant', id: 'd-sushi', name: '鮨山日本料理（葡京店）', channel: 'delivery', image: fishPotImg, emoji: '🍣',
-    rating: 4.8, monthlySales: 430, distanceKm: 2.1, deliveryMinutes: 40, deliveryFee: 10, minOrder: 80,
+    rating: 4.8, monthlySales: 430, distanceKm: 2.1, address: '澳門葡京酒店地庫12號舖', deliveryMinutes: 40, deliveryFee: 10, minOrder: 80,
     coupons: [], tags: ['可自取'], categories: ['日料', '壽司', '刺身'], status: 'rest',
   },
   {
     kind: 'merchant', id: 'd-hotpot', name: '海底撈火鍋（澳門店）', channel: 'delivery', image: fishPotImg, emoji: '🍲',
-    rating: 4.9, monthlySales: 1500, distanceKm: 1.9, deliveryMinutes: 35, deliveryFee: 0, minOrder: 60,
+    rating: 4.9, monthlySales: 1500, distanceKm: 1.9, address: '澳門友誼大馬路555號置地廣場2樓', deliveryMinutes: 35, deliveryFee: 0, minOrder: 60,
     coupons: ['滿200減30'], tags: ['神會員', '免配送費'], categories: ['火鍋', '川菜'], status: 'open',
   },
   {
     kind: 'merchant', id: 'g-pizza', name: 'Pizza Lab西塔烤肉（威尼斯人店）', channel: 'groupbuy', image: bbqImg, emoji: '🍕',
-    rating: 4.6, monthlySales: 650, distanceKm: 1.5, groupbuyCount: 12, avgPrice: 88,
+    rating: 4.6, monthlySales: 650, distanceKm: 1.5, address: '氹仔威尼斯人美食廣場A12', groupbuyCount: 12, avgPrice: 88,
     coupons: ['2人套餐'], tags: ['隨時退', '免預約'], categories: ['烤肉', '西餐'], status: 'open',
   },
   {
     kind: 'merchant', id: 'g-kfc', name: '肯德基KFC（澳門店）', channel: 'groupbuy', image: friedChickenImg, emoji: '🍗',
-    rating: 4.4, monthlySales: 1200, distanceKm: 1.1, groupbuyCount: 8, avgPrice: 45,
+    rating: 4.4, monthlySales: 1200, distanceKm: 1.1, address: '澳門殷皇子大馬路43號地下', groupbuyCount: 8, avgPrice: 45,
     coupons: ['59.9套餐'], tags: ['隨時退'], categories: ['炸雞', '快餐'], status: 'open',
   },
   {
     kind: 'merchant', id: 'g-hotpot', name: '海底撈火鍋（澳門店）', channel: 'groupbuy', image: fishPotImg, emoji: '🍲',
-    rating: 4.9, monthlySales: 3000, distanceKm: 1.9, groupbuyCount: 6, avgPrice: 168,
+    rating: 4.9, monthlySales: 3000, distanceKm: 1.9, address: '澳門友誼大馬路555號置地廣場2樓', groupbuyCount: 6, avgPrice: 168,
     coupons: ['代金券'], tags: ['隨時退', '免預約'], categories: ['火鍋', '川菜'], status: 'open',
   },
   {
     kind: 'merchant', id: 'g-spa', name: '悅SPA按摩（皇朝店）', channel: 'groupbuy', image: lemonTeaImg, emoji: '💆',
-    rating: 4.7, monthlySales: 210, distanceKm: 2.4, groupbuyCount: 5, avgPrice: 128,
+    rating: 4.7, monthlySales: 210, distanceKm: 2.4, address: '澳門皇朝區倫敦街77號2樓', groupbuyCount: 5, avgPrice: 128,
     coupons: ['60分鐘按摩'], tags: ['隨時退', '免預約'], categories: ['美容美髮', '按摩', '生活服務'], status: 'open',
   },
   {
     kind: 'merchant', id: 'g-buffet', name: '澳門銀河自助餐', channel: 'groupbuy', image: bbqImg, emoji: '🍽️',
-    rating: 4.8, monthlySales: 180, distanceKm: 3.2, groupbuyCount: 4, avgPrice: 298,
+    rating: 4.8, monthlySales: 180, distanceKm: 3.2, address: '路氹銀河綜合城1樓百老匯', groupbuyCount: 4, avgPrice: 298,
     coupons: ['2人同行'], tags: ['免預約'], categories: ['自助餐', '酒店餐飲'], status: 'open',
   },
   {
     kind: 'merchant', id: 'g-sushi', name: '鮨山日本料理（葡京店）', channel: 'groupbuy', image: fishPotImg, emoji: '🍣',
-    rating: 4.8, monthlySales: 160, distanceKm: 2.1, groupbuyCount: 3, avgPrice: 388,
+    rating: 4.8, monthlySales: 160, distanceKm: 2.1, address: '澳門葡京酒店地庫12號舖', groupbuyCount: 3, avgPrice: 388,
     coupons: ['雙人Omakase'], tags: ['免預約'], categories: ['日料', '壽司'], status: 'open',
   },
   {
     kind: 'merchant', id: 'm-donki', name: 'DONKI驚安之殿堂（澳門店）', channel: 'market', image: undefined, emoji: '🛒',
-    rating: 4.7, monthlySales: 3200, distanceKm: 1.6, deliveryMinutes: 45, deliveryFee: 10, minOrder: 99,
+    rating: 4.7, monthlySales: 3200, distanceKm: 1.6, address: '澳門蘇亞利斯博士大馬路181號', deliveryMinutes: 45, deliveryFee: 10, minOrder: 99,
     coupons: ['滿199減20'], tags: ['可自取'], categories: ['超市', '零食', '日用品'], status: 'open',
   },
   {
     kind: 'merchant', id: 'm-taste', name: 'Taste超市（氹仔店）', channel: 'market', image: undefined, emoji: '🥬',
-    rating: 4.5, monthlySales: 2100, distanceKm: 1.2, deliveryMinutes: 30, deliveryFee: 0, minOrder: 50,
+    rating: 4.5, monthlySales: 2100, distanceKm: 1.2, address: '氹仔星皓廣場地庫B16', deliveryMinutes: 30, deliveryFee: 0, minOrder: 50,
     coupons: ['滿99免運'], tags: ['免配送費', '可自取'], categories: ['超市', '生鮮', '糧油'], status: 'open',
   },
   {
     kind: 'merchant', id: 'm-7eleven', name: '7-Eleven（新口岸店）', channel: 'market', image: undefined, emoji: '🏪',
-    rating: 4.3, monthlySales: 1680, distanceKm: 0.6, deliveryMinutes: 20, deliveryFee: 5, minOrder: 30,
+    rating: 4.3, monthlySales: 1680, distanceKm: 0.6, address: '澳門新口岸廣州街66號地下', deliveryMinutes: 20, deliveryFee: 5, minOrder: 30,
     coupons: [], tags: [], categories: ['便利店', '飲料', '零食'], status: 'open',
   },
   {
     kind: 'merchant', id: 'm-fresh', name: '鮮果薈（黑沙環店）', channel: 'market', image: undefined, emoji: '🍓',
-    rating: 4.6, monthlySales: 960, distanceKm: 1.4, deliveryMinutes: 25, deliveryFee: 0, minOrder: 40,
+    rating: 4.6, monthlySales: 960, distanceKm: 1.4, address: '澳門黑沙環新街21號祐漢街市旁', deliveryMinutes: 25, deliveryFee: 0, minOrder: 40,
     coupons: ['滿60減5'], tags: ['免配送費', '可自取'], categories: ['水果', '生鮮'], status: 'open',
   },
 ]
@@ -427,6 +429,13 @@ function entryMerchant(entry: SearchEntry): SearchMerchant | undefined {
   return entry.kind === 'merchant' ? entry : getMerchant(entry.merchantId)
 }
 
+/** 配送半径（原型口径）：超过即视为超出配送范围，结果页置灰并归入独立分组（参考美团超范围置灰） */
+export const DELIVERY_RANGE_KM = 2
+
+export function isOutOfRange(entry: SearchEntry): boolean {
+  return (entryMerchant(entry)?.distanceKm ?? Number.POSITIVE_INFINITY) > DELIVERY_RANGE_KM
+}
+
 function entryTags(entry: SearchEntry): string[] {
   return entry.kind === 'merchant' ? entry.tags : [...entry.tags, ...(entryMerchant(entry)?.tags ?? [])]
 }
@@ -530,16 +539,23 @@ export function sortEntries(entries: SearchEntry[], sort: SearchSort): SearchEnt
 export interface SearchSuggestion {
   key: string
   text: string
-  type: 'merchant' | 'product' | 'deal' | 'category'
+  type: 'merchant' | 'product' | 'deal'
   typeLabel: string
   meta: string
+  /** 命中对象所属频道：联想行渲染频道图标方块（外賣/團購/超市） */
+  channel?: ConsumerChannel
+  /** 店铺营业状态：联想行渲染「休息中」标记（需求 1.7） */
+  status?: SearchMerchant['status']
+  /** 可直达的店铺 ID：点击联想行直接进店而非再搜一次（需求 1.5） */
+  merchantId?: string
+  /** 商品/套餐价格：联想行第二行展示 */
+  price?: number
 }
 
 const SUGGEST_TYPE_LABEL: Record<SearchSuggestion['type'], string> = {
   merchant: '店鋪',
   product: '商品',
   deal: '套餐',
-  category: '分類',
 }
 
 export function suggestFor(
@@ -557,29 +573,23 @@ export function suggestFor(
     if (entry.kind === 'merchant') {
       candidates.push({
         key: `m-${entry.id}`, text: entry.name, type: 'merchant', typeLabel: SUGGEST_TYPE_LABEL.merchant,
-        meta: `${CHANNEL_LABEL[entry.channel]} · ${entry.rating}分`,
+        // 频道改由角标表达，meta 只保留可比较维度：综合得分 + 月售（需求 1.8）
+        meta: `${entry.rating}分 · 月售${entry.monthlySales}`,
+        channel: entry.channel, status: entry.status, merchantId: entry.id,
       })
     } else if (entry.kind === 'product') {
       candidates.push({
         key: `p-${entry.id}`, text: entry.name, type: 'product', typeLabel: SUGGEST_TYPE_LABEL.product,
-        meta: `${entry.merchantName} · $${entry.price}`,
+        meta: `${entry.merchantName} · $${formatMoney(entry.price)}`,
+        channel: entry.channel, merchantId: entry.merchantId, price: entry.price,
       })
     } else {
       candidates.push({
         key: `d-${entry.id}`, text: entry.title, type: 'deal', typeLabel: SUGGEST_TYPE_LABEL.deal,
-        meta: `${entry.merchantName} · $${entry.price}`,
+        meta: `${entry.merchantName} · $${formatMoney(entry.price)}`,
+        channel: entry.channel, merchantId: entry.merchantId, price: entry.price,
       })
     }
-  }
-
-  const categorySet = new Set(entries.flatMap((entry) => (
-    entry.kind === 'merchant' ? entry.categories : [entry.category]
-  )))
-  for (const category of categorySet) {
-    candidates.push({
-      key: `c-${category}`, text: category, type: 'category', typeLabel: SUGGEST_TYPE_LABEL.category,
-      meta: `${entries.filter((entry) => (entry.kind === 'merchant' ? entry.categories : [entry.category]).includes(category)).length} 個結果`,
-    })
   }
 
   const seen = new Set<string>()
@@ -599,11 +609,55 @@ export function suggestFor(
     .slice(0, limit)
 }
 
-export const HOT_WORDS: Record<Exclude<SearchScope, 'store'>, string[]> = {
-  global: ['太二酸菜魚', '珍珠奶茶', '火鍋', '超市', '士多啤梨', '按摩', '全家桶', '紙巾'],
-  delivery: ['太二酸菜魚', '珍珠奶茶', '炸雞', '壽司', '沙拉', '海底撈', '早餐', '免配送費'],
-  groupbuy: ['火鍋', '自助餐', '按摩', '烤肉', 'KFC', '雙人套餐', '下午茶', '美容'],
-  market: ['紙巾', '牛奶', '雞蛋', '士多啤梨', '零食', '香米', '洗衣液', '藍莓'],
+/** 人气热搜榜条目：热度值 + 上升/热标，激活页「人氣熱搜」卡片用（参考美团榜单） */
+export interface HotWord {
+  word: string
+  heat: number
+  up?: boolean
+  hot?: boolean
+}
+
+export const HOT_LIST: Record<Exclude<SearchScope, 'store'>, HotWord[]> = {
+  global: [
+    { word: '太二酸菜魚', heat: 5255, hot: true },
+    { word: '珍珠奶茶', heat: 2004, up: true, hot: true },
+    { word: '火鍋', heat: 1086, hot: true },
+    { word: '超市', heat: 1050, up: true },
+    { word: '士多啤梨', heat: 1019 },
+    { word: '按摩', heat: 930, hot: true },
+    { word: '全家桶', heat: 772, up: true },
+    { word: '紙巾', heat: 688, up: true },
+  ],
+  delivery: [
+    { word: '太二酸菜魚', heat: 4310, hot: true },
+    { word: '珍珠奶茶', heat: 2204, up: true },
+    { word: '炸雞', heat: 1586, hot: true },
+    { word: '壽司', heat: 1150, up: true },
+    { word: '沙拉', heat: 919 },
+    { word: '海底撈', heat: 830, hot: true },
+    { word: '早餐', heat: 672, up: true },
+    { word: '免配送費', heat: 588 },
+  ],
+  groupbuy: [
+    { word: '火鍋', heat: 3120, hot: true },
+    { word: '自助餐', heat: 2014, up: true },
+    { word: '按摩', heat: 1486, hot: true },
+    { word: '烤肉', heat: 1150 },
+    { word: '雙人套餐', heat: 919, up: true },
+    { word: '下午茶', heat: 730 },
+    { word: '美容', heat: 672 },
+    { word: 'KFC', heat: 588, up: true },
+  ],
+  market: [
+    { word: '紙巾', heat: 4210, hot: true },
+    { word: '牛奶', heat: 2104, up: true },
+    { word: '雞蛋', heat: 1586 },
+    { word: '士多啤梨', heat: 1250, up: true },
+    { word: '零食', heat: 919 },
+    { word: '香米', heat: 830 },
+    { word: '洗衣液', heat: 672, up: true },
+    { word: '藍莓', heat: 588 },
+  ],
 }
 
 export const GUESS_WORDS: Record<Exclude<SearchScope, 'store'>, string[]> = {
@@ -614,10 +668,17 @@ export const GUESS_WORDS: Record<Exclude<SearchScope, 'store'>, string[]> = {
 }
 
 export function hotWordsFor(scope: SearchScope, merchantId?: string): string[] {
-  if (scope !== 'store') return HOT_WORDS[scope]
-  const top = sortEntries(getStoreOffers(merchantId ?? ''), 'sales').slice(0, 6)
-  const words = top.map((entry) => (entry.kind === 'deal' ? entry.title : entry.name))
-  return words.length > 0 ? words : ['招牌', '套餐', '優惠']
+  return hotListFor(scope, merchantId).map((item) => item.word)
+}
+
+/** 人气热搜榜：非店铺作用域取配置榜单；店内按本店热销销量作热度值 */
+export function hotListFor(scope: SearchScope, merchantId?: string): HotWord[] {
+  if (scope !== 'store') return HOT_LIST[scope]
+  return sortEntries(getStoreOffers(merchantId ?? ''), 'sales').slice(0, 8).map((entry) => (
+    entry.kind === 'deal'
+      ? { word: entry.title, heat: entry.sold }
+      : { word: entry.name, heat: entry.monthlySales }
+  ))
 }
 
 export function guessWordsFor(scope: SearchScope, merchantId?: string): string[] {

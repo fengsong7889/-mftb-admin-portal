@@ -13,6 +13,8 @@ import {
   getMerchant,
   getStoreCategories,
   getStoreOffers,
+  hotListFor,
+  isOutOfRange,
   loadHistory,
   normalizeQuery,
   pushHistory,
@@ -174,6 +176,25 @@ describe('输入联想', () => {
     expect(suggestions[0].text).toContain('麥當勞')
   })
 
+  it('商家联想带频道、营业状态、综合得分与可直达店铺 ID', () => {
+    const merchant = suggestFor('global', '麥當勞')[0]
+    expect(merchant.channel).toBe('delivery')
+    expect(merchant.status).toBe('new')
+    expect(merchant.merchantId).toBe('d-mcd')
+    expect(merchant.meta).toContain('4.5分')
+
+    const product = suggestFor('global', '抽取式紙巾')[0]
+    expect(product.type).toBe('product')
+    expect(product.channel).toBe('market')
+    expect(product.merchantId).toBe('m-7eleven')
+  })
+
+  it('打烊店铺在联想中携带休息中状态（需求 1.7）', () => {
+    const suggestions = suggestFor('global', '鮨山')
+    const merchant = suggestions.find((item) => item.type === 'merchant' && item.merchantId === 'd-sushi')
+    expect(merchant?.status).toBe('rest')
+  })
+
   it('联想范围跟随作用域，不会带出其它频道或别家店的词', () => {
     const market = suggestFor('market', '紙巾')
     expect(market.map((item) => item.text)).toContain('抽取式紙巾')
@@ -184,8 +205,37 @@ describe('输入联想', () => {
     expect(store.every((item) => !item.text.includes('麥當勞'))).toBe(true)
   })
 
-  it('空关键词不返回联想', () => {
+  it('空关键词不返回联想；无匹配时返回空数组供界面渲染 🔍 搜索行（需求 1.6）', () => {
     expect(suggestFor('global', '   ')).toEqual([])
+    expect(suggestFor('global', 'zzz不存在')).toEqual([])
+  })
+
+  it('联想只产出店铺/商品/套餐三类，不再混入分类词', () => {
+    const suggestions = suggestFor('global', '火鍋')
+    expect(suggestions.length).toBeGreaterThan(0)
+    expect(suggestions.every((item) => ['merchant', 'product', 'deal'].includes(item.type))).toBe(true)
+  })
+})
+
+describe('配送范围与热搜榜', () => {
+  it('超过配送半径的商家及其商品/套餐判定为超范围', () => {
+    expect(isOutOfRange(getMerchant('d-organic')!)).toBe(true)
+    expect(isOutOfRange(getMerchant('g-buffet')!)).toBe(true)
+    expect(isOutOfRange(getMerchant('d-mcd')!)).toBe(false)
+
+    const offers = searchCatalog('global', '沙拉')
+    expect(offers.every((entry) => isOutOfRange(entry))).toBe(true)
+  })
+
+  it('热搜榜带热度值与上升标，店内按本店热销销量作热度', () => {
+    const global = hotListFor('global')
+    expect(global).toHaveLength(8)
+    expect(global[0]).toMatchObject({ word: '太二酸菜魚', heat: 5255, hot: true })
+    expect(global.some((item) => item.up)).toBe(true)
+
+    const store = hotListFor('store', 'd-tai2')
+    expect(store.map((item) => item.word)).toContain('太二酸菜魚（2人份）')
+    expect(store.every((item) => item.heat > 0)).toBe(true)
   })
 })
 

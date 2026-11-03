@@ -14,26 +14,101 @@ import {
   FILTER_LABEL,
   SCOPE_CONFIG,
   clearHistory,
-  countByTab,
   entryMatchesTab,
   formatMoney,
+  getMerchant,
   getStoreCategories,
   getStoreName,
   guessWordsFor,
+  hotListFor,
   hotWordsFor,
+  isOutOfRange,
   loadHistory,
   pushHistory,
   searchCatalog,
   sortEntries,
   suggestFor,
+  type ConsumerChannel,
   type SearchEntry,
   type SearchFilter,
   type SearchMerchant,
   type SearchOffer,
   type SearchScope,
   type SearchSort,
+  type SearchSuggestion,
   type SearchTab,
 } from './consumerSearchData'
+
+/** 频道/对象自绘图标（统一描边风格，currentColor 取色）：
+ *  外賣=骑手摩托、超市=購物車、團購/套餐=券票、商家=門店、商品=購物袋、綜合=四宫格、搜尋=放大鏡 */
+type GlyphKind = 'all' | ConsumerChannel | 'merchant' | 'product' | 'deal' | 'search'
+
+function ChannelGlyph({ kind }: { kind: GlyphKind }) {
+  return (
+    <svg
+      className="apcs-glyph"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {kind === 'delivery' && (
+        <>
+          <circle cx="6" cy="17" r="2.4" />
+          <circle cx="18" cy="17" r="2.4" />
+          <path d="M8.4 17h7.2" />
+          <path d="M18 14.6V7.5h-3.2" />
+          <path d="M6 14.6V9.5a1.8 1.8 0 0 1 1.8-1.8h3.4l2 9.3" />
+        </>
+      )}
+      {kind === 'market' && (
+        <>
+          <circle cx="9.5" cy="19" r="1.7" />
+          <circle cx="17" cy="19" r="1.7" />
+          <path d="M3.5 4.5h2.6l2 10.5h9.6l1.8-7.5H7" />
+        </>
+      )}
+      {(kind === 'groupbuy' || kind === 'deal') && (
+        <>
+          <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z" />
+          <path d="M13 5v2" />
+          <path d="M13 11v2" />
+          <path d="M13 17v2" />
+        </>
+      )}
+      {kind === 'merchant' && (
+        <>
+          <path d="M4 10v9h16v-9" />
+          <path d="M3 9.5 5 4h14l2 5.5" />
+          <path d="M9.5 19v-5h5v5" />
+        </>
+      )}
+      {kind === 'product' && (
+        <>
+          <path d="M6 7.5h12L19.5 20h-15Z" />
+          <path d="M9 7.5a3 3 0 0 1 6 0" />
+        </>
+      )}
+      {kind === 'all' && (
+        <>
+          <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
+          <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
+          <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
+          <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
+        </>
+      )}
+      {kind === 'search' && (
+        <>
+          <circle cx="11" cy="11" r="6" />
+          <path d="m20 20-4.8-4.8" />
+        </>
+      )}
+    </svg>
+  )
+}
 
 interface SearchSession {
   input: string
@@ -91,24 +166,37 @@ function MerchantCard({
   entry,
   query,
   showChannel,
+  far,
   onOpen,
 }: {
   entry: SearchMerchant
   query: string
   showChannel: boolean
+  far?: boolean
   onOpen?: () => void
 }) {
-  const fulfillment = entry.channel === 'groupbuy'
-    ? `${entry.distanceKm}km · ${entry.groupbuyCount ?? 0} 個團購 · 人均 $${formatMoney(entry.avgPrice ?? 0)}`
-    : `${entry.deliveryMinutes ?? 0}分鐘 · ${entry.distanceKm}km · ${entry.deliveryFee === 0 ? '免配送費' : `配送費 $${formatMoney(entry.deliveryFee ?? 0)}`} · 起送 $${formatMoney(entry.minOrder ?? 0)}`
+  const cols = entry.channel === 'groupbuy'
+    ? [
+        { label: '距離', value: `${entry.distanceKm}km` },
+        { label: '團購', value: `${entry.groupbuyCount ?? 0} 個` },
+        { label: '人均', value: `$${formatMoney(entry.avgPrice ?? 0)}` },
+      ]
+    : [
+        { label: '起送', value: `$${formatMoney(entry.minOrder ?? 0)}` },
+        { label: '配送', value: entry.deliveryFee === 0 ? '免配送費' : `$${formatMoney(entry.deliveryFee ?? 0)}起` },
+        { label: '距離', value: `${entry.distanceKm}km` },
+      ]
 
   return (
     <button
       type="button"
-      className={`apcs-card apcs-merchant${entry.status === 'rest' ? ' is-rest' : ''}`}
+      className={`apcs-card apcs-merchant${entry.status === 'rest' ? ' is-rest' : ''}${far ? ' is-far' : ''}`}
       onClick={onOpen}
     >
-      <Thumb entry={entry} />
+      <span className="apcs-thumb">
+        {entry.image ? <img src={entry.image} alt="" /> : <span>{entry.emoji}</span>}
+        {entry.monthlySales >= 1500 && <em className="apcs-thumb-badge">人氣</em>}
+      </span>
       <span className="apcs-card-main">
         <span className="apcs-card-head">
           <span className="apcs-card-name"><Highlight text={entry.name} keyword={query} /></span>
@@ -117,12 +205,20 @@ function MerchantCard({
           )}
           {entry.status === 'rest' && <em className="apcs-status apcs-status--rest">休息中</em>}
           {entry.status === 'new' && <em className="apcs-status apcs-status--new">新店</em>}
+          {far && <em className="apcs-status apcs-status--far">超出範圍</em>}
         </span>
         <span className="apcs-card-rate">
-          <b>{entry.rating}</b>分<i>月售 {entry.monthlySales}</i>
-          {entry.channel === 'groupbuy' && <i>{entry.groupbuyCount ?? 0} 個團購</i>}
+          <b>★ {entry.rating}</b>
+          <i className="apcs-card-sales">月售 {entry.monthlySales}</i>
         </span>
-        <span className="apcs-card-meta">{fulfillment}</span>
+        <span className="apcs-card-cols">
+          {cols.map((col) => (
+            <span key={col.label}>
+              <em>{col.label}</em>
+              <b>{col.value}</b>
+            </span>
+          ))}
+        </span>
         {entry.coupons.length > 0 && (
           <span className="apcs-card-coupons">
             {entry.coupons.slice(0, 3).map((coupon) => (
@@ -138,7 +234,6 @@ function MerchantCard({
           </span>
         )}
       </span>
-      <span className="apcs-chevron" aria-hidden="true">›</span>
     </button>
   )
 }
@@ -147,12 +242,14 @@ function OfferCard({
   entry,
   query,
   showChannel,
+  far,
   onOpen,
   onAdd,
 }: {
   entry: SearchOffer
   query: string
   showChannel: boolean
+  far?: boolean
   onOpen?: () => void
   onAdd?: () => void
 }) {
@@ -165,7 +262,7 @@ function OfferCard({
   const off = discountLabel(entry.price, entry.originPrice)
 
   return (
-    <div className="apcs-card apcs-offer">
+    <div className={`apcs-card apcs-offer${far ? ' is-far' : ''}`}>
       <button type="button" className="apcs-offer-hit" onClick={onOpen}>
         <Thumb entry={entry} />
         <span className="apcs-card-main">
@@ -234,7 +331,6 @@ export default function ConsumerSearch({
   const [sort, setSort] = useState<SearchSort>(seed?.sort ?? 'default')
   const [filters, setFilters] = useState<SearchFilter[]>(seed?.filters ?? [])
   const [category, setCategory] = useState('all')
-  const [showFilters, setShowFilters] = useState(false)
   const [history, setHistory] = useState<string[]>(() => loadHistory(scope, merchantId))
 
   const inputRef = useRef<HTMLInputElement>(null)
@@ -258,10 +354,6 @@ export default function ConsumerSearch({
     () => searchCatalog(scope, query, { merchantId, filters }),
     [scope, query, merchantId, filters],
   )
-  const counts = useMemo(
-    () => countByTab(scope, query, filters, merchantId),
-    [scope, query, filters, merchantId],
-  )
   const results = useMemo(() => {
     let list = baseResults.filter((entry) => entryMatchesTab(entry, tab))
     if (scope === 'store' && category !== 'all') {
@@ -277,6 +369,7 @@ export default function ConsumerSearch({
     [scope, input, merchantId],
   )
   const hotWords = useMemo(() => hotWordsFor(scope, merchantId), [scope, merchantId])
+  const hotList = useMemo(() => hotListFor(scope, merchantId), [scope, merchantId])
   const guessWords = useMemo(() => guessWordsFor(scope, merchantId), [scope, merchantId])
   const storeCategories = useMemo(
     () => (scope === 'store' && merchantId ? getStoreCategories(merchantId) : []),
@@ -314,6 +407,19 @@ export default function ConsumerSearch({
     onBack()
   }
 
+  /** 点击联想行：能定位到店铺的直达店铺（需求 1.5），否则退化为按联想词再搜一次 */
+  const handleSuggestionPick = (suggestion: SearchSuggestion) => {
+    const text = suggestion.text.trim()
+    setHistory(pushHistory(scope, text, merchantId))
+    if (suggestion.merchantId && onOpenStore) {
+      setInput(text)
+      setQuery(text)
+      onOpenStore(suggestion.merchantId)
+      return
+    }
+    runSearch(text)
+  }
+
   const toggleFilter = (filter: SearchFilter) => {
     setFilters((prev) => (
       prev.includes(filter) ? prev.filter((item) => item !== filter) : [...prev, filter]
@@ -325,8 +431,11 @@ export default function ConsumerSearch({
     setHistory([])
   }
 
-  const merchantResults = results.filter((entry): entry is SearchMerchant => entry.kind === 'merchant')
-  const offerResults = results.filter((entry): entry is SearchOffer => entry.kind !== 'merchant')
+  /** 超出配送范围的命中：置灰并归入独立分组（参考美团超范围置灰，不混在可下单列表里） */
+  const nearResults = results.filter((entry) => !isOutOfRange(entry))
+  const farResults = results.filter(isOutOfRange)
+  const nearMerchants = nearResults.filter((entry): entry is SearchMerchant => entry.kind === 'merchant')
+  const nearOffers = nearResults.filter((entry): entry is SearchOffer => entry.kind !== 'merchant')
   const offerTitle = scope === 'global'
     ? '商品與團購'
     : scope === 'groupbuy'
@@ -335,12 +444,12 @@ export default function ConsumerSearch({
         ? ''
         : '商品'
 
-  const renderCards = (list: SearchEntry[], title?: string) => (
-    <section className="apcs-section">
+  const renderCards = (list: SearchEntry[], title?: string, far = false) => (
+    <section className={`apcs-section${far ? ' apcs-farsec' : ''}`}>
       {title && (
-        <header className="apcs-section-head">
+        <header className={far ? 'apcs-far-head' : 'apcs-section-head'}>
           <b>{title}</b>
-          <span>{list.length}</span>
+          {!far && <span>{list.length}</span>}
         </header>
       )}
       <div className="apcs-cards">
@@ -351,6 +460,7 @@ export default function ConsumerSearch({
               entry={entry}
               query={query}
               showChannel={scope === 'global'}
+              far={far}
               onOpen={onOpenStore ? () => onOpenStore(entry.id) : undefined}
             />
           ) : (
@@ -359,6 +469,7 @@ export default function ConsumerSearch({
               entry={entry}
               query={query}
               showChannel={scope === 'global'}
+              far={far}
               onOpen={onOpenStore ? () => onOpenStore(entry.merchantId) : undefined}
               onAdd={scope === 'store' && onAddToCart ? () => onAddToCart(entry) : undefined}
             />
@@ -403,6 +514,7 @@ export default function ConsumerSearch({
           runSearch(input)
         }}
       >
+        <button type="button" className="apcs-back" aria-label="返回" onClick={handleCancel}>‹</button>
         <div className="apcs-box">
           <span className="apcs-box-ico" aria-hidden="true">🔍</span>
           <input
@@ -427,8 +539,8 @@ export default function ConsumerSearch({
               ×
             </button>
           )}
+          <button type="submit" className="apcs-submit">搜索</button>
         </div>
-        <button type="button" className="apcs-cancel" onClick={handleCancel}>取消</button>
       </form>
 
       <div className="apcs-scope">
@@ -440,25 +552,14 @@ export default function ConsumerSearch({
         {isActivation && (
           <div className="apcs-activation">
             <section className="apcs-section">
-              <header className="apcs-section-head">
-                <b>搜尋歷史</b>
-                {history.length > 0 && (
-                  <button type="button" className="apcs-clear-history" onClick={handleClearHistory}>
-                    <span aria-hidden="true">🗑</span> 清空
+              <header className="apcs-section-head"><b>熱門搜索</b></header>
+              <div className="apcs-chips">
+                {guessWords.map((word) => (
+                  <button key={word} type="button" className="apcs-chip apcs-chip--guess" onClick={() => runSearch(word)}>
+                    {word}
                   </button>
-                )}
-              </header>
-              {history.length > 0 ? (
-                <div className="apcs-chips">
-                  {history.map((word) => (
-                    <button key={word} type="button" className="apcs-chip" onClick={() => runSearch(word)}>
-                      {word}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <p className="apcs-muted">還沒有搜尋記錄</p>
-              )}
+                ))}
+              </div>
             </section>
 
             {scope === 'store' && storeCategories.length > 0 && (
@@ -476,30 +577,45 @@ export default function ConsumerSearch({
 
             <section className="apcs-section">
               <header className="apcs-section-head">
-                <b>熱搜榜</b>
-                <span>{scope === 'store' ? '店內熱銷' : '澳門 · 今日'}</span>
-              </header>
-              <div className="apcs-hot">
-                {hotWords.map((word, index) => (
-                  <button key={word} type="button" className="apcs-hot-item" onClick={() => runSearch(word)}>
-                    <em className={`apcs-hot-rank${index < 3 ? ' is-top' : ''}`}>{index + 1}</em>
-                    <span className="apcs-hot-text">{word}</span>
-                    {index === 0 && <i className="apcs-hot-badge apcs-hot-badge--hot">熱</i>}
-                    {index === 1 && <i className="apcs-hot-badge apcs-hot-badge--new">新</i>}
-                    {index === 2 && <i className="apcs-hot-badge apcs-hot-badge--up">升</i>}
+                <b>歷史搜索</b>
+                {history.length > 0 && (
+                  <button type="button" className="apcs-clear-history" aria-label="清空搜尋歷史" onClick={handleClearHistory}>
+                    <span aria-hidden="true">🗑</span>
                   </button>
-                ))}
-              </div>
+                )}
+              </header>
+              {history.length > 0 ? (
+                <div className="apcs-chips">
+                  {history.map((word) => (
+                    <button key={word} type="button" className="apcs-chip" onClick={() => runSearch(word)}>
+                      {word}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="apcs-muted">還沒有搜尋記錄</p>
+              )}
             </section>
 
             <section className="apcs-section">
-              <header className="apcs-section-head"><b>{scope === 'store' ? '店內推薦' : '猜你想搜'}</b></header>
-              <div className="apcs-chips">
-                {guessWords.map((word) => (
-                  <button key={word} type="button" className="apcs-chip apcs-chip--guess" onClick={() => runSearch(word)}>
-                    {word}
-                  </button>
-                ))}
+              <div className="apcs-hotcard">
+                <header className="apcs-hotcard-head">
+                  <span aria-hidden="true">🔥</span>
+                  <b>人氣熱搜</b>
+                  <i>{scope === 'store' ? '店內熱銷' : '澳門 · 今日'}</i>
+                </header>
+                <div className="apcs-hotlist">
+                  {hotList.map((item, index) => (
+                    <button key={item.word} type="button" className="apcs-hotrow" onClick={() => runSearch(item.word)}>
+                      <em className={`apcs-rank apcs-rank--${index < 3 ? index + 1 : 'n'}`}>{index + 1}</em>
+                      <span className="apcs-hot-text">{item.word}</span>
+                      {item.hot && <i className="apcs-hot-badge apcs-hot-badge--hot">熱</i>}
+                      <span className={`apcs-heat${item.up ? ' is-up' : ''}`}>
+                        {item.up && <b aria-hidden="true">↑</b>}{item.heat}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
             </section>
           </div>
@@ -507,23 +623,55 @@ export default function ConsumerSearch({
 
         {showSuggestions && (
           <div className="apcs-sugs">
-            <button type="button" className="apcs-sug apcs-sug--all" onClick={() => runSearch(input)}>
-              <span className="apcs-sug-ico" aria-hidden="true">🔍</span>
-              <span className="apcs-sug-text">搜尋「<b>{trimmedInput}</b>」</span>
-            </button>
-            {suggestions.map((suggestion) => (
-              <button key={suggestion.key} type="button" className="apcs-sug" onClick={() => runSearch(suggestion.text)}>
-                <span className={`apcs-sug-type apcs-sug-type--${suggestion.type}`}>{suggestion.typeLabel}</span>
-                <span className="apcs-sug-text">
-                  <Highlight text={suggestion.text} keyword={trimmedInput} />
-                </span>
-                <span className="apcs-sug-meta">{suggestion.meta}</span>
-              </button>
-            ))}
+            {suggestions.map((suggestion) => {
+              const merchant = suggestion.merchantId ? getMerchant(suggestion.merchantId) : undefined
+              return (
+                <button
+                  key={suggestion.key}
+                  type="button"
+                  className="apcs-sug"
+                  onClick={() => handleSuggestionPick(suggestion)}
+                >
+                  <span
+                    className={`apcs-sug-ico apcs-sug-ico--${suggestion.channel ?? 'none'}`}
+                    aria-label={suggestion.channel ? CHANNEL_LABEL[suggestion.channel] : undefined}
+                  >
+                    <ChannelGlyph kind={suggestion.channel ?? 'search'} />
+                  </span>
+                  <span className="apcs-sug-main">
+                    <span className="apcs-sug-name">
+                      <Highlight text={suggestion.text} keyword={trimmedInput} />
+                      {suggestion.status === 'rest' && <em className="apcs-status apcs-status--rest">休息中</em>}
+                    </span>
+                    <span className="apcs-sug-sub">
+                      {suggestion.type === 'merchant' && merchant ? (
+                        <>
+                          <b className="apcs-sug-rate">★ {merchant.rating}</b>
+                          <i>{merchant.categories[0]}</i>
+                          <em className="apcs-sug-addr">📍 {merchant.address}</em>
+                        </>
+                      ) : (
+                        <>
+                          <b className="apcs-sug-rate">${formatMoney(suggestion.price ?? 0)}</b>
+                          <em className="apcs-sug-addr">{merchant?.name}</em>
+                        </>
+                      )}
+                    </span>
+                  </span>
+                  {merchant && <span className="apcs-sug-dist">{merchant.distanceKm}km</span>}
+                </button>
+              )
+            })}
             {suggestions.length === 0 && (
-              <p className="apcs-muted apcs-sug-empty">
-                按下「搜尋」在{config.label}內查找「{trimmedInput}」
-              </p>
+              <button type="button" className="apcs-sug apcs-sug--search" onClick={() => runSearch(input)}>
+                <span className="apcs-sug-ico apcs-sug-ico--none" aria-label="搜尋">
+                  <ChannelGlyph kind="search" />
+                </span>
+                <span className="apcs-sug-main">
+                  <span className="apcs-sug-name">搜尋「{trimmedInput}」</span>
+                  <span className="apcs-sug-sub"><i>沒有匹配的店鋪或商品，點擊直接搜尋</i></span>
+                </span>
+              </button>
             )}
           </div>
         )}
@@ -536,25 +684,23 @@ export default function ConsumerSearch({
             </div>
 
             {config.tabs.length > 1 && (
-              <div className="apcs-tabs" role="tablist" aria-label="結果分類">
-                {config.tabs.map((item) => {
-                  const count = counts[item.key] ?? 0
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      role="tab"
-                      aria-selected={tab === item.key}
-                      className={`apcs-tab${tab === item.key ? ' is-on' : ''}${count === 0 ? ' is-empty' : ''}`}
-                      onClick={() => {
-                        setTab(item.key)
-                        if (bodyRef.current) bodyRef.current.scrollTop = 0
-                      }}
-                    >
-                      {item.label}<em>{count}</em>
-                    </button>
-                  )
-                })}
+              <div className="apcs-pills" role="tablist" aria-label="結果分類">
+                {config.tabs.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === item.key}
+                    className={`apcs-pill${tab === item.key ? ' is-on' : ''}`}
+                    onClick={() => {
+                      setTab(item.key)
+                      if (bodyRef.current) bodyRef.current.scrollTop = 0
+                    }}
+                  >
+                    <span aria-hidden="true"><ChannelGlyph kind={(item.key as GlyphKind) ?? 'all'} /></span>
+                    {item.label}
+                  </button>
+                ))}
               </div>
             )}
 
@@ -569,19 +715,9 @@ export default function ConsumerSearch({
                   {item.label}
                 </button>
               ))}
-              {config.filters.length > 0 && (
-                <button
-                  type="button"
-                  className={`apcs-filter-toggle${showFilters ? ' is-on' : ''}`}
-                  aria-expanded={showFilters}
-                  onClick={() => setShowFilters((prev) => !prev)}
-                >
-                  篩選 ▾
-                </button>
-              )}
             </div>
 
-            {showFilters && config.filters.length > 0 && (
+            {config.filters.length > 0 && (
               <div className="apcs-filterchips">
                 {config.filters.map((filter) => (
                   <button
@@ -619,12 +755,17 @@ export default function ConsumerSearch({
               </div>
             )}
 
-            {results.length === 0 ? renderEmpty() : tab === 'all' ? (
+            {results.length === 0 ? renderEmpty() : (
               <>
-                {merchantResults.length > 0 && renderCards(merchantResults, scope === 'global' ? '店鋪' : '商家')}
-                {offerResults.length > 0 && renderCards(offerResults, offerTitle || undefined)}
+                {tab === 'all' ? (
+                  <>
+                    {nearMerchants.length > 0 && renderCards(nearMerchants, scope === 'global' ? '店鋪' : '商家')}
+                    {nearOffers.length > 0 && renderCards(nearOffers, offerTitle || undefined)}
+                  </>
+                ) : renderCards(nearResults)}
+                {farResults.length > 0 && renderCards(farResults, '超出當前配送範圍', true)}
               </>
-            ) : renderCards(results)}
+            )}
           </div>
         )}
       </div>

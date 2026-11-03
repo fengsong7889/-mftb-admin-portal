@@ -96,6 +96,7 @@ export default function ConsumerApp() {
             onBack={nav.back}
             onSearch={() => openSearch('groupbuy')}
             onOpenStore={openStore}
+            onOpenOrder={() => nav.reset(ROOT.order)}
           />
         )
       case 'delivery':

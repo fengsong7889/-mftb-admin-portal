@@ -2,7 +2,7 @@
  * 用户端 APP · 特價團購页（按设计稿还原，纯前端静态原型）
  *
  * 入口：首页「特價團購」小模块点击进入（见 ConsumerHome 的 onOpenGroupBuy）。
- * 结构：粉色头部(返回+定位) → 搜索+訂單 → 日料 Hero → 十宫格分类 → 快捷胶囊 →
+ * 结构：粉色头部(返回+定位) → 搜索行 + 独立訂單入口 → 日料 Hero → 十宫格分类 → 快捷胶囊 →
  *       促销位 → 標題欄(横滑) → 標題欄(双列) → 红包券 → 筛选栏 → 竖向商品列表 → 到底提示。
  *
  * 说明：图片为 AI 占位图（src/assets/consumer-home/），文案暂硬编码繁中，待切图与 i18n 接入后替换。
@@ -65,10 +65,12 @@ export default function ConsumerGroupBuy({
   onBack,
   onSearch,
   onOpenStore,
+  onOpenOrder,
 }: {
   onBack: () => void
   onSearch: () => void
   onOpenStore?: (merchantId: string) => void
+  onOpenOrder?: () => void
 }) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const [scrolled, setScrolled] = useState(false)
@@ -112,8 +114,13 @@ export default function ConsumerGroupBuy({
             <span className="apc-search-ico" aria-hidden="true">🔍</span>
             <span className="apg-hot">熱搜：滾動字體後台傳</span>
             <span className="apg-search-btn">搜索</span>
-            <span className="apg-order-btn">訂單</span>
           </button>
+          {/* 訂單是独立入口（跳底部訂單 Tab），不能嵌在搜索框按钮内 */}
+          {onOpenOrder && (
+            <button type="button" className="apg-order-btn" onClick={onOpenOrder}>
+              訂單
+            </button>
+          )}
           {scrolled && (
             <span className="apg-header-loc"><span aria-hidden="true">📍</span><i>威尼斯人A座</i></span>
           )}
