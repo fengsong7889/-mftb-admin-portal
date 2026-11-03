@@ -3911,6 +3911,10 @@
     "goMenu": "Go to an Accessible Menu"
   },
   "header": {
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
     "languagesLoadError": "Unable to load languages. Reopen the list to retry.",
     "noLanguages": "No languages configured",
     "notifications": "System Messages",

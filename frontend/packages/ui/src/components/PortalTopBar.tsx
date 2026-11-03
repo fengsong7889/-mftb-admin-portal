@@ -19,6 +19,7 @@ import { changeAppLanguage, ensureLanguageBundle } from '@/i18n'
 import { getBrandTitle } from '@/constants/portalSystems'
 import { fetchLanguages, LANGUAGES_CHANGED_EVENT, type LanguageVO } from '@/api/translation'
 import { COUNTRY_INFO, countrySysName, getCountryOfLanguage, LANG_INFO } from '@/utils/translationConfig'
+import ThemeControls from './ThemeControls'
 import './PortalTopBar.css'
 
 const { Header } = Layout
@@ -145,6 +146,8 @@ export default function PortalTopBar() {
         </div>
         <div className="portal-top-bar-right">
           <PortalLocaleControls />
+          {/* 门户页也要能切主题：否则用户在门户看到浅色、进系统变深色，会当成故障 */}
+          <ThemeControls />
           <div className="portal-user-controls">
             {/* 与系统内一致：直接展示姓名（工號）+ 职位 + 部门，点击展开我的資產/更换头像/修改密码/退出登录 */}
             <UserMenu myAssetsPath="/my-assets?from=portal" />

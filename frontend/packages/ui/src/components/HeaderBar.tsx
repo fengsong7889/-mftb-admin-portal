@@ -13,6 +13,7 @@ import UserMenu from './UserMenu'
 import SystemSwitcher from './SystemSwitcher'
 import { useTranslation } from 'react-i18next'
 import { PortalLocaleControls } from './PortalTopBar'
+import ThemeControls from './ThemeControls'
 import { fetchNotifications, markAllNotificationsRead, type NotificationItem } from '@/api/notification'
 
 const { Header } = Layout
@@ -165,6 +166,9 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
       </div>
       <div className="header-right">
         <PortalLocaleControls />
+
+        {/* 主题切换：与企业门户顶栏同一份实现，避开了两处各写一套后偏好逻辑漂移 */}
+        <ThemeControls />
 
         {/* 通知铃铛 */}
         <Popover

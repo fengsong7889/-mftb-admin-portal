@@ -3791,6 +3791,10 @@
     "goMenu": "前往可用菜單"
   },
   "header": {
+    "theme": "主題",
+    "themeLight": "淺色",
+    "themeDark": "深色",
+    "themeSystem": "跟隨系統",
     "languagesLoadError": "語言載入失敗，請重新展開列表重試",
     "noLanguages": "尚未配置語言",
     "notifications": "系統消息",
