@@ -637,7 +637,17 @@ export default function Portal() {
       <span
         key={sys.code}
         className={`portal-quick-item${removable ? '' : ' portal-quick-item--recent'}`}
-        style={removable ? { background: domain.toneBg, borderColor: `${domain.tone}22` } : undefined}
+        /*
+         * 淡底不再直接写 background，而是注入两个 CSS 变量：
+         * 浅色仍取原 toneBg（零视觉变化），深色下由 index.css 用 color-mix
+         * 把 scene 色与卡片底混成暗色淡染。
+         * 不这样做的后果：文字已随主题变亮而底色仍是 #FFF7E6 这类浅底，
+         * 得到「白底 + 亮字」，用户完全看不清（已报障）。内联色值也不会被 codemod 扫到。
+         * 不在 JS 里判断主题：颜色差异属于令牌层职责（见 §9.1 禁止清单）。
+         */
+        style={removable
+          ? ({ '--chip-tone': domain.tone, '--chip-tone-bg': domain.toneBg, borderColor: `${domain.tone}22` } as React.CSSProperties)
+          : undefined}
       >
         <button
           type="button"

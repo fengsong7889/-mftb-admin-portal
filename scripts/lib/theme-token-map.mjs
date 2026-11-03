@@ -40,7 +40,7 @@
  */
 export const SEMANTIC_TOKENS = [
   // 表面
-  'surface-1', 'surface-2', 'surface-3', 'surface-hover', 'surface-sunken', 'header-glass',
+  'surface-1', 'surface-2', 'surface-3', 'surface-hover', 'surface-sunken', 'header-glass', 'art-surface',
   // 文字
   'text-1', 'text-2', 'text-3', 'text-4', 'on-brand', 'text-brand', 'header-text',
   // 边框
@@ -86,6 +86,15 @@ export const TOKEN_VALUES = {
   // （实踩：门户顶栏从 1.04 的「深字白底」变成同为 1.04 的「浅字白底」，看起来没修其实更糟）。
   // 两侧都保留 alpha 以维持 backdrop-filter 的毛玻璃质感，不换成不透明实底。
   'header-glass': { light: 'rgba(255,255,255,0.92)', dark: 'rgba(31,31,31,0.92)' },
+  /*
+   * 插画「纸面/屏幕」专用令牌。门户 SVG 插画内有 97 个 fill="#fff" 零件（纸张、屏幕、卡片内容区），
+   * 它们就是深色下「一张白卡片浮在深界面上」的全部来源（卡片本身背景已经令牌化）。
+   *
+   * 不能换成 --surface-2（#1F1F1F）：那与卡片底同色，纸面会直接消失、插画变成一堆悬浮线条。
+   * 取 #2E2E2E：比卡片底亮两档、比表头底（#262626）再亮一点，
+   * 既能消除白斑，又保留「纸面 vs 卡片底」的层次，也让 scene 主色零件（如 #E8720C 对勾）仍有对比。
+   */
+  'art-surface': { light: '#FFFFFF', dark: '#2E2E2E' },
   'text-1': { light: '#262626', dark: '#E8E8E8' },
   'text-2': { light: '#595959', dark: '#B0B0B0' },
   // 深色提亮：#8C8C8C 在 #262626 表头底实测仅 4.50:1 卡线，#9A9A9A 为 5.38:1
