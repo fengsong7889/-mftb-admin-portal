@@ -313,7 +313,7 @@ export default function PricingAdd() {
             
             onClick={handleAddCancelTier}
             disabled={isDetailMode}
-            style={{ color: '#E8720C' }}
+            style={{ color: 'var(--brand)' }}
           >
             {t('common:add')}
           </Button>
@@ -335,7 +335,7 @@ export default function PricingAdd() {
     <div className="content-area">
       {/* 页面标题 */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
         overflow: 'hidden',
       }}>
@@ -351,7 +351,7 @@ export default function PricingAdd() {
             <Button type="primary" icon={<ArrowLeftOutlined />}
               onClick={() => navigate('/recommend-pricing')}
               style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                backgroundColor: 'var(--brand)', borderColor: 'var(--brand)',
                 borderRadius: 8, height: 36, padding: '0 16px',
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
@@ -359,13 +359,13 @@ export default function PricingAdd() {
               }}>{t('common:back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{pageTitle}</h2>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>{pageTitle}</h2>
               {isReviveAlgorithm && (
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '3px 12px', background: '#FFF7E6',
+                  padding: '3px 12px', background: 'var(--warning-soft)',
                   border: '1px solid #FFD591', borderRadius: 4,
-                  fontSize: 13, color: '#E8720C', fontWeight: 500,
+                  fontSize: 13, color: 'var(--brand)', fontWeight: 500,
                 }}>
                   <span style={{ fontSize: 14 }}>🔥</span>
                   {t('recommend.algoHotReviveAd')}
@@ -376,7 +376,7 @@ export default function PricingAdd() {
           {!isDetailMode && (
             <Button type="primary" icon={<SaveOutlined />} onClick={handleSave}
               style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                backgroundColor: 'var(--brand)', borderColor: 'var(--brand)',
                 borderRadius: 8, height: 36, padding: '0 18px',
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -394,13 +394,13 @@ export default function PricingAdd() {
         <Card
           title={
             <Space>
-              <AppstoreOutlined style={{ fontSize: 16, color: '#1890ff' }} />
+              <AppstoreOutlined style={{ fontSize: 16, color: 'var(--info)' }} />
               <span style={{ fontSize: 15, fontWeight: 500 }}>{t('recommend.basicInfo')}</span>
             </Space>
           }
           style={{
             marginTop: 16,
-            backgroundColor: '#fafbfc',
+            backgroundColor: 'var(--surface-sunken)',
             border: '1px solid #e8eaed',
             borderRadius: 8,
             boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
@@ -451,14 +451,14 @@ export default function PricingAdd() {
         <Card
           title={
             <Space>
-              <SettingOutlined style={{ fontSize: 16, color: '#E8720C' }} />
+              <SettingOutlined style={{ fontSize: 16, color: 'var(--brand)' }} />
               <span style={{ fontSize: 15, fontWeight: 500 }}>{t('recommend.salesStrategy')}</span>
             </Space>
           }
           extra={<Tag color="orange" style={{ fontSize: 11 }}>{t('recommend.strategyConfigTag')}</Tag>}
           style={{
             marginTop: 16,
-            backgroundColor: '#ffffff',
+            backgroundColor: 'var(--surface-2)',
             border: '1px solid #e8eaed',
             borderRadius: 12,
             boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
@@ -472,15 +472,15 @@ export default function PricingAdd() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 14, color: '#595959', minWidth: 80 }}>{t('recommend.preSaleDaysLabel')}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-2)', minWidth: 80 }}>{t('recommend.preSaleDaysLabel')}</span>
               <Form.Item name="minDays" style={{ marginBottom: 0 }}>
                 <InputNumber min={1} max={30} style={{ width: 100 }} addonAfter={t('recommend:dayUnit')} />
               </Form.Item>
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.preSaleDaysTip')}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('recommend.preSaleDaysTip')}</span>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 14, color: '#595959', minWidth: 80 }}>{t('recommend.blockMerchantsLabel')}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-2)', minWidth: 80 }}>{t('recommend.blockMerchantsLabel')}</span>
               <Form.Item name="status" style={{ marginBottom: 0 }}>
                 <Switch
                   checkedChildren={t('recommend.blockOn')}
@@ -488,7 +488,7 @@ export default function PricingAdd() {
                   defaultChecked={false}
                 />
               </Form.Item>
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.blockMerchantTip')}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('recommend.blockMerchantTip')}</span>
             </div>
           </div>
         </Card>
@@ -519,7 +519,7 @@ export default function PricingAdd() {
             }
             style={{
               marginTop: 16,
-              backgroundColor: '#fafbfc',
+              backgroundColor: 'var(--surface-sunken)',
               border: '1px solid #e8eaed',
               borderRadius: 8,
               boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
@@ -531,12 +531,12 @@ export default function PricingAdd() {
             }}
           >
             {districtPricings.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 40, color: '#8c8c8c', fontSize: 13 }}>
+              <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-3)', fontSize: 13 }}>
                 {t('recommend.districtEmptyHint')}
               </div>
             ) : (
               districtPricings.map((config) => (
-                <div key={config.region} style={{ marginBottom: 16, padding: 16, background: '#fafafa', borderRadius: 6 }}>
+                <div key={config.region} style={{ marginBottom: 16, padding: 16, background: 'var(--surface-3)', borderRadius: 6 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                     <Tag color="cyan" style={{ fontSize: 14, padding: '4px 12px' }}>
                       {config.regionLabel}
@@ -544,9 +544,9 @@ export default function PricingAdd() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <Button
                         type="text"
-                        icon={<EditOutlined style={{ fontSize: 14, color: '#1890FF' }} />}
+                        icon={<EditOutlined style={{ fontSize: 14, color: 'var(--info)' }} />}
                         onClick={() => handleReplaceDistrict(config.region)}
-                        style={{ fontSize: 12, color: '#1890FF', padding: '2px 6px' }}
+                        style={{ fontSize: 12, color: 'var(--info)', padding: '2px 6px' }}
                       >
                         {t('common:edit')}
                       </Button>
@@ -592,13 +592,13 @@ export default function PricingAdd() {
             }
             extra={
               <Space>
-                <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.matchDiscountTip')}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('recommend.matchDiscountTip')}</span>
                 <Switch checked={discountEnabled} onChange={setDiscountEnabled} />
               </Space>
             }
             style={{
               marginTop: 16,
-              backgroundColor: '#ffffff',
+              backgroundColor: 'var(--surface-2)',
               border: '1px solid #e8eaed',
               borderRadius: 12,
               boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
@@ -640,7 +640,7 @@ export default function PricingAdd() {
             }
             style={{
               marginTop: 16,
-              backgroundColor: '#fafbfc',
+              backgroundColor: 'var(--surface-sunken)',
               border: '1px solid #e8eaed',
               borderRadius: 8,
               boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
@@ -691,12 +691,12 @@ export default function PricingAdd() {
             <Space>
               <SettingOutlined style={{ fontSize: 16, color: '#F5222D' }} />
               <span style={{ fontSize: 15, fontWeight: 500 }}>{t('recommend.refundConfig')}</span>
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.refundConfigDesc')}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('recommend.refundConfigDesc')}</span>
             </Space>
           }
           extra={
             <Space>
-              <span style={{ fontSize: 13, color: refundEnabled ? '#52c41a' : '#8c8c8c' }}>{refundEnabled ? t('recommend.allowRefund') : t('recommend.denyRefund')}</span>
+              <span style={{ fontSize: 13, color: refundEnabled ? 'var(--success)' : 'var(--text-3)' }}>{refundEnabled ? t('recommend.allowRefund') : t('recommend.denyRefund')}</span>
               <Switch
                 size="small"
                 checked={refundEnabled}
@@ -707,7 +707,7 @@ export default function PricingAdd() {
           }
           style={{
             marginTop: 16,
-            backgroundColor: '#ffffff',
+            backgroundColor: 'var(--surface-2)',
             border: '1px solid #e8eaed',
             borderRadius: 12,
             boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
@@ -731,10 +731,10 @@ export default function PricingAdd() {
           ) : (
             <div style={{
               padding: '24px', textAlign: 'center',
-              background: '#fafafa', borderRadius: 8,
+              background: 'var(--surface-3)', borderRadius: 8,
               border: '1px dashed #d9d9d9',
             }}>
-              <span style={{ fontSize: 13, color: '#8c8c8c' }}>{t('recommend.denyRefundTip')}</span>
+              <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{t('recommend.denyRefundTip')}</span>
             </div>
           )}
         </Card>
@@ -742,22 +742,22 @@ export default function PricingAdd() {
 
       {/* 操作记录（仅详情模式） */}
       {isDetailMode && (
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <EditOutlined style={{ fontSize: 14, color: '#595959' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--surface-1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <EditOutlined style={{ fontSize: 14, color: 'var(--text-2)' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>操作记录</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>操作记录</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 80 }}>最后更新人：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{pricingDetailData?.updatedBy || '-'}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 80 }}>最后更新人：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{pricingDetailData?.updatedBy || '-'}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 80 }}>最后更新时间：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{pricingDetailData?.updatedAt ? dayjs(pricingDetailData.updatedAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 80 }}>最后更新时间：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{pricingDetailData?.updatedAt ? dayjs(pricingDetailData.updatedAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</span>
             </div>
           </div>
         </div>
@@ -790,9 +790,9 @@ export default function PricingAdd() {
           style={{ marginTop: 16 }}
         />
         {selectedRegionNode && (
-          <div style={{ marginTop: 12, padding: '8px 12px', background: '#f6ffed', borderRadius: 6, border: '1px solid #b7eb8f' }}>
-            <span style={{ color: '#52c41a', fontSize: 13 }}>{t('recommend.selectedLabel')}</span>
-            <span style={{ fontWeight: 600, color: '#262626' }}>{selectedRegionNode.title}</span>
+          <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--success-soft)', borderRadius: 6, border: '1px solid #b7eb8f' }}>
+            <span style={{ color: 'var(--success)', fontSize: 13 }}>{t('recommend.selectedLabel')}</span>
+            <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{selectedRegionNode.title}</span>
           </div>
         )}
       </Modal>

@@ -704,7 +704,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
         <DetailPageHeader
           title={t('recommend.algoDetail')}
           tags={selectedAlgorithmType ? (
-            <span style={{ fontSize: 14, color: '#595959', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 14, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
               {TYPE_ICON[selectedAlgorithmType]} {t(TYPE_LABEL_KEY[selectedAlgorithmType])}
             </span>
           ) : undefined}
@@ -718,7 +718,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
         />
       ) : (
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
         overflow: 'hidden',
       }}>
@@ -733,7 +733,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleBack}
               style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                backgroundColor: 'var(--brand)', borderColor: 'var(--brand)',
                 borderRadius: 8, height: 36, padding: '0 16px',
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
@@ -741,11 +741,11 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
               }}>{t('common:back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>
                 {isEditMode ? t('recommend.editAlgo') : t('recommend.addAlgo')}
               </h2>
               {selectedAlgorithmType && (
-                <span style={{ fontSize: 14, color: '#595959' }}>
+                <span style={{ fontSize: 14, color: 'var(--text-2)' }}>
                   {TYPE_ICON[selectedAlgorithmType]} {t(TYPE_LABEL_KEY[selectedAlgorithmType])}
                 </span>
               )}
@@ -838,20 +838,20 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                     style={{
                       flex: 1, padding: '10px 14px', borderRadius: 8, cursor: isDetailMode ? 'default' : 'pointer',
                       border: layoutMode === m.value ? '1px solid #52C41A' : '1px solid #f0f0f0',
-                      background: layoutMode === m.value ? '#f6ffed' : '#fafafa',
+                      background: layoutMode === m.value ? 'var(--success-soft)' : 'var(--surface-3)',
                       transition: 'all 0.2s',
                     }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: layoutMode === m.value ? '#52C41A' : '#595959' }}>{t(m.labelKey)}</div>
-                    <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 2 }}>{t(m.descKey)}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: layoutMode === m.value ? 'var(--success)' : 'var(--text-2)' }}>{t(m.labelKey)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{t(m.descKey)}</div>
                   </div>
                 ))}
               </div>
 
               {/* ===== 指定模式 ===== */}
               {layoutMode === 'manual' && (
-                <div style={{ background: '#fafafa', borderRadius: 8, border: '1px solid #f0f0f0', padding: '14px 16px' }}>
+                <div style={{ background: 'var(--surface-3)', borderRadius: 8, border: '1px solid #f0f0f0', padding: '14px 16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: '#595959' }}>{t('recommend:manualRuleHint')}</span>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)' }}>{t('recommend:manualRuleHint')}</span>
                     {!isDetailMode && (
                       <Button type="dashed" size="small" icon={<PlusOutlined style={{ fontSize: 11 }} />}
                         onClick={() => setManualRules(prev => [...prev, { id: ruleIdSeed++, position: 1, layout: 'grid' }])}
@@ -860,7 +860,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                     )}
                   </div>
                   {manualRules.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '16px 0', color: '#bfbfbf', fontSize: 13 }}>
+                    <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--text-4)', fontSize: 13 }}>
                       {t('recommend:noRulesSet')}
                     </div>
                   ) : (
@@ -868,13 +868,13 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                       {manualRules.map((rule) => (
                         <div key={rule.id} style={{
                           display: 'flex', alignItems: 'center', gap: 8,
-                          background: '#fff', borderRadius: 6, padding: '8px 12px', border: '1px solid #f0f0f0',
+                          background: 'var(--surface-2)', borderRadius: 6, padding: '8px 12px', border: '1px solid #f0f0f0',
                         }}>
-                          <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:nthMerchant')}</span>
+                          <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('recommend:nthMerchant')}</span>
                           <InputNumber min={1} max={999} value={rule.position} disabled={isDetailMode}
                             onChange={v => v && setManualRules(prev => prev.map(r => r.id === rule.id ? { ...r, position: v } : r))}
                             style={{ width: 60 }} size="small" />
-                          <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:merchantDisplay')}</span>
+                          <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('recommend:merchantDisplay')}</span>
                           <Select value={rule.layout} disabled={isDetailMode} style={{ width: 170 }} size="small"
                             onChange={v => setManualRules(prev => prev.map(r => r.id === rule.id ? { ...r, layout: v } : r))}
                             options={POPULAR_LAYOUT_OPTIONS.filter(o => o.value !== 'small').map(o => ({ label: `${o.icon} ${t(o.labelKey)}`, value: o.value }))}
@@ -894,8 +894,8 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
 
               {/* ===== 系統計算模式：有序閉環循環 ===== */}
               {layoutMode === 'auto' && (
-                <div style={{ background: '#fafafa', borderRadius: 8, border: '1px solid #f0f0f0', padding: '14px 16px' }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#595959', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ background: 'var(--surface-3)', borderRadius: 8, border: '1px solid #f0f0f0', padding: '14px 16px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span>{t('recommend:cycleChainHint')}</span>
                     {!isDetailMode && (
                       <Button type="dashed" size="small" icon={<PlusOutlined style={{ fontSize: 11 }} />}
@@ -911,7 +911,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                   </div>
 
                   {autoLayouts.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '16px 0', color: '#bfbfbf', fontSize: 13 }}>
+                    <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--text-4)', fontSize: 13 }}>
                       {t('recommend:noStylesAdded')}
                     </div>
                   ) : (
@@ -928,7 +928,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                             )}
                             <div style={{
                               display: 'flex', alignItems: 'center', gap: 10,
-                              background: '#fff', borderRadius: 8, padding: '10px 14px',
+                              background: 'var(--surface-2)', borderRadius: 8, padding: '10px 14px',
                               border: `1px solid ${opt.color}33`,
                             }}>
                               {/* 序號 */}
@@ -943,11 +943,11 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                                 onChange={v => setAutoLayouts(prev => prev.map(a => a.id === item.id ? { ...a, type: v } : a))}
                                 options={bigLayoutOptions.map(o => ({ label: `${o.icon} ${t(o.labelKey)}`, value: o.value }))}
                               />
-                              <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:afterAppear')}</span>
+                              <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('recommend:afterAppear')}</span>
                               <InputNumber min={1} max={999} value={item.interval} disabled={isDetailMode}
                                 onChange={v => v && setAutoLayouts(prev => prev.map(a => a.id === item.id ? { ...a, interval: v } : a))}
                                 style={{ width: 60 }} size="small" />
-                              <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend:merchantsBeforeNext')}</span>
+                              <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('recommend:merchantsBeforeNext')}</span>
                               {!isDetailMode && (
                                 <Button type="text" size="small" danger
                                   onClick={() => setAutoLayouts(prev => prev.filter(a => a.id !== item.id))}
@@ -964,7 +964,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                           <div style={{ display: 'flex', alignItems: 'center', paddingLeft: 20, height: 18 }}>
                             <div style={{ width: 1, height: '100%', background: '#d9d9d9' }} />
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 4, fontSize: 12, color: '#8c8c8c', fontStyle: 'italic' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 4, fontSize: 12, color: 'var(--text-3)', fontStyle: 'italic' }}>
                             <span style={{ fontSize: 14 }}>↻</span>
                             {t('recommend:cycleLoopHint', { count: autoLayouts.length + 1, total: autoLayouts.reduce((s, a) => s + a.interval, 0) })}
                           </div>
@@ -982,8 +982,8 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
           {selectedAlgorithmType === AlgorithmType.GOLDEN_SIGNBOARD && (
             <AlgorithmSection title={t('recommend.algoParams')}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#E8720C' }} />
-              <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>招牌標籤配置</span>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--brand)' }} />
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>招牌標籤配置</span>
               <HelpPopover
                 ariaLabel="金字招牌標籤配置與全量文案說明"
                 title="📝 標籤配置與全量文案"
@@ -991,8 +991,8 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                 width={720}
                 content={
                   <div style={{ fontSize: 12, lineHeight: 1.9, maxHeight: '62vh', overflowY: 'auto', paddingRight: 4 }}>
-                    <div style={{ fontWeight: 600, marginBottom: 4, color: '#E8720C' }}>🔑 標籤分類與場景：</div>
-                    <div style={{ color: '#595959', marginBottom: 10 }}>
+                    <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--brand)' }}>🔑 標籤分類與場景：</div>
+                    <div style={{ color: 'var(--text-2)', marginBottom: 10 }}>
                       對比類標籤（熱門/人氣/銷量/好評/復購）：每個標籤可同時配置「全澳對比」與「商圈對比」兩個場景<br />
                       ・各場景獨立啟用，場景內支持多條件組合（且/或關係）<br />
                       ・場景決定可選範圍：全澳場景限「全澳商家/全澳-品類商家」，商圈場景限「商圈商家/商圈-品類商家」<br />
@@ -1000,12 +1000,12 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                       統計類標籤（收藏/顧客數）：統計全量數據門檻，不劃分場景
                     </div>
                     <SignboardCopyReference />
-                    <div style={{ fontWeight: 600, marginTop: 10, marginBottom: 4, color: '#262626' }}>💡 人數說明：</div>
-                    <div style={{ color: '#595959' }}>
+                    <div style={{ fontWeight: 600, marginTop: 10, marginBottom: 4, color: 'var(--text-1)' }}>💡 人數說明：</div>
+                    <div style={{ color: 'var(--text-2)' }}>
                       ❤️ 收藏 和 👥 顧客數 文案中展示的{`{人數}`}是店鋪實際數據，配置的資格條件僅為門檻值（如配置 ≥1000人，實際展示該店鋪真實的收藏/顧客人數）
                     </div>
-                    <div style={{ fontWeight: 600, marginTop: 8, marginBottom: 4, color: '#262626' }}>📊 數據來源：</div>
-                    <div style={{ color: '#595959' }}>
+                    <div style={{ fontWeight: 600, marginTop: 8, marginBottom: 4, color: 'var(--text-1)' }}>📊 數據來源：</div>
+                    <div style={{ color: 'var(--text-2)' }}>
                       📈 月訂單量、月訪問量、月復購率、月好評率 → 取上月統計<br />
                       ❤️ 門店收藏 → 累積數據（實時累計）<br />
                       👥 顧客數 → 基於昨天最新數據，每一天都會重新計算
@@ -1013,7 +1013,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                   </div>
                 }
               />
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>點擊標籤直接配置，開啟場景即自動啟用</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>點擊標籤直接配置，開啟場景即自動啟用</span>
             </div>
 
             {/* 標籤 Tab 欄：對比類標籤（按場景配置） + 統計類標籤（全量門檻） */}
@@ -1028,14 +1028,14 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                     style={{
                       padding: '6px 14px', borderRadius: 6, cursor: 'pointer',
                       border: '1px solid',
-                      borderColor: isActive ? '#E8720C' : '#f0f0f0',
-                      background: isActive ? '#FFF7E6' : '#fff',
+                      borderColor: isActive ? 'var(--brand)' : 'var(--border-2)',
+                      background: isActive ? 'var(--warning-soft)' : 'var(--surface-2)',
                       boxShadow: isActive ? '0 0 0 1px #E8720C' : 'none',
                       transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 5,
                       opacity: isEnabled ? 1 : 0.5,
                     }}>
                     <span style={{ fontSize: 14 }}>{opt.icon}</span>
-                    <span style={{ fontSize: 12, fontWeight: isActive ? 600 : 400, color: isActive ? '#E8720C' : '#595959' }}>{opt.label}</span>
+                    <span style={{ fontSize: 12, fontWeight: isActive ? 600 : 400, color: isActive ? 'var(--brand)' : 'var(--text-2)' }}>{opt.label}</span>
                     {configured && <span style={{ fontSize: 10, color: '#fff', background: '#52C41A', borderRadius: 3, padding: '0 4px', lineHeight: '16px', fontWeight: 600 }}>已配置</span>}
                   </button>
                 )
@@ -1043,13 +1043,13 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
               return (
                 <div style={{ marginBottom: 16 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                    <span style={{ fontSize: 12, color: '#8c8c8c', lineHeight: '30px', flexShrink: 0 }}>對比類標籤</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: '30px', flexShrink: 0 }}>對比類標籤</span>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
                       {SIGNBOARD_LABEL_OPTIONS.filter(o => COMPARISON_LABELS.includes(o.value)).map(renderTab)}
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 8 }}>
-                    <span style={{ fontSize: 12, color: '#8c8c8c', lineHeight: '30px', flexShrink: 0 }}>統計類標籤</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: '30px', flexShrink: 0 }}>統計類標籤</span>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
                       {SIGNBOARD_LABEL_OPTIONS.filter(o => AGGREGATE_LABELS.includes(o.value)).map(renderTab)}
                     </div>
@@ -1078,34 +1078,34 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                     {opts.conditions.map((cond, condIdx) => (
                       <div key={cond.id}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 12, color: '#8c8c8c', minWidth: 46, flexShrink: 0 }}>條件{condIdx + 1}</span>
+                          <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 46, flexShrink: 0 }}>條件{condIdx + 1}</span>
                           {opts.scenario ? (
                             <>
                               {isDetailMode ? (
-                                <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{METRIC_OPTIONS.find(m => m.value === cond.metric)?.label || cond.metric}</span>
+                                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{METRIC_OPTIONS.find(m => m.value === cond.metric)?.label || cond.metric}</span>
                               ) : (
                                 <Select value={cond.metric} onChange={v => opts.onUpdate(cond.id, metricChangePatch(v))}
                                   style={{ width: 120 }} options={METRIC_OPTIONS} />
                               )}
-                              <span style={{ fontSize: 13, color: '#595959' }}>超過</span>
+                              <span style={{ fontSize: 13, color: 'var(--text-2)' }}>超過</span>
                               {isDetailMode ? (
-                                <span style={{ fontSize: 12, fontWeight: 600, color: '#595959' }}>{SCOPE_OPTIONS.find(o => o.value === cond.scope)?.label || cond.scope}</span>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)' }}>{SCOPE_OPTIONS.find(o => o.value === cond.scope)?.label || cond.scope}</span>
                               ) : (
                                 <Select value={cond.scope} onChange={v => opts.onUpdate(cond.id, { scope: v })}
                                   style={{ width: 150 }} options={scopeOptions} />
                               )}
                               {isDetailMode ? (
                                 <>
-                                  <span style={{ fontSize: 13, color: '#595959' }}>前</span>
-                                  <span style={{ fontSize: 13, fontWeight: 700, color: '#262626' }}>{cond.value ?? '-'}</span>
-                                  <span style={{ fontSize: 13, color: '#595959' }}>{cond.comparison === 'percentage' ? '%' : '名'}的商家</span>
+                                  <span style={{ fontSize: 13, color: 'var(--text-2)' }}>前</span>
+                                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{cond.value ?? '-'}</span>
+                                  <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{cond.comparison === 'percentage' ? '%' : '名'}的商家</span>
                                 </>
                               ) : (
                                 <>
                                   <Select value={cond.comparison} onChange={v => opts.onUpdate(cond.id, { comparison: v })}
                                     style={{ width: 110 }}
                                     options={[{ label: '百分比', value: 'percentage' }, { label: '排名', value: 'ranking' }]} />
-                                  <span style={{ fontSize: 13, color: '#595959' }}>前</span>
+                                  <span style={{ fontSize: 13, color: 'var(--text-2)' }}>前</span>
                                   <InputNumber value={cond.value}
                                     onChange={v => opts.onUpdate(cond.id, { value: v ?? undefined })}
                                     min={1}
@@ -1113,38 +1113,38 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                                     placeholder="數值"
                                     addonAfter={cond.comparison === 'percentage' ? '%' : '名'}
                                     style={{ width: 150 }} />
-                                  <span style={{ fontSize: 13, color: '#595959' }}>的商家</span>
+                                  <span style={{ fontSize: 13, color: 'var(--text-2)' }}>的商家</span>
                                 </>
                               )}
                             </>
                           ) : (
                             <>
                               {/* 統計類：固定指標 + 門檻樣式 */}
-                              <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{METRIC_OPTIONS.find(m => m.value === cond.metric)?.label || cond.metric}</span>
+                              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{METRIC_OPTIONS.find(m => m.value === cond.metric)?.label || cond.metric}</span>
                               {cond.metric === 'monthlyCustomers' && (
                                 <>
-                                  <span style={{ fontSize: 13, color: '#595959' }}>統計週期 近</span>
+                                  <span style={{ fontSize: 13, color: 'var(--text-2)' }}>統計週期 近</span>
                                   {isDetailMode ? (
-                                    <span style={{ fontSize: 13, fontWeight: 700, color: '#262626' }}>{cond.period ?? '-'}</span>
+                                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{cond.period ?? '-'}</span>
                                   ) : (
                                     <InputNumber value={cond.period}
                                       onChange={v => opts.onUpdate(cond.id, { period: v ?? undefined })}
                                       min={1} placeholder="天數"
                                       addonAfter="天" style={{ width: 130 }} />
                                   )}
-                                  <span style={{ fontSize: 13, color: '#595959' }}>天，</span>
+                                  <span style={{ fontSize: 13, color: 'var(--text-2)' }}>天，</span>
                                 </>
                               )}
-                              <span style={{ fontSize: 13, color: '#595959' }}>人數 ≥</span>
+                              <span style={{ fontSize: 13, color: 'var(--text-2)' }}>人數 ≥</span>
                               {isDetailMode ? (
-                                <span style={{ fontSize: 13, fontWeight: 700, color: '#262626' }}>{cond.value ?? '-'}</span>
+                                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-1)' }}>{cond.value ?? '-'}</span>
                               ) : (
                                 <InputNumber value={cond.value}
                                   onChange={v => opts.onUpdate(cond.id, { value: v ?? undefined })}
                                   min={1} placeholder="人數"
                                   addonAfter="人" style={{ width: 150 }} />
                               )}
-                              <span style={{ fontSize: 13, color: '#595959' }}>人</span>
+                              <span style={{ fontSize: 13, color: 'var(--text-2)' }}>人</span>
                             </>
                           )}
                           {!isDetailMode && (
@@ -1166,8 +1166,8 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                                   padding: '2px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600,
                                   cursor: isDetailMode ? 'default' : 'pointer',
                                   transition: 'all 0.2s',
-                                  background: cond.nextOperator === 'or' ? '#E6F7FF' : '#F6FFED',
-                                  color: cond.nextOperator === 'or' ? '#1890FF' : '#52C41A',
+                                  background: cond.nextOperator === 'or' ? 'var(--info-soft)' : 'var(--success-soft)',
+                                  color: cond.nextOperator === 'or' ? 'var(--info)' : 'var(--success)',
                                   border: cond.nextOperator === 'or' ? '1px solid #91D5FF' : '1px solid #B7EB8F',
                                 }}>
                                 {cond.nextOperator === 'or' ? '或' : '且'}
@@ -1180,7 +1180,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                     ))}
                     {!isDetailMode && showAdd && (
                       <Button type="dashed" icon={<PlusOutlined />} onClick={opts.onAdd}
-                        style={{ marginTop: 12, width: '100%', fontSize: 13, borderRadius: 6, color: '#E8720C', borderColor: '#E8720C' }}>
+                        style={{ marginTop: 12, width: '100%', fontSize: 13, borderRadius: 6, color: 'var(--brand)', borderColor: 'var(--brand)' }}>
                         添加條件
                       </Button>
                     )}
@@ -1199,18 +1199,18 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                       return (
                         <div key={def.key} style={{
                           border: '1px solid #e8eaed', borderLeft: `3px solid ${def.color}`,
-                          borderRadius: 8, background: '#fff', overflow: 'hidden',
+                          borderRadius: 8, background: 'var(--surface-2)', overflow: 'hidden',
                         }}>
                           {/* 場景標題行 */}
                           <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                             <span style={{ fontSize: 14 }}>{def.icon}</span>
                             <span style={{ fontSize: 13, fontWeight: 600, color: def.color }}>{def.label}場景</span>
-                            <span style={{ fontSize: 11, color: '#8c8c8c' }}>{def.desc}；可選：{scopeOpts.map(o => o.label).join(' / ')}</span>
+                            <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{def.desc}；可選：{scopeOpts.map(o => o.label).join(' / ')}</span>
                             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
                               {scCfg.enabled && (scCfg.conditions.length === 0 || scCfg.conditions.some(c => c.value === undefined || c.value === null)) && (
-                                <span style={{ fontSize: 12, color: '#FF4D4F', fontWeight: 600 }}>待配置</span>
+                                <span style={{ fontSize: 12, color: 'var(--danger)', fontWeight: 600 }}>待配置</span>
                               )}
-                              <span style={{ fontSize: 12, color: scCfg.enabled ? '#52C41A' : '#8C8C8C' }}>{scCfg.enabled ? '已啟用' : '未啟用'}</span>
+                              <span style={{ fontSize: 12, color: scCfg.enabled ? 'var(--success)' : 'var(--text-3)' }}>{scCfg.enabled ? '已啟用' : '未啟用'}</span>
                               {!isDetailMode && (
                                 <Switch size="small" checked={scCfg.enabled}
                                   onChange={checked => toggleScenarioEnabled(activeSignboardTab, def.key, checked)} />
@@ -1229,11 +1229,11 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                               })}
                               {/* 文案規則 + 預覽文案 */}
                               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10, flexWrap: 'wrap' }}>
-                                <span style={{ fontSize: 12, color: '#8c8c8c', flexShrink: 0 }}>文案規則：</span>
-                                <span style={{ fontSize: 11, color: '#595959', background: '#f5f5f5', padding: '1px 8px', borderRadius: 4, border: '1px solid #e8eaed', fontFamily: 'monospace' }}>
+                                <span style={{ fontSize: 12, color: 'var(--text-3)', flexShrink: 0 }}>文案規則：</span>
+                                <span style={{ fontSize: 11, color: 'var(--text-2)', background: 'var(--surface-1)', padding: '1px 8px', borderRadius: 4, border: '1px solid #e8eaed', fontFamily: 'monospace' }}>
                                   {getLabelRuleTemplate(activeSignboardTab)}
                                 </span>
-                                <span style={{ fontSize: 12, color: '#8c8c8c', flexShrink: 0 }}>預覽：</span>
+                                <span style={{ fontSize: 12, color: 'var(--text-3)', flexShrink: 0 }}>預覽：</span>
                                 <span style={{
                                   fontSize: 13, fontWeight: 600, color: def.color,
                                   background: def.bg, padding: '2px 10px', borderRadius: 6,
@@ -1244,7 +1244,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                               </div>
                             </div>
                           ) : (
-                            <div style={{ padding: '12px 16px', borderTop: '1px solid #f0f0f0', fontSize: 12, color: '#bfbfbf' }}>
+                            <div style={{ padding: '12px 16px', borderTop: '1px solid #f0f0f0', fontSize: 12, color: 'var(--text-4)' }}>
                               開啟後可配置「{def.label}」類資格條件
                             </div>
                           )}
@@ -1258,11 +1258,11 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
               /* ===== 統計類標籤（收藏/顧客數）：全量數據門檻 ===== */
               const conditions = aggregateConditions[activeSignboardTab] || []
               return (
-                <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px' }}>
+                <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                     <span style={{ fontSize: 14 }}>{activeLabelCfg?.icon}</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{activeLabelCfg?.label}</span>
-                    <span style={{ fontSize: 12, color: '#8c8c8c' }}>統計全量數據門檻，不區分全澳/商圈</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{activeLabelCfg?.label}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)' }}>統計全量數據門檻，不區分全澳/商圈</span>
                   </div>
                   {renderConditionList({
                     conditions,
@@ -1273,12 +1273,12 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                   })}
                   {/* 文案規則 + 預覽文案 */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 12, color: '#8c8c8c', flexShrink: 0 }}>文案規則：</span>
-                    <span style={{ fontSize: 11, color: '#595959', background: '#f5f5f5', padding: '1px 8px', borderRadius: 4, border: '1px solid #e8eaed', fontFamily: 'monospace' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', flexShrink: 0 }}>文案規則：</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-2)', background: 'var(--surface-1)', padding: '1px 8px', borderRadius: 4, border: '1px solid #e8eaed', fontFamily: 'monospace' }}>
                       {getLabelRuleTemplate(activeSignboardTab)}
                     </span>
-                    <span style={{ fontSize: 12, color: '#8c8c8c', flexShrink: 0 }}>預覽：</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#E8720C', background: '#FFF7E6', padding: '2px 10px', borderRadius: 6, border: '1px solid rgba(232,114,12,0.15)' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', flexShrink: 0 }}>預覽：</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--brand)', background: 'var(--warning-soft)', padding: '2px 10px', borderRadius: 6, border: '1px solid rgba(232,114,12,0.15)' }}>
                       {conditions[0] ? generatePreviewForCondition(activeSignboardTab, conditions[0]) : '—'}
                     </span>
                   </div>
@@ -1291,7 +1291,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
           {/* ===== 其他算法：商家狀態計算 + 數據一致性校驗 ===== */}
           {selectedAlgorithmType !== AlgorithmType.POPULAR_MERCHANT_KA && selectedAlgorithmType !== AlgorithmType.GOLDEN_SIGNBOARD && (
             <AlgorithmSection title={t('recommend.merchantStatusCalc')} icon={<ShopOutlined />} tone="info"
-              extra={<span style={{ color: '#8c8c8c', fontSize: 12 }}>{t('recommend.merchantStatusCalcHint')}</span>}>
+              extra={<span style={{ color: 'var(--text-3)', fontSize: 12 }}>{t('recommend.merchantStatusCalcHint')}</span>}>
               <MerchantStatusFields readOnly={isDetailMode} initializeOpen />
               <ConsistencyCheckField readOnly={isDetailMode} />
             </AlgorithmSection>
@@ -1300,7 +1300,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
           {/* ===== 猜你喜歡：用戶興趣得分規則 ===== */}
           {selectedAlgorithmType === AlgorithmType.GUESS_YOU_LIKE && (
             <AlgorithmSection title={t('recommend:userInterestScoreRules')}>
-              <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 14 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14 }}>
                 {t('recommend:userInterestScoreHint')}
               </div>
           
@@ -1323,7 +1323,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
           {/* ===== 猜你喜歡：推送規則 ===== */}
           {selectedAlgorithmType === AlgorithmType.GUESS_YOU_LIKE && (
             <AlgorithmSection title={t('recommend:pushRules')}>
-              <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 14 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14 }}>
                 {t('recommend:pushRulesHint')}
               </div>
               <div className="algorithm-fields algorithm-fields--compact">
@@ -1357,7 +1357,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                 {/* 輪詢計算說明 */}
                 {merchantExposureStrategy === 'random' && (
                   <div className="algorithm-form__note">
-                    <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
+                    <span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: '22px' }}>
                       {t('recommend:roundRobinStrategyDesc')}
                     </span>
                   </div>
@@ -1366,10 +1366,10 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                 {/* 加權隨機說明 */}
                 {merchantExposureStrategy === 'weightedRandom' && (
                   <div className="algorithm-form__note">
-                    <div style={{ fontSize: 13, color: '#595959', lineHeight: '22px', marginBottom: 8 }}>
+                    <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: '22px', marginBottom: 8 }}>
                       {t('recommend:weightedRandomDesc')}
                     </div>
-                    <div style={{ padding: '8px 10px', background: '#ffffff', border: '1px solid #e8e8e8', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ padding: '8px 10px', background: 'var(--surface-2)', border: '1px solid #e8e8e8', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontWeight: 600, color: '#d46b08', fontSize: 12 }}>{t('recommend:allocationFormula')}</span>
                       <span style={{ fontFamily: 'monospace', fontSize: 12 }}>P(店鋪i) = score_i / Σ(達標店鋪得分)</span>
                       <Popover
@@ -1378,13 +1378,13 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                         title={<span style={{ fontWeight: 600, color: '#d46b08' }}>{t('recommend:allocationExampleTitle')}</span>}
                         content={
                           <div style={{ maxWidth: 300, fontSize: 12, lineHeight: '20px' }}>
-                            <div style={{ color: '#595959', marginBottom: 6 }}>
+                            <div style={{ color: 'var(--text-2)', marginBottom: 6 }}>
                               {t('recommend:allocationExampleDesc')}
                             </div>
-                            <div style={{ color: '#595959' }}>
+                            <div style={{ color: 'var(--text-2)' }}>
                               {t('recommend:allocationExampleResult')}
                             </div>
-                            <div style={{ marginTop: 8, padding: '6px 8px', background: '#fff7e6', borderRadius: 4, color: '#8c8c8c', fontSize: 11 }}>
+                            <div style={{ marginTop: 8, padding: '6px 8px', background: 'var(--warning-soft)', borderRadius: 4, color: 'var(--text-3)', fontSize: 11 }}>
                               {t('recommend:allocationExampleHint')}
                             </div>
                           </div>
@@ -1407,23 +1407,23 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
 
                 {/* 默認參數說明 + 清空操作（緊鄰說明文字，便於發現） */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 13, color: '#595959' }}>
+                  <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
                     {t('recommend:newStoreCycleDesc', { days: NEW_STORE_CYCLE_DAYS, interval: WAVE_INTERVAL_DAYS, nodes: waveNodes.length })}
                   </span>
                   <Button size="small" danger disabled={isDetailMode} onClick={handleClearWaveNodes}>{t('recommend:clearAll')}</Button>
                 </div>
 
                 {/* 波浪節點勾選矩陣：緊湊固定列寬 */}
-                <div style={{ border: '1px solid #e8eaed', borderRadius: 8, overflow: 'hidden', background: '#fff', width: 'fit-content' }}>
+                <div style={{ border: '1px solid #e8eaed', borderRadius: 8, overflow: 'hidden', background: 'var(--surface-2)', width: 'fit-content' }}>
                   <div style={{
                     display: 'grid',
                     gridTemplateColumns: '90px repeat(3, 96px)',
                     background: '#f0f5ff', borderBottom: '1px solid #d6e4ff',
                     padding: '8px 16px', alignItems: 'center',
                   }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#1890ff' }}>{t('recommend:remainingDays')}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--info)' }}>{t('recommend:remainingDays')}</span>
                     {WAVE_RANGE_OPTIONS.map(opt => (
-                      <span key={opt.value} style={{ fontSize: 13, fontWeight: 600, color: '#1890ff', textAlign: 'center' }}>{t(opt.labelKey)}</span>
+                      <span key={opt.value} style={{ fontSize: 13, fontWeight: 600, color: 'var(--info)', textAlign: 'center' }}>{t(opt.labelKey)}</span>
                     ))}
                   </div>
                   <div style={{ maxHeight: 360, overflowY: 'auto' }}>
@@ -1433,10 +1433,10 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                         gridTemplateColumns: '90px repeat(3, 96px)',
                         padding: '6px 16px', alignItems: 'center',
                         borderBottom: idx < waveNodes.length - 1 ? '1px solid #f0f0f0' : 'none',
-                        background: node.ranges.length > 0 ? '#fffcf5' : (idx % 2 === 0 ? '#ffffff' : '#fafafa'),
+                        background: node.ranges.length > 0 ? '#fffcf5' : (idx % 2 === 0 ? 'var(--surface-2)' : 'var(--surface-3)'),
                         transition: 'background 0.2s',
                       }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{node.day} {t('recommend:dayUnit')}</span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{node.day} {t('recommend:dayUnit')}</span>
                         {WAVE_RANGE_OPTIONS.map(opt => (
                           <div key={opt.value} style={{ textAlign: 'center' }}>
                             <Checkbox
@@ -1450,7 +1450,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                     ))}
                   </div>
                 </div>
-                <div style={{ marginTop: 8, fontSize: 12, color: '#8c8c8c' }}>
+                <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-3)' }}>
                   {t('recommend:waveHint')}
                 </div>
               </AlgorithmSection>
@@ -1501,7 +1501,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                       {merchantExposureStrategy === 'random' && (
                         <div className="algorithm-form__note">
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                            <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
+                            <span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: '22px' }}>
                               {selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR
                                 ? t('recommend:randomStrategyDesc')
                                 : t('recommend:roundRobinStrategyDesc')}
@@ -1512,10 +1512,10 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
 
                       {/* 按商家维度配置 */}
                       {merchantExposureStrategy === 'merchant' && (
-                        <div style={{ marginTop: 16, padding: '12px 16px', background: '#ffffff', border: '1px solid #e8eaed', borderRadius: 6 }}>
+                        <div style={{ marginTop: 16, padding: '12px 16px', background: 'var(--surface-2)', border: '1px solid #e8eaed', borderRadius: 6 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                            <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>
-                              <span style={{ color: '#1890ff', fontWeight: 600 }}>*</span> {t('recommend:dimensionLabel')}
+                            <span style={{ fontSize: 13, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
+                              <span style={{ color: 'var(--info)', fontWeight: 600 }}>*</span> {t('recommend:dimensionLabel')}
                             </span>
                             {dimensionItems.length < DIMENSION_OPTIONS.length && (
                               <>
@@ -1542,7 +1542,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                                 >
                                   {t('recommend:addDimension')}
                                 </Button>
-                                <span style={{ fontSize: 12, color: '#8c8c8c', whiteSpace: 'nowrap' }}>{t('recommend:dimensionHint')}</span>
+                                <span style={{ fontSize: 12, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>{t('recommend:dimensionHint')}</span>
                               </>
                             )}
                           </div>
@@ -1550,12 +1550,12 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                             {dimensionItems.map((item, index) => {
                               const opt = DIMENSION_OPTIONS.find(o => o.value === item.type)
                               return (
-                                <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, position: 'relative', padding: '10px 12px', background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 6 }}>
+                                <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, position: 'relative', padding: '10px 12px', background: 'var(--surface-3)', border: '1px solid #f0f0f0', borderRadius: 6 }}>
                                   {/* 第一行：参数名 + 描述 + 删除 */}
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <span style={{ fontSize: 13, color: '#595959', fontWeight: 500, whiteSpace: 'nowrap' }}>{opt ? t(opt.labelKey) : ''}</span>
+                                    <span style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 500, whiteSpace: 'nowrap' }}>{opt ? t(opt.labelKey) : ''}</span>
                                     {item.type === 'orderCompletion' ? (
-                                      <span style={{ fontSize: 13, color: '#8c8c8c', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                      <span style={{ fontSize: 13, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 4 }}>
                                         {t('recommend:recentPrefix')}
                                         <InputNumber
                                           min={1}
@@ -1570,13 +1570,13 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                                         <Popover
                                           trigger="click"
                                           placement="right"
-                                          title={<span style={{ fontWeight: 600, color: '#52c41a' }}>{t('recommend:bayesianTitle')}</span>}
+                                          title={<span style={{ fontWeight: 600, color: 'var(--success)' }}>{t('recommend:bayesianTitle')}</span>}
                                           content={
                                             <div style={{ maxWidth: 280, fontSize: 12, lineHeight: '20px' }}>
                                               <div style={{ marginBottom: 6 }}>
                                                 <strong>{t('recommend:bayesianFormula')}</strong> = (完成單數 + α) / (總單數 + β)
                                               </div>
-                                              <div style={{ color: '#595959' }}>
+                                              <div style={{ color: 'var(--text-2)' }}>
                                                 {t('recommend:bayesianAlpha')}
                                                 <br />
                                                 {t('recommend:bayesianBeta')}
@@ -1585,7 +1585,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                                                 <br />
                                                 {t('recommend:bayesianLargeVolume')}
                                               </div>
-                                              <div style={{ marginTop: 8, padding: '6px 8px', background: '#f6ffed', borderRadius: 4, color: '#8c8c8c', fontSize: 11 }}>
+                                              <div style={{ marginTop: 8, padding: '6px 8px', background: 'var(--success-soft)', borderRadius: 4, color: 'var(--text-3)', fontSize: 11 }}>
                                                 {t('recommend:bayesianExample1')}
                                                 <br />
                                                 {t('recommend:bayesianExample2')}
@@ -1593,29 +1593,29 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                                             </div>
                                           }
                                         >
-                                          <QuestionCircleOutlined style={{ color: '#1890ff', cursor: 'pointer', fontSize: 14 }} />
+                                          <QuestionCircleOutlined style={{ color: 'var(--info)', cursor: 'pointer', fontSize: 14 }} />
                                         </Popover>
                                       </span>
                                     ) : item.type === 'distance' ? (
-                                      <span style={{ fontSize: 13, color: '#8c8c8c', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                      <span style={{ fontSize: 13, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 4 }}>
                                         {opt ? t(opt.descKey) : ''}
                                         <Popover
                                           trigger="click"
                                           placement="right"
-                                          title={<span style={{ fontWeight: 600, color: '#722ed1' }}>{t('recommend:distanceDecayTitle')}</span>}
+                                          title={<span style={{ fontWeight: 600, color: 'var(--purple)' }}>{t('recommend:distanceDecayTitle')}</span>}
                                           content={
                                             <div style={{ maxWidth: 280, fontSize: 12, lineHeight: '20px' }}>
                                               <div style={{ marginBottom: 6 }}>
                                                 <strong>{t('recommend:distanceFormula')}</strong> = e<sup>-0.1 × 距離(km)</sup>
                                               </div>
-                                              <div style={{ color: '#595959' }}>
+                                              <div style={{ color: 'var(--text-2)' }}>
                                                 {t('recommend:distanceNear')}
                                                 <br />
                                                 {t('recommend:distanceFar')}
                                                 <br />
                                                 {t('recommend:distanceCoeff')}
                                               </div>
-                                              <div style={{ marginTop: 8, padding: '6px 8px', background: '#f9f0ff', borderRadius: 4, color: '#8c8c8c', fontSize: 11 }}>
+                                              <div style={{ marginTop: 8, padding: '6px 8px', background: 'var(--purple-soft)', borderRadius: 4, color: 'var(--text-3)', fontSize: 11 }}>
                                                 1km → 0.90 &nbsp; 3km → 0.74 &nbsp; 5km → 0.61
                                                 <br />
                                                 8km → 0.45 &nbsp; 15km → 0.22 &nbsp; 30km → 0.05
@@ -1623,22 +1623,22 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                                             </div>
                                           }
                                         >
-                                          <QuestionCircleOutlined style={{ color: '#722ed1', cursor: 'pointer', fontSize: 14 }} />
+                                          <QuestionCircleOutlined style={{ color: 'var(--purple)', cursor: 'pointer', fontSize: 14 }} />
                                         </Popover>
                                       </span>
                                     ) : (
-                                      <span style={{ fontSize: 13, color: '#8c8c8c' }}>({opt ? t(opt.descKey) : ''})</span>
+                                      <span style={{ fontSize: 13, color: 'var(--text-3)' }}>({opt ? t(opt.descKey) : ''})</span>
                                     )}
                                     {!isDetailMode && (
                                       <DeleteOutlined
-                                        style={{ color: '#ff4d4f', fontSize: 16, cursor: 'pointer' }}
+                                        style={{ color: 'var(--danger)', fontSize: 16, cursor: 'pointer' }}
                                         onClick={() => setDimensionItems(dimensionItems.filter((_, i) => i !== index))}
                                       />
                                     )}
                                   </div>
                                   {/* 第二行：权重滑块 */}
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 0 }}>
-                                    <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend:weightLabel')}</span>
+                                    <span style={{ fontSize: 13, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>{t('recommend:weightLabel')}</span>
                                     <div className="ws-wrapper">
                                       {/* 原生滑块 + 气泡 */}
                                       <div className="ws-slider-box">
@@ -1700,40 +1700,40 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                           </div>
 
                           {/* 计算公式 */}
-                          <div style={{ marginTop: 16, padding: '10px 12px', background: '#f9f9f9', border: '1px solid #e8e8e8', borderRadius: 4, fontSize: 12, color: '#595959', lineHeight: '20px' }}>
+                          <div style={{ marginTop: 16, padding: '10px 12px', background: '#f9f9f9', border: '1px solid #e8e8e8', borderRadius: 4, fontSize: 12, color: 'var(--text-2)', lineHeight: '20px' }}>
                             <div style={{ display: 'flex', gap: 24, marginBottom: 12 }}>
                               <div style={{ flex: 1 }}>
-                                <div style={{ fontWeight: 600, marginBottom: 4, color: '#1890ff' }}>{t('recommend:calcFormula')}</div>
+                                <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--info)' }}>{t('recommend:calcFormula')}</div>
                                 <div>{t('recommend:finalScoreFormula')}</div>
-                                <div style={{ marginTop: 4, color: '#8c8c8c' }}>{t('recommend:supportScoreFormula')}</div>
+                                <div style={{ marginTop: 4, color: 'var(--text-3)' }}>{t('recommend:supportScoreFormula')}</div>
                               </div>
                               <div style={{ flex: 1, borderLeft: '1px solid #e8e8e8', paddingLeft: 16 }}>
-                                <div style={{ fontWeight: 600, marginBottom: 4, color: '#52c41a' }}>{t('recommend:exampleTitle')}</div>
+                                <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--success)' }}>{t('recommend:exampleTitle')}</div>
                                 <div style={{ marginBottom: 8 }}>{t('recommend:exampleWeight')}</div>
                                 <div style={{ display: 'flex', gap: 16 }}>
                                   <div style={{ flex: 1 }}>
                                     <div>{t('recommend:merchantA')}</div>
-                                    <div style={{ color: '#8c8c8c' }}>{t('recommend:merchantARate')}</div>
-                                    <div style={{ color: '#8c8c8c' }}>{t('recommend:merchantAScore')} <span style={{ color: '#1890ff', fontWeight: 600 }}>9.58</span></div>
+                                    <div style={{ color: 'var(--text-3)' }}>{t('recommend:merchantARate')}</div>
+                                    <div style={{ color: 'var(--text-3)' }}>{t('recommend:merchantAScore')} <span style={{ color: 'var(--info)', fontWeight: 600 }}>9.58</span></div>
                                   </div>
                                   <div style={{ flex: 1 }}>
                                     <div>{t('recommend:merchantB')}</div>
-                                    <div style={{ color: '#8c8c8c' }}>{t('recommend:merchantBRate')}</div>
-                                    <div style={{ color: '#8c8c8c' }}>{t('recommend:merchantBScore')} <span style={{ color: '#1890ff', fontWeight: 600 }}>7.7</span></div>
+                                    <div style={{ color: 'var(--text-3)' }}>{t('recommend:merchantBRate')}</div>
+                                    <div style={{ color: 'var(--text-3)' }}>{t('recommend:merchantBScore')} <span style={{ color: 'var(--info)', fontWeight: 600 }}>7.7</span></div>
                                   </div>
                                 </div>
                               </div>
                             </div>
 
                             {/* 曝光分配策略 */}
-                            <div style={{ padding: '10px 12px', background: '#fff7e6', border: '1px solid #ffd591', borderRadius: 4 }}>
+                            <div style={{ padding: '10px 12px', background: 'var(--warning-soft)', border: '1px solid #ffd591', borderRadius: 4 }}>
                               <div style={{ fontWeight: 600, marginBottom: 8, color: '#d46b08', fontSize: 12 }}>
                                 {t('recommend:exposureStrategyTitle')}
                               </div>
-                              <div style={{ fontSize: 12, color: '#595959', marginBottom: 8 }}>
+                              <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 8 }}>
                                 {t('recommend:exposureStrategyDesc')}
                               </div>
-                              <div style={{ padding: '8px 10px', background: '#ffffff', border: '1px solid #e8e8e8', borderRadius: 4 }}>
+                              <div style={{ padding: '8px 10px', background: 'var(--surface-2)', border: '1px solid #e8e8e8', borderRadius: 4 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                                   <span style={{ fontWeight: 600, color: '#d46b08', fontSize: 12 }}>{t('recommend:allocationFormula')}</span>
                                   <span style={{ fontFamily: 'monospace', fontSize: 12 }}>P(商家i) = score_i / Σ(所有商家得分)</span>
@@ -1743,7 +1743,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                                     title={<span style={{ fontWeight: 600, color: '#d46b08' }}>{t('recommend:allocationExampleTitle')}</span>}
                                     content={
                                       <div style={{ maxWidth: 320, fontSize: 12 }}>
-                                        <div style={{ color: '#595959', marginBottom: 8 }}>
+                                        <div style={{ color: 'var(--text-2)', marginBottom: 8 }}>
                                           {t('recommend:allocationExample5')}
                                         </div>
                                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
@@ -1754,14 +1754,14 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                                             { name: 'A', score: 6, color: '#fa8c16' },
                                             { name: 'D', score: 5, color: '#eb2f96' },
                                           ].map(m => (
-                                            <div key={m.name} style={{ flex: '1 1 70px', padding: '4px 6px', background: '#fafafa', borderRadius: 4, border: '1px solid #f0f0f0', textAlign: 'center' }}>
+                                            <div key={m.name} style={{ flex: '1 1 70px', padding: '4px 6px', background: 'var(--surface-3)', borderRadius: 4, border: '1px solid #f0f0f0', textAlign: 'center' }}>
                                               <div style={{ fontWeight: 600, color: m.color, fontSize: 12 }}>{t('recommend:merchantLabel')}{m.name}</div>
-                                              <div style={{ fontSize: 10, color: '#8c8c8c' }}>{t('recommend:scoreLabel')} {m.score}</div>
-                                              <div style={{ fontSize: 11, fontWeight: 600, color: '#595959' }}>{(m.score / 37.5 * 100).toFixed(1)}%</div>
+                                              <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{t('recommend:scoreLabel')} {m.score}</div>
+                                              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-2)' }}>{(m.score / 37.5 * 100).toFixed(1)}%</div>
                                             </div>
                                           ))}
                                         </div>
-                                        <div style={{ fontSize: 11, color: '#8c8c8c', lineHeight: '18px', padding: '4px 6px', background: '#f6ffed', borderRadius: 4 }}>
+                                        <div style={{ fontSize: 11, color: 'var(--text-3)', lineHeight: '18px', padding: '4px 6px', background: 'var(--success-soft)', borderRadius: 4 }}>
                                           {t('recommend:longTermEffect')}
                                         </div>
                                       </div>
@@ -1783,26 +1783,26 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
           {selectedAlgorithmType === AlgorithmType.EXCLUSIVE_MERCHANT && (
             <AlgorithmSection title={t('recommend:storeLevelBlockOrders')} icon={<ShopOutlined />}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 13, color: '#595959', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>{t('recommend:calcOrderType')}</span>
+                <span style={{ fontSize: 13, color: 'var(--text-2)', minWidth: 96, textAlign: 'right', flexShrink: 0 }}>{t('recommend:calcOrderType')}</span>
                 <Form.Item name="orderTypeDelivery" noStyle valuePropName="checked">
                   <Checkbox disabled={isDetailMode}>{t('recommend:deliveryOrder')}</Checkbox>
                 </Form.Item>
                 <Form.Item name="orderTypePickup" noStyle valuePropName="checked">
                   <Checkbox disabled={isDetailMode}>{t('recommend:pickupOrder')}</Checkbox>
                 </Form.Item>
-                <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
                   {t('recommend:orderTypeHint')}
                 </span>
               </div>
               {/* 店鋪等級保障單量配置（樣式與品牌商家店鋪等級配置保持一致） */}
               <div>
-                <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 12 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12 }}>
                   {t('recommend:storeLevelBlockHint')}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
                   {STORE_LEVEL_BLOCK_OPTIONS.map(({ level, labelKey, color, defaultOrders }) => (
                     <div key={level} style={{
-                      background: '#fff',
+                      background: 'var(--surface-2)',
                       border: `1px solid ${color}33`,
                       borderTop: `3px solid ${color}`,
                       borderRadius: 8,
@@ -1854,7 +1854,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                       {merchantExposureStrategy === 'random' && (
                         <div className="algorithm-form__note">
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                            <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
+                            <span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: '22px' }}>
                               {t('recommend:roundRobinStrategyDesc')}
                             </span>
                           </div>
@@ -1874,7 +1874,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
                   {STORE_LEVEL_BLOCK_OPTIONS.map(({ level, labelKey, color, defaultOrders }) => (
                     <div key={level} style={{
-                      background: '#fff',
+                      background: 'var(--surface-2)',
                       border: `1px solid ${color}33`,
                       borderTop: `3px solid ${color}`,
                       borderRadius: 8,
@@ -1926,7 +1926,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                       {merchantExposureStrategy === 'random' && (
                         <div className="algorithm-form__note">
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                            <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
+                            <span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: '22px' }}>
                               {t('recommend:roundRobinStrategyDesc')}
                             </span>
                           </div>
@@ -1957,7 +1957,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                       {merchantExposureStrategy === 'random' && (
                         <div className="algorithm-form__note">
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                            <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
+                            <span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: '22px' }}>
                               {t('recommend:roundRobinStrategyDesc')}
                             </span>
                           </div>
@@ -1980,7 +1980,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
 
                 {/* 輪詢說明 */}
                 <div className="algorithm-form__note">
-                  <span style={{ fontSize: 13, color: '#595959', lineHeight: '22px' }}>
+                  <span style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: '22px' }}>
                     {t('recommend:newStoreRoundRobinDesc')}
                   </span>
                 </div>
@@ -1995,7 +1995,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
           <div style={{ 
             textAlign: 'center', 
             padding: '60px 20px',
-            color: '#8c8c8c'
+            color: 'var(--text-3)'
           }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>⚙️</div>
             <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 8 }}>
@@ -2012,10 +2012,10 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
           <div style={{ 
             textAlign: 'center', 
             padding: '60px 20px',
-            color: '#595959'
+            color: 'var(--text-2)'
           }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>👆</div>
-            <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 8, color: '#1890ff' }}>
+            <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 8, color: 'var(--info)' }}>
               {t('recommend:selectAdTypeFirst')}
             </div>
             <div style={{ fontSize: 14 }}>
@@ -2118,7 +2118,7 @@ const SIGNBOARD_COUNT_ROWS: string[][] = [
 function SignboardCopyReference() {
   return (
     <div>
-      <div style={{ fontWeight: 600, marginBottom: 4, color: '#262626' }}>📋 對比類全量文案（5 個標籤 / 24 條）：</div>
+      <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--text-1)' }}>📋 對比類全量文案（5 個標籤 / 24 條）：</div>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 4 }}>
         <thead>
           <tr>{SIGNBOARD_COPY_HEADERS.map(header => <th key={header} style={COPY_TH_STYLE}>{header}</th>)}</tr>
@@ -2131,11 +2131,11 @@ function SignboardCopyReference() {
           ))}
         </tbody>
       </table>
-      <div style={{ color: '#8C8C8C', marginBottom: 10 }}>
+      <div style={{ color: 'var(--text-3)', marginBottom: 10 }}>
         商圈列以「高仕德」為示例，實際顯示門店所在商圈名；{`{品類}`} 在配置頁為佔位符，實際顯示門店品類（如 火鍋）；第1名/前10% 為示例，實際取配置的排名或百分比。
       </div>
 
-      <div style={{ fontWeight: 600, marginBottom: 4, color: '#262626' }}>📋 統計類全量文案（按人數檔位）：</div>
+      <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--text-1)' }}>📋 統計類全量文案（按人數檔位）：</div>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 4 }}>
         <thead>
           <tr>{['配置門檻（人）', '❤️ 收藏', '👥 顧客數'].map(header => <th key={header} style={COPY_TH_STYLE}>{header}</th>)}</tr>
@@ -2148,7 +2148,7 @@ function SignboardCopyReference() {
           ))}
         </tbody>
       </table>
-      <div style={{ color: '#8C8C8C' }}>「5」代表 1~9 檔的任意值；10~99 檔取起始整十（15→10、29→20）。</div>
+      <div style={{ color: 'var(--text-3)' }}>「5」代表 1~9 檔的任意值；10~99 檔取起始整十（15→10、29→20）。</div>
     </div>
   )
 }

@@ -106,8 +106,8 @@ export default function MemberBonusScorePanel({
         {/* 靠右成组：修改人/时间在按钮左侧，与通用计分项工具条位置一致 */}
         <Space style={{ marginLeft: 'auto' }} size={12}>
           {!isEditing && (updatedBy || updatedAt) && (
-            <span style={{ fontSize: 11, color: '#8C8C8C', whiteSpace: 'nowrap' }}>
-              {updatedBy && <>修改人：<span style={{ color: '#595959' }}>{updatedBy}</span></>}
+            <span style={{ fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
+              {updatedBy && <>修改人：<span style={{ color: 'var(--text-2)' }}>{updatedBy}</span></>}
               {updatedBy && updatedAt && <span style={{ margin: '0 4px' }}>·</span>}
               {updatedAt && <span>{updatedAt}</span>}
             </span>
@@ -119,7 +119,7 @@ export default function MemberBonusScorePanel({
           </Button>
           {!isEditing && !readOnly && (
             <Button size="small" icon={<EditOutlined aria-hidden="true" />} onClick={handleEdit}
-              style={{ borderRadius: 6, borderColor: '#E8720C', color: '#E8720C', fontSize: 12, height: 28 }}>編輯</Button>
+              style={{ borderRadius: 6, borderColor: 'var(--brand)', color: 'var(--brand)', fontSize: 12, height: 28 }}>編輯</Button>
           )}
         </Space>
       </div>
@@ -165,7 +165,7 @@ export default function MemberBonusScorePanel({
               <span className="organic-score-edit-row__label">報名分值</span>
               <InputNumber aria-label="報名分值" value={draft.enrollmentScore} min={0} max={100} disabled={!draft.enrollmentEnabled}
                 onChange={v => patch({ enrollmentScore: v ?? 0 })} style={{ width: 160 }} addonAfter="分" />
-              <span style={{ fontSize: 12, color: '#8C8C8C' }}>每商家只計一次有效報名</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>每商家只計一次有效報名</span>
             </div>
           </div>
         </AlgorithmSection>
@@ -177,23 +177,23 @@ export default function MemberBonusScorePanel({
           </>}>
           <div className="organic-score-panel" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>加碼得分條件</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>加碼得分條件</span>
               <Button size="small" type="link" icon={<PlusOutlined aria-hidden="true" />} onClick={addTier}
-                style={{ color: '#E8720C' }}>添加加碼檔位</Button>
+                style={{ color: 'var(--brand)' }}>添加加碼檔位</Button>
             </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
               平台配置的出資金額由商家承擔；商家額外加碼越多分越高，命中一檔即停、分數不累加
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {draft.bonusTiers.map((tier, i) => (
                 <div key={i} className="organic-score-edit-row" style={{ flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 13, color: '#262626' }}>當商家加碼 ≥</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-1)' }}>當商家加碼 ≥</span>
                   <InputNumber aria-label={`第 ${i + 1} 檔加碼金額`} value={tier.amount} min={0.01} max={10000000} precision={2} step={5}
                     onChange={v => patchTier(i, { amount: v ?? 0 })} style={{ width: 150 }} addonAfter="元" />
-                  <span style={{ fontSize: 13, color: '#595959' }}>→ 得</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-2)' }}>→ 得</span>
                   <InputNumber aria-label={`第 ${i + 1} 檔加碼分值`} value={tier.score} min={0} max={1000}
                     onChange={v => patchTier(i, { score: v ?? 0 })} style={{ width: 120 }} addonAfter="分" />
-                  {i > 0 && <span style={{ fontSize: 12, color: '#8C8C8C' }}>≥ 上一檔 {draft.bonusTiers[i - 1].score} 分</span>}
+                  {i > 0 && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>≥ 上一檔 {draft.bonusTiers[i - 1].score} 分</span>}
                   <Button aria-label={`刪除加碼第 ${i + 1} 檔`} size="small" type="text" danger icon={<DeleteOutlined />}
                     disabled={draft.bonusTiers.length <= 1} onClick={() => removeTier(i)} />
                 </div>
@@ -233,7 +233,7 @@ export default function MemberBonusScorePanel({
                 <Button key={item.name} aria-label={item.name} size="small" onClick={() => setPreviewAmount(item.amount)}>{item.name}</Button>)}
             </Space>
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>商家額外加碼金額（元，未加碼填 0）</div>
+              <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>商家額外加碼金額（元，未加碼填 0）</div>
               <InputNumber aria-label="商家加碼金額" value={previewAmount} min={0} max={10000000} precision={2} step={5}
                 onChange={v => setPreviewAmount(v ?? 0)} style={{ width: '100%' }} />
             </div>
@@ -250,10 +250,10 @@ export default function MemberBonusScorePanel({
 
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16,
-              padding: '14px 20px', background: '#FFF7E6', border: '1px solid #FFE7D1', borderRadius: 8,
+              padding: '14px 20px', background: 'var(--warning-soft)', border: '1px solid #FFE7D1', borderRadius: 8,
             }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>單項總得分 = 報名分 + 加碼分</span>
-              <output aria-label="單項總得分" aria-live="polite" style={{ fontSize: 24, fontWeight: 700, color: '#E8720C' }}>{preview.total} 分</output>
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>單項總得分 = 報名分 + 加碼分</span>
+              <output aria-label="單項總得分" aria-live="polite" style={{ fontSize: 24, fontWeight: 700, color: 'var(--brand)' }}>{preview.total} 分</output>
             </div>
           </AlgorithmSection>
         </Modal>
@@ -288,16 +288,16 @@ const BONUS_BASIS_SECTIONS: HelpSection[] = [
 
 /** 模块内的一行公式+示例：放在区块标题右侧，不另占一块区域 */
 function FormulaHint({ formula, example }: { formula: string; example: string }) {
-  return <span style={{ fontSize: 12, color: '#8C8C8C' }}>公式：{formula}{' · '}例：{example}</span>
+  return <span style={{ fontSize: 12, color: 'var(--text-3)' }}>公式：{formula}{' · '}例：{example}</span>
 }
 
 /** 试算指标单元格 */
 function MetricCell({ label, value, color, note }: { label: string; value: string; color?: string; note?: string }) {
   return (
-    <div style={{ padding: '10px 12px', background: '#FAFAFA', borderRadius: 6, border: '1px solid #F0F0F0' }}>
-      <div style={{ fontSize: 11, color: '#8C8C8C', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 16, fontWeight: 600, color: color || '#262626' }}>
-        {value}{note && <span style={{ fontSize: 11, fontWeight: 400, color: '#8C8C8C', marginLeft: 6 }}>{note}</span>}
+    <div style={{ padding: '10px 12px', background: 'var(--surface-3)', borderRadius: 6, border: '1px solid #F0F0F0' }}>
+      <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 16, fontWeight: 600, color: color || 'var(--text-1)' }}>
+        {value}{note && <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 6 }}>{note}</span>}
       </div>
     </div>
   )

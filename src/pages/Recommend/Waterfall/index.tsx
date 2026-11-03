@@ -564,7 +564,7 @@ export default function Waterfall() {
     return (
       <div className="content-area">
         <div style={{
-          position: 'relative', background: '#fff', marginBottom: 16,
+          position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
           borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
           overflow: 'hidden',
         }}>
@@ -577,11 +577,11 @@ export default function Waterfall() {
             justifyContent: 'space-between', animation: 'headerFadeSlideIn 0.5s ease',
           }}>
             <div>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>
                 <WalletOutlined style={{ marginRight: 8 }} />
                 {t('waterfall.salesPricing')}
               </h2>
-              <p style={{ margin: '6px 0 0', color: '#8c8c8c', fontSize: 12 }}>
+              <p style={{ margin: '6px 0 0', color: 'var(--text-3)', fontSize: 12 }}>
                 {t('waterfall.salesPricingDesc')}
               </p>
             </div>
@@ -655,7 +655,7 @@ export default function Waterfall() {
     <div className="content-area">
       {/* 标题区域 */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
         overflow: 'hidden',
       }}>
@@ -671,7 +671,7 @@ export default function Waterfall() {
             <Button type="primary" icon={<ArrowLeftOutlined />}
               onClick={handleBackToCards}
               style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                backgroundColor: 'var(--brand)', borderColor: 'var(--brand)',
                 borderRadius: 8, height: 36, padding: '0 16px',
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
@@ -680,9 +680,9 @@ export default function Waterfall() {
             >{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('waterfall.pricingList')}</h2>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>{t('waterfall.pricingList')}</h2>
               {selectedAlgorithmType != null && (
-                <span style={{ fontSize: 14, color: '#595959' }}>
+                <span style={{ fontSize: 14, color: 'var(--text-2)' }}>
                   {ALGORITHM_TYPE_CARDS.find(c => c.type === selectedAlgorithmType)?.icon} {ALGORITHM_TYPE_LABEL[selectedAlgorithmType]}
                 </span>
               )}
@@ -840,7 +840,7 @@ export default function Waterfall() {
               {modalAlgoBrand ? (
                 <BrandTag value={modalAlgoBrand} />
               ) : (
-                <span style={{ color: '#bfbfbf' }}>{t('waterfall.selectAlgorithmNameFirst')}</span>
+                <span style={{ color: 'var(--text-4)' }}>{t('waterfall.selectAlgorithmNameFirst')}</span>
               )}
             </Form.Item>
           </Card>
@@ -863,11 +863,11 @@ export default function Waterfall() {
                 rules={[{ required: true, message: t('waterfall.purchaseLimitRule') }]}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ color: '#595959', fontWeight: 500 }}>{t('waterfall.within')}</span>
+                  <span style={{ color: 'var(--text-2)', fontWeight: 500 }}>{t('waterfall.within')}</span>
                   <InputNumber min={1} max={365} placeholder={t('waterfall.daysPlaceholder')} style={{ width: 100 }} />
-                  <span style={{ color: '#595959', fontWeight: 500 }}>{t('waterfall.daysInMaxBuy')}</span>
+                  <span style={{ color: 'var(--text-2)', fontWeight: 500 }}>{t('waterfall.daysInMaxBuy')}</span>
                   <InputNumber min={1} max={100} placeholder={t('waterfall.quantity')} style={{ width: 100 }} />
-                  <span style={{ color: '#595959', fontWeight: 500 }}>{t('waterfall.slotsUnit')}</span>
+                  <span style={{ color: 'var(--text-2)', fontWeight: 500 }}>{t('waterfall.slotsUnit')}</span>
                 </div>
               </Form.Item>
             )}
@@ -879,9 +879,9 @@ export default function Waterfall() {
                 rules={[{ required: true, message: t('waterfall.intervalDaysRule') }]}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ color: '#595959', fontWeight: 500 }}>{t('waterfall.interval')}</span>
+                  <span style={{ color: 'var(--text-2)', fontWeight: 500 }}>{t('waterfall.interval')}</span>
                   <InputNumber min={1} max={365} placeholder={t('waterfall.daysPlaceholder')} style={{ width: 100 }} />
-                  <span style={{ color: '#595959', fontWeight: 500 }}>{t('waterfall.daysCanBuy')}</span>
+                  <span style={{ color: 'var(--text-2)', fontWeight: 500 }}>{t('waterfall.daysCanBuy')}</span>
                 </div>
               </Form.Item>
             )}
@@ -1021,7 +1021,7 @@ export default function Waterfall() {
                 </Tag>
               </Descriptions.Item>
               <Descriptions.Item label={t('algorithm.colAlgorithmId')}>
-                <code style={{ background: '#f5f5f5', padding: '2px 6px', borderRadius: 4 }}>
+                <code style={{ background: 'var(--surface-1)', padding: '2px 6px', borderRadius: 4 }}>
                   {String(viewingRecord.algorithmId).padStart(6, '0')}
                 </code>
               </Descriptions.Item>

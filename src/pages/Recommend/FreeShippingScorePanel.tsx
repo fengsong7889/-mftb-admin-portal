@@ -113,8 +113,8 @@ export default function FreeShippingScorePanel({
         {/* 靠右成组：修改人/时间在按钮左侧，与通用计分项工具条位置一致 */}
         <Space style={{ marginLeft: 'auto' }} size={12}>
           {!isEditing && (updatedBy || updatedAt) && (
-            <span style={{ fontSize: 11, color: '#8C8C8C', whiteSpace: 'nowrap' }}>
-              {updatedBy && <>修改人：<span style={{ color: '#595959' }}>{updatedBy}</span></>}
+            <span style={{ fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
+              {updatedBy && <>修改人：<span style={{ color: 'var(--text-2)' }}>{updatedBy}</span></>}
               {updatedBy && updatedAt && <span style={{ margin: '0 4px' }}>·</span>}
               {updatedAt && <span>{updatedAt}</span>}
             </span>
@@ -126,7 +126,7 @@ export default function FreeShippingScorePanel({
           </Button>
           {!isEditing && !readOnly && (
             <Button size="small" icon={<EditOutlined aria-hidden="true" />} onClick={handleEdit}
-              style={{ borderRadius: 6, borderColor: '#E8720C', color: '#E8720C', fontSize: 12, height: 28 }}>編輯</Button>
+              style={{ borderRadius: 6, borderColor: 'var(--brand)', color: 'var(--brand)', fontSize: 12, height: 28 }}>編輯</Button>
           )}
         </Space>
       </div>
@@ -219,7 +219,7 @@ export default function FreeShippingScorePanel({
               <span className="organic-score-edit-row__label">報名分值</span>
               <InputNumber aria-label="報名分值" value={draft.enrollmentScore} min={0} max={100} disabled={!draft.enrollmentEnabled}
                 onChange={v => patch({ enrollmentScore: v ?? 0 })} style={{ width: 160 }} addonAfter="分" />
-              <span style={{ fontSize: 12, color: '#8C8C8C' }}>多個活動也只計一次有效報名</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>多個活動也只計一次有效報名</span>
             </div>
           </div>
         </AlgorithmSection>
@@ -235,28 +235,28 @@ export default function FreeShippingScorePanel({
               <span className="organic-score-edit-row__label">啟用門檻計分</span>
               <Switch aria-label="啟用門檻計分" checkedChildren="啟用" unCheckedChildren="停用" checked={draft.thresholdEnabled}
                 onChange={v => patch({ thresholdEnabled: v })} />
-              <span style={{ fontSize: 12, color: '#8C8C8C' }}>停用時檔位不參與計算，也不校驗</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>停用時檔位不參與計算，也不校驗</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>門檻得分條件</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>門檻得分條件</span>
               <Button size="small" type="link" icon={<PlusOutlined aria-hidden="true" />} onClick={addThresholdBand}
-                disabled={!draft.thresholdEnabled} style={{ color: '#E8720C' }}>添加門檻檔位</Button>
+                disabled={!draft.thresholdEnabled} style={{ color: 'var(--brand)' }}>添加門檻檔位</Button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
                 0 元表示無門檻；檔位按門檻從低到高匹配，命中即停、分數不累加；門檻越低（越好用）分數越高
               </div>
               {draft.thresholdBands.map((band, i) => (
                 <div key={i} className="organic-score-edit-row" style={{ flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 13, color: '#262626' }}>當減免門檻 ≤</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-1)' }}>當減免門檻 ≤</span>
                   <InputNumber aria-label={`第 ${i + 1} 檔門檻金額`} value={band.threshold} min={0} max={10000000} precision={2} step={10}
                     disabled={!draft.thresholdEnabled}
                     onChange={v => patchThresholdBand(i, { threshold: v ?? 0 })} style={{ width: 140 }} addonAfter="元" />
-                  <span style={{ fontSize: 13, color: '#595959' }}>→ 得</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-2)' }}>→ 得</span>
                   <InputNumber aria-label={`第 ${i + 1} 檔門檻分值`} value={band.score} min={0} max={1000}
                     disabled={!draft.thresholdEnabled}
                     onChange={v => patchThresholdBand(i, { score: v ?? 0 })} style={{ width: 120 }} addonAfter="分" />
-                  {i > 0 && <span style={{ fontSize: 12, color: '#8C8C8C' }}>≤ 上一檔 {draft.thresholdBands[i - 1].score} 分</span>}
+                  {i > 0 && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>≤ 上一檔 {draft.thresholdBands[i - 1].score} 分</span>}
                   <Button aria-label={`刪除門檻第 ${i + 1} 檔`} size="small" type="text" danger icon={<DeleteOutlined />}
                     disabled={!draft.thresholdEnabled || draft.thresholdBands.length <= 1} onClick={() => removeThresholdBand(i)} />
                 </div>
@@ -275,7 +275,7 @@ export default function FreeShippingScorePanel({
                 placeholder={lastBandThreshold === undefined ? '未配置檔位時可不填' : `跟隨末檔（${lastBandThreshold} 元）`}
                 onChange={v => patch({ guardThreshold: v ?? undefined })} style={{ width: 190 }} addonAfter="元" />
               {draft.guardThreshold !== undefined && (
-                <Button size="small" type="link" onClick={() => patch({ guardThreshold: undefined })} style={{ color: '#E8720C' }}>
+                <Button size="small" type="link" onClick={() => patch({ guardThreshold: undefined })} style={{ color: 'var(--brand)' }}>
                   跟隨末檔
                 </Button>
               )}
@@ -286,9 +286,9 @@ export default function FreeShippingScorePanel({
               <span className="organic-score-edit-row__label">超限報名分</span>
               <Switch aria-label="超過上限仍發報名分" checkedChildren="仍發" unCheckedChildren="停發"
                 checked={!!draft.enrollWhenGuarded} onChange={v => patch({ enrollWhenGuarded: v })} />
-              <span style={{ fontSize: 12, color: '#8C8C8C' }}>預設停發，與券類護欄口徑一致</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>預設停發，與券類護欄口徑一致</span>
             </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
               上限留空則跟隨末檔（{lastBandThreshold === undefined ? '未配置' : `${lastBandThreshold} 元`}）；手動覆蓋必須不低於末檔，
               否則會出現「檔位有分但報名分停發」的矛盾區間
             </div>
@@ -329,7 +329,7 @@ export default function FreeShippingScorePanel({
                 <Button key={item.name} aria-label={item.name} size="small" onClick={() => setPreviewThreshold(item.threshold)}>{item.name}</Button>)}
             </Space>
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>商家生效活動的減免門檻（元，無門檻填 0）</div>
+              <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>商家生效活動的減免門檻（元，無門檻填 0）</div>
               <InputNumber aria-label="減免門檻" value={previewThreshold} min={0} max={10000000} precision={2} step={10}
                 onChange={v => setPreviewThreshold(v ?? 0)} style={{ width: '100%' }} />
             </div>
@@ -357,10 +357,10 @@ export default function FreeShippingScorePanel({
 
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16,
-              padding: '14px 20px', background: '#FFF7E6', border: '1px solid #FFE7D1', borderRadius: 8,
+              padding: '14px 20px', background: 'var(--warning-soft)', border: '1px solid #FFE7D1', borderRadius: 8,
             }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>單項總得分 = 報名分 + 門檻分</span>
-              <output aria-label="單項總得分" aria-live="polite" style={{ fontSize: 24, fontWeight: 700, color: '#E8720C' }}>{preview.total} 分</output>
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>單項總得分 = 報名分 + 門檻分</span>
+              <output aria-label="單項總得分" aria-live="polite" style={{ fontSize: 24, fontWeight: 700, color: 'var(--brand)' }}>{preview.total} 分</output>
             </div>
           </AlgorithmSection>
         </Modal>
@@ -404,16 +404,16 @@ const GUARD_BASIS_SECTIONS: HelpSection[] = [
 
 /** 模块内的一行公式+示例：放在区块标题右侧，不另占一块区域 */
 function FormulaHint({ formula, example }: { formula: string; example: string }) {
-  return <span style={{ fontSize: 12, color: '#8C8C8C' }}>公式：{formula}{' · '}例：{example}</span>
+  return <span style={{ fontSize: 12, color: 'var(--text-3)' }}>公式：{formula}{' · '}例：{example}</span>
 }
 
 /** 试算指标单元格 */
 function MetricCell({ label, value, color, note }: { label: string; value: string; color?: string; note?: string }) {
   return (
-    <div style={{ padding: '10px 12px', background: '#FAFAFA', borderRadius: 6, border: '1px solid #F0F0F0' }}>
-      <div style={{ fontSize: 11, color: '#8C8C8C', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 16, fontWeight: 600, color: color || '#262626' }}>
-        {value}{note && <span style={{ fontSize: 11, fontWeight: 400, color: '#8C8C8C', marginLeft: 6 }}>{note}</span>}
+    <div style={{ padding: '10px 12px', background: 'var(--surface-3)', borderRadius: 6, border: '1px solid #F0F0F0' }}>
+      <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 16, fontWeight: 600, color: color || 'var(--text-1)' }}>
+        {value}{note && <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 6 }}>{note}</span>}
       </div>
     </div>
   )

@@ -313,7 +313,7 @@ export default function PopularSkinPricing() {
     <div className="content-area">
       {/* 顶部标题栏 */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
       }}>
         <div style={{
@@ -327,7 +327,7 @@ export default function PopularSkinPricing() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleBack}
               style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                backgroundColor: 'var(--brand)', borderColor: 'var(--brand)',
                 borderRadius: 8, height: 36, padding: '0 16px',
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
@@ -336,10 +336,10 @@ export default function PopularSkinPricing() {
             >{t('common:back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>
                 {isDetailMode ? t('recommend.popularSkin.skinPricingDetail') : isEditMode ? t('recommend.popularSkin.skinPricingEdit') : t('recommend.popularSkin.skinPricingAdd')}
               </h2>
-              <span style={{ fontSize: 14, color: '#595959' }}>🏆 {t('recommend.popularSkin.skinPopularMerchant')}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-2)' }}>🏆 {t('recommend.popularSkin.skinPopularMerchant')}</span>
             </div>
           </div>
         </div>
@@ -348,7 +348,7 @@ export default function PopularSkinPricing() {
       <Form form={form} layout="vertical" disabled={isDetailMode}>
         {/* 基礎信息 */}
         <div style={cardShellStyle}>
-          {cardTitle(<ShopOutlined style={{ fontSize: 14, color: '#1890ff' }} />, '#e6f7ff', t('recommend.popularSkin.basicInfoTitle'))}
+          {cardTitle(<ShopOutlined style={{ fontSize: 14, color: 'var(--info)' }} />, '#e6f7ff', t('recommend.popularSkin.basicInfoTitle'))}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
             <Form.Item label={t('recommend.popularSkin.appLabel')} name="app" rules={[{ required: true, message: t('recommend.popularSkin.selectApp') }]}>
               <Select placeholder={t('recommend.popularSkin.pleaseSelect')} options={tAppOptions} disabled={isEditMode || isDetailMode} />
@@ -366,7 +366,7 @@ export default function PopularSkinPricing() {
               {detailFileList.length < 1 && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                   <PlusOutlined style={{ fontSize: 20 }} />
-                  <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.popularSkin.uploadDetailImage')}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('recommend.popularSkin.uploadDetailImage')}</span>
                 </div>
               )}
             </Upload>
@@ -375,27 +375,27 @@ export default function PopularSkinPricing() {
 
         {/* 銷售策略 */}
         <div style={cardShellStyle}>
-          {cardTitle(<BarChartOutlined style={{ fontSize: 14, color: '#fa8c16' }} />, '#fff7e6', t('recommend.popularSkin.salesStrategyCard'))}
+          {cardTitle(<BarChartOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />, '#fff7e6', t('recommend.popularSkin.salesStrategyCard'))}
           <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>{t('recommend.popularSkin.presaleDaysLabel')}</span>
+            <span style={{ fontSize: 13, color: 'var(--text-2)', minWidth: 80 }}>{t('recommend.popularSkin.presaleDaysLabel')}</span>
             <InputNumber min={1} max={90} precision={0} value={presaleDays} disabled={isDetailMode}
               onChange={(value) => setPresaleDays(value || 7)} addonAfter={t('recommend.popularSkin.dayAddon')} style={{ width: 160 }} />
-            <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 8 }}>{t('recommend.popularSkin.presaleDaysHint', { days: presaleDays })}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>{t('recommend.popularSkin.presaleDaysHint', { days: presaleDays })}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 1, marginTop: 16 }}>
-            <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>{t('recommend.popularSkin.giftCashValueLabel')}</span>
+            <span style={{ fontSize: 13, color: 'var(--text-2)', minWidth: 80 }}>{t('recommend.popularSkin.giftCashValueLabel')}</span>
             <InputNumber min={0} max={9999} precision={0} value={giftCashValue} disabled={isDetailMode}
               onChange={(value) => setGiftCashValue(value || 0)}
               addonAfter={`${t('recommend.popularSkin.mopUnit')}/${t('recommend.popularSkin.dayUnit')}`} style={{ width: 160 }} />
-            <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 8 }}>{t('recommend.popularSkin.giftCashValueHint', { value: giftCashValue })}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>{t('recommend.popularSkin.giftCashValueHint', { value: giftCashValue })}</span>
           </div>
         </div>
 
         {/* 皮膚列表（新版组件） */}
         <div style={cardShellStyle}>
           {cardTitle(
-            <SkinOutlined style={{ fontSize: 14, color: '#E8720C' }} />, '#FFF7E6', t('recommend.popularSkin.skinListCard'),
-            <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 4 }}>
+            <SkinOutlined style={{ fontSize: 14, color: 'var(--brand)' }} />, '#FFF7E6', t('recommend.popularSkin.skinListCard'),
+            <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 4 }}>
               小圖 {SMALL_SKIN_TEMPLATES.length} 套 · 大圖 {LARGE_SKIN_TEMPLATES.length} 套，逐套開啟售賣
             </span>,
           )}
@@ -411,7 +411,7 @@ export default function PopularSkinPricing() {
         {/* 購買多天折扣配置 */}
         <div style={cardShellStyle}>
           {cardTitle(
-            <PercentageOutlined style={{ fontSize: 14, color: '#722ED1' }} />, '#F9F0FF', t('recommend.popularSkin.gradientDiscountTitle'),
+            <PercentageOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />, '#F9F0FF', t('recommend.popularSkin.gradientDiscountTitle'),
             <Switch size="small" checked={gradientEnabled} disabled={isDetailMode}
               onChange={checked => {
                 setGradientEnabled(checked)
@@ -424,7 +424,7 @@ export default function PopularSkinPricing() {
             <>
               {/* 折扣模式切换 */}
               <div style={{ marginBottom: 16 }}>
-                <span style={{ fontSize: 13, color: '#595959', marginRight: 12 }}>{t('recommend.popularSkin.discountModeLabel')}：</span>
+                <span style={{ fontSize: 13, color: 'var(--text-2)', marginRight: 12 }}>{t('recommend.popularSkin.discountModeLabel')}：</span>
                 <Radio.Group
                   value={discountMode} disabled={isDetailMode}
                   onChange={e => {
@@ -446,7 +446,7 @@ export default function PopularSkinPricing() {
                   <Radio.Button value="shared">{t('recommend.popularSkin.discountModeShared')}</Radio.Button>
                   <Radio.Button value="independent">{t('recommend.popularSkin.discountModeIndependent')}</Radio.Button>
                 </Radio.Group>
-                <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 12 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 12 }}>
                   {discountMode === 'shared'
                     ? t('recommend.popularSkin.discountModeSharedHint')
                     : t('recommend.popularSkin.discountModeIndependentHint')}
@@ -462,7 +462,7 @@ export default function PopularSkinPricing() {
               {discountMode === 'independent' && (
                 <>
                   <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <span style={{ fontSize: 13, color: '#595959', fontWeight: 500 }}>{t('recommend.popularSkin.discountConfigTitle', { defaultValue: '折扣配置' })}：</span>
+                    <span style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 500 }}>{t('recommend.popularSkin.discountConfigTitle', { defaultValue: '折扣配置' })}：</span>
                     <Radio.Group
                       value={independentTab} disabled={isDetailMode}
                       onChange={e => setIndependentTab(e.target.value)}
@@ -489,7 +489,7 @@ export default function PopularSkinPricing() {
               )}
             </>
           ) : (
-            <div style={{ fontSize: 13, color: '#8c8c8c' }}>{t('recommend.popularSkin.gradientDisabledHint')}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-3)' }}>{t('recommend.popularSkin.gradientDisabledHint')}</div>
           )}
         </div>
 
@@ -497,9 +497,9 @@ export default function PopularSkinPricing() {
         <div style={cardShellStyle}>
           {cardTitle(
             <SettingOutlined style={{ fontSize: 14, color: '#f5222d' }} />, '#fff1f0', t('recommend.popularSkin.refundConfigTitle'),
-            <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 4 }}>{t('recommend.popularSkin.refundConfigHint')}</span>,
+            <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 4 }}>{t('recommend.popularSkin.refundConfigHint')}</span>,
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, color: refundEnabled ? '#52c41a' : '#8c8c8c' }}>{refundEnabled ? t('recommend.popularSkin.allowRefund') : t('recommend.popularSkin.notAllowRefund')}</span>
+              <span style={{ fontSize: 13, color: refundEnabled ? 'var(--success)' : 'var(--text-3)' }}>{refundEnabled ? t('recommend.popularSkin.allowRefund') : t('recommend.popularSkin.notAllowRefund')}</span>
               <Switch size="small" checked={refundEnabled} disabled={isDetailMode}
                 onChange={checked => setRefundEnabled(checked)} style={{ background: refundEnabled ? '#52c41a' : '#d9d9d9' }} />
             </div>,
@@ -510,7 +510,7 @@ export default function PopularSkinPricing() {
                 { title: t('recommend.popularSkin.adPromotionCol'), dataIndex: 'maxDays', width: 220,
                   render: (_, record: CancelFeeRule) => (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend.popularSkin.remainingDaysLe')}</span>
+                      <span style={{ fontSize: 13, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>{t('recommend.popularSkin.remainingDaysLe')}</span>
                       <InputNumber disabled={isDetailMode} min={0} max={999} value={record.maxDays === 999 ? undefined : record.maxDays}
                         onChange={(val) => setCancelFeeRules(prev => prev.map(r => r.id === record.id ? { ...r, maxDays: val ?? 0 } : r))}
                         addonAfter={record.maxDays === 999 ? '' : t('recommend.popularSkin.dayAddon')} style={{ flex: 1 }} />
@@ -526,7 +526,7 @@ export default function PopularSkinPricing() {
                 },
                 { title: t('recommend.popularSkin.opCol'), width: 120, align: 'center' as const,
                   render: (_: unknown, record: CancelFeeRule) => {
-                    if (isDetailMode) return <span style={{ color: '#bfbfbf' }}>—</span>
+                    if (isDetailMode) return <span style={{ color: 'var(--text-4)' }}>—</span>
                     const isLastRow = cancelFeeRules[cancelFeeRules.length - 1]?.id === record.id
                     return (
                       <Space size={4}>
@@ -539,21 +539,21 @@ export default function PopularSkinPricing() {
               ]}
             />
           ) : (
-            <div style={{ padding: '24px', textAlign: 'center', background: '#fafafa', borderRadius: 8, border: '1px dashed #d9d9d9' }}>
-              <span style={{ fontSize: 13, color: '#8c8c8c' }}>{t('recommend.popularSkin.notAllowRefundHint')}</span>
+            <div style={{ padding: '24px', textAlign: 'center', background: 'var(--surface-3)', borderRadius: 8, border: '1px dashed #d9d9d9' }}>
+              <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{t('recommend.popularSkin.notAllowRefundHint')}</span>
             </div>
           )}
         </div>
 
         {/* 狀態設置 */}
         <div style={cardShellStyle}>
-          {cardTitle(<CheckCircleOutlined style={{ fontSize: 14, color: '#52c41a' }} />, '#f6ffed', t('recommend.popularSkin.statusSettingCard'))}
+          {cardTitle(<CheckCircleOutlined style={{ fontSize: 14, color: 'var(--success)' }} />, '#f6ffed', t('recommend.popularSkin.statusSettingCard'))}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.popularSkin.statusLabelColon')}</span>
+            <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('recommend.popularSkin.statusLabelColon')}</span>
             <Switch checked={status === ServiceStatus.ENABLED} disabled={isDetailMode}
               onChange={checked => setStatus(checked ? ServiceStatus.ENABLED : ServiceStatus.DISABLED)}
               checkedChildren={t('recommend.popularSkin.statusEnabledText')} unCheckedChildren={t('recommend.popularSkin.statusDisabledText')} />
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.popularSkin.disableSkinHint')}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('recommend.popularSkin.disableSkinHint')}</span>
           </div>
         </div>
       </Form>

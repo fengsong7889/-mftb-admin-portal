@@ -231,13 +231,13 @@ export default function TrafficPackagePricing() {
     padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
   }
   const fieldLabelStyle: React.CSSProperties = { fontSize: 13, color: '#595959', marginBottom: 4 }
-  const requiredMark = <span style={{ color: '#ff4d4f', marginRight: 4 }}>*</span>
+  const requiredMark = <span style={{ color: 'var(--danger)', marginRight: 4 }}>*</span>
   const cardTitle = (icon: React.ReactNode, iconBg: string, title: string, extra?: React.ReactNode, action?: React.ReactNode) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
       <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {icon}
       </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>
       {extra}
       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
       {action}
@@ -248,7 +248,7 @@ export default function TrafficPackagePricing() {
     <div className="content-area">
       {/* 標題欄 */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
         overflow: 'hidden',
       }}>
@@ -263,7 +263,7 @@ export default function TrafficPackagePricing() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleBack}
               style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                backgroundColor: 'var(--brand)', borderColor: 'var(--brand)',
                 borderRadius: 8, height: 36, padding: '0 16px',
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
@@ -272,7 +272,7 @@ export default function TrafficPackagePricing() {
             >{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>
                 {isDetailMode ? tAd('trafficPricingDetailTitle') : isEditMode ? tAd('trafficPricingEditTitle') : tAd('trafficPricingAddTitle')}
               </h2>
               {current.pricingNo && (
@@ -286,7 +286,7 @@ export default function TrafficPackagePricing() {
       <Form form={form} layout="vertical" disabled={isDetailMode}>
         {/* ── 1. 基礎信息（與金字招牌定價一致的卡片結構） ── */}
         <div style={cardShellStyle}>
-          {cardTitle(<ShopOutlined style={{ fontSize: 14, color: '#1890ff' }} />, '#E6F7FF', t('recommend.basicInfo'))}
+          {cardTitle(<ShopOutlined style={{ fontSize: 14, color: 'var(--info)' }} />, '#E6F7FF', t('recommend.basicInfo'))}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
             <Form.Item label={t('common.brand')} name="brand" rules={[{ required: true, message: t('common.selectBrand') }]}>
               <Select
@@ -326,7 +326,7 @@ export default function TrafficPackagePricing() {
               {detailFileList.length < 1 && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                   <PlusOutlined style={{ fontSize: 20 }} />
-                  <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.popularSkin.uploadDetailImage')}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('recommend.popularSkin.uploadDetailImage')}</span>
                 </div>
               )}
             </Upload>
@@ -336,8 +336,8 @@ export default function TrafficPackagePricing() {
         {/* ── 2. 套餐包配置（運營自行新增套餐包，支持限時折扣） ── */}
         <div style={cardShellStyle}>
           {cardTitle(
-            <AppstoreOutlined style={{ fontSize: 14, color: '#E8720C' }} />, '#FFF7E6', tAd('trafficPackageConfig'),
-            <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 4 }}>{tAd('trafficPackageConfigHint')}</span>,
+            <AppstoreOutlined style={{ fontSize: 14, color: 'var(--brand)' }} />, '#FFF7E6', tAd('trafficPackageConfig'),
+            <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 4 }}>{tAd('trafficPackageConfigHint')}</span>,
             !isDetailMode && (
               <Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleAddPackage} style={{ borderRadius: 6 }}>
                 {tAd('trafficAddPackage')}
@@ -346,12 +346,12 @@ export default function TrafficPackagePricing() {
           )}
 
           {current.tiers.length === 0 ? (
-            <div style={{ padding: '24px', textAlign: 'center', background: '#FAFAFA', borderRadius: 8, border: '1px dashed #D9D9D9' }}>
-              <span style={{ fontSize: 13, color: '#8C8C8C' }}>{tAd('trafficNoPackage')}</span>
+            <div style={{ padding: '24px', textAlign: 'center', background: 'var(--surface-3)', borderRadius: 8, border: '1px dashed #D9D9D9' }}>
+              <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{tAd('trafficNoPackage')}</span>
             </div>
           ) : (
             [...current.tiers].sort((a, b) => a.sort - b.sort).map((tier, index) => (
-              <div key={tier.id} style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: '16px 20px', marginBottom: 12, background: '#FAFAFA' }}>
+              <div key={tier.id} style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: '16px 20px', marginBottom: 12, background: 'var(--surface-3)' }}>
                 {/* 塊頭：序號徽章 + 套餐包 + 刪除（配置即可售，無需上架操作） */}
                 <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
                   <div style={{
@@ -361,7 +361,7 @@ export default function TrafficPackagePricing() {
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     boxShadow: '0 2px 4px rgba(232,114,12,0.25)', marginRight: 8,
                   }}>{index + 1}</div>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{tAd('trafficPackageKit')}</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{tAd('trafficPackageKit')}</span>
                   <div style={{ flex: 1 }} />
                   {!isDetailMode && (
                     <Button type="link" danger size="small" icon={<DeleteOutlined />} onClick={() => handleDeleteTier(tier.id)}>
@@ -406,11 +406,11 @@ export default function TrafficPackagePricing() {
                 {/* 第二行：折扣（開關 + 折扣值 + 限定時間/不限時間 + 折後價預覽） */}
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
-                  padding: '10px 12px', background: tier.discountEnabled ? '#FFF7E6' : '#FAFAFA',
+                  padding: '10px 12px', background: tier.discountEnabled ? 'var(--warning-soft)' : 'var(--surface-3)',
                   border: `1px solid ${tier.discountEnabled ? '#FFD591' : '#f0f0f0'}`, borderRadius: 6,
                   transition: 'all 0.25s',
                 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: tier.discountEnabled ? '#d46b08' : '#8C8C8C' }}>💰 {tAd('trafficDiscountTitle')}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: tier.discountEnabled ? '#d46b08' : 'var(--text-3)' }}>💰 {tAd('trafficDiscountTitle')}</span>
                   <Switch size="small" checked={!!tier.discountEnabled} disabled={isDetailMode}
                     onChange={checked => updateTier(tier.id, { discountEnabled: checked })} />
                   {tier.discountEnabled && (
@@ -431,7 +431,7 @@ export default function TrafficPackagePricing() {
                       </Radio.Group>
                       {tier.discountTimeMode === 'limited' && (
                         <>
-                          <span style={{ fontSize: 13, color: '#595959' }}>{tAd('trafficDiscountPeriod')}</span>
+                          <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{tAd('trafficDiscountPeriod')}</span>
                           <DatePicker.RangePicker
                             disabled={isDetailMode}
                             value={tier.discountStartDate && tier.discountEndDate ? [dayjs(tier.discountStartDate), dayjs(tier.discountEndDate)] : null}
@@ -443,7 +443,7 @@ export default function TrafficPackagePricing() {
                         </>
                       )}
                       {tier.discount != null && tier.price > 0 && (
-                        <span style={{ fontSize: 12, color: '#E8720C', fontWeight: 600 }}>
+                        <span style={{ fontSize: 12, color: 'var(--brand)', fontWeight: 600 }}>
                           {tAd('trafficDiscountPreview').replace('{{discounted}}', String(Math.round(tier.price * tier.discount / 10 * 100) / 100))}
                         </span>
                       )}
@@ -458,8 +458,8 @@ export default function TrafficPackagePricing() {
         {/* ── 3. 自定義階梯單價（曝光量 ≥ xx 命中計價） ── */}
         <div style={cardShellStyle}>
           {cardTitle(
-            <BarChartOutlined style={{ fontSize: 14, color: '#722ED1' }} />, '#F9F0FF', tAd('trafficLadderConfig'),
-            <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 4 }}>{tAd('trafficLadderHint')}</span>,
+            <BarChartOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />, '#F9F0FF', tAd('trafficLadderConfig'),
+            <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 4 }}>{tAd('trafficLadderHint')}</span>,
             !isDetailMode && (
               <Button type="primary" size="small" icon={<PlusOutlined />} onClick={addLadderRow} style={{ borderRadius: 6 }}>
                 {tAd('trafficLadderAddRow')}
@@ -468,22 +468,22 @@ export default function TrafficPackagePricing() {
           )}
 
           {current.ladder.length === 0 ? (
-            <div style={{ padding: '24px', textAlign: 'center', background: '#FAFAFA', borderRadius: 8, border: '1px dashed #D9D9D9' }}>
-              <span style={{ fontSize: 13, color: '#8C8C8C' }}>{tAd('trafficNoLadder')}</span>
+            <div style={{ padding: '24px', textAlign: 'center', background: 'var(--surface-3)', borderRadius: 8, border: '1px dashed #D9D9D9' }}>
+              <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{tAd('trafficNoLadder')}</span>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {[...current.ladder].sort((a, b) => a.minQty - b.minQty).map((row, idx) => (
-                <div key={row.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, background: '#FAFAFA', borderRadius: 6, flexWrap: 'wrap' }}>
+                <div key={row.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, background: 'var(--surface-3)', borderRadius: 6, flexWrap: 'wrap' }}>
                   <Tag color="blue">{tAd('trafficLadderTier')} {idx + 1}</Tag>
-                  <span style={{ fontSize: 13, color: '#595959' }}>{tAd('trafficLadderQtyPrefix')} ≥</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{tAd('trafficLadderQtyPrefix')} ≥</span>
                   <InputNumber
                     min={1} max={9999999} precision={0}
                     value={row.minQty} disabled={isDetailMode}
                     style={{ width: 120 }}
                     onChange={val => updateLadderRow(row.id, 'minQty', val ?? 1)}
                   />
-                  <span style={{ fontSize: 13, color: '#595959' }}>{tAd('trafficLadderRowSuffix')}</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{tAd('trafficLadderRowSuffix')}</span>
                   <InputNumber
                     min={0.01} max={99} step={0.01} precision={2}
                     value={row.unitPrice} disabled={isDetailMode}
@@ -492,7 +492,7 @@ export default function TrafficPackagePricing() {
                     onChange={val => updateLadderRow(row.id, 'unitPrice', val ?? 0.01)}
                   />
                   {row.maxQty > 0 && (
-                    <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
                       {tAd('trafficLadderRangeHint').replace('{{range}}', `${row.minQty.toLocaleString()} ~ ${row.maxQty.toLocaleString()}`)}
                     </span>
                   )}
@@ -509,16 +509,16 @@ export default function TrafficPackagePricing() {
           )}
 
           {/* 規則說明：最低起購 = 第一梯度起始值 */}
-          <div style={{ marginTop: 14, padding: '10px 12px', background: '#F9F0FF', border: '1px solid #D3ADF7', borderRadius: 6, fontSize: 12, color: '#595959', lineHeight: '22px' }}>
-            <span style={{ fontWeight: 600, color: '#722ED1' }}>📖 {tAd('trafficLadderRuleTitle')}：</span>
-            <span style={{ color: '#8C8C8C' }}>
+          <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--purple-soft)', border: '1px solid #D3ADF7', borderRadius: 6, fontSize: 12, color: 'var(--text-2)', lineHeight: '22px' }}>
+            <span style={{ fontWeight: 600, color: 'var(--purple)' }}>📖 {tAd('trafficLadderRuleTitle')}：</span>
+            <span style={{ color: 'var(--text-3)' }}>
               {tAd('trafficLadderRule').split('{{min}}').join(String(firstLadderMin ?? current.customMinQty ?? 100))}
             </span>
           </div>
         </div>
 
         {/* 區塊4：計價示例 */}
-        <div style={{ marginBottom: 16, padding: '12px 14px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 8, fontSize: 12, color: '#595959', lineHeight: '22px' }}>
+        <div style={{ marginBottom: 16, padding: '12px 14px', background: 'var(--success-soft)', border: '1px solid #b7eb8f', borderRadius: 8, fontSize: 12, color: 'var(--text-2)', lineHeight: '22px' }}>
           <div style={{ fontWeight: 600, color: '#389e0d', marginBottom: 4 }}>💡 {tAd('trafficPricingExample')}</div>
           <div>{tAd('trafficPricingExampleDesc')}</div>
           {exampleUnit !== null && (
@@ -535,9 +535,9 @@ export default function TrafficPackagePricing() {
         <div style={cardShellStyle}>
           {cardTitle(
             <SettingOutlined style={{ fontSize: 14, color: '#f5222d' }} />, '#FFF1F0', t('recommend.popularSkin.refundConfigTitle'),
-            <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 4 }}>{tAd('trafficRefundConfigHint')}</span>,
+            <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 4 }}>{tAd('trafficRefundConfigHint')}</span>,
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, color: allowRefund ? '#52C41A' : '#8C8C8C' }}>
+              <span style={{ fontSize: 13, color: allowRefund ? 'var(--success)' : 'var(--text-3)' }}>
                 {allowRefund ? t('recommend.popularSkin.allowRefund') : t('recommend.popularSkin.notAllowRefund')}
               </span>
               <Switch
@@ -552,12 +552,12 @@ export default function TrafficPackagePricing() {
           {allowRefund ? (
             <div>
               {/* 退款公式 */}
-              <div style={{ padding: '10px 12px', background: '#FFF1F0', border: '1px solid #FFCCC7', borderRadius: 6, fontSize: 12, color: '#595959', lineHeight: '22px', marginBottom: 12 }}>
+              <div style={{ padding: '10px 12px', background: 'var(--danger-soft)', border: '1px solid #FFCCC7', borderRadius: 6, fontSize: 12, color: 'var(--text-2)', lineHeight: '22px', marginBottom: 12 }}>
                 <div style={{ fontFamily: 'monospace' }}>{tAd('trafficRefundFormula')}</div>
               </div>
               {/* 退款手續費比例 */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 13, color: '#595959' }}>{tAd('trafficRefundFeeLabel')}</span>
+                <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{tAd('trafficRefundFeeLabel')}</span>
                 <InputNumber
                   min={0} max={100} step={1} precision={0}
                   value={current.refundFeePercent ?? 0}
@@ -565,10 +565,10 @@ export default function TrafficPackagePricing() {
                   style={{ width: 120 }} addonAfter="%"
                   onChange={val => updateCurrent({ refundFeePercent: val ?? 0 })}
                 />
-                <span style={{ fontSize: 12, color: '#8C8C8C' }}>{tAd('trafficRefundFeeHint')}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{tAd('trafficRefundFeeHint')}</span>
               </div>
               {/* 退款細則（行業慣例） */}
-              <div style={{ marginTop: 10, fontSize: 12, color: '#8C8C8C', lineHeight: '20px' }}>
+              <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-3)', lineHeight: '20px' }}>
                 <div>· {tAd('trafficRefundRule1')}</div>
                 <div>· {tAd('trafficRefundRule2')}</div>
               </div>
@@ -576,19 +576,19 @@ export default function TrafficPackagePricing() {
           ) : (
             <div style={{
               padding: '24px', textAlign: 'center',
-              background: '#FAFAFA', borderRadius: 8,
+              background: 'var(--surface-3)', borderRadius: 8,
               border: '1px dashed #D9D9D9',
             }}>
-              <span style={{ fontSize: 13, color: '#8C8C8C' }}>{tAd('trafficNotAllowRefundHint')}</span>
+              <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{tAd('trafficNotAllowRefundHint')}</span>
             </div>
           )}
         </div>
 
         {/* ── 6. 狀態設置 ── */}
         <div style={cardShellStyle}>
-          {cardTitle(<CheckCircleOutlined style={{ fontSize: 14, color: '#52C41A' }} />, '#F6FFED', t('recommend.popularSkin.statusSettingCard'))}
+          {cardTitle(<CheckCircleOutlined style={{ fontSize: 14, color: 'var(--success)' }} />, '#F6FFED', t('recommend.popularSkin.statusSettingCard'))}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.popularSkin.statusLabelColon')}</span>
+            <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('recommend.popularSkin.statusLabelColon')}</span>
             <Switch
               checked={current.status !== 'disabled'}
               disabled={isDetailMode}
@@ -596,7 +596,7 @@ export default function TrafficPackagePricing() {
               checkedChildren={t('recommend.popularSkin.statusEnabledText')}
               unCheckedChildren={t('recommend.popularSkin.statusDisabledText')}
             />
-            <span style={{ fontSize: 12, color: '#8C8C8C' }}>{tAd('trafficStatusHint')}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{tAd('trafficStatusHint')}</span>
           </div>
         </div>
       </Form>

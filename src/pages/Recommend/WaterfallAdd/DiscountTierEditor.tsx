@@ -67,7 +67,7 @@ export default function DiscountTierEditor({
   return (
     <div>
       {value.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 24, color: '#8c8c8c', fontSize: 13 }}>
+        <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-3)', fontSize: 13 }}>
           {t('recommend.popularSkin.noGradientConfig')}
         </div>
       ) : (
@@ -76,19 +76,19 @@ export default function DiscountTierEditor({
             // 後端百分比 → 折值顯示
             const uiDiscount = pctToZhe(row.discount)
             return (
-              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, background: '#fafafa', borderRadius: 6 }}>
+              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, background: 'var(--surface-3)', borderRadius: 6 }}>
                 <span style={labelStyle}>
                   {groupLabel && value.length > 1
                     ? `${groupLabel} ${idx + 1}`
                     : t('recommend.popularSkin.gradientN', { index: idx + 1 })}
                 </span>
-                <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.popularSkin.purchaseDaysGe')}</span>
+                <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('recommend.popularSkin.purchaseDaysGe')}</span>
                 <InputNumber
                   min={1} max={9999} precision={0} style={{ width: 110 }}
                   value={row.days ?? undefined} disabled={disabled}
                   onChange={v => handleUpdate(idx, 'days', v)}
                 />
-                <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.popularSkin.correspondingDiscount')}</span>
+                <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('recommend.popularSkin.correspondingDiscount')}</span>
                 <InputNumber
                   min={0.1} max={9.9} precision={1} style={{ width: 120 }}
                   addonAfter={t('recommend.zheUnit')}
@@ -106,7 +106,7 @@ export default function DiscountTierEditor({
       )}
       {!disabled && (
         <Button type="dashed" icon={<PlusOutlined />} onClick={handleAdd}
-          style={{ width: '100%', marginTop: 12, borderRadius: 6, borderColor: '#d9d9d9', color: '#595959' }}>
+          style={{ width: '100%', marginTop: 12, borderRadius: 6, borderColor: 'var(--border-1)', color: 'var(--text-2)' }}>
           {t('recommend.popularSkin.addGradient')}
         </Button>
       )}
