@@ -134,17 +134,25 @@ export default function VersionHistoryForm() {
         style={{ maxWidth: 720 }}
         initialValues={{ releaseType: 'patch', status: 1, releaseDate: dayjs() }}
       >
+        {/* 版本号必须让 Input 直接作为带 name 的 Form.Item 子节点：旧写法把 Input 套在 div 里，
+            value/onChange 落在外层 div 上，输入与「自動建議」回填都进不了表单，提交时 versionNo 为空 */}
         <Form.Item
           label={t('versionHistory.versionNo')}
-          name="versionNo"
-          rules={[
-            { required: true, message: t('common.required') },
-            { pattern: /^\d+\.\d+\.\d+(\.\d{1,2})?$/, message: '請使用版本格式，如 1.0.0 或 1.0.01' },
-          ]}
-          extra="重大更新→第二位增长(1.0.0→1.1.0)；功能新增→第三位增长(1.0.0→1.0.1)；bug修復→第四位增长(1.0.0→1.0.01)；前端交互優化→第四位增长(1.0.0→1.0.01)"
+          required
+          extra={t('versionHistory.versionNoExtra')}
         >
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <Input placeholder="例：1.0.1 或 1.0.01" style={{ maxWidth: 200 }} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            <Form.Item
+              name="versionNo"
+              style={{ marginBottom: 0 }}
+              rules={[
+                { required: true, message: t('common.required') },
+                // 仅 UX 校验：段位封顶与唯一性在后端重新裁决
+                { pattern: /^\d{1,4}\.\d{1,2}\.\d{1,2}(\.\d{1,2})?$/, message: t('versionHistory.versionNoRule') },
+              ]}
+            >
+              <Input placeholder="例：1.0.1 或 1.0.0.01" style={{ maxWidth: 200 }} />
+            </Form.Item>
             {!isEdit && (
               <Button
                 type="link"

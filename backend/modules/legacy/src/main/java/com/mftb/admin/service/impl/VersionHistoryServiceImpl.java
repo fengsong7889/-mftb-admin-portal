@@ -9,7 +9,9 @@ import com.mftb.admin.mapper.SysVersionHistoryMapper;
 import com.mftb.admin.service.VersionHistoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.io.BufferedReader;
@@ -19,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -29,7 +32,27 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class VersionHistoryServiceImpl implements VersionHistoryService {
 
+    /** 版本号段位封顶：第二位及之后的每一位最大 99，再 +1 时向前一位进位（里程表式） */
+    static final int SEGMENT_CAP = 99;
+
+    private static final int SEGMENT_BASE = SEGMENT_CAP + 1;
+
+    /** 版本号写法：第一段 1~4 位，第二~四段各 1~2 位（即 0~99），第四段可省略 */
+    private static final Pattern VERSION_PATTERN = Pattern.compile("^\\d{1,4}\\.\\d{1,2}\\.\\d{1,2}(\\.\\d{1,2})?$");
+
+    /**
+     * 可作为重排起点的号形：每段只要求是数字，故意放宽到允许进位规则上线前的旧号（如 1.0.117.00），
+     * 这类号取进来后由 {@link #carrySegments(int[])} 归位，不会把非法序列继承下去。
+     */
+    private static final Pattern STARTABLE_VERSION = Pattern.compile("^\\d+\\.\\d+\\.\\d+(\\.\\d+)?$");
+
+    /** 重排起始号的兜底值：仅当首条记录的现有号解不出上面这种形状（历史脏值、临时号残留）时才用 */
+    static final String RENUMBER_FALLBACK_START = "1.0.0.00";
+
     private final SysVersionHistoryMapper mapper;
+
+    /** 需求表按版本号的字符串快照关联发布记录，重新编号后必须同步换号，只能走原生 SQL */
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     public PageResult<VersionHistoryVO> list(long page, long size, String keyword, String releaseType,
@@ -97,6 +120,7 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
 
     @Override
     public Long create(VersionHistoryVO vo, String operator) {
+        validateVersionNo(vo.getVersionNo(), null);
         SysVersionHistory entity = new SysVersionHistory();
         copyFromVO(entity, vo);
         entity.setCreatedBy(operator);
@@ -111,9 +135,32 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
         if (entity == null) {
             throw new BusinessException("版本記錄不存在");
         }
+        // 存量记录可能保留进位规则上线前的超标号（如 1.0.117.00），只改概要等其他字段时不得因此卡死；
+        // 一旦真的改号，必须按新规则在服务端重新裁决（前端校验只负责 UX）
+        if (!Objects.equals(entity.getVersionNo(), vo.getVersionNo())) {
+            validateVersionNo(vo.getVersionNo(), id);
+        }
         copyFromVO(entity, vo);
         entity.setUpdatedBy(operator);
         mapper.updateById(entity);
+    }
+
+    /** 版本号格式与唯一性的服务端裁决 */
+    private void validateVersionNo(String versionNo, Long selfId) {
+        String trimmed = versionNo == null ? null : versionNo.trim();
+        if (trimmed == null || trimmed.isEmpty() || !VERSION_PATTERN.matcher(trimmed).matches()) {
+            throw new BusinessException("版本號格式不正確：第二位及之後每一位最大 99，滿 99 向前一位進位"
+                    + "（例 1.0.117.00 應寫為 1.1.17.00）；合法寫法如 1.0.1 或 1.0.01");
+        }
+        LambdaQueryWrapper<SysVersionHistory> dup = new LambdaQueryWrapper<>();
+        dup.eq(SysVersionHistory::getVersionNo, trimmed);
+        if (selfId != null) {
+            dup.ne(SysVersionHistory::getId, selfId);
+        }
+        if (mapper.selectCount(dup) > 0) {
+            // 唯一键冲突若交给数据库抛异常会变成 500，这里给业务可读提示
+            throw new BusinessException("版本號 " + trimmed + " 已存在，請更換後再保存");
+        }
     }
 
     @Override
@@ -353,6 +400,46 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
     }
 
     /**
+     * 里程表式进位：第二~四段任何一位超过 {@link #SEGMENT_CAP} 就向前一位进 1、本位归零，
+     * 进位可逐级传递到第一位（主版本号不设上限）。
+     * <p>就地修改并返回同一数组，调用方拿到的一定是符合封顶规则的号位。
+     */
+    static int[] carrySegments(int[] v) {
+        for (int i = v.length - 1; i > 0; i--) {
+            if (v[i] > SEGMENT_CAP) {
+                v[i] -= SEGMENT_BASE;
+                v[i - 1] += 1;
+            }
+        }
+        return v;
+    }
+
+    /**
+     * 按发布类型推进一步版本号并套用进位规则。
+     * <p>低位递增时高位归零的既有口径保持不变：重大更新重置第三/四段，功能新增重置第四段。
+     */
+    static int[] advanceVersion(int[] current, String releaseType) {
+        int[] v = current.clone();
+        if ("major".equals(releaseType)) {
+            v[1] += 1;
+            v[2] = 0;
+            v[3] = 0;
+        } else if ("minor".equals(releaseType)) {
+            v[2] += 1;
+            v[3] = 0;
+        } else {
+            // patch / frontend：第四位（子补丁）增长
+            v[3] += 1;
+        }
+        return carrySegments(v);
+    }
+
+    /** 版本号展示格式：第一~三段不补零，第四段固定两位（00~99） */
+    static String formatVersion(int[] v) {
+        return v[0] + "." + v[1] + "." + v[2] + "." + String.format("%02d", v[3]);
+    }
+
+    /**
      * 读取 Git 提交日志（增量同步）
      * @param projectDir     项目根目录
      * @param sinceHash      上次同步到的最新 commit hash（非空时使用 hash 范围精确查询）
@@ -448,56 +535,21 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
     }
 
     /**
-     * 根据提交记录计算下一个版本号
-     * 版本规则：
-     *   重大更新 → 第二位数增长  1.0.0 → 1.1.0
-     *   功能新增 → 第三位数增长  1.0.0 → 1.0.1
-     *   问题修复 → 第四位(子补丁) 1.0.0 → 1.0.01
+     * 根据提交记录计算下一个版本号（进位口径见 advanceVersion）：
+     *   重大更新 → 第二位数增长  1.0.0.00 → 1.1.0.00
+     *   功能新增 → 第三位数增长  1.0.0.00 → 1.0.1.00
+     *   问题修复/前端优化 → 第四位数增长 1.0.0.00 → 1.0.0.01
+     * 第二位及之后每一位封顶 99，满 99 向前一位进位。
      */
     private String bumpVersion(String currentVersion, List<GitCommit> commits) {
-        int[] v = parseVersion(currentVersion);
-        int major = v[0], minor = v[1], patch = v[2], subPatch = v[3];
-
-        boolean hasBreaking = commits.stream()
-                .anyMatch(c -> c.getSubject().contains("!") || c.getSubject().toLowerCase().contains("breaking"));
-        boolean hasFeature = commits.stream()
-                .anyMatch(c -> c.getSubject().startsWith("feat") || c.getSubject().startsWith("feat("));
-        boolean hasFix = commits.stream()
-                .anyMatch(c -> c.getSubject().startsWith("fix") || c.getSubject().startsWith("fix("));
-
-        if (hasBreaking) {
-            // 重大更新：第二位数增长
-            return major + "." + (minor + 1) + ".0.00";
-        } else if (hasFeature) {
-            // 功能新增：第三位数增长
-            return major + "." + minor + "." + (patch + 1) + ".00";
-        } else if (hasFix) {
-            // bug修复：第四位(子补丁)增长
-            return major + "." + minor + "." + patch + "." + String.format("%02d", subPatch + 1);
-        } else {
-            // 前端交互优化：第四位(子补丁)增长
-            return major + "." + minor + "." + patch + "." + String.format("%02d", subPatch + 1);
-        }
+        return formatVersion(advanceVersion(parseVersion(currentVersion), determineReleaseType(commits)));
     }
 
     @Override
     public String suggestNextVersion(String releaseType) {
         String lastVersionNo = getLastVersionNo();
         String base = lastVersionNo != null ? lastVersionNo : "1.0.0";
-
-        int[] v = parseVersion(base);
-        int major = v[0], minor = v[1], patch = v[2], subPatch = v[3];
-
-        if ("major".equals(releaseType)) {
-            // 重大更新：第二位数增长
-            return major + "." + (minor + 1) + ".0.00";
-        } else if ("minor".equals(releaseType)) {
-            // 功能新增：第三位数增长
-            return major + "." + minor + "." + (patch + 1) + ".00";
-        } else {
-            // bug修复 / 前端交互优化：第四位(子补丁)增长
-            return major + "." + minor + "." + patch + "." + String.format("%02d", subPatch + 1);
-        }
+        return formatVersion(advanceVersion(parseVersion(base), releaseType));
     }
 
     private String determineReleaseType(List<GitCommit> commits) {
@@ -556,48 +608,111 @@ public class VersionHistoryServiceImpl implements VersionHistoryService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public String renumberAll() {
-        // 按创建时间正序查询所有记录（最早的在前）
+        // 按创建时间正序查询所有记录（最早的在前）；同一秒创建的多条以主键兼做次级排序，
+        // 否则数据库返回顺序拖动就会得出不同的编号
         List<SysVersionHistory> all = mapper.selectList(
-                new LambdaQueryWrapper<SysVersionHistory>().orderByAsc(SysVersionHistory::getCreatedAt));
+                new LambdaQueryWrapper<SysVersionHistory>()
+                        .orderByAsc(SysVersionHistory::getCreatedAt)
+                        .orderByAsc(SysVersionHistory::getId));
         if (all.isEmpty()) {
             return "沒有版本記錄需要重新編號";
         }
 
-        // 第一步：先将所有版本号清空（避免唯一键冲突）
+        // 起始号必须在置临时号之前取：置号后 record.getVersionNo() 已经是 _tmp_<id>，解不出任何形状
+        String firstVersionNo = all.get(0).getVersionNo();
+
+        // 第一步：先记住旧号，再把所有版本号置为临时号（避免与唯一键冲突）
+        Map<Long, String> oldNoById = new LinkedHashMap<>();
         for (SysVersionHistory record : all) {
+            oldNoById.put(record.getId(), record.getVersionNo());
             record.setVersionNo("_tmp_" + record.getId());
             mapper.updateById(record);
         }
 
-        // 第二步：从起始版本 1.0.0.00 开始，按创建时间正序递增
-        int major = 1, minor = 0, patch = 0, subPatch = 0;
+        // 第二步：以「重排前首条记录的现有号」为起点，按创建时间正序递增，每位封顶 99 并进位
+        int[] v = resolveStartVersion(firstVersionNo);
+        Map<String, String> remap = new LinkedHashMap<>();
         int updated = 0;
 
         for (SysVersionHistory record : all) {
-            String releaseType = record.getReleaseType();
-
             if (updated > 0) {
-                // 从第二条开始递增
-                if ("major".equals(releaseType)) {
-                    minor++;
-                    patch = 0;
-                    subPatch = 0;
-                } else if ("minor".equals(releaseType)) {
-                    patch++;
-                    subPatch = 0;
-                } else {
-                    // patch / frontend：第四位递增
-                    subPatch++;
-                }
+                v = advanceVersion(v, record.getReleaseType());
             }
-
-            String newVersion = major + "." + minor + "." + patch + "." + String.format("%02d", subPatch);
+            String newVersion = formatVersion(v);
             record.setVersionNo(newVersion);
             mapper.updateById(record);
+            String oldVersion = oldNoById.get(record.getId());
+            if (oldVersion != null && !oldVersion.equals(newVersion)) {
+                remap.put(oldVersion, newVersion);
+            }
             updated++;
         }
 
-        return String.format("成功重新編號 %d 條版本記錄", updated);
+        // 第三步：需求表存的是版本号的字符串快照，不同步换号会把「版本追溯」查成空
+        int migrated = migrateRequirementVersionLinks(remap);
+
+        String msg = String.format("成功重新編號 %d 條版本記錄，同步遷移 %d 條需求關聯版本號", updated, migrated);
+        log.info(msg);
+        return msg;
+    }
+
+    /**
+     * 解析重排起始号 —— 不写死常量，而是沿用库里首条记录现有的号。
+     * <p>为什么必须自适应：新装库由 {@code 98_version_history.sql} 种子写入首条 {@code 1.0.0.00}（major，初始版本），
+     * 而存量库的首条是 {@code 1.0.1.00}。写死其中任何一个，另一类库点一次「重新編號」就整体错位一格
+     * （存量库 Δ-1 会把「第三段 = 批次号」的约定打散，新装库 Δ+1 会把初始版本改成功能新增号）。
+     * 取现有首条号作起点后，本就合规的序列重排结果与自身相等（幂等），重排只修超限段及其后的行。
+     * <p>起始号自身若超限（如首条就是 1.0.117.00）也先按封顶规则归位，避免把非法原点传染给整条序列。
+     */
+    private int[] resolveStartVersion(String firstVersionNo) {
+        if (firstVersionNo == null || !STARTABLE_VERSION.matcher(firstVersionNo).matches()) {
+            log.warn("重新編號起始号无法解析（首条记录现号={}），回退到 {}", firstVersionNo, RENUMBER_FALLBACK_START);
+            return carrySegments(parseVersion(RENUMBER_FALLBACK_START));
+        }
+        return carrySegments(parseVersion(firstVersionNo));
+    }
+
+    /**
+     * 把 rdm_requirement.version_no 按旧号→新号一次性改写。
+     * <p>必须用单条 CASE 批量语句：逐条 UPDATE 时，若某条的新号恰好是另一条的旧号
+     * （全量重算必然整体前移，因此肯定发生），已改写的行会被后续语句二次平移。
+     * <p>所有值均走参数绑定，只拼接固定的 CASE 结构，不存在注入面。
+     * 参数必须按 SQL 里占位符的出现顺序装配：先全部 WHEN/THEN 对，再全部 IN 旧号。
+     */
+    private int migrateRequirementVersionLinks(Map<String, String> remap) {
+        if (remap.isEmpty()) {
+            return 0;
+        }
+        RemapStatement statement = buildRequirementRemapSql(remap);
+        return jdbcTemplate.update(statement.sql(), statement.args());
+    }
+
+    /** 批量换号语句：SQL 文本 + 与占位符同序的参数 */
+    record RemapStatement(String sql, Object[] args) {
+    }
+
+    /**
+     * 拼装旧号→新号的单条 CASE 语句。
+     * <p>参数必须按占位符在 SQL 里的出现顺序装配：先全部 WHEN/THEN 对，再全部 IN 旧号。
+     * 顺序错位不会报错、只会静默把需求关联改到错误的版本上，因此单独抽出便于直接断言。
+     */
+    static RemapStatement buildRequirementRemapSql(Map<String, String> remap) {
+        StringBuilder sql = new StringBuilder("UPDATE rdm_requirement SET version_no = CASE version_no ");
+        List<Object> args = new ArrayList<>();
+        for (Map.Entry<String, String> entry : remap.entrySet()) {
+            sql.append("WHEN ? THEN ? ");
+            args.add(entry.getKey());
+            args.add(entry.getValue());
+        }
+        sql.append("END WHERE version_no IN (");
+        int index = 0;
+        for (String oldVersionNo : remap.keySet()) {
+            sql.append(index++ == 0 ? "?" : ", ?");
+            args.add(oldVersionNo);
+        }
+        sql.append(")");
+        return new RemapStatement(sql.toString(), args.toArray());
     }
 }

@@ -106,15 +106,15 @@ export default function VersionHistory() {
     Modal.confirm({
       className: 'custom-confirm-modal',
       icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
-      title: '確認重新編號',
-      content: '將按創建時間倒序重新編排所有版本編號（起始 1.0.0），確定要繼續嗎？',
+      title: t('versionHistory.renumberConfirmTitle'),
+      content: t('versionHistory.renumberConfirmContent'),
       okText: t('common.confirm'),
       cancelText: t('common.cancel'),
       okButtonProps: { danger: true },
       onOk: async () => {
         try {
           const res = await renumberAllVersions()
-          message.success(res || '重新編號成功')
+          message.success(res || t('versionHistory.renumberSuccess'))
           loadData()
         } catch {
           /* error handled by interceptor */
@@ -303,7 +303,7 @@ export default function VersionHistory() {
             {t('versionHistory.syncFromGit')}
           </Button>
           <Button onClick={handleRenumberAll}>
-            重新編號
+            {t('versionHistory.renumber')}
           </Button>
         </div>
         <div className="action-section-right">
