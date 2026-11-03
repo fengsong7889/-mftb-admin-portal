@@ -65,10 +65,17 @@
 .organic__rank-pill { display: inline-block; min-width: 28px; text-align: center; padding: 1px 8px; border-radius: 13px; background: #FFF7E6; border: 1px solid #FFE7D1; color: #E8720C; font-weight: 700; font-size: 12px; }
 /* 必选查询条件红星标记（对齐 antd Form required 样式） */
 .organic__label--required::before { content: '*'; color: #FF4D4F; margin-right: 4px; }
-/* 商家權重分：算法口徑回顯條（品牌/頻道為算法庫單值配置，不是獨立篩選條件） */
-.organic__algo-scope { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 20px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed #F0F0F0; font-size: 12px; color: #595959; }
-.organic__algo-scope > span:first-child { color: #722ED1; font-weight: 600; }
-.organic__algo-scope b { color: #E8720C; font-weight: 600; }
+/* 商家權重分：綁定瀑布流单元格（只展示首条，多条折叠为 +N 面板） */
+.organic__wf-cell { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.organic__wf-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.organic__wf-panel { display: flex; flex-direction: column; gap: 8px; width: 280px; max-height: 260px; overflow-y: auto; }
+.organic__wf-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; border-bottom: 1px dashed #F0F0F0; padding-bottom: 6px; }
+.organic__wf-item:last-child { border-bottom: none; padding-bottom: 0; }
+/* 「+N ▾」展开入口：文字色彩仍继承全局 .ant-table .ant-btn-link（静态品牌橙、hover 变亮 + 浅橙底），
+   只补描边/圆角让它看上去是个可点控件；选择器加到 .ant-btn-link 一级是为了覆盖全局的 padding/border-radius，
+   描边取同一主色的透明度阶（不引入新色相），禁止重写 color / background */
+.ant-table .ant-btn-link.organic__wf-more { flex-shrink: 0; font-weight: 600; padding: 0 6px; border: 1px solid rgba(232, 114, 12, 0.35); border-radius: 10px; }
+.ant-table .ant-btn-link.organic__wf-more:hover { border-color: rgba(245, 148, 50, 0.65); }
 /* 距离衰减试算行 */
 .organic__distance-sim { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 12px; color: #595959; }
 .organic__distance-sim b { color: #E8720C; font-size: 13px; }

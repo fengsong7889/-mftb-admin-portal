@@ -6062,7 +6062,8 @@
     "waterfallRefWarning": "⚠️ This algorithm is referenced by the following waterfall configs:",
     "waterfallRefImpact": "Disabling/deleting will also remove references in waterfall configs. Continue?",
     "affectedSlots": "slots {{positions}}",
-    "selectAlgorithmFirst": "Select an algorithm first"
+    "selectAlgorithmFirst": "Select an algorithm first",
+    "btnScoreResult": "Score Result"
   },
   "recommendDashboard": {
     "pageTitle": "Dashboard",

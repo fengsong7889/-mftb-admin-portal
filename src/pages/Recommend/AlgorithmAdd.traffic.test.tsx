@@ -160,7 +160,7 @@ describe('算法库统一表单样式', () => {
   })
 })
 
-describe('自然流量算法業務頻道歸屬', () => {
+describe('自然流量算法不收業務頻道（頻道在「瀑布流策略」归类）', () => {
   const organicType = AlgorithmType.ORGANIC_TRAFFIC
   const openSelect = (name: string) => {
     fireEvent.mouseDown(screen.getByRole('combobox', { name }))
@@ -169,49 +169,31 @@ describe('自然流量算法業務頻道歸屬', () => {
     return within(dropdown as HTMLElement)
   }
 
-  it('新增自然流量：業務頻道只列三個真實頻道（不含大首頁），未選不得提交', async () => {
+  it('新增自然流量只收名稱與品牌，不出現業務頻道字段', async () => {
     await act(async () => { mountPage(`type=${organicType}`) })
-    const options = openSelect('common:channel')
-    expect(options.getByText('recommend.channelDeliveryName')).toBeInTheDocument()
-    expect(options.getByText('recommend.channelSupermarketName')).toBeInTheDocument()
-    expect(options.getByText('recommend.channelGroupBuyName')).toBeInTheDocument()
-    expect(options.queryByText('recommend.channelHomeName')).not.toBeInTheDocument()
-    // antd 虚拟列表的 role="option" 节点不等于可见选项数，按渲染出的 option 容器计数
-    expect(document.querySelectorAll('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option')).toHaveLength(3)
-
+    expect(screen.queryByRole('combobox', { name: 'common:channel' })).not.toBeInTheDocument()
+    // 算法本身不歸屬頻道：同一條算法可被不同频道的瀑布流引用，頻道由瀑布流决定
     fireEvent.change(screen.getByRole('textbox', { name: 'recommend.algoName' }), { target: { value: '超市百貨自然流量' } })
     fireEvent.click(openSelect('common:brand').getByText('recommend.appShanfeng'))
-    fireEvent.click(screen.getByRole('button', { name: /common:save/ }))
-    expect(await screen.findByText('common:selectChannel')).toBeInTheDocument()
-    expect(api.create).not.toHaveBeenCalled()
-  })
-
-  it('選定頻道後按「算法×頻道」落庫，payload 带上所選 channel', async () => {
-    await act(async () => { mountPage(`type=${organicType}`) })
-    fireEvent.change(screen.getByRole('textbox', { name: 'recommend.algoName' }), { target: { value: '超市百貨自然流量' } })
-    fireEvent.click(openSelect('common:brand').getByText('recommend.appShanfeng'))
-    fireEvent.click(openSelect('common:channel').getByText('recommend.channelSupermarketName'))
     fireEvent.click(screen.getByRole('button', { name: /common:save/ }))
     await waitFor(() => expect(api.create).toHaveBeenCalledTimes(1))
-    expect(api.create.mock.calls[0][0]).toMatchObject({
-      algoName: '超市百貨自然流量', algoType: organicType, brand: 'flashBee', channel: RecommendChannel.SUPERMARKET,
-    })
+    expect(api.create.mock.calls[0][0]).toMatchObject({ algoName: '超市百貨自然流量', algoType: organicType, brand: 'flashBee' })
+    expect(api.create.mock.calls[0][0]).not.toHaveProperty('channel')
   })
 
-  it('编辑自然流量回填已有頻道，保存原样回传不被抹空', async () => {
+  it('編輯存量算法（庫內仍有頻道殘值）時不回顯也不回寫，不抹掉瀑布流側口徑', async () => {
     api.fetch.mockResolvedValueOnce({ id: 9, algoCode: 'SFZR0009', algoName: '存量自然流量', algoType: organicType,
       brand: 'flashBee', channel: RecommendChannel.GROUP_BUY, params: '{}' })
     await act(async () => { mountPage(`type=${organicType}&id=9`) })
     await waitFor(() => expect(screen.getByRole('textbox', { name: 'recommend.algoName' })).toHaveValue('存量自然流量'))
-    const channelItem = screen.getByRole('combobox', { name: 'common:channel' }).closest('.ant-form-item')
-    expect(channelItem).toHaveTextContent('recommend.channelGroupBuyName')
+    expect(screen.queryByRole('combobox', { name: 'common:channel' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /common:save/ }))
     await waitFor(() => expect(api.update).toHaveBeenCalledTimes(1))
-    expect(api.update.mock.calls[0][1]).toMatchObject({ channel: RecommendChannel.GROUP_BUY })
+    expect(api.update.mock.calls[0][1]).not.toHaveProperty('channel')
   })
 
-  it('非自然流量类型不展示業務頻道（其頻道真值住定價表，不在此回写）', async () => {
-    await act(async () => { mountPage(`type=${AlgorithmType.INVINCIBLE_STAR}`) })
+  it.each([AlgorithmType.INVINCIBLE_STAR, AlgorithmType.TRAFFIC_AD, AlgorithmType.GOLDEN_SIGNBOARD])('其他廣告類型 %s 同樣不展示業務頻道（頻道真值住定價表或瀑布流）', async type => {
+    await act(async () => { mountPage(`type=${type}`) })
     expect(screen.queryByRole('combobox', { name: 'common:channel' })).not.toBeInTheDocument()
   })
 })

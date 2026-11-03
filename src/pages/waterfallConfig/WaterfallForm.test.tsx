@@ -110,6 +110,7 @@ describe('瀑布流布局及算法字段显示', () => {
       records: [
         ...algorithms,
         { ...algorithms[0], algoCode: 'OTHER_BRAND', algoName: '其他品牌算法', brand: 'mFood' },
+        // 頻道不再是算法的歸屬字段：同品牌但頻道殘值不同的算法仍應可被本瀑布流引用
         { ...algorithms[0], algoCode: 'OTHER_CHANNEL', algoName: '其他频道算法', channel: channel === GROUP_BUY_CHANNEL ? SUPERMARKET_CHANNEL : GROUP_BUY_CHANNEL },
       ],
       total: 4,
@@ -132,12 +133,15 @@ describe('瀑布流布局及算法字段显示', () => {
       expect(typeInput).toHaveValue('')
       expect(screen.getByText('所屬品牌')).toBeInTheDocument()
       expect(screen.queryByRole('combobox', { name: '選擇門店' })).not.toBeInTheDocument()
+      // 候選只按品牌收窄：其他品牌不可選，同品牌跨頻道可選（頻道由本瀑布流归类）
+      await act(async () => { fireEvent.mouseDown(selector.closest('.ant-select')!.querySelector('.ant-select-selector')!) })
+      expect(await screen.findByText('其他频道算法')).toBeInTheDocument()
+      expect(screen.queryByText('其他品牌算法')).toBeNull()
       await selectOption(selector, algo.algoName)
-      expect(screen.queryByText('其他品牌算法')).not.toBeInTheDocument()
-      expect(screen.queryByText('其他频道算法')).not.toBeInTheDocument()
       expect(typeInput).toHaveValue(algo.algoType === AlgorithmType.INVINCIBLE_STAR ? zh.recommend.algoInvincibleStar : zh.recommend.algoHotReviveAd)
       expect(screen.getByText('閃蜂')).toBeInTheDocument()
-      expect(fetchAdAlgorithms).toHaveBeenLastCalledWith(expect.objectContaining({ brand: 'flashBee', channel }))
+      expect(fetchAdAlgorithms).toHaveBeenLastCalledWith(expect.objectContaining({ brand: 'flashBee' }))
+      expect(vi.mocked(fetchAdAlgorithms).mock.calls.at(-1)?.[0]).not.toHaveProperty('channel')
       fireEvent.click(screen.getByRole('button', { name: /^1號位/ }))
       await act(async () => { fireEvent.click(screen.getByRole('button', { name: /應用並返回/ })) })
       await screen.findByDisplayValue('算法字段回归')

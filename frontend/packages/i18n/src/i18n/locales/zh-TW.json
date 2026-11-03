@@ -5942,7 +5942,8 @@
     "waterfallRefWarning": "⚠️ 該算法已被以下瀑布流配置引用：",
     "waterfallRefImpact": "停用/刪除後將同步清除瀑布流中的引用，確定繼續？",
     "affectedSlots": "坑位 {{positions}}",
-    "selectAlgorithmFirst": "請先選擇算法"
+    "selectAlgorithmFirst": "請先選擇算法",
+    "btnScoreResult": "計分結果"
   },
   "recommendDashboard": {
     "pageTitle": "數據看板",

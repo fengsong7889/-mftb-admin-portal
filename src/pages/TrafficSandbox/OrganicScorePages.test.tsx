@@ -12,14 +12,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MerchantScoreInsight from './MerchantScoreInsight'
 import LocationSimulation from './organic/LocationSimulation'
 import { getSampleSnapshot } from './organic/fixtures'
+import { setExtension } from '../waterfallConfig/waterfallExtStore'
+import { defaultExtension } from '@mftb/contracts/waterfallTypes'
 import type { Coordinate } from './organic/types'
 
 const permissions = vi.hoisted(() => ({ view: true, export: true }))
 const exportMock = vi.hoisted(() => vi.fn())
+const waterfallsMock = vi.hoisted(() => vi.fn())
 const algorithmsMock = vi.hoisted(() => vi.fn())
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ hasMenuPermission: () => permissions.view, hasPermission: (key: string) => key.endsWith(':export') ? permissions.export : permissions.view }) }))
 vi.mock('@/utils/exportCSV', () => ({ exportToCSV: exportMock }))
-vi.mock('@/api/adPromotion', () => ({ fetchAdAlgorithms: algorithmsMock }))
+// 只mock两个取数函数；保留模块的纯映射助手（brandToAppType 等）给页面的品牌导出口径用
+vi.mock('@/api/adPromotion', async importOriginal => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  fetchWaterfallList: waterfallsMock,
+  fetchAdAlgorithms: algorithmsMock,
+}))
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => (({ 'common.back': '返回', 'recommend.channelDelivery': '美食外賣', 'recommend.channelHome': '大首頁', 'recommend.channelSupermarket': '超市百貨', 'recommend.channelGroupBuy': '團購到店', 'recommend.appShanfeng': '閃蜂', 'recommend.appMfood': 'mFood' }) as Record<string, string>)[key] ?? key }) }))
 vi.mock('@ant-design/charts', () => ({ Line: () => <div aria-label="距離曲線" /> }))
 vi.mock('./organic/LocationMap', () => ({ default: ({ onPick }: { onPick: (p: Coordinate) => void }) => <button onClick={() => onPick({ lat: 22.18, lng: 113.56 })}>地圖點選新位置</button> }))
@@ -41,119 +49,219 @@ const routeParam = (name: string) => {
   const text = screen.getByLabelText('路由').textContent ?? ''
   return new URLSearchParams(text.split('?')[1] ?? '').get(name)
 }
+const openDropdown = (name: string) => {
+  fireEvent.mouseDown(screen.getByRole('combobox', { name }))
+  const dropdown = document.querySelector<HTMLElement>('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+  expect(dropdown, `下拉未展開：${name}`).toBeTruthy()
+  return dropdown as HTMLElement
+}
 beforeEach(() => {
   permissions.view = true; permissions.export = true
   localStorage.clear(); exportMock.mockClear()
+  waterfallsMock.mockReset().mockResolvedValue({ records: [
+    { id: 11, strategyCode: 'PB001', strategyName: '外賣首頁瀑布流', brand: 'flashBee', naturalAlgoId: 'SFZR001', naturalAlgoName: '外賣自然流量', status: 1 },
+    { id: 12, strategyCode: 'PB002', strategyName: '超市首頁瀑布流', brand: 'mFood', naturalAlgoId: 'SFZR002', naturalAlgoName: '超市自然流量', status: 1 },
+    // 同一條算法可被多條瀑布流引用：綁定列要能列出全部引用者
+    { id: 14, strategyCode: 'PB004', strategyName: '超市分類瀑布流', brand: 'flashBee', naturalAlgoId: 'SFZR002', naturalAlgoName: '超市自然流量', status: 1 },
+    // 停用的瀑布流也是歷史引用，綁定列要帶 (停用) 標記
+    { id: 15, strategyCode: 'PB005', strategyName: '外賣停用瀑布流', brand: 'flashBee', naturalAlgoId: 'SFZR001', naturalAlgoName: '外賣自然流量', status: 2 },
+    // 內容型瀑布流：可以不綁定算法，此類記錄沒有自然流量算法
+    { id: 13, strategyCode: 'PB003', strategyName: '超市門店瀑布流（未綁算法）', brand: 'mFood', naturalAlgoId: null, status: 1 },
+  ], total: 5 })
   algorithmsMock.mockReset().mockResolvedValue({ records: [
-    { id: 1, algoCode: 'ZRL001', algoName: '自然流量算法甲', algoType: 7, status: 1, brand: 'flashBee', channel: 2 },
-    { id: 2, algoCode: 'ZRL002', algoName: '自然流量算法乙', algoType: 7, status: 1, brand: 'mFood', channel: 3 },
-  ], total: 2 })
+    { id: 1, algoCode: 'SFZR001', algoName: '外賣自然流量', algoType: 7, status: 1, brand: 'flashBee' },
+    { id: 2, algoCode: 'SFZR002', algoName: '超市自然流量', algoType: 7, status: 1, brand: 'mFood' },
+    // 業務場景：新增後還沒綁任何瀑布流的算法，也要能出榜算分
+    { id: 3, algoCode: 'SFZR003', algoName: '未綁定瀑布流的算法', algoType: 7, status: 1, brand: 'flashBee' },
+  ], total: 3 })
+  // 業務頻道存在「瀑布流策略」的本地擴展存儲（後端本期無頻道列），口徑用例需預置擴展
+  setExtension(11, { ...defaultExtension('delivery'), bizChannel: 'food', confirmed: true })
+  setExtension(12, { ...defaultExtension('delivery'), bizChannel: 'supermarket', confirmed: true })
+  setExtension(14, { ...defaultExtension('delivery'), bizChannel: 'supermarket', confirmed: true })
 })
 
 describe('商家權重分', () => {
-  it('列表页标准结构：无定制页头，搜索条件与十二列齐全', async () => {
+  it('列表页标准结构：算法首位必选、瀑布流为带出入口，綁定瀑布流在操作列前', async () => {
     await mount()
-    // 列表设计规范 §E.7：搜索区置顶，不允许 hero 式定制页头；顶部说明横条已按需求移除
+    // 列表设计规范 §E.7：搜索区置顶，不允许 hero 式定制页头
     expect(document.querySelector('.organic__header')).toBeNull()
-    expect(document.querySelector('.organic__notice')).toBeNull()
-    expect(screen.getByRole('combobox', { name: '運營商圈' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: '自然流量算法' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: '瀑布流' })).toBeInTheDocument()
+    expect(screen.getByRole('spinbutton', { name: '排名下限' })).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: '集團ID/名稱' })).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: '門店ID/名稱' })).toBeInTheDocument()
-    expect(screen.getByRole('spinbutton', { name: '排名下限' })).toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: '算法名稱' })).toBeInTheDocument()
-    // 所屬品牌與業務頻道是算法上的單值字段：選了算法就定了口徑，不再作為獨立篩選條件
+    expect(screen.getByRole('combobox', { name: '運營商圈' })).toBeInTheDocument()
+    // 品牌/频道是算法口径的派生展示，不做筛选控件
     expect(screen.queryByRole('combobox', { name: '所屬品牌' })).toBeNull()
     expect(screen.queryByRole('combobox', { name: '業務頻道' })).toBeNull()
-    // 算法提到搜索區首位且必選（红星標記），第二位的排名區間不再帶红星
+    // 算法是榜单唯一必选口径（红星），第二位的瀑布流只是带出入口不带红星
     expect(document.querySelector('.organic__filter-grid > label:first-child .organic__label--required')).toBeInTheDocument()
     expect(document.querySelector('.organic__filter-grid > label:nth-child(2) .organic__label--required')).toBeNull()
-    expect(screen.queryByLabelText('門店搜尋')).not.toBeInTheDocument()
     const headers = Array.from(document.querySelectorAll('.ant-table-thead th')).map(th => th.textContent?.trim())
-    expect(headers).toEqual(['排名', '算法ID/名稱', '集團ID/名稱', '門店ID/名稱', '所屬品牌', '業務頻道', '運營商圈', '商業維度分', '店鋪維度分', '平台維度分', '綜合得分', '操作'])
-    // 統計卡、圖表、覆蓋矩陣、對比與導出均已移除
+    expect(headers).toEqual(['', '排名', '算法ID/名稱', '集團ID/名稱', '門店ID/名稱', '所屬品牌', '業務頻道', '運營商圈', '商業維度分', '店鋪維度分', '平台維度分', '綜合得分', '綁定瀑布流', '操作'])
+    // 多选列（供勾选导出）：表头全选框存在
+    expect(screen.getAllByRole('checkbox').length).toBeGreaterThan(0)
+    // 列表页标配：導出 + 字段設置（顯隱/排序）
+    expect(screen.getByRole('button', { name: /導出/ })).toBeInTheDocument()
+    expect(document.querySelector('.table-column-config-btn')).toBeTruthy()
     expect(document.querySelector('.organic__stats')).toBeNull()
-    expect(screen.queryByText('計分覆蓋')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /導出/ })).not.toBeInTheDocument()
-    expect(screen.queryAllByRole('checkbox')).toHaveLength(0)
   })
-  it('占比配置已停用：页面不出现占比、加权贡献或维度权重', async () => {
-    await mount()
-    expect(document.body.textContent).not.toMatch(/占比|加權|權重\s*\d/)
-    await mount('board', '?view=detail&storeId=DEMO-090')
-    expect(await screen.findByRole('heading', { name: '門店計分詳情' })).toBeInTheDocument()
-    expect(document.body.textContent).not.toMatch(/占比|加權|權重\s*\d/)
-  })
-  it('未選算法時不展示榜單，查詢提示必選', async () => {
+  it('未選算法不出榜，查詢提示算法必選', async () => {
     await mount()
     expect(bodyRows()).toHaveLength(0)
-    expect(screen.getByText('請先選擇算法後再查看排名')).toBeInTheDocument()
+    expect(screen.getByText('請先選擇自然流量算法後再查看排名')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /查\s*詢/ }))
-    expect(await screen.findByText('算法名稱為必選條件，請先選擇算法')).toBeInTheDocument()
+    expect(await screen.findByText('自然流量算法為必選條件，請先選擇算法')).toBeInTheDocument()
   })
-  it('品牌與頻道取算法庫口徑：口徑條與榜內列整榜同值', async () => {
-    algorithmsMock.mockResolvedValue({ records: [
-      { id: 1, algoCode: 'ZRL001', algoName: '外賣自然流量', algoType: 7, status: 1, brand: 'flashBee', channel: 2 },
-      { id: 2, algoCode: 'ZRL002', algoName: '超市自然流量', algoType: 7, status: 1, brand: 'mFood', channel: 3 },
-    ], total: 2 })
-    await mount('board', '?algo=ZRL002')
+  it('選已綁定算法即出榜：綁定列只展首条，+N 面板看全部', async () => {
+    await mount('board', '?algo=SFZR001')
     await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0))
-    // 口徑條回顯所選算法在算法庫綁定的品牌與頻道
-    const scope = document.querySelector<HTMLElement>('.organic__algo-scope')
-    expect(scope, '算法口徑條未渲染').toBeTruthy()
-    expect(scope!.textContent).toContain('mFood')
-    expect(scope!.textContent).toContain('超市百貨')
-    // 榜內每一行都等於算法口徑（舊實現按門店序號假分攤，會出現行品牌與算法矛盾）
-    for (const row of bodyRows()) {
-      expect(within(row).getByText('mFood')).toBeInTheDocument()
-      expect(within(row).getByText('超市百貨')).toBeInTheDocument()
-    }
+    const first = bodyRows()[0]
+    // 列内只放第一条，第二条折叠成 +1
+    expect(within(first).getByText('外賣首頁瀑布流(PB001)')).toBeInTheDocument()
+    expect(within(first).queryByText(/PB005/)).toBeNull()
+    const moreBtn = within(first).getByRole('button', { name: '查看全部 2 條綁定瀑布流' })
+    expect(moreBtn).toHaveTextContent('+1 ▾')
+    // 可点入口必须跟操作列同一套色彩语言（link 按钮：静态品牌橙 + hover 变亮带浅橙底），不自造描边胶囊也不手写色值
+    expect(moreBtn.className).toContain('ant-btn-link')
+    expect(moreBtn.className).toContain('organic__wf-more')
+    // 点 +N 展开面板：列出全部绑定及其频道/状态
+    fireEvent.click(within(first).getByRole('button', { name: '查看全部 2 條綁定瀑布流' }))
+    const panel = await screen.findByRole('tooltip')
+    expect(within(panel).getByText('外賣首頁瀑布流')).toBeInTheDocument()
+    expect(within(panel).getByText('PB001 · 美食外賣')).toBeInTheDocument()
+    expect(within(panel).getByText('外賣停用瀑布流')).toBeInTheDocument()
+    expect(within(panel).getByText('PB005 · 美食外賣')).toBeInTheDocument()
+    expect(within(panel).getByText('停用')).toBeInTheDocument()
+    // 頻道集合列去重後單值；品牌取算法自身配置
+    expect(within(first).getByText('美食外賣')).toBeInTheDocument()
+    expect(within(first).getByText('閃蜂')).toBeInTheDocument()
+    expect(within(first).getByText('SFZR001')).toBeInTheDocument()
+    for (const row of bodyRows()) expect(within(row).getByText('外賣首頁瀑布流(PB001)')).toBeInTheDocument()
   })
-  it('存量算法未填品牌/頻道時如實顯示未設定，不臆造归属', async () => {
-    algorithmsMock.mockResolvedValue({ records: [
-      { id: 3, algoCode: 'ZRL003', algoName: '未定口徑算法', algoType: 7, status: 1 },
-    ], total: 1 })
-    await mount('board', '?algo=ZRL003')
+  it('未綁定瀑布流的算法同樣出榜：綁定列與頻道列顯示無', async () => {
+    await mount('board', '?algo=SFZR003')
     await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0))
-    expect(within(bodyRows()[0]).getAllByText('算法未設定')).toHaveLength(2)
-    expect(document.querySelector<HTMLElement>('.organic__algo-scope')!.textContent).toContain('算法未設定')
+    const first = bodyRows()[0]
+    // 綁定瀑布流、業務頻道兩列都如實顯示「無」，不猜頻道也不阻断出榜
+    expect(within(first).getAllByText('無')).toHaveLength(2)
+    // 品牌取算法自身配置
+    expect(within(first).getByText('閃蜂')).toBeInTheDocument()
+    expect(within(first).getByText('SFZR003')).toBeInTheDocument()
   })
-  it('URL 帶未知算法或被已移除的舊參數時不出榜，也不报错', async () => {
-    await mount('board', '?algo=ZZZZ9999&brand=2&channel=3')
+  it('只帶瀑布流的舊链接：自動補出綁定算法並出榜', async () => {
+    await mount('board', '?wf=PB002')
+    await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0))
+    await waitFor(() => expect(routeParam('algo')).toBe('SFZR002'))
+    expect(screen.getByRole('combobox', { name: '自然流量算法' }).closest('label')).toHaveTextContent('超市自然流量(SFZR002)')
+  })
+  it('瀑布流未綁算法時空態指向瀑布流配置，不誤報算法庫問題', async () => {
+    await mount('board', '?wf=PB003')
     expect(bodyRows()).toHaveLength(0)
-    expect(await screen.findByText('所選算法不存在或已停用，請重新選擇算法')).toBeInTheDocument()
-    // 品牌/頻道控件已移除，手改 URL 留下的舊參數不参与篩選
-    expect(screen.queryByRole('combobox', { name: '業務頻道' })).toBeNull()
-    expect(screen.queryByRole('combobox', { name: '所屬品牌' })).toBeNull()
+    expect(await screen.findByText('該瀑布流未綁定自然流量算法，請改選算法，或到「瀑布流策略」為其補綁')).toBeInTheDocument()
   })
-
-  it('排名按筛选结果从1连续编号，展示品牌频道与三个维度的得分', async () => {
-    await mount('board', '?algo=ZRL001')
+  it('選瀑布流帶出算法後改選其它算法會清空瀑布流', async () => {
+    await mount('board', '?wf=PB002')
+    await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0))
+    fireEvent.click(within(openDropdown('自然流量算法')).getByText('外賣自然流量(SFZR001)'))
+    // PB002 绑的是 SFZR002，改選 SFZR001 後瀑布流草稿被清空，但未查询前 URL 不變
+    const wfLabel = screen.getByRole('combobox', { name: '瀑布流' }).closest('label')!
+    expect(wfLabel).not.toHaveTextContent('超市首頁瀑布流')
+    expect(wfLabel).toHaveTextContent('可選，選後帶出其算法')
+    expect(routeParam('wf')).toBe('PB002')
+  })
+  it('導出全量榜單：含綁定瀑布流、頻道集合與演示性質標記', async () => {
+    await mount('board', '?algo=SFZR002&regions=1,6')
+    await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0))
+    fireEvent.click(screen.getByRole('button', { name: /導出/ }))
+    expect(exportMock).toHaveBeenCalledTimes(1)
+    const [filename, fields, data] = exportMock.mock.calls[0] as [string, { title: string }[], Record<string, unknown>[]]
+    expect(filename).toBe('商家權重分_SFZR002')
+    expect(fields.map(field => field.title)).toEqual(['排名', '算法ID', '算法名稱', '綁定瀑布流', '集團ID', '集團名稱', '門店ID', '門店名稱', '所屬品牌', '業務頻道', '運營商圈', '商業維度分', '店鋪維度分', '平台維度分', '綜合得分', '榜單口徑', '資料性質'])
+    // 导出不只当前页：跟当前筛选条件走的全量榜單
+    const snapshot = getSampleSnapshot()
+    const expected = snapshot.stores.filter(s => s.totalScore != null && [1, 6].includes(s.regionId)).length
+    expect(data).toHaveLength(expected)
+    expect(data[0]).toMatchObject({
+      rank: 1, algoCode: 'SFZR002', algoName: '超市自然流量',
+      wfBindings: '超市首頁瀑布流(PB002)、超市分類瀑布流(PB004)',
+      brand: 'mFood', channel: '超市百貨',
+      scope: '算法 SFZR002 · 綁定瀑布流 2 條 · 業務頻道 超市百貨',
+      dataNature: '前端演示快照，非真實計分結果',
+    })
+  })
+  it('勾选后只导出所选门店，未勾选导出全量，可一键清空选择', async () => {
+    await mount('board', '?algo=SFZR001')
+    await waitFor(() => expect(bodyRows()).toHaveLength(20))
+    fireEvent.click(within(bodyRows()[0]).getByRole('checkbox'))
+    fireEvent.click(within(bodyRows()[1]).getByRole('checkbox'))
+    expect(screen.getByRole('button', { name: /導出\(2\)/ })).toBeInTheDocument()
+    expect(screen.getByText(/已選 2 家，導出僅含所選/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /導出\(2\)/ }))
+    expect(exportMock).toHaveBeenCalledTimes(1)
+    const selected = exportMock.mock.calls[0][2] as Record<string, unknown>[]
+    expect(selected).toHaveLength(2)
+    expect(selected.map(row => row.rank)).toEqual([1, 2])
+    // 清空选择后回到「不勾选=全量」口径
+    fireEvent.click(screen.getByRole('button', { name: /清空選擇/ }))
+    expect(screen.queryByRole('button', { name: /導出\(2\)/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /導出/ }))  // 已無勾選，按钮回到「導出」
+    const snapshot = getSampleSnapshot()
+    const all = exportMock.mock.calls[1][2] as Record<string, unknown>[]
+    expect(all).toHaveLength(snapshot.stores.filter(s => s.totalScore != null).length)
+  })
+  it('無導出權限時不顯示導出按鈕，字段設置仍可用', async () => {
+    permissions.export = false
+    await mount('board', '?algo=SFZR002')
+    await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0))
+    expect(screen.queryByRole('button', { name: /導出/ })).toBeNull()
+    expect(document.querySelector('.table-column-config-btn')).toBeTruthy()
+  })
+  it('字段設置保存後列顯隱與順序立即生效', async () => {
+    // 用户配置：隱藏業務頻道，並把綜合得分提到排名第二
+    localStorage.setItem('table-config-merchant-score-insight', JSON.stringify([
+      { key: 'rank', title: '排名', visible: true, locked: 'head' },
+      { key: 'total', title: '綜合得分', visible: true, locked: null },
+      { key: 'algo', title: '算法ID/名稱', visible: true, locked: null },
+      { key: 'merchantIdName', title: '集團ID/名稱', visible: true, locked: null },
+      { key: 'storeIdName', title: '門店ID/名稱', visible: true, locked: null },
+      { key: 'brand', title: '所屬品牌', visible: true, locked: null },
+      { key: 'channel', title: '業務頻道', visible: false, locked: null },
+      { key: 'region', title: '運營商圈', visible: true, locked: null },
+      { key: 'commercial', title: '商業維度分', visible: true, locked: null },
+      { key: 'storeScore', title: '店鋪維度分', visible: true, locked: null },
+      { key: 'platform', title: '平台維度分', visible: true, locked: null },
+      { key: 'wfBindings', title: '綁定瀑布流', visible: true, locked: null },
+      { key: 'action', title: '操作', visible: true, locked: 'tail' },
+    ]))
+    await mount('board', '?algo=SFZR002')
+    await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0))
+    const headers = Array.from(document.querySelectorAll('.ant-table-thead th')).map(th => th.textContent?.trim())
+    expect(headers).toEqual(['', '排名', '綜合得分', '算法ID/名稱', '集團ID/名稱', '門店ID/名稱', '所屬品牌', '運營商圈', '商業維度分', '店鋪維度分', '平台維度分', '綁定瀑布流', '操作'])
+  })
+  it('排名按筛选结果从1连续编号，展示三个维度的得分与名次徽章', async () => {
+    await mount('board', '?algo=SFZR001')
     await waitFor(() => expect(bodyRows()).toHaveLength(20))
     const first = bodyRows()[0]
     expect(within(first).getByText('1')).toBeInTheDocument()
     expect(within(first).getByText('DEMO-001')).toBeInTheDocument()
-    expect(within(first).getByText('閃蜂')).toBeInTheDocument()
-    expect(within(first).getByText('美食外賣')).toBeInTheDocument()
     const scoreCells = first.querySelectorAll('td')
-    for (const index of [7, 8, 9, 10]) expect(scoreCells[index].textContent).toMatch(/^\d+\.\d{2}$/)
-    // 算法库加载后按门店序号轮转归属：DEMO-001 → 第一家算法
-    expect(await within(first).findByText('ZRL001')).toBeInTheDocument()
+    // 13 列中第 9~12 列为三个维度分与综合得分
+    for (const index of [8, 9, 10, 11]) expect(scoreCells[index].textContent).toMatch(/^\d+\.\d{2}$/)
     expect(within(bodyRows()[1]).getByText('2')).toBeInTheDocument()
-    // 名次徽章：金银铜奖牌与 4-10 名胶囊，第 11 名起纯数字
     expect(bodyRows()[0].querySelector('.organic__rank-medal--gold')).toBeTruthy()
     expect(bodyRows()[1].querySelector('.organic__rank-medal--silver')).toBeTruthy()
     expect(bodyRows()[2].querySelector('.organic__rank-medal--bronze')).toBeTruthy()
     expect(bodyRows()[9].querySelector('.organic__rank-pill')).toBeTruthy()
     expect(bodyRows()[10].querySelector('.organic__rank-medal, .organic__rank-pill')).toBeNull()
     const snapshot = getSampleSnapshot()
-    // 算法必選且為榜單口徑：所选算法覆盖全部参排名門店（不再按門店序號轮转归属）
     const ranked = snapshot.stores.filter(s => s.totalScore != null)
     expect(screen.getByText(`共 ${ranked.length} 家參排名門店`)).toBeInTheDocument()
   })
   it('区域筛选只收窄榜单并重置名次，不出现非本区域门店', async () => {
     const snapshot = getSampleSnapshot()
     const expected = snapshot.stores.filter(s => s.totalScore != null && [1, 6].includes(s.regionId))
-    await mount('board', '?algo=ZRL001&regions=1,6')
+    await mount('board', '?algo=SFZR001&regions=1,6')
     await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0))
     expect(screen.getByText(`共 ${expected.length} 家參排名門店`)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /查\s*詢/ }))
@@ -161,40 +269,28 @@ describe('商家權重分', () => {
     expect(bodyRows()[0].textContent).toContain(expected[0].storeId)
   })
   it('门店下拉筛选按ID精确收窄并重新编号，重置后回到必选引导', async () => {
-    await mount('board', '?algo=ZRL001&store=DEMO-003')
+    await mount('board', '?algo=SFZR001&store=DEMO-003')
     await waitFor(() => expect(bodyRows()).toHaveLength(1))
     expect(within(bodyRows()[0]).getByText('DEMO-003')).toBeInTheDocument()
     expect(within(bodyRows()[0]).getByText('1')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /重\s*置/ }))
     await waitFor(() => expect(bodyRows()).toHaveLength(0))
-    expect(screen.getByText('請先選擇算法後再查看排名')).toBeInTheDocument()
+    expect(screen.getByText('請先選擇自然流量算法後再查看排名')).toBeInTheDocument()
     expect(routeParam('store')).toBeNull()
   })
   it('集团下拉筛选按ID精确收窄', async () => {
-    await mount('board', '?algo=ZRL001&merchant=GROUP-3')
+    await mount('board', '?algo=SFZR001&merchant=GROUP-3')
     await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0))
     for (const row of bodyRows()) expect(row.textContent).toContain('GROUP-3')
   })
-  it('名次區間先重新編號再收窄，品牌列取算法口徑而非門店假分攤', async () => {
-    await mount('board', '?algo=ZRL002&rankMin=2&rankMax=3')
+  it('名次區間先重新編號再收窄', async () => {
+    await mount('board', '?algo=SFZR002&rankMin=2&rankMax=3')
     await waitFor(() => expect(bodyRows()).toHaveLength(2))
     expect(within(bodyRows()[0]).getByText('2')).toBeInTheDocument()
     expect(within(bodyRows()[1]).getByText('3')).toBeInTheDocument()
-    // ZRL002 在算法庫綁定 mFood/超市百貨，榜內每行都該是這個口徑
-    for (const row of bodyRows()) {
-      expect(within(row).getByText('mFood')).toBeInTheDocument()
-      expect(within(row).getByText('超市百貨')).toBeInTheDocument()
-    }
-  })
-  it('算法即榜單範圍：所选算法覆盖全量参排名門店并從1編號', async () => {
-    await mount('board', '?algo=ZRL002')
-    await waitFor(() => expect(within(bodyRows()[0]).getByText('DEMO-001')).toBeInTheDocument())
-    expect(bodyRows()).toHaveLength(20)
-    for (const row of bodyRows()) expect(within(row).getByText('ZRL002')).toBeInTheDocument()
-    expect(within(bodyRows()[0]).getByText('1')).toBeInTheDocument()
   })
   it('詳情展示三个维度得分与逐项原因，返回后保留区域筛选', async () => {
-    await mount('board', '?algo=ZRL001&regions=1,6')
+    await mount('board', '?algo=SFZR001&regions=1,6')
     await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0))
     fireEvent.click(screen.getAllByRole('button', { name: '詳情' })[0])
     expect(await screen.findByRole('heading', { name: '門店計分詳情' })).toBeInTheDocument()
