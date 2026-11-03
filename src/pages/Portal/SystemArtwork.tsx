@@ -592,7 +592,10 @@ function Storefront({ x, y }: { x: number; y: number }) {
   return <g transform={`translate(${x} ${y})`}>
     <rect x="-23" y="-3" width="46" height="31" rx="4" fill="var(--art-surface)" stroke="currentColor" strokeWidth="1.5" />
     <path d="m-26-3 6-15h40l6 15Z" fill="currentColor" />
-    {[-26, -13, 0, 13].map((left, index) => <path key={left} d={`M${left}-3h13v5a6.5 6.5 0 0 1-13 0Z`} fill={index % 2 ? '#fff' : 'currentColor'} />)}
+    {/* 交替取「纸面色 / scene 主色」的条状零件。白色必须走 --art-surface：
+        它藏在条件表达式里（fill={index % 2 ? ... }），grep 'fill="#fff"' 与 codemod 都扫不到，
+        上一轮改完 97 处后 DOM 里仍残留 8 个白零件就是这个原因。 */}
+    {[-26, -13, 0, 13].map((left, index) => <path key={left} d={`M${left}-3h13v5a6.5 6.5 0 0 1-13 0Z`} fill={index % 2 ? 'var(--art-surface)' : 'currentColor'} />)}
     <path d="M-13 28V11h12v17m8-15h9v7H7Z" fill="currentColor" opacity="0.45" />
   </g>
 }
