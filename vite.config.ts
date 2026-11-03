@@ -3,6 +3,41 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import { createHash } from 'crypto'
 import { buildMetaPlugin } from './vite-build-meta'
+// 主题防闪烁脚本单一真源（.mjs 纯文本模块；本文件不在 tsconfig.include 内，由 vite 的 esbuild 加载）。
+// 门禁 scripts/check-theme-tokens.mjs 消费同一常量校验产物，避免「插件改了、校验没改」。
+// @ts-expect-error 无 .d.mts 声明：它只是一个导出的字符串常量
+import { THEME_BOOT_SCRIPT } from './scripts/lib/theme-boot-script.mjs'
+
+/**
+ * 首屏主题引导注入（深浅色主题方案 §6.10）。
+ *
+ * 为什么走 transformIndexHtml 而不是往 index.html 里贴脚本：
+ * 主站 `index.html` 与 `frontend/apps/{eam,hr,rdm}/index.html` 是四份独立文档，
+ * 但 `scripts/build-apps.mjs` 以 `VITE_APP_ROOT` 切入口、复用同一份 vite.config.ts，
+ * 所以一个插件即覆盖全部四份，将来新增第五个应用也不会漏。
+ * 手工贴四份的代价是某个子系统刷新时白闪，而平时开发在主站上看不出来。
+ *
+ * order:'pre' + head-prepend：必须在入口 script 与任何样式之前执行，
+ * 否则深色主题会先以浅色绘制一帧再跳色（FOUC）。
+ *
+ * 灰度开关（`VITE_THEME_SWITCH_ENABLED`）关闭时不注入：此时 `<html>` 上没有 data-theme，
+ * `:root` 浅色令牌直接生效，与 React 侧「开关关闭恒浅色」结果一致，不存在闪变窗口。
+ * 客户端侧读的是同一个构建期变量（Vite 会把同名 shell 环境变量注入 import.meta.env），
+ * 两边天然同源；详见 frontend/packages/ui/src/theme/featureFlag.ts。
+ */
+function themeBootstrapPlugin(): Plugin {
+  const switchEnabled = process.env.VITE_THEME_SWITCH_ENABLED === 'true'
+  return {
+    name: 'mftb:theme-bootstrap',
+    transformIndexHtml: {
+      order: 'pre',
+      handler() {
+        if (!switchEnabled) return []
+        return [{ tag: 'script', children: THEME_BOOT_SCRIPT, injectTo: 'head-prepend' }]
+      },
+    },
+  }
+}
 
 /** LLM 通道（一條通道 = 一個 OpenAI 兼容服務端點） */
 interface LlmChannel {
@@ -497,7 +532,7 @@ export default defineConfig({
         cacheDir: path.resolve(__dirname, 'node_modules/.vite'),
       }
     : {}),
-  plugins: [react(), llmProxyPlugin(__dirname), buildMetaPlugin()],
+  plugins: [react(), themeBootstrapPlugin(), llmProxyPlugin(__dirname), buildMetaPlugin()],
   // 前端托管基路径：默认整站门户子路径；按应用发布时用 VITE_APP_BASE 指定各自子路径/域名前缀，
   // 产物里的资源 URL 会按该值生成（卷布前不需要改代码，发布侧先定路径即可）。
   base: process.env.VITE_APP_BASE ?? (process.env.NODE_ENV === 'production' ? '/-mftb-admin-portal/' : '/'),
@@ -528,6 +563,9 @@ export default defineConfig({
       '@/components': path.resolve(__dirname, './frontend/packages/ui/src/components'),
       '@/hooks': path.resolve(__dirname, './frontend/packages/ui/src/hooks'),
       '@/styles': path.resolve(__dirname, './frontend/packages/ui/src/styles'),
+      // 主题状态层与令牌（深浅色主题方案 §3）：与 @/styles 同属 ui 包。必须显式声明，
+      // 否则 '@/theme/xxx' 会被后面的 '@' 兜底截到 src/theme（该目录不存在）。
+      '@/theme': path.resolve(__dirname, './frontend/packages/ui/src/theme'),
       '@/i18n': path.resolve(__dirname, './frontend/packages/i18n/src/i18n'),
       '@/constants': path.resolve(__dirname, './frontend/packages/contracts/src/constants'),
       '@': path.resolve(__dirname, './src'),

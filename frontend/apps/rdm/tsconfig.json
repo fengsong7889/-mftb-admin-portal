@@ -67,6 +67,12 @@
       "@/styles": [
         "../../packages/ui/src/styles"
       ],
+      "@/theme/*": [
+        "../../packages/ui/src/theme/*"
+      ],
+      "@/theme": [
+        "../../packages/ui/src/theme"
+      ],
       "@/assets/*": [
         "../../packages/ui/src/assets/*"
       ],
