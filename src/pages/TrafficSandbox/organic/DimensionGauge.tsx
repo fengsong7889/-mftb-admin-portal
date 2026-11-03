@@ -68,7 +68,10 @@ export default function DimensionGauge({ label, color, score, max }: GaugeProps)
             <stop offset="100%" style={{ stopColor: color, stopOpacity: 1 }} />
           </linearGradient>
         </defs>
-        <circle cx={centerX} cy={centerY} r={radius} fill="#fff" stroke="#e8e8e8" strokeWidth={2} />
+        {/* 底盘走 --surface-2：盘内前景（弧、指针、内圈、中心点）全部用传入的语义色 color，
+            没有深色线条，所以白底换深底不会让任何零件消失；
+            反而未达标刻度的 #d9d9d9 在白底上只有 1.2:1（几乎看不见），换深底后升到约 6.5:1。 */}
+        <circle cx={centerX} cy={centerY} r={radius} fill="var(--surface-2)" stroke="#e8e8e8" strokeWidth={2} />
         {animatedPct > 0 && <path d={arcPath(animatedAngle)} fill="none" stroke={`url(#${gradId})`} strokeWidth={8} strokeLinecap="round" />}
         {ticks}
         {/* 指针：按 0° 方向画标准锥形后整体绕圆心旋转；固定底边三角形在竖直方向会与顶点共线退化成细针 */}
@@ -76,8 +79,10 @@ export default function DimensionGauge({ label, color, score, max }: GaugeProps)
           <polygon points={`${centerX + radius - 18},${centerY} ${centerX - 9},${centerY - 4.5} ${centerX - 9},${centerY + 4.5}`} fill={color} />
           <line x1={centerX - 9} y1={centerY} x2={centerX - 17} y2={centerY} stroke={color} strokeWidth={3} strokeLinecap="round" />
         </g>
-        <circle cx={centerX} cy={centerY} r={12} fill="#f5f5f5" stroke="#d9d9d9" strokeWidth={1.5} />
+        <circle cx={centerX} cy={centerY} r={12} fill="var(--surface-1)" stroke="var(--border-1)" strokeWidth={1.5} />
         <circle cx={centerX} cy={centerY} r={7} fill={color} />
+        {/* 中心白点保持白色：它紧贴在外圈 fill={color} 的饱和色上，与插画对勾同理，
+            改成令牌色反而会让它在彩色底上消失。 */}
         <circle cx={centerX} cy={centerY} r={3.5} fill="#fff" />
       </svg>
       {/* 满分不可控（演示配置合计），得分框只展示当前分 */}
