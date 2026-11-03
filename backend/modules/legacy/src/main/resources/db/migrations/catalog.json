@@ -4080,14 +4080,32 @@
       "status": "ACTIVE",
       "dependencies": [
         "core:menu-seed-v46",
-        "ads:merchant-score-menu-first-v1"
+        "ads:merchant-score-menu-first-v1",
+        "ads:merchant-score-menu-rename-v1"
       ],
       "scriptFiles": [
         "326_merchant_score_menu_shorten.sql"
       ],
       "intent": "「商家權重分排名」更名為「商家權重分」：菜單名只留實體名，不帶「排名」這個頁面形態後綴",
       "author": "Qoder",
-      "comment": "與同組「瀑布流推演 / 算法推演 / 商家推廣診斷」口徑對齊，後者都不帶頁面後綴。命名鏈：商家評分透視 →（sql/321, ads:merchant-score-menu-rename-v1）→ 商家權重分排名 →（本條 v2）→ 商家權重分。321 已記成功不會重跑，故改名必須用新鍵而非回改歷史腳本；舊键 v1 尚未登記 catalog（同一批遺留缺口，本次只補 325/326，v1 的追溯靠本節命名鏈）。守衛：UPDATE 帶舊名稱作條件，運營在「菜單配置」裡自定義過的名稱不命中、不会被顶掉；命中 0 行属正常幂等。菜單名真值在 sys_menu.name，前端取權威名稱必須走 menuKey，本改名不影響權限鍵與路由。參考 SQL: sql/326_merchant_score_menu_shorten.sql"
+      "comment": "與同組「瀑布流推演 / 算法推演 / 商家推廣診斷」口徑對齊，後者都不帶頁面後綴。命名鏈：商家評分透視 →（sql/321, ads:merchant-score-menu-rename-v1）→ 商家權重分排名 →（本條 v2）→ 商家權重分。321 已記成功不會重跑，故改名必須用新鍵而非回改歷史腳本；舊鍵 v1 已補登記（見下方 ads:merchant-score-menu-rename-v1），本條依賴也已補上該鍵——本條 UPDATE 守衛取的正是在 v1 改出來的舊名「商家權重分排名」，沒有 v1 就只會命中 0 行、名字停在上一形態。守衛：UPDATE 帶舊名稱作條件，運營在「菜單配置」裡自定義過的名稱不命中、不会被顶掉；命中 0 行属正常幂等。菜單名真值在 sys_menu.name，前端取權威名稱必須走 menuKey，本改名不影響權限鍵與路由。參考 SQL: sql/326_merchant_score_menu_shorten.sql"
+    },
+    {
+      "versionKey": "ads:merchant-score-menu-rename-v1",
+      "module": "ads",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "dataInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "core:menu-seed-v46"
+      ],
+      "scriptFiles": [
+        "321_rename_merchant_score_menu.sql"
+      ],
+      "intent": "「商家評分透視」更名為「商家權重分排名」：占比（權重）配置模組已停用，頁面只展示三維度得分合計",
+      "author": "Qoder",
+      "comment": "2026-11-03 拉取 main 後把 sys_schema_version 與 catalog 逐鍵對賬時發現：321/325/326 三條菜單遷移裡，上一次補登記（29258ebf）只補了 325/326 兩條，321 的執行記錄（庫裡 applied_at=2026-11-01 00:03:32）仍不在台賬裡，違反「登記先行」，導致免登預檢與交付對賬看不到本條。MigrationCatalogTest 只校驗清單內部一致性（唯一鍵/依賴存在/無環），不校驗代碼側 applyOnce 是否都已登記，所以 CI 抓不到這類漏登記；執行真值始終在 DataInitializer（versionTracker.applyOnce(「ads:merchant-score-menu-rename-v1」, this::renameMerchantScoreInsightMenu)），本登記不觸發二次執行。依賴取 core:menu-seed-v46：它是當前代碼裡 V_MENU_SEED 的門控鍵，本條在代碼順序上確實晚於菜單種子；首次執行時（2026-11-01）庫裡生效的還是更早的 seed 版本，不改變「必須在種子之後」這個約束。守衛：UPDATE 帶舊名「商家評分透視」作條件，運營在「菜單配置」裡自定義過的名稱不命中；已改名環境命中 0 行屬正常幂等。參考 SQL: sql/321_rename_merchant_score_menu.sql"
     }
   ]
 }
