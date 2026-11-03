@@ -20,7 +20,8 @@ import { formatSignboardPeopleCount } from './signboardLabels'
 import './WeightSlider.css'
 
 /** 自然流量算法可選業務頻道：按系統數據字典只列三個真實頻道（大首頁是跨頻道混排聚合層，不是一種業務頻道）。
- * 算法必须归属到其中一个，商家權重分等榜单才能「先選頻道、再選該頻道下的算法」。*/
+ * 算法必須歸屬其中一個且只歸屬一個（單值字段）：商家權重分榜單直接取該算法綁定的品牌與頻道作口徑，
+ * 因此頻道/品牌在榜單頁不再是獨立篩選條件。*/
 const ORGANIC_CHANNEL_OPTIONS = [
   { value: RecommendChannel.DELIVERY, labelKey: 'recommend.channelDeliveryName' },
   { value: RecommendChannel.SUPERMARKET, labelKey: 'recommend.channelSupermarketName' },
@@ -813,7 +814,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
             />
           </Form.Item>
 
-          {/* 自然流量：算法必须归属一个業務頻道（榜单按「頻道 → 算法」级联取数）；
+          {/* 自然流量：算法必須歸屬一個業務頻道（單值；榜單的品牌/頻道口徑直接取這裡的配置）；
               编辑模式允许改，存量未填的算法可在此补选 */}
           {selectedAlgorithmType === AlgorithmType.ORGANIC_TRAFFIC && (
             <Form.Item
