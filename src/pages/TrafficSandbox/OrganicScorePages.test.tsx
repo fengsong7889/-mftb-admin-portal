@@ -45,8 +45,8 @@ beforeEach(() => {
   permissions.view = true; permissions.export = true
   localStorage.clear(); exportMock.mockClear()
   algorithmsMock.mockReset().mockResolvedValue({ records: [
-    { id: 1, algoCode: 'ZRL001', algoName: '自然流量算法甲', algoType: 7, status: 1 },
-    { id: 2, algoCode: 'ZRL002', algoName: '自然流量算法乙', algoType: 7, status: 1 },
+    { id: 1, algoCode: 'ZRL001', algoName: '自然流量算法甲', algoType: 7, status: 1, brand: 'flashBee', channel: 2 },
+    { id: 2, algoCode: 'ZRL002', algoName: '自然流量算法乙', algoType: 7, status: 1, brand: 'mFood', channel: 3 },
   ], total: 2 })
 })
 
@@ -60,18 +60,13 @@ describe('商家權重分', () => {
     expect(screen.getByRole('combobox', { name: '集團ID/名稱' })).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: '門店ID/名稱' })).toBeInTheDocument()
     expect(screen.getByRole('spinbutton', { name: '排名下限' })).toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: '所屬品牌' })).toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: '業務頻道' })).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: '算法名稱' })).toBeInTheDocument()
-    // 業務頻道按系統數據字典只列三個頻道：大首頁是混排聚合層，不是一種業務頻道
-    fireEvent.mouseDown(screen.getByRole('combobox', { name: '業務頻道' }))
-    expect(await screen.findByText('美食外賣')).toBeInTheDocument()
-    expect(screen.getByText('超市百貨')).toBeInTheDocument()
-    expect(screen.getByText('團購到店')).toBeInTheDocument()
-    expect(screen.queryByText('大首頁')).not.toBeInTheDocument()
-    // 自然流量按業務頻道配置：頻道排首位，算法名稱退到第二位但仍必選（红星标记）
-    expect(document.querySelector('.organic__filter-grid > label:first-child .organic__label--required')).toBeNull()
-    expect(document.querySelector('.organic__filter-grid > label:nth-child(2) .organic__label--required')).toBeInTheDocument()
+    // 所屬品牌與業務頻道是算法上的單值字段：選了算法就定了口徑，不再作為獨立篩選條件
+    expect(screen.queryByRole('combobox', { name: '所屬品牌' })).toBeNull()
+    expect(screen.queryByRole('combobox', { name: '業務頻道' })).toBeNull()
+    // 算法提到搜索區首位且必選（红星標記），第二位的排名區間不再帶红星
+    expect(document.querySelector('.organic__filter-grid > label:first-child .organic__label--required')).toBeInTheDocument()
+    expect(document.querySelector('.organic__filter-grid > label:nth-child(2) .organic__label--required')).toBeNull()
     expect(screen.queryByLabelText('門店搜尋')).not.toBeInTheDocument()
     const headers = Array.from(document.querySelectorAll('.ant-table-thead th')).map(th => th.textContent?.trim())
     expect(headers).toEqual(['排名', '算法ID/名稱', '集團ID/名稱', '門店ID/名稱', '所屬品牌', '業務頻道', '運營商圈', '商業維度分', '店鋪維度分', '平台維度分', '綜合得分', '操作'])
@@ -95,31 +90,40 @@ describe('商家權重分', () => {
     fireEvent.click(screen.getByRole('button', { name: /查\s*詢/ }))
     expect(await screen.findByText('算法名稱為必選條件，請先選擇算法')).toBeInTheDocument()
   })
-  it('業務頻道聯動算法下拉：只列該頻道與未定頻道的算法，換頻道後已選算法被清空', async () => {
+  it('品牌與頻道取算法庫口徑：口徑條與榜內列整榜同值', async () => {
     algorithmsMock.mockResolvedValue({ records: [
-      { id: 1, algoCode: 'ZRL001', algoName: '外賣自然流量', algoType: 7, status: 1, channel: 2 },
-      { id: 2, algoCode: 'ZRL002', algoName: '超市自然流量', algoType: 7, status: 1, channel: 3 },
-      // 存量算法大多未填頻道：按「通用」处理，不得被频道筛选误杀
-      { id: 3, algoCode: 'ZRL003', algoName: '未定頻道算法', algoType: 7, status: 1 },
-    ], total: 3 })
-    await mount('board', '?algo=ZRL001')
+      { id: 1, algoCode: 'ZRL001', algoName: '外賣自然流量', algoType: 7, status: 1, brand: 'flashBee', channel: 2 },
+      { id: 2, algoCode: 'ZRL002', algoName: '超市自然流量', algoType: 7, status: 1, brand: 'mFood', channel: 3 },
+    ], total: 2 })
+    await mount('board', '?algo=ZRL002')
     await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0))
-
-    fireEvent.mouseDown(screen.getByRole('combobox', { name: '業務頻道' }))
-    let dropdown = document.querySelector<HTMLElement>('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-    expect(dropdown, '頻道下拉未展開').toBeTruthy()
-    fireEvent.click(within(dropdown as HTMLElement).getByText('超市百貨'))
-
-    // 原算法属外賣頻道，换频道后必须重选；直接查询被必选拦截而不是给出空榜
-    // （antd message 挂在 body 上不随组件卸载，同一文件内多个用例会叠加同一提示，故用 findAll）
-    fireEvent.click(screen.getByRole('button', { name: /查\s*詢/ }))
-    expect((await screen.findAllByText('算法名稱為必選條件，請先選擇算法')).length).toBeGreaterThan(0)
-
-    fireEvent.mouseDown(screen.getByRole('combobox', { name: '算法名稱' }))
-    dropdown = document.querySelector<HTMLElement>('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-    expect(dropdown, '算法下拉未展開').toBeTruthy()
-    expect(Array.from(dropdown!.querySelectorAll('.ant-select-item-option')).map(el => el.textContent))
-      .toEqual(['超市自然流量(ZRL002)', '未定頻道算法(ZRL003)'])
+    // 口徑條回顯所選算法在算法庫綁定的品牌與頻道
+    const scope = document.querySelector<HTMLElement>('.organic__algo-scope')
+    expect(scope, '算法口徑條未渲染').toBeTruthy()
+    expect(scope!.textContent).toContain('mFood')
+    expect(scope!.textContent).toContain('超市百貨')
+    // 榜內每一行都等於算法口徑（舊實現按門店序號假分攤，會出現行品牌與算法矛盾）
+    for (const row of bodyRows()) {
+      expect(within(row).getByText('mFood')).toBeInTheDocument()
+      expect(within(row).getByText('超市百貨')).toBeInTheDocument()
+    }
+  })
+  it('存量算法未填品牌/頻道時如實顯示未設定，不臆造归属', async () => {
+    algorithmsMock.mockResolvedValue({ records: [
+      { id: 3, algoCode: 'ZRL003', algoName: '未定口徑算法', algoType: 7, status: 1 },
+    ], total: 1 })
+    await mount('board', '?algo=ZRL003')
+    await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0))
+    expect(within(bodyRows()[0]).getAllByText('算法未設定')).toHaveLength(2)
+    expect(document.querySelector<HTMLElement>('.organic__algo-scope')!.textContent).toContain('算法未設定')
+  })
+  it('URL 帶未知算法或被已移除的舊參數時不出榜，也不报错', async () => {
+    await mount('board', '?algo=ZZZZ9999&brand=2&channel=3')
+    expect(bodyRows()).toHaveLength(0)
+    expect(await screen.findByText('所選算法不存在或已停用，請重新選擇算法')).toBeInTheDocument()
+    // 品牌/頻道控件已移除，手改 URL 留下的舊參數不参与篩選
+    expect(screen.queryByRole('combobox', { name: '業務頻道' })).toBeNull()
+    expect(screen.queryByRole('combobox', { name: '所屬品牌' })).toBeNull()
   })
 
   it('排名按筛选结果从1连续编号，展示品牌频道与三个维度的得分', async () => {
@@ -142,13 +146,13 @@ describe('商家權重分', () => {
     expect(bodyRows()[9].querySelector('.organic__rank-pill')).toBeTruthy()
     expect(bodyRows()[10].querySelector('.organic__rank-medal, .organic__rank-pill')).toBeNull()
     const snapshot = getSampleSnapshot()
-    // 算法必选：ZRL001 按轮转只覆盖奇数序号门店
-    const ranked = snapshot.stores.filter(s => s.totalScore != null && Number(s.storeId.slice(-3)) % 2 === 1)
+    // 算法必選且為榜單口徑：所选算法覆盖全部参排名門店（不再按門店序號轮转归属）
+    const ranked = snapshot.stores.filter(s => s.totalScore != null)
     expect(screen.getByText(`共 ${ranked.length} 家參排名門店`)).toBeInTheDocument()
   })
   it('区域筛选只收窄榜单并重置名次，不出现非本区域门店', async () => {
     const snapshot = getSampleSnapshot()
-    const expected = snapshot.stores.filter(s => s.totalScore != null && [1, 6].includes(s.regionId) && Number(s.storeId.slice(-3)) % 2 === 1)
+    const expected = snapshot.stores.filter(s => s.totalScore != null && [1, 6].includes(s.regionId))
     await mount('board', '?algo=ZRL001&regions=1,6')
     await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0))
     expect(screen.getByText(`共 ${expected.length} 家參排名門店`)).toBeInTheDocument()
@@ -171,16 +175,20 @@ describe('商家權重分', () => {
     await waitFor(() => expect(bodyRows().length).toBeGreaterThan(0))
     for (const row of bodyRows()) expect(row.textContent).toContain('GROUP-3')
   })
-  it('品牌筛选与名次区间叠加：先重新编号再按区间收窄', async () => {
-    await mount('board', '?algo=ZRL002&brand=2&rankMin=2&rankMax=3')
+  it('名次區間先重新編號再收窄，品牌列取算法口徑而非門店假分攤', async () => {
+    await mount('board', '?algo=ZRL002&rankMin=2&rankMax=3')
     await waitFor(() => expect(bodyRows()).toHaveLength(2))
-    expect(within(bodyRows()[0]).getByText('DEMO-006')).toBeInTheDocument()
     expect(within(bodyRows()[0]).getByText('2')).toBeInTheDocument()
-    for (const row of bodyRows()) expect(within(row).getByText('mFood')).toBeInTheDocument()
+    expect(within(bodyRows()[1]).getByText('3')).toBeInTheDocument()
+    // ZRL002 在算法庫綁定 mFood/超市百貨，榜內每行都該是這個口徑
+    for (const row of bodyRows()) {
+      expect(within(row).getByText('mFood')).toBeInTheDocument()
+      expect(within(row).getByText('超市百貨')).toBeInTheDocument()
+    }
   })
-  it('算法名称筛选只保留该算法的门店并重新编号', async () => {
+  it('算法即榜單範圍：所选算法覆盖全量参排名門店并從1編號', async () => {
     await mount('board', '?algo=ZRL002')
-    await waitFor(() => expect(within(bodyRows()[0]).getByText('DEMO-002')).toBeInTheDocument())
+    await waitFor(() => expect(within(bodyRows()[0]).getByText('DEMO-001')).toBeInTheDocument())
     expect(bodyRows()).toHaveLength(20)
     for (const row of bodyRows()) expect(within(row).getByText('ZRL002')).toBeInTheDocument()
     expect(within(bodyRows()[0]).getByText('1')).toBeInTheDocument()
