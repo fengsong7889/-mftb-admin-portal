@@ -9425,7 +9425,13 @@
     "syncNoNewCommits": "No new Git commits to sync",
     "syncGitNotAvailable": "Git is not installed in this environment; sync unavailable",
     "commitHash": "Sync Anchor Commit",
-    "commitHashTip": "The Git Commit SHA synced in this record; next sync will incrementally pull from this commit"
+    "commitHashTip": "The Git Commit SHA synced in this record; next sync will incrementally pull from this commit",
+    "renumber": "Renumber",
+    "renumberConfirmTitle": "Confirm Renumbering",
+    "renumberConfirmContent": "All version records will be renumbered in creation order, starting from the number currently held by the earliest record (so a compliant sequence stays put instead of shifting by one): breaking updates advance the 2nd segment, features the 3rd, fixes and UI tweaks the 4th. Every segment from the 2nd on is capped at 99 and carries into the previous one (carry example: 1.0.117.00 carries to 1.1.17.00). Over-cap records and everything after them will be rewritten, and version numbers referenced by requirements migrate with them. Continue?",
+    "renumberSuccess": "Renumbering succeeded",
+    "versionNoRule": "Invalid version number: every segment from the 2nd on is capped at 99 and carries into the previous one (e.g. write 1.1.17.00 instead of 1.0.117.00)",
+    "versionNoExtra": "Breaking update → 2nd segment (1.0.0.00→1.1.0.00); feature → 3rd segment (1.0.0.00→1.0.1.00); fix / UI tweak → 4th segment (1.0.0.00→1.0.0.01); every segment from the 2nd on is capped at 99 and carries into the previous one"
   },
   "mcpService": {
     "pageTitle": "MCP Services",
