@@ -407,7 +407,7 @@ const Thermometer = ({ score, maxScore, dimension, color }: ThermometerProps) =>
             cx={centerX}
             cy={centerY}
             r={radius}
-            fill="#fff"
+            fill="var(--surface-2)"
             stroke="#e8e8e8"
             strokeWidth={2}
           />
@@ -431,13 +431,15 @@ const Thermometer = ({ score, maxScore, dimension, color }: ThermometerProps) =>
             cx={centerX}
             cy={centerY}
             r={12}
-            fill="#f5f5f5"
-            stroke="#d9d9d9"
+            fill="var(--surface-1)"
+            stroke="var(--border-1)"
             strokeWidth={1.5}
           />
           
           {/* 指針中心軸内圓 */}
           <circle cx={centerX} cy={centerY} r={7} fill={color} />
+          {/* 中心白点保持白色（外圈是饱和色 fill={color}）；底盘改 --surface-2 后，
+              未达标刻度的 #d9d9d9 对比度反而由约 1.2:1 提升到约 6.5:1。 */}
           <circle cx={centerX} cy={centerY} r={3.5} fill="#fff" />
           
           {/* 指針 - 三角形 */}
