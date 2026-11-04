@@ -504,7 +504,7 @@ export default function ReleaseBatchDetail() {
       children: (
         <div>
           <strong>創建批次</strong>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{detail.applicantUserName || '-'} · {detail.createdAt ? dayjs(detail.createdAt).format('YYYY-MM-DD HH:mm') : '-'}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{detail.applicantUserName || '-'} · {detail.createdAt ? dayjs(detail.createdAt).format('YYYY-MM-DD HH:mm') : '-'}</div>
         </div>
       ),
     })
@@ -517,7 +517,7 @@ export default function ReleaseBatchDetail() {
         children: (
           <div>
             <strong>放行檢查</strong>
-            <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
               {passed === totalChecks ? '全部通過' : `${totalChecks - passed} 項未通過`}
             </div>
           </div>
@@ -531,7 +531,7 @@ export default function ReleaseBatchDetail() {
         children: (
           <div>
             <strong>申請發布</strong>
-            <div style={{ fontSize: 12, color: '#8C8C8C' }}>{detail.applicantUserName}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{detail.applicantUserName}</div>
           </div>
         ),
       })
@@ -544,7 +544,7 @@ export default function ReleaseBatchDetail() {
         children: (
           <div>
             <strong>{isApproved ? '審批通過' : '審批拒絕'}</strong>
-            <div style={{ fontSize: 12, color: '#8C8C8C' }}>{detail.approvalUserName} · {dayjs(detail.approvalTime).format('YYYY-MM-DD HH:mm')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{detail.approvalUserName} · {dayjs(detail.approvalTime).format('YYYY-MM-DD HH:mm')}</div>
           </div>
         ),
       })
@@ -558,7 +558,7 @@ export default function ReleaseBatchDetail() {
             children: (
               <div>
                 <strong>部署 {dep.systemName || dep.systemCode}</strong>
-                <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+                <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
                   {RDM_DEPLOY_STATUS_LABEL[dep.deployStatus] ?? dep.deployStatus} · {dayjs(dep.deployTime).format('MM-DD HH:mm')}
                   {dep.operatorUserName ? ` · ${dep.operatorUserName}` : ''}
                 </div>
@@ -572,7 +572,7 @@ export default function ReleaseBatchDetail() {
             children: (
               <div>
                 <strong>驗證 {dep.systemName || dep.systemCode}</strong>
-                <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+                <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
                   {RDM_VERIFY_STATUS_LABEL[dep.verifyStatus] ?? dep.verifyStatus} · {dayjs(dep.verifyTime).format('MM-DD HH:mm')}
                 </div>
               </div>
@@ -585,7 +585,7 @@ export default function ReleaseBatchDetail() {
     if (detail.status === RDM_RELEASE_BATCH_STATUS.RELEASED) {
       items.push({
         color: 'green',
-        children: <div><strong>發布完成</strong><div style={{ fontSize: 12, color: '#8C8C8C' }}>{detail.updatedAt ? dayjs(detail.updatedAt).format('YYYY-MM-DD HH:mm') : ''}</div></div>,
+        children: <div><strong>發布完成</strong><div style={{ fontSize: 12, color: 'var(--text-3)' }}>{detail.updatedAt ? dayjs(detail.updatedAt).format('YYYY-MM-DD HH:mm') : ''}</div></div>,
       })
     }
 
@@ -595,7 +595,7 @@ export default function ReleaseBatchDetail() {
         children: (
           <div>
             <strong>已回滾</strong>
-            <div style={{ fontSize: 12, color: '#8C8C8C' }}>{detail.rollbackReason || ''} · {detail.updatedAt ? dayjs(detail.updatedAt).format('YYYY-MM-DD HH:mm') : ''}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{detail.rollbackReason || ''} · {detail.updatedAt ? dayjs(detail.updatedAt).format('YYYY-MM-DD HH:mm') : ''}</div>
           </div>
         ),
       })
@@ -742,8 +742,8 @@ export default function ReleaseBatchDetail() {
                 <div key={idx} className={`rdm-release-check-item ${item.passed ? 'passed' : 'failed'}`}>
                   <span className="rdm-release-check-icon">
                     {item.passed
-                      ? <CheckCircleOutlined style={{ color: '#52C41A', fontSize: 16 }} />
-                      : <CloseCircleOutlined style={{ color: '#FF4D4F', fontSize: 16 }} />}
+                      ? <CheckCircleOutlined style={{ color: 'var(--success)', fontSize: 16 }} />
+                      : <CloseCircleOutlined style={{ color: 'var(--danger)', fontSize: 16 }} />}
                   </span>
                   <span className="rdm-release-check-type">{RDM_RELEASE_CHECK_TYPE_LABEL[item.checkType] ?? item.checkType}</span>
                   <span className="rdm-release-check-msg">{item.message || '-'}</span>
@@ -829,7 +829,7 @@ export default function ReleaseBatchDetail() {
                         {RDM_EXEMPTION_DECISION_TYPE_LABEL.release}{types.has(RDM_EXEMPTION_DECISION_TYPE.RELEASE) ? '✓' : '…'}
                       </Tag>
                     </Space>
-                    {ex.reason && <div style={{ fontSize: 12, color: '#595959', marginTop: 4 }}>事由：{ex.reason}</div>}
+                    {ex.reason && <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 4 }}>事由：{ex.reason}</div>}
                   </div>
                 )
               })}
@@ -957,7 +957,7 @@ export default function ReleaseBatchDetail() {
 
       {/* ===== 回滾 Modal ===== */}
       <Modal
-        title={<span style={{ color: '#FF4D4F' }}><RollbackOutlined style={{ marginRight: 8 }} />回滾發布批次</span>}
+        title={<span style={{ color: 'var(--danger)' }}><RollbackOutlined style={{ marginRight: 8 }} />回滾發布批次</span>}
         open={rollbackModalOpen}
         onCancel={() => { setRollbackModalOpen(false); rollbackForm.resetFields() }}
         onOk={handleRollbackSubmit}

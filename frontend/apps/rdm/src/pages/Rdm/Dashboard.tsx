@@ -82,10 +82,10 @@ export default function RdmDashboard() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         gap: 12, flexWrap: 'wrap', marginBottom: 16,
       }}>
-        <div style={{ fontSize: 18, fontWeight: 700, color: '#262626', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <BarChartOutlined style={{ color: '#E8720C' }} />
+        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <BarChartOutlined style={{ color: 'var(--brand)' }} />
           產研需求全局看板
-          <span style={{ fontSize: 12, fontWeight: 400, color: '#8C8C8C' }}>
+          <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-3)' }}>
             需求吞吐 · 交付效率 · 風險預警 · 個人產出
           </span>
         </div>
@@ -139,10 +139,10 @@ export default function RdmDashboard() {
       {/* ── 交付流水线（阶段负载） ── */}
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}><RiseOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--warning-soft)', color: 'var(--brand)' }}><RiseOutlined /></span>
           交付流水線負載
           <span className="rdm-card-title-split" />
-          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>點擊進入需求清單查看明細</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>點擊進入需求清單查看明細</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
           {board.columns.map(col => (
@@ -151,15 +151,15 @@ export default function RdmDashboard() {
               onClick={() => navigate(`/rdm-requirement?statuses=${encodeURIComponent((col.statuses ?? []).join(','))}&src=${encodeURIComponent(col.title)}`)}
               style={{
                 border: '1px solid #e8eaed', borderRadius: 8, padding: '12px 14px', cursor: 'pointer',
-                background: col.overdue > 0 ? '#FFF7F0' : '#FAFBFC',
+                background: col.overdue > 0 ? 'var(--brand-soft)' : 'var(--surface-sunken)',
                 transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
             >
-              <div style={{ fontSize: 12, color: '#8C8C8C' }}>{col.title}</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#262626', margin: '4px 0' }}>{col.count}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{col.title}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-1)', margin: '4px 0' }}>{col.count}</div>
               {col.overdue > 0
                 ? <Tag color="error" style={{ margin: 0 }}>逾期 {col.overdue}</Tag>
-                : <span style={{ fontSize: 12, color: '#52C41A' }}>無逾期</span>}
+                : <span style={{ fontSize: 12, color: 'var(--success)' }}>無逾期</span>}
             </div>
           ))}
         </div>
@@ -169,7 +169,7 @@ export default function RdmDashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
         <div className="rdm-card" style={{ marginBottom: 0 }}>
           <div className="rdm-card-title">
-            <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><BarChartOutlined /></span>
+            <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}><BarChartOutlined /></span>
             需求類型分佈
           </div>
           <Pie
@@ -185,7 +185,7 @@ export default function RdmDashboard() {
         </div>
         <div className="rdm-card" style={{ marginBottom: 0 }}>
           <div className="rdm-card-title">
-            <span className="rdm-icon-block" style={{ background: '#F9F0FF', color: '#722ED1' }}><ClockCircleOutlined /></span>
+            <span className="rdm-icon-block" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}><ClockCircleOutlined /></span>
             各階段平均停留（天）—— 定位流程瓶頸
           </div>
           <Column
@@ -202,7 +202,7 @@ export default function RdmDashboard() {
 
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#F6FFED', color: '#52C41A' }}><RiseOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}><RiseOutlined /></span>
           提交 / 交付趨勢
         </div>
         <Line
@@ -222,7 +222,7 @@ export default function RdmDashboard() {
       {/* ── 风险与产出入口：明细与两张排名表已拆为独立菜单，这里只留计数与入口，不再复制一份明细 ── */}
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#FFF1F0', color: '#FF4D4F' }}><AlertOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}><AlertOutlined /></span>
           風險與產出
           <span className="rdm-card-title-split" />
           <Space size={6} wrap>
@@ -232,7 +232,7 @@ export default function RdmDashboard() {
             <Tag color="gold" style={{ margin: 0 }}>審批停滯 {overview.intakeStuckTotal}</Tag>
           </Space>
         </div>
-        <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 12 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12 }}>
           風險按「當前狀態停留時長」統計；逐條明細跟催請進風險中心，部門與個人負載在另一頁復盤。
         </div>
         <Space size={8} wrap>

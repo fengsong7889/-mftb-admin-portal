@@ -107,10 +107,10 @@ export default function SlaConfig() {
     {
       title: '效果預覽', key: 'preview', width: 200,
       render: (_, r) => (
-        <Space size={4} style={{ fontSize: 12, color: '#8C8C8C' }}>
+        <Space size={4} style={{ fontSize: 12, color: 'var(--text-3)' }}>
           <ClockCircleOutlined />
           {r.warnHours}h 後提醒處理人，{r.slaHours}h 未處理通知
-          <b style={{ color: '#595959' }}>{RDM_ROLE_LABEL[r.escalateRole as RdmRoleCode] ?? r.escalateRole}</b>
+          <b style={{ color: 'var(--text-2)' }}>{RDM_ROLE_LABEL[r.escalateRole as RdmRoleCode] ?? r.escalateRole}</b>
         </Space>
       ),
     },

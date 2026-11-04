@@ -60,7 +60,7 @@ export default function BuiltinTemplateDetail() {
   return (
     <div className="content-area">
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
       }}>
         <div style={{
@@ -72,13 +72,13 @@ export default function BuiltinTemplateDetail() {
               回到模板配置頁會讓用戶以為自己剛才是從模板列表進來的 */}
           <Button type="primary" icon={<ArrowLeftOutlined />} onClick={() => navigate('/rdm-daily-report-rules')}
             style={{
-              backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px',
+              backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8, height: 36, padding: '0 16px',
               display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
             }}>
             {t('rdm.dailyTemplate.back')}
           </Button>
           <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{title}</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>{title}</h2>
           <Tag color="blue">{t('rdm.dailyTemplate.preset')}</Tag>
         </div>
       </div>
@@ -94,10 +94,10 @@ export default function BuiltinTemplateDetail() {
 
       <div style={cardStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>版式預覽</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>版式預覽</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0' }} />
         </div>
-        <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 12 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12 }}>
           按示例數據渲染，用於確認版式；不會發送
         </div>
         {loading

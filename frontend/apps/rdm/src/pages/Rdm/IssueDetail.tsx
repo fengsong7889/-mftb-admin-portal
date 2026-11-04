@@ -456,7 +456,7 @@ export default function IssueDetail() {
       {/* ── Section 1: 問題摘要 ── */}
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#FFF1F0', color: '#FF4D4F' }}><ExclamationCircleOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}><ExclamationCircleOutlined /></span>
           問題摘要
           <span className="rdm-card-title-split" />
         </div>
@@ -493,14 +493,14 @@ export default function IssueDetail() {
       {detail.deferRecords && detail.deferRecords.length > 0 && (
         <div className="rdm-card">
           <div className="rdm-card-title">
-            <span className="rdm-icon-block" style={{ background: '#F9F0FF', color: '#722ED1' }}><ClockCircleOutlined /></span>
+            <span className="rdm-icon-block" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}><ClockCircleOutlined /></span>
             延期流程
             <span className="rdm-card-title-split" />
           </div>
           {deferSteps.map(({ record, steps }, idx) => (
             <div key={record.id} style={{ marginBottom: idx < deferSteps.length - 1 ? 24 : 0 }}>
               {deferSteps.length > 1 && (
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>第 {idx + 1} 次延期申請</div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>第 {idx + 1} 次延期申請</div>
               )}
               <Steps size="small" current={steps.findIndex(s => s.status === 'process')} items={steps.map(s => ({
                 title: s.title,
@@ -514,15 +514,15 @@ export default function IssueDetail() {
                   <Col span={8}><b>目標版本：</b>{record.targetVersion || '-'}</Col>
                   <Col span={8}><b>截止日期：</b>{record.dueAt ? dayjs(record.dueAt).format('YYYY-MM-DD') : '-'}</Col>
                 </Row>
-                {record.impactDesc && <div style={{ fontSize: 12, color: '#595959', marginTop: 8 }}><b>影響描述：</b>{record.impactDesc}</div>}
-                {record.mitigation && <div style={{ fontSize: 12, color: '#595959', marginTop: 4 }}><b>臨時措施：</b>{record.mitigation}</div>}
+                {record.impactDesc && <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 8 }}><b>影響描述：</b>{record.impactDesc}</div>}
+                {record.mitigation && <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 4 }}><b>臨時措施：</b>{record.mitigation}</div>}
                 {record.productDecideReason && (
-                  <div style={{ fontSize: 12, color: '#595959', marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 4 }}>
                     <b>產品裁決原因：</b>{record.productDecideReason}
                   </div>
                 )}
                 {record.bizDecideReason && (
-                  <div style={{ fontSize: 12, color: '#595959', marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 4 }}>
                     <b>業務裁決原因：</b>{record.bizDecideReason}
                   </div>
                 )}

@@ -97,7 +97,7 @@ export default function TeamOutput() {
             strokeColor={rateColor(r.onTimeRate)}
             showInfo={false}
           />
-          <span style={{ fontSize: 12, color: '#595959' }}>{Math.round(r.onTimeRate * 100)}%</span>
+          <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{Math.round(r.onTimeRate * 100)}%</span>
         </Space>
       ),
     },
@@ -105,7 +105,7 @@ export default function TeamOutput() {
       title: '平均交付天數', dataIndex: 'avgDays', key: 'avgDays', width: 130,
       sorter: (a, b) => a.avgDays - b.avgDays,
       render: (v: number) => (
-        <span style={{ color: v > 20 ? '#CF1322' : '#595959' }}>{v.toFixed(1)} 天</span>
+        <span style={{ color: v > 20 ? '#CF1322' : 'var(--text-2)' }}>{v.toFixed(1)} 天</span>
       ),
     },
     {
@@ -125,7 +125,7 @@ export default function TeamOutput() {
     { title: '已交付', dataIndex: 'delivered', key: 'delivered', width: 100 },
     {
       title: '逾期', dataIndex: 'overdue', key: 'overdue', width: 90,
-      render: (v: number) => <span style={{ color: v > 0 ? '#CF1322' : '#52C41A' }}>{v}</span>,
+      render: (v: number) => <span style={{ color: v > 0 ? '#CF1322' : 'var(--success)' }}>{v}</span>,
     },
     {
       title: '平均交付天數', dataIndex: 'avgDays', key: 'avgDays', width: 140,
@@ -147,10 +147,10 @@ export default function TeamOutput() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         gap: 12, flexWrap: 'wrap', marginBottom: 16,
       }}>
-        <div style={{ fontSize: 18, fontWeight: 700, color: '#262626', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <TeamOutlined style={{ color: '#1890FF' }} />
+        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <TeamOutlined style={{ color: 'var(--info)' }} />
           部門與人員產出
-          <span style={{ fontSize: 12, fontWeight: 400, color: '#8C8C8C' }}>
+          <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-3)' }}>
             吞吐 · 按時率 · 在途負載（復盤找瓶頸用，不是績效打分依據）
           </span>
         </div>
@@ -201,7 +201,7 @@ export default function TeamOutput() {
 
       <div className="rdm-card" style={{ marginBottom: 16 }}>
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><PieChartOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}><PieChartOutlined /></span>
           部門需求產出（{deptRank.length}）
           <span className="rdm-card-title-split" />
           {deptCfg.configComponent}
@@ -226,7 +226,7 @@ export default function TeamOutput() {
 
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#F9F0FF', color: '#722ED1' }}><TeamOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}><TeamOutlined /></span>
           產品經理負載（{pmRank.length}）
           <span className="rdm-card-title-split" />
           {pmCfg.configComponent}

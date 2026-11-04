@@ -390,7 +390,7 @@ export default function ProjectOverview() {
         <div className="confirm-info-card">
           <div className="confirm-info-row"><span>{t('rdm.projOverview.deleteNoLabel')}</span><b>{record.projectNo || '-'}</b></div>
           <div className="confirm-info-row"><span>{t('rdm.projOverview.deleteNameLabel')}</span><b>{record.name}</b></div>
-          <div style={{ marginTop: 8, color: '#8C8C8C' }}>
+          <div style={{ marginTop: 8, color: 'var(--text-3)' }}>
             {t('rdm.projOverview.deleteHint')}
           </div>
         </div>
@@ -453,7 +453,7 @@ export default function ProjectOverview() {
               <ul style={{ margin: 0, paddingLeft: 18, color: '#CF1322' }}>
                 {(rec.mismatches.length ? rec.mismatches : ['對賬未通過']).slice(0, 8).map((m, i) => <li key={i}>{m}</li>)}
               </ul>
-              <div style={{ marginTop: 8, color: '#8C8C8C' }}>仍要導出嗎？</div>
+              <div style={{ marginTop: 8, color: 'var(--text-3)' }}>仍要導出嗎？</div>
             </div>
           ),
           okText: '仍要導出',
@@ -521,13 +521,13 @@ export default function ProjectOverview() {
     {
       // 固定首列：14 位（PROJ+8 位日期+2 位日序）需留足寬度，存量空值降級 -
       title: '項目編號', dataIndex: 'projectNo', key: 'projectNo', width: 150,
-      render: (v?: string | null) => v || <span style={{ color: '#8C8C8C' }}>-</span>,
+      render: (v?: string | null) => v || <span style={{ color: 'var(--text-3)' }}>-</span>,
     },
     {
       title: t('rdm.projOverview.colName'), dataIndex: 'name', key: 'name', width: 200,
       render: (name: string, record) => (
         <div
-          style={{ fontWeight: 600, color: '#262626', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+          style={{ fontWeight: 600, color: 'var(--text-1)', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
           onClick={() => navigate(detailPath(record.id))}
           title={name}
         >
@@ -537,8 +537,8 @@ export default function ProjectOverview() {
     },
     { title: t('rdm.projOverview.colPm'), dataIndex: 'pmUserName', key: 'pmUserName', width: 150, render: (v: string | null | undefined, r) => renderOwner(v, r.pmUserEmpNo) },
     { title: t('rdm.projOverview.colPo'), dataIndex: 'productOwnerUserName', key: 'productOwnerUserName', width: 150, render: (v: string | null | undefined, r) => renderOwner(v, r.productOwnerUserEmpNo) },
-    { title: t('rdm.projOverview.colPlanStart'), dataIndex: 'planStartDate', key: 'planStartDate', width: 125, sorter: true, render: (v?: string | null) => v || <span style={{ color: '#8C8C8C' }}>-</span> },
-    { title: t('rdm.projOverview.colPlanEnd'), dataIndex: 'planEndDate', key: 'planEndDate', width: 125, sorter: true, render: (v?: string | null) => v || <span style={{ color: '#8C8C8C' }}>-</span> },
+    { title: t('rdm.projOverview.colPlanStart'), dataIndex: 'planStartDate', key: 'planStartDate', width: 125, sorter: true, render: (v?: string | null) => v || <span style={{ color: 'var(--text-3)' }}>-</span> },
+    { title: t('rdm.projOverview.colPlanEnd'), dataIndex: 'planEndDate', key: 'planEndDate', width: 125, sorter: true, render: (v?: string | null) => v || <span style={{ color: 'var(--text-3)' }}>-</span> },
     {
       /**
        * 三层进度同格呈现（需求 → 交付项 → 研发任务）：三个数全部取自后端事实源同一行，
@@ -547,7 +547,7 @@ export default function ProjectOverview() {
       title: t('rdm.projOverview.colDelivery'), key: 'delivery', width: 300,
       render: (_, record) => (
         <span
-          style={{ color: '#1890FF', cursor: 'pointer', fontSize: 13 }}
+          style={{ color: 'var(--info)', cursor: 'pointer', fontSize: 13 }}
           onClick={() => navigate(detailPath(record.id))}
         >
           {t('rdm.projOverview.deliveryTriple', {
@@ -566,25 +566,25 @@ export default function ProjectOverview() {
         // 口径：剩余 = 承诺交付项数 − 已交付数，只算交付项，不算需求与研发任务。
         // 承诺数为 0 时必须单独呈现：旧实现 0−0=0 走「全部完成」分支，刚建完还没排交付项的项目
         // 会被显示成已全部交付完，等于把「还没承诺」谎报成「已经做完」。
-        if (record.totalDeliveryCount === 0) return <span style={{ color: '#8C8C8C' }}>{t('rdm.projOverview.remainingNone')}</span>
+        if (record.totalDeliveryCount === 0) return <span style={{ color: 'var(--text-3)' }}>{t('rdm.projOverview.remainingNone')}</span>
         const remaining = record.totalDeliveryCount - record.deliveredCount
-        if (remaining <= 0) return <span style={{ color: '#52C41A' }}>{t('rdm.projOverview.remainingAllDone')}</span>
+        if (remaining <= 0) return <span style={{ color: 'var(--success)' }}>{t('rdm.projOverview.remainingAllDone')}</span>
         return (
-          <span style={{ fontSize: 13, color: '#595959' }}>
+          <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
             {record.blockedCount > 0 && <Tag color="error" style={{ marginRight: 4 }}>{t('rdm.projOverview.blockedInline', { n: record.blockedCount })}</Tag>}
             {t('rdm.projOverview.remainingMore', { n: remaining })}
           </span>
         )
       },
     },
-    { title: t('rdm.projOverview.colNextDelivery'), dataIndex: 'nextDeliveryDate', key: 'nextDeliveryDate', width: 120, render: (v?: string | null) => v || <span style={{ color: '#8C8C8C' }}>-</span> },
+    { title: t('rdm.projOverview.colNextDelivery'), dataIndex: 'nextDeliveryDate', key: 'nextDeliveryDate', width: 120, render: (v?: string | null) => v || <span style={{ color: 'var(--text-3)' }}>-</span> },
     {
       title: t('rdm.projOverview.colBlockDecision'), key: 'blockDecision', width: 130,
       render: (_, record) => (
         <Space size={4}>
           {record.blockedCount > 0 && <Tag color="error" style={{ margin: 0 }}>{t('rdm.projOverview.blockedTag', { n: record.blockedCount })}</Tag>}
           {record.pendingDecisionCount > 0 && <Tag color="purple" style={{ margin: 0 }}>{t('rdm.projOverview.pendingTag', { n: record.pendingDecisionCount })}</Tag>}
-          {record.blockedCount === 0 && record.pendingDecisionCount === 0 && <span style={{ color: '#52C41A', fontSize: 12 }}>{t('rdm.projOverview.normalText')}</span>}
+          {record.blockedCount === 0 && record.pendingDecisionCount === 0 && <span style={{ color: 'var(--success)', fontSize: 12 }}>{t('rdm.projOverview.normalText')}</span>}
         </Space>
       ),
     },
@@ -614,12 +614,12 @@ export default function ProjectOverview() {
               body: { whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.7 },
             }}
           >
-            <span style={{ color: '#595959', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span style={{ color: 'var(--text-2)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {v}
             </span>
           </Tooltip>
         )
-        : <span style={{ color: '#8C8C8C' }}>-</span>,
+        : <span style={{ color: 'var(--text-3)' }}>-</span>,
     },
     // 最后更新人：后端 rdm:schema:v3.14 起写入；存量行为空，降级显示 -
     { title: t('rdm.projOverview.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 110, render: (v?: string | null) => v || '-' },
@@ -679,7 +679,7 @@ export default function ProjectOverview() {
               onChange={e => setKeywordDraft(e.target.value)}
               onPressEnter={handleSearch}
               allowClear
-              prefix={<SearchOutlined style={{ color: '#BFBFBF' }} />}
+              prefix={<SearchOutlined style={{ color: 'var(--text-4)' }} />}
             />
           </Form.Item>
           <Form.Item label={t('rdm.projOverview.filterPm')}>

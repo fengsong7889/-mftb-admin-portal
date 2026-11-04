@@ -41,7 +41,7 @@ export default function WorkbenchCustomize({ layout }: { layout: WorkbenchLayout
   const content = (
     <div style={{ width: 380 }}>
       <div style={{ marginBottom: 10 }}>
-        <span style={{ fontSize: 12, color: '#8C8C8C', marginRight: 6 }}>識別到的工作身份</span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)', marginRight: 6 }}>識別到的工作身份</span>
         {identities.map(identity => (
           <Tag key={identity} color="orange" style={{ margin: '0 4px 4px 0' }}>
             {RDM_IDENTITY_LABEL[identity]}
@@ -65,12 +65,12 @@ export default function WorkbenchCustomize({ layout }: { layout: WorkbenchLayout
                 onChange={e => toggle(meta.key, e.target.checked)}
                 aria-label={`${meta.label}顯示開關`}
               />
-              <span style={{ color: checked ? '#E8720C' : '#BFBFBF', fontSize: 14 }}>
+              <span style={{ color: checked ? 'var(--brand)' : 'var(--text-4)', fontSize: 14 }}>
                 {RDM_SECTION_ICON[meta.key] ?? DEFAULT_SECTION_ICON}
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, color: '#262626' }}>{meta.label}</div>
-                <div style={{ fontSize: 12, color: '#8C8C8C' }}>{meta.hint}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-1)' }}>{meta.label}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{meta.hint}</div>
               </div>
               <Space size={2}>
                 <Button

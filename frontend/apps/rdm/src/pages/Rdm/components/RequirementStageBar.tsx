@@ -66,7 +66,7 @@ export default function RequirementStageBar({ status, overdue, compact, stayDays
               key={st}
               style={{
                 flex: 1, height: 4, borderRadius: 2,
-                background: idx < currentIdx ? '#E8720C'
+                background: idx < currentIdx ? 'var(--brand)'
                   : idx === currentIdx ? (overdue ? '#FF4D4F' : '#F59432')
                   : '#F0F0F0',
               }}
@@ -75,14 +75,14 @@ export default function RequirementStageBar({ status, overdue, compact, stayDays
         </div>
         <div style={{
           marginTop: 4, fontSize: 11,
-          color: overdue ? '#CF1322' : '#8C8C8C',
+          color: overdue ? '#CF1322' : 'var(--text-3)',
         }}>
           {currentIdx >= 0 ? RDM_STAGE_LABEL[RDM_STAGE_ORDER[currentIdx]] : RDM_STATUS_LABEL[status as RdmStatus] ?? status}
           {derived ? '（交付項）' : ''}
         </div>
         {/* 看板卡片：推导阶段旁边直出 N/M，不占额外行也不靠悬停 */}
         {derived && derivedHint && (
-          <div style={{ fontSize: 11, color: '#8C8C8C' }}>{derivedHint}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{derivedHint}</div>
         )}
       </div>
     )
@@ -109,10 +109,10 @@ export default function RequirementStageBar({ status, overdue, compact, stayDays
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 64 }}>
                 <div style={{
                   width: 22, height: 22, borderRadius: '50%',
-                  background: done ? '#E8720C' : active ? (alarm ? '#FFF2F0' : '#FFF7F0') : '#fff',
+                  background: done ? 'var(--brand)' : active ? (alarm ? '#FFF2F0' : 'var(--brand-soft)') : 'var(--surface-2)',
                   border: `2px solid ${color}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 11, fontWeight: 700, color: done ? '#fff' : active ? (alarm ? '#CF1322' : '#E8720C') : '#BFBFBF',
+                  fontSize: 11, fontWeight: 700, color: done ? '#fff' : active ? (alarm ? '#CF1322' : 'var(--brand)') : 'var(--text-4)',
                   boxShadow: active ? `0 0 0 4px ${alarm ? 'rgba(255,77,79,0.12)' : 'rgba(232,114,12,0.12)'}` : 'none',
                   animation: active ? 'statusPulse 2s ease-in-out infinite' : undefined,
                   transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -124,15 +124,15 @@ export default function RequirementStageBar({ status, overdue, compact, stayDays
                   trigger="hover"
                   content={
                     <div style={{ maxWidth: 320 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 6 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 6 }}>
                         {RDM_STAGE_LABEL[st]}
                         {typeof stay === 'number' ? ` · 停留 ${stay} 天` : ''}
                       </div>
-                      <div style={{ fontSize: 12, color: '#595959', marginBottom: active ? 8 : 0 }}>
+                      <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: active ? 8 : 0 }}>
                         {RDM_STAGE_DESC[st]}
                       </div>
                       {active && (
-                        <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
                           {derived ? (
                             <>
                               階段來源：<Tag color="purple" style={{ margin: 0 }}>由交付項推導</Tag>
@@ -156,7 +156,7 @@ export default function RequirementStageBar({ status, overdue, compact, stayDays
                   <div style={{ marginTop: 6, textAlign: 'center', cursor: 'pointer' }}>
                     <div style={{
                       fontSize: 12, whiteSpace: 'nowrap',
-                      color: alarm ? '#CF1322' : active ? '#E8720C' : done ? '#595959' : '#8C8C8C',
+                      color: alarm ? '#CF1322' : active ? 'var(--brand)' : done ? 'var(--text-2)' : 'var(--text-3)',
                       fontWeight: active ? 600 : 400,
                     }}>
                       {RDM_STAGE_LABEL[st]}
@@ -165,7 +165,7 @@ export default function RequirementStageBar({ status, overdue, compact, stayDays
                     {(stalled || typeof stay === 'number') && (
                       <div style={{
                         fontSize: 11, whiteSpace: 'nowrap', marginTop: 2,
-                        color: alarm ? '#CF1322' : '#8C8C8C',
+                        color: alarm ? '#CF1322' : 'var(--text-3)',
                       }}>
                         {stalled
                           ? `${stalled}${typeof stay === 'number' ? ` · 停留 ${stay} 天` : ''}`
@@ -189,7 +189,7 @@ export default function RequirementStageBar({ status, overdue, compact, stayDays
       </div>
       {/* V3：把推导口径常驻在阶段条下方，避免「阶标在開発、需求状态却还是已受理」被读成矛盾 */}
       {derived && derivedHint && (
-        <div style={{ marginTop: 4, paddingLeft: 2, fontSize: 12, color: '#8C8C8C' }}>{derivedHint}</div>
+        <div style={{ marginTop: 4, paddingLeft: 2, fontSize: 12, color: 'var(--text-3)' }}>{derivedHint}</div>
       )}
     </div>
   )

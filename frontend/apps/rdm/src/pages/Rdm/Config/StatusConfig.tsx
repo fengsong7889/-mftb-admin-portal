@@ -74,7 +74,7 @@ export default function StatusConfig() {
     },
     {
       title: '終態', dataIndex: 'finalFlag', key: 'finalFlag', width: 90,
-      render: (v: boolean) => (v ? <Tag color="red">是</Tag> : <span style={{ color: '#8C8C8C' }}>否</span>),
+      render: (v: boolean) => (v ? <Tag color="red">是</Tag> : <span style={{ color: 'var(--text-3)' }}>否</span>),
     },
     {
       title: '啟用', key: 'enabled', width: 90,
@@ -94,7 +94,7 @@ export default function StatusConfig() {
       render: (_, r) => (
         <Space size={6}>
           <Tag style={{ margin: 0 }}>{statusLabel(r.fromStatus)}</Tag>
-          <BranchesOutlined style={{ color: '#8C8C8C' }} />
+          <BranchesOutlined style={{ color: 'var(--text-3)' }} />
           <Tag color="blue" style={{ margin: 0 }}>{statusLabel(r.toStatus)}</Tag>
         </Space>
       ),
@@ -118,7 +118,7 @@ export default function StatusConfig() {
       title: '必填字段', key: 'required', width: 200,
       render: (_, r) => (r.requiredFields.length
         ? <Space size={4} wrap>{r.requiredFields.map(f => <Tag key={f} color="gold" style={{ margin: 0 }}>{RDM_REQUIRED_FIELD_LABEL[f] ?? f}</Tag>)}</Space>
-        : <span style={{ color: '#8C8C8C' }}>無</span>),
+        : <span style={{ color: 'var(--text-3)' }}>無</span>),
     },
     {
       title: '啟用', key: 'enabled', width: 90,

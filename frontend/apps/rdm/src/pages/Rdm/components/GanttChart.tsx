@@ -340,12 +340,12 @@ export default function GanttChart({ editable }: GanttChartProps) {
         <div className="rdm-card-title">
           任務依賴
           <span className="rdm-card-title-split" />
-          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>
             只支持「完成→開始」（FS），可加減工作日延遲；成環會被服務端拒絕
           </span>
         </div>
         {deps.length === 0 && (
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>尚未設定依賴，所有任務會被視為可並行。</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>尚未設定依賴，所有任務會被視為可並行。</div>
         )}
         {deps.map(d => (
           <div key={d.id} className="rdm-delivery-row">
@@ -354,14 +354,14 @@ export default function GanttChart({ editable }: GanttChartProps) {
               <b style={{ fontWeight: 500 }}>{d.predTaskTitle ?? `#${d.predTaskId}`}</b>
               <span style={{ margin: '0 8px' }}>→</span>
               <b style={{ fontWeight: 500 }}>{d.succTaskTitle ?? `#${d.succTaskId}`}</b>
-              {d.lagDays ? <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>延遲 {d.lagDays} 工作日</span> : null}
+              {d.lagDays ? <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>延遲 {d.lagDays} 工作日</span> : null}
             </span>
             {editable && (
               <>
                 <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => handleRemove(d)}>刪除</Button>
                 <span className="action-split">|</span>
                 <Tooltip title="刪除後兩張任務變成可並行，關鍵路徑會重算">
-                  <span style={{ fontSize: 12, color: '#8C8C8C' }}>影響排程</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>影響排程</span>
                 </Tooltip>
               </>
             )}
@@ -379,7 +379,7 @@ export default function GanttChart({ editable }: GanttChartProps) {
               options={taskOptions(bars, succId)}
               onChange={setPredId}
             />
-            <span style={{ color: '#8C8C8C' }}>完成後 →</span>
+            <span style={{ color: 'var(--text-3)' }}>完成後 →</span>
             <Select
               style={{ minWidth: 240 }}
               placeholder="後續任務"

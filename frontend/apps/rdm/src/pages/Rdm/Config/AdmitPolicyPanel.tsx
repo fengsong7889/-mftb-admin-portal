@@ -330,7 +330,7 @@ export default function AdmitPolicyPanel() {
       {/* ── 规则模拟：配好策略先验证，而不是等真实需求走错流程才发现 ── */}
       <div className="rdm-card" style={{ marginBottom: 16 }}>
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#F9F0FF', color: '#722ED1' }}><ExperimentOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}><ExperimentOutlined /></span>
           規則模擬
           <span className="rdm-todo-hint">按服務端同一套裁決邏輯演算，結果與真實提交一致</span>
           <span className="rdm-card-title-split" />
@@ -374,7 +374,7 @@ export default function AdmitPolicyPanel() {
                 <Tag color="error" style={{ margin: 0 }}>審批節點缺失 → 異常待辦</Tag>
               )}
               {simResult.policyName && (
-                <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
                   {simResult.policyName} · {simResult.policyVersion || 'v1'}
                 </span>
               )}
@@ -382,7 +382,7 @@ export default function AdmitPolicyPanel() {
             <ol className="rdm-sim-steps">
               {(simResult.explain || []).map((line, idx) => <li key={idx}>{line}</li>)}
             </ol>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
               真實提交時，以上判定鏈路會同策略版本一起寫進本輪準入記錄（rdm_intake_round），
               方便事後追查「為什么這單免了審」。
             </div>

@@ -124,7 +124,7 @@ export default function WeeklyReport() {
     { title: '上線日期', dataIndex: 'actualReleaseDate', key: 'actualReleaseDate', width: 120, render: (v?: string | null) => v ?? '-' },
     {
       title: '滿意度', dataIndex: 'acceptanceScore', key: 'acceptanceScore', width: 100,
-      render: (v?: number | null) => (v ? <span style={{ color: '#52C41A', fontWeight: 600 }}>{v} / 5</span> : '-'),
+      render: (v?: number | null) => (v ? <span style={{ color: 'var(--success)', fontWeight: 600 }}>{v} / 5</span> : '-'),
     },
   ], [navigate])
 
@@ -143,7 +143,7 @@ export default function WeeklyReport() {
     {
       title: '停留天數', dataIndex: 'days', key: 'days', width: 110,
       sorter: (a, b) => a.days - b.days,
-      render: (v: number) => <span style={{ color: v > 7 ? '#CF1322' : '#595959' }}>{v} 天</span>,
+      render: (v: number) => <span style={{ color: v > 7 ? '#CF1322' : 'var(--text-2)' }}>{v} 天</span>,
     },
     {
       title: '風險', dataIndex: 'riskType', key: 'riskType', width: 130,
@@ -163,7 +163,7 @@ export default function WeeklyReport() {
     { title: '部門', dataIndex: 'deptName', key: 'deptName', width: 160 },
     { title: '本週提交', dataIndex: 'submitted', key: 'submitted', width: 100 },
     { title: '本期上線', dataIndex: 'delivered', key: 'delivered', width: 110 },
-    { title: '逾期', dataIndex: 'overdue', key: 'overdue', width: 90, render: (v: number) => <span style={{ color: v > 0 ? '#CF1322' : '#52C41A' }}>{v}</span> },
+    { title: '逾期', dataIndex: 'overdue', key: 'overdue', width: 90, render: (v: number) => <span style={{ color: v > 0 ? '#CF1322' : 'var(--success)' }}>{v}</span> },
     { title: '平均交付天數', dataIndex: 'avgDays', key: 'avgDays', width: 130, render: (v: number) => `${v.toFixed(1)} 天` },
   ], [])
 
@@ -226,7 +226,7 @@ export default function WeeklyReport() {
         backText="返回看板"
         onBack={() => navigate('/rdm-dashboard')}
         badge={(
-          <span style={{ fontSize: 12, fontWeight: 400, color: '#8C8C8C' }}>
+          <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-3)' }}>
             {report ? `${report.range.startDate} ~ ${report.range.endDate}` : error ? '載入失敗' : '載入中…'}
           </span>
         )}
@@ -324,10 +324,10 @@ export default function WeeklyReport() {
 
           <div className="rdm-card">
             <div className="rdm-card-title">
-              <span className="rdm-icon-block" style={{ background: '#F6FFED', color: '#52C41A' }}><CheckCircleOutlined /></span>
+              <span className="rdm-icon-block" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}><CheckCircleOutlined /></span>
               本期上線清單（{report?.released.length ?? 0}）
               <span className="rdm-card-title-split" />
-              <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>每條都可點進需求看驗收結論與所屬版本</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>每條都可點進需求看驗收結論與所屬版本</span>
               {releasedConfig}
             </div>
             <Table
@@ -342,7 +342,7 @@ export default function WeeklyReport() {
 
           <div className="rdm-card">
             <div className="rdm-card-title">
-              <span className="rdm-icon-block" style={{ background: '#FFF1F0', color: '#FF4D4F' }}><AlertOutlined /></span>
+              <span className="rdm-icon-block" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}><AlertOutlined /></span>
               風險清單（{report?.risks.length ?? 0}）
               <span className="rdm-card-title-split" />
               {riskConfig}
@@ -361,7 +361,7 @@ export default function WeeklyReport() {
           <div className="rdm-quality-grid">
             <div className="rdm-card">
               <div className="rdm-card-title">
-                <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><RiseOutlined /></span>
+                <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}><RiseOutlined /></span>
                 部門產出
                 <span className="rdm-card-title-split" />
                 {deptConfig}
@@ -377,7 +377,7 @@ export default function WeeklyReport() {
             </div>
             <div className="rdm-card">
               <div className="rdm-card-title">
-                <span className="rdm-icon-block" style={{ background: '#F9F0FF', color: '#722ED1' }}><CalendarOutlined /></span>
+                <span className="rdm-icon-block" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}><CalendarOutlined /></span>
                 下週預計上線（{report?.nextWeek.length ?? 0}）
                 <span className="rdm-card-title-split" />
                 {nextConfig}

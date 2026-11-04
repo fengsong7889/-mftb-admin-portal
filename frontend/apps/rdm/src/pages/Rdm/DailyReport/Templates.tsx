@@ -227,7 +227,7 @@ export default function DailyReportTemplates() {
         }
         return flags.length > 0
           ? <Space size={4} wrap>{flags}</Space>
-          : <span style={{ color: '#bfbfbf' }}>—</span>
+          : <span style={{ color: 'var(--text-4)' }}>—</span>
       },
     },
     {
@@ -244,11 +244,11 @@ export default function DailyReportTemplates() {
     { title: t('rdm.dailyTemplate.colRemark'), dataIndex: 'remark', key: 'remark', ellipsis: true },
     {
       title: t('rdm.dailyTemplate.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 110,
-      render: (v: string | null | undefined) => v || <span style={{ color: '#bfbfbf' }}>—</span>,
+      render: (v: string | null | undefined) => v || <span style={{ color: 'var(--text-4)' }}>—</span>,
     },
     {
       title: t('rdm.dailyTemplate.colUpdatedAt'), dataIndex: 'updatedAt', key: 'updatedAt', width: 160,
-      render: (v: string | null | undefined) => v || <span style={{ color: '#bfbfbf' }}>—</span>,
+      render: (v: string | null | undefined) => v || <span style={{ color: 'var(--text-4)' }}>—</span>,
     },
     {
       title: t('rdm.dailyTemplate.colEnabled'), dataIndex: 'enabled', key: 'enabled', width: 100,

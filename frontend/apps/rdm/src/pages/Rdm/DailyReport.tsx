@@ -146,11 +146,11 @@ export default function DailyReport() {
     <div className="content-area" style={{ maxWidth: PAGE_MAX_WIDTH, margin: '0 auto' }}>
       {/* ── 頁頭：標題 + 檔位 + 日期 ── */}
       <div style={{
-        background: '#fff', borderRadius: 12, padding: '14px 16px', marginBottom: 12,
+        background: 'var(--surface-2)', borderRadius: 12, padding: '14px 16px', marginBottom: 12,
         boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#262626' }}>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text-1)' }}>
             {t('rdm.daily.title')}
           </h2>
           <Segmented
@@ -175,7 +175,7 @@ export default function DailyReport() {
             style={{ width: 140 }}
           />
           {snapshot?.generatedAt && (
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
               <ClockCircleOutlined style={{ marginRight: 4 }} />
               {t('rdm.daily.generatedAt', { time: snapshot.generatedAt })}
             </span>
@@ -214,7 +214,7 @@ export default function DailyReport() {
           description={
             <div>
               <div style={{ fontWeight: 600, marginBottom: 4 }}>{t('rdm.daily.emptyTitle')}</div>
-              <div style={{ fontSize: 12, color: '#8c8c8c' }}>{t('rdm.daily.emptyDesc')}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('rdm.daily.emptyDesc')}</div>
             </div>
           }
         />
@@ -267,16 +267,16 @@ export default function DailyReport() {
           {/* ── 未掛項目的迭代：如實列出，不塞進任何項目下充數 ── */}
           {snapshot.unassignedIterations && snapshot.unassignedIterations.length > 0 && (
             <div style={{
-              background: '#fff', borderRadius: 12, padding: '14px 16px', marginTop: 12,
+              background: 'var(--surface-2)', borderRadius: 12, padding: '14px 16px', marginTop: 12,
               border: '1px solid #ffe58f',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                <AlertOutlined style={{ color: '#fa8c16' }} />
+                <AlertOutlined style={{ color: 'var(--warning)' }} />
                 <span style={{ fontSize: 14, fontWeight: 600 }}>{t('rdm.daily.unassignedIterations')}</span>
                 <Tag color="orange">{snapshot.unassignedIterations.length}</Tag>
               </div>
               <Tooltip title={t('rdm.daily.unassignedHint')}>
-                <span style={{ fontSize: 12, color: '#8c8c8c', display: 'block', marginBottom: 8 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-3)', display: 'block', marginBottom: 8 }}>
                   {t('rdm.daily.unassignedHintShort')}
                 </span>
               </Tooltip>
@@ -308,13 +308,13 @@ function MetricCard({ label, value, unit, tone }: { label: string; value: number
   const s = TONE_STYLE[tone]
   return (
     <div style={{
-      background: '#fff', borderRadius: 10, padding: '10px 12px',
+      background: 'var(--surface-2)', borderRadius: 10, padding: '10px 12px',
       borderLeft: `3px solid ${s.color}`, boxShadow: '0 1px 6px rgba(0,0,0,0.04)',
     }}>
-      <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{label}</div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
         <span style={{ fontSize: 22, fontWeight: 700, color: s.color, lineHeight: 1.1 }}>{value}</span>
-        <span style={{ fontSize: 12, color: '#8c8c8c' }}>{unit}</span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{unit}</span>
       </div>
     </div>
   )
@@ -329,7 +329,7 @@ function ProjectCard({ project, anchored, collapsed, onToggle }: {
   const { t } = useTranslation()
   return (
     <div style={{
-      background: '#fff', borderRadius: 12, marginBottom: 12, overflow: 'hidden',
+      background: 'var(--surface-2)', borderRadius: 12, marginBottom: 12, overflow: 'hidden',
       border: anchored ? '2px solid #E8720C' : '1px solid #f0f0f0',
       boxShadow: anchored ? '0 2px 12px rgba(232,114,12,0.15)' : '0 1px 6px rgba(0,0,0,0.04)',
     }}>
@@ -340,15 +340,15 @@ function ProjectCard({ project, anchored, collapsed, onToggle }: {
       >
         <RightOutlined
           rotate={collapsed ? 0 : 90}
-          style={{ color: '#bfbfbf', fontSize: 12, marginTop: 5, flexShrink: 0 }}
+          style={{ color: 'var(--text-4)', fontSize: 12, marginTop: 5, flexShrink: 0 }}
         />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 600, fontSize: 15, color: '#262626' }}>
+            <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--text-1)' }}>
               {project.projectName || '—'}
             </span>
             {project.projectNo && (
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>{project.projectNo}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{project.projectNo}</span>
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
@@ -359,7 +359,7 @@ function ProjectCard({ project, anchored, collapsed, onToggle }: {
               <Tag icon={<PauseCircleOutlined />} style={{ marginInlineEnd: 0 }}>{t('rdm.daily.tagPaused')}</Tag>
             )}
             {(project.pmUserName || project.productOwnerUserName) && (
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
                 {project.pmUserName && `${t('rdm.daily.pm')} ${project.pmUserName}`}
                 {project.pmUserName && project.productOwnerUserName && '｜'}
                 {project.productOwnerUserName && `${t('rdm.daily.productOwner')} ${project.productOwnerUserName}`}
@@ -397,7 +397,7 @@ function ProjectCard({ project, anchored, collapsed, onToggle }: {
           <Tag style={{ marginInlineEnd: 0 }}>{t('rdm.daily.notScheduled')}</Tag>
         )}
         {project.nextDeliveryDate && (
-          <span style={{ fontSize: 12, color: '#595959' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
             {t('rdm.daily.nextDelivery')}：{project.nextDeliveryDate}
           </span>
         )}
@@ -406,7 +406,7 @@ function ProjectCard({ project, anchored, collapsed, onToggle }: {
       {!collapsed && (
         <div style={{ padding: '0 14px 14px 34px', borderTop: '1px dashed #f0f0f0', paddingTop: 12 }}>
           {project.iterations.length === 0 && project.unscheduledRequirements.length === 0 ? (
-            <span style={{ fontSize: 12, color: '#bfbfbf' }}>{t('rdm.daily.noIterationOrReq')}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-4)' }}>{t('rdm.daily.noIterationOrReq')}</span>
           ) : (
             <>
               {project.iterations.map(it => (
@@ -414,7 +414,7 @@ function ProjectCard({ project, anchored, collapsed, onToggle }: {
               ))}
               {project.unscheduledRequirements.length > 0 && (
                 <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 13, color: '#595959', marginBottom: 6 }}>
+                  <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 6 }}>
                     {t('rdm.daily.unscheduledGroup')}
                     <Tag style={{ marginLeft: 6, marginInlineEnd: 0 }}>
                       {t('rdm.daily.unscheduledCount', { count: project.unscheduledRequirements.length })}
@@ -430,7 +430,7 @@ function ProjectCard({ project, anchored, collapsed, onToggle }: {
           {project.detailUrl && (
             <a
               href={`#${project.detailUrl}`}
-              style={{ fontSize: 12, color: '#1890ff', display: 'inline-block', marginTop: 4 }}
+              style={{ fontSize: 12, color: 'var(--info)', display: 'inline-block', marginTop: 4 }}
             >
               {t('rdm.daily.openProjectDetail')}
             </a>
@@ -449,18 +449,18 @@ function IterationBlock({ iteration }: { iteration: DailyReportIteration }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 13, fontWeight: 600 }}>{iteration.code}</span>
         {iteration.name && iteration.name !== iteration.code && (
-          <span style={{ fontSize: 12, color: '#595959' }}>{iteration.name}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{iteration.name}</span>
         )}
         <Tag color={iteration.status === 'active' ? 'processing' : iteration.status === 'closed' ? 'default' : 'warning'}
           style={{ marginInlineEnd: 0 }}>
           {iterationStatusLabel(iteration.status, t)}
         </Tag>
         {iteration.startDate && iteration.endDate && (
-          <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
             {iteration.startDate} ~ {iteration.endDate}
           </span>
         )}
-        <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
           {t('rdm.daily.requirementCount', { count: iteration.requirementCount })}
         </span>
         {!iteration.projectId && (
@@ -469,7 +469,7 @@ function IterationBlock({ iteration }: { iteration: DailyReportIteration }) {
       </div>
     ),
     children: iteration.requirements.length === 0
-      ? <span style={{ fontSize: 12, color: '#bfbfbf' }}>{t('rdm.daily.noRequirement')}</span>
+      ? <span style={{ fontSize: 12, color: 'var(--text-4)' }}>{t('rdm.daily.noRequirement')}</span>
       : iteration.requirements.map(r => <RequirementRow key={r.reqId} req={r} />),
   }]
   return (
@@ -477,7 +477,7 @@ function IterationBlock({ iteration }: { iteration: DailyReportIteration }) {
       size="small"
       items={items}
       defaultActiveKey={[String(iteration.iterationId)]}
-      style={{ marginBottom: 8, background: '#fafafa' }}
+      style={{ marginBottom: 8, background: 'var(--surface-3)' }}
     />
   )
 }
@@ -490,26 +490,26 @@ function RequirementRow({ req }: { req: DailyReportSnapshot['projects'][number][
       borderBottom: '1px solid #f5f5f5', flexWrap: 'wrap',
     }}>
       <div style={{ flex: 1, minWidth: 180 }}>
-        <div style={{ fontSize: 13, color: '#262626', wordBreak: 'break-word' }}>
+        <div style={{ fontSize: 13, color: 'var(--text-1)', wordBreak: 'break-word' }}>
           {req.title || '—'}
           {req.overdueFlag === 1 && <Tag color="error" style={{ marginLeft: 6 }}>{t('rdm.daily.tagOverdue')}</Tag>}
           {req.blockedFlag === 1 && <Tag color="warning" style={{ marginLeft: 4 }}>{t('rdm.daily.tagBlocked')}</Tag>}
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4, flexWrap: 'wrap' }}>
-          {req.reqNo && <span style={{ fontSize: 11, color: '#8c8c8c' }}>{req.reqNo}</span>}
+          {req.reqNo && <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{req.reqNo}</span>}
           {!req.reqNo && (
             // 延遲發號口徑：認領前沒有正式編號，如實顯示待發號而不是留白
-            <span style={{ fontSize: 11, color: '#bfbfbf' }}>{t('rdm.daily.reqNoPending')}</span>
+            <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{t('rdm.daily.reqNoPending')}</span>
           )}
           {req.statusLabel && <Tag color={statusColor(req.status)} style={{ marginInlineEnd: 0 }}>{req.statusLabel}</Tag>}
           {req.priority && <Tag color={priorityColor(req.priority)} style={{ marginInlineEnd: 0 }}>{req.priority}</Tag>}
           {req.assigneePmName && (
-            <span style={{ fontSize: 11, color: '#8c8c8c' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
               {t('rdm.daily.productOwner')} {req.assigneePmName}
             </span>
           )}
           {req.planReleaseDate && (
-            <span style={{ fontSize: 11, color: '#8c8c8c' }}>
+            <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
               {t('rdm.daily.planRelease')}：{req.planReleaseDate}
             </span>
           )}

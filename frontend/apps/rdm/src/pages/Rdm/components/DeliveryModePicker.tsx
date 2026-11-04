@@ -100,8 +100,8 @@ export default function DeliveryModePicker({
         {options.map(option => (
           <Radio key={option.value} value={option.value} style={{ flex: '1 1 220px', marginRight: 0, alignItems: 'flex-start' }}>
             <span style={{ display: 'block', lineHeight: 1.6 }}>
-              <span style={{ fontWeight: 600, color: '#262626' }}>{option.label}</span>
-              <span style={{ display: 'block', fontSize: 12, color: '#8C8C8C' }}>{option.desc}</span>
+              <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{option.label}</span>
+              <span style={{ display: 'block', fontSize: 12, color: 'var(--text-3)' }}>{option.desc}</span>
             </span>
           </Radio>
         ))}

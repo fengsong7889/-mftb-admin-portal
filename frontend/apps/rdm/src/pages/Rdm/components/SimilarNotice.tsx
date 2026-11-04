@@ -71,7 +71,7 @@ export default function SimilarNotice({ title, expectText, excludeId }: SimilarN
 
   if (loading && items.length === 0) {
     return (
-      <div style={{ margin: '-8px 0 12px', fontSize: 12, color: '#8C8C8C' }}>
+      <div style={{ margin: '-8px 0 12px', fontSize: 12, color: 'var(--text-3)' }}>
         <Spin size="small" style={{ marginRight: 6 }} />正在檢查是否已有相似需求…
       </div>
     )
@@ -107,10 +107,10 @@ export default function SimilarNotice({ title, expectText, excludeId }: SimilarN
           {visible.map(item => (
             <div key={item.reqId} className="rdm-similar-row">
               <span className="rdm-similar-row-main">
-                <a style={{ color: '#E8720C' }} onClick={() => navigate(`/rdm-detail?id=${item.reqId}`)}>
+                <a style={{ color: 'var(--brand)' }} onClick={() => navigate(`/rdm-detail?id=${item.reqId}`)}>
                   {item.title}
                 </a>
-                <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>
                   {formatRdmReqNo(item.reqNo)} · {RDM_STATUS_LABEL[item.status as RdmStatus] ?? item.status}
                   {item.pmName ? ` · 產品 ${item.pmName}` : ''}
                   {item.submitterName ? ` · 提出 ${item.submitterName}` : ''}
@@ -138,7 +138,7 @@ export default function SimilarNotice({ title, expectText, excludeId }: SimilarN
               </Button>
             )}
             {firstMatchedTerms.length > 0 && (
-              <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
                 命中詞：{firstMatchedTerms.join('、')}
               </span>
             )}

@@ -191,7 +191,7 @@ export default function IterationPlan() {
           <div className="confirm-info-row"><span>{t('rdm.iteration.deleteCodeLabel')}</span><b>{row.code}</b></div>
           <div className="confirm-info-row"><span>{t('rdm.iteration.deleteNameLabel')}</span><b>{row.name}</b></div>
           <div className="confirm-info-row"><span>{t('rdm.iteration.deleteReqLabel')}</span><b>{t('rdm.iteration.deleteReqCount', { n: reqCount })}</b></div>
-          <div style={{ marginTop: 8, color: reqCount > 0 ? '#CF1322' : '#8C8C8C' }}>
+          <div style={{ marginTop: 8, color: reqCount > 0 ? '#CF1322' : 'var(--text-3)' }}>
             {reqCount > 0 ? t('rdm.iteration.deleteBlocked') : t('rdm.iteration.deleteHint')}
           </div>
         </div>
@@ -221,8 +221,8 @@ export default function IterationPlan() {
       title: t('rdm.iteration.colName'), dataIndex: 'name', key: 'name', width: 220,
       render: (v: string, r) => (
         <div style={{ lineHeight: 1.4 }}>
-          <div style={{ color: '#262626', fontWeight: 500 }}>{v}</div>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{r.code}</div>
+          <div style={{ color: 'var(--text-1)', fontWeight: 500 }}>{v}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{r.code}</div>
         </div>
       ),
     },
@@ -249,7 +249,7 @@ export default function IterationPlan() {
         // hotfix 允许不挂项目（跨项目平台级热修），不算异常；其余类型未挂是存量待补
         const isHotfix = (r.iterationType ?? RDM_ITERATION_TYPE.SPRINT) === RDM_ITERATION_TYPE.HOTFIX
         return isHotfix
-          ? <span style={{ color: '#8C8C8C', fontSize: 12 }}>-</span>
+          ? <span style={{ color: 'var(--text-3)', fontSize: 12 }}>-</span>
           : <Tag color="warning" style={{ margin: 0 }}>{t('rdm.iteration.noProject')}</Tag>
       },
     },
@@ -267,8 +267,8 @@ export default function IterationPlan() {
       render: (_, r) => {
         const days = r.startDate && r.endDate ? dayjs(r.endDate).diff(dayjs(r.startDate), 'day') + 1 : 0
         return days > 0
-          ? <span style={{ color: '#595959' }}>{t('rdm.iteration.durationDays', { days })}</span>
-          : <span style={{ color: '#8C8C8C' }}>-</span>
+          ? <span style={{ color: 'var(--text-2)' }}>{t('rdm.iteration.durationDays', { days })}</span>
+          : <span style={{ color: 'var(--text-3)' }}>-</span>
       },
     },
     {
@@ -296,7 +296,7 @@ export default function IterationPlan() {
               strokeColor={over ? '#FF4D4F' : rate >= 85 ? '#FA8C16' : '#52C41A'}
               style={{ width: 96 }}
             />
-            <span style={{ fontSize: 12, color: over ? '#CF1322' : '#595959' }}>
+            <span style={{ fontSize: 12, color: over ? '#CF1322' : 'var(--text-2)' }}>
               {(r.taskHours ?? 0).toFixed(0)} / {r.capacityHours ?? 0} h
             </span>
             {over && (
@@ -364,10 +364,10 @@ export default function IterationPlan() {
 
   return (
     <div className="content-area">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 18, fontWeight: 700, color: '#262626' }}>
-        <FieldTimeOutlined style={{ color: '#E8720C' }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>
+        <FieldTimeOutlined style={{ color: 'var(--brand)' }} />
         {t('rdm.iteration.pageTitle')}
-        <span style={{ fontSize: 12, fontWeight: 400, color: '#8C8C8C' }}>
+        <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-3)' }}>
           {t('rdm.iteration.pageHint')}
         </span>
       </div>

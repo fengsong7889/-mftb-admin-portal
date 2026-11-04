@@ -93,18 +93,18 @@ export default function AcceptanceTraceCard({ detail }: AcceptanceTraceCardProps
     <div key={r.id} className="rdm-acceptance-history">
       <ResultTag result={r.result} />
       <span className="rdm-acceptance-history-main">
-        <span style={{ color: '#262626' }}>第 {r.attempt} 次{r.acceptorName ? ` · ${r.acceptorName}` : ''}</span>
-        <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+        <span style={{ color: 'var(--text-1)' }}>第 {r.attempt} 次{r.acceptorName ? ` · ${r.acceptorName}` : ''}</span>
+        <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
           {r.acceptTime ? dayjs(r.acceptTime).format('YYYY-MM-DD HH:mm') : ''}
           {r.testEnv ? ` · ${RDM_TEST_ENV_LABEL[r.testEnv as RdmTestEnv] ?? r.testEnv}` : ''}
           {r.caseTotal != null ? ` · 用例 ${r.casePass ?? 0}/${r.caseTotal}` : ''}
           {r.score != null ? ` · 滿意度 ${r.score}/5` : ''}
         </div>
         {(r.issues || r.opinion) && (
-          <div style={{ fontSize: 12, color: '#595959', marginTop: 2 }}>{r.issues ?? r.opinion}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>{r.issues ?? r.opinion}</div>
         )}
         {r.followUpReqNo && (
-          <div style={{ fontSize: 12, color: '#1890FF', marginTop: 2 }}>遺留事項已轉：{r.followUpReqNo}</div>
+          <div style={{ fontSize: 12, color: 'var(--info)', marginTop: 2 }}>遺留事項已轉：{r.followUpReqNo}</div>
         )}
       </span>
     </div>
@@ -113,7 +113,7 @@ export default function AcceptanceTraceCard({ detail }: AcceptanceTraceCardProps
   return (
     <div className="rdm-card">
       <div className="rdm-card-title">
-        <span className="rdm-icon-block" style={{ background: '#F6FFED', color: '#52C41A' }}><CheckCircleOutlined /></span>
+        <span className="rdm-icon-block" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}><CheckCircleOutlined /></span>
         業務驗收與追溯
         <span className="rdm-card-title-split" />
         {reworkCount > 0 && (
@@ -124,23 +124,23 @@ export default function AcceptanceTraceCard({ detail }: AcceptanceTraceCardProps
       </div>
 
       {records.length === 0 && (
-        <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+        <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
           {loading ? '載入中…' : '尚未提交驗收結論，上線前需由業務驗收人逐項確認用例。'}
         </div>
       )}
 
       {records.length > 0 && postRecords.length > 0 && (
-        <div style={{ fontSize: 12, color: '#52C41A', fontWeight: 600, margin: '4px 0 6px' }}>
+        <div style={{ fontSize: 12, color: 'var(--success)', fontWeight: 600, margin: '4px 0 6px' }}>
           {RDM_ACCEPT_STAGE_LABEL[RDM_ACCEPT_STAGE.POST_RELEASE]}
-          <span style={{ color: '#8C8C8C', fontWeight: 400, marginLeft: 6 }}>正式滿意度口徑</span>
+          <span style={{ color: 'var(--text-3)', fontWeight: 400, marginLeft: 6 }}>正式滿意度口徑</span>
         </div>
       )}
       {renderRecords(postRecords)}
 
       {records.length > 0 && preRecords.length > 0 && (
-        <div style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 600, margin: '10px 0 6px' }}>
+        <div style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 600, margin: '10px 0 6px' }}>
           {RDM_ACCEPT_STAGE_LABEL[RDM_ACCEPT_STAGE.PRE_RELEASE]}
-          <span style={{ color: '#8C8C8C', fontWeight: 400, marginLeft: 6 }}>不計入正式滿意度</span>
+          <span style={{ color: 'var(--text-3)', fontWeight: 400, marginLeft: 6 }}>不計入正式滿意度</span>
         </div>
       )}
       {renderRecords(preRecords)}

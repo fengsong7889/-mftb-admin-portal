@@ -371,7 +371,7 @@ export default function RdmWorkbench() {
     'todo-board': todoBoard ? (
       <div className="rdm-card" style={{ marginBottom: 16 }}>
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><AuditOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}><AuditOutlined /></span>
           我的待辦
           {/* 去重計數：用 todo-board 的 total（已去重），不用分組直接相加 */}
           <Tag color="blue" style={{ margin: 0 }}>{todoBoard.total}</Tag>
@@ -388,27 +388,27 @@ export default function RdmWorkbench() {
           ] as const).map(bucket => {
             const items = todoBoard.todos.filter(t => t.bucket === bucket.key)
             return (
-              <div key={bucket.key} style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: 10, background: '#fff' }}>
+              <div key={bucket.key} style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: 10, background: 'var(--surface-2)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: bucket.color }} />
                   <span style={{ fontWeight: 600, fontSize: 13, color: bucket.color }}>{bucket.title}</span>
                   <Tag color={bucket.count > 0 ? 'orange' : 'default'} style={{ margin: 0 }}>{bucket.count}</Tag>
                 </div>
                 {items.length === 0 ? (
-                  <div style={{ fontSize: 12, color: '#BFBFBF', padding: '8px 0' }}>無</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-4)', padding: '8px 0' }}>無</div>
                 ) : items.slice(0, 6).map(item => (
                   <div
                     key={item.key}
                     onClick={() => { if (item.actionUrl) navigate(item.actionUrl) }}
                     style={{ padding: '6px 0', borderBottom: '1px dashed #f0f0f0', cursor: item.actionUrl ? 'pointer' : 'default' }}
                   >
-                    <div style={{ fontSize: 13, color: '#262626', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
+                    <div style={{ fontSize: 13, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
                       {item.title}
                     </div>
-                    <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
                       <span>{item.refNo}</span>
                       {item.responsibleName && <span> · {item.responsibleName}</span>}
-                      {item.overdue && <span style={{ color: '#FF4D4F' }}> · 逾期{item.overdueWorkingDays ? ` ${item.overdueWorkingDays} 工作日` : ''}</span>}
+                      {item.overdue && <span style={{ color: 'var(--danger)' }}> · 逾期{item.overdueWorkingDays ? ` ${item.overdueWorkingDays} 工作日` : ''}</span>}
                     </div>
                     {item.reasons.length > 0 && (
                       <div style={{ fontSize: 12, color: '#D46B08', marginTop: 2 }}>
@@ -494,7 +494,7 @@ export default function RdmWorkbench() {
     'need-action': needAction.length > 0 ? (
       <div className="rdm-card" style={{ marginBottom: 16 }}>
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#FFF1F0', color: '#FF4D4F' }}><ExclamationCircleOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}><ExclamationCircleOutlined /></span>
           需要我補充
           <Tag color="red" style={{ margin: 0 }}>{needAction.length}</Tag>
           <span className="rdm-todo-hint">這些需求在等提出人補内容或做決定，不處理會停在原地</span>
@@ -580,7 +580,7 @@ export default function RdmWorkbench() {
     'my-tracking': (
       <div className="rdm-card" style={{ marginBottom: 16 }}>
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><RocketOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}><RocketOutlined /></span>
           我的提交追蹤
           <span className="rdm-todo-hint">只看到自己提的需求，進展與責任人一目了然</span>
           <span className="rdm-card-title-split" />
@@ -627,7 +627,7 @@ export default function RdmWorkbench() {
     'activity': recentActivity.length > 0 ? (
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}>
+          <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}>
             <ClockCircleOutlined />
           </span>
           最近交付動態
@@ -639,10 +639,10 @@ export default function RdmWorkbench() {
         {recentActivity.slice(0, 6).map(node => (
           <div key={node.id} className="rdm-risk-item">
             <StatusTag status={node.status} />
-            <span style={{ color: '#595959' }}>
+            <span style={{ color: 'var(--text-2)' }}>
               {node.operatorName} 將需求推進至「{RDM_STATUS_LABEL[node.status as RdmStatus] ?? node.statusLabel ?? '-'}」
             </span>
-            <span style={{ marginLeft: 'auto', color: '#8C8C8C', fontSize: 12 }}>
+            <span style={{ marginLeft: 'auto', color: 'var(--text-3)', fontSize: 12 }}>
               {dayjs(node.time).format('MM-DD HH:mm')}
             </span>
           </div>
@@ -651,7 +651,7 @@ export default function RdmWorkbench() {
     ) : (
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}>
+          <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}>
             <ClockCircleOutlined />
           </span>
           最近交付動態

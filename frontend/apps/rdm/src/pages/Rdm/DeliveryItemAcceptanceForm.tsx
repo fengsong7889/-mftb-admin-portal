@@ -340,7 +340,7 @@ export default function DeliveryItemAcceptanceForm() {
 
           <Space size={24} wrap align="end">
             <span>
-              <span style={{ fontSize: 13, color: '#595959', marginRight: 8 }}>驗收環境</span>
+              <span style={{ fontSize: 13, color: 'var(--text-2)', marginRight: 8 }}>驗收環境</span>
               <Select
                 style={{ width: 160 }}
                 placeholder="選填"
@@ -351,7 +351,7 @@ export default function DeliveryItemAcceptanceForm() {
               />
             </span>
             <span>
-              <span style={{ fontSize: 13, color: '#595959', marginRight: 8 }}>構建標識</span>
+              <span style={{ fontSize: 13, color: 'var(--text-2)', marginRight: 8 }}>構建標識</span>
               <Input style={{ width: 200 }} value={buildId} maxLength={120} placeholder="選填，例：build-a-1" onChange={e => setBuildId(e.target.value)} />
               <HelpPopover
                 title={t('rdm.acceptance.buildIdHelpTitle')}
@@ -361,7 +361,7 @@ export default function DeliveryItemAcceptanceForm() {
             </span>
             {/* inline-flex 锁同行：antd Rate 渲染为块级 ul，不包一层会把说明挤到下一行 */}
             <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, color: '#595959', marginRight: 8 }}>
+              <span style={{ fontSize: 13, color: 'var(--text-2)', marginRight: 8 }}>
                 交付滿意度{isBusiness ? '（業務驗收必填）' : '（選填）'}
               </span>
               <Rate
@@ -370,7 +370,7 @@ export default function DeliveryItemAcceptanceForm() {
                 tooltips={RDM_SCORE_TIERS.map(x => `${t(x.short)}：${t(x.desc)}`)}
               />
               {/* 与需求验收同口径：每档含义常驻在星星右侧，不只悬停才有 */}
-              <span style={{ fontSize: 12, color: score ? '#E8720C' : '#8C8C8C', marginLeft: 10 }}>
+              <span style={{ fontSize: 12, color: score ? 'var(--brand)' : 'var(--text-3)', marginLeft: 10 }}>
                 {score
                   ? `${score} 分 · ${t(RDM_SCORE_TIERS[score - 1].short)}：${t(RDM_SCORE_TIERS[score - 1].desc)}`
                   : t('rdm.acceptance.scoreHintUnrated')}
@@ -380,7 +380,7 @@ export default function DeliveryItemAcceptanceForm() {
 
           {needStructuredConditions && (
             <div className="rdm-followup-box">
-              <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 8 }}>
                 結構化整改條件（業務驗收有條件通過必填，每條含 條件/期限/責任人）
               </div>
               <Space direction="vertical" size={8} style={{ width: '100%' }}>
@@ -415,15 +415,15 @@ export default function DeliveryItemAcceptanceForm() {
           )}
 
           <div>
-            <div style={{ fontSize: 13, color: '#595959', marginBottom: 6 }}>驗收意見（選填）</div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 6 }}>驗收意見（選填）</div>
             <TextArea rows={2} value={opinion} onChange={e => setOpinion(e.target.value)} placeholder="例：功能符合交付項範圍，業務側確認可用。" />
           </div>
 
           {/* 证据录入：用户只贴链接，JSON 结构由前端组装——业务/产品验收人不应被要求懂技术格式 */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
-              <span style={{ fontSize: 13, color: '#595959' }}>{t('rdm.acceptance.evidenceField')}</span>
-              <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 6 }}>{t('rdm.acceptance.evidenceHint')}</span>
+              <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('rdm.acceptance.evidenceField')}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 6 }}>{t('rdm.acceptance.evidenceHint')}</span>
               <HelpPopover
                 title={t('rdm.acceptance.evidenceHelpTitle')}
                 ariaLabel="驗收證據填寫說明"
@@ -471,7 +471,7 @@ export default function DeliveryItemAcceptanceForm() {
         <div className="rdm-card-title">
           歷次驗收記錄
           <span className="rdm-card-title-split" />
-          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>
             {records.length === 0 ? '尚無驗收記錄' : `共 ${records.length} 條`}
           </span>
         </div>

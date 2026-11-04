@@ -170,7 +170,7 @@ export default function AcceptanceList() {
         // 已归档需求不再计算等待天数：归档后数字没有管理意义
         if (r.status === RDM_STATUS.CLOSED) return '-'
         const days = Math.round((r.stayHours ?? 0) / 24)
-        return <span style={{ color: days > 3 ? '#CF1322' : '#595959' }}>{days || '-'} 天</span>
+        return <span style={{ color: days > 3 ? '#CF1322' : 'var(--text-2)' }}>{days || '-'} 天</span>
       },
     },
     {
@@ -196,7 +196,7 @@ export default function AcceptanceList() {
         const meta = r.acceptanceResult ? RESULT_TAG[r.acceptanceResult] : undefined
         return meta
           ? <Tag color={meta.color} style={{ margin: 0 }}>{meta.text}</Tag>
-          : <span style={{ color: '#8C8C8C' }}>未評分</span>
+          : <span style={{ color: 'var(--text-3)' }}>未評分</span>
       },
     },
     {
@@ -219,12 +219,12 @@ export default function AcceptanceList() {
       title: '驗收結論', dataIndex: 'acceptanceResult', key: 'acceptanceResult', width: 120,
       render: (v?: string | null) => {
         const meta = v ? RESULT_TAG[v] : undefined
-        return meta ? <Tag color={meta.color} style={{ margin: 0 }}>{meta.text}</Tag> : <span style={{ color: '#8C8C8C' }}>待驗收</span>
+        return meta ? <Tag color={meta.color} style={{ margin: 0 }}>{meta.text}</Tag> : <span style={{ color: 'var(--text-3)' }}>待驗收</span>
       },
     },
     {
       title: '滿意度', dataIndex: 'acceptanceScore', key: 'acceptanceScore', width: 110,
-      render: (v?: number | null) => (v ? <span style={{ color: '#52C41A', fontWeight: 600 }}>{v} / 5</span> : '-'),
+      render: (v?: number | null) => (v ? <span style={{ color: 'var(--success)', fontWeight: 600 }}>{v} / 5</span> : '-'),
     },
     { title: '上線版本', dataIndex: 'versionNo', key: 'versionNo', width: 100, render: (v?: string | null) => v ?? '-' },
     { title: '上線時間', dataIndex: 'actualReleaseDate', key: 'actualReleaseDate', width: 120, render: (v?: string | null) => v ?? '-' },
@@ -341,7 +341,7 @@ export default function AcceptanceList() {
       render: (v: string, r) => (
         <div style={{ lineHeight: 1.4 }}>
           <a className="rdm-table-title__link" title={v} onClick={() => navigate(`/rdm-delivery-item?mode=view&id=${r.id}`)}>{v}</a>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{r.itemNo}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{r.itemNo}</div>
         </div>
       ),
     },
@@ -350,7 +350,7 @@ export default function AcceptanceList() {
       render: (_, r) => (
         <div style={{ lineHeight: 1.4 }}>
           <a className="rdm-table-title__link" title={r.reqTitle} href={detailHref(r.reqId)}>{r.reqTitle}</a>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{r.reqNo}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{r.reqNo}</div>
         </div>
       ),
     },
@@ -378,7 +378,7 @@ export default function AcceptanceList() {
     {
       title: '結論', dataIndex: 'acceptanceStatus', key: 'acceptanceStatus', width: 110,
       render: (v?: string) => {
-        if (!v) return <span style={{ color: '#8C8C8C' }}>-</span>
+        if (!v) return <span style={{ color: 'var(--text-3)' }}>-</span>
         // 交付项推导出的结论是 pass/conditional/fail，必须走映射；直接渲染会出现英文枚举
         const meta = RESULT_TAG[v]
         return meta
@@ -450,10 +450,10 @@ export default function AcceptanceList() {
 
   return (
     <div className="content-area">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 18, fontWeight: 700, color: '#262626' }}>
-        <CheckCircleOutlined style={{ color: '#52C41A' }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>
+        <CheckCircleOutlined style={{ color: 'var(--success)' }} />
         {t('rdm.acceptance.pageTitle')}
-        <span style={{ fontSize: 12, fontWeight: 400, color: '#8C8C8C' }}>
+        <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-3)' }}>
           上線前預驗收 / 上線後業務驗收 / 我的驗收記錄，三類隊列互不混用
         </span>
       </div>

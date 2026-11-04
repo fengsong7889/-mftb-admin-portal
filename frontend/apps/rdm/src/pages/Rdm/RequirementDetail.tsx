@@ -1246,7 +1246,7 @@ export default function RequirementDetail() {
       content: (
         <div style={{ fontSize: 13, lineHeight: 1.8 }}>
           <div>將以當前需求為模板建立一條<b>草稿</b>，確認內容後再提交。</div>
-          <div style={{ color: '#8C8C8C', fontSize: 12, marginTop: 8 }}>
+          <div style={{ color: 'var(--text-3)', fontSize: 12, marginTop: 8 }}>
             複製：標題、類型、優先級、規模、現狀與痛點、期望結果、業務價值、期望日期、需求對象、驗收人、意向產品經理。<br />
             不複製：附件（需重新上傳）、所屬項目/迭代、交付流程（分配/認領時重新確定）、評審/PRD/任務/交付項/驗收記錄。
           </div>
@@ -1265,7 +1265,7 @@ export default function RequirementDetail() {
   if (!detail) {
     return (
       <div className="content-area">
-        <div style={{ padding: 60, textAlign: 'center', color: '#8C8C8C' }}>
+        <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-3)' }}>
           {!id ? '未指定需求編號，請從清單進入詳情'
             : error ? error
             : loading ? '需求載入中…' : '需求不存在或已被刪除'}
@@ -1418,7 +1418,7 @@ export default function RequirementDetail() {
         <div className="rdm-detail-main">
           <div className="rdm-card">
             <div className="rdm-card-title">
-              <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}><AimOutlined /></span>
+              <span className="rdm-icon-block" style={{ background: 'var(--warning-soft)', color: 'var(--brand)' }}><AimOutlined /></span>
               需求內容
               <span className="rdm-card-title-split" />
               <span className="rdm-todo-hint">業務事實與定位，產研據此判斷怎麼做</span>
@@ -1518,7 +1518,7 @@ export default function RequirementDetail() {
                       {activityItems.length === 0 && <div className="rdm-empty-hint">還沒有動態，可在下方補充說明。</div>}
                       {activityItems.map(item => (
                         <div key={item.id} className="rdm-activity-item">
-                          <span className="rdm-icon-block" style={{ background: '#FFF7F0', color: '#E8720C', width: 28, height: 28 }}>
+                          <span className="rdm-icon-block" style={{ background: 'var(--brand-soft)', color: 'var(--brand)', width: 28, height: 28 }}>
                             {item.author.slice(0, 1)}
                           </span>
                           <div className="rdm-activity-body">
@@ -1611,7 +1611,7 @@ export default function RequirementDetail() {
                       {detail.requirementKind === RDM_REQUIREMENT_KIND.AGGREGATE && (
                         <div className="rdm-v3-delivery-items">
                           <div className="rdm-section-title">
-                            <span className="rdm-icon-block" style={{ background: '#F9F0FF', color: '#722ED1' }}><BranchesOutlined /></span>
+                            <span className="rdm-icon-block" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}><BranchesOutlined /></span>
                             結構子需求
                             {structureTree.length > 0 && <Tag color="purple" style={{ margin: 0 }}>{structureTree.length}</Tag>}
                             <span className="rdm-card-title-split" />
@@ -1778,7 +1778,7 @@ export default function RequirementDetail() {
                       <ChangeSection summary={summary} canCreate={!closed} reqId={detail.id} />
                       <IntakePolicySection detail={detail} navigate={navigate} />
                       <div className="rdm-section-title" style={{ marginTop: 16 }}>
-                        <span className="rdm-icon-block" style={{ background: '#F5F5F5', color: '#595959' }}><HistoryOutlined /></span>
+                        <span className="rdm-icon-block" style={{ background: 'var(--surface-1)', color: 'var(--text-2)' }}><HistoryOutlined /></span>
                         全生命週期記錄
                         <span className="rdm-card-title-split" />
                         <span className="rdm-todo-hint">共 {detail.timeline.length} 個節點，每一步誰在什麼時候做的都有留痕</span>
@@ -1790,14 +1790,14 @@ export default function RequirementDetail() {
                             <div>
                               <Space size={6} wrap>
                                 <StatusTag status={node.status} />
-                                <span style={{ fontSize: 13, color: '#262626', fontWeight: 500 }}>{node.operatorName}</span>
+                                <span style={{ fontSize: 13, color: 'var(--text-1)', fontWeight: 500 }}>{node.operatorName}</span>
                                 {node.operatorRole && (
-                                  <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+                                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
                                     {RDM_ROLE_LABEL[node.operatorRole as RdmRoleCode] ?? node.operatorRole}
                                   </span>
                                 )}
                               </Space>
-                              <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 2 }}>
+                              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
                                 {node.time}{node.remark ? ` · ${node.remark}` : ''}
                               </div>
                             </div>
@@ -1816,7 +1816,7 @@ export default function RequirementDetail() {
         <aside className="rdm-detail-side">
           <div className="rdm-card">
             <div className="rdm-card-title">
-              <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><FileProtectOutlined /></span>
+              <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}><FileProtectOutlined /></span>
               屬性
               <span className="rdm-card-title-split" />
               {inlineEditing ? (
@@ -1901,7 +1901,7 @@ export default function RequirementDetail() {
               />
               <PropRow
                 label={t('rdm.attr.pm')}
-                value={detail.pmName ?? <span style={{ color: '#FF4D4F' }}>{t('rdm.attr.unassigned')}</span>}
+                value={detail.pmName ?? <span style={{ color: 'var(--danger)' }}>{t('rdm.attr.unassigned')}</span>}
                 // 需求池走「分配」而非改派；无受理人时由批量分配/认领产生，不能在这里凭空指派
                 editing={inlineEditing && canEditPmInline}
                 editor={
@@ -1963,7 +1963,7 @@ export default function RequirementDetail() {
                       <span style={{ fontSize: 12, color: planReleaseInfo?.tone === 'overdue' ? '#CF1322' : '#AD4E00' }}>{planReleaseCountdown}</span>
                     )}
                   </span>
-                ) : <span style={{ color: '#8C8C8C' }}>{t('rdm.attr.tbdSchedule')}</span>}
+                ) : <span style={{ color: 'var(--text-3)' }}>{t('rdm.attr.tbdSchedule')}</span>}
                 editing={inlineEditing && canEditDeliveryAttrs}
                 editor={
                   <DatePicker
@@ -1978,12 +1978,12 @@ export default function RequirementDetail() {
                 <a style={{ color: '#2F54EB' }} onClick={() => navigate(`/rdm-project-detail?id=${detail.projectId}`)}>
                   {detail.projectName ?? `項目 #${detail.projectId}`}
                 </a>
-              ) : <span style={{ color: '#8C8C8C' }}>未掛項目</span>} />
+              ) : <span style={{ color: 'var(--text-3)' }}>未掛項目</span>} />
               <PropRow
                 label={t('rdm.attr.iteration')}
                 value={detail.iterationCode
                   ? (detail.iterationName ? `${detail.iterationName} · ${detail.iterationCode}` : detail.iterationCode)
-                  : <span style={{ color: '#8C8C8C' }}>{t('rdm.attr.unlinked')}</span>}
+                  : <span style={{ color: 'var(--text-3)' }}>{t('rdm.attr.unlinked')}</span>}
                 editing={inlineEditing
                   && ITERATION_ADJUSTABLE_STATUS.includes(detail.status as RdmStatus)
                   && (hasPermission('rdm-requirement:edit') || hasPermission('rdm-requirement:dispatch'))}
@@ -2043,7 +2043,7 @@ export default function RequirementDetail() {
                   ? rdmDeliveryModeLabel(RDM_DELIVERY_MODE.BATCH)
                   : ([RDM_STATUS.DRAFT, RDM_STATUS.INTAKE_PENDING, RDM_STATUS.INTAKE_REJECTED,
                     RDM_STATUS.POOL, RDM_STATUS.ASSIGNED, RDM_STATUS.EVALUATING] as string[]).includes(detail.status)
-                    ? <span style={{ color: '#E8720C' }}>{t('rdm.deliveryMode.pendingValue', { defaultValue: '待確定（分配 / 認領時選擇，默認分批交付）' })}</span>
+                    ? <span style={{ color: 'var(--brand)' }}>{t('rdm.deliveryMode.pendingValue', { defaultValue: '待確定（分配 / 認領時選擇，默認分批交付）' })}</span>
                     : rdmDeliveryModeLabel(detail.flowVersion)}
               />
               {showAllProps && (
@@ -2063,7 +2063,7 @@ export default function RequirementDetail() {
                   <PropRow label="返工 / 變更 / 駁回" value={`${detail.reworkCount ?? 0} / ${detail.changeCount ?? 0} / ${detail.rejectCount ?? 0} 次`} />
                   <PropRow label="掛起復審" value={detail.onHoldUntil ?? '-'} />
                   <PropRow label="來源渠道" value={RDM_SOURCE_CHANNEL_LABEL[detail.sourceChannel as RdmSourceChannel] ?? detail.sourceChannel ?? '-'} />
-                  {detail.parentReqNo && <PropRow label="來源需求" value={<span style={{ color: '#1890FF' }}>{detail.parentReqNo}</span>} />}
+                  {detail.parentReqNo && <PropRow label="來源需求" value={<span style={{ color: 'var(--info)' }}>{detail.parentReqNo}</span>} />}
                   {/* V3 新增屬性 */}
                   {detail.requirementKind && (
                     <PropRow label="需求種類" value={
@@ -2084,14 +2084,14 @@ export default function RequirementDetail() {
                       <Space size={2} wrap>
                         {ancestors.map((a, idx) => (
                           <span key={a.reqId} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-                            {idx > 0 && <RightOutlined style={{ fontSize: 10, color: '#BFBFBF' }} />}
+                            {idx > 0 && <RightOutlined style={{ fontSize: 10, color: 'var(--text-4)' }} />}
                             <a style={{ color: '#2F54EB' }} onClick={() => goDetail(a.reqId)}>
                               {formatRdmReqNo(a.reqNo)}
                             </a>
                           </span>
                         ))}
-                        <RightOutlined style={{ fontSize: 10, color: '#BFBFBF' }} />
-                        <span style={{ color: '#595959' }}>本需求</span>
+                        <RightOutlined style={{ fontSize: 10, color: 'var(--text-4)' }} />
+                        <span style={{ color: 'var(--text-2)' }}>本需求</span>
                       </Space>
                     } />
                   )}
@@ -2110,7 +2110,7 @@ export default function RequirementDetail() {
                   .map(code => RDM_TASK_TYPE_LABEL[code as RdmTaskType] ?? code)
                 return (
                   <div key={p.userId} className="rdm-participant-row">
-                    <span style={{ color: '#262626', flexShrink: 0 }}>{formatEmployee(p.name, p.empNo)}</span>
+                    <span style={{ color: 'var(--text-1)', flexShrink: 0 }}>{formatEmployee(p.name, p.empNo)}</span>
                     <Space size={4} wrap style={{ marginLeft: 'auto', justifyContent: 'flex-end' }}>
                       {p.roles.map(role => {
                         const roleLabel = RDM_ROLE_LABEL[role as RdmRoleCode] ?? role
@@ -2237,7 +2237,7 @@ export default function RequirementDetail() {
                   {t('rdm.deliveryMode.title', { defaultValue: '交付流程' })} *<DeliveryModeHelp />
                 </div>
                 <DeliveryModePicker value={actionDeliveryMode} onChange={setActionDeliveryMode} />
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 6 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 6 }}>
                   {t('rdm.deliveryMode.assignNote', { defaultValue: '選「分批交付」時系統會自動建立首個交付項；已建立任務的需求只能選「整單交付」。' })}
                 </div>
               </div>
@@ -2245,7 +2245,7 @@ export default function RequirementDetail() {
             {activeAction === RDM_ACTION.DISPATCH && detail.flowVersion === RDM_DELIVERY_MODE.BATCH && (
               <div>
                 <div className="rdm-action-modal-label">{t('rdm.deliveryMode.title', { defaultValue: '交付流程' })}</div>
-                <div style={{ fontSize: 13, color: '#595959' }}>
+                <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
                   {t('rdm.deliveryMode.lockedValue', { defaultValue: '分批交付（已鎖定：需求已按交付項推進，不能退回整單交付）' })}
                 </div>
               </div>
@@ -2255,7 +2255,7 @@ export default function RequirementDetail() {
                 <div className="rdm-action-modal-label">承諾出 PRD 日期 *</div>
                 <DatePicker style={{ width: '100%' }} value={promisedDate} onChange={setPromisedDate} />
                 {/* 这个日期不只是字段：受理后会变成一条带负责人的 PRD 任务，管理侧靠它在甘特图上看产品进度 */}
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
                   受理後自動生成「PRD 產出」任務（負責人＝產品經理），子任務與甘特圖均可見
                 </div>
               </div>
@@ -2283,7 +2283,7 @@ export default function RequirementDetail() {
                   filterOption={(input, option) => (option?.label ?? '').includes(input)}
                 />
                 {!actionOptionsLoading && versionOptions.length === 0 && (
-                  <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{VERSION_FALLBACK_HINT}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{VERSION_FALLBACK_HINT}</div>
                 )}
               </div>
             )}
@@ -2343,7 +2343,7 @@ export default function RequirementDetail() {
 
         <div className="rdm-action-modal-label">
           {remarkRequired ? '說明 / 理由 *' : '補充說明'}
-          {!remarkRequired && <span style={{ color: '#8C8C8C' }}>（選填，會寫進流轉記錄）</span>}
+          {!remarkRequired && <span style={{ color: 'var(--text-3)' }}>（選填，會寫進流轉記錄）</span>}
         </div>
         <RemarkTextArea
           placeholder={remarkRequired
@@ -2413,14 +2413,14 @@ export default function RequirementDetail() {
           </div>
         </div>
         <div className="rdm-action-modal-label" style={{ marginTop: 12 }}>
-          調整原因<span style={{ color: '#8C8C8C' }}>（選填，會寫進流轉記錄）</span>
+          調整原因<span style={{ color: 'var(--text-3)' }}>（選填，會寫進流轉記錄）</span>
         </div>
         <RemarkTextArea
           placeholder="例：測試發現遺留缺陷，本迭代產能不足，順延到下一迭代"
           value={iterModalRemark}
           onChange={e => setIterModalRemark(e.target.value)}
         />
-        <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8 }}>
           調整後本需求下未完成的任務會同步換到目標迭代（已完成/已取消的任務保留歷史事實）。
         </div>
       </Modal>
@@ -2435,7 +2435,7 @@ export default function RequirementDetail() {
         confirmLoading={childSubmitting}
         okButtonProps={{ disabled: !childSelected }}
       >
-        <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 12 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12 }}>
           從本項目下的執行需求中選擇一條掛到本聚合需求下；已掛接的需求不會重複出現。
         </div>
         <Select
@@ -2458,7 +2458,7 @@ export default function RequirementDetail() {
 function SectionTitleDocs({ count }: { count: number }) {
   return (
     <div className="rdm-section-title">
-      <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><LinkOutlined /></span>
+      <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}><LinkOutlined /></span>
       關聯文檔（{count}）
       <span className="rdm-card-title-split" />
       <span className="rdm-todo-hint">正文存於文檔中心，點擊標題在系統內查閱</span>
@@ -2471,7 +2471,7 @@ function docColumns(navigate: (path: string) => void): TableColumnsType<DocNode>
   return [
     {
       title: '文檔', dataIndex: 'title', key: 'title',
-      render: (v: string, r) => <a style={{ color: '#E8720C' }} onClick={() => navigate(`/doc-center/detail?id=${r.id}`)}>{v}</a>,
+      render: (v: string, r) => <a style={{ color: 'var(--brand)' }} onClick={() => navigate(`/doc-center/detail?id=${r.id}`)}>{v}</a>,
     },
     { title: '類型', dataIndex: 'docType', key: 'docType', width: 100, render: (v: string, r) => <Tag style={{ margin: 0 }}>{r.docTypeLabel ?? v}</Tag> },
     {
@@ -2491,7 +2491,7 @@ function IntakePolicySection({ detail, navigate }: {
   return (
     <>
       <div className="rdm-section-title">
-        <span className="rdm-icon-block" style={{ background: '#FFF1F0', color: '#FF4D4F' }}><AuditOutlined /></span>
+        <span className="rdm-icon-block" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}><AuditOutlined /></span>
         需求準入審批
         <span className="rdm-card-title-split" />
         {detail.intakeFlowNo && (
@@ -2507,14 +2507,14 @@ function IntakePolicySection({ detail, navigate }: {
         )}
       </div>
       {(detail.intakePolicyName || detail.intakeRoundNo) && (
-        <div style={{ fontSize: 12, color: '#595959', marginBottom: 8 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 8 }}>
           命中策略：{detail.intakePolicyName || '默認策略'}（版本 {detail.intakePolicyVersion || 'v1'}）
           {detail.intakeRoundNo ? ` · 第 ${detail.intakeRoundNo} 輪提交` : ''}
           {detail.intakeMode ? ` · 裁決 ${RDM_INTAKE_MODE_LABEL[detail.intakeMode as keyof typeof RDM_INTAKE_MODE_LABEL] ?? detail.intakeMode}` : ''}
         </div>
       )}
       {detail.approvalNodes.length === 0 && (
-        <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>
           {detail.intakeFlowNo
             ? '審批節點載入中，可點「前往審批單」到 OA 審批中心處理。'
             : (detail.needApproval === 0
@@ -2533,14 +2533,14 @@ function IntakePolicySection({ detail, navigate }: {
           <div key={idx} className="rdm-risk-item">
             <Tag color={meta.color} style={{ margin: 0 }}>{meta.text}</Tag>
             <span>{node.nodeName}</span>
-            <span style={{ marginLeft: 'auto', fontSize: 12, color: '#8C8C8C' }}>
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-3)' }}>
               {node.approverName}{node.time ? ` · ${dayjs(node.time).format('MM-DD HH:mm')}` : ''}
             </span>
           </div>
         )
       })}
       {detail.approvalNodes[0]?.comment && (
-        <div style={{ fontSize: 12, color: '#595959', marginTop: 6 }}>審批意見：{detail.approvalNodes[0].comment}</div>
+        <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 6 }}>審批意見：{detail.approvalNodes[0].comment}</div>
       )}
     </>
   )
@@ -2597,10 +2597,10 @@ function CollapsibleText({ text }: { text: string }) {
 function BlockLabel({ text }: { text: string }) {
   return (
     <div style={{
-      fontSize: 12, color: '#8C8C8C', margin: '12px 0 6px',
+      fontSize: 12, color: 'var(--text-3)', margin: '12px 0 6px',
       display: 'flex', alignItems: 'center', gap: 6,
     }}>
-      <span style={{ width: 3, height: 12, background: '#E8720C', borderRadius: 2, display: 'inline-block' }} />
+      <span style={{ width: 3, height: 12, background: 'var(--brand)', borderRadius: 2, display: 'inline-block' }} />
       {text}
     </div>
   )

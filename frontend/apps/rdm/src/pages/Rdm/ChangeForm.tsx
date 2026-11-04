@@ -216,7 +216,7 @@ export default function ChangeForm() {
           </LabeledField>
           <Space size={16} wrap align="end">
             <div>
-              <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>增加工時（小時）</div>
+              <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 4 }}>增加工時（小時）</div>
               <InputNumber
                 min={0}
                 step={1}
@@ -227,7 +227,7 @@ export default function ChangeForm() {
               />
             </div>
             <div>
-              <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>計劃上線（現）</div>
+              <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 4 }}>計劃上線（現）</div>
               <Input style={{ width: 150 }} value={requirement?.planReleaseDate ?? '-'} disabled />
             </div>
           </Space>
@@ -261,8 +261,8 @@ export default function ChangeForm() {
 function LabeledField({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>
-        {required && <span style={{ color: '#FF4D4F', marginRight: 4 }}>*</span>}
+      <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 4 }}>
+        {required && <span style={{ color: 'var(--danger)', marginRight: 4 }}>*</span>}
         {label}
       </div>
       {children}

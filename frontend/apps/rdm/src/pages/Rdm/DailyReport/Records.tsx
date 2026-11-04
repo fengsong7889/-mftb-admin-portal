@@ -130,7 +130,7 @@ export default function DailyReportRecords() {
       title: t('rdm.dailyRecord.colRule'), key: 'rule', width: 160,
       render: (_, r) => r.ruleName
         ? <span>{r.ruleName}</span>
-        : <span style={{ color: '#bfbfbf' }}>{t('rdm.dailyRecord.noRule')}</span>,
+        : <span style={{ color: 'var(--text-4)' }}>{t('rdm.dailyRecord.noRule')}</span>,
     },
     {
       title: t('rdm.dailyRecord.colProject'), key: 'project', width: 220,
@@ -140,7 +140,7 @@ export default function DailyReportRecords() {
             ? `${r.projectNo ? `${r.projectNo} ` : ''}${r.projectName ?? `#${r.projectId}`}`
             : r.scopeLabel}
         </span>
-        : <span style={{ color: '#bfbfbf' }}>—</span>),
+        : <span style={{ color: 'var(--text-4)' }}>—</span>),
     },
     {
       title: t('rdm.dailyRecord.colIteration'), dataIndex: 'iterationCode', key: 'iteration', width: 150,
@@ -169,7 +169,7 @@ export default function DailyReportRecords() {
           <Tag color={r.triggerType === 'manual' ? 'blue' : 'default'} style={{ marginInlineEnd: 0 }}>
             {r.triggerType === 'manual' ? t('rdm.dailyRecord.triggerManual') : t('rdm.dailyRecord.triggerSchedule')}
           </Tag>
-          {r.triggerBy && <span style={{ fontSize: 12, color: '#8c8c8c' }}>{r.triggerBy}</span>}
+          {r.triggerBy && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{r.triggerBy}</span>}
         </Space>
       ),
     },
@@ -250,7 +250,7 @@ export default function DailyReportRecords() {
       {/* 操作区：说明在左、刷新在右 */}
       <div className="action-section">
         <div className="action-section-left">
-          <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('rdm.dailyRecord.hint')}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('rdm.dailyRecord.hint')}</span>
         </div>
         <div className="action-section-right">
           <Button size="small" icon={<ReloadOutlined />} onClick={() => void load()} loading={loading}>
