@@ -73,7 +73,7 @@ export default function AuthorizationCenter() {
     <div className="authz-center-page">
       {/* 页面头部：全局统一风格（橙色顶条 + 返回按钮 + 标题） */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
       }}>
         <div style={{
@@ -87,7 +87,7 @@ export default function AuthorizationCenter() {
               icon={<ArrowLeftOutlined />}
               onClick={() => navigate(-1)}
               style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                backgroundColor: 'var(--brand)', borderColor: 'var(--brand)',
                 borderRadius: 8, height: 36, padding: '0 16px',
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
@@ -97,10 +97,10 @@ export default function AuthorizationCenter() {
               {t('common.back', '返回')}
             </Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#262626' }}>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-1)' }}>
               {t('authorizationCenter.title', '授權中心')}
             </h2>
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
               {t('authorizationCenter.subtitle', '以角色/部門 × 系統為單位維護准入與菜單動作，支持權限透視與變更審計')}
             </span>
           </div>

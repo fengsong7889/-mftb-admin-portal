@@ -101,7 +101,7 @@ export default function EmployeePermTrace() {
     <div>
       <Card size="small" style={{ marginBottom: 16 }}>
         <div className="authz-trace-picker">
-          <UserOutlined style={{ color: '#E8720C' }} />
+          <UserOutlined style={{ color: 'var(--brand)' }} />
           <span className="authz-field-label">{t('authorizationCenter.trace.pickEmployee', '選擇員工')}:</span>
           <Select
             style={{ minWidth: 360 }}

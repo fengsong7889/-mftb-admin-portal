@@ -399,7 +399,7 @@ export default function EmployeeManagement() {
   /** 根据角色ID渲染角色名称标签（单行展示，禁止换行） */
   const renderRoleTags = (roleIds: number[]) => {
     if (!roleIds || roleIds.length === 0) {
-      return <span style={{ color: '#8C8C8C' }}>{t('employee.notBound')}</span>
+      return <span style={{ color: 'var(--text-3)' }}>{t('employee.notBound')}</span>
     }
     return (
       <Space size={4} style={{ whiteSpace: 'nowrap' }}>
@@ -480,7 +480,7 @@ export default function EmployeeManagement() {
       key: 'deptPermission',
       width: 110,
       render: (_: unknown, record: EmployeeItem) => {
-        if (!record.departmentId) return <span style={{ color: '#8C8C8C' }}>{t('employee.noDept')}</span>
+        if (!record.departmentId) return <span style={{ color: 'var(--text-3)' }}>{t('employee.noDept')}</span>
         const dept = departments.find(d => d.id === record.departmentId)
         const hasDeptPerm = dept?.permissions && dept.permissions.length > 0
         return hasDeptPerm

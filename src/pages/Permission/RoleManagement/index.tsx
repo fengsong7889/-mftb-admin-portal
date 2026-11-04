@@ -376,7 +376,7 @@ export default function RoleManagement() {
       width: 110,
       render: (value: number | undefined) => (value === 1
         ? <Tag color="green" style={{ margin: 0 }}>{t('roleManagement.selfServiceOn')}</Tag>
-        : <span style={{ color: '#bfbfbf' }}>-</span>),
+        : <span style={{ color: 'var(--text-4)' }}>-</span>),
     },
     {
       title: t('common.colStatus'),
