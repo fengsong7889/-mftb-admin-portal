@@ -371,7 +371,7 @@ function LegacyGlobalConfig() {
                   </Space>
                   <Button type="link" size="small" onClick={() => navigate('/synonym-config')}>{t('globalConfig.manage')}</Button>
                 </div>
-                <div style={{ marginTop: 6, color: '#8c8c8c', fontSize: 12, lineHeight: '18px' }}>
+                <div style={{ marginTop: 6, color: 'var(--text-3)', fontSize: 12, lineHeight: '18px' }}>
                   {t('globalConfig.libSynonymDesc')}
                 </div>
               </Card>
@@ -391,7 +391,7 @@ function LegacyGlobalConfig() {
                   </Space>
                   <Button type="link" size="small" onClick={() => navigate('/stop-words')}>{t('globalConfig.manage')}</Button>
                 </div>
-                <div style={{ marginTop: 6, color: '#8c8c8c', fontSize: 12, lineHeight: '18px' }}>
+                <div style={{ marginTop: 6, color: 'var(--text-3)', fontSize: 12, lineHeight: '18px' }}>
                   {t('globalConfig.libStopWordDesc')}
                 </div>
               </Card>
@@ -410,7 +410,7 @@ function LegacyGlobalConfig() {
                     />
                   </Space>
                 </div>
-                <div style={{ marginTop: 6, color: '#8c8c8c', fontSize: 12, lineHeight: '18px' }}>
+                <div style={{ marginTop: 6, color: 'var(--text-3)', fontSize: 12, lineHeight: '18px' }}>
                   {t('globalConfig.libMerchantKwDesc')}
                 </div>
               </Card>
@@ -429,7 +429,7 @@ function LegacyGlobalConfig() {
                     />
                   </Space>
                 </div>
-                <div style={{ marginTop: 6, color: '#8c8c8c', fontSize: 12, lineHeight: '18px' }}>
+                <div style={{ marginTop: 6, color: 'var(--text-3)', fontSize: 12, lineHeight: '18px' }}>
                   {t('globalConfig.libProductKwDesc')}
                 </div>
               </Card>
@@ -443,11 +443,11 @@ function LegacyGlobalConfig() {
             style={{ borderColor: '#d9f7be' }}
             styles={{ header: { background: '#f6ffed', borderBottom: '1px solid #d9f7be' } }}
           >
-            <div style={{ color: '#8c8c8c', fontSize: 12, marginBottom: 10 }}>
+            <div style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 10 }}>
               {t('globalConfig.fuzzyDesc')}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-              <div style={{ padding: '10px 14px', border: '1px solid #f0f0f0', borderRadius: 6, background: '#fafafa' }}>
+              <div style={{ padding: '10px 14px', border: '1px solid #f0f0f0', borderRadius: 6, background: 'var(--surface-3)' }}>
                 <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{t('globalConfig.fuzzyPinyin')}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Switch
@@ -457,10 +457,10 @@ function LegacyGlobalConfig() {
                     unCheckedChildren={t('globalConfig.off')}
                     size="small"
                   />
-                  <span style={{ color: '#8c8c8c', fontSize: 12 }}>{t('globalConfig.fuzzyPinyinTip')}</span>
+                  <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{t('globalConfig.fuzzyPinyinTip')}</span>
                 </div>
               </div>
-              <div style={{ padding: '10px 14px', border: '1px solid #f0f0f0', borderRadius: 6, background: '#fafafa' }}>
+              <div style={{ padding: '10px 14px', border: '1px solid #f0f0f0', borderRadius: 6, background: 'var(--surface-3)' }}>
                 <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{t('globalConfig.fuzzySimp')}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Switch
@@ -470,10 +470,10 @@ function LegacyGlobalConfig() {
                     unCheckedChildren={t('globalConfig.off')}
                     size="small"
                   />
-                  <span style={{ color: '#8c8c8c', fontSize: 12 }}>{t('globalConfig.fuzzySimpTip')}</span>
+                  <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{t('globalConfig.fuzzySimpTip')}</span>
                 </div>
               </div>
-              <div style={{ padding: '10px 14px', border: '1px solid #f0f0f0', borderRadius: 6, background: '#fafafa' }}>
+              <div style={{ padding: '10px 14px', border: '1px solid #f0f0f0', borderRadius: 6, background: 'var(--surface-3)' }}>
                 <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{t('globalConfig.fuzzyTolerance')}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Switch
@@ -483,7 +483,7 @@ function LegacyGlobalConfig() {
                     unCheckedChildren={t('globalConfig.off')}
                     size="small"
                   />
-                  <span style={{ color: '#8c8c8c', fontSize: 12 }}>{t('globalConfig.fuzzyToleranceTip')}</span>
+                  <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{t('globalConfig.fuzzyToleranceTip')}</span>
                 </div>
               </div>
             </div>
@@ -544,7 +544,7 @@ function LegacyGlobalConfig() {
                 style={{ borderColor: '#ffe7ba' }}
                 styles={{ header: { background: '#fff7e6', borderBottom: '1px solid #ffe7ba' } }}
               >
-                <div style={{ color: '#8c8c8c', fontSize: 12, marginBottom: 10 }}>
+                <div style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 10 }}>
                   {t('globalConfig.bonusDesc', { strong: <span style={{ fontWeight: 600 }}>{t('globalConfig.bonusDescStrong')}</span> })}
                   {isBonusEditing && <span style={{ color: '#1677ff', marginLeft: 8 }}>{t('globalConfig.editing')}</span>}
                 </div>
@@ -594,7 +594,7 @@ function LegacyGlobalConfig() {
             {/* 維度權重佔比：3 個業務頻道並排 */}
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <div style={{ color: '#722ed1', fontWeight: 600, fontSize: 15 }}>{t('globalConfig.dimTitle')}</div>
+                <div style={{ color: 'var(--purple)', fontWeight: 600, fontSize: 15 }}>{t('globalConfig.dimTitle')}</div>
                 {isDimEditing ? (
                   <Space>
                     <Button onClick={handleDimCancel}>{t('common.cancel')}</Button>
@@ -626,13 +626,13 @@ function LegacyGlobalConfig() {
                         padding: '14px 16px',
                         borderRadius: 6,
                         border: '1px solid #efdbff',
-                        background: '#fff',
+                        background: 'var(--surface-2)',
                       }}
                     >
                       {/* 頻道標題 */}
                       <div style={{
                         fontWeight: 600, fontSize: 14,
-                        color: '#722ed1',
+                        color: 'var(--purple)',
                         paddingBottom: 8, marginBottom: 12,
                         borderBottom: '2px solid #d3adf7',
                         textAlign: 'center',
@@ -661,13 +661,13 @@ function LegacyGlobalConfig() {
                       <div style={{
                         marginTop: 8, padding: '6px 10px',
                         borderRadius: 4,
-                        background: ok ? '#f6ffed' : '#fff2f0',
+                        background: ok ? 'var(--success-soft)' : '#fff2f0',
                         border: `1px solid ${ok ? '#b7eb8f' : '#ffccc7'}`,
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                         fontSize: 12,
                       }}>
-                        <span style={{ color: '#595959' }}>{t('globalConfig.dimTotal')}</span>
-                        <span style={{ fontWeight: 600, color: ok ? '#52c41a' : '#ff4d4f' }}>
+                        <span style={{ color: 'var(--text-2)' }}>{t('globalConfig.dimTotal')}</span>
+                        <span style={{ fontWeight: 600, color: ok ? 'var(--success)' : 'var(--danger)' }}>
                           {total}%{ok ? ' ✓' : ' ✗'}
                         </span>
                       </div>
@@ -694,7 +694,7 @@ function LegacyGlobalConfig() {
                 )
               }
             >
-              <div style={{ color: '#8c8c8c', fontSize: 12, marginBottom: 12 }}>
+              <div style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 12 }}>
                 {t('globalConfig.mixingDesc')}
               </div>
 
@@ -739,16 +739,16 @@ function LegacyGlobalConfig() {
                     padding: '12px 16px',
                     borderRadius: 6,
                     border: `1px solid ${!currentActivePeriod ? '#52c41a' : '#e8e8e8'}`,
-                    background: !currentActivePeriod ? '#f6ffed' : '#fafafa',
+                    background: !currentActivePeriod ? 'var(--success-soft)' : 'var(--surface-3)',
                     marginBottom: 8,
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
                     <Tag color="blue" style={{ margin: 0 }}>
                       {t('globalConfig.allDayRatio')}
-                      {!currentActivePeriod && <span style={{ marginLeft: 6, color: '#52c41a' }}>{t('globalConfig.activeNow')}</span>}
+                      {!currentActivePeriod && <span style={{ marginLeft: 6, color: 'var(--success)' }}>{t('globalConfig.activeNow')}</span>}
                     </Tag>
-                    <span style={{ color: '#8c8c8c', fontSize: 12 }}>{t('globalConfig.allDayDefault')}</span>
+                    <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{t('globalConfig.allDayDefault')}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                     <span>
@@ -794,7 +794,7 @@ function LegacyGlobalConfig() {
                 <div style={{ marginTop: 16 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontWeight: 600, color: '#595959' }}>{t('globalConfig.periodRules')}</span>
+                      <span style={{ fontWeight: 600, color: 'var(--text-2)' }}>{t('globalConfig.periodRules')}</span>
                       <QuestionCircleOutlined 
                         style={{ color: '#1677ff', cursor: 'pointer', fontSize: 14 }} 
                         onClick={() => setShowTimePeriodHelp(true)}
@@ -832,7 +832,7 @@ function LegacyGlobalConfig() {
                             padding: '12px 16px',
                             borderRadius: 6,
                             border: `1px solid ${isActive ? '#52c41a' : '#e8e8e8'}`,
-                            background: isActive ? '#f6ffed' : '#fafafa',
+                            background: isActive ? 'var(--success-soft)' : 'var(--surface-3)',
                             transition: 'all 0.3s',
                           }}
                         >
@@ -860,12 +860,12 @@ function LegacyGlobalConfig() {
                             ) : (
                               <Tag color="cyan" style={{ margin: 0 }}>
                                 {enumConfig?.label || t('globalConfig.pending')}
-                                {isActive && <span style={{ marginLeft: 6, color: '#52c41a' }}>{t('globalConfig.activeNow')}</span>}
+                                {isActive && <span style={{ marginLeft: 6, color: 'var(--success)' }}>{t('globalConfig.activeNow')}</span>}
                               </Tag>
                             )}
                             {/* 時間範圍 */}
                             {enumConfig && (
-                              <span style={{ color: '#595959', fontSize: 13 }}>{enumConfig.timeRange}</span>
+                              <span style={{ color: 'var(--text-2)', fontSize: 13 }}>{enumConfig.timeRange}</span>
                             )}
                             {/* 當前生效標籤（查看模式） */}
                             {!isMixingEditing && isActive && (
@@ -928,7 +928,7 @@ function LegacyGlobalConfig() {
                       )
                     })}
                     {mixingPriority.timePeriodList.length === 0 && (
-                      <div style={{ textAlign: 'center', padding: '16px', color: '#8c8c8c', border: '1px dashed #d9d9d9', borderRadius: 6 }}>
+                      <div style={{ textAlign: 'center', padding: '16px', color: 'var(--text-3)', border: '1px dashed #d9d9d9', borderRadius: 6 }}>
                         {t('globalConfig.noPeriodRule')}
                       </div>
                     )}
@@ -978,25 +978,25 @@ function LegacyGlobalConfig() {
                 width={480}
               >
                 <div style={{ lineHeight: 1.8, fontSize: 14 }}>
-                  <div style={{ marginBottom: 16, color: '#595959' }}>
+                  <div style={{ marginBottom: 16, color: 'var(--text-2)' }}>
                     {t('globalConfig.help1Desc')}
                   </div>
 
-                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>{t('globalConfig.help1How')}</div>
-                  <div style={{ marginBottom: 16, paddingLeft: 12, color: '#595959' }}>
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: 'var(--text-1)' }}>{t('globalConfig.help1How')}</div>
+                  <div style={{ marginBottom: 16, paddingLeft: 12, color: 'var(--text-2)' }}>
                     <div>{t('globalConfig.help1How1')}</div>
                     <div>{t('globalConfig.help1How2')}</div>
                   </div>
 
-                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>{t('globalConfig.help1Special')}</div>
-                  <div style={{ marginBottom: 16, paddingLeft: 12, color: '#595959' }}>
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: 'var(--text-1)' }}>{t('globalConfig.help1Special')}</div>
+                  <div style={{ marginBottom: 16, paddingLeft: 12, color: 'var(--text-2)' }}>
                     <div>{t('globalConfig.help1Special1')}</div>
                     <div>{t('globalConfig.help1Special2')}</div>
                     <div>{t('globalConfig.help1Special3')}</div>
                   </div>
 
-                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>{t('globalConfig.help1Order')}</div>
-                  <div style={{ paddingLeft: 12, color: '#595959' }}>
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: 'var(--text-1)' }}>{t('globalConfig.help1Order')}</div>
+                  <div style={{ paddingLeft: 12, color: 'var(--text-2)' }}>
                     {t('globalConfig.help1Order1')}
                   </div>
                 </div>
@@ -1015,26 +1015,26 @@ function LegacyGlobalConfig() {
                 width={480}
               >
                 <div style={{ lineHeight: 1.8, fontSize: 14 }}>
-                  <div style={{ marginBottom: 16, color: '#595959' }}>
+                  <div style={{ marginBottom: 16, color: 'var(--text-2)' }}>
                     {t('globalConfig.help2Desc')}
                   </div>
 
-                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>{t('globalConfig.help2AllDay')}</div>
-                  <div style={{ marginBottom: 16, paddingLeft: 12, color: '#595959' }}>
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: 'var(--text-1)' }}>{t('globalConfig.help2AllDay')}</div>
+                  <div style={{ marginBottom: 16, paddingLeft: 12, color: 'var(--text-2)' }}>
                     <div>{t('globalConfig.help2AllDay1')}</div>
                     <div>{t('globalConfig.help2AllDay2')}</div>
                     <div>{t('globalConfig.help2AllDay3')}</div>
                   </div>
 
-                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>{t('globalConfig.help2Period')}</div>
-                  <div style={{ marginBottom: 16, paddingLeft: 12, color: '#595959' }}>
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: 'var(--text-1)' }}>{t('globalConfig.help2Period')}</div>
+                  <div style={{ marginBottom: 16, paddingLeft: 12, color: 'var(--text-2)' }}>
                     <div>{t('globalConfig.help2Period1')}</div>
                     <div>{t('globalConfig.help2Period2')}</div>
                     <div>{t('globalConfig.help2Period3')}</div>
                   </div>
 
-                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>{t('globalConfig.help2Tip')}</div>
-                  <div style={{ paddingLeft: 12, color: '#595959' }}>
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: 'var(--text-1)' }}>{t('globalConfig.help2Tip')}</div>
+                  <div style={{ paddingLeft: 12, color: 'var(--text-2)' }}>
                     <div>{t('globalConfig.help2Tip1')}</div>
                     <div>{t('globalConfig.help2Tip2')}</div>
                     <div>{t('globalConfig.help2Tip3')}</div>
@@ -1055,12 +1055,12 @@ function LegacyGlobalConfig() {
                 width={480}
               >
                 <div style={{ lineHeight: 1.8, fontSize: 14 }}>
-                  <div style={{ marginBottom: 16, color: '#595959' }}>
+                  <div style={{ marginBottom: 16, color: 'var(--text-2)' }}>
                     {t('globalConfig.help3Desc')}
                   </div>
 
-                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>{t('globalConfig.help3Avail')}</div>
-                  <div style={{ marginBottom: 16, paddingLeft: 12, color: '#595959' }}>
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: 'var(--text-1)' }}>{t('globalConfig.help3Avail')}</div>
+                  <div style={{ marginBottom: 16, paddingLeft: 12, color: 'var(--text-2)' }}>
                     <div>• {t('globalConfig.periodBreakfast')}（07:00-09:00）</div>
                     <div>• {t('globalConfig.periodLunch')}（11:00-13:00）</div>
                     <div>• {t('globalConfig.periodTea')}（14:00-17:00）</div>
@@ -1068,15 +1068,15 @@ function LegacyGlobalConfig() {
                     <div>• {t('globalConfig.periodSupper')}（22:00-01:00）</div>
                   </div>
 
-                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>{t('globalConfig.help3Rule')}</div>
-                  <div style={{ marginBottom: 16, paddingLeft: 12, color: '#595959' }}>
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: 'var(--text-1)' }}>{t('globalConfig.help3Rule')}</div>
+                  <div style={{ marginBottom: 16, paddingLeft: 12, color: 'var(--text-2)' }}>
                     <div>{t('globalConfig.help3Rule1')}</div>
                     <div>{t('globalConfig.help3Rule2')}</div>
                     <div>{t('globalConfig.help3Rule3')}</div>
                   </div>
 
-                  <div style={{ fontWeight: 600, marginBottom: 8, color: '#262626' }}>{t('globalConfig.help3Match')}</div>
-                  <div style={{ paddingLeft: 12, color: '#595959' }}>
+                  <div style={{ fontWeight: 600, marginBottom: 8, color: 'var(--text-1)' }}>{t('globalConfig.help3Match')}</div>
+                  <div style={{ paddingLeft: 12, color: 'var(--text-2)' }}>
                     <div>{t('globalConfig.help3Match1')}</div>
                     <div>{t('globalConfig.help3Match2')}</div>
                     <div>{t('globalConfig.help3Match3')}</div>
@@ -1100,7 +1100,7 @@ function LegacyGlobalConfig() {
         size="small"
         style={{ marginBottom: 16, background: '#f6f8fa', border: '1px solid #e8e8e8' }}
       >
-        <span style={{ color: '#595959', fontSize: 13 }}>
+        <span style={{ color: 'var(--text-2)', fontSize: 13 }}>
           {t('globalConfig.pageDesc')}
         </span>
       </Card>
