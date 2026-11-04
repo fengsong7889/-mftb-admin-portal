@@ -59,6 +59,12 @@ export default defineConfig({
      */
     testTimeout: 60000,
     hookTimeout: 30000,
+    /**
+     * 单次抖动重试：CI 共享 runner 冷启动/并行争抢曾造成整轮 Test 步骤偶发假红
+     * （#566，同树本地双 TZ 全量均绿、无法复现）。真实回归两次尝试都会失败、
+     * 照样红灯，retry 只吸收单次环境抖动，不弱化任何断言。
+     */
+    retry: 1,
     setupFiles: ['./src/test/setup.ts'],
     pool: 'forks',
     // Vitest 4 已移除 poolOptions.forks，预算必须放到顶层才会生效。
