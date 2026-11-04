@@ -1406,8 +1406,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                     padding: '14px 20px', cursor: 'pointer', userSelect: 'none',
                     background: isExpanded ? 'var(--surface-3)' : 'var(--surface-2)',
                   }}
-                  onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = '#FAFAFA' }}
-                  onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = '#fff' }}
+                  onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = 'var(--surface-3)' }}
+                  onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = 'var(--surface-2)' }}
                 >
                   {/* 展開/折疀箭頭 */}
                   <span style={{
