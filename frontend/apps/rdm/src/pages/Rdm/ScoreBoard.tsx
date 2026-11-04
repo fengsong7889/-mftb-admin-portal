@@ -63,9 +63,9 @@ function ScoreTracePanel({ records }: { records: RdmScoreRecord[] }) {
       {records.map(r => (
         <div key={r.id} className="rdm-score-trace-item">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <b style={{ fontWeight: 600, color: '#262626' }}>{r.score.toFixed(2)} 分</b>
-            <span style={{ color: '#595959' }}>{r.reqNo}</span>
-            <span style={{ color: '#8C8C8C', fontSize: 12 }}>{r.reqTitle}</span>
+            <b style={{ fontWeight: 600, color: 'var(--text-1)' }}>{r.score.toFixed(2)} 分</b>
+            <span style={{ color: 'var(--text-2)' }}>{r.reqNo}</span>
+            <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{r.reqTitle}</span>
             <Tag color="geekblue" style={{ margin: 0 }}>{RDM_ROLE_LABEL[r.roleCode as RdmRoleCode] ?? r.roleCode}</Tag>
             <ComplexityTag complexity={r.complexity} />
             <PriorityTag priority={r.priority} />
@@ -197,26 +197,26 @@ export default function ScoreBoard() {
       title: '排名', key: 'rank', width: 70,
       render: (_, __, i) => (i < 3
         ? <Tooltip title={`第 ${i + 1} 名`}><Tag color={['gold', 'orange', 'red'][i]} style={{ margin: 0 }} icon={<CrownOutlined />}>{i + 1}</Tag></Tooltip>
-        : <span style={{ color: '#8C8C8C' }}>{i + 1}</span>),
+        : <span style={{ color: 'var(--text-3)' }}>{i + 1}</span>),
     },
     {
       title: '人員', key: 'person', width: 170,
       render: (_, r) => (
         <div style={{ lineHeight: 1.4 }}>
-          <div style={{ color: '#262626', fontWeight: 500 }}>{r.userName}</div>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{r.empNo}{r.deptName ? ` · ${r.deptName}` : ''}</div>
+          <div style={{ color: 'var(--text-1)', fontWeight: 500 }}>{r.userName}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{r.empNo}{r.deptName ? ` · ${r.deptName}` : ''}</div>
         </div>
       ),
     },
     {
       title: '總積分', dataIndex: 'totalScore', key: 'totalScore', width: 110,
       sorter: (a, b) => a.totalScore - b.totalScore,
-      render: (v: number) => <b style={{ color: '#E8720C', fontSize: 15 }}>{v.toFixed(2)}</b>,
+      render: (v: number) => <b style={{ color: 'var(--brand)', fontSize: 15 }}>{v.toFixed(2)}</b>,
     },
     { title: '參與需求', dataIndex: 'reqCount', key: 'reqCount', width: 100, render: (v: number) => v ?? 0 },
     {
       title: '按時率', dataIndex: 'onTimeRate', key: 'onTimeRate', width: 95,
-      render: (v: number) => <span style={{ color: v >= 0.85 ? '#52C41A' : v >= 0.6 ? '#FA8C16' : '#FF4D4F' }}>{Math.round((v ?? 0) * 100)}%</span>,
+      render: (v: number) => <span style={{ color: v >= 0.85 ? 'var(--success)' : v >= 0.6 ? 'var(--warning)' : 'var(--danger)' }}>{Math.round((v ?? 0) * 100)}%</span>,
     },
     {
       title: '一次通過率', dataIndex: 'firstPassRate', key: 'firstPassRate', width: 110,
@@ -224,7 +224,7 @@ export default function ScoreBoard() {
     },
     {
       title: '返工', dataIndex: 'reworkCount', key: 'reworkCount', width: 80,
-      render: (v: number) => (v > 0 ? <Tag color="warning" style={{ margin: 0 }}>{v} 次</Tag> : <span style={{ color: '#52C41A' }}>無</span>),
+      render: (v: number) => (v > 0 ? <Tag color="warning" style={{ margin: 0 }}>{v} 次</Tag> : <span style={{ color: 'var(--success)' }}>無</span>),
     },
     {
       title: '績效推送', dataIndex: 'pushStatus', key: 'pushStatus', width: 120,
@@ -253,11 +253,11 @@ export default function ScoreBoard() {
     {
       title: '得分', dataIndex: 'score', key: 'score', width: 90,
       sorter: (a, b) => a.score - b.score,
-      render: (v: number) => <b style={{ color: '#E8720C' }}>{v.toFixed(2)}</b>,
+      render: (v: number) => <b style={{ color: 'var(--brand)' }}>{v.toFixed(2)}</b>,
     },
     {
       title: '規則版本', dataIndex: 'ruleVersion', key: 'ruleVersion', width: 100,
-      render: (v?: number | null) => <span style={{ fontSize: 12, color: '#8C8C8C' }}>v{v ?? '-'}</span>,
+      render: (v?: number | null) => <span style={{ fontSize: 12, color: 'var(--text-3)' }}>v{v ?? '-'}</span>,
     },
   ], [navigate])
 
@@ -291,10 +291,10 @@ export default function ScoreBoard() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         gap: 12, flexWrap: 'wrap', marginBottom: 12,
       }}>
-        <div style={{ fontSize: 18, fontWeight: 700, color: '#262626', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <CalculatorOutlined style={{ color: '#722ED1' }} />
+        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <CalculatorOutlined style={{ color: 'var(--purple)' }} />
           個人產出積分
-          <span style={{ fontSize: 12, fontWeight: 400, color: '#8C8C8C' }}>
+          <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-3)' }}>
             複雜度 × 難度 × 按時 × 質量 × 角色，逐條可追溯
           </span>
         </div>
@@ -363,10 +363,10 @@ export default function ScoreBoard() {
 
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#F9F0FF', color: '#722ED1' }}><CrownOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}><CrownOutlined /></span>
           人員積分排名
           <span className="rdm-card-title-split" />
-          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>展開行可看每條分的計算式與成因（績效申訴依據）</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>展開行可看每條分的計算式與成因（績效申訴依據）</span>
           <span style={{ marginLeft: 'auto' }}>{rankConfig}</span>
         </div>
         <Table<RdmPersonalScore>
@@ -392,10 +392,10 @@ export default function ScoreBoard() {
 
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}><TeamOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--warning-soft)', color: 'var(--brand)' }}><TeamOutlined /></span>
           部門產出對比
           <span className="rdm-card-title-split" />
-          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>總分受規模影響，橫向比較請看人均</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>總分受規模影響，橫向比較請看人均</span>
         </div>
         <Table
           rowKey="deptName"
@@ -407,7 +407,7 @@ export default function ScoreBoard() {
             {
               title: '人均積分', dataIndex: 'avgScore', key: 'avgScore', width: 110,
               sorter: (a, b) => a.avgScore - b.avgScore,
-              render: (v: number) => <b style={{ color: '#722ED1' }}>{v.toFixed(2)}</b>,
+              render: (v: number) => <b style={{ color: 'var(--purple)' }}>{v.toFixed(2)}</b>,
             },
             {
               title: '按時率', dataIndex: 'onTimeRate', key: 'onTimeRate', width: 110,
@@ -428,7 +428,7 @@ export default function ScoreBoard() {
 
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><CalculatorOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}><CalculatorOutlined /></span>
           積分明細流水
           <span className="rdm-card-title-split" />
           <Button size="small" icon={<ExportOutlined />} onClick={() => navigate('/rdm-weekly-report')}>週報導出</Button>

@@ -163,7 +163,7 @@ export default function AssignPm() {
       title: '現負責產品', dataIndex: 'pmName', key: 'pmName', width: 140,
       render: (v: string | null | undefined, r) => v
         ? formatPerson({ name: v, empNo: r.pmEmpNo })
-        : <span style={{ color: '#8C8C8C' }}>未分配</span>,
+        : <span style={{ color: 'var(--text-3)' }}>未分配</span>,
     },
   ]
 
@@ -286,7 +286,7 @@ export default function AssignPm() {
 
       <div className="rdm-form-section">
         <div className="rdm-form-section-title">
-          <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><UserSwitchOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}><UserSwitchOutlined /></span>
           分配對象
           <span className="rdm-todo-hint">按領域命中與剩餘容量排序，點卡片即選中</span>
           <span style={{ flex: 1 }} />
@@ -315,7 +315,7 @@ export default function AssignPm() {
                 舊受理人、新受理人與提出人都會收到通知。服務端以舊受理人為條件更新，兩人同時改派只有一人成功。
               </div>
               <div>
-                <div style={{ fontSize: 13, color: '#595959', marginBottom: 6 }}>改派原因（必填，會寫進流轉記錄）</div>
+                <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 6 }}>改派原因（必填，會寫進流轉記錄）</div>
                 <Input.TextArea
                   rows={2}
                   style={{ maxWidth: 720 }}
@@ -380,17 +380,17 @@ export default function AssignPm() {
       {mode === 'DISPATCH' && (
         <div className="rdm-form-section">
           <div className="rdm-form-section-title">
-            <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}><ApartmentOutlined /></span>
+            <span className="rdm-icon-block" style={{ background: 'var(--warning-soft)', color: 'var(--brand)' }}><ApartmentOutlined /></span>
             {t('rdm.deliveryMode.title', { defaultValue: '交付流程' })}
             <span className="rdm-todo-hint">
               {t('rdm.deliveryMode.assignSectionHint', { defaultValue: '分配後生效；受理前還能改，受理後鎖定' })}
             </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 13, color: '#595959', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 13, color: 'var(--text-2)', marginBottom: 8 }}>
             {t('rdm.deliveryMode.pickHint', { defaultValue: '分配後按哪種流程推進 *' })}<DeliveryModeHelp />
           </div>
           <DeliveryModePicker value={deliveryMode} onChange={setDeliveryMode} />
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8 }}>
             {t('rdm.deliveryMode.assignNote', { defaultValue: '選「分批交付」時系統會自動建立首個交付項；已建立任務的需求只能選「整單交付」。' })}
           </div>
         </div>
@@ -398,7 +398,7 @@ export default function AssignPm() {
 
       <div className="rdm-form-section">
         <div className="rdm-form-section-title">
-          <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}><SendOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--warning-soft)', color: 'var(--brand)' }}><SendOutlined /></span>
           {/* 加载中先按“要分配几条”计数，否则进入页面的瞬间会显示「被分配的需求（0）」，
               让人误以为没选中任何需求 */}
           被分配的需求（{loading ? ids.length : rows.length}）

@@ -62,7 +62,7 @@ export default function RequirementKanban({ rows, limitHint, onOpen }: Requireme
             <span>{col.label}</span>
             <Space size={4}>
               {col.items.some(r => r.overdueFlag) && <Tag color="error" icon={<AlertOutlined />} style={{ margin: 0 }}>逾期</Tag>}
-              <span style={{ color: '#8C8C8C', fontWeight: 400 }}>{col.items.length}</span>
+              <span style={{ color: 'var(--text-3)', fontWeight: 400 }}>{col.items.length}</span>
             </Space>
           </div>
           <div className="rdm-board-col-body">
@@ -94,7 +94,7 @@ export default function RequirementKanban({ rows, limitHint, onOpen }: Requireme
                       <span>提出：{formatPerson({ name: item.submitterName, empNo: item.submitterEmpNo })}</span>
                     </div>
                     <div className="rdm-board-card-meta" style={{ marginTop: 4 }}>
-                      <span>處理人：{cardHandlers || <span style={{ color: '#FF4D4F' }}>未分配</span>}</span>
+                      <span>處理人：{cardHandlers || <span style={{ color: 'var(--danger)' }}>未分配</span>}</span>
                       {item.planReleaseDate && <span>計劃：{item.planReleaseDate}</span>}
                     </div>
                     <RequirementStageBar
@@ -110,7 +110,7 @@ export default function RequirementKanban({ rows, limitHint, onOpen }: Requireme
               )
             })}
             {col.items.length === 0 && (
-              <div style={{ textAlign: 'center', color: '#BFBFBF', fontSize: 12, padding: '18px 0' }}>
+              <div style={{ textAlign: 'center', color: 'var(--text-4)', fontSize: 12, padding: '18px 0' }}>
                 無需求
               </div>
             )}

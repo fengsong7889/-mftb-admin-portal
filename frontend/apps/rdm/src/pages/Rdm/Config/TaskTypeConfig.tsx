@@ -136,7 +136,7 @@ export default function TaskTypeConfig() {
       render: (_, record) => (
         canEdit ? (
           <Button type="link" size="small" onClick={() => navigate(`/rdm-task-type-config-form?id=${record.id}`)}>{t('common.edit')}</Button>
-        ) : <span style={{ color: '#8C8C8C' }}>{t('rdm.taskTypeConfig.readOnly')}</span>
+        ) : <span style={{ color: 'var(--text-3)' }}>{t('rdm.taskTypeConfig.readOnly')}</span>
       ),
     },
   ]

@@ -293,7 +293,7 @@ function RequirementAcceptanceForm() {
   if (!detail) {
     return (
       <div className="content-area">
-        <div style={{ padding: 60, textAlign: 'center', color: '#8C8C8C' }}>
+        <div style={{ padding: 60, textAlign: 'center', color: 'var(--text-3)' }}>
           {id ? '載入中…' : '未指定需求，請從待驗收列表進入'}
           <div style={{ marginTop: 16 }}>
             <Button onClick={() => navigate('/rdm-acceptance')}>返回待驗收列表</Button>
@@ -391,15 +391,15 @@ function RequirementAcceptanceForm() {
       {/* ── 当初的需求与期望（帮助验收人对照） ── */}
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}><AimOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--warning-soft)', color: 'var(--brand)' }}><AimOutlined /></span>
           需求與期望對照
           <span className="rdm-card-title-split" />
         </div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#262626', marginBottom: 8 }}>{detail.title}</div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>{detail.title}</div>
         <div className="rdm-desc-block">{detail.description}</div>
         {detail.expectResult && (
           <>
-            <div style={{ fontSize: 12, color: '#8C8C8C', margin: '10px 0 6px' }}>當初的期望結果</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', margin: '10px 0 6px' }}>當初的期望結果</div>
             <div className="rdm-desc-block">{detail.expectResult}</div>
           </>
         )}
@@ -409,7 +409,7 @@ function RequirementAcceptanceForm() {
       {/* ── 验收检查项（卡片流：每条一项一张卡，长文本完整可见） ── */}
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><CheckCircleOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}><CheckCircleOutlined /></span>
           {t('rdm.acceptance.caseCardTitle')}
           {/* 检查项全由验收人自己写，就得告诉他写成什么样才可判；长说明走 HelpPopover（§问号说明规范） */}
           <HelpPopover
@@ -424,7 +424,7 @@ function RequirementAcceptanceForm() {
             ]}
           />
           <span className="rdm-card-title-split" />
-          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>
             通過 {stat.passed}/{stat.total}
             {stat.defects > 0 && <span style={{ color: '#CF1322', marginLeft: 8 }}>缺陷 {stat.defects}（致命/嚴重 {stat.blocking}）</span>}
           </span>
@@ -560,7 +560,7 @@ function RequirementAcceptanceForm() {
       {/* ── 结论 ── */}
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#F6FFED', color: '#52C41A' }}><SendOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}><SendOutlined /></span>
           驗收結論與評價
           <span className="rdm-card-title-split" />
         </div>
@@ -584,13 +584,13 @@ function RequirementAcceptanceForm() {
               disabled: resultDisabled[o.value],
             }))}
           />
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
             {RESULT_OPTIONS.find(o => o.value === result)?.desc}
           </div>
 
           <Space size={24} wrap align="end">
             <span>
-              <span style={{ fontSize: 13, color: '#595959', marginRight: 8 }}>驗收環境</span>
+              <span style={{ fontSize: 13, color: 'var(--text-2)', marginRight: 8 }}>驗收環境</span>
               <Select
                 style={{ width: 160 }}
                 placeholder="必選"
@@ -601,14 +601,14 @@ function RequirementAcceptanceForm() {
             </span>
             {/* inline-flex 锁同行：antd Rate 渲染为块级 ul，不包一层会把说明挤到下一行 */}
             <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-              <span style={{ fontSize: 13, color: '#595959', marginRight: 8 }}>交付滿意度</span>
+              <span style={{ fontSize: 13, color: 'var(--text-2)', marginRight: 8 }}>交付滿意度</span>
               <Rate
                 value={score}
                 onChange={setScore}
                 tooltips={RDM_SCORE_TIERS.map(x => `${t(x.short)}：${t(x.desc)}`)}
               />
               {/* 每档口径常驻显示在星星右侧：光靠悬停的话，业务方打完分就忘了自己为什么选 3 分 */}
-              <span style={{ fontSize: 12, color: score ? '#E8720C' : '#8C8C8C', marginLeft: 10 }}>
+              <span style={{ fontSize: 12, color: score ? 'var(--brand)' : 'var(--text-3)', marginLeft: 10 }}>
                 {score
                   ? `${score} 分 · ${t(RDM_SCORE_TIERS[score - 1].short)}：${t(RDM_SCORE_TIERS[score - 1].desc)}`
                   : t('rdm.acceptance.scoreHintUnrated')}
@@ -617,7 +617,7 @@ function RequirementAcceptanceForm() {
           </Space>
 
           <div>
-            <div style={{ fontSize: 13, color: '#595959', marginBottom: 6 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 6 }}>
               問題/遺留事項{result !== RDM_ACCEPT_RESULT.PASS ? '（必填）' : '（選填）'}
             </div>
             <TextArea rows={3} value={issues} onChange={e => setIssues(e.target.value)} placeholder="例：導出超過 90 天區間時提示不明確，建議下個版本補充。" />
@@ -652,7 +652,7 @@ function RequirementAcceptanceForm() {
           )}
 
           <div>
-            <div style={{ fontSize: 13, color: '#595959', marginBottom: 6 }}>驗收意見（將進入需求檔案）</div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 6 }}>驗收意見（將進入需求檔案）</div>
             <TextArea rows={2} value={opinion} onChange={e => setOpinion(e.target.value)} placeholder="例：功能符合預期，業務側確認可用，同意上線。" />
           </div>
 
@@ -671,10 +671,10 @@ function RequirementAcceptanceForm() {
       {history.length > 0 && (
         <div className="rdm-card">
           <div className="rdm-card-title">
-            <span className="rdm-icon-block" style={{ background: '#F9F0FF', color: '#722ED1' }}><HistoryOutlined /></span>
+            <span className="rdm-icon-block" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}><HistoryOutlined /></span>
             曆次驗收記錄
             <span className="rdm-card-title-split" />
-            <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>返工不是追責，而是讓「一次通過率」有真實分母</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>返工不是追責，而是讓「一次通過率」有真實分母</span>
           </div>
           {history.map(h => (
             <div key={h.id} className="rdm-acceptance-history">
@@ -682,18 +682,18 @@ function RequirementAcceptanceForm() {
                 第 {h.attempt} 次 · {RESULT_OPTIONS.find(o => o.value === h.result)?.label ?? h.result}
               </Tag>
               <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ color: '#262626' }}>{h.acceptorName ?? '-'}</span>
-                <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>
+                <span style={{ color: 'var(--text-1)' }}>{h.acceptorName ?? '-'}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>
                   {h.acceptTime ? dayjs(h.acceptTime).format('MM-DD HH:mm') : ''}
                   {h.testEnv ? ` · ${RDM_TEST_ENV_LABEL[h.testEnv as RdmTestEnv] ?? h.testEnv}` : ''}
                   {h.caseTotal != null ? ` · 檢查項 ${h.casePass ?? 0}/${h.caseTotal}` : ''}
                   {h.score != null ? ` · 滿意度 ${h.score}/5` : ''}
                 </span>
                 {(h.issues || h.opinion) && (
-                  <div style={{ fontSize: 12, color: '#595959', marginTop: 2 }}>{h.issues ?? h.opinion}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>{h.issues ?? h.opinion}</div>
                 )}
                 {h.followUpReqNo && (
-                  <div style={{ fontSize: 12, color: '#1890FF', marginTop: 2 }}>遺留事項已轉後續需求：{h.followUpReqNo}</div>
+                  <div style={{ fontSize: 12, color: 'var(--info)', marginTop: 2 }}>遺留事項已轉後續需求：{h.followUpReqNo}</div>
                 )}
                 {/* 用例明细默认折叠：返工链上的全部用例一次性展开会掉信息密度，
                     而证据正文由 EvidenceThumb 按 index 懒取，展开也不会自动拉图 */}
@@ -715,9 +715,9 @@ function RequirementAcceptanceForm() {
                           <div key={cs.id} className="rdm-history-case">
                             <span className="rdm-case-no">{cs.seq}</span>
                             <span style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ color: '#262626' }}>{cs.title}</div>
+                              <div style={{ color: 'var(--text-1)' }}>{cs.title}</div>
                               {cs.actual && (
-                                <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 2 }}>
+                                <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
                                   {t('rdm.acceptance.actualField')}：{cs.actual}
                                 </div>
                               )}

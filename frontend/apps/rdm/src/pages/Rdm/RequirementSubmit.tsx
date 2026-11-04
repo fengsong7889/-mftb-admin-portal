@@ -742,7 +742,7 @@ export default function RequirementSubmit() {
         <Form.Item name="requirementKind" hidden><Input /></Form.Item>
         <div className="rdm-form-section">
           <div className="rdm-form-section-title">
-            <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}><FileTextOutlined /></span>
+            <span className="rdm-icon-block" style={{ background: 'var(--warning-soft)', color: 'var(--brand)' }}><FileTextOutlined /></span>
             需求內容
             <span className="rdm-todo-hint">只寫業務事實，不需要寫技術方案</span>
           </div>
@@ -769,7 +769,7 @@ export default function RequirementSubmit() {
         {/* ── ② 需求对象（可多个：已有功能 / 新增入口 / 暂不确定）── */}
         <div className="rdm-form-section">
           <div className="rdm-form-section-title">
-            <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><AimOutlined /></span>
+            <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}><AimOutlined /></span>
             需求對象
             <HelpPopover
               title="需求對象怎麼填"
@@ -808,7 +808,7 @@ export default function RequirementSubmit() {
         {/* ── ③ 受理与时间 ── */}
         <div className="rdm-form-section">
           <div className="rdm-form-section-title">
-            <span className="rdm-icon-block" style={{ background: '#F9F0FF', color: '#722ED1' }}><NodeIndexOutlined /></span>
+            <span className="rdm-icon-block" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}><NodeIndexOutlined /></span>
             受理路徑與時間
           </div>
           <div className="rdm-assign-card">
@@ -817,7 +817,7 @@ export default function RequirementSubmit() {
               onClick={() => form.setFieldValue('assignMode', 'POOL')}
             >
               <div className="rdm-assign-option-title">
-                <TeamOutlined style={{ color: assignMode === 'POOL' ? '#E8720C' : '#8C8C8C' }} />
+                <TeamOutlined style={{ color: assignMode === 'POOL' ? 'var(--brand)' : 'var(--text-3)' }} />
                 提交技術部統一分配（推薦）
               </div>
               <div className="rdm-assign-option-desc">
@@ -829,7 +829,7 @@ export default function RequirementSubmit() {
               onClick={() => form.setFieldValue('assignMode', 'PM')}
             >
               <div className="rdm-assign-option-title">
-                <CheckCircleOutlined style={{ color: assignMode === 'PM' ? '#E8720C' : '#8C8C8C' }} />
+                <CheckCircleOutlined style={{ color: assignMode === 'PM' ? 'var(--brand)' : 'var(--text-3)' }} />
                 我已知道對口的產品經理
               </div>
               <div className="rdm-assign-option-desc">直接指定受理人，跳過需求池人工分配，響應更快。</div>
@@ -906,7 +906,7 @@ export default function RequirementSubmit() {
           */}
           <div className="rdm-approval-card">
             <div className="rdm-approval-card-title">
-              <SafetyCertificateOutlined style={{ color: '#E8720C' }} />
+              <SafetyCertificateOutlined style={{ color: 'var(--brand)' }} />
               審批要求（由系統按部門與角色判定，提交人無需選擇）
               {decision && (
                 <Tag color={decision.needApproval ? 'processing' : 'success'} style={{ margin: 0 }}>
@@ -939,7 +939,7 @@ export default function RequirementSubmit() {
                   : '正在按你的部門與角色裁決本單要不要先經準入審批…'
               )}
             </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 6 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 6 }}>
               指定產品經理不等於免審批；要調整準入規則請到「需求配置 · 分發矩陣 · 準入策略」。
             </div>
           </div>
@@ -950,7 +950,7 @@ export default function RequirementSubmit() {
           ghost
           items={[{
             key: 'more',
-            label: <span style={{ fontSize: 13, fontWeight: 500, color: '#595959' }}>更多設置（需求類型、優先級、業務價值、附件）</span>,
+            label: <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-2)' }}>更多設置（需求類型、優先級、業務價值、附件）</span>,
             children: (
               <>
                 {/* 三字段并排（全局表单规范：每行 3 个字段），固定宽度会把优先级长文案截断 */}
@@ -990,7 +990,7 @@ export default function RequirementSubmit() {
                     >
                       <Button icon={<CameraOutlined />} loading={uploading}>上傳現狀截圖 / 附件</Button>
                     </Upload>
-                    <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
                       支持圖片與 pdf/doc/xls/ppt/zip，單個不超過 5MB，最多 5 個
                     </span>
                   </Space>
@@ -1001,16 +1001,16 @@ export default function RequirementSubmit() {
                         return (
                           <div key={`${att.name}-${idx}`} style={{
                             position: 'relative', border: '1px solid #e8eaed', borderRadius: 6,
-                            padding: 6, background: '#FAFBFC', maxWidth: 180,
+                            padding: 6, background: 'var(--surface-sunken)', maxWidth: 180,
                           }}>
                             {isImage ? (
                               <img src={att.dataUrl} alt={att.name} style={{ width: 156, height: 88, objectFit: 'cover', borderRadius: 4 }} />
                             ) : (
-                              <div style={{ width: 156, height: 88, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#8C8C8C' }}>
+                              <div style={{ width: 156, height: 88, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--text-3)' }}>
                                 {att.name}
                               </div>
                             )}
-                            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 156 }}>
+                            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 156 }}>
                               {att.name} · {(att.fileSize / 1024).toFixed(0)} KB
                             </div>
                             <Button
@@ -1031,7 +1031,7 @@ export default function RequirementSubmit() {
               </>
             ),
           }]}
-          style={{ marginBottom: 16, background: '#fff', borderRadius: 8, border: '1px solid #e8eaed' }}
+          style={{ marginBottom: 16, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid #e8eaed' }}
         />
       </Form>
 

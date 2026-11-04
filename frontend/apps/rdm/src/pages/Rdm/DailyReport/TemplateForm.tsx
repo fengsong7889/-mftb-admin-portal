@@ -207,7 +207,7 @@ export default function DailyReportTemplateForm() {
   return (
     <div className="content-area">
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
       }}>
         <div style={{
@@ -217,13 +217,13 @@ export default function DailyReportTemplateForm() {
         <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
           <Button type="primary" icon={<ArrowLeftOutlined />} onClick={() => navigate('/rdm-daily-report-templates')}
             style={{
-              backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px',
+              backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8, height: 36, padding: '0 16px',
               display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
             }}>
             {t('rdm.dailyTemplate.back')}
           </Button>
           <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>
             {isDetail ? t('rdm.dailyTemplate.formTitleDetail')
               : editKey ? t('rdm.dailyTemplate.formTitleEdit')
                 : cloneFrom ? t('rdm.dailyTemplate.formTitleClone') : t('rdm.dailyTemplate.formTitleNew')}
@@ -337,7 +337,7 @@ export default function DailyReportTemplateForm() {
           />
           {showRaw && (
             <pre style={{
-              background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 6, padding: 12, marginTop: 10,
+              background: 'var(--surface-3)', border: '1px solid #f0f0f0', borderRadius: 6, padding: 12, marginTop: 10,
               fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 360, overflow: 'auto',
             }}>
               {preview.content}
@@ -348,7 +348,7 @@ export default function DailyReportTemplateForm() {
               <Button icon={<LinkOutlined />} onClick={openPreviewLink}>
                 {t('rdm.dailyTemplate.viewBoard')}
               </Button>
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
                 {t('rdm.dailyTemplate.previewOpenBoardHint')}
               </span>
             </div>
@@ -386,14 +386,14 @@ function CardTitle({ text, hint }: { text: string; hint?: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
       <div style={{
-        width: 28, height: 28, borderRadius: 6, background: '#fff7e6',
+        width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <FileTextOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+        <FileTextOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />
       </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{text}</span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{text}</span>
       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-      {hint && <span style={{ fontSize: 12, color: '#8c8c8c' }}>{hint}</span>}
+      {hint && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{hint}</span>}
     </div>
   )
 }

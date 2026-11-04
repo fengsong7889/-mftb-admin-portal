@@ -169,7 +169,7 @@ const BizSidebar = ({ activeBiz, onChange }: { activeBiz: Biz; onChange: (v: Biz
   ]
   return (
   <div style={{ width: 160, flexShrink: 0, marginRight: 16 }}>
-    <div style={{ background: '#fafafa', borderRadius: 8, padding: 12 }}>
+    <div style={{ background: 'var(--surface-3)', borderRadius: 8, padding: 12 }}>
       <div style={{
         padding: '0 0 12px',
         marginBottom: 8,
@@ -198,7 +198,7 @@ const BizSidebar = ({ activeBiz, onChange }: { activeBiz: Biz; onChange: (v: Biz
             borderLeft: activeBiz === opt.value ? '3px solid #1677ff' : '3px solid transparent',
             fontSize: 14,
             fontWeight: activeBiz === opt.value ? 600 : 400,
-            color: activeBiz === opt.value ? '#1677ff' : '#595959',
+            color: activeBiz === opt.value ? '#1677ff' : 'var(--text-2)',
             transition: 'all 0.2s',
             display: 'flex',
             alignItems: 'center',
@@ -531,7 +531,7 @@ export default function DimensionStrategy() {
           />
           <div style={{ marginBottom: 16 }}>
             <Space>
-              <Input prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />} placeholder={t('channelStrategy.searchName')} allowClear
+              <Input prefix={<SearchOutlined style={{ color: 'var(--text-4)' }} />} placeholder={t('channelStrategy.searchName')} allowClear
                 value={commercialSearchText} onChange={e => setCommercialSearchText(e.target.value)} style={{ width: 200 }} />
               <Button type="primary" icon={<SearchOutlined />}>{t('common.search')}</Button>
               <Button icon={<ReloadOutlined />} onClick={() => setCommercialSearchText('')}>{t('common.reset')}</Button>
@@ -580,7 +580,7 @@ export default function DimensionStrategy() {
         <div style={{ flex: 1 }}>
           <div style={{ marginBottom: 16 }}>
             <Space>
-              <Input prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />} placeholder={t('channelStrategy.searchFactor')} allowClear
+              <Input prefix={<SearchOutlined style={{ color: 'var(--text-4)' }} />} placeholder={t('channelStrategy.searchFactor')} allowClear
                 value={storeNameFilter} onChange={e => setStoreNameFilter(e.target.value)} style={{ width: 180 }} />
               <Button type="primary" icon={<SearchOutlined />} onClick={() => {}}>{t('common.search')}</Button>
               <Button icon={<ReloadOutlined />} onClick={() => setStoreNameFilter('')}>{t('common.reset')}</Button>
@@ -670,13 +670,13 @@ export default function DimensionStrategy() {
 
   return (
     <div style={{ padding: '0 4px' }}>
-      <div style={{ background: '#fff', padding: '16px', borderRadius: 8 }}>
+      <div style={{ background: 'var(--surface-2)', padding: '16px', borderRadius: 8 }}>
         {/* 頁面描述 */}
         <Card
           size="small"
           style={{ marginBottom: 16, background: '#f6f8fa', border: '1px solid #e8e8e8' }}
         >
-          <span style={{ color: '#595959', fontSize: 13 }}>
+          <span style={{ color: 'var(--text-2)', fontSize: 13 }}>
             {t('channelStrategy.pageDesc')}
           </span>
         </Card>
@@ -772,7 +772,7 @@ export default function DimensionStrategy() {
                   border: '1px solid #d9d9d9', 
                   borderRadius: 4, 
                   padding: 16, 
-                  background: '#fafafa'
+                  background: 'var(--surface-3)'
                 }}>
                   <div style={{ marginBottom: 12 }}>
                     <div style={{ marginBottom: 8, fontSize: 13, color: '#333', fontWeight: 500 }}>{t('channelStrategy.boostMethod')}</div>
@@ -873,7 +873,7 @@ export default function DimensionStrategy() {
                       <div style={{ 
                         marginTop: 8, 
                         padding: 8, 
-                        background: '#e6f7ff', 
+                        background: 'var(--info-soft)', 
                         borderRadius: 4,
                         fontSize: 12,
                         color: '#0050b3',
@@ -881,7 +881,7 @@ export default function DimensionStrategy() {
                       }}>
                         <strong>{t('channelStrategy.percentTipTitle')}</strong>
                         {t('channelStrategy.percentTipBody')}
-                        <code style={{ margin: '0 4px', padding: '2px 6px', background: '#f5f5f5', borderRadius: 3 }}>{t('channelStrategy.percentTipCode')}</code>
+                        <code style={{ margin: '0 4px', padding: '2px 6px', background: 'var(--surface-1)', borderRadius: 3 }}>{t('channelStrategy.percentTipCode')}</code>
                         {t('channelStrategy.percentTipExample')}
                       </div>
                     )}

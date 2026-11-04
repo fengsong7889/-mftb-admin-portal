@@ -115,17 +115,17 @@ export default function InboundDetail({ batchId, onBack }: Props) {
       },
     },
     { title: t('asset.colStorageLocation'), dataIndex: 'locationId', key: 'locationId', width: 120,
-      render: (v: number) => <span style={{ color: '#262626' }}>{locationMap.get(v) || '-'}</span>,
+      render: (v: number) => <span style={{ color: 'var(--text-1)' }}>{locationMap.get(v) || '-'}</span>,
     },
     {
       title: t('asset.colRejectReason'), dataIndex: 'rejectReason', key: 'rejectReason', width: 200, ellipsis: true,
-      render: (v: string | undefined) => <span style={{ color: '#595959' }}>{v || '-'}</span>,
+      render: (v: string | undefined) => <span style={{ color: 'var(--text-2)' }}>{v || '-'}</span>,
     },
     {
       title: t('asset.colAccessories'), key: 'accessories', width: 220,
       render: (_: unknown, r: InboundBatchItem) => {
         const accs = r.accessories || []
-        if (accs.length === 0) return <span style={{ color: '#bfbfbf' }}>-</span>
+        if (accs.length === 0) return <span style={{ color: 'var(--text-4)' }}>-</span>
         return (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             {accs.map((a, i) => (
@@ -139,7 +139,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
       title: t('asset.colPhotos'), key: 'photos', width: 140,
       render: (_: unknown, r: InboundBatchItem) => {
         const photos = r.photos || []
-        if (photos.length === 0) return <span style={{ color: '#bfbfbf' }}>-</span>
+        if (photos.length === 0) return <span style={{ color: 'var(--text-4)' }}>-</span>
         return (
           <Space size={4}>
             {photos.slice(0, 3).map((p, i) => (
@@ -152,7 +152,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
             {photos.length > 3 && (
               <span
                 onClick={() => { setPreviewPhotos(photos); setPreviewIndex(0); setPreviewImage(photos[0].dataUrl); setPreviewRotate(0); setPreviewVisible(true) }}
-                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 24, height: 20, padding: '0 6px', background: '#E8720C', color: '#fff', fontSize: 11, fontWeight: 600, borderRadius: 10, cursor: 'pointer' }}
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 24, height: 20, padding: '0 6px', background: 'var(--brand)', color: '#fff', fontSize: 11, fontWeight: 600, borderRadius: 10, cursor: 'pointer' }}
               >
                 +{photos.length - 3}
               </span>
@@ -173,7 +173,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
                   fontFamily: 'monospace', fontSize: 12,
                 }}>{no}</span>
               ))
-            : <span style={{ color: '#bfbfbf' }}>—</span>
+            : <span style={{ color: 'var(--text-4)' }}>—</span>
           }
         </div>
       ),
@@ -181,7 +181,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
     {
       title: t('asset.colExchangeTracking'), key: 'exchange', width: 160,
       render: (_: unknown, r: InboundBatchItem) => {
-        if (r.disposition !== 'exchange') return <span style={{ color: '#bfbfbf' }}>-</span>
+        if (r.disposition !== 'exchange') return <span style={{ color: 'var(--text-4)' }}>-</span>
         return (
           <Space size={4} wrap>
             {r.exchangeStatus === 'shipped' ? (
@@ -222,12 +222,12 @@ export default function InboundDetail({ batchId, onBack }: Props) {
       />
 
       {/* ====== 批次信息 ====== */}
-      <div style={{ borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+      <div style={{ borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <FileTextOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <FileTextOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.batchInfoTitle')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.batchInfoTitle')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
@@ -237,12 +237,12 @@ export default function InboundDetail({ batchId, onBack }: Props) {
           <Descriptions.Item label={t('asset.labelInboundDate')}>{batch.inboundDate}</Descriptions.Item>
           <Descriptions.Item label={t('asset.colOperator')}>{batch.operator || '-'}</Descriptions.Item>
           <Descriptions.Item label={t('asset.orderBrand')}>
-            {batch.brand ? <BrandTag value={batch.brand} /> : <span style={{ color: '#bfbfbf' }}>-</span>}
+            {batch.brand ? <BrandTag value={batch.brand} /> : <span style={{ color: 'var(--text-4)' }}>-</span>}
           </Descriptions.Item>
           <Descriptions.Item label={t('asset.colSupplier')}>
             {(() => {
               const suppliers = batch.suppliers && batch.suppliers.length > 0 ? batch.suppliers : (batch.supplier ? [batch.supplier] : [])
-              if (suppliers.length === 0) return <span style={{ color: '#bfbfbf' }}>無供應商</span>
+              if (suppliers.length === 0) return <span style={{ color: 'var(--text-4)' }}>無供應商</span>
               if (suppliers.length === 1) return <span style={{ fontWeight: 500 }}>{suppliers[0]}</span>
               // 多供應商：顯示第一個 + +N 標記
               const rest = suppliers.slice(1)
@@ -262,7 +262,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
                     title="所有供應商"
                     trigger="click"
                   >
-                    <Tag style={{ margin: 0, cursor: 'pointer', borderRadius: 10, borderColor: '#E8720C', color: '#E8720C', fontWeight: 500 }}>
+                    <Tag style={{ margin: 0, cursor: 'pointer', borderRadius: 10, borderColor: 'var(--brand)', color: 'var(--brand)', fontWeight: 500 }}>
                       +{rest.length}
                     </Tag>
                   </Popover>
@@ -273,19 +273,19 @@ export default function InboundDetail({ batchId, onBack }: Props) {
           <Descriptions.Item label={t('asset.purchaseType')}>
             {batch.purchaseType
               ? <Tag color={batch.purchaseType === 'purchase' ? 'blue' : 'green'}>{batch.purchaseType === 'purchase' ? t('asset.purchaseTypePurchase') : t('asset.purchaseTypeLease')}</Tag>
-              : <span style={{ color: '#bfbfbf' }}>-</span>}
+              : <span style={{ color: 'var(--text-4)' }}>-</span>}
           </Descriptions.Item>
           <Descriptions.Item label={t('asset.storageLocationSection')}>
             {(() => {
               const item = batch.items?.find((it) => it.locationName)
-              if (!item?.locationName) return <span style={{ color: '#bfbfbf' }}>-</span>
+              if (!item?.locationName) return <span style={{ color: 'var(--text-4)' }}>-</span>
               const addr = item.locationAddress
               const text = addr ? `${item.locationName}(${addr})` : item.locationName
               return <span style={{ fontWeight: 500 }}>{text}</span>
             })()}
           </Descriptions.Item>
           <Descriptions.Item label={t('asset.mgmtDeptLabel')}>
-            {batch.departmentName ? <span style={{ fontWeight: 500 }}>{batch.departmentName}</span> : <span style={{ color: '#bfbfbf' }}>-</span>}
+            {batch.departmentName ? <span style={{ fontWeight: 500 }}>{batch.departmentName}</span> : <span style={{ color: 'var(--text-4)' }}>-</span>}
           </Descriptions.Item>
           <Descriptions.Item label={t('asset.colCreatedAt')}>{batch.createdAt}</Descriptions.Item>
           {batch.purchaseReason && <Descriptions.Item label={t('asset.orderReasonLabel')}>{batch.purchaseReason}</Descriptions.Item>}
@@ -293,12 +293,12 @@ export default function InboundDetail({ batchId, onBack }: Props) {
       </div>
 
       {/* ====== 验收统计 ====== */}
-      <div style={{ borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+      <div style={{ borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ShoppingCartOutlined style={{ fontSize: 14, color: '#52c41a' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--success-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ShoppingCartOutlined style={{ fontSize: 14, color: 'var(--success)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.statsTitle')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.statsTitle')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
@@ -315,28 +315,28 @@ export default function InboundDetail({ batchId, onBack }: Props) {
               position: 'relative', overflow: 'hidden', cursor: 'default',
               transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
             }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{card.label}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>{card.label}</div>
               <div style={{ fontSize: 22, fontWeight: 700, color: card.color }}>{card.value}</div>
             </div>
           ))}
         </div>
         {/* 讓步接收單獨展示（與通過量合並計入已入庫） */}
         {batch.concessionQty > 0 && (
-          <div style={{ marginTop: 12, padding: '8px 16px', background: '#E6F7FF', borderRadius: 8, border: '1px solid #91d5ff22', textAlign: 'center' }}>
-            <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.rejectConcession')}</span>
-            <span style={{ fontSize: 18, fontWeight: 700, color: '#1890FF', marginLeft: 8 }}>{batch.concessionQty}</span>
-            <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>({t('asset.concessionIncludedInReceived')})</span>
+          <div style={{ marginTop: 12, padding: '8px 16px', background: 'var(--info-soft)', borderRadius: 8, border: '1px solid #91d5ff22', textAlign: 'center' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.rejectConcession')}</span>
+            <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--info)', marginLeft: 8 }}>{batch.concessionQty}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>({t('asset.concessionIncludedInReceived')})</span>
           </div>
         )}
       </div>
 
       {/* ====== 入库明细 ====== */}
-      <div style={{ borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+      <div style={{ borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <EnvironmentOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <EnvironmentOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.itemsTitle')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.itemsTitle')}</span>
           <Tag color="blue" style={{ fontSize: 11 }}>{t('asset.exceptionCountTag', { count: batch.items.length })}</Tag>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
@@ -353,23 +353,23 @@ export default function InboundDetail({ batchId, onBack }: Props) {
 
       {/* ====== 備註 ====== */}
       {batch.remark && (
-        <div style={{ borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+        <div style={{ borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('asset.remarkTitle')}</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.remarkTitle')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
-          <div style={{ fontSize: 14, color: '#595959', lineHeight: 1.8 }}>{batch.remark}</div>
+          <div style={{ fontSize: 14, color: 'var(--text-2)', lineHeight: 1.8 }}>{batch.remark}</div>
         </div>
       )}
 
       {/* ====== 最後更新 ====== */}
       <div style={{
-        background: '#fafafa', borderRadius: 8, padding: '12px 24px',
+        background: 'var(--surface-3)', borderRadius: 8, padding: '12px 24px',
         border: '1px solid #f0f0f0',
         display: 'flex', justifyContent: 'flex-end', gap: 24,
       }}>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedByLabel')}<span style={{ color: '#595959' }}>{batch.updatedBy || '-'}</span></span>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedAtLabel')}<span style={{ color: '#595959' }}>{batch.updatedAt || '-'}</span></span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.updatedByLabel')}<span style={{ color: 'var(--text-2)' }}>{batch.updatedBy || '-'}</span></span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.updatedAtLabel')}<span style={{ color: 'var(--text-2)' }}>{batch.updatedAt || '-'}</span></span>
       </div>
 
       {/* ====== 照片預覽 ====== */}
@@ -382,7 +382,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
         title={<span style={{ fontSize: 15, fontWeight: 600 }}>照片預覽 ({previewIndex + 1} / {previewPhotos.length})</span>}
       >
         {/* 图片区域 */}
-        <div style={{ minHeight: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fafafa', borderRadius: 8, padding: 24 }}>
+        <div style={{ minHeight: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface-3)', borderRadius: 8, padding: 24 }}>
           <img
             alt="preview"
             src={previewImage}
@@ -394,26 +394,26 @@ export default function InboundDetail({ batchId, onBack }: Props) {
           <Button
             onClick={() => { const idx = previewIndex - 1; if (idx >= 0) { setPreviewIndex(idx); setPreviewImage(previewPhotos[idx].dataUrl); setPreviewRotate(0) } }}
             disabled={previewIndex === 0}
-            style={{ width: 40, height: 40, borderRadius: 8, fontSize: 18, fontWeight: 600, background: '#fff', border: '1px solid #d9d9d9' }}
+            style={{ width: 40, height: 40, borderRadius: 8, fontSize: 18, fontWeight: 600, background: 'var(--surface-2)', border: '1px solid #d9d9d9' }}
           >
             ‹
           </Button>
           <Button
             onClick={() => setPreviewRotate((prev) => prev - 90)}
-            style={{ height: 40, borderRadius: 8, fontSize: 13, fontWeight: 500, padding: '0 16px', background: '#fff', border: '1px solid #d9d9d9' }}
+            style={{ height: 40, borderRadius: 8, fontSize: 13, fontWeight: 500, padding: '0 16px', background: 'var(--surface-2)', border: '1px solid #d9d9d9' }}
           >
             ↺ 逆時針
           </Button>
           <Button
             onClick={() => setPreviewRotate((prev) => prev + 90)}
-            style={{ height: 40, borderRadius: 8, fontSize: 13, fontWeight: 500, padding: '0 16px', background: '#fff', border: '1px solid #d9d9d9' }}
+            style={{ height: 40, borderRadius: 8, fontSize: 13, fontWeight: 500, padding: '0 16px', background: 'var(--surface-2)', border: '1px solid #d9d9d9' }}
           >
             ↻ 順時針
           </Button>
           <Button
             onClick={() => { const idx = previewIndex + 1; if (idx < previewPhotos.length) { setPreviewIndex(idx); setPreviewImage(previewPhotos[idx].dataUrl); setPreviewRotate(0) } }}
             disabled={previewIndex === previewPhotos.length - 1}
-            style={{ width: 40, height: 40, borderRadius: 8, fontSize: 18, fontWeight: 600, background: '#fff', border: '1px solid #d9d9d9' }}
+            style={{ width: 40, height: 40, borderRadius: 8, fontSize: 18, fontWeight: 600, background: 'var(--surface-2)', border: '1px solid #d9d9d9' }}
           >
             ›
           </Button>
@@ -454,12 +454,12 @@ export default function InboundDetail({ batchId, onBack }: Props) {
       >
         {exchangeModal && (
           <div>
-            <div style={{ background: '#FAFAFA', border: '1px solid #f0f0f0', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 13 }}>
-              <div><span style={{ color: '#8C8C8C' }}>{t('asset.modelNameLabel')}</span><b>{exchangeModal.modelName}</b></div>
-              <div><span style={{ color: '#8C8C8C' }}>{t('asset.exchangeQtyLabel')}</span><b style={{ color: '#FA8C16' }}>{exchangeModal.qty}</b> {t('asset.unitPiece')}</div>
+            <div style={{ background: 'var(--surface-3)', border: '1px solid #f0f0f0', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 13 }}>
+              <div><span style={{ color: 'var(--text-3)' }}>{t('asset.modelNameLabel')}</span><b>{exchangeModal.modelName}</b></div>
+              <div><span style={{ color: 'var(--text-3)' }}>{t('asset.exchangeQtyLabel')}</span><b style={{ color: 'var(--warning)' }}>{exchangeModal.qty}</b> {t('asset.unitPiece')}</div>
             </div>
             <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 13, marginBottom: 6 }}>{t('asset.trackingNoLabel')} <span style={{ color: '#FF4D4F' }}>*</span></div>
+              <div style={{ fontSize: 13, marginBottom: 6 }}>{t('asset.trackingNoLabel')} <span style={{ color: 'var(--danger)' }}>*</span></div>
               <Input value={exchangeTrackingNo} onChange={(e) => setExchangeTrackingNo(e.target.value)} placeholder={t('asset.phTrackingNo')} allowClear />
             </div>
             <div>

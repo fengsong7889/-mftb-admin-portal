@@ -171,11 +171,11 @@ export default function ScoreRuleConfig() {
       title: '規則', dataIndex: 'ruleCode', key: 'ruleCode', width: 180,
       render: (v: string, r) => (
         <div style={{ lineHeight: 1.4 }}>
-          <div style={{ color: '#262626', fontWeight: 600 }}>
+          <div style={{ color: 'var(--text-1)', fontWeight: 600 }}>
             {v}
             {r.enabled && <Tag color="processing" style={{ margin: '0 0 0 6px' }}>當前生效</Tag>}
           </div>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>v{r.version} · 生效 {r.effectiveFrom ?? '-'}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>v{r.version} · 生效 {r.effectiveFrom ?? '-'}</div>
         </div>
       ),
     },
@@ -321,10 +321,10 @@ export default function ScoreRuleConfig() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         gap: 12, flexWrap: 'wrap', marginBottom: 12,
       }}>
-        <div style={{ fontSize: 18, fontWeight: 700, color: '#262626', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <CalculatorOutlined style={{ color: '#722ED1' }} />
+        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <CalculatorOutlined style={{ color: 'var(--purple)' }} />
           積分規則
-          <span style={{ fontSize: 12, fontWeight: 400, color: '#8C8C8C' }}>
+          <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-3)' }}>
             權重與係數決定所有人的產出分，改版必留痕
           </span>
         </div>
@@ -344,10 +344,10 @@ export default function ScoreRuleConfig() {
       {/* ── 试算器：先把系数影响看清楚再保存 ── */}
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#F9F0FF', color: '#722ED1' }}><ThunderboltOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}><ThunderboltOutlined /></span>
           係數試算器
           <span className="rdm-card-title-split" />
-          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>按當前生效規則實時折算，改上方係數這裡立刻變</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>按當前生效規則實時折算，改上方係數這裡立刻變</span>
         </div>
         <Space size={12} wrap align="end" style={{ marginBottom: 12 }}>
           <LabeledField label="需求類型">
@@ -403,7 +403,7 @@ export default function ScoreRuleConfig() {
           </LabeledField>
           <Space size={6} align="center" style={{ paddingBottom: 4 }}>
             <Switch size="small" checked={facts.onTime} onChange={v => setFacts(prev => ({ ...prev, onTime: v }))} />
-            <span style={{ fontSize: 12, color: '#595959' }}>按時上線</span>
+            <span style={{ fontSize: 12, color: 'var(--text-2)' }}>按時上線</span>
           </Space>
         </Space>
 
@@ -416,7 +416,7 @@ export default function ScoreRuleConfig() {
           </div>
           <div className="rdm-score-preview-meta">
             <Tag style={{ margin: 0 }}>{RDM_SCORE_ALLOC_MODE_LABEL[(currentRule?.allocMode ?? RDM_SCORE_ALLOC_MODE.EACH) as keyof typeof RDM_SCORE_ALLOC_MODE_LABEL]}</Tag>
-            <span style={{ fontSize: 12, color: '#8C8C8C' }}>假設該需求還有 PM / QA 參與（SPLIT 模式下按三者係數瓜分）</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>假設該需求還有 PM / QA 參與（SPLIT 模式下按三者係數瓜分）</span>
           </div>
         </div>
         <Space style={{ marginTop: 10 }}>
@@ -424,7 +424,7 @@ export default function ScoreRuleConfig() {
             用真實需求試算（走後端）
           </Button>
           {preview && (
-            <span style={{ fontSize: 12, color: '#595959' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
               {preview.reqNo} · {RDM_ROLE_LABEL[preview.roleCode as RdmRoleCode] ?? preview.roleCode} → <b>{preview.score.toFixed(2)} 分</b>
             </span>
           )}
@@ -433,10 +433,10 @@ export default function ScoreRuleConfig() {
 
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}><SaveOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--warning-soft)', color: 'var(--brand)' }}><SaveOutlined /></span>
           規則列表
           <span className="rdm-card-title-split" />
-          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>
             停用版本保留供歷史流水回溯，不刪除
           </span>
         </div>
@@ -473,7 +473,7 @@ export default function ScoreRuleConfig() {
 function LabeledField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>{label}</div>
       {children}
     </div>
   )

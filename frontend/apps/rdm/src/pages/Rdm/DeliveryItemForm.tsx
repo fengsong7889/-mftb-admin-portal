@@ -325,7 +325,7 @@ export default function DeliveryItemForm() {
         {/* 基本信息 */}
         <div className="rdm-form-section">
           <div className="rdm-form-section-title">
-            <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}>
+            <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}>
               <CheckCircleOutlined />
             </span>
             基本信息
@@ -337,12 +337,12 @@ export default function DeliveryItemForm() {
             <Descriptions.Item label="範圍描述" span={2}>
               {detail.scopeDesc
                 ? <div className="rdm-desc-block">{detail.scopeDesc}</div>
-                : <span style={{ color: '#BFBFBF' }}>未填寫</span>}
+                : <span style={{ color: 'var(--text-4)' }}>未填寫</span>}
             </Descriptions.Item>
             <Descriptions.Item label="驗收標準" span={2}>
               {detail.acceptanceCriteria
                 ? <div className="rdm-desc-block">{detail.acceptanceCriteria}</div>
-                : <span style={{ color: '#BFBFBF' }}>未填寫</span>}
+                : <span style={{ color: 'var(--text-4)' }}>未填寫</span>}
             </Descriptions.Item>
           </Descriptions>
         </div>
@@ -350,7 +350,7 @@ export default function DeliveryItemForm() {
         {/* Batch2：範圍版本 */}
         <div className="rdm-form-section">
           <div className="rdm-form-section-title">
-            <span className="rdm-icon-block" style={{ background: '#F6FFED', color: '#52C41A' }}>
+            <span className="rdm-icon-block" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}>
               <HistoryOutlined />
             </span>
             範圍版本
@@ -388,12 +388,12 @@ export default function DeliveryItemForm() {
                 color: h.version === (itemSummary?.scopeVersion ?? scopeHistory[0]?.version) ? 'green' : 'gray',
                 children: (
                   <div>
-                    <div style={{ fontSize: 13, color: '#262626' }}>
+                    <div style={{ fontSize: 13, color: 'var(--text-1)' }}>
                       <b>版本 v{h.version}</b>
-                      {h.userName && <span style={{ color: '#8C8C8C', marginLeft: 8 }}>{h.userName}</span>}
-                      {h.time && <span style={{ color: '#BFBFBF', marginLeft: 8, fontSize: 12 }}>{h.time.slice(0, 16).replace('T', ' ')}</span>}
+                      {h.userName && <span style={{ color: 'var(--text-3)', marginLeft: 8 }}>{h.userName}</span>}
+                      {h.time && <span style={{ color: 'var(--text-4)', marginLeft: 8, fontSize: 12 }}>{h.time.slice(0, 16).replace('T', ' ')}</span>}
                     </div>
-                    {h.reason && <div style={{ fontSize: 12, color: '#595959', marginTop: 2 }}>{h.reason}</div>}
+                    {h.reason && <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>{h.reason}</div>}
                   </div>
                 ),
               }))}
@@ -404,7 +404,7 @@ export default function DeliveryItemForm() {
         {/* 責任人與路徑 */}
         <div className="rdm-form-section">
           <div className="rdm-form-section-title">
-            <span className="rdm-icon-block" style={{ background: '#F9F0FF', color: '#722ED1' }}>
+            <span className="rdm-icon-block" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}>
               <CheckCircleOutlined />
             </span>
             責任人與路徑
@@ -423,7 +423,7 @@ export default function DeliveryItemForm() {
         {/* 計劃 */}
         <div className="rdm-form-section">
           <div className="rdm-form-section-title">
-            <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}>
+            <span className="rdm-icon-block" style={{ background: 'var(--warning-soft)', color: 'var(--brand)' }}>
               <CheckCircleOutlined />
             </span>
             計劃時間
@@ -534,7 +534,7 @@ export default function DeliveryItemForm() {
         {/* Section 1：基本信息 */}
         <div className="rdm-form-section">
           <div className="rdm-form-section-title">
-            <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}>
+            <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}>
               <EditOutlined />
             </span>
             基本信息
@@ -554,7 +554,7 @@ export default function DeliveryItemForm() {
               <Input
                 value={detail.reqNo ? `${detail.reqNo} — ${detail.reqTitle}` : '-'}
                 readOnly
-                style={{ background: '#FAFBFC', color: '#595959' }}
+                style={{ background: 'var(--surface-sunken)', color: 'var(--text-2)' }}
               />
             </Form.Item>
           ) : (
@@ -623,7 +623,7 @@ export default function DeliveryItemForm() {
         {/* Section 2：責任人與路徑 */}
         <div className="rdm-form-section">
           <div className="rdm-form-section-title">
-            <span className="rdm-icon-block" style={{ background: '#F9F0FF', color: '#722ED1' }}>
+            <span className="rdm-icon-block" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}>
               <CheckCircleOutlined />
             </span>
             責任人與路徑
@@ -718,7 +718,7 @@ export default function DeliveryItemForm() {
         {/* Section 3：計劃 */}
         <div className="rdm-form-section">
           <div className="rdm-form-section-title">
-            <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}>
+            <span className="rdm-icon-block" style={{ background: 'var(--warning-soft)', color: 'var(--brand)' }}>
               <CheckCircleOutlined />
             </span>
             計劃時間

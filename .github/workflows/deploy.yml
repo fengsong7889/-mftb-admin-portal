@@ -34,8 +34,45 @@ jobs:
       - run: npm ci --legacy-peer-deps
       - name: Lint
         run: npm run lint
+
+      # tsc 在本仓库体量下已越过 Node 默认 ~2GB 老生代上限：裸跑 `npm run typecheck` 会在
+      # **同一份代码**上间歇性 V8 OOM——退出码 134、日志末尾是
+      # `FATAL ERROR: Ineffective mark-compacts near heap limit`，而不是任何 TS 错误行。
+      # 2026-11-04 第五批（#17）合入 main 时实踩：同一 commit 在 PR 事件绿、在 push 事件崩，
+      # 后续步骤全 skipped、产物不上传，靠 `gh run rerun --failed` 才解除部署阻塞。
+      # 本地实测阈值（同一棵树、每次先删 tsconfig.tsbuildinfo 保证等效）：2048MB 必崩、3072MB 起通过。
+      #
+      # 堆上限按 runner 实际内存算，不写死：仓库里读不到 runner 规格，
+      # 写小了照样崩，写大了在小规格 self-hosted 机器上会把内存打满。
+      # 取内存的 3/4，下限 3072（实测可过）、上限 8192（够用且不过度承诺）。
+      #
+      # ⚠ 必须**步骤级**设 NODE_OPTIONS，不要“简化”成 job 级 env：下一步 Test 用的 vitest
+      #   会按 min(CPU-1, 内存GB/2) 开多个 fork 并继承同一份 NODE_OPTIONS，几份大堆叠起来
+      #   正好复现「慢=超时」的集体假红（见 vitest.config.ts 顶部注释）。
+      #   日后若别的 Node 步骤出现同样的 134 特征，照本步骤加步骤级 env，而不是提到 job 级。
+      - name: Resolve type-check heap
+        id: tscheap
+        run: |
+          total_mb=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)
+          heap=$(( total_mb * 3 / 4 ))
+          [ "$heap" -lt 3072 ] && heap=3072
+          [ "$heap" -gt 8192 ] && heap=8192
+          echo "runner 内存 ${total_mb} MB → tsc 堆上限设为 ${heap} MB"
+          echo "heap=${heap}" >> "$GITHUB_OUTPUT"
       - name: Type Check
-        run: npm run typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=${{ steps.tscheap.outputs.heap }}
+        # 失败时把「不许绕过门禁」写进日志：本步骤的正确修法是上调上面的堆上限，
+        # 不是跳过类型检查、不是换更宽松的调用、也不是放宽 tsconfig。
+        run: |
+          set +e
+          npm run typecheck
+          code=$?
+          set -e
+          if [ "$code" -ne 0 ]; then
+            echo "::error::typecheck 失败 (exit ${code})。若日志含 'heap out of memory' 或退出码 134，说明堆上限仍不足——请上调 Resolve type-check heap 的取值，不得跳过本步骤或放宽 tsconfig。"
+          fi
+          exit "$code"
       - name: Menu Consistency
         run: npm run check:menu
       - name: Dependency Boundary

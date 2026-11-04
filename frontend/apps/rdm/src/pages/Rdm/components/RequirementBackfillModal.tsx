@@ -110,7 +110,7 @@ export default function RequirementBackfillModal({
         value={remark}
         onChange={e => setRemark(e.target.value)}
       />
-      <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>
+      <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8 }}>
         {t('rdm.batchBackfill.hint')}
       </div>
     </Modal>

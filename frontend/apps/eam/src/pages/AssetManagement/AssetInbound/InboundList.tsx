@@ -334,7 +334,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
       title: '供應商', key: 'supplier', width: 200, ellipsis: true,
       render: (_: unknown, r: InboundBatch) => {
         const suppliers = r.suppliers && r.suppliers.length > 0 ? r.suppliers : (r.supplier ? [r.supplier] : [])
-        if (suppliers.length === 0) return <span style={{ color: '#bfbfbf' }}>無供應商</span>
+        if (suppliers.length === 0) return <span style={{ color: 'var(--text-4)' }}>無供應商</span>
         if (suppliers.length === 1) return <span>{suppliers[0]}</span>
         // 多供應商：顯示第一個 + +N 標記
         const rest = suppliers.slice(1)
@@ -354,7 +354,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
               title="所有供應商"
               trigger="click"
             >
-              <Tag style={{ margin: 0, cursor: 'pointer', borderRadius: 10, borderColor: '#E8720C', color: '#E8720C', fontWeight: 500 }}>
+              <Tag style={{ margin: 0, cursor: 'pointer', borderRadius: 10, borderColor: 'var(--brand)', color: 'var(--brand)', fontWeight: 500 }}>
                 +{rest.length}
               </Tag>
             </Popover>
@@ -364,7 +364,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     },
     {
       title: t('asset.orderBrand'), dataIndex: 'brand', key: 'brand', width: 100,
-      render: (v: number | undefined) => v ? <BrandTag value={v} /> : <span style={{ color: '#bfbfbf' }}>-</span>,
+      render: (v: number | undefined) => v ? <BrandTag value={v} /> : <span style={{ color: 'var(--text-4)' }}>-</span>,
     },
     {
       title: t('asset.colBatchStatus'), key: 'batchStatus', width: 110,
@@ -380,7 +380,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
       sorter: (a, b) => resolveAssetCount(a) - resolveAssetCount(b),
       render: (_: unknown, r: InboundBatch) => {
         const n = resolveAssetCount(r)
-        return <span style={{ color: n > 0 ? '#52C41A' : '#8C8C8C', fontWeight: 700 }}>{n}</span>
+        return <span style={{ color: n > 0 ? 'var(--success)' : 'var(--text-3)', fontWeight: 700 }}>{n}</span>
       },
     },
     {
@@ -409,10 +409,10 @@ export default function InboundList({ onAdd, onDetail }: Props) {
       title: t('asset.colRemark'), key: 'remark', width: 200, ellipsis: true,
       render: (_: unknown, r: InboundBatch) => {
         const text = r.purchaseReason || r.remark || ''
-        if (!text) return <span style={{ color: '#bfbfbf' }}>-</span>
+        if (!text) return <span style={{ color: 'var(--text-4)' }}>-</span>
         return (
           <Tooltip title={text} placement="topLeft">
-            <span style={{ color: '#595959' }}>{text}</span>
+            <span style={{ color: 'var(--text-2)' }}>{text}</span>
           </Tooltip>
         )
       },
@@ -561,8 +561,8 @@ export default function InboundList({ onAdd, onDetail }: Props) {
               height: 24,
               borderRadius: 4,
               border: '1px solid #d9d9d9',
-              background: isExpanded ? '#E8720C' : '#fff',
-              color: isExpanded ? '#fff' : '#595959',
+              background: isExpanded ? 'var(--brand)' : 'var(--surface-2)',
+              color: isExpanded ? '#fff' : 'var(--text-2)',
               fontSize: 14,
               fontWeight: 600,
               cursor: hasGroups ? 'pointer' : 'default',
@@ -598,12 +598,12 @@ export default function InboundList({ onAdd, onDetail }: Props) {
       title: t('asset.orderBrand'), key: 'brand', width: 100,
       render: (_: unknown, r: PendingOrderRow) => r.brand
         ? <BrandTag value={r.brand} />
-        : <span style={{ color: '#bfbfbf' }}>-</span>,
+        : <span style={{ color: 'var(--text-4)' }}>-</span>,
     },
     {
       title: t('asset.colSupplier'), key: 'suppliers', width: 200, ellipsis: true,
       render: (_: unknown, r: PendingOrderRow) => {
-        if (r.suppliers.length === 0) return <span style={{ color: '#bfbfbf' }}>無供應商</span>
+        if (r.suppliers.length === 0) return <span style={{ color: 'var(--text-4)' }}>無供應商</span>
         if (r.suppliers.length === 1) return <span>{r.suppliers[0]}</span>
         const rest = r.suppliers.slice(1)
         const isExpanded = pendingExpandedRowKeys.includes(r.orderId)
@@ -624,7 +624,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
               trigger="click"
             >
               <Tag
-                style={{ margin: 0, cursor: 'pointer', borderRadius: 10, borderColor: '#E8720C', color: isExpanded ? '#fff' : '#E8720C', background: isExpanded ? '#E8720C' : undefined, fontWeight: 500 }}
+                style={{ margin: 0, cursor: 'pointer', borderRadius: 10, borderColor: 'var(--brand)', color: isExpanded ? '#fff' : 'var(--brand)', background: isExpanded ? 'var(--brand)' : undefined, fontWeight: 500 }}
                 onClick={(e) => {
                   e.stopPropagation()
                   setPendingExpandedRowKeys(prev =>
@@ -651,21 +651,21 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     },
     {
       title: t('asset.colGroupReceivedQty'), key: 'receivedQty', width: 80, align: 'right',
-      render: (_: unknown, r: PendingOrderRow) => <span style={{ color: r.receivedQty > 0 ? '#52C41A' : '#8C8C8C', fontWeight: 600 }}>{r.receivedQty}</span>,
+      render: (_: unknown, r: PendingOrderRow) => <span style={{ color: r.receivedQty > 0 ? 'var(--success)' : 'var(--text-3)', fontWeight: 600 }}>{r.receivedQty}</span>,
     },
     {
       title: t('asset.colGroupPendingQty'), key: 'pendingQty', width: 80, align: 'right',
       sorter: (a, b) => a.pendingQty - b.pendingQty,
       defaultSortOrder: 'descend',
       render: (_: unknown, r: PendingOrderRow) => (
-        <span style={{ color: r.pendingQty > 0 ? '#FF4D4F' : '#8C8C8C', fontWeight: 700, fontSize: 15 }}>{r.pendingQty}</span>
+        <span style={{ color: r.pendingQty > 0 ? 'var(--danger)' : 'var(--text-3)', fontWeight: 700, fontSize: 15 }}>{r.pendingQty}</span>
       ),
     },
     {
       title: t('asset.colExchangeQty'), key: 'exchangeQty', width: 70, align: 'right',
       render: (_: unknown, r: PendingOrderRow) => (
         <Tooltip title={t('asset.tipOrderExchange')}>
-          <span style={{ color: r.exchangeQty > 0 ? '#FA8C16' : '#8C8C8C', fontWeight: r.exchangeQty > 0 ? 600 : 400 }}>{r.exchangeQty}</span>
+          <span style={{ color: r.exchangeQty > 0 ? 'var(--warning)' : 'var(--text-3)', fontWeight: r.exchangeQty > 0 ? 600 : 400 }}>{r.exchangeQty}</span>
         </Tooltip>
       ),
     },
@@ -673,7 +673,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
       title: t('asset.colReturnQty'), key: 'returnQty', width: 70, align: 'right',
       render: (_: unknown, r: PendingOrderRow) => (
         <Tooltip title={t('asset.tipOrderReturn')}>
-          <span style={{ color: r.returnQty > 0 ? '#FF4D4F' : '#8C8C8C', fontWeight: r.returnQty > 0 ? 600 : 400 }}>{r.returnQty}</span>
+          <span style={{ color: r.returnQty > 0 ? 'var(--danger)' : 'var(--text-3)', fontWeight: r.returnQty > 0 ? 600 : 400 }}>{r.returnQty}</span>
         </Tooltip>
       ),
     },
@@ -713,23 +713,23 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     expandedRowRender: (record: PendingOrderRow) => {
       if (record.groups.length === 0) {
         return (
-          <div style={{ padding: '24px', textAlign: 'center', color: '#8C8C8C', fontSize: 13, background: '#FAFAFA', borderRadius: 6, margin: '4px 0' }}>
+          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-3)', fontSize: 13, background: 'var(--surface-3)', borderRadius: 6, margin: '4px 0' }}>
             <InfoCircleOutlined style={{ fontSize: 16, marginBottom: 8, display: 'block', color: '#D9D9D9' }} />
             無供應商
           </div>
         )
       }
       return (
-        <div style={{ background: '#FAFAFA', borderRadius: 8, padding: '12px 16px', border: '1px solid #f0f0f0' }}>
+        <div style={{ background: 'var(--surface-3)', borderRadius: 8, padding: '12px 16px', border: '1px solid #f0f0f0' }}>
           <Table<SupplierGroupSummary>
             columns={[
-              { title: '供應商', dataIndex: 'supplier', key: 'supplier', width: 160, render: (v: string) => v || <span style={{ color: '#bfbfbf' }}>無供應商</span> },
-              { title: '完成採購時間', key: 'completedAt', width: 170, render: () => <span style={{ color: '#595959' }}>{record.order.updatedAt || '-'}</span> },
+              { title: '供應商', dataIndex: 'supplier', key: 'supplier', width: 160, render: (v: string) => v || <span style={{ color: 'var(--text-4)' }}>無供應商</span> },
+              { title: '完成採購時間', key: 'completedAt', width: 170, render: () => <span style={{ color: 'var(--text-2)' }}>{record.order.updatedAt || '-'}</span> },
               { title: '總數', dataIndex: 'totalQty', key: 'totalQty', width: 80, align: 'right', render: (v: number) => <span style={{ fontWeight: 600 }}>{v}</span> },
-              { title: '已驗收', dataIndex: 'receivedQty', key: 'receivedQty', width: 80, align: 'right', render: (v: number) => <span style={{ color: v > 0 ? '#52C41A' : '#8C8C8C' }}>{v}</span> },
-              { title: '待驗收', dataIndex: 'pendingQty', key: 'pendingQty', width: 80, align: 'right', render: (v: number) => <span style={{ color: v > 0 ? '#FF4D4F' : '#8C8C8C', fontWeight: 600 }}>{v}</span> },
-              { title: '換貨', dataIndex: 'exchangeQty', key: 'exchangeQty', width: 70, align: 'right', render: (v: number) => <span style={{ color: v > 0 ? '#FA8C16' : '#8C8C8C' }}>{v}</span> },
-              { title: '退貨', dataIndex: 'returnQty', key: 'returnQty', width: 70, align: 'right', render: (v: number) => <span style={{ color: v > 0 ? '#FF4D4F' : '#8C8C8C' }}>{v}</span> },
+              { title: '已驗收', dataIndex: 'receivedQty', key: 'receivedQty', width: 80, align: 'right', render: (v: number) => <span style={{ color: v > 0 ? 'var(--success)' : 'var(--text-3)' }}>{v}</span> },
+              { title: '待驗收', dataIndex: 'pendingQty', key: 'pendingQty', width: 80, align: 'right', render: (v: number) => <span style={{ color: v > 0 ? 'var(--danger)' : 'var(--text-3)', fontWeight: 600 }}>{v}</span> },
+              { title: '換貨', dataIndex: 'exchangeQty', key: 'exchangeQty', width: 70, align: 'right', render: (v: number) => <span style={{ color: v > 0 ? 'var(--warning)' : 'var(--text-3)' }}>{v}</span> },
+              { title: '退貨', dataIndex: 'returnQty', key: 'returnQty', width: 70, align: 'right', render: (v: number) => <span style={{ color: v > 0 ? 'var(--danger)' : 'var(--text-3)' }}>{v}</span> },
               {
                 title: '狀態', key: 'status', width: 100,
                 render: (_: unknown, g: SupplierGroupSummary) => {
@@ -759,7 +759,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
             rowKey="groupId"
             pagination={false}
             size="small"
-            style={{ background: '#fff', borderRadius: 6 }}
+            style={{ background: 'var(--surface-2)', borderRadius: 6 }}
           />
         </div>
       )
@@ -873,7 +873,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
                 </Form>
               </div>
 
-              <div style={{ marginBottom: 12, fontSize: 13, color: '#8C8C8C' }}>
+              <div style={{ marginBottom: 12, fontSize: 13, color: 'var(--text-3)' }}>
                 {t('asset.pendingHint')}
               </div>
               <Table<PendingOrderRow>
@@ -928,7 +928,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
     <Drawer
       open={recordsDrawer.open}
       onClose={() => setRecordsDrawer({ ...recordsDrawer, open: false })}
-      title={<span style={{ fontSize: 15, fontWeight: 600 }}><FileTextOutlined style={{ marginRight: 8, color: '#E8720C' }} />{recordsDrawer.title} - 驗收記錄</span>}
+      title={<span style={{ fontSize: 15, fontWeight: 600 }}><FileTextOutlined style={{ marginRight: 8, color: 'var(--brand)' }} />{recordsDrawer.title} - 驗收記錄</span>}
       width={720}
       destroyOnClose
     >
@@ -937,30 +937,30 @@ export default function InboundList({ onAdd, onDetail }: Props) {
           <Spin size="large" />
         </div>
       ) : inspectionRecords.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 60, color: '#8C8C8C' }}>暫無驗收記錄</div>
+        <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-3)' }}>暫無驗收記錄</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {inspectionRecords.map((record) => (
-            <div key={record.batchId} style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: 16, background: '#fafafa' }}>
+            <div key={record.batchId} style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: 16, background: 'var(--surface-3)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <div>
                   <span style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: 14 }}>{record.batchNo}</span>
                   {record.supplier && (
                     <Tag color="blue" style={{ marginLeft: 8, margin: '0 0 0 8px', fontSize: 12 }}>{record.supplier}</Tag>
                   )}
-                  <span style={{ marginLeft: 12, color: '#8C8C8C', fontSize: 13 }}>{record.inboundDate} · {record.operator}</span>
+                  <span style={{ marginLeft: 12, color: 'var(--text-3)', fontSize: 13 }}>{record.inboundDate} · {record.operator}</span>
                 </div>
                 <Button type="link" size="small" onClick={() => onDetail(record.batchId)}>{t('common.detail')}</Button>
               </div>
               <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 13 }}>
                 <span>總數：<b>{record.totalQty}</b></span>
-                {record.acceptedQty > 0 && <span style={{ color: '#52C41A' }}>通過：<b>{record.acceptedQty}</b></span>}
-                {record.returnQty > 0 && <span style={{ color: '#FF4D4F' }}>退貨：<b>{record.returnQty}</b></span>}
-                {record.exchangeQty > 0 && <span style={{ color: '#FA8C16' }}>換貨：<b>{record.exchangeQty}</b></span>}
-                {record.concessionQty > 0 && <span style={{ color: '#1890FF' }}>讓步：<b>{record.concessionQty}</b></span>}
+                {record.acceptedQty > 0 && <span style={{ color: 'var(--success)' }}>通過：<b>{record.acceptedQty}</b></span>}
+                {record.returnQty > 0 && <span style={{ color: 'var(--danger)' }}>退貨：<b>{record.returnQty}</b></span>}
+                {record.exchangeQty > 0 && <span style={{ color: 'var(--warning)' }}>換貨：<b>{record.exchangeQty}</b></span>}
+                {record.concessionQty > 0 && <span style={{ color: 'var(--info)' }}>讓步：<b>{record.concessionQty}</b></span>}
               </div>
               {record.items.length > 0 && (
-                <div style={{ fontSize: 13, color: '#595959' }}>
+                <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
                   {record.items.map((item, idx) => (
                     <div key={idx} style={{ padding: '4px 0', borderBottom: idx < record.items.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
                       <span style={{ fontWeight: 500 }}>{item.modelName}</span> × {item.qty}
@@ -969,7 +969,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
                           {item.disposition === 'return' ? '退貨' : item.disposition === 'exchange' ? '換貨' : '讓步'}
                         </Tag>
                       )}
-                      {item.rejectReason && <span style={{ marginLeft: 8, color: '#8C8C8C' }}>原因：{item.rejectReason}</span>}
+                      {item.rejectReason && <span style={{ marginLeft: 8, color: 'var(--text-3)' }}>原因：{item.rejectReason}</span>}
                     </div>
                   ))}
                 </div>

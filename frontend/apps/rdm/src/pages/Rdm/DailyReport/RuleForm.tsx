@@ -307,7 +307,7 @@ export default function DailyReportRuleForm() {
     <div className="content-area">
       {/* 页面头部：橙色渐变动画条 + 返回 + 标题（form-page-style §2） */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
       }}>
         <div style={{
@@ -317,13 +317,13 @@ export default function DailyReportRuleForm() {
         <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
           <Button type="primary" icon={<ArrowLeftOutlined />} onClick={() => navigate('/rdm-daily-report-rules')}
             style={{
-              backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px',
+              backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8, height: 36, padding: '0 16px',
               display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
             }}>
             {t('rdm.dailyRule.back')}
           </Button>
           <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>
             {isDetail ? t('rdm.dailyRule.formTitleDetail')
               : editId ? t('rdm.dailyRule.formTitleEdit') : t('rdm.dailyRule.formTitleNew')}
           </h2>
@@ -457,14 +457,14 @@ function CardTitle({ text, hint }: { text: string; hint?: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
       <div style={{
-        width: 28, height: 28, borderRadius: 6, background: '#e6f7ff',
+        width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <SettingOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+        <SettingOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
       </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{text}</span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{text}</span>
       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-      {hint && <span style={{ fontSize: 12, color: '#8c8c8c' }}>{hint}</span>}
+      {hint && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{hint}</span>}
     </div>
   )
 }

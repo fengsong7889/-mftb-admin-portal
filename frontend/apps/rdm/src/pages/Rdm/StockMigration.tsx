@@ -146,7 +146,7 @@ export default function StockMigration() {
       content: (
         <div>
           <div style={{ marginBottom: 8 }}>確認前請核對預覽影響面。確認後方可小批執行；<b>未確認不可執行</b>。</div>
-          <div style={{ color: '#8C8C8C' }}>批次 #{batch.batchId} · 分塊大小 {batch.chunkSize ?? '-'} · 預覽哈希 {batch.previewHash ?? '-'}</div>
+          <div style={{ color: 'var(--text-3)' }}>批次 #{batch.batchId} · 分塊大小 {batch.chunkSize ?? '-'} · 預覽哈希 {batch.previewHash ?? '-'}</div>
         </div>
       ),
       okText: '我已核對，主責確認',
@@ -355,7 +355,7 @@ export default function StockMigration() {
       {/* ── 生成預覽 ── */}
       <div className="rdm-card" style={{ marginBottom: 16 }}>
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><EyeOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}><EyeOutlined /></span>
           生成遷移預覽
           <span className="rdm-todo-hint">只讀推導影響面，不落任何業務變更</span>
         </div>
@@ -420,7 +420,7 @@ export default function StockMigration() {
       {/* ── 批次列表 ── */}
       <div className="rdm-card" style={{ marginBottom: 16 }}>
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#F6FFED', color: '#52C41A' }}><ReloadOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}><ReloadOutlined /></span>
           遷移批次
           <span className="rdm-card-title-split" />
           <Space>
@@ -451,7 +451,7 @@ export default function StockMigration() {
       ) : detail && (
         <div className="rdm-card">
           <div className="rdm-card-title">
-            <span className="rdm-icon-block" style={{ background: '#F9F0FF', color: '#722ED1' }}><ThunderboltOutlined /></span>
+            <span className="rdm-icon-block" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}><ThunderboltOutlined /></span>
             批次 #{detail.batchId} 詳情
             <Tag color={RDM_STOCK_MIGRATION_BATCH_STATUS_COLOR[detail.status] ?? 'default'} style={{ margin: 0 }}>
               {RDM_STOCK_MIGRATION_BATCH_STATUS_LABEL[detail.status] ?? detail.status}
@@ -536,7 +536,7 @@ export default function StockMigration() {
                   <div>
                     <div>{rollbackResult.rejectReason || '存在遷移後新生成的 V3 事實，回退會丟失這些事實，故整體拒絕。'}</div>
                     {rollbackResult.newFactsByItem && Object.keys(rollbackResult.newFactsByItem).length > 0 && (
-                      <div style={{ marginTop: 6, color: '#8C8C8C' }}>
+                      <div style={{ marginTop: 6, color: 'var(--text-3)' }}>
                         涉及新事實的交付項：{Object.keys(rollbackResult.newFactsByItem).join('、')}
                       </div>
                     )}

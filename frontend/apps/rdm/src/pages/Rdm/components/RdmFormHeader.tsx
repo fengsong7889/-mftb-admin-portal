@@ -36,7 +36,7 @@ export default function RdmFormHeader({ title, onBack, backText = '返回', badg
   return (
     <div style={{
       position: 'relative',
-      background: '#fff',
+      background: 'var(--surface-2)',
       marginBottom: 16,
       borderRadius: 12,
       boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
@@ -63,8 +63,8 @@ export default function RdmFormHeader({ title, onBack, backText = '返回', badg
             icon={<ArrowLeftOutlined />}
             onClick={onBack}
             style={{
-              backgroundColor: '#E8720C',
-              borderColor: '#E8720C',
+              backgroundColor: 'var(--brand)',
+              borderColor: 'var(--brand)',
               borderRadius: 8,
               height: 36,
               padding: '0 16px',
@@ -81,10 +81,10 @@ export default function RdmFormHeader({ title, onBack, backText = '返回', badg
           <div style={{ width: 1, height: 20, background: '#E8E8E8', flexShrink: 0 }} />
           <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{title}</h2>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>{title}</h2>
               {badge}
             </div>
-            {meta && <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{meta}</div>}
+            {meta && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{meta}</div>}
           </div>
         </div>
         {right && <div style={{ flexShrink: 0 }}>{right}</div>}

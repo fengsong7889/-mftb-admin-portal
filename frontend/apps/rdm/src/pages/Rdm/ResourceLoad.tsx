@@ -597,8 +597,8 @@ export default function ResourceLoad() {
       fixed: 'left',
       render: (_, r) => (
         <div>
-          <div style={{ fontWeight: 600, color: '#262626', fontSize: 13 }}>{formatEmployee(r.userName, r.empNo)}</div>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{r.dept || '-'}</div>
+          <div style={{ fontWeight: 600, color: 'var(--text-1)', fontSize: 13 }}>{formatEmployee(r.userName, r.empNo)}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{r.dept || '-'}</div>
         </div>
       ),
     },
@@ -622,7 +622,7 @@ export default function ResourceLoad() {
       key: 'productReqs',
       width: 90,
       sorter: (a, b) => a.productReqs - b.productReqs,
-      render: (v: number) => v > 0 ? <span style={{ fontWeight: 600, color: '#1890FF' }}>{v}</span> : <span style={{ color: '#D9D9D9' }}>0</span>,
+      render: (v: number) => v > 0 ? <span style={{ fontWeight: 600, color: 'var(--info)' }}>{v}</span> : <span style={{ color: '#D9D9D9' }}>0</span>,
     },
     {
       title: t('rdm.resLoad.colDevTasks'),
@@ -630,7 +630,7 @@ export default function ResourceLoad() {
       key: 'devTasks',
       width: 90,
       sorter: (a, b) => a.devTasks - b.devTasks,
-      render: (v: number) => v > 0 ? <span style={{ fontWeight: 600, color: '#E8720C' }}>{v}</span> : <span style={{ color: '#D9D9D9' }}>0</span>,
+      render: (v: number) => v > 0 ? <span style={{ fontWeight: 600, color: 'var(--brand)' }}>{v}</span> : <span style={{ color: '#D9D9D9' }}>0</span>,
     },
     {
       title: t('rdm.resLoad.colTestTasks'),
@@ -638,22 +638,22 @@ export default function ResourceLoad() {
       key: 'testTasks',
       width: 90,
       sorter: (a, b) => a.testTasks - b.testTasks,
-      render: (v: number) => v > 0 ? <span style={{ fontWeight: 600, color: '#722ED1' }}>{v}</span> : <span style={{ color: '#D9D9D9' }}>0</span>,
+      render: (v: number) => v > 0 ? <span style={{ fontWeight: 600, color: 'var(--purple)' }}>{v}</span> : <span style={{ color: '#D9D9D9' }}>0</span>,
     },
     {
       title: t('rdm.resLoad.colCoord'),
       dataIndex: 'coordItems',
       key: 'coordItems',
       width: 90,
-      render: (v: number) => v > 0 ? <span style={{ fontWeight: 600, color: '#595959' }}>{v}</span> : <span style={{ color: '#D9D9D9' }}>0</span>,
+      render: (v: number) => v > 0 ? <span style={{ fontWeight: 600, color: 'var(--text-2)' }}>{v}</span> : <span style={{ color: '#D9D9D9' }}>0</span>,
     },
     {
       title: t('rdm.resLoad.colHours'),
       key: 'hours',
       width: 180,
       render: (_, r) => (
-        <span style={{ fontSize: 12, color: '#595959' }}>
-          {r.totalCapacity} / <b style={{ color: r.totalPlanned > r.totalCapacity ? '#CF1322' : '#262626' }}>{r.totalPlanned}</b> / {r.totalActual}
+        <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
+          {r.totalCapacity} / <b style={{ color: r.totalPlanned > r.totalCapacity ? '#CF1322' : 'var(--text-1)' }}>{r.totalPlanned}</b> / {r.totalActual}
         </span>
       ),
     },
@@ -719,11 +719,11 @@ export default function ResourceLoad() {
               <span
                 className="rdm-load-cell"
                 style={{
-                  background: d.weekend || d.leave ? '#F5F5F5'
+                  background: d.weekend || d.leave ? 'var(--surface-1)'
                     : d.overloaded ? '#FF4D4F'
                     : d.planned > 0 ? (d.planned / d.capacity > 0.85 ? '#FA8C16' : '#52C41A')
                     : '#FFFFFF',
-                  borderColor: d.weekend ? '#E8EAED' : 'transparent',
+                  borderColor: d.weekend ? 'var(--border-3)' : 'transparent',
                   opacity: d.planned > 0 && !d.overloaded ? 0.4 + Math.min(0.6, d.planned / 16) : 1,
                 }}
               />
@@ -799,7 +799,7 @@ export default function ResourceLoad() {
                   </Tag>
                   <span className="rdm-delivery-row-main">
                     <b style={{ fontWeight: 500, fontSize: 13 }}>{item.title}</b>
-                    <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>
                       {item.sourceLabel} · {item.phase}
                       {item.planHours != null && ` · ${t('rdm.resLoad.planTag', { hours: item.planHours })}`}
                       {item.remainingHours != null && item.remainingHours !== item.planHours && ` · ${t('rdm.resLoad.remainTag', { hours: item.remainingHours })}`}
@@ -834,6 +834,9 @@ export default function ResourceLoad() {
       />
       <Form form={assignForm} layout="vertical">
         {assignTarget ? (
+          /* 底色与前景必须成对令牌化：#AD4E00 无等值令牌（REVIEW_REQUIRED），
+             若只把背景换成令牌 brand-soft 而文字留裸 #AD4E00，深色下为「深底深字」约 2.2:1。
+             待定下 brand-deep 一类令牌后再成对改；单独跑 codemod 会把背景重新刷上去，见方案 §18.6。 */
           <div style={{
             background: '#FFF7F0', border: '1px solid #FFE7D1', borderRadius: 8,
             padding: '10px 14px', marginBottom: 16, fontSize: 12, color: '#AD4E00',
@@ -893,7 +896,7 @@ export default function ResourceLoad() {
               { title: t('rdm.resLoad.colCode'), dataIndex: 'code', key: 'code', width: 150 },
               { title: t('rdm.resLoad.colTitle'), dataIndex: 'title', key: 'title', ellipsis: true },
               { title: t('rdm.resLoad.colReqTitle'), dataIndex: 'reqTitle', key: 'reqTitle', width: 170, ellipsis: true, render: (v?: string) => v ?? '—' },
-              { title: t('rdm.resLoad.colPlanHours'), dataIndex: 'planHours', key: 'planHours', width: 90, render: (v?: number | null) => v != null ? `${v}h` : <span style={{ color: '#FA8C16' }}>{t('rdm.resLoad.estimating')}</span> },
+              { title: t('rdm.resLoad.colPlanHours'), dataIndex: 'planHours', key: 'planHours', width: 90, render: (v?: number | null) => v != null ? `${v}h` : <span style={{ color: 'var(--warning)' }}>{t('rdm.resLoad.estimating')}</span> },
             ]}
           />
         )}
@@ -919,7 +922,7 @@ export default function ResourceLoad() {
     return (
       <div className="content-area">
         <div style={{
-          position: 'relative', background: '#fff', marginBottom: 16,
+          position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
           borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
         }}>
           <div style={{
@@ -930,13 +933,13 @@ export default function ResourceLoad() {
           <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <Button type="primary" onClick={() => navigate('/rdm-resource-load')}
-                style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}>
+                style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}>
                 ← {t('common.back')}
               </Button>
               <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('rdm.resLoad.viewTitleUnassigned')}</h2>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>{t('rdm.resLoad.viewTitleUnassigned')}</h2>
             </div>
-            <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('rdm.resLoad.unassignedCount', { count: totalAssignable })}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('rdm.resLoad.unassignedCount', { count: totalAssignable })}</span>
           </div>
         </div>
 
@@ -953,7 +956,7 @@ export default function ResourceLoad() {
           return (
             <div className="rdm-card" key={source}>
               <div className="rdm-card-title">
-                <span className="rdm-icon-block" style={{ background: '#e6f7ff', color: '#1890ff' }}><TeamOutlined /></span>
+                <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}><TeamOutlined /></span>
                 {meta.label}
                 <Tag color="blue" style={{ marginLeft: 4 }}>{items.length}</Tag>
                 <span className="rdm-card-title-split" />
@@ -973,8 +976,8 @@ export default function ResourceLoad() {
                     { title: t('rdm.resLoad.colCode'), dataIndex: 'code', key: 'code', width: 150 },
                     { title: t('rdm.resLoad.colTitle'), dataIndex: 'title', key: 'title', ellipsis: true },
                     { title: t('rdm.resLoad.colReqTitle'), dataIndex: 'reqTitle', key: 'reqTitle', width: 180, ellipsis: true, render: (v?: string) => v ?? '—' },
-                    { title: t('rdm.resLoad.colPlanHours'), dataIndex: 'planHours', key: 'planHours', width: 90, render: (v?: number | null) => v != null ? `${v}h` : <span style={{ color: '#FA8C16' }}>{t('rdm.resLoad.estimating')}</span> },
-                    { title: t('rdm.resLoad.colCurrentOwner'), dataIndex: 'currentOwner', key: 'currentOwner', width: 110, render: (v?: string) => v ?? <span style={{ color: '#8C8C8C' }}>{t('rdm.resLoad.ownerUnassigned')}</span> },
+                    { title: t('rdm.resLoad.colPlanHours'), dataIndex: 'planHours', key: 'planHours', width: 90, render: (v?: number | null) => v != null ? `${v}h` : <span style={{ color: 'var(--warning)' }}>{t('rdm.resLoad.estimating')}</span> },
+                    { title: t('rdm.resLoad.colCurrentOwner'), dataIndex: 'currentOwner', key: 'currentOwner', width: 110, render: (v?: string) => v ?? <span style={{ color: 'var(--text-3)' }}>{t('rdm.resLoad.ownerUnassigned')}</span> },
                     {
                       title: t('common.colAction'), key: 'action', width: 80, fixed: 'right',
                       render: (_, r) => <Button type="link" size="small" onClick={() => handleAssign(null, source, r.id)}>{t('rdm.resLoad.btnAssign')}</Button>,
@@ -994,25 +997,25 @@ export default function ResourceLoad() {
   // ── 子视图：名册维护（B-2）──
   if (view === 'roster') {
     const renderRoles = (codes?: string | null) => {
-      if (!codes) return <span style={{ color: '#8C8C8C' }}>{t('rdm.resLoad.roleUnset')}</span>
+      if (!codes) return <span style={{ color: 'var(--text-3)' }}>{t('rdm.resLoad.roleUnset')}</span>
       try {
         const arr = JSON.parse(codes) as string[]
         return arr.length
           ? arr.map(r => <Tag key={r} style={{ margin: '0 4px 0 0' }}>{t(ROLE_KEY[r as RoleCode] ?? r)}</Tag>)
-          : <span style={{ color: '#8C8C8C' }}>{t('rdm.resLoad.roleUnset')}</span>
+          : <span style={{ color: 'var(--text-3)' }}>{t('rdm.resLoad.roleUnset')}</span>
       } catch { return codes }
     }
     return (
       <div className="content-area">
-        <div style={{ position: 'relative', background: '#fff', marginBottom: 16, borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+        <div style={{ position: 'relative', background: 'var(--surface-2)', marginBottom: 16, borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
           <div style={{ height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)', backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite' }} />
           <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <Button type="primary" onClick={() => navigate('/rdm-resource-load')} style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}>← {t('common.back')}</Button>
+              <Button type="primary" onClick={() => navigate('/rdm-resource-load')} style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}>← {t('common.back')}</Button>
               <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('rdm.resLoad.rosterTitle')}</h2>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>{t('rdm.resLoad.rosterTitle')}</h2>
             </div>
-            <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('rdm.resLoad.rosterCount', { count: members.filter(m => m.status === 1).length })}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('rdm.resLoad.rosterCount', { count: members.filter(m => m.status === 1).length })}</span>
           </div>
         </div>
 
@@ -1041,7 +1044,7 @@ export default function ResourceLoad() {
             { title: t('rdm.resLoad.colEmpNo'), dataIndex: 'empNo', key: 'empNo', width: 110, render: (v?: string | null) => v ?? '-' },
             { title: t('rdm.resLoad.colDept'), dataIndex: 'dept', key: 'dept', width: 160, ellipsis: true, render: (v?: string | null) => v ?? '-' },
             { title: t('rdm.resLoad.colRoles'), dataIndex: 'roleCodes', key: 'roleCodes', width: 180, render: renderRoles },
-            { title: t('rdm.resLoad.colWeeklyCapacity'), dataIndex: 'weeklyCapacityHours', key: 'weeklyCapacityHours', width: 120, render: (v?: number | null) => v ? `${v}h` : <span style={{ color: '#8C8C8C' }}>{t('rdm.resLoad.capacityFallback')}</span> },
+            { title: t('rdm.resLoad.colWeeklyCapacity'), dataIndex: 'weeklyCapacityHours', key: 'weeklyCapacityHours', width: 120, render: (v?: number | null) => v ? `${v}h` : <span style={{ color: 'var(--text-3)' }}>{t('rdm.resLoad.capacityFallback')}</span> },
             { title: t('rdm.resLoad.colStatus'), dataIndex: 'status', key: 'status', width: 90, render: (v?: number) => v === 1 ? <Tag color="success" style={{ margin: 0 }}>{t('rdm.resLoad.statusActive')}</Tag> : <Tag style={{ margin: 0 }}>{t('rdm.resLoad.statusRemoved')}</Tag> },
             { title: t('rdm.resLoad.colRemark'), dataIndex: 'remark', key: 'remark', ellipsis: true, render: (v?: string | null) => v ?? '-' },
             {
@@ -1103,7 +1106,7 @@ export default function ResourceLoad() {
       <div className="content-area">
         {/* 页面头部 */}
         <div style={{
-          position: 'relative', background: '#fff', marginBottom: 16,
+          position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
           borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
         }}>
           <div style={{
@@ -1117,17 +1120,17 @@ export default function ResourceLoad() {
                 type="primary"
                 onClick={() => navigate('/rdm-resource-load')}
                 style={{
-                  backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8,
+                  backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8,
                   height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6,
                   boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 }}
               >← {t('common.back')}</Button>
               <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>
                 {t('rdm.resLoad.personDetailTitle', { name: person.userName })}
               </h2>
             </div>
-            <Button type="primary" onClick={() => handleAssign(person)} style={{ backgroundColor: '#E8720C', borderColor: '#E8720C' }}>
+            <Button type="primary" onClick={() => handleAssign(person)} style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)' }}>
               {t('rdm.resLoad.btnAssignWork')}
             </Button>
           </div>
@@ -1136,7 +1139,7 @@ export default function ResourceLoad() {
         {/* 基本信息卡 */}
         <div className="rdm-card">
           <div className="rdm-card-title">
-            <span className="rdm-icon-block" style={{ background: '#e6f7ff', color: '#1890ff' }}><TeamOutlined /></span>
+            <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}><TeamOutlined /></span>
             {t('rdm.resLoad.basicInfo')}
             <span className="rdm-card-title-split" />
             <Tag color={LOAD_STATUS_COLOR[person.loadStatus]} style={{ margin: 0 }}>{t(LOAD_STATUS_KEY[person.loadStatus])}</Tag>
@@ -1152,7 +1155,7 @@ export default function ResourceLoad() {
             <div><div className="rdm-meta-item-label">{t('rdm.resLoad.metaPlanHours')}</div><div className="rdm-meta-item-value" style={{ color: person.totalPlanned > person.totalCapacity ? '#CF1322' : undefined }}>{person.totalPlanned} h</div></div>
             <div><div className="rdm-meta-item-label">{t('rdm.resLoad.metaActualHours')}</div><div className="rdm-meta-item-value">{person.totalActual} h</div></div>
             <div><div className="rdm-meta-item-label">{t('rdm.resLoad.metaRemain')}</div>
-              <div className="rdm-meta-item-value" style={{ color: person.totalCapacity - person.totalPlanned > 0 ? '#52C41A' : '#CF1322' }}>
+              <div className="rdm-meta-item-value" style={{ color: person.totalCapacity - person.totalPlanned > 0 ? 'var(--success)' : '#CF1322' }}>
                 {Math.max(0, person.totalCapacity - person.totalPlanned)} h
               </div>
             </div>
@@ -1162,10 +1165,10 @@ export default function ResourceLoad() {
         {/* 逐日热力图 */}
         <div className="rdm-card">
           <div className="rdm-card-title">
-            <span className="rdm-icon-block" style={{ background: '#fff7e6', color: '#fa8c16' }}><ClockCircleOutlined /></span>
+            <span className="rdm-icon-block" style={{ background: 'var(--warning-soft)', color: 'var(--warning)' }}><ClockCircleOutlined /></span>
             {t('rdm.resLoad.heatmapTitle', { from: range[0].format('MM/DD'), to: range[1].format('MM/DD') })}
             <span className="rdm-card-title-split" />
-            <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>{t('rdm.resLoad.heatmapLegend')}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>{t('rdm.resLoad.heatmapLegend')}</span>
           </div>
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {person.days.map(d => (
@@ -1177,13 +1180,13 @@ export default function ResourceLoad() {
                 <div style={{
                   width: 40, height: 40, borderRadius: 6, display: 'flex', flexDirection: 'column',
                   alignItems: 'center', justifyContent: 'center', cursor: 'default',
-                  background: d.weekend || d.leave ? '#F5F5F5'
+                  background: d.weekend || d.leave ? 'var(--surface-1)'
                     : d.overloaded ? '#FFF1F0'
                     : d.planned / Math.max(d.capacity, 1) > 0.85 ? '#FFF7E6'
                     : d.planned > 0 ? '#F6FFED' : '#fff',
                   border: `1px solid ${d.overloaded ? '#FFCCC7' : d.planned / Math.max(d.capacity, 1) > 0.85 ? '#FFE7D1' : d.planned > 0 ? '#B7EB8F' : '#F0F0F0'}`,
                 }}>
-                  <span style={{ fontSize: 10, color: '#8C8C8C' }}>{d.day}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{d.day}</span>
                   <span style={{ fontSize: 11, fontWeight: 600, color: d.overloaded ? '#CF1322' : d.planned > 0 ? '#389E0D' : '#D9D9D9' }}>
                     {d.weekend || d.leave ? '—' : `${Math.max(0, d.capacity - d.planned).toFixed(0)}h`}
                   </span>
@@ -1196,7 +1199,7 @@ export default function ResourceLoad() {
         {/* 工作明细 */}
         <div className="rdm-card">
           <div className="rdm-card-title">
-            <span className="rdm-icon-block" style={{ background: '#f9f0ff', color: '#722ed1' }}><AlertOutlined /></span>
+            <span className="rdm-icon-block" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}><AlertOutlined /></span>
             {t('rdm.resLoad.workDetail', { count: items.length })}
             <span className="rdm-card-title-split" />
           </div>
@@ -1210,7 +1213,7 @@ export default function ResourceLoad() {
                 </Tag>
                 <span className="rdm-delivery-row-main">
                   <b style={{ fontWeight: 500, fontSize: 13 }}>{item.title}</b>
-                  <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>
                     {item.sourceLabel} · {item.phase}
                     {item.planHours != null && ` · ${t('rdm.resLoad.planTag', { hours: item.planHours })}`}
                     {item.remainingHours != null && item.remainingHours !== item.planHours && ` · ${t('rdm.resLoad.remainTag', { hours: item.remainingHours })}`}

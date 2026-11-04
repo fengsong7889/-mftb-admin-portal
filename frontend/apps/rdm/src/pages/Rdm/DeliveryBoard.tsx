@@ -365,8 +365,8 @@ export default function DeliveryBoard() {
       title: '所屬需求', key: 'req', width: 150, ellipsis: true,
       render: (_, r) => (
         <div style={{ lineHeight: 1.4 }}>
-          <div className="rdm-table-title__link" title={r.reqTitle ?? undefined} style={{ color: '#262626' }}>{r.reqTitle ?? '-'}</div>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+          <div className="rdm-table-title__link" title={r.reqTitle ?? undefined} style={{ color: 'var(--text-1)' }}>{r.reqTitle ?? '-'}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
             {r.reqNo}
             {r.reqStatus ? ` · ${RDM_STATUS_LABEL[r.reqStatus as RdmStatus] ?? r.reqStatus}` : ''}
           </div>
@@ -473,16 +473,16 @@ export default function DeliveryBoard() {
         </div>
         <Space size={12} wrap align="end">
           <span>
-            <span style={{ fontSize: 12, color: '#595959', marginRight: 6 }}>進度 %</span>
+            <span style={{ fontSize: 12, color: 'var(--text-2)', marginRight: 6 }}>進度 %</span>
             {/* 進度下限 1%：0% 等於没上报，而 100% 是完成态的专属值，必须走「上報並完成」 */}
             <InputNumber min={1} max={100} value={progress} onChange={v => setProgress(v ?? 0)} style={{ width: 80 }} />
           </span>
           <span>
-            <span style={{ fontSize: 12, color: '#595959', marginRight: 6 }}>實際工時</span>
+            <span style={{ fontSize: 12, color: 'var(--text-2)', marginRight: 6 }}>實際工時</span>
             <InputNumber min={0} step={0.5} value={actualHours} onChange={setActualHours} placeholder="選填" style={{ width: 90 }} />
           </span>
           <span style={{ minWidth: 260 }}>
-            <span style={{ fontSize: 12, color: '#595959', marginRight: 6 }}>說明 / 阻塞原因</span>
+            <span style={{ fontSize: 12, color: 'var(--text-2)', marginRight: 6 }}>說明 / 阻塞原因</span>
             <Input value={remark} onChange={e => setRemark(e.target.value)} placeholder="完成/阻塞必填：交付說明或阻塞原因" style={{ width: 260 }} />
           </span>
           {/*
@@ -517,7 +517,7 @@ export default function DeliveryBoard() {
         <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed #E8EAED' }}>
           <Space size={8} wrap>
             <LinkOutlined style={{ color: '#2F54EB' }} />
-            <span style={{ fontSize: 12, color: '#595959' }}>前置依賴</span>
+            <span style={{ fontSize: 12, color: 'var(--text-2)' }}>前置依賴</span>
             <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => openDepModal(r)}>添加跨交付項依賴</Button>
           </Space>
         </div>
@@ -680,18 +680,18 @@ export default function DeliveryBoard() {
                 )}
               </div>
               {g.item && expandedBlockedId === g.item.id && (blockedMap[g.item.id]?.length ?? 0) > 0 && (
-                <div style={{ margin: '0 0 8px', padding: '8px 12px', background: '#FFF7E6', border: '1px solid #FFE7BA', borderRadius: 6 }}>
+                <div style={{ margin: '0 0 8px', padding: '8px 12px', background: 'var(--warning-soft)', border: '1px solid #FFE7BA', borderRadius: 6 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: '#D46B08', marginBottom: 6 }}>
                     <WarningOutlined /> 被前置依賴阻塞的任務（{blockedMap[g.item.id].length}）
                   </div>
                   {blockedMap[g.item.id].map(bt => (
-                    <div key={bt.taskId} style={{ fontSize: 12, color: '#595959', lineHeight: 1.9 }}>
+                    <div key={bt.taskId} style={{ fontSize: 12, color: 'var(--text-2)', lineHeight: 1.9 }}>
                       · {bt.taskTitle}
                       <Tag color={RDM_BLOCK_POINT_COLOR[bt.blockPoint] ?? 'orange'} style={{ margin: '0 6px' }}>
                         {RDM_BLOCK_POINT_LABEL[bt.blockPoint] ?? bt.blockPoint}
                       </Tag>
                       待 <a onClick={() => navigate(`/rdm-delivery-item?mode=view&id=${bt.predDeliveryItemId}`)}>{bt.predDeliveryItemTitle}</a>
-                      {bt.reason && <span style={{ color: '#8C8C8C' }}>（{bt.reason}）</span>}
+                      {bt.reason && <span style={{ color: 'var(--text-3)' }}>（{bt.reason}）</span>}
                     </div>
                   ))}
                 </div>
@@ -727,7 +727,7 @@ export default function DeliveryBoard() {
         )}
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           <div>
-            <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>前置交付項</div>
+            <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>前置交付項</div>
             <Select
               style={{ width: '100%' }}
               showSearch
@@ -741,7 +741,7 @@ export default function DeliveryBoard() {
             />
           </div>
           <div>
-            <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>前置任務</div>
+            <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>前置任務</div>
             <Select
               style={{ width: '100%' }}
               showSearch
@@ -757,7 +757,7 @@ export default function DeliveryBoard() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>阻斷點</div>
+              <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>阻斷點</div>
               <Select
                 style={{ width: '100%' }}
                 value={depBlockPoint}
@@ -766,7 +766,7 @@ export default function DeliveryBoard() {
               />
             </div>
             <div>
-              <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>依賴類型</div>
+              <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>依賴類型</div>
               <Select
                 style={{ width: '100%' }}
                 value={depType}
