@@ -459,7 +459,7 @@ export default function PrdForm() {
         backText="返回需求"
         onBack={handleLeave}
         badge={siblings.length > 0 ? (
-          <span style={{ fontSize: 12, fontWeight: 400, color: '#8C8C8C' }}>同需求已有 {siblings.length} 份 PRD</span>
+          <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-3)' }}>同需求已有 {siblings.length} 份 PRD</span>
         ) : undefined}
         meta={requirement ? `${requirement.reqNo} · ${requirement.title}` : t('rdm.prdForm.metaFallback', { defaultValue: '需求說明支援富文本編輯' })}
       />
@@ -468,9 +468,9 @@ export default function PrdForm() {
         <div
           style={{
             marginBottom: 16, padding: '8px 12px', borderRadius: 6, fontSize: 12,
-            background: draftNotice.failed ? '#FFF1F0' : '#FFF7F0',
+            background: draftNotice.failed ? 'var(--danger-soft)' : 'var(--brand-soft)',
             border: `1px solid ${draftNotice.failed ? '#FFCCC7' : '#FFE7D1'}`,
-            color: draftNotice.failed ? '#CF1322' : '#8C8C8C',
+            color: draftNotice.failed ? '#CF1322' : 'var(--text-3)',
           }}
           role="status"
         >
@@ -539,7 +539,7 @@ export default function PrdForm() {
           <div className="rdm-card-title">
             版本鏈（定稿快照）
             <span className="rdm-card-title-split" />
-            <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>共 {snapshots.length} 次定稿</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>共 {snapshots.length} 次定稿</span>
           </div>
           {snapshots.map(s => (
             <div key={s.id} className="rdm-delivery-row">
@@ -564,7 +564,7 @@ export default function PrdForm() {
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           <Space size={8} wrap>
             <Button icon={<BulbOutlined />} loading={aiLoading} onClick={handleAiDraft}>AI 生成草稿</Button>
-            <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
               草稿只填入表單，不會自動保存；模型只寫描述，複雜度與排期仍由人定
             </span>
           </Space>
@@ -578,7 +578,7 @@ export default function PrdForm() {
               placeholder={t('rdm.prdForm.descPlaceholder', { defaultValue: '目標用戶、功能清單、驗收標準、交互細節與邊界異常都寫在這裡；支援標題 / 清單 / 粗體等富文本格式' })}
               onChange={html => setForm(prev => ({ ...prev, contentRich: html }))}
             />
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
               {t('rdm.prdForm.descHint', { defaultValue: '以「驗收標準」為獨立標題寫成一節（清單尤佳），保存時自動抽取為業務驗收檢查項' })}
             </div>
           </LabeledField>
@@ -611,8 +611,8 @@ export default function PrdForm() {
 function LabeledField({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>
-        {required && <span style={{ color: '#FF4D4F', marginRight: 4 }}>*</span>}
+      <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 4 }}>
+        {required && <span style={{ color: 'var(--danger)', marginRight: 4 }}>*</span>}
         {label}
       </div>
       {children}

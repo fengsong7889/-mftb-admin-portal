@@ -171,7 +171,7 @@ export default function RiskCenter() {
         // 已归档需求不再计停留：归档是终点，天数只增不减
         if (r.status === RDM_STATUS.CLOSED) return '-'
         return (
-          <span style={{ color: v >= 30 ? '#CF1322' : v >= 14 ? '#FA8C16' : '#595959', fontWeight: 600 }}>
+          <span style={{ color: v >= 30 ? '#CF1322' : v >= 14 ? 'var(--warning)' : 'var(--text-2)', fontWeight: 600 }}>
             {v} 天
           </span>
         )
@@ -199,10 +199,10 @@ export default function RiskCenter() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         gap: 12, flexWrap: 'wrap', marginBottom: 16,
       }}>
-        <div style={{ fontSize: 18, fontWeight: 700, color: '#262626', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <AlertOutlined style={{ color: '#FF4D4F' }} />
+        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <AlertOutlined style={{ color: 'var(--danger)' }} />
           風險中心
-          <span style={{ fontSize: 12, fontWeight: 400, color: '#8C8C8C' }}>
+          <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-3)' }}>
             逾期 · 阻塞 · 無主 · 審批停滯 · 超 7 天無進展（按當前狀態停留時長統計）
           </span>
         </div>
@@ -293,7 +293,7 @@ export default function RiskCenter() {
 
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#FFF1F0', color: '#FF4D4F' }}><AlertOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}><AlertOutlined /></span>
           風險明細（{filteredRisks.length}）
           <span className="rdm-card-title-split" />
           {configComponent}

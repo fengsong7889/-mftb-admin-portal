@@ -149,7 +149,7 @@ export default function VersionTrace() {
             <Tag color={RDM_ACCEPT_RESULT_COLOR[key] ?? 'default'} style={{ margin: 0 }}>
               {RDM_ACCEPT_RESULT_LABEL[key] ?? r.acceptanceResult ?? '待驗收'}
             </Tag>
-            {r.acceptanceScore != null && <span style={{ fontSize: 12, color: '#8C8C8C' }}>{r.acceptanceScore}/5</span>}
+            {r.acceptanceScore != null && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{r.acceptanceScore}/5</span>}
           </Space>
         )
       },
@@ -158,7 +158,7 @@ export default function VersionTrace() {
       title: '返工', dataIndex: 'reworkCount', key: 'reworkCount', width: 90,
       render: (v?: number | null) => v && v > 0
         ? <Tooltip title="驗收退回累計次數"><Tag color="error" style={{ margin: 0 }}>{v} 次</Tag></Tooltip>
-        : <span style={{ color: '#52C41A' }}>無</span>,
+        : <span style={{ color: 'var(--success)' }}>無</span>,
     },
     { title: '計劃上線', dataIndex: 'planReleaseDate', key: 'planReleaseDate', width: 110, render: (v?: string | null) => v ?? '-' },
     { title: '實際上線', dataIndex: 'actualReleaseDate', key: 'actualReleaseDate', width: 110, render: (v?: string | null) => v ?? '-' },
@@ -203,10 +203,10 @@ export default function VersionTrace() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         gap: 12, flexWrap: 'wrap', marginBottom: 16,
       }}>
-        <div style={{ fontSize: 18, fontWeight: 700, color: '#262626', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <BranchesOutlined style={{ color: '#1890FF' }} />
+        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <BranchesOutlined style={{ color: 'var(--info)' }} />
           需求 ↔ 版本追溯
-          <span style={{ fontSize: 12, fontWeight: 400, color: '#8C8C8C' }}>
+          <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-3)' }}>
             上線必須關聯版本，版本可反查需求，兩側都能追到源頭
           </span>
         </div>
@@ -256,15 +256,15 @@ export default function VersionTrace() {
 
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><TagsOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}><TagsOutlined /></span>
           版本 {trace?.versionNo ?? '-'}
           <span className="rdm-card-title-split" />
-          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>
             {trace?.releaseDate ?? '未記錄發佈日期'}
             {trace?.commitHash ? ` · commit ${trace.commitHash}` : ''}
           </span>
         </div>
-        {trace?.summary && <div style={{ fontSize: 13, color: '#595959', marginBottom: 12 }}>{trace.summary}</div>}
+        {trace?.summary && <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 12 }}>{trace.summary}</div>}
         <StatCards
           animationKey={trace?.versionNo ?? 'none'}
           items={[
@@ -292,7 +292,7 @@ export default function VersionTrace() {
 
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}><BranchesOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--warning-soft)', color: 'var(--brand)' }}><BranchesOutlined /></span>
           本版上線需求明細
           <span className="rdm-card-title-split" />
         </div>

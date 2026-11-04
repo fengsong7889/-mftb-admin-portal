@@ -57,14 +57,14 @@ const GATE_OPEN_STATUS: string[] = [
 /** 检查结果图标：通过 / 失败 / 已豁免 / 旧流程跳过 */
 function CheckIcon({ check }: { check: RdmReleaseCheck }) {
   if (check.skipped) {
-    return <MinusCircleOutlined style={{ color: '#8C8C8C' }} />
+    return <MinusCircleOutlined style={{ color: 'var(--text-3)' }} />
   }
   if (check.waived) {
-    return <Tooltip title="已豁免：理由隨放行單永久留痕"><SafetyCertificateOutlined style={{ color: '#FA8C16' }} /></Tooltip>
+    return <Tooltip title="已豁免：理由隨放行單永久留痕"><SafetyCertificateOutlined style={{ color: 'var(--warning)' }} /></Tooltip>
   }
   return check.passed
-    ? <CheckCircleOutlined style={{ color: '#52C41A' }} />
-    : <CloseCircleOutlined style={{ color: check.blocking === false ? '#FAAD14' : '#FF4D4F' }} />
+    ? <CheckCircleOutlined style={{ color: 'var(--success)' }} />
+    : <CloseCircleOutlined style={{ color: check.blocking === false ? '#FAAD14' : 'var(--danger)' }} />
 }
 
 export default function ReleasePanel({ reqId, status, flowVersion, editable }: ReleasePanelProps) {
@@ -134,7 +134,7 @@ export default function ReleasePanel({ reqId, status, flowVersion, editable }: R
     return (
       <div className="rdm-card" id="rdm-release-gate">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><RocketOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}><RocketOutlined /></span>
           {t('rdm.releasePanel.title')}
           <span className="rdm-card-title-split" />
         </div>
@@ -202,10 +202,10 @@ export default function ReleasePanel({ reqId, status, flowVersion, editable }: R
   return (
     <div className="rdm-card" id="rdm-release-gate">
       <div className="rdm-card-title">
-        <span className="rdm-icon-block" style={{ background: '#FFF1F0', color: '#F5222D' }}><RocketOutlined /></span>
+        <span className="rdm-icon-block" style={{ background: 'var(--danger-soft)', color: '#F5222D' }}><RocketOutlined /></span>
         發布放行
         <span className="rdm-card-title-split" />
-        <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>
+        <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>
           上線前的質量閘門，與上線後的業務驗收是兩件事
         </span>
       </div>
@@ -298,7 +298,7 @@ export default function ReleasePanel({ reqId, status, flowVersion, editable }: R
                 <Space>
                   <Button type="primary" loading={saving} onClick={() => void handleApply()}>提交放行單</Button>
                   <Button onClick={resetApply}>取消</Button>
-                  <span style={{ fontSize: 12, color: '#8C8C8C' }}>發起人不可自行放行（系統管理員僅在運維應急時可自批）</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>發起人不可自行放行（系統管理員僅在運維應急時可自批）</span>
                 </Space>
               </Space>
             </div>
@@ -311,7 +311,7 @@ export default function ReleasePanel({ reqId, status, flowVersion, editable }: R
           <Tag color={RDM_RELEASE_STATUS_COLOR[RDM_RELEASE_STATUS.PENDING]}>待裁決</Tag>
           <span className="rdm-delivery-row-main">
             <b style={{ fontWeight: 500 }}>{pendingGate.releaseNo}</b>
-            <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>
               第 {pendingGate.roundNo} 次 · {RDM_RELEASE_ENV_LABEL[pendingGate.env ?? 'prod'] ?? pendingGate.env}
               {pendingGate.applicantName ? ` · 發起 ${pendingGate.applicantName}` : ''}
               {pendingGate.applyTime ? ` · ${pendingGate.applyTime}` : ''}
@@ -361,7 +361,7 @@ export default function ReleasePanel({ reqId, status, flowVersion, editable }: R
 
       {gates.length > 1 && (
         <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>放行歷史（含被駁回與作廢的輪次，不覆蓋）</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>放行歷史（含被駁回與作廢的輪次，不覆蓋）</div>
           {gates.map(g => (
             <div key={g.id} className="rdm-delivery-row">
               <Tag color={RDM_RELEASE_STATUS_COLOR[(g.status ?? 'pending') as RdmReleaseStatus] ?? 'default'} style={{ margin: 0 }}>
@@ -369,7 +369,7 @@ export default function ReleasePanel({ reqId, status, flowVersion, editable }: R
               </Tag>
               <span className="rdm-delivery-row-main">
                 <b style={{ fontWeight: 500 }}>第 {g.roundNo} 次 · {g.releaseNo}</b>
-                <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>
                   {RDM_RELEASE_ENV_LABEL[g.env ?? 'prod'] ?? g.env}
                   {g.versionNo ? ` · ${g.versionNo}` : ''}
                   {g.gateName ? ` · 放行 ${g.gateName}` : ''}

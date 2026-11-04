@@ -29,7 +29,7 @@ import {
 function UnknownTag({ value }: { value: string }) {
   return (
     <Tooltip title="未收錄的歷史編碼，需核對數據來源後補入映射表">
-      <Tag style={{ margin: 0, color: '#595959', borderColor: '#D9D9D9', background: '#FAFAFA' }}>
+      <Tag style={{ margin: 0, color: 'var(--text-2)', borderColor: 'var(--border-1)', background: 'var(--surface-3)' }}>
         {value}
       </Tag>
     </Tooltip>
@@ -85,7 +85,7 @@ export function TypeTag({ reqType }: { reqType: string }) {
 
 /** 复杂度标签 */
 export function ComplexityTag({ complexity }: { complexity?: string | null }) {
-  if (!complexity?.trim()) return <span style={{ color: '#8C8C8C' }}>-</span>
+  if (!complexity?.trim()) return <span style={{ color: 'var(--text-3)' }}>-</span>
   const key = complexity.trim().toUpperCase() as RdmComplexity
   const map: Record<RdmComplexity, string> = { SIMPLE: 'default', MEDIUM: 'blue', COMPLEX: 'orange', HUGE: 'red' }
   return <Tag color={map[key] ?? 'default'} title={complexity} style={{ margin: 0 }}>{getRdmComplexityLabel(complexity)}</Tag>

@@ -269,7 +269,7 @@ export default function TestBatchSubmit() {
         {/* ── 提測範圍 ── */}
         <div className="rdm-form-section">
           <div className="rdm-form-section-title">
-            <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><AimOutlined /></span>
+            <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}><AimOutlined /></span>
             提測範圍
             <span className="rdm-card-title-split" />
             <span className="rdm-todo-hint">{t('rdm.testBatchSubmit.scopeHint', { defaultValue: '勾選任務後自動帶出交付項；未拆交付項的任務歸入默認交付項' })}</span>
@@ -322,7 +322,7 @@ export default function TestBatchSubmit() {
         {/* ── 測試安排 ── */}
         <div className="rdm-form-section">
           <div className="rdm-form-section-title">
-            <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#FA8C16' }}><ScheduleOutlined /></span>
+            <span className="rdm-icon-block" style={{ background: 'var(--warning-soft)', color: 'var(--warning)' }}><ScheduleOutlined /></span>
             測試安排
             <span className="rdm-card-title-split" />
             <span className="rdm-todo-hint">{t('rdm.testBatchSubmit.arrangeHint', { defaultValue: '負責人與執行人均從在職員工中搜索選擇' })}</span>
@@ -364,7 +364,7 @@ export default function TestBatchSubmit() {
         {/* ── 測試用例（受理時凍結為必測用例集，不可為空）── */}
         <div className="rdm-form-section">
           <div className="rdm-form-section-title">
-            <span className="rdm-icon-block" style={{ background: '#F6FFED', color: '#52C41A' }}><ExperimentOutlined /></span>
+            <span className="rdm-icon-block" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}><ExperimentOutlined /></span>
             測試用例
             <span className="rdm-card-title-split" />
             <span className="rdm-todo-hint">{t('rdm.testBatchSubmit.casesHint', { defaultValue: '受理時凍結為必測用例集，逐條錄入結果' })}</span>
@@ -435,7 +435,7 @@ export default function TestBatchSubmit() {
         {/* ── 構建標識 ── */}
         <div className="rdm-form-section">
           <div className="rdm-form-section-title">
-            <span className="rdm-icon-block" style={{ background: '#F9F0FF', color: '#722ED1' }}><BuildOutlined /></span>
+            <span className="rdm-icon-block" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}><BuildOutlined /></span>
             構建標識
             <span className="rdm-card-title-split" />
             <span className="rdm-todo-hint">{t('rdm.testBatchSubmit.buildHint', { defaultValue: '選填；登記 CI/CD 構建產物標識便於回溯' })}</span>

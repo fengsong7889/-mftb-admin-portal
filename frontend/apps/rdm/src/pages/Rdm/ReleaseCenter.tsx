@@ -172,7 +172,7 @@ export default function ReleaseCenter() {
         return (
           <Space size={4}>
             <Progress percent={pct} size="small" style={{ width: 60 }} showInfo={false} />
-            <span style={{ fontSize: 12, color: '#595959' }}>{r.deployedCount}/{r.systemCount}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{r.deployedCount}/{r.systemCount}</span>
           </Space>
         )
       },
@@ -240,7 +240,7 @@ export default function ReleaseCenter() {
               onChange={e => setKeyword(e.target.value)}
               onPressEnter={handleSearch}
               allowClear
-              prefix={<SearchOutlined style={{ color: '#BFBFBF' }} />}
+              prefix={<SearchOutlined style={{ color: 'var(--text-4)' }} />}
             />
           </Form.Item>
           <Form.Item label="狀態">

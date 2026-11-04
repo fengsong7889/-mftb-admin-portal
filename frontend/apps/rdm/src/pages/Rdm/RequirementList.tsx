@@ -533,14 +533,14 @@ export default function RequirementList({
             </div>
           </div>
           <div style={{ marginTop: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 13, color: '#595959', marginBottom: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 13, color: 'var(--text-2)', marginBottom: 6 }}>
               {t('rdm.deliveryMode.title', { defaultValue: '交付流程' })} *<DeliveryModeHelp />
             </div>
             <DeliveryModePicker
               defaultValue={RDM_DELIVERY_MODE.BATCH}
               onChange={v => { pickedMode = v }}
             />
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 6 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 6 }}>
               {t('rdm.deliveryMode.claimNote', { defaultValue: '認領後即鎖定；已建立任務的需求只能選「整單交付」。' })}
             </div>
           </div>
@@ -1062,7 +1062,7 @@ export default function RequirementList({
           ellipsis: true,
           render: (v?: string | null) => (v
             ? <span style={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>{v}</span>
-            : <span style={{ color: '#BFBFBF' }}>-</span>),
+            : <span style={{ color: 'var(--text-4)' }}>-</span>),
         }]
       : []),
     {
@@ -1072,15 +1072,15 @@ export default function RequirementList({
           // 未发起审批时的展示按侧侧划分，避免向用户保证不会存在的 OA 单号
           const notSubmitted = r && (r.status === RDM_STATUS.DRAFT || r.status === RDM_STATUS.INTAKE_REJECTED)
           if (isIntakeSide && notSubmitted) {
-            return <span style={{ color: '#8C8C8C' }}>未發起</span>
+            return <span style={{ color: 'var(--text-3)' }}>未發起</span>
           }
           if (r && r.status === RDM_STATUS.POOL && r.needApproval === 0) {
             // 免审批需求不会发起 OA 准入单，直接进池
             return <Tag color="green" style={{ margin: 0 }}>免審批</Tag>
           }
-          return <span style={{ color: '#BFBFBF' }}>—</span>
+          return <span style={{ color: 'var(--text-4)' }}>—</span>
         }
-        return <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', color: '#E8720C' }}>{v}</span>
+        return <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', color: 'var(--brand)' }}>{v}</span>
       },
     },
     {
@@ -1148,12 +1148,12 @@ export default function RequirementList({
             <Tooltip
               title={`分批交付：階段由交付項推導（${done}/${total} 完成）；需求狀態為「${statusLabel}」`}
             >
-              <Tag style={{ margin: 0, color: '#722ED1', borderColor: '#722ED166', background: '#722ED112', fontWeight: 500 }}>
+              <Tag style={{ margin: 0, color: 'var(--purple)', borderColor: '#722ED166', background: '#722ED112', fontWeight: 500 }}>
                 {(r.overdueFlag ?? false) && <ClockCircleOutlined style={{ marginRight: 4 }} />}
                 {derived}{total ? ` ${done}/${total}` : ''}
               </Tag>
             </Tooltip>
-            <div style={{ marginTop: 2, fontSize: 12, color: '#8C8C8C', whiteSpace: 'nowrap' }}>
+            <div style={{ marginTop: 2, fontSize: 12, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
               需求狀態：{statusLabel}
             </div>
           </div>
@@ -1167,7 +1167,7 @@ export default function RequirementList({
       title: '產品經理', dataIndex: 'pmName', key: 'pmName', width: 190, ellipsis: true,
       render: (v: string | null | undefined, r) => v
         ? formatPerson({ name: v, empNo: r.pmEmpNo })
-        : <span style={{ color: '#FF4D4F' }}>未分配</span>,
+        : <span style={{ color: 'var(--danger)' }}>未分配</span>,
     },
     {
       title: '當前處理人', dataIndex: 'handlers', key: 'currentHandler', width: 215,
@@ -1215,7 +1215,7 @@ export default function RequirementList({
         const days = Math.round((r.stayHours ?? 0) / 24)
         if (!days) return '-'
         return (
-          <span style={{ color: r.overdueFlag ? '#CF1322' : days > 3 ? '#D46B08' : '#595959' }}>
+          <span style={{ color: r.overdueFlag ? '#CF1322' : days > 3 ? '#D46B08' : 'var(--text-2)' }}>
             {days} 天
           </span>
         )
@@ -1229,7 +1229,7 @@ export default function RequirementList({
        */
       title: t('rdm.reqList.colIteration'), dataIndex: 'iterationCode', key: 'iterationCode', width: 190, ellipsis: true,
       render: (v?: string | null, r?: RdmRequirementRow) => {
-        if (!v) return <span style={{ color: '#BFBFBF' }}>-</span>
+        if (!v) return <span style={{ color: 'var(--text-4)' }}>-</span>
         const name = r?.iterationName ?? iterationNameMap[v]
         const text = name ? `${name} · ${v}` : v
         return <span title={text}>{text}</span>
@@ -1691,7 +1691,7 @@ export default function RequirementList({
           value={submitterRemark}
           onChange={e => setSubmitterRemark(e.target.value)}
         />
-        <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8 }}>
           {t('rdm.batchSubmitter.hint')}
         </div>
       </Modal>

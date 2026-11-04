@@ -71,7 +71,7 @@ export default function QualityBoard() {
     },
     {
       title: '最近退回原因', dataIndex: 'lastRejectReason', key: 'lastRejectReason', width: 240,
-      render: (v?: string | null) => <span style={{ color: '#8C8C8C', fontSize: 12 }}>{v ?? '-'}</span>,
+      render: (v?: string | null) => <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{v ?? '-'}</span>,
     },
     {
       title: '操作', key: 'action', width: 90,
@@ -88,7 +88,7 @@ export default function QualityBoard() {
       render: (_, r) => (
         <Space size={8}>
           <Progress percent={Math.round(r.firstPassRate * 100)} size="small" style={{ width: 92 }} strokeColor={rateColor(r.firstPassRate)} />
-          <span style={{ fontSize: 12, color: '#595959' }}>{pct(r.firstPassRate)}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{pct(r.firstPassRate)}</span>
         </Space>
       ),
     },
@@ -96,10 +96,10 @@ export default function QualityBoard() {
       title: '滿意度', dataIndex: 'avgScore', key: 'avgScore', width: 100,
       // 无「上线后评分」的部门 avgScore 为 null：显示 '-'，不能伪装成 0 分
       render: (v?: number | null) => (v == null
-        ? <span style={{ color: '#8C8C8C' }}>-</span>
-        : <span style={{ color: v >= 4.5 ? '#52C41A' : v >= 4 ? '#FA8C16' : '#FF4D4F' }}>{v.toFixed(1)} / 5</span>),
+        ? <span style={{ color: 'var(--text-3)' }}>-</span>
+        : <span style={{ color: v >= 4.5 ? 'var(--success)' : v >= 4 ? 'var(--warning)' : 'var(--danger)' }}>{v.toFixed(1)} / 5</span>),
     },
-    { title: '缺陷數', dataIndex: 'defectCount', key: 'defectCount', width: 90, render: (v: number) => <span style={{ color: v > 3 ? '#CF1322' : '#595959' }}>{v}</span> },
+    { title: '缺陷數', dataIndex: 'defectCount', key: 'defectCount', width: 90, render: (v: number) => <span style={{ color: v > 3 ? '#CF1322' : 'var(--text-2)' }}>{v}</span> },
   ], [])
 
   /*
@@ -132,10 +132,10 @@ export default function QualityBoard() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         gap: 12, flexWrap: 'wrap', marginBottom: 16,
       }}>
-        <div style={{ fontSize: 18, fontWeight: 700, color: '#262626', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <BarChartOutlined style={{ color: '#722ED1' }} />
+        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <BarChartOutlined style={{ color: 'var(--purple)' }} />
           交付質量口徑
-          <span style={{ fontSize: 12, fontWeight: 400, color: '#8C8C8C' }}>
+          <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-3)' }}>
             一次通過率 · 返工 · 缺陷 · 滿意度（口徑來自驗收單與狀態流水）
           </span>
         </div>
@@ -173,7 +173,7 @@ export default function QualityBoard() {
       <div className="rdm-quality-grid">
         <div className="rdm-card">
           <div className="rdm-card-title">
-            <span className="rdm-icon-block" style={{ background: '#FFF1F0', color: '#FF4D4F' }}><BugOutlined /></span>
+            <span className="rdm-icon-block" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}><BugOutlined /></span>
             缺陷嚴重度分佈
             <span className="rdm-card-title-split" />
             {/* 口径说明（带因果）用 HelpPopover，不用 Tooltip 承载（AGENTS.md 问号规范） */}
@@ -182,7 +182,7 @@ export default function QualityBoard() {
               ariaLabel="缺陷嚴重度分佈說明"
               content={'致命/嚴重缺陷佔比過高時，即使按期上線也會帶來返工與客訴。'}
             >
-              <span style={{ fontSize: 12, color: majorRate > 0.25 ? '#CF1322' : '#8C8C8C', fontWeight: 400 }}>
+              <span style={{ fontSize: 12, color: majorRate > 0.25 ? '#CF1322' : 'var(--text-3)', fontWeight: 400 }}>
                 嚴重佔比 {pct(majorRate)}
               </span>
             </HelpPopover>
@@ -210,7 +210,7 @@ export default function QualityBoard() {
 
         <div className="rdm-card">
           <div className="rdm-card-title">
-            <span className="rdm-icon-block" style={{ background: '#F6FFED', color: '#52C41A' }}><SmileOutlined /></span>
+            <span className="rdm-icon-block" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}><SmileOutlined /></span>
             滿意度評分分佈
             <span className="rdm-card-title-split" />
           </div>
@@ -233,10 +233,10 @@ export default function QualityBoard() {
 
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}><AlertOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--warning-soft)', color: 'var(--brand)' }}><AlertOutlined /></span>
           返工 TOP 需求
           <span className="rdm-card-title-split" />
-          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>返工次數來自驗收退回（uat_rejected）累計，點需求看退回原因</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>返工次數來自驗收退回（uat_rejected）累計，點需求看退回原因</span>
           <span style={{ marginLeft: 'auto' }}>{reworkConfig}</span>
         </div>
         <Table
@@ -260,7 +260,7 @@ export default function QualityBoard() {
 
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><BarChartOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}><BarChartOutlined /></span>
           部門質量對比
           <span className="rdm-card-title-split" />
           <span style={{ marginLeft: 'auto' }}>{deptConfig}</span>

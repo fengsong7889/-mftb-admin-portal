@@ -438,7 +438,7 @@ export default function DailyReportRules() {
     {
       title: t('rdm.dailyRule.colTemplate'), key: 'tpl', width: 220,
       render: (_, r) => (
-        <span style={{ fontSize: 12, color: '#595959' }}>
+        <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
           {(r.groupTemplateKey || t('rdm.dailyRule.useDefault'))} / {(r.personalTemplateKey || t('rdm.dailyRule.useDefault'))}
         </span>
       ),
@@ -479,34 +479,34 @@ export default function DailyReportRules() {
       {/* 全局开关与默认模板：对所有规则生效的总闸 */}
       <div style={cardStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <SettingOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <SettingOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('rdm.dailyRule.globalTitle')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('rdm.dailyRule.globalTitle')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-          <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('rdm.dailyRule.globalHint')}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('rdm.dailyRule.globalHint')}</span>
         </div>
         <Form form={form} layout="vertical" disabled={!canEdit} onValuesChange={() => setCfgDirty(true)}>
           {/* 第一层：总闸。单独成行，不再与两个渠道开关平铺成三列 */}
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
             padding: '12px 16px', borderRadius: 8,
-            background: masterEnabled ? '#fff7f0' : '#fafafa',
+            background: masterEnabled ? 'var(--brand-soft)' : 'var(--surface-3)',
             border: `1px solid ${masterEnabled ? '#ffe7d1' : '#f0f0f0'}`,
             transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-              <PoweroffOutlined style={{ fontSize: 16, color: masterEnabled ? '#e8720c' : '#bfbfbf' }} />
+              <PoweroffOutlined style={{ fontSize: 16, color: masterEnabled ? 'var(--brand)' : 'var(--text-4)' }} />
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: masterEnabled ? '#262626' : '#8c8c8c' }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: masterEnabled ? 'var(--text-1)' : 'var(--text-3)' }}>
                     {t('rdm.dailyRule.masterSwitch')}
                   </span>
                   <Tag color={masterEnabled ? 'volcano' : 'default'} style={{ marginInlineEnd: 0, fontSize: 11 }}>
                     {t('rdm.dailyRule.masterBadge')}
                   </Tag>
                 </div>
-                <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 2 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
                   {t('rdm.dailyRule.masterDesc')}
                 </div>
               </div>
@@ -523,8 +523,8 @@ export default function DailyReportRules() {
             transition: 'opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '12px 0 8px' }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>{t('rdm.dailyRule.channelTitle')}</span>
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('rdm.dailyRule.channelHint')}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>{t('rdm.dailyRule.channelTitle')}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('rdm.dailyRule.channelHint')}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
               {([
@@ -533,9 +533,9 @@ export default function DailyReportRules() {
               ] as const).map(item => (
                 <div key={item.name} style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
-                  padding: '8px 12px', borderRadius: 6, background: '#fafafa',
+                  padding: '8px 12px', borderRadius: 6, background: 'var(--surface-3)',
                 }}>
-                  <span style={{ fontSize: 13, color: '#262626' }}>{item.label}</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-1)' }}>{item.label}</span>
                   <Form.Item name={item.name} valuePropName="checked" style={{ marginBottom: 0 }}>
                     <Switch disabled={!masterEnabled || !canEdit}
                       checkedChildren={t('rdm.dailyRule.on')} unCheckedChildren={t('rdm.dailyRule.off')} />
@@ -551,13 +551,13 @@ export default function DailyReportRules() {
             */}
             <div style={{
               marginTop: 12, padding: '14px 16px', borderRadius: 8,
-              background: '#fafafa', border: '1px solid #f0f0f0',
+              background: 'var(--surface-3)', border: '1px solid #f0f0f0',
               opacity: personalEnabled ? 1 : 0.55,
               transition: 'opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <TeamOutlined style={{ fontSize: 14, color: personalEnabled ? '#e8720c' : '#bfbfbf' }} />
-                <span style={{ fontSize: 13, fontWeight: 600, color: personalEnabled ? '#262626' : '#8c8c8c' }}>
+                <TeamOutlined style={{ fontSize: 14, color: personalEnabled ? 'var(--brand)' : 'var(--text-4)' }} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: personalEnabled ? 'var(--text-1)' : 'var(--text-3)' }}>
                   {t('rdm.dailyRule.receiverTitle')}
                 </span>
                 <HelpPopover
@@ -573,7 +573,7 @@ export default function DailyReportRules() {
                   ]}
                 />
                 <div style={{ flex: 1, height: 1, background: '#f0f0f0' }} />
-                <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('rdm.dailyRule.receiverScopeHint')}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('rdm.dailyRule.receiverScopeHint')}</span>
               </div>
 
               <Form.Item name="receiverRoles" style={{ marginBottom: 6 }}>
@@ -587,7 +587,7 @@ export default function DailyReportRules() {
                   </div>
                 </Checkbox.Group>
               </Form.Item>
-              <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 14 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 14 }}>
                 {t('rdm.dailyRule.receiverRoleHint')}
               </div>
 
@@ -615,7 +615,7 @@ export default function DailyReportRules() {
                   />
                 </Form.Item>
               </div>
-              <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 10 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 10 }}>
                 {t('rdm.dailyRule.receiverExtraExcludeHint')}
               </div>
 
@@ -626,25 +626,25 @@ export default function DailyReportRules() {
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
                 padding: '8px 12px', borderRadius: 6,
-                background: (receiverPreview?.unbound ?? 0) > 0 ? '#fff7e6' : '#f6ffed',
+                background: (receiverPreview?.unbound ?? 0) > 0 ? 'var(--warning-soft)' : 'var(--success-soft)',
                 border: `1px solid ${(receiverPreview?.unbound ?? 0) > 0 ? '#ffe7d1' : '#b7eb8f'}`,
               }}>
                 {receiverPreview ? (
-                  <span style={{ fontSize: 12, color: '#595959' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
                     {t('rdm.dailyRule.receiverPreviewSendingPrefix')}
-                    <b style={{ color: '#e8720c' }}>{receiverPreview.total}</b>
+                    <b style={{ color: 'var(--brand)' }}>{receiverPreview.total}</b>
                     {t('rdm.dailyRule.receiverPreviewSendingSuffix')}
                     {receiverPreview.unbound > 0 && (
                       <>
                         {t('rdm.dailyRule.receiverPreviewUnboundPrefix')}
-                        <b style={{ color: '#fa8c16' }}>{receiverPreview.unbound}</b>
+                        <b style={{ color: 'var(--warning)' }}>{receiverPreview.unbound}</b>
                         {t('rdm.dailyRule.receiverPreviewUnboundSuffix')}
                       </>
                     )}
-                    <span style={{ color: '#bfbfbf' }}>{t('rdm.dailyRule.receiverPreviewScope')}</span>
+                    <span style={{ color: 'var(--text-4)' }}>{t('rdm.dailyRule.receiverPreviewScope')}</span>
                   </span>
                 ) : (
-                  <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('rdm.dailyRule.receiverPreviewComputing')}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('rdm.dailyRule.receiverPreviewComputing')}</span>
                 )}
                 <Button type="link" size="small" style={{ marginLeft: 'auto', padding: 0 }}
                   disabled={!personalEnabled || !receiverPreview?.receivers.length}
@@ -661,11 +661,11 @@ export default function DailyReportRules() {
           */}
           <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px dashed #f0f0f0' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <LinkOutlined style={{ color: '#e8720c' }} />
-              <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>
+              <LinkOutlined style={{ color: 'var(--brand)' }} />
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>
                 {t('rdm.dailyRule.boardTitle')}
               </span>
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('rdm.dailyRule.boardHint')}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('rdm.dailyRule.boardHint')}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
               <Form.Item name="boardLinkValidDays" label={t('rdm.dailyRule.boardValidDays')}
@@ -695,11 +695,11 @@ export default function DailyReportRules() {
           */}
           <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px dashed #f0f0f0' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <NotificationOutlined style={{ color: '#e8720c' }} />
-              <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>
+              <NotificationOutlined style={{ color: 'var(--brand)' }} />
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>
                 {t('rdm.dailyRule.msgTitle')}
               </span>
-              <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('rdm.dailyRule.msgHint')}</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('rdm.dailyRule.msgHint')}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
               <Form.Item name="messageMode" label={t('rdm.dailyRule.msgMode')} style={{ marginBottom: 8 }}>
@@ -721,7 +721,7 @@ export default function DailyReportRules() {
                 ]} />
               </Form.Item>
             </div>
-            <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 10 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 10 }}>
               {messageMode === 'template'
                 ? t('rdm.dailyRule.msgTemplateNote')
                 : t('rdm.dailyRule.msgFrameworkNote')}
@@ -753,7 +753,7 @@ export default function DailyReportRules() {
               }}>
                 {BUILTIN_LAYOUT_ENTRIES.map(item => (
                   <div key={item.type} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 12, color: '#595959' }}>{t(item.labelKey)}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{t(item.labelKey)}</span>
                     <Button size="small" icon={<EyeOutlined />}
                       onClick={() => navigate(`/rdm-daily-report-template-builtin?type=${item.type}`)}>
                       {t('rdm.dailyRule.viewBuiltinStyle')}
@@ -762,7 +762,7 @@ export default function DailyReportRules() {
                 ))}
               </div>
             )}
-            <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 10 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 10 }}>
               {t('rdm.dailyRule.quietHint')}
             </div>
             {/*
@@ -777,14 +777,14 @@ export default function DailyReportRules() {
               items={[{
                 key: 'messageFields',
                 label: (
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>
                     {t('rdm.dailyRule.msgAdvanced')}
                   </span>
                 ),
                 children: (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16 }}>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>
                         {t('rdm.dailyRule.msgProjectFields')}
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '4px 12px' }}>
@@ -797,10 +797,10 @@ export default function DailyReportRules() {
                       </div>
                     </div>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 2 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 2 }}>
                         {t('rdm.dailyRule.msgIterationFields')}
                       </div>
-                      <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 8 }}>
+                      <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>
                         {t('rdm.dailyRule.msgIterationScope')}
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '4px 12px' }}>
@@ -836,7 +836,7 @@ export default function DailyReportRules() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px' }}>
           <span style={{ fontSize: 15, fontWeight: 600 }}>
             {t('rdm.dailyRule.rulesTitle')}
-            <span style={{ fontSize: 12, color: '#8c8c8c', fontWeight: 400, marginLeft: 8 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400, marginLeft: 8 }}>
               {t('rdm.dailyRule.rulesCount', { count: rows.length })}
             </span>
           </span>

@@ -128,8 +128,8 @@ export default function WorkloadPanel() {
       fixed: 'left',
       render: (_: string, r) => (
         <div>
-          <div style={{ fontWeight: 500, color: '#262626' }}>{r.userName ?? `#${r.userId}`}</div>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{r.empNo ?? '-'} · {r.reqCount ?? 0} 個需求</div>
+          <div style={{ fontWeight: 500, color: 'var(--text-1)' }}>{r.userName ?? `#${r.userId}`}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{r.empNo ?? '-'} · {r.reqCount ?? 0} 個需求</div>
         </div>
       ),
     },
@@ -181,7 +181,7 @@ export default function WorkloadPanel() {
                         : day.weekend
                           ? '#FAFAFA'
                           : '#FFFFFF',
-                  borderColor: day.weekend ? '#E8EAED' : 'transparent',
+                  borderColor: day.weekend ? 'var(--border-3)' : 'transparent',
                   opacity: (day.planned ?? 0) > 0 && !day.overloaded ? 0.35 + Math.min(0.6, (day.planned ?? 0) / 16) : 1,
                 }}
               />
@@ -228,16 +228,16 @@ export default function WorkloadPanel() {
       {/* 个人工作日历：排程与负载的输入，只记例外日 */}
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#F6FFED', color: '#52C41A' }}><CalendarOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}><CalendarOutlined /></span>
           我的工作日曆
           <span className="rdm-card-title-split" />
-          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>
             默認為週一至週五 8 小時，這裡只登記例外；請假會直接把關鍵路徑往後推
           </span>
         </div>
 
         {calendar.length === 0 && drafts.length === 0 && (
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>尚未登記例外日。</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>尚未登記例外日。</div>
         )}
 
         {calendar.map(item => (
@@ -247,14 +247,14 @@ export default function WorkloadPanel() {
             </Tag>
             <span className="rdm-delivery-row-main">
               <b style={{ fontWeight: 500 }}>{item.day}</b>
-              <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>
+              <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>
                 可用 {item.availableHours ?? '-'} 小時{item.reason ? ` · ${item.reason}` : ''}
               </span>
             </span>
             <Button type="link" size="small" danger icon={<DeleteOutlined />} onClick={() => removeExisting(item)}>移除</Button>
             <span className="action-split">|</span>
             <Tooltip title="移除後該日恢復默認容量，需重新保存才生效">
-              <span style={{ fontSize: 12, color: '#8C8C8C' }}>待保存</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>待保存</span>
             </Tooltip>
           </div>
         ))}

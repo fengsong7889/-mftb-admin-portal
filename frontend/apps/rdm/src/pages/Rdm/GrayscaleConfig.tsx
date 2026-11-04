@@ -97,7 +97,7 @@ export default function GrayscaleConfig() {
         <div>
           <div style={{ marginBottom: 8 }}>{desc}</div>
           <Input placeholder={txt('rdm.grayscale.reasonPlaceholder', '變更原因（必填，審計留痕）')} onChange={e => { reasonVal = e.target.value }} />
-          <div style={{ marginTop: 8, color: '#8C8C8C', fontSize: 12 }}>
+          <div style={{ marginTop: 8, color: 'var(--text-3)', fontSize: 12 }}>
             {txt('rdm.grayscale.gateNote', '開啟灰度 ≠ 放開發布門禁：發布仍須過全部硬門禁與四眼。')}
           </div>
         </div>
@@ -223,6 +223,8 @@ export default function GrayscaleConfig() {
           {/* ── GLOBAL 熔斷 + 總閘（模块分组用 .rdm-card，不用 antd Card 彩色标题头，§B.6/§9.1）── */}
           <div className="rdm-card">
             <div className="rdm-card-title">
+              {/* 成对保留裸色：#FFEBEE（Material red-50）无等值令牌且不透明，不会随主题变深；
+                  若只把前景换成令牌 danger，深色下会得「浅粉底 + 亮红字」约 1.3:1。见方案 §18.6。 */}
               <span className="rdm-icon-block" style={{ background: '#FFEBEE', color: '#FF4D4F' }}>
                 <WarningOutlined />
               </span>
@@ -263,7 +265,7 @@ export default function GrayscaleConfig() {
           {/* ── 項目級雙獨立開關 ── */}
           <div className="rdm-card">
             <div className="rdm-card-title">
-              <span className="rdm-icon-block" style={{ background: '#e6f7ff', color: '#1890ff' }}>
+              <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}>
                 <ControlOutlined />
               </span>
               {txt('rdm.grayscale.projectCard', '項目級灰度（雙獨立開關）')}{projectId ? `· #${projectId}` : txt('rdm.grayscale.noProjectSelected', '（未指定項目）')}
@@ -310,8 +312,8 @@ function SwitchRow({ label, hint, checked, disabled, danger, tag, onChange }: {
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', border: '1px solid #f0f0f0', borderRadius: 8 }}>
       <Switch checked={checked} disabled={disabled} onChange={onChange} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: danger ? '#CF1322' : '#262626' }}>{label}</div>
-        {hint && <div style={{ fontSize: 12, color: '#8C8C8C' }}>{hint}</div>}
+        <div style={{ fontSize: 13, fontWeight: 600, color: danger ? '#CF1322' : 'var(--text-1)' }}>{label}</div>
+        {hint && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{hint}</div>}
       </div>
       {tag}
     </div>
@@ -320,5 +322,5 @@ function SwitchRow({ label, hint, checked, disabled, danger, tag, onChange }: {
 
 /** 空態 */
 function Empty2({ text }: { text: string }) {
-  return <div style={{ textAlign: 'center', color: '#8C8C8C', padding: 16, fontSize: 13 }}>{text}</div>
+  return <div style={{ textAlign: 'center', color: 'var(--text-3)', padding: 16, fontSize: 13 }}>{text}</div>
 }

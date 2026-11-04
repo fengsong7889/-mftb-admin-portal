@@ -47,7 +47,7 @@ export default function DailyReportBoardPreviewModal({ open, url, view, onClose 
           style={{ width: '100%', height: 'calc(100vh - 160px)', border: 'none', display: 'block' }}
         />
       ) : (
-        <div style={{ padding: 32, textAlign: 'center', color: '#8c8c8c', fontSize: 13 }}>
+        <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-3)', fontSize: 13 }}>
           {t('rdm.board.previewModalEmpty', { defaultValue: '暫無可預覽的看板連結' })}
         </div>
       )}

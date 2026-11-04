@@ -185,12 +185,12 @@ export default function ReviewForm() {
       <div className="rdm-form-section">
         {/* 模块标题行：图标色块 + 标题 + 延伸分隔线 + 右侧说明（§C.3） */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <AuditOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <AuditOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('rdm.reviewForm.sectionTitle')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('rdm.reviewForm.sectionTitle')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-          <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('rdm.reviewForm.sectionNote')}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('rdm.reviewForm.sectionNote')}</span>
         </div>
 
         <Form

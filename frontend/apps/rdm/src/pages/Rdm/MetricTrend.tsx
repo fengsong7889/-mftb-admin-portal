@@ -115,11 +115,11 @@ export default function MetricTrend() {
     { title: '已受理', dataIndex: 'accepted', key: 'accepted', width: 90 },
     {
       title: '上線', dataIndex: 'released', key: 'released', width: 80,
-      render: (v: number) => <span style={{ color: v > 0 ? '#52C41A' : '#8C8C8C' }}>{v}</span>,
+      render: (v: number) => <span style={{ color: v > 0 ? 'var(--success)' : 'var(--text-3)' }}>{v}</span>,
     },
     {
       title: '逾期', dataIndex: 'overdue', key: 'overdue', width: 80,
-      render: (v: number) => <span style={{ color: v > 0 ? '#CF1322' : '#8C8C8C' }}>{v}</span>,
+      render: (v: number) => <span style={{ color: v > 0 ? '#CF1322' : 'var(--text-3)' }}>{v}</span>,
     },
     {
       title: '響應時長', dataIndex: 'avgResponseHours', key: 'avgResponseHours', width: 110,
@@ -161,10 +161,10 @@ export default function MetricTrend() {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         gap: 12, flexWrap: 'wrap', marginBottom: 16,
       }}>
-        <div style={{ fontSize: 18, fontWeight: 700, color: '#262626', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <BarChartOutlined style={{ color: '#1890FF' }} />
+        <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-1)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <BarChartOutlined style={{ color: 'var(--info)' }} />
           效能量趨勢
-          <span style={{ fontSize: 12, fontWeight: 400, color: '#8C8C8C' }}>
+          <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text-3)' }}>
             按日快照取數，歷史數字不會因為後續修訂而變
           </span>
         </div>
@@ -223,10 +223,10 @@ export default function MetricTrend() {
 
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><RiseOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}><RiseOutlined /></span>
           {RDM_METRIC_DIM_LABEL[dim]} · 近 {days} 天走勢
           <span className="rdm-card-title-split" />
-          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>數量與比率分开两个坐标轴，比率已换算为百分比（0–100）</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>數量與比率分开两个坐标轴，比率已换算为百分比（0–100）</span>
         </div>
         <div style={{ minHeight: 300 }}>
           {loading
@@ -239,7 +239,7 @@ export default function MetricTrend() {
               }}>
                 {countChartData.length > 0 && (
                   <div>
-                    <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>數量</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>數量</div>
                     <Line
                       data={countChartData}
                       xField="date"
@@ -255,7 +255,7 @@ export default function MetricTrend() {
                 )}
                 {rateChartData.length > 0 && (
                   <div>
-                    <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>比率（%）</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>比率（%）</div>
                     <Line
                       data={rateChartData}
                       xField="date"
@@ -276,10 +276,10 @@ export default function MetricTrend() {
 
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}><DatabaseOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--warning-soft)', color: 'var(--brand)' }}><DatabaseOutlined /></span>
           快照明細
           <span className="rdm-card-title-split" />
-          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>最新一天排在最前</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>最新一天排在最前</span>
           <span style={{ marginLeft: 'auto' }}>{configComponent}</span>
         </div>
         <Table<RdmMetricPoint>

@@ -104,7 +104,7 @@ export function DeliverySummaryBar({ summary }: { summary: RdmDeliverySummary | 
       <div className="rdm-delivery-summary-item">
         <span className="rdm-delivery-summary-label">實際工時</span>
         <b>{(summary.actualHoursTotal ?? 0).toFixed(1)} h</b>
-        <span style={{ color: '#8C8C8C', fontSize: 12 }}> / 計劃 {(summary.planHoursTotal ?? 0).toFixed(1)} h</span>
+        <span style={{ color: 'var(--text-3)', fontSize: 12 }}> / 計劃 {(summary.planHoursTotal ?? 0).toFixed(1)} h</span>
       </div>
       <div className="rdm-delivery-summary-item">
         <span className="rdm-delivery-summary-label">阻塞</span>
@@ -166,8 +166,8 @@ export function TaskSection({ summary, editable, reqId, canCreate, reqPlanReleas
       title: '任務', dataIndex: 'title', key: 'title',
       render: (v: string, r) => (
         <div style={{ lineHeight: 1.4 }}>
-          <div style={{ color: '#262626' }}>{v}</div>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+          <div style={{ color: 'var(--text-1)' }}>{v}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
             {r.taskNo}
             {r.iterationCode ? ` · ${r.iterationCode}` : ''}
           </div>
@@ -185,13 +185,13 @@ export function TaskSection({ summary, editable, reqId, canCreate, reqPlanReleas
     */
     {
       title: '開始日期', dataIndex: 'planStartDate', key: 'planStartDate', width: 110,
-      render: (v?: string | null) => <span style={{ whiteSpace: 'nowrap', color: v ? '#595959' : '#BFBFBF' }}>{v ?? '-'}</span>,
+      render: (v?: string | null) => <span style={{ whiteSpace: 'nowrap', color: v ? 'var(--text-2)' : 'var(--text-4)' }}>{v ?? '-'}</span>,
     },
     {
       title: '結束日期', dataIndex: 'planFinishDate', key: 'planFinishDate', width: 110,
       render: (v: string | null | undefined, r: RdmTaskItem) => (
         /* 逾期由服务端判定（未完成且计划完成日已过），这里只做红色提示，不另算一套口径 */
-        <span style={{ whiteSpace: 'nowrap', color: v && r.overdue ? '#CF1322' : v ? '#595959' : '#BFBFBF' }}>{v ?? '-'}</span>
+        <span style={{ whiteSpace: 'nowrap', color: v && r.overdue ? '#CF1322' : v ? 'var(--text-2)' : 'var(--text-4)' }}>{v ?? '-'}</span>
       ),
     },
     {
@@ -200,10 +200,10 @@ export function TaskSection({ summary, editable, reqId, canCreate, reqPlanReleas
       key: 'planReleaseDate',
       width: 116,
       render: (v: string | null | undefined) => {
-        if (!v) return <span style={{ color: '#BFBFBF' }}>-</span>
+        if (!v) return <span style={{ color: 'var(--text-4)' }}>-</span>
         // 日期是 ISO 定长字符串，字典序即时间序；晚于需求上线说明这条子任务注定赶不上
         const late = !!reqPlanRelease && v > reqPlanRelease
-        return <span style={{ whiteSpace: 'nowrap', color: late ? '#CF1322' : '#595959' }}>{v}</span>
+        return <span style={{ whiteSpace: 'nowrap', color: late ? '#CF1322' : 'var(--text-2)' }}>{v}</span>
       },
     },
     {
@@ -223,7 +223,7 @@ export function TaskSection({ summary, editable, reqId, canCreate, reqPlanReleas
         <Space size={6}>
           <Progress percent={r.progress ?? 0} size="small" style={{ width: 62 }} />
           {/* 缺报不等于 0：把未填报当成 0 会同时做假负载与估时偏差 */}
-          <span style={{ fontSize: 12, color: r.actualHoursReported ? '#8C8C8C' : '#FA8C16' }}>
+          <span style={{ fontSize: 12, color: r.actualHoursReported ? 'var(--text-3)' : 'var(--warning)' }}>
             {r.taskType === 'prd'
               // PRD 任务以承诺日期为交付口径，不按工时考核，避免“未填报/-h”被误读为漏报
               ? t('rdm.reqSections.deliverByPromise')
@@ -297,8 +297,8 @@ function PrdRow({ prd, editable, onClick }: { prd: RdmPrdItem; editable?: boolea
     <div className="rdm-delivery-row">
       <Tag color={RDM_PRD_STATUS_COLOR[key] ?? 'default'} style={{ margin: 0 }}>{RDM_PRD_STATUS_LABEL[key] ?? prd.status}</Tag>
       <span className="rdm-delivery-row-main">
-        <a style={{ color: '#E8720C' }} onClick={onClick}>{prd.title}</a>
-        <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>
+        <a style={{ color: 'var(--brand)' }} onClick={onClick}>{prd.title}</a>
+        <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>
           {prd.prdNo}{prd.versionNo ? ` · ${prd.versionNo}` : ''}{prd.authorName ? ` · ${prd.authorName}` : ''}
         </span>
       </span>
@@ -345,7 +345,7 @@ function ReviewRow({ review, editable, onDecide }: {
         </Tag>
         <span className="rdm-delivery-row-main">
           <b style={{ fontWeight: 500 }}>{formatRdmReviewTypes(review.reviewType)}</b>
-          <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>
             {review.reviewNo}
             {review.prdTitle ? ` · ${review.prdTitle}` : ''}
             {review.reviewTime ? ` · ${dayjs(review.reviewTime).format('MM-DD HH:mm')}` : ''}
@@ -483,7 +483,7 @@ export function PlanSection({ summary, status, planReleaseDate, editable, canCre
           />
         ))}
       {planReleaseDate && (
-        <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8 }}>
           計劃上線：{planReleaseDate}（以已凍結基線為準，業務期望日期不等同產研承諾）
         </div>
       )}
@@ -525,16 +525,16 @@ function ChangeRow({ change }: { change: RdmChangeItem }) {
       <Tag color={RDM_CHANGE_STATUS_COLOR[key] ?? 'default'} style={{ margin: 0 }}>{RDM_CHANGE_STATUS_LABEL[key] ?? change.approvalStatus}</Tag>
       <span className="rdm-delivery-row-main">
         <b style={{ fontWeight: 500 }}>{RDM_CHANGE_TYPE_LABEL[change.changeType as RdmChangeType] ?? change.changeType}</b>
-        <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>
+        <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>
           {change.changeNo}
           {change.applicantName ? ` · ${change.applicantName}` : ''}
           {change.applyTime ? ` · ${dayjs(change.applyTime).format('MM-DD HH:mm')}` : ''}
           {change.affectsSchedule ? ' · 影響排期' : ''}
           {change.addedHours ? ` · 加 ${change.addedHours}h` : ''}
         </span>
-        <div style={{ fontSize: 13, color: '#595959', marginTop: 4 }}>{change.afterContent}</div>
-        <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 2 }}>原因：{change.reason}</div>
-        {change.decideRemark && <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 2 }}>審批意見：{change.decideRemark}</div>}
+        <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 4 }}>{change.afterContent}</div>
+        <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>原因：{change.reason}</div>
+        {change.decideRemark && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>審批意見：{change.decideRemark}</div>}
       </span>
     </div>
   )

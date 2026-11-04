@@ -327,7 +327,7 @@ export default function TestBatchDetail() {
       {/* ── Section 1: 批次摘要 ── */}
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}><ExperimentOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}><ExperimentOutlined /></span>
           批次摘要
           <span className="rdm-card-title-split" />
         </div>
@@ -384,7 +384,7 @@ export default function TestBatchDetail() {
           </Descriptions.Item>
           {detail.returnedReason && (
             <Descriptions.Item label="退回原因" span={4}>
-              <span style={{ color: '#FF4D4F' }}>{detail.returnedReason}</span>
+              <span style={{ color: 'var(--danger)' }}>{detail.returnedReason}</span>
             </Descriptions.Item>
           )}
         </Descriptions>
@@ -394,7 +394,7 @@ export default function TestBatchDetail() {
       {summary && (
         <div className="rdm-card">
           <div className="rdm-card-title">
-            <span className="rdm-icon-block" style={{ background: '#F6FFED', color: '#52C41A' }}><CheckCircleOutlined /></span>
+            <span className="rdm-icon-block" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}><CheckCircleOutlined /></span>
             執行摘要
             <span className="rdm-card-title-split" />
           </div>
@@ -421,7 +421,7 @@ export default function TestBatchDetail() {
               alignItems: 'center', justifyContent: 'center',
               border: '1px solid #f0f0f0', borderRadius: 12,
             }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>通過率</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>通過率</div>
               {/* status=normal：antd 在 percent=100 时默认渲染勾图标而不显示数字，通过率 100% 会看不到具体百分比 */}
               <Progress
                 type="circle"
@@ -438,7 +438,7 @@ export default function TestBatchDetail() {
       {/* ── Section 3: 執行記錄 ── */}
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}><SyncOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--warning-soft)', color: 'var(--brand)' }}><SyncOutlined /></span>
           執行記錄
           <span className="rdm-card-title-split" />
           <Space size={12} style={{ marginLeft: 'auto' }}>
@@ -511,7 +511,7 @@ export default function TestBatchDetail() {
         cancelText="取消"
         okButtonProps={{ danger: true }}
       >
-        <div style={{ marginBottom: 12, color: '#595959', fontSize: 13 }}>
+        <div style={{ marginBottom: 12, color: 'var(--text-2)', fontSize: 13 }}>
           退回後研發需修復問題再重新提測，請說明退回原因：
         </div>
         <TextArea rows={4} value={returnReason} onChange={e => setReturnReason(e.target.value)}
@@ -598,12 +598,12 @@ export default function TestBatchDetail() {
         destroyOnHidden
       >
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>復測原因（必填）</div>
+          <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 8 }}>復測原因（必填）</div>
           <TextArea rows={3} value={retestReason} onChange={e => setRetestReason(e.target.value)}
             placeholder="例：研發已修復登入跳轉問題，新構建 build-2024-1234" maxLength={500} showCount />
         </div>
         <div>
-          <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>新構建標識</div>
+          <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 8 }}>新構建標識</div>
           {retestBuildIds.map((bid, idx) => (
             <Space key={idx} style={{ display: 'flex', marginBottom: 8 }}>
               <Input

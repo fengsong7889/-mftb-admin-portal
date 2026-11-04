@@ -257,7 +257,7 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
             status={r.over ? 'exception' : r.warning ? 'active' : 'normal'}
             style={{ width: 110 }}
           />
-          <span style={{ fontSize: 12, color: '#595959' }}>{r.usedRatio ?? 0}%</span>
+          <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{r.usedRatio ?? 0}%</span>
           {r.over && <Tag color="error" style={{ margin: 0 }}>超預算</Tag>}
           {!r.over && r.warning && <Tag color="warning" style={{ margin: 0 }}>接近上限</Tag>}
         </Space>
@@ -307,8 +307,8 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
       width: 170,
       render: (_, r) => (
         <div>
-          <div style={{ fontWeight: 500, color: '#262626' }}>{r.userName ?? `#${r.userId}`}</div>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{r.empNo ?? '-'} · {r.deptName ?? '未歸屬部門'}</div>
+          <div style={{ fontWeight: 500, color: 'var(--text-1)' }}>{r.userName ?? `#${r.userId}`}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{r.empNo ?? '-'} · {r.deptName ?? '未歸屬部門'}</div>
         </div>
       ),
     },
@@ -320,7 +320,7 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
       sorter: (a, b) => Number(a.totalScore ?? 0) - Number(b.totalScore ?? 0),
       render: (_, r) => (
         <Space size={4}>
-          <b style={{ color: '#E8720C' }}>{Number(r.totalScore ?? 0).toFixed(1)}</b>
+          <b style={{ color: 'var(--brand)' }}>{Number(r.totalScore ?? 0).toFixed(1)}</b>
           {r.overBudget && (
             <Tooltip title={`部門預算已用 ${r.budgetUsedRatio ?? 0}%，超限需書面說明才能推送`}>
               <Tag color="error" style={{ margin: 0 }}>超限</Tag>
@@ -334,7 +334,7 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
       key: 'basis',
       width: 210,
       render: (_, r) => (
-        <span style={{ fontSize: 12, color: '#595959' }}>
+        <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
           {r.recordCount ?? 0} 條流水 · {r.deliveredCount ?? 0} 個交付
           {r.avgAcceptanceScore ? ` · 滿意度 ${Number(r.avgAcceptanceScore).toFixed(1)}/5` : ''}
           {r.firstPassCount ? ` · 一次通過 ${r.firstPassCount}` : ''}
@@ -353,7 +353,7 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
             {RDM_SUGGESTION_STATUS_LABEL[v as RdmSuggestionStatus] ?? v}
           </Tag>
           {r.reviewerName && (
-            <span style={{ fontSize: 12, color: '#8C8C8C' }}>{r.reviewerName} · {r.reviewTime}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{r.reviewerName} · {r.reviewTime}</span>
           )}
         </Space>
       ),
@@ -365,7 +365,7 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
       width: 170,
       render: (_, r) => {
         if (!r.actionable && !editable) {
-          return <span style={{ fontSize: 12, color: '#8C8C8C' }}>{r.blockedReason ?? '-'}</span>
+          return <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{r.blockedReason ?? '-'}</span>
         }
         return (
           <Space size={0}>
@@ -390,7 +390,7 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
                 撤回
               </Button>
             )}
-            {!editable && !r.actionable && <span style={{ fontSize: 12, color: '#8C8C8C' }}>{r.blockedReason ?? '只讀'}</span>}
+            {!editable && !r.actionable && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{r.blockedReason ?? '只讀'}</span>}
           </Space>
         )
       },
@@ -401,10 +401,10 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
     <>
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}><FileProtectOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--warning-soft)', color: 'var(--brand)' }}><FileProtectOutlined /></span>
           貢獻分預算
           <span className="rdm-card-title-split" />
-          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>
             預算只用于超限預警，不會自動折算個人分數——折算會讓分數取決於同期他人產出
           </span>
         </div>
@@ -433,10 +433,10 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
 
       <div className="rdm-card">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#F9F0FF', color: '#722ED1' }}><AuditOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}><AuditOutlined /></span>
           HR 績效建議
           <span className="rdm-card-title-split" />
-          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>
             積分 → 人工復核 → 推送建議值；自評/主管評/最終分仍由 HR 校準
           </span>
           <Space size={8} style={{ marginLeft: 'auto' }}>
@@ -535,7 +535,7 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
         <div className="rdm-card-title">
           指標口徑字典
           <span className="rdm-card-title-split" />
-          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>
             每個數都應能回答：怎麼算的、能不能回算、哪裡會誤讀
           </span>
           {editable && (
@@ -568,12 +568,12 @@ export default function GovernancePanel({ periodCode, editable }: GovernancePane
                 onOk: () => handleRecompute(),
               })}>開注重算</Button>
               <Button onClick={() => { setRecomputeOpen(false); setRecomputeRange(null) }}>取消</Button>
-              <span style={{ fontSize: 12, color: '#8C8C8C' }}>只覆蓋快照表，不改需求與流水原始數據</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>只覆蓋快照表，不改需求與流水原始數據</span>
             </Space>
           </div>
         )}
         {metrics.length === 0 ? (
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>指標字典載入中，或後端不可用（本頁僅作展示，不影響數據）。</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>指標字典載入中，或後端不可用（本頁僅作展示，不影響數據）。</div>
         ) : (
           <Collapse
             size="small"

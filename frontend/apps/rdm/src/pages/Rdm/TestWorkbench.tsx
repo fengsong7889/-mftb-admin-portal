@@ -373,7 +373,7 @@ export default function TestWorkbench() {
         cancelText="取消"
         okButtonProps={{ danger: true }}
       >
-        <div style={{ marginBottom: 12, color: '#595959', fontSize: 13 }}>
+        <div style={{ marginBottom: 12, color: 'var(--text-2)', fontSize: 13 }}>
           退回後研發需修復問題再重新提測，請說明退回原因：
         </div>
         <TextArea

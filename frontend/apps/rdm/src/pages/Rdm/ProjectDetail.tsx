@@ -327,7 +327,7 @@ export default function ProjectDetail() {
    */
   const renderRequirementRows = (rows: RdmProjectRequirementRow[], emptyText: string) => {
     if (rows.length === 0) {
-      return <div style={{ fontSize: 12, color: '#8C8C8C', padding: '4px 0' }}>{emptyText}</div>
+      return <div style={{ fontSize: 12, color: 'var(--text-3)', padding: '4px 0' }}>{emptyText}</div>
     }
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -342,16 +342,16 @@ export default function ProjectDetail() {
               padding: '8px 12px',
               borderRadius: 6,
               border: '1px solid #f0f0f0',
-              background: req.blocked || req.overdue ? '#FFF7F0' : '#FAFBFC',
+              background: req.blocked || req.overdue ? 'var(--brand-soft)' : 'var(--surface-sunken)',
               cursor: 'pointer',
               transition: 'all 0.2s',
             }}
           >
             <Tag color="default" style={{ margin: 0, flexShrink: 0 }}>{req.reqNo || `需求 #${req.id}`}</Tag>
-            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13, color: '#262626' }}>
+            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13, color: 'var(--text-1)' }}>
               {req.title}
             </span>
-            <span style={{ fontSize: 12, color: '#8C8C8C', flexShrink: 0 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-3)', flexShrink: 0 }}>
               {req.pmName ? `PM ${req.pmName}` : 'PM -'} · {req.devOwnerName ? `研發 ${req.devOwnerName}` : '研發 -'}
             </span>
             <Tag
@@ -360,7 +360,7 @@ export default function ProjectDetail() {
             >
               {(RDM_STATUS_LABEL as Record<string, string>)[req.status] ?? req.status}
             </Tag>
-            <span style={{ fontSize: 12, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{req.planDevDate || '-'}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{req.planDevDate || '-'}</span>
             {req.deliveryItemTotal > 0 ? (
               <Tag
                 color={req.deliveryItemDone === req.deliveryItemTotal ? 'success' : 'blue'}
@@ -546,7 +546,7 @@ export default function ProjectDetail() {
         />
         <div className="rdm-card" style={{ padding: '20px 24px' }}>
           <div className="rdm-card-title">
-            <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}>
+            <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}>
               <FileTextOutlined style={{ fontSize: 14 }} />
             </span>
             <span>基本信息</span>
@@ -653,7 +653,7 @@ export default function ProjectDetail() {
           {/* Section 1：基本信息（項目目標已拆出為獨立卡片） */}
           <div className="rdm-card">
             <div className="rdm-card-title">
-              <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}>
+              <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}>
                 <FileTextOutlined />
               </span>
               基本信息
@@ -684,7 +684,7 @@ export default function ProjectDetail() {
           {/* Section 2：項目目標 —— 目標多為帶編號的多句長文，塞進 Descriptions 會和字段網格混成一片，故獨立成卡 */}
           <div className="rdm-card">
             <div className="rdm-card-title">
-              <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}>
+              <span className="rdm-icon-block" style={{ background: 'var(--warning-soft)', color: 'var(--brand)' }}>
                 <AimOutlined />
               </span>
               項目目標
@@ -695,11 +695,11 @@ export default function ProjectDetail() {
                 style={{
                   padding: '12px 16px',
                   borderRadius: 6,
-                  background: '#FAFBFC',
+                  background: 'var(--surface-sunken)',
                   border: '1px solid #f0f0f0',
                   fontSize: 13,
                   lineHeight: 1.9,
-                  color: '#262626',
+                  color: 'var(--text-1)',
                   // 目標常按「1，2，3」分條書寫，保留使用者輸入的換行
                   whiteSpace: 'pre-wrap',
                   wordBreak: 'break-word',
@@ -708,14 +708,14 @@ export default function ProjectDetail() {
                 {detail.objective}
               </div>
             ) : (
-              <span style={{ fontSize: 13, color: '#BFBFBF' }}>未設定</span>
+              <span style={{ fontSize: 13, color: 'var(--text-4)' }}>未設定</span>
             )}
           </div>
 
           {/* Section 3：交付清單 */}
           <div className="rdm-card">
             <div className="rdm-card-title">
-              <span className="rdm-icon-block" style={{ background: '#F6FFED', color: '#52C41A' }}>
+              <span className="rdm-icon-block" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}>
                 <CheckCircleOutlined />
               </span>
               交付清單
@@ -733,7 +733,7 @@ export default function ProjectDetail() {
 
             {!hasRequirementContent ? (
               <Empty description="暫無需求" image={Empty.PRESENTED_IMAGE_SIMPLE}>
-                <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+                <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
                   項目下暫無迭代/需求；待准入需求也會出現在此處
                 </div>
               </Empty>
@@ -751,12 +751,12 @@ export default function ProjectDetail() {
                     label: (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <Tag color="purple" style={{ margin: 0 }}>{group.iterationCode}</Tag>
-                        <span style={{ fontWeight: 500, color: '#262626' }}>{group.iterationName}</span>
-                        <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+                        <span style={{ fontWeight: 500, color: 'var(--text-1)' }}>{group.iterationName}</span>
+                        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
                           {(RDM_ITERATION_STATUS_LABEL as Record<string, string>)[group.status] ?? group.status}
                           {group.startDate && ` · ${group.startDate} ~ ${group.endDate || '待定'}`}
                         </span>
-                        <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 'auto' }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 'auto' }}>
                           {group.requirementDelivered}/{group.requirementTotal} 需求已交付
                         </span>
                       </div>
@@ -769,8 +769,8 @@ export default function ProjectDetail() {
                         label: (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <Tag color="orange" style={{ margin: 0 }}>未排期</Tag>
-                            <span style={{ fontWeight: 500, color: '#262626' }}>未挂迭代的需求</span>
-                            <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 'auto' }}>
+                            <span style={{ fontWeight: 500, color: 'var(--text-1)' }}>未挂迭代的需求</span>
+                            <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 'auto' }}>
                               {visibleUnplanned.length} 條，需在需求詳情排期時選擇迭代
                             </span>
                           </div>
@@ -786,18 +786,18 @@ export default function ProjectDetail() {
           {/* Section 4：待推進事項 */}
           <div className="rdm-card">
             <div className="rdm-card-title">
-              <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}>
+              <span className="rdm-icon-block" style={{ background: 'var(--warning-soft)', color: 'var(--brand)' }}>
                 <ClockCircleOutlined />
               </span>
               待推進事項
               <span className="rdm-card-title-split" />
-              <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>共 {board?.todos.length ?? 0} 項</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>共 {board?.todos.length ?? 0} 項</span>
             </div>
 
             {pendingGroups.length === 0 ? (
               <div style={{ textAlign: 'center', padding: 16 }}>
-                <CheckCircleOutlined style={{ color: '#52C41A', fontSize: 24 }} />
-                <div style={{ fontSize: 13, color: '#8C8C8C', marginTop: 8 }}>所有事項均已推進完成</div>
+                <CheckCircleOutlined style={{ color: 'var(--success)', fontSize: 24 }} />
+                <div style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 8 }}>所有事項均已推進完成</div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -810,7 +810,7 @@ export default function ProjectDetail() {
                           {cfg.icon}
                         </span>
                         <span style={{ fontSize: 13, fontWeight: 600, color: cfg.color }}>{cfg.label}</span>
-                        <span style={{ fontSize: 12, color: '#8C8C8C' }}>({items.length})</span>
+                        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>({items.length})</span>
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         {items.map(item => (
@@ -826,23 +826,23 @@ export default function ProjectDetail() {
                               padding: '7px 12px',
                               borderRadius: 6,
                               border: '1px solid #f0f0f0',
-                              background: '#fff',
+                              background: 'var(--surface-2)',
                               cursor: item.actionUrl ? 'pointer' : 'default',
                               transition: 'all 0.2s',
                             }}
                           >
                             <Tag color="default" style={{ margin: 0, flexShrink: 0 }}>{item.reqNo || '-'}</Tag>
-                            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13, color: '#262626' }}>
+                            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 13, color: 'var(--text-1)' }}>
                               {item.title}
                             </span>
                             {item.detail && (
-                              <span style={{ fontSize: 12, color: '#8C8C8C', flexShrink: 0, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <span style={{ fontSize: 12, color: 'var(--text-3)', flexShrink: 0, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {item.detail}
                               </span>
                             )}
-                            <span style={{ fontSize: 12, color: '#8C8C8C', flexShrink: 0 }}>{item.responsibleName || '-'}</span>
+                            <span style={{ fontSize: 12, color: 'var(--text-3)', flexShrink: 0 }}>{item.responsibleName || '-'}</span>
                             {item.dueDate && (
-                              <span style={{ fontSize: 12, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>截止 {item.dueDate}</span>
+                              <span style={{ fontSize: 12, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>截止 {item.dueDate}</span>
                             )}
                           </div>
                         ))}
@@ -860,17 +860,17 @@ export default function ProjectDetail() {
           {/* 進度統計（雙口徑：需求/迭代為主，交付項為可選批次） */}
           <div className="rdm-card">
             <div className="rdm-card-title">
-              <span className="rdm-icon-block" style={{ background: '#E6F7FF', color: '#1890FF' }}>
+              <span className="rdm-icon-block" style={{ background: 'var(--info-soft)', color: 'var(--info)' }}>
                 <ThunderboltOutlined />
               </span>
               交付進度
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: '#8C8C8C' }}>已交付需求</span>
-                <span style={{ color: '#52C41A', fontWeight: 600 }}>
+                <span style={{ color: 'var(--text-3)' }}>已交付需求</span>
+                <span style={{ color: 'var(--success)', fontWeight: 600 }}>
                   {board?.summary.requirementDelivered ?? 0}
-                  <span style={{ color: '#BFBFBF', fontWeight: 400 }}> / {board?.summary.requirementTotal ?? 0}</span>
+                  <span style={{ color: 'var(--text-4)', fontWeight: 400 }}> / {board?.summary.requirementTotal ?? 0}</span>
                 </span>
               </div>
               {/* 需求進度條 */}
@@ -886,49 +886,49 @@ export default function ProjectDetail() {
                 }} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: '#8C8C8C' }}>迭代數</span>
-                <span style={{ color: '#262626', fontWeight: 600 }}>{board?.summary.iterationTotal ?? 0}</span>
+                <span style={{ color: 'var(--text-3)' }}>迭代數</span>
+                <span style={{ color: 'var(--text-1)', fontWeight: 600 }}>{board?.summary.iterationTotal ?? 0}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: '#8C8C8C' }}>進行中需求</span>
-                <span style={{ color: '#1890FF', fontWeight: 600 }}>{board?.summary.requirementInProgress ?? 0}</span>
+                <span style={{ color: 'var(--text-3)' }}>進行中需求</span>
+                <span style={{ color: 'var(--info)', fontWeight: 600 }}>{board?.summary.requirementInProgress ?? 0}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: '#8C8C8C' }}>待准入/草稿需求</span>
-                <span style={{ color: (board?.summary.requirementPending ?? 0) > 0 ? '#E8720C' : '#262626', fontWeight: 600 }}>
+                <span style={{ color: 'var(--text-3)' }}>待准入/草稿需求</span>
+                <span style={{ color: (board?.summary.requirementPending ?? 0) > 0 ? 'var(--brand)' : 'var(--text-1)', fontWeight: 600 }}>
                   {board?.summary.requirementPending ?? 0}
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: '#8C8C8C' }}>阻塞任務</span>
-                <span style={{ color: (board?.summary.blockedTaskCount ?? 0) > 0 ? '#FF4D4F' : '#262626', fontWeight: 600 }}>
+                <span style={{ color: 'var(--text-3)' }}>阻塞任務</span>
+                <span style={{ color: (board?.summary.blockedTaskCount ?? 0) > 0 ? 'var(--danger)' : 'var(--text-1)', fontWeight: 600 }}>
                   {board?.summary.blockedTaskCount ?? 0}
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                <span style={{ color: '#8C8C8C' }}>待裁決</span>
-                <span style={{ color: (board?.summary.pendingDecisionCount ?? 0) > 0 ? '#722ED1' : '#262626', fontWeight: 600 }}>
+                <span style={{ color: 'var(--text-3)' }}>待裁決</span>
+                <span style={{ color: (board?.summary.pendingDecisionCount ?? 0) > 0 ? 'var(--purple)' : 'var(--text-1)', fontWeight: 600 }}>
                   {board?.summary.pendingDecisionCount ?? 0}
                 </span>
               </div>
               {/* 次口徑：交付項（可選拆分批次，未拆分時為 0 不誤導） */}
               <div style={{ borderTop: '1px dashed #f0f0f0', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                  <span style={{ color: '#8C8C8C' }}>交付項（可選批次）</span>
-                  <span style={{ color: '#262626', fontWeight: 600 }}>
+                  <span style={{ color: 'var(--text-3)' }}>交付項（可選批次）</span>
+                  <span style={{ color: 'var(--text-1)', fontWeight: 600 }}>
                     {board?.summary.deliveryItemDone ?? 0}
-                    <span style={{ color: '#BFBFBF', fontWeight: 400 }}> / {board?.summary.deliveryItemTotal ?? 0}</span>
+                    <span style={{ color: 'var(--text-4)', fontWeight: 400 }}> / {board?.summary.deliveryItemTotal ?? 0}</span>
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                  <span style={{ color: '#8C8C8C' }}>待驗收交付項</span>
-                  <span style={{ color: '#262626', fontWeight: 600 }}>{board?.summary.pendingAcceptanceCount ?? 0}</span>
+                  <span style={{ color: 'var(--text-3)' }}>待驗收交付項</span>
+                  <span style={{ color: 'var(--text-1)', fontWeight: 600 }}>{board?.summary.pendingAcceptanceCount ?? 0}</span>
                 </div>
               </div>
               {detail.nextDeliveryDate && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                  <span style={{ color: '#8C8C8C' }}>下次交付</span>
-                  <span style={{ color: '#E8720C', fontWeight: 600 }}>{detail.nextDeliveryDate}</span>
+                  <span style={{ color: 'var(--text-3)' }}>下次交付</span>
+                  <span style={{ color: 'var(--brand)', fontWeight: 600 }}>{detail.nextDeliveryDate}</span>
                 </div>
               )}
             </div>
@@ -937,7 +937,7 @@ export default function ProjectDetail() {
           {/* 成員列表 */}
           <div className="rdm-card">
             <div className="rdm-card-title">
-              <span className="rdm-icon-block" style={{ background: '#F9F0FF', color: '#722ED1' }}>
+              <span className="rdm-icon-block" style={{ background: 'var(--purple-soft)', color: 'var(--purple)' }}>
                 <TeamOutlined />
               </span>
               項目成員
@@ -955,12 +955,12 @@ export default function ProjectDetail() {
               )}
             </div>
             {detail.members.length === 0 ? (
-              <div style={{ fontSize: 12, color: '#8C8C8C', textAlign: 'center', padding: 8 }}>暫無成員</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'center', padding: 8 }}>暫無成員</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {detail.members.map(m => (
                   <div key={m.id} className="rdm-participant-row">
-                    <span style={{ flex: 1, fontSize: 13, color: '#262626' }}>{m.userName || m.empNo}</span>
+                    <span style={{ flex: 1, fontSize: 13, color: 'var(--text-1)' }}>{m.userName || m.empNo}</span>
                     {/* 历史行存过大写角色码（DEV），查找前归一化，否则会直接露出原始码 */}
                     <Tag color="default" style={{ margin: 0 }}>{MEMBER_ROLE_LABEL[(m.roleCode || '').toLowerCase()] ?? m.roleCode}</Tag>
                     {canEditProject && (
@@ -982,7 +982,7 @@ export default function ProjectDetail() {
           {/* 快捷操作 */}
           <div className="rdm-card">
             <div className="rdm-card-title">
-              <span className="rdm-icon-block" style={{ background: '#FFF7E6', color: '#E8720C' }}>
+              <span className="rdm-icon-block" style={{ background: 'var(--warning-soft)', color: 'var(--brand)' }}>
                 <ThunderboltOutlined />
               </span>
               快捷操作
@@ -1040,7 +1040,7 @@ export default function ProjectDetail() {
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '8px 0' }}>
           <div>
-            <div style={{ fontSize: 13, color: '#595959', marginBottom: 6 }}>成員 <span style={{ color: '#FF4D4F' }}>*</span></div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 6 }}>成員 <span style={{ color: 'var(--danger)' }}>*</span></div>
             {/* 必須選真實員工：後端以 userId 為歸屬鍵，手輸姓名無法建立可用的成員關係 */}
             <EmployeeSelect
               single
@@ -1051,7 +1051,7 @@ export default function ProjectDetail() {
             />
           </div>
           <div>
-            <div style={{ fontSize: 13, color: '#595959', marginBottom: 6 }}>角色</div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 6 }}>角色</div>
             <Space size={6} wrap>
               {MEMBER_ROLE_OPTIONS.map(role => (
                 <Tag
@@ -1098,7 +1098,7 @@ export default function ProjectDetail() {
             {urgeResult.notes && urgeResult.notes.length > 0 && (
               <div style={{ marginTop: 12 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>說明（為什麼沒發）</div>
-                <ul style={{ margin: 0, paddingLeft: 18, color: '#595959', fontSize: 13 }}>
+                <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--text-2)', fontSize: 13 }}>
                   {urgeResult.notes.map((n, i) => <li key={i}>{n}</li>)}
                 </ul>
               </div>

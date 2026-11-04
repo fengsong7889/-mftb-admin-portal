@@ -317,7 +317,7 @@ export function MyTestBatchesPanel() {
               )}
               <span>
                 通過 {batch.passCount}/{batch.totalCount}
-                {batch.failCount > 0 && <span style={{ color: '#FF4D4F' }}>｜未通過 {batch.failCount}</span>}
+                {batch.failCount > 0 && <span style={{ color: 'var(--danger)' }}>｜未通過 {batch.failCount}</span>}
               </span>
             </div>
           </div>

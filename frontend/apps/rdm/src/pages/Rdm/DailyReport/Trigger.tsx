@@ -223,7 +223,7 @@ export default function DailyReportTrigger() {
             {t('rdm.dailyTrigger.allProjects')}
           </Checkbox>
           {allProjects && (
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('rdm.dailyTrigger.allProjectsNoIteration')}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('rdm.dailyTrigger.allProjectsNoIteration')}</span>
           )}
         </div>
 
@@ -244,7 +244,7 @@ export default function DailyReportTrigger() {
             }}
           />
           {!allProjects && (
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
               {projectIds.length > 1
                 ? t('rdm.dailyTrigger.multipleProjects', { count: projectIds.length })
                 : t('rdm.dailyTrigger.projectRequiredHint')}
@@ -264,7 +264,7 @@ export default function DailyReportTrigger() {
             notFoundContent={singleProjectId == null
               ? t('rdm.dailyTrigger.iterationOnlySingle') : t('rdm.dailyTrigger.noIteration')}
           />
-          <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('rdm.dailyTrigger.iterationHint')}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('rdm.dailyTrigger.iterationHint')}</span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
@@ -294,7 +294,7 @@ export default function DailyReportTrigger() {
             <Radio.Button value="group">{t('rdm.dailyTrigger.recipientGroup')}</Radio.Button>
             <Radio.Button value="users">{t('rdm.dailyTrigger.recipientUsers')}</Radio.Button>
           </Radio.Group>
-          <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
             {recipientMode === 'group'
               ? t('rdm.dailyTrigger.recipientGroupHint')
               : recipientMode === 'users'
@@ -319,7 +319,7 @@ export default function DailyReportTrigger() {
               options={employeeOptions}
               onChange={v => { setRecipientUserIds(v.map(Number)); setResult(null) }}
             />
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('rdm.dailyTrigger.recipientLimit')}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('rdm.dailyTrigger.recipientLimit')}</span>
           </div>
         )}
 
@@ -358,12 +358,12 @@ export default function DailyReportTrigger() {
             <>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{result.groupTitle}</div>
               <pre style={{
-                background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 6, padding: 12,
+                background: 'var(--surface-3)', border: '1px solid #f0f0f0', borderRadius: 6, padding: 12,
                 fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0, maxHeight: 420, overflow: 'auto',
               }}>
                 {result.groupContent}
               </pre>
-              <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 6 }}>{t('rdm.dailyTrigger.previewHint')}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 6 }}>{t('rdm.dailyTrigger.previewHint')}</div>
             </>
           ) : (
             <Result status="info" subTitle={t('rdm.dailyTrigger.noContent')} />
