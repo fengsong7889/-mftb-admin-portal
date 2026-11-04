@@ -97,6 +97,9 @@ public class OrganicScoreRuleRequest {
     /** 门店标签计分配置 JSON 字符串（仅 STB_04 使用：[{labelValue, labelName, score}]） */
     private String storeLabelConfig;
 
+    /** 主營時段分時段计分配置 JSON 字符串（仅 STB_01 使用：[{periodValue, periodName, score}]） */
+    private String timePeriodConfig;
+
     /** 服务状态: 1=启用 2=停用 */
     @NotNull(message = "狀態不能為空")
     private Integer status;

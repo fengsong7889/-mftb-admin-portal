@@ -12,6 +12,7 @@ import com.mftb.admin.entity.OrganicScoreRule;
 import com.mftb.admin.mapper.OrganicScoreDimensionMapper;
 import com.mftb.admin.mapper.OrganicScoreRuleMapper;
 import com.mftb.admin.service.OrganicScoreService;
+import com.mftb.admin.util.OperatorDisplayEnricher;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -49,6 +50,7 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
     private final OrganicScoreDimensionMapper dimensionMapper;
     private final OrganicScoreRuleMapper ruleMapper;
     private final OperatorResolver operatorResolver;
+    private final OperatorDisplayEnricher operatorDisplayEnricher;
 
     @Override
     public OrganicScoreConfigVO getConfig() {
@@ -65,7 +67,7 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
                 new LambdaQueryWrapper<OrganicScoreRule>()
                         .orderByAsc(OrganicScoreRule::getDimension)
                         .orderByAsc(OrganicScoreRule::getSortOrder));
-        config.setRules(rules.stream().map(this::toRuleVO).toList());
+        config.setRules(enrichUpdaterDisplay(rules.stream().map(this::toRuleVO).toList()));
 
         return config;
     }
@@ -148,13 +150,14 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         entity.setMemberBonusConfig(request.getMemberBonusConfig());
         entity.setTrafficBalanceConfig(request.getTrafficBalanceConfig());
         entity.setStoreLabelConfig(request.getStoreLabelConfig());
+        entity.setTimePeriodConfig(request.getTimePeriodConfig());
         entity.setPrerequisites(request.getPrerequisites());
         entity.setStatus(request.getStatus());
         entity.setBuiltin(0);
         entity.setSortOrder(999);
         entity.setUpdatedBy(operator);
         ruleMapper.insert(entity);
-        return toRuleVO(entity);
+        return enrichUpdaterDisplay(toRuleVO(entity));
     }
 
     @Override
@@ -192,11 +195,12 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         entity.setMemberBonusConfig(request.getMemberBonusConfig());
         entity.setTrafficBalanceConfig(request.getTrafficBalanceConfig());
         entity.setStoreLabelConfig(request.getStoreLabelConfig());
+        entity.setTimePeriodConfig(request.getTimePeriodConfig());
         entity.setPrerequisites(request.getPrerequisites());
         entity.setStatus(request.getStatus());
         entity.setUpdatedBy(operatorResolver.currentOperatorName());
         ruleMapper.updateById(entity);
-        return toRuleVO(entity);
+        return enrichUpdaterDisplay(toRuleVO(entity));
     }
 
     @Override
@@ -389,11 +393,28 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         vo.setMemberBonusConfig(entity.getMemberBonusConfig());
         vo.setTrafficBalanceConfig(entity.getTrafficBalanceConfig());
         vo.setStoreLabelConfig(entity.getStoreLabelConfig());
+        vo.setTimePeriodConfig(entity.getTimePeriodConfig());
         vo.setStatus(entity.getStatus());
         vo.setBuiltin(entity.getBuiltin());
         vo.setSortOrder(entity.getSortOrder());
         vo.setUpdatedBy(entity.getUpdatedBy());
         vo.setUpdateTime(entity.getUpdatedAt() != null ? entity.getUpdatedAt().format(DISPLAY_FMT) : null);
+        return vo;
+    }
+
+    /**
+     * 计分项工具条/悬停说明的「修改人」补成「姓名(工号)」。
+     * <p>整批一次反查（写在 map 之后而不是 toRuleVO 内部），否则一次拉配置会退化成逐条查库。
+     * 写入口径不变，重名/查不到时保持原值。
+     */
+    private List<OrganicScoreRuleVO> enrichUpdaterDisplay(List<OrganicScoreRuleVO> rules) {
+        operatorDisplayEnricher.enrich(rules, OrganicScoreRuleVO::getUpdatedBy, OrganicScoreRuleVO::setUpdatedBy);
+        return rules;
+    }
+
+    /** 单条规则写回后的展示补全（与列表口径一致） */
+    private OrganicScoreRuleVO enrichUpdaterDisplay(OrganicScoreRuleVO vo) {
+        operatorDisplayEnricher.enrichOne(vo, OrganicScoreRuleVO::getUpdatedBy, OrganicScoreRuleVO::setUpdatedBy);
         return vo;
     }
 }

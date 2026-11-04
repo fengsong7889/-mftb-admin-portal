@@ -28,7 +28,28 @@ vi.mock('@/api/adPromotion', async importOriginal => ({
   fetchWaterfallList: waterfallsMock,
   fetchAdAlgorithms: algorithmsMock,
 }))
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => (({ 'common.back': '返回', 'recommend.channelDelivery': '美食外賣', 'recommend.channelHome': '大首頁', 'recommend.channelSupermarket': '超市百貨', 'recommend.channelGroupBuy': '團購到店', 'recommend.appShanfeng': '閃蜂', 'recommend.appMfood': 'mFood' }) as Record<string, string>)[key] ?? key }) }))
+// 页面只用到少量 i18n 短标签：这里按白名单给真实繁中值（含 {{var}} 插值），未登记的 key 会原样露出键名
+// 注：频道/品牌白名单与语言包取值有意不同（页面口径走代码内硬编码同源文字），因此不直接加载整份 zh-TW.json
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, unknown>) => {
+      const text = (({
+        'common.back': '返回',
+        'recommend.channelDelivery': '美食外賣',
+        'recommend.channelHome': '大首頁',
+        'recommend.channelSupermarket': '超市百貨',
+        'recommend.channelGroupBuy': '團購到店',
+        'recommend.appShanfeng': '閃蜂',
+        'recommend.appMfood': 'mFood',
+        'recommend.statusDisabled': '停用',
+        'trafficSandbox.boundWaterfall': '綁定瀑布流',
+        'trafficSandbox.boundWaterfallCount': '{{count}} 條',
+        'trafficSandbox.viewAllBoundWaterfall': '查看全部 {{count}} 條綁定瀑布流',
+      }) as Record<string, string>)[key] ?? key
+      return Object.entries(options ?? {}).reduce((acc, [name, value]) => acc.split(`{{${name}}}`).join(String(value)), text)
+    },
+  }),
+}))
 vi.mock('@ant-design/charts', () => ({ Line: () => <div aria-label="距離曲線" /> }))
 vi.mock('./organic/LocationMap', () => ({ default: ({ onPick }: { onPick: (p: Coordinate) => void }) => <button onClick={() => onPick({ lat: 22.18, lng: 113.56 })}>地圖點選新位置</button> }))
 
@@ -125,14 +146,23 @@ describe('商家權重分', () => {
     // 可点入口必须跟操作列同一套色彩语言（link 按钮：静态品牌橙 + hover 变亮带浅橙底），不自造描边胶囊也不手写色值
     expect(moreBtn.className).toContain('ant-btn-link')
     expect(moreBtn.className).toContain('organic__wf-more')
-    // 点 +N 展开面板：列出全部绑定及其频道/状态
+    // 点 +N 展开面板：三层结构（口径头 → 条目卡 → 尾注），逐条展示编号/频道/状态
     fireEvent.click(within(first).getByRole('button', { name: '查看全部 2 條綁定瀑布流' }))
     const panel = await screen.findByRole('tooltip')
+    expect(within(panel).getByText('綁定瀑布流')).toBeInTheDocument()
+    expect(within(panel).getByText('2 條')).toBeInTheDocument()
+    const wfItems = panel.querySelectorAll<HTMLElement>('.organic__wf-item')
+    expect(wfItems).toHaveLength(2)
     expect(within(panel).getByText('外賣首頁瀑布流')).toBeInTheDocument()
-    expect(within(panel).getByText('PB001 · 美食外賣')).toBeInTheDocument()
+    expect(within(panel).getByText('PB001')).toBeInTheDocument()
     expect(within(panel).getByText('外賣停用瀑布流')).toBeInTheDocument()
-    expect(within(panel).getByText('PB005 · 美食外賣')).toBeInTheDocument()
-    expect(within(panel).getByText('停用')).toBeInTheDocument()
+    expect(within(panel).getByText('PB005')).toBeInTheDocument()
+    // 兩條均歸類美食外賣：每條条目卡各一個頻道 chip
+    expect(within(panel).getAllByText('美食外賣')).toHaveLength(2)
+    // 停用标记只跟着已停用那条，不串到启用条目上
+    expect(within(wfItems[1]).getByText('停用')).toBeInTheDocument()
+    expect(wfItems[1].className).toContain('organic__wf-item--disabled')
+    expect(within(wfItems[0]).queryByText('停用')).toBeNull()
     // 頻道集合列去重後單值；品牌取算法自身配置
     expect(within(first).getByText('美食外賣')).toBeInTheDocument()
     expect(within(first).getByText('閃蜂')).toBeInTheDocument()

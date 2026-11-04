@@ -16450,5 +16450,349 @@
       "guidanceTerminal": "終端",
       "guidanceTimeSlot": "時段"
     }
+  },
+  "appConsumer": {
+    "common": {
+      "back": "返回",
+      "location": "威尼斯人A座",
+      "search": "搜索",
+      "order": "訂單",
+      "heroBadge": "最強澳門日料Top.1",
+      "heroVoucherWord": "代",
+      "heroSub": "單次可用5張",
+      "promoLead": "盒你一起",
+      "promoHighlight": "大發現",
+      "sectionPlaceholder": "標題欄",
+      "sectionSubLow30": "低至3折",
+      "priceFrom": "起",
+      "viewMore": "查看更多",
+      "couponNote": "激賞圍購神券 · 1月10日到期",
+      "useNow": "去使用",
+      "enterStore": "進入店鋪：{{shop}}",
+      "grab": "搶",
+      "reachedBottom": "已經到我底線了",
+      "more": "更多",
+      "newStoreTag": "新店",
+      "ratingSuffix": "分",
+      "monthlySales": "月售 {{value}}",
+      "kilometers": "{{value}}km",
+      "halfYearSales": "半年售 {{value}}",
+      "vipCard": "神會員",
+      "memberCenter": "會員中心",
+      "couponMinSpend": "滿${{price}}可用",
+      "pagePending": "「{{name}}」頁面待設計稿",
+      "toTop": "回到頂部",
+      "sellIdle": "賣閒置",
+      "filter": "篩選"
+    },
+    "tab": {
+      "home": "首頁",
+      "category": "分類",
+      "cart": "購物車",
+      "order": "訂單",
+      "mine": "我的",
+      "vip": "神會員",
+      "delivery": "外賣",
+      "praise": "好評"
+    },
+    "groupBuy": {
+      "filter": {
+        "multiSuffix": "{{first}}+{{rest}}",
+        "nearby": "附近",
+        "allCategories": "全部分類",
+        "vipCard": "神會員",
+        "subsidyCoupon": "津貼神券",
+        "pickDistrict": "選擇商圈 {{value}}",
+        "pickDistance": "選擇距離 {{value}}",
+        "pickSort": "排序方式 {{value}}",
+        "closePanel": "收起篩選面板"
+      },
+      "title": "特價團購",
+      "hotSearchHint": "熱搜：滾動字體後台傳",
+      "cat": {
+        "hotpot": "火鍋",
+        "bbq": "燒烤烤肉",
+        "drink": "甜品飲料",
+        "western": "西餐扒飯",
+        "beauty": "美容美髮",
+        "buffet": "自助餐",
+        "chaChaCanTeng": "茶餐廳",
+        "burger": "漢堡小食",
+        "exotic": "異域料理",
+        "service": "生活服務"
+      },
+      "pill": {
+        "member": "會員中心",
+        "checkIn": "每日簽到",
+        "hotRank": "打卡熱榜",
+        "nearbyMerchant": "附近商家"
+      },
+      "chip": {
+        "deal": "特價",
+        "recommend": "推薦",
+        "merchant": "商家",
+        "chaChaCanTeng": "茶餐廳",
+        "leisure": "休閒娛樂"
+      },
+      "category": {
+        "hotpot": "火鍋燒肉",
+        "dessert": "甜品飲品",
+        "localCuisine": "地方菜系",
+        "exotic": "異國料理",
+        "fastFood": "快餐小食",
+        "congeeNoodle": "粥粉麵飯",
+        "buffet": "自助餐",
+        "service": "生活服務",
+        "leisure": "休閒娛樂",
+        "beauty": "美容美髮"
+      },
+      "sort": {
+        "smart": "智能排序",
+        "distance": "距離優先",
+        "sales": "銷量優先",
+        "priceAsc": "低價優先",
+        "priceDesc": "高價優先"
+      },
+      "panel": {
+        "nearby": "附近篩選面板",
+        "category": "分類篩選面板",
+        "sort": "排序篩選面板"
+      }
+    },
+    "home": {
+      "location": "澳門新八佰伴",
+      "bannerNote": "限時新品 · 第二份半價",
+      "orderAccepted": "商家已接單",
+      "orderEta": "預計 {{time}} 送達",
+      "viewOrder": "查看訂單",
+      "onePriceTitle": "超神一口價",
+      "tagFreeDelivery": "免運費",
+      "tagFreeShipping": "免配送",
+      "feedTagWaiting": "等送 · 可自取",
+      "enterDeliveryChannel": "進入外賣頻道",
+      "quick": {
+        "honey": "蜂蜜兑換",
+        "flashDeal": "超值秒殺",
+        "groupBuy": "團購",
+        "buffet": "自助餐",
+        "checkIn": "簽到領券",
+        "more": "更多"
+      }
+    },
+    "delivery": {
+      "minutes": "{{value}}分鐘",
+      "freeDelivery": "免配送費",
+      "fee": "配送費 ${{value}}",
+      "minOrder": "起送 ${{value}}",
+      "railPopular": "人氣商家",
+      "railEnter": "立即進入",
+      "cat": {
+        "burger": "漢堡炸雞",
+        "breakfast": "醒神早餐",
+        "global": "全球美食",
+        "drink": "飲品糖水",
+        "snack": "美味小食",
+        "mcd": "麥當勞",
+        "lion": "獅會中心",
+        "flash": "外賣快閃",
+        "must": "必食好店",
+        "more": "更多分類"
+      },
+      "benefit": {
+        "vip": "神會員",
+        "honey": "蜂蜜提現",
+        "reputation": "口碑好",
+        "merchantBoost": "商家助力",
+        "newArrival": "新品"
+      },
+      "service": {
+        "coupon": "領券",
+        "freeDelivery": "免配送",
+        "freeShipping": "免运費",
+        "halfHour": "30分鐘",
+        "selfPickup": "可自取"
+      }
+    },
+    "channel": {
+      "market": "超市百貨",
+      "delivery": "美食外賣",
+      "groupBuy": "特價團購",
+      "deliveryShort": "外賣"
+    },
+    "market": {
+      "searchPlaceholder": "搜尋超市商品、商家",
+      "heroBadge": "超市到家 · 最快 20 分鐘",
+      "heroTitle": "天天低價",
+      "heroSub": "滿 $99 免配送費 · 新人立減 $20",
+      "nearbyTitle": "附近超市",
+      "shopCount": "{{count}} 家",
+      "hotProducts": "熱賣商品",
+      "restockAnytime": "隨時補貨",
+      "cat": {
+        "fruit": "生鮮水果",
+        "dairy": "乳品烘焙",
+        "grain": "糧油調味",
+        "snack": "零食飲料",
+        "daily": "日用百貨",
+        "frozen": "冷凍食品",
+        "drink": "酒水飲品",
+        "baby": "母嬰用品",
+        "pet": "寵物生活"
+      }
+    },
+    "store": {
+      "title": "店鋪",
+      "notFound": "店鋪不存在或已下線",
+      "groupbuyCount": "{{count}} 個團購",
+      "avgPerPerson": "人均 ${{price}}",
+      "searchPlaceholder": "搜尋店內商品",
+      "tabInStore": "店內",
+      "resting": "休息中",
+      "filterAll": "全部",
+      "addToCart": "加入：{{name}}",
+      "emptyCategory": "該分類下暫無商品",
+      "selectedCount": "已選 {{count}} 件",
+      "checkout": "去結算"
+    },
+    "profile": {
+      "levelDiamond": "鑽石",
+      "actionMessage": "訊息",
+      "actionData": "數據",
+      "growthLabel": "成長值",
+      "couponDelivery": "外賣神券",
+      "maxUpTo": "最高膨至{{price}} ›",
+      "couponBrand": "大牌專屬券",
+      "memberBenefits": "會員權益",
+      "myOrders": "我的訂單",
+      "checkInTasks": "簽到&任務",
+      "checkInHint": "連續簽到領更多紅包",
+      "honeyExchange": "蜂蜜兌換",
+      "honeyAvailable": "可用蜂蜜 {{value}}",
+      "bannerLine1": "快手游戏人",
+      "bannerLine2": "暑假打卡",
+      "serviceSettings": "服務設置",
+      "order": {
+        "all": "全部訂單",
+        "toPay": "待付款",
+        "toUse": "待使用",
+        "toReview": "待評價",
+        "refund": "退款"
+      },
+      "count": {
+        "redpack": "閃蜂紅包",
+        "voucher": "商家代金券",
+        "cut": "立減券"
+      },
+      "setting": {
+        "address": "收貨地址",
+        "favorite": "我的收藏",
+        "bankCard": "銀行卡",
+        "review": "我的評價",
+        "feedback": "意見反饋",
+        "merchantApply": "商家入駐",
+        "language": "語言切換",
+        "system": "設置"
+      },
+      "unitSheet": "張"
+    },
+    "search": {
+      "colDistance": "距離",
+      "colGroupbuy": "團購",
+      "unitGroupbuy": "{{count}} 個",
+      "colAvg": "人均",
+      "colMinOrder": "起送",
+      "colDelivery": "配送",
+      "fromPrice": "${{price}}起",
+      "badgePopular": "人氣",
+      "statusRest": "休息中",
+      "statusFar": "超出範圍",
+      "addToCart": "加入購物車：{{name}}",
+      "offerTitleGlobal": "商品與團購",
+      "emptyTitle": "沒有找到與「{{query}}」相關的結果",
+      "emptyHint": "試試更短的關鍵詞，或切換搜尋範圍",
+      "emptySearchGlobal": "在全站搜尋「{{query}}」",
+      "emptyViewAll": "查看全部商品",
+      "emptyHotWords": "熱門搜尋",
+      "dialogLabel": "搜尋",
+      "clearKeyword": "清除關鍵詞",
+      "inStoreScope": "店內 · {{name}}",
+      "sectionGuess": "熱門搜索",
+      "sectionStoreCategories": "店內分類",
+      "sectionHistory": "歷史搜索",
+      "clearHistory": "清空搜尋歷史",
+      "historyEmpty": "還沒有搜尋記錄",
+      "sectionHotRank": "人氣熱搜",
+      "hotInStore": "店內熱銷",
+      "hotTodayMacau": "澳門 · 今日",
+      "hotBadge": "熱",
+      "sugSearch": "搜尋「{{keyword}}」",
+      "sugSearchHint": "沒有匹配的店鋪或商品，點擊直接搜尋",
+      "resultSummary": "為你找到 {{count}} 個結果",
+      "tablistLabel": "結果分類",
+      "groupStores": "店鋪",
+      "groupFar": "超出當前配送範圍",
+      "channel": {
+        "delivery": "外賣",
+        "groupbuy": "團購",
+        "market": "超市"
+      },
+      "filter": {
+        "freeDelivery": "免配送費",
+        "discount": "有優惠",
+        "open": "營業中",
+        "pickup": "可自取",
+        "refundable": "隨時退",
+        "member": "神會員"
+      },
+      "tab": {
+        "all": "綜合",
+        "merchant": "商家",
+        "product": "商品",
+        "deal": "團購套餐",
+        "delivery": "外賣",
+        "groupbuy": "團購",
+        "market": "超市"
+      },
+      "sort": {
+        "default": "綜合排序",
+        "distance": "距離",
+        "sales": "銷量",
+        "priceAsc": "價格",
+        "priceDesc": "高價優先",
+        "deliveryFee": "配送費"
+      },
+      "scope": {
+        "global": {
+          "label": "全站",
+          "short": "全站",
+          "placeholder": "搜尋商家、商品、團購",
+          "hint": "可搜尋外賣、團購、超市的商家與商品"
+        },
+        "delivery": {
+          "label": "美食外賣",
+          "short": "外賣",
+          "placeholder": "搜尋外賣商家、商品",
+          "hint": "僅搜尋美食外賣頻道的商家與商品"
+        },
+        "groupbuy": {
+          "label": "特價團購",
+          "short": "團購",
+          "placeholder": "搜尋團購套餐、商家",
+          "hint": "僅搜尋特價團購頻道的套餐與商家"
+        },
+        "market": {
+          "label": "超市百貨",
+          "short": "超市",
+          "placeholder": "搜尋超市商品、商家",
+          "hint": "僅搜尋超市百貨頻道的商家與商品"
+        },
+        "store": {
+          "label": "店內",
+          "short": "店內",
+          "placeholder": "搜尋店內商品",
+          "hint": "僅搜尋本店商品，不跨店"
+        }
+      }
+    }
   }
 }

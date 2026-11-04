@@ -373,6 +373,24 @@
       "comment": "金字招牌计价主表 + 标签明细表自动建表与补列，附结构后置校验。"
     },
     {
+      "versionKey": "adpromo:timeslot_pricing_tables:v1",
+      "module": "adpromo",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "adPromotionDataInitializer",
+      "status": "ACTIVE",
+      "comment": "時段推薦計價主表 + 時段明細表自動建表（CREATE TABLE IF NOT EXISTS 幂等），附結構后置校驗。參考 SQL: sql/327_time_slot_ad_pricing.sql"
+    },
+    {
+      "versionKey": "adpromo:timeslot_order_item_table:v1",
+      "module": "adpromo",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "adPromotionDataInitializer",
+      "status": "ACTIVE",
+      "comment": "時段推薦訂單明細表自動建表（CREATE TABLE IF NOT EXISTS 幂等），附結構后置校驗。參考 SQL: sql/328_time_slot_order_item.sql"
+    },
+    {
       "versionKey": "adpromo:hot-skin-discount-v1.0",
       "module": "adpromo",
       "phase": "MODULE_STRUCTURE",
@@ -4106,6 +4124,34 @@
       "intent": "「商家評分透視」更名為「商家權重分排名」：占比（權重）配置模組已停用，頁面只展示三維度得分合計",
       "author": "Qoder",
       "comment": "2026-11-03 拉取 main 後把 sys_schema_version 與 catalog 逐鍵對賬時發現：321/325/326 三條菜單遷移裡，上一次補登記（29258ebf）只補了 325/326 兩條，321 的執行記錄（庫裡 applied_at=2026-11-01 00:03:32）仍不在台賬裡，違反「登記先行」，導致免登預檢與交付對賬看不到本條。MigrationCatalogTest 只校驗清單內部一致性（唯一鍵/依賴存在/無環），不校驗代碼側 applyOnce 是否都已登記，所以 CI 抓不到這類漏登記；執行真值始終在 DataInitializer（versionTracker.applyOnce(「ads:merchant-score-menu-rename-v1」, this::renameMerchantScoreInsightMenu)），本登記不觸發二次執行。依賴取 core:menu-seed-v46：它是當前代碼裡 V_MENU_SEED 的門控鍵，本條在代碼順序上確實晚於菜單種子；首次執行時（2026-11-01）庫裡生效的還是更早的 seed 版本，不改變「必須在種子之後」這個約束。守衛：UPDATE 帶舊名「商家評分透視」作條件，運營在「菜單配置」裡自定義過的名稱不命中；已改名環境命中 0 行屬正常幂等。參考 SQL: sql/321_rename_merchant_score_menu.sql"
+    },
+    {
+      "versionKey": "organic:retire-plt02a-v1",
+      "module": "organic",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "organicScoreDataInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "329_organic_retire_plt02a.sql"
+      ],
+      "intent": "下架平台維度計分項 PLT_02A「配送範圍」，库内残留行逻辑删除",
+      "author": "Qoder",
+      "comment": "业务决定取消「配送範圍」计分项：前端已从默认计分项移除并登记进 RETIRED_ORGANIC_RULE_IDS（读取侧过滤以覆盖历史库），算法配置页与商家权重分两侧同步下架，但库里仍留着 23 种子写入的该行，看库/对账与界面口径不一致。不能复用 organic:retire-rules-v1（只覆盖 COM_09/STB_04）或 organic:retire-stb09-v1（只覆盖 STB_09）：生产已记为成功后 applyOnce 门控下追加条目不会重跑（类注释里 multiplier_tiers 漏列的历史事故），因此用独立新键。用逻辑删除而非物理删除，与应用 deleteRule 的 @TableLogic 语义一致，保留历史可回滚；号位不回收，历史订单与快照仍按该编码对账。表结构不动：time_range_scores 列与 DTO 字段保留，回滚不需要 ALTER。回滚需同时撤掉前端 RETIRED_ORGANIC_RULE_IDS 里的 'PLT_02A' 并把模板行加回 DEFAULT_ORGANIC_SCORE_RULES，否则行虽复活仍被读取侧过滤。校验以「deleted=0 的 PLT_02A 残留行数必须为 0」为准，与 migrate 同口径（不断言名称取值，管理员改过名不影响下架是否生效）；未播种（查无该行）不算失败。参考 SQL: sql/329_organic_retire_plt02a.sql"
+    },
+    {
+      "versionKey": "organic:stb01-time-period-v1",
+      "module": "organic",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "organicScoreDataInitializer",
+      "status": "ACTIVE",
+      "scriptFiles": [
+        "330_organic_stb01_time_period.sql"
+      ],
+      "intent": "STB_01「主營時段加分」由单一固定分改为五餐段独立配分，原固定分写进午餐一档并把 score 置 0",
+      "author": "Qoder",
+      "comment": "界面已改走 TimePeriodScorePanel（时段 → 分值清单，当前时段由业务系统传入、命中一檔即停不累加），但库里仍只有一个固定分 score，看库/对账与界面两套口径。新增专用列 time_period_config（沿用 store_label_config / traffic_balance_config / free_shipping_config 先例，已在 LegacyCoreContracts.organicScoreRuleContract 登记 CREATE DDL 与可自愈 ColumnSpec）。注意时序：SchemaContractValidator 是 @Order(Integer.MAX_VALUE)，跑在本 Runner 之后，新库首启时列还没被契约自愈补上，因此 migrate 先调 ensureTimePeriodConfigColumn() 探测列是否就绪再决定是否 ALTER（探测用「SELECT 该列 WHERE 1=0」而不是 INFORMATION_SCHEMA+DATABASE()，因后者在测试用 H2 下永不相等、会把补列逻辑留在测不到的状态；DDL 与契约 ColumnSpec 逐字一致，ALTER 失败不吞异常、直接抛出，否则会被误记成功——金字招牌历史事故）。守卫：只在 time_period_config IS NULL 时逐行收敛，把该行原 score 放进午餐一档、score 置 0；运营已在界面配过清单的行绝不顶掉；score 为 NULL 时写空清单（不猜分值，留给运营配）。score 置 0 的原因：本项得分此后只由 time_period_config 决定，保留固定分会让外部计分引擎把固定分与时段分重复累加。校验与守卫同口径——只断言「不再有 time_period_config IS NULL 的在用 STB_01 行」，不断言 JSON 内容或名称（运营改过配置后仍属正常）；未播种（查无该行）不算失败。回滚需同时把前端模板/面板改回固定分入口，否则界面仍按时段清单读写。参考 SQL: sql/330_organic_stb01_time_period.sql"
     }
   ]
 }

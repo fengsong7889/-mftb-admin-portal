@@ -639,8 +639,10 @@ export interface ScoreInsightResult {
   dimensions: ScoreDimensionDetail[]
 }
 
-/** 規則配置表：規則編碼 / 名稱 key / 計分方式 / 統計天數 / 基準分 */
-const SCORE_RULE_CONFIG: Array<{
+/** 規則配置表：規則編碼 / 名稱 key / 計分方式 / 統計天數 / 基準分
+ * 手工维护的演示数据集，必须与界面默认计分项目录对齐：已下架编码（RETIRED_ORGANIC_RULE_IDS）不得出现在本表，
+ * 否则会出现「界面已下架、沙盘还在算」两套口径；回归守卫见 src/pages/TrafficSandbox/trafficSandboxMockRules.test.ts。 */
+export const SCORE_RULE_CONFIG: Array<{
   dimension: ScoreDimension
   ruleCode: string
   nameKey: string
@@ -664,11 +666,9 @@ const SCORE_RULE_CONFIG: Array<{
   // STB_06 已改為「自動接單 · 固定加分」，nameKey 仍是舊標識符 ruleRejectOrder：
   // 該 key 已進入後端 sys_translation 登記表（ja/ko/ru 靠它供文案），改 key 會丟掉已有譯文，因此只改取值不改 key。
   { dimension: ScoreDimension.STORE, ruleCode: 'STB_06', nameKey: 'scoreInsight.ruleRejectOrder', mode: ScoreMode.RULE_ADD, statDays: 30, baseScore: 50 },
-  // 平台維度
+  // 平台維度（PLT_02「配送範圍」已下架；PLT_04「訂單過熱調控」已并入 PLT_03 流量均衡，两条都不再出现在本表）
   { dimension: ScoreDimension.PLATFORM, ruleCode: 'PLT_01', nameKey: 'scoreInsight.ruleDistanceDecay', mode: ScoreMode.DECAY, statDays: 1, baseScore: 30 },
-  { dimension: ScoreDimension.PLATFORM, ruleCode: 'PLT_02', nameKey: 'scoreInsight.ruleDeliveryRange', mode: ScoreMode.CONDITION, statDays: 1, baseScore: 15 },
   { dimension: ScoreDimension.PLATFORM, ruleCode: 'PLT_03', nameKey: 'scoreInsight.ruleMerchantSupport', mode: ScoreMode.RULE_ADD, statDays: 30, baseScore: 20 },
-  { dimension: ScoreDimension.PLATFORM, ruleCode: 'PLT_04', nameKey: 'scoreInsight.ruleOrderOverheat', mode: ScoreMode.RULE_DEDUCT, statDays: 1, baseScore: -15 },
 ]
 
 /** 維度默認權重（對應 biz_organic_score_dimension.weight） */

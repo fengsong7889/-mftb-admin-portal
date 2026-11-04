@@ -10,6 +10,7 @@ import FreeShippingScorePanel from './FreeShippingScorePanel'
 import MemberBonusScorePanel from './MemberBonusScorePanel'
 import SignboardScorePanel from './SignboardScorePanel'
 import StoreLabelScorePanel from './StoreLabelScorePanel'
+import TimePeriodScorePanel from './TimePeriodScorePanel'
 import TrafficBalancePanel from './TrafficBalancePanel'
 import { ServiceStatus, AppType } from '@mftb/contracts/recommendConstants'
 import { getSystemRuleValue } from '@/hooks/useSystemRules'
@@ -20,7 +21,7 @@ import {
   SCORE_MODE_COLOR,
   DEFAULT_DIMENSION_WEIGHT, DIMENSION_WEIGHT_TOTAL,
   DEFAULT_ORGANIC_SCORE_RULES,
-  RANGE_SCORE_KEYS, DEFAULT_RANGE_SCORES,
+  RANGE_SCORE_KEYS,
   TIME_PERIOD_KEYS, TIME_PERIOD_LABELS,
   TIER_DIRECTION_LABEL,
   type OrganicScoreRule, type RangeScores, type TimeRangeScores, type ScoreTier, type ScoreConditionItem, type PeakTimeRange, type ActivityScoreItem, type MultiplierTier, type RegionSupportConfig, type RegionOverheatConfig, type RegionKey,
@@ -28,6 +29,7 @@ import {
   isCouponScoreRule,
   isSignboardScoreRule, DEFAULT_SIGNBOARD_SCORE_CONFIG,
   isStoreLabelScoreRule, normalizeStoreLabelScoreConfig, normalizeOrganicRuleId,
+  isTimePeriodScoreRule, normalizeTimePeriodScoreConfig, DEFAULT_TIME_PERIOD_SCORE_CONFIG,
   isFreeShippingScoreRule, FREE_SHIPPING_ENROLLMENT_PREREQUISITE, normalizeFreeShippingScoreConfig,
   isMemberBonusScoreRule, normalizeMemberBonusScoreConfig,
   isOrganicRuleVisible, RETIRED_ORGANIC_RULE_IDS, DEFAULT_COUPON_SCORE_CONFIG, BUSINESS_STATE_ITEMS, isFilteredBusinessState,
@@ -38,6 +40,7 @@ import {
   normalizeTrafficBalanceConfig, type TrafficBalanceConfig, MEAL_TIME_AUTO_CORRECT_ON, MEAL_TIME_AUTO_CORRECT_OFF, isMealTimeAutoCorrectEnabled,
   type CouponScoreConfig, type SignboardScoreConfig, type FreeShippingScoreConfig, type MemberBonusScoreConfig, type OntimeRateBand, type StarTierBand, type CancelRateBand,
   type StoreLabelScoreConfig,
+  type TimePeriodScoreConfig,
 } from './organicTrafficConfig'
 import {
   fetchOrganicScoreConfig, updateDimensionWeights as apiUpdateWeights,
@@ -93,9 +96,6 @@ interface RuleFormValues {
   status: ServiceStatus
 }
 
-/** 判斷是否為配送範圍規則（合併後僅 PLT_02A） */
-const isDeliveryRange = (id?: string) => id === 'PLT_02A'
-
 /** 判斷是否需要統計天數（訂單、好評、差評、梯度計分等時效性指標需要） */
 const needsStatDays = (mode?: ScoreMode, id?: string) => {
   if (mode === ScoreMode.TIERED) return true
@@ -150,6 +150,8 @@ function voToRule(vo: OrganicRuleVO): OrganicScoreRule {
   try { memberBonusConfig = vo.memberBonusConfig ? JSON.parse(vo.memberBonusConfig) : undefined } catch { memberBonusConfig = undefined }
   // 门店标签配置：后端只透传 JSON，读取时由 normalize 过滤非法行；其他计分项不写这个字段，避免污染它们自己的列
   const storeLabelConfig = vo.storeLabelConfig ? normalizeStoreLabelScoreConfig(vo.storeLabelConfig) : undefined
+  // 主營時段分時段配置（STB_01）：同样只透传 JSON，不猜未写入的行该用哪些时段
+  const timePeriodConfig = vo.timePeriodConfig ? normalizeTimePeriodScoreConfig(vo.timePeriodConfig) : undefined
   return {
     // 舊語義編碼收编到數字編碼（STB_LABEL→STB_04、STB_ACT→STB_09）：後端遷移未生效的窗口内仍能按現行口径渲染
     id: normalizeOrganicRuleId(vo.ruleCode) ?? vo.ruleCode,
@@ -181,6 +183,7 @@ function voToRule(vo: OrganicRuleVO): OrganicScoreRule {
     freeShippingConfig,
     memberBonusConfig,
     storeLabelConfig,
+    timePeriodConfig,
     trafficBalanceConfig: vo.trafficBalanceConfig ? normalizeTrafficBalanceConfig(vo.trafficBalanceConfig) : undefined,
     status: vo.status as ServiceStatus,
     builtin: vo.builtin === 1,
@@ -246,7 +249,7 @@ const RULE_TYPE_TAG_CONFIG: Record<string, { color: string; label: string }> = {
   COM_07: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
   COM_10: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
   COM_SLOT: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
-  STB_01: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
+  STB_01: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '分時段加分' },
   STB_02: { color: 'purple', label: '四檔狀態計分' },
   STB_03: { color: 'purple', label: '分數梯度加分' },
   STB_05: { color: 'purple', label: '準時率梯度' },
@@ -255,7 +258,6 @@ const RULE_TYPE_TAG_CONFIG: Record<string, { color: string; label: string }> = {
   STB_08: { color: 'purple', label: '取消率梯度加分' },
   STB_09: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
   PLT_01: { color: 'blue', label: '距離衰減' },
-  PLT_02A: { color: SCORE_MODE_COLOR[ScoreMode.RULE_BONUS], label: '固定加分' },
   PLT_03: { color: 'purple', label: '梯度均衡加分' },
 }
 
@@ -368,18 +370,6 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
           if (r.id === 'PLT_01') {
             r.name = '距離衰減'
             if (!r.decayCoefficient) r.decayCoefficient = 5
-          }
-          if (r.id === 'PLT_02A') {
-            r.name = '配送範圍'
-            if (!r.timeRangeScores) {
-              r.timeRangeScores = {
-                breakfast: { ...DEFAULT_RANGE_SCORES },
-                lunch: { ...DEFAULT_RANGE_SCORES },
-                afternoonTea: { ...DEFAULT_RANGE_SCORES },
-                dinner: { ...DEFAULT_RANGE_SCORES },
-                lateNight: { ...DEFAULT_RANGE_SCORES },
-              }
-            }
           }
           if (r.id === 'COM_01') {
             r.name = '滿額立減'
@@ -522,6 +512,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
   const [signboardDrafts, setSignboardDrafts] = useState<Record<string, SignboardScoreConfig>>({})
   /** 门店标签计分（STB_04）页面草稿 */
   const [storeLabelDrafts, setStoreLabelDrafts] = useState<Record<string, StoreLabelScoreConfig>>({})
+  /** 主營時段分時段配置草稿（STB_01）：与門店標籤同一机制，本阶段仅页面草稿，落库随 time_period_config 列一并接 */
+  const [timePeriodDrafts, setTimePeriodDrafts] = useState<Record<string, TimePeriodScoreConfig>>({})
   /** 減免運費計分（COM_02）頁面草稿 */
   const [freeShippingDrafts, setFreeShippingDrafts] = useState<Record<string, FreeShippingScoreConfig>>({})
   /** 平台會員紅包計分（COM_06）頁面草稿 */
@@ -668,6 +660,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
       : undefined,
     storeLabelConfig: (values as any).storeLabelConfig
       ? JSON.stringify((values as any).storeLabelConfig as StoreLabelScoreConfig)
+      : undefined,
+    timePeriodConfig: (values as any).timePeriodConfig
+      ? JSON.stringify((values as any).timePeriodConfig as TimePeriodScoreConfig)
       : undefined,
     trafficBalanceConfig: (values as any).trafficBalanceConfig
       ? JSON.stringify((values as any).trafficBalanceConfig as TrafficBalanceConfig)
@@ -854,14 +849,6 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
         return
       }
     }
-    // PLT_02A 配送範圍校驗：每個時段至少有一個分值配置
-    if (ruleId === 'PLT_02A') {
-      const trs = (values as any).timeRangeScores as TimeRangeScores | undefined
-      if (!trs || !TIME_PERIOD_KEYS.some(k => trs[k])) {
-        message.warning('請至少配置一個時段的配送範圍分值')
-        return
-      }
-    }
     // STB_09 活動加分校驗：每行需選到活動且加分分值 > 0，同一活動不得重複配置
     if (ruleId === 'STB_09') {
       const items: ActivityScoreItem[] = (values as any).activityItems || []
@@ -979,6 +966,30 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
     } catch {
       // request 層已彈錯，這裡只回滾頁面草稿，避免未落庫的配置被讀成已保存
       setStoreLabelDrafts(prev => { const n = { ...prev }; delete n[rule.id]; return n })
+    }
+  }
+
+  /**
+   * 主營時段面板保存（STB_01）：与时段配置一并写库，并沿用 storeLabel 的错误回滚口径。
+   * score 不再参与本项计算（迁移已置 0），因此不随面板改动；失败时只回滚页面草稿，
+   * 避免未落库的配置被读成已保存。
+   */
+  const handleSaveTimePeriodPanel = async (rule: OrganicScoreRule, next: TimePeriodScoreConfig, description: string) => {
+    if (readOnly) return
+    setTimePeriodDrafts(prev => ({ ...prev, [rule.id]: next }))
+    try {
+      const vo = await updateOrganicRule(ruleIdentifier(rule),
+        buildRulePayload({ ...rule, description, timePeriodConfig: next }))
+      setRules(prev => prev.map(r => (r.id === rule.id ? {
+        ...r,
+        description,
+        timePeriodConfig: next,
+        updatedBy: vo?.updatedBy ?? r.updatedBy,
+        updatedAt: vo?.updateTime ?? r.updatedAt,
+      } : r)))
+      message.success('主營時段分時段配置已保存')
+    } catch {
+      setTimePeriodDrafts(prev => { const n = { ...prev }; delete n[rule.id]; return n })
     }
   }
 
@@ -1194,13 +1205,6 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
           return
         }
       }
-      if (tpl.id === 'PLT_02A') {
-        const trs = (values as any).timeRangeScores
-        if (!trs || !TIME_PERIOD_KEYS.some(k => trs[k])) {
-          message.warning('請至少配置一個時段的配送範圍分值')
-          return
-        }
-      }
     }
 
     // 梯度計分模式時，將 tierRows 寫入 tiers
@@ -1406,8 +1410,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                     padding: '14px 20px', cursor: 'pointer', userSelect: 'none',
                     background: isExpanded ? 'var(--surface-3)' : 'var(--surface-2)',
                   }}
-                  onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = '#FAFAFA' }}
-                  onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = '#fff' }}
+                  onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = 'var(--surface-3)' }}
+                  onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = 'var(--surface-2)' }}
                 >
                   {/* 展開/折疀箭頭 */}
                   <span style={{
@@ -1567,6 +1571,26 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                       </div>
                     )
                   }
+                  // 主營時段（STB_01）：早餐/午餐/下午茶/晚餐/宵夜 五个时段各自独立配分，
+                  // 当前时段由业务系统传入，命中一檔即停不累加；交互形式对齐門店標籤
+                  if (isTimePeriodScoreRule(rule.id)) {
+                    const draft = timePeriodDrafts[rule.id]
+                    const saved = rule.timePeriodConfig ?? DEFAULT_TIME_PERIOD_SCORE_CONFIG
+                    return (
+                      <div className="algorithm-form__rule-body">
+                        <TimePeriodScorePanel
+                          ruleName={rule.name}
+                          config={draft ?? saved}
+                          hasSavedConfig={!!rule.timePeriodConfig?.items?.length}
+                          description={rule.description}
+                          updatedBy={rule.updatedBy}
+                          updatedAt={rule.updatedAt}
+                          readOnly={readOnly}
+                          onSave={(next, desc) => { void handleSaveTimePeriodPanel(rule, next, desc) }}
+                        />
+                      </div>
+                    )
+                  }
                   return (
                   <div className="algorithm-form__rule-body">
                     {/* ─ 元信息行：顯示模式展示信息 + 編輯按鈕 ── */}
@@ -1577,9 +1601,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                           {(() => {
                             const tagEntry = RULE_TYPE_TAG_CONFIG[rule.id]
                             if (tagEntry) {
-                              // COM_03~COM_10/STB_01/PLT_02A/STB_09 根據 mode 動態切換標籤
+                              // COM_03~COM_10/STB_01/STB_09 根據 mode 動態切換標籤
                               const isDynamic = rule.mode === ScoreMode.AMOUNT_MULTIPLIER
-                                && ['COM_03','COM_04','COM_05','COM_07','COM_10','STB_01','PLT_02A','STB_09'].includes(rule.id)
+                                && ['COM_03','COM_04','COM_05','COM_07','COM_10','STB_01','STB_09'].includes(rule.id)
                               return <Tag color={tagEntry.color} style={{ fontSize: 11, margin: 0 }}>{isDynamic ? '動態加分' : tagEntry.label}</Tag>
                             }
                             return (
@@ -1619,7 +1643,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                     {!isEditingInline ? (
                       /* 顯示模式 */
                       <AlgorithmSection title="計分明細" icon={<SettingOutlined />} tone={tone}>
-                        {!['COM_01', 'COM_SLOT', 'STB_02', 'STB_03', 'STB_05', 'STB_06', 'STB_07', 'STB_08', 'STB_09', 'PLT_01', 'PLT_02A', 'PLT_03', 'PLT_04'].includes(rule.id)
+                        {!['COM_01', 'COM_SLOT', 'STB_02', 'STB_03', 'STB_05', 'STB_06', 'STB_07', 'STB_08', 'STB_09', 'PLT_01', 'PLT_03', 'PLT_04'].includes(rule.id)
                           && [ScoreMode.RULE_BONUS, ScoreMode.RULE_DEDUCTION, ScoreMode.DECAY, ScoreMode.AMOUNT_MULTIPLIER].includes(rule.mode) && (
                           <div className="organic-score-panel">
                             <ScoreRow label={rule.name} score={rule.score}
@@ -1981,32 +2005,6 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             </div>
                           )
                         })()}
-                        {/* PLT_02A 配送範圍自定義只讀顯示 */}
-                        {rule.id === 'PLT_02A' && (() => {
-                          const trs = rule.timeRangeScores ?? {}
-                          return (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                              {TIME_PERIOD_KEYS.map(periodKey => {
-                                const scores = trs[periodKey] ?? DEFAULT_RANGE_SCORES
-                                return (
-                                  <div key={periodKey} className="organic-score-panel">
-                                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>
-                                      {TIME_PERIOD_LABELS[periodKey]}
-                                    </div>
-                                    <div className="organic-score-list">
-                                      {RANGE_SCORE_KEYS.map(key => (
-                                        <ScoreRow key={key} label={RANGE_LABEL[key]} score={scores[key]} />
-                                      ))}
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                                備注：後端根據當前時間自動匹配對應時段的分值，未配置的時段不計分
-                              </div>
-                            </div>
-                          )
-                        })()}
                         {rule.mode === ScoreMode.TIERED && rule.tiers?.length && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && (
                           <div>
                             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>梯度檔位明細（{rule.tiers.length} 檔）</div>
@@ -2019,7 +2017,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             </div>
                           </div>
                         )}
-                        {rule.rangeScores && rule.id !== 'PLT_02A' && (
+                        {rule.rangeScores && (
                           <div>
                             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>配送範圍分值</div>
                             <div className="organic-score-panel organic-score-list">
@@ -2037,7 +2035,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                       <AlgorithmSection title="計分配置" icon={<SettingOutlined />} tone={tone}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                         <div className="organic-score-config-grid">
-                            {(rule.id !== 'COM_01' && rule.id !== 'COM_03' && rule.id !== 'COM_04' && rule.id !== 'COM_05' && rule.id !== 'COM_06' && rule.id !== 'COM_07' && rule.id !== 'COM_10' && rule.id !== 'COM_SLOT' && rule.id !== 'STB_01' && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_09') && (
+                            {(rule.id !== 'COM_01' && rule.id !== 'COM_03' && rule.id !== 'COM_04' && rule.id !== 'COM_05' && rule.id !== 'COM_06' && rule.id !== 'COM_07' && rule.id !== 'COM_10' && rule.id !== 'COM_SLOT' && rule.id !== 'STB_01' && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'PLT_01' && rule.id !== 'STB_09') && (
                             <div>
                               <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>前提條件</div>
                               <Input value={form.prerequisites || ''} maxLength={60} showCount allowClear
@@ -2663,43 +2661,6 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             </div>
                           )
                         })()}
-                        {/* PLT_02A 配送範圍自定義編輯 */}
-                        {rule.id === 'PLT_02A' && (() => {
-                          const trs = (form as any).timeRangeScores ?? {}
-                          return (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                              {TIME_PERIOD_KEYS.map(periodKey => {
-                                const scores = trs[periodKey] ?? DEFAULT_RANGE_SCORES
-                                return (
-                                  <div key={periodKey} className="organic-score-panel">
-                                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 10 }}>
-                                      {TIME_PERIOD_LABELS[periodKey]}
-                                    </div>
-                                    <div className="organic-score-fields">
-                                      {RANGE_SCORE_KEYS.map(key => (
-                                        <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                          <span style={{ fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>{RANGE_LABEL[key]}</span>
-                                          <InputNumber
-                                            value={scores[key] ?? 0}
-                                            min={0} max={500} style={{ width: '100%' }}
-                                            addonAfter="分"
-                                            onChange={val => {
-                                              const newTrs = { ...trs, [periodKey]: { ...scores, [key]: val ?? 0 } }
-                                              setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], timeRangeScores: newTrs } }) as any)
-                                            }}
-                                          />
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                                備注：後端根據當前時間自動匹配對應時段的分值，未配置的時段不計分
-                              </div>
-                            </div>
-                          )
-                        })()}
                         {/* STB_09 活動加分自定義編輯：下拉選中活動即帶出名與狀態，不需再點查詢（暫對接算法庫） */}
                         {rule.id === 'STB_09' && (() => {
                           const items: ActivityScoreItem[] = ((form as any).activityItems || [])
@@ -2779,26 +2740,15 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             </div>
                           )
                         })()}
-                        {/* STB_01 主營時段自定義編輯（固定加分，無下拉框）；原同位置的 STB_04「店鋪標籤-金牌」已下架，
-                            该编码现由門店標籤（走 StoreLabelScorePanel）使用，不得再走本固定分入口 */}
-                        {rule.id === 'STB_01' && (
-                          <div className="organic-score-edit-tier">
-                            <span className="organic-score-edit-tier__label">主營時段加分</span>
-                            <span style={{ fontSize: 12, color: 'var(--success)', fontWeight: 500 }}>固定加分</span>
-                            <InputNumber value={form.score} min={0} max={200} style={{ width: 130 }}
-                              addonAfter="分" placeholder="輸入分數"
-                              onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], score: val ?? 0 } }) as any)} />
-                          </div>
-                        )}
-                        {/* 非 STB_02/STB_03/PLT_03/PLT_04/STB_05/STB_06/STB_07/STB_08/PLT_01/PLT_02A/STB_01/STB_09/COM_01 顯示標準計分方式 */}
-                        {(rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_01' && rule.id !== 'STB_09' && rule.id !== 'COM_01' && rule.id !== 'COM_SLOT') && (
+                        {/* STB_01 已改走 TimePeriodScorePanel（分時段配分），不再需要固定加分编辑器；
+                            原同位置的 STB_04「店鋪標籤-金牌」已下架，该编码现由門店標籤使用 */}
+                        {/* 非 STB_02/STB_03/PLT_03/PLT_04/STB_05/STB_06/STB_07/STB_08/PLT_01/STB_01/STB_09/COM_01 顯示標準計分方式 */}
+                        {(rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'PLT_01' && rule.id !== 'STB_01' && rule.id !== 'STB_09' && rule.id !== 'COM_01' && rule.id !== 'COM_SLOT') && (
                           <div className="organic-score-fields">
                             <div>
                               <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>計分方式</div>
                               <Select value={form.mode} style={{ width: '100%' }}
-                                options={rule.id === 'STB_01' ? [
-                                  { label: '固定加分', value: ScoreMode.RULE_BONUS },
-                                ] : (rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_10') ? [
+                                options={(rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_10') ? [
                                   { label: '固定加分', value: ScoreMode.RULE_BONUS },
                                   { label: '動態加分', value: ScoreMode.AMOUNT_MULTIPLIER },
                                 ] : MODE_OPTIONS}
@@ -3060,30 +3010,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                       </div>
                     )}
 
-                    {/* PLT_02A 配送範圍：5 個時段 × 4 個距離分值 */}
-                    {tpl.id === 'PLT_02A' && (
-                      <div style={{ marginBottom: 16 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 10 }}>配送範圍分時段配置</div>
-                        {TIME_PERIOD_KEYS.map(periodKey => (
-                          <div key={periodKey} style={{ padding: '10px 12px', background: 'var(--surface-3)', borderRadius: 6, border: '1px solid #F0F0F0', marginBottom: 8 }}>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>{TIME_PERIOD_LABELS[periodKey]}</div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-                              {RANGE_SCORE_KEYS.map(key => (
-                                <div key={key}>
-                                  <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>{RANGE_LABEL[key]}</div>
-                                  <Form.Item name={['timeRangeScores', periodKey, key]} noStyle>
-                                    <InputNumber min={0} max={500} style={{ width: '100%' }} addonAfter="分" size="small" />
-                                  </Form.Item>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
                     {/* 通用 RULE_BONUS / AMOUNT_MULTIPLIER：分值 */}
-                    {tpl.mode === ScoreMode.RULE_BONUS && tpl.id !== 'PLT_02A' && (
+                    {tpl.mode === ScoreMode.RULE_BONUS && (
                       <div style={{ marginBottom: 16 }}>
                         <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>分值</div>
                         <Form.Item name="score" noStyle>
@@ -3229,9 +3157,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
               <Form.Item label={t('organicTrafficScore.scoringMode')} name="mode" rules={[{ required: true, message: t('organicTrafficScore.scoringModeRequired') }]}>
                 <Select options={MODE_OPTIONS} placeholder={t('organicTrafficScore.selectScoringMode')} disabled={editingRule?.mode === ScoreMode.TIERED} />
               </Form.Item>
-              {!isDeliveryRange(editingRule?.id) && ruleFormMode !== ScoreMode.TIERED && ruleFormMode !== ScoreMode.CONDITIONAL && ruleFormMode !== ScoreMode.TIERED_MULTIPLIER && (
+              {ruleFormMode !== ScoreMode.TIERED && ruleFormMode !== ScoreMode.CONDITIONAL && ruleFormMode !== ScoreMode.TIERED_MULTIPLIER && (
                 <Form.Item label={t('organicTrafficScore.score')} name="score"
-                  rules={[{ required: !isDeliveryRange(editingRule?.id), message: t('organicTrafficScore.scoreRequired') }]}
+                  rules={[{ required: true, message: t('organicTrafficScore.scoreRequired') }]}
                   extra={ruleFormMode === ScoreMode.AMOUNT_MULTIPLIER ? t('organicTrafficScore.scoreExtraMultiplier') : t('organicTrafficScore.scoreExtraNormal')}>
                   <InputNumber min={-100} max={100} style={{ width: '100%' }} placeholder={t('organicTrafficScore.scorePlaceholder')} />
                 </Form.Item>
@@ -3457,25 +3385,6 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
               >
                 新增檔位
               </Button>
-            </div>
-          )}
-          {isDeliveryRange(editingRule?.id) && (
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-1)', marginBottom: 8 }}>{t('organicTrafficScore.deliveryRangeTiered')}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
-                {RANGE_SCORE_KEYS.map(key => (
-                  <Form.Item
-                    key={key}
-                    label={RANGE_LABEL[key]}
-                    name={['rangeScores', key]}
-                    rules={[{ required: true, message: t('organicTrafficScore.rangeScoreRequired', { label: RANGE_LABEL[key] }) }]}
-                    style={{ marginBottom: 0 }}
-                    initialValue={DEFAULT_RANGE_SCORES[key]}
-                  >
-                    <InputNumber min={0} max={100} style={{ width: '100%' }} placeholder={t('organicTrafficScore.scoreInputPlaceholder')} addonAfter={t('organicTrafficScore.scoreUnit')} />
-                  </Form.Item>
-                ))}
-              </div>
             </div>
           )}
           <Form.Item label={t('organicTrafficScore.scoringDesc')} name="description" rules={[{ required: true, message: t('organicTrafficScore.scoringDescRequired') }]}>

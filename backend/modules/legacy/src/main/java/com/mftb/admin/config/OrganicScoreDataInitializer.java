@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.dao.DataAccessException;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -202,6 +203,24 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
      * 该编码后来被「活動加分」收编使用（organic:rename-stb-code-numeric-v1 先把本残留行改挂 STB_09_RETIRED 让位），
      * 因此本步必须继续跑在新库的收编步骤之前，不能删。*/
     static final String RETIRED_STB09_RULE_CODE = "STB_09";
+
+    /**
+     * 平台维度「配送範圍」（PLT_02A）下架编码：前端已从默认计分项移除并登记进 RETIRED_ORGANIC_RULE_IDS，
+     * 但 23 種子仍会写入该行，看库/对账与界面口径不一致；同样用独立新键逐一下架（不能复用已记成功的旧键）。
+     * 号位不回收：历史订单与快照仍按该编码对账，物理删除会断掉可追溯性，因此只逻辑删除。
+     */
+    static final String RETIRED_PLT02A_RULE_CODE = "PLT_02A";
+
+    /**
+     * 主營時段加分（STB_01）分時段化的目标编码：本项由「单一固定分」改为早餐/午餐/下午茶/晚餐/宵夜
+     * 各自配分，当前时段由业务系统传入、命中一檔即停不累加。
+     * 迁移把该行原有 score 写进午餐一档（与历史语义一致：处于主营时段即得此分），其余四档不预填，
+     * 并把 score 置 0——保留固定分会让外部计分引擎把固定分与时段分重复累加。
+     */
+    static final String MAIN_TIME_SLOT_RULE_CODE = "STB_01";
+    /** 默认预填的时段档：与前端 organicTrafficConfig MAIN_TIME_SLOT_DEFAULT_PERIOD 逐字一致 */
+    static final String MAIN_TIME_SLOT_DEFAULT_PERIOD = "lunch";
+    static final String MAIN_TIME_SLOT_DEFAULT_PERIOD_NAME = "午餐";
 
     /**
      * 新增内置计分项 STB_LABEL（店鋪維度）：独家/品牌/连锁/金牌四选一，按门店当前标签命中一档即停。
@@ -482,6 +501,27 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
                     this::renameStbCodesToNumeric, this::verifyStbCodesRenamed);
         } catch (Exception e) {
             log.error("店鋪維度內置计分项编码收编失败：{}", e.getMessage(), e);
+        }
+
+        // Step 23: 平台維度「配送範圍」（PLT_02A）下架 (一次性, 版本化, 带后置校验)
+        // 前端已从默认计分项移除并加入 RETIRED_ORGANIC_RULE_IDS（读取侧过滤以覆盖历史库），但库里仍留着
+        // 23 种子写入的该行；用逻辑删除对齐应用自身 deleteRule 的 @TableLogic 语义，保留历史可回滚。
+        // 参考 SQL: sql/329_organic_retire_plt02a.sql
+        try {
+            versionTracker.applyOnce("organic:retire-plt02a-v1", this::retirePlt02aRule, this::verifyPlt02aRetired);
+        } catch (Exception e) {
+            log.error("PLT_02A 配送範圍下架收敛失败：{}", e.getMessage(), e);
+        }
+
+        // Step 24: STB_01「主營時段加分」改为五餐段独立配分 (一次性, 版本化, 带后置校验)
+        // 界面已改走 TimePeriodScorePanel（时段 → 分值清单），但库里仍只有一个固定分 score，两套口径必须收收；
+        // 新增专用列 time_period_config（沿用 store_label_config / traffic_balance_config 先例，已在
+        // LegacyCoreContracts 登记可自愈补列）。参考 SQL: sql/330_organic_stb01_time_period.sql
+        try {
+            versionTracker.applyOnce("organic:stb01-time-period-v1",
+                    this::migrateStb01TimePeriod, this::verifyStb01TimePeriod);
+        } catch (Exception e) {
+            log.error("STB_01 主營時段分時段配置收敛失败：{}", e.getMessage(), e);
         }
     }
 
@@ -1053,6 +1093,100 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
                 Integer.class, RETIRED_STB09_RULE_CODE);
         if (remains != null && remains > 0) {
             throw new IllegalStateException("下架計分項 " + RETIRED_STB09_RULE_CODE + " 仍有 " + remains + " 行未收斂");
+        }
+    }
+
+    /** 逻辑删除已下架的 PLT_02A「配送範圍」（保留历史可回滚，与应用 deleteRule 的 @TableLogic 语义一致）。 */
+    private void retirePlt02aRule() {
+        int changed = jdbcTemplate.update(
+                "UPDATE biz_organic_score_rule SET deleted = 1, updated_by = 'system' "
+                        + "WHERE deleted = 0 AND rule_code = ?",
+                RETIRED_PLT02A_RULE_CODE);
+        log.info("已逻辑删除下架計分項 {}：{} 行", RETIRED_PLT02A_RULE_CODE, changed);
+    }
+
+    /**
+     * 后置校验：与 migrate 同口径——只断言「deleted=0 的 PLT_02A 残留行数必须为 0」，
+     * 不断言名称等于某个值（管理员改过名也不影响下架是否生效）；未播种（查无该行）不算失败。
+     */
+    private void verifyPlt02aRetired() {
+        Integer remains = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM biz_organic_score_rule WHERE deleted = 0 AND rule_code = ?",
+                Integer.class, RETIRED_PLT02A_RULE_CODE);
+        if (remains != null && remains > 0) {
+            throw new IllegalStateException("下架計分項 " + RETIRED_PLT02A_RULE_CODE + " 仍有 " + remains + " 行未收斂");
+        }
+    }
+
+    /**
+     * 把 STB_01 的固定分收敛为分時段配置：逐行读回 score 再写 JSON，不拼 SQL。
+     * 先确保列存在：本 Runner 跑在 SchemaContractValidator（@Order 最大值）之前，
+     * 新库首启时契约还未自愈补列，直接引用会因「unknown column」失败并拖到第二次启动才生效。
+     * 以「time_period_config IS NULL」作守卫：运营已在界面配过分時段清单的行绝不再顶掉；
+     * score 为 NULL 时写空清单（不猜分值，留给运营配），非 NULL 时把原值放进午餐一档并把 score 置 0。
+     */
+    private void migrateStb01TimePeriod() {
+        ensureTimePeriodConfigColumn();
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, score FROM biz_organic_score_rule"
+                        + " WHERE rule_code = ? AND deleted = 0 AND time_period_config IS NULL",
+                MAIN_TIME_SLOT_RULE_CODE);
+        int changed = 0;
+        for (Map<String, Object> row : rows) {
+            Object rawScore = row.get("score");
+            String config = rawScore instanceof Number
+                    ? "{\"items\":[{\"periodValue\":\"" + MAIN_TIME_SLOT_DEFAULT_PERIOD
+                            + "\",\"periodName\":\"" + MAIN_TIME_SLOT_DEFAULT_PERIOD_NAME
+                            + "\",\"score\":" + ((Number) rawScore).intValue() + "}]}"
+                    : "{\"items\":[]}";
+            changed += jdbcTemplate.update(
+                    "UPDATE biz_organic_score_rule SET time_period_config = ?, score = 0, updated_by = 'system' WHERE id = ?",
+                    config, row.get("id"));
+        }
+        log.info("已將 STB_01 主營時段收敛為分時段配置：{} 行（原固定分已移入午餐一档并置 0）", changed);
+    }
+
+    /**
+     * 补列 time_period_config（不吞异常）：不存在才 ADD COLUMN。
+     * DDL 与 LegacyCoreContracts.organicScoreRuleContract 的 ColumnSpec 逐字一致，
+     * 两边谁先执行都不会出现同列两形；ALTER 失败必须抛出，否则会被误记为已迁移（金字招牌历史事故）。
+     */
+    private void ensureTimePeriodConfigColumn() {
+        if (timePeriodConfigColumnReady()) return;
+        jdbcTemplate.execute("ALTER TABLE `biz_organic_score_rule` ADD COLUMN `time_period_config` TEXT DEFAULT NULL "
+                + "COMMENT '主營時段分時段計分配置 JSON（[{periodValue,periodName,score}]，僅 STB_01）'");
+        log.info("已補列 biz_organic_score_rule.time_period_config");
+    }
+
+    /**
+     * 列就绪探测：直接查该列的空结果集，MySQL 与测试用 H2 都成立。
+     * 两个坑都踩过：
+     * - INFORMATION_SCHEMA + DATABASE() 在 H2 下 TABLE_SCHEMA（schema 名）与 DATABASE()（库名）永不相等，
+     *   会把已有列误判为缺失；生产虽不受影响，但那条路径无法被单测覆盖，等于把补列逻辑留在没测过的状态。
+     * - queryForObject 在零行时抛 EmptyResultDataAccessException，会把「列存在」错报成「列缺失」，
+     *   造成每次启动重复 ALTER 并报「列已存在」——生产也会坏。因此用 query + 空回调，只看语法是否成立。
+     * 这里的 catch 只是探测，真正的补列失败仍由上方 ALTER 抛出。
+     */
+    private boolean timePeriodConfigColumnReady() {
+        try {
+            jdbcTemplate.query("SELECT time_period_config FROM biz_organic_score_rule WHERE 1 = 0", rs -> { });
+            return true;
+        } catch (DataAccessException e) {
+            return false;
+        }
+    }
+
+    /**
+     * 后置校验：与 migrate 守卫同口径——只断言「不再有 time_period_config IS NULL 的在用 STB_01 行」，
+     * 不断言 JSON 内容或名称（运营改过配置后仍属正常）；未播种（查无该行）不算失败。
+     */
+    private void verifyStb01TimePeriod() {
+        Integer remains = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM biz_organic_score_rule"
+                        + " WHERE rule_code = ? AND deleted = 0 AND time_period_config IS NULL",
+                Integer.class, MAIN_TIME_SLOT_RULE_CODE);
+        if (remains != null && remains > 0) {
+            throw new IllegalStateException("STB_01 主營時段仍有 " + remains + " 行未写入 time_period_config，迁移未生效");
         }
     }
 
