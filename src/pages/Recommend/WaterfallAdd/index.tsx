@@ -478,7 +478,7 @@ function WaterfallAddGeneral() {
         style={{
           fontSize: 14,
           fontWeight: isChecked ? 400 : 600,
-          color: isChecked ? '#8c8c8c' : '#1890ff',
+          color: isChecked ? 'var(--text-3)' : 'var(--info)',
           transition: 'all 0.3s ease',
           minWidth: 36,
           textAlign: 'right',
@@ -508,7 +508,7 @@ function WaterfallAddGeneral() {
             left: 3,
             width: 22,
             height: 22,
-            background: '#ffffff',
+            background: 'var(--surface-2)',
             borderRadius: '50%',
             boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
             transform: isChecked ? 'translateX(44px)' : 'translateX(0)',
@@ -521,7 +521,7 @@ function WaterfallAddGeneral() {
         style={{
           fontSize: 14,
           fontWeight: isChecked ? 600 : 400,
-          color: isChecked ? '#1890ff' : '#8c8c8c',
+          color: isChecked ? 'var(--info)' : 'var(--text-3)',
           transition: 'all 0.3s ease',
           minWidth: 36,
           textAlign: 'left',
@@ -925,7 +925,7 @@ function WaterfallAddGeneral() {
         <DetailPageHeader
           title={t('recommend.pricingDetailTitle')}
           tags={urlAlgorithmType != null && (
-            <span style={{ fontSize: 14, color: '#595959' }}>
+            <span style={{ fontSize: 14, color: 'var(--text-2)' }}>
               {TYPE_ICON[urlAlgorithmType]} {(ALGORITHM_TYPE_OPTIONS.find(o => o.value === urlAlgorithmType)?.labelKey ? t(ALGORITHM_TYPE_OPTIONS.find(o => o.value === urlAlgorithmType)!.labelKey) : '')}
             </span>
           )}
@@ -939,7 +939,7 @@ function WaterfallAddGeneral() {
         />
       ) : (
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
         overflow: 'hidden',
       }}>
@@ -954,7 +954,7 @@ function WaterfallAddGeneral() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleBack}
               style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                backgroundColor: 'var(--brand)', borderColor: 'var(--brand)',
                 borderRadius: 8, height: 36, padding: '0 16px',
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
@@ -963,11 +963,11 @@ function WaterfallAddGeneral() {
             >{t('common:back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>
                 {isEditMode ? t('recommend.editPricingTitle') : t('recommend.addPricingTitle')}
               </h2>
               {urlAlgorithmType != null && (
-                <span style={{ fontSize: 14, color: '#595959' }}>
+                <span style={{ fontSize: 14, color: 'var(--text-2)' }}>
                   {TYPE_ICON[urlAlgorithmType]} {(ALGORITHM_TYPE_OPTIONS.find(o => o.value === urlAlgorithmType)?.labelKey ? t(ALGORITHM_TYPE_OPTIONS.find(o => o.value === urlAlgorithmType)!.labelKey) : '')}
                 </span>
               )}
@@ -981,12 +981,12 @@ function WaterfallAddGeneral() {
       <div style={{ padding: 0 }}>
         <Form form={form} layout="vertical" disabled={isDetailMode}>
           {/* 基础信息 */}
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <ShopOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+              <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <ShopOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
               </div>
-              <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('recommend.basicInfo')}</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('recommend.basicInfo')}</span>
               <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
@@ -1064,7 +1064,7 @@ function WaterfallAddGeneral() {
                   {coverFileList.length < 1 && (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                       <PlusOutlined style={{ fontSize: 20 }} />
-                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.uploadDetailImage')}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('recommend.uploadDetailImage')}</span>
                     </div>
                   )}
                 </Upload>
@@ -1074,12 +1074,12 @@ function WaterfallAddGeneral() {
 
           {/* 推广图片（多圖類型：詳情/宣傳；單圖類型已合併至基礎信息卡片） */}
           {!isSingleImageType && (
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <PictureOutlined style={{ fontSize: 14, color: '#52c41a' }} />
+              <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--success-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <PictureOutlined style={{ fontSize: 14, color: 'var(--success)' }} />
               </div>
-              <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('recommend.promoImage')}</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('recommend.promoImage')}</span>
               <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24 }}>
@@ -1093,7 +1093,7 @@ function WaterfallAddGeneral() {
                   {coverFileList.length < 1 && (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                       <PlusOutlined style={{ fontSize: 20 }} />
-                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.uploadDetailImage')}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('recommend.uploadDetailImage')}</span>
                     </div>
                   )}
                 </Upload>
@@ -1108,7 +1108,7 @@ function WaterfallAddGeneral() {
                   {detailFileList.length < 1 && (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                       <PlusOutlined style={{ fontSize: 20 }} />
-                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.uploadDetailImage')}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('recommend.uploadDetailImage')}</span>
                     </div>
                   )}
                 </Upload>
@@ -1123,7 +1123,7 @@ function WaterfallAddGeneral() {
                   {promoFileList.length < 1 && (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                       <PlusOutlined style={{ fontSize: 20 }} />
-                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.uploadPromoImage')}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('recommend.uploadPromoImage')}</span>
                     </div>
                   )}
                 </Upload>
@@ -1134,19 +1134,19 @@ function WaterfallAddGeneral() {
 
           {/* 销售策略（无敌星星 + 盘活复苏） */}
           {(
-            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-                <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <BarChartOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+                <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <BarChartOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />
                 </div>
-                <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('recommend.salesStrategy')}</span>
+                <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('recommend.salesStrategy')}</span>
                 <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('recommend.strategyConfigTag')}</Tag>
                 <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
               </div>
               {/* 预售天数 */}
               <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>{t('recommend.preSaleDaysLabel')}</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-2)', minWidth: 80 }}>{t('recommend.preSaleDaysLabel')}</span>
                   <InputNumber
                     min={1}
                     max={90}
@@ -1155,7 +1155,7 @@ function WaterfallAddGeneral() {
                     addonAfter={t('recommend.dayAddon')}
                     style={{ width: 160 }}
                   />
-                  <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 8 }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>
                     {t('recommend.preSaleDaysTipDynamic', { days: presaleDays })}
                   </span>
                 </div>
@@ -1164,7 +1164,7 @@ function WaterfallAddGeneral() {
               {/* 屏蔽商家：Switch + 选择商家 + 备注 */}
               <div style={{ display: 'flex', gap: 16, marginBottom: 16, alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 200 }}>
-                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>{t('recommend.blockMerchantsLabel')}</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-2)', minWidth: 80 }}>{t('recommend.blockMerchantsLabel')}</span>
                   <Switch 
                     checked={merchantLimit}
                     onChange={(checked) => setMerchantLimit(checked)}
@@ -1203,7 +1203,7 @@ function WaterfallAddGeneral() {
                     )}
                   </div>
                 )}
-                <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
                   {t('recommend.blockMerchantTip')}
                 </span>
               </div>
@@ -1212,7 +1212,7 @@ function WaterfallAddGeneral() {
               {!isReviveAlgorithm && (
               <div style={{ display: 'flex', gap: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 200 }}>
-                  <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>{t('recommend.sellableTimeSlots')}</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-2)', minWidth: 80 }}>{t('recommend.sellableTimeSlots')}</span>
                   <Switch 
                     checked={!onlySellTimeSlots.includes('fullDay')}
                     onChange={(checked) => {
@@ -1230,7 +1230,7 @@ function WaterfallAddGeneral() {
                 </div>
                 {/* 指定时显示5个时段勾选 */}
                 {!onlySellTimeSlots.includes('fullDay') && (
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 16, padding: 12, background: '#f6ffed', borderRadius: 6, border: '1px solid #b7eb8f' }}>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 16, padding: 12, background: 'var(--success-soft)', borderRadius: 6, border: '1px solid #b7eb8f' }}>
                     {TIME_SLOTS.filter(s => s.key !== 'fullDay').map(slot => (
                       <Checkbox
                         key={slot.key}
@@ -1261,10 +1261,10 @@ function WaterfallAddGeneral() {
             </div>
           )}
           {showNotAvailable && (
-            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
-              <div style={{ textAlign: 'center', padding: '32px 0', color: '#8c8c8c' }}>
+            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+              <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-3)' }}>
                 <div style={{ fontSize: 32, marginBottom: 12 }}>🚧</div>
-                <div style={{ fontSize: 15, fontWeight: 500, color: '#595959', marginBottom: 6 }}>
+                <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-2)', marginBottom: 6 }}>
                   {t('recommend.notAvailableTitle')}
                 </div>
                 <div style={{ fontSize: 13 }}>
@@ -1276,12 +1276,12 @@ function WaterfallAddGeneral() {
 
 
           {/* 区域计价配置 - 无敌星星和盘活复苏都显示 */}
-            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-                <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <FundOutlined style={{ fontSize: 14, color: '#722ed1' }} />
+                <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--purple-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <FundOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />
                 </div>
-                <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('recommend.districtPricingConfig')}</span>
+                <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('recommend.districtPricingConfig')}</span>
                 <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>{t('recommend.zonePricingTag')}</Tag>
                 <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
                 <Button 
@@ -1298,21 +1298,21 @@ function WaterfallAddGeneral() {
                 </Button>
               </div>
               {regionPricingConfigs.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 40, color: '#8c8c8c', fontSize: 13 }}>
+                <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-3)', fontSize: 13 }}>
                   {t('recommend.districtEmptyHint')}
                 </div>
               ) : (
                 <>
               {/* 每个区域的计价配置 */}
               {regionPricingConfigs.map((config, index) => (
-                <div key={config.region} style={{ marginBottom: index < regionPricingConfigs.length - 1 ? 24 : 0, padding: 16, background: '#fafafa', borderRadius: 6 }}>
+                <div key={config.region} style={{ marginBottom: index < regionPricingConfigs.length - 1 ? 24 : 0, padding: 16, background: 'var(--surface-3)', borderRadius: 6 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <Tag color="cyan" style={{ fontSize: 14, padding: '4px 12px' }}>
                         {config.regionLabel}
                       </Tag>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.dailySalesCount')}</span>
+                        <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('recommend.dailySalesCount')}</span>
                         <InputNumber
                           min={1}
                           max={999}
@@ -1321,7 +1321,7 @@ function WaterfallAddGeneral() {
                           addonAfter={t('recommend.dailySalesUnit')}
                           style={{ width: 140 }}
                         />
-                        <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
                           {t('recommend.dailySalesHint', { count: config.dailySalesLimit })}
                         </span>
                       </div>
@@ -1329,9 +1329,9 @@ function WaterfallAddGeneral() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <Button
                         type="text"
-                        icon={<EditOutlined style={{ fontSize: 14, color: '#1890FF' }} />}
+                        icon={<EditOutlined style={{ fontSize: 14, color: 'var(--info)' }} />}
                         onClick={() => handleReplaceRegion(config.region)}
-                        style={{ fontSize: 12, color: '#1890FF', padding: '2px 6px' }}
+                        style={{ fontSize: 12, color: 'var(--info)', padding: '2px 6px' }}
                       >
                         {t('recommend.replace')}
                       </Button>
@@ -1398,13 +1398,13 @@ function WaterfallAddGeneral() {
                   {!isReviveAlgorithm && (
                     <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: config.discountEnabled ? 12 : 0 }}>
-                    <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.slotDiscountConfig')}</span>
+                    <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('recommend.slotDiscountConfig')}</span>
                     <Switch 
                       checked={config.discountEnabled} 
                       onChange={(checked) => handleToggleRegionDiscount(config.region, checked)}
                       size="small"
                     />
-                    <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.slotDiscountHint')}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('recommend.slotDiscountHint')}</span>
                   </div>
 
                   {/* 时段折扣配置 */}
@@ -1412,13 +1412,13 @@ function WaterfallAddGeneral() {
                     <>
                       {/* 限时折扣开关 */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: config.limitedTimeDiscount ? 12 : 16 }}>
-                        <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.longTermDiscount')}</span>
+                        <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('recommend.longTermDiscount')}</span>
                         <Switch 
                           checked={config.limitedTimeDiscount} 
                           onChange={(checked) => handleToggleLimitedTimeDiscount(config.region, checked)}
                           size="small"
                         />
-                        <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
                           {config.limitedTimeDiscount ? t('recommend.executeInPeriod') : t('recommend.limitedTimeDiscountLabel')}
                         </span>
                       </div>
@@ -1455,7 +1455,7 @@ function WaterfallAddGeneral() {
                           style={{ marginBottom: 0 }}
                         >
                           {isDetailMode && (discountValue === null || discountValue === undefined) ? (
-                            <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 11px', background: '#fafafa', border: '1px solid #e8eaed', borderRadius: 6, color: '#8c8c8c' }}>{t('recommend.noDiscount')}</div>
+                            <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 11px', background: 'var(--surface-3)', border: '1px solid #e8eaed', borderRadius: 6, color: 'var(--text-3)' }}>{t('recommend.noDiscount')}</div>
                           ) : (
                             <InputNumber
                               min={1}
@@ -1483,10 +1483,10 @@ function WaterfallAddGeneral() {
 
           {/* 盘活复苏 - 梯度折扣配置（选择商圈后才展示） */}
           {isReviveAlgorithm && regionPricingConfigs.length > 0 && (
-            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               {/* 购买多天折扣配置（梯度） */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('recommend.multiDayDiscount')}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{t('recommend.multiDayDiscount')}</span>
                 <Switch 
                   checked={gradientEnabled}
                   onChange={(checked) => {
@@ -1497,7 +1497,7 @@ function WaterfallAddGeneral() {
                   }}
                   size="small"
                 />
-                <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.matchDiscountTip')}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('recommend.matchDiscountTip')}</span>
                 {gradientEnabled && (
                   <Button 
                     type="primary" 
@@ -1512,15 +1512,15 @@ function WaterfallAddGeneral() {
               </div>
               {gradientEnabled && (
                 gradients.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: 24, color: '#8c8c8c', fontSize: 13 }}>
+                  <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-3)', fontSize: 13 }}>
                     {t('recommend.noGradientConfig')}
                   </div>
                 ) : (
                   <Space direction="vertical" size={12} style={{ width: '100%' }}>
                   {gradients.map((gradient, index) => (
-                    <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, background: '#fafafa', borderRadius: 6 }}>
+                    <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, background: 'var(--surface-3)', borderRadius: 6 }}>
                       <Tag color="blue">{t('recommend.gradientN', { index: index + 1 })}</Tag>
-                      <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.purchaseDaysGe')}</span>
+                      <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('recommend.purchaseDaysGe')}</span>
                       <InputNumber
                         min={1}
                         max={9999}
@@ -1529,7 +1529,7 @@ function WaterfallAddGeneral() {
                         value={gradient.count || undefined}
                         onChange={(value) => handleUpdateGradient(index, 'count', value)}
                       />
-                      <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.dayUnit')}{t('recommend.correspondingDiscount')}</span>
+                      <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('recommend.dayUnit')}{t('recommend.correspondingDiscount')}</span>
                       <InputNumber
                         min={0.01}
                         max={10}
@@ -1556,12 +1556,12 @@ function WaterfallAddGeneral() {
 
           {/* 时段个数折扣配置 - 仅无敌星星显示 */}
           {!isReviveAlgorithm && selectedRegions.length > 0 && (
-            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
                 <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6fffb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <BarChartOutlined style={{ fontSize: 14, color: '#13c2c2' }} />
                 </div>
-                <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>
+                <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>
                   {t('recommend.slotCountDiscountTitle')}
                 </span>
                 <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
@@ -1575,7 +1575,7 @@ function WaterfallAddGeneral() {
                   }}
                   size="small"
                 />
-                <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
                   {t('recommend.slotCountDiscountHint')}
                 </span>
                 {gradientEnabled && (
@@ -1592,15 +1592,15 @@ function WaterfallAddGeneral() {
               </div>
               {gradientEnabled ? (
                 gradients.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: 24, color: '#8c8c8c', fontSize: 13 }}>
+                  <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-3)', fontSize: 13 }}>
                     {t('recommend.noGradientConfig')}
                   </div>
                 ) : (
                   <Space direction="vertical" size={12} style={{ width: '100%' }}>
                   {gradients.map((gradient, index) => (
-                    <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, background: '#fafafa', borderRadius: 6 }}>
+                    <div key={index} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, background: 'var(--surface-3)', borderRadius: 6 }}>
                       <Tag color="blue">{t('recommend.gradientN', { index: index + 1 })}</Tag>
-                      <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.slotCountGe')}</span>
+                      <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('recommend.slotCountGe')}</span>
                       <InputNumber
                         min={1}
                         max={9999}
@@ -1609,7 +1609,7 @@ function WaterfallAddGeneral() {
                         value={gradient.count || undefined}
                         onChange={(value) => handleUpdateGradient(index, 'count', value)}
                       />
-                      <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.slotCountUnit')}{t('recommend.correspondingDiscount')}</span>
+                      <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('recommend.slotCountUnit')}{t('recommend.correspondingDiscount')}</span>
                       <InputNumber
                         min={0.01}
                         max={10}
@@ -1689,7 +1689,7 @@ function WaterfallAddGeneral() {
             <div style={{ display: 'flex', gap: 16, padding: '8px 0' }}>
               {/* 左侧树形结构 */}
               <div style={{ width: 240, flexShrink: 0 }}>
-                <div style={{ marginBottom: 8, fontSize: 13, color: '#8c8c8c' }}>
+                <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--text-3)' }}>
                   {t('recommend.selectRegionOrDistrict')}
                 </div>
                 <Tree
@@ -1706,13 +1706,13 @@ function WaterfallAddGeneral() {
                       level: info.node.children ? 1 : 2,
                     })
                   }}
-                  style={{ padding: 12, background: '#fafafa', borderRadius: 6, border: '1px solid #f0f0f0', minHeight: 520 }}
+                  style={{ padding: 12, background: 'var(--surface-3)', borderRadius: 6, border: '1px solid #f0f0f0', minHeight: 520 }}
                 />
                 {selectedRegionNode && (
-                  <div style={{ marginTop: 8, padding: '8px 12px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6 }}>
-                    <span style={{ fontSize: 12, color: '#595959' }}>{t('recommend.selectedLabel')}</span>
+                  <div style={{ marginTop: 8, padding: '8px 12px', background: 'var(--success-soft)', border: '1px solid #b7eb8f', borderRadius: 6 }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{t('recommend.selectedLabel')}</span>
                     <Tag color="green">{selectedRegionNode.title}</Tag>
-                    <span style={{ fontSize: 12, color: '#8c8c8c' }}>({selectedRegionNode.level === 1 ? t('recommend.regionLabel') : t('recommend.districtLabel')})</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)' }}>({selectedRegionNode.level === 1 ? t('recommend.regionLabel') : t('recommend.districtLabel')})</span>
                   </div>
                 )}
               </div>
@@ -1742,16 +1742,16 @@ function WaterfallAddGeneral() {
       </div>
 
       {/* 訂單退款，退費比例配置 */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff1f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--danger-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <SettingOutlined style={{ fontSize: 14, color: '#f5222d' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('recommend.refundConfig')}</span>
-          <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 4 }}>{t('recommend.refundConfigDesc')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('recommend.refundConfig')}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 4 }}>{t('recommend.refundConfigDesc')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13, color: refundEnabled ? '#52c41a' : '#8c8c8c' }}>{refundEnabled ? t('recommend.allowRefund') : t('recommend.denyRefund')}</span>
+            <span style={{ fontSize: 13, color: refundEnabled ? 'var(--success)' : 'var(--text-3)' }}>{refundEnabled ? t('recommend.allowRefund') : t('recommend.denyRefund')}</span>
             <Switch
               size="small"
               checked={refundEnabled}
@@ -1774,7 +1774,7 @@ function WaterfallAddGeneral() {
               width: 220,
               render: (_, record: { id: number; maxDays: number; feePercent: number }) => (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend.remainingDaysLE')}</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>{t('recommend.remainingDaysLE')}</span>
                   <InputNumber
                     disabled={isDetailMode}
                     min={0}
@@ -1813,7 +1813,7 @@ function WaterfallAddGeneral() {
               width: 120,
               align: 'center',
               render: (_: unknown, record: { id: number; maxDays: number; feePercent: number }) => {
-                if (isDetailMode) return <span style={{ color: '#bfbfbf' }}>—</span>
+                if (isDetailMode) return <span style={{ color: 'var(--text-4)' }}>—</span>
                 const isLastRow = cancelFeeRules[cancelFeeRules.length - 1]?.id === record.id
                 return (
                   <Space size={0} split={<span className="action-split">|</span>}>
@@ -1853,22 +1853,22 @@ function WaterfallAddGeneral() {
         ) : (
           <div style={{
             padding: '24px', textAlign: 'center',
-            background: '#fafafa', borderRadius: 8,
+            background: 'var(--surface-3)', borderRadius: 8,
             border: '1px dashed #d9d9d9',
           }}>
-            <span style={{ fontSize: 13, color: '#8c8c8c' }}>{t('recommend.denyRefundTip')}</span>
+            <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{t('recommend.denyRefundTip')}</span>
           </div>
         )}
       </div>
 
       {/* 狀態設置 */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('recommend.statusSetting')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('recommend.statusSetting')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.statusLabelColon')}</span>
+          <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('recommend.statusLabelColon')}</span>
           <Switch
             checked={status === ServiceStatus.ENABLED}
             disabled={isDetailMode}
@@ -1876,28 +1876,28 @@ function WaterfallAddGeneral() {
             checkedChildren={t('recommend.enableLabel')}
             unCheckedChildren={t('recommend.disableLabel')}
           />
-          <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.disablePricingHint')}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('recommend.disablePricingHint')}</span>
         </div>
       </div>
 
       {/* 操作记录（仅详情模式） */}
       {isDetailMode && (
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <EditOutlined style={{ fontSize: 14, color: '#595959' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--surface-1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <EditOutlined style={{ fontSize: 14, color: 'var(--text-2)' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>操作记录</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>操作记录</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 80 }}>最后更新人：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{waterfallDetailData?.updatedBy || '-'}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 80 }}>最后更新人：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{waterfallDetailData?.updatedBy || '-'}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 80 }}>最后更新时间：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{waterfallDetailData?.updatedAt ? dayjs(waterfallDetailData.updatedAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 80 }}>最后更新时间：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{waterfallDetailData?.updatedAt ? dayjs(waterfallDetailData.updatedAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</span>
             </div>
           </div>
         </div>
@@ -1939,13 +1939,13 @@ function WaterfallAddGeneral() {
       >
         {selectedAlgorithmInfo && (
           <div>
-            <div style={{ marginBottom: 16, padding: 12, background: '#f6ffed', borderRadius: 6 }}>
+            <div style={{ marginBottom: 16, padding: 12, background: 'var(--success-soft)', borderRadius: 6 }}>
               <Space>
-                <span style={{ color: '#8c8c8c' }}>{t('recommend.algoIdLabel')}</span>
-                <code style={{ background: '#fff', padding: '2px 8px', borderRadius: 4 }}>
+                <span style={{ color: 'var(--text-3)' }}>{t('recommend.algoIdLabel')}</span>
+                <code style={{ background: 'var(--surface-2)', padding: '2px 8px', borderRadius: 4 }}>
                   {String(selectedAlgorithmInfo.id).padStart(6, '0')}
                 </code>
-                <span style={{ color: '#8c8c8c', marginLeft: 16 }}>{t('recommend.algoNameLabelColon')}</span>
+                <span style={{ color: 'var(--text-3)', marginLeft: 16 }}>{t('recommend.algoNameLabelColon')}</span>
                 <strong>{selectedAlgorithmInfo.name}</strong>
               </Space>
             </div>
@@ -1953,10 +1953,10 @@ function WaterfallAddGeneral() {
             <Divider style={{ margin: '16px 0' }} />
 
             <h4 style={{ marginBottom: 12 }}>{t('recommend.ruleParamConfig')}</h4>
-            <div style={{ background: '#fafafa', padding: 16, borderRadius: 6 }}>
+            <div style={{ background: 'var(--surface-3)', padding: 16, borderRadius: 6 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ background: '#fff', borderBottom: '2px solid #d9d9d9' }}>
+                  <tr style={{ background: 'var(--surface-2)', borderBottom: '2px solid #d9d9d9' }}>
                     <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: 13 }}>{t('recommend.paramNameCol')}</th>
                     <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: 13 }}>{t('recommend.paramValueCol')}</th>
                     <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: 13 }}>{t('recommend.descCol')}</th>
@@ -1966,27 +1966,27 @@ function WaterfallAddGeneral() {
                   <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}>{t('recommend.matchStrategyRow')}</td>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}><code>weighted_score</code></td>
-                    <td style={{ padding: '8px 12px', fontSize: 13, color: '#8c8c8c' }}>{t('recommend.weightedScoreMatch')}</td>
+                    <td style={{ padding: '8px 12px', fontSize: 13, color: 'var(--text-3)' }}>{t('recommend.weightedScoreMatch')}</td>
                   </tr>
                   <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}>{t('recommend.recallCountRow')}</td>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}><code>100</code></td>
-                    <td style={{ padding: '8px 12px', fontSize: 13, color: '#8c8c8c' }}>{t('recommend.initialRecallItems')}</td>
+                    <td style={{ padding: '8px 12px', fontSize: 13, color: 'var(--text-3)' }}>{t('recommend.initialRecallItems')}</td>
                   </tr>
                   <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}>{t('recommend.fineRankThresholdRow')}</td>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}><code>0.75</code></td>
-                    <td style={{ padding: '8px 12px', fontSize: 13, color: '#8c8c8c' }}>{t('recommend.fineRankFilterThreshold')}</td>
+                    <td style={{ padding: '8px 12px', fontSize: 13, color: 'var(--text-3)' }}>{t('recommend.fineRankFilterThreshold')}</td>
                   </tr>
                   <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}>{t('recommend.rerankStrategyRow')}</td>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}><code>diversity_boost</code></td>
-                    <td style={{ padding: '8px 12px', fontSize: 13, color: '#8c8c8c' }}>{t('recommend.diversityBoostRerank')}</td>
+                    <td style={{ padding: '8px 12px', fontSize: 13, color: 'var(--text-3)' }}>{t('recommend.diversityBoostRerank')}</td>
                   </tr>
                   <tr>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}>{t('recommend.scatterRuleRow')}</td>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}><code>category_interval=3</code></td>
-                    <td style={{ padding: '8px 12px', fontSize: 13, color: '#8c8c8c' }}>{t('recommend.categoryInterval3')}</td>
+                    <td style={{ padding: '8px 12px', fontSize: 13, color: 'var(--text-3)' }}>{t('recommend.categoryInterval3')}</td>
                   </tr>
                 </tbody>
               </table>
@@ -1995,22 +1995,22 @@ function WaterfallAddGeneral() {
             <Divider style={{ margin: '16px 0' }} />
 
             <h4 style={{ marginBottom: 12 }}>{t('recommend.weightConfigTitle')}</h4>
-            <div style={{ background: '#fafafa', padding: 16, borderRadius: 6 }}>
+            <div style={{ background: 'var(--surface-3)', padding: 16, borderRadius: 6 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
-                <div style={{ padding: 12, background: '#fff', borderRadius: 8 }}>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>{t('recommend.salesWeight')}</div>
-                  <div style={{ fontSize: 18, fontWeight: 600, color: '#1890ff' }}>0.35</div>
+                <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('recommend.salesWeight')}</div>
+                  <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--info)' }}>0.35</div>
                 </div>
-                <div style={{ padding: 12, background: '#fff', borderRadius: 8 }}>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>{t('recommend.ratingWeight')}</div>
-                  <div style={{ fontSize: 18, fontWeight: 600, color: '#52c41a' }}>0.25</div>
+                <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('recommend.ratingWeight')}</div>
+                  <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--success)' }}>0.25</div>
                 </div>
-                <div style={{ padding: 12, background: '#fff', borderRadius: 4 }}>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>{t('recommend.distanceWeight')}</div>
+                <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 4 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('recommend.distanceWeight')}</div>
                   <div style={{ fontSize: 18, fontWeight: 600, color: '#faad14' }}>0.20</div>
                 </div>
-                <div style={{ padding: 12, background: '#fff', borderRadius: 4 }}>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>{t('recommend.conversionWeight')}</div>
+                <div style={{ padding: 12, background: 'var(--surface-2)', borderRadius: 4 }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('recommend.conversionWeight')}</div>
                   <div style={{ fontSize: 18, fontWeight: 600, color: '#f5222d' }}>0.20</div>
                 </div>
               </div>
@@ -2023,10 +2023,10 @@ function WaterfallAddGeneral() {
       <Modal
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 24, height: 24, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ShopOutlined style={{ fontSize: 12, color: '#1890ff' }} />
+            <div style={{ width: 24, height: 24, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ShopOutlined style={{ fontSize: 12, color: 'var(--info)' }} />
             </div>
-            <span style={{ fontSize: 16, fontWeight: 600, color: '#1890ff' }}>{t('recommend.selectBlockMerchant')}</span>
+            <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--info)' }}>{t('recommend.selectBlockMerchant')}</span>
           </div>
         }
         open={merchantModalVisible}
@@ -2073,8 +2073,8 @@ function WaterfallAddGeneral() {
 
         {/* 已选提示 */}
         {tempSelectedMerchants.length > 0 && (
-          <div style={{ marginBottom: 12, padding: '6px 12px', background: '#f6ffed', borderRadius: 6, border: '1px solid #b7eb8f', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 12, color: '#52c41a', fontWeight: 500 }}>
+          <div style={{ marginBottom: 12, padding: '6px 12px', background: 'var(--success-soft)', borderRadius: 6, border: '1px solid #b7eb8f', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 12, color: 'var(--success)', fontWeight: 500 }}>
               {t('recommend.merchantsSelectedCount', { count: tempSelectedMerchants.length })}
             </span>
             <Space size={4} wrap>

@@ -30,7 +30,7 @@ export const cardTitle = (
     <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       {icon}
     </div>
-    <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+    <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>
     {extra}
     <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
     {action}

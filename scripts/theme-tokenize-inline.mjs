@@ -51,6 +51,19 @@ const onlyDir = dirIdx >= 0 ? ARGS[dirIdx + 1] : null
 const PROP_STR_RE = /([A-Za-z][A-Za-z0-9-]*)\s*:\s*(["'])((?:(?!\2)[^\\]|\\.)*?)\2/g
 const HEX_RE = /#([0-9a-fA-F]{3,8})\b/g
 
+/*
+ * 值段形式：`属性: <不含 , ; { } 的表达式>`。
+ * 它比 PROP_STR_RE 宽，能多抓住一类盲区——三元表达式里的色值：
+ *   color: isBonus ? '#52C41A' : '#FF4D4F'      （Recommend 42 处 / 全仓 371 处）
+ * 不含花括号是为了不跟跨对象边界，遇到嵌套 style={{...}} 会自然停下。
+ * 段内只对「引号包裹的色值」动手，所以 `label: f ? '是' : '否'` 这类非色串不会被动到。
+ * 仍不自动处理 JSX 属性形式（fill={...}）：插画里的白色对勾与中心点是刻意保留的决策，
+ * 自动刷成令牌色会让它们在饱和底上消失。
+ */
+const PROP_EXPR_RE = /([A-Za-z][A-Za-z0-9-]*)\s*:\s*([^,;{}]+)/g
+/** 只匹配引号内的十六进制色值串，确保不会改动非颜色文本 */
+const QUOTED_HEX_RE = /(["'])#([0-9a-fA-F]{3,8})\1/g
+
 function walk(dir, out = []) {
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry)
@@ -95,36 +108,45 @@ function collectFiles() {
 function transform(source) {
   let replaced = 0
   const skipped = []
+  /** style 区段状态：单行 `style={{...}}` 不残留，多行写法要跟踪到 `}}` 才退出 */
+  let inStyle = false
 
   const next = source
     .split('\n')
     .map((line) => {
+      const eligible = inStyle || line.includes('style={{')
+      if (line.includes('style={{')) inStyle = !line.includes('}}')
+      else if (inStyle && line.includes('}}')) inStyle = false
+      if (!eligible) return line
       if (!/["'][^"']*#[0-9a-fA-F]{3}/.test(line)) return line
       if (line.includes('var(--')) return line
 
+      // 只在真正的 style 上下文内替换。数据对象里的 `{ color: '#1890FF' }` 常被喂给
+      // ECharts / SVG / canvas，它们不解析 CSS 变量，刷成 var(--info) 会静默毁掉配色。
+      // 所以下面用轻量状态机识别 `style={{ ... }}` 区段（含跨行写法）。
       let localSkips = 0
-      const rewritten = line.replace(PROP_STR_RE, (whole, prop, quote, value) => {
-        if (!HEX_RE.test(value)) {
-          HEX_RE.lastIndex = 0
-          return whole
-        }
-        HEX_RE.lastIndex = 0
+      const rewritten = line.replace(PROP_EXPR_RE, (whole, prop, expr) => {
         const segment = classifyProperty(prop)
         if (!segment) return whole // 非颜色属性（width / transition / fontSize 等）
+        if (!QUOTED_HEX_RE.test(expr)) {
+          QUOTED_HEX_RE.lastIndex = 0
+          return whole
+        }
+        QUOTED_HEX_RE.lastIndex = 0
 
-        const nextValue = value.replace(HEX_RE, (rawHex) => {
-          const normalized = normalizeHex(rawHex)
-          if (!normalized || normalized.hasAlpha) return rawHex
+        const nextExpr = expr.replace(QUOTED_HEX_RE, (rawStr, quote, digits) => {
+          const normalized = normalizeHex(digits)
+          if (!normalized || normalized.hasAlpha) return rawStr
           const token = COLOR_TO_TOKEN[segment]?.[normalized.hex]
           if (!token) {
             localSkips += 1
-            return rawHex
+            return rawStr
           }
           replaced += 1
-          return `var(--${token})`
+          return `${quote}var(--${token})${quote}`
         })
 
-        return nextValue === value ? whole : `${prop}: ${quote}${nextValue}${quote}`
+        return nextExpr === expr ? whole : whole.replace(expr, nextExpr)
       })
 
       if (localSkips > 0) skipped.push(line.trim().slice(0, 72))

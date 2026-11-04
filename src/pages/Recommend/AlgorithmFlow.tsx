@@ -44,7 +44,7 @@ function TerminalNode({ data }: NodeProps) {
       <div style={{ fontSize: 14, fontWeight: 700, color: isEnd ? '#CF1322' : '#389E0D', letterSpacing: 2 }}>
         {data.label as string}
       </div>
-      {desc ? <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 2 }}>{desc}</div> : null}
+      {desc ? <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{desc}</div> : null}
       <Handle type="source" position={Position.Bottom} style={{ background: isEnd ? '#FF4D4F' : '#52C41A' }} />
       <Handle type="target" position={Position.Top} style={{ background: isEnd ? '#FF4D4F' : '#52C41A' }} />
     </div>
@@ -66,7 +66,7 @@ function StageNode({ data }: NodeProps) {
       minWidth: 200,
     }}>
       <div style={{ fontSize: 13, fontWeight: 700, color }}>{data.label as string}</div>
-      {desc ? <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 2 }}>{desc}</div> : null}
+      {desc ? <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>{desc}</div> : null}
       <Handle type="source" position={Position.Bottom} style={{ background: color }} />
       <Handle type="target" position={Position.Top} style={{ background: color }} />
     </div>
@@ -82,17 +82,17 @@ function ProcessNode({ data }: NodeProps) {
     <div style={{
       padding: '10px 18px',
       borderRadius: 6,
-      background: '#fff',
+      background: 'var(--surface-2)',
       border: `1.5px solid ${color}`,
       textAlign: 'center',
       minWidth: 130,
       boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
     }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>
         {icon && <span style={{ marginRight: 4 }}>{icon}</span>}
         {data.label as string}
       </div>
-      {desc ? <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 3 }}>{desc}</div> : null}
+      {desc ? <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>{desc}</div> : null}
       <Handle type="source" position={Position.Bottom} style={{ background: color }} />
       <Handle type="target" position={Position.Top} style={{ background: color }} />
       <Handle type="source" position={Position.Right} style={{ background: color }} />
@@ -121,10 +121,10 @@ function DecisionNode({ data }: NodeProps) {
         background: color, color: '#fff', fontSize: 10, padding: '1px 6px',
         borderRadius: '0 4px 0 4px', fontWeight: 600,
       }}>判斷</div>
-      <div style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>
         {data.label as string}
       </div>
-      {desc ? <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 3 }}>{desc}</div> : null}
+      {desc ? <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>{desc}</div> : null}
       <Handle type="source" position={Position.Bottom} style={{ background: color }} />
       <Handle type="target" position={Position.Top} style={{ background: color }} />
       <Handle type="source" position={Position.Right} style={{ background: color }} />
@@ -140,7 +140,7 @@ function SystemNode({ data }: NodeProps) {
     <div style={{
       padding: '10px 18px',
       borderRadius: 6,
-      background: '#F9F0FF',
+      background: 'var(--purple-soft)',
       border: '2px dashed #722ED1',
       textAlign: 'center',
       minWidth: 130,
@@ -149,7 +149,7 @@ function SystemNode({ data }: NodeProps) {
       <div style={{ fontSize: 13, fontWeight: 600, color: '#531DAB' }}>
         ⚙️ {data.label as string}
       </div>
-      {desc ? <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 3 }}>{desc}</div> : null}
+      {desc ? <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 3 }}>{desc}</div> : null}
       <Handle type="source" position={Position.Bottom} style={{ background: '#722ED1' }} />
       <Handle type="target" position={Position.Top} style={{ background: '#722ED1' }} />
       <Handle type="source" position={Position.Right} style={{ background: '#722ED1' }} />
@@ -555,7 +555,7 @@ function FlowEditor() {
         justifyContent: 'space-between',
         alignItems: 'center',
         padding: '12px 24px',
-        background: '#fff',
+        background: 'var(--surface-2)',
         borderBottom: '1px solid #f0f0f0',
         flexShrink: 0,
       }}>
@@ -607,7 +607,7 @@ function FlowEditor() {
         display: 'flex',
         gap: 20,
         padding: '8px 24px',
-        background: '#FAFAFA',
+        background: 'var(--surface-3)',
         borderBottom: '1px solid #f0f0f0',
         flexShrink: 0,
         flexWrap: 'wrap',
@@ -628,10 +628,10 @@ function FlowEditor() {
               background: item.bg,
               border: `2px ${item.dashed ? 'dashed' : 'solid'} ${item.border}`,
             }} />
-            <span style={{ fontSize: 12, color: '#595959' }}>{t(item.labelKey)}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{t(item.labelKey)}</span>
           </Space>
         ))}
-        <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 'auto' }}>
+        <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 'auto' }}>
           {editMode ? t('recommend.flowEditHint') : t('recommend.flowTipHint')}
         </span>
       </div>
@@ -642,16 +642,16 @@ function FlowEditor() {
         {editMode && (
           <div style={{
             width: 180,
-            background: '#FAFAFA',
+            background: 'var(--surface-3)',
             borderRight: '1px solid #f0f0f0',
             padding: '12px 10px',
             overflowY: 'auto',
             flexShrink: 0,
           }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
               <DragOutlined /> {t('recommend.flowNodePanel')}
             </div>
-            <div style={{ fontSize: 11, color: '#8C8C8C', marginBottom: 10 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 10 }}>
               {t('recommend.flowDragToAdd')}
             </div>
             {NODE_PALETTE.map(item => (
@@ -667,7 +667,7 @@ function FlowEditor() {
                   padding: '10px 12px',
                   marginBottom: 8,
                   borderRadius: 6,
-                  background: '#fff',
+                  background: 'var(--surface-2)',
                   border: `1.5px solid ${item.color}`,
                   cursor: 'grab',
                   display: 'flex',
@@ -681,15 +681,15 @@ function FlowEditor() {
               >
                 <span style={{ fontSize: 18 }}>{item.icon}</span>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#262626' }}>{t(item.labelKey)}</div>
-                  <div style={{ fontSize: 10, color: '#8C8C8C' }}>{t(item.descKey)}</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)' }}>{t(item.labelKey)}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-3)' }}>{t(item.descKey)}</div>
                 </div>
               </div>
             ))}
             <div style={{
               marginTop: 16,
               padding: '8px 10px',
-              background: '#FFF7E6',
+              background: 'var(--warning-soft)',
               borderRadius: 6,
               border: '1px solid #FFD591',
               fontSize: 11,

@@ -105,8 +105,8 @@ export default function SignboardScorePanel({ ruleName, config, hasDraft, descri
         {/* 靠右成组：修改人／时间在按钮左侧，与通用计分项工具条位置一致 */}
         <Space style={{ marginLeft: 'auto' }} size={12}>
           {!isEditing && (updatedBy || updatedAt) && (
-            <span style={{ fontSize: 11, color: '#8C8C8C', whiteSpace: 'nowrap' }}>
-              {updatedBy && <>修改人：<span style={{ color: '#595959' }}>{updatedBy}</span></>}
+            <span style={{ fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
+              {updatedBy && <>修改人：<span style={{ color: 'var(--text-2)' }}>{updatedBy}</span></>}
               {updatedBy && updatedAt && <span style={{ margin: '0 4px' }}>·</span>}
               {updatedAt && <span>{updatedAt}</span>}
             </span>
@@ -117,7 +117,7 @@ export default function SignboardScorePanel({ ruleName, config, hasDraft, descri
           </Button>
           {!isEditing && !readOnly && (
             <Button size="small" icon={<EditOutlined aria-hidden="true" />} onClick={handleEdit}
-              style={{ borderRadius: 6, borderColor: '#E8720C', color: '#E8720C', fontSize: 12, height: 28 }}>編輯</Button>
+              style={{ borderRadius: 6, borderColor: 'var(--brand)', color: 'var(--brand)', fontSize: 12, height: 28 }}>編輯</Button>
           )}
         </Space>
       </div>
@@ -146,23 +146,23 @@ export default function SignboardScorePanel({ ruleName, config, hasDraft, descri
           extra={<FormulaHint formula="得分 = Σ 已購買且投放期內標籤的分值" example={`熱門 + 收藏 = ${demo.total} 分`} />}>
           <div className="organic-score-panel" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>已配置標籤（{draft.items.length}）</span>
-              <Button size="small" type="link" icon={<PlusOutlined aria-hidden="true" />} onClick={addRow} disabled={allLabelsUsed} style={{ color: '#E8720C' }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>已配置標籤（{draft.items.length}）</span>
+              <Button size="small" type="link" icon={<PlusOutlined aria-hidden="true" />} onClick={addRow} disabled={allLabelsUsed} style={{ color: 'var(--brand)' }}>
                 {allLabelsUsed ? '全部標籤已配置' : '添加標籤'}
               </Button>
             </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C' }}>同一標籤只能配一行；分值為 0～1000 的整數；未列出的標籤不計分</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>同一標籤只能配一行；分值為 0～1000 的整數；未列出的標籤不計分</div>
             {draft.items.map((item, i) => (
               <div key={i} className="organic-score-edit-row" style={{ flexWrap: 'wrap' }}>
                 <Select aria-label={`第 ${i + 1} 行招牌標籤`} style={{ width: 200 }} placeholder="選擇招牌標籤"
                   value={item.labelType || undefined} options={labelOptions(i)} onChange={value => pickLabel(i, value)} />
-                <span style={{ fontSize: 13, color: '#595959' }}>→ 得</span>
+                <span style={{ fontSize: 13, color: 'var(--text-2)' }}>→ 得</span>
                 <InputNumber aria-label={`第 ${i + 1} 行標籤分值`} value={item.score} min={0} max={1000}
                   onChange={value => patchRow(i, { score: value ?? 0 })} style={{ width: 120 }} addonAfter="分" />
                 <Button aria-label={`刪除第 ${i + 1} 行`} size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => removeRow(i)} />
               </div>
             ))}
-            {draft.items.length === 0 && <div style={{ fontSize: 12, color: '#8C8C8C' }}>尚未配置任何標籤，點擊「添加標籤」開始</div>}
+            {draft.items.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>尚未配置任何標籤，點擊「添加標籤」開始</div>}
           </div>
         </AlgorithmSection>
 
@@ -195,7 +195,7 @@ export default function SignboardScorePanel({ ruleName, config, hasDraft, descri
             {view.items.length === 0 ? (
               <Alert type="info" showIcon message="尚未配置標籤分值，先保存至少一個標籤再試算。" />
             ) : <>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>勾選該商家目前持有（已購買且投放期內）的標籤：</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>勾選該商家目前持有（已購買且投放期內）的標籤：</div>
               <Checkbox.Group aria-label="商家持有標籤" value={owned} onChange={values => setOwned(values as string[])}
                 style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
                 {view.items.map(item => (
@@ -208,18 +208,18 @@ export default function SignboardScorePanel({ ruleName, config, hasDraft, descri
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
                 {preview.matched.map(item => (
-                  <div key={item.labelType} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#595959' }}>
-                    <span>{signboardLabelText(item.labelType)}</span><span style={{ color: '#52C41A', fontWeight: 600 }}>+{item.score} 分</span>
+                  <div key={item.labelType} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-2)' }}>
+                    <span>{signboardLabelText(item.labelType)}</span><span style={{ color: 'var(--success)', fontWeight: 600 }}>+{item.score} 分</span>
                   </div>
                 ))}
-                {preview.matched.length === 0 && <span style={{ fontSize: 13, color: '#8C8C8C' }}>未命中任何已配置標籤，得分 0 分</span>}
+                {preview.matched.length === 0 && <span style={{ fontSize: 13, color: 'var(--text-3)' }}>未命中任何已配置標籤，得分 0 分</span>}
               </div>
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '14px 20px', background: '#FFF7E6', border: '1px solid #FFE7D1', borderRadius: 8,
+                padding: '14px 20px', background: 'var(--warning-soft)', border: '1px solid #FFE7D1', borderRadius: 8,
               }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>單項總得分 = 各持有標籤分值累加</span>
-                <output aria-label="單項總得分" aria-live="polite" style={{ fontSize: 24, fontWeight: 700, color: '#E8720C' }}>{preview.total} 分</output>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>單項總得分 = 各持有標籤分值累加</span>
+                <output aria-label="單項總得分" aria-live="polite" style={{ fontSize: 24, fontWeight: 700, color: 'var(--brand)' }}>{preview.total} 分</output>
               </div>
             </>}
           </AlgorithmSection>
@@ -231,5 +231,5 @@ export default function SignboardScorePanel({ ruleName, config, hasDraft, descri
 
 /** 模块内的一行公式+示例：放在区块标题右侧，不另占一块区域 */
 function FormulaHint({ formula, example }: { formula: string; example: string }) {
-  return <span style={{ fontSize: 12, color: '#8C8C8C' }}>公式：{formula}{' · '}例：{example}</span>
+  return <span style={{ fontSize: 12, color: 'var(--text-3)' }}>公式：{formula}{' · '}例：{example}</span>
 }

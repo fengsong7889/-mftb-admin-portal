@@ -95,7 +95,7 @@ describe('算法详情标题同行布局', () => {
     const row = screen.getByText('recommend.algoDetail').parentElement
     expect(row).toHaveStyle({ display: 'flex', alignItems: 'center' })
     expect(row).toHaveTextContent(labelKey)
-    expect(row?.querySelector('span')).toHaveStyle({ fontSize: '14px', color: '#595959', whiteSpace: 'nowrap' })
+    expect(row?.querySelector('span')).toHaveStyle({ fontSize: '14px', color: 'var(--text-2)', whiteSpace: 'nowrap' })
   })
 })
 

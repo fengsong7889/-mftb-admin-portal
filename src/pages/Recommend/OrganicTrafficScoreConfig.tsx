@@ -112,7 +112,7 @@ function StarTierValue({ star, fontSize = 14 }: { star: number; fontSize?: numbe
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
       <Rate disabled allowHalf value={star} count={STAR_TIER_MAX} style={{ fontSize, lineHeight: 1 }} />
-      <span style={{ fontSize: 12, color: '#595959', fontWeight: 600 }}>{star.toFixed(1)} {t('organicTrafficScore.scoreUnit')}</span>
+      <span style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600 }}>{star.toFixed(1)} {t('organicTrafficScore.scoreUnit')}</span>
     </span>
   )
 }
@@ -1353,7 +1353,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
             disabled={false}
             allowClear
             value={keyword}
-            prefix={<SearchOutlined style={{ color: '#BFBFBF' }} />}
+            prefix={<SearchOutlined style={{ color: 'var(--text-4)' }} />}
             placeholder={t('organicTrafficScore.searchPlaceholder')}
             style={{ width: 260 }}
             onChange={e => setKeyword(e.target.value)}
@@ -1370,7 +1370,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
             ]}
             onChange={val => setStatusFilter(val)}
           />
-          <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
             {t('organicTrafficScore.statsTotal', { total: total.length, enabled: enabledCount })}{data.length !== total.length ? t('organicTrafficScore.statsFiltered', { count: data.length }) : ''}
           </span>
           {!readOnly && (
@@ -1388,7 +1388,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
         {/* 可展開規則列表（參考規則配置菜單風格） */}
         <div style={{ border: '1px solid #f0f0f0', borderRadius: 8, overflow: 'hidden' }}>
           {data.length === 0 && (
-            <div style={{ padding: 40, textAlign: 'center', color: '#bfbfbf', fontSize: 13 }}>暫無評分項配置</div>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-4)', fontSize: 13 }}>暫無評分項配置</div>
           )}
           {data.map((rule, idx) => {
             const isExpanded = !!expandedRules[rule.id]
@@ -1404,7 +1404,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                   style={{
                     display: 'flex', alignItems: 'center',
                     padding: '14px 20px', cursor: 'pointer', userSelect: 'none',
-                    background: isExpanded ? '#FAFAFA' : '#fff',
+                    background: isExpanded ? 'var(--surface-3)' : 'var(--surface-2)',
                   }}
                   onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = '#FAFAFA' }}
                   onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = '#fff' }}
@@ -1418,7 +1418,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                   }}>
                     {isExpanded
                       ? <UpOutlined style={{ fontSize: 10, color: '#fff' }} />
-                      : <DownOutlined style={{ fontSize: 10, color: '#8C8C8C' }} />
+                      : <DownOutlined style={{ fontSize: 10, color: 'var(--text-3)' }} />
                     }
                   </span>
                   {/* 規則ID */}
@@ -1434,7 +1434,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                       </span>
                     ) : undefined}
                   >
-                    <span style={{ fontWeight: 500, color: '#262626', fontSize: 14 }}>{rule.name}</span>
+                    <span style={{ fontWeight: 500, color: 'var(--text-1)', fontSize: 14 }}>{rule.name}</span>
                   </Tooltip>
                   {/* 右側：狀態 + 操作 */}
                   <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
@@ -1598,15 +1598,15 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                           {/* 最後更新信息 + 編輯按鈕：統一靠右成組（兩個 margin-left:auto 會把說明擠到中間） */}
                           <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
                             {(rule.updatedBy || rule.updatedAt) && (
-                              <span style={{ fontSize: 11, color: '#8C8C8C', whiteSpace: 'nowrap' }}>
-                                {rule.updatedBy && <>修改人：<span style={{ color: '#595959' }}>{rule.updatedBy}</span></>}
+                              <span style={{ fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
+                                {rule.updatedBy && <>修改人：<span style={{ color: 'var(--text-2)' }}>{rule.updatedBy}</span></>}
                                 {rule.updatedBy && rule.updatedAt && <span style={{ margin: '0 4px' }}>·</span>}
                                 {rule.updatedAt && <span>{rule.updatedAt}</span>}
                               </span>
                             )}
                             {!readOnly && (
                               <Button size="small" icon={<EditOutlined />} onClick={() => handleInlineEdit(rule)}
-                                style={{ borderRadius: 6, borderColor: '#E8720C', color: '#E8720C', fontSize: 12, height: 28 }}>
+                                style={{ borderRadius: 6, borderColor: 'var(--brand)', color: 'var(--brand)', fontSize: 12, height: 28 }}>
                                 編輯
                               </Button>
                             )}
@@ -1629,7 +1629,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                         )}
                         {rule.mode === ScoreMode.CONDITIONAL && rule.conditionItems?.length && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'STB_05' && rule.id !== 'STB_08' && (
                           <div>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>條件分值明細（{rule.conditionItems.length} 組）</div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>條件分值明細（{rule.conditionItems.length} 組）</div>
                             <div className="organic-score-panel organic-score-list">
                               {rule.conditionItems.map((item: ScoreConditionItem, i: number) => (
                                 <ScoreRow key={i} index={i} label={item.condition} score={item.score} />
@@ -1643,7 +1643,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                           return (
                             <div className="organic-score-panel">
                               {items.length === 0 ? (
-                                <div style={{ fontSize: 12, color: '#8C8C8C' }}>尚未配置活動，點擊右上角「編輯」後從下拉框選擇活動並設置固定加分</div>
+                                <div style={{ fontSize: 12, color: 'var(--text-3)' }}>尚未配置活動，點擊右上角「編輯」後從下拉框選擇活動並設置固定加分</div>
                               ) : (
                                 <div className="organic-score-list">
                                   {items.map((item, idx) => {
@@ -1653,8 +1653,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                     return (
                                       <ScoreRow key={item.activityId || idx} index={idx} score={item.score}
                                         label={<span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6, minWidth: 0 }}>
-                                          <span style={{ color: '#262626', fontWeight: 500 }}>{name}</span>
-                                          <span style={{ color: '#8C8C8C', fontFamily: 'monospace', fontSize: 12 }}>（{item.activityId}）</span>
+                                          <span style={{ color: 'var(--text-1)', fontWeight: 500 }}>{name}</span>
+                                          <span style={{ color: 'var(--text-3)', fontFamily: 'monospace', fontSize: 12 }}>（{item.activityId}）</span>
                                         </span>}
                                         hint={status === 1
                                           ? <Tag color="success" style={{ margin: 0 }}>{t('organicTrafficScore.activityStatusActive')}</Tag>
@@ -1722,12 +1722,12 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                           const lowest = view[view.length - 1]?.star ?? 0
                           return (
                             <div className="organic-score-panel">
-                              <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>{t('organicTrafficScore.scoringRuleHeader')}</div>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>{t('organicTrafficScore.scoringRuleHeader')}</div>
                               <div className="organic-score-list">
                                 {view.map((band, i) => (
                                   <ScoreRow key={`${band.star}-${i}`} index={i}
                                     label={<div style={{ display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
-                                      <span style={{ fontSize: 12, color: '#595959', fontWeight: 500 }}>{t('organicTrafficScore.compositeScoreAtLeast')}</span>
+                                      <span style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 500 }}>{t('organicTrafficScore.compositeScoreAtLeast')}</span>
                                       <StarTierValue star={band.star} />
                                     </div>}
                                     score={band.score} />
@@ -1756,8 +1756,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                               {/* 屏蔽商家（全局） */}
                               {blocked.length > 0 && (
                                 <div style={{ padding: '8px 14px', background: '#FFF2F0', borderRadius: 8, border: '1px solid #FFCCC7', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                  <span style={{ fontSize: 11, fontWeight: 600, color: '#FF4D4F', whiteSpace: 'nowrap' }}>🚫 屏蔽商家（{blocked.length} 家）</span>
-                                  <span style={{ fontSize: 11, color: '#8C8C8C' }}>全局生效，所有區域共享</span>
+                                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--danger)', whiteSpace: 'nowrap' }}>🚫 屏蔽商家（{blocked.length} 家）</span>
+                                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>全局生效，所有區域共享</span>
                                   <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
                                     {blocked.slice(0, 5).map(code => (
                                       <Tag key={code} color="error" style={{ fontSize: 11, margin: 0 }}>{code}</Tag>
@@ -1791,11 +1791,11 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                               {/* 區域配置卡片 */}
                               <div className="organic-score-panel">
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
-                                  <div style={{ fontSize: 13, color: '#595959' }}>
-                                    <span style={{ fontWeight: 600, color: '#262626' }}>統計週期：</span>過去 <span style={{ fontWeight: 600, color: regionColor.primary }}>{days}</span> 天
+                                  <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
+                                    <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>統計週期：</span>過去 <span style={{ fontWeight: 600, color: regionColor.primary }}>{days}</span> 天
                                   </div>
                                   <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                    <span style={{ fontSize: 11, fontWeight: 600, color: '#722ED1' }}>前提條件：</span>
+                                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--purple)' }}>前提條件：</span>
                                     {isUnconditional ? (
                                       <Tag color="green" style={{ fontSize: 12, margin: 0 }}>無條件</Tag>
                                     ) : (
@@ -1807,7 +1807,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                     )}
                                   </div>
                                 </div>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>梯度配置</div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>梯度配置</div>
                                 <div className="organic-score-list">
                                   {tiers.map((tier, idx) => (
                                     <ScoreRow key={idx} index={idx} label={<>訂單量 ≤ <b>{tier.threshold}</b> 單</>}
@@ -1841,14 +1841,14 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                               {/* 區域配置卡片 */}
                               <div className="organic-score-panel">
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                                  <div style={{ fontSize: 13, color: '#595959' }}>
-                                    <span style={{ fontWeight: 600, color: '#262626' }}>監控方式：</span>
-                                    <span style={{ fontWeight: 600, color: '#722ED1' }}>定時監控</span>
-                                    <span style={{ margin: '0 4px', color: '#8C8C8C' }}>·</span>
+                                  <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
+                                    <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>監控方式：</span>
+                                    <span style={{ fontWeight: 600, color: 'var(--purple)' }}>定時監控</span>
+                                    <span style={{ margin: '0 4px', color: 'var(--text-3)' }}>·</span>
                                     <span>每 <span style={{ fontWeight: 600, color: regionColor.primary }}>{hours}</span> 小時校驗一次</span>
                                   </div>
                                 </div>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>梯度配置</div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>梯度配置</div>
                                 <div className="organic-score-list">
                                   {tiers.map((tier, idx) => (
                                     <ScoreRow key={idx} index={idx} label={<>訂單量 ≥ <b>{tier.threshold}</b> 單</>}
@@ -1866,7 +1866,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                           const lowest = view[view.length - 1]?.rate ?? 0
                           return (
                             <div className="organic-score-panel">
-                              <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>計分規則</div>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>計分規則</div>
                               <div className="organic-score-list">
                                 {view.map((band, i) => (
                                   <ScoreRow key={`${band.rate}-${i}`} index={i}
@@ -1939,16 +1939,16 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                           return (
                             <div className="organic-score-panel">
                               <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 10, flexWrap: 'wrap' }}>
-                                <div style={{ fontSize: 13, color: '#595959' }}>
-                                  <span style={{ fontWeight: 600, color: '#262626' }}>{t('organicTrafficScore.statDays')}：</span>
-                                  <span style={{ fontWeight: 600, color: '#E8720C' }}>{days}</span> {t('organicTrafficScore.daysUnit')}
+                                <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
+                                  <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{t('organicTrafficScore.statDays')}：</span>
+                                  <span style={{ fontWeight: 600, color: 'var(--brand)' }}>{days}</span> {t('organicTrafficScore.daysUnit')}
                                 </div>
-                                <div style={{ fontSize: 13, color: '#595959' }}>
-                                  <span style={{ fontWeight: 600, color: '#262626' }}>{t('organicTrafficScore.includeThresholdLabel')}：</span>
-                                  統計期內 ≥ <span style={{ fontWeight: 600, color: '#1890FF' }}>{minOrders}</span> {t('organicTrafficScore.orderUnit')}
+                                <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
+                                  <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{t('organicTrafficScore.includeThresholdLabel')}：</span>
+                                  統計期內 ≥ <span style={{ fontWeight: 600, color: 'var(--info)' }}>{minOrders}</span> {t('organicTrafficScore.orderUnit')}
                                 </div>
                               </div>
-                              <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>{t('organicTrafficScore.scoringRuleHeader')}</div>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>{t('organicTrafficScore.scoringRuleHeader')}</div>
                               <div className="organic-score-list">
                                 {view.map((band, i) => (
                                   <ScoreRow key={`${band.maxRate}-${i}`} index={i}
@@ -1971,9 +1971,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                               <ScoreRow label="衰減係數" score={coeff} kind="decay" />
                               <div style={{
                                 display: 'flex', alignItems: 'center', gap: 12,
-                                padding: '10px 12px', background: '#e6f7ff', borderRadius: 6,
+                                padding: '10px 12px', background: 'var(--info-soft)', borderRadius: 6,
                               }}>
-                                <span style={{ fontSize: 13, color: '#595959' }}>計算公式：得分 = 滿分 - 衰減係數 × 距離</span>
+                                <span style={{ fontSize: 13, color: 'var(--text-2)' }}>計算公式：得分 = 滿分 - 衰減係數 × 距離</span>
                               </div>
                               <div className="organic-score-note">
                                 備注：距離越遠得分越低，最低為 0 分
@@ -1990,7 +1990,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                 const scores = trs[periodKey] ?? DEFAULT_RANGE_SCORES
                                 return (
                                   <div key={periodKey} className="organic-score-panel">
-                                    <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>
                                       {TIME_PERIOD_LABELS[periodKey]}
                                     </div>
                                     <div className="organic-score-list">
@@ -2001,7 +2001,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                   </div>
                                 )
                               })}
-                              <div style={{ fontSize: 11, color: '#8C8C8C' }}>
+                              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
                                 備注：後端根據當前時間自動匹配對應時段的分值，未配置的時段不計分
                               </div>
                             </div>
@@ -2009,7 +2009,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                         })()}
                         {rule.mode === ScoreMode.TIERED && rule.tiers?.length && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && (
                           <div>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>梯度檔位明細（{rule.tiers.length} 檔）</div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>梯度檔位明細（{rule.tiers.length} 檔）</div>
                             <div className="organic-score-panel organic-score-list">
                               {rule.tiers.map((tier: ScoreTier, i: number) => (
                                 <ScoreRow key={i} index={i} score={tier.score}
@@ -2021,7 +2021,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                         )}
                         {rule.rangeScores && rule.id !== 'PLT_02A' && (
                           <div>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>配送範圍分值</div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>配送範圍分值</div>
                             <div className="organic-score-panel organic-score-list">
                               {RANGE_SCORE_KEYS.map(key => (
                                 <ScoreRow key={key} label={RANGE_LABEL[key]} score={rule.rangeScores![key]} />
@@ -2039,7 +2039,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                         <div className="organic-score-config-grid">
                             {(rule.id !== 'COM_01' && rule.id !== 'COM_03' && rule.id !== 'COM_04' && rule.id !== 'COM_05' && rule.id !== 'COM_06' && rule.id !== 'COM_07' && rule.id !== 'COM_10' && rule.id !== 'COM_SLOT' && rule.id !== 'STB_01' && rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_09') && (
                             <div>
-                              <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>前提條件</div>
+                              <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>前提條件</div>
                               <Input value={form.prerequisites || ''} maxLength={60} showCount allowClear
                                 placeholder="填寫規則生效的前提條件"
                                 onChange={e => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], prerequisites: e.target.value || undefined } }) as any)} />
@@ -2065,8 +2065,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                 <div style={{ padding: 12, background: '#FFF2F0', borderRadius: 8, border: '1px solid #FFCCC7' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: blocked.length > 0 ? 8 : 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                      <span style={{ fontSize: 12, fontWeight: 600, color: '#FF4D4F', whiteSpace: 'nowrap' }}>🚫 屏蔽商家</span>
-                                      <span style={{ fontSize: 11, color: '#8C8C8C' }}>全局生效，所有區域共享</span>
+                                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--danger)', whiteSpace: 'nowrap' }}>🚫 屏蔽商家</span>
+                                      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>全局生效，所有區域共享</span>
                                     </div>
                                     <Button
                                       size="small"
@@ -2124,7 +2124,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                 <div className="organic-score-panel">
                                   {/* 前提條件 */}
                                   <div style={{ marginBottom: 12 }}>
-                                    <div style={{ fontSize: 12, color: '#595959', marginBottom: 8 }}>前提條件</div>
+                                    <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 8 }}>前提條件</div>
                                     <Radio.Group
                                       value={isUnconditional ? 'UNCONDITIONAL' : 'CONDITIONAL'}
                                       onChange={e => {
@@ -2152,7 +2152,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                   </div>
                                   {/* 統計天數 */}
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                                    <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>統計天數</span>
+                                    <span style={{ fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>統計天數</span>
                                     <InputNumber
                                       value={regionData.statDays ?? 30}
                                       min={1}
@@ -2161,16 +2161,16 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                       addonAfter="天"
                                       onChange={val => updateRegion(activeRegion, { statDays: val ?? 30 })}
                                     />
-                                    <span style={{ fontSize: 11, color: '#8C8C8C' }}>過去 N 天內的訂單數據</span>
+                                    <span style={{ fontSize: 11, color: 'var(--text-3)' }}>過去 N 天內的訂單數據</span>
                                   </div>
                                   {/* 梯度配置 */}
-                                  <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>梯度配置</div>
+                                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>梯度配置</div>
                                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                     {(regionData.tiers || []).map((tier: ScoreTier, idx: number) => (
                                       <div key={idx} className="organic-score-edit-tier">
-                                        <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
-                                        <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>訂單量</span>
-                                        <span style={{ fontSize: 13, color: '#262626', fontWeight: 500 }}>≤</span>
+                                        <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 20 }}>#{idx + 1}</span>
+                                        <span style={{ fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>訂單量</span>
+                                        <span style={{ fontSize: 13, color: 'var(--text-1)', fontWeight: 500 }}>≤</span>
                                         <InputNumber
                                           value={tier.threshold || undefined}
                                           min={0}
@@ -2182,8 +2182,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                             updateRegion(activeRegion, { tiers: newTiers })
                                           }}
                                         />
-                                        <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>單</span>
-                                        <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>固定加分</span>
+                                        <span style={{ fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>單</span>
+                                        <span style={{ fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>固定加分</span>
                                         <InputNumber
                                           value={tier.score || undefined}
                                           min={0}
@@ -2241,20 +2241,20 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                 if (isFilteredBusinessState(item, currentItem)) return (
                                   <div key={item.key} className="organic-score-edit-tier">
                                     <div>
-                                      <div style={{ fontSize: 12, color: '#262626', fontWeight: 500 }}>{item.label}</div>
-                                      <div style={{ fontSize: 11, color: '#8C8C8C' }}>{item.desc}</div>
+                                      <div style={{ fontSize: 12, color: 'var(--text-1)', fontWeight: 500 }}>{item.label}</div>
+                                      <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{item.desc}</div>
                                     </div>
-                                    <span style={{ marginLeft: 'auto', fontSize: 12, color: '#8C8C8C' }}>由系統直接過濾，不加載到瀑布流，無需配置分值</span>
+                                    <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-3)' }}>由系統直接過濾，不加載到瀑布流，無需配置分值</span>
                                   </div>
                                 )
                                 // 墊底档不给加/减分配置入口：排序由系統統一處理，避免運營配出“休息扣 N 分”的錯誤預期
                                 if (item.bottom) return (
                                   <div key={item.key} className="organic-score-edit-tier">
                                     <div>
-                                      <div style={{ fontSize: 12, color: '#262626', fontWeight: 500 }}>{item.label}</div>
-                                      <div style={{ fontSize: 11, color: '#8C8C8C' }}>{item.desc}</div>
+                                      <div style={{ fontSize: 12, color: 'var(--text-1)', fontWeight: 500 }}>{item.label}</div>
+                                      <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{item.desc}</div>
                                     </div>
-                                    <span style={{ marginLeft: 'auto', fontSize: 12, color: '#8C8C8C' }}>系統自動墊底排序，排在正常參與排序的商家之後，無需配置加減分</span>
+                                    <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-3)' }}>系統自動墊底排序，排在正常參與排序的商家之後，無需配置加減分</span>
                                   </div>
                                 )
                                 // 營業中只能加分：下拉鎖定「固定加分」，不允許改成固定減分
@@ -2262,20 +2262,20 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                 return (
                                   <div key={item.key} className="organic-score-edit-tier">
                                     <div>
-                                      <div style={{ fontSize: 12, color: '#262626', fontWeight: 500 }}>{item.label}</div>
-                                      <div style={{ fontSize: 11, color: '#8C8C8C' }}>{item.desc}</div>
+                                      <div style={{ fontSize: 12, color: 'var(--text-1)', fontWeight: 500 }}>{item.label}</div>
+                                      <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{item.desc}</div>
                                     </div>
                                     <Select
                                       value={lockBonus ? 'bonus' : currentItem.condition === 'deduction' ? 'deduction' : 'bonus'}
                                       style={{ width: 110 }}
                                       disabled={lockBonus}
                                       options={[
-                                        { label: <span style={{ color: '#52C41A', fontWeight: 500 }}>固定加分</span>, value: 'bonus' },
-                                        { label: <span style={{ color: '#FF4D4F', fontWeight: 500 }}>固定減分</span>, value: 'deduction' },
+                                        { label: <span style={{ color: 'var(--success)', fontWeight: 500 }}>固定加分</span>, value: 'bonus' },
+                                        { label: <span style={{ color: 'var(--danger)', fontWeight: 500 }}>固定減分</span>, value: 'deduction' },
                                       ]}
                                       labelRender={(props) => {
                                         const isBonus = props.value === 'bonus'
-                                        return <span style={{ color: isBonus ? '#52C41A' : '#FF4D4F', fontWeight: 500 }}>{isBonus ? '固定加分' : '固定減分'}</span>
+                                        return <span style={{ color: isBonus ? 'var(--success)' : 'var(--danger)', fontWeight: 500 }}>{isBonus ? '固定加分' : '固定減分'}</span>
                                       }}
                                       onChange={val => {
                                         const newItems = [...(form as any).conditionItems || []]
@@ -2326,19 +2326,19 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                           return (
                             <div className="organic-score-panel">
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                                <span style={{ fontSize: 12, fontWeight: 600, color: '#262626' }}>{t('organicTrafficScore.tierConfig')}</span>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)' }}>{t('organicTrafficScore.tierConfig')}</span>
                                 <Button size="small" type="link" icon={<PlusOutlined aria-hidden="true" />} onClick={addBand}
-                                  style={{ color: '#E8720C' }}>{t('organicTrafficScore.addTier')}</Button>
+                                  style={{ color: 'var(--brand)' }}>{t('organicTrafficScore.addTier')}</Button>
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                 {list.map((band, idx) => (
                                   <div key={idx} className="organic-score-edit-row" style={{ flexWrap: 'wrap' }}>
-                                    <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
-                                    <span style={{ fontSize: 13, color: '#262626', whiteSpace: 'nowrap' }}>{t('organicTrafficScore.compositeScoreAtLeast')}</span>
+                                    <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 20 }}>#{idx + 1}</span>
+                                    <span style={{ fontSize: 13, color: 'var(--text-1)', whiteSpace: 'nowrap' }}>{t('organicTrafficScore.compositeScoreAtLeast')}</span>
                                     <Rate aria-label={`第 ${idx + 1} 檔店鋪綜合分`} allowHalf value={band.star} count={STAR_TIER_MAX}
                                       style={{ fontSize: 18 }} onChange={val => patchBand(idx, { star: val > 0 ? val : STAR_TIER_STEP })} />
-                                    <span style={{ fontSize: 12, color: '#595959', fontWeight: 600 }}>{band.star.toFixed(1)} {t('organicTrafficScore.scoreUnit')}</span>
-                                    <span style={{ fontSize: 12, color: '#52C41A', fontWeight: 500, whiteSpace: 'nowrap' }}>{t('organicTrafficScore.fixedBonusLabel')}</span>
+                                    <span style={{ fontSize: 12, color: 'var(--text-2)', fontWeight: 600 }}>{band.star.toFixed(1)} {t('organicTrafficScore.scoreUnit')}</span>
+                                    <span style={{ fontSize: 12, color: 'var(--success)', fontWeight: 500, whiteSpace: 'nowrap' }}>{t('organicTrafficScore.fixedBonusLabel')}</span>
                                     <InputNumber aria-label={`第 ${idx + 1} 檔加分`} value={band.score} min={0} max={1000}
                                       style={{ width: 120 }} addonAfter={t('organicTrafficScore.scoreUnit')} placeholder={t('organicTrafficScore.scorePlaceholder')}
                                       onChange={val => patchBand(idx, { score: val ?? 0 })} />
@@ -2378,9 +2378,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                               <div className="organic-score-panel">
                                 {/* 校驗間隔 */}
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>監控方式</span>
+                                  <span style={{ fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>監控方式</span>
                                   <Tag color="purple" style={{ fontSize: 12, margin: 0 }}>定時監控</Tag>
-                                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>校驗間隔</span>
+                                  <span style={{ fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>校驗間隔</span>
                                   <InputNumber
                                     value={regionData.calcIntervalHours ?? 1}
                                     min={0.1}
@@ -2391,16 +2391,16 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                     placeholder="輸入小時數"
                                     onChange={val => updateRegion(activeRegion, { calcIntervalHours: val ?? 1 })}
                                   />
-                                  <span style={{ fontSize: 11, color: '#8C8C8C' }}>（如 0.5 = 30 分鐘）</span>
+                                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>（如 0.5 = 30 分鐘）</span>
                                 </div>
                                 {/* 梯度配置 */}
-                                <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>梯度配置</div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>梯度配置</div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                   {(regionData.tiers || []).map((tier: ScoreTier, idx: number) => (
                                     <div key={idx} className="organic-score-edit-tier">
-                                      <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
-                                      <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>訂單量</span>
-                                      <span style={{ fontSize: 13, color: '#262626', fontWeight: 500 }}>≥</span>
+                                      <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 20 }}>#{idx + 1}</span>
+                                      <span style={{ fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>訂單量</span>
+                                      <span style={{ fontSize: 13, color: 'var(--text-1)', fontWeight: 500 }}>≥</span>
                                       <InputNumber
                                         value={tier.threshold || undefined}
                                         min={0}
@@ -2412,8 +2412,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                           updateRegion(activeRegion, { tiers: newTiers })
                                         }}
                                       />
-                                      <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>單</span>
-                                      <span style={{ fontSize: 12, color: '#FF4D4F', whiteSpace: 'nowrap' }}>固定減分</span>
+                                      <span style={{ fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>單</span>
+                                      <span style={{ fontSize: 12, color: 'var(--danger)', whiteSpace: 'nowrap' }}>固定減分</span>
                                       <InputNumber
                                         value={Math.abs(tier.score) || undefined}
                                         min={0}
@@ -2474,18 +2474,18 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                           return (
                             <div className="organic-score-panel">
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                                <span style={{ fontSize: 12, fontWeight: 600, color: '#262626' }}>計分規則</span>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)' }}>計分規則</span>
                                 <Button size="small" type="link" icon={<PlusOutlined aria-hidden="true" />} onClick={addBand}
-                                  style={{ color: '#E8720C' }}>添加檔位</Button>
+                                  style={{ color: 'var(--brand)' }}>添加檔位</Button>
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                 {list.map((band, i) => (
                                   <div key={i} className="organic-score-edit-row" style={{ flexWrap: 'wrap' }}>
-                                    <span style={{ fontSize: 13, color: '#262626' }}>出餐準時率 ≥</span>
+                                    <span style={{ fontSize: 13, color: 'var(--text-1)' }}>出餐準時率 ≥</span>
                                     <InputNumber aria-label={`第 ${i + 1} 檔準時率`} value={band.rate} min={0} max={100} precision={1}
                                       onChange={val => patchBands(list.map((item, j) => j === i ? { ...item, rate: val ?? 0 } : item))}
                                       style={{ width: 130 }} addonAfter="%" />
-                                    <span style={{ fontSize: 13, color: '#595959' }}>→ 得</span>
+                                    <span style={{ fontSize: 13, color: 'var(--text-2)' }}>→ 得</span>
                                     <InputNumber aria-label={`第 ${i + 1} 檔分值`} value={band.score} min={0} max={1000}
                                       onChange={val => patchBands(list.map((item, j) => j === i ? { ...item, score: val ?? 0 } : item))}
                                       style={{ width: 120 }} addonAfter="分" />
@@ -2506,7 +2506,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             <div className="organic-score-edit-tier">
                               <span className="organic-score-edit-tier__label">開啟自動接單</span>
                               <Switch checked disabled checkedChildren="啟用" unCheckedChildren="停用" aria-label="自動接單計分前提條件" />
-                              <span style={{ fontSize: 12, color: '#52C41A', fontWeight: 500 }}>固定加分</span>
+                              <span style={{ fontSize: 12, color: 'var(--success)', fontWeight: 500 }}>固定加分</span>
                               <InputNumber value={form.score} min={0} max={200} style={{ width: 130 }}
                                 addonAfter="分" placeholder="輸入分數"
                                 onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], score: val ?? 0 } }) as any)} />
@@ -2528,7 +2528,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                   ...prev,
                                   [rule.id]: { ...prev[rule.id], prerequisites: checked ? MEAL_TIME_AUTO_CORRECT_ON : MEAL_TIME_AUTO_CORRECT_OFF },
                                 }) as any)} />
-                              <span style={{ fontSize: 12, color: '#52C41A', fontWeight: 500 }}>{t('organicTrafficScore.fixedBonusLabel')}</span>
+                              <span style={{ fontSize: 12, color: 'var(--success)', fontWeight: 500 }}>{t('organicTrafficScore.fixedBonusLabel')}</span>
                               <InputNumber aria-label={t('organicTrafficScore.mealTimeScoreAria')} value={form.score ?? MEAL_TIME_DEFAULT_SCORE} min={1} max={500} style={{ width: 130 }}
                                 addonAfter={t('organicTrafficScore.scoreUnit')} placeholder={t('organicTrafficScore.scorePlaceholder')}
                                 onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], score: val ?? 0 } }) as any)} />
@@ -2543,7 +2543,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                           <div className="organic-score-panel">
                             <div className="organic-score-edit-tier">
                               <span className="organic-score-edit-tier__label">{TIME_SLOT_AD_PREREQUISITE}</span>
-                              <span style={{ fontSize: 12, color: '#52C41A', fontWeight: 500 }}>固定加分</span>
+                              <span style={{ fontSize: 12, color: 'var(--success)', fontWeight: 500 }}>固定加分</span>
                               <InputNumber aria-label={t('organicTrafficScore.timeSlotScoreAria')} value={form.score ?? TIME_SLOT_AD_DEFAULT_SCORE} min={0} max={200} style={{ width: 130 }}
                                 addonAfter="分" placeholder="輸入分數"
                                 onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], score: val ?? 0 } }) as any)} />
@@ -2579,7 +2579,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             <div className="organic-score-panel">
                               <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{t('organicTrafficScore.statDays')}</span>
+                                  <span style={{ fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>{t('organicTrafficScore.statDays')}</span>
                                   <InputNumber
                                     aria-label="訂單取消率統計天數"
                                     value={days}
@@ -2589,29 +2589,29 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                   />
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{t('organicTrafficScore.orderCountAtLeast')}</span>
+                                  <span style={{ fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>{t('organicTrafficScore.orderCountAtLeast')}</span>
                                   <InputNumber
                                     aria-label="納入門檻訂單量" value={minOrders}
                                     min={1} max={100000} precision={0} style={{ width: 120 }}
                                     addonAfter={t('organicTrafficScore.orderUnit')}
                                     onChange={val => writeItems(list, val ?? DEFAULT_CANCEL_MIN_ORDERS)}
                                   />
-                                  <span style={{ fontSize: 11, color: '#8C8C8C' }}>{t('organicTrafficScore.minOrderHint')}</span>
+                                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{t('organicTrafficScore.minOrderHint')}</span>
                                 </div>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                                <span style={{ fontSize: 12, fontWeight: 600, color: '#262626' }}>{t('organicTrafficScore.scoringRuleHeader')}</span>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)' }}>{t('organicTrafficScore.scoringRuleHeader')}</span>
                                 <Button size="small" type="link" icon={<PlusOutlined aria-hidden="true" />} onClick={addBand}
-                                  style={{ color: '#E8720C' }}>{t('organicTrafficScore.addTier')}</Button>
+                                  style={{ color: 'var(--brand)' }}>{t('organicTrafficScore.addTier')}</Button>
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                 {list.map((band, i) => (
                                   <div key={i} className="organic-score-edit-row" style={{ flexWrap: 'wrap' }}>
-                                    <span style={{ fontSize: 13, color: '#262626' }}>{t('organicTrafficScore.cancelRateAtMost')}</span>
+                                    <span style={{ fontSize: 13, color: 'var(--text-1)' }}>{t('organicTrafficScore.cancelRateAtMost')}</span>
                                     <InputNumber aria-label={`第 ${i + 1} 檔取消率上限`} value={band.maxRate} min={0} max={100} precision={1}
                                       onChange={val => patchBand(i, { maxRate: val ?? 0 })}
                                       style={{ width: 140 }} addonAfter="%" />
-                                    <span style={{ fontSize: 13, color: '#595959' }}>→ {t('organicTrafficScore.fixedBonusLabel')}</span>
+                                    <span style={{ fontSize: 13, color: 'var(--text-2)' }}>→ {t('organicTrafficScore.fixedBonusLabel')}</span>
                                     <InputNumber aria-label={`第 ${i + 1} 檔分值`} value={band.score} min={0} max={1000}
                                       onChange={val => patchBand(i, { score: val ?? 0 })}
                                       style={{ width: 120 }} addonAfter={t('organicTrafficScore.scoreUnit')} />
@@ -2634,7 +2634,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             <div className="organic-score-panel">
                               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>滿分</span>
+                                  <span style={{ fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>滿分</span>
                                   <InputNumber
                                     value={fullScore}
                                     min={0} max={500} style={{ width: 110 }}
@@ -2643,7 +2643,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                   />
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>衰減係數</span>
+                                  <span style={{ fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>衰減係數</span>
                                   <InputNumber
                                     value={coeff}
                                     min={0.1} max={100} step={0.1} style={{ width: 130 }}
@@ -2653,11 +2653,11 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                 </div>
                               </div>
                               <div style={{
-                                padding: '8px 12px', background: '#e6f7ff', borderRadius: 6, marginBottom: 8,
+                                padding: '8px 12px', background: 'var(--info-soft)', borderRadius: 6, marginBottom: 8,
                               }}>
-                                <span style={{ fontSize: 12, color: '#595959' }}>計算公式：得分 = 滿分 - 衰減係數 × 距離</span>
+                                <span style={{ fontSize: 12, color: 'var(--text-2)' }}>計算公式：得分 = 滿分 - 衰減係數 × 距離</span>
                               </div>
-                              <div style={{ fontSize: 11, color: '#8C8C8C' }}>
+                              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
                                 備注：距離越遠得分越低，最低為 0 分
                               </div>
                             </div>
@@ -2672,13 +2672,13 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                 const scores = trs[periodKey] ?? DEFAULT_RANGE_SCORES
                                 return (
                                   <div key={periodKey} className="organic-score-panel">
-                                    <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 10 }}>
+                                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 10 }}>
                                       {TIME_PERIOD_LABELS[periodKey]}
                                     </div>
                                     <div className="organic-score-fields">
                                       {RANGE_SCORE_KEYS.map(key => (
                                         <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                          <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>{RANGE_LABEL[key]}</span>
+                                          <span style={{ fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>{RANGE_LABEL[key]}</span>
                                           <InputNumber
                                             value={scores[key] ?? 0}
                                             min={0} max={500} style={{ width: '100%' }}
@@ -2694,7 +2694,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                   </div>
                                 )
                               })}
-                              <div style={{ fontSize: 11, color: '#8C8C8C' }}>
+                              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
                                 備注：後端根據當前時間自動匹配對應時段的分值，未配置的時段不計分
                               </div>
                             </div>
@@ -2710,7 +2710,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                           return (
                             <div className="organic-score-panel">
                               {items.length === 0 ? (
-                                <div style={{ fontSize: 12, color: '#8C8C8C', textAlign: 'center', padding: '10px 0' }}>尚未添加活動，點擊下方「添加活動」，從下拉框選中即自動帶出活動名稱與狀態</div>
+                                <div style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'center', padding: '10px 0' }}>尚未添加活動，點擊下方「添加活動」，從下拉框選中即自動帶出活動名稱與狀態</div>
                               ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                   {items.map((item, idx) => {
@@ -2718,7 +2718,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                     const live = algoOptions.find(a => a.algoCode === code)
                                     return (
                                       <div key={idx} className="organic-score-edit-row" style={{ flexWrap: 'wrap' }}>
-                                        <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
+                                        <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 20 }}>#{idx + 1}</span>
                                         <Select
                                           aria-label={`第 ${idx + 1} 行活動`}
                                           showSearch allowClear
@@ -2747,7 +2747,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                                         <Tag color={live?.status === 1 ? 'success' : live?.status === 2 ? 'warning' : 'default'} style={{ margin: 0 }}>
                                           {live?.status === 1 ? t('organicTrafficScore.activityStatusActive') : live?.status === 2 ? t('organicTrafficScore.activityStatusExpired') : t('organicTrafficScore.activityStatusUnknown')}
                                         </Tag>
-                                        <span style={{ fontSize: 12, color: '#52C41A', fontWeight: 500, whiteSpace: 'nowrap' }}>{t('organicTrafficScore.fixedBonusLabel')}</span>
+                                        <span style={{ fontSize: 12, color: 'var(--success)', fontWeight: 500, whiteSpace: 'nowrap' }}>{t('organicTrafficScore.fixedBonusLabel')}</span>
                                         <InputNumber aria-label={`第 ${idx + 1} 行加分分值`} value={item.score || undefined} min={1} max={500}
                                           style={{ width: 120 }} addonAfter={t('organicTrafficScore.scoreUnit')} placeholder={t('organicTrafficScore.scorePlaceholder')}
                                           onChange={val => updateActivityItem(rule.id, idx, { score: val ?? 0 })} />
@@ -2784,7 +2784,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                         {rule.id === 'STB_01' && (
                           <div className="organic-score-edit-tier">
                             <span className="organic-score-edit-tier__label">主營時段加分</span>
-                            <span style={{ fontSize: 12, color: '#52C41A', fontWeight: 500 }}>固定加分</span>
+                            <span style={{ fontSize: 12, color: 'var(--success)', fontWeight: 500 }}>固定加分</span>
                             <InputNumber value={form.score} min={0} max={200} style={{ width: 130 }}
                               addonAfter="分" placeholder="輸入分數"
                               onChange={val => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], score: val ?? 0 } }) as any)} />
@@ -2794,7 +2794,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                         {(rule.id !== 'STB_02' && rule.id !== 'STB_03' && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && rule.id !== 'STB_05' && rule.id !== 'STB_06' && rule.id !== 'STB_07' && rule.id !== 'STB_08' && rule.id !== 'PLT_01' && rule.id !== 'PLT_02A' && rule.id !== 'STB_01' && rule.id !== 'STB_09' && rule.id !== 'COM_01' && rule.id !== 'COM_SLOT') && (
                           <div className="organic-score-fields">
                             <div>
-                              <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>計分方式</div>
+                              <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>計分方式</div>
                               <Select value={form.mode} style={{ width: '100%' }}
                                 options={rule.id === 'STB_01' ? [
                                   { label: '固定加分', value: ScoreMode.RULE_BONUS },
@@ -2806,11 +2806,11 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             </div>
                             <div>
                               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 4 }}>
-                                <span style={{ fontSize: 12, color: '#595959' }}>
+                                <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
                                   {(rule.id === 'COM_01' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_10') && form.mode === ScoreMode.AMOUNT_MULTIPLIER ? '倍率' : '分值'}
                                 </span>
                                 {(rule.id === 'COM_01' || rule.id === 'COM_03' || rule.id === 'COM_04' || rule.id === 'COM_05' || rule.id === 'COM_06' || rule.id === 'COM_07' || rule.id === 'COM_10') && (
-                                  <span style={{ fontSize: 11, color: '#8C8C8C' }}>
+                                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>
                                     {form.mode === ScoreMode.AMOUNT_MULTIPLIER
                                       ? rule.id === 'COM_01' ? '（立減金額 × 倍率 = 得分）' : rule.id === 'COM_03' ? '（領券金額 × 倍率 = 得分）' : rule.id === 'COM_04' ? '（門店新客券金額 × 倍率 = 得分）' : rule.id === 'COM_05' ? '（贈券金額 × 倍率 = 得分）' : rule.id === 'COM_06' ? '（紅包金額 × 倍率 = 得分）' : rule.id === 'COM_07' ? '（神券金額 × 倍率 = 得分）' : '（廣告金額 × 倍率 = 得分）'
                                       : '（直接加固定分）'}
@@ -2823,7 +2823,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                           </div>
                         )}
                         <div>
-                          <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>評分說明</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>評分說明</div>
                           <Input.TextArea value={form.description} rows={2} maxLength={120} showCount
                             onChange={e => setInlineForm(prev => ({ ...prev, [rule.id]: { ...prev[rule.id], description: e.target.value } }) as any)} />
                         </div>
@@ -2947,7 +2947,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
             label: (
               <span style={{ fontSize: 13 }}>
                 {SCORE_DIMENSION_ICON[dimension]} {DIM_LABEL[dimension]}
-                <span style={{ color: '#8C8C8C', marginLeft: 4 }}>
+                <span style={{ color: 'var(--text-3)', marginLeft: 4 }}>
                   ({getRules(dimension).length})
                 </span>
               </span>
@@ -2965,7 +2965,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
         onCancel={() => setRuleModalOpen(false)}
         footer={<Button disabled={false} onClick={() => setRuleModalOpen(false)}>{t('organicTrafficScore.close')}</Button>}
       >
-        <div style={{ fontSize: 13, lineHeight: 2, color: '#595959', marginTop: 12 }}>
+        <div style={{ fontSize: 13, lineHeight: 2, color: 'var(--text-2)', marginTop: 12 }}>
           <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(t('organicTrafficScore.rule1')) }} />
           <div>{t('organicTrafficScore.rule2')}</div>
           <div>{t('organicTrafficScore.rule3')}</div>
@@ -3011,7 +3011,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                 <Alert type="error" showIcon message="該評分項已在列表中配置，不可重複添加" style={{ marginBottom: 16 }} />
               )}
               {!selectedTemplate && (
-                <div style={{ textAlign: 'center', padding: '32px 0', color: '#bfbfbf', fontSize: 13 }}>
+                <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-4)', fontSize: 13 }}>
                   請從上方選擇一個評分項模板
                 </div>
               )}
@@ -3020,7 +3020,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                 return (
                   <>
                     {/* 描述（只讀） */}
-                    <div style={{ padding: '10px 14px', background: '#FAFAFA', borderRadius: 6, marginBottom: 16, fontSize: 13, color: '#595959', lineHeight: 1.6 }}>
+                    <div style={{ padding: '10px 14px', background: 'var(--surface-3)', borderRadius: 6, marginBottom: 16, fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6 }}>
                       {tpl.description}
                     </div>
 
@@ -3028,13 +3028,13 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                     {tpl.mode === ScoreMode.RULE_DEDUCTION && (
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
                         <div>
-                          <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>統計天數</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>統計天數</div>
                           <Form.Item name="statDays" noStyle>
                             <InputNumber min={1} max={365} style={{ width: '100%' }} addonAfter="天" placeholder="統計天數" />
                           </Form.Item>
                         </div>
                         <div>
-                          <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>每單扣分</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>每單扣分</div>
                           <Form.Item name="deductionPerOrder" noStyle>
                             <InputNumber min={1} max={500} style={{ width: '100%' }} addonAfter="分" placeholder="每單扣分" />
                           </Form.Item>
@@ -3046,13 +3046,13 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                     {tpl.id === 'PLT_01' && (
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
                         <div>
-                          <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>滿分</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>滿分</div>
                           <Form.Item name="score" noStyle>
                             <InputNumber min={0} max={500} style={{ width: '100%' }} addonAfter="分" placeholder="滿分分值" />
                           </Form.Item>
                         </div>
                         <div>
-                          <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>衰減係數</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>衰減係數</div>
                           <Form.Item name="decayCoefficient" noStyle>
                             <InputNumber min={0.1} max={100} step={0.1} style={{ width: '100%' }} placeholder="衰減係數" />
                           </Form.Item>
@@ -3063,14 +3063,14 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                     {/* PLT_02A 配送範圍：5 個時段 × 4 個距離分值 */}
                     {tpl.id === 'PLT_02A' && (
                       <div style={{ marginBottom: 16 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 10 }}>配送範圍分時段配置</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 10 }}>配送範圍分時段配置</div>
                         {TIME_PERIOD_KEYS.map(periodKey => (
-                          <div key={periodKey} style={{ padding: '10px 12px', background: '#FAFAFA', borderRadius: 6, border: '1px solid #F0F0F0', marginBottom: 8 }}>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>{TIME_PERIOD_LABELS[periodKey]}</div>
+                          <div key={periodKey} style={{ padding: '10px 12px', background: 'var(--surface-3)', borderRadius: 6, border: '1px solid #F0F0F0', marginBottom: 8 }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>{TIME_PERIOD_LABELS[periodKey]}</div>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
                               {RANGE_SCORE_KEYS.map(key => (
                                 <div key={key}>
-                                  <div style={{ fontSize: 11, color: '#8C8C8C', marginBottom: 2 }}>{RANGE_LABEL[key]}</div>
+                                  <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 2 }}>{RANGE_LABEL[key]}</div>
                                   <Form.Item name={['timeRangeScores', periodKey, key]} noStyle>
                                     <InputNumber min={0} max={500} style={{ width: '100%' }} addonAfter="分" size="small" />
                                   </Form.Item>
@@ -3085,7 +3085,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                     {/* 通用 RULE_BONUS / AMOUNT_MULTIPLIER：分值 */}
                     {tpl.mode === ScoreMode.RULE_BONUS && tpl.id !== 'PLT_02A' && (
                       <div style={{ marginBottom: 16 }}>
-                        <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>分值</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>分值</div>
                         <Form.Item name="score" noStyle>
                           <InputNumber min={0} max={500} style={{ width: '100%' }} addonAfter="分" placeholder="固定加分分值" />
                         </Form.Item>
@@ -3093,7 +3093,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                     )}
                     {tpl.mode === ScoreMode.AMOUNT_MULTIPLIER && (
                       <div style={{ marginBottom: 16 }}>
-                        <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>倍率</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>倍率</div>
                         <Form.Item name="score" noStyle>
                           <InputNumber min={0} max={100} step={0.1} style={{ width: '100%' }} addonAfter="倍" placeholder="金額倍率" />
                         </Form.Item>
@@ -3102,29 +3102,29 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
 
                     {/* TIERED：梯度檔位配置 */}
                     {tpl.mode === ScoreMode.TIERED && (
-                      <div style={{ marginBottom: 16, padding: '14px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 8 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 12 }}>梯度計分配置</div>
+                      <div style={{ marginBottom: 16, padding: '14px 16px', background: 'var(--success-soft)', border: '1px solid #b7eb8f', borderRadius: 8 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 12 }}>梯度計分配置</div>
                         {tierRows.length === 0 && (
-                          <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>尚未配置檔位，請點擊下方「新增檔位」</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>尚未配置檔位，請點擊下方「新增檔位」</div>
                         )}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
                           {tierRows.map((tier, idx) => (
-                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0' }}>
-                              <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
-                              <span style={{ fontSize: 12, color: '#595959' }}>統計</span>
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', padding: '8px 12px', background: 'var(--surface-2)', borderRadius: 6, border: '1px solid #f0f0f0' }}>
+                              <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 20 }}>#{idx + 1}</span>
+                              <span style={{ fontSize: 12, color: 'var(--text-2)' }}>統計</span>
                               <InputNumber value={tier.statDays} min={1} max={365} size="small" style={{ width: 64 }} placeholder="天數"
                                 onChange={val => { const n = [...tierRows]; n[idx] = { ...n[idx], statDays: val ?? undefined }; setTierRows(n) }} />
-                              <span style={{ fontSize: 12, color: '#595959' }}>天，訂單</span>
+                              <span style={{ fontSize: 12, color: 'var(--text-2)' }}>天，訂單</span>
                               <Select value={tier.direction} style={{ width: 72 }} size="small"
                                 onChange={val => { const n = [...tierRows]; n[idx] = { ...n[idx], direction: val }; setTierRows(n) }}
                                 options={[{ label: '≤', value: TierDirection.LESS_THAN }, { label: '≥', value: TierDirection.MORE_THAN }]} />
                               <InputNumber value={tier.threshold} min={0} size="small" style={{ width: 72 }} placeholder="閾值"
                                 onChange={val => { const n = [...tierRows]; n[idx] = { ...n[idx], threshold: val ?? 0 }; setTierRows(n) }} />
-                              <span style={{ fontSize: 12, color: '#595959' }}>單，</span>
-                              <span style={{ fontSize: 12, color: tier.score >= 0 ? '#52C41A' : '#FF4D4F' }}>加</span>
+                              <span style={{ fontSize: 12, color: 'var(--text-2)' }}>單，</span>
+                              <span style={{ fontSize: 12, color: tier.score >= 0 ? 'var(--success)' : 'var(--danger)' }}>加</span>
                               <InputNumber value={tier.score} size="small" style={{ width: 72 }} placeholder="分值"
                                 onChange={val => { const n = [...tierRows]; n[idx] = { ...n[idx], score: val ?? 0 }; setTierRows(n) }} />
-                              <span style={{ fontSize: 12, color: '#595959' }}>分</span>
+                              <span style={{ fontSize: 12, color: 'var(--text-2)' }}>分</span>
                               <Button type="text" size="small" danger icon={<DeleteOutlined />} style={{ marginLeft: 'auto' }}
                                 onClick={() => setTierRows(prev => prev.filter((_, i) => i !== idx))} />
                             </div>
@@ -3140,20 +3140,20 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                     {/* CONDITIONAL：條件計分配置 */}
                     {tpl.mode === ScoreMode.CONDITIONAL && (
                       <div style={{ marginBottom: 16, padding: '14px 16px', background: '#f0f5ff', border: '1px solid #adc6ff', borderRadius: 8 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 4 }}>條件計分配置</div>
-                        <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 12 }}>每組定義一個條件描述及對應分值</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 4 }}>條件計分配置</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12 }}>每組定義一個條件描述及對應分值</div>
                         {conditionRows.length === 0 && (
-                          <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>尚未配置條件，請點擊下方「新增條件」</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>尚未配置條件，請點擊下方「新增條件」</div>
                         )}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
                           {conditionRows.map((item, idx) => (
-                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0' }}>
-                              <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 6, border: '1px solid #f0f0f0' }}>
+                              <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 20 }}>#{idx + 1}</span>
                               <Input value={item.condition} placeholder="條件描述" style={{ flex: 1 }} size="small"
                                 onChange={e => { const n = [...conditionRows]; n[idx] = { ...n[idx], condition: e.target.value }; setConditionRows(n) }} />
                               <InputNumber value={item.score} min={-100} max={100} size="small" style={{ width: 80 }} placeholder="分值"
                                 onChange={val => { const n = [...conditionRows]; n[idx] = { ...n[idx], score: val ?? 0 }; setConditionRows(n) }} />
-                              <span style={{ fontSize: 12, color: '#595959' }}>分</span>
+                              <span style={{ fontSize: 12, color: 'var(--text-2)' }}>分</span>
                               <Button type="text" size="small" danger icon={<DeleteOutlined />} style={{ marginLeft: 'auto' }}
                                 onClick={() => setConditionRows(prev => prev.filter((_, i) => i !== idx))} />
                             </div>
@@ -3168,20 +3168,20 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
 
                     {/* TIERED_MULTIPLIER：倍數梯度計分配置 */}
                     {tpl.mode === ScoreMode.TIERED_MULTIPLIER && (
-                      <div style={{ marginBottom: 16, padding: '14px 16px', background: '#FFF7E6', border: '1px solid #FFE7D1', borderRadius: 8 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 4 }}>倍數梯度計分配置</div>
-                        <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 12 }}>以門店客單價為基準，滿額立減門檻低於客單價的倍數越多，得分越高</div>
+                      <div style={{ marginBottom: 16, padding: '14px 16px', background: 'var(--warning-soft)', border: '1px solid #FFE7D1', borderRadius: 8 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 4 }}>倍數梯度計分配置</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12 }}>以門店客單價為基準，滿額立減門檻低於客單價的倍數越多，得分越高</div>
                         {multiplierTierRows.length === 0 && (
-                          <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>尚未配置檔位，請點擊下方「新增檔位」</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>尚未配置檔位，請點擊下方「新增檔位」</div>
                         )}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
                           {multiplierTierRows.map((tier, idx) => (
-                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#fff', borderRadius: 6, border: '1px solid #f0f0f0' }}>
-                              <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
-                              <span style={{ fontSize: 12, color: '#595959' }}>門檻 {'<'} 客單價 ×</span>
+                            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--surface-2)', borderRadius: 6, border: '1px solid #f0f0f0' }}>
+                              <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 20 }}>#{idx + 1}</span>
+                              <span style={{ fontSize: 12, color: 'var(--text-2)' }}>門檻 {'<'} 客單價 ×</span>
                               <InputNumber value={tier.multiplier || undefined} min={0.1} step={0.5} size="small" style={{ width: 80 }} placeholder="倍數" addonAfter="倍"
                                 onChange={val => { const n = [...multiplierTierRows]; n[idx] = { ...n[idx], multiplier: val ?? 1 }; setMultiplierTierRows(n) }} />
-                              <span style={{ fontSize: 12, color: '#595959' }}>固定加分</span>
+                              <span style={{ fontSize: 12, color: 'var(--text-2)' }}>固定加分</span>
                               <InputNumber value={tier.score ?? undefined} min={0} max={200} size="small" style={{ width: 80 }} placeholder="分值" addonAfter="分"
                                 onChange={val => { const n = [...multiplierTierRows]; n[idx] = { ...n[idx], score: val ?? 0 }; setMultiplierTierRows(n) }} />
                               <Button type="text" size="small" danger icon={<DeleteOutlined />} style={{ marginLeft: 'auto' }}
@@ -3238,20 +3238,20 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
               )}
           {/* 梯度計分配置：檔位編輯器（統計天數合併到每檔） */}
           {ruleFormMode === ScoreMode.TIERED && (
-            <div style={{ marginBottom: 16, padding: '14px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 12 }}>梯度計分配置</div>
+            <div style={{ marginBottom: 16, padding: '14px 16px', background: 'var(--success-soft)', border: '1px solid #b7eb8f', borderRadius: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 12 }}>梯度計分配置</div>
               {tierRows.length === 0 && (
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>尚未配置檔位，請點擊下方「新增檔位」</div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>尚未配置檔位，請點擊下方「新增檔位」</div>
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
                 {tierRows.map((tier, idx) => (
                   <div key={idx} style={{
                     display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
-                    padding: '8px 12px', background: '#fff', borderRadius: 6,
+                    padding: '8px 12px', background: 'var(--surface-2)', borderRadius: 6,
                     border: '1px solid #f0f0f0',
                   }}>
-                    <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
-                    <span style={{ fontSize: 12, color: '#595959' }}>統計</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 20 }}>#{idx + 1}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-2)' }}>統計</span>
                     <InputNumber
                       value={tier.statDays}
                       min={1}
@@ -3265,7 +3265,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                         setTierRows(next)
                       }}
                     />
-                    <span style={{ fontSize: 12, color: '#595959' }}>天，訂單</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-2)' }}>天，訂單</span>
                     <Select
                       value={tier.direction}
                       style={{ width: 72 }}
@@ -3292,8 +3292,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                         setTierRows(next)
                       }}
                     />
-                    <span style={{ fontSize: 12, color: '#595959' }}>單，</span>
-                    <span style={{ fontSize: 12, color: tier.score >= 0 ? '#52C41A' : '#FF4D4F' }}>加</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-2)' }}>單，</span>
+                    <span style={{ fontSize: 12, color: tier.score >= 0 ? 'var(--success)' : 'var(--danger)' }}>加</span>
                     <InputNumber
                       value={tier.score}
                       size="small"
@@ -3305,7 +3305,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                         setTierRows(next)
                       }}
                     />
-                    <span style={{ fontSize: 12, color: '#595959' }}>分</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-2)' }}>分</span>
                     <Button
                       type="text"
                       size="small"
@@ -3331,19 +3331,19 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
           {/* 條件計分配置：多組「條件描述 → 分值」 */}
           {ruleFormMode === ScoreMode.CONDITIONAL && (
             <div style={{ marginBottom: 16, padding: '14px 16px', background: '#f0f5ff', border: '1px solid #adc6ff', borderRadius: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 4 }}>條件計分配置</div>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 12 }}>每組定義一個條件描述及對應分值，可新增多組以覆蓋不同場景</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 4 }}>條件計分配置</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12 }}>每組定義一個條件描述及對應分值，可新增多組以覆蓋不同場景</div>
               {conditionRows.length === 0 && (
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>尚未配置條件，請點擊下方「新增條件」</div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>尚未配置條件，請點擊下方「新增條件」</div>
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
                 {conditionRows.map((item, idx) => (
                   <div key={idx} style={{
                     display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '10px 12px', background: '#fff', borderRadius: 6,
+                    padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 6,
                     border: '1px solid #f0f0f0',
                   }}>
-                    <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 20 }}>#{idx + 1}</span>
                     <Input
                       value={item.condition}
                       placeholder="條件描述，如：報名免運費活動"
@@ -3368,7 +3368,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                         setConditionRows(next)
                       }}
                     />
-                    <span style={{ fontSize: 12, color: '#595959' }}>分</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-2)' }}>分</span>
                     <Button
                       type="text"
                       size="small"
@@ -3393,21 +3393,21 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
           )}
           {/* 倍數梯度計分配置：以門店客單價為基準，按倍數閾值分檔 */}
           {ruleFormMode === ScoreMode.TIERED_MULTIPLIER && (
-            <div style={{ marginBottom: 16, padding: '14px 16px', background: '#FFF7E6', border: '1px solid #FFE7D1', borderRadius: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 4 }}>倍數梯度計分配置</div>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 12 }}>以門店客單價為基準，滿額立減門檻低於客單價的倍數越多，得分越高</div>
+            <div style={{ marginBottom: 16, padding: '14px 16px', background: 'var(--warning-soft)', border: '1px solid #FFE7D1', borderRadius: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 4 }}>倍數梯度計分配置</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12 }}>以門店客單價為基準，滿額立減門檻低於客單價的倍數越多，得分越高</div>
               {multiplierTierRows.length === 0 && (
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>尚未配置檔位，請點擊下方「新增檔位」</div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>尚未配置檔位，請點擊下方「新增檔位」</div>
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
                 {multiplierTierRows.map((tier, idx) => (
                   <div key={idx} style={{
                     display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '8px 12px', background: '#fff', borderRadius: 6,
+                    padding: '8px 12px', background: 'var(--surface-2)', borderRadius: 6,
                     border: '1px solid #f0f0f0',
                   }}>
-                    <span style={{ fontSize: 12, color: '#8C8C8C', minWidth: 20 }}>#{idx + 1}</span>
-                    <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>門檻 {'<'} 客單價 ×</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 20 }}>#{idx + 1}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>門檻 {'<'} 客單價 ×</span>
                     <InputNumber
                       value={tier.multiplier || undefined}
                       min={0.1}
@@ -3422,7 +3422,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                         setMultiplierTierRows(next)
                       }}
                     />
-                    <span style={{ fontSize: 12, color: '#595959', whiteSpace: 'nowrap' }}>固定加分</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>固定加分</span>
                     <InputNumber
                       value={tier.score ?? undefined}
                       min={0}
@@ -3461,7 +3461,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
           )}
           {isDeliveryRange(editingRule?.id) && (
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: '#262626', marginBottom: 8 }}>{t('organicTrafficScore.deliveryRangeTiered')}</div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-1)', marginBottom: 8 }}>{t('organicTrafficScore.deliveryRangeTiered')}</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
                 {RANGE_SCORE_KEYS.map(key => (
                   <Form.Item
@@ -3511,9 +3511,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ width: 24, height: 24, borderRadius: 6, background: '#fff2f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ShopOutlined style={{ fontSize: 12, color: '#FF4D4F' }} />
+            <ShopOutlined style={{ fontSize: 12, color: 'var(--danger)' }} />
           </div>
-          <span style={{ fontSize: 16, fontWeight: 600, color: '#FF4D4F' }}>{storeModalReadOnly ? '屏蔽商家列表' : '選擇屏蔽商家'}</span>
+          <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--danger)' }}>{storeModalReadOnly ? '屏蔽商家列表' : '選擇屏蔽商家'}</span>
         </div>
       }
       open={storeModalVisible}
@@ -3576,7 +3576,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
       {/* 已選提示（編輯模式可關閉，只讀模式純展示） */}
       {tempBlockedStores.length > 0 && (
         <div style={{ marginBottom: 12, padding: '6px 12px', background: '#fff2f0', borderRadius: 6, border: '1px solid #ffccc7', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
-          <span style={{ fontSize: 12, color: '#FF4D4F', fontWeight: 500 }}>共 {tempBlockedStores.length} 家商家</span>
+          <span style={{ fontSize: 12, color: 'var(--danger)', fontWeight: 500 }}>共 {tempBlockedStores.length} 家商家</span>
           <Space size={4} wrap>
             {tempBlockedStores.slice(0, 8).map(s => (
               <Tag

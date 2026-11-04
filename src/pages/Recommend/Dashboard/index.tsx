@@ -274,7 +274,7 @@ export default function Dashboard() {
             <Statistic
               title={t('recommendDashboard.statRunningAds')}
               value={RUNNING_ADS.filter(ad => ad.status === 'running').length}
-              prefix={<FundOutlined style={{ color: '#722ed1' }} />}
+              prefix={<FundOutlined style={{ color: 'var(--purple)' }} />}
               valueStyle={{ color: '#722ed1' }}
               suffix={t('recommendDashboard.statAdsSuffix')}
             />
@@ -285,7 +285,7 @@ export default function Dashboard() {
             <Statistic
               title={t('recommendDashboard.statTotalImpressions')}
               value={RUNNING_ADS.reduce((sum, ad) => sum + ad.impressions, 0)}
-              prefix={<EyeOutlined style={{ color: '#fa8c16' }} />}
+              prefix={<EyeOutlined style={{ color: 'var(--warning)' }} />}
               valueStyle={{ color: '#fa8c16' }}
             />
           </Card>

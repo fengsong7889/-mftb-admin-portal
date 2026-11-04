@@ -586,7 +586,10 @@ describe('流量均衡：统一口径持久化到 PLT_03', () => {
 
   it('只读编辑按钮为橙色描边', async () => {
     const panel = await openBalancePanel()
-    expect(panel.getByRole('button', { name: TB('editAria') })).toHaveStyle({ color: '#E8720C', borderColor: '#E8720C' })
+    // jsdom 不求值 CSS 变量，且对 borderColor 这类简写属性会丢弃 inline 的 var() 值
+    //（真实浏览器有效）。所以这里只断言能验证到的 color；borderColor 的正确性
+    // 归给浏览器视觉核对（方案 §8.5）。不假装测到了。
+    expect(panel.getByRole('button', { name: TB('editAria') })).toHaveStyle({ color: 'var(--brand)' })
     expect(api.update).not.toHaveBeenCalled()
   })
 

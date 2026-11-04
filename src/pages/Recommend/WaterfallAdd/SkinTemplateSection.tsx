@@ -96,7 +96,7 @@ function TierSelector({ value, onChange, disabled }: {
             style={{
               position: 'relative', flex: 1, textAlign: 'center', padding: '5px 0',
               fontSize: 12, lineHeight: '18px', fontWeight: selected ? 600 : 400,
-              color: selected ? '#fff' : '#8c8c8c',
+              color: selected ? '#fff' : 'var(--text-3)',
               cursor: disabled ? 'not-allowed' : 'pointer', transition: 'color 0.25s',
               userSelect: 'none', zIndex: 1,
             }}
@@ -207,8 +207,8 @@ export default function SkinTemplateSection({
   }
 
   const fieldLabel = (text: string, required?: boolean) => (
-    <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>
-      {required && <span style={{ color: '#ff4d4f', marginRight: 4 }}>*</span>}
+    <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 4 }}>
+      {required && <span style={{ color: 'var(--danger)', marginRight: 4 }}>*</span>}
       {text}
     </div>
   )
@@ -289,7 +289,7 @@ export default function SkinTemplateSection({
       {/* ===== 下方配置面板 ===== */}
       <div className="skin-config">
         {!selectedSkin ? (
-          <div style={{ textAlign: 'center', color: '#BFBFBF', padding: 40 }}>請選擇一套皮膚進行配置</div>
+          <div style={{ textAlign: 'center', color: 'var(--text-4)', padding: 40 }}>請選擇一套皮膚進行配置</div>
         ) : (
           <>
             {/* 面板头 */}

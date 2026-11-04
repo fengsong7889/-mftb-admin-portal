@@ -106,15 +106,15 @@ export default function TrafficBalancePanel({ config, readOnly = false, stores, 
         {!isEditing && (
           <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
             {(updatedBy || updatedAt) && (
-              <span style={{ fontSize: 11, color: '#8C8C8C', whiteSpace: 'nowrap' }}>
-                {updatedBy && <>{tb('updatedBy')}<span style={{ color: '#595959' }}>{updatedBy}</span></>}
+              <span style={{ fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
+                {updatedBy && <>{tb('updatedBy')}<span style={{ color: 'var(--text-2)' }}>{updatedBy}</span></>}
                 {updatedBy && updatedAt && <span style={{ margin: '0 4px' }}>·</span>}
                 {updatedAt && <span>{updatedAt}</span>}
               </span>
             )}
             {!readOnly && (
               <Button aria-label={tb('editAria')} size="small" icon={<EditOutlined />} onClick={handleEdit}
-                style={{ borderRadius: 6, borderColor: '#E8720C', color: '#E8720C', fontSize: 12, height: 28 }}>
+                style={{ borderRadius: 6, borderColor: 'var(--brand)', color: 'var(--brand)', fontSize: 12, height: 28 }}>
                 {tb('edit')}
               </Button>
             )}

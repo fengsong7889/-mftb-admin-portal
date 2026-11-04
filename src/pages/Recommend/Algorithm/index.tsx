@@ -209,18 +209,18 @@ export default function Algorithm() {
             <p>{t('algorithm.confirmToggleContent', { action: actionText, name: record.name })}</p>
             {hasRefs && (
               <>
-                <p style={{ color: '#FA8C16', fontWeight: 500, marginTop: 12 }}>
+                <p style={{ color: 'var(--warning)', fontWeight: 500, marginTop: 12 }}>
                   {t('algorithm.waterfallRefWarning')}
                 </p>
-                <div style={{ maxHeight: 200, overflowY: 'auto', background: '#FFF7E6', borderRadius: 6, padding: '8px 12px', marginTop: 8 }}>
+                <div style={{ maxHeight: 200, overflowY: 'auto', background: 'var(--warning-soft)', borderRadius: 6, padding: '8px 12px', marginTop: 8 }}>
                   {groupedList.map((g, i) => (
-                    <div key={i} style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>
-                      <code style={{ background: '#f5f5f5', padding: '1px 4px', borderRadius: 3 }}>{g.strategyCode}</code>
+                    <div key={i} style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>
+                      <code style={{ background: 'var(--surface-1)', padding: '1px 4px', borderRadius: 3 }}>{g.strategyCode}</code>
                       {' '}{g.strategyName}（{t('algorithm.affectedSlots', { positions: g.positions.join(', ') })}）
                     </div>
                   ))}
                 </div>
-                <p style={{ color: '#FF4D4F', fontSize: 12, marginTop: 8 }}>
+                <p style={{ color: 'var(--danger)', fontSize: 12, marginTop: 8 }}>
                   {t('algorithm.waterfallRefImpact')}
                 </p>
               </>
@@ -275,18 +275,18 @@ export default function Algorithm() {
           <p>{t('algorithm.confirmDeleteContent', { name: record.name })}</p>
           {hasRefs && (
             <>
-              <p style={{ color: '#FA8C16', fontWeight: 500, marginTop: 12 }}>
+              <p style={{ color: 'var(--warning)', fontWeight: 500, marginTop: 12 }}>
                 {t('algorithm.waterfallRefWarning')}
               </p>
-              <div style={{ maxHeight: 200, overflowY: 'auto', background: '#FFF7E6', borderRadius: 6, padding: '8px 12px', marginTop: 8 }}>
+              <div style={{ maxHeight: 200, overflowY: 'auto', background: 'var(--warning-soft)', borderRadius: 6, padding: '8px 12px', marginTop: 8 }}>
                 {groupedList.map((g, i) => (
-                  <div key={i} style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>
-                    <code style={{ background: '#f5f5f5', padding: '1px 4px', borderRadius: 3 }}>{g.strategyCode}</code>
+                  <div key={i} style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>
+                    <code style={{ background: 'var(--surface-1)', padding: '1px 4px', borderRadius: 3 }}>{g.strategyCode}</code>
                     {' '}{g.strategyName}（{t('algorithm.affectedSlots', { positions: g.positions.join(', ') })}）
                   </div>
                 ))}
               </div>
-              <p style={{ color: '#FF4D4F', fontSize: 12, marginTop: 8 }}>
+              <p style={{ color: 'var(--danger)', fontSize: 12, marginTop: 8 }}>
                 {t('algorithm.waterfallRefImpact')}
               </p>
             </>
@@ -413,7 +413,7 @@ export default function Algorithm() {
     return (
       <div className="content-area">
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
         overflow: 'hidden',
       }}>
@@ -426,18 +426,18 @@ export default function Algorithm() {
           justifyContent: 'space-between', animation: 'headerFadeSlideIn 0.5s ease',
         }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>
               <AppstoreOutlined style={{ marginRight: 8 }} />
               {t('algorithm.algorithmLibrary')}
             </h2>
-            <p style={{ margin: '6px 0 0', color: '#8c8c8c', fontSize: 12 }}>
+            <p style={{ margin: '6px 0 0', color: 'var(--text-3)', fontSize: 12 }}>
               {t('algorithm.algorithmLibraryDesc')}
             </p>
           </div>
           <Button type="primary" icon={<ApartmentOutlined />}
             onClick={() => navigate('/promotion-algorithm-flow')}
             style={{
-              backgroundColor: '#E8720C', borderColor: '#E8720C',
+              backgroundColor: 'var(--brand)', borderColor: 'var(--brand)',
               borderRadius: 8, height: 36, padding: '0 18px',
               boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
             }}
@@ -496,7 +496,7 @@ export default function Algorithm() {
     <div className="content-area">
       {/* 页面头部 */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
         overflow: 'hidden',
       }}>
@@ -512,7 +512,7 @@ export default function Algorithm() {
             <Button type="primary" icon={<ArrowLeftOutlined />}
               onClick={handleBackToCards}
               style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                backgroundColor: 'var(--brand)', borderColor: 'var(--brand)',
                 borderRadius: 8, height: 36, padding: '0 16px',
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
@@ -521,9 +521,9 @@ export default function Algorithm() {
             >{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('algorithm.algorithmList')}</h2>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>{t('algorithm.algorithmList')}</h2>
               {selectedType != null && (
-                <span style={{ fontSize: 14, color: '#595959' }}>
+                <span style={{ fontSize: 14, color: 'var(--text-2)' }}>
                   {selectedTypeCard?.icon} {TYPE_LABEL[selectedType]}
                 </span>
               )}

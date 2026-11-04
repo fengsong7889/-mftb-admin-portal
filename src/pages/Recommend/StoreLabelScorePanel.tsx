@@ -114,8 +114,8 @@ export default function StoreLabelScorePanel({ ruleName, config, hasSavedConfig,
         {/* 靠右成组：修改人／时间在按钮左侧，与通用计分项工具条位置一致 */}
         <Space style={{ marginLeft: 'auto' }} size={12}>
           {!isEditing && (updatedBy || updatedAt) && (
-            <span style={{ fontSize: 11, color: '#8C8C8C', whiteSpace: 'nowrap' }}>
-              {updatedBy && <>{t(K('updatedBy'))}<span style={{ color: '#595959' }}>{updatedBy}</span></>}
+            <span style={{ fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
+              {updatedBy && <>{t(K('updatedBy'))}<span style={{ color: 'var(--text-2)' }}>{updatedBy}</span></>}
               {updatedBy && updatedAt && <span style={{ margin: '0 4px' }}>·</span>}
               {updatedAt && <span>{updatedAt}</span>}
             </span>
@@ -126,7 +126,7 @@ export default function StoreLabelScorePanel({ ruleName, config, hasSavedConfig,
           </Button>
           {!isEditing && !readOnly && (
             <Button size="small" icon={<EditOutlined aria-hidden="true" />} onClick={handleEdit}
-              style={{ borderRadius: 6, borderColor: '#E8720C', color: '#E8720C', fontSize: 12, height: 28 }}>{t(K('edit'))}</Button>
+              style={{ borderRadius: 6, borderColor: 'var(--brand)', color: 'var(--brand)', fontSize: 12, height: 28 }}>{t(K('edit'))}</Button>
           )}
         </Space>
       </div>
@@ -155,23 +155,23 @@ export default function StoreLabelScorePanel({ ruleName, config, hasSavedConfig,
           extra={<FormulaHint formula={t(K('formula'))} example={demoExample} />}>
           <div className="organic-score-panel" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{t(K('configuredCount'), { count: draft.items.length })}</span>
-              <Button size="small" type="link" icon={<PlusOutlined aria-hidden="true" />} onClick={addRow} disabled={allLabelsUsed} style={{ color: '#E8720C' }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{t(K('configuredCount'), { count: draft.items.length })}</span>
+              <Button size="small" type="link" icon={<PlusOutlined aria-hidden="true" />} onClick={addRow} disabled={allLabelsUsed} style={{ color: 'var(--brand)' }}>
                 {allLabelsUsed ? t(K('allUsed')) : t(K('add'))}
               </Button>
             </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C' }}>{t(K('editHint'))}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{t(K('editHint'))}</div>
             {draft.items.map((item, i) => (
               <div key={i} className="organic-score-edit-row" style={{ flexWrap: 'wrap' }}>
                 <Select aria-label={t(K('rowLabelAria'), { index: i + 1 })} style={{ width: 200 }} placeholder={t(K('rowLabelPlaceholder'))}
                   value={item.labelValue || undefined} options={labelOptions(i)} onChange={value => pickLabel(i, value)} />
-                <span style={{ fontSize: 13, color: '#595959' }}>{t(K('rowArrow'))}</span>
+                <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t(K('rowArrow'))}</span>
                 <InputNumber aria-label={t(K('rowScoreAria'), { index: i + 1 })} value={item.score} min={0} max={1000}
                   onChange={value => patchRow(i, { score: value ?? 0 })} style={{ width: 120 }} addonAfter={t(K('scoreUnit'))} />
                 <Button aria-label={t(K('rowDeleteAria'), { index: i + 1 })} size="small" type="text" danger icon={<DeleteOutlined />} onClick={() => removeRow(i)} />
               </div>
             ))}
-            {draft.items.length === 0 && <div style={{ fontSize: 12, color: '#8C8C8C' }}>{t(K('addEmpty'))}</div>}
+            {draft.items.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{t(K('addEmpty'))}</div>}
           </div>
         </AlgorithmSection>
 
@@ -204,7 +204,7 @@ export default function StoreLabelScorePanel({ ruleName, config, hasSavedConfig,
             {view.items.length === 0 ? (
               <Alert type="info" showIcon message={t(K('exampleEmpty'))} />
             ) : <>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>{t(K('pickLabel'))}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>{t(K('pickLabel'))}</div>
               <Radio.Group aria-label={t(K('radioGroupAria'))} value={owned} onChange={e => setOwned(e.target.value as string)}
                 style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
                 {STORE_LABELS.map(label => {
@@ -224,18 +224,18 @@ export default function StoreLabelScorePanel({ ruleName, config, hasSavedConfig,
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
                 {preview.matched ? (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#595959' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-2)' }}>
                     <span>{storeLabelText(owned)}</span>
-                    <span style={{ color: '#52C41A', fontWeight: 600 }}>+{preview.matched.score} {t(K('scoreUnit'))}</span>
+                    <span style={{ color: 'var(--success)', fontWeight: 600 }}>+{preview.matched.score} {t(K('scoreUnit'))}</span>
                   </div>
-                ) : <span style={{ fontSize: 13, color: '#8C8C8C' }}>{t(K('noMatch'))}</span>}
+                ) : <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{t(K('noMatch'))}</span>}
               </div>
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '14px 20px', background: '#FFF7E6', border: '1px solid #FFE7D1', borderRadius: 8,
+                padding: '14px 20px', background: 'var(--warning-soft)', border: '1px solid #FFE7D1', borderRadius: 8,
               }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t(K('total'))}</span>
-                <output aria-label={t(K('totalAria'))} aria-live="polite" style={{ fontSize: 24, fontWeight: 700, color: '#E8720C' }}>{preview.total} {t(K('scoreUnit'))}</output>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{t(K('total'))}</span>
+                <output aria-label={t(K('totalAria'))} aria-live="polite" style={{ fontSize: 24, fontWeight: 700, color: 'var(--brand)' }}>{preview.total} {t(K('scoreUnit'))}</output>
               </div>
             </>}
           </AlgorithmSection>
@@ -248,5 +248,5 @@ export default function StoreLabelScorePanel({ ruleName, config, hasSavedConfig,
 /** 模块内的一行公式+示例：放在区块标题右侧，不另占一块区域 */
 function FormulaHint({ formula, example }: { formula: string; example: string }) {
   const { t } = useTranslation()
-  return <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('organicTrafficScore.storeLabel.formulaPrefix')}{formula}{' · '}{t('organicTrafficScore.storeLabel.examplePrefix')}{example}</span>
+  return <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('organicTrafficScore.storeLabel.formulaPrefix')}{formula}{' · '}{t('organicTrafficScore.storeLabel.examplePrefix')}{example}</span>
 }

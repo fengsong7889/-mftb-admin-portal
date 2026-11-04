@@ -552,7 +552,7 @@ export default function GoldenSignboardPricing() {
 
   /* ── 樣式 ── */
   const fieldLabelStyle: React.CSSProperties = { fontSize: 13, color: '#595959', marginBottom: 4 }
-  const requiredMark = <span style={{ color: '#ff4d4f', marginRight: 4 }}>*</span>
+  const requiredMark = <span style={{ color: 'var(--danger)', marginRight: 4 }}>*</span>
 
   /* ── 渲染：梯度折扣行 ── */
   const renderDiscountTiers = (
@@ -565,7 +565,7 @@ export default function GoldenSignboardPricing() {
   ) => {
     if (!gradientOn) {
       return (
-        <div style={{ fontSize: 13, color: '#8C8C8C' }}>
+        <div style={{ fontSize: 13, color: 'var(--text-3)' }}>
           未啟用多天折扣梯度，商家購買多天無折扣優惠
         </div>
       )
@@ -575,17 +575,17 @@ export default function GoldenSignboardPricing() {
       <div>
         {tiers.length === 0 ? (
           <div style={{
-            padding: '20px 24px', textAlign: 'center', background: '#FAFAFA',
+            padding: '20px 24px', textAlign: 'center', background: 'var(--surface-3)',
             borderRadius: 8, border: '1px dashed #d9d9d9',
           }}>
-            <span style={{ fontSize: 13, color: '#8C8C8C' }}>暫無折扣梯度，點擊右上角「添加梯度」添加</span>
+            <span style={{ fontSize: 13, color: 'var(--text-3)' }}>暫無折扣梯度，點擊右上角「添加梯度」添加</span>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {tiers.map((tier, idx) => (
-              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, background: '#FAFAFA', borderRadius: 6 }}>
+              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 12, background: 'var(--surface-3)', borderRadius: 6 }}>
                 <Tag color="blue">梯度 {idx + 1}</Tag>
-                <span style={{ fontSize: 13, color: '#595959' }}>購買 ≥</span>
+                <span style={{ fontSize: 13, color: 'var(--text-2)' }}>購買 ≥</span>
                 <InputNumber
                   min={1} max={9999} precision={0}
                   placeholder="天數"
@@ -594,7 +594,7 @@ export default function GoldenSignboardPricing() {
                   disabled={isDetailMode}
                   onChange={v => onUpdate(idx, 'days', v)}
                 />
-                <span style={{ fontSize: 13, color: '#595959' }}>天，享折扣</span>
+                <span style={{ fontSize: 13, color: 'var(--text-2)' }}>天，享折扣</span>
                 <InputNumber
                   min={0.01} max={10} precision={2}
                   placeholder="折扣"
@@ -605,7 +605,7 @@ export default function GoldenSignboardPricing() {
                   onChange={v => onUpdate(idx, 'discount', v)}
                 />
                 {tier.days && tier.discount && (
-                  <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
                     即買 {tier.days} 天享 {tier.discount} 折
                   </span>
                 )}
@@ -632,8 +632,8 @@ export default function GoldenSignboardPricing() {
 
     if (isComparison && scenarios.length === 0) {
       return (
-        <div style={{ padding: '24px', textAlign: 'center', background: '#FAFAFA', borderRadius: 8 }}>
-          <span style={{ fontSize: 13, color: '#8C8C8C' }}>該標籤未啟用任何場景，請先到算法庫配置</span>
+        <div style={{ padding: '24px', textAlign: 'center', background: 'var(--surface-3)', borderRadius: 8 }}>
+          <span style={{ fontSize: 13, color: 'var(--text-3)' }}>該標籤未啟用任何場景，請先到算法庫配置</span>
         </div>
       )
     }
@@ -644,7 +644,7 @@ export default function GoldenSignboardPricing() {
         {isComparison ? (
           <div style={{
             display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px 24px',
-            padding: '12px 16px', background: '#FAFAFA', borderRadius: 8, marginBottom: 16,
+            padding: '12px 16px', background: 'var(--surface-3)', borderRadius: 8, marginBottom: 16,
           }}>
             {scenarios.map(sc => {
               const scDef = SCENARIO_DEFS.find(d => d.apiValue === sc)
@@ -657,7 +657,7 @@ export default function GoldenSignboardPricing() {
                   <span style={{ fontSize: 13, color: scDef.color, fontWeight: 500, whiteSpace: 'nowrap' }}>{scDef.label}</span>
                   {unpriced && (
                     <span style={{
-                      fontSize: 10, color: '#D46B08', background: '#FFF7E6',
+                      fontSize: 10, color: '#D46B08', background: 'var(--warning-soft)',
                       border: '1px solid #FFD591', borderRadius: 4, padding: '0 4px',
                       lineHeight: '16px', whiteSpace: 'nowrap', flexShrink: 0,
                     }}>未定價</span>
@@ -678,14 +678,14 @@ export default function GoldenSignboardPricing() {
         ) : (
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8,
-            padding: '12px 16px', background: '#FAFAFA', borderRadius: 8, marginBottom: 16,
+            padding: '12px 16px', background: 'var(--surface-3)', borderRadius: 8, marginBottom: 16,
             maxWidth: '50%',
           }}>
             <span style={{ fontSize: 14, flexShrink: 0 }}>{getLabelConfig(labelValue).icon}</span>
             <span style={{ fontSize: 13, color: getLabelConfig(labelValue).color, fontWeight: 500, whiteSpace: 'nowrap' }}>{getLabelConfig(labelValue).label}</span>
             {(labelPrices[labelValue] == null || labelPrices[labelValue]! <= 0) && (
               <span style={{
-                fontSize: 10, color: '#D46B08', background: '#FFF7E6',
+                fontSize: 10, color: '#D46B08', background: 'var(--warning-soft)',
                 border: '1px solid #FFD591', borderRadius: 4, padding: '0 4px',
                 lineHeight: '16px', whiteSpace: 'nowrap', flexShrink: 0,
               }}>未定價</span>
@@ -713,7 +713,7 @@ export default function GoldenSignboardPricing() {
       <style>{`@keyframes signboardTabFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}`}</style>
       {/* ── 頂部標題欄（與無敵星星/盤活復蘇/人氣商家保持一致） ── */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
         overflow: 'hidden',
       }}>
@@ -728,7 +728,7 @@ export default function GoldenSignboardPricing() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleBack}
               style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                backgroundColor: 'var(--brand)', borderColor: 'var(--brand)',
                 borderRadius: 8, height: 36, padding: '0 16px',
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
@@ -737,10 +737,10 @@ export default function GoldenSignboardPricing() {
             >{t('common:back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>
                 {isDetailMode ? t('recommend.pricingDetailTitle') : isEditMode ? t('recommend.editPricingTitle') : t('recommend.addPricingTitle')}
               </h2>
-              <span style={{ fontSize: 14, color: '#595959' }}>
+              <span style={{ fontSize: 14, color: 'var(--text-2)' }}>
                 🏅 {t('algorithm.typeGoldenSignboard')}
               </span>
             </div>
@@ -751,7 +751,7 @@ export default function GoldenSignboardPricing() {
       <Form form={form} layout="vertical" disabled={isDetailMode}>
         {/* ── 1. 基礎信息（從算法庫獲取金字招牌數據） ── */}
         <div style={cardShellStyle}>
-          {cardTitle(<ShopOutlined style={{ fontSize: 14, color: '#1890ff' }} />, '#E6F7FF', t('recommend.basicInfo'))}
+          {cardTitle(<ShopOutlined style={{ fontSize: 14, color: 'var(--info)' }} />, '#E6F7FF', t('recommend.basicInfo'))}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
             <Form.Item label={t('common:brand')} name="app" rules={[{ required: true, message: t('common:selectBrand') }]}>
               <Select
@@ -795,7 +795,7 @@ export default function GoldenSignboardPricing() {
               {detailFileList.length < 1 && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                   <PlusOutlined style={{ fontSize: 20 }} />
-                  <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('recommend.popularSkin.uploadDetailImage')}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('recommend.popularSkin.uploadDetailImage')}</span>
                 </div>
               )}
             </Upload>
@@ -805,10 +805,10 @@ export default function GoldenSignboardPricing() {
         {/* ── 2. 銷售策略（預售天數） ── */}
         <div style={cardShellStyle}>
           {cardTitle(
-            <CalendarOutlined style={{ fontSize: 14, color: '#fa8c16' }} />, '#FFF7E6', t('recommend.popularSkin.salesStrategyCard'),
+            <CalendarOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />, '#FFF7E6', t('recommend.popularSkin.salesStrategyCard'),
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <span style={{ fontSize: 13, color: '#595959', minWidth: 80 }}>{t('recommend.popularSkin.presaleDaysLabel')}</span>
+            <span style={{ fontSize: 13, color: 'var(--text-2)', minWidth: 80 }}>{t('recommend.popularSkin.presaleDaysLabel')}</span>
             <InputNumber
               min={1} max={90} precision={0}
               value={presaleDays}
@@ -817,10 +817,10 @@ export default function GoldenSignboardPricing() {
               addonAfter={t('recommend.popularSkin.dayAddon')}
               style={{ width: 160 }}
             />
-            <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>
               系統持續銷售 {presaleDays} 天內的廣告，每過一天自動補充一天，循環銷售；
               <span style={{
-                background: '#FFF7E6', border: '1px solid #FFD591', borderRadius: 4,
+                background: 'var(--warning-soft)', border: '1px solid #FFD591', borderRadius: 4,
                 padding: '1px 6px', color: '#D46B08', fontWeight: 500, fontSize: 11, marginLeft: 4,
               }}>條件規則含按月計算的標籤不受此限制</span>
             </span>
@@ -831,17 +831,17 @@ export default function GoldenSignboardPricing() {
         <div style={cardShellStyle}>
           {cardTitle(
             <TrophyOutlined style={{ fontSize: 14, color: '#2F54EB' }} />, '#F0F5FF', '標籤定價配置',
-            <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 4 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 4 }}>
               為每種標籤分別設置售價
             </span>,
           )}
 
           {!selectedAlgorithmInfo && algorithmSelectOptions.length > 0 && (
             <div style={{
-              padding: '24px', textAlign: 'center', background: '#FAFAFA',
+              padding: '24px', textAlign: 'center', background: 'var(--surface-3)',
               borderRadius: 8, border: '1px dashed #d9d9d9', marginBottom: 16,
             }}>
-              <span style={{ fontSize: 13, color: '#8C8C8C' }}>{t('recommend.selectAlgorithmNameFirst')}</span>
+              <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{t('recommend.selectAlgorithmNameFirst')}</span>
             </div>
           )}
 
@@ -861,14 +861,14 @@ export default function GoldenSignboardPricing() {
                       onClick={() => isConfigured && setActiveTab(lv)}
                       style={{
                         padding: '6px 14px', borderRadius: 6, cursor: isConfigured ? 'pointer' : 'not-allowed',
-                        border: '1px solid', borderColor: isActive ? '#E8720C' : '#f0f0f0',
-                        background: isActive ? '#FFF7E6' : '#fff',
+                        border: '1px solid', borderColor: isActive ? 'var(--brand)' : 'var(--border-2)',
+                        background: isActive ? 'var(--warning-soft)' : 'var(--surface-2)',
                         boxShadow: isActive ? '0 0 0 1px #E8720C' : 'none',
                         transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 5,
                         opacity: isConfigured ? 1 : 0.45,
                       }}>
                       <span style={{ fontSize: 14 }}>{l.icon}</span>
-                      <span style={{ fontSize: 12, fontWeight: isActive ? 600 : 400, color: isActive ? '#E8720C' : '#595959' }}>{l.label}</span>
+                      <span style={{ fontSize: 12, fontWeight: isActive ? 600 : 400, color: isActive ? 'var(--brand)' : 'var(--text-2)' }}>{l.label}</span>
                       {hasPrice && isConfigured && (
                         <span style={{ fontSize: 10, color: '#fff', background: '#52C41A', borderRadius: 3, padding: '0 4px', lineHeight: '16px', fontWeight: 600 }}>已配置</span>
                       )}
@@ -884,12 +884,12 @@ export default function GoldenSignboardPricing() {
                   return isConfigured
                     ? renderLabelPanel(activeTab)
                     : (
-                      <div style={{ padding: '32px 0', textAlign: 'center', background: '#FAFAFA', borderRadius: 8 }}>
+                      <div style={{ padding: '32px 0', textAlign: 'center', background: 'var(--surface-3)', borderRadius: 8 }}>
                         <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.4 }}>{l.icon}</div>
-                        <div style={{ fontSize: 14, color: '#8C8C8C', marginBottom: 4 }}>
+                        <div style={{ fontSize: 14, color: 'var(--text-3)', marginBottom: 4 }}>
                           算法庫未配置「{l.label}」標籤規則
                         </div>
-                        <div style={{ fontSize: 12, color: '#BFBFBF' }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-4)' }}>
                           請先到算法庫中配置該標籤的資格條件，返回後即可配置定價
                         </div>
                       </div>
@@ -900,18 +900,18 @@ export default function GoldenSignboardPricing() {
               <div style={{ marginTop: 20 }}>
                 <div style={{
                   border: `1px solid ${discountMode === 'global' ? '#E8720C33' : '#f0f0f0'}`, borderRadius: 8,
-                  background: discountMode === 'global' ? '#FFF7E6' : '#FAFAFA', overflow: 'hidden',
+                  background: discountMode === 'global' ? 'var(--warning-soft)' : 'var(--surface-3)', overflow: 'hidden',
                 }}>
                   {/* 模式切換 + 說明 */}
                   <div style={{
                     padding: '14px 20px',
                     borderBottom: '1px solid',
-                    borderColor: discountMode === 'global' ? '#E8720C22' : '#f0f0f0',
+                    borderColor: discountMode === 'global' ? '#E8720C22' : 'var(--border-2)',
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <PercentageOutlined style={{ fontSize: 15, color: '#722ED1' }} />
-                      <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>多天折扣梯度</span>
+                      <PercentageOutlined style={{ fontSize: 15, color: 'var(--purple)' }} />
+                      <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>多天折扣梯度</span>
                       <div style={{
                         display: 'inline-flex', borderRadius: 6, overflow: 'hidden',
                         border: '1px solid #d9d9d9',
@@ -920,8 +920,8 @@ export default function GoldenSignboardPricing() {
                           <div key={mode} onClick={() => !isDetailMode && handleDiscountModeChange(mode)} style={{
                             padding: '3px 12px', fontSize: 12,
                             cursor: isDetailMode ? 'default' : 'pointer',
-                            background: discountMode === mode ? '#E8720C' : '#fff',
-                            color: discountMode === mode ? '#fff' : '#595959',
+                            background: discountMode === mode ? 'var(--brand)' : 'var(--surface-2)',
+                            color: discountMode === mode ? '#fff' : 'var(--text-2)',
                             transition: 'all 0.2s', whiteSpace: 'nowrap',
                           }}>
                             {mode === 'global' ? '全局折扣' : '局部折扣'}
@@ -938,7 +938,7 @@ export default function GoldenSignboardPricing() {
                   </div>
                   {/* 模式說明 + 梯度開關 */}
                   <div style={{ padding: '10px 20px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 12, color: '#8C8C8C', flex: 1 }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', flex: 1 }}>
                       {discountMode === 'global'
                         ? '所有標籤的折扣都按當前配置打折優惠'
                         : '每個標籤的折扣是獨立配置的'}
@@ -947,7 +947,7 @@ export default function GoldenSignboardPricing() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <Switch size="small" checked={globalDiscountEnabled} disabled={isDetailMode}
                           onChange={handleToggleGlobalGradient} />
-                        <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
                           {globalDiscountEnabled ? `已配置 ${globalDiscountTiers.length} 個梯度` : '未啟用'}
                         </span>
                       </div>
@@ -957,7 +957,7 @@ export default function GoldenSignboardPricing() {
                           checked={labelGradientEnabled[activeTab] ?? false}
                           disabled={isDetailMode}
                           onChange={checked => toggleGradientEnabled(activeTab, checked)} />
-                        <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+                        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
                           {(labelGradientEnabled[activeTab] ?? false) ? `已配置 ${(labelDiscounts[activeTab] || []).length} 個梯度` : '未啟用'}
                         </span>
                       </div>
@@ -983,9 +983,9 @@ export default function GoldenSignboardPricing() {
         <div style={cardShellStyle}>
           {cardTitle(
             <SettingOutlined style={{ fontSize: 14, color: '#f5222d' }} />, '#FFF1F0', t('recommend.popularSkin.refundConfigTitle'),
-            <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 4 }}>{t('recommend.popularSkin.refundConfigHint')}</span>,
+            <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 4 }}>{t('recommend.popularSkin.refundConfigHint')}</span>,
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, color: refundEnabled ? '#52C41A' : '#8C8C8C' }}>
+              <span style={{ fontSize: 13, color: refundEnabled ? 'var(--success)' : 'var(--text-3)' }}>
                 {refundEnabled ? t('recommend.popularSkin.allowRefund') : t('recommend.popularSkin.notAllowRefund')}
               </span>
               <Switch
@@ -1011,7 +1011,7 @@ export default function GoldenSignboardPricing() {
                   width: 220,
                   render: (_, record: CancelFeeRule) => (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 13, color: '#595959', whiteSpace: 'nowrap' }}>{t('recommend.popularSkin.remainingDaysLe')}</span>
+                      <span style={{ fontSize: 13, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>{t('recommend.popularSkin.remainingDaysLe')}</span>
                       <InputNumber
                         disabled={isDetailMode}
                         min={0} max={999}
@@ -1048,7 +1048,7 @@ export default function GoldenSignboardPricing() {
                   width: 120,
                   align: 'center',
                   render: (_: unknown, record: CancelFeeRule) => {
-                    if (isDetailMode) return <span style={{ color: '#BFBFBF' }}>—</span>
+                    if (isDetailMode) return <span style={{ color: 'var(--text-4)' }}>—</span>
                     const isLastRow = cancelFeeRules[cancelFeeRules.length - 1]?.id === record.id
                     return (
                       <Space size={4}>
@@ -1080,19 +1080,19 @@ export default function GoldenSignboardPricing() {
           ) : (
             <div style={{
               padding: '24px', textAlign: 'center',
-              background: '#FAFAFA', borderRadius: 8,
+              background: 'var(--surface-3)', borderRadius: 8,
               border: '1px dashed #D9D9D9',
             }}>
-              <span style={{ fontSize: 13, color: '#8C8C8C' }}>{t('recommend.popularSkin.notAllowRefundHint')}</span>
+              <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{t('recommend.popularSkin.notAllowRefundHint')}</span>
             </div>
           )}
         </div>
 
         {/* ── 5. 狀態設置 ── */}
         <div style={cardShellStyle}>
-          {cardTitle(<CheckCircleOutlined style={{ fontSize: 14, color: '#52C41A' }} />, '#F6FFED', t('recommend.popularSkin.statusSettingCard'))}
+          {cardTitle(<CheckCircleOutlined style={{ fontSize: 14, color: 'var(--success)' }} />, '#F6FFED', t('recommend.popularSkin.statusSettingCard'))}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13, color: '#595959' }}>{t('recommend.popularSkin.statusLabelColon')}</span>
+            <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('recommend.popularSkin.statusLabelColon')}</span>
             <Switch
               checked={status === ServiceStatus.ENABLED}
               disabled={isDetailMode}
@@ -1100,7 +1100,7 @@ export default function GoldenSignboardPricing() {
               checkedChildren={t('recommend.popularSkin.statusEnabledText')}
               unCheckedChildren={t('recommend.popularSkin.statusDisabledText')}
             />
-            <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('recommend.popularSkin.disableSkinHint')}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('recommend.popularSkin.disableSkinHint')}</span>
           </div>
         </div>
       </Form>

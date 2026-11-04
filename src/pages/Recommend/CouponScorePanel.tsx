@@ -134,8 +134,8 @@ export default function CouponScorePanel({ ruleName, config, hasDraft, descripti
         <Space style={{ marginLeft: 'auto' }} size={12}>
           {/* 最後更新信息：僅只讀態展示，編輯中不需要占位 */}
           {!isEditing && (updatedBy || updatedAt) && (
-            <span style={{ fontSize: 11, color: '#8C8C8C', whiteSpace: 'nowrap' }}>
-              {updatedBy && <>修改人：<span style={{ color: '#595959' }}>{updatedBy}</span></>}
+            <span style={{ fontSize: 11, color: 'var(--text-3)', whiteSpace: 'nowrap' }}>
+              {updatedBy && <>修改人：<span style={{ color: 'var(--text-2)' }}>{updatedBy}</span></>}
               {updatedBy && updatedAt && <span style={{ margin: '0 4px' }}>·</span>}
               {updatedAt && <span>{updatedAt}</span>}
             </span>
@@ -146,7 +146,7 @@ export default function CouponScorePanel({ ruleName, config, hasDraft, descripti
           </Button>
           {!isEditing && !readOnly && (
             <Button size="small" icon={<EditOutlined aria-hidden="true" />} onClick={handleEdit}
-              style={{ borderRadius: 6, borderColor: '#E8720C', color: '#E8720C', fontSize: 12, height: 28 }}>編輯</Button>
+              style={{ borderRadius: 6, borderColor: 'var(--brand)', color: 'var(--brand)', fontSize: 12, height: 28 }}>編輯</Button>
           )}
         </Space>
       </div>
@@ -247,7 +247,7 @@ export default function CouponScorePanel({ ruleName, config, hasDraft, descripti
               <span className="organic-score-edit-row__label">報名分值</span>
               <InputNumber aria-label="報名分值" value={draft.enrollmentScore} min={0} max={100} disabled={!draft.enrollmentEnabled}
                 onChange={v => patch({ enrollmentScore: v ?? 0 })} style={{ width: 160 }} addonAfter="分" />
-              <span style={{ fontSize: 12, color: '#8C8C8C' }}>每門店、每活動只計一次有效報名</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>每門店、每活動只計一次有效報名</span>
             </div>
           </div>
         </AlgorithmSection>
@@ -259,24 +259,24 @@ export default function CouponScorePanel({ ruleName, config, hasDraft, descripti
               <span className="organic-score-edit-row__label">啟用門檻計分</span>
               <Switch aria-label="啟用門檻計分" checkedChildren="啟用" unCheckedChildren="停用" checked={draft.thresholdEnabled}
                 onChange={v => patch({ thresholdEnabled: v })} />
-              <span style={{ fontSize: 12, color: '#8C8C8C' }}>停用時檔位不參與計算，也不校驗</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>停用時檔位不參與計算，也不校驗</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>門檻得分條件</span>
-              <Button size="small" type="link" icon={<PlusOutlined aria-hidden="true" />} onClick={addThresholdBand} disabled={!draft.thresholdEnabled} style={{ color: '#E8720C' }}>添加門檻檔位</Button>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>門檻得分條件</span>
+              <Button size="small" type="link" icon={<PlusOutlined aria-hidden="true" />} onClick={addThresholdBand} disabled={!draft.thresholdEnabled} style={{ color: 'var(--brand)' }}>添加門檻檔位</Button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C' }}>從第一檔往下找，命中即停，分數不累加；門檻倍數越小（越好用）分數越高（要給 1.1 倍容錯就直接配 1.1 倍檔）</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>從第一檔往下找，命中即停，分數不累加；門檻倍數越小（越好用）分數越高（要給 1.1 倍容錯就直接配 1.1 倍檔）</div>
               {draft.thresholdBands.map((band, i) => (
                 <div key={i} className="organic-score-edit-row" style={{ flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 13, color: '#262626' }}>當使用門檻 ≤</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-1)' }}>當使用門檻 ≤</span>
                   <InputNumber aria-label={`第 ${i + 1} 檔門檻倍數`} value={band.upper} min={0.1} step={0.1} disabled={!draft.thresholdEnabled}
                     onChange={v => patchThresholdBand(i, { upper: v ?? 0 })} style={{ width: 120 }} addonAfter="倍" />
-                  <span style={{ fontSize: 13, color: '#262626' }}>門店客單價</span>
-                  <span style={{ fontSize: 13, color: '#595959' }}>→ 得</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-1)' }}>門店客單價</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-2)' }}>→ 得</span>
                   <InputNumber aria-label={`第 ${i + 1} 檔門檻分值`} value={band.score} min={0} max={1000} disabled={!draft.thresholdEnabled}
                     onChange={v => patchThresholdBand(i, { score: v ?? 0 })} style={{ width: 120 }} addonAfter="分" />
-                  {i > 0 && <span style={{ fontSize: 12, color: '#8C8C8C' }}>≤ 上一檔 {draft.thresholdBands[i - 1].score} 分</span>}
+                  {i > 0 && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>≤ 上一檔 {draft.thresholdBands[i - 1].score} 分</span>}
                   <Button aria-label={`刪除門檻第 ${i + 1} 檔`} size="small" type="text" danger icon={<DeleteOutlined />}
                     disabled={!draft.thresholdEnabled || draft.thresholdBands.length <= 1} onClick={() => removeThresholdBand(i)} />
                 </div>
@@ -292,24 +292,24 @@ export default function CouponScorePanel({ ruleName, config, hasDraft, descripti
               <span className="organic-score-edit-row__label">啟用力度計分</span>
               <Switch aria-label="啟用力度計分" checkedChildren="啟用" unCheckedChildren="停用" checked={draft.discountEnabled}
                 onChange={v => patch({ discountEnabled: v })} />
-              <span style={{ fontSize: 12, color: '#8C8C8C' }}>停用時檔位不參與計算，也不校驗</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>停用時檔位不參與計算，也不校驗</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>力度得分條件</span>
-              <Button size="small" type="link" icon={<PlusOutlined aria-hidden="true" />} onClick={addDiscountBand} disabled={!draft.discountEnabled} style={{ color: '#E8720C' }}>添加力度檔位</Button>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>力度得分條件</span>
+              <Button size="small" type="link" icon={<PlusOutlined aria-hidden="true" />} onClick={addDiscountBand} disabled={!draft.discountEnabled} style={{ color: 'var(--brand)' }}>添加力度檔位</Button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C' }}>從第一檔往下找，命中即停，分數不累加</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>從第一檔往下找，命中即停，分數不累加</div>
               {draft.discountBands.map((band, i) => (
                 <div key={i} className="organic-score-edit-row" style={{ flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 13, color: '#262626' }}>當{amountLabel} ≥</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-1)' }}>當{amountLabel} ≥</span>
                   <InputNumber aria-label={`第 ${i + 1} 檔優惠力度`} value={band.lower} min={1} max={500} disabled={!draft.discountEnabled}
                     onChange={v => patchDiscountBand(i, { lower: v ?? 0 })} style={{ width: 120 }} addonAfter="%" />
-                  <span style={{ fontSize: 13, color: '#262626' }}>計價基數</span>
-                  <span style={{ fontSize: 13, color: '#595959' }}>→ 得</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-1)' }}>計價基數</span>
+                  <span style={{ fontSize: 13, color: 'var(--text-2)' }}>→ 得</span>
                   <InputNumber aria-label={`第 ${i + 1} 檔力度分值`} value={band.score} min={0} max={1000} disabled={!draft.discountEnabled}
                     onChange={v => patchDiscountBand(i, { score: v ?? 0 })} style={{ width: 120 }} addonAfter="分" />
-                  {i > 0 && <span style={{ fontSize: 12, color: '#8C8C8C' }}>≤ 上一檔 {draft.discountBands[i - 1].score} 分</span>}
+                  {i > 0 && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>≤ 上一檔 {draft.discountBands[i - 1].score} 分</span>}
                   <Button aria-label={`刪除力度第 ${i + 1} 檔`} size="small" type="text" danger icon={<DeleteOutlined />}
                     disabled={!draft.discountEnabled || draft.discountBands.length <= 1} onClick={() => removeDiscountBand(i)} />
                 </div>
@@ -336,7 +336,7 @@ export default function CouponScorePanel({ ruleName, config, hasDraft, descripti
               <span className="organic-score-edit-row__label">護欄觸發時報名分</span>
               <Switch aria-label="護欄觸發時仍發報名分" checkedChildren="仍發放" unCheckedChildren="停發" checked={draft.enrollWhenGuarded}
                 onChange={v => patch({ enrollWhenGuarded: v })} />
-              <span style={{ fontSize: 12, color: '#8C8C8C' }}>預設停發，避免挂一張夠不著的券白拿報名分</span>
+              <span style={{ fontSize: 12, color: 'var(--text-3)' }}>預設停發，避免挂一張夠不著的券白拿報名分</span>
             </div>
           </div>
         </AlgorithmSection>
@@ -375,15 +375,15 @@ export default function CouponScorePanel({ ruleName, config, hasDraft, descripti
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                 <div>
-                  <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>門店客單價 B（元）</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>門店客單價 B（元）</div>
                   <InputNumber aria-label="門店客單價 B" value={benchmark} min={0} max={10000000} precision={2} step={10} onChange={v => setBenchmark(v ?? 0)} style={{ width: '100%' }} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>使用門檻 T（元，無門檻填 0）</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>使用門檻 T（元，無門檻填 0）</div>
                   <InputNumber aria-label="使用門檻 T" value={threshold} min={0} max={10000000} precision={2} step={10} onChange={v => setThreshold(v ?? 0)} style={{ width: '100%' }} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>{amountLabel} D（元）</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>{amountLabel} D（元）</div>
                   <InputNumber aria-label={`${amountLabel} D`} value={couponAmount} min={0} max={10000000} precision={2} step={10} onChange={v => setCouponAmount(v ?? 0)} style={{ width: '100%' }} />
                 </div>
               </div>
@@ -410,10 +410,10 @@ export default function CouponScorePanel({ ruleName, config, hasDraft, descripti
 
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '14px 20px', background: '#FFF7E6', border: '1px solid #FFE7D1', borderRadius: 8,
+                padding: '14px 20px', background: 'var(--warning-soft)', border: '1px solid #FFE7D1', borderRadius: 8,
               }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>單項總得分 = 報名分 + 門檻分 + 力度分</span>
-                <output aria-label="單項總得分" aria-live="polite" style={{ fontSize: 24, fontWeight: 700, color: '#E8720C' }}>{preview.total} 分</output>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>單項總得分 = 報名分 + 門檻分 + 力度分</span>
+                <output aria-label="單項總得分" aria-live="polite" style={{ fontSize: 24, fontWeight: 700, color: 'var(--brand)' }}>{preview.total} 分</output>
               </div>
             </div>
           </AlgorithmSection>
@@ -455,7 +455,7 @@ const INTENSITY_BASE_SECTIONS: HelpSection[] = [
  */
 function FormulaHint({ formula, example }: { formula: string; example: string }) {
   return (
-    <span style={{ fontSize: 12, color: '#8C8C8C' }}>公式：{formula}{' · '}例：{example}</span>
+    <span style={{ fontSize: 12, color: 'var(--text-3)' }}>公式：{formula}{' · '}例：{example}</span>
   )
 }
 
@@ -472,10 +472,10 @@ function FormulaWithTip({ formula, example }: { formula: string; example: string
 /** 试算指标单元格 */
 function MetricCell({ label, value, color, highlight, note }: { label: string; value: string; color?: string; highlight?: string; note?: string }) {
   return (
-    <div style={{ padding: '10px 12px', background: '#FAFAFA', borderRadius: 6, border: '1px solid #F0F0F0' }}>
-      <div style={{ fontSize: 11, color: '#8C8C8C', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 16, fontWeight: 600, color: color || highlight || '#262626' }}>
-        {value}{note && <span style={{ fontSize: 11, fontWeight: 400, color: '#8C8C8C', marginLeft: 6 }}>{note}</span>}
+    <div style={{ padding: '10px 12px', background: 'var(--surface-3)', borderRadius: 6, border: '1px solid #F0F0F0' }}>
+      <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 16, fontWeight: 600, color: color || highlight || 'var(--text-1)' }}>
+        {value}{note && <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 6 }}>{note}</span>}
       </div>
     </div>
   )
