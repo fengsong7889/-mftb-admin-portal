@@ -30,7 +30,8 @@ npm ci --legacy-peer-deps
 # 本地开发
 npm run dev
 
-# 类型检查（不产出文件）
+# 类型检查（不产出文件）；体量已越过 Node 默认 2GB 堆，
+# 如报 exit 134 / heap out of memory，加 NODE_OPTIONS=--max-old-space-size=6144 前缀
 npm run typecheck
 
 # 构建（含类型检查）
@@ -83,6 +84,12 @@ node scripts/check-theme-tokens.mjs --snapshot   # 清理完一批后下调棘�
 2. **类型检查**：`tsconfig.json` 启用 `strict: true`。CI 先以独立步骤执行全量 `npm run typecheck`（不产出），
    通过后再 `npm run build` 打包——同一次发布不再重复跑两遍 `tsc`。
    本地单命令仍可用 `npm run build:strict`（`tsc && vite build`）。
+   ⚠ **仓库体量已越过 Node 默认 ~2GB 堆上限**：裸跑 `npm run typecheck` 会在**同一份代码**上
+   间歇性 V8 OOM（退出码 **134**、日志末尾 `FATAL ERROR: ... near heap limit`，而不是 TS 错误行），
+   2026-11-04 曾因此打断过 main 的生产部署。本地必要时加
+   `NODE_OPTIONS=--max-old-space-size=6144`；CI 已按 runner 内存自动取步骤级上限。
+   **堆不够只能上调堆，不得跳过类型检查或放宽 `tsconfig`**；取值/阈值/为何不能提到 job 级
+   （会乘到 vitest 多个 fork 上造成「慢=超时」假红）见 `ENVIRONMENT-REFERENCE.md` §4.3.1。
 3. **环境变量**：前端 Mock 凭据通过 `.env.local`（已 gitignore）注入，参考 `.env.example`；
    后端运行时凭据（`DB_URL`/`DB_USERNAME`/`DB_PASSWORD`/`JWT_SECRET`）统一放 `backend/.env.local`（已 gitignore），
    参考 `backend/.env.local.example`。**任何受版本控制的文件禁止写入明文凭据**，由 `npm run secret-scan` 拦截。
