@@ -50,6 +50,8 @@ interface PositionRecord {
   /** 异动动作 code（判定与配色用）；历史未回填时为空 */
   operationCode?: string
   reason: string
+  /** 服务部门稳定 ID（同名部门的真正区分靠它，名称快照不能区分）；历史行可能为空 */
+  deptId?: number
   serviceDept?: string
   position?: string
   workCountry?: string
@@ -181,6 +183,7 @@ function mapPositionRecord(r: PositionRecordItem): PositionRecord {
     operation: r.operation,
     operationCode: r.operationCode,
     reason: r.reason ?? '',
+    deptId: r.deptId,
     serviceDept: r.serviceDept,
     position: r.positionName,
     workCountry: r.workCountry,
@@ -210,6 +213,8 @@ function deptDisplayName(dept: DepartmentItem, isNonZh: boolean) {
  *
  * 服务部门仍按名称快照入库（契约不变）：名称由 handlePosDeptChange 随选中的部门 ID 一起写好，
  * 这里不再二次换算，以免历史值匹配不到节点时被误清空。
+ * deptId 同时上传：同名部门（TB/MF 技术中心下各有前端研發部）只给名称时服务端只能留空 dept_id，
+ * 账号投影的 department_id 也就跟不上，部门数据权限会停在旧部门。
  */
 function buildPositionPayload(values: PositionFormValues): PositionRecordPayload {
   const effectiveDate = values.effectiveDate
@@ -218,6 +223,7 @@ function buildPositionPayload(values: PositionFormValues): PositionRecordPayload
     // 只提交 code：名称快照由服务端按 code 规范化，避免前端写出繁体名把在职派生判失灵
     operationCode: values.operation,
     reason: values.reason,
+    deptId: values.serviceDeptId,
     serviceDept: values.serviceDept,
     sequenceType: values.sequence,
     positionLevel: values.positionLevel,
@@ -905,8 +911,9 @@ export default function EmployeeDetail() {
       // 预填 code：历史行没回填时从名称快照反推，两者都推不出才退回原值
       operation: record.operationCode ?? hrOperationCodeFromName(record.operation) ?? record.operation,
       reason: record.reason,
-      // 回填：名称快照换算成部门 ID 只为把树节点选中；换算不到时 serviceDept 原值仍会原样提交，不会丢
-      serviceDeptId: record.serviceDept ? posDeptIdByName.get(record.serviceDept) : undefined,
+      // 回填优先用服务端给的部门 ID（同名部门能精确定位）；历史行没有 ID 时才按名称反推，
+      // 反推仅为了把当前值显示出来，换算不到也不影响 serviceDept 原值原样提交
+      serviceDeptId: record.deptId ?? (record.serviceDept ? posDeptIdByName.get(record.serviceDept) : undefined),
       serviceDept: record.serviceDept,
       sequence: record.sequence,
       positionLevel: record.positionLevel,
@@ -955,6 +962,7 @@ export default function EmployeeDetail() {
         operation: hrOperationLabel(payload.operationCode, undefined, t),
         operationCode: payload.operationCode,
         reason: payload.reason ?? '',
+        deptId: payload.deptId,
         serviceDept: payload.serviceDept,
         position: payload.positionName,
         workCountry: payload.workCountry,

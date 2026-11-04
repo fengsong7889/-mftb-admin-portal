@@ -304,6 +304,8 @@ export interface PositionRecordItem {
   /** 异动动作 code（判定用）；历史未回填时可能为空 */
   operationCode?: string
   reason?: string
+  /** 服务部门稳定 ID；历史行只存名称快照且同名部门无法唯一反推时为 undefined */
+  deptId?: number
   serviceDept?: string
   sequenceType?: string
   positionLevel?: string
@@ -332,6 +334,12 @@ export interface PositionRecordPayload {
   /** 异动动作 code（HR_OPERATION），提交端的主字段 */
   operationCode?: string
   reason?: string
+  /**
+   * 服务部门 ID（sys_department.id）。
+   * 组织架构允许同名部门，只传 serviceDept 时服务端无法判定是哪一个；
+   * 在部门树上选定节点后应连同 ID 一起提交，服务端以 ID 为准回写名称快照。
+   */
+  deptId?: number
   serviceDept?: string
   sequenceType?: string
   positionLevel?: string

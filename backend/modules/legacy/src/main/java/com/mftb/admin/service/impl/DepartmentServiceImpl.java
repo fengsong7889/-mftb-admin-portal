@@ -102,6 +102,19 @@ public class DepartmentServiceImpl implements DepartmentService {
     }
 
     @Override
+    public String requireEnabledDepartmentNameById(Long id) {
+        if (id == null) {
+            throw new BusinessException("部門不能為空");
+        }
+        // 逻辑删除条件由 MyBatis-Plus 自动排除，这里只补启用态；ID 已选定，不存在同名歧义
+        SysDepartment dept = requireDept(id);
+        if (!Objects.equals(STATUS_ENABLED, dept.getStatus())) {
+            throw new BusinessException("所選部門已停用，請重新選擇");
+        }
+        return dept.getName();
+    }
+
+    @Override
     public DepartmentVO create(DepartmentRequest request) {
         // 部门编码由系统按编号生成规则 dept_code 自动生成, 不接受前端传入
         String code = generateDeptCode();

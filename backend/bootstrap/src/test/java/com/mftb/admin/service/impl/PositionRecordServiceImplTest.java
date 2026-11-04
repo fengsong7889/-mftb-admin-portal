@@ -1,5 +1,6 @@
 package com.mftb.admin.service.impl;
 
+import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.PositionRecordRequest;
 import com.mftb.admin.entity.EmpPositionRecord;
 import com.mftb.admin.entity.SysDepartment;
@@ -24,8 +25,11 @@ import java.time.LocalDate;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -46,6 +50,7 @@ class PositionRecordServiceImplTest {
     private SysDepartmentMapper sysDepartmentMapper;
     private HrAssignmentQuery hrAssignmentQuery;
     private PermissionService permissionService;
+    private HrMasterDataResolver masterDataResolver;
     private PositionRecordServiceImpl service;
 
     @BeforeEach
@@ -55,6 +60,12 @@ class PositionRecordServiceImplTest {
         sysDepartmentMapper = mock(SysDepartmentMapper.class);
         hrAssignmentQuery = mock(HrAssignmentQuery.class);
         permissionService = mock(PermissionService.class);
+        // 默认按「名称命中多个同名部门」的真实行为：把 dept_id 抹成 NULL，用来验证显式 ID 不会被它覆写
+        masterDataResolver = mock(HrMasterDataResolver.class);
+        doAnswer(invocation -> {
+            ((EmpPositionRecord) invocation.getArgument(0)).setDeptId(null);
+            return null;
+        }).when(masterDataResolver).applyStableIds(any(EmpPositionRecord.class));
         OperatorResolver operatorResolver = mock(OperatorResolver.class);
         when(operatorResolver.currentOperatorName()).thenReturn("tester");
         service = new PositionRecordServiceImpl(
@@ -64,7 +75,7 @@ class PositionRecordServiceImplTest {
                 mock(SysPositionMapper.class),
                 operatorResolver,
                 mock(EmployeeService.class),
-                mock(HrMasterDataResolver.class),
+                masterDataResolver,
                 mock(HrEmploymentPeriodService.class),
                 mock(HrAuditService.class),
                 hrAssignmentQuery,
@@ -153,5 +164,82 @@ class PositionRecordServiceImplTest {
 
         verify(sysUserMapper, never()).updateById(any(SysUser.class));
         verify(permissionService, never()).evictAll();
+    }
+
+    /**
+     * 同名部门（TB/MF 技术中心下各有前端研發部）按名称归一必然落空，
+     * 但用户在部门树上点定了节点，dept_id 就不能再留空。
+     */
+    @Test
+    @DisplayName("显式选定部门 ID 时以该节点为准，不被名称归一的 NULL 覆写")
+    void explicitDeptIdOverridesAmbiguousNameResolution() {
+        when(sysUserMapper.selectById(9L)).thenReturn(user());
+        when(positionRecordMapper.selectOne(any())).thenReturn(null);
+        SysDepartment mfFrontend = department(36L, "前端研發部", 1);
+        when(sysDepartmentMapper.selectById(36L)).thenReturn(mfFrontend);
+
+        PositionRecordRequest request = transferRequest(LocalDate.now(), "前端研發部");
+        request.setDeptId(36L);
+        // 前端在英文界面选的中英文混写，服务端必须按主数据规范化
+        request.setServiceDept("Front-end R&D");
+
+        service.create(9L, request);
+
+        ArgumentCaptor<EmpPositionRecord> captor = ArgumentCaptor.forClass(EmpPositionRecord.class);
+        verify(positionRecordMapper).insert(captor.capture());
+        assertEquals(36L, captor.getValue().getDeptId(), "显式部门 ID 被名称归一的 NULL 覆写了");
+        assertEquals("前端研發部", captor.getValue().getServiceDept(), "名称快照未取自主数据");
+    }
+
+    @Test
+    @DisplayName("未传部门 ID 时保持旧口径：只按前端传来的名称入库，不猜 ID")
+    void missingDeptIdKeepsLegacyNameOnlyPath() {
+        when(sysUserMapper.selectById(9L)).thenReturn(user());
+        when(positionRecordMapper.selectOne(any())).thenReturn(null);
+        when(hrAssignmentQuery.asOf(eq(9L), any())).thenReturn(Optional.empty());
+
+        service.create(9L, transferRequest(LocalDate.now(), "前端研發部"));
+
+        ArgumentCaptor<EmpPositionRecord> captor = ArgumentCaptor.forClass(EmpPositionRecord.class);
+        verify(positionRecordMapper).insert(captor.capture());
+        assertNull(captor.getValue().getDeptId(), "只给名称时不得猜部门 ID");
+        assertEquals("前端研發部", captor.getValue().getServiceDept());
+        verify(sysDepartmentMapper, never()).selectById(any());
+    }
+
+    @Test
+    @DisplayName("部门 ID 不存在或已删除时拒写异动")
+    void unknownDeptIdIsRejected() {
+        when(sysUserMapper.selectById(9L)).thenReturn(user());
+        when(positionRecordMapper.selectOne(any())).thenReturn(null);
+        when(sysDepartmentMapper.selectById(999L)).thenReturn(null);
+
+        PositionRecordRequest request = transferRequest(LocalDate.now(), "前端研發部");
+        request.setDeptId(999L);
+
+        assertThrows(BusinessException.class, () -> service.create(9L, request));
+        verify(positionRecordMapper, never()).insert(any(EmpPositionRecord.class));
+    }
+
+    @Test
+    @DisplayName("停用部门即使前端置灰被绕过，服务端仍拒写异动")
+    void disabledDeptIdIsRejected() {
+        when(sysUserMapper.selectById(9L)).thenReturn(user());
+        when(positionRecordMapper.selectOne(any())).thenReturn(null);
+        when(sysDepartmentMapper.selectById(36L)).thenReturn(department(36L, "前端研發部", 0));
+
+        PositionRecordRequest request = transferRequest(LocalDate.now(), "前端研發部");
+        request.setDeptId(36L);
+
+        assertThrows(BusinessException.class, () -> service.create(9L, request));
+        verify(positionRecordMapper, never()).insert(any(EmpPositionRecord.class));
+    }
+
+    private static SysDepartment department(long id, String name, int status) {
+        SysDepartment dept = new SysDepartment();
+        dept.setId(id);
+        dept.setName(name);
+        dept.setStatus(status);
+        return dept;
     }
 }

@@ -120,6 +120,25 @@ class EamReturnServiceImplTest {
         assertTrue(update.getValue().getParamNameValuePairs().containsValue(null));
     }
 
+    /**
+     * 同名部门（TB/MF 技术中心下各有前端研發部）只传名称会被拒为「存在同名部門」，
+     * 但用户已经在部门树上点定了节点，ID 路径必须走通，且不得再回头按名称校验。
+     */
+    @Test
+    void departmentIdIsPreferredOverAmbiguousName() {
+        stubClaim();
+        EamAsset asset = stubAssetForReturn();
+        when(departmentService.requireEnabledDepartmentNameById(36L)).thenReturn("前端研發部");
+
+        EamReturnDTO dto = dto("前端研發部");
+        dto.setReceiveDepartmentId(36L);
+
+        assertEquals(11L, service.register(dto));
+
+        assertEquals("前端研發部", asset.getDepartment());
+        verify(departmentService, never()).requireEnabledDepartmentName(any());
+    }
+
     @ParameterizedTest
     @NullAndEmptySource
     @ValueSource(strings = {" \t "})

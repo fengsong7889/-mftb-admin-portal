@@ -29,7 +29,13 @@ public class EamReturnDTO {
     private String evidenceDataUrl;
     /** 凭证文件名 */
     private String evidenceFileName;
-    /** 接收管理部门（正常归还归位用，空则保持原归属部门） */
+    /**
+     * 接收管理部门 ID（sys_department.id）。
+     * <p>组织架构允许同名部门，只传名称时服务端无法判定是哪一个（会直接拒为「存在同名部門」）；
+     * 前端在部门树上选定节点后应连同 ID 一起提交。
+     */
+    private Long receiveDepartmentId;
+    /** 接收管理部门（正常归还归位用，空则保持原归属部门）；receiveDepartmentId 存在时以 ID 为准 */
     private String receiveDepartment;
     /** 归还位置 ID（空则保持原位置） */
     private Long receiveLocationId;

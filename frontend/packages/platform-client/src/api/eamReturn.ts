@@ -83,7 +83,9 @@ export interface ReturnRegisterDTO {
   actualReturneeName?: string
   evidenceDataUrl?: string
   evidenceFileName?: string
-  /** 接收部门（正常归还归位用，空则保持原归属部门） */
+  /** 接收部门 ID（sys_department.id）。同名部门按名称提交会被服务端拒为「存在同名部門」，树上选定节点后应传 ID */
+  receiveDepartmentId?: number
+  /** 接收部门（正常归还归位用，空则保持原归属部门）；receiveDepartmentId 存在时服务端以 ID 为准 */
   receiveDepartment?: string
   /** 归还位置 ID（空则保持原位置） */
   receiveLocationId?: number

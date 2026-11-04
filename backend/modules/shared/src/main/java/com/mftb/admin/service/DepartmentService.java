@@ -17,6 +17,13 @@ public interface DepartmentService {
     /** 按名称校验唯一、启用且未删除的部门，返回库中的标准名称。 */
     String requireEnabledDepartmentName(String name);
 
+    /**
+     * 按 ID 校验启用且未删除的部门，返回库中的标准名称。
+     * <p>组织架构允许同名部门（TB/MF 技术中心下各有前端研發部），按名称校验只能拒歧义；
+     * 调用方在部门树上选定节点后应改走本方法，由 ID 消除歧义。
+     */
+    String requireEnabledDepartmentNameById(Long id);
+
     /** 新增部门 */
     DepartmentVO create(DepartmentRequest request);
 
