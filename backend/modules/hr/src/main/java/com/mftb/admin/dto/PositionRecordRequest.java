@@ -32,6 +32,13 @@ public class PositionRecordRequest {
     private String reason;
 
     // 任职信息
+    /**
+     * 服务部门 ID（sys_department.id）。组织架构允许同名部门（TB/MF 技术中心下各有前端研發部），
+     * 只给名称时服务端无法判定是哪一个，dept_id 只能留空；前端在部门树上选定节点后应连同 ID 一起提交，
+     * 服务端以 ID 为准回写名称快照。为空时退回按名称归一的旧口径（兼容只给名称的写入源）。
+     */
+    private Long deptId;
+    /** 服务部门名称快照；deptId 存在时由服务端按主数据规范化，不采信前端传入值 */
     private String serviceDept;
     private String sequenceType;
     private String positionLevel;

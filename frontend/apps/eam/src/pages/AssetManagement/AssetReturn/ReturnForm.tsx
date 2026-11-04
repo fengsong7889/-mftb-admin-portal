@@ -70,18 +70,24 @@ function ReturnCard({ icon, iconBg, title, children }: {
 }
 
 interface DeptTreeOption {
-  value: string
+  value: number
   title: string
   disabled?: boolean
   children?: DeptTreeOption[]
 }
 
-/** 平铺部门列表构建 TreeSelect 树数据 */
+/**
+ * 平铺部门列表构建 TreeSelect 树数据
+ *
+ * 节点 value 必须用部门 ID：组织架构里存在同名部门（TB/MF 技术中心下各有前端研發部），
+ * TreeSelect 内部以 value 作为节点唯一键，重名会让下拉树缩进错乱、行相互覆盖；
+ * 而且只传名称提交时会被服务端拒为「存在同名部門」，用户根本办不成归还。
+ */
 function buildDeptTreeData(list: DepartmentItem[]): DeptTreeOption[] {
   const nodeMap = new Map<number, DeptTreeOption>()
   list.forEach(dept => {
     nodeMap.set(dept.id, {
-      value: dept.name,
+      value: dept.id,
       title: dept.name,
       disabled: dept.status !== DEPT_STATUS_ENABLED,
       children: [],
@@ -102,7 +108,8 @@ interface Values {
   condition: 'normal' | 'damaged' | 'lost'
   reason: string
   actualReturnee?: { value: number; label: string } | null
-  receiveDepartment?: string
+  /** 接收部门 ID：树上选定的是哪个节点就存哪个，同名部门靠它区分 */
+  receiveDepartmentId?: number
   receiveLocationId?: number
 }
 
@@ -175,7 +182,7 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
         exceptionReason: values.condition !== 'normal' ? values.reason : undefined,
         actualReturneeId: returnee?.value,
         actualReturneeName: returnee?.label || user?.name,
-        receiveDepartment: values.receiveDepartment,
+        receiveDepartmentId: values.receiveDepartmentId,
         receiveLocationId: values.receiveLocationId,
       }
       await onSubmit(dto)
@@ -405,7 +412,7 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
                 ? '指定接收部門與存放倉庫後，資產歸還時同步歸位；不填則保持原歸屬部門與原位置。'
                 : '損壞資產仍需指定接收部門與存放位置，便於後續處置與跟蹤；不填則保持原歸屬。'} />
             <div className="return-grid">
-              <Form.Item name="receiveDepartment" label="接收部門">
+              <Form.Item name="receiveDepartmentId" label="接收部門">
                 <TreeSelect
                   treeData={deptTreeData}
                   placeholder="選擇接收部門（可選）"

@@ -89,4 +89,39 @@ class DepartmentServiceImplTest {
         assertTrue(assertThrows(BusinessException.class,
                 () -> service.requireEnabledDepartmentName("同名部門")).getMessage().contains("同名部門"));
     }
+
+    /**
+     * 同名部门按名称只能拒歧义，但用户既然在树上点定了具体节点，ID 路径就必须能走通；
+     * 否则资产归还等写入源对 4/5 号同名部门永远办不成。
+     */
+    @Test
+    void idPathAcceptsDepartmentThatNamePathRejectsAsAmbiguous() {
+        assertEquals("同名部門", service.requireEnabledDepartmentNameById(5L));
+    }
+
+    @Test
+    void idPathReturnsCanonicalNameOfEnabledDepartment() {
+        assertEquals("用戶運營部", service.requireEnabledDepartmentNameById(1L));
+    }
+
+    @Test
+    void idPathRejectsMissingOrLogicallyDeletedDepartment() {
+        assertTrue(assertThrows(BusinessException.class,
+                () -> service.requireEnabledDepartmentNameById(999L)).getMessage().contains("部門不存在"));
+        // 3 号为逻辑删除行：MyBatis-Plus @TableLogic 应把它过滤掉，不能当成可用部门
+        assertTrue(assertThrows(BusinessException.class,
+                () -> service.requireEnabledDepartmentNameById(3L)).getMessage().contains("部門不存在"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(longs = {2L, 7L})
+    void idPathRejectsDisabledDepartment(Long id) {
+        assertTrue(assertThrows(BusinessException.class,
+                () -> service.requireEnabledDepartmentNameById(id)).getMessage().contains("已停用"));
+    }
+
+    @Test
+    void idPathRejectsNullId() {
+        assertThrows(BusinessException.class, () -> service.requireEnabledDepartmentNameById(null));
+    }
 }
