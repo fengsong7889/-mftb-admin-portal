@@ -42,6 +42,9 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class PositionRecordServiceImpl implements PositionRecordService {
 
+    /** 部门启用状态：与 sys_department.status、DepartmentServiceImpl.STATUS_ENABLED 同源 */
+    private static final int DEPT_STATUS_ENABLED = 1;
+
     private final EmpPositionRecordMapper positionRecordMapper;
     private final SysUserMapper sysUserMapper;
     private final SysDepartmentMapper sysDepartmentMapper;
@@ -102,6 +105,7 @@ public class PositionRecordServiceImpl implements PositionRecordService {
         entity.setDeleted(0);
         // 名称→稳定 ID 归一（只认唯一命中），失败留 NULL：写错关联比留空更难发现
         masterDataResolver.applyStableIds(entity);
+        applyDeptSelection(entity, request);
         positionRecordMapper.insert(entity);
         syncPeriods(userId);
         // 职务变动一落库，账号投影（部门/职位快照）必须跟上，否则 RDM/花名册等读到的是旧部门
@@ -152,6 +156,7 @@ public class PositionRecordServiceImpl implements PositionRecordService {
         entity.setContractLocation(request.getContractLocation());
         entity.setUpdatedBy(operatorResolver.currentOperatorName());
         masterDataResolver.applyStableIds(entity);
+        applyDeptSelection(entity, request);
         positionRecordMapper.updateById(entity);
         syncPeriods(userId);
         syncAccountProjection(userId);
@@ -181,6 +186,33 @@ public class PositionRecordServiceImpl implements PositionRecordService {
                 .detail("删除异动 #" + recordId + " " + entity.getOperationCode()
                         + " @ " + entity.getEffectiveDate())
                 .effectiveDate(entity.getEffectiveDate()));
+    }
+
+    /**
+     * 服务部门以「前端在部门树上选定的那个节点」为准。
+     *
+     * <p>{@link HrMasterDataResolver#applyStableIds} 只认名称唯一命中，同名部门（TB/MF 技术中心下
+     * 各有前端研發部）会故意把 dept_id 留空。但用户已经点定了具体节点，再退化成猜就是把已知的
+     * 信息丢掉；dept_id 缺失还会连带让账号投影只同步名称不改 department_id，部门数据权限挂在旧部门上。
+     *
+     * <p>未传 ID 时保持原口径（OA 审批回调等写入源只给名称），不回退成猜测。
+     * 必须在 applyStableIds 之后执行，否则同名部门会被它重新抹成 NULL。
+     */
+    private void applyDeptSelection(EmpPositionRecord entity, PositionRecordRequest request) {
+        if (request.getDeptId() == null) {
+            return;
+        }
+        SysDepartment dept = sysDepartmentMapper.selectById(request.getDeptId());
+        if (dept == null) {
+            throw new BusinessException("所選服務部門不存在或已刪除，請重新選擇");
+        }
+        // 前端校验不是安全边界：停用部门在树上已置灰，这里仍要硬拦，异动不能把人挂进停用部门
+        if (!Objects.equals(DEPT_STATUS_ENABLED, dept.getStatus())) {
+            throw new BusinessException("所選服務部門已停用，請重新選擇");
+        }
+        entity.setDeptId(dept.getId());
+        // 名称快照以主数据为准：不采信前端传来的写法，避免繁简/中英文混存把在职派生与部门比对判失灵
+        entity.setServiceDept(dept.getName());
     }
 
     /**

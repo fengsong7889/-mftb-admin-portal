@@ -127,7 +127,8 @@ public class EamReturnServiceImpl implements EamReturnService {
             throw new BusinessException("資產狀況異常時必須填寫異常原因");
         }
 
-        String receiveDepartment = resolveReceiveDepartment(dto.getReceiveDepartment());
+        String receiveDepartment = resolveReceiveDepartment(
+                dto.getReceiveDepartment(), dto.getReceiveDepartmentId());
         EamAsset holding = assetMapper.selectOne(new LambdaQueryWrapper<EamAsset>().eq(EamAsset::getId, assetId).last("FOR UPDATE"));
         if (holding == null || !"in_use".equals(holding.getStatus()) || !Objects.equals(holding.getCurrentHolderId(), employeeId)
                 || (claim != null && !Objects.equals(holding.getActiveClaimId(), claim.getId()))
@@ -587,9 +588,22 @@ public class EamReturnServiceImpl implements EamReturnService {
         return w;
     }
 
-    /** 可选接收部门：未填写时保留资产原归属，提供时必须通过部门有效性校验。 */
-    private String resolveReceiveDepartment(String name) {
+    /**
+     * 可选接收部门：未填写时保留资产原归属，提供时必须通过部门有效性校验。
+     *
+     * <p>同名部门（TB/MF 技术中心下各有前端研發部）按名称校验只能拒为「存在同名部門」，
+     * 用户明明在部门树上点定了节点却被拦下；因此给了 ID 就以 ID 为准，名称仅作旧调用方的兜底。
+     */
+    private String resolveReceiveDepartment(String name, Long id) {
+        if (id != null) {
+            return departmentService.requireEnabledDepartmentNameById(id);
+        }
         return hasText(name) ? departmentService.requireEnabledDepartmentName(name) : null;
+    }
+
+    /** 只给名称的旧口径（处置/找回等尚未传部门 ID 的调用方） */
+    private String resolveReceiveDepartment(String name) {
+        return resolveReceiveDepartment(name, null);
     }
 
     private boolean hasText(String text) { return text != null && !text.isBlank(); }

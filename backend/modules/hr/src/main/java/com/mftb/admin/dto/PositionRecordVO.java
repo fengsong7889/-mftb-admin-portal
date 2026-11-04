@@ -25,6 +25,11 @@ public class PositionRecordVO {
     private String reason;
 
     // 任职信息
+    /**
+     * 服务部门稳定 ID（编辑时回填部门树选中节点用）。
+     * <p>历史行只存了名称快照、且名称命中多个同名部门时为 null，前端需提示重新选择。
+     */
+    private Long deptId;
     private String serviceDept;
     private String sequenceType;
     private String positionLevel;
@@ -56,6 +61,7 @@ public class PositionRecordVO {
         vo.setOperation(entity.getOperation());
         vo.setOperationCode(entity.getOperationCode());
         vo.setReason(entity.getReason());
+        vo.setDeptId(entity.getDeptId());
         vo.setServiceDept(entity.getServiceDept());
         vo.setSequenceType(entity.getSequenceType());
         vo.setPositionLevel(entity.getPositionLevel());
