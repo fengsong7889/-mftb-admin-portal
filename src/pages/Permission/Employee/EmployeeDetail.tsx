@@ -153,6 +153,9 @@ interface PositionFormValues {
   /** 表单存的是 code（HR_OPERATION），不再存中文名 */
   operation: string
   reason?: string
+  /** TreeSelect 选项值：部门 ID。必须用 ID——同名部门分属不同中心，名称一重复节点键就冲突，下拉树会渲染错乱 */
+  serviceDeptId?: number
+  /** 入库的服务部门名称快照：随选择写回；历史值匹配不到节点时原样保留，避免保存把部门清空 */
   serviceDept?: string
   sequence?: string
   positionLevel?: string
@@ -197,7 +200,17 @@ function mapPositionRecord(r: PositionRecordItem): PositionRecord {
   }
 }
 
-/** 表单值 → 后端请求（sequence→sequenceType, rank→rankCode, position→positionName），修复直接透传导致的字段丢失 */
+/** 部门展示名：非繁中环境优先英文名（与组织架构页口径一致） */
+function deptDisplayName(dept: DepartmentItem, isNonZh: boolean) {
+  return isNonZh ? (dept.nameEn || dept.name) : dept.name
+}
+
+/**
+ * 表单值 → 后端请求（sequence→sequenceType, rank→rankCode, position→positionName），修复直接透传导致的字段丢失
+ *
+ * 服务部门仍按名称快照入库（契约不变）：名称由 handlePosDeptChange 随选中的部门 ID 一起写好，
+ * 这里不再二次换算，以免历史值匹配不到节点时被误清空。
+ */
 function buildPositionPayload(values: PositionFormValues): PositionRecordPayload {
   const effectiveDate = values.effectiveDate
   return {
@@ -471,11 +484,11 @@ export default function EmployeeDetail() {
     return (
       <div style={{
         marginTop: 16, padding: '12px 24px', borderRadius: 8,
-        border: '1px solid #f0f0f0', background: '#fafafa',
+        border: '1px solid #f0f0f0', background: 'var(--surface-3)',
         display: 'flex', justifyContent: 'flex-end', gap: 24,
       }}>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>最后更新人：<span style={{ color: '#595959' }}>{info?.updatedBy || '-'}</span></span>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>最后更新時間：<span style={{ color: '#595959' }}>{info?.updatedAt || t('employeeDetail.noUpdateRecord')}</span></span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>最后更新人：<span style={{ color: 'var(--text-2)' }}>{info?.updatedBy || '-'}</span></span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>最后更新時間：<span style={{ color: 'var(--text-2)' }}>{info?.updatedAt || t('employeeDetail.noUpdateRecord')}</span></span>
       </div>
     )
   }
@@ -504,14 +517,20 @@ export default function EmployeeDetail() {
   const watchPosCountry = Form.useWatch('workCountry', posForm)
   const watchPosSequence = Form.useWatch('sequence', posForm)
 
-  /** 职务弹窗：部门树（value 用部门名称，方便详情展示） */
+  /**
+   * 职务弹窗：部门树
+   *
+   * 节点 value 必须用部门 ID：组织架构里存在同名部门（TB技术中心/MF技术中心下各有
+   * 前端研發部、後端研發部、測試部、設計部），TreeSelect 内部以 value 作为节点唯一键，
+   * 一旦重名，下拉列表的缩进与行会相互覆盖，整棵树看起来就是一团重复项的平铺。
+   */
   const posDeptTreeData = useMemo(() => {
-    interface Node { value: string; title: string; disabled?: boolean; children?: Node[] }
+    interface Node { value: number; title: string; disabled?: boolean; children?: Node[] }
     const nodeMap = new Map<number, Node>()
     departments.forEach(dept => {
       nodeMap.set(dept.id, {
-        value: isNonZh ? (dept.nameEn || dept.name) : dept.name,
-        title: isNonZh ? (dept.nameEn || dept.name) : dept.name,
+        value: dept.id,
+        title: deptDisplayName(dept, isNonZh),
         disabled: dept.status !== DEPT_STATUS.ENABLED,
         children: [],
       })
@@ -525,6 +544,30 @@ export default function EmployeeDetail() {
     })
     return roots
   }, [departments, isNonZh])
+
+  /** 职务弹窗：部门 ID → 展示名，选中时写回 service_dept 名称快照 */
+  const posDeptNameById = useMemo(() => {
+    const map = new Map<number, string>()
+    departments.forEach(dept => map.set(dept.id, deptDisplayName(dept, isNonZh)))
+    return map
+  }, [departments, isNonZh])
+
+  /**
+   * 职务弹窗：名称 → 部门 ID，仅用于编辑回填。
+   * 库里只存了名称，同名部门无法反推是哪一个，取首个同名节点只为把当前值显示出来；
+   * 中英文名都登记，避免早期在非繁中环境下录入的英文名快照回填不出来。
+   */
+  const posDeptIdByName = useMemo(() => {
+    const map = new Map<string, number>()
+    const put = (label: string | undefined, id: number) => {
+      if (label && !map.has(label)) map.set(label, id)
+    }
+    departments.forEach(dept => {
+      put(dept.name, dept.id)
+      put(dept.nameEn, dept.id)
+    })
+    return map
+  }, [departments])
 
   /** 职务弹窗：根据所选国家获取城市列表 */
   const posCityOptions = useMemo(() => {
@@ -540,9 +583,10 @@ export default function EmployeeDetail() {
     return Array.from({ length: 7 }, (_, i) => ({ value: `${prefix}${i + 1}`, label: `${prefix}${i + 1}` }))
   }, [watchPosSequence])
 
-  /** 职务弹窗：选择服务部门后自动带出直属上级 */
-  const handlePosDeptChange = (deptName: string) => {
-    const dept = departments.find(d => (isNonZh ? (d.nameEn || d.name) : d.name) === deptName)
+  /** 职务弹窗：选择服务部门后写回名称快照（入库字段）并自动带出直属上级 */
+  const handlePosDeptChange = (deptId?: number) => {
+    posForm.setFieldValue('serviceDept', deptId != null ? posDeptNameById.get(deptId) : undefined)
+    const dept = departments.find(d => d.id === deptId)
     if (dept?.leader) {
       posForm.setFieldValue('directSuperior', dept.leader)
     } else {
@@ -861,6 +905,8 @@ export default function EmployeeDetail() {
       // 预填 code：历史行没回填时从名称快照反推，两者都推不出才退回原值
       operation: record.operationCode ?? hrOperationCodeFromName(record.operation) ?? record.operation,
       reason: record.reason,
+      // 回填：名称快照换算成部门 ID 只为把树节点选中；换算不到时 serviceDept 原值仍会原样提交，不会丢
+      serviceDeptId: record.serviceDept ? posDeptIdByName.get(record.serviceDept) : undefined,
       serviceDept: record.serviceDept,
       sequence: record.sequence,
       positionLevel: record.positionLevel,
@@ -981,7 +1027,7 @@ export default function EmployeeDetail() {
     { title: t('employeeDetail.colRate'), dataIndex: 'rate', key: 'rate', width: 100,
       render: (v: number) => v > 0 ? `${v}%` : '-' },
     { title: t('employeeDetail.colAmountCny'), dataIndex: 'amount', key: 'amount', width: 140,
-      render: (v: number) => v > 0 ? <span style={{ color: '#ff4d4f', fontWeight: 600 }}>¥{v.toLocaleString()}</span> : '-' },
+      render: (v: number) => v > 0 ? <span style={{ color: 'var(--danger)', fontWeight: 600 }}>¥{v.toLocaleString()}</span> : '-' },
     { title: t('employeeDetail.colRemark'), dataIndex: 'remark', key: 'remark', render: (v: string) => v || '-' },
     ...(salaryWritable ? [{
       title: t('common.colAction'), key: 'action', width: 120,
@@ -1521,14 +1567,14 @@ export default function EmployeeDetail() {
     return (
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-          <span style={{ width: 3, height: 12, borderRadius: 2, background: '#E8720C' }} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>{title}</span>
+          <span style={{ width: 3, height: 12, borderRadius: 2, background: 'var(--brand)' }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>{title}</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
           {items.map(i => (
             <div key={i.label} style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{i.label}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{i.value || '-'}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{i.label}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{i.value || '-'}</span>
             </div>
           ))}
         </div>
@@ -1540,12 +1586,12 @@ export default function EmployeeDetail() {
     return (
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         {/* 左侧：當前选中节点的职务變动详情（各节点部門/职位可能不同） */}
-        <div style={{ flex: 1, minWidth: 0, border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px' }}>
+        <div style={{ flex: 1, minWidth: 0, border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <IdcardOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <IdcardOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.posDetailTitle')}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('employeeDetail.posDetailTitle')}</span>
             {selectedPos && <Tag color={posOpColor(selectedPos.operationCode, selectedPos.operation)} style={{ marginLeft: 4 }}>{hrOperationLabel(selectedPos.operationCode, selectedPos.operation, t)}</Tag>}
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             <Space size={8}>
@@ -1598,17 +1644,17 @@ export default function EmployeeDetail() {
         </div>
 
         {/* 右侧：人事變动軌跡状态轴（点擊节点联动左侧详情） */}
-        <div style={{ width: 320, flexShrink: 0, border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px' }}>
+        <div style={{ width: 320, flexShrink: 0, border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ClockCircleOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ClockCircleOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.posTimelineTitle')}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('employeeDetail.posTimelineTitle')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           {sortedPosRecords.length > 0 ? (
             <>
-              <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 12 }}>{t('employeeDetail.posTimelineHint')}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12 }}>{t('employeeDetail.posTimelineHint')}</div>
               <Timeline
                 items={sortedPosRecords.map(r => {
                   const active = selectedPos?.id === r.id
@@ -1617,7 +1663,7 @@ export default function EmployeeDetail() {
                       <span style={{
                         display: 'inline-block', width: active ? 14 : 10, height: active ? 14 : 10,
                         borderRadius: '50%', boxSizing: 'border-box',
-                        background: active ? '#E8720C' : '#fff',
+                        background: active ? 'var(--brand)' : 'var(--surface-2)',
                         border: active ? '3px solid #F59432' : '2px solid #d9d9d9',
                         boxShadow: active ? '0 0 0 4px rgba(232,114,12,0.12)' : 'none',
                         transition: 'all 0.2s',
@@ -1628,19 +1674,19 @@ export default function EmployeeDetail() {
                         onClick={() => setSelectedPosId(r.id)}
                         style={{
                           cursor: 'pointer', marginLeft: 4, padding: '8px 12px', borderRadius: 8,
-                          background: active ? '#FFF7E6' : 'transparent',
+                          background: active ? 'var(--warning-soft)' : 'transparent',
                           border: active ? '1px solid #FFD591' : '1px solid transparent',
                           transition: 'all 0.2s',
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: active ? '#E8720C' : '#262626' }}>{r.effectiveDate}</span>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: active ? 'var(--brand)' : 'var(--text-1)' }}>{r.effectiveDate}</span>
                           <Tag color={posOpColor(r.operationCode, r.operation)} style={{ marginRight: 0, fontSize: 11, lineHeight: '18px' }}>{hrOperationLabel(r.operationCode, r.operation, t)}</Tag>
                         </div>
-                        <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 4 }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
                           {[r.serviceDept, r.position].filter(Boolean).join(' · ') || '-'}
                         </div>
-                        <div style={{ fontSize: 11, color: '#bfbfbf', marginTop: 4 }}>
+                        <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 4 }}>
                           {r.updatedBy || '-'} · {r.updatedAt ? dayjs(r.updatedAt).format('YYYY-MM-DD HH:mm') : '-'}
                         </div>
                       </div>
@@ -1672,34 +1718,34 @@ export default function EmployeeDetail() {
         )}
         {/* 薪資概覽卡片 */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
-          <div style={{ padding: 20, borderRadius: 8, background: '#F6FFED', border: '1px solid #D9F7BE' }}>
-            <div style={{ fontSize: 13, color: '#8C8C8C', marginBottom: 8 }}>{t('employeeDetail.grossSalary')}</div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#52C41A' }}>
+          <div style={{ padding: 20, borderRadius: 8, background: 'var(--success-soft)', border: '1px solid #D9F7BE' }}>
+            <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 8 }}>{t('employeeDetail.grossSalary')}</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--success)' }}>
               {salaryIncome.length === 0 && salaryDeduction.length === 0 ? '--' : `¥${totalIncome.toLocaleString()}`}
             </div>
           </div>
           <div style={{ padding: 20, borderRadius: 8, background: '#FFF2F0', border: '1px solid #FFCCC7' }}>
-            <div style={{ fontSize: 13, color: '#8C8C8C', marginBottom: 8 }}>{t('employeeDetail.totalDeduction')}</div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#FF4D4F' }}>
+            <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 8 }}>{t('employeeDetail.totalDeduction')}</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--danger)' }}>
               {salaryIncome.length === 0 && salaryDeduction.length === 0 ? '--' : `¥${totalDeduction.toLocaleString()}`}
             </div>
           </div>
-          <div style={{ padding: 20, borderRadius: 8, background: '#E6F7FF', border: '1px solid #91D5FF' }}>
-            <div style={{ fontSize: 13, color: '#8C8C8C', marginBottom: 8 }}>{t('employeeDetail.netSalary')}</div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#1890FF' }}>
+          <div style={{ padding: 20, borderRadius: 8, background: 'var(--info-soft)', border: '1px solid #91D5FF' }}>
+            <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 8 }}>{t('employeeDetail.netSalary')}</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--info)' }}>
               {salaryIncome.length === 0 && salaryDeduction.length === 0 ? '--' : `¥${netSalary.toLocaleString()}`}
             </div>
           </div>
         </div>
 
         {/* 收入項目 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: 14, color: '#52c41a' }}>💰</span>
+              <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--success-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: 14, color: 'var(--success)' }}>💰</span>
               </div>
-              <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.incomeTitle')}</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('employeeDetail.incomeTitle')}</span>
               <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             </div>
             {salaryWritable && (
@@ -1710,13 +1756,13 @@ export default function EmployeeDetail() {
         </div>
 
         {/* 扣除項目 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff2f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: 14, color: '#ff4d4f' }}>📉</span>
+                <span style={{ fontSize: 14, color: 'var(--danger)' }}>📉</span>
               </div>
-              <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.deductionTitle')}</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('employeeDetail.deductionTitle')}</span>
               <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             </div>
             {salaryWritable && (
@@ -1727,13 +1773,13 @@ export default function EmployeeDetail() {
         </div>
 
         {/* 薪資配置 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: 14, color: '#fa8c16' }}>️</span>
+              <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: 14, color: 'var(--warning)' }}>️</span>
               </div>
-              <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.configTitle')}</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('employeeDetail.configTitle')}</span>
               <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             </div>
             {salaryWritable && (
@@ -1742,28 +1788,28 @@ export default function EmployeeDetail() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelSalaryStructure')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{salaryConfig.salaryStructure}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelSalaryStructure')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{salaryConfig.salaryStructure}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelPaymentMethod')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{salaryConfig.paymentMethod}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelPaymentMethod')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{salaryConfig.paymentMethod}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelPayDay')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{t('employeeDetail.payDayFormat', { day: salaryConfig.payDay })}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelPayDay')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{t('employeeDetail.payDayFormat', { day: salaryConfig.payDay })}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelBankName')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{salaryConfig.bankName}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelBankName')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{salaryConfig.bankName}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelBankAccount')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{salaryConfig.bankAccount}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelBankAccount')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{salaryConfig.bankAccount}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelTaxCity')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{salaryConfig.taxCity}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelTaxCity')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{salaryConfig.taxCity}</span>
             </div>
           </div>
         </div>
@@ -1776,58 +1822,58 @@ export default function EmployeeDetail() {
     return (
       <div>
         {/* 个人信息 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <UserOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <UserOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.personalInfo')}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('employeeDetail.personalInfo')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             {canEditProfile && <Button icon={<EditOutlined />} onClick={handleEditPersonal}>{t('common.edit')}</Button>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.nameLabel')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{employee?.name || '-'}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employee.nameLabel')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{employee?.name || '-'}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelGender')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.gender}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelGender')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{basicInfo.gender}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelNationality')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.nationality}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelNationality')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{basicInfo.nationality}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelEthnicity')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.ethnicity}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelEthnicity')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{basicInfo.ethnicity}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelBirthDate')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.birthDate}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelBirthDate')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{basicInfo.birthDate}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelMaritalStatus')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.maritalStatus}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelMaritalStatus')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{basicInfo.maritalStatus}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelPoliticalStatus')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.politicalStatus}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelPoliticalStatus')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{basicInfo.politicalStatus}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelReligion')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.religion || '-'}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelReligion')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{basicInfo.religion || '-'}</span>
             </div>
           </div>
         </div>
 
         {/* 證件信息 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <IdcardOutlined style={{ fontSize: 14, color: '#722ed1' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--purple-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <IdcardOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.idInfo')}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('employeeDetail.idInfo')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             {canViewSensitive && !piiRevealed && (
               <Button type="link" size="small" onClick={handleRevealPII}>查看明文</Button>
@@ -1836,73 +1882,73 @@ export default function EmployeeDetail() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelIdType')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.idType}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelIdType')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{basicInfo.idType}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelIdNumber')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.idNumber}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelIdNumber')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{basicInfo.idNumber}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelIdAddress')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.idAddress}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelIdAddress')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{basicInfo.idAddress}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelHouseholdType')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.householdType}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelHouseholdType')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{basicInfo.householdType}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelHouseholdLocation')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.householdLocation}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelHouseholdLocation')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{basicInfo.householdLocation}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelNativePlace')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.nativePlace}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelNativePlace')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{basicInfo.nativePlace}</span>
             </div>
           </div>
         </div>
 
         {/* 通訊信息 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6fffb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ fontSize: 14, color: '#13c2c2' }}></span>
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.contactInfo')}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('employeeDetail.contactInfo')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             {canEditProfile && <Button icon={<EditOutlined />} onClick={handleEditContact}>{t('common.edit')}</Button>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelMobile')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.mobile}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelMobile')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{basicInfo.mobile}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelEmail')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.email}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelEmail')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{basicInfo.email}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelAddressCountry')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{countryLabel(basicInfo.addressCountry) || '-'}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelAddressCountry')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{countryLabel(basicInfo.addressCountry) || '-'}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelAddressCity')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{cityLabel(basicInfo.addressCity) || '-'}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelAddressCity')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{cityLabel(basicInfo.addressCity) || '-'}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gridColumn: 'span 2' }}>
-              <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelAddressDetail')}：</span>
-              <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo.addressDetail || '-'}</span>
+              <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.labelAddressDetail')}：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{basicInfo.addressDetail || '-'}</span>
             </div>
           </div>
         </div>
 
         {/* 緊急联繫人 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 14, color: '#fa8c16' }}>🚨</span>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: 14, color: 'var(--warning)' }}>🚨</span>
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.emergencyInfo')}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('employeeDetail.emergencyInfo')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             {canEditProfile && <Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleAddEmergency}>{t('common.add')}</Button>}
           </div>
@@ -1923,7 +1969,7 @@ export default function EmployeeDetail() {
                   <Space size="small">
                     <a onClick={() => handleEditEmergency(record)}>{t('common.edit')}</a>
                     <Popconfirm title={t('employeeDetail.confirmDeleteEmergency')} onConfirm={() => handleDeleteEmergency(record.id)}>
-                      <a style={{ color: '#ff4d4f' }}>{t('common.delete')}</a>
+                      <a style={{ color: 'var(--danger)' }}>{t('common.delete')}</a>
                     </Popconfirm>
                   </Space>
                 ),
@@ -1940,12 +1986,12 @@ export default function EmployeeDetail() {
     return (
       <div>
         {/* 登錄账号 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 14, color: '#1890ff' }}>🔑</span>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: 14, color: 'var(--info)' }}>🔑</span>
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.loginAccountGroup')}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('employeeDetail.loginAccountGroup')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <Table
@@ -1958,20 +2004,20 @@ export default function EmployeeDetail() {
         </div>
 
         {/* 三方通讯账号（后续可扩展：企微ID、QQ邮箱、公司邮箱等） */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 14, color: '#fa8c16' }}>💬</span>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: 14, color: 'var(--warning)' }}>💬</span>
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.thirdPartyAccountGroup')}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('employeeDetail.thirdPartyAccountGroup')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             {canEditProfile && <Button icon={<EditOutlined />} onClick={handleEditThirdParty}>{t('common.edit')}</Button>}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', rowGap: 16, columnGap: 24 }}>
             {THIRD_PARTY_ACCOUNT_FIELDS.map(f => (
               <div key={f.key} style={{ display: 'flex', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t(f.labelKey)}：</span>
-                <span style={{ fontSize: 14, color: '#262626' }}>{basicInfo[f.key] || '-'}</span>
+                <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t(f.labelKey)}：</span>
+                <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{basicInfo[f.key] || '-'}</span>
               </div>
             ))}
           </div>
@@ -2035,7 +2081,7 @@ export default function EmployeeDetail() {
   if (loading) {
     return (
       <div className="content-area" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <div style={{ fontSize: 16, color: '#8C8C8C' }}>{t('common.loading')}</div>
+        <div style={{ fontSize: 16, color: 'var(--text-3)' }}>{t('common.loading')}</div>
       </div>
     )
   }
@@ -2067,7 +2113,7 @@ export default function EmployeeDetail() {
     <div className="content-area">
       {/* ═══ 页面頭部（全局统一風格） ═══ */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
       }}>
         <div style={{
@@ -2078,19 +2124,19 @@ export default function EmployeeDetail() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleBack}
               style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                backgroundColor: 'var(--brand)', borderColor: 'var(--brand)',
                 borderRadius: 8, height: 36, padding: '0 16px',
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
               }}>{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>
               {isEdit ? `${t('employeeDetail.pageTitleEdit')} - ${employee?.name || ''}` : t('employee.addTitle')}
             </h2>
           </div>
           {employee && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontSize: 13, color: '#8C8C8C' }}>{t('employeeDetail.empIdColon', { empId: employee.empId })}</span>
+              <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{t('employeeDetail.empIdColon', { empId: employee.empId })}</span>
               {employee.employmentStatus === 'resigned'
                 ? <Tag color="default">{t('employee.statusResigned')}</Tag>
                 : <Tag color="success">{t('employee.statusActive')}</Tag>}
@@ -2101,14 +2147,14 @@ export default function EmployeeDetail() {
 
       {/* ══ 員工基礎信息卡片 ═══ */}
       <div style={{
-        border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
+        border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)',
         padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <UserOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <UserOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('employeeDetail.baseInfoTitle')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('employeeDetail.baseInfoTitle')}</span>
           {!isEdit && <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>{t('employeeDetail.newTag')}</Tag>}
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
@@ -2117,59 +2163,59 @@ export default function EmployeeDetail() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', rowGap: 16, columnGap: 24 }}>
               {/* 姓名 */}
               <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.nameLabel')}：</span>
-                <span style={{ fontSize: 14, color: '#262626' }}>{employee.name}</span>
+                <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employee.nameLabel')}：</span>
+                <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{employee.name}</span>
               </div>
               {/* 工號 */}
               <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.empIdLabel')}：</span>
-                <span style={{ fontSize: 14, color: '#262626' }}>{employee.empId}</span>
+                <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employee.empIdLabel')}：</span>
+                <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{employee.empId}</span>
               </div>
               {/* 任職公司 */}
               <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.colPosCompany')}：</span>
-                <span style={{ fontSize: 14, color: '#262626' }}>{activePosRecord?.company || '-'}</span>
+                <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employeeDetail.colPosCompany')}：</span>
+                <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{activePosRecord?.company || '-'}</span>
               </div>
               {/* 所屬部門 */}
               <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.deptLabel')}：</span>
-                <span style={{ fontSize: 14, color: '#262626' }}>{activePosRecord?.serviceDept || employee.department || '-'}</span>
+                <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employee.deptLabel')}：</span>
+                <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{activePosRecord?.serviceDept || employee.department || '-'}</span>
               </div>
               {/* 职位 */}
               <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.positionLabel')}：</span>
-                <span style={{ fontSize: 14, color: '#262626' }}>{activePosRecord?.position || employee.position || '-'}</span>
+                <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employee.positionLabel')}：</span>
+                <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{activePosRecord?.position || employee.position || '-'}</span>
               </div>
               {/* 职級序列 */}
               <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.sequenceLabel')}：</span>
-                <span style={{ fontSize: 14, color: '#262626' }}>{activePosRecord?.sequence || employee.sequence || '-'}</span>
+                <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employee.sequenceLabel')}：</span>
+                <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{activePosRecord?.sequence || employee.sequence || '-'}</span>
               </div>
               {/* 职級 */}
               <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.colJobLevel')}：</span>
-                <span style={{ fontSize: 14, color: '#262626' }}>{activePosRecord?.positionLevel || employee.jobLevel || '-'}</span>
+                <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employee.colJobLevel')}：</span>
+                <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{activePosRecord?.positionLevel || employee.jobLevel || '-'}</span>
               </div>
               {/* 职等 */}
               <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.rankLabel')}：</span>
-                <span style={{ fontSize: 14, color: '#262626' }}>{activePosRecord?.rank || employee.rank || '-'}</span>
+                <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employee.rankLabel')}：</span>
+                <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{activePosRecord?.rank || employee.rank || '-'}</span>
               </div>
               {/* 在职状态 */}
               <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.employmentStatus')}：</span>
+                <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employee.employmentStatus')}：</span>
                 {employee.employmentStatus === 'resigned'
                   ? <Tag color="default">{t('employee.statusResigned')}</Tag>
                   : <Tag color="success">{t('employee.statusActive')}</Tag>}
               </div>
               {/* 工齡 */}
               <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.seniorityLabel')}：</span>
-                <span style={{ fontSize: 14, color: '#262626' }}>{seniorityText || <span style={{ color: '#BFBFBF' }}>-</span>}</span>
+                <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employee.seniorityLabel')}：</span>
+                <span style={{ fontSize: 14, color: 'var(--text-1)' }}>{seniorityText || <span style={{ color: 'var(--text-4)' }}>-</span>}</span>
               </div>
               {/* 角色授權 */}
               <div style={{ display: 'flex', alignItems: 'baseline' }}>
-                <span style={{ fontSize: 14, color: '#8C8C8C', flexShrink: 0, minWidth: 72 }}>{t('employee.roleAuthLabel')}：</span>
+                <span style={{ fontSize: 14, color: 'var(--text-3)', flexShrink: 0, minWidth: 72 }}>{t('employee.roleAuthLabel')}：</span>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
                   {employee.functionRoleIds?.length
                     ? (() => {
@@ -2188,12 +2234,12 @@ export default function EmployeeDetail() {
                           </>
                         )
                       })()
-                    : <span style={{ color: '#BFBFBF' }}>{t('employee.notBound')}</span>}
+                    : <span style={{ color: 'var(--text-4)' }}>{t('employee.notBound')}</span>}
                 </div>
               </div>
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: 40, color: '#8C8C8C' }}>
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-3)' }}>
               {t('employeeDetail.notFoundHint')}
             </div>
           )
@@ -2320,8 +2366,8 @@ export default function EmployeeDetail() {
         <Form form={posForm} layout="vertical">
           {/* 變动信息 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-            <span style={{ width: 3, height: 12, borderRadius: 2, background: '#E8720C' }} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>{t('employeeDetail.posGroupChange')}</span>
+            <span style={{ width: 3, height: 12, borderRadius: 2, background: 'var(--brand)' }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>{t('employeeDetail.posGroupChange')}</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
             <Form.Item
@@ -2357,10 +2403,10 @@ export default function EmployeeDetail() {
           {/* 任职信息 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
             <span style={{ width: 3, height: 12, borderRadius: 2, background: '#1890ff' }} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>{t('employeeDetail.posGroupAppointment')}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>{t('employeeDetail.posGroupAppointment')}</span>
           </div>
-          {/* 1.1 服务部门 - TreeSelect 树状结构 */}
-          <Form.Item name="serviceDept" label={t('employeeDetail.colServiceDept')}>
+          {/* 1.1 服务部门 - TreeSelect 树状结构（选项值用部门 ID，同名部门才不会把下拉树撑乱） */}
+          <Form.Item name="serviceDeptId" label={t('employeeDetail.colServiceDept')}>
             <TreeSelect
               treeData={posDeptTreeData}
               treeDefaultExpandAll
@@ -2371,6 +2417,8 @@ export default function EmployeeDetail() {
               onChange={handlePosDeptChange}
             />
           </Form.Item>
+          {/* 入库的服务部门名称快照：不单独展示，由上面的选择联动写入 */}
+          <Form.Item name="serviceDept" hidden />
           {/* 1.2 职级序列 + 1.3 职级 + 1.4 职等 */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0 16px' }}>
             <Form.Item name="sequence" label={t('employeeDetail.colSequence')}>
@@ -2430,7 +2478,7 @@ export default function EmployeeDetail() {
           {/* 工作信息 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
             <span style={{ width: 3, height: 12, borderRadius: 2, background: '#52c41a' }} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>{t('employeeDetail.posGroupWork')}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>{t('employeeDetail.posGroupWork')}</span>
           </div>
           {/* 2.1 工作国家 + 2.2 工作城市 */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
