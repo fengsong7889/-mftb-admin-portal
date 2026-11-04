@@ -65,7 +65,7 @@ describe('自然流量展示快照', () => {
     }
     expect(getSampleSnapshot(AppType.SHANFENG, 'A', 'stale').stores[0].rules.find(r => r.ruleCode === 'STB_05')?.observedAt).not.toBe(DATA_TIME)
   })
-  it('单因素模式只变距离项，完整场景可以变更配送及资格', () => {
+  it('单因素模式只变距离项，完整场景可以变更流量均衡及资格', () => {
     const a = getSampleSnapshot()
     const b = getSampleSnapshot(AppType.SHANFENG, 'B')
     for (const store of a.stores) {
@@ -74,7 +74,11 @@ describe('自然流量展示快照', () => {
       expect(changed.every(r => r.ruleCode === 'PLT_01')).toBe(true)
     }
     const full = getSampleSnapshot(AppType.SHANFENG, 'B', 'normal', 'full')
-    expect(full.stores.find(s => s.storeId === 'DEMO-108')!.eligibility).toBe('filtered')
+    const demo108 = full.stores.find(s => s.storeId === 'DEMO-108')!
+    expect(demo108.eligibility).toBe('filtered')
+    // 资格变化样例由流量均衡的「排除商家名单」驱动（配送範圍已下架，不再拿配送分层当资格样例的口径）
+    expect(demo108.rules.find(r => r.ruleCode === 'PLT_03')!.reasonCode).toBe('BALANCE_EXCLUDED')
+    expect(full.stores.some(s => s.rules.some(r => r.ruleCode === 'PLT_02A'))).toBe(false)
     expect(getSampleSnapshot(AppType.SHANFENG, 'B').stores.find(s => s.storeId === 'DEMO-108')!.eligibility).toBe('ranked')
   })
   it('扣分场景保留负分并计入三维合计', () => {

@@ -39,6 +39,8 @@ function LocationIndicator() {
 
 /** 流量均衡面板文案已接 i18n；测试的 t mock 返回 key，故断言用 key 串（与 STB_07 用例一致）。 */
 const TB = (k: string) => `organicTrafficScore.trafficBalance.${k}`
+/** 主營時段分時段面板同理 */
+const TP = (k: string) => `organicTrafficScore.timePeriod.${k}`
 /** 门店标签面板文案已接 i18n；测试的 t mock 返回 key，故断言用 key 串（与 TB 同惯例）。 */
 const SL = (k: string) => `organicTrafficScore.storeLabel.${k}`
 
@@ -172,7 +174,8 @@ describe('通用计分项：模块卡片与减免运费开关', () => {
     await mount()
     fireEvent.click(screen.getByRole('tab', { name: /dimStore/ }))
     fireEvent.click(screen.getByText('STB_01'))
-    expect(screen.getByText('計分明細')).toBeInTheDocument()
+    // STB_01 已改走 TimePeriodScorePanel（分時段配分），区块标题同样取语言包 key
+    expect(screen.getByText(TP('sectionDetail'))).toBeInTheDocument()
   })
 
   it('金字招牌计分项走标签计分面板，不再是单一固定分', async () => {
@@ -260,6 +263,14 @@ describe('通用计分项：模块卡片与减免运费开关', () => {
     await mount()
     expect(screen.queryByText('COM_09')).not.toBeInTheDocument()
     expect(screen.queryByText('購買廣告-點金廣告')).not.toBeInTheDocument()
+  })
+
+  it('配送範圍計分項已下架，後端殘留數據也不再展示', async () => {
+    api.fetch.mockResolvedValue({ dimensions: [], rules: [{ id: 30, ruleCode: 'PLT_02A', dimension: 4,
+      name: '配送範圍', description: '按時段配置配送範圍分層計分', mode: 1, score: 0, status: 1, builtin: 1 }] })
+    await mount()
+    expect(screen.queryByText('PLT_02A')).not.toBeInTheDocument()
+    expect(screen.queryByText('配送範圍')).not.toBeInTheDocument()
   })
 
   it('門店標籤收编為 STB_04：後端以數字編碼下發行時走標籤計分面板，舊金牌名稱被界面口径覆蓋', async () => {

@@ -104,6 +104,13 @@ public class OrganicScoreRule {
     /** 门店标签计分配置 JSON（[{labelValue, labelName, score}]，仅 STB_04 使用） */
     private String storeLabelConfig;
 
+    /**
+     * 主營時段分時段计分配置 JSON（[{periodValue, periodName, score}]，仅 STB_01 使用）。
+     * 本项改为按五餐段独立配分后，固定分 score 不再参与计算（由迁移置 0），
+     * 避免外部计分引擎把固定分与时段分重复累加。
+     */
+    private String timePeriodConfig;
+
     /** 服务状态: 1=启用 2=停用 */
     private Integer status;
 

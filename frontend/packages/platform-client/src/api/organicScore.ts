@@ -40,6 +40,8 @@ export interface OrganicRuleVO {
   trafficBalanceConfig?: string
   /** 门店标签计分配置 JSON（[{labelValue,labelName,score}]，仅 STB_04） */
   storeLabelConfig?: string
+  /** 主營時段分時段计分配置 JSON（[{periodValue,periodName,score}]，仅 STB_01） */
+  timePeriodConfig?: string
   status: number
   builtin: number
   sortOrder: number
@@ -83,6 +85,8 @@ export interface OrganicRulePayload {
   trafficBalanceConfig?: string
   /** 门店标签计分配置 JSON（[{labelValue,labelName,score}]，仅 STB_04） */
   storeLabelConfig?: string
+  /** 主營時段分時段计分配置 JSON（[{periodValue,periodName,score}]，仅 STB_01） */
+  timePeriodConfig?: string
   status: number
 }
 
