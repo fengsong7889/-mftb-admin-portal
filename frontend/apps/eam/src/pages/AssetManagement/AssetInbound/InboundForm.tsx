@@ -556,14 +556,14 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
       title: t('asset.purchaseType'), key: 'purchaseType', width: 80,
       render: (_: unknown, r: InspectionRow) => {
         const pt = r.item.purchaseType
-        if (!pt) return <span style={{ color: '#bfbfbf' }}>-</span>
+        if (!pt) return <span style={{ color: 'var(--text-4)' }}>-</span>
         return <Tag color={pt === 'purchase' ? 'blue' : 'green'}>{pt === 'purchase' ? t('asset.purchaseTypePurchase') : t('asset.purchaseTypeLease')}</Tag>
       },
     },
     {
       title: `${t('asset.colUnitPrice')}(MOP)`, key: 'confirmedPrice', width: 100, align: 'right',
       render: (_: unknown, r: InspectionRow) => (
-        <span style={{ fontWeight: r.item.confirmedPrice ? 600 : 400, color: r.item.confirmedPrice ? '#52c41a' : '#bfbfbf' }}>
+        <span style={{ fontWeight: r.item.confirmedPrice ? 600 : 400, color: r.item.confirmedPrice ? 'var(--success)' : 'var(--text-4)' }}>
           {r.item.confirmedPrice ? r.item.confirmedPrice.toLocaleString() : '-'}
         </span>
       ),
@@ -572,7 +572,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
       title: `${t('asset.colSubtotal')}(MOP)`, key: 'subtotal', width: 100, align: 'right',
       render: (_: unknown, r: InspectionRow) => {
         const cp = r.item.confirmedPrice || r.item.price
-        return <span style={{ fontWeight: 700, color: '#262626' }}>{(cp * r.item.qty).toLocaleString()}</span>
+        return <span style={{ fontWeight: 700, color: 'var(--text-1)' }}>{(cp * r.item.qty).toLocaleString()}</span>
       },
     },
     {
@@ -605,7 +605,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
               placeholder={allocatable <= 0 ? t('asset.tagCompleted') : undefined}
             />
             {rowAllocs > 0 && (
-              <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 2 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
                 {t('asset.allocatedCount', { count: rowAllocs })}
               </div>
             )}
@@ -630,7 +630,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
             {(r.histReturnQty || 0) > 0 && (
               <Tag color="error" style={{ margin: 0, fontSize: 11 }}>{t('asset.tagReturnCount', { count: r.histReturnQty })}</Tag>
             )}
-            {!(r.histExchangeQty || 0) && !(r.histReturnQty || 0) && !isFullyAccepted(r.item) && <span style={{ color: '#bfbfbf', fontSize: 11 }}>-</span>}
+            {!(r.histExchangeQty || 0) && !(r.histReturnQty || 0) && !isFullyAccepted(r.item) && <span style={{ color: 'var(--text-4)', fontSize: 11 }}>-</span>}
           </Space>
         )
       },
@@ -661,7 +661,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                 setPassPhotos([])
                 setPassAccessories([])
               }}
-              style={{ color: '#52C41A', fontWeight: 600, fontSize: 12, padding: '0 2px' }}
+              style={{ color: 'var(--success)', fontWeight: 600, fontSize: 12, padding: '0 2px' }}
             >
               {t('asset.passBtn')}
             </Button>
@@ -811,7 +811,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
     <Spin spinning={loading}>
       {/* ====== 頁面頭部 ====== */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
       }}>
         <div style={{
@@ -820,51 +820,51 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
         }} />
         <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
           <Button type="primary" icon={<ArrowLeftOutlined />} onClick={onBack}
-            style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}
+            style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}
           >{t('common.back')}</Button>
           <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#E8720C' }}>{t('asset.inboundTitle')}</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--brand)' }}>{t('asset.inboundTitle')}</h2>
           <Tag color="orange" style={{ marginLeft: 4 }}>{order.poNo}</Tag>
           {scopeSupplier && <Tag color="purple">{t('asset.supplierLabel')}{scopeSupplier}</Tag>}
         </div>
       </div>
 
       {/* ====== 訂單信息 ====== */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 24px', marginBottom: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 24px', marginBottom: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ShoppingCartOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ShoppingCartOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.orderInfoTitle')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.orderInfoTitle')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
         <Row gutter={[16, 8]}>
           <Col xs={24} sm={12} md={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.colPurchaser')}</div>
-            <div style={{ fontSize: 14, color: '#262626' }}>{order.purchaser || '-'}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('asset.colPurchaser')}</div>
+            <div style={{ fontSize: 14, color: 'var(--text-1)' }}>{order.purchaser || '-'}</div>
           </Col>
           <Col xs={24} sm={12} md={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.orderDept')}</div>
-            <div style={{ fontSize: 14, color: '#262626' }}>{purchaserDept || '-'}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('asset.orderDept')}</div>
+            <div style={{ fontSize: 14, color: 'var(--text-1)' }}>{purchaserDept || '-'}</div>
           </Col>
           <Col xs={24} sm={12} md={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.orderBrand')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('asset.orderBrand')}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {order.brand ? <BrandTag value={order.brand} /> : <span style={{ color: '#bfbfbf', fontSize: 14 }}>-</span>}
-              {order.brand === 1 && <span style={{ fontSize: 12, color: '#E8720C' }}>{t('asset.brandCodeTb')}</span>}
-              {order.brand === 2 && <span style={{ fontSize: 12, color: '#1890FF' }}>{t('asset.brandCodeMf')}</span>}
+              {order.brand ? <BrandTag value={order.brand} /> : <span style={{ color: 'var(--text-4)', fontSize: 14 }}>-</span>}
+              {order.brand === 1 && <span style={{ fontSize: 12, color: 'var(--brand)' }}>{t('asset.brandCodeTb')}</span>}
+              {order.brand === 2 && <span style={{ fontSize: 12, color: 'var(--info)' }}>{t('asset.brandCodeMf')}</span>}
             </div>
           </Col>
         </Row>
         <Row gutter={[16, 8]}>
           <Col xs={24} sm={12} md={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.orderTotal')}</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#E8720C' }}>MOP {grandTotal.toLocaleString()}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('asset.orderTotal')}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--brand)' }}>MOP {grandTotal.toLocaleString()}</div>
           </Col>
           <Col xs={24} sm={12} md={16}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.orderReasonLabel')}</div>
-            <div style={{ fontSize: 14, color: '#262626' }}>{order.remark || '-'}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('asset.orderReasonLabel')}</div>
+            <div style={{ fontSize: 14, color: 'var(--text-1)' }}>{order.remark || '-'}</div>
           </Col>
         </Row>
 
@@ -877,7 +877,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
         const groupAllocQty = groupAllocs.reduce((s, a) => s + a.qty, 0)
         const groupTotal = ig.rows.length
         return (
-          <div key={ig.group.id} style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 24px', marginBottom: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div key={ig.group.id} style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 24px', marginBottom: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             {/* 分組標題 */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -888,7 +888,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                   color: '#fff', fontSize: 11, fontWeight: 700,
                   boxShadow: '0 1px 4px rgba(24,144,255,0.3)',
                 }}>{gi + 1}</span>
-                <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('asset.groupTitle')}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.groupTitle')}</span>
                 <Tag color="blue" style={{ fontSize: 11 }}>{t('asset.groupSubtotalTag', { amount: subtotal.toLocaleString() })}</Tag>
                 <Tag color={groupAllocs.length > 0 ? 'success' : 'processing'} style={{ fontSize: 11 }}>
                   {t('asset.groupProgressTag', { confirmed: groupAllocs.length, total: groupTotal })}
@@ -902,25 +902,25 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
             {/* 供應商信息（只讀）+ 驗收日期 */}
             <Row gutter={[16, 8]} style={{ marginBottom: 12 }}>
               <Col xs={24} sm={12} md={8}>
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.labelSupplierName')}</div>
-                <div style={{ fontSize: 14, color: '#262626' }}>{ig.group.supplier || '-'}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('asset.labelSupplierName')}</div>
+                <div style={{ fontSize: 14, color: 'var(--text-1)' }}>{ig.group.supplier || '-'}</div>
               </Col>
               <Col xs={24} sm={12} md={8}>
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.labelSupplierContact')}</div>
-                <div style={{ fontSize: 14, color: '#262626' }}>{ig.group.contact || '-'}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('asset.labelSupplierContact')}</div>
+                <div style={{ fontSize: 14, color: 'var(--text-1)' }}>{ig.group.contact || '-'}</div>
               </Col>
               <Col xs={24} sm={12} md={8}>
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.labelOrderDate')}</div>
-                <div style={{ fontSize: 14, color: '#262626' }}>{ig.group.orderDate || '-'}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('asset.labelOrderDate')}</div>
+                <div style={{ fontSize: 14, color: 'var(--text-1)' }}>{ig.group.orderDate || '-'}</div>
               </Col>
             </Row>
             <Row gutter={[16, 8]} style={{ marginBottom: 12 }}>
               <Col xs={24} sm={12} md={8}>
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.labelDeliveryMethod')}</div>
-                <div style={{ fontSize: 14, color: '#262626' }}>{ig.group.deliveryMethod && DELIVERY_METHOD_LABEL[ig.group.deliveryMethod] ? t(`asset.${DELIVERY_METHOD_LABEL[ig.group.deliveryMethod]}`) : '-'}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('asset.labelDeliveryMethod')}</div>
+                <div style={{ fontSize: 14, color: 'var(--text-1)' }}>{ig.group.deliveryMethod && DELIVERY_METHOD_LABEL[ig.group.deliveryMethod] ? t(`asset.${DELIVERY_METHOD_LABEL[ig.group.deliveryMethod]}`) : '-'}</div>
               </Col>
               <Col xs={24} sm={12} md={8}>
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.labelInboundDate')}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('asset.labelInboundDate')}</div>
                 <DatePicker
                   value={dayjs(ig.inboundDate)}
                   onChange={(d) => updateGroupDate(ig.group.id, d || dayjs())}
@@ -961,12 +961,12 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
           concession: { color: 'processing', key: 'asset.rejectConcession' },
         }
         return (
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '16px 24px', marginBottom: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 24px', marginBottom: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f0f5ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <AppstoreOutlined style={{ fontSize: 14, color: '#1890FF' }} />
+                <AppstoreOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
               </div>
-              <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.resultsTitle')}</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.resultsTitle')}</span>
               <Tag color="blue" style={{ fontSize: 11 }}>{t('asset.resultsCountTag', { count: allocationCount, qty: totalAllocatedQty })}</Tag>
               <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             </div>
@@ -987,12 +987,12 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                 },
                 {
                   title: t('asset.colRejectReason'), key: 'reason', ellipsis: true,
-                  render: (_: unknown, a: InspectionAllocation) => <span style={{ color: '#595959' }}>{a.reason || '-'}</span>,
+                  render: (_: unknown, a: InspectionAllocation) => <span style={{ color: 'var(--text-2)' }}>{a.reason || '-'}</span>,
                 },
                 {
                   title: t('asset.colPhotos'), key: 'photos', width: 100, align: 'center',
                   render: (_: unknown, a: InspectionAllocation) => {
-                    if (!a.photos || a.photos.length === 0) return <span style={{ color: '#bfbfbf', fontSize: 12 }}>-</span>
+                    if (!a.photos || a.photos.length === 0) return <span style={{ color: 'var(--text-4)', fontSize: 12 }}>-</span>
                     return (
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'center', alignItems: 'center' }}>
                         {a.photos.slice(0, 3).map((p, idx) => (
@@ -1003,7 +1003,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                             onClick={() => { setPreviewPhotos(a.photos); setPreviewIndex(idx); setPreviewImage(p.dataUrl); setPreviewRotate(0); setPreviewVisible(true) }}
                             style={{
                               width: 36, height: 36, objectFit: 'cover', borderRadius: 4,
-                              border: '1px solid #e8e8e8', cursor: 'pointer', background: '#fafafa',
+                              border: '1px solid #e8e8e8', cursor: 'pointer', background: 'var(--surface-3)',
                               transition: 'transform 0.2s',
                             }}
                             onMouseEnter={(e) => { (e.target as HTMLImageElement).style.transform = 'scale(1.15)' }}
@@ -1011,7 +1011,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                           />
                         ))}
                         {a.photos.length > 3 && (
-                          <span style={{ fontSize: 11, color: '#8C8C8C', marginLeft: 2 }}>+{a.photos.length - 3}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-3)', marginLeft: 2 }}>+{a.photos.length - 3}</span>
                         )}
                       </div>
                     )
@@ -1074,32 +1074,32 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
         {passRow && (
           <>
             {/* 物資信息 */}
-            <div style={{ background: '#FAFAFA', border: '1px solid #f0f0f0', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
+            <div style={{ background: 'var(--surface-3)', border: '1px solid #f0f0f0', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', rowGap: 10, fontSize: 13 }}>
-                <div><span style={{ color: '#8C8C8C' }}>{t('asset.modelNameLabel')}</span><span style={{ fontWeight: 600 }}>{passRow.item.modelName}</span></div>
-                <div><span style={{ color: '#8C8C8C' }}>{t('asset.categoryLabel')}</span>{passRow.item.categoryName || '-'}</div>
-                <div><span style={{ color: '#8C8C8C' }}>{t('asset.thisQtyLabel')}</span><span style={{ fontWeight: 700, color: '#E8720C' }}>{editingAllocation ? editingAllocation.qty : (passRow.inputQty ?? 0)}</span> {t('asset.unitPiece')}</div>
+                <div><span style={{ color: 'var(--text-3)' }}>{t('asset.modelNameLabel')}</span><span style={{ fontWeight: 600 }}>{passRow.item.modelName}</span></div>
+                <div><span style={{ color: 'var(--text-3)' }}>{t('asset.categoryLabel')}</span>{passRow.item.categoryName || '-'}</div>
+                <div><span style={{ color: 'var(--text-3)' }}>{t('asset.thisQtyLabel')}</span><span style={{ fontWeight: 700, color: 'var(--brand)' }}>{editingAllocation ? editingAllocation.qty : (passRow.inputQty ?? 0)}</span> {t('asset.unitPiece')}</div>
                 <div>
-                  <span style={{ color: '#8C8C8C' }}>{t('asset.purchaseType')}</span>
+                  <span style={{ color: 'var(--text-3)' }}>{t('asset.purchaseType')}</span>
                   {passRow.item.purchaseType
                     ? <Tag color={passRow.item.purchaseType === 'purchase' ? 'blue' : 'green'} style={{ marginLeft: 4 }}>{passRow.item.purchaseType === 'purchase' ? t('asset.purchaseTypePurchase') : t('asset.purchaseTypeLease')}</Tag>
-                    : <span style={{ color: '#bfbfbf' }}>-</span>}
+                    : <span style={{ color: 'var(--text-4)' }}>-</span>}
                 </div>
               </div>
             </div>
 
             {/* 處置方式選擇（正常通過 / 讓步接收） */}
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 13, color: '#262626', marginBottom: 8, fontWeight: 500 }}>{t('asset.passDispositionLabel')}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-1)', marginBottom: 8, fontWeight: 500 }}>{t('asset.passDispositionLabel')}</div>
               <Radio.Group value={passDisposition} onChange={(e) => setPassDisposition(e.target.value)} style={{ width: '100%' }}>
                 <Space direction="vertical" style={{ width: '100%' }}>
                   <Radio value="pass">
                     <span style={{ fontWeight: 500 }}>{t('asset.passDispositionNormal')}</span>
-                    <span style={{ color: '#8C8C8C', fontSize: 12, marginLeft: 4 }}>{t('asset.passDispositionNormalDesc')}</span>
+                    <span style={{ color: 'var(--text-3)', fontSize: 12, marginLeft: 4 }}>{t('asset.passDispositionNormalDesc')}</span>
                   </Radio>
                   <Radio value="concession">
                     <span style={{ fontWeight: 500 }}>{t('asset.passDispositionConcession')}</span>
-                    <span style={{ color: '#8C8C8C', fontSize: 12, marginLeft: 4 }}>{t('asset.passDispositionConcessionDesc')}</span>
+                    <span style={{ color: 'var(--text-3)', fontSize: 12, marginLeft: 4 }}>{t('asset.passDispositionConcessionDesc')}</span>
                   </Radio>
                 </Space>
               </Radio.Group>
@@ -1108,8 +1108,8 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
             {/* 讓步接收原因（僅 concession 時顯示） */}
             {passDisposition === 'concession' && (
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 13, color: '#262626', marginBottom: 8, fontWeight: 500 }}>
-                  {t('asset.concessionReasonLabel')} <span style={{ color: '#FF4D4F' }}>*</span>
+                <div style={{ fontSize: 13, color: 'var(--text-1)', marginBottom: 8, fontWeight: 500 }}>
+                  {t('asset.concessionReasonLabel')} <span style={{ color: 'var(--danger)' }}>*</span>
                 </div>
                 <Input.TextArea
                   rows={2}
@@ -1125,18 +1125,18 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
 
             {/* 現場照片（到貨憑證，同步寫入資產主圖；全局統一憑證上傳樣式） */}
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 13, color: '#262626', marginBottom: 8, fontWeight: 500 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-1)', marginBottom: 8, fontWeight: 500 }}>
                 <CameraOutlined style={{ marginRight: 4 }} />
                 {t('asset.sitePhotoRequired')}
-                <span style={{ color: '#FF4D4F' }}> *</span>
-                <span style={{ color: '#8C8C8C', fontWeight: 400, marginLeft: 8 }}>{t('asset.photoLimitHint', { max: MAX_PHOTOS })}</span>
+                <span style={{ color: 'var(--danger)' }}> *</span>
+                <span style={{ color: 'var(--text-3)', fontWeight: 400, marginLeft: 8 }}>{t('asset.photoLimitHint', { max: MAX_PHOTOS })}</span>
               </div>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                 {passPhotos.map((p, idx) => (
                   <div key={idx} style={{ position: 'relative', width: 88, height: 88 }}>
                     <img
                       src={p.dataUrl} alt={p.name}
-                      style={{ width: 88, height: 88, objectFit: 'cover', borderRadius: 8, border: '1px solid #e8e8e8', cursor: 'pointer', display: 'block', background: '#fafafa' }}
+                      style={{ width: 88, height: 88, objectFit: 'cover', borderRadius: 8, border: '1px solid #e8e8e8', cursor: 'pointer', display: 'block', background: 'var(--surface-3)' }}
                       onClick={() => { setPreviewPhotos(passPhotos); setPreviewIndex(idx); setPreviewImage(p.dataUrl); setPreviewRotate(0); setPreviewVisible(true) }}
                     />
                     <Button type="text" size="small" danger
@@ -1151,9 +1151,9 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                     beforeUpload={(file) => { handlePassPhotoUpload(file); return false }}
                     accept="image/*"
                   >
-                    <div style={{ width: 88, height: 88, border: '1px dashed #d9d9d9', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#999', fontSize: 12, background: '#fafafa', transition: 'all 0.3s' }}
-                      onMouseEnter={(e) => { const el = e.currentTarget; el.style.borderColor = '#E8720C'; el.style.background = '#fff7e6'; el.style.color = '#E8720C' }}
-                      onMouseLeave={(e) => { const el = e.currentTarget; el.style.borderColor = '#d9d9d9'; el.style.background = '#fafafa'; el.style.color = '#999' }}
+                    <div style={{ width: 88, height: 88, border: '1px dashed #d9d9d9', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#999', fontSize: 12, background: 'var(--surface-3)', transition: 'all 0.3s' }}
+                      onMouseEnter={(e) => { const el = e.currentTarget; el.style.borderColor = 'var(--brand)'; el.style.background = 'var(--warning-soft)'; el.style.color = 'var(--brand)' }}
+                      onMouseLeave={(e) => { const el = e.currentTarget; /* 還原必須用與基態相同的令牌：寫回裸色值會讓深色主題 hover 一次後永久停在淺色塊 */ el.style.borderColor = 'var(--border-1)'; el.style.background = 'var(--surface-3)'; el.style.color = '#999' }}
                     >
                       <UploadOutlined style={{ fontSize: 22, marginBottom: 4, color: 'inherit' }} />
                       <span>{uploading ? t('asset.uploadingNow') : t('asset.photoUploadBtn')}</span>
@@ -1162,7 +1162,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                 )}
               </div>
               {passPhotos.length > 0 && (
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8 }}>
                   {t('asset.uploadedCount', { current: passPhotos.length, max: MAX_PHOTOS })}
                 </div>
               )}
@@ -1172,8 +1172,8 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
             <div style={{ marginBottom: 16 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, fontSize: 13 }}>
                 <div>
-                  <div style={{ marginBottom: 4, fontWeight: 500, color: '#262626' }}>
-                    {t('asset.storageLocationSection')} <span style={{ color: '#FF4D4F' }}>*</span>
+                  <div style={{ marginBottom: 4, fontWeight: 500, color: 'var(--text-1)' }}>
+                    {t('asset.storageLocationSection')} <span style={{ color: 'var(--danger)' }}>*</span>
                   </div>
                   <TreeSelect
                     value={passLocationId}
@@ -1187,8 +1187,8 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                   />
                 </div>
                 <div>
-                  <div style={{ marginBottom: 4, fontWeight: 500, color: '#262626' }}>
-                    {t('asset.mgmtDeptLabel')} <span style={{ color: '#FF4D4F' }}>*</span>
+                  <div style={{ marginBottom: 4, fontWeight: 500, color: 'var(--text-1)' }}>
+                    {t('asset.mgmtDeptLabel')} <span style={{ color: 'var(--danger)' }}>*</span>
                   </div>
                   <TreeSelect
                     value={passDepartmentId}
@@ -1206,7 +1206,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
 
             {/* 配件清單（分類級配置，品牌產品庫維護） */}
             <div>
-              <div style={{ fontSize: 13, color: '#262626', marginBottom: 8, fontWeight: 500 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-1)', marginBottom: 8, fontWeight: 500 }}>
                 <AppstoreOutlined style={{ marginRight: 4 }} />
                 {t('asset.accessoryListTitle')}
               </div>
@@ -1243,7 +1243,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                 )}
               </div>
               {passAccessories.length === 0 && (
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 6 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 6 }}>
                   {t('asset.accessoryTip')}
                 </div>
               )}
@@ -1265,21 +1265,21 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
         destroyOnClose
       >
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 13, color: '#262626', marginBottom: 8, fontWeight: 500 }}>{t('asset.colDisposeMethod')}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-1)', marginBottom: 8, fontWeight: 500 }}>{t('asset.colDisposeMethod')}</div>
           <Radio.Group value={rejectType} onChange={(e) => setRejectType(e.target.value)} style={{ width: '100%' }}>
             <Space direction="vertical" style={{ width: '100%' }}>
               {REJECT_OPTIONS.map((opt) => (
                 <Radio key={opt.value} value={opt.value}>
                   <span style={{ fontWeight: 500 }}>{t(`asset.${opt.labelKey}`)}</span>
-                  <span style={{ color: '#8C8C8C', fontSize: 12, marginLeft: 4 }}>{t(`asset.${opt.descKey}`)}</span>
+                  <span style={{ color: 'var(--text-3)', fontSize: 12, marginLeft: 4 }}>{t(`asset.${opt.descKey}`)}</span>
                 </Radio>
               ))}
             </Space>
           </Radio.Group>
         </div>
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 13, color: '#262626', marginBottom: 8, fontWeight: 500 }}>
-            {t('asset.rejectQtyLabel')} <span style={{ color: '#FF4D4F' }}>*</span>
+          <div style={{ fontSize: 13, color: 'var(--text-1)', marginBottom: 8, fontWeight: 500 }}>
+            {t('asset.rejectQtyLabel')} <span style={{ color: 'var(--danger)' }}>*</span>
           </div>
           <InputNumber
             value={rejectQty}
@@ -1295,7 +1295,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
             style={{ width: '100%' }}
             placeholder={t('asset.rejectQtyPh')}
           />
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
             {t('asset.rejectQtyHint', { max: (() => {
               if (!rejectModal) return 1
               if (editingAllocation) return editingAllocation.qty
@@ -1306,8 +1306,8 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
           </div>
         </div>
         <div>
-          <div style={{ fontSize: 13, color: '#262626', marginBottom: 8, fontWeight: 500 }}>
-            {t('asset.colRejectReason')} <span style={{ color: '#FF4D4F' }}>*</span>
+          <div style={{ fontSize: 13, color: 'var(--text-1)', marginBottom: 8, fontWeight: 500 }}>
+            {t('asset.colRejectReason')} <span style={{ color: 'var(--danger)' }}>*</span>
           </div>
           <Input.TextArea
             rows={3}
@@ -1320,17 +1320,17 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
           />
         </div>
         <div style={{ marginTop: 16 }}>
-          <div style={{ fontSize: 13, color: '#262626', marginBottom: 8, fontWeight: 500 }}>
+          <div style={{ fontSize: 13, color: 'var(--text-1)', marginBottom: 8, fontWeight: 500 }}>
             <CameraOutlined style={{ marginRight: 4 }} />
             {t('asset.sitePhotoEvidence')}
-            <span style={{ color: '#8C8C8C', fontWeight: 400, marginLeft: 8 }}>{t('asset.photoMaxHint', { max: MAX_PHOTOS })}</span>
+            <span style={{ color: 'var(--text-3)', fontWeight: 400, marginLeft: 8 }}>{t('asset.photoMaxHint', { max: MAX_PHOTOS })}</span>
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
             {rejectPhotos.map((p, idx) => (
               <div key={idx} style={{ position: 'relative', width: 88, height: 88 }}>
                 <img
                   src={p.dataUrl} alt={p.name}
-                  style={{ width: 88, height: 88, objectFit: 'cover', borderRadius: 8, border: '1px solid #e8e8e8', cursor: 'pointer', display: 'block', background: '#fafafa' }}
+                  style={{ width: 88, height: 88, objectFit: 'cover', borderRadius: 8, border: '1px solid #e8e8e8', cursor: 'pointer', display: 'block', background: 'var(--surface-3)' }}
                   onClick={() => { setPreviewImage(p.dataUrl); setPreviewVisible(true) }}
                 />
                 <Button type="text" size="small" danger
@@ -1345,9 +1345,9 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                 beforeUpload={(file) => { handleRejectPhotoUpload(file); return false }}
                 accept="image/*"
               >
-                <div style={{ width: 88, height: 88, border: '1px dashed #d9d9d9', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#999', fontSize: 12, background: '#fafafa', transition: 'all 0.3s' }}
-                  onMouseEnter={(e) => { const el = e.currentTarget; el.style.borderColor = '#E8720C'; el.style.background = '#fff7e6'; el.style.color = '#E8720C' }}
-                  onMouseLeave={(e) => { const el = e.currentTarget; el.style.borderColor = '#d9d9d9'; el.style.background = '#fafafa'; el.style.color = '#999' }}
+                <div style={{ width: 88, height: 88, border: '1px dashed #d9d9d9', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#999', fontSize: 12, background: 'var(--surface-3)', transition: 'all 0.3s' }}
+                  onMouseEnter={(e) => { const el = e.currentTarget; el.style.borderColor = 'var(--brand)'; el.style.background = 'var(--warning-soft)'; el.style.color = 'var(--brand)' }}
+                  onMouseLeave={(e) => { const el = e.currentTarget; /* 還原必須用與基態相同的令牌：寫回裸色值會讓深色主題 hover 一次後永久停在淺色塊 */ el.style.borderColor = 'var(--border-1)'; el.style.background = 'var(--surface-3)'; el.style.color = '#999' }}
                 >
                   <UploadOutlined style={{ fontSize: 22, marginBottom: 4, color: 'inherit' }} />
                   <span>{uploading ? t('asset.uploadingNow') : t('asset.photoUploadBtn')}</span>
@@ -1369,7 +1369,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
         width={480}
         destroyOnClose
       >
-        <div style={{ marginBottom: 8, fontSize: 13, color: '#595959' }}>
+        <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--text-2)' }}>
           {t('asset.accessorySelectTip')}
         </div>
         <div style={{ maxHeight: 360, overflowY: 'auto', border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px' }}>
@@ -1377,7 +1377,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
             const code = passRow?.item.categoryCode
             const list = code ? categoryAccessories.get(code) || [] : []
             if (list.length === 0) {
-              return <div style={{ padding: 24, textAlign: 'center', color: '#bfbfbf', fontSize: 13 }}>{t('asset.accessoryEmpty')}</div>
+              return <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-4)', fontSize: 13 }}>{t('asset.accessoryEmpty')}</div>
             }
             return list.map((acc) => {
               const checked = selectedAccessoryNames.has(acc.name)
@@ -1398,19 +1398,19 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                       })
                     }}
                   >
-                    <span style={{ fontSize: 13, color: '#262626' }}>{acc.name}</span>
+                    <span style={{ fontSize: 13, color: 'var(--text-1)' }}>{acc.name}</span>
                     {alreadyAdded && (
                       <Tag color="green" style={{ marginLeft: 8, fontSize: 11 }}>{t('asset.tagAdded')}</Tag>
                     )}
                   </Checkbox>
-                  <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.defaultQtyHint', { count: acc.defaultQty || 1 })}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.defaultQtyHint', { count: acc.defaultQty || 1 })}</span>
                 </div>
               )
             })
           })()}
         </div>
         {selectedAccessoryNames.size > 0 && (
-          <div style={{ marginTop: 12, fontSize: 12, color: '#8C8C8C', textAlign: 'right' }}>
+          <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-3)', textAlign: 'right' }}>
             {t('asset.selectedCount', { count: selectedAccessoryNames.size })}
           </div>
         )}
@@ -1426,7 +1426,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
         title={<span style={{ fontSize: 15, fontWeight: 600 }}>照片預覽 ({previewIndex + 1} / {previewPhotos.length})</span>}
       >
         {/* 圖片區域 */}
-        <div style={{ minHeight: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fafafa', borderRadius: 8, padding: 24 }}>
+        <div style={{ minHeight: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface-3)', borderRadius: 8, padding: 24 }}>
           <img
             alt="preview"
             src={previewImage}
@@ -1463,7 +1463,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
               alignItems: 'center',
               justifyContent: 'center',
               border: '1px solid #d9d9d9',
-              background: '#fff',
+              background: 'var(--surface-2)',
             }}
           >
             ‹
@@ -1478,7 +1478,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
               fontSize: 13,
               fontWeight: 500,
               border: '1px solid #d9d9d9',
-              background: '#fff',
+              background: 'var(--surface-2)',
               padding: '0 16px',
             }}
           >
@@ -1494,7 +1494,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
               fontSize: 13,
               fontWeight: 500,
               border: '1px solid #d9d9d9',
-              background: '#fff',
+              background: 'var(--surface-2)',
               padding: '0 16px',
             }}
           >
@@ -1522,7 +1522,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
               alignItems: 'center',
               justifyContent: 'center',
               border: '1px solid #d9d9d9',
-              background: '#fff',
+              background: 'var(--surface-2)',
             }}
           >
             ›
