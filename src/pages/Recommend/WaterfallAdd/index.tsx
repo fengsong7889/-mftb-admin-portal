@@ -36,6 +36,7 @@ import dayjs from 'dayjs'
 import PopularSkinPricing from './PopularSkinPricing'
 import GoldenSignboardPricing from './GoldenSignboardPricing'
 import TrafficPackagePricing from './TrafficPackagePricing'
+import TimeSlotAdPricing from './TimeSlotAdPricing'
 import { fetchAdAlgorithms, fetchAdPricingDetail, createAdPricing, updateAdPricing, fetchAdRevivePricingDetail, createAdRevivePricing, updateAdRevivePricing, fetchAdPricingList, fetchAdRevivePricingList, appTypeToBrand, brandToAppType, type AdPricingStarRequest, type AdPricingReviveRequest } from '@/api/adPromotion'
 import { fetchStores } from '@/api/store'
 
@@ -154,6 +155,10 @@ export default function WaterfallAdd() {
   // 投流廣告：流量包定價配置（預設檔位 + 階梯單價，按業務頻道配置）
   if (typeParam && Number(typeParam) === AlgorithmType.TRAFFIC_AD) {
     return <TrafficPackagePricing />
+  }
+  // 時段推薦廣告：按時段（早/午/下午茶/晚/宵夜 + 自定義）分別定價
+  if (typeParam && Number(typeParam) === AlgorithmType.TIME_SLOT_AD) {
+    return <TimeSlotAdPricing />
   }
   return <WaterfallAddGeneral />
 }

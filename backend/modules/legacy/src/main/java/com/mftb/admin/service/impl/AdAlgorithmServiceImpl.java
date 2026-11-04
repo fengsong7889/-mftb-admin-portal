@@ -28,6 +28,7 @@ import com.mftb.admin.service.AdPricingStarService;
 import com.mftb.admin.service.AdPricingTrafficService;
 import com.mftb.admin.util.BizSeqService;
 import com.mftb.admin.util.JsonUtils;
+import com.mftb.admin.util.OperatorDisplayEnricher;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -59,6 +60,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
     private final BizStoreMapper storeMapper;
     private final BizMerchantGroupMapper groupMapper;
     private final OperatorResolver operatorResolver;
+    private final OperatorDisplayEnricher operatorDisplayEnricher;
     private final BizSeqService bizSeqService;
 
     @Override
@@ -82,6 +84,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
         List<AdAlgorithmVO> records = result.getRecords().stream()
                 .map(AdAlgorithmVO::from)
                 .toList();
+        enrichUpdaterDisplay(records);
         long total = result.getTotal();
         // 销售菜单场景: 过滤掉对该门店屏蔽的算法（规则6）
         if (StringUtils.hasText(storeCode)) {
@@ -201,7 +204,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
 
     @Override
     public AdAlgorithmVO detail(Long id) {
-        return AdAlgorithmVO.from(require(id));
+        return enrichUpdaterDisplay(AdAlgorithmVO.from(require(id)));
     }
 
     @Override
@@ -216,7 +219,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
         if (entity == null) {
             throw new BusinessException("算法不存在: " + algoCode);
         }
-        return AdAlgorithmVO.from(entity);
+        return enrichUpdaterDisplay(AdAlgorithmVO.from(entity));
     }
 
     @Override
@@ -329,6 +332,19 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
             throw new BusinessException("算法不存在");
         }
         return entity;
+    }
+
+    /**
+     * 列表/详情的「最后更新人」补成「姓名(工号)」。
+     * <p>写入口径不变（库里仍是姓名快照），只在读侧按姓名反查；重名/查不到时保持原值。
+     */
+    private void enrichUpdaterDisplay(Iterable<AdAlgorithmVO> records) {
+        operatorDisplayEnricher.enrich(records, AdAlgorithmVO::getUpdatedBy, AdAlgorithmVO::setUpdatedBy);
+    }
+
+    private AdAlgorithmVO enrichUpdaterDisplay(AdAlgorithmVO vo) {
+        operatorDisplayEnricher.enrichOne(vo, AdAlgorithmVO::getUpdatedBy, AdAlgorithmVO::setUpdatedBy);
+        return vo;
     }
 
     private void applyRequest(AdAlgorithm entity, AdAlgorithmRequest request) {

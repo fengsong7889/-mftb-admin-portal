@@ -12,6 +12,7 @@ export const DELIVERY_CARD_TYPES: AlgorithmType[] = [
   AlgorithmType.TRAFFIC_AD,
   AlgorithmType.POPULAR_MERCHANT_KA,
   AlgorithmType.GOLDEN_SIGNBOARD,
+  AlgorithmType.TIME_SLOT_AD,
 ]
 
 export const GROUP_BUY_CARD_TYPES: AlgorithmType[] = [

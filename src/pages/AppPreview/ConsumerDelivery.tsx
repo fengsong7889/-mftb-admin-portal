@@ -5,9 +5,12 @@
  * 结构：头部(返回+定位) → 搜索 → 日料 Hero → 十宫格分类 → 促销位 → 红包券 →
  *       权益胶囊 → 服务标签 → 商家/商品瀑布流（多种卡片形态）→ 到底提示 → 本页自带的 5 Tab 底栏。
  *
- * 说明：图片为 AI 占位图（src/assets/consumer-home/），文案暂硬编码繁中，待切图与 i18n 接入后替换。
+ * 说明：图片为 AI 占位图（src/assets/consumer-home/）；界面文案走 appConsumer 命名空间。
+ * 商家名/销量/券文案/状态角标仍为占位数据，不进入语言包。
+ * 存量数组里的繁中一律用「下标 → key」映射，避免手敲繁体时发生繁简码位归一化。
  */
 import { useRef, useState, type KeyboardEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import groupbuyHeroImg from '@/assets/consumer-home/groupbuy-hero.jpg'
 import bbqImg from '@/assets/consumer-home/bbq.jpg'
 import riceballImg from '@/assets/consumer-home/riceball.jpg'
@@ -31,6 +34,22 @@ const CATS = [
 
 const BENEFITS = ['神會員', '蜂蜜提現', '口碑好', '商家助力', '新品']
 const SERVICES = ['領券', '免配送', '免运費', '30分鐘', '可自取']
+
+/** 权益胶囊 / 服务标签的下标→key 映射（顺序与上面两个数组严格一致） */
+const BENEFIT_KEYS = [
+  'appConsumer.delivery.benefit.vip',
+  'appConsumer.delivery.benefit.honey',
+  'appConsumer.delivery.benefit.reputation',
+  'appConsumer.delivery.benefit.merchantBoost',
+  'appConsumer.delivery.benefit.newArrival',
+]
+const SERVICE_KEYS = [
+  'appConsumer.delivery.service.coupon',
+  'appConsumer.delivery.service.freeDelivery',
+  'appConsumer.delivery.service.freeShipping',
+  'appConsumer.delivery.service.halfHour',
+  'appConsumer.delivery.service.selfPickup',
+]
 
 /** 商家/商品卡：rail=左侧人气商家侧栏；products=商品缩略图；status=状态角标 */
 interface FeedCard {
@@ -116,11 +135,25 @@ const FEED: FeedCard[] = [
 ]
 
 const BOTTOM_TABS = [
-  { key: 'food', icon: '🍜', label: '外賣' },
-  { key: 'cart', icon: '🛒', label: '購物車', badge: 1 },
-  { key: 'review', icon: '👍', label: '好評' },
-  { key: 'order', icon: '📋', label: '訂單' },
-  { key: 'more', icon: '⋯', label: '更多' },
+  { key: 'food', icon: '🍜', labelKey: 'appConsumer.tab.delivery', zh: '外賣' },
+  { key: 'cart', icon: '🛒', labelKey: 'appConsumer.tab.cart', zh: '購物車', badge: 1 },
+  { key: 'review', icon: '👍', labelKey: 'appConsumer.tab.praise', zh: '好評' },
+  { key: 'order', icon: '📋', labelKey: 'appConsumer.tab.order', zh: '訂單' },
+  { key: 'more', icon: '⋯', labelKey: 'appConsumer.common.more', zh: '更多' },
+]
+
+/** 十宮格分类与热搜词：存量繁中保留作兜底真值，另给一张下标→key 表 */
+const CAT_KEYS = [
+  'appConsumer.delivery.cat.burger',
+  'appConsumer.delivery.cat.breakfast',
+  'appConsumer.delivery.cat.global',
+  'appConsumer.delivery.cat.drink',
+  'appConsumer.delivery.cat.snack',
+  'appConsumer.delivery.cat.mcd',
+  'appConsumer.delivery.cat.lion',
+  'appConsumer.delivery.cat.flash',
+  'appConsumer.delivery.cat.must',
+  'appConsumer.delivery.cat.more',
 ]
 
 const HOT_WORDS = ['小龍蝦', '珍珠奶茶', '叉燒', '海南雞飯', '螺螄粉', '漢堡', '甜點', '火鍋']
@@ -134,6 +167,7 @@ export default function ConsumerDelivery({
   onSearch: (keyword?: string) => void
   onOpenStore?: (merchantId: string) => void
 }) {
+  const { t } = useTranslation()
   const bodyRef = useRef<HTMLDivElement>(null)
   const [scrolled, setScrolled] = useState(false)
 
@@ -159,22 +193,22 @@ export default function ConsumerDelivery({
       {/* 顶部：可折叠吸顶头（滚动后仅保留搜索行，标题与热搜词行收起） */}
       <div className={`apd-header${scrolled ? ' is-scrolled' : ''}`}>
         <div className="apd-header-top">
-          <button type="button" className="apg-back" onClick={onBack} aria-label="返回">‹</button>
-          <span className="apg-title">美食外賣</span>
-          <span className="apg-loc"><span aria-hidden="true">📍</span>威尼斯人A座 <i aria-hidden="true">›</i></span>
+          <button type="button" className="apg-back" onClick={onBack} aria-label={t('appConsumer.common.back', { defaultValue: '返回' })}>‹</button>
+          <span className="apg-title">{t('appConsumer.channel.delivery', { defaultValue: '美食外賣' })}</span>
+          <span className="apg-loc"><span aria-hidden="true">📍</span>{t('appConsumer.common.location', { defaultValue: '威尼斯人A座' })} <i aria-hidden="true">›</i></span>
         </div>
 
         <div className="apd-header-search">
           {scrolled && (
-            <button type="button" className="apg-back apd-back-inline" onClick={onBack} aria-label="返回">‹</button>
+            <button type="button" className="apg-back apd-back-inline" onClick={onBack} aria-label={t('appConsumer.common.back', { defaultValue: '返回' })}>‹</button>
           )}
           <button type="button" className="apd-searchrow" onClick={() => onSearch()}>
             <span className="apc-search-ico" aria-hidden="true">🔍</span>
             <span className="apg-hot">太二酸菜鱼</span>
-            <span className="apd-search-btn">搜索</span>
+            <span className="apd-search-btn">{t('appConsumer.common.search', { defaultValue: '搜索' })}</span>
           </button>
           {scrolled && (
-            <span className="apd-header-loc"><span aria-hidden="true">📍</span><i>威尼斯人A座</i></span>
+            <span className="apd-header-loc"><span aria-hidden="true">📍</span><i>{t('appConsumer.common.location', { defaultValue: '威尼斯人A座' })}</i></span>
           )}
         </div>
 
@@ -192,39 +226,39 @@ export default function ConsumerDelivery({
           className="apg-hero"
           style={{ background: `linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.1) 60%, rgba(0,0,0,0) 100%), url(${groupbuyHeroImg}) center/cover no-repeat` }}
         >
-          <span className="apg-hero-badge">最強澳門日料Top.1</span>
-          <span className="apg-hero-title"><i>$</i>90<em>代</em><i>$</i>100</span>
-          <span className="apg-hero-sub">單次可用5張</span>
+          <span className="apg-hero-badge">{t('appConsumer.common.heroBadge', { defaultValue: '最強澳門日料Top.1' })}</span>
+          <span className="apg-hero-title"><i>$</i>90<em>{t('appConsumer.common.heroVoucherWord', { defaultValue: '代' })}</em><i>$</i>100</span>
+          <span className="apg-hero-sub">{t('appConsumer.common.heroSub', { defaultValue: '單次可用5張' })}</span>
         </div>
 
         {/* 十宮格分類 */}
         <div className="apg-cats">
-          {CATS.map((c) => (
+          {CATS.map((c, i) => (
             <button key={c.key} type="button" className="apg-cat">
               {c.img
                 ? <img className="apg-cat-img" src={c.img} alt="" />
                 : <span className="apg-cat-emoji" style={{ background: c.bg }} aria-hidden="true">{c.emoji}</span>}
-              <span className="apg-cat-label">{c.label}</span>
+              <span className="apg-cat-label">{t(CAT_KEYS[i], { defaultValue: c.label })}</span>
             </button>
           ))}
         </div>
 
         {/* 促銷位 */}
         <div className="apc-promo" style={{ background: 'linear-gradient(120deg,#5B8DEF,#7B4DFF)' }}>
-          <span className="apc-promo-title">盒你一起<b>大發現</b></span>
+          <span className="apc-promo-title">{t('appConsumer.common.promoLead', { defaultValue: '盒你一起' })}<b>{t('appConsumer.common.promoHighlight', { defaultValue: '大發現' })}</b></span>
           <span className="apc-promo-emoji" aria-hidden="true">🧧</span>
         </div>
 
         {/* 紅包券（宽卡） */}
         <div className="apd-coupons">
-          {[{ a: '25', c: '滿$60可用' }, { a: '50', c: '滿$120可用' }].map((c) => (
+          {[{ a: '25', min: 60 }, { a: '50', min: 120 }].map((c) => (
             <button key={c.a} type="button" className="apd-coupon">
               <span className="apc-coupon-amt"><i>$</i>{c.a}</span>
               <span className="apc-coupon-meta">
-                <b>{c.c}</b>
-                <i>激賞圍購神券 · 1月10日到期</i>
+                <b>{t('appConsumer.common.couponMinSpend', { price: c.min, defaultValue: '滿${{price}}可用' })}</b>
+                <i>{t('appConsumer.common.couponNote', { defaultValue: '激賞圍購神券 · 1月10日到期' })}</i>
               </span>
-              <span className="apc-coupon-use">去使用</span>
+              <span className="apc-coupon-use">{t('appConsumer.common.useNow', { defaultValue: '去使用' })}</span>
             </button>
           ))}
         </div>
@@ -233,17 +267,17 @@ export default function ConsumerDelivery({
         <div className="apd-benefits">
           {BENEFITS.map((b, i) => (
             <button key={b} type="button" className={`apd-benefit${i === 0 ? ' is-on' : ''}`}>
-              <span aria-hidden="true">🎁</span>{b}
+              <span aria-hidden="true">🎁</span>{t(BENEFIT_KEYS[i], { defaultValue: b })}
             </button>
           ))}
         </div>
 
         {/* 服務標籤 */}
         <div className="apd-services">
-          {SERVICES.map((s) => (
-            <span key={s} className="apd-service">{s}</span>
+          {SERVICES.map((s, i) => (
+            <span key={s} className="apd-service">{t(SERVICE_KEYS[i], { defaultValue: s })}</span>
           ))}
-          <span className="apd-service apd-service--filter">篩選 ▾</span>
+          <span className="apd-service apd-service--filter">{t('appConsumer.common.filter', { defaultValue: '篩選' })} ▾</span>
         </div>
 
         {/* 商家/商品瀑布流 */}
@@ -254,14 +288,14 @@ export default function ConsumerDelivery({
               className={`apd-card${onOpenStore ? ' is-clickable' : ''}`}
               role={onOpenStore ? 'button' : undefined}
               tabIndex={onOpenStore ? 0 : undefined}
-              aria-label={onOpenStore ? `進入店鋪：${m.name}` : undefined}
+              aria-label={onOpenStore ? t('appConsumer.common.enterStore', { shop: m.name, defaultValue: '進入店鋪：{{shop}}' }) : undefined}
               onClick={onOpenStore ? () => onOpenStore(m.merchantId) : undefined}
               onKeyDown={onOpenStore ? (event) => handleCardKey(event, m.merchantId) : undefined}
             >
               {m.rail && (
                 <div className="apd-rail">
                   <span className="apd-rail-emoji" aria-hidden="true">🐝</span>
-                  <span className="apd-rail-text">人氣商家<br />立即進入</span>
+                  <span className="apd-rail-text">{t('appConsumer.delivery.railPopular', { defaultValue: '人氣商家' })}<br />{t('appConsumer.delivery.railEnter', { defaultValue: '立即進入' })}</span>
                 </div>
               )}
               <div className="apd-card-main">
@@ -270,7 +304,7 @@ export default function ConsumerDelivery({
                   {m.speed && <span className="apd-speed">{m.speed}</span>}
                 </div>
                 <div className="apd-card-rating">
-                  <b>{m.rating}</b>分<i>{m.sold}</i>
+                  <b>{m.rating}</b>{t('appConsumer.common.ratingSuffix', { defaultValue: '分' })}<i>{m.sold}</i>
                 </div>
                 <div className="apd-card-meta">{m.meta}</div>
                 {m.rank && <div className="apd-rank">{m.rank}</div>}
@@ -284,7 +318,7 @@ export default function ConsumerDelivery({
                     {m.products.map((p) => (
                       <div key={p.key} className="apd-product">
                         <img className="apd-product-img" src={p.img} alt="" />
-                        {p.grab && <span className="apd-grab">搶</span>}
+                        {p.grab && <span className="apd-grab">{t('appConsumer.common.grab', { defaultValue: '搶' })}</span>}
                         <span className="apd-product-price">{p.price}</span>
                         <span className="apd-product-origin">{p.origin}</span>
                       </div>
@@ -303,19 +337,19 @@ export default function ConsumerDelivery({
         {/* 到底 */}
         <div className="apg-end">
           <span className="apg-end-emoji" aria-hidden="true">🐝</span>
-          <span className="apg-end-text">已經到我底線了</span>
+          <span className="apg-end-text">{t('appConsumer.common.reachedBottom', { defaultValue: '已經到我底線了' })}</span>
         </div>
       </div>
 
       {/* 本頁自帶的 5 Tab 底欄 */}
       <div className="ap-tabbar apd-tabbar">
-        {BOTTOM_TABS.map((t, i) => (
-          <button key={t.key} type="button" className={`ap-tab${i === 0 ? ' is-active' : ''}`}>
+        {BOTTOM_TABS.map((tab, i) => (
+          <button key={tab.key} type="button" className={`ap-tab${i === 0 ? ' is-active' : ''}`}>
             <span className="ap-tab-icon apd-tab-icon" aria-hidden="true">
-              {t.icon}
-              {t.badge ? <em className="apd-badge">{t.badge}</em> : null}
+              {tab.icon}
+              {tab.badge ? <em className="apd-badge">{tab.badge}</em> : null}
             </span>
-            <span>{t.label}</span>
+            <span>{t(tab.labelKey, { defaultValue: tab.zh })}</span>
           </button>
         ))}
       </div>

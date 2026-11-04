@@ -10,8 +10,10 @@
  * 从搜索结果进入店铺再返回时，ConsumerSearch 通过页面级记忆恢复上一次结果。
  *
  * 说明：消费者侧暂无对应后端只读接口，各页先用占位数据渲染版式，待接口与设计切图接入后替换。
+ * 界面文案走 appConsumer 命名空间（zh-TW + en 双语已登记，其余语种回落英文）。
  */
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import ConsumerHome from './ConsumerHome'
 import ConsumerGroupBuy from './ConsumerGroupBuy'
 import ConsumerDelivery from './ConsumerDelivery'
@@ -24,11 +26,11 @@ import type { SearchScope } from './consumerSearchData'
 
 type RootKey = 'home' | 'vip' | 'order' | 'mine'
 
-const TABS: { key: RootKey; icon: string; label: string }[] = [
-  { key: 'home', icon: '🏠', label: '首頁' },
-  { key: 'vip', icon: '💎', label: '神會員' },
-  { key: 'order', icon: '📋', label: '訂單' },
-  { key: 'mine', icon: '👤', label: '我的' },
+const TABS: { key: RootKey; icon: string; labelKey: string; zh: string }[] = [
+  { key: 'home', icon: '🏠', labelKey: 'appConsumer.tab.home', zh: '首頁' },
+  { key: 'vip', icon: '💎', labelKey: 'appConsumer.tab.vip', zh: '神會員' },
+  { key: 'order', icon: '📋', labelKey: 'appConsumer.tab.order', zh: '訂單' },
+  { key: 'mine', icon: '👤', labelKey: 'appConsumer.tab.mine', zh: '我的' },
 ]
 
 type ConsumerScreen =
@@ -50,6 +52,7 @@ const ROOT: Record<RootKey, ConsumerScreen> = {
 }
 
 export default function ConsumerApp() {
+  const { t } = useTranslation()
   const nav = useMobileNav<ConsumerScreen>(ROOT.home)
   const { current } = nav
   const [cartCount, setCartCount] = useState(0)
@@ -74,7 +77,7 @@ export default function ConsumerApp() {
       onClick={() => nav.reset(ROOT[tab.key])}
     >
       <span className="ap-tab-icon" aria-hidden="true">{tab.icon}</span>
-      <span>{tab.label}</span>
+      <span>{t(tab.labelKey, { defaultValue: tab.zh })}</span>
     </button>
   )
 
@@ -131,7 +134,7 @@ export default function ConsumerApp() {
       case 'order':
         return (
           <div className="ap-body">
-            <div className="ap-empty-tip">「{TABS.find((tab) => tab.key === screen.key)?.label}」頁面待設計稿</div>
+            <div className="ap-empty-tip">{t('appConsumer.common.pagePending', { name: t(TABS.find((tab) => tab.key === screen.key)!.labelKey), defaultValue: '「{{name}}」頁面待設計稿' })}</div>
           </div>
         )
       case 'search':
@@ -157,15 +160,15 @@ export default function ConsumerApp() {
       )}
 
       {/* 回到頂部（悬浮在 Tab 之上；搜索覆盖层打开时隐藏） */}
-      {!isSearch && <button type="button" className="apc-to-top" aria-label="回到頂部">↑</button>}
+      {!isSearch && <button type="button" className="apc-to-top" aria-label={t('appConsumer.common.toTop', { defaultValue: '回到頂部' })}>↑</button>}
 
       {isRoot && (
         <div className="ap-tabbar apc-tabbar">
           {TABS.slice(0, 2).map(renderTab)}
           {/* 中间「賣閒置」悬浮钮（设计稿：凸出在底栏之上） */}
-          <button type="button" className="apc-fab" aria-label="賣閒置">
+          <button type="button" className="apc-fab" aria-label={t('appConsumer.common.sellIdle', { defaultValue: '賣閒置' })}>
             <span className="apc-fab-ico" aria-hidden="true">🐝</span>
-            <span className="apc-fab-label">賣閒置</span>
+            <span className="apc-fab-label">{t('appConsumer.common.sellIdle', { defaultValue: '賣閒置' })}</span>
           </button>
           {TABS.slice(2).map(renderTab)}
         </div>

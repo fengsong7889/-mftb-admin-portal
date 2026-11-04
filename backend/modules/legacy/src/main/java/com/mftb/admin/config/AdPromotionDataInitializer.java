@@ -71,6 +71,10 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
         // v2: 金字招牌计价表建表/补列，附结构后置校验；v1 因补列吞异常可能误记成功，故用新版本键重跑并以校验兜底
         runVerified("金字招牌计价表自动创建与补列", "adpromo:signboard_pricing_tables:v2",
                 this::ensureSignboardPricingTables, this::verifySignboardPricing);
+        runVerified("時段推薦計價表自動創建與補列", "adpromo:timeslot_pricing_tables:v1",
+                this::ensureTimeSlotPricingTables, this::verifyTimeSlotPricing);
+        runVerified("時段推薦訂單明細表自動創建", "adpromo:timeslot_order_item_table:v1",
+                this::ensureTimeSlotOrderItemTable, this::verifyTimeSlotOrderItemTable);
         String schema = jdbcTemplate.queryForObject("SELECT DATABASE()", String.class);
         migrationLock.runExclusive("mftb:schema:" + schema, 120, () ->
                 versionTracker.applyOnce("adpromo:hot-skin-discount-v1.0",
@@ -532,7 +536,117 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
     }
 
     /**
-     * 列不存在时执行 ALTER（幂等）。
+     * 時段推薦計價表自動創建（幂等）。主表存商家範圍/折扣/退款等 JSON 配置，時段明細獨立子表。
+     * 對應參考腳本: sql/327_time_slot_ad_pricing.sql
+     */
+    private void ensureTimeSlotPricingTables() {
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_ad_pricing_timeslot ("
+                + "id              BIGINT        PRIMARY KEY AUTO_INCREMENT COMMENT '主鍵ID', "
+                + "pricing_no      VARCHAR(32)   NOT NULL                   COMMENT '定價編號（DJSD + YYYYMMDD + 3位）', "
+                + "algo_id         BIGINT        DEFAULT NULL               COMMENT '關聯算法ID（時段推薦可空）', "
+                + "algo_name       VARCHAR(128)  DEFAULT NULL               COMMENT '時段推薦名稱', "
+                + "brand           VARCHAR(32)   DEFAULT NULL               COMMENT '所属品牌', "
+                + "channel         INT           DEFAULT NULL               COMMENT '業務頻道', "
+                + "presale_days    INT           NOT NULL DEFAULT 7         COMMENT '預售天數', "
+                + "merchant_scope  VARCHAR(16)   NOT NULL DEFAULT 'all'     COMMENT '商家可購範圍: all/whitelist/blacklist/category', "
+                + "allow_categories TEXT         DEFAULT NULL               COMMENT '可購分類編碼JSON', "
+                + "whitelist_merchants TEXT      DEFAULT NULL               COMMENT '可購商家白名單JSON', "
+                + "blacklist_merchants TEXT      DEFAULT NULL               COMMENT '不可購商家黑名單JSON', "
+                + "category_exclude_merchants TEXT DEFAULT NULL             COMMENT '分類內排除商家JSON', "
+                + "days_discount_enabled TINYINT NOT NULL DEFAULT 0         COMMENT '按天數折扣開關: 1/0', "
+                + "days_discount_tiers TEXT      DEFAULT NULL               COMMENT '按天數折扣梯度JSON', "
+                + "refund_enabled  INT           NOT NULL DEFAULT 1         COMMENT '退款開關: 1=允許 2=不允許', "
+                + "cancel_fee_tiers TEXT         DEFAULT NULL               COMMENT '取消扣費梯度JSON', "
+                + "status          INT           NOT NULL DEFAULT 1         COMMENT '服務狀態: 1=啟用 2=停用', "
+                + "remark          VARCHAR(255)  DEFAULT NULL               COMMENT '備註', "
+                + "updated_by      VARCHAR(64)   DEFAULT NULL               COMMENT '最後更新人', "
+                + "deleted         TINYINT       DEFAULT 0                  COMMENT '邏輯刪除', "
+                + "created_at      DATETIME      DEFAULT CURRENT_TIMESTAMP  COMMENT '創建時間', "
+                + "updated_at      DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新時間', "
+                + "UNIQUE KEY uk_pricing_timeslot_no (pricing_no), "
+                + "KEY idx_pricing_timeslot_channel (channel), "
+                + "KEY idx_pricing_timeslot_status (status)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='時段推薦計價主表'");
+
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_ad_pricing_timeslot_slot ("
+                + "id              BIGINT        PRIMARY KEY AUTO_INCREMENT COMMENT '主鍵ID', "
+                + "pricing_id      BIGINT        NOT NULL                   COMMENT '計價主表ID', "
+                + "slot_key        VARCHAR(32)   NOT NULL                   COMMENT '時段標識', "
+                + "slot_name       VARCHAR(64)   NOT NULL                   COMMENT '時段名稱', "
+                + "start_time      VARCHAR(8)    DEFAULT NULL               COMMENT '售卖開始時間 HH:mm', "
+                + "end_time        VARCHAR(8)    DEFAULT NULL               COMMENT '售卖結束時間 HH:mm', "
+                + "price           DECIMAL(12,2) NOT NULL DEFAULT 0.00      COMMENT '售卖價格（MOP）', "
+                + "discount_enabled TINYINT      NOT NULL DEFAULT 0         COMMENT '時段折扣開關: 1/0', "
+                + "discount        DECIMAL(5,2)  DEFAULT NULL               COMMENT '折扣（折，如 9.5）', "
+                + "discount_time_mode VARCHAR(16) NOT NULL DEFAULT 'unlimited' COMMENT '折扣時間模式: limited/unlimited', "
+                + "discount_start_date VARCHAR(10) DEFAULT NULL              COMMENT '限時折扣開始日期 YYYY-MM-DD', "
+                + "discount_end_date   VARCHAR(10) DEFAULT NULL              COMMENT '限時折扣結束日期 YYYY-MM-DD', "
+                + "sort_order      INT           NOT NULL DEFAULT 0         COMMENT '排序', "
+                + "deleted         TINYINT       DEFAULT 0                  COMMENT '邏輯刪除', "
+                + "created_at      DATETIME      DEFAULT CURRENT_TIMESTAMP  COMMENT '創建時間', "
+                + "updated_at      DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新時間', "
+                + "KEY idx_timeslot_slot_pricing (pricing_id)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='時段推薦計價時段明細表'");
+
+        log.info("時段推薦計價表結構就緒: biz_ad_pricing_timeslot + biz_ad_pricing_timeslot_slot");
+    }
+
+    /** 時段推薦計價結構后置校驗：兩表及關鍵列就緒，任一缺失即抛異常使 applyOnce 不記版本。 */
+    private void verifyTimeSlotPricing() {
+        if (!tableExists("biz_ad_pricing_timeslot")) {
+            throw new IllegalStateException("時段推薦計價主表未就緒: biz_ad_pricing_timeslot");
+        }
+        if (!columnExists("biz_ad_pricing_timeslot", "merchant_scope")) {
+            throw new IllegalStateException("列未就緒: biz_ad_pricing_timeslot.merchant_scope");
+        }
+        if (!tableExists("biz_ad_pricing_timeslot_slot")) {
+            throw new IllegalStateException("時段推薦時段明細表未就緒: biz_ad_pricing_timeslot_slot");
+        }
+        if (!columnExists("biz_ad_pricing_timeslot_slot", "discount")) {
+            throw new IllegalStateException("列未就緒: biz_ad_pricing_timeslot_slot.discount");
+        }
+    }
+
+    /**
+     * 時段推薦訂單明細表自動創建（幂等）。一行 = 一個「時段 x 日期」格子，仿金字招牌訂單明細。
+     * 對應參考腳本: sql/328_time_slot_order_item.sql
+     */
+    private void ensureTimeSlotOrderItemTable() {
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS biz_ad_order_item_timeslot ("
+                + "id              BIGINT        PRIMARY KEY AUTO_INCREMENT COMMENT '主鍵ID', "
+                + "order_id        BIGINT        NOT NULL                   COMMENT '訂單主表ID', "
+                + "order_no        VARCHAR(32)   DEFAULT NULL               COMMENT '訂單編號快照', "
+                + "biz_date        DATE          NOT NULL                   COMMENT '投放日期', "
+                + "slot_key        VARCHAR(32)   NOT NULL                   COMMENT '時段標識', "
+                + "slot_name       VARCHAR(64)   DEFAULT NULL               COMMENT '時段名稱快照', "
+                + "original_price  DECIMAL(12,2) NOT NULL DEFAULT 0.00      COMMENT '格子原價（時段日單價）', "
+                + "sale_price      DECIMAL(12,2) NOT NULL DEFAULT 0.00      COMMENT '實付分攤價（折扣後）', "
+                + "refund_price    DECIMAL(12,2) NOT NULL DEFAULT 0.00      COMMENT '已退款金額', "
+                + "delivery_status INT           NOT NULL DEFAULT 1         COMMENT '投放狀態: 1=待投放 2=已投放 3=已退款', "
+                + "deleted         TINYINT       DEFAULT 0                  COMMENT '邏輯刪除', "
+                + "created_at      DATETIME      DEFAULT CURRENT_TIMESTAMP  COMMENT '創建時間', "
+                + "updated_at      DATETIME      DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新時間', "
+                + "KEY idx_timeslot_item_order (order_id), "
+                + "KEY idx_timeslot_item_date (biz_date)"
+                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='時段推薦訂單明細表'");
+        log.info("時段推薦訂單明細表結構就緒: biz_ad_order_item_timeslot");
+    }
+
+    /** 時段推薦訂單明細表結構后置校驗：表與關鍵列就緒，否則抛異常使 applyOnce 不記版本。 */
+    private void verifyTimeSlotOrderItemTable() {
+        if (!tableExists("biz_ad_order_item_timeslot")) {
+            throw new IllegalStateException("時段推薦訂單明細表未就緒: biz_ad_order_item_timeslot");
+        }
+        if (!columnExists("biz_ad_order_item_timeslot", "slot_key")) {
+            throw new IllegalStateException("列未就緒: biz_ad_order_item_timeslot.slot_key");
+        }
+    }
+
+    /**
+     * 列不存在時執行 ALTER（幂等）。
      * 兼容式治理：不再吞异常——补列失败必须向上抛出，使 {@link SchemaVersionTracker#applyOnce}
      * 不记录成功版本、写失败审计并在下次启动重试，杜绝“结构未就绪却被记为已迁移”。
      */

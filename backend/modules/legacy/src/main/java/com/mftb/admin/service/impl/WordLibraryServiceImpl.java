@@ -10,6 +10,7 @@ import com.mftb.admin.dto.WordLibraryVO;
 import com.mftb.admin.entity.PromWordLibrary;
 import com.mftb.admin.mapper.PromWordLibraryMapper;
 import com.mftb.admin.service.WordLibraryService;
+import com.mftb.admin.util.OperatorDisplayEnricher;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,7 @@ public class WordLibraryServiceImpl implements WordLibraryService {
 
     private final PromWordLibraryMapper wordLibraryMapper;
     private final OperatorResolver operatorResolver;
+    private final OperatorDisplayEnricher operatorDisplayEnricher;
 
     @Override
     public PageResult<WordLibraryVO> listWords(long page, long size, String keyword, String channel,
@@ -77,7 +79,7 @@ public class WordLibraryServiceImpl implements WordLibraryService {
         Page<PromWordLibrary> result = wordLibraryMapper.selectPage(pageParam, wrapper);
 
         return new PageResult<>(
-                result.getRecords().stream().map(this::toVO).toList(),
+                enrichUpdaterDisplay(result.getRecords().stream().map(this::toVO).toList()),
                 result.getTotal()
         );
     }
@@ -248,5 +250,14 @@ public class WordLibraryServiceImpl implements WordLibraryService {
         vo.setUpdateTime(entity.getUpdatedAt() != null ? entity.getUpdatedAt().format(DISPLAY_FMT) : null);
         vo.setRemark(entity.getRemark());
         return vo;
+    }
+
+    /**
+     * 列表「最后更新人」补成「姓名(工号)」：写入口径不变，只在读侧按姓名反查；
+     * 重名/查不到时保持原值。
+     */
+    private List<WordLibraryVO> enrichUpdaterDisplay(List<WordLibraryVO> records) {
+        operatorDisplayEnricher.enrich(records, WordLibraryVO::getUpdatedBy, WordLibraryVO::setUpdatedBy);
+        return records;
     }
 }

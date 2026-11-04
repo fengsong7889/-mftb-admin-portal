@@ -47,6 +47,8 @@ public class BizSeqService {
     public static final String RULE_AD_ORDER_POPULAR = "ad_order_popular";
     /** 金字招牌订单 */
     public static final String RULE_AD_ORDER_SIGNBOARD = "ad_order_signboard";
+    /** 時段推薦廣告訂單 */
+    public static final String RULE_AD_ORDER_TIMESLOT = "ad_order_timeslot";
     /** 无敌星星定价 */
     public static final String RULE_PRICING_STAR = "config_pricing_star";
     /** 人气商家定价 */
@@ -408,6 +410,7 @@ public class BizSeqService {
             case 5 -> RULE_AD_ORDER_POPULAR;
             case 13 -> RULE_AD_ORDER_SIGNBOARD;
             case 15 -> RULE_AD_ORDER_TRAFFIC;
+            case 16 -> RULE_AD_ORDER_TIMESLOT;
             default -> null;
         };
     }

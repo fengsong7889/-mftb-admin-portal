@@ -22,7 +22,7 @@ import { fetchStores, type StoreItem } from '@/api/store'
 import { fetchFinAccountBalance } from '@/api/finance'
 import { AlgorithmType, ServiceStatus, REGION_LABEL_KEY, RecommendChannel } from '@mftb/contracts/recommendConstants'
 import { signboardTagText } from '../Recommend/signboardLabels'
-import { MAX_BUY_DAYS, PRESALE_OPEN_HOUR, MONTHS_PER_PAGE, parseDayTiers, getPresaleOpenTime, PickerPresaleInfoModal, PickerPaymentSuccessModal } from './components/pickerShared'
+import { MAX_BUY_DAYS, PRESALE_OPEN_HOUR, MONTHS_PER_PAGE, parseDayTiers, getPresaleOpenTime, MonthTabBar, PickerPresaleInfoModal, PickerPaymentSuccessModal } from './components/pickerShared'
 
 /** 金字招牌廣告類型標識（與後端一致） */
 const GIFT_AD_TYPE_SIGNBOARD = 'golden_signboard'
@@ -138,7 +138,6 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
   const [activeDateLabel, setActiveDateLabel] = useState<string | null>(null)
   const [expandedMonths, setExpandedMonths] = useState<Record<string, boolean>>({})
   const [calMonth, setCalMonth] = useState<Dayjs>(dayjs().add(1, 'day').startOf('month'))
-  const [hoveredCalMonth, setHoveredCalMonth] = useState<string | null>(null)
   const [monthPage, setMonthPage] = useState(0)
   const [batchRange, setBatchRange] = useState<[Dayjs | null, Dayjs | null] | null>(null)
   const [excludedWeekdays, setExcludedWeekdays] = useState<number[]>([])
@@ -953,50 +952,26 @@ export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: 
               {/* 月份橫向選擇器 */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                 <Button size="small" disabled={monthPage === 0} onClick={() => setMonthPage(p => Math.max(0, p - 1))}>◀</Button>
-                <div style={{ flex: 1, display: 'flex', gap: 4 }}>
-                  {visibleMonths.map(m => {
-                    const monthStr = m.format('YYYY-MM')
-                    const isSelected = m.isSame(calMonth, 'month')
-                    const isHovered = hoveredCalMonth === monthStr
-                    const hasSelectedDates = customDates.some(d => dayjs(d).isSame(m, 'month'))
-                    const monthPresale = m.startOf('month').isAfter(customMaxDate, 'day')
-                    return (
-                      <div
-                        key={monthStr}
-                        onClick={() => {
-                          if (monthPresale) {
-                            const firstDay = m.startOf('month')
-                            setPresaleInfo({
-                              date: firstDay.format('YYYY-MM-DD'),
-                              weekday: WEEKDAY_LABELS[firstDay.day()],
-                              openTime: getPresaleOpenTime(firstDay, sellableDays).format(t('presaleDateFormat')),
-                            })
-                            return
-                          }
-                          setCalMonth(m)
-                        }}
-                        onMouseEnter={() => setHoveredCalMonth(monthStr)}
-                        onMouseLeave={() => setHoveredCalMonth(null)}
-                        style={{
-                          flex: 1, padding: '8px 4px', borderRadius: 6, position: 'relative',
-                          border: monthPresale ? '1px dashed #d9d9d9' : isSelected ? '2px solid #fa8c16' : isHovered ? '2px solid #fa8c16' : '1px solid #e8e8e8',
-                          background: monthPresale ? '#fafafa' : isSelected ? '#fff7e6' : isHovered ? '#fff7e6' : '#fff',
-                          cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s', whiteSpace: 'nowrap', overflow: 'hidden',
-                        }}
-                      >
-                        <span style={{ fontSize: 15, fontWeight: !monthPresale && (isSelected || isHovered) ? 700 : 500, color: monthPresale ? '#bfbfbf' : isSelected || isHovered ? '#fa8c16' : '#333' }}>
-                          {m.year() === dayjs().year() ? m.format('M月') : m.format('YYYY年M月')}
-                        </span>
-                        {monthPresale && (
-                          <span style={{ fontSize: 11, color: '#8c8c8c', marginLeft: 4, border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>待開售</span>
-                        )}
-                        {hasSelectedDates && (
-                          <div style={{ position: 'absolute', top: 3, right: 3, width: 8, height: 8, borderRadius: '50%', background: '#ff4d4f', animation: 'dotPulse 1.5s ease-in-out infinite' }} />
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
+                <MonthTabBar
+                  months={visibleMonths}
+                  current={calMonth}
+                  isPresaleMonth={m => m.startOf('month').isAfter(customMaxDate, 'day')}
+                  hasSelectedDates={m => customDates.some(d => dayjs(d).isSame(m, 'month'))}
+                  onChange={m => {
+                    // 整月待開售：彈窗提示首日開售時間
+                    if (m.startOf('month').isAfter(customMaxDate, 'day')) {
+                      const firstDay = m.startOf('month')
+                      setPresaleInfo({
+                        date: firstDay.format('YYYY-MM-DD'),
+                        weekday: WEEKDAY_LABELS[firstDay.day()],
+                        openTime: getPresaleOpenTime(firstDay, sellableDays).format(t('presaleDateFormat')),
+                      })
+                      return
+                    }
+                    setCalMonth(m)
+                  }}
+                  presaleTag="🔒待開售"
+                />
                 <Button size="small" disabled={monthPage >= monthPageCount - 1} onClick={() => setMonthPage(p => Math.min(monthPageCount - 1, p + 1))}>▶</Button>
               </div>
 

@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class OrganicScoreRuleValidationTest {
 
     /** validateRuleRequest 不访问任何依赖，传 null 即可隔离单测 */
-    private final OrganicScoreServiceImpl service = new OrganicScoreServiceImpl(null, null, null);
+    private final OrganicScoreServiceImpl service = new OrganicScoreServiceImpl(null, null, null, null);
 
     private OrganicScoreRuleRequest request(Integer mode, Integer score) {
         OrganicScoreRuleRequest req = new OrganicScoreRuleRequest();

@@ -8,6 +8,7 @@ import com.mftb.admin.dto.AdOrderVO;
 import com.mftb.admin.dto.AdPricingHotVO;
 import com.mftb.admin.dto.AdPricingReviveVO;
 import com.mftb.admin.dto.AdPricingSignboardVO;
+import com.mftb.admin.dto.AdPricingTimeSlotVO;
 import com.mftb.admin.dto.AdPricingStarVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.AdOrder;
@@ -15,6 +16,7 @@ import com.mftb.admin.entity.AdOrderItemHot;
 import com.mftb.admin.entity.AdOrderItemNewStore;
 import com.mftb.admin.entity.AdOrderItemRevive;
 import com.mftb.admin.entity.AdOrderItemSignboard;
+import com.mftb.admin.entity.AdOrderItemTimeSlot;
 import com.mftb.admin.entity.AdOrderItemStar;
 import com.mftb.admin.entity.AdOrderItemTraffic;
 import com.mftb.admin.entity.AdAlgorithm;
@@ -30,6 +32,7 @@ import com.mftb.admin.mapper.AdOrderItemHotMapper;
 import com.mftb.admin.mapper.AdOrderItemNewStoreMapper;
 import com.mftb.admin.mapper.AdOrderItemReviveMapper;
 import com.mftb.admin.mapper.AdOrderItemSignboardMapper;
+import com.mftb.admin.mapper.AdOrderItemTimeSlotMapper;
 import com.mftb.admin.mapper.AdOrderItemStarMapper;
 import com.mftb.admin.mapper.AdOrderItemTrafficMapper;
 import com.mftb.admin.mapper.AdOrderMapper;
@@ -44,6 +47,7 @@ import com.mftb.admin.service.AdOrderService;
 import com.mftb.admin.service.AdPricingHotService;
 import com.mftb.admin.service.AdPricingReviveService;
 import com.mftb.admin.service.AdPricingSignboardService;
+import com.mftb.admin.service.AdPricingTimeSlotService;
 import com.mftb.admin.service.AdPricingStarService;
 import com.mftb.admin.service.DataScopeService;
 import com.mftb.admin.service.FinAccountService;
@@ -86,6 +90,7 @@ public class AdOrderServiceImpl implements AdOrderService {
     private final AdOrderItemNewStoreMapper newStoreItemMapper;
     private final AdOrderItemHotMapper hotItemMapper;
     private final AdOrderItemSignboardMapper signboardItemMapper;
+    private final AdOrderItemTimeSlotMapper timeSlotItemMapper;
     private final AdOrderItemTrafficMapper trafficItemMapper;
     private final AdAlgorithmMapper algorithmMapper;
     private final AdPricingHotMapper hotPricingMapper;
@@ -97,6 +102,7 @@ public class AdOrderServiceImpl implements AdOrderService {
     private final AdPricingReviveService revivePricingService;
     private final AdPricingHotService hotPricingService;
     private final AdPricingSignboardService signboardPricingService;
+    private final AdPricingTimeSlotService timeSlotPricingService;
     private final FinAccountService accountService;
     private final FinWriteChainService finWriteChainService;
     private final BizSeqService bizSeqService;
@@ -173,6 +179,13 @@ public class AdOrderServiceImpl implements AdOrderService {
                             .eq(AdOrderItemSignboard::getOrderId, order.getId())
                             .orderByAsc(AdOrderItemSignboard::getBizDate)
                             .orderByAsc(AdOrderItemSignboard::getLabelType));
+            items.forEach(item -> vo.getItems().add(AdOrderDetailVO.Item.from(item)));
+        } else if (isTimeSlot(order)) {
+            List<AdOrderItemTimeSlot> items = timeSlotItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemTimeSlot>()
+                            .eq(AdOrderItemTimeSlot::getOrderId, order.getId())
+                            .orderByAsc(AdOrderItemTimeSlot::getBizDate)
+                            .orderByAsc(AdOrderItemTimeSlot::getSlotKey));
             items.forEach(item -> vo.getItems().add(AdOrderDetailVO.Item.from(item)));
         } else if (isTraffic(order)) {
             // 投流广告：一单一条流量包明细，展示字段已由 fillSummaries 回填
@@ -302,6 +315,22 @@ public class AdOrderServiceImpl implements AdOrderService {
                 item.setRefundPrice(refundPrice);
                 item.setDeliveryStatus(3);
                 trafficItemMapper.updateById(item);
+                refundTotal = refundTotal.add(refundPrice);
+            }
+        } else if (isTimeSlot(order)) {
+            // 時段推薦退款：逐格（時段x日期）按取消扣費梯度退實付分攤價；無 cellQuota 占用，退款後該時段日期可再購
+            List<AdOrderItemTimeSlot> tsItems = timeSlotItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemTimeSlot>()
+                            .eq(AdOrderItemTimeSlot::getOrderId, order.getId())
+                            .in(AdOrderItemTimeSlot::getDeliveryStatus, 1, 2));
+            if (tsItems.isEmpty()) {
+                throw new BusinessException("訂單沒有可退款的明細");
+            }
+            for (AdOrderItemTimeSlot item : tsItems) {
+                BigDecimal refundPrice = calcRefundPrice(item.getSalePrice(), cancelFeeTiersJson, today, item.getBizDate());
+                item.setRefundPrice(refundPrice);
+                item.setDeliveryStatus(3);
+                timeSlotItemMapper.updateById(item);
                 refundTotal = refundTotal.add(refundPrice);
             }
         } else {
@@ -446,6 +475,20 @@ public class AdOrderServiceImpl implements AdOrderService {
                 item.setRefundPrice(refundPrice);
                 item.setDeliveryStatus(3);
                 trafficItemMapper.updateById(item);
+                refundTotal = refundTotal.add(refundPrice);
+            }
+        } else if (isTimeSlot(order)) {
+            // 時段推薦取消：逐格按取消扣費梯度退實付分攤價；無 cellQuota 占用
+            List<AdOrderItemTimeSlot> tsItems = timeSlotItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemTimeSlot>()
+                            .eq(AdOrderItemTimeSlot::getOrderId, order.getId())
+                            .in(AdOrderItemTimeSlot::getDeliveryStatus, 1, 2));
+            if (tsItems.isEmpty()) throw new BusinessException("訂單沒有可取消的明細");
+            for (AdOrderItemTimeSlot item : tsItems) {
+                BigDecimal refundPrice = calcRefundPrice(item.getSalePrice(), cancelFeeTiersJson, today, item.getBizDate());
+                item.setRefundPrice(refundPrice);
+                item.setDeliveryStatus(3);
+                timeSlotItemMapper.updateById(item);
                 refundTotal = refundTotal.add(refundPrice);
             }
         } else {
@@ -615,7 +658,7 @@ public class AdOrderServiceImpl implements AdOrderService {
         List<Long> starOrderIds = records.stream()
                 .filter(r -> !isReviveType(r.getAlgoType()) && !isNewStoreType(r.getAlgoType())
                         && !isHotType(r.getAlgoType()) && !isSignboardType(r.getAlgoType())
-                        && !isTrafficType(r.getAlgoType()))
+                        && !isTrafficType(r.getAlgoType()) && !isTimeSlotType(r.getAlgoType()))
                 .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
         List<Long> reviveOrderIds = records.stream().filter(r -> isReviveType(r.getAlgoType()))
                 .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
@@ -626,6 +669,8 @@ public class AdOrderServiceImpl implements AdOrderService {
         List<Long> signboardOrderIds = records.stream().filter(r -> isSignboardType(r.getAlgoType()))
                 .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
         List<Long> trafficOrderIds = records.stream().filter(r -> isTrafficType(r.getAlgoType()))
+                .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
+        List<Long> timeSlotOrderIds = records.stream().filter(r -> isTimeSlotType(r.getAlgoType()))
                 .map(AdOrderVO::getId).filter(java.util.Objects::nonNull).toList();
         Map<Long, List<AdOrderItemStar>> byOrder = starOrderIds.isEmpty() ? Map.of()
                 : itemMapper.selectList(new LambdaQueryWrapper<AdOrderItemStar>()
@@ -651,6 +696,10 @@ public class AdOrderServiceImpl implements AdOrderService {
                 : trafficItemMapper.selectList(new LambdaQueryWrapper<AdOrderItemTraffic>()
                         .in(AdOrderItemTraffic::getOrderId, trafficOrderIds))
                 .stream().collect(Collectors.groupingBy(AdOrderItemTraffic::getOrderId));
+        Map<Long, List<AdOrderItemTimeSlot>> timeSlotByOrder = timeSlotOrderIds.isEmpty() ? Map.of()
+                : timeSlotItemMapper.selectList(new LambdaQueryWrapper<AdOrderItemTimeSlot>()
+                        .in(AdOrderItemTimeSlot::getOrderId, timeSlotOrderIds))
+                .stream().collect(Collectors.groupingBy(AdOrderItemTimeSlot::getOrderId));
         // 人气商家：构建 skinName → tier 映射（从定价配置表查皮肤等级）
         Map<String, String> skinTierMap = hotOrderIds.isEmpty() ? Map.of()
                 : hotSkinMapper.selectList(new LambdaQueryWrapper<AdPricingHotSkin>().isNotNull(AdPricingHotSkin::getTier))
@@ -740,6 +789,18 @@ public class AdOrderServiceImpl implements AdOrderService {
                     vo.setTrafficImpressions(first.getImpressions() == null ? null : first.getImpressions().longValue());
                     vo.setDeliverySlot(first.getDeliverySlot());
                 }
+                continue;
+            }
+            if (isTimeSlotType(vo.getAlgoType())) {
+                List<AdOrderItemTimeSlot> items = timeSlotByOrder.getOrDefault(vo.getId(), List.of());
+                vo.setRegions(new ArrayList<>());   // 時段推薦無商圈
+                // 已選時段名稱（去重，供列表 mealSlots 降級展示）
+                vo.setMealSlots(items.stream().map(AdOrderItemTimeSlot::getSlotName)
+                        .filter(java.util.Objects::nonNull).distinct().toList());
+                // 購買日期列表（去重排序，供列表「推廣天數」面板展示）
+                vo.setPurchaseDays(items.stream().map(AdOrderItemTimeSlot::getBizDate)
+                        .filter(java.util.Objects::nonNull).distinct().sorted()
+                        .map(Object::toString).toList());
                 continue;
             }
             List<AdOrderItemStar> items = byOrder.getOrDefault(vo.getId(), List.of());
@@ -866,9 +927,9 @@ public class AdOrderServiceImpl implements AdOrderService {
         }
     }
 
-    /** 该算法类型的订单 algo_id 存的是定价配置ID（而非算法表主键）：人气商家/金字招牌/投流广告 */
+    /** 该算法类型的订单 algo_id 存的是定价配置ID（而非算法表主键）：人气商家/金字招牌/投流广告/时段推荐 */
     private static boolean storesPricingId(Integer algoType) {
-        return algoType != null && (algoType == 5 || algoType == 13 || algoType == 15);
+        return algoType != null && (algoType == 5 || algoType == 13 || algoType == 15 || algoType == 16);
     }
 
     private AdOrder require(String orderNo) {
@@ -927,6 +988,15 @@ public class AdOrderServiceImpl implements AdOrderService {
         return algoType != null && algoType == 15;
     }
 
+    /** 時段推薦廣告訂單（algo_type=16） */
+    private static boolean isTimeSlot(AdOrder order) {
+        return isTimeSlotType(order.getAlgoType());
+    }
+
+    private static boolean isTimeSlotType(Integer algoType) {
+        return algoType != null && algoType == 16;
+    }
+
     /** 无敌星星订单（algo_type=1） */
     private static boolean isStarType(Integer algoType) {
         return algoType != null && algoType == 1;
@@ -965,6 +1035,13 @@ public class AdOrderServiceImpl implements AdOrderService {
             AdPricingTraffic pricing = trafficPricingMapper.selectById(order.getAlgoId());
             if (pricing != null && refundEnabled == null) {
                 refundEnabled = pricing.getRefundEnabled();
+            }
+        } else if (isTimeSlot(order)) {
+            // 時段推薦：algoId 即定價配置ID，回查取消扣費梯度
+            AdPricingTimeSlotVO pricing = timeSlotPricingService.detailOrNull(order.getAlgoId());
+            if (pricing != null) {
+                if (refundEnabled == null) refundEnabled = pricing.getRefundEnabled();
+                cancelFeeTiersJson = pricing.getCancelFeeTiers();
             }
         } else {
             AdPricingStarVO pricing = pricingService.activeByAlgo(order.getAlgoId());

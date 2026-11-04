@@ -3,8 +3,10 @@
  *
  * 入口：搜索结果中的商家/商品、外卖页商家卡、超市页商家卡、首页瀑布流商品卡。
  * 关键能力：顶部「搜尋店內商品」进入 scope=store 的搜索，只搜本店，不跨店。
+ * 界面文案走 appConsumer 命名空间；店名/商品名/分类名/价格仍为 consumerSearchData 的占位数据。
  */
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   CHANNEL_LABEL,
   formatMoney,
@@ -35,6 +37,7 @@ export default function ConsumerStore({
   cartCount: number
   onAddToCart: (offer: SearchOffer) => void
 }) {
+  const { t } = useTranslation()
   const merchant = getMerchant(merchantId)
   const offers = getStoreOffers(merchantId)
   const categories = getStoreCategories(merchantId)
@@ -44,11 +47,11 @@ export default function ConsumerStore({
     return (
       <>
         <div className="ap-navbar">
-          <button type="button" className="ap-navbar-back" onClick={onBack}>‹ 返回</button>
-          <span className="ap-navbar-title">店鋪</span>
+          <button type="button" className="ap-navbar-back" onClick={onBack}>‹ {t('appConsumer.common.back', { defaultValue: '返回' })}</button>
+          <span className="ap-navbar-title">{t('appConsumer.store.title', { defaultValue: '店鋪' })}</span>
         </div>
         <div className="ap-body">
-          <div className="ap-empty-tip">店鋪不存在或已下線</div>
+          <div className="ap-empty-tip">{t('appConsumer.store.notFound', { defaultValue: '店鋪不存在或已下線' })}</div>
         </div>
       </>
     )
@@ -59,22 +62,33 @@ export default function ConsumerStore({
     : offers.filter((offer) => offer.category === category)
 
   const fulfillment = merchant.channel === 'groupbuy'
-    ? `${merchant.distanceKm}km · ${merchant.groupbuyCount ?? 0} 個團購 · 人均 $${formatMoney(merchant.avgPrice ?? 0)}`
-    : `${merchant.deliveryMinutes ?? 0}分鐘 · ${merchant.distanceKm}km · ${merchant.deliveryFee === 0 ? '免配送費' : `配送費 $${formatMoney(merchant.deliveryFee ?? 0)}`} · 起送 $${formatMoney(merchant.minOrder ?? 0)}`
+    ? [
+      t('appConsumer.common.kilometers', { value: merchant.distanceKm ?? '', defaultValue: '{{value}}km' }),
+      t('appConsumer.store.groupbuyCount', { count: merchant.groupbuyCount ?? 0, defaultValue: '{{count}} 個團購' }),
+      t('appConsumer.store.avgPerPerson', { price: formatMoney(merchant.avgPrice ?? 0), defaultValue: '人均 ${{price}}' }),
+    ].join(' · ')
+    : [
+      t('appConsumer.delivery.minutes', { value: merchant.deliveryMinutes ?? 0, defaultValue: '{{value}}分鐘' }),
+      t('appConsumer.common.kilometers', { value: merchant.distanceKm ?? '', defaultValue: '{{value}}km' }),
+      merchant.deliveryFee === 0
+        ? t('appConsumer.delivery.freeDelivery', { defaultValue: '免配送費' })
+        : t('appConsumer.delivery.fee', { value: formatMoney(merchant.deliveryFee ?? 0), defaultValue: '配送費 ${{value}}' }),
+      t('appConsumer.delivery.minOrder', { value: formatMoney(merchant.minOrder ?? 0), defaultValue: '起送 ${{value}}' }),
+    ].join(' · ')
 
   return (
     <>
       <div className="apst-header">
-        <button type="button" className="apg-back" onClick={onBack} aria-label="返回">‹</button>
+        <button type="button" className="apg-back" onClick={onBack} aria-label={t('appConsumer.common.back', { defaultValue: '返回' })}>‹</button>
         <span className="apst-title">{merchant.name}</span>
-        <button type="button" className="apst-more" aria-label="更多">⋯</button>
+        <button type="button" className="apst-more" aria-label={t('appConsumer.common.more', { defaultValue: '更多' })}>⋯</button>
       </div>
 
       <div className="apst-searchrow">
         <button type="button" className="apst-search" onClick={onSearch}>
           <span aria-hidden="true">🔍</span>
-          <span>搜尋店內商品</span>
-          <em>店內</em>
+          <span>{t('appConsumer.store.searchPlaceholder', { defaultValue: '搜尋店內商品' })}</span>
+          <em>{t('appConsumer.store.tabInStore', { defaultValue: '店內' })}</em>
         </button>
       </div>
 
@@ -84,16 +98,16 @@ export default function ConsumerStore({
             ? <img className="apst-hero-img" src={merchant.image} alt="" />
             : <span className="apst-hero-emoji" aria-hidden="true">{merchant.emoji}</span>}
           <span className={`apcs-channel apcs-channel--${merchant.channel}`}>{CHANNEL_LABEL[merchant.channel]}</span>
-          {merchant.status === 'rest' && <span className="apst-rest">休息中</span>}
-          {merchant.status === 'new' && <span className="apst-new">新店</span>}
+          {merchant.status === 'rest' && <span className="apst-rest">{t('appConsumer.store.resting', { defaultValue: '休息中' })}</span>}
+          {merchant.status === 'new' && <span className="apst-new">{t('appConsumer.common.newStoreTag', { defaultValue: '新店' })}</span>}
         </div>
 
         <div className="apst-info">
           <div className="apst-info-head">
             <b>{merchant.name}</b>
-            <span className="apst-rating"><i>{merchant.rating}</i>分</span>
+            <span className="apst-rating"><i>{merchant.rating}</i>{t('appConsumer.common.ratingSuffix', { defaultValue: '分' })}</span>
           </div>
-          <div className="apst-info-meta">月售 {merchant.monthlySales} · {fulfillment}</div>
+          <div className="apst-info-meta">{t('appConsumer.common.monthlySales', { value: merchant.monthlySales ?? '', defaultValue: '月售 {{value}}' })} · {fulfillment}</div>
           <div className="apst-info-tags">
             {merchant.tags.map((tag) => <em key={tag} className="apcs-tag">{tag}</em>)}
           </div>
@@ -110,7 +124,7 @@ export default function ConsumerStore({
             className={`apcs-filterchip${category === 'all' ? ' is-on' : ''}`}
             onClick={() => setCategory('all')}
           >
-            全部
+            {t('appConsumer.store.filterAll', { defaultValue: '全部' })}
           </button>
           {categories.map((item) => (
             <button
@@ -134,8 +148,12 @@ export default function ConsumerStore({
                 <div className="apst-item-main">
                   <div className="apst-item-name">{name}</div>
                   <div className="apst-item-meta">
-                    {isProduct ? offer.spec : `${offer.distanceKm}km · ${offer.rating}分`}
-                    <i>{isProduct ? `月售 ${offer.monthlySales}` : `半年售 ${offer.sold}`}</i>
+                    {isProduct
+                      ? offer.spec
+                      : `${t('appConsumer.common.kilometers', { value: offer.distanceKm ?? '', defaultValue: '{{value}}km' })} · ${offer.rating}${t('appConsumer.common.ratingSuffix', { defaultValue: '分' })}`}
+                    <i>{isProduct
+                      ? t('appConsumer.common.monthlySales', { value: offer.monthlySales ?? '', defaultValue: '月售 {{value}}' })
+                      : t('appConsumer.common.halfYearSales', { value: offer.sold ?? '', defaultValue: '半年售 {{value}}' })}</i>
                   </div>
                   <div className="apst-item-price">
                     <b><i>$</i>{formatMoney(offer.price)}</b>
@@ -148,10 +166,10 @@ export default function ConsumerStore({
                 <button
                   type="button"
                   className="apst-add"
-                  aria-label={`加入：${name}`}
+                  aria-label={t('appConsumer.store.addToCart', { name, defaultValue: '加入：{{name}}' })}
                   onClick={() => onAddToCart(offer)}
                 >
-                  {isProduct ? '+' : '搶'}
+                  {isProduct ? '+' : t('appConsumer.common.grab', { defaultValue: '搶' })}
                 </button>
               </div>
             )
@@ -159,22 +177,22 @@ export default function ConsumerStore({
           {visibleOffers.length === 0 && (
             <div className="apst-empty">
               <span aria-hidden="true">🍽️</span>
-              <p>該分類下暫無商品</p>
+              <p>{t('appConsumer.store.emptyCategory', { defaultValue: '該分類下暫無商品' })}</p>
             </div>
           )}
         </div>
 
         <div className="apg-end">
           <span className="apg-end-emoji" aria-hidden="true">🐝</span>
-          <span className="apg-end-text">已經到我底線了</span>
+          <span className="apg-end-text">{t('appConsumer.common.reachedBottom', { defaultValue: '已經到我底線了' })}</span>
         </div>
       </div>
 
       {cartCount > 0 && (
         <div className="apst-cartbar">
           <span className="apst-cart-ico" aria-hidden="true">🛒<em>{cartCount}</em></span>
-          <span className="apst-cart-text">已選 {cartCount} 件</span>
-          <button type="button" className="apst-cart-btn">去結算</button>
+          <span className="apst-cart-text">{t('appConsumer.store.selectedCount', { count: cartCount, defaultValue: '已選 {{count}} 件' })}</span>
+          <button type="button" className="apst-cart-btn">{t('appConsumer.store.checkout', { defaultValue: '去結算' })}</button>
         </div>
       )}
     </>

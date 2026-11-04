@@ -14,6 +14,7 @@ import com.mftb.admin.mapper.AdWaterfallMapper;
 import com.mftb.admin.mapper.AdWaterfallSlotMapper;
 import com.mftb.admin.service.AdWaterfallService;
 import com.mftb.admin.util.BizSeqService;
+import com.mftb.admin.util.OperatorDisplayEnricher;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -42,6 +43,7 @@ public class AdWaterfallServiceImpl implements AdWaterfallService {
     private final AdWaterfallSlotMapper slotMapper;
     private final AdAlgorithmMapper algorithmMapper;
     private final OperatorResolver operatorResolver;
+    private final OperatorDisplayEnricher operatorDisplayEnricher;
     private final BizSeqService bizSeqService;
 
     @Override
@@ -77,6 +79,7 @@ public class AdWaterfallServiceImpl implements AdWaterfallService {
         List<AdWaterfallVO> records = result.getRecords().stream()
                 .map(AdWaterfallVO::from)
                 .toList();
+        operatorDisplayEnricher.enrich(records, AdWaterfallVO::getUpdatedBy, AdWaterfallVO::setUpdatedBy);
         fillSlotSummary(records);
         return new PageResult<>(records, result.getTotal());
     }
@@ -253,6 +256,7 @@ public class AdWaterfallServiceImpl implements AdWaterfallService {
             items.add(toSlotItem(slot));
         }
         vo.setSlots(items);
+        operatorDisplayEnricher.enrichOne(vo, AdWaterfallVO::getUpdatedBy, AdWaterfallVO::setUpdatedBy);
         return vo;
     }
 
