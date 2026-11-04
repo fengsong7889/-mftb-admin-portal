@@ -52,7 +52,7 @@ export const RULE_CATALOG: { code: string; name: string; dimension: Dimension; s
   { code: 'COM_07', name: '平台官方神券', dimension: 'commercial', source: '官方券活動', metric: '品牌適用、報名、門檻與優惠力度', window: '活動有效期' },
   { code: 'COM_10', name: '金字招牌(廣告)', dimension: 'commercial', source: '購買標籤與投放期', metric: '有效標籤去重、投放有效期', window: '投放有效期' },
   { code: 'COM_SLOT', name: '時段推薦', dimension: 'commercial', source: '時段推薦購買記錄（待接）', metric: '購買狀態與投放有效期', window: '投放有效期' },
-  { code: 'STB_01', name: '主營時段加分', dimension: 'store', source: '門店營業設定', metric: '樣例午餐時段命中', window: '2026-10-30 午餐' },
+  { code: 'STB_01', name: '主營時段加分', dimension: 'store', source: '算法庫分時段配置與業務系統當前時段', metric: '當前時段與該時段配置分值', window: '2026-10-30 午餐' },
   { code: 'STB_04', name: '門店標籤', dimension: 'store', source: '門店標籤購買訂單（待接）', metric: '門店當前標籤與命中檔位', window: '評估時刻' },
   { code: 'STB_02', name: '營業狀態', dimension: 'store', source: '門店營業狀態', metric: '營業中', window: '評估時刻' },
   { code: 'STB_03', name: '店鋪綜合分', dimension: 'store', source: '門店綜合評分', metric: '業務綜合分與命中檔位', window: '最新傳入值' },
@@ -62,7 +62,6 @@ export const RULE_CATALOG: { code: string; name: string; dimension: Dimension; s
   { code: 'STB_08', name: '訂單取消率', dimension: 'store', source: '外賣訂單統計', metric: '取消率1%；120筆外賣樣本（不含自取）', window: '2026-09-30 ～ 2026-10-30' },
   { code: 'STB_09', name: '活動加分', dimension: 'store', source: '真實活動/報名（待接）', metric: '進行中活動；按活動獨立累加', window: '活動有效期' },
   { code: 'PLT_01', name: '距離衰減', dimension: 'platform', source: '用戶點與門店點', metric: 'WGS84示例球面距離（公里）', window: '評估時刻' },
-  { code: 'PLT_02A', name: '配送範圍', dimension: 'platform', source: '配送範圍匹配（待接）', metric: '午餐；樣例短程檔（非真實配送判定）', window: '2026-10-30 午餐' },
   { code: 'PLT_03', name: '流量均衡', dimension: 'platform', source: '訂單統計與大區梯度', metric: '外賣＋自取；取消及退款不納入；未被排除', window: '2026-10-23 ～ 2026-10-30' },
 ]
 
@@ -185,6 +184,14 @@ function baseStore(index: number, brand: AppType): StoreResult {
   Object.assign(storeLabel, {
     parts: [{ label: storeLabelText('gold'), score: 20, reference: '訂單號 SL-20261015-0006', validFrom: '2026-10-15', validTo: '2026-11-14' }],
     metric: '僅抓取支付成功且已生效的 1 筆門店標籤購買訂單：金牌；過期訂單不抓取不展示不加分', rawScore: 20, effectiveMax: 40, expression: '購買標籤即按算法庫配置分值加分（金牌 20 分）；僅有效期內訂單有效',
+  })
+  // 主營時段：已改为按五餐段独立配分（不再是单一固定加分），当前时段由业务系统传入、命中一檔即停不累加。
+  // 演示快照按算法库默认配置（仅午餐一档 60 分）计入，其余时段未配置 → 不得分，跟界面口径一致。
+  const mainTimeSlot = rules.find(r => r.ruleCode === 'STB_01')!
+  Object.assign(mainTimeSlot, {
+    parts: [{ label: '午餐（當前時段）', score: 60, reference: '算法庫已配置：早餐/下午茶/晚餐/宵夜未配置，午餐 60 分' }],
+    metric: '當前時段 12:00 → 午餐；該時段已配置加分', rawScore: 60, effectiveMax: 100,
+    expression: '當前時段命中午餐檔 +60；命中一檔即停不累加，未配置的時段不加分',
   })
   // 店铺综合分：算法库按分数配档（DEFAULT_STAR_TIER_BANDS：5星+50/4.5+40/4+30/3.5+15/3+5，从高到低命中一档即停，低3星不加分）
   // 展示商家当前综合分、命中档位与对应得分；分数由业务系统实时传入，取最新传入值
@@ -320,11 +327,18 @@ function createSnapshot(brand: AppType, point: PointId, scene: SampleScene, mode
       r.metric = `${store.distanceKm.toFixed(4)} km；滿分100；每公里扣5分`
       r.expression = `max(0, 100 − 5 × ${store.distanceKm.toFixed(4)})`
       if (mode === 'full') {
-        const range = store.rules.find(rule => rule.ruleCode === 'PLT_02A')!
-        range.rawScore = store.regionId === Region.KOKSAA ? 20 : 60
-        range.metric = store.regionId === Region.KOKSAA ? '午餐；跨橋檔（固定場景，不是直線推斷）' : '午餐；中程檔（固定場景）'
-        range.reason = '完整場景樣例變更配送分層'
-        if (store.storeId === 'DEMO-108') { store.eligibility = 'filtered'; store.eligibilityReason = '完整場景樣例：此定位不在配送範圍'; store.rankingBucket = 'excluded' }
+        // 完整场景的「分项变化 + 资格变化」样例改由流量均衡驱动：配送範圍已下架，
+        // 而区域梯度与「排除商家名单」本就是流量均衡（PLT_03）的配置项，不需要新造口径。
+        const balance = store.rules.find(rule => rule.ruleCode === 'PLT_03')!
+        if (store.regionId === Region.KOKSAA) {
+          Object.assign(balance, { matchStatus: 'missed', reasonCode: 'BALANCE_BAND_MISSED', rawScore: 0,
+            metric: '完整場景：該大區梯度未覆蓋當前訂單量', reason: '完整場景樣例變更流量均衡命中檔位', expression: '未命中任何檔位：本項 0 分' })
+        }
+        if (store.storeId === 'DEMO-108') {
+          Object.assign(balance, { ruleStatus: 'inapplicable', matchStatus: 'inapplicable', reasonCode: 'BALANCE_EXCLUDED', rawScore: 0,
+            metric: '完整場景：命中流量均衡排除商家名單', reason: '排除名單命中：本項不加分且不參與排名', expression: '排除名單命中：不參與本次均衡加分與排名' })
+          store.eligibility = 'filtered'; store.eligibilityReason = '完整場景樣例：該商家在流量均衡排除名單内'; store.rankingBucket = 'excluded'
+        }
       }
     }
     if (scene === 'zero') {

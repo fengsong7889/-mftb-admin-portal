@@ -68,9 +68,25 @@
 /* 商家權重分：綁定瀑布流单元格（只展示首条，多条折叠为 +N 面板） */
 .organic__wf-cell { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .organic__wf-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.organic__wf-panel { display: flex; flex-direction: column; gap: 8px; width: 280px; max-height: 260px; overflow-y: auto; }
-.organic__wf-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; border-bottom: 1px dashed #F0F0F0; padding-bottom: 6px; }
-.organic__wf-item:last-child { border-bottom: none; padding-bottom: 0; }
+/* +N 展开面板：口径头（暖橙底）→ 条目卡列表（可滚动）→ 虚线尾注，三层拉开标题与内容 */
+.organic__wf-panel { display: flex; flex-direction: column; gap: 10px; width: 320px; }
+.organic__wf-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid var(--brand-border); border-radius: 8px; background: var(--brand-soft); }
+.organic__wf-head-title { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--text-1); }
+.organic__wf-head-title .anticon { color: var(--brand); }
+.organic__wf-head-count { flex-shrink: 0; padding: 1px 8px; border: 1px solid var(--brand-border); border-radius: 10px; background: var(--surface-2); color: var(--brand); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.organic__wf-list { display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto; }
+.organic__wf-item { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border: 1px solid var(--border-2); border-radius: 8px; background: var(--surface-3); transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+.organic__wf-item:hover { border-color: var(--brand-border); background: var(--brand-soft); box-shadow: var(--shadow-card-soft); }
+.organic__wf-index { flex-shrink: 0; display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid var(--border-2); border-radius: 6px; background: var(--surface-2); color: var(--text-3); font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.organic__wf-item:hover .organic__wf-index { border-color: var(--brand-border); color: var(--brand); }
+.organic__wf-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.organic__wf-title { font-size: 13px; font-weight: 600; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.organic__wf-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 11px; }
+.organic__wf-code { padding: 0 6px; border: 1px solid var(--border-2); border-radius: 4px; background: var(--surface-2); color: var(--text-3); font-variant-numeric: tabular-nums; }
+.organic__wf-channel { padding: 0 6px; border: 1px solid var(--border-2); border-radius: 4px; background: var(--surface-2); color: var(--text-2); }
+.organic__wf-status { flex-shrink: 0; margin-inline-end: 0; }
+.organic__wf-item--disabled .organic__wf-title { font-weight: 500; color: var(--text-3); }
+.organic__wf-foot { padding-top: 8px; border-top: 1px dashed var(--border-2); font-size: 11px; line-height: 1.6; color: var(--text-3); }
 /* 「+N ▾」展开入口：文字色彩仍继承全局 .ant-table .ant-btn-link（静态品牌橙、hover 变亮 + 浅橙底），
    只补描边/圆角让它看上去是个可点控件；选择器加到 .ant-btn-link 一级是为了覆盖全局的 padding/border-radius，
    描边取同一主色的透明度阶（不引入新色相），禁止重写 color / background */

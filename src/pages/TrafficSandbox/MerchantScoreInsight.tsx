@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Button, Empty, InputNumber, message, Popover, Result, Select, Table, Tag, TreeSelect } from 'antd'
 import type { TableColumnsType } from 'antd'
-import { ReloadOutlined, ExportOutlined, SearchOutlined } from '@ant-design/icons'
+import { ReloadOutlined, ExportOutlined, SearchOutlined, ColumnHeightOutlined } from '@ant-design/icons'
 import { AlgorithmType, REGION_LABEL_KEY, REGION_TREE_DATA, ServiceStatus, type Region } from '@mftb/contracts/recommendConstants'
 import { useAuth } from '@/contexts/AuthContext'
 import BrandTag from '@/components/BrandTag'
@@ -221,17 +221,38 @@ export default function MerchantScoreInsight() {
   const scopeChannelCell = scopeChannelText || <span className="organic__muted">無</span>
   const scopeAlgoCell = selectedAlgo ? idNameStatic(selectedAlgo.algoCode, selectedAlgo.algoName) : scopeFallback
   // 綁定瀑布流列只放第一条，超出收进 +N 面板（面板逐条展示名称/编号/频道/状态），避免长串名称撑爆列宽
-  const wfPanel = <div className="organic__wf-panel">{boundWaterfalls.map(strategy => <div className="organic__wf-item" key={strategy.strategyCode}>
-    <b>{strategy.strategyName}</b>
-    <span className="organic__muted">{strategy.strategyCode} · {waterfallChannelText(strategy, algoChannelByCode)}</span>
-    {strategy.status === ServiceStatus.DISABLED && <Tag>停用</Tag>}
-  </div>)}</div>
+  // 面板走「口径头 → 条目卡 → 尾注」三层结构：标题区用暖橙底与条目卡拉开层次，条目卡用序号+白底 chips 区分主次，
+  // 避免整块白底把标题和内容糊成一片读不出重点
+  const wfPanel = <div className="organic__wf-panel">
+    <div className="organic__wf-head">
+      <span className="organic__wf-head-title"><ColumnHeightOutlined />{t('trafficSandbox.boundWaterfall')}</span>
+      <span className="organic__wf-head-count">{t('trafficSandbox.boundWaterfallCount', { count: boundWaterfalls.length })}</span>
+    </div>
+    <div className="organic__wf-list">
+      {boundWaterfalls.map((strategy, index) => {
+        const disabled = strategy.status === ServiceStatus.DISABLED
+        return <div className={`organic__wf-item${disabled ? ' organic__wf-item--disabled' : ''}`} key={strategy.strategyCode}>
+          <span className="organic__wf-index">{index + 1}</span>
+          <div className="organic__wf-main">
+            <div className="organic__wf-title" title={strategy.strategyName}>{strategy.strategyName}</div>
+            <div className="organic__wf-meta">
+              <span className="organic__wf-code">{strategy.strategyCode}</span>
+              <span className="organic__wf-channel">{waterfallChannelText(strategy, algoChannelByCode)}</span>
+            </div>
+          </div>
+          {disabled && <Tag className="organic__wf-status" color="default">{t('recommend.statusDisabled')}</Tag>}
+        </div>
+      })}
+    </div>
+    {/* 尾注是长句业务口径（与同页其它口径说明同一惯例），按项目口径保留硬编码繁中，只把短标签接 i18n */}
+    <div className="organic__wf-foot">含已停用策略 · 僅展示綁定關係，不影響計分</div>
+  </div>
   const scopeWfCell = boundWaterfalls.length === 0
     ? <span className="organic__muted">無</span>
     : <div className="organic__wf-cell">
         <span className="organic__wf-name" title={waterfallLabel(boundWaterfalls[0])}>{waterfallLabel(boundWaterfalls[0])}</span>
-        {boundWaterfalls.length > 1 && <Popover trigger="click" placement="leftTop" title={`綁定瀑布流 ${boundWaterfalls.length} 條`} content={wfPanel}>
-          <Button type="link" size="small" className="organic__wf-more" title="查看全部綁定瀑布流" aria-label={`查看全部 ${boundWaterfalls.length} 條綁定瀑布流`}>+{boundWaterfalls.length - 1} ▾</Button>
+        {boundWaterfalls.length > 1 && <Popover trigger="click" placement="leftTop" content={wfPanel}>
+          <Button type="link" size="small" className="organic__wf-more" title={t('trafficSandbox.viewAllBoundWaterfall', { count: boundWaterfalls.length })} aria-label={t('trafficSandbox.viewAllBoundWaterfall', { count: boundWaterfalls.length })}>+{boundWaterfalls.length - 1} ▾</Button>
         </Popover>}
       </div>
   // 导出当前榜单（未勾选=全量筛选结果，勾选=仅所选，跨页保留），不只当前页：口径列与表内各列同源，不跟随列显隐配置
@@ -291,7 +312,7 @@ export default function MerchantScoreInsight() {
     { key: 'platform', title: '平台維度分', width: 130, align: 'right', render: (_, r) => scoreText(dimensionScore(r.store, 'platform')) },
     { key: 'total', title: '綜合得分', width: 130, align: 'right', render: (_, r) => <b className="organic__total-score">{scoreText(r.store.totalScore)}</b> },
     // 綁定瀑布流放最后一列（操作列前）：它是投放上下文而非计分要素，不占用前部阅读区
-    { key: 'wfBindings', title: <span className="organic__th">綁定瀑布流<HelpPopover title="綁定瀑布流口徑" ariaLabel="綁定瀑布流口徑說明" placement="topLeft" width={400} content={[
+    { key: 'wfBindings', title: <span className="organic__th">{t('trafficSandbox.boundWaterfall')}<HelpPopover title="綁定瀑布流口徑" ariaLabel="綁定瀑布流口徑說明" placement="topLeft" width={400} content={[
       { tone: 'info', label: '只展示第一条', body: '列内只显示首条引用该算法的瀑布流，多条时折叠为 +N，点 +N 展开面板看全部（含编号、频道与停用标记）。' },
       { tone: 'neutral', label: '展示引用關係', body: '列出引用該算法作為「自然流量兜底算法」的全部瀑布流策略（含停用）。' },
       { tone: 'warn', label: '無＝尚未上線', body: '顯示「無」表示該算法還沒有綁定任何瀑布流：不影響算分與出榜，只是尚未歸類到任何業務頻道投放。' },

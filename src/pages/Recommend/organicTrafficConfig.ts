@@ -476,7 +476,7 @@ export const isCouponScoreRule = (id?: string): boolean =>
 /** 已下架的計分項編碼：不再展示、不再作為新增模板（後端殘留數據由遷移清理）。PLT_04 已合并進流量均衡（PLT_03）。
  * STB_04 / STB_09 已從本清單移出：兩個下架項讓出號位後，該兩個編碼現由內置項「門店標籤 / 活動加分」收编使用
  * （後端遷移 organic:rename-stb-code-numeric-v1）。 */
-export const RETIRED_ORGANIC_RULE_IDS: string[] = ['COM_09', 'PLT_04']
+export const RETIRED_ORGANIC_RULE_IDS: string[] = ['COM_09', 'PLT_04', 'PLT_02A']
 
 /**
  * 舊語義編碼 → 現行數字編碼的讀取別名。
@@ -1154,6 +1154,113 @@ export function normalizeStoreLabelScoreConfig(
   return { items }
 }
 
+/* ────────── 主營時段加分（STB_01）：分時段獨立配分 ────────── */
+
+/** 使用主營時段計分面板的规则编码 */
+export const TIME_PERIOD_SCORE_RULE_IDS = ['STB_01'] as const
+
+/** 判断该计分项是否走主營時段分时段计分面板 */
+export const isTimePeriodScoreRule = (id?: string): boolean =>
+  !!id && (TIME_PERIOD_SCORE_RULE_IDS as readonly string[]).includes(id)
+
+/**
+ * 单个时段的计分配置。
+ * 时段枚举直接复用 TIME_PERIOD_KEYS / TIME_PERIOD_LABELS（同一套五餐段口径），
+ * 不另建一份名称表，避免与时段推荐广告、配送分层面板三处漂移。
+ */
+export interface TimePeriodScore {
+  /** 时段存储值（枚举见 TIME_PERIOD_KEYS） */
+  periodValue: string
+  /** 时段名称快照：保存时从枚举带出，枚举调整后历史数据仍可读（与 StoreLabelScore.labelName 同口径） */
+  periodName: string
+  /** 该时段加分：当前时段命中即得分 */
+  score: number
+}
+
+/** 主營時段计分配置（与门店标签面板同构，但命中依据是业务系统传入的当前时段） */
+export interface TimePeriodScoreConfig {
+  items: TimePeriodScore[]
+}
+
+/** 改造前「固定加分」的分值：迁移时沿用该值，只预填午餐一档，其余时段留待运营配置 */
+export const MAIN_TIME_SLOT_DEFAULT_SCORE = 60
+export const MAIN_TIME_SLOT_DEFAULT_PERIOD: keyof TimeRangeScores = 'lunch'
+
+/** 默认配置：仅午餐一档（沿用原固定加分 60 分），其余时段由运营自行新增 */
+export const DEFAULT_TIME_PERIOD_SCORE_CONFIG: TimePeriodScoreConfig = {
+  items: [{
+    periodValue: MAIN_TIME_SLOT_DEFAULT_PERIOD,
+    periodName: TIME_PERIOD_LABELS[MAIN_TIME_SLOT_DEFAULT_PERIOD],
+    score: MAIN_TIME_SLOT_DEFAULT_SCORE,
+  }],
+}
+
+/** 时段展示文案；未知编码退回原始值，避免界面出现空白 */
+export const timePeriodText = (value?: string): string => {
+  if (!value) return ''
+  const key = value as keyof TimeRangeScores
+  return TIME_PERIOD_KEYS.includes(key) ? TIME_PERIOD_LABELS[key] : value
+}
+
+/** 主營時段计分结果 */
+export interface TimePeriodScoreResult {
+  /** 命中的时段档（未配置即为空） */
+  matched?: TimePeriodScore
+  /** 业务系统传了当前时段但后台未配分值：不计分，供界面提示补配 */
+  unconfigured: boolean
+  total: number
+}
+
+/**
+ * 算分：以业务系统传入的当前时段为准，命中一檔即停、不累加。
+ * 未配置该时段、或未拿到当前时段，都按 0 分处理（不设兜底分）。
+ */
+export function computeTimePeriodScore(cfg: TimePeriodScoreConfig, periodValue?: string): TimePeriodScoreResult {
+  const matched = periodValue ? cfg.items.find(item => item.periodValue === periodValue) : undefined
+  return { matched, unconfigured: !!periodValue && !matched, total: matched?.score ?? 0 }
+}
+
+/** 配置校驗：返回錯誤文案，null 表示通过（同一时段不得重复，分值必须是 0～1000 整数） */
+export function validateTimePeriodScoreConfig(cfg: TimePeriodScoreConfig): string | null {
+  const seen = new Set<string>()
+  for (let i = 0; i < cfg.items.length; i++) {
+    const item = cfg.items[i]
+    const name = item.periodName || item.periodValue || `第 ${i + 1} 行`
+    if (!item.periodValue) return `${name}請選擇時段`
+    if (seen.has(item.periodValue)) return `時段「${name}」重複配置，同一時段只能有一檔分值`
+    seen.add(item.periodValue)
+    if (!Number.isInteger(item.score) || item.score < 0 || item.score > 1000) return `時段「${name}」的分值必須是 0～1000 的整數`
+  }
+  return null
+}
+
+/** 归一化后端 JSON 字符串或本地草稿：丢弃未选时段与分值非数的行（与 normalizeStoreLabelScoreConfig 同口径） */
+export function normalizeTimePeriodScoreConfig(
+  raw: Partial<TimePeriodScoreConfig> | string | undefined | null,
+): TimePeriodScoreConfig {
+  // 后端列与本地草稿都是不可信 JSON：先按 unknown 收，再逐字段验型，
+  // 否则 Number(null) / Number('') 都是 0，会把未填分值的行当成 0 分有效行留下
+  let parsed: { items?: Array<Record<string, unknown>> } | null = null
+  if (typeof raw === 'string') {
+    try { parsed = JSON.parse(raw) as { items?: Array<Record<string, unknown>> } } catch { parsed = null }
+  } else if (raw && typeof raw === 'object') {
+    parsed = raw as { items?: Array<Record<string, unknown>> }
+  }
+  const items = Array.isArray(parsed?.items)
+    ? parsed.items
+        .filter(item => typeof item?.periodValue === 'string' && item.periodValue
+          && item.score !== null && item.score !== undefined && item.score !== ''
+          && Number.isFinite(Number(item.score)))
+        .map(item => ({
+          periodValue: item.periodValue as string,
+          // 名称快照缺失时回查枚举，不让界面出现空标签
+          periodName: typeof item.periodName === 'string' && item.periodName ? item.periodName : timePeriodText(item.periodValue as string),
+          score: Math.trunc(Number(item.score)),
+        }))
+    : []
+  return { items }
+}
+
 /** 高峰時段定義 */
 export interface PeakTimeRange {
   /** 標籤（如「午高峰」） */
@@ -1221,6 +1328,8 @@ export interface OrganicScoreRule {
   memberBonusConfig?: MemberBonusScoreConfig
   /** 門店標籤計分配置（僅 STB_04 規則使用：標籤 → 分值清單，命中一檔即停） */
   storeLabelConfig?: StoreLabelScoreConfig
+  /** 主營時段計分配置（僅 STB_01 使用：時段 → 分值清單，当前时段命中一檔即停） */
+  timePeriodConfig?: TimePeriodScoreConfig
   /** 流量均衡合併配置（僅 PLT_03 使用：統一商家扶持與訂單過熱調控，統計口徑 + 區域梯度） */
   trafficBalanceConfig?: TrafficBalanceConfig
   status: ServiceStatus
@@ -1289,7 +1398,10 @@ export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
   { id: 'COM_SLOT', dimension: ScoreDimension.COMMERCIAL, name: '時段推薦', description: '商家購買時段推薦廣告，投放期內即得固定加分，不區分購買時段數量、不累加；未購買或已過期不加分', mode: ScoreMode.RULE_BONUS, score: TIME_SLOT_AD_DEFAULT_SCORE, status: ENABLED, builtin: true, prerequisites: TIME_SLOT_AD_PREREQUISITE },
 
   // ===== 店鋪維度（基礎信息 + 店鋪運營） =====
-  { id: 'STB_01', dimension: ScoreDimension.STORE, name: '主營時段加分', description: '主營時段配置完整，當前處於主營時段內加分', mode: ScoreMode.RULE_BONUS, score: 60, status: ENABLED, builtin: true },
+  // 口径改造：原「固定加分 60」改为按五餐段独立配分，当前时段由业务系统传入，命中一檔即停不累加。
+  // score 置 0：本项得分只由 timePeriodConfig 决定，保留旧固定分会让外部计分引擎把固定分与时段分重复累加；
+  // 字段仍保留以兼容后端 mode=1（規則加分）score 不得为负的通用校验。第二阶段随 time_period_config 列一并落库。
+  { id: 'STB_01', dimension: ScoreDimension.STORE, name: '主營時段加分', description: '當前時段命中已配置的主營時段即得該時段加分，命中一檔即停不累加；未配置的時段不加分', mode: ScoreMode.RULE_BONUS, score: 0, status: ENABLED, builtin: true, timePeriodConfig: structuredClone(DEFAULT_TIME_PERIOD_SCORE_CONFIG) },
   // 門店標籤（STB_04）：原 STB_04「店鋪標籤-金牌」只支持金牌单一身份已下架，本項改為獨家/品牌/連鎖/金牌四選一的標籤分值表；
   // 建項時曾用語義編碼 STB_LABEL，現由後端遷移 organic:rename-stb-code-numeric-v1 收编回讓出的 STB_04 號位
   { id: 'STB_04', dimension: ScoreDimension.STORE, name: '門店標籤', description: '門店標籤由門店資料手動指定，獨家／品牌／連鎖／金牌四選一；按當前標籤命中對應分值，命中一檔即停、不累加，未配置該標籤不加分', mode: ScoreMode.RULE_BONUS, score: 0, status: ENABLED, builtin: true },
@@ -1314,11 +1426,6 @@ export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
 
   // ===== 平台維度 =====
   { id: 'PLT_01', dimension: ScoreDimension.PLATFORM, name: '距離衰減', description: '滿分按衰減係數×距離遞減，距離越遠得分越低', mode: ScoreMode.DECAY, score: 100, decayCoefficient: 5, status: ENABLED, builtin: true },
-  { id: 'PLT_02A', dimension: ScoreDimension.PLATFORM, name: '配送範圍', description: '按時段配置配送範圍分層計分，後端根據當前時間自動匹配對應時段', mode: ScoreMode.RULE_BONUS, score: 0, timeRangeScores: {
-    breakfast: { ...DEFAULT_RANGE_SCORES },
-    lunch: { ...DEFAULT_RANGE_SCORES },
-    afternoonTea: { ...DEFAULT_RANGE_SCORES },
-    dinner: { ...DEFAULT_RANGE_SCORES },
-    lateNight: { ...DEFAULT_RANGE_SCORES },
-  }, status: ENABLED, builtin: true },
+  // PLT_02A「配送範圍」已下架：從默認計分項目錄移除並登記進 RETIRED_ORGANIC_RULE_IDS（讀取側過濾歷史庫），
+  // 庫內殘留行由後端遷移 organic:retire-plt02a-v1 邏輯刪除；timeRangeScores 列與 DTO 字段保留（不改表結構、不影響其它規則）。
 ]

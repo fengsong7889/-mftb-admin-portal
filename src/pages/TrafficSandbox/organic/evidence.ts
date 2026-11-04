@@ -49,7 +49,7 @@ export function attachSampleEvidence(store: StoreResult, userPoint: Coordinate):
       rule.inputs = [input('生效日期內訂單', usable ? 1 : 0, '筆'), input('投放期', '2026-10-28 ～ 2026-11-27（演示）'), input('計分方式', '只抓取生效日期內訂單；購買即固定加分，不區分時段數量、不累加')]
       // 时段推荐保留夹具显式子项（带订单号与投放起止），不再拆解覆盖
     }
-    if (rule.ruleCode === 'STB_01') rule.inputs = [input('評估時刻', '2026-10-30 12:00:00（澳門）'), input('主營時段', '11:00–14:00（演示）'), input('是否命中', usable)]
+    if (rule.ruleCode === 'STB_01') rule.inputs = [input('評估時刻', '2026-10-30 12:00:00（澳門）'), input('業務系統傳入的當前時段', '午餐'), input('該時段配置分值', usable ? 60 : 0, '分'), input('其餘時段', '早餐/下午茶/晚餐/宵夜未配置 → 不加分'), input('計分方式', '命中當前時段一檔即停不累加；時段歸屬由業務系統判定，本倉庫只配時段與分值')]
     if (rule.ruleCode === 'STB_04') rule.inputs = [input('有效期內購買訂單', usable ? 1 : 0, '筆'), input('當前標籤', '金牌（演示）'), input('計分方式', '與金字招牌同口径：買標籤生成訂單，只抓取支付成功且已生效的有效期内訂單加分')]
     if (rule.ruleCode === 'STB_02') rule.inputs = [input('營業狀態', store.eligibility === 'ranked' || store.eligibility === 'pending' ? '營業中' : store.eligibilityReason), input('排序分組', store.rankingBucket)]
     if (rule.ruleCode === 'STB_03') {
@@ -76,10 +76,9 @@ export function attachSampleEvidence(store: StoreResult, userPoint: Coordinate):
       rule.metricValue = store.distanceKm; rule.unit = 'km'
       rule.inputs = [input('用戶WGS84座標', `${userPoint.lat}, ${userPoint.lng}`), input('門店WGS84座標', store.coordinate ? `${store.coordinate.lat}, ${store.coordinate.lng}` : null), input('球面直線距離', store.distanceKm, 'km'), input('距離滿分', 100, '原始分'), input('每公里扣分', 5, '分/km')]
     }
-    if (rule.ruleCode === 'PLT_02A') rule.inputs = [input('餐段', '午餐（演示）'), input('配送分層', rule.metric), input('匹配來源', '固定場景資料，不用直線距離推斷跨橋')]
     if (rule.ruleCode === 'PLT_03') {
       rule.metricValue = 45; rule.unit = '單'
-      rule.inputs = [input('計分大區', store.regionId <= 5 ? 'MACAU（澳門區域）' : 'TAIPA（氹仔區域）'), input('訂單量', 45, '單'), input('訂單類型', '外賣＋自取'), input('取消訂單計入', false), input('退款訂單計入', false), input('排除門店名單命中', false), input('刷新間隔', 60, '分鐘'), input('命中檔位上界', rule.reasonCode === 'CONFIG_MISSING' ? null : 80, '單')]
+      rule.inputs = [input('計分大區', store.regionId <= 5 ? 'MACAU（澳門區域）' : 'TAIPA（氹仔區域）'), input('訂單量', 45, '單'), input('訂單類型', '外賣＋自取'), input('取消訂單計入', false), input('退款訂單計入', false), input('排除門店名單命中', rule.reasonCode === 'BALANCE_EXCLUDED'), input('刷新間隔', 60, '分鐘'), input('命中檔位上界', rule.reasonCode === 'CONFIG_MISSING' ? null : 80, '單')]
     }
     if (!rule.inputs.length) rule.inputs = [input('預製樣例結論', rule.reason)]
     if (!usable && rule.matchStatus !== 'deducted') rule.matchedTier = null
