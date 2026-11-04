@@ -272,6 +272,35 @@ npm run test:run      # Vitest 单元测试
 npm run secret-scan   # 硬编码敏感信息扫描
 ```
 
+#### 4.3.1 typecheck 的 Node 堆上限（必读）
+
+仓库体量已越过 Node 默认 ~2GB 老生代上限，**裸跑 `npm run typecheck` 会在同一份代码上
+间歇性 V8 OOM**：退出码 **134**，日志末尾是
+`FATAL ERROR: Ineffective mark-compacts near heap limit`，而不是任何 TS 错误行。
+2026-11-04 曾因此把 main 的生产部署打断一次（同一 commit 在 PR 事件绿、在 push 事件崩，
+后续步骤全 skipped、产物不上传）。
+
+本地实测阈值（同一棵树、每次先删 `tsconfig.tsbuildinfo` 保证等效）：
+
+| `--max-old-space-size` | 结果 |
+|---|---|
+| 2048（默认量级） | **必崩**，exit 134 |
+| 3072 | 通过 |
+| 4096 / 8192 | 通过 |
+
+因此：
+
+- **CI**：`deploy.yml` 里有一个 `Resolve type-check heap` 步骤，按 runner 实际内存取
+  `min(max(内存×3/4, 3072), 8192)` MB，并**仅对 Type Check 步骤**注入 `NODE_OPTIONS`。
+- **本地**：低内存机器或并行跑着别的东西时，用
+  `NODE_OPTIONS=--max-old-space-size=6144 npm run typecheck`。
+- ⚠ **不要把 `NODE_OPTIONS` 提到 job 级 env**：下一步 `test:run` 的 vitest 会按
+  `min(CPU-1, 内存GB/2)` 开多个 fork 并继承同一份 `NODE_OPTIONS`，几份大堆叠起来
+  正好会复现「慢 = 超时」的集体假红（见 `vitest.config.ts` 顶部注释）。
+  别的 Node 步骤出现同样的 134 特征时，照 Type Check 那样加**步骤级** env。
+- 🚫 正确的修法只有「上调堆上限」。**不得**跳过类型检查、换成更宽松的调用、
+  或放宽 `tsconfig`（步骤失败时会把这条写进日志）。
+
 ---
 
 ## 五、工具链版本速查
