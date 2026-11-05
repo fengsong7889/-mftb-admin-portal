@@ -63,7 +63,7 @@ export default function QuotaConfigSection({
   return (
     <SectionCard
       header={{
-        icon: <FundOutlined style={{ fontSize: 14, color: '#E8720C' }} />,
+        icon: <FundOutlined style={{ fontSize: 14, color: 'var(--brand)' }} />,
         iconBg: '#fff7e6',
         title: t('aiQuotaAuth.quotaConfigSection'),
         tag: t('aiQuotaAuth.coreTag'),
@@ -99,7 +99,7 @@ export default function QuotaConfigSection({
         </Form.Item>
         <Form.Item
           name="softThreshold"
-          label={<span>{t('aiQuotaAuth.softThresholdLabel')} <span style={{ color: '#8C8C8C', fontWeight: 400, fontSize: 12 }}>{t('aiQuotaAuth.softThresholdHint')}</span></span>}
+          label={<span>{t('aiQuotaAuth.softThresholdLabel')} <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 12 }}>{t('aiQuotaAuth.softThresholdHint')}</span></span>}
         >
           <Slider min={10} max={100} step={5} marks={{ 50: '50%', 80: '80%', 100: '100%' }}
             tooltip={{ formatter: (v) => `${v}%` }} />
@@ -129,12 +129,12 @@ export default function QuotaConfigSection({
                   display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer',
                   padding: '12px 14px', borderRadius: 8,
                   border: `1px solid ${active ? '#E8720C' : '#e8eaed'}`,
-                  background: active ? '#FFF7E6' : '#fff', transition: 'all 0.2s',
+                  background: active ? 'var(--warning-soft)' : 'var(--surface-2)', transition: 'all 0.2s',
                 }}>
                   <Radio value={act} style={{ marginTop: 2 }} />
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: '#262626' }}>{OVER_LIMIT_ACTION_LABEL[act]}</div>
-                    <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 2, lineHeight: 1.5 }}>{desc}</div>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-1)' }}>{OVER_LIMIT_ACTION_LABEL[act]}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2, lineHeight: 1.5 }}>{desc}</div>
                   </div>
                 </label>
               )
@@ -163,11 +163,11 @@ export default function QuotaConfigSection({
         marginTop: 4, padding: '14px 16px', borderRadius: 8,
         background: 'linear-gradient(135deg, #FFF7E6, #FFFBF0)', border: '1px solid #FFE7BA',
       }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#E8720C', marginBottom: 8 }}>{t('aiQuotaAuth.quotaInterpretTitle')}</div>
-        <div style={{ fontSize: 13, color: '#595959', lineHeight: 1.9 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--brand)', marginBottom: 8 }}>{t('aiQuotaAuth.quotaInterpretTitle')}</div>
+        <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.9 }}>
           {interpretPrefix}
           <div>· {t('aiQuotaAuth.quotaAlertLabel')}：{t('aiQuotaAuth.quotaAlertText', { percent: softThreshold ?? 80 })}</div>
-          <div>· {t('aiQuotaAuth.quotaOverLabel')}：<strong style={{ color: '#FF4D4F' }}>{OVER_LIMIT_ACTION_LABEL[overLimitAction ?? 'reject']}</strong>
+          <div>· {t('aiQuotaAuth.quotaOverLabel')}：<strong style={{ color: 'var(--danger)' }}>{OVER_LIMIT_ACTION_LABEL[overLimitAction ?? 'reject']}</strong>
             {overLimitAction === 'downgrade' ? t('aiQuotaAuth.quotaOverDowngrade') : ''}</div>
         </div>
       </div>

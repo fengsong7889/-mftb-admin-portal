@@ -85,15 +85,15 @@ export function ModelAuthSection({ models, value, onChange, dataResidency, onDat
   }
 
   return (
-    <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+    <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-        <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <EyeOutlined style={{ fontSize: 14, color: '#722ED1' }} />
+        <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--purple-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <EyeOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />
         </div>
-        <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.modelAuthConfigSection')}</span>
+        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.modelAuthConfigSection')}</span>
         <Tag color="purple" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.capabilityGranularity')}</Tag>
         <Tooltip title={t('aiQuotaAuth.modelAuthTooltip')}>
-          <span style={{ fontSize: 12, color: '#8C8C8C', cursor: 'help' }}>{t('aiQuotaAuth.addModelHint')}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', cursor: 'help' }}>{t('aiQuotaAuth.addModelHint')}</span>
         </Tooltip>
         <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
       </div>
@@ -102,11 +102,11 @@ export function ModelAuthSection({ models, value, onChange, dataResidency, onDat
       {onDataResidencyChange && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
-          background: '#F9F0FF', borderRadius: 6, border: '1px solid #D3ADF7', marginBottom: 16,
+          background: 'var(--purple-soft)', borderRadius: 6, border: '1px solid #D3ADF7', marginBottom: 16,
         }}>
           <Switch size="small" checked={residencyOn} onChange={handleResidencyChange} />
-          <span style={{ fontSize: 13, color: '#722ED1', fontWeight: 500 }}>{t('aiQuotaAuth.dataResidencyLabel')}</span>
-          <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+          <span style={{ fontSize: 13, color: 'var(--purple)', fontWeight: 500 }}>{t('aiQuotaAuth.dataResidencyLabel')}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
             {t('aiQuotaAuth.dataResidencyHint')}
           </span>
         </div>
@@ -128,7 +128,7 @@ export function ModelAuthSection({ models, value, onChange, dataResidency, onDat
       </div>
 
       {value.length === 0 ? (
-        <div style={{ padding: '40px 0', textAlign: 'center', color: '#8C8C8C', fontSize: 13, background: '#FAFAFA', borderRadius: 8, border: '1px dashed #D9D9D9' }}>
+        <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-3)', fontSize: 13, background: 'var(--surface-3)', borderRadius: 8, border: '1px dashed var(--border-1)' }}>
           {t('aiQuotaAuth.noModelHint')}
         </div>
       ) : (
@@ -139,12 +139,12 @@ export function ModelAuthSection({ models, value, onChange, dataResidency, onDat
             return (
               <div key={auth.modelId} style={{
                 border: '1px solid #D3ADF7', borderRadius: 10, padding: '16px',
-                background: '#F9F0FF', transition: 'all 0.25s',
+                background: 'var(--purple-soft)', transition: 'all 0.25s',
               }}>
                 {/* 模型头部 + 移除 */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontWeight: 600, fontSize: 14, color: '#262626' }}>{model.name}</span>
+                    <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-1)' }}>{model.name}</span>
                     {model.type && (
                       <Tag color={MODEL_TYPE_TAG[model.type]} style={{ fontSize: 11 }}>
                         {t('aiQuotaAuth.' + (MODEL_TYPE_LABEL_KEYS[model.type] || '')) || model.type}
@@ -170,12 +170,12 @@ export function ModelAuthSection({ models, value, onChange, dataResidency, onDat
                           <div style={{
                             display: 'flex', alignItems: 'center', gap: 4,
                             padding: '4px 10px', borderRadius: 6,
-                            background: !supported ? '#FAFAFA' : (auth[key] ? `${color}0A` : '#F5F5F5'),
+                            background: !supported ? 'var(--surface-3)' : (auth[key] ? `${color}0A` : '#F5F5F5'),
                             border: `1px solid ${!supported ? '#F0F0F0' : (auth[key] ? color + '30' : '#E8E8E8')}`,
                             opacity: supported ? 1 : 0.65,
                             transition: 'all 0.2s',
                           }}>
-                            <span style={{ fontSize: 12, color: supported ? '#595959' : '#BFBFBF', whiteSpace: 'nowrap' }}>{label}</span>
+                            <span style={{ fontSize: 12, color: supported ? 'var(--text-2)' : 'var(--text-4)', whiteSpace: 'nowrap' }}>{label}</span>
                             <Switch
                               size="small"
                               disabled={!supported}
@@ -195,7 +195,7 @@ export function ModelAuthSection({ models, value, onChange, dataResidency, onDat
         </div>
       )}
 
-      <div style={{ marginTop: 12, fontSize: 12, color: '#8C8C8C' }}>
+      <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-3)' }}>
         {t('aiQuotaAuth.authorizedCount', { count: value.length })}
       </div>
     </div>
@@ -213,12 +213,12 @@ export function ModelAuthSectionReadonly({ models, configs }: ModelAuthSectionRe
   const modelMap = useMemo(() => new Map(models.map((m) => [m.id, m])), [models])
 
   return (
-    <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+    <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-        <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <EyeOutlined style={{ fontSize: 14, color: '#722ED1' }} />
+        <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--purple-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <EyeOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />
         </div>
-        <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.authModelSection')}</span>
+        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.authModelSection')}</span>
         <Tag color="purple">{t('aiQuotaAuth.modelCount', { count: configs.length })}</Tag>
         <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
       </div>
@@ -229,12 +229,12 @@ export function ModelAuthSectionReadonly({ models, configs }: ModelAuthSectionRe
           return (
             <div key={config.modelId} style={{
               border: '1px solid #D3ADF7', borderRadius: 10, padding: 16,
-              background: '#F9F0FF',
+              background: 'var(--purple-soft)',
             }}>
               {/* 模型头部 */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontWeight: 600, fontSize: 14, color: '#262626' }}>
+                  <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-1)' }}>
                     {model?.name ?? `模型 #${config.modelId}`}
                   </span>
                   {model?.type && (
@@ -248,7 +248,7 @@ export function ModelAuthSectionReadonly({ models, configs }: ModelAuthSectionRe
 
               {/* 能力矩阵 */}
               <div style={{ borderTop: '1px solid #E8D5F5', paddingTop: 12 }}>
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>{t('aiQuotaAuth.capabilityConfig')}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>{t('aiQuotaAuth.capabilityConfig')}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {CAPABILITY_SHORT_FIELDS.map(({ key, labelKey, color }) => {
                     const supported = config[key] === 1
@@ -262,9 +262,9 @@ export function ModelAuthSectionReadonly({ models, configs }: ModelAuthSectionRe
                         {supported ? (
                           <CheckCircleFilled style={{ fontSize: 12, color }} />
                         ) : (
-                          <CloseCircleFilled style={{ fontSize: 12, color: '#BFBFBF' }} />
+                          <CloseCircleFilled style={{ fontSize: 12, color: 'var(--text-4)' }} />
                         )}
-                        <span style={{ fontSize: 12, color: supported ? '#262626' : '#BFBFBF' }}>{t('aiQuotaAuth.' + labelKey)}</span>
+                        <span style={{ fontSize: 12, color: supported ? 'var(--text-1)' : 'var(--text-4)' }}>{t('aiQuotaAuth.' + labelKey)}</span>
                       </div>
                     )
                   })}
@@ -274,7 +274,7 @@ export function ModelAuthSectionReadonly({ models, configs }: ModelAuthSectionRe
           )
         })}
         {configs.length === 0 && (
-          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 40, color: '#BFBFBF' }}>
+          <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 40, color: 'var(--text-4)' }}>
             {t('aiQuotaAuth.noAuthModel')}
           </div>
         )}

@@ -162,24 +162,24 @@ export default function RoleQuotaEdit() {
   return (
     <div className="content-area">
       {/* 頁面頭部 */}
-      <div style={{ position: 'relative', background: '#fff', marginBottom: 16, borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+      <div style={{ position: 'relative', background: 'var(--surface-2)', marginBottom: 16, borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
         <div style={{ height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)', backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite' }} />
         <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', animation: 'headerFadeSlideIn 0.5s ease' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleBack}
-              style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 6px rgba(232,114,12,0.25)', transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)' }}>{t('common.back')}</Button>
+              style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8, height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 6px rgba(232,114,12,0.25)', transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)' }}>{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{isEdit ? t('aiQuotaAuth.editRoleQuota') : t('aiQuotaAuth.addRoleQuota')}</h2>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>{isEdit ? t('aiQuotaAuth.editRoleQuota') : t('aiQuotaAuth.addRoleQuota')}</h2>
           </div>
         </div>
       </div>
 
       <Form form={form} layout="vertical" initialValues={{ period: 'monthly', quotaType: 'token', currency: 'CNY', softThreshold: 80, overLimitAction: 'reject', status: 1 }}>
         {/* ═══ 分区 1：基础信息 ═══ */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} /></div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.basicInfoSection')}</span>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AppstoreOutlined style={{ fontSize: 14, color: 'var(--info)' }} /></div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.basicInfoSection')}</span>
             <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.editableTag')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
@@ -194,34 +194,34 @@ export default function RoleQuotaEdit() {
         </div>
 
         {/* ═══ 分区 2：绑定员工（穿梭框） ═══ */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><TeamOutlined style={{ fontSize: 14, color: '#1890ff' }} /></div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.bindEmpLabel')}</span>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><TeamOutlined style={{ fontSize: 14, color: 'var(--info)' }} /></div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.bindEmpLabel')}</span>
             <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.transferTag')}</Tag>
-            <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('aiQuotaAuth.bindEmpHint')}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('aiQuotaAuth.bindEmpHint')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
             {/* 左側：可選員工 */}
-            <div style={{ flex: 1, border: '1px solid #d9d9d9', borderRadius: 8, display: 'flex', flexDirection: 'column', height: 360 }}>
-              <div style={{ padding: '10px 16px', borderBottom: '1px solid #f0f0f0', background: '#fafafa', borderRadius: '8px 8px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.availableEmpTitle', { count: availableEmps.length })}</span>
+            <div style={{ flex: 1, border: '1px solid var(--border-1)', borderRadius: 8, display: 'flex', flexDirection: 'column', height: 360 }}>
+              <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border-2)', background: 'var(--surface-3)', borderRadius: '8px 8px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.availableEmpTitle', { count: availableEmps.length })}</span>
                 <a onClick={() => { const unchecked = availableEmps.map((e) => e.id).filter((id) => !boundUsers.includes(id)); setCheckedEmpIds(unchecked) }} style={{ fontSize: 12 }}>{t('aiQuotaAuth.selectAll')}</a>
               </div>
-              <div style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}><Input placeholder={t('aiQuotaAuth.empSearchPh')} allowClear size="small" value={empSearchKw} onChange={(e) => setEmpSearchKw(e.target.value)} /></div>
+              <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-2)' }}><Input placeholder={t('aiQuotaAuth.empSearchPh')} allowClear size="small" value={empSearchKw} onChange={(e) => setEmpSearchKw(e.target.value)} /></div>
               <div style={{ flex: 1, overflow: 'auto', padding: '8px 12px' }}>
                 {availableEmps.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: '#BFBFBF', padding: '40px 0', fontSize: 13 }}>{t('aiQuotaAuth.noAvailableEmp')}</div>
+                  <div style={{ textAlign: 'center', color: 'var(--text-4)', padding: '40px 0', fontSize: 13 }}>{t('aiQuotaAuth.noAvailableEmp')}</div>
                 ) : availableEmps.map((emp) => {
                   const checked = checkedEmpIds.includes(emp.id)
                   return (
                     <div key={emp.id} onClick={() => { setCheckedEmpIds((prev) => checked ? prev.filter((id) => id !== emp.id) : [...prev, emp.id]) }}
-                      style={{ padding: '6px 8px', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, background: checked ? '#FFF7E6' : 'transparent', border: `1px solid ${checked ? '#FFE7BA' : 'transparent'}`, marginBottom: 2, transition: 'all 0.15s' }}>
-                      <div style={{ width: 16, height: 16, borderRadius: 3, border: `1px solid ${checked ? '#E8720C' : '#d9d9d9'}`, background: checked ? '#E8720C' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', flexShrink: 0 }}>
+                      style={{ padding: '6px 8px', borderRadius: 4, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, background: checked ? 'var(--warning-soft)' : 'transparent', border: `1px solid ${checked ? '#FFE7BA' : 'transparent'}`, marginBottom: 2, transition: 'all 0.15s' }}>
+                      <div style={{ width: 16, height: 16, borderRadius: 3, border: `1px solid ${checked ? '#E8720C' : '#d9d9d9'}`, background: checked ? 'var(--brand)' : 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', flexShrink: 0 }}>
                         {checked && <span style={{ color: '#fff', fontSize: 10, lineHeight: 1 }}>✓</span>}
                       </div>
-                      <span style={{ fontSize: 13, color: '#262626' }}>
+                      <span style={{ fontSize: 13, color: 'var(--text-1)' }}>
                         {/* 选人列表统一「姓名（工號）」，部门不参与消歧 */}
                         {emp.name}（{emp.empId}）
                       </span>
@@ -234,18 +234,18 @@ export default function RoleQuotaEdit() {
             <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8 }}>
               <Button type="primary" size="small" icon={<span style={{ fontSize: 16 }}>›</span>}
                 onClick={() => { const newIds = checkedEmpIds.filter((id) => !boundUsers.includes(id)); if (!newIds.length) { message.warning(t('aiQuotaAuth.selectEmpFirst')); setCheckedEmpIds([]); return }; setBoundUsers((prev) => [...prev, ...newIds]); setCheckedEmpIds([]) }}
-                disabled={checkedEmpIds.length === 0} style={{ backgroundColor: '#E8720C', borderColor: '#E8720C' }} />
+                disabled={checkedEmpIds.length === 0} style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)' }} />
               <Button size="small" icon={<span style={{ fontSize: 16 }}>‹</span>} onClick={() => { setBoundUsers([]); setCheckedEmpIds([]) }} disabled={boundUsers.length === 0} />
             </div>
             {/* 右側：已選員工 */}
-            <div style={{ flex: 1, border: '1px solid #d9d9d9', borderRadius: 8, display: 'flex', flexDirection: 'column', height: 360 }}>
-              <div style={{ padding: '10px 16px', borderBottom: '1px solid #f0f0f0', background: '#fafafa', borderRadius: '8px 8px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.selectedEmpTitle', { count: boundUsers.length })}</span>
+            <div style={{ flex: 1, border: '1px solid var(--border-1)', borderRadius: 8, display: 'flex', flexDirection: 'column', height: 360 }}>
+              <div style={{ padding: '10px 16px', borderBottom: '1px solid var(--border-2)', background: 'var(--surface-3)', borderRadius: '8px 8px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.selectedEmpTitle', { count: boundUsers.length })}</span>
                 <a onClick={() => { setBoundUsers([]); setCheckedEmpIds([]) }} style={{ fontSize: 12 }}>{t('aiQuotaAuth.clearAll')}</a>
               </div>
               <div style={{ flex: 1, overflow: 'auto', padding: 8 }}>
                 {selectedEmpList.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: '#BFBFBF', padding: '40px 0', fontSize: 13 }}>{t('aiQuotaAuth.selectEmpFromLeft')}</div>
+                  <div style={{ textAlign: 'center', color: 'var(--text-4)', padding: '40px 0', fontSize: 13 }}>{t('aiQuotaAuth.selectEmpFromLeft')}</div>
                 ) : (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {selectedEmpList.map((emp) => (
@@ -257,7 +257,7 @@ export default function RoleQuotaEdit() {
                   </div>
                 )}
               </div>
-              <div style={{ padding: '8px 16px', borderTop: '1px solid #f0f0f0', background: '#fafafa', borderRadius: '0 0 8px 8px', fontSize: 12, color: '#595959' }}>
+              <div style={{ padding: '8px 16px', borderTop: '1px solid var(--border-2)', background: 'var(--surface-3)', borderRadius: '0 0 8px 8px', fontSize: 12, color: 'var(--text-2)' }}>
                 {t('aiQuotaAuth.totalBoundEmp', { count: boundUsers.length })}
               </div>
             </div>
@@ -265,10 +265,10 @@ export default function RoleQuotaEdit() {
         </div>
 
         {/* ═══ 分区 3：额度配置 ═══ */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FundOutlined style={{ fontSize: 14, color: '#E8720C' }} /></div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.quotaConfigSection')}</span>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FundOutlined style={{ fontSize: 14, color: 'var(--brand)' }} /></div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.quotaConfigSection')}</span>
             <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.coreTag')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
@@ -280,7 +280,7 @@ export default function RoleQuotaEdit() {
             <Form.Item name="quotaValue" label={t('aiQuotaAuth.quotaValueLabel')} rules={[{ required: true, message: t('aiQuotaAuth.quotaValueRequired') }]}>
               <InputNumber<number> min={1} style={{ width: '100%' }} addonAfter={valueUnit} formatter={(v) => `${v ?? ''}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(v) => Number(`${v ?? ''}`.replace(/,/g, ''))} />
             </Form.Item>
-            <Form.Item name="softThreshold" label={<span>{t('aiQuotaAuth.softThresholdLabel')} <span style={{ color: '#8C8C8C', fontWeight: 400, fontSize: 12 }}>{t('aiQuotaAuth.softThresholdHint')}</span></span>}>
+            <Form.Item name="softThreshold" label={<span>{t('aiQuotaAuth.softThresholdLabel')} <span style={{ color: 'var(--text-3)', fontWeight: 400, fontSize: 12 }}>{t('aiQuotaAuth.softThresholdHint')}</span></span>}>
               <Slider min={10} max={100} step={5} marks={{ 50: '50%', 80: '80%', 100: '100%' }} tooltip={{ formatter: (v) => `${v}%` }} />
             </Form.Item>
           </div>
@@ -295,11 +295,11 @@ export default function RoleQuotaEdit() {
                 {(['reject', 'approve', 'downgrade'] as OverLimitAction[]).map((act) => {
                   const active = overLimitAction === act
                   return (
-                    <label key={act} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', padding: '12px 14px', borderRadius: 8, border: `1px solid ${active ? '#E8720C' : '#e8eaed'}`, background: active ? '#FFF7E6' : '#fff', transition: 'all 0.2s' }}>
+                    <label key={act} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', padding: '12px 14px', borderRadius: 8, border: `1px solid ${active ? '#E8720C' : '#e8eaed'}`, background: active ? 'var(--warning-soft)' : 'var(--surface-2)', transition: 'all 0.2s' }}>
                       <Radio value={act} style={{ marginTop: 2 }} />
                       <div>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: '#262626' }}>{OVER_LIMIT_ACTION_LABEL[act]}</div>
-                        <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 2 }}>{act === 'reject' ? t('aiQuotaAuth.overLimitRejectShort') : act === 'approve' ? t('aiQuotaAuth.overLimitApproveShort') : t('aiQuotaAuth.overLimitDowngradeShort')}</div>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-1)' }}>{OVER_LIMIT_ACTION_LABEL[act]}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{act === 'reject' ? t('aiQuotaAuth.overLimitRejectShort') : act === 'approve' ? t('aiQuotaAuth.overLimitApproveShort') : t('aiQuotaAuth.overLimitDowngradeShort')}</div>
                       </div>
                     </label>
                   )
@@ -312,25 +312,25 @@ export default function RoleQuotaEdit() {
           )}
           {/* 實時額度解讀 */}
           <div style={{ marginTop: 4, padding: '14px 16px', borderRadius: 8, background: 'linear-gradient(135deg, #FFF7E6, #FFFBF0)', border: '1px solid #FFE7BA' }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#E8720C', marginBottom: 8 }}>{t('aiQuotaAuth.quotaInterpretation')}</div>
-            <div style={{ fontSize: 13, color: '#595959', lineHeight: 1.9 }}>
-              <div>{t('aiQuotaAuth.roleLabel')}<strong style={{ color: '#262626' }}>{form.getFieldValue('roleName') || t('aiQuotaAuth.noRoleName')}</strong>（{t('aiQuotaAuth.personCount', { count: boundUsers.length })}）</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--brand)', marginBottom: 8 }}>{t('aiQuotaAuth.quotaInterpretation')}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.9 }}>
+              <div>{t('aiQuotaAuth.roleLabel')}<strong style={{ color: 'var(--text-1)' }}>{form.getFieldValue('roleName') || t('aiQuotaAuth.noRoleName')}</strong>（{t('aiQuotaAuth.personCount', { count: boundUsers.length })}）</div>
               <div>· {t('aiQuotaAuth.quotaValueLabel')}：{quotaReadable}</div>
               <div>· {t('aiQuotaAuth.alertUsageReach')} <strong style={{ color: '#FAAD14' }}>{softThreshold ?? 80}%</strong>{t('aiQuotaAuth.notifyNoBlock')}</div>
-              <div>· {t('aiQuotaAuth.overLimitLabel')}<strong style={{ color: '#FF4D4F' }}>{OVER_LIMIT_ACTION_LABEL[overLimitAction ?? 'reject']}</strong></div>
+              <div>· {t('aiQuotaAuth.overLimitLabel')}<strong style={{ color: 'var(--danger)' }}>{OVER_LIMIT_ACTION_LABEL[overLimitAction ?? 'reject']}</strong></div>
             </div>
           </div>
         </div>
 
         {/* ═══ 分区 4：状态配置 ═══ */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><PoweroffOutlined style={{ fontSize: 14, color: '#E8720C' }} /></div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.statusConfigSection')}</span>
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><PoweroffOutlined style={{ fontSize: 14, color: 'var(--brand)' }} /></div>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.statusConfigSection')}</span>
             <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.editableTag')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
-          <div style={{ background: '#FFF7E6', padding: 16, borderRadius: 8, border: '1px solid #FFE7BA' }}>
+          <div style={{ background: 'var(--warning-soft)', padding: 16, borderRadius: 8, border: '1px solid #FFE7BA' }}>
             <Form.Item name="status" label={t('aiQuotaAuth.enableStatusLabel')} valuePropName="checked" getValueFromEvent={(checked) => checked ? 1 : 0} getValueProps={(value) => ({ checked: value === 1 })} style={{ marginBottom: 0 }} extra={t('aiQuotaAuth.disableStatusExtra')}>
               <Switch checkedChildren={t('aiQuotaAuth.enableText')} unCheckedChildren={t('aiQuotaAuth.disableText')} />
             </Form.Item>

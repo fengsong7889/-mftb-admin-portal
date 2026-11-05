@@ -161,7 +161,7 @@ export default function EmpRoleAuthEdit() {
     <div className="content-area">
       {/* 頁面頭部（全局統一：橙色頂條 + 橙色返回按鈕） */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
       }}>
         <div style={{
@@ -175,13 +175,13 @@ export default function EmpRoleAuthEdit() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleBack}
               style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8,
+                backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8,
                 height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               }}>{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>
               {isEdit ? t('aiQuotaAuth.editRoleAuth') : t('aiQuotaAuth.addRoleAuth')}
             </h2>
           </div>
@@ -190,12 +190,12 @@ export default function EmpRoleAuthEdit() {
 
       <Form form={form} layout="vertical" initialValues={{ roleName: '', description: '', status: 1 }}>
         {/* ═══ 分区 1：基础信息（自定義角色名稱） ═══ */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <AppstoreOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.basicInfoSection')}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.basicInfoSection')}</span>
             <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>{isEdit ? t('aiQuotaAuth.roleNameImmutable') : t('aiQuotaAuth.customRoleTag')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
@@ -215,29 +215,29 @@ export default function EmpRoleAuthEdit() {
         </div>
 
         {/* ═══ 分区 2：绑定员工（穿梭框，顯示工號） ═══ */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <TeamOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <TeamOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.bindEmpLabel')}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.bindEmpLabel')}</span>
             <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.transferTag')}</Tag>
-            <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('aiQuotaAuth.bindEmpAuthHint')}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('aiQuotaAuth.bindEmpAuthHint')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           {/* 穿梭框：左側員工列表 + 右側已選標籤（與部門穿梭框規則一致） */}
           <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
             {/* 左側：可選員工 */}
             <div style={{
-              flex: 1, border: '1px solid #d9d9d9', borderRadius: 8,
+              flex: 1, border: '1px solid var(--border-1)', borderRadius: 8,
               display: 'flex', flexDirection: 'column', height: 360,
             }}>
               <div style={{
-                padding: '10px 16px', borderBottom: '1px solid #f0f0f0',
-                background: '#fafafa', borderRadius: '8px 8px 0 0',
+                padding: '10px 16px', borderBottom: '1px solid var(--border-2)',
+                background: 'var(--surface-3)', borderRadius: '8px 8px 0 0',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>
                   {t('aiQuotaAuth.availableEmpTitle', { count: availableEmps.length })}
                 </span>
                 <a
@@ -248,7 +248,7 @@ export default function EmpRoleAuthEdit() {
                   style={{ fontSize: 12 }}
                 >{t('aiQuotaAuth.selectAll')}</a>
               </div>
-              <div style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
+              <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-2)' }}>
                 <Input
                   placeholder={t('aiQuotaAuth.empSearchPh')}
                   allowClear
@@ -259,7 +259,7 @@ export default function EmpRoleAuthEdit() {
               </div>
               <div style={{ flex: 1, overflow: 'auto', padding: '8px 12px' }}>
                 {availableEmps.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: '#BFBFBF', padding: '40px 0', fontSize: 13 }}>
+                  <div style={{ textAlign: 'center', color: 'var(--text-4)', padding: '40px 0', fontSize: 13 }}>
                     {t('aiQuotaAuth.noAvailableEmp')}
                   </div>
                 ) : availableEmps.map((emp) => {
@@ -275,7 +275,7 @@ export default function EmpRoleAuthEdit() {
                       style={{
                         padding: '6px 8px', borderRadius: 4, cursor: 'pointer',
                         display: 'flex', alignItems: 'center', gap: 8,
-                        background: checked ? '#FFF7E6' : 'transparent',
+                        background: checked ? 'var(--warning-soft)' : 'transparent',
                         border: `1px solid ${checked ? '#FFE7BA' : 'transparent'}`,
                         marginBottom: 2, transition: 'all 0.15s',
                       }}
@@ -283,13 +283,13 @@ export default function EmpRoleAuthEdit() {
                       <div style={{
                         width: 16, height: 16, borderRadius: 3,
                         border: `1px solid ${checked ? '#E8720C' : '#d9d9d9'}`,
-                        background: checked ? '#E8720C' : '#fff',
+                        background: checked ? 'var(--brand)' : 'var(--surface-2)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         transition: 'all 0.15s', flexShrink: 0,
                       }}>
                         {checked && <span style={{ color: '#fff', fontSize: 10, lineHeight: 1 }}>✓</span>}
                       </div>
-                      <span style={{ fontSize: 13, color: '#262626' }}>
+                      <span style={{ fontSize: 13, color: 'var(--text-1)' }}>
                         {/* 选人列表统一「姓名（工號）」，部门不参与消歧 */}
                         {emp.name}（{emp.empId}）
                       </span>
@@ -316,7 +316,7 @@ export default function EmpRoleAuthEdit() {
                   setCheckedEmpIds([])
                 }}
                 disabled={checkedEmpIds.length === 0}
-                style={{ backgroundColor: '#E8720C', borderColor: '#E8720C' }}
+                style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)' }}
               />
               <Button
                 size="small"
@@ -331,22 +331,22 @@ export default function EmpRoleAuthEdit() {
 
             {/* 右側：已選員工（Tag 標籤，支持點擊刪除 + 清空） */}
             <div style={{
-              flex: 1, border: '1px solid #d9d9d9', borderRadius: 8,
+              flex: 1, border: '1px solid var(--border-1)', borderRadius: 8,
               display: 'flex', flexDirection: 'column', height: 360,
             }}>
               <div style={{
-                padding: '10px 16px', borderBottom: '1px solid #f0f0f0',
-                background: '#fafafa', borderRadius: '8px 8px 0 0',
+                padding: '10px 16px', borderBottom: '1px solid var(--border-2)',
+                background: 'var(--surface-3)', borderRadius: '8px 8px 0 0',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>
                   {t('aiQuotaAuth.selectedEmpTitle', { count: boundUsers.length })}
                 </span>
                 <a onClick={() => { setBoundUsers([]); setCheckedEmpIds([]) }} style={{ fontSize: 12 }}>{t('aiQuotaAuth.clearAll')}</a>
               </div>
               <div style={{ flex: 1, overflow: 'auto', padding: 8 }}>
                 {selectedEmpList.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: '#BFBFBF', padding: '40px 0', fontSize: 13 }}>
+                  <div style={{ textAlign: 'center', color: 'var(--text-4)', padding: '40px 0', fontSize: 13 }}>
                     {t('aiQuotaAuth.selectEmpFromLeft')}
                   </div>
                 ) : (
@@ -366,8 +366,8 @@ export default function EmpRoleAuthEdit() {
                 )}
               </div>
               <div style={{
-                padding: '8px 16px', borderTop: '1px solid #f0f0f0', background: '#fafafa',
-                borderRadius: '0 0 8px 8px', fontSize: 12, color: '#595959',
+                padding: '8px 16px', borderTop: '1px solid var(--border-2)', background: 'var(--surface-3)',
+                borderRadius: '0 0 8px 8px', fontSize: 12, color: 'var(--text-2)',
               }}>
                 {t('aiQuotaAuth.totalBoundEmp', { count: boundUsers.length })}
               </div>
@@ -379,16 +379,16 @@ export default function EmpRoleAuthEdit() {
         <ModelAuthSection models={models} value={modelAuths} onChange={setModelAuths} dataResidency={dataResidency} onDataResidencyChange={setDataResidency} />
 
         {/* ═══ 分区 4：状态配置（與職位授權一致） ═══ */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <PoweroffOutlined style={{ fontSize: 14, color: '#E8720C' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <PoweroffOutlined style={{ fontSize: 14, color: 'var(--brand)' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.statusConfigSection')}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.statusConfigSection')}</span>
             <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiQuotaAuth.editableTag')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
-          <div style={{ background: '#FFF7E6', padding: 16, borderRadius: 8, border: '1px solid #FFE7BA' }}>
+          <div style={{ background: 'var(--warning-soft)', padding: 16, borderRadius: 8, border: '1px solid #FFE7BA' }}>
             <Form.Item
               name="status"
               label={t('aiQuotaAuth.enableStatusLabel')}

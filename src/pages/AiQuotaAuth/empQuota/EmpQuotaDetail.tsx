@@ -71,7 +71,7 @@ export default function EmpQuotaDetail() {
   if (!policy) {
     return (
       <div className="content-area" style={{ textAlign: 'center', padding: 80 }}>
-        <div style={{ fontSize: 16, color: '#8C8C8C' }}>{t('aiQuotaAuth.quotaPolicyLoadFailed')}</div>
+        <div style={{ fontSize: 16, color: 'var(--text-3)' }}>{t('aiQuotaAuth.quotaPolicyLoadFailed')}</div>
         <Button style={{ marginTop: 16 }} onClick={handleBack}>{t('aiQuotaAuth.backToList')}</Button>
       </div>
     )
@@ -128,7 +128,7 @@ export default function EmpQuotaDetail() {
       {/* ═══ 分区 2：适用职位 ═══ */}
       <SectionCard
         header={{
-          icon: <IdcardOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
+          icon: <IdcardOutlined style={{ fontSize: 14, color: 'var(--info)' }} />,
           iconBg: '#e6f7ff',
           title: t('aiQuotaAuth.applicablePosTitle'),
           tag: t('aiQuotaAuth.seqLevelCount', { seqCount: policy.sequences.length, levelCount: policy.jobLevels.length }),
@@ -137,29 +137,29 @@ export default function EmpQuotaDetail() {
       >
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>{t('aiQuotaAuth.seqLabel')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>{t('aiQuotaAuth.seqLabel')}</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {policy.sequences.map((s) => (
                 <Tag key={s} color={POSITION_SEQUENCE_TAG_COLOR[s]} style={{ fontSize: 13, padding: '4px 12px', lineHeight: '24px' }}>
                   {POSITION_SEQUENCE[s] ?? s}
                 </Tag>
               ))}
-              {policy.sequences.length === 0 && <span style={{ color: '#BFBFBF' }}>{t('aiQuotaAuth.notSetLabel')}</span>}
+              {policy.sequences.length === 0 && <span style={{ color: 'var(--text-4)' }}>{t('aiQuotaAuth.notSetLabel')}</span>}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>{t('aiQuotaAuth.jobLevelLabel')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>{t('aiQuotaAuth.jobLevelLabel')}</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {policy.jobLevels.map((l) => (
                 <Tag key={l} style={{ fontSize: 13, padding: '4px 12px', lineHeight: '24px' }}>{l}</Tag>
               ))}
-              {policy.jobLevels.length === 0 && <span style={{ color: '#BFBFBF' }}>{t('aiQuotaAuth.notSetLabel')}</span>}
+              {policy.jobLevels.length === 0 && <span style={{ color: 'var(--text-4)' }}>{t('aiQuotaAuth.notSetLabel')}</span>}
             </div>
           </div>
         </div>
-        <div style={{ marginTop: 16, fontSize: 13, color: '#595959' }}>
+        <div style={{ marginTop: 16, fontSize: 13, color: 'var(--text-2)' }}>
           {t('aiQuotaAuth.totalCoverCount', { count: policy.totalEmployeeCount })}
-          <span style={{ marginLeft: 8, color: '#8C8C8C' }}>{t('aiQuotaAuth.perCapitaQuotaNote', { quota: quotaText(policy) })}</span>
+          <span style={{ marginLeft: 8, color: 'var(--text-3)' }}>{t('aiQuotaAuth.perCapitaQuotaNote', { quota: quotaText(policy) })}</span>
         </div>
       </SectionCard>
 

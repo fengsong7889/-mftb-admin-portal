@@ -191,7 +191,7 @@ export default function EmpQuotaEdit() {
         {/* ═══ 分区 2：适用职位 ═══ */}
         <SectionCard
           header={{
-            icon: <IdcardOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
+            icon: <IdcardOutlined style={{ fontSize: 14, color: 'var(--info)' }} />,
             iconBg: '#e6f7ff',
             title: t('aiQuotaAuth.applicablePositionSection'),
             tag: t('aiQuotaAuth.posSeqLevelTag'),
@@ -211,10 +211,10 @@ export default function EmpQuotaEdit() {
           {/* 匹配員工預覽 */}
           <div style={{
             marginTop: 4, padding: '12px 16px', borderRadius: 8,
-            background: '#F6FFED', border: '1px solid #D9F7BE',
+            background: 'var(--success-soft)', border: '1px solid #D9F7BE',
             display: 'flex', alignItems: 'center', gap: 12,
           }}>
-            <span style={{ fontSize: 13, color: '#595959' }}>
+            <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
               {t('aiQuotaAuth.matchCondition')}
               {(sequences ?? []).map((s) => (
                 <Tag key={s} color={POSITION_SEQUENCE_TAG_COLOR[s]} style={{ marginRight: 4 }}>{POSITION_SEQUENCE[s] ?? s}</Tag>
@@ -223,7 +223,7 @@ export default function EmpQuotaEdit() {
                 <Tag key={l} style={{ marginRight: 4 }}>{l}</Tag>
               ))}
             </span>
-            <span style={{ fontSize: 13, fontWeight: 600, color: matchedEmployeeCount > 0 ? '#52C41A' : '#8C8C8C' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: matchedEmployeeCount > 0 ? 'var(--success)' : 'var(--text-3)' }}>
               {t('aiQuotaAuth.matchEmpCount', { count: matchedEmployeeCount })}
             </span>
           </div>
@@ -233,8 +233,8 @@ export default function EmpQuotaEdit() {
         <QuotaConfigSection
           interpretPrefix={
             <>
-              <div>· {t('aiQuotaAuth.applySeqLabel')}：<strong style={{ color: '#262626' }}>{seqLabel}</strong></div>
-              <div>· {t('aiQuotaAuth.applyLevelLabel')}：<strong style={{ color: '#262626' }}>{lvlLabel}</strong>（{matchedEmployeeCount} 人）</div>
+              <div>· {t('aiQuotaAuth.applySeqLabel')}：<strong style={{ color: 'var(--text-1)' }}>{seqLabel}</strong></div>
+              <div>· {t('aiQuotaAuth.applyLevelLabel')}：<strong style={{ color: 'var(--text-1)' }}>{lvlLabel}</strong>（{matchedEmployeeCount} 人）</div>
               <div>· {t('aiQuotaAuth.quotaLimitLabel')}：{quotaReadable}</div>
             </>
           }

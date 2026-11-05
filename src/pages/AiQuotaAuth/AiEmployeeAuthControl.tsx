@@ -221,7 +221,7 @@ export default function AiEmployeeAuthControl() {
           <Tag key={c.modelId} color="processing">{modelName[c.modelId] ?? `#${c.modelId}`}</Tag>
         ))}
         {configs.length > 3 && (
-          <Tag style={{ color: '#E8720C', borderColor: '#E8720C' }}>+{configs.length - 3}</Tag>
+          <Tag style={{ color: 'var(--brand)', borderColor: 'var(--brand)' }}>+{configs.length - 3}</Tag>
         )}
       </Space>
     )
@@ -234,7 +234,7 @@ export default function AiEmployeeAuthControl() {
     const enabledCaps = CAPABILITY_SHORT_FIELDS.filter(({ key }) =>
       configs.some((c) => c[key] === 1),
     )
-    if (!enabledCaps.length) return <span style={{ color: '#BFBFBF', fontSize: 12 }}>{t('aiQuotaAuth.noCapability')}</span>
+    if (!enabledCaps.length) return <span style={{ color: 'var(--text-4)', fontSize: 12 }}>{t('aiQuotaAuth.noCapability')}</span>
     return (
       <Popover
         trigger="click"
@@ -251,7 +251,7 @@ export default function AiEmployeeAuthControl() {
                       ? caps.map(({ key, labelKey, color }) => (
                           <Tag key={key} color={color} style={{ fontSize: 11 }}>{t('aiQuotaAuth.' + labelKey)}</Tag>
                         ))
-                      : <span style={{ fontSize: 11, color: '#BFBFBF' }}>{t('aiQuotaAuth.noCapability')}</span>
+                      : <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{t('aiQuotaAuth.noCapability')}</span>
                     }
                   </div>
                 </div>
@@ -334,7 +334,7 @@ export default function AiEmployeeAuthControl() {
         message={
           <span>
             {t('aiQuotaAuth.posAuthAlert')}
-            <span style={{ color: '#8C8C8C' }}>
+            <span style={{ color: 'var(--text-3)' }}>
               {t('aiQuotaAuth.posAuthAlertHint')}
             </span>
           </span>
@@ -375,7 +375,7 @@ export default function AiEmployeeAuthControl() {
       {/* 操作区 */}
       <div className="action-section">
         <div className="action-section-left">
-          <span style={{ fontSize: 13, color: '#595959' }}>{t('aiQuotaAuth.authStrategyCount', { count: filteredRules.length })}</span>
+          <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('aiQuotaAuth.authStrategyCount', { count: filteredRules.length })}</span>
         </div>
         <div className="action-section-right">
           <Button type="primary" icon={<PlusOutlined />} onClick={handleRuleCreate}>{t('common.add')}</Button>
@@ -584,7 +584,7 @@ export default function AiEmployeeAuthControl() {
       {/* 操作区：左侧统计文字，右侧新增 + 列配置 */}
       <div className="action-section">
         <div className="action-section-left">
-          <span style={{ fontSize: 13, color: '#595959' }}>{t('aiQuotaAuth.customRoleCount', { count: filteredRoles.length })}</span>
+          <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('aiQuotaAuth.customRoleCount', { count: filteredRoles.length })}</span>
         </div>
         <div className="action-section-right">
           <Button type="primary" icon={<PlusOutlined />} onClick={handleRoleCreate}>{t('common.add')}</Button>

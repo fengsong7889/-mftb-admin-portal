@@ -217,7 +217,7 @@ export default function DeptQuotaEdit() {
         {/* ═══ 分区 2：适用部门 ═══ */}
         <SectionCard
           header={{
-            icon: <TeamOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
+            icon: <TeamOutlined style={{ fontSize: 14, color: 'var(--info)' }} />,
             iconBg: '#e6f7ff',
             title: t('aiQuotaAuth.applicableDeptSection'),
             tag: t('aiQuotaAuth.transferTreeTag'),
@@ -230,19 +230,19 @@ export default function DeptQuotaEdit() {
           {/* 穿梭框：左側樹結構 + 右側已選列表 */}
           <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
             {/* 左側：部門樹 */}
-            <div style={{ flex: 1, border: '1px solid #d9d9d9', borderRadius: 8, display: 'flex', flexDirection: 'column', height: 360 }}>
+            <div style={{ flex: 1, border: '1px solid var(--border-1)', borderRadius: 8, display: 'flex', flexDirection: 'column', height: 360 }}>
               <div style={{
-                padding: '10px 16px', borderBottom: '1px solid #f0f0f0', background: '#fafafa',
+                padding: '10px 16px', borderBottom: '1px solid var(--border-2)', background: 'var(--surface-3)',
                 borderRadius: '8px 8px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.availableDepts')}（{deptOptions.length}）</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.availableDepts')}（{deptOptions.length}）</span>
                 <a onClick={() => {
                   // 全选：将所有未入选的部门加入勾选
                   const unchecked = deptOptions.map((d) => d.deptId).filter((id) => !selectedDeptIds.includes(id))
                   setCheckedDeptIds(unchecked)
                 }} style={{ fontSize: 12 }}>{t('aiQuotaAuth.selectAll')}</a>
               </div>
-              <div style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
+              <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-2)' }}>
                 <Input placeholder={t('aiQuotaAuth.searchDeptPh')} allowClear size="small" value={deptSearchKw} onChange={(e) => setDeptSearchKw(e.target.value)} />
               </div>
               <div style={{ flex: 1, overflow: 'auto', padding: '8px 4px' }}>
@@ -284,23 +284,23 @@ export default function DeptQuotaEdit() {
                   if (skipped > 0) message.warning(t('aiQuotaAuth.deptSkipped', { count: skipped }))
                 }}
                 disabled={checkedDeptIds.length === 0}
-                style={{ backgroundColor: '#E8720C', borderColor: '#E8720C' }} />
+                style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)' }} />
               <Button size="small" icon={<span style={{ fontSize: 16 }}>‹</span>}
                 onClick={() => setSelectedDeptIds([])} disabled={selectedDeptIds.length === 0} />
             </div>
 
             {/* 右側：已選部門 */}
-            <div style={{ flex: 1, border: '1px solid #d9d9d9', borderRadius: 8, display: 'flex', flexDirection: 'column', height: 360 }}>
+            <div style={{ flex: 1, border: '1px solid var(--border-1)', borderRadius: 8, display: 'flex', flexDirection: 'column', height: 360 }}>
               <div style={{
-                padding: '10px 16px', borderBottom: '1px solid #f0f0f0', background: '#fafafa',
+                padding: '10px 16px', borderBottom: '1px solid var(--border-2)', background: 'var(--surface-3)',
                 borderRadius: '8px 8px 0 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.selectedDepts')}（{selectedDeptIds.length}）</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.selectedDepts')}（{selectedDeptIds.length}）</span>
                 <a onClick={() => setSelectedDeptIds([])} style={{ fontSize: 12 }}>{t('aiQuotaAuth.clearBtn')}</a>
               </div>
               <div style={{ flex: 1, overflow: 'auto', padding: 8 }}>
                 {selectedDeptIds.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: '#BFBFBF', padding: '40px 0', fontSize: 13 }}>{t('aiQuotaAuth.selectDeptPlease')}</div>
+                  <div style={{ textAlign: 'center', color: 'var(--text-4)', padding: '40px 0', fontSize: 13 }}>{t('aiQuotaAuth.selectDeptPlease')}</div>
                 ) : (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {selectedDeptIds.map((id) => {
@@ -316,8 +316,8 @@ export default function DeptQuotaEdit() {
                 )}
               </div>
               <div style={{
-                padding: '8px 16px', borderTop: '1px solid #f0f0f0', background: '#fafafa',
-                borderRadius: '0 0 8px 8px', fontSize: 12, color: '#595959',
+                padding: '8px 16px', borderTop: '1px solid var(--border-2)', background: 'var(--surface-3)',
+                borderRadius: '0 0 8px 8px', fontSize: 12, color: 'var(--text-2)',
               }}>
                 {/* t() 无法插值 React 元素（会渲染成 [object Object]），且 count 是 i18next 复数保留字，只能传纯值 */}
                 {t('aiQuotaAuth.deptsCount', {
@@ -333,7 +333,7 @@ export default function DeptQuotaEdit() {
         <QuotaConfigSection
           interpretPrefix={
             <>
-              <div>· {t('aiQuotaAuth.quotaApplyLabel')}：<strong style={{ color: '#262626' }}>{deptLabel}</strong></div>
+              <div>· {t('aiQuotaAuth.quotaApplyLabel')}：<strong style={{ color: 'var(--text-1)' }}>{deptLabel}</strong></div>
               <div>· {t('aiQuotaAuth.quotaLimitLabel')}：{quotaReadable}</div>
             </>
           }
@@ -359,12 +359,12 @@ export default function DeptQuotaEdit() {
                         display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer',
                         padding: '12px 14px', borderRadius: 8,
                         border: `1px solid ${active ? '#E8720C' : '#e8eaed'}`,
-                        background: active ? '#FFF7E6' : '#fff', transition: 'all 0.2s',
+                        background: active ? 'var(--warning-soft)' : 'var(--surface-2)', transition: 'all 0.2s',
                       }}>
                         <Radio value={mode} style={{ marginTop: 2 }} />
                         <div>
-                          <div style={{ fontWeight: 600, fontSize: 13, color: '#262626' }}>{ALLOCATE_MODE_LABEL[mode]}</div>
-                          <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 2, lineHeight: 1.5 }}>{desc}</div>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-1)' }}>{ALLOCATE_MODE_LABEL[mode]}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2, lineHeight: 1.5 }}>{desc}</div>
                         </div>
                       </label>
                     )

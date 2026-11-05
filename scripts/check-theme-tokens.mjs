@@ -136,6 +136,8 @@ function scan() {
     reviewHits: new Map(),
     pollution: [],
     primitive: [],
+    /** rel -> 内联裸色值个数（仅 >0 的入表）。见下方 --per-file 的说明 */
+    byFile: new Map(),
   }
 
   const POLLUTION_RE = /var\(\s*--(surface|text|border|brand|success|info|warning|danger|purple|shadow)-/
@@ -161,7 +163,10 @@ function scan() {
     result.tokenized += stat.tokenized
     result.rgbaBlack += stat.rgbaBlack
     if (kind === 'css') result.cssHex += stat.hex
-    else result.inlineHex += stat.hex
+    else {
+      result.inlineHex += stat.hex
+      if (stat.hex > 0) result.byFile.set(rel, stat.hex)
+    }
 
     for (const [value, n] of stat.unmapped) result.unmapped.set(value, (result.unmapped.get(value) ?? 0) + n)
     for (const [value, n] of stat.hits) {
@@ -366,6 +371,23 @@ if (ARGS.has('--snapshot')) {
   console.log('✅ 已写入 scripts/theme-token-baseline.json')
   console.log(`   cssHex=${written.cssHex} inlineHex=${written.inlineHex} rgbaBlack=${written.rgbaBlack} tokenized=${written.tokenized}`)
   console.log(`   expectThemeFiles=${written.expectThemeFiles}`)
+  process.exit(0)
+}
+
+if (ARGS.has('--per-file')) {
+  // 逐文件内联裸色值计数，走与门禁完全相同的 scan()（同排除区、同剥注释/剥 className 口径）。
+  // 加这个模式的原因：批量令牌化需要「本批范围 PRE/POST 差分」来证明没新增半对，
+  // 而差分脚本若自己另写一份计数正则，就会和门禁口径分叉（实测能差出近 200 处）；
+  // 早期脚本还 import 过并不存在的 lib/theme-token-ratchet.mjs，拿到空输入后直接把「新增 0」当成通过。
+  // 结论：任何对账都必须复用门禁自己的输出，不得另建一份实现。
+  const rows = [...result.byFile.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+  const sum = rows.reduce((n, [, v]) => n + v, 0)
+  if (sum !== result.inlineHex) {
+    console.error(`::error(--per-file 分解与总数不一致：逐文件合计 ${sum} ≠ inlineHex ${result.inlineHex}，差分结论作废）`)
+    process.exit(1)
+  }
+  for (const [rel, n] of rows) console.log(`${n}\t${rel}`)
+  console.log(`# 合计 ${result.inlineHex} 处 / ${rows.length} 个文件（与门禁 inlineHex 同口径，已自检相等）`)
   process.exit(0)
 }
 

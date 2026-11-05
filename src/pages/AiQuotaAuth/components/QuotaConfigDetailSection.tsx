@@ -38,7 +38,7 @@ export default function QuotaConfigDetailSection(props: QuotaConfigDetailSection
   return (
     <SectionCard
       header={{
-        icon: <FundOutlined style={{ fontSize: 14, color: '#E8720C' }} />,
+        icon: <FundOutlined style={{ fontSize: 14, color: 'var(--brand)' }} />,
         iconBg: '#fff7e6',
         title: t('aiQuotaAuth.quotaConfigTitle'),
       }}
@@ -46,35 +46,35 @@ export default function QuotaConfigDetailSection(props: QuotaConfigDetailSection
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px 16px' }}>
         {allocateModeTag && (
           <div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.allocateMethod')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>{t('aiQuotaAuth.allocateMethod')}</div>
             {allocateModeTag}
           </div>
         )}
         <div>
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.quotaCycle')}</div>
-          <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{periodLabel}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>{t('aiQuotaAuth.quotaCycle')}</div>
+          <div style={{ fontSize: 14, color: 'var(--text-1)', fontWeight: 500 }}>{periodLabel}</div>
         </div>
         <div>
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.quotaTypeValue')}</div>
-          <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{quotaTypeLabel}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>{t('aiQuotaAuth.quotaTypeValue')}</div>
+          <div style={{ fontSize: 14, color: 'var(--text-1)', fontWeight: 500 }}>{quotaTypeLabel}</div>
         </div>
         <div>
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.quotaLimitValue')}</div>
-          <div style={{ fontSize: 14, color: '#E8720C', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{quotaValueText}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>{t('aiQuotaAuth.quotaLimitValue')}</div>
+          <div style={{ fontSize: 14, color: 'var(--brand)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{quotaValueText}</div>
         </div>
         <div>
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.softThresholdTip')}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>{t('aiQuotaAuth.softThresholdTip')}</div>
           <div style={{ fontSize: 14, color: '#FAAD14', fontWeight: 600 }}>{softThreshold}%</div>
         </div>
         <div>
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.overLimitActionTip')} <Tooltip title={t('aiQuotaAuth.gatewayTooltip')}><QuestionCircleOutlined style={{ fontSize: 12, color: '#BFBFBF', cursor: 'help' }} /></Tooltip></div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>{t('aiQuotaAuth.overLimitActionTip')} <Tooltip title={t('aiQuotaAuth.gatewayTooltip')}><QuestionCircleOutlined style={{ fontSize: 12, color: 'var(--text-4)', cursor: 'help' }} /></Tooltip></div>
           {overLimitTag}
-          <div style={{ fontSize: 11, color: '#BFBFBF', marginTop: 4 }}>{t('aiQuotaAuth.gatewayNote')}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 4 }}>{t('aiQuotaAuth.gatewayNote')}</div>
         </div>
         {downgradeModelText && (
           <div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.downgradeTargetModelLabel')}</div>
-            <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{downgradeModelText}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>{t('aiQuotaAuth.downgradeTargetModelLabel')}</div>
+            <div style={{ fontSize: 14, color: 'var(--text-1)', fontWeight: 500 }}>{downgradeModelText}</div>
           </div>
         )}
       </div>

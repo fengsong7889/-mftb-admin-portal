@@ -23,14 +23,14 @@ export default function StatusConfigSection({ name = 'status', extra, initialVal
   return (
     <SectionCard
       header={{
-        icon: <PoweroffOutlined style={{ fontSize: 14, color: '#E8720C' }} />,
+        icon: <PoweroffOutlined style={{ fontSize: 14, color: 'var(--brand)' }} />,
         iconBg: '#fff7e6',
         title: t('aiQuotaAuth.statusSection'),
         tag: t('aiQuotaAuth.editableTag'),
         tagColor: 'orange',
       }}
     >
-      <div style={{ background: '#FFF7E6', padding: 16, borderRadius: 8, border: '1px solid #FFE7BA' }}>
+      <div style={{ background: 'var(--warning-soft)', padding: 16, borderRadius: 8, border: '1px solid #FFE7BA' }}>
         <Form.Item
           name={name}
           label={t('aiQuotaAuth.statusLabel2')}

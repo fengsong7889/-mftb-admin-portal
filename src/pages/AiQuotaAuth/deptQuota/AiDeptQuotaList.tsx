@@ -177,11 +177,11 @@ export default function AiDeptQuotaList() {
                 title={t('aiQuotaAuth.allDeptPopover', { count: v.length })}
                 trigger="click"
               >
-                <Tag style={{ marginRight: 4, marginBottom: 2, cursor: 'pointer', color: '#E8720C', borderColor: '#E8720C' }}>+{v.length - 3}</Tag>
+                <Tag style={{ marginRight: 4, marginBottom: 2, cursor: 'pointer', color: 'var(--brand)', borderColor: 'var(--brand)' }}>+{v.length - 3}</Tag>
               </Popover>
             )}
           </span>
-        ) : <span style={{ color: '#BFBFBF' }}>--</span>
+        ) : <span style={{ color: 'var(--text-4)' }}>--</span>
       ),
     },
     { key: 'totalEmployeeCount', title: t('aiQuotaAuth.coverCountCol'), dataIndex: 'totalEmployeeCount', width: 100, align: 'right', render: (v: number) => t('aiQuotaAuth.personUnitRender', { count: v.toLocaleString() }) },
@@ -208,8 +208,8 @@ export default function AiDeptQuotaList() {
               strokeColor={usageColor(row)}
               style={{ marginBottom: 2 }}
             />
-            <div style={{ fontSize: 12, color: '#595959', display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-              <span style={{ color: '#8C8C8C' }}>{usedText(row)}</span>
+            <div style={{ fontSize: 12, color: 'var(--text-2)', display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+              <span style={{ color: 'var(--text-3)' }}>{usedText(row)}</span>
               <span style={{ color: usageColor(row), fontWeight: 600 }}>{pct}%</span>
             </div>
           </div>
@@ -296,13 +296,13 @@ export default function AiDeptQuotaList() {
         showIcon
         style={{ marginBottom: 16 }}
         message={t('aiQuotaAuth.deptQuotaAlertMsg')}
-        description={<span style={{ color: '#8C8C8C', fontSize: 12 }}>{t('aiQuotaAuth.deptQuotaAlertDesc')}</span>}
+        description={<span style={{ color: 'var(--text-3)', fontSize: 12 }}>{t('aiQuotaAuth.deptQuotaAlertDesc')}</span>}
       />
 
       {/* 操作區 */}
       <div className="action-section">
         <div className="action-section-left">
-          <span style={{ fontSize: 13, color: '#595959' }}>
+          <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
             {t('aiQuotaAuth.deptQuotaStats', { count: policies.length, deptCount: totalDeptCount, empCount: totalEmployeeCount.toLocaleString() })}
           </span>
         </div>

@@ -51,7 +51,7 @@ export default function UsageOverviewSection(props: UsageOverviewSectionProps) {
   return (
     <SectionCard
       header={{
-        icon: <BarChartOutlined style={{ fontSize: 14, color: '#52C41A' }} />,
+        icon: <BarChartOutlined style={{ fontSize: 14, color: 'var(--success)' }} />,
         iconBg: '#f6ffed',
         title: t('aiQuotaAuth.usageOverview'),
         tag: periodTag,
@@ -59,45 +59,45 @@ export default function UsageOverviewSection(props: UsageOverviewSectionProps) {
       }}
     >
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-        <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: '#E6F7FF', border: '1px solid #1890FF22', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#1890FF' }}>
+        <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: 'var(--info-soft)', border: '1px solid #1890FF22', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--info)' }}>
             <AnimatedNumber value={usedValue} prefix={valuePrefix} />
           </div>
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.currentPeriodUsed')}{unitLabel ? t('aiQuotaAuth.quotaLimitUnit', { unit: unitLabel }) : ''}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{t('aiQuotaAuth.currentPeriodUsed')}{unitLabel ? t('aiQuotaAuth.quotaLimitUnit', { unit: unitLabel }) : ''}</div>
         </div>
-        <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: '#F9F0FF', border: '1px solid #722ED122', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#722ED1' }}>
+        <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: 'var(--purple-soft)', border: '1px solid #722ED122', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--purple)' }}>
             <AnimatedNumber value={quotaValue} prefix={valuePrefix} />
           </div>
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.quotaLimitTotal')}{unitLabel ? t('aiQuotaAuth.quotaLimitUnit', { unit: unitLabel }) : ''}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{t('aiQuotaAuth.quotaLimitTotal')}{unitLabel ? t('aiQuotaAuth.quotaLimitUnit', { unit: unitLabel }) : ''}</div>
         </div>
         <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: percentBg, border: `1px solid ${percentColor}22`, transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
           <div style={{ fontSize: 22, fontWeight: 700, color: percentColor }}>
             <AnimatedNumber value={percent} suffix="%" />
           </div>
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.currentUsageRate')}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{t('aiQuotaAuth.currentUsageRate')}</div>
         </div>
-        <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: '#F6FFED', border: '1px solid #52C41A22', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#52C41A' }}>
+        <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: 'var(--success-soft)', border: '1px solid #52C41A22', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--success)' }}>
             <AnimatedNumber value={totalEmployeeCount} suffix={t('aiQuotaAuth.animatedPersonSuffix')} />
           </div>
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.coverEmpCount')}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{t('aiQuotaAuth.coverEmpCount')}</div>
         </div>
       </div>
 
       {/* 用量進度條 */}
-      <div style={{ marginTop: 20, padding: '18px 20px', borderRadius: 12, background: '#FAFAFA', border: '1px solid #F0F0F0' }}>
+      <div style={{ marginTop: 20, padding: '18px 20px', borderRadius: 12, background: 'var(--surface-3)', border: '1px solid var(--border-2)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.currentUsageProgress')}</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.currentUsageProgress')}</span>
           <span style={{ fontSize: 13, fontWeight: 600, color: percentColor }}>{percent}%</span>
         </div>
         <Progress percent={Math.min(percent, 100)} strokeColor={percentColor} showInfo={false} size={['100%', 14]} style={{ marginBottom: 12 }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, fontSize: 13 }}>
-          <span style={{ color: '#595959' }}>
+          <span style={{ color: 'var(--text-2)' }}>
             {t('aiQuotaAuth.usedLabel')} <strong style={{ color: percentColor }}>{usedText}</strong> · {t('aiQuotaAuth.quotaLimitLabel2')} {quotaText}
           </span>
-          <span style={{ color: '#8C8C8C' }}>
-            {t('aiQuotaAuth.softAlertLabel')} {softThreshold}% · {t('aiQuotaAuth.remainingLabel')} <strong style={{ color: remaining > 0 ? '#52C41A' : '#FF4D4F' }}>{valuePrefix}{remaining.toLocaleString()}{unitLabel ? ` ${unitLabel}` : ''}</strong>
+          <span style={{ color: 'var(--text-3)' }}>
+            {t('aiQuotaAuth.softAlertLabel')} {softThreshold}% · {t('aiQuotaAuth.remainingLabel')} <strong style={{ color: remaining > 0 ? 'var(--success)' : 'var(--danger)' }}>{valuePrefix}{remaining.toLocaleString()}{unitLabel ? ` ${unitLabel}` : ''}</strong>
           </span>
         </div>
       </div>

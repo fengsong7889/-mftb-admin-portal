@@ -47,6 +47,41 @@ const dirIdx = ARGS.indexOf('--dir')
 /** --dir 限定批次范围（方案 §5.3 按菜单分批），不传则全站 */
 const onlyDir = dirIdx >= 0 ? ARGS[dirIdx + 1] : null
 
+/*
+ * 参数校验（2026-11-05 加，起因是跑第八批时漏敲 --dir，把目录写成了位置参数）：
+ * 本工具以前不检查参数，于是三个错误用法都“看起来正常”：
+ *   1. 位置参数被静默忽略 → 作用域退成全站（--run 下去就是 300+ 文件 / 3000+ 处）；
+ *   2. --dry-run 只写在注释里，其实从未实现（不写 --run 默认就是预览，所“能跑通”是偶然）；
+ *   3. --report 在方案 §5 里写着「输出未命中映射表的色值 Top50」，但本工具没有这个功能。
+ * 批量令牌化的作用域只能靠人工确认，恰好是最不能“静默失败”的地方，因此直接拒跑而不是提示后继续。
+ */
+const VALID_FLAGS = ['--run', '--dir', '--verbose', '--all', '--dry-run']
+// dirIdx 为 -1（没传 --dir）时 dirIdx+1 恰好是 0，会把第一个位置参数误当成 --dir 的值而漏检；
+// 索引必须先判存在再取后继，不能靠 -1+1 的巧合。
+const dirValueIdx = dirIdx >= 0 ? dirIdx + 1 : -1
+const positional = ARGS.filter((a, i) => !a.startsWith('--') && i !== dirValueIdx)
+const unknownFlag = ARGS.find((a) => a.startsWith('--') && !VALID_FLAGS.includes(a))
+const argErrors = []
+if (positional.length) {
+  argErrors.push(`多余的位置参数：${positional.join(' ')}。本工具只认 --dir <路径>；不传 --dir 就是全站扫描。`
+    + '\n   （历史批次靠 --dir 分批，误当位置参数会一刷整仓并和并行线冲突）')
+}
+if (unknownFlag) {
+  argErrors.push(`未实现的参数：${unknownFlag}。未命中色值的分布请看 node scripts/check-theme-tokens.mjs --report（那个才有 --report）`)
+}
+if (ARGS.includes('--dry-run') && RUN) argErrors.push('--run 与 --dry-run 同时传入是矛盾的；不写 --run 即为预览')
+if (RUN && !onlyDir && !ARGS.includes('--all')) {
+  argErrors.push('写模式（--run）缺 --dir：全站刷色值不是任何一批的意图。\n   确定要全站才加 --all，否则用 --run --dir src/pages/<目录>')
+}
+if (onlyDir && !onlyDir.startsWith('src/') && !onlyDir.startsWith('frontend/')) {
+  argErrors.push(`--dir 取值看起来不像仓内相对路径：${onlyDir}`)
+}
+if (argErrors.length) {
+  console.error('❌ 参数不合法，未做任何修改：')
+  for (const e of argErrors) console.error(`   · ${e}`)
+  process.exit(1)
+}
+
 /** 属性名 + 引号包裹的完整字符串值；值内允许出现除该引号外的任意字符 */
 const PROP_STR_RE = /([A-Za-z][A-Za-z0-9-]*)\s*:\s*(["'])((?:(?!\2)[^\\]|\\.)*?)\2/g
 const HEX_RE = /#([0-9a-fA-F]{3,8})\b/g
@@ -61,8 +96,10 @@ const HEX_RE = /#([0-9a-fA-F]{3,8})\b/g
  * 自动刷成令牌色会让它们在饱和底上消失。
  */
 const PROP_EXPR_RE = /([A-Za-z][A-Za-z0-9-]*)\s*:\s*([^,;{}]+)/g
-/** 只匹配引号内的十六进制色值串，确保不会改动非颜色文本 */
-const QUOTED_HEX_RE = /(["'])#([0-9a-fA-F]{3,8})\1/g
+/** 任意单行引号串（不含模板字符串）——用于拿「简写里内嵌的色值」 */
+const QUOTED_ANY_RE = /(["'])((?:(?!\1)[^\\]|\\.)*?)\1/g
+/** 串内部的一个 hex 片段（可能多个，如渐变、border 简写） */
+const HEX_INNER_RE = /#([0-9a-fA-F]{3,8})\b/g
 
 function walk(dir, out = []) {
   for (const entry of readdirSync(dir)) {
@@ -128,23 +165,41 @@ function transform(source) {
       const rewritten = line.replace(PROP_EXPR_RE, (whole, prop, expr) => {
         const segment = classifyProperty(prop)
         if (!segment) return whole // 非颜色属性（width / transition / fontSize 等）
-        if (!QUOTED_HEX_RE.test(expr)) {
-          QUOTED_HEX_RE.lastIndex = 0
-          return whole
-        }
-        QUOTED_HEX_RE.lastIndex = 0
+        if (!/#[0-9a-fA-F]{3}/.test(expr)) return whole
 
-        const nextExpr = expr.replace(QUOTED_HEX_RE, (rawStr, quote, digits) => {
-          const normalized = normalizeHex(digits)
-          if (!normalized || normalized.hasAlpha) return rawStr
-          const token = COLOR_TO_TOKEN[segment]?.[normalized.hex]
-          if (!token) {
-            localSkips += 1
+        // 一个颜色属性值里可能同时存在两种写法：
+        //   color: '#333'                     整串纯色（旧行为）
+        //   border: '1px solid #e8eaed'       简写内嵌（盲区②，2026-11-05 补）
+        // 不补后者会造成一个很阴的回归：同一块的 background 被刷成 var(--surface-2)、
+        // 而 border 里的近白描边不动，深色下就是「深卡配白边」——比两侧都裸更难看。
+        // 判据不变：仍要求与令牌**浅色值严格等值**，段不匹配就进 skipped 行报告。
+        let localSkipsHere = 0
+        const nextExpr = expr.replace(QUOTED_ANY_RE, (rawStr, quote, inner) => {
+          if (!/#([0-9a-fA-F]{3,8})/.test(inner)) return rawStr
+          // url(#grad1) 这类片段引用里的 #xxx 不是颜色（实测 id 叫 #feed 时会被当 hex）。
+          // 宁可漏改也不能把引用 id 换成令牌；含此形态的串整条跳过。
+          if (/url\(\s*#/.test(inner)) {
+            localSkipsHere += 1
             return rawStr
           }
-          replaced += 1
-          return `${quote}var(--${token})${quote}`
+          let changed = false
+          const nextInner = inner.replace(HEX_INNER_RE, (rawHex, digits) => {
+            const normalized = normalizeHex(digits)
+            if (!normalized || normalized.hasAlpha) return rawHex
+            const token = COLOR_TO_TOKEN[segment]?.[normalized.hex]
+            if (!token) {
+              localSkipsHere += 1
+              return rawHex
+            }
+            changed = true
+            replaced += 1
+            return `var(--${token})`
+          })
+          HEX_INNER_RE.lastIndex = 0
+          return changed ? `${quote}${nextInner}${quote}` : rawStr
         })
+        QUOTED_ANY_RE.lastIndex = 0
+        if (localSkipsHere > 0) localSkips += localSkipsHere
 
         return nextExpr === expr ? whole : whole.replace(expr, nextExpr)
       })

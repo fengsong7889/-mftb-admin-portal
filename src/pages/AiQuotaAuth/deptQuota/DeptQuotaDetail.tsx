@@ -73,7 +73,7 @@ export default function DeptQuotaDetail() {
   if (!policy) {
     return (
       <div className="content-area" style={{ textAlign: 'center', padding: 80 }}>
-        <div style={{ fontSize: 16, color: '#8C8C8C' }}>{t('aiQuotaAuth.quotaPolicyLoadFailed')}</div>
+        <div style={{ fontSize: 16, color: 'var(--text-3)' }}>{t('aiQuotaAuth.quotaPolicyLoadFailed')}</div>
         <Button style={{ marginTop: 16 }} onClick={handleBack}>{t('aiQuotaAuth.backToList')}</Button>
       </div>
     )
@@ -133,7 +133,7 @@ export default function DeptQuotaDetail() {
       {/* ═══ 分区 2：适用部门 ═══ */}
       <SectionCard
         header={{
-          icon: <TeamOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
+          icon: <TeamOutlined style={{ fontSize: 14, color: 'var(--info)' }} />,
           iconBg: '#e6f7ff',
           title: t('aiQuotaAuth.applicableDeptTitle'),
           tag: t('aiQuotaAuth.deptCountLabel', { count: policy.deptNames.length }),
@@ -149,12 +149,12 @@ export default function DeptQuotaDetail() {
               </Tag>
             )
           })}
-          {policy.deptNames.length === 0 && <span style={{ color: '#BFBFBF' }}>{t('aiQuotaAuth.noRelatedDept')}</span>}
+          {policy.deptNames.length === 0 && <span style={{ color: 'var(--text-4)' }}>{t('aiQuotaAuth.noRelatedDept')}</span>}
         </div>
-        <div style={{ marginTop: 12, fontSize: 13, color: '#595959' }}>
+        <div style={{ marginTop: 12, fontSize: 13, color: 'var(--text-2)' }}>
           {t('aiQuotaAuth.totalCoverCount', { count: policy.totalEmployeeCount })}
           {policy.allocateMode === 'per_capita' && (
-            <span style={{ marginLeft: 8, color: '#8C8C8C' }}>{t('aiQuotaAuth.perCapitaQuotaNote', { quota: quotaText(policy) })}</span>
+            <span style={{ marginLeft: 8, color: 'var(--text-3)' }}>{t('aiQuotaAuth.perCapitaQuotaNote', { quota: quotaText(policy) })}</span>
           )}
         </div>
         </SectionCard>

@@ -62,7 +62,7 @@ export default function RoleQuotaDetail() {
   const handleBack = () => navigate('/ai-emp-quota#role')
 
   if (loading) return <div className="content-area" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}><Spin size="large" /></div>
-  if (!policy) return <div className="content-area" style={{ textAlign: 'center', padding: 80 }}><div style={{ fontSize: 16, color: '#8C8C8C' }}>{t('aiQuotaAuth.quotaPolicyLoadFailed')}</div><Button style={{ marginTop: 16 }} onClick={handleBack}>{t('aiQuotaAuth.backToList')}</Button></div>
+  if (!policy) return <div className="content-area" style={{ textAlign: 'center', padding: 80 }}><div style={{ fontSize: 16, color: 'var(--text-3)' }}>{t('aiQuotaAuth.quotaPolicyLoadFailed')}</div><Button style={{ marginTop: 16 }} onClick={handleBack}>{t('aiQuotaAuth.backToList')}</Button></div>
 
   const pct = usagePercent(policy)
   const pctColor = usageColor(policy)
@@ -93,49 +93,49 @@ export default function RoleQuotaDetail() {
       />
 
       {/* ═══ 分区 1：用量概览 ═══ */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><BarChartOutlined style={{ fontSize: 14, color: '#52C41A' }} /></div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.usageOverview')}</span>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--success-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><BarChartOutlined style={{ fontSize: 14, color: 'var(--success)' }} /></div>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.usageOverview')}</span>
           <Tag color="green">{t('aiQuotaAuth.quotaPeriodReset', { period: t('aiQuotaAuth.' + (PERIOD_KEYS[policy.period] || '')) })}</Tag>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <div key={policy.id} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: '#E6F7FF', border: '1px solid #1890FF22' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#1890FF' }}><AnimatedNumber value={policy.usedValue} prefix={valuePrefix} /></div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.currentPeriodUsed')}{unitLabel ? t('aiQuotaAuth.quotaLimitUnit', { unit: unitLabel }) : ''}</div>
+          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: 'var(--info-soft)', border: '1px solid #1890FF22' }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--info)' }}><AnimatedNumber value={policy.usedValue} prefix={valuePrefix} /></div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{t('aiQuotaAuth.currentPeriodUsed')}{unitLabel ? t('aiQuotaAuth.quotaLimitUnit', { unit: unitLabel }) : ''}</div>
           </div>
-          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: '#F9F0FF', border: '1px solid #722ED122' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#722ED1' }}><AnimatedNumber value={policy.quotaValue} prefix={valuePrefix} /></div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.quotaLimitTotal')}{unitLabel ? t('aiQuotaAuth.quotaLimitUnit', { unit: unitLabel }) : ''}</div>
+          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: 'var(--purple-soft)', border: '1px solid #722ED122' }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--purple)' }}><AnimatedNumber value={policy.quotaValue} prefix={valuePrefix} /></div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{t('aiQuotaAuth.quotaLimitTotal')}{unitLabel ? t('aiQuotaAuth.quotaLimitUnit', { unit: unitLabel }) : ''}</div>
           </div>
           <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: pctBg, border: `1px solid ${pctColor}22` }}>
             <div style={{ fontSize: 22, fontWeight: 700, color: pctColor }}><AnimatedNumber value={pct} suffix="%" /></div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.currentUsageRate')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{t('aiQuotaAuth.currentUsageRate')}</div>
           </div>
-          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: '#F6FFED', border: '1px solid #52C41A22' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#52C41A' }}><AnimatedNumber value={policy.totalEmployeeCount} suffix={t('aiQuotaAuth.animatedPersonSuffix')} /></div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.boundEmpCount')}</div>
+          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: 'var(--success-soft)', border: '1px solid #52C41A22' }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--success)' }}><AnimatedNumber value={policy.totalEmployeeCount} suffix={t('aiQuotaAuth.animatedPersonSuffix')} /></div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{t('aiQuotaAuth.boundEmpCount')}</div>
           </div>
         </div>
-        <div style={{ marginTop: 20, padding: '18px 20px', borderRadius: 12, background: '#FAFAFA', border: '1px solid #F0F0F0' }}>
+        <div style={{ marginTop: 20, padding: '18px 20px', borderRadius: 12, background: 'var(--surface-3)', border: '1px solid var(--border-2)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.currentUsageProgress')}</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.currentUsageProgress')}</span>
             <span style={{ fontSize: 13, fontWeight: 600, color: pctColor }}>{pct}%</span>
           </div>
           <Progress percent={Math.min(pct, 100)} strokeColor={pctColor} showInfo={false} size={['100%', 14]} style={{ marginBottom: 12 }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, fontSize: 13 }}>
-            <span style={{ color: '#595959' }}>{t('aiQuotaAuth.usedLabel')} <strong style={{ color: pctColor }}>{usedText(policy)}</strong> · {t('aiQuotaAuth.quotaLimitLabel2')} {quotaText(policy)}</span>
-            <span style={{ color: '#8C8C8C' }}>{t('aiQuotaAuth.softAlertLabel')} {policy.softThreshold}% · {t('aiQuotaAuth.remainingLabel')} <strong style={{ color: remaining > 0 ? '#52C41A' : '#FF4D4F' }}>{valuePrefix}{remaining.toLocaleString()}{unitLabel ? ` ${unitLabel}` : ''}</strong></span>
+            <span style={{ color: 'var(--text-2)' }}>{t('aiQuotaAuth.usedLabel')} <strong style={{ color: pctColor }}>{usedText(policy)}</strong> · {t('aiQuotaAuth.quotaLimitLabel2')} {quotaText(policy)}</span>
+            <span style={{ color: 'var(--text-3)' }}>{t('aiQuotaAuth.softAlertLabel')} {policy.softThreshold}% · {t('aiQuotaAuth.remainingLabel')} <strong style={{ color: remaining > 0 ? 'var(--success)' : 'var(--danger)' }}>{valuePrefix}{remaining.toLocaleString()}{unitLabel ? ` ${unitLabel}` : ''}</strong></span>
           </div>
         </div>
       </div>
 
       {/* ═══ 分区 2：绑定员工 ═══ */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><TeamOutlined style={{ fontSize: 14, color: '#1890ff' }} /></div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.boundEmpCount')}</span>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><TeamOutlined style={{ fontSize: 14, color: 'var(--info)' }} /></div>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.boundEmpCount')}</span>
           <Tag color="blue">{t('aiQuotaAuth.personSuffix', { count: policy.totalEmployeeCount })}</Tag>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
@@ -149,36 +149,36 @@ export default function RoleQuotaDetail() {
             <Tag key={name} style={{ fontSize: 13, padding: '4px 12px', lineHeight: '24px' }}>{name}</Tag>
           ))}
         </div>
-        <div style={{ marginTop: 12, fontSize: 13, color: '#595959' }}>
+        <div style={{ marginTop: 12, fontSize: 13, color: 'var(--text-2)' }}>
           {t('aiQuotaAuth.totalBoundCount', { count: policy.totalEmployeeCount })}
-          <span style={{ marginLeft: 8, color: '#8C8C8C' }}>{t('aiQuotaAuth.perCapitaQuotaNote', { quota: quotaText(policy) })}</span>
+          <span style={{ marginLeft: 8, color: 'var(--text-3)' }}>{t('aiQuotaAuth.perCapitaQuotaNote', { quota: quotaText(policy) })}</span>
         </div>
       </div>
 
       {/* ═══ 分区 3：额度配置 ═══ */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FundOutlined style={{ fontSize: 14, color: '#E8720C' }} /></div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.quotaConfigTitle')}</span>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FundOutlined style={{ fontSize: 14, color: 'var(--brand)' }} /></div>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.quotaConfigTitle')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px 16px' }}>
-          <div><div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.quotaCycle')}</div><div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{t('aiQuotaAuth.' + (PERIOD_KEYS[policy.period] || ''))}</div></div>
-          <div><div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.quotaTypeValue')}</div><div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{t('aiQuotaAuth.' + (TYPE_KEYS[policy.quotaType] || ''))}</div></div>
-          <div><div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.quotaLimitValue')}</div><div style={{ fontSize: 14, color: '#E8720C', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{quotaText(policy)}</div></div>
-          <div><div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.softThresholdTip')}</div><div style={{ fontSize: 14, color: '#FAAD14', fontWeight: 600 }}>{policy.softThreshold}%</div></div>
-          <div><div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.overLimitActionTip')} <Tooltip title={t('aiQuotaAuth.gatewayTooltip')}><QuestionCircleOutlined style={{ fontSize: 12, color: '#BFBFBF', cursor: 'help' }} /></Tooltip></div><Tag color={OVER_LIMIT_TAG[policy.overLimitAction]}>{t('aiQuotaAuth.' + (OVER_LIMIT_KEYS[policy.overLimitAction] || ''))}</Tag><div style={{ fontSize: 11, color: '#BFBFBF', marginTop: 4 }}>{t('aiQuotaAuth.gatewayNote')}</div></div>
+          <div><div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>{t('aiQuotaAuth.quotaCycle')}</div><div style={{ fontSize: 14, color: 'var(--text-1)', fontWeight: 500 }}>{t('aiQuotaAuth.' + (PERIOD_KEYS[policy.period] || ''))}</div></div>
+          <div><div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>{t('aiQuotaAuth.quotaTypeValue')}</div><div style={{ fontSize: 14, color: 'var(--text-1)', fontWeight: 500 }}>{t('aiQuotaAuth.' + (TYPE_KEYS[policy.quotaType] || ''))}</div></div>
+          <div><div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>{t('aiQuotaAuth.quotaLimitValue')}</div><div style={{ fontSize: 14, color: 'var(--brand)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{quotaText(policy)}</div></div>
+          <div><div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>{t('aiQuotaAuth.softThresholdTip')}</div><div style={{ fontSize: 14, color: '#FAAD14', fontWeight: 600 }}>{policy.softThreshold}%</div></div>
+          <div><div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>{t('aiQuotaAuth.overLimitActionTip')} <Tooltip title={t('aiQuotaAuth.gatewayTooltip')}><QuestionCircleOutlined style={{ fontSize: 12, color: 'var(--text-4)', cursor: 'help' }} /></Tooltip></div><Tag color={OVER_LIMIT_TAG[policy.overLimitAction]}>{t('aiQuotaAuth.' + (OVER_LIMIT_KEYS[policy.overLimitAction] || ''))}</Tag><div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 4 }}>{t('aiQuotaAuth.gatewayNote')}</div></div>
           {policy.overLimitAction === 'downgrade' && (
-            <div><div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 6 }}>{t('aiQuotaAuth.downgradeTargetModelLabel')}</div><div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{downgradeModelName ?? '-'}</div></div>
+            <div><div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>{t('aiQuotaAuth.downgradeTargetModelLabel')}</div><div style={{ fontSize: 14, color: 'var(--text-1)', fontWeight: 500 }}>{downgradeModelName ?? '-'}</div></div>
           )}
         </div>
       </div>
 
       {/* ═══ 分区 4：基础信息 ═══ */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} /></div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.basicInfoSection')}</span>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AppstoreOutlined style={{ fontSize: 14, color: 'var(--info)' }} /></div>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.basicInfoSection')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
@@ -191,8 +191,8 @@ export default function RoleQuotaDetail() {
             { label: t('aiQuotaAuth.updatedAtCol'), value: policy.updatedAt ?? '-' },
           ] as Array<{ label: string; value: string }>).map((item) => (
             <div key={item.label}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{item.label}</div>
-              <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{item.value}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{item.label}</div>
+              <div style={{ fontSize: 14, color: 'var(--text-1)', fontWeight: 500 }}>{item.value}</div>
             </div>
           ))}
         </div>
