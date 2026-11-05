@@ -373,6 +373,24 @@
       "comment": "金字招牌计价主表 + 标签明细表自动建表与补列，附结构后置校验。"
     },
     {
+      "versionKey": "adpromo:timeslot_pricing_tables:v1",
+      "module": "adpromo",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "adPromotionDataInitializer",
+      "status": "ACTIVE",
+      "comment": "時段推薦計價主表 + 時段明細表自動建表（CREATE TABLE IF NOT EXISTS 幂等），附結構后置校驗。參考 SQL: sql/327_time_slot_ad_pricing.sql"
+    },
+    {
+      "versionKey": "adpromo:timeslot_order_item_table:v1",
+      "module": "adpromo",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "adPromotionDataInitializer",
+      "status": "ACTIVE",
+      "comment": "時段推薦訂單明細表自動建表（CREATE TABLE IF NOT EXISTS 幂等），附結構后置校驗。參考 SQL: sql/328_time_slot_order_item.sql"
+    },
+    {
       "versionKey": "adpromo:hot-skin-discount-v1.0",
       "module": "adpromo",
       "phase": "MODULE_STRUCTURE",

@@ -36,7 +36,7 @@ import { fetchStores, type StoreItem } from '@/api/store'
 import { fetchFinAccountBalance } from '@/api/finance'
 import { fetchAdPricingChannels } from '@/api/adPromotion'
 import { AlgorithmType, RecommendChannel } from '@mftb/contracts/recommendConstants'
-import { MAX_BUY_DAYS, PRESALE_OPEN_HOUR, MONTHS_PER_PAGE, parseDayTiers, getPresaleOpenTime, PickerPresaleInfoModal, PickerPaymentSuccessModal } from './components/pickerShared'
+import { MAX_BUY_DAYS, PRESALE_OPEN_HOUR, MONTHS_PER_PAGE, parseDayTiers, getPresaleOpenTime, MonthTabBar, PickerPresaleInfoModal, PickerPaymentSuccessModal } from './components/pickerShared'
 
 /** 人氣商家廣告類型標識（與後端一致） */
 const GIFT_AD_TYPE_POPULAR = 'popular_merchant'
@@ -253,7 +253,6 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
   // 自選日期狀態：已選日期 / 日曆當前月 / 批量添加範圍 / 每週休息日
   const [customDates, setCustomDates] = useState<string[]>([])
   const [calMonth, setCalMonth] = useState<Dayjs>(dayjs().add(1, 'day').startOf('month'))
-  const [hoveredCalMonth, setHoveredCalMonth] = useState<string | null>(null)
   const [monthPage, setMonthPage] = useState(0)
   const [batchRange, setBatchRange] = useState<[Dayjs | null, Dayjs | null] | null>(null)
   const [excludedWeekdays, setExcludedWeekdays] = useState<number[]>([])
@@ -285,7 +284,7 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
   const quoteAbortRef = useRef<AbortController | null>(null)
 
   // ===== 真實接口接線 =====
-  // 人氣名稱下拉（從銷售定價配置加載，value=algoId）
+  // 人氣商家名稱下拉（從銷售定價配置加載，value=algoId）
   const [pricingOptions, setPricingOptions] = useState<Array<{ label: string; value: string }>>([])
   // 門店下拉（真實門店，value=storeCode）
   const [storeOptions, setStoreOptions] = useState<Array<{ label: string; value: string }>>([])
@@ -432,7 +431,7 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
     }).catch(() => {})
   }, [])
 
-  // 人氣名稱下拉：從銷售定價配置加載（按品牌過濾，僅顯示啟用且有皮膚的定價）
+  // 人氣商家名稱下拉：從銷售定價配置加載（按品牌過濾，僅顯示啟用且有皮膚的定價）
   const [allPricingOptions, setAllPricingOptions] = useState<Array<{ label: string; value: string; channel?: number }>>([])
   useEffect(() => {
     if (!searchBrand) {
@@ -986,61 +985,27 @@ export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }
                     >
                       ◀
                     </Button>
-                    <div style={{ flex: 1, display: 'flex', gap: 4 }}>
-                    {visibleMonths.map(m => {
-                      const monthStr = m.format('YYYY-MM')
-                      const isSelected = m.isSame(calMonth, 'month')
-                      const isHovered = hoveredCalMonth === monthStr
-                      const hasSelectedDates = customDates.some(d => dayjs(d).isSame(m, 'month'))
-                      // 整月待開售：月初首日即超出可購範圍，直接標記待開售（同盤活復蘇）
-                      const monthPresale = m.startOf('month').isAfter(customMaxDate, 'day')
-                      return (
-                        <div
-                          key={monthStr}
-                          onClick={() => {
-                            if (monthPresale) {
-                              // 整月待開售：彈窗提示首日開售時間（同盤活復蘇規範）
-                              const firstDay = m.startOf('month')
-                              setPresaleInfo({
-                                date: firstDay.format('YYYY-MM-DD'),
-                                weekday: WEEKDAY_LABELS[firstDay.day()],
-                                openTime: getPresaleOpenTime(firstDay, sellableDays).format(t('presaleDateFormat')),
-                              })
-                              return
-                            }
-                            setCalMonth(m)
-                          }}
-                          onMouseEnter={() => setHoveredCalMonth(monthStr)}
-                          onMouseLeave={() => setHoveredCalMonth(null)}
-                          style={{
-                            flex: 1, padding: '8px 4px', borderRadius: 6, position: 'relative',
-                            border: monthPresale
-                              ? '1px dashed #d9d9d9'
-                              : isSelected ? '2px solid #fa8c16' : isHovered ? '2px solid #fa8c16' : '1px solid #e8e8e8',
-                            background: monthPresale
-                              ? '#fafafa'
-                              : isSelected ? '#fff7e6' : isHovered ? '#fff7e6' : '#fff',
-                            cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s', whiteSpace: 'nowrap', overflow: 'hidden',
-                          }}
-                        >
-                          <span style={{ fontSize: 15, fontWeight: !monthPresale && (isSelected || isHovered) ? 700 : 500, color: monthPresale ? '#bfbfbf' : isSelected || isHovered ? '#fa8c16' : '#333' }}>
-                            {m.year() === dayjs().year() ? m.format(t('monthFormat')) : m.format(t('yearMonthFormat'))}
-                          </span>
-                          {monthPresale && (
-                            <span style={{ fontSize: 11, color: '#8c8c8c', marginLeft: 4, border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>{t('presaleTag')}</span>
-                          )}
-                          {hasSelectedDates && (
-                            <div style={{
-                              position: 'absolute', top: 3, right: 3,
-                              width: 8, height: 8, borderRadius: '50%',
-                              background: '#ff4d4f',
-                              animation: 'dotPulse 1.5s ease-in-out infinite',
-                            }} />
-                          )}
-                        </div>
-                      )
-                    })}
-                    </div>
+                    <MonthTabBar
+                      months={visibleMonths}
+                      current={calMonth}
+                      isPresaleMonth={m => m.startOf('month').isAfter(customMaxDate, 'day')}
+                      hasSelectedDates={m => customDates.some(d => dayjs(d).isSame(m, 'month'))}
+                      onChange={m => {
+                        // 整月待開售：彈窗提示首日開售時間（同盤活復蘇規範）
+                        if (m.startOf('month').isAfter(customMaxDate, 'day')) {
+                          const firstDay = m.startOf('month')
+                          setPresaleInfo({
+                            date: firstDay.format('YYYY-MM-DD'),
+                            weekday: WEEKDAY_LABELS[firstDay.day()],
+                            openTime: getPresaleOpenTime(firstDay, sellableDays).format(t('presaleDateFormat')),
+                          })
+                          return
+                        }
+                        setCalMonth(m)
+                      }}
+                      labelOf={m => (m.year() === dayjs().year() ? m.format(t('monthFormat')) : m.format(t('yearMonthFormat')))}
+                      presaleTag={t('presaleTag')}
+                    />
                     <Button
                       size="small"
                       disabled={monthPage >= monthPageCount - 1}

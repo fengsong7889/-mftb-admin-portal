@@ -98,6 +98,7 @@ export default function Algorithm() {
     [AlgorithmType.GOLD_AD]: t('algorithm.typeGoldAd'),
     [AlgorithmType.GOLDEN_SIGNBOARD]: t('algorithm.typeGoldenSignboard'),
     [AlgorithmType.PRODUCT_PROMO]: t('algorithm.typeProductPromo'),
+    [AlgorithmType.TIME_SLOT_AD]: t('algorithm.typeTimeSlotAd'),
   }
   /** 广告类型卡片配置（依赖 t，定义在组件内以便响应语言切换） */
   const ALGORITHM_TYPE_CARDS: { type: AlgorithmType; icon: string; description: string }[] = [

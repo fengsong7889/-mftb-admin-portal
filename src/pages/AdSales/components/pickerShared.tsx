@@ -2,8 +2,9 @@
  * GoldenSignboardLabelPicker 與 PopularSkinPicker 共享代碼
  * - 常量：MAX_BUY_DAYS、PRESALE_OPEN_HOUR、MONTHS_PER_PAGE
  * - 工具函數：parseDayTiers、getPresaleOpenTime
- * - 組件：PickerPresaleInfoModal、PickerPaymentSuccessModal
+ * - 組件：MonthTabBar、PickerPresaleInfoModal、PickerPaymentSuccessModal
  */
+import { useState } from 'react'
 import { Modal, Button, Space } from 'antd'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
@@ -43,6 +44,86 @@ export function getPresaleOpenTime(date: Dayjs, sellableDays: number): Dayjs {
 }
 
 // ===== 共享組件 =====
+
+/**
+ * 月份選擇 Tab 條（廣告銷售各選購頁共用）
+ *
+ * 等寬 grid（每頁固定 MONTHS_PER_PAGE 列）+「待開售」標籤獨立成行並預留行高：
+ * 避免舊 flex+行內 nowrap 樣式導致短月份（如 11月）窄小不均、長月份（如 2027年4月 🔒待開售）撐破容器。
+ */
+interface MonthTabBarProps {
+  /** 當前頁可見月份 */
+  months: Dayjs[]
+  /** 當前選中月份 */
+  current: Dayjs
+  /** 整月待開售判定（樣式優先於選中/懸停） */
+  isPresaleMonth: (m: Dayjs) => boolean
+  /** 該月是否已有選中日期（右上角紅點） */
+  hasSelectedDates?: (m: Dayjs) => boolean
+  /** 點擊月份（待開售月也回調，由調用方決定切換或彈開售提醒） */
+  onChange: (m: Dayjs) => void
+  /** 月份文案格式化（默認：同年「M月」，跨年「YYYY年M月」） */
+  labelOf?: (m: Dayjs) => string
+  /** 待開售標籤文案（i18n 或硬編碼，統一帶鎖圖標） */
+  presaleTag: string
+}
+
+export function MonthTabBar({
+  months, current, isPresaleMonth, hasSelectedDates, onChange, labelOf, presaleTag,
+}: MonthTabBarProps) {
+  const [hovered, setHovered] = useState<string | null>(null)
+  const fmt = labelOf ?? ((m: Dayjs) => (m.year() === dayjs().year() ? m.format('M月') : m.format('YYYY年M月')))
+  return (
+    <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: `repeat(${MONTHS_PER_PAGE}, 1fr)`, gap: 4 }}>
+      {months.map(m => {
+        const monthStr = m.format('YYYY-MM')
+        const isSelected = current.format('YYYY-MM') === monthStr
+        const isHovered = hovered === monthStr
+        const presale = isPresaleMonth(m)
+        return (
+          <div
+            key={monthStr}
+            onClick={() => onChange(m)}
+            onMouseEnter={() => setHovered(monthStr)}
+            onMouseLeave={() => setHovered(null)}
+            style={{
+              minWidth: 0, padding: '5px 2px 4px', borderRadius: 6, position: 'relative', textAlign: 'center',
+              border: presale
+                ? '1px dashed #d9d9d9'
+                : isSelected ? '2px solid #fa8c16' : isHovered ? '2px solid #fa8c16' : '1px solid #e8e8e8',
+              background: presale
+                ? '#fafafa'
+                : isSelected ? '#fff7e6' : isHovered ? '#fff7e6' : '#fff',
+              cursor: 'pointer', transition: 'all 0.2s',
+            }}
+          >
+            <div style={{
+              fontSize: 13, lineHeight: '20px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+              fontWeight: !presale && (isSelected || isHovered) ? 700 : 500,
+              color: presale ? '#bfbfbf' : isSelected || isHovered ? '#fa8c16' : '#333',
+            }}>
+              {fmt(m)}
+            </div>
+            {/* 待開售標籤獨立成行（固定行高保持各 Tab 等高） */}
+            <div style={{ height: 15, lineHeight: '15px', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+              {presale && (
+                <span style={{ fontSize: 10, color: '#8c8c8c', border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>{presaleTag}</span>
+              )}
+            </div>
+            {hasSelectedDates?.(m) && (
+              <div style={{
+                position: 'absolute', top: 3, right: 3,
+                width: 8, height: 8, borderRadius: '50%',
+                background: '#ff4d4f',
+                animation: 'dotPulse 1.5s ease-in-out infinite',
+              }} />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 /** 待開售提醒彈窗 */
 interface PickerPresaleInfoModalProps {

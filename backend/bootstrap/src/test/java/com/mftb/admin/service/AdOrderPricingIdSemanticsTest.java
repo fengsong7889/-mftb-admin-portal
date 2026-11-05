@@ -13,6 +13,7 @@ import com.mftb.admin.mapper.AdOrderItemHotMapper;
 import com.mftb.admin.mapper.AdOrderItemNewStoreMapper;
 import com.mftb.admin.mapper.AdOrderItemReviveMapper;
 import com.mftb.admin.mapper.AdOrderItemSignboardMapper;
+import com.mftb.admin.mapper.AdOrderItemTimeSlotMapper;
 import com.mftb.admin.mapper.AdOrderItemStarMapper;
 import com.mftb.admin.mapper.AdOrderItemTrafficMapper;
 import com.mftb.admin.mapper.AdOrderMapper;
@@ -148,10 +149,11 @@ class AdOrderPricingIdSemanticsTest {
         AdOrderServiceImpl service = new AdOrderServiceImpl(
                 mock(AdOrderMapper.class), mock(AdOrderItemStarMapper.class), mock(AdCellQuotaService.class),
                 mock(AdOrderItemReviveMapper.class), mock(AdOrderItemNewStoreMapper.class), mock(AdOrderItemHotMapper.class),
-                mock(AdOrderItemSignboardMapper.class), mock(AdOrderItemTrafficMapper.class), mock(AdAlgorithmMapper.class),
+                mock(AdOrderItemSignboardMapper.class), mock(AdOrderItemTimeSlotMapper.class), mock(AdOrderItemTrafficMapper.class), mock(AdAlgorithmMapper.class),
                 mock(AdPricingHotMapper.class), mock(AdPricingHotSkinMapper.class), mock(AdPricingSignboardMapper.class),
                 mock(AdPricingTrafficMapper.class), mock(FinDetailMapper.class), mock(AdPricingStarService.class),
                 mock(AdPricingReviveService.class), hotPricingService, signboardPricingService,
+                mock(AdPricingTimeSlotService.class),
                 mock(FinAccountService.class), mock(FinWriteChainService.class), mock(BizSeqService.class),
                 mock(OperatorResolver.class), mock(DataScopeService.class), mock(BizStoreMapper.class));
 

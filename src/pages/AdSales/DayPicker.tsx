@@ -21,6 +21,7 @@ import {
 } from '../_shared/ad-promotion/dayPickerConstants'
 import { useDayPickerCommon } from '../_shared/ad-promotion/hooks/useDayPickerCommon'
 import PaymentSuccessModal from '../_shared/ad-promotion/components/PaymentSuccessModal'
+import { MonthTabBar } from './components/pickerShared'
 
 interface DayPickerProps {
   inventoryItem: InventoryItem
@@ -157,48 +158,15 @@ export default function DayPicker({ inventoryItem, storeMode }: DayPickerProps) 
             >
               ◀
             </Button>
-            <div style={{ flex: 1, display: 'flex', gap: 4 }}>
-            {common.visibleMonths.map(month => {
-              const monthStr = month.format('YYYY-MM')
-              const isSelected = common.currentMonth.format('YYYY-MM') === monthStr
-              const isHovered = common.hoveredMonth === monthStr
-              const hasSelectedDates = common.datesByMonth.some(g => g.month === monthStr)
-              const monthPresale = isPresaleDate(month.startOf('month'), common.sellableDays)
-              return (
-                <div
-                  key={monthStr}
-                  onClick={() => common.handleMonthChange(month)}
-                  onMouseEnter={() => common.setHoveredMonth(monthStr)}
-                  onMouseLeave={() => common.setHoveredMonth(null)}
-                  style={{
-                    flex: 1, padding: '8px 4px', borderRadius: 6, position: 'relative',
-                    border: monthPresale
-                      ? '1px dashed #d9d9d9'
-                      : isSelected ? '2px solid #fa8c16' : isHovered ? '2px solid #fa8c16' : '1px solid #e8e8e8',
-                    background: monthPresale
-                      ? '#fafafa'
-                      : isSelected ? '#fff7e6' : isHovered ? '#fff7e6' : '#fff',
-                    cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s', whiteSpace: 'nowrap', overflow: 'hidden',
-                  }}
-                >
-                  <span style={{ fontSize: 15, fontWeight: !monthPresale && (isSelected || isHovered) ? 700 : 500, color: monthPresale ? '#bfbfbf' : isSelected || isHovered ? '#fa8c16' : '#333' }}>
-                    {month.year() === dayjs().year() ? month.format(t('monthFormat')) : month.format(t('yearMonthFormat'))}
-                  </span>
-                  {monthPresale && (
-                    <span style={{ fontSize: 11, color: '#8c8c8c', marginLeft: 4, border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>{t('presaleTag')}</span>
-                  )}
-                  {hasSelectedDates && (
-                    <div style={{
-                      position: 'absolute', top: 3, right: 3,
-                      width: 8, height: 8, borderRadius: '50%',
-                      background: '#ff4d4f',
-                      animation: 'dotPulse 1.5s ease-in-out infinite',
-                    }} />
-                  )}
-                </div>
-              )
-            })}
-            </div>
+            <MonthTabBar
+              months={common.visibleMonths}
+              current={common.currentMonth}
+              isPresaleMonth={m => isPresaleDate(m.startOf('month'), common.sellableDays)}
+              hasSelectedDates={m => common.datesByMonth.some(g => g.month === m.format('YYYY-MM'))}
+              onChange={common.handleMonthChange}
+              labelOf={m => (m.year() === dayjs().year() ? m.format(t('monthFormat')) : m.format(t('yearMonthFormat')))}
+              presaleTag={t('presaleTag')}
+            />
             <Button
               size="small"
               disabled={common.monthPage >= common.monthPageCount - 1}

@@ -19,7 +19,7 @@ import {
   ALGO_CARD_COLOR_MAP,
 } from '@mftb/contracts/recommendConstants'
 import type { WaterfallSlotConfig } from '../types'
-import { fetchAdPricingList, updateAdPricingStatus, deleteAdPricing, fetchAdRevivePricingList, updateAdRevivePricingStatus, deleteAdRevivePricing, fetchAdHotPricingList, updateAdHotPricingStatus, deleteAdHotPricing, updateAdSignboardPricingStatus, deleteAdSignboardPricing, fetchAdSignboardPricingList, fetchAdTrafficPricingList, updateAdTrafficPricingStatus, deleteAdTrafficPricing, fetchAdAlgorithms, brandToAppType, type AdPricingStar, type AdPricingHot, type AdPricingTraffic, type AdAlgorithm } from '@/api/adPromotion'
+import { fetchAdPricingList, updateAdPricingStatus, deleteAdPricing, fetchAdRevivePricingList, updateAdRevivePricingStatus, deleteAdRevivePricing, fetchAdHotPricingList, updateAdHotPricingStatus, deleteAdHotPricing, updateAdSignboardPricingStatus, deleteAdSignboardPricing, fetchAdSignboardPricingList, fetchAdTrafficPricingList, updateAdTrafficPricingStatus, deleteAdTrafficPricing, fetchAdTimeSlotPricingList, updateAdTimeSlotPricingStatus, deleteAdTimeSlotPricing, fetchAdAlgorithms, brandToAppType, type AdPricingStar, type AdPricingHot, type AdPricingTraffic, type AdPricingTimeSlot, type AdAlgorithm } from '@/api/adPromotion'
 import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { useCardOrder } from '@/hooks/useCardOrder'
 
@@ -44,6 +44,7 @@ const TAB_ALGORITHM_MAP: Record<string, AlgorithmType[]> = {
     AlgorithmType.POPULAR_MERCHANT_KA,
     AlgorithmType.TRAFFIC_AD,
     AlgorithmType.GOLDEN_SIGNBOARD,
+    AlgorithmType.TIME_SLOT_AD,
   ],
   groupBuy: [
     AlgorithmType.INVINCIBLE_STAR,
@@ -77,6 +78,7 @@ const ALGORITHM_TYPE_COLOR: Record<AlgorithmType, string> = {
   [AlgorithmType.GOLD_AD]: 'gold',
   [AlgorithmType.GOLDEN_SIGNBOARD]: 'gold',
   [AlgorithmType.PRODUCT_PROMO]: 'red',
+  [AlgorithmType.TIME_SLOT_AD]: 'gold',
 }
 
 /** 投流廣告計價配置 → 定價列表行（業務頻道來自 bizChannel 而非展示頁面 channel） */
@@ -103,6 +105,28 @@ const toTrafficPricingRow = (vo: AdPricingTraffic): WaterfallSlotConfig => {
     source: 'api',
   }
 }
+
+/** 時段推薦計價配置 → 定價列表行（無算法，名稱取 algoName；algorithmId 以 0 佔位） */
+const toTimeSlotPricingRow = (vo: AdPricingTimeSlot): WaterfallSlotConfig => ({
+  id: -(vo.id ?? 0),
+  adId: `TS${String(vo.id ?? 0).padStart(6, '0')}`,
+  pricingNo: vo.pricingNo,
+  promotionName: vo.algoName || '-',
+  app: (brandToAppType(vo.brand) ?? AppType.SHANFENG) as AppType,
+  channel: (vo.channel ?? RecommendChannel.DELIVERY) as RecommendChannel,
+  bizChannel: vo.channel === RecommendChannel.GROUP_BUY ? 'groupBuy' : vo.channel === RecommendChannel.SUPERMARKET ? 'supermarket' : 'food',
+  slotPosition: 0,
+  algorithmId: vo.algoId ?? 0,
+  algorithmName: vo.algoName || '-',
+  algorithmType: AlgorithmType.TIME_SLOT_AD,
+  merchantLimit: 'unlimited',
+  regionLimit: 'unlimited',
+  status: (vo.status ?? ServiceStatus.ENABLED) as ServiceStatus,
+  updatedBy: vo.updatedBy || '-',
+  updatedAt: vo.updatedAt ? dayjs(vo.updatedAt).format('YYYY-MM-DD HH:mm:ss') : '-',
+  createdAt: vo.createdAt ? dayjs(vo.createdAt).format('YYYY-MM-DD HH:mm:ss') : '-',
+  source: 'api',
+})
 
 /** 後端計價配置 → 定價列表行（按來源設置算法類型） */
 const toPricingRow = (vo: AdPricingStar, algoType: AlgorithmType): WaterfallSlotConfig => ({
@@ -156,6 +180,7 @@ export default function Waterfall() {
     { type: AlgorithmType.POPULAR_MERCHANT_KA, icon: '🏆', description: t('waterfall.descPopularMerchant') },
     { type: AlgorithmType.TRAFFIC_AD, icon: '📊', description: t('algorithm.descTraffic') },
     { type: AlgorithmType.GOLDEN_SIGNBOARD, icon: '🏅', description: t('algorithm.descGoldenSignboard') },
+    { type: AlgorithmType.TIME_SLOT_AD, icon: '⏰', description: t('algorithm.descTimeSlotAd') },
   ]
 
   /** 算法类型标签映射（复用 algorithm 命名空间，依赖 t，定义在组件内以便响应语言切换） */
@@ -172,6 +197,7 @@ export default function Waterfall() {
     [AlgorithmType.GOLD_AD]: t('algorithm.typeGoldAd'),
     [AlgorithmType.GOLDEN_SIGNBOARD]: t('algorithm.typeGoldenSignboard'),
     [AlgorithmType.PRODUCT_PROMO]: t('algorithm.typeProductPromo'),
+    [AlgorithmType.TIME_SLOT_AD]: t('algorithm.typeTimeSlotAd'),
   }
 
   /** 展示頁面映射（依赖 t，定义在组件内以便响应语言切换） */
@@ -206,7 +232,7 @@ export default function Waterfall() {
   const tAlgorithmTypeOptions = useMemo(() => ALGORITHM_TYPE_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
   const tRegionOptions = useMemo(() => REGION_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
 
-  /** 加载定价列表（无敌星星 + 盘活复苏 + 人气商家 + 金字招牌 + 投流广告五路并行拉取后合并）+ 算法列表 */
+  /** 加载定价列表（无敌星星 + 盘活复苏 + 人气商家 + 金字招牌 + 投流广告 + 时段推荐广告六路并行拉取后合并）+ 算法列表 */
   useEffect(() => {
     let mounted = true
     Promise.all([
@@ -215,9 +241,10 @@ export default function Waterfall() {
       fetchAdHotPricingList({ page: 1, size: 200 }).catch(() => ({ records: [] as AdPricingHot[], total: 0 })),
       fetchAdSignboardPricingList({ page: 1, size: 200 }).catch(() => ({ records: [] as AdPricingStar[], total: 0 })),
       fetchAdTrafficPricingList({ page: 1, size: 200 }).catch(() => ({ records: [] as AdPricingTraffic[], total: 0 })),
+      fetchAdTimeSlotPricingList({ page: 1, size: 200 }).catch(() => ({ records: [] as AdPricingTimeSlot[], total: 0 })),
       fetchAdAlgorithms({ page: 1, size: 500 }).catch(() => ({ records: [] as AdAlgorithm[], total: 0 })),
     ])
-      .then(([starRes, reviveRes, hotRes, signboardRes, trafficRes, algoRes]) => {
+      .then(([starRes, reviveRes, hotRes, signboardRes, trafficRes, timeSlotRes, algoRes]) => {
         if (!mounted) return
         const list = [
           ...(starRes.records ?? []).map(vo => toPricingRow(vo, AlgorithmType.INVINCIBLE_STAR)),
@@ -225,6 +252,7 @@ export default function Waterfall() {
           ...(hotRes.records ?? []).map(vo => toPricingRow(vo as unknown as AdPricingStar, AlgorithmType.POPULAR_MERCHANT_KA)),
           ...(signboardRes.records ?? []).map(vo => toPricingRow({ ...vo, presaleDays: vo.presaleDays ?? 0 } as AdPricingStar, AlgorithmType.GOLDEN_SIGNBOARD)),
           ...(trafficRes.records ?? []).map(toTrafficPricingRow),
+          ...(timeSlotRes.records ?? []).map(toTimeSlotPricingRow),
         ]
         setDataList(list)
         // 缓存全量算法列表（排除金字招牌，只需标签不需坑位配置；algoCode 前缀 SFJZ 兜底过滤）
@@ -388,6 +416,8 @@ export default function Waterfall() {
               await deleteAdSignboardPricing(-record.id)
             } else if (record.algorithmType === AlgorithmType.TRAFFIC_AD) {
               await deleteAdTrafficPricing(-record.id)
+            } else if (record.algorithmType === AlgorithmType.TIME_SLOT_AD) {
+              await deleteAdTimeSlotPricing(-record.id)
             } else {
               await deleteAdPricing(-record.id)
             }
@@ -426,6 +456,8 @@ export default function Waterfall() {
               await updateAdSignboardPricingStatus(-record.id, newStatus)
             } else if (record.algorithmType === AlgorithmType.TRAFFIC_AD) {
               await updateAdTrafficPricingStatus(-record.id, newStatus)
+            } else if (record.algorithmType === AlgorithmType.TIME_SLOT_AD) {
+              await updateAdTimeSlotPricingStatus(-record.id, newStatus)
             } else {
               await updateAdPricingStatus(-record.id, newStatus)
             }
@@ -444,7 +476,7 @@ export default function Waterfall() {
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
     { key: 'pricingNo', title: t('waterfall.colConfigId') },
-    { key: 'promotionName', title: selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? '人氣名稱' : t('waterfall.colAlgorithmName') },
+    { key: 'promotionName', title: selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? '人氣商家名稱' : t('waterfall.colAlgorithmName') },
     { key: 'app', title: t('common.colBrand') },
     { key: 'bizChannel', title: t('waterfall.colBizChannel') },
     { key: 'status', title: t('common.colStatus') },
@@ -467,7 +499,7 @@ export default function Waterfall() {
       render: (text: string) => <Tag color="blue">{text || '-'}</Tag>,
     },
     { 
-      title: selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? '人氣名稱' : t('waterfall.colAlgorithmName'),
+      title: selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? '人氣商家名稱' : t('waterfall.colAlgorithmName'),
       dataIndex: 'promotionName',
       key: 'promotionName',
       width: 200,
@@ -618,7 +650,7 @@ export default function Waterfall() {
                     card => card.type,
                   ).map(card => {
                       const cardOrder = tabKey === 'delivery' ? deliveryCardOrder : groupBuyCardOrder
-                      const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.POPULAR_MERCHANT_KA || card.type === AlgorithmType.GOLDEN_SIGNBOARD || card.type === AlgorithmType.TRAFFIC_AD
+                      const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.POPULAR_MERCHANT_KA || card.type === AlgorithmType.GOLDEN_SIGNBOARD || card.type === AlgorithmType.TRAFFIC_AD || card.type === AlgorithmType.TIME_SLOT_AD
                       return (
                         <div
                           key={card.type}
@@ -697,7 +729,7 @@ export default function Waterfall() {
           <Form.Item label={t('waterfall.colConfigId')} name="adId">
             <Input placeholder={t('waterfall.placeholderConfigId')} allowClear />
           </Form.Item>
-          <Form.Item label={selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? '人氣名稱' : t('waterfall.colAlgorithmName')} name="promotionName">
+          <Form.Item label={selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? '人氣商家名稱' : t('waterfall.colAlgorithmName')} name="promotionName">
             <Select 
               placeholder={t('waterfall.placeholderSearch')} 
               allowClear
@@ -1012,7 +1044,7 @@ export default function Waterfall() {
               <Descriptions.Item label={t('waterfall.placementPage')}>
                 {CHANNEL_LABEL[viewingRecord.channel]}
               </Descriptions.Item>
-              <Descriptions.Item label={viewingRecord.algorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? '人氣名稱' : t('waterfall.colAlgorithmName')} span={2}>
+              <Descriptions.Item label={viewingRecord.algorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? '人氣商家名稱' : t('waterfall.colAlgorithmName')} span={2}>
                 <strong>{viewingRecord.algorithmName}</strong>
               </Descriptions.Item>
               <Descriptions.Item label={t('waterfall.adType')}>

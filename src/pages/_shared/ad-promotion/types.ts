@@ -135,6 +135,13 @@ export const RECOMMEND_TYPE_CONFIGS: RecommendTypeConfig[] = [
     enabled: true,
   },
   {
+    type: AlgorithmType.TIME_SLOT_AD,
+    name: '時段推薦廣告',
+    icon: '⏰',
+    description: '按早/午/下午茶/晚餐/宵夜或自定義時段推薦',
+    enabled: true,
+  },
+  {
     type: AlgorithmType.PRODUCT_PROMO,
     name: '商品促銷',
     icon: '🎯',
@@ -204,6 +211,7 @@ export function generateMockInventory(
     [AlgorithmType.GOLD_AD]: '點金廣告',
     [AlgorithmType.GOLDEN_SIGNBOARD]: '金字招牌',
     [AlgorithmType.PRODUCT_PROMO]: '商品促銷',
+    [AlgorithmType.TIME_SLOT_AD]: '時段推薦廣告',
   }
   
   // 各类型的推广名称后缀

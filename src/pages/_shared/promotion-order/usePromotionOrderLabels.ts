@@ -72,6 +72,7 @@ export function usePromotionOrderLabels(orderType: string): PromotionOrderLabels
       [RecommendType.TRAFFIC_AD]: t('promotionReport.recTypeTraffic'),
       [RecommendType.POPULAR_MERCHANT_KA]: t('promotionOrderManage.recTypePopular'),
       [RecommendType.GOLDEN_SIGNBOARD]: t('promotionOrderManage.recTypeGoldenSignboard'),
+      [RecommendType.TIME_SLOT_AD]: t('algorithm.typeTimeSlotAd'),
     }
     return map[v] || String(v)
   }

@@ -178,6 +178,12 @@ public class BizSeqRuleInitializer implements CommandLineRunner {
      */
     private static final String V_INIT_AI_ACCESS_RULE_KEY = "seq:init-v22";
 
+    /** 時段推薦定價編號規則登記（seq:init-v23） */
+    private static final String V_INIT_TIMESLOT_PRICING_RULE = "seq:init-v23";
+
+    /** 時段推薦訂單編號規則登記（seq:init-v24） */
+    private static final String V_INIT_TIMESLOT_ORDER_RULE = "seq:init-v24";
+
     /** AI 使用申請規則的舊 key（僅作存量對齊依據，新代碼一律用 BizSeqService.RULE_AI_ACCESS_REQUEST） */
     private static final String LEGACY_AI_ACCESS_RULE_KEY = "ai_access";
 
@@ -255,6 +261,10 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
         versionTracker.applyOnce(V_INIT_RDM_MENU_LABEL_RENAME, this::renameRdmRuleBizMenu);
         versionTracker.applyOnce(V_INIT_AI_ACCESS_RULE_KEY,
                 this::alignAiAccessRuleKey, this::verifyAiAccessRuleKey);
+        versionTracker.applyOnce(V_INIT_TIMESLOT_PRICING_RULE,
+                this::seedTimeSlotPricingRule, this::verifyTimeSlotPricingRule);
+        versionTracker.applyOnce(V_INIT_TIMESLOT_ORDER_RULE,
+                this::seedTimeSlotOrderRule, this::verifyTimeSlotOrderRule);
     }
 
     /**
@@ -287,6 +297,42 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
         if (countRule(BizSeqService.RULE_AI_ACCESS_REQUEST) == 0) {
             throw new IllegalStateException(
                     "AI 使用申請流程編號規則未就緒: " + BizSeqService.RULE_AI_ACCESS_REQUEST);
+        }
+    }
+
+    /**
+     * 時段推薦定價編號規則種子（DJSD 前綴，銷售定價菜單）。
+     * 用獨立版本鍵，不併入 PRICING_RULES——後者被投流遷移的 verifyTrafficAlgoPrefixAndPricingMenu
+     * 以「5 條」硬斷言，加行會撞校驗。
+     */
+    void seedTimeSlotPricingRule() {
+        upsertRule("config_pricing_timeslot", "時段推薦定價", PRICING_BIZ_MENU, "DJSD",
+                "YYYYMMDD", 3, 0, "{prefix} + YYYYMMDD + {n}位自增序號");
+        bizSeqService.refreshRules();
+    }
+
+    /** 後置校驗：時段推薦定價規則已登記，否則不記版本、下次啟動重試 */
+    void verifyTimeSlotPricingRule() {
+        if (countRule("config_pricing_timeslot") == 0) {
+            throw new IllegalStateException("時段推薦定價編號規則未就緒: config_pricing_timeslot");
+        }
+    }
+
+    /**
+     * 時段推薦訂單編號規則種子（DDSD 前綴，廣告銷售菜單）。
+     * 用獨立版本鍵，不併入 AD_ORDER_RULES——後者被 seq:init-v20 的 verifyAdOrderCodes
+     * 以固定條數硬斷言，加行會撞校驗。
+     */
+    void seedTimeSlotOrderRule() {
+        upsertRule(BizSeqService.RULE_AD_ORDER_TIMESLOT, "時段推薦訂單", AD_ORDER_BIZ_MENU, "DDSD",
+                "YYYYMMDD", 4, 0, "{prefix} + YYYYMMDD + {n}位自增序號");
+        bizSeqService.refreshRules();
+    }
+
+    /** 後置校驗：時段推薦訂單規則已登記，否則不記版本、下次啟動重試 */
+    void verifyTimeSlotOrderRule() {
+        if (countRule(BizSeqService.RULE_AD_ORDER_TIMESLOT) == 0) {
+            throw new IllegalStateException("時段推薦訂單編號規則未就緒: " + BizSeqService.RULE_AD_ORDER_TIMESLOT);
         }
     }
 
