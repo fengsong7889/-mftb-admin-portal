@@ -1251,7 +1251,7 @@ export default function RequirementList({
       render: (_, r) => {
         if (r.flowVersion !== 3 || !r.deliveryItemCount) return '-'
         return (
-          <span style={{ color: '#2F54EB', fontWeight: 500 }}>
+          <span style={{ color: 'var(--info-deep)', fontWeight: 500 }}>
             {r.deliveryDoneCount ?? 0}/{r.deliveryItemCount}
           </span>
         )

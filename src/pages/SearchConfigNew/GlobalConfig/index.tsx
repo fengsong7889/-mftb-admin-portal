@@ -351,7 +351,7 @@ function LegacyGlobalConfig() {
           <Card
             title={<span style={{ color: '#1d39c4', fontWeight: 600 }}>{t('globalConfig.libTitle')}</span>}
             size="small"
-            style={{ borderColor: '#d6e4ff' }}
+            style={{ borderColor: 'var(--info-hover-border)' }}
             styles={{ header: { background: '#f0f5ff', borderBottom: '1px solid #d6e4ff' } }}
           >
             {/* 詞庫開關 2x2 网格 */}

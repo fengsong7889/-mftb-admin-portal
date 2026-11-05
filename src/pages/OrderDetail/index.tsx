@@ -866,11 +866,11 @@ export default function OrderDetail() {
               </colgroup>
               <thead>
                 <tr style={{ background: 'var(--surface-3)' }}>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('promotionOrderManage.colRegion')}</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colSlot')}</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colOriginalPrice')}</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colDiscount')}</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colFinalPrice')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('promotionOrderManage.colRegion')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colSlot')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colOriginalPrice')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colDiscount')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colFinalPrice')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -939,10 +939,10 @@ export default function OrderDetail() {
               </colgroup>
               <thead>
                 <tr style={{ background: 'var(--surface-3)' }}>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colSlot')}</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colOriginalPrice')}</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colDiscount')}</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colFinalPrice')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colSlot')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colOriginalPrice')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colDiscount')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colFinalPrice')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1004,11 +1004,11 @@ export default function OrderDetail() {
                 </colgroup>
                 <thead>
                   <tr style={{ background: 'var(--surface-3)' }}>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{(isPopular || isRevive) ? t('orderDetail.promoDate') : t('orderDetail.colSlot')}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{isPopular ? t('orderDetail.dailyPrice') : isRevive ? t('orderDetail.dayPrice') : t('orderDetail.colOriginalPrice')}</th>
-                    {!isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colDiscount')}</th>}
-                    {!isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colFinalPrice')}</th>}
-                    {isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoStatus')}</th>}
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{(isPopular || isRevive) ? t('orderDetail.promoDate') : t('orderDetail.colSlot')}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{isPopular ? t('orderDetail.dailyPrice') : isRevive ? t('orderDetail.dayPrice') : t('orderDetail.colOriginalPrice')}</th>
+                    {!isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colDiscount')}</th>}
+                    {!isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colFinalPrice')}</th>}
+                    {isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.promoStatus')}</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -1059,9 +1059,9 @@ export default function OrderDetail() {
                 </colgroup>
                 <thead>
                   <tr style={{ background: 'var(--surface-3)' }}>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.deductDays')}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoStatus')}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.promoDate')}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.deductDays')}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.promoStatus')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1127,11 +1127,11 @@ export default function OrderDetail() {
                 </colgroup>
                 <thead>
                   <tr style={{ background: 'var(--surface-3)' }}>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{'標籤名稱'}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{'推廣商圈'}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.dailyPrice')}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoStatus')}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{'標籤名稱'}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{'推廣商圈'}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.promoDate')}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.dailyPrice')}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.promoStatus')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1677,12 +1677,12 @@ export default function OrderDetail() {
                               </colgroup>
                               <thead>
                                 <tr style={{ background: 'var(--surface-3)' }}>
-                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{'標籤名稱'}</th>
-                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{'推廣商圈'}</th>
-                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
-                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colImpressions')}</th>
-                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colClicks')}</th>
-                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colCtr')}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{'標籤名稱'}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{'推廣商圈'}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.promoDate')}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colImpressions')}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colClicks')}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colCtr')}</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -1782,13 +1782,13 @@ export default function OrderDetail() {
                             </colgroup>
                             <thead>
                               <tr style={{ background: 'var(--surface-3)' }}>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colImpressions')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.promoDate')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colImpressions')}</th>
                                 {isTrafficAd && (
-                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>消耗金額</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>消耗金額</th>
                                 )}
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colClicks')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colCtr')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colClicks')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colCtr')}</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -1827,11 +1827,11 @@ export default function OrderDetail() {
                             </colgroup>
                             <thead>
                               <tr style={{ background: 'var(--surface-3)' }}>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colSlot')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colImpressions')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colClicks')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colCtr')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.promoDate')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colSlot')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colImpressions')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colClicks')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colCtr')}</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -1881,11 +1881,11 @@ export default function OrderDetail() {
                             </colgroup>
                             <thead>
                               <tr style={{ background: 'var(--surface-3)' }}>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('promotionOrderManage.colRegion')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colSlot')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colImpressions')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colClicks')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colCtr')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('promotionOrderManage.colRegion')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colSlot')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colImpressions')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colClicks')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)' }}>{t('orderDetail.colCtr')}</th>
                               </tr>
                             </thead>
                             <tbody>
