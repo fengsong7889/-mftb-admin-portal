@@ -84,7 +84,21 @@ export function facilityOptions(): { value: string; label: string }[] {
   return Object.entries(facilityLabels()).map(([value, label]) => ({ value, label }))
 }
 
-/** 关联业务类型 */
+/**
+ * 会议类型下拉顺序：高频在前，别让运营为了一个「需求对接」翻整张表。
+ *
+ * <p>取值必须逐字等于后端 MeetingConstants.BIZ_TYPES：不一致时要么下拉里选得到却被服务端拒，
+ * 要么选不到但存量数据能读到（只能退化成显示原始码）。
+ * <p>新增类型只在这里加一行 ASCII，文案真值放语言包（i18n 覆盖棘轮只降不升，
+ * 不再往中文兜底表加行）。
+ */
+const BIZ_TYPE_ORDER = [
+  'general', 'requirement_alignment', 'rdm_review', 'project_kickoff', 'team_sync',
+  'design_review', 'retrospective', 'brainstorm', 'one_on_one', 'customer_meeting',
+  'interview', 'training',
+]
+
+/** 关联业务类型：存量四项的中文兜底（它们早于语言包存在，保留作回落真值） */
 const BIZ_TYPE_SOURCE: Record<string, string> = {
   general: '一般會議',
   rdm_review: '需求評審',
@@ -92,10 +106,15 @@ const BIZ_TYPE_SOURCE: Record<string, string> = {
   training: '培訓',
 }
 
+/** 类型码 → i18n key：snake_case 转 camelCase */
+const bizTypeKey = (code: string): string =>
+  `meeting.meta.bizType.${code.replace(/_(\w)/g, (_, c: string) => c.toUpperCase())}`
+
 export function bizTypeLabels(): Record<string, string> {
   const out: Record<string, string> = {}
-  for (const [code, zh] of Object.entries(BIZ_TYPE_SOURCE)) {
-    out[code] = tl(`meeting.meta.bizType.${code.replace(/_(\w)/g, (_, c: string) => c.toUpperCase())}`, zh)
+  for (const code of BIZ_TYPE_ORDER) {
+    const zh = BIZ_TYPE_SOURCE[code]
+    out[code] = zh ? tl(bizTypeKey(code), zh) : i18n.t(bizTypeKey(code))
   }
   return out
 }

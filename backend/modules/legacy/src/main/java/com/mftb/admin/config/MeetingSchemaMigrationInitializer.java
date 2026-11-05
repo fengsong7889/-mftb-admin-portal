@@ -89,11 +89,23 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
      */
     static final String VERSION_MENU_V14 = "meeting:menu:v1.4";
 
+    /**
+     * 会议类型扩充：放宽 {@code ck_meeting_booking_biz_type} 并刷新列注释。
+     *
+     * <p>为什么单独一个版本键：v1.0/v1.1 已记录的库不会重跑它们的 task，把新取值写进 230
+     * 对存量环境等于没改——新类型会在写库时被旧 CHECK 打回成「數據庫操作異常」。
+     * <p>白名单唯一真值是 {@link MeetingConstants#BIZ_TYPES}，DDL 与 Java 校验同源；
+     * 331 脚本仅作参考文档，不可整脚本重放（MySQL 8 无 DROP CHECK IF EXISTS）。
+     */
+    static final String VERSION_SCHEMA_V12 = "meeting:schema:v1.2";
+
     /** 黑名單菜單 key（與 MeetingConstants.MENU_BLACKLIST 一致） */
     private static final String MENU_BLACKLIST_KEY = MeetingConstants.MENU_BLACKLIST;
 
     private static final String SCHEMA_SCRIPT = "230_meeting_core_tables.sql";
     private static final String SCHEMA_SCRIPT_M2 = "231_meeting_series_blacklist.sql";
+    /** 会议类型白名单放宽的参考脚本（实际执行由 doBizTypeExpand 带守卫完成） */
+    private static final String BIZ_TYPE_SCRIPT = "331_meeting_biz_type_expand.sql";
 
     private static final String SYSTEM_CODE = SystemCode.MEETING.code();
     private static final String ADMIN_ROLE_CODE = "admin";
@@ -306,6 +318,7 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce(VERSION_SEED_V11, this::doSeedCopyFix, this::verifySeedCopyFix);
         versionTracker.applyOnce(VERSION_MENU_V13, this::doMenuPromoteUsage, this::verifyMenuPromoteUsage);
         versionTracker.applyOnce(VERSION_MENU_V14, this::doMenuReservationSplit, this::verifyMenuReservationSplit);
+        versionTracker.applyOnce(VERSION_SCHEMA_V12, this::doBizTypeExpand, this::verifyBizTypeExpand);
         // 移出 applyOnce 的部分每次启动重放：版本已记录的库不会重跑 task，
         // 编号规则/场景/配置的展示元数据若只写在 task 里，改动永远不会落到已有环境
         syncSeqRule();
@@ -355,6 +368,61 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
             if (!columnExists(col[0], col[1])) {
                 throw new IllegalStateException(col[0] + "." + col[1]
                         + " 列缺失，實體按字段拼 SELECT 會在首次查詢時報 bad SQL grammar");
+            }
+        }
+    }
+
+    /* ==================== 1.5 会议类型白名单扩充 ==================== */
+
+    /**
+     * v1.2：放宽 ck_meeting_booking_biz_type 并刷新列注释。
+     *
+     * <p>顺序固定为 DROP → MODIFY → ADD：列注释里写着旧的四种取值，不刷新会误导后来人；
+     * 而带 CHECK 依赖直接 MODIFY 在 MySQL 8 上并非所有版本都放行，先摘掉约束再改列最稳。
+     * <p>可重入：约束不存在（全新库之外只有早期手工建表的环境）时不 DROP，避免
+     * BadSqlGrammarException 把整个迁移卡在不记版本的状态。
+     */
+    private void doBizTypeExpand() {
+        if (checkConstraintExists("biz_meeting_booking", "ck_meeting_booking_biz_type")) {
+            jdbcTemplate.execute("ALTER TABLE biz_meeting_booking DROP CHECK ck_meeting_booking_biz_type");
+        }
+        // 列注释与 CHECK 同源于 BIZ_TYPES：排序后拼接，不让两处各写一份字面量飘移
+        String values = String.join("/", MeetingConstants.BIZ_TYPES.stream().sorted().toList());
+        jdbcTemplate.execute("ALTER TABLE biz_meeting_booking MODIFY COLUMN biz_type VARCHAR(24) "
+                + "NOT NULL DEFAULT 'general' COMMENT '關聯業務類型：" + values + "'");
+        jdbcTemplate.execute("ALTER TABLE biz_meeting_booking ADD CONSTRAINT ck_meeting_booking_biz_type "
+                + "CHECK (biz_type IN " + MeetingConstants.bizTypeSqlInList() + ")");
+        log.info("會議類型白名單已擴充：{} 項取值（參考腳本 {}）", MeetingConstants.BIZ_TYPES.size(), BIZ_TYPE_SCRIPT);
+    }
+
+    /**
+     * v1.2 后置校验：CHECK 必须真的强制生效，且约束文本包含全白名单取值。
+     *
+     * <p>为什么不能只验「约束存在」：本迁移改的是取值集合，约束存在但仍是旧四项时，
+     * 新类型提交照样被数据库打回——只有实查 CHECK_CLAUSE 才能证明放宽生效。
+     * <p>表名必须从 {@code TABLE_CONSTRAINTS} 关联取：MySQL 8 的 {@code CHECK_CONSTRAINTS} 只有
+     * CONSTRAINT_SCHEMA/CONSTRAINT_NAME/CHECK_CLAUSE，没有 TABLE_NAME 列；拿表名直接筛它会报
+     * Unknown column 并让启动失败（开发库实测）。约束名在同一 schema 内不保证全局唯一，
+     * 因此下钻到表级而不是只按约束名查。
+     * <p>比对前先去掉反斜杠：MySQL 8 回传的 CHECK_CLAUSE 会给字面量加字符集引入符并转义引号
+     * （实测为 {@code _utf8mb4\'brainstorm\'}），直接按 {@code 'value'} 匹配会把已放宽的约束
+     * 误判成未放宽，不记版本、下次启动重跑，开发库因此反复启动失败。
+     * <p>必须要求 ENFORCED='YES'：不被强制的 CHECK 等于不存在，记成「已迁移」比没记更危险。
+     */
+    private void verifyBizTypeExpand() {
+        if (!checkConstraintExists("biz_meeting_booking", "ck_meeting_booking_biz_type")) {
+            throw new IllegalStateException("CHECK ck_meeting_booking_biz_type 缺失或未強制（ENFORCED!=YES）");
+        }
+        String clause = jdbcTemplate.queryForObject(
+                "SELECT cc.CHECK_CLAUSE FROM information_schema.CHECK_CONSTRAINTS cc "
+                        + "JOIN information_schema.TABLE_CONSTRAINTS tc "
+                        + "  ON tc.CONSTRAINT_SCHEMA = cc.CONSTRAINT_SCHEMA AND tc.CONSTRAINT_NAME = cc.CONSTRAINT_NAME "
+                        + "WHERE cc.CONSTRAINT_SCHEMA = DATABASE() AND cc.CONSTRAINT_NAME = 'ck_meeting_booking_biz_type' "
+                        + "AND tc.TABLE_NAME = 'biz_meeting_booking'", String.class);
+        String actual = clause == null ? "" : clause.replace("\\", "");
+        for (String value : MeetingConstants.BIZ_TYPES) {
+            if (!actual.contains("'" + value + "'")) {
+                throw new IllegalStateException("會議類型 CHECK 未包含 " + value + "（實際：" + actual + "）");
             }
         }
     }
@@ -1115,6 +1183,24 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
                 "SELECT COUNT(*) FROM information_schema.COLUMNS "
                         + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
                 Integer.class, table, column);
+        return n != null && n > 0;
+    }
+
+    /**
+     * CHECK 约束是否已存在且处于强制状态。
+     *
+     * <p>读 {@code TABLE_CONSTRAINTS}而不是 {@code CHECK_CONSTRAINTS}：MySQL 8 的
+     * {@code CHECK_CONSTRAINTS} 没有 ENFORCED 列（拿它当筛选条件会直接 BadSqlGrammarException，
+     * 整个迁移因而不记版本）；ENFORCED 在 TABLE_CONSTRAINTS 上，与 RDM 侧保持同一查法。
+     * <p>必须要求 ENFORCED='YES'：不被强制的 CHECK（旧版本/被人为置 NO）兑底等于不存在，
+     * 记成「已迁移」比没记更危险。
+     */
+    private boolean checkConstraintExists(String table, String constraintName) {
+        Integer n = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS "
+                        + "WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = ? "
+                        + "AND CONSTRAINT_NAME = ? AND CONSTRAINT_TYPE = 'CHECK' AND ENFORCED = 'YES'",
+                Integer.class, table, constraintName);
         return n != null && n > 0;
     }
 

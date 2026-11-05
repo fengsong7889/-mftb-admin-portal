@@ -38,7 +38,7 @@ public class MeetingBooking {
 
     private String title;
 
-    /** general/rdm_review/interview/training */
+    /** 会议类型，取值见 MeetingConstants.BIZ_TYPES；数据库 CHECK 与它同源 */
     private String bizType;
 
     /** 关联业务对象ID（如 rdm 需求ID） */

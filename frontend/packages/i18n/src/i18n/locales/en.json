@@ -12622,7 +12622,15 @@
       },
       "bizType": {
         "general": "General",
+        "requirementAlignment": "Requirement alignment",
         "rdmReview": "Requirement review",
+        "projectKickoff": "Project kickoff",
+        "teamSync": "Team sync / weekly",
+        "designReview": "Design review",
+        "retrospective": "Retrospective",
+        "brainstorm": "Brainstorming",
+        "oneOnOne": "1:1",
+        "customerMeeting": "Customer / business",
         "interview": "Interview",
         "training": "Training"
       },

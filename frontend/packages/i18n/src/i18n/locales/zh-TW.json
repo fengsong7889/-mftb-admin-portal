@@ -12622,7 +12622,15 @@
       },
       "bizType": {
         "general": "一般會議",
+        "requirementAlignment": "需求對接",
         "rdmReview": "需求評審",
+        "projectKickoff": "項目啟動會",
+        "teamSync": "例會／週會",
+        "designReview": "方案評審",
+        "retrospective": "復盤會",
+        "brainstorm": "腦力激盪",
+        "oneOnOne": "1:1 溝通",
+        "customerMeeting": "客戶／商務會議",
         "interview": "面試",
         "training": "培訓"
       },
