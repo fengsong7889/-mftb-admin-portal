@@ -87,6 +87,11 @@ export function toDetailOrder(
     refundEnabled: boolean
     discountTiers: { minSlots: number; discount: number }[]
   },
+  /** 時段推薦專用：定價配置的時段折扣與天數檔位（缺失時降級為舊反推邏輯） */
+  timeSlotPricing?: {
+    slots: { slotName?: string | null; discountEnabled?: boolean | null; discount?: number | null }[]
+    daysTiers: { minDays: number; discount: number }[]
+  },
 ): OrderItem {
   // 后端 LocalDateTime 统一序列化为毫秒时间戳，兼容字符串/数字两种格式
   const fmt = (t?: string | number) => {
@@ -107,7 +112,26 @@ export function toDetailOrder(
   const giftTotalVo = vo.giftAmount ?? 0
   const sumSaleVo = vo.items.reduce((s, i) => s + i.salePrice, 0)
   const giftRatio = sumSaleVo > 0 && actualTotalVo + giftTotalVo > 0 ? (actualTotalVo + giftTotalVo) / sumSaleVo : 1
+  // 時段推薦(16)且有定價配置：折扣列展示純時段折扣，折後價=原價×時段折扣（天數檔位折扣在彙總/公式第二段體現）
+  const isTimeSlotCfg = vo.algoType === 16 && !!timeSlotPricing
+  const slotRateByName = new Map<string, number>()
+  if (isTimeSlotCfg) {
+    timeSlotPricing!.slots.forEach(s => {
+      slotRateByName.set(s.slotName ?? '', s.discountEnabled && s.discount ? s.discount / 10 : 1)
+    })
+  }
   const slotPrices: SlotPriceItem[] = vo.items.map(item => {
+    if (isTimeSlotCfg) {
+      const rate = slotRateByName.get(item.mealSlot ?? '') ?? 1
+      return {
+        slot: item.mealSlot || '全天',
+        date: item.bizDate,
+        originalPrice: item.originalPrice,
+        discount: Math.round(rate * 10 * 10) / 10,
+        actualPrice: Math.round(item.originalPrice * rate * 100) / 100,
+        region: undefined,
+      }
+    }
     // 纯赠送抵扣时 salePrice=0，无法反推 → 直接用 originalPrice × 梯度折扣
     let afterSlot: number
     if (item.salePrice > 0) {
@@ -129,6 +153,26 @@ export function toDetailOrder(
   })
   const regions = vo.regions && vo.regions.length > 0 ? vo.regions : Array.from(new Set(vo.items.map(i => i.region).filter(Boolean)))
   const firstBizDate = vo.items.map(i => i.bizDate).sort()[0] || fmt(vo.orderTime).slice(0, 10)
+  // 時段推薦：兩段式折扣彙總（時段折扣小計 → 按去重天數命中天數檔位）
+  let timeSlotSummary: OrderItem['timeSlotSummary']
+  if (isTimeSlotCfg) {
+    const slotAfterSubtotal = Math.round(slotPrices.reduce((s, sp) => s + sp.actualPrice, 0) * 100) / 100
+    const originalSum = Math.round(slotPrices.reduce((s, sp) => s + sp.originalPrice, 0) * 100) / 100
+    const distinctDays = new Set(slotPrices.map(sp => sp.date)).size
+    const dayTier = [...timeSlotPricing!.daysTiers]
+      .filter(t => t.minDays <= distinctDays)
+      .sort((a, b) => b.minDays - a.minDays)[0] ?? null
+    const dayRate = dayTier ? dayTier.discount / 10 : 1
+    const finalSubtotal = Math.round(slotAfterSubtotal * dayRate * 100) / 100
+    timeSlotSummary = {
+      slotAfterSubtotal,
+      slotDiscountAmount: Math.round((originalSum - slotAfterSubtotal) * 100) / 100,
+      dayTier,
+      distinctDays,
+      dayDiscountAmount: Math.round((slotAfterSubtotal - finalSubtotal) * 100) / 100,
+      finalSubtotal,
+    }
+  }
   // TODO: 对接推广效果统计 API，当前不再生成 mock 推广数据
   const mappedStatus = mapAdStatus(vo.status)
   void mappedStatus // 未来对接推广 API 时使用
@@ -156,6 +200,7 @@ export function toDetailOrder(
     payTime: vo.payTime ? fmt(vo.payTime) : undefined,
     slotPrices,
     gradientDiscount: matchedTier ? { count: matchedTier.minSlots, discount: matchedTier.discount / 10 } : null,
+    timeSlotSummary,
     cancelFeeRules: pricing?.cancelFeeRules ?? [],
     refundAmount: vo.refundAmount ? vo.refundAmount : undefined,
     refundEnabled: vo.refundEnabled !== undefined ? vo.refundEnabled === 1 : (pricing?.refundEnabled ?? true),

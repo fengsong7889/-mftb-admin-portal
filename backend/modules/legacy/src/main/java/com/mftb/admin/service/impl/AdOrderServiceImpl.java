@@ -574,6 +574,12 @@ public class AdOrderServiceImpl implements AdOrderService {
                     new LambdaQueryWrapper<AdOrderItemSignboard>()
                             .eq(AdOrderItemSignboard::getOrderId, vo.getId()));
             return computeDayBasedEffectiveStatus(items.stream().map(AdOrderItemSignboard::getBizDate).toList(), today, status);
+        } else if (isTimeSlotType(vo.getAlgoType())) {
+            // 時段推薦: 按投放日期集合判定（起投日當天/之前 → 推廣中，全部過期 → 已推廣）
+            List<AdOrderItemTimeSlot> items = timeSlotItemMapper.selectList(
+                    new LambdaQueryWrapper<AdOrderItemTimeSlot>()
+                            .eq(AdOrderItemTimeSlot::getOrderId, vo.getId()));
+            return computeDayBasedEffectiveStatus(items.stream().map(AdOrderItemTimeSlot::getBizDate).toList(), today, status);
         } else if (isTrafficType(vo.getAlgoType())) {
             // 投流广告: 无日期维度，仍有投放中明细 → 推广中，否则 → 已推广（曝光消耗完毕或已退款）
             Long delivering = trafficItemMapper.selectCount(new LambdaQueryWrapper<AdOrderItemTraffic>()

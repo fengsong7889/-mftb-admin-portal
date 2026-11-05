@@ -97,6 +97,7 @@ export default function OrderDetail() {
       [RecommendType.TRAFFIC_AD]: t('promotionReport.recTypeTraffic'),
       [RecommendType.POPULAR_MERCHANT_KA]: t('promotionOrderManage.recTypePopular'),
       [RecommendType.GOLDEN_SIGNBOARD]: t('recommend.algoGoldenSignboard'),
+      [RecommendType.TIME_SLOT_AD]: t('algorithm.typeTimeSlotAd'),
     }
     return map[v] || String(v)
   }
@@ -147,6 +148,8 @@ export default function OrderDetail() {
       refundEnabled: boolean
       discountTiers: { minSlots: number; discount: number }[]
     } | undefined
+    /** 時段推薦專用：傳入定價的時段折扣與天數檔位，費用明細才能拆兩段折扣 */
+    let timeSlotPricing: Parameters<typeof toDetailOrder>[2]
     try {
       // 按算法類型取對應計價配置：盤活復蘇(3)/金字招牌(13)/無敵星星分開處理，避免聯合類型收窄丟失各自字段
       if (detail.algoType === 3) {
@@ -169,7 +172,7 @@ export default function OrderDetail() {
           }
         }
       } else if (detail.algoType === 16) {
-        // 時段推薦：algoId 存的是定價配置ID；折扣已逐格落在 salePrice，不取梯度
+        // 時段推薦：algoId 存的是定價配置ID；取時段折扣與天數檔位供兩段式費用明細
         const p = await fetchAdTimeSlotPricingDetail(detail.algoId).catch(() => null)
         if (p) {
           pricing = {
@@ -177,6 +180,18 @@ export default function OrderDetail() {
             refundEnabled: p.refundEnabled === 1,
             discountTiers: [],
           }
+          let daysTiers: { minDays: number; discount: number }[] = []
+          if (p.daysDiscountEnabled === 1 && p.daysDiscountTiers) {
+            try {
+              const arr: unknown = JSON.parse(p.daysDiscountTiers)
+              if (Array.isArray(arr)) {
+                daysTiers = (arr as { minDays?: number; discount?: number }[])
+                  .map(t => ({ minDays: Number(t.minDays) || 0, discount: Number(t.discount) || 0 }))
+                  .filter(t => t.minDays > 0 && t.discount > 0)
+              }
+            } catch { /* 配置解析失敗降級 */ }
+          }
+          timeSlotPricing = { slots: p.slots ?? [], daysTiers }
         }
       } else {
         const p = await fetchAdPricingActive(detail.algoId).catch(() => null)
@@ -191,7 +206,7 @@ export default function OrderDetail() {
     } catch {
       // 计价配置缺失时使用默认规则
     }
-    return toDetailOrder(detail, pricing)
+    return toDetailOrder(detail, pricing, timeSlotPricing)
   }
 
   useEffect(() => {
@@ -1244,15 +1259,54 @@ export default function OrderDetail() {
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>MOP {totalOriginal}</span>
             </div>
 
-            {/* ② 梯度折扣（所有訂單類型統一展示，固定第二步） */}
-            {!order.gradientDiscount && (
+            {/* ②-⑤ 時段推薦：時段折扣 + 購買天數檔位兩段式明細（與上方列表每格折扣對齊） */}
+            {isTimeSlotAd && order.timeSlotSummary && (() => {
+              const ts = order.timeSlotSummary
+              const totalDiscount = Math.round((ts.slotDiscountAmount + ts.dayDiscountAmount) * 100) / 100
+              return (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 90 }}>{'②'} {'時段折扣:'}</span>
+                    {ts.slotDiscountAmount > 0 ? (
+                      <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
+                        {'各時段原價×時段折扣'} <strong style={{ color: 'var(--warning)' }}>-MOP {ts.slotDiscountAmount}</strong>
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{t('orderDetail.noDiscount')}</span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 90 }}>{'③'} {'天數折扣:'}</span>
+                    {ts.dayTier ? (
+                      <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
+                        {'購買滿'}{ts.dayTier.minDays}{'天享'} <strong style={{ color: 'var(--brand)' }}>{ts.dayTier.discount}{t('orderDetail.foldSuffix')}</strong>
+                        {' ，共計天數 '}{ts.distinctDays}{' 天'} <strong style={{ color: 'var(--warning)' }}>-MOP {ts.dayDiscountAmount}</strong>
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{'未達折扣門檻（已選 ' + ts.distinctDays + ' 天）'}</span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 90 }}>{'④'} {t('orderDetail.orderDiscountLabel')}</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--warning)' }}>MOP {totalDiscount}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 90 }}>{'⑤'} {t('orderDetail.step3FinalPrice')}</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--brand)' }}>MOP {ts.finalSubtotal}</span>
+                  </div>
+                </>
+              )
+            })()}
+
+            {/* ② 梯度折扣（所有訂單類型統一展示，固定第二步；時段推薦走上方兩段式塊不重復渲染） */}
+            {!order.gradientDiscount && !order.timeSlotSummary && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 90 }}>{'②'} {t('orderDetail.gradientDiscountLabel')}</span>
                 <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{t('orderDetail.noDiscount')}</span>
               </div>
             )}
 
-            {order.gradientDiscount && (
+            {!order.timeSlotSummary && order.gradientDiscount && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 90 }}>{'②'} {t('orderDetail.gradientDiscountLabel')}</span>
                 <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
@@ -1261,8 +1315,8 @@ export default function OrderDetail() {
               </div>
             )}
 
-            {/* ③ 訂單優惠（折扣金額，無折扣時顯示 0） */}
-            {!isNewStore && (
+            {/* ③ 訂單優惠（折扣金額，無折扣時顯示 0；時段推薦已在兩段式塊內展示） */}
+            {!isNewStore && !order.timeSlotSummary && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 90 }}>{'③'} {t('orderDetail.orderDiscountLabel')}</span>
                 <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--warning)' }}>
@@ -1271,8 +1325,8 @@ export default function OrderDetail() {
               </div>
             )}
 
-            {/* ④ 折後價格（所有訂單類型統一展示） */}
-            {!isNewStore && (
+            {/* ④ 折後價格（所有訂單類型統一展示；時段推薦已在兩段式塊內展示） */}
+            {!isNewStore && !order.timeSlotSummary && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 90 }}>{'④'} {t('orderDetail.step3FinalPrice')}</span>
                 <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--brand)' }}>MOP {order.gradientDiscount ? finalPrice : totalOriginal}</span>
@@ -1388,6 +1442,25 @@ export default function OrderDetail() {
                     ) : (
                       <> <strong style={{ color: 'var(--brand)' }}>{giftDays} {t('orderDetail.daysSuffix')}</strong></>
                     )}
+                  </>
+                )}
+                <span style={{ color: 'var(--text-4)' }}>{t('orderDetail.mopUnit')}</span>
+              </>
+            ) : isTimeSlotAd && order.timeSlotSummary ? (
+              // 時段推薦：兩段式公式 Σ(原價×時段折扣)=時段折後小計 [× 天數檔位倍率 = 折後價]
+              <>
+                {order.slotPrices.map((sp, i) => (
+                  <span key={i}>
+                    {sp.slot} {sp.originalPrice}×{sp.discount / 10}{i < order.slotPrices.length - 1 ? ' + ' : ''}
+                  </span>
+                ))}
+                {' = '}
+                <strong style={{ color: 'var(--success)' }}>{order.timeSlotSummary.slotAfterSubtotal}</strong>
+                {order.timeSlotSummary.dayTier && (
+                  <>
+                    {' × '}{order.timeSlotSummary.dayTier.discount / 10}
+                    （{'購買滿'}{order.timeSlotSummary.dayTier.minDays}{'天享'}{order.timeSlotSummary.dayTier.discount}{'折'}）
+                    {' = '}<strong style={{ color: 'var(--brand)' }}>{order.timeSlotSummary.finalSubtotal}</strong>
                   </>
                 )}
                 <span style={{ color: 'var(--text-4)' }}>{t('orderDetail.mopUnit')}</span>
