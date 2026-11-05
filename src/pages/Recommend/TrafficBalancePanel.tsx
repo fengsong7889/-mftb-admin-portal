@@ -238,7 +238,7 @@ export default function TrafficBalancePanel({ config, readOnly = false, stores, 
         </AlgorithmSection>
       </Form>
       {/* 最後一排：取消/保存居中（狀態啟停統一由卡片頭部開關負責，底部不再重複） */}
-      {isEditing && <div className="organic-score-toolbar" style={{ paddingTop: 12, borderTop: '1px dashed #e8eaed', marginBottom: 0, justifyContent: 'center' }}>
+      {isEditing && <div className="organic-score-toolbar" style={{ paddingTop: 12, borderTop: '1px dashed var(--border-3)', marginBottom: 0, justifyContent: 'center' }}>
         <div className="organic-score-edit-actions">
           <Button size="small" onClick={handleCancel}>{tb('cancel')}</Button>
           <Button size="small" type="primary" icon={<SaveOutlined />} loading={saving} onClick={() => { void handleSave() }}>{tb('save')}</Button>

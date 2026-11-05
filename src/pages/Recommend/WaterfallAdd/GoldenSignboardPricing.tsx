@@ -576,7 +576,7 @@ export default function GoldenSignboardPricing() {
         {tiers.length === 0 ? (
           <div style={{
             padding: '20px 24px', textAlign: 'center', background: 'var(--surface-3)',
-            borderRadius: 8, border: '1px dashed #d9d9d9',
+            borderRadius: 8, border: '1px dashed var(--border-1)',
           }}>
             <span style={{ fontSize: 13, color: 'var(--text-3)' }}>暫無折扣梯度，點擊右上角「添加梯度」添加</span>
           </div>
@@ -657,7 +657,7 @@ export default function GoldenSignboardPricing() {
                   <span style={{ fontSize: 13, color: scDef.color, fontWeight: 500, whiteSpace: 'nowrap' }}>{scDef.label}</span>
                   {unpriced && (
                     <span style={{
-                      fontSize: 10, color: '#D46B08', background: 'var(--warning-soft)',
+                      fontSize: 10, color: 'var(--warning-deep)', background: 'var(--warning-soft)',
                       border: '1px solid #FFD591', borderRadius: 4, padding: '0 4px',
                       lineHeight: '16px', whiteSpace: 'nowrap', flexShrink: 0,
                     }}>未定價</span>
@@ -685,7 +685,7 @@ export default function GoldenSignboardPricing() {
             <span style={{ fontSize: 13, color: getLabelConfig(labelValue).color, fontWeight: 500, whiteSpace: 'nowrap' }}>{getLabelConfig(labelValue).label}</span>
             {(labelPrices[labelValue] == null || labelPrices[labelValue]! <= 0) && (
               <span style={{
-                fontSize: 10, color: '#D46B08', background: 'var(--warning-soft)',
+                fontSize: 10, color: 'var(--warning-deep)', background: 'var(--warning-soft)',
                 border: '1px solid #FFD591', borderRadius: 4, padding: '0 4px',
                 lineHeight: '16px', whiteSpace: 'nowrap', flexShrink: 0,
               }}>未定價</span>
@@ -821,7 +821,7 @@ export default function GoldenSignboardPricing() {
               系統持續銷售 {presaleDays} 天內的廣告，每過一天自動補充一天，循環銷售；
               <span style={{
                 background: 'var(--warning-soft)', border: '1px solid #FFD591', borderRadius: 4,
-                padding: '1px 6px', color: '#D46B08', fontWeight: 500, fontSize: 11, marginLeft: 4,
+                padding: '1px 6px', color: 'var(--warning-deep)', fontWeight: 500, fontSize: 11, marginLeft: 4,
               }}>條件規則含按月計算的標籤不受此限制</span>
             </span>
           </div>
@@ -839,7 +839,7 @@ export default function GoldenSignboardPricing() {
           {!selectedAlgorithmInfo && algorithmSelectOptions.length > 0 && (
             <div style={{
               padding: '24px', textAlign: 'center', background: 'var(--surface-3)',
-              borderRadius: 8, border: '1px dashed #d9d9d9', marginBottom: 16,
+              borderRadius: 8, border: '1px dashed var(--border-1)', marginBottom: 16,
             }}>
               <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{t('recommend.selectAlgorithmNameFirst')}</span>
             </div>
@@ -863,7 +863,7 @@ export default function GoldenSignboardPricing() {
                         padding: '6px 14px', borderRadius: 6, cursor: isConfigured ? 'pointer' : 'not-allowed',
                         border: '1px solid', borderColor: isActive ? 'var(--brand)' : 'var(--border-2)',
                         background: isActive ? 'var(--warning-soft)' : 'var(--surface-2)',
-                        boxShadow: isActive ? '0 0 0 1px #E8720C' : 'none',
+                        boxShadow: isActive ? '0 0 0 1px var(--brand)' : 'none',
                         transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 5,
                         opacity: isConfigured ? 1 : 0.45,
                       }}>
@@ -914,7 +914,7 @@ export default function GoldenSignboardPricing() {
                       <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>多天折扣梯度</span>
                       <div style={{
                         display: 'inline-flex', borderRadius: 6, overflow: 'hidden',
-                        border: '1px solid #d9d9d9',
+                        border: '1px solid var(--border-1)',
                       }}>
                         {(['global', 'local'] as DiscountMode[]).map(mode => (
                           <div key={mode} onClick={() => !isDetailMode && handleDiscountModeChange(mode)} style={{
@@ -1081,7 +1081,7 @@ export default function GoldenSignboardPricing() {
             <div style={{
               padding: '24px', textAlign: 'center',
               background: 'var(--surface-3)', borderRadius: 8,
-              border: '1px dashed #D9D9D9',
+              border: '1px dashed var(--border-1)',
             }}>
               <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{t('recommend.popularSkin.notAllowRefundHint')}</span>
             </div>

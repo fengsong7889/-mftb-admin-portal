@@ -232,7 +232,7 @@ export default function StoreLabelScorePanel({ ruleName, config, hasSavedConfig,
               </div>
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '14px 20px', background: 'var(--warning-soft)', border: '1px solid #FFE7D1', borderRadius: 8,
+                padding: '14px 20px', background: 'var(--warning-soft)', border: '1px solid var(--brand-border)', borderRadius: 8,
               }}>
                 <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{t(K('total'))}</span>
                 <output aria-label={t(K('totalAria'))} aria-live="polite" style={{ fontSize: 24, fontWeight: 700, color: 'var(--brand)' }}>{preview.total} {t(K('scoreUnit'))}</output>

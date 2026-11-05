@@ -216,7 +216,7 @@ export default function SignboardScorePanel({ ruleName, config, hasDraft, descri
               </div>
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '14px 20px', background: 'var(--warning-soft)', border: '1px solid #FFE7D1', borderRadius: 8,
+                padding: '14px 20px', background: 'var(--warning-soft)', border: '1px solid var(--brand-border)', borderRadius: 8,
               }}>
                 <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>單項總得分 = 各持有標籤分值累加</span>
                 <output aria-label="單項總得分" aria-live="polite" style={{ fontSize: 24, fontWeight: 700, color: 'var(--brand)' }}>{preview.total} 分</output>

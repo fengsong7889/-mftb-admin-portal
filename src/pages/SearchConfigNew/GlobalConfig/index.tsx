@@ -447,7 +447,7 @@ function LegacyGlobalConfig() {
               {t('globalConfig.fuzzyDesc')}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-              <div style={{ padding: '10px 14px', border: '1px solid #f0f0f0', borderRadius: 6, background: 'var(--surface-3)' }}>
+              <div style={{ padding: '10px 14px', border: '1px solid var(--border-2)', borderRadius: 6, background: 'var(--surface-3)' }}>
                 <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{t('globalConfig.fuzzyPinyin')}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Switch
@@ -460,7 +460,7 @@ function LegacyGlobalConfig() {
                   <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{t('globalConfig.fuzzyPinyinTip')}</span>
                 </div>
               </div>
-              <div style={{ padding: '10px 14px', border: '1px solid #f0f0f0', borderRadius: 6, background: 'var(--surface-3)' }}>
+              <div style={{ padding: '10px 14px', border: '1px solid var(--border-2)', borderRadius: 6, background: 'var(--surface-3)' }}>
                 <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{t('globalConfig.fuzzySimp')}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Switch
@@ -473,7 +473,7 @@ function LegacyGlobalConfig() {
                   <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{t('globalConfig.fuzzySimpTip')}</span>
                 </div>
               </div>
-              <div style={{ padding: '10px 14px', border: '1px solid #f0f0f0', borderRadius: 6, background: 'var(--surface-3)' }}>
+              <div style={{ padding: '10px 14px', border: '1px solid var(--border-2)', borderRadius: 6, background: 'var(--surface-3)' }}>
                 <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{t('globalConfig.fuzzyTolerance')}</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Switch
@@ -661,7 +661,7 @@ function LegacyGlobalConfig() {
                       <div style={{
                         marginTop: 8, padding: '6px 10px',
                         borderRadius: 4,
-                        background: ok ? 'var(--success-soft)' : '#fff2f0',
+                        background: ok ? 'var(--success-soft)' : 'var(--danger-callout)',
                         border: `1px solid ${ok ? '#b7eb8f' : '#ffccc7'}`,
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                         fontSize: 12,
@@ -928,7 +928,7 @@ function LegacyGlobalConfig() {
                       )
                     })}
                     {mixingPriority.timePeriodList.length === 0 && (
-                      <div style={{ textAlign: 'center', padding: '16px', color: 'var(--text-3)', border: '1px dashed #d9d9d9', borderRadius: 6 }}>
+                      <div style={{ textAlign: 'center', padding: '16px', color: 'var(--text-3)', border: '1px dashed var(--border-1)', borderRadius: 6 }}>
                         {t('globalConfig.noPeriodRule')}
                       </div>
                     )}

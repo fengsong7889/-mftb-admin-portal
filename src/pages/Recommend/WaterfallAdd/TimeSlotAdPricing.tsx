@@ -724,7 +724,7 @@ export default function TimeSlotAdPricing() {
             時段默認為空，需手動添加；可選 早餐/午餐/下午茶/晚餐/宵夜/自定義，自定義可自由命名；每個時段配置售卖時間段（如 06:30-10:30）、售卖價格與時段折扣，均支持刪除。時段折扣可選限時：開啟限時後需選折扣周期（日期區間），區間外按原價售賣；不開限時則折扣長期有效。
           </div>
           {slots.length === 0 ? (
-            <div style={{ padding: 24, textAlign: 'center', background: 'var(--surface-3)', borderRadius: 8, border: '1px dashed #d9d9d9' }}>
+            <div style={{ padding: 24, textAlign: 'center', background: 'var(--surface-3)', borderRadius: 8, border: '1px dashed var(--border-1)' }}>
               <span style={{ fontSize: 13, color: 'var(--text-3)' }}>暫無時段，請點擊右上角「添加時段」新增</span>
             </div>
           ) : slots.map(renderSlotRow)}
@@ -741,11 +741,11 @@ export default function TimeSlotAdPricing() {
               )}
             </div>)}
           {!daysDiscountEnabled ? (
-            <div style={{ padding: 24, textAlign: 'center', background: 'var(--surface-3)', borderRadius: 8, border: '1px dashed #d9d9d9' }}>
+            <div style={{ padding: 24, textAlign: 'center', background: 'var(--surface-3)', borderRadius: 8, border: '1px dashed var(--border-1)' }}>
               <span style={{ fontSize: 13, color: 'var(--text-3)' }}>未啟用按天數折扣，商家購買多天無折扣優惠</span>
             </div>
           ) : daysDiscountTiers.length === 0 ? (
-            <div style={{ padding: 24, textAlign: 'center', background: 'var(--surface-3)', borderRadius: 8, border: '1px dashed #d9d9d9' }}>
+            <div style={{ padding: 24, textAlign: 'center', background: 'var(--surface-3)', borderRadius: 8, border: '1px dashed var(--border-1)' }}>
               <span style={{ fontSize: 13, color: 'var(--text-3)' }}>暫無折扣梯度，點擊右上角「添加梯度」</span>
             </div>
           ) : (
@@ -832,7 +832,7 @@ export default function TimeSlotAdPricing() {
               ]}
             />
           ) : (
-            <div style={{ padding: 24, textAlign: 'center', background: 'var(--surface-3)', borderRadius: 8, border: '1px dashed #d9d9d9' }}>
+            <div style={{ padding: 24, textAlign: 'center', background: 'var(--surface-3)', borderRadius: 8, border: '1px dashed var(--border-1)' }}>
               <span style={{ fontSize: 13, color: 'var(--text-3)' }}>不允許退款：訂單一旦支付成功不支持退費</span>
             </div>
           )}

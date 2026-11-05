@@ -38,7 +38,7 @@ export default function ChannelSelector({ value = RecommendChannel.HOME, onChang
         icon: iconMap[opt.value],
         label: t(opt.labelKey),
       }))}
-      style={{ width: 180, borderRight: '1px solid #f0f0f0' }}
+      style={{ width: 180, borderRight: '1px solid var(--border-2)' }}
     />
   )
 }

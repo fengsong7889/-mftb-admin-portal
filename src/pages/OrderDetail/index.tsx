@@ -592,7 +592,7 @@ export default function OrderDetail() {
                     <div style={{
                       marginTop: 10, fontSize: 13,
                       fontWeight: isCurrent ? 700 : (isSkip || isPast) ? 600 : 400,
-                      color: isSkip ? '#FF4D4F' : isPast ? '#52C41A' : isCurrent ? terminalTheme.main : '#8C8C8C',
+                      color: isSkip ? 'var(--danger)' : isPast ? 'var(--success)' : isCurrent ? terminalTheme.main : 'var(--text-3)',
                       whiteSpace: 'nowrap', transition: 'color 0.3s',
                       animation: isCurrent ? 'nodeBreath 2s ease-in-out infinite' : 'none',
                       textShadow: isCurrent ? `0 0 8px ${terminalTheme.ripple}0.3)` : 'none',
@@ -866,11 +866,11 @@ export default function OrderDetail() {
               </colgroup>
               <thead>
                 <tr style={{ background: 'var(--surface-3)' }}>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('promotionOrderManage.colRegion')}</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colSlot')}</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colOriginalPrice')}</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colDiscount')}</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colFinalPrice')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('promotionOrderManage.colRegion')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colSlot')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colOriginalPrice')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colDiscount')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colFinalPrice')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -892,7 +892,7 @@ export default function OrderDetail() {
                     return rSlots.map((sp, si) => {
                       const idx = rowIdx++
                       return (
-                        <tr key={idx} style={{ borderTop: idx > 0 ? '1px solid #f0f0f0' : 'none' }}>
+                        <tr key={idx} style={{ borderTop: idx > 0 ? '1px solid var(--border-2)' : 'none' }}>
                           {si === 0 && (
                             <td rowSpan={rSlots.length} style={{
                               padding: '8px 16px', textAlign: 'center', verticalAlign: 'middle',
@@ -939,15 +939,15 @@ export default function OrderDetail() {
               </colgroup>
               <thead>
                 <tr style={{ background: 'var(--surface-3)' }}>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colSlot')}</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colOriginalPrice')}</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colDiscount')}</th>
-                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colFinalPrice')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colSlot')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colOriginalPrice')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colDiscount')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colFinalPrice')}</th>
                 </tr>
               </thead>
               <tbody>
                 {slots.map((sp, i) => (
-                  <tr key={i} style={{ borderTop: i > 0 ? '1px solid #f0f0f0' : 'none' }}>
+                  <tr key={i} style={{ borderTop: i > 0 ? '1px solid var(--border-2)' : 'none' }}>
                     <td style={{ padding: '8px 16px', textAlign: 'center' }}>{sp.slot}</td>
                     <td style={{ padding: '8px 16px', textAlign: 'center', color: 'var(--text-2)' }}>{sp.originalPrice}</td>
                     <td style={{ padding: '8px 16px', textAlign: 'center' }}>
@@ -1004,16 +1004,16 @@ export default function OrderDetail() {
                 </colgroup>
                 <thead>
                   <tr style={{ background: 'var(--surface-3)' }}>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{(isPopular || isRevive) ? t('orderDetail.promoDate') : t('orderDetail.colSlot')}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{isPopular ? t('orderDetail.dailyPrice') : isRevive ? t('orderDetail.dayPrice') : t('orderDetail.colOriginalPrice')}</th>
-                    {!isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colDiscount')}</th>}
-                    {!isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colFinalPrice')}</th>}
-                    {isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoStatus')}</th>}
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{(isPopular || isRevive) ? t('orderDetail.promoDate') : t('orderDetail.colSlot')}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{isPopular ? t('orderDetail.dailyPrice') : isRevive ? t('orderDetail.dayPrice') : t('orderDetail.colOriginalPrice')}</th>
+                    {!isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colDiscount')}</th>}
+                    {!isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colFinalPrice')}</th>}
+                    {isPopular && <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoStatus')}</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {order.slotPrices.map((sp, i) => (
-                    <tr key={i} style={{ borderTop: i > 0 ? '1px solid #f0f0f0' : 'none' }}>
+                    <tr key={i} style={{ borderTop: i > 0 ? '1px solid var(--border-2)' : 'none' }}>
                       <td style={{ padding: '8px 16px', textAlign: 'center' }}>{(isPopular || isRevive) ? sp.date : slotLabel(sp.slot)}</td>
                       <td style={{ padding: '8px 16px', textAlign: 'center', color: 'var(--text-2)' }}>{sp.originalPrice}</td>
                       {!isPopular && <td style={{ padding: '8px 16px', textAlign: 'center' }}>
@@ -1059,16 +1059,16 @@ export default function OrderDetail() {
                 </colgroup>
                 <thead>
                   <tr style={{ background: 'var(--surface-3)' }}>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.deductDays')}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoStatus')}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.deductDays')}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoStatus')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(order.purchaseDays || []).map((day, i) => {
                     const dayStatus = getDayStatus(day)
                     return (
-                      <tr key={i} style={{ borderTop: i > 0 ? '1px solid #f0f0f0' : 'none' }}>
+                      <tr key={i} style={{ borderTop: i > 0 ? '1px solid var(--border-2)' : 'none' }}>
                         <td style={{ padding: '8px 16px', textAlign: 'center' }}>{day}</td>
                         <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500, color: 'var(--brand)' }}>1</td>
                         <td style={{ padding: '8px 16px', textAlign: 'center' }}>
@@ -1127,11 +1127,11 @@ export default function OrderDetail() {
                 </colgroup>
                 <thead>
                   <tr style={{ background: 'var(--surface-3)' }}>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{'標籤名稱'}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{'推廣商圈'}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.dailyPrice')}</th>
-                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoStatus')}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{'標籤名稱'}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{'推廣商圈'}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.dailyPrice')}</th>
+                    <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoStatus')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1141,7 +1141,7 @@ export default function OrderDetail() {
                     const labelCfg = labelInfo ? SIGNBOARD_LABEL_CN[labelInfo.label] : null
                     const rs = rowSpans[i]
                     return (
-                      <tr key={i} style={{ borderTop: i > 0 ? '1px solid #f0f0f0' : 'none' }}>
+                      <tr key={i} style={{ borderTop: i > 0 ? '1px solid var(--border-2)' : 'none' }}>
                         {rs > 0 && (
                           <td rowSpan={rs} style={{
                             padding: '8px 16px', textAlign: 'center', verticalAlign: 'middle',
@@ -1491,8 +1491,8 @@ export default function OrderDetail() {
                   {/* 訂單退款扣費比例 - 独立区块，新店廣告不顯示 */}
                   {!isNewStore && <div style={{
                     marginBottom: 16, padding: '14px 20px', borderRadius: 8,
-                    background: order.refundEnabled === false ? '#fff2f0' : '#FAFAFA',
-                    border: order.refundEnabled === false ? '1px solid #ffccc7' : '1px solid #F0F0F0',
+                    background: order.refundEnabled === false ? 'var(--danger-callout)' : 'var(--surface-3)',
+                    border: order.refundEnabled === false ? '1px solid #ffccc7' : '1px solid var(--border-2)',
                   }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ width: 4, height: 14, background: '#FF4D4F', borderRadius: 2, display: 'inline-block' }} />
@@ -1538,7 +1538,7 @@ export default function OrderDetail() {
                         {isRefunded && (
                           <div style={{
                             marginTop: 12, padding: '12px 16px', borderRadius: 8,
-                            background: '#fff2f0', border: '1px solid #ffccc7',
+                            background: 'var(--danger-callout)', border: '1px solid #ffccc7',
                             display: 'flex', flexDirection: 'column', gap: 8,
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1677,17 +1677,17 @@ export default function OrderDetail() {
                               </colgroup>
                               <thead>
                                 <tr style={{ background: 'var(--surface-3)' }}>
-                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{'標籤名稱'}</th>
-                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{'推廣商圈'}</th>
-                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
-                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colImpressions')}</th>
-                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colClicks')}</th>
-                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colCtr')}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{'標籤名稱'}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{'推廣商圈'}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colImpressions')}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colClicks')}</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colCtr')}</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {gRecs.map((rec, ri) => (
-                                  <tr key={ri} style={{ borderTop: ri > 0 ? '1px solid #f0f0f0' : 'none' }}>
+                                  <tr key={ri} style={{ borderTop: ri > 0 ? '1px solid var(--border-2)' : 'none' }}>
                                     {ri === 0 && (
                                       <td rowSpan={gRecs.length} style={{
                                         padding: '8px 16px', textAlign: 'center', verticalAlign: 'middle',
@@ -1714,7 +1714,7 @@ export default function OrderDetail() {
                                     <td style={{ padding: '8px 16px', textAlign: 'center', color: 'var(--success)', fontWeight: 500 }}>{rec.clicks}</td>
                                     <td style={{ padding: '8px 16px', textAlign: 'center' }}>
                                       <span style={{
-                                        color: rec.clickRate >= 8 ? '#52C41A' : rec.clickRate >= 5 ? '#E8720C' : '#FF4D4F',
+                                        color: rec.clickRate >= 8 ? 'var(--success)' : rec.clickRate >= 5 ? 'var(--brand)' : 'var(--danger)',
                                         fontWeight: 600,
                                       }}>{rec.clickRate}%</span>
                                     </td>
@@ -1747,8 +1747,8 @@ export default function OrderDetail() {
                                 <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>流量包</span>
                                 <Tag style={{
                                   margin: 0,
-                                  color: order.trafficMode === 'custom' ? '#722ED1' : '#E8720C',
-                                  background: order.trafficMode === 'custom' ? '#F9F0FF' : '#FFF7E6',
+                                  color: order.trafficMode === 'custom' ? 'var(--purple)' : 'var(--brand)',
+                                  background: order.trafficMode === 'custom' ? 'var(--purple-soft)' : 'var(--warning-soft)',
                                   borderColor: order.trafficMode === 'custom' ? '#D3ADF7' : '#FFD591',
                                 }}>
                                   📊 {order.trafficMode === 'custom' ? '自定義' : (order.trafficPackageName || '-')}
@@ -1782,18 +1782,18 @@ export default function OrderDetail() {
                             </colgroup>
                             <thead>
                               <tr style={{ background: 'var(--surface-3)' }}>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colImpressions')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colImpressions')}</th>
                                 {isTrafficAd && (
-                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>消耗金額</th>
+                                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>消耗金額</th>
                                 )}
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colClicks')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colCtr')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colClicks')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colCtr')}</th>
                               </tr>
                             </thead>
                             <tbody>
                               {data.map((rec, i) => (
-                                <tr key={i} style={{ borderTop: i > 0 ? '1px solid #f0f0f0' : 'none' }}>
+                                <tr key={i} style={{ borderTop: i > 0 ? '1px solid var(--border-2)' : 'none' }}>
                                   <td style={{ padding: '8px 16px', textAlign: 'center' }}>{rec.date}</td>
                                   <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500 }}>{rec.impressions.toLocaleString()}</td>
                                   {isTrafficAd && (
@@ -1804,7 +1804,7 @@ export default function OrderDetail() {
                                   <td style={{ padding: '8px 16px', textAlign: 'center', color: 'var(--success)', fontWeight: 500 }}>{rec.clicks}</td>
                                   <td style={{ padding: '8px 16px', textAlign: 'center' }}>
                                     <span style={{
-                                      color: rec.clickRate >= 8 ? '#52C41A' : rec.clickRate >= 5 ? '#E8720C' : '#FF4D4F',
+                                      color: rec.clickRate >= 8 ? 'var(--success)' : rec.clickRate >= 5 ? 'var(--brand)' : 'var(--danger)',
                                       fontWeight: 600,
                                     }}>{rec.clickRate}%</span>
                                   </td>
@@ -1827,23 +1827,23 @@ export default function OrderDetail() {
                             </colgroup>
                             <thead>
                               <tr style={{ background: 'var(--surface-3)' }}>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colSlot')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colImpressions')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colClicks')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colCtr')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colSlot')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colImpressions')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colClicks')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colCtr')}</th>
                               </tr>
                             </thead>
                             <tbody>
                               {data.map((rec, ri) => (
-                                <tr key={ri} style={{ borderTop: ri > 0 ? '1px solid #f0f0f0' : 'none' }}>
+                                <tr key={ri} style={{ borderTop: ri > 0 ? '1px solid var(--border-2)' : 'none' }}>
                                   <td style={{ padding: '8px 16px', textAlign: 'center' }}>{rec.date}</td>
                                   <td style={{ padding: '8px 16px', textAlign: 'center' }}>{rec.slot || t('orderDetail.fullDaySlot')}</td>
                                   <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500 }}>{rec.impressions.toLocaleString()}</td>
                                   <td style={{ padding: '8px 16px', textAlign: 'center', color: 'var(--success)', fontWeight: 500 }}>{rec.clicks}</td>
                                   <td style={{ padding: '8px 16px', textAlign: 'center' }}>
                                     <span style={{
-                                      color: rec.clickRate >= 8 ? '#52C41A' : rec.clickRate >= 5 ? '#E8720C' : '#FF4D4F',
+                                      color: rec.clickRate >= 8 ? 'var(--success)' : rec.clickRate >= 5 ? 'var(--brand)' : 'var(--danger)',
                                       fontWeight: 600,
                                     }}>{rec.clickRate}%</span>
                                   </td>
@@ -1881,11 +1881,11 @@ export default function OrderDetail() {
                             </colgroup>
                             <thead>
                               <tr style={{ background: 'var(--surface-3)' }}>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('promotionOrderManage.colRegion')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colSlot')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colImpressions')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colClicks')}</th>
-                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colCtr')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('promotionOrderManage.colRegion')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colSlot')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colImpressions')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colClicks')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: 'var(--info-hover-tint)', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colCtr')}</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -1917,7 +1917,7 @@ export default function OrderDetail() {
                                     return sRecs.map((rec, si) => {
                                       const idx = rowIdx++
                                       return (
-                                        <tr key={idx} style={{ borderTop: idx > 0 ? '1px solid #f0f0f0' : 'none' }}>
+                                        <tr key={idx} style={{ borderTop: idx > 0 ? '1px solid var(--border-2)' : 'none' }}>
                                           {si === 0 && slotIdx === 0 && (
                                             <td rowSpan={regionRowCount} style={{
                                               padding: '8px 16px', textAlign: 'center', verticalAlign: 'middle',
@@ -1938,7 +1938,7 @@ export default function OrderDetail() {
                                           <td style={{ padding: '8px 16px', textAlign: 'center', color: 'var(--success)', fontWeight: 500 }}>{rec.clicks}</td>
                                           <td style={{ padding: '8px 16px', textAlign: 'center' }}>
                                             <span style={{
-                                              color: rec.clickRate >= 8 ? '#52C41A' : rec.clickRate >= 5 ? '#E8720C' : '#FF4D4F',
+                                              color: rec.clickRate >= 8 ? 'var(--success)' : rec.clickRate >= 5 ? 'var(--brand)' : 'var(--danger)',
                                               fontWeight: 600,
                                             }}>{rec.clickRate}%</span>
                                           </td>
