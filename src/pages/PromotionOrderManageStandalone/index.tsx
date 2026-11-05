@@ -431,7 +431,7 @@ export default function PromotionOrderManage() {
     {
       title: orderType === '無敵星星' ? t('promotionOrderManage.purchaseSlots') : (orderType === '盤活復蘇' || orderType === '新店廣告') ? t('promotionOrderManage.colPromoDays') : orderType === '人氣商家' ? t('promotionOrderManage.colPromoDays') : orderType === '金字招牌' ? t('promotionOrderManage.purchaseContent') : t('promotionOrderManage.purchaseContent'),
       key: 'purchaseContent',
-      width: orderType === '金字招牌' ? 320 : 140,
+      width: orderType === '金字招牌' ? 320 : orderType === '時段推薦廣告' ? 210 : 140,
       render: (_, record) => {
         // 投流廣告：展示流量包名稱 + 曝光次數（自定義購買展示「自定義」）
         if (orderType === '投流廣告' || record.recommendType === RecommendType.TRAFFIC_AD) {
@@ -669,7 +669,7 @@ export default function PromotionOrderManage() {
               {hiddenCount > 0 && (
                 <Popover content={panelContent} trigger="click" placement="bottomLeft">
                   <Button type="link" size="small"
-                    style={{ border: '1px solid rgba(232,114,12,0.35)', borderRadius: 12, padding: '0 10px', height: 22, fontSize: 12, fontWeight: 600, lineHeight: '20px' }}>
+                    style={{ border: '1px solid rgba(232,114,12,0.35)', borderRadius: 12, padding: '0 10px', height: 22, fontSize: 12, fontWeight: 600, lineHeight: '20px', flexShrink: 0, whiteSpace: 'nowrap' }}>
                     {`+${hiddenCount} ▾`}
                   </Button>
                 </Popover>
