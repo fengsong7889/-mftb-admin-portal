@@ -228,7 +228,7 @@ export function createPurchaseContentRenderer(deps: PurchaseContentDeps) {
           {hiddenCount > 0 && (
             <Popover content={panelContent} trigger="click" placement="bottomLeft">
               <Button type="link" size="small"
-                style={{ border: '1px solid rgba(232,114,12,0.35)', borderRadius: 12, padding: '0 10px', height: 22, fontSize: 12, fontWeight: 600, lineHeight: '20px' }}>
+                style={{ border: '1px solid rgba(232,114,12,0.35)', borderRadius: 12, padding: '0 10px', height: 22, fontSize: 12, fontWeight: 600, lineHeight: '20px', flexShrink: 0, whiteSpace: 'nowrap' }}>
                 {`+${hiddenCount} ▾`}
               </Button>
             </Popover>

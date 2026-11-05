@@ -229,7 +229,7 @@ export default function PromotionOrderManage() {
     {
       title: orderType === '無敵星星' ? t('promotionOrderManage.purchaseSlots') : orderType === '盤活復蘇' ? t('promotionOrderManage.purchaseDaysTitle') : orderType === '金字招牌' ? t('promotionOrderManage.purchaseContent') : t('promotionOrderManage.purchaseContent'),
       key: 'purchaseContent',
-      width: orderType === '金字招牌' ? 320 : 140,
+      width: orderType === '金字招牌' ? 320 : orderType === '時段推薦廣告' ? 210 : 140,
       render: createPurchaseContentRenderer({ t, orderType, regionLabel }),
     },
     {
