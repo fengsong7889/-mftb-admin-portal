@@ -47,6 +47,8 @@ export const SEMANTIC_TOKENS = [
   'border-1', 'border-2', 'border-3', 'border-input',
   // 语义色描边阶（antd 实色淡彩档；浅色严格等于站内字面量，深色沿用 brand-border 的 rgba 合成约定）
   'danger-border', 'warning-border', 'success-border', 'info-border', 'purple-border',
+  // geekblue 四件套补齐与两个前景/底色邻阶（详见 TOKEN_VALUES 里的实测注释）
+  'info-deep', 'info-hover-border', 'brand-deep',
   // 品牌
   'brand', 'brand-hover', 'brand-active', 'brand-soft', 'brand-border',
   // 统计卡描边族（主色 + 13% alpha，不能由 var() 拼接得到）
@@ -196,6 +198,34 @@ export const TOKEN_VALUES = {
    * 背景是 hover，所以取 0.16 与其余 soft 持平而不是更淡；更淡会弱化 hover 反馈。
    */
   'info-hover-tint': { light: '#F0F5FF', dark: 'rgba(24,144,255,0.16)' },
+  /*
+   * geekblue 四件套的补齐（描边阶与深前景两个邻阶）。背景那一侧就是上面的 --info-hover-tint，
+   * 前景与描边以前只能钉裸值，所以同块一侧令牌化、一侧不跟主题——深色下就是「暗图标坐浅底」。
+   * 实测数字均采自 scripts/lib/theme-token-map.test.mjs 里的同一套合成算法，不是心算：
+   *   info-deep        浅色 #2F54EB on 白卡 5.8518 / on --info-hover-tint 5.3530；
+   *                    深色 #85A5FF 合成底 #1e3143 上 5.6001（均达 AA）。
+   *                    不复用 --info：#2F54EB ≠ #1890FF，收敛会改浅色观感。
+   *   info-hover-border 与 --info-hover-tint 成套的 geekblue-2 描边；浅色 vs 白卡 1.2804，
+   *                    深色 rgba(64,169,255,0.32) 合成后 vs 三个卡片背板 1.7843~1.8073，
+   *                    与同族 --info-border 同一量级（描边是 1.2~1.9 的细线，不套 WCAG）。
+   */
+  'info-deep': { light: '#2F54EB', dark: '#85A5FF' },
+  'info-hover-border': { light: '#D6E4FF', dark: 'rgba(64,169,255,0.32)' },
+  /*
+   * 这里原来准备新建 --warning-callout（淡橙提示条底 #FFF7E6）——建完去核映射表才发现
+   * **它就是上面 warning-soft 的浅色值**，在 bg 段里再建一个同值令牌是错的：对象字面量
+   * 重复键会被后者静默覆盖，现有断言根看不出来（本轮靠 lint 的 no-dupe-keys + 一个新增单测抓出）。
+   * 站内那 66 处 #FFF7E6 没被令牌化，不是「缺令牌」，而是它们在未跑过的目录里或写在渐变串内；
+   * 前者留给各自批次（会自动换成 --warning-soft），后者归「渐变那一轮」。
+   */
+  /*
+   * 品牌橙的深前景邻阶（antd 体系里的深橙棕 #AD4E00，全站 7 处均作 color 用，语义单一）。
+   * 原列 REVIEW_REQUIRED（「接近 --brand-active(#CC6200) 但不等值」），本次按建令牌处理而非收敛。
+   * 深色取 --brand-hover 的 #F59432：实测 on brand-soft 合成底 #3b2b1c 为 5.9192（达 AA）；
+   * 浅色 #AD4E00 on brand-soft 为 5.1245（达 AA）。
+   * 两个令牌共用一个深色值不是错误：#F59432 就是「品牌色的亮档」，深色下不需要再区分两档深橙。
+   */
+  'brand-deep': { light: '#AD4E00', dark: '#F59432' },
   // 组件层
   'sidebar-bg': { light: '#1E1E1E', dark: '#1A1A1A' },
   'sidebar-item-color': { light: '#B0B0B0', dark: '#A6A6A6' },
@@ -291,6 +321,10 @@ export const COLOR_TO_TOKEN = {
     // orange-7 深橙：只进 fg。它在全站 46 处均作前景，语义单一；
     // 不进 bg/border 段，避免把同色值的背景用法误映射成文字令牌。
     d46b08: 'warning-deep',
+    // 两个深前景邻阶。只进 fg 段：#2F54EB 站内有 2 处描边用法、#AD4E00 全 7 处均作前景，
+    // 描边位不跟着换是故意的（geekblue 描边另有 --info-hover-border 表示）。
+    '2f54eb': 'info-deep',
+    ad4e00: 'brand-deep',
   },
   /** border* / outline / stroke */
   border: {
@@ -312,6 +346,8 @@ export const COLOR_TO_TOKEN = {
     b7eb8f: 'success-border',
     '91d5ff': 'info-border',
     d3adf7: 'purple-border',
+    // geekblue-2 描边（站内 49 处描边位，其中 OrderDetail 一家占 48）：与 --info-hover-tint 成套
+    d6e4ff: 'info-hover-border',
   },
 }
 
@@ -336,7 +372,9 @@ export const REVIEW_REQUIRED = {
   // 是两个不同决定：收敛会连带改掉 46 处浅色观感，建令牌不会。保留收敛作为后续可选清理。
   // （映射表与本清单必须互斥，同一色值不得既自动替换又待人工判定）
   cf1322: 'RDM 深度测试报告已建议收敛，属既有债务',
-  ad4e00: '接近 --brand-active(#CC6200) 但不等值',
+  // ad4e00 不再列在这里：本次为它建了 --brand-deep（浅色严格等值）并归入 COLOR_TO_TOKEN.fg。
+  // 原登记理由「接近 --brand-active(#CC6200) 但不等值」仍成立，但收敛会改 7 处浅色观感，
+  // 所以走建令牌面而不是收敛（与 --warning-deep 同一先例）。
   f39c12: '登录页品牌橙（登录页已整体排除，见 EXCLUDE_PATHS）',
   '9254de': '紫浅色阶；注意它同时是门户 iam 场景色，受 §A.1.1 唯一真源约束',
   '73d13d': 'success hover 阶（.btn-export hover），需新增 --success-hover 令牌后再映射',
