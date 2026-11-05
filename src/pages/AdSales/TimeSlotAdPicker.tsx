@@ -28,7 +28,8 @@ import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
 import { useNavigate } from 'react-router-dom'
 import {
-  fetchAdTimeSlotPricingList, placeAdTimeSlotOrder, type AdPricingTimeSlot, type AdTimeSlotItem,
+  fetchAdTimeSlotPricingList, placeAdTimeSlotOrder, fetchAdTimeSlotPurchasedCells,
+  type AdPricingTimeSlot, type AdTimeSlotItem,
 } from '@/api/adPromotion'
 import { fetchStores } from '@/api/store'
 import { fetchFinAccountBalance } from '@/api/finance'
@@ -96,6 +97,8 @@ export default function TimeSlotAdPicker() {
 
   /* ── 右側：購物車 + 結算 ── */
   const [cart, setCart] = useState<CartEntry[]>([])
+  /** 已購買格子集（「YYYY-MM-DD|slotKey」）：加購物車前置攔截 + 日曆標註，避免走到最終支付才報重複 */
+  const [purchasedCells, setPurchasedCells] = useState<Set<string>>(new Set())
   /** 推廣金餘額：null = 未取到（無權限/後端不可用），展示 '--' 且跳過前端預校驗，不得降為 0 誤擋下單 */
   const [merchantBalance, setMerchantBalance] = useState<number | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -211,10 +214,22 @@ export default function TimeSlotAdPicker() {
     setSelectedSlotKeys(prev => prev.includes(slotKey) ? prev.filter(k => k !== slotKey) : [...prev, slotKey])
   }
 
-  /* ── 添加到購物車（多時段，各自生成一條購物車條目） ── */
+  /* ── 添加到購物車（多時段，各自生成一條購物車條目；先前置校驗已購買/購物車內重複格子） ── */
   const handleAddToCart = () => {
     if (selectedSlotKeys.length === 0) { message.warning('請先選擇要購買的時段'); return }
     if (selectedDates.length === 0) { message.warning('請先在日曆選擇購買天數'); return }
+    const conflicts: string[] = []
+    for (const k of selectedSlotKeys) {
+      const name = configSlots.find(s => s.slotKey === k)?.slotName ?? k
+      for (const d of selectedDates) {
+        if (purchasedCells.has(`${d}|${k}`)) conflicts.push(`時段 ${name} 在 ${d} 已購買`)
+        else if (cart.some(e => e.slotKey === k && e.dates.includes(d))) conflicts.push(`時段 ${name} 在 ${d} 已在購物車中`)
+      }
+    }
+    if (conflicts.length > 0) {
+      message.error(`${conflicts.slice(0, 3).join('；')}${conflicts.length > 3 ? `；等共 ${conflicts.length} 項` : ''}，請調整日期或時段`)
+      return
+    }
     const entries: CartEntry[] = selectedSlotKeys
       .map(k => configSlots.find(s => s.slotKey === k))
       .filter((s): s is AdTimeSlotItem => !!s)
@@ -281,12 +296,21 @@ export default function TimeSlotAdPicker() {
       setCart([])
       setSelectedDates([])
       setSelectedSlotKeys([])
+      // 支付成功後刷新已購買格子，後續加購立即感知新占用
+      loadPurchasedCells(config.id, st.groupCode)
       setSuccessOpen(true)
     } catch (err) {
       message.error(err instanceof Error && err.message ? err.message : '下單失敗，請稍後重試')
     } finally {
       setPaying(false)
     }
+  }
+
+  /** 加載已購買格子（失敗時清空，不阻斷選購；最終重複仍由後端下單裁決） */
+  const loadPurchasedCells = (pricingId: number, groupCode: string) => {
+    fetchAdTimeSlotPurchasedCells(pricingId, groupCode)
+      .then(list => setPurchasedCells(new Set(list ?? [])))
+      .catch(() => setPurchasedCells(new Set()))
   }
 
   const handleSearch = () => {
@@ -303,12 +327,15 @@ export default function TimeSlotAdPicker() {
     fetchFinAccountBalance(st?.groupCode, searchBrand)
       .then(bal => setMerchantBalance(bal ? Number(bal.virtualBalance) : null))
       .catch(() => setMerchantBalance(null))
+    // 已購買格子：加購物車前置攔截與日曆標註
+    if (st) loadPurchasedCells(searchName, st.groupCode)
+    else setPurchasedCells(new Set())
   }
   const handleReset = () => {
     setSearchBrand(undefined); setSearchChannel(undefined); setSearchName(undefined)
     setSearchStore(undefined); setSearchBD(undefined); setBdOptions([])
     setHasSearched(false); setSelectedSlotKeys([]); setSelectedDates([]); setCart([])
-    setRestWeekdays([]); setMonthPage(0); setMerchantBalance(null)
+    setRestWeekdays([]); setMonthPage(0); setMerchantBalance(null); setPurchasedCells(new Set())
   }
 
   return (
@@ -471,7 +498,11 @@ export default function TimeSlotAdPicker() {
                               <>
                                 <span style={{ fontSize: 14, fontWeight: selected ? 700 : 500 }}>{d.date()}</span>
                                 {selected && <span style={{ fontSize: 9 }}>已選擇</span>}
-                                {!selected && sellable && <span style={{ fontSize: 9, color: '#52c41a' }}>可購買</span>}
+                                {!selected && sellable && (
+                                  selectedSlotKeys.some(k => purchasedCells.has(`${key}|${k}`))
+                                    ? <span style={{ fontSize: 9, color: '#ff4d4f' }}>已購買</span>
+                                    : <span style={{ fontSize: 9, color: '#52c41a' }}>可購買</span>
+                                )}
                                 {!selected && d && isPresale(d) && <span style={{ fontSize: 9, color: '#8c8c8c', marginTop: 2, border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>🔒待開售</span>}
                               </>
                             )}

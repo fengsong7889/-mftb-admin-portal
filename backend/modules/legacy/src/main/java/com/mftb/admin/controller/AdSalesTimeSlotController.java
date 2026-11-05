@@ -14,10 +14,14 @@ import com.mftb.admin.dto.AdTimeSlotOrderRequest;
 import com.mftb.admin.service.AdSalesTimeSlotService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * 時段推薦廣告銷售接口（下單扣款）
@@ -34,5 +38,12 @@ public class AdSalesTimeSlotController {
     @RequirePermission(menu = "ad-sales", action = "create")
     public Result<AdOrderVO> placeOrder(@Valid @RequestBody AdTimeSlotOrderRequest request) {
         return Result.success("下單成功", salesService.placeOrder(request));
+    }
+
+    /** 查詢預售窗口內已購買的格子集合（「YYYY-MM-DD|slotKey」，選購頁加購物車前置攔截用） */
+    @GetMapping("/purchased-cells")
+    @RequirePermission(menu = "ad-sales")
+    public Result<List<String>> purchasedCells(@RequestParam Long pricingId, @RequestParam String groupCode) {
+        return Result.success(salesService.purchasedCells(pricingId, groupCode));
     }
 }

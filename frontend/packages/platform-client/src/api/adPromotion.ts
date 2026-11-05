@@ -1449,6 +1449,11 @@ export function deleteAdTimeSlotPricing(id: number) {
   return request.delete<unknown, void>(`/ad/pricing/timeslot/${id}`, SILENT)
 }
 
+/** 查詢預售窗口內已購買（活躍訂單）的格子集合，元素格式「YYYY-MM-DD|slotKey」；選購頁加購物車前置攔截用 */
+export function fetchAdTimeSlotPurchasedCells(pricingId: number, groupCode: string) {
+  return request.get<unknown, string[]>('/ad/sales/timeslot/purchased-cells', { params: { pricingId, groupCode }, ...SILENT })
+}
+
 /** 時段推薦下單購物車條目：一個時段 + 其購買日期集合（同 slotKey 可多條，後端合併去重） */
 export interface AdTimeSlotOrderItem {
   slotKey: string

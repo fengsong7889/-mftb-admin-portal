@@ -230,6 +230,17 @@ public class AdSalesTimeSlotServiceImpl implements AdSalesTimeSlotService {
         return AdOrderVO.from(order);
     }
 
+    @Override
+    public List<String> purchasedCells(Long pricingId, String groupCode) {
+        AdPricingTimeSlotVO pricing = pricingService.detailOrNull(pricingId);
+        if (pricing == null) {
+            return List.of();
+        }
+        LocalDate today = LocalDate.now();
+        LocalDate windowEnd = today.plusDays((pricing.getPresaleDays() == null ? 7 : pricing.getPresaleDays()) - 1L);
+        return List.copyOf(purchasedSlots(pricing.getId(), groupCode, today, windowEnd));
+    }
+
     /* ==================== 內部方法 ==================== */
 
     private AdPricingTimeSlotVO requireActivePricing(Long pricingId) {
