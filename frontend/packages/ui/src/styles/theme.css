@@ -15,7 +15,7 @@
  * 改颜色的正确流程：改 TOKEN_VALUES（浅色值 + 深色值 + 实测对比度）→ 跑生成脚本 → 跑门禁。
  * 深色取值规则与实测依据：docs/design/深浅色主题切换_可落地实施方案_2026-11-03.md §4.3 / §4.5 / §4.6
  *
- * 令牌共 55 个：语义层 + 组件层（--sidebar-*）+ 阴影/描边补偿。
+ * 令牌共 60 个：语义层 + 组件层（--sidebar-*）+ 阴影/描边补偿。
  * 业务代码只允许引用语义层；--sidebar-* 属组件层，仅壳层 CSS 可用。
  */
 :root {
@@ -38,6 +38,11 @@
   --border-2: #F0F0F0;
   --border-3: #E8EAED;
   --border-input: #D9D9D9;
+  --danger-border: #FFCCC7;
+  --warning-border: #FFD591;
+  --success-border: #B7EB8F;
+  --info-border: #91D5FF;
+  --purple-border: #D3ADF7;
   --brand: #E8720C;
   --brand-hover: #F59432;
   --brand-active: #CC6200;
@@ -96,6 +101,11 @@ html[data-theme='dark'] {
   --border-2: #303030;
   --border-3: #303030;
   --border-input: #5A5A5A;
+  --danger-border: rgba(255,120,117,0.32);
+  --warning-border: rgba(250,160,61,0.32);
+  --success-border: rgba(106,190,57,0.32);
+  --info-border: rgba(64,169,255,0.32);
+  --purple-border: rgba(163,113,231,0.32);
   --brand: #E8720C;
   --brand-hover: #F59432;
   --brand-active: #D4670A;
@@ -165,6 +175,11 @@ html {
     --border-2: #F0F0F0;
     --border-3: #E8EAED;
     --border-input: #D9D9D9;
+    --danger-border: #FFCCC7;
+    --warning-border: #FFD591;
+    --success-border: #B7EB8F;
+    --info-border: #91D5FF;
+    --purple-border: #D3ADF7;
     --brand: #E8720C;
     --brand-hover: #F59432;
     --brand-active: #CC6200;
