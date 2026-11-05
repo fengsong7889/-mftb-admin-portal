@@ -794,7 +794,7 @@
 }
 
 .nowrap-table .rdm-task-row--blocked > td:first-child {
-  box-shadow: inset 3px 0 0 #FA8C16;
+  box-shadow: inset 3px 0 0 var(--warning);
 }
 
 .nowrap-table .rdm-task-row--blocked:hover > td {
@@ -2261,10 +2261,10 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 
 /* 选中态沿用侧边栏菜单的「左侧 3px 主色指示条」语言，保持全站一致 */
 .rdm-view-rail-item.active {
-  background: #FFF7F0;
-  color: #E8720C;
+  background: var(--brand-soft);
+  color: var(--brand);
   font-weight: 600;
-  box-shadow: inset 3px 0 0 #E8720C;
+  box-shadow: inset 3px 0 0 var(--brand);
 }
 
 .rdm-view-rail-item-label {
