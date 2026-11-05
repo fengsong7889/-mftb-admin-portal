@@ -169,7 +169,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
             ? r.assetNos.map((no) => (
                 <span key={no} style={{
                   padding: '2px 8px', borderRadius: 4,
-                  background: '#f0f5ff', border: '1px solid #adc6ff',
+                  background: 'var(--info-hover-tint)', border: '1px solid #adc6ff',
                   fontFamily: 'monospace', fontSize: 12,
                 }}>{no}</span>
               ))

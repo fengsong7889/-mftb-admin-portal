@@ -247,10 +247,11 @@ export default function AssetList() {
           <div className="confirm-info-row"><span>資產編號：</span><b>{record.assetNo}</b></div>
           <div className="confirm-info-row"><span>資產名稱：</span><b>{record.assetName}</b></div>
           <div className="confirm-info-row"><span>當前狀態：</span><b>{t(STATUS_META[record.status].key)}</b></div>
-          {/* 成对保留裸色：#FFF2F0（antd red-1）无等值令牌（danger-soft 浅色是 #FFF1F0，差 1 个单位），
-              不透明且不会随主题变深；若只把前景换成令牌 danger，深色下为「浅粉底 + 亮红字」约 1.5:1。
-              待定下 danger-1 等价令牌后再成对改；见方案 §18.6。 */}
-          <div style={{ marginTop: 12, padding: '8px 12px', background: '#FFF2F0', borderRadius: 6, border: '1px solid #FFCCC7', fontSize: 13, color: '#FF4D4F' }}>
+          {/* 底色与文字已成对令牌化：#FFF2F0 现为 --danger-callout（浅色严格等值，逐像素不变）。
+              第七批曾因为「无等值令牌」而把前景退回裸值，现令牌已建、codemod 自动配齐两侧。
+              实测：浅色 danger #FF4D4F on #FFF2F0 = 2.99（存量债务，未顺手改）；
+              深色 #FF7875 on 合成底 #432627 = 5.30（达 AA）。见方案 §18.6。 */}
+          <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--danger-callout)', borderRadius: 6, border: '1px solid #FFCCC7', fontSize: 13, color: 'var(--danger)' }}>
             ⚠️ 報廢後資產狀態將變更為「已報廢」，此操作不可恢復，請謹慎操作。
           </div>
         </div>

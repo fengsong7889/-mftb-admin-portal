@@ -206,7 +206,11 @@ const BizSidebar = ({ activeBiz, onChange }: { activeBiz: Biz; onChange: (v: Biz
           }}
           onMouseEnter={e => {
             if (activeBiz !== opt.value) {
-              e.currentTarget.style.background = '#f0f5ff'
+              // 必须用令牌而不是裸 #f0f5ff：本行文字色已令牌化为 --text-2（见上方），
+              // 而 #f0f5ff 不透明、不随主题变深，深色下 hover 时亮灰字压近白底只有 1.98:1。
+              // --info-hover-tint 浅色严格等于 #F0F5FF（逐像素不变），深色合成后为 5.64:1。
+              // leave 恢复 transparent 与基态一致，本来就不必改。
+              e.currentTarget.style.background = 'var(--info-hover-tint)'
               e.currentTarget.style.transform = 'translateX(4px)'
             }
           }}
@@ -821,7 +825,7 @@ export default function DimensionStrategy() {
                   borderRadius: 4, 
                   padding: 12, 
                   marginBottom: 8,
-                  background: '#fff2f0'
+                  background: 'var(--danger-callout)'
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                     <span style={{ fontWeight: 'bold' }}>{t('channelStrategy.tier', { index: index + 1 })}</span>

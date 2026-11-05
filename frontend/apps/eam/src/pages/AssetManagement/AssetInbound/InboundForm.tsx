@@ -963,7 +963,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
         return (
           <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 24px', marginBottom: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f0f5ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-hover-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <AppstoreOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
               </div>
               <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.resultsTitle')}</span>

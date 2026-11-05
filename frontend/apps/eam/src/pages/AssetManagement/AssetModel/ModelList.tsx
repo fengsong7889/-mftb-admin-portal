@@ -620,10 +620,10 @@ export default function ModelList({
           </div>
 
           {/* 提示文字 */}
-          {/* 成对保留裸色：#D46B08 无等值令牌（REVIEW_REQUIRED），只换背景会让深色下
-             变成「深橙底 + 深橙字」约 3.4:1，低于正文 AA 4.5；见方案 §18.6。 */}
+          {/* 底色与文字已成对令牌化：#D46B08 现为 --warning-deep（浅色严格等值）。
+             实测浅色 3.34（存量债务，单测卡 3.3 下限）、深色 6.58（达 AA）；见方案 §18.6。 */}
           {viewMode === 'brands' && brands.length > 0 && (
-            <div style={{ padding: '8px 12px', background: '#FFF7E6', border: '1px solid #FFD591', borderRadius: 6, marginBottom: 12, fontSize: 13, color: '#D46B08' }}>
+            <div style={{ padding: '8px 12px', background: 'var(--warning-soft)', border: '1px solid #FFD591', borderRadius: 6, marginBottom: 12, fontSize: 13, color: 'var(--warning-deep)' }}>
               {t('asset.brandClickHint')}
             </div>
           )}

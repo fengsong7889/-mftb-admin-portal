@@ -52,6 +52,9 @@ export const SEMANTIC_TOKENS = [
   // 语义色
   'success', 'success-soft', 'info', 'info-soft',
   'warning', 'warning-soft', 'danger', 'danger-soft', 'purple', 'purple-soft',
+  // 语义色的补充阶：危险提示条底、深橙前景、蓝调 hover 底
+  //（它们不是另一令牌的重复值，而是 antd 调色板上真实存在、与现有令牌差 1~15 个单位的邻阶）
+  'danger-callout', 'warning-deep', 'info-hover-tint',
   // 阴影与描边补偿
   'shadow-1', 'shadow-2', 'shadow-3', 'shadow-card-soft',
   'shadow-btn-hover', 'shadow-btn-active', 'shadow-popover',
@@ -143,6 +146,32 @@ export const TOKEN_VALUES = {
   // 深色多提半档：antd 的 #9254DE 实测仅 3.57:1，作正文不达标；#A371E7 为 4.77:1
   purple: { light: '#722ED1', dark: '#A371E7' },
   'purple-soft': { light: '#F9F0FF', dark: 'rgba(114,46,209,0.18)' },
+  /*
+   * 危险提示条底色（antd v4 error-1 = #FFF2F0）。
+   * 为什么不直接收敛到 --danger-soft(#FFF1F0)：两者差 1 个单位，映射过去会改变浅色观感，
+   * 而「浅色侧逐像素不变」是整个分批推进的前提（见 §15.2 第 5 条）。
+   * 深色沿用 *-soft 一族的 16% 混合约定：合成到 surface-2(#1F1F1F) 得 #432627，
+   * 实测 --danger 深色 #FF7875 上为 **5.30:1**（达标 AA）。
+   * 它是收敛候选：等哪次愿意接受 1 个单位的浅色偏移，就可以并回 --danger-soft。
+   */
+  'danger-callout': { light: '#FFF2F0', dark: 'rgba(255,77,79,0.16)' },
+  /*
+   * 深橙前景（antd orange-7 = #D46B08），用在 --warning-soft 底上作提示文字。
+   * 原列在 REVIEW_REQUIRED（「RDM 深度测试报告已建议收敛到 #FF4D4F/#FA8C16 体系」），
+   * 本次改为**建令牌表示**而非收敛：全站 46 处均作前景、语义单一，收敛会连带改掉 46 处浅色观感。
+   * 深色取 antd orange-5 #FFA940：实测在 warning-soft 深色合成底 #42301E 上为 **6.58:1**（达标 AA）。
+   * ⚠ 浅色侧 #D46B08 on #FFF7E6 实测只有 **3.34:1**，低于正文 AA 4.5——这是**存量债务**，
+   *   令牌化不修复它（严格等值只保证不变差），已在单测里按 3.0 下限显式登记而不是假装达标。
+   */
+  'warning-deep': { light: '#D46B08', dark: '#FFA940' },
+  /*
+   * 蓝调 hover 底色（antd geekblue-1 = #F0F5FF），用于业务频道侧栏未选中项的 hover 反馈。
+   * 不能复用 --info-soft(#E6F7FF)：两者在蓝绿通道上差 8~15 个单位，观感不同（一个是淡蓝一个是青蓝）。
+   * 深色取 rgba(24,144,255,0.16)（与 *-soft 一族同约定）：合成到侧栏底 surface-3(#262626)
+   * 得 #243749，实测 --text-2 深色 #B0B0B0 上为 **5.64:1**（达标 AA）。
+   * 背景是 hover，所以取 0.16 与其余 soft 持平而不是更淡；更淡会弱化 hover 反馈。
+   */
+  'info-hover-tint': { light: '#F0F5FF', dark: 'rgba(24,144,255,0.16)' },
   // 组件层
   'sidebar-bg': { light: '#1E1E1E', dark: '#1A1A1A' },
   'sidebar-item-color': { light: '#B0B0B0', dark: '#A6A6A6' },
@@ -209,7 +238,11 @@ export const COLOR_TO_TOKEN = {
     e6f7ff: 'info-soft',
     fff7e6: 'warning-soft',
     fff1f0: 'danger-soft',
+    // antd v4 error-1：与 danger-soft 差 1 个单位，不能归并（会动浅色）
+    fff2f0: 'danger-callout',
     f9f0ff: 'purple-soft',
+    // geekblue-1 淡蓝 hover 底（与 info-soft #E6F7FF 不同阶）
+    f0f5ff: 'info-hover-tint',
     e8720c: 'brand',
   },
   /** color / -webkit-text-fill-color */
@@ -231,6 +264,9 @@ export const COLOR_TO_TOKEN = {
     fa8c16: 'warning',
     ff4d4f: 'danger',
     '722ed1': 'purple',
+    // orange-7 深橙：只进 fg。它在全站 46 处均作前景，语义单一；
+    // 不进 bg/border 段，避免把同色值的背景用法误映射成文字令牌。
+    d46b08: 'warning-deep',
   },
   /** border* / outline / stroke */
   border: {
@@ -265,7 +301,10 @@ export const REVIEW_REQUIRED = {
   faad14: 'antd gold，与 --warning(#FA8C16) 并存，需确认是否收敛',
   ffccc7: 'danger 描边阶，需新增 --danger-border 令牌后再映射',
   ff7875: 'danger hover 阶；注意它同时是 --danger 的**深色值**，跨主题同值需人工确认',
-  d46b08: 'RDM 深度测试报告已建议收敛到 #FF4D4F/#FA8C16 体系，属既有债务',
+  // d46b08 已不再列在这里：本次为它建了 --warning-deep（浅色严格等值）并归入 COLOR_TO_TOKEN.fg。
+  // 原登记理由「RDM 深度测试报告已建议收敛到 #FF4D4F/#FA8C16 体系」仍成立，但收敛与建令牌
+  // 是两个不同决定：收敛会连带改掉 46 处浅色观感，建令牌不会。保留收敛作为后续可选清理。
+  // （映射表与本清单必须互斥，同一色值不得既自动替换又待人工判定）
   cf1322: 'RDM 深度测试报告已建议收敛，属既有债务',
   ad4e00: '接近 --brand-active(#CC6200) 但不等值',
   f39c12: '登录页品牌橙（登录页已整体排除，见 EXCLUDE_PATHS）',
