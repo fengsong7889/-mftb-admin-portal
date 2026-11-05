@@ -2948,3 +2948,35 @@ body:has(.ai-assistant-page) .pet-mascot-wrapper {
   color: rgba(0, 0, 0, 0.25) !important;
   box-shadow: none !important;
 }
+
+/* ========================================================================
+   品牌橙实底上的前景随主题转色（方案 §4.6.5）—— 仅深色，浅色零变化
+   ========================================================================
+   为什么必须手写覆写：antd 5.29 把这三处的选中态前景直接绑到**种子 token**上，
+   而种子 token 不随 darkAlgorithm 变，所以深色下它们仍是白字压品牌橙（实测约 3.0:1）。
+   本方案已拍板品牌底前景深色取 --on-brand(#141414)，黑字压橙实测 6.00:1。
+   取色来源（读 antd 源码查实，非推测）：
+     - Checkbox 勾号：checkbox/style/index.js `border: lineWidthBold solid token.colorWhite`
+     - Radio 内圆点：radio/style/index.js `radioColor: wireframe ? colorPrimary : colorWhite`
+     - Switch 选中文字：switch/style/index.js `color: token.colorTextLightSolid`
+   三者都没有对应的组件级 token，所以不能靠 ConfigProvider 解决（改 colorWhite 会连带
+   翻转 Tooltip、Modal 关闭钮等无关元素，影响面失控）。
+
+   刻意不覆写的三处（不是遗漏）：
+     - Switch 滑柄圆点：#fff 实底，本就该白；
+     - Checkbox 半选方块：background 取 colorTextDisabled、底是 colorBgContainer，与品牌橙无关；
+     - Switch 未选中文字：底是灰色轨道，转黑字反而不可读。
+   打印/导出不受影响：theme.css 的 @media print 用 `html, html[data-theme='dark']`
+   已把 --on-brand 锁回 #FFFFFF，本覆写取的是变量值，打印时自动退回白字。
+   用 !important 的理由同本文件 .form-footer 段：antd CSS-in-JS 会在根类上附加 hashId，
+   特异性对拼不稳，静默失效比不改更糟。
+   ======================================================================== */
+html[data-theme='dark'] .ant-checkbox-checked .ant-checkbox-inner::after {
+  border-color: var(--on-brand) !important;
+}
+html[data-theme='dark'] .ant-radio-checked .ant-radio-inner::after {
+  background-color: var(--on-brand) !important;
+}
+html[data-theme='dark'] .ant-switch .ant-switch-inner .ant-switch-inner-checked {
+  color: var(--on-brand) !important;
+}

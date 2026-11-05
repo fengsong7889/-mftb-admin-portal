@@ -279,3 +279,55 @@ describe('深色主题的关键取值必须是实测过的值，不得回落到�
     expect(offenders, `深色未加强的黑色阴影档：${offenders.join(', ')}`).toEqual([])
   })
 })
+
+/**
+ * §4.6.5「品牌橙实底上的前景」在 antd 控件上的落点。
+ *
+ * 为什么用「读 CSS 文本」而不是渲染断言：jsdom 不加载外部样式表，也不会对 var()
+ * 求值，所以组件级渲染测不到这三条选择器是否真的生效；而此处真正会退化的事实是
+ * 「规则被删、被改掉取值、或漏了深色限定而泄漏到浅色」，这三件事用文本断言钉得住。
+ * （实际生效与对比度数值由方案 §8.5 的浏览器计算值实测环节负责，两者不互相代替。）
+ */
+const COMPONENTS_CSS = readFileSync(join(process.cwd(), 'frontend/packages/ui/src/styles/components.css'), 'utf8')
+
+/** 去掉块注释：说明文字里会写 `#fff` 等取值，不能当成规则参与断言 */
+const CSS_BODY = COMPONENTS_CSS.replace(/\/\*[\s\S]*?\*\//g, '')
+
+describe('品牌底前景控件覆写（Switch / Checkbox / Radio，§4.6.5）', () => {
+  // 三条覆写：antd 把它们绑在种子 token（colorWhite / colorTextLightSolid）上，没有组件级 token 可用
+  const REQUIRED: Array<[string, string]> = [
+    ['.ant-checkbox-checked .ant-checkbox-inner::after', 'border-color'],
+    ['.ant-radio-checked .ant-radio-inner::after', 'background-color'],
+    ['.ant-switch .ant-switch-inner .ant-switch-inner-checked', 'color'],
+  ]
+
+  it.each(REQUIRED)('%s 的 %s 必须取 var(--on-brand)', (selector, prop) => {
+    const rule = new RegExp(
+      `html\\[data-theme='dark'\\][^{]*${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{[^}]*}`,
+    )
+    const hit = CSS_BODY.match(rule)
+    expect(hit, `缺少深色覆写：${selector}`).not.toBeNull()
+    expect(hit![0], `${selector} 的 ${prop} 未取 --on-brand`).toContain(`${prop}: var(--on-brand)`)
+  })
+
+  it.each(REQUIRED)('%s 不得在没有深色限定时出现（浅色必须视觉恒等）', (selector) => {
+    // 只管这三条 antd 控件覆写：不能扩大成「全站不得有浅色 --on-brand 用法」，
+    // 品牌橙按钮上的白字本就应用 --on-brand（浅 #FFFFFF / 深 #141414），那是正当用法。
+    const bare = new RegExp(`(^|\\n)\\s*[^{}\\n]*${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^{}]*\\{`)
+    const hit = CSS_BODY.match(bare)
+    expect(hit, `${selector} 的规则头缺少 html[data-theme='dark'] 前缀`).toBeTruthy()
+    expect(hit![0]).toContain("data-theme='dark'")
+  })
+
+  it('不动清单不得被顺手加进来（滑柄白圆点 / 半选方块本就该保持白）', () => {
+    const forbidden = ['.ant-switch-handle', '.ant-checkbox-indeterminate']
+    const wrong = forbidden.filter((sel) =>
+      new RegExp(`[^{}]*${sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^{}]*\\{[^}]*--on-brand`).test(CSS_BODY))
+    expect(wrong, `这两处的底不是品牌橙，覆写会制造新的不可见：${wrong.join(' | ')}`).toEqual([])
+  })
+
+  it('--on-brand 本体仍是「浅白 / 深黑」，且深色侧确为黑字', () => {
+    expect(ALL_TOKENS['on-brand'].light.toUpperCase()).toBe('#FFFFFF')
+    expect(ALL_TOKENS['on-brand'].dark.toUpperCase()).toBe('#141414')
+  })
+})
