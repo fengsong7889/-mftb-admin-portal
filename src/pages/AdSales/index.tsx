@@ -10,6 +10,7 @@ import NewStoreDayPicker from './NewStoreDayPicker'
 import PopularSkinPicker from './PopularSkinPicker'
 import GoldenSignboardLabelPicker from './GoldenSignboardLabelPicker'
 import TrafficPackagePicker from './TrafficPackagePicker'
+import TimeSlotAdPicker from './TimeSlotAdPicker'
 import {
   type InventoryItem,
   type RecommendTypeConfig,
@@ -70,7 +71,7 @@ export default function AdSales() {
       return
     }
     // 新店广告、人气商家、金字招牌：进入各自选购界面；投流广告：进入流量包选购界面（均无需库存数据）
-    if (config.type === AlgorithmType.NEW_STORE_AD || config.type === AlgorithmType.POPULAR_MERCHANT_KA || config.type === AlgorithmType.GOLDEN_SIGNBOARD || config.type === AlgorithmType.TRAFFIC_AD) {
+    if (config.type === AlgorithmType.NEW_STORE_AD || config.type === AlgorithmType.POPULAR_MERCHANT_KA || config.type === AlgorithmType.GOLDEN_SIGNBOARD || config.type === AlgorithmType.TRAFFIC_AD || config.type === AlgorithmType.TIME_SLOT_AD) {
       setSelectedAlgorithmType(config.type)
       setSelectedInventory(null)
       setCurrentStep(1)
@@ -198,8 +199,15 @@ export default function AdSales() {
         </Card>
       )}
 
+      {/* Step 2: 选择时段并购买 - 時段推薦廣告 */}
+      {currentStep === 1 && selectedAlgorithmType === AlgorithmType.TIME_SLOT_AD && (
+        <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 24px' }}>
+          <TimeSlotAdPicker />
+        </Card>
+      )}
+
       {/* Step 2: 选择时段并加购 - 無敵星星 */}
-      {currentStep === 1 && selectedAlgorithmType !== AlgorithmType.NEW_STORE_AD && selectedAlgorithmType !== AlgorithmType.POPULAR_MERCHANT_KA && selectedAlgorithmType !== AlgorithmType.GOLDEN_SIGNBOARD && selectedAlgorithmType !== AlgorithmType.TRAFFIC_AD && selectedInventory && selectedInventory.algorithmType !== AlgorithmType.HOT_REVIVE_AD && (
+      {currentStep === 1 && selectedAlgorithmType !== AlgorithmType.NEW_STORE_AD && selectedAlgorithmType !== AlgorithmType.POPULAR_MERCHANT_KA && selectedAlgorithmType !== AlgorithmType.GOLDEN_SIGNBOARD && selectedAlgorithmType !== AlgorithmType.TRAFFIC_AD && selectedAlgorithmType !== AlgorithmType.TIME_SLOT_AD && selectedInventory && selectedInventory.algorithmType !== AlgorithmType.HOT_REVIVE_AD && (
         <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 24px' }}>
           <DateTimeGrid
             inventoryItem={selectedInventory}

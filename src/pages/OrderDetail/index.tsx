@@ -748,7 +748,7 @@ export default function OrderDetail() {
           <Descriptions.Item label={isPopular ? '配置ID' : t('orderDetail.colAlgorithmId')}>
             <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{order.algorithmId}</span>
           </Descriptions.Item>
-          <Descriptions.Item label={isPopular ? '人氣名稱' : t('orderDetail.colAlgorithmName')}>{order.promotionName}</Descriptions.Item>
+          <Descriptions.Item label={isPopular ? '人氣商家名稱' : t('orderDetail.colAlgorithmName')}>{order.promotionName}</Descriptions.Item>
           {isGoldenSignboard ? (
             <Descriptions.Item label="購買標籤">
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>

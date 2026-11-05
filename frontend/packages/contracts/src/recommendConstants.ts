@@ -53,6 +53,7 @@ export enum AlgorithmType {
   GOLD_AD = 12,              // 点金广告
   GOLDEN_SIGNBOARD = 13,     // 金字招牌
   PRODUCT_PROMO = 14,        // 商品促销
+  TIME_SLOT_AD = 16,         // 時段推薦廣告（外賣到家：按早/午/下午茶/晚/宵夜及自定義時段分別定價）
 }
 
 export const ALGORITHM_TYPE_OPTIONS = [
@@ -68,6 +69,7 @@ export const ALGORITHM_TYPE_OPTIONS = [
   { labelKey: 'recommend.algoGoldAd', value: AlgorithmType.GOLD_AD },
   { labelKey: 'recommend.algoGoldenSignboard', value: AlgorithmType.GOLDEN_SIGNBOARD },
   { labelKey: 'recommend.algoProductPromo', value: AlgorithmType.PRODUCT_PROMO },
+  { labelKey: 'recommend.algoTimeSlotAd', value: AlgorithmType.TIME_SLOT_AD },
 ]
 
 /** 算法类型对应卡片顶部装饰线颜色（与 CSS .algo-card-wrapper--* 类名一致） */
@@ -84,6 +86,7 @@ export const ALGO_CARD_COLOR_MAP: Record<AlgorithmType, string> = {
   [AlgorithmType.GOLD_AD]: 'cyan',
   [AlgorithmType.GOLDEN_SIGNBOARD]: 'geekblue',
   [AlgorithmType.PRODUCT_PROMO]: 'volcano',
+  [AlgorithmType.TIME_SLOT_AD]: 'yellow',
 } as Record<AlgorithmType, string>
 
 /** 区域（全系统唯一商圈枚举：定价/门店/购买/订单等所有商圈相关数据均引用此处） */

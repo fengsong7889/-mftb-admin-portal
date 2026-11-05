@@ -14,6 +14,7 @@ export const RECOMMEND_TYPE_LABEL: Partial<Record<RecommendType, string>> = {
   [RecommendType.TRAFFIC_AD]: '投流廣告',
   [RecommendType.POPULAR_MERCHANT_KA]: '人氣商家',
   [RecommendType.GOLDEN_SIGNBOARD]: '金字招牌',
+  [RecommendType.TIME_SLOT_AD]: '時段推薦廣告',
 }
 
 export const RECOMMEND_TYPE_ICON: Partial<Record<RecommendType, string>> = {
@@ -23,6 +24,7 @@ export const RECOMMEND_TYPE_ICON: Partial<Record<RecommendType, string>> = {
   [RecommendType.TRAFFIC_AD]: '📊',
   [RecommendType.POPULAR_MERCHANT_KA]: '🏆',
   [RecommendType.GOLDEN_SIGNBOARD]: '🏅',
+  [RecommendType.TIME_SLOT_AD]: '⏰',
 }
 
 export const _RECOMMEND_TYPE_COLOR: Partial<Record<RecommendType, string>> = {

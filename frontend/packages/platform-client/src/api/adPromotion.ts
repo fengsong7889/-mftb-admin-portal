@@ -1334,3 +1334,146 @@ export function fetchCardOrder(menuKey: string, tabKey: string) {
 export function saveCardOrder(menuKey: string, tabKey: string, order: number[]) {
   return request.put<unknown, void>(`/card-order/${menuKey}/${tabKey}`, { order }, SILENT)
 }
+
+/* ==================== 時段推薦廣告 - 計價配置（銷售定價） ==================== */
+
+/** 時段推薦計價 - 單個時段明細（VO 回傳） */
+export interface AdTimeSlotItem {
+  id?: number
+  slotKey: string
+  slotName: string
+  startTime?: string | null
+  endTime?: string | null
+  price?: number
+  discountEnabled?: boolean
+  discount?: number | null
+  /** 折扣時間模式: limited=限時折扣 unlimited=長期打折 */
+  discountTimeMode?: 'limited' | 'unlimited' | null
+  discountStartDate?: string | null
+  discountEndDate?: string | null
+}
+
+/** 時段推薦計價配置（與後端 AdPricingTimeSlotVO 對齊；商家/分類/折扣梯度/退款以 JSON 字符串回傳） */
+export interface AdPricingTimeSlot {
+  id?: number
+  pricingNo?: string
+  algoId?: number | null
+  algoName?: string
+  brand?: string
+  channel?: number
+  presaleDays?: number
+  merchantScope?: string
+  allowCategories?: string | null
+  whitelistMerchants?: string | null
+  blacklistMerchants?: string | null
+  categoryExcludeMerchants?: string | null
+  daysDiscountEnabled?: number
+  daysDiscountTiers?: string | null
+  refundEnabled?: number
+  cancelFeeTiers?: string | null
+  status?: number
+  remark?: string
+  updatedBy?: string
+  createdAt?: string
+  updatedAt?: string
+  slots?: AdTimeSlotItem[]
+}
+
+/** 新增/編輯請求（商家/分類/梯度以結構化數組提交，後端序列化為 JSON） */
+export interface AdPricingTimeSlotRequest {
+  algoId?: number | null
+  algoName: string
+  brand?: string
+  channel: number
+  presaleDays: number
+  merchantScope?: string
+  allowCategories?: string[]
+  whitelistMerchants?: Record<string, unknown>[]
+  blacklistMerchants?: Record<string, unknown>[]
+  categoryExcludeMerchants?: Record<string, unknown>[]
+  daysDiscountEnabled?: boolean
+  daysDiscountTiers?: { minDays: number; discount: number }[]
+  refundEnabled?: number
+  cancelFeeTiers?: { remainDays: number; ratio: number }[]
+  status?: number
+  remark?: string
+  slots: {
+    slotKey: string
+    slotName: string
+    startTime?: string
+    endTime?: string
+    price: number
+    discountEnabled?: boolean
+    discount?: number
+    discountTimeMode?: 'limited' | 'unlimited'
+    discountStartDate?: string
+    discountEndDate?: string
+  }[]
+}
+
+export interface AdPricingTimeSlotQuery {
+  page?: number
+  size?: number
+  brand?: string
+  channel?: number
+  status?: number
+}
+
+/** 時段推薦計價配置分頁查詢 */
+export function fetchAdTimeSlotPricingList(params: AdPricingTimeSlotQuery) {
+  return request.get<unknown, AdPageResult<AdPricingTimeSlot>>('/ad/pricing/timeslot', { params, ...SILENT })
+}
+
+/** 時段推薦計價配置詳情 */
+export function fetchAdTimeSlotPricingDetail(id: number) {
+  return request.get<unknown, AdPricingTimeSlot>(`/ad/pricing/timeslot/${id}`, SILENT)
+}
+
+/** 新增時段推薦計價配置 */
+export function createAdTimeSlotPricing(data: AdPricingTimeSlotRequest) {
+  return request.post<unknown, AdPricingTimeSlot>('/ad/pricing/timeslot', data, SILENT)
+}
+
+/** 編輯時段推薦計價配置 */
+export function updateAdTimeSlotPricing(id: number, data: AdPricingTimeSlotRequest) {
+  return request.put<unknown, AdPricingTimeSlot>(`/ad/pricing/timeslot/${id}`, data, SILENT)
+}
+
+/** 時段推薦計價配置啟用/停用 */
+export function updateAdTimeSlotPricingStatus(id: number, status: number) {
+  return request.put<unknown, void>(`/ad/pricing/timeslot/${id}/status`, { status }, SILENT)
+}
+
+/** 刪除時段推薦計價配置 */
+export function deleteAdTimeSlotPricing(id: number) {
+  return request.delete<unknown, void>(`/ad/pricing/timeslot/${id}`, SILENT)
+}
+
+/** 查詢預售窗口內已購買（活躍訂單）的格子集合，元素格式「YYYY-MM-DD|slotKey」；選購頁加購物車前置攔截用 */
+export function fetchAdTimeSlotPurchasedCells(pricingId: number, groupCode: string) {
+  return request.get<unknown, string[]>('/ad/sales/timeslot/purchased-cells', { params: { pricingId, groupCode }, ...SILENT })
+}
+
+/** 時段推薦下單購物車條目：一個時段 + 其購買日期集合（同 slotKey 可多條，後端合併去重） */
+export interface AdTimeSlotOrderItem {
+  slotKey: string
+  /** 購買日期 YYYY-MM-DD，需在預售窗口內 */
+  dates: string[]
+}
+
+/** 時段推薦下單請求（後端展開為「時段 x 日期」格子逐格計價，天數折扣檔位按日期去重後天數合計匹配） */
+export interface AdTimeSlotOrderRequest {
+  pricingId: number
+  groupCode: string
+  storeCode?: string
+  bdEmpId?: string
+  channel?: number
+  remark?: string
+  giftDays?: number
+  items: AdTimeSlotOrderItem[]
+}
+
+/** 時段推薦下單（從推廣金賬戶扣款） */
+export function placeAdTimeSlotOrder(data: AdTimeSlotOrderRequest) {
+  return request.post<unknown, AdOrder>('/ad/sales/timeslot/order', data)
+}
