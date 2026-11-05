@@ -4,7 +4,7 @@
 .doc-preview__nav { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; margin-bottom: 24px; border: 1px solid #f0f0f0; border-radius: 12px; background: #fff; }
 .doc-preview__nav > button { display: flex; align-items: center; justify-content: center; gap: 8px; flex: 1 1 130px; padding: 12px 14px; border: 0; border-radius: 8px; background: transparent; color: #595959; font: inherit; font-size: 14px; cursor: pointer; transition: background 0.2s, color 0.2s; }
 .doc-preview__nav > button:hover, .doc-preview__nav > button[aria-current='page'] { background: #FFF7F0; color: #E8720C; }
-.doc-preview__nav > button[aria-current='page'] { font-weight: 600; box-shadow: inset 0 -2px 0 #E8720C; }
+.doc-preview__nav > button[aria-current='page'] { font-weight: 600; box-shadow: inset 0 -2px 0 var(--brand); }
 .doc-preview__nav small { color: #E8720C; font-size: 10px; padding: 1px 4px; border: 1px solid #FFE7D1; border-radius: 4px; }
 .doc-preview button:focus-visible { outline: 2px solid #1890FF; outline-offset: 3px; }
 .doc-preview__main { min-width: 0; }
