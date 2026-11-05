@@ -12,7 +12,12 @@
  *      "这场会为什么没了"的凭据；
  *   3. 统计卡片在搜索区下方且随筛选条件变化（§E.8）；
  *   4. 未开始的会议给「編輯」入口：改时间/换房/补参会人走同一张预约表单页，
- *      按钮可见性只看服务端 canEdit，不在前端复算“是否已开始”。
+ *      按钮可见性只看服务端 canEdit，不在前端复算“是否已开始”；
+ *   5. 默认按会议开始时间倒序（最近一场在最前）：台账要找的就是刚开完/即将开的会，
+ *      正序等于每次都得翻到最后一页；排序走服务端 sort 参数，因为分页也在服务端；
+ *   6. 「提前結束」与「釋放房間」是两个事实，必须各自有入口：开过场的会（服务端已下发
+ *      canFinish）走提前結束，不标爽约、纪要入口保留；無人到場才走釋放并计入爽约。
+ *      曾经台账只给釋放，行政把提前散会当成释放，于是正常开会的人背了爽约记录。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, DatePicker, Form, Input, Modal, Select, Space, Table, Tag, message } from 'antd'
@@ -28,6 +33,7 @@ import { useColumnConfig } from '@/hooks/useColumnConfig'
 import {
   cancelMeeting,
   fetchMeetings,
+  finishMeeting,
   releaseMeeting,
   fetchMeetingRooms,
   toMeetingIso,
@@ -89,7 +95,8 @@ export default function BookingRecords() {
   const [stats, setStats] = useState<MeetingStats>(EMPTY_STATS)
   const [total, setTotal] = useState(0)
   const [rooms, setRooms] = useState<MeetingRoomVO[]>([])
-  const [query, setQuery] = useState<MeetingQuery>({ page: 1, size: 20, scope: 'all' })
+  // sort 属于本页固定口径（台账倒序），不进搜索条件：重置/筛选都不应把它丢掉
+  const [query, setQuery] = useState<MeetingQuery>({ page: 1, size: 20, scope: 'all', sort: 'time-desc' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>()
   const [form] = Form.useForm()
@@ -140,7 +147,7 @@ export default function BookingRecords() {
 
   const reset = () => {
     form.resetFields()
-    setQuery({ page: 1, size: query.size ?? 20, scope: 'all' })
+    setQuery({ page: 1, size: query.size ?? 20, scope: 'all', sort: 'time-desc' })
   }
 
   /** 代取消：必填原因，写入审计并附在通知里（§B.3 校验 → 弹框 → 接口） */
@@ -182,6 +189,32 @@ export default function BookingRecords() {
         }
         await cancelMeeting(record.id, { reason: reason.trim(), version: record.version })
         message.success(t('meeting.meetingCancelledOnBehalf', { defaultValue: '已代組織者取消會議' }))
+        void load()
+      },
+    })
+  }
+
+  /** 提前結束：会真的开过、只是提前收尾。与「釋放房間」分开——释放等于無人到場，
+   *  把开过的会记成爽约会虚增次数（可能把人推向自动拉黑阈值）并吃掉纪要入口 */
+  const handleFinish = (record: MeetingVO) => {
+    Modal.confirm({
+      title: t('meeting.finishThisMeetingEarly', { defaultValue: '確認提前結束這場會議？' }),
+      className: 'custom-confirm-modal',
+      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      okText: t('meeting.confirmFinish', { defaultValue: '確認結束' }),
+      cancelText: t('meeting.back', { defaultValue: '返回' }),
+      content: (
+        <div className="confirm-info-card">
+          <div className="confirm-info-row"><span>{t('meeting.labelTopic', { defaultValue: '會議主題：' })}</span><b>{record.title}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.bookingNo2', { defaultValue: '單號：' })}</span><b>{record.bookingNo}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.time2', { defaultValue: '時間：' })}</span><b>{record.timeText}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.labelRoom', { defaultValue: '會議室：' })}</span><b>{record.roomName}</b></div>
+          <div className="confirm-info-row"><span>{t('meeting.impact', { defaultValue: '影響：' })}</span><b>{t('meeting.finishEarlyNoShowNote', { defaultValue: '提前結束不計入爽約統計，參會名單與紀要入口保持可用' })}</b></div>
+        </div>
+      ),
+      onOk: async () => {
+        await finishMeeting(record.id)
+        message.success(t('meeting.meetingFinished', { defaultValue: '會議已結束' }))
         void load()
       },
     })
@@ -316,6 +349,10 @@ export default function BookingRecords() {
                 ? t('meeting.minutes.viewShort', { defaultValue: '查看紀要' })
                 : t('meeting.minutes.recordShort', { defaultValue: '錄入紀要' })}
             </Button>
+          )}
+          {/* 提前結束：开过的会走这里收尾（不标爽约）；按钮口径只看服务端 canFinish */}
+          {canEdit && record.canFinish && (
+            <Button type="link" size="small" onClick={() => handleFinish(record)}>{t('meeting.finishEarly', { defaultValue: '提前結束' })}</Button>
           )}
           {canEdit && record.canRelease && (
             <Button type="link" size="small" onClick={() => handleRelease(record)}>{t('meeting.releaseRoom', { defaultValue: '釋放房間' })}</Button>

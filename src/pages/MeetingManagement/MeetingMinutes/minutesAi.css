@@ -52,8 +52,10 @@
 }
 .mm-ai__description { color: #595959; font-size: 13px; line-height: 1.8; margin: 0 0 20px; }
 .mm-ai__editor-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 8px; }
-.mm-ai__input-label { color: #262626; font-size: 13px; font-weight: 500; margin-right: auto; }
-.mm-ai__editor-heading > .mm-ai__hint { margin: 0; }
+/* 标题与 @ 提示同组靠左，按钮仍贴右侧：提示不再单独占中间一块，用户视线不用来回跳 */
+.mm-ai__editor-label-group { display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 4px; margin-right: auto; }
+.mm-ai__input-label { color: #262626; font-size: 13px; font-weight: 500; }
+.mm-ai__editor-label-group > .mm-ai__hint { margin: 0; }
 .mm-ai__editor { width: 100%; border-radius: 8px; }
 /* 测量层必须和 textarea 同排版，否则 @ 弹层会偏离光标。 */
 .mm-ai__editor textarea, .mm-ai__editor .ant-mentions-measure { padding: 14px 16px; line-height: 1.9; font-size: 14px; }

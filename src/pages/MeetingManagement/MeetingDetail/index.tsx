@@ -629,6 +629,14 @@ export default function MeetingDetail() {
                     </Button>
                   </div>
                 )}
+                {/* 不给按钮时必须说清为什么不给：只留一句「尚未錄入紀要」，用户只会当成缺功能的 bug */}
+                {record && !deriveCanRecordMinutes(record, minutesCapability) && (
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                    {t('meeting.minutes.entryBlocked', {
+                      defaultValue: '已取消或已釋放的會議不產生紀要；若只是提前散會，請在「會議詳情」改用「提前結束」收尾後再錄入',
+                    })}
+                  </span>
+                )}
               </Space>
             )}
 

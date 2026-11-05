@@ -608,6 +608,10 @@ export default function MeetingBookingForm() {
           {slotChanged && (
             <div className="confirm-info-row"><span>{t('meeting.impact', { defaultValue: '影響：' })}</span><b>{t('meeting.changingTimeRoom', { defaultValue: '改時間或換房間會重置全體參會人的表態，並重新送達變更通知' })}</b></div>
           )}
+          {/* 已开始的会被改到未来 = 这场会还没开过：服务端会撤回签到事实，必须先在确认框里说清 */}
+          {origin.status === 'checked_in' && dayjs(payload.startTime).isAfter(dayjs()) && (
+            <div className="confirm-info-row"><span>{t('meeting.impact', { defaultValue: '影響：' })}</span><b>{t('meeting.movedToFutureWithdrawsCheckins', { defaultValue: '這場會已開始，改到未來時間會撤回已有簽到記錄並回到待開會' })}</b></div>
+          )}
           <div style={{ marginTop: 12 }}>
             <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('meeting.changeNoteOptional', { defaultValue: '變更說明（選填，會寫入審計並附在通知裡）' })}</div>
             <Input.TextArea

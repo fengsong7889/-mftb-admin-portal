@@ -77,7 +77,7 @@ public class MeetingBookingController {
         return Result.success("會議已預約", bookingService.create(form));
     }
 
-    /** 变更会议（时间/房间/参会人）：会议开始后不可变更 */
+    /** 变更会议（时间/房间/参会人）：占用中的单都能改，已收尾的不改写历史 */
     @PutMapping("/bookings/{id}")
     @RequirePermission(menu = BOOKING, action = MeetingConstants.ACTION_EDIT, anyOf = {RECORD})
     public Result<MeetingBookingDto.VO> update(@PathVariable long id,
@@ -99,6 +99,14 @@ public class MeetingBookingController {
     public Result<MeetingBookingDto.VO> respond(@PathVariable long id,
                                                 @RequestBody @Valid MeetingBookingDto.ResponseForm form) {
         return Result.success("響應已記錄", bookingService.respond(id, form));
+    }
+
+    /** 补录参会人：预约时漏加的正式参会人（纪要录入页用），只补名单不重发邀约 */
+    @PostMapping("/bookings/{id}/attendees/backfill")
+    @RequirePermission(menu = MY, action = MeetingConstants.ACTION_EDIT, anyOf = {BOOKING, RECORD})
+    public Result<MeetingBookingDto.VO> backfillAttendee(@PathVariable long id,
+                                                         @RequestBody @Valid MeetingBookingDto.BackfillForm form) {
+        return Result.success("參會人已補錄", bookingService.backfillAttendee(id, form));
     }
 
     /* ==================== 我的会议 ==================== */

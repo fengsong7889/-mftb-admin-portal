@@ -30,7 +30,7 @@ public interface MeetingBookingService {
     /** 新建预约：免审批即时占用窗口，重复提交由 requestKey 幂等挡回 */
     MeetingBookingDto.CreateResult create(MeetingBookingDto.CreateForm form);
 
-    /** 改期/换房/改参会人：先版本比对再释放旧窗口，同事务内完成，避免中间态被抢占 */
+    /** 改期/换房/改参会人：占用中的单（已預約/已簽到）都可变更，先版本比对再释放旧窗口，同事务完成 */
     MeetingBookingDto.VO update(long id, MeetingBookingDto.UpdateForm form);
 
     /** 取消会议：原因必填，窗口立即归还可被别人重订 */
@@ -38,6 +38,13 @@ public interface MeetingBookingService {
 
     /** 参会人响应邀约（接受/拒绝）：只能替自己表态 */
     MeetingBookingDto.VO respond(long id, MeetingBookingDto.ResponseForm form);
+
+    /**
+     * 补录参会人：预约时漏加的正式参会人（区别于会中临时到场），只补名单不重发邀约。
+     *
+     * <p>已取消/已释放的单没有到场事实，不接受补录；姓名与工号由服务端从账号回查。
+     */
+    MeetingBookingDto.VO backfillAttendee(long id, MeetingBookingDto.BackfillForm form);
 
     /** 我某一天的日程（日历视图单元格数据，含我发起与我参与） */
     List<MeetingBookingDto.ScheduleVO> schedule(LocalDate date);

@@ -44,6 +44,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -451,21 +452,28 @@ class MeetingBookingSecurityTest {
     }
 
     @Test
-    @DisplayName("已开始的会议不可变更：改期语义只存在于未开始的预约")
-    void startedBookingCannotBeUpdated() {
+    @DisplayName("已开始的会议同样可变更：临时换房/加人/改议程就发生在这个窗口")
+    void startedBookingCanStillBeUpdated() {
         MeetingBooking stored = booking(61L, MeetingConstants.STATUS_BOOKED, ORGANIZER.getId());
         stored.setStartTime(LocalDateTime.now().minusMinutes(5));
         when(bookingMapper.selectForUpdate(61L)).thenReturn(stored);
+        when(guard.isOrganizer(stored, ORGANIZER)).thenReturn(true);
+        when(userMapper.selectById(ORGANIZER.getId())).thenReturn(ORGANIZER);
+        when(bookingMapper.update(isNull(), any())).thenReturn(1);
+        when(bookingMapper.selectById(61L)).thenReturn(stored);
         MeetingBookingDto.UpdateForm form = new MeetingBookingDto.UpdateForm();
-        form.setTitle("晚一點開始");
+        form.setTitle("換到更大的會議室");
         form.setRoomId(1L);
         form.setStartTime(LocalDateTime.now().plusMinutes(60));
         form.setEndTime(LocalDateTime.now().plusMinutes(90));
         form.setVersion(stored.getVersion());
 
-        BusinessException ex = assertThrows(BusinessException.class, () -> service.update(61L, form));
-        // 状态仍是 booked 但开始时间已过：拦住的是"已开始的会议不能改期"这条口径
-        assertTrue(ex.getMessage().contains("已開始或已結束"), ex.getMessage());
+        // 旧口径在这里报「已開始或已結束」；现在占用中的单一律能改，只有已收尾才拦
+        service.update(61L, form);
+
+        verify(bookingMapper, atLeastOnce()).update(isNull(), any());
+        verify(auditRecorder).recordBooking(eq(61L), any(), any(), eq(MeetingConstants.EVENT_UPDATE),
+                any(), any(), any(), eq(ORGANIZER), isNull());
     }
 
     @Test
@@ -574,15 +582,15 @@ class MeetingBookingSecurityTest {
     }
 
     /**
-     * 「編輯」按钮与 update() 护栏同口径。
+     * 「編輯」按钮与 update() 护栏同口径（STATUS_EDITABLE）。
      *
-     * <p>为什么单独钉一条：canEdit 早先是按 occupying（已預約 + 已簽到）算的，
-     * 而 update 只接受「已預約且尚未開始」——已签到又未到点的会因此拿到按钮，
-     * 用户填完整张表单才被拒。按钮能给≠改得动，这类错位只能靠断言钉住。
+     * <p>口径变更缘由：临时换会议室、加参会人、改议程恰恰都发生在开会之后，
+     * 旧口径「未开始才能改」把这些真实场景全推到「取消重订」，等于让行政重发一轮邀约。
+     * 现在占用中（已預約/已簽到）一律可改；已收尾（已完成/已取消/已释放）仍是历史事实。
      */
     @Test
-    @DisplayName("只有已預約且尚未開始的会才给编辑入口：已签到不给，已开始也不给")
-    void editEntryOpensOnlyForNotStartedBookedMeeting() {
+    @DisplayName("占用中的会都给编辑入口（未开始/已开始/已签到）；已收尾不给")
+    void editEntryOpensForEveryOccupyingMeeting() {
         LocalDateTime futureStart = LocalDateTime.now().plusHours(2);
         MeetingBooking booked = booking(72L, MeetingConstants.STATUS_BOOKED, ORGANIZER.getId());
         booked.setStartTime(futureStart);
@@ -596,14 +604,51 @@ class MeetingBookingSecurityTest {
         checkedIn.setEndTime(futureStart.plusHours(1));
         when(bookingMapper.selectById(73L)).thenReturn(checkedIn);
         when(guard.isOrganizer(checkedIn, ORGANIZER)).thenReturn(true);
-        assertFalse(Boolean.TRUE.equals(service.detail(73L).getCanEdit()), "已簽到的會改不了，不給必敗的按鈕");
+        assertTrue(Boolean.TRUE.equals(service.detail(73L).getCanEdit()), "已簽到的會同样能改名单与议程");
 
         MeetingBooking started = booking(74L, MeetingConstants.STATUS_BOOKED, ORGANIZER.getId());
         started.setStartTime(LocalDateTime.now().minusMinutes(5));
         started.setEndTime(LocalDateTime.now().plusMinutes(55));
         when(bookingMapper.selectById(74L)).thenReturn(started);
         when(guard.isOrganizer(started, ORGANIZER)).thenReturn(true);
-        assertFalse(Boolean.TRUE.equals(service.detail(74L).getCanEdit()), "已開始的會只能取消重訂");
+        assertTrue(Boolean.TRUE.equals(service.detail(74L).getCanEdit()), "已開始的會临时换房是常态");
+
+        MeetingBooking settled = booking(78L, MeetingConstants.STATUS_FINISHED, ORGANIZER.getId());
+        settled.setStartTime(LocalDateTime.now().minusHours(2));
+        settled.setEndTime(LocalDateTime.now().minusHours(1));
+        when(bookingMapper.selectById(78L)).thenReturn(settled);
+        when(guard.isOrganizer(settled, ORGANIZER)).thenReturn(true);
+        assertFalse(Boolean.TRUE.equals(service.detail(78L).getCanEdit()), "已收尾的會是历史事实，不给编辑入口");
+    }
+
+    /**
+     * 「釋放房間」与「提前結束」的按钮必须互斥。
+     *
+     * <p>两者在服务端是两个事实：無人到場（released + 爽约）与开过但提前收尾（finished）。
+     * 行政台账曾只给了釋放，开过的会因此被记成爽约；现在两个按钮都下发，
+     * 但已签到的会不能再给釋放（点了必被拒），只能给提前結束。
+     */
+    @Test
+    @DisplayName("释放与提前結束按钮互斥：已签到的会只给提前結束，不给必被拒的釋放")
+    void releaseAndFinishEntriesAreMutuallyExclusive() {
+        when(guard.currentUser()).thenReturn(ADMIN);
+        when(guard.canOperateRecords(ADMIN)).thenReturn(true);
+        LocalDateTime started = LocalDateTime.now().minusMinutes(30);
+
+        MeetingBooking nobody = booking(75L, MeetingConstants.STATUS_BOOKED, ORGANIZER.getId());
+        nobody.setStartTime(started);
+        nobody.setEndTime(started.plusHours(1));
+        when(bookingMapper.selectById(75L)).thenReturn(nobody);
+        MeetingBookingDto.VO nobodyVo = service.detail(75L);
+        assertTrue(Boolean.TRUE.equals(nobodyVo.getCanRelease()), "無人到場的會才走釋放");
+
+        MeetingBooking arrived = booking(76L, MeetingConstants.STATUS_CHECKED_IN, ORGANIZER.getId());
+        arrived.setStartTime(started);
+        arrived.setEndTime(started.plusHours(1));
+        when(bookingMapper.selectById(76L)).thenReturn(arrived);
+        MeetingBookingDto.VO arrivedVo = service.detail(76L);
+        assertFalse(Boolean.TRUE.equals(arrivedVo.getCanRelease()), "已簽到的會釋放必被拒，不給按鈕");
+        assertTrue(Boolean.TRUE.equals(arrivedVo.getCanFinish()), "已簽到的會必須給提前結束入口");
     }
 
     @Test
@@ -699,6 +744,47 @@ class MeetingBookingSecurityTest {
                 statusCaptor.capture(), groupCaptor.capture(), isNull(), isNull(), isNull());
         assertEquals("cancelled", statusCaptor.getValue());
         assertEquals("done", groupCaptor.getValue());
+    }
+
+    @Test
+    @DisplayName("列表排序口径：不传 sort 保持正序，time-desc 才把最近一场排最前")
+    void bookingListSortFollowsExplicitOrder() {
+        when(guard.currentUser()).thenReturn(ADMIN);
+        when(guard.canSeeAll(ADMIN)).thenReturn(true);
+        Page<MeetingBooking> page = new Page<>(1, 20);
+        page.setRecords(List.of());
+        when(bookingMapper.selectPage(any(), any())).thenReturn(page);
+        ArgumentCaptor<LambdaQueryWrapper<MeetingBooking>> ascCaptor = ArgumentCaptor.captor();
+        ArgumentCaptor<LambdaQueryWrapper<MeetingBooking>> descCaptor = ArgumentCaptor.captor();
+
+        MeetingBookingDto.Query asc = new MeetingBookingDto.Query();
+        asc.setScope("all");
+        service.listWithStats(asc);
+        verify(bookingMapper).selectPage(any(), ascCaptor.capture());
+        // 「我的會議」不传 sort，必须拿到原来的正序——本页只改行政台账，不能连带改另一个页面的观感
+        assertTrue(ascCaptor.getValue().getTargetSql().contains("start_time ASC"), ascCaptor.getValue().getTargetSql());
+
+        MeetingBookingDto.Query desc = new MeetingBookingDto.Query();
+        desc.setScope("all");
+        desc.setSort("time-desc");
+        service.listWithStats(desc);
+        // 两次调用各用一个 captor：同一个 captor 在 times(2) 复核时会把首次调用再记一遍，下标就错位了
+        verify(bookingMapper, times(2)).selectPage(any(), descCaptor.capture());
+        String descSql = descCaptor.getAllValues().get(descCaptor.getAllValues().size() - 1).getTargetSql();
+        assertTrue(descSql.contains("start_time DESC"), descSql);
+    }
+
+    @Test
+    @DisplayName("未知排序口径被拒：静默回落成缺省等于把写错的参数悄悄换成另一种顺序")
+    void unknownSortValueIsRejected() {
+        when(guard.currentUser()).thenReturn(ADMIN);
+        when(guard.canSeeAll(ADMIN)).thenReturn(true);
+        MeetingBookingDto.Query query = new MeetingBookingDto.Query();
+        query.setScope("all");
+        query.setSort("desc");
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.listWithStats(query));
+        assertTrue(ex.getMessage().contains("不支持的排序方式"), ex.getMessage());
     }
 
     /* ==================== 邀约投递契约 ==================== */

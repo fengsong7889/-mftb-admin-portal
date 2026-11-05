@@ -64,6 +64,10 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
     private static final String GROUP_ONGOING = "ongoing";
     private static final String GROUP_DONE = "done";
 
+    /** 列表时间排序口径：台账要看最近一场在前，个人清单保持早的在前，两种需求不能共用一个写死的序 */
+    private static final String SORT_TIME_ASC = "time-asc";
+    private static final String SORT_TIME_DESC = "time-desc";
+
     /** 派生展示态：进行中不落库，由 start<=now<end 算出 */
     private static final String PHASE_PENDING = "pending";
     private static final String PHASE_ONGOING = "ongoing";
@@ -361,11 +365,10 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
         blacklistService.assertNotBlacklisted(before.getDelegateForId(), "實際使用人");
         guard.requireBookingWritable(before, current);
         requireVersion(form.getVersion(), before);
-        if (!MeetingConstants.STATUS_BOOKED.equals(before.getStatus())) {
-            throw new BusinessException("只有「已預約且尚未開始」的會議可以變更，當前狀態：" + before.getStatus());
-        }
-        if (!before.getStartTime().isAfter(LocalDateTime.now())) {
-            throw new BusinessException("會議已開始或已結束，請取消後重新預約");
+        // 预约之后临时换房、加参会人、改议程是常态，因此「占用中」（已預約/已簽到）一律允许变更，
+        // 已开始甚至已签到也不例外；已收尾（已完成/已取消/已释放）是已经发生的历史事实，不再改写。
+        if (!MeetingConstants.STATUS_EDITABLE.contains(before.getStatus())) {
+            throw new BusinessException("該會議已結束或已終止，不能再變更，當前狀態：" + before.getStatus());
         }
 
         MeetingRoom room = roomMapper.selectForUpdate(form.getRoomId());
@@ -438,6 +441,12 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
                 || !Objects.equals(before.getRoomId(), saved.getRoomId());
         if (slotChanged) {
             resetResponses(id, current);
+            // 把已开始的会改到未来 = 这场会还没开过：签到事实必须一起撤回，
+            // 否则留下「开始时间在未来却已签到」的矛盾数据，释放/爽约判定也跟着错
+            if (saved.getStartTime().isAfter(LocalDateTime.now())) {
+                resetCheckins(id, before, current);
+                saved = requireBooking(id);
+            }
         }
 
         auditRecorder.recordBooking(id, saved.getRoomId(), saved.getBookingNo(),
@@ -527,6 +536,70 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
         auditRecorder.recordBooking(id, booking.getRoomId(), booking.getBookingNo(),
                 MeetingConstants.EVENT_UPDATE, "參會人響應：" + response, null, diff, current, null);
         return toVO(requireBooking(id), current);
+    }
+
+    /**
+     * 补录参会人：预约时漏加的正式参会人，由记录人/行政在录纪要时回填。
+     *
+     * <p>与「会中临时到场」是两件事：临时到场只进纪要的出席名单，不影响预约名单与人数；
+     * 补录要写进 biz_meeting_attendee，人数、详情名单、后续报表都包含他。
+     * <p>不发邀约：会已在开或已开完，重发邀请只会让人收到一场他事后才知道的会；
+     * 响应直接记 accepted，避免他在「待我響應」里看到一条无法表态的历史邀约。
+     * <p>重复补录：先锁预约单再查名单，同一人的并发补录会在行锁上串行，
+     * 生成列 uk_meeting_attendee 是兼底硬约束（不依赖它也不允许写重）。
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public MeetingBookingDto.VO backfillAttendee(long id, MeetingBookingDto.BackfillForm form) {
+        SysUser current = guard.currentUser();
+        MeetingBooking booking = bookingMapper.selectForUpdate(id);
+        if (booking == null) {
+            throw new BusinessException("會議記錄不存在或已刪除");
+        }
+        guard.requireBookingWritable(booking, current);
+        // 已取消/已释放没有到场事实，补人等于伪造名单；已完成可以补（纪要就是这时候录的）
+        if (!MeetingConstants.STATUS_EDITABLE.contains(booking.getStatus())
+                && !MeetingConstants.STATUS_FINISHED.equals(booking.getStatus())) {
+            throw new BusinessException("只有進行中或已結束的會議可以補錄參會人，當前狀態：" + booking.getStatus());
+        }
+        SysUser person = userMapper.selectById(form.getUserId());
+        if (person == null) {
+            throw new BusinessException("參會人不存在於系統，請重新選擇：" + form.getUserId());
+        }
+        if (person.getStatus() == null || person.getStatus() != 1) {
+            throw new BusinessException("以下人員已停用或離職，不可作為參會人：" + displayName(person));
+        }
+        List<MeetingAttendee> existing = attendeeMapper.findByBooking(id);
+        if (existing.stream().anyMatch(row -> Objects.equals(row.getUserId(), person.getId()))) {
+            throw new BusinessException("該員工已在參會名單中，無需補錄：" + displayName(person));
+        }
+        MeetingAttendee row = new MeetingAttendee();
+        row.setBookingId(id);
+        row.setUserId(person.getId());
+        row.setEmpNo(Objects.toString(person.getEmpId(), ""));
+        row.setName(displayName(person));
+        row.setDepartmentName(Objects.toString(person.getDepartment(), ""));
+        row.setAttendeeType(MeetingConstants.ATTENDEE_REQUIRED);
+        row.setResponse(MeetingConstants.RESPOND_ACCEPTED);
+        row.setRespondAt(LocalDateTime.now());
+        row.setNotifyStatus(MeetingConstants.NOTIFY_SKIPPED);
+        row.setNotifyNote("補錄名單，未發邀約");
+        row.setCreatedBy(current.getName());
+        row.setUpdatedBy(current.getName());
+        attendeeMapper.insert(row);
+
+        // 人数按名单重算而不是 +1：外部参会人也在同一张表，拿存量字段加一容易与详情名单对不上
+        int attendeeCount = attendeeMapper.findByBooking(id).size();
+        bookingMapper.update(null, new LambdaUpdateWrapper<MeetingBooking>()
+                .eq(MeetingBooking::getId, id)
+                .set(MeetingBooking::getAttendeeCount, attendeeCount)
+                .set(MeetingBooking::getUpdatedBy, current.getName())
+                .setSql("version = version + 1"));
+        MeetingBooking saved = requireBooking(id);
+        auditRecorder.recordBooking(id, saved.getRoomId(), saved.getBookingNo(),
+                MeetingConstants.EVENT_ATTENDEE_BACKFILL, "補錄參會人：" + row.getName(),
+                snapshot(booking), snapshot(saved), current, null);
+        return toVO(saved, current);
     }
 
     /* ==================== 定时作业的单元操作 ==================== */
@@ -775,6 +848,12 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
             // 还会虚增爽约次数把好好的人推向自动拉黑阈值，因此只允许走“代取消”。
             throw new BusinessException("會議尚未開始，請改用「代取消」；釋放僅針對已開始但未到場的會議");
         }
+        if (MeetingConstants.STATUS_CHECKED_IN.equals(booking.getStatus())) {
+            // 已有人签到 = 这场会真的开过，只是提前收尾。走释放会把它写成「無人到場」：
+            // 爽约次数虚增（可能把正常开会的人推向自动拉黑阈值）、使用率统计按无人到场算，
+            // 纪要入口也会因「已释放的会不产生纪要」而消失。因此只允许走「提前結束」。
+            throw new BusinessException("會議已有參會人簽到，請改用「提前結束」；釋放僅針對無人到場的會議");
+        }
         requireVersion(form.getVersion(), booking);
         doRelease(booking, form.getReason().trim(), current.getId(), current.getName());
         return toVO(requireBooking(id), current, roomMapper.selectById(booking.getRoomId()));
@@ -1007,8 +1086,25 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
         if (StringUtils.hasText(query.getStatus())) {
             wrapper.eq(MeetingBooking::getStatus, query.getStatus().trim());
         }
-        wrapper.orderByAsc(MeetingBooking::getStartTime).orderByDesc(MeetingBooking::getId);
+        applySort(wrapper, query.getSort());
         return wrapper;
+    }
+
+    /**
+     * 时间排序口径：缺省正序，只有显式请求才倒序。
+     *
+     * <p>白名单之外的取值直接拒绝而不是回落成缺省（与 {@code respond} 同一口径）：
+     * 静默回落会让前端写错的参数拿到另一种顺序，行政台账翻页时无法解释为何顺序变了。
+     * <p>同秒的单以 ID 倒序兜底：不给第二排序键时，MySQL 对并列值的返回序不稳定，
+     * 翻页会出现同一条重复或漏行。
+     */
+    private void applySort(LambdaQueryWrapper<MeetingBooking> wrapper, String sort) {
+        String value = StringUtils.hasText(sort) ? sort.trim() : SORT_TIME_ASC;
+        switch (value) {
+            case SORT_TIME_ASC -> wrapper.orderByAsc(MeetingBooking::getStartTime).orderByDesc(MeetingBooking::getId);
+            case SORT_TIME_DESC -> wrapper.orderByDesc(MeetingBooking::getStartTime).orderByDesc(MeetingBooking::getId);
+            default -> throw new BusinessException("不支持的排序方式：" + value);
+        }
     }
 
     /** 列表与统计共用的条件部分（状态/Tab 维度也已同时传给统计，见 {@code countByStatus}） */
@@ -1225,6 +1321,32 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
                 .set(MeetingAttendee::getUpdatedBy, operator.getName()));
     }
 
+    /**
+     * 改期到未来时撤回签到事实：单子回到「已預約」，个人签到与「已开始」时间一并清空。
+     *
+     * <p>只改时间不改签到会留下两种矛盾数据：开始时间在未来却已签到（使用率与爽约判定失真）、
+     * 以及已签到状态却拿不到签到入口。反过来，改到过去/进行中的会不动签到——
+     * 人确实到过场，那是已经发生的事实。
+     */
+    private void resetCheckins(long bookingId, MeetingBooking before, SysUser operator) {
+        attendeeMapper.update(null, new LambdaUpdateWrapper<MeetingAttendee>()
+                .eq(MeetingAttendee::getBookingId, bookingId)
+                .isNotNull(MeetingAttendee::getCheckinAt)
+                .set(MeetingAttendee::getCheckinAt, null)
+                .set(MeetingAttendee::getUpdatedBy, operator.getName()));
+        if (!MeetingConstants.STATUS_CHECKED_IN.equals(before.getStatus())) {
+            return;
+        }
+        bookingMapper.update(null, new LambdaUpdateWrapper<MeetingBooking>()
+                .eq(MeetingBooking::getId, bookingId)
+                .set(MeetingBooking::getStatus, MeetingConstants.STATUS_BOOKED)
+                .set(MeetingBooking::getCheckinAt, null)
+                .set(MeetingBooking::getCheckinBy, null)
+                .set(MeetingBooking::getActualStartAt, null)
+                .set(MeetingBooking::getUpdatedBy, operator.getName())
+                .setSql("version = version + 1"));
+    }
+
     private SysUser organizerOf(MeetingBooking booking) {
         SysUser organizer = userMapper.selectById(booking.getOrganizerId());
         if (organizer == null) {
@@ -1409,15 +1531,16 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
         vo.setSeriesSeq(booking.getSeriesSeq());
         boolean writable = guard.isOrganizer(booking, current) || guard.canOperateRecords(current);
         boolean occupying = MeetingConstants.OCCUPYING_STATUSES.contains(booking.getStatus());
-        // canEdit 必须与 update() 的护栏同口径：只有「已預約且尚未開始」真能改。
-        // 早前用 occupying（含已簽到）算，已签到又未到点的会会给出「編輯」按钮，
-        // 点进去填完一整张表单才被服务端拒——这种"按钮能点但一定失败"比没有按钮更糟
-        vo.setCanEdit(writable && MeetingConstants.STATUS_EDITABLE.contains(booking.getStatus())
-                && booking.getStartTime().isAfter(now));
+        // canEdit 必须与 update() 的护栏同口径（只看 STATUS_EDITABLE）：占用中的单真能改。
+        // 早先额外要求“开始时间在未来”，于是已开始的会拿不到按钮，而临时换房/加人恰恰发生在开会之后；
+        // 反过来只放宽界面而不放宽服务端，就会变成“点了必被拒”，两边必须一起改
+        vo.setCanEdit(writable && MeetingConstants.STATUS_EDITABLE.contains(booking.getStatus()));
         vo.setCanCancel(writable && occupying && booking.getEndTime().isAfter(now));
         // 按钮可见性只看服务端结论：前端拿 canXxx 决定渲不渲染，不再自己复算一遍窗口口径
-        // 释放必须与 release() 的护栏同口径：未开始的会不给“釋放房間”入口，否则点了只会碰壁
-        vo.setCanRelease(occupying && !booking.getStartTime().isAfter(now) && guard.canOperateRecords(current));
+        // 释放必须与 release() 的护栏同口径：未开始的会不给“釋放房間”入口，否则点了只会碰壁；
+        // 已有人签到的会同样不给——那只能走“提前結束”，给了按钮再被服务端拒是更糟的体验
+        vo.setCanRelease(occupying && !booking.getStartTime().isAfter(now) && guard.canOperateRecords(current)
+                && !MeetingConstants.STATUS_CHECKED_IN.equals(booking.getStatus()));
         vo.setCanFinish(writable && occupying && !booking.getStartTime().isAfter(now));
         vo.setCheckinRequired(booking.getCheckinRequiredSnapshot() != null
                 ? booking.getCheckinRequiredSnapshot() == 1

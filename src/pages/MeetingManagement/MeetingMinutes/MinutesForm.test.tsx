@@ -27,6 +27,7 @@ vi.mock('@/contexts/AuthContext', () => ({
 vi.mock('@/api/meeting', () => ({
   fetchMeetingDetail: vi.fn(),
   newMeetingRequestKey: vi.fn(() => 'mm-test-key'),
+  backfillMeetingAttendee: vi.fn(),
   toMeetingIso: (value: { format: (f: string) => string }) => value.format('YYYY-MM-DDTHH:mm:ss'),
   toMeetingIsoDate: (value: { format: (f: string) => string } | null) => (value ? value.format('YYYY-MM-DD') : undefined),
 }))
@@ -58,7 +59,7 @@ vi.mock('@/api/employee', () => ({
   fetchEmployees: vi.fn(async () => ({ records: [], total: 0 })),
 }))
 
-import { fetchMeetingDetail } from '@/api/meeting'
+import { fetchMeetingDetail, backfillMeetingAttendee } from '@/api/meeting'
 import {
   createMinutes, deleteMinutesAttachment, emptyMinutesContent, fetchMinutes, fetchMinutesAttachmentAccess,
   extractMinutesAi, fetchMinutesAiStatus, saveMinutesNote,
@@ -634,6 +635,33 @@ describe('會議紀要表單', () => {
       expect.objectContaining({ userId: 1 }), expect.objectContaining({ userId: 2 }),
       expect.objectContaining({ userId: 100, name: '臨時支援', status: 'present' }),
     ])
+  })
+
+  it('补录参会人写入正式名单：走服务端、刷新会议数据，并算作已邀约而不是临时到场', async () => {
+    vi.mocked(fetchEmployees).mockResolvedValue({
+      records: [{ id: 55, name: '趙六', empId: 'MF00055' }], total: 1,
+    } as never)
+    vi.mocked(backfillMeetingAttendee).mockResolvedValue({
+      ...MEETING,
+      attendeeCount: MEETING.attendeeCount + 1,
+      attendees: [...MEETING.attendees, {
+        id: 900, userId: 55, name: '趙六', empNo: 'MF00055', attendeeType: 'required', response: 'accepted',
+      }],
+    } as never)
+    renderForm()
+    const section = await screen.findByRole('region', { name: '實際出席確認' })
+
+    fireEvent.click(within(section).getByRole('button', { name: '補錄參會人' }))
+    const input = within(section).getByRole('combobox')
+    fireEvent.focus(input)
+    fireEvent.mouseDown(input.closest('.ant-select')!.querySelector('.ant-select-selector')!)
+    fireEvent.click(await screen.findByText('趙六', { selector: '.ant-select-item-option-content span' }))
+
+    // 名单归服务端：只在前端拼一行会造成界面与预约名单两套口径
+    await waitFor(() => expect(backfillMeetingAttendee).toHaveBeenCalledWith(MEETING.id, { userId: 55 }))
+    const row = await within(within(section).getByRole('table')).findByRole('row', { name: /趙六/ })
+    expect(within(row).getByText('已邀約')).toBeInTheDocument()
+    expect(within(row).getByRole('radio', { name: '是' })).toBeChecked()
   })
 
   it('没有邀约人员时展示空态，仍提供临时人员添加入口', async () => {
