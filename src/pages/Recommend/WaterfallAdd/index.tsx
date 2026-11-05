@@ -1235,7 +1235,7 @@ function WaterfallAddGeneral() {
                 </div>
                 {/* 指定时显示5个时段勾选 */}
                 {!onlySellTimeSlots.includes('fullDay') && (
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 16, padding: 12, background: 'var(--success-soft)', borderRadius: 6, border: '1px solid #b7eb8f' }}>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 16, padding: 12, background: 'var(--success-soft)', borderRadius: 6, border: '1px solid var(--success-border)' }}>
                     {TIME_SLOTS.filter(s => s.key !== 'fullDay').map(slot => (
                       <Checkbox
                         key={slot.key}
@@ -1714,7 +1714,7 @@ function WaterfallAddGeneral() {
                   style={{ padding: 12, background: 'var(--surface-3)', borderRadius: 6, border: '1px solid var(--border-2)', minHeight: 520 }}
                 />
                 {selectedRegionNode && (
-                  <div style={{ marginTop: 8, padding: '8px 12px', background: 'var(--success-soft)', border: '1px solid #b7eb8f', borderRadius: 6 }}>
+                  <div style={{ marginTop: 8, padding: '8px 12px', background: 'var(--success-soft)', border: '1px solid var(--success-border)', borderRadius: 6 }}>
                     <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{t('recommend.selectedLabel')}</span>
                     <Tag color="green">{selectedRegionNode.title}</Tag>
                     <span style={{ fontSize: 12, color: 'var(--text-3)' }}>({selectedRegionNode.level === 1 ? t('recommend.regionLabel') : t('recommend.districtLabel')})</span>
@@ -2078,7 +2078,7 @@ function WaterfallAddGeneral() {
 
         {/* 已选提示 */}
         {tempSelectedMerchants.length > 0 && (
-          <div style={{ marginBottom: 12, padding: '6px 12px', background: 'var(--success-soft)', borderRadius: 6, border: '1px solid #b7eb8f', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ marginBottom: 12, padding: '6px 12px', background: 'var(--success-soft)', borderRadius: 6, border: '1px solid var(--success-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 12, color: 'var(--success)', fontWeight: 500 }}>
               {t('recommend.merchantsSelectedCount', { count: tempSelectedMerchants.length })}
             </span>

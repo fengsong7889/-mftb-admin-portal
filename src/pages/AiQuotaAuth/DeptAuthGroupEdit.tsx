@@ -461,7 +461,7 @@ export default function DeptAuthGroupEdit() {
           {/* 數據不出域：開啟後僅可授權私有化部署模型 */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
-            background: 'var(--purple-soft)', borderRadius: 6, border: '1px solid #D3ADF7', marginBottom: 16,
+            background: 'var(--purple-soft)', borderRadius: 6, border: '1px solid var(--purple-border)', marginBottom: 16,
           }}>
             <Form.Item name="dataResidency" noStyle valuePropName="checked"
               getValueFromEvent={(checked) => checked ? 1 : 0}
@@ -500,7 +500,7 @@ export default function DeptAuthGroupEdit() {
                 if (!model) return null
                 return (
                   <div key={auth.modelId} style={{
-                    border: '1px solid #D3ADF7', borderRadius: 10, padding: '16px',
+                    border: '1px solid var(--purple-border)', borderRadius: 10, padding: '16px',
                     background: 'var(--purple-soft)', transition: 'all 0.25s',
                   }}>
                     {/* 模型头部 + 移除 */}

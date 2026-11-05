@@ -256,8 +256,8 @@ export default function RequirementImportModal({ open, onClose, onImport }: Requ
           <div style={{
             maxHeight: 140,
             overflow: 'auto',
-            background: '#FFF2F0',
-            border: '1px solid #FFCCC7',
+            background: 'var(--danger-callout)',
+            border: '1px solid var(--danger-border)',
             borderRadius: 6,
             padding: '8px 12px',
           }}

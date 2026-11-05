@@ -225,7 +225,7 @@ export default function GrayscaleConfig() {
             <div className="rdm-card-title">
               {/* 成对保留裸色：#FFEBEE（Material red-50）无等值令牌且不透明，不会随主题变深；
                   若只把前景换成令牌 danger，深色下会得「浅粉底 + 亮红字」约 1.3:1。见方案 §18.6。 */}
-              <span className="rdm-icon-block" style={{ background: '#FFEBEE', color: '#FF4D4F' }}>
+              <span className="rdm-icon-block" style={{ background: '#FFEBEE', color: '#FF4D4F' /* theme-pair-locked：#FFEBEE（Material red-50）无等值令牌且不透明，两侧成对保持裸值 */ }}>
                 <WarningOutlined />
               </span>
               {txt('rdm.grayscale.globalCard', 'GLOBAL 灰度 / 熔斷')}
@@ -309,7 +309,7 @@ function SwitchRow({ label, hint, checked, disabled, danger, tag, onChange }: {
   tag: React.ReactNode; onChange: (next: boolean) => void
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', border: '1px solid #f0f0f0', borderRadius: 8 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', border: '1px solid var(--border-2)', borderRadius: 8 }}>
       <Switch checked={checked} disabled={disabled} onChange={onChange} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: danger ? '#CF1322' : 'var(--text-1)' }}>{label}</div>

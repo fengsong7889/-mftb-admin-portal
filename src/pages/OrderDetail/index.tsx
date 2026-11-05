@@ -620,7 +620,7 @@ export default function OrderDetail() {
                       <div style={{
                         marginTop: 6, textAlign: 'center', whiteSpace: 'nowrap',
                         padding: '3px 10px', background: 'var(--danger-soft)',
-                        border: '1px solid #FFCCC7', borderRadius: 4,
+                        border: '1px solid var(--danger-border)', borderRadius: 4,
                       }}>
                         <div style={{ fontSize: 11, fontWeight: 600, color: '#cf1322', marginBottom: 2 }}>
                           {terminalActorTypeLabel}
@@ -756,7 +756,7 @@ export default function OrderDetail() {
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '4px 12px', background: 'var(--warning-soft)',
-            borderRadius: 4, border: '1px solid #FFD591',
+            borderRadius: 4, border: '1px solid var(--warning-border)',
             marginLeft: 4,
           }}>
             <span style={{ fontSize: 11, color: 'var(--brand)', fontWeight: 600 }}>{t('orderDetail.orderNo')}</span>
@@ -974,7 +974,7 @@ export default function OrderDetail() {
                   <>
                     {/* 人氣商家：購買皮膚，無推廣商圈，只展示皮膚名稱 */}
                     <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>{t('orderDetail.skinKit')}</span>
-                    <Tag style={{ margin: 0, color: 'var(--brand)', background: 'var(--warning-soft)', borderColor: '#FFD591' }}>🎨 {order.skinName}</Tag>
+                    <Tag style={{ margin: 0, color: 'var(--brand)', background: 'var(--warning-soft)', borderColor: 'var(--warning-border)' }}>🎨 {order.skinName}</Tag>
                     <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-3)', fontWeight: 400 }}>{t('orderDetail.skinDailyNote')}</span>
                   </>
                 ) : (
@@ -1225,7 +1225,7 @@ export default function OrderDetail() {
               {/* 计算公式详解 */}
               <div style={{
                 marginTop: 16, padding: '10px 14px', background: 'var(--surface-2)', borderRadius: 8,
-                border: '1px dashed #FFD591', fontSize: 12, color: 'var(--text-3)', lineHeight: 2,
+                border: '1px dashed var(--warning-border)', fontSize: 12, color: 'var(--text-3)', lineHeight: 2,
               }}>
                 <div style={{ fontWeight: 600, color: 'var(--text-2)', marginBottom: 4 }}>{t('orderDetail.calcFormula')}</div>
                 {t('orderDetail.perDayCalc', { count: deductDays })}<strong style={{ color: 'var(--brand)' }}>{deductDays}</strong>
@@ -1331,7 +1331,7 @@ export default function OrderDetail() {
                 <span style={{ fontSize: 12, color: 'var(--text-3)', minWidth: 90 }}>{'④'} {t('orderDetail.step3FinalPrice')}</span>
                 <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--brand)' }}>MOP {order.gradientDiscount ? finalPrice : totalOriginal}</span>
                 {(order.gradientDiscount ? totalSaved > 0 : false) && (
-                  <span style={{ fontSize: 11, color: 'var(--success)', background: 'var(--success-soft)', padding: '1px 8px', borderRadius: 4, border: '1px solid #B7EB8F' }}>
+                  <span style={{ fontSize: 11, color: 'var(--success)', background: 'var(--success-soft)', padding: '1px 8px', borderRadius: 4, border: '1px solid var(--success-border)' }}>
                     {t('orderDetail.savedAmount', { amount: totalSaved })}
                   </span>
                 )}
@@ -1353,7 +1353,7 @@ export default function OrderDetail() {
                     <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{giftDeductTipText}</span>
                   </div>
                   <div style={{
-                    padding: '4px 16px', background: 'var(--warning-soft)', border: '1px solid #FFD591',
+                    padding: '4px 16px', background: 'var(--warning-soft)', border: '1px solid var(--warning-border)',
                     borderRadius: 8,
                   }}>
                     <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--brand)' }}>{giftDays.toLocaleString()} {giftCountSuffix}</span>
@@ -1365,7 +1365,7 @@ export default function OrderDetail() {
                     <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-1)' }}>{t('orderDetail.giftDeductCashLabel')}</span>
                   </div>
                   <div style={{
-                    padding: '4px 16px', background: 'var(--warning-soft)', border: '1px solid #FFD591',
+                    padding: '4px 16px', background: 'var(--warning-soft)', border: '1px solid var(--warning-border)',
                     borderRadius: 8,
                   }}>
                     <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--brand)' }}>MOP {giftAmount}</span>
@@ -1396,7 +1396,7 @@ export default function OrderDetail() {
                 </div>
               ) : isRefunded ? (
                 <div style={{
-                  padding: '5px 18px', background: 'var(--warning-soft)', border: '1px solid #FFD591',
+                  padding: '5px 18px', background: 'var(--warning-soft)', border: '1px solid var(--warning-border)',
                   borderRadius: 8,
                 }}>
                   <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--brand)' }}>MOP {actualPaid}</span>
@@ -1415,7 +1415,7 @@ export default function OrderDetail() {
           {/* 计算公式详解 */}
           <div style={{
             marginTop: 16, padding: '10px 14px', background: 'var(--surface-2)', borderRadius: 8,
-            border: '1px dashed #FFD591', fontSize: 12, color: 'var(--text-3)', lineHeight: 2,
+            border: '1px dashed var(--warning-border)', fontSize: 12, color: 'var(--text-3)', lineHeight: 2,
           }}>
             <div style={{ fontWeight: 600, color: 'var(--text-2)', marginBottom: 4 }}>{t('orderDetail.calcFormula')}</div>
             {(isPopular || isRevive) ? (
@@ -1492,7 +1492,7 @@ export default function OrderDetail() {
                   {!isNewStore && <div style={{
                     marginBottom: 16, padding: '14px 20px', borderRadius: 8,
                     background: order.refundEnabled === false ? 'var(--danger-callout)' : 'var(--surface-3)',
-                    border: order.refundEnabled === false ? '1px solid #ffccc7' : '1px solid var(--border-2)',
+                    border: order.refundEnabled === false ? '1px solid var(--danger-border)' : '1px solid var(--border-2)',
                   }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ width: 4, height: 14, background: '#FF4D4F', borderRadius: 2, display: 'inline-block' }} />
@@ -1538,7 +1538,7 @@ export default function OrderDetail() {
                         {isRefunded && (
                           <div style={{
                             marginTop: 12, padding: '12px 16px', borderRadius: 8,
-                            background: 'var(--danger-callout)', border: '1px solid #ffccc7',
+                            background: 'var(--danger-callout)', border: '1px solid var(--danger-border)',
                             display: 'flex', flexDirection: 'column', gap: 8,
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1553,7 +1553,7 @@ export default function OrderDetail() {
                               <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('orderDetail.feePercentLabel')}</span>
                               <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{refundInfo?.feePercent ?? 0}%</span>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px dashed #ffccc7', paddingTop: 12, marginTop: 4 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px dashed var(--danger-border)', paddingTop: 12, marginTop: 4 }}>
                               <span style={{ fontSize: 14, fontWeight: 700, color: '#cf1322' }}>{t('orderDetail.refundAmountLabel')}</span>
                               <div style={{
                                 padding: '6px 20px', background: 'linear-gradient(135deg, #FF4D4F, #FF7875)',
@@ -1740,7 +1740,7 @@ export default function OrderDetail() {
                             {isPopular ? (
                               <>
                                 <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>{t('orderDetail.skinKit')}</span>
-                                <Tag style={{ margin: 0, color: 'var(--brand)', background: 'var(--warning-soft)', borderColor: '#FFD591' }}>🎨 {order.skinName}</Tag>
+                                <Tag style={{ margin: 0, color: 'var(--brand)', background: 'var(--warning-soft)', borderColor: 'var(--warning-border)' }}>🎨 {order.skinName}</Tag>
                               </>
                             ) : isTrafficAd ? (
                               <>
@@ -1749,7 +1749,7 @@ export default function OrderDetail() {
                                   margin: 0,
                                   color: order.trafficMode === 'custom' ? 'var(--purple)' : 'var(--brand)',
                                   background: order.trafficMode === 'custom' ? 'var(--purple-soft)' : 'var(--warning-soft)',
-                                  borderColor: order.trafficMode === 'custom' ? '#D3ADF7' : '#FFD591',
+                                  borderColor: order.trafficMode === 'custom' ? 'var(--purple-border)' : 'var(--warning-border)',
                                 }}>
                                   📊 {order.trafficMode === 'custom' ? '自定義' : (order.trafficPackageName || '-')}
                                 </Tag>
@@ -1993,7 +1993,7 @@ export default function OrderDetail() {
         {isNewStore ? (
           <div>
             <div style={{
-              background: 'var(--warning-soft)', border: '1px solid #FFD591', borderRadius: 8,
+              background: 'var(--warning-soft)', border: '1px solid var(--warning-border)', borderRadius: 8,
               padding: 16, marginBottom: 16,
             }}>
               <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 2 }}>
@@ -2026,7 +2026,7 @@ export default function OrderDetail() {
           <div>
             {/* 投流廣告：按定價配置的計算公式退款（退還剩餘未消耗曝光價值 − 手續費） */}
             <div style={{
-              background: 'var(--warning-soft)', border: '1px solid #FFD591', borderRadius: 8,
+              background: 'var(--warning-soft)', border: '1px solid var(--warning-border)', borderRadius: 8,
               padding: 16, marginBottom: 16,
             }}>
               <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.8 }}>
@@ -2085,7 +2085,7 @@ export default function OrderDetail() {
         ) : payMode === 'gift' ? (
           <div>
             <div style={{
-              background: 'var(--success-soft)', border: '1px solid #B7EB8F', borderRadius: 8,
+              background: 'var(--success-soft)', border: '1px solid var(--success-border)', borderRadius: 8,
               padding: 16, marginBottom: 16,
             }}>
               <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.8 }}>
@@ -2132,7 +2132,7 @@ export default function OrderDetail() {
         ) : (
           <div>
             <div style={{
-              background: 'var(--warning-soft)', border: '1px solid #FFD591', borderRadius: 8,
+              background: 'var(--warning-soft)', border: '1px solid var(--warning-border)', borderRadius: 8,
               padding: 16, marginBottom: 16,
             }}>
               <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.8 }}>

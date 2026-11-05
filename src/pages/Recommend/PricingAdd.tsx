@@ -364,7 +364,7 @@ export default function PricingAdd() {
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '3px 12px', background: 'var(--warning-soft)',
-                  border: '1px solid #FFD591', borderRadius: 4,
+                  border: '1px solid var(--warning-border)', borderRadius: 4,
                   fontSize: 13, color: 'var(--brand)', fontWeight: 500,
                 }}>
                   <span style={{ fontSize: 14 }}>🔥</span>
@@ -790,7 +790,7 @@ export default function PricingAdd() {
           style={{ marginTop: 16 }}
         />
         {selectedRegionNode && (
-          <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--success-soft)', borderRadius: 6, border: '1px solid #b7eb8f' }}>
+          <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--success-soft)', borderRadius: 6, border: '1px solid var(--success-border)' }}>
             <span style={{ color: 'var(--success)', fontSize: 13 }}>{t('recommend.selectedLabel')}</span>
             <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{selectedRegionNode.title}</span>
           </div>

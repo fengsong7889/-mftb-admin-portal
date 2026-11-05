@@ -245,7 +245,7 @@ export function MyDevTasksPanel() {
                 </span>
               )}
               {typeof task.progress === 'number' && task.progress > 0 && <span>進度 {task.progress}%</span>}
-              {task.blockedReason && <span style={{ color: '#D46B08' }}>阻塞：{task.blockedReason}</span>}
+              {task.blockedReason && <span style={{ color: 'var(--warning-deep)' }}>阻塞：{task.blockedReason}</span>}
             </div>
           </div>
           <Tag color={RDM_TASK_STATUS_COLOR[task.status as keyof typeof RDM_TASK_STATUS_COLOR] ?? 'default'} style={{ margin: 0 }}>

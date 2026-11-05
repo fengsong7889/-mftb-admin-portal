@@ -301,7 +301,7 @@ export default function InventoryDetail({ taskId, onBack }: Props) {
     const isLost = editor.status === 'lost'
     const isPending = editor.status === 'pending'
     return (
-      <div style={{ background: 'var(--surface-3)', border: '1px solid #f0f0f0', borderRadius: 8, padding: 16 }}>
+      <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border-2)', borderRadius: 8, padding: 16 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, alignItems: 'flex-end' }}>
           <div>
             <div style={labelStyle}>{t('asset.colCheckStatus')}</div>
@@ -515,7 +515,7 @@ export default function InventoryDetail({ taskId, onBack }: Props) {
       >
         {prepare && (
           <>
-            <div style={{ background: 'var(--brand-soft)', border: '1px solid #FFE7D1', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
+            <div style={{ background: 'var(--brand-soft)', border: '1px solid var(--brand-border)', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
               <Space size="large" wrap>
                 <span>{t('asset.invStatExpected')}：<b>{prepare.stats.expectedCount}</b></span>
                 <span>{t('asset.invStatChecked')}：<b style={{ color: 'var(--success)' }}>{prepare.checkedCount}</b></span>

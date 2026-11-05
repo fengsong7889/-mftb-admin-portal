@@ -212,7 +212,7 @@ export default function AccessoryConfig({ categoryCode, categoryName, onBack }: 
          实测：浅色 #D46B08 on #FFF7E6 = 3.34（低于正文 AA，属存量债务，单测按 3.3 卡下限防回退）；
          深色 #FFA940 on 合成底 #42301E = 6.58（达 AA）。见方案 §18.6。 */}
       <div style={{
-        padding: '8px 12px', background: 'var(--warning-soft)', border: '1px solid #FFD591',
+        padding: '8px 12px', background: 'var(--warning-soft)', border: '1px solid var(--warning-border)',
         borderRadius: 6, marginBottom: 12, fontSize: 13, color: 'var(--warning-deep)', lineHeight: 1.7,
       }}>
         {t('asset.accConfigHint')}

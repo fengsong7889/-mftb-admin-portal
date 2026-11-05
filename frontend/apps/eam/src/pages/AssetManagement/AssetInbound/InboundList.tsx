@@ -345,7 +345,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
               content={
                 <div style={{ maxWidth: 240 }}>
                   {suppliers.map((s, i) => (
-                    <div key={i} style={{ padding: '4px 0', borderBottom: i < suppliers.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                    <div key={i} style={{ padding: '4px 0', borderBottom: i < suppliers.length - 1 ? '1px solid var(--border-2)' : 'none' }}>
                       {s}
                     </div>
                   ))}
@@ -560,7 +560,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
               width: 24,
               height: 24,
               borderRadius: 4,
-              border: '1px solid #d9d9d9',
+              border: '1px solid var(--border-1)',
               background: isExpanded ? 'var(--brand)' : 'var(--surface-2)',
               color: isExpanded ? '#fff' : 'var(--text-2)',
               fontSize: 14,
@@ -614,7 +614,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
               content={
                 <div style={{ maxWidth: 240 }}>
                   {r.suppliers.map((s, i) => (
-                    <div key={i} style={{ padding: '4px 0', borderBottom: i < r.suppliers.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                    <div key={i} style={{ padding: '4px 0', borderBottom: i < r.suppliers.length - 1 ? '1px solid var(--border-2)' : 'none' }}>
                       {s}
                     </div>
                   ))}
@@ -720,7 +720,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
         )
       }
       return (
-        <div style={{ background: 'var(--surface-3)', borderRadius: 8, padding: '12px 16px', border: '1px solid #f0f0f0' }}>
+        <div style={{ background: 'var(--surface-3)', borderRadius: 8, padding: '12px 16px', border: '1px solid var(--border-2)' }}>
           <Table<SupplierGroupSummary>
             columns={[
               { title: '供應商', dataIndex: 'supplier', key: 'supplier', width: 160, render: (v: string) => v || <span style={{ color: 'var(--text-4)' }}>無供應商</span> },
@@ -941,7 +941,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {inspectionRecords.map((record) => (
-            <div key={record.batchId} style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: 16, background: 'var(--surface-3)' }}>
+            <div key={record.batchId} style={{ border: '1px solid var(--border-2)', borderRadius: 8, padding: 16, background: 'var(--surface-3)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <div>
                   <span style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: 14 }}>{record.batchNo}</span>
@@ -962,7 +962,7 @@ export default function InboundList({ onAdd, onDetail }: Props) {
               {record.items.length > 0 && (
                 <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
                   {record.items.map((item, idx) => (
-                    <div key={idx} style={{ padding: '4px 0', borderBottom: idx < record.items.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                    <div key={idx} style={{ padding: '4px 0', borderBottom: idx < record.items.length - 1 ? '1px solid var(--border-2)' : 'none' }}>
                       <span style={{ fontWeight: 500 }}>{item.modelName}</span> × {item.qty}
                       {item.disposition && item.disposition !== 'pass' && (
                         <Tag color={item.disposition === 'return' ? 'error' : item.disposition === 'exchange' ? 'warning' : 'processing'} style={{ marginLeft: 8, fontSize: 11 }}>

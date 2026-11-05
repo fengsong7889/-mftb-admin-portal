@@ -634,7 +634,7 @@ function LegacyGlobalConfig() {
                         fontWeight: 600, fontSize: 14,
                         color: 'var(--purple)',
                         paddingBottom: 8, marginBottom: 12,
-                        borderBottom: '2px solid #d3adf7',
+                        borderBottom: '2px solid var(--purple-border)',
                         textAlign: 'center',
                       }}>
                         {ch.label}

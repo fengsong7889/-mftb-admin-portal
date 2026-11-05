@@ -330,7 +330,7 @@ function ProjectCard({ project, anchored, collapsed, onToggle }: {
   return (
     <div style={{
       background: 'var(--surface-2)', borderRadius: 12, marginBottom: 12, overflow: 'hidden',
-      border: anchored ? '2px solid #E8720C' : '1px solid #f0f0f0',
+      border: anchored ? '2px solid var(--brand)' : '1px solid var(--border-2)',
       boxShadow: anchored ? '0 2px 12px rgba(232,114,12,0.15)' : '0 1px 6px rgba(0,0,0,0.04)',
     }}>
       {/* 卡頭：整行可點折疊，手機上比小圖標好點 */}
@@ -404,7 +404,7 @@ function ProjectCard({ project, anchored, collapsed, onToggle }: {
       </div>
 
       {!collapsed && (
-        <div style={{ padding: '0 14px 14px 34px', borderTop: '1px dashed #f0f0f0', paddingTop: 12 }}>
+        <div style={{ padding: '0 14px 14px 34px', borderTop: '1px dashed var(--border-2)', paddingTop: 12 }}>
           {project.iterations.length === 0 && project.unscheduledRequirements.length === 0 ? (
             <span style={{ fontSize: 12, color: 'var(--text-4)' }}>{t('rdm.daily.noIterationOrReq')}</span>
           ) : (

@@ -1170,7 +1170,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                                   transition: 'all 0.2s',
                                   background: cond.nextOperator === 'or' ? 'var(--info-soft)' : 'var(--success-soft)',
                                   color: cond.nextOperator === 'or' ? 'var(--info)' : 'var(--success)',
-                                  border: cond.nextOperator === 'or' ? '1px solid #91D5FF' : '1px solid #B7EB8F',
+                                  border: cond.nextOperator === 'or' ? '1px solid var(--info-border)' : '1px solid var(--success-border)',
                                 }}>
                                 {cond.nextOperator === 'or' ? '或' : '且'}
                               </div>
@@ -1728,7 +1728,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                             </div>
 
                             {/* 曝光分配策略 */}
-                            <div style={{ padding: '10px 12px', background: 'var(--warning-soft)', border: '1px solid #ffd591', borderRadius: 4 }}>
+                            <div style={{ padding: '10px 12px', background: 'var(--warning-soft)', border: '1px solid var(--warning-border)', borderRadius: 4 }}>
                               <div style={{ fontWeight: 600, marginBottom: 8, color: 'var(--warning-deep)', fontSize: 12 }}>
                                 {t('recommend:exposureStrategyTitle')}
                               </div>

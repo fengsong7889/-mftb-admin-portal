@@ -509,7 +509,7 @@ export default function TrafficPackagePricing() {
           )}
 
           {/* 規則說明：最低起購 = 第一梯度起始值 */}
-          <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--purple-soft)', border: '1px solid #D3ADF7', borderRadius: 6, fontSize: 12, color: 'var(--text-2)', lineHeight: '22px' }}>
+          <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--purple-soft)', border: '1px solid var(--purple-border)', borderRadius: 6, fontSize: 12, color: 'var(--text-2)', lineHeight: '22px' }}>
             <span style={{ fontWeight: 600, color: 'var(--purple)' }}>📖 {tAd('trafficLadderRuleTitle')}：</span>
             <span style={{ color: 'var(--text-3)' }}>
               {tAd('trafficLadderRule').split('{{min}}').join(String(firstLadderMin ?? current.customMinQty ?? 100))}
@@ -518,7 +518,7 @@ export default function TrafficPackagePricing() {
         </div>
 
         {/* 區塊4：計價示例 */}
-        <div style={{ marginBottom: 16, padding: '12px 14px', background: 'var(--success-soft)', border: '1px solid #b7eb8f', borderRadius: 8, fontSize: 12, color: 'var(--text-2)', lineHeight: '22px' }}>
+        <div style={{ marginBottom: 16, padding: '12px 14px', background: 'var(--success-soft)', border: '1px solid var(--success-border)', borderRadius: 8, fontSize: 12, color: 'var(--text-2)', lineHeight: '22px' }}>
           <div style={{ fontWeight: 600, color: '#389e0d', marginBottom: 4 }}>💡 {tAd('trafficPricingExample')}</div>
           <div>{tAd('trafficPricingExampleDesc')}</div>
           {exampleUnit !== null && (
@@ -552,7 +552,7 @@ export default function TrafficPackagePricing() {
           {allowRefund ? (
             <div>
               {/* 退款公式 */}
-              <div style={{ padding: '10px 12px', background: 'var(--danger-soft)', border: '1px solid #FFCCC7', borderRadius: 6, fontSize: 12, color: 'var(--text-2)', lineHeight: '22px', marginBottom: 12 }}>
+              <div style={{ padding: '10px 12px', background: 'var(--danger-soft)', border: '1px solid var(--danger-border)', borderRadius: 6, fontSize: 12, color: 'var(--text-2)', lineHeight: '22px', marginBottom: 12 }}>
                 <div style={{ fontFamily: 'monospace' }}>{tAd('trafficRefundFormula')}</div>
               </div>
               {/* 退款手續費比例 */}

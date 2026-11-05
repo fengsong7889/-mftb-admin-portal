@@ -48,7 +48,7 @@ export default function RequirementKanban({ rows, limitHint, onOpen }: Requireme
       {(orphan.length > 0 || limitHint) && (
         <div className="rdm-board-notice">
           {orphan.length > 0 && (
-            <span style={{ color: '#D46B08' }}>
+            <span style={{ color: 'var(--warning-deep)' }}>
               另有 {orphan.length} 條需求的狀態未歸入看板列，請切換表格視圖查看。
             </span>
           )}

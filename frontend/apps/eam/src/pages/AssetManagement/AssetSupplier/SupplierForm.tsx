@@ -161,7 +161,7 @@ export default function SupplierForm({ id, onBack }: Props) {
 
       {/* ====== 基本信息 ====== */}
       <div style={{
-        border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)',
+        border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)',
         padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
@@ -223,7 +223,7 @@ export default function SupplierForm({ id, onBack }: Props) {
 
       {/* ====== 聯繫人列表 ====== */}
       <div style={{
-        border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)',
+        border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)',
         padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
@@ -245,7 +245,7 @@ export default function SupplierForm({ id, onBack }: Props) {
           <div key={idx} style={{
             display: 'grid', gridTemplateColumns: '1fr 1fr 80px 40px', gap: 12,
             alignItems: 'start', marginBottom: 12,
-            padding: '12px 16px', background: 'var(--surface-3)', borderRadius: 8, border: '1px solid #f0f0f0',
+            padding: '12px 16px', background: 'var(--surface-3)', borderRadius: 8, border: '1px solid var(--border-2)',
           }}>
             <div>
               <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>{t('asset.contactNameLabel')}</div>

@@ -458,7 +458,7 @@ export default function RepairDetail({ assetId, onBack }: Props) {
       {/* ====== 最後更新（詳情頁規範 footer） ====== */}
       <div style={{
         background: 'var(--surface-3)', borderRadius: 8, padding: '12px 24px',
-        border: '1px solid #f0f0f0',
+        border: '1px solid var(--border-2)',
         display: 'flex', justifyContent: 'flex-end', gap: 24,
       }}>
         <span style={{ fontSize: 12, color: 'var(--text-3)' }}>最後更新人：<span style={{ color: 'var(--text-2)' }}>{asset.applicant || '-'}</span></span>

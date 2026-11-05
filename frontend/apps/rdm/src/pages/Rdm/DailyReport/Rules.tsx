@@ -518,7 +518,7 @@ export default function DailyReportRules() {
 
           {/* 第二层：推送渠道。左侧竖线挂到总闸下面，总闸关闭时整块置灰并禁用 */}
           <div style={{
-            marginLeft: 20, paddingLeft: 20, borderLeft: '2px solid #f0f0f0',
+            marginLeft: 20, paddingLeft: 20, borderLeft: '2px solid var(--border-2)',
             opacity: masterEnabled ? 1 : 0.45,
             transition: 'opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
           }}>
@@ -551,7 +551,7 @@ export default function DailyReportRules() {
             */}
             <div style={{
               marginTop: 12, padding: '14px 16px', borderRadius: 8,
-              background: 'var(--surface-3)', border: '1px solid #f0f0f0',
+              background: 'var(--surface-3)', border: '1px solid var(--border-2)',
               opacity: personalEnabled ? 1 : 0.55,
               transition: 'opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
             }}>
@@ -659,7 +659,7 @@ export default function DailyReportRules() {
             看板與連結：樣式固定（前端寫死），這裡只調展示參數。
             不提供皮膚/自定義 CSS 入口：一旦可改樣式，多渠道轉發後就沒有可信的統一模板。
           */}
-          <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px dashed #f0f0f0' }}>
+          <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px dashed var(--border-2)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <LinkOutlined style={{ color: 'var(--brand)' }} />
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>
@@ -693,7 +693,7 @@ export default function DailyReportRules() {
             这里只决定每行带哪几个字段。不自造“拖拽排序/自定义层级”：一旦能改框架，
             同一个日报在不同群里就无法形成稳定的阅读习惯。
           */}
-          <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px dashed #f0f0f0' }}>
+          <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px dashed var(--border-2)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <NotificationOutlined style={{ color: 'var(--brand)' }} />
               <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>

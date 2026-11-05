@@ -1683,7 +1683,7 @@ export default function EmployeeDetail() {
                         style={{
                           cursor: 'pointer', marginLeft: 4, padding: '8px 12px', borderRadius: 8,
                           background: active ? 'var(--warning-soft)' : 'transparent',
-                          border: active ? '1px solid #FFD591' : '1px solid transparent',
+                          border: active ? '1px solid var(--warning-border)' : '1px solid transparent',
                           transition: 'all 0.2s',
                         }}
                       >
@@ -1732,13 +1732,13 @@ export default function EmployeeDetail() {
               {salaryIncome.length === 0 && salaryDeduction.length === 0 ? '--' : `¥${totalIncome.toLocaleString()}`}
             </div>
           </div>
-          <div style={{ padding: 20, borderRadius: 8, background: 'var(--danger-callout)', border: '1px solid #FFCCC7' }}>
+          <div style={{ padding: 20, borderRadius: 8, background: 'var(--danger-callout)', border: '1px solid var(--danger-border)' }}>
             <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 8 }}>{t('employeeDetail.totalDeduction')}</div>
             <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--danger)' }}>
               {salaryIncome.length === 0 && salaryDeduction.length === 0 ? '--' : `¥${totalDeduction.toLocaleString()}`}
             </div>
           </div>
-          <div style={{ padding: 20, borderRadius: 8, background: 'var(--info-soft)', border: '1px solid #91D5FF' }}>
+          <div style={{ padding: 20, borderRadius: 8, background: 'var(--info-soft)', border: '1px solid var(--info-border)' }}>
             <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 8 }}>{t('employeeDetail.netSalary')}</div>
             <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--info)' }}>
               {salaryIncome.length === 0 && salaryDeduction.length === 0 ? '--' : `¥${netSalary.toLocaleString()}`}

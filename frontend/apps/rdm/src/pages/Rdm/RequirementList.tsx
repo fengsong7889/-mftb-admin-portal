@@ -1215,7 +1215,7 @@ export default function RequirementList({
         const days = Math.round((r.stayHours ?? 0) / 24)
         if (!days) return '-'
         return (
-          <span style={{ color: r.overdueFlag ? '#CF1322' : days > 3 ? '#D46B08' : 'var(--text-2)' }}>
+          <span style={{ color: r.overdueFlag ? '#CF1322' : days > 3 ? 'var(--warning-deep)' : 'var(--text-2)' }}>
             {days} 天
           </span>
         )

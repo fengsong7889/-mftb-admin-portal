@@ -108,7 +108,7 @@ export default function AssetTagDetail({ id, onBack }: AssetTagDetailProps) {
       </div>
 
       {/* 模塊1：基本信息 */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         {renderCardTitle('📋', '#e6f7ff', t('common.basicInfo'))}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
           <div>
@@ -133,7 +133,7 @@ export default function AssetTagDetail({ id, onBack }: AssetTagDetailProps) {
       </div>
 
       {/* 模塊2：標籤樣式與展示字段（左信息 + 右實際效果） */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         {renderCardTitle('🎨', '#fff7e6', t('assetTag.styleFieldsTitle'), t('assetTag.styleFieldsExtra', { count: record.displayFields.length }))}
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px, 1fr) minmax(360px, 1.4fr)', gap: 24, alignItems: 'start' }}>
           {/* 左：配置信息 */}
@@ -142,14 +142,14 @@ export default function AssetTagDetail({ id, onBack }: AssetTagDetailProps) {
               <div>
                 <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 4 }}>{t('assetTag.bgColorLabel')}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ width: 18, height: 18, borderRadius: 4, background: record.bgColor, border: '1px solid #e8eaed', display: 'inline-block' }} />
+                  <span style={{ width: 18, height: 18, borderRadius: 4, background: record.bgColor, border: '1px solid var(--border-3)', display: 'inline-block' }} />
                   <span style={{ fontSize: 13, color: 'var(--text-1)' }}>{record.bgColor}</span>
                 </div>
               </div>
               <div>
                 <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 4 }}>{t('assetTag.textColorLabel')}</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ width: 18, height: 18, borderRadius: 4, background: record.textColor, border: '1px solid #e8eaed', display: 'inline-block' }} />
+                  <span style={{ width: 18, height: 18, borderRadius: 4, background: record.textColor, border: '1px solid var(--border-3)', display: 'inline-block' }} />
                   <span style={{ fontSize: 13, color: 'var(--text-1)' }}>{record.textColor}</span>
                 </div>
               </div>

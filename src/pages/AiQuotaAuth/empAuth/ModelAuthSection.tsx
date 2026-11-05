@@ -102,7 +102,7 @@ export function ModelAuthSection({ models, value, onChange, dataResidency, onDat
       {onDataResidencyChange && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
-          background: 'var(--purple-soft)', borderRadius: 6, border: '1px solid #D3ADF7', marginBottom: 16,
+          background: 'var(--purple-soft)', borderRadius: 6, border: '1px solid var(--purple-border)', marginBottom: 16,
         }}>
           <Switch size="small" checked={residencyOn} onChange={handleResidencyChange} />
           <span style={{ fontSize: 13, color: 'var(--purple)', fontWeight: 500 }}>{t('aiQuotaAuth.dataResidencyLabel')}</span>
@@ -138,7 +138,7 @@ export function ModelAuthSection({ models, value, onChange, dataResidency, onDat
             if (!model) return null
             return (
               <div key={auth.modelId} style={{
-                border: '1px solid #D3ADF7', borderRadius: 10, padding: '16px',
+                border: '1px solid var(--purple-border)', borderRadius: 10, padding: '16px',
                 background: 'var(--purple-soft)', transition: 'all 0.25s',
               }}>
                 {/* 模型头部 + 移除 */}
@@ -228,7 +228,7 @@ export function ModelAuthSectionReadonly({ models, configs }: ModelAuthSectionRe
           const model = modelMap.get(config.modelId)
           return (
             <div key={config.modelId} style={{
-              border: '1px solid #D3ADF7', borderRadius: 10, padding: 16,
+              border: '1px solid var(--purple-border)', borderRadius: 10, padding: 16,
               background: 'var(--purple-soft)',
             }}>
               {/* 模型头部 */}

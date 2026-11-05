@@ -57,7 +57,7 @@ export default function WorkbenchCustomize({ layout }: { layout: WorkbenchLayout
               key={meta.key}
               style={{
                 display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0',
-                borderBottom: index < rows.length - 1 ? '1px dashed #f0f0f0' : 'none',
+                borderBottom: index < rows.length - 1 ? '1px dashed var(--border-2)' : 'none',
               }}
             >
               <Checkbox

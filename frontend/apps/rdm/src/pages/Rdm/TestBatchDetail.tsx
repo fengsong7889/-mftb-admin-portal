@@ -419,7 +419,7 @@ export default function TestBatchDetail() {
             <div style={{
               width: 132, flexShrink: 0, display: 'flex', flexDirection: 'column',
               alignItems: 'center', justifyContent: 'center',
-              border: '1px solid #f0f0f0', borderRadius: 12,
+              border: '1px solid var(--border-2)', borderRadius: 12,
             }}>
               <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 6 }}>通過率</div>
               {/* status=normal：antd 在 percent=100 时默认渲染勾图标而不显示数字，通过率 100% 会看不到具体百分比 */}

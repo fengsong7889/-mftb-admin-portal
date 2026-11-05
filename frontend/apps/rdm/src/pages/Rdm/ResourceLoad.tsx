@@ -838,7 +838,7 @@ export default function ResourceLoad() {
              若只把背景换成令牌 brand-soft 而文字留裸 #AD4E00，深色下为「深底深字」约 2.2:1。
              待定下 brand-deep 一类令牌后再成对改；单独跑 codemod 会把背景重新刷上去，见方案 §18.6。 */
           <div style={{
-            background: '#FFF7F0', border: '1px solid #FFE7D1', borderRadius: 8,
+            background: '#FFF7F0', border: '1px solid #FFE7D1', /* theme-pair-locked：文字仍钉裸 #AD4E00（无等值令牌，待 brand-deep），只刷背景会在深色下凑出「深底深字」约 2.2:1 */ borderRadius: 8,
             padding: '10px 14px', marginBottom: 16, fontSize: 12, color: '#AD4E00',
           }}>
             <div>{t('rdm.resLoad.assigneeLabel')}：<b>{assignTarget.userName}（{assignTarget.empNo}）</b> · {assignTarget.dept}</div>
@@ -847,7 +847,7 @@ export default function ResourceLoad() {
               <div style={{ color: '#CF1322', marginTop: 4 }}>{t('rdm.resLoad.assigneeOverloadWarn')}</div>
             )}
             {assignTarget.loadStatus === 'data_incomplete' && (
-              <div style={{ color: '#D46B08', marginTop: 4 }}>{t('rdm.resLoad.assigneeIncompleteWarn')}</div>
+              <div style={{ color: 'var(--warning-deep)', marginTop: 4 }}>{t('rdm.resLoad.assigneeIncompleteWarn')}</div>
             )}
           </div>
         ) : (

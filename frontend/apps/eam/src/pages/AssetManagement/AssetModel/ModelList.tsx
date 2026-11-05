@@ -623,7 +623,7 @@ export default function ModelList({
           {/* 底色与文字已成对令牌化：#D46B08 现为 --warning-deep（浅色严格等值）。
              实测浅色 3.34（存量债务，单测卡 3.3 下限）、深色 6.58（达 AA）；见方案 §18.6。 */}
           {viewMode === 'brands' && brands.length > 0 && (
-            <div style={{ padding: '8px 12px', background: 'var(--warning-soft)', border: '1px solid #FFD591', borderRadius: 6, marginBottom: 12, fontSize: 13, color: 'var(--warning-deep)' }}>
+            <div style={{ padding: '8px 12px', background: 'var(--warning-soft)', border: '1px solid var(--warning-border)', borderRadius: 6, marginBottom: 12, fontSize: 13, color: 'var(--warning-deep)' }}>
               {t('asset.brandClickHint')}
             </div>
           )}

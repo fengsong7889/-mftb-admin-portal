@@ -1457,7 +1457,7 @@ export default function RequirementDetail() {
                         alt={att.fileName}
                         style={{
                           width: 148, height: 84, objectFit: 'cover',
-                          border: '1px solid #e8eaed', borderRadius: 6,
+                          border: '1px solid var(--border-3)', borderRadius: 6,
                           transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                         }}
                       />
@@ -1480,7 +1480,7 @@ export default function RequirementDetail() {
                   <img
                     src={detail.targets[0].screenshotUrl!}
                     alt="現狀截圖"
-                    style={{ maxWidth: 360, border: '1px solid #e8eaed', borderRadius: 6 }}
+                    style={{ maxWidth: 360, border: '1px solid var(--border-3)', borderRadius: 6 }}
                   />
                 </a>
               </>
@@ -1530,7 +1530,7 @@ export default function RequirementDetail() {
                                     <StatusTag status={item.status} overdue={item.overdue} />
                                     <span>{item.content}</span>
                                     {!closed && item.durationHours != null && item.durationHours > 0 && (
-                                      <span style={{ fontSize: 12, color: '#D46B08' }}>
+                                      <span style={{ fontSize: 12, color: 'var(--warning-deep)' }}>
                                         <ClockCircleOutlined /> 停留 {(item.durationHours / 24).toFixed(1)} 天
                                       </span>
                                     )}
@@ -1673,7 +1673,7 @@ export default function RequirementDetail() {
                       {detail.flowVersion === 3 && (
                         <div className="rdm-v3-delivery-items">
                           <div className="rdm-section-title">
-                            <span className="rdm-icon-block" style={{ background: '#F0F5FF', color: '#2F54EB' }}><CheckCircleOutlined /></span>
+                            <span className="rdm-icon-block" style={{ background: '#F0F5FF', color: '#2F54EB' /* theme-pair-locked：geekblue 四件套（#2F54EB / #D6E4FF / #F0F5FF）未成套定令牌前不得单刷一侧 */ }}><CheckCircleOutlined /></span>
                             交付項清單
                             {deliveryItems.length > 0 && <Tag color="blue" style={{ margin: 0 }}>{deliveryItems.length}</Tag>}
                             <span className="rdm-card-title-split" />
@@ -1958,7 +1958,7 @@ export default function RequirementDetail() {
                 label={t('rdm.attr.planReleaseDate')}
                 value={detail.planReleaseDate ? (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                    <b style={{ fontSize: 13, color: planReleaseInfo?.tone === 'overdue' ? '#CF1322' : '#D46B08' }}>{detail.planReleaseDate}</b>
+                    <b style={{ fontSize: 13, color: planReleaseInfo?.tone === 'overdue' ? '#CF1322' : 'var(--warning-deep)' }}>{detail.planReleaseDate}</b>
                     {planReleaseCountdown && (
                       <span style={{ fontSize: 12, color: planReleaseInfo?.tone === 'overdue' ? '#CF1322' : '#AD4E00' }}>{planReleaseCountdown}</span>
                     )}

@@ -326,7 +326,7 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
         const dm = group.deliveryMethod
         return (
           <div key={group.id} style={{
-            border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)',
+            border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)',
             padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
           }}>
             {/* 分組標題 */}
@@ -400,7 +400,7 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
       {/* ====== 最後更新 ====== */}
       <div style={{
         background: 'var(--surface-3)', borderRadius: 8, padding: '12px 24px',
-        border: '1px solid #f0f0f0',
+        border: '1px solid var(--border-2)',
         display: 'flex', justifyContent: 'flex-end', gap: 24,
       }}>
         <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.updatedByLabel')}<span style={{ color: 'var(--text-2)' }}>{detail.updatedBy || '-'}</span></span>

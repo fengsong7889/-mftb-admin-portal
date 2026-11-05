@@ -130,7 +130,7 @@ export default function HandoverDetail({ record, loading = false, error, onBack,
       </div>
 
       {/* ====== 最後更新（詳情頁規範 footer，對齊採購訂單詳情） ====== */}
-      <div style={{ background: 'var(--surface-3)', borderRadius: 8, padding: '12px 24px', border: '1px solid #f0f0f0', display: 'flex', justifyContent: 'flex-end', gap: 24 }}>
+      <div style={{ background: 'var(--surface-3)', borderRadius: 8, padding: '12px 24px', border: '1px solid var(--border-2)', display: 'flex', justifyContent: 'flex-end', gap: 24 }}>
         <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.updatedByLabel')}<span style={{ color: 'var(--text-2)' }}>{record.updatedBy || '-'}</span></span>
         <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.updatedAtLabel')}<span style={{ color: 'var(--text-2)' }}>{record.updatedAt || '-'}</span></span>
       </div>

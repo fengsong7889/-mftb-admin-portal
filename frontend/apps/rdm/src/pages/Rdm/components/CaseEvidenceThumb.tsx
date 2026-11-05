@@ -52,7 +52,7 @@ export default function EvidenceThumb({ reqId, caseId, meta }: EvidenceThumbProp
         width={56}
         height={56}
         alt={label}
-        style={{ objectFit: 'cover', borderRadius: 4, border: '1px solid #e8eaed' }}
+        style={{ objectFit: 'cover', borderRadius: 4, border: '1px solid var(--border-3)' }}
       />
     ) : (
       // 非图片附件（pdf/文档等）没有预览语义，直接给下载链接
