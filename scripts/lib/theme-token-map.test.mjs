@@ -128,6 +128,85 @@ describe('对比度门槛（方案 §4.5 实测矩阵的机验版）', () => {
   })
 })
 
+describe('补充阶令牌的合成对比度（danger-callout / warning-deep / info-hover-tint）', () => {
+  /*
+   * 为什么必须单独写这一组：上面那组的 SURFACES 只有 surface-1/2，而这三个令牌
+   * 是叠在别的令牌上的「邻阶」：danger-callout / info-hover-tint 是背景，
+   * warning-deep 是坐在 warning-soft 底上的前景。它们全部落在既有断言的覆盖范围之外，
+   * 不补就是「令牌加了、门禁根本没看它」（§16.2 第 5 条那类静默空比对）。
+   *
+   * 深色值是 rgba，而 contrastRatio 不处理 alpha（传 rgba 会返回 null），
+   * 所以先把 tint 合成到它实际所在的卡片底上再算——不手算：真源明写「禁止凭估算修改」。
+   */
+  const toRgb = (s) => {
+    if (s.startsWith('#')) {
+      const h = s.length === 4 ? `#${[...s.slice(1)].map((c) => c + c).join('')}` : s
+      return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16), 1]
+    }
+    const p = s.match(/rgba?\(([^)]+)\)/)[1].split(',').map((x) => Number(x.trim()))
+    return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]
+  }
+  /** 把带 alpha 的 tint 合成到不透明背板下，得到实际渲染色 */
+  const over = (tint, base) => {
+    const [fr, fg, fb, a] = toRgb(tint)
+    const [br, bg, bb] = toRgb(base)
+    return `#${[fr, fg, fb].map((v, i) => Math.round(v * a + [br, bg, bb][i] * (1 - a)).toString(16).padStart(2, '0')).join('')}`
+  }
+
+  it('rgba 真处必须能合成出合法十六进制（防 tint 表达式写错后静默算出 NaN）', () => {
+    for (const name of ['danger-callout', 'info-hover-tint', 'warning-soft', 'danger-soft']) {
+      const composited = over(TOKEN_VALUES[name].dark, TOKEN_VALUES['surface-2'].dark)
+      expect(composited, name).toMatch(/^#[0-9a-f]{6}$/)
+    }
+  })
+
+  it('--danger 深色在 danger-callout 合成底上必须达 AA', () => {
+    const bg = over(TOKEN_VALUES['danger-callout'].dark, TOKEN_VALUES['surface-2'].dark)
+    expect(contrastRatio(TOKEN_VALUES.danger.dark, bg)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('danger-callout 浅色侧不得低于存量值（实测 2.99，低于 AA 属既有债务，只守不变差）', () => {
+    // 令牌化的目的是让深色跟随变化，不是顺手修浅色的对比度——那会动 29 处存量观感。
+    // 但也不能因为建了令牌就把它当达标处理，所以按存量值卡下限而不是按 4.5 卡。
+    expect(contrastRatio(TOKEN_VALUES.danger.light, TOKEN_VALUES['danger-callout'].light))
+      .toBeGreaterThanOrEqual(2.9)
+  })
+
+  it('--warning-deep 深色在 warning-soft 合成底上必须达 AA', () => {
+    const bg = over(TOKEN_VALUES['warning-soft'].dark, TOKEN_VALUES['surface-2'].dark)
+    expect(contrastRatio(TOKEN_VALUES['warning-deep'].dark, bg)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('--warning-deep 浅色侧不得低于存量值（实测 3.34，低于正文 AA 属既有债务）', () => {
+    // 这组存量就是 §18.6 登记的「提示条文字」形态：令牌化只保证两侧都跟随主题变，
+    // 不把浅色从 3.34 拉到 4.5（那等于未讨论就改了全站 46 处观感）。
+    expect(contrastRatio(TOKEN_VALUES['warning-deep'].light, TOKEN_VALUES['warning-soft'].light))
+      .toBeGreaterThanOrEqual(3.3)
+  })
+
+  it('--text-2 在 info-hover-tint 上两个主题都必须达 AA（hover 时文字不能消失）', () => {
+    // 这条是第四批 ChannelStrategy 那个「hover 亮灰字压近白底 1.98:1」缺陷的回归锁：
+    // 当时背景是裸值不跟随主题，前景已令牌化 → 深色下凑成低对比。
+    expect(contrastRatio(TOKEN_VALUES['text-2'].light, TOKEN_VALUES['info-hover-tint'].light))
+      .toBeGreaterThanOrEqual(4.5)
+    const bg = over(TOKEN_VALUES['info-hover-tint'].dark, TOKEN_VALUES['surface-3'].dark)
+    expect(contrastRatio(TOKEN_VALUES['text-2'].dark, bg)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('--info 图标在 info-hover-tint 色块上：深色必须达 3:1，浅色按存量值卡下限', () => {
+    // 真实用法：EAM AssetInbound 的 icon-block 是 info-hover-tint 底 + --info 图标。
+    // 不补这条，这个令牌就只被 text-2 场景守着，图标场景的取值变化没人管。
+    //
+    // ⚠ 写这条断言时才发现：**浅色侧本来就欠**——#1890FF on #F0F5FF 实测 2.97，
+    //   低于非文本图形的 3.0 门槛。令牌化前后用的是同两个颜色，所以不是本次引入的回归。
+    //   不把下限改成 2.9 来“做绿”，也不假装它达标：按存量值卡住回退，并把欠标这件事登记下来。
+    const light = contrastRatio(TOKEN_VALUES.info.light, TOKEN_VALUES['info-hover-tint'].light)
+    expect(light, '浅色侧存量 2.97，不得因改令牌取值而变差').toBeGreaterThanOrEqual(2.9)
+    const bg = over(TOKEN_VALUES['info-hover-tint'].dark, TOKEN_VALUES['surface-3'].dark)
+    expect(contrastRatio(TOKEN_VALUES.info.dark, bg)).toBeGreaterThanOrEqual(3.0)
+  })
+})
+
 describe('严格等值判据（映射表 ↔ 令牌浅色值）', () => {
   it.each(['bg', 'fg', 'border'])('%s 段的每个映射都必须与令牌浅色值完全相同', (segment) => {
     const violations = []
@@ -166,9 +245,11 @@ describe('令牌清单一致性', () => {
     expect(incomplete, `缺主题值会导致静默 fallback：${incomplete.join(', ')}`).toEqual([])
   })
 
-  it('soft 类令牌的深色值必须用 rgba 混合，不得用浅色实底', () => {
+  it('soft / tint / callout 类背景令牌的深色值必须用 rgba 混合，不得用浅色实底', () => {
+    // 后缀集合要覆盖所有「叠加型底色」：只认 -soft 会让新加的 *-tint / *-callout 静默逃过这条规则。
+    const TINT_SUFFIXES = /(-soft|-tint|-callout)$/
     const offenders = Object.entries(TOKEN_VALUES)
-      .filter(([name]) => name.endsWith('-soft'))
+      .filter(([name]) => TINT_SUFFIXES.test(name))
       .filter(([, v]) => !v.dark.startsWith('rgba('))
       .map(([name, v]) => `${name}=${v.dark}`)
     expect(offenders, `深色下浅色实底会刺眼：${offenders.join(', ')}`).toEqual([])

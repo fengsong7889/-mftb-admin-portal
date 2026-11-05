@@ -538,7 +538,7 @@ function LegacyGlobalConfig() {
 
             return (
               <Card
-                title={<span style={{ color: '#d46b08', fontWeight: 600 }}>{t('globalConfig.bonusTitle')}</span>}
+                title={<span style={{ color: 'var(--warning-deep)', fontWeight: 600 }}>{t('globalConfig.bonusTitle')}</span>}
                 size="small"
                 extra={bonusExtra}
                 style={{ borderColor: '#ffe7ba' }}

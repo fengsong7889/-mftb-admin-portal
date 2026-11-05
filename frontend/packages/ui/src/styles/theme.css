@@ -15,7 +15,7 @@
  * 改颜色的正确流程：改 TOKEN_VALUES（浅色值 + 深色值 + 实测对比度）→ 跑生成脚本 → 跑门禁。
  * 深色取值规则与实测依据：docs/design/深浅色主题切换_可落地实施方案_2026-11-03.md §4.3 / §4.5 / §4.6
  *
- * 令牌共 52 个：语义层 + 组件层（--sidebar-*）+ 阴影/描边补偿。
+ * 令牌共 55 个：语义层 + 组件层（--sidebar-*）+ 阴影/描边补偿。
  * 业务代码只允许引用语义层；--sidebar-* 属组件层，仅壳层 CSS 可用。
  */
 :root {
@@ -58,6 +58,9 @@
   --danger-soft: #FFF1F0;
   --purple: #722ED1;
   --purple-soft: #F9F0FF;
+  --danger-callout: #FFF2F0;
+  --warning-deep: #D46B08;
+  --info-hover-tint: #F0F5FF;
   --sidebar-bg: #1E1E1E;
   --sidebar-item-color: #B0B0B0;
   --sidebar-item-hover-bg: #2A2A2A;
@@ -113,6 +116,9 @@ html[data-theme='dark'] {
   --danger-soft: rgba(255,77,79,0.16);
   --purple: #A371E7;
   --purple-soft: rgba(114,46,209,0.18);
+  --danger-callout: rgba(255,77,79,0.16);
+  --warning-deep: #FFA940;
+  --info-hover-tint: rgba(24,144,255,0.16);
   --sidebar-bg: #1A1A1A;
   --sidebar-item-color: #A6A6A6;
   --sidebar-item-hover-bg: #2E2E2E;
@@ -179,6 +185,9 @@ html {
     --danger-soft: #FFF1F0;
     --purple: #722ED1;
     --purple-soft: #F9F0FF;
+    --danger-callout: #FFF2F0;
+    --warning-deep: #D46B08;
+    --info-hover-tint: #F0F5FF;
     --sidebar-bg: #1E1E1E;
     --sidebar-item-color: #B0B0B0;
     --sidebar-item-hover-bg: #2A2A2A;

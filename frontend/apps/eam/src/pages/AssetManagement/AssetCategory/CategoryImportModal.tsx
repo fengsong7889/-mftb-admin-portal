@@ -161,7 +161,7 @@ export default function CategoryImportModal({ open, onClose, onImport, existingC
             <CloseCircleOutlined style={{ marginRight: 4 }} />
             {t('asset.parseErrorsFound', { count: errors.length })}
           </div>
-          <div style={{ maxHeight: 120, overflow: 'auto', background: '#FFF2F0', border: '1px solid #FFCCC7', borderRadius: 6, padding: '8px 12px' }}>
+          <div style={{ maxHeight: 120, overflow: 'auto', background: 'var(--danger-callout)', border: '1px solid #FFCCC7', borderRadius: 6, padding: '8px 12px' }}>
             {errors.map((err, i) => (
               <div key={i} style={{ fontSize: 12, color: '#CF1322', lineHeight: 1.8 }}>{err}</div>
             ))}

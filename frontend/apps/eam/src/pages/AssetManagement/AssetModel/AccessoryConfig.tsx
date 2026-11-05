@@ -207,12 +207,13 @@ export default function AccessoryConfig({ categoryCode, categoryName, onBack }: 
       </div>
 
       {/* 說明文字 */}
-      {/* 成对保留裸色：#D46B08 无等值令牌（REVIEW_REQUIRED）；若只把背景换成令牌 warning-soft
-         （会随主题变深），深色下为「深橙底 + 深橙字」约 3.4:1，低于正文 AA 4.5。
-         待定下与 #D46B08 等值的前景令牌后再成对改；见方案 §18.6。 */}
+      {/* 底色与文字已成对令牌化：#D46B08 现为 --warning-deep（浅色严格等值，逐像素不变）。
+         第七批曾因为「无等值前景令牌」而把背景退回裸值，现令牌已建、两侧都跟着主题走。
+         实测：浅色 #D46B08 on #FFF7E6 = 3.34（低于正文 AA，属存量债务，单测按 3.3 卡下限防回退）；
+         深色 #FFA940 on 合成底 #42301E = 6.58（达 AA）。见方案 §18.6。 */}
       <div style={{
-        padding: '8px 12px', background: '#FFF7E6', border: '1px solid #FFD591',
-        borderRadius: 6, marginBottom: 12, fontSize: 13, color: '#D46B08', lineHeight: 1.7,
+        padding: '8px 12px', background: 'var(--warning-soft)', border: '1px solid #FFD591',
+        borderRadius: 6, marginBottom: 12, fontSize: 13, color: 'var(--warning-deep)', lineHeight: 1.7,
       }}>
         {t('asset.accConfigHint')}
       </div>
