@@ -124,6 +124,41 @@ export function getFieldTranslation(fieldKey: string, langCode: string): string 
 export const SYS_LANG_ORDER = ['zh-TW', 'en', 'ja', 'ko', 'ru']
 
 /**
+ * names 数组下标：简体中文复用繁中那一列。
+ * <p>LANG_INFO/COUNTRY_INFO 的 names 只有 SYS_LANG_ORDER 这 5 列，而 zh-CN 已是一等语言。
+ * 不把 zh-CN 映射到中文列，`indexOf('zh-CN')` 返回 -1：
+ * 语言下拉会退成母语名（English/日本語/한국어）、国家下拉退成英文名（China/United States），
+ * 即「界面是简体中文、选项却是英文」。
+ */
+export function sysLangIndex(sysLang: string): number {
+  return SYS_LANG_ORDER.indexOf(sysLang === 'zh-CN' ? SYS_LANG_ORDER[0] : sysLang)
+}
+
+/**
+ * 简体中文语境下的专用显示名（只覆盖系统当前注册的 6 种语言与它们对应的 5 个国家）。
+ * <p>中文那一列是繁体字，简中用户读得懂但跟周围简体文案不统一（典型如顶栏默认就展示的
+ * 「美國」/「簡中」）。这里只手写“默认可见的那几个”，剩下的长尾语言/国家仍回退中文列：
+ * 它们没在 `sys_language` 注册，门户与系统内语言下拉根本选不到，为它们补一份手写简中名单不值得。
+ */
+const NAME_ZH_CN_LANG: Record<string, string> = {
+  'zh-TW': '繁体中文',
+  'zh-CN': '简体中文',
+  en: '英文',
+  ja: '日文',
+  ko: '韩文',
+  ru: '俄文',
+}
+
+/** 简体中文语境下的国家显示名（与 NAME_ZH_CN_LANG 同一口径，只列已注册语言所属国家） */
+const NAME_ZH_CN_COUNTRY: Record<string, string> = {
+  china: '中国',
+  usa: '美国',
+  japan: '日本',
+  south_korea: '韩国',
+  russia: '俄罗斯',
+}
+
+/**
  * 语言信息库：母语名称 + 默认国旗 + 各系统语言下的显示名
  * names 数组顺序：[zh-TW, en, ja, ko, ru]
  */
@@ -204,7 +239,8 @@ export function langNamesOf(code: string): Record<string, string> {
 export function langSysName(code: string, sysLang: string): string {
   const info = LANG_INFO[code]
   if (!info) return code
-  const idx = SYS_LANG_ORDER.indexOf(sysLang)
+  if (sysLang === 'zh-CN') return NAME_ZH_CN_LANG[code] ?? info.native
+  const idx = sysLangIndex(sysLang)
   return idx >= 0 && info.names[idx] ? info.names[idx] : info.native
 }
 
@@ -277,7 +313,8 @@ export const COUNTRY_INFO: Record<string, { flag: string; names: string[]; langu
 export function countrySysName(code: string, sysLang: string): string {
   const info = COUNTRY_INFO[code]
   if (!info) return code
-  const idx = SYS_LANG_ORDER.indexOf(sysLang)
+  if (sysLang === 'zh-CN') return NAME_ZH_CN_COUNTRY[code] ?? info.names[0] ?? info.names[1] ?? code
+  const idx = sysLangIndex(sysLang)
   return idx >= 0 && info.names[idx] ? info.names[idx] : info.names[1] || code
 }
 

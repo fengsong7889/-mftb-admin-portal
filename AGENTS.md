@@ -82,6 +82,19 @@ npm run check:halfpair
 node scripts/audit-theme-halfpair.mjs --report                     # 看现存半对按文件分布
 node scripts/audit-theme-halfpair.mjs --snapshot                   # 已逐处定性后才下调基线
 node scripts/audit-theme-halfpair.mjs --baseline /tmp/pre-<目录>   # 本批差分（改前树用 git archive 导出）
+
+# 多语言三道门禁（详见下方「多语言文案三处同步」）
+npm run check:i18n            # 引用完整性 + 插值 + 硬编码棘轮 + 翻译库收录率棘轮
+npm run check:i18n-zhcn       # 静态 zh-CN.json 与 zh-TW.json 结构齐备
+npm run check:i18n-mirror     # 后端 resources/i18n 镜像 == 前端真源
+
+# 新增/修改文案后的三步固定动作
+npm run i18n:gen-zhcn         # 由繁中真源生成静态 zh-CN.json（需 JDK17 + ICU4J，产物入库）
+npm run i18n:sync-backend     # 把 locales/{zh-TW,en,zh-CN}.json 刷进后端 resources
+npm run i18n:snapshot         # 从开发库导出 field_key 快照（check:i18n 的免检名单）
+
+# 六语真实完成度（静态包 ∪ 后端语言包；验收只认这个口径，翻译统计页的分母不含未入库 key）
+npm run i18n:report
 ```
 
 ## 关键约束
@@ -246,6 +259,7 @@ frontend/
 | `docs/code-comment-audit_2026-10.md` | 代码注释覆盖度审计与例外登记 |
 | `docs/AUTHORSHIP_EVIDENCE_CHECKLIST_2026-10.md` | **权属锚定与软著登记操作清单**：笔名 `fengsong7889` 与自然人本人的证据链怎么建（提交身份修正、`.mailmap`、首次发表存证、登记材料与鉴别样本、历史重写前的 4 个影响面）。凡涉及权属/署名/登记的变更需同步本文件与 `LICENSE` 第十条 |
 | `docs/HOME_REQUEST_STORM_2026-10.md` | 首页请求风暴与自动写库的**独立立项记录**：修复前后实测数据表、dev/prod 与 StrictMode 的**判读口径**、`agent/status` 合并接口等剩余待办。**复测首页或任何取数/限流类改动前先读本文件第二节**，否则会误把 StrictMode 双调用当成缺陷；对「不应该发生」型断言必须先做变异验证。 |
+| `docs/I18N_MULTILANG_AUDIT_2026-11.md` | 多语言链路的**审计与修复事实记录**：简体中文大面积回退英文的根因（后端语言包镜像腐化 + zh-CN 无静态兜底 + 门禁不查收录率）、六语真实完成度、新增文案的固定同步动作与顺序、启动期全量同步的实测耗时与发布窗口影响、**剩余项（ja/ko/ru 机翻额度、登录页外语等）**。凡改动 i18n 链路、机翻、语言包镜像或重新评估多语言完成度，先读本文件。 |
 
 ### 本地工具文档（未入库，仅本机有效）
 
@@ -455,6 +469,41 @@ import HelpPopover from '@/components/HelpPopover'   // 或相对路径
 
 自检：`AiMenuLayoutTest.全系统菜单图标不得重复`（AI 系统启动期静态断言）+ `npm run check:menu-consistency`（图标注册表门禁）；
 其它系统新增菜单时按本规则人工核对，后续可纳入统一门禁脚本。
+
+---
+
+## 多语言文案三处同步（前后端强制规范）
+
+> 背景：一次新增文案会同时落在三个位置，其中两个靠手工维护就会漂移。
+> 2026-11-05 实测：后端 `resources/i18n/zh-TW.json` 镜像只有前端真源的一半（8007/16044），
+> 导致切换简体中文后约一半字段直接回退英文；而「翻译统计」页的分母只算库里已有的记录，
+> 六语全部显示 100%，`npm run check:i18n` 也全绿——没有任何环节报警。
+
+**一种文案三个家，改动后必须同步到齐：**
+
+| # | 位置 | 怎么同步 | 不同步的后果 |
+|---|------|---------|-------------|
+| 1 | `frontend/packages/i18n/src/i18n/locales/zh-TW.json`（**真源**）+ `en.json` | 手写 | 繁中/英文界面直接缺文案 |
+| 2 | 同目录 `zh-CN.json` | `npm run i18n:gen-zhcn`（ICU4J 繁→简，与后端同算法） | 简体中文登录页与未入库 key 全回退英文 |
+| 3 | `backend/modules/legacy/src/main/resources/i18n/{zh-TW,en,zh-CN}.json` | `npm run i18n:sync-backend` | `sys_translation` 永久缺这批 key，ja/ko/ru 无从译起 |
+
+**强制约束：**
+1. 后端镜像是**只读副本**，禁止直接编辑；它由 `npm run i18n:sync-backend` 生成，
+   `npm run check:i18n-mirror` 要逐字节一致，CI 拦住。后端启动同步器只读它、不读前端目录。
+2. `zh-CN.json` 是入库产物，禁止手改；重新生成需要 JDK 17 + ICU4J（取本地 Maven 仓库，
+   可用 `ICU4J_JAR` 指定）。算法必须与后端 `TranslationServiceImpl#convertToSimplifiedChinese` 一致，
+   否则会出现「库里一个样、界面上另一个样」。
+3. 静态包优先级高于数据库语言包（注入时 `overwrite=false`）：繁中/简中/英文 UI 文案以
+   **前端真源为准**，`sys_translation` 只负责菜单名/业务字段等静态包里没的 key。
+   因此在翻译工作台改 zh-TW/en/zh-CN 对已入静态包的 key 不会生效，要改文案请改前端。
+4. 启动同步器对 `source='sync'` 且非 `menu.*` 的字段按镜像回填；`manual` 字段、`menu.*` 字段
+   （真源是 `sys_menu`）、以及**工作台里人工修订过的字段**只补空坑、不盖现有值。不得为了「同步干净」去掉这层保护。
+5. 新增语言必须同时：在后端「多语言配置」注册（写入 `sys_language`）+ 补机翻引擎/额度；
+   只在前端 `SUPPORTED_LANGUAGES` 加代码而不入库，等于新增一个只会显示英文的语言。
+
+自检：`frontend/packages/i18n/src/i18n/index.test.ts`（zh-CN 静态包齐备与优先级口径）
++ `backend` `TranslationMirrorSyncTest`（镜像同步的插/改/跳过判定）
++ `npm run check:i18n-zhcn` + `npm run check:i18n-mirror` + `check:i18n` 的「翻译库收录」棘轮。
 
 ---
 

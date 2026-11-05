@@ -26,7 +26,7 @@
  * 就不是同一份代码，测过了也不算数。
  */
 import { spawnSync } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -51,7 +51,18 @@ beforeAll(() => {
   mkdirSync(join(root, LOCALE_DIR), { recursive: true })
 
   // 被测对象是真脚本，不是复刻的判定
+  const scriptSrc = readFileSync(join(REPO, 'scripts', 'check-i18n-coverage.py'), 'utf8')
   cpSync(join(REPO, 'scripts', 'check-i18n-coverage.py'), join(root, 'scripts', 'check-i18n-coverage.py'))
+
+  // 夹具里的语言列表从真脚本的 ALL_LANGS 解析，不再直接写死。
+  // 旧版写的是 `['zh-TW','en','ja','ko','ru']`：给门禁添一门语言（本次的 zh-CN）就会
+  // FileNotFoundError，而报错长得很像「路径不对」，得回过来改测试。语言集必须跟着被测脚本走。
+  const allLangs = (scriptSrc.match(/ALL_LANGS\s*=\s*\[([^\]]*)\]/)?.[1] ?? '')
+    .split(',')
+    .map(item => item.trim().replace(/^['"]|['"]$/g, ''))
+    .filter(Boolean)
+  // 解析不到就直接判失败：静默退化成一个语言都不写，下面全部断言会因「脚本没跑起来」而假绿
+  expect(allLangs.length, '未能从门禁脚本解析出 ALL_LANGS，夹具不能保证与被测脚本同语言集').toBeGreaterThanOrEqual(2)
 
   // 夹具：asset.title / asset.desc 是「后端确实供数」的具体键（快照里有）；
   // channel/remark/storeName 是裸叶子键，旧判据会把它们误升格成命名空间前缀；
@@ -63,14 +74,23 @@ beforeAll(() => {
   // 棘轮与引用基线都设成 0：本测试只关心「哪些 key 被判为无法解析」，不关心退出码
   writeFileSync(
     join(root, 'scripts', 'i18n-baseline.json'),
-    JSON.stringify({ meeting: 0, attendance: 0, vehicle: 0, asset: 0, rdm: 0, _refsMissing: 0 }),
+    JSON.stringify({
+      meeting: 0, attendance: 0, vehicle: 0, asset: 0, rdm: 0,
+      _refsMissing: 0,
+      // 新增的两道基线缺省时脚本会报「基线缺失」，虽不影响本测试的断言，但会把 stdout
+      // 染成一片失败噪声；给宽值让夹具只对它真正要测的那一段负责
+      _refsBlank: 0,
+      // 夹具只有一份 plainNs 静态包而快照全是 asset./channel. 这类键，两边根不重合；
+      // 给个宽基线让「收录率」那道检查不报超过，本测试不靠它判定
+      _dbGapKeys: 50,
+    }),
   )
   const locales = {
     plainNs: { known: '已知' },
   }
-  // 脚本按 ALL_LANGS（zh-TW/en/ja/ko/ru）全量加载，少一个会直接 FileNotFoundError；
-  // 只写两语会留下「测试根本没跑起来」的假绿坑，所以五份全部落盘。
-  for (const lang of ['zh-TW', 'en', 'ja', 'ko', 'ru']) {
+  // 脚本按 ALL_LANGS 全量加载语言包，少一个会直接 FileNotFoundError；
+  // 只写两份会留下「测试根本没跑起来」的假绿坑，所以每一语都落盘。
+  for (const lang of allLangs) {
     writeFileSync(join(root, LOCALE_DIR, `${lang}.json`), JSON.stringify(locales, null, 2))
   }
 

@@ -72,6 +72,14 @@ jobs:
           done
           unzip -Z1 "$INNER" | grep -qx 'db/migrations/165_notification_apps_and_scenarios.sql' \
             || { echo "❌ 仓库 sql/ 目录映射资源未打包"; exit 1; }
+          # 语言包镜像必须随包分发：启动期 TranslationDataInitializer.syncI18nKeys() 只读
+          # classpath:i18n/*.json，缺文件就默默不同步（旧实现只 warn 不失败），
+          # 后果是 sys_translation 停在旧 key 集合、简体中文界面大面积回退英文。
+          echo "→ 校验语言包镜像随包分发"
+          for res in i18n/zh-TW.json i18n/en.json i18n/zh-CN.json; do
+            unzip -Z1 "$INNER" | grep -qx "$res" \
+              || { echo "❌ 语言包镜像未打包: $res（跑 npm run i18n:sync-backend 后提交）"; exit 1; }
+          done
           echo "✅ 迁移资源完整性校验通过"
 
       # 记录制品摘要：镜像阶段据此证明「装进镜像的就是刚跑过全量测试的那个 JAR」

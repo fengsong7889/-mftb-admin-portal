@@ -8,12 +8,16 @@
 本脚本与下面两份数据必须同在版本控制里：CI 是从干净 checkout 跑的，历史上它被放在
 不入库的 `.qoder/` 下，deploy.yml 的 i18n 步骤因此在 CI 里直接 file not found 而失败。
 
-三件事缺一不可，只查前两项会让"顺手硬编码一行"永远无人拦：
+四件事缺一不可，只查前两项会让"顺手硬编码一行"永远无人拦：
   1. 引用完整性：代码里出现的 t('<ns>.<key>') 必须在 zh-TW 与 en 都能解析
      （项目 fallbackLng='en'，故这两语是硬要求；ja/ko/ru 回落英文，与 HR 域既有口径一致）
   2. 插值规范：必须 {{count}} 双花括号，单花括号 i18next 不解析
   3. 棘轮：每个域"含中文的可见文案行数"不得高于基线，只能降不能升
      —— 存量硬编码分域分批清理期间，用它锁住"别再加新的"。
+  4. 翻译库收录：前端静态包的每个 key 必须同时出现在后端 sys_translation 快照里。
+     只查"能不能解析"会把整条多语言链路判成绿：zh-TW/en 有静态包所以永远能解析，
+     但没入库的词条在翻译工作台里看不到、业务方无法译成 ja/ko/ru，外语界面就回退英文
+     （2026-11-05 实测：门禁全绿而简体中文 48.6% 的字段是英文兜底）。
 """
 import glob
 import io
@@ -21,6 +25,7 @@ import json
 import os
 import re
 import sys
+from collections import Counter
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 # 棘轮基线一旦缺失，main() 里 limit 恒为 None，硬编码检查整段跳过却照样输出通过——
@@ -30,7 +35,7 @@ BASELINE = os.path.join(ROOT, 'scripts', 'i18n-baseline.json')
 # 由后端供文案的 key（asset./transfer./menu. 等 7000+ 条）全判成缺失，门禁直接失去可信度
 DB_KEYS = os.path.join(ROOT, 'scripts', 'i18n-db-keys.json')
 REQUIRED_LANGS = ['zh-TW', 'en']
-ALL_LANGS = ['zh-TW', 'en', 'ja', 'ko', 'ru']
+ALL_LANGS = ['zh-TW', 'zh-CN', 'en', 'ja', 'ko', 'ru']
 
 # 域定义：目录 + 该域自有命名空间（common 等公共 ns 单独放行，任何域都可引用）
 DOMAINS = {
@@ -101,18 +106,7 @@ def load_db_keys():
 
 def snapshot_db_keys():
     """从开发库把 field_key 导出成快照（只在本地跑，CI 只读快照）"""
-    import pymysql
-    env = {}
-    for line in io.open(os.path.join(ROOT, 'backend', '.env.local'), encoding='utf-8'):
-        line = line.strip()
-        if line and not line.startswith('#') and '=' in line:
-            k, v = line.split('=', 1)
-            env[k.strip()] = v.strip().strip('"').strip("'")
-    body = env['DB_URL'].split('?')[0][len('jdbc:mysql://'):]
-    hostport, dbname = body.split('/')[0], body.split('/')[1].split('/')[0]
-    conn = pymysql.connect(host=hostport.split(':')[0], port=int(hostport.split(':')[1]),
-                           user=env['DB_USERNAME'], password=env['DB_PASSWORD'],
-                           database=dbname, charset='utf8mb4')
+    conn = _dev_db_conn()
     cur = conn.cursor()
     cur.execute('SELECT field_key FROM sys_translation')
     keys = sorted(row[0] for row in cur.fetchall())
@@ -121,18 +115,49 @@ def snapshot_db_keys():
     print(f'已导出后端语言包 key 快照 {len(keys)} 条 → {DB_KEYS}')
 
 
+def _dev_db_conn():
+    """连开发库（凭据只从 backend/.env.local 读，不得写到任何入库文件）"""
+    import pymysql
+    env = _load_env_local()
+    body = env['DB_URL'].split('?')[0][len('jdbc:mysql://'):]
+    hostport, dbname = body.split('/')[0], body.split('/')[1].split('/')[0]
+    return pymysql.connect(host=hostport.split(':')[0], port=int(hostport.split(':')[1]),
+                           user=env['DB_USERNAME'], password=env['DB_PASSWORD'],
+                           database=dbname, charset='utf8mb4')
+
+
+def _load_env_local():
+    env = {}
+    path = os.path.join(ROOT, 'backend', '.env.local')
+    if not os.path.exists(path):
+        raise SystemExit('❌ 缺 backend/.env.local：--snapshot-db / --report 需要开发库连接信息')
+    for line in io.open(path, encoding='utf-8'):
+        line = line.strip()
+        if line and not line.startswith('#') and '=' in line:
+            k, v = line.split('=', 1)
+            env[k.strip()] = v.strip().strip('"').strip("'")
+    return env
+
+
 def load_locale(lang):
     path = os.path.join(ROOT, 'frontend', 'packages', 'i18n', 'src', 'i18n', 'locales', f'{lang}.json')
     return json.load(io.open(path, encoding='utf-8'))
 
 
-def resolves(data, dotted):
+def resolve_state(data, dotted):
+    """返回 None（键不存在）/ 'blank'（存在但空串）/ 'ok'。
+
+    不得把空串当成"已翻译"：i18next 对空值会继续回退，而旧版只判"键在不在"，
+    于是 en.json 里 8 个空量词永远查不出来。
+    """
     node = data
     for part in dotted.split('.'):
         if not isinstance(node, dict) or part not in node:
-            return False
+            return None
         node = node[part]
-    return not isinstance(node, dict)
+    if isinstance(node, dict):
+        return None
+    return 'ok' if str(node or '').strip() else 'blank'
 
 
 def find_dotted_keys(node, prefix=''):
@@ -166,9 +191,13 @@ def check_references(problems, locales, db_keys):
 
     旧逻辑只在 DOMAINS 登记的域内检查，域外命名空间（如 agentConsole）整段漏检；
     2026-10 的「带点扁平键」事故就是借此逃过门禁的，故改为全 src 扫描。
+
+    返回 (引用数, 硬缺失, 空值)。硬缺失与空值分开计数：量词类文案（個/家/週）
+    在英文里确实该留空，归入棘轮才能"只降不升"；而真缺键基线仍是 0。
     """
     refs = 0
     missing = []
+    blanks = []
     for path in all_source_files():
         rel = os.path.relpath(path, ROOT)
         text = strip_comments(io.open(path, encoding='utf-8').read())
@@ -184,14 +213,45 @@ def check_references(problems, locales, db_keys):
             # 要么把 92 个真命名空间从逐键比对降级成免检（拿覆盖率换绿灯）。
             if key in db_keys:
                 continue
-            ok = [lang for lang in REQUIRED_LANGS if resolves(locales[lang], key)]
-            if not ok:
+            states = {lang: resolve_state(locales[lang], key) for lang in REQUIRED_LANGS}
+            absent = [lang for lang, state in states.items() if state is None]
+            if len(absent) == len(REQUIRED_LANGS):
                 missing.append(f'{rel}: 引用 "{key}" 在 zh-TW/en 均无法解析 → 英文界面会回落 defaultValue（中文）')
-            elif len(ok) != len(REQUIRED_LANGS):
-                for lang in REQUIRED_LANGS:
-                    if lang not in ok:
-                        missing.append(f'{rel}: 引用 "{key}" 在 {lang}.json 缺失（另一语已有，切换语言会串）')
-    return refs, missing
+            else:
+                for lang in absent:
+                    missing.append(f'{rel}: 引用 "{key}" 在 {lang}.json 缺失（另一语已有，切换语言会串）')
+                for lang, state in states.items():
+                    if state == 'blank':
+                        blanks.append(f'{rel}: 引用 "{key}" 在 {lang}.json 是空串（界面会渲染成空白）')
+    return refs, missing, blanks
+
+
+def flatten_root(node):
+    """从根节点摊平为「无先导点」的点分键。
+
+    不得直接用 flatten(node, '')：它把 prefix 无条件拼成 f'{prefix}.{key}'，
+    从根调用会得到 '.accountBalance.colBrand' 这种带先导点的键，
+    跟任何真实键都比不上（只能接一个命名空间当 prefix 的调用方）。
+    """
+    return {key[1:] if key.startswith('.') else key: value
+            for key, value in flatten(node, '').items()}
+
+
+def check_db_capture(locales, db_keys):
+    """后端翻译库收录率：前端静态包的每个 key 都必须在 sys_translation 快照里。
+
+    这是"各系统是否真的对接了翻译管理系统"的唯一硬口径。仅查引用能否解析会漏掉整段：
+    zh-TW/en 有静态包所以永远能解析，但没入库的词条在翻译工作台里根不存在，
+    业务方无从译成 ja/ko/ru，简体中文则完全依赖库里的值。
+    快照缺失（没跑过 --snapshot-db）时不判定，避免把环境问题报成漏收。
+    """
+    if not db_keys:
+        return None, []
+    # 只比文案叶：flatten 不会产出「空对象」键，但会产出空串文案的键（如 asset.alertMsg），
+    # 后者确实是后端不入库的缺口（同步器故意不往库里写空文案），归入基线而不是当假阳性排掉
+    static_keys = {k for k, v in flatten_root(locales['zh-TW']).items() if not isinstance(v, dict)}
+    gap = sorted(static_keys - set(db_keys))
+    return len(gap), gap
 
 
 def collect_files(domain):
@@ -217,10 +277,61 @@ def strip_comments(text):
     return text
 
 
+def report_coverage():
+    """六语真实完成度：静态包 ∪ 后端语言包，按「界面能取到非空文案」计数。
+
+    为什么不能拿翻译工作台的完成率当验收口径：那个页面的分母是 sys_translation 里已有的记录，
+    而前端静态包里的文案如果没同步进库，它根本不在分母里——
+    2026-11-05 就是库里 8504 条全翻完、六语显示 100%，而简体中文实际只能解析 51.4%。
+    要看真值必须把前端静态包也拉进分母，就是本命令做的事。
+    """
+    locales = {lang: load_locale(lang) for lang in ALL_LANGS}
+    static = {lang: flatten_root(locales[lang]) for lang in ALL_LANGS}
+    conn = _dev_db_conn()
+    cur = conn.cursor()
+    cur.execute('SELECT field_key, translations_json FROM sys_translation')
+    db = {}
+    for field_key, raw in cur.fetchall():
+        try:
+            db[field_key] = json.loads(raw) if raw else {}
+        except (ValueError, TypeError):
+            db[field_key] = {}
+    conn.close()
+
+    universe = set(db)
+    for lang in ALL_LANGS:
+        universe |= set(static[lang])
+    print(f'口径全集（静态包 ∪ sys_translation）：{len(universe)} 个 key，'
+          f'其中后端收录 {len(db)} 条')
+    print()
+    print(f"{'语言':8s} {'能解析':>8s} {'占比':>7s} {'缺失':>7s}  缺失最多的命名空间")
+    for lang in ['zh-TW', 'zh-CN', 'en', 'ja', 'ko', 'ru']:
+        miss = []
+        for key in universe:
+            value = static[lang].get(key)
+            if isinstance(value, str) and value.strip():
+                continue
+            db_value = db.get(key, {}).get(lang)
+            if isinstance(db_value, str) and db_value.strip():
+                continue
+            miss.append(key)
+        ns = Counter(k.split('.')[0] for k in miss)
+        top = ', '.join(f'{name}:{cnt}' for name, cnt in ns.most_common(4)) or '—'
+        print(f'{lang:8s} {len(universe) - len(miss):>8d} '
+              f'{(len(universe) - len(miss)) / len(universe) * 100:>6.1f}% '
+              f'{len(miss):>7d}  {top}')
+    print()
+    print('说明：静态包只在 zh-TW/zh-CN/en 是全量；ja/ko/ru 只有门户文案，其余靠机翻入库。')
+    print('      缺失部分在界面上按 fallbackLng=en 回退英文；补翻需机翻额度（见 backend/.env.local.example）。')
+    return 0
+
+
 def main():
     if '--snapshot-db' in sys.argv:
         snapshot_db_keys()
         return 0
+    if '--report' in sys.argv:
+        return report_coverage()
     update = '--update' in sys.argv
     locales = {lang: load_locale(lang) for lang in ALL_LANGS}
     baseline = {}
@@ -253,8 +364,10 @@ def main():
 
     if update:
         # 写基线发生在引用解析之前，这里先算一次，避免 UnboundLocalError
-        _refs, _missing = check_references([], locales, db_keys)
+        _refs, _missing, _blanks = check_references([], locales, db_keys)
         counts['_refsMissing'] = len(_missing)
+        counts['_refsBlank'] = len(_blanks)
+        counts['_dbGapKeys'] = check_db_capture(locales, db_keys)[0]
         json.dump(counts, io.open(BASELINE, 'w', encoding='utf-8'), indent=2, ensure_ascii=False)
         print('基线已写入:', counts)
         return 0
@@ -280,18 +393,46 @@ def main():
                     if isinstance(value, str) and SINGLE_BRACE_RE.search(value):
                         problems.append(f'{lang}.json: {key} 的插值写成单花括号，i18next 不解析：{value[:40]}')
 
-    refs, missing = check_references(problems, locales, db_keys)
+    refs, missing, blanks = check_references(problems, locales, db_keys)
     ref_limit = baseline.get('_refsMissing')
     print(f'引用解析：扫描 {refs} 条静态 key，无法解析 {len(missing)} 条（基线 {ref_limit if ref_limit is not None else "未设定"}）')
-    if update:
-        counts['_refsMissing'] = len(missing)
-    elif ref_limit is None:
+    if ref_limit is None:
         problems.append(f'引用解析基线缺失，请先执行 --update 固化存量（当前 {len(missing)} 条）')
     elif len(missing) > ref_limit:
         problems.append(f'引用解析失败数 {len(missing)} 超过基线 {ref_limit}（新增 {len(missing) - ref_limit} 条）：新增文案必须同时登记 zh-TW/en')
         problems.extend(missing[:40])
     else:
         print(f'  ✅ 未超过基线（可清理存量后 --update 收紧）')
+
+    # 空串在语言包里是「看得到键但渲染为空」，旧版只判键在不在所以永远漏；
+    # 存量里确实有故意留空的量词，不能一律阻断，用"只降不升"的棘轮收拢
+    blank_limit = baseline.get('_refsBlank')
+    print(f'引用空值：{len(blanks)} 处引用在 zh-TW/en 里是空串（基线 {blank_limit if blank_limit is not None else "未设定"}）')
+    if blank_limit is None:
+        problems.append(f'引用空值基线缺失，请先执行 --update 固化存量（当前 {len(blanks)} 处）')
+    elif len(blanks) > blank_limit:
+        problems.append(f'引用空值 {len(blanks)} 超过基线 {blank_limit}（新增 {len(blanks) - blank_limit} 处）：新文案不得先登空串')
+        problems.extend(blanks[:20])
+    else:
+        print('  ✅ 未超过基线')
+
+    # 后端翻译库收录率：没入库的词条在翻译工作台里不存在，业务方无法译成 ja/ko/ru
+    db_gap, db_gap_keys = check_db_capture(locales, db_keys)
+    db_limit = baseline.get('_dbGapKeys')
+    if db_gap is None:
+        print('翻译库收录：快照缺失（未跑 npm run i18n:snapshot），本次不判定')
+    else:
+        print(f'翻译库收录：前端静态包有 {db_gap} 个 key 未进 sys_translation（基线 {db_limit if db_limit is not None else "未设定"}）')
+        if db_limit is None:
+            problems.append(f'翻译库收录基线缺失，请先执行 --update 固化存量（当前 {db_gap} 个 key）')
+        elif db_gap > db_limit:
+            problems.append(
+                f'翻译库未收录 {db_gap} 个静态 key，超过基线 {db_limit}（新增 {db_gap - db_limit} 个）：'
+                '跑 npm run i18n:sync-backend + npm run i18n:snapshot 后重启后端；'
+                '否则该词条在翻译工作台不存在，ja/ko/ru 与简体中文只能回退英文')
+            problems.extend(f'  未入库 key: {k}' for k in db_gap_keys[:20])
+        else:
+            print('  ✅ 未超过基线')
 
     print('硬编码中文行数（域 → 基线 → 当前）:')
     for name, value in counts.items():
@@ -305,7 +446,7 @@ def main():
         if len(problems) > 60:
             print(f'  ...另有 {len(problems) - 60} 项')
         return 1
-    print('\n✅ i18n 覆盖检查通过（引用完整、插值规范、无新增硬编码）')
+    print('\n✅ i18n 覆盖检查通过（引用完整、无新增硬编码、翻译库已收录）')
     return 0
 
 

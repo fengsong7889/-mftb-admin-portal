@@ -110,6 +110,13 @@ translation:
     # 默认值不再内嵌任何个人邮箱（入库即公开）；需要提额度时通过环境变量注入。
     # 留空时服务层会省去 email 参数、以匿名身份调用，仅额度降为 5000 字符/天。
     email: ${MYMEMORY_EMAIL:}
+  auto-mt:
+    # 启动时自动补齐「已注册但还没有译文」的语言（后台线程，不阻塞启动）。
+    # 离线/无外网或不想让每台开发机都打外部 API 时置 false，改由翻译工作台手动机翻。
+    enabled: ${TRANSLATION_AUTO_MT_ENABLED:true}
+    # 单轮递交的缺口字段上限。额度只有几百条/天时设上限 + 按 id 升序，
+    # 才能做到「每次启动从上次断点继续」而不是每轮都在重头碰壁。
+    batch-limit: ${TRANSLATION_AUTO_MT_BATCH_LIMIT:2000}
 
 # CORS 跨域配置
 cors:

@@ -102,6 +102,14 @@ jobs:
         run: npm run check:i18n
       - name: i18n Fallback Copy
         run: npm run check:i18n-fallback
+      # 简体中文静态包门禁：zh-CN 没有静态兜底时，库里缺的 key 会按 fallbackLng 直接回退英文，
+      # 且登录页（取不到数据库语言包）整页英文——繁中/英文界面看不出来，所以必须机器拦
+      - name: i18n zh-CN Static Bundle
+        run: npm run check:i18n-zhcn
+      # 后端 resources/i18n 镜像必须与前端真源逐字节一致：镜像落后就等于 sys_translation
+      # 永远同步不到新 key（2026-11-05 实测副本只有真源的一半），简体中文会大面积回退英文
+      - name: i18n Backend Mirror
+        run: npm run check:i18n-mirror
       - name: Secret Scan
         run: npm run secret-scan
       - name: Test

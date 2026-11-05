@@ -111,6 +111,11 @@ jwt.expiration: 86400000  # 24 小时
 # AI 供应商 API Key 的静态加密密钥（无默认值；未注入时 ProviderKeyCipher 回退复用 ${jwt.secret}）
 # 属性本身不在 application.yml 里声明，靠 Spring relaxed binding 读环境变量 AI_PROVIDER_CRYPTO_KEY
 ai.provider.crypto-key: ${AI_PROVIDER_CRYPTO_KEY}
+
+# 多语言机翻（application.yml 的 translation 块，均有可用默认值，不必强制配）
+translation.mymemory.email: ${MYMEMORY_EMAIL:}                      # 匿名 5000 字符/天；配了提至 50000
+translation.auto-mt.enabled: ${TRANSLATION_AUTO_MT_ENABLED:true}    # 启动期后台补齐空缺语言
+translation.auto-mt.batch-limit: ${TRANSLATION_AUTO_MT_BATCH_LIMIT:2000}  # 单轮递交缺口上限
 ```
 
 > ⚠️ **连接串完全由环境变量决定，仓内不内置任何可用数据库**：
@@ -301,6 +306,26 @@ npm run secret-scan   # 硬编码敏感信息扫描
 - 🚫 正确的修法只有「上调堆上限」。**不得**跳过类型检查、换成更宽松的调用、
   或放宽 `tsconfig`（步骤失败时会把这条写进日志）。
 
+#### 4.3.2 多语言三道门禁（新增文案后必读）
+
+一种 UI 文案同时住在三个地方，其中两个靠手工维护就会腐化（完整口径见 `AGENTS.md`「多语言文案三处同步」）：
+
+| 命令 | 守住什么 | 漏做的后果 |
+|---|---|---|
+| `npm run i18n:gen-zhcn` + `npm run check:i18n-zhcn` | 静态 `locales/zh-CN.json` 与繁中真源结构齐备 | 简体中文登录页与未入库 key 全回退英文 |
+| `npm run i18n:sync-backend` + `npm run check:i18n-mirror` | 后端 `resources/i18n/` 镜像 == 前端真源（逐字节） | `sys_translation` 停在旧 key 集合，外语无人可译 |
+| `npm run check:i18n` | 引用完整性 + 插值 + 硬编码棘轮 + **翻译库收录率棘轮** `_dbGapKeys` | 新 key 进了静态包但没入库，门禁不报 |
+| `npm run i18n:snapshot` | 刷新 `scripts/i18n-db-keys.json`（后端供数 key 的免检名单） | 快照过期会把后端 key 误报成缺失 |
+| `npm run i18n:report` | 六语**真实**完成度（静态包 ∪ 库） | 看翻译统计页会把未入库 key 排除在分母外，假绿 |
+
+依赖说明：`i18n:gen-zhcn` 需要 JDK 17 + ICU4J（从本地 Maven 仓库取，可用 `ICU4J_JAR` 指定）；
+`i18n:snapshot` / `i18n:report` 需要 `backend/.env.local` 指向的开发库（CI 连不到库，所以只读快照）。
+
+> ⚠️ **首次带本改造上线的后端实例会在启动期做一次全量同步**（实测开发库：新增 8040 条 + 修正 6756 条，
+> 约 9 分钟，期间 `/api/health/ready` 保持 503）。生产 RDS 延迟更低但仍按分钟计：
+> `maxUnavailable: 0` + 就绪探针会保住旧实例接流量，不会断流，但要**预留发布窗口**。
+> 第二次启动就是幂等的（新增 0 / 修正 0，< 1 秒）。详见 `docs/I18N_MULTILANG_AUDIT_2026-11.md` 第四节。
+
 ---
 
 ## 五、工具链版本速查
@@ -404,6 +429,25 @@ SELECT provider_key,
   （旧密文不可逆，没有任何自动恢复手段）；③ 以后轮换 `JWT_SECRET` 不再影响供应商 Key。
 - 三态口径：`apiKeyStatus` 0=未配置、1=已配置、2=密钥已失效（需重填）。**2 不等于没配过**，
   看到「密鑰已失效」直接去重填，不要再去查保存接口。
+
+### Q7：切换某种语言后，很多字段名变成英文 / 「翻译统计」显示 100% 但界面仍是英文？
+
+**A**：先跑 `npm run i18n:report` 拿真值，别信翻译统计页的完成率——它的分母只是
+`sys_translation` 里已有的记录，**前端静态包里没同步进库的 key 根不在分母里**。
+
+```bash
+npm run i18n:report        # 六语真实完成度（静态包 ∪ 库）
+npm run check:i18n-mirror  # 后端镜像是否落后于前端真源
+npm run check:i18n-zhcn    # 静态简中包结构是否齐备
+```
+
+- 报告显示某种语言解析率低、而 `check:i18n-mirror` 报漂移 → 就是镜像腐化（历史事故）：
+  跑 `npm run i18n:sync-backend` 后重启后端，再 `npm run i18n:snapshot`。
+- 只有 ja/ko/ru 低：属正常未翻完，看机翻额度。启动期会自动按缺口补空（每轮上限 2000 条），
+  要快就配 `MYMEMORY_EMAIL` 或在「机翻引擎」里给 `openai` 填可用 Key（见 2.3 与 4.3.2）。
+- 繁体界面正常、只有简体中文不对：先查 `locales/zh-CN.json` 还在不在、有没有跟 `zh-TW.json` 对齐，
+  简中**没有静态兜底就必然掉英文**（`fallbackLng='en'`）。
+- 完整根因、修复口径与剩余项见 `docs/I18N_MULTILANG_AUDIT_2026-11.md`。
 
 ---
 

@@ -3,6 +3,7 @@ import type { Resource, ResourceLanguage } from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import { TRANSLATION_BUNDLE_EVENT } from './bundleEvent'
 import zhTW from './locales/zh-TW.json'
+import zhCN from './locales/zh-CN.json'
 import en from './locales/en.json'
 import ja from './locales/ja.json'
 import ko from './locales/ko.json'
@@ -19,7 +20,14 @@ export const LANGUAGE_STORAGE_KEY = 'app_language'
  */
 export { TRANSLATION_BUNDLE_EVENT } from './bundleEvent'
 
-/** 支持的语言（zh-TW/en 有靜態 JSON 兆底，ja/ko/ru/zh-CN 由數據庫語言包動態注入） */
+/**
+ * 支持的语言。
+ * <p>zh-TW/en/zh-CN 有静态 JSON 兜底，ja/ko/ru 的门户文案有静态 JSON、其余由数据库语言包注入。
+ * <p>zh-CN 的静态包由 `npm run i18n:gen-zhcn`（ICU4J 繁→简，与后端同算法）生成：
+ * 没有它时简体中文的唯一文案来源是后端 `/translations/bundle`，于是
+ * 库里缺的 key 一律按 fallbackLng 回退英文，且登录页（取不到 bundle，因为需要登录）整页英文。
+ * 2026-11-05 实测库里只覆盖 8504/16540 个 key，即简中界面约一半是英文兜底。
+ */
 export const SUPPORTED_LANGUAGES = ['zh-TW', 'en', 'ja', 'ko', 'ru', 'zh-CN'] as const
 export type AppLanguage = (typeof SUPPORTED_LANGUAGES)[number]
 
@@ -64,6 +72,7 @@ function buildResources(json: Record<string, unknown>): Resource {
 i18n.use(initReactI18next).init({
   resources: {
     'zh-TW': buildResources(zhTW),
+    'zh-CN': buildResources(zhCN),
     en: buildResources(en),
     // 门户五语文案离线可用；系统内其余文案继续由后端语言包补齐。
     ja: buildResources(ja),
@@ -136,16 +145,22 @@ export function registerRemoteBundleLoader(loader: RemoteBundleLoader | null): v
 
 /**
  * 確保指定語言的數據庫語言包已注入（登錄後/刷新後恢復動態翻譯）：
- * 靜態 JSON 已覆蓋 zh-TW/en 的 UI 文案，但業務字段/菜單名等動態翻譯存於後端
+ * 靜態 JSON 已覆蓋 zh-TW/zh-CN/en 的 UI 文案，但業務字段/菜單名等動態翻譯存於後端
  * sys_translation；刷新後 i18next 重建資源需重新拉取注入，否則 ja/ko/ru 回退英文。
- * 同一語言會話內只拉取一次，失敗時清標誌以便下次重試。
+ * 同一語言會話內只拉取一次；**沒拿到內容（抛異常或返回 null）都要清標誌**，
+ * 否則後端重啟窗口內切一次語言就會把這個語言永久標成「已處理」，本次會話再也不會重試，
+ * 用戶看到的是「怎麼切都還是英文」而不是「等後端起來就好」。
  */
 export async function ensureLanguageBundle(lang: string) {
   if (!lang || bundleEnsuredLang === lang) return
   bundleEnsuredLang = lang
   try {
     const bundle = remoteBundleLoader ? await remoteBundleLoader(lang) : null
-    if (bundle) injectTranslationBundle(lang, bundle)
+    if (!bundle) {
+      bundleEnsuredLang = null
+      return
+    }
+    injectTranslationBundle(lang, bundle)
   } catch {
     /* 拉取失敗（未登錄/網絡異常）靜默降級：UI 文案仍由靜態 JSON 兜底 */
     bundleEnsuredLang = null
