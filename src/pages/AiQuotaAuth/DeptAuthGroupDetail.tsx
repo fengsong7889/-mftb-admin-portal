@@ -71,7 +71,7 @@ export default function DeptAuthGroupDetail() {
   if (!detail) {
     return (
       <div className="content-area" style={{ textAlign: 'center', padding: 80 }}>
-        <div style={{ fontSize: 16, color: '#8C8C8C' }}>{t('aiQuotaAuth.authPolicyLoadFailed')}</div>
+        <div style={{ fontSize: 16, color: 'var(--text-3)' }}>{t('aiQuotaAuth.authPolicyLoadFailed')}</div>
         <Button style={{ marginTop: 16 }} onClick={handleBack}>{t('aiQuotaAuth.backToList')}</Button>
       </div>
     )
@@ -100,12 +100,12 @@ export default function DeptAuthGroupDetail() {
       />
 
       {/* ═══ 分区 1：统计概览 ═══ */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <BarChartOutlined style={{ fontSize: 14, color: '#52C41A' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--success-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <BarChartOutlined style={{ fontSize: 14, color: 'var(--success)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.statsOverview')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.statsOverview')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
@@ -124,19 +124,19 @@ export default function DeptAuthGroupDetail() {
               <div style={{ fontSize: item.isText ? 16 : 22, fontWeight: 700, color: item.color }}>
                 {item.isText ? item.value : (typeof item.value === 'number' ? item.value.toLocaleString() : item.value)}
               </div>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{item.label}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{item.label}</div>
             </div>
           ))}
         </div>
       </div>
 
       {/* ═══ 分区 2：适用部门 ═══ */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <TeamOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <TeamOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.applicableDeptTitle')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.applicableDeptTitle')}</span>
           <Tag color="blue">{t('aiQuotaAuth.deptCountLabel', { count: totalDeptCount })}</Tag>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
@@ -146,20 +146,20 @@ export default function DeptAuthGroupDetail() {
               {d.deptName}{t('aiQuotaAuth.deptEmpCount', { count: d.employeeCount })}
             </Tag>
           ))}
-          {detail.departments.length === 0 && <span style={{ color: '#BFBFBF' }}>{t('aiQuotaAuth.noRelatedDept')}</span>}
+          {detail.departments.length === 0 && <span style={{ color: 'var(--text-4)' }}>{t('aiQuotaAuth.noRelatedDept')}</span>}
         </div>
-        <div style={{ marginTop: 12, fontSize: 13, color: '#595959' }}>
+        <div style={{ marginTop: 12, fontSize: 13, color: 'var(--text-2)' }}>
           {t('aiQuotaAuth.totalCoverCount', { count: detail.totalEmployeeCount })}
         </div>
       </div>
 
       {/* ═══ 分区 3：授权模型 ═══ */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <EyeOutlined style={{ fontSize: 14, color: '#722ED1' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--purple-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <EyeOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.authModelSection')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.authModelSection')}</span>
           <Tag color="purple">{t('aiQuotaAuth.modelCountLabel', { count: enabledModelCount })}</Tag>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
@@ -170,12 +170,12 @@ export default function DeptAuthGroupDetail() {
             return (
               <div key={config.modelId} style={{
                 border: '1px solid #D3ADF7', borderRadius: 10, padding: 16,
-                background: '#F9F0FF',
+                background: 'var(--purple-soft)',
               }}>
                 {/* 模型头部 */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontWeight: 600, fontSize: 14, color: '#262626' }}>
+                    <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-1)' }}>
                       {model?.name ?? t('aiQuotaAuth.modelIdRef', { id: config.modelId })}
                     </span>
                     {model?.type && (
@@ -189,7 +189,7 @@ export default function DeptAuthGroupDetail() {
 
                 {/* 能力矩阵 */}
                 <div style={{ borderTop: '1px solid #E8D5F5', paddingTop: 12 }}>
-                  <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>{t('aiQuotaAuth.capabilityConfig')}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>{t('aiQuotaAuth.capabilityConfig')}</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {CAPABILITY_FIELDS.map(({ key, labelKey, color }) => {
                       const supported = config[key] === 1
@@ -203,9 +203,9 @@ export default function DeptAuthGroupDetail() {
                           {supported ? (
                             <CheckCircleFilled style={{ fontSize: 12, color }} />
                           ) : (
-                            <CloseCircleFilled style={{ fontSize: 12, color: '#BFBFBF' }} />
+                            <CloseCircleFilled style={{ fontSize: 12, color: 'var(--text-4)' }} />
                           )}
-                          <span style={{ fontSize: 12, color: supported ? '#262626' : '#BFBFBF' }}>{t('aiQuotaAuth.' + labelKey)}</span>
+                          <span style={{ fontSize: 12, color: supported ? 'var(--text-1)' : 'var(--text-4)' }}>{t('aiQuotaAuth.' + labelKey)}</span>
                         </div>
                       )
                     })}
@@ -215,7 +215,7 @@ export default function DeptAuthGroupDetail() {
             )
           })}
           {detail.modelConfigs.length === 0 && (
-            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 40, color: '#BFBFBF' }}>
+            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 40, color: 'var(--text-4)' }}>
               {t('aiQuotaAuth.noAuthModel')}
             </div>
           )}
@@ -223,12 +223,12 @@ export default function DeptAuthGroupDetail() {
       </div>
 
       {/* ═══ 分区 4：基础信息 ═══ */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <AppstoreOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.basicInfoSection')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.basicInfoSection')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
@@ -242,8 +242,8 @@ export default function DeptAuthGroupDetail() {
             { label: t('aiQuotaAuth.updatedAtCol'), value: detail.updatedAt ?? '-' },
           ] as Array<{ label: string; value: string }>).map((item) => (
             <div key={item.label}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{item.label}</div>
-              <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{item.value}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{item.label}</div>
+              <div style={{ fontSize: 14, color: 'var(--text-1)', fontWeight: 500 }}>{item.value}</div>
             </div>
           ))}
         </div>

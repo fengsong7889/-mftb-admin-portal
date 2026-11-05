@@ -132,7 +132,7 @@ export default function DirectQuotaEdit() {
         {/* ═══ 分区 1：適用對象 ═══ */}
         <SectionCard
           header={{
-            icon: <UserOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
+            icon: <UserOutlined style={{ fontSize: 14, color: 'var(--info)' }} />,
             iconBg: '#e6f7ff',
             title: t('aiQuotaAuth.directQuotaTargetSection'),
             note: t('aiQuotaAuth.directQuotaTargetNote'),
@@ -168,7 +168,7 @@ export default function DirectQuotaEdit() {
         {/* ═══ 分区 2：額度配置 ═══ */}
         <SectionCard
           header={{
-            icon: <ThunderboltOutlined style={{ fontSize: 14, color: '#fa8c16' }} />,
+            icon: <ThunderboltOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />,
             iconBg: '#fff7e6',
             title: t('aiQuotaAuth.directQuotaLimitSection'),
             note: t('aiQuotaAuth.directQuotaLimitNote'),
@@ -199,7 +199,7 @@ export default function DirectQuotaEdit() {
         {/* ═══ 分区 3：重置策略 ═══ */}
         <SectionCard
           header={{
-            icon: <SettingOutlined style={{ fontSize: 14, color: '#722ed1' }} />,
+            icon: <SettingOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />,
             iconBg: '#f9f0ff',
             title: t('aiQuotaAuth.directQuotaResetSection'),
             note: t('aiQuotaAuth.directQuotaResetNote'),

@@ -297,7 +297,7 @@ export default function DeptAuthGroupEdit() {
         {/* ═══ 分区 2：适用部门 ═══ */}
         <SectionCard
           header={{
-            icon: <TeamOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
+            icon: <TeamOutlined style={{ fontSize: 14, color: 'var(--info)' }} />,
             iconBg: '#e6f7ff',
             title: t('aiQuotaAuth.applicableDeptSection'),
             tag: t('aiQuotaAuth.transferTreeTag'),
@@ -311,15 +311,15 @@ export default function DeptAuthGroupEdit() {
           <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
             {/* 左側：部門樹 */}
             <div style={{
-              flex: 1, border: '1px solid #d9d9d9', borderRadius: 8,
+              flex: 1, border: '1px solid var(--border-1)', borderRadius: 8,
               display: 'flex', flexDirection: 'column', height: 360,
             }}>
               <div style={{
-                padding: '10px 16px', borderBottom: '1px solid #f0f0f0',
-                background: '#fafafa', borderRadius: '8px 8px 0 0',
+                padding: '10px 16px', borderBottom: '1px solid var(--border-2)',
+                background: 'var(--surface-3)', borderRadius: '8px 8px 0 0',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>
                   {t('aiQuotaAuth.availableDepts')}（{deptOptions.length}）
                 </span>
                 <a
@@ -331,7 +331,7 @@ export default function DeptAuthGroupEdit() {
                   style={{ fontSize: 12 }}
                 >{t('aiQuotaAuth.selectAll')}</a>
               </div>
-              <div style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
+              <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-2)' }}>
                 <Input
                   placeholder={t('aiQuotaAuth.searchDeptPh')}
                   allowClear
@@ -382,7 +382,7 @@ export default function DeptAuthGroupEdit() {
                   if (skipped > 0) message.warning(t('aiQuotaAuth.deptSkipped', { count: skipped }))
                 }}
                 disabled={checkedDeptIds.length === 0}
-                style={{ backgroundColor: '#E8720C', borderColor: '#E8720C' }}
+                style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)' }}
               />
               <Button
                 size="small"
@@ -394,22 +394,22 @@ export default function DeptAuthGroupEdit() {
 
             {/* 右側：已選部門 */}
             <div style={{
-              flex: 1, border: '1px solid #d9d9d9', borderRadius: 8,
+              flex: 1, border: '1px solid var(--border-1)', borderRadius: 8,
               display: 'flex', flexDirection: 'column', height: 360,
             }}>
               <div style={{
-                padding: '10px 16px', borderBottom: '1px solid #f0f0f0',
-                background: '#fafafa', borderRadius: '8px 8px 0 0',
+                padding: '10px 16px', borderBottom: '1px solid var(--border-2)',
+                background: 'var(--surface-3)', borderRadius: '8px 8px 0 0',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>
                   {t('aiQuotaAuth.selectedDepts')}（{selectedDeptIds.length}）
                 </span>
                 <a onClick={() => setSelectedDeptIds([])} style={{ fontSize: 12 }}>{t('aiQuotaAuth.clearBtn')}</a>
               </div>
               <div style={{ flex: 1, overflow: 'auto', padding: 8 }}>
                 {selectedDeptIds.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: '#BFBFBF', padding: '40px 0', fontSize: 13 }}>
+                  <div style={{ textAlign: 'center', color: 'var(--text-4)', padding: '40px 0', fontSize: 13 }}>
                     {t('aiQuotaAuth.selectDeptPlease')}
                   </div>
                 ) : (
@@ -432,8 +432,8 @@ export default function DeptAuthGroupEdit() {
                 )}
               </div>
               <div style={{
-                padding: '8px 16px', borderTop: '1px solid #f0f0f0', background: '#fafafa',
-                borderRadius: '0 0 8px 8px', fontSize: 12, color: '#595959',
+                padding: '8px 16px', borderTop: '1px solid var(--border-2)', background: 'var(--surface-3)',
+                borderRadius: '0 0 8px 8px', fontSize: 12, color: 'var(--text-2)',
               }}>
                                 {/* 与 DeptQuotaEdit 同一复制粘贴缺陷：t() 不能插值 React 元素，count 为 i18next 保留字 */}
                 {t('aiQuotaAuth.deptsCount', {
@@ -448,7 +448,7 @@ export default function DeptAuthGroupEdit() {
         {/* ═══ 分区 3：模型授权配置 ═══ */}
         <SectionCard
           header={{
-            icon: <EyeOutlined style={{ fontSize: 14, color: '#722ED1' }} />,
+            icon: <EyeOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />,
             iconBg: '#f9f0ff',
             title: t('aiQuotaAuth.modelAuthConfig'),
             tag: t('aiQuotaAuth.editableTag'),
@@ -461,15 +461,15 @@ export default function DeptAuthGroupEdit() {
           {/* 數據不出域：開啟後僅可授權私有化部署模型 */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
-            background: '#F9F0FF', borderRadius: 6, border: '1px solid #D3ADF7', marginBottom: 16,
+            background: 'var(--purple-soft)', borderRadius: 6, border: '1px solid #D3ADF7', marginBottom: 16,
           }}>
             <Form.Item name="dataResidency" noStyle valuePropName="checked"
               getValueFromEvent={(checked) => checked ? 1 : 0}
               getValueProps={(value) => ({ checked: value === 1 })}>
               <Switch size="small" onChange={handleResidencyToggle} />
             </Form.Item>
-            <span style={{ fontSize: 13, color: '#722ED1', fontWeight: 500 }}>{t('aiQuotaAuth.dataResidency')}</span>
-            <span style={{ fontSize: 12, color: '#8C8C8C' }}>
+            <span style={{ fontSize: 13, color: 'var(--purple)', fontWeight: 500 }}>{t('aiQuotaAuth.dataResidency')}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
               {t('aiQuotaAuth.dataResidencyDesc')}
             </span>
           </div>
@@ -490,7 +490,7 @@ export default function DeptAuthGroupEdit() {
           </div>
 
           {modelAuths.length === 0 ? (
-            <div style={{ padding: '40px 0', textAlign: 'center', color: '#8C8C8C', fontSize: 13, background: '#FAFAFA', borderRadius: 8, border: '1px dashed #D9D9D9' }}>
+            <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--text-3)', fontSize: 13, background: 'var(--surface-3)', borderRadius: 8, border: '1px dashed var(--border-1)' }}>
               {t('aiQuotaAuth.noModelAdded')}
             </div>
           ) : (
@@ -501,12 +501,12 @@ export default function DeptAuthGroupEdit() {
                 return (
                   <div key={auth.modelId} style={{
                     border: '1px solid #D3ADF7', borderRadius: 10, padding: '16px',
-                    background: '#F9F0FF', transition: 'all 0.25s',
+                    background: 'var(--purple-soft)', transition: 'all 0.25s',
                   }}>
                     {/* 模型头部 + 移除 */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontWeight: 600, fontSize: 14, color: '#262626' }}>{model.name}</span>
+                        <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-1)' }}>{model.name}</span>
                         {model.type && (
                           <Tag color={MODEL_TYPE_TAG[model.type]} style={{ fontSize: 11 }}>
                             {MODEL_TYPE_LABEL_KEYS[model.type] ? t('aiQuotaAuth.' + MODEL_TYPE_LABEL_KEYS[model.type]) : model.type}
@@ -532,12 +532,12 @@ export default function DeptAuthGroupEdit() {
                               <div style={{
                                 display: 'flex', alignItems: 'center', gap: 4,
                                 padding: '4px 10px', borderRadius: 6,
-                                background: !supported ? '#FAFAFA' : (auth[key] ? `${color}0A` : '#F5F5F5'),
+                                background: !supported ? 'var(--surface-3)' : (auth[key] ? `${color}0A` : '#F5F5F5'),
                                 border: `1px solid ${!supported ? '#F0F0F0' : (auth[key] ? color + '30' : '#E8E8E8')}`,
                                 opacity: supported ? 1 : 0.65,
                                 transition: 'all 0.2s',
                               }}>
-                                <span style={{ fontSize: 12, color: supported ? '#595959' : '#BFBFBF', whiteSpace: 'nowrap' }}>{label}</span>
+                                <span style={{ fontSize: 12, color: supported ? 'var(--text-2)' : 'var(--text-4)', whiteSpace: 'nowrap' }}>{label}</span>
                                 <Switch
                                   size="small"
                                   disabled={!supported}
@@ -557,7 +557,7 @@ export default function DeptAuthGroupEdit() {
             </div>
           )}
 
-          <div style={{ marginTop: 12, fontSize: 12, color: '#8C8C8C' }}>
+          <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-3)' }}>
             {t('aiQuotaAuth.authorizedCount', { count: modelAuths.length })}
           </div>
         </SectionCard>

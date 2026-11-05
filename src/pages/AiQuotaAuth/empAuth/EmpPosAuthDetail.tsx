@@ -74,7 +74,7 @@ export default function EmpPosAuthDetail() {
   if (!rule) {
     return (
       <div className="content-area" style={{ textAlign: 'center', padding: 80 }}>
-        <div style={{ fontSize: 16, color: '#8C8C8C' }}>{t('aiQuotaAuth.authPolicyLoadFailed')}</div>
+        <div style={{ fontSize: 16, color: 'var(--text-3)' }}>{t('aiQuotaAuth.authPolicyLoadFailed')}</div>
         <Button style={{ marginTop: 16 }} onClick={handleBack}>{t('aiQuotaAuth.backToList')}</Button>
       </div>
     )
@@ -93,71 +93,71 @@ export default function EmpPosAuthDetail() {
       />
 
       {/* ═══ 分区 1：统计概览（數據指標統計卡標準 12.1） ═══ */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <BarChartOutlined style={{ fontSize: 14, color: '#52C41A' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--success-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <BarChartOutlined style={{ fontSize: 14, color: 'var(--success)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.statsOverview')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.statsOverview')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <div key={rule.id} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: '#E6F7FF', border: '1px solid #1890FF22', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#1890FF' }}>
+          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: 'var(--info-soft)', border: '1px solid #1890FF22', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--info)' }}>
               <AnimatedNumber value={rule.sequence.length} />
             </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.seqLabel')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{t('aiQuotaAuth.seqLabel')}</div>
           </div>
-          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: '#F6FFED', border: '1px solid #52C41A22', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#52C41A' }}>
+          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: 'var(--success-soft)', border: '1px solid #52C41A22', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--success)' }}>
               <AnimatedNumber value={rule.jobLevels.length} />
             </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.jobLevelCount')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{t('aiQuotaAuth.jobLevelCount')}</div>
           </div>
-          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: '#F9F0FF', border: '1px solid #722ED122', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#722ED1' }}>
+          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: 'var(--purple-soft)', border: '1px solid #722ED122', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--purple)' }}>
               <AnimatedNumber value={rule.modelConfigs.length} />
             </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.authModelCount')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{t('aiQuotaAuth.authModelCount')}</div>
           </div>
-          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: '#FFF7E6', border: '1px solid #E8720C22', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#E8720C' }}>
+          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: 'var(--warning-soft)', border: '1px solid #E8720C22', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--brand)' }}>
               {rule.createdAt?.split('T')[0] ?? '-'}
             </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.createdAtCol')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{t('aiQuotaAuth.createdAtCol')}</div>
           </div>
         </div>
       </div>
 
       {/* ═══ 分区 2：适用职位 ═══ */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <IdcardOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <IdcardOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.applicablePosTitle')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.applicablePosTitle')}</span>
           <Tag color="blue">{t('aiQuotaAuth.seqLevelCount', { seqCount: rule.sequence.length, levelCount: rule.jobLevels.length })}</Tag>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>{t('aiQuotaAuth.seqLabel')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>{t('aiQuotaAuth.seqLabel')}</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {rule.sequence.map((s) => (
                 <Tag key={s} color={POSITION_SEQUENCE_TAG_COLOR[s]} style={{ fontSize: 13, padding: '4px 12px', lineHeight: '24px' }}>
                   {POSITION_SEQUENCE[s] ?? s}
                 </Tag>
               ))}
-              {rule.sequence.length === 0 && <span style={{ color: '#BFBFBF' }}>{t('aiQuotaAuth.notSetLabel')}</span>}
+              {rule.sequence.length === 0 && <span style={{ color: 'var(--text-4)' }}>{t('aiQuotaAuth.notSetLabel')}</span>}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>{t('aiQuotaAuth.jobLevelLabel')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>{t('aiQuotaAuth.jobLevelLabel')}</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {rule.jobLevels.map((l) => (
                 <Tag key={l} style={{ fontSize: 13, padding: '4px 12px', lineHeight: '24px' }}>{l}</Tag>
               ))}
-              {rule.jobLevels.length === 0 && <span style={{ color: '#BFBFBF' }}>{t('aiQuotaAuth.notSetLabel')}</span>}
+              {rule.jobLevels.length === 0 && <span style={{ color: 'var(--text-4)' }}>{t('aiQuotaAuth.notSetLabel')}</span>}
             </div>
           </div>
         </div>
@@ -167,12 +167,12 @@ export default function EmpPosAuthDetail() {
       <ModelAuthSectionReadonly models={models} configs={rule.modelConfigs} />
 
       {/* ═══ 分区 4：基础信息 ═══ */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <AppstoreOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.basicInfoSection')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.basicInfoSection')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
@@ -185,8 +185,8 @@ export default function EmpPosAuthDetail() {
             { label: t('aiQuotaAuth.updatedAtCol'), value: rule.updatedAt ?? '-' },
           ] as Array<{ label: string; value: string }>).map((item) => (
             <div key={item.label}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{item.label}</div>
-              <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{item.value}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{item.label}</div>
+              <div style={{ fontSize: 14, color: 'var(--text-1)', fontWeight: 500 }}>{item.value}</div>
             </div>
           ))}
         </div>

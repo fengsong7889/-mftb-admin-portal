@@ -30,7 +30,7 @@ export default function BasicInfoFormSection({
   return (
     <SectionCard
       header={{
-        icon: <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
+        icon: <AppstoreOutlined style={{ fontSize: 14, color: 'var(--info)' }} />,
         iconBg: '#e6f7ff',
         title: t('aiQuotaAuth.basicInfoSection'),
         tag: t('aiQuotaAuth.editableTag'),

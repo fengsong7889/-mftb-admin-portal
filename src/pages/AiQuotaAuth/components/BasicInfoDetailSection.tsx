@@ -35,7 +35,7 @@ export default function BasicInfoDetailSection({
   return (
     <SectionCard
       header={{
-        icon: <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
+        icon: <AppstoreOutlined style={{ fontSize: 14, color: 'var(--info)' }} />,
         iconBg: '#e6f7ff',
         title: t('aiQuotaAuth.basicInfoSection'),
       }}
@@ -43,8 +43,8 @@ export default function BasicInfoDetailSection({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
         {items.map((item) => (
           <div key={item.label}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{item.label}</div>
-            <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{item.value}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{item.label}</div>
+            <div style={{ fontSize: 14, color: 'var(--text-1)', fontWeight: 500 }}>{item.value}</div>
           </div>
         ))}
       </div>

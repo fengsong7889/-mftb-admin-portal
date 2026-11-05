@@ -184,7 +184,7 @@ export default function EmpQuotaList() {
             content={<div style={{ maxWidth: 300 }}>{row.jobLevels.map((l) => <Tag key={`all-${l}`} style={{ marginRight: 4, marginBottom: 4 }}>{l}</Tag>)}</div>}
             title={t('aiQuotaAuth.allJobLevelsPopover', { count: row.jobLevels.length })} trigger="click"
           >
-            <Tag style={{ marginRight: 4, marginBottom: 2, cursor: 'pointer', color: '#E8720C', borderColor: '#E8720C' }}>+{row.jobLevels.length - 3}</Tag>
+            <Tag style={{ marginRight: 4, marginBottom: 2, cursor: 'pointer', color: 'var(--brand)', borderColor: 'var(--brand)' }}>+{row.jobLevels.length - 3}</Tag>
           </Popover>
         ) : null
         return <span>{seqTags}{lvlTags}{extra}</span>
@@ -199,8 +199,8 @@ export default function EmpQuotaList() {
         return (
           <div>
             <Progress percent={Math.min(pct, 100)} size="small" showInfo={false} strokeColor={usageColor(row)} style={{ marginBottom: 2 }} />
-            <div style={{ fontSize: 12, color: '#595959', display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-              <span style={{ color: '#8C8C8C' }}>{usedText(row)}</span>
+            <div style={{ fontSize: 12, color: 'var(--text-2)', display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+              <span style={{ color: 'var(--text-3)' }}>{usedText(row)}</span>
               <span style={{ color: usageColor(row), fontWeight: 600 }}>{pct}%</span>
             </div>
           </div>
@@ -239,8 +239,8 @@ export default function EmpQuotaList() {
         message={
           <span>
             {t('aiQuotaAuth.posQuotaAlertFull')}
-            <span style={{ color: '#8C8C8C' }}>{t('aiQuotaAuth.posQuotaAlertMaxRule')}</span>
-            <div style={{ color: '#8C8C8C', fontSize: 12, marginTop: 4 }}>{t('aiQuotaAuth.posQuotaGatewayNote')}</div>
+            <span style={{ color: 'var(--text-3)' }}>{t('aiQuotaAuth.posQuotaAlertMaxRule')}</span>
+            <div style={{ color: 'var(--text-3)', fontSize: 12, marginTop: 4 }}>{t('aiQuotaAuth.posQuotaGatewayNote')}</div>
           </span>
         }
       />
@@ -261,7 +261,7 @@ export default function EmpQuotaList() {
       </div>
       {/* 操作區 */}
       <div className="action-section">
-        <div className="action-section-left"><span style={{ fontSize: 13, color: '#595959' }}>{t('aiQuotaAuth.posStrategyCountCover', { count: filteredPosPolicies.length, empCount: totalPosEmployeeCount.toLocaleString() })}</span></div>
+        <div className="action-section-left"><span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('aiQuotaAuth.posStrategyCountCover', { count: filteredPosPolicies.length, empCount: totalPosEmployeeCount.toLocaleString() })}</span></div>
         <div className="action-section-right">
           <Button type="primary" icon={<PlusOutlined />} onClick={handlePosCreate}>{t('common.add')}</Button>
           {posConfigComponent}
@@ -366,7 +366,7 @@ export default function EmpQuotaList() {
                 content={<div style={{ maxWidth: 300 }}>{row.userNames.map((n) => <Tag key={n} style={{ marginRight: 4, marginBottom: 4, fontSize: 12 }}>{n}</Tag>)}</div>}
                 title={t('aiQuotaAuth.allEmpPopover', { count: row.totalEmployeeCount })} trigger="click"
               >
-                <Tag style={{ marginRight: 4, marginBottom: 2, cursor: 'pointer', color: '#E8720C', borderColor: '#E8720C', fontSize: 12 }}>+{row.userNames.length - 3}</Tag>
+                <Tag style={{ marginRight: 4, marginBottom: 2, cursor: 'pointer', color: 'var(--brand)', borderColor: 'var(--brand)', fontSize: 12 }}>+{row.userNames.length - 3}</Tag>
               </Popover>
             )}
           </span>
@@ -381,8 +381,8 @@ export default function EmpQuotaList() {
         return (
           <div>
             <Progress percent={Math.min(pct, 100)} size="small" showInfo={false} strokeColor={roleUsageColor(row)} style={{ marginBottom: 2 }} />
-            <div style={{ fontSize: 12, color: '#595959', display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-              <span style={{ color: '#8C8C8C' }}>{roleUsedText(row)}</span>
+            <div style={{ fontSize: 12, color: 'var(--text-2)', display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+              <span style={{ color: 'var(--text-3)' }}>{roleUsedText(row)}</span>
               <span style={{ color: roleUsageColor(row), fontWeight: 600 }}>{pct}%</span>
             </div>
           </div>
@@ -418,7 +418,7 @@ export default function EmpQuotaList() {
     <>
       <Alert
         type="info" showIcon style={{ marginBottom: 16 }}
-        message={<>{t('aiQuotaAuth.roleQuotaAlertFull')}<span style={{ color: '#8C8C8C', fontSize: 12, marginLeft: 4 }}>{t('aiQuotaAuth.roleQuotaGatewayNote')}</span></>}
+        message={<>{t('aiQuotaAuth.roleQuotaAlertFull')}<span style={{ color: 'var(--text-3)', fontSize: 12, marginLeft: 4 }}>{t('aiQuotaAuth.roleQuotaGatewayNote')}</span></>}
       />
       {/* 查詢區域 */}
       <div className="search-section">
@@ -434,7 +434,7 @@ export default function EmpQuotaList() {
       </div>
       {/* 操作區 */}
       <div className="action-section">
-        <div className="action-section-left"><span style={{ fontSize: 13, color: '#595959' }}>{t('aiQuotaAuth.roleStrategyCountCover', { count: filteredRolePolicies.length, empCount: totalRoleEmployeeCount.toLocaleString() })}</span></div>
+        <div className="action-section-left"><span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('aiQuotaAuth.roleStrategyCountCover', { count: filteredRolePolicies.length, empCount: totalRoleEmployeeCount.toLocaleString() })}</span></div>
         <div className="action-section-right">
           <Button type="primary" icon={<PlusOutlined />} onClick={handleRoleCreate}>{t('common.add')}</Button>
           {roleConfigComponent}
@@ -483,7 +483,7 @@ export default function EmpQuotaList() {
   }
 
   /** 額度數字：0 表示該維度不限制，展示為 -- */
-  const quotaNumber = (v: number) => (v > 0 ? v.toLocaleString() : <span style={{ color: '#BFBFBF' }}>--</span>)
+  const quotaNumber = (v: number) => (v > 0 ? v.toLocaleString() : <span style={{ color: 'var(--text-4)' }}>--</span>)
 
   const directColumnMeta = [
     { key: 'targetName', title: t('aiQuotaAuth.employeeCol') },
@@ -509,7 +509,7 @@ export default function EmpQuotaList() {
     {
       key: 'modelName', title: t('aiQuotaAuth.authModelCol'), dataIndex: 'modelName', width: 200,
       render: (v: string | null) => (v
-        ? <Tag style={{ color: '#E8720C', background: '#FFF7E6', border: '1px solid #FFD8A8' }}>{v}</Tag>
+        ? <Tag style={{ color: 'var(--brand)', background: 'var(--warning-soft)', border: '1px solid #FFD8A8' }}>{v}</Tag>
         : <Tag color="blue">{t('aiQuotaAuth.allModelsShared')}</Tag>),
     },
     {
@@ -550,7 +550,7 @@ export default function EmpQuotaList() {
       <Alert
         type="info" showIcon style={{ marginBottom: 16 }}
         message={t('aiQuotaAuth.directQuotaAlertMsg')}
-        description={<span style={{ color: '#8C8C8C', fontSize: 12 }}>{t('aiQuotaAuth.directQuotaAlertDesc')}</span>}
+        description={<span style={{ color: 'var(--text-3)', fontSize: 12 }}>{t('aiQuotaAuth.directQuotaAlertDesc')}</span>}
       />
       {/* 查詢區域 */}
       <div className="search-section">
@@ -563,7 +563,7 @@ export default function EmpQuotaList() {
       {/* 操作區 */}
       <div className="action-section">
         <div className="action-section-left">
-          <span style={{ fontSize: 13, color: '#595959' }}>
+          <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
             {t('aiQuotaAuth.directQuotaCount', { count: filteredDirect.length })}
           </span>
         </div>

@@ -199,7 +199,7 @@ export default function AiAuth() {
               title={t('aiQuotaAuth.allDeptPopover', { count: v.length })}
               trigger="click"
             >
-              <Tag style={{ marginRight: 4, marginBottom: 2, cursor: 'pointer', color: '#E8720C', borderColor: '#E8720C' }}>+{v.length - 3}</Tag>
+              <Tag style={{ marginRight: 4, marginBottom: 2, cursor: 'pointer', color: 'var(--brand)', borderColor: 'var(--brand)' }}>+{v.length - 3}</Tag>
             </Popover>
           )}
         </span>
@@ -213,7 +213,7 @@ export default function AiAuth() {
         return (
           <span style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             {ids.slice(0, 3).map((id) => (
-              <Tag key={id} style={{ color: '#E8720C', background: '#FFF7E6', border: '1px solid #FFD8A8' }}>
+              <Tag key={id} style={{ color: 'var(--brand)', background: 'var(--warning-soft)', border: '1px solid #FFD8A8' }}>
                 {modelName[id] ?? id}
               </Tag>
             ))}
@@ -223,7 +223,7 @@ export default function AiAuth() {
                 content={
                   <div style={{ maxWidth: 300 }}>
                     {ids.map((id) => (
-                      <Tag key={id} style={{ marginRight: 4, marginBottom: 4, color: '#E8720C', background: '#FFF7E6', border: '1px solid #FFD8A8' }}>
+                      <Tag key={id} style={{ marginRight: 4, marginBottom: 4, color: 'var(--brand)', background: 'var(--warning-soft)', border: '1px solid #FFD8A8' }}>
                         {modelName[id] ?? id}
                       </Tag>
                     ))}
@@ -231,7 +231,7 @@ export default function AiAuth() {
                 }
                 title={t('aiQuotaAuth.allModelPopover', { count: ids.length })}
               >
-                <Tag style={{ color: '#E8720C', borderColor: '#E8720C', cursor: 'pointer' }}>+{ids.length - 3}</Tag>
+                <Tag style={{ color: 'var(--brand)', borderColor: 'var(--brand)', cursor: 'pointer' }}>+{ids.length - 3}</Tag>
               </Popover>
             )}
           </span>
@@ -242,12 +242,12 @@ export default function AiAuth() {
       key: 'capabilities', title: t('aiQuotaAuth.capabilityCol'), width: 220,
       render: (_: unknown, row: DeptAuthGroupItem) => {
         const configs = buildModelConfigs(row)
-        if (!configs.length) return <span style={{ color: '#BFBFBF', fontSize: 12 }}>{t('aiQuotaAuth.notConfiguredShort')}</span>
+        if (!configs.length) return <span style={{ color: 'var(--text-4)', fontSize: 12 }}>{t('aiQuotaAuth.notConfiguredShort')}</span>
         // 去重：收集所有模型中已啟用的能力
         const enabledCaps = CAPABILITY_SHORT_FIELDS.filter(({ key }) =>
           configs.some((c) => c[key] === 1),
         )
-        if (!enabledCaps.length) return <span style={{ color: '#BFBFBF', fontSize: 12 }}>{t('aiQuotaAuth.noCapability')}</span>
+        if (!enabledCaps.length) return <span style={{ color: 'var(--text-4)', fontSize: 12 }}>{t('aiQuotaAuth.noCapability')}</span>
         return (
           <Popover
             trigger="click"
@@ -264,7 +264,7 @@ export default function AiAuth() {
                           ? caps.map(({ key, labelKey, color }) => (
                               <Tag key={key} color={color} style={{ fontSize: 11 }}>{t('aiQuotaAuth.' + labelKey)}</Tag>
                             ))
-                          : <span style={{ fontSize: 11, color: '#BFBFBF' }}>{t('aiQuotaAuth.noCapability')}</span>
+                          : <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{t('aiQuotaAuth.noCapability')}</span>
                         }
                       </div>
                     </div>
@@ -352,7 +352,7 @@ export default function AiAuth() {
           {/* 操作區 */}
           <div className="action-section">
             <div className="action-section-left">
-              <span style={{ fontSize: 13, color: '#595959' }}>
+              <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
                 {t('aiQuotaAuth.deptStrategySummary', { count: deptGroups.length, deptCount: totalDeptCount, empCount: totalEmployeeCount.toLocaleString() })}
               </span>
             </div>

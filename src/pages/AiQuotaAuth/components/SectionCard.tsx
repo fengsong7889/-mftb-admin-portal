@@ -37,15 +37,15 @@ export function SectionHeader({ icon, iconBg, title, tag, tagColor, note, toolti
       <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {icon}
       </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>
       {tag && <Tag color={tagColor} style={{ marginLeft: 4, fontSize: 11 }}>{tag}</Tag>}
       {note && (
         tooltip ? (
           <Tooltip title={tooltip}>
-            <span style={{ fontSize: 12, color: '#8C8C8C', cursor: 'help' }}>{note}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)', cursor: 'help' }}>{note}</span>
           </Tooltip>
         ) : (
-          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{note}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{note}</span>
         )
       )}
       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
@@ -67,7 +67,7 @@ interface SectionCardProps {
 export default function SectionCard({ header, children, style }: SectionCardProps) {
   return (
     <div style={{
-      border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
+      border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)',
       padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       ...style,
     }}>

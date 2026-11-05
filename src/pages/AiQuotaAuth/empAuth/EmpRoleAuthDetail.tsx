@@ -88,7 +88,7 @@ export default function EmpRoleAuthDetail() {
   if (!config) {
     return (
       <div className="content-area" style={{ textAlign: 'center', padding: 80 }}>
-        <div style={{ fontSize: 16, color: '#8C8C8C' }}>{t('aiQuotaAuth.roleAuthLoadFailed')}</div>
+        <div style={{ fontSize: 16, color: 'var(--text-3)' }}>{t('aiQuotaAuth.roleAuthLoadFailed')}</div>
         <Button style={{ marginTop: 16 }} onClick={handleBack}>{t('aiQuotaAuth.backToList')}</Button>
       </div>
     )
@@ -98,7 +98,7 @@ export default function EmpRoleAuthDetail() {
     <div className="content-area">
       {/* 頭部概覽卡（全局統一規範：詳情頁紫色頂條 + 橙色返回 + 紫色編輯） */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
       }}>
         <div style={{
@@ -112,25 +112,25 @@ export default function EmpRoleAuthDetail() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleBack}
               style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8,
+                backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8,
                 height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               }}>{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)', display: 'flex', alignItems: 'center', gap: 10 }}>
                 {t('aiQuotaAuth.roleAuthDetailTitle')}
                 {config.status === 1 ? <Tag color="success">{t('aiQuotaAuth.enableText')}</Tag> : <Tag color="default">{t('aiQuotaAuth.disableText')}</Tag>}
               </h2>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
                 {config.roleName} · {t('aiQuotaAuth.lastUpdateLabel')}：{config.updatedBy ?? '-'} · {config.updatedAt ?? '-'}
               </div>
             </div>
           </div>
           <Button type="primary" icon={<EditOutlined />} onClick={() => navigate(`/ai-role-auth-edit?roleId=${config.roleId}`)}
             style={{
-              backgroundColor: '#722ED1', borderColor: '#722ED1', borderRadius: 8,
+              backgroundColor: '#722ED1', borderColor: 'var(--purple)', borderRadius: 8,
               height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6,
               boxShadow: '0 2px 6px rgba(114,46,209,0.25)',
               transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -139,49 +139,49 @@ export default function EmpRoleAuthDetail() {
       </div>
 
       {/* ══ 分区 1：统计概览（數據指標統計卡標準 12.1） ═══ */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <BarChartOutlined style={{ fontSize: 14, color: '#52C41A' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--success-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <BarChartOutlined style={{ fontSize: 14, color: 'var(--success)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.statsOverview')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.statsOverview')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <div key={config.roleId} style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: '#F9F0FF', border: '1px solid #722ED122', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#722ED1' }}>
+          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: 'var(--purple-soft)', border: '1px solid #722ED122', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--purple)' }}>
               <AnimatedNumber value={config.modelConfigs.length} />
             </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.authModelCount')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{t('aiQuotaAuth.authModelCount')}</div>
           </div>
-          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: '#E6F7FF', border: '1px solid #1890FF22', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#1890FF' }}>
+          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: 'var(--info-soft)', border: '1px solid #1890FF22', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--info)' }}>
               <AnimatedNumber value={config.userIds.length} />
             </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.boundEmpCount')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{t('aiQuotaAuth.boundEmpCount')}</div>
           </div>
-          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: '#F6FFED', border: '1px solid #52C41A22', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#52C41A' }}>
+          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: 'var(--success-soft)', border: '1px solid #52C41A22', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--success)' }}>
               <AnimatedNumber value={config.modelConfigs.reduce((s, c) => s + (c.visionSupport + c.functionCalling + c.jsonMode + c.streaming + c.thinkingMode), 0)} />
             </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.capabilityItemCount')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{t('aiQuotaAuth.capabilityItemCount')}</div>
           </div>
-          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: '#FFF7E6', border: '1px solid #E8720C22', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#E8720C' }}>
+          <div style={{ padding: 16, borderRadius: 12, textAlign: 'center', background: 'var(--warning-soft)', border: '1px solid #E8720C22', transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'default' }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--brand)' }}>
               {config.createdAt?.split('T')[0] ?? '-'}
             </div>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiQuotaAuth.createdAtCol')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{t('aiQuotaAuth.createdAtCol')}</div>
           </div>
         </div>
       </div>
 
       {/* ═══ 分区 2：绑定员工（顯示工號） ═══ */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <TeamOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <TeamOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.boundEmpCount')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.boundEmpCount')}</span>
           <Tag color="blue">{t('aiQuotaAuth.boundEmpNameCount', { count: config.userIds.length })}</Tag>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
@@ -189,10 +189,10 @@ export default function EmpRoleAuthDetail() {
           {boundEmployees.map((emp) => (
             <Tag key={emp.id} style={{ fontSize: 13, padding: '4px 12px', lineHeight: '24px' }}>
               {emp.name}（{emp.empId}）
-              {emp.department && <span style={{ color: '#8C8C8C', marginLeft: 4 }}>· {emp.department}</span>}
+              {emp.department && <span style={{ color: 'var(--text-3)', marginLeft: 4 }}>· {emp.department}</span>}
             </Tag>
           ))}
-          {boundEmployees.length === 0 && <span style={{ color: '#BFBFBF' }}>{t('aiQuotaAuth.noBoundEmp')}</span>}
+          {boundEmployees.length === 0 && <span style={{ color: 'var(--text-4)' }}>{t('aiQuotaAuth.noBoundEmp')}</span>}
         </div>
       </div>
 
@@ -200,12 +200,12 @@ export default function EmpRoleAuthDetail() {
       <ModelAuthSectionReadonly models={models} configs={config.modelConfigs} />
 
       {/* ═══ 分区 4：基础信息 ═══ */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <AppstoreOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiQuotaAuth.basicInfoSection')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiQuotaAuth.basicInfoSection')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
@@ -219,8 +219,8 @@ export default function EmpRoleAuthDetail() {
             { label: t('aiQuotaAuth.updatedAtCol'), value: config.updatedAt ?? '-' },
           ] as Array<{ label: string; value: string }>).map((item) => (
             <div key={item.label}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{item.label}</div>
-              <div style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{item.value}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{item.label}</div>
+              <div style={{ fontSize: 14, color: 'var(--text-1)', fontWeight: 500 }}>{item.value}</div>
             </div>
           ))}
         </div>
