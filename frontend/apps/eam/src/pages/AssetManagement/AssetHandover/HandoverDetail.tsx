@@ -57,7 +57,7 @@ export default function HandoverDetail({ record, loading = false, error, onBack,
       title: t('asset.colAssetNo'), dataIndex: 'assetNo', key: 'assetNo', width: 160,
       render: (v: string) => (
         <span
-          style={{ fontFamily: 'monospace', fontWeight: 600, cursor: onViewAsset ? 'pointer' : 'default', color: onViewAsset ? '#E8720C' : undefined }}
+          style={{ fontFamily: 'monospace', fontWeight: 600, cursor: onViewAsset ? 'pointer' : 'default', color: onViewAsset ? 'var(--brand)' : undefined }}
           onClick={() => { if (onViewAsset && v && !v.startsWith('#')) onViewAsset(v) }}
         >{v}</span>
       ),
@@ -83,12 +83,12 @@ export default function HandoverDetail({ record, loading = false, error, onBack,
       {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} />}
 
       {/* ====== 交接信息（模塊卡片規範：無邊框 + 陰影 0.06，對齊採購訂單詳情） ====== */}
-      <div style={{ borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+      <div style={{ borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <FileTextOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <FileTextOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.sectionBasic')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.sectionBasic')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <Descriptions column={4} size="middle" items={[
@@ -109,12 +109,12 @@ export default function HandoverDetail({ record, loading = false, error, onBack,
       </div>
 
       {/* ====== 交接資產明細 ====== */}
-      <div style={{ borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+      <div style={{ borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ProfileOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ProfileOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.sectionAssetInfo')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.sectionAssetInfo')}</span>
           <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{record.assetCount}</Tag>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
@@ -130,9 +130,9 @@ export default function HandoverDetail({ record, loading = false, error, onBack,
       </div>
 
       {/* ====== 最後更新（詳情頁規範 footer，對齊採購訂單詳情） ====== */}
-      <div style={{ background: '#fafafa', borderRadius: 8, padding: '12px 24px', border: '1px solid #f0f0f0', display: 'flex', justifyContent: 'flex-end', gap: 24 }}>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedByLabel')}<span style={{ color: '#595959' }}>{record.updatedBy || '-'}</span></span>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedAtLabel')}<span style={{ color: '#595959' }}>{record.updatedAt || '-'}</span></span>
+      <div style={{ background: 'var(--surface-3)', borderRadius: 8, padding: '12px 24px', border: '1px solid #f0f0f0', display: 'flex', justifyContent: 'flex-end', gap: 24 }}>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.updatedByLabel')}<span style={{ color: 'var(--text-2)' }}>{record.updatedBy || '-'}</span></span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.updatedAtLabel')}<span style={{ color: 'var(--text-2)' }}>{record.updatedAt || '-'}</span></span>
       </div>
     </div>
   )

@@ -46,9 +46,9 @@ function renderCardTitle(icon: string, iconBg: string, title: string, extra?: st
       <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ fontSize: 14 }}>{icon}</span>
       </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>
       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-      {extra && <span style={{ fontSize: 12, color: '#8c8c8c' }}>{extra}</span>}
+      {extra && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{extra}</span>}
     </div>
   )
 }
@@ -141,7 +141,7 @@ export default function AssetTagForm({ id, onBack }: AssetTagFormProps) {
     <>
       {/* 頁面頭部 */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
       }}>
         <div style={{
@@ -154,14 +154,14 @@ export default function AssetTagForm({ id, onBack }: AssetTagFormProps) {
             <Button
               type="primary" icon={<ArrowLeftOutlined />} onClick={onBack}
               style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8,
+                backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8,
                 height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
             >{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>
               {isEdit ? t('assetTag.editTitle') : t('assetTag.addTitle')}
             </h2>
           </div>
@@ -170,7 +170,7 @@ export default function AssetTagForm({ id, onBack }: AssetTagFormProps) {
 
       <Form form={form} layout="vertical" disabled={loading}>
         {/* 模塊1：基本信息 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           {renderCardTitle('📋', '#e6f7ff', t('common.basicInfo'))}
           <Row gutter={16}>
             <Col xs={24} sm={12} md={8}>
@@ -194,7 +194,7 @@ export default function AssetTagForm({ id, onBack }: AssetTagFormProps) {
         {/* 三欄工作區：樣式畫廊 / 實時預覽 / 字段配置 */}
         <div className="asset-tag-workspace">
           {/* 左欄：標籤樣式配置 */}
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             {renderCardTitle('🎨', '#fff7e6', t('assetTag.styleTitle'), t('assetTag.stylePresetExtra'))}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               {COLOR_PRESETS.map(preset => {
@@ -218,33 +218,33 @@ export default function AssetTagForm({ id, onBack }: AssetTagFormProps) {
               })}
             </div>
             <div style={{ height: 1, background: '#f0f0f0', margin: '14px 0' }} />
-            <div style={{ fontSize: 13, fontWeight: 500, color: '#595959', marginBottom: 8 }}>{t('assetTag.customColor')}</div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-2)', marginBottom: 8 }}>{t('assetTag.customColor')}</div>
             <div style={{ display: 'flex', gap: 16 }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>{t('assetTag.bgColorLabel')}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('assetTag.bgColorLabel')}</div>
                 <ColorPicker value={bgColor} showText onChange={(c) => setBgColor(c.toHexString())} />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>{t('assetTag.textColorLabel')}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('assetTag.textColorLabel')}</div>
                 <ColorPicker value={textColor} showText onChange={(c) => setTextColor(c.toHexString())} />
               </div>
             </div>
           </div>
 
           {/* 中欄：實時預覽 */}
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             {renderCardTitle('👁', '#e6f7ff', t('assetTag.previewTitle'), t('assetTag.previewSyncExtra'))}
             <div className="asset-tag-canvas">
               <AssetTagPreview data={{ name: nameWatch, bgColor, textColor, displayFields: selectedFields }} />
-              <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
                 {t('assetTag.previewSummary', { name: nameWatch || t('assetTag.nameLabel'), count: orderedFields.length })}
               </div>
             </div>
             <div style={{ marginTop: 12 }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: '#595959', marginBottom: 8 }}>{t('assetTag.fieldOrderTitle')}</div>
+              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-2)', marginBottom: 8 }}>{t('assetTag.fieldOrderTitle')}</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {orderedFields.length === 0 ? (
-                  <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('assetTag.fieldOrderEmpty')}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('assetTag.fieldOrderEmpty')}</span>
                 ) : (
                   orderedFields.map((f, idx) => (
                     <span key={f.key} style={{
@@ -262,7 +262,7 @@ export default function AssetTagForm({ id, onBack }: AssetTagFormProps) {
           </div>
 
           {/* 右欄：展示字段配置 */}
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             {renderCardTitle('📑', '#f6ffed', t('assetTag.fieldsTitle'), t('assetTag.fieldsSelectedExtra', { selected: selectedFields.length, total: ASSET_DISPLAY_FIELDS.length }))}
             <div className="asset-tag-panel-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {ASSET_DISPLAY_FIELDS.map(field => {
@@ -278,10 +278,10 @@ export default function AssetTagForm({ id, onBack }: AssetTagFormProps) {
                       onClick={(e) => e.stopPropagation()}
                       onChange={() => handleToggleField(field.key)}
                     />
-                    <span style={{ fontSize: 13, fontWeight: checked ? 500 : 400, color: '#262626' }}>
+                    <span style={{ fontSize: 13, fontWeight: checked ? 500 : 400, color: 'var(--text-1)' }}>
                       {field.label}
                     </span>
-                    <span style={{ marginLeft: 'auto', fontSize: 12, color: '#8C8C8C' }}>
+                    <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text-3)' }}>
                       {ASSET_FIELD_SAMPLE_VALUES[field.key]}
                     </span>
                   </div>

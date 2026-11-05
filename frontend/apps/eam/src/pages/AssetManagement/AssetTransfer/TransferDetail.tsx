@@ -28,11 +28,11 @@ function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string })
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
       <div style={{
         width: 28, height: 28, borderRadius: 6,
-        background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {icon}
       </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>
       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
     </div>
   )
@@ -74,7 +74,7 @@ export default function TransferDetail() {
       {/* ====== 資產信息 ====== */}
       <div style={detailCardStyle}>
         <SectionTitle
-          icon={<FileTextOutlined style={{ fontSize: 14, color: '#1890ff' }} />}
+          icon={<FileTextOutlined style={{ fontSize: 14, color: 'var(--info)' }} />}
           title={t('asset.sectionAssetInfo')}
         />
         <Descriptions column={4} size="middle">
@@ -90,7 +90,7 @@ export default function TransferDetail() {
       {/* ====== 調撥信息 ====== */}
       <div style={detailCardStyle}>
         <SectionTitle
-          icon={<SwapOutlined style={{ fontSize: 14, color: '#722ed1' }} />}
+          icon={<SwapOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />}
           title={t('asset.sectionTransferInfo')}
         />
         <Descriptions column={4} size="middle">

@@ -122,21 +122,21 @@ export default function AssetTagBindingSection({ assetId, asset }: Props) {
 
   return (
     <div style={{
-      border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
+      border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)',
       padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
     }}>
       {/* 標題行（模塊卡片規範） */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
         <div style={{
-          width: 28, height: 28, borderRadius: 6, background: '#e6f7ff',
+          width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <TagOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+          <TagOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
         </div>
-        <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('assetTag.sectionTitle')}</span>
+        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('assetTag.sectionTitle')}</span>
         <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>{t('assetTag.primaryPolicyTag', { count: MAX_BINDINGS_PER_ASSET - 1 })}</Tag>
         <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-        <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
           {t('assetTag.boundCountShort', { count: bindings.length })}{bindings.some(b => b.isPrimary) ? '' : t('assetTag.noPrimarySuffix')}
         </span>
       </div>
@@ -145,7 +145,7 @@ export default function AssetTagBindingSection({ assetId, asset }: Props) {
         {bindings.length === 0 ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description={<span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('assetTag.emptyDesc')}</span>}
+            description={<span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('assetTag.emptyDesc')}</span>}
             style={{ margin: '8px 0 16px' }}
           />
         ) : (
@@ -204,7 +204,7 @@ export default function AssetTagBindingSection({ assetId, asset }: Props) {
         okButtonProps={{ disabled: !selectedTagId }}
         width={420}
       >
-        <div style={{ marginBottom: 8, fontSize: 13, color: '#595959' }}>
+        <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--text-2)' }}>
           {t('assetTag.assetNoLabel')}<span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{asset?.assetNo || assetId}</span>
         </div>
         <Select
@@ -213,15 +213,15 @@ export default function AssetTagBindingSection({ assetId, asset }: Props) {
           value={selectedTagId}
           onChange={setSelectedTagId}
           options={bindableTemplates.map(t => ({ label: t.name, value: t.id }))}
-          notFoundContent={<span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('assetTag.noBindableTemplate')}</span>}
+          notFoundContent={<span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('assetTag.noBindableTemplate')}</span>}
         />
         {selectedTemplate && (
-          <div style={{ marginTop: 12, background: '#FAFAFA', borderRadius: 8, padding: 12 }}>
-            <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 8 }}>{t('assetTag.previewLabel')}</div>
+          <div style={{ marginTop: 12, background: 'var(--surface-3)', borderRadius: 8, padding: 12 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>{t('assetTag.previewLabel')}</div>
             <AssetTagPreview data={selectedTemplate} />
           </div>
         )}
-        <div style={{ marginTop: 12, fontSize: 12, color: '#8c8c8c' }}>
+        <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-3)' }}>
           {t('assetTag.bindInstantTip')}
         </div>
       </Modal>

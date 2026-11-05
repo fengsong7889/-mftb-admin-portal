@@ -97,7 +97,7 @@ export default function LossCreate({ onBack, onCreated }: Props) {
         {/* ====== 模塊 1：資產信息 ====== */}
         <div style={detailCardStyle}>
           <SectionTitle
-            icon={<InboxOutlined style={{ fontSize: 14, color: '#1890ff' }} />}
+            icon={<InboxOutlined style={{ fontSize: 14, color: 'var(--info)' }} />}
             iconBg="#e6f7ff"
             title="資產信息"
             tag={asset ? <Tag color={ASSET_STATUS_COLOR[asset.status]}>{getAssetStatusLabel(asset.status)}</Tag> : undefined}
@@ -170,7 +170,7 @@ export default function LossCreate({ onBack, onCreated }: Props) {
         {asset && (
           <div style={detailCardStyle}>
             <SectionTitle
-              icon={<SearchOutlined style={{ fontSize: 14, color: '#fa8c16' }} />}
+              icon={<SearchOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />}
               iconBg="#fff7e6"
               title="遺失信息"
             />

@@ -63,7 +63,7 @@ function SectionTitle({ icon, iconBg, title, tag, extra }: {
       <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {icon}
       </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>
       {tag}
       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
       {extra}
@@ -208,7 +208,7 @@ export default function RepairCreate({ onBack, onCreated }: Props) {
         {/* ====== 模块 1：资产信息 ====== */}
         <div style={detailCardStyle}>
           <SectionTitle
-            icon={<AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />}
+            icon={<AppstoreOutlined style={{ fontSize: 14, color: 'var(--info)' }} />}
             iconBg="#e6f7ff"
             title={t('asset.sectionAssetInfo')}
             tag={asset ? <Tag color={ASSET_STATUS_COLOR[asset.status]}>{t(`asset.status${asset.status === 'in_use' ? 'InUse' : asset.status === 'in_repair' ? 'InRepair' : asset.status === 'scrapped' ? 'Scrapped' : 'Idle'}`)}</Tag> : undefined}
@@ -261,8 +261,8 @@ export default function RepairCreate({ onBack, onCreated }: Props) {
                 return (
                   <div style={{ marginTop: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                      <AppstoreOutlined style={{ fontSize: 13, color: '#FA8C16' }} />
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>{t('asset.repairAccessoriesTitle', '資產配件')}</span>
+                      <AppstoreOutlined style={{ fontSize: 13, color: 'var(--warning)' }} />
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>{t('asset.repairAccessoriesTitle', '資產配件')}</span>
                       {accessories.length > 0 && <Tag color="orange" style={{ fontSize: 11 }}>{t('asset.accessoryCount', { count: accessories.length })}</Tag>}
                       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
                     </div>
@@ -280,9 +280,9 @@ export default function RepairCreate({ onBack, onCreated }: Props) {
                         ))}
                       </div>
                     ) : (
-                      <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.accessoriesEmpty')}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.accessoriesEmpty')}</span>
                     )}
-                    <div style={{ marginTop: 8, fontSize: 12, color: '#8C8C8C' }}>
+                    <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-3)' }}>
                       {t('asset.repairAccessoryRemoveTip', '點擊 × 可移除不需要维修的配件，歸還時僅展示维修的配件。')}
                     </div>
                   </div>
@@ -317,7 +317,7 @@ export default function RepairCreate({ onBack, onCreated }: Props) {
         {asset && (
           <div style={detailCardStyle}>
             <SectionTitle
-              icon={<ToolOutlined style={{ fontSize: 14, color: '#fa8c16' }} />}
+              icon={<ToolOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />}
               iconBg="#fff7e6"
               title={t('asset.repairRecordsTitle', '維修記錄')}
             />

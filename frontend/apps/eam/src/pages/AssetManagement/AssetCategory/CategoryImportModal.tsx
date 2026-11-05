@@ -134,7 +134,7 @@ export default function CategoryImportModal({ open, onClose, onImport, existingC
       {/* 模板下载 + 上传区 */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <span style={{ fontSize: 13, color: '#595959' }}>
+          <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
             {t('asset.templateHint')}
           </span>
           <Button size="small" icon={<DownloadOutlined />} onClick={handleDownloadTemplate}>
@@ -157,7 +157,7 @@ export default function CategoryImportModal({ open, onClose, onImport, existingC
       {/* 错误提示 */}
       {errors.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <div style={{ color: '#FF4D4F', fontWeight: 600, marginBottom: 8, fontSize: 13 }}>
+          <div style={{ color: 'var(--danger)', fontWeight: 600, marginBottom: 8, fontSize: 13 }}>
             <CloseCircleOutlined style={{ marginRight: 4 }} />
             {t('asset.parseErrorsFound', { count: errors.length })}
           </div>
@@ -172,7 +172,7 @@ export default function CategoryImportModal({ open, onClose, onImport, existingC
       {/* 预览表格 */}
       {parsedRows.length > 0 && (
         <div>
-          <div style={{ fontSize: 13, color: '#52C41A', fontWeight: 600, marginBottom: 8 }}>
+          <div style={{ fontSize: 13, color: 'var(--success)', fontWeight: 600, marginBottom: 8 }}>
             <CheckCircleOutlined style={{ marginRight: 4 }} />
             {t('asset.parseSuccessTotal', { count: parsedRows.length })}
           </div>

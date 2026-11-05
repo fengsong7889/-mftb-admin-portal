@@ -256,7 +256,7 @@ export default function HandoverForm({ onBack }: Props) {
     <Spin spinning={submitting}>
       {/* ====== 頂部標題欄（橙色漸變頂條） ====== */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
       }}>
         <div style={{
@@ -265,16 +265,16 @@ export default function HandoverForm({ onBack }: Props) {
         }} />
         <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
           <Button type="primary" icon={<ArrowLeftOutlined />} onClick={onBack}
-            style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}
+            style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}
           >{t('common.back')}</Button>
           <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('asset.handoverAddTitle')}</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>{t('asset.handoverAddTitle')}</h2>
         </div>
       </div>
 
       {/* ====== 交接人查詢 ====== */}
       <div style={{
-        background: '#fff', borderRadius: 8, padding: '20px 24px', marginBottom: 16,
+        background: 'var(--surface-2)', borderRadius: 8, padding: '20px 24px', marginBottom: 16,
         boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
       }}>
         <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 600 }}>{t('asset.sectionFromUser')}</h3>
@@ -299,7 +299,7 @@ export default function HandoverForm({ onBack }: Props) {
             placeholder={t('asset.colDepartment')}
             value={fromUserDept}
             readOnly
-            style={{ width: 220, color: fromUserDept ? undefined : '#BFBFBF' }}
+            style={{ width: 220, color: fromUserDept ? undefined : 'var(--text-4)' }}
           />
           <Button
             type="primary"
@@ -308,8 +308,8 @@ export default function HandoverForm({ onBack }: Props) {
             disabled={!fromUserEmpId}
             onClick={handleQueryAssets}
             style={{
-              backgroundColor: '#E8720C',
-              borderColor: '#E8720C',
+              backgroundColor: 'var(--brand)',
+              borderColor: 'var(--brand)',
               borderRadius: 6,
               height: 32,
               fontSize: 13,
@@ -349,7 +349,7 @@ export default function HandoverForm({ onBack }: Props) {
 
       {/* ====== 接收資產表單 ====== */}
       <div style={{
-        background: '#fff', borderRadius: 8, padding: 24, marginBottom: 16,
+        background: 'var(--surface-2)', borderRadius: 8, padding: 24, marginBottom: 16,
         boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
       }}>
         <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600 }}>{t('asset.handoverFormSection')}</h3>

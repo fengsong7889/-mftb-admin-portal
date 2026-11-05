@@ -78,7 +78,7 @@ export default function AssetDashboard() {
     <div className="content-area" style={{ padding: '20px 24px' }}>
       {/* ====== 標題 ====== */}
       <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <PieChartOutlined style={{ fontSize: 22, color: '#1890ff' }} />
+        <PieChartOutlined style={{ fontSize: 22, color: 'var(--info)' }} />
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>{t('asset.dashboardTitle')}</h2>
       </div>
 
@@ -128,7 +128,7 @@ export default function AssetDashboard() {
                 <Badge count={a.value ?? '—' as unknown as number} overflowCount={99} style={{ backgroundColor: a.color }}>
                   <span style={{ fontSize: 20, color: a.color, padding: 4 }}>{a.icon}</span>
                 </Badge>
-                <span style={{ fontSize: 13, color: '#595959' }}>{a.label}</span>
+                <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{a.label}</span>
               </div>
             </Col>
           ))}
@@ -154,7 +154,7 @@ export default function AssetDashboard() {
                 height={280}
               />
             ) : (
-              <div style={{ textAlign: 'center', padding: 60, color: '#bfbfbf' }}>{t('common.noData')}</div>
+              <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-4)' }}>{t('common.noData')}</div>
             )}
           </Card>
         </Col>
@@ -174,7 +174,7 @@ export default function AssetDashboard() {
                 height={280}
               />
             ) : (
-              <div style={{ textAlign: 'center', padding: 60, color: '#bfbfbf' }}>{t('common.noData')}</div>
+              <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-4)' }}>{t('common.noData')}</div>
             )}
           </Card>
         </Col>
@@ -193,7 +193,7 @@ export default function AssetDashboard() {
                 height={280}
               />
             ) : (
-              <div style={{ textAlign: 'center', padding: 60, color: '#bfbfbf' }}>{t('common.noData')}</div>
+              <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-4)' }}>{t('common.noData')}</div>
             )}
           </Card>
         </Col>

@@ -126,13 +126,13 @@ export default function LossList({ onViewDetail, onFollowUp, onCreate }: Props) 
         const isWrittenOff = record.status === 'written_off'
         return (
           <span>
-            <a onClick={() => onViewDetail(record.id)} style={{ color: '#E8720C' }}>
+            <a onClick={() => onViewDetail(record.id)} style={{ color: 'var(--brand)' }}>
               詳情
             </a>
             {!isWrittenOff && (
               <>
                 <span className="action-split" />
-                <a onClick={() => onFollowUp(record.id)} style={{ color: '#1890FF' }}>
+                <a onClick={() => onFollowUp(record.id)} style={{ color: 'var(--info)' }}>
                   跟進
                 </a>
               </>

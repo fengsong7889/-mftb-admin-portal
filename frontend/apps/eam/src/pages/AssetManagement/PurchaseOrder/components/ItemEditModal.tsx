@@ -206,8 +206,8 @@ export default function ItemEditModal({
 
         {/* 參數信息 */}
         {selectedModel && paramTemplate.length > 0 && (
-          <div style={{ background: '#fafafa', borderRadius: 8, padding: '12px 16px', marginBottom: 16, border: '1px solid #f0f0f0' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 10 }}>{t('asset.paramInfoTitle')}</div>
+          <div style={{ background: 'var(--surface-3)', borderRadius: 8, padding: '12px 16px', marginBottom: 16, border: '1px solid #f0f0f0' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 10 }}>{t('asset.paramInfoTitle')}</div>
             <Row gutter={12}>
               {paramTemplate.map((p) => (
                 <Col span={8} key={p.key}>

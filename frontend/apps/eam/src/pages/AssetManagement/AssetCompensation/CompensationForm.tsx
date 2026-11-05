@@ -73,7 +73,7 @@ function SectionTitle({ icon, iconBg, title }: { icon: React.ReactNode; iconBg: 
       <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {icon}
       </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>
       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
     </div>
   )
@@ -204,7 +204,7 @@ export default function CompensationForm({ onBack, onCreated }: Props) {
         {/* ====== 模塊 1：資產信息 ====== */}
         <div style={detailCardStyle}>
           <SectionTitle
-            icon={<AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />}
+            icon={<AppstoreOutlined style={{ fontSize: 14, color: 'var(--info)' }} />}
             iconBg="#e6f7ff"
             title="資產信息"
           />
@@ -254,7 +254,7 @@ export default function CompensationForm({ onBack, onCreated }: Props) {
         {asset && (
           <div style={detailCardStyle}>
             <SectionTitle
-              icon={<AppstoreOutlined style={{ fontSize: 14, color: '#fa8c16' }} />}
+              icon={<AppstoreOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />}
               iconBg="#fff7e6"
               title="賠付信息"
             />

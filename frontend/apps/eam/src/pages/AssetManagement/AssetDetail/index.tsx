@@ -61,7 +61,7 @@ function ModuleTitle({ icon, iconBg, title, tag }: { icon: React.ReactNode; icon
       <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {icon}
       </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>
       {tag && <Tag color="blue" style={{ fontSize: 11 }}>{tag}</Tag>}
       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
     </div>
@@ -108,7 +108,7 @@ export default function AssetDetail() {
       {/* ====== 模块1：资产信息 ====== */}
       <div style={detailCardStyle}>
         <ModuleTitle
-          icon={<AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />}
+          icon={<AppstoreOutlined style={{ fontSize: 14, color: 'var(--info)' }} />}
           iconBg="#e6f7ff"
           title={t('asset.assetInfoTitle')}
         />
@@ -126,7 +126,7 @@ export default function AssetDetail() {
         {/* 资产照片 */}
         {imageList.length > 0 && (
           <>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', margin: '16px 0 8px' }}>{t('asset.assetPhotoSection')}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', margin: '16px 0 8px' }}>{t('asset.assetPhotoSection')}</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
               {imageList.map((src, i) => (
                 <Image
@@ -142,7 +142,7 @@ export default function AssetDetail() {
       {/* ====== 模块2：租/购信息 ====== */}
       <div style={detailCardStyle}>
         <ModuleTitle
-          icon={<DollarOutlined style={{ fontSize: 14, color: '#E8720C' }} />}
+          icon={<DollarOutlined style={{ fontSize: 14, color: 'var(--brand)' }} />}
           iconBg="#fff7e6"
           title={t('asset.rentPurchaseInfo')}
         />
@@ -156,7 +156,7 @@ export default function AssetDetail() {
             <>
               <Descriptions.Item label={t('asset.purchaseCompanyLabel')}>{asset.company || '-'}</Descriptions.Item>
               <Descriptions.Item label={t('asset.colPurchaseValue')}>
-                <span style={{ fontWeight: 600, color: '#E8720C' }}>
+                <span style={{ fontWeight: 600, color: 'var(--brand)' }}>
                   {asset.purchaseValue ? `MOP ${asset.purchaseValue.toLocaleString()}` : '-'}
                 </span>
               </Descriptions.Item>
@@ -169,7 +169,7 @@ export default function AssetDetail() {
               <Descriptions.Item label={t('asset.leaseCompanyLabel')}>{asset.company || '-'}</Descriptions.Item>
               <Descriptions.Item label={t('asset.leaseCompanyLabel2')}>{a.leaseCompany || '-'}</Descriptions.Item>
               <Descriptions.Item label={t('asset.rentalCostLabel')}>
-                <span style={{ fontWeight: 600, color: '#E8720C' }}>
+                <span style={{ fontWeight: 600, color: 'var(--brand)' }}>
                   {a.rentalCost ? `MOP ${a.rentalCost.toLocaleString()}` : '-'}
                 </span>
               </Descriptions.Item>
@@ -206,7 +206,7 @@ export default function AssetDetail() {
       {asset.accessories && asset.accessories.length > 0 && (
         <div style={detailCardStyle}>
           <ModuleTitle
-            icon={<ToolOutlined style={{ fontSize: 14, color: '#FA8C16' }} />}
+            icon={<ToolOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />}
             iconBg="#FFF7E6"
             title={t('asset.accessoryListTitleDetail')}
             tag={t('asset.accessoryCount', { count: asset.accessories.length })}
@@ -227,7 +227,7 @@ export default function AssetDetail() {
       {/* ====== 模块5：入库信息 ====== */}
       <div style={detailCardStyle}>
         <ModuleTitle
-          icon={<InboxOutlined style={{ fontSize: 14, color: '#722ED1' }} />}
+          icon={<InboxOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />}
           iconBg="#f9f0ff"
           title={t('asset.inboundInfoTitle')}
         />
@@ -241,12 +241,12 @@ export default function AssetDetail() {
 
       {/* ====== 最後更新（詳情頁規範 footer） ====== */}
       <div style={{
-        background: '#fafafa', borderRadius: 8, padding: '12px 24px',
+        background: 'var(--surface-3)', borderRadius: 8, padding: '12px 24px',
         border: '1px solid #f0f0f0',
         display: 'flex', justifyContent: 'flex-end', gap: 24,
       }}>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedByLabel')}<span style={{ color: '#595959' }}>{asset.applicant || '-'}</span></span>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedAtLabel')}<span style={{ color: '#595959' }}>{asset.updatedAt || '-'}</span></span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.updatedByLabel')}<span style={{ color: 'var(--text-2)' }}>{asset.applicant || '-'}</span></span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.updatedAtLabel')}<span style={{ color: 'var(--text-2)' }}>{asset.updatedAt || '-'}</span></span>
       </div>
     </div>
   )

@@ -381,10 +381,10 @@ export default function RepairDetail({ assetId, onBack }: Props) {
       {/* ====== 资产信息 ====== */}
       <div style={detailCardStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <AppstoreOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.sectionAssetInfo')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.sectionAssetInfo')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <Descriptions column={4} size="middle">
@@ -407,10 +407,10 @@ export default function RepairDetail({ assetId, onBack }: Props) {
       {asset && asset.status !== 'idle' && (
         <div style={detailCardStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <UserOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <UserOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.sectionHolderInfo', { defaultValue: '使用人信息' })}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.sectionHolderInfo', { defaultValue: '使用人信息' })}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <Descriptions column={4} size="middle">
@@ -433,10 +433,10 @@ export default function RepairDetail({ assetId, onBack }: Props) {
       {/* ====== 维修记录 ====== */}
       <div style={detailCardStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ToolOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ToolOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.repairRecordsTitle', { defaultValue: '維修記錄' })}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.repairRecordsTitle', { defaultValue: '維修記錄' })}</span>
           <Tag color="orange" style={{ fontSize: 11 }}>{records.length}</Tag>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           <Button type="primary" icon={<PlusOutlined />} onClick={handleNewRecord}
@@ -457,12 +457,12 @@ export default function RepairDetail({ assetId, onBack }: Props) {
 
       {/* ====== 最後更新（詳情頁規範 footer） ====== */}
       <div style={{
-        background: '#fafafa', borderRadius: 8, padding: '12px 24px',
+        background: 'var(--surface-3)', borderRadius: 8, padding: '12px 24px',
         border: '1px solid #f0f0f0',
         display: 'flex', justifyContent: 'flex-end', gap: 24,
       }}>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新人：<span style={{ color: '#595959' }}>{asset.applicant || '-'}</span></span>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新時間：<span style={{ color: '#595959' }}>{asset.updatedAt || '-'}</span></span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>最後更新人：<span style={{ color: 'var(--text-2)' }}>{asset.applicant || '-'}</span></span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>最後更新時間：<span style={{ color: 'var(--text-2)' }}>{asset.updatedAt || '-'}</span></span>
       </div>
 
       {/* 维修登记弹窗 */}

@@ -247,6 +247,9 @@ export default function AssetList() {
           <div className="confirm-info-row"><span>資產編號：</span><b>{record.assetNo}</b></div>
           <div className="confirm-info-row"><span>資產名稱：</span><b>{record.assetName}</b></div>
           <div className="confirm-info-row"><span>當前狀態：</span><b>{t(STATUS_META[record.status].key)}</b></div>
+          {/* 成对保留裸色：#FFF2F0（antd red-1）无等值令牌（danger-soft 浅色是 #FFF1F0，差 1 个单位），
+              不透明且不会随主题变深；若只把前景换成令牌 danger，深色下为「浅粉底 + 亮红字」约 1.5:1。
+              待定下 danger-1 等价令牌后再成对改；见方案 §18.6。 */}
           <div style={{ marginTop: 12, padding: '8px 12px', background: '#FFF2F0', borderRadius: 6, border: '1px solid #FFCCC7', fontSize: 13, color: '#FF4D4F' }}>
             ⚠️ 報廢後資產狀態將變更為「已報廢」，此操作不可恢復，請謹慎操作。
           </div>
@@ -422,7 +425,7 @@ export default function AssetList() {
       title: t('asset.purchaseType'),
       dataIndex: 'purchaseType', key: 'purchaseType', width: 90,
       render: (v: string) => {
-        if (!v) return <span style={{ color: '#bfbfbf' }}>-</span>
+        if (!v) return <span style={{ color: 'var(--text-4)' }}>-</span>
         return <Tag color={v === 'purchase' ? 'blue' : 'green'}>{v === 'purchase' ? t('asset.purchaseTypePurchase') : t('asset.purchaseTypeLease')}</Tag>
       },
     },
@@ -432,7 +435,7 @@ export default function AssetList() {
       render: (v: string) => (
         <Tooltip title={v || undefined}>
           <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {v || <span style={{ color: '#8C8C8C' }}>-</span>}
+            {v || <span style={{ color: 'var(--text-3)' }}>-</span>}
           </span>
         </Tooltip>
       ),
@@ -440,7 +443,7 @@ export default function AssetList() {
     {
       title: t('asset.colCompanyBrand'),
       dataIndex: 'companyBrand', key: 'companyBrand', width: 110,
-      render: (v: number | null | undefined) => v ? <BrandTag value={v} /> : <span style={{ color: '#8C8C8C' }}>-</span>,
+      render: (v: number | null | undefined) => v ? <BrandTag value={v} /> : <span style={{ color: 'var(--text-3)' }}>-</span>,
     },
     {
       title: t('asset.colCompany'),
@@ -459,7 +462,7 @@ export default function AssetList() {
       render: (_: string, record: AssetItem) => {
         const parts = [record.province, record.city, record.district, record.address].filter(Boolean)
         const full = parts.length > 0 ? parts.join('') : (record.location || '-')
-        if (!record.location && parts.length === 0) return <span style={{ color: '#8C8C8C' }}>-</span>
+        if (!record.location && parts.length === 0) return <span style={{ color: 'var(--text-3)' }}>-</span>
         return (
           <Tooltip title={full}>
             <span style={{ cursor: 'default' }}>{full}</span>
@@ -784,9 +787,9 @@ export default function AssetList() {
           value={batchTagId}
           onChange={setBatchTagId}
           options={tagTemplates.map(t2 => ({ label: t2.name, value: t2.id }))}
-          notFoundContent={<span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('asset.noEnabledTemplate')}</span>}
+          notFoundContent={<span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.noEnabledTemplate')}</span>}
         />
-        <div style={{ marginTop: 12, fontSize: 12, color: '#8c8c8c' }}>
+        <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-3)' }}>
           {t('asset.bindSkipHint')}
         </div>
       </Modal>

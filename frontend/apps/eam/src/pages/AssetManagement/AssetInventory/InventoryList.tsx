@@ -119,7 +119,7 @@ export default function InventoryList({ onCreate, onOpen }: Props) {
     { key: 'expectedCount', title: t('asset.colExpectedCount'), dataIndex: 'expectedCount', width: 100, align: 'right' },
     { key: 'checkedCount', title: t('asset.colCheckedCount'), width: 100, align: 'right', render: (_, r) => r.stats?.checkedCount ?? 0 },
     { key: 'anomalyCount', title: t('asset.colAnomalyCount'), width: 100, align: 'right',
-      render: (_, r) => { const n = r.stats?.anomalyCount ?? 0; return <span style={{ color: n > 0 ? '#FF4D4F' : '#52C41A' }}>{n}</span> } },
+      render: (_, r) => { const n = r.stats?.anomalyCount ?? 0; return <span style={{ color: n > 0 ? 'var(--danger)' : 'var(--success)' }}>{n}</span> } },
     { key: 'notCheckedCount', title: t('asset.colNotCheckedCount'), width: 100, align: 'right', render: (_, r) => r.stats?.notCheckedCount ?? 0 },
     { key: 'status', title: t('asset.colStatus'), width: 110,
       render: (_, r) => <Tag color={TASK_STATUS_COLOR[r.status]}>{t(TASK_STATUS_LABEL_KEY[r.status] || r.status)}</Tag> },

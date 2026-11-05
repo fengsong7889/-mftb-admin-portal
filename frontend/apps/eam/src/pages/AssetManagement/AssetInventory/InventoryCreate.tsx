@@ -133,16 +133,16 @@ export default function InventoryCreate({ onBack, onCreated }: Props) {
 
   return (
     <>
-      <div style={{ position: 'relative', background: '#fff', marginBottom: 16, borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+      <div style={{ position: 'relative', background: 'var(--surface-2)', marginBottom: 16, borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
         <div style={{ height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)', backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite' }} />
         <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button type="primary" icon={<ArrowLeftOutlined />} onClick={onBack}
-              style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 6px rgba(232,114,12,0.25)', transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)' }}>
+              style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8, height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 6px rgba(232,114,12,0.25)', transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)' }}>
               {t('common.back', { defaultValue: '返回' })}
             </Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('asset.invCreateTitle', { defaultValue: '發起盤點' })}</h2>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>{t('asset.invCreateTitle', { defaultValue: '發起盤點' })}</h2>
           </div>
         </div>
       </div>
@@ -151,10 +151,10 @@ export default function InventoryCreate({ onBack, onCreated }: Props) {
         {/* 基础信息 */}
         <div style={cardStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <FileSearchOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <FileSearchOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.basicInfo', { defaultValue: '基礎信息' })}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.basicInfo', { defaultValue: '基礎信息' })}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
@@ -174,14 +174,14 @@ export default function InventoryCreate({ onBack, onCreated }: Props) {
         {/* 盘点范围 */}
         <div style={cardStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <AimOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <AimOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.invScopeMode', { defaultValue: '盤點範圍' })}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.invScopeMode', { defaultValue: '盤點範圍' })}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             <Space>
               <Button icon={<InboxOutlined />} loading={previewing} onClick={handlePreview}>{t('asset.invPreviewBtn', { defaultValue: '預覽應盤清單' })}</Button>
-              {preview && <span style={{ fontSize: 13, color: '#8c8c8c' }}>{t('asset.invPreviewTotal')}：<b style={{ color: '#E8720C' }}>{preview.total}</b></span>}
+              {preview && <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{t('asset.invPreviewTotal')}：<b style={{ color: 'var(--brand)' }}>{preview.total}</b></span>}
             </Space>
           </div>
 
@@ -214,7 +214,7 @@ export default function InventoryCreate({ onBack, onCreated }: Props) {
             </Form.Item>
           </div>
           {scopeMode === 'ALL' && (
-            <div style={{ fontSize: 12, color: '#8c8c8c' }}>{t('asset.invPreviewTip', { defaultValue: '全盤將按所選狀態快照全部適用資產' })}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.invPreviewTip', { defaultValue: '全盤將按所選狀態快照全部適用資產' })}</div>
           )}
         </div>
       </Form>

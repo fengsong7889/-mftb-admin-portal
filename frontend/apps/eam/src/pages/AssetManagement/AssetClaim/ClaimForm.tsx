@@ -162,7 +162,7 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
         width: 28, height: 28, borderRadius: 6, background: iconBg,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>{icon}</div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>
       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
     </div>
   )
@@ -172,7 +172,7 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
       {contextHolder}
       {/* ====== 頂部標題欄（橙色漸變頂條） ====== */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
       }}>
         <div style={{
@@ -181,10 +181,10 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
         }} />
         <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
           <Button type="primary" icon={<ArrowLeftOutlined />} onClick={onBack}
-            style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}
+            style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}
           >{t('common.back')}</Button>
           <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#1890ff' }}>{t('asset.claimTitle')}</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--info)' }}>{t('asset.claimTitle')}</h2>
         </div>
       </div>
 
@@ -201,7 +201,7 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
           {/* ====== 模塊1：資產選擇 ====== */}
           <div style={CARD_STYLE}>
             {renderCardTitle(
-              <DatabaseOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
+              <DatabaseOutlined style={{ fontSize: 14, color: 'var(--info)' }} />,
               '#e6f7ff',
               '資產選擇',
             )}
@@ -234,14 +234,14 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
             {/* 所選資產信息展示 */}
             {selected && (
               <div style={{ marginTop: 4 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>資產信息</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 12 }}>資產信息</div>
                 <AssetSummary asset={selected} hideAccessories />
                 {/* 配件清单（可删除） */}
                 {claimAccessories.length > 0 && (
                   <div style={{ marginTop: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                      <AppstoreOutlined style={{ fontSize: 13, color: '#FA8C16' }} />
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>配件清单</span>
+                      <AppstoreOutlined style={{ fontSize: 13, color: 'var(--warning)' }} />
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>配件清单</span>
                       <Tag color="orange" style={{ fontSize: 11 }}>{claimAccessories.length} 项</Tag>
                       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
                     </div>
@@ -261,7 +261,7 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
                         </Tag>
                       ))}
                     </div>
-                    <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 6 }}>点击 × 可移除不需要的配件，归还时仅展示领用的配件。</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 6 }}>点击 × 可移除不需要的配件，归还时仅展示领用的配件。</div>
                   </div>
                 )}
               </div>
@@ -271,7 +271,7 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
           {/* ====== 模塊2：領用信息 ====== */}
           <div style={CARD_STYLE}>
             {renderCardTitle(
-              <UserOutlined style={{ fontSize: 14, color: '#E8720C' }} />,
+              <UserOutlined style={{ fontSize: 14, color: 'var(--brand)' }} />,
               '#fff7e6',
               '領用信息',
             )}
@@ -324,7 +324,7 @@ export default function ClaimForm({ onBack, employeeId, assetId, initialEmployee
           {/* ====== 模塊3：備注信息 ====== */}
           <div style={CARD_STYLE}>
             {renderCardTitle(
-              <span style={{ fontSize: 14, color: '#722ED1' }}></span>,
+              <span style={{ fontSize: 14, color: 'var(--purple)' }}></span>,
               '#f9f0ff',
               '備注信息',
             )}

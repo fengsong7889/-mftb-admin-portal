@@ -107,15 +107,15 @@ export default function AssetFlow() {
       { label: t('asset.colLocationName'), from: record.fromLocation, to: record.toLocation },
     ].filter((r) => r.from || r.to)
 
-    if (!rows.length) return <span style={{ color: '#8c8c8c' }}>-</span>
+    if (!rows.length) return <span style={{ color: 'var(--text-3)' }}>-</span>
 
     return (
       <Space direction="vertical" size={4} style={{ width: '100%' }}>
         {rows.map((r) => (
           <Space key={r.label} size={6}>
-            <span style={{ color: '#8c8c8c', minWidth: 72, display: 'inline-block' }}>{r.label}</span>
+            <span style={{ color: 'var(--text-3)', minWidth: 72, display: 'inline-block' }}>{r.label}</span>
             <Tag>{r.from || '-'}</Tag>
-            <span style={{ color: '#bfbfbf' }}>→</span>
+            <span style={{ color: 'var(--text-4)' }}>→</span>
             <Tag color="blue">{r.to || '-'}</Tag>
           </Space>
         ))}

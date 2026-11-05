@@ -70,7 +70,7 @@ function SectionTitle({ icon, iconBg, title, tag }: { icon: React.ReactNode; ico
       <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {icon}
       </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>
       {tag}
       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
     </div>
@@ -217,13 +217,13 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
         <Space>
           {record.compensationId && (
             <Button type="primary" onClick={() => navigate(`/asset-compensation/detail?id=${record.compensationId}`)}
-              style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}>
+              style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}>
               查看關聯賠付單
             </Button>
           )}
           {record.repairId && (
             <Button type="primary" onClick={() => navigate(`/asset-repair?id=${record.assetId}`)}
-              style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}>
+              style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}>
               查看關聯維修單
             </Button>
           )}
@@ -237,7 +237,7 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
       {/* ====== 模块 1：处理进度 ====== */}
       <div style={detailCardStyle}>
         <SectionTitle
-          icon={<ProfileOutlined style={{ fontSize: 14, color: '#fa8c16' }} />}
+          icon={<ProfileOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />}
           iconBg="#fff7e6"
           title="處理進度"
         />
@@ -259,7 +259,7 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
     
       {/* ====== 模块 2：资产信息 ====== */}
       <div style={detailCardStyle}>
-        <SectionTitle icon={<InboxOutlined style={{ fontSize: 14, color: '#1890ff' }} />} iconBg="#e6f7ff" title="資產信息" />
+        <SectionTitle icon={<InboxOutlined style={{ fontSize: 14, color: 'var(--info)' }} />} iconBg="#e6f7ff" title="資產信息" />
         {source ? (
           <Descriptions column={4} size="middle">
             <Descriptions.Item label="領用編號">
@@ -288,8 +288,8 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
         {cr?.accessories && cr.accessories.length > 0 && (
           <div style={{ marginTop: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <AppstoreOutlined style={{ fontSize: 13, color: '#FA8C16' }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>領用配件</span>
+              <AppstoreOutlined style={{ fontSize: 13, color: 'var(--warning)' }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>領用配件</span>
               <Tag color="orange" style={{ fontSize: 11 }}>{cr.accessories.length} 項</Tag>
               <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             </div>
@@ -306,7 +306,7 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
 
       {/* ====== 模块 3：领用信息 ====== */}
       <div style={detailCardStyle}>
-        <SectionTitle icon={<FileTextOutlined style={{ fontSize: 14, color: '#1890ff' }} />} iconBg="#e6f7ff" title="領用信息" />
+        <SectionTitle icon={<FileTextOutlined style={{ fontSize: 14, color: 'var(--info)' }} />} iconBg="#e6f7ff" title="領用信息" />
         {source ? (
           <Descriptions column={4} size="middle">
             <Descriptions.Item label={isClaim ? '領用人' : isBorrow ? '借用人' : '使用人'}>
@@ -345,17 +345,17 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
       {/* ====== 模块 4：签收信息与凭证（仅领用归还） ====== */}
       {isClaim && cr && (
         <div style={detailCardStyle}>
-          <SectionTitle icon={<FileProtectOutlined style={{ fontSize: 14, color: '#fa8c16' }} />} iconBg="#fff7e6" title="簽收信息與憑證" />
+          <SectionTitle icon={<FileProtectOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />} iconBg="#fff7e6" title="簽收信息與憑證" />
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 48px', alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, color: '#8c8c8c' }}>簽收狀態：</span>
+              <span style={{ fontSize: 13, color: 'var(--text-3)' }}>簽收狀態：</span>
               <Tag color={SIGNATURE_META[cr.signatureStatus]?.color} style={{ marginInlineEnd: 0 }}>
                 {SIGNATURE_META[cr.signatureStatus]?.label ?? cr.signatureStatus}
               </Tag>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 13, color: '#8c8c8c' }}>實際簽署時間：</span>
-              <span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{cr.signedAt || '—'}</span>
+              <span style={{ fontSize: 13, color: 'var(--text-3)' }}>實際簽署時間：</span>
+              <span style={{ fontSize: 14, color: 'var(--text-1)', fontWeight: 500 }}>{cr.signedAt || '—'}</span>
             </div>
           </div>
         </div>
@@ -364,7 +364,7 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
 
       {/* ====== 模块 5：验收信息 ====== */}
       <div style={detailCardStyle}>
-        <SectionTitle icon={<RollbackOutlined style={{ fontSize: 14, color: '#52c41a' }} />} iconBg="#f6ffed" title="驗收信息" />
+        <SectionTitle icon={<RollbackOutlined style={{ fontSize: 14, color: 'var(--success)' }} />} iconBg="#f6ffed" title="驗收信息" />
         <Descriptions column={4} size="middle">
           <Descriptions.Item label="歸還來源">{SOURCE_LABEL[record.sourceType] || record.sourceType}</Descriptions.Item>
           <Descriptions.Item label="歸還日期">{record.returnDate}</Descriptions.Item>
@@ -402,7 +402,7 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
       {canDispose && (
         <div style={detailCardStyle} ref={dispositionRef}>
         <SectionTitle
-          icon={<ToolOutlined style={{ fontSize: 14, color: '#fa8c16' }} />}
+          icon={<ToolOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />}
           iconBg="#fff7e6"
           title="處置結果"
           tag={record.disposition
@@ -429,7 +429,7 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
               <Button onClick={onBack}>取消</Button>
               <Button type="primary" icon={<SaveOutlined />} loading={submitting} onClick={handleDispositionSubmit}
-                style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', boxShadow: '0 2px 4px rgba(232,114,12,0.25)' }}>
+                style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', boxShadow: '0 2px 4px rgba(232,114,12,0.25)' }}>
                 確認處置
               </Button>
             </div>
@@ -464,12 +464,12 @@ export default function ReturnDetail({ record, loading = false, error, canEdit =
 
     {/* ====== 最後更新（詳情頁規範 footer） ====== */}
     <div style={{
-      background: '#fafafa', borderRadius: 8, padding: '12px 24px',
+      background: 'var(--surface-3)', borderRadius: 8, padding: '12px 24px',
       border: '1px solid #f0f0f0',
       display: 'flex', justifyContent: 'flex-end', gap: 24,
     }}>
-      <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新人：<span style={{ color: '#595959' }}>{record.operatorNo ? `${record.operatorName || '-'}（${record.operatorNo}）` : (record.operatorName || '-')}</span></span>
-      <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新時間：<span style={{ color: '#595959' }}>{record.updatedAt || '-'}</span></span>
+      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>最後更新人：<span style={{ color: 'var(--text-2)' }}>{record.operatorNo ? `${record.operatorName || '-'}（${record.operatorNo}）` : (record.operatorName || '-')}</span></span>
+      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>最後更新時間：<span style={{ color: 'var(--text-2)' }}>{record.updatedAt || '-'}</span></span>
     </div>
   </>
 }

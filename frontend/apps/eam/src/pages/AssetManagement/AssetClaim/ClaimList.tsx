@@ -84,17 +84,17 @@ export default function ClaimList({ onAdd, onManage, canAdd = false, data, loadi
     {
       title: t('asset.colClaimedCount'), dataIndex: 'claimedCount', key: 'claimedCount', width: 110, align: 'center',
       render: (v: number) => (
-        <span style={{ fontWeight: 600, color: v > 0 ? '#1890FF' : '#bfbfbf' }}>{v} {t('asset.unitItem')}</span>
+        <span style={{ fontWeight: 600, color: v > 0 ? 'var(--info)' : 'var(--text-4)' }}>{v} {t('asset.unitItem')}</span>
       ),
     },
     {
       title: t('asset.colReturnedCount'), dataIndex: 'returnedCount', key: 'returnedCount', width: 100, align: 'center',
       render: (v: number) => (
-        <span style={{ color: v > 0 ? '#8c8c8c' : '#bfbfbf' }}>{v} {t('asset.unitItem')}</span>
+        <span style={{ color: v > 0 ? 'var(--text-3)' : 'var(--text-4)' }}>{v} {t('asset.unitItem')}</span>
       ),
     },
     { title: '待簽領用', dataIndex: 'pendingCount', key: 'pendingCount', width: 110, align: 'center' },
-    { title: '代辦未簽', dataIndex: 'proxyPendingCount', key: 'proxyPendingCount', width: 110, align: 'center', render: (v: number) => <span style={{ color: v ? '#E8720C' : '#8C8C8C' }}>{v}</span> },
+    { title: '代辦未簽', dataIndex: 'proxyPendingCount', key: 'proxyPendingCount', width: 110, align: 'center', render: (v: number) => <span style={{ color: v ? 'var(--brand)' : 'var(--text-3)' }}>{v}</span> },
     { title: t('asset.colLastClaimDate'), dataIndex: 'lastClaimDate', key: 'lastClaimDate', width: 140, render: (v?: string) => v || '—' },
     {
       title: t('asset.colAction'), key: 'action', width: 100, fixed: 'right',

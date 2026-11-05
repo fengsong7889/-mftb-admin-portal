@@ -294,7 +294,7 @@ export default function AssetTagList({ onAdd, onEdit, onDetail }: AssetTagListPr
         <>
           {/* 卡片视图（参考图 2：卡片直接渲染标签最终效果） */}
           {pageData.length === 0 ? (
-            <div style={{ background: '#fff', border: '1px solid #e8eaed', borderRadius: 8, padding: '48px 0' }}>
+            <div style={{ background: 'var(--surface-2)', border: '1px solid #e8eaed', borderRadius: 8, padding: '48px 0' }}>
               <Empty description={loading ? t('common.loading') : t('assetTag.empty')} />
             </div>
           ) : (
@@ -303,7 +303,7 @@ export default function AssetTagList({ onAdd, onEdit, onDetail }: AssetTagListPr
                 <div key={record.id} className="asset-tag-card">
                   <div className="asset-tag-card-header">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                      <span style={{ fontSize: 14, fontWeight: 600, color: '#262626', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {record.name}
                       </span>
                       <Tag color={record.status === 'enabled' ? 'success' : 'default'} style={{ margin: 0 }}>

@@ -110,7 +110,7 @@ export default function AssetReport() {
             <div style={{ color: c.color, fontSize: 22, fontWeight: 700 }}>
               <AnimatedNumber value={c.value} />
             </div>
-            <div style={{ color: '#8C8C8C', fontSize: 12, marginTop: 4 }}>{c.label}</div>
+            <div style={{ color: 'var(--text-3)', fontSize: 12, marginTop: 4 }}>{c.label}</div>
           </div>
         ))}
       </div>
@@ -119,8 +119,8 @@ export default function AssetReport() {
       <Card style={{ marginBottom: 16, borderRadius: 12, background: 'linear-gradient(135deg, #FFF7E6, #FFE7BA)' }} bordered>
         <Row align="middle" justify="space-between">
           <Col>
-            <div style={{ color: '#8C8C8C', fontSize: 12, marginBottom: 4 }}>{t('asset.cardTotalValue')}</div>
-            <div style={{ color: '#E8720C', fontSize: 32, fontWeight: 700 }}>
+            <div style={{ color: 'var(--text-3)', fontSize: 12, marginBottom: 4 }}>{t('asset.cardTotalValue')}</div>
+            <div style={{ color: 'var(--brand)', fontSize: 32, fontWeight: 700 }}>
               MOP <AnimatedNumber value={stats.totalValue} />
             </div>
           </Col>
@@ -168,7 +168,7 @@ export default function AssetReport() {
               <div key={r.key} style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                   <span style={{ fontWeight: 500 }}>{r.name}</span>
-                  <span style={{ color: '#8C8C8C' }}>{r.count} ({r.percent}%)</span>
+                  <span style={{ color: 'var(--text-3)' }}>{r.count} ({r.percent}%)</span>
                 </div>
                 <Progress percent={r.percent} strokeColor={r.color} showInfo={false} />
               </div>

@@ -289,7 +289,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
     {
       title: t('asset.paramInfoTitle'), key: 'params', width: 180,
       render: (_: unknown, r: PurchaseOrderItem) => {
-        if (!r.params || Object.keys(r.params).length === 0) return <span style={{ color: '#bfbfbf' }}>-</span>
+        if (!r.params || Object.keys(r.params).length === 0) return <span style={{ color: 'var(--text-4)' }}>-</span>
         return (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             {Object.entries(r.params).map(([k, v]) => {
@@ -426,7 +426,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
     <>
       {/* ====== 页面头部 ====== */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
       }}>
         <div style={{
@@ -435,22 +435,22 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
         }} />
         <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
           <Button type="primary" icon={<ArrowLeftOutlined />} onClick={onBack}
-            style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}
+            style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}
           >{t('common.back')}</Button>
           <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#E8720C' }}>{t('asset.editPoTitle')}</h2>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--brand)' }}>{t('asset.editPoTitle')}</h2>
           <Tag color="orange" style={{ marginLeft: 4 }}>{order.poNo}</Tag>
         </div>
       </div>
 
       <Form<GlobalFormValues> form={form} layout="vertical">
         {/* ====== 订单信息 ====== */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ShoppingCartOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ShoppingCartOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.orderInfoTitle')}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.orderInfoTitle')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
 
@@ -475,7 +475,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
             </Col>
             <Col span={8}>
               <Form.Item label={t('asset.serviceDept')} name="department">
-                <Input disabled placeholder={t('asset.phDeptAutoFill')} style={{ color: '#262626' }} />
+                <Input disabled placeholder={t('asset.phDeptAutoFill')} style={{ color: 'var(--text-1)' }} />
               </Form.Item>
             </Col>
             <Col span={8}>
@@ -489,7 +489,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
                 />
               </Form.Item>
               {order.status === 'received' && (
-                <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: -18, marginBottom: 8 }}>{t('asset.receivedStatusLocked')}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: -18, marginBottom: 8 }}>{t('asset.receivedStatusLocked')}</div>
               )}
             </Col>
           </Row>
@@ -499,14 +499,14 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
                 <Select placeholder={t('asset.phSelectCompanyBrand')} options={numericOptions} />
               </Form.Item>
               {watchedBrand && codeHint[watchedBrand] && (
-                <div style={{ fontSize: 12, color: '#E8720C', marginTop: -18, marginBottom: 8 }}>
+                <div style={{ fontSize: 12, color: 'var(--brand)', marginTop: -18, marginBottom: 8 }}>
                   {t('asset.brandCodeHint', { brand: labelMap[watchedBrand], code: codeHint[watchedBrand] })}
                 </div>
               )}
             </Col>
             <Col span={8}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.orderTotal')}</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#E8720C' }}>MOP {total.toLocaleString()}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('asset.orderTotal')}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--brand)' }}>MOP {total.toLocaleString()}</div>
             </Col>
           </Row>
           <Row gutter={24}>
@@ -523,7 +523,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
           const subtotal = groupSubtotal(group)
           const dm = group.deliveryMethod as DeliveryMethod | undefined
           return (
-            <div key={group.id} style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div key={group.id} style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               {/* 分组标题 */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -534,7 +534,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
                     color: '#fff', fontSize: 11, fontWeight: 700,
                     boxShadow: '0 1px 4px rgba(24,144,255,0.3)',
                   }}>{gi + 1}</span>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('asset.purchaseMaterials')}</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.purchaseMaterials')}</span>
                   <Tag color="blue" style={{ fontSize: 11 }}>{t('asset.groupSubtotalTag', { amount: subtotal.toLocaleString() })}</Tag>
                 </div>
                 {supplierGroups.length > 1 && (
@@ -586,7 +586,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
                       />
                     )}
                     {group.contact && group.supplierId && autoFilledContact[group.id] !== group.contact && (
-                      <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4, whiteSpace: 'nowrap' }}>
+                      <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4, whiteSpace: 'nowrap' }}>
                         {t('asset.contactSyncHint')}
                       </div>
                     )}
@@ -647,8 +647,8 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
 
               {/* 选中工具栏 */}
               {selectedItemKeys.size > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', marginBottom: 12, background: '#e6f7ff', borderRadius: 6, border: '1px solid #91d5ff' }}>
-                  <span style={{ fontSize: 13, color: '#1890ff' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', marginBottom: 12, background: 'var(--info-soft)', borderRadius: 6, border: '1px solid #91d5ff' }}>
+                  <span style={{ fontSize: 13, color: 'var(--info)' }}>
                     {t('asset.selectedItemsCount', { count: selectedItemKeys.size })}
                   </span>
                   <Space size={8}>
@@ -674,7 +674,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
                   scroll={{ x: 1200 }}
                 />
               ) : (
-                <div style={{ textAlign: 'center', color: '#bfbfbf', padding: '24px 0', fontSize: 13 }}>
+                <div style={{ textAlign: 'center', color: 'var(--text-4)', padding: '24px 0', fontSize: 13 }}>
                   {t('asset.noItems')}
                 </div>
               )}
@@ -686,8 +686,8 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
                   onClick={() => handleOpenAddModal(group.id)}
                   style={{
                     marginTop: 12,
-                    borderColor: '#E8720C',
-                    color: '#E8720C',
+                    borderColor: 'var(--brand)',
+                    color: 'var(--brand)',
                     fontWeight: 500,
                   }}
                 >
@@ -714,7 +714,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
         width={560}
         centered
       >
-        <div style={{ marginBottom: 8, fontSize: 13, color: '#595959' }}>
+        <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--text-2)' }}>
           {t('asset.splitConfirmDesc', { count: selectedItemKeys.size })}
         </div>
         <div style={{ maxHeight: 320, overflowY: 'auto', border: '1px solid #f0f0f0', borderRadius: 6 }}>
@@ -781,7 +781,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
                   justifyContent: 'center',
                   border: `2px solid ${isSelected ? '#E8720C' : isSource ? '#e8eaed' : '#d9d9d9'}`,
                   background: isSelected ? 'linear-gradient(135deg, #FFF7F0, #FFE7D1)' : isSource ? '#fafafa' : '#fff',
-                  color: isSelected ? '#E8720C' : isSource ? '#bfbfbf' : '#262626',
+                  color: isSelected ? 'var(--brand)' : isSource ? 'var(--text-4)' : 'var(--text-1)',
                   fontSize: 20,
                   fontWeight: 700,
                   cursor: isSource ? 'not-allowed' : 'pointer',
@@ -809,7 +809,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
             )
           })}
         </div>
-        <div style={{ marginTop: 16, textAlign: 'center', fontSize: 12, color: '#8C8C8C' }}>灰色圆圈为当前分组，不可选择</div>
+        <div style={{ marginTop: 16, textAlign: 'center', fontSize: 12, color: 'var(--text-3)' }}>灰色圆圈为当前分组，不可选择</div>
       </Modal>
 
       {/* ====== 底部操作栏 ====== */}

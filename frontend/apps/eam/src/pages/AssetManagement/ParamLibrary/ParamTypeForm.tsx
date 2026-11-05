@@ -344,9 +344,9 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
       <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {icon}
       </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>
       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-      {rightText && <span style={{ fontSize: 12, color: '#8c8c8c' }}>{rightText}</span>}
+      {rightText && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{rightText}</span>}
     </div>
   )
 
@@ -359,7 +359,7 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
         children: (
           <div style={cardShellStyle}>
             {cardTitleRow(
-              <DatabaseOutlined style={{ fontSize: 14, color: '#fa8c16' }} />,
+              <DatabaseOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />,
               '#FFF7E6',
               t('asset.basicInfoTitle'),
               t('asset.basicInfoSubtitle'),
@@ -418,7 +418,7 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
                     <span>
                       {t('asset.labelValueType')}
                       {watchedValueType && watchedValueType !== 'select' && (
-                        <span style={{ fontSize: 12, color: '#fa8c16', marginLeft: 6, fontWeight: 400 }}>
+                        <span style={{ fontSize: 12, color: 'var(--warning)', marginLeft: 6, fontWeight: 400 }}>
                           {t('asset.valueTypeHint')}
                         </span>
                       )}
@@ -455,7 +455,7 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
         children: (
           <div style={cardShellStyle}>
             {cardTitleRow(
-              <DatabaseOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
+              <DatabaseOutlined style={{ fontSize: 14, color: 'var(--info)' }} />,
               '#E6F7FF',
               t('asset.paramValueManagement'),
               t('asset.paramValuesSubtitle', { code: currentTypeCode }),
@@ -498,7 +498,7 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
     <Spin spinning={loading}>
       {/* ====== 頂部標題欄 ====== */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
         overflow: 'hidden',
       }}>
@@ -514,7 +514,7 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button type="primary" icon={<ArrowLeftOutlined />} onClick={onBack}
               style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                backgroundColor: 'var(--brand)', borderColor: 'var(--brand)',
                 borderRadius: 8, height: 36, padding: '0 16px',
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
@@ -522,7 +522,7 @@ export default function ParamTypeForm({ id, defaultCategoryCode, onBack }: Props
               }}
             >{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>
               {isEdit ? t('asset.editParamTypeTitle') : t('asset.addParamTypeTitle')}
             </h2>
           </div>
