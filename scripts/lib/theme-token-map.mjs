@@ -422,6 +422,26 @@ export const EXCLUDE_PATHS = [
   'frontend/packages/ui/src/components/SliderCaptcha',
   // 门户插画本体（scene 派生明度阶与 currentColor 零件）：整文件仍排除
   'src/pages/Portal/SystemArtwork.tsx',
+  /*
+   * 品牌资产与设备拟真外壳（决策口径同登录页：它们代的是「不可变的实物」，不是应用壳层）。
+   * 为什么不能走令牌化而是必须排除：
+   *   - 两个 Logo：品牌标识不随主题重画（登录页同理）；
+   *   - 手机壳：`PhoneFrame.tsx` 全文只有 10 个 #000（机身），`PhoneMockup.tsx` 是
+   *     `border: 10px solid #1a1a1a` + 灰色渐变壳 + 白屏。它们的屏内是**投放创意**（给客户看的 APP 画面），
+   *     而 APP 端自已是浅色——若把白屏刷成 var(--surface-2)，深色后台里会预览出一台
+   *     「黑屏手机」，直接毁掉预览的真实性（这类判断已写进 §16.5.1 的 inset 逐处表）。
+   * 四个文件实测 var(--surface / var(--text 痕迹均为 0（门禁第 4 条反向断言会持续守这一点），
+   * 所以排除不会与已令牌化的历史批次矛盾。
+   *
+   * 不包进来的：`src/pages/HintPreview`、`src/pages/waterfallConfig/WaterfallPreview`、
+   * `src/pages/AppPreview/*`（除 PhoneFrame）—— 这些文件**同时含页面壳层与手机外壳**，
+   * 整文件排除会重犯 §17.2 第 1 条「排除过粗，连卡片底/描边/文字也无法令牌化」，
+   * 它们需要的是逐处人工判背板（已登记在 §十八 待办）。
+   */
+  'frontend/packages/ui/src/components/BrandLogo.tsx',
+  'frontend/packages/ui/src/components/GroupLogo.tsx',
+  'frontend/packages/ui/src/components/PhoneMockup.tsx',
+  'src/pages/AppPreview/PhoneFrame.tsx',
   // 动效参数变量，非颜色
   'frontend/packages/ui/src/components/PetMascot.css',
   // 测试内的色值断言是防漂移锚点，需人工判断
