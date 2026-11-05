@@ -341,7 +341,7 @@ export default function ProjectDetail() {
               gap: 10,
               padding: '8px 12px',
               borderRadius: 6,
-              border: '1px solid #f0f0f0',
+              border: '1px solid var(--border-2)',
               background: req.blocked || req.overdue ? 'var(--brand-soft)' : 'var(--surface-sunken)',
               cursor: 'pointer',
               transition: 'all 0.2s',
@@ -696,7 +696,7 @@ export default function ProjectDetail() {
                   padding: '12px 16px',
                   borderRadius: 6,
                   background: 'var(--surface-sunken)',
-                  border: '1px solid #f0f0f0',
+                  border: '1px solid var(--border-2)',
                   fontSize: 13,
                   lineHeight: 1.9,
                   color: 'var(--text-1)',
@@ -825,7 +825,7 @@ export default function ProjectDetail() {
                               gap: 10,
                               padding: '7px 12px',
                               borderRadius: 6,
-                              border: '1px solid #f0f0f0',
+                              border: '1px solid var(--border-2)',
                               background: 'var(--surface-2)',
                               cursor: item.actionUrl ? 'pointer' : 'default',
                               transition: 'all 0.2s',
@@ -912,7 +912,7 @@ export default function ProjectDetail() {
                 </span>
               </div>
               {/* 次口徑：交付項（可選拆分批次，未拆分時為 0 不誤導） */}
-              <div style={{ borderTop: '1px dashed #f0f0f0', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ borderTop: '1px dashed var(--border-2)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                   <span style={{ color: 'var(--text-3)' }}>交付項（可選批次）</span>
                   <span style={{ color: 'var(--text-1)', fontWeight: 600 }}>

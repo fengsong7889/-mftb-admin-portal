@@ -45,6 +45,8 @@ export const SEMANTIC_TOKENS = [
   'text-1', 'text-2', 'text-3', 'text-4', 'on-brand', 'text-brand', 'header-text',
   // 边框
   'border-1', 'border-2', 'border-3', 'border-input',
+  // 语义色描边阶（antd 实色淡彩档；浅色严格等于站内字面量，深色沿用 brand-border 的 rgba 合成约定）
+  'danger-border', 'warning-border', 'success-border', 'info-border', 'purple-border',
   // 品牌
   'brand', 'brand-hover', 'brand-active', 'brand-soft', 'brand-border',
   // 统计卡描边族（主色 + 13% alpha，不能由 var() 拼接得到）
@@ -117,6 +119,28 @@ export const TOKEN_VALUES = {
   'border-2': { light: '#F0F0F0', dark: '#303030' },
   'border-3': { light: '#E8EAED', dark: '#303030' },
   'border-input': { light: '#D9D9D9', dark: '#5A5A5A' },
+  /*
+   * 语义色描边阶（第八批之后的专门一轮）。存量里这些淡彩实色大量出现在
+   * `border: '1px solid #FFD591'` / `borderColor: '#FFCCC7'` 这类**描边位**上，
+   * 与同族的 `*-soft` 底色不是一回事（底色用透明叠加就能自适应，描边取的是
+   * antd 预设的实色档），所以既不能复用 `*-soft`，也不能复用中性 `border-*`。
+   *
+   * 取值口径：每个族取站内**描边位出现最多**的那一档（仅统计 border 段属性，
+   * 不是全站用量）：#FFD591 63 处 > #FFE7BA 29 处；#B7EB8F 32 处 > #D9F7BE 18 处；
+   * #91D5FF 14 处 > #ADC6FF 7 处；#D3ADF7 17 处 > #E8D5F5 4 处；#FFCCC7 35 处 > #FFA39E 10 处。
+   * 少数档**不收敛也不建第二个令牌**：收敛会改变浅色外观（违反「浅色逐像素不变」），
+   * 登记为待定项（见方案 §18.6）。
+   *
+   * 深色侧统一用「该族深色主色 + 32% alpha」（与 `brand-border` 一致）。
+   * 可见性实测（描边不是文本也不是图形实体，以下数字只用作「不得比现状更差」的回归守卫，
+   * 不是 WCAG 达标声明）：浅色 vs 白卡底 1.3731~1.8935；深色合成 vs 三个卡片背板最差 1.5833~1.9546。
+   * 均不低于既有 `brand-border`（浅色 1.1930 / 深色 1.6212）。
+   */
+  'danger-border': { light: '#FFCCC7', dark: 'rgba(255,120,117,0.32)' },
+  'warning-border': { light: '#FFD591', dark: 'rgba(250,160,61,0.32)' },
+  'success-border': { light: '#B7EB8F', dark: 'rgba(106,190,57,0.32)' },
+  'info-border': { light: '#91D5FF', dark: 'rgba(64,169,255,0.32)' },
+  'purple-border': { light: '#D3ADF7', dark: 'rgba(163,113,231,0.32)' },
   brand: { light: '#E8720C', dark: '#E8720C' },
   'brand-hover': { light: '#F59432', dark: '#F59432' },
   'brand-active': { light: '#CC6200', dark: '#D4670A' },
@@ -280,6 +304,14 @@ export const COLOR_TO_TOKEN = {
     fa8c16: 'warning',
     ff4d4f: 'danger',
     '722ed1': 'purple',
+    // 语义色描边阶。只进 border 段：同一个色值若被用在背景位（站内确实有，如
+    // #FFCCC7 1 处 bg、#FFD591 1 处 bg）就不会被换——按段映射本身就是防误伤的守卫，
+    // 仓内 `brand-border`（#FFE7D1，也有 2 处 bg 用法）已经是这个口径的先例。
+    ffccc7: 'danger-border',
+    ffd591: 'warning-border',
+    b7eb8f: 'success-border',
+    '91d5ff': 'info-border',
+    d3adf7: 'purple-border',
   },
 }
 
@@ -296,10 +328,8 @@ export const REVIEW_REQUIRED = {
   eef0f3: '接近 --surface-1(#F5F5F5) 但不等值',
   f58a2e: '接近 --brand-hover(#F59432) 但不等值；且它是 bootstrap.tsx 的 antd token，不应被 codemod 触碰',
   ffb347: '品牌渐变装饰条（headerGradientShift）专用色，深色下应保留以维持品牌识别',
-  ffd591: '接近 --brand-border(#FFE7D1) 但不等值',
-  ffe7ba: '接近 --warning-soft 的描边阶，需新增 --warning-border 令牌后再映射',
+  ffe7ba: 'warning 描边阶的少数档（描边位 29 处 vs canonical #FFD591 的 63 处）。描边令牌族已建，但同族不建第二个令牌——收敛会改变浅色外观（违反「浅色逐像素不变」），需单独定',
   faad14: 'antd gold，与 --warning(#FA8C16) 并存，需确认是否收敛',
-  ffccc7: 'danger 描边阶，需新增 --danger-border 令牌后再映射',
   ff7875: 'danger hover 阶；注意它同时是 --danger 的**深色值**，跨主题同值需人工确认',
   // d46b08 已不再列在这里：本次为它建了 --warning-deep（浅色严格等值）并归入 COLOR_TO_TOKEN.fg。
   // 原登记理由「RDM 深度测试报告已建议收敛到 #FF4D4F/#FA8C16 体系」仍成立，但收敛与建令牌

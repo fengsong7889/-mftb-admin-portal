@@ -299,7 +299,7 @@ export default function TaskForm() {
           <div className="confirm-info-row"><span>負責人：</span><b>{ownerText}</b></div>
           {/* 无交付权限不阻断保存，但必须在确认框里再提醒一次，否则 PM 会以为对方能直接上报进度 */}
           {ownerCheck?.warning && (
-            <div className="confirm-info-row"><span>權限提醒：</span><b style={{ color: '#D46B08' }}>{ownerCheck.warning}</b></div>
+            <div className="confirm-info-row"><span>權限提醒：</span><b style={{ color: 'var(--warning-deep)' }}>{ownerCheck.warning}</b></div>
           )}
           <div className="confirm-info-row"><span>{t('rdm.attr.planReleaseDate')}：</span><b>{values.planRelease ? values.planRelease.format('YYYY-MM-DD') : '-'}</b></div>
           <div className="confirm-info-row"><span>計劃工時：</span><b>{values.planHours ?? '-'} h</b></div>

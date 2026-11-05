@@ -240,7 +240,7 @@ export default function AssetClaim() {
           <img
             src={recordData.signatureImageUrl}
             alt="簽收憑證"
-            style={{ maxWidth: '100%', maxHeight: '70vh', border: '1px solid #f0f0f0', borderRadius: 8 }}
+            style={{ maxWidth: '100%', maxHeight: '70vh', border: '1px solid var(--border-2)', borderRadius: 8 }}
           />
         </div>
       ),

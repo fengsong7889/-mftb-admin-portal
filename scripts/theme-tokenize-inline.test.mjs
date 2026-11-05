@@ -59,6 +59,15 @@ const SOURCE = [
   // 时，拿掉守卫也不会发生替换，断言前后都成立——那就是一条无牙齿的空断言。
   "      <em style={{ border: '2px solid var(--brand) #f0f0f0' }} />",
   "      <u style={{ background: ok ? 'var(--success-soft)' : '#fafafa' }} />",
+  // 成对锁定哨兵：#FFF7F0 在 bg 段确实有严格等值令牌（--brand-soft），
+  // 但没有哨兵就应该刷、有哨兵就必须不动——拿真实可映射色值才能验出区别。
+  "      <s style={{ background: '#FFF7F0', color: '#AD4E00' /* theme-pair-locked：两侧成对保持裸值，待 brand-deep 令牌 */ }} />",
+  // 跳行写法（真实站点 RDM ResourceLoad 就是这种）：哨兵在第一行，待保护的颜色在下一行，
+  // 只有「整块锁」能保住它——只锁行的旧行为会把 #1890FF 刷成令牌并反向造出半对。
+  '      <div style={{',
+  "        background: '#FFF7F0', /* theme-pair-locked：整块成对，不得单刷任一侧 */",
+  "        color: '#1890FF',",
+  '      }}>跳行块</div>',
   '      <i style={{ background: `linear-gradient(180deg, ${tone}, #ffffff)` }} />',
   '    </div>',
   '  )',
@@ -139,6 +148,23 @@ describe('theme-tokenize-inline codemod', () => {
     const out = readFileSync(join(root, FIXTURE_FILE), 'utf8')
     expect(out).toContain("ok ? 'var(--success-soft)' : ")
     expect(out).toContain(expectToken('#fafafa', 'bg'))
+  })
+
+  it('theme-pair-locked 哨兵行不得被动（人工成对回退靠它才能挡住重跑）', () => {
+    const out = readFileSync(join(root, FIXTURE_FILE), 'utf8')
+    // #FFF7F0 本身是可映射的，哨兵必须让它保持裸值
+    expect(out).toContain("background: '#FFF7F0'")
+    expect(out).not.toContain("background: '" + expectToken('#FFF7F0', 'bg') + "'")
+    expect(out).toContain("color: '#AD4E00'")
+  })
+
+  it('theme-pair-locked 跳行块：哨兵在上一行，下一行的可映射色值也必须不动（整块锁）', () => {
+    const out = readFileSync(join(root, FIXTURE_FILE), 'utf8')
+    // 按精确缩进定位被保护的那一行（不能写 not.toContain(var(--info))：
+    // 夹具开头的 div 行本来就该刷成 var(--info)，那样断言会误报）。
+    expect(out).toContain("        color: '#1890FF',")
+    // #1890FF 应当只剩两处：区段外的 chartOption + 被哨兵护住的跳行块（div 行已刷成令牌）
+    expect(out.split('#1890FF').length - 1).toBe(2)
   })
 
   describe('参数校验：不合法必须拒跑且不写盘', () => {

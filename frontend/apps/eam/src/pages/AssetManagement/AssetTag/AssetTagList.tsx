@@ -294,7 +294,7 @@ export default function AssetTagList({ onAdd, onEdit, onDetail }: AssetTagListPr
         <>
           {/* 卡片视图（参考图 2：卡片直接渲染标签最终效果） */}
           {pageData.length === 0 ? (
-            <div style={{ background: 'var(--surface-2)', border: '1px solid #e8eaed', borderRadius: 8, padding: '48px 0' }}>
+            <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border-3)', borderRadius: 8, padding: '48px 0' }}>
               <Empty description={loading ? t('common.loading') : t('assetTag.empty')} />
             </div>
           ) : (

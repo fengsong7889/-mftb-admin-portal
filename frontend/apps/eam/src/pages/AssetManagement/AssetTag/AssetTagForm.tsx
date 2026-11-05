@@ -170,7 +170,7 @@ export default function AssetTagForm({ id, onBack }: AssetTagFormProps) {
 
       <Form form={form} layout="vertical" disabled={loading}>
         {/* 模塊1：基本信息 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           {renderCardTitle('📋', '#e6f7ff', t('common.basicInfo'))}
           <Row gutter={16}>
             <Col xs={24} sm={12} md={8}>
@@ -194,7 +194,7 @@ export default function AssetTagForm({ id, onBack }: AssetTagFormProps) {
         {/* 三欄工作區：樣式畫廊 / 實時預覽 / 字段配置 */}
         <div className="asset-tag-workspace">
           {/* 左欄：標籤樣式配置 */}
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             {renderCardTitle('🎨', '#fff7e6', t('assetTag.styleTitle'), t('assetTag.stylePresetExtra'))}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               {COLOR_PRESETS.map(preset => {
@@ -232,7 +232,7 @@ export default function AssetTagForm({ id, onBack }: AssetTagFormProps) {
           </div>
 
           {/* 中欄：實時預覽 */}
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             {renderCardTitle('👁', '#e6f7ff', t('assetTag.previewTitle'), t('assetTag.previewSyncExtra'))}
             <div className="asset-tag-canvas">
               <AssetTagPreview data={{ name: nameWatch, bgColor, textColor, displayFields: selectedFields }} />
@@ -262,7 +262,7 @@ export default function AssetTagForm({ id, onBack }: AssetTagFormProps) {
           </div>
 
           {/* 右欄：展示字段配置 */}
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             {renderCardTitle('📑', '#f6ffed', t('assetTag.fieldsTitle'), t('assetTag.fieldsSelectedExtra', { selected: selectedFields.length, total: ASSET_DISPLAY_FIELDS.length }))}
             <div className="asset-tag-panel-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {ASSET_DISPLAY_FIELDS.map(field => {

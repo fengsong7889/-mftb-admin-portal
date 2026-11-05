@@ -388,7 +388,7 @@ export default function RdmWorkbench() {
           ] as const).map(bucket => {
             const items = todoBoard.todos.filter(t => t.bucket === bucket.key)
             return (
-              <div key={bucket.key} style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: 10, background: 'var(--surface-2)' }}>
+              <div key={bucket.key} style={{ border: '1px solid var(--border-2)', borderRadius: 8, padding: 10, background: 'var(--surface-2)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                   <span style={{ width: 8, height: 8, borderRadius: '50%', background: bucket.color }} />
                   <span style={{ fontWeight: 600, fontSize: 13, color: bucket.color }}>{bucket.title}</span>
@@ -400,7 +400,7 @@ export default function RdmWorkbench() {
                   <div
                     key={item.key}
                     onClick={() => { if (item.actionUrl) navigate(item.actionUrl) }}
-                    style={{ padding: '6px 0', borderBottom: '1px dashed #f0f0f0', cursor: item.actionUrl ? 'pointer' : 'default' }}
+                    style={{ padding: '6px 0', borderBottom: '1px dashed var(--border-2)', cursor: item.actionUrl ? 'pointer' : 'default' }}
                   >
                     <div style={{ fontSize: 13, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.title}>
                       {item.title}
@@ -411,7 +411,7 @@ export default function RdmWorkbench() {
                       {item.overdue && <span style={{ color: 'var(--danger)' }}> · 逾期{item.overdueWorkingDays ? ` ${item.overdueWorkingDays} 工作日` : ''}</span>}
                     </div>
                     {item.reasons.length > 0 && (
-                      <div style={{ fontSize: 12, color: '#D46B08', marginTop: 2 }}>
+                      <div style={{ fontSize: 12, color: 'var(--warning-deep)', marginTop: 2 }}>
                         {item.reasons.map(r => RDM_TODO_REASON_LABEL[r] ?? r).join('；')}
                       </div>
                     )}
@@ -468,7 +468,7 @@ export default function RdmWorkbench() {
                         )}
                         {/* 已归档需求不再展示停留：归档是终点，天数只增不减 */}
                         {item.status !== RDM_STATUS.CLOSED && item.stayHours != null && item.stayHours > 24 && (
-                          <span style={{ color: '#D46B08' }}>
+                          <span style={{ color: 'var(--warning-deep)' }}>
                             已停留 {Math.round(item.stayHours / 24)} 天
                           </span>
                         )}
@@ -520,7 +520,7 @@ export default function RdmWorkbench() {
               <div className="rdm-todo-item-meta">
                 <span>{formatRdmReqNo(row.reqNo)}</span>
                 {row.status !== RDM_STATUS.CLOSED && row.stayHours != null && row.stayHours > 24 && (
-                  <span style={{ color: '#D46B08' }}>已停留 {Math.round(row.stayHours / 24)} 天</span>
+                  <span style={{ color: 'var(--warning-deep)' }}>已停留 {Math.round(row.stayHours / 24)} 天</span>
                 )}
               </div>
             </div>
@@ -537,7 +537,7 @@ export default function RdmWorkbench() {
     'my-projects': myProjects.length > 0 ? (
       <div className="rdm-v3-projects">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#F0F5FF', color: '#2F54EB' }}><ProjectOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: '#F0F5FF', color: '#2F54EB' /* theme-pair-locked：geekblue 四件套（#2F54EB / #D6E4FF / #F0F5FF）未成套定令牌前不得单刷一侧 */ }}><ProjectOutlined /></span>
           項目一覽
           <Tag color="blue" style={{ margin: 0 }}>{myProjects.length}</Tag>
           <span className="rdm-todo-hint">可見範圍內的分批交付項目進度一覽</span>

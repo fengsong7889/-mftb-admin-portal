@@ -109,7 +109,7 @@ export default function RequirementStageBar({ status, overdue, compact, stayDays
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 64 }}>
                 <div style={{
                   width: 22, height: 22, borderRadius: '50%',
-                  background: done ? 'var(--brand)' : active ? (alarm ? '#FFF2F0' : 'var(--brand-soft)') : 'var(--surface-2)',
+                  background: done ? 'var(--brand)' : active ? (alarm ? 'var(--danger-callout)' : 'var(--brand-soft)') : 'var(--surface-2)',
                   border: `2px solid ${color}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 11, fontWeight: 700, color: done ? '#fff' : active ? (alarm ? '#CF1322' : 'var(--brand)') : 'var(--text-4)',

@@ -830,7 +830,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
       </div>
 
       {/* ====== 訂單信息 ====== */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 24px', marginBottom: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 24px', marginBottom: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <ShoppingCartOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />
@@ -877,7 +877,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
         const groupAllocQty = groupAllocs.reduce((s, a) => s + a.qty, 0)
         const groupTotal = ig.rows.length
         return (
-          <div key={ig.group.id} style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 24px', marginBottom: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div key={ig.group.id} style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 24px', marginBottom: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             {/* 分組標題 */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -961,7 +961,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
           concession: { color: 'processing', key: 'asset.rejectConcession' },
         }
         return (
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 24px', marginBottom: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 24px', marginBottom: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-hover-tint)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <AppstoreOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
@@ -1074,7 +1074,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
         {passRow && (
           <>
             {/* 物資信息 */}
-            <div style={{ background: 'var(--surface-3)', border: '1px solid #f0f0f0', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
+            <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', rowGap: 10, fontSize: 13 }}>
                 <div><span style={{ color: 'var(--text-3)' }}>{t('asset.modelNameLabel')}</span><span style={{ fontWeight: 600 }}>{passRow.item.modelName}</span></div>
                 <div><span style={{ color: 'var(--text-3)' }}>{t('asset.categoryLabel')}</span>{passRow.item.categoryName || '-'}</div>
@@ -1151,7 +1151,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                     beforeUpload={(file) => { handlePassPhotoUpload(file); return false }}
                     accept="image/*"
                   >
-                    <div style={{ width: 88, height: 88, border: '1px dashed #d9d9d9', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#999', fontSize: 12, background: 'var(--surface-3)', transition: 'all 0.3s' }}
+                    <div style={{ width: 88, height: 88, border: '1px dashed var(--border-1)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#999', fontSize: 12, background: 'var(--surface-3)', transition: 'all 0.3s' }}
                       onMouseEnter={(e) => { const el = e.currentTarget; el.style.borderColor = 'var(--brand)'; el.style.background = 'var(--warning-soft)'; el.style.color = 'var(--brand)' }}
                       onMouseLeave={(e) => { const el = e.currentTarget; /* 還原必須用與基態相同的令牌：寫回裸色值會讓深色主題 hover 一次後永久停在淺色塊 */ el.style.borderColor = 'var(--border-1)'; el.style.background = 'var(--surface-3)'; el.style.color = '#999' }}
                     >
@@ -1345,7 +1345,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                 beforeUpload={(file) => { handleRejectPhotoUpload(file); return false }}
                 accept="image/*"
               >
-                <div style={{ width: 88, height: 88, border: '1px dashed #d9d9d9', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#999', fontSize: 12, background: 'var(--surface-3)', transition: 'all 0.3s' }}
+                <div style={{ width: 88, height: 88, border: '1px dashed var(--border-1)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#999', fontSize: 12, background: 'var(--surface-3)', transition: 'all 0.3s' }}
                   onMouseEnter={(e) => { const el = e.currentTarget; el.style.borderColor = 'var(--brand)'; el.style.background = 'var(--warning-soft)'; el.style.color = 'var(--brand)' }}
                   onMouseLeave={(e) => { const el = e.currentTarget; /* 還原必須用與基態相同的令牌：寫回裸色值會讓深色主題 hover 一次後永久停在淺色塊 */ el.style.borderColor = 'var(--border-1)'; el.style.background = 'var(--surface-3)'; el.style.color = '#999' }}
                 >
@@ -1372,7 +1372,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
         <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--text-2)' }}>
           {t('asset.accessorySelectTip')}
         </div>
-        <div style={{ maxHeight: 360, overflowY: 'auto', border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px' }}>
+        <div style={{ maxHeight: 360, overflowY: 'auto', border: '1px solid var(--border-2)', borderRadius: 8, padding: '8px 12px' }}>
           {(() => {
             const code = passRow?.item.categoryCode
             const list = code ? categoryAccessories.get(code) || [] : []
@@ -1462,7 +1462,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: '1px solid #d9d9d9',
+              border: '1px solid var(--border-1)',
               background: 'var(--surface-2)',
             }}
           >
@@ -1477,7 +1477,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
               borderRadius: 8,
               fontSize: 13,
               fontWeight: 500,
-              border: '1px solid #d9d9d9',
+              border: '1px solid var(--border-1)',
               background: 'var(--surface-2)',
               padding: '0 16px',
             }}
@@ -1493,7 +1493,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
               borderRadius: 8,
               fontSize: 13,
               fontWeight: 500,
-              border: '1px solid #d9d9d9',
+              border: '1px solid var(--border-1)',
               background: 'var(--surface-2)',
               padding: '0 16px',
             }}
@@ -1521,7 +1521,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              border: '1px solid #d9d9d9',
+              border: '1px solid var(--border-1)',
               background: 'var(--surface-2)',
             }}
           >
@@ -1548,7 +1548,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                   objectFit: 'cover',
                   borderRadius: 6,
                   cursor: 'pointer',
-                  border: i === previewIndex ? '2px solid #E8720C' : '1px solid #f0f0f0',
+                  border: i === previewIndex ? '2px solid var(--brand)' : '1px solid var(--border-2)',
                   opacity: i === previewIndex ? 1 : 0.6,
                   transition: 'all 0.2s',
                   boxShadow: i === previewIndex ? '0 2px 8px rgba(232,114,12,0.25)' : 'none',

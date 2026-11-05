@@ -147,14 +147,32 @@ function transform(source) {
   const skipped = []
   /** style 区段状态：单行 `style={{...}}` 不残留，多行写法要跟踪到 `}}` 才退出 */
   let inStyle = false
+  /** 当前 style 块是否被成对锁定哨兵护住（必须整块护，原因见下方注释） */
+  let pairLocked = false
 
   const next = source
     .split('\n')
     .map((line) => {
       const eligible = inStyle || line.includes('style={{')
-      if (line.includes('style={{')) inStyle = !line.includes('}}')
-      else if (inStyle && line.includes('}}')) inStyle = false
+      if (line.includes('style={{')) {
+        inStyle = !line.includes('}}')
+        // 每进入一个新的 style 块先清锁：锁不跨块，也不残留给下一个元素
+        pairLocked = false
+      } else if (inStyle && line.includes('}}')) inStyle = false
       if (!eligible) return line
+      // 成对锁定哨兵（字符串 theme-pair-locked，写在 style 对象内部的注释里才合法）。
+      // 为什么必需：人工把半对回退成「两侧都裸」后，这一行不再含 var(，行级与串级守卫
+      // 都保护不了它；下一次重跑（比如新增令牌后的回填轮）会把其中一侧重新刷成令牌。
+      // 第九批实测踩中了 4 处，其中两处代码里原本就写着「单独跑 codemod 会把背景重新刷上去」
+      // 的 prose 注释（RDM ResourceLoad / GrayscaleConfig）——人工决定必须变成机器可读的标记。
+      //
+      // 锁必须按**整块**生效而不是按行：真实站点的 background 与 color 分处相邻两行，
+      // 只锁写哨兵那一行，未来给那个色值建了令牌（如 brand-deep）就会反向造出新的半对。
+      if (line.includes('theme-pair-locked')) {
+        pairLocked = true
+        return line
+      }
+      if (pairLocked) return line
       if (!/(["'][^"']*#[0-9a-fA-F]{3})|([^"']#[0-9a-fA-F]{3,8}[^"']*['"])/.test(line)) return line
       // 行级「含 var( 就整行跳过」的写法在第八批后已收到串级（见下方 QUOTED_ANY 处理）。
       // 原意是防「把人工选定的 var(--on-brand) 改回自动映射结果」，但工具只换 #hex、

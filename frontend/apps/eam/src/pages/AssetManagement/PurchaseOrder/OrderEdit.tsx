@@ -445,7 +445,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
 
       <Form<GlobalFormValues> form={form} layout="vertical">
         {/* ====== 订单信息 ====== */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ShoppingCartOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />
@@ -523,7 +523,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
           const subtotal = groupSubtotal(group)
           const dm = group.deliveryMethod as DeliveryMethod | undefined
           return (
-            <div key={group.id} style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div key={group.id} style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               {/* 分组标题 */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -647,7 +647,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
 
               {/* 选中工具栏 */}
               {selectedItemKeys.size > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', marginBottom: 12, background: 'var(--info-soft)', borderRadius: 6, border: '1px solid #91d5ff' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', marginBottom: 12, background: 'var(--info-soft)', borderRadius: 6, border: '1px solid var(--info-border)' }}>
                   <span style={{ fontSize: 13, color: 'var(--info)' }}>
                     {t('asset.selectedItemsCount', { count: selectedItemKeys.size })}
                   </span>
@@ -717,7 +717,7 @@ export default function OrderEdit({ id, onBack, onSaved }: Props) {
         <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--text-2)' }}>
           {t('asset.splitConfirmDesc', { count: selectedItemKeys.size })}
         </div>
-        <div style={{ maxHeight: 320, overflowY: 'auto', border: '1px solid #f0f0f0', borderRadius: 6 }}>
+        <div style={{ maxHeight: 320, overflowY: 'auto', border: '1px solid var(--border-2)', borderRadius: 6 }}>
           <Table<PurchaseOrderItem>
             columns={[
               { title: t('asset.colCategory'), dataIndex: 'categoryName', key: 'categoryName', width: 80, ellipsis: true, render: (v: string | undefined) => v || '-' },

@@ -520,7 +520,7 @@ function RequirementAcceptanceForm() {
                         width={56}
                         height={56}
                         alt={ev.name}
-                        style={{ objectFit: 'cover', borderRadius: 4, border: '1px solid #e8eaed' }}
+                        style={{ objectFit: 'cover', borderRadius: 4, border: '1px solid var(--border-3)' }}
                       />
                     ) : (
                       <a href={ev.dataUrl} download={ev.name} style={{ fontSize: 12 }}>{ev.name}</a>

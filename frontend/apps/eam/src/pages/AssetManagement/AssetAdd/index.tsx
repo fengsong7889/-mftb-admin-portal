@@ -482,7 +482,7 @@ export default function AssetAdd() {
       {imageFiles.length < 5 && (
         <Upload accept="image/*" showUploadList={false} beforeUpload={handleImageUpload}>
           <div style={{
-            width: 88, height: 88, border: '1px dashed #d9d9d9', borderRadius: 8,
+            width: 88, height: 88, border: '1px dashed var(--border-1)', borderRadius: 8,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', background: 'var(--surface-3)', transition: 'border-color 0.3s',
           }}
@@ -557,7 +557,7 @@ export default function AssetAdd() {
         <Form form={form} layout="vertical" disabled={loading}>
 
           {/* ====== 模块1：资产信息 ====== */}
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             {renderCardTitle(
               <PictureOutlined style={{ fontSize: 14, color: 'var(--success)' }} />,
               '#f6ffed',
@@ -655,7 +655,7 @@ export default function AssetAdd() {
                   <div style={{
                     display: 'grid', gridTemplateColumns: '1fr 140px 100px',
                     gap: 12, padding: '8px 12px', background: 'var(--surface-3)',
-                    borderRadius: '6px 6px 0 0', border: '1px solid #f0f0f0', borderBottom: 'none',
+                    borderRadius: '6px 6px 0 0', border: '1px solid var(--border-2)', borderBottom: 'none',
                     fontSize: 13, fontWeight: 600, color: 'var(--text-1)',
                   }}>
                     <span>{t('asset.accessoryNameCol')}</span>
@@ -667,7 +667,7 @@ export default function AssetAdd() {
                     <div key={idx} style={{
                       display: 'grid', gridTemplateColumns: '1fr 140px 100px',
                       gap: 12, padding: '8px 12px',
-                      border: '1px solid #f0f0f0', borderTop: 'none',
+                      border: '1px solid var(--border-2)', borderTop: 'none',
                       alignItems: 'center',
                     }}>
                       <AutoComplete
@@ -695,7 +695,7 @@ export default function AssetAdd() {
                   {/* 底部操作行 */}
                   <div style={{
                     display: 'flex', gap: 16, padding: '10px 12px',
-                    border: '1px solid #f0f0f0', borderTop: 'none',
+                    border: '1px solid var(--border-2)', borderTop: 'none',
                     borderRadius: '0 0 6px 6px',
                   }}>
                     <Button type="link" size="small" icon={<PlusOutlined />}
@@ -720,7 +720,7 @@ export default function AssetAdd() {
                 <div style={{
                   padding: '20px', textAlign: 'center',
                   background: 'var(--surface-3)', borderRadius: 8,
-                  border: '1px dashed #d9d9d9',
+                  border: '1px dashed var(--border-1)',
                 }}>
                   <div style={{ marginBottom: 12 }}>
                     <Button type="link" size="small" icon={<PlusOutlined />}
@@ -746,7 +746,7 @@ export default function AssetAdd() {
           </div>
 
           {/* ====== 模块2：租/购信息 ====== */}
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             {renderCardTitle(
               <span style={{ fontSize: 14, color: 'var(--brand)' }}>¥</span>,
               '#fff7e6',
@@ -887,7 +887,7 @@ export default function AssetAdd() {
 
           {/* ====== 模块3：当前使用人（仅编辑模式展示，字段只读；新增模式隐藏） ====== */}
           {isEdit && (
-            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               {renderCardTitle(
                 <PictureOutlined style={{ fontSize: 14, color: '#13C2C2' }} />,
                 '#E6FFFB',
@@ -945,7 +945,7 @@ export default function AssetAdd() {
           )}
 
           {/* ====== 模块4：备注信息 ====== */}
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             {renderCardTitle(
               <span style={{ fontSize: 14, color: 'var(--purple)' }}></span>,
               '#f9f0ff',
@@ -958,7 +958,7 @@ export default function AssetAdd() {
           </div>
 
           {/* ====== 模块5：入库信息（最底部，验收入库跳转时自动带入） ====== */}
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             {renderCardTitle(
               <PictureOutlined style={{ fontSize: 14, color: 'var(--info)' }} />,
               '#e6f7ff',
@@ -1027,7 +1027,7 @@ export default function AssetAdd() {
         <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--text-2)' }}>
           {t('asset.accessorySelectTip')}
         </div>
-        <div style={{ maxHeight: 360, overflowY: 'auto', border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px' }}>
+        <div style={{ maxHeight: 360, overflowY: 'auto', border: '1px solid var(--border-2)', borderRadius: 8, padding: '8px 12px' }}>
           {categoryAccessories.length === 0 ? (
             <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-4)', fontSize: 13 }}>{t('asset.accessoryEmpty')}</div>
           ) : (

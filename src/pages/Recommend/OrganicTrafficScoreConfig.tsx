@@ -1779,7 +1779,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                               {/* 屏蔽商家（全局） */}
                               {blocked.length > 0 && (
-                                <div style={{ padding: '8px 14px', background: 'var(--danger-callout)', borderRadius: 8, border: '1px solid #FFCCC7', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                <div style={{ padding: '8px 14px', background: 'var(--danger-callout)', borderRadius: 8, border: '1px solid var(--danger-border)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                                   <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--danger)', whiteSpace: 'nowrap' }}>🚫 屏蔽商家（{blocked.length} 家）</span>
                                   <span style={{ fontSize: 11, color: 'var(--text-3)' }}>全局生效，所有區域共享</span>
                                   <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -2060,7 +2060,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             return (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                 {/* 屏蔽商家（全局） */}
-                                <div style={{ padding: 12, background: 'var(--danger-callout)', borderRadius: 8, border: '1px solid #FFCCC7' }}>
+                                <div style={{ padding: 12, background: 'var(--danger-callout)', borderRadius: 8, border: '1px solid var(--danger-border)' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: blocked.length > 0 ? 8 : 0 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                       <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--danger)', whiteSpace: 'nowrap' }}>🚫 屏蔽商家</span>
@@ -3030,7 +3030,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
 
                     {/* TIERED：梯度檔位配置 */}
                     {tpl.mode === ScoreMode.TIERED && (
-                      <div style={{ marginBottom: 16, padding: '14px 16px', background: 'var(--success-soft)', border: '1px solid #b7eb8f', borderRadius: 8 }}>
+                      <div style={{ marginBottom: 16, padding: '14px 16px', background: 'var(--success-soft)', border: '1px solid var(--success-border)', borderRadius: 8 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 12 }}>梯度計分配置</div>
                         {tierRows.length === 0 && (
                           <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>尚未配置檔位，請點擊下方「新增檔位」</div>
@@ -3166,7 +3166,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
               )}
           {/* 梯度計分配置：檔位編輯器（統計天數合併到每檔） */}
           {ruleFormMode === ScoreMode.TIERED && (
-            <div style={{ marginBottom: 16, padding: '14px 16px', background: 'var(--success-soft)', border: '1px solid #b7eb8f', borderRadius: 8 }}>
+            <div style={{ marginBottom: 16, padding: '14px 16px', background: 'var(--success-soft)', border: '1px solid var(--success-border)', borderRadius: 8 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 12 }}>梯度計分配置</div>
               {tierRows.length === 0 && (
                 <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>尚未配置檔位，請點擊下方「新增檔位」</div>
@@ -3484,7 +3484,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
 
       {/* 已選提示（編輯模式可關閉，只讀模式純展示） */}
       {tempBlockedStores.length > 0 && (
-        <div style={{ marginBottom: 12, padding: '6px 12px', background: 'var(--danger-callout)', borderRadius: 6, border: '1px solid #ffccc7', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+        <div style={{ marginBottom: 12, padding: '6px 12px', background: 'var(--danger-callout)', borderRadius: 6, border: '1px solid var(--danger-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
           <span style={{ fontSize: 12, color: 'var(--danger)', fontWeight: 500 }}>共 {tempBlockedStores.length} 家商家</span>
           <Space size={4} wrap>
             {tempBlockedStores.slice(0, 8).map(s => (

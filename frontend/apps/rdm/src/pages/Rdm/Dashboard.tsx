@@ -150,7 +150,7 @@ export default function RdmDashboard() {
               key={col.key}
               onClick={() => navigate(`/rdm-requirement?statuses=${encodeURIComponent((col.statuses ?? []).join(','))}&src=${encodeURIComponent(col.title)}`)}
               style={{
-                border: '1px solid #e8eaed', borderRadius: 8, padding: '12px 14px', cursor: 'pointer',
+                border: '1px solid var(--border-3)', borderRadius: 8, padding: '12px 14px', cursor: 'pointer',
                 background: col.overdue > 0 ? 'var(--brand-soft)' : 'var(--surface-sunken)',
                 transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
               }}

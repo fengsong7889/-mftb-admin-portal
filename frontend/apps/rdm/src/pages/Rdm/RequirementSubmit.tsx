@@ -1000,7 +1000,7 @@ export default function RequirementSubmit() {
                         const isImage = att.fileType.startsWith('image/')
                         return (
                           <div key={`${att.name}-${idx}`} style={{
-                            position: 'relative', border: '1px solid #e8eaed', borderRadius: 6,
+                            position: 'relative', border: '1px solid var(--border-3)', borderRadius: 6,
                             padding: 6, background: 'var(--surface-sunken)', maxWidth: 180,
                           }}>
                             {isImage ? (
@@ -1031,7 +1031,7 @@ export default function RequirementSubmit() {
               </>
             ),
           }]}
-          style={{ marginBottom: 16, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid #e8eaed' }}
+          style={{ marginBottom: 16, background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border-3)' }}
         />
       </Form>
 

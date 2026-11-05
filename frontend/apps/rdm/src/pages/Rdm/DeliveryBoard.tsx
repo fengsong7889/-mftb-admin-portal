@@ -514,7 +514,7 @@ export default function DeliveryBoard() {
           </div>
         )}
         {/* Batch2：前置依賴（跨交付項） */}
-        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed #E8EAED' }}>
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--border-3)' }}>
           <Space size={8} wrap>
             <LinkOutlined style={{ color: '#2F54EB' }} />
             <span style={{ fontSize: 12, color: 'var(--text-2)' }}>前置依賴</span>
@@ -681,7 +681,7 @@ export default function DeliveryBoard() {
               </div>
               {g.item && expandedBlockedId === g.item.id && (blockedMap[g.item.id]?.length ?? 0) > 0 && (
                 <div style={{ margin: '0 0 8px', padding: '8px 12px', background: 'var(--warning-soft)', border: '1px solid #FFE7BA', borderRadius: 6 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#D46B08', marginBottom: 6 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--warning-deep)', marginBottom: 6 }}>
                     <WarningOutlined /> 被前置依賴阻塞的任務（{blockedMap[g.item.id].length}）
                   </div>
                   {blockedMap[g.item.id].map(bt => (

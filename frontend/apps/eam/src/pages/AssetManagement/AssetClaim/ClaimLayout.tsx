@@ -29,7 +29,7 @@ export function ClaimFormHeader({ title, subtitle, onBack }: { title: string; su
 /** 内容分节卡片；icon 可缺省（仅留一个占位圆，保持标题基线对齐） */
 export function ClaimSection({ title, icon, children }: { title: string; icon?: ReactNode; children: ReactNode }) {
   return (
-    <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+    <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
       <div className="claim-section-heading"><span className="claim-section-icon">{icon}</span><h3>{title}</h3><span className="claim-section-line" /></div>
       {children}
     </div>

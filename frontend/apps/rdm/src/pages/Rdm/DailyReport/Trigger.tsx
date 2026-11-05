@@ -358,7 +358,7 @@ export default function DailyReportTrigger() {
             <>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{result.groupTitle}</div>
               <pre style={{
-                background: 'var(--surface-3)', border: '1px solid #f0f0f0', borderRadius: 6, padding: 12,
+                background: 'var(--surface-3)', border: '1px solid var(--border-2)', borderRadius: 6, padding: 12,
                 fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word', margin: 0, maxHeight: 420, overflow: 'auto',
               }}>
                 {result.groupContent}

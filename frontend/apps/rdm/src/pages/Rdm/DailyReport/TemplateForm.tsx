@@ -337,7 +337,7 @@ export default function DailyReportTemplateForm() {
           />
           {showRaw && (
             <pre style={{
-              background: 'var(--surface-3)', border: '1px solid #f0f0f0', borderRadius: 6, padding: 12, marginTop: 10,
+              background: 'var(--surface-3)', border: '1px solid var(--border-2)', borderRadius: 6, padding: 12, marginTop: 10,
               fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 360, overflow: 'auto',
             }}>
               {preview.content}

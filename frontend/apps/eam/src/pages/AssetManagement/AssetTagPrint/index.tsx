@@ -209,7 +209,7 @@ export default function AssetTagPrint() {
 
       {/* ====== 配置卡片（列印時隱藏） ====== */}
       <div className="asset-tag-print-config" style={{
-        border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)',
+        border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)',
         padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
         display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16,
       }}>
@@ -251,14 +251,14 @@ export default function AssetTagPrint() {
         {!selectedTemplate ? (
           <div style={{
             background: 'var(--surface-2)', borderRadius: 8, padding: 60,
-            border: '1px solid #e8eaed', textAlign: 'center',
+            border: '1px solid var(--border-3)', textAlign: 'center',
           }}>
             <Empty description={t('assetTag.selectFirstEmpty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
           </div>
         ) : !hasAssets ? (
           <div style={{
             background: 'var(--surface-2)', borderRadius: 8, padding: 60,
-            border: '1px solid #e8eaed', textAlign: 'center',
+            border: '1px solid var(--border-3)', textAlign: 'center',
           }}>
             <Empty
               description={<span style={{ fontSize: 13, color: 'var(--text-3)' }}>{t('assetTag.noPrintableAssets')}</span>}

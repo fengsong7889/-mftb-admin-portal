@@ -146,7 +146,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
               <img
                 key={i} src={p.dataUrl} alt={p.name}
                 onClick={() => { setPreviewPhotos(photos); setPreviewIndex(i); setPreviewImage(p.dataUrl); setPreviewRotate(0); setPreviewVisible(true) }}
-                style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, cursor: 'pointer', border: '1px solid #f0f0f0' }}
+                style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, cursor: 'pointer', border: '1px solid var(--border-2)' }}
               />
             ))}
             {photos.length > 3 && (
@@ -253,7 +253,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
                     content={
                       <div style={{ maxWidth: 240 }}>
                         {suppliers.map((s, i) => (
-                          <div key={i} style={{ padding: '4px 0', borderBottom: i < suppliers.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                          <div key={i} style={{ padding: '4px 0', borderBottom: i < suppliers.length - 1 ? '1px solid var(--border-2)' : 'none' }}>
                             {s}
                           </div>
                         ))}
@@ -365,7 +365,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
       {/* ====== 最後更新 ====== */}
       <div style={{
         background: 'var(--surface-3)', borderRadius: 8, padding: '12px 24px',
-        border: '1px solid #f0f0f0',
+        border: '1px solid var(--border-2)',
         display: 'flex', justifyContent: 'flex-end', gap: 24,
       }}>
         <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.updatedByLabel')}<span style={{ color: 'var(--text-2)' }}>{batch.updatedBy || '-'}</span></span>
@@ -394,26 +394,26 @@ export default function InboundDetail({ batchId, onBack }: Props) {
           <Button
             onClick={() => { const idx = previewIndex - 1; if (idx >= 0) { setPreviewIndex(idx); setPreviewImage(previewPhotos[idx].dataUrl); setPreviewRotate(0) } }}
             disabled={previewIndex === 0}
-            style={{ width: 40, height: 40, borderRadius: 8, fontSize: 18, fontWeight: 600, background: 'var(--surface-2)', border: '1px solid #d9d9d9' }}
+            style={{ width: 40, height: 40, borderRadius: 8, fontSize: 18, fontWeight: 600, background: 'var(--surface-2)', border: '1px solid var(--border-1)' }}
           >
             ‹
           </Button>
           <Button
             onClick={() => setPreviewRotate((prev) => prev - 90)}
-            style={{ height: 40, borderRadius: 8, fontSize: 13, fontWeight: 500, padding: '0 16px', background: 'var(--surface-2)', border: '1px solid #d9d9d9' }}
+            style={{ height: 40, borderRadius: 8, fontSize: 13, fontWeight: 500, padding: '0 16px', background: 'var(--surface-2)', border: '1px solid var(--border-1)' }}
           >
             ↺ 逆時針
           </Button>
           <Button
             onClick={() => setPreviewRotate((prev) => prev + 90)}
-            style={{ height: 40, borderRadius: 8, fontSize: 13, fontWeight: 500, padding: '0 16px', background: 'var(--surface-2)', border: '1px solid #d9d9d9' }}
+            style={{ height: 40, borderRadius: 8, fontSize: 13, fontWeight: 500, padding: '0 16px', background: 'var(--surface-2)', border: '1px solid var(--border-1)' }}
           >
             ↻ 順時針
           </Button>
           <Button
             onClick={() => { const idx = previewIndex + 1; if (idx < previewPhotos.length) { setPreviewIndex(idx); setPreviewImage(previewPhotos[idx].dataUrl); setPreviewRotate(0) } }}
             disabled={previewIndex === previewPhotos.length - 1}
-            style={{ width: 40, height: 40, borderRadius: 8, fontSize: 18, fontWeight: 600, background: 'var(--surface-2)', border: '1px solid #d9d9d9' }}
+            style={{ width: 40, height: 40, borderRadius: 8, fontSize: 18, fontWeight: 600, background: 'var(--surface-2)', border: '1px solid var(--border-1)' }}
           >
             ›
           </Button>
@@ -429,7 +429,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
                 onClick={() => { setPreviewIndex(i); setPreviewImage(p.dataUrl); setPreviewRotate(0) }}
                 style={{
                   width: 56, height: 56, objectFit: 'cover', borderRadius: 6,
-                  border: i === previewIndex ? '2px solid #E8720C' : '1px solid #f0f0f0',
+                  border: i === previewIndex ? '2px solid var(--brand)' : '1px solid var(--border-2)',
                   opacity: i === previewIndex ? 1 : 0.6,
                   boxShadow: i === previewIndex ? '0 2px 8px rgba(232,114,12,0.25)' : 'none',
                   cursor: 'pointer',
@@ -454,7 +454,7 @@ export default function InboundDetail({ batchId, onBack }: Props) {
       >
         {exchangeModal && (
           <div>
-            <div style={{ background: 'var(--surface-3)', border: '1px solid #f0f0f0', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 13 }}>
+            <div style={{ background: 'var(--surface-3)', border: '1px solid var(--border-2)', borderRadius: 8, padding: '12px 16px', marginBottom: 16, fontSize: 13 }}>
               <div><span style={{ color: 'var(--text-3)' }}>{t('asset.modelNameLabel')}</span><b>{exchangeModal.modelName}</b></div>
               <div><span style={{ color: 'var(--text-3)' }}>{t('asset.exchangeQtyLabel')}</span><b style={{ color: 'var(--warning)' }}>{exchangeModal.qty}</b> {t('asset.unitPiece')}</div>
             </div>

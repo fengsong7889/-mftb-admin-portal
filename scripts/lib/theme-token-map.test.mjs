@@ -205,6 +205,52 @@ describe('补充阶令牌的合成对比度（danger-callout / warning-deep / in
     const bg = over(TOKEN_VALUES['info-hover-tint'].dark, TOKEN_VALUES['surface-3'].dark)
     expect(contrastRatio(TOKEN_VALUES.info.dark, bg)).toBeGreaterThanOrEqual(3.0)
   })
+
+  /*
+   * 描边阶令牌（danger/warning/success/info/purple-border）。
+   * 必须单独写：上面两组断言算的是「文字/图形坐在背板上」，而描边两者都不是，
+   * 不补就是「令牌加了、没人看它」。同时这里**不声称达到 WCAG**：描边本身就是
+   * antd 预设的 1.2~1.9 细线，拿 3.0/4.5 卡它是假命题；正确的守卫是「不得比现状差」，
+   * 下限取实测观测值：五个新令牌浅色最低 1.3731、深色合成最差 1.5833，
+   * 既有 brand-border 是 1.1930 / 1.6212。所以卡 1.15 与 1.55：既容纳存量，又挡住回退。
+   */
+  const BORDER_TOKENS = ['danger-border', 'warning-border', 'success-border', 'info-border', 'purple-border', 'brand-border']
+  const CARD_BACKS = ['surface-1', 'surface-2', 'surface-3']
+
+  it('描边阶深色值必须能合成出合法十六进制（rgba 写错会静默算出 NaN）', () => {
+    for (const name of BORDER_TOKENS) {
+      for (const back of CARD_BACKS) {
+        const composited = over(TOKEN_VALUES[name].dark, TOKEN_VALUES[back].dark)
+        expect(composited, `${name} on ${back}`).toMatch(/^#[0-9a-f]{6}$/)
+      }
+    }
+  })
+
+  it('描边阶深色值必须是带 alpha 的 rgba 四元（缺 alpha 会被静默当成不透明）', () => {
+    // 变异验证跑出来的真实缺口：`rgba(64,169,)` 这种写错形态，前面的「合成合法十六进制」
+    // 断言拓不住——toRgb 拿到三个数、alpha 默认 1，照样合成出一个合法 hex，
+    // 只是颜色完全错了。叠加型令牌的全部语义就建在 alpha 上，所以这里按严格四元卡。
+    for (const name of BORDER_TOKENS) {
+      const m = TOKEN_VALUES[name].dark.match(/^rgba\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)$/)
+      expect(m, `${name} 的深色值必须是 rgba(r,g,b,a) 四元，实际：${TOKEN_VALUES[name].dark}`).not.toBeNull()
+      const a = Number(m[4])
+      expect(a, `${name} 的 alpha 必须落在 (0,1)`).toBeGreaterThan(0)
+      expect(a, `${name} 的 alpha 必须落在 (0,1)`).toBeLessThan(1)
+    }
+  })
+
+  it.each(BORDER_TOKENS)('%s 浅色侧可见性不得跌到 1.15 以下（存量下限 1.1930）', (name) => {
+    expect(contrastRatio(TOKEN_VALUES[name].light, TOKEN_VALUES['surface-2'].light))
+      .toBeGreaterThanOrEqual(1.15)
+  })
+
+  it.each(BORDER_TOKENS)('%s 深色侧合成后可见性不得跌到 1.55 以下（观测最差 1.5833）', (name) => {
+    for (const back of CARD_BACKS) {
+      const bg = over(TOKEN_VALUES[name].dark, TOKEN_VALUES[back].dark)
+      expect(contrastRatio(bg, TOKEN_VALUES[back].dark), `${name} on ${back}`)
+        .toBeGreaterThanOrEqual(1.55)
+    }
+  })
 })
 
 describe('严格等值判据（映射表 ↔ 令牌浅色值）', () => {
@@ -245,9 +291,10 @@ describe('令牌清单一致性', () => {
     expect(incomplete, `缺主题值会导致静默 fallback：${incomplete.join(', ')}`).toEqual([])
   })
 
-  it('soft / tint / callout 类背景令牌的深色值必须用 rgba 混合，不得用浅色实底', () => {
-    // 后缀集合要覆盖所有「叠加型底色」：只认 -soft 会让新加的 *-tint / *-callout 静默逃过这条规则。
-    const TINT_SUFFIXES = /(-soft|-tint|-callout)$/
+  it('soft / tint / callout / 描边类令牌的深色值必须用 rgba 混合，不得用浅色实底', () => {
+    // 后缀集合要覆盖所有「叠加型」令牌：只认 -soft 会让新加的 *-tint / *-callout / *-border 静默逃过。
+    // 不会误伤中性描边：border-1/2/3/border-input 不以 -border 结尾（它们就该是实色）。
+    const TINT_SUFFIXES = /(-soft|-tint|-callout|-border)$/
     const offenders = Object.entries(TOKEN_VALUES)
       .filter(([name]) => TINT_SUFFIXES.test(name))
       .filter(([, v]) => !v.dark.startsWith('rgba('))

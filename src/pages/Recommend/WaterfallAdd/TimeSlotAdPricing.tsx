@@ -897,7 +897,7 @@ export default function TimeSlotAdPricing() {
         </div>
 
         {tempSelectedMerchants.length > 0 && (
-          <div style={{ marginBottom: 12, padding: '6px 12px', background: 'var(--success-soft)', borderRadius: 6, border: '1px solid #b7eb8f', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ marginBottom: 12, padding: '6px 12px', background: 'var(--success-soft)', borderRadius: 6, border: '1px solid var(--success-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 12, color: 'var(--success)', fontWeight: 500 }}>已選 {tempSelectedMerchants.length} 個商家</span>
             <Space size={4} wrap>
               {tempSelectedMerchants.slice(0, 5).map(m => (

@@ -251,7 +251,7 @@ export default function AssetList() {
               第七批曾因为「无等值令牌」而把前景退回裸值，现令牌已建、codemod 自动配齐两侧。
               实测：浅色 danger #FF4D4F on #FFF2F0 = 2.99（存量债务，未顺手改）；
               深色 #FF7875 on 合成底 #432627 = 5.30（达 AA）。见方案 §18.6。 */}
-          <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--danger-callout)', borderRadius: 6, border: '1px solid #FFCCC7', fontSize: 13, color: 'var(--danger)' }}>
+          <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--danger-callout)', borderRadius: 6, border: '1px solid var(--danger-border)', fontSize: 13, color: 'var(--danger)' }}>
             ⚠️ 報廢後資產狀態將變更為「已報廢」，此操作不可恢復，請謹慎操作。
           </div>
         </div>

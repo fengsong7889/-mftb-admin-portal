@@ -691,7 +691,7 @@ function FlowEditor() {
               padding: '8px 10px',
               background: 'var(--warning-soft)',
               borderRadius: 6,
-              border: '1px solid #FFD591',
+              border: '1px solid var(--warning-border)',
               fontSize: 11,
               color: 'var(--warning-deep)',
               lineHeight: 1.6,

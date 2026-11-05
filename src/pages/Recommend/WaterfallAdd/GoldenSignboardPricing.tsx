@@ -658,7 +658,7 @@ export default function GoldenSignboardPricing() {
                   {unpriced && (
                     <span style={{
                       fontSize: 10, color: 'var(--warning-deep)', background: 'var(--warning-soft)',
-                      border: '1px solid #FFD591', borderRadius: 4, padding: '0 4px',
+                      border: '1px solid var(--warning-border)', borderRadius: 4, padding: '0 4px',
                       lineHeight: '16px', whiteSpace: 'nowrap', flexShrink: 0,
                     }}>未定價</span>
                   )}
@@ -686,7 +686,7 @@ export default function GoldenSignboardPricing() {
             {(labelPrices[labelValue] == null || labelPrices[labelValue]! <= 0) && (
               <span style={{
                 fontSize: 10, color: 'var(--warning-deep)', background: 'var(--warning-soft)',
-                border: '1px solid #FFD591', borderRadius: 4, padding: '0 4px',
+                border: '1px solid var(--warning-border)', borderRadius: 4, padding: '0 4px',
                 lineHeight: '16px', whiteSpace: 'nowrap', flexShrink: 0,
               }}>未定價</span>
             )}
@@ -820,7 +820,7 @@ export default function GoldenSignboardPricing() {
             <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>
               系統持續銷售 {presaleDays} 天內的廣告，每過一天自動補充一天，循環銷售；
               <span style={{
-                background: 'var(--warning-soft)', border: '1px solid #FFD591', borderRadius: 4,
+                background: 'var(--warning-soft)', border: '1px solid var(--warning-border)', borderRadius: 4,
                 padding: '1px 6px', color: 'var(--warning-deep)', fontWeight: 500, fontSize: 11, marginLeft: 4,
               }}>條件規則含按月計算的標籤不受此限制</span>
             </span>

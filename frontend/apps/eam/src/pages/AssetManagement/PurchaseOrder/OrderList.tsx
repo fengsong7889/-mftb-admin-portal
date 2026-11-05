@@ -350,7 +350,7 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
               content={
                 <div style={{ maxWidth: 240 }}>
                   {suppliers.map((s, i) => (
-                    <div key={i} style={{ padding: '4px 0', borderBottom: i < suppliers.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                    <div key={i} style={{ padding: '4px 0', borderBottom: i < suppliers.length - 1 ? '1px solid var(--border-2)' : 'none' }}>
                       {s}
                     </div>
                   ))}

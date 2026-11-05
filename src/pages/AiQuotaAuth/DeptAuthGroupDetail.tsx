@@ -169,7 +169,7 @@ export default function DeptAuthGroupDetail() {
             const model = modelMap.get(config.modelId)
             return (
               <div key={config.modelId} style={{
-                border: '1px solid #D3ADF7', borderRadius: 10, padding: 16,
+                border: '1px solid var(--purple-border)', borderRadius: 10, padding: 16,
                 background: 'var(--purple-soft)',
               }}>
                 {/* 模型头部 */}
