@@ -43,6 +43,7 @@ const REQUIRED_STEPS = [
   'Stat Card Order',
   'Confirm Modal Style',
   'Theme Tokens',
+  'Half-Pair Audit',
   'i18n Coverage',
   'i18n Fallback Copy',
   'Secret Scan',

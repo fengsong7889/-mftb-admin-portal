@@ -94,6 +94,10 @@ jobs:
       # 主题令牌棘轮门禁（方案 §8.2）：裸色值只减不增 + 令牌双源一致，与本地 npm run verify 同序（confirm-modal 之后、i18n 之前）
       - name: Theme Tokens
         run: npm run check:theme-tokens
+      # 半对门禁（方案 §17.2 / §18.2 第 4c 步）：拦住「一侧令牌、一侧钉裸色」的改了一半。
+      # 裸色计数只降不能发现它——两侧都裸也是降；所以单独按 style 块聚合计棘轮。
+      - name: Half-Pair Audit
+        run: npm run check:halfpair
       - name: i18n Coverage
         run: npm run check:i18n
       - name: i18n Fallback Copy
