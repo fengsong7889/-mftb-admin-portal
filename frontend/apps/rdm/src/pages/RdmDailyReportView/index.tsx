@@ -7,6 +7,7 @@ import { Button, Segmented, Spin } from 'antd'
 import GroupLogo from '@/components/GroupLogo'
 import {
   AppstoreOutlined,
+  CheckOutlined,
   ClockCircleOutlined,
   ColumnWidthOutlined,
   CopyOutlined,
@@ -24,6 +25,7 @@ import HelpPopover, { type HelpSection } from '@/components/HelpPopover'
 import GanttBoard, { type GanttDraft, type GanttRow, type GanttTask } from '../Rdm/components/GanttBoard'
 import { fetchDailyReportPublicView, type DailyReportPublicView } from '@/api/rdmDailyReportPublic'
 import { changeAppLanguage, LANGUAGE_STORAGE_KEY } from '@/i18n'
+import { applyWebViewTitle } from '@/utils/webViewTitle'
 import type {
   DailyReportIteration,
   DailyReportProject,
@@ -212,10 +214,11 @@ export default function RdmDailyReportView() {
   }, [i18n])
 
   // Keep page-specific copy local until UI confirmation; the embedded preview must not change the host title.
-  const pageTitle = i18n.language?.startsWith('zh') ? '項目進度匯報' : 'Project progress report'
+  // 顶栏归属名按用户口径固定为「项目汇报」；页内主标题仍是「進度日報看板」，两者不混用。
+  const pageTitle = i18n.language?.startsWith('zh') ? '項目匯報' : 'Project Report'
   useLayoutEffect(() => {
     const previousTitle = document.title
-    document.title = pageTitle
+    applyWebViewTitle(pageTitle)
     return () => { document.title = previousTitle }
   }, [pageTitle])
 
@@ -317,6 +320,13 @@ function BoardUtilityBar() {
     setCopyState((await writeClipboard(window.location.href)) ? 'done' : 'failed')
   }, [])
 
+  const copyLabel = copyState === 'done'
+    ? t('rdm.board.copyLinkDone', { defaultValue: '已複製連結' })
+    : copyState === 'failed'
+      ? t('rdm.board.copyLinkFailedShort', { defaultValue: '請手動複製' })
+      : t('rdm.board.copyLink', { defaultValue: '複製連結' })
+  const openLabel = t('rdm.board.openInBrowser', { defaultValue: '在瀏覽器打開' })
+
   return (
     <div className="rdm-board-utility-bar">
       <Segmented
@@ -330,16 +340,12 @@ function BoardUtilityBar() {
           { value: 'en', label: t('rdm.board.langEn', { defaultValue: 'EN' }) },
         ]}
       />
-      <Button size="small" icon={<CopyOutlined />} onClick={() => void copyLink()}>
-        {copyState === 'done'
-          ? t('rdm.board.copyLinkDone', { defaultValue: '已複製連結' })
-          : copyState === 'failed'
-            ? t('rdm.board.copyLinkFailedShort', { defaultValue: '請手動複製' })
-            : t('rdm.board.copyLink', { defaultValue: '複製連結' })}
-      </Button>
-      <Button size="small" type="primary" icon={<ExportOutlined />} onClick={openInBrowser}>
-        {t('rdm.board.openInBrowser', { defaultValue: '在瀏覽器打開' })}
-      </Button>
+      {/* 复制/打开改图标按钮：钉钉侧边栏约 490px，带文字的按钮会把工具条挤成两行 */}
+      <Button size="small" type="text" icon={copyState === 'done' ? <CheckOutlined /> : <CopyOutlined />}
+        aria-label={copyLabel} title={copyLabel} onClick={() => void copyLink()} />
+      <Button size="small" type="text" icon={<ExportOutlined />}
+        aria-label={openLabel} title={openLabel} onClick={openInBrowser} />
+      <span aria-live="polite" className="rdm-board-sr-only">{copyState === 'idle' ? '' : copyLabel}</span>
     </div>
   )
 }

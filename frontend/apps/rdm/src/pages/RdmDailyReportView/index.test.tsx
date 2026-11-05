@@ -155,12 +155,12 @@ describe('進度日報看板（開放頁）', () => {
     fetchView.mockReturnValue(new Promise(() => {}))
     document.title = 'MFTB Group Portal'
     const page = openPage()
-    await waitFor(() => expect(document.title).toBe('項目進度匯報'))
+    await waitFor(() => expect(document.title).toBe('項目匯報'))
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBeNull()
     fireEvent.click(screen.getByRole('radio', { name: 'EN' }))
-    await waitFor(() => expect(document.title).toBe('Project progress report'))
+    await waitFor(() => expect(document.title).toBe('Project Report'))
     fireEvent.click(screen.getByRole('radio', { name: '中文' }))
-    await waitFor(() => expect(document.title).toBe('項目進度匯報'))
+    await waitFor(() => expect(document.title).toBe('項目匯報'))
     page.unmount()
     expect(document.title).toBe('MFTB Group Portal')
   })
@@ -503,7 +503,7 @@ describe('進度日報看板（開放頁）', () => {
     openPage('/rdm-daily-view')
     await waitFor(() => expect(screen.getByText('缺少查看令牌')).toBeInTheDocument())
     expect(fetchView).not.toHaveBeenCalled()
-    expect(document.title).toBe('項目進度匯報')
+    expect(document.title).toBe('項目匯報')
   })
 
   it('令牌失效：展示后端返回的原因，而不是空白页', async () => {
@@ -517,7 +517,7 @@ describe('進度日報看板（開放頁）', () => {
     openPage('/rdm-daily-view?token=expired')
     await waitFor(() => expect(screen.getByText('連結不可用')).toBeInTheDocument())
     expect(screen.getByText('連結已過期，請聯繫推送人重新發送')).toBeInTheDocument()
-    expect(document.title).toBe('項目進度匯報')
+    expect(document.title).toBe('項目匯報')
   })
 
   it('接口异常：页面自己承接错误并给出重试入口', async () => {

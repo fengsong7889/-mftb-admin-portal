@@ -48,6 +48,17 @@
   flex-shrink: 0;
 }
 
+/* 图标按钮的复制结果播报给读屏用户：视觉隐藏但保留在无障碍树里 */
+.rdm-board-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 /* ── 载入与提示 ── */
 .rdm-board-center {
   display: flex;
