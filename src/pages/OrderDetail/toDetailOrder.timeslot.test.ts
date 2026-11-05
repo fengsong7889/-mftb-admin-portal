@@ -93,4 +93,18 @@ describe('toDetailOrder 時段推薦兩段式折扣', () => {
     // salePrice/originalPrice=90/100 → 反推 9 折
     expect(order.slotPrices[0].discount).toBe(9)
   })
+
+  it('推廣中：按已投放日期生成 mock 推廣數據（待推廣不生成）', () => {
+    const pending = toDetailOrder(buildVo())
+    expect(pending.promoData).toBeUndefined()
+    const promoting = toDetailOrder({ ...buildVo(), status: 2 })
+    // 3 格全部 bizDate ≤ 今天（構造日期為過去/當天）→ 3 條明細，CTR 合法
+    expect(promoting.promoData).toHaveLength(3)
+    promoting.promoData!.forEach(rec => {
+      expect(rec.impressions).toBeGreaterThan(0)
+      expect(rec.clickRate).toBeGreaterThanOrEqual(0)
+      expect(rec.clickRate).toBeLessThan(100)
+      expect(rec.slot).toBeTruthy()
+    })
+  })
 })

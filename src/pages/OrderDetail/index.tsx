@@ -1815,6 +1815,45 @@ export default function OrderDetail() {
                         </div>
                       )
                     })()
+                  ) : isTimeSlotAd ? (
+                    /* 時段推薦：已投放「日期×時段」平鋪明細（效果數據為 mock 過渡，統計 API 落地後替換） */
+                    (() => {
+                      const data = order.promoData || []
+                      return (
+                        <div style={{ border: '1px solid var(--border-2)', borderRadius: 8, overflow: 'hidden', marginBottom: 12 }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
+                            <colgroup>
+                              <col style={{ width: '22%' }} /><col style={{ width: '20%' }} /><col style={{ width: '20%' }} /><col style={{ width: '18%' }} /><col style={{ width: '20%' }} />
+                            </colgroup>
+                            <thead>
+                              <tr style={{ background: 'var(--surface-3)' }}>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.promoDate')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colSlot')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colImpressions')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colClicks')}</th>
+                                <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colCtr')}</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {data.map((rec, ri) => (
+                                <tr key={ri} style={{ borderTop: ri > 0 ? '1px solid #f0f0f0' : 'none' }}>
+                                  <td style={{ padding: '8px 16px', textAlign: 'center' }}>{rec.date}</td>
+                                  <td style={{ padding: '8px 16px', textAlign: 'center' }}>{rec.slot || t('orderDetail.fullDaySlot')}</td>
+                                  <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500 }}>{rec.impressions.toLocaleString()}</td>
+                                  <td style={{ padding: '8px 16px', textAlign: 'center', color: 'var(--success)', fontWeight: 500 }}>{rec.clicks}</td>
+                                  <td style={{ padding: '8px 16px', textAlign: 'center' }}>
+                                    <span style={{
+                                      color: rec.clickRate >= 8 ? '#52C41A' : rec.clickRate >= 5 ? '#E8720C' : '#FF4D4F',
+                                      fontWeight: 600,
+                                    }}>{rec.clickRate}%</span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )
+                    })()
                   ) : (
                     /* 无敌星星：按日期分组，商圈 rowSpan 合并 */
                     (() => {

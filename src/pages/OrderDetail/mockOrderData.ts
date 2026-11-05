@@ -79,6 +79,23 @@ function genPopularPromoData(regionName: string, purchaseDays: string[]): PromoR
   })
 }
 
+/** 時段推薦推廣數據：效果統計 API 未接入，暫按「時段×已投放日期」用 mock 數據代替（統計接口落地後替換） */
+function genTimeSlotPromoData(items: AdOrderDetail['items']): PromoRecord[] {
+  const today = dayjs().format('YYYY-MM-DD')
+  return items
+    .filter(i => i.bizDate <= today)
+    .map((it, i) => {
+      const imp = 800 + i * 160 + Math.floor(Math.random() * 400)
+      const clk = 55 + i * 8 + Math.floor(Math.random() * 30)
+      return {
+        date: it.bizDate, region: '-', slot: it.mealSlot || '',
+        waterfallName: '時段推薦廣告', position: 1,
+        impressions: imp, clicks: clk,
+        clickRate: +((clk / imp) * 100).toFixed(1),
+      }
+    })
+}
+
 /** 后端订单详情 → 详情页 OrderItem（明细折扣还原为定价配置的时段折扣口径） */
 export function toDetailOrder(
   vo: AdOrderDetail,
@@ -173,9 +190,8 @@ export function toDetailOrder(
       finalSubtotal,
     }
   }
-  // TODO: 对接推广效果统计 API，当前不再生成 mock 推广数据
+  // TODO: 對接推廣效果統計 API；當前時段推薦用 mock 過渡，其他類型仍為空
   const mappedStatus = mapAdStatus(vo.status)
-  void mappedStatus // 未来对接推广 API 时使用
   return {
     id: vo.orderNo,
     orderNo: vo.orderNo,
@@ -210,7 +226,9 @@ export function toDetailOrder(
     labelDates: vo.labelDates?.map(ld => ({ label: ld.label, scenario: ld.scenario, dates: ld.dates })),
     giftDays: vo.giftDays ?? 0,
     giftAmount: vo.giftAmount ?? 0,
-    promoData: undefined,
+    promoData: vo.algoType === 16 && (mappedStatus === OrderStatus.PROMOTING || mappedStatus === OrderStatus.PROMOTED)
+      ? genTimeSlotPromoData(vo.items)
+      : undefined,
     source: 'api',
   }
 }
