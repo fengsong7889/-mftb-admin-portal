@@ -454,7 +454,7 @@ export default function AiAccessApply() {
     <div className="content-area" style={{ padding: 24 }}>
       {/* ====== 頁面頭部 ====== */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
       }}>
         <div style={{
@@ -467,7 +467,7 @@ export default function AiAccessApply() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button type="primary" icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)}
               style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                backgroundColor: 'var(--brand)', borderColor: 'var(--brand)',
                 borderRadius: 8, height: 36, padding: '0 16px',
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
@@ -476,7 +476,7 @@ export default function AiAccessApply() {
             </Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>
                 {t('aiApply.pageTitle')}
               </h2>
               <Tag style={{ fontSize: 11, color: '#1677FF', borderColor: '#1677FF' }}>{t('oaRequests.aiAccessType')}</Tag>
@@ -487,58 +487,58 @@ export default function AiAccessApply() {
 
       {/* ====== 基本信息（自動填充） ====== */}
       <div style={{
-        border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
+        border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)',
         padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
           <div style={{
-            width: 28, height: 28, borderRadius: 6, background: '#fff7e6',
+            width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <FileTextOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+            <FileTextOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiApply.basicInfo')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiApply.basicInfo')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
         {/* 第一行：申請人、申請日期、流程編號 */}
         <Row gutter={24} style={{ marginBottom: 16 }}>
           <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiApply.applicant')}</div>
-            <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('aiApply.applicant')}</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-1)' }}>
               {user ? (user.empId ? `${user.name}(${user.empId})` : user.name) : '-'}
             </div>
           </Col>
           <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiApply.applyDate')}</div>
-            <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{applyDate}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('aiApply.applyDate')}</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-1)' }}>{applyDate}</div>
           </Col>
           <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiApply.flowNo')}</div>
-            <div style={{ fontSize: 13, color: '#BFBFBF' }}>{t('aiApply.flowNoAuto')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('aiApply.flowNo')}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-4)' }}>{t('aiApply.flowNoAuto')}</div>
           </Col>
         </Row>
 
         {/* 第二行：所屬公司、服務部門、職位 */}
         <Row gutter={24} style={{ marginBottom: 16 }}>
           <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiApply.company')}</div>
-            <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{t('aiApply.companyName')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('aiApply.company')}</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-1)' }}>{t('aiApply.companyName')}</div>
           </Col>
           <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiApply.department')}</div>
-            <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{user?.department || '-'}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('aiApply.department')}</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-1)' }}>{user?.department || '-'}</div>
           </Col>
           <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiApply.position')}</div>
-            <div style={{ fontSize: 14, fontWeight: 500, color: '#262626' }}>{user?.position || '-'}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('aiApply.position')}</div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-1)' }}>{user?.position || '-'}</div>
           </Col>
         </Row>
 
         {/* 第三行：流程狀態 */}
         <Row gutter={24}>
           <Col span={8}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('approvalCenter.colFlowStatus')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('approvalCenter.colFlowStatus')}</div>
             <div>
               <Tag color="warning" style={{ fontSize: 13, padding: '2px 10px' }}>{t('approvalCenter.flowDraft')}</Tag>
             </div>
@@ -549,14 +549,14 @@ export default function AiAccessApply() {
       {/* ====== 當前狀態摘要 ====== */}
       {isBlockedEntry && (
       <div style={{
-        border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
+        border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)',
         padding: '16px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <LockOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <LockOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiApply.currentStatus')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiApply.currentStatus')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -572,25 +572,25 @@ export default function AiAccessApply() {
 
       {/* ====== 申請類型 ====== */}
       <div style={{
-        border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
+        border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)',
         padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <SendOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <SendOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiApply.applyInfo')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiApply.applyInfo')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
         <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>{t('aiApply.requestType')}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 8 }}>{t('aiApply.requestType')}</div>
           <Select value={requestType} onChange={(v) => { setRequestType(v); if (v === 'quota_only') setSelectedModels([]) }}
             style={{ width: 360 }}
             options={typeOptions.map((o) => ({
               label: o.disabled ? (
                 <Tooltip title={o.disabledTip}>
-                  <span style={{ color: '#bfbfbf' }}>{o.label}</span>
+                  <span style={{ color: 'var(--text-4)' }}>{o.label}</span>
                 </Tooltip>
               ) : o.label,
               value: o.value,
@@ -603,22 +603,22 @@ export default function AiAccessApply() {
       {/* ====== 模型選擇區（僅 model_only / model_and_quota 展示） ====== */}
       {showModelSection && modelsLoaded && (
         <div style={{
-          border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
+          border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)',
           padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <CheckCircleOutlined style={{ fontSize: 14, color: '#722ed1' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--purple-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CheckCircleOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiApply.modelSelect')}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiApply.modelSelect')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('aiApply.modelHint')}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('aiApply.modelHint')}</span>
           </div>
 
           {/* 已授權模型 */}
           {authorizedModels.length > 0 && (
             <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 13, color: '#52c41a', marginBottom: 10, fontWeight: 600 }}>
+              <div style={{ fontSize: 13, color: 'var(--success)', marginBottom: 10, fontWeight: 600 }}>
                 <CheckCircleOutlined style={{ marginRight: 6 }} />
                 {t('aiApply.authorizedModels')}（{authorizedModels.length}）
               </div>
@@ -628,12 +628,12 @@ export default function AiAccessApply() {
                 {authorizedModels.map((m) => (
                   <div key={m.id} style={{
                     display: 'flex', alignItems: 'center', padding: '6px 0',
-                    borderBottom: '1px solid #f0f0f0',
+                    borderBottom: '1px solid var(--border-2)',
                   }}>
-                    <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8, fontSize: 14 }} />
-                    <span style={{ fontSize: 13, fontWeight: 500, color: '#262626' }}>{m.name || m.modelKey}</span>
+                    <CheckCircleOutlined style={{ color: 'var(--success)', marginRight: 8, fontSize: 14 }} />
+                    <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-1)' }}>{m.name || m.modelKey}</span>
                     {m.providerName && (
-                      <span style={{ fontSize: 12, color: '#8c8c8c', marginLeft: 8 }}>({m.providerName})</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>({m.providerName})</span>
                     )}
                     {renderCapabilityTags(m)}
                   </div>
@@ -645,7 +645,7 @@ export default function AiAccessApply() {
           {/* 可申請模型 */}
           {availableModels.length > 0 ? (
             <div>
-              <div style={{ fontSize: 13, color: '#1890ff', marginBottom: 10, fontWeight: 600 }}>
+              <div style={{ fontSize: 13, color: 'var(--info)', marginBottom: 10, fontWeight: 600 }}>
                 <LockOutlined style={{ marginRight: 6 }} />
                 {t('aiApply.availableModels')}（{t('aiApply.clickToSelect')}）
               </div>
@@ -660,7 +660,7 @@ export default function AiAccessApply() {
                       style={{
                         border: `1px solid ${isSelected ? '#1890ff' : '#e8eaed'}`,
                         borderRadius: 8, padding: '10px 14px', cursor: 'pointer',
-                        background: isSelected ? '#e6f7ff' : '#fff',
+                        background: isSelected ? 'var(--info-soft)' : 'var(--surface-2)',
                         transition: 'all 0.2s', minWidth: 200,
                       }}
                     >
@@ -668,7 +668,7 @@ export default function AiAccessApply() {
                         <div style={{
                           width: 18, height: 18, borderRadius: 4,
                           border: `2px solid ${isSelected ? '#1890ff' : '#d9d9d9'}`,
-                          background: isSelected ? '#1890ff' : '#fff',
+                          background: isSelected ? '#1890ff' : 'var(--surface-2)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           transition: 'all 0.2s', flexShrink: 0,
                         }}>
@@ -676,7 +676,7 @@ export default function AiAccessApply() {
                         </div>
                         <span style={{ fontSize: 13, fontWeight: 500 }}>{m.name || m.modelKey}</span>
                         {m.providerName && (
-                          <span style={{ fontSize: 11, color: '#8c8c8c' }}>({m.providerName})</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-3)' }}>({m.providerName})</span>
                         )}
                       </div>
                       <div style={{ marginTop: 6 }}>{renderCapabilityTags(m)}</div>
@@ -686,13 +686,13 @@ export default function AiAccessApply() {
               </div>
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: '20px 0', color: '#8c8c8c', fontSize: 13 }}>
+            <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-3)', fontSize: 13 }}>
               {t('aiApply.allModelsAuthorized')}
             </div>
           )}
 
           {/* 底部提示 */}
-          <div style={{ marginTop: 16, fontSize: 12, color: '#8c8c8c', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ marginTop: 16, fontSize: 12, color: 'var(--text-3)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <QuestionCircleOutlined />
             {t('aiApply.modelSelectHint')}
           </div>
@@ -701,22 +701,22 @@ export default function AiAccessApply() {
 
       {/* ====== 用途說明 ====== */}
       <div style={{
-        border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
+        border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)',
         padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <CheckCircleOutlined style={{ fontSize: 14, color: '#52c41a' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--success-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CheckCircleOutlined style={{ fontSize: 14, color: 'var(--success)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiApply.usageInfo')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiApply.usageInfo')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           {/* 用途說明 */}
           <div style={{ gridColumn: '1 / -1' }}>
-            <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>
-              {t('aiApply.usageDescription')} <span style={{ color: '#ff4d4f' }}>*</span>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 8 }}>
+              {t('aiApply.usageDescription')} <span style={{ color: 'var(--danger)' }}>*</span>
             </div>
             <TextArea
               value={usageDesc}
@@ -730,7 +730,7 @@ export default function AiAccessApply() {
 
           {/* 使用場景（多選標籤）+ 使用頻率 並排 */}
           <div>
-            <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 8 }}>
               {t('aiApply.usageScenarios')}
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -745,8 +745,8 @@ export default function AiAccessApply() {
                     style={{
                       cursor: 'pointer', fontSize: 13, padding: '4px 12px', borderRadius: 6,
                       border: `1px solid ${active ? '#1890ff' : '#d9d9d9'}`,
-                      background: active ? '#e6f7ff' : '#fff',
-                      color: active ? '#1890ff' : '#595959',
+                      background: active ? 'var(--info-soft)' : 'var(--surface-2)',
+                      color: active ? 'var(--info)' : 'var(--text-2)',
                       transition: 'all 0.2s',
                     }}
                   >
@@ -759,7 +759,7 @@ export default function AiAccessApply() {
 
           {/* 使用頻率 */}
           <div>
-            <div style={{ fontSize: 13, color: '#595959', marginBottom: 8 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 8 }}>
               {t('aiApply.usageFrequency')}
             </div>
             <Radio.Group
@@ -778,24 +778,24 @@ export default function AiAccessApply() {
 
       {/* ====== 相關憑證（選填，隨申請一併提交供審批人查看） ====== */}
       <div style={{
-        border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
+        border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)',
         padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
           <div style={{
-            width: 28, height: 28, borderRadius: 6, background: '#e6f7ff',
+            width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <UploadOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+            <UploadOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>相關憑證</span>
-          <span style={{ fontSize: 12, color: '#8C8C8C', fontWeight: 400 }}>支持 JPG、PNG、PDF，單文件不超過 5MB</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>相關憑證</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)', fontWeight: 400 }}>支持 JPG、PNG、PDF，單文件不超過 5MB</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-start' }}>
           {credentials.map((c, i) => (
-            <div key={`${c.name}_${i}`} style={{
+            <div key={`${c.name}_${i}`} style={{ /* theme-pair-locked：描边 #e8e8e8 与 --border-2(#F0F0F0) 不等值，底色只能跟着继续钉住 */
               width: 88, height: 88, border: '1px solid #e8e8e8', borderRadius: 8,
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               position: 'relative', background: '#fafafa',
@@ -804,7 +804,7 @@ export default function AiAccessApply() {
                 ? <FilePdfOutlined style={{ fontSize: 28, color: '#E53935' }} />
                 : <FileImageOutlined style={{ fontSize: 28, color: '#1976D2' }} />}
               <span style={{
-                fontSize: 10, color: '#999', marginTop: 4, maxWidth: 76,
+                fontSize: 10, color: 'var(--text-hint)', marginTop: 4, maxWidth: 76,
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>{c.name}</span>
               <Button type="text" size="small" danger
@@ -825,22 +825,26 @@ export default function AiAccessApply() {
               beforeUpload={handleUploadCredential}
             >
               <div style={{
-                width: 88, height: 88, border: '1px dashed #d9d9d9', borderRadius: 8,
+                width: 88, height: 88, border: '1px dashed var(--border-1)', borderRadius: 8,
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', color: '#999', fontSize: 12, background: '#fafafa',
+                cursor: 'pointer', color: 'var(--text-hint)', fontSize: 12, background: 'var(--surface-3)',
                 transition: 'all 0.3s',
               }}
                 onMouseEnter={(e) => {
                   const el = e.currentTarget
-                  el.style.borderColor = '#E8720C'
-                  el.style.background = '#fff7e6'
-                  el.style.color = '#E8720C'
+                  // 必须写令牌而不是裸色：基态的 border/background/color 本批已被令牌化，
+                  // 而 React 只在 vdom 的 style 值发生变化时才写 DOM——handler 里留裸值
+                  // 会深色下 hover 一次就永久粘住浅色块（方案 §18.6 第三类盲区）。
+                  el.style.borderColor = 'var(--brand)'
+                  el.style.background = 'var(--warning-soft)'
+                  el.style.color = 'var(--brand)'
                 }}
                 onMouseLeave={(e) => {
                   const el = e.currentTarget
-                  el.style.borderColor = '#d9d9d9'
-                  el.style.background = '#fafafa'
-                  el.style.color = '#999'
+                  // 恢复值必须与基态用同一令牌，否则仍然会粘住
+                  el.style.borderColor = 'var(--border-1)'
+                  el.style.background = 'var(--surface-3)'
+                  el.style.color = 'var(--text-hint)'
                 }}
               >
                 <UploadOutlined style={{ fontSize: 22, marginBottom: 4, color: 'inherit' }} />
@@ -871,7 +875,7 @@ export default function AiAccessApply() {
           zIndex: 1000,
         }}>
           <div style={{
-            background: '#fff', borderRadius: 12, padding: '32px 28px',
+            background: 'var(--surface-2)', borderRadius: 12, padding: '32px 28px',
             width: 400, textAlign: 'center',
             boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
           }}>
@@ -884,14 +888,14 @@ export default function AiAccessApply() {
             }}>
               <span style={{ fontSize: 32, color: '#fff' }}>✓</span>
             </div>
-            <h3 style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 12 }}>
+            <h3 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-1)', marginBottom: 12 }}>
               {t('aiApply.submitSuccessTitle')}
             </h3>
-            <p style={{ fontSize: 14, color: '#595959', lineHeight: 1.8, marginBottom: 24 }}>
+            <p style={{ fontSize: 14, color: 'var(--text-2)', lineHeight: 1.8, marginBottom: 24 }}>
               {submittedFlowNo && (
                 <>
                   {t('aiApply.flowNoLabel')}
-                  <span style={{ color: '#E8720C', fontWeight: 500 }}>{submittedFlowNo}</span>
+                  <span style={{ color: 'var(--brand)', fontWeight: 500 }}>{submittedFlowNo}</span>
                   <br />
                 </>
               )}
