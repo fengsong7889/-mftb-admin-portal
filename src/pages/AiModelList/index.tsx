@@ -43,7 +43,7 @@ const StatCard = ({ icon, value, label, color, bg }: { icon: React.ReactNode; va
   >
     <div style={{ fontSize: 20, color, marginBottom: 6 }}>{icon}</div>
     <div style={{ fontSize: 22, fontWeight: 700, color }}>{value}</div>
-    <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 2 }}>{label}</div>
+    <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{label}</div>
   </div>
 )
 
@@ -318,10 +318,10 @@ export default function AiModelList() {
       title: '模型名稱', key: 'name', width: 220, fixed: 'left',
       render: (_, row) => (
         <div>
-          <div style={{ fontWeight: 600, color: '#262626' }}>{row.name}</div>
-          <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 2 }}>
+          <div style={{ fontWeight: 600, color: 'var(--text-1)' }}>{row.name}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 2 }}>
             <span style={{ fontFamily: 'monospace' }}>{row.modelKey}</span>
-            {row.version && <span style={{ marginLeft: 6, color: '#BFBFBF' }}>· {row.version}</span>}
+            {row.version && <span style={{ marginLeft: 6, color: 'var(--text-4)' }}>· {row.version}</span>}
           </div>
         </div>
       ),
@@ -335,7 +335,7 @@ export default function AiModelList() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span>{name}</span>
             {isConnected ? (
-              <Tooltip title="已對接"><CheckCircleOutlined style={{ color: '#52C41A', fontSize: 12 }} /></Tooltip>
+              <Tooltip title="已對接"><CheckCircleOutlined style={{ color: 'var(--success)', fontSize: 12 }} /></Tooltip>
             ) : (
               <Tooltip title="未對接"><CloseCircleOutlined style={{ color: '#D9D9D9', fontSize: 12 }} /></Tooltip>
             )}
@@ -359,8 +359,8 @@ export default function AiModelList() {
       title: '上下文 / 最大輸出', key: 'context', width: 150,
       render: (_, row) => (
         <div style={{ fontSize: 12 }}>
-          <div>↑ <span style={{ color: '#1890FF', fontWeight: 600 }}>{contextLengthText(row.contextWindow)}</span></div>
-          <div style={{ color: '#8C8C8C', marginTop: 2 }}>↓ {contextLengthText(row.maxOutputTokens)}</div>
+          <div>↑ <span style={{ color: 'var(--info)', fontWeight: 600 }}>{contextLengthText(row.contextWindow)}</span></div>
+          <div style={{ color: 'var(--text-3)', marginTop: 2 }}>↓ {contextLengthText(row.maxOutputTokens)}</div>
         </div>
       ),
     },
@@ -371,13 +371,13 @@ export default function AiModelList() {
         return (
           <div style={{ fontSize: 12 }}>
             <div>
-              <span style={{ color: '#8C8C8C' }}>入 </span>
-              <span style={{ color: '#52C41A', fontWeight: 600 }}>{sym}{row.inputPrice ?? '-'}</span>
+              <span style={{ color: 'var(--text-3)' }}>入 </span>
+              <span style={{ color: 'var(--success)', fontWeight: 600 }}>{sym}{row.inputPrice ?? '-'}</span>
             </div>
             <div style={{ marginTop: 2 }}>
-              <span style={{ color: '#8C8C8C' }}>出 </span>
-              <span style={{ color: '#E8720C', fontWeight: 600 }}>{sym}{row.outputPrice ?? '-'}</span>
-              <span style={{ color: '#BFBFBF', fontSize: 10, marginLeft: 2 }}>/百萬</span>
+              <span style={{ color: 'var(--text-3)' }}>出 </span>
+              <span style={{ color: 'var(--brand)', fontWeight: 600 }}>{sym}{row.outputPrice ?? '-'}</span>
+              <span style={{ color: 'var(--text-4)', fontSize: 10, marginLeft: 2 }}>/百萬</span>
             </div>
           </div>
         )

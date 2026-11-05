@@ -216,6 +216,48 @@ describe('补充阶令牌的合成对比度（danger-callout / warning-deep / in
     expect(COLOR_TO_TOKEN.bg?.d6e4ff).toBeUndefined()
   })
 
+  /*
+   * antd v4 实色灰两兄弟（text-hint / text-body）。
+   * 它俩存量合计 229 处前景位，不建令牌则每个新批次撞上它们都会因为
+   * 「一侧跟主题、一侧钉 #999/#666」而造出新半对（第九批就是在 AiAccessApply 的 hover 块上碰到的）。
+   */
+  it('text-body 两侧都必须达 AA（浅色 5.7418 / 深色 6.7710）', () => {
+    expect(contrastRatio(TOKEN_VALUES['text-body'].light, TOKEN_VALUES['surface-2'].light))
+      .toBeGreaterThanOrEqual(4.5)
+    expect(contrastRatio(TOKEN_VALUES['text-body'].dark, TOKEN_VALUES['surface-2'].dark))
+      .toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('text-hint 深色必须达 AA；浅色按存量 2.84 卡下限（存量 a11y 欠标，不假装达标）', () => {
+    expect(contrastRatio(TOKEN_VALUES['text-hint'].dark, TOKEN_VALUES['surface-2'].dark))
+      .toBeGreaterThanOrEqual(4.5)
+    // 实测 #999999 on 白底 = 2.8490，143 处都是这个观感。令牌化只保证两侧都跟随主题，
+    // 不把下限抬到 4.5 来“做绿”（那会红），也不声称它达标：按存量卡住，防止取值被改得更差。
+    expect(contrastRatio(TOKEN_VALUES['text-hint'].light, TOKEN_VALUES['surface-2'].light))
+      .toBeGreaterThanOrEqual(2.8)
+  })
+
+  it('两个 v4 灰不得进 bg/border 段（#999 站内确有描边用法，不能被当背景色换）', () => {
+    for (const seg of ['bg', 'border']) {
+      for (const hex of ['999999', '666666']) {
+        expect(COLOR_TO_TOKEN[seg]?.[hex], `${seg} 段不该有 #${hex}`).toBeUndefined()
+      }
+    }
+  })
+
+  it('同族文字令牌的亮度必须与重要性单调一致（浅色越不重要越浅、深色越不重要越暗）', () => {
+    // 排序按浅色真值：#262626 < #595959 < #666666 < #8C8C8C < #999999 < #BFBFBF
+    const rank = ['text-1', 'text-2', 'text-body', 'text-3', 'text-hint', 'text-4']
+    for (let i = 1; i < rank.length; i += 1) {
+      const prevL = parseInt(TOKEN_VALUES[rank[i - 1]].light.slice(1, 3), 16)
+      const curL = parseInt(TOKEN_VALUES[rank[i]].light.slice(1, 3), 16)
+      expect(curL, `浅色 ${rank[i]} 应不比 ${rank[i - 1]} 更深`).toBeGreaterThanOrEqual(prevL)
+      const prevD = parseInt(TOKEN_VALUES[rank[i - 1]].dark.slice(1, 3), 16)
+      const curD = parseInt(TOKEN_VALUES[rank[i]].dark.slice(1, 3), 16)
+      expect(curD, `深色 ${rank[i]}(${TOKEN_VALUES[rank[i]].dark}) 不得比 ${rank[i - 1]}(${TOKEN_VALUES[rank[i - 1]].dark}) 更亮`).toBeLessThanOrEqual(prevD)
+    }
+  })
+
   it('每个段的 hex 键必须唯一：重复键会被后者静默覆盖，运行时根本看不出来', () => {
     /*
      * 真实踩过一次：本轮差点新建 --warning-callout（#FFF7E6），而 #FFF7E6 已是

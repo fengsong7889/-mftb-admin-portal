@@ -43,6 +43,8 @@ export const SEMANTIC_TOKENS = [
   'surface-1', 'surface-2', 'surface-3', 'surface-hover', 'surface-sunken', 'header-glass', 'art-surface',
   // 文字
   'text-1', 'text-2', 'text-3', 'text-4', 'on-brand', 'text-brand', 'header-text',
+  // antd v4 实色灰（与上面 v5 中性阶共存，存量共 229 处前景位）
+  'text-hint', 'text-body',
   // 边框
   'border-1', 'border-2', 'border-3', 'border-input',
   // 语义色描边阶（antd 实色淡彩档；浅色严格等于站内字面量，深色沿用 brand-border 的 rgba 合成约定）
@@ -226,6 +228,22 @@ export const TOKEN_VALUES = {
    * 两个令牌共用一个深色值不是错误：#F59432 就是「品牌色的亮档」，深色下不需要再区分两档深橙。
    */
   'brand-deep': { light: '#AD4E00', dark: '#F59432' },
+  /*
+   * antd v4 灰阶文字三兄弟里的两个（#333 不进来：它在站内多语义——侧边栏激活底、
+   * 表头色、正文深色，按§18.5「语义单一」继续留在 REVIEW_REQUIRED）。
+   * 仓内共存着两套灰阶：本令牌的 v4 实色灰（#666/#999）与 text-1..4 的 v5 中性阶
+   * （#262626/#595959/#8C8C8C/#BFBFBF）。收敛到一开会改 140+86 处浅色观感，所以先按角色各建令牌。
+   * 取 antd v4 自己的角色名而不占 text-N 编号：#666/#999 在亮度上分别落在 text-2/text-3 之间，
+   * 叫 text-25 / text-35 只会让人以为是编号笔误。
+   * 深色保持与同族单调一致（越不重要越暗）：text-body #A6A6A6 > text-hint #8A8A8A，
+   * 实测 on surface-2(#1F1F1F) 分别为 6.7710 / 4.7746（均过 AA 4.5；on surface-3 分别 6.2167 / 4.3837，
+   * text-hint 在沉阴底上略低 4.5，已在断言里按实际背板分别卡而不是笼统写“达 AA”）。
+   * ⚠ 浅色侧 text-hint 是**存量 a11y 欠标**（不是本次引入）：#999999 on #FFF = 2.8490，
+   *   143 处都是这个观感；而 text-body 的 #666666 on #FFF = 5.7418 本就达 AA。
+   *   严格等值只保证不变差，所以单测对 text-hint 按存量卡下限（2.8）而不是按 4.5 假装达标。
+   */
+  'text-hint': { light: '#999999', dark: '#8A8A8A' },
+  'text-body': { light: '#666666', dark: '#A6A6A6' },
   // 组件层
   'sidebar-bg': { light: '#1E1E1E', dark: '#1A1A1A' },
   'sidebar-item-color': { light: '#B0B0B0', dark: '#A6A6A6' },
@@ -325,6 +343,10 @@ export const COLOR_TO_TOKEN = {
     // 描边位不跟着换是故意的（geekblue 描边另有 --info-hover-border 表示）。
     '2f54eb': 'info-deep',
     ad4e00: 'brand-deep',
+    // v4 实色灰：只进 fg。#999 全站 153 处里有 143 处在前景位，剩下的少量在描边位，
+    // 不跟着换是故意的（描边另有 border 族令牌），不能让它被映射成文字色。
+    '999999': 'text-hint',
+    '666666': 'text-body',
   },
   /** border* / outline / stroke */
   border: {
@@ -359,7 +381,9 @@ export const COLOR_TO_TOKEN = {
 export const REVIEW_REQUIRED = {
   fff7ed: '接近 --brand-soft(#FFF7F0) 但不等值；它是 Table.rowHoverBg，需先定义 --brand-hover-soft 令牌再映射',
   '333333': '同值多语义：侧边栏 itemActiveBg / 表头 headerColor / 页面正文深色',
-  '666666': '接近 --text-2(#595959) 但不等值，替换会让浅色文字变深',
+  // 666666 不再列在这里：已为它建 --text-body（浅色严格等值）并归入 COLOR_TO_TOKEN.fg。
+  // 原登记理由「接近 --text-2(#595959) 但不等值」仍成立，但那是**收敛**决定（会改 86 处浅色观感），
+  // 与建令牌是两个不同决定（同 --warning-deep / --brand-deep 的先例）。
   e8e8e8: '接近 --border-2(#F0F0F0) 但不等值',
   eef0f3: '接近 --surface-1(#F5F5F5) 但不等值',
   f58a2e: '接近 --brand-hover(#F59432) 但不等值；且它是 bootstrap.tsx 的 antd token，不应被 codemod 触碰',

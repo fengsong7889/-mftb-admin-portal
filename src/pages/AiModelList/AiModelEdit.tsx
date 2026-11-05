@@ -62,7 +62,7 @@ const formatTokenLimit = (n: number) => {
 /** 模态胶囊组 */
 const ModalityChips = ({ modalities }: { modalities?: string }) => {
   const list = parseModalities(modalities)
-  if (list.length === 0) return <span style={{ color: '#BFBFBF' }}>-</span>
+  if (list.length === 0) return <span style={{ color: 'var(--text-4)' }}>-</span>
   const MODALITY_TAG: Record<string, { color: string; label: string }> = {
     text: { color: 'blue', label: '文本' },
     image: { color: 'purple', label: '圖像' },
@@ -179,7 +179,7 @@ export default function AiModelEdit() {
   if (!model) {
     return (
       <div className="content-area" style={{ textAlign: 'center', padding: 80 }}>
-        <div style={{ fontSize: 16, color: '#8C8C8C' }}>{t('aiModel.loadError')}</div>
+        <div style={{ fontSize: 16, color: 'var(--text-3)' }}>{t('aiModel.loadError')}</div>
         <Button style={{ marginTop: 16 }} onClick={handleBack}>{t('common.back')}</Button>
       </div>
     )
@@ -193,7 +193,7 @@ export default function AiModelEdit() {
     <div className="content-area">
       {/* 页面头部 */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
         overflow: 'hidden',
       }}>
@@ -208,7 +208,7 @@ export default function AiModelEdit() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleBack}
               style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                backgroundColor: 'var(--brand)', borderColor: 'var(--brand)',
                 borderRadius: 8, height: 36, padding: '0 16px',
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
@@ -216,7 +216,7 @@ export default function AiModelEdit() {
               }}>返回</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>
                 編輯模型 - {model.name}
               </h2>
             </div>
@@ -228,12 +228,12 @@ export default function AiModelEdit() {
       <Form form={form} layout="vertical">
 
         {/* ═══ 分区 1：基础信息 ═══ */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <AppstoreOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiModel.basicInfo')}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiModel.basicInfo')}</span>
             <Tag color="blue" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiModel.editable')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
@@ -258,12 +258,12 @@ export default function AiModelEdit() {
         </div>
 
         {/* ═══ 分区 2：模型能力（只读） ═══ */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <EyeOutlined style={{ fontSize: 14, color: '#722ED1' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--purple-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <EyeOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiModel.capability')}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiModel.capability')}</span>
             <Tag color="default" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiModel.readOnly')}</Tag>
             <HelpPopover
               title="模型能力"
@@ -287,7 +287,7 @@ export default function AiModelEdit() {
                 background: model[key] ? `${color}08` : '#FAFAFA',
                 border: `1px solid ${model[key] ? color + '22' : '#F0F0F0'}`,
               }}>
-                <div style={{ fontSize: 12, fontWeight: 500, color: '#595959' }}>{label}</div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-2)' }}>{label}</div>
                 <Switch
                   checked={!!model[key]}
                   checkedChildren="支持"
@@ -301,18 +301,18 @@ export default function AiModelEdit() {
         </div>
 
         {/* ═══ 分区 3：模型属性（只读） ═══ */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6fffb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <CodeOutlined style={{ fontSize: 14, color: '#13C2C2' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiModel.attributes')}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiModel.attributes')}</span>
             <Tag color="default" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiModel.readOnly')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
             <div>
-              <div style={{ color: '#8C8C8C', marginBottom: 6, fontSize: 13 }}>
+              <div style={{ color: 'var(--text-3)', marginBottom: 6, fontSize: 13 }}>
                 API 兼容
                 <HelpPopover
                   title="API 兼容"
@@ -326,7 +326,7 @@ export default function AiModelEdit() {
               </Tag>
             </div>
             <div>
-              <div style={{ color: '#8C8C8C', marginBottom: 6, fontSize: 13 }}>
+              <div style={{ color: 'var(--text-3)', marginBottom: 6, fontSize: 13 }}>
                 類型
                 <HelpPopover
                   title="類型"
@@ -340,7 +340,7 @@ export default function AiModelEdit() {
               </Tag>
             </div>
             <div>
-              <div style={{ color: '#8C8C8C', marginBottom: 6, fontSize: 13 }}>
+              <div style={{ color: 'var(--text-3)', marginBottom: 6, fontSize: 13 }}>
                 模態
                 <HelpPopover
                   title="模態"
@@ -355,12 +355,12 @@ export default function AiModelEdit() {
         </div>
 
         {/* ═══ 分区 4：官方价格（只读） ═══ */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <DollarOutlined style={{ fontSize: 14, color: '#52C41A' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--success-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <DollarOutlined style={{ fontSize: 14, color: 'var(--success)' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiModel.officialPrice')}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiModel.officialPrice')}</span>
             <Tag color="default" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiModel.readOnly')}</Tag>
             <HelpPopover
               title="官方價格"
@@ -371,44 +371,44 @@ export default function AiModelEdit() {
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-            <div style={{ padding: '12px 16px', borderRadius: 8, background: '#F6FFED', border: '1px solid #D9F7BE' }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiModel.priceInput')}</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: '#52C41A' }}>
+            <div style={{ padding: '12px 16px', borderRadius: 8, background: '#F6FFED', border: '1px solid #D9F7BE' /* theme-pair-locked：green-2 描边档，与 canonical 不同档 */ }}>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('aiModel.priceInput')}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--success)' }}>
                 {CURRENCY_SYMBOL[model.currency || 'CNY']}{model.inputPrice ?? '-'}
               </div>
             </div>
-            <div style={{ padding: '12px 16px', borderRadius: 8, background: '#FFF7E6', border: '1px solid #FFE7BA' }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiModel.priceOutput')}</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: '#E8720C' }}>
+            <div style={{ padding: '12px 16px', borderRadius: 8, background: '#FFF7E6', border: '1px solid #FFE7BA' /* theme-pair-locked：orange-2 描边档，与 canonical 不同档 */ }}>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('aiModel.priceOutput')}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--brand)' }}>
                 {CURRENCY_SYMBOL[model.currency || 'CNY']}{model.outputPrice ?? '-'}
               </div>
             </div>
             <div style={{ padding: '12px 16px', borderRadius: 8, background: '#E6FFFB', border: '1px solid #B5F5EC' }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiModel.priceCached')}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('aiModel.priceCached')}</div>
               <div style={{ fontSize: 18, fontWeight: 700, color: '#13C2C2' }}>
                 {model.cachedInputPrice != null ? `${CURRENCY_SYMBOL[model.currency || 'CNY']}${model.cachedInputPrice}` : '-'}
               </div>
             </div>
-            <div style={{ padding: '12px 16px', borderRadius: 8, background: '#FAFAFA', border: '1px solid #F0F0F0' }}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiModel.priceCurrency')}</div>
-              <div style={{ fontSize: 18, fontWeight: 700, color: '#595959' }}>
+            <div style={{ padding: '12px 16px', borderRadius: 8, background: 'var(--surface-3)', border: '1px solid var(--border-2)' }}>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('aiModel.priceCurrency')}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-2)' }}>
                 {model.currency || '-'}
               </div>
             </div>
           </div>
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>{t('aiModel.priceNote')}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8 }}>{t('aiModel.priceNote')}</div>
         </div>
 
         {/* ═══ 分区 5：部署参数（可编辑） ═══ */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <SettingOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <SettingOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiModel.deployParams')}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiModel.deployParams')}</span>
             <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>{t('aiModel.editable')}</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-            <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('aiModel.deployDesc')}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('aiModel.deployDesc')}</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
             <Form.Item
@@ -465,16 +465,16 @@ export default function AiModelEdit() {
         </div>
 
         {/* ═══ 分区 6：状态配置 ═══ */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <PoweroffOutlined style={{ fontSize: 14, color: '#E8720C' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <PoweroffOutlined style={{ fontSize: 14, color: 'var(--brand)' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>狀態配置</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>狀態配置</span>
             <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>可編輯</Tag>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
-          <div style={{ background: '#FFF7E6', padding: 16, borderRadius: 8, border: '1px solid #FFE7BA' }}>
+          <div style={{ background: '#FFF7E6', padding: 16, borderRadius: 8, border: '1px solid #FFE7BA' /* theme-pair-locked：orange-2 描边档，与 canonical 不同档 */ }}>
             <Form.Item
               name="status"
               label="啟用狀態"

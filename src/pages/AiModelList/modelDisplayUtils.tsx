@@ -62,7 +62,7 @@ export const CapabilityTag = ({ enabled, icon, label, color }: { enabled: boolea
         display: 'inline-flex', alignItems: 'center', gap: 2,
         padding: '1px 6px', borderRadius: 4,
         fontSize: 11, lineHeight: '18px',
-        color: enabled ? color : '#BFBFBF',
+        color: enabled ? color : 'var(--text-4)',
         background: enabled ? `${color}11` : '#F5F5F5',
         border: `1px solid ${enabled ? color + '44' : '#E8E8E8'}`,
         marginRight: 2, marginBottom: 2,
@@ -90,7 +90,7 @@ export const CapabilityMatrix = ({ model }: { model: AiModel }) => (
 /** 模态胶囊组 */
 export const ModalityChips = ({ modalities }: { modalities?: string }) => {
   const list = parseModalities(modalities)
-  if (list.length === 0) return <span style={{ color: '#BFBFBF' }}>-</span>
+  if (list.length === 0) return <span style={{ color: 'var(--text-4)' }}>-</span>
   return (
     <Space size={2} wrap>
       {list.map((m) => (
