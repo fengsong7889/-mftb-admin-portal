@@ -14,6 +14,7 @@ import {
   fetchAdPricingActive,
   fetchAdRevivePricingActive,
   fetchAdSignboardPricingActive,
+  fetchAdTimeSlotPricingDetail,
   refundAdOrder,
   cancelAdOrder,
 } from '@/api/adPromotion'
@@ -167,6 +168,16 @@ export default function OrderDetail() {
             discountTiers: [],
           }
         }
+      } else if (detail.algoType === 16) {
+        // 時段推薦：algoId 存的是定價配置ID；折扣已逐格落在 salePrice，不取梯度
+        const p = await fetchAdTimeSlotPricingDetail(detail.algoId).catch(() => null)
+        if (p) {
+          pricing = {
+            cancelFeeRules: parseCancelFeeTiers(p.cancelFeeTiers ?? undefined),
+            refundEnabled: p.refundEnabled === 1,
+            discountTiers: [],
+          }
+        }
       } else {
         const p = await fetchAdPricingActive(detail.algoId).catch(() => null)
         if (p) {
@@ -289,6 +300,8 @@ export default function OrderDetail() {
   const isRevive = order.recommendType === RecommendType.HOT_REVIVE_AD
   const isGoldenSignboard = order.recommendType === RecommendType.GOLDEN_SIGNBOARD
   const isTrafficAd = order.recommendType === RecommendType.TRAFFIC_AD
+  /** 時段推薦廣告：無算法，algoId 存定價配置ID，名稱由運營自命名 */
+  const isTimeSlotAd = order.recommendType === RecommendType.TIME_SLOT_AD
 
   /** 金字招牌標籤類型 → 中文翻譯映射 */
   const SIGNBOARD_LABEL_CN: Record<string, { label: string; icon: string; color: string }> = {
@@ -745,10 +758,10 @@ export default function OrderDetail() {
           </Descriptions.Item>
           <Descriptions.Item label={t('common.colBrand')}>{appLabel(order.app)}</Descriptions.Item>
           <Descriptions.Item label={t('common.colChannel')}>{channelLabel(order.channel)}</Descriptions.Item>
-          <Descriptions.Item label={isPopular ? '配置ID' : t('orderDetail.colAlgorithmId')}>
+          <Descriptions.Item label={isPopular ? '配置ID' : isTimeSlotAd ? '定價ID' : t('orderDetail.colAlgorithmId')}>
             <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{order.algorithmId}</span>
           </Descriptions.Item>
-          <Descriptions.Item label={isPopular ? '人氣商家名稱' : t('orderDetail.colAlgorithmName')}>{order.promotionName}</Descriptions.Item>
+          <Descriptions.Item label={isPopular ? '人氣商家名稱' : isTimeSlotAd ? '時段推薦名稱' : t('orderDetail.colAlgorithmName')}>{order.promotionName}</Descriptions.Item>
           {isGoldenSignboard ? (
             <Descriptions.Item label="購買標籤">
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -790,7 +803,7 @@ export default function OrderDetail() {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
             onClick={() => setSlotsCollapsed(!slotsCollapsed)}>
-            <CardTitle icon={<DollarOutlined style={{ fontSize: 12, color: 'var(--info)' }} />} text={isNewStore ? t('orderDetail.slotTitleNewStore') : (isPopular || isRevive) ? t('orderDetail.slotTitlePopular') : isGoldenSignboard ? t('orderDetail.slotTitleGoldenSignboard') : isTrafficAd ? '購買流量包' : t('orderDetail.slotTitleStar')} />
+            <CardTitle icon={<DollarOutlined style={{ fontSize: 12, color: 'var(--info)' }} />} text={isNewStore ? t('orderDetail.slotTitleNewStore') : (isPopular || isRevive) ? t('orderDetail.slotTitlePopular') : isGoldenSignboard ? t('orderDetail.slotTitleGoldenSignboard') : isTrafficAd ? '購買流量包' : isTimeSlotAd ? '購買時段與價格' : t('orderDetail.slotTitleStar')} />
             <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 4 }}>
               {slotsCollapsed ? <RightOutlined /> : <DownOutlined />}
             </span>
@@ -886,6 +899,48 @@ export default function OrderDetail() {
                     })
                   })
                 })()}
+              </tbody>
+            </table>
+          </div>
+        ))}
+
+        {/* 時段推薦廣告：按日期分組，每行一個時段（無商圈），折扣取實付分攤反推 */}
+        {isTimeSlotAd && slotsByDate.map(([date, slots]) => (
+          <div key={date} style={{
+            border: '1px solid var(--border-2)', borderRadius: 8, marginBottom: 12, overflow: 'hidden',
+          }}>
+            <div style={{
+              background: 'var(--surface-3)', padding: '8px 16px', borderBottom: '1px solid var(--border-2)',
+              fontSize: 13, fontWeight: 600, color: 'var(--text-1)',
+            }}>
+              {date}
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
+              <colgroup>
+                <col style={{ width: '25%' }} />
+                <col style={{ width: '25%' }} />
+                <col style={{ width: '25%' }} />
+                <col style={{ width: '25%' }} />
+              </colgroup>
+              <thead>
+                <tr style={{ background: 'var(--surface-3)' }}>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colSlot')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colOriginalPrice')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colDiscount')}</th>
+                  <th style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-1)', fontSize: 12, background: '#F0F5FF', borderBottom: '1px solid #D6E4FF' }}>{t('orderDetail.colFinalPrice')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {slots.map((sp, i) => (
+                  <tr key={i} style={{ borderTop: i > 0 ? '1px solid #f0f0f0' : 'none' }}>
+                    <td style={{ padding: '8px 16px', textAlign: 'center' }}>{sp.slot}</td>
+                    <td style={{ padding: '8px 16px', textAlign: 'center', color: 'var(--text-2)' }}>{sp.originalPrice}</td>
+                    <td style={{ padding: '8px 16px', textAlign: 'center' }}>
+                      {sp.discount < 10 ? <Tag color="green">{t('orderDetail.discountFold', { n: sp.discount })}</Tag> : <span style={{ color: 'var(--text-3)' }}>{t('orderDetail.noDiscount')}</span>}
+                    </td>
+                    <td style={{ padding: '8px 16px', textAlign: 'center', fontWeight: 500, color: 'var(--brand)' }}>{sp.actualPrice}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

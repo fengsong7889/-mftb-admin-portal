@@ -37,6 +37,7 @@ const TYPE_LABEL_KEY: Record<number, string> = {
   [AlgorithmType.GOLD_AD]: 'recommend.algoGoldAd',
   [AlgorithmType.GOLDEN_SIGNBOARD]: 'recommend.algoGoldenSignboard',
   [AlgorithmType.PRODUCT_PROMO]: 'recommend.algoProductPromo',
+  [AlgorithmType.TIME_SLOT_AD]: 'recommend.algoTimeSlotAd',
 }
 
 const TYPE_ICON: Record<number, string> = {
@@ -52,6 +53,7 @@ const TYPE_ICON: Record<number, string> = {
   [AlgorithmType.GOLD_AD]: '💰',
   [AlgorithmType.GOLDEN_SIGNBOARD]: '🏅',
   [AlgorithmType.PRODUCT_PROMO]: '🎯',
+  [AlgorithmType.TIME_SLOT_AD]: '⏰',
 }
 
 /** 店鋪等級配置（獨家商家保障單量 / 品牌商家保障流量共用）：等級 / 標籤 / 標籤色 / 默認值 */
