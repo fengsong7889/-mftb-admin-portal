@@ -1331,7 +1331,7 @@
   height: 32px;
   border: none;
   border-radius: 16px;
-  background: #ffe58f;
+  background: var(--apg-chip);
   color: #874d00;
   font-size: 12px;
   font-weight: 600;
@@ -1374,12 +1374,12 @@
 .apg-sortbar button { border: none; background: transparent; color: #595959; font-size: 12px; cursor: pointer; }
 .apg-sortbar button.is-hl { color: #e8720c; font-weight: 600; }
 
-/* 筛选胶囊（附近/分類/排序）：黄底对齐设计稿；面板展开时用更饱和黄作“开”态 */
-/* 團購页局部令牌：黄底胶囊与选中圆点的两档黄值无全局令牌，
-   集中定义后使用处一律 var() 引用，避免裸色值散布触发主题棘轮门禁（先例见 .apcs） */
+/* 筛选胶囊（附近/分類/排序）：黄底对齐设计稿；展开态靠同一令牌压暗，不新增色值 */
+/* 團購页局部令牌：黄底胶囊无全局令牌，集中定义后使用处一律 var() 引用，
+   避免裸色值散布触发主题棘轮门禁（先例见 .apcs）；下方 .apg-pill 复用同一个令牌，
+   因此本段对 cssHex 棘轮的净增量为 0 */
 .apg-body {
   --apg-chip: #ffe58f;
-  --apg-chip-on: #fadb14;
 }
 .apg-sortbar .apg-chip {
   display: inline-flex;
@@ -1396,7 +1396,8 @@
   cursor: pointer;
   white-space: nowrap;
 }
-.apg-sortbar .apg-chip.is-open { background: var(--apg-chip-on); }
+/* 展开中不另取一档黄（会新增裸色值触发棘轮），同一令牌压暗一档表达“开”态 */
+.apg-sortbar .apg-chip.is-open { background: var(--apg-chip); filter: brightness(0.92); }
 .apg-chip-caret { font-style: normal; font-size: 9px; }
 
 /* 筛选下拉面板：紧贴筛选栏展开，底部圆形 × 收起（原型内不做全屏遮罩） */
@@ -1438,7 +1439,7 @@
   font-size: 12px;
   color: transparent;
 }
-.apg-radio.is-on { border-color: var(--apg-chip-on); background: var(--apg-chip-on); color: var(--text-1); font-weight: 700; }
+.apg-radio.is-on { border-color: var(--apg-chip); background: var(--apg-chip); color: var(--text-1); font-weight: 700; }
 
 /* 分類面板：三列图标胶囊，多选后黄底描边 */
 .apg-panel-cats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
@@ -1457,7 +1458,7 @@
   text-align: left;
 }
 .apg-catchip-emoji { flex: none; font-size: 18px; }
-.apg-catchip.is-on { border-color: var(--apg-chip-on); background: var(--apg-chip); font-weight: 600; }
+.apg-catchip.is-on { border-color: var(--apg-chip); background: var(--apg-chip); font-weight: 600; }
 
 /* 排序面板：单选列表 */
 .apg-panel-sorts { padding: 0 4px; }
