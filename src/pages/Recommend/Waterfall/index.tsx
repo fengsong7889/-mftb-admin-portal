@@ -476,7 +476,7 @@ export default function Waterfall() {
   /** 列配置元数据 */
   const columnMeta = useMemo(() => [
     { key: 'pricingNo', title: t('waterfall.colConfigId') },
-    { key: 'promotionName', title: selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? '人氣商家名稱' : t('waterfall.colAlgorithmName') },
+    { key: 'promotionName', title: selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? '人氣商家名稱' : selectedAlgorithmType === AlgorithmType.TIME_SLOT_AD ? '時段推薦名稱' : t('waterfall.colAlgorithmName') },
     { key: 'app', title: t('common.colBrand') },
     { key: 'bizChannel', title: t('waterfall.colBizChannel') },
     { key: 'status', title: t('common.colStatus') },
@@ -499,7 +499,7 @@ export default function Waterfall() {
       render: (text: string) => <Tag color="blue">{text || '-'}</Tag>,
     },
     { 
-      title: selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? '人氣商家名稱' : t('waterfall.colAlgorithmName'),
+      title: selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? '人氣商家名稱' : selectedAlgorithmType === AlgorithmType.TIME_SLOT_AD ? '時段推薦名稱' : t('waterfall.colAlgorithmName'),
       dataIndex: 'promotionName',
       key: 'promotionName',
       width: 200,
@@ -729,7 +729,7 @@ export default function Waterfall() {
           <Form.Item label={t('waterfall.colConfigId')} name="adId">
             <Input placeholder={t('waterfall.placeholderConfigId')} allowClear />
           </Form.Item>
-          <Form.Item label={selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? '人氣商家名稱' : t('waterfall.colAlgorithmName')} name="promotionName">
+          <Form.Item label={selectedAlgorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? '人氣商家名稱' : selectedAlgorithmType === AlgorithmType.TIME_SLOT_AD ? '時段推薦名稱' : t('waterfall.colAlgorithmName')} name="promotionName">
             <Select 
               placeholder={t('waterfall.placeholderSearch')} 
               allowClear
@@ -1044,7 +1044,7 @@ export default function Waterfall() {
               <Descriptions.Item label={t('waterfall.placementPage')}>
                 {CHANNEL_LABEL[viewingRecord.channel]}
               </Descriptions.Item>
-              <Descriptions.Item label={viewingRecord.algorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? '人氣商家名稱' : t('waterfall.colAlgorithmName')} span={2}>
+              <Descriptions.Item label={viewingRecord.algorithmType === AlgorithmType.POPULAR_MERCHANT_KA ? '人氣商家名稱' : viewingRecord.algorithmType === AlgorithmType.TIME_SLOT_AD ? '時段推薦名稱' : t('waterfall.colAlgorithmName')} span={2}>
                 <strong>{viewingRecord.algorithmName}</strong>
               </Descriptions.Item>
               <Descriptions.Item label={t('waterfall.adType')}>

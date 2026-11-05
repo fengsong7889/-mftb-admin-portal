@@ -176,6 +176,7 @@ const SUB_PAGE_FULL_TITLE: Record<string, SubPageTitle> = {
       '13': 'i18n:recommend.algoGoldenSignboard',
       '14': 'i18n:recommend.algoProductPromo',
       '15': 'i18n:recommend.algoTrafficAd',
+      '16': 'i18n:recommend.algoTimeSlotAd',
     },
   },
   '/promotion-slot-config-add': { add: 'i18n:promotionSlotConfig:addSlotConfig', edit: 'i18n:promotionSlotConfig:editSlotConfig' },
