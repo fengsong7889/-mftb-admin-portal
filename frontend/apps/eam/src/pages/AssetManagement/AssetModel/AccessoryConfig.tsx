@@ -179,7 +179,7 @@ export default function AccessoryConfig({ categoryCode, categoryName, onBack }: 
     <div className="content-area">
       {/* 頂部標題欄（橙色漸變頂條 + 返回按鈕） */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
       }}>
         <div style={{
@@ -191,7 +191,7 @@ export default function AccessoryConfig({ categoryCode, categoryName, onBack }: 
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Button type="primary" icon={<ArrowLeftOutlined />} onClick={onBack}
               style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8,
+                backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8,
                 height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
                 transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -199,7 +199,7 @@ export default function AccessoryConfig({ categoryCode, categoryName, onBack }: 
               {t('common.back')}
             </Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>
               {t('asset.accConfigTitle', { name: categoryName })}
             </h2>
           </div>
@@ -207,6 +207,9 @@ export default function AccessoryConfig({ categoryCode, categoryName, onBack }: 
       </div>
 
       {/* 說明文字 */}
+      {/* 成对保留裸色：#D46B08 无等值令牌（REVIEW_REQUIRED）；若只把背景换成令牌 warning-soft
+         （会随主题变深），深色下为「深橙底 + 深橙字」约 3.4:1，低于正文 AA 4.5。
+         待定下与 #D46B08 等值的前景令牌后再成对改；见方案 §18.6。 */}
       <div style={{
         padding: '8px 12px', background: '#FFF7E6', border: '1px solid #FFD591',
         borderRadius: 6, marginBottom: 12, fontSize: 13, color: '#D46B08', lineHeight: 1.7,

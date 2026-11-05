@@ -218,7 +218,7 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
     <Spin spinning={loading}>
       {/* ====== 顶部标题栏 ====== */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
         overflow: 'hidden',
       }}>
@@ -236,14 +236,14 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
               icon={<ArrowLeftOutlined />}
               onClick={onBack}
               style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                backgroundColor: 'var(--brand)', borderColor: 'var(--brand)',
                 borderRadius: 8, height: 36, padding: '0 16px',
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
               }}
             >{t('common.back')}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>
               {isEdit ? (isBrand ? t('asset.editBrandTitle') : t('asset.editProductTitle')) : (isBrand ? t('asset.addBrandTitle') : t('asset.addProductTitle'))}
             </h2>
           </div>
@@ -254,8 +254,8 @@ export default function ModelForm({ id, categoryCode: initialCategoryCode, brand
       <div style={cardShellStyle}>
         <div style={cardTitleStyle}>
           {isBrand
-            ? <ShopOutlined style={{ color: '#E8720C', fontSize: 16 }} />
-            : <AppstoreOutlined style={{ color: '#E8720C', fontSize: 16 }} />
+            ? <ShopOutlined style={{ color: 'var(--brand)', fontSize: 16 }} />
+            : <AppstoreOutlined style={{ color: 'var(--brand)', fontSize: 16 }} />
           }
           <span>{isBrand ? t('asset.brandInfoTitle') : t('asset.productInfoTitle')}</span>
         </div>

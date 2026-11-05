@@ -212,12 +212,12 @@ export default function ScrapList({ onCreate, onViewDetail }: Props) {
       icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: '確認刪除此報廢記錄？',
       content: (
-        <div style={{ background: '#FFF7F0', border: '1px solid #FFE7D1', borderRadius: 8, padding: '12px 16px', marginTop: 12 }}>
-          <div style={{ fontSize: 13, color: '#595959' }}>
-            <div>資產編號：<b style={{ color: '#262626' }}>{record.assetNo}</b></div>
-            <div>資產名稱：<b style={{ color: '#262626' }}>{record.assetName}</b></div>
+        <div style={{ background: 'var(--brand-soft)', border: '1px solid #FFE7D1', borderRadius: 8, padding: '12px 16px', marginTop: 12 }}>
+          <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
+            <div>資產編號：<b style={{ color: 'var(--text-1)' }}>{record.assetNo}</b></div>
+            <div>資產名稱：<b style={{ color: 'var(--text-1)' }}>{record.assetName}</b></div>
           </div>
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8 }}>
             刪除後資產將恢復為閒置狀態，可再次被領用或借用。
           </div>
         </div>

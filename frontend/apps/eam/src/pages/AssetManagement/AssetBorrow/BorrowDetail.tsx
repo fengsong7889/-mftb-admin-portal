@@ -60,7 +60,7 @@ export default function BorrowDetail({ record, loading = false, error, canEdit =
             )}
             {canReturn && (
               <Button type="primary" onClick={() => navigate(`/asset-return/add?borrowId=${record.id}`)}
-                style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}>
+                style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}>
                 歸還
               </Button>
             )}
@@ -77,20 +77,20 @@ export default function BorrowDetail({ record, loading = false, error, canEdit =
     {/* ====== 借用信息 ====== */}
     <div style={detailCardStyle}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-        <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <FileTextOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+        <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <FileTextOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
         </div>
-        <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>借用信息</span>
+        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>借用信息</span>
         <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
       </div>
       <Descriptions column={4} size="middle">
         <Descriptions.Item label="借用單號"><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{record.borrowNo}</span></Descriptions.Item>
-        <Descriptions.Item label={t('asset.colAssetName')}>{record.assetName} <span style={{ color: '#8C8C8C', fontSize: 12 }}>({record.assetNo})</span></Descriptions.Item>
+        <Descriptions.Item label={t('asset.colAssetName')}>{record.assetName} <span style={{ color: 'var(--text-3)', fontSize: 12 }}>({record.assetNo})</span></Descriptions.Item>
         <Descriptions.Item label="借用人">{record.holderName}</Descriptions.Item>
         <Descriptions.Item label="借用部門">{record.department}</Descriptions.Item>
         <Descriptions.Item label="借出日期">{record.startDate}</Descriptions.Item>
         <Descriptions.Item label="到期日期">
-          <span style={{ color: record.status === 'overdue' ? '#FF4D4F' : undefined, fontWeight: record.status === 'overdue' ? 600 : 400 }}>{record.dueDate}</span>
+          <span style={{ color: record.status === 'overdue' ? 'var(--danger)' : undefined, fontWeight: record.status === 'overdue' ? 600 : 400 }}>{record.dueDate}</span>
         </Descriptions.Item>
         <Descriptions.Item label="逾期天数">{overdueDays > 0 ? overdueDays : '—'}</Descriptions.Item>
         <Descriptions.Item label="續借次數">{record.renewCount}</Descriptions.Item>
@@ -103,12 +103,12 @@ export default function BorrowDetail({ record, loading = false, error, canEdit =
 
     {/* ====== 最後更新（詳情頁規範 footer） ====== */}
     <div style={{
-      background: '#fafafa', borderRadius: 8, padding: '12px 24px',
+      background: 'var(--surface-3)', borderRadius: 8, padding: '12px 24px',
       border: '1px solid #f0f0f0',
       display: 'flex', justifyContent: 'flex-end', gap: 24,
     }}>
-      <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新人：<span style={{ color: '#595959' }}>{record.operatorName || '-'}</span></span>
-      <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新時間：<span style={{ color: '#595959' }}>{record.updatedAt || '-'}</span></span>
+      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>最後更新人：<span style={{ color: 'var(--text-2)' }}>{record.operatorName || '-'}</span></span>
+      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>最後更新時間：<span style={{ color: 'var(--text-2)' }}>{record.updatedAt || '-'}</span></span>
     </div>
   </>
 }

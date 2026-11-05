@@ -454,7 +454,7 @@ export default function AssetAdd() {
         width: 28, height: 28, borderRadius: 6, background: iconBg,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>{icon}</div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>
       {tag && <Tag color="blue" style={{ fontSize: 11 }}>{tag}</Tag>}
       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
     </div>
@@ -466,7 +466,7 @@ export default function AssetAdd() {
       {imageFiles.map((file) => (
         <div key={file.uid} style={{
           width: 88, height: 88, border: '1px solid #e8e8e8', borderRadius: 8,
-          overflow: 'hidden', position: 'relative', background: '#fafafa',
+          overflow: 'hidden', position: 'relative', background: 'var(--surface-3)',
         }}>
           {file.url ? (
             <img src={file.url} alt={file.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -484,13 +484,13 @@ export default function AssetAdd() {
           <div style={{
             width: 88, height: 88, border: '1px dashed #d9d9d9', borderRadius: 8,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', background: '#fafafa', transition: 'border-color 0.3s',
+            cursor: 'pointer', background: 'var(--surface-3)', transition: 'border-color 0.3s',
           }}
             onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#E8720C')}
             onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#d9d9d9')}
           >
-            <PictureOutlined style={{ fontSize: 20, color: '#bfbfbf' }} />
-            <span style={{ fontSize: 11, color: '#bfbfbf', marginTop: 4 }}>{t('asset.uploadImage')}</span>
+            <PictureOutlined style={{ fontSize: 20, color: 'var(--text-4)' }} />
+            <span style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 4 }}>{t('asset.uploadImage')}</span>
           </div>
         </Upload>
       )}
@@ -499,7 +499,7 @@ export default function AssetAdd() {
 
   /* ==================== 参数动态字段渲染 ==================== */
   const renderParamFields = () => {
-    if (!paramFields.length) return <span style={{ color: '#bfbfbf', fontSize: 13 }}>{t('asset.selectAssetNameFirst')}</span>
+    if (!paramFields.length) return <span style={{ color: 'var(--text-4)', fontSize: 13 }}>{t('asset.selectAssetNameFirst')}</span>
     return (
       <div className="asset-param-editor">
         {paramFieldsWithOptions.map((field) => (
@@ -535,7 +535,7 @@ export default function AssetAdd() {
     <div className="content-area" style={{ padding: '20px 24px' }}>
       {/* ====== 顶部标题栏（橙色渐变顶条） ====== */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
       }}>
         <div style={{
@@ -544,10 +544,10 @@ export default function AssetAdd() {
         }} />
         <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
           <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleCancel}
-            style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}
+            style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}
           >{t('common.back')}</Button>
           <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: '#1890ff' }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--info)' }}>
             {isEdit ? t('asset.editAssetTitle') : t('asset.addAssetTitle')}
           </h2>
         </div>
@@ -557,9 +557,9 @@ export default function AssetAdd() {
         <Form form={form} layout="vertical" disabled={loading}>
 
           {/* ====== 模块1：资产信息 ====== */}
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             {renderCardTitle(
-              <PictureOutlined style={{ fontSize: 14, color: '#52C41A' }} />,
+              <PictureOutlined style={{ fontSize: 14, color: 'var(--success)' }} />,
               '#f6ffed',
               t('asset.assetInfoTitle'),
             )}
@@ -573,7 +573,7 @@ export default function AssetAdd() {
                 >
                   {isEdit
                     ? <Input placeholder={t('asset.assetNoPh')} allowClear disabled style={{ fontFamily: 'monospace' }} />
-                    : <Input placeholder={t('asset.assetNoAutoGen')} disabled style={{ fontFamily: 'monospace', color: '#8C8C8C' }} />
+                    : <Input placeholder={t('asset.assetNoAutoGen')} disabled style={{ fontFamily: 'monospace', color: 'var(--text-3)' }} />
                   }
                 </Form.Item>
               </Col>
@@ -632,20 +632,20 @@ export default function AssetAdd() {
 
             {/* 资产参数信息 */}
             <div style={{ marginTop: 8, marginBottom: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>{t('asset.paramInfoSection')}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 12 }}>{t('asset.paramInfoSection')}</div>
               {renderParamFields()}
             </div>
 
             {/* 资产照片 */}
             <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>{t('asset.assetPhotoSection')}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 12 }}>{t('asset.assetPhotoSection')}</div>
               {renderImageUpload()}
-              <div style={{ color: '#8c8c8c', fontSize: 12, marginTop: 8 }}>{t('asset.photoUploadHint')}</div>
+              <div style={{ color: 'var(--text-3)', fontSize: 12, marginTop: 8 }}>{t('asset.photoUploadHint')}</div>
             </div>
 
             {/* 配件清单 */}
             <div style={{ marginTop: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 12 }}>
                 <AppstoreOutlined style={{ marginRight: 4 }} />
                 {t('asset.accessoryListTitleAdd')}
               </div>
@@ -654,9 +654,9 @@ export default function AssetAdd() {
                   {/* 表头 */}
                   <div style={{
                     display: 'grid', gridTemplateColumns: '1fr 140px 100px',
-                    gap: 12, padding: '8px 12px', background: '#fafafa',
+                    gap: 12, padding: '8px 12px', background: 'var(--surface-3)',
                     borderRadius: '6px 6px 0 0', border: '1px solid #f0f0f0', borderBottom: 'none',
-                    fontSize: 13, fontWeight: 600, color: '#262626',
+                    fontSize: 13, fontWeight: 600, color: 'var(--text-1)',
                   }}>
                     <span>{t('asset.accessoryNameCol')}</span>
                     <span>{t('asset.accessoryQtyCol')}</span>
@@ -699,13 +699,13 @@ export default function AssetAdd() {
                     borderRadius: '0 0 6px 6px',
                   }}>
                     <Button type="link" size="small" icon={<PlusOutlined />}
-                      style={{ color: '#E8720C', padding: 0 }}
+                      style={{ color: 'var(--brand)', padding: 0 }}
                       onClick={() => setAccessories((prev) => [...prev, { name: '', qty: 1 }])}>
                       {t('asset.accessoryManual')}
                     </Button>
                     {categoryAccessories.length > 0 && (
                       <Button type="link" size="small" icon={<AppstoreOutlined />}
-                        style={{ color: '#E8720C', padding: 0 }}
+                        style={{ color: 'var(--brand)', padding: 0 }}
                         onClick={() => {
                           const existing = new Set(accessories.map((a) => a.name))
                           setSelectedAccessoryNames(existing)
@@ -719,18 +719,18 @@ export default function AssetAdd() {
               ) : (
                 <div style={{
                   padding: '20px', textAlign: 'center',
-                  background: '#fafafa', borderRadius: 8,
+                  background: 'var(--surface-3)', borderRadius: 8,
                   border: '1px dashed #d9d9d9',
                 }}>
                   <div style={{ marginBottom: 12 }}>
                     <Button type="link" size="small" icon={<PlusOutlined />}
-                      style={{ color: '#E8720C' }}
+                      style={{ color: 'var(--brand)' }}
                       onClick={() => setAccessories((prev) => [...prev, { name: '', qty: 1 }])}>
                       {t('asset.accessoryManual')}
                     </Button>
                     {categoryAccessories.length > 0 && (
                       <Button type="link" size="small" icon={<AppstoreOutlined />}
-                        style={{ color: '#E8720C', marginLeft: 16 }}
+                        style={{ color: 'var(--brand)', marginLeft: 16 }}
                         onClick={() => {
                           setSelectedAccessoryNames(new Set())
                           setAccessorySelectOpen(true)
@@ -739,16 +739,16 @@ export default function AssetAdd() {
                       </Button>
                     )}
                   </div>
-                  <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.accessoryTipAdd')}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.accessoryTipAdd')}</span>
                 </div>
               )}
             </div>
           </div>
 
           {/* ====== 模块2：租/购信息 ====== */}
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             {renderCardTitle(
-              <span style={{ fontSize: 14, color: '#E8720C' }}>¥</span>,
+              <span style={{ fontSize: 14, color: 'var(--brand)' }}>¥</span>,
               '#fff7e6',
               t('asset.rentPurchaseTitle'),
             )}
@@ -887,7 +887,7 @@ export default function AssetAdd() {
 
           {/* ====== 模块3：当前使用人（仅编辑模式展示，字段只读；新增模式隐藏） ====== */}
           {isEdit && (
-            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               {renderCardTitle(
                 <PictureOutlined style={{ fontSize: 14, color: '#13C2C2' }} />,
                 '#E6FFFB',
@@ -945,9 +945,9 @@ export default function AssetAdd() {
           )}
 
           {/* ====== 模块4：备注信息 ====== */}
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             {renderCardTitle(
-              <span style={{ fontSize: 14, color: '#722ED1' }}></span>,
+              <span style={{ fontSize: 14, color: 'var(--purple)' }}></span>,
               '#f9f0ff',
               t('asset.remarkTitle'),
             )}
@@ -958,9 +958,9 @@ export default function AssetAdd() {
           </div>
 
           {/* ====== 模块5：入库信息（最底部，验收入库跳转时自动带入） ====== */}
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             {renderCardTitle(
-              <PictureOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
+              <PictureOutlined style={{ fontSize: 14, color: 'var(--info)' }} />,
               '#e6f7ff',
               t('asset.inboundInfoTitle'),
               searchParams.get('inboundBatchNo') ? t('asset.fromInboundTag') : undefined,
@@ -1024,12 +1024,12 @@ export default function AssetAdd() {
         width={480}
         destroyOnClose
       >
-        <div style={{ marginBottom: 8, fontSize: 13, color: '#595959' }}>
+        <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--text-2)' }}>
           {t('asset.accessorySelectTip')}
         </div>
         <div style={{ maxHeight: 360, overflowY: 'auto', border: '1px solid #f0f0f0', borderRadius: 8, padding: '8px 12px' }}>
           {categoryAccessories.length === 0 ? (
-            <div style={{ padding: 24, textAlign: 'center', color: '#bfbfbf', fontSize: 13 }}>{t('asset.accessoryEmpty')}</div>
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-4)', fontSize: 13 }}>{t('asset.accessoryEmpty')}</div>
           ) : (
             categoryAccessories.map((acc) => {
               const checked = selectedAccessoryNames.has(acc.name)
@@ -1050,19 +1050,19 @@ export default function AssetAdd() {
                       })
                     }}
                   >
-                    <span style={{ fontSize: 13, color: '#262626' }}>{acc.name}</span>
+                    <span style={{ fontSize: 13, color: 'var(--text-1)' }}>{acc.name}</span>
                     {alreadyAdded && (
                       <Tag color="green" style={{ marginLeft: 8, fontSize: 11 }}>{t('asset.tagAdded')}</Tag>
                     )}
                   </Checkbox>
-                  <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.defaultQtyHint', { count: acc.defaultQty || 1 })}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.defaultQtyHint', { count: acc.defaultQty || 1 })}</span>
                 </div>
               )
             })
           )}
         </div>
         {selectedAccessoryNames.size > 0 && (
-          <div style={{ marginTop: 12, fontSize: 12, color: '#8C8C8C', textAlign: 'right' }}>
+          <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-3)', textAlign: 'right' }}>
             {t('asset.selectedCount', { count: selectedAccessoryNames.size })}
           </div>
         )}

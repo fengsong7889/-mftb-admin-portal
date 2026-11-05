@@ -57,7 +57,7 @@ export default function SupplierDetail({ id, onBack, onEdit }: Props) {
       <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {icon}
       </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>
       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
     </div>
   )
@@ -94,7 +94,7 @@ export default function SupplierDetail({ id, onBack, onEdit }: Props) {
   if (!supplier) {
     return (
       <div style={{ textAlign: 'center', padding: 60 }}>
-        <span style={{ color: '#8C8C8C' }}>{t('asset.supplierNotExist')}</span>
+        <span style={{ color: 'var(--text-3)' }}>{t('asset.supplierNotExist')}</span>
       </div>
     )
   }
@@ -115,7 +115,7 @@ export default function SupplierDetail({ id, onBack, onEdit }: Props) {
       {/* ====== 基本信息 ====== */}
       <div style={cardStyle}>
         {cardTitle(
-          <ContactsOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
+          <ContactsOutlined style={{ fontSize: 14, color: 'var(--info)' }} />,
           '#E6F7FF',
           t('asset.basicInfoTitle'),
         )}
@@ -143,11 +143,11 @@ export default function SupplierDetail({ id, onBack, onEdit }: Props) {
 
       {/* ====== 聯繫人列表 ====== */}
       <div style={{
-        background: '#fff', borderRadius: 8, padding: '20px 24px',
+        background: 'var(--surface-2)', borderRadius: 8, padding: '20px 24px',
         marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
       }}>
         {cardTitle(
-          <ContactsOutlined style={{ fontSize: 14, color: '#52c41a' }} />,
+          <ContactsOutlined style={{ fontSize: 14, color: 'var(--success)' }} />,
           '#F6FFED',
           t('asset.contactInfoTitle'),
         )}
@@ -163,12 +163,12 @@ export default function SupplierDetail({ id, onBack, onEdit }: Props) {
 
       {/* ====== 最後更新 ====== */}
       <div style={{
-        background: '#fafafa', borderRadius: 8, padding: '12px 24px',
+        background: 'var(--surface-3)', borderRadius: 8, padding: '12px 24px',
         border: '1px solid #f0f0f0',
         display: 'flex', justifyContent: 'flex-end', gap: 24,
       }}>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedByColon')}<span style={{ color: '#595959' }}>{supplier.updatedBy || '-'}</span></span>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedAtColon')}<span style={{ color: '#595959' }}>{supplier.updatedAt || '-'}</span></span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.updatedByColon')}<span style={{ color: 'var(--text-2)' }}>{supplier.updatedBy || '-'}</span></span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.updatedAtColon')}<span style={{ color: 'var(--text-2)' }}>{supplier.updatedAt || '-'}</span></span>
       </div>
     </>
   )

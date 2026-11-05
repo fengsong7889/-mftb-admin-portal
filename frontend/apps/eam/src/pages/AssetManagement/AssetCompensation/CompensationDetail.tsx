@@ -74,7 +74,7 @@ export default function CompensationDetail({ record, loading = false, error, can
     if (record.reviewRequired > 0) {
       btns.push(
         <Button key="review" type="primary" onClick={() => navigate(`/asset-compensation/review?id=${record.id}`)}
-          style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}>
+          style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}>
           找回復核
         </Button>
       )
@@ -119,15 +119,15 @@ export default function CompensationDetail({ record, loading = false, error, can
     {/* ====== 赔付基本信息 ====== */}
     <div style={detailCardStyle}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-        <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <FileTextOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+        <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <FileTextOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />
         </div>
-        <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>賠付基本信息</span>
+        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>賠付基本信息</span>
         <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
       </div>
       <Descriptions column={4} size="middle">
         <Descriptions.Item label="賠付單號"><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{record.compNo}</span></Descriptions.Item>
-        <Descriptions.Item label={t('asset.colAssetName')}>{record.assetName} <span style={{ color: '#8C8C8C', fontSize: 12 }}>({record.assetNo})</span></Descriptions.Item>
+        <Descriptions.Item label={t('asset.colAssetName')}>{record.assetName} <span style={{ color: 'var(--text-3)', fontSize: 12 }}>({record.assetNo})</span></Descriptions.Item>
         <Descriptions.Item label="原持有人">{record.holderName}</Descriptions.Item>
         <Descriptions.Item label="損失類型"><Tag color={record.damageType === 'loss' ? 'error' : 'warning'}>{DAMAGE_LABEL[record.damageType] || record.damageType}</Tag></Descriptions.Item>
         <Descriptions.Item label="關聯歸還單">
@@ -148,10 +148,10 @@ export default function CompensationDetail({ record, loading = false, error, can
     {/* ====== 收款/退款 & 找回复核记录 ====== */}
     <div style={detailCardStyle}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-        <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <ProfileOutlined style={{ fontSize: 14, color: '#52c41a' }} />
+        <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--success-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <ProfileOutlined style={{ fontSize: 14, color: 'var(--success)' }} />
         </div>
-        <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>記錄明細</span>
+        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>記錄明細</span>
         <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
       </div>
       <Tabs items={[
@@ -170,12 +170,12 @@ export default function CompensationDetail({ record, loading = false, error, can
 
     {/* ====== 最後更新（詳情頁規範 footer） ====== */}
     <div style={{
-      background: '#fafafa', borderRadius: 8, padding: '12px 24px',
+      background: 'var(--surface-3)', borderRadius: 8, padding: '12px 24px',
       border: '1px solid #f0f0f0',
       display: 'flex', justifyContent: 'flex-end', gap: 24,
     }}>
-      <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新人：<span style={{ color: '#595959' }}>{record.operatorName || '-'}</span></span>
-      <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新時間：<span style={{ color: '#595959' }}>{record.updatedAt || '-'}</span></span>
+      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>最後更新人：<span style={{ color: 'var(--text-2)' }}>{record.operatorName || '-'}</span></span>
+      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>最後更新時間：<span style={{ color: 'var(--text-2)' }}>{record.updatedAt || '-'}</span></span>
     </div>
   </>
 }

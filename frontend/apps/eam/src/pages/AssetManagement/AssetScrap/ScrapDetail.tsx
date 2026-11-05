@@ -43,7 +43,7 @@ function SectionTitle({ icon, iconBg, title }: { icon: React.ReactNode; iconBg: 
       <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {icon}
       </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>
       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
     </div>
   )
@@ -75,12 +75,12 @@ export default function ScrapDetail({ scrapId, onBack, onDeleted }: Props) {
       icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: '確認刪除此報廢記錄？',
       content: (
-        <div style={{ background: '#FFF7F0', border: '1px solid #FFE7D1', borderRadius: 8, padding: '12px 16px', marginTop: 12 }}>
-          <div style={{ fontSize: 13, color: '#595959' }}>
-            <div>資產編號：<b style={{ color: '#262626' }}>{record.assetNo}</b></div>
-            <div>資產名稱：<b style={{ color: '#262626' }}>{record.assetName}</b></div>
+        <div style={{ background: 'var(--brand-soft)', border: '1px solid #FFE7D1', borderRadius: 8, padding: '12px 16px', marginTop: 12 }}>
+          <div style={{ fontSize: 13, color: 'var(--text-2)' }}>
+            <div>資產編號：<b style={{ color: 'var(--text-1)' }}>{record.assetNo}</b></div>
+            <div>資產名稱：<b style={{ color: 'var(--text-1)' }}>{record.assetName}</b></div>
           </div>
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8 }}>
             刪除後資產將恢復為閒置狀態，可再次被領用或借用。
           </div>
         </div>
@@ -120,7 +120,7 @@ export default function ScrapDetail({ scrapId, onBack, onDeleted }: Props) {
           {/* ====== 模块 1：资产快照信息 ====== */}
           <div style={detailCardStyle}>
             <SectionTitle
-              icon={<ExclamationCircleOutlined style={{ fontSize: 14, color: '#1890ff' }} />}
+              icon={<ExclamationCircleOutlined style={{ fontSize: 14, color: 'var(--info)' }} />}
               iconBg="#e6f7ff"
               title="資產信息"
             />
@@ -140,7 +140,7 @@ export default function ScrapDetail({ scrapId, onBack, onDeleted }: Props) {
           {/* ====== 模块 2：报废信息 ====== */}
           <div style={detailCardStyle}>
             <SectionTitle
-              icon={<FileTextOutlined style={{ fontSize: 14, color: '#fa8c16' }} />}
+              icon={<FileTextOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />}
               iconBg="#fff7e6"
               title="報廢信息"
             />
@@ -159,7 +159,7 @@ export default function ScrapDetail({ scrapId, onBack, onDeleted }: Props) {
               <Descriptions.Item label="處置方式">
                 {record.disposeType
                   ? <Tag>{DISPOSE_LABELS[record.disposeType] || record.disposeType}</Tag>
-                  : <span style={{ color: '#8C8C8C' }}>未填寫</span>}
+                  : <span style={{ color: 'var(--text-3)' }}>未填寫</span>}
               </Descriptions.Item>
               <Descriptions.Item label="報廢原因" span={2}>
                 {record.reason || '-'}
@@ -173,7 +173,7 @@ export default function ScrapDetail({ scrapId, onBack, onDeleted }: Props) {
           {/* ====== 模块 3：时间与操作人 ====== */}
           <div style={detailCardStyle}>
             <SectionTitle
-              icon={<ClockCircleOutlined style={{ fontSize: 14, color: '#722ed1' }} />}
+              icon={<ClockCircleOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />}
               iconBg="#f9f0ff"
               title="時間與操作人"
             />

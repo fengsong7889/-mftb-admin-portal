@@ -35,7 +35,7 @@ const CARD_STYLE: React.CSSProperties = {
 const renderCardTitle = (icon: React.ReactNode, iconBg: string, title: string) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
     <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{icon}</div>
-    <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+    <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>
     <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
   </div>
 )
@@ -126,7 +126,7 @@ export default function BorrowForm({
 
         {/* ====== 模塊1：資產選擇 ====== */}
         <div style={CARD_STYLE}>
-          {renderCardTitle(<DatabaseOutlined style={{ fontSize: 14, color: '#1890ff' }} />, '#e6f7ff', '資產選擇')}
+          {renderCardTitle(<DatabaseOutlined style={{ fontSize: 14, color: 'var(--info)' }} />, '#e6f7ff', '資產選擇')}
           <Alert type="info" showIcon style={{ marginBottom: 16, borderRadius: 8 }}
             message="僅可選擇閒置狀態的資產；借用後資產將標記為使用中。" />
           <Row gutter={16}>
@@ -142,7 +142,7 @@ export default function BorrowForm({
           </Row>
           {selected && (
             <div style={{ marginTop: 4 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#595959', marginBottom: 12 }}>資產信息</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)', marginBottom: 12 }}>資產信息</div>
               <AssetSummary asset={selected} />
             </div>
           )}
@@ -150,7 +150,7 @@ export default function BorrowForm({
 
         {/* ====== 模塊2：借用人與期限 ====== */}
         <div style={CARD_STYLE}>
-          {renderCardTitle(<UserOutlined style={{ fontSize: 14, color: '#E8720C' }} />, '#fff7e6', '借用人信息')}
+          {renderCardTitle(<UserOutlined style={{ fontSize: 14, color: 'var(--brand)' }} />, '#fff7e6', '借用人信息')}
           <Row gutter={16}>
             <Col xs={24} sm={12} md={8}>
               <Form.Item name="holderId" label="借用人" rules={[{ required: true, message: '請選擇借用人' }]}>
@@ -180,7 +180,7 @@ export default function BorrowForm({
 
         {/* ====== 模塊3：借用期限 ====== */}
         <div style={CARD_STYLE}>
-          {renderCardTitle(<SaveOutlined style={{ fontSize: 14, color: '#722ED1' }} />, '#f9f0ff', '借用期限')}
+          {renderCardTitle(<SaveOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />, '#f9f0ff', '借用期限')}
           <Row gutter={16}>
             <Col xs={24} sm={12} md={8}>
               <Form.Item name="startDate" label="借出日期" rules={[{ required: true, message: '請選擇借出日期' }]}>

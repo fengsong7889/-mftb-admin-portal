@@ -146,8 +146,8 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
         icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
         content: (
           <div style={{ marginTop: 8 }}>
-            <div style={{ marginBottom: 12, color: '#595959' }}>以下信息尚未完善：</div>
-            <ul style={{ margin: 0, paddingLeft: 20, color: '#262626' }}>
+            <div style={{ marginBottom: 12, color: 'var(--text-2)' }}>以下信息尚未完善：</div>
+            <ul style={{ margin: 0, paddingLeft: 20, color: 'var(--text-1)' }}>
               {errors.map((err, idx) => <li key={idx} style={{ marginBottom: 4 }}>{err}</li>)}
             </ul>
           </div>
@@ -194,10 +194,10 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
     {
       title: t('asset.paramInfoTitle'), key: 'params', width: 200,
       render: (_: unknown, r) => {
-        if (!r.params || Object.keys(r.params).length === 0) return <span style={{ color: '#bfbfbf', fontSize: 12 }}>-</span>
+        if (!r.params || Object.keys(r.params).length === 0) return <span style={{ color: 'var(--text-4)', fontSize: 12 }}>-</span>
         const entries = Object.entries(r.params).filter(([, v]) => v && v !== 'undefined')
-        if (entries.length === 0) return <span style={{ color: '#bfbfbf', fontSize: 12 }}>-</span>
-        return <span style={{ fontSize: 12, color: '#595959' }}>{entries.map(([k, v]) => `${paramNameMap.get(k) || k}: ${v}`).join(', ')}</span>
+        if (entries.length === 0) return <span style={{ color: 'var(--text-4)', fontSize: 12 }}>-</span>
+        return <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{entries.map(([k, v]) => `${paramNameMap.get(k) || k}: ${v}`).join(', ')}</span>
       },
     },
     { title: t('asset.colQty'), dataIndex: 'qty', key: 'qty', width: 60, align: 'right' },
@@ -211,7 +211,7 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
     {
       title: t('asset.confirmedPrice'), key: 'confirmedPrice', width: 100, align: 'right',
       render: (_: unknown, r) => (
-        <span style={{ fontWeight: r.confirmedPrice ? 600 : 400, color: r.confirmedPrice ? '#52c41a' : '#bfbfbf' }}>
+        <span style={{ fontWeight: r.confirmedPrice ? 600 : 400, color: r.confirmedPrice ? 'var(--success)' : 'var(--text-4)' }}>
           {r.confirmedPrice ? `MOP ${r.confirmedPrice.toLocaleString()}` : '-'}
         </span>
       ),
@@ -263,19 +263,19 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
           <Space>
             {detail.execStatus === 'pending' && (
               <Button type="primary" onClick={handleStartPurchase}
-                style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}>
+                style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}>
                 {t('asset.btnStartPurchase')}
               </Button>
             )}
             {detail.execStatus === 'purchasing' && (
               <Button type="primary" onClick={handleCompletePurchase}
-                style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}>
+                style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}>
                 {t('asset.btnCompletePurchase')}
               </Button>
             )}
             {detail.execStatus === 'completed' && (
               <Button type="primary" onClick={() => onInbound(detail.id)}
-                style={{ backgroundColor: '#722ED1', borderColor: '#722ED1', borderRadius: 8, height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 6px rgba(114,46,209,0.25)' }}>
+                style={{ backgroundColor: '#722ED1', borderColor: 'var(--purple)', borderRadius: 8, height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 6px rgba(114,46,209,0.25)' }}>
                 {t('asset.btnReceive')}
               </Button>
             )}
@@ -285,14 +285,14 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
 
       {/* ====== 訂單信息 ====== */}
       <div style={{
-        background: '#fff', borderRadius: 8, padding: '20px 24px', marginBottom: 16,
+        background: 'var(--surface-2)', borderRadius: 8, padding: '20px 24px', marginBottom: 16,
         boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ fontSize: 14, color: '#fa8c16' }}>🛒</span>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: 14, color: 'var(--warning)' }}>🛒</span>
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.orderInfoTitle')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.orderInfoTitle')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
@@ -300,7 +300,7 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
           <Descriptions.Item label={t('asset.colPoNo')}><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{detail.poNo}</span></Descriptions.Item>
           <Descriptions.Item label={t('asset.orderBrand')}>
             {detail.brand ? <BrandTag value={detail.brand} /> : '-'}
-            {detail.brand && codeHint[detail.brand] && <span style={{ fontSize: 12, color: '#E8720C', marginLeft: 8 }}>{t('asset.brandCodeHint', { brand: labelMap[detail.brand], code: codeHint[detail.brand] })}</span>}
+            {detail.brand && codeHint[detail.brand] && <span style={{ fontSize: 12, color: 'var(--brand)', marginLeft: 8 }}>{t('asset.brandCodeHint', { brand: labelMap[detail.brand], code: codeHint[detail.brand] })}</span>}
           </Descriptions.Item>
           <Descriptions.Item label={t('asset.colReqNo')}>
             {detail.reqId > 0 && detail.reqNo ? (
@@ -311,7 +311,7 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
           </Descriptions.Item>
           <Descriptions.Item label={t('asset.execStatus')}><Tag color={execMeta.color}>{t(execMeta.key)}</Tag></Descriptions.Item>
           <Descriptions.Item label={t('asset.orderTotal')}>
-            <span style={{ fontSize: 18, fontWeight: 700, color: '#E8720C' }}>MOP {grandTotal.toLocaleString()}</span>
+            <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--brand)' }}>MOP {grandTotal.toLocaleString()}</span>
           </Descriptions.Item>
           <Descriptions.Item label={t('asset.colPurchaser')}>{detail.purchaser || '-'}</Descriptions.Item>
           <Descriptions.Item label={t('asset.serviceDept')}>{purchaserDept || '-'}</Descriptions.Item>
@@ -326,7 +326,7 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
         const dm = group.deliveryMethod
         return (
           <div key={group.id} style={{
-            border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
+            border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)',
             padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
           }}>
             {/* 分組標題 */}
@@ -339,7 +339,7 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
                   color: '#fff', fontSize: 11, fontWeight: 700,
                   boxShadow: '0 1px 4px rgba(24,144,255,0.3)',
                 }}>{gIdx + 1}</span>
-                <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('asset.purchaseMaterials')}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.purchaseMaterials')}</span>
                 <Tag color="blue" style={{ fontSize: 11 }}>{t('asset.groupSubtotalTag', { amount: subtotal.toLocaleString() })}</Tag>
               </div>
             </div>
@@ -384,7 +384,7 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
         const percent = totalQty ? Math.round((receivedQty / totalQty) * 100) : 0
         return (
           <div style={{
-            background: '#fff', borderRadius: 8, padding: '20px 24px', marginBottom: 16,
+            background: 'var(--surface-2)', borderRadius: 8, padding: '20px 24px', marginBottom: 16,
             boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
           }}>
             <h3 style={{ margin: '0 0 16px', fontSize: 16, fontWeight: 600 }}>{t('asset.sectionInboundProgress')}</h3>
@@ -399,12 +399,12 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
 
       {/* ====== 最後更新 ====== */}
       <div style={{
-        background: '#fafafa', borderRadius: 8, padding: '12px 24px',
+        background: 'var(--surface-3)', borderRadius: 8, padding: '12px 24px',
         border: '1px solid #f0f0f0',
         display: 'flex', justifyContent: 'flex-end', gap: 24,
       }}>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedByLabel')}<span style={{ color: '#595959' }}>{detail.updatedBy || '-'}</span></span>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedAtLabel')}<span style={{ color: '#595959' }}>{detail.updatedAt || '-'}</span></span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.updatedByLabel')}<span style={{ color: 'var(--text-2)' }}>{detail.updatedBy || '-'}</span></span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.updatedAtLabel')}<span style={{ color: 'var(--text-2)' }}>{detail.updatedAt || '-'}</span></span>
       </div>
     </Spin>
 
@@ -419,7 +419,7 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
         confirmLoading={purchaserConfirmLoading}
         destroyOnHidden
       >
-        <div style={{ marginBottom: 8, fontSize: 13, color: '#595959' }}>
+        <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--text-2)' }}>
           {t('asset.colPoNo')}：<span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{detail?.poNo}</span>
         </div>
         <Form layout="vertical">

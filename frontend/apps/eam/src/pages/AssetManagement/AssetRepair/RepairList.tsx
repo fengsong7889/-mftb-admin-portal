@@ -231,7 +231,7 @@ export default function RepairList({ onViewAsset, onViewDetail, onCreate }: Prop
       key: 'source', title: '來源', width: 100,
       render: (_: unknown, r: AssetRepairRecord) => r.returnId
         ? <Tag color="blue">歸還處置</Tag>
-        : <span style={{ color: '#8C8C8C' }}>-</span>,
+        : <span style={{ color: 'var(--text-3)' }}>-</span>,
     },
     { key: 'updatedBy', title: t('asset.colUpdatedBy'), dataIndex: 'updatedBy', width: 110, ellipsis: true, render: (v: string | null) => v || '-' },
     { key: 'updatedAt', title: t('asset.colUpdatedAt'), dataIndex: 'updatedAt', width: 170, render: (v: string | null) => v || '-' },

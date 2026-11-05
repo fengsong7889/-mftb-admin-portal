@@ -39,7 +39,7 @@ function SectionTitle({ icon, iconBg, title, extra }: {
       <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {icon}
       </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>
       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
       {extra}
     </div>
@@ -244,7 +244,7 @@ export default function InventoryDetail({ taskId, onBack }: Props) {
     } catch (e: unknown) { message.error(e instanceof Error ? e.message : t('common.exportFailed', { defaultValue: '導出失敗' })) }
   }
 
-  const resultTag = (key?: string | null) => key ? <Tag color={RESULT_COLOR[key]}>{t(RESULT_LABEL_KEY[key] || key)}</Tag> : <span style={{ color: '#bfbfbf' }}>-</span>
+  const resultTag = (key?: string | null) => key ? <Tag color={RESULT_COLOR[key]}>{t(RESULT_LABEL_KEY[key] || key)}</Tag> : <span style={{ color: 'var(--text-4)' }}>-</span>
 
   /** 盘点范围摘要（与列表页同口径） */
   const scopeText = (r: InventoryTaskRecord) => {
@@ -284,7 +284,7 @@ export default function InventoryDetail({ taskId, onBack }: Props) {
         {/* 危险（缺失）操作按规范放最后 */}
         <Button type="link" size="small" danger onClick={() => openEditor(r, 'lost')}>{t('asset.invOpLost', { defaultValue: '缺失' })}</Button>
       </Space>
-    ) : <span style={{ color: '#bfbfbf' }}>-</span> },
+    ) : <span style={{ color: 'var(--text-4)' }}>-</span> },
   ]
 
   const stats = task?.stats
@@ -301,7 +301,7 @@ export default function InventoryDetail({ taskId, onBack }: Props) {
     const isLost = editor.status === 'lost'
     const isPending = editor.status === 'pending'
     return (
-      <div style={{ background: '#FAFAFA', border: '1px solid #f0f0f0', borderRadius: 8, padding: 16 }}>
+      <div style={{ background: 'var(--surface-3)', border: '1px solid #f0f0f0', borderRadius: 8, padding: 16 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, alignItems: 'flex-end' }}>
           <div>
             <div style={labelStyle}>{t('asset.colCheckStatus')}</div>
@@ -401,12 +401,12 @@ export default function InventoryDetail({ taskId, onBack }: Props) {
         )}
       />
 
-      {!isV2 && <div style={{ marginBottom: 12, color: '#8c8c8c', fontSize: 13 }}>{t('asset.invHistoryTip', { defaultValue: '歷史任務僅可查看/導出' })}</div>}
+      {!isV2 && <div style={{ marginBottom: 12, color: 'var(--text-3)', fontSize: 13 }}>{t('asset.invHistoryTip', { defaultValue: '歷史任務僅可查看/導出' })}</div>}
 
       {/* 盘点任务信息（详情页规范 §D.3：白底卡片 + 模块标题行 + Descriptions） */}
       <div className="detail-card">
         <SectionTitle
-          icon={<FileSearchOutlined style={{ fontSize: 14, color: '#1890ff' }} />}
+          icon={<FileSearchOutlined style={{ fontSize: 14, color: 'var(--info)' }} />}
           iconBg="#e6f7ff"
           title={t('asset.invTaskInfoTitle', { defaultValue: '盤點任務信息' })}
         />
@@ -436,7 +436,7 @@ export default function InventoryDetail({ taskId, onBack }: Props) {
       {/* 盘点明细 */}
       <div className="detail-card">
         <SectionTitle
-          icon={<ProfileOutlined style={{ fontSize: 14, color: '#fa8c16' }} />}
+          icon={<ProfileOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />}
           iconBg="#fff7e6"
           title={t('asset.invDetailListTitle', { defaultValue: '盤點明細' })}
           extra={editable && selected.length > 0 ? (
@@ -488,18 +488,18 @@ export default function InventoryDetail({ taskId, onBack }: Props) {
       {/* 操作记录（详情页规范 §D.4：仅展示最后更新人 + 最后更新时间） */}
       <div className="detail-card">
         <SectionTitle
-          icon={<EditOutlined style={{ fontSize: 14, color: '#1890ff' }} />}
+          icon={<EditOutlined style={{ fontSize: 14, color: 'var(--info)' }} />}
           iconBg="#e6f7ff"
           title={t('asset.operationRecord')}
         />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
           <div>
             <div style={labelStyle}>{t('asset.colUpdatedBy')}</div>
-            <div style={{ fontSize: 14, color: '#262626' }}>{updatedBy || '-'}</div>
+            <div style={{ fontSize: 14, color: 'var(--text-1)' }}>{updatedBy || '-'}</div>
           </div>
           <div>
             <div style={labelStyle}>{t('asset.colUpdatedAt')}</div>
-            <div style={{ fontSize: 14, color: '#262626' }}>{updatedAt || '-'}</div>
+            <div style={{ fontSize: 14, color: 'var(--text-1)' }}>{updatedAt || '-'}</div>
           </div>
         </div>
       </div>
@@ -515,11 +515,11 @@ export default function InventoryDetail({ taskId, onBack }: Props) {
       >
         {prepare && (
           <>
-            <div style={{ background: '#FFF7F0', border: '1px solid #FFE7D1', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
+            <div style={{ background: 'var(--brand-soft)', border: '1px solid #FFE7D1', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
               <Space size="large" wrap>
                 <span>{t('asset.invStatExpected')}：<b>{prepare.stats.expectedCount}</b></span>
-                <span>{t('asset.invStatChecked')}：<b style={{ color: '#52C41A' }}>{prepare.checkedCount}</b></span>
-                <span>{t('asset.invStatAnomaly')}：<b style={{ color: '#FF4D4F' }}>{prepare.stats.anomalyCount}</b></span>
+                <span>{t('asset.invStatChecked')}：<b style={{ color: 'var(--success)' }}>{prepare.checkedCount}</b></span>
+                <span>{t('asset.invStatAnomaly')}：<b style={{ color: 'var(--danger)' }}>{prepare.stats.anomalyCount}</b></span>
                 <span>{t('asset.invStatNotChecked')}：<b>{prepare.notCheckedCount}</b></span>
               </Space>
             </div>

@@ -74,21 +74,21 @@ export default function ModelDetail({ id, type, onBack, onEdit }: Props) {
       />
 
       {/* ====== 基本信息卡片（无边框） ====== */}
-      <div style={{ borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+      <div style={{ borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: isBrand ? '#fff7e6' : '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: isBrand ? 'var(--warning-soft)' : 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             {isBrand
-              ? <ShopOutlined style={{ fontSize: 14, color: '#E8720C' }} />
-              : <AppstoreOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+              ? <ShopOutlined style={{ fontSize: 14, color: 'var(--brand)' }} />
+              : <AppstoreOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
             }
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{isBrand ? t('asset.brandInfoTitle') : t('asset.productInfoTitle')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{isBrand ? t('asset.brandInfoTitle') : t('asset.productInfoTitle')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
         {isBrand && brand ? (
           <Descriptions column={4} size="middle">
             <Descriptions.Item label="编码">
-              <span style={{ fontFamily: 'monospace', color: '#595959' }}>{brand.code || '-'}</span>
+              <span style={{ fontFamily: 'monospace', color: 'var(--text-2)' }}>{brand.code || '-'}</span>
             </Descriptions.Item>
             <Descriptions.Item label={t('asset.belongCategory')}>
               <Tag color="blue">{categoryName(brand.categoryCode)}</Tag>
@@ -104,7 +104,7 @@ export default function ModelDetail({ id, type, onBack, onEdit }: Props) {
         ) : model ? (
           <Descriptions column={4} size="middle">
             <Descriptions.Item label="编码">
-              <span style={{ fontFamily: 'monospace', color: '#595959' }}>{model.code || '-'}</span>
+              <span style={{ fontFamily: 'monospace', color: 'var(--text-2)' }}>{model.code || '-'}</span>
             </Descriptions.Item>
             <Descriptions.Item label={t('asset.belongBrand')}>
               <Tag color="orange">{model.brandZh}</Tag>
@@ -120,12 +120,12 @@ export default function ModelDetail({ id, type, onBack, onEdit }: Props) {
 
       {/* ====== 最後更新（詳情頁規範 footer） ====== */}
       <div style={{
-        background: '#fafafa', borderRadius: 8, padding: '12px 24px',
+        background: 'var(--surface-3)', borderRadius: 8, padding: '12px 24px',
         border: '1px solid #f0f0f0',
         display: 'flex', justifyContent: 'flex-end', gap: 24,
       }}>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedByLabel')}<span style={{ color: '#595959' }}>{(isBrand ? brand?.updatedBy : model?.updatedBy) || '-'}</span></span>
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.updatedAtLabel')}<span style={{ color: '#595959' }}>{(isBrand ? brand?.updatedAt : model?.updatedAt) || '-'}</span></span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.updatedByLabel')}<span style={{ color: 'var(--text-2)' }}>{(isBrand ? brand?.updatedBy : model?.updatedBy) || '-'}</span></span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.updatedAtLabel')}<span style={{ color: 'var(--text-2)' }}>{(isBrand ? brand?.updatedAt : model?.updatedAt) || '-'}</span></span>
       </div>
     </>
   )

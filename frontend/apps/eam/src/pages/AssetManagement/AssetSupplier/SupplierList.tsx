@@ -167,7 +167,7 @@ export default function SupplierList({ onAdd, onEdit, onView }: Props) {
     },
     {
       title: t('asset.contactPersonCol'), dataIndex: 'contactCount', key: 'contactCount', width: 90, align: 'center',
-      render: (v: number | undefined) => v ? <Tag color="blue">{t('common.total', { count: v })}</Tag> : <span style={{ color: '#bfbfbf' }}>-</span>,
+      render: (v: number | undefined) => v ? <Tag color="blue">{t('common.total', { count: v })}</Tag> : <span style={{ color: 'var(--text-4)' }}>-</span>,
     },
     {
       title: t('asset.bankNameLabel'), dataIndex: 'bankName', key: 'bankName', width: 200, ellipsis: true,
@@ -191,7 +191,7 @@ export default function SupplierList({ onAdd, onEdit, onView }: Props) {
           checkedChildren={t('common.enable')}
           unCheckedChildren={t('common.disable')}
           style={{
-            backgroundColor: v === 'enabled' ? '#E8720C' : '#D9D9D9',
+            backgroundColor: v === 'enabled' ? 'var(--brand)' : '#D9D9D9',
           }}
           onClick={() => handleToggle(record)}
         />

@@ -32,7 +32,7 @@ export default function AssetTagPreview({ data, variant = 'card', values, fluid 
       className="asset-tag-preview"
       style={{
         display: 'inline-block',
-        background: '#fff',
+        background: 'var(--surface-2)',
         border: `1px solid ${bgColor}55`,
         borderRadius: 8,
         overflow: 'hidden',
@@ -66,7 +66,7 @@ export default function AssetTagPreview({ data, variant = 'card', values, fluid 
       {isMini ? (
         <div style={{ padding: '6px 8px', display: 'flex', flexWrap: 'wrap', gap: 4 }}>
           {fields.length === 0 ? (
-            <span style={{ fontSize: 11, color: '#8C8C8C' }}>未配置展示字段</span>
+            <span style={{ fontSize: 11, color: 'var(--text-3)' }}>未配置展示字段</span>
           ) : (
             <>
               {fields.slice(0, 4).map(f => (
@@ -82,7 +82,7 @@ export default function AssetTagPreview({ data, variant = 'card', values, fluid 
                 }}>{f.label}</span>
               ))}
               {fields.length > 4 && (
-                <span style={{ fontSize: 11, color: '#8C8C8C', lineHeight: '18px' }}>
+                <span style={{ fontSize: 11, color: 'var(--text-3)', lineHeight: '18px' }}>
                   +{fields.length - 4}
                 </span>
               )}
@@ -92,14 +92,14 @@ export default function AssetTagPreview({ data, variant = 'card', values, fluid 
       ) : (
         <div style={{ padding: '10px 14px' }}>
           {fields.length === 0 ? (
-            <div style={{ fontSize: 12, color: '#8C8C8C' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-3)' }}>
               未配置展示字段，請在「展示字段配置」中勾選
             </div>
           ) : (
             fields.map(f => (
               <div key={f.key} style={{ display: 'flex', gap: 6, fontSize: 12, lineHeight: '22px' }}>
-                <span style={{ color: '#8C8C8C', flexShrink: 0 }}>{f.label}：</span>
-                <span style={{ color: '#262626', fontWeight: 500 }}>
+                <span style={{ color: 'var(--text-3)', flexShrink: 0 }}>{f.label}：</span>
+                <span style={{ color: 'var(--text-1)', fontWeight: 500 }}>
                   {values?.[f.key] || ASSET_FIELD_SAMPLE_VALUES[f.key] || '—'}
                 </span>
               </div>

@@ -57,7 +57,7 @@ export default function EmployeeAssetDetail({ employeeId, employee, stats, data,
   /* ----- 員工信息卡 ----- */
   const renderInfoCard = () => (
     <div style={{
-      background: '#fff', borderRadius: 12, padding: '20px 24px', marginBottom: 16,
+      background: 'var(--surface-2)', borderRadius: 12, padding: '20px 24px', marginBottom: 16,
       boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
@@ -72,14 +72,14 @@ export default function EmployeeAssetDetail({ employeeId, employee, stats, data,
         </div>
         {/* 基本信息 */}
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 17, fontWeight: 600, color: '#262626', marginBottom: 4 }}>
+          <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--text-1)', marginBottom: 4 }}>
             {empName}
-            <span style={{ fontSize: 13, fontWeight: 400, color: '#8c8c8c', marginLeft: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-3)', marginLeft: 8 }}>
               {empNo}
             </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 13, color: '#595959' }}>
-            <span><TeamOutlined style={{ marginRight: 4, color: '#8c8c8c' }} />{department || '—'}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 13, color: 'var(--text-2)' }}>
+            <span><TeamOutlined style={{ marginRight: 4, color: 'var(--text-3)' }} />{department || '—'}</span>
           </div>
         </div>
         <span className="claim-muted">员工 ID：{employeeId}</span>

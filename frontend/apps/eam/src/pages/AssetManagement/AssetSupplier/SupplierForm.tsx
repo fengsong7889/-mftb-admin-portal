@@ -141,7 +141,7 @@ export default function SupplierForm({ id, onBack }: Props) {
     <Spin spinning={loading}>
       {/* ====== 頂部標題欄（橙色漸變頂條） ====== */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
       }}>
         <div style={{
@@ -150,10 +150,10 @@ export default function SupplierForm({ id, onBack }: Props) {
         }} />
         <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
           <Button type="primary" icon={<ArrowLeftOutlined />} onClick={onBack}
-            style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}
+            style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}
           >{t('common.back')}</Button>
           <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>
             {isEdit ? t('asset.editSupplierTitle') : t('asset.addSupplierTitle')}
           </h2>
         </div>
@@ -161,14 +161,14 @@ export default function SupplierForm({ id, onBack }: Props) {
 
       {/* ====== 基本信息 ====== */}
       <div style={{
-        border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
+        border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)',
         padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ContactsOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ContactsOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.basicInfoTitle')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.basicInfoTitle')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
@@ -183,7 +183,7 @@ export default function SupplierForm({ id, onBack }: Props) {
                 <Input
                   disabled
                   placeholder={isEdit ? '' : t('asset.autoGenAfterSave')}
-                  style={{ fontFamily: 'monospace', color: '#595959' }}
+                  style={{ fontFamily: 'monospace', color: 'var(--text-2)' }}
                 />
               </Form.Item>
             </Col>
@@ -223,20 +223,20 @@ export default function SupplierForm({ id, onBack }: Props) {
 
       {/* ====== 聯繫人列表 ====== */}
       <div style={{
-        border: '1px solid #e8eaed', borderRadius: 8, background: '#fff',
+        border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)',
         padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ContactsOutlined style={{ fontSize: 14, color: '#52c41a' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--success-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ContactsOutlined style={{ fontSize: 14, color: 'var(--success)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.contactInfoTitle')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.contactInfoTitle')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-          <span style={{ fontSize: 12, color: '#8c8c8c' }}>{t('asset.multiContactHint')}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.multiContactHint')}</span>
         </div>
 
         {contacts.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '24px 0', color: '#bfbfbf', fontSize: 13 }}>
+          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-4)', fontSize: 13 }}>
             {t('asset.noContactYet')}
           </div>
         )}
@@ -245,10 +245,10 @@ export default function SupplierForm({ id, onBack }: Props) {
           <div key={idx} style={{
             display: 'grid', gridTemplateColumns: '1fr 1fr 80px 40px', gap: 12,
             alignItems: 'start', marginBottom: 12,
-            padding: '12px 16px', background: '#fafafa', borderRadius: 8, border: '1px solid #f0f0f0',
+            padding: '12px 16px', background: 'var(--surface-3)', borderRadius: 8, border: '1px solid #f0f0f0',
           }}>
             <div>
-              <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>{t('asset.contactNameLabel')}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>{t('asset.contactNameLabel')}</div>
               <Input
                 value={c.contactName}
                 onChange={(e) => updateContact(idx, { contactName: e.target.value })}
@@ -257,7 +257,7 @@ export default function SupplierForm({ id, onBack }: Props) {
               />
             </div>
             <div>
-              <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>{t('asset.contactPhoneLabel')}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>{t('asset.contactPhoneLabel')}</div>
               <Input
                 value={c.contactPhone}
                 onChange={(e) => updateContact(idx, { contactPhone: e.target.value })}
@@ -266,7 +266,7 @@ export default function SupplierForm({ id, onBack }: Props) {
               />
             </div>
             <div>
-              <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>{t('asset.enableLabel')}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>{t('asset.enableLabel')}</div>
               <Switch
                 checked={c.status !== 'disabled'}
                 onChange={(checked) => updateContact(idx, { status: checked ? 'enabled' : 'disabled' })}

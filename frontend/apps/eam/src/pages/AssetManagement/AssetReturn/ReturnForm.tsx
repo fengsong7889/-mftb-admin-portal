@@ -60,7 +60,7 @@ function ReturnCard({ icon, iconBg, title, children }: {
         <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {icon}
         </div>
-        <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>
         <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
       </div>
       {/* 内容直接渲染，不额外包裹，保证卡片高度紧贴内容 */}
@@ -201,7 +201,7 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
     <ReturnHeader title="歸還登記" onBack={onBack} />
     <Spin spinning={loading}>
         {/* ====== 模块 1：资产信息 ====== */}
-        <ReturnCard icon={<InboxOutlined style={{ fontSize: 14, color: '#1890ff' }} />} iconBg="#e6f7ff" title="資產信息">
+        <ReturnCard icon={<InboxOutlined style={{ fontSize: 14, color: 'var(--info)' }} />} iconBg="#e6f7ff" title="資產信息">
           <TransferError error={sourceState.error} retry={sourceState.refresh} />
             {sourceState.data && (() => {
               const d = sourceState.data as ClaimRow | BorrowRow | AssetItem
@@ -252,8 +252,8 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
                     return (
                       <div style={{ marginTop: 16 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                          <AppstoreOutlined style={{ fontSize: 13, color: '#FA8C16' }} />
-                          <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>領用配件</span>
+                          <AppstoreOutlined style={{ fontSize: 13, color: 'var(--warning)' }} />
+                          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>領用配件</span>
                           <Tag color="orange" style={{ fontSize: 11 }}>{accs.length} 項</Tag>
                           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
                         </div>
@@ -274,7 +274,7 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
         </ReturnCard>
 
         {/* ====== 模块 2：领用信息 ====== */}
-        <ReturnCard icon={<FileTextOutlined style={{ fontSize: 14, color: '#1890ff' }} />} iconBg="#e6f7ff" title="領用信息">
+        <ReturnCard icon={<FileTextOutlined style={{ fontSize: 14, color: 'var(--info)' }} />} iconBg="#e6f7ff" title="領用信息">
             {sourceState.data && (() => {
               const d = sourceState.data as ClaimRow | BorrowRow | AssetItem
               const cr = d as ClaimRow
@@ -341,7 +341,7 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
 
         {/* ====== 模块 3：签收信息与凭证 ====== */}
         {claimId != null && (
-          <ReturnCard icon={<FileProtectOutlined style={{ fontSize: 14, color: '#fa8c16' }} />} iconBg="#fff7e6" title="簽收信息與憑證">
+          <ReturnCard icon={<FileProtectOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />} iconBg="#fff7e6" title="簽收信息與憑證">
               {sourceState.data && (() => {
                 const cr = sourceState.data as ClaimRow
                 const signatureStatus = cr.signatureStatus
@@ -350,12 +350,12 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
                 return (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 48px', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, color: '#8c8c8c' }}>簽收狀態：</span>
+                      <span style={{ fontSize: 13, color: 'var(--text-3)' }}>簽收狀態：</span>
                       <Tag color={SIGNATURE_META[signatureStatus]?.color} style={{ marginInlineEnd: 0 }}>{SIGNATURE_META[signatureStatus]?.label ?? signatureStatus}</Tag>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 13, color: '#8c8c8c' }}>實際簽署時間：</span>
-                      <span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>{signedAt || '—'}</span>
+                      <span style={{ fontSize: 13, color: 'var(--text-3)' }}>實際簽署時間：</span>
+                      <span style={{ fontSize: 14, color: 'var(--text-1)', fontWeight: 500 }}>{signedAt || '—'}</span>
                     </div>
                   </div>
                 )
@@ -364,7 +364,7 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
         )}
 
       <Form<Values> className="return-compact-form" form={form} layout="vertical" disabled={loading} initialValues={{ date: dayjs(), condition: 'normal' }}>
-        <ReturnCard icon={<RollbackOutlined style={{ fontSize: 14, color: '#52c41a' }} />} iconBg="#f6ffed" title="歸還信息">
+        <ReturnCard icon={<RollbackOutlined style={{ fontSize: 14, color: 'var(--success)' }} />} iconBg="#f6ffed" title="歸還信息">
           <div className="return-grid">
             <Form.Item name="date" label="員工歸還日期" rules={[{ required: true }]}>
               <DatePicker disabledDate={d => d.isAfter(dayjs(), 'day')} style={{ width: '100%' }} />
@@ -389,7 +389,7 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
           </div>
         </ReturnCard>
 
-        <ReturnCard icon={<FileProtectOutlined style={{ fontSize: 14, color: '#fa8c16' }} />} iconBg="#fff7e6" title="驗收狀況">
+        <ReturnCard icon={<FileProtectOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />} iconBg="#fff7e6" title="驗收狀況">
           <Form.Item name="condition" label="資產驗收" rules={[{ required: true }]}>
             <Radio.Group optionType="button" buttonStyle="solid"
               options={Object.entries(CONDITION_LABEL).map(([v, l]) => ({ value: v, label: l }))} />
@@ -406,7 +406,7 @@ export default function ReturnForm({ claimId, borrowId, assetId, operatorName, c
         </ReturnCard>
 
         {condition !== 'lost' && (
-          <ReturnCard icon={<AppstoreOutlined style={{ fontSize: 14, color: '#52c41a' }} />} iconBg="#f6ffed" title="接收管理">
+          <ReturnCard icon={<AppstoreOutlined style={{ fontSize: 14, color: 'var(--success)' }} />} iconBg="#f6ffed" title="接收管理">
             <Alert className="claim-notice" showIcon type="info"
               message={condition === 'normal'
                 ? '指定接收部門與存放倉庫後，資產歸還時同步歸位；不填則保持原歸屬部門與原位置。'

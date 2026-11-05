@@ -32,7 +32,7 @@ function SectionTitle({ icon, iconBg, title }: { icon: React.ReactNode; iconBg: 
       <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {icon}
       </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>
       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
     </div>
   )
@@ -286,7 +286,7 @@ export default function LossDetail({ lossId, followUp, onBack }: Props) {
 
       {/* 基本信息 */}
       <div style={detailCardStyle}>
-        <SectionTitle icon={<EditOutlined style={{ fontSize: 14, color: '#1890ff' }} />} iconBg="#e6f7ff" title="報失信息" />
+        <SectionTitle icon={<EditOutlined style={{ fontSize: 14, color: 'var(--info)' }} />} iconBg="#e6f7ff" title="報失信息" />
         <Descriptions column={4} size="middle">
           <Descriptions.Item label="遺失單號">{loss.lossNo}</Descriptions.Item>
           <Descriptions.Item label="來源">{({ return: '歸還驗收', direct: '主動報失', claim: '領用報失', borrow: '借用報失' } as Record<string, string>)[loss.sourceType] || loss.sourceType}</Descriptions.Item>
@@ -306,7 +306,7 @@ export default function LossDetail({ lossId, followUp, onBack }: Props) {
 
       {/* 模塊：資產信息 */}
       <div style={detailCardStyle}>
-        <SectionTitle icon={<InboxOutlined style={{ fontSize: 14, color: '#1890ff' }} />} iconBg="#e6f7ff" title="資產信息" />
+        <SectionTitle icon={<InboxOutlined style={{ fontSize: 14, color: 'var(--info)' }} />} iconBg="#e6f7ff" title="資產信息" />
         <Descriptions column={4} size="middle">
           <Descriptions.Item label="資產編號"><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{loss.assetNo}</span></Descriptions.Item>
           <Descriptions.Item label="資產名稱">{loss.assetName}</Descriptions.Item>
@@ -323,7 +323,7 @@ export default function LossDetail({ lossId, followUp, onBack }: Props) {
       {/* 模塊：遺失時使用人（僅資產非閒置時展示） */}
       {loss.assetStatus === 'in_use' && (
         <div style={detailCardStyle}>
-          <SectionTitle icon={<UserOutlined style={{ fontSize: 14, color: '#1890ff' }} />} iconBg="#e6f7ff" title="遺失時使用人" />
+          <SectionTitle icon={<UserOutlined style={{ fontSize: 14, color: 'var(--info)' }} />} iconBg="#e6f7ff" title="遺失時使用人" />
           <Descriptions column={4} size="middle">
             <Descriptions.Item label="遺失時使用人">
               {(() => {
@@ -342,7 +342,7 @@ export default function LossDetail({ lossId, followUp, onBack }: Props) {
       {/* 找回信息 */}
       {loss.recoveredDate && (
         <div style={detailCardStyle}>
-          <SectionTitle icon={<SearchOutlined style={{ fontSize: 14, color: '#52c41a' }} />} iconBg="#f6ffed" title="找回信息" />
+          <SectionTitle icon={<SearchOutlined style={{ fontSize: 14, color: 'var(--success)' }} />} iconBg="#f6ffed" title="找回信息" />
           <Descriptions column={4} size="middle">
             <Descriptions.Item label="找回日期">{loss.recoveredDate}</Descriptions.Item>
             <Descriptions.Item label="找回地點">{loss.recoveredLocation || '-'}</Descriptions.Item>
@@ -362,7 +362,7 @@ export default function LossDetail({ lossId, followUp, onBack }: Props) {
       {/* 验收信息 */}
       {loss.inspectionResult && (
         <div style={detailCardStyle}>
-          <SectionTitle icon={<CheckCircleOutlined style={{ fontSize: 14, color: '#fa8c16' }} />} iconBg="#fff7e6" title="驗收處置" />
+          <SectionTitle icon={<CheckCircleOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />} iconBg="#fff7e6" title="驗收處置" />
           <Descriptions column={4} size="middle">
             <Descriptions.Item label="驗收結果">{INSPECTION_MAP[loss.inspectionResult] || loss.inspectionResult}</Descriptions.Item>
             <Descriptions.Item label="驗收日期">{loss.inspectionDate || '-'}</Descriptions.Item>
@@ -374,7 +374,7 @@ export default function LossDetail({ lossId, followUp, onBack }: Props) {
       {/* 核销信息 */}
       {loss.writeOffDate && (
         <div style={detailCardStyle}>
-          <SectionTitle icon={<StopOutlined style={{ fontSize: 14, color: '#722ed1' }} />} iconBg="#f9f0ff" title="核銷信息" />
+          <SectionTitle icon={<StopOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />} iconBg="#f9f0ff" title="核銷信息" />
           <Descriptions column={4} size="middle">
             <Descriptions.Item label="核銷日期">{loss.writeOffDate}</Descriptions.Item>
             <Descriptions.Item label="核銷原因" span={3}>{loss.writeOffReason || '-'}</Descriptions.Item>
@@ -385,7 +385,7 @@ export default function LossDetail({ lossId, followUp, onBack }: Props) {
       {/* 关联单据 */}
       {(loss.compensationId || loss.repairId || loss.scrapId) && (
         <div style={detailCardStyle}>
-          <SectionTitle icon={<InboxOutlined style={{ fontSize: 14, color: '#1890ff' }} />} iconBg="#e6f7ff" title="關聯單據" />
+          <SectionTitle icon={<InboxOutlined style={{ fontSize: 14, color: 'var(--info)' }} />} iconBg="#e6f7ff" title="關聯單據" />
           <Descriptions column={4} size="middle">
             {loss.compensationId && <Descriptions.Item label="賠付單">{loss.compensationNo || `#${loss.compensationId}`}</Descriptions.Item>}
             {loss.repairId && <Descriptions.Item label="維修記錄">#{loss.repairId}</Descriptions.Item>}
@@ -396,7 +396,7 @@ export default function LossDetail({ lossId, followUp, onBack }: Props) {
 
       {/* 操作日志 */}
       <div style={detailCardStyle}>
-        <SectionTitle icon={<ClockCircleOutlined style={{ fontSize: 14, color: '#8c8c8c' }} />} iconBg="#f5f5f5" title="操作日誌" />
+        <SectionTitle icon={<ClockCircleOutlined style={{ fontSize: 14, color: 'var(--text-3)' }} />} iconBg="#f5f5f5" title="操作日誌" />
         {loss.events && loss.events.length > 0 ? (
           <Timeline
             items={loss.events.map((e) => ({
@@ -404,8 +404,8 @@ export default function LossDetail({ lossId, followUp, onBack }: Props) {
                 <div>
                   <div style={{ fontWeight: 500 }}>
                     {EVENT_TYPE_MAP[e.eventType] || e.eventType}
-                    <span style={{ color: '#8C8C8C', fontWeight: 400, marginLeft: 8, fontSize: 12 }}>{e.createdAt}</span>
-                    <span style={{ color: '#8C8C8C', fontWeight: 400, marginLeft: 8, fontSize: 12 }}>
+                    <span style={{ color: 'var(--text-3)', fontWeight: 400, marginLeft: 8, fontSize: 12 }}>{e.createdAt}</span>
+                    <span style={{ color: 'var(--text-3)', fontWeight: 400, marginLeft: 8, fontSize: 12 }}>
                       {(() => {
                         const name = e.operatorName || '-'
                         const no = e.operatorNo
@@ -414,13 +414,13 @@ export default function LossDetail({ lossId, followUp, onBack }: Props) {
                       })()}
                     </span>
                   </div>
-                  <div style={{ color: '#595959', fontSize: 13 }}>{e.eventDesc}</div>
+                  <div style={{ color: 'var(--text-2)', fontSize: 13 }}>{e.eventDesc}</div>
                 </div>
               ),
             }))}
           />
         ) : (
-          <div style={{ color: '#8C8C8C' }}>暫無操作記錄</div>
+          <div style={{ color: 'var(--text-3)' }}>暫無操作記錄</div>
         )}
       </div>
 

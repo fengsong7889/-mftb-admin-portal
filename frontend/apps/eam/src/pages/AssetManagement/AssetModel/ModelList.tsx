@@ -380,7 +380,7 @@ export default function ModelList({
     {
       title: '品牌编码', dataIndex: 'code', key: 'code', width: 100,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
-      render: (v: string | undefined) => v ? <span style={{ fontFamily: 'monospace', color: '#595959' }}>{v}</span> : '-',
+      render: (v: string | undefined) => v ? <span style={{ fontFamily: 'monospace', color: 'var(--text-2)' }}>{v}</span> : '-',
     },
     {
       title: t('asset.colAssetBrand'), key: 'brand', width: 200,
@@ -388,7 +388,7 @@ export default function ModelList({
       render: (_: unknown, r: AssetBrand) => (
         <Space size={6}>
           <span style={{ fontWeight: 600 }}>{r.brandZh}</span>
-          {r.brandEn && <span style={{ color: '#8C8C8C', fontSize: 12 }}>{r.brandEn}</span>}
+          {r.brandEn && <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{r.brandEn}</span>}
         </Space>
       ),
     },
@@ -433,7 +433,7 @@ export default function ModelList({
     {
       title: '编码', dataIndex: 'code', key: 'code', width: 130,
       onCell: () => ({ style: { whiteSpace: 'nowrap' } }),
-      render: (v: string | undefined) => v ? <span style={{ fontFamily: 'monospace', color: '#595959' }}>{v}</span> : '-',
+      render: (v: string | undefined) => v ? <span style={{ fontFamily: 'monospace', color: 'var(--text-2)' }}>{v}</span> : '-',
     },
     {
       title: '产品名称', dataIndex: 'name', key: 'name', width: 220, ellipsis: true,
@@ -512,14 +512,14 @@ export default function ModelList({
         {/* 右侧主区 */}
         <div className="cat-main">
           {/* 面包屑导航 */}
-          <div style={{ padding: '12px 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#8C8C8C' }}>
-            <FolderOutlined style={{ color: '#E8720C' }} />
+          <div style={{ padding: '12px 0', display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-3)' }}>
+            <FolderOutlined style={{ color: 'var(--brand)' }} />
             <span>{selectedCategory?.name || t('common.all')}</span>
             {selectedBrand && (
               <>
                 <span>/</span>
-                <ShopOutlined style={{ color: '#E8720C' }} />
-                <span style={{ color: '#262626', fontWeight: 600 }}>{selectedBrand.brandZh}</span>
+                <ShopOutlined style={{ color: 'var(--brand)' }} />
+                <span style={{ color: 'var(--text-1)', fontWeight: 600 }}>{selectedBrand.brandZh}</span>
               </>
             )}
           </div>
@@ -620,6 +620,8 @@ export default function ModelList({
           </div>
 
           {/* 提示文字 */}
+          {/* 成对保留裸色：#D46B08 无等值令牌（REVIEW_REQUIRED），只换背景会让深色下
+             变成「深橙底 + 深橙字」约 3.4:1，低于正文 AA 4.5；见方案 §18.6。 */}
           {viewMode === 'brands' && brands.length > 0 && (
             <div style={{ padding: '8px 12px', background: '#FFF7E6', border: '1px solid #FFD591', borderRadius: 6, marginBottom: 12, fontSize: 13, color: '#D46B08' }}>
               {t('asset.brandClickHint')}

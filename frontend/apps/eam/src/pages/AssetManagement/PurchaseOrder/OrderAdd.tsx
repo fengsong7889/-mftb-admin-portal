@@ -126,10 +126,10 @@ export default function OrderAdd() {
     {
       title: t('asset.paramInfoTitle'), key: 'params', width: 200,
       render: (_: unknown, r: PurchaseOrderItem) => {
-        if (!r.params || Object.keys(r.params).length === 0) return <span style={{ color: '#bfbfbf', fontSize: 12 }}>-</span>
+        if (!r.params || Object.keys(r.params).length === 0) return <span style={{ color: 'var(--text-4)', fontSize: 12 }}>-</span>
         const entries = Object.entries(r.params).filter(([, v]) => v && v !== 'undefined')
-        if (entries.length === 0) return <span style={{ color: '#bfbfbf', fontSize: 12 }}>-</span>
-        return <span style={{ fontSize: 12, color: '#595959' }}>{entries.map(([k, v]) => `${paramNameMap.get(k) || k}: ${v}`).join(', ')}</span>
+        if (entries.length === 0) return <span style={{ color: 'var(--text-4)', fontSize: 12 }}>-</span>
+        return <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{entries.map(([k, v]) => `${paramNameMap.get(k) || k}: ${v}`).join(', ')}</span>
       },
     },
     { title: t('asset.colQty'), dataIndex: 'qty', key: 'qty', width: 60, align: 'right' },
@@ -142,7 +142,7 @@ export default function OrderAdd() {
     {
       title: t('asset.confirmedPrice'), key: 'confirmedPrice', width: 100, align: 'right',
       render: (_: unknown, r: PurchaseOrderItem) => (
-        <span style={{ color: r.confirmedPrice ? '#262626' : '#bfbfbf', fontSize: 12 }}>
+        <span style={{ color: r.confirmedPrice ? 'var(--text-1)' : 'var(--text-4)', fontSize: 12 }}>
           {r.confirmedPrice ? `MOP ${r.confirmedPrice.toLocaleString()}` : '-'}
         </span>
       ),
@@ -171,7 +171,7 @@ export default function OrderAdd() {
     <Spin spinning={dataLoading}>
       {/* ====== 页面头部 ====== */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
       }}>
         <div style={{
@@ -180,23 +180,23 @@ export default function OrderAdd() {
         }} />
         <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', gap: 16 }}>
           <Button type="primary" icon={<ArrowLeftOutlined />} onClick={handleCancel}
-            style={{ backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}
+            style={{ backgroundColor: 'var(--brand)', borderColor: 'var(--brand)', borderRadius: 8, height: 36, padding: '0 16px', boxShadow: '0 2px 6px rgba(232,114,12,0.25)' }}
           >{t('common.back')}</Button>
           <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#E8720C' }}>{t('asset.addPoTitle')}</h2>
-          <span style={{ fontSize: 11, color: '#8c8c8c', background: '#f5f5f5', padding: '2px 8px', borderRadius: 4 }}>{t('asset.directOrderBadge')}</span>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--brand)' }}>{t('asset.addPoTitle')}</h2>
+          <span style={{ fontSize: 11, color: 'var(--text-3)', background: 'var(--surface-1)', padding: '2px 8px', borderRadius: 4 }}>{t('asset.directOrderBadge')}</span>
         </div>
       </div>
 
       <Form<GlobalFormValues> form={form} layout="vertical">
 
         {/* ====== 订单信息 ====== */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ShoppingCartOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ShoppingCartOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('asset.orderInfoTitle')}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.orderInfoTitle')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
 
@@ -221,12 +221,12 @@ export default function OrderAdd() {
             </Col>
             <Col span={8}>
               <Form.Item label={t('asset.serviceDept')} name="department">
-                <Input disabled placeholder={t('asset.phDeptAutoFill')} style={{ color: '#262626' }} />
+                <Input disabled placeholder={t('asset.phDeptAutoFill')} style={{ color: 'var(--text-1)' }} />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('asset.orderTotal')}</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#E8720C' }}>MOP {total.toLocaleString()}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('asset.orderTotal')}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--brand)' }}>MOP {total.toLocaleString()}</div>
             </Col>
           </Row>
           <Row gutter={24}>
@@ -235,7 +235,7 @@ export default function OrderAdd() {
                 <Select placeholder={t('asset.phSelectCompanyBrand')} options={numericOptions} />
               </Form.Item>
               {watchedBrand && codeHint[watchedBrand] && (
-                <div style={{ fontSize: 12, color: '#E8720C', marginTop: -18, marginBottom: 8 }}>
+                <div style={{ fontSize: 12, color: 'var(--brand)', marginTop: -18, marginBottom: 8 }}>
                   {t('asset.brandCodeHint', { brand: labelMap[watchedBrand], code: codeHint[watchedBrand] })}
                 </div>
               )}
@@ -250,7 +250,7 @@ export default function OrderAdd() {
 
         {/* ====== 采购物资分组 ====== */}
         {supplierGroups.map((group, gIdx) => (
-          <div key={group.id} style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div key={group.id} style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{
@@ -260,7 +260,7 @@ export default function OrderAdd() {
                   color: '#fff', fontSize: 11, fontWeight: 700,
                   boxShadow: '0 1px 4px rgba(24,144,255,0.3)',
                 }}>{gIdx + 1}</span>
-                <span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{t('asset.purchaseMaterials')}</span>
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{t('asset.purchaseMaterials')}</span>
                 <Tag color="blue" style={{ fontSize: 11 }}>
                   {t('asset.groupSubtotalTag', { amount: groupSubtotal(group).toLocaleString() })}
                 </Tag>
@@ -314,7 +314,7 @@ export default function OrderAdd() {
                     />
                   )}
                   {group.contact && group.supplierId && autoFilledContact[group.id] !== group.contact && (
-                    <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4, whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4, whiteSpace: 'nowrap' }}>
                       {t('asset.contactSyncHint')}
                     </div>
                   )}
@@ -389,8 +389,8 @@ export default function OrderAdd() {
               icon={<PlusOutlined />}
               onClick={() => handleOpenAddModal(group.id)}
               style={{
-                borderColor: '#E8720C',
-                color: '#E8720C',
+                borderColor: 'var(--brand)',
+                color: 'var(--brand)',
                 fontWeight: 500,
               }}
             >

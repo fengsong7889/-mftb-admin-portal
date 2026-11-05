@@ -261,8 +261,8 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
         icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
         content: (
           <div style={{ marginTop: 8 }}>
-            <div style={{ marginBottom: 12, color: '#595959' }}>以下信息尚未完善：</div>
-            <ul style={{ margin: 0, paddingLeft: 20, color: '#262626' }}>
+            <div style={{ marginBottom: 12, color: 'var(--text-2)' }}>以下信息尚未完善：</div>
+            <ul style={{ margin: 0, paddingLeft: 20, color: 'var(--text-1)' }}>
               {errors.map((err, idx) => <li key={idx} style={{ marginBottom: 4 }}>{err}</li>)}
             </ul>
           </div>
@@ -318,7 +318,7 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
     },
     {
       title: t('asset.orderBrand'), dataIndex: 'brand', key: 'brand', width: 100,
-      render: (v: number | undefined) => v ? <BrandTag value={v} /> : <span style={{ color: '#bfbfbf' }}>-</span>,
+      render: (v: number | undefined) => v ? <BrandTag value={v} /> : <span style={{ color: 'var(--text-4)' }}>-</span>,
     },
     {
       title: t('asset.colReqNo'), dataIndex: 'reqId', key: 'reqId', width: 130,
@@ -335,7 +335,7 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
         }
         // 無供應商
         if (suppliers.length === 0) {
-          return <span style={{ color: '#bfbfbf' }}>無供應商</span>
+          return <span style={{ color: 'var(--text-4)' }}>無供應商</span>
         }
         // 单个供应商
         if (suppliers.length === 1) {
@@ -359,7 +359,7 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
               title="所有供應商"
               trigger="click"
             >
-              <Tag style={{ margin: 0, cursor: 'pointer', borderRadius: 10, borderColor: '#E8720C', color: '#E8720C', fontWeight: 500 }}>+{rest.length}</Tag>
+              <Tag style={{ margin: 0, cursor: 'pointer', borderRadius: 10, borderColor: 'var(--brand)', color: 'var(--brand)', fontWeight: 500 }}>+{rest.length}</Tag>
             </Popover>
           </Space>
         )
@@ -369,20 +369,20 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
       title: t('asset.colConfirmedAmount'), dataIndex: 'confirmedAmount', key: 'confirmedAmount', width: 130, align: 'right',
       render: (v: number | undefined, r: PurchaseOrder) => {
         const amt = v ?? r.amount
-        return <span style={{ fontWeight: v ? 600 : 400, color: v ? '#52c41a' : undefined }}>MOP {amt.toLocaleString()}</span>
+        return <span style={{ fontWeight: v ? 600 : 400, color: v ? 'var(--success)' : undefined }}>MOP {amt.toLocaleString()}</span>
       },
     },
     { title: t('asset.colTrackingNo'), dataIndex: 'trackingNo', key: 'trackingNo', width: 140,
-      render: (v: string | undefined) => v ? <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{v}</span> : <span style={{ color: '#bfbfbf' }}>-</span>,
+      render: (v: string | undefined) => v ? <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{v}</span> : <span style={{ color: 'var(--text-4)' }}>-</span>,
     },
     { title: t('asset.colPurchaser'), dataIndex: 'purchaser', key: 'purchaser', width: 110,
-      render: (v: string | undefined) => v || <span style={{ color: '#bfbfbf' }}>-</span>,
+      render: (v: string | undefined) => v || <span style={{ color: 'var(--text-4)' }}>-</span>,
     },
     {
       title: '服務部門', key: 'department', width: 120,
       render: (_: unknown, r: PurchaseOrder) => {
         const dept = r.department || empDeptMap.get(r.purchaser || '') || ''
-        if (!dept) return <span style={{ color: '#bfbfbf' }}>-</span>
+        if (!dept) return <span style={{ color: 'var(--text-4)' }}>-</span>
         return (
           <Tooltip title={dept}>
             <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dept}</span>
@@ -404,7 +404,7 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
     {
       title: t('asset.inboundTitle'), key: 'inboundProgress', width: 220,
       render: (_: unknown, r: PurchaseOrder) => {
-        if (r.execStatus !== 'completed') return <span style={{ color: '#bfbfbf', fontSize: 12 }}>—</span>
+        if (r.execStatus !== 'completed') return <span style={{ color: 'var(--text-4)', fontSize: 12 }}>—</span>
         // 列表接口不返回明細，優先用後端 totalQty/acceptedQty 計算
         const totalQty = r.totalQty ?? (r.items || []).reduce((s, it) => s + it.qty, 0)
         const accepted = r.acceptedQty ?? (r.items || []).reduce((s, it) => s + it.receivedQty, 0)
@@ -425,10 +425,10 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
     },
     { title: t('asset.colCreatedAt'), dataIndex: 'createdAt', key: 'createdAt', width: 170 },
     { title: t('asset.colUpdatedBy'), dataIndex: 'updatedBy', key: 'updatedBy', width: 120,
-      render: (v: string | undefined) => v || <span style={{ color: '#bfbfbf' }}>-</span>,
+      render: (v: string | undefined) => v || <span style={{ color: 'var(--text-4)' }}>-</span>,
     },
     { title: t('asset.colUpdatedAt'), dataIndex: 'updatedAt', key: 'updatedAt', width: 170,
-      render: (v: string | undefined) => v || <span style={{ color: '#bfbfbf' }}>-</span>,
+      render: (v: string | undefined) => v || <span style={{ color: 'var(--text-4)' }}>-</span>,
     },
     {
       title: t('common.colAction'), key: 'action', width: 240, fixed: 'right',
@@ -561,7 +561,7 @@ export default function OrderList({ onDetail, onEdit, onInbound }: Props) {
         confirmLoading={purchaserModalConfirmLoading}
         destroyOnHidden
       >
-        <div style={{ marginBottom: 8, fontSize: 13, color: '#595959' }}>
+        <div style={{ marginBottom: 8, fontSize: 13, color: 'var(--text-2)' }}>
           採購單號：<span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{purchaserModalRecord?.poNo}</span>
         </div>
         <Form layout="vertical">

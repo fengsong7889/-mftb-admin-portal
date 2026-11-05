@@ -34,7 +34,7 @@ function SectionTitle({ icon, iconBg, title }: { icon: React.ReactNode; iconBg: 
       <div style={{ width: 28, height: 28, borderRadius: 6, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {icon}
       </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>
       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
     </div>
   )
@@ -128,7 +128,7 @@ export default function ClaimRecordDetail({ record, loading, error, onBack, onSi
     <Spin spinning={loading}>
       {/* ====== 模塊 1：資產信息 ====== */}
       <div style={detailCardStyle}>
-        <SectionTitle icon={<InboxOutlined style={{ fontSize: 14, color: '#1890ff' }} />} iconBg="#e6f7ff" title="資產信息" />
+        <SectionTitle icon={<InboxOutlined style={{ fontSize: 14, color: 'var(--info)' }} />} iconBg="#e6f7ff" title="資產信息" />
         {record && !error ? (
           <Descriptions column={4} size="middle">
             <Descriptions.Item label="領用編號"><span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{record.claimNo}</span></Descriptions.Item>
@@ -146,8 +146,8 @@ export default function ClaimRecordDetail({ record, loading, error, onBack, onSi
         {record?.accessories && record.accessories.length > 0 && (
           <div style={{ marginTop: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <AppstoreOutlined style={{ fontSize: 13, color: '#FA8C16' }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>領用配件</span>
+              <AppstoreOutlined style={{ fontSize: 13, color: 'var(--warning)' }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>領用配件</span>
               <Tag color="orange" style={{ fontSize: 11 }}>{record.accessories.length} 項</Tag>
               <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
             </div>
@@ -164,7 +164,7 @@ export default function ClaimRecordDetail({ record, loading, error, onBack, onSi
 
       {/* ====== 模塊 2：領用信息 ====== */}
       <div style={detailCardStyle}>
-        <SectionTitle icon={<FileTextOutlined style={{ fontSize: 14, color: '#1890ff' }} />} iconBg="#e6f7ff" title="領用信息" />
+        <SectionTitle icon={<FileTextOutlined style={{ fontSize: 14, color: 'var(--info)' }} />} iconBg="#e6f7ff" title="領用信息" />
         {record && !error ? (
           <Descriptions column={4} size="middle">
             <Descriptions.Item label="領用人">{record.empName}（{record.empNo}）</Descriptions.Item>
@@ -183,7 +183,7 @@ export default function ClaimRecordDetail({ record, loading, error, onBack, onSi
 
       {/* ====== 模塊 3：簽收信息與憑證 ====== */}
       <div style={detailCardStyle}>
-        <SectionTitle icon={<FileProtectOutlined style={{ fontSize: 14, color: '#fa8c16' }} />} iconBg="#fff7e6" title="簽收信息與憑證" />
+        <SectionTitle icon={<FileProtectOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />} iconBg="#fff7e6" title="簽收信息與憑證" />
         {record && !error ? (
           <Descriptions column={4} size="middle">
             <Descriptions.Item label="簽收狀態"><SignatureStatusTag status={record.signatureStatus} /></Descriptions.Item>
@@ -198,7 +198,7 @@ export default function ClaimRecordDetail({ record, loading, error, onBack, onSi
             ? '這是歸還前未補簽的遗留記錄：補簽只補簽名憑證，不改領用狀態（仍為已歸還）、也不重新分配資產。'
             : '補簽只確認歷史領用事實，不重新分配資產，也不影響之後的新領用。'}
           style={{ marginBottom: 16 }} />}
-        <p className="claim-muted" style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 16 }}>僅作為內部簽收憑證，不承諾 CA 認證、可信時間戳或特定司法效力。憑證僅允許受控查看和下載。</p>
+        <p className="claim-muted" style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 16 }}>僅作為內部簽收憑證，不承諾 CA 認證、可信時間戳或特定司法效力。憑證僅允許受控查看和下載。</p>
         <Space>
           <Button disabled={!record || !!error || record.signatureStatus !== SIGNATURE_STATUS.SIGNED || !onViewEvidence} onClick={onViewEvidence}>查看簽收憑證</Button>
           <Button disabled={!record || !!error || record.signatureStatus !== SIGNATURE_STATUS.SIGNED || !onDownloadEvidence} onClick={onDownloadEvidence}>下載憑證包</Button>
@@ -215,7 +215,7 @@ export default function ClaimRecordDetail({ record, loading, error, onBack, onSi
                     <div className="confirm-info-row"><span>領用編號：</span><b>{record.claimNo}</b></div>
                     <div className="confirm-info-row"><span>領用人：</span><b>{record.empName}（{record.empNo}）</b></div>
                     <div className="confirm-info-row"><span>資產：</span><b>{record.assetNo} / {record.assetName}</b></div>
-                    <div style={{ marginTop: 8, fontSize: 12, color: isSigned ? '#FA8C16' : '#8C8C8C' }}>
+                    <div style={{ marginTop: 8, fontSize: 12, color: isSigned ? 'var(--warning)' : 'var(--text-3)' }}>
                       {isSigned
                         ? '當前已簽署，重新推送後簽收狀態將回退為「待本人簽署」，原簽名憑證將被刪除，需員工重新簽字提交。'
                         : '將向領用人重新發送釘釘簽署通知，無論當前是否已簽署。'}
@@ -241,7 +241,7 @@ export default function ClaimRecordDetail({ record, loading, error, onBack, onSi
       {/* ====== 模塊 4：歸還信息（僅已歸還資產展示） ====== */}
       {isReturned && record && !error && (
         <div style={detailCardStyle}>
-          <SectionTitle icon={<RollbackOutlined style={{ fontSize: 14, color: '#52c41a' }} />} iconBg="#f6ffed" title="歸還信息" />
+          <SectionTitle icon={<RollbackOutlined style={{ fontSize: 14, color: 'var(--success)' }} />} iconBg="#f6ffed" title="歸還信息" />
           <Descriptions column={4} size="middle">
             <Descriptions.Item label="員工歸還日期">{record.returnDate || '—'}</Descriptions.Item>
             <Descriptions.Item label="實際歸還人">
@@ -284,12 +284,12 @@ export default function ClaimRecordDetail({ record, loading, error, onBack, onSi
 
     {/* ====== 最後更新（詳情頁規範 footer） ====== */}
     <div style={{
-      background: '#fafafa', borderRadius: 8, padding: '12px 24px',
+      background: 'var(--surface-3)', borderRadius: 8, padding: '12px 24px',
       border: '1px solid #f0f0f0',
       display: 'flex', justifyContent: 'flex-end', gap: 24,
     }}>
-      <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新人：<span style={{ color: '#595959' }}>{record?.updatedBy || record?.operator || '-'}</span></span>
-      <span style={{ fontSize: 12, color: '#8C8C8C' }}>最後更新時間：<span style={{ color: '#595959' }}>{record?.updatedAt || '-'}</span></span>
+      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>最後更新人：<span style={{ color: 'var(--text-2)' }}>{record?.updatedBy || record?.operator || '-'}</span></span>
+      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>最後更新時間：<span style={{ color: 'var(--text-2)' }}>{record?.updatedAt || '-'}</span></span>
     </div>
   </>
 }
