@@ -63,6 +63,22 @@ export interface PromoRecord {
   clickRate: number     // 点击率（百分比）
 }
 
+/* ---- 時段推薦廣告：兩段式折扣彙總（時段折扣 → 購買天數檔位折扣） ---- */
+export interface TimeSlotSummary {
+  /** Σ各格原價×時段折扣（天數折扣前小計） */
+  slotAfterSubtotal: number
+  /** 時段折扣共優惠多少 MOP */
+  slotDiscountAmount: number
+  /** 購買天數折扣命中檔位（null=未命中） */
+  dayTier: { minDays: number; discount: number } | null
+  /** 去重日曆天數（檔位匹配口徑） */
+  distinctDays: number
+  /** 天數折扣共優惠多少 MOP */
+  dayDiscountAmount: number
+  /** 折後價格 = slotAfterSubtotal × 天數檔位倍率 */
+  finalSubtotal: number
+}
+
 export interface OrderItem {
   id: string
   orderNo: string
@@ -87,6 +103,8 @@ export interface OrderItem {
   payTime?: string
   slotPrices: SlotPriceItem[]
   gradientDiscount?: { count: number; discount: number } | null
+  /** 時段推薦廣告專用：兩段折扣明細（其他類型無此字段） */
+  timeSlotSummary?: TimeSlotSummary
   cancelFeeRules: { maxDays: number; feePercent: number }[]
   refundAmount?: number
   refundEnabled?: boolean // 是否允许退款
