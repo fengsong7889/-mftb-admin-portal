@@ -297,7 +297,34 @@ describe('會議預約表单联动', () => {
     expect(requiredItem.querySelector('.ant-select-selection-item')?.textContent).toBe('11')
     expect(optionalItem.querySelector('.ant-select-selection-item')?.textContent).toBe('12')
     // 实际使用人不随改期迁移，代订开关在编辑态锁住
-    expect(screen.getByRole('switch')).toBeDisabled()
+    const selfSwitch = screen.getByRole('switch')
+    expect(selfSwitch).toBeDisabled()
+    // 自订的会进编辑也不能反过来显示成代订
+    expect(selfSwitch).not.toBeChecked()
+  })
+
+  it('代订的会议进编辑仍显示代订：开关按原单置为开启并锁住，使用人只读回显', async () => {
+    vi.mocked(fetchMeetingDetail).mockResolvedValue({
+      ...BOOKING,
+      delegateForId: 21,
+      delegateForName: '王五',
+      // 后端把实际使用人并进必参名单，回填口径与新建一致
+      attendees: [
+        ...BOOKING.attendees,
+        { id: 4, userId: 21, name: '王五', attendeeType: 'required', response: 'accepted' },
+      ],
+    } as never)
+    mount('/meeting-booking-form?bookingId=77&from=%2Fmeeting-record')
+    await screen.findByRole('heading', { name: '編輯會議' })
+    await screen.findByDisplayValue('改期驗證')
+    const delegateSwitch = await screen.findByRole('switch')
+    // 关键回归：代订的会不能被显示成自订（历史缺陷：回填把开关硬写成 false）
+    expect(delegateSwitch).toBeChecked()
+    expect(delegateSwitch).toBeDisabled()
+    // 使用人字段随开关展开且只读：改期不迁移使用人，能改就会被后端静默丢弃
+    const delegateItem = [...document.querySelectorAll('.ant-form-item')]
+      .find(item => item.querySelector('.ant-form-item-label')?.textContent?.includes('實際使用人'))!
+    expect(delegateItem.querySelector('.ant-select')).toHaveClass('ant-select-disabled')
   })
 
   it('保存变更走 PUT：带回原版本号、业务单归属与拆开回传的名单', async () => {

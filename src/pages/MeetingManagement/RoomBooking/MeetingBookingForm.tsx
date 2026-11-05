@@ -295,9 +295,12 @@ export default function MeetingBookingForm() {
         intervalN: 1,
         byWeekday: [],
         occurrenceLimit: 12,
-        delegateEnabled: false,
-        delegateForId: [],
+        // 代订状态按原单回填：开关与使用人在编辑态都是只读的（改期不迁移使用人），
+        // 但不回填就会把「代订」的会显示成「自订」，界面与实际归属相反
+        delegateEnabled: detail.delegateForId != null,
+        delegateForId: detail.delegateForId != null ? [detail.delegateForId] : [],
       })
+      setDelegateName(detail.delegateForName ?? '')
       setPreview([])
       return
     }
@@ -861,7 +864,7 @@ export default function MeetingBookingForm() {
                     content={t('meeting.countedAsRequiredAttendee', { defaultValue: '自動計入必參；衝突與名額按此人判定' })} />
                 </Space>} name="delegateForId"
                   rules={[{ required: true, message: t('meeting.pleaseChooseTheActual', { defaultValue: '請選擇實際使用人' }) }]}>
-                  <EmployeeSelect single style={{ width: '100%' }} placeholder={t('meeting.searchByNameOr', { defaultValue: '搜尋姓名或工號' })}
+                  <EmployeeSelect single disabled={isEdit} style={{ width: '100%' }} placeholder={t('meeting.searchByNameOr', { defaultValue: '搜尋姓名或工號' })}
                     onPick={items => setDelegateName(items[0]?.name ?? '')} />
                 </Form.Item>
               )}
