@@ -6,9 +6,10 @@
  *
  * 说明：消费者侧暂无对应后端只读接口（见 ConsumerApp 文件头），本页先用占位数据渲染版式。
  * 商品/门店图当前为 AI 生成的统一风格占位图（src/assets/consumer-home/），待设计切图接入后按同名文件替换即可。
- * 文案暂硬编码繁中（与设计稿一致），后续随 i18n 解耦统一替换。
+ * 界面文案走 appConsumer 命名空间；商品名/门店名/价格/销量仍为占位数据，不进入语言包。
  */
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import bannerImg from '@/assets/consumer-home/banner.jpg'
 import riceballImg from '@/assets/consumer-home/riceball.jpg'
 import friedChickenImg from '@/assets/consumer-home/friedchicken.jpg'
@@ -23,26 +24,36 @@ const SHADE_INTERVAL_MS = 3000
 
 interface Tile {
   key: string
-  title: string
-  sub: string
+  titleKey: string
+  titleZh: string
+  subKey: string
+  subZh: string
   badge: string
+  badgeKey?: string
   emoji: string
   bg: string
 }
 
 const TILES: Tile[] = [
-  { key: 'food', title: '美食外賣', sub: '優惠領不停 美味一鍵達', badge: '去逛逛 ›', emoji: '🍔', bg: 'linear-gradient(135deg,#FFB347,#FF7A45)' },
-  { key: 'group', title: '特價團購', sub: '火鍋低至3折起', badge: '3折', emoji: '🍲', bg: 'linear-gradient(135deg,#FF9AC1,#F759AB)' },
-  { key: 'market', title: '超市百貨', sub: '天天1秒殺！', badge: '1秒殺', emoji: '🛒', bg: 'linear-gradient(135deg,#7FE3D8,#36CFC9)' },
+  { key: 'food', titleKey: 'appConsumer.channel.delivery', titleZh: '美食外賣', subKey: 'appConsumer.home.tileDeliverySub', subZh: '優惠領不停 美味一鍵達', badge: '去逛逛 ›', badgeKey: 'appConsumer.home.tileGoBrowse', emoji: '🍔', bg: 'linear-gradient(135deg,#FFB347,#FF7A45)' },
+  { key: 'group', titleKey: 'appConsumer.channel.groupBuy', titleZh: '特價團購', subKey: 'appConsumer.home.tileGroupSub', subZh: '火鍋低至3折起', badge: '3折', emoji: '🍲', bg: 'linear-gradient(135deg,#FF9AC1,#F759AB)' },
+  { key: 'market', titleKey: 'appConsumer.channel.market', titleZh: '超市百貨', subKey: 'appConsumer.home.tileMarketSub', subZh: '天天1秒殺！', badge: '1秒殺', emoji: '🛒', bg: 'linear-gradient(135deg,#7FE3D8,#36CFC9)' },
 ]
 
 const QUICK_ENTRIES = [
-  { emoji: '🍯', label: '蜂蜜兑換' },
-  { emoji: '⏰', label: '超值秒殺' },
-  { emoji: '👥', label: '團購' },
-  { emoji: '🍱', label: '自助餐' },
-  { emoji: '🎁', label: '簽到領券' },
-  { emoji: '⋯', label: '更多' },
+  { emoji: '🍯', key: 'appConsumer.home.quick.honey', zh: '蜂蜜兑換' },
+  { emoji: '⏰', key: 'appConsumer.home.quick.flashDeal', zh: '超值秒殺' },
+  { emoji: '👥', key: 'appConsumer.home.quick.groupBuy', zh: '團購' },
+  { emoji: '🍱', key: 'appConsumer.home.quick.buffet', zh: '自助餐' },
+  { emoji: '🎁', key: 'appConsumer.home.quick.checkIn', zh: '簽到領券' },
+  { emoji: '⋯', key: 'appConsumer.home.quick.more', zh: '更多' },
+]
+
+/** 首页分类切换（与三宮格同一套频道口径） */
+const HOME_CHANNELS = [
+  { key: 'appConsumer.channel.delivery', zh: '美食外賣' },
+  { key: 'appConsumer.channel.groupBuy', zh: '特價團購' },
+  { key: 'appConsumer.channel.market', zh: '超市百貨' },
 ]
 
 /** 超神一口價：横滑商品 */
@@ -105,8 +116,9 @@ export default function ConsumerHome({
   onSearch?: () => void
   onOpenStore?: (merchantId: string) => void
 }) {
+  const { t } = useTranslation()
   const bodyRef = useRef<HTMLDivElement>(null)
-  const [cat, setCat] = useState('美食外賣')
+  const [cat, setCat] = useState<string>(HOME_CHANNELS[0].key)
   const [scrolled, setScrolled] = useState(false)
   const [shadeIndex, setShadeIndex] = useState(0)
 
@@ -135,15 +147,15 @@ export default function ConsumerHome({
           <button type="button" className="apc-search" onClick={onSearch}>
             <span className="apc-search-ico" aria-hidden="true">🔍</span>
             <span className="apc-search-ph" key={shadeIndex}>{SHADE_WORDS[shadeIndex]}</span>
-            <span className="apc-search-btn">搜索</span>
+            <span className="apc-search-btn">{t('appConsumer.common.search', { defaultValue: '搜索' })}</span>
           </button>
           {scrolled && (
-            <span className="apc-header-loc"><span aria-hidden="true">📍</span><i>澳門新八佰伴</i></span>
+            <span className="apc-header-loc"><span aria-hidden="true">📍</span><i>{t('appConsumer.home.location', { defaultValue: '澳門新八佰伴' })}</i></span>
           )}
         </div>
         <div className="apc-header-locrow">
           <span aria-hidden="true">📍</span>
-          <span>澳門新八佰伴</span>
+          <span>{t('appConsumer.home.location', { defaultValue: '澳門新八佰伴' })}</span>
         </div>
       </div>
 
@@ -157,7 +169,7 @@ export default function ConsumerHome({
         <div className="apc-banner-copy">
           <b>menu</b>
           <em>REMIX</em>
-          <i>限時新品 · 第二份半價</i>
+          <i>{t('appConsumer.home.bannerNote', { defaultValue: '限時新品 · 第二份半價' })}</i>
         </div>
         <div className="apc-dots" aria-hidden="true"><i className="is-on" /><i /><i /></div>
       </div>
@@ -165,9 +177,9 @@ export default function ConsumerHome({
       {/* 三宮格分類 */}
       <div className="apc-tiles">
         <button type="button" className="apc-tile apc-tile-lg" style={{ background: TILES[0].bg }} onClick={onOpenDelivery}>
-          <span className="apc-tile-badge">{TILES[0].badge}</span>
-          <span className="apc-tile-title">{TILES[0].title}</span>
-          <span className="apc-tile-sub">{TILES[0].sub}</span>
+          <span className="apc-tile-badge">{t(TILES[0].badgeKey!, { defaultValue: TILES[0].badge })}</span>
+          <span className="apc-tile-title">{t(TILES[0].titleKey, { defaultValue: TILES[0].titleZh })}</span>
+          <span className="apc-tile-sub">{t(TILES[0].subKey, { defaultValue: TILES[0].subZh })}</span>
           <span className="apc-tile-emoji" aria-hidden="true">{TILES[0].emoji}</span>
         </button>
         <div className="apc-tile-col">
@@ -179,9 +191,9 @@ export default function ConsumerHome({
               style={{ background: tl.bg }}
               onClick={tl.key === 'group' ? onOpenGroupBuy : tl.key === 'market' ? onOpenMarket : undefined}
             >
-              <span className="apc-tile-badge">{tl.badge}</span>
-              <span className="apc-tile-title">{tl.title}</span>
-              <span className="apc-tile-sub">{tl.sub}</span>
+              <span className="apc-tile-badge">{tl.badgeKey ? t(tl.badgeKey, { defaultValue: tl.badge }) : tl.badge}</span>
+              <span className="apc-tile-title">{t(tl.titleKey, { defaultValue: tl.titleZh })}</span>
+              <span className="apc-tile-sub">{t(tl.subKey, { defaultValue: tl.subZh })}</span>
               <span className="apc-tile-emoji" aria-hidden="true">{tl.emoji}</span>
             </button>
           ))}
@@ -191,16 +203,16 @@ export default function ConsumerHome({
       {/* 快捷入口 */}
       <div className="apc-quick">
         {QUICK_ENTRIES.map((q) => (
-          <button key={q.label} type="button" className="apc-quick-item">
+          <button key={q.key} type="button" className="apc-quick-item">
             <span className="apc-quick-ico" aria-hidden="true">{q.emoji}</span>
-            <span className="apc-quick-label">{q.label}</span>
+            <span className="apc-quick-label">{t(q.key, { defaultValue: q.zh })}</span>
           </button>
         ))}
       </div>
 
       {/* 促銷位 */}
       <div className="apc-promo" style={{ background: 'linear-gradient(120deg,#5B8DEF,#7B4DFF)' }}>
-        <span className="apc-promo-title">盒你一起<b>大發現</b></span>
+        <span className="apc-promo-title">{t('appConsumer.common.promoLead', { defaultValue: '盒你一起' })}<b>{t('appConsumer.common.promoHighlight', { defaultValue: '大發現' })}</b></span>
         <span className="apc-promo-emoji" aria-hidden="true">🧧</span>
       </div>
 
@@ -208,26 +220,26 @@ export default function ConsumerHome({
       <button type="button" className="apc-tracking">
         <span className="apc-tracking-ico" aria-hidden="true">🛵</span>
         <span className="apc-tracking-main">
-          <b>商家已接單</b>
-          <i>預計 12:46 送達</i>
+          <b>{t('appConsumer.home.orderAccepted', { defaultValue: '商家已接單' })}</b>
+          <i>{t('appConsumer.home.orderEta', { time: '12:46', defaultValue: '預計 {{time}} 送達' })}</i>
         </span>
-        <span className="apc-tracking-btn">查看訂單</span>
+        <span className="apc-tracking-btn">{t('appConsumer.home.viewOrder', { defaultValue: '查看訂單' })}</span>
       </button>
 
       {/* 超神一口價 */}
       <section className="apc-sec">
         <header className="apc-sec-head">
-          <span className="apc-sec-title">超神一口價</span>
-          <span className="apc-tag">免運費</span>
-          <span className="apc-tag apc-tag-red">免配送</span>
-          <button type="button" className="apc-more">更多 ›</button>
+          <span className="apc-sec-title">{t('appConsumer.home.onePriceTitle', { defaultValue: '超神一口價' })}</span>
+          <span className="apc-tag">{t('appConsumer.home.tagFreeDelivery', { defaultValue: '免運費' })}</span>
+          <span className="apc-tag apc-tag-red">{t('appConsumer.home.tagFreeShipping', { defaultValue: '免配送' })}</span>
+          <button type="button" className="apc-more">{t('appConsumer.common.more', { defaultValue: '更多' })} ›</button>
         </header>
         <div className="apc-hscroll">
           {ONE_PRICE.map((it) => (
             <button key={it.key} type="button" className="apc-hcard" onClick={() => onOpenStore?.('d-rice')}>
               <img className="apc-thumb" src={it.img} alt={it.title} />
               <span className="apc-hcard-title">{it.title}</span>
-              <span className="apc-price"><i>¥</i>{it.price}<em>起</em></span>
+              <span className="apc-price"><i>¥</i>{it.price}<em>{t('appConsumer.common.priceFrom', { defaultValue: '起' })}</em></span>
             </button>
           ))}
         </div>
@@ -236,8 +248,8 @@ export default function ConsumerHome({
       {/* 精選宮格 */}
       <section className="apc-sec">
         <header className="apc-sec-head">
-          <span className="apc-sec-title">標題欄<span className="apc-sec-sub">低至3折</span></span>
-          <button type="button" className="apc-more">查看更多 ›</button>
+          <span className="apc-sec-title">{t('appConsumer.common.sectionPlaceholder', { defaultValue: '標題欄' })}<span className="apc-sec-sub">{t('appConsumer.common.sectionSubLow30', { defaultValue: '低至3折' })}</span></span>
+          <button type="button" className="apc-more">{t('appConsumer.common.viewMore', { defaultValue: '查看更多' })} ›</button>
         </header>
         <div className="apc-grid2">
           {GRID_ITEMS.map((it) => (
@@ -245,11 +257,11 @@ export default function ConsumerHome({
               <span className="apc-gcard-badge">{it.badge}</span>
               <img className="apc-thumb apc-thumb-lg" src={it.img} alt={it.title} />
               <span className="apc-gcard-title">{it.title}</span>
-              <span className="apc-price"><i>¥</i>{it.price}<em>起</em></span>
+              <span className="apc-price"><i>¥</i>{it.price}<em>{t('appConsumer.common.priceFrom', { defaultValue: '起' })}</em></span>
             </button>
           ))}
         </div>
-        <button type="button" className="apc-more-center">查看更多</button>
+        <button type="button" className="apc-more-center">{t('appConsumer.common.viewMore', { defaultValue: '查看更多' })}</button>
       </section>
 
       {/* 紅包券 */}
@@ -261,15 +273,15 @@ export default function ConsumerHome({
               <b>{c.cond}</b>
               <i>{c.exp}</i>
             </span>
-            <span className="apc-coupon-use">去使用</span>
+            <span className="apc-coupon-use">{t('appConsumer.common.useNow', { defaultValue: '去使用' })}</span>
           </button>
         ))}
       </div>
 
       {/* 分類切換 */}
       <div className="apc-cats">
-        {['美食外賣', '特價團購', '超市百貨'].map((c) => (
-          <button key={c} type="button" className={cat === c ? 'is-on' : ''} onClick={() => setCat(c)}>{c}</button>
+        {HOME_CHANNELS.map((c) => (
+          <button key={c.key} type="button" className={cat === c.key ? 'is-on' : ''} onClick={() => setCat(c.key)}>{t(c.key, { defaultValue: c.zh })}</button>
         ))}
       </div>
 
@@ -280,20 +292,20 @@ export default function ConsumerHome({
             <span className="apc-fcard-img">
               <img className="apc-fcard-photo" src={it.img} alt={it.title} />
               {it.hot && <span className="apc-rim apc-rim-hot">🔥HOT</span>}
-              {it.fresh && <span className="apc-rim apc-rim-new">新店</span>}
+              {it.fresh && <span className="apc-rim apc-rim-new">{t('appConsumer.common.newStoreTag', { defaultValue: '新店' })}</span>}
             </span>
             <span className="apc-fcard-body">
               <span className="apc-fcard-meta">
-                <em className="apc-chip-dark">{it.channel}</em>
+                <em className="apc-chip-dark">{t('appConsumer.channel.deliveryShort', { defaultValue: it.channel })}</em>
                 <i>{it.dist}</i><i>{it.time}</i>
               </span>
               <span className="apc-fcard-title">{it.title}</span>
-              <span className="apc-fcard-rate"><b>{it.rating}</b> 等送 · 可自取</span>
+              <span className="apc-fcard-rate"><b>{it.rating}</b> {t('appConsumer.home.feedTagWaiting', { defaultValue: '等送 · 可自取' })}</span>
               <span className="apc-fcard-tags">
                 {it.promo.map((p) => <em key={p} className="apc-promo-tag">{p}</em>)}
               </span>
               <span className="apc-fcard-foot">
-                <span className="apc-price apc-price-lg"><i>¥</i>{it.price}<em>起</em></span>
+                <span className="apc-price apc-price-lg"><i>¥</i>{it.price}<em>{t('appConsumer.common.priceFrom', { defaultValue: '起' })}</em></span>
                 <span className="apc-fcard-strike">¥{it.origin}</span>
                 <span className="apc-fcard-off">{it.off}</span>
               </span>
@@ -303,7 +315,7 @@ export default function ConsumerHome({
       </div>
 
       {/* 進入外賣頻道 */}
-      <button type="button" className="apc-channel-btn" onClick={onOpenDelivery}>進入外賣頻道</button>
+      <button type="button" className="apc-channel-btn" onClick={onOpenDelivery}>{t('appConsumer.home.enterDeliveryChannel', { defaultValue: '進入外賣頻道' })}</button>
       </div>
     </>
   )

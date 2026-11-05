@@ -121,6 +121,49 @@ export const FILTER_LABEL: Record<SearchFilter, string> = {
   member: '神會員',
 }
 
+/**
+ * 文案 i18n key 映射（与上面两张 label 表逐键对应）。
+ * label 字段保留作兜底真值：既让现有单测与可读性不变，也让缺 key 时界面不会直接显示 key 路径。
+ */
+export const CHANNEL_LABEL_KEY: Record<ConsumerChannel, string> = {
+  delivery: 'appConsumer.search.channel.delivery',
+  groupbuy: 'appConsumer.search.channel.groupbuy',
+  market: 'appConsumer.search.channel.market',
+}
+
+export const FILTER_LABEL_KEY: Record<SearchFilter, string> = {
+  freeDelivery: 'appConsumer.search.filter.freeDelivery',
+  discount: 'appConsumer.search.filter.discount',
+  open: 'appConsumer.search.filter.open',
+  pickup: 'appConsumer.search.filter.pickup',
+  refundable: 'appConsumer.search.filter.refundable',
+  member: 'appConsumer.search.filter.member',
+}
+
+export const SEARCH_TAB_LABEL_KEY: Record<SearchTab, string> = {
+  all: 'appConsumer.search.tab.all',
+  merchant: 'appConsumer.search.tab.merchant',
+  product: 'appConsumer.search.tab.product',
+  deal: 'appConsumer.search.tab.deal',
+  delivery: 'appConsumer.search.tab.delivery',
+  groupbuy: 'appConsumer.search.tab.groupbuy',
+  market: 'appConsumer.search.tab.market',
+}
+
+export const SEARCH_SORT_LABEL_KEY: Record<SearchSort, string> = {
+  default: 'appConsumer.search.sort.default',
+  distance: 'appConsumer.search.sort.distance',
+  sales: 'appConsumer.search.sort.sales',
+  priceAsc: 'appConsumer.search.sort.priceAsc',
+  priceDesc: 'appConsumer.search.sort.priceDesc',
+  deliveryFee: 'appConsumer.search.sort.deliveryFee',
+}
+
+/** 作用域四项文案的 key（label / short / placeholder / hint） */
+export function scopeTextKey(scope: SearchScope, field: 'label' | 'short' | 'placeholder' | 'hint'): string {
+  return `appConsumer.search.scope.${scope}.${field}`
+}
+
 const ALL_CHANNELS: ConsumerChannel[] = ['delivery', 'groupbuy', 'market']
 
 export const SCOPE_CONFIG: Record<SearchScope, ScopeConfig> = {

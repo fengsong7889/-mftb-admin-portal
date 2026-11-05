@@ -1,4 +1,352 @@
 {
+  "appConsumer": {
+    "channel": {
+      "delivery": "Delivery",
+      "groupBuy": "Group Deals",
+      "market": "Supermarket",
+      "deliveryShort": "Delivery"
+    },
+    "common": {
+      "back": "Back",
+      "search": "Search",
+      "order": "Orders",
+      "toTop": "Back to top",
+      "sellIdle": "Sell second-hand",
+      "pagePending": "The \"{{name}}\" page is awaiting its design",
+      "viewMore": "View more",
+      "useNow": "Use now",
+      "priceFrom": "from",
+      "grab": "Get",
+      "reachedBottom": "You have reached the end",
+      "enterStore": "Open store: {{shop}}",
+      "sectionPlaceholder": "Section",
+      "sectionSubLow30": "Up to 70% off",
+      "location": "Venetian Tower A",
+      "more": "More",
+      "filter": "Filter",
+      "newStoreTag": "New",
+      "ratingSuffix": "/5",
+      "monthlySales": "{{value}} sold/mo",
+      "halfYearSales": "{{value}} sold/6mo",
+      "kilometers": "{{value}} km",
+      "vipCard": "Super Member",
+      "memberCenter": "Membership",
+      "couponMinSpend": "Min. spend ${{price}}",
+      "couponNote": "Group-buy mega coupon · expires Jan 10",
+      "heroBadge": "Macau's No.1 Japanese Dining",
+      "heroVoucherWord": "worth",
+      "heroSub": "Up to 5 per visit",
+      "promoLead": "Unbox with us",
+      "promoHighlight": "Big Finds"
+    },
+    "tab": {
+      "home": "Home",
+      "vip": "Member",
+      "order": "Orders",
+      "mine": "Me",
+      "category": "Categories",
+      "cart": "Cart",
+      "praise": "Reviews",
+      "delivery": "Delivery"
+    },
+    "groupBuy": {
+      "title": "Group Deals",
+      "hotSearchHint": "Trending: served from the backend",
+      "cat": {
+        "hotpot": "Hot Pot",
+        "bbq": "BBQ & Grill",
+        "drink": "Desserts & Drinks",
+        "western": "Western Mains",
+        "beauty": "Salon & Hair",
+        "buffet": "Buffet",
+        "chaChaCanTeng": "Cha Chaan Teng",
+        "burger": "Burgers & Snacks",
+        "exotic": "International",
+        "service": "Local Services"
+      },
+      "pill": {
+        "member": "Membership",
+        "checkIn": "Daily Check-in",
+        "hotRank": "Trending List",
+        "nearbyMerchant": "Nearby Stores"
+      },
+      "chip": {
+        "deal": "Deals",
+        "recommend": "For You",
+        "merchant": "Stores",
+        "chaChaCanTeng": "Cha Chaan Teng",
+        "leisure": "Leisure"
+      },
+      "category": {
+        "hotpot": "Hot Pot & BBQ",
+        "dessert": "Desserts & Drinks",
+        "localCuisine": "Local Cuisine",
+        "exotic": "International",
+        "fastFood": "Fast Food",
+        "congeeNoodle": "Congee & Noodles",
+        "buffet": "Buffet",
+        "service": "Local Services",
+        "leisure": "Leisure & Fun",
+        "beauty": "Salon & Hair"
+      },
+      "sort": {
+        "smart": "Smart sort",
+        "distance": "Nearest first",
+        "sales": "Best selling first",
+        "priceAsc": "Price low to high",
+        "priceDesc": "Price high to low"
+      },
+      "filter": {
+        "nearby": "Nearby",
+        "allCategories": "All Categories",
+        "vipCard": "Super Member",
+        "subsidyCoupon": "Subsidy Coupons",
+        "multiSuffix": "{{first}} +{{rest}}",
+        "pickDistance": "Select distance {{value}}",
+        "pickDistrict": "Select business area {{value}}",
+        "pickSort": "Sort by {{value}}",
+        "closePanel": "Close filter panel"
+      },
+      "panel": {
+        "nearby": "Nearby filter panel",
+        "category": "Category filter panel",
+        "sort": "Sort options panel"
+      }
+    },
+    "home": {
+      "location": "New Yaohan Macau",
+      "bannerNote": "New item for a limited time · half price on the second",
+      "orderAccepted": "Order accepted",
+      "orderEta": "Est. delivery at {{time}}",
+      "viewOrder": "View order",
+      "onePriceTitle": "One-Price Deals",
+      "tagFreeDelivery": "Free delivery",
+      "tagFreeShipping": "No delivery fee",
+      "feedTagWaiting": "Awaiting delivery · pickup available",
+      "enterDeliveryChannel": "Enter Delivery",
+      "quick": {
+        "honey": "Honey Rewards",
+        "flashDeal": "Flash Deals",
+        "groupBuy": "Group Buy",
+        "buffet": "Buffet",
+        "checkIn": "Check-in Coupons",
+        "more": "More"
+      },
+      "tileDeliverySub": "Deals stack up, dinner in a tap",
+      "tileGroupSub": "Hot pot from 30% of price",
+      "tileMarketSub": "Daily flash sales",
+      "tileGoBrowse": "Browse"
+    },
+    "delivery": {
+      "minutes": "{{value}} min",
+      "freeDelivery": "Free delivery",
+      "fee": "Delivery ${{value}}",
+      "minOrder": "Min. order ${{value}}",
+      "railPopular": "Popular stores",
+      "railEnter": "Enter now",
+      "cat": {
+        "burger": "Burgers & Chicken",
+        "breakfast": "Breakfast",
+        "global": "World Cuisine",
+        "drink": "Drinks & Dessert",
+        "snack": "Snacks",
+        "mcd": "McDonald's",
+        "lion": "Lion Center",
+        "flash": "Flash Deals",
+        "must": "Top Picks",
+        "more": "More"
+      },
+      "benefit": {
+        "vip": "Super Member",
+        "honey": "Honey Cash-out",
+        "reputation": "Highly Rated",
+        "merchantBoost": "Store Boost",
+        "newArrival": "New"
+      },
+      "service": {
+        "coupon": "Coupons",
+        "freeDelivery": "Free delivery",
+        "freeShipping": "No delivery fee",
+        "halfHour": "30 min",
+        "selfPickup": "Pickup"
+      }
+    },
+    "market": {
+      "searchPlaceholder": "Search supermarkets and products",
+      "heroBadge": "Supermarket to your door · as fast as 20 min",
+      "heroTitle": "Low prices every day",
+      "heroSub": "Free delivery over $99 · $20 off for new users",
+      "nearbyTitle": "Nearby supermarkets",
+      "shopCount": "{{count}} stores",
+      "hotProducts": "Best sellers",
+      "restockAnytime": "Restock anytime",
+      "cat": {
+        "fruit": "Fresh Fruit",
+        "dairy": "Dairy & Bakery",
+        "grain": "Pantry & Seasoning",
+        "snack": "Snacks & Drinks",
+        "daily": "Household",
+        "frozen": "Frozen Food",
+        "drink": "Beverages",
+        "baby": "Baby & Maternity",
+        "pet": "Pet Supplies"
+      }
+    },
+    "store": {
+      "title": "Store",
+      "notFound": "This store does not exist or is offline",
+      "groupbuyCount": "{{count}} group deals",
+      "avgPerPerson": "${{price}} per person",
+      "searchPlaceholder": "Search this store",
+      "tabInStore": "In store",
+      "resting": "Closed",
+      "filterAll": "All",
+      "addToCart": "Add to cart: {{name}}",
+      "emptyCategory": "No products in this category",
+      "selectedCount": "{{count}} selected",
+      "checkout": "Checkout"
+    },
+    "profile": {
+      "levelDiamond": "Diamond",
+      "actionMessage": "Messages",
+      "actionData": "Activity",
+      "growthLabel": "Growth",
+      "couponDelivery": "Delivery Coupons",
+      "couponBrand": "Brand Coupons",
+      "memberBenefits": "Member Benefits",
+      "maxUpTo": "Up to {{price}} ›",
+      "myOrders": "My Orders",
+      "order": {
+        "all": "All orders",
+        "toPay": "To pay",
+        "toUse": "To use",
+        "toReview": "To review",
+        "refund": "Refunds"
+      },
+      "count": {
+        "redpack": "Honey Rewards",
+        "voucher": "Store Vouchers",
+        "cut": "Instant Discounts"
+      },
+      "unitSheet": "pcs",
+      "checkInTasks": "Check-in & Tasks",
+      "checkInHint": "Check in daily for more rewards",
+      "honeyExchange": "Redeem Honey",
+      "honeyAvailable": "Honey available: {{value}}",
+      "bannerLine1": "Quick Game",
+      "bannerLine2": "Summer Check-in",
+      "serviceSettings": "Service & Settings",
+      "setting": {
+        "address": "Delivery addresses",
+        "favorite": "Favorites",
+        "bankCard": "Bank cards",
+        "review": "My reviews",
+        "feedback": "Feedback",
+        "merchantApply": "Become a merchant",
+        "language": "Language",
+        "system": "Settings"
+      }
+    },
+    "search": {
+      "channel": {
+        "delivery": "Delivery",
+        "groupbuy": "Group Buy",
+        "market": "Market"
+      },
+      "colDistance": "Distance",
+      "colGroupbuy": "Deals",
+      "colAvg": "Avg.",
+      "colMinOrder": "Min.",
+      "colDelivery": "Delivery",
+      "unitGroupbuy": "{{count}} deals",
+      "fromPrice": "from ${{price}}",
+      "badgePopular": "Popular",
+      "statusRest": "Closed",
+      "statusFar": "Out of range",
+      "addToCart": "Add to cart: {{name}}",
+      "emptyTitle": "No results for \"{{query}}\"",
+      "emptyHint": "Try a shorter keyword, or change the search scope",
+      "emptySearchGlobal": "Search \"{{query}}\" across everything",
+      "emptyViewAll": "View all products",
+      "emptyHotWords": "Trending searches",
+      "dialogLabel": "Search",
+      "clearKeyword": "Clear keyword",
+      "inStoreScope": "In {{name}}",
+      "sectionGuess": "Trending searches",
+      "sectionStoreCategories": "Store categories",
+      "sectionHistory": "Recent searches",
+      "clearHistory": "Clear search history",
+      "historyEmpty": "No search history yet",
+      "sectionHotRank": "Top trending",
+      "hotInStore": "Best sellers here",
+      "hotTodayMacau": "Macau · today",
+      "hotBadge": "Hot",
+      "sugSearch": "Search \"{{keyword}}\"",
+      "sugSearchHint": "No matching store or product — tap to search anyway",
+      "resultSummary": "{{count}} results found",
+      "tablistLabel": "Result categories",
+      "groupStores": "Stores",
+      "groupFar": "Beyond the current delivery range",
+      "offerTitleGlobal": "Products & deals",
+      "tab": {
+        "all": "All",
+        "merchant": "Stores",
+        "product": "Products",
+        "deal": "Deals",
+        "delivery": "Delivery",
+        "groupbuy": "Group Buy",
+        "market": "Market"
+      },
+      "sort": {
+        "default": "Relevance",
+        "distance": "Distance",
+        "sales": "Sales",
+        "priceAsc": "Price",
+        "priceDesc": "Price (high to low)",
+        "deliveryFee": "Delivery fee"
+      },
+      "filter": {
+        "freeDelivery": "Free delivery",
+        "discount": "On offer",
+        "open": "Open now",
+        "pickup": "Pickup",
+        "refundable": "Refundable",
+        "member": "Super Member"
+      },
+      "scope": {
+        "global": {
+          "label": "Everything",
+          "short": "All",
+          "placeholder": "Search stores, products and deals",
+          "hint": "Searches stores and products across delivery, group buy and supermarket"
+        },
+        "delivery": {
+          "label": "Delivery",
+          "short": "Delivery",
+          "placeholder": "Search delivery stores and products",
+          "hint": "Searches only the Delivery channel"
+        },
+        "groupbuy": {
+          "label": "Group Deals",
+          "short": "Deals",
+          "placeholder": "Search group-buy packages and stores",
+          "hint": "Searches only group-buy packages and stores"
+        },
+        "market": {
+          "label": "Supermarket",
+          "short": "Market",
+          "placeholder": "Search supermarket products and stores",
+          "hint": "Searches only the Supermarket channel"
+        },
+        "store": {
+          "label": "In store",
+          "short": "In store",
+          "placeholder": "Search products in this store",
+          "hint": "Searches only this store, never across stores"
+        }
+      }
+    }
+  },
   "docKnowledge": {
     "detailTitle": "Knowledge Document",
     "taxonomyTitle": "Categories & Tags",
