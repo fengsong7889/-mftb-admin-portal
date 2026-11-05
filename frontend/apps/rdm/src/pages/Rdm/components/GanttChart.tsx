@@ -224,14 +224,14 @@ export default function GanttChart({ editable }: GanttChartProps) {
                     y={LANE_H - 18}
                     width={DAY_W}
                     height={height}
-                    fill={weekend ? '#FAFAFA' : 'transparent'}
+                    fill={weekend ? 'var(--surface-3)' : 'transparent'}
                   />
                   <text
                     x={LABEL_W + i * DAY_W + DAY_W / 2}
                     y={LANE_H - 6}
                     textAnchor="middle"
                     fontSize={10}
-                    fill={weekend ? '#8C8C8C' : '#595959'}
+                    fill={weekend ? 'var(--text-3)' : 'var(--text-2)'}
                   >
                     {day.format('MM/DD')}
                   </text>
@@ -250,7 +250,7 @@ export default function GanttChart({ editable }: GanttChartProps) {
                 <g key={`ms-${ms.code}-${i}`}>
                   <polygon
                     points={`${x},${LANE_H - 2} ${x + 6},${LANE_H + 4} ${x},${LANE_H + 10} ${x - 6},${LANE_H + 4}`}
-                    fill={slipped ? '#FF4D4F' : '#52C41A'}
+                    fill={slipped ? 'var(--danger)' : 'var(--success)'}
                     opacity={0.9}
                   >
                     <title>{`${ms.name ?? ms.code} 基線 ${ms.baselineDate ?? '-'}／實際 ${ms.actualDate ?? '未完成'}`}</title>
@@ -265,16 +265,17 @@ export default function GanttChart({ editable }: GanttChartProps) {
               const planEnd = xOfDay(bar.planFinishDate)
               const es = xOfDay(bar.earliestStart)
               const ef = xOfDay(bar.earliestFinish)
-              const typeColor = RDM_TASK_TYPE_COLOR[bar.taskType as RdmTaskType] ?? '#E8720C'
+              const typeColor = RDM_TASK_TYPE_COLOR[bar.taskType as RdmTaskType] ?? 'var(--brand)'
               const done = bar.status === RDM_TASK_STATUS.DONE
               return (
                 <g key={bar.taskId}>
-                  <text x={8} y={y + ROW_H / 2 + 4} fontSize={12} fill="#262626">
+                  <text x={8} y={y + ROW_H / 2 + 4} fontSize={12} fill="var(--text-1)">
                     {bar.title.length > 14 ? `${bar.title.slice(0, 14)}…` : bar.title}
                   </text>
-                  {/* 人工计划（浅色底条） */}
+                  {/* 人工计划（浅色底条）；取 --border-2 是因为全站只有它与 #F0F0F0 严格等值，
+                      名字带 border 但用在这里要的就是它的深色值会变亮（否则深底上看不见计划条） */}
                   {planX != null && planEnd != null && planEnd >= planX && (
-                    <rect x={planX} y={y + 10} width={Math.max(DAY_W, planEnd - planX + DAY_W)} height={12} rx={6} fill="#F0F0F0" />
+                    <rect x={planX} y={y + 10} width={Math.max(DAY_W, planEnd - planX + DAY_W)} height={12} rx={6} fill="var(--border-2)" />
                   )}
                   {/* 排程推演条 */}
                   {es != null && ef != null && (
@@ -285,8 +286,8 @@ export default function GanttChart({ editable }: GanttChartProps) {
                         width={Math.max(DAY_W, ef - es + DAY_W)}
                         height={18}
                         rx={4}
-                        fill={done ? '#F6FFED' : '#FFF7E6'}
-                        stroke={bar.critical ? '#E8720C' : 'transparent'}
+                        fill={done ? 'var(--success-soft)' : 'var(--warning-soft)'}
+                        stroke={bar.critical ? 'var(--brand)' : 'transparent'}
                         strokeWidth={bar.critical ? 2 : 0}
                       />
                       <rect
@@ -302,7 +303,7 @@ export default function GanttChart({ editable }: GanttChartProps) {
                       </rect>
                     </>
                   )}
-                  {bar.overdue && <circle cx={(ef ?? planX ?? LABEL_W) + DAY_W + 8} cy={y + ROW_H / 2} r={3} fill="#FF4D4F" />}
+                  {bar.overdue && <circle cx={(ef ?? planX ?? LABEL_W) + DAY_W + 8} cy={y + ROW_H / 2} r={3} fill="var(--danger)" />}
                 </g>
               )
             })}
@@ -326,7 +327,7 @@ export default function GanttChart({ editable }: GanttChartProps) {
                   key={`link-${link.id}`}
                   points={`${x1},${y1} ${mid},${y1} ${mid},${y2} ${x2},${y2}`}
                   fill="none"
-                  stroke="#BFBFBF"
+                  stroke="var(--text-4)"
                   strokeWidth={1.2}
                 />
               )
