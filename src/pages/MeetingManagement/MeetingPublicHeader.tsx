@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
 import { Button, Segmented } from 'antd'
-import { CopyOutlined, ExportOutlined } from '@ant-design/icons'
+import { CheckOutlined, CopyOutlined, ExportOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import { changeAppLanguage, LANGUAGE_STORAGE_KEY } from '@/i18n'
+import { applyWebViewTitle } from '@/utils/webViewTitle'
 
 /** Keep public meeting controls within the meeting domain, independent of the RDM app. */
 export default function MeetingPublicHeader({ kind }: { kind: 'invite' | 'minutes' }) {
@@ -10,6 +11,11 @@ export default function MeetingPublicHeader({ kind }: { kind: 'invite' | 'minute
   const [copyState, setCopyState] = useState<'idle' | 'done' | 'failed'>('idle')
   const lang = i18n.language?.startsWith('zh') ? 'zh-TW' : 'en'
   const title = kind === 'invite' ? t('meeting.meta.scenario.invite') : t('meeting.minutes.pageTitle')
+  // 顶栏归属名与页内场景名是两件事：钉钉／浏览器顶栏要回答「这是哪个助手」，
+  // 页内灰字才回答「这是邀约还是纪要」；两者混用就会把助手名塞进正文或把场景名顶到顶栏
+  const docTitle = kind === 'invite'
+    ? (i18n.language?.startsWith('zh') ? '會議助手' : 'Meeting Assistant')
+    : title
 
   // Match the daily report: default to Chinese without overwriting a saved preference.
   useLayoutEffect(() => {
@@ -21,9 +27,9 @@ export default function MeetingPublicHeader({ kind }: { kind: 'invite' | 'minute
   // Public routes bypass the portal header, so they must own the WebView/tab title.
   useLayoutEffect(() => {
     const previousTitle = document.title
-    document.title = title
+    applyWebViewTitle(docTitle)
     return () => { document.title = previousTitle }
-  }, [title])
+  }, [docTitle])
 
   useEffect(() => {
     if (copyState === 'idle') return
@@ -51,10 +57,17 @@ export default function MeetingPublicHeader({ kind }: { kind: 'invite' | 'minute
     setCopyState((await copyPublicLink(window.location.href)) ? 'done' : 'failed')
   }
 
+  const copyLabel = copyState === 'done' ? t('rdm.board.copyLinkDone')
+    : copyState === 'failed' ? t('rdm.board.copyLinkFailedShort') : t('rdm.board.copyLink')
+  const openLabel = t('rdm.board.openInBrowser')
+
   return (
-    <header style={{ marginBottom: 12 }}>
-      <div style={{ fontSize: 13, color: '#8C8C8C', marginBottom: 12 }}>{title}</div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 8 }}>
+    <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
+      <span style={{ fontSize: 13, color: '#8C8C8C', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {title}
+      </span>
+      {/* 三个控件压成一行且复制/打开改图标：钉钉侧边栏约 490px，两行带文字的工具条会吃掉首屏一整块内容 */}
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
         <Segmented
           size="small"
           style={{ flexShrink: 0 }}
@@ -66,16 +79,18 @@ export default function MeetingPublicHeader({ kind }: { kind: 'invite' | 'minute
             { value: 'en', label: t('rdm.board.langEn') },
           ]}
         />
-        <Button size="small" icon={<CopyOutlined />} onClick={() => void handleCopyLink()}>
-          <span aria-live="polite">
-            {copyState === 'done' ? t('rdm.board.copyLinkDone')
-              : copyState === 'failed' ? t('rdm.board.copyLinkFailedShort') : t('rdm.board.copyLink')}
-          </span>
-        </Button>
-        <Button size="small" icon={<ExportOutlined />} onClick={handleOpenInBrowser}>
-          {t('rdm.board.openInBrowser')}
-        </Button>
-      </div>
+        <Button size="small" type="text" icon={copyState === 'done' ? <CheckOutlined /> : <CopyOutlined />}
+          aria-label={copyLabel} title={copyLabel} onClick={() => void handleCopyLink()} />
+        <Button size="small" type="text" icon={<ExportOutlined />}
+          aria-label={openLabel} title={openLabel} onClick={handleOpenInBrowser} />
+        {/* 图标按钮没有可见文字：复制结果靠 aria-live 播报给读屏用户 */}
+        <span aria-live="polite" style={{
+          position: 'absolute', width: 1, height: 1, margin: -1,
+          overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap',
+        }}>
+          {copyState === 'idle' ? '' : copyLabel}
+        </span>
+      </span>
     </header>
   )
 }

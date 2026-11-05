@@ -79,14 +79,19 @@ export default function MeetingViewPage() {
 
   return (
     <div style={{
-      minHeight: '100vh',
+      // 全局 html/body/#root 是 overflow:hidden（后台布局靠内部容器滚动），
+      // 免登页必须自己当滚动容器：参会人一多内容超出视口却滑不动就是缺了这条。
+      // 不能用 display:flex + minHeight 居中——flex 容器会自动撑开让 overflow 失效，
+      // 居中改由内层 margin:auto 完成（与 .mm-public-page 同一套口径）。
+      height: '100vh',
+      overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch',
+      overscrollBehavior: 'contain',
       background: 'linear-gradient(180deg, #F7F9FC 0%, #EEF2F8 100%)',
       padding: '24px 16px 40px',
-      display: 'flex',
-      justifyContent: 'center',
     }}
     >
-      <div style={{ width: '100%', maxWidth: 520 }}>
+      <div style={{ width: '100%', maxWidth: 520, margin: '0 auto' }}>
         <MeetingPublicHeader kind="invite" />
 
         {loading && (

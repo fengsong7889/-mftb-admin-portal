@@ -76,7 +76,8 @@ describe('會議詳情免登頁', () => {
     document.title = 'MFTB Group Portal'
     const page = openPage()
     await screen.findByText('會議邀約')
-    expect(document.title).toBe('會議邀約')
+    // 顶栏归属名是「會議助手」，页内灰字才是场景名「會議邀約」
+    expect(document.title).toBe('會議助手')
     expect(i18n.language).toBe('zh-TW')
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBeNull()
     page.unmount()
@@ -88,17 +89,17 @@ describe('會議詳情免登頁', () => {
     await i18n.changeLanguage('en')
     openPage()
     await screen.findByText('Attendees')
-    expect(document.title).toBe('Meeting invitation')
+    expect(document.title).toBe('Meeting Assistant')
     expect(screen.getByText('Upcoming')).toBeInTheDocument()
     expect(screen.getByText('Required')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('radio', { name: '中文' }))
     await screen.findByText('參會人員')
-    expect(document.title).toBe('會議邀約')
+    expect(document.title).toBe('會議助手')
     expect(screen.getByText('待開始')).toBeInTheDocument()
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('zh-TW')
     fireEvent.click(screen.getByRole('radio', { name: 'EN' }))
     await screen.findByText('Attendees')
-    expect(document.title).toBe('Meeting invitation')
+    expect(document.title).toBe('Meeting Assistant')
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('en')
   })
 
@@ -207,8 +208,20 @@ describe('會議詳情免登頁', () => {
     openPage('expired')
     await waitFor(() => expect(screen.getByText('查看連結不可用')).toBeInTheDocument())
     expect(screen.getByText('連結無效或已過期')).toBeInTheDocument()
-    expect(document.title).toBe('會議邀約')
+    expect(document.title).toBe('會議助手')
     expect(screen.getByRole('radiogroup', { name: '切換語言' })).toBeInTheDocument()
+  })
+
+  it('参会人多时页面可上滑：根容器自身是滚动容器，不被 flex 撑开', async () => {
+    openPage()
+    const label = await screen.findByText('會議邀約')
+    // 结构：root(滚动容器) > inner(限宽居中) > header(公共页头)
+    const pageRoot = label.closest('header')!.parentElement!.parentElement as HTMLElement
+    // 全局 html/body/#root 是 overflow:hidden，免登页不自己滚动就永远滑不动
+    expect(pageRoot.style.overflowY).toBe('auto')
+    expect(pageRoot.style.height).toBe('100vh')
+    // flex + minHeight 会让容器自动撑开、overflow 失效（历史缺陷口径）
+    expect(pageRoot.style.display).not.toBe('flex')
   })
 
   it('没有 token 参数时不请求接口，直接说明缺令牌', async () => {
