@@ -179,7 +179,10 @@ def check_references(problems, locales, db_keys):
             if tail.startswith('+'):
                 continue
             refs += 1
-            if key.split('.')[0] in db_keys or key in db_keys:
+            # 只跳过「完整键命中 DB 快照」的引用：后端确实供数的 key 不误报，其余一律逐键查。
+            # 不得按命名空间前缀整体免检——那要么把裸叶子键误升成前缀（旧 bug，造成静默盲区），
+            # 要么把 92 个真命名空间从逐键比对降级成免检（拿覆盖率换绿灯）。
+            if key in db_keys:
                 continue
             ok = [lang for lang in REQUIRED_LANGS if resolves(locales[lang], key)]
             if not ok:
