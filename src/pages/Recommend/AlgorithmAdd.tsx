@@ -1420,7 +1420,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
                   <div style={{
                     display: 'grid',
                     gridTemplateColumns: '90px repeat(3, 96px)',
-                    background: 'var(--info-hover-tint)', borderBottom: '1px solid #d6e4ff',
+                    background: 'var(--info-hover-tint)', borderBottom: '1px solid var(--info-hover-border)',
                     padding: '8px 16px', alignItems: 'center',
                   }}>
                     <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--info)' }}>{t('recommend:remainingDays')}</span>

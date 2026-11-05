@@ -830,7 +830,7 @@ export default function GoldenSignboardPricing() {
         {/* ── 3. 標籤定價配置（全部標籤，未配置的置灰禁用） ── */}
         <div style={cardShellStyle}>
           {cardTitle(
-            <TrophyOutlined style={{ fontSize: 14, color: '#2F54EB' }} />, '#F0F5FF', '標籤定價配置',
+            <TrophyOutlined style={{ fontSize: 14, color: 'var(--info-deep)' }} />, '#F0F5FF', '標籤定價配置',
             <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 4 }}>
               為每種標籤分別設置售價
             </span>,

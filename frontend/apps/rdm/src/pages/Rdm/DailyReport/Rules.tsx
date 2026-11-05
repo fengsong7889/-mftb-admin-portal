@@ -749,7 +749,7 @@ export default function DailyReportRules() {
               <div style={{
                 display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16,
                 marginBottom: 10, padding: '10px 12px', borderRadius: 8,
-                background: '#f0f6ff', border: '1px solid #d6e4ff',
+                background: '#f0f6ff', border: '1px solid #D6E4FF' /* theme-pair-locked：底色 #F0F6FF 与 --info-hover-tint(#F0F5FF) 差 1 个单位，严格等值判据不映射它；只换描边会凑出半对。待 geekblue 邻阶收敛 */ ,
               }}>
                 {BUILTIN_LAYOUT_ENTRIES.map(item => (
                   <div key={item.type} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>

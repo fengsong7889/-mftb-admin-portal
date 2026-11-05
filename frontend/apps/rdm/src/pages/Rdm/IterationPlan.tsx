@@ -241,7 +241,7 @@ export default function IterationPlan() {
       render: (v: string | null | undefined, r) => {
         if (r.projectId != null) {
           return (
-            <a style={{ color: '#2F54EB' }} onClick={() => navigate(`/rdm-project-detail?id=${r.projectId}`)}>
+            <a style={{ color: 'var(--info-deep)' }} onClick={() => navigate(`/rdm-project-detail?id=${r.projectId}`)}>
               {v ?? `項目 #${r.projectId}`}
             </a>
           )

@@ -24,6 +24,9 @@
  *    破防后果：`'a.tsx'.includes('.ts')` 为 true，整个前端被排除，统计恒为 0、棘轮形同虚设。
  */
 import { describe, it, expect } from 'vitest'
+// readFileSync 只为「读自己源码查重复键」那条断言服务：重复键在运行时会被静默合并，
+// 只能像门禁核 theme.css 那样从文本层抓出来。
+import { readFileSync } from 'node:fs'
 import {
   COLOR_TO_TOKEN,
   COMPONENT_TOKENS,
@@ -49,7 +52,7 @@ const ALL_TOKEN_NAMES = [...SEMANTIC_TOKENS, ...COMPONENT_TOKENS]
 const ALL_TOKEN_VALUES = { ...TOKEN_VALUES, ...NON_COLOR_TOKENS }
 
 describe('令牌去重：不允许未登记的「浅深两值全同」重复令牌', () => {
-  // 本次 --text-inverse 差点被当成新令牌 --on-brand 新增，就是靠这条拓出来的。
+  // 本次 --text-inverse 差点被当成新令牌 --on-brand 新增，就是靠这条抓出来的。
   // 浅深全同的令牌映射到任一侧渲染结果一致（不属于 #333333 那种真歧义），
   // 但必须当场决定「合并」还是「做别名并登记理由」，不能等到漂移后才追认。
   it('INTENTIONAL_VALUE_DUPLICATES 中的令牌名必须都存在', () => {
@@ -184,6 +187,70 @@ describe('补充阶令牌的合成对比度（danger-callout / warning-deep / in
       .toBeGreaterThanOrEqual(3.3)
   })
 
+  /*
+   * geekblue 四件套与两个邻阶（info-deep / info-hover-border / warning-callout / brand-deep）。
+   * 写这些断言的同一套合成算法，是因为 contrastRatio 不处理 alpha；数字全部来自实测。
+   * 达标的按 AA 卡（≥ 4.5），不达标的按存量值卡住不回退，不假装达标（与 danger-callout 同一口径）。
+   */
+  it('info-deep 在 info-hover-tint 上两侧都必须达 AA（它是正文/图标前景）', () => {
+    expect(contrastRatio(TOKEN_VALUES['info-deep'].light, TOKEN_VALUES['info-hover-tint'].light))
+      .toBeGreaterThanOrEqual(4.5)
+    const bg = over(TOKEN_VALUES['info-hover-tint'].dark, TOKEN_VALUES['surface-2'].dark)
+    expect(contrastRatio(TOKEN_VALUES['info-deep'].dark, bg)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('brand-deep 在 brand-soft 上两侧都必须达 AA', () => {
+    expect(contrastRatio(TOKEN_VALUES['brand-deep'].light, TOKEN_VALUES['brand-soft'].light))
+      .toBeGreaterThanOrEqual(4.5)
+    const bg = over(TOKEN_VALUES['brand-soft'].dark, TOKEN_VALUES['surface-2'].dark)
+    expect(contrastRatio(TOKEN_VALUES['brand-deep'].dark, bg)).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('两个 deep 前景令牌不得进 bg/border 段（同色值的背景用法必须继续人工判定）', () => {
+    for (const seg of ['bg', 'border']) {
+      for (const hex of ['2f54eb', 'ad4e00']) {
+        expect(COLOR_TO_TOKEN[seg]?.[hex], `${seg} 段不该有 #${hex}`).toBeUndefined()
+      }
+    }
+    // 反向也要卡住：描边令牌不能漏进背景段，否则 hover 底会被刷成描边令牌
+    expect(COLOR_TO_TOKEN.bg?.d6e4ff).toBeUndefined()
+  })
+
+  it('每个段的 hex 键必须唯一：重复键会被后者静默覆盖，运行时根本看不出来', () => {
+    /*
+     * 真实踩过一次：本轮差点新建 --warning-callout（#FFF7E6），而 #FFF7E6 已是
+     * --warning-soft 的浅色值且在 bg 段里。两个键入同一个对象不报错，后者胜，
+     * 严格等值断言也照样通过（两个令牌的浅色值都与键相等）——所以这道检查必须读源码，
+     * 像门禁核 theme.css 那样。另外只要把取值写错就会错得很静默。
+     */
+    const src = readFileSync(new URL('./theme-token-map.mjs', import.meta.url), 'utf8')
+    const dupes = []
+    for (const seg of ['bg', 'fg', 'border']) {
+      const m = src.match(new RegExp(`\\n  ${seg}: \\{([\\s\\S]*?)\\n  \\},`))
+      expect(m, `找不到 ${seg} 段，检查写法是否被动过`).toBeTruthy()
+      const keys = [...m[1].matchAll(/^\s+'?([0-9a-f]{3,8})'?:/gm)].map((x) => x[1])
+      const seen = new Set()
+      for (const k of keys) {
+        if (seen.has(k)) dupes.push(`${seg}.${k}`)
+        seen.add(k)
+      }
+    }
+    expect(dupes, `段内重复键（后者会静默覆盖前者）：${dupes.join(', ')}`).toEqual([])
+  })
+
+  it('同一浅色值不得在同一个段里映到两个不同令牌（跨段允许）', () => {
+    // 上条查源码里的重复键；本条查「不同键但归一后同值」这种更阴的情况（如 #fff 与 #ffffff）。
+    for (const seg of ['bg', 'fg', 'border']) {
+      const byValue = new Map()
+      for (const [hex, token] of Object.entries(COLOR_TO_TOKEN[seg])) {
+        const norm = normalizeHex(hex)?.hex ?? hex
+        const prev = byValue.get(norm)
+        if (prev && prev !== token) expect.unreachable(`${seg} 段 #${norm} 同时映射到 --${prev} 与 --${token}`)
+        byValue.set(norm, token)
+      }
+    }
+  })
+
   it('--text-2 在 info-hover-tint 上两个主题都必须达 AA（hover 时文字不能消失）', () => {
     // 这条是第四批 ChannelStrategy 那个「hover 亮灰字压近白底 1.98:1」缺陷的回归锁：
     // 当时背景是裸值不跟随主题，前景已令牌化 → 深色下凑成低对比。
@@ -214,7 +281,7 @@ describe('补充阶令牌的合成对比度（danger-callout / warning-deep / in
    * 下限取实测观测值：五个新令牌浅色最低 1.3731、深色合成最差 1.5833，
    * 既有 brand-border 是 1.1930 / 1.6212。所以卡 1.15 与 1.55：既容纳存量，又挡住回退。
    */
-  const BORDER_TOKENS = ['danger-border', 'warning-border', 'success-border', 'info-border', 'purple-border', 'brand-border']
+  const BORDER_TOKENS = ['danger-border', 'warning-border', 'success-border', 'info-border', 'purple-border', 'info-hover-border', 'brand-border']
   const CARD_BACKS = ['surface-1', 'surface-2', 'surface-3']
 
   it('描边阶深色值必须能合成出合法十六进制（rgba 写错会静默算出 NaN）', () => {
@@ -228,7 +295,7 @@ describe('补充阶令牌的合成对比度（danger-callout / warning-deep / in
 
   it('描边阶深色值必须是带 alpha 的 rgba 四元（缺 alpha 会被静默当成不透明）', () => {
     // 变异验证跑出来的真实缺口：`rgba(64,169,)` 这种写错形态，前面的「合成合法十六进制」
-    // 断言拓不住——toRgb 拿到三个数、alpha 默认 1，照样合成出一个合法 hex，
+    // 断言抓不住——toRgb 拿到三个数、alpha 默认 1，照样合成出一个合法 hex，
     // 只是颜色完全错了。叠加型令牌的全部语义就建在 alpha 上，所以这里按严格四元卡。
     for (const name of BORDER_TOKENS) {
       const m = TOKEN_VALUES[name].dark.match(/^rgba\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)$/)

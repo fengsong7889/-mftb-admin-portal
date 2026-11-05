@@ -1637,7 +1637,7 @@ export default function RequirementDetail() {
                                 {
                                   title: '標題', dataIndex: 'title', key: 'title', ellipsis: true,
                                   render: (v: string, r) => (
-                                    <a style={{ color: '#2F54EB' }} onClick={() => goDetail(r.reqId)}>{v}</a>
+                                    <a style={{ color: 'var(--info-deep)' }} onClick={() => goDetail(r.reqId)}>{v}</a>
                                   ),
                                 },
                                 {
@@ -1673,7 +1673,7 @@ export default function RequirementDetail() {
                       {detail.flowVersion === 3 && (
                         <div className="rdm-v3-delivery-items">
                           <div className="rdm-section-title">
-                            <span className="rdm-icon-block" style={{ background: '#F0F5FF', color: '#2F54EB' /* theme-pair-locked：geekblue 四件套（#2F54EB / #D6E4FF / #F0F5FF）未成套定令牌前不得单刷一侧 */ }}><CheckCircleOutlined /></span>
+                            <span className="rdm-icon-block" style={{ background: 'var(--info-hover-tint)', color: 'var(--info-deep)' }}><CheckCircleOutlined /></span>
                             交付項清單
                             {deliveryItems.length > 0 && <Tag color="blue" style={{ margin: 0 }}>{deliveryItems.length}</Tag>}
                             <span className="rdm-card-title-split" />
@@ -1960,7 +1960,7 @@ export default function RequirementDetail() {
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                     <b style={{ fontSize: 13, color: planReleaseInfo?.tone === 'overdue' ? '#CF1322' : 'var(--warning-deep)' }}>{detail.planReleaseDate}</b>
                     {planReleaseCountdown && (
-                      <span style={{ fontSize: 12, color: planReleaseInfo?.tone === 'overdue' ? '#CF1322' : '#AD4E00' }}>{planReleaseCountdown}</span>
+                      <span style={{ fontSize: 12, color: planReleaseInfo?.tone === 'overdue' ? '#CF1322' : 'var(--brand-deep)' }}>{planReleaseCountdown}</span>
                     )}
                   </span>
                 ) : <span style={{ color: 'var(--text-3)' }}>{t('rdm.attr.tbdSchedule')}</span>}
@@ -1975,7 +1975,7 @@ export default function RequirementDetail() {
               />
               {/* 归属体系改造：项目与迭代是一等属性，不再收进「更多」里（ 有值即常显） */}
               <PropRow label="所屬項目" value={detail.projectId ? (
-                <a style={{ color: '#2F54EB' }} onClick={() => navigate(`/rdm-project-detail?id=${detail.projectId}`)}>
+                <a style={{ color: 'var(--info-deep)' }} onClick={() => navigate(`/rdm-project-detail?id=${detail.projectId}`)}>
                   {detail.projectName ?? `項目 #${detail.projectId}`}
                 </a>
               ) : <span style={{ color: 'var(--text-3)' }}>未掛項目</span>} />
@@ -2074,7 +2074,7 @@ export default function RequirementDetail() {
                   )}
                   {detail.structureParentReqId && (
                     <PropRow label="主需求" value={
-                      <a style={{ color: '#2F54EB' }} onClick={() => goDetail(detail.structureParentReqId!)}>
+                      <a style={{ color: 'var(--info-deep)' }} onClick={() => goDetail(detail.structureParentReqId!)}>
                         {detail.structureParentReqNo ?? `需求 #${detail.structureParentReqId}`}
                       </a>
                     } />
@@ -2085,7 +2085,7 @@ export default function RequirementDetail() {
                         {ancestors.map((a, idx) => (
                           <span key={a.reqId} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
                             {idx > 0 && <RightOutlined style={{ fontSize: 10, color: 'var(--text-4)' }} />}
-                            <a style={{ color: '#2F54EB' }} onClick={() => goDetail(a.reqId)}>
+                            <a style={{ color: 'var(--info-deep)' }} onClick={() => goDetail(a.reqId)}>
                               {formatRdmReqNo(a.reqNo)}
                             </a>
                           </span>

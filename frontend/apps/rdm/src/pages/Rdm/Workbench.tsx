@@ -462,7 +462,7 @@ export default function RdmWorkbench() {
                         {item.expectDate && <span>期望：{item.expectDate}</span>}
                         {/* V3：显示交付项进度 */}
                         {item.flowVersion === 3 && item.deliveryItemCount != null && item.deliveryItemCount > 0 && (
-                          <span style={{ color: '#2F54EB', fontWeight: 500 }}>
+                          <span style={{ color: 'var(--info-deep)', fontWeight: 500 }}>
                             交付項 {item.deliveryDoneCount ?? 0}/{item.deliveryItemCount}
                           </span>
                         )}
@@ -537,7 +537,7 @@ export default function RdmWorkbench() {
     'my-projects': myProjects.length > 0 ? (
       <div className="rdm-v3-projects">
         <div className="rdm-card-title">
-          <span className="rdm-icon-block" style={{ background: '#F0F5FF', color: '#2F54EB' /* theme-pair-locked：geekblue 四件套（#2F54EB / #D6E4FF / #F0F5FF）未成套定令牌前不得单刷一侧 */ }}><ProjectOutlined /></span>
+          <span className="rdm-icon-block" style={{ background: 'var(--info-hover-tint)', color: 'var(--info-deep)' }}><ProjectOutlined /></span>
           項目一覽
           <Tag color="blue" style={{ margin: 0 }}>{myProjects.length}</Tag>
           <span className="rdm-todo-hint">可見範圍內的分批交付項目進度一覽</span>

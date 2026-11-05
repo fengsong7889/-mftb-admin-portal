@@ -516,7 +516,7 @@ export default function DeliveryBoard() {
         {/* Batch2：前置依賴（跨交付項） */}
         <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--border-3)' }}>
           <Space size={8} wrap>
-            <LinkOutlined style={{ color: '#2F54EB' }} />
+            <LinkOutlined style={{ color: 'var(--info-deep)' }} />
             <span style={{ fontSize: 12, color: 'var(--text-2)' }}>前置依賴</span>
             <Button type="link" size="small" icon={<PlusOutlined />} onClick={() => openDepModal(r)}>添加跨交付項依賴</Button>
           </Space>

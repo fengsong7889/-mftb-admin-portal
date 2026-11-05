@@ -834,12 +834,14 @@ export default function ResourceLoad() {
       />
       <Form form={assignForm} layout="vertical">
         {assignTarget ? (
-          /* 底色与前景必须成对令牌化：#AD4E00 无等值令牌（REVIEW_REQUIRED），
-             若只把背景换成令牌 brand-soft 而文字留裸 #AD4E00，深色下为「深底深字」约 2.2:1。
-             待定下 brand-deep 一类令牌后再成对改；单独跑 codemod 会把背景重新刷上去，见方案 §18.6。 */
+          /* 底色与前景必须成对令牌化：曾经因 #AD4E00 无等值令牌而三侧一起保持裸值
+             （只换背景会在深色下凑出「深底深字」约 2.2:1，见方案 §18.6）。
+             现在 --brand-deep / --brand-soft / --brand-border 都已严格等值入表，
+             下一行会被 codemod 一次性成对刷完；原来的成对锁定标记已移除（锁标记的字面量只能
+             出现在真正需要锁定的那行，否则 grep 不到完整锁定清单）。 */
           <div style={{
-            background: '#FFF7F0', border: '1px solid #FFE7D1', /* theme-pair-locked：文字仍钉裸 #AD4E00（无等值令牌，待 brand-deep），只刷背景会在深色下凑出「深底深字」约 2.2:1 */ borderRadius: 8,
-            padding: '10px 14px', marginBottom: 16, fontSize: 12, color: '#AD4E00',
+            background: 'var(--brand-soft)', border: '1px solid var(--brand-border)', borderRadius: 8,
+            padding: '10px 14px', marginBottom: 16, fontSize: 12, color: 'var(--brand-deep)',
           }}>
             <div>{t('rdm.resLoad.assigneeLabel')}：<b>{assignTarget.userName}（{assignTarget.empNo}）</b> · {assignTarget.dept}</div>
             <div>{t('rdm.resLoad.assigneeLoad')}：<b>{assignTarget.loadRate}%</b>（{assignTarget.totalPlanned}h / {assignTarget.totalCapacity}h）· {t('rdm.resLoad.assigneeRemain')}：<b>{Math.max(0, assignTarget.totalCapacity - assignTarget.totalPlanned)}h</b></div>
