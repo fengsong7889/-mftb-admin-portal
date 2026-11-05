@@ -301,6 +301,25 @@ class MeetingBookingLifecycleTest {
     }
 
     @Test
+    @DisplayName("已有人签到的会不可释放：那是提前結束，走释放会把开过的会记成爽约")
+    void releaseRejectsMeetingAlreadyCheckedIn() {
+        when(guard.currentUser()).thenReturn(ADMIN);
+        when(guard.canOperateRecords(ADMIN)).thenReturn(true);
+        LocalDateTime start = LocalDateTime.now().minusMinutes(30);
+        when(bookingMapper.selectForUpdate(50L))
+                .thenReturn(booking(MeetingConstants.STATUS_CHECKED_IN, start, start.plusHours(1)));
+
+        MeetingBookingDto.ReleaseForm form = new MeetingBookingDto.ReleaseForm();
+        form.setReason("行政误操");
+        form.setVersion(0);
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.release(50L, form));
+        assertTrue(ex.getMessage().contains("請改用「提前結束」"), ex.getMessage());
+        // 爽约三件套一行都不能写：no_show_flag=1 会把正常开会的人推向自动拉黑阈值
+        verify(bookingMapper, never()).update(isNull(), any());
+        verify(auditRecorder, never()).recordBooking(anyLong(), anyLong(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("自动释放触发爽约统计：手动释放不触发（帮人腾房不是处分依据）")
     void autoReleaseEvaluatesBlacklist() {
         LocalDateTime start = LocalDateTime.now().minusMinutes(30);
@@ -317,6 +336,158 @@ class MeetingBookingLifecycleTest {
         MeetingBooking future = booking(MeetingConstants.STATUS_BOOKED,
                 LocalDateTime.now().plusMinutes(30), LocalDateTime.now().plusMinutes(90));
         assertFalse(service.releaseAsNoShow(future, "超時未簽到"));
+    }
+
+    /* ==================== 变更（编辑）窗口 ==================== */
+
+    private MeetingBookingDto.UpdateForm updateForm(LocalDateTime start, LocalDateTime end, int version) {
+        MeetingBookingDto.UpdateForm form = new MeetingBookingDto.UpdateForm();
+        form.setTitle("例會（变更）");
+        form.setRoomId(1L);
+        form.setStartTime(start);
+        form.setEndTime(end);
+        form.setAttendeeUserIds(List.of(ATTENDEE.getId()));
+        form.setBizType(MeetingConstants.BIZ_GENERAL);
+        form.setVersion(version);
+        return form;
+    }
+
+    /** 变更路径的依赖桩：房间锁、组织者、名单解析、乐观锁写入 */
+    private void stubUpdatePath(MeetingBooking stored, MeetingBooking saved) {
+        when(bookingMapper.selectForUpdate(50L)).thenReturn(stored);
+        when(roomMapper.selectForUpdate(1L)).thenReturn(room(1));
+        when(userMapper.selectById(ORGANIZER.getId())).thenReturn(ORGANIZER);
+        when(userMapper.selectList(any())).thenReturn(List.of(ATTENDEE));
+        when(bookingMapper.update(isNull(), any())).thenReturn(1);
+        when(attendeeMapper.findByBooking(50L)).thenReturn(List.of());
+        when(bookingMapper.selectById(50L)).thenReturn(saved);
+    }
+
+    @Test
+    @DisplayName("已签到（已开始）的会允许变更：临时换房/加人/改议程就发生在这个窗口")
+    void updateAllowsCheckedInMeeting() {
+        LocalDateTime start = LocalDateTime.now().minusMinutes(30);
+        MeetingBooking stored = booking(MeetingConstants.STATUS_CHECKED_IN, start, start.plusHours(2));
+        // 新时间仍在过去：会真的开过，签到事实不该被撤回
+        MeetingBooking saved = booking(MeetingConstants.STATUS_CHECKED_IN, start.plusMinutes(15), start.plusHours(2));
+        stubUpdatePath(stored, saved);
+
+        service.update(50L, updateForm(saved.getStartTime(), saved.getEndTime(), 0));
+
+        verify(bookingMapper).update(isNull(), any());
+        verify(auditRecorder).recordBooking(eq(50L), eq(1L), any(), eq(MeetingConstants.EVENT_UPDATE),
+                any(), any(), any(), eq(ORGANIZER), isNull());
+        // 时间未改到未来 → 只重置表态，不撤回签到
+        verify(attendeeMapper, times(1)).update(isNull(), any());
+    }
+
+    @Test
+    @DisplayName("已收尾的会不能再变更：完成/取消/释放是历史事实")
+    void updateRejectsSettledMeeting() {
+        LocalDateTime start = LocalDateTime.now().minusHours(2);
+        MeetingBooking stored = booking(MeetingConstants.STATUS_FINISHED, start, start.plusHours(1));
+        when(bookingMapper.selectForUpdate(50L)).thenReturn(stored);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.update(50L, updateForm(start.plusHours(3), start.plusHours(4), 0)));
+        assertTrue(ex.getMessage().contains("不能再變更"), ex.getMessage());
+        verify(bookingMapper, never()).update(isNull(), any());
+    }
+
+    @Test
+    @DisplayName("已开始的会被改到未来：撤回签到事实，单子回到已預約")
+    void updateMovedToFutureWithdrawsCheckins() {
+        LocalDateTime start = LocalDateTime.now().minusMinutes(30);
+        MeetingBooking stored = booking(MeetingConstants.STATUS_CHECKED_IN, start, start.plusHours(2));
+        LocalDateTime future = LocalDateTime.now().plusDays(1);
+        MeetingBooking saved = booking(MeetingConstants.STATUS_CHECKED_IN, future, future.plusHours(2));
+        stubUpdatePath(stored, saved);
+
+        service.update(50L, updateForm(future, future.plusHours(2), 0));
+
+        // 两次 booking 更新：一次写变更本身，一次撤回签到（状态回到 booked、清 checkin/actual_start）
+        verify(bookingMapper, times(2)).update(isNull(), any());
+        // 两次 attendee 更新：重置表态 + 清个人签到时间，否则留下“未来开会却已签到”
+        verify(attendeeMapper, times(2)).update(isNull(), any());
+    }
+
+    /* ==================== 补录参会人（纪要录入页） ==================== */
+
+    private MeetingBookingDto.BackfillForm backfillForm(long userId) {
+        MeetingBookingDto.BackfillForm form = new MeetingBookingDto.BackfillForm();
+        form.setUserId(userId);
+        return form;
+    }
+
+    @Test
+    @DisplayName("补录参会人写入正式名单：不发邀约、不留待响应，并留下审计")
+    void backfillWritesFormalAttendeeWithoutInvite() {
+        LocalDateTime start = LocalDateTime.now().minusMinutes(30);
+        MeetingBooking stored = booking(MeetingConstants.STATUS_CHECKED_IN, start, start.plusHours(2));
+        when(bookingMapper.selectForUpdate(50L)).thenReturn(stored);
+        when(userMapper.selectById(ATTENDEE.getId())).thenReturn(ATTENDEE);
+        when(attendeeMapper.findByBooking(50L)).thenReturn(List.of(attendeeRow(start)));
+        when(bookingMapper.update(isNull(), any())).thenReturn(1);
+        when(bookingMapper.selectById(50L)).thenReturn(booking(MeetingConstants.STATUS_CHECKED_IN, start, start.plusHours(2)));
+
+        service.backfillAttendee(50L, backfillForm(ATTENDEE.getId()));
+
+        ArgumentCaptor<MeetingAttendee> captor = ArgumentCaptor.captor();
+        verify(attendeeMapper).insert(captor.capture());
+        MeetingAttendee inserted = captor.getValue();
+        assertEquals(ATTENDEE.getId(), inserted.getUserId());
+        assertEquals(MeetingConstants.ATTENDEE_REQUIRED, inserted.getAttendeeType());
+        // 补录的人不该出现在「待我響應」里，也不该收到一场事后才知道的邀约
+        assertEquals(MeetingConstants.RESPOND_ACCEPTED, inserted.getResponse());
+        assertEquals(MeetingConstants.NOTIFY_SKIPPED, inserted.getNotifyStatus());
+        verify(notifyDispatcher, never()).enqueue(any(), any(), any(), any(), any());
+        // 人数必须跟着重算，否则列表写 4 人、详情名单 5 行
+        verify(bookingMapper).update(isNull(), any());
+        verify(auditRecorder).recordBooking(eq(50L), eq(1L), any(), eq(MeetingConstants.EVENT_ATTENDEE_BACKFILL),
+                any(), any(), any(), eq(ORGANIZER), isNull());
+    }
+
+    @Test
+    @DisplayName("已取消/已释放的单不能补录：没有到场事实，补人等于伪造名单")
+    void backfillRejectsTerminatedMeeting() {
+        LocalDateTime start = LocalDateTime.now().minusMinutes(30);
+        when(bookingMapper.selectForUpdate(50L))
+                .thenReturn(booking(MeetingConstants.STATUS_RELEASED, start, start.plusHours(2)));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.backfillAttendee(50L, backfillForm(ATTENDEE.getId())));
+        assertTrue(ex.getMessage().contains("補錄參會人"), ex.getMessage());
+        verify(attendeeMapper, never()).insert(any(MeetingAttendee.class));
+    }
+
+    @Test
+    @DisplayName("已在名单的人不重复补录：给出可读提示而不是唯一键异常")
+    void backfillRejectsAlreadyInvitedAttendee() {
+        LocalDateTime start = LocalDateTime.now().minusMinutes(30);
+        MeetingAttendee already = attendeeRow(start);
+        already.setUserId(ATTENDEE.getId());
+        when(bookingMapper.selectForUpdate(50L)).thenReturn(booking(MeetingConstants.STATUS_CHECKED_IN, start, start.plusHours(2)));
+        when(userMapper.selectById(ATTENDEE.getId())).thenReturn(ATTENDEE);
+        when(attendeeMapper.findByBooking(50L)).thenReturn(List.of(already));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.backfillAttendee(50L, backfillForm(ATTENDEE.getId())));
+        assertTrue(ex.getMessage().contains("無需補錄"), ex.getMessage());
+        verify(attendeeMapper, never()).insert(any(MeetingAttendee.class));
+    }
+
+    @Test
+    @DisplayName("停用/离职员工不能作为补录对象：名单里不能出现无账号归属的人")
+    void backfillRejectsInactiveUser() {
+        LocalDateTime start = LocalDateTime.now().minusMinutes(30);
+        SysUser left = user(300L, "MF00300", "王五");
+        left.setStatus(0);
+        when(bookingMapper.selectForUpdate(50L)).thenReturn(booking(MeetingConstants.STATUS_CHECKED_IN, start, start.plusHours(2)));
+        when(userMapper.selectById(300L)).thenReturn(left);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.backfillAttendee(50L, backfillForm(300L)));
+        assertTrue(ex.getMessage().contains("已停用或離職"), ex.getMessage());
+        verify(attendeeMapper, never()).insert(any(MeetingAttendee.class));
     }
 
     /* ==================== 黑名单联动 ==================== */

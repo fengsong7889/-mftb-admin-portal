@@ -87,9 +87,15 @@ public final class MeetingConstants {
     public static final List<String> OCCUPYING_STATUSES = List.of(STATUS_BOOKED, STATUS_CHECKED_IN);
 
     /**
-     * 尚未开始的预约（可改期/可取消）
+     * 可变更（改期/换房/改名单）的状态集合。
+     *
+     * <p>预约之后临时换会议室、加参会人、改议程是常态，因此已开始（已簽到）也包含在内；
+     * 已收尾（已完成/已取消/已释放）是已经发生的历史事实，不再开放改写。
+     * <p>必须与 {@code MeetingBookingServiceImpl.update()} 的护栏和 VO 的 canEdit 同源：
+     * 不一致就会出现「给了按钮却必被服务端拒」或「服务端能改界面进不去」。取值等同占用中集合，
+     * 但语义不同（占用判定用于冲突与释放，可变更判定用于写入口），因此各自命名而不复用。
      */
-    public static final Set<String> STATUS_EDITABLE = Set.of(STATUS_BOOKED);
+    public static final Set<String> STATUS_EDITABLE = Set.of(STATUS_BOOKED, STATUS_CHECKED_IN);
 
     /** 允许签到或取消的窗口内状态（已收尾/已终止的单不再接受任何参会动作） */
     public static final Set<String> STATUS_OPEN = Set.of(STATUS_BOOKED, STATUS_CHECKED_IN);
@@ -166,6 +172,8 @@ public final class MeetingConstants {
     public static final String EVENT_CHECKIN = "checkin";
     public static final String EVENT_RELEASE = "release";
     public static final String EVENT_FINISH = "finish";
+    /** 补录参会人：预约时漏加的正式参会人，由记录人/行政在纪要录入时回填（event_code 列无 CHECK，新码可直接用） */
+    public static final String EVENT_ATTENDEE_BACKFILL = "attendee_backfill";
     public static final String EVENT_NOTIFY = "notify";
     public static final String EVENT_ROOM_CREATE = "room_create";
     public static final String EVENT_ROOM_UPDATE = "room_update";

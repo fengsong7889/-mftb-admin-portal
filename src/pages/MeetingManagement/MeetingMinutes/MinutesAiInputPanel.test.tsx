@@ -171,11 +171,22 @@ describe('自由笔记与 AI 面板', () => {
       saveState="loading" maxChars={20000} phase="idle" stale={false} onExtract={vi.fn()} onManual={vi.fn()}
       onApply={vi.fn()} onDiscard={vi.fn()} onReload={vi.fn()} />)
     expect(screen.getByRole('textbox', { name: '原始筆記' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: '插入 @員工' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '選擇參會人' })).toBeDisabled()
     view.unmount()
     Harness()
     typeMention('@')
-    expect(await screen.findByText('未找到參會人，可用「插入 @員工」搜尋')).toBeInTheDocument()
+    expect(await screen.findByText('未找到參會人，可用「選擇參會人」搜尋')).toBeInTheDocument()
+  })
+
+  it('@ 提示紧贴笔记标题，选择参会人入口独立靠右', () => {
+    const { container } = render(<MinutesAiInputPanel text="" onTextChange={vi.fn()} mentions={[]} onMentionsChange={vi.fn()}
+      saveState="saved" maxChars={20000} phase="idle" stale={false} onExtract={vi.fn()} onManual={vi.fn()}
+      onApply={vi.fn()} onDiscard={vi.fn()} onReload={vi.fn()} />)
+    const heading = container.querySelector('.mm-ai__editor-heading')!
+    const labelGroup = heading.querySelector('.mm-ai__editor-label-group')!
+    expect(labelGroup.querySelector('.mm-ai__input-label')?.textContent).toBe('原始筆記')
+    expect(labelGroup.querySelector('.mm-ai__hint')?.textContent).toBe('（輸入@選參會人）')
+    expect(heading.lastElementChild?.textContent).toBe('選擇參會人')
   })
 
   it('选人后超过上限时保留原文且不记录绑定', async () => {
@@ -204,7 +215,7 @@ describe('自由笔记与 AI 面板', () => {
     fireEvent.change(input, { target: { value: '請 明天交付', selectionStart: 2, selectionEnd: 2 } })
     fireEvent.blur(input)
     await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)) })
-    fireEvent.click(screen.getByRole('button', { name: '插入 @員工' }))
+    fireEvent.click(screen.getByRole('button', { name: '選擇參會人' }))
     const group = screen.getByRole('group', { name: '插入員工姓名' })
     const combobox = within(group).getByRole('combobox')
     fireEvent.focus(combobox)

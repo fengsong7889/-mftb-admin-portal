@@ -2,7 +2,7 @@
  * 自由笔记 + AI 提取触发面板（受控组件，真实数据链路）。
  *
  * 状态与请求都由 MinutesForm 持有的 hooks 驱动，这里只负责输入、展示保存/提取状态、
- * 插入 @员工、触发提取与渲染核对结果。不直接调模型或写业务数据。文案全部走 meeting.minutes.ai.* 双语。
+ * 选择参会人、触发提取与渲染核对结果。不直接调模型或写业务数据。文案全部走 meeting.minutes.ai.* 双语。
  */
 import { useEffect, useRef, useState } from 'react'
 import type { ComponentProps } from 'react'
@@ -177,8 +177,11 @@ export default function MinutesAiInputPanel(props: Props) {
           ]} />} />
         <p className="mm-ai__description">{t('meeting.minutes.ai.introSubtitle')}</p>
         <div className="mm-ai__editor-heading">
-          <label className="mm-ai__input-label" htmlFor="minutes-note-input">{t('meeting.minutes.ai.noteLabel')}</label>
-          <span className="mm-ai__hint" id="minutes-note-mention-hint">{t('meeting.minutes.ai.mentionHint', { defaultValue: '輸入 @ 選參會人' })}</span>
+          {/* 提示紧贴标题（原始筆記（輸入@選參會人）），入口按钮独立靠右 */}
+          <span className="mm-ai__editor-label-group">
+            <label className="mm-ai__input-label" htmlFor="minutes-note-input">{t('meeting.minutes.ai.noteLabel')}</label>
+            <span className="mm-ai__hint" id="minutes-note-mention-hint">{t('meeting.minutes.ai.mentionHint', { defaultValue: '（輸入@選參會人）' })}</span>
+          </span>
           <Button type="text" size="small" disabled={inputDisabled} onClick={() => setShowMention(open => !open)} aria-expanded={showMention}
             aria-controls="minutes-note-mention">{t('meeting.minutes.ai.insertEmployee')}</Button>
         </div>
@@ -190,7 +193,7 @@ export default function MinutesAiInputPanel(props: Props) {
             const person = mentionPeople.find(item => String(item.id) === option.key)
             return `${person?.name ?? ''} ${person?.empId ?? ''}`.toLowerCase().includes(query.toLowerCase())
           }}
-          notFoundContent={<span className="mm-ai__hint">{t('meeting.minutes.ai.mentionEmpty', { defaultValue: '未找到參會人，可用「插入 @員工」搜尋' })}</span>}
+          notFoundContent={<span className="mm-ai__hint">{t('meeting.minutes.ai.mentionEmpty', { defaultValue: '未找到參會人，可用「選擇參會人」搜尋' })}</span>}
           placeholder={t('meeting.minutes.ai.notePlaceholder')}
           onChange={handleTextChange} onSelect={handleMentionSelect}
           onKeyDownCapture={event => {

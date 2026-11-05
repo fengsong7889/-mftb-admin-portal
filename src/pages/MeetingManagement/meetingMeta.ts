@@ -201,12 +201,23 @@ const EVENT_SOURCE: Record<string, string> = {
   minutes_revoke: '作廢紀要鏈接',
 }
 
+/**
+ * 只登记 i18n key 的事件码：新增码不再往中文兜底表加行（i18n 覆盖棘轮只降不升）。
+ * 补录参会人这类新动作的文案本来就只该有一份真值，即语言包里的 meeting.meta.event.*。
+ */
+const EVENT_KEY_ONLY = new Set(['attendee_backfill'])
+
+/** 事件码 → i18n key：snake_case 转 camelCase */
+const eventKey = (code: string): string =>
+  `meeting.meta.event.${code.replace(/_(\w)/g, (_, c: string) => c.toUpperCase())}`
+
 export function eventLabel(code?: string | null): string {
   if (!code) return '-'
   if (code === 'minutes_publish') return i18n.t('meeting.minutes.publish')
+  if (EVENT_KEY_ONLY.has(code)) return i18n.t(eventKey(code))
   const zh = EVENT_SOURCE[code]
   if (!zh) return code
-  return tl(`meeting.meta.event.${code.replace(/_(\w)/g, (_, c: string) => c.toUpperCase())}`, zh)
+  return tl(eventKey(code), zh)
 }
 
 /** 通知事件码：invite_updated 带版本号（invite_updated_v3），前缀匹配即可 */

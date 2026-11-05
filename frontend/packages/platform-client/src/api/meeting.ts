@@ -231,6 +231,8 @@ export function deleteMeetingRoom(id: number, payload: { reason: string; version
 export type MeetingScope = 'mine' | 'attended' | 'all'
 /** group=pending 待开 / ongoing 进行中 / done 已结束 */
 export type MeetingGroup = 'pending' | 'ongoing' | 'done'
+/** 时间排序口径：time-asc 早的在前（服务端缺省）/ time-desc 最近的在最前（行政台账用） */
+export type MeetingSort = 'time-asc' | 'time-desc'
 
 export interface MeetingQuery {
   page?: number
@@ -250,6 +252,11 @@ export interface MeetingQuery {
    * 不要用 group='pending' 代替 —— 那是会议阶段（待開會），与“我要不要参加”无关。
    */
   respond?: 'pending'
+  /**
+   * 时间排序。排序与分页都在服务端，前端只表达口径：
+   * 只重排当前页会得到「第一页看着对、翻页就乱」的假排序。未知取值由服务端直接拒绝。
+   */
+  sort?: MeetingSort
 }
 
 export interface MeetingAttendeeVO {
@@ -467,6 +474,14 @@ export function cancelMeeting(id: number, payload: { reason: string; version: nu
 
 export function respondMeeting(id: number, payload: { accept: boolean; note?: string }): Promise<MeetingVO> {
   return request.post<unknown, MeetingVO>(`/meeting/bookings/${id}/attendees/me/response`, payload)
+}
+
+/**
+ * 补录参会人：预约时漏加的正式参会人（纪要录入页用）。
+ * 只传 userId，姓名/工号由服务端从账号回查；写入正式名单且不重发邀约。
+ */
+export function backfillMeetingAttendee(id: number, payload: { userId: number }): Promise<MeetingVO> {
+  return request.post<unknown, MeetingVO>(`/meeting/bookings/${id}/attendees/backfill`, payload)
 }
 
 export function fetchMySchedule(date?: string): Promise<MeetingScheduleVO[]> {

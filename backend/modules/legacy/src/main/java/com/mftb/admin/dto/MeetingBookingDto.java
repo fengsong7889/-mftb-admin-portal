@@ -57,6 +57,12 @@ public final class MeetingBookingDto {
          * 两者混用会让「待我響應」列出自己组织的会。
          */
         private String respond;
+        /**
+         * 时间排列口径：{@code time-asc}（默认，早的在前）/ {@code time-desc}（最近的在最前）。
+         * <p>排序必须在服务端做：分页也在服务端，只重排当前页会产生
+         * 「第一页看着对、一翻页就乱」的假排序；不传时保持正序，以免未请求的页面被连带改动。
+         */
+        private String sort;
     }
 
     /* ==================== 写入 ==================== */
@@ -195,6 +201,18 @@ public final class MeetingBookingDto {
 
         @Size(max = 200, message = "響應說明最長 200 字")
         private String note;
+    }
+
+    /**
+     * 补录参会人：预约时漏加、但属于正式参会（不是会中临时到场）的人。
+     *
+     * <p>入参只有 userId：姓名/工号/部门一律服务端从账号回查做快照，相信前端传的名字
+     * 等于允许把名单写成任意人；补录也不重发邀约（会已在开或已开完）。
+     */
+    @Data
+    public static class BackfillForm {
+        @NotNull(message = "請選擇補錄的參會人")
+        private Long userId;
     }
 
     /* ==================== 视图 ==================== */

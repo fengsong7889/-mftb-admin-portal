@@ -20,7 +20,7 @@ import { Alert, Button, DatePicker, Empty, Form, Input, Modal, Radio, Segmented,
 import {
   ArrowLeftOutlined, CalendarOutlined, CheckCircleOutlined, DeleteOutlined, FileTextOutlined,
   LeftOutlined, PlusOutlined, ProfileOutlined, RightOutlined, SaveOutlined, SendOutlined,
-  UnorderedListOutlined,
+  UnorderedListOutlined, UserAddOutlined,
 } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -35,7 +35,7 @@ import {
   MINUTES_CONTENT_MAX_LENGTH, MINUTES_LIMITS, emptyMinutesContent, minutesContentLength, minutesPurposeText,
   type MinutesAttendance, type MinutesContent, type MinutesDecisionStatus, type MinutesLinkVO, type MinutesSeriesNode, type MinutesVO,
 } from '@/api/meetingMinutes'
-import { fetchMeetingDetail, newMeetingRequestKey, toMeetingIsoDate, type MeetingVO } from '@/api/meeting'
+import { backfillMeetingAttendee, fetchMeetingDetail, newMeetingRequestKey, toMeetingIsoDate, type MeetingVO } from '@/api/meeting'
 import EmployeeSelect from '@/components/EmployeeSelect'
 import { bizTypeLabels, minutesStatusMeta, phaseMeta } from '../meetingMeta'
 import MinutesContentCard, { MinutesNoticePreview } from './MinutesContentCard'
@@ -678,6 +678,7 @@ export default function MinutesForm() {
           </div>
           <AttendanceEditor value={attendance} invited={meeting?.attendees ?? []}
             onChange={value => { setAttendance(value); setHasUnsavedChanges(true) }}
+            bookingId={meeting?.id ?? bookingId} onBackfilled={saved => setMeeting(saved)}
             disabled={minutes?.canEdit === false || !!minutesLoadNote || !!error || loading} />
           {/* 关联其他会议纪要：只选 id，标题与时间由服务端回查快照，收件人才知道“引自哪场会” */}
           <div style={{ marginTop: 16 }}>
@@ -990,15 +991,21 @@ function InfoField({ label, value, tag }: { label: string; value: string; tag?: 
 }
 
 /** 出席确认采用限高表格式编辑，邀约人员不可移除，避免名单在反复编辑时丢失。 */
-function AttendanceEditor({ value, invited, onChange, disabled }: {
+function AttendanceEditor({ value, invited, onChange, disabled, bookingId, onBackfilled }: {
   value: MinutesAttendance[]
   invited: NonNullable<MeetingVO['attendees']>
   onChange: (next: MinutesAttendance[]) => void
   disabled?: boolean
+  /** 补录要写回预约名单，因此需要会议单号与「刷新会议数据」的回调；没有单号时不给入口 */
+  bookingId?: number
+  onBackfilled?: (meeting: MeetingVO) => void
 }) {
   const { t } = useTranslation()
   const [adding, setAdding] = useState(false)
   const [pickerVersion, setPickerVersion] = useState(0)
+  const [backfilling, setBackfilling] = useState(false)
+  const [backfillSaving, setBackfillSaving] = useState(false)
+  const [backfillVersion, setBackfillVersion] = useState(0)
   const invitedByKey = new Map(invited.map(person => [attendanceKey(person), person]))
   const presentCount = value.filter(person => person.status === 'present').length
   const temporaryCount = value.filter(person => !invitedByKey.has(attendanceKey(person))).length
@@ -1017,7 +1024,32 @@ function AttendanceEditor({ value, invited, onChange, disabled }: {
     setPickerVersion(version => version + 1)
   }
 
-  // 第一阶段先确认交互，新增繁中文案待界面确认后统一补齐 i18n。
+  /**
+   * 补录参会人：预约时漏加的正式参会人（不是会中临时到场）。
+   *
+   * 名单写入服务端后人数/详情名单都包含他，因此必须拿服务端回传的会议单刷新本页，
+   * 不能只在前端拼一行——那会让界面与预约名单两套口径。
+   */
+  const handleBackfill = async (picked: { id: number; name: string; empId?: string }[]) => {
+    const person = picked[0]
+    if (!person || !bookingId || disabled || atLimit || backfillSaving) return
+    setBackfillSaving(true)
+    try {
+      const saved = await backfillMeetingAttendee(bookingId, { userId: person.id })
+      onBackfilled?.(saved)
+      if (!value.some(item => item.userId === person.id)) {
+        onChange([...value, { userId: person.id, name: person.name, empNo: person.empId, status: 'present' }])
+      }
+      message.success(t('meeting.minutes.backfillDone', { name: person.name, defaultValue: '{{name}} 已補錄進參會名單' }))
+      setBackfilling(false)
+      setBackfillVersion(version => version + 1)
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : t('meeting.minutes.backfillFailed', { defaultValue: '補錄失敗，請刷新後重試' }))
+    } finally {
+      setBackfillSaving(false)
+    }
+  }
+
   return (
     <section className="mm-attendance" aria-label={t('meeting.minutes.attendance')}>
       <div className="mm-attendance__toolbar">
@@ -1028,6 +1060,7 @@ function AttendanceEditor({ value, invited, onChange, disabled }: {
             { tone: 'info', label: t('meeting.minutes.attendanceHelpAutoLabel'), body: t('meeting.minutes.attendanceHelpAutoBody') },
             { tone: 'neutral', label: t('meeting.minutes.attendanceHelpRecordLabel'), body: t('meeting.minutes.attendanceHelpRecordBody') },
             { tone: 'info', label: t('meeting.minutes.attendanceHelpTempLabel'), body: t('meeting.minutes.attendanceHelpTempBody') },
+            { tone: 'warn', label: t('meeting.minutes.backfillHelpLabel', { defaultValue: '補錄參會人' }), body: t('meeting.minutes.backfillHelpBody', { defaultValue: '補錄會寫進會議的正式參會名單與人數統計，不同於只記在紀要裡的臨時到場；不會重發邀約。' }) },
           ]} />
           <span className="mm-attendance__summary" aria-live="polite">
             {t('meeting.minutes.attendanceSummary', { present: presentCount, total: value.length, temporary: temporaryCount })}
@@ -1036,6 +1069,12 @@ function AttendanceEditor({ value, invited, onChange, disabled }: {
         {!disabled && <Button icon={<PlusOutlined />} disabled={atLimit} onClick={() => setAdding(open => !open)}
           aria-label={t('meeting.minutes.addTemporaryAttendee')} aria-expanded={adding} aria-controls="minutes-attendance-add">
           {t('meeting.minutes.addTemporaryAttendee')}</Button>}
+        {/* 补录入口只在拿得到会议单号时给：写不回预约名单的“补录”只会让界面与名单两套口径 */}
+        {!disabled && bookingId != null && <Button icon={<UserAddOutlined />} loading={backfillSaving} disabled={atLimit}
+          aria-label={t('meeting.minutes.backfillAttendee', { defaultValue: '補錄參會人' })}
+          aria-expanded={backfilling} aria-controls="minutes-attendance-backfill"
+          onClick={() => setBackfilling(open => !open)}>
+          {t('meeting.minutes.backfillAttendee', { defaultValue: '補錄參會人' })}</Button>}
       </div>
       <p className="mm-attendance__hint">{t('meeting.minutes.attendanceHint')}</p>
       {adding && !disabled && <div className="mm-attendance__add" id="minutes-attendance-add">
@@ -1048,6 +1087,17 @@ function AttendanceEditor({ value, invited, onChange, disabled }: {
         </div>
         <span className="mm-attendance__hint">{t('meeting.minutes.temporaryPickHint')}</span>
         <Button type="text" onClick={() => setAdding(false)}>{t('meeting.minutes.finishAdding')}</Button>
+      </div>}
+      {backfilling && !disabled && bookingId != null && <div className="mm-attendance__add" id="minutes-attendance-backfill">
+        <span>{t('meeting.minutes.backfillAttendeeLabel', { defaultValue: '補錄正式參會人' })}</span>
+        <div className="mm-attendance__picker">
+          <EmployeeSelect key={backfillVersion} single style={{ width: '100%' }} disabled={backfillSaving}
+            placeholder={t('meeting.minutes.ownerPlaceholder')} value={[]}
+            excludeIds={invited.map(person => person.userId).filter((id): id is number => id != null)}
+            onPick={picked => { void handleBackfill(picked) }} />
+        </div>
+        <span className="mm-attendance__hint">{t('meeting.minutes.backfillPickHint', { defaultValue: '用於預約時漏加的參會人：會寫進會議名單與人數統計，不重發邀約；已在名單的人不列在候選裡。' })}</span>
+        <Button type="text" onClick={() => setBackfilling(false)}>{t('meeting.minutes.finishAdding')}</Button>
       </div>}
       <div className="mm-attendance__scroll" tabIndex={0} role="region" aria-label={t('meeting.minutes.attendanceListRegion')}>
         <table className="mm-attendance__table" aria-label={t('meeting.minutes.attendanceListTable')}>
