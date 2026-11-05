@@ -5,12 +5,18 @@
  * 激活页文案与热搜跟着 scope 变、结果 Tab 计数正确、跨域空态能一键转全站、
  * 店内搜索能加购本店商品。避免原型改样式时把入口语义弄丢。
  */
-import { describe, expect, it, vi } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import i18n from '@/i18n'
 import ConsumerSearch from './ConsumerSearch'
 
 const noop = () => {}
+
+beforeAll(async () => {
+  // 文案已接入 i18n：不固定語言時斷言会命中英文分支
+  await i18n.changeLanguage('zh-TW')
+})
 
 describe('用户端统一搜索页', () => {
   it('外卖作用域展示外卖专属提示与热搜，不混入全站热搜', () => {

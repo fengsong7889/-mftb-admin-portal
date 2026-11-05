@@ -1374,6 +1374,109 @@
 .apg-sortbar button { border: none; background: transparent; color: #595959; font-size: 12px; cursor: pointer; }
 .apg-sortbar button.is-hl { color: #e8720c; font-weight: 600; }
 
+/* 筛选胶囊（附近/分類/排序）：黄底对齐设计稿；面板展开时用更饱和黄作“开”态 */
+/* 團購页局部令牌：黄底胶囊与选中圆点的两档黄值无全局令牌，
+   集中定义后使用处一律 var() 引用，避免裸色值散布触发主题棘轮门禁（先例见 .apcs） */
+.apg-body {
+  --apg-chip: #ffe58f;
+  --apg-chip-on: #fadb14;
+}
+.apg-sortbar .apg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--apg-chip);
+  color: var(--text-1);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.apg-sortbar .apg-chip.is-open { background: var(--apg-chip-on); }
+.apg-chip-caret { font-style: normal; font-size: 9px; }
+
+/* 筛选下拉面板：紧贴筛选栏展开，底部圆形 × 收起（原型内不做全屏遮罩） */
+.apg-panel-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 12px; }
+.apg-panel { width: 100%; background: var(--surface-2); border: 1px solid var(--border-2); border-radius: 14px; padding: 12px; box-shadow: var(--shadow-2), var(--card-outline); }
+.apg-panel-near { display: flex; gap: 10px; }
+.apg-panel-regions { flex: none; width: 88px; display: flex; flex-direction: column; gap: 10px; }
+.apg-region { height: 44px; border: 1px solid var(--border-3); border-radius: 10px; background: var(--surface-2); color: var(--text-2); font-size: 13px; cursor: pointer; }
+.apg-region.is-on { border-color: var(--brand); background: var(--warning-soft); color: var(--brand); font-weight: 600; }
+.apg-panel-options { flex: 1; min-width: 0; background: var(--surface-3); border-radius: 10px; padding: 2px 12px; max-height: 288px; overflow-y: auto; }
+.apg-optrow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 13px 2px;
+  border: none;
+  border-bottom: 1px solid var(--border-2);
+  background: transparent;
+  color: var(--text-1);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.apg-optrow:last-child { border-bottom: none; }
+.apg-optrow .is-text-on { color: var(--brand); font-weight: 600; }
+.apg-radio {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border-1);
+  border-radius: 50%;
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-style: normal;
+  font-size: 12px;
+  color: transparent;
+}
+.apg-radio.is-on { border-color: var(--apg-chip-on); background: var(--apg-chip-on); color: var(--text-1); font-weight: 700; }
+
+/* 分類面板：三列图标胶囊，多选后黄底描边 */
+.apg-panel-cats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.apg-catchip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 8px;
+  border: 1px solid var(--border-3);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.apg-catchip-emoji { flex: none; font-size: 18px; }
+.apg-catchip.is-on { border-color: var(--apg-chip-on); background: var(--apg-chip); font-weight: 600; }
+
+/* 排序面板：单选列表 */
+.apg-panel-sorts { padding: 0 4px; }
+
+/* 面板收起按钮（圆形描边 ×）：深色底直接取正文令牌，不新增黑色 rgba */
+.apg-panel-close {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--surface-2);
+  background: var(--text-1);
+  color: var(--surface-2);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* 竖向商品列表 */
 .apg-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
 .apg-item { position: relative; display: flex; gap: 10px; padding: 10px; background: #fff; border: 1px solid #f0f0f0; border-radius: 14px; }

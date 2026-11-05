@@ -7,12 +7,19 @@
  *
  * 说明：Mock 数据与检索逻辑在 consumerSearchData.ts；生产接入时替换为后端搜索接口即可，
  * 交互结构与本组件保持不变。搜索历史按作用域存 localStorage，可一键清空。
+ * 界面文案走 appConsumer.search 命名空间；商家/商品名与热搜词条仍为占位数据。
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   CHANNEL_LABEL,
+  CHANNEL_LABEL_KEY,
   FILTER_LABEL,
+  FILTER_LABEL_KEY,
   SCOPE_CONFIG,
+  SEARCH_SORT_LABEL_KEY,
+  SEARCH_TAB_LABEL_KEY,
+  scopeTextKey,
   clearHistory,
   entryMatchesTab,
   formatMoney,
@@ -175,16 +182,17 @@ function MerchantCard({
   far?: boolean
   onOpen?: () => void
 }) {
+  const { t } = useTranslation()
   const cols = entry.channel === 'groupbuy'
     ? [
-        { label: '距離', value: `${entry.distanceKm}km` },
-        { label: '團購', value: `${entry.groupbuyCount ?? 0} 個` },
-        { label: '人均', value: `$${formatMoney(entry.avgPrice ?? 0)}` },
+        { label: t('appConsumer.search.colDistance', { defaultValue: '距離' }), value: t('appConsumer.common.kilometers', { value: entry.distanceKm, defaultValue: '{{value}}km' }) },
+        { label: t('appConsumer.search.colGroupbuy', { defaultValue: '團購' }), value: t('appConsumer.search.unitGroupbuy', { count: entry.groupbuyCount ?? 0, defaultValue: '{{count}} 個' }) },
+        { label: t('appConsumer.search.colAvg', { defaultValue: '人均' }), value: `$${formatMoney(entry.avgPrice ?? 0)}` },
       ]
     : [
-        { label: '起送', value: `$${formatMoney(entry.minOrder ?? 0)}` },
-        { label: '配送', value: entry.deliveryFee === 0 ? '免配送費' : `$${formatMoney(entry.deliveryFee ?? 0)}起` },
-        { label: '距離', value: `${entry.distanceKm}km` },
+        { label: t('appConsumer.search.colMinOrder', { defaultValue: '起送' }), value: `$${formatMoney(entry.minOrder ?? 0)}` },
+        { label: t('appConsumer.search.colDelivery', { defaultValue: '配送' }), value: entry.deliveryFee === 0 ? t('appConsumer.delivery.freeDelivery', { defaultValue: '免配送費' }) : t('appConsumer.search.fromPrice', { price: formatMoney(entry.deliveryFee ?? 0), defaultValue: '${{price}}起' }) },
+        { label: t('appConsumer.search.colDistance', { defaultValue: '距離' }), value: t('appConsumer.common.kilometers', { value: entry.distanceKm, defaultValue: '{{value}}km' }) },
       ]
 
   return (
@@ -195,21 +203,21 @@ function MerchantCard({
     >
       <span className="apcs-thumb">
         {entry.image ? <img src={entry.image} alt="" /> : <span>{entry.emoji}</span>}
-        {entry.monthlySales >= 1500 && <em className="apcs-thumb-badge">人氣</em>}
+        {entry.monthlySales >= 1500 && <em className="apcs-thumb-badge">{t('appConsumer.search.badgePopular', { defaultValue: '人氣' })}</em>}
       </span>
       <span className="apcs-card-main">
         <span className="apcs-card-head">
           <span className="apcs-card-name"><Highlight text={entry.name} keyword={query} /></span>
           {showChannel && (
-            <em className={`apcs-channel apcs-channel--${entry.channel}`}>{CHANNEL_LABEL[entry.channel]}</em>
+            <em className={`apcs-channel apcs-channel--${entry.channel}`}>{t(CHANNEL_LABEL_KEY[entry.channel], { defaultValue: CHANNEL_LABEL[entry.channel] })}</em>
           )}
-          {entry.status === 'rest' && <em className="apcs-status apcs-status--rest">休息中</em>}
-          {entry.status === 'new' && <em className="apcs-status apcs-status--new">新店</em>}
-          {far && <em className="apcs-status apcs-status--far">超出範圍</em>}
+          {entry.status === 'rest' && <em className="apcs-status apcs-status--rest">{t('appConsumer.search.statusRest', { defaultValue: '休息中' })}</em>}
+          {entry.status === 'new' && <em className="apcs-status apcs-status--new">{t('appConsumer.common.newStoreTag', { defaultValue: '新店' })}</em>}
+          {far && <em className="apcs-status apcs-status--far">{t('appConsumer.search.statusFar', { defaultValue: '超出範圍' })}</em>}
         </span>
         <span className="apcs-card-rate">
           <b>★ {entry.rating}</b>
-          <i className="apcs-card-sales">月售 {entry.monthlySales}</i>
+          <i className="apcs-card-sales">{t('appConsumer.common.monthlySales', { value: entry.monthlySales, defaultValue: '月售 {{value}}' })}</i>
         </span>
         <span className="apcs-card-cols">
           {cols.map((col) => (
@@ -253,12 +261,15 @@ function OfferCard({
   onOpen?: () => void
   onAdd?: () => void
 }) {
+  const { t } = useTranslation()
   const isProduct = entry.kind === 'product'
   const name = isProduct ? entry.name : entry.title
-  const sold = isProduct ? `月售 ${entry.monthlySales}` : `半年售 ${entry.sold}`
+  const sold = isProduct
+    ? t('appConsumer.common.monthlySales', { value: entry.monthlySales, defaultValue: '月售 {{value}}' })
+    : t('appConsumer.common.halfYearSales', { value: entry.sold, defaultValue: '半年售 {{value}}' })
   const meta = isProduct
     ? `${entry.merchantName} · ${entry.spec}`
-    : `${entry.merchantName} · ${entry.distanceKm}km · ${entry.rating}分`
+    : `${entry.merchantName} · ${t('appConsumer.common.kilometers', { value: entry.distanceKm, defaultValue: '{{value}}km' })} · ${entry.rating}${t('appConsumer.common.ratingSuffix', { defaultValue: '分' })}`
   const off = discountLabel(entry.price, entry.originPrice)
 
   return (
@@ -268,7 +279,7 @@ function OfferCard({
         <span className="apcs-card-main">
           <span className="apcs-card-name apcs-card-name--offer"><Highlight text={name} keyword={query} /></span>
           <span className="apcs-card-meta">{meta}</span>
-          <span className="apcs-card-rate"><i>{sold}</i>{!isProduct && <i>{entry.rating}分</i>}</span>
+          <span className="apcs-card-rate"><i>{sold}</i>{!isProduct && <i>{entry.rating}{t('appConsumer.common.ratingSuffix', { defaultValue: '分' })}</i>}</span>
           <span className="apcs-price-row">
             <span className="apcs-price"><i>$</i>{formatMoney(entry.price)}</span>
             {entry.originPrice !== undefined && entry.originPrice > entry.price && (
@@ -279,7 +290,7 @@ function OfferCard({
           {(showChannel || entry.tags.length > 0) && (
             <span className="apcs-card-tags">
               {showChannel && (
-                <em className={`apcs-channel apcs-channel--${entry.channel}`}>{CHANNEL_LABEL[entry.channel]}</em>
+                <em className={`apcs-channel apcs-channel--${entry.channel}`}>{t(CHANNEL_LABEL_KEY[entry.channel], { defaultValue: CHANNEL_LABEL[entry.channel] })}</em>
               )}
               {entry.tags.slice(0, 3).map((tag) => (
                 <em key={tag} className="apcs-tag">{tag}</em>
@@ -292,7 +303,7 @@ function OfferCard({
         <button
           type="button"
           className="apcs-add"
-          aria-label={`加入購物車：${name}`}
+          aria-label={t('appConsumer.search.addToCart', { name, defaultValue: '加入購物車：{{name}}' })}
           onClick={onAdd}
         >
           +
@@ -311,6 +322,7 @@ export default function ConsumerSearch({
   onSearchGlobal,
   onAddToCart,
 }: ConsumerSearchProps) {
+  const { t } = useTranslation()
   const key = sessionKey(scope, merchantId)
   const memory = sessions.get(key)
   const config = SCOPE_CONFIG[scope]
@@ -437,12 +449,12 @@ export default function ConsumerSearch({
   const nearMerchants = nearResults.filter((entry): entry is SearchMerchant => entry.kind === 'merchant')
   const nearOffers = nearResults.filter((entry): entry is SearchOffer => entry.kind !== 'merchant')
   const offerTitle = scope === 'global'
-    ? '商品與團購'
+    ? t('appConsumer.search.offerTitleGlobal', { defaultValue: '商品與團購' })
     : scope === 'groupbuy'
-      ? '團購套餐'
+      ? t(SEARCH_TAB_LABEL_KEY.deal, { defaultValue: config.tabs.find((x) => x.key === 'deal')?.label ?? '' })
       : scope === 'store'
         ? ''
-        : '商品'
+        : t(SEARCH_TAB_LABEL_KEY.product, { defaultValue: config.tabs.find((x) => x.key === 'product')?.label ?? '' })
 
   const renderCards = (list: SearchEntry[], title?: string, far = false) => (
     <section className={`apcs-section${far ? ' apcs-farsec' : ''}`}>
@@ -482,20 +494,20 @@ export default function ConsumerSearch({
   const renderEmpty = () => (
     <div className="apcs-empty">
       <span className="apcs-empty-ico" aria-hidden="true">🔍</span>
-      <b>沒有找到與「{query}」相關的結果</b>
-      <p>試試更短的關鍵詞，或切換搜尋範圍</p>
+      <b>{t('appConsumer.search.emptyTitle', { query, defaultValue: '沒有找到與「{{query}}」相關的結果' })}</b>
+      <p>{t('appConsumer.search.emptyHint', { defaultValue: '試試更短的關鍵詞，或切換搜尋範圍' })}</p>
       {scope !== 'global' && onSearchGlobal && (
         <button type="button" className="apcs-empty-cta" onClick={() => onSearchGlobal(query)}>
-          在全站搜尋「{query}」
+          {t('appConsumer.search.emptySearchGlobal', { query, defaultValue: '在全站搜尋「{{query}}」' })}
         </button>
       )}
       {scope === 'store' && (
         <button type="button" className="apcs-empty-cta apcs-empty-cta--ghost" onClick={onBack}>
-          查看全部商品
+          {t('appConsumer.search.emptyViewAll', { defaultValue: '查看全部商品' })}
         </button>
       )}
       <div className="apcs-empty-hot">
-        <span>熱門搜尋</span>
+        <span>{t('appConsumer.search.emptyHotWords', { defaultValue: '熱門搜尋' })}</span>
         <div>
           {hotWords.slice(0, 4).map((word) => (
             <button key={word} type="button" onClick={() => runSearch(word)}>{word}</button>
@@ -506,7 +518,7 @@ export default function ConsumerSearch({
   )
 
   return (
-    <div className="apcs" role="dialog" aria-modal="true" aria-label="搜尋">
+    <div className="apcs" role="dialog" aria-modal="true" aria-label={t('appConsumer.search.dialogLabel', { defaultValue: '搜尋' })}>
       <form
         className="apcs-top"
         onSubmit={(event) => {
@@ -514,15 +526,15 @@ export default function ConsumerSearch({
           runSearch(input)
         }}
       >
-        <button type="button" className="apcs-back" aria-label="返回" onClick={handleCancel}>‹</button>
+        <button type="button" className="apcs-back" aria-label={t('appConsumer.common.back', { defaultValue: '返回' })} onClick={handleCancel}>‹</button>
         <div className="apcs-box">
           <span className="apcs-box-ico" aria-hidden="true">🔍</span>
           <input
             ref={inputRef}
             value={input}
             onChange={(event) => handleInputChange(event.target.value)}
-            placeholder={config.placeholder}
-            aria-label={config.hint}
+            placeholder={t(scopeTextKey(scope, 'placeholder'), { defaultValue: config.placeholder })}
+            aria-label={t(scopeTextKey(scope, 'hint'), { defaultValue: config.hint })}
             autoComplete="off"
             enterKeyHint="search"
           />
@@ -530,7 +542,7 @@ export default function ConsumerSearch({
             <button
               type="button"
               className="apcs-clear"
-              aria-label="清除關鍵詞"
+              aria-label={t('appConsumer.search.clearKeyword', { defaultValue: '清除關鍵詞' })}
               onClick={() => {
                 handleInputChange('')
                 inputRef.current?.focus()
@@ -539,20 +551,20 @@ export default function ConsumerSearch({
               ×
             </button>
           )}
-          <button type="submit" className="apcs-submit">搜索</button>
+          <button type="submit" className="apcs-submit">{t('appConsumer.common.search', { defaultValue: '搜索' })}</button>
         </div>
       </form>
 
       <div className="apcs-scope">
-        <span className="apcs-scope-tag">{scope === 'store' ? `店內 · ${storeName}` : config.label}</span>
-        <span className="apcs-scope-hint">{config.hint}</span>
+        <span className="apcs-scope-tag">{scope === 'store' ? t('appConsumer.search.inStoreScope', { name: storeName, defaultValue: '店內 · {{name}}' }) : t(scopeTextKey(scope, 'label'), { defaultValue: config.label })}</span>
+        <span className="apcs-scope-hint">{t(scopeTextKey(scope, 'hint'), { defaultValue: config.hint })}</span>
       </div>
 
       <div className="apcs-body" ref={bodyRef}>
         {isActivation && (
           <div className="apcs-activation">
             <section className="apcs-section">
-              <header className="apcs-section-head"><b>熱門搜索</b></header>
+              <header className="apcs-section-head"><b>{t('appConsumer.search.sectionGuess', { defaultValue: '熱門搜索' })}</b></header>
               <div className="apcs-chips">
                 {guessWords.map((word) => (
                   <button key={word} type="button" className="apcs-chip apcs-chip--guess" onClick={() => runSearch(word)}>
@@ -564,7 +576,7 @@ export default function ConsumerSearch({
 
             {scope === 'store' && storeCategories.length > 0 && (
               <section className="apcs-section">
-                <header className="apcs-section-head"><b>店內分類</b><span>{storeCategories.length}</span></header>
+                <header className="apcs-section-head"><b>{t('appConsumer.search.sectionStoreCategories', { defaultValue: '店內分類' })}</b><span>{storeCategories.length}</span></header>
                 <div className="apcs-chips">
                   {storeCategories.map((item) => (
                     <button key={item} type="button" className="apcs-chip" onClick={() => runSearch(item)}>
@@ -577,9 +589,9 @@ export default function ConsumerSearch({
 
             <section className="apcs-section">
               <header className="apcs-section-head">
-                <b>歷史搜索</b>
+                <b>{t('appConsumer.search.sectionHistory', { defaultValue: '歷史搜索' })}</b>
                 {history.length > 0 && (
-                  <button type="button" className="apcs-clear-history" aria-label="清空搜尋歷史" onClick={handleClearHistory}>
+                  <button type="button" className="apcs-clear-history" aria-label={t('appConsumer.search.clearHistory', { defaultValue: '清空搜尋歷史' })} onClick={handleClearHistory}>
                     <span aria-hidden="true">🗑</span>
                   </button>
                 )}
@@ -593,7 +605,7 @@ export default function ConsumerSearch({
                   ))}
                 </div>
               ) : (
-                <p className="apcs-muted">還沒有搜尋記錄</p>
+                <p className="apcs-muted">{t('appConsumer.search.historyEmpty', { defaultValue: '還沒有搜尋記錄' })}</p>
               )}
             </section>
 
@@ -601,15 +613,15 @@ export default function ConsumerSearch({
               <div className="apcs-hotcard">
                 <header className="apcs-hotcard-head">
                   <span aria-hidden="true">🔥</span>
-                  <b>人氣熱搜</b>
-                  <i>{scope === 'store' ? '店內熱銷' : '澳門 · 今日'}</i>
+                  <b>{t('appConsumer.search.sectionHotRank', { defaultValue: '人氣熱搜' })}</b>
+                  <i>{scope === 'store' ? t('appConsumer.search.hotInStore', { defaultValue: '店內熱銷' }) : t('appConsumer.search.hotTodayMacau', { defaultValue: '澳門 · 今日' })}</i>
                 </header>
                 <div className="apcs-hotlist">
                   {hotList.map((item, index) => (
                     <button key={item.word} type="button" className="apcs-hotrow" onClick={() => runSearch(item.word)}>
                       <em className={`apcs-rank apcs-rank--${index < 3 ? index + 1 : 'n'}`}>{index + 1}</em>
                       <span className="apcs-hot-text">{item.word}</span>
-                      {item.hot && <i className="apcs-hot-badge apcs-hot-badge--hot">熱</i>}
+                      {item.hot && <i className="apcs-hot-badge apcs-hot-badge--hot">{t('appConsumer.search.hotBadge', { defaultValue: '熱' })}</i>}
                       <span className={`apcs-heat${item.up ? ' is-up' : ''}`}>
                         {item.up && <b aria-hidden="true">↑</b>}{item.heat}
                       </span>
@@ -634,14 +646,14 @@ export default function ConsumerSearch({
                 >
                   <span
                     className={`apcs-sug-ico apcs-sug-ico--${suggestion.channel ?? 'none'}`}
-                    aria-label={suggestion.channel ? CHANNEL_LABEL[suggestion.channel] : undefined}
+                    aria-label={suggestion.channel ? t(CHANNEL_LABEL_KEY[suggestion.channel], { defaultValue: CHANNEL_LABEL[suggestion.channel] }) : undefined}
                   >
                     <ChannelGlyph kind={suggestion.channel ?? 'search'} />
                   </span>
                   <span className="apcs-sug-main">
                     <span className="apcs-sug-name">
                       <Highlight text={suggestion.text} keyword={trimmedInput} />
-                      {suggestion.status === 'rest' && <em className="apcs-status apcs-status--rest">休息中</em>}
+                      {suggestion.status === 'rest' && <em className="apcs-status apcs-status--rest">{t('appConsumer.search.statusRest', { defaultValue: '休息中' })}</em>}
                     </span>
                     <span className="apcs-sug-sub">
                       {suggestion.type === 'merchant' && merchant ? (
@@ -658,18 +670,18 @@ export default function ConsumerSearch({
                       )}
                     </span>
                   </span>
-                  {merchant && <span className="apcs-sug-dist">{merchant.distanceKm}km</span>}
+                  {merchant && <span className="apcs-sug-dist">{t('appConsumer.common.kilometers', { value: merchant.distanceKm, defaultValue: '{{value}}km' })}</span>}
                 </button>
               )
             })}
             {suggestions.length === 0 && (
               <button type="button" className="apcs-sug apcs-sug--search" onClick={() => runSearch(input)}>
-                <span className="apcs-sug-ico apcs-sug-ico--none" aria-label="搜尋">
+                <span className="apcs-sug-ico apcs-sug-ico--none" aria-label={t('appConsumer.search.dialogLabel', { defaultValue: '搜尋' })}>
                   <ChannelGlyph kind="search" />
                 </span>
                 <span className="apcs-sug-main">
-                  <span className="apcs-sug-name">搜尋「{trimmedInput}」</span>
-                  <span className="apcs-sug-sub"><i>沒有匹配的店鋪或商品，點擊直接搜尋</i></span>
+                  <span className="apcs-sug-name">{t('appConsumer.search.sugSearch', { keyword: trimmedInput, defaultValue: '搜尋「{{keyword}}」' })}</span>
+                  <span className="apcs-sug-sub"><i>{t('appConsumer.search.sugSearchHint', { defaultValue: '沒有匹配的店鋪或商品，點擊直接搜尋' })}</i></span>
                 </span>
               </button>
             )}
@@ -679,12 +691,12 @@ export default function ConsumerSearch({
         {showResults && (
           <div className="apcs-results">
             <div className="apcs-summary">
-              <span>為你找到 <b>{results.length}</b> 個結果</span>
+              <span>{t('appConsumer.search.resultSummary', { count: results.length, defaultValue: '為你找到 {{count}} 個結果' })}</span>
               <span className="apcs-summary-kw">「{query}」</span>
             </div>
 
             {config.tabs.length > 1 && (
-              <div className="apcs-pills" role="tablist" aria-label="結果分類">
+              <div className="apcs-pills" role="tablist" aria-label={t('appConsumer.search.tablistLabel', { defaultValue: '結果分類' })}>
                 {config.tabs.map((item) => (
                   <button
                     key={item.key}
@@ -698,7 +710,7 @@ export default function ConsumerSearch({
                     }}
                   >
                     <span aria-hidden="true"><ChannelGlyph kind={(item.key as GlyphKind) ?? 'all'} /></span>
-                    {item.label}
+                    {t(SEARCH_TAB_LABEL_KEY[item.key], { defaultValue: item.label })}
                   </button>
                 ))}
               </div>
@@ -712,7 +724,7 @@ export default function ConsumerSearch({
                   className={`apcs-sort${sort === item.key ? ' is-on' : ''}`}
                   onClick={() => setSort(item.key)}
                 >
-                  {item.label}
+                  {t(SEARCH_SORT_LABEL_KEY[item.key], { defaultValue: item.label })}
                 </button>
               ))}
             </div>
@@ -727,7 +739,7 @@ export default function ConsumerSearch({
                     aria-pressed={filters.includes(filter)}
                     onClick={() => toggleFilter(filter)}
                   >
-                    {FILTER_LABEL[filter]}
+                    {t(FILTER_LABEL_KEY[filter], { defaultValue: FILTER_LABEL[filter] })}
                   </button>
                 ))}
               </div>
@@ -740,7 +752,7 @@ export default function ConsumerSearch({
                   className={`apcs-filterchip${category === 'all' ? ' is-on' : ''}`}
                   onClick={() => setCategory('all')}
                 >
-                  全部
+                  {t('appConsumer.store.filterAll', { defaultValue: '全部' })}
                 </button>
                 {storeCategories.map((item) => (
                   <button
@@ -759,11 +771,11 @@ export default function ConsumerSearch({
               <>
                 {tab === 'all' ? (
                   <>
-                    {nearMerchants.length > 0 && renderCards(nearMerchants, scope === 'global' ? '店鋪' : '商家')}
+                    {nearMerchants.length > 0 && renderCards(nearMerchants, scope === 'global' ? t('appConsumer.search.groupStores', { defaultValue: '店鋪' }) : t(SEARCH_TAB_LABEL_KEY.merchant, { defaultValue: '商家' }))}
                     {nearOffers.length > 0 && renderCards(nearOffers, offerTitle || undefined)}
                   </>
                 ) : renderCards(nearResults)}
-                {farResults.length > 0 && renderCards(farResults, '超出當前配送範圍', true)}
+                {farResults.length > 0 && renderCards(farResults, t('appConsumer.search.groupFar', { defaultValue: '超出當前配送範圍' }), true)}
               </>
             )}
           </div>
