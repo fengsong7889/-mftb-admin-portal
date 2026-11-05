@@ -605,7 +605,7 @@ export default function DimensionStrategy() {
       <div style={{ flex: 1 }}>
         <Card size="small" styles={{ body: { padding: 0 } }}>
           {bizCfg.userFactors.map((row, idx) => (
-            <div key={row.key} style={{ padding: '12px 20px', borderBottom: idx < bizCfg.userFactors.length - 1 ? '1px solid #f0f0f0' : undefined }}>
+            <div key={row.key} style={{ padding: '12px 20px', borderBottom: idx < bizCfg.userFactors.length - 1 ? '1px solid var(--border-2)' : undefined }}>
               <Row align="middle" gutter={16}>
                 <Col span={6}>
                   <Text strong style={{ fontSize: 13 }}>{row.label}</Text>
@@ -638,7 +638,7 @@ export default function DimensionStrategy() {
       <div style={{ flex: 1 }}>
         <Card size="small" styles={{ body: { padding: 0 } }}>
           {bizCfg.platformFactors.map((row, idx) => (
-            <div key={row.key} style={{ padding: '12px 20px', borderBottom: idx < bizCfg.platformFactors.length - 1 ? '1px solid #f0f0f0' : undefined }}>
+            <div key={row.key} style={{ padding: '12px 20px', borderBottom: idx < bizCfg.platformFactors.length - 1 ? '1px solid var(--border-2)' : undefined }}>
               <Row align="middle" gutter={16}>
                 <Col span={6}>
                   <Text strong style={{ fontSize: 13 }}>{row.label}</Text>
@@ -773,7 +773,7 @@ export default function DimensionStrategy() {
               </div>
               {adBoostTiers.map((tier, index) => (
                 <div key={index} style={{ 
-                  border: '1px solid #d9d9d9', 
+                  border: '1px solid var(--border-1)', 
                   borderRadius: 4, 
                   padding: 16, 
                   background: 'var(--surface-3)'
@@ -821,7 +821,7 @@ export default function DimensionStrategy() {
               </div>
               {adDemoteTiers.map((tier, index) => (
                 <div key={index} style={{ 
-                  border: '1px solid #d9d9d9', 
+                  border: '1px solid var(--border-1)', 
                   borderRadius: 4, 
                   padding: 12, 
                   marginBottom: 8,

@@ -490,7 +490,7 @@ export default function EmployeeDetail() {
     return (
       <div style={{
         marginTop: 16, padding: '12px 24px', borderRadius: 8,
-        border: '1px solid #f0f0f0', background: 'var(--surface-3)',
+        border: '1px solid var(--border-2)', background: 'var(--surface-3)',
         display: 'flex', justifyContent: 'flex-end', gap: 24,
       }}>
         <span style={{ fontSize: 12, color: 'var(--text-3)' }}>最后更新人：<span style={{ color: 'var(--text-2)' }}>{info?.updatedBy || '-'}</span></span>
@@ -1594,7 +1594,7 @@ export default function EmployeeDetail() {
     return (
       <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         {/* 左侧：當前选中节点的职务變动详情（各节点部門/职位可能不同） */}
-        <div style={{ flex: 1, minWidth: 0, border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px' }}>
+        <div style={{ flex: 1, minWidth: 0, border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <IdcardOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
@@ -1652,7 +1652,7 @@ export default function EmployeeDetail() {
         </div>
 
         {/* 右侧：人事變动軌跡状态轴（点擊节点联动左侧详情） */}
-        <div style={{ width: 320, flexShrink: 0, border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px' }}>
+        <div style={{ width: 320, flexShrink: 0, border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <ClockCircleOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />
@@ -1672,7 +1672,7 @@ export default function EmployeeDetail() {
                         display: 'inline-block', width: active ? 14 : 10, height: active ? 14 : 10,
                         borderRadius: '50%', boxSizing: 'border-box',
                         background: active ? 'var(--brand)' : 'var(--surface-2)',
-                        border: active ? '3px solid #F59432' : '2px solid #d9d9d9',
+                        border: active ? '3px solid #F59432' : '2px solid var(--border-1)',
                         boxShadow: active ? '0 0 0 4px rgba(232,114,12,0.12)' : 'none',
                         transition: 'all 0.2s',
                       }} />
@@ -1732,7 +1732,7 @@ export default function EmployeeDetail() {
               {salaryIncome.length === 0 && salaryDeduction.length === 0 ? '--' : `¥${totalIncome.toLocaleString()}`}
             </div>
           </div>
-          <div style={{ padding: 20, borderRadius: 8, background: '#FFF2F0', border: '1px solid #FFCCC7' }}>
+          <div style={{ padding: 20, borderRadius: 8, background: 'var(--danger-callout)', border: '1px solid #FFCCC7' }}>
             <div style={{ fontSize: 13, color: 'var(--text-3)', marginBottom: 8 }}>{t('employeeDetail.totalDeduction')}</div>
             <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--danger)' }}>
               {salaryIncome.length === 0 && salaryDeduction.length === 0 ? '--' : `¥${totalDeduction.toLocaleString()}`}
@@ -1747,7 +1747,7 @@ export default function EmployeeDetail() {
         </div>
 
         {/* 收入項目 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--success-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1764,10 +1764,10 @@ export default function EmployeeDetail() {
         </div>
 
         {/* 扣除項目 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff2f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--danger-callout)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ fontSize: 14, color: 'var(--danger)' }}>📉</span>
               </div>
               <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('employeeDetail.deductionTitle')}</span>
@@ -1781,7 +1781,7 @@ export default function EmployeeDetail() {
         </div>
 
         {/* 薪資配置 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1830,7 +1830,7 @@ export default function EmployeeDetail() {
     return (
       <div>
         {/* 个人信息 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <UserOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
@@ -1876,7 +1876,7 @@ export default function EmployeeDetail() {
         </div>
 
         {/* 證件信息 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--purple-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <IdcardOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />
@@ -1917,7 +1917,7 @@ export default function EmployeeDetail() {
         </div>
 
         {/* 通訊信息 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6fffb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ fontSize: 14, color: '#13c2c2' }}></span>
@@ -1951,7 +1951,7 @@ export default function EmployeeDetail() {
         </div>
 
         {/* 緊急联繫人 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ fontSize: 14, color: 'var(--warning)' }}>🚨</span>
@@ -1994,7 +1994,7 @@ export default function EmployeeDetail() {
     return (
       <div>
         {/* 登錄账号 */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ fontSize: 14, color: 'var(--info)' }}>🔑</span>
@@ -2012,7 +2012,7 @@ export default function EmployeeDetail() {
         </div>
 
         {/* 三方通讯账号（后续可扩展：企微ID、QQ邮箱、公司邮箱等） */}
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ fontSize: 14, color: 'var(--warning)' }}>💬</span>
@@ -2155,7 +2155,7 @@ export default function EmployeeDetail() {
 
       {/* ══ 員工基礎信息卡片 ═══ */}
       <div style={{
-        border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)',
+        border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)',
         padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>

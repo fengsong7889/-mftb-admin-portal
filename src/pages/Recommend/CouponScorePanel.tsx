@@ -410,7 +410,7 @@ export default function CouponScorePanel({ ruleName, config, hasDraft, descripti
 
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '14px 20px', background: 'var(--warning-soft)', border: '1px solid #FFE7D1', borderRadius: 8,
+                padding: '14px 20px', background: 'var(--warning-soft)', border: '1px solid var(--brand-border)', borderRadius: 8,
               }}>
                 <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>單項總得分 = 報名分 + 門檻分 + 力度分</span>
                 <output aria-label="單項總得分" aria-live="polite" style={{ fontSize: 24, fontWeight: 700, color: 'var(--brand)' }}>{preview.total} 分</output>
@@ -472,7 +472,7 @@ function FormulaWithTip({ formula, example }: { formula: string; example: string
 /** 试算指标单元格 */
 function MetricCell({ label, value, color, highlight, note }: { label: string; value: string; color?: string; highlight?: string; note?: string }) {
   return (
-    <div style={{ padding: '10px 12px', background: 'var(--surface-3)', borderRadius: 6, border: '1px solid #F0F0F0' }}>
+    <div style={{ padding: '10px 12px', background: 'var(--surface-3)', borderRadius: 6, border: '1px solid var(--border-2)' }}>
       <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 16, fontWeight: 600, color: color || highlight || 'var(--text-1)' }}>
         {value}{note && <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-3)', marginLeft: 6 }}>{note}</span>}

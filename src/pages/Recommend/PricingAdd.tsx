@@ -401,7 +401,7 @@ export default function PricingAdd() {
           style={{
             marginTop: 16,
             backgroundColor: 'var(--surface-sunken)',
-            border: '1px solid #e8eaed',
+            border: '1px solid var(--border-3)',
             borderRadius: 8,
             boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
           }}
@@ -437,7 +437,7 @@ export default function PricingAdd() {
 
           <Form.Item label={t('recommend.detailImage')} style={{ marginBottom: 0 }}>
             <div style={{
-              width: 120, height: 120, border: '1px dashed #d9d9d9', borderRadius: 8,
+              width: 120, height: 120, border: '1px dashed var(--border-1)', borderRadius: 8,
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', color: '#999', fontSize: 12,
             }}>
@@ -459,7 +459,7 @@ export default function PricingAdd() {
           style={{
             marginTop: 16,
             backgroundColor: 'var(--surface-2)',
-            border: '1px solid #e8eaed',
+            border: '1px solid var(--border-3)',
             borderRadius: 12,
             boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
           }}
@@ -520,7 +520,7 @@ export default function PricingAdd() {
             style={{
               marginTop: 16,
               backgroundColor: 'var(--surface-sunken)',
-              border: '1px solid #e8eaed',
+              border: '1px solid var(--border-3)',
               borderRadius: 8,
               boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
             }}
@@ -599,7 +599,7 @@ export default function PricingAdd() {
             style={{
               marginTop: 16,
               backgroundColor: 'var(--surface-2)',
-              border: '1px solid #e8eaed',
+              border: '1px solid var(--border-3)',
               borderRadius: 12,
               boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
             }}
@@ -641,7 +641,7 @@ export default function PricingAdd() {
             style={{
               marginTop: 16,
               backgroundColor: 'var(--surface-sunken)',
-              border: '1px solid #e8eaed',
+              border: '1px solid var(--border-3)',
               borderRadius: 8,
               boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
             }}
@@ -708,7 +708,7 @@ export default function PricingAdd() {
           style={{
             marginTop: 16,
             backgroundColor: 'var(--surface-2)',
-            border: '1px solid #e8eaed',
+            border: '1px solid var(--border-3)',
             borderRadius: 12,
             boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
           }}
@@ -732,7 +732,7 @@ export default function PricingAdd() {
             <div style={{
               padding: '24px', textAlign: 'center',
               background: 'var(--surface-3)', borderRadius: 8,
-              border: '1px dashed #d9d9d9',
+              border: '1px dashed var(--border-1)',
             }}>
               <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{t('recommend.denyRefundTip')}</span>
             </div>
@@ -742,7 +742,7 @@ export default function PricingAdd() {
 
       {/* 操作记录（仅详情模式） */}
       {isDetailMode && (
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--surface-1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <EditOutlined style={{ fontSize: 14, color: 'var(--text-2)' }} />

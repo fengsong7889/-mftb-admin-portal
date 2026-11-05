@@ -346,12 +346,12 @@ export default function TrafficPackagePricing() {
           )}
 
           {current.tiers.length === 0 ? (
-            <div style={{ padding: '24px', textAlign: 'center', background: 'var(--surface-3)', borderRadius: 8, border: '1px dashed #D9D9D9' }}>
+            <div style={{ padding: '24px', textAlign: 'center', background: 'var(--surface-3)', borderRadius: 8, border: '1px dashed var(--border-1)' }}>
               <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{tAd('trafficNoPackage')}</span>
             </div>
           ) : (
             [...current.tiers].sort((a, b) => a.sort - b.sort).map((tier, index) => (
-              <div key={tier.id} style={{ border: '1px solid #f0f0f0', borderRadius: 8, padding: '16px 20px', marginBottom: 12, background: 'var(--surface-3)' }}>
+              <div key={tier.id} style={{ border: '1px solid var(--border-2)', borderRadius: 8, padding: '16px 20px', marginBottom: 12, background: 'var(--surface-3)' }}>
                 {/* 塊頭：序號徽章 + 套餐包 + 刪除（配置即可售，無需上架操作） */}
                 <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
                   <div style={{
@@ -410,7 +410,7 @@ export default function TrafficPackagePricing() {
                   border: `1px solid ${tier.discountEnabled ? '#FFD591' : '#f0f0f0'}`, borderRadius: 6,
                   transition: 'all 0.25s',
                 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: tier.discountEnabled ? '#d46b08' : 'var(--text-3)' }}>💰 {tAd('trafficDiscountTitle')}</span>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: tier.discountEnabled ? 'var(--warning-deep)' : 'var(--text-3)' }}>💰 {tAd('trafficDiscountTitle')}</span>
                   <Switch size="small" checked={!!tier.discountEnabled} disabled={isDetailMode}
                     onChange={checked => updateTier(tier.id, { discountEnabled: checked })} />
                   {tier.discountEnabled && (
@@ -468,7 +468,7 @@ export default function TrafficPackagePricing() {
           )}
 
           {current.ladder.length === 0 ? (
-            <div style={{ padding: '24px', textAlign: 'center', background: 'var(--surface-3)', borderRadius: 8, border: '1px dashed #D9D9D9' }}>
+            <div style={{ padding: '24px', textAlign: 'center', background: 'var(--surface-3)', borderRadius: 8, border: '1px dashed var(--border-1)' }}>
               <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{tAd('trafficNoLadder')}</span>
             </div>
           ) : (
@@ -577,7 +577,7 @@ export default function TrafficPackagePricing() {
             <div style={{
               padding: '24px', textAlign: 'center',
               background: 'var(--surface-3)', borderRadius: 8,
-              border: '1px dashed #D9D9D9',
+              border: '1px dashed var(--border-1)',
             }}>
               <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{tAd('trafficNotAllowRefundHint')}</span>
             </div>

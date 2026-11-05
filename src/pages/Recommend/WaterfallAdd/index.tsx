@@ -986,7 +986,7 @@ function WaterfallAddGeneral() {
       <div style={{ padding: 0 }}>
         <Form form={form} layout="vertical" disabled={isDetailMode}>
           {/* 基础信息 */}
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
               <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <ShopOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
@@ -1079,7 +1079,7 @@ function WaterfallAddGeneral() {
 
           {/* 推广图片（多圖類型：詳情/宣傳；單圖類型已合併至基礎信息卡片） */}
           {!isSingleImageType && (
-          <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+          <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
               <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--success-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <PictureOutlined style={{ fontSize: 14, color: 'var(--success)' }} />
@@ -1139,7 +1139,7 @@ function WaterfallAddGeneral() {
 
           {/* 销售策略（无敌星星 + 盘活复苏） */}
           {(
-            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
                 <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <BarChartOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />
@@ -1266,7 +1266,7 @@ function WaterfallAddGeneral() {
             </div>
           )}
           {showNotAvailable && (
-            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-3)' }}>
                 <div style={{ fontSize: 32, marginBottom: 12 }}>🚧</div>
                 <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--text-2)', marginBottom: 6 }}>
@@ -1281,7 +1281,7 @@ function WaterfallAddGeneral() {
 
 
           {/* 区域计价配置 - 无敌星星和盘活复苏都显示 */}
-            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
                 <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--purple-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <FundOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />
@@ -1460,7 +1460,7 @@ function WaterfallAddGeneral() {
                           style={{ marginBottom: 0 }}
                         >
                           {isDetailMode && (discountValue === null || discountValue === undefined) ? (
-                            <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 11px', background: 'var(--surface-3)', border: '1px solid #e8eaed', borderRadius: 6, color: 'var(--text-3)' }}>{t('recommend.noDiscount')}</div>
+                            <div style={{ height: 32, display: 'flex', alignItems: 'center', padding: '0 11px', background: 'var(--surface-3)', border: '1px solid var(--border-3)', borderRadius: 6, color: 'var(--text-3)' }}>{t('recommend.noDiscount')}</div>
                           ) : (
                             <InputNumber
                               min={1}
@@ -1488,7 +1488,7 @@ function WaterfallAddGeneral() {
 
           {/* 盘活复苏 - 梯度折扣配置（选择商圈后才展示） */}
           {isReviveAlgorithm && regionPricingConfigs.length > 0 && (
-            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               {/* 购买多天折扣配置（梯度） */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
                 <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{t('recommend.multiDayDiscount')}</span>
@@ -1561,7 +1561,7 @@ function WaterfallAddGeneral() {
 
           {/* 时段个数折扣配置 - 仅无敌星星显示 */}
           {!isReviveAlgorithm && selectedRegions.length > 0 && (
-            <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
                 <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6fffb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <BarChartOutlined style={{ fontSize: 14, color: '#13c2c2' }} />
@@ -1711,7 +1711,7 @@ function WaterfallAddGeneral() {
                       level: info.node.children ? 1 : 2,
                     })
                   }}
-                  style={{ padding: 12, background: 'var(--surface-3)', borderRadius: 6, border: '1px solid #f0f0f0', minHeight: 520 }}
+                  style={{ padding: 12, background: 'var(--surface-3)', borderRadius: 6, border: '1px solid var(--border-2)', minHeight: 520 }}
                 />
                 {selectedRegionNode && (
                   <div style={{ marginTop: 8, padding: '8px 12px', background: 'var(--success-soft)', border: '1px solid #b7eb8f', borderRadius: 6 }}>
@@ -1722,7 +1722,7 @@ function WaterfallAddGeneral() {
                 )}
               </div>
               {/* 右侧地图区域 */}
-              <div style={{ flex: 1, borderRadius: 6, overflow: 'hidden', border: '1px solid #f0f0f0', minHeight: 520, height: 520 }}>
+              <div style={{ flex: 1, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border-2)', minHeight: 520, height: 520 }}>
                 <MapContainer
                   center={[22.1987, 113.5439]}
                   zoom={12}
@@ -1747,7 +1747,7 @@ function WaterfallAddGeneral() {
       </div>
 
       {/* 訂單退款，退費比例配置 */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
           <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--danger-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <SettingOutlined style={{ fontSize: 14, color: '#f5222d' }} />
@@ -1859,7 +1859,7 @@ function WaterfallAddGeneral() {
           <div style={{
             padding: '24px', textAlign: 'center',
             background: 'var(--surface-3)', borderRadius: 8,
-            border: '1px dashed #d9d9d9',
+            border: '1px dashed var(--border-1)',
           }}>
             <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{t('recommend.denyRefundTip')}</span>
           </div>
@@ -1867,7 +1867,7 @@ function WaterfallAddGeneral() {
       </div>
 
       {/* 狀態設置 */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
           <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('recommend.statusSetting')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
@@ -1887,7 +1887,7 @@ function WaterfallAddGeneral() {
 
       {/* 操作记录（仅详情模式） */}
       {isDetailMode && (
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '16px 20px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--surface-1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <EditOutlined style={{ fontSize: 14, color: 'var(--text-2)' }} />
@@ -1961,29 +1961,29 @@ function WaterfallAddGeneral() {
             <div style={{ background: 'var(--surface-3)', padding: 16, borderRadius: 6 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ background: 'var(--surface-2)', borderBottom: '2px solid #d9d9d9' }}>
+                  <tr style={{ background: 'var(--surface-2)', borderBottom: '2px solid var(--border-1)' }}>
                     <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: 13 }}>{t('recommend.paramNameCol')}</th>
                     <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: 13 }}>{t('recommend.paramValueCol')}</th>
                     <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: 13 }}>{t('recommend.descCol')}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+                  <tr style={{ borderBottom: '1px solid var(--border-2)' }}>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}>{t('recommend.matchStrategyRow')}</td>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}><code>weighted_score</code></td>
                     <td style={{ padding: '8px 12px', fontSize: 13, color: 'var(--text-3)' }}>{t('recommend.weightedScoreMatch')}</td>
                   </tr>
-                  <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+                  <tr style={{ borderBottom: '1px solid var(--border-2)' }}>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}>{t('recommend.recallCountRow')}</td>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}><code>100</code></td>
                     <td style={{ padding: '8px 12px', fontSize: 13, color: 'var(--text-3)' }}>{t('recommend.initialRecallItems')}</td>
                   </tr>
-                  <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+                  <tr style={{ borderBottom: '1px solid var(--border-2)' }}>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}>{t('recommend.fineRankThresholdRow')}</td>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}><code>0.75</code></td>
                     <td style={{ padding: '8px 12px', fontSize: 13, color: 'var(--text-3)' }}>{t('recommend.fineRankFilterThreshold')}</td>
                   </tr>
-                  <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+                  <tr style={{ borderBottom: '1px solid var(--border-2)' }}>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}>{t('recommend.rerankStrategyRow')}</td>
                     <td style={{ padding: '8px 12px', fontSize: 13 }}><code>diversity_boost</code></td>
                     <td style={{ padding: '8px 12px', fontSize: 13, color: 'var(--text-3)' }}>{t('recommend.diversityBoostRerank')}</td>

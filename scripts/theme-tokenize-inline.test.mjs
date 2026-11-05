@@ -52,6 +52,13 @@ const SOURCE = [
   "    <div style={{ background: '#ffffff', color: '#1890FF', border: '1px solid #e8eaed', borderRadius: 4 }}>",
   "      <span style={{ color: '#FFE7BA' }}>未映射色值</span>",
   "      <p style={{ background: 'url(#feed) #ffffff' }}>片段引用不得当成颜色</p>",
+  "      <b style={{ color: 'var(--text-2)', border: '1px solid #f0f0f0' }} />",
+  // 合成夹具（仓内自然形态很少「同串无逗号却又混用 var+hex」，渐变那条会被逗号先截断）；
+  // 它测的是串级守卫本身：一旦值段正则以后放宽，也不得只换串里的其中一段。
+  // ⚠ 色值必须取 border 段里**确实存在**的 #f0f0f0：变异验证发现用 #ffffff（不在 border 段）
+  // 时，拿掉守卫也不会发生替换，断言前后都成立——那就是一条无牙齿的空断言。
+  "      <em style={{ border: '2px solid var(--brand) #f0f0f0' }} />",
+  "      <u style={{ background: ok ? 'var(--success-soft)' : '#fafafa' }} />",
   '      <i style={{ background: `linear-gradient(180deg, ${tone}, #ffffff)` }} />',
   '    </div>',
   '  )',
@@ -86,7 +93,7 @@ describe('theme-tokenize-inline codemod', () => {
     // 盲区②：这一条是本批新增能力的核心断言
     expect(out).toContain(`border: '1px solid ${expectToken('#e8eaed', 'border')}'`)
     // 报告口径 = 实际替换处数，多刷/漏刷都会在这里露出来
-    expect(res.stdout).toMatch(/改写 1 个文件、共 3 处/)
+    expect(res.stdout).toMatch(/改写 1 个文件、共 5 处/)
   })
 
   it('style 区段外的数据对象必须保持裸值（喂 ECharts/SVG/canvas 不解析 var()）', () => {
@@ -100,9 +107,9 @@ describe('theme-tokenize-inline codemod', () => {
     const out = readFileSync(join(root, FIXTURE_FILE), 'utf8')
     expect(out).toContain("color: '#FFE7BA'")
     expect(out).toContain("background: 'url(#feed) #ffffff'")
-    // 未覆盖行 = 淡彩描边那行（无严格等值令牌）+ url 片段引用那行（主动跳过），共 2 行；
+    // 未覆盖行 = 淡彩描边那行（无严格等值令牌）+ url 片段引用那行 + 同串混用那行，共 3 行；
     // 注：行计数打在逐文件那行摘要上，不在末尾的总计行上。
-    expect(res.stdout).toMatch(/Case\.tsx：3 处（2 行含未覆盖色值）/)
+    expect(res.stdout).toMatch(/Case\.tsx：5 处（3 行含未覆盖色值）/)
   })
 
   it('url(#id) 片段引用整条跳过，同串里的合法色值也不换（宁可漏改）', () => {
@@ -113,6 +120,25 @@ describe('theme-tokenize-inline codemod', () => {
   it('模板字符串不参与替换', () => {
     const out = readFileSync(join(root, FIXTURE_FILE), 'utf8')
     expect(out).toContain('`linear-gradient(180deg, ${tone}, #ffffff)`')
+  })
+
+  it('同串已混用令牌与裸色 → 整串跳过（不得只换其中一段）', () => {
+    const out = readFileSync(join(root, FIXTURE_FILE), 'utf8')
+    expect(out).toContain("'2px solid var(--brand) #f0f0f0'")
+  })
+
+  it('行级守卫收窄后：一侧已令牌、另一侧裸值的半对可被配对（旧行为会把整行护住）', () => {
+    const out = readFileSync(join(root, FIXTURE_FILE), 'utf8')
+    // 已有令牌那一侧不得被动
+    expect(out).toContain("color: 'var(--text-2)'")
+    // 钉住的那一侧必须被配对
+    expect(out).toContain(`border: '1px solid ${expectToken('#f0f0f0', 'border')}'`)
+  })
+
+  it('三元表达式：裸色分支若有严格等值令牌也要配对（已令牌那侧不动）', () => {
+    const out = readFileSync(join(root, FIXTURE_FILE), 'utf8')
+    expect(out).toContain("ok ? 'var(--success-soft)' : ")
+    expect(out).toContain(expectToken('#fafafa', 'bg'))
   })
 
   describe('参数校验：不合法必须拒跑且不写盘', () => {

@@ -141,7 +141,7 @@ function SystemNode({ data }: NodeProps) {
       padding: '10px 18px',
       borderRadius: 6,
       background: 'var(--purple-soft)',
-      border: '2px dashed #722ED1',
+      border: '2px dashed var(--purple)',
       textAlign: 'center',
       minWidth: 130,
       boxShadow: '0 1px 4px rgba(114,46,209,0.08)',
@@ -556,7 +556,7 @@ function FlowEditor() {
         alignItems: 'center',
         padding: '12px 24px',
         background: 'var(--surface-2)',
-        borderBottom: '1px solid #f0f0f0',
+        borderBottom: '1px solid var(--border-2)',
         flexShrink: 0,
       }}>
         <Space size={16}>
@@ -608,7 +608,7 @@ function FlowEditor() {
         gap: 20,
         padding: '8px 24px',
         background: 'var(--surface-3)',
-        borderBottom: '1px solid #f0f0f0',
+        borderBottom: '1px solid var(--border-2)',
         flexShrink: 0,
         flexWrap: 'wrap',
         alignItems: 'center',
@@ -643,7 +643,7 @@ function FlowEditor() {
           <div style={{
             width: 180,
             background: 'var(--surface-3)',
-            borderRight: '1px solid #f0f0f0',
+            borderRight: '1px solid var(--border-2)',
             padding: '12px 10px',
             overflowY: 'auto',
             flexShrink: 0,
@@ -693,7 +693,7 @@ function FlowEditor() {
               borderRadius: 6,
               border: '1px solid #FFD591',
               fontSize: 11,
-              color: '#D46B08',
+              color: 'var(--warning-deep)',
               lineHeight: 1.6,
             }}>
               💡 {t('recommend.flowEditNodeTip')}
@@ -729,7 +729,7 @@ function FlowEditor() {
             <Controls showInteractive={false} />
             <MiniMap
               nodeColor={() => '#E8720C'}
-              style={{ borderRadius: 8, border: '1px solid #f0f0f0' }}
+              style={{ borderRadius: 8, border: '1px solid var(--border-2)' }}
             />
           </ReactFlow>
         </div>

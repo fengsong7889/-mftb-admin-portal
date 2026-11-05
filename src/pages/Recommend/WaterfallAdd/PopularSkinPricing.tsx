@@ -539,7 +539,7 @@ export default function PopularSkinPricing() {
               ]}
             />
           ) : (
-            <div style={{ padding: '24px', textAlign: 'center', background: 'var(--surface-3)', borderRadius: 8, border: '1px dashed #d9d9d9' }}>
+            <div style={{ padding: '24px', textAlign: 'center', background: 'var(--surface-3)', borderRadius: 8, border: '1px dashed var(--border-1)' }}>
               <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{t('recommend.popularSkin.notAllowRefundHint')}</span>
             </div>
           )}
