@@ -131,9 +131,48 @@ public final class MeetingConstants {
     public static final String BIZ_RDM_REVIEW = "rdm_review";
     public static final String BIZ_INTERVIEW = "interview";
     public static final String BIZ_TRAINING = "training";
+    /**
+     * 需求对接：运营/业务方找产品、技术当面对齐诉求与边界。
+     * <p>它和 rdm_review（需求评审）不是一回事：评审是已有正式需求单的过会，对接是需求还没成文前的碰头；
+     * 两者混成一个，事后从会议数量上看不出「到底是在定需求还是在做需求」。
+     */
+    public static final String BIZ_REQUIREMENT_ALIGNMENT = "requirement_alignment";
+    /** 项目/需求启动会：目标、范围、分工、里程碑当场定下来 */
+    public static final String BIZ_PROJECT_KICKOFF = "project_kickoff";
+    /** 例会/週会：固定节奏的团队同步，週期预约的主用场景 */
+    public static final String BIZ_TEAM_SYNC = "team_sync";
+    /** 复盘会：上线后、活动后、事故后的结论回看 */
+    public static final String BIZ_RETROSPECTIVE = "retrospective";
+    /** 方案/设计评审：技术、交互、视觉方案的过会（区别于需求评审） */
+    public static final String BIZ_DESIGN_REVIEW = "design_review";
+    /** 头脑风暴：开放讨论拿创意，不要求当场出结论 */
+    public static final String BIZ_BRAINSTORM = "brainstorm";
+    /** 1:1 沟通：上下级、跨部门点对点，参会人固定两人 */
+    public static final String BIZ_ONE_ON_ONE = "one_on_one";
+    /** 客户/商务会议：对外沟通（商家、供应商、渠道），敏感度高、通常需要纪要留档 */
+    public static final String BIZ_CUSTOMER_MEETING = "customer_meeting";
 
+    /**
+     * 会议类型白名单：服务层校验、预约表单下拉、数据库 CHECK 约束共用这一份取值。
+     *
+     * <p>新增类型只改本集合并补语言包，不在 DDL、Java、TS 三处各写一份字面量：
+     * 历史上三处飘移的后果是「下拉里选得到、提交被服务端拒」或「能提交却被 CHECK 打回」。
+     */
     public static final Set<String> BIZ_TYPES = Set.of(
-            BIZ_GENERAL, BIZ_RDM_REVIEW, BIZ_INTERVIEW, BIZ_TRAINING);
+            BIZ_GENERAL, BIZ_RDM_REVIEW, BIZ_INTERVIEW, BIZ_TRAINING,
+            BIZ_REQUIREMENT_ALIGNMENT, BIZ_PROJECT_KICKOFF, BIZ_TEAM_SYNC, BIZ_RETROSPECTIVE,
+            BIZ_DESIGN_REVIEW, BIZ_BRAINSTORM, BIZ_ONE_ON_ONE, BIZ_CUSTOMER_MEETING);
+
+    /**
+     * 拼成 SQL IN 列表（如 {@code ('brainstorm','customer_meeting',...)}），供 CHECK 约束使用。
+     *
+     * <p>必须排序：{@code Set.of} 的迭代顺序不固定，直接拼会让每次生成的约束文本都不一样，
+     * 结构锁用例与「已有约束是否等价」的判断就都没法写。
+     */
+    public static String bizTypeSqlInList() {
+        return "(" + String.join(",", BIZ_TYPES.stream().sorted()
+                .map(value -> "'" + value + "'").toList()) + ")";
+    }
 
     /* ==================== 参会人 ==================== */
 

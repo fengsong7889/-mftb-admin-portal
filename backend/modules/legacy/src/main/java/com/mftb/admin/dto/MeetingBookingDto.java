@@ -43,7 +43,7 @@ public final class MeetingBookingDto {
         private Long roomId;
         /** booked/checked_in/finished/cancelled/released */
         private String status;
-        /** general/rdm_review/interview/training */
+        /** 会议类型，取值见 MeetingConstants.BIZ_TYPES（缺省 general） */
         private String bizType;
         private Long organizerId;
         private Long departmentId;

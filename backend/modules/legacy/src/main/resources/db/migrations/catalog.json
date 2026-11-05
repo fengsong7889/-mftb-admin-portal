@@ -1752,6 +1752,24 @@
       "comment": "只改展示层不建菜单会让权限链路悬空：黑名单路由与控制器已切到 meeting-blacklist，菜单未落地时 PermissionAnnotationValidator 会报未登记菜单。保留 meeting-config 的 menu id 只改父级，避免换 key 导致存量角色授权全丢；新叶子用 ensureMenu 声明，让 check-menu 门禁能扫到路由/受控/图标/动作集。授权迁移用 INSERT IGNORE 按角色逐条复制，保留显式收窄的动作集，不自动授普通员工。后置校验钉三件事：目录为顶级分组、两个叶子挂在其下、admin 已获分组授权。"
     },
     {
+      "versionKey": "meeting:schema:v1.2",
+      "module": "meeting",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "meetingSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "meeting:schema:v1.1"
+      ],
+      "scriptFiles": [
+        "331_meeting_biz_type_expand.sql"
+      ],
+      "intent": "会议类型白名单扩充：放宽 biz_meeting_booking 的 ck_meeting_booking_biz_type（4 项 → 12 项），并刷新列注释",
+      "author": "Qoder",
+      "ticket": "meeting-biz-type-expand",
+      "comment": "原四项取值让运营/产品/项目/HR 的高频场景（需求对接、项目启动、例会週会、复盘、方案评审、1:1、对外商务）全被塞进「一般會議」，会议类型作为统计维度等于失效。白名单唯一真值是 MeetingConstants.BIZ_TYPES：DDL 的 IN 列表与列注释都由它排序后拼出，Java 校验、前端下拉、数据库 CHECK 三处同源。230 建表脚本不改：v1.0/v1.1 已记版本的库不会重跑它们的 task，只写进 230 对存量环境等于没改。MySQL 8 无 DROP CHECK IF EXISTS，Java 侧先查 TABLE_CONSTRAINTS（要求 ENFORCED='YES'）再 DROP → MODIFY → ADD，可重入；顺序不能反，带 CHECK 依赖直接 MODIFY 并非所有 MySQL 8 版本都放行。后置校验实查 CHECK_CLAUSE 必须包含全 12 个取值：只验约束存在会放过「约束还在但仍是旧四项」的假成功，新类型提交照样被打回成「數據庫操作異常」。331 腳本僅作參考文檔，不可整腳本重放。"
+    },
+    {
       "versionKey": "meeting:rule-snapshot:v1.0",
       "module": "meeting",
       "phase": "DATA_MIGRATION",
