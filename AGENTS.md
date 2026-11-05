@@ -76,6 +76,12 @@ npm run check:boundary
 npm run check:theme-tokens
 node scripts/check-theme-tokens.mjs --report     # 看待人工判定与长尾色值分布
 node scripts/check-theme-tokens.mjs --snapshot   # 清理完一批后下调棘轮基线
+
+# 半对门禁（同一 style 块里“一侧令牌、一侧钉裸色”只降不升；裸色计数拦不住它，两侧都裸也是降）
+npm run check:halfpair
+node scripts/audit-theme-halfpair.mjs --report                     # 看现存半对按文件分布
+node scripts/audit-theme-halfpair.mjs --snapshot                   # 已逐处定性后才下调基线
+node scripts/audit-theme-halfpair.mjs --baseline /tmp/pre-<目录>   # 本批差分（改前树用 git archive 导出）
 ```
 
 ## 关键约束
@@ -150,7 +156,7 @@ frontend/
 
 - **平台**：GitHub Actions → GitHub Pages
 - **触发**：push 到 main 分支
-- **质量门禁**：lint + typecheck + menu-consistency + dependency-boundary + stat-card-order + confirm-modal + theme-tokens + i18n + secret-scan + test（任一失败中止部署）
+- **质量门禁**：lint + typecheck + menu-consistency + dependency-boundary + stat-card-order + confirm-modal + theme-tokens + half-pair-audit + i18n + secret-scan + test（任一失败中止部署）
 - **部署**：`actions/deploy-pages@v4`
 
 ## 测试
