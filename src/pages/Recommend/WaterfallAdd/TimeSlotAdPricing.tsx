@@ -842,7 +842,7 @@ export default function TimeSlotAdPricing() {
         <div style={cardShellStyle}>
           {cardTitle(<CheckCircleOutlined style={{ fontSize: 14, color: 'var(--success)' }} />, '#F6FFED', '狀態設置')}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13, color: 'var(--text-2)' }}>上架狀態:</span>
+            <span style={{ fontSize: 13, color: 'var(--text-2)' }}>狀態:</span>
             <Switch checked={status === ServiceStatus.ENABLED} disabled={isDetailMode}
               onChange={checked => setStatus(checked ? ServiceStatus.ENABLED : ServiceStatus.DISABLED)}
               checkedChildren="啟用" unCheckedChildren="停用" />
