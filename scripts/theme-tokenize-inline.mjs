@@ -155,8 +155,11 @@ function transform(source) {
       if (line.includes('style={{')) inStyle = !line.includes('}}')
       else if (inStyle && line.includes('}}')) inStyle = false
       if (!eligible) return line
-      if (!/["'][^"']*#[0-9a-fA-F]{3}/.test(line)) return line
-      if (line.includes('var(--')) return line
+      if (!/(["'][^"']*#[0-9a-fA-F]{3})|([^"']#[0-9a-fA-F]{3,8}[^"']*['"])/.test(line)) return line
+      // 行级「含 var( 就整行跳过」的写法在第八批后已收到串级（见下方 QUOTED_ANY 处理）。
+      // 原意是防「把人工选定的 var(--on-brand) 改回自动映射结果」，但工具只换 #hex、
+      // 永远改写不了已有的 var()，所以那条守卫比必要范围宽得多：它把同一行里
+      // **另一个仍钉着裸值的属性**也一并护住了——恰好就是最需要配对的半对形态（实测占残留 46/78）。
 
       // 只在真正的 style 上下文内替换。数据对象里的 `{ color: '#1890FF' }` 常被喂给
       // ECharts / SVG / canvas，它们不解析 CSS 变量，刷成 var(--info) 会静默毁掉配色。
@@ -176,6 +179,12 @@ function transform(source) {
         let localSkipsHere = 0
         const nextExpr = expr.replace(QUOTED_ANY_RE, (rawStr, quote, inner) => {
           if (!/#([0-9a-fA-F]{3,8})/.test(inner)) return rawStr
+          // 同一条串里已经混用令牌与裸色（典型是只换了一半的渐变）：整串跳过。
+          // 再往里只换其中一段会做出「一半随主题一半不随」，比不换更难查。
+          if (inner.includes('var(')) {
+            localSkipsHere += 1
+            return rawStr
+          }
           // url(#grad1) 这类片段引用里的 #xxx 不是颜色（实测 id 叫 #feed 时会被当 hex）。
           // 宁可漏改也不能把引用 id 换成令牌；含此形态的串整条跳过。
           if (/url\(\s*#/.test(inner)) {
