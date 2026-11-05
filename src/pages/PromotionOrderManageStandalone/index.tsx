@@ -638,6 +638,45 @@ export default function PromotionOrderManage() {
             </Space>
           )
         }
+        // 時段推薦：最多展示 2 個時段標籤，超出收進 +N 面板（全部時段 + 購買日期）；
+        // +N 入口按列表可點元素規範：Button type=link 继承品牌橙，頁面只補描邊/形態屬性
+        if (orderType === '時段推薦廣告' || record.recommendType === RecommendType.TIME_SLOT_AD) {
+          const slots = record.mealSlots ?? []
+          if (slots.length === 0) return <span style={{ color: 'var(--text-4)' }}>-</span>
+          const MAX_SHOW = 2
+          const visibleSlots = slots.slice(0, MAX_SHOW)
+          const hiddenCount = slots.length - MAX_SHOW
+          const days = record.purchaseDays ?? []
+          const panelContent = (
+            <div style={{ maxWidth: 360, maxHeight: 300, overflowY: 'auto' }}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>{`全部時段（${slots.length}）`}</div>
+              <Space wrap size={6}>
+                {slots.map((slot, si) => <Tag key={si} color="blue" style={{ margin: 0 }}>{slot}</Tag>)}
+              </Space>
+              {days.length > 0 && (
+                <>
+                  <div style={{ fontWeight: 600, fontSize: 13, margin: '12px 0 8px' }}>{`購買日期（${days.length} 天）`}</div>
+                  <Space wrap size={6}>
+                    {days.map((d, di) => <Tag key={di} color="green" style={{ margin: 0 }}>{d}</Tag>)}
+                  </Space>
+                </>
+              )}
+            </div>
+          )
+          return (
+            <Space size={6} align="center">
+              {visibleSlots.map((slot, si) => <Tag key={si} color="blue" style={{ margin: 0 }}>{slot}</Tag>)}
+              {hiddenCount > 0 && (
+                <Popover content={panelContent} trigger="click" placement="bottomLeft">
+                  <Button type="link" size="small"
+                    style={{ border: '1px solid rgba(232,114,12,0.35)', borderRadius: 12, padding: '0 10px', height: 22, fontSize: 12, fontWeight: 600, lineHeight: '20px' }}>
+                    {`+${hiddenCount} ▾`}
+                  </Button>
+                </Popover>
+              )}
+            </Space>
+          )
+        }
         // 降級：無 dateSlots 時展示 mealSlots
         if (record.mealSlots && record.mealSlots.length > 0) {
           return (
