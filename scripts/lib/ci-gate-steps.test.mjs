@@ -28,7 +28,6 @@ import { dirname, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const WORKFLOW = resolve(dirname(fileURLToPath(import.meta.url)), '../../.github/workflows/deploy.yml')
-const raw = readFileSync(WORKFLOW, 'utf8')
 
 /** CI 必须执行的步骤，顺序敏感：新增门禁请同时把它加进本清单 */
 const REQUIRED_STEPS = [
@@ -46,6 +45,9 @@ const REQUIRED_STEPS = [
   'Half-Pair Audit',
   'i18n Coverage',
   'i18n Fallback Copy',
+  'i18n zh-CN Static Bundle',
+  'i18n Backend Mirror',
+  'Ignore Shadow Guard',
   'Secret Scan',
   'Test',
 ]
@@ -58,6 +60,65 @@ function stepNames(text) {
   return [...text.matchAll(/^ {6}- name:\s*(.+)$/gm)].map((m) => m[1].trim())
 }
 
+/**
+ * 按步骤切块，收每块里出现过的 `npm run <命令>`。
+ * 两个细节都是实跑坑出来的：
+ * 1. 必须按块而不是按行：Type Check 用的是 `run: |` 多行块，命令不在 `run:` 那一行上；
+ * 2. 不用 `split(正则)` 切块：同一份文本里 `matchAll(/^ {6}- name:/gm)` 能命中 23 处，
+ *    而 `split(/^ {6}- (?=.+)$/m)` 命中 0 处——切块失效会退化成「空集合 = 空集合」的假绿灯。
+ *    改成按命中下标切片，并天然保证与 stepNames() 同序同数。
+ * 3. 必须先剥掉注释行：本文件大量注释会引用其它命令名（「与本地 npm run verify 同序」、
+ *    「不再走 build:strict」），把它们当执行命令会让双向比对假红。
+ */
+function stepsWithCommands(text) {
+  const starts = [...text.matchAll(/^ {6}- name:\s*(.+)$/gm)]
+  return starts.map((m, i) => {
+    const end = i + 1 < starts.length ? starts[i + 1].index : text.length
+    const body = text
+      .slice(m.index, end)
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('#'))
+      .join('\n')
+    return {
+      name: m[1].trim(),
+      cmds: [...body.matchAll(/npm run ([a-zA-Z0-9:_-]+)/g)].map((c) => c[1]),
+    }
+  })
+}
+
+/** 本地 `npm run verify` 里声明的门禁命令（唯一另一份「跑哪些门禁」的真源） */
+function verifyCommands(verifyScript) {
+  return [...new Set([...verifyScript.matchAll(/npm run ([a-zA-Z0-9:_-]+)/g)].map((m) => m[1]))]
+}
+
+function readVerifyScript() {
+  const pkg = JSON.parse(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../package.json'), 'utf8'))
+  return pkg.scripts.verify || ''
+}
+
+/**
+ * 双向比对：CI「发布前的门禁步骤」跟本地 verify 必须跑同一套命令。
+ * 抽成纯函数是为了能拿「内存里改过的副本」做变异验证：本仓的 package.json / deploy.yml
+ * 是多会话共用的热文件，不应为了验一次判据而真去改它们（改动窗口里被并发
+ * `git add -A` 扫走就是坏 main）。
+ */
+function gateDiff(workflowText, verifyScript) {
+  const names = stepNames(workflowText)
+  const steps = stepsWithCommands(workflowText)
+  if (steps.length !== names.length) throw new Error(`CI 步骤解析不一致：names=${names.length}, steps=${steps.length}`)
+  const releaseIdx = RELEASE_STEPS.map((s) => names.indexOf(s)).filter((i) => i >= 0)
+  if (!releaseIdx.length) throw new Error('未解析出任何发布步骤，切块边界不可信')
+  const ci = new Set([...new Set(steps.slice(0, Math.min(...releaseIdx)).flatMap((s) => s.cmds))])
+  const local = new Set(verifyCommands(verifyScript))
+  return {
+    ciCount: ci.size,
+    localCount: local.size,
+    missingInCi: [...local].filter((c) => !ci.has(c)),
+    missingInLocal: [...ci].filter((c) => !local.has(c)),
+  }
+}
+
+const raw = readFileSync(WORKFLOW, 'utf8')
 const names = stepNames(raw)
 
 describe('deploy.yml 门禁清单守卫', () => {
@@ -80,6 +141,38 @@ describe('deploy.yml 门禁清单守卫', () => {
     const rIdx = names.indexOf(releaseStep)
     expect(rIdx).toBeGreaterThanOrEqual(0)
     for (const s of REQUIRED_STEPS) expect(names.indexOf(s)).toBeLessThan(rIdx)
+  })
+
+  // 双向防复发：上面只能发现「清单里写的步骤被删了」，发现不了
+  // 「本地 verify 加了一道门禁、CI 忘加」——那正是 REQUIRED_STEPS 自己会跟进失配的地方
+  // （2026-11-06 拉取 a71cc774 时就撞见两道新 i18n 门禁在 CI 里、却没进本清单）。
+  it('本地 verify 与 CI 门禁步骤的命令集合必须一致（双向）', () => {
+    const d = gateDiff(raw, readVerifyScript())
+    // 自检：解析真的有效，否则两条集合比对会退化成「空 = 相等」的假绿灯
+    expect(d.ciCount).toBeGreaterThanOrEqual(REQUIRED_STEPS.length - 1)
+    expect(d.localCount).toBeGreaterThanOrEqual(REQUIRED_STEPS.length - 1)
+    expect(d.missingInCi, `这些门禁在本地 verify 里有、CI 却没跑：${d.missingInCi.join(', ')}`).toEqual([])
+    expect(d.missingInLocal, `这些门禁 CI 跑了、本地 verify 漏了：${d.missingInLocal.join(', ')}`).toEqual([])
+  })
+
+  // 下面两条是常驻的变异验证：只删 CI 那一行步骤 / 只删 verify 里那一段命令，
+  // 两个方向都必须各自判红，而且只对应方向报错。没这两条，上面的双向比对等于没测过：
+  // 集合方向写反、切块取错区间、命令名被注释污染，全都能照样绿。
+  it('变异验证：CI 少一步门禁时必须报 missingInCi', () => {
+    const mutated = raw.replace(/^ {6}- name: Ignore Shadow Guard\r?\n {8}run: npm run check:ignore-shadow\r?\n/m, '')
+    expect(mutated, '变异没生效，本用例自身失效').not.toBe(raw)
+    const d = gateDiff(mutated, readVerifyScript())
+    expect(d.missingInCi).toContain('check:ignore-shadow')
+    expect(d.missingInLocal).toEqual([])
+  })
+
+  it('变异验证：verify 少一段命令时必须报 missingInLocal', () => {
+    const verify = readVerifyScript()
+    const mutated = verify.replace(' && npm run check:ignore-shadow', '')
+    expect(mutated.length, '变异没生效，本用例自身失效').toBeLessThan(verify.length)
+    const d = gateDiff(raw, mutated)
+    expect(d.missingInLocal).toContain('check:ignore-shadow')
+    expect(d.missingInCi).toEqual([])
   })
 
   // 2026-11-04 第五批合入 main 时，裸 `npm run typecheck` 因 Node 默认 ~2GB 堆间歇 OOM
