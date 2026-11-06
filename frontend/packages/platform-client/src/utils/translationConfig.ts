@@ -1,123 +1,15 @@
 /**
- * 多语言配置校验工具（供 HeaderBar / Login 等顶部语言选择器共用）
- * 校验某语言是否已在「多语言配置」菜单完成配置：
- * 1. not_configured — 语言不在已配置列表或完成率为 0：阻断切换，提醒去配置
- * 2. partial       — 完成率 > 0 但低于阈值（如只配了 1 个字段）：警告后可强制切换
- * 3. ready         — 完成率达到阈值：直接切换
+ * 语言 / 国家显示名常量库（顶部语言与国家选择器、多语言配置页共用）。
+ *
+ * <p>这里曾经还住着另一套「语言完成率 + 切换校验」（getLanguageCoverage /
+ * validateLanguageConfigured / getFieldTranslation，读 localStorage 的 translation_data），
+ * 2026-11-06 全仓引用数为 0，已删除。删它不是因为占地方，而是它会**凭空造数**：
+ * 库里没数据时它给 zh-TW/en 返回 rate=1、给其它任何语言返回 rate=0.5，
+ * 既不查语言包也不查 sys_translation。完成率这类指标一旦存在第二套算法，
+ * 迟早会有一套变成假的——2026-11-05 简体中文真实解析率 51.4% 而各处都显示 100%，
+ * 根因就是分母被各自发明。现在全站口径唯一来源是后端 /translations/coverage
+ * （见 frontend/packages/platform-client/src/utils/coverageRows.ts）。
  */
-
-/** 与 TranslationManage 页面共用的 localStorage key */
-export const TRANSLATION_DATA_KEY = 'translation_data'
-export const TRANSLATION_LANGS_KEY = 'translation_languages'
-
-/** 完成率达标阈值（>= 60% 视为已配置） */
-export const COVERAGE_READY_THRESHOLD = 0.6
-
-/** 未进入过多语言配置页时的默认识别语言 */
-const DEFAULT_LANG_CODES = ['zh-TW', 'en', 'ja', 'ko', 'ru']
-
-/** 多语言配置中的语言条目（与页面 Language 结构一致） */
-export interface ConfiguredLanguage {
-  code: string
-  name: string
-  flag: string
-  names?: Record<string, string>
-}
-
-interface TranslationRecord {
-  id: string
-  fieldKey: string
-  category: string
-  description: string
-  translations: Record<string, string>
-}
-
-/** 读取已配置的语言列表（未配置过则返回默认 5 语言） */
-export function getConfiguredLanguages(): ConfiguredLanguage[] {
-  try {
-    const saved = localStorage.getItem(TRANSLATION_LANGS_KEY)
-    if (saved) {
-      const parsed = JSON.parse(saved) as ConfiguredLanguage[]
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed
-    }
-  } catch {
-    /* 隐私模式等异常降级 */
-  }
-  return DEFAULT_LANG_CODES.map(code => ({ code, name: code, flag: '🌐' }))
-}
-
-/** 读取翻译数据（未配置过返回 null） */
-function getTranslationData(): TranslationRecord[] | null {
-  try {
-    const saved = localStorage.getItem(TRANSLATION_DATA_KEY)
-    if (saved) {
-      const parsed = JSON.parse(saved) as TranslationRecord[]
-      if (Array.isArray(parsed)) return parsed
-    }
-  } catch {
-    /* 降级 */
-  }
-  return null
-}
-
-export interface LanguageCoverage {
-  total: number
-  translated: number
-  rate: number
-}
-
-/** 计算某语言的翻译完成率 */
-export function getLanguageCoverage(langCode: string): LanguageCoverage {
-  const data = getTranslationData()
-  // 未进入过多语言配置页：系统内置语言视为完整，其它按待审核处理
-  if (!data || data.length === 0) {
-    if (langCode === 'zh-TW' || langCode === 'en') {
-      return { total: 0, translated: 0, rate: 1 }
-    }
-    return { total: 0, translated: 0, rate: 0.5 }
-  }
-  const total = data.length
-  const translated = data.filter(item => (item.translations[langCode] || '').trim()).length
-  return { total, translated, rate: total > 0 ? translated / total : 0 }
-}
-
-export type LangConfigStatus = 'not_configured' | 'partial' | 'ready'
-
-export interface LangValidationResult extends LanguageCoverage {
-  status: LangConfigStatus
-}
-
-/** 校验某语言是否已完成配置 */
-export function validateLanguageConfigured(langCode: string): LangValidationResult {
-  const languages = getConfiguredLanguages()
-  const exists = languages.some(l => l.code === langCode)
-  const coverage = getLanguageCoverage(langCode)
-
-  if (!exists || coverage.rate === 0) {
-    return { ...coverage, status: 'not_configured' }
-  }
-  if (coverage.rate < COVERAGE_READY_THRESHOLD) {
-    return { ...coverage, status: 'partial' }
-  }
-  return { ...coverage, status: 'ready' }
-}
-
-/**
- * 获取字段在指定语言下的翻译（全局回退链）：
- * 目标语言 → 英文 → 繁中 → 字段名称
- * 完成率 60%~100% 的语言切换后，未配置字段即按此规则用英文展示
- */
-export function getFieldTranslation(fieldKey: string, langCode: string): string {
-  const data = getTranslationData()
-  const field = data?.find(item => item.fieldKey === fieldKey || item.description === fieldKey)
-  if (!field) return fieldKey
-  return (
-    (field.translations[langCode] || '').trim() ||
-    (field.translations['en'] || '').trim() ||
-    (field.translations['zh-TW'] || '').trim() ||
-    field.description
-  )
-}
 
 /* ==== 语言信息库（供多语言配置页与顶部语言选择器共用） ==== */
 /** 系统语言顺序（与 LANG_INFO 中 names 数组下标对应） */

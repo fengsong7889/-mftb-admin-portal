@@ -3,18 +3,16 @@ package com.mftb.admin.config;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mftb.admin.dto.MachineTranslateRequest;
+import com.mftb.admin.service.I18nLocaleMirror;
 import com.mftb.admin.service.TranslationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /**
@@ -37,6 +35,8 @@ public class TranslationDataInitializer implements CommandLineRunner {
     private final TranslationService translationService;
     private final ObjectMapper objectMapper;
     private final SchemaVersionTracker versionTracker;
+    /** 语言包镜像的唯一解析入口：同步与完成率统计共用，不得各写一套展平 */
+    private final I18nLocaleMirror localeMirror;
 
     /**
      * 语言包镜像里带哪几种语言，与 {@code npm run i18n:sync-backend} 同步的文件名一一对应。
@@ -44,7 +44,8 @@ public class TranslationDataInitializer implements CommandLineRunner {
      * {@code backfillZhCn()}（一次性版本门）或 MyMemory 配额填充，两者都会在
      * 「同步器补了新 key」之后留下空洞，而 zh-CN 又没有静态包兜底，界面就直接回退英文。
      */
-    private static final List<String> MIRRORED_LANGS = List.of("zh-TW", "en", "zh-CN");
+    /** 镜像里带哪几种语言：真值在 {@link I18nLocaleMirror}，这里只给个本地别名 */
+    private static final List<String> MIRRORED_LANGS = I18nLocaleMirror.MIRRORED_LANGS;
 
     /** 菜单同步字段前缀: 值由 sys_menu 决定, 不接受语言包镜像覆盖 */
     private static final String MENU_KEY_PREFIX = "menu.";
@@ -273,9 +274,13 @@ public class TranslationDataInitializer implements CommandLineRunner {
         }
         Map<String, String> zhTw = mirrors.get("zh-TW");
         if (zhTw == null || zhTw.isEmpty()) {
-            log.warn("多语言模块: classpath:i18n/zh-TW.json 不存在或为空，跳过 i18n 字段同步");
+            log.warn("多语言模块: classpath:i18n/zh-TW.json 不存在或为空，跳过 i18n 字段同步（" 
+                    + "完成率会退到仅按库记录口径，而简体中文只能靠静态包）");
             return;
         }
+        // 把全站口径的基数打进启动日志：镜像能不能读到、读到了多少，运维无需登录就能对账
+        log.info("多语言模块: 语言包镜像已加载，繁中需译文案 {} 个（数组型已排除），镜像语言 {}",
+                localeMirror.textKeyCount(), mirrors.keySet());
 
         // 一次性取现有字段，避免逐条检查
         Map<String, ExistingField> existing = new HashMap<>();
@@ -423,18 +428,20 @@ public class TranslationDataInitializer implements CommandLineRunner {
 
     /**
      * 判断一条字段是否被翻译工台人工修订过。
-     * <p>机翻写 {@code machine(人名)}（{@code TranslationServiceImpl#machineTranslate}）、
-     * 繁转简回填写 {@code backfill-zh-CN}、镜像同步写 {@code i18n-sync}；
-     * 剩下的非空且不带前缀的名字只可能是工台里的 {@code update()} 写入，即人工译名。
+     * <p>系统写入都带可识别前缀：机翻写 {@code machine(人名)}、繁转简回写
+     * {@code backfill-zh-CN}、镜像同步写 {@code i18n-sync}、免登文案订正写
+     * {@code i18n-preauth-fix}。因此「i18n- 开头」与「machine( 开头」以外的非空值
+     * 只可能是工台 {@code update()} 写入，即人工译名。
+     * <p>用前缀规则而不是枚举名字：枚举名单会漏掉下一个新添的系统写入方，
+     * 漏了就等于系统自己把自己当人工修订保护起来、永远不再被修正。
      */
     static boolean isHumanEdited(String updatedBy) {
         if (!StringUtils.hasText(updatedBy)) {
             return false;
         }
         String value = updatedBy.trim();
-        return !value.startsWith("machine(")
-                && !"backfill-zh-CN".equals(value)
-                && !"i18n-sync".equals(value);
+        return !value.startsWith("machine(") && !value.startsWith("i18n-")
+                && !"backfill-zh-CN".equals(value);
     }
 
     /** 已入库字段的判定快照 */
@@ -458,27 +465,8 @@ public class TranslationDataInitializer implements CommandLineRunner {
     record TranslationSnapshot(long id, Map<String, String> translations) {
     }
 
-    /** 递归展平嵌套 Map 为点分隔键 */
-    @SuppressWarnings("unchecked")
-    private void flattenMap(String prefix, Map<String, Object> map, Map<String, String> result) {
-        for (Map.Entry<String, Object> entry : map.entrySet()) {
-            String key = prefix.isEmpty() ? entry.getKey() : prefix + "." + entry.getKey();
-            Object value = entry.getValue();
-            if (value instanceof Map) {
-                flattenMap(key, (Map<String, Object>) value, result);
-            } else if (value instanceof List) {
-                // 数组型文案（日历星期表头、励志语清单等）不进翻译表：sys_translation 是扁平的
-                // key→字符串结构，结构上装不下数组。旧实现走 value.toString()，把
-                // ["週日","週一",…] 灌成 "[周日, 周一, …]"（ja/ko/ru 还在这堆括号串上跑了机翻，
-                // 得到 "【日・月・…】"）；前端 addResourceBundle 会把静态包里的真数组覆盖成这个串，
-                // 于是 returnObjects 拿到字符串，日历视图整页崩成错误边界（2026-11-06 实测）。
-                // 数组的真源只能是前端静态语言包，这里直接跳过。
-                log.debug("多语言模块: 数组型 key 不进翻译表, 已跳过: {}", key);
-            } else if (value != null) {
-                result.put(key, value.toString());
-            }
-        }
-    }
+    // 展平镜像与「数组型文案不得进翻译表」的口径已收敛到 I18nLocaleMirror#textOf，
+    // 本类不再自带一份 flatten：两套解析同一份数据就是本轮镜像腐化的母型。
 
     /**
      * 一次性退库：把历史上被错误灌进 sys_translation 的数组型 key 逻辑删除。
@@ -535,57 +523,22 @@ public class TranslationDataInitializer implements CommandLineRunner {
     }
 
     /**
-     * 从镜像 zh-TW.json 现算「值为数组」的点分隔 key。
-     * <p>读不到镜像时返回空集：宁可不退，也不能因为镜像缺失就把全部字段当数组删掉。
+     * 从镜像现算「值为数组」的点分 key。
+     * <p>解析已收敛到 {@link I18nLocaleMirror#arrayKeys()}：待清名单不写死，将来新增/删除
+     * 数组型文案会自动跟上，不会留下「代码里的名单比真源旧」这种二次腐化；
+     * 读不到镜像时那边返回空集，本步自然整步跳过。
      */
     List<String> collectArrayValuedKeys() {
-        ClassPathResource resource = new ClassPathResource("i18n/" + SOURCE_LANG + ".json");
-        if (!resource.exists()) {
-            log.warn("多语言模块: classpath:i18n/{}.json 不存在，数组型 key 退库跳过", SOURCE_LANG);
-            return List.of();
-        }
-        List<String> keys = new ArrayList<>();
-        try (InputStream is = resource.getInputStream()) {
-            String json = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-            Map<String, Object> root = objectMapper.readValue(json, new TypeReference<>() {});
-            collectListKeys("", root, keys);
-        } catch (Exception e) {
-            log.warn("多语言模块: 解析 i18n/{}.json 失败，数组型 key 退库跳过: {}", SOURCE_LANG, e.getMessage());
-            return List.of();
-        }
-        return keys;
+        return localeMirror.arrayKeys();
     }
 
-    @SuppressWarnings("unchecked")
-    private static void collectListKeys(String prefix, Map<String, Object> node, List<String> out) {
-        for (Map.Entry<String, Object> entry : node.entrySet()) {
-            String key = prefix.isEmpty() ? entry.getKey() : prefix + "." + entry.getKey();
-            Object value = entry.getValue();
-            if (value instanceof List) {
-                out.add(key);
-            } else if (value instanceof Map) {
-                collectListKeys(key, (Map<String, Object>) value, out);
-            }
-        }
-    }
-
-    /** 读取并展平一份语言包镜像；不存在或解析失败返回空 Map，由调用方按「该语言不参与同步」降级 */
+    /**
+     * 读取一份语言包镜像的扁平文案。
+     * <p>解析细节全部收敛在 {@link I18nLocaleMirror}：完成率统计要用同一套 key 全集，
+     * 两边各写一遍展平就会漂——本轮镜像腐化的母型就是「同一份数据两套解析」。
+     */
     private Map<String, String> readLocaleMirror(String lang) {
-        ClassPathResource resource = new ClassPathResource("i18n/" + lang + ".json");
-        if (!resource.exists()) {
-            log.warn("多语言模块: classpath:i18n/{}.json 不存在，该语言不参与字段同步", lang);
-            return new LinkedHashMap<>();
-        }
-        Map<String, String> flatMap = new LinkedHashMap<>();
-        try (InputStream is = resource.getInputStream()) {
-            String json = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-            Map<String, Object> root = objectMapper.readValue(json, new TypeReference<>() {});
-            flattenMap("", root, flatMap);
-        } catch (Exception e) {
-            log.warn("多语言模块: 读取 i18n/{}.json 失败: {}", lang, e.getMessage());
-            return new LinkedHashMap<>();
-        }
-        return flatMap;
+        return localeMirror.textOf(lang);
     }
 
     /** 分类取 key 的首个命名空间（与旧实现同口径，翻译工作台的分类筛选与统计靠它） */

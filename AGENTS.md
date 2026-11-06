@@ -83,13 +83,15 @@ node scripts/audit-theme-halfpair.mjs --report                     # 看现存�
 node scripts/audit-theme-halfpair.mjs --snapshot                   # 已逐处定性后才下调基线
 node scripts/audit-theme-halfpair.mjs --baseline /tmp/pre-<目录>   # 本批差分（改前树用 git archive 导出）
 
-# 多语言三道门禁（详见下方「多语言文案三处同步」）
+# 多语言四道门禁（详见下方「多语言文案三处同步」与「免登界面的静态兜底」）
 npm run check:i18n            # 引用完整性 + 插值 + 硬编码棘轮 + 翻译库收录率棘轮
 npm run check:i18n-zhcn       # 静态 zh-CN.json 与 zh-TW.json 结构齐备
 npm run check:i18n-mirror     # 后端 resources/i18n 镜像 == 前端真源
+npm run check:i18n-preauth    # 免登界面（登录页）六语静态兜底齐备
 
-# 新增/修改文案后的三步固定动作
+# 新增/修改文案后的固定动作
 npm run i18n:gen-zhcn         # 由繁中真源生成静态 zh-CN.json（需 JDK17 + ICU4J，产物入库）
+npm run i18n:gen-preauth      # 从库里取既有译文，补全 ja/ko/ru 的免登界面静态文案
 npm run i18n:sync-backend     # 把 locales/{zh-TW,en,zh-CN}.json 刷进后端 resources
 npm run i18n:snapshot         # 从开发库导出 field_key 快照（check:i18n 的免检名单）
 
@@ -516,10 +518,46 @@ import HelpPopover from '@/components/HelpPopover'   // 或相对路径
    （真源是 `sys_menu`）、以及**工作台里人工修订过的字段**只补空坑、不盖现有值。不得为了「同步干净」去掉这层保护。
 5. 新增语言必须同时：在后端「多语言配置」注册（写入 `sys_language`）+ 补机翻引擎/额度；
    只在前端 `SUPPORTED_LANGUAGES` 加代码而不入库，等于新增一个只会显示英文的语言。
+   反过来，要让**登录页**也能选这门新语言，还得同时具备：进 `SUPPORTED_LANGUAGES`
+   + 有对应静态兜底包（或至少 `login.*` 有译文）。登录页下拉只列 `SUPPORTED_LANGUAGES`，
+   因为 `/translations/languages` 需要登录、登录前拿不到真值；铺全量候选会造出
+   「选中了、也存了、但界面不切换」的死选项（`applyLoginLanguage` 只会对 SUPPORTED_LANGUAGES
+   里的代码真正切语言）。「语言管理」与「翻译工作台」里的 60 种候选不受此限制——那是给
+   管理员注册新语言用的，本来就该给全量。
 
 自检：`frontend/packages/i18n/src/i18n/index.test.ts`（zh-CN 静态包齐备与优先级口径）
 + `backend` `TranslationMirrorSyncTest`（镜像同步的插/改/跳过判定）
 + `npm run check:i18n-zhcn` + `npm run check:i18n-mirror` + `check:i18n` 的「翻译库收录」棘轮。
+
+---
+
+## 免登界面的静态兜底（前后端强制规范）
+
+> 背景：`/translations/bundle` **需要登录**才能访问（不在 `SecurityConfig.WHITE_LIST`），
+> 所以登录页的文案**只能来自前端静态包**。ja/ko/ru 的静态包当初只覆盖门户文案，
+> 一条 `login.*` 都没有——日语界面下打开登录页，工号/密码/登录按钮整片英文。
+> 库里其实早有译文，只是没进静态包（这一步不耗机翻额度）。
+
+**规则：未登录能被渲染的界面，它引用的每个 key 必须在六份静态包里都有非空值。**
+
+1. 免登界面清单写在 `scripts/i18n-preauth-locale.py` 的 `PREAUTH_SURFACES`。
+   **新增免登页（登录、签署页、看板开放页等）必须同步登记**，否则该页又会回到
+   「静态包没覆盖 + 拿不到语言包 = 整页英文」的老路。清单里的路径不存在时脚本直接报错，
+   不会静默少扫。
+2. `npm run check:i18n-preauth`（CI 必跑）：不连数据库，只校六份静态包。缺哪个、
+   是哪种语言，会逐条列出。
+3. `npm run i18n:gen-preauth`：以开发库 `sys_translation` 为上游写 `locales/{ja,ko,ru}.json`。
+   所有权划分：**库里非空 → 以库为准（静态跟库修正）；库里为空而静态有值 → 保留手写值**
+   （门户那批手写文案不会被库里空值洗掉）；两边都空才用 `MANUAL_TEXTS` 兜底。
+   反过来说：在「翻译工作台」改完这批 key 的 ja/ko/ru 后，**必须重跑本命令**才能在登录页生效
+   （静态包优先级高于数据库语言包）。库里也没有的，归入「仍缺」清单。
+4. 库里没有、又属于**无歧义安全提示/品牌读屏标签**的极少数条目，可以进脚本的
+   `MANUAL_TEXTS` 手写兜底；必须标注待业务复核，且**不回写数据库**——覆盖率因此不会虚高。
+   业务类文案一律不允许走这条路（不能编造）。
+5. 登录页语言下拉只列 `SUPPORTED_LANGUAGES`，不铺全量 `LANG_INFO`：
+   未进去的语言选了也不会生效（`applyLoginLanguage` 有守卫），属于死选项。
+
+自检：`npm run check:i18n-preauth` + `scripts/i18n-preauth-locale.py --keys`（看免登 key 清单）。
 
 ---
 

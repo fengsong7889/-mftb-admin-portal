@@ -105,10 +105,16 @@ def load_db_keys():
 
 
 def snapshot_db_keys():
-    """从开发库把 field_key 导出成快照（只在本地跑，CI 只读快照）"""
+    """从开发库把 field_key 导出成快照（只在本地跑，CI 只读快照）
+
+    必须带 `deleted = 0`：配置表虽然改用物理删除，但退库类迁移（如
+    translation:array-keys-cleanup-v1 把数组型 key 从翻译表逻辑删除）留下的就是 deleted=1 行。
+    不排掉它们，这份免检名单会持续把「已从翻译表退库的 key」当成后端供数，
+    于是引用它们时既不计入未入库、也不逐键解析——等于门禁对这批 key 永久失明。
+    """
     conn = _dev_db_conn()
     cur = conn.cursor()
-    cur.execute('SELECT field_key FROM sys_translation')
+    cur.execute('SELECT field_key FROM sys_translation WHERE deleted = 0')
     keys = sorted(row[0] for row in cur.fetchall())
     conn.close()
     json.dump(keys, io.open(DB_KEYS, 'w', encoding='utf-8'), ensure_ascii=False, indent=0)
@@ -247,9 +253,11 @@ def check_db_capture(locales, db_keys):
     """
     if not db_keys:
         return None, []
-    # 只比文案叶：flatten 不会产出「空对象」键，但会产出空串文案的键（如 asset.alertMsg），
-    # 后者确实是后端不入库的缺口（同步器故意不往库里写空文案），归入基线而不是当假阳性排掉
-    static_keys = {k for k, v in flatten_root(locales['zh-TW']).items() if not isinstance(v, dict)}
+    # 分母只算扁平文案叶：数组型 key（星期表头、励志语清单等）的真源只能是前端静态包，
+    # 它进不了 sys_translation 这张 key→字符串 扁平表（flattenMap 已显式跳过 List），
+    # 计入分母就是造 8 个永远填不上的假缺口。dict 与 list 都不是可译文案。
+    static_keys = {k for k, v in flatten_root(locales['zh-TW']).items()
+                   if not isinstance(v, (dict, list, tuple))}
     gap = sorted(static_keys - set(db_keys))
     return len(gap), gap
 

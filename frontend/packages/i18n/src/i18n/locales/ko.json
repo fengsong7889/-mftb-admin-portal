@@ -1014,6 +1014,36 @@
     "btnScoreResult": "점수 결과"
   },
   "meeting": {
-    "calendarWeekdays": ["일", "월", "화", "수", "목", "금", "토"]
+    "calendarWeekdays": [
+      "일",
+      "월",
+      "화",
+      "수",
+      "목",
+      "금",
+      "토"
+    ]
+  },
+  "login": {
+    "accountDisabledDesc": "관리자에 의해 계정이 비활성화되었습니다. 계정을 복원하려면 관리자에게 문의하세요.",
+    "accountDisabledOk": "확인",
+    "accountDisabledTitle": "계정이 비활성화되었습니다",
+    "alipay": "알리페이",
+    "captchaRequiredHint": "계정 보호를 위해 연속 로그인 실패 후에는 다음 로그인 시 슬라이더 인증을 먼저 완료해야 합니다",
+    "empIdLabel": "로그인 작업 번호",
+    "empIdPlaceholder": "회사 ID를 입력하세요.",
+    "empIdRequired": "회사 ID를 입력하세요.",
+    "failed": "로그인 실패",
+    "pwdLabel": "로그인 비밀번호",
+    "pwdPlaceholder": "비밀번호를 입력하세요",
+    "pwdRequired": "비밀번호를 입력하세요",
+    "submit": "로그인",
+    "success": "로그인 성공",
+    "videoBrand": "MFTB//검색 프로모션 시스템",
+    "wechat": "위챗",
+    "welcomeTitle": "안녕하세요. MFTB 마케팅 시스템에 오신 것을 환영합니다."
+  },
+  "app": {
+    "logoGroup": "MFTB 그룹 포털"
   }
 }

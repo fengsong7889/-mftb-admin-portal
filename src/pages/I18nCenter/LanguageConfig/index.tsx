@@ -28,10 +28,11 @@ import {
 import {
   fetchLanguages,
   fetchTranslations,
+  fetchCoverage,
   createLanguage as createLanguageApi,
   deleteLanguage as deleteLanguageApi,
 } from '@/api/translation'
-import type { LanguageVO, TranslationVO } from '@/api/translation'
+import { buildCoverageRows, averageRate, type CoverageRow } from '@/utils/coverageRows'
 import { useCountUp } from '@/hooks/useCountUp'
 
 /* ---- 动画数字组件 ---- */
@@ -41,15 +42,12 @@ function AnimatedNumber({ value }: { value: number }) {
 }
 
 /* ---- 类型 ---- */
-interface LanguageItem {
-  code: string
-  name: string
-  flag: string
-  names?: Record<string, string>
-  total: number
-  translated: number
-  rate: number
-}
+/**
+ * 一行 = 一种已启用语言。完成率一律来自后端 coverage（全站口径），
+ * 本文件不再用 fields.length 自算分母——那是 2026-11-05 「六语显示 100%、
+ * 简体中文实际只解析 51.4%」的直接成因。
+ */
+type LanguageItem = CoverageRow & { names?: Record<string, string> }
 
 /* ---- 国旗选项（与 TranslationManage 共用数据源） ---- */
 const FLAG_OPTIONS = [
@@ -92,28 +90,16 @@ export default function LanguageConfig() {
   const [editForm] = Form.useForm()
   const [_editingRecord, setEditingRecord] = useState<LanguageItem | null>(null)
 
-  /* 加载语言列表 + 计算完成率 */
+  /* 加载语言列表 + 完成率（分母拿后端全站口径：语言包镜像 key ∪ 库里字段） */
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
       const [langs, fields] = await Promise.all([fetchLanguages(), fetchTranslations()])
       if (langs) {
-        const totalFields = fields?.length ?? 0
-        const items: LanguageItem[] = langs.map((vo: LanguageVO) => {
-          const translated = fields
-            ? fields.filter((f: TranslationVO) => (f.translations?.[vo.code] ?? '').trim()).length
-            : 0
-          return {
-            code: vo.code,
-            name: vo.name,
-            flag: vo.flag,
-            names: vo.names,
-            total: totalFields,
-            translated,
-            rate: totalFields > 0 ? Math.round((translated / totalFields) * 100) : 0,
-          }
-        })
-        setData(items)
+        // coverage 是按语言的单次查询；任一语言取不到时 buildCoverageRows 会走兜底并标 estimated
+        const coverages = await Promise.all(langs.map(lang => fetchCoverage(lang.code)))
+        setData(buildCoverageRows(langs, coverages, fields ?? [])
+          .map((row, index) => ({ ...row, names: langs[index].names })))
       }
     } catch {
       /* 全局拦截器已提示 */
@@ -196,28 +182,40 @@ export default function LanguageConfig() {
     {
       title: '翻譯完成率',
       key: 'rate',
-      width: 240,
+      width: 260,
       render: (_: unknown, r: LanguageItem) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Progress
-            percent={r.rate}
-            size="small"
-            status={r.rate >= 60 ? 'success' : r.rate > 0 ? 'normal' : 'exception'}
-            style={{ flex: 1, margin: 0 }}
-          />
-          <span style={{ fontSize: 12, color: '#8C8C8C', whiteSpace: 'nowrap' }}>
-            {r.translated}/{r.total}
-          </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Progress
+              percent={r.rate}
+              size="small"
+              status={r.rate >= 60 ? 'success' : r.rate > 0 ? 'normal' : 'exception'}
+              style={{ flex: 1, margin: 0 }}
+            />
+            <span style={{ fontSize: 12, color: '#8C8C8C', whiteSpace: 'nowrap' }}>
+              {r.translated}/{r.total}
+            </span>
+          </div>
+          {/* 口径自述：分母是谁给的、缺在哪，不能只留一个百分比 */}
+          {r.estimated && (
+            <span style={{ fontSize: 11, color: 'var(--warning)' }}>後端 coverage 不可用，此數按庫內記錄估算（會偏高）</span>
+          )}
+          {!r.estimated && r.missingInDb > 0 && (
+            <span style={{ fontSize: 11, color: 'var(--warning)' }}>
+              前端有 {r.missingInDb} 個詞條尚未同步進翻譯庫（跑 npm run i18n:sync-backend 後重啟後端）
+            </span>
+          )}
         </div>
       ),
     },
     {
       title: '狀態',
       key: 'status',
-      width: 100,
+      width: 120,
       render: (_: unknown, r: LanguageItem) => {
-        if (r.rate >= 60) return <Tag color="success">就緒</Tag>
-        if (r.rate > 0) return <Tag color="warning">部分完成</Tag>
+        // 状态用后端返回值而不是页面再拿 rate 推一遍：阈值只该有一处定义
+        if (r.status === 'ready') return <Tag color="success">就緒</Tag>
+        if (r.status === 'partial') return <Tag color="warning">部分完成</Tag>
         return <Tag color="error">未配置</Tag>
       },
     },
@@ -248,8 +246,9 @@ export default function LanguageConfig() {
 
   /* 统计 */
   const totalLangs = data.length
-  const readyLangs = data.filter(d => d.rate >= 60).length
-  const avgRate = data.length > 0 ? Math.round(data.reduce((s, d) => s + d.rate, 0) / data.length) : 0
+  // 就绪/平均都改拿后端状态与加权均值：前者不自己重推阈值，后者不会把 100% 和 10% 平均成 55%
+  const readyLangs = data.filter(d => d.status === 'ready').length
+  const avgRate = averageRate(data)
 
   return (
     <div className="content-area">
