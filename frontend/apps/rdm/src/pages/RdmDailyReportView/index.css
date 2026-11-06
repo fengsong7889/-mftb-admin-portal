@@ -17,7 +17,7 @@
   overscroll-behavior: contain;
   padding: 16px 14px 32px;
   background: #f4f5f7;
-  color: #262626;
+  color: var(--text-1);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -71,14 +71,14 @@
 
 .rdm-board-center-text {
   font-size: 13px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 .rdm-board-notice {
   max-width: 520px;
   margin: 12vh auto 0;
   padding: 32px 28px;
-  background: #fff;
+  background: var(--surface-2);
   border-radius: 16px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
   text-align: center;
@@ -89,8 +89,8 @@
   height: 52px;
   margin: 0 auto 16px;
   border-radius: 14px;
-  background: #fff7e6;
-  color: #e8720c;
+  background: var(--warning-soft);
+  color: var(--brand);
   font-size: 24px;
   display: flex;
   align-items: center;
@@ -106,7 +106,7 @@
 .rdm-board-notice-msg {
   font-size: 13px;
   line-height: 1.7;
-  color: #8c8c8c;
+  color: var(--text-3);
   word-break: break-word;
 }
 
@@ -114,9 +114,9 @@
   margin-top: 18px;
   height: 34px;
   padding: 0 18px;
-  border: 1px solid #e8720c;
+  border: 1px solid var(--brand);
   border-radius: 8px;
-  background: #e8720c;
+  background: var(--brand);
   color: #fff;
   font-size: 13px;
   font-weight: 500;
@@ -137,7 +137,7 @@
   overflow: hidden;
   margin-bottom: 16px;
   border-radius: 16px;
-  background: #fff;
+  background: var(--surface-2);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
 }
 
@@ -178,21 +178,21 @@
 .rdm-board-brand-name {
   font-size: 14px;
   font-weight: 700;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .rdm-board-brand-sub {
   margin-top: 2px;
   font-size: 10px;
   letter-spacing: 1.2px;
-  color: #bfbfbf;
+  color: var(--text-4);
 }
 
 .rdm-board-type-pill {
   padding: 5px 12px;
   border-radius: 999px;
-  background: #fff7e6;
-  color: #e8720c;
+  background: var(--warning-soft);
+  color: var(--brand);
   font-size: 12px;
   font-weight: 600;
 }
@@ -211,7 +211,7 @@
   gap: 8px 18px;
   flex-wrap: wrap;
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 .rdm-board-meta-item {
@@ -227,9 +227,9 @@
   margin-top: 14px;
   padding: 7px 12px;
   border-radius: 8px;
-  background: #fff7f0;
-  border: 1px solid #ffe7d1;
-  color: #ad4e00;
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-border);
+  color: var(--brand-deep);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -245,8 +245,8 @@
 .rdm-board-kpi {
   padding: 14px 16px;
   border-radius: 12px;
-  border-left: 3px solid #d9d9d9;
-  background: #fff;
+  border-left: 3px solid var(--border-1);
+  background: var(--surface-2);
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
@@ -258,7 +258,7 @@
 
 .rdm-board-kpi-label {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
   margin-bottom: 6px;
 }
 
@@ -274,14 +274,14 @@
 .rdm-board-kpi-unit {
   font-size: 12px;
   font-weight: 400;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 /* KPI 口径说明：避免读者把「本次推送範圍」的 1 个项目误读成全系统只有 1 个 */
 .rdm-board-kpi-scope {
   margin: -6px 2px 14px;
   font-size: 11px;
-  color: #8c8c8c;
+  color: var(--text-3);
   line-height: 1.6;
 }
 
@@ -290,13 +290,13 @@
   margin-bottom: 16px;
   padding: 14px 18px;
   border-radius: 12px;
-  background: #fff;
-  border: 1px solid #ffe7d1;
+  background: var(--surface-2);
+  border: 1px solid var(--brand-border);
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
 }
 
 .rdm-board-risk[data-empty="true"] {
-  border-color: #d9f7be;
+  border-color: var(--success-border-soft);
   background: #fcfffa;
 }
 
@@ -306,11 +306,11 @@
   gap: 7px;
   font-size: 14px;
   font-weight: 700;
-  color: #ad4e00;
+  color: var(--brand-deep);
 }
 
 .rdm-board-risk[data-empty="true"] .rdm-board-risk-head {
-  color: #389e0d;
+  color: var(--success-deep);
 }
 
 .rdm-board-risk-count {
@@ -318,7 +318,7 @@
   height: 20px;
   padding: 0 6px;
   border-radius: 999px;
-  background: #fff1f0;
+  background: var(--danger-soft);
   color: #cf1322;
   font-size: 12px;
   font-weight: 700;
@@ -340,19 +340,19 @@
   gap: 6px;
   padding: 5px 10px;
   border-radius: 8px;
-  background: #fafafa;
+  background: var(--surface-3);
   font-size: 12px;
 }
 
 .rdm-board-risk-name {
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .rdm-board-risk-none {
   margin-top: 6px;
   font-size: 12px;
-  color: #52c41a;
+  color: var(--success);
 }
 
 /* ── 区块标题 ── */
@@ -368,7 +368,7 @@
   margin: 0 2px 10px;
   font-size: 15px;
   font-weight: 700;
-  color: #262626;
+  color: var(--text-1);
 }
 
 /* 标题行右侧的视图切换：推到最右，窄屏自动换行到标题下方 */
@@ -385,7 +385,7 @@
   display: inline-flex;
   align-items: center;
   padding: 3px;
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--border-2);
   border-radius: 999px;
   background: #f5f7fa;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
@@ -402,7 +402,7 @@
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
-  color: #8c8c8c;
+  color: var(--text-3);
   font-size: 12px;
   font-weight: 500;
   line-height: 1;
@@ -411,18 +411,18 @@
 }
 
 .rdm-board-view-switch button:hover {
-  color: #e8720c;
+  color: var(--brand);
 }
 
 .rdm-board-view-switch button[data-active="true"] {
-  border-color: #ffe7d1;
+  border-color: var(--brand-border);
   background: linear-gradient(135deg, #fff7f0 0%, #ffffff 70%);
-  color: #e8720c;
+  color: var(--brand);
   box-shadow: 0 2px 6px rgba(232, 114, 12, 0.16);
 }
 
 .rdm-board-view-switch button:focus-visible {
-  outline: 2px solid #e8720c;
+  outline: 2px solid var(--brand);
   outline-offset: 1px;
 }
 
@@ -444,7 +444,7 @@
 .rdm-board-section-count {
   font-size: 12px;
   font-weight: 400;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 /* ── 全局展示口径（只影响下方明细，不改变顶部 KPI） ── */
@@ -457,7 +457,7 @@
   padding: 8px 12px;
   border: 1px solid #eef0f3;
   border-radius: 10px;
-  background: #fafbfc;
+  background: var(--surface-sunken);
 }
 
 .rdm-board-filter-group {
@@ -468,14 +468,14 @@
 
 .rdm-board-filter-label {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
   white-space: nowrap;
 }
 
 .rdm-board-filter-hint {
   margin-left: auto;
   font-size: 12px;
-  color: #bfbfbf;
+  color: var(--text-4);
 }
 
 /* 存量兜底：历史迭代里的未完成需求，用整行按钮把它变成可发现、可点击的线索 */
@@ -498,7 +498,7 @@
 }
 
 .rdm-board-legacy-hint:focus-visible {
-  outline: 2px solid #fa8c16;
+  outline: 2px solid var(--warning);
   outline-offset: 1px;
 }
 
@@ -524,7 +524,7 @@
 }
 
 .rdm-board-card {
-  background: #fff;
+  background: var(--surface-2);
   border: 1px solid #eef0f3;
   border-radius: 14px;
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
@@ -557,8 +557,8 @@
 .rdm-board-project-no {
   padding: 2px 7px;
   border-radius: 6px;
-  background: #f5f5f5;
-  color: #8c8c8c;
+  background: var(--surface-1);
+  color: var(--text-3);
   font-size: 11px;
   font-weight: 500;
 }
@@ -579,7 +579,7 @@
   flex-wrap: wrap;
   margin-top: 6px;
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 /* 项目头：标题在左、交付进度在右；窄屏自动换行到标题下方 */
@@ -607,14 +607,14 @@
 
 .rdm-board-delivery-label {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 .rdm-board-delivery-pct {
   font-size: 15px;
   font-weight: 700;
   line-height: 1;
-  color: #e8720c;
+  color: var(--brand);
 }
 
 .rdm-board-delivery .rdm-board-progress-track {
@@ -627,7 +627,7 @@
   gap: 6px;
   margin-top: 6px;
   font-size: 11px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 .rdm-board-delivery-dot {
@@ -637,20 +637,20 @@
 .rdm-board-delivery-empty {
   margin-top: 2px;
   font-size: 12px;
-  color: #bfbfbf;
+  color: var(--text-4);
 }
 
 .rdm-board-project-next {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 .rdm-board-project-zero {
   margin-top: 14px;
   padding: 8px 12px;
   border-radius: 8px;
-  background: #fafafa;
-  color: #8c8c8c;
+  background: var(--surface-3);
+  color: var(--text-3);
   font-size: 12px;
 }
 
@@ -679,11 +679,11 @@
   justify-content: space-between;
   margin-top: 6px;
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 .rdm-board-progress-pct {
-  color: #e8720c;
+  color: var(--brand);
   font-weight: 700;
 }
 
@@ -695,7 +695,7 @@
   margin-top: 14px;
   padding: 10px 12px;
   border-radius: 10px;
-  background: #fafafa;
+  background: var(--surface-3);
 }
 
 .rdm-board-metric {
@@ -711,7 +711,7 @@
 .rdm-board-metric-label {
   margin-top: 2px;
   font-size: 11px;
-  color: #8c8c8c;
+  color: var(--text-3);
   white-space: nowrap;
 }
 
@@ -721,14 +721,14 @@
   gap: 6px 16px;
   margin-top: 10px;
   font-size: 12px;
-  color: #595959;
+  color: var(--text-2);
 }
 
 /* ── 迭代与需求 ── */
 .rdm-board-project-body {
   margin-top: 14px;
   padding-top: 6px;
-  border-top: 1px dashed #f0f0f0;
+  border-top: 1px dashed var(--border-2);
 }
 
 .rdm-board-iteration {
@@ -748,7 +748,7 @@
   cursor: pointer;
   list-style: none;
   font-size: 12px;
-  color: #595959;
+  color: var(--text-2);
 }
 
 .rdm-board-iteration-summary::-webkit-details-marker {
@@ -770,15 +770,15 @@
 
 .rdm-board-iteration-code {
   font-weight: 700;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .rdm-board-iteration-name {
-  color: #595959;
+  color: var(--text-2);
 }
 
 .rdm-board-iteration-meta {
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 .rdm-board-iteration-body {
@@ -788,7 +788,7 @@
 .rdm-board-iteration-empty {
   padding: 6px 0;
   font-size: 12px;
-  color: #bfbfbf;
+  color: var(--text-4);
 }
 
 .rdm-board-req {
@@ -810,7 +810,7 @@
   gap: 6px;
   flex-wrap: wrap;
   font-size: 13px;
-  color: #262626;
+  color: var(--text-1);
   word-break: break-word;
 }
 
@@ -821,15 +821,15 @@
   flex-wrap: wrap;
   margin-top: 4px;
   font-size: 11px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 .rdm-board-req-no {
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 .rdm-board-req-no-pending {
-  color: #bfbfbf;
+  color: var(--text-4);
 }
 
 /* ── 标签 ── */
@@ -853,32 +853,32 @@
 .rdm-board-note {
   margin-bottom: 4px;
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 .rdm-board-empty {
   padding: 28px 0;
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface-2);
   text-align: center;
   font-size: 13px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 /* ── 页脚 ── */
 .rdm-board-footer {
   margin-top: 22px;
   padding: 16px 4px 0;
-  border-top: 1px solid #e8eaed;
+  border-top: 1px solid var(--border-3);
   font-size: 12px;
   line-height: 1.9;
-  color: #8c8c8c;
+  color: var(--text-3);
   text-align: center;
 }
 
 .rdm-board-footer-brand {
   margin-top: 6px;
-  color: #bfbfbf;
+  color: var(--text-4);
   letter-spacing: 0.5px;
 }
 
@@ -891,7 +891,7 @@
   margin-bottom: 16px;
   padding: 12px 18px;
   border-radius: 12px;
-  background: #fff;
+  background: var(--surface-2);
   border: 1px solid #eef0f3;
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.04);
 }
@@ -904,7 +904,7 @@
 .rdm-board-focus-title {
   font-size: 13px;
   font-weight: 700;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .rdm-board-focus-list {
@@ -928,13 +928,13 @@
 
 .rdm-board-focus-label {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 /* ── 负责人芯片 ── */
 .rdm-board-owners-title {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 .rdm-board-owner-chip {
@@ -943,7 +943,7 @@
   padding: 2px 8px;
   border-radius: 6px;
   background: #f5f7fa;
-  color: #595959;
+  color: var(--text-2);
   font-size: 12px;
   line-height: 18px;
 }
@@ -951,17 +951,17 @@
 /* ── 迭代块（嵌套在项目卡内） ── */
 .rdm-board-iteration-block {
   padding: 10px 0;
-  border-top: 1px dashed #f0f0f0;
+  border-top: 1px dashed var(--border-2);
 }
 
 /* 已关闭迭代：左侧灰条标明历史版本，避免和推进中的版本混在一起误读 */
 .rdm-board-iteration-block[data-closed="true"] {
-  border-left: 3px solid #d9d9d9;
+  border-left: 3px solid var(--border-1);
   padding-left: 10px;
 }
 
 .rdm-board-iteration-block[data-closed="true"] .rdm-board-iteration-code {
-  color: #595959;
+  color: var(--text-2);
 }
 
 .rdm-board-iteration-block:first-child {
@@ -976,15 +976,15 @@
   flex-wrap: wrap;
   margin-bottom: 6px;
   font-size: 12px;
-  color: #595959;
+  color: var(--text-2);
 }
 
 .rdm-board-iteration-owner {
   margin-left: auto;
   padding: 1px 8px;
   border-radius: 999px;
-  background: #e6f7ff;
-  color: #1890ff;
+  background: var(--info-soft);
+  color: var(--info);
   font-size: 11px;
 }
 
@@ -1002,8 +1002,8 @@
   gap: 4px;
   padding: 1px 8px;
   border-radius: 999px;
-  background: #fafafa;
-  color: #8c8c8c;
+  background: var(--surface-3);
+  color: var(--text-3);
   font-size: 11px;
   line-height: 18px;
   white-space: nowrap;
@@ -1015,28 +1015,28 @@
 }
 
 .rdm-board-metric-chip.is-progress {
-  background: #e6f7ff;
-  color: #1890ff;
+  background: var(--info-soft);
+  color: var(--info);
 }
 
 .rdm-board-metric-chip.is-success {
-  background: #f6ffed;
-  color: #52c41a;
+  background: var(--success-soft);
+  color: var(--success);
 }
 
 .rdm-board-metric-chip.is-warn {
-  background: #fff7e6;
-  color: #fa8c16;
+  background: var(--warning-soft);
+  color: var(--warning);
 }
 
 .rdm-board-metric-chip.is-danger {
-  background: #fff1f0;
+  background: var(--danger-soft);
   color: #f5222d;
 }
 
 .rdm-board-metric-chip.is-muted {
-  background: #fafafa;
-  color: #bfbfbf;
+  background: var(--surface-3);
+  color: var(--text-4);
 }
 
 .rdm-board-metric-chip-label {
@@ -1058,7 +1058,7 @@
 }
 
 .rdm-board-type-help:focus-visible {
-  outline: 2px solid #e8720c;
+  outline: 2px solid var(--brand);
   outline-offset: 2px;
 }
 
@@ -1069,7 +1069,7 @@
 .rdm-board-unscheduled-reqs {
   margin-top: 6px;
   padding-top: 8px;
-  border-top: 1px dashed #f0f0f0;
+  border-top: 1px dashed var(--border-2);
 }
 
 /* ── 需求行（可点击展开） ── */
@@ -1088,7 +1088,7 @@
 }
 
 .rdm-board-req-head:hover {
-  background: #fafafa;
+  background: var(--surface-3);
 }
 
 .rdm-board-req.is-open .rdm-board-req-head {
@@ -1121,7 +1121,7 @@
   gap: 6px;
   flex-wrap: wrap;
   font-size: 13px;
-  color: #262626;
+  color: var(--text-1);
   word-break: break-word;
 }
 
@@ -1132,7 +1132,7 @@
   flex-wrap: wrap;
   margin-top: 4px;
   font-size: 11px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 /* ── 甘特：复用「我的甘特圖」GanttBoard，只读 ── */
@@ -1154,7 +1154,7 @@
   height: 24px;
   padding: 0 6px;
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 /* 看板自身是长页面滚动，甘特不再单独限高，避免展开后只看到几行 */
@@ -1164,6 +1164,6 @@
 
 .rdm-board-gantt-empty {
   font-size: 12px;
-  color: #bfbfbf;
+  color: var(--text-4);
   padding: 4px 0;
 }

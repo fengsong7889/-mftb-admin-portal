@@ -610,7 +610,7 @@ function KpiSection({ snapshot }: { snapshot: DailyReportSnapshot }) {
       <section className="rdm-board-kpis">
         {cards.map(c => (
           <div key={c.label} className="rdm-board-kpi"
-            style={{ borderLeftColor: c.tone === 'neutral' ? '#d9d9d9' : TONE_STYLE[c.tone].color }}>
+            style={{ borderLeftColor: c.tone === 'neutral' ? 'var(--border-1)' : TONE_STYLE[c.tone].color }}>
             <div className="rdm-board-kpi-label">{c.label}</div>
             <div className="rdm-board-kpi-value" style={{ color: TONE_STYLE[c.tone].color }}>
               <AnimatedNumber value={c.value} />

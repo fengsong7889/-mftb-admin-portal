@@ -28,7 +28,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { COLOR_TO_TOKEN } from './lib/theme-token-map.mjs'
+import { COLOR_TO_TOKEN, normalizeHex } from './lib/theme-token-map.mjs'
 
 const SCRIPT = new URL('./theme-tokenize-inline.mjs', import.meta.url).pathname
 const FIXTURE_DIR = 'src/pages/__codemodFixture__'
@@ -40,7 +40,10 @@ const FIXTURE_FILE = join(FIXTURE_DIR, 'Case.tsx')
  * @param {'bg'|'fg'|'border'} segment 属性分段
  */
 function expectToken(hex, segment) {
-  const token = COLOR_TO_TOKEN[segment]?.[hex.slice(1).toLowerCase()]
+  // 必须走工具自己的 normalizeHex（把 #fff 展开成 ffffff）：测试里另写一份归一化
+  // 就会与工具漂移——本轮实踩：bg 段只有 6 位键，直接 slice(1) 查 `fff` 永远查不到。
+  const norm = normalizeHex(hex.slice(1))
+  const token = norm && !norm.hasAlpha ? COLOR_TO_TOKEN[segment]?.[norm.hex] : undefined
   if (!token) throw new Error(`映射表缺少 ${hex}（${segment} 段），测试夹具需要跟着映射表一起改`)
   return `var(--${token})`
 }
@@ -76,6 +79,66 @@ const SOURCE = [
 ].join('\n')
 
 let root = ''
+/** CSS 夹具目录：与 TSX 夹具分开，否则两边“共 N 处”的精确计数断言会互相污染 */
+const CSS_FIXTURE_DIR = 'src/pages/__codemodCss__'
+const CSS_FIXTURE_FILE = join(CSS_FIXTURE_DIR, 'case.css')
+/**
+ * CSS 侧夹具。每一块都对应一个真实会错的地方，不是凑数：
+ *   ① 单行规则——第一版实现只处理多行块，会静默漏改（Portal/index.css 里大量这种写法）；
+ *   ② 分段纪律——`background: #595959` 是前景位的值，进 bg 段就是语义失真；
+ *   ③④ 选择器排除与多选择器组——登录页品牌固定样式不得被动；
+ *   ⑤ 嵌套继承——`&:hover` 自身不含 `.login-`，不继承上层锁定就会去改登录页 hover 色；
+ *   ⑥ @media print——打印恒浅色是已定版策略；
+ *   ⑦⑧⑨ 渐变 / var 混用 / url 片段引用，三种“只换一半会更糟”的形态；
+ *   ⑩ 哨兵锁整块；⑪ 无严格等值项不动。
+ */
+const CSS_SOURCE = [
+  '/* ① 单行规则 */',
+  '.one-line { color: #595959; }',
+  '',
+  '/* ② 多行块：三种分段各一处，段不匹配那条必须原样 */',
+  '.segmented {',
+  '  background: #fff;',
+  '  border: 1px solid #e8eaed;',
+  '  background: #595959;',
+  '}',
+  '',
+  '/* ③ 选择器排除 */',
+  '.login-card-v2 { background: #fff; }',
+  '',
+  '/* ④ 多选择器组：有一个命中就整块不动 */',
+  '.grouped, .biz-panel { color: #fff; }',
+  '',
+  '/* ⑤ 嵌套选择器继承上层锁定 */',
+  '.login-card-v2 {',
+  '  &:hover { color: #fff; }',
+  '}',
+  '',
+  '/* ⑥ 打印恒浅色 */',
+  '@media print {',
+  '  .hero { background: #fff; }',
+  '}',
+  '',
+  '/* ⑦⑧⑨ 三种“只换一半会更糟”的形态 */',
+  '.gradient { background: linear-gradient(180deg, #f7f8fa, #ffffff); }',
+  '.mixed { border-color: var(--brand) #f0f0f0; }',
+  '.fragment { background: url(#feed) #ffffff; }',
+  '',
+  '/* ⑩ 哨兵锁整块 */',
+  '.locked {',
+  '  /* theme-pair-locked：两侧成对保持裸值 */',
+  '  background: #fff;',
+  '  color: #595959;',
+  '}',
+  '',
+  '/* ⑪ 无严格等值项 */',
+  '.unmapped { color: #123456; }',
+  '',
+].join('\n')
+
+/** ① 1 处 + ② 2 处 = 3；其余全部必须不动，多刷一处这里就会露出来 */
+const CSS_EXPECTED_REPLACED = 3
+
 /** @param {...string} args 传给 codemod 的命令行参数 */
 function runCli(...args) {
   return spawnSync(process.execPath, [SCRIPT, ...args], { cwd: root, encoding: 'utf8' })
@@ -85,6 +148,8 @@ beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), 'tokenize-inline-'))
   mkdirSync(join(root, FIXTURE_DIR), { recursive: true })
   writeFileSync(join(root, FIXTURE_FILE), SOURCE)
+  mkdirSync(join(root, CSS_FIXTURE_DIR), { recursive: true })
+  writeFileSync(join(root, CSS_FIXTURE_FILE), CSS_SOURCE)
 })
 
 afterAll(() => {
@@ -188,6 +253,69 @@ describe('theme-tokenize-inline codemod', () => {
       const res = runCli('--report')
       expect(res.status).toBe(1)
       expect(res.stderr).toContain('check-theme-tokens.mjs --report')
+    })
+  })
+  
+  /**
+   * CSS 侧（档 B 的工具缺口）。2026-11-06 之前 codemod 只认 .tsx/.ts，
+   * 导致页面 CSS 只能手工改（用户报的 5 张图里图1/图5 就落在这个缺口上）。
+   * 默认不开 --css 就不碰 CSS：现有各批的作用域必须一字不变。
+   */
+  describe('theme-tokenize-inline --css（CSS 侧改写）', () => {
+    it('不加 --css 时 CSS 完全不动（防静默扩大作用域）', () => {
+      writeFileSync(join(root, CSS_FIXTURE_FILE), CSS_SOURCE)
+      const res = runCli('--run', '--dir', CSS_FIXTURE_DIR)
+      expect(res.status).toBe(0)
+      expect(readFileSync(join(root, CSS_FIXTURE_FILE), 'utf8')).toBe(CSS_SOURCE)
+      expect(res.stdout).toContain('共 0 处')
+    })
+  
+    it('加 --css：单行规则、背景/描边/前景三分段都换成严格等值令牌，且总数精确', () => {
+      // 先把夹具写回原样：vitest 会重试失败用例，不重置的话第二次跑自然是 0 处，
+      // “共 3 处”这条精确断言就会因重试而假红（本轮实踩）。
+      writeFileSync(join(root, CSS_FIXTURE_FILE), CSS_SOURCE)
+      const res = runCli('--run', '--css', '--dir', CSS_FIXTURE_DIR)
+      expect(res.status).toBe(0)
+      expect(res.stdout).toContain(`共 ${CSS_EXPECTED_REPLACED} 处`)
+      const out = readFileSync(join(root, CSS_FIXTURE_FILE), 'utf8')
+      // ① 单行规则（旧实现会静默漏改）
+      expect(out).toContain(`.one-line { color: ${expectToken('#595959', 'fg')}; }`)
+      // ② 多行块
+      expect(out).toContain(`background: ${expectToken('#fff', 'bg')};`)
+      expect(out).toContain(`border: 1px solid ${expectToken('#e8eaed', 'border')};`)
+    })
+  
+    it('段不匹配、无等值项、选择器排除、多选择器组、嵌套继承、@media print 全部保持原样', () => {
+      const out = readFileSync(join(root, CSS_FIXTURE_FILE), 'utf8')
+      expect(out).toContain('  background: #595959;')        // 前景位的值不得进 bg 段
+      expect(out).toContain('.unmapped { color: #123456; }')  // 无严格等值项
+      expect(out).toContain('.login-card-v2 { background: #fff; }')  // ③ 排除前缀
+      expect(out).toContain('.grouped, .biz-panel { color: #fff; }') // ④ 组内有一个命中
+      expect(out).toContain('  &:hover { color: #fff; }')            // ⑤ 嵌套继承锁定
+      expect(out).toContain('  .hero { background: #fff; }')         // ⑥ 打印块
+    })
+  
+    it('渐变 / var 混用 / url 片段引用 / 哨兵块，四种形态整值不动', () => {
+      const out = readFileSync(join(root, CSS_FIXTURE_FILE), 'utf8')
+      expect(out).toContain('background: linear-gradient(180deg, #f7f8fa, #ffffff);')
+      expect(out).toContain('border-color: var(--brand) #f0f0f0;')
+      expect(out).toContain('background: url(#feed) #ffffff;')
+      // 哨兵块内两个色值都是真实可映射的（#fff→bg、#595959→fg），没哨兵就会被刷
+      expect(out).toContain('  background: #fff;\n  color: #595959;\n}')
+    })
+  
+    it('幂等：第二次跑必须 0 处（否则回填轮会反复刷同一批）', () => {
+      const res = runCli('--run', '--css', '--dir', CSS_FIXTURE_DIR)
+      expect(res.status).toBe(0)
+      expect(res.stdout).toContain('共 0 处')
+    })
+  
+    it('改写后不得破坏格式：原缩进与分号必须逐字保留', () => {
+      const out = readFileSync(join(root, CSS_FIXTURE_FILE), 'utf8')
+      expect(out).toContain('  border: 1px solid ')
+      // 重建 `prop: value` 的旧写法会把 `background : #fff` 这类空格归一化；
+      // 这里用原始行逐字对比，只允许色值部分变化
+      expect(out).toMatch(/^  background: var\(--/m)
     })
   })
 })

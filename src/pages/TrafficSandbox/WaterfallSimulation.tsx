@@ -168,7 +168,7 @@ export default function WaterfallSimulation() {
       render: (_: unknown, r: WaterfallSlotResult) => (
         <div>
           <div style={{ fontWeight: 600 }}>{r.storeName}</div>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{r.storeCode}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{r.storeCode}</div>
         </div>
       ),
     },
@@ -186,14 +186,14 @@ export default function WaterfallSimulation() {
               {r.orderNo}
             </Button>
           )
-          : <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('waterfallSimulation.sourceOrganic')}</span>
+          : <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('waterfallSimulation.sourceOrganic')}</span>
       ),
     },
     {
       title: t('waterfallSimulation.colTotalScore'), dataIndex: 'totalScore', width: 110, align: 'right',
       render: (v: number | undefined, r: WaterfallSlotResult) => (
         v == null
-          ? <span style={{ color: '#BFBFBF' }}>—</span>
+          ? <span style={{ color: 'var(--text-4)' }}>—</span>
           : (
             <Button
               type="link"
@@ -213,17 +213,17 @@ export default function WaterfallSimulation() {
       <Alert type="info" showIcon style={{ marginBottom: 16 }} message="演示資料 · 非真實瀑布流執行結果" description="兩種模式均使用固定演示資料，不代表正式配置已接入投放。展示位次與自然流量排名是不同口徑。" />
       {/* 頁面標題 */}
       <div style={{
-        background: '#fff', padding: '12px 20px', marginBottom: 12,
+        background: 'var(--surface-2)', padding: '12px 20px', marginBottom: 12,
         borderRadius: 8, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <NodeIndexOutlined style={{ fontSize: 20, color: '#E8720C' }} />
+          <NodeIndexOutlined style={{ fontSize: 20, color: 'var(--brand)' }} />
           <div>
-            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#E8720C' }}>
+            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--brand)' }}>
               {t('waterfallSimulation.title')}
             </h2>
-            <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-hint)', marginTop: 2 }}>
               {t('waterfallSimulation.desc')}
             </div>
           </div>
@@ -250,17 +250,17 @@ export default function WaterfallSimulation() {
 
       {/* 查詢條件區 */}
       <Card
-        title={<Space><SearchOutlined style={{ color: '#E8720C' }} /><span>{t('trafficSandbox.conditionTitle')}</span></Space>}
+        title={<Space><SearchOutlined style={{ color: 'var(--brand)' }} /><span>{t('trafficSandbox.conditionTitle')}</span></Space>}
         size="small"
         style={{ marginBottom: 16, borderRadius: 8 }}
       >
         <Row gutter={16} style={{ marginBottom: 12 }}>
           <Col span={6}>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>{t('waterfallSimulation.brandLabel')}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-body)', marginBottom: 4 }}>{t('waterfallSimulation.brandLabel')}</div>
             <Select value={brand} onChange={setBrand} options={BRAND_OPTIONS} style={{ width: '100%' }} />
           </Col>
           <Col span={6}>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>{t('waterfallSimulation.channelLabel')}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-body)', marginBottom: 4 }}>{t('waterfallSimulation.channelLabel')}</div>
             <Select
               value={channel}
               onChange={setChannel}
@@ -269,7 +269,7 @@ export default function WaterfallSimulation() {
             />
           </Col>
           <Col span={6}>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>{t('waterfallSimulation.placementLabel')}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-body)', marginBottom: 4 }}>{t('waterfallSimulation.placementLabel')}</div>
             <Select
               value={placement}
               onChange={setPlacement}
@@ -278,7 +278,7 @@ export default function WaterfallSimulation() {
             />
           </Col>
           <Col span={6}>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>{t('waterfallSimulation.regionLabel')}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-body)', marginBottom: 4 }}>{t('waterfallSimulation.regionLabel')}</div>
             <Select
               value={region}
               onChange={setRegion}
@@ -289,7 +289,7 @@ export default function WaterfallSimulation() {
         </Row>
         <Row gutter={16}>
           <Col span={6}>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>{t('waterfallSimulation.dateLabel')}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-body)', marginBottom: 4 }}>{t('waterfallSimulation.dateLabel')}</div>
             <DatePicker
               value={date}
               onChange={d => d && setDate(d)}
@@ -300,7 +300,7 @@ export default function WaterfallSimulation() {
             />
           </Col>
           <Col span={6}>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>{t('waterfallSimulation.timeSlotLabel')}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-body)', marginBottom: 4 }}>{t('waterfallSimulation.timeSlotLabel')}</div>
             <Select
               value={timeSlot}
               onChange={setTimeSlot}
@@ -309,7 +309,7 @@ export default function WaterfallSimulation() {
             />
           </Col>
           <Col span={6}>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>{t('waterfallSimulation.userLabel')}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-body)', marginBottom: 4 }}>{t('waterfallSimulation.userLabel')}</div>
             <Select
               value={userId || undefined}
               onChange={v => setUserId(v ?? '')}
@@ -337,7 +337,7 @@ export default function WaterfallSimulation() {
           {/* 命中策略卡 */}
           <Card
             size="small"
-            title={<Space><NodeIndexOutlined style={{ color: '#1890FF' }} /><span>{t('waterfallSimulation.strategyTitle')}</span></Space>}
+            title={<Space><NodeIndexOutlined style={{ color: 'var(--info)' }} /><span>{t('waterfallSimulation.strategyTitle')}</span></Space>}
             style={{ marginBottom: 16, borderRadius: 8 }}
           >
             <Descriptions column={3} size="small">
@@ -428,8 +428,8 @@ export default function WaterfallSimulation() {
       {/* 未命中策略空態 */}
       {searched && !result?.strategy && (
         <Card style={{ borderRadius: 8, textAlign: 'center', padding: '40px 0' }}>
-          <NodeIndexOutlined style={{ fontSize: 48, color: '#BFBFBF', marginBottom: 16 }} />
-          <div style={{ fontSize: 15, color: '#8C8C8C', marginBottom: 16 }}>
+          <NodeIndexOutlined style={{ fontSize: 48, color: 'var(--text-4)', marginBottom: 16 }} />
+          <div style={{ fontSize: 15, color: 'var(--text-3)', marginBottom: 16 }}>
             {t('waterfallSimulation.noStrategyTip')}
           </div>
           <Button type="primary" onClick={() => navigate('/promotion-slot-config')}>
@@ -455,7 +455,7 @@ function CandidatePanel({ slot }: { slot: WaterfallSlotResult }) {
 
   return (
     <div style={{ padding: '4px 0' }}>
-      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: '#595959' }}>
+      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: 'var(--text-2)' }}>
         {t('waterfallSimulation.candidateTitle', { position: slot.position })}
       </div>
       <Table
@@ -484,8 +484,8 @@ function CandidatePanel({ slot }: { slot: WaterfallSlotResult }) {
             dataIndex: 'loseReasonKey',
             render: (v: string | undefined) => (
               v
-                ? <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t(v)}</span>
-                : <span style={{ color: '#BFBFBF' }}>—</span>
+                ? <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t(v)}</span>
+                : <span style={{ color: 'var(--text-4)' }}>—</span>
             ),
           },
         ]}
@@ -543,7 +543,7 @@ function SlotConfigDrawer({
               style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '10px 12px', borderRadius: 8,
-                background: modified ? '#FFF7E6' : '#FAFAFA',
+                background: modified ? 'var(--warning-soft)' : 'var(--surface-3)',
                 border: `1px solid ${modified ? '#FFD591' : '#F0F0F0'}`,
               }}
             >

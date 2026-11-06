@@ -68,7 +68,7 @@ export default function AccountWhitelistPanel() {
           const current = draft[channel]
           const dirty = JSON.stringify(saved) !== JSON.stringify(current)
           return (
-            <div key={channel} style={{ border: '1px solid #F0F0F0', borderRadius: 8, padding: 20, background: '#fff' }}>
+            <div key={channel} style={{ border: '1px solid var(--border-2)', borderRadius: 8, padding: 20, background: 'var(--surface-2)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, fontWeight: 600 }}>
                   {t(`aiQuotaAuth.whitelistChannel_${channel}`)}

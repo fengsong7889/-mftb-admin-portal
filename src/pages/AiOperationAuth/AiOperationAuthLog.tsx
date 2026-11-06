@@ -94,7 +94,7 @@ export default function AiOperationAuthLog() {
     {
       title: t('aiOperationAuth.colResult'), key: 'result',
       render: (_, row) => (
-        <span style={{ color: row.result === t('aiOperationAuth.resultSuccess') ? '#52C41A' : '#FF4D4F' }}>{row.result}</span>
+        <span style={{ color: row.result === t('aiOperationAuth.resultSuccess') ? 'var(--success)' : 'var(--danger)' }}>{row.result}</span>
       ),
     },
   ]
@@ -125,30 +125,30 @@ export default function AiOperationAuthLog() {
 
       {/* ── 工具概览卡片 ── */}
       {tool && meta && (
-        <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+        <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ToolOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+            <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ToolOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
             </div>
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiOperationAuth.overviewTitle')}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiOperationAuth.overviewTitle')}</span>
             <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
             <div>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiOperationAuth.colToolName')}</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{tool.name}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('aiOperationAuth.colToolName')}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{tool.name}</div>
             </div>
             <div>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiOperationAuth.colToolCode')}</div>
-              <div style={{ fontSize: 14, color: '#262626', fontFamily: 'monospace' }}>{tool.code}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('aiOperationAuth.colToolCode')}</div>
+              <div style={{ fontSize: 14, color: 'var(--text-1)', fontFamily: 'monospace' }}>{tool.code}</div>
             </div>
             <div>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiOperationAuth.colMenuName')}</div>
-              <div style={{ fontSize: 14, color: '#262626' }}>{tool.menuName}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('aiOperationAuth.colMenuName')}</div>
+              <div style={{ fontSize: 14, color: 'var(--text-1)' }}>{tool.menuName}</div>
             </div>
             <div>
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>{t('aiOperationAuth.colLevel')}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>{t('aiOperationAuth.colLevel')}</div>
               <Tag color={meta.tagColor} style={{ borderRadius: 4 }}>{tool.level} · {t(`aiOperationAuth.levelName.${tool.level}`)}</Tag>
             </div>
           </div>
@@ -156,12 +156,12 @@ export default function AiOperationAuthLog() {
       )}
 
       {/* ── 调用日志表格卡片 ── */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <HistoryOutlined style={{ fontSize: 14, color: '#52c41a' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--success-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <HistoryOutlined style={{ fontSize: 14, color: 'var(--success)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiOperationAuth.logSectionTitle')}</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiOperationAuth.logSectionTitle')}</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
@@ -187,7 +187,7 @@ export default function AiOperationAuthLog() {
           pagination={tablePagination(t)}
         />
 
-        <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
           <FileSearchOutlined />
           {t('aiOperationAuth.logSource')}
         </div>

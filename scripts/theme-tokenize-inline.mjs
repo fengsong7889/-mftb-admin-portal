@@ -37,12 +37,19 @@ import {
   SCAN_ROOTS,
   classifyProperty,
   isExcluded,
+  isExcludedSelector,
   normalizeHex,
 } from './lib/theme-token-map.mjs'
 
 const ROOT = process.cwd()
 const ARGS = process.argv.slice(2)
 const RUN = ARGS.includes('--run')
+/**
+ * CSS 侧开关。默认关：现有各批的 TSX 行为一字不改，避免“同一命令突然开始改 CSS”这种静默扩大作用域。
+ * 为什么需要它：档 B（页面 CSS）有 2874 个裸色值，此前只能手工一个个改（档 A 就是这么做的），
+ * 而里面的绝大多数其实有严格等值令牌——工具不支 CSS 纯粹是历史缺口，不是风险判断。
+ */
+const CSS = ARGS.includes('--css')
 const dirIdx = ARGS.indexOf('--dir')
 /** --dir 限定批次范围（方案 §5.3 按菜单分批），不传则全站 */
 const onlyDir = dirIdx >= 0 ? ARGS[dirIdx + 1] : null
@@ -55,7 +62,7 @@ const onlyDir = dirIdx >= 0 ? ARGS[dirIdx + 1] : null
  *   3. --report 在方案 §5 里写着「输出未命中映射表的色值 Top50」，但本工具没有这个功能。
  * 批量令牌化的作用域只能靠人工确认，恰好是最不能“静默失败”的地方，因此直接拒跑而不是提示后继续。
  */
-const VALID_FLAGS = ['--run', '--dir', '--verbose', '--all', '--dry-run']
+const VALID_FLAGS = ['--run', '--dir', '--verbose', '--all', '--dry-run', '--css']
 // dirIdx 为 -1（没传 --dir）时 dirIdx+1 恰好是 0，会把第一个位置参数误当成 --dir 的值而漏检；
 // 索引必须先判存在再取后继，不能靠 -1+1 的巧合。
 const dirValueIdx = dirIdx >= 0 ? dirIdx + 1 : -1
@@ -113,7 +120,7 @@ function walk(dir, out = []) {
     if (st.isDirectory()) {
       if (entry === 'node_modules' || entry === 'dist' || entry === 'dist-apps' || entry === 'target') continue
       walk(full, out)
-    } else if (['.tsx', '.ts'].includes(extname(entry))) {
+    } else if (['.tsx', '.ts'].includes(extname(entry)) || (CSS && extname(entry) === '.css')) {
       out.push(full)
     }
   }
@@ -239,12 +246,131 @@ function transform(source) {
   return { next, replaced, skipped }
 }
 
+/**
+ * CSS 侧改写。与 TSX 侧共用同一张映射表、同一个 classifyProperty、同一套「严格等值」判据，
+ * 只把作域识别从 `style={{…}}` 换成选择器块。**故意不另写一份映射逻辑**——
+ * 分叉的计数/判据实现已经多次造成假结论（§18.4）。
+ *
+ * 六条刻意保守的规则，每条背后都是一个具体事故：
+ *  1. 选择器命中 EXCLUDE_SELECTOR_PREFIXES（`.login-` / `.biz-` / `[data-scene=` 等）→ 整块跳过。
+ *     多选择器组 `.a, .login-b {…}` 只要有一个命中就整块跳过（宁可漏改，不可误伤品牌固定样式）。
+ *  2. **嵌套选择器继承上层的锁定**：`&:hover` 这种自身不包含 `.login-` 字样，
+ *     不继承就会去改登录页的 hover 颜。这是本函数与直觉写法最容易错开的一处。
+ *  3. `@media print` 块内不动：打印恒浅色是已定版策略（theme.css 里用 `html, html[data-theme='dark']`
+ *     抬特异性做到），在页面 CSS 里把它改成令牌等于把这条策略交给运行时。
+ *  4. 值里含 `gradient(` → 整值跳过：只换首尾停靠色会做出「一半随主题一半不随」。
+ *  5. 值里已含 `var(` 又还有裸 hex → 整值跳过（人工只换了一半的现场，动它前需要人看）。
+ *  6. `url(#id)` 里的 `#` 不是颜色（实测 id 叫 #feed 时会被当 hex）。
+ * 另外 `theme-pair-locked` 哨兵在规则块内同样生效（锁整块，不锁单行）。
+ */
+const CSS_PROP_RE = /(^|[{;\s])(-{0,2}[a-z][a-z0-9-]*)\s*:\s*([^;{}]+)/g
+
+/** 对一段声明文本跑映射；只换 hex 本身，**不重建 `prop: value`**（否则会抹掉原始空格与分号） */
+function rewriteDecls(text, counters) {
+  return text.replace(CSS_PROP_RE, (whole, pre, prop, expr) => {
+    const segment = classifyProperty(prop)
+    if (!segment) return whole
+    if (!/#[0-9a-fA-F]{3}/.test(expr)) return whole
+    // 规则 4 / 5 / 6：这三种形态整值不动，只计入未覆盖报告
+    if (/gradient\(/i.test(expr) || expr.includes('var(') || /url\(\s*#/.test(expr)) {
+      counters.skips += 1
+      return whole
+    }
+    let changed = false
+    // head = 匹配串里除 expr 以外的部分（`pre + prop + ':' + 空格`），原样保留
+    const head = whole.slice(0, whole.length - expr.length)
+    const nextExpr = expr.replace(HEX_INNER_RE, (rawHex, digits) => {
+      const normalized = normalizeHex(digits)
+      if (!normalized || normalized.hasAlpha) return rawHex
+      const token = COLOR_TO_TOKEN[segment]?.[normalized.hex]
+      if (!token) {
+        counters.skips += 1
+        return rawHex
+      }
+      changed = true
+      counters.replaced += 1
+      return `var(--${token})`
+    })
+    HEX_INNER_RE.lastIndex = 0
+    return changed ? head + nextExpr : whole
+  })
+}
+
+export function transformCss(source) {
+  const counters = { replaced: 0, skips: 0 }
+  const skipped = []
+  /** 块栈：每层带自己的锁定标志，嵌套层继承上层 */
+  const stack = []
+  let pending = ''
+  /** 本行内先开后关的单行规则，它的锁定必须在 pop 之后仍然可用 */
+  let singleLineLock = true
+
+  const next = source
+    .split('\n')
+    .map((line) => {
+      const opens = (line.match(/\{/g) || []).length
+      const closes = (line.match(/\}/g) || []).length
+      const braceIdx = line.indexOf('{')
+
+      // 选择器头 = 之前累积的行 + 本行 `{` 之前的部分。
+      // 必须在处理前算好：同一行先开后关（`.login-x { color:#fff }`）时
+      // pending 是空的，不拿本行开头就会让锁定失效——这是最危险的一种漏判。
+      const head = braceIdx >= 0 ? (pending + line.slice(0, braceIdx)).trim() : pending.trim()
+      if (braceIdx >= 0) pending = ''
+
+      if (braceIdx >= 0) {
+        const isAt = head.startsWith('@')
+        const lockedByAt = /@media[^{]*\bprint\b/i.test(head)
+        const lockedBySel = !isAt && head.split(',').some((s) => isExcludedSelector(s.trim()))
+        const inherited = stack.length ? stack[stack.length - 1].locked : false
+        singleLineLock = lockedByAt || lockedBySel || inherited
+        stack.push({ locked: singleLineLock })
+      }
+      for (let i = 0; i < closes; i++) stack.pop()
+
+      // 哨兵：锁当前最内层块（不锁单行，原因同 TSX 侧）
+      if (stack.length && line.includes('theme-pair-locked')) {
+        stack[stack.length - 1].locked = true
+        return line
+      }
+      // 哨兵写在规则头那一行时，刚压的栈就是它自己的块
+      if (braceIdx >= 0 && line.includes('theme-pair-locked')) return line
+
+      // 单行规则（`.a { color:#fff }`）在本行内先 push 后 pop，栈会回到外层；
+      // 此时必须用刚算出的本块锁定，不能用“栈顶”——否则栈为空会被当成“不在任何块里”
+      // 而整行跳过（测试用 2≠3 的精确计数拦住了这个：上一轮自以为修好了单行规则）。
+      const locked = opens > 0 && closes > 0
+        ? singleLineLock
+        : (stack.length ? stack[stack.length - 1].locked : true)
+      if (locked || !/#[0-9a-fA-F]{3}/.test(line)) return line
+
+      if (opens > 0 && closes > 0) {
+        // 单行规则 `.a { color: #fff; }`：只重写 `{…}` 之间的部分，头尾不动
+        const close = line.lastIndexOf('}')
+        const body = line.slice(braceIdx + 1, close)
+        const before = counters.skips
+        const rewritten = line.slice(0, braceIdx + 1) + rewriteDecls(body, counters) + line.slice(close)
+        if (counters.skips > before) skipped.push(line.trim().slice(0, 72))
+        return rewritten
+      }
+      if (opens > 0 || closes > 0) return line // 开合混排行（如 `} else`、多块一行）不猜
+
+      const before = counters.skips
+      const rewritten = rewriteDecls(line, counters)
+      if (counters.skips > before) skipped.push(line.trim().slice(0, 72))
+      return rewritten
+    })
+    .join('\n')
+
+  return { next, replaced: counters.replaced, skipped }
+}
+
 let totalFiles = 0
 let totalReplaced = 0
 
 for (const rel of collectFiles()) {
   const before = readFileSync(join(ROOT, rel), 'utf8')
-  const { next, replaced, skipped } = transform(before)
+  const { next, replaced, skipped } = rel.endsWith('.css') ? transformCss(before) : transform(before)
   if (replaced === 0) continue
 
   totalFiles += 1

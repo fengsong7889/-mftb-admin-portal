@@ -767,9 +767,9 @@ export default function Portal() {
       <div className="portal-groups">
         <section className="portal-group">
           <header className="portal-group-head">
-            <span className="portal-group-icon" style={{ background: '#FFF7E6', color: '#E8720C' }}><MobileOutlined /></span>
+            <span className="portal-group-icon" style={{ background: 'var(--warning-soft)', color: 'var(--brand)' }}><MobileOutlined /></span>
             <h2 className="portal-group-title">{t('portal.appGroup', '移動應用')}</h2>
-            <span className="portal-group-count" style={{ color: '#E8720C', background: '#FFF7E6' }}>2</span>
+            <span className="portal-group-count" style={{ color: 'var(--brand)', background: 'var(--warning-soft)' }}>2</span>
             <span className="portal-group-line" aria-hidden="true" />
             <span className="portal-group-desc">{t('portal.appGroupDesc', '原型預覽 · 數據取自真實後端')}</span>
           </header>

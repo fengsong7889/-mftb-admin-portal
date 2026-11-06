@@ -8,10 +8,10 @@
     "统计已排除方案 §5.4 的排除区（登录页 / 门户插画 scene / PetMascot 动效变量 / 测试断言）。",
     "expectThemeFiles：theme.css 与 themeTokens.ts 是否应已存在；置 true 后文件缺失即判失败，防止门禁长期 SKIP。"
   ],
-  "cssHex": 2874,
-  "inlineHex": 5414,
+  "cssHex": 1356,
+  "inlineHex": 5072,
   "rgbaBlack": 575,
-  "tokenized": 4615,
+  "tokenized": 6518,
   "expectThemeFiles": true,
   "updatedAt": "2026-11-06"
 }

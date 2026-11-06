@@ -53,7 +53,7 @@ export default function SystemAccessApprovalPanel({ options, denied, value, onCh
           ]}
         />
       </div>
-      <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
         <SafetyOutlined />
         {t('approvalDetail.saGrantAutoHint')}
       </div>
@@ -94,15 +94,15 @@ export default function SystemAccessApprovalPanel({ options, denied, value, onCh
                     width: '100%', margin: 0, borderRadius: 8, padding: '12px 14px',
                     alignItems: 'flex-start', cursor: 'pointer',
                     border: `1px solid ${selected ? '#E8720C' : '#e8eaed'}`,
-                    background: selected ? '#fff7e6' : '#fff',
+                    background: selected ? 'var(--warning-soft)' : 'var(--surface-2)',
                   }}
                 >
                   <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 4 }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <TeamOutlined style={{ color: selected ? '#E8720C' : '#8C8C8C' }} />
-                      <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>{option.targetName}</span>
+                      <TeamOutlined style={{ color: selected ? 'var(--brand)' : 'var(--text-3)' }} />
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{option.targetName}</span>
                       {option.targetCode && (
-                        <span style={{ fontSize: 11, color: '#8c8c8c' }}>({option.targetCode})</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-3)' }}>({option.targetCode})</span>
                       )}
                       {option.preferred && (
                         <Tag color="orange" style={{ margin: 0, fontSize: 11 }}>
@@ -116,10 +116,10 @@ export default function SystemAccessApprovalPanel({ options, denied, value, onCh
                       )}
                     </span>
                     {option.description && (
-                      <span style={{ fontSize: 12, color: '#8c8c8c' }}>{option.description}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{option.description}</span>
                     )}
                     {/* 只给数量不给清单：审批人需要知道范围宽窄，但不需要（也不该）在这里看到功能明细 */}
-                    <span style={{ fontSize: 12, color: '#8c8c8c' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
                       {t('approvalDetail.saGrantMenuCount', { count: option.grantedMenuCount })}
                     </span>
                   </span>
@@ -132,8 +132,8 @@ export default function SystemAccessApprovalPanel({ options, denied, value, onCh
 
       {options.length > 0 && (
         <div style={{
-          marginTop: 12, fontSize: 12, color: '#8c8c8c', lineHeight: 1.7,
-          borderTop: '1px dashed #f0f0f0', paddingTop: 10,
+          marginTop: 12, fontSize: 12, color: 'var(--text-3)', lineHeight: 1.7,
+          borderTop: '1px dashed var(--border-2)', paddingTop: 10,
         }}>
           {t('approvalDetail.saGrantFooterHint')}
         </div>

@@ -234,7 +234,7 @@ export default function AiOperationAuth() {
       render: (_, row) => (
         <div>
           <div>{row.name}</div>
-          <div style={{ fontSize: 11, color: '#8C8C8C' }}>{row.code}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{row.code}</div>
         </div>
       ),
     },
@@ -251,10 +251,10 @@ export default function AiOperationAuth() {
       title: t('aiOperationAuth.colParams'), key: 'params', width: 100, align: 'center',
       render: (_, row) => (row.params.length
         ? t('aiOperationAuth.paramCount', { count: row.params.length })
-        : <span style={{ color: '#BFBFBF' }}>--</span>),
+        : <span style={{ color: 'var(--text-4)' }}>--</span>),
     },
-    { title: t('aiOperationAuth.colCallCount30d'), dataIndex: 'callCount30d', width: 110, align: 'right', render: (v: number) => (v ? v.toLocaleString() : <span style={{ color: '#BFBFBF' }}>0</span>) },
-    { title: t('aiOperationAuth.colLastCalledAt'), dataIndex: 'lastCalledAt', width: 160, render: (v: string | null) => v ?? <span style={{ color: '#BFBFBF' }}>--</span> },
+    { title: t('aiOperationAuth.colCallCount30d'), dataIndex: 'callCount30d', width: 110, align: 'right', render: (v: number) => (v ? v.toLocaleString() : <span style={{ color: 'var(--text-4)' }}>0</span>) },
+    { title: t('aiOperationAuth.colLastCalledAt'), dataIndex: 'lastCalledAt', width: 160, render: (v: string | null) => v ?? <span style={{ color: 'var(--text-4)' }}>--</span> },
     {
       title: t('aiOperationAuth.colStatus'), dataIndex: 'status', width: 80, align: 'center',
       render: (_: unknown, row: ToolPolicyRow) => (
@@ -315,22 +315,22 @@ export default function AiOperationAuth() {
       <div
         style={{
           border: `1px solid ${killSwitch?.engaged ? '#FFCCC7' : '#f0f0f0'}`,
-          background: killSwitch?.engaged ? '#FFF1F0' : '#fff',
+          background: killSwitch?.engaged ? 'var(--danger-soft)' : 'var(--surface-2)',
           borderRadius: 8, padding: '16px 20px', marginBottom: 16,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
         }}
       >
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <PoweroffOutlined style={{ color: killSwitch?.engaged ? '#FF4D4F' : '#8C8C8C' }} />
-            <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{t('aiOperationAuth.killSwitchTitle')}</span>
+            <PoweroffOutlined style={{ color: killSwitch?.engaged ? 'var(--danger)' : 'var(--text-3)' }} />
+            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{t('aiOperationAuth.killSwitchTitle')}</span>
             <Tag color={killSwitch?.engaged ? 'error' : 'success'} style={{ borderRadius: 4 }}>
               {killSwitch?.engaged ? t('aiOperationAuth.killSwitchOn') : t('aiOperationAuth.killSwitchOff')}
             </Tag>
           </div>
-          <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{t('aiOperationAuth.killSwitchDesc')}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{t('aiOperationAuth.killSwitchDesc')}</div>
           {killSwitch?.engaged && (
-            <div style={{ fontSize: 12, color: '#595959', marginTop: 4 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 4 }}>
               {t('aiOperationAuth.killSwitchOperator')}：{killSwitch.operator}｜{t('aiOperationAuth.killSwitchReasonLabel')}
               ：{killSwitch.reason || '-'}｜{t('aiOperationAuth.killSwitchUpdatedAt')}：{formatEpochOrDash(killSwitch.updatedAt)}
             </div>
@@ -372,7 +372,7 @@ export default function AiOperationAuth() {
                 <span style={{ fontWeight: 700, color: meta.color }}>{level}</span>
                 <span style={{ fontWeight: 600, fontSize: 13 }}>{t(`aiOperationAuth.levelName.${level}`)}</span>
               </div>
-              <div style={{ fontSize: 11, color: '#8C8C8C', lineHeight: 1.5 }}>{t(`aiOperationAuth.levelDesc.${level}`)}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', lineHeight: 1.5 }}>{t(`aiOperationAuth.levelDesc.${level}`)}</div>
               <div style={{ fontSize: 11, color: meta.color, marginTop: 4 }}>{t('aiOperationAuth.humanIntervention')}{t(`aiOperationAuth.levelHuman.${level}`)}</div>
             </div>
           )

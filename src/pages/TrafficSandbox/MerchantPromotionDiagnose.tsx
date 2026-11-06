@@ -156,7 +156,7 @@ export default function MerchantPromotionDiagnose() {
       render: (_: unknown, r: DisplayPosition) => (
         <div>
           <div style={{ fontWeight: 500 }}>{r.strategyName}</div>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{r.strategyCode}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{r.strategyCode}</div>
         </div>
       ),
     },
@@ -192,16 +192,16 @@ export default function MerchantPromotionDiagnose() {
       <Alert type="info" showIcon style={{ marginBottom: 16 }} message="演示資料 · 非真實推廣診斷" description="訂單、投放及診斷結論均為樣例。真實報名與匹配資料待商戶運營系統接入，不可據此調整商家業務。" />
       {/* 頁面標題 */}
       <div style={{
-        background: '#fff', padding: '12px 20px', marginBottom: 12,
+        background: 'var(--surface-2)', padding: '12px 20px', marginBottom: 12,
         borderRadius: 8, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <MedicineBoxOutlined style={{ fontSize: 20, color: '#E8720C' }} />
+          <MedicineBoxOutlined style={{ fontSize: 20, color: 'var(--brand)' }} />
           <div>
-            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#E8720C' }}>
+            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--brand)' }}>
               {t('merchantDiagnose.title')}
             </h2>
-            <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-hint)', marginTop: 2 }}>
               {t('merchantDiagnose.desc')}
             </div>
           </div>
@@ -210,15 +210,15 @@ export default function MerchantPromotionDiagnose() {
 
       {/* 查詢條件區 */}
       <Card
-        title={<Space><SearchOutlined style={{ color: '#E8720C' }} /><span>{t('trafficSandbox.conditionTitle')}</span></Space>}
+        title={<Space><SearchOutlined style={{ color: 'var(--brand)' }} /><span>{t('trafficSandbox.conditionTitle')}</span></Space>}
         size="small"
         style={{ marginBottom: 16, borderRadius: 8 }}
       >
         <Row gutter={16}>
           <Col span={8}>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-body)', marginBottom: 4 }}>
               {t('merchantDiagnose.storeLabel')}
-              <span style={{ color: '#FF4D4F', marginLeft: 4 }}>*</span>
+              <span style={{ color: 'var(--danger)', marginLeft: 4 }}>*</span>
             </div>
             <RemoteSearchSelect
               value={storeCode}
@@ -229,7 +229,7 @@ export default function MerchantPromotionDiagnose() {
             />
           </Col>
           <Col span={6}>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>{t('merchantDiagnose.dateLabel')}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-body)', marginBottom: 4 }}>{t('merchantDiagnose.dateLabel')}</div>
             <DatePicker
               value={date}
               onChange={d => d && setDate(d)}
@@ -277,7 +277,7 @@ export default function MerchantPromotionDiagnose() {
 
           {/* 區塊一：已購買廣告 */}
           <Card
-            title={<Space><ShopOutlined style={{ color: '#1890FF' }} /><span>{t('merchantDiagnose.sectionPurchased')}</span></Space>}
+            title={<Space><ShopOutlined style={{ color: 'var(--info)' }} /><span>{t('merchantDiagnose.sectionPurchased')}</span></Space>}
             size="small"
             extra={<Tag color="blue">{t('merchantDiagnose.adCount', { count: result.purchasedAds.length })}</Tag>}
             style={{ marginBottom: 16, borderRadius: 8 }}
@@ -293,7 +293,7 @@ export default function MerchantPromotionDiagnose() {
 
           {/* 區塊二：實際展示位置 */}
           <Card
-            title={<Space><TrophyOutlined style={{ color: '#E8720C' }} /><span>{t('merchantDiagnose.sectionPositions')}</span></Space>}
+            title={<Space><TrophyOutlined style={{ color: 'var(--brand)' }} /><span>{t('merchantDiagnose.sectionPositions')}</span></Space>}
             size="small"
             extra={<Tag color="orange">{t('merchantDiagnose.positionCount', { count: result.displayPositions.length })}</Tag>}
             style={{ marginBottom: 16, borderRadius: 8 }}
@@ -309,7 +309,7 @@ export default function MerchantPromotionDiagnose() {
 
           {/* 區塊三：未展示原因診斷 */}
           <Card
-            title={<Space><MedicineBoxOutlined style={{ color: '#722ED1' }} /><span>{t('merchantDiagnose.sectionChecks')}</span></Space>}
+            title={<Space><MedicineBoxOutlined style={{ color: 'var(--purple)' }} /><span>{t('merchantDiagnose.sectionChecks')}</span></Space>}
             size="small"
             style={{ borderRadius: 8 }}
           >
@@ -341,22 +341,22 @@ function CheckRow({ check, onFix }: { check: DiagnoseCheckItem; onFix: (path: st
     <div style={{
       display: 'flex', alignItems: 'flex-start', gap: 10,
       padding: '10px 14px', borderRadius: 8,
-      background: failed ? '#FFF1F0' : '#FAFAFA',
+      background: failed ? 'var(--danger-soft)' : 'var(--surface-3)',
       border: `1px solid ${failed ? '#FFCCC7' : '#F0F0F0'}`,
     }}>
       {failed
-        ? <CloseCircleOutlined style={{ color: '#FF4D4F', fontSize: 16, marginTop: 2 }} />
-        : <CheckCircleOutlined style={{ color: '#52C41A', fontSize: 16, marginTop: 2 }} />}
+        ? <CloseCircleOutlined style={{ color: 'var(--danger)', fontSize: 16, marginTop: 2 }} />
+        : <CheckCircleOutlined style={{ color: 'var(--success)', fontSize: 16, marginTop: 2 }} />}
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: failed ? '#CF1322' : '#262626' }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: failed ? '#CF1322' : 'var(--text-1)' }}>
           {t(check.labelKey)}
         </div>
-        <div style={{ fontSize: 12, color: failed ? '#CF1322' : '#8C8C8C', marginTop: 2 }}>
+        <div style={{ fontSize: 12, color: failed ? '#CF1322' : 'var(--text-3)', marginTop: 2 }}>
           {t(check.detailKey, check.detailParams)}
         </div>
         {failed && check.fixKey && (
           <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 12, color: '#E8720C' }}>{t(check.fixKey, check.detailParams)}</span>
+            <span style={{ fontSize: 12, color: 'var(--brand)' }}>{t(check.fixKey, check.detailParams)}</span>
             {check.fixPath && (
               <Button type="link" size="small" style={{ padding: 0 }} onClick={() => onFix(check.fixPath!)}>
                 {t('merchantDiagnose.goFix')}

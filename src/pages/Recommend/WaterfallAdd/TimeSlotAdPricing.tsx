@@ -467,7 +467,7 @@ export default function TimeSlotAdPricing() {
   const renderSlotRow = (slot: SlotConfig) => (
     <div key={slot.key} style={{
       padding: 16, background: 'var(--surface-3)', borderRadius: 8, marginBottom: 12,
-      border: '1px solid #ffe7ba',
+      border: '1px solid var(--warning-border-soft)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
         {slot.preset ? (

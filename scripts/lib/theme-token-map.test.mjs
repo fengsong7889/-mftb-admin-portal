@@ -43,10 +43,18 @@ import {
   isExcluded,
   isExcludedSelector,
   normalizeHex,
+  relativeLuminance,
 } from './theme-token-map.mjs'
 
-/** 深浅两主题有意保持同值的令牌：品牌橙是品牌识别锚点，深色下实测 5.37:1 反而优于浅色底 */
-const INTENTIONAL_SAME_VALUE = new Set(['brand', 'brand-hover'])
+/**
+ * 深浅两主题有意保持同值的令牌。它们不是“忘了配深色”，而是**语义不随主题翻面**：
+ *   brand / brand-hover —— 品牌橙是品牌识别锚点，深色下实测 5.37:1 反而优于浅色底；
+ *   medal-* / on-medal —— 金/银/铜是**排名编码**，压暗就不再是金牌；而配套数字前景
+ *     必须跟着金属色走而不是跟着主题走（主题翻面会弄断唯一达标的那对关系）。
+ * 新加名字进本集合前先问：这个颜色代的是“品牌/实体/编码”，还是“主题表面”？
+ * 后者永远不该出现在这里，它应该去配真正的深/浅两档。
+ */
+const INTENTIONAL_SAME_VALUE = new Set(['brand', 'brand-hover', 'medal-gold', 'medal-silver', 'medal-bronze', 'on-medal'])
 
 const ALL_TOKEN_NAMES = [...SEMANTIC_TOKENS, ...COMPONENT_TOKENS]
 const ALL_TOKEN_VALUES = { ...TOKEN_VALUES, ...NON_COLOR_TOKENS }
@@ -411,7 +419,7 @@ describe('令牌清单一致性', () => {
     expect(offenders, `深色下浅色实底会刺眼：${offenders.join(', ')}`).toEqual([])
   })
 
-  it('深浅同值的令牌只允许品牌色（其余同值意味着切换无效果）', () => {
+  it('深浅同值只能出现在已登记的语义编码上（其余同值意味着切换无效果）', () => {
     const same = Object.entries(TOKEN_VALUES)
       .filter(([, v]) => v.light.toLowerCase() === v.dark.toLowerCase())
       .map(([name]) => name)
@@ -593,5 +601,186 @@ describe('countBareColors', () => {
 
   it('白色 rgba 不计入黑色阴影（毛玻璃等场景属独立债务）', () => {
     expect(countBareColors('.a{background:rgba(255,255,255,0.15)}', 'css').rgbaBlack).toBe(0)
+  })
+})
+
+/**
+ * 插画角色表面 --art-figure（用户报的图3：「人工智能系统 SVG 图深色下有点恐怖」）。
+ *
+ * 为何必须单独一组：这个令牌存在的**全部理由就是对比度**，而不是色值偏好。
+ * 不钉住它，下任把它“为了统一”改回 --art-surface 时，门禁不会报错，而机器人会重新变成灰脸空洞。
+ */
+describe('插画角色表面（--art-figure）', () => {
+  /** AI 场景的面罩与瞳孔都是 scene 主色紫（Portal/index.css 里 data-scene='ai' 的 color） */
+  const SCENE_AI = '#722ED1'
+  const CARD = TOKEN_VALUES['surface-2'].dark
+
+  it('深色下角色表面与卡片底必须拉开 ≥ 3:1（否则脸没有轮廓）', () => {
+    expect(contrastRatio(TOKEN_VALUES['art-figure'].dark, CARD))
+      .toBeGreaterThanOrEqual(3.0)
+  })
+
+  it('深色下角色表面与场景紫（面罩/瞳孔）必须双向 ≥ 3:1', () => {
+    const c = contrastRatio(TOKEN_VALUES['art-figure'].dark, SCENE_AI)
+    expect(c, '眼白 on 面罩').toBeGreaterThanOrEqual(3.0)
+    expect(c, '瞳孔 on 眼白（同一对颜色）').toBeGreaterThanOrEqual(3.0)
+  })
+
+  it('浅色值必须仍为 #FFFFFF（浅色逐像素不变）', () => {
+    expect(TOKEN_VALUES['art-figure'].light).toBe('#FFFFFF')
+  })
+
+  it('不得与 --art-surface 同值（同值就等于这个令牌没意义，应该直接用纸面令牌）', () => {
+    expect(TOKEN_VALUES['art-figure'].dark).not.toBe(TOKEN_VALUES['art-surface'].dark)
+  })
+
+  it('旧现状必须真的不达标（钉住“为什么需要这个令牌”，防止被当成过度设计删掉）', () => {
+    // 这两个数字是本轮实测写进注释的；如果哪天它们不再低于 3.0，说明场景色/卡片底变了，
+    // 需要重新评估本令牌是否保留，而不是默认它永远必要。
+    expect(contrastRatio(TOKEN_VALUES['art-surface'].dark, SCENE_AI)).toBeLessThan(3.0)
+    expect(contrastRatio(TOKEN_VALUES['art-surface'].dark, CARD)).toBeLessThan(3.0)
+  })
+})
+
+/**
+ * 品牌橙实底上的玻璃面板族（门户 hero 顶部搜索框 = 用户报的图2）。
+ *
+ * 为何必须单独一组：族令牌的背板不是 surface-*，而是**品牌橙渐变本身**。
+ * 既有对比度断言只覆盖固定背板集合，不补就是「令牌加了、门禁根本没看它」（§16.2 第 5 条）。
+ */
+const GLASS_TOKENS = ['brand-glass', 'brand-glass-hover', 'brand-glass-border']
+
+describe('品牌玻璃面板族（--brand-glass*）', () => {
+  /** hero 渐变的四个停靠色；搜索框在横幅最右（最亮）端，那里是最难的一档 */
+  const HERO = ['#B14A05', '#E8720C', '#F59432', '#FFB347']
+  /**
+   * 合成方向必须是 tint×alpha + 背板×(1-alpha)。
+   * 本轮手写探针时把它写成过反（背板×alpha + tint×(1-alpha)），算出
+   * “黑玻璃压深底变亮绿 #4aaa1b”这种荒谬值——差点当作实测数字写进注释。
+   * 这里不复用上面 describe 里的 toRgb（它不在本作用域），归一化仍走工具自己的 normalizeHex。
+   */
+  const rgb = (s) => {
+    if (s.startsWith('#')) {
+      // 3 位展开走工具自己的 normalizeHex，不在测试里再抄一份（抄了就会漂）
+      const n = normalizeHex(s.slice(1))
+      const h = n.hex
+      return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16), 1]
+    }
+    const p = s.match(/rgba?\(([^)]+)\)/)[1].split(',').map((x) => Number(x.trim()))
+    return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]
+  }
+  const over = (tint, back) => {
+    const t = rgb(tint)
+    const b = rgb(back)
+    return `#${[0, 1, 2].map((i) => Math.round(t[i] * t[3] + b[i] * (1 - t[3])).toString(16).padStart(2, '0')).join('')}`
+  }
+
+  it('深色值必须是带 alpha 的 rgba 四元（缺 alpha 会被合成函数静默当不透明）', () => {
+    for (const name of [...GLASS_TOKENS, 'on-brand-glass']) {
+      const m = TOKEN_VALUES[name].dark.match(/^rgba\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)$/)
+      if (name === 'on-brand-glass') continue // 前景是不透明白，本来就不该有 alpha
+      expect(m, `${name} 的深色值必须是 rgba(r,g,b,a) 四元，实际：${TOKEN_VALUES[name].dark}`).not.toBeNull()
+      const a = Number(m[4])
+      expect(a, `${name} 的 alpha 必须落在 (0,1)`).toBeGreaterThan(0)
+      expect(a, `${name} 的 alpha 必须落在 (0,1)`).toBeLessThan(1)
+    }
+  })
+
+  it('白字 on 玻璃底必须在 hero 每一个停靠色上都达 AA', () => {
+    for (const name of ['brand-glass', 'brand-glass-hover']) {
+      for (const hero of HERO) {
+        const bg = over(TOKEN_VALUES[name].dark, hero)
+        expect(bg, `${name} on ${hero} 合成失败`).toMatch(/^#[0-9a-f]{6}$/)
+        expect(contrastRatio('#FFFFFF', bg), `${name} 的白字 on ${hero}`).toBeGreaterThanOrEqual(4.5)
+      }
+    }
+  })
+
+  it('族令牌的浅色值必须逐个等于它替换掉的 CSS 字面量（这是「浅色不变」的唯一机验）', () => {
+    // 这四个值来自 Portal/index.css 搜索框原本的字面量；改动任何一项就意味着浅色观感被动了。
+    expect(TOKEN_VALUES['brand-glass'].light).toBe('rgba(255,255,255,0.94)')
+    expect(TOKEN_VALUES['brand-glass-hover'].light).toBe('#FFFFFF')
+    expect(TOKEN_VALUES['brand-glass-border'].light).toBe('rgba(255,255,255,0.40)')
+    // 配套前景的浅色值必须仍等于 --text-3，否则搜索图标在浅色下会变颜色
+    expect(TOKEN_VALUES['on-brand-glass'].light).toBe(TOKEN_VALUES['text-3'].light)
+  })
+
+  it('配套前景必须在玻璃底上达非文本 3:1（只改背景会把图标弄没）', () => {
+    for (const hero of HERO) {
+      const bg = over(TOKEN_VALUES['brand-glass'].dark, hero)
+      expect(contrastRatio(TOKEN_VALUES['on-brand-glass'].dark, bg), `on-brand-glass on ${hero}`)
+        .toBeGreaterThanOrEqual(3.0)
+    }
+  })
+
+  it('族令牌不得被当作背景段自动映射目标（它们不是 hex，也不该被 codemod 自刷）', () => {
+    for (const seg of Object.keys(COLOR_TO_TOKEN)) {
+      const hit = Object.entries(COLOR_TO_TOKEN[seg]).filter(([, token]) => String(token).includes('glass'))
+      expect(hit, `${seg} 段不应映射到 glass 族`).toEqual([])
+    }
+  })
+})
+
+/**
+ * 奖牌金属色族（图 6 自然流量详情）。本组同样全走对比度，而不是色值偏好。
+ *
+ * 为什么必须单独一组：这三档颜色与配套数字前景是**绑定关系**。
+ * 只把金属色令牌化、数字仍留白字，就是把一个既有 AA 缺陷刷成“看起来已治理”的样子；
+ * 而只改数字不登记金属色，codemod 下轮会把它们当裸值刷成别的令牌。
+ */
+describe('奖牌金属色族（--medal-* / --on-medal）', () => {
+  const MEDALS = ['medal-gold', 'medal-silver', 'medal-bronze']
+
+  it('旧现状必须真的不达标（钉住“为什么连数字前景一起改”，防止被当成过度设计删掉）', () => {
+    // 这三对就是改动前 organic.css 里的真实组合：白字压在金属色上。
+    // 它们跟深浅主题无关，在浅色下也一样红；不再 < 4.5 就说明有人动过金属色，
+    // 那 on-medal 的存在理由需要重新评估，而不是默认它永远必要。
+    for (const name of MEDALS) {
+      expect(contrastRatio('#FFFFFF', TOKEN_VALUES[name].light), `${name} 上的白字不该被判为已达标`)
+        .toBeLessThan(4.5)
+    }
+  })
+
+  it('配套数字前景必须在三档金属底上都达 AA 4.5:1', () => {
+    for (const name of MEDALS) {
+      for (const theme of ['light', 'dark']) {
+        expect(contrastRatio(TOKEN_VALUES['on-medal'][theme], TOKEN_VALUES[name][theme]),
+          `${TOKEN_VALUES['on-medal'][theme]} on ${name}/${theme}`)
+          .toBeGreaterThanOrEqual(4.5)
+      }
+    }
+  })
+
+  it('三档金属色深浅必须同值（它们是排名语义编码，不是主题表面）', () => {
+    // 一旦有人为了“深色更柔和”去压暗，实测会把两个方向都弄坏：
+    // #FA8C16 压到 #D48806 后白字 2.87、#141414 字 6.19，都不如原值。
+    for (const name of MEDALS) {
+      expect(TOKEN_VALUES[name].dark, `${name} 不得随主题翻面`).toBe(TOKEN_VALUES[name].light)
+    }
+    expect(TOKEN_VALUES['on-medal'].dark).toBe(TOKEN_VALUES['on-medal'].light)
+  })
+
+  it('三档彼此亮度必须实拉开（金/银/铜 失去区分度比不达标更隐蔽）', () => {
+    const [gold, silver, bronze] = MEDALS.map((n) => relativeLuminance(TOKEN_VALUES[n].light))
+    expect(gold).toBeGreaterThan(silver)
+    expect(silver).toBeGreaterThan(bronze)
+    // 两两亮度差至少 0.04：低于这个值在 26px 小圆上肉眼已经分不出金银
+    expect(gold - silver).toBeGreaterThanOrEqual(0.04)
+    expect(silver - bronze).toBeGreaterThanOrEqual(0.04)
+  })
+
+  it('族令牌不得进 COLOR_TO_TOKEN（否则 codemod 会把无关站点刷成奖牌色）', () => {
+    // #FA8C16 在站内还兼任其他语义主色的深色档（§廿四 故意没把它加进 bg 段），
+    // #8C8C8C 在 fg 段已是 --text-3。这两条是真实存在过的手滑，所以单独钉住。
+    for (const seg of Object.keys(COLOR_TO_TOKEN)) {
+      const hit = Object.entries(COLOR_TO_TOKEN[seg]).filter(([, token]) => String(token).includes('medal'))
+      expect(hit, `${seg} 段不应映射到奖牌族`).toEqual([])
+    }
+  })
+
+  it('配套前景不得复用 --on-brand（它的浅色档是白，语义上是反的）', () => {
+    expect(TOKEN_VALUES['on-medal'].light).not.toBe(TOKEN_VALUES['on-brand'].light)
+    // 而深色档恰好同值——这是巧合不是可合并的理由，所以两边都钉住
+    expect(TOKEN_VALUES['on-medal'].dark).toBe(TOKEN_VALUES['on-brand'].dark)
   })
 })

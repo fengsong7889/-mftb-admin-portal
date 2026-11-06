@@ -150,7 +150,7 @@ export function AlgoStep({ nav }: { nav: Nav }) {
   return (
     <div className="ap-body">
       <div className="ap-card" style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 12, color: '#8c8c8c' }}>當前門店</div>
+        <div style={{ fontSize: 12, color: 'var(--text-3)' }}>當前門店</div>
         <div style={{ fontSize: 15, fontWeight: 600, marginTop: 4 }}>{store?.storeName}（{store?.storeCode}）</div>
       </div>
       <div className="ap-section-title">選擇推廣方案（無敵星星算法）</div>
@@ -238,7 +238,7 @@ export function CellsStep({ nav }: { nav: Nav }) {
       <div className="ap-body">
         <div className="ap-card" style={{ marginBottom: 12, padding: '10px 14px' }}>
           <div style={{ fontSize: 13, fontWeight: 600 }}>{algo?.algoName}</div>
-          <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 2 }}>{store?.storeName} · 预售 {inventory?.presaleDays ?? '-'} 天</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{store?.storeName} · 预售 {inventory?.presaleDays ?? '-'} 天</div>
         </div>
         {dates.length === 0 ? (
           <div className="ap-empty-tip">暫無可購時段</div>
@@ -412,9 +412,9 @@ export function SuccessStep({ nav, orderNo, amount }: { nav: Nav; orderNo: strin
     <div className="ap-success">
       <div className="ap-success-icon">✓</div>
       <div className="ap-success-title">下單成功</div>
-      <div style={{ fontSize: 13, color: '#8c8c8c', marginTop: 6 }}>已從推廣金賬戶扣款 MOP {Math.round(amount)}</div>
+      <div style={{ fontSize: 13, color: 'var(--text-3)', marginTop: 6 }}>已從推廣金賬戶扣款 MOP {Math.round(amount)}</div>
       <div className="ap-success-no">訂單號：{orderNo}</div>
-      <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 12 }}>可在後台「推廣訂單管理」查看此訂單</div>
+      <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 12 }}>可在後台「推廣訂單管理」查看此訂單</div>
       <div style={{ display: 'flex', gap: 12, marginTop: 26 }}>
         <button type="button" className="ap-btn is-danger" style={{ marginLeft: 0 }} onClick={() => nav.reset({ key: 'home' })}>繼續選購</button>
         <button type="button" className="ap-btn" style={{ marginLeft: 0 }} onClick={() => nav.reset({ key: 'orderDetail', orderNo })}>查看訂單</button>

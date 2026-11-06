@@ -112,7 +112,7 @@ export default function LocationSimulation() {
       </Section>
     </div>
     <Section title="距離衰減曲線" description="固定示例：滿分100、每公里扣5分，20公里歸零。曲線僅代表PLT_01原始分。">
-      <VisualBoundary label="距離曲線"><Line height={170} data={DISTANCE_CURVE} xField="distance" yField="score" scale={{ x: { type: 'linear' }, y: { domain: [0, 100] } }} style={{ stroke: '#722ED1', lineWidth: 2 }} point={{ size: 3 }} axis={{ x: { title: '距離（km）' }, y: { title: '原始分' } }} animate={false} /></VisualBoundary>
+      <VisualBoundary label="距離曲線"><Line height={170} data={DISTANCE_CURVE} xField="distance" yField="score" scale={{ x: { type: 'linear' }, y: { domain: [0, 100] } }} style={{ stroke: 'var(--purple)', lineWidth: 2 }} point={{ size: 3 }} axis={{ x: { title: '距離（km）' }, y: { title: '原始分' } }} animate={false} /></VisualBoundary>
       <div className="organic__legend">{DISTANCE_CURVE.filter(p => [0, 1, 5, 20].includes(p.distance)).map(p => <span key={p.distance}>{p.distance} km → <b>{p.score} 分</b></span>)}</div>
     </Section>
     <div className="action-section"><div className="action-section-left"><Input aria-label="對比門店搜尋" placeholder="搜尋對比門店" value={keyword} maxLength={100} allowClear onChange={e => { setKeyword(e.target.value); setPage(1) }} />{hasPermission('algorithm-simulation:export') && <Button className="btn-export" icon={<ExportOutlined />} disabled={!comparison || !rows.length} onClick={handleExport}>導出演示對比</Button>}</div><div className="action-section-right">{configComponent}</div></div>

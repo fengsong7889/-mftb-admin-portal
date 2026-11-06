@@ -567,6 +567,32 @@ export default function Home() {
   /* ── 當前引擎（模型通道 / 使用權限）── */
   const [engine, setEngine] = useState<LlmEngineStatus | null>(null)
 
+  /**
+   * 引擎路由結果有三個寫入點：60s 輪詢、用戶手動切換、受限清單校正。
+   * 不收敛會出兩類真實後果：
+   * ① 並發覆蓋：輪詢與用戶點選幾乎同時發起時，慢的那個會用舊數據蓋掉剛切好的結果，
+   *    膠囊退回用戶上一次的模式；
+   * ② 卸載後落地：請求在飛時離開首頁，`.then` 仍會 setState。生產裡是一次無效更新，
+   *    測試裡表現為 CI 偶發 `ReferenceError: window is not defined`（React 往已關閉的
+   *    jsdom 提交渲染）—— 該現象在 main 上近 6 次跑裡紅 2 次。
+   * 所以統一走「最新請求勝出」：序號不是最新的不落，組件已卸載的不落。
+   * mountedRef 的置真必須寫在 setup 裡（而不是只在 cleanup 置假）：StrictMode 會走
+   * setup→cleanup→setup，不在 setup 復位的話從第二次掛載起就永久認為自己未掛載。
+   */
+  const engineMountedRef = useRef(true)
+  const engineReqSeqRef = useRef(0)
+  useEffect(() => {
+    engineMountedRef.current = true
+    return () => { engineMountedRef.current = false }
+  }, [])
+  const loadEngine = useCallback(() => {
+    const seq = ++engineReqSeqRef.current
+    return fetchEngineStatus().then((s) => {
+      if (engineMountedRef.current && seq === engineReqSeqRef.current) setEngine(s)
+      return s
+    })
+  }, [])
+
   /* ── 上下文窗口 & 思考模式設定 ── */
   const [contextWindow, setContextWindow] = useState<number | null>(null)
   const [thinkingEnabled, setThinkingEnabled] = useState(false)
@@ -676,12 +702,10 @@ export default function Home() {
 
   /** 定時刷新引擎路由結果（手動切換 / 代理重啟後同步到膠囊） */
   useEffect(() => {
-    let cancelled = false
-    const load = () => fetchEngineStatus().then((s) => { if (!cancelled) setEngine(s) })
-    load()
-    const timer = setInterval(load, 60000)
-    return () => { cancelled = true; clearInterval(timer) }
-  }, [])
+    loadEngine()
+    const timer = setInterval(loadEngine, 60000)
+    return () => { clearInterval(timer) }
+  }, [loadEngine])
 
   /** 加載我的授權模型；並分別探測兩條通道得到網關真實接入的模型清單 */
   useEffect(() => {
@@ -1512,7 +1536,7 @@ export default function Home() {
     }
     setEngineMode(next)
     aiSettingsDirtyRef.current = true
-    fetchEngineStatus().then(setEngine)
+    loadEngine()
     if (next === 'auto' && deniedChannels.length > 0) {
       showAutoLimitedModal(deniedChannels)
       return
@@ -1525,7 +1549,7 @@ export default function Home() {
     if ((engineMode === 'primary' || engineMode === 'off-peak') && deniedChannels.includes(engineMode)) {
       setEngineMode('auto')
       aiSettingsDirtyRef.current = true
-      fetchEngineStatus().then(setEngine)
+      loadEngine()
       message.info(t('home.engineAutoSwitchMsg', { model: modelDisplayName(modeModelKey(engineMode)) ?? engineMode }))
     }
   }, [engineMode, deniedChannels]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -1613,7 +1637,7 @@ export default function Home() {
                     />
                     <span
                       className="home-ai-usage-pill-value"
-                      style={{ color: infoBarUsedPercent < 40 ? '#52C41A' : infoBarUsedPercent < 80 ? '#FAAD14' : '#FF4D4F' }}
+                      style={{ color: infoBarUsedPercent < 40 ? 'var(--success)' : infoBarUsedPercent < 80 ? '#FAAD14' : 'var(--danger)' }}
                     >
                       {infoBarUsedPercent === 0
                         ? t('home.usageAvailableFull')
@@ -1951,8 +1975,8 @@ export default function Home() {
                           <span key={`${tr.toolKey}-${i}`}
                             style={{
                               fontSize: 11, lineHeight: '18px', padding: '0 8px', borderRadius: 4,
-                              color: tr.success ? '#1890FF' : '#FF4D4F',
-                              background: tr.success ? '#E6F7FF' : '#FFEBEE',
+                              color: tr.success ? 'var(--info)' : 'var(--danger)',
+                              background: tr.success ? 'var(--info-soft)' : '#FFEBEE',
                               border: `1px solid ${tr.success ? '#91D5FF' : '#FFA39E'}`,
                             }}>
                             {toolDisplayName(tr.toolKey)}{tr.elapsedMs ? ` · ${tr.elapsedMs}ms` : ''}
@@ -2374,7 +2398,7 @@ export default function Home() {
                 >
                   <div style={{ fontSize: 20, color: stat.color, marginBottom: 6 }}>{stat.icon}</div>
                   <div style={{ fontSize: 20, fontWeight: 700, color: stat.color }}>{stat.value}</div>
-                  <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 2 }}>{stat.label}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{stat.label}</div>
                 </div>
               ))}
             </div>
@@ -2384,20 +2408,23 @@ export default function Home() {
             {myUsage.dimensions.length === 0 ? (
               myUsage.unlimited ? (
                 // 内置系统管理员：无额度维度属预期，展示为不限额而非「未配置额度」空态
-                <div style={{ border: '1px dashed #B7EB8F', background: '#F6FFED', borderRadius: 12, padding: '20px 16px', textAlign: 'center', marginBottom: 20 }}>
-                  <div style={{ width: 40, height: 40, margin: '0 auto 10px', borderRadius: '50%', background: '#F6FFED', border: '1px solid #D9F7BE', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#389E0D', fontSize: 18 }}>
+                <div style={{ border: '1px dashed var(--success-border)', background: 'var(--success-soft)', borderRadius: 12, padding: '20px 16px', textAlign: 'center', marginBottom: 20 }}>
+                  <div style={{ width: 40, height: 40, margin: '0 auto 10px', borderRadius: '50%', background: 'var(--success-soft)', border: '1px solid var(--success-border-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--success-deep)', fontSize: 18 }}>
                     <CheckCircleOutlined />
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#262626', marginBottom: 6 }}>{t('home.usageDimsUnlimited')}</div>
-                  <div style={{ fontSize: 12, color: '#8C8C8C', lineHeight: 1.7 }}>{t('home.usageDimsUnlimitedHint')}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', marginBottom: 6 }}>{t('home.usageDimsUnlimited')}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.7 }}>{t('home.usageDimsUnlimitedHint')}</div>
                 </div>
               ) : (
-                <div style={{ border: '1px dashed #FFD591', background: '#FFFBF5', borderRadius: 12, padding: '20px 16px', textAlign: 'center', marginBottom: 20 }}>
-                  <div style={{ width: 40, height: 40, margin: '0 auto 10px', borderRadius: '50%', background: '#FFF7E6', border: '1px solid #FFE7BA', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D46B08', fontSize: 18 }}>
+                <div style={{ /* theme-pair-locked：底色 #FFFBF5 全站仅 2 处且无严格等值令牌，不为它单开一档（表膨胀）；
+                    所以描边也退回裸值，否则深色下会变成「浅暖面板 + 半透明橙边」的两边向不同方向变。
+                    待产拍：与 --warning-soft(#FFF7E6) 收敛（会动浅色），或真的新增一个暖面板令牌。 */
+                    border: '1px dashed #FFD591', background: '#FFFBF5', borderRadius: 12, padding: '20px 16px', textAlign: 'center', marginBottom: 20 }}>
+                  <div style={{ width: 40, height: 40, margin: '0 auto 10px', borderRadius: '50%', background: 'var(--warning-soft)', border: '1px solid var(--warning-border-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--warning-deep)', fontSize: 18 }}>
                     <LockOutlined />
                   </div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#262626', marginBottom: 6 }}>{t('home.usageDimsEmpty')}</div>
-                  <div style={{ fontSize: 12, color: '#8C8C8C', lineHeight: 1.7 }}>{t('home.usageDimsEmptyHint')}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)', marginBottom: 6 }}>{t('home.usageDimsEmpty')}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', lineHeight: 1.7 }}>{t('home.usageDimsEmptyHint')}</div>
                 </div>
               )
             ) : (
@@ -2413,7 +2440,7 @@ export default function Home() {
                 return (
                   <div
                     key={`${dim.source}-${dim.period}-${dim.quotaType}-${dim.modelId ?? 'all'}-${i}`}
-                    style={{ border: '1px solid #F0F0F0', borderRadius: 12, padding: '12px 14px', marginBottom: 12 }}
+                    style={{ border: '1px solid var(--border-2)', borderRadius: 12, padding: '12px 14px', marginBottom: 12 }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
@@ -2421,13 +2448,13 @@ export default function Home() {
                         <span style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dim.sourceName}</span>
                         {dim.source !== 'employee' && (
                           <Tooltip title={t('home.usageDimSharedTeamTooltip')}>
-                            <span style={{ fontSize: 11, color: '#1890FF', cursor: 'help', display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+                            <span style={{ fontSize: 11, color: 'var(--info)', cursor: 'help', display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
                               <InfoCircleOutlined />{t('home.usageDimSharedTeamHint')}
                             </span>
                           </Tooltip>
                         )}
                       </div>
-                      <Tag style={{ marginRight: 0, color: '#8C8C8C' }}>{dim.modelName ?? t('home.usageDimAllModels')}</Tag>
+                      <Tag style={{ marginRight: 0, color: 'var(--text-3)' }}>{dim.modelName ?? t('home.usageDimAllModels')}</Tag>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                       <Tag style={{ marginRight: 0 }}>
@@ -2441,10 +2468,10 @@ export default function Home() {
                       </span>
                     </div>
                     <Progress percent={percent} strokeColor={color} format={(p) => `${p}%`} size="small" />
-                    <div style={{ fontSize: 12, color: '#595959', marginTop: 2 }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 2 }}>
                       {t('home.usageDimUsedPercent', { percent })} · {fmt(used)} / {fmt(quota)}{unit ? ` ${unit}` : ''}
                     </div>
-                    <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 4 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>
                       {dim.period === 'daily' ? t('home.usageDimResetDaily') : t('home.usageDimResetOn', { date: dim.resetDate })}
                     </div>
                   </div>
@@ -2458,19 +2485,19 @@ export default function Home() {
               <Empty description={t('home.usageEmpty')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
             ) : (
               myUsage.recentRecords.map((r) => (
-                <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #F0F0F0' }}>
+                <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-2)' }}>
                   <div>
                     <div style={{ fontSize: 13 }}>{r.model} · {r.mode}</div>
-                    <div style={{ fontSize: 11, color: '#8C8C8C' }}>{r.time}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{r.time}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{formatNumber(r.promptTokens + r.completionTokens)} {t('home.usageUnitToken')}</div>
-                    <div style={{ fontSize: 11, color: '#8C8C8C' }}>{r.currency ? `${currencySymbol(r.currency)}${formatCost(r.cost)}` : '--'}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{r.currency ? `${currencySymbol(r.currency)}${formatCost(r.cost)}` : '--'}</div>
                   </div>
                 </div>
               ))
             )}
-            <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 12 }}>
               {t('home.usageRecentHint')}
             </div>
           </>

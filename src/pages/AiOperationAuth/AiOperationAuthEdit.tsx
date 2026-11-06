@@ -139,7 +139,7 @@ export default function AiOperationAuthEdit() {
     <div className="content-area">
       {/* ── 页面头部 ── */}
       <div style={{
-        position: 'relative', background: '#fff', marginBottom: 16,
+        position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
         borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
       }}>
         <div style={{
@@ -153,7 +153,7 @@ export default function AiOperationAuthEdit() {
               icon={<ArrowLeftOutlined />}
               onClick={handleBack}
               style={{
-                backgroundColor: '#E8720C', borderColor: '#E8720C',
+                backgroundColor: 'var(--brand)', borderColor: 'var(--brand)',
                 borderRadius: 8, height: 36, padding: '0 16px',
                 display: 'flex', alignItems: 'center', gap: 6,
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
@@ -161,19 +161,19 @@ export default function AiOperationAuthEdit() {
               }}
             >返回</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{pageTitle}</h2>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>{pageTitle}</h2>
           </div>
         </div>
       </div>
 
       {/* ── 基本信息模块 ── */}
       <Form form={form} layout="vertical" initialValues={{ level: 'L1' }}>
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6f7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ToolOutlined style={{ fontSize: 14, color: '#1890ff' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--info-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ToolOutlined style={{ fontSize: 14, color: 'var(--info)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>基本信息</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>基本信息</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
 
@@ -194,12 +194,12 @@ export default function AiOperationAuthEdit() {
       </div>
 
       {/* ── 权限等级模块 ── */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#fff7e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ToolOutlined style={{ fontSize: 14, color: '#fa8c16' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--warning-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ToolOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>權限等級</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>權限等級</span>
           <Tag color="orange" style={{ marginLeft: 4, fontSize: 11 }}>核心配置</Tag>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
@@ -212,7 +212,7 @@ export default function AiOperationAuthEdit() {
                   return (
                     <Radio key={level} value={level}>
                       <span style={{ color: meta.color, fontWeight: 600 }}>{level} · {meta.name}</span>
-                      <span style={{ fontSize: 12, color: '#8C8C8C', marginLeft: 8 }}>{meta.desc}（{meta.human}）</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-3)', marginLeft: 8 }}>{meta.desc}（{meta.human}）</span>
                     </Radio>
                   )
                 })}
@@ -223,15 +223,15 @@ export default function AiOperationAuthEdit() {
       </Form>
 
       {/* ── 可见范围模块 ── */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f6ffed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ToolOutlined style={{ fontSize: 14, color: '#52c41a' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--success-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ToolOutlined style={{ fontSize: 14, color: 'var(--success)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>可見範圍</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>可見範圍</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
-        <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 16 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 16 }}>
           留空 = 全員可見；選中後只有命中的角色或部門會看到/調用該工具。超管始終可見。此處只控制“能不能用”，數據範圍仍由業務菜單判定。
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -265,15 +265,15 @@ export default function AiOperationAuthEdit() {
       </div>
 
       {/* ── 参数白名单模块 ── */}
-      <div style={{ border: '1px solid #e8eaed', borderRadius: 8, background: '#fff', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+      <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 6, background: '#f9f0ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <ToolOutlined style={{ fontSize: 14, color: '#722ed1' }} />
+          <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--purple-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ToolOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>參數白名單</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>參數白名單</span>
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
-        <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 16 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 16 }}>
           AI 只能使用預定義的參數；「白名單取值」留空表示允許自由輸入，填寫後僅可從列舉值中選擇，防止構造越權參數。
         </div>
 
