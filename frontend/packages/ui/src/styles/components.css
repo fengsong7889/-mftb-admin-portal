@@ -836,6 +836,30 @@
   gap: 16px 12px;
   align-items: start;
 }
+/*
+ * 窄屏必须降列：上一行写死 4 列，在 390px 手机上每列只剩 ~66px，
+ * RangePicker 的两个 input 被压到 1px（等于无法使用），“重置/查询”也被顶出可视区。
+ * 会议模块 E2E 两轮都碰到同一件事，而它是全站列表页共用的布局，所以收在共享层而不是单页打补丁。
+ */
+@media (max-width: 1199.98px) {
+  .search-section .ant-form-inline {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 991.98px) {
+  .search-section .ant-form-inline {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 767.98px) {
+  .search-section .ant-form-inline {
+    grid-template-columns: 1fr;
+  }
+  /* 单列时按钮区不再需要“跳过标题高度”的对齐上边距，否则会多出一段空白 */
+  .search-section .ant-form-item:last-child {
+    padding-top: 0;
+  }
+}
 .search-section .ant-form-item {
   margin-bottom: 0;
   margin-right: 0;
@@ -2679,6 +2703,18 @@ html:has(.login-page-video) {
   font-weight: 800;
   color: #fff;
   line-height: 1;
+}
+
+/*
+ * 危险确认的图标变体：按钮已经是红色 danger，图标却还顶着品牌橙渐变——
+ * 同一个弹窗里出现两套语义色，用户无法从颜色判断这件事能不能撤销。
+ * 2026-11-06 E2E 实测：删除会议室的「确认删除」按钮是 #FF4D4F，图标仍是橙色（早期还是黑色）。
+ * 底色直接用 --danger 令牌本身（不拼二段渐变：浅红端没有对应令牌，为了渐变而钉裸色值
+ * 会踩 check:theme-tokens 的裸色棘轮，而语义上并不需要一个中间色）。深浅主题各自跟随令牌。
+ */
+.custom-confirm-modal .confirm-icon-wrapper--danger {
+  background: var(--danger);
+  box-shadow: 0 2px 6px rgba(255, 77, 79, 0.3);
 }
 
 /* 关闭按钮 */

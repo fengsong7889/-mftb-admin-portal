@@ -161,7 +161,7 @@ request.interceptors.response.use(
     bizError.code = res.code
     return Promise.reject(bizError)
   },
-  (error) => {
+  async (error) => {
     // HTTP 层错误
     const status = error?.response?.status
     const silent = error?.config?.headers?.[SILENT_HEADER] === '1'
@@ -184,32 +184,42 @@ request.interceptors.response.use(
     } else if (status >= 500) {
       if (!silent) message.error('服務器異常，請稍後重試')
     } else {
-      // 超时/连接中断必须给业务可读文案：axios 原文「timeout of 15000ms exceeded」
-      // 是英文技术黑话，与界面语言不一致，用户也不知道能不能重试（评审 P0-7）。
-      const code = (error as { code?: string } | undefined)?.code
-      const timedOut = code === 'ECONNABORTED' || code === 'ETIMEDOUT'
-        || /timeout/i.test(typeof error?.message === 'string' ? error.message : '')
-      if (!silent) {
-        if (timedOut) void showTimeoutMessage()
-        else message.error(error?.message || '網絡異常')
-      }
+      // 超时/断线必须给业务可读文案：axios 原文「timeout of 15000ms exceeded」「Network Error」
+      // 是英文技术黑话，与界面语言不一致，用户也不知道能不能重试（超时那一路是评审 P0-7 改的，
+      // 断线那一路当时漏了：2026-11-06 E2E 实测 4/5 个会议页面直接把 Network Error 抛给用户，
+      // 而同一个系统的 #/meeting-room 已经写了人话——同一件事两套样貌）。
+      //
+      // 不仅要弹 toast，还要把 error.message 就地改写：页面级 Alert 读的就是 e.message，
+      // 只修 toast 会修一半。但不能换成普通 Error——isBackendUnavailable 靠
+      // axios.isAxiosError 判定「后端不可用」并降级到本地 Mock 数据，换掉就打断离线演示链路。
+      const friendly = await friendlyNetworkMessage(error)
+      if (friendly && typeof error?.message === 'string') error.message = friendly
+      if (!silent && friendly) message.error(friendly)
     }
     return Promise.reject(error)
   },
 )
 
 /**
- * 超时提示：文案取 i18n 的 common.requestTimeout，但不在文件顶部静态 import src/i18n ——
- * 原因见文件头说明：静态引入会在 mock react-i18next 的测试里于模块加载期抛错。
- * 这里用动态 import 惰性取值，模块早已初始化时即刻 resolve，不会再付一次初始化成本；
- * 取值失败（jsdom / 被 mock）则回落到繁中字面量，不影响错误上报链路。
+ * 断线/超时的人话文案（带 i18n）。
+ * <p>返回 null 表示这不是「连接层」错误（比如 4xx 带响应体），沿用 axios 原信息。
+ * <p>i18n 不在文件顶部静态 import，原因见文件头：会在 mock react-i18next 的测试里
+ * 于模块加载期抛错；这里用动态 import 惰性取值，取不到就回落到繁中字面量。
  */
-async function showTimeoutMessage() {
+async function friendlyNetworkMessage(error: unknown): Promise<string | null> {
+  const code = (error as { code?: string } | undefined)?.code
+  const raw = typeof (error as Error | undefined)?.message === 'string' ? (error as Error).message : ''
+  const timedOut = code === 'ECONNABORTED' || code === 'ETIMEDOUT' || /timeout/i.test(raw)
+  const disconnected = code === 'ERR_NETWORK' || /network|failed to fetch|networkerror/i.test(raw)
+  if (!timedOut && !disconnected) return null
+  const key = timedOut ? 'common.requestTimeout' : 'common.networkError'
+  const fallback = timedOut ? '網路回應逾時，請稍後重試' : '網路連線異常，請檢查網路後重試'
   try {
     const { default: i18n } = await import('@/i18n')
-    message.error(i18n.t('common.requestTimeout', { defaultValue: '網路回應逾時，請稍後重試' }))
+    const text = i18n.t(key, { defaultValue: fallback })
+    return typeof text === 'string' && text.trim() ? text : fallback
   } catch {
-    message.error('網路回應逾時，請稍後重試')
+    return fallback
   }
 }
 
@@ -217,6 +227,13 @@ async function showTimeoutMessage() {
  * 处理登录失效（Token 过期 / 被清除 / 无效）：
  * 清除本地登录信息, 提示用户, 并通知 AuthContext 同步清除 React 登录态,
  * 由路由守卫将用户带回登录页。并发 401 只处理一次。
+ *
+ * <p>这里**不再直接改 `window.location.hash`**：回跳目标是路由守卫（src/App.tsx 的
+ * RedirectToLogin）的职责，它拿的是 react-router 的 location，本来就是准确值。
+ * 旧实现在这里再拼一次 hash，与守卫形成两条并存实现：谁先跑完全取决于 401 落在
+ * 哪一刻，而 `unauthorizedHandled` 去重只会让第一个 401 生效——并发首屏那批 401 里
+ * 第一个发生时路由还没落地，拼出来的就是 `redirect=%2F`，用户重新登录后被送回门户，
+ * 刚才那一页丢了（2026-11-06 E2E 两轮实测）。收归单一归属比再加一层兼容更可靠。
  */
 function handleUnauthorized(customMessage?: string) {
   if (unauthorizedHandled) return
@@ -225,17 +242,11 @@ function handleUnauthorized(customMessage?: string) {
   localStorage.removeItem('is_authenticated')
   localStorage.removeItem('user_info')
   message.error(customMessage || '登錄校驗已過期，請重新登錄')
-  // 通知 AuthContext 清除 React 状态（isAuthenticated），路由守卫自动跳回登录页
+  // 通知 AuthContext 清除 React 状态（isAuthenticated）；AppRoutes 会切到
+  // `/login` + `*` → RedirectToLogin 分支，由它带上准确的 redirect 回登录页。
+  // 公开页（#/m/…、#/asset-claim-sign、#/meeting-checkin 等）在 AppRoutes 里走独立分支，
+  // 不被这个跳转影响，所以这里无需再列一份公开路径名单。
   window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT))
-  // 兜底: HashRouter 场景下直接跳转登录页
-  // 公開頁面除外（免登錄場景由頁面自身展示錯誤態，不強制跳登錄頁）：
-  // - #/m/... 掃碼查看資產標籤
-  // - #/asset-claim-sign 釘釘簽署頁（後端白名單接口，憑 HMAC 令牌校驗）
-  const hash = window.location.hash
-  const isPublicPath = hash.startsWith('#/m/') || hash.startsWith('#/asset-claim-sign')
-  if (!isPublicPath && hash !== '#/login') {
-    window.location.hash = '#/login'
-  }
 }
 
 /** 重新登录成功后重置登录失效标记, 保证同一 SPA 会话内再次过期仍可正常登出 */

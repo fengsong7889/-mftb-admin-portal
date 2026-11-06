@@ -1978,6 +1978,19 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   'meeting-record',
   'meeting-config',
   'meeting-blacklist',
+  // 行政侧纪要检索：漏在这里等于对全站所有登录用户开放（hasMenuPermission 对
+  // 未登记 key 默认放行），而它查的是全量纪要正文。2026-11-06 E2E 用低权限账号
+  // 直接访问 #/meeting-minutes-list 实测：路由守卫没拦，整页壳正常渲染，
+  // 只剩后端 403 把内部权限键抖在页面上。
+  'meeting-minutes-list',
+  // 通知模板/推送开关：后端 MeetingNotifyConfigController 按这两个菜单 key 做 @RequirePermission，
+  // 但前端受控名单没登记 → hasMenuPermission 对未登记 key 默认放行，低权限用户能整页打开，
+  // 拿到的只是一屏后端 403 报错。与 meeting-minutes-list 同一类 fail-open，一并补齐。
+  'notification-template',
+  'notification-switch',
+  // 耗材领用：后端 EamConsumableClaimController / EamConsumableDocController 都按这个 key 鉴权，
+  // 前端却把它当「未接入权限校验的原型菜单」放行——同样只会在页面上撞后端 403。
+  'consumable-claim',
   // 文檔中心（後端 DocSchemaMigrationInitializer 已種菜單，前端同步納入受控）
   'doc-plans',
   'doc-governance',

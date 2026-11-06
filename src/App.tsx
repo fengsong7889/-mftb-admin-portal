@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense, lazy } from 'react'
+import { useState, useEffect, useRef, Suspense, lazy } from 'react'
 import { Layout, Spin, Modal } from 'antd'
 import { createHashRouter, RouterProvider, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -19,6 +19,7 @@ import MenuPermissionGuard from '@/components/MenuPermissionGuard'
 import ForcePasswordChangeGate from '@/components/ForcePasswordChangeGate'
 import VersionUpdateNotification from '@/components/VersionUpdateNotification'
 import useVersionCheck from '@/hooks/useVersionCheck'
+import { isNarrowScreen, useNarrowScreen } from '@/hooks/useNarrowScreen'
 import './App.css'
 
 /* 懶加载所有页面组件，避免启动时一次性加载所有模块 */
@@ -312,7 +313,18 @@ function PageLoading() {
 
 /** 需要认证的路由布局 */
 function AuthenticatedLayout() {
-  const [collapsed, setCollapsed] = useState(false)
+  // 窄屏默认收起侧栏：Sider 宽 220px，在 390px 手机上会吃掉大半屏宽，
+  // 内容区只剩 132px 时表单 input 实测 1px 宽、底部主操作被裁到屏外（2026-11-06 E2E 实测）。
+  // 旧实现只给了 collapsible/collapsedWidth，没有 breakpoint 也没跟随视口，所以上面那一幕永远在发生。
+  const [collapsed, setCollapsed] = useState(isNarrowScreen)
+  const narrow = useNarrowScreen()
+  // 只在**跨越断点**时跟随收/放；断点之内不强制，否则用户在窄屏上手动展开会被立刻打回去
+  const lastNarrow = useRef(narrow)
+  useEffect(() => {
+    if (lastNarrow.current === narrow) return
+    lastNarrow.current = narrow
+    setCollapsed(narrow)
+  }, [narrow])
   const location = useLocation()
   const { updateAvailable, current: currentVersion, latest: latestVersion } = useVersionCheck()
 

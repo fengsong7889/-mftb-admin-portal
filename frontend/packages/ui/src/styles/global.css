@@ -21,6 +21,20 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/*
+ * 多行文本原样呈现：保留用户敲的换行，但不允许横向溢出。
+ * <p>为什么需要一个公共类而不是各页 inline style：议程、备注、取消/释放原因这类字段
+ * 本来就是按行写的（“1. 复盘 / 2. 评审 / 3. 排期”三行），直接放进 HTML 会被当空白
+ * 折叠成一行，用户在详情页看到的和他在表单里敲的完全不一样（2026-11-06 会议详情实测：
+ * 编辑页 textarea 正常、详情页挤成一整行）。收成一个类而不是每个页面各写一份 whiteSpace，
+ * 是为了不再出现“这个页面改了、那个页面没改”的两套口径。
+ */
+.text-pre-line {
+  white-space: pre-line;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
 /* 滚动条样式 */
 ::-webkit-scrollbar {
   width: 6px;

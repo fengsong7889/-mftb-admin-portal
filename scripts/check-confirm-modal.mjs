@@ -19,15 +19,23 @@
  *
  * 退出码：0 = 通过；1 = 存在违规
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync, existsSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 
 const ROOT = process.cwd()
 const SCAN_DIRS = ['src', 'frontend']
 const QUIET = process.argv.includes('--quiet')
+const SNAPSHOT = process.argv.includes('--snapshot')
 const CALL_RE = /Modal\.confirm\(\s*\{/g
 const EXEMPT_RE = /confirm-modal-exempt\s*:/
 const STANDARD_ICON_RE = /confirm-icon-wrapper/
+/**
+ * 危险确认图标变体的存量基线（每文件违规处数，只降不升）。
+ * <p>为什么用基线而不是直接全量强制：这条规则是 2026-11-06 会议模块 E2E 之后补的，
+ * 存量 91 处横跨 eam/hr/rdm/ads 四个系统，一次性改完会把一次业务修复变成 74 文件的噪声提交。
+ * 没有基线的话就只能「要么不开这条规则、要么 CI 恒红」，两个都是坏选项。
+ */
+const DANGER_BASELINE_PATH = join(ROOT, 'scripts', 'confirm-modal-danger-icon-baseline.json')
 
 /**
  * 从 '{' 起做括号配对扫描，返回配置对象顶层属性名列表与结束位置。
@@ -112,8 +120,31 @@ function collectFiles(dir, acc) {
   return acc
 }
 
+/**
+ * 读危险确认图标基线。文件不存在按「零容忍」处理（所有违规都是新增），
+ * 不能把读不到当成空基线静默放行——那等于门禁本身被删了也不会响。
+ */
+function readDangerBaseline() {
+  if (!existsSync(DANGER_BASELINE_PATH)) return { meta: {}, entries: {} }
+  let parsed = {}
+  try {
+    parsed = JSON.parse(readFileSync(DANGER_BASELINE_PATH, 'utf8'))
+  } catch {
+    return { meta: {}, entries: {} }
+  }
+  const entries = {}
+  const meta = {}
+  for (const [key, value] of Object.entries(parsed)) {
+    if (key.startsWith('_')) meta[key] = value
+    else if (typeof value === 'number') entries[key] = value
+  }
+  return { meta, entries }
+}
+
 const violations = []
 let scanned = 0
+/** 危险确认图标缺 --danger 变体：按文件计数，最后与基线对比（只降不升） */
+const dangerByFile = new Map()
 
 for (const dir of SCAN_DIRS) {
   for (const file of collectFiles(join(ROOT, dir), [])) {
@@ -150,6 +181,16 @@ for (const dir of SCAN_DIRS) {
           if (!isNull && !hasStandard && !viaIdent) {
             problems.push('icon 未使用规范的 confirm-icon-wrapper 节点')
           }
+          // 危险确认的图标必须转红：按钮已经是 danger 红、图标还顶品牌橙，
+          // 同一个弹窗两套语义色，用户无法从颜色判断这件事能不能撤销（§B.1/§B.3）。
+          // 2026-11-06 E2E 实测：删除会议室的确认按钮是 #FF4D4F，图标仍是橙色。
+          // 只看 icon 之后到 okButtonProps 之间的那几个顶层键，不把同文件下一个弹窗的 danger 算进来。
+          const okProps = valueOf(src, openIdx, 'okButtonProps')
+          const isDanger = !!okProps && /danger:\s*true/.test(okProps)
+          if (isDanger && !isNull && !/confirm-icon-wrapper--danger/.test(val) && !viaIdent) {
+            const rel2 = relative(ROOT, file)
+            dangerByFile.set(rel2, (dangerByFile.get(rel2) ?? 0) + 1)
+          }
         }
       }
       if (problems.length) {
@@ -159,6 +200,28 @@ for (const dir of SCAN_DIRS) {
         else violations.push(`  ${rel}:${lineIdx + 1}`)
       }
     }
+  }
+}
+
+if (SNAPSHOT) {
+  const baseline = readDangerBaseline()
+  const next = { ...baseline.meta }
+  for (const [file, count] of [...dangerByFile.entries()].sort()) next[file] = count
+  writeFileSync(DANGER_BASELINE_PATH, `${JSON.stringify(next, null, 2)}\n`, 'utf8')
+  console.log(`✅ 危险确认图标基线已下调：${dangerByFile.size} 个文件 / ${[...dangerByFile.values()].reduce((a, b) => a + b, 0)} 处`)
+  // 快照模式不重复报违规：它的用途就是把整改成果固定下来
+} else {
+  const baseline = readDangerBaseline()
+  for (const [file, count] of [...dangerByFile.entries()].sort()) {
+    const allowed = baseline.entries[file] ?? 0
+    if (count > allowed) {
+      violations.push(`  ${file}  危险确认图标缺 confirm-icon-wrapper--danger 变体 ${count} 处（基线 ${allowed}）——新增危险确认必须用红色图标变体`)
+    }
+  }
+  const stale = Object.entries(baseline.entries).filter(([file]) => (dangerByFile.get(file) ?? 0) < baseline.entries[file])
+  if (stale.length > 0) {
+    const saved = stale.reduce((sum, [file, n]) => sum + (n - (dangerByFile.get(file) ?? 0)), 0)
+    console.log(`ℹ️  危险确认图标已有 ${stale.length} 个文件整改到位（可再降 ${saved} 处），执行 node scripts/check-confirm-modal.mjs --snapshot 下调基线`)
   }
 }
 
