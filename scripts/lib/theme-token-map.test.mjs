@@ -595,3 +595,82 @@ describe('countBareColors', () => {
     expect(countBareColors('.a{background:rgba(255,255,255,0.15)}', 'css').rgbaBlack).toBe(0)
   })
 })
+
+/**
+ * 品牌橙实底上的玻璃面板族（门户 hero 顶部搜索框 = 用户报的图2）。
+ *
+ * 为何必须单独一组：族令牌的背板不是 surface-*，而是**品牌橙渐变本身**。
+ * 既有对比度断言只覆盖固定背板集合，不补就是「令牌加了、门禁根本没看它」（§16.2 第 5 条）。
+ */
+const GLASS_TOKENS = ['brand-glass', 'brand-glass-hover', 'brand-glass-border']
+
+describe('品牌玻璃面板族（--brand-glass*）', () => {
+  /** hero 渐变的四个停靠色；搜索框在横幅最右（最亮）端，那里是最难的一档 */
+  const HERO = ['#B14A05', '#E8720C', '#F59432', '#FFB347']
+  /**
+   * 合成方向必须是 tint×alpha + 背板×(1-alpha)。
+   * 本轮手写探针时把它写成过反（背板×alpha + tint×(1-alpha)），算出
+   * “黑玻璃压深底变亮绿 #4aaa1b”这种荒谬值——差点当作实测数字写进注释。
+   * 这里不复用上面 describe 里的 toRgb（它不在本作用域），归一化仍走工具自己的 normalizeHex。
+   */
+  const rgb = (s) => {
+    if (s.startsWith('#')) {
+      // 3 位展开走工具自己的 normalizeHex，不在测试里再抄一份（抄了就会漂）
+      const n = normalizeHex(s.slice(1))
+      const h = n.hex
+      return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16), 1]
+    }
+    const p = s.match(/rgba?\(([^)]+)\)/)[1].split(',').map((x) => Number(x.trim()))
+    return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]
+  }
+  const over = (tint, back) => {
+    const t = rgb(tint)
+    const b = rgb(back)
+    return `#${[0, 1, 2].map((i) => Math.round(t[i] * t[3] + b[i] * (1 - t[3])).toString(16).padStart(2, '0')).join('')}`
+  }
+
+  it('深色值必须是带 alpha 的 rgba 四元（缺 alpha 会被合成函数静默当不透明）', () => {
+    for (const name of [...GLASS_TOKENS, 'on-brand-glass']) {
+      const m = TOKEN_VALUES[name].dark.match(/^rgba\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)$/)
+      if (name === 'on-brand-glass') continue // 前景是不透明白，本来就不该有 alpha
+      expect(m, `${name} 的深色值必须是 rgba(r,g,b,a) 四元，实际：${TOKEN_VALUES[name].dark}`).not.toBeNull()
+      const a = Number(m[4])
+      expect(a, `${name} 的 alpha 必须落在 (0,1)`).toBeGreaterThan(0)
+      expect(a, `${name} 的 alpha 必须落在 (0,1)`).toBeLessThan(1)
+    }
+  })
+
+  it('白字 on 玻璃底必须在 hero 每一个停靠色上都达 AA', () => {
+    for (const name of ['brand-glass', 'brand-glass-hover']) {
+      for (const hero of HERO) {
+        const bg = over(TOKEN_VALUES[name].dark, hero)
+        expect(bg, `${name} on ${hero} 合成失败`).toMatch(/^#[0-9a-f]{6}$/)
+        expect(contrastRatio('#FFFFFF', bg), `${name} 的白字 on ${hero}`).toBeGreaterThanOrEqual(4.5)
+      }
+    }
+  })
+
+  it('族令牌的浅色值必须逐个等于它替换掉的 CSS 字面量（这是「浅色不变」的唯一机验）', () => {
+    // 这四个值来自 Portal/index.css 搜索框原本的字面量；改动任何一项就意味着浅色观感被动了。
+    expect(TOKEN_VALUES['brand-glass'].light).toBe('rgba(255,255,255,0.94)')
+    expect(TOKEN_VALUES['brand-glass-hover'].light).toBe('#FFFFFF')
+    expect(TOKEN_VALUES['brand-glass-border'].light).toBe('rgba(255,255,255,0.40)')
+    // 配套前景的浅色值必须仍等于 --text-3，否则搜索图标在浅色下会变颜色
+    expect(TOKEN_VALUES['on-brand-glass'].light).toBe(TOKEN_VALUES['text-3'].light)
+  })
+
+  it('配套前景必须在玻璃底上达非文本 3:1（只改背景会把图标弄没）', () => {
+    for (const hero of HERO) {
+      const bg = over(TOKEN_VALUES['brand-glass'].dark, hero)
+      expect(contrastRatio(TOKEN_VALUES['on-brand-glass'].dark, bg), `on-brand-glass on ${hero}`)
+        .toBeGreaterThanOrEqual(3.0)
+    }
+  })
+
+  it('族令牌不得被当作背景段自动映射目标（它们不是 hex，也不该被 codemod 自刷）', () => {
+    for (const seg of Object.keys(COLOR_TO_TOKEN)) {
+      const hit = Object.entries(COLOR_TO_TOKEN[seg]).filter(([, token]) => String(token).includes('glass'))
+      expect(hit, `${seg} 段不应映射到 glass 族`).toEqual([])
+    }
+  })
+})
