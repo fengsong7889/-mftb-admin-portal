@@ -62,6 +62,57 @@ export function isOverlap(startA: number, endA: number, startB: number, endB: nu
   return startA < endB && endA > startB
 }
 
+/** 时间选择器要禁掉的小时/分钟（antd TimePicker 的 disabledHours / disabledMinutes 形状） */
+export interface BookableTimeGuard {
+  disabledHours: () => number[]
+  disabledMinutes: (hour: number) => number[]
+}
+
+/** 不做任何限制的空守卫：规则缺失/非法时宁可全部可选，也不能把用户锁死在选不出时间上 */
+const NO_TIME_GUARD: BookableTimeGuard = { disabledHours: () => [], disabledMinutes: () => [] }
+
+/**
+ * 把会议室可预约窗落到时间下拉上：窗外的小时/分钟直接置灰。
+ *
+ * <p>为什么不能只靠提交时报错：旧实现下拉全天 24 小时开放，用户选到 23:00 才发现
+ * 「會議需在同一天內結束」，而且旧的一条「無法提交」Alert 不会随修改清除，
+ * 改完时间还顶着一屏过期报错（2026-11-06 E2E 实测）。把约束前置到选择器，
+ * 才是「选得出的一定能提交」；提交时的服务端校验仍然保留（前端校验只是 UX）。
+ *
+ * @param rule 生效规则（已按房间覆盖过全局）
+ * @param allowAtOrBefore 编辑态放行到原开始时间（含）之前：原单可能录在窗外或已过时，
+ *   不把这一格放出来就等于连「时间不动、只改主题」都保存不了（与 disabledDate 当年同一个坑）
+ */
+export function bookableTimeGuard(
+  rule?: Pick<WindowRule, 'bookableStart' | 'bookableEnd'>,
+  allowAtOrBefore?: number,
+): BookableTimeGuard {
+  if (!rule) return NO_TIME_GUARD
+  const windowStart = toMinutesOfDay(rule.bookableStart)
+  const windowEnd = toMinutesOfDay(rule.bookableEnd)
+  if (!Number.isFinite(windowStart) || !Number.isFinite(windowEnd)) return NO_TIME_GUARD
+  const lower = allowAtOrBefore == null ? windowStart : Math.min(windowStart, allowAtOrBefore)
+  // 上沿取到 bookableEnd 本身：会议必须在此之前结束由 validateBookingWindow 裁决，
+  // 选择器只负责「开始时间不能选到窗外去」
+  const upper = Math.max(windowEnd, lower)
+  const hours: number[] = []
+  for (let hour = 0; hour < 24; hour += 1) {
+    // 整点小时都落在窗外才禁：跨界的小时要留给分钟级判定
+    if (hour * 60 + 59 < lower || hour * 60 > upper) hours.push(hour)
+  }
+  return {
+    disabledHours: () => hours,
+    disabledMinutes: (hour: number) => {
+      const blocked: number[] = []
+      for (let minute = 0; minute < 60; minute += 1) {
+        const value = hour * 60 + minute
+        if (value < lower || value > upper) blocked.push(minute)
+      }
+      return blocked
+    },
+  }
+}
+
 /** 时长（分钟） */
 export function durationMinutes(start: Date, end: Date): number {
   return Math.round((end.getTime() - start.getTime()) / 60000)

@@ -45,6 +45,7 @@ import {
 } from '@/api/meeting'
 import { bizTypeLabels, phaseMeta } from '../meetingMeta'
 import { deriveCanRecordMinutes, hasMinutesRecord, minutesPathOf } from '../MeetingMinutes/minutesAccess'
+import { useMeetingPhaseClock } from '../useMeetingPhaseClock'
 import MeetingStatCards from '../MeetingStatCards'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
@@ -83,7 +84,7 @@ const COLUMN_META = (t: TFunction) => [
 export default function BookingRecords() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { hasPermission } = useAuth()
+  const { hasPermission, user } = useAuth()
   const canEdit = hasPermission('meeting-record:edit')
   /** 纪要入口能力：本页以行政视野为主，canManageRecords 与 canEdit 同源 */
   const minutesCapability = {
@@ -130,6 +131,10 @@ export default function BookingRecords() {
 
   const statsKey = useMemo(() => JSON.stringify(query), [query])
 
+  // 阶段时钟：台账里的「進行中/待開會」同样是服务端按 now 算的，不刷新就会一直停在旧阶段，
+  // 行政据此判断该不该去释放房间就会判错（2026-11-06 E2E 实测：必须手动刷新才变進行中）。
+  useMeetingPhaseClock(rows, () => { void load() }, !loading)
+
   const search = () => {
     const values = form.getFieldsValue()
     const range = values.range as [Dayjs | null, Dayjs | null] | undefined
@@ -156,7 +161,7 @@ export default function BookingRecords() {
     Modal.confirm({
       title: t('meeting.cancelThisMeetingOn', { defaultValue: '確認代組織者取消這場會議？' }),
       className: 'custom-confirm-modal',
-      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      icon: <span className="confirm-icon-wrapper confirm-icon-wrapper--danger"><span className="confirm-icon-text">!</span></span>,
       okText: t('meeting.confirmProxyCancel', { defaultValue: '確認代取消' }),
       okButtonProps: { danger: true },
       cancelText: t('meeting.back', { defaultValue: '返回' }),
@@ -197,6 +202,7 @@ export default function BookingRecords() {
   /** 提前結束：会真的开过、只是提前收尾。与「釋放房間」分开——释放等于無人到場，
    *  把开过的会记成爽约会虚增次数（可能把人推向自动拉黑阈值）并吃掉纪要入口 */
   const handleFinish = (record: MeetingVO) => {
+    let note = ''
     Modal.confirm({
       title: t('meeting.finishThisMeetingEarly', { defaultValue: '確認提前結束這場會議？' }),
       className: 'custom-confirm-modal',
@@ -210,10 +216,22 @@ export default function BookingRecords() {
           <div className="confirm-info-row"><span>{t('meeting.time2', { defaultValue: '時間：' })}</span><b>{record.timeText}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.labelRoom', { defaultValue: '會議室：' })}</span><b>{record.roomName}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.impact', { defaultValue: '影響：' })}</span><b>{t('meeting.finishEarlyNoShowNote', { defaultValue: '提前結束不計入爽約統計，參會名單與紀要入口保持可用' })}</b></div>
+          {/* 与详情页同口径：散会说明选填但给得出入口，两边不能一个能写一个不能写 */}
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('meeting.finishNoteOptional', { defaultValue: '散會說明（選填，會寫入審計並附在通知裡）' })}</div>
+            <Input.TextArea
+              rows={2}
+              maxLength={300}
+              showCount
+              style={{ resize: 'none' }}
+              placeholder={t('meeting.eGTopicsSettledEarly', { defaultValue: '例：議題已全部結論，提前散會' })}
+              onChange={(e) => { note = e.target.value }}
+            />
+          </div>
         </div>
       ),
       onOk: async () => {
-        await finishMeeting(record.id)
+        await finishMeeting(record.id, note.trim() || undefined)
         message.success(t('meeting.meetingFinished', { defaultValue: '會議已結束' }))
         void load()
       },
@@ -226,7 +244,7 @@ export default function BookingRecords() {
     Modal.confirm({
       title: t('meeting.releaseThisMeetingRoom', { defaultValue: '確認釋放這間會議室？' }),
       className: 'custom-confirm-modal',
-      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      icon: <span className="confirm-icon-wrapper confirm-icon-wrapper--danger"><span className="confirm-icon-text">!</span></span>,
       okText: t('meeting.confirmRelease', { defaultValue: '確認釋放' }),
       okButtonProps: { danger: true },
       cancelText: t('meeting.back', { defaultValue: '返回' }),
@@ -358,7 +376,14 @@ export default function BookingRecords() {
             <Button type="link" size="small" onClick={() => handleRelease(record)}>{t('meeting.releaseRoom', { defaultValue: '釋放房間' })}</Button>
           )}
           {canEdit && record.canCancel && (
-            <Button type="link" size="small" danger onClick={() => handleCancel(record)}>{t('meeting.proxyCancel', { defaultValue: '代取消' })}</Button>
+            // 「代取消」只用于取消别人的会：台账是行政视野，但行政自己办的会也在表里，
+            // 对自己办的会写「代取消」会让行政误以为要走一套额外的授权（2026-11-06 E2E 实测）。
+            // 接口与必填原因完全一致，只是把语义说准。
+            <Button type="link" size="small" danger onClick={() => handleCancel(record)}>
+              {record.organizerId === user?.id
+                ? t('meeting.cancelMeeting', { defaultValue: '取消會議' })
+                : t('meeting.proxyCancel', { defaultValue: '代取消' })}
+            </Button>
           )}
         </Space>
       ),

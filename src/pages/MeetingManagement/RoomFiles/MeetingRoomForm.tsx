@@ -12,7 +12,7 @@
  *   3. 时间的起止倒挂、上下限倒挂在前端就拦下（后端同样各有一道，那是安全边界）。
  */
 import { useCallback, useEffect, useState } from 'react'
-import { AutoComplete, Button, Form, Input, InputNumber, Select, Spin, Switch, message } from 'antd'
+import { Alert, AutoComplete, Button, Form, Input, InputNumber, Select, Spin, Switch, message } from 'antd'
 import type { CSSProperties } from 'react'
 import {
   ArrowLeftOutlined, ClockCircleOutlined, EnvironmentOutlined, HomeOutlined,
@@ -212,12 +212,20 @@ export default function MeetingRoomForm() {
       </div>
 
       {loadError && (
-        <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 8, background: '#FFF1F0', border: '1px solid #FFCCC7', color: '#CF1322', fontSize: 13 }}>
-          {t('meeting.roomLoadFailedBanner', { error: loadError, defaultValue: `會議室檔案加載失敗：${loadError}` })}
-        </div>
+        // 必须是规范 Alert 而不是裸 div：同一个模块的预约表单/详情页都用 Alert + 返回入口，
+        // 这里旧实现自己拼了一个无样式块，错误看上去不像系统的一部分（2026-11-06 E2E 实测）。
+        // 同时「保存」按钮必须置灰：拿不到原单还让人提交，只会写出一张错档案。
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message={t('meeting.cannotLoadRoomProfile', { defaultValue: '無法載入會議室檔案' })}
+          description={loadError}
+          action={<Button size="small" onClick={handleBack}>{t('meeting.backToRoomList', { defaultValue: '返回列表' })}</Button>}
+        />
       )}
 
-      <Form form={form} layout="vertical" requiredMark="optional" disabled={!canEdit || submitting}>
+      <Form form={form} layout="vertical" requiredMark="optional" disabled={!canEdit || submitting || !!loadError}>
         {/* 一、基本信息 */}
         <div style={cardStyle}>
           <CardTitle icon={<HomeOutlined />} tone="info" title={t('meeting.basicInfo', { defaultValue: '基本信息' })} />
@@ -328,7 +336,7 @@ export default function MeetingRoomForm() {
       {canEdit && (
         <div className="form-footer">
           <Button onClick={handleBack}>{t('common.cancel', { defaultValue: '取消' })}</Button>
-          <Button type="primary" icon={<SaveOutlined />} loading={submitting} onClick={() => void handleSubmit()}>{t('common.save', { defaultValue: '保存' })}</Button>
+          <Button type="primary" icon={<SaveOutlined />} loading={submitting} disabled={!!loadError} onClick={() => void handleSubmit()}>{t('common.save', { defaultValue: '保存' })}</Button>
         </div>
       )}
     </div>

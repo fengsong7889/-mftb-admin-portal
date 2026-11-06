@@ -200,7 +200,7 @@ export default function RoomFiles() {
     Modal.confirm({
       title: t('meeting.confirmDeleteRoom', { name: record.roomName, defaultValue: `確定要刪除「${record.roomName}」嗎？` }),
       className: 'custom-confirm-modal',
-      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      icon: <span className="confirm-icon-wrapper confirm-icon-wrapper--danger"><span className="confirm-icon-text">!</span></span>,
       okText: t('common.confirmDelete', { defaultValue: '確認刪除' }),
       okButtonProps: { danger: true },
       cancelText: t('common.cancel', { defaultValue: '取消' }),

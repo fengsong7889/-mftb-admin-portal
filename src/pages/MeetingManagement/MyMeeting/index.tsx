@@ -44,6 +44,8 @@ import { phaseMeta, statusMeta } from '../meetingMeta'
 import { useAuth } from '@/contexts/AuthContext'
 import { deriveCanRecordMinutes, hasMinutesRecord, minutesPathOf } from '../MeetingMinutes/minutesAccess'
 import MeetingStatCards from '../MeetingStatCards'
+import { useMeetingPhaseClock } from '../useMeetingPhaseClock'
+import { readTextArray } from '@/i18n'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import './index.css'
@@ -190,7 +192,10 @@ export default function MyMeeting() {
     return Array.from({ length: 42 }, (_, i) => start.add(i, 'day'))
   }, [calMonthKey])
 
-  const weekdays = t('meeting.calendarWeekdays', { returnObjects: true }) as string[]
+  // 数组型文案必须走 readTextArray：旧写法 `t(...) as string[]` 在简体中文下拿到的是
+  // 逗号串，串没有 .map，整页被 RouteErrorBoundary 接走（2026-11-06 E2E 实测，
+  // 且只在 zh-CN 复现、繁中开发路径碰不到，所以存活至今）。条数契约由繁中真源给出，不在这里写死。
+  const weekdays = useMemo(() => readTextArray(t, 'meeting.calendarWeekdays'), [t])
   const dayList = calByDate[calValue.format('YYYY-MM-DD')] ?? []
 
   // 操作后的刷新必须覆盖日历：否则在当日日程里响应邀约后，网格上的标签还是旧状态
@@ -199,6 +204,11 @@ export default function MyMeeting() {
     void loadList()
     if (viewMode === 'calendar') void loadCalendar()
   }
+
+  // 阶段时钟：会议阶段是时间的函数，页面不动就会停在旧快照上——E2E 实测 07:00 开始的会
+  // 07:01 仍显示「待開會」，必须手动刷新才变「進行中」。只在确有阶段要跨时唤醒一次，不轮询。
+  const phaseRows = useMemo(() => (viewMode === 'calendar' ? calRows : rows), [viewMode, calRows, rows])
+  useMeetingPhaseClock(phaseRows, refresh, !loading && !calLoading)
 
   // 口径快照带上视图与月份：翻月/切视图时统计卡重挂载、重跑计数动画（§E.8）
   const statsKey = useMemo(() => `${tab}-${JSON.stringify(query)}-${viewMode}-${calMonthKey}`, [tab, query, viewMode, calMonthKey])
@@ -269,7 +279,7 @@ export default function MyMeeting() {
     Modal.confirm({
       title: t('meeting.cancelThisMeeting', { defaultValue: '確認取消這場會議？' }),
       className: 'custom-confirm-modal',
-      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      icon: <span className="confirm-icon-wrapper confirm-icon-wrapper--danger"><span className="confirm-icon-text">!</span></span>,
       okText: t('meeting.confirmCancel', { defaultValue: '確認取消' }),
       okButtonProps: { danger: true },
       cancelText: t('meeting.back', { defaultValue: '返回' }),
@@ -379,11 +389,14 @@ export default function MyMeeting() {
       render: (_, record) => t('meeting.headcount', { count: record.attendeeCount ?? 0, defaultValue: '{{count}} 人' }),
     },
     {
-      title: t('meeting.myRole', { defaultValue: '我的身份' }), key: 'myRole', width: 110,
+      title: t('meeting.myRole', { defaultValue: '我的身份' }), key: 'myRole', width: 150,
       render: (_, record) => (
-        <Tag color={record.myRole === 'organizer' ? 'blue' : record.myRole === 'none' ? 'default' : 'green'}>
-          {roleLabel(t, record.myRole)}
-        </Tag>
+        <Space direction="vertical" size={2}>
+          <Tag color={record.myRole === 'organizer' ? 'blue' : record.myRole === 'none' ? 'default' : 'green'}>
+            {roleLabel(t, record.myRole)}
+          </Tag>
+          {renderStance(t, record)}
+        </Space>
       ),
     },
     {
@@ -417,7 +430,7 @@ export default function MyMeeting() {
           <Form.Item label={t('meeting.keyword', { defaultValue: '關鍵字' })} name="keyword">
             <Input placeholder={t('meeting.bookingNoTopic', { defaultValue: '單號／主題' })} allowClear style={{ width: '100%' }} onPressEnter={search} />
           </Form.Item>
-          <Form.Item label={t('meeting.group', { defaultValue: '分組' })} name="group">
+          <Form.Item label={t('meeting.status', { defaultValue: '狀態' })} name="group">
             <Select
               style={{ width: '100%' }}
               options={[
@@ -545,7 +558,11 @@ export default function MyMeeting() {
                         <div
                           key={item.id}
                           className={`meeting-cal-chip meeting-cal-chip--${phaseChipVariant(item.phase)}`}
-                          title={`${item.startTime.slice(11, 16)} ${item.title}`}
+                          // 状态得写进可读文本：已取消与已釋放以前只差一个圆点颜色，
+                          // 色觉障碍用户与读屏软件都拿不到区分（2026-11-06 E2E 实测）；
+                          // 字段名仍叫 group（服务端契约），但标签说的是它真正在筛的东西
+                          title={`${item.startTime.slice(11, 16)} ${item.title} · ${phaseMeta(item.phase).label}`}
+                          aria-label={`${item.startTime.slice(11, 16)} ${item.title}，${phaseMeta(item.phase).label}`}
                           onClick={e => { e.stopPropagation(); navigate(`/meeting-detail?id=${item.id}`) }}
                         >
                           <span className="meeting-cal-dot" style={{ background: phaseDot(item.phase) }} />
@@ -585,9 +602,7 @@ export default function MyMeeting() {
                   <a className="meeting-cal-dayrow-title" onClick={() => navigate(`/meeting-detail?id=${item.id}`)}>{item.title}</a>
                   <span className="meeting-cal-dayrow-room">{item.roomName}</span>
                   <Tag color={phaseMeta(item.phase).color}>{phaseMeta(item.phase).label}</Tag>
-                  {item.myRole !== 'organizer' && item.myResponse === 'pending' && (
-                    <Tag color="orange">{t('meeting.pendingResponse', { defaultValue: '待響應' })}</Tag>
-                  )}
+                  {renderStance(t, item)}
                   <div className="meeting-cal-dayrow-actions">{renderActions(item)}</div>
                 </div>
               ))
@@ -625,4 +640,25 @@ function roleLabel(t: TFunction, role?: string | null): string {
     case 'external': return t('meeting.external', { defaultValue: '外部' })
     default: return t('meeting.unrelated', { defaultValue: '無關' })
   }
+}
+
+/**
+ * 我的表态标签：列表与日历共用一份，两个入口不会一个显示表态、一个什么都不显示。
+ *
+ * <p>为什么必须有它：表态成功后服务端已落库、列表也重查了，但两个视图都不把
+ * `myResponse` 渲染出来——用户只看到「接受 | 婉拒」两个按钮原封不动，无法判断自己到底
+ * 表过态没有（E2E 实测：统计卡「待我響應」已经是 0，同一行的按钮还在给接受/婉拒，
+ * 同屏自相矛盾）。按设计开始前可以改表态，所以按钮继续给是对的，缺的是把当前立场说出来。
+ * <p>组织者与无关人员没有表态语义，不渲染标签（而不是给一个「待響應」误导）。
+ */
+function renderStance(t: TFunction, record: MeetingVO) {
+  if (record.myRole === 'organizer' || record.myRole === 'none' || record.myRole == null) return null
+  if (record.myResponse === 'accepted') {
+    return <Tag color="green">{t('meeting.invitationAccepted', { defaultValue: '已接受邀約' })}</Tag>
+  }
+  if (record.myResponse === 'declined') {
+    return <Tag color="default">{t('meeting.invitationDeclined', { defaultValue: '已婉拒邀約' })}</Tag>
+  }
+  if (record.myResponse === 'invalid') return null
+  return <Tag color="orange">{t('meeting.pendingResponse', { defaultValue: '待響應' })}</Tag>
 }

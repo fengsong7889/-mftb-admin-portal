@@ -248,6 +248,11 @@ export function notifyEventLabel(code: string): string {
   if (code.startsWith('invite_cancelled')) return tl('meeting.meta.notifyEvent.inviteCancelled', '會議取消')
   if (code.startsWith('remind_before_start')) return tl('meeting.meta.notifyEvent.remindBeforeStart', '開始前提醒')
   if (code.startsWith('ops_released')) return tl('meeting.meta.notifyEvent.opsReleased', '會議室釋放')
+  // 签到与收尾同样会投递留痕（后端 MeetingConstants.NOTIFY_EVT_CHECKED_IN / NOTIFY_EVT_FINISHED）。
+  // 之前这两个没登记，投递表就把 `ops_finished` 这种内部事件码直接抖给用户看——
+  // 行政对不上「通知配置」里的哪个开关，还以为是一条异常记录。
+  if (code.startsWith('ops_checked_in')) return tl('meeting.meta.notifyEvent.opsCheckedIn', '已簽到')
+  if (code.startsWith('ops_finished')) return tl('meeting.meta.notifyEvent.opsFinished', '會議已結束')
   return code
 }
 

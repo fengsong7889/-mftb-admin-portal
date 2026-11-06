@@ -206,7 +206,11 @@ export default function MeetingMinutesAdmin() {
           showTotal: value => t('meeting.totalRecords', { count: value, defaultValue: `共 ${value} 條` }),
           onChange: (nextPage, nextSize) => { setPage(nextSize !== size ? 1 : nextPage); setSize(nextSize) }
         }}
-        locale={{ emptyText: t('meeting.minutes.noMinutes', { defaultValue: '暫無符合條件的紀要' }) }}
+        // 报错时不能再报「暂无符合条件的纪要」：上面刚弹了「加載失敗」，下面又说库里没数据，
+        // 同一屏两个互相矛盾的结论，用户不知道是没查到还是没加载（2026-11-06 E2E 实测）
+        locale={{ emptyText: error
+          ? t('meeting.minutes.loadFailedRetry', { defaultValue: '本次未能加載，請重試' })
+          : t('meeting.minutes.noMinutes', { defaultValue: '暫無符合條件的紀要' }) }}
       />
     </div>
   )

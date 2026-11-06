@@ -29,6 +29,7 @@ import {
 import { useSearchParams } from 'react-router-dom'
 import DetailPageHeader from '@/components/DetailPageHeader'
 import CardTitle from '@/components/CardTitle'
+import { useMeetingPhaseClock } from '../useMeetingPhaseClock'
 import {
   cancelMeeting,
   checkinMeeting,
@@ -132,6 +133,11 @@ export default function MeetingDetail() {
 
   useEffect(() => { void load() }, [load])
 
+  // 阶段时钟：详情页是「现在能不能签到/该不该提前结束」的唯一依据，
+  // 而 phase 是服务端按 now 现算的——页面停着不动就会一直显示「待開會」，
+  // 用户据此判断会还没开始，直接错过签到窗口（2026-11-06 E2E 实测：07:00 开会、07:01 仍显示待開會）。
+  useMeetingPhaseClock(record ? [record] : [], () => { void load() }, record != null)
+
   const respond = async (accept: boolean) => {
     if (!record) return
     try {
@@ -159,6 +165,7 @@ export default function MeetingDetail() {
   /** 提前结束会把剩余窗口立刻还给他人，不可逆：必须二次确认（§B.3） */
   const handleFinish = () => {
     if (!record) return
+    let note = ''
     Modal.confirm({
       title: t('meeting.finishThisMeetingEarly', { defaultValue: '確認提前結束這場會議？' }),
       className: 'custom-confirm-modal',
@@ -171,9 +178,27 @@ export default function MeetingDetail() {
           <div className="confirm-info-row"><span>{t('meeting.time2', { defaultValue: '時間：' })}</span><b>{record.timeText}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.labelRoom', { defaultValue: '會議室：' })}</span><b>{record.roomName}</b></div>
           <div className="confirm-info-row"><span>{t('meeting.impact', { defaultValue: '影響：' })}</span><b>{t('meeting.theRemainingSlotBecomes', { defaultValue: '結束後剩餘窗口立刻可被他人預訂，不可恢復' })}</b></div>
+          {/* 散会说明选填但必须给入口：与「代取消/释放必填原因」对齐同一套留痕习惯，
+              旧实现只报一个时间戳，参会人不知道为什么会提前散（2026-11-06 E2E 实测）。
+              不强制：正常散会不是异常，强制反而会把人推到乱填一句。 */}
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('meeting.finishNoteOptional', { defaultValue: '散會說明（選填，會寫入審計並附在通知裡）' })}</div>
+            <Input.TextArea
+              rows={2}
+              maxLength={300}
+              showCount
+              style={{ resize: 'none' }}
+              placeholder={t('meeting.eGTopicsSettledEarly', { defaultValue: '例：議題已全部結論，提前散會' })}
+              onChange={(e) => { note = e.target.value }}
+            />
+          </div>
         </div>
       ),
-      onOk: () => run(finishMeeting, t('meeting.meetingFinished', { defaultValue: '會議已結束' })),
+      onOk: async () => {
+        await finishMeeting(record.id, note.trim() || undefined)
+        message.success(t('meeting.meetingFinished', { defaultValue: '會議已結束' }))
+        void load()
+      },
     })
   }
 
@@ -184,7 +209,7 @@ export default function MeetingDetail() {
     Modal.confirm({
       title: t('meeting.releaseThisMeetingRoom', { defaultValue: '確認釋放這間會議室？' }),
       className: 'custom-confirm-modal',
-      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      icon: <span className="confirm-icon-wrapper confirm-icon-wrapper--danger"><span className="confirm-icon-text">!</span></span>,
       okText: t('meeting.confirmRelease', { defaultValue: '確認釋放' }),
       okButtonProps: { danger: true },
       cancelText: t('meeting.back', { defaultValue: '返回' }),
@@ -229,7 +254,7 @@ export default function MeetingDetail() {
     Modal.confirm({
       title: t('meeting.cancelThisMeeting', { defaultValue: '確認取消這場會議？' }),
       className: 'custom-confirm-modal',
-      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      icon: <span className="confirm-icon-wrapper confirm-icon-wrapper--danger"><span className="confirm-icon-text">!</span></span>,
       okText: t('meeting.confirmCancel', { defaultValue: '確認取消' }),
       okButtonProps: { danger: true },
       cancelText: t('meeting.back', { defaultValue: '返回' }),
@@ -489,7 +514,11 @@ export default function MeetingDetail() {
                 description={t('meeting.notifySkippedDesc', { defaultValue: '下方「參會人」列表的投遞列標明了每個人未送達的原因；站內日程仍然可見，不受影響。' })}
               />
             )}
-            <Descriptions column={4} size="middle" items={[
+            <Descriptions
+              // 响应式列数：写死 column={4} 时窄屏会把单元格压到 18px、文字逐字竖排
+              //（2026-11-06 移动端 390px 实测），按断点退到 2/1 列才能读
+              column={{ xxl: 4, xl: 4, lg: 3, md: 2, sm: 1, xs: 1 }}
+              size="middle" items={[
               { key: 'time', label: t('meeting.meetingTime', { defaultValue: '會議時間' }), span: 2, children: t('meeting.timeRangeWithMinutes', { start: record.startTime, end: record.endTime, count: record.durationMinutes, defaultValue: `${record.startTime} ~ ${record.endTime}（${record.durationMinutes} 分鐘）` }) },
               {
                 key: 'room', label: t('meeting.meetingRoom', { defaultValue: '會議室' }), span: 2,
@@ -533,11 +562,13 @@ export default function MeetingDetail() {
                     : record.bizNo)
                   : t('meeting.none', { defaultValue: '無' }),
               },
-              { key: 'desc', label: t('meeting.agenda', { defaultValue: '會議議程' }), span: 4, children: record.description || '-' },
-              { key: 'external', label: t('meeting.externalAttendees', { defaultValue: '外部參會人' }), span: 4, children: record.externalAttendees || '-' },
-              ...(record.cancelReason ? [{ key: 'cancel', label: t('meeting.cancellationReason', { defaultValue: '取消原因' }), span: 4, children: record.cancelReason }] : []),
+              // 长文本一律走 .text-pre-line：议程/备注本来就是按行写的，
+              // 不保留换行会让详情页与编辑页两套样貌（E2E 实测议程三行被挤成一整行）
+              { key: 'desc', label: t('meeting.agenda', { defaultValue: '會議議程' }), span: 4, children: record.description ? <span className="text-pre-line">{record.description}</span> : '-' },
+              { key: 'external', label: t('meeting.externalAttendees', { defaultValue: '外部參會人' }), span: 4, children: record.externalAttendees ? <span className="text-pre-line">{record.externalAttendees}</span> : '-' },
+              ...(record.cancelReason ? [{ key: 'cancel', label: t('meeting.cancellationReason', { defaultValue: '取消原因' }), span: 4, children: <span className="text-pre-line">{record.cancelReason}</span> }] : []),
               ...(record.releaseReason
-                ? [{ key: 'release', label: t('meeting.releaseReason', { defaultValue: '釋放原因' }), span: 4, children: `${record.releaseReason}（${record.releaseAt ?? '-'}）` }]
+                ? [{ key: 'release', label: t('meeting.releaseReason', { defaultValue: '釋放原因' }), span: 4, children: <span className="text-pre-line">{`${record.releaseReason}（${record.releaseAt ?? '-'}）`}</span> }]
                 : []),
             ]} />
           </div>
@@ -708,7 +739,9 @@ export default function MeetingDetail() {
                           {item.operatorName}{item.operatorEmpNo ? `（${item.operatorEmpNo}）` : ''} · {item.occurredAt}
                         </span>
                       </Space>
-                      {item.reason && <span style={{ fontSize: 12 }}>{t('meeting.notePrefix', { reason: item.reason, defaultValue: `說明：${item.reason}` })}</span>}
+                      {/* 轨迹里的说明与议程同口径：多行输入不能被压成一行（E2E 实测同一个三行原因
+                          在详情页议程渲染三行、到会议轨迹只剩一行） */}
+                      {item.reason && <span className="text-pre-line" style={{ fontSize: 12 }}>{t('meeting.notePrefix', { reason: item.reason, defaultValue: `說明：${item.reason}` })}</span>}
                     </Space>
                   ),
                 }))}

@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, DatePicker, Empty, Form, InputNumber, Select, Space, Spin, Tag, message } from 'antd'
 import { CheckCircleOutlined, EnvironmentOutlined, GlobalOutlined, HomeOutlined, PushpinOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   fetchCities,
   fetchRoomAvailability,
@@ -33,8 +33,15 @@ const WINDOW_FALLBACK_END = 1320    // 22:00
 export default function RoomBooking() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [form] = Form.useForm()
-  const [day, setDay] = useState<Dayjs>(dayjs())
+  // 支持 ?date=YYYY-MM-DD 回跳：预约表单提交后要回到用户原本在看的那一天，
+  // 旧实现一回到本页就重置成今天，连续排会得每次重新选日期（2026-11-06 E2E 实测）。
+  // 非法/超范围的值一律回到今天，不让脏参数把一个看不见的日期塞进查询。
+  const [day, setDay] = useState<Dayjs>(() => {
+    const from = searchParams.get('date')
+    return from && dayjs(from).isValid() ? dayjs(from) : dayjs()
+  })
   const [rooms, setRooms] = useState<RoomAvailability[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>()

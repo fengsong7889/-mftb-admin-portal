@@ -24,7 +24,8 @@ import {
   Alert, Button, DatePicker, Form, Input, InputNumber, Modal, Select, Space, Spin, Switch, Table, Tag, TimePicker, message,
 } from 'antd'
 import {
-  ArrowLeftOutlined, ClockCircleOutlined, EnvironmentOutlined, ProfileOutlined, SendOutlined, TeamOutlined,
+  ArrowLeftOutlined, ClockCircleOutlined, EnvironmentOutlined, ProfileOutlined, ReloadOutlined,
+  SendOutlined, TeamOutlined,
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
@@ -46,12 +47,15 @@ import {
   type SeriesPreview,
 } from '@/api/meeting'
 import { bizTypeLabels } from '../meetingMeta'
-import { durationOptions, ruleForRoom, validateBookingWindow } from '../meetingRules'
+import { bookableTimeGuard, durationOptions, ruleForRoom, validateBookingWindow } from '../meetingRules'
 import EmployeeSelect from '@/components/EmployeeSelect'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import CardTitle from '@/components/CardTitle'
 import HelpPopover from '@/components/HelpPopover'
+
+/** 外部参会人上限：与后端 MeetingConstants.MAX_EXTERNAL_ATTENDEES 同口径（前端只是提前提示，后端必须重验） */
+const MAX_EXTERNAL_ATTENDEES = 50
 
 /** 周期会议的跳过清单：只给一句 toast 等于让用户自己去数哪几天没订上 */
 interface SkippedItem { seq: number; startTime: string; endTime: string; reason: string }
@@ -128,7 +132,10 @@ export default function MeetingBookingForm() {
   const editId = bookingIdParam ? Number(bookingIdParam) : undefined
   const isEdit = editId != null && Number.isFinite(editId) && editId > 0
   /** 保存/返回后的落点：预约记录与详情页都从这里进来，回到来处才不会把人丢在别的菜单 */
-  const backTarget = searchParams.get('from') || (isEdit ? `/meeting-detail?id=${editId}` : '/meeting-booking')
+  // 新建时默认回到忙闲页并带上查询日期：旧实现只跳 /meeting-booking，日期被重置为今天，
+  // 而用户刚约的是后天那场——连续排会时得重新选一次日期（2026-11-06 E2E 实测）。
+  const backTarget = searchParams.get('from')
+    || (isEdit ? `/meeting-detail?id=${editId}` : (dateParam ? `/meeting-booking?date=${dateParam}` : '/meeting-booking'))
   const day = dateParam && dayjs(dateParam).isValid() ? dayjs(dateParam) : dayjs()
   const initialStart = startParam && dayjs(`${day.format('YYYY-MM-DD')} ${startParam}`).isValid()
     ? dayjs(`${day.format('YYYY-MM-DD')} ${startParam}`)
@@ -169,6 +176,17 @@ export default function MeetingBookingForm() {
   const delegateUserId = watchedDelegateEnabled ? watchedDelegateIds[0] : undefined
 
   const rule = useMemo(() => (room ? ruleForRoom(room) : undefined), [room])
+  /**
+   * 时间下拉的可选范围：把房间可预约窗直接置灰到选择器里。
+   * 旧实现全天 24 小时开放，用户选到 23:00 才发现「會議需在同一天內結束」，
+   * 报错又随修改不清除（2026-11-06 E2E 实测）。编辑态放行到原开始时间（含）之前，
+   * 否则「时间不动、只改主题」也会被自己锁死——与 disabledDate 当年同一个坑。
+   */
+  const timeGuard = useMemo(() => bookableTimeGuard(rule, isEdit && booking
+    ? (dayjs(booking.startTime).isValid()
+      ? dayjs(booking.startTime).hour() * 60 + dayjs(booking.startTime).minute()
+      : undefined)
+    : undefined), [rule, isEdit, booking])
   // 后端会把实际使用人并入必参名单，前端必须同口径算人数：人数不当容量门槛了，
   // 但它仍是预约单上的參會人數（详情/纪要/统计都拿它），少算一个就是单据写错
   const delegateExtra = delegateUserId != null
@@ -188,6 +206,29 @@ export default function MeetingBookingForm() {
   const goBack = useCallback(() => {
     navigate(backTarget, { replace: true, state: { closeMenuTab: location.pathname + location.search } })
   }, [navigate, backTarget, location.pathname, location.search])
+
+  /** 编辑模式重新拉单：乐观锁冲突后必须给一个「拿新版本重试」的入口，不能让用户对着陈旧表单反复提交 */
+  const reloadBooking = useCallback(async () => {
+    if (editId == null) return
+    setLoading(true)
+    setLoadError(undefined)
+    try {
+      const detail = await fetchMeetingDetail(editId)
+      setBooking(detail)
+      const roomDetail = await fetchMeetingRoomDetail(detail.roomId)
+      setRoom(roomDetail)
+      if (!detail.canEdit) {
+        setLoadError(t('meeting.thisMeetingCanNo', { defaultValue: '這場會議已開始、已結束或已終止，無法再編輯；如需調整請取消後重新預約' }))
+      }
+      initFormFor(detail, roomDetail)
+      setIssues([])
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : t('meeting.failedToLoadThe', { defaultValue: '會議加載失敗' }))
+    } finally {
+      setLoading(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId])
 
   /** 按 roomId 回查房间档案：忙闲页只带展示字段，容量与生效规则必须从档案接口取 */
   useEffect(() => {
@@ -668,8 +709,8 @@ export default function MeetingBookingForm() {
           height: 3, background: 'linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C)',
           backgroundSize: '200% 100%', animation: 'headerGradientShift 4s ease infinite',
         }} />
-        <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: '1 1 auto', minWidth: 0 }}>
             <Button type="primary" icon={<ArrowLeftOutlined />} onClick={goBack}
               style={{
                 backgroundColor: '#E8720C', borderColor: '#E8720C', borderRadius: 8, height: 36,
@@ -677,14 +718,14 @@ export default function MeetingBookingForm() {
                 boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
               }}>{t('meeting.back', { defaultValue: '返回' })}</Button>
             <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff', whiteSpace: 'nowrap' }}>
               {isEdit
                 ? t('meeting.editMeeting', { defaultValue: '編輯會議' })
                 : t('meeting.bookAMeetingRoom', { defaultValue: '預約會議室' })}
             </h2>
           </div>
           {room && (
-            <Space size={6} wrap>
+            <Space size={6} wrap style={{ flex: '0 1 auto', justifyContent: 'flex-end' }}>
               {booking && <Tag color="geekblue">{booking.bookingNo}</Tag>}
               <Tag color="blue">{room.roomNo}</Tag>
               <Tag>{room.roomName}</Tag>
@@ -720,17 +761,26 @@ export default function MeetingBookingForm() {
           message={t('meeting.cannotSubmit', { defaultValue: '無法提交' })}
           description={<ul style={{ margin: 0, paddingLeft: 18 }}>{issues.map(item => <li key={item}>{item}</li>)}</ul>}
           style={{ marginBottom: 16 }}
+          // 乐观锁冲突靠一条转瞬的 toast 接不住用户：表单仍是陈旧版本，没有重载入口就只能
+          // 盲猜并反复提交（2026-11-06 E2E 实测）。后端不静默覆盖是对的，拒绝之后得给出下一步。
+          action={isEdit && issues.some(text => text.includes(t('meeting.theMeetingHasBeen', { defaultValue: '已被他人修改' })))
+            ? <Button size="small" icon={<ReloadOutlined />} onClick={() => void reloadBooking()}>{t('meeting.reload', { defaultValue: '重新載入' })}</Button>
+            : undefined}
         />
       )}
 
       <Form form={form} layout="vertical" requiredMark="optional"
-        disabled={!room || submitting || (isEdit && booking != null && !booking.canEdit)}
+        disabled={!room || submitting || !!loadError || (isEdit && booking != null && !booking.canEdit)}
         onValuesChange={(changed: Partial<FormShape>) => {
           const currentStart = form.getFieldValue('start') as Dayjs | undefined
           if (changed.startDate && currentStart) {
             form.setFieldValue('start', changed.startDate.startOf('day').hour(currentStart.hour()).minute(currentStart.minute()))
           }
           setPreview([])
+          // 旧的「無法提交」必须随修改清除：issues 全是由当前值算出来的结论，
+          // 值变了还顶着一屏过期报错，用户会以为改了也没用（E2E 实测：23:00 报错后改成 10:00，
+          // 两条旧 Alert 仍在，形成误导堆叠）
+          setIssues([])
         }}>
         {/* 一、会议室与时间 */}
         <div style={cardStyle}>
@@ -755,7 +805,8 @@ export default function MeetingBookingForm() {
               getValueFromEvent={(value: Dayjs | null) => value && startDate
                 ? startDate.startOf('day').hour(value.hour()).minute(value.minute()) : value}>
               <TimePicker aria-label={t('meeting.startTime')} format="HH:mm" minuteStep={pickerMinuteStep(rule?.granularity)}
-                needConfirm={false} showNow={false} style={{ width: '100%' }} />
+                needConfirm={false} showNow={false} style={{ width: '100%' }}
+                disabledHours={timeGuard.disabledHours} disabledMinutes={timeGuard.disabledMinutes} />
             </Form.Item>
             <Form.Item label={t('meeting.duration2', { defaultValue: '時長' })} name="duration" rules={[{ required: true, message: t('meeting.pleaseChooseTheDuration', { defaultValue: '請選擇時長' }) }]}
               extra={t('meeting.endTimeIsDerived', { defaultValue: '結束時間由時長算出，保證符合粒度與上下限' })}>
@@ -877,7 +928,18 @@ export default function MeetingBookingForm() {
             <Form.Item label={t('meeting.optionalAttendees', { defaultValue: '選參人員' })} name="optionalUserIds" extra={t('meeting.reminderOnlyStillCounted', { defaultValue: '只提醒不強制出席，同樣計入參會人數' })}>
               <EmployeeSelect placeholder={t('meeting.searchByNameOr3', { defaultValue: '搜尋姓名或工號（可多選）' })} />
             </Form.Item>
-            <Form.Item label={t('meeting.externalAttendees', { defaultValue: '外部參會人' })} name="externalAttendees" extra={t('meeting.guestsOrCandidatesName', { defaultValue: '訪客／面試者，只留姓名快照，收不到釘釘邀約' })}>
+            <Form.Item label={t('meeting.externalAttendees', { defaultValue: '外部參會人' })} name="externalAttendees" extra={t('meeting.guestsOrCandidatesName', { defaultValue: '訪客／面試者，只留姓名快照，收不到釘釘邀約' })}
+              rules={[{ validator: (_rule, value: string[] | undefined) => {
+                // 前端只做提前提醒（后端必须重验并拒绝）：旧实现不拦，100 人提交后服务端
+                // 静默只存一部分，组织者以为全都收到了
+                const count = (value ?? []).filter(Boolean).length
+                return count > MAX_EXTERNAL_ATTENDEES
+                  ? Promise.reject(new Error(t('meeting.maxExternalAttendees', {
+                    max: MAX_EXTERNAL_ATTENDEES, count,
+                    defaultValue: '外部參會人最多 {{max}} 人，當前 {{count}} 人',
+                  })))
+                  : Promise.resolve()
+              } }]}>
               <Select mode="tags" allowClear open={false} placeholder={t('meeting.typeANameAnd', { defaultValue: '輸入姓名後回車' })} tokenSeparators={[',', '、']} />
             </Form.Item>
           </div>
@@ -906,6 +968,18 @@ export default function MeetingBookingForm() {
             ]}>
               <Input placeholder={t('meeting.eGQ4Requirement', { defaultValue: '如 Q4 需求評審' })} maxLength={200} allowClear />
             </Form.Item>
+            {/* 主题脱敏房间必须当场说清：否则组织者写完主题后在忙闲视图找不到它，
+                会以为「预约没生效」而重复提交一场（2026-11-06 E2E 实测：该页对 hide_title 零提示）。
+                脱敏本身在服务端生效，这里只补齐告知义务。 */}
+            {room?.hideTitle === true && (
+              <Alert
+                type="info"
+                showIcon
+                style={{ gridColumn: '1 / -1' }}
+                message={t('meeting.roomHidesTopicTitle', { defaultValue: '本會議室的主題不對外公示' })}
+                description={t('meeting.roomHidesTopicDesc', { defaultValue: '在「會議室預約」的忙閒視圖裡，這場會只顯示「已佔用」，不顯示主題與組織者；參會人的邀請與站內日程不受影響。' })}
+              />
+            )}
             <Form.Item label={t('meeting.meetingType', { defaultValue: '會議類型' })} name="bizType">
               <Select options={Object.entries(bizTypeLabels()).map(([value, label]) => ({ value, label }))} />
             </Form.Item>
@@ -943,7 +1017,8 @@ export default function MeetingBookingForm() {
       {/* 底部操作栏（§C.5） */}
       <div className="form-footer">
         <Button onClick={goBack}>{t('meeting.cancel', { defaultValue: '取消' })}</Button>
-        <Button type="primary" icon={<SendOutlined />} loading={submitting} disabled={!room || (isEdit && booking != null && !booking.canEdit)}
+        <Button type="primary" icon={<SendOutlined />} loading={submitting}
+          disabled={!room || !!loadError || (isEdit && booking != null && !booking.canEdit)}
           onClick={() => void handleSubmit()}>
           {isEdit
             ? t('meeting.saveChanges', { defaultValue: '保存變更' })

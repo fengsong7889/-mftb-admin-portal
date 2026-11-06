@@ -205,6 +205,14 @@
   background: var(--surface-3);
 }
 
+/* 已釋放加一条警告橙左侧条：与已取消不再只靠圆点颜色区分。
+   两者语义不同——已取消是主动撤销，已釋放是开了房间却无人到场（计入爽约），
+   行政在月历上一眼扫过时必须能分开它们。色值取已登记令牌，不引新色相。 */
+.meeting-cal-chip--released {
+  border-left: 3px solid var(--warning-border);
+  padding-left: 5px;
+}
+
 .meeting-cal-chip--cancelled .meeting-cal-title,
 .meeting-cal-chip--released .meeting-cal-title {
   text-decoration: line-through;

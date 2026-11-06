@@ -127,7 +127,7 @@ export default function MinutesView() {
     Modal.confirm({
       title: t('meeting.minutes.revokeConfirmTitle', { defaultValue: '確認作廢全部查看鏈接？' }),
       className: 'custom-confirm-modal',
-      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      icon: <span className="confirm-icon-wrapper confirm-icon-wrapper--danger"><span className="confirm-icon-text">!</span></span>,
       okText: t('meeting.minutes.revokeConfirmOk', { defaultValue: '確認作廢' }),
       okButtonProps: { danger: true },
       cancelText: t('meeting.cancel', { defaultValue: '取消' }),
@@ -152,7 +152,7 @@ export default function MinutesView() {
     Modal.confirm({
       title: t('meeting.minutes.revokeBatchTitle'),
       className: 'custom-confirm-modal',
-      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
+      icon: <span className="confirm-icon-wrapper confirm-icon-wrapper--danger"><span className="confirm-icon-text">!</span></span>,
       okText: t('meeting.minutes.revokeBatchOk'),
       okButtonProps: { danger: true },
       cancelText: t('meeting.cancel', { defaultValue: '取消' }),

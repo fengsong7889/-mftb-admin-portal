@@ -108,6 +108,14 @@ function AttendanceNames({ people }: { people: MinutesAttendance[] }) {
       <span>{personText(person.name, person.empNo)}</span>
       <span aria-hidden="true"> · </span>
       <span className={`mm-document__attendance-status mm-document__attendance-status--${status}`}>{t(`meeting.minutes.${status}`)}</span>
+      {/*
+       * `status !== 'absent'` 是刻意的，不是写反：本组件同时渲染出席/缺席/待核实三个分栏，
+       * 而缺席原因（“未簽到”“出差”“身体不适”……）属于个人负面信息，纪要却会被广泛发送
+       * （可发给未参会的人、可生成免读链接），因此正文只披露「缺席」这个状态本身，
+       * 原因仍完整存在 content.attendance[].reason 里，录入/编辑页可回显可修改。
+       * 该口径由 MinutesReading.test.tsx 两条用例钉住（「缺席只显示状态但保留原原因」）；
+       * 2026-11-06 E2E 曾把“查看页不显示缺席原因”当成缺陷，实为误判，不得改成 `=== 'absent'`。
+       */}
       {status !== 'absent' && person.reason && <span className="mm-document__attendance-reason"> · {person.reason}</span>}
     </span>
   })}</div>

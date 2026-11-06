@@ -498,8 +498,14 @@ export function checkinMeeting(id: number): Promise<MeetingVO> {
   return request.post<unknown, MeetingVO>(`/meeting/bookings/${id}/checkin`)
 }
 
-export function finishMeeting(id: number): Promise<MeetingVO> {
-  return request.post<unknown, MeetingVO>(`/meeting/bookings/${id}/finish`)
+/**
+ * 提前结束：散会说明选填，会写入审计并附在参会人通知里。
+ * <p>与代取消/释放对齐同一套留痕口径（那两个必填原因，收尾是正常散会所以不强制），
+ * 但旧实现根本没有这个入口，通知里只剩一个时间戳。
+ */
+export function finishMeeting(id: number, note?: string): Promise<MeetingVO> {
+  const trimmed = note?.trim()
+  return request.post<unknown, MeetingVO>(`/meeting/bookings/${id}/finish`, trimmed ? { note: trimmed } : {})
 }
 
 export function releaseMeeting(id: number, payload: { reason: string; version: number }): Promise<MeetingVO> {
