@@ -626,21 +626,39 @@ html[data-theme='dark'] .portal-quick-item:not(.portal-quick-item--recent) {
   width: 100%;
   height: 38px;
   padding: 0 12px;
-  border-color: rgba(255, 255, 255, 0.4);
+  /* 品牌橙实底上的玻璃面板：两侧都走族令牌，浅色值逐个等于原本的字面量（逐像素不变），
+     深色换成黑玻璃。原本这里钉的是 rgba 白玻璃，深色下就是「橙底白块」——用户报的图2。
+     不用 var(--surface-2)：那在深色下是实心近黑，在一整片橙色横幅上会像个洞而不是输入框。 */
+  border-color: var(--brand-glass-border);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.94);
+  background: var(--brand-glass);
   box-shadow: 0 4px 14px rgba(120, 55, 0, 0.14);
 }
 
 .portal-search .ant-input-prefix {
   margin-right: 8px;
-  color: var(--text-3);
+  /* 图标必须跟着走：实测 --text-3 在玻璃底上只有 1.6355~2.4360，连非文本 3:1 都不达，
+     只改背景会把图标弄没。浅色值 #8C8C8C 等于原来的 --text-3，所以浅色侧不变。 */
+  color: var(--on-brand-glass);
 }
 
 .portal-search.ant-input-affix-wrapper:hover,
 .portal-search.ant-input-affix-wrapper-focused {
-  border-color: #fff;
-  background: var(--surface-2);
+  /* 原本这里还写 `border-color: #fff`：hover 时背景已是全不透明白，
+     0.4 与 1.0 的白边画在同一块白上结果相同 → 删掉它是浅色零变化，
+     同时消除一个 CSS 侧半对（背景已令牌化而描边钉白，深色下就是黑块配白边）。 */
+  background: var(--brand-glass-hover);
+}
+
+/*
+ * 占位文字与清除图标：antd 在深色下用 rgba(255,255,255,0.25)，压在黑玻璃上只有 ~1.2，
+ * 等于“搜索框看着是空的”。只卡深色侧（浅色一行不动，保留 antd 现有观感）；
+ * 用 color-mix 而不是新令牌：它不表达颜色语义，只是同一个前景的透度调节。
+ * 实测白@0.85 压最亮端玻璃底 = 4.4745（非文本控件门槛 3:1，留足余量）。
+ */
+html[data-theme='dark'] .portal-search .ant-input::placeholder,
+html[data-theme='dark'] .portal-search .ant-input-clear-icon {
+  color: color-mix(in srgb, var(--on-brand-glass) 85%, transparent);
 }
 
 .portal-loading,

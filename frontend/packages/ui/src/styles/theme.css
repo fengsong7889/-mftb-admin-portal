@@ -15,7 +15,7 @@
  * 改颜色的正确流程：改 TOKEN_VALUES（浅色值 + 深色值 + 实测对比度）→ 跑生成脚本 → 跑门禁。
  * 深色取值规则与实测依据：docs/design/深浅色主题切换_可落地实施方案_2026-11-03.md §4.3 / §4.5 / §4.6
  *
- * 令牌共 69 个：语义层 + 组件层（--sidebar-*）+ 阴影/描边补偿。
+ * 令牌共 73 个：语义层 + 组件层（--sidebar-*）+ 阴影/描边补偿。
  * 业务代码只允许引用语义层；--sidebar-* 属组件层，仅壳层 CSS 可用。
  */
 :root {
@@ -44,6 +44,10 @@
   --success-border: #B7EB8F;
   --info-border: #91D5FF;
   --purple-border: #D3ADF7;
+  --brand-glass: rgba(255,255,255,0.94);
+  --brand-glass-hover: #FFFFFF;
+  --brand-glass-border: rgba(255,255,255,0.40);
+  --on-brand-glass: #8C8C8C;
   --success-border-soft: #D9F7BE;
   --warning-border-soft: #FFE7BA;
   --brand: #E8720C;
@@ -116,6 +120,10 @@ html[data-theme='dark'] {
   --success-border: rgba(106,190,57,0.32);
   --info-border: rgba(64,169,255,0.32);
   --purple-border: rgba(163,113,231,0.32);
+  --brand-glass: rgba(0,0,0,0.46);
+  --brand-glass-hover: rgba(0,0,0,0.56);
+  --brand-glass-border: rgba(255,255,255,0.34);
+  --on-brand-glass: #FFFFFF;
   --success-border-soft: rgba(106,190,57,0.24);
   --warning-border-soft: rgba(250,160,61,0.24);
   --brand: #E8720C;
@@ -199,6 +207,10 @@ html {
     --success-border: #B7EB8F;
     --info-border: #91D5FF;
     --purple-border: #D3ADF7;
+    --brand-glass: rgba(255,255,255,0.94);
+    --brand-glass-hover: #FFFFFF;
+    --brand-glass-border: rgba(255,255,255,0.40);
+    --on-brand-glass: #8C8C8C;
     --success-border-soft: #D9F7BE;
     --warning-border-soft: #FFE7BA;
     --brand: #E8720C;

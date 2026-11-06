@@ -51,6 +51,8 @@ export const SEMANTIC_TOKENS = [
   'border-1', 'border-2', 'border-3', 'border-input',
   // 语义色描边阶（antd 实色淡彩档；浅色严格等于站内字面量，深色沿用 brand-border 的 rgba 合成约定）
   'danger-border', 'warning-border', 'success-border', 'info-border', 'purple-border',
+  // 品牌橙实底上的玻璃面板族（门户 hero；浅色值等于今天字面量，见 TOKEN_VALUES 里的实测 alpha 推导）
+  'brand-glass', 'brand-glass-hover', 'brand-glass-border', 'on-brand-glass',
   // 同族第二档（#D9F7BE / #FFE7BA，用量 24 与 38 处，见 TOKEN_VALUES 里的理由）
   'success-border-soft', 'warning-border-soft',
   // geekblue 四件套补齐与两个前景/底色邻阶（详见 TOKEN_VALUES 里的实测注释）
@@ -169,6 +171,26 @@ export const TOKEN_VALUES = {
   'success-border': { light: '#B7EB8F', dark: 'rgba(106,190,57,0.32)' },
   'info-border': { light: '#91D5FF', dark: 'rgba(64,169,255,0.32)' },
   'purple-border': { light: '#D3ADF7', dark: 'rgba(163,113,231,0.32)' },
+  /*
+   * 品牌橙实底上的玻璃面板族（门户 hero 顶部搜索框是第一个使用者）。
+   * 为何必须建族而不是在 CSS 里直接写 rgba(0,0,0,0.46)：
+   *   ① 直接写黑 rgba 会让 `rgbaBlack` 棘轮 +1 而当场判红；
+   *   ② Portal/index.css 里这类「橙底白玻璃」写法实测有 17 处 rgba + 7 处 #fff，
+   *     它们需要同一个深色方向，不建族就是 24 处各自拍 alpha。
+   * 浅色值逐个等于今天 CSS 里的字面量 → 浅色逐像素不变。
+   * alpha 不是拍脑袋：搜索框在横幅**最右（最亮）端**，那里 hero 渐变走到 #FFB347；
+   * 实测白字 on 黑玻璃0.46 = **5.4995**（0.40 才刚过 4.5 得 4.6745，所以留余量）；
+   * hover 0.56 = 7.4280；中段 #E8720C 上分别是 8.1914 / 10.3786。
+   * 合成口径：tint×alpha + 背板×(1-alpha)（写反会得出“深底变亮绿”的荒谬值，本轮实踩过）。
+   *
+   * `on-brand-glass` 是配套前景，不是可选项：实测 --text-3 图标在玻璃底上只有
+   * **1.6355~2.4360**，连非文本 3:1 都不达——**只改背景会把图标弄没**。
+   * 它的浅色值 #8C8C8C 等于今天的 --text-3，所以浅色侧图标也不变。
+   */
+  'brand-glass': { light: 'rgba(255,255,255,0.94)', dark: 'rgba(0,0,0,0.46)' },
+  'brand-glass-hover': { light: '#FFFFFF', dark: 'rgba(0,0,0,0.56)' },
+  'brand-glass-border': { light: 'rgba(255,255,255,0.40)', dark: 'rgba(255,255,255,0.34)' },
+  'on-brand-glass': { light: '#8C8C8C', dark: '#FFFFFF' },
   /*
    * 同族第二档（antd 调色板更浅一档：green-2 / orange-2）。建令牌的理由是用量，不是审美：
    * 本轮实测 #D9F7BE 24 处、#FFE7BA 38 处，且它们已经卡住真实界面的成对性
