@@ -41,6 +41,8 @@
 export const SEMANTIC_TOKENS = [
   // 表面
   'surface-1', 'surface-2', 'surface-3', 'surface-hover', 'surface-sunken', 'header-glass', 'art-surface',
+  // 插画角色表面（与纸面 --art-surface 语义不同，见 TOKEN_VALUES 里的实测对比度）
+  'art-figure',
   // 文字
   'text-1', 'text-2', 'text-3', 'text-4', 'on-brand', 'text-brand', 'header-text',
   // antd v4 实色灰（与上面 v5 中性阶共存，存量共 229 处前景位）
@@ -108,6 +110,24 @@ export const TOKEN_VALUES = {
    * 既能消除白斑，又保留「纸面 vs 卡片底」的层次，也让 scene 主色零件（如 #E8720C 对勾）仍有对比。
    */
   'art-surface': { light: '#FFFFFF', dark: '#2E2E2E' },
+  /*
+   * 插画里的**角色表面**（不是纸面）：机器人的脸板、眼白、眼部高光。
+   * 与 --art-surface 的区别是语义而不是色值：
+   *   --art-surface 给“纸/屏/卡片”这类 UI 表板，深色下必须不发光（#2E2E2E）；
+   *   --art-figure 给“白色机器人”这类**角色本体**。
+   * AI 场景的实际叠层（读 SystemArtwork 查实，不是猜）：白脸板 → 紫色面罩
+   * `rect x=102 y=68 w=99 h=44 fill=currentColor` → 眼白在其上 → 瞳孔是紫色 currentColor。
+   * 所以深色下用 --art-surface 时，眼白与瞳孔都变成 #2E2E2E / #722ED1 这一对：
+   *   实测 眼白(#2E2E2E) on 紫面罩(#722ED1) = **1.9574**，瞳孔(#722ED1) on 眼白(#2E2E2E) = **1.9574**
+   *   ——非文本图形需 3:1，两边都不达标；再加上 脸(#2E2E2E) on 卡片(#1F1F1F) = **1.2138** 甚至分不出轮廓。
+   *   这就是用户报的图3「深色下有点恐怖」：一张没有轮廓的脸 + 两个发暗的眼洞。
+   * 改用本令牌（深 #F5F5F5）后实测：瞳孔 on 眼白 = **6.3635**，脸 on 卡片 = **15.1188**，
+   *   与浅色下的观感一致（浅色下瞳孔 on 眼白实测 6.9376）。
+   * 深色取 #F5F5F5 而不是 #FFFFFF：避开 §17.1 当初担心的“发光白块”；
+   * 角色是小面积且内部有紫色五官，不违反“纸面不能亮白”的初衷。
+   * 浅色保持 #FFFFFF → 浅色逐像素不变。
+   */
+  'art-figure': { light: '#FFFFFF', dark: '#F5F5F5' },
   'text-1': { light: '#262626', dark: '#E8E8E8' },
   'text-2': { light: '#595959', dark: '#B0B0B0' },
   // 深色提亮：#8C8C8C 在 #262626 表头底实测仅 4.50:1 卡线，#9A9A9A 为 5.38:1
