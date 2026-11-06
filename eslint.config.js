@@ -6,10 +6,12 @@ import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
   {
-    // 2026-11-06 从忽略列表里摘掉 `*.config.ts` / `*.config.js`：根级配置文件此前完全在
-    // lint 检查面之外，实踩两个静默缺陷：`vitest.config.ts` 与 `vite.config.ts` 里
-    // 各有 7 个别名键重复定义（只以 ESbuild 告警形式漏出来），而重复键在 JS 里不报错、
-    // 默默以后写的为准——两份映射一旦分叉就是「改了不生效」。现在由 no-dupe-keys 拦住。
+    // 2026-11-06 从忽略列表里摘掉 `*.config.ts` / `*.config.js`：根级配置文件此前双重隐身 ——
+    // ESLint 不查它（本条 ignore + `lint` 脚本只跑 `eslint src frontend`），tsc 也不查它
+    // （tsconfig 的 include 只有 `src` 与 `frontend/*/src`）。正是这个空档让
+    // `vitest.config.ts` 与 `vite.config.ts` 各有 7 个别名键重复定义长期存活，
+    // 只以每次跑测试时的 esbuild Duplicate key 告警形式漏出来。
+    // 已确认 src/ 与 frontend/ 下没有匹配该命名的文件，所以摘掉只影响 4 个根配置文件本身。
     ignores: ['dist/', 'node_modules/', 'public/'],
   },
   {
@@ -27,8 +29,11 @@ export default tseslint.config(
       'react-refresh': reactRefresh,
     },
     rules: {
-      // 配置对象里的重复键：不报错、不告警，只会静默以一条覆盖另一条（本仓库实踩）。
-      // 2026-11-06 实测：全仓 `src frontend` 开此规则的新增错误数为 0，故直接定为 error。
+      // 【为什么必须显式重新开启】extends 的两套 recommended 是生效的，但 typescript-eslint
+      // recommended 会故意关掉 22 条「认为 tsc 能报」的核心规则，no-dupe-keys 就在这个名单里。
+      // 那个前提对 src/ 与 frontend/ 成立，对不在 tsconfig include 内的根配置文件不成立：
+      // ESLint 交给 tsc、tsc 不看这些文件，两边都以为对方管——所以这里手动接回来。
+      // 2026-11-06 实测：全仓 `src frontend` 开此规则的新增错误数 = 0，故直接定 error 不添欠债。
       'no-dupe-keys': 'error',
       // React Hooks 核心規則（error）
       'react-hooks/rules-of-hooks': 'error',

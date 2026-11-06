@@ -190,10 +190,17 @@ frontend/
 
 ## Lint
 
-- **框架**：ESLint 9（Flat Config）
+- **框架**：ESLint 10（Flat Config；`eslint@10.7.0` + `@eslint/js@10.0.1` + `typescript-eslint@8.65.0`）
 - **配置**：`eslint.config.js`
-- **规则**：TypeScript ESLint recommended + React Hooks 核心规则
-- **已知警告**：现有代码库存在约 300 个 warning（unused vars、any 类型），渐进修复中
+- **规则**：TypeScript ESLint recommended + React Hooks 核心规则 + 显式 `no-dupe-keys`
+- **检查面**：`src frontend` 再加 4 个根配置文件（`vite.config.ts` / `vitest.config.ts` /
+  `vite-build-meta.ts` / `eslint.config.js`）；`scripts/*.mjs` 仍未纳入，见下方已知偏差
+- **已知警告**：现有代码库存在约 620 个 warning（unused vars、any 类型），渐进修复中
+
+> ⚠️ **已知偏差**：typescript-eslint 的 recommended 会故意关掉 22 条它认为「tsc 能报」的核心规则
+> （含 `no-dupe-keys`、`no-undef`、`no-unused-vars`）。这个委托前提对不在 `tsconfig.json` 的
+> `include` 内的根配置文件不成立，需要按需显式接回。取证命令、完整名单、剩余批次见
+> `docs/ESLINT_CONFIG_BLINDSPOT_2026-11.md`。
 
 ## MCP 工具使用指引
 
@@ -265,6 +272,7 @@ frontend/
 | `docs/OFFLINE_DELIVERY_CHECKLIST_2026-10.md` | **线下交付包清单与操作规程**：交付分级（L1 只读演示 / L2 本地可运行 / L3 私有化）、环境变量矩阵（由 `application.yml` 实测导出）、schema dump 与脱敏红线、交付前检查表、交付台账模板。⚠️ 只写流程与要求，**不写未关闭缺口的实况**（见第七节）。任何对外交付必须先走本规程 |
 | `SECURITY.md` | 对外安全政策：授权测试边界（未授权不得碰生产实例）、漏洞报告渠道与响应预期、**已实施安全控制清单**、例外登记口径 |
 | `docs/code-comment-audit_2026-10.md` | 代码注释覆盖度审计与例外登记 |
+| `docs/ESLINT_CONFIG_BLINDSPOT_2026-11.md` | ESLint 与 tsc 对根配置文件的**委托空档**：重复别名键为何能长期存活、typescript-eslint 关掉的 22 条核心规则名单、一次错误结论与失效对照组的复盘、剩余批次路线。改 lint 面 / 排查「规则查出来不报」前先读本文件 |
 | `docs/AUTHORSHIP_EVIDENCE_CHECKLIST_2026-10.md` | **权属锚定与软著登记操作清单**：笔名 `fengsong7889` 与自然人本人的证据链怎么建（提交身份修正、`.mailmap`、首次发表存证、登记材料与鉴别样本、历史重写前的 4 个影响面）。凡涉及权属/署名/登记的变更需同步本文件与 `LICENSE` 第十条 |
 | `docs/HOME_REQUEST_STORM_2026-10.md` | 首页请求风暴与自动写库的**独立立项记录**：修复前后实测数据表、dev/prod 与 StrictMode 的**判读口径**、`agent/status` 合并接口等剩余待办。**复测首页或任何取数/限流类改动前先读本文件第二节**，否则会误把 StrictMode 双调用当成缺陷；对「不应该发生」型断言必须先做变异验证。 |
 | `docs/I18N_MULTILANG_AUDIT_2026-11.md` | 多语言链路的**审计与修复事实记录**：简体中文大面积回退英文的根因（后端语言包镜像腐化 + zh-CN 无静态兜底 + 门禁不查收录率）、六语真实完成度、新增文案的固定同步动作与顺序、启动期全量同步的实测耗时与发布窗口影响、**剩余项（ja/ko/ru 机翻额度、登录页外语等）**。凡改动 i18n 链路、机翻、语言包镜像或重新评估多语言完成度，先读本文件。 |
