@@ -5,7 +5,7 @@
 .approval-detail-page {
   display: flex;
   flex-direction: column;
-  background: #f5f5f5;
+  background: var(--surface-1);
 }
 
 /* 顶部标题栏 */
@@ -14,8 +14,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 16px 24px;
-  background: #fff;
-  border-bottom: 1px solid #f0f0f0;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border-2);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
@@ -55,7 +55,7 @@
   width: 360px;
   flex-shrink: 0;
   align-self: flex-start;
-  background: #fff;
+  background: var(--surface-2);
   border-radius: 8px;
   padding: 16px 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
@@ -81,7 +81,7 @@
 
 /* 信息区块 — 紧凑卡片，对齐全局 detail-card 规范 */
 .approval-section {
-  background: #fff;
+  background: var(--surface-2);
   border-radius: 8px;
   padding: 14px 20px;
   margin-bottom: 10px;
@@ -103,18 +103,18 @@
 
 .approval-info-label {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 
 .approval-info-value {
   font-size: 14px;
-  color: #262626;
+  color: var(--text-1);
   font-weight: 500;
 }
 
 /* 金额样式 */
 .approval-amount--orange {
-  color: #E8720C;
+  color: var(--brand);
   font-size: 18px;
   font-weight: 700;
 }
@@ -126,26 +126,26 @@
 }
 
 .approval-amount--green {
-  color: #52c41a;
+  color: var(--success);
   font-size: 18px;
   font-weight: 700;
 }
 
 .approval-amount--blue {
-  color: #1890ff;
+  color: var(--info);
   font-size: 18px;
   font-weight: 700;
 }
 
 .approval-amount--purple {
-  color: #722ed1;
+  color: var(--purple);
   font-size: 18px;
   font-weight: 700;
 }
 
 /* 赠送配置审核重点字段突出 */
 .approval-gift-highlight {
-  color: #E8720C;
+  color: var(--brand);
   font-weight: 700;
 }
 
@@ -166,7 +166,7 @@
   width: 80px;
   height: 80px;
   border-radius: 8px;
-  background: #f5f5f5;
+  background: var(--surface-1);
   border: 1px solid #e8e8e8;
   display: flex;
   flex-direction: column;
@@ -179,7 +179,7 @@
 
 .approval-doc-thumb:hover {
   background: #e8f4ff;
-  border-color: #1890ff;
+  border-color: var(--info);
 }
 
 .approval-doc-icon {
@@ -194,20 +194,20 @@
 
 .approval-doc-view-label {
   font-size: 10px;
-  color: #666;
+  color: var(--text-body);
 }
 
 .approval-doc-thumb--view {
-  background: #fafafa;
+  background: var(--surface-3);
 }
 
 /* 备注信息 */
 .approval-notes {
   padding: 12px;
-  background: #fafafa;
+  background: var(--surface-3);
   border-radius: 6px;
   font-size: 13px;
-  color: #666;
+  color: var(--text-body);
   line-height: 1.8;
 }
 
@@ -237,16 +237,16 @@
 
 .approval-repayment-table th {
   padding: 10px 12px;
-  background: #fafafa;
+  background: var(--surface-3);
   text-align: left;
   font-weight: 600;
-  color: #666;
+  color: var(--text-body);
   border-bottom: 1px solid #e8e8e8;
 }
 
 .approval-repayment-table td {
   padding: 10px 12px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-2);
   color: #333;
 }
 
@@ -254,10 +254,10 @@
 .approval-timeline-title {
   font-size: 15px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
   margin-bottom: 16px;
   padding-bottom: 10px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-2);
 }
 
 .approval-timeline {
@@ -299,13 +299,13 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #fff;
-  border: 2px solid #d9d9d9;
+  background: var(--surface-2);
+  border: 2px solid var(--border-1);
 }
 
 .approval-timeline-item--approved .approval-timeline-dot {
   background: #52c41a;
-  border-color: #52c41a;
+  border-color: var(--success);
 }
 
 .approval-timeline-item--rejected .approval-timeline-dot {
@@ -315,20 +315,20 @@
 
 .approval-timeline-item--submitted .approval-timeline-dot {
   background: #1890ff;
-  border-color: #1890ff;
+  border-color: var(--info);
 }
 
 .approval-timeline-item--pending .approval-timeline-dot {
-  background: #fff;
-  border-color: #d9d9d9;
+  background: var(--surface-2);
+  border-color: var(--border-1);
 }
 
 /* 时间线内容 — 轻量卡片 */
 .approval-timeline-content {
   padding: 10px 12px;
-  background: #fafafa;
+  background: var(--surface-3);
   border-radius: 8px;
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--border-2);
 }
 
 .approval-timeline-header {
@@ -341,17 +341,17 @@
 .approval-timeline-node {
   font-size: 14px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .approval-timeline-time {
   font-size: 11px;
-  color: #999;
+  color: var(--text-hint);
 }
 
 .approval-timeline-info {
   font-size: 12px;
-  color: #595959;
+  color: var(--text-2);
   margin-bottom: 4px;
 }
 
@@ -361,16 +361,16 @@
 
 .approval-timeline-comment {
   font-size: 12px;
-  color: #595959;
+  color: var(--text-2);
   line-height: 1.6;
   padding: 6px 8px;
-  background: #fff;
+  background: var(--surface-2);
   border-radius: 4px;
   margin-top: 6px;
 }
 
 .approval-timeline-comment-label {
-  color: #999;
+  color: var(--text-hint);
   font-size: 11px;
 }
 
@@ -385,7 +385,7 @@
 }
 
 .approval-timeline-reject-label {
-  color: #999;
+  color: var(--text-hint);
   font-size: 11px;
 }
 
@@ -395,8 +395,8 @@
   justify-content: center;
   gap: 12px;
   padding: 10px 24px;
-  background: #fff;
-  border-top: 1px solid #f0f0f0;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border-2);
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04);
   flex-shrink: 0;
   z-index: 10;
@@ -441,6 +441,6 @@
 
 .revoke-modal-warning {
   font-size: 13px;
-  color: #999;
+  color: var(--text-hint);
   line-height: 1.6;
 }

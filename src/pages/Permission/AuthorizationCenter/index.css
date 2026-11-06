@@ -23,7 +23,7 @@
 .authz-target-bar {
   padding: 0 0 16px;
   margin-bottom: 16px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-2);
 }
 
 .authz-target-row {
@@ -41,13 +41,13 @@
 
 .authz-field-label {
   font-size: 13px;
-  color: #595959;
+  color: var(--text-2);
 }
 
 .authz-member-count {
   font-size: 12px;
   line-height: 18px;
-  color: #8c8c8c;
+  color: var(--text-3);
   white-space: nowrap;
 }
 
@@ -66,7 +66,7 @@
 .authz-target-hint {
   margin-top: 12px;
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -83,7 +83,7 @@
 .authz-sys-panel {
   width: 208px;
   flex-shrink: 0;
-  border: 1px solid #e8eaed;
+  border: 1px solid var(--border-3);
   border-radius: 8px;
   overflow: hidden;
   display: flex;
@@ -94,9 +94,9 @@
   padding: 10px 14px;
   font-size: 13px;
   font-weight: 600;
-  color: #595959;
-  border-bottom: 1px solid #f0f0f0;
-  background: #fafafa;
+  color: var(--text-2);
+  border-bottom: 1px solid var(--border-2);
+  background: var(--surface-3);
 }
 
 .authz-sys-list {
@@ -112,25 +112,25 @@
   padding: 10px 14px;
   cursor: pointer;
   font-size: 13px;
-  color: #262626;
+  color: var(--text-1);
   border-left: 3px solid transparent;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .authz-sys-item:hover {
-  background: #fafafa;
+  background: var(--surface-3);
 }
 
 /* 选中态：品牌橙浅底 + 左侧 3px 指示条（与侧边栏选中语言一致） */
 .authz-sys-item--active {
-  background: #fff7f0;
-  border-left-color: #e8720c;
-  color: #e8720c;
+  background: var(--brand-soft);
+  border-left-color: var(--brand);
+  color: var(--brand);
   font-weight: 500;
 }
 
 .authz-sys-item--active:hover {
-  background: #fff7f0;
+  background: var(--brand-soft);
 }
 
 .authz-sys-name {
@@ -156,8 +156,8 @@
 /* 已授权菜单数角标 */
 .authz-sys-count {
   font-size: 11px;
-  color: #8c8c8c;
-  background: #f5f5f5;
+  color: var(--text-3);
+  background: var(--surface-1);
   border-radius: 8px;
   padding: 0 6px;
   line-height: 16px;
@@ -165,7 +165,7 @@
 }
 
 .authz-sys-item--active .authz-sys-count {
-  color: #e8720c;
+  color: var(--brand);
   background: #ffe7d1;
 }
 
@@ -181,7 +181,7 @@
 .authz-sys-detail {
   flex: 1;
   min-width: 0;
-  border: 1px solid #e8eaed;
+  border: 1px solid var(--border-3);
   border-radius: 8px;
   padding: 16px 20px;
   display: flex;
@@ -195,13 +195,13 @@
   gap: 12px;
   flex-wrap: wrap;
   padding-bottom: 12px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-2);
 }
 
 .authz-detail-title {
   font-size: 15px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .authz-access-switch {
@@ -212,7 +212,7 @@
 
 .authz-revoke-hint {
   font-size: 12px;
-  color: #fa8c16;
+  color: var(--warning);
 }
 
 .authz-quick-actions {
@@ -241,7 +241,7 @@
 .authz-action-panel {
   width: 240px;
   flex-shrink: 0;
-  border-left: 1px solid #f0f0f0;
+  border-left: 1px solid var(--border-2);
   padding-left: 16px;
   display: flex;
   flex-direction: column;
@@ -251,18 +251,18 @@
 .authz-action-panel-title {
   font-size: 14px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .authz-action-panel-menu {
   font-size: 13px;
-  color: #e8720c;
+  color: var(--brand);
   font-weight: 500;
 }
 
 .authz-action-panel-tip {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
   line-height: 1.6;
 }
 
@@ -274,14 +274,14 @@
 
 .authz-action-list .ant-checkbox-wrapper {
   font-size: 13px;
-  color: #595959;
+  color: var(--text-2);
 }
 
 /* 功能操作面板的「全選」行：批量入口，与下方逐项微调在视觉上分层 */
 .authz-action-list .authz-action-select-all {
   font-size: 13px;
   font-weight: 500;
-  color: #262626;
+  color: var(--text-1);
 }
 
 /* 全选行与逐项动作之间的分隔线 */
@@ -311,7 +311,7 @@
 
 .authz-trace-system-sources {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 .authz-trace-collapse {
@@ -327,16 +327,16 @@
 }
 
 .authz-audit-snapshot-col {
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--border-2);
   border-radius: 8px;
   padding: 12px 16px;
-  background: #fafafa;
+  background: var(--surface-3);
 }
 
 .authz-audit-snapshot-title {
   font-size: 13px;
   font-weight: 600;
-  color: #595959;
+  color: var(--text-2);
   margin-bottom: 8px;
 }
 
@@ -351,7 +351,7 @@
 
 .authz-audit-empty {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 @media (max-width: 960px) {
@@ -375,7 +375,7 @@
     width: 100%;
     border-left: none;
     padding-left: 0;
-    border-top: 1px solid #f0f0f0;
+    border-top: 1px solid var(--border-2);
     padding-top: 12px;
   }
 }
@@ -388,7 +388,7 @@
   gap: 8px;
   padding-right: 12px;
   margin-right: 4px;
-  border-right: 1px solid #f0f0f0;
+  border-right: 1px solid var(--border-2);
 }
 
 .authz-batch-grant-label {
@@ -396,19 +396,19 @@
   align-items: center;
   gap: 4px;
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
   white-space: nowrap;
 }
 
 .authz-batch-grant-info {
   font-size: 12px;
-  color: #bfbfbf;
+  color: var(--text-4);
   cursor: help;
   transition: color 0.2s;
 }
 
 .authz-batch-grant-info:hover {
-  color: #e8720c;
+  color: var(--brand);
 }
 
 /* 批量授权确认框：标签定宽不换行（默认 confirm 宽 416 会把「權限深度：」挤成两行） */
@@ -416,12 +416,12 @@
   flex-shrink: 0;
   white-space: nowrap;
   min-width: 88px;
-  color: #8c8c8c;
+  color: var(--text-3);
   font-size: 13px;
 }
 
 .custom-confirm-modal .authz-confirm-value {
-  color: #262626;
+  color: var(--text-1);
   font-weight: 600;
 }
 
@@ -434,18 +434,18 @@
 }
 
 .custom-confirm-modal .authz-depth-safe {
-  color: #52c41a;
+  color: var(--success);
   font-weight: 700;
   font-size: 14px;
 }
 
 .custom-confirm-modal .authz-depth-full {
-  color: #ff4d4f;
+  color: var(--danger);
   font-weight: 700;
   font-size: 14px;
 }
 
 .custom-confirm-modal .authz-depth-detail {
-  color: #8c8c8c;
+  color: var(--text-3);
   font-size: 12px;
 }

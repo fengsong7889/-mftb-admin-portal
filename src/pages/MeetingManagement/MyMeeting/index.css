@@ -3,7 +3,7 @@
    中性边框 #f0f0f0、弱文本 #8C8C8C；周末表头沿用 AdSales 日历的 #FA8C16 口径。 */
 
 .meeting-cal-card {
-  background: #fff;
+  background: var(--surface-2);
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 16px;
@@ -29,7 +29,7 @@
 .meeting-cal-month {
   font-size: 15px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
   min-width: 96px;
 }
 
@@ -39,7 +39,7 @@
   gap: 12px;
   flex-wrap: wrap;
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 .meeting-cal-legend-item {
@@ -59,8 +59,8 @@
 .meeting-cal-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  border-top: 1px solid #f0f0f0;
-  border-left: 1px solid #f0f0f0;
+  border-top: 1px solid var(--border-2);
+  border-left: 1px solid var(--border-2);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -69,14 +69,14 @@
   padding: 8px 12px;
   font-size: 12px;
   font-weight: 600;
-  color: #595959;
-  background: #fafafa;
-  border-right: 1px solid #f0f0f0;
-  border-bottom: 1px solid #f0f0f0;
+  color: var(--text-2);
+  background: var(--surface-3);
+  border-right: 1px solid var(--border-2);
+  border-bottom: 1px solid var(--border-2);
 }
 
 .meeting-cal-weekday--weekend {
-  color: #fa8c16;
+  color: var(--warning);
 }
 
 .meeting-cal-cell {
@@ -85,30 +85,30 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  background: #fff;
-  border-right: 1px solid #f0f0f0;
-  border-bottom: 1px solid #f0f0f0;
+  background: var(--surface-2);
+  border-right: 1px solid var(--border-2);
+  border-bottom: 1px solid var(--border-2);
   cursor: pointer;
   transition: background 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .meeting-cal-cell:hover,
 .meeting-cal-cell--weekend:hover {
-  background: #fff7f0;
+  background: var(--brand-soft);
 }
 
 .meeting-cal-cell--weekend {
-  background: #fafafa;
+  background: var(--surface-3);
 }
 
 .meeting-cal-cell--selected {
-  background: #fff7f0;
-  box-shadow: inset 0 0 0 1px #ffe7d1;
+  background: var(--brand-soft);
+  box-shadow: inset 0 0 0 1px var(--brand-border);
 }
 
 /* 非本月日期整体淡化：用透明度而不是新色值，避免令牌外颜色 */
 .meeting-cal-cell--other .meeting-cal-date {
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 .meeting-cal-cell--other .meeting-cal-chip,
@@ -131,18 +131,18 @@
   justify-content: center;
   font-size: 13px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .meeting-cal-date--today {
-  background: #e8720c;
+  background: var(--brand);
   color: #fff;
   box-shadow: 0 2px 4px rgba(232, 114, 12, 0.25);
 }
 
 .meeting-cal-count {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 /* 会议条：阶段色点 + 时间 + 主题（单行截断，悬浮原生 title 看全） */
@@ -168,13 +168,13 @@
 }
 
 .meeting-cal-time {
-  color: #595959;
+  color: var(--text-2);
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
 }
 
 .meeting-cal-title {
-  color: #262626;
+  color: var(--text-1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -184,11 +184,11 @@
    待開會=浅蓝底、進行中=浅橙底+呼吸圆点、已結束=浅绿底；
    已取消/已釋放灰化+删除线（两者都是“这场会不开了”），已釋放保留警告橙圆点与已取消区分。 */
 .meeting-cal-chip--pending {
-  background: #e6f7ff;
+  background: var(--info-soft);
 }
 
 .meeting-cal-chip--ongoing {
-  background: #fff7e6;
+  background: var(--warning-soft);
 }
 
 /* 复用 global.css 已注册的 statusPulse（品牌橙涟漪），不重复定义 keyframes */
@@ -197,29 +197,29 @@
 }
 
 .meeting-cal-chip--ended {
-  background: #f6ffed;
+  background: var(--success-soft);
 }
 
 .meeting-cal-chip--cancelled,
 .meeting-cal-chip--released {
-  background: #fafafa;
+  background: var(--surface-3);
 }
 
 .meeting-cal-chip--cancelled .meeting-cal-title,
 .meeting-cal-chip--released .meeting-cal-title {
   text-decoration: line-through;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 .meeting-cal-chip--cancelled .meeting-cal-time,
 .meeting-cal-chip--released .meeting-cal-time {
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 .meeting-cal-more {
   padding-left: 6px;
   font-size: 12px;
-  color: #e8720c;
+  color: var(--brand);
 }
 
 .meeting-cal-more:hover {
@@ -228,7 +228,7 @@
 
 /* 当日日程面板：图标色块 + 标题 + 行数，行内复用列表页操作按钮 */
 .meeting-cal-daypanel {
-  background: #fff;
+  background: var(--surface-2);
   border-radius: 8px;
   padding: 16px 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
@@ -245,8 +245,8 @@
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  background: #e6f7ff;
-  color: #1890ff;
+  background: var(--info-soft);
+  color: var(--info);
   font-size: 14px;
   display: flex;
   align-items: center;
@@ -256,12 +256,12 @@
 .meeting-cal-daypanel-title {
   font-size: 15px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .meeting-cal-daypanel-count {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 .meeting-cal-dayrow {
@@ -274,7 +274,7 @@
 }
 
 .meeting-cal-dayrow:hover {
-  background: #fafafa;
+  background: var(--surface-3);
 }
 
 .meeting-cal-dayrow + .meeting-cal-dayrow {
@@ -285,7 +285,7 @@
   min-width: 104px;
   font-size: 13px;
   font-weight: 500;
-  color: #595959;
+  color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
 
@@ -298,7 +298,7 @@
 
 .meeting-cal-dayrow-room {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 .meeting-cal-dayrow-actions {

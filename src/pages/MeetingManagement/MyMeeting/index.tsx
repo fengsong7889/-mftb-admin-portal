@@ -283,7 +283,7 @@ export default function MyMeeting() {
           {/* 通知是否真的送达成于场景开关，不能把话说死成“会收到”（曾经与实际不符） */}
           <div className="confirm-info-row"><span>{t('meeting.impact', { defaultValue: '影響：' })}</span><b>{t('meeting.theSlotIsReleased', { defaultValue: '房間窗口立即歸還；若已開啟釘釘通知場景，參會人會收到取消告知' })}</b></div>
           <div style={{ marginTop: 12 }}>
-            <div style={{ fontSize: 13, color: '#595959', marginBottom: 4 }}>{t('meeting.cancellationReasonRequired', { defaultValue: '取消原因（必填）' })}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', marginBottom: 4 }}>{t('meeting.cancellationReasonRequired', { defaultValue: '取消原因（必填）' })}</div>
             <Input.TextArea
               rows={3}
               maxLength={200}
@@ -351,7 +351,7 @@ export default function MyMeeting() {
       render: (_, record) => (
         <div>
           <div style={{ fontWeight: 500 }}>{record.timeText}</div>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{t('meeting.minutesUnit', { count: record.durationMinutes, defaultValue: '{{count}} 分鐘' })}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('meeting.minutesUnit', { count: record.durationMinutes, defaultValue: '{{count}} 分鐘' })}</div>
         </div>
       ),
     },
@@ -360,7 +360,7 @@ export default function MyMeeting() {
       render: (value: string, record) => (
         <Space direction="vertical" size={2}>
           <a onClick={() => navigate(`/meeting-detail?id=${record.id}`)}>{value}</a>
-          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{record.bookingNo}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{record.bookingNo}</span>
         </Space>
       ),
     },
@@ -369,7 +369,7 @@ export default function MyMeeting() {
       render: (_, record) => (
         <div>
           <div>{record.roomName}</div>
-          <div style={{ fontSize: 12, color: '#8C8C8C' }}>{record.roomLocation}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{record.roomLocation}</div>
         </div>
       ),
     },
