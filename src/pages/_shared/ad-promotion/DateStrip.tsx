@@ -88,13 +88,13 @@ export default function DateStrip({
                   animation: 'dotPulse 1.5s ease-in-out infinite',
                 }} />
               )}
-              <span style={{ fontSize: 14, fontWeight: isSelected || isHovered ? 700 : 500, color: presale ? '#bfbfbf' : isSelected || isHovered ? '#fa8c16' : '#333' }}>
+              <span style={{ fontSize: 14, fontWeight: isSelected || isHovered ? 700 : 500, color: presale ? 'var(--text-4)' : isSelected || isHovered ? 'var(--warning)' : '#333' }}>
                 {date.format('MM-DD')}
               </span>
               {presale ? (
-                <span style={{ fontSize: 11, color: '#8c8c8c', marginLeft: 4, border: '1px solid #d9d9d9', borderRadius: 3, padding: '0 3px', background: '#f5f5f5' }}>{t('presaleTag')}</span>
+                <span style={{ fontSize: 11, color: 'var(--text-3)', marginLeft: 4, border: '1px solid var(--border-1)', borderRadius: 3, padding: '0 3px', background: 'var(--surface-1)' }}>{t('presaleTag')}</span>
               ) : (
-                <span style={{ fontSize: 12, color: isSelected || isHovered ? '#fa8c16' : '#8c8c8c', marginLeft: 4 }}>
+                <span style={{ fontSize: 12, color: isSelected || isHovered ? 'var(--warning)' : 'var(--text-3)', marginLeft: 4 }}>
                   {isToday ? t('today') : WEEKDAY_LABELS[date.day()]}
                 </span>
               )}

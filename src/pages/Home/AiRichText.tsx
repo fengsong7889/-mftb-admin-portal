@@ -14,7 +14,7 @@ function renderInline(line: string, keyPrefix: string): ReactNode[] {
   return parts.filter((p) => p !== '').map((p, i) => {
     const bold = /^\*\*(.+)\*\*$/.exec(p)
     if (bold) {
-      return <strong key={`${keyPrefix}-${i}`} style={{ color: '#E8720C', fontWeight: 600 }}>{bold[1]}</strong>
+      return <strong key={`${keyPrefix}-${i}`} style={{ color: 'var(--brand)', fontWeight: 600 }}>{bold[1]}</strong>
     }
     return <Fragment key={`${keyPrefix}-${i}`}>{p}</Fragment>
   })
@@ -40,7 +40,7 @@ function renderTable(block: string[], key: number) {
       <thead>
         <tr>
           {header.map((cell, i) => (
-            <th key={i} style={{ border: '1px solid #e8eaed', background: '#FAFAFA', padding: '4px 10px', textAlign: 'left', fontWeight: 600 }}>
+            <th key={i} style={{ border: '1px solid var(--border-3)', background: 'var(--surface-3)', padding: '4px 10px', textAlign: 'left', fontWeight: 600 }}>
               {renderInline(cell, `th-${key}-${i}`)}
             </th>
           ))}
@@ -50,7 +50,7 @@ function renderTable(block: string[], key: number) {
         {body.map((row, r) => (
           <tr key={r}>
             {header.map((_, c) => (
-              <td key={c} style={{ border: '1px solid #f0f0f0', padding: '4px 10px', color: '#595959' }}>
+              <td key={c} style={{ border: '1px solid var(--border-2)', padding: '4px 10px', color: 'var(--text-2)' }}>
                 {renderInline(row[c] ?? '', `td-${key}-${r}-${c}`)}
               </td>
             ))}
@@ -81,14 +81,14 @@ export default function AiRichText({ text }: { text: string }) {
     if (ul) {
       nodes.push(
         <div key={i} style={{ display: 'flex', gap: 6, paddingLeft: 4 }}>
-          <span aria-hidden="true" style={{ color: '#8C8C8C' }}>•</span>
+          <span aria-hidden="true" style={{ color: 'var(--text-3)' }}>•</span>
           <span style={{ flex: 1 }}>{renderInline(ul[1], `ul-${i}`)}</span>
         </div>,
       )
     } else if (ol) {
       nodes.push(
         <div key={i} style={{ display: 'flex', gap: 6, paddingLeft: 4 }}>
-          <span style={{ color: '#8C8C8C', minWidth: 16, textAlign: 'right' }}>{ol[1]}.</span>
+          <span style={{ color: 'var(--text-3)', minWidth: 16, textAlign: 'right' }}>{ol[1]}.</span>
           <span style={{ flex: 1 }}>{renderInline(ol[2], `ol-${i}`)}</span>
         </div>,
       )
