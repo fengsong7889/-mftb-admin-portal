@@ -557,17 +557,10 @@ export default defineConfig({
       '@/styles': path.resolve(__dirname, './frontend/packages/ui/src/styles'),
       '@/constants': path.resolve(__dirname, './frontend/packages/contracts/src/constants'),
       '@/assets': path.resolve(__dirname, './frontend/packages/ui/src/assets'),
-      '@/api': path.resolve(__dirname, './frontend/packages/platform-client/src/api'),
-      '@/contexts': path.resolve(__dirname, './frontend/packages/platform-client/src/contexts'),
-      '@/utils': path.resolve(__dirname, './frontend/packages/platform-client/src/utils'),
-      '@/components': path.resolve(__dirname, './frontend/packages/ui/src/components'),
-      '@/hooks': path.resolve(__dirname, './frontend/packages/ui/src/hooks'),
-      '@/styles': path.resolve(__dirname, './frontend/packages/ui/src/styles'),
       // 主题状态层与令牌（深浅色主题方案 §3）：与 @/styles 同属 ui 包。必须显式声明，
       // 否则 '@/theme/xxx' 会被后面的 '@' 兜底截到 src/theme（该目录不存在）。
       '@/theme': path.resolve(__dirname, './frontend/packages/ui/src/theme'),
       '@/i18n': path.resolve(__dirname, './frontend/packages/i18n/src/i18n'),
-      '@/constants': path.resolve(__dirname, './frontend/packages/contracts/src/constants'),
       '@': path.resolve(__dirname, './src'),
     },
     dedupe: ['react', 'react-dom'],

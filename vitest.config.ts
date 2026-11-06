@@ -33,18 +33,11 @@ export default defineConfig({
       '@/styles': path.resolve(__dirname, './frontend/packages/ui/src/styles'),
       '@/constants': path.resolve(__dirname, './frontend/packages/contracts/src/constants'),
       '@/assets': path.resolve(__dirname, './frontend/packages/ui/src/assets'),
-      '@/api': path.resolve(__dirname, './frontend/packages/platform-client/src/api'),
-      '@/contexts': path.resolve(__dirname, './frontend/packages/platform-client/src/contexts'),
-      '@/utils': path.resolve(__dirname, './frontend/packages/platform-client/src/utils'),
-      '@/components': path.resolve(__dirname, './frontend/packages/ui/src/components'),
-      '@/hooks': path.resolve(__dirname, './frontend/packages/ui/src/hooks'),
-      '@/styles': path.resolve(__dirname, './frontend/packages/ui/src/styles'),
       // 主题层别名（深浅色主题方案 §3）。别名共三处定义（tsconfig.json / vite.config.ts / vitest.config.ts），
       // 本文件不继承 vite.config.ts，漏加会让测试里 import '@/theme/xxx' 直接解析失败。
       // 这条已由 check:theme-tokens 第 5 条断言守住（本次就是靠测试跑挂才发现漏了这里）。
       '@/theme': path.resolve(__dirname, './frontend/packages/ui/src/theme'),
       '@/i18n': path.resolve(__dirname, './frontend/packages/i18n/src/i18n'),
-      '@/constants': path.resolve(__dirname, './frontend/packages/contracts/src/constants'),
       '@': path.resolve(__dirname, './src'),
     },
     dedupe: ['react', 'react-dom'],
