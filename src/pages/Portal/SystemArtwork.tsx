@@ -1210,16 +1210,19 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
       <path d="M89 76H61V45h37m133 30h30V43h-28M85 129H56v25h41m133-26h31v25h-29" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" fill="none" />
       {[ [98, 45], [233, 43], [97, 154], [232, 153] ].map(([cx, cy]) => <circle key={cx} cx={cx} cy={cy} r="6" fill="currentColor" opacity="0.5" />)}
       <rect x="89" y="52" width="139" height="99" rx="28" fill="currentColor" opacity="0.16" />
-      <rect x="82" y="45" width="139" height="99" rx="28" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.3" />
+      <rect x="82" y="45" width="139" height="99" rx="28" fill="var(--art-figure)" stroke="currentColor" strokeOpacity="0.3" />
       <path d="M152 45V30" stroke="currentColor" strokeWidth="4" />
       <circle className="portal-art-motion portal-robot-signal" cx="152" cy="27" r="7" fill="currentColor" />
       <path className="portal-art-motion portal-robot-signal" d="M139 21q13-12 26 0m-32-6q19-17 38 0" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.5" />
       <rect x="102" y="68" width="99" height="44" rx="17" fill="currentColor" />
       {[125, 178].map(x => <g key={x} className="portal-art-motion portal-robot-eye">
-        <ellipse cx={x} cy="89" rx="10" ry="12" fill="var(--art-surface)" />
+        {/* 脸板与眼白/高光走 --art-figure（角色表面）而不是 --art-surface（纸面）：
+            后者深色下是 #2E2E2E，会把白机器人翻成灰脸——脸与卡片对比只剩 1.2138，
+            紫色瞳孔 on 灰脸只剩 1.9574（非文本需 3:1），这就是图3 报的“有点恐怖”。 */}
+        <ellipse cx={x} cy="89" rx="10" ry="12" fill="var(--art-figure)" />
         <g className="portal-art-motion portal-robot-pupil">
           <circle cx={x} cy="90" r="5" fill="currentColor" />
-          <circle cx={x + 1.5} cy="88" r="1.5" fill="var(--art-surface)" />
+          <circle cx={x + 1.5} cy="88" r="1.5" fill="var(--art-figure)" />
         </g>
       </g>)}
       <path className="portal-art-motion portal-robot-smile" d="M140 124q12 12 24 0" stroke="currentColor" strokeWidth="3" fill="none" />
