@@ -3,13 +3,20 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import { createHash } from 'crypto'
 import { buildMetaPlugin } from './vite-build-meta'
-// 主题防闪烁脚本单一真源（.mjs 纯文本模块；本文件不在 tsconfig.include 内，由 vite 的 esbuild 加载）。
-// 门禁 scripts/check-theme-tokens.mjs 消费同一常量校验产物，避免「插件改了、校验没改」。
-// @ts-expect-error 无 .d.mts 声明：它只是一个导出的字符串常量
-import { THEME_BOOT_SCRIPT } from './scripts/lib/theme-boot-script.mjs'
+// 主题首屏引导插件（.mjs；本文件不在 tsconfig.include 内，由 vite 的 esbuild 加载）。
+// 脚本文本单一真源仍是 scripts/lib/theme-boot-script.mjs；开关判定与客户端 featureFlag.ts
+// 共用同一个变量名与同一个纯函数（见下方注释里的「为何不得读 process.env」）。
+// ⚠ 修正一处旧说法：此处原写「门禁 check-theme-tokens.mjs 消费同一常量校验产物」，
+//   但 grep 全仓后确认当时**没有任何门禁消费 THEME_BOOT_SCRIPT / THEME_BOOT_MARKER**（两者仅被
+//   插件自己使用），所以产物侧一直无守卫。现在由 scripts/lib/theme-bootstrap-plugin.test.mjs
+//   在**插件行为层面**钉住（注入与否 / order / injectTo / 脚本本体），
+//   产物级断言只在构建时开关为开才有意义，而 CI 构建设开关为关 → 本轮靠 dev server 实测补过。
+// @ts-expect-error 无 .d.mts 声明：纯 JS 模块
+import { themeBootstrapPlugin } from './scripts/lib/theme-bootstrap-plugin.mjs'
 
 /**
- * 首屏主题引导注入（深浅色主题方案 §6.10）。
+ * 首屏主题引导注入（深浅色主题方案 §6.10）：插件本体在
+ * `scripts/lib/theme-bootstrap-plugin.mjs`（抽出去是为了可测，行为契约由同名测试钉住）。
  *
  * 为什么走 transformIndexHtml 而不是往 index.html 里贴脚本：
  * 主站 `index.html` 与 `frontend/apps/{eam,hr,rdm}/index.html` 是四份独立文档，
@@ -17,27 +24,11 @@ import { THEME_BOOT_SCRIPT } from './scripts/lib/theme-boot-script.mjs'
  * 所以一个插件即覆盖全部四份，将来新增第五个应用也不会漏。
  * 手工贴四份的代价是某个子系统刷新时白闪，而平时开发在主站上看不出来。
  *
- * order:'pre' + head-prepend：必须在入口 script 与任何样式之前执行，
- * 否则深色主题会先以浅色绘制一帧再跳色（FOUC）。
- *
- * 灰度开关（`VITE_THEME_SWITCH_ENABLED`）关闭时不注入：此时 `<html>` 上没有 data-theme，
- * `:root` 浅色令牌直接生效，与 React 侧「开关关闭恒浅色」结果一致，不存在闪变窗口。
- * 客户端侧读的是同一个构建期变量（Vite 会把同名 shell 环境变量注入 import.meta.env），
- * 两边天然同源；详见 frontend/packages/ui/src/theme/featureFlag.ts。
+ * 为什么不得改回读 `process.env`：客户端 `featureFlag.ts` 读的是 `import.meta.env`
+ * （= Vite 解析 .env* 后的 `config.env`），两个源只在「shell 传变量」时碰巧同源；
+ * 写在 `.env.local` / `.env.production` 里时 Node 侧读不到 → 开关**半开**：
+ * 切换入口出现了，但防 FOUC 的引导脚本没注入，深色下每次刷新先白一下。
  */
-function themeBootstrapPlugin(): Plugin {
-  const switchEnabled = process.env.VITE_THEME_SWITCH_ENABLED === 'true'
-  return {
-    name: 'mftb:theme-bootstrap',
-    transformIndexHtml: {
-      order: 'pre',
-      handler() {
-        if (!switchEnabled) return []
-        return [{ tag: 'script', children: THEME_BOOT_SCRIPT, injectTo: 'head-prepend' }]
-      },
-    },
-  }
-}
 
 /** LLM 通道（一條通道 = 一個 OpenAI 兼容服務端點） */
 interface LlmChannel {
