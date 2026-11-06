@@ -1379,6 +1379,24 @@
 /* ========================================================================
    登录页面 V6 - 视频背景 + 橙色暖色风
    ======================================================================== */
+
+/*
+ * 登录页不参与主题切换（已拍板决策），但 theme.css 里的 FOUC 规则
+ * `html { background: var(--surface-2) }` 会跟随主题：实测切深色后画布从
+ * rgb(255,255,255) 变 rgb(31,31,31)，而本页根容器 `.login-page-video` 与
+ * `.login-video` 的计算背景都是透明的（颜色由视频本体提供）——
+ * 于是**视频加载前 / 未铺满的边缘与回退场景会露出深色画布**。
+ *
+ * 用 `white` 而不是 var(--surface-2)：本条的目的正是让这里**不随主题变**；
+ * 也不用 #FFFFFF，避开给 cssHex 棘轮添一笔。
+ * 浅色侧与现状完全相同（原本就是白画布）→ 零视觉变化。
+ * 特异性：html(0,0,1) + :has(.login-page-video)(0,1,0) = (0,1,1) 严格大于
+ * theme.css 的 html (0,0,1)；:has() 在本仓已有先例（body:has(.ai-assistant-page)）。
+ */
+html:has(.login-page-video) {
+  background: white;
+}
+
 .login-page-video {
   width: 100vw;
   height: 100vh;
@@ -2968,8 +2986,10 @@ body:has(.ai-assistant-page) .pet-mascot-wrapper {
      - Switch 未选中文字：底是灰色轨道，转黑字反而不可读。
    打印/导出不受影响：theme.css 的 @media print 用 `html, html[data-theme='dark']`
    已把 --on-brand 锁回 #FFFFFF，本覆写取的是变量值，打印时自动退回白字。
-   用 !important 的理由同本文件 .form-footer 段：antd CSS-in-JS 会在根类上附加 hashId，
-   特异性对拼不稳，静默失效比不改更糟。
+   为何保留 !important：antd 5 的 hashId 其实包在 `:where()` 里（恒零权重），
+   实测三条规则特异性 201 / 301 / 300，我们 302 / 302 / 401，本不需要 !important 就能赢；
+   留着是为了防“选择器被写短一级”这类静默漂移（同特异性就变成比源码顺序），
+   并且已由 onBrandSpecificity.test.tsx 把这个结论钉成 CI 机验，不再靠注释里的说法。
    ======================================================================== */
 html[data-theme='dark'] .ant-checkbox-checked .ant-checkbox-inner::after {
   border-color: var(--on-brand) !important;
