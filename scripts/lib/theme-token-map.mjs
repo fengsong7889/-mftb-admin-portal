@@ -53,6 +53,8 @@ export const SEMANTIC_TOKENS = [
   'danger-border', 'warning-border', 'success-border', 'info-border', 'purple-border',
   // 品牌橙实底上的玻璃面板族（门户 hero；浅色值等于今天字面量，见 TOKEN_VALUES 里的实测 alpha 推导）
   'brand-glass', 'brand-glass-hover', 'brand-glass-border', 'on-brand-glass',
+  // 奖牌金属色族（自然流量「商家權重分」页的排名徽章）+ 配套数字前景，理由见 TOKEN_VALUES 注释
+  'medal-gold', 'medal-silver', 'medal-bronze', 'on-medal',
   // 同族第二档（#D9F7BE / #FFE7BA，用量 24 与 38 处，见 TOKEN_VALUES 里的理由）
   'success-border-soft', 'warning-border-soft',
   // geekblue 四件套补齐与两个前景/底色邻阶（详见 TOKEN_VALUES 里的实测注释）
@@ -191,6 +193,27 @@ export const TOKEN_VALUES = {
   'brand-glass-hover': { light: '#FFFFFF', dark: 'rgba(0,0,0,0.56)' },
   'brand-glass-border': { light: 'rgba(255,255,255,0.40)', dark: 'rgba(255,255,255,0.34)' },
   'on-brand-glass': { light: '#8C8C8C', dark: '#FFFFFF' },
+  /*
+   * 奖牌金属色族（自然流量「商家權重分」页的排名徽章，organic.css）。
+   *
+   * 两个与主题无关、但必须一起处理的发现：
+   * ① 金属色是**排名语义编码**而不是表面，所以深浅两档同值。不能为了“深色更柔和”
+   *    去压暗：实测 #FA8C16 压到 #D48806 后，白字 2.87、#141414 字 6.19，两头都往坏走；
+   *    而徽章是 26px 小面，不触发 §17.1「大面表板不得发光」那条约束。
+   * ② 真正的缺陷在**数字前景**：原来三档金属底配的全是白字，实测
+   *      gold #FA8C16 2.3789 / silver #8C8C8C 3.3627 / bronze #BB6C21 3.9773
+   *    —— 全部不达 AA，而且**浅色主题下也一样不达标**，不是深色改造引入的。
+   *    改用 #141414 后：7.7441 / 5.4785 / 4.6319，最小值仍 ≥ 4.5。
+   *    这是本轮**唯一故意改变浅色观感**的地点，因为“令牌化”不能只是把缺陷搬进表里。
+   *
+   * 四个值都**不进** COLOR_TO_TOKEN：#FA8C16 在站内还兼任其他语义主色的深色档
+   * （§廿四 故意没把它加进 bg 段），#8C8C8C 在 fg 段已是 --text-3。进了反向映射，
+   * codemod 就会把这些无关站点刷成奖牌色。所以奖牌四处全走人工。
+   */
+  'medal-gold': { light: '#FA8C16', dark: '#FA8C16' },
+  'medal-silver': { light: '#8C8C8C', dark: '#8C8C8C' },
+  'medal-bronze': { light: '#BB6C21', dark: '#BB6C21' },
+  'on-medal': { light: '#141414', dark: '#141414' },
   /*
    * 同族第二档（antd 调色板更浅一档：green-2 / orange-2）。建令牌的理由是用量，不是审美：
    * 本轮实测 #D9F7BE 24 处、#FFE7BA 38 处，且它们已经卡住真实界面的成对性
