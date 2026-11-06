@@ -95,6 +95,12 @@ npm run i18n:snapshot         # 从开发库导出 field_key 快照（check:i18n
 
 # 六语真实完成度（静态包 ∪ 后端语言包；验收只认这个口径，翻译统计页的分母不含未入库 key）
 npm run i18n:report
+
+# gitignore 遮蔽 / 本地凭据副本门禁
+# 两件都不会让任何测试变红：① 已跟踪的入库模板被忽略规则挡出 git status 视野；
+# ② 本地凭据备份（如 backend/.env.local.bak-<日期>）没被忽略，随时被 git add -A 扫进公开仓。
+npm run check:ignore-shadow
+node scripts/check-gitignore-shadow.mjs --json    # 机器可读输出
 ```
 
 ## 关键约束
@@ -169,7 +175,9 @@ frontend/
 
 - **平台**：GitHub Actions → GitHub Pages
 - **触发**：push 到 main 分支
-- **质量门禁**：lint + typecheck + menu-consistency + dependency-boundary + stat-card-order + confirm-modal + theme-tokens + half-pair-audit + i18n + secret-scan + test（任一失败中止部署）
+- **质量门禁**：lint + typecheck + menu-consistency + dependency-boundary + stat-card-order + confirm-modal + theme-tokens + half-pair-audit + i18n + ignore-shadow + secret-scan + test（任一失败中止部署）
+  本地 `npm run verify` 与 CI 门禁步骤必须跑同一套命令；两边失配由 `scripts/lib/ci-gate-steps.test.mjs`
+  双向判红（新增门禁只改一处会被拦下来，不用靠人记）
 - **部署**：`actions/deploy-pages@v4`
 
 ## 测试
