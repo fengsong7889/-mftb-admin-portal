@@ -98,7 +98,7 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
             size="small"
             icon={<CheckOutlined />}
             onClick={handleMarkAllRead}
-            style={{ fontSize: 12, color: '#E8720C', padding: '0 4px', height: 24 }}
+            style={{ fontSize: 12, color: 'var(--brand)', padding: '0 4px', height: 24 }}
           >
             {t('header.markAllRead')}
           </Button>
@@ -121,7 +121,7 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
                 borderBottom: '1px solid #f5f5f5',
                 cursor: 'pointer',
                 borderLeft: `3px solid ${allRead ? '#D9D9D9' : typeStyle.borderColor}`,
-                background: allRead ? '#FAFAFA' : typeStyle.bgColor,
+                background: allRead ? 'var(--surface-3)' : typeStyle.bgColor,
                 transition: 'background 0.15s',
                 opacity: allRead ? 0.6 : 1,
               }}
@@ -137,13 +137,13 @@ export default function HeaderBar({ collapsed, onToggle }: HeaderBarProps) {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <span style={{ color: allRead ? '#BFBFBF' : typeStyle.color, fontSize: 13 }}>{typeStyle.icon}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: allRead ? '#8C8C8C' : '#E65100' }}>{item.title}</span>
+                <span style={{ color: allRead ? 'var(--text-4)' : typeStyle.color, fontSize: 13 }}>{typeStyle.icon}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: allRead ? 'var(--text-3)' : '#E65100' }}>{item.title}</span>
               </div>
-              <div style={{ fontSize: 12, color: allRead ? '#BFBFBF' : '#595959', lineHeight: 1.6, marginBottom: 4 }}>{item.content}</div>
+              <div style={{ fontSize: 12, color: allRead ? 'var(--text-4)' : 'var(--text-2)', lineHeight: 1.6, marginBottom: 4 }}>{item.content}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 {item.createdAt && (
-                  <span style={{ fontSize: 11, color: '#BFBFBF' }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-4)' }}>
                     {item.createdAt.replace('T', ' ').slice(0, 16)}
                   </span>
                 )}

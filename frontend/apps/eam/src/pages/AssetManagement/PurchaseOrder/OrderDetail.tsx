@@ -275,7 +275,7 @@ export default function OrderDetail({ id, onBack, onEdit, onInbound, onViewReque
             )}
             {detail.execStatus === 'completed' && (
               <Button type="primary" onClick={() => onInbound(detail.id)}
-                style={{ backgroundColor: '#722ED1', borderColor: 'var(--purple)', borderRadius: 8, height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 6px rgba(114,46,209,0.25)' }}>
+                style={{ /* theme-pair-locked：背景必须钉 #722ED1——它是「白字实底」，而 --purple 深色档 #A371E7 上白字只有 3.4578（现值 6.9376），令牌化会把按钮文字打到 AA 以下；描边因此一并回退保持同色 */ backgroundColor: '#722ED1', borderColor: '#722ED1', borderRadius: 8, height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 6px rgba(114,46,209,0.25)' }}>
                 {t('asset.btnReceive')}
               </Button>
             )}

@@ -173,7 +173,7 @@ export function SignaturePad({
       className={className}
       style={{
         position: 'relative',
-        border: '1px solid #d9d9d9',
+        border: '1px solid var(--border-1)',
         borderRadius: 8,
         overflow: 'hidden',
         background: backgroundColor,
@@ -206,9 +206,9 @@ export function SignaturePad({
             right: 8,
             padding: '2px 10px',
             fontSize: 12,
-            color: '#8c8c8c',
+            color: 'var(--text-3)',
             background: 'rgba(255,255,255,0.85)',
-            border: '1px solid #d9d9d9',
+            border: '1px solid var(--border-1)',
             borderRadius: 4,
             cursor: 'pointer',
           }}
@@ -224,7 +224,7 @@ export function SignaturePad({
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            color: '#bfbfbf',
+            color: 'var(--text-4)',
             fontSize: 14,
             pointerEvents: 'none',
             userSelect: 'none',

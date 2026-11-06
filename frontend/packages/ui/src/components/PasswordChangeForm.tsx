@@ -111,7 +111,7 @@ export default function PasswordChangeForm({ forced = false, onCancel, onSubmitt
               }} />
             ))}
           </div>
-          <span className="pwd-strength-label" style={{ color: assessment.empty ? '#BFBFBF' : STRENGTH_COLOR[assessment.strength] }}>
+          <span className="pwd-strength-label" style={{ color: assessment.empty ? 'var(--text-4)' : STRENGTH_COLOR[assessment.strength] }}>
             {assessment.empty ? t('header.pwdStrengthPlaceholder') : t(`header.pwdStrength.${assessment.strength}`)}
           </span>
         </div>

@@ -39,7 +39,7 @@ export default function DetailPageHeader({ title, tags, meta, onBack, onEdit, me
 
   return (
     <div style={{
-      position: 'relative', background: '#fff', marginBottom: 10,
+      position: 'relative', background: 'var(--surface-2)', marginBottom: 10,
       borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
     }}>
       {/* 頂部漸變裝飾線（詳情頁全局規範：紫色） */}
@@ -55,7 +55,7 @@ export default function DetailPageHeader({ title, tags, meta, onBack, onEdit, me
             icon={<ArrowLeftOutlined />}
             onClick={onBack}
             style={{
-              backgroundColor: '#E8720C', borderColor: '#E8720C',
+              backgroundColor: 'var(--brand)', borderColor: 'var(--brand)',
               borderRadius: 8, height: 36, padding: '0 16px',
               display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
               boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
@@ -67,10 +67,10 @@ export default function DetailPageHeader({ title, tags, meta, onBack, onEdit, me
           <div style={{ width: 1, height: 20, background: '#E8E8E8', flexShrink: 0 }} />
           <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{title}</h2>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>{title}</h2>
               {tags}
             </div>
-            {meta && <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>{meta}</div>}
+            {meta && <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>{meta}</div>}
           </div>
         </div>
         {extra ?? (canEdit && (
@@ -79,7 +79,7 @@ export default function DetailPageHeader({ title, tags, meta, onBack, onEdit, me
             icon={<EditOutlined />}
             onClick={onEdit}
             style={{
-              backgroundColor: '#722ED1', borderColor: '#722ED1', borderRadius: 8,
+              backgroundColor: '#722ED1', borderColor: 'var(--purple)', borderRadius: 8,
               height: 36, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6,
               boxShadow: '0 2px 6px rgba(114,46,209,0.25)',
               transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',

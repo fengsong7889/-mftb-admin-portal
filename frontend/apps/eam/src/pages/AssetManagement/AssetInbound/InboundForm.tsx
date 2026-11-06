@@ -1151,7 +1151,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                     beforeUpload={(file) => { handlePassPhotoUpload(file); return false }}
                     accept="image/*"
                   >
-                    <div style={{ width: 88, height: 88, border: '1px dashed var(--border-1)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#999', fontSize: 12, background: 'var(--surface-3)', transition: 'all 0.3s' }}
+                    <div style={{ width: 88, height: 88, border: '1px dashed var(--border-1)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-hint)', fontSize: 12, background: 'var(--surface-3)', transition: 'all 0.3s' }}
                       onMouseEnter={(e) => { const el = e.currentTarget; el.style.borderColor = 'var(--brand)'; el.style.background = 'var(--warning-soft)'; el.style.color = 'var(--brand)' }}
                       onMouseLeave={(e) => { const el = e.currentTarget; /* 還原必須用與基態相同的令牌：寫回裸色值會讓深色主題 hover 一次後永久停在淺色塊 */ el.style.borderColor = 'var(--border-1)'; el.style.background = 'var(--surface-3)'; el.style.color = '#999' }}
                     >
@@ -1345,7 +1345,7 @@ export default function InboundForm({ poId, groupId, onBack }: Props) {
                 beforeUpload={(file) => { handleRejectPhotoUpload(file); return false }}
                 accept="image/*"
               >
-                <div style={{ width: 88, height: 88, border: '1px dashed var(--border-1)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#999', fontSize: 12, background: 'var(--surface-3)', transition: 'all 0.3s' }}
+                <div style={{ width: 88, height: 88, border: '1px dashed var(--border-1)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-hint)', fontSize: 12, background: 'var(--surface-3)', transition: 'all 0.3s' }}
                   onMouseEnter={(e) => { const el = e.currentTarget; el.style.borderColor = 'var(--brand)'; el.style.background = 'var(--warning-soft)'; el.style.color = 'var(--brand)' }}
                   onMouseLeave={(e) => { const el = e.currentTarget; /* 還原必須用與基態相同的令牌：寫回裸色值會讓深色主題 hover 一次後永久停在淺色塊 */ el.style.borderColor = 'var(--border-1)'; el.style.background = 'var(--surface-3)'; el.style.color = '#999' }}
                 >

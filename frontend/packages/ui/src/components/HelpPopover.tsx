@@ -69,7 +69,7 @@ function SectionCard({ section }: { section: HelpSection }) {
         <div style={{ fontSize: 13, fontWeight: 600, color: tone.accent, marginBottom: section.body ? 4 : 0 }}>{section.label}</div>
       )}
       {typeof section.body === 'string'
-        ? <div style={{ fontSize: 13, lineHeight: 1.7, color: '#595959', whiteSpace: 'pre-line' }}>{section.body}</div>
+        ? <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--text-2)', whiteSpace: 'pre-line' }}>{section.body}</div>
         : section.body}
     </div>
   )
@@ -83,7 +83,7 @@ export default function HelpPopover({
       {content.map((section, i) => <SectionCard key={i} section={section} />)}
     </div>
   ) : typeof content === 'string' ? (
-    <div style={{ fontSize: 13, lineHeight: 1.7, color: '#595959', whiteSpace: 'pre-line' }}>{content}</div>
+    <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--text-2)', whiteSpace: 'pre-line' }}>{content}</div>
   ) : (
     content
   )
@@ -95,11 +95,11 @@ export default function HelpPopover({
       trigger="click"
       placement={placement}
       overlayStyle={{ maxWidth: width + 40 }}
-      title={<span style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{title}</span>}
+      title={<span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>}
       content={<div style={{ width }}>{body}</div>}
     >
       {children ?? (
-        <TriggerIcon aria-label={ariaLabel} style={{ color: '#8C8C8C', cursor: 'pointer', marginLeft: 4 }} />
+        <TriggerIcon aria-label={ariaLabel} style={{ color: 'var(--text-3)', cursor: 'pointer', marginLeft: 4 }} />
       )}
     </Popover>
   )

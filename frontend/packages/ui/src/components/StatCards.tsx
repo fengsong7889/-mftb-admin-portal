@@ -62,7 +62,7 @@ function StatCard({ item }: { item: StatCardItem }) {
           )
           : <>{item.prefix}{item.value}{item.suffix}</>}
       </div>
-      <div style={{ fontSize: 12, color: '#8C8C8C' }}>{item.label}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{item.label}</div>
     </div>
   )
 }

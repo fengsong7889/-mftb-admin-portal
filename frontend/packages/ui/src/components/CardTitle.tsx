@@ -46,10 +46,10 @@ export default function CardTitle({ icon, tone = 'info', title, tag, note }: Pro
       <div style={{ ...iconBoxStyle, background: palette.bg }}>
         <span style={{ fontSize: 14, color: palette.color }}>{icon}</span>
       </div>
-      <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>
       {tag}
       <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
-      {note && <span style={{ fontSize: 12, color: '#8c8c8c' }}>{note}</span>}
+      {note && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{note}</span>}
     </div>
   )
 }

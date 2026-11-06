@@ -45,13 +45,13 @@ function StoreLogo({ size }: { size: number }) {
 function InfoRows({ nameSize = 13 }: { nameSize?: number } = {}) {
   return (
     <>
-      <div style={{ fontSize: nameSize, fontWeight: 600, color: '#262626', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <div style={{ fontSize: nameSize, fontWeight: 600, color: 'var(--text-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         McDonald's（氹仔泉福店）
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#FA8C16' }}>⭐ 4.6</span>
-        <span style={{ fontSize: 10, color: '#8C8C8C' }}>月售 1196</span>
-        <span style={{ fontSize: 10, color: '#8C8C8C' }}>起送$40・減配$0~3・32分鐘・1.9km</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--warning)' }}>⭐ 4.6</span>
+        <span style={{ fontSize: 10, color: 'var(--text-3)' }}>月售 1196</span>
+        <span style={{ fontSize: 10, color: 'var(--text-3)' }}>起送$40・減配$0~3・32分鐘・1.9km</span>
       </div>
     </>
   )
@@ -123,7 +123,7 @@ function DishCarousel() {
             {isFront && (
               <>
                 <div style={{ position: 'absolute', left: 5, bottom: 22, display: 'flex', alignItems: 'stretch', borderRadius: 10, overflow: 'hidden' }}>
-                  <span style={{ fontSize: 9, fontWeight: 700, color: '#E8302D', background: '#fff', padding: '2px 5px' }}>🏷️ {dish.discount}</span>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: '#E8302D', background: 'var(--surface-2)', padding: '2px 5px' }}>🏷️ {dish.discount}</span>
                   <span style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#E8302D', padding: '2px 5px', display: 'flex', alignItems: 'baseline', gap: 2 }}>
                     {dish.price}
                     <span style={{ fontSize: 8, fontWeight: 400, color: 'rgba(255,255,255,0.8)', textDecoration: 'line-through' }}>{dish.original}</span>
@@ -131,7 +131,7 @@ function DishCarousel() {
                 </div>
                 <div style={{
                   position: 'absolute', left: 0, right: 0, bottom: 0, padding: '2px 6px',
-                  background: 'rgba(255,255,255,0.92)', fontSize: 10, fontWeight: 600, color: '#262626',
+                  background: 'rgba(255,255,255,0.92)', fontSize: 10, fontWeight: 600, color: 'var(--text-1)',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>{dish.name}</div>
               </>
@@ -195,12 +195,12 @@ function WaterfallContext({ children }: { children: React.ReactNode }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {/* 上方鄰卡（模糊淡化） */}
       <div style={{ filter: 'blur(0.5px)', opacity: 0.8, transform: 'scale(0.97)', pointerEvents: 'none' }}>
-        <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', border: '1px solid #f0f0f0' }}>
+        <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '10px 12px', border: '1px solid var(--border-2)' }}>
           <div style={{ display: 'flex', gap: 8 }}>
             <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f0f0f0', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🍜</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#262626' }}>老友記茶餐廳</div>
-              <div style={{ fontSize: 10, color: '#8C8C8C', marginTop: 3 }}>★4.2 月售 866</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)' }}>老友記茶餐廳</div>
+              <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 3 }}>★4.2 月售 866</div>
             </div>
           </div>
         </div>
@@ -218,12 +218,12 @@ function WaterfallContext({ children }: { children: React.ReactNode }) {
       </div>
       {/* 下方鄰卡（模糊淡化） */}
       <div style={{ filter: 'blur(0.5px)', opacity: 0.8, transform: 'scale(0.97)', pointerEvents: 'none' }}>
-        <div style={{ background: '#fff', borderRadius: 10, padding: '10px 12px', border: '1px solid #f0f0f0' }}>
+        <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '10px 12px', border: '1px solid var(--border-2)' }}>
           <div style={{ display: 'flex', gap: 8 }}>
             <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f0f0f0', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>☕</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#262626' }}>街角咖啡</div>
-              <div style={{ fontSize: 10, color: '#8C8C8C', marginTop: 3 }}>★4.6 月售 1024</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)' }}>街角咖啡</div>
+              <div style={{ fontSize: 10, color: 'var(--text-3)', marginTop: 3 }}>★4.6 月售 1024</div>
             </div>
           </div>
         </div>
@@ -245,8 +245,8 @@ export default function PopularLayoutPreviewModal() {
         onClick={() => setVisible(true)}
         style={{
           borderRadius: 6,
-          borderColor: '#52C41A',
-          color: '#52C41A',
+          borderColor: 'var(--success)',
+          color: 'var(--success)',
           fontSize: 12,
           fontWeight: 500,
           flexShrink: 0,
@@ -262,11 +262,11 @@ export default function PopularLayoutPreviewModal() {
         width={500}
         centered
       >
-        <div style={{ background: '#F5F5F5', borderRadius: 8, padding: 20 }}>
+        <div style={{ background: 'var(--surface-1)', borderRadius: 8, padding: 20 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             {/* ===== 小圖模式 ===== */}
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>📱 小圖模式</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>📱 小圖模式</div>
               <WaterfallContext>
                 <div style={cardWithBorder}>
                   <div style={{ display: 'flex', gap: 10 }}>
@@ -284,15 +284,15 @@ export default function PopularLayoutPreviewModal() {
             <div>
               {/* 標題 + Tab 切換（同定價預覽樣式） */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>🖼️ 大圖模式</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>🖼️ 大圖模式</span>
                 {([['grid', '大圖拼列（1大2小）'], ['carousel', '階梯輪播']] as const).map(([key, label]) => (
                   <span
                     key={key}
                     onClick={() => setBigLayoutTab(key)}
                     style={{
                       fontSize: 11, cursor: 'pointer', borderRadius: 4, padding: '1px 8px', lineHeight: '18px',
-                      color: bigLayoutTab === key ? '#E8720C' : '#8C8C8C',
-                      background: bigLayoutTab === key ? '#FFF7E6' : '#F0F0F0',
+                      color: bigLayoutTab === key ? 'var(--brand)' : 'var(--text-3)',
+                      background: bigLayoutTab === key ? 'var(--warning-soft)' : '#F0F0F0',
                       border: `1px solid ${bigLayoutTab === key ? '#E8720C' : 'transparent'}`,
                       transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                     }}
@@ -314,7 +314,7 @@ export default function PopularLayoutPreviewModal() {
 
             </div>
           </div>
-          <div style={{ fontSize: 11, color: '#8C8C8C', marginTop: 12 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 12 }}>
             店鋪名稱、評分、商品圖與優惠信息為示意數據，實際以商家數據自動生成為準
           </div>
         </div>
