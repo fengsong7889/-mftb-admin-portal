@@ -134,7 +134,7 @@ export default function AiApprovalActionPanel({ requestType, requestedModels, dr
         <SafetyOutlined style={{ marginRight: 6 }} />
         {t('approvalDetail.aiGrantTitle')}
       </div>
-      <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
         <SafetyOutlined />
         {t('approvalDetail.aiGrantAutoHint')}
       </div>
@@ -142,17 +142,17 @@ export default function AiApprovalActionPanel({ requestType, requestedModels, dr
       {/* ====== 授權範圍 ====== */}
       {showModelScope && (
         <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               {t('approvalDetail.aiGrantScopeTitle')}
-              <span style={{ color: '#ff4d4f', marginLeft: 2 }}>*</span>
+              <span style={{ color: 'var(--danger)', marginLeft: 2 }}>*</span>
             </div>
             <button
               type="button"
               onClick={() => setShowAddModal(true)}
               style={{
-                border: '1px dashed #E8720C', borderRadius: 6, padding: '2px 10px',
-                background: '#fff', color: '#E8720C', fontSize: 12, cursor: 'pointer',
+                border: '1px dashed var(--brand)', borderRadius: 6, padding: '2px 10px',
+                background: 'var(--surface-2)', color: 'var(--brand)', fontSize: 12, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 4,
               }}
             >
@@ -160,7 +160,7 @@ export default function AiApprovalActionPanel({ requestType, requestedModels, dr
             </button>
           </div>
           {selectedModelDetails.length === 0 && (
-            <div style={{ fontSize: 12, color: '#8C8C8C', padding: '12px 0' }}>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', padding: '12px 0' }}>
               {t('approvalDetail.aiGrantNoModel')}
             </div>
           )}
@@ -172,15 +172,15 @@ export default function AiApprovalActionPanel({ requestType, requestedModels, dr
                 <div
                   key={m.id}
                   style={{
-                    border: '1px solid #E8720C', borderRadius: 8, padding: '12px 14px',
-                    background: '#fff7e6', position: 'relative',
+                    border: '1px solid var(--brand)', borderRadius: 8, padding: '12px 14px',
+                    background: 'var(--warning-soft)', position: 'relative',
                   }}
                 >
                   {/* 模型名稱行 */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <CheckSquareOutlined style={{ color: '#E8720C', fontSize: 14 }} />
-                    <span style={{ fontSize: 13, fontWeight: 500, color: '#262626' }}>{m.name || m.modelKey}</span>
-                    {m.providerName && <span style={{ fontSize: 11, color: '#8c8c8c' }}>({m.providerName})</span>}
+                    <CheckSquareOutlined style={{ color: 'var(--brand)', fontSize: 14 }} />
+                    <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-1)' }}>{m.name || m.modelKey}</span>
+                    {m.providerName && <span style={{ fontSize: 11, color: 'var(--text-3)' }}>({m.providerName})</span>}
                     {isRequested && (
                       <Tag color="blue" style={{ fontSize: 11, margin: 0, lineHeight: '18px' }}>
                         {t('approvalDetail.aiGrantRequested')}
@@ -188,7 +188,7 @@ export default function AiApprovalActionPanel({ requestType, requestedModels, dr
                     )}
                     {/* 移除按鈕 */}
                     <CloseOutlined
-                      style={{ color: '#8C8C8C', fontSize: 12, cursor: 'pointer', marginLeft: 'auto' }}
+                      style={{ color: 'var(--text-3)', fontSize: 12, cursor: 'pointer', marginLeft: 'auto' }}
                       onClick={() => toggleModel(m)}
                       title={t('common.delete')}
                     />
@@ -211,7 +211,7 @@ export default function AiApprovalActionPanel({ requestType, requestedModels, dr
                       {/* 生效類型 + 到期時間 */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span style={{ fontSize: 12, color: '#595959' }}>{t('approvalDetail.aiGrantModelEffective')}：</span>
+                          <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{t('approvalDetail.aiGrantModelEffective')}：</span>
                           <Radio.Group
                             size="small"
                             value={cfg.effectiveType}
@@ -223,7 +223,7 @@ export default function AiApprovalActionPanel({ requestType, requestedModels, dr
                         </div>
                         {cfg.effectiveType === 'temporary' && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <span style={{ fontSize: 12, color: '#595959' }}>{t('approvalDetail.aiGrantExpireAt')}：</span>
+                            <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{t('approvalDetail.aiGrantExpireAt')}：</span>
                             <DatePicker
                               showTime
                               size="small"
@@ -252,11 +252,11 @@ export default function AiApprovalActionPanel({ requestType, requestedModels, dr
         footer={null}
         width={560}
       >
-        <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 12 }}>
+        <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12 }}>
           {t('approvalDetail.aiGrantAddModelHint')}
         </div>
         {availableModels.length === 0 && (
-          <div style={{ fontSize: 13, color: '#8C8C8C', padding: '20px 0', textAlign: 'center' }}>
+          <div style={{ fontSize: 13, color: 'var(--text-3)', padding: '20px 0', textAlign: 'center' }}>
             {t('approvalDetail.aiGrantNoAvailableModel')}
           </div>
         )}
@@ -266,16 +266,16 @@ export default function AiApprovalActionPanel({ requestType, requestedModels, dr
               key={m.id}
               onClick={() => toggleModel(m)}
               style={{
-                border: '1px solid #e8eaed', borderRadius: 8, padding: '10px 14px',
-                cursor: 'pointer', background: '#fff', transition: 'all 0.2s',
+                border: '1px solid var(--border-3)', borderRadius: 8, padding: '10px 14px',
+                cursor: 'pointer', background: 'var(--surface-2)', transition: 'all 0.2s',
               }}
               onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#E8720C'; e.currentTarget.style.background = '#fff7e6' }}
               onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e8eaed'; e.currentTarget.style.background = '#fff' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <PlusOutlined style={{ color: '#E8720C', fontSize: 14 }} />
-                <span style={{ fontSize: 13, fontWeight: 500, color: '#262626' }}>{m.name || m.modelKey}</span>
-                {m.providerName && <span style={{ fontSize: 11, color: '#8c8c8c' }}>({m.providerName})</span>}
+                <PlusOutlined style={{ color: 'var(--brand)', fontSize: 14 }} />
+                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-1)' }}>{m.name || m.modelKey}</span>
+                {m.providerName && <span style={{ fontSize: 11, color: 'var(--text-3)' }}>({m.providerName})</span>}
               </div>
             </div>
           ))}
@@ -285,14 +285,14 @@ export default function AiApprovalActionPanel({ requestType, requestedModels, dr
       {/* ====== 額度設置 ====== */}
       {showQuota && (
         <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
             <WalletOutlined />
             {t('approvalDetail.aiGrantQuotaTitle')}
-            <span style={{ color: '#ff4d4f' }}>*</span>
+            <span style={{ color: 'var(--danger)' }}>*</span>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
             <div>
-              <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>{t('approvalDetail.aiGrantQuotaType')}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>{t('approvalDetail.aiGrantQuotaType')}</div>
               <Select
                 value={draft.quotaType}
                 onChange={(v) => onChange({ ...draft, quotaType: v })}
@@ -304,7 +304,7 @@ export default function AiApprovalActionPanel({ requestType, requestedModels, dr
               />
             </div>
             <div>
-              <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>{t('approvalDetail.aiGrantQuotaValue')}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>{t('approvalDetail.aiGrantQuotaValue')}</div>
               <InputNumber
                 value={draft.quotaValue}
                 onChange={(v) => onChange({ ...draft, quotaValue: v })}
@@ -316,7 +316,7 @@ export default function AiApprovalActionPanel({ requestType, requestedModels, dr
               />
             </div>
             <div>
-              <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>{t('approvalDetail.aiGrantQuotaPeriod')}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>{t('approvalDetail.aiGrantQuotaPeriod')}</div>
               <Select
                 value={draft.quotaPeriod}
                 onChange={(v) => onChange({ ...draft, quotaPeriod: v })}
@@ -328,7 +328,7 @@ export default function AiApprovalActionPanel({ requestType, requestedModels, dr
               />
             </div>
             <div>
-              <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>{t('approvalDetail.aiGrantOverLimit')}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>{t('approvalDetail.aiGrantOverLimit')}</div>
               <Select
                 value={draft.overLimitAction}
                 onChange={(v) => onChange({ ...draft, overLimitAction: v })}
@@ -341,7 +341,7 @@ export default function AiApprovalActionPanel({ requestType, requestedModels, dr
               />
             </div>
             <div>
-              <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>{t('approvalDetail.aiGrantEffectiveType')}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>{t('approvalDetail.aiGrantEffectiveType')}</div>
               <Radio.Group
                 value={draft.effectiveType}
                 onChange={(e) => onChange({ ...draft, effectiveType: e.target.value })}
@@ -354,9 +354,9 @@ export default function AiApprovalActionPanel({ requestType, requestedModels, dr
             </div>
             {draft.effectiveType === 'temporary' && (
               <div>
-                <div style={{ fontSize: 12, color: '#595959', marginBottom: 4 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>
                   {t('approvalDetail.aiGrantExpireAt')}
-                  <span style={{ color: '#ff4d4f', marginLeft: 2 }}>*</span>
+                  <span style={{ color: 'var(--danger)', marginLeft: 2 }}>*</span>
                 </div>
                 <DatePicker
                   showTime

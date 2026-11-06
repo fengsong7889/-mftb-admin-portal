@@ -1034,7 +1034,7 @@ export default function ApprovalDetail() {
     if (doc.type === 'image') {
       return (
         <div key={index} className="approval-doc-thumb">
-          <FileImageOutlined className="approval-doc-icon" style={{ color: '#1890ff' }} />
+          <FileImageOutlined className="approval-doc-icon" style={{ color: 'var(--info)' }} />
         </div>
       )
     }
@@ -1048,7 +1048,7 @@ export default function ApprovalDetail() {
     }
     return (
       <div key={index} className="approval-doc-thumb approval-doc-thumb--view">
-        <EyeOutlined className="approval-doc-icon" style={{ color: '#666' }} />
+        <EyeOutlined className="approval-doc-icon" style={{ color: 'var(--text-body)' }} />
         <span className="approval-doc-view-label">{t('approvalDetail.viewDoc')}</span>
       </div>
     )
@@ -1070,7 +1070,7 @@ export default function ApprovalDetail() {
         <div style={{ width: 28, height: 28, borderRadius: 6, background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           {icon}
         </div>
-        <span style={{ fontSize: 15, fontWeight: 600, color: '#262626' }}>{title}</span>
+        <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>
         <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
       </div>
     )
@@ -1086,8 +1086,8 @@ export default function ApprovalDetail() {
             {isOaEngineType(type) || type === 'ai_access'
               ? <Tag color={type === 'oa_purchase' ? 'orange' : 'blue'} style={{ margin: 0 }}>{typeTitleMapKeys[type ?? ''] ? t(typeTitleMapKeys[type ?? '']) : (type === 'oa_purchase' ? '採購' : 'AI申請')}</Tag>
               : <Tag color="blue" style={{ margin: 0 }}>{data.brand}</Tag>}
-            <span style={{ fontSize: 13, color: '#8C8C8C' }}>{data.applyDate.split(' ')[0]}</span>
-            <span style={{ fontSize: 13, color: '#595959', fontWeight: 500 }}>{data.applicant}</span>
+            <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{data.applyDate.split(' ')[0]}</span>
+            <span style={{ fontSize: 13, color: 'var(--text-2)', fontWeight: 500 }}>{data.applicant}</span>
           </>
         }
         onBack={() => navigate(-1)}
@@ -1121,7 +1121,7 @@ export default function ApprovalDetail() {
         <div className="approval-detail-left">
           {/* 基本信息 */}
           <div className="approval-section">
-            {renderSectionTitle(<FileTextOutlined style={{ fontSize: 14, color: '#1890ff' }} />, t('approvalDetail.baseInfo'), 'blue')}
+            {renderSectionTitle(<FileTextOutlined style={{ fontSize: 14, color: 'var(--info)' }} />, t('approvalDetail.baseInfo'), 'blue')}
             <div className="approval-info-grid">
               {/* 第一行：申請人、申請日期、流程編號 */}
               <div className="approval-info-item">
@@ -1182,7 +1182,7 @@ export default function ApprovalDetail() {
             <>
               {/* 充值帳戶資訊 */}
               <div className="approval-section">
-                {renderSectionTitle(<AccountBookOutlined style={{ fontSize: 14, color: '#722ed1' }} />, t('approvalDetail.rechargeAccountInfo'), 'purple')}
+                {renderSectionTitle(<AccountBookOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />, t('approvalDetail.rechargeAccountInfo'), 'purple')}
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
                     <span className="approval-info-label">{t('common.colGroupId')}</span>
@@ -1213,7 +1213,7 @@ export default function ApprovalDetail() {
 
               {/* 充值金額明細 */}
               <div className="approval-section">
-                {renderSectionTitle(<DollarOutlined style={{ fontSize: 14, color: '#fa8c16' }} />, t('approvalDetail.rechargeAmountDetail'), 'orange')}
+                {renderSectionTitle(<DollarOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />, t('approvalDetail.rechargeAmountDetail'), 'orange')}
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
                     <span className="approval-info-label">{t('approvalDetail.isActual')}</span>
@@ -1279,7 +1279,7 @@ export default function ApprovalDetail() {
               {/* 扣款門店（僅實收 & 混合支付/營業額支付時展示） */}
               {data.isActual && (data.payMethod === 'mixed' || data.payMethod === 'revenue') && data.deductStores && data.deductStores.length > 0 && (
                 <div className="approval-section">
-                  {renderSectionTitle(<ShopOutlined style={{ fontSize: 14, color: '#8c8c8c' }} />, t('approvalDetail.deductStores'))}
+                  {renderSectionTitle(<ShopOutlined style={{ fontSize: 14, color: 'var(--text-3)' }} />, t('approvalDetail.deductStores'))}
                   <table className="approval-repayment-table">
                     <thead>
                       <tr>
@@ -1296,18 +1296,18 @@ export default function ApprovalDetail() {
                           <td>
                             <span style={{
                               display: 'inline-block', padding: '2px 10px', borderRadius: 4,
-                              background: '#fff7e6', color: '#E8720C', fontWeight: 600, fontSize: 13,
-                              border: '1px solid #ffd591',
+                              background: 'var(--warning-soft)', color: 'var(--brand)', fontWeight: 600, fontSize: 13,
+                              border: '1px solid var(--warning-border)',
                             }}>MOP {store.amount.toLocaleString()}</span>
                           </td>
                         </tr>
                       ))}
-                      <tr style={{ fontWeight: 600, background: '#fafafa' }}>
+                      <tr style={{ fontWeight: 600, background: 'var(--surface-3)' }}>
                         <td colSpan={2} style={{ textAlign: 'right' }}>{t('approvalDetail.total')}</td>
                         <td>
                           <span style={{
                             display: 'inline-block', padding: '2px 10px', borderRadius: 4,
-                            background: '#E8720C', color: '#fff', fontWeight: 700, fontSize: 13,
+                            background: 'var(--brand)', color: 'var(--on-brand)', fontWeight: 700, fontSize: 13,
                           }}>MOP {data.deductStores.reduce((s, r) => s + r.amount, 0).toLocaleString()}</span>
                         </td>
                       </tr>
@@ -1323,7 +1323,7 @@ export default function ApprovalDetail() {
             <>
               {/* 基础信息 */}
               <div className="approval-section">
-                {renderSectionTitle(<FileTextOutlined style={{ fontSize: 14, color: '#722ed1' }} />, t('approvalDetail.baseInfo'), 'purple')}
+                {renderSectionTitle(<FileTextOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />, t('approvalDetail.baseInfo'), 'purple')}
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
                     <span className="approval-info-label">{t('common.colGroupId')}</span>
@@ -1341,7 +1341,7 @@ export default function ApprovalDetail() {
               </div>
               {/* 扣款方式 */}
               <div className="approval-section">
-                {renderSectionTitle(<CreditCardOutlined style={{ fontSize: 14, color: '#fa8c16' }} />, t('approvalDetail.deductMethodTitle'), 'orange')}
+                {renderSectionTitle(<CreditCardOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />, t('approvalDetail.deductMethodTitle'), 'orange')}
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
                     <span className="approval-info-label">{t('approvalDetail.deductMethodTitle')}</span>
@@ -1395,7 +1395,7 @@ export default function ApprovalDetail() {
             <>
               {/* 转出集团资讯 */}
               <div className="approval-section">
-                {renderSectionTitle(<LogoutOutlined style={{ fontSize: 14, color: '#722ed1' }} />, t('approvalDetail.fromGroup'), 'purple')}
+                {renderSectionTitle(<LogoutOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />, t('approvalDetail.fromGroup'), 'purple')}
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
                     <span className="approval-info-label">{t('common.colGroupId')}</span>
@@ -1413,7 +1413,7 @@ export default function ApprovalDetail() {
               </div>
               {/* 转入集团资讯 */}
               <div className="approval-section">
-                {renderSectionTitle(<LoginOutlined style={{ fontSize: 14, color: '#52c41a' }} />, t('approvalDetail.toGroup'), 'green')}
+                {renderSectionTitle(<LoginOutlined style={{ fontSize: 14, color: 'var(--success)' }} />, t('approvalDetail.toGroup'), 'green')}
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
                     <span className="approval-info-label">{t('common.colGroupId')}</span>
@@ -1431,7 +1431,7 @@ export default function ApprovalDetail() {
               </div>
               {/* 转账金额 */}
               <div className="approval-section">
-                {renderSectionTitle(<SwapOutlined style={{ fontSize: 14, color: '#fa8c16' }} />, t('approvalDetail.transferAmountTitle'), 'orange')}
+                {renderSectionTitle(<SwapOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />, t('approvalDetail.transferAmountTitle'), 'orange')}
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
                     <span className="approval-info-label">{t('approvalDetail.transferAmountTitle')}</span>
@@ -1455,7 +1455,7 @@ export default function ApprovalDetail() {
             <>
               {/* 合并集团资讯 */}
               <div className="approval-section">
-                {renderSectionTitle(<CloseCircleOutlined style={{ fontSize: 14, color: '#722ed1' }} />, <>{t('approvalDetail.cancelledGroup')} <Tag color="red" style={{ fontSize: 11, marginLeft: 4 }}>{t('approvalDetail.closingSoon')}</Tag></>, 'purple')}
+                {renderSectionTitle(<CloseCircleOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />, <>{t('approvalDetail.cancelledGroup')} <Tag color="red" style={{ fontSize: 11, marginLeft: 4 }}>{t('approvalDetail.closingSoon')}</Tag></>, 'purple')}
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
                     <span className="approval-info-label">{t('common.colGroupId')}</span>
@@ -1481,7 +1481,7 @@ export default function ApprovalDetail() {
               </div>
               {/* 被合并集团资讯 */}
               <div className="approval-section">
-                {renderSectionTitle(<CheckCircleOutlined style={{ fontSize: 14, color: '#52c41a' }} />, <>{t('approvalDetail.survivingGroup')} <Tag color="green" style={{ fontSize: 11, marginLeft: 4 }}>{t('approvalDetail.receivingAssets')}</Tag></>, 'green')}
+                {renderSectionTitle(<CheckCircleOutlined style={{ fontSize: 14, color: 'var(--success)' }} />, <>{t('approvalDetail.survivingGroup')} <Tag color="green" style={{ fontSize: 11, marginLeft: 4 }}>{t('approvalDetail.receivingAssets')}</Tag></>, 'green')}
                 <div className="approval-info-grid">
                   <div className="approval-info-item">
                     <span className="approval-info-label">{t('common.colGroupId')}</span>
@@ -1500,8 +1500,8 @@ export default function ApprovalDetail() {
               {/* 欠款偿还 */}
               {data.repayStores && data.repayStores.length > 0 && (
                 <div className="approval-section">
-                  {renderSectionTitle(<WarningOutlined style={{ fontSize: 14, color: '#ff4d4f' }} />, t('approvalDetail.debtRepayment'), 'red')}
-                  <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 12 }}>
+                  {renderSectionTitle(<WarningOutlined style={{ fontSize: 14, color: 'var(--danger)' }} />, t('approvalDetail.debtRepayment'), 'red')}
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12 }}>
                     {t('approvalDetail.debtRepaymentDesc', { amount: data.mergeDebtAmount?.toLocaleString() })}
                   </div>
                   <Table
@@ -1525,8 +1525,8 @@ export default function ApprovalDetail() {
                         render: (val: number) => (
                           <span style={{
                             padding: '2px 10px', borderRadius: 4,
-                            background: '#fff7e6', color: '#E8720C', fontWeight: 600, fontSize: 13,
-                            border: '1px solid #ffd591',
+                            background: 'var(--warning-soft)', color: 'var(--brand)', fontWeight: 600, fontSize: 13,
+                            border: '1px solid var(--warning-border)',
                           }}>
                             MOP {val.toLocaleString()}
                           </span>
@@ -1544,7 +1544,7 @@ export default function ApprovalDetail() {
                             <Table.Summary.Cell index={1} align="center">
                               <span style={{
                                 padding: '2px 10px', borderRadius: 4,
-                                background: '#E8720C', color: '#fff', fontWeight: 700, fontSize: 13,
+                                background: 'var(--brand)', color: 'var(--on-brand)', fontWeight: 700, fontSize: 13,
                               }}>
                                 MOP {total.toLocaleString()}
                               </span>
@@ -1557,7 +1557,7 @@ export default function ApprovalDetail() {
                   {data.repayStores && (
                     <div style={{ marginTop: 8, fontSize: 12, textAlign: 'right' }}>
                       {data.repayStores.reduce((sum, r) => sum + r.amount, 0) < (data.mergeDebtAmount || 0) && (
-                        <span style={{ color: '#ff4d4f' }}>
+                        <span style={{ color: 'var(--danger)' }}>
                           {t('approvalDetail.unallocated', { amount: (data.mergeDebtAmount! - data.repayStores.reduce((sum, r) => sum + r.amount, 0)).toLocaleString() })}
                         </span>
                       )}
@@ -1571,7 +1571,7 @@ export default function ApprovalDetail() {
           {/* 赠送类型 */}
           {type === 'gift' && (
             <div className="approval-section">
-              {renderSectionTitle(<GiftOutlined style={{ fontSize: 14, color: '#722ed1' }} />, t('approvalDetail.giftConfig'), 'purple')}
+              {renderSectionTitle(<GiftOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />, t('approvalDetail.giftConfig'), 'purple')}
               <div className="approval-info-grid">
                 <div className="approval-info-item">
                   <span className="approval-info-label">{t('common.colGroupId')}</span>
@@ -1612,7 +1612,7 @@ export default function ApprovalDetail() {
           {/* AI 申請類型 */}
           {type === 'ai_access' && (
             <div className="approval-section">
-              {renderSectionTitle(<RobotOutlined style={{ fontSize: 14, color: '#722ed1' }} />, t('approvalDetail.aiAccessInfo'), 'purple')}
+              {renderSectionTitle(<RobotOutlined style={{ fontSize: 14, color: 'var(--purple)' }} />, t('approvalDetail.aiAccessInfo'), 'purple')}
               <div className="approval-info-grid">
                 <div className="approval-info-item">
                   <span className="approval-info-label">{t('approvalDetail.aiRequestType')}</span>
@@ -1675,7 +1675,7 @@ export default function ApprovalDetail() {
           {/* AI 申請：審批結果（審批即授權下發明細，供申請人與審批人回看） */}
           {type === 'ai_access' && !isPending && aiRequest && (
             <div className="approval-section">
-              {renderSectionTitle(<CheckCircleOutlined style={{ fontSize: 14, color: '#52c41a' }} />, t('approvalDetail.aiResultTitle'), 'green')}
+              {renderSectionTitle(<CheckCircleOutlined style={{ fontSize: 14, color: 'var(--success)' }} />, t('approvalDetail.aiResultTitle'), 'green')}
               <div className="approval-info-grid">
                 {aiRequest.approvedModelConfigs && aiRequest.approvedModelConfigs.length > 0 && (
                   <div className="approval-info-item" style={{ gridColumn: '1 / -1' }}>
@@ -1749,7 +1749,7 @@ export default function ApprovalDetail() {
           {isSystemAccessType(type) && saRequest && (
             <div className="approval-section">
               {renderSectionTitle(
-                <SafetyCertificateOutlined style={{ fontSize: 14, color: '#1890ff' }} />,
+                <SafetyCertificateOutlined style={{ fontSize: 14, color: 'var(--info)' }} />,
                 t('approvalDetail.saInfoTitle'),
                 'blue',
               )}
@@ -1828,7 +1828,7 @@ export default function ApprovalDetail() {
           {isSystemAccessType(type) && !isPending && saRequest && (
             <div className="approval-section">
               {renderSectionTitle(
-                <CheckCircleOutlined style={{ fontSize: 14, color: '#52c41a' }} />,
+                <CheckCircleOutlined style={{ fontSize: 14, color: 'var(--success)' }} />,
                 t('approvalDetail.saResultTitle'),
                 'green',
               )}
@@ -1866,7 +1866,7 @@ export default function ApprovalDetail() {
                           </Tag>
                         )}
                         {saRequest.revokeStatus === 'revoked' && saRequest.revokedAt && (
-                          <span style={{ marginLeft: 8, fontSize: 12, color: '#8c8c8c' }}>
+                          <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--text-3)' }}>
                             {t('approvalDetail.saRevokedAt')}: {saRequest.revokedAt}
                           </span>
                         )}
@@ -1890,7 +1890,7 @@ export default function ApprovalDetail() {
           {/* 採購申請類型：採購明細表格 */}
           {type === 'oa_purchase' && data.purchaseItems && data.purchaseItems.length > 0 && (
             <div className="approval-section">
-              {renderSectionTitle(<ShoppingCartOutlined style={{ fontSize: 14, color: '#8c8c8c' }} />, '採購明細')}
+              {renderSectionTitle(<ShoppingCartOutlined style={{ fontSize: 14, color: 'var(--text-3)' }} />, '採購明細')}
               <Table
                 size="small"
                 pagination={false}
@@ -1905,7 +1905,7 @@ export default function ApprovalDetail() {
                     if (!v || Object.keys(v).length === 0) return '--'
                     const entries = Object.entries(v).filter(([, val]) => val && val !== 'undefined')
                     if (entries.length === 0) return '--'
-                    return <span style={{ fontSize: 12, color: '#595959' }}>{entries.map(([k, val]) => `${paramLabelMap[k] || k}: ${val}`).join(', ')}</span>
+                    return <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{entries.map(([k, val]) => `${paramLabelMap[k] || k}: ${val}`).join(', ')}</span>
                   }},
                   { title: '數量', dataIndex: 'qty', key: 'qty', width: 70, align: 'right', render: (v: number) => v ?? '--' },
                   { title: '備註', dataIndex: 'remark', key: 'remark', width: 120, render: (v: string) => v || '--' },
@@ -1916,7 +1916,7 @@ export default function ApprovalDetail() {
 
           {/* 相关凭证 */}
           <div className="approval-section">
-            {renderSectionTitle(<FileImageOutlined style={{ fontSize: 14, color: '#8c8c8c' }} />, t('approvalDetail.documents'))}
+            {renderSectionTitle(<FileImageOutlined style={{ fontSize: 14, color: 'var(--text-3)' }} />, t('approvalDetail.documents'))}
             <div className="approval-documents">
               {data.documents?.map((doc, i) => renderDocument(doc, i))}
             </div>
@@ -1930,7 +1930,7 @@ export default function ApprovalDetail() {
           {isSystemAccessType(type) && saRequest && saRequest.attachments.length > 0 && (
             <div className="approval-section">
               {renderSectionTitle(
-                <FileImageOutlined style={{ fontSize: 14, color: '#8c8c8c' }} />,
+                <FileImageOutlined style={{ fontSize: 14, color: 'var(--text-3)' }} />,
                 t('systemAccessApply.attachmentSection'),
               )}
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -1941,7 +1941,7 @@ export default function ApprovalDetail() {
                       type="button"
                       onClick={() => setSaPreview(item)}
                       style={{
-                        width: 96, height: 96, border: '1px solid #e8e8e8', borderRadius: 8, background: '#fafafa',
+                        width: 96, height: 96, border: '1px solid #e8e8e8', borderRadius: 8, background: 'var(--surface-3)',
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                         cursor: 'pointer', gap: 4,
                       }}
@@ -1949,7 +1949,7 @@ export default function ApprovalDetail() {
                     >
                       <FilePdfOutlined style={{ fontSize: 28, color: '#e53935' }} />
                       <span style={{
-                        fontSize: 10, color: '#999', maxWidth: 84,
+                        fontSize: 10, color: 'var(--text-hint)', maxWidth: 84,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>{item.name}</span>
                     </button>
@@ -1963,7 +1963,7 @@ export default function ApprovalDetail() {
                         style={{ objectFit: 'cover', borderRadius: 8, border: '1px solid #e8e8e8' }}
                       />
                       <div style={{
-                        fontSize: 10, color: '#999', maxWidth: 96,
+                        fontSize: 10, color: 'var(--text-hint)', maxWidth: 96,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>{item.name}</div>
                     </div>
@@ -1976,14 +1976,14 @@ export default function ApprovalDetail() {
           {/* 备注信息 / 採購事由（AI 申請的用途說明已在 AI 申請資訊中展示，系統權限申請的申请说明同理，此處不重複） */}
           {type !== 'ai_access' && !isSystemAccessType(type) && (
           <div className="approval-section">
-            {renderSectionTitle(<FileTextOutlined style={{ fontSize: 14, color: '#8c8c8c' }} />, type === 'oa_purchase' ? '採購事由' : t('approvalDetail.notesTitle'))}
+            {renderSectionTitle(<FileTextOutlined style={{ fontSize: 14, color: 'var(--text-3)' }} />, type === 'oa_purchase' ? '採購事由' : t('approvalDetail.notesTitle'))}
             <div className="approval-notes">{data.notes}</div>
           </div>
           )}
 
           {/* 审批意见 */}
           <div className="approval-section">
-            {renderSectionTitle(<ExclamationCircleOutlined style={{ fontSize: 14, color: '#8c8c8c' }} />, t('approvalDetail.commentTitle'))}
+            {renderSectionTitle(<ExclamationCircleOutlined style={{ fontSize: 14, color: 'var(--text-3)' }} />, t('approvalDetail.commentTitle'))}
             <Input.TextArea
               rows={3}
               placeholder={t('approvalDetail.commentPlaceholder')}
@@ -2008,13 +2008,13 @@ export default function ApprovalDetail() {
                     <span className="approval-timeline-time">{item.time}</span>
                   </div>
                   {item.approvers?.length ? (
-                    <div style={{ fontSize: 12, color: '#666', lineHeight: 2, marginTop: 4 }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-body)', lineHeight: 2, marginTop: 4 }}>
                       {/* 多人審批：最多展示 3 人，超出顯示 +N 點擊查看 */}
                       {item.approvers.slice(0, 3).map((a, i) => (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span>{a.status === 'skipped' ? <s style={{ color: '#bbb' }}>{a.name}</s> : a.name}</span>
                           {renderStatusTag(a.status === 'skipped' ? 'pending' : a.status)}
-                          <span style={{ color: '#999', fontSize: 11 }}>{a.time || '--'}</span>
+                          <span style={{ color: 'var(--text-hint)', fontSize: 11 }}>{a.time || '--'}</span>
                         </div>
                       ))}
                       {item.approvers.length > 3 && (
@@ -2210,12 +2210,12 @@ export default function ApprovalDetail() {
                   alignItems: 'center',
                   gap: 12,
                   padding: '8px 0',
-                  borderBottom: i < viewApprovers.approvers.length - 1 ? '1px solid #F0F0F0' : 'none',
+                  borderBottom: i < viewApprovers.approvers.length - 1 ? '1px solid var(--border-2)' : 'none',
                 }}
               >
                 <span style={{ flex: 1 }}>{a.status === 'skipped' ? <s style={{ color: '#bbb' }}>{a.name}</s> : a.name}</span>
                 {renderStatusTag(a.status === 'skipped' ? 'pending' : a.status)}
-                <span style={{ color: '#999', fontSize: 12, minWidth: 130, textAlign: 'right' }}>{a.time || '--'}</span>
+                <span style={{ color: 'var(--text-hint)', fontSize: 12, minWidth: 130, textAlign: 'right' }}>{a.time || '--'}</span>
               </div>
             ))}
           </div>

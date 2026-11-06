@@ -519,7 +519,7 @@ export default function TrafficPackagePricing() {
 
         {/* 區塊4：計價示例 */}
         <div style={{ marginBottom: 16, padding: '12px 14px', background: 'var(--success-soft)', border: '1px solid var(--success-border)', borderRadius: 8, fontSize: 12, color: 'var(--text-2)', lineHeight: '22px' }}>
-          <div style={{ fontWeight: 600, color: '#389e0d', marginBottom: 4 }}>💡 {tAd('trafficPricingExample')}</div>
+          <div style={{ fontWeight: 600, color: 'var(--success-deep)', marginBottom: 4 }}>💡 {tAd('trafficPricingExample')}</div>
           <div>{tAd('trafficPricingExampleDesc')}</div>
           {exampleUnit !== null && (
             <div style={{ fontFamily: 'monospace' }}>
