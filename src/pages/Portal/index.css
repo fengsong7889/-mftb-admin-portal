@@ -1046,7 +1046,7 @@ html[data-theme='dark'] .portal-quick-item:not(.portal-quick-item--recent) {
 .portal-card-artwork .portal-hr-welcome,
 .portal-card-artwork .portal-hr-assigned { animation-name: portalHrAssigned; }
 .portal-card-artwork .portal-hr-matching { animation-name: portalHrMatching; }
-.portal-card-artwork .portal-hr-assigned { color: #52C41A; }
+.portal-card-artwork .portal-hr-assigned { color: var(--success); }
 
 /*
  * 考勤假勤两套构图共用一个 7.2 秒节拍：
