@@ -52,6 +52,9 @@ public class TranslationDataInitializer implements CommandLineRunner {
     /** 繁中是全站文案的源语言，也是机翻的源，不能当成「待补的目标语言」 */
     private static final String SOURCE_LANG = "zh-TW";
 
+    /** 启动期自动写入的 updated_by 标记：与其余系统写入同口径，便于事后区分人操作与启动期迁移 */
+    private static final String BUILTIN_OPERATOR = "system";
+
     /** 自动机翻开关：离线/无外网环境可以关掉，避免每次启动都在后台重试外部 API */
     @org.springframework.beans.factory.annotation.Value("${translation.auto-mt.enabled:true}")
     private boolean autoMtEnabled;
@@ -75,6 +78,8 @@ public class TranslationDataInitializer implements CommandLineRunner {
             });
             // "活"逻辑: 菜单种子化可能新增菜单, 需同步为翻译字段; 增量同步成本极低, 每次执行
             syncMenuNames();
+            // 数组型 key 的一次性退库：必须在 syncI18nKeys 之前，否则本轮同步会把它们当新字段又灌回去。
+            retireArrayValuedKeys();
             syncI18nKeys();
             // zh-CN 回填: 将已有 zh-TW 翻译通过 ICU4J 繁→简转换填充缺失的 zh-CN。
             // 不再做一次性版本门：镜像只能覆盖到「前端有同名 key」的字段，
@@ -461,8 +466,105 @@ public class TranslationDataInitializer implements CommandLineRunner {
             Object value = entry.getValue();
             if (value instanceof Map) {
                 flattenMap(key, (Map<String, Object>) value, result);
+            } else if (value instanceof List) {
+                // 数组型文案（日历星期表头、励志语清单等）不进翻译表：sys_translation 是扁平的
+                // key→字符串结构，结构上装不下数组。旧实现走 value.toString()，把
+                // ["週日","週一",…] 灌成 "[周日, 周一, …]"（ja/ko/ru 还在这堆括号串上跑了机翻，
+                // 得到 "【日・月・…】"）；前端 addResourceBundle 会把静态包里的真数组覆盖成这个串，
+                // 于是 returnObjects 拿到字符串，日历视图整页崩成错误边界（2026-11-06 实测）。
+                // 数组的真源只能是前端静态语言包，这里直接跳过。
+                log.debug("多语言模块: 数组型 key 不进翻译表, 已跳过: {}", key);
             } else if (value != null) {
                 result.put(key, value.toString());
+            }
+        }
+    }
+
+    /**
+     * 一次性退库：把历史上被错误灌进 sys_translation 的数组型 key 逻辑删除。
+     *
+     * <p>为什么必须清而不是只防：前端 {@code addResourceBundle(lang, ns, deep, overwrite=false)}
+     * 对「静态包里已有同名 key」不会覆盖，所以 zh-TW/en/zh-CN 靠静态包就能正；但 ja/ko/ru 的静态包
+     * 里根本没有 meeting.calendarWeekdays，取值完全依赖数据库注入——库里留着那个括号串就等于
+     * 「这个语言有值」，i18next 不再 fallback 到英文数组，日语用户看到的星期表头会是
+     * "[Sun, Mon, …]" 整串。删除后该 key 在 ja/ko/ru 重新走 fallbackLng 拿英文数组，口径才正确。
+     *
+     * <p>待清 key 不写死：从镜像 zh-TW.json 现算，将来新增/删除数组型文案会自动跟上，
+     * 不会留下「代码里的名单比真源旧」这种二次腐化。只动 {@code source='sync'} 的行，
+     * 人工登记的 {@code manual} 一律不碰（那是业务方手工译名）。用逻辑删除，可回滚。
+     */
+    private void retireArrayValuedKeys() {
+        versionTracker.applyOnce("translation:array-keys-cleanup-v1",
+                this::doRetireArrayKeys, this::verifyArrayKeysRetired);
+    }
+
+    private void doRetireArrayKeys() {
+        List<String> keys = collectArrayValuedKeys();
+        if (keys.isEmpty()) {
+            log.info("多语言模块: 镜像里没有数组型 key，无需退库");
+            return;
+        }
+        // 参数化 IN 列表（不拼接字面量）：key 来自镜像 JSON 文本，仍按不可信输入处理
+        Object[] args = new Object[keys.size() + 1];
+        args[0] = BUILTIN_OPERATOR;
+        for (int i = 0; i < keys.size(); i++) {
+            args[i + 1] = keys.get(i);
+        }
+        int retired = jdbcTemplate.update(
+                "UPDATE sys_translation SET deleted = 1, updated_by = ? "
+                        + "WHERE source = 'sync' AND deleted = 0 AND field_key IN ("
+                        + String.join(",", Collections.nCopies(keys.size(), "?")) + ")",
+                args);
+        log.info("多语言模块: 数组型 key 已从翻译表退库（镜像共 {} 个数组 key，逻辑删除命中 {} 行）",
+                keys.size(), retired);
+    }
+
+    /** 后置校验：这些 key 不得再有「未删除且 sync 来源」的行，否则等于没退干净 */
+    private void verifyArrayKeysRetired() {
+        List<String> keys = collectArrayValuedKeys();
+        if (keys.isEmpty()) {
+            return;
+        }
+        Integer residual = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_translation WHERE source = 'sync' AND deleted = 0 AND field_key IN ("
+                        + String.join(",", Collections.nCopies(keys.size(), "?")) + ")",
+                Integer.class, keys.toArray());
+        if (residual != null && residual > 0) {
+            throw new IllegalStateException("数组型 key 退库后仍有 " + residual + " 行在用，未被清理");
+        }
+    }
+
+    /**
+     * 从镜像 zh-TW.json 现算「值为数组」的点分隔 key。
+     * <p>读不到镜像时返回空集：宁可不退，也不能因为镜像缺失就把全部字段当数组删掉。
+     */
+    List<String> collectArrayValuedKeys() {
+        ClassPathResource resource = new ClassPathResource("i18n/" + SOURCE_LANG + ".json");
+        if (!resource.exists()) {
+            log.warn("多语言模块: classpath:i18n/{}.json 不存在，数组型 key 退库跳过", SOURCE_LANG);
+            return List.of();
+        }
+        List<String> keys = new ArrayList<>();
+        try (InputStream is = resource.getInputStream()) {
+            String json = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            Map<String, Object> root = objectMapper.readValue(json, new TypeReference<>() {});
+            collectListKeys("", root, keys);
+        } catch (Exception e) {
+            log.warn("多语言模块: 解析 i18n/{}.json 失败，数组型 key 退库跳过: {}", SOURCE_LANG, e.getMessage());
+            return List.of();
+        }
+        return keys;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void collectListKeys(String prefix, Map<String, Object> node, List<String> out) {
+        for (Map.Entry<String, Object> entry : node.entrySet()) {
+            String key = prefix.isEmpty() ? entry.getKey() : prefix + "." + entry.getKey();
+            Object value = entry.getValue();
+            if (value instanceof List) {
+                out.add(key);
+            } else if (value instanceof Map) {
+                collectListKeys(key, (Map<String, Object>) value, out);
             }
         }
     }

@@ -3985,7 +3985,7 @@
     "pleaseSelect": "Please select",
     "serverError": "Server error, please retry later",
     "requestFailed": "Request failed",
-    "networkError": "Network error",
+    "networkError": "Network connection failed. Please check your connection and try again.",
     "noPermission": "You don't have permission for this action. Please contact an administrator.",
     "apiNotFound": "Endpoint or resource not found (404): {{path}}. Check the request path, whether the resource exists, and whether the backend version is up to date.",
     "sessionExpired": "Session expired, please sign in again",
@@ -12145,6 +12145,15 @@
     "itemsRequired": "Add at least one document"
   },
   "meeting": {
+    "reload": "Reload",
+    "theMeetingHasBeen": "was already changed by someone else",
+    "maxExternalAttendees": "External attendees are limited to {{max}}; currently {{count}}",
+    "roomHidesTopicTitle": "This room does not publish meeting topics",
+    "roomHidesTopicDesc": "In the room availability view this meeting shows only \"occupied\" — no topic, no organizer. Invitations and in-app calendar entries are unaffected.",
+    "finishNoteOptional": "Closing note (optional; recorded in the audit trail and attached to the notification)",
+    "eGTopicsSettledEarly": "e.g. All agenda items concluded, ending early",
+    "cannotLoadRoomProfile": "Unable to load the room profile",
+    "backToRoomList": "Back to list",
     "booked": "Booked",
     "checkedIn": "Checked in",
     "finished": "Finished",
@@ -12683,7 +12692,9 @@
         "inviteUpdated": "Meeting changed ({{version}})",
         "inviteCancelled": "Meeting cancelled",
         "remindBeforeStart": "Reminder before start",
-        "opsReleased": "Room released"
+        "opsReleased": "Room released",
+        "opsCheckedIn": "Checked in",
+        "opsFinished": "Meeting finished"
       },
       "scenario": {
         "invite": "Meeting invitation",
@@ -13253,6 +13264,7 @@
       "statPending": "Pending items",
       "statOverdue": "Overdue items",
       "noMinutes": "No minutes match the filters",
+      "loadFailedRetry": "Failed to load, please retry",
       "recorderColumn": "Recorder",
       "itemTotal_one": "{{count}} item",
       "itemPendingCount_one": "{{count}} pending",

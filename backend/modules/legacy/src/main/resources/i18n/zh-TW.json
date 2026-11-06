@@ -3865,7 +3865,7 @@
     "pleaseSelect": "請選擇",
     "serverError": "服務器異常，請稍後重試",
     "requestFailed": "請求失敗",
-    "networkError": "網絡異常",
+    "networkError": "網路連線異常，請檢查網路後重試",
     "noPermission": "您沒有權限執行此操作，請聯繫管理員授權",
     "apiNotFound": "接口或資源不存在（404）：{{path}}，請檢查請求地址、資源是否存在及後端版本是否已更新",
     "sessionExpired": "登錄校驗已過期，請重新登錄",
@@ -12145,6 +12145,15 @@
     "itemsRequired": "請至少添加一篇文檔"
   },
   "meeting": {
+    "reload": "重新載入",
+    "theMeetingHasBeen": "已被他人修改",
+    "maxExternalAttendees": "外部參會人最多 {{max}} 人，當前 {{count}} 人",
+    "roomHidesTopicTitle": "本會議室的主題不對外公示",
+    "roomHidesTopicDesc": "在「會議室預約」的忙閒視圖裡，這場會只顯示「已佔用」，不顯示主題與組織者；參會人的邀請與站內日程不受影響。",
+    "finishNoteOptional": "散會說明（選填，會寫入審計並附在通知裡）",
+    "eGTopicsSettledEarly": "例：議題已全部結論，提前散會",
+    "cannotLoadRoomProfile": "無法載入會議室檔案",
+    "backToRoomList": "返回列表",
     "booked": "已預約",
     "checkedIn": "已簽到",
     "finished": "已完成",
@@ -12683,7 +12692,9 @@
         "inviteUpdated": "會議變更（{{version}}）",
         "inviteCancelled": "會議取消",
         "remindBeforeStart": "開始前提醒",
-        "opsReleased": "會議室釋放"
+        "opsReleased": "會議室釋放",
+        "opsCheckedIn": "已簽到",
+        "opsFinished": "會議已結束"
       },
       "scenario": {
         "invite": "會議邀約",
@@ -13253,6 +13264,7 @@
       "statPending": "待辦事項",
       "statOverdue": "逾期事項",
       "noMinutes": "暫無符合條件的紀要",
+      "loadFailedRetry": "本次未能加載，請重試",
       "recorderColumn": "記錄人",
       "itemTotal_one": "共 {{count}} 項",
       "itemPendingCount_one": "待辦 {{count}}",

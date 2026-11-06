@@ -34,8 +34,10 @@ function drawQuote(deck: number[], size: number, previous: number): number {
 
 /**
  * 读取当前语言的励志语数组。
- * returnObjects 让 i18next 直接返回数组，语言包缺该键时由 fallbackLng（英文）兜底；
+ * <p>returnObjects 让 i18next 直接返回数组，语言包缺该键时由 fallbackLng（英文）兜底；
  * 数据库翻译包只会写入扁平字符串，因此必须校验类型，非数组则视为无语料。
+ * <p>这里故意不拿其它语言的语料充数（与 readTextArray 的星期表头不同）：励志语是
+ * 「语料」而不是「结构」，宁可横幅整体不渲染，也不能给日语用户挂一条繁中励志语。
  */
 export function useMotivationQuotes(): string[] {
   const { t } = useTranslation()

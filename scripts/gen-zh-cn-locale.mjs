@@ -33,9 +33,9 @@
  * 后端 pom 用的是 74.2，本地若同时存在多个版本，结果可能与后端不一致，日志会打印实际取用的版本。
  */
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync, readdirSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync, readdirSync, realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -47,30 +47,93 @@ const EXPECTED_ICU4J = '74.2'
 
 const CHECK_ONLY = process.argv.includes('--check')
 
-/** 摊平嵌套对象为 [路径, 文案]，保序——生成物要与真源逐 key 对齐，不能靠字典序重排 */
+/**
+ * 空容器哨兵。`{}` / `[]` 不产出任何文案叶子，但必须原样保留结构：
+ * 2026-11-06 写自校时实测到旧重建会把 `meeting.minutesSend: {}` 整个弄丢，
+ * 生成物与真源不再同形。哨兵在转换阶段被跳过，在重建阶段还原成空容器。
+ */
+const EMPTY_OBJECT = Symbol.for('mftb.i18n.emptyObject')
+const EMPTY_ARRAY = Symbol.for('mftb.i18n.emptyArray')
+
+const isEmptyMarker = value => value === EMPTY_OBJECT || value === EMPTY_ARRAY
+
+/**
+ * 摊平嵌套结构为 [路径, 文案]，保序——生成物要与真源逐 key 对齐，不能靠字典序重排。
+ * <p>数组必须按下标展开成 `a.b.[3]` 这样的路径，**不能当叶子整条压成字符串**：
+ * 2026-11-06 实测旧实现把 `meeting.calendarWeekdays` 生成成 `"周日,周一,…"`，
+ * i18next 的 `returnObjects` 于是返回字符串，日历视图 `weekdays.map()` 直接把
+ * 「我的会议」整页打成错误边界——而 `--check` 因为两侧都把数组当叶子，结构完全对称，
+ * 一路绿灯。按下标展开后，类型腐化会表现为「key 集合不一致」，本门禁才拦得住。
+ */
 function flatten(node, prefix = '', out = []) {
-  if (!node || typeof node !== 'object') return out
-  for (const [key, value] of Object.entries(node)) {
+  if (node === null || typeof node !== 'object') return out
+  const entries = Array.isArray(node)
+    ? node.map((value, index) => [`[${index}]`, value])
+    : Object.entries(node)
+  if (entries.length === 0) out.push([prefix, Array.isArray(node) ? EMPTY_ARRAY : EMPTY_OBJECT])
+  for (const [key, value] of entries) {
     const path = prefix ? `${prefix}.${key}` : key
-    if (value && typeof value === 'object' && !Array.isArray(value)) flatten(value, path, out)
+    if (value !== null && typeof value === 'object') flatten(value, path, out)
     else out.push([path, value])
   }
   return out
 }
 
-/** 由点分路径重建嵌套对象（与 flatten 严格互逆） */
+/** 由点分路径重建嵌套结构（与 flatten 严格互逆，`[i]` 段还原为数组下标） */
 function unflatten(pairs) {
   const root = {}
   for (const [path, value] of pairs) {
     const parts = path.split('.')
     let node = root
     for (let i = 0; i < parts.length - 1; i += 1) {
-      if (typeof node[parts[i]] !== 'object' || node[parts[i]] === null) node[parts[i]] = {}
-      node = node[parts[i]]
+      const index = asIndex(parts[i])
+      const key = index !== null ? index : parts[i]
+      // 容器取数组还是对象，由下一段是不是下标决定——否则对象数组会被重建为带数字键的对象
+      const nextIsIndex = asIndex(parts[i + 1]) !== null
+      if (typeof node[key] !== 'object' || node[key] === null) node[key] = nextIsIndex ? [] : {}
+      node = node[key]
     }
-    node[parts[parts.length - 1]] = value
+    const lastIndex = asIndex(parts[parts.length - 1])
+    const lastKey = lastIndex !== null ? lastIndex : parts[parts.length - 1]
+    node[lastKey] = value === EMPTY_ARRAY ? [] : value === EMPTY_OBJECT ? {} : value
   }
   return root
+}
+
+/** `'[12]'` → 12；其余返回 null（表示这是一个普通对象键） */
+function asIndex(segment) {
+  return /^\[(\d+)\]$/.test(segment) ? Number(segment.slice(1, -1)) : null
+}
+
+/**
+ * 写入前自校：`unflatten(flatten(x))` 必须与 `x` 逐字节同形同序。
+ * <p>这条不是防御性代码，而是本脚本唯一能证明「数组没被压成字符串、对象数组没被拆成数字键对象」
+ * 的断言。旧实现没有它，把 8 个数组型 key 全量压平产出并入库，下游崩了三层才被发现。
+ * 不成立就中止，宁可不产出也不能产出结构变形的语言包。
+ */
+function assertRoundTrip(source) {
+  const rebuilt = unflatten(flatten(source))
+  const dump = value => JSON.stringify(value)
+  if (dump(rebuilt) === dump(source)) return
+  // 只在失败路径上跑：找出第一批形状不一致的叶子，把诊断信息挨到具体 key，而不是只报「不等」
+  const pairs = flatten(source)
+  const bad = []
+  for (const [path, value] of pairs) {
+    let node = rebuilt
+    for (const seg of path.split('.')) {
+      if (node === null || typeof node !== 'object') { node = undefined; break }
+      const index = asIndex(seg)
+      node = node[index !== null ? index : seg]
+    }
+    if (dump(node) !== (isEmptyMarker(value) ? dump(value === EMPTY_ARRAY ? [] : {}) : dump(value))) {
+      bad.push(`${path}：源 ${isEmptyMarker(value) ? '(空容器)' : dump(value)} → 重建 ${dump(node)}`)
+    }
+    if (bad.length >= 3) break
+  }
+  console.error(`❌ 内部错误：flatten/unflatten 不是严格互逆，共 ${pairs.length} 个源叶子，首批变形如下`)
+  bad.forEach(line => console.error(`   ${line}`))
+  console.error('   中止写入，以免产出结构变形的语言包。')
+  process.exit(1)
 }
 
 /** 在本地 Maven 仓库里找 ICU4J jar */
@@ -130,7 +193,11 @@ public class I18nTradToSimp {
 `
 
 function generate() {
-  const pairs = flatten(JSON.parse(readFileSync(SRC_PATH, 'utf8')))
+  const source = JSON.parse(readFileSync(SRC_PATH, 'utf8'))
+  assertRoundTrip(source)
+  const pairs = flatten(source)
+  // 哨兵不参与繁简转换（它们不是文案），只参与结构重建
+  const textPairs = pairs.filter(([, value]) => !isEmptyMarker(value))
   const jar = locateIcu4j()
   if (!jar) {
     console.error(`❌ 找不到 ICU4J jar。请确认后端依赖已下载（mvn -f backend/pom.xml -q dependency:resolve），`)
@@ -146,9 +213,9 @@ function generate() {
   try {
     const javaFile = join(workDir, 'I18nTradToSimp.java')
     writeFileSync(javaFile, JAVA_SOURCE, 'utf8')
-    const payload = pairs
+    const payload = textPairs
       .map(([, value]) => String(value ?? ''))
-      .map((text, i) => `${Buffer.from(pairs[i][0], 'utf8').toString('base64url')}\t${Buffer.from(text, 'utf8').toString('base64url')}`)
+      .map((text, i) => `${Buffer.from(textPairs[i][0], 'utf8').toString('base64url')}\t${Buffer.from(text, 'utf8').toString('base64url')}`)
       .join('\n') + '\n'
 
     // JDK 17 单文件源码模式：不产生 class 文件，也不需要临时 pom
@@ -168,16 +235,16 @@ function generate() {
       byKey.set(key, value)
     }
 
-    const missing = pairs.filter(([k]) => !byKey.has(k))
+    const missing = textPairs.filter(([k]) => !byKey.has(k))
     if (missing.length > 0) {
       console.error(`❌ 转换结果缺 ${missing.length} 个 key（如 ${missing.slice(0, 5).map(m => m[0]).join(', ')}），中止写入以免产出残缺语言包`)
       process.exit(1)
     }
 
-    const converted = pairs.map(([k, v]) => [k, byKey.get(k) ?? v])
-    const unchanged = converted.filter(([k, v], i) => String(v) === String(pairs[i][1])).length
+    const converted = pairs.map(([k, v]) => [k, isEmptyMarker(v) ? v : (byKey.get(k) ?? v)])
+    const unchanged = textPairs.filter(([k, v]) => String(byKey.get(k) ?? '') === String(v ?? '')).length
     writeFileSync(DST_PATH, `${JSON.stringify(unflatten(converted), null, 2)}\n`, 'utf8')
-    console.log(`✅ 已生成 zh-CN.json：${converted.length} 个 key（其中 ${converted.length - unchanged} 个字形有变化）`)
+    console.log(`✅ 已生成 zh-CN.json：${textPairs.length} 个文案 key（其中 ${textPairs.length - unchanged} 个字形有变化）`)
   } finally {
     rmSync(workDir, { recursive: true, force: true })
   }
@@ -201,10 +268,11 @@ function check() {
   const srcKeys = new Set(srcPairs.map(([k]) => k))
   const missing = srcPairs.filter(([k]) => !(k in dstFlat))
   const stale = Object.keys(dstFlat).filter(k => !srcKeys.has(k))
+  // 空容器哨兵不是文案：既不参与「有值/为空」判定，也不得因为它的存在而报空洞
   const holes = Object.entries(srcFlat)
-    .filter(([k, v]) => String(v ?? '').trim() && !String(dstFlat[k] ?? '').trim())
+    .filter(([k, v]) => !isEmptyMarker(v) && String(v ?? '').trim() && !String(dstFlat[k] ?? '').trim())
     .map(([k]) => k)
-  const srcBlank = srcPairs.filter(([, v]) => !String(v ?? '').trim()).map(([k]) => k)
+  const srcBlank = srcPairs.filter(([, v]) => !isEmptyMarker(v) && !String(v ?? '').trim()).map(([k]) => k)
 
   console.log(`zh-TW.json ${srcKeys.size} 个 key / zh-CN.json ${Object.keys(dstFlat).length} 个 key`)
   let failed = false
@@ -231,5 +299,24 @@ function check() {
   console.log('✅ zh-CN 静态包与 zh-TW 结构齐备')
 }
 
-if (CHECK_ONLY) check()
-else generate()
+/**
+ * 只有直接执行本文件才跑生成/校验；被测试 import 时不执行。
+ * <p>旧版本在模块顶层直接 `if (CHECK_ONLY) check() else generate()`，导致 flatten/unflatten
+ * 根本没法单测——一 import 就去读真源、找 ICU4J、写文件。结构保真这条不变量必须有单测钉住。
+ * <p>两边都取 realpath：工作区目录可能是符号链接（本机 Desktop/SARY → Projects/SARY），
+ * 只比字面路径会让「直接执行」被误判成「被 import」，门禁当场变成什么都不做地绿过去。
+ */
+const isMain = (() => {
+  if (!process.argv[1]) return false
+  try {
+    return realpathSync(resolve(process.argv[1])) === realpathSync(fileURLToPath(import.meta.url))
+  } catch {
+    return false
+  }
+})()
+if (isMain) {
+  if (CHECK_ONLY) check()
+  else generate()
+}
+
+export { flatten, unflatten, asIndex, isEmptyMarker, EMPTY_OBJECT, EMPTY_ARRAY }

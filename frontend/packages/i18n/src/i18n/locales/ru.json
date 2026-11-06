@@ -1012,5 +1012,8 @@
   },
   "algorithm": {
     "btnScoreResult": "Результат подсчёта"
+  },
+  "meeting": {
+    "calendarWeekdays": ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"]
   }
 }

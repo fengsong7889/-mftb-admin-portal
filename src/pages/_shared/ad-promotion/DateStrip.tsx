@@ -6,6 +6,7 @@ import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import { isPresaleDate, getPresaleOpenTime } from './gridConstants'
+import { readWeekdayFull } from './weekdayLabels'
 
 export interface DateStripProps {
   dateList: Dayjs[]
@@ -38,7 +39,7 @@ export default function DateStrip({
   onPageChange,
 }: DateStripProps) {
   const { t } = useTranslation('adSales')
-  const WEEKDAY_LABELS = t('weekdayFull', { returnObjects: true }) as string[]
+  const WEEKDAY_LABELS = readWeekdayFull(t)
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

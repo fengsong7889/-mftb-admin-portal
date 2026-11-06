@@ -42,6 +42,7 @@ import { fetchGiftAvailableDays } from '@/api/gift'
 import { usePaymentRule } from '@/hooks/usePaymentRule'
 import { getSystemRuleValue } from '@/hooks/useSystemRules'
 import { AlgorithmType, REGION_LABEL_KEY, RecommendChannel } from '@mftb/contracts/recommendConstants'
+import { readWeekdayShort } from '../weekdayLabels'
 
 export interface UseDayPickerCommonOptions {
   inventoryItem: InventoryItem
@@ -416,7 +417,7 @@ export function useDayPickerCommon({ inventoryItem, storeMode, showAlgoCode }: U
 
   const handleDateClick = (date: Dayjs | null) => {
     if (!date) return
-    const WEEKDAY_LABELS = t('weekdayShort', { returnObjects: true }) as string[]
+    const WEEKDAY_LABELS = readWeekdayShort(t)
     if (isPresaleDate(date, sellableDays)) {
       setPresaleInfo({
         date: date.format('YYYY-MM-DD'),
@@ -473,7 +474,7 @@ export function useDayPickerCommon({ inventoryItem, storeMode, showAlgoCode }: U
   }
 
   const handleMonthChange = (month: Dayjs) => {
-    const WEEKDAY_LABELS = t('weekdayShort', { returnObjects: true }) as string[]
+    const WEEKDAY_LABELS = readWeekdayShort(t)
     const firstDay = month.startOf('month')
     if (isPresaleDate(firstDay, sellableDays)) {
       setPresaleInfo({

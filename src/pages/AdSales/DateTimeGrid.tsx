@@ -47,6 +47,7 @@ import {
 } from '../_shared/ad-promotion/gridConstants'
 import DateStrip from '../_shared/ad-promotion/DateStrip'
 import { useDateTimeGridCommon, type GridCartItem } from '../_shared/ad-promotion/useDateTimeGridCommon'
+import { readWeekdayFull } from '../_shared/ad-promotion/weekdayLabels'
 import {
   ConflictModal,
   SuccessModal,
@@ -139,7 +140,7 @@ export default function DateTimeGrid({ inventoryItem, storeMode }: DateTimeGridP
   ], [t])
 
   // 星期标签（含翻译）
-  const WEEKDAY_LABELS = t('weekdayFull', { returnObjects: true }) as string[]
+  const WEEKDAY_LABELS = readWeekdayFull(t)
 
   // 商圈名称翻译映射
   const REGION_NAME_MAP: Record<number, string> = useMemo(() => ({

@@ -14,6 +14,7 @@ import {
   type DiscountTierDef,
 } from './gridConstants'
 import type { PresaleInfo } from './DateStrip'
+import { readWeekdayFull } from './weekdayLabels'
 
 /** 共享购物车项接口（AdSales 额外有 mealSlotKey 字段） */
 export interface GridCartItem {
@@ -143,7 +144,7 @@ export function useDateTimeGridCommon(config: GridCommonConfig) {
   // ─── 日期点击 ──────────────────────────────────────────────────────────────
   const handleDateClick = useCallback((date: Dayjs) => {
     if (isPresaleDate(date, sellableDays)) {
-      const WEEKDAY_LABELS = t('weekdayFull', { returnObjects: true }) as string[]
+      const WEEKDAY_LABELS = readWeekdayFull(t)
       setPresaleInfo({
         date: date.format('YYYY-MM-DD'),
         weekday: WEEKDAY_LABELS[date.day()],

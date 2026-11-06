@@ -16,12 +16,13 @@ import { fetchAdAlgorithms, fetchAdNewStoreInventory, placeAdNewStoreOrder } fro
 import type { AdNewStoreInventoryVO } from '@/api/adPromotion'
 import { fetchStores } from '@/api/store'
 import { useNewStoreCalendar, AnimatedNumber } from '../_shared/ad-promotion/useNewStoreCalendar'
+import { readWeekdayShort } from '../_shared/ad-promotion/weekdayLabels'
 
 // algorithm/store/BD options from backend
 
 export default function NewStoreDayPicker({ storeMode }: { storeMode?: boolean }) {
   const { t } = useTranslation('adSales')
-  const WEEKDAY_LABELS = t('weekdayShort', { returnObjects: true }) as string[]
+  const WEEKDAY_LABELS = readWeekdayShort(t)
   const navigate = useNavigate()
 
   // 查询条件状态

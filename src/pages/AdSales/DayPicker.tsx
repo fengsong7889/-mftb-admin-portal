@@ -22,6 +22,7 @@ import {
 import { useDayPickerCommon } from '../_shared/ad-promotion/hooks/useDayPickerCommon'
 import PaymentSuccessModal from '../_shared/ad-promotion/components/PaymentSuccessModal'
 import { MonthTabBar } from './components/pickerShared'
+import { readWeekdayShort } from '../_shared/ad-promotion/weekdayLabels'
 
 interface DayPickerProps {
   inventoryItem: InventoryItem
@@ -31,7 +32,7 @@ interface DayPickerProps {
 export default function DayPicker({ inventoryItem, storeMode }: DayPickerProps) {
   const common = useDayPickerCommon({ inventoryItem, storeMode, showAlgoCode: true })
   const { t } = common
-  const WEEKDAY_LABELS = t('weekdayShort', { returnObjects: true }) as string[]
+  const WEEKDAY_LABELS = readWeekdayShort(t)
 
   // AdSales 独有：支付成功弹窗展示赠送天数和支付方式
   const [paidGiftDays, setPaidGiftDays] = useState(0)

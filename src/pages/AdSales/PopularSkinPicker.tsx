@@ -37,6 +37,7 @@ import { fetchFinAccountBalance } from '@/api/finance'
 import { fetchAdPricingChannels } from '@/api/adPromotion'
 import { AlgorithmType, RecommendChannel } from '@mftb/contracts/recommendConstants'
 import { MAX_BUY_DAYS, PRESALE_OPEN_HOUR, MONTHS_PER_PAGE, parseDayTiers, getPresaleOpenTime, MonthTabBar, PickerPresaleInfoModal, PickerPaymentSuccessModal } from './components/pickerShared'
+import { readWeekdayShort } from '../_shared/ad-promotion/weekdayLabels'
 
 /** 人氣商家廣告類型標識（與後端一致） */
 const GIFT_AD_TYPE_POPULAR = 'popular_merchant'
@@ -230,7 +231,7 @@ const SKIN_COLOR_PALETTE = [
 export default function PopularSkinPicker({ storeMode }: { storeMode?: boolean }) {
   const { t } = useTranslation('adSales')
   const { t: tr } = useTranslation() // 默認 translation 命名空間，用於 recommend.popularSkin.* 鍵
-  const WEEKDAY_LABELS = t('weekdayShort', { returnObjects: true }) as string[]
+  const WEEKDAY_LABELS = readWeekdayShort(t)
   
   const navigate = useNavigate()
 

@@ -23,6 +23,7 @@ import { fetchFinAccountBalance } from '@/api/finance'
 import { AlgorithmType, ServiceStatus, REGION_LABEL_KEY, RecommendChannel } from '@mftb/contracts/recommendConstants'
 import { signboardTagText } from '../Recommend/signboardLabels'
 import { MAX_BUY_DAYS, PRESALE_OPEN_HOUR, MONTHS_PER_PAGE, parseDayTiers, getPresaleOpenTime, MonthTabBar, PickerPresaleInfoModal, PickerPaymentSuccessModal } from './components/pickerShared'
+import { readWeekdayShort } from '../_shared/ad-promotion/weekdayLabels'
 
 /** 金字招牌廣告類型標識（與後端一致） */
 const GIFT_AD_TYPE_SIGNBOARD = 'golden_signboard'
@@ -117,7 +118,7 @@ interface LabelPricingInfo {
 export default function GoldenSignboardLabelPicker({ storeMode }: { storeMode?: boolean }) {
   const { t } = useTranslation('adSales')
   const { t: tr } = useTranslation()
-  const WEEKDAY_LABELS = t('weekdayShort', { returnObjects: true }) as string[]
+  const WEEKDAY_LABELS = readWeekdayShort(t)
 
   const navigate = useNavigate()
 

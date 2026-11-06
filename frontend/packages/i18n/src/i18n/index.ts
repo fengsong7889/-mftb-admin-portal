@@ -1,5 +1,5 @@
 import i18n from 'i18next'
-import type { Resource, ResourceLanguage } from 'i18next'
+import type { Resource, ResourceLanguage, TFunction } from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import { TRANSLATION_BUNDLE_EVENT } from './bundleEvent'
 import zhTW from './locales/zh-TW.json'
@@ -88,6 +88,65 @@ i18n.use(initReactI18next).init({
 export function changeAppLanguage(lang: string) {
   localStorage.setItem(LANGUAGE_STORAGE_KEY, lang)
   i18n.changeLanguage(lang)
+}
+
+/**
+ * 读取语言包里的「数组型」文案（日历星期表头、励志语清单这类）。
+ *
+ * <p>为什么必须走本函数而不是直接 `t(key, { returnObjects: true }) as string[]`：
+ * 数组型文案的真源只能是前端静态语言包，而链路上有两个会把它们压成字符串的来源 ——
+ * ① `scripts/gen-zh-cn-locale.mjs` 旧实现把数组当叶子做 `String()`（2026-11-06 实测
+ * zh-CN 的 meeting.calendarWeekdays 变成 `"周日,周一,…"`）；
+ * ② 后端 sys_translation 是扁平 key→字符串表，结构上装不下数组，镜像同步旧实现把
+ * List `toString()` 灌成 `"[周日, 周一, …]"`，ja/ko/ru 还在这串上跑了机翻。
+ * 只要拿到字符串，`.map()` 就抛 TypeError，把整页打成错误边界 —— 而这条崩溃只在特定
+ * 语言下发生，繁中开发路径永远碰不到。`useMotivationQuote` 早已按此约定做类型校验，
+ * 本函数把这个约定收口成一处，不再依赖每个调用点自觉。
+ *
+ * <p>兜底不写死任何语言的文案，而是回落到**繁中真源**的同一路径：繁中本来就是全站源
+ * 语言（也是机翻的源），回到真值比在代码里钉一份中文更对，也不会踩 check:i18n 的硬编码棘轮。
+ *
+ * @param key    当前语境下的取值键（可以是 `useTranslation('adSales')` 里的短键）
+ * @param sourcePath 繁中真源里的点分全路径；不传则用 key（跨 ns 调用必须显式传）
+ */
+export function readTextArray(
+  translate: TFunction,
+  key: string,
+  sourcePath: string = key,
+): string[] {
+  const source = sourceTextArray(sourcePath)
+  const raw = translate(key, { returnObjects: true }) as unknown
+  // 只有结构型数组（真源非空）才拆历史串：星期表头这类短词列表拆回来是无损的；
+  // 真源里没这个键时不拆，宁可返回空让调用方按「无数据」处理。
+  const items = Array.isArray(raw) ? raw : (source.length > 0 ? splitLegacyArrayText(raw, key) : [])
+  const cleaned = items.map(item => String(item ?? '').trim()).filter(Boolean)
+  if (source.length === 0) return cleaned
+  // 条数必须与真源一致：缺一格就是整行错位，宁可整组回到真源也不拿残缺值凑数
+  return cleaned.length === source.length ? cleaned : source
+}
+
+/** 从繁中真源（全站源语言）按点分路径取数组型文案；取不到返回空数组 */
+function sourceTextArray(path: string): string[] {
+  let node: unknown = zhTW
+  for (const seg of path.split('.')) {
+    if (node === null || typeof node !== 'object') return []
+    node = (node as Record<string, unknown>)[seg]
+  }
+  return Array.isArray(node) ? node.map(item => String(item ?? '').trim()).filter(Boolean) : []
+}
+
+/**
+ * 把历史腐化值拆回数组：兼容 `a,b,c` 与 `[a, b, c]` 两种形态。
+ * <p>拿不到 key（i18next 查不到时原样返回 key 字符串）必须返回空，
+ * 否则会把 `"meeting.calendarWeekdays"` 按点号拆成看似合法的垃圾值。
+ */
+function splitLegacyArrayText(raw: unknown, key: string): unknown[] {
+  if (typeof raw !== 'string' || raw === key || raw === '') return []
+  return raw
+    .replace(/^\[|\]$/g, '')
+    .split(/[,，、]/)
+    .map(part => part.trim().replace(/^"|"$/g, ''))
+    .filter(Boolean)
 }
 
 /** 平鋪 key 轉嵌套結構（i18next 按 '.' 分層查找） */

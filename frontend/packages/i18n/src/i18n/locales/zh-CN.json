@@ -1208,7 +1208,38 @@
     "favoritesCollapse": "收起",
     "favUndo": "撤销",
     "statAllGranted": "全部已开通",
-    "quotes": "把每一件简单的事做好，就是不简单,今天的推进，是明天结果的伏笔,数据不会说谎，努力也不会被辜负,把复杂留给系统，把简单留给用户,每一次上线，都是下一次更好的起点,慢就是快，稳就是进,细节里藏着专业，专业里藏着信任,与其等待完美，不如现在就开始,目标清晰，步伐从容，结果自然会来,好的产品，是日复一日打磨出来的,把问题写下来，就已经解决了一半,团队的天花板，是每个人的下限,先完成，再完美；先跑通，再优化,每一次复盘，都是最便宜的成长,让数据说话，让决策更硬气,今天多走一里路，明天少绕一个弯,稳定压倒一切，细节决定成败,把小事做到位，大事才有底气,成长，藏在舒适圈之外,好结果，从来都是认真过程的副产品,别急着要答案，先把问题问对,每一次按时交付，都在累积信任的复利,系统要可维护，人要靠得住,与其焦虑未来，不如经营好当下,把压力拆成任务，把任务做成结果,一次只做一件事，把这件事做到极致,所有的从容，都是长期准备的结果,用户的每一步，都值得我们多走一步,敢于放下沉没成本，才能腾出生长空间,把今天做到最好，明天自然有交代",
+    "quotes": [
+      "把每一件简单的事做好，就是不简单",
+      "今天的推进，是明天结果的伏笔",
+      "数据不会说谎，努力也不会被辜负",
+      "把复杂留给系统，把简单留给用户",
+      "每一次上线，都是下一次更好的起点",
+      "慢就是快，稳就是进",
+      "细节里藏着专业，专业里藏着信任",
+      "与其等待完美，不如现在就开始",
+      "目标清晰，步伐从容，结果自然会来",
+      "好的产品，是日复一日打磨出来的",
+      "把问题写下来，就已经解决了一半",
+      "团队的天花板，是每个人的下限",
+      "先完成，再完美；先跑通，再优化",
+      "每一次复盘，都是最便宜的成长",
+      "让数据说话，让决策更硬气",
+      "今天多走一里路，明天少绕一个弯",
+      "稳定压倒一切，细节决定成败",
+      "把小事做到位，大事才有底气",
+      "成长，藏在舒适圈之外",
+      "好结果，从来都是认真过程的副产品",
+      "别急着要答案，先把问题问对",
+      "每一次按时交付，都在累积信任的复利",
+      "系统要可维护，人要靠得住",
+      "与其焦虑未来，不如经营好当下",
+      "把压力拆成任务，把任务做成结果",
+      "一次只做一件事，把这件事做到极致",
+      "所有的从容，都是长期准备的结果",
+      "用户的每一步，都值得我们多走一步",
+      "敢于放下沉没成本，才能腾出生长空间",
+      "把今天做到最好，明天自然有交代"
+    ],
     "heroEyebrow": "麦峰集团 · 统一工作入口",
     "heroUserFallback": "同事",
     "greetingLine": "{{greeting}}，{{name}}{{empId}}",
@@ -3834,7 +3865,7 @@
     "pleaseSelect": "请选择",
     "serverError": "服务器异常，请稍后重试",
     "requestFailed": "请求失败",
-    "networkError": "网络异常",
+    "networkError": "网路连线异常，请检查网路后重试",
     "noPermission": "您没有权限执行此操作，请联系管理员授权",
     "apiNotFound": "接口或资源不存在（404）：{{path}}，请检查请求地址、资源是否存在及后端版本是否已更新",
     "sessionExpired": "登录校验已过期，请重新登录",
@@ -4420,7 +4451,20 @@
     "emptyFavorites": "暂无常用菜单,请通过搜索添加",
     "addMenu": "添加菜单",
     "todoTitle": "📌 待办事项",
-    "todos": "[object Object],[object Object],[object Object],[object Object]",
+    "todos": [
+      {
+        "title": "推广金充值申请审批"
+      },
+      {
+        "title": "推广金扣款申请审批"
+      },
+      {
+        "title": "推广金转账申请审批"
+      },
+      {
+        "title": "商户合并申请审批"
+      }
+    ],
     "todayOrders": "今日订单",
     "deliveryOrders": "外卖订单",
     "groupBuyOrders": "团购订单",
@@ -4433,11 +4477,49 @@
     "rechargeCount": "充值笔数:{{count}} 笔",
     "notifications": "通知",
     "announcements": "公告",
-    "notifList": "[object Object],[object Object],[object Object],[object Object]",
-    "announceList": "[object Object],[object Object],[object Object]",
+    "notifList": [
+      {
+        "title": "用户管理菜单新增日志查看通知",
+        "time": "1小时前"
+      },
+      {
+        "title": "权限管理支持授权多个国家数据权限通知",
+        "time": "3小时前"
+      },
+      {
+        "title": "运营培训会议事项",
+        "time": "1天前"
+      },
+      {
+        "title": "新增广告无敌星星上线通知",
+        "time": "2天前"
+      }
+    ],
+    "announceList": [
+      {
+        "title": "12月绩效数据公布告知",
+        "time": "2天前"
+      },
+      {
+        "title": "团购策略调整公布",
+        "time": "3天前"
+      },
+      {
+        "title": "电信新用户推广策略公布",
+        "time": "5天前"
+      }
+    ],
     "orderTrend": "订单趋势(近7天)",
     "rechargeTrend": "充值趋势(近7天)",
-    "weekdays": "星期日,星期一,星期二,星期三,星期四,星期五,星期六",
+    "weekdays": [
+      "星期日",
+      "星期一",
+      "星期二",
+      "星期三",
+      "星期四",
+      "星期五",
+      "星期六"
+    ],
     "dateFormat": "{{year}}年{{month}}月{{day}}日 {{hours}}:{{minutes}}:{{seconds}}",
     "greetingMorning": "早安",
     "greetingNoon": "午安",
@@ -7996,8 +8078,24 @@
     "noSelectedSlots": "暂无已选时段",
     "today": "今天",
     "presaleTag": "🔒待开售",
-    "weekdayFull": "星期日,星期一,星期二,星期三,星期四,星期五,星期六",
-    "weekdayShort": "日,一,二,三,四,五,六",
+    "weekdayFull": [
+      "星期日",
+      "星期一",
+      "星期二",
+      "星期三",
+      "星期四",
+      "星期五",
+      "星期六"
+    ],
+    "weekdayShort": [
+      "日",
+      "一",
+      "二",
+      "三",
+      "四",
+      "五",
+      "六"
+    ],
     "secondUnit": "秒",
     "minuteUnit": "分钟",
     "lockReleased": "已释放",
@@ -12047,6 +12145,15 @@
     "itemsRequired": "请至少添加一篇文档"
   },
   "meeting": {
+    "reload": "重新载入",
+    "theMeetingHasBeen": "已被他人修改",
+    "maxExternalAttendees": "外部参会人最多 {{max}} 人，当前 {{count}} 人",
+    "roomHidesTopicTitle": "本会议室的主题不对外公示",
+    "roomHidesTopicDesc": "在「会议室预约」的忙闲视图里，这场会只显示「已占用」，不显示主题与组织者；参会人的邀请与站内日程不受影响。",
+    "finishNoteOptional": "散会说明（选填，会写入审计并附在通知里）",
+    "eGTopicsSettledEarly": "例：议题已全部结论，提前散会",
+    "cannotLoadRoomProfile": "无法载入会议室档案",
+    "backToRoomList": "返回列表",
     "booked": "已预约",
     "checkedIn": "已签到",
     "finished": "已完成",
@@ -12285,7 +12392,15 @@
     "noMeetingRelatedTo": "这一天没有与你相关的会议",
     "listView": "列表视图",
     "calendarView": "日历视图",
-    "calendarWeekdays": "周日,周一,周二,周三,周四,周五,周六",
+    "calendarWeekdays": [
+      "周日",
+      "周一",
+      "周二",
+      "周三",
+      "周四",
+      "周五",
+      "周六"
+    ],
     "calendarMonthTitle": "{{year}} 年 {{month}} 月",
     "calendarToday": "今天",
     "previousMonth": "上个月",
@@ -12577,7 +12692,9 @@
         "inviteUpdated": "会议变更（{{version}}）",
         "inviteCancelled": "会议取消",
         "remindBeforeStart": "开始前提醒",
-        "opsReleased": "会议室释放"
+        "opsReleased": "会议室释放",
+        "opsCheckedIn": "已签到",
+        "opsFinished": "会议已结束"
       },
       "scenario": {
         "invite": "会议邀约",
@@ -12589,6 +12706,7 @@
         "draft": "草稿",
         "sent": "已发送"
       },
+      "minutesSend": {},
       "minutesTarget": {
         "group": "钉钉群",
         "user": "个人（工作通知）"
@@ -13146,6 +13264,7 @@
       "statPending": "待办事项",
       "statOverdue": "逾期事项",
       "noMinutes": "暂无符合条件的纪要",
+      "loadFailedRetry": "本次未能加载，请重试",
       "recorderColumn": "记录人",
       "itemTotal_one": "共 {{count}} 项",
       "itemPendingCount_one": "待办 {{count}}",
@@ -15154,7 +15273,8 @@
       "draftRestoredMsg": "已恢复本机暂存，请核对后再保存",
       "draftSavedHint": "已暂存到本机 {{time}}；离开页面前可在 24 小时内恢复（仅限本分页）。",
       "draftFailedHint": "本机暂存失败（内容过大或浏览器储存不可用），请先点「保存 PRD」，离开将不会保留本次修改。"
-    }
+    },
+    "releaseCenter": {}
   },
   "aiModel": {
     "basicInfo": "基础信息",
@@ -15266,6 +15386,8 @@
     "killSwitchSuccess": "熔断状态已更新",
     "killSwitchFailed": "熔断操作失败，请重试"
   },
+  "aiEmpPermission": {},
+  "aiAccessApply": {},
   "notification": {
     "template": {
       "pageTitle": "通知模板",
