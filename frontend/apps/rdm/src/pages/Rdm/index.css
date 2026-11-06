@@ -10,7 +10,7 @@
   position: relative;
   border-radius: 12px;
   background: linear-gradient(135deg, #FFF7F0 0%, #FFFDFB 55%, #FFFFFF 100%);
-  border: 1px solid #FFE7D1;
+  border: 1px solid var(--brand-border);
   padding: 18px 24px 14px;
   margin-bottom: 16px;
   overflow: hidden;
@@ -44,7 +44,7 @@
 .rdm-hero-label {
   font-size: 13px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 /* 第二带右侧的身份上下文（部门 · 工号 · 职位）：只解释“这些待算在谁头上”，不重复首页的姓名/头像 */
@@ -53,7 +53,7 @@
   align-items: center;
   flex-wrap: wrap;
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
   margin-left: auto;
 }
 
@@ -84,8 +84,8 @@
   height: 36px;
   padding: 0 20px;
   border-radius: 8px;
-  background: #E8720C;
-  border-color: #E8720C;
+  background: var(--brand);
+  border-color: var(--brand);
   box-shadow: 0 2px 6px rgba(232, 114, 12, 0.3);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -106,7 +106,7 @@
   flex-wrap: wrap;
   margin-top: 14px;
   padding-top: 12px;
-  border-top: 1px dashed #FFE7D1;
+  border-top: 1px dashed var(--brand-border);
 }
 
 .rdm-hero-views {
@@ -133,8 +133,8 @@
   padding: 0 10px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.8);
-  border: 1px solid #FFE7D1;
-  color: #E8720C;
+  border: 1px solid var(--brand-border);
+  color: var(--brand);
   font-size: 12px;
   font-weight: 500;
 }
@@ -147,9 +147,9 @@
   height: 28px;
   padding: 0 12px;
   border-radius: 8px;
-  border: 1px solid #D9D9D9;
-  background: #fff;
-  color: #595959;
+  border: 1px solid var(--border-1);
+  background: var(--surface-2);
+  color: var(--text-2);
   font-family: inherit;
   font-size: 12px;
   font-weight: 500;
@@ -173,26 +173,26 @@
 }
 
 .rdm-hero-chip--brand {
-  color: #E8720C;
-  background: #FFF7E6;
+  color: var(--brand);
+  background: var(--warning-soft);
   border-color: rgba(232, 114, 12, 0.13);
 }
 
 .rdm-hero-chip--purple {
-  color: #722ED1;
-  background: #F9F0FF;
+  color: var(--purple);
+  background: var(--purple-soft);
   border-color: rgba(114, 46, 209, 0.13);
 }
 
 .rdm-hero-chip--danger {
-  color: #FF4D4F;
-  background: #FFF1F0;
+  color: var(--danger);
+  background: var(--danger-soft);
   border-color: rgba(255, 77, 79, 0.13);
 }
 
 .rdm-hero-chip--warn {
-  color: #FA8C16;
-  background: #FFF7F0;
+  color: var(--warning);
+  background: var(--brand-soft);
   border-color: rgba(250, 140, 22, 0.13);
 }
 
@@ -201,14 +201,14 @@
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  color: #52C41A;
+  color: var(--success);
 }
 
 /* 待办分组卡片 */
 .rdm-todo-group {
-  border: 1px solid #e8eaed;
+  border: 1px solid var(--border-3);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface-2);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   margin-bottom: 16px;
   overflow: hidden;
@@ -226,14 +226,14 @@
   justify-content: space-between;
   gap: 12px;
   padding: 12px 20px;
-  border-bottom: 1px solid #f0f0f0;
-  background: #FAFBFC;
+  border-bottom: 1px solid var(--border-2);
+  background: var(--surface-sunken);
 }
 
 .rdm-todo-title {
   font-size: 15px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -241,7 +241,7 @@
 
 .rdm-todo-hint {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
   font-weight: 400;
 }
 
@@ -255,7 +255,7 @@
   align-items: center;
   gap: 12px;
   padding: 10px 0;
-  border-bottom: 1px dashed #f0f0f0;
+  border-bottom: 1px dashed var(--border-2);
 }
 
 .rdm-todo-item:last-child {
@@ -285,7 +285,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #E8720C;
+  color: var(--brand);
 }
 
 .rdm-table-title > .ant-tag {
@@ -318,7 +318,7 @@
 
 .rdm-todo-item-title {
   font-size: 13px;
-  color: #262626;
+  color: var(--text-1);
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -327,7 +327,7 @@
 
 .rdm-todo-item-meta {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
   margin-top: 2px;
   display: flex;
   gap: 10px;
@@ -374,9 +374,9 @@
 }
 
 .rdm-card {
-  border: 1px solid #e8eaed;
+  border: 1px solid var(--border-3);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface-2);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   padding: 16px 20px;
   margin-bottom: 16px;
@@ -385,7 +385,7 @@
 .rdm-card-title {
   font-size: 15px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -413,9 +413,9 @@
   white-space: pre-wrap;
   font-size: 13px;
   line-height: 1.7;
-  color: #595959;
-  background: #FAFBFC;
-  border: 1px solid #f0f0f0;
+  color: var(--text-2);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-2);
   border-radius: 6px;
   padding: 12px 16px;
 }
@@ -428,12 +428,12 @@
 
 .rdm-meta-item-label {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 
 .rdm-meta-item-value {
   font-size: 13px;
-  color: #262626;
+  color: var(--text-1);
   margin-top: 2px;
   font-weight: 500;
 }
@@ -451,19 +451,19 @@
 }
 
 .rdm-sla-normal {
-  background: #F6FFED;
-  border: 1px solid #B7EB8F;
-  color: #389E0D;
+  background: var(--success-soft);
+  border: 1px solid var(--success-border);
+  color: var(--success-deep);
 }
 
 .rdm-sla-warn {
-  background: #FFF7E6;
-  border: 1px solid #FFD591;
-  color: #D46B08;
+  background: var(--warning-soft);
+  border: 1px solid var(--warning-border);
+  color: var(--warning-deep);
 }
 
 .rdm-sla-overdue {
-  background: #FFF1F0;
+  background: var(--danger-soft);
   border: 1px solid #FFA39E;
   color: #CF1322;
 }
@@ -473,7 +473,7 @@
   display: flex;
   gap: 10px;
   padding: 10px 0;
-  border-bottom: 1px dashed #f0f0f0;
+  border-bottom: 1px dashed var(--border-2);
 }
 
 .rdm-comment-item:last-child {
@@ -487,14 +487,14 @@
 
 .rdm-comment-text {
   font-size: 13px;
-  color: #262626;
+  color: var(--text-1);
   line-height: 1.6;
   white-space: pre-wrap;
 }
 
 .rdm-comment-meta {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
   margin-top: 4px;
 }
 
@@ -512,9 +512,9 @@
   margin-bottom: 8px;
   padding: 8px 12px;
   font-size: 12px;
-  color: #8C8C8C;
-  background: #FFF7F0;
-  border: 1px solid #FFE7D1;
+  color: var(--text-3);
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-border);
   border-radius: 6px;
 }
 
@@ -537,7 +537,7 @@
   border-bottom: 1px solid #eceff3;
   font-size: 13px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
   position: sticky;
   top: 0;
   background: #F7F8FA;
@@ -553,9 +553,9 @@
 }
 
 .rdm-board-card {
-  background: #fff;
+  background: var(--surface-2);
   border: 1px solid #eef0f3;
-  border-left: 3px solid #E8720C;
+  border-left: 3px solid var(--brand);
   border-radius: 6px;
   padding: 10px 12px;
   cursor: pointer;
@@ -568,12 +568,12 @@
 }
 
 .rdm-board-card.overdue {
-  border-left-color: #FF4D4F;
+  border-left-color: var(--danger);
 }
 
 .rdm-board-card-title {
   font-size: 13px;
-  color: #262626;
+  color: var(--text-1);
   font-weight: 500;
   line-height: 1.5;
   display: -webkit-box;
@@ -585,7 +585,7 @@
 
 .rdm-board-card-meta {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
   margin-top: 6px;
   display: flex;
   align-items: center;
@@ -595,9 +595,9 @@
 
 /* ========== 表单（提交需求） ========== */
 .rdm-form-section {
-  border: 1px solid #e8eaed;
+  border: 1px solid var(--border-3);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface-2);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   padding: 16px 24px 4px;
   margin-bottom: 16px;
@@ -606,7 +606,7 @@
 .rdm-form-section-title {
   font-size: 15px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -614,12 +614,12 @@
 }
 
 .rdm-tip-card {
-  background: #FFF7F0;
-  border: 1px solid #FFE7D1;
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-border);
   border-radius: 6px;
   padding: 10px 14px;
   font-size: 12px;
-  color: #AD4E00;
+  color: var(--brand-deep);
   line-height: 1.7;
 }
 
@@ -632,12 +632,12 @@
 .rdm-assign-option {
   flex: 1;
   min-width: 260px;
-  border: 1px solid #D9D9D9;
+  border: 1px solid var(--border-1);
   border-radius: 8px;
   padding: 12px 16px;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  background: #fff;
+  background: var(--surface-2);
 }
 
 .rdm-assign-option:hover {
@@ -647,15 +647,15 @@
 }
 
 .rdm-assign-option.active {
-  border-color: #E8720C;
-  background: #FFF7F0;
+  border-color: var(--brand);
+  background: var(--brand-soft);
   box-shadow: 0 2px 6px rgba(232, 114, 12, 0.18);
 }
 
 .rdm-assign-option-title {
   font-size: 13px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -663,7 +663,7 @@
 
 .rdm-assign-option-desc {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
   margin-top: 4px;
   line-height: 1.6;
 }
@@ -690,7 +690,7 @@
   align-items: center;
   gap: 10px;
   padding: 8px 0;
-  border-bottom: 1px dashed #f0f0f0;
+  border-bottom: 1px dashed var(--border-2);
   font-size: 13px;
 }
 
@@ -700,7 +700,7 @@
 
 /* ========== 动作面板 ========== */
 .rdm-action-panel {
-  border: 1px solid #FFE7D1;
+  border: 1px solid var(--brand-border);
   border-radius: 8px;
   background: #FFFDFB;
   padding: 12px 14px;
@@ -710,7 +710,7 @@
 .rdm-action-panel-title {
   font-size: 13px;
   font-weight: 600;
-  color: #AD4E00;
+  color: var(--brand-deep);
   margin-bottom: 8px;
 }
 
@@ -719,7 +719,7 @@
   margin-left: 10px;
   font-size: 12px;
   font-weight: 400;
-  color: #D46B08;
+  color: var(--warning-deep);
 }
 
 /* 进度填到 100% 时的完成口径提示，避免用户以为“还能再报一次” */
@@ -727,10 +727,10 @@
   margin-top: 8px;
   padding: 6px 10px;
   border-radius: 6px;
-  background: #FFF7E6;
-  border: 1px solid #FFE7BA;
+  background: var(--warning-soft);
+  border: 1px solid var(--warning-border-soft);
   font-size: 12px;
-  color: #AD4E00;
+  color: var(--brand-deep);
 }
 
 /* ========== 研发工作台：进度 / 阻塞展示 ========== */
@@ -751,19 +751,19 @@
 .rdm-task-progress__pct {
   font-size: 12px;
   font-weight: 600;
-  color: #595959;
+  color: var(--text-2);
   min-width: 34px;
   text-align: right;
 }
 
 .rdm-task-progress__hours {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 
 /* 未填工时用警告色，避免读者把缺报读成“没花时间” */
 .rdm-task-progress__hours.is-missing {
-  color: #FA8C16;
+  color: var(--warning);
 }
 
 /* 状态列：阻塞 Tag + 原因两行，原因过长省略，悬停看全文（单元格截断属允许用 title 的场景） */
@@ -781,7 +781,7 @@
   white-space: nowrap;
   font-size: 12px;
   line-height: 1.4;
-  color: #D46B08;
+  color: var(--warning-deep);
 }
 
 /*
@@ -790,7 +790,7 @@
  * 用 !important 是为了压过 antd 默认的 td 背景与 hover 背景。
  */
 .nowrap-table .rdm-task-row--blocked > td {
-  background: #FFF7E6 !important;
+  background: var(--warning-soft) !important;
 }
 
 .nowrap-table .rdm-task-row--blocked > td:first-child {
@@ -808,9 +808,9 @@
   gap: 6px;
   padding: 4px 10px;
   border-radius: 14px;
-  background: #F0F5FF;
-  border: 1px solid #D6E4FF;
-  color: #1890FF;
+  background: var(--info-hover-tint);
+  border: 1px solid var(--info-hover-border);
+  color: var(--info);
   font-size: 12px;
 }
 
@@ -821,9 +821,9 @@
   gap: 20px;
   flex-wrap: wrap;
   padding: 10px 14px;
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--border-2);
   border-radius: 8px;
-  background: #FAFBFC;
+  background: var(--surface-sunken);
   margin-bottom: 12px;
 }
 
@@ -832,12 +832,12 @@
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .rdm-delivery-summary-label {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 
 .rdm-delivery-hours {
@@ -854,9 +854,9 @@
   gap: 4px;
   padding: 2px 8px;
   border-radius: 4px;
-  background: #FFF7F0;
-  border: 1px solid #FFE7D1;
-  color: #AD4E00;
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-border);
+  color: var(--brand-deep);
   font-size: 12px;
   cursor: default;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -872,7 +872,7 @@
   align-items: center;
   gap: 10px;
   padding: 8px 0;
-  border-bottom: 1px dashed #f0f0f0;
+  border-bottom: 1px dashed var(--border-2);
   font-size: 13px;
 }
 
@@ -888,7 +888,7 @@
 
 .rdm-delivery-row-desc {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
   line-height: 1.7;
   padding: 0 0 8px 4px;
   white-space: pre-wrap;
@@ -896,10 +896,10 @@
 
 .rdm-empty-hint {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
   line-height: 1.8;
-  background: #FAFBFC;
-  border: 1px dashed #e8eaed;
+  background: var(--surface-sunken);
+  border: 1px dashed var(--border-3);
   border-radius: 6px;
   padding: 12px 14px;
 }
@@ -916,7 +916,7 @@
   align-items: flex-start;
   gap: 10px;
   padding: 8px 0;
-  border-bottom: 1px dashed #f0f0f0;
+  border-bottom: 1px dashed var(--border-2);
   font-size: 13px;
 }
 
@@ -931,9 +931,9 @@
 }
 
 .rdm-followup-box {
-  border: 1px solid #FFE7D1;
+  border: 1px solid var(--brand-border);
   border-radius: 8px;
-  background: #FFF7F0;
+  background: var(--brand-soft);
   padding: 12px 14px;
 }
 
@@ -945,27 +945,27 @@
 }
 
 .rdm-score-trace-item {
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--border-2);
   border-radius: 8px;
-  background: #FAFBFC;
+  background: var(--surface-sunken);
   padding: 10px 12px;
 }
 
 .rdm-score-trace-formula {
   font-size: 12px;
-  color: #595959;
+  color: var(--text-2);
   margin-top: 6px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .rdm-score-trace-formula b {
-  color: #E8720C;
+  color: var(--brand);
   font-size: 13px;
 }
 
 .rdm-score-trace-reason {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
   margin-top: 3px;
   line-height: 1.6;
 }
@@ -973,7 +973,7 @@
 .rdm-score-trace-label {
   display: inline-block;
   min-width: 96px;
-  color: #595959;
+  color: var(--text-2);
   font-weight: 500;
 }
 
@@ -991,21 +991,21 @@
 .rdm-score-preview-total {
   font-size: 28px;
   font-weight: 700;
-  color: #722ED1;
+  color: var(--purple);
   line-height: 1;
 }
 
 .rdm-score-preview-total span {
   font-size: 13px;
   font-weight: 400;
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 
 .rdm-score-preview-formula {
   flex: 1;
   min-width: 260px;
   font-size: 12px;
-  color: #595959;
+  color: var(--text-2);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   line-height: 1.7;
 }
@@ -1023,7 +1023,7 @@
   align-items: center;
   gap: 10px;
   padding: 6px 0;
-  border-bottom: 1px dashed #f0f0f0;
+  border-bottom: 1px dashed var(--border-2);
   font-size: 13px;
 }
 
@@ -1040,7 +1040,7 @@
 }
 
 .rdm-risk-narrative {
-  border-left: 3px solid #722ED1;
+  border-left: 3px solid var(--purple);
   background: #FAFBFF;
   border-radius: 0 6px 6px 0;
   padding: 10px 14px;
@@ -1051,7 +1051,7 @@
   display: block;
   font-size: 13px;
   line-height: 1.8;
-  color: #262626;
+  color: var(--text-1);
   white-space: pre-wrap;
 }
 
@@ -1059,7 +1059,7 @@
   margin: 0 0 10px 18px;
   padding: 0;
   font-size: 12px;
-  color: #595959;
+  color: var(--text-2);
   line-height: 1.9;
 }
 
@@ -1073,7 +1073,7 @@
   align-items: center;
   gap: 10px;
   padding: 8px 0;
-  border-bottom: 1px dashed #f0f0f0;
+  border-bottom: 1px dashed var(--border-2);
   font-size: 13px;
   cursor: pointer;
   transition: background 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1084,7 +1084,7 @@
 }
 
 .rdm-risk-list-item:hover {
-  background: #FAFBFC;
+  background: var(--surface-sunken);
 }
 
 .rdm-risk-list-main {
@@ -1096,7 +1096,7 @@
 .rdm-risk-list-meta {
   display: block;
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 
 .rdm-risk-list-days {
@@ -1149,7 +1149,7 @@
 
 .rdm-track-label {
   font-size: 11px;
-  color: #8C8C8C;
+  color: var(--text-3);
   white-space: nowrap;
 }
 
@@ -1162,16 +1162,16 @@
 }
 
 .rdm-track-step.done .rdm-track-label {
-  color: #595959;
+  color: var(--text-2);
 }
 
 .rdm-track-step.current .rdm-track-dot {
-  background: #E8720C;
+  background: var(--brand);
   box-shadow: 0 0 0 3px rgba(232, 114, 12, 0.18);
 }
 
 .rdm-track-step.current .rdm-track-label {
-  color: #E8720C;
+  color: var(--brand);
   font-weight: 600;
 }
 
@@ -1180,7 +1180,7 @@
   align-items: flex-start;
   gap: 12px;
   padding: 12px 0;
-  border-bottom: 1px dashed #f0f0f0;
+  border-bottom: 1px dashed var(--border-2);
 }
 
 .rdm-track-item:last-child {
@@ -1192,7 +1192,7 @@
   align-items: center;
   gap: 12px;
   padding: 10px 0;
-  border-bottom: 1px dashed #f0f0f0;
+  border-bottom: 1px dashed var(--border-2);
 }
 
 .rdm-need-item:last-child {
@@ -1201,7 +1201,7 @@
 
 .rdm-need-reason {
   font-size: 12px;
-  color: #AD4E00;
+  color: var(--brand-deep);
   line-height: 1.6;
   margin-top: 2px;
 }
@@ -1210,16 +1210,16 @@
 
 /* 一条需求可以打多个入口，所以每个对象自成一块，视觉上与外层卡片拉开层级 */
 .rdm-target-row {
-  border: 1px solid #e8eaed;
+  border: 1px solid var(--border-3);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface-2);
   padding: 12px 16px 8px;
   margin-bottom: 12px;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .rdm-target-row:hover {
-  border-color: #FFE7D1;
+  border-color: var(--brand-border);
 }
 
 /* 需求对象字段区：全局表单规范 §C.4 —— 每行 3 个字段，控件撑满列宽 */
@@ -1279,8 +1279,8 @@
 
 /* 审批要求：暖橙面板只做告知，不提供可操作控件（避免把准入决定交给提交人） */
 .rdm-approval-card {
-  background: #FFF7F0;
-  border: 1px solid #FFE7D1;
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-border);
   border-radius: 8px;
   padding: 12px 16px;
   margin-top: 4px;
@@ -1293,12 +1293,12 @@
   flex-wrap: wrap;
   font-size: 13px;
   font-weight: 600;
-  color: #AD4E00;
+  color: var(--brand-deep);
 }
 
 .rdm-approval-card-body {
   font-size: 12px;
-  color: #AD4E00;
+  color: var(--brand-deep);
   line-height: 1.8;
   margin-top: 6px;
 }
@@ -1308,9 +1308,9 @@
   display: flex;
   flex-wrap: wrap;
   gap: 12px 24px;
-  background: #fff;
-  border: 1px solid #e8eaed;
-  border-left: 3px solid #E8720C;
+  background: var(--surface-2);
+  border: 1px solid var(--border-3);
+  border-left: 3px solid var(--brand);
   border-radius: 8px;
   padding: 12px 20px;
   margin-bottom: 16px;
@@ -1326,17 +1326,17 @@
 
 .rdm-next-label {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 
 .rdm-next-value {
   font-size: 13px;
-  color: #262626;
+  color: var(--text-1);
   font-weight: 500;
 }
 
 .rdm-next-item.warn .rdm-next-value {
-  color: #D46B08;
+  color: var(--warning-deep);
 }
 
 .rdm-next-item.danger .rdm-next-value {
@@ -1348,19 +1348,19 @@
   margin: 0 0 10px;
   padding-left: 18px;
   font-size: 12px;
-  color: #595959;
+  color: var(--text-2);
   line-height: 1.9;
 }
 
 .rdm-judge-list b {
-  color: #262626;
+  color: var(--text-1);
 }
 
 /* ========== 准入策略：规则模拟结果 ========== */
 .rdm-sim-result {
   margin-top: 12px;
-  background: #FAFBFC;
-  border: 1px dashed #e8eaed;
+  background: var(--surface-sunken);
+  border: 1px dashed var(--border-3);
   border-radius: 8px;
   padding: 12px 16px;
 }
@@ -1372,14 +1372,14 @@
   flex-wrap: wrap;
   font-size: 13px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .rdm-sim-steps {
   margin: 8px 0 0;
   padding-left: 20px;
   font-size: 12px;
-  color: #595959;
+  color: var(--text-2);
   line-height: 1.9;
 }
 
@@ -1392,9 +1392,9 @@
 }
 
 .rdm-pm-card {
-  border: 1px solid #e8eaed;
+  border: 1px solid var(--border-3);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface-2);
   padding: 12px 14px;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1403,11 +1403,11 @@
 .rdm-pm-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  border-color: #FFE7D1;
+  border-color: var(--brand-border);
 }
 
 .rdm-pm-card.active {
-  border-color: #E8720C;
+  border-color: var(--brand);
   box-shadow: 0 0 0 2px rgba(232, 114, 12, 0.12);
 }
 
@@ -1421,7 +1421,7 @@
 .rdm-pm-card-name {
   font-size: 14px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .rdm-pm-card-load {
@@ -1429,13 +1429,13 @@
   justify-content: space-between;
   gap: 8px;
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
   margin: 8px 0 6px;
 }
 
 .rdm-pm-card-reason {
   font-size: 12px;
-  color: #595959;
+  color: var(--text-2);
   line-height: 1.6;
   margin-top: 8px;
 }
@@ -1444,16 +1444,16 @@
 
 /* 一个节点一块：四套日期 + 负责人 + 状态都在同一视线内，避免表格横向滚动时看不见基线 */
 .rdm-milestone-row {
-  border: 1px solid #e8eaed;
+  border: 1px solid var(--border-3);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface-2);
   padding: 12px 16px 16px;
   margin-bottom: 12px;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .rdm-milestone-row:hover {
-  border-color: #FFE7D1;
+  border-color: var(--brand-border);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
@@ -1468,7 +1468,7 @@
 .rdm-milestone-name {
   font-size: 14px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 /* ========== 甘特与负载视图（阶段 5） ========== */
@@ -1477,9 +1477,9 @@
 .rdm-gantt-scroll {
   overflow-x: auto;
   overflow-y: hidden;
-  border: 1px solid #e8eaed;
+  border: 1px solid var(--border-3);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface-2);
   padding: 8px 4px 12px;
 }
 
@@ -1499,7 +1499,7 @@
 
 /* 页面头部：橙色渐变顶条 + 返回 + 标题 + 视角切换（form-page-style §C.2） */
 .rdm-gantt-header {
-  position: relative; background: #fff; margin-bottom: 12px;
+  position: relative; background: var(--surface-2); margin-bottom: 12px;
   border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); overflow: hidden;
 }
 .rdm-gantt-header-bar {
@@ -1512,12 +1512,12 @@
   justify-content: space-between; gap: 16px; flex-wrap: wrap;
 }
 .rdm-gantt-back {
-  background-color: #E8720C !important; border-color: #E8720C !important;
+  background-color: var(--brand) !important; border-color: var(--brand) !important;
   border-radius: 8px; height: 36px; padding: 0 16px;
   display: flex; align-items: center; gap: 6px; flex-shrink: 0;
   box-shadow: 0 2px 6px rgba(232,114,12,0.25);
 }
-.rdm-gantt-title { margin: 0; font-size: 18px; font-weight: 700; color: #1890ff; white-space: nowrap; }
+.rdm-gantt-title { margin: 0; font-size: 18px; font-weight: 700; color: var(--info); white-space: nowrap; }
 
 /* 筛选区（非表单，自定义 5 列网格） */
 .rdm-gantt-filters {
@@ -1536,11 +1536,11 @@
 /* 甘特分页条：已加载/总数 + 简易分页 */
 .rdm-gantt-pager {
   display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; margin-top: 10px; font-size: 12px; color: #8C8C8C;
+  gap: 12px; margin-top: 10px; font-size: 12px; color: var(--text-3);
 }
 
 /* 甘特板：外层裁剪，内层横向滚动 */
-.rdm-g2 { border: 1px solid #e8eaed; border-radius: 8px; background: #fff; overflow: hidden; }
+.rdm-g2 { border: 1px solid var(--border-3); border-radius: 8px; background: var(--surface-2); overflow: hidden; }
 .rdm-g2-scroll { overflow: auto; max-height: calc(100vh - 360px); }
 .rdm-g2-inner { position: relative; }
 
@@ -1548,24 +1548,24 @@
 .rdm-g2-row, .rdm-g2-head { display: flex; align-items: stretch; }
 .rdm-g2-row { border-bottom: 1px solid #f2f3f5; }
 .rdm-g2-row.mine { background: #FFF9F3; }
-.rdm-g2-row.group { background: #FAFAFA; font-weight: 600; }
+.rdm-g2-row.group { background: var(--surface-3); font-weight: 600; }
 
 .rdm-g2-labels {
   position: sticky; left: 0; z-index: 5; flex: none;
   box-sizing: border-box;
   display: flex; align-items: center; gap: 6px;
-  background: #fff; border-right: 1px solid #e8eaed;
-  padding-right: 10px; font-size: 12px; color: #595959;
+  background: var(--surface-2); border-right: 1px solid var(--border-3);
+  padding-right: 10px; font-size: 12px; color: var(--text-2);
 }
 .rdm-g2-row.mine .rdm-g2-labels { background: #FFF9F3; }
-.rdm-g2-row.group .rdm-g2-labels { background: #FAFAFA; }
+.rdm-g2-row.group .rdm-g2-labels { background: var(--surface-3); }
 /* 展开热区扩大到整块标题区：光标提示 + hover 反馈（§B.2 品牌橙浅底） */
 .rdm-g2-labels.group.expandable { cursor: pointer; user-select: none; transition: background .15s; }
-.rdm-g2-labels.group.expandable:hover { background: #FFF7E6; }
-.rdm-g2-labels.group.expandable:focus-visible { outline: 2px solid #E8720C; outline-offset: -2px; }
+.rdm-g2-labels.group.expandable:hover { background: var(--warning-soft); }
+.rdm-g2-labels.group.expandable:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 .rdm-g2-labels.head {
-  z-index: 6; height: 46px; color: #8C8C8C; font-weight: 600;
-  background: #fff; border-bottom: 1px solid #e8eaed;
+  z-index: 6; height: 46px; color: var(--text-3); font-weight: 600;
+  background: var(--surface-2); border-bottom: 1px solid var(--border-3);
 }
 .rdm-g2-labels.head > span { display: inline-flex; align-items: center; }
 
@@ -1573,47 +1573,47 @@
 .rdm-g2-col-flex { flex: 1 1 auto; min-width: 0; width: auto; }
 
 .rdm-g2-timeline { position: relative; flex: none; }
-.rdm-g2-head { position: sticky; top: 0; z-index: 7; background: #fff; }
-.rdm-g2-timeline.head { border-bottom: 1px solid #e8eaed; height: 46px; }
+.rdm-g2-head { position: sticky; top: 0; z-index: 7; background: var(--surface-2); }
+.rdm-g2-timeline.head { border-bottom: 1px solid var(--border-3); height: 46px; }
 
 /* 月份分段 */
 .rdm-g2-month-row { position: relative; height: 22px; border-bottom: 1px solid #f2f3f5; }
 .rdm-g2-month-row > span {
   position: absolute; top: 0; height: 22px; line-height: 22px;
-  font-size: 11px; color: #595959; font-weight: 600; padding-left: 6px;
-  border-left: 1px solid #e8eaed; white-space: nowrap; overflow: hidden;
+  font-size: 11px; color: var(--text-2); font-weight: 600; padding-left: 6px;
+  border-left: 1px solid var(--border-3); white-space: nowrap; overflow: hidden;
 }
 /* 日期刻度 */
 .rdm-g2-day-row { position: relative; height: 24px; }
 .rdm-g2-daytick {
   position: absolute; top: 0; height: 24px; line-height: 24px; text-align: center;
-  font-size: 10px; color: #8C8C8C; border-left: 1px solid #f5f5f5; overflow: hidden;
+  font-size: 10px; color: var(--text-3); border-left: 1px solid #f5f5f5; overflow: hidden;
 }
-.rdm-g2-daytick.weekend { background: rgba(0,0,0,0.03); color: #BFBFBF; }
-.rdm-g2-daytick.today { color: #E8720C; font-weight: 700; }
+.rdm-g2-daytick.weekend { background: rgba(0,0,0,0.03); color: var(--text-4); }
+.rdm-g2-daytick.today { color: var(--brand); font-weight: 700; }
 
 /* 折叠箭头 */
-.rdm-g2-caret { cursor: pointer; color: #8C8C8C; width: 14px; display: inline-flex; }
+.rdm-g2-caret { cursor: pointer; color: var(--text-3); width: 14px; display: inline-flex; }
 .rdm-g2-caret-ph { width: 14px; display: inline-block; flex: none; }
-.rdm-g2-group-label { flex: 1 1 auto; min-width: 0; color: #262626; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rdm-g2-group-meta { color: #8C8C8C; font-size: 11px; margin-left: 6px; white-space: nowrap; }
-.rdm-g2-empty-text { flex: 1 1 auto; min-width: 0; color: #BFBFBF; font-size: 12px; font-style: italic; }
+.rdm-g2-group-label { flex: 1 1 auto; min-width: 0; color: var(--text-1); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rdm-g2-group-meta { color: var(--text-3); font-size: 11px; margin-left: 6px; white-space: nowrap; }
+.rdm-g2-empty-text { flex: 1 1 auto; min-width: 0; color: var(--text-4); font-size: 12px; font-style: italic; }
 
 /* 任务行左列各单元格 */
-.rdm-g2-name { display: inline-flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #262626; }
+.rdm-g2-name { display: inline-flex; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-1); }
 .rdm-g2-me {
-  flex: none; background: #E8720C; color: #fff; font-size: 10px;
+  flex: none; background: var(--brand); color: #fff; font-size: 10px;
   border-radius: 3px; padding: 0 4px; line-height: 16px;
 }
 .rdm-g2-role { display: inline-flex; align-items: center; gap: 4px; overflow: hidden; white-space: nowrap; }
 .rdm-g2-type-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .rdm-g2-owner { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rdm-g2-datecell { display: inline-flex; justify-content: center; }
-.rdm-g2-date { white-space: nowrap; color: #595959; }
-.rdm-g2-date.empty { color: #BFBFBF; }
+.rdm-g2-date { white-space: nowrap; color: var(--text-2); }
+.rdm-g2-date.empty { color: var(--text-4); }
 .rdm-g2-date.overdue { color: #CF1322; font-weight: 600; }
-.rdm-g2-date.editable { cursor: pointer; border-bottom: 1px dashed #E8720C; }
-.rdm-g2-date.editable:hover { color: #E8720C; }
+.rdm-g2-date.editable { cursor: pointer; border-bottom: 1px dashed var(--brand); }
+.rdm-g2-date.editable:hover { color: var(--brand); }
 
 /* 今日线 */
 .rdm-g2-today { position: absolute; top: 0; width: 2px; background: rgba(255,77,79,0.5); z-index: 1; pointer-events: none; }
@@ -1635,7 +1635,7 @@
 .rdm-g2-bar.draggable { cursor: grab; }
 .rdm-g2-bar.draggable:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
 .rdm-g2-bar.dragging { cursor: grabbing; opacity: 0.92; box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
-.rdm-g2-bar.mine { outline: 2px solid #E8720C; outline-offset: -1px; }
+.rdm-g2-bar.mine { outline: 2px solid var(--brand); outline-offset: -1px; }
 .rdm-g2-bar.done { opacity: 0.7; }
 .rdm-g2-bar-progress { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(255,255,255,0.4); border-radius: 5px 0 0 5px; }
 .rdm-g2-bar-label {
@@ -1670,11 +1670,11 @@
   font-size: 11px; padding: 2px 8px; border-radius: 4px; white-space: nowrap; pointer-events: none;
 }
 .rdm-g2-overdue-dot { position: absolute; top: 18px; width: 7px; height: 7px; border-radius: 50%; background: #FF4D4F; z-index: 3; }
-.rdm-g2-unscheduled { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); font-size: 11px; color: #BFBFBF; font-style: italic; }
+.rdm-g2-unscheduled { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text-4); font-style: italic; }
 /* 调整模式下的未排期入口 chip：虚线橙色描边，点击唤起日期编辑器（§A.1 品牌橙令牌） */
-.rdm-g2-unscheduled.add { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border: 1px dashed #E8720C; border-radius: 4px; background: #FFF7E6; color: #E8720C; font-style: normal; cursor: pointer; transition: background .15s, border-color .15s; }
+.rdm-g2-unscheduled.add { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border: 1px dashed var(--brand); border-radius: 4px; background: var(--warning-soft); color: var(--brand); font-style: normal; cursor: pointer; transition: background .15s, border-color .15s; }
 .rdm-g2-unscheduled.add:hover { background: #FFE7BA; border-color: #D46B08; border-style: solid; }
-.rdm-g2-sameday { position: absolute; top: 50%; transform: translateY(-50%); font-size: 10px; color: #8C8C8C; }
+.rdm-g2-sameday { position: absolute; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--text-3); }
 
 /* ── 進度軌與拖動手柄（第一階段：本地預覽）── */
 /* 軌道貼在條形下沿的空隙，與條身平移/兩端改期分離，避免三種手勢搶事件 */
@@ -1682,10 +1682,10 @@
   position: absolute; height: 4px; border-radius: 2px;
   background: rgba(0, 0, 0, 0.06); z-index: 2; pointer-events: none;
 }
-.rdm-g2-ptrack-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: #E8720C; opacity: .5; }
+.rdm-g2-ptrack-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: var(--brand); opacity: .5; }
 .rdm-g2-pgrip {
   position: absolute; width: 12px; height: 12px; margin-left: -6px; z-index: 4;
-  border-radius: 50%; background: #fff; border: 2px solid #E8720C;
+  border-radius: 50%; background: var(--surface-2); border: 2px solid var(--brand);
   box-shadow: 0 1px 4px rgba(0, 0, 0, .2); cursor: ew-resize; touch-action: none;
 }
 .rdm-g2-pgrip:hover, .rdm-g2-pgrip:focus-visible, .rdm-g2-pgrip.dragging {
@@ -1693,7 +1693,7 @@
   box-shadow: 0 0 0 3px rgba(232, 114, 12, .18), 0 2px 6px rgba(0, 0, 0, .22);
 }
 .rdm-g2-ptip {
-  position: absolute; z-index: 4; background: #E8720C; color: #fff;
+  position: absolute; z-index: 4; background: var(--brand); color: #fff;
   font-size: 11px; padding: 2px 8px; border-radius: 4px; white-space: nowrap; pointer-events: none;
 }
 /* 百分比徽标可点击（精确面板入口），按钮需抹平浏览器默认样式 */
@@ -1702,46 +1702,46 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 
 /* 進度精確面板：滑桿 + 數字 + 快捷檔位 */
 .rdm-g2-ppanel { width: 268px; }
-.rdm-g2-ppanel-title { font-size: 12px; color: #262626; font-weight: 600; margin-bottom: 4px; }
+.rdm-g2-ppanel-title { font-size: 12px; color: var(--text-1); font-weight: 600; margin-bottom: 4px; }
 .rdm-g2-ppanel-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
-.rdm-g2-ppanel-hint { margin-top: 8px; font-size: 11px; color: #8C8C8C; }
+.rdm-g2-ppanel-hint { margin-top: 8px; font-size: 11px; color: var(--text-3); }
 .rdm-g2-ppanel-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
 
 /* 完成任務彈窗：先把後果說清，再讓用戶填交付說明 */
-.rdm-g2-done-hint { margin-bottom: 8px; font-size: 12px; color: #595959; line-height: 1.6; }
+.rdm-g2-done-hint { margin-bottom: 8px; font-size: 12px; color: var(--text-2); line-height: 1.6; }
 
 /* 調整模式操作口徑提示 */
-.rdm-gantt-edit-hint { font-size: 12px; color: #8C8C8C; }
+.rdm-gantt-edit-hint { font-size: 12px; color: var(--text-3); }
 /* PRD 改期確認：把「承諾日期也會一起改」放在日期行下方，避免只看到日期變化 */
-.rdm-gantt-prd-confirm-note { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #FFE7D1; font-size: 12px; color: #8C8C8C; line-height: 1.6; }
+.rdm-gantt-prd-confirm-note { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--brand-border); font-size: 12px; color: var(--text-3); line-height: 1.6; }
 
 /* 悬浮卡片：标题 + 标签-取值键值行，层次清晰、可一眼扫读 */
 .rdm-g2-hover { min-width: 220px; }
 .rdm-g2-hover-row { display: flex; align-items: baseline; gap: 8px; padding: 2px 0; font-size: 12px; }
-.rdm-g2-hover-row > span { flex: none; width: 44px; color: #8C8C8C; }
-.rdm-g2-hover-row > b { flex: 1; min-width: 0; color: #262626; font-weight: 500; }
+.rdm-g2-hover-row > span { flex: none; width: 44px; color: var(--text-3); }
+.rdm-g2-hover-row > b { flex: 1; min-width: 0; color: var(--text-1); font-weight: 500; }
 .rdm-g2-hover-overdue { margin-left: 6px; font-style: normal; color: #CF1322; font-weight: 600; }
 /* 悬浮卡片補充說明：PRD 承諾日同步、唯讀原因等 */
-.rdm-g2-hover-note { margin-top: 6px; padding-top: 6px; border-top: 1px dashed #E8EAED; font-size: 11px; color: #8C8C8C; line-height: 1.5; }
+.rdm-g2-hover-note { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border-3); font-size: 11px; color: var(--text-3); line-height: 1.5; }
 /* 进度行重点标记：标签提色 + 迷你进度条 + 加粗彩色百分比 */
-.rdm-g2-hover-progress > span { color: #E8720C; font-weight: 600; }
+.rdm-g2-hover-progress > span { color: var(--brand); font-weight: 600; }
 .rdm-g2-hover-progress-val { display: flex; align-items: center; gap: 8px; }
 .rdm-g2-hover-track { flex: 1 1 auto; min-width: 90px; height: 6px; border-radius: 3px; background: #F0F0F0; overflow: hidden; }
 .rdm-g2-hover-track > i { display: block; height: 100%; border-radius: 3px; }
 .rdm-g2-hover-progress-val > em { flex: none; font-style: normal; font-weight: 700; font-size: 13px; }
-.rdm-g2-hover-title { font-size: 13px; font-weight: 600; color: #262626; }
-.rdm-g2-hover-no { margin-left: 8px; font-size: 11px; font-weight: 400; color: #8C8C8C; }
+.rdm-g2-hover-title { font-size: 13px; font-weight: 600; color: var(--text-1); }
+.rdm-g2-hover-no { margin-left: 8px; font-size: 11px; font-weight: 400; color: var(--text-3); }
 
 /* 图例 */
 .rdm-gantt-legend {
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  margin-top: 10px; font-size: 12px; color: #8C8C8C;
+  margin-top: 10px; font-size: 12px; color: var(--text-3);
 }
-.rdm-gantt-legend-title { color: #595959; font-weight: 600; }
+.rdm-gantt-legend-title { color: var(--text-2); font-weight: 600; }
 .rdm-gantt-legend-sep { width: 1px; height: 14px; background: #e8eaed; }
 .rdm-gantt-legend-item { display: inline-flex; align-items: center; gap: 5px; }
 .rdm-gantt-legend-item > i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
-.rdm-gantt-legend-item > i.lg-mine { background: #FFF7E6; outline: 2px solid #E8720C; outline-offset: -1px; }
+.rdm-gantt-legend-item > i.lg-mine { background: var(--warning-soft); outline: 2px solid var(--brand); outline-offset: -1px; }
 .rdm-gantt-legend-item > i.lg-overdue { background: #FF4D4F; border-radius: 50%; }
 .rdm-gantt-legend-item > i.lg-span { background: linear-gradient(90deg, #D9D9D9, #BFBFBF, #D9D9D9); border: 1px solid #BFBFBF; height: 8px; }
 
@@ -1759,10 +1759,10 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-  border: 1px solid #e8eaed;
-  border-left: 3px solid #E8720C;
+  border: 1px solid var(--border-3);
+  border-left: 3px solid var(--brand);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface-2);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   padding: 14px 20px;
   margin-bottom: 16px;
@@ -1797,7 +1797,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   flex-shrink: 0;
   font-size: 12px;
   color: #fff;
-  background: #E8720C;
+  background: var(--brand);
   border-radius: 4px;
   padding: 1px 6px;
 }
@@ -1805,7 +1805,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 .rdm-action-bar-hint {
   font-size: 13px;
   font-weight: 500;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .rdm-action-bar-meta {
@@ -1814,11 +1814,11 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   gap: 16px;
   flex-wrap: wrap;
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 
 .rdm-action-bar-meta b {
-  color: #595959;
+  color: var(--text-2);
   font-weight: 500;
 }
 
@@ -1834,7 +1834,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 /* 处理条右侧不再放按钮（已全部收进页面底部 .form-footer）；本类是无动作时的占位提示 */
 .rdm-action-bar-locked {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 
 /*
@@ -1893,7 +1893,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 /* 弹窗内字段标签：与表单标签同一口径（12px 次色） */
 .rdm-action-modal-label {
   font-size: 12px;
-  color: #595959;
+  color: var(--text-2);
   margin-bottom: 4px;
 }
 
@@ -1904,13 +1904,13 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  border-top: 1px dashed #f0f0f0;
+  border-top: 1px dashed var(--border-2);
   padding-top: 8px;
 }
 
 .rdm-judge-trigger {
   font-size: 12px;
-  color: #E8720C;
+  color: var(--brand);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -1919,7 +1919,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 
 .rdm-judge-note {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 
 /* 风险提示：处理条只显示最需要行动的一条，其余点开看 */
@@ -1938,22 +1938,22 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 }
 
 .rdm-risk-popover-item.danger {
-  background: #FFF2F0;
-  border: 1px solid #FFCCC7;
+  background: var(--danger-callout);
+  border: 1px solid var(--danger-border);
   color: #CF1322;
 }
 
 .rdm-risk-popover-item.warn {
-  background: #FFF7E6;
-  border: 1px solid #FFE7D1;
-  color: #D46B08;
+  background: var(--warning-soft);
+  border: 1px solid var(--brand-border);
+  color: var(--warning-deep);
 }
 
 /* 页签内的小节标题：比 rdm-card-title 轻一档，避免页签里再出现一层大标题 */
 .rdm-section-title {
   font-size: 14px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1976,7 +1976,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   justify-content: space-between;
   gap: 12px;
   padding: 7px 0;
-  border-bottom: 1px dashed #f0f0f0;
+  border-bottom: 1px dashed var(--border-2);
 }
 
 .rdm-prop-row:last-child {
@@ -1985,13 +1985,13 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 
 .rdm-prop-label {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
   flex-shrink: 0;
 }
 
 .rdm-prop-value {
   font-size: 13px;
-  color: #262626;
+  color: var(--text-1);
   font-weight: 500;
   text-align: right;
   word-break: break-all;
@@ -2019,8 +2019,8 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   margin: 8px 0 4px;
   padding: 6px 10px;
   border-radius: 6px;
-  background: #FFF7E6;
-  border: 1px solid #FFD591;
+  background: var(--warning-soft);
+  border: 1px solid var(--warning-border);
   color: #AD6800;
   font-size: 12px;
   line-height: 1.6;
@@ -2028,14 +2028,14 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 
 /* 参与人：一人一行、多角色并排，取代原来一角色一行的六行清单 */
 .rdm-participant-block {
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--border-2);
   margin-top: 12px;
   padding-top: 10px;
 }
 
 .rdm-participant-title {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
   margin-bottom: 6px;
 }
 
@@ -2093,7 +2093,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   display: flex;
   gap: 10px;
   padding: 10px 0;
-  border-bottom: 1px dashed #f0f0f0;
+  border-bottom: 1px dashed var(--border-2);
 }
 
 .rdm-activity-item:last-child {
@@ -2107,14 +2107,14 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 
 .rdm-activity-text {
   font-size: 13px;
-  color: #262626;
+  color: var(--text-1);
   line-height: 1.6;
   white-space: pre-wrap;
 }
 
 .rdm-activity-meta {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
   margin-top: 4px;
 }
 
@@ -2142,14 +2142,14 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   align-items: baseline;
   margin-top: 12px;
   font-size: 13px;
-  color: #595959;
+  color: var(--text-2);
   line-height: 1.6;
 }
 
 .rdm-value-line-label {
   flex-shrink: 0;
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 
 /* 长正文默认收 6 行，由显式的「展開全文」按钮放开（不用 hover，避免鼠标扫过就跳版） */
@@ -2163,19 +2163,19 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 
 /* 详情页统一收尾：最后更新时间 + 最近操作人，不再单开「操作记录」卡片 */
 .rdm-detail-footer {
-  background: #fff;
-  border: 1px solid #f0f0f0;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
   border-radius: 8px;
   padding: 12px 24px;
   display: flex;
   justify-content: flex-end;
   gap: 24px;
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 
 .rdm-detail-footer b {
-  color: #595959;
+  color: var(--text-2);
   font-weight: 500;
 }
 
@@ -2208,16 +2208,16 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 .rdm-workspace-title {
   font-size: 15px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .rdm-view-rail {
   width: 184px;
   flex-shrink: 0;
   align-self: stretch;
-  border: 1px solid #e8eaed;
+  border: 1px solid var(--border-3);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface-2);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   padding: 10px 8px;
   display: flex;
@@ -2231,14 +2231,14 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   justify-content: space-between;
   font-size: 13px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
   padding: 0 4px 6px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-2);
 }
 
 .rdm-view-rail-group-title {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
   padding: 6px 6px 2px;
 }
 
@@ -2249,14 +2249,14 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   padding: 7px 8px;
   border-radius: 6px;
   font-size: 13px;
-  color: #595959;
+  color: var(--text-2);
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .rdm-view-rail-item:hover {
-  background: #F5F5F5;
-  color: #E8720C;
+  background: var(--surface-1);
+  color: var(--brand);
 }
 
 /* 选中态沿用侧边栏菜单的「左侧 3px 主色指示条」语言，保持全站一致 */
@@ -2277,20 +2277,20 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   margin-left: auto;
   flex-shrink: 0;
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 
 .rdm-view-rail-item.active .rdm-view-rail-item-count {
-  color: #E8720C;
+  color: var(--brand);
 }
 
 .rdm-view-rail-foot {
   margin-top: auto;
   font-size: 11px;
   line-height: 1.6;
-  color: #8C8C8C;
+  color: var(--text-3);
   padding: 8px 6px 0;
-  border-top: 1px dashed #f0f0f0;
+  border-top: 1px dashed var(--border-2);
 }
 
 /*
@@ -2335,10 +2335,10 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 }
 
 .rdm-stat-card {
-  background: #fff;
+  background: var(--surface-2);
   border-radius: 8px;
   padding: 16px 20px;
-  border: 1px solid #e8eaed;
+  border: 1px solid var(--border-3);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -2349,27 +2349,27 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 }
 
 .rdm-stat-card--warning {
-  border-left: 3px solid #FA8C16;
+  border-left: 3px solid var(--warning);
 }
 
 .rdm-stat-card--processing {
-  border-left: 3px solid #1890FF;
+  border-left: 3px solid var(--info);
 }
 
 .rdm-stat-card--error {
-  border-left: 3px solid #FF4D4F;
+  border-left: 3px solid var(--danger);
 }
 
 .rdm-stat-card--success {
-  border-left: 3px solid #52C41A;
+  border-left: 3px solid var(--success);
 }
 
 /* ========== 問題詳情：延期記錄卡片 ========== */
 .rdm-defer-detail-card {
   margin-top: 16px;
   padding: 12px 16px;
-  background: #FAFBFC;
-  border: 1px solid #f0f0f0;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-2);
   border-radius: 6px;
 }
 
@@ -2379,10 +2379,10 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 }
 
 .rdm-release-stat-card {
-  background: #fff;
+  background: var(--surface-2);
   border-radius: 8px;
   padding: 16px 20px;
-  border: 1px solid #F0F0F0;
+  border: 1px solid var(--border-2);
   transition: box-shadow 0.25s ease, transform 0.2s ease;
 }
 
@@ -2392,22 +2392,22 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 }
 
 .rdm-release-stat-card--processing {
-  border-color: #91D5FF;
+  border-color: var(--info-border);
   background: linear-gradient(135deg, #F0F9FF 0%, #FFFFFF 100%);
 }
 
 .rdm-release-stat-card--warning {
-  border-color: #FFE7D1;
+  border-color: var(--brand-border);
   background: linear-gradient(135deg, #FFF9F0 0%, #FFFFFF 100%);
 }
 
 .rdm-release-stat-card--success {
-  border-color: #B7EB8F;
+  border-color: var(--success-border);
   background: linear-gradient(135deg, #F6FFED 0%, #FFFFFF 100%);
 }
 
 .rdm-release-section {
-  background: #fff;
+  background: var(--surface-2);
   border-radius: 8px;
   padding: 24px;
   margin-bottom: 16px;
@@ -2417,12 +2417,12 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 .rdm-release-section-title {
   font-size: 15px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
   margin: 0 0 16px;
   display: flex;
   align-items: center;
   padding-bottom: 10px;
-  border-bottom: 1px solid #F0F0F0;
+  border-bottom: 1px solid var(--border-2);
 }
 
 .rdm-release-checklist {
@@ -2437,18 +2437,18 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   gap: 10px;
   padding: 8px 12px;
   border-radius: 6px;
-  border: 1px solid #F0F0F0;
+  border: 1px solid var(--border-2);
   transition: background 0.2s;
 }
 
 .rdm-release-check-item.passed {
-  background: #F6FFED;
-  border-color: #B7EB8F;
+  background: var(--success-soft);
+  border-color: var(--success-border);
 }
 
 .rdm-release-check-item.failed {
-  background: #FFF2F0;
-  border-color: #FFCCC7;
+  background: var(--danger-callout);
+  border-color: var(--danger-border);
 }
 
 .rdm-release-check-icon {
@@ -2460,13 +2460,13 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 .rdm-release-check-type {
   font-weight: 600;
   font-size: 13px;
-  color: #262626;
+  color: var(--text-1);
   min-width: 120px;
 }
 
 .rdm-release-check-msg {
   font-size: 13px;
-  color: #595959;
+  color: var(--text-2);
   flex: 1;
 }
 
@@ -2474,8 +2474,8 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 
 /* 工作台「我的項目」横向卡片 */
 .rdm-v3-projects {
-  background: #fff;
-  border: 1px solid #f0f0f0;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 16px;
@@ -2491,7 +2491,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 .rdm-v3-project-card {
   flex: 0 0 260px;
   min-width: 260px;
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--border-2);
   border-radius: 8px;
   padding: 12px 14px;
   cursor: pointer;
@@ -2516,7 +2516,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 .rdm-v3-project-card-name {
   font-size: 14px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2527,11 +2527,11 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   flex-wrap: wrap;
   gap: 6px 14px;
   font-size: 12px;
-  color: #595959;
+  color: var(--text-2);
 }
 
 .rdm-v3-project-card-meta b {
-  color: #2f54eb;
+  color: var(--info-deep);
   font-weight: 600;
 }
 
@@ -2547,7 +2547,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 }
 
 .rdm-v3-delivery-single {
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--border-2);
   border-radius: 8px;
   padding: 12px 14px;
   background: #fafcff;
@@ -2559,7 +2559,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   gap: 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
   margin-bottom: 8px;
 }
 
@@ -2568,7 +2568,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   flex-wrap: wrap;
   gap: 6px 18px;
   font-size: 12px;
-  color: #595959;
+  color: var(--text-2);
 }
 
 /* 研发交付「按交付項」分组视图 */
@@ -2593,7 +2593,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 }
 
 .rdm-v3-group {
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--border-2);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -2603,25 +2603,25 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  background: #fafafa;
-  border-bottom: 1px solid #f0f0f0;
+  background: var(--surface-3);
+  border-bottom: 1px solid var(--border-2);
   flex-wrap: wrap;
 }
 
 .rdm-v3-group-title {
   font-size: 14px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .rdm-v3-group-coord {
   font-size: 12px;
-  color: #595959;
+  color: var(--text-2);
 }
 
 .rdm-v3-group-count {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
   margin-left: auto;
 }
 
@@ -2633,27 +2633,27 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 /* 验收用例卡片流：每条用例一张卡，长文本完整可见（替代原 220px 单行 Input 表格） */
 .rdm-case-source {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
   margin-bottom: 12px;
 }
 
 .rdm-case-empty {
   text-align: center;
-  color: #8c8c8c;
+  color: var(--text-3);
   padding: 24px;
 }
 
 .rdm-case-card {
-  border: 1px solid #e8eaed;
+  border: 1px solid var(--border-3);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface-2);
   padding: 12px 16px;
   margin-bottom: 12px;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .rdm-case-card:hover {
-  border-color: #ffe7d1;
+  border-color: var(--brand-border);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
@@ -2668,8 +2668,8 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: #fff7e6;
-  color: #e8720c;
+  background: var(--warning-soft);
+  color: var(--brand);
   font-size: 12px;
   font-weight: 600;
   display: flex;
@@ -2698,7 +2698,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 
 .rdm-case-field-label {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
   margin-bottom: 4px;
 }
 
@@ -2738,7 +2738,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 .rdm-history-cases {
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px dashed #f0f0f0;
+  border-top: 1px dashed var(--border-2);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -2771,7 +2771,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 .tpl-placeholder-panel {
   margin-bottom: 12px;
   padding: 10px 12px;
-  border: 1px dashed #d6e4ff;
+  border: 1px dashed var(--info-hover-border);
   border-radius: 8px;
   background: #f7faff;
 }
@@ -2790,7 +2790,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 .tpl-placeholder-tip {
   font-size: 12px;
   font-weight: 400;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 .tpl-placeholder-list {
@@ -2801,9 +2801,9 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 
 .tpl-placeholder-chip {
   padding: 2px 8px;
-  border: 1px solid #d6e4ff;
+  border: 1px solid var(--info-hover-border);
   border-radius: 5px;
-  background: #fff;
+  background: var(--surface-2);
   color: #1d39c4;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
@@ -2813,9 +2813,9 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 }
 
 .tpl-placeholder-chip:hover:not(:disabled) {
-  border-color: #e8720c;
-  background: #fff7e6;
-  color: #e8720c;
+  border-color: var(--brand);
+  background: var(--warning-soft);
+  color: var(--brand);
 }
 
 .tpl-placeholder-chip:disabled {
@@ -2848,7 +2848,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   gap: 8px;
   margin-bottom: 8px;
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 .rdm-dingtalk-preview__app {
@@ -2856,7 +2856,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 }
 
 .rdm-dingtalk-preview__bubble {
-  background: #ffffff;
+  background: var(--surface-2);
   border-radius: 10px;
   padding: 14px;
   max-width: 360px;
@@ -2870,14 +2870,14 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 .rdm-dingtalk-preview__title {
   font-size: 15px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
   line-height: 1.5;
   margin-bottom: 8px;
 }
 
 .rdm-dingtalk-preview__body {
   font-size: 13px;
-  color: #262626;
+  color: var(--text-1);
   line-height: 1.7;
 }
 
@@ -2891,7 +2891,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 
 .rdm-dingtalk-preview__quote {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
   padding-left: 8px;
   border-left: 2px solid #e5e5e5;
 }
@@ -2915,13 +2915,13 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 .rdm-dingtalk-preview__footer {
   margin-top: 12px;
   padding-top: 10px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--border-2);
 }
 
 .rdm-dingtalk-preview__button {
   display: block;
   text-align: center;
-  background: #f5f5f5;
+  background: var(--surface-1);
   border-radius: 6px;
   padding: 8px 12px;
   font-size: 13px;
@@ -2932,7 +2932,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 .rdm-dingtalk-preview__hint {
   margin-top: 10px;
   font-size: 12px;
-  color: #bfbfbf;
+  color: var(--text-4);
 }
 
 /*
@@ -2948,7 +2948,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   padding: 12px 18px;
   margin-bottom: 16px;
   border-radius: 10px;
-  border: 1px solid #FFD591;
+  border: 1px solid var(--warning-border);
   background: linear-gradient(90deg, #FFF7E6, #FFFBF0);
   font-size: 13px;
   color: #874D00;
@@ -2968,7 +2968,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 .rdm-plan-banner-icon {
   display: inline-flex;
   font-size: 16px;
-  color: #E8720C;
+  color: var(--brand);
 }
 
 .rdm-plan-banner--overdue .rdm-plan-banner-icon {
@@ -2983,7 +2983,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.3px;
-  color: #D46B08;
+  color: var(--warning-deep);
 }
 
 .rdm-plan-banner--overdue .rdm-plan-banner-date {
@@ -2996,7 +2996,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   font-size: 12px;
   font-weight: 600;
   background: #FFE7BA;
-  color: #AD4E00;
+  color: var(--brand-deep);
 }
 
 .rdm-plan-banner--overdue .rdm-plan-banner-days {
@@ -3006,7 +3006,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 
 .rdm-plan-banner-hint {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 
 /* 详情页标题旁的「計劃上線」胶囊：比属性面板里的一行字更容易被看见 */
@@ -3016,16 +3016,16 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   gap: 6px;
   padding: 2px 10px;
   border-radius: 999px;
-  border: 1px solid #FFD591;
-  background: #FFF7E6;
+  border: 1px solid var(--warning-border);
+  background: var(--warning-soft);
   font-size: 12px;
   line-height: 20px;
-  color: #AD4E00;
+  color: var(--brand-deep);
 }
 
 .rdm-plan-chip b {
   font-size: 13px;
-  color: #D46B08;
+  color: var(--warning-deep);
 }
 
 .rdm-plan-chip-days {
@@ -3041,7 +3041,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 
 .rdm-plan-chip--overdue {
   border-color: #FFA39E;
-  background: #FFF1F0;
+  background: var(--danger-soft);
   color: #A8071A;
 }
 

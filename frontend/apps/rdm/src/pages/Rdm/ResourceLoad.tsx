@@ -1189,7 +1189,7 @@ export default function ResourceLoad() {
                   border: `1px solid ${d.overloaded ? '#FFCCC7' : d.planned / Math.max(d.capacity, 1) > 0.85 ? '#FFE7D1' : d.planned > 0 ? '#B7EB8F' : '#F0F0F0'}`,
                 }}>
                   <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{d.day}</span>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: d.overloaded ? '#CF1322' : d.planned > 0 ? '#389E0D' : '#D9D9D9' }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: d.overloaded ? '#CF1322' : d.planned > 0 ? 'var(--success-deep)' : '#D9D9D9' }}>
                     {d.weekend || d.leave ? '—' : `${Math.max(0, d.capacity - d.planned).toFixed(0)}h`}
                   </span>
                 </div>
