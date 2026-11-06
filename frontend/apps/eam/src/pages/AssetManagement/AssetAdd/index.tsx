@@ -486,8 +486,8 @@ export default function AssetAdd() {
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', background: 'var(--surface-3)', transition: 'border-color 0.3s',
           }}
-            onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#E8720C')}
-            onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#d9d9d9')}
+            onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--brand)')}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border-1)')}
           >
             <PictureOutlined style={{ fontSize: 20, color: 'var(--text-4)' }} />
             <span style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 4 }}>{t('asset.uploadImage')}</span>

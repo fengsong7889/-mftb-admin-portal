@@ -344,7 +344,7 @@ export default function UserMenu({ myAssetsPath = '/my-assets' }: Props) {
         onCancel={closeAvatarModal}
         footer={
           avatarTab === 'upload' && uploadPreview ? null : (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 24px', borderTop: '1px solid #f0f0f0' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, padding: '12px 24px', borderTop: '1px solid var(--border-2)' }}>
               <Button
                 onClick={() => {
                   if (avatarTab === 'upload') {
@@ -387,7 +387,7 @@ export default function UserMenu({ myAssetsPath = '/my-assets' }: Props) {
                         key={avatar.key}
                         style={{
                           cursor: 'pointer',
-                          border: isSelected ? '3px solid #E8720C' : '3px solid transparent',
+                          border: isSelected ? '3px solid var(--brand)' : '3px solid transparent',
                           borderRadius: '50%',
                           padding: 8,
                           background: isSelected ? '#FFF8E1' : 'transparent',
@@ -399,7 +399,7 @@ export default function UserMenu({ myAssetsPath = '/my-assets' }: Props) {
                         <div style={{ width: 64, height: 64 }}>
                           <PikachuFace expression={avatar.key.replace('pikachu-', '') || 'happy'} size={64} />
                         </div>
-                        <div style={{ textAlign: 'center', fontSize: 12, color: '#666', marginTop: 4 }}>
+                        <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-body)', marginTop: 4 }}>
                           {t(`header.avatarNames.${avatar.key.replace('pikachu-', '')}`)}
                         </div>
                       </div>
@@ -431,7 +431,7 @@ export default function UserMenu({ myAssetsPath = '/my-assets' }: Props) {
                   {iconFontLoading && iconFontAvatars.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '40px 0' }}>
                       <Spin size="large" />
-                      <div style={{ marginTop: 8, color: '#8C8C8C' }}>加载中...</div>
+                      <div style={{ marginTop: 8, color: 'var(--text-3)' }}>加载中...</div>
                     </div>
                   ) : iconFontAvatars.length > 0 ? (
                     <>
@@ -448,7 +448,7 @@ export default function UserMenu({ myAssetsPath = '/my-assets' }: Props) {
                                 alignItems: 'center',
                                 padding: 8,
                                 borderRadius: 12,
-                                border: isSelected ? '3px solid #E8720C' : '3px solid transparent',
+                                border: isSelected ? '3px solid var(--brand)' : '3px solid transparent',
                                 background: isSelected ? '#FFF8E1' : 'transparent',
                                 transition: 'all 0.2s',
                               }}
@@ -463,7 +463,7 @@ export default function UserMenu({ myAssetsPath = '/my-assets' }: Props) {
                                   ;(e.target as HTMLImageElement).src = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><circle cx="32" cy="32" r="32" fill="%23E8720C"/><text x="32" y="40" text-anchor="middle" fill="white" font-size="24" font-family="sans-serif">?</text></svg>')}`
                                 }}
                               />
-                              <span style={{ fontSize: 11, color: '#666', marginTop: 4, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
+                              <span style={{ fontSize: 11, color: 'var(--text-body)', marginTop: 4, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' }}>
                                 {avatar.title}
                               </span>
                             </div>
@@ -485,8 +485,8 @@ export default function UserMenu({ myAssetsPath = '/my-assets' }: Props) {
                     </>
                   ) : (
                     <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                      <InboxOutlined style={{ fontSize: 48, color: '#BFBFBF' }} />
-                      <div style={{ marginTop: 8, color: '#8C8C8C' }}>点击「搜索」按钮查找喜欢的头像</div>
+                      <InboxOutlined style={{ fontSize: 48, color: 'var(--text-4)' }} />
+                      <div style={{ marginTop: 8, color: 'var(--text-3)' }}>点击「搜索」按钮查找喜欢的头像</div>
                     </div>
                   )}
                 </div>
@@ -499,11 +499,11 @@ export default function UserMenu({ myAssetsPath = '/my-assets' }: Props) {
                 <div style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
                   {uploadPreview ? (
                     <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 8 }}>{t('header.avatarPreview')}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 8 }}>{t('header.avatarPreview')}</div>
                       <img
                         src={uploadPreview}
                         alt="preview"
-                        style={{ width: 120, height: 120, borderRadius: '50%', objectFit: 'cover', border: '3px solid #E8720C' }}
+                        style={{ width: 120, height: 120, borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--brand)' }}
                       />
                       <div style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 16 }}>
                         <Button
@@ -528,14 +528,14 @@ export default function UserMenu({ myAssetsPath = '/my-assets' }: Props) {
                       style={{
                         width: 200,
                         height: 200,
-                        border: '2px dashed #D9D9D9',
+                        border: '2px dashed var(--border-1)',
                         borderRadius: 12,
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: uploading ? 'wait' : 'pointer',
-                        background: '#FAFAFA',
+                        background: 'var(--surface-3)',
                         transition: 'all 0.25s',
                       }}
                       onMouseEnter={(e) => { if (!uploading) { e.currentTarget.style.borderColor = '#E8720C'; e.currentTarget.style.background = '#FFF7E6' } }}
@@ -545,8 +545,8 @@ export default function UserMenu({ myAssetsPath = '/my-assets' }: Props) {
                         <Spin tip={t('header.avatarCompressing')} />
                       ) : (
                         <>
-                          <InboxOutlined style={{ fontSize: 32, color: '#8C8C8C' }} />
-                          <div style={{ fontSize: 13, color: '#595959', marginTop: 8 }}>{t('header.avatarUploadHint')}</div>
+                          <InboxOutlined style={{ fontSize: 32, color: 'var(--text-3)' }} />
+                          <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 8 }}>{t('header.avatarUploadHint')}</div>
                         </>
                       )}
                     </div>

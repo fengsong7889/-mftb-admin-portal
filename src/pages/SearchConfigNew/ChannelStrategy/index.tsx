@@ -768,7 +768,7 @@ export default function DimensionStrategy() {
           {/* 加分规则配置 - 根据Tab显示 */}
           {adCategory === 'boost' && (
             <Form.Item label={t('channelStrategy.boostRuleTitle')}>
-              <div style={{ marginBottom: 12, color: '#666', fontSize: 12 }}>
+              <div style={{ marginBottom: 12, color: 'var(--text-body)', fontSize: 12 }}>
                 {t('channelStrategy.boostRuleDesc')}
               </div>
               {adBoostTiers.map((tier, index) => (
@@ -802,7 +802,7 @@ export default function DimensionStrategy() {
                       addonAfter={tier.boostType === 'amount_match' ? t('channelStrategy.unitTimes') : t('channelStrategy.unitPoints')}
                       placeholder={tier.boostType === 'amount_match' ? t('channelStrategy.amountPlaceholder') : t('channelStrategy.fixedPlaceholder')}
                     />
-                    <div style={{ marginTop: 8, fontSize: 12, color: '#999' }}>
+                    <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-hint)' }}>
                       {tier.boostType === 'amount_match' 
                         ? t('channelStrategy.amountTip') 
                         : t('channelStrategy.fixedTip')}
@@ -816,7 +816,7 @@ export default function DimensionStrategy() {
           {/* 减分规则配置 - 根据Tab显示 */}
           {adCategory === 'demote' && (
             <Form.Item label={t('channelStrategy.demoteRuleTitle')}>
-              <div style={{ marginBottom: 8, color: '#666', fontSize: 12 }}>
+              <div style={{ marginBottom: 8, color: 'var(--text-body)', fontSize: 12 }}>
                 {t('channelStrategy.demoteRuleDesc')}
               </div>
               {adDemoteTiers.map((tier, index) => (
@@ -840,7 +840,7 @@ export default function DimensionStrategy() {
                     </Button>
                   </div>
                   <div style={{ marginBottom: 8 }}>
-                    <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>{t('channelStrategy.daysLabel')}</div>
+                    <div style={{ marginBottom: 4, fontSize: 12, color: 'var(--text-body)' }}>{t('channelStrategy.daysLabel')}</div>
                     <InputNumber
                       style={{ width: '100%' }}
                       value={tier.days}
@@ -851,7 +851,7 @@ export default function DimensionStrategy() {
                     />
                   </div>
                   <div style={{ marginBottom: 8 }}>
-                    <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>{t('channelStrategy.deductionMethod')}</div>
+                    <div style={{ marginBottom: 4, fontSize: 12, color: 'var(--text-body)' }}>{t('channelStrategy.deductionMethod')}</div>
                     <Radio.Group 
                       value={tier.deductionType}
                       onChange={(e) => handleUpdateAdDemoteTier(index, 'deductionType', e.target.value)}
@@ -861,7 +861,7 @@ export default function DimensionStrategy() {
                     </Radio.Group>
                   </div>
                   <div>
-                    <div style={{ marginBottom: 4, fontSize: 12, color: '#666' }}>
+                    <div style={{ marginBottom: 4, fontSize: 12, color: 'var(--text-body)' }}>
                       {tier.deductionType === 'fixed_deduction' ? t('channelStrategy.deductionValue') : t('channelStrategy.discountRatio')}
                     </div>
                     <InputNumber

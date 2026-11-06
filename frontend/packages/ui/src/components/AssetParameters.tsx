@@ -53,8 +53,8 @@ export function AssetSummary({ asset, hideAccessories = false }: { asset: Summar
     {!hideAccessories ? (
       <div style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <AppstoreOutlined style={{ fontSize: 13, color: '#FA8C16' }} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#595959' }}>{t('asset.accessoryListTitleDetail')}</span>
+          <AppstoreOutlined style={{ fontSize: 13, color: 'var(--warning)' }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>{t('asset.accessoryListTitleDetail')}</span>
           {accessories.length > 0 && <Tag color="orange" style={{ fontSize: 11 }}>{t('asset.accessoryCount', { count: accessories.length })}</Tag>}
           <div style={{ flex: 1, height: 1, background: '#f0f0f0', marginLeft: 8 }} />
         </div>
@@ -67,7 +67,7 @@ export function AssetSummary({ asset, hideAccessories = false }: { asset: Summar
             ))}
           </div>
         ) : (
-          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t('asset.accessoriesEmpty')}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('asset.accessoriesEmpty')}</span>
         )}
       </div>
     ) : null}

@@ -105,7 +105,7 @@ export default function Dashboard() {
       key: 'budget',
       render: (_: unknown, record: RunningAd) => (
         <span>
-          <span style={{ color: '#999' }}>MOP {record.budget.toLocaleString()}</span>
+          <span style={{ color: 'var(--text-hint)' }}>MOP {record.budget.toLocaleString()}</span>
           {' / '}
           <span style={{ color: '#1677ff', fontWeight: 500 }}>MOP {record.spent.toLocaleString()}</span>
         </span>

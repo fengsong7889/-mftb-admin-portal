@@ -439,7 +439,7 @@ export default function PricingAdd() {
             <div style={{
               width: 120, height: 120, border: '1px dashed var(--border-1)', borderRadius: 8,
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: '#999', fontSize: 12,
+              cursor: 'pointer', color: 'var(--text-hint)', fontSize: 12,
             }}>
               <PlusOutlined style={{ fontSize: 20, marginBottom: 4 }} />
               <span>{t('recommend.uploadDetailImage')}</span>
