@@ -22,3 +22,14 @@ run-local.sh
 # 本地环境变量（含数据库凭据，禁止提交）
 .env
 .env.local
+
+# 上述文件的备份/交换产物同样含明文凭据，不得入库（根 .gitignore 已有同规则，此处重复是为了本目录自带说明）
+# `.env.local.*` 盖住 .bak / .backup / .save 等变体；下一行是必需的例外规则，
+# 否则入库模板 .env.local.example 会被一起遮蔽
+.env.local.*
+!.env.local.example
+*.bak
+*.bak*
+*.orig
+*.rej
+*~

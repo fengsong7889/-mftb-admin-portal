@@ -31,6 +31,19 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# 本地环境文件的备份/交换产物同样携带明文凭据，必须一并忽略。
+# 起因：2026-11-06 手工 `cp .env.local .env.local.bak-<日期>` 产生的副本不在上面任何
+# 模式覆盖内，直接落进 `git status` 未跟踪列表，随时会被 `git add -A` 扫进公开仓提交。
+# `.env.local.*` 一次盖住 .bak / .backup / .save / .old 等全部变体；
+# 下一行是必需的例外规则（gitignore 后匹配优先），否则入库模板 `.env.local.example` 会被一起遮蔽。
+.env.local.*
+!.env.local.example
+*.bak
+*.bak*
+*.orig
+*.rej
+*~
+
 # Logs
 *.log
 
