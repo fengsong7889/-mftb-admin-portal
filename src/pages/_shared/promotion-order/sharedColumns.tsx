@@ -38,7 +38,7 @@ export function getSharedOrderColumns(deps: SharedColumnDeps): ColumnsType<BaseO
       width: 180,
       render: (_, record) => (
         <Space direction="vertical" size={0}>
-          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{record.groupId}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{record.groupId}</span>
           <span>{record.groupName}</span>
         </Space>
       ),
@@ -49,7 +49,7 @@ export function getSharedOrderColumns(deps: SharedColumnDeps): ColumnsType<BaseO
       width: 180,
       render: (_, record) => (
         <Space direction="vertical" size={0}>
-          <span style={{ fontSize: 12, color: '#8C8C8C' }}>{record.storeId}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{record.storeId}</span>
           <span>{record.storeName}</span>
         </Space>
       ),
@@ -83,7 +83,7 @@ export function getSharedOrderColumns(deps: SharedColumnDeps): ColumnsType<BaseO
       align: 'right' as const,
       render: (_, record) => {
         const disc = record.discountAmount ?? (record.originalPrice - record.actualPrice)
-        return disc > 0 ? <span style={{ color: '#fa8c16' }}>-${disc}</span> : <span style={{ color: '#bfbfbf' }}>-</span>
+        return disc > 0 ? <span style={{ color: 'var(--warning)' }}>-${disc}</span> : <span style={{ color: 'var(--text-4)' }}>-</span>
       },
     },
     {
@@ -106,8 +106,8 @@ export function getSharedOrderColumns(deps: SharedColumnDeps): ColumnsType<BaseO
       render: (_, record) => {
         const gd = record.giftDays ?? 0
         return gd > 0
-          ? <span style={{ color: '#E8720C', fontWeight: 600 }}>{gd} {t('promotionOrderManage.dayUnit')}</span>
-          : <span style={{ color: '#bfbfbf' }}>-</span>
+          ? <span style={{ color: 'var(--brand)', fontWeight: 600 }}>{gd} {t('promotionOrderManage.dayUnit')}</span>
+          : <span style={{ color: 'var(--text-4)' }}>-</span>
       },
     },
     {
@@ -117,7 +117,7 @@ export function getSharedOrderColumns(deps: SharedColumnDeps): ColumnsType<BaseO
       width: 120,
       align: 'right' as const,
       render: (price: number) => (
-        <span style={{ color: '#ff4d4f', fontWeight: 600 }}>${price}</span>
+        <span style={{ color: 'var(--danger)', fontWeight: 600 }}>${price}</span>
       ),
     },
     {

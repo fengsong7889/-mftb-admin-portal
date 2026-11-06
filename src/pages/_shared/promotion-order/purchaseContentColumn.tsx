@@ -66,7 +66,7 @@ export function createPurchaseContentRenderer(deps: PurchaseContentDeps) {
                 <div key={li} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                   <Tag color={cfg?.color || 'default'} style={{ margin: 0 }}>{cfg?.icon} {formatSignboardLabel(lg.label, lg.scenario)}</Tag>
                   {firstDate && (
-                    <span style={{ fontSize: 12, color: '#595959' }}>{firstDate}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{firstDate}</span>
                   )}
                   {moreCount > 0 && (
                     <Popover
@@ -75,7 +75,7 @@ export function createPurchaseContentRenderer(deps: PurchaseContentDeps) {
                       trigger="click"
                       placement="bottomLeft"
                     >
-                      <span style={{ fontSize: 11, color: '#1890ff', cursor: 'pointer' }}>+{moreCount}</span>
+                      <span style={{ fontSize: 11, color: 'var(--info)', cursor: 'pointer' }}>+{moreCount}</span>
                     </Popover>
                   )}
                 </div>
@@ -83,13 +83,13 @@ export function createPurchaseContentRenderer(deps: PurchaseContentDeps) {
             })}
             {hiddenCount > 0 && (
               <Popover content={allLabelsContent} title="全部標籤日期" trigger="click" placement="bottomLeft">
-                <span style={{ fontSize: 11, color: '#1890ff', cursor: 'pointer' }}>+{hiddenCount}</span>
+                <span style={{ fontSize: 11, color: 'var(--info)', cursor: 'pointer' }}>+{hiddenCount}</span>
               </Popover>
             )}
           </Space>
         )
       }
-      return <span style={{ color: '#bfbfbf' }}>-</span>
+      return <span style={{ color: 'var(--text-4)' }}>-</span>
     }
 
     // 盤活復蘇：只展示天數+日期
@@ -103,14 +103,14 @@ export function createPurchaseContentRenderer(deps: PurchaseContentDeps) {
           <Space direction="vertical" size={2}>
             <Tag color="green" style={{ margin: 0 }}>{t('promotionOrderManage.daysUnit', { count: days })}</Tag>
             {hasDates && (
-              <span style={{ fontSize: 12, color: '#595959' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
                 {first} ~ {last}
               </span>
             )}
           </Space>
         )
       }
-      return <span style={{ color: '#bfbfbf' }}>-</span>
+      return <span style={{ color: 'var(--text-4)' }}>-</span>
     }
 
     // 無敵星星：去重時段展示（最多3行），面板按商圈→日期→時段層級展示
@@ -156,12 +156,12 @@ export function createPurchaseContentRenderer(deps: PurchaseContentDeps) {
                   : regionLabel(record.region as Region))
             return (
               <div key={regionVal}>
-                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, color: '#262626' }}>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, color: 'var(--text-1)' }}>
                   {regionName}
                 </div>
                 {Array.from(group.dates.entries()).map(([date, slots]) => (
                   <div key={date} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
-                    <span style={{ fontSize: 13, color: '#595959', minWidth: 90 }}>{date}</span>
+                    <span style={{ fontSize: 13, color: 'var(--text-2)', minWidth: 90 }}>{date}</span>
                     <Space size={4}>
                       {slots.map((slot, si) => (
                         <Tag key={si} color="blue" style={{ margin: 0 }}>{slot}</Tag>
@@ -181,16 +181,16 @@ export function createPurchaseContentRenderer(deps: PurchaseContentDeps) {
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <Tag color="blue" style={{ margin: 0 }}>{slot}</Tag>
               <Popover content={panelContent} title={t('promotionOrderManage.allSlots')} trigger="click" placement="bottomLeft">
-                <span style={{ fontSize: 11, color: '#1890ff', cursor: 'pointer' }}>{dates[0]}</span>
+                <span style={{ fontSize: 11, color: 'var(--info)', cursor: 'pointer' }}>{dates[0]}</span>
               </Popover>
               {dates.length > 1 && (
-                <span style={{ fontSize: 11, color: '#1890ff', cursor: 'pointer' }}>+{dates.length - 1}</span>
+                <span style={{ fontSize: 11, color: 'var(--info)', cursor: 'pointer' }}>+{dates.length - 1}</span>
               )}
             </div>
           ))}
           {hiddenCount > 0 && (
             <Popover content={panelContent} title={t('promotionOrderManage.allSlots')} trigger="click" placement="bottomLeft">
-              <span style={{ fontSize: 11, color: '#1890ff', cursor: 'pointer' }}>+{hiddenCount}</span>
+              <span style={{ fontSize: 11, color: 'var(--info)', cursor: 'pointer' }}>+{hiddenCount}</span>
             </Popover>
           )}
         </Space>
@@ -249,6 +249,6 @@ export function createPurchaseContentRenderer(deps: PurchaseContentDeps) {
         </Space>
       )
     }
-    return <span style={{ color: '#bfbfbf' }}>-</span>
+    return <span style={{ color: 'var(--text-4)' }}>-</span>
   }
 }

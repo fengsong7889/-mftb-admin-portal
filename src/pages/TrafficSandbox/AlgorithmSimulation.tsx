@@ -186,7 +186,7 @@ function LegacyAlgorithmSimulation() {
     },
     {
       title: t('algorithmSimulation.colStoreCode'), dataIndex: 'storeCode', width: 120,
-      render: (v: string) => <span style={{ fontFamily: 'monospace', fontSize: 12, color: '#595959' }}>{v}</span>,
+      render: (v: string) => <span style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--text-2)' }}>{v}</span>,
     },
     {
       title: t('algorithmSimulation.colStoreName'), dataIndex: 'storeName', width: 200,
@@ -219,12 +219,12 @@ function LegacyAlgorithmSimulation() {
     },
     {
       title: t('algorithmSimulation.colScore'), dataIndex: 'score', width: 100, align: 'right',
-      render: (v: number) => <span style={{ fontWeight: 700, color: '#1890FF' }}>{v}</span>,
+      render: (v: number) => <span style={{ fontWeight: 700, color: 'var(--info)' }}>{v}</span>,
     },
     {
       title: t('algorithmSimulation.colRankBasis'),
       render: (_: unknown, r: AlgorithmHitMerchant) => (
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t(r.rankBasisKey)}</span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t(r.rankBasisKey)}</span>
       ),
     },
   ]
@@ -235,7 +235,7 @@ function LegacyAlgorithmSimulation() {
     {
       title: t('algorithmSimulation.colMissReason'),
       render: (_: unknown, r: AlgorithmMissMerchant) => (
-        <span style={{ fontSize: 12, color: '#8C8C8C' }}>{t(r.missReasonKey)}</span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t(r.missReasonKey)}</span>
       ),
     },
   ]
@@ -245,17 +245,17 @@ function LegacyAlgorithmSimulation() {
       <Alert type="info" showIcon style={{ marginBottom: 16 }} message="演示資料 · 非真實算法執行結果" description="此視圖保留舊算法樣例；分數與參數變化不可作為真實排名或投放依據。" />
       {/* 頁面標題 */}
       <div style={{
-        background: '#fff', padding: '12px 20px', marginBottom: 12,
+        background: 'var(--surface-2)', padding: '12px 20px', marginBottom: 12,
         borderRadius: 8, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <DeploymentUnitOutlined style={{ fontSize: 20, color: '#E8720C' }} />
+          <DeploymentUnitOutlined style={{ fontSize: 20, color: 'var(--brand)' }} />
           <div>
-            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: '#E8720C' }}>
+            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--brand)' }}>
               {t('algorithmSimulation.title')}
             </h2>
-            <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-hint)', marginTop: 2 }}>
               {t('algorithmSimulation.desc')}
             </div>
           </div>
@@ -282,15 +282,15 @@ function LegacyAlgorithmSimulation() {
 
       {/* 查詢條件區 */}
       <Card
-        title={<Space><SearchOutlined style={{ color: '#E8720C' }} /><span>{t('trafficSandbox.conditionTitle')}</span></Space>}
+        title={<Space><SearchOutlined style={{ color: 'var(--brand)' }} /><span>{t('trafficSandbox.conditionTitle')}</span></Space>}
         size="small"
         style={{ marginBottom: 16, borderRadius: 8 }}
       >
         <Row gutter={16}>
           <Col span={8}>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>
+            <div style={{ fontSize: 13, color: 'var(--text-body)', marginBottom: 4 }}>
               {t('algorithmSimulation.algoLabel')}
-              <span style={{ color: '#FF4D4F', marginLeft: 4 }}>*</span>
+              <span style={{ color: 'var(--danger)', marginLeft: 4 }}>*</span>
             </div>
             <RemoteSearchSelect
               // 模式切換後重建組件，避免殘留上一模式的算法選項
@@ -303,7 +303,7 @@ function LegacyAlgorithmSimulation() {
             />
           </Col>
           <Col span={5}>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>{t('algorithmSimulation.regionLabel')}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-body)', marginBottom: 4 }}>{t('algorithmSimulation.regionLabel')}</div>
             <Select
               value={region}
               onChange={setRegion}
@@ -314,7 +314,7 @@ function LegacyAlgorithmSimulation() {
             />
           </Col>
           <Col span={4}>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>{t('algorithmSimulation.dateLabel')}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-body)', marginBottom: 4 }}>{t('algorithmSimulation.dateLabel')}</div>
             <DatePicker
               value={date}
               onChange={d => d && setDate(d)}
@@ -324,7 +324,7 @@ function LegacyAlgorithmSimulation() {
             />
           </Col>
           <Col span={4}>
-            <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>{t('algorithmSimulation.timeSlotLabel')}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-body)', marginBottom: 4 }}>{t('algorithmSimulation.timeSlotLabel')}</div>
             <Select
               value={timeSlot}
               onChange={setTimeSlot}
@@ -350,7 +350,7 @@ function LegacyAlgorithmSimulation() {
           {/* 算法配置摘要卡 */}
           <Card
             size="small"
-            title={<Space><DeploymentUnitOutlined style={{ color: '#1890FF' }} /><span>{t('algorithmSimulation.summaryTitle')}</span></Space>}
+            title={<Space><DeploymentUnitOutlined style={{ color: 'var(--info)' }} /><span>{t('algorithmSimulation.summaryTitle')}</span></Space>}
             style={{ marginBottom: 16, borderRadius: 8 }}
             extra={
               result.algo.status === ServiceStatus.ENABLED
@@ -391,7 +391,7 @@ function LegacyAlgorithmSimulation() {
           {isSandbox && (
             <Card
               size="small"
-              title={<Space><RiseOutlined style={{ color: '#722ED1' }} /><span>{t('algorithmSimulation.trialTitle')}</span></Space>}
+              title={<Space><RiseOutlined style={{ color: 'var(--purple)' }} /><span>{t('algorithmSimulation.trialTitle')}</span></Space>}
               style={{ marginBottom: 16, borderRadius: 8 }}
               extra={
                 trial && (
@@ -401,12 +401,12 @@ function LegacyAlgorithmSimulation() {
                 )
               }
             >
-              <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 12 }}>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 12 }}>
                 {t('algorithmSimulation.trialHint')}
               </div>
               <Row gutter={16}>
                 <Col span={6}>
-                  <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>{t('algorithmSimulation.fieldRecallDimension')}</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-body)', marginBottom: 4 }}>{t('algorithmSimulation.fieldRecallDimension')}</div>
                   <Select
                     value={result.effective.recallDimension}
                     onChange={v => handleTrialChange({ recallDimension: v as RecallDimension })}
@@ -415,7 +415,7 @@ function LegacyAlgorithmSimulation() {
                   />
                 </Col>
                 <Col span={6}>
-                  <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>{t('algorithmSimulation.fieldRankingStage')}</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-body)', marginBottom: 4 }}>{t('algorithmSimulation.fieldRankingStage')}</div>
                   <Select
                     value={result.effective.rankingStage}
                     onChange={v => handleTrialChange({ rankingStage: v as RankingStage })}
@@ -424,7 +424,7 @@ function LegacyAlgorithmSimulation() {
                   />
                 </Col>
                 <Col span={6}>
-                  <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>{t('algorithmSimulation.fieldBidMode')}</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-body)', marginBottom: 4 }}>{t('algorithmSimulation.fieldBidMode')}</div>
                   <Select
                     value={result.effective.bidMode}
                     onChange={v => handleTrialChange({ bidMode: v as BidMode })}
@@ -433,7 +433,7 @@ function LegacyAlgorithmSimulation() {
                   />
                 </Col>
                 <Col span={6}>
-                  <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>{t('algorithmSimulation.fieldSlotCount')}</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-body)', marginBottom: 4 }}>{t('algorithmSimulation.fieldSlotCount')}</div>
                   <Select
                     value={result.effective.slotCount}
                     onChange={v => handleTrialChange({ slotCount: v })}
@@ -482,7 +482,7 @@ function LegacyAlgorithmSimulation() {
 
           {/* 未命中商家抽樣區 */}
           <Collapse
-            style={{ marginTop: 16, background: '#fff', borderRadius: 8 }}
+            style={{ marginTop: 16, background: 'var(--surface-2)', borderRadius: 8 }}
             items={[{
               key: 'miss',
               label: (
@@ -537,22 +537,22 @@ function TrialComparePanel({
   return (
     <Card
       size="small"
-      title={<Space><RiseOutlined style={{ color: '#722ED1' }} /><span>{t('algorithmSimulation.compareTitle')}</span></Space>}
+      title={<Space><RiseOutlined style={{ color: 'var(--purple)' }} /><span>{t('algorithmSimulation.compareTitle')}</span></Space>}
       style={{ marginBottom: 16, borderRadius: 8 }}
     >
       <Row gutter={16}>
         <Col span={6}>
-          <div style={{ padding: 12, background: '#FAFAFA', borderRadius: 8 }}>
-            <div style={{ fontSize: 12, color: '#8C8C8C', marginBottom: 4 }}>
+          <div style={{ padding: 12, background: 'var(--surface-3)', borderRadius: 8 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-3)', marginBottom: 4 }}>
               {t('algorithmSimulation.compareHitCount')}
             </div>
             <div style={{ fontSize: 18, fontWeight: 700 }}>
               {base.stats.hitCount}
-              <span style={{ margin: '0 6px', color: '#BFBFBF' }}>→</span>
+              <span style={{ margin: '0 6px', color: 'var(--text-4)' }}>→</span>
               {current.stats.hitCount}
               <span style={{
                 marginLeft: 8, fontSize: 13,
-                color: hitDelta === 0 ? '#8C8C8C' : hitDelta > 0 ? '#52C41A' : '#FF4D4F',
+                color: hitDelta === 0 ? 'var(--text-3)' : hitDelta > 0 ? 'var(--success)' : 'var(--danger)',
               }}>
                 {hitDelta > 0 ? `+${hitDelta}` : hitDelta}
               </span>
@@ -560,22 +560,22 @@ function TrialComparePanel({
           </div>
         </Col>
         <Col span={9}>
-          <div style={{ fontSize: 12, color: '#52C41A', fontWeight: 600, marginBottom: 6 }}>
+          <div style={{ fontSize: 12, color: 'var(--success)', fontWeight: 600, marginBottom: 6 }}>
             {t('algorithmSimulation.compareEntered', { count: entered.length })}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             {entered.length === 0
-              ? <span style={{ fontSize: 12, color: '#BFBFBF' }}>{t('algorithmSimulation.compareNone')}</span>
+              ? <span style={{ fontSize: 12, color: 'var(--text-4)' }}>{t('algorithmSimulation.compareNone')}</span>
               : entered.map(h => <Tag key={h.storeCode} color="success">{h.storeName}</Tag>)}
           </div>
         </Col>
         <Col span={9}>
-          <div style={{ fontSize: 12, color: '#FF4D4F', fontWeight: 600, marginBottom: 6 }}>
+          <div style={{ fontSize: 12, color: 'var(--danger)', fontWeight: 600, marginBottom: 6 }}>
             {t('algorithmSimulation.compareDropped', { count: dropped.length })}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             {dropped.length === 0
-              ? <span style={{ fontSize: 12, color: '#BFBFBF' }}>{t('algorithmSimulation.compareNone')}</span>
+              ? <span style={{ fontSize: 12, color: 'var(--text-4)' }}>{t('algorithmSimulation.compareNone')}</span>
               : dropped.map(h => <Tag key={h.storeCode} color="error">{h.storeName}</Tag>)}
           </div>
         </Col>

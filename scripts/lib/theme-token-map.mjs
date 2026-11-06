@@ -49,6 +49,8 @@ export const SEMANTIC_TOKENS = [
   'border-1', 'border-2', 'border-3', 'border-input',
   // 语义色描边阶（antd 实色淡彩档；浅色严格等于站内字面量，深色沿用 brand-border 的 rgba 合成约定）
   'danger-border', 'warning-border', 'success-border', 'info-border', 'purple-border',
+  // 同族第二档（#D9F7BE / #FFE7BA，用量 24 与 38 处，见 TOKEN_VALUES 里的理由）
+  'success-border-soft', 'warning-border-soft',
   // geekblue 四件套补齐与两个前景/底色邻阶（详见 TOKEN_VALUES 里的实测注释）
   'info-deep', 'info-hover-border', 'brand-deep',
   // 品牌
@@ -61,6 +63,8 @@ export const SEMANTIC_TOKENS = [
   // 语义色的补充阶：危险提示条底、深橙前景、蓝调 hover 底
   //（它们不是另一令牌的重复值，而是 antd 调色板上真实存在、与现有令牌差 1~15 个单位的邻阶）
   'danger-callout', 'warning-deep', 'info-hover-tint',
+  // success 深字档（与 warning-deep 同角色，补对称缺口；#389E0D 全站 16 处）
+  'success-deep',
   // 阴影与描边补偿
   'shadow-1', 'shadow-2', 'shadow-3', 'shadow-card-soft',
   'shadow-btn-hover', 'shadow-btn-active', 'shadow-popover',
@@ -145,6 +149,15 @@ export const TOKEN_VALUES = {
   'success-border': { light: '#B7EB8F', dark: 'rgba(106,190,57,0.32)' },
   'info-border': { light: '#91D5FF', dark: 'rgba(64,169,255,0.32)' },
   'purple-border': { light: '#D3ADF7', dark: 'rgba(163,113,231,0.32)' },
+  /*
+   * 同族第二档（antd 调色板更浅一档：green-2 / orange-2）。建令牌的理由是用量，不是审美：
+   * 本轮实测 #D9F7BE 24 处、#FFE7BA 38 处，且它们已经卡住真实界面的成对性
+   * （首页空状态图标圈：背景已令牌化、描边只能钉裸值）。
+   * 深色 alpha 取 0.24（比 canonical 档 0.32 弱一档）：浅色侧这一档本来就是「更柔的细线」，
+   * 深色下跟同族的 tint 底（--success-soft / --warning-soft 均为 0.16）拉开但不至于消失。
+   */
+  'success-border-soft': { light: '#D9F7BE', dark: 'rgba(106,190,57,0.24)' },
+  'warning-border-soft': { light: '#FFE7BA', dark: 'rgba(250,160,61,0.24)' },
   brand: { light: '#E8720C', dark: '#E8720C' },
   'brand-hover': { light: '#F59432', dark: '#F59432' },
   'brand-active': { light: '#CC6200', dark: '#D4670A' },
@@ -192,6 +205,15 @@ export const TOKEN_VALUES = {
    *   令牌化不修复它（严格等值只保证不变差），已在单测里按 3.0 下限显式登记而不是假装达标。
    */
   'warning-deep': { light: '#D46B08', dark: '#FFA940' },
+  /*
+   * success 的深字档——补的是**对称缺口**，不是新语义：同一个首页空状态里，
+   * warning 侧那个图标圈已经用 `var(--warning-deep)`，success 侧却钉着裸值 `#389E0D`（全站 16 处）。
+   * 实测：浅色 `#389E0D` on `--success-soft(#F6FFED)` = **3.3712**（图标属非文本，门槛 3:1 达标）；
+   * 深色取 green-5 `#73D13D`：on 合成后的 soft 底（rgba(82,196,26,0.16) 压 #1F1F1F = #27391E）
+   * = **6.4585**，on 纯卡片 = 8.5684。合成口径：tint×alpha + 背板×(1-alpha)，
+   * 写反会得出“深底变亮绿”的荒谬值（本轮实踩过一次，所以公式写在这里）。
+   */
+  'success-deep': { light: '#389E0D', dark: '#73D13D' },
   /*
    * 蓝调 hover 底色（antd geekblue-1 = #F0F5FF），用于业务频道侧栏未选中项的 hover 反馈。
    * 不能复用 --info-soft(#E6F7FF)：两者在蓝绿通道上差 8~15 个单位，观感不同（一个是淡蓝一个是青蓝）。
@@ -339,6 +361,7 @@ export const COLOR_TO_TOKEN = {
     // orange-7 深橙：只进 fg。它在全站 46 处均作前景，语义单一；
     // 不进 bg/border 段，避免把同色值的背景用法误映射成文字令牌。
     d46b08: 'warning-deep',
+    '389e0d': 'success-deep',
     // 两个深前景邻阶。只进 fg 段：#2F54EB 站内有 2 处描边用法、#AD4E00 全 7 处均作前景，
     // 描边位不跟着换是故意的（geekblue 描边另有 --info-hover-border 表示）。
     '2f54eb': 'info-deep',
@@ -365,6 +388,9 @@ export const COLOR_TO_TOKEN = {
     // 仓内 `brand-border`（#FFE7D1，也有 2 处 bg 用法）已经是这个口径的先例。
     ffccc7: 'danger-border',
     ffd591: 'warning-border',
+    // 同族第二档（只进 border 段，同上口径：背景位的同名值不会被换）
+    d9f7be: 'success-border-soft',
+    ffe7ba: 'warning-border-soft',
     b7eb8f: 'success-border',
     '91d5ff': 'info-border',
     d3adf7: 'purple-border',
@@ -388,7 +414,10 @@ export const REVIEW_REQUIRED = {
   eef0f3: '接近 --surface-1(#F5F5F5) 但不等值',
   f58a2e: '接近 --brand-hover(#F59432) 但不等值；且它是 bootstrap.tsx 的 antd token，不应被 codemod 触碰',
   ffb347: '品牌渐变装饰条（headerGradientShift）专用色，深色下应保留以维持品牌识别',
-  ffe7ba: 'warning 描边阶的少数档（描边位 29 处 vs canonical #FFD591 的 63 处）。描边令牌族已建，但同族不建第二个令牌——收敛会改变浅色外观（违反「浅色逐像素不变」），需单独定',
+  // ffe7ba 已于 2026-11-06 从本清单移除：它进了 `--warning-border-soft`（浅色严格等值，
+  // 所以不违反「浅色逐像素不变」）。旧理由里“29 处 vs canonical 63 处”是 #42 已推翻的
+  // 重复计数（实为 38 / 51）；“同族不建第二个令牌”当时是待决而非定论，现在它开始卡住
+  // 首页空状态的成对性（背景已令牌化、描边只能钉裸值），所以按阶梯走“根治”那一步。
   faad14: 'antd gold，与 --warning(#FA8C16) 并存，需确认是否收敛',
   ff7875: 'danger hover 阶；注意它同时是 --danger 的**深色值**，跨主题同值需人工确认',
   // d46b08 已不再列在这里：本次为它建了 --warning-deep（浅色严格等值）并归入 COLOR_TO_TOKEN.fg。

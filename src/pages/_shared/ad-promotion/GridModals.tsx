@@ -32,13 +32,13 @@ export function ConflictModal({ visible, onConfirm, onCancel, variant = 'default
       okButtonProps={{ danger: true }}
     >
       <div style={{ padding: '8px 0' }}>
-        <p style={{ marginBottom: 12, fontSize: 14, color: '#262626' }}>
+        <p style={{ marginBottom: 12, fontSize: 14, color: 'var(--text-1)' }}>
           {t('switchWarnLine1')}
         </p>
-        <p style={{ marginBottom: 0, fontSize: 13, color: '#595959' }}>
+        <p style={{ marginBottom: 0, fontSize: 13, color: 'var(--text-2)' }}>
           {t(warnLine2Key)}
         </p>
-        <ul style={{ margin: '8px 0 0', paddingLeft: 20, fontSize: 13, color: '#595959' }}>
+        <ul style={{ margin: '8px 0 0', paddingLeft: 20, fontSize: 13, color: 'var(--text-2)' }}>
           <li>{t('switchOption1')}</li>
           <li>{t('switchOption2')}</li>
         </ul>
@@ -69,7 +69,7 @@ export function SuccessModal({ visible, onClose, onViewOrder, onContinuePurchase
         <Button key="view" type="primary" onClick={onViewOrder}>
           {t('viewOrder')}
         </Button>,
-        <Button key="continue" onClick={onContinuePurchase} style={{ background: '#fa8c16', borderColor: '#fa8c16', color: '#fff' }}>
+        <Button key="continue" onClick={onContinuePurchase} style={{ background: 'var(--warning)', borderColor: 'var(--warning)', color: 'var(--on-brand)' }}>
           {t('continueBuy')}
         </Button>,
       ]}
@@ -77,7 +77,7 @@ export function SuccessModal({ visible, onClose, onViewOrder, onContinuePurchase
     >
       <div style={{ textAlign: 'center', padding: '20px 0' }}>
         <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-        <p style={{ fontSize: 16, color: '#595959', marginBottom: 24 }}>
+        <p style={{ fontSize: 16, color: 'var(--text-2)', marginBottom: 24 }}>
           {t('successMessage')}
         </p>
         <div style={{
@@ -86,7 +86,7 @@ export function SuccessModal({ visible, onClose, onViewOrder, onContinuePurchase
           borderRadius: 8,
           marginBottom: 16,
         }}>
-          <p style={{ fontSize: 14, color: '#8c8c8c', marginBottom: 8 }}>
+          <p style={{ fontSize: 14, color: 'var(--text-3)', marginBottom: 8 }}>
             {t('deductedPromo')}
           </p>
           <p style={{
@@ -120,44 +120,44 @@ export function SoldOutModal({ visible, onClose, details, lockDurationSeconds }:
       title={
         <Space>
           <span style={{ fontSize: 18 }}>⚠️</span>
-          <span style={{ color: '#ff4d4f', fontWeight: 600 }}>{t('partialSoldOut')}</span>
+          <span style={{ color: 'var(--danger)', fontWeight: 600 }}>{t('partialSoldOut')}</span>
         </Space>
       }
       open={visible}
       onCancel={onClose}
       footer={[
-        <Button key="ok" type="primary" onClick={onClose} style={{ background: '#fa8c16', borderColor: '#fa8c16', minWidth: 100 }}>
+        <Button key="ok" type="primary" onClick={onClose} style={{ background: 'var(--warning)', borderColor: 'var(--warning)', minWidth: 100 }}>
           {t('gotIt')}
         </Button>,
       ]}
       width={460}
     >
       <div style={{ padding: '8px 0' }}>
-        <p style={{ fontSize: 14, color: '#262626', marginBottom: 12, lineHeight: 1.6 }}>
+        <p style={{ fontSize: 14, color: 'var(--text-1)', marginBottom: 12, lineHeight: 1.6 }}>
           {t('soldOutExplain')}
         </p>
         <div style={{
-          background: '#fff2f0', border: '1px solid #ffccc7', borderRadius: 8,
+          background: 'var(--danger-callout)', border: '1px solid var(--danger-border)', borderRadius: 8,
           padding: '12px 16px', marginBottom: 16, maxHeight: 200, overflowY: 'auto',
         }}>
           {details.map((item, idx) => (
             <div key={idx} style={{
               display: 'flex', alignItems: 'center', gap: 8,
               padding: '6px 0',
-              borderBottom: idx < details.length - 1 ? '1px dashed #ffccc7' : 'none',
+              borderBottom: idx < details.length - 1 ? '1px dashed var(--danger-border)' : 'none',
             }}>
-              <span style={{ fontSize: 13, color: '#ff4d4f' }}>✕</span>
-              <span style={{ fontSize: 13, color: '#595959' }}>
-                <span style={{ fontWeight: 600, color: '#262626' }}>{item.date}</span>
+              <span style={{ fontSize: 13, color: 'var(--danger)' }}>✕</span>
+              <span style={{ fontSize: 13, color: 'var(--text-2)' }}>
+                <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>{item.date}</span>
                 {' · '}
-                <span style={{ color: '#722ed1' }}>{item.regionName}</span>
+                <span style={{ color: 'var(--purple)' }}>{item.regionName}</span>
                 {' · '}
                 <Tag color="orange" style={{ fontSize: 11, margin: 0 }}>{item.mealSlot}</Tag>
               </span>
             </div>
           ))}
         </div>
-        <p style={{ fontSize: 13, color: '#ff4d4f', margin: 0, fontWeight: 500 }}>
+        <p style={{ fontSize: 13, color: 'var(--danger)', margin: 0, fontWeight: 500 }}>
           {t('lockExpiryWarning', {
             count: lockDurationSeconds >= 60 ? lockDurationSeconds / 60 : lockDurationSeconds,
             unit: lockDurationSeconds >= 60 ? '分鐘' : '秒',
@@ -182,7 +182,7 @@ export function PresaleInfoModal({ info, onClose }: PresaleInfoModalProps) {
       title={
         <Space>
           <span style={{ fontSize: 18 }}>⏳</span>
-          <span style={{ color: '#1890ff', fontWeight: 600 }}>{t('notYetOnSale')}</span>
+          <span style={{ color: 'var(--info)', fontWeight: 600 }}>{t('notYetOnSale')}</span>
         </Space>
       }
       open={!!info}
@@ -200,10 +200,10 @@ export function PresaleInfoModal({ info, onClose }: PresaleInfoModalProps) {
             background: '#e6f4ff', border: '1px solid #91caff', borderRadius: 8,
             padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8,
           }}>
-            <span style={{ fontSize: 13, color: '#595959' }}>{t('saleTimeLabel')}</span>
-            <span style={{ fontSize: 16, fontWeight: 700, color: '#1890ff' }}>{info.openTime}</span>
+            <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('saleTimeLabel')}</span>
+            <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--info)' }}>{info.openTime}</span>
           </div>
-          <p style={{ fontSize: 12, color: '#8c8c8c', marginTop: 12, marginBottom: 0 }}>
+          <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 12, marginBottom: 0 }}>
             {t('dailyReleaseHint', { hour: PRESALE_OPEN_HOUR })}
           </p>
         </div>

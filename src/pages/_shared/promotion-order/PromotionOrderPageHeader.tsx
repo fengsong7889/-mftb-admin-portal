@@ -27,7 +27,7 @@ export function PromotionOrderPageHeader({
 }: PromotionOrderPageHeaderProps) {
   return (
     <div style={{
-      position: 'relative', background: '#fff', marginBottom: 16,
+      position: 'relative', background: 'var(--surface-2)', marginBottom: 16,
       borderRadius: 12, boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
       overflow: 'hidden',
     }}>
@@ -43,7 +43,7 @@ export function PromotionOrderPageHeader({
           <Button type="primary" icon={<ArrowLeftOutlined />}
             onClick={onBack}
             style={{
-              backgroundColor: '#E8720C', borderColor: '#E8720C',
+              backgroundColor: 'var(--brand)', borderColor: 'var(--brand)',
               borderRadius: 8, height: 36, padding: '0 16px',
               display: 'flex', alignItems: 'center', gap: 6,
               boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
@@ -51,13 +51,13 @@ export function PromotionOrderPageHeader({
             }}>{t('common.back')}</Button>
           <div style={{ width: 1, height: 20, background: '#E8E8E8' }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1890ff' }}>{t('promotionOrderManage.orderListTitle')}</h2>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--info)' }}>{t('promotionOrderManage.orderListTitle')}</h2>
             {orderType && (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                padding: '3px 12px', background: '#FFF7E6',
-                border: '1px solid #FFD591', borderRadius: 4,
-                fontSize: 13, color: '#E8720C', fontWeight: 500,
+                padding: '3px 12px', background: 'var(--warning-soft)',
+                border: '1px solid var(--warning-border)', borderRadius: 4,
+                fontSize: 13, color: 'var(--brand)', fontWeight: 500,
               }}>
                 {orderTypeKey !== undefined && <span style={{ fontSize: 14 }}>{RECOMMEND_TYPE_ICON[orderTypeKey as RecommendType]}</span>}
                 {orderTypeKey !== undefined ? recommendTypeLabel(orderTypeKey) : orderType}
@@ -68,7 +68,7 @@ export function PromotionOrderPageHeader({
         <Button type="primary" icon={<ShoppingCartOutlined />}
           onClick={onBuyAd}
           style={{
-            backgroundColor: '#E8720C', borderColor: '#E8720C',
+            backgroundColor: 'var(--brand)', borderColor: 'var(--brand)',
             borderRadius: 8, height: 36, padding: '0 18px',
             boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
             transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
