@@ -605,6 +605,44 @@ describe('countBareColors', () => {
 })
 
 /**
+ * 插画角色表面 --art-figure（用户报的图3：「人工智能系统 SVG 图深色下有点恐怖」）。
+ *
+ * 为何必须单独一组：这个令牌存在的**全部理由就是对比度**，而不是色值偏好。
+ * 不钉住它，下任把它“为了统一”改回 --art-surface 时，门禁不会报错，而机器人会重新变成灰脸空洞。
+ */
+describe('插画角色表面（--art-figure）', () => {
+  /** AI 场景的面罩与瞳孔都是 scene 主色紫（Portal/index.css 里 data-scene='ai' 的 color） */
+  const SCENE_AI = '#722ED1'
+  const CARD = TOKEN_VALUES['surface-2'].dark
+
+  it('深色下角色表面与卡片底必须拉开 ≥ 3:1（否则脸没有轮廓）', () => {
+    expect(contrastRatio(TOKEN_VALUES['art-figure'].dark, CARD))
+      .toBeGreaterThanOrEqual(3.0)
+  })
+
+  it('深色下角色表面与场景紫（面罩/瞳孔）必须双向 ≥ 3:1', () => {
+    const c = contrastRatio(TOKEN_VALUES['art-figure'].dark, SCENE_AI)
+    expect(c, '眼白 on 面罩').toBeGreaterThanOrEqual(3.0)
+    expect(c, '瞳孔 on 眼白（同一对颜色）').toBeGreaterThanOrEqual(3.0)
+  })
+
+  it('浅色值必须仍为 #FFFFFF（浅色逐像素不变）', () => {
+    expect(TOKEN_VALUES['art-figure'].light).toBe('#FFFFFF')
+  })
+
+  it('不得与 --art-surface 同值（同值就等于这个令牌没意义，应该直接用纸面令牌）', () => {
+    expect(TOKEN_VALUES['art-figure'].dark).not.toBe(TOKEN_VALUES['art-surface'].dark)
+  })
+
+  it('旧现状必须真的不达标（钉住“为什么需要这个令牌”，防止被当成过度设计删掉）', () => {
+    // 这两个数字是本轮实测写进注释的；如果哪天它们不再低于 3.0，说明场景色/卡片底变了，
+    // 需要重新评估本令牌是否保留，而不是默认它永远必要。
+    expect(contrastRatio(TOKEN_VALUES['art-surface'].dark, SCENE_AI)).toBeLessThan(3.0)
+    expect(contrastRatio(TOKEN_VALUES['art-surface'].dark, CARD)).toBeLessThan(3.0)
+  })
+})
+
+/**
  * 品牌橙实底上的玻璃面板族（门户 hero 顶部搜索框 = 用户报的图2）。
  *
  * 为何必须单独一组：族令牌的背板不是 surface-*，而是**品牌橙渐变本身**。

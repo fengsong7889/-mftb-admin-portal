@@ -567,6 +567,32 @@ export default function Home() {
   /* ── 當前引擎（模型通道 / 使用權限）── */
   const [engine, setEngine] = useState<LlmEngineStatus | null>(null)
 
+  /**
+   * 引擎路由結果有三個寫入點：60s 輪詢、用戶手動切換、受限清單校正。
+   * 不收敛會出兩類真實後果：
+   * ① 並發覆蓋：輪詢與用戶點選幾乎同時發起時，慢的那個會用舊數據蓋掉剛切好的結果，
+   *    膠囊退回用戶上一次的模式；
+   * ② 卸載後落地：請求在飛時離開首頁，`.then` 仍會 setState。生產裡是一次無效更新，
+   *    測試裡表現為 CI 偶發 `ReferenceError: window is not defined`（React 往已關閉的
+   *    jsdom 提交渲染）—— 該現象在 main 上近 6 次跑裡紅 2 次。
+   * 所以統一走「最新請求勝出」：序號不是最新的不落，組件已卸載的不落。
+   * mountedRef 的置真必須寫在 setup 裡（而不是只在 cleanup 置假）：StrictMode 會走
+   * setup→cleanup→setup，不在 setup 復位的話從第二次掛載起就永久認為自己未掛載。
+   */
+  const engineMountedRef = useRef(true)
+  const engineReqSeqRef = useRef(0)
+  useEffect(() => {
+    engineMountedRef.current = true
+    return () => { engineMountedRef.current = false }
+  }, [])
+  const loadEngine = useCallback(() => {
+    const seq = ++engineReqSeqRef.current
+    return fetchEngineStatus().then((s) => {
+      if (engineMountedRef.current && seq === engineReqSeqRef.current) setEngine(s)
+      return s
+    })
+  }, [])
+
   /* ── 上下文窗口 & 思考模式設定 ── */
   const [contextWindow, setContextWindow] = useState<number | null>(null)
   const [thinkingEnabled, setThinkingEnabled] = useState(false)
@@ -676,12 +702,10 @@ export default function Home() {
 
   /** 定時刷新引擎路由結果（手動切換 / 代理重啟後同步到膠囊） */
   useEffect(() => {
-    let cancelled = false
-    const load = () => fetchEngineStatus().then((s) => { if (!cancelled) setEngine(s) })
-    load()
-    const timer = setInterval(load, 60000)
-    return () => { cancelled = true; clearInterval(timer) }
-  }, [])
+    loadEngine()
+    const timer = setInterval(loadEngine, 60000)
+    return () => { clearInterval(timer) }
+  }, [loadEngine])
 
   /** 加載我的授權模型；並分別探測兩條通道得到網關真實接入的模型清單 */
   useEffect(() => {
@@ -1512,7 +1536,7 @@ export default function Home() {
     }
     setEngineMode(next)
     aiSettingsDirtyRef.current = true
-    fetchEngineStatus().then(setEngine)
+    loadEngine()
     if (next === 'auto' && deniedChannels.length > 0) {
       showAutoLimitedModal(deniedChannels)
       return
@@ -1525,7 +1549,7 @@ export default function Home() {
     if ((engineMode === 'primary' || engineMode === 'off-peak') && deniedChannels.includes(engineMode)) {
       setEngineMode('auto')
       aiSettingsDirtyRef.current = true
-      fetchEngineStatus().then(setEngine)
+      loadEngine()
       message.info(t('home.engineAutoSwitchMsg', { model: modelDisplayName(modeModelKey(engineMode)) ?? engineMode }))
     }
   }, [engineMode, deniedChannels]) // eslint-disable-line react-hooks/exhaustive-deps
