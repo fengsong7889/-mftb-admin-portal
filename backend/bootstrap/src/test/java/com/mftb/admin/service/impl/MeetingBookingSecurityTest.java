@@ -197,19 +197,38 @@ class MeetingBookingSecurityTest {
     /* ==================== 冲突与并发 ==================== */
 
     @Test
-    @DisplayName("同房间同窗口已有占用单时直接拒绝，并把冲突单号与组织者写进提示")
+    @DisplayName("同房间同窗口已有占用单时直接拒绝：单号与时段必给，但主题与组织者只对能读这场会的人给")
     void roomConflictIsRejectedWithReadableDetail() {
         MeetingBooking occupied = booking(9L, MeetingConstants.STATUS_BOOKED, ATTENDEE.getId());
         occupied.setTitle("競品對標");
         occupied.setOrganizerName("趙六");
         when(bookingMapper.findRoomConflicts(eq(1L), any(), any(), isNull())).thenReturn(List.of(occupied));
 
+        // 当前登录人 ORGANIZER 与这场占用会无关（不是组织者、不是参会人、不是行政）
         BusinessException ex = assertThrows(BusinessException.class, () -> service.create(createForm("k-1")));
         assertTrue(ex.getMessage().contains("已被佔用"), ex.getMessage());
         assertTrue(ex.getMessage().contains(occupied.getBookingNo()), "提示必须包含占位的單號：" + ex.getMessage());
-        assertTrue(ex.getMessage().contains("趙六"), "提示必须包含组织者：" + ex.getMessage());
+        // 单号与时段是解决冲突必需的；而主题与组织者姓名属于他人会议的内容。
+        // 旧实现无条件拼全，任何能提交预约的人靠一次撞车就能拿到「某人在某时段开了什么会」
+        // （2026-11-06 E2E 用低权限账号实测到）。所以这里断言的是不泄露。
+        assertFalse(ex.getMessage().contains("趙六"), "非相关人不得拿到他人会议的组织者：" + ex.getMessage());
+        assertFalse(ex.getMessage().contains("競品對標"), "非相关人不得拿到他人会议的主题：" + ex.getMessage());
         verify(bookingMapper, never()).insert(any(MeetingBooking.class));
         verify(notifyDispatcher, never()).enqueue(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("能读那场冲突会的人（行政视野）仍拿到完整冲突详情：只拦不可读的人，不弱化协调能力")
+    void roomConflictKeepsFullDetailForReader() {
+        MeetingBooking occupied = booking(9L, MeetingConstants.STATUS_BOOKED, ATTENDEE.getId());
+        occupied.setTitle("競品對標");
+        occupied.setOrganizerName("趙六");
+        when(bookingMapper.findRoomConflicts(eq(1L), any(), any(), isNull())).thenReturn(List.of(occupied));
+        when(guard.canSeeAll(ORGANIZER)).thenReturn(true);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.create(createForm("k-2")));
+        assertTrue(ex.getMessage().contains("趙六"), "可读的人必须拿到组织者：" + ex.getMessage());
+        assertTrue(ex.getMessage().contains("競品對標"), "可读的人必须拿到主题：" + ex.getMessage());
     }
 
     @Test

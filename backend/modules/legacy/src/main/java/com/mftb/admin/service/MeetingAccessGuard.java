@@ -1,6 +1,8 @@
 package com.mftb.admin.service;
 
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.common.PermissionDeniedException;
+import com.mftb.admin.common.ResultCode;
 import com.mftb.admin.constant.MeetingConstants;
 import com.mftb.admin.entity.MeetingAttendee;
 import com.mftb.admin.entity.MeetingBooking;
@@ -38,7 +40,9 @@ public class MeetingAccessGuard {
     public SysUser currentUser() {
         SysUser user = operatorResolver.currentUser();
         if (user == null) {
-            throw new BusinessException("登錄狀態失效，請重新登錄");
+            // 必须是 401 而不是业务码 500：这句话本身就是「请重新登录」，
+            // 给 500 时前端只弹 toast、不跳登录页，用户会停在一片拿不到数据的界面上反复重试
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "登錄狀態失效，請重新登錄");
         }
         return user;
     }
@@ -62,7 +66,7 @@ public class MeetingAccessGuard {
     /** 会议室档案写入的统一守卫：写方法只调这一句，不把权限判断漏到服务层各个分支里 */
     public void requireRoomManage(SysUser user) {
         if (!canManageRoom(user)) {
-            throw new BusinessException("無權維護會議室檔案，請在「會議室檔案」由行政操作");
+            throw PermissionDeniedException.denied("無權維護會議室檔案，請在「會議室檔案」由行政操作");
         }
     }
 
@@ -93,14 +97,14 @@ public class MeetingAccessGuard {
      */
     public void requireRecordManager(SysUser user) {
         if (!canOperateRecords(user)) {
-            throw new BusinessException("無權修改預約規則或黑名單，請在「預約記錄」由行政操作");
+            throw PermissionDeniedException.denied("無權修改預約規則或黑名單，請在「預約記錄」由行政操作");
         }
     }
 
     /** 列表可见范围：非行政视野只能看到与自己相关的会议 */
     public void requireSeeAll(boolean seeAll) {
         if (!seeAll) {
-            throw new BusinessException("無權查看全部預約記錄，請在「我的會議」查看與您相關的會議");
+            throw PermissionDeniedException.denied("無權查看全部預約記錄，請在「我的會議」查看與您相關的會議");
         }
     }
 
@@ -117,7 +121,7 @@ public class MeetingAccessGuard {
         if (attendeeMapper.countAttendee(booking.getId(), current.getId()) > 0) {
             return;
         }
-        throw new BusinessException("無權查看該會議");
+        throw PermissionDeniedException.denied("無權查看該會議");
     }
 
     /**
@@ -130,7 +134,7 @@ public class MeetingAccessGuard {
         if (isOrganizer(booking, current) || canOperateRecords(current)) {
             return;
         }
-        throw new BusinessException("只有會議組織者或行政可以變更或取消該會議");
+        throw PermissionDeniedException.denied("只有會議組織者或行政可以變更或取消該會議");
     }
 
     public boolean isOrganizer(MeetingBooking booking, SysUser current) {
@@ -177,7 +181,7 @@ public class MeetingAccessGuard {
             return null;
         }
         if (!canOperateRecords(operator)) {
-            throw new BusinessException("僅行政可替他人預訂會議，請由本人自行預約");
+            throw PermissionDeniedException.denied("僅行政可替他人預訂會議，請由本人自行預約");
         }
         SysUser delegate = userMapper.selectById(delegateForId);
         if (delegate == null) {
@@ -192,7 +196,7 @@ public class MeetingAccessGuard {
     /** 参会人必须是本人或行政：响应与签到都属于"替自己表态"的动作 */
     public void requireSelfOrAdmin(long targetUserId, SysUser current) {
         if (!Objects.equals(targetUserId, current.getId()) && !isAdmin(current)) {
-            throw new BusinessException("只能為本人執行該操作");
+            throw PermissionDeniedException.denied("只能為本人執行該操作");
         }
     }
 }

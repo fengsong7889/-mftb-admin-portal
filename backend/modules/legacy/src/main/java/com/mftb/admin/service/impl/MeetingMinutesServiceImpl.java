@@ -3,6 +3,7 @@ package com.mftb.admin.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.common.PermissionDeniedException;
 import com.mftb.admin.constant.MeetingConstants;
 import com.mftb.admin.dto.MeetingMinutesContent;
 import com.mftb.admin.dto.MeetingMinutesDto;
@@ -1309,7 +1310,9 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         requireEnabled();
         SysUser current = guard.currentUser();
         if (!guard.canOperateRecords(current)) {
-            throw new BusinessException("無權查看全部會議紀要");
+            // 这句话本身已经明确说出「无权」，所以给 403 不增加任何暂露面；
+            // 继续给业务码 500 会把「没授权」与「服务端出错」压成同一个信号
+            throw PermissionDeniedException.denied("無權查看全部會議紀要");
         }
         StringBuilder where = new StringBuilder(" WHERE m.deleted = 0");
         List<Object> params = new ArrayList<>();

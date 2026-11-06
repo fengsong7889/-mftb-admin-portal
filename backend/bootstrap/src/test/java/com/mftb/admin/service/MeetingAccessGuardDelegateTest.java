@@ -1,6 +1,7 @@
 package com.mftb.admin.service;
 
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.common.PermissionDeniedException;
 import com.mftb.admin.constant.MeetingConstants;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.MeetingAttendeeMapper;
@@ -80,7 +81,11 @@ class MeetingAccessGuardDelegateTest {
         when(permissionService.hasPermission(operator, MeetingConstants.MENU_RECORD, MeetingConstants.ACTION_EDIT))
                 .thenReturn(false);
 
-        BusinessException ex = assertThrows(BusinessException.class,
+        // 必须是 PermissionDeniedException（由 GlobalExceptionHandler 转成业务码 403），
+        // 不能再是裸 BusinessException：旧实现把「用户没被授权」与「服务端出错」都吐成 code 500，
+        // 监控告警、客户端分支、审计统计全部失真（2026-11-06 E2E 实测 6 条越权拒绝全为 500）。
+        // 拒绝文案与「不查人」两条断言原样保留——本次只改错误码语义，不放宽判定也不改话术。
+        PermissionDeniedException ex = assertThrows(PermissionDeniedException.class,
                 () -> guard.resolveDelegateFor(9L, operator));
         assertTrue(ex.getMessage().contains("僅行政"), ex.getMessage());
         verify(userMapper, never()).selectById(9L);

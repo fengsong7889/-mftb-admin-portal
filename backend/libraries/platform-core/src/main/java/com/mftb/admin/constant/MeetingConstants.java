@@ -27,6 +27,27 @@ public final class MeetingConstants {
     private MeetingConstants() {
     }
 
+    /* ==================== 外部参会人容量口径（明细行 / 顿号快照 / DDL 三处同源） ==================== */
+
+    /**
+     * 单场会外部参会人上限。
+     * <p>明细行与顿号快照必须共用本数：旧实现行上 {@code .limit(50)}、快照只按 500 字符
+     * 截断且不限条数，100 人提交时行存 50、快照存 85、{@code attendee_count=51}，
+     * 三个数互相矛盾，而前端编辑回填读的是快照——每改一次名单就飘一次（2026-11-06 E2E 实测）。
+     */
+    public static final int MAX_EXTERNAL_ATTENDEES = 50;
+
+    /** 外部人姓名列宽（与 {@code biz_meeting_attendee.name VARCHAR(64)} 一致） */
+    public static final int EXTERNAL_NAME_MAX = 64;
+
+    /**
+     * 顿号快照列宽（与 {@code biz_meeting_booking.external_attendees} 一致）。
+     * <p>预算：{@value #MAX_EXTERNAL_ATTENDEES} 人 × {@value #EXTERNAL_NAME_MAX} 字
+     * + 49 个顿号 = 3249，预留整数到 3300。旧实现是 VARCHAR(500)，装不下 50 个长姓名，
+     * 只能靠 {@code substring} 截断——那会把姓名从中间切断。由 meeting:schema:v1.3 拓宽。
+     */
+    public static final int EXTERNAL_SNAPSHOT_MAX = 3300;
+
     /* ==================== 菜单 key（与 MeetingMenuInitializer 种子一一对应） ==================== */
 
     /** 我的会议：员工视角的日程与邀约响应 */

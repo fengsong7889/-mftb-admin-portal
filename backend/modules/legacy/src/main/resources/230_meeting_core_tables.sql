@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS biz_meeting_booking (
     attendee_count     INT           NOT NULL DEFAULT 1 COMMENT '参会人数（含组织者与外部人员）',
     description        VARCHAR(1000) NULL COMMENT '会议议程',
     online_meeting_url VARCHAR(500)  NULL COMMENT '线上会议链接（腾讯会议/钉钉会议等，人工填写）',
-    external_attendees VARCHAR(500)  NULL COMMENT '外部参会人姓名快照，逗号分隔（无系统账号）',
+    external_attendees VARCHAR(3300) NULL COMMENT '外部参会人姓名快照，頓號分隔（無系統帳號）；寬度須容得下上限內全量名單，見 MeetingConstants.EXTERNAL_SNAPSHOT_MAX',
     status             VARCHAR(20)   NOT NULL DEFAULT 'booked' COMMENT '业务状态：booked/checked_in/finished/cancelled/released',
     cancel_reason      VARCHAR(300)  NULL COMMENT '取消原因（取消必须留原因）',
     cancelled_by       BIGINT        NULL COMMENT '取消操作人 sys_user.id',

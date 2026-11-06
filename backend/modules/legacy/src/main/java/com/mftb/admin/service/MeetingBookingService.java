@@ -82,8 +82,11 @@ public interface MeetingBookingService {
      */
     MeetingBookingDto.VO stateForCheckin(long id, SysUser participant);
 
-    /** 提前结束：写 actual_end_at 并把状态推入 finished，剩余窗口立即归还可被重订 */
-    MeetingBookingDto.VO finish(long id);
+    /**
+     * 提前结束：写 actual_end_at 并把状态推入 finished，剩余窗口立即归还可被重订。
+     * <p>form.note 选填，写入审计并附在参会人通知里（与代取消/释放同一套留痕口径）。
+     */
+    MeetingBookingDto.VO finish(long id, MeetingBookingDto.FinishForm form);
 
     /** 行政手动释放（记操作人与原因，与系统自动释放的事实列分开） */
     MeetingBookingDto.VO release(long id, MeetingBookingDto.ReleaseForm form);

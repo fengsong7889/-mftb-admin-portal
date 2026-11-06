@@ -242,8 +242,15 @@ class MeetingBookingLifecycleTest {
         LocalDateTime start = LocalDateTime.now().plusHours(1);
         when(bookingMapper.selectForUpdate(50L))
                 .thenReturn(booking(MeetingConstants.STATUS_BOOKED, start, start.plusHours(1)));
-        BusinessException ex = assertThrows(BusinessException.class, () -> service.finish(50L));
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> service.finish(50L, finishForm(null)));
         assertTrue(ex.getMessage().contains("尚未開始"), ex.getMessage());
+    }
+
+    private static MeetingBookingDto.FinishForm finishForm(String note) {
+        MeetingBookingDto.FinishForm form = new MeetingBookingDto.FinishForm();
+        form.setNote(note);
+        return form;
     }
 
     @Test
@@ -258,11 +265,39 @@ class MeetingBookingLifecycleTest {
         when(bookingMapper.selectById(50L)).thenReturn(after);
         when(roomMapper.selectById(1L)).thenReturn(room(1));
 
-        service.finish(50L);
+        service.finish(50L, finishForm(null));
 
         verify(bookingMapper).update(isNull(), any());
         verify(notifyDispatcher).enqueue(any(), eq(MeetingConstants.NOTIFY_EVT_FINISHED),
                 eq(MeetingConstants.SCENARIO_OPS), any(), any());
+        // 没填散会说明时审计 reason 保持 null：不能为了“看起来有留痕”而编造内容
+        verify(auditRecorder).recordBooking(eq(50L), eq(1L), any(), eq(MeetingConstants.EVENT_FINISH),
+                isNull(), any(), any(), eq(ORGANIZER), isNull());
+    }
+
+    @Test
+    @DisplayName("提前结束的散会说明同时进审计与通知：只报一个时间戳，参会人不知道为什么提前散")
+    void finishNotePropagatesToAuditAndNotify() {
+        LocalDateTime start = LocalDateTime.now().minusMinutes(10);
+        when(bookingMapper.selectForUpdate(50L))
+                .thenReturn(booking(MeetingConstants.STATUS_CHECKED_IN, start, start.plusHours(2)));
+        when(bookingMapper.update(isNull(), any())).thenReturn(1);
+        MeetingBooking after = booking(MeetingConstants.STATUS_FINISHED, start, start.plusHours(2));
+        after.setActualEndAt(LocalDateTime.now());
+        when(bookingMapper.selectById(50L)).thenReturn(after);
+        when(roomMapper.selectById(1L)).thenReturn(room(1));
+
+        service.finish(50L, finishForm("需求已確認完畢，提前散會"));
+
+        ArgumentCaptor<String> reason = ArgumentCaptor.forClass(String.class);
+        verify(auditRecorder).recordBooking(eq(50L), eq(1L), any(), eq(MeetingConstants.EVENT_FINISH),
+                reason.capture(), any(), any(), eq(ORGANIZER), isNull());
+        assertEquals("需求已確認完畢，提前散會", reason.getValue());
+
+        ArgumentCaptor<String> detail = ArgumentCaptor.forClass(String.class);
+        verify(notifyDispatcher).enqueue(any(), eq(MeetingConstants.NOTIFY_EVT_FINISHED),
+                eq(MeetingConstants.SCENARIO_OPS), any(), detail.capture());
+        assertTrue(detail.getValue().contains("需求已確認完畢，提前散會"), detail.getValue());
     }
 
     @Test

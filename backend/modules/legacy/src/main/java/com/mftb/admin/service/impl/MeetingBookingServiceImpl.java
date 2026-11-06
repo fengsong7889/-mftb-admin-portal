@@ -41,6 +41,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -796,8 +797,9 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public MeetingBookingDto.VO finish(long id) {
+    public MeetingBookingDto.VO finish(long id, MeetingBookingDto.FinishForm form) {
         SysUser current = guard.currentUser();
+        String note = trimToEmpty(form == null ? null : form.getNote());
         MeetingBooking booking = bookingMapper.selectForUpdate(id);
         if (booking == null) {
             throw new BusinessException("會議記錄不存在或已刪除");
@@ -821,10 +823,15 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
             throw new BusinessException("會議狀態已變更，請刷新後重試");
         }
         MeetingBooking after = requireBooking(id);
+        // 散会说明写入审计 reason 并附进通知：没填时保持原行为（只报时间），不编造内容
         auditRecorder.recordBooking(id, after.getRoomId(), after.getBookingNo(),
-                MeetingConstants.EVENT_FINISH, null, snapshot(booking), snapshot(after), current, null);
+                MeetingConstants.EVENT_FINISH, note.isEmpty() ? null : note,
+                snapshot(booking), snapshot(after), current, null);
         notifyDispatcher.enqueue(after, MeetingConstants.NOTIFY_EVT_FINISHED, MeetingConstants.SCENARIO_OPS,
-                inviteReceivers(attendeeMapper.findByBooking(id)), "會議已提前結束：" + now.format(FMT_TIME));
+                inviteReceivers(attendeeMapper.findByBooking(id)),
+                note.isEmpty()
+                        ? "會議已提前結束：" + now.format(FMT_TIME)
+                        : "會議已提前結束：" + now.format(FMT_TIME) + "；" + note);
         return toVO(after, current, roomMapper.selectById(after.getRoomId()));
     }
 
@@ -1254,19 +1261,50 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
             }
         }
         if (externals != null) {
-            externals.stream().filter(StringUtils::hasText).map(String::trim).distinct()
-                    .limit(50)
-                    .forEach(name -> {
-                        MeetingAttendee row = new MeetingAttendee();
-                        row.setName(name.length() > 64 ? name.substring(0, 64) : name);
-                        row.setAttendeeType(MeetingConstants.ATTENDEE_EXTERNAL);
-                        row.setResponse(MeetingConstants.RESPOND_ACCEPTED);
-                        row.setNotifyStatus(MeetingConstants.NOTIFY_SKIPPED);
-                        row.setNotifyNote("外部參會人無系統帳號");
-                        rows.add(row);
-                    });
+            normalizeExternalNames(externals).forEach(name -> {
+                MeetingAttendee row = new MeetingAttendee();
+                row.setName(name);
+                row.setAttendeeType(MeetingConstants.ATTENDEE_EXTERNAL);
+                row.setResponse(MeetingConstants.RESPOND_ACCEPTED);
+                row.setNotifyStatus(MeetingConstants.NOTIFY_SKIPPED);
+                row.setNotifyNote("外部參會人無系統帳號");
+                rows.add(row);
+            });
         }
         return rows;
+    }
+
+    /**
+     * 归一化外部名单：去空白、trim、去重、保序，并在此处裁决条数与单名长度。
+     * <p>落库的两处（明细行与顿号快照）必须走同一个方法，否则两边对同一次提交
+     * 算出不同的名单——那正是 P1-2 与旧上限问题的根源。
+     * <p><b>超限明确拒绝，不静默截断</b>：截断条数等于组织者以为 100 个人都收到了会议，
+     * 而到场名单只有 50 个，这个落差比报错难查得多；截断姓名同理——旧实现把 65 字的
+     * 名字剪成 64 字，两个共享前缀的长名字会变成同一个「人」，同步时直接被当成同一个人处理。
+     * <p>上限真值在 {@link MeetingConstants#MAX_EXTERNAL_ATTENDEES}，与 DDL 列宽同源。
+     */
+    static List<String> normalizeExternalNames(List<String> names) {
+        if (names == null) {
+            return List.of();
+        }
+        List<String> normalized = names.stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .distinct()
+                .toList();
+        if (normalized.size() > MeetingConstants.MAX_EXTERNAL_ATTENDEES) {
+            throw new BusinessException("外部參會人最多 " + MeetingConstants.MAX_EXTERNAL_ATTENDEES + " 人，當前 "
+                    + normalized.size() + " 人，請精簡名單後重新提交");
+        }
+        List<String> tooLong = normalized.stream()
+                .filter(name -> name.length() > MeetingConstants.EXTERNAL_NAME_MAX)
+                .toList();
+        if (!tooLong.isEmpty()) {
+            throw new BusinessException("外部參會人姓名最長 " + MeetingConstants.EXTERNAL_NAME_MAX + " 字，超長："
+                    + String.join("、", tooLong.stream().map(name -> name.substring(0, 12) + "…")
+                    .limit(3).toList()));
+        }
+        return normalized;
     }
 
     /**
@@ -1274,16 +1312,50 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
      *
      * <p>已存在的人保留其响应记录（一个人已经"接受"过，不该因为组织者改了议程就被重置），
      * 只有时间/房间变化时才整体重置（见 {@link #resetResponses}）。
+     *
+     * <p><b>外部参会人必须按姓名快照对齐，不能无条件 insert</b>：旧实现的
+     * {@code existingByUser} 只收 {@code userId != null} 的行，而外部人 {@code userId} 恒为 NULL，
+     * 于是 desired 里每条外部人都走「insert 新行」，而删除分支遍历的还是同一个 map、
+     * 永远碰不到旧外部行——结果是<b>每保存一次就把整份外部名单再追加一份</b>。
+     * 2026-11-06 E2E 实测：一场 6 人的会被编辑两次后，明细表积到 10 行，
+     * 详情页表头「共 10 人」与基本信息「参会人数 6 人」同屏打架（attendee_count 是按
+     * desired 算的，所以它是对的，脏的是明细行）。数据库也拦不住：
+     * {@code uk_meeting_attendee} 生成列只在 {@code user_id IS NOT NULL} 时取值，
+     * 外部行取到 NULL，而 MySQL 唯一索引视 NULL 互不相异。
+     *
+     * <p>本实现同时负责<b>自愈</b>：把库里已存在的重复外部行按姓名归组，只留 id 最小的一行，
+     * 其余一并逻辑删除——这样历史脏数据不需要等一次独立回填就能收敛。
      */
     private void syncAttendees(long bookingId, List<MeetingAttendee> desired, SysUser operator) {
         List<MeetingAttendee> existing = attendeeMapper.findByBooking(bookingId);
         Map<Long, MeetingAttendee> existingByUser = existing.stream()
                 .filter(row -> row.getUserId() != null)
                 .collect(Collectors.toMap(MeetingAttendee::getUserId, row -> row, (left, right) -> left));
+        // 外部人按姓名归组（不是 toMap）：同一姓名可能有历史重复行，全部留下就分不清该删谁
+        Map<String, List<MeetingAttendee>> existingByExternalName = new LinkedHashMap<>();
+        for (MeetingAttendee row : existing) {
+            if (row.getUserId() != null) {
+                continue;
+            }
+            existingByExternalName.computeIfAbsent(externalKey(row.getName()),
+                    key -> new ArrayList<>()).add(row);
+        }
+        // 按 id 升序固定「留哪一行」：不排序则保留谁取决于查询返回顺序，同一份数据重跑两次
+        // 可能删掉不同的行，对账与回归测试都无从判定
+        existingByExternalName.values().forEach(rows -> rows.sort(Comparator.comparing(MeetingAttendee::getId)));
 
         Set<Long> keep = new LinkedHashSet<>();
+        Set<String> keepExternal = new LinkedHashSet<>();
         for (MeetingAttendee row : desired) {
             if (row.getUserId() == null) {
+                String key = externalKey(row.getName());
+                keepExternal.add(key);
+                List<MeetingAttendee> oldRows = existingByExternalName.get(key);
+                if (oldRows != null && !oldRows.isEmpty()) {
+                    // 已在名单里：保留最早那一行（保住创建时间与审计），多出来的重复行删掉
+                    oldRows.stream().skip(1).forEach(duplicate -> attendeeMapper.deleteById(duplicate.getId()));
+                    continue;
+                }
                 row.setBookingId(bookingId);
                 row.setCreatedBy(operator.getName());
                 row.setUpdatedBy(operator.getName());
@@ -1309,6 +1381,20 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
                 .filter(entry -> !keep.contains(entry.getKey())
                         && !MeetingConstants.ATTENDEE_ORGANIZER.equals(entry.getValue().getAttendeeType()))
                 .forEach(entry -> attendeeMapper.deleteById(entry.getValue().getId()));
+        // 被移出的外部人：同样按姓名判定。旧实现漏掉这一路，才让重复行只增不减。
+        existingByExternalName.entrySet().stream()
+                .filter(entry -> !keepExternal.contains(entry.getKey()))
+                .flatMap(entry -> entry.getValue().stream())
+                .forEach(row -> attendeeMapper.deleteById(row.getId()));
+    }
+
+    /**
+     * 外部参会人的对齐键：外部行没有 userId，只能拿姓名快照当身份。
+     * <p>与 {@link #normalizeExternalNames} 同口径（已 trim、已校长度），
+     * 两边口径不一致就会「存的是截断值、比的是完整值」，每次编辑把同一个人再插一遍。
+     */
+    private static String externalKey(String name) {
+        return name == null ? "" : name.trim();
     }
 
     /** 时间或房间变了 → 全部非组织者响应重置为 pending：旧表态是针对旧安排做出的 */
@@ -1374,17 +1460,35 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
         }
     }
 
-    /** 冲突提示必须点名"被谁的哪场会占了"：只说"时段冲突"会让人反复试错 */
+    /**
+     * 冲突提示必须点名"被谁的哪场会占了"：只说"时段冲突"会让人反复试错。
+     *
+     * <p>但披露只到「够用来协调」为止，不是越多越好：单号与时段是解决冲突必需的，
+     * 而主题与组织者姓名属于他人会议的内容——旧实现无条件拼全，任何能提交预约的人
+     * 靠一次撞车就能拿到「某人在某时段开了什么会」，这是横向信息泄露
+     * （2026-11-06 E2E 用低权限账号验证）。因此只对能读这场会的人（行政视野 /
+     * 组织者 / 参会人）给全量，其余只给单号与时段。
+     */
     private BusinessException conflict(String head, List<MeetingBooking> conflicts) {
+        SysUser viewer = guard.currentUser();
         String detail = conflicts.stream().limit(3)
-                .map(booking -> String.format("%s「%s」（%s，%s–%s）",
-                        booking.getBookingNo(), booking.getTitle(),
-                        Objects.toString(booking.getOrganizerName(), ""),
-                        DateTimeUtils.format(booking.getStartTime()),
-                        DateTimeUtils.format(booking.getEndTime())))
+                .map(booking -> conflictDetail(booking, viewer))
                 .collect(Collectors.joining("；"));
         String more = conflicts.size() > 3 ? " 等 " + conflicts.size() + " 場" : "";
         return new BusinessException(head + "：" + detail + more);
+    }
+
+    /** 单条冲突的披露粒度：读得到就给主题与组织者，读不到就只给单号与时段 */
+    private String conflictDetail(MeetingBooking booking, SysUser viewer) {
+        boolean readable = guard.canSeeAll(viewer) || guard.isOrganizer(booking, viewer)
+                || attendeeMapper.countAttendee(booking.getId(), viewer.getId()) > 0;
+        String slot = DateTimeUtils.format(booking.getStartTime()) + "–" + DateTimeUtils.format(booking.getEndTime());
+        if (!readable) {
+            return String.format("%s（%s）", booking.getBookingNo(), slot);
+        }
+        return String.format("%s「%s」（%s，%s）",
+                booking.getBookingNo(), booking.getTitle(),
+                Objects.toString(booking.getOrganizerName(), ""), slot);
     }
 
     private void requireVersion(Integer expected, MeetingBooking booking) {
@@ -1767,13 +1871,34 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
                 .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
-    private static String joinExternal(List<String> names) {
-        if (names == null) {
+    /**
+     * 外部参会人的顿号快照。
+     * <p>与明细行走同一个 {@link #normalizeExternalNames}，两边算出的名单必须逐字一致：
+     * 前端编辑回填读的是本字段，不一致就会把行与快照的偏差带进下一次提交（旧实现快照
+     * 不限条数，100 人提交时行存 50、快照存 85，就是这个偏差）。
+     * <p>列宽兼容兼做最后一道：按整名逐条累加、不半路截断姓名（旧实现直接
+     * {@code substring(0,500)} 会把名字从中间切断）；正常路径下上限裁决已保证不溢出。
+     */
+    static String joinExternal(List<String> names) {
+        List<String> normalized = normalizeExternalNames(names);
+        if (normalized.isEmpty()) {
             return null;
         }
-        String joined = names.stream().filter(StringUtils::hasText).map(String::trim).distinct()
-                .collect(Collectors.joining("、"));
-        return joined.isEmpty() ? null : truncate(joined, 500);
+        StringBuilder joined = new StringBuilder();
+        for (String name : normalized) {
+            // 快照列宽预算（与 VARCHAR(3300) 同口径），预留顿号；上限裁决已保证不溢出，
+            // 这里只当最后一道安全网，触发即说明两处口径又飘了
+            int cost = name.length() + (joined.isEmpty() ? 0 : 1);
+            if (joined.length() + cost > MeetingConstants.EXTERNAL_SNAPSHOT_MAX) {
+                log.warn("外部參會人快照超出列宽，已停止追加：已写入 {} / 共 {} 人", joined.length(), normalized.size());
+                break;
+            }
+            if (!joined.isEmpty()) {
+                joined.append('、');
+            }
+            joined.append(name);
+        }
+        return joined.isEmpty() ? null : joined.toString();
     }
 
     private static String displayName(SysUser user) {
@@ -1794,12 +1919,5 @@ public class MeetingBookingServiceImpl implements MeetingBookingService {
 
     private static String trimToEmpty(String value) {
         return value == null ? "" : value.trim();
-    }
-
-    private static String truncate(String value, int max) {
-        if (value == null) {
-            return null;
-        }
-        return value.length() > max ? value.substring(0, max) : value;
     }
 }

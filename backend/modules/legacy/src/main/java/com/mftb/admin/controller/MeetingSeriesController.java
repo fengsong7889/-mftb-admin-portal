@@ -88,11 +88,12 @@ public class MeetingSeriesController {
         return Result.success("簽到成功", bookingService.checkin(id));
     }
 
-    /** 提前结束：写实际结束时间并立即归还剩余窗口 */
+    /** 提前结束：写实际结束时间并立即归还剩余窗口（散会说明选填，留痕用） */
     @PostMapping("/bookings/{id}/finish")
     @RequirePermission(menu = MY, action = MeetingConstants.ACTION_EDIT, anyOf = {BOOKING, RECORD})
-    public Result<MeetingBookingDto.VO> finish(@PathVariable long id) {
-        return Result.success("會議已結束", bookingService.finish(id));
+    public Result<MeetingBookingDto.VO> finish(@PathVariable long id,
+                                               @RequestBody(required = false) @Valid MeetingBookingDto.FinishForm form) {
+        return Result.success("會議已結束", bookingService.finish(id, form));
     }
 
     /** 行政手动释放（与系统自动释放在事实列上分列，必须留原因） */

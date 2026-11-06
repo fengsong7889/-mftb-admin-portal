@@ -193,6 +193,19 @@ public final class MeetingBookingDto {
         private Integer version;
     }
 
+    /**
+     * 提前结束。
+     * <p>note 选填：与「代取消必填原因」「释放必填原因」对齐同一套询问习惯——
+     * 收尾是正常散会不是异常，所以不强制；但行政想写一句「需求已确认完，提前散会」时
+     * 必须有一个地方能写，否则审计与通知里只剩一个时间戳，参会人不知道为什么提了前。
+     * 旧实现根本没有这个入口（2026-11-06 E2E 实测）。
+     */
+    @Data
+    public static class FinishForm {
+        @Size(max = 300, message = "散會說明最長 300 字")
+        private String note;
+    }
+
     /** 参会人响应邀约 */
     @Data
     public static class ResponseForm {

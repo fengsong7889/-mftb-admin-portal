@@ -104,6 +104,12 @@ public class MeetingRoomServiceImpl implements MeetingRoomService {
         room.setStatus(defaultStatus(form.getStatus()));
         room.setApprovalRequired(0);
         room.setVersion(0);
+        // 创建人/最后更新人必须在创建时就写上：这两列 NOT NULL DEFAULT ''，不写就是空串，
+        // 列表的「最后更新」列会只显示时间不显示人，直到第一次编辑才被回填——
+        // 而新建后那段时间恰恰是最该能回答「这间房是谁建的」（2026-11-06 E2E 实测）。
+        // 审计表里有操作人，但台账列不读审计，补上写入侧才算口径一致。
+        room.setCreatedBy(current.getName());
+        room.setUpdatedBy(current.getName());
         try {
             roomMapper.insert(room);
         } catch (org.springframework.dao.DuplicateKeyException e) {

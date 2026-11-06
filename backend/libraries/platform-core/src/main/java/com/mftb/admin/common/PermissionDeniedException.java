@@ -46,4 +46,18 @@ public class PermissionDeniedException extends RuntimeException {
     public static PermissionDeniedException outOfDataScope(String target) {
         return new PermissionDeniedException("僅能查看與操作本人的資料，無法訪問" + target, true);
     }
+
+    /**
+     * 领域内已定稿的授权拒绝文案（带下一步指引，如「請在「會議室檔案」由行政操作」）。
+     *
+     * <p>为什么需要这个入口而不是 {@code new BusinessException(...)}：业务码 500 会把
+     * 「用户没被授权」与「服务端出错」压成同一个信号，监控告警、客户端分支、
+     * 审计统计都会失真（2026-11-06 会议域 E2E 实测：6 条越权拒绝全返回 HTTP 200 + code 500）。
+     * <p>只用于**本来就已经明确说出「无权」**的文案：那些话术已经把拒绝理由透露给用户了，
+     * 换成 403 不增加任何信息暂面。反之，故意用「不存在」来防 id 枚举的判定不得改到这里来，
+     * 那是补偿控制而不是缺陷。
+     */
+    public static PermissionDeniedException denied(String message) {
+        return new PermissionDeniedException(message, true);
+    }
 }

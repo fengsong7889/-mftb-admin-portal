@@ -99,6 +99,18 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
      */
     static final String VERSION_SCHEMA_V12 = "meeting:schema:v1.2";
 
+    /**
+     * v1.3：外部参会人顿号快照列宽由 VARCHAR(500) 拓宽到
+     * {@link MeetingConstants#EXTERNAL_SNAPSHOT_MAX}。
+     *
+     * <p>为什么单独一个版本键：500 根装不下「50 人 × 64 字」的合法名单（预算 3249），
+     * 旧实现只能靠 substring 截断，那会把姓名从中间切断；而列宽与上限不同源时，
+     * 快照与明细行必然分叉（2026-11-06 实测 100 人提交：行存 50、快照存 85）。
+     * 已跑过 v1.2 的库不会重跑旧 task，写进 230 对存量环境等于没改。
+     * <p>拓宽是非破坏性变更（不丢数据、不动类型），回滚只需改回窄列且先确认无长名单。
+     */
+    static final String VERSION_SCHEMA_V13 = "meeting:schema:v1.3";
+
     /** 黑名單菜單 key（與 MeetingConstants.MENU_BLACKLIST 一致） */
     private static final String MENU_BLACKLIST_KEY = MeetingConstants.MENU_BLACKLIST;
 
@@ -106,6 +118,8 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
     private static final String SCHEMA_SCRIPT_M2 = "231_meeting_series_blacklist.sql";
     /** 会议类型白名单放宽的参考脚本（实际执行由 doBizTypeExpand 带守卫完成） */
     private static final String BIZ_TYPE_SCRIPT = "331_meeting_biz_type_expand.sql";
+    /** 外部参会人快照列宽拓宽的参考脚本（实际执行由 doExternalSnapshotWidth 带守卫完成） */
+    private static final String EXTERNAL_WIDTH_SCRIPT = "333_meeting_external_snapshot_width.sql";
 
     private static final String SYSTEM_CODE = SystemCode.MEETING.code();
     private static final String ADMIN_ROLE_CODE = "admin";
@@ -319,6 +333,8 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce(VERSION_MENU_V13, this::doMenuPromoteUsage, this::verifyMenuPromoteUsage);
         versionTracker.applyOnce(VERSION_MENU_V14, this::doMenuReservationSplit, this::verifyMenuReservationSplit);
         versionTracker.applyOnce(VERSION_SCHEMA_V12, this::doBizTypeExpand, this::verifyBizTypeExpand);
+        // v1.3：外部参会人快照列宽必须能容纳上限内的全量名单，否则与明细行分叉
+        versionTracker.applyOnce(VERSION_SCHEMA_V13, this::doExternalSnapshotWidth, this::verifyExternalSnapshotWidth);
         // 移出 applyOnce 的部分每次启动重放：版本已记录的库不会重跑 task，
         // 编号规则/场景/配置的展示元数据若只写在 task 里，改动永远不会落到已有环境
         syncSeqRule();
@@ -425,6 +441,54 @@ public class MeetingSchemaMigrationInitializer implements CommandLineRunner {
                 throw new IllegalStateException("會議類型 CHECK 未包含 " + value + "（實際：" + actual + "）");
             }
         }
+    }
+
+    /* ==================== v1.3：外部参会人快照列宽 ==================== */
+
+    /**
+     * 把 {@code biz_meeting_booking.external_attendees} 拓宽到能容纳上限内的全量外部名单。
+     *
+     * <p>守卫取实际列宽而不是直接 ALTER：已经是目标宽度的库（含新库由 230 脚本直接建对）
+     * 不应再跑一次 DDL——ALTER 在 InnoDB 上即使无变化也要重建表。
+     * <p>列不存在直接抛出而不静默跳过：那意味着建表脚本没跑到位，把“宽不了”当成
+     * “已迁移”会让下次启动不再重试，快照与明细行的分叉就永久留在库里。
+     */
+    private void doExternalSnapshotWidth() {
+        Integer width = queryExternalSnapshotWidth();
+        if (width == null) {
+            throw new IllegalStateException("biz_meeting_booking.external_attendees 列不存在，无法确认快照列宽");
+        }
+        if (width >= MeetingConstants.EXTERNAL_SNAPSHOT_MAX) {
+            log.info("biz_meeting_booking.external_attendees 已是 {} 字，无需拓宽", width);
+            return;
+        }
+        jdbcTemplate.execute("ALTER TABLE biz_meeting_booking MODIFY COLUMN external_attendees VARCHAR("
+                + MeetingConstants.EXTERNAL_SNAPSHOT_MAX + ") NULL "
+                + "COMMENT '外部參會人姓名快照，頓號分隔（無系統帳號）；列寬必須容得下上限內全量名單'");
+        log.info("已拓寬 biz_meeting_booking.external_attendees：{} → {}（參考腳本 {}）",
+                width, MeetingConstants.EXTERNAL_SNAPSHOT_MAX, EXTERNAL_WIDTH_SCRIPT);
+    }
+
+    /**
+     * v1.3 后置校验：实查列宽必须达到目标值。
+     * <p>不能只验「ALTER 语句执行没报错」：本迁移的意义就是「装得下」，
+     * 拿不到真实宽度就记成功，等于把分叉留在库里并禁止下次重试。
+     */
+    private void verifyExternalSnapshotWidth() {
+        Integer width = queryExternalSnapshotWidth();
+        if (width == null || width < MeetingConstants.EXTERNAL_SNAPSHOT_MAX) {
+            throw new IllegalStateException("external_attendees 列寬未達 "
+                    + MeetingConstants.EXTERNAL_SNAPSHOT_MAX + "（實際：" + width + "），快照仍會與明細行分叉");
+        }
+    }
+
+    /** 查列的字符上限；列不存在返回 null（由调用方按「结构未就位」处理） */
+    private Integer queryExternalSnapshotWidth() {
+        return jdbcTemplate.query(
+                "SELECT CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS "
+                        + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'biz_meeting_booking' "
+                        + "AND COLUMN_NAME = 'external_attendees'",
+                rs -> rs.next() ? (int) rs.getLong(1) : null);
     }
 
     /* ==================== 2. 菜单种子 ==================== */
