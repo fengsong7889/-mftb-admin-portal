@@ -82,8 +82,9 @@ public final class MeetingMinutesRenderer {
 
     /** 新通知只从正式文档生成，不提供正文、名单或缺席原因给模板。
      *
-     * <p>格式与会议邀约推送保持一致：标题灰色、正文黑色；标题为「会议名称(会议纪要)」，
-     * 正文简洁只写重点：会议时间、记录人、议题/行动/跟进数量。
+     * <p>卡片版式（v2.1 定版）：标题固定「會議紀要」，会议主题降为副标题行，
+     * 不再展示纪要编号与版本（查看人不关注单号，版本以打开的文档为准）；
+     * 正文只写重点：会议主题、会议时间、发布人、议题/行动/跟进数量。
      */
     public static Rendered publishedCard(MeetingMinutesDocument document, int batchSeq,
                                           MeetingNotifyTemplateService templates) {
@@ -92,16 +93,19 @@ public final class MeetingMinutesRenderer {
         vars.put("meetingTitle", cardText(document.getMeetingTitle(), 100));
         vars.put("meetingTime", cardText(document.getMeetingTimeText(), 80));
         vars.put("recorder", cardText(document.getRecorderName(), 64));
+        vars.put("publisher", cardText(document.getPublisherName(), 64));
         vars.put("minutesNo", cardText(document.getMinutesNo(), 40));
         vars.put("revisionNo", String.valueOf(document.getRevisionNo()));
         vars.put("topicCount", String.valueOf(content.getItems() == null ? 0 : content.getItems().size()));
         vars.put("actionCount", String.valueOf(content.getActions() == null ? 0 : content.getActions().size()));
         vars.put("followCount", String.valueOf(content.getOpenIssues() == null ? 0 : content.getOpenIssues().size()));
-        // 标题格式：会议名称(会议纪要)，与会议邀约推送风格一致（灰色标题）
-        String title = vars.get("meetingTitle") + "(会议纪要)";
-        // 正文简洁：会议时间 + 记录人 + 议题/行动/跟进数量
-        String fallback = "會議時間：" + vars.get("meetingTime") + "\n"
-                + "記錄人：" + vars.get("recorder") + "\n\n"
+        // 标题固定为场景名：通知列表里每条纪要推送一眼可辨，具体哪场会由卡片副标题回答
+        String title = "會議紀要";
+        // 正文简洁：主题副标题 + 会议时间 + 发布人 + 议题/行动/跟进数量
+        String fallback = "**會議紀要**\n\n"
+                + "<font color=\"#8C8C8C\">會議主題：</font>" + vars.get("meetingTitle") + "\n\n"
+                + "<font color=\"#8C8C8C\">會議時間：</font>" + vars.get("meetingTime") + "\n\n"
+                + "<font color=\"#8C8C8C\">發布人：</font>" + vars.get("publisher") + "\n\n"
                 + "議題 " + vars.get("topicCount") + " 項 · 行動 " + vars.get("actionCount")
                 + " 項 · 跟進 " + vars.get("followCount") + " 項";
         MeetingNotifyTemplateService.Rendered custom = templates == null ? null

@@ -381,8 +381,8 @@ export default function MinutesView() {
             <p className="mm-form-section-note">{t('meeting.minutes.cardVersionBound', { defaultValue: '通知綁定所選正式版本；重發只增加通知批次，不產生新版本。' })}</p>
             {minutes.canSend && document && <Button type="primary" onClick={() => setSendOpen(true)}>{t('meeting.minutes.sendNow')}</Button>}
           </div>
-          <MinutesNoticePreview title={document?.meetingTitle ?? minutes.meetingTitle} timeText={document?.meetingTimeText ?? minutes.meetingTimeText} minutesNo={minutes.minutesNo}
-            revisionNo={document?.revisionNo} publisher={document?.publisherName}
+          <MinutesNoticePreview title={document?.meetingTitle ?? minutes.meetingTitle} timeText={document?.meetingTimeText ?? minutes.meetingTimeText}
+            publisher={document?.publisherName}
             topicCount={content?.items?.length ?? 0}
             actionCount={content?.actions?.length ?? 0}
             followCount={content?.openIssues?.length ?? 0}

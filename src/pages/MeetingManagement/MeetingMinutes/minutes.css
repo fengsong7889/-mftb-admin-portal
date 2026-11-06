@@ -269,6 +269,7 @@
 .mm-document__rule { height: 0; margin-top: 16px; border-top: 3px double #595959; }
 .mm-document__title { margin: 24px 0 20px; font-size: clamp(20px, 2.5vw, 26px); line-height: 1.6; font-weight: 700; color: #262626; text-align: center; }
 .mm-document__identity { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 20px; color: #595959; font-size: 12px; padding-bottom: 10px; font-variant-numeric: tabular-nums; }
+.mm-document__identity--foot { margin-top: 20px; padding: 12px 0 0; border-top: 1px solid var(--border-1); }
 .mm-document__edition { margin-left: auto; color: #262626; font-weight: 600; }
 
 /* 标签与值共用连续表格线，参会和缺席名单跨整行；窄容器自动变为一组字段。 */
@@ -307,9 +308,9 @@
 .mm-document__section-title > span { flex-shrink: 0; color: #e8720c; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .mm-document__summary { margin-top: 12px; padding: 12px 16px; border: 1px solid #d9d9d9; }
 .mm-document__summary > .mm-document__label { color: #e8720c; font-weight: 600; }
-.mm-document__summary ol { padding-left: 22px; margin: 8px 0; }
-.mm-document__summary li { padding: 3px 0; white-space: pre-wrap; }
-.mm-document__summary li::marker { font-variant-numeric: tabular-nums; }
+/* 结论保留记录人自带的 1、2、3 标记，系统不再套一层有序列表编号（否则两套数字重叠） */
+.mm-document__conclusions { margin: 8px 0; }
+.mm-document__conclusions p { margin: 0; padding: 3px 0; white-space: pre-wrap; }
 .mm-document__muted { color: #595959; font-size: 12px; }
 /* 子网格共享标签列宽，完整容纳中英文标题，并保持讨论与结论的竖线对齐。 */
 .mm-document__topic { display: grid; grid-template-columns: minmax(132px, max-content) minmax(0, 1fr); border: 1px solid #d9d9d9; }
@@ -401,6 +402,8 @@
 /* 出席确认固定短控件宽度，将剩余空间留给原因；名单限高，正文位置不随人数无限下移。 */
 .mm-attendance { margin-top: 12px; min-width: 0; }
 .mm-attendance__toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+/* 两个入口按钮成组靠右：space-between 只分「标题组 / 按钮组」两份，按钮之间不再被撑开 */
+.mm-attendance__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
 .mm-attendance__heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
 .mm-attendance__heading h3 { margin: 0; font-size: 15px; font-weight: 600; color: #262626; }
 .mm-attendance__icon { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; color: #1890ff; background: #e6f7ff; }
@@ -417,7 +420,8 @@
 .mm-attendance__status-col { width: 112px; }
 .mm-attendance__action-col { width: 68px; }
 .mm-attendance__table th, .mm-attendance__table td { padding: 8px 12px; text-align: left; vertical-align: middle; border-bottom: 1px solid #f0f0f0; }
-.mm-attendance__table thead th { position: sticky; top: 0; z-index: 1; background: #fafafa; color: #595959; font-weight: 500; white-space: nowrap; }
+/*  sticky 表头必须压过 antd 选中态单选（z-index:1），否则上滑时选中的「是/否」会盖住列标题 */
+.mm-attendance__table thead th { position: sticky; top: 0; z-index: 2; background: #fafafa; color: #595959; font-weight: 500; white-space: nowrap; }
 .mm-attendance__table tbody th { font-weight: 400; }
 .mm-attendance__table tbody tr:last-child > * { border-bottom: 0; }
 .mm-attendance__table tbody tr:hover { background: #fafafa; }

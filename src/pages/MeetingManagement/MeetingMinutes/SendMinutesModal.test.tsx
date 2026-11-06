@@ -105,16 +105,19 @@ describe('紀要發送面板', () => {
 
   it('带摘要与批次去重提示：确认前必须看得见"发给谁"和"为什么重发不会丢"', async () => {
     open()
-    expect(screen.getAllByText('Q4 預算復核')).toHaveLength(2)
+    // 预览卡副标题带「會議主題：」前缀，只能宽松匹配主题文本
+    expect(screen.getAllByText(/Q4 預算復核/)).toHaveLength(2)
     expect(screen.getByText('未選擇')).toBeInTheDocument()
     expect(screen.getByText('0 人')).toBeInTheDocument()
     expect(screen.getByText(/釘釘對同一員工當天相同內容只投一條/)).toBeInTheDocument()
     expect(screen.getByText('只發選中的群，不會回退到默認群')).toBeInTheDocument()
   })
 
-  it('通知预览只展示正式版本及计数，不泄露正文、名单或缺席原因', async () => {
+  it('通知预览只展示标题副标题及计数，不泄露正文、名单、缺席原因或编号版本', async () => {
     open()
-    expect(screen.getByText('V1')).toBeInTheDocument()
+    expect(screen.getByText('會議主題：Q4 預算復核')).toBeInTheDocument()
+    // v2.1 版式：卡片不再展示版本号与纪要编号
+    expect(screen.queryByText('V1')).toBeNull()
     expect(screen.getByText('議題 1 項 · 行動 1 項 · 跟進 1 項')).toBeInTheDocument()
     expect(screen.queryByText(/分攤口徑/)).toBeNull()
     expect(screen.queryByText(/輸出明細表/)).toBeNull()

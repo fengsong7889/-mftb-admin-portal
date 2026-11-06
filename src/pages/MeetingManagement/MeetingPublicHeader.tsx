@@ -6,7 +6,7 @@ import { changeAppLanguage, LANGUAGE_STORAGE_KEY } from '@/i18n'
 import { applyWebViewTitle } from '@/utils/webViewTitle'
 
 /** Keep public meeting controls within the meeting domain, independent of the RDM app. */
-export default function MeetingPublicHeader({ kind }: { kind: 'invite' | 'minutes' }) {
+export default function MeetingPublicHeader({ kind, titleSuffix }: { kind: 'invite' | 'minutes'; titleSuffix?: string }) {
   const { t, i18n } = useTranslation()
   const [copyState, setCopyState] = useState<'idle' | 'done' | 'failed'>('idle')
   const lang = i18n.language?.startsWith('zh') ? 'zh-TW' : 'en'
@@ -64,7 +64,8 @@ export default function MeetingPublicHeader({ kind }: { kind: 'invite' | 'minute
   return (
     <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
       <span style={{ fontSize: 13, color: '#8C8C8C', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {title}
+        {/* 场景名与文档口径并排一行（如「會議紀要(只讀文件)」）：钉钉侧边栏首屏寸土寸金，不单独占一行 */}
+        {titleSuffix ? `${title}(${titleSuffix})` : title}
       </span>
       {/* 三个控件压成一行且复制/打开改图标：钉钉侧边栏约 490px，两行带文字的工具条会吃掉首屏一整块内容 */}
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>

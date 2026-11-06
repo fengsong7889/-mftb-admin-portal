@@ -223,8 +223,8 @@ export default function SendMinutesModal({ minutesId, meeting, content, document
         <div>
           <div style={{ fontSize: 13, color: '#595959', marginBottom: 6 }}>{t('meeting.minutes.previewLabel', { defaultValue: '發送內容預覽' })}</div>
           <div className="mm-send-preview">
-            <MinutesNoticePreview title={document?.meetingTitle} timeText={document?.meetingTimeText} minutesNo={document?.minutesNo}
-              revisionNo={document?.revisionNo} publisher={document?.publisherName} topicCount={content.items.length}
+            <MinutesNoticePreview title={document?.meetingTitle} timeText={document?.meetingTimeText}
+              publisher={document?.publisherName} topicCount={content.items.length}
               actionCount={content.actions.length} followCount={content.openIssues.length} />
           </div>
           <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 4 }}>

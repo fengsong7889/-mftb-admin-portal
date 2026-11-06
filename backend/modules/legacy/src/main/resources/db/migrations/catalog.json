@@ -3071,6 +3071,21 @@
       "comment": "新增版本表及兼容列，不覆盖旧内容或批次。结构 DDL 从 classpath 脚本读取，ALTER 前查询 information_schema 保证幂等，并通过后置校验及结构契约复核。事项保留旧 seq 唯一键但新版按 id 更新，display_order 只负责展示排序。通知模板只新增独立场景，不覆盖管理员自定义旧模板。回滚保留版本表和已发布数据，仅停新发布及新卡片写入。"
     },
     {
+      "versionKey": "meeting:minutes-publication:v2.1",
+      "module": "meeting",
+      "phase": "DATA_MIGRATION",
+      "executionType": "JAVA",
+      "executor": "meetingMinutesSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "meeting:minutes-publication:v2.0"
+      ],
+      "intent": "发布卡片版式定版：标题固定「會議紀要」，会议主题降为副标题行，删除纪要编号与版本行，补发布人变量（修复模板引用了未提供变量导致发布人空白）",
+      "author": "Qoder",
+      "ticket": "meeting-minutes-publication",
+      "comment": "v2.0 的模板种子只在 INSERT 时生效，已跑过的库不会重读 308 脚本，只改脚本等于线上永远还是旧版式，因此用独立版本键做 UPDATE。守卫双通道：updated_by='meeting-publication-v2' 的出厂行，以及 body 仍含旧「紀要編號：${minutesNo}」占位符的行（含被手工补过灰标签的环境）；管理员把 body 整体改写（不再含该占位符）的行不动。渲染器 publishedCard 的内置兜底文案同版式同步，模板缺失时卡片不长回旧样。后置校验：不得残留 updated_by='meeting-publication-v2' 的同场景模板。回滚：旧 body_tpl 存于 308 脚本，需要时按场景键手工写回并删除 sys_schema_migration_log 对应行重跑。"
+    },
+    {
       "versionKey": "meeting:minutes-attachments:v1.0",
       "module": "meeting",
       "phase": "MODULE_STRUCTURE",

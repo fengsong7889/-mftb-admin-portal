@@ -185,4 +185,34 @@ class MeetingMinutesRendererTest {
         assertNull(MinutesViewTokenUtil.parse(
                 MinutesViewTokenUtil.generate(1L, 1L, 0, LocalDateTime.now().minusSeconds(1), SECRET), SECRET));
     }
+
+    /**
+     * v2.1 版式契约：标题固定「會議紀要」、主题降副标题、去纪要编号、发布人有值。
+     * 卡片是查看人对纪要的第一印象，版式回退都是线上真实投诉，用单测锁住。
+     */
+    @Test
+    @DisplayName("发布卡片：标题固定会议纪要，主题降为副标题，不展示纪要编号且发布人有值")
+    void publishedCardFollowsTheV21Layout() {
+        com.mftb.admin.dto.MeetingMinutesDocument document = new com.mftb.admin.dto.MeetingMinutesDocument();
+        document.setMeetingTitle("業務需求対接");
+        document.setMeetingTimeText("2026-11-06 00:00–01:00");
+        document.setMinutesNo("MJ202611060001");
+        document.setBookingNo("MT202611050002");
+        document.setRevisionNo(1);
+        document.setPublisherName("冯松");
+        MeetingMinutesContent content = new MeetingMinutesContent();
+        content.setItems(List.of(item("分攤口徑", "財務主張按營收", "按營收分攤")));
+        document.setContent(content);
+
+        MeetingMinutesRenderer.Rendered rendered = MeetingMinutesRenderer.publishedCard(document, 1, null);
+
+        assertEquals("會議紀要", rendered.title());
+        assertTrue(rendered.markdown().startsWith("**會議紀要**"), "卡片首行必须是固定标题");
+        assertTrue(rendered.markdown().contains("會議主題：</font>業務需求対接"), "会议主题必须降为副标题行");
+        assertTrue(rendered.markdown().contains("會議時間：</font>2026-11-06 00:00–01:00"));
+        assertTrue(rendered.markdown().contains("發布人：</font>冯松"), "发布人变量必须供上，不能空白");
+        assertFalse(rendered.markdown().contains("紀要編號"), "查看人不关注单号：卡片不得出现纪要编号");
+        assertFalse(rendered.markdown().contains("MJ202611060001"));
+        assertTrue(rendered.markdown().contains("議題 1 項 · 行動 0 項 · 跟進 0 項"));
+    }
 }

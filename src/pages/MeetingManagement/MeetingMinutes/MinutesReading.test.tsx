@@ -66,14 +66,16 @@ describe('商務紀要正文', () => {
     expect(masthead.nextElementSibling?.nextElementSibling).toHaveClass('mm-document__title')
   })
 
-  it('章节采用统一文件结构，取消彩色卡片分区并为结论保留有序编号', () => {
+  it('章节采用统一文件结构，取消彩色卡片分区且结论不套系统编号', () => {
     const { container } = render(<MinutesContentCard content={content} />)
     const headings = screen.getAllByRole('heading', { level: 3 })
     expect(headings.map(heading => heading.querySelector('span')?.textContent)).toEqual(['01', '02', '03', '04', '05'])
     headings.forEach(heading => {
       expect(heading.closest('section')).toHaveAttribute('class', 'mm-document__section')
     })
-    expect(container.querySelector('.mm-document__summary ol li')).toHaveTextContent('採用營收分攤口徑')
+    // 记录人自带的 1、2、3 标记保留原文：系统不再套有序列表编号造成两套数字重叠
+    expect(container.querySelector('.mm-document__summary ol')).toBeNull()
+    expect(container.querySelector('.mm-document__conclusions p')).toHaveTextContent('採用營收分攤口徑')
   })
 
   it('只保留会议目的模块，旧目的和摘要按段落合并且不改写原数据', () => {
@@ -206,6 +208,11 @@ describe('商務紀要正文', () => {
     expect(screen.getByRole('heading', { name: '經營例會' })).toBeInTheDocument()
     const headings = screen.getAllByRole('heading', { level: 3 }).map(element => element.textContent)
     expect(headings).toEqual(['01會議目的', '02議程與結論', '03行動項', '04未決與跟進事項', '05後續安排與相關資料'])
+    // 单号/版本是归档口径：沉到文档最底部（最后一个子节点），首屏不占位
+    const foot = container.querySelector('.mm-document__identity--foot')
+    expect(foot).not.toBeNull()
+    expect(foot?.parentElement?.lastElementChild).toBe(foot)
+    expect(foot?.textContent).toContain('MJ-TEST-01')
     expect(screen.getAllByText('採用營收分攤口徑')).toHaveLength(2)
     expect(screen.getByText('歷史紀要未保存完整參會名單快照')).toBeInTheDocument()
     expect(screen.getByText('工作稿 · 未鎖版')).toBeInTheDocument()
@@ -273,10 +280,12 @@ describe('商務紀要正文', () => {
 
   it('新版通知预览只有基础信息、计数与一个全文入口，不调用发送接口', () => {
     const onView = vi.fn()
-    render(<MinutesNoticePreview title="經營例會" minutesNo="MJ-TEST-01" topicCount={2} actionCount={3} followCount={1} onView={onView} />)
+    render(<MinutesNoticePreview title="經營例會" topicCount={2} actionCount={3} followCount={1} onView={onView} />)
     expect(screen.getByText('議題 2 項 · 行動 3 項 · 跟進 1 項')).toBeInTheDocument()
     expect(screen.getByText('此處僅預覽新版卡片，不會發送通知。')).toBeInTheDocument()
-    expect(screen.queryByText('舊批次行動')).toBeNull()
+    // 卡片版式定版：标题固定「會議紀要」，主题降为副标题行，不再展示纪要编号
+    expect(screen.getByText('會議主題：經營例會')).toBeInTheDocument()
+    expect(screen.queryByText(/MJ-TEST-01/)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '查看紀要（預覽）' }))
     expect(onView).toHaveBeenCalledTimes(1)
   })

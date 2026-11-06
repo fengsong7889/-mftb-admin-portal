@@ -31,7 +31,7 @@ import HelpPopover from '@/components/HelpPopover'
 import RemarkTextArea from '@/components/RemarkTextArea'
 import { useAuth } from '@/contexts/AuthContext'
 import {
-  createMinutes, fetchMinutes, fetchMinutesById, searchMinutes, updateMinutes, publishMinutes,
+  createMinutes, fetchMinutes, fetchMinutesById, searchMinutes, updateMinutes, publishMinutes, sendMinutes,
   MINUTES_CONTENT_MAX_LENGTH, MINUTES_LIMITS, emptyMinutesContent, minutesContentLength, minutesPurposeText,
   type MinutesAttendance, type MinutesContent, type MinutesDecisionStatus, type MinutesLinkVO, type MinutesSeriesNode, type MinutesVO,
 } from '@/api/meetingMinutes'
@@ -353,6 +353,33 @@ export default function MinutesForm() {
     return undefined
   }
 
+  /**
+   * 发布即通知：复用正式版发送契约把发布卡片推给参会人（含临时到场），
+   * 站点地址/场景开关/钉钉绑定/收件人在职仍由后端复核；推送送不出只提示不回滚发布。
+   * 请求层已统一弹错，这里不再二次 toast，避免双弹。
+   */
+  const notifyPublished = async (id: number, version: number, revisionId: number) => {
+    const attendeeIds = attendance.map(person => person.userId).filter((userId): userId is number => userId != null)
+    if (attendeeIds.length === 0) {
+      message.success(t('meeting.minutes.published', { defaultValue: '紀要已發布' }))
+      return
+    }
+    try {
+      const result = await sendMinutes(id, {
+        revisionId, receiverUserIds: attendeeIds, alsoNotifyAttendees: true,
+        acknowledgePublicLink: true, requestKey: newMeetingRequestKey('mms'), version,
+      })
+      if (result.queued > 0) {
+        message.success(t('meeting.minutes.publishedAndPushed', { queued: result.queued, defaultValue: '紀要已發布，釘釘通知已提交（{{queued}} 人）' }))
+      } else {
+        message.success(t('meeting.minutes.publishedNotifySkipped', { defaultValue: '紀要已發布；釘釘推送未送出（場景未啟用或收件人未綁定釘釘），可在紀要查看頁補發' }))
+      }
+    } catch (e) {
+      message.success(t('meeting.minutes.published', { defaultValue: '紀要已發布' }))
+      console.warn(t('meeting.minutes.publishedNotifySkipped'), e instanceof Error ? e.message : e)
+    }
+  }
+
   /** 保存：send=true 时保存成功后直接打开发送面板（一次点击只做一件事，但动线不断） */
   const handleSave = async (send: boolean) => {
     // 附件未传完/有失败时拦住保存：不能静默丢附件后提示"保存成功"，也不能把失败项当没发生
@@ -421,11 +448,11 @@ export default function MinutesForm() {
           title: t('meeting.minutes.confirmPublication', { defaultValue: '確認發布正式紀要？' }),
           className: 'custom-confirm-modal',
           icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
-          content: <div className="confirm-info-card">{saved.minutesNo} · V{(saved.publishedRevisionNo ?? 0) + 1}<p>{t('meeting.minutes.publicationImmutable', { defaultValue: '發布後保留不可覆蓋的版本；通知另行設定，本次不會發送訊息。' })}</p></div>,
+          content: <div className="confirm-info-card">{saved.minutesNo} · V{(saved.publishedRevisionNo ?? 0) + 1}<p>{t('meeting.minutes.publicationImmutable', { defaultValue: '發布後保留不可覆蓋的版本；發布後將向參會人員推送釘釘紀要通知。' })}</p></div>,
           okText: t('meeting.minutes.publish', { defaultValue: '正式發布' }), cancelText: t('common.cancel'),
           onOk: async () => {
-            await publishMinutes(saved.id!, { version: saved.version ?? 0, requestKey: key, changeNote })
-            message.success(t('meeting.minutes.published', { defaultValue: '紀要已發布，可另行通知收件人' }))
+            const revision = await publishMinutes(saved.id!, { version: saved.version ?? 0, requestKey: key, changeNote })
+            await notifyPublished(saved.id!, saved.version ?? 0, revision.id)
             finishEditing(saved.id!)
           },
         })
@@ -919,7 +946,7 @@ export default function MinutesForm() {
           <CardTitle icon={<SendOutlined />} tone="info" title={t('meeting.minutes.publicationText.publicationAndNotificationSettings')} />
           <div className="mm-form-publish">
             <div className="mm-form-publish__fields">
-              <p className="mm-form-section-note">{t('meeting.minutes.publicationImmutable', { defaultValue: '發布後保留不可覆蓋的版本；通知另行設定，本次不會發送訊息。' })}</p>
+              <p className="mm-form-section-note">{t('meeting.minutes.publicationImmutable', { defaultValue: '發布後保留不可覆蓋的版本；發布後將向參會人員推送釘釘紀要通知。' })}</p>
               <div className="mm-form-grid mm-form-grid--two">
                 <Form.Item label={<PreviewFieldLabel title={t('meeting.minutes.publicationText.publishedVersion')} />}><Input disabled value={`V${(minutes?.publishedRevisionNo ?? 0) + 1}`} /></Form.Item>
                 <Form.Item label={<PreviewFieldLabel title={t('meeting.minutes.publisher')} />}><Input disabled value={user?.name} /></Form.Item>
@@ -928,7 +955,7 @@ export default function MinutesForm() {
               <p className="mm-form-section-note">{t('meeting.minutes.publicationText.publicLinksCanBeForwardedAnyoneHolding')}</p>
             </div>
             <div className="mm-form-publish__preview">
-              <MinutesNoticePreview title={meeting?.title} timeText={meeting?.timeText} minutesNo={minutes?.minutesNo}
+              <MinutesNoticePreview title={meeting?.title} timeText={meeting?.timeText}
                 topicCount={(watchedValues?.items ?? []).filter(item => item.topic?.trim()).length}
                 actionCount={(watchedValues?.actions ?? []).filter(item => item.content?.trim()).length}
                 followCount={(watchedValues?.followUps ?? []).filter(item => item.content?.trim()).length}
@@ -1066,15 +1093,17 @@ function AttendanceEditor({ value, invited, onChange, disabled, bookingId, onBac
             {t('meeting.minutes.attendanceSummary', { present: presentCount, total: value.length, temporary: temporaryCount })}
           </span>
         </div>
-        {!disabled && <Button icon={<PlusOutlined />} disabled={atLimit} onClick={() => setAdding(open => !open)}
-          aria-label={t('meeting.minutes.addTemporaryAttendee')} aria-expanded={adding} aria-controls="minutes-attendance-add">
-          {t('meeting.minutes.addTemporaryAttendee')}</Button>}
-        {/* 补录入口只在拿得到会议单号时给：写不回预约名单的“补录”只会让界面与名单两套口径 */}
-        {!disabled && bookingId != null && <Button icon={<UserAddOutlined />} loading={backfillSaving} disabled={atLimit}
-          aria-label={t('meeting.minutes.backfillAttendee', { defaultValue: '補錄參會人' })}
-          aria-expanded={backfilling} aria-controls="minutes-attendance-backfill"
-          onClick={() => setBackfilling(open => !open)}>
-          {t('meeting.minutes.backfillAttendee', { defaultValue: '補錄參會人' })}</Button>}
+        {!disabled && <div className="mm-attendance__actions">
+          <Button icon={<PlusOutlined />} disabled={atLimit} onClick={() => setAdding(open => !open)}
+            aria-label={t('meeting.minutes.addTemporaryAttendee')} aria-expanded={adding} aria-controls="minutes-attendance-add">
+            {t('meeting.minutes.addTemporaryAttendee')}</Button>
+          {/* 补录入口只在拿得到会议单号时给：写不回预约名单的“补录”只会让界面与名单两套口径 */}
+          {bookingId != null && <Button icon={<UserAddOutlined />} loading={backfillSaving} disabled={atLimit}
+            aria-label={t('meeting.minutes.backfillAttendee', { defaultValue: '補錄參會人' })}
+            aria-expanded={backfilling} aria-controls="minutes-attendance-backfill"
+            onClick={() => setBackfilling(open => !open)}>
+            {t('meeting.minutes.backfillAttendee', { defaultValue: '補錄參會人' })}</Button>}
+        </div>}
       </div>
       <p className="mm-attendance__hint">{t('meeting.minutes.attendanceHint')}</p>
       {adding && !disabled && <div className="mm-attendance__add" id="minutes-attendance-add">

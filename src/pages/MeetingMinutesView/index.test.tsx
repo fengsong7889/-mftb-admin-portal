@@ -72,7 +72,8 @@ describe('紀要免登查看頁', () => {
     fetchMinutesPage.mockReturnValue(new Promise(() => {}))
     document.title = 'MFTB Group Portal'
     const page = openPage()
-    await screen.findByText('會議紀要')
+    // 只读口径并排接在场景名后：會議紀要(只讀文件)
+    await screen.findByText('會議紀要(只讀文件)')
     expect(document.title).toBe('會議紀要')
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBeNull()
     page.unmount()

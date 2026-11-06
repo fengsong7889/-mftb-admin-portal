@@ -59,9 +59,8 @@ export default function MeetingMinutesView() {
     <div className="mm-public-page">
       <div className="mm-public-page__inner">
         {/* 公共页头（语言切换/复制链接/浏览器打开）由 MeetingPublicHeader 统一提供，与免登签到页同源；
-            「只读文档」口径提示留在 label 行，避免改版后丢失批次快照语义。 */}
-        <MeetingPublicHeader kind="minutes" />
-        <div className="mm-public-page__label"><span>{t('meeting.minutes.publicationText.readonlyDocument')}</span></div>
+            「只读文档」口径并排接在场景名后面（會議紀要(只讀文件)），不再单独占一行吃掉首屏。 */}
+        <MeetingPublicHeader kind="minutes" titleSuffix={t('meeting.minutes.publicationText.readonlyDocument')} />
 
         {loading && (
           <div className="mm-public-page__loading"><Spin size="large" /></div>

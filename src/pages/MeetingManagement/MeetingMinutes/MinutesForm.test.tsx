@@ -325,7 +325,8 @@ describe('會議紀要表單', () => {
 
   it('模板分区齐全：會議資訊 / 議程與結論 / 行動項 / 未決事項 / 下次會議 / 補充說明', async () => {
     renderForm()
-    await waitFor(() => expect(screen.getAllByText('Q4 預算復核')).toHaveLength(2))
+    // 预览卡副标题带「會議主題：」前缀，主题文本只能宽松匹配（資訊区值 + 预览卡副标题两处）
+    await waitFor(() => expect(screen.getAllByText(/Q4 預算復核/)).toHaveLength(2))
     for (const section of ['會議資訊', '議程與結論', '行動項', '跟進事項', '下次會議', '補充說明']) {
       expect(screen.getAllByText(section).length, `缺少分區：${section}`).toBeGreaterThan(0)
     }

@@ -161,11 +161,6 @@ export default function MinutesContentCard({ content: suppliedContent, attachmen
           </div>
           <div className="mm-document__rule" aria-hidden="true" />
           <h2 className="mm-document__title">{info.title || t('meeting.minutes.publicationText.meetingTitleNotRecorded')}</h2>
-          <div className="mm-document__identity">
-            <span>{t('meeting.minutes.publicationText.minutesNumber')}：{info.minutesNo || t('meeting.minutes.publicationText.minutesNumberPending')}</span>
-            {info.bookingNo && <span>{t('meeting.minutes.publicationText.meetingNumber')}：{info.bookingNo}</span>}
-            <span className="mm-document__edition">{info.editionLabel || t('meeting.minutes.publicationText.workingDraftUnpublished')}</span>
-          </div>
           <dl className="mm-document__metadata">
             {fields.map(field => (
               <div key={field.label}><dt>{field.label}</dt><dd>{field.value || t('meeting.minutes.publicationText.notRecorded')}</dd></div>
@@ -198,7 +193,7 @@ export default function MinutesContentCard({ content: suppliedContent, attachmen
           <div className="mm-document__summary">
             <div className="mm-document__label">{t('meeting.minutes.publicationText.keyConclusions')}</div>
             {conclusions.length > 0 ? (
-              <ol>{conclusions.map((item, index) => <li key={index}>{item.conclusion}</li>)}</ol>
+              <div className="mm-document__conclusions">{conclusions.map((item, index) => <p key={index}>{item.conclusion}</p>)}</div>
             ) : <p className="mm-document__muted">{t('meeting.minutes.publicationText.noConclusionRecordedSeeTheDiscussionBelow')}</p>}
             <div className="mm-document__muted">{t('meeting.minutes.conclusionsSource', { defaultValue: '摘自各議題結論，實際發布狀態以文檔版本為準。' })}</div>
           </div>
@@ -293,25 +288,32 @@ export default function MinutesContentCard({ content: suppliedContent, attachmen
         </Section>
       )}
       {info?.footer && <footer className="mm-document__footer">{info.footer}</footer>}
+      {/* 单号与版本是归档口径，阅读人不关注：沉到文档最底部，首屏留给会议信息与结论 */}
+      {info && (
+        <div className="mm-document__identity mm-document__identity--foot">
+          <span>{t('meeting.minutes.publicationText.minutesNumber')}：{info.minutesNo || t('meeting.minutes.publicationText.minutesNumberPending')}</span>
+          {info.bookingNo && <span>{t('meeting.minutes.publicationText.meetingNumber')}：{info.bookingNo}</span>}
+          <span className="mm-document__edition">{info.editionLabel || t('meeting.minutes.publicationText.workingDraftUnpublished')}</span>
+        </div>
+      )}
     </article>
   )
 }
 
-/** 纯展示卡片：不拼令牌、不请求接口；只允许在当前页面切换全文预览。 */
-export function MinutesNoticePreview({ title, timeText, minutesNo, revisionNo, publisher, topicCount, actionCount, followCount, onView }: {
-  title?: string; timeText?: string; minutesNo?: string; revisionNo?: number; publisher?: string
+/** 纯展示卡片：不拼令牌、不请求接口；只允许在当前页面切换全文预览。
+ *  版式与钉钉实际卡片同构：标题固定「會議紀要」，会议主题为副标题行，不展示纪要编号与版本。 */
+export function MinutesNoticePreview({ title, timeText, publisher, topicCount, actionCount, followCount, onView }: {
+  title?: string; timeText?: string; publisher?: string
   topicCount: number; actionCount: number; followCount: number; onView?: () => void
 }) {
   const { t } = useTranslation()
   return (
     <div className="mm-notice-preview" aria-label={t('meeting.minutes.publicationText.dingtalkNotificationCardPreview')}>
       <div className="mm-notice-preview__source"><FileTextOutlined />{t('meeting.minutes.publicationText.meetingManagement')}<span>{t('meeting.minutes.publicationText.stylePreview')}</span></div>
-      <h4>{t('meeting.minutes.publicationText.meetingMinutesNotification')}</h4>
-      <div className="mm-notice-preview__subject">{title || t('meeting.minutes.meetingTitle')}</div>
+      <h4>{t('meeting.minutes.pageTitle')}</h4>
+      <div className="mm-notice-preview__subject">{t('meeting.minutes.meetingTitle')}：{title || t('meeting.minutes.publicationText.meetingTitleNotRecorded')}</div>
       <dl>
         <div><dt>{t('meeting.viewPage.time')}</dt><dd>{timeText || t('meeting.minutes.publicationText.pending')}</dd></div>
-        <div><dt>{t('meeting.minutes.publicationText.minutesNumber')}</dt><dd>{minutesNo || t('meeting.minutes.publicationText.generatedAfterSaving')}</dd></div>
-        <div><dt>{t('meeting.minutes.publicationText.publishedVersion')}</dt><dd>{revisionNo ? `V${revisionNo}` : t('meeting.minutes.versionAfterPublish', { defaultValue: '發布後生成' })}</dd></div>
         {publisher && <div><dt>{t('meeting.minutes.publisher', { defaultValue: '發布人' })}</dt><dd>{publisher}</dd></div>}
       </dl>
       <p className="mm-notice-preview__counts">{t('meeting.minutes.cardCounts', { topic: topicCount, action: actionCount, follow: followCount })}</p>

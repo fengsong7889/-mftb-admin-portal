@@ -48,6 +48,25 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
     private static final String SCHEMA_SCRIPT_V2 = "268_meeting_minutes_v2.sql";
     static final String VERSION_PUBLICATION = "meeting:minutes-publication:v2.0";
 
+    /**
+     * v2.1：发布卡片版式定版（标题固定「會議紀要」、主题降副标题、去纪要编号与版本、补发布人变量）。
+     *
+     * <p>为什么单独一个版本键：v2.0 的模板种子只在首次插入，已跑过的库不会重读 308 脚本；
+     * 只改脚本等于永远修不上现有环境。
+     */
+    static final String VERSION_PUBLICATION_CARD_V21 = "meeting:minutes-publication:v2.1";
+
+    /** v2.1 卡片正文：灰色标签+黑色值，字段各自成段（钉钉 markdown 会把连续单换行归并成一行） */
+    private static final String CARD_COPY_MINUTES_PUBLISHED_V21 = String.join("\n\n",
+            "**會議紀要**",
+            "<font color=\"#8C8C8C\">會議主題：</font>${meetingTitle}",
+            "<font color=\"#8C8C8C\">會議時間：</font>${meetingTime}",
+            "<font color=\"#8C8C8C\">發布人：</font>${publisher}",
+            "議題 ${topicCount} 項 · 行動 ${actionCount} 項 · 跟進 ${followCount} 項");
+    private static final String CARD_TITLE_MINUTES_PUBLISHED_V21 = "會議紀要";
+    private static final String CARD_VARS_MINUTES_PUBLISHED_V21 =
+            "${meetingTitle},${meetingTime},${publisher},${topicCount},${actionCount},${followCount}";
+
     /** 补充说明附件：元数据表（二进制入对象存储，不入 MySQL） */
     static final String VERSION_ATTACHMENTS = "meeting:minutes-attachments:v1.0";
     static final String VERSION_AI = "meeting:minutes-ai-v1.0";
@@ -201,6 +220,9 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
         // 两个同序号的 Bean 执行顺序不确定，全新库上可能先建子表而 1215 失败。
         versionTracker.applyOnce(VERSION_SCHEMA_V2, this::doSchemaMigrateV2, this::verifySchemaV2);
         versionTracker.applyOnce(VERSION_PUBLICATION, this::migratePublication, this::verifyPublication);
+        // v2.1：发布卡片版式定版。必须在 v2.0 之后（模板场景行先就绪）
+        versionTracker.applyOnce(VERSION_PUBLICATION_CARD_V21,
+                this::refreshMinutesPublishedCardV21, this::verifyMinutesPublishedCardV21);
         versionTracker.applyOnce(VERSION_BATCH_REVOKE, this::migrateBatchRevoke, this::verifyBatchRevoke);
         versionTracker.applyOnce(VERSION_ATTACHMENTS, this::migrateAttachments, this::verifyAttachments);
         versionTracker.applyOnce(VERSION_AI, this::migrateAiNotes, this::verifyAiNotes);
@@ -468,6 +490,31 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
                 MeetingConstants.SCENARIO_INVITE, MeetingConstants.SCENARIO_REMIND, MeetingConstants.SCENARIO_OPS);
         if (stale != null && stale > 0) {
             throw new IllegalStateException("會議通知模板仍有 " + stale + " 條未升級為灰色字段名");
+        }
+    }
+
+    /**
+     * v2.1：发布卡片版式定版。只升级出厂行（updated_by='meeting-publication-v2'）
+     * 与 body 仍带旧「紀要編號」占位符的行（含被手工补过灰标签的环境）；
+     * 管理员把 body 整体改写（不再含该占位符）的行不动。
+     */
+    private void refreshMinutesPublishedCardV21() {
+        int rows = jdbcTemplate.update("UPDATE sys_notification_template SET title_tpl = ?, body_tpl = ?, "
+                        + "variables = ?, updated_by = 'meeting-publication-v3' "
+                        + "WHERE scene_key = ? AND (updated_by = 'meeting-publication-v2' OR body_tpl LIKE ?)",
+                CARD_TITLE_MINUTES_PUBLISHED_V21, CARD_COPY_MINUTES_PUBLISHED_V21,
+                CARD_VARS_MINUTES_PUBLISHED_V21, MeetingConstants.SCENARIO_MINUTES_PUBLISHED,
+                "%紀要編號：${minutesNo}%");
+        log.info("紀要發布卡片版式已升級 v2.1（標題固定會議紀要、主題降副標題、去紀要編號）: {} 行", rows);
+    }
+
+    private void verifyMinutesPublishedCardV21() {
+        Integer stale = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_notification_template WHERE scene_key = ? "
+                        + "AND updated_by = 'meeting-publication-v2'", Integer.class,
+                MeetingConstants.SCENARIO_MINUTES_PUBLISHED);
+        if (stale != null && stale > 0) {
+            throw new IllegalStateException("紀要發布模板仍有 " + stale + " 條未升級為 v2.1 版式");
         }
     }
 
