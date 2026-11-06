@@ -680,7 +680,7 @@ export default function DeliveryBoard() {
                 )}
               </div>
               {g.item && expandedBlockedId === g.item.id && (blockedMap[g.item.id]?.length ?? 0) > 0 && (
-                <div style={{ margin: '0 0 8px', padding: '8px 12px', background: 'var(--warning-soft)', border: '1px solid #FFE7BA', borderRadius: 6 }}>
+                <div style={{ margin: '0 0 8px', padding: '8px 12px', background: 'var(--warning-soft)', border: '1px solid var(--warning-border-soft)', borderRadius: 6 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--warning-deep)', marginBottom: 6 }}>
                     <WarningOutlined /> 被前置依賴阻塞的任務（{blockedMap[g.item.id].length}）
                   </div>

@@ -98,10 +98,10 @@ function OrdersScreen({ nav }: { nav: MobileNavApi<MerchantScreen> }) {
                   {ORDER_STATUS_NAME[o.status] || '未知'}
                 </span>
               </div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#262626' }}>{o.algoName}</div>
-              <div style={{ fontSize: 12, color: '#8c8c8c', marginTop: 3 }}>{o.storeName || o.groupName}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{o.algoName}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 3 }}>{o.storeName || o.groupName}</div>
               <div className="ap-order-foot">
-                <span style={{ fontSize: 12, color: '#8c8c8c' }}>{o.itemCount ?? 0} 個時段</span>
+                <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{o.itemCount ?? 0} 個時段</span>
                 <span className="ap-order-amount">MOP {Math.round(o.actualAmount)}</span>
               </div>
             </div>
@@ -145,7 +145,7 @@ function OrderDetailScreen({ orderNo }: { orderNo: string }) {
         <div className="ap-kv"><span>集團</span><b>{detail.groupName || detail.groupCode}</b></div>
         <div className="ap-kv"><span>原價</span><b>MOP {Math.round(detail.originalAmount)}</b></div>
         <div className="ap-kv"><span>優惠</span><b>- MOP {Math.round(detail.discountAmount)}</b></div>
-        <div className="ap-kv"><span>實付</span><b style={{ color: '#e8720c' }}>MOP {Math.round(detail.actualAmount)}</b></div>
+        <div className="ap-kv"><span>實付</span><b style={{ color: 'var(--brand)' }}>MOP {Math.round(detail.actualAmount)}</b></div>
       </div>
       {detail.dateSlots && detail.dateSlots.length > 0 && (
         <div className="ap-card">
