@@ -20,7 +20,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { compareRatchet, classify, classifyWithCounts, colorPropsOfBlock, scan, selfCheck, SELF_SAMPLES, styleBlocks } from './audit-theme-halfpair.mjs'
+import { compareRatchet, classify, classifyWithCounts, colorPropsOfBlock, scan, selfCheck, SELF_SAMPLES, styleBlocks, hazardKey, diffHazards } from './audit-theme-halfpair.mjs'
 
 describe('块切分', () => {
   it('跳行书写的 style 必须整块看到（单行正则会漏）', () => {
@@ -189,5 +189,45 @@ describe('阳性对照自检（结论的前提，不是可选步骤）', () => {
     const clean = SELF_SAMPLES.filter((s) => s.expect === null)
     expect(dangerous.length).toBeGreaterThanOrEqual(3)
     expect(clean.length).toBeGreaterThanOrEqual(3)
+  })
+})
+
+/**
+ * 差分定位本身的守卫（2026-11-06 实踩：旧版把 POST 全量前 12 条当成「本批新增」打印，
+ * 标题与实际不符，差点让人去改历史存量站点）。
+ */
+describe('差分只把真正新增的站点当新增', () => {
+  const h = (file, line, kind, body) => ({ file, line, kind, body })
+  const A = h('src/a.tsx', 10, '前景钉裸值（半对）', `background: 'var(--x)', color: '#fff'`)
+
+  it('行号漂移不算新增也不算消失（键故意不含行号）', () => {
+    const moved = h('src/a.tsx', 88, A.kind, A.body)
+    expect(diffHazards([A], [moved])).toEqual({ fresh: [], gone: [] })
+  })
+
+  it('真新增只列出那一个，修好的列进 gone', () => {
+    const B = h('src/b.tsx', 5, '描边钉裸值（半对）', `background: 'var(--y)', border: '1px solid #eee'`)
+    const d = diffHazards([A, B], [A])
+    expect(d.fresh).toEqual([])
+    expect(d.gone).toHaveLength(1)
+    expect(d.gone[0].file).toBe('src/b.tsx')
+
+    const d2 = diffHazards([A], [A, B])
+    expect(d2.fresh).toHaveLength(1)
+    expect(d2.fresh[0].file).toBe('src/b.tsx')
+    expect(d2.gone).toEqual([])
+  })
+
+  it('同块体不同类别 / 不同文件都必须算不同站点', () => {
+    expect(hazardKey(A)).not.toBe(hazardKey({ ...A, kind: '背景钉裸值（半对）' }))
+    expect(hazardKey(A)).not.toBe(hazardKey({ ...A, file: 'src/c.tsx' }))
+    expect(hazardKey(A)).toBe(hazardKey({ ...A, line: 999 }))
+  })
+
+  it('空基线不得被当成「没新增」（旧版曾因 import 不存在的模块而拿到空 PRE 树）', () => {
+    // 主流程已有 PRE files=0 就 exit 2 的护栏；这里钉的是 diffHazards 自身语义：
+    // PRE 为空时 POST 全部应被当作新增，而不是被当成“无对比基准”而静默返回空。
+    const d = diffHazards([], [A, A])
+    expect(d.fresh).toHaveLength(2)
   })
 })

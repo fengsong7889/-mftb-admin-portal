@@ -48,6 +48,27 @@ const ARGS = process.argv.slice(2)
 export const CLASSES_KEYS = ['前景钉裸值（半对）', '背景钉裸值（半对）', '描边钉裸值（半对）']
 
 /**
+ * 差分用的站点键：文件 + 类别 + 归一化块体（body 已在 scan 里压平并截到 120 字）。
+ * 故意不含行号：同一块体在文件里往上或往下漂几行，语义上是同一个半对；
+ * 把行号放进键会让“只是行号漂了”被误报成“新增 + 消失”各一次。
+ */
+export const hazardKey = (h) => `${h.file}\u0000${h.kind}\u0000${h.body}`
+
+/**
+ * 差分定位：返回新增与消失的站点。抽成纯函数是为了可测 —— 旧版直接在 main 里
+ * `result.hazards.slice(0, 12)`，标题写「本批新增」而内容其实是 POST 全量，
+ * 这种错法只能跑两个树才能发现；抽出来后可以用分叉的假站点直接测。
+ */
+export function diffHazards(baseHazards, nowHazards) {
+  const baseKeys = new Set(baseHazards.map(hazardKey))
+  const nowKeys = new Set(nowHazards.map(hazardKey))
+  return {
+    fresh: nowHazards.filter((h) => !baseKeys.has(hazardKey(h))),
+    gone: baseHazards.filter((h) => !nowKeys.has(hazardKey(h))),
+  }
+}
+
+/**
  * 颜色属性分段。必须与 codemod 的 classifyProperty 同口径，否则「工具能改、门禁看不见」：
  * 变异验证 H3 就是踩在漏了 fill / stroke 上（当时 url 保护样本因此空转）。
  */
@@ -257,8 +278,15 @@ function main() {
     }
     console.log(`  （带 alpha 的 8 位色值按既有例外跳过 ${result.alphaSkipped} 处，不参与判定）`)
     if (added) {
-      console.error(`❌ 本批新增 ${added} 处半对，必须逐处定性：能成对令牌化就补令牌，只能回退的就两侧一起回退并加 theme-pair-locked 哨兵`)
-      for (const h of result.hazards.slice(0, 12)) console.error(`   ${h.file}:${h.line} [${h.kind}] ${h.body}`)
+      // 只列**新增**的站点。键用「文件 + 类别 + 归一化块体」而不行号：编辑会让行号漂，
+      // 而旧版这里打的是 `result.hazards.slice(0, 12)`——POST 全量前 12 条，标题却写「本批新增」，
+      // 会把历史存量指成本批引入（2026-11-06 实踩：差点去“修”三处 EAM 老站点）。
+      const { fresh, gone } = diffHazards(base.hazards, result.hazards)
+      console.error(`❌ 本批新增 ${added} 处半对（定位到新站点 ${fresh.length} 个、消失 ${gone.length} 个），必须逐处定性：能成对令牌化就补令牌，只能回退的就两侧一起回退并加 theme-pair-locked 哨兵`)
+      // 反向自证：计数说新增了却一个站点都定位不到，说明差分本身有毛病，
+      // 不能把“没列出站点”读成“其实没新增”（空输入假绿的老坑）。
+      if (fresh.length === 0) console.error('::error 计数显示新增但 0 个新站点被定位 —— 差分不可信，请人工核对两棵树')
+      for (const h of fresh) console.error(`   ${h.file}:${h.line} [${h.kind}] ${h.body}`)
       process.exit(1)
     }
     console.log('✅ 三类半对本批新增 0 处')
