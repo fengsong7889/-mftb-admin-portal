@@ -779,7 +779,7 @@ export default function Portal() {
                 key={a.key}
                 type="button"
                 className="portal-card"
-                onClick={() => navigate(`/app-preview?app=${a.key}&from=app`)}
+                onClick={() => navigate(a.key === 'consumer' ? `/app-preview?from=app` : `/app-preview?app=${a.key}&from=app`)}
                 aria-label={a.name}
               >
                 <span className="portal-card-cover">
