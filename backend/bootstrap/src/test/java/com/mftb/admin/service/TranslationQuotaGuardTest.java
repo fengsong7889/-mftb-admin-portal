@@ -11,6 +11,7 @@ package com.mftb.admin.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mftb.admin.mapper.SysLanguageMapper;
 import com.mftb.admin.mapper.SysTranslationMapper;
+import com.mftb.admin.service.I18nLocaleMirror;
 import com.mftb.admin.service.impl.TranslationServiceImpl;
 import com.mftb.admin.util.OperatorResolver;
 import org.junit.jupiter.api.DisplayName;
@@ -38,13 +39,14 @@ import static org.mockito.Mockito.mock;
  */
 class TranslationQuotaGuardTest {
 
-    /** 构造被测服务：只关心额度判定，DB/Mapper 全部给 mock */
+    /** 构造被测服务：只关心额度判定，DB/Mapper/镜像全部给 mock */
     private TranslationServiceImpl service(String email) {
         TranslationServiceImpl s = new TranslationServiceImpl(
                 mock(SysTranslationMapper.class),
                 mock(SysLanguageMapper.class),
                 mock(OperatorResolver.class),
-                new ObjectMapper());
+                new ObjectMapper(),
+                mock(I18nLocaleMirror.class));
         ReflectionTestUtils.setField(s, "myMemoryEmail", email);
         return s;
     }

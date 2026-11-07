@@ -317,9 +317,16 @@ npm run secret-scan   # 硬编码敏感信息扫描
 | `npm run check:i18n` | 引用完整性 + 插值 + 硬编码棘轮 + **翻译库收录率棘轮** `_dbGapKeys` | 新 key 进了静态包但没入库，门禁不报 |
 | `npm run i18n:snapshot` | 刷新 `scripts/i18n-db-keys.json`（后端供数 key 的免检名单） | 快照过期会把后端 key 误报成缺失 |
 | `npm run i18n:report` | 六语**真实**完成度（静态包 ∪ 库） | 看翻译统计页会把未入库 key 排除在分母外，假绿 |
+| `npm run i18n:gen-preauth` + `npm run check:i18n-preauth` | 免登界面（登录页）的六语静态兜底 | 日语/韩语/俄语登录页整页回退英文（`/translations/bundle` 需要登录，登录前拿不到） |
 
 依赖说明：`i18n:gen-zhcn` 需要 JDK 17 + ICU4J（从本地 Maven 仓库取，可用 `ICU4J_JAR` 指定）；
-`i18n:snapshot` / `i18n:report` 需要 `backend/.env.local` 指向的开发库（CI 连不到库，所以只读快照）。
+`i18n:snapshot` / `i18n:report` / `i18n:gen-preauth` 需要 `backend/.env.local` 指向的开发库
+（CI 连不到库，所以只读快照；三个 `check:*` 都不连库）。
+
+完成率口径（2026-11-06 修正）：后端 `/api/translations/coverage` 的分母是
+「语言包镜像 key ∪ 库里字段」，不再是库里记录数；前端「翻译统计」/「语言管理」都消耗这一个接口
+（口径集中在 `frontend/packages/platform-client/src/utils/coverageRows.ts`，页面不再自算分母）。
+库里没数据时不得退回旧的自算口径静默渲染——`estimated: true` 会把「此读数偏高」直接写在页面上。
 
 > ⚠️ **首次带本改造上线的后端实例会在启动期做一次全量同步**（实测开发库：新增 8040 条 + 修正 6756 条，
 > 约 9 分钟，期间 `/api/health/ready` 保持 503）。生产 RDS 延迟更低但仍按分钟计：
@@ -447,6 +454,8 @@ npm run check:i18n-zhcn    # 静态简中包结构是否齐备
   要快就配 `MYMEMORY_EMAIL` 或在「机翻引擎」里给 `openai` 填可用 Key（见 2.3 与 4.3.2）。
 - 繁体界面正常、只有简体中文不对：先查 `locales/zh-CN.json` 还在不在、有没有跟 `zh-TW.json` 对齐，
   简中**没有静态兜底就必然掉英文**（`fallbackLng='en'`）。
+- 只有登录页不对（其他页正常）：登录页拿不到数据库语言包（bundle 需登录），只能靠静态包。
+  跑 `npm run i18n:gen-preauth` 从库里取既有译文补齐，再 `npm run check:i18n-preauth` 确认。
 - 完整根因、修复口径与剩余项见 `docs/I18N_MULTILANG_AUDIT_2026-11.md`。
 
 ---

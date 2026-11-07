@@ -129,9 +129,15 @@ export default function Login() {
       label: countrySysName(code, sysLang),
     })), [sysLang])
 
-  // 语言选项：全部语言可选（与国家独立），语言种类与多语言配置一致
+  // 语言选项：只列前端真的能渲染的语言（SUPPORTED_LANGUAGES）。
+  // 这里不能直接铺全 LANG_INFO（60 种）：未入 SUPPORTED_LANGUAGES 的选项选了也不会生效
+  // —— applyLoginLanguage 下方的守卫会直接跳过 changeAppLanguage，于是一个死选项；
+  // 用户在登录前选「泰文」，页面照旧不动，登录后也还是原语言，只能当成「切换坏了」。
+  // 真值是后端的 sys_language，但 /translations/languages 需要登录才能访问（不在白名单），
+  // 登录页拿不到，所以这里只给静态兜底齐备的那几种：它们离线也能完整渲染，选了就一定生效。
+  // 门户/系统内的语言下拉仍读后端已启用语言（PortalLocaleControls），不受本处收敛影响。
   const languageOptions = useMemo(() =>
-    Object.keys(LANG_INFO).map(code => ({
+    SUPPORTED_LANGUAGES.map(code => ({
       value: code,
       label: `${LANG_INFO[code]?.flag ?? '🌐'} ${langSysName(code, sysLang)}`,
     })), [sysLang])
@@ -174,7 +180,10 @@ export default function Login() {
       }
     }
     const savedLang = localStorage.getItem('login_language')
-    const lang = savedLang && LANG_INFO[savedLang] ? savedLang : 'en'
+    // 只在「前端真能渲染」的语言里恢复历史选择：旧版本会把未支持的语言写进
+    // login_language（当时下拉铺了全 60 种），不拦就会回到「选中但不生效」的同一种坑
+    const lang = savedLang && (SUPPORTED_LANGUAGES as readonly string[]).includes(savedLang)
+      ? savedLang : 'en'
     setLoginCountry(country)
     applyLoginLanguage(lang)
   }, [])
@@ -289,6 +298,7 @@ export default function Login() {
             <Select
               value={loginCountry}
               onChange={handleLoginCountryChange}
+              aria-label={t('portal.country')}
               size="small"
               variant="borderless"
               className="login-locale-select"
@@ -305,6 +315,7 @@ export default function Login() {
             <Select
               value={loginLanguage}
               onChange={handleLoginLanguageChange}
+              aria-label={t('portal.language')}
               size="small"
               variant="borderless"
               className="login-locale-select"

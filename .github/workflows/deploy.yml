@@ -110,6 +110,10 @@ jobs:
       # 永远同步不到新 key（2026-11-05 实测副本只有真源的一半），简体中文会大面积回退英文
       - name: i18n Backend Mirror
         run: npm run check:i18n-mirror
+      # 免登界面（登录页）只能靠静态包：/translations/bundle 需要登录才拿得到。
+      # 少了这道门禁，给登录页加一句新文案就会让日语/韩语/俄语登录页静默回退英文
+      - name: i18n Pre-auth Static Bundle
+        run: npm run check:i18n-preauth
       # gitignore 遮蔽/凭据副本守卫：两件事都不会让任何测试变红——
       # ① 忽略规则写宽，把已跟踪的入库模板静默挡出 git status 视野；
       # ② 本地凭据备份（形如 backend/.env.local.bak-<日期>）没被忽略，随时被 `git add -A` 扫进公开仓。

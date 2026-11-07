@@ -30,13 +30,20 @@ export interface LanguageVO {
   names?: Record<string, string>
 }
 
-/** 语言完成率 */
+/** 语言完成率（全站口径：分母 = 语言包镜像 key ∪ 库里字段） */
 export interface CoverageVO {
   langCode: string
+  /** 需译全集；不是「库里记录数」——旧口径会把未入库词条排除在分母外，刷出假 100% */
   total: number
   translated: number
   rate: number
   status: 'not_configured' | 'partial' | 'ready'
+  /** 库里现有记录数（用来说明 total 与旧口径的差） */
+  dbTotal?: number
+  /** 镜像文案 key 数；0 表示镜像不可用，此时 total 退回只按库记录算 */
+  mirrorTotal?: number
+  /** 镜像里有、库里还没同步的 key 数；>0 就是「加了文案没跑同步」 */
+  missingInDb?: number
 }
 
 const SILENT = { headers: { [SILENT_HEADER]: '1' } }
@@ -84,7 +91,7 @@ export async function fetchTranslationBundle(lang: string) {
   }
 }
 
-/** 语言完成率校验 */
+/** 语言完成率校验（全站口径，供顶部语言切换与统计页共用） */
 export async function fetchCoverage(lang: string) {
   try {
     return await request.get<unknown, CoverageVO>('/translations/coverage', {

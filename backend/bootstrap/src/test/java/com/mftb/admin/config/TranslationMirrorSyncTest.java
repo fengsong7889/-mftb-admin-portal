@@ -1,5 +1,3 @@
-package com.mftb.admin.config;
-
 /*
  * Copyright (c) 2026 fengsong7889. All Rights Reserved.
  *
@@ -7,6 +5,7 @@ package com.mftb.admin.config;
  * 未经著作权人书面许可，不得使用、复制、修改、再分发或用于任何商业目的。
  * 完整许可条款见仓库根目录 LICENSE 文件。
  */
+package com.mftb.admin.config;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -216,11 +215,13 @@ class TranslationMirrorSyncTest {
     }
 
     @Test
-    @DisplayName("updated_by 前缀判定：回写与机翻不算人工，空值不算，人名算")
+    @DisplayName("updated_by 前缀判定：系统写入不算人工，空值不算，人名算")
     void humanEditMarkerRecognition() {
         assertFalse(TranslationDataInitializer.isHumanEdited("machine(null)"));
         assertFalse(TranslationDataInitializer.isHumanEdited("backfill-zh-CN"));
         assertFalse(TranslationDataInitializer.isHumanEdited("i18n-sync"));
+        // 系统写入方一旦改名成 i18n- 前缀家族，不能被误判成人工修订而永久不再被修正
+        assertFalse(TranslationDataInitializer.isHumanEdited("i18n-preauth-fix"));
         assertFalse(TranslationDataInitializer.isHumanEdited(null));
         assertFalse(TranslationDataInitializer.isHumanEdited("  "));
         assertTrue(TranslationDataInitializer.isHumanEdited("管理员"));

@@ -13,6 +13,7 @@ import com.mftb.admin.entity.SysLanguage;
 import com.mftb.admin.entity.SysTranslation;
 import com.mftb.admin.mapper.SysLanguageMapper;
 import com.mftb.admin.mapper.SysTranslationMapper;
+import com.mftb.admin.service.I18nLocaleMirror;
 import com.mftb.admin.service.TranslationService;
 import com.ibm.icu.text.Transliterator;
 import com.mftb.admin.util.OperatorResolver;
@@ -30,10 +31,12 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -107,6 +110,8 @@ public class TranslationServiceImpl implements TranslationService {
     private final SysLanguageMapper languageMapper;
     private final OperatorResolver operatorResolver;
     private final ObjectMapper objectMapper;
+    /** 前端语言包镜像：完成率分母的全站 key 全集来自它 */
+    private final I18nLocaleMirror localeMirror;
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(5))
             .build();
@@ -228,13 +233,43 @@ public class TranslationServiceImpl implements TranslationService {
         return bundle;
     }
 
+    /**
+     * 语言翻译完成率统计（全站口径）。
+     * <p>分母是「镜像文案 key 全集 ∪ 库里已有字段」，不是库里记录数。旧口径会让
+     * 前端有、但尚未同步入库的词条根本不入分母，于是翻译完库里那部分就能刷到 100%，
+     * 而界面实际只能解析一半（2026-11-05 实测：库里 8504 条全翻完，简体中文真实解析率 51.4%，
+     * 「翻译统计」页六语均显示 100%，没有任何环节报警）。数组型文案由镜像侧直接排除，
+     * 它的真源是前端静态包，不应出现在翻译表里。
+     */
     @Override
     public TranslationCoverageVO coverage(String langCode) {
         List<SysTranslation> all = translationMapper.selectList(null);
-        long total = all.size();
-        long translated = all.stream()
-                .filter(t -> StringUtils.hasText(readJson(t.getTranslationsJson()).get(langCode)))
-                .count();
+        // fieldKey → 该语言是否非空；库里没这条 key 的不在图内，另计入 missingInDb
+        Map<String, Boolean> hasValue = new HashMap<>(Math.max(16, all.size() * 2));
+        for (SysTranslation t : all) {
+            hasValue.put(t.getFieldKey(), StringUtils.hasText(readJson(t.getTranslationsJson()).get(langCode)));
+        }
+
+        Set<String> universe = new HashSet<>(hasValue.keySet());
+        long mirrorTotal = localeMirror.textKeyCount();
+        if (mirrorTotal > 0) {
+            universe.addAll(localeMirror.textKeys());
+        } else {
+            // 镜像不可用时不能把分母拍成 0：退回旧口径，并在日志里说清这个读数不是全站口径
+            log.warn("多语言模块: 语言包镜像不可用，{} 的完成率退回「仅按库记录」口径（会偏高）", langCode);
+        }
+
+        long total = universe.size();
+        long translated = 0;
+        long missingInDb = 0;
+        for (String fieldKey : universe) {
+            Boolean present = hasValue.get(fieldKey);
+            if (present == null) {
+                missingInDb++;
+            } else if (present) {
+                translated++;
+            }
+        }
 
         boolean langRegistered = languageMapper.selectCount(
                 new LambdaQueryWrapper<SysLanguage>().eq(SysLanguage::getCode, langCode)) > 0;
@@ -243,6 +278,9 @@ public class TranslationServiceImpl implements TranslationService {
         vo.setLangCode(langCode);
         vo.setTotal(total);
         vo.setTranslated(translated);
+        vo.setDbTotal(all.size());
+        vo.setMirrorTotal(mirrorTotal);
+        vo.setMissingInDb(missingInDb);
         double rate = total > 0 ? (double) translated / total : 0;
         vo.setRate(rate);
         if (!langRegistered || rate == 0) {

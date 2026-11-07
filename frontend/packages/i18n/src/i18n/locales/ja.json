@@ -1014,6 +1014,36 @@
     "btnScoreResult": "採点結果"
   },
   "meeting": {
-    "calendarWeekdays": ["日", "月", "火", "水", "木", "金", "土"]
+    "calendarWeekdays": [
+      "日",
+      "月",
+      "火",
+      "水",
+      "木",
+      "金",
+      "土"
+    ]
+  },
+  "login": {
+    "accountDisabledDesc": "アカウントが管理者によって無効化されました。管理者に連絡して復元してください。",
+    "accountDisabledOk": "「…………うん、分かったよ」",
+    "accountDisabledTitle": "アカウントが無効化されました",
+    "alipay": "Alipay",
+    "captchaRequiredHint": "アカウント保護のため、連続でログインに失敗した後は、次回ログイン前にスライダー認証を完了する必要があります",
+    "empIdLabel": "ログイン作業番号",
+    "empIdPlaceholder": "勤務先IDを入力してください",
+    "empIdRequired": "勤務先IDを入力してください",
+    "failed": "ログインに失敗しました",
+    "pwdLabel": "ログインパスワード",
+    "pwdPlaceholder": "パスワードを入力してください",
+    "pwdRequired": "パスワードを入力してください",
+    "submit": "ログイン",
+    "success": "ログインに成功しました",
+    "videoBrand": "MFTB //検索プロモーションシステム",
+    "wechat": "WeChat",
+    "welcomeTitle": "こんにちは、MFTBマーケティングシステムへようこそ"
+  },
+  "app": {
+    "logoGroup": "MFTBグループポータル"
   }
 }

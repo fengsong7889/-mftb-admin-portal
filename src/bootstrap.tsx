@@ -3,11 +3,20 @@ import React, { useEffect, useMemo, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import { ConfigProvider } from 'antd'
 import zhTW from 'antd/locale/zh_TW'
+import zhCN from 'antd/locale/zh_CN'
 import enUS from 'antd/locale/en_US'
+import jaJP from 'antd/locale/ja_JP'
+import koKR from 'antd/locale/ko_KR'
+import ruRU from 'antd/locale/ru_RU'
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-tw'
+import 'dayjs/locale/zh-cn'
+import 'dayjs/locale/ja'
+import 'dayjs/locale/ko'
+import 'dayjs/locale/ru'
 import App from './App'
 import i18n, { registerRemoteBundleLoader } from '@/i18n'
+import { antdLocaleKey, dayjsLocaleKey, htmlLangAttr } from '@/i18n/localeMapping'
 import ThemeProvider from '@/theme/ThemeProvider'
 import { useTheme } from '@/theme/ThemeContext'
 import { buildThemeConfig } from '@/theme/themeTokens'
@@ -21,6 +30,20 @@ import '@/styles/global.css'
 // antd DatePicker 的星期表头取自 dayjs locale，未设置时会显示英文（Sun/Mon…）；
 // 默认语言为繁中，这里同步把 dayjs locale 设为 zh-tw，语言切换时再跟随调整
 dayjs.locale('zh-tw')
+
+/**
+ * 界面语言 → antd 内置文案 locale（分页/空数据/确认按钮等）。
+ * 类型直接取 zhTW 的形状：antd 并不从 config-provider 导出 Locale（写了会 TS2614），
+ * 拿现成的导入项做型比再猜导出路径更不容易碎。
+ */
+const ANTD_LOCALES: Record<ReturnType<typeof antdLocaleKey>, typeof zhTW> = {
+  en_US: enUS,
+  zh_CN: zhCN,
+  zh_TW: zhTW,
+  ja_JP: jaJP,
+  ko_KR: koKR,
+  ru_RU: ruRU,
+}
 
 /**
  * antd 主题配置已移到 `@/theme/themeTokens`（浅色/深色两套 + buildThemeConfig）。
@@ -37,9 +60,13 @@ function AppProviders() {
 
   useEffect(() => {
     const syncLocale = () => {
-      const isEn = !!i18n.language?.startsWith('en')
-      setLocale(isEn ? enUS : zhTW)
-      dayjs.locale(isEn ? 'en' : 'zh-tw')
+      // 旧实现只分「en 用英文、其余一律繁中」：简体中文会拿到繁体的 antd 内置文案与
+      // dayjs 星期表头（週日/週一），跟已经是简体的正文同一屏两种字形；ja/ko/ru 同理。
+      // 现在按当前语言选对应 locale，映射口径由 localeMapping 统一持有并由单测钉住。
+      setLocale(ANTD_LOCALES[antdLocaleKey(i18n.language)])
+      dayjs.locale(dayjsLocaleKey(i18n.language))
+      // 读屏器与搜索引擎靠这个属性判断页面语种；它此前一直停在 index.html 的 zh-TW
+      document.documentElement.lang = htmlLangAttr(i18n.language)
     }
     syncLocale()
     i18n.on('languageChanged', syncLocale)

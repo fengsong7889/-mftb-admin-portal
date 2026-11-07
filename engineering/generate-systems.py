@@ -106,6 +106,9 @@ BACKEND_PREFIXES = {
     'platform': ['Sys', 'System', 'Notification', 'Translation', 'Version', 'Schema',
                  'Migration', 'Word', 'Ding', 'Api', 'Avatar', 'Batch', 'Date'],
     'search': ['Search', 'Hint', 'HotSearch', 'StopWord', 'Synonym'],
+    # 多语言系统（前端目录见 line 75 的 'i18n'）：`I18n*` 类（如 I18nLocaleMirror 语言包镜像视图）
+    # 归本系统；`Translation*` 仍在 platform 下，那是平台侧的翻译服务与管理接口，不搬。
+    'i18n': ['I18n'],
     'portal': ['Portal', 'Home'],
 }
 
