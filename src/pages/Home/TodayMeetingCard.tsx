@@ -48,15 +48,10 @@ export default function TodayMeetingCard({ bar }: { bar: TodayMeetingBarState })
   if (!bar.hasMeeting || bar.collapsed || !data) return null
 
   return (
-    <div
-      className="home-today-meeting"
-      style={{
-        display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
-        padding: '10px 12px 10px 18px', marginBottom: 14, borderRadius: 10,
-        background: 'linear-gradient(90deg, #F0F7FF 0%, #FFFFFF 100%)',
-        border: '1px solid #E6F0FB',
-      }}
-    >
+    /* 样式住在 Home/index.css 的 .home-today-meeting：原先写在本行 inline style 里，
+       而 inline 优先级高于任何 CSS 规则，深色侧只能靠 !important 硬碰，
+       所以把静态样式移回 CSS。渐变两端已令牌化，浅色逐像素不变。 */
+    <div className="home-today-meeting">
       {/* 信息区只做展示，不再整行可点：避免点「收起」时误触跳转我的會議 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
         <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('home.meetingTitle')}</span>
@@ -84,7 +79,7 @@ export default function TodayMeetingCard({ bar }: { bar: TodayMeetingBarState })
         >
           {t('home.meetingView')} <RightOutlined style={{ fontSize: 10 }} />
         </Button>
-        <span style={{ width: 1, height: 14, background: '#DCE7F2' }} aria-hidden="true" />
+        <span className="home-today-meeting__divider" aria-hidden="true" />
         <Tooltip title={t('home.meetingCollapseTip')}>
           <Button
             type="text"

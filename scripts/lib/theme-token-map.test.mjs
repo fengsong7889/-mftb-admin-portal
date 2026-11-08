@@ -784,3 +784,89 @@ describe('奖牌金属色族（--medal-* / --on-medal）', () => {
     expect(TOKEN_VALUES['on-medal'].dark).toBe(TOKEN_VALUES['on-brand'].dark)
   })
 })
+
+/**
+ * 首页「今日會議」提示栏一族（--info-bar-*）。
+ *
+ * 为什么必须单独一组：这一栏上**最弱的前景不是文字，而是「查看我的會議」那条品牌橙链接**。
+ * 不钉住它，下任为了“让提示栏更显眼”把蓝色调调浓，就会把那条链接压到 AA 以下，
+ * 而肉眼完全看不出问题（底仍然很暗）。所以除了“现在达标”，还必须钉“更浓就不达标”。
+ *
+ * ⚠ alpha 一律从 TOKEN_VALUES 里解出来，不在测试里重抄一遍：
+ *   重抄的话改深色调时测试不会红，等于断言没有牙。
+ */
+describe('今日會議提示栏（--info-bar-*）', () => {
+  const CARD = TOKEN_VALUES['surface-2'].dark
+
+  const toRgb = (s) => {
+    if (s.startsWith('#')) {
+      const h = normalizeHex(s).hex
+      return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16), 1]
+    }
+    const p = s.match(/rgba?\(([^)]+)\)/)[1].split(',').map((x) => Number(x.trim()))
+    return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]
+  }
+  /** 合成方向必须是 tint×alpha + 背板×(1-alpha)。写反会得出“深底变亮”的荒谬值（§廿六 实踩）。 */
+  const over = (tint, back) => {
+    const t = toRgb(tint), b = toRgb(back)
+    return '#' + [0, 1, 2].map((i) => Math.round(t[i] * t[3] + b[i] * (1 - t[3])).toString(16).padStart(2, '0')).join('')
+  }
+  /** 把任意 alpha 的 info 色调合成到卡片底，用于扫“调浓一档会怎样” */
+  const barAt = (alpha) => over(`rgba(24, 144, 255, ${alpha})`, CARD)
+
+  it('深色底必须是带 alpha 的四元 rgba，且 alpha 不得大于 0.12', () => {
+    const m = TOKEN_VALUES['info-bar-from'].dark
+      .match(/^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/)
+    expect(m, `必须是 rgba(r,g,b,a) 四元，实际：${TOKEN_VALUES['info-bar-from'].dark}`).not.toBeNull()
+    // 上限不是审美而是扫出来的：α=0.12 时品牌橙链接实测 4.588（仍达标），α=0.14 起跌破 4.5。
+    // 取 0.12 作硬上限是为了给“再调浓一点”留一个会红的边界，而不是鼓动用到 0.12。
+    expect(Number(m[4]), 'alpha 超过 0.12 会把品牌橙链接压到 AA 以下').toBeLessThanOrEqual(0.12)
+  })
+
+  it('栏上四种前景在合成底上全部达 AA 4.5:1', () => {
+    const bg = barAt(toRgb(TOKEN_VALUES['info-bar-from'].dark)[3])
+    const fg = ['text-2', 'text-3', 'info', 'brand']
+    for (const name of fg) {
+      const c = contrastRatio(TOKEN_VALUES[name].dark, bg)
+      expect(c, `${name}(${TOKEN_VALUES[name].dark}) on ${bg}`).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+
+  it('更浓一档必须真的不达标（钉住 0.10 这个选择，防止被当成“不够显眼”而调浓）', () => {
+    // 这三对就是本轮定档时扫出来的实测数字；如果哪天它们不再 < 4.5，
+    // 说明品牌橙或卡片底变了，需要重新评估本族 alpha，而不是默认 0.10 永远对。
+    expect(contrastRatio(TOKEN_VALUES.brand.dark, barAt(0.14)), 'α=0.14 上的品牌橙链接')
+      .toBeLessThan(4.5)
+    expect(contrastRatio(TOKEN_VALUES.brand.dark, barAt(0.20)), 'α=0.20 上的品牌橙链接')
+      .toBeLessThan(4.5)
+  })
+
+  it('浅色值必须逐个等于被替换的原字面量（这是「浅色不变」的唯一机验）', () => {
+    // 这四个值就是 TodayMeetingCard 原先 inline style 里的字面量，改动任何一项就意味着浅色观感被动了。
+    expect(TOKEN_VALUES['info-bar-from'].light).toBe('#F0F7FF')
+    expect(TOKEN_VALUES['info-bar-border'].light).toBe('#E6F0FB')
+    expect(TOKEN_VALUES['info-bar-divider'].light).toBe('#DCE7F2')
+    // 渐变右端复用 --surface-2，不另建档（它的浅色档就是原来的 #FFFFFF）
+    expect(TOKEN_VALUES['surface-2'].light).toBe('#FFFFFF')
+  })
+
+  it('族令牌不得进 COLOR_TO_TOKEN（它们藏在串内部，codemod 本来就扫不到）', () => {
+    // 这正是它们能逃过十几轮批次的原因；入了反向映射只会多三个用不上的条目，
+    // 而且一旦渐变里出现同值的不同语义（比如白底卡片），就会被误刷。
+    for (const seg of Object.keys(COLOR_TO_TOKEN)) {
+      const hit = Object.entries(COLOR_TO_TOKEN[seg]).filter(([, token]) => String(token).includes('info-bar'))
+      expect(hit, `${seg} 段不应映射到 info-bar 族`).toEqual([])
+    }
+  })
+
+  it('描边与分隔线必须比栏底更亮（深色下“靠底色区分”很弱，主要靠边）', () => {
+    const bg = barAt(toRgb(TOKEN_VALUES['info-bar-from'].dark)[3])
+    expect(relativeLuminance(over(TOKEN_VALUES['info-bar-border'].dark, CARD)))
+      .toBeGreaterThan(relativeLuminance(bg))
+    expect(relativeLuminance(over(TOKEN_VALUES['info-bar-divider'].dark, CARD)))
+      .toBeGreaterThan(relativeLuminance(bg))
+    // 而分隔线要比外框弱一档，否则两个 1px 线在深色下分不清主次
+    expect(relativeLuminance(over(TOKEN_VALUES['info-bar-divider'].dark, CARD)))
+      .toBeLessThan(relativeLuminance(over(TOKEN_VALUES['info-bar-border'].dark, CARD)))
+  })
+})

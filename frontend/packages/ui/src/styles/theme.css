@@ -15,7 +15,7 @@
  * 改颜色的正确流程：改 TOKEN_VALUES（浅色值 + 深色值 + 实测对比度）→ 跑生成脚本 → 跑门禁。
  * 深色取值规则与实测依据：docs/design/深浅色主题切换_可落地实施方案_2026-11-03.md §4.3 / §4.5 / §4.6
  *
- * 令牌共 77 个：语义层 + 组件层（--sidebar-*）+ 阴影/描边补偿。
+ * 令牌共 80 个：语义层 + 组件层（--sidebar-*）+ 阴影/描边补偿。
  * 业务代码只允许引用语义层；--sidebar-* 属组件层，仅壳层 CSS 可用。
  */
 :root {
@@ -68,6 +68,9 @@
   --success-soft: #F6FFED;
   --info: #1890FF;
   --info-soft: #E6F7FF;
+  --info-bar-from: #F0F7FF;
+  --info-bar-border: #E6F0FB;
+  --info-bar-divider: #DCE7F2;
   --warning: #FA8C16;
   --warning-soft: #FFF7E6;
   --danger: #FF4D4F;
@@ -148,6 +151,9 @@ html[data-theme='dark'] {
   --success-soft: rgba(82,196,26,0.16);
   --info: #40A9FF;
   --info-soft: rgba(24,144,255,0.16);
+  --info-bar-from: rgba(24,144,255,0.10);
+  --info-bar-border: rgba(64,169,255,0.32);
+  --info-bar-divider: rgba(64,169,255,0.24);
   --warning: #FAA03D;
   --warning-soft: rgba(250,140,22,0.16);
   --danger: #FF7875;
@@ -239,6 +245,9 @@ html {
     --success-soft: #F6FFED;
     --info: #1890FF;
     --info-soft: #E6F7FF;
+    --info-bar-from: #F0F7FF;
+    --info-bar-border: #E6F0FB;
+    --info-bar-divider: #DCE7F2;
     --warning: #FA8C16;
     --warning-soft: #FFF7E6;
     --danger: #FF4D4F;

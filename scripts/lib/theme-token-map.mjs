@@ -65,6 +65,8 @@ export const SEMANTIC_TOKENS = [
   'stat-border-info', 'stat-border-brand', 'stat-border-success', 'stat-border-purple', 'stat-border-neutral',
   // 语义色
   'success', 'success-soft', 'info', 'info-soft',
+  // 首页「今日會議」提示栏专用一族（渐变底 + 描边 + 内部分隔），理由见 TOKEN_VALUES 注释
+  'info-bar-from', 'info-bar-border', 'info-bar-divider',
   'warning', 'warning-soft', 'danger', 'danger-soft', 'purple', 'purple-soft',
   // 语义色的补充阶：危险提示条底、深橙前景、蓝调 hover 底
   //（它们不是另一令牌的重复值，而是 antd 调色板上真实存在、与现有令牌差 1~15 个单位的邻阶）
@@ -245,6 +247,34 @@ export const TOKEN_VALUES = {
   'success-soft': { light: '#F6FFED', dark: 'rgba(82,196,26,0.16)' },
   info: { light: '#1890FF', dark: '#40A9FF' },
   'info-soft': { light: '#E6F7FF', dark: 'rgba(24,144,255,0.16)' },
+  /*
+   * 首页「今日會議」提示栏专用一族（TodayMeetingCard）。
+   *
+   * 为什么它们逃过了全部批次（这是本族存在的唯一理由）：三个色值都写在
+   * **渐变串与 border 简写串内部**（`linear-gradient(90deg, #F0F7FF 0%, #FFFFFF 100%)`、
+   * `border: '1px solid #E6F0FB'`），而：
+   *   - codemod 对渐变内色值故意保守跳过（怕弄坏装饰渐变）；
+   *   - `inlineHex` 只统计**引号紧邻**的 hex，串内部的 hex 根本不进计数。
+   * 所以门禁看不见它们，批次跑了十几轮也没人碰到——直到用户拿截图报障。
+   * 渐变右端直接复用 --surface-2（浅 #FFFFFF / 深 #1F1F1F），不另建档。
+   *
+   * 深色档不是拍脑袋：这条栏上实际承载四种前景，**瓶颈不是文字而是「查看我的會議」
+   * 那条品牌橙链接**。取 tint=(24,144,255) 压在卡片底 #1F1F1F 上合成：
+   *   α=0.10 → 合成底 #1E2A35：brand #E8720C **4.760**、text-3 5.190、text-2 6.735、info 5.799
+   *   α=0.14 → 合成底 #1E2F3E：brand 跌到 **4.469**（AA 不达标）
+   *   α=0.20 → 合成底 #1E364C：brand 仅 **4.056**
+   * 所以 0.10 是「蓝色调仍可辨」与「最弱前景达 AA」交集里偏保守的一档。
+   *
+   * 描边取 0.32 与 --info-border 同档，**不为了凑 3.0 而开一个与全站不一致的强边**：
+   * 实测描边压在页面底 #1F1F1F 上要 α≥0.60 才到 3.211，但那会让深色下的细边比浅色下还重；
+   * 深色下这条栏的区分靠「底色蓝调 + 描边」共同作用，而描边可见性本来就不套 WCAG 3.0。
+   *
+   * 三个值都**不进** COLOR_TO_TOKEN：它们只在渐变/简写串内部，codemod 本来就扫不到，
+   * 入了反向映射只会多三个永远用不上的条目（与奖牌族、玻璃族同处理）。
+   */
+  'info-bar-from': { light: '#F0F7FF', dark: 'rgba(24,144,255,0.10)' },
+  'info-bar-border': { light: '#E6F0FB', dark: 'rgba(64,169,255,0.32)' },
+  'info-bar-divider': { light: '#DCE7F2', dark: 'rgba(64,169,255,0.24)' },
   warning: { light: '#FA8C16', dark: '#FAA03D' },
   'warning-soft': { light: '#FFF7E6', dark: 'rgba(250,140,22,0.16)' },
   danger: { light: '#FF4D4F', dark: '#FF7875' },

@@ -141,6 +141,31 @@
   outline-offset: 2px;
 }
 
+/* 首页「今日會議」提示栏（TodayMeetingCard）。
+   样式原先全在 inline style 里，而 inline 优先级高于任何 CSS 规则——
+   深色侧覆盖只能靠 !important 跟它打架，所以先把它移回 CSS。
+   渐变两端都用 var()：浅色逐像素等于原来的
+   `linear-gradient(90deg, #F0F7FF 0%, #FFFFFF 100%)`，深色自动换成「蓝调 → 卡片底」。 */
+.home-today-meeting {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px 10px 18px;
+  margin-bottom: 14px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, var(--info-bar-from) 0%, var(--surface-2) 100%);
+  border: 1px solid var(--info-bar-border);
+}
+
+/* 「查看我的會議」与「收起」之间的竖分隔线：原先是 inline 的 #DCE7F2，
+   它是这一栏里唯一被 inlineHex 门禁看见过的色值（其余三个藏在串内部）。 */
+.home-today-meeting__divider {
+  width: 1px;
+  height: 14px;
+  background: var(--info-bar-divider);
+}
+
 .home-greeting-time {
   font-size: 26px;
   font-weight: 700;
