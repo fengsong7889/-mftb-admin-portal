@@ -23,15 +23,19 @@ export interface SpecEntry {
 }
 
 /** 说明面板 key */
-export type SpecPanelKey = 'groupBuy' | 'delivery'
+export type SpecPanelKey = 'groupBuy' | 'delivery' | 'preferred' | 'groupPage'
 
 export interface SpecPanel {
   key: SpecPanelKey
+  /** 菜单分类（说明 Tab 分组）：首页 / 特惠团购页 */
+  group: string
   /** 面板 Tab 文案 */
   label: string
   defaults: SpecEntry[]
   /** localStorage 版本号（变更时自动失效该面板旧缓存） */
   version: number
+  /** 高亮锚点作用域：卡片 SpecField 的 panel 值；缺省=key（「推荐」与首页团购共用 groupBuy 锚点） */
+  anchor?: SpecPanelKey
 }
 
 /* ══════════ 面板一：团购瀑布流（GroupBuyFeedCard，No.1~No.15） ══════════ */
@@ -76,10 +80,25 @@ export const DELIVERY_SPECS: SpecEntry[] = [
   { id: 14, label: '配送类型', desc: '1、MFOOD 按顺序：mFood送 → 自送 → 支持自取；\n2、閃蜂按顺序：閃蜂送 → 自送 → 支持自取；\n3、具体展示配送类型值，由调度系统返回；\n4、商家支持自取：有折扣显示「自取x折」，无折扣直接显示「支持自取」。', source: '待补充' },
 ]
 
-/* ─── 面板注册表（说明表格 Tab 与 localStorage 读写都以此为准） ─── */
+/* ══════════ 面板三：優選商家瀑布流（PreferredMerchantCard，閃蜂專屬） ══════════
+   No.9=界面入口（无卡片锚点，纯导航说明）；No.1~No.6 锚点已包到商家卡字段。 */
+export const PREFERRED_SPECS: SpecEntry[] = [
+  { id: 9, label: '界面入口', desc: '如何切换到当前界面：閃蜂APP → 首页【特惠團購】→ 特惠團購界面 → 页签【優選商家】；切换后页签行下方瀑布流由团购券切换为商家卡瀑布流（即本面板说明的对象）。\n反向联动：点击本面板 Tab 也会向手机壳下发命令，自动进入特惠團購界面并切到【優選商家】页签；壳内点击页签同样会回流切换本面板。', source: '閃蜂APP → 特惠團購 → 页签【優選商家】', brand: 'bee' },
+  { id: 1, label: '门店名称', desc: '【展示】黑色加粗标题「翡翠茶餐廳🏆-關閘店（🔥全澳...）」。\n数据来源：展示业务门店配置的真实门店名称。\n排版截断：单行展示，超出可用宽度尾部自动以省略号「...」截断。\n交互行为：点击门店名称直接跳转至该门店的「商家/门店主页」。\n【右上角收藏】：右上角悬浮半透明背景收藏星标。', source: '商家后台 → 门店配置 → 门店名称', brand: 'bee' },
+  { id: 2, label: '门店Logo', desc: '左侧圆角方块：品牌色渐变底 + 白色品牌字（占位口径，待切图后展示商家配置的品牌 LOGO）。\n新店飘带：新店于左上角展示绿色斜飘带「新店」。', source: '商家后台 → 门店配置 → 品牌LOGO', brand: 'bee' },
+  { id: 3, label: '评分行', desc: '橙色心形 + 评分 ｜ 人均 ｜ 品类·商圈 ｜ 距离，四段以细竖线分隔；超宽时品类·商圈段省略号截断。\n距离口径同团购瀑布流 No.9：小于1公里显示 m。', source: '门店配置 → 评分/人均/品类 + 用户定位', brand: 'bee' },
+  { id: 4, label: '标签行', desc: '勁爆券紫色标（带⚡尾标）+ 可选膨胀紫软标「最高膨脹至$xx」+ 灰色标「半年售xx+」。\n半年售阶梯取整口径同团购瀑布流 No.6。', source: '营销后台 → 券包/红包配置 + 销量统计', brand: 'bee' },
+  { id: 5, label: '券列表', desc: '1~3 行：橙色方图标（券/惠/秒）+ 红色价格 + 红描边折扣 pill + 灰色券名（单行截断）。\n图标语义：券=代金券、惠=优惠券、秒=秒杀券；行数取门店当前可领券数，最多3行。', source: '商家后台 → 券配置', brand: 'bee' },
+  { id: 6, label: '收藏按钮', desc: '右上角圆形钮：未收藏=灰色空心星，已收藏=橙色实心星；点击切换收藏态。', source: '用户收藏关系', brand: 'bee' },
+]
+
+/* ─── 面板注册表（说明表格 Tab 与 localStorage 读写都以此为准） ───
+   分组口径：首页 → 团购/外卖瀑布流；特惠团购页 → 推荐（团购卡同规格）/優選商家。 */
 export const SPEC_PANELS: SpecPanel[] = [
-  { key: 'groupBuy', label: '团购瀑布流', defaults: GROUPBUY_SPECS, version: 10 },
-  { key: 'delivery', label: '外卖瀑布流', defaults: DELIVERY_SPECS, version: 22 },
+  { key: 'groupBuy', group: '首页', label: '团购瀑布流', defaults: GROUPBUY_SPECS, version: 10 },
+  { key: 'delivery', group: '首页', label: '外卖瀑布流', defaults: DELIVERY_SPECS, version: 22 },
+  { key: 'groupPage', group: '特惠团购页', label: '推荐', defaults: GROUPBUY_SPECS, version: 1, anchor: 'groupBuy' },
+  { key: 'preferred', group: '特惠团购页', label: '優選商家', defaults: PREFERRED_SPECS, version: 1 },
 ]
 
 /** 旧导出名兼容（团购默认规范，历史消费方） */
@@ -88,6 +107,8 @@ export const DEFAULT_SPECS = GROUPBUY_SPECS
 /* ─── localStorage 读写（按面板分 key；版本号变更时自动失效该面板旧缓存） ─── */
 
 function storageKey(panel: SpecPanelKey) {
+  if (panel === 'preferred') return 'app-preview:preferred-specs'
+  if (panel === 'groupPage') return 'app-preview:group-page-specs'
   return panel === 'groupBuy' ? 'app-preview:group-buy-specs' : 'app-preview:delivery-specs'
 }
 

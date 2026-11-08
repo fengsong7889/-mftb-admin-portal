@@ -19,6 +19,7 @@
  * 类名前缀 apw-grid-（外賣瀑布流卡片模式），样式全部走语义令牌（不新增裸色值）。
  */
 import { SpecField } from './SpecHighlight'
+import BrandCover from './BrandCover'
 
 /** 卡片模式门店数据（閃蜂 DeliveryStore / MFOOD MfoodStore 的公共子集） */
 export interface DeliveryGridStore {
@@ -60,7 +61,7 @@ export default function DeliveryGridCard({ brand, store, onOpenStore }: {
     <div className="apw-grid-card" onClick={() => onOpenStore?.(store.merchantId)}>
       <SpecField panel="delivery" id={15}>
         <div className="apw-grid-img">
-          <img src={store.image} alt={store.name} />
+          <BrandCover seed={store.merchantId} name={store.name} />
           <div className="apw-grid-overlay">
             <span className="apw-grid-overlay-type">{overlayType}</span>
             <SpecField panel="delivery" id={8}>

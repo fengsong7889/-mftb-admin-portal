@@ -12,7 +12,7 @@
  * 说明：消费者侧暂无对应后端只读接口，各页先用占位数据渲染版式，待接口与设计切图接入后替换。
  * 界面文案走 appConsumer 命名空间（zh-TW + en 双语已登记，其余语种回落英文）。
  */
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import ConsumerHome from './ConsumerHome'
 import ConsumerGroupBuy from './ConsumerGroupBuy'
@@ -72,6 +72,20 @@ export default function ConsumerApp({ onCategoryChange, syncCategory, syncSeq, d
   }
   const addToCart = () => setCartCount((count) => count + 1)
 
+  /* 壳外说明面板同步命令：特惠团购页两类 → 进入特惠團購界面（页签由 ConsumerGroupBuy 内部切换）；
+     首页两类 → 回首页根屏（分类由 ConsumerHome 内部切换） */
+  const syncSeqRef = useRef(syncSeq ?? 0)
+  useEffect(() => {
+    if ((syncSeq ?? 0) !== syncSeqRef.current) {
+      syncSeqRef.current = syncSeq ?? 0
+      if (syncCategory === 'preferred' || syncCategory === 'page-group') {
+        if (nav.current.key !== 'groupbuy') nav.push({ key: 'groupbuy' })
+      } else if ((syncCategory === 'group' || syncCategory === 'delivery') && nav.current.key !== 'home') {
+        nav.reset(ROOT.home)
+      }
+    }
+  }, [syncSeq, syncCategory, nav])
+
   const isSearch = current.key === 'search'
   const baseScreen = isSearch ? nav.stack[nav.stack.length - 2] : current
   const isRoot = !isSearch && TABS.some((tab) => tab.key === current.key)
@@ -111,6 +125,9 @@ export default function ConsumerApp({ onCategoryChange, syncCategory, syncSeq, d
             onSearch={() => openSearch('groupbuy')}
             onOpenStore={openStore}
             onOpenOrder={() => nav.reset(ROOT.order)}
+            onTabChange={onCategoryChange}
+            syncTab={syncCategory}
+            syncSeq={syncSeq}
           />
         )
       case 'delivery':

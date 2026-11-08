@@ -17,7 +17,8 @@ import riceballImg from '@/assets/consumer-home/riceball.jpg'
 import friedChickenImg from '@/assets/consumer-home/friedchicken.jpg'
 import fishPotImg from '@/assets/consumer-home/fishpot.jpg'
 import lemonTeaImg from '@/assets/consumer-home/lemontea.jpg'
-import GroupBuyFeedCard, { type GroupBuyItem } from './GroupBuyFeedCard'
+import GroupBuyFeedCard from './GroupBuyFeedCard'
+import { FEED } from './MfoodGroupFeed'
 import MfoodDeliveryStoreCard, { type MfoodStore } from './MfoodDeliveryStoreCard'
 import DeliveryGridCard from './DeliveryGridCard'
 import hotPosterOrangeImg from '@/assets/consumer-home/posters/poster_orange.png'
@@ -55,14 +56,7 @@ const FLASH_ITEMS = [
   { key: 'f4', brand: '翡翠茶餐廳', title: '【9店通用】40...', discount: '8.5折', save: '即慳6', price: '34', img: burgerImg },
 ]
 
-/* ─── 瀑布流团购券（使用共享 GroupBuyFeedCard） ─── */
-const FEED: GroupBuyItem[] = [
-  { key: 'a1', brand: '新華順咖啡美食', title: '【連環賞推薦】50元代60元券（新華順）', image: fishPotImg, isNew: true, typeLabel: '酒', halfYearSales: 0, customTags: ['新品推薦'], price: '50', origin: '60', dist: '4.9km', area: '台山', shop: '新華順(台山-花雕雞瀨粉)', merchantId: 'm-1' },
-  { key: 'a2', brand: '慶記冰室', title: '超值下午茶套餐', image: burgerImg, halfYearSales: 68, customTags: ['新品推薦'], price: '24', origin: '43', dist: '5.1km', area: '筷子基', shop: '慶記冰室🌟招牌蒸飯/焗...', merchantId: 'm-2' },
-  { key: 'a3', brand: '福隆煌', title: '🍜招牌牛肉麵/粉', image: riceballImg, isNew: true, halfYearSales: 0, customTags: ['新品推薦'], price: '33', origin: '38', dist: '6.4km', area: '新馬路', shop: '福隆煌（福隆新街店）', merchantId: 'm-3' },
-  { key: 'a4', brand: '金庫餐廳', title: '金庫餐廳澳門元200餐飲折扣券', image: friedChickenImg, halfYearSales: 54, customTags: ['新品推薦'], price: '120', origin: '200', dist: '6.6km', area: '新口岸', shop: '金庫餐廳', merchantId: 'm-4' },
-  { key: 'a5', brand: '峰盛比薩', title: '雅廉訪總店主廚特選【僅限自取】', image: burgerImg, halfYearSales: 1, customTags: ['新品推薦'], price: '68', origin: '152', dist: '5.9km', area: '高士德', shop: 'Lavish Pizza峰盛比薩(雅...', merchantId: 'm-5', flashBadge: '秒殺', flashCountdown: '1天 07:38:18', flashBadgePos: 'bottom', remainingLabel: '剩餘50份', remainingPct: 50, ctaText: '秒殺', discountNote: '秒殺補貼，享4.5折' },
-]
+/* ─── 瀑布流团购券：数据唯一真源在 ./MfoodGroupFeed（首页与特惠團購页共用） ─── */
 
 /* ─── 美食外賣門店瀑布流（MFOOD 专属组件 MfoodDeliveryStoreCard；勁爆券皮；与閃蜂数据互不共用）
    门店顺序与閃蜂 DELIVERY_STORES 逐位形态对齐（新店/品质标签/打烊三态/预定/免配送費/自取/準時寶/
@@ -99,6 +93,7 @@ const MFOOD_STORES: MfoodStore[] = [
 export default function MfoodHome({
   onSearch,
   onOpenStore,
+  onOpenGroupBuy,
   onCategoryChange,
   syncCategory,
   syncSeq,
@@ -106,6 +101,8 @@ export default function MfoodHome({
 }: {
   onSearch?: () => void
   onOpenStore?: (merchantId: string) => void
+  /** 分类宫格「特價團購」入口 → 特惠團購页（MfoodApp 根屏切换） */
+  onOpenGroupBuy?: () => void
   /** 分类切换回调（双机视图联动右侧说明面板：美食外賣 → 外卖说明，其余 → 团购说明） */
   onCategoryChange?: (tab: string) => void
   /** 右侧说明面板 Tab 下发的分类同步命令（syncSeq 自增时执行，壳内自身切换不回流） */
@@ -118,12 +115,13 @@ export default function MfoodHome({
   const [tab, setTab] = useState<string>(TABS[0].key)
   const [scrolled, setScrolled] = useState(false)
 
-  /* 右侧说明面板 Tab 下发的同步命令：只在 syncSeq 变化时执行，避免壳内自身切换被面板回流覆盖 */
+  /* 右侧说明面板 Tab 下发的同步命令：只在 syncSeq 变化时执行，避免壳内自身切换被面板回流覆盖；
+     優選商家等 MFOOD 不存在的面板命令忽略，保持当前分类 */
   const syncSeqRef = useRef(syncSeq ?? 0)
   useEffect(() => {
     if ((syncSeq ?? 0) !== syncSeqRef.current && syncCategory) {
       syncSeqRef.current = syncSeq ?? 0
-      setTab(syncCategory)
+      if (TABS.some((tb) => tb.key === syncCategory)) setTab(syncCategory)
     }
   }, [syncSeq, syncCategory])
 
@@ -200,7 +198,7 @@ export default function MfoodHome({
         <div className="apm-cat-section">
           <div className="apm-cat-grid">
             {CATEGORIES.map((c) => (
-              <button key={c.key} type="button" className="apm-cat-item">
+              <button key={c.key} type="button" className="apm-cat-item" onClick={c.key === 'group' ? onOpenGroupBuy : undefined}>
                 {c.badge && <span className="apm-cat-badge" style={{ background: c.badgeColor }}>{c.badge}</span>}
                 <span className="apm-cat-emoji">{c.emoji}</span>
                 <span className="apm-cat-label">{c.zh}</span>

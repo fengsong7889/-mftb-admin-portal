@@ -11,7 +11,7 @@
  * 钉住设计稿三张图的口径：附近=距离单选 + 三区域商圈多选、分類=多选、排序=单选；
  * 同一时刻只展开一个面板，选中结果要回写到胶囊文案。避免后续改样式时把交互语义弄丢。
  */
-import { beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import i18n from '@/i18n'
@@ -118,6 +118,76 @@ describe('特價團購筛选面板', () => {
     await user.click(screen.getByLabelText('排序方式 低價優先'))
     expect(screen.queryByLabelText('排序方式 距離優先')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: '低價優先' })).toBeInTheDocument()
+  })
+
+  it('更多篩選面板：五大模块齐备，单选/多选/重置/完成口径', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(screen.getByRole('button', { name: '篩選條件' }))
+    const panel = screen.getByRole('group', { name: '更多篩選面板' })
+    // 五模块（设计稿图2-5）：人均篩選器/營業時間/使用人數/偏好优惠/店鋪服務
+    expect(within(panel).getByText('人均篩選器')).toBeInTheDocument()
+    expect(within(panel).getByText('營業時間')).toBeInTheDocument()
+    expect(within(panel).getByText('使用人數')).toBeInTheDocument()
+    expect(within(panel).getByText(/偏好优惠/)).toBeInTheDocument()
+    expect(within(panel).getByText(/店鋪服務/)).toBeInTheDocument()
+
+    // 单选胶囊：再点同一个取消
+    await user.click(within(panel).getByRole('button', { name: '0-5 時' }))
+    expect(within(panel).getByRole('button', { name: '0-5 時' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(within(panel).getByRole('button', { name: '0-5 時' }))
+    expect(within(panel).getByRole('button', { name: '0-5 時' })).toHaveAttribute('aria-pressed', 'false')
+
+    // 多选胶囊：可勾可消
+    await user.click(within(panel).getByRole('button', { name: '有 WIFI' }))
+    await user.click(within(panel).getByRole('button', { name: '可包場' }))
+    expect(within(panel).getByRole('button', { name: '可包場' })).toHaveAttribute('aria-pressed', 'true')
+
+    // 重置：清空全部模块，面板保持展开
+    await user.click(within(panel).getByRole('button', { name: '重置' }))
+    expect(within(panel).getByRole('button', { name: '有 WIFI' })).toHaveAttribute('aria-pressed', 'false')
+    expect(within(panel).getByRole('button', { name: '可包場' })).toHaveAttribute('aria-pressed', 'false')
+
+    // 完成：收起面板
+    await user.click(within(panel).getByRole('button', { name: '完成 (可多選)' }))
+    expect(screen.queryByRole('group', { name: '更多篩選面板' })).not.toBeInTheDocument()
+  })
+
+  it('優選商家页签：点击切换商家瀑布流（图2口径），切回推薦恢复团购瀑布流', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(screen.getByRole('button', { name: '優選商家' }))
+    expect(screen.getByText('翡翠茶餐廳🏆-關閘店（🔥全澳…')).toBeInTheDocument()
+    expect(screen.getByText('最高膨脹至$60')).toBeInTheDocument()
+    expect(screen.getAllByText('代金券名稱代代金券名稱…').length).toBeGreaterThanOrEqual(3)
+
+    // 收藏钮：麥田初始橙星（取消收藏），点击后全列表无收藏态
+    await user.click(screen.getByRole('button', { name: '取消收藏' }))
+    expect(screen.queryByRole('button', { name: '取消收藏' })).not.toBeInTheDocument()
+
+    // 切回推薦：商家瀑布流卸载，团购瀑布流恢复
+    await user.click(screen.getByRole('button', { name: '推薦' }))
+    expect(screen.queryByText('翡翠茶餐廳🏆-關閘店（🔥全澳…')).not.toBeInTheDocument()
+    expect(screen.getByText('雞蛋10只（散裝）')).toBeInTheDocument()
+  })
+
+  it('说明面板联动：syncTab 命令切到優選商家，页签切换回流 onTabChange', async () => {
+    const user = userEvent.setup()
+    const onTabChange = vi.fn()
+    const { rerender } = render(
+      <ConsumerGroupBuy onBack={noop} onSearch={noop} onTabChange={onTabChange} syncTab="preferred" syncSeq={0} />,
+    )
+    // syncSeq 自增 = 壳外说明面板下发命令 → 切到優選商家瀑布流
+    rerender(
+      <ConsumerGroupBuy onBack={noop} onSearch={noop} onTabChange={onTabChange} syncTab="preferred" syncSeq={1} />,
+    )
+    expect(screen.getByText('翡翠茶餐廳🏆-關閘店（🔥全澳…')).toBeInTheDocument()
+
+    // 壳内点页签回流：推薦 → page-group（壳外「特惠团购页·推荐」面板）
+    await user.click(screen.getByRole('button', { name: '推薦' }))
+    expect(onTabChange).toHaveBeenLastCalledWith('page-group')
   })
 
   it('面板互斥：展开一个即收起另一个，重复点同一按钮收起', async () => {

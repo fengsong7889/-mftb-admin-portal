@@ -19,6 +19,7 @@
 import { useContext, useState } from 'react'
 import { getSmallTemplate, getFallbackPoster } from '@/constants/popularSkinTemplates'
 import { HighlightContext, SpecField } from './SpecHighlight'
+import BrandCover from './BrandCover'
 
 export interface MemberTag {
   kind: 'shen' | 'point' | 'coupon' | 'red' | 'plain' | 'green' | 'gray'
@@ -190,13 +191,13 @@ export default function DeliveryStoreCard({
         </SpecField>
       ) : hot ? (
         <div className="apw-card-img">
-          <SpecField panel="delivery" id={15}><img src={store.image} alt={store.name} /></SpecField>
+          <SpecField panel="delivery" id={15}><BrandCover seed={store.key} name={store.name} /></SpecField>
           {store.isNew && <SpecField panel="delivery" id={2}><span className="apw-new-tag">新店</span></SpecField>}
         </div>
       ) : (
         <SpecField panel="delivery" id={15}>
           <div className="apw-card-img">
-            <img src={store.image} alt={store.name} />
+            <BrandCover seed={store.key} name={store.name} />
             {store.isNew && <SpecField panel="delivery" id={2}><span className="apw-new-tag">新店</span></SpecField>}
           </div>
         </SpecField>

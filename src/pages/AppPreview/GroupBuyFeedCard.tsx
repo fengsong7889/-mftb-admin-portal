@@ -14,6 +14,7 @@
  *   ratingNote      — 底部评分前缀（4.5分），出现时底部不再展示距离/行政区
  */
 import { SpecField } from './SpecHighlight'
+import BrandCover from './BrandCover'
 /* 字段规范唯一真源在 ./groupBuySpec.ts（壳外说明表消费），此处不再维护副本 */
 
 /* ─── 卡片数据接口（方案D：JSDoc 即文档，IDE hover 可见） ─── */
@@ -116,7 +117,7 @@ export default function GroupBuyFeedCard({
       <div className="apf-card-left">
         <SpecField panel="groupBuy" id={2}>
           <div className="apf-card-img">
-            <img src={item.image} alt={item.title} />
+            <BrandCover seed={item.key} name={item.brand} />
             {item.isNew && <SpecField panel="groupBuy" id={3}><span className="apf-ribbon">新品</span></SpecField>}
             {item.typeLabel && <SpecField panel="groupBuy" id={4}><span className="apf-badge-type">{item.typeLabel}</span></SpecField>}
             {/* 閃蜂：左上秒殺倒计时 */}

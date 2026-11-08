@@ -2081,11 +2081,14 @@
   cursor: pointer;
 }
 .apg-filters button.is-on { background: var(--danger-soft); border-color: var(--danger-border); color: var(--danger); font-weight: 600; }
-.apg-sortbar { display: flex; align-items: center; gap: 10px; padding: 6px 12px 10px; margin-bottom: 4px; }
+.apg-sortbar { display: flex; align-items: center; gap: 10px; padding: 6px 12px 8px; margin-bottom: 0; }
+/* 瀑布流与筛选栏间隔过宽（2026-11 反馈）：團購页收起瀑布流容器顶 padding，
+   胶囊→首卡 = 筛选栏底 padding 8px，与卡片间隔同节奏；首页/MFOOD 复用同容器不受影响 */
+.apg-body .apf-feed-list { padding-top: 0; }
 .apg-sortbar button { border: none; background: transparent; color: var(--text-2); font-size: 12px; cursor: pointer; }
 .apg-sortbar button.is-hl { color: var(--brand); font-weight: 600; }
 
-/* 筛选胶囊（附近/分類/排序）：黄底对齐设计稿；展开态靠同一令牌压暗，不新增色值 */
+/* 筛选胶囊（附近/分類/排序）：白底+可见描边+轻投影，灰底页面上清晰可点；展开态品牌色描边，不新增色值 */
 /* 團購页局部令牌：黄底胶囊无全局令牌，集中定义后使用处一律 var() 引用，
    避免裸色值散布触发主题棘轮门禁（先例见 .apcs）；下方 .apg-pill 复用同一个令牌，
    因此本段对 cssHex 棘轮的净增量为 0 */
@@ -2112,16 +2115,17 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  height: 30px;
-  padding: 0 12px;
-  border: 1px solid var(--border-2);
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--border-3);
   border-radius: 8px;
-  background: var(--surface-1);
+  background: var(--surface-2);
   color: var(--text-1);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  box-shadow: var(--shadow-1);
 }
 /* 展开中不另取色（会新增裸色值触发棘轮），品牌色描边表达“开”态 */
 .apg-sortbar .apg-chip.is-open { border-color: var(--brand); color: var(--brand); }
@@ -2163,8 +2167,167 @@
 .apg-chip-ico--red { background: var(--apg-red); }
 .apg-chip-ico--vs { background: var(--brand); }
 .apg-chip-ico--thumb { border-radius: 50%; background: var(--apg-gold); color: var(--text-1); }
-.apg-chip.is-slider { font-size: 14px; }
-.apg-chip-caret { font-style: normal; font-size: 9px; }
+/* 更多篩選：暖底+描边+滑杆图标+文字，与中性白胶囊区分；取色全走令牌，深浅主题均清晰 */
+.apg-chip.is-slider { gap: 5px; font-size: 13px; background: var(--warning-soft); border-color: var(--warning-border); }
+.apg-slider-ico { flex: none; display: block; }
+.apg-chip-caret { font-style: normal; font-size: 10px; line-height: 1; }
+
+/* ── 更多篩選底部面板（设计稿图2-5）：sticky 满屏罩 + 白底 sheet（五模块可滚）+ 重置/完成 + 圆形 × ──
+   罩层压暗用 color-mix 拿令牌混透明，不新增裸 rgba（rgbaBlack 棘轮只降不升）；
+   sheet/胶囊双层底色复用 surface-2/surface-1，图标渐变一律复用页局部令牌与全局语义令牌 */
+.apg-more {
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--text-1) 45%, transparent);
+}
+.apg-more-sheet {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-2);
+  border-radius: 0 0 18px 18px;
+}
+.apg-more-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 16px 6px; display: flex; flex-direction: column; gap: 24px; }
+.apg-more-sec { display: flex; flex-direction: column; gap: 14px; }
+.apg-more-title { margin: 0; color: var(--text-1); font-size: 16px; font-weight: 700; }
+.apg-more-title i { font-style: normal; font-size: 13px; font-weight: 400; color: var(--text-2); }
+/* 營業時間/使用人數/店鋪服務：四列灰底胶囊；选中态暖底+品牌字（与篩選按钮同一套色彩语言）
+   文案一律单行（设计稿口径）：字号收窄到 11px、长名单服务档再收 10.5px，避免胶囊内换行 */
+.apg-more-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 8px; }
+.apg-more-chip {
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 20px;
+  background: var(--surface-1);
+  color: var(--text-1);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.apg-more-grid--svc .apg-more-chip { font-size: 10.5px; }
+.apg-more-chip.is-on { background: var(--warning-soft); color: var(--brand); font-weight: 600; box-shadow: inset 0 0 0 1px var(--warning-border); }
+/* 人均篩選器：灰底圆角卡 + 橙色两端标签 + 双滑杆（轨道分段渐变由 inline style 传入，全 var() 无裸色） */
+.apg-range-card { background: var(--surface-1); border-radius: 14px; padding: 16px 14px 20px; }
+.apg-range-labels { display: flex; justify-content: space-between; margin-bottom: 16px; color: var(--apg-head-from); font-size: 15px; font-weight: 700; }
+.apg-range-track { position: relative; height: 4px; border-radius: 2px; }
+.apg-range-input {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  pointer-events: none;
+}
+/* 滑杆thumb：白圆钮+双竖杠（设计稿暂停式钮），杠色复用页局部橙令牌；两 input 叠放仅 thumb 可点 */
+.apg-range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background:
+    linear-gradient(var(--apg-head-from), var(--apg-head-from)) 10px 50% / 2px 10px no-repeat,
+    linear-gradient(var(--apg-head-from), var(--apg-head-from)) 16px 50% / 2px 10px no-repeat,
+    var(--surface-2);
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+  pointer-events: auto;
+}
+.apg-range-input::-moz-range-thumb {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background:
+    linear-gradient(var(--apg-head-from), var(--apg-head-from)) 10px 50% / 2px 10px no-repeat,
+    linear-gradient(var(--apg-head-from), var(--apg-head-from)) 16px 50% / 2px 10px no-repeat,
+    var(--surface-2);
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+  pointer-events: auto;
+}
+.apg-range-input::-moz-range-track { background: transparent; }
+/* 偏好优惠：三列带圆图标胶囊；图标底色用语义令牌近似设计稿渐变（占位口径，待切图） */
+.apg-more-grid--pref { grid-template-columns: repeat(3, 1fr); }
+.apg-more-pref {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 4px 8px 4px 4px;
+  border: none;
+  border-radius: 22px;
+  background: var(--surface-1);
+  color: var(--text-1);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.apg-more-pref.is-on { background: var(--warning-soft); color: var(--brand); font-weight: 600; box-shadow: inset 0 0 0 1px var(--warning-border); }
+.apg-pref-ico {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: var(--surface-2);
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 800;
+}
+.apg-pref-ico--crown { background: linear-gradient(135deg, var(--apg-red), var(--apg-head-to)); }
+.apg-pref-ico--coupon { background: linear-gradient(135deg, var(--purple), var(--apg-red)); }
+.apg-pref-ico--vs { background: var(--apg-red); font-size: 13px; }
+.apg-pref-ico--fire { background: linear-gradient(135deg, var(--apg-head-from), var(--apg-red)); }
+.apg-pref-ico--chain { background: var(--success); }
+.apg-pref-ico--thumb { background: var(--warning); }
+.apg-pref-ico--service { background: linear-gradient(135deg, var(--brand), var(--warning)); }
+.apg-pref-ico--taste { background: linear-gradient(135deg, var(--apg-red), var(--brand)); }
+.apg-pref-ico--new { background: var(--purple); font-size: 12px; font-style: italic; }
+.apg-pref-ico--env { background: linear-gradient(135deg, var(--success), var(--apg-gold)); }
+.apg-pref-ico--healthy { background: linear-gradient(135deg, var(--text-brand), var(--success)); }
+/* 底部操作条：二分单丸（左黑重置/右黄完成）；黑取 text-1 反色、黄复用页局部金令牌，深浅主题均成立 */
+.apg-more-footer { display: flex; padding: 12px 16px 16px; }
+.apg-more-reset {
+  flex: 1;
+  height: 52px;
+  border: none;
+  border-radius: 26px 0 0 26px;
+  background: var(--text-1);
+  color: var(--surface-2);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.apg-more-done {
+  flex: 1;
+  height: 52px;
+  border: none;
+  border-radius: 0 26px 26px 0;
+  background: var(--apg-gold);
+  color: var(--text-1);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+/* sheet 下：白色细杆 + 圆形 ×（复用 .apg-panel-close）；杆外透出罩层压暗的列表 */
+.apg-more-closebar { flex: none; display: flex; flex-direction: column; align-items: center; padding: 0 0 6px; }
+.apg-more-stem { width: 3px; height: 20px; background: var(--surface-2); }
 
 /* 筛选下拉面板：紧贴筛选栏展开，底部圆形 × 收起（原型内不做全屏遮罩） */
 .apg-panel-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 0 12px 12px; }
@@ -2394,101 +2557,7 @@
 .apg-tab.is-on .apg-tab-label { color: var(--text-1); font-weight: 700; }
 /* 吸顶态保留图标圆（对齐设计稿），仅加白底与投影表达“吸附” */
 
-/* 秒杀竖列表（图3/图4）：左=飘带图+已搶进度；右=品牌|商品+半年售+价格块+秒CTA+门店行 */
-.apg-flash-list { display: flex; flex-direction: column; gap: 10px; margin: 0 12px 14px; }
-.apg-flash { display: flex; gap: 10px; padding: 10px; background: var(--surface-2); border: 1px solid var(--border-2); border-radius: 14px; }
-.apg-flash.is-clickable { cursor: pointer; }
-.apg-flash-left { flex: none; width: 128px; }
-.apg-flash-media { position: relative; border-radius: 10px; overflow: hidden; }
-.apg-flash-ribbon {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 1;
-  padding: 2px 0 8px;
-  background: var(--apg-red);
-  color: var(--surface-1);
-  font-size: 10px;
-  font-weight: 700;
-  text-align: center;
-  clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%);
-}
-.apg-flash-img { width: 100%; height: 108px; object-fit: cover; display: block; }
-.apg-flash-loc {
-  position: absolute;
-  left: 6px;
-  bottom: 6px;
-  padding: 2px 7px;
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--text-1) 62%, transparent);
-  color: var(--surface-1);
-  font-size: 10px;
-}
-.apg-flash-progress {
-  position: relative;
-  height: 14px;
-  margin-top: 6px;
-  border-radius: 7px;
-  background: var(--apg-track);
-  overflow: hidden;
-}
-.apg-flash-progress-fill { position: absolute; inset: 0 auto 0 0; background: var(--apg-red); border-radius: 7px; }
-.apg-flash-progress-txt {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  font-size: 9px;
-  font-weight: 700;
-  color: var(--apg-red);
-}
-.apg-flash-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
-.apg-flash-title { font-size: 13px; font-weight: 700; color: var(--text-1); line-height: 1.35; }
-.apg-flash-title b { color: var(--text-brand); font-weight: 800; }
-.apg-flash-title i { font-style: normal; margin: 0 3px; color: var(--border-2); }
-.apg-flash-tags { display: flex; gap: 5px; }
-.apg-flash-sold, .apg-flash-tag {
-  padding: 1px 7px;
-  border-radius: 4px;
-  background: var(--surface-3);
-  color: var(--text-3);
-  font-size: 11px;
-}
-.apg-flash-pricebox {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 6px 64px 6px 8px;
-  border-radius: 8px;
-  background: var(--apg-price-bg);
-}
-.apg-flash-price { display: flex; align-items: baseline; gap: 4px; color: var(--apg-red); font-weight: 800; font-size: 18px; }
-.apg-flash-price i { font-size: 11px; font-style: normal; }
-.apg-flash-price s { color: var(--text-3); font-size: 11px; font-weight: 400; }
-.apg-flash-discount { font-size: 10px; color: var(--text-2); }
-.apg-flash-cta {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 7px 10px;
-  border: none;
-  border-radius: 10px 14px 14px 10px;
-  background: linear-gradient(90deg, var(--apg-gold), var(--apg-red));
-  color: var(--surface-1);
-  font-size: 13px;
-  font-weight: 800;
-  cursor: pointer;
-}
-.apg-flash-cta i { font-style: normal; font-size: 11px; }
-.apg-flash-shop { font-size: 11px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 秒杀竖列表已改用共享 GroupBuyFeedCard（apf-card/apf-feed-list），旧 .apg-flash* 样式随之下线 */
 
 /* 横向滚动条隐藏（桌面预览时 hotwords/tabs/flash-hscroll 会露出灰条） */
 .apg-hotwords, .apg-tabs, .apg-flash-hscroll { scrollbar-width: none; }
@@ -4186,6 +4255,8 @@ button.apcs-card:hover { border-color: var(--warning-border); }
 
 /* 滚动容器 */
 .apm-home-body { background: #F5F5F5; padding: 0 12px 16px; }
+/* 瀑布流卡片与首页其余模块同宽（12px 内缩）：取消卡片自带横向外边距，避免双重留白 */
+.apm-home-body .apf-card { margin-left: 0; margin-right: 0; }
 
 /* 橙色顶区 */
 .apm-dark-top {
@@ -4569,9 +4640,11 @@ button.apcs-card:hover { border-color: var(--warning-border); }
 .apf-feed-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   padding: 8px 0;
 }
+/* 卡片自带 margin-bottom 与容器 gap 叠加会把间隔撑到 22px；瀑布流内归零，间隔统一由 gap 控制 */
+.apf-feed-list .apf-card { margin-bottom: 0; }
 .apf-spec-toggle {
   align-self: flex-end;
   margin-bottom: 4px;
@@ -4914,29 +4987,57 @@ button.apcs-card:hover { border-color: var(--warning-border); }
 }
 .ap-spec-reset:hover { background: #E2E8F0; }
 
-/* 说明面板顶部 Tab：团购瀑布流 / 外卖瀑布流（壳内分类点击自动联动切换） */
+/* 说明面板顶部 Tab：横排三层（壳内分类/页签点击自动联动切换）
+   ①菜单分类行=分段轨道（内凹底+白丸选中）②面板行=描边胶囊（蓝紫渐变选中）③条件行 */
 .ap-spec-tabs {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
   margin-bottom: 14px;
 }
+.ap-spec-group-row {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--surface-1);
+  box-shadow: inset 0 0 0 1px var(--border-2);
+}
+.ap-spec-group-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
 .ap-spec-tab {
   padding: 6px 18px;
-  border: 1px solid #CBD5E1;
-  border-radius: 18px;
-  background: #F8FAFC;
-  color: #64748B;
+  border: 1px solid var(--border-3);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-2);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
+  box-shadow: var(--shadow-1);
 }
-.ap-spec-tab:hover { background: #EFF6FF; color: #1D4ED8; border-color: #93C5FD; }
+.ap-spec-tab:hover { border-color: var(--text-brand); color: var(--text-brand); }
 .ap-spec-tab.is-on {
-  background: linear-gradient(135deg, #3B82F6, #2563EB);
-  border-color: #2563EB;
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
+  background: linear-gradient(135deg, var(--text-brand), var(--purple));
+  border-color: transparent;
+  color: var(--surface-2);
+  box-shadow: var(--shadow-2);
+}
+/* 分类行小一号：选中=轨道内浮起白丸，与面板行的渐变选中态分层 */
+.ap-spec-tab.ap-spec-tab--group {
+  padding: 5px 16px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
+}
+.ap-spec-tab.ap-spec-tab--group:hover { background: var(--surface-2); color: var(--text-1); }
+.ap-spec-tab.ap-spec-tab--group.is-on {
+  background: var(--surface-2);
+  color: var(--text-1);
+  box-shadow: var(--shadow-1);
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -5478,12 +5579,16 @@ button.apcs-card:hover { border-color: var(--warning-border); }
 }
 .ap-spec-mode-switch {
   display: inline-flex;
-  border: 1px solid var(--border-2);
-  border-radius: 8px;
-  overflow: hidden;
+  gap: 2px;
+  padding: 3px;
+  border: none;
+  border-radius: 10px;
+  background: var(--surface-1);
+  box-shadow: inset 0 0 0 1px var(--border-2);
 }
 .ap-spec-mode-btn {
   border: none;
+  border-radius: 8px;
   background: transparent;
   padding: 4px 12px;
   font-size: 12px;
@@ -5493,6 +5598,7 @@ button.apcs-card:hover { border-color: var(--warning-border); }
 .ap-spec-mode-btn.is-on {
   background: var(--brand);
   color: var(--on-brand);
+  box-shadow: var(--shadow-1);
   font-weight: 600;
 }
 .ap-spec-mode-hint {
@@ -5500,3 +5606,290 @@ button.apcs-card:hover { border-color: var(--warning-border); }
   font-size: 12px;
   color: var(--text-3);
 }
+
+/* ── MFOOD 特惠團購页（设计稿图1-3）：品红头部/hero/宫格/秒殺页签/横滑卡/双列Banner/圆签/胶囊/吸顶 ──
+   设计稿品红等色以全局令牌渐变近似（purple→danger），全段无裸色值（主题棘轮门禁）；
+   滚动体底色对齐首页 .apm-home-body 口径（浅灰底+白卡）；瀑布流左右不再加内缩，
+   卡片仅保留自带 12px 外边距，与上方圆签/胶囊行同宽，避免两侧留白过大 */
+.mpg-body { padding: 0 0 16px; background: var(--surface-1); }
+.mpg-sticky-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: var(--surface-2);
+  transform: translateY(-100%);
+  transition: transform 0.25s ease;
+  box-shadow: var(--shadow-1);
+}
+.mpg-sticky-header.is-visible { transform: translateY(0); }
+.mpg-sticky-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; }
+.mpg-sticky-search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 4px 0 12px;
+  border: 1px solid var(--brand);
+  border-radius: 18px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+.mpg-sticky-search-btn { margin-left: auto; height: 28px; padding: 0 14px; border: none; border-radius: 14px; background: var(--brand); color: var(--surface-2); font-size: 12px; font-weight: 600; }
+.mpg-sticky-loc { flex: none; color: var(--text-1); font-size: 12px; font-weight: 600; }
+/* 吸顶页签行（图3）：文字下划线态 */
+.mpg-sticky-tabs { display: flex; gap: 18px; overflow-x: auto; padding: 4px 12px 8px; background: var(--surface-2); scrollbar-width: none; }
+.mpg-sticky-tabs::-webkit-scrollbar { display: none; }
+.mpg-sticky-tab { flex: none; position: relative; padding: 2px 0 6px; border: none; background: transparent; color: var(--text-1); font-size: 14px; font-weight: 600; cursor: pointer; }
+.mpg-sticky-tab.is-on { color: var(--brand); }
+.mpg-sticky-tab.is-on::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 22px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--brand);
+  transform: translateX(-50%);
+}
+/* 品红渐变头部（图1） */
+.mpg-head { padding: 12px 12px 14px; background: linear-gradient(135deg, var(--purple), var(--danger)); }
+.mpg-head-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.mpg-title { border: none; background: transparent; padding: 0; color: var(--surface-2); font-size: 20px; font-weight: 800; letter-spacing: 1px; cursor: pointer; }
+.mpg-title i { font-style: normal; font-size: 11px; }
+.mpg-loc { color: var(--surface-2); font-size: 13px; font-weight: 700; }
+.mpg-head-search { display: flex; align-items: stretch; gap: 12px; }
+.mpg-searchbox {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 4px 0 12px;
+  border: none;
+  border-radius: 20px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 13px;
+  cursor: pointer;
+}
+.mpg-searchbox-btn { margin-left: auto; height: 32px; padding: 0 16px; border: none; border-radius: 16px; background: var(--brand); color: var(--surface-2); font-size: 13px; font-weight: 700; }
+.mpg-head-entries { display: flex; gap: 14px; }
+.mpg-head-entry { display: flex; flex-direction: column; align-items: center; gap: 2px; border: none; background: transparent; color: var(--surface-2); font-size: 11px; cursor: pointer; }
+.mpg-head-entry i { font-style: normal; font-size: 16px; }
+.mpg-hotwords { display: flex; gap: 8px; margin-top: 10px; overflow-x: auto; scrollbar-width: none; }
+.mpg-hotwords::-webkit-scrollbar { display: none; }
+.mpg-hotword { flex: none; height: 26px; padding: 0 12px; border: none; border-radius: 13px; color: var(--surface-2); font-size: 12px; cursor: pointer; }
+.mpg-hotword--red { background: var(--danger); }
+.mpg-hotword--green { background: var(--success); }
+/* 促销 hero Banner（占位渐变待切图） */
+.mpg-hero { position: relative; margin: 0 12px 12px; padding: 26px 16px 18px; border-radius: 14px; background: linear-gradient(135deg, var(--warning), var(--danger)); overflow: hidden; }
+.mpg-hero-tag { position: absolute; top: 0; left: 0; padding: 4px 10px; border-radius: 14px 0 14px 0; background: var(--surface-2); color: var(--text-1); font-size: 11px; font-weight: 700; }
+.mpg-hero-title { color: var(--surface-2); font-size: 22px; font-weight: 900; }
+.mpg-hero-sub { color: var(--surface-2); font-size: 13px; font-weight: 600; }
+.mpg-hero-pill { display: inline-block; margin-top: 8px; padding: 4px 12px; border-radius: 14px; background: var(--purple); color: var(--surface-2); font-size: 11px; }
+/* 白色圆角区 */
+.mpg-sheet { margin: 0 0 4px; padding: 14px 0 0; border-radius: 16px 16px 0 0; background: var(--surface-2); }
+.mpg-icons { display: flex; gap: 14px; overflow-x: auto; padding: 4px 12px 12px; scrollbar-width: none; }
+.mpg-icons::-webkit-scrollbar { display: none; }
+.mpg-icon { position: relative; flex: none; display: flex; flex-direction: column; align-items: center; gap: 6px; border: none; background: transparent; cursor: pointer; }
+.mpg-icon-tile { width: 52px; height: 52px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+.mpg-icon-tile--a { background: var(--warning-soft); }
+.mpg-icon-tile--b { background: var(--purple-soft); }
+.mpg-icon-tile--c { background: var(--success-soft); }
+.mpg-icon-tile--d { background: var(--danger-soft); }
+.mpg-icon-label { font-size: 12px; color: var(--text-1); }
+.mpg-icon-badge { position: absolute; top: -6px; left: 50%; margin-left: -4px; padding: 1px 6px; border-radius: 8px 8px 8px 0; background: var(--danger); color: var(--surface-2); font-size: 9px; }
+/* 勁爆秒殺页签行 */
+.mpg-flashtabs { display: flex; align-items: stretch; border-top: 1px solid var(--border-2); }
+.mpg-flashtab-lead {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 18px 12px;
+  border: none;
+  border-radius: 0 0 14px 0;
+  background: linear-gradient(135deg, var(--danger), var(--brand));
+  color: var(--surface-2);
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.mpg-flashtab-cd { padding: 2px 8px; border-radius: 6px; background: var(--text-1); color: var(--surface-2); font-size: 11px; font-weight: 700; }
+.mpg-flashtabs-scroll { display: flex; flex: 1; overflow-x: auto; scrollbar-width: none; }
+.mpg-flashtabs-scroll::-webkit-scrollbar { display: none; }
+.mpg-flashtab { flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 16px; border: none; background: transparent; cursor: pointer; }
+.mpg-flashtab b { font-size: 15px; color: var(--text-1); }
+.mpg-flashtab i { font-style: normal; font-size: 11px; color: var(--danger); }
+/* 横滑秒杀卡 */
+.mpg-fcards { display: flex; gap: 10px; overflow-x: auto; padding: 12px; scrollbar-width: none; }
+.mpg-fcards::-webkit-scrollbar { display: none; }
+.mpg-fcard { flex: none; width: 132px; display: flex; flex-direction: column; gap: 6px; border: none; background: transparent; padding: 0; cursor: pointer; }
+.mpg-fcard-media { position: relative; border-radius: 10px; overflow: hidden; }
+.mpg-fcard-img { width: 100%; height: 112px; object-fit: cover; display: block; }
+.mpg-fcard-disc { position: absolute; left: 6px; bottom: 6px; padding: 2px 8px; border-radius: 9px; background: color-mix(in srgb, var(--text-1) 72%, transparent); color: var(--surface-2); font-size: 10px; }
+.mpg-fcard-title { font-size: 13px; font-weight: 600; color: var(--text-1); line-height: 1.35; }
+.mpg-fcard-brand { display: flex; align-items: center; gap: 4px; color: var(--text-2); font-size: 11px; overflow: hidden; white-space: nowrap; }
+.mpg-fcard-brand i { font-style: normal; color: var(--danger); font-weight: 800; }
+.mpg-fcard-price { display: flex; align-items: stretch; }
+.mpg-fcard-price b { display: flex; align-items: center; padding: 3px 6px; background: var(--warning-soft); color: var(--text-2); font-size: 10px; font-weight: 600; border-radius: 4px 0 0 4px; }
+.mpg-fcard-price strong { flex: 1; padding: 3px 8px; background: var(--danger); color: var(--surface-2); font-size: 13px; font-weight: 800; border-radius: 0 14px 14px 0; }
+.mpg-more { display: flex; justify-content: center; padding: 2px 0 12px; }
+.mpg-more button { border: none; background: transparent; color: var(--text-2); font-size: 12px; cursor: pointer; }
+/* 双列活动 Banner */
+.mpg-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px 12px 4px; }
+.mpg-duo-card { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 16px 12px; border: none; border-radius: 12px; cursor: pointer; }
+.mpg-duo-card--dark { background: linear-gradient(160deg, var(--text-1), var(--text-2)); }
+.mpg-duo-card--red { background: linear-gradient(135deg, var(--danger), var(--purple)); }
+.mpg-duo-title { color: var(--surface-2); font-size: 16px; font-weight: 900; }
+.mpg-duo-sub { color: var(--surface-2); font-size: 11px; }
+.mpg-duo-cta { margin-top: 4px; padding: 4px 12px; border-radius: 14px; background: var(--warning); color: var(--text-1); font-size: 11px; font-weight: 700; }
+/* 圆形图标页签行（未吸顶态） */
+.mpg-roundtabs { display: flex; gap: 16px; overflow-x: auto; padding: 12px; scrollbar-width: none; }
+.mpg-roundtabs::-webkit-scrollbar { display: none; }
+.mpg-roundtab { flex: none; display: flex; flex-direction: column; align-items: center; gap: 6px; border: none; background: transparent; cursor: pointer; }
+.mpg-roundtab-ico { width: 44px; height: 44px; border-radius: 50%; background: var(--surface-2); display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: var(--shadow-1); }
+.mpg-roundtab.is-on .mpg-roundtab-ico { box-shadow: 0 0 0 2px var(--brand); }
+.mpg-roundtab-label { font-size: 12px; color: var(--text-1); }
+/* 筛选胶囊 */
+.mpg-chips { display: flex; gap: 10px; padding: 0 12px 12px; overflow-x: auto; scrollbar-width: none; }
+.mpg-chips::-webkit-scrollbar { display: none; }
+.mpg-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: var(--shadow-1);
+}
+.mpg-chip i { font-style: normal; font-size: 9px; color: var(--text-3); }
+/* 瀑布流卡片底色跟随首页口径（白卡），不作粉底特化 */
+.mpg-end { padding: 16px 0 22px; text-align: center; color: var(--text-4); font-size: 12px; }
+
+/* ── 閃蜂·優選商家瀑布流卡（设计稿图2）：logo+新店飘带 / 店名+收藏 / 评分行 / 标签行 / 券列表 ──
+   取色全走令牌：紫标 --purple、橙 --brand、红价 --danger、绿飘带 --success，无裸色值 */
+.apq-feed { display: flex; flex-direction: column; gap: 8px; padding: 8px 12px; }
+.apq-card { display: flex; gap: 12px; padding: 12px; border-radius: 16px; background: var(--surface-2); }
+.apq-logo {
+  position: relative;
+  flex: none;
+  width: 108px;
+  height: 108px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--surface-2);
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  overflow: hidden;
+}
+.apq-logo--red { background: linear-gradient(135deg, var(--apg-red), var(--danger)); }
+.apq-logo--green { background: linear-gradient(135deg, var(--success), var(--text-brand)); }
+.apq-logo--orange { background: linear-gradient(135deg, var(--brand), var(--warning)); }
+.apq-logo--blue { background: linear-gradient(135deg, var(--text-brand), var(--purple)); }
+/* 新店绿色斜飘带（左上 45°） */
+.apq-new {
+  position: absolute;
+  top: 10px;
+  left: -14px;
+  padding: 2px 16px;
+  background: var(--success);
+  color: var(--surface-2);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  transform: rotate(-45deg);
+}
+.apq-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+.apq-head { display: flex; align-items: flex-start; gap: 8px; }
+.apq-name { flex: 1; min-width: 0; font-size: 15px; font-weight: 800; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apq-fav {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: var(--surface-1);
+  color: var(--text-3);
+  font-size: 15px;
+  cursor: pointer;
+}
+.apq-fav.is-on { color: var(--brand); }
+/* 评分行：橙心+评分 | 人均 | 品类·商圈 | 距离 */
+.apq-meta { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); overflow: hidden; white-space: nowrap; }
+.apq-rating { color: var(--brand); font-weight: 700; }
+.apq-rating i { font-style: normal; margin-right: 2px; }
+.apq-sep { flex: none; width: 1px; height: 10px; background: var(--border-3); }
+.apq-cate { overflow: hidden; text-overflow: ellipsis; }
+/* 标签行：勁爆券紫标 + 膨胀紫软标 + 半年售灰标 */
+.apq-tags { display: flex; align-items: center; gap: 6px; }
+.apq-boom {
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--purple), var(--text-brand));
+  color: var(--surface-2);
+  font-size: 11px;
+  font-weight: 800;
+}
+.apq-boom i { font-style: normal; margin-left: 2px; }
+.apq-inflate { padding: 2px 8px; border-radius: 6px; background: var(--purple-soft); color: var(--purple); font-size: 11px; font-weight: 600; }
+.apq-sales { padding: 2px 8px; border-radius: 6px; background: var(--surface-1); color: var(--text-2); font-size: 11px; }
+/* 券列表：橙方图标 + 红价 + 红描边折扣 pill + 灰券名截断 */
+.apq-coupons { display: flex; flex-direction: column; gap: 6px; }
+.apq-coupon { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.apq-coupon-ico {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: var(--brand);
+  color: var(--surface-2);
+  font-size: 11px;
+  font-weight: 800;
+  font-style: normal;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.apq-coupon b { color: var(--danger); font-size: 16px; font-weight: 800; }
+.apq-coupon-disc { flex: none; padding: 1px 6px; border: 1px solid var(--danger-border); border-radius: 6px; color: var(--danger); font-size: 11px; }
+.apq-coupon-name { flex: 1; min-width: 0; color: var(--text-2); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── 瀑布流封面占位：品牌色渐变圆角方块 + 白色品牌字（设计稿口径，待切图后替换回 img） ──
+   閃蜂/MFOOD 团购与外卖四类瀑布流共用（BrandCover.tsx 按 seed 取色）；色调仅全局令牌渐变 */
+.apf-cover {
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--surface-2);
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 3px;
+}
+.apf-cover--t0 { background: linear-gradient(135deg, var(--danger), var(--warning)); }
+.apf-cover--t1 { background: linear-gradient(135deg, var(--success), var(--text-brand)); }
+.apf-cover--t2 { background: linear-gradient(135deg, var(--brand), var(--warning)); }
+.apf-cover--t3 { background: linear-gradient(135deg, var(--text-brand), var(--purple)); }
+.apf-cover--t4 { background: linear-gradient(135deg, var(--purple), var(--danger)); }
+.apf-cover--t5 { background: linear-gradient(135deg, var(--success), var(--purple)); }

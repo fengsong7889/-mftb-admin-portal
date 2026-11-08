@@ -14,15 +14,17 @@
  *   橙色头部(返回+标题+定位 / 搜索行+訂單图标 / 热词胶囊，滚动后折叠为 搜索行+訂單) →
  *   新店 Banner 轮播(圆角+指示点) → 十宫格分类 → 地图卡（附近 2133 家店）→
  *   團購超級秒殺(倒计时+更多 / 横滑秒杀卡) → 页签行(未吸顶=圆形图标，吸顶=文字下划线) →
- *   筛选胶囊(附近商家/全部分類/智能排序/神/筛选) → 筛选下拉面板 →
- *   秒杀竖列表(秒殺倒计时飘带+商圈距离 pill+已搶进度条 / 品牌|商品名+半年售+价格块+秒CTA+门店行) → 到底提示。
+ *   筛选胶囊(附近商家/全部分類/智能排序/神/篩選) → 筛选下拉面板 / 更多篩選底部 sheet(五模块) →
+ *   瀑布流团购券(共享 GroupBuyFeedCard + apf-feed-list，与首页「团购」瀑布流同规格) → 到底提示。
  *
  * 说明：图片为 AI 占位图（src/assets/consumer-home/）；品牌/商品/门店名/热词为占位数据，
  * 按口径不进入语言包；界面骨架文案已接 i18n（appConsumer 命名空间，复用既有 key）。
  */
-import { useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { useTranslation } from 'react-i18next'
 import { REGION_LABEL_KEY as REGION_TITLE_KEY, REGION_TREE_DATA } from '@mftb/contracts/recommendConstants'
+import GroupBuyFeedCard, { type GroupBuyItem } from './GroupBuyFeedCard'
+import PreferredMerchantCard, { type PreferredMerchant } from './PreferredMerchantCard'
 import groupbuyHeroImg from '@/assets/consumer-home/groupbuy-hero.jpg'
 import groupbuyMapImg from '@/assets/consumer-home/groupbuy-map.png'
 import bbqImg from '@/assets/consumer-home/bbq.jpg'
@@ -81,15 +83,14 @@ const SECKILL_CARDS = [
 /** 團購超級秒殺 · 倒计时（占位静态值） */
 const SECKILL_COUNTDOWN = ['05', '38', '52']
 
-/** 秒杀竖列表（图3/图4；占位数据；theme: red=红底实拍 gold=黄底放射） */
-const FLASH_LIST = [
-  { key: 'f1', brand: '麥當勞', title: "10 元代金券（McDonald's）", sold: '半年售1884', tags: [], price: '8.4', origin: '10', discount: '秒殺價8.4折,降價超16%', grabPct: 46, theme: 'red', img: burgerImg },
-  { key: 'f2', brand: '麥當勞', title: '麥樂雞 (9件)', sold: '半年售787', tags: ['1人餐'], price: '14', origin: '29.5', discount: '秒殺價4.7折,降價超53%', grabPct: 23, theme: 'gold', img: friedChickenImg },
-  { key: 'f3', brand: '麥當勞', title: '厚椰拿鐵', sold: '半年售103', tags: ['1人餐'], price: '16.7', origin: '36', discount: '秒殺價4.6折,降價超54%', grabPct: 31, theme: 'gold', img: lemonTeaImg },
-  { key: 'f4', brand: '麥當勞', title: '炒雙蛋火腿飽超值早晨套餐', sold: '半年售227', tags: ['1人餐'], price: '31', origin: '38', discount: '秒殺價8.2折,降價超18%', grabPct: 34, theme: 'gold', img: burgerImg },
+/** 瀑布流团购券：与首页「团购」瀑布流同一口径（共享 GroupBuyFeedCard + apf-feed-list 容器），数据同首页 FEED */
+const FEED: GroupBuyItem[] = [
+  { key: 'f1', brand: '魚🐟日本料理大王大三巴店', title: '200蚊代250蚊券 葉林極 上日料放題💕炒...', image: fishPotImg, isNew: true, typeLabel: '酒', halfYearSales: 1000, customTags: ['人氣熱賣', '自定義'], price: '240', origin: '300', dist: '5.8km', area: '筷子基', shop: '澳門新影匯W酒店-津津餐...', merchantId: 'd-jp1' },
+  { key: 'f2', brand: '魚🐟日本料理大王大三巴店', title: '200蚊代250蚊券 葉林極 上日料放題💕炒...', image: burgerImg, halfYearSales: 1000, customTags: ['人氣熱賣', '自定義'], price: '240', origin: '300', dist: '5.8km', area: '筷子基', shop: '澳門新影匯W酒店-津津餐...', merchantId: 'd-jp2' },
+  { key: 'f3', brand: '湘楚人家', brandEmoji: '😋', title: '【份量超大抵食】單人全日套餐', image: riceballImg, isNew: true, halfYearSales: 416, price: '25.9', origin: '80', dist: '5.3km', area: '新口岸', shop: '湘楚人家（蓋飯🍳乾鍋小炒...', merchantId: 'd-hn' },
+  { key: 'f4', brand: '聯豐', title: '雞蛋10只（散裝）', image: lemonTeaImg, halfYearSales: 5066, customTags: ['性價比之選'], price: '8.8', origin: '15.9', dist: '7.1km', area: '筷子基', shop: '聯豐宅鮮餸（筷子基店）', merchantId: 'd-egg' },
+  { key: 'f5', brand: '湘楚人家', brandEmoji: '😋', title: '【份量超大抵食】單人全日套餐', image: fishPotImg, halfYearSales: 416, customTags: ['1人餐', '蜂蜜抵$2'], price: '25.9', origin: '80', dist: '5.0km', area: '新口岸', shop: '湘楚人家（蓋飯🍳乾鍋小炒...', merchantId: 'd-xc', flashBadge: '秒殺', flashCountdown: '07:36:58', flashBadgePos: 'top', grabbedLabel: '已搶30%', grabbedPct: 30, ctaText: '秒', discountNote: '秒殺價3.2折,降價超68%', ratingNote: '4.5分' },
 ]
-/** 秒杀卡公共占位（商圈/距离/评分/门店/倒计时） */
-const FLASH_COMMON = { area: '新口岸', dist: '6.9km', rating: '4.8分', shop: "McDonald's (利新店 Lei San)", countdown: '05:37:44' }
 
 /** 「附近」页签（左列第一个）与其距离档（单选）；距离单位全球通用，不进语言包 */
 const NEARBY_TAB = 'nearby'
@@ -132,16 +133,81 @@ const PANEL_TITLE = {
   sort: { key: 'appConsumer.groupBuy.panel.sort', zh: '排序篩選面板' },
 } as const
 
+/**
+ * 「更多篩選」底部面板占位文案（照抄设计稿图2-5；与 HOT_WORDS/FLASH_LIST 同口径：
+ * 占位数据暂不进语言包，二期统一接 i18n，避免一期 UI 先行时新增未收录 key 触发门禁）。
+ * 营业时间/使用人数为单选胶囊；偏好优惠/店铺服务为多选胶囊。
+ */
+const MORE_HOURS = ['0-5 時', '5-10 時', '10-14 時', '14-17 時', '17-21 時', '21-24 時', '24 小時營業']
+const MORE_PEOPLE = ['單人', '雙人', '3-4 人', '5-10 人', '10 人以上']
+/** 偏好优惠：圆形渐变图标 + 文案；icon 为占位 emoji/字样，待切图后替换 */
+const MORE_PREFS = [
+  { key: 'vip', label: '神會員', icon: '👑', tone: 'crown' },
+  { key: 'coupon', label: '津貼神券', icon: '🎫', tone: 'coupon' },
+  { key: 'vs', label: '全澳格價', icon: 'VS', tone: 'vs' },
+  { key: 'hot', label: '人氣推薦', icon: '🔥', tone: 'fire' },
+  { key: 'chain', label: '連鎖店鋪', icon: '🏪', tone: 'chain' },
+  { key: 'praise', label: '好評高分', icon: '👍', tone: 'thumb' },
+  { key: 'service', label: '服務優先', icon: '🛎️', tone: 'service' },
+  { key: 'taste', label: '口味優先', icon: '🌶️', tone: 'taste' },
+  { key: 'newstore', label: '新店入駐', icon: 'New', tone: 'new' },
+  { key: 'env', label: '環境優先', icon: '🌴', tone: 'env' },
+  { key: 'healthy', label: '食得健康', icon: '🥗', tone: 'healthy' },
+]
+/** 店铺服务（多选；设计稿含重名条目，渲染 key 需带下标） */
+const MORE_SERVICES = [
+  '有 WIFI', '免費停車', '付費停車', '可包場',
+  '可預點餐', '可電話預定', '等位區', '宴會廳',
+  '有包廂', '寶寶椅', '寵物禁入', '無煙餐廳',
+  '吸煙區', '有露臺', '室內衛生間', '有充電寶',
+  '無隱形消費', '不主動推銷', '不滿意重做', '保證正品',
+  '有演出', '流行音樂主體', '有卡座', '工業風裝修',
+  '有舞台', '有骰子', '可容納 400 人', '可存酒',
+  '啤酒', '敘利亞風格', '復古裝修', '中國風裝修',
+  '歐式裝修', '有調酒師', '團隊包場', '頂級音響',
+  '更衣室', '寄存櫃', '有沐浴房', '充電寶',
+  '不滿意重拍', '可開發票', '專業化妝', '有公主',
+  '自助購買酒水', '超大舞池', '隱藏式酒吧', '觀影享受',
+  '電競主體', '有沙發位', '爵士樂', '景觀位',
+  '威士忌', '雪茄吧', '自助點餐', '空調開放',
+  '可手機充電', '可電話預定', 'VIP 包廂', '可刷卡',
+  '一對一專屬服務', '保證正品', '沙發座', '電影房',
+  '汗蒸房', '大型溫泉游泳池',
+]
+/** 人均筛选器价格档（$1-$200+，到顶显示 +） */
+const PRICE_MIN = 1
+const PRICE_MAX = 200
+
+/** 頁签行下标：「優選商家」点击后瀑布流切换为商家卡（设计稿图2） */
+const TAB_PREFERRED = 1
+
+/** 優選商家瀑布流（设计稿图2口径；占位数据，logo 为令牌渐变占位待切图） */
+const PREFERRED_MERCHANTS: PreferredMerchant[] = [
+  { key: 'pm1', name: '翡翠茶餐廳🏆-關閘店（🔥全澳…', rating: '4.6', perPerson: '$76/人', cateArea: '淮揚菜·新馬路商圈', dist: '231m', logoText: '翡翠', logoTone: 'red', isNew: true, sales: '半年售300+', coupons: [{ icon: '券', price: '90', discount: '5.8折', name: '代金券名稱代代金券名稱…' }] },
+  { key: 'pm2', name: '麥田茶餐廳（SINCE 2016）', rating: '4.6', perPerson: '$76/人', cateArea: '淮揚菜·新馬路商圈', dist: '231m', logoText: '麥田', logoTone: 'green', fav: true, inflate: '最高膨脹至$60', sales: '半年售300+', coupons: [{ icon: '券', price: '90', discount: '5.8折', name: '代金券名稱代代金券名稱…' }, { icon: '惠', price: '90', discount: '5.8折', name: '代金券名稱代代金券名稱…' }, { icon: '秒', price: '90', discount: '5.8折', name: '代金券名稱代代金券名稱…' }] },
+  { key: 'pm3', name: '大豐燒肉🥩-氹仔店', rating: '4.8', perPerson: '$120/人', cateArea: '燒烤·氹仔商圈', dist: '1.2km', logoText: '大豐', logoTone: 'orange', isNew: true, sales: '半年售1000+', coupons: [{ icon: '券', price: '150', discount: '7.5折', name: '燒肉雙人套餐券' }, { icon: '秒', price: '88', discount: '6折', name: '工作日午市秒殺券' }] },
+  { key: 'pm4', name: '記記冰室😋-下環店', rating: '4.5', perPerson: '$45/人', cateArea: '港式·下環商圈', dist: '800m', logoText: '記記', logoTone: 'blue', inflate: '最高膨脹至$30', sales: '半年售600+', coupons: [{ icon: '惠', price: '40', discount: '8.8折', name: '下午茶專享優惠' }] },
+  { key: 'pm5', name: '龍湯堂🍜-北區店', rating: '4.7', perPerson: '$60/人', cateArea: '粥麵·北區商圈', dist: '2.4km', logoText: '龍湯', logoTone: 'red', sales: '半年售2000+', coupons: [{ icon: '券', price: '55', discount: '5.5折', name: '粥麵雙人券' }, { icon: '惠', price: '30', discount: '9折', name: '小食優惠券' }] },
+]
+
 export default function ConsumerGroupBuy({
   onBack,
   onSearch,
   onOpenStore,
   onOpenOrder,
+  onTabChange,
+  syncTab,
+  syncSeq,
 }: {
   onBack: () => void
   onSearch: () => void
   onOpenStore?: (merchantId: string) => void
   onOpenOrder?: () => void
+  /** 页签切换回流（壳外说明面板联动：優選商家 ↔ preferred 面板） */
+  onTabChange?: (tab: string) => void
+  /** 壳外说明面板下发的页签同步命令（syncSeq 自增时执行） */
+  syncTab?: string
+  syncSeq?: number
 }) {
   const { t } = useTranslation()
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -150,8 +216,8 @@ export default function ConsumerGroupBuy({
   const [tabsStuck, setTabsStuck] = useState(false)
   /** 当前激活页签（仅视觉态，原型不做真实过滤） */
   const [activeTab, setActiveTab] = useState<number>(0)
-  /** 当前展开的筛选面板：附近 / 分類 / 排序，同一时刻只开一个（null=收起） */
-  const [openPanel, setOpenPanel] = useState<'nearby' | 'category' | 'sort' | null>(null)
+  /** 当前展开的筛选面板：附近 / 分類 / 排序 / 更多篩選，同一时刻只开一个（null=收起） */
+  const [openPanel, setOpenPanel] = useState<'nearby' | 'category' | 'sort' | 'more' | null>(null)
   /** 附近-距离档（单选），null 表示未选距离 */
   const [distance, setDistance] = useState<string | null>(null)
   /** 左侧当前浏览的页签（附近 或 区域 value），僅控制右列展示哪组选项，不是选中态 */
@@ -162,6 +228,26 @@ export default function ConsumerGroupBuy({
   const [categories, setCategories] = useState<string[]>([])
   /** 排序方式（单选，存 i18n key） */
   const [sort, setSort] = useState<string>(SORT_OPTIONS[0].key)
+  /** 更多篩選·人均价格区间（双滑杆；原型仅视觉态，不做真实过滤） */
+  const [priceRange, setPriceRange] = useState<[number, number]>([PRICE_MIN, PRICE_MAX])
+  /** 更多篩選·营业时间（单选胶囊，再点取消） */
+  const [moreHour, setMoreHour] = useState<string | null>(null)
+  /** 更多篩選·使用人数（单选胶囊，再点取消） */
+  const [morePeople, setMorePeople] = useState<string | null>(null)
+  /** 更多篩選·偏好优惠（多选） */
+  const [morePrefs, setMorePrefs] = useState<string[]>([])
+  /** 更多篩選·店铺服务（多选） */
+  const [moreServices, setMoreServices] = useState<string[]>([])
+
+  /* 壳外说明面板同步命令：只在 syncSeq 变化时执行；preferred → 優選商家页签，page-group → 推薦页签 */
+  const syncSeqRef = useRef(syncSeq ?? 0)
+  useEffect(() => {
+    if ((syncSeq ?? 0) !== syncSeqRef.current) {
+      syncSeqRef.current = syncSeq ?? 0
+      if (syncTab === 'preferred') setActiveTab(TAB_PREFERRED)
+      else if (syncTab === 'page-group') setActiveTab(0)
+    }
+  }, [syncSeq, syncTab])
 
   /** 内容区上滑：过阈值折叠头部标题行；再过阈值页签行吸顶变文字态（图4） */
   const handleScroll = () => {
@@ -175,17 +261,8 @@ export default function ConsumerGroupBuy({
 
   const openStore = (merchantId: string) => () => onOpenStore?.(merchantId)
 
-  /** 整条团购商品是进店入口，Enter/Space 与点击等价 */
-  const handleItemKey = (event: KeyboardEvent<HTMLDivElement>, merchantId: string) => {
-    if (!onOpenStore) return
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault()
-      onOpenStore(merchantId)
-    }
-  }
-
   /** 点筛选按钮：展开对应面板，再点同一个收起 */
-  const togglePanel = (panel: 'nearby' | 'category' | 'sort') => () =>
+  const togglePanel = (panel: 'nearby' | 'category' | 'sort' | 'more') => () =>
     setOpenPanel((prev) => (prev === panel ? null : panel))
 
   /** 距离档单选：与商圈集合互斥（同一个胶囊只能表达一种地点口径），选中即收起面板 */
@@ -214,6 +291,26 @@ export default function ConsumerGroupBuy({
     setOpenPanel(null)
   }
 
+  /** 人均双滑杆：低端不得越过高端（反之亦然），越界就夹到对方位置 */
+  const pickPriceMin = (value: number) =>
+    setPriceRange(([, hi]) => [Math.min(value, hi), hi])
+  const pickPriceMax = (value: number) =>
+    setPriceRange(([lo]) => [lo, Math.max(value, lo)])
+  /** 单选胶囊：再点同一个取消 */
+  const pickOne = (setter: Dispatch<SetStateAction<string | null>>) => (value: string) => () =>
+    setter((prev) => (prev === value ? null : value))
+  /** 多选胶囊：可勾可消 */
+  const pickMany = (setter: Dispatch<SetStateAction<string[]>>) => (key: string) => () =>
+    setter((prev) => (prev.includes(key) ? prev.filter((x) => x !== key) : [...prev, key]))
+  /** 重置：五个模块全部回到默认（价格满档、其余清空），面板保持展开 */
+  const resetMore = () => {
+    setPriceRange([PRICE_MIN, PRICE_MAX])
+    setMoreHour(null)
+    setMorePeople(null)
+    setMorePrefs([])
+    setMoreServices([])
+  }
+
   /** 当前浏览页签对应的区域节点（附近页签无区域节点，右列展示距离档） */
   const activeArea = AREA_TREE.find((a) => a.value === activeAreaTab)
   /** 多选回写：首个选中项 + 剩余数量（量词走模板，避免英文下语序错乱） */
@@ -230,6 +327,9 @@ export default function ConsumerGroupBuy({
   const sortLabel = t(sort)
   /** 箭头方向跟随面板开合（▲=展开中） */
   const caret = (panel: 'nearby' | 'category' | 'sort') => (openPanel === panel ? '▲' : '▼')
+  /** 人均双滑杆轨道渐变分段点（满档百分比） */
+  const pctLo = ((priceRange[0] - PRICE_MIN) / (PRICE_MAX - PRICE_MIN)) * 100
+  const pctHi = ((priceRange[1] - PRICE_MIN) / (PRICE_MAX - PRICE_MIN)) * 100
 
   return (
     <div className="apg-root">
@@ -340,7 +440,10 @@ export default function ConsumerGroupBuy({
               key={`${tab.zh}-${i}`}
               type="button"
               className={`apg-tab${activeTab === i ? ' is-on' : ''}`}
-              onClick={() => setActiveTab(i)}
+              onClick={() => {
+                setActiveTab(i)
+                onTabChange?.(i === TAB_PREFERRED ? 'preferred' : 'page-group')
+              }}
             >
               <i className="apg-tab-ico" aria-hidden="true">{tab.emoji}</i>
               <span className="apg-tab-label">{tab.key ? t(tab.key, { defaultValue: tab.zh }) : tab.zh}</span>
@@ -390,11 +493,25 @@ export default function ConsumerGroupBuy({
               <i className="apg-chip-ico apg-chip-ico--thumb" aria-hidden="true">👍</i>好評高分
             </button>
           </div>
-          <button type="button" className="apg-chip is-slider" aria-label={t('appConsumer.groupBuy.filter.sliders', { defaultValue: '篩選條件' })}>🎚</button>
+          <button
+            type="button"
+            className={`apg-chip is-slider${openPanel === 'more' ? ' is-open' : ''}`}
+            aria-label={t('appConsumer.groupBuy.filter.sliders', { defaultValue: '篩選條件' })}
+            aria-expanded={openPanel === 'more'}
+            onClick={togglePanel('more')}
+          >
+            <svg className="apg-slider-ico" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+              <path d="M2 4.5h12M2 8h12M2 11.5h12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <circle cx="6" cy="4.5" r="1.9" fill="currentColor" />
+              <circle cx="10.5" cy="8" r="1.9" fill="currentColor" />
+              <circle cx="5" cy="11.5" r="1.9" fill="currentColor" />
+            </svg>
+            {t('appConsumer.common.filter', { defaultValue: '篩選' })}
+          </button>
         </div>
 
-        {/* 筛选下拉面板：同一时刻只展开一个，底部 × 收起 */}
-        {openPanel && (
+        {/* 筛选下拉面板：同一时刻只展开一个，底部 × 收起（更多篩選走独立底部 sheet，不经此处） */}
+        {(openPanel === 'nearby' || openPanel === 'category' || openPanel === 'sort') && (
           <div className="apg-panel-wrap">
             <div className="apg-panel" role="group" aria-label={t(PANEL_TITLE[openPanel].key, { defaultValue: PANEL_TITLE[openPanel].zh })}>
               {openPanel === 'nearby' && (
@@ -474,55 +591,116 @@ export default function ConsumerGroupBuy({
           </div>
         )}
 
-        {/* 秒杀竖列表：左=秒殺飘带+图+商圈距离 pill+已搶进度条；右=品牌|商品+半年售+价格块+秒CTA+门店行 */}
-        <div className="apg-flash-list">
-          {FLASH_LIST.map((p) => (
-            <div
-              key={p.key}
-              className={`apg-flash${onOpenStore ? ' is-clickable' : ''}`}
-              role={onOpenStore ? 'button' : undefined}
-              tabIndex={onOpenStore ? 0 : undefined}
-              aria-label={onOpenStore ? t('appConsumer.common.enterStore', { shop: FLASH_COMMON.shop, defaultValue: '進入店鋪：{{shop}}' }) : undefined}
-              onClick={onOpenStore ? openStore('g-seckill') : undefined}
-              onKeyDown={onOpenStore ? (event) => handleItemKey(event, 'g-seckill') : undefined}
-            >
-              <div className="apg-flash-left">
-                <div className="apg-flash-media">
-                  <span className="apg-flash-ribbon">秒殺 {FLASH_COMMON.countdown}</span>
-                  <img className={`apg-flash-img is-${p.theme}`} src={p.img} alt="" />
-                  <span className="apg-flash-loc">{FLASH_COMMON.area} | {FLASH_COMMON.dist}</span>
-                </div>
-                <div className="apg-flash-progress">
-                  <i className="apg-flash-progress-fill" style={{ width: `${p.grabPct}%` }} />
-                  <span className="apg-flash-progress-txt">🔥 已搶{p.grabPct}%</span>
-                </div>
-              </div>
-              <div className="apg-flash-main">
-                <div className="apg-flash-title"><b>{p.brand}</b><i>|</i>{p.title}</div>
-                <div className="apg-flash-tags">
-                  <span className="apg-flash-sold">{p.sold}</span>
-                  {p.tags.map((tag) => (
-                    <span key={tag} className="apg-flash-tag">{tag}</span>
-                  ))}
-                </div>
-                <div className="apg-flash-pricebox">
-                  <span className="apg-flash-price"><i>$</i>{p.price} <s>${p.origin}</s></span>
-                  <span className="apg-flash-discount">📉 {p.discount}</span>
-                  <button type="button" className="apg-flash-cta" onClick={(e) => e.stopPropagation()}>
-                    <span aria-hidden="true">⚡</span>秒 <i aria-hidden="true">›</i>
-                  </button>
-                </div>
-                <div className="apg-flash-shop">{FLASH_COMMON.rating} | {FLASH_COMMON.shop} ›</div>
-              </div>
-            </div>
-          ))}
-        </div>
+        {/* 瀑布流：優選商家页签 → 商家卡瀑布流（图2）；其余页签 → 与首页「团购」同规格瀑布流 */}
+        {activeTab === TAB_PREFERRED ? (
+          <div className="apq-feed">
+            {PREFERRED_MERCHANTS.map((m) => (
+              <PreferredMerchantCard key={m.key} item={m} />
+            ))}
+          </div>
+        ) : (
+          <div className="apf-feed-list">
+            {FEED.map((it) => (
+              <GroupBuyFeedCard key={it.key} item={it} theme="orange" onOpenStore={onOpenStore} />
+            ))}
+          </div>
+        )}
 
-        {/* 到底 */}
+        {/* 到底：仅文字提示 */}
         <div className="apg-end">
-          <span className="apg-end-emoji" aria-hidden="true">🐝</span>
           <span className="apg-end-text">{t('appConsumer.common.reachedBottom', { defaultValue: '已經到我底線了' })}</span>
         </div>
+
+        {/* 更多篩選底部面板（设计稿图2-5）：sticky 满屏罩 + 白底_sheet（五模块可滚）+ 重置/完成 + sheet 下圆形 × */}
+        {openPanel === 'more' && (
+          <div className="apg-more">
+            <div className="apg-more-sheet" role="group" aria-label="更多篩選面板">
+              <div className="apg-more-scroll">
+                <section className="apg-more-sec">
+                  <h4 className="apg-more-title">人均篩選器</h4>
+                  <div className="apg-range-card">
+                    <div className="apg-range-labels">
+                      <span>${priceRange[0]}</span>
+                      <span>{priceRange[1] >= PRICE_MAX ? `$${PRICE_MAX}+` : `$${priceRange[1]}`}</span>
+                    </div>
+                    <div
+                      className="apg-range-track"
+                      style={{ background: `linear-gradient(to right, var(--border-3) 0 ${pctLo}%, var(--apg-head-from) ${pctLo}% ${pctHi}%, var(--border-3) ${pctHi}% 100%)` }}
+                    >
+                      <input
+                        className="apg-range-input"
+                        type="range"
+                        min={PRICE_MIN}
+                        max={PRICE_MAX}
+                        value={priceRange[0]}
+                        onChange={(e) => pickPriceMin(Number(e.target.value))}
+                        aria-label="最低人均價格"
+                      />
+                      <input
+                        className="apg-range-input"
+                        type="range"
+                        min={PRICE_MIN}
+                        max={PRICE_MAX}
+                        value={priceRange[1]}
+                        onChange={(e) => pickPriceMax(Number(e.target.value))}
+                        aria-label="最高人均價格"
+                      />
+                    </div>
+                  </div>
+                </section>
+                <section className="apg-more-sec">
+                  <h4 className="apg-more-title">營業時間</h4>
+                  <div className="apg-more-grid">
+                    {MORE_HOURS.map((h) => (
+                      <button key={h} type="button" className={`apg-more-chip${moreHour === h ? ' is-on' : ''}`} aria-pressed={moreHour === h} onClick={pickOne(setMoreHour)(h)}>
+                        {h}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+                <section className="apg-more-sec">
+                  <h4 className="apg-more-title">使用人數</h4>
+                  <div className="apg-more-grid">
+                    {MORE_PEOPLE.map((p) => (
+                      <button key={p} type="button" className={`apg-more-chip${morePeople === p ? ' is-on' : ''}`} aria-pressed={morePeople === p} onClick={pickOne(setMorePeople)(p)}>
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+                <section className="apg-more-sec">
+                  <h4 className="apg-more-title">偏好优惠 <i>(可多選)</i></h4>
+                  <div className="apg-more-grid apg-more-grid--pref">
+                    {MORE_PREFS.map((p) => (
+                      <button key={p.key} type="button" className={`apg-more-pref${morePrefs.includes(p.key) ? ' is-on' : ''}`} aria-pressed={morePrefs.includes(p.key)} onClick={pickMany(setMorePrefs)(p.key)}>
+                        <i className={`apg-pref-ico apg-pref-ico--${p.tone}`} aria-hidden="true">{p.icon}</i>
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+                <section className="apg-more-sec">
+                  <h4 className="apg-more-title">店鋪服務 <i>(可多選)</i></h4>
+                  <div className="apg-more-grid apg-more-grid--svc">
+                    {MORE_SERVICES.map((s, i) => (
+                      <button key={`${s}-${i}`} type="button" className={`apg-more-chip${moreServices.includes(s) ? ' is-on' : ''}`} aria-pressed={moreServices.includes(s)} onClick={pickMany(setMoreServices)(s)}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              </div>
+              <div className="apg-more-footer">
+                <button type="button" className="apg-more-reset" onClick={resetMore}>重置</button>
+                <button type="button" className="apg-more-done" onClick={() => setOpenPanel(null)}>完成 (可多選)</button>
+              </div>
+            </div>
+            <div className="apg-more-closebar">
+              <i className="apg-more-stem" aria-hidden="true" />
+              <button type="button" className="apg-panel-close" aria-label={t('appConsumer.groupBuy.filter.closePanel', { defaultValue: '收起篩選面板' })} onClick={() => setOpenPanel(null)}>✕</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
