@@ -54,7 +54,7 @@ import {
  * 新加名字进本集合前先问：这个颜色代的是“品牌/实体/编码”，还是“主题表面”？
  * 后者永远不该出现在这里，它应该去配真正的深/浅两档。
  */
-const INTENTIONAL_SAME_VALUE = new Set(['brand', 'brand-hover', 'medal-gold', 'medal-silver', 'medal-bronze', 'on-medal'])
+const INTENTIONAL_SAME_VALUE = new Set(['brand', 'brand-hover', 'medal-gold', 'medal-silver', 'medal-bronze', 'on-medal', 'on-brand-pill'])
 
 const ALL_TOKEN_NAMES = [...SEMANTIC_TOKENS, ...COMPONENT_TOKENS]
 const ALL_TOKEN_VALUES = { ...TOKEN_VALUES, ...NON_COLOR_TOKENS }
@@ -868,5 +868,68 @@ describe('今日會議提示栏（--info-bar-*）', () => {
     // 而分隔线要比外框弱一档，否则两个 1px 线在深色下分不清主次
     expect(relativeLuminance(over(TOKEN_VALUES['info-bar-divider'].dark, CARD)))
       .toBeLessThan(relativeLuminance(over(TOKEN_VALUES['info-bar-border'].dark, CARD)))
+  })
+})
+
+/**
+ * 品牌渐变胶囊前景（--on-brand-pill）。
+ *
+ * 为什么必须单独一组：这个缺陷**门禁结构性看不见**——背景在渐变串内部不计数，
+ * 前景 #FFFFFF 在 fg 段又无等值映射，所以棘轮与 codemod 两边都碰不到它。
+ * 没有断言，它就只会停在“有人看过一次源码”的状态。
+ *
+ * ⚠ 与 §4.6 已登记的「债务④」（#E8720C 上白字 3.07，靠 14px/500 字重成立）不同：
+ *   胶囊渐变最差的两个端点连 3.0 都不达，那条理由在这里不适用。
+ */
+describe('品牌渐变胶囊前景（--on-brand-pill）', () => {
+  // 这四个端点就是 BrandTag.tsx 里写死的渐变（下一条用例跨文件锚定它）
+  const ENDPOINTS = ['#FFB300', '#FB8C00', '#FF7A45', '#F5680C']
+
+  it('渐变端点必须与 BrandTag.tsx 源码一致（跨文件锚定，防止改了组件忘了断言依据）', () => {
+    const src = readFileSync(
+      new URL('../../frontend/packages/ui/src/components/BrandTag.tsx', import.meta.url), 'utf8')
+    const found = [...src.matchAll(/linear-gradient\(135deg, (#[0-9A-Fa-f]{6}) 0%, (#[0-9A-Fa-f]{6}) 100%\)/g)]
+      .flatMap((m) => [m[1].toUpperCase(), m[2].toUpperCase()])
+    expect(found.length, 'BrandTag 里应该能找到渐变端点').toBeGreaterThan(0)
+    // 双向相等：组件新增端点时本组必须跟着重新实测，而不是默默少守一个
+    expect([...new Set(found)].sort()).toEqual([...ENDPOINTS].sort())
+  })
+
+  it('前景深字在每个渐变端点上都达 AA 4.5:1', () => {
+    for (const ep of ENDPOINTS) {
+      for (const theme of ['light', 'dark']) {
+        const c = contrastRatio(TOKEN_VALUES['on-brand-pill'][theme], ep)
+        expect(c, `${TOKEN_VALUES['on-brand-pill'][theme]} on ${ep}（${theme}）`).toBeGreaterThanOrEqual(4.5)
+      }
+    }
+  })
+
+  it('白字必须真的不达标（钉住“为何改深字”，防止被当成审美改动回退）', () => {
+    // 全部 < 4.5；且最差的两个连大字号的 3.0 门槛都不达，
+    // 所以 §4.6「债务④：靠 14px/500 字重勉强成立」那条理由在这里不适用。
+    for (const ep of ENDPOINTS) {
+      expect(contrastRatio('#FFFFFF', ep), `白字 on ${ep} 不该被判为达 AA`).toBeLessThan(4.5)
+    }
+    const worst = Math.min(...ENDPOINTS.map((ep) => contrastRatio('#FFFFFF', ep)))
+    expect(worst, '最差的端点应仍低于大字号 3.0 门槛').toBeLessThan(3.0)
+  })
+
+  it('两档必须同值（背景是不翻面的品牌资产，前景翻回去就是白字不达标）', () => {
+    expect(TOKEN_VALUES['on-brand-pill'].dark).toBe(TOKEN_VALUES['on-brand-pill'].light)
+    // 而且不得复用 --on-brand：它的浅色档是白，正是本组要修的缺陷本身
+    expect(TOKEN_VALUES['on-brand'].light).toBe('#FFFFFF')
+    expect(TOKEN_VALUES['on-brand-pill'].light).not.toBe(TOKEN_VALUES['on-brand'].light)
+  })
+
+  it('不得进 COLOR_TO_TOKEN（#141414 还兼任 surface-1/on-brand 的深色档）', () => {
+    // 进了 fg 段，codemod 会把无关站点的深色前景全刷成“胶囊专用”语义。
+    for (const seg of Object.keys(COLOR_TO_TOKEN)) {
+      const hit = Object.entries(COLOR_TO_TOKEN[seg]).filter(([, token]) => String(token).includes('brand-pill'))
+      expect(hit, `${seg} 段不应映射到 on-brand-pill`).toEqual([])
+    }
+    // 而 #141414 确实已存在于其它段的映射里，这正是不能复用的实证
+    const dup = Object.entries(TOKEN_VALUES).filter(([n, v]) =>
+      n !== 'on-brand-pill' && (v.light === '#141414' || v.dark === '#141414')).map(([n]) => n)
+    expect(dup.length, '#141414 已被哪些令牌占用').toBeGreaterThan(0)
   })
 })
