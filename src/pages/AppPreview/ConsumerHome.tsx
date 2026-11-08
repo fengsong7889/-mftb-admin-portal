@@ -21,7 +21,7 @@ import { hotWordsFor } from './consumerSearchData'
 import GroupBuyFeedCard, { type GroupBuyItem } from './GroupBuyFeedCard'
 import DeliveryStoreCard, { type DeliveryStore } from './DeliveryStoreCard'
 import DeliveryGridCard from './DeliveryGridCard'
-import hotPosterImg from '@/assets/consumer-home/hot-poster.png'
+import hotPosterImg from '@/assets/consumer-home/posters/poster_red.png'
 
 /** 搜索底纹词：轮播全站热搜前 5 个（美团式引导，需求 1.1），点搜索框后进激活页仍可换词 */
 const SHADE_WORDS = hotWordsFor('global').slice(0, 5)
