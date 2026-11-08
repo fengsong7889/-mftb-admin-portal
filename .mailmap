@@ -1,0 +1,35 @@
+# .mailmap —— 历史署名归一（只改显示层，不改写任何 commit）
+#
+# 为什么需要：本仓历史里混着 13 类身份，实测全部来自同一台机器与同一个人
+#   （645 笔占位假名 John Doe、88 笔本机主机名邮箱、41 笔 192.168.31.x 内网 DHCP 地址派生邮箱、
+#    83 笔正确的 42200535+fengsong7889@users.noreply、1 笔无前缀 noreply）。
+#   权属与软著证据链要求署名与 LICENSE 第十条、AGENTS.md 权属声明逐字符一致，
+#   所以把这些历史身份统一归到笔名。
+#
+# 归一前已实测确认：所有邮箱域名只涉及本机主机名、同一内网段、qq.com.com 占位、GitHub noreply，
+#   没有任何 CI 机器人或第三方域名 —— 也就是说不存在「把他人提交归名到自己头上」的情形。
+#   若日后新增协作者，必须从下面删掉不属于本人的行，否则这条证据链会整体失效。
+#
+# 为什么选带账号 ID 前缀的 noreply 地址：它是 GitHub 为该账号发行的规范形式，能被反查到账号；
+#   不带前缀的 fengsong7889@users.noreply.github.com 不保证生效。
+#
+# 验证（必须用大写的 %aN/%aE：小写 %an/%ae 是**原始**身份，mailmap 只作用于大写形式与 shortlog/blame）：
+#   git log --all --format='%aN <%aE>' | sort -u    # 期望只剩 1 行（实测 2026-11-08 已为 1）
+#   git shortlog -sne --all                          # 期望只剩 1 个作者（实测 896 笔归一）
+# ⚠ 别拿 --use-mailmap 配小写 %an 来验——那永远是 13 行，会把“已生效”误判成“没生效”。
+#    本文件初稿就沿用了这个错命令（源自 .qoder/mailmap.candidate 的验证段），落地时实测才发现。
+# ⚠ GitHub 网页端是否套用 .mailmap 以平台当前行为为准，需单独实测，不要把本地结论外推。
+
+fengsong7889 <42200535+fengsong7889@users.noreply.github.com> John Doe <1451619287@qq.com.com>
+fengsong7889 <42200535+fengsong7889@users.noreply.github.com> <1451619287@qq.com.com>
+fengsong7889 <42200535+fengsong7889@users.noreply.github.com> 杨晶晶 <yangjingjing@yangjingjingdeiMac.local>
+fengsong7889 <42200535+fengsong7889@users.noreply.github.com> 杨晶晶 <yangjingjing@192.168.31.19>
+fengsong7889 <42200535+fengsong7889@users.noreply.github.com> 杨晶晶 <yangjingjing@192.168.31.196>
+fengsong7889 <42200535+fengsong7889@users.noreply.github.com> 杨晶晶 <yangjingjing@192.168.31.50>
+fengsong7889 <42200535+fengsong7889@users.noreply.github.com> 杨晶晶 <yangjingjing@192.168.31.149>
+fengsong7889 <42200535+fengsong7889@users.noreply.github.com> 杨晶晶 <yangjingjing@192.168.31.88>
+fengsong7889 <42200535+fengsong7889@users.noreply.github.com> 杨晶晶 <yangjingjing@192.168.31.47>
+fengsong7889 <42200535+fengsong7889@users.noreply.github.com> 杨晶晶 <yangjingjing@192.168.31.158>
+fengsong7889 <42200535+fengsong7889@users.noreply.github.com> 杨晶晶 <yangjingjing@192.168.31.12>
+fengsong7889 <42200535+fengsong7889@users.noreply.github.com> 杨晶晶 <yangjingjing@192.168.31.71>
+fengsong7889 <42200535+fengsong7889@users.noreply.github.com> <fengsong7889@users.noreply.github.com>
