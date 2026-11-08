@@ -114,20 +114,20 @@ export default function GroupBuyFeedCard({
     <div className={`apf-card ${ctaClass}${flashClass}`}>
       {/* 左列：图片 + 库存条 */}
       <div className="apf-card-left">
-        <SpecField id={2}>
+        <SpecField panel="groupBuy" id={2}>
           <div className="apf-card-img">
             <img src={item.image} alt={item.title} />
-            {item.isNew && <SpecField id={3}><span className="apf-ribbon">新品</span></SpecField>}
-            {item.typeLabel && <SpecField id={4}><span className="apf-badge-type">{item.typeLabel}</span></SpecField>}
+            {item.isNew && <SpecField panel="groupBuy" id={3}><span className="apf-ribbon">新品</span></SpecField>}
+            {item.typeLabel && <SpecField panel="groupBuy" id={4}><span className="apf-badge-type">{item.typeLabel}</span></SpecField>}
             {/* 閃蜂：左上秒殺倒计时 */}
             {item.flashBadge && item.flashBadgePos === 'top' && (
-              <SpecField id={13}>
+              <SpecField panel="groupBuy" id={13}>
                 <span className="apf-flash-tag-top">{item.flashBadge} {item.flashCountdown}</span>
               </SpecField>
             )}
             {/* MFOOD：底部秒殺倒计时横条 */}
             {item.flashBadge && item.flashBadgePos !== 'top' && item.flashCountdown && (
-              <SpecField id={13}>
+              <SpecField panel="groupBuy" id={13}>
                 <div className="apf-flash-bar-bottom">
                   <span className="apf-flash-tag">{item.flashBadge}</span>
                   <span className="apf-flash-time">{item.flashCountdown}</span>
@@ -139,7 +139,7 @@ export default function GroupBuyFeedCard({
           </div>
         </SpecField>
         {item.remainingLabel && (
-          <SpecField id={13}>
+          <SpecField panel="groupBuy" id={13}>
             <div className="apf-remaining-bar">
               <span className="apf-remaining-fill" style={{ width: `${item.remainingPct ?? 50}%` }}>{item.remainingLabel}</span>
             </div>
@@ -147,7 +147,7 @@ export default function GroupBuyFeedCard({
         )}
         {/* 閃蜂：图片下方已搶进度条（与 MFOOD 库存条同位置） */}
         {item.grabbedLabel && (
-          <SpecField id={13}>
+          <SpecField panel="groupBuy" id={13}>
             <div className="apf-grabbed-bar">
               <span className="apf-grabbed-fill" style={{ width: `${item.grabbedPct ?? 20}%` }}>
                 🔥 {item.grabbedLabel}
@@ -159,7 +159,7 @@ export default function GroupBuyFeedCard({
 
       {/* 右侧内容 */}
       <div className="apf-card-body">
-        <SpecField id={1}>
+        <SpecField panel="groupBuy" id={1}>
           <div className="apf-card-title-row">
             <span className="apf-brand">
               {item.brandEmoji && <span className="apf-brand-emoji">{item.brandEmoji}</span>}
@@ -167,13 +167,13 @@ export default function GroupBuyFeedCard({
             </span>
           </div>
         </SpecField>
-        <SpecField id={5}>
+        <SpecField panel="groupBuy" id={5}>
           <div className="apf-card-title-row">
             <span className="apf-title-sep">|</span>
             <span className="apf-title">{item.title}</span>
           </div>
         </SpecField>
-        <SpecField id={6}>
+        <SpecField panel="groupBuy" id={6}>
           <div className="apf-card-meta">
             <span className="apf-meta-tag">半年售{formatSales(item.halfYearSales)}</span>
             {item.customTags?.map((tag) => (
@@ -182,12 +182,12 @@ export default function GroupBuyFeedCard({
           </div>
         </SpecField>
         <div className="apf-card-price-row">
-          <SpecField id={7}>
+          <SpecField panel="groupBuy" id={7}>
             <span className="apf-price"><i>$</i>{item.price}</span>
             <span className="apf-origin">${item.origin}</span>
           </SpecField>
           {item.showCta !== false && (
-            <SpecField id={12}>
+            <SpecField panel="groupBuy" id={12}>
               <button type="button" className="apf-cta" onClick={() => onOpenStore?.(item.merchantId)}>
                 {item.flashBadge && <span className="apf-cta-bolt" aria-hidden="true">⚡</span>}
                 {ctaText} ▸
@@ -196,14 +196,14 @@ export default function GroupBuyFeedCard({
           )}
         </div>
         {item.discountNote ? (
-          <SpecField id={8}>
+          <SpecField panel="groupBuy" id={8}>
             <div className="apf-card-discount">
               <span className="apf-discount-icon">↘</span>
               {item.discountNote}
             </div>
           </SpecField>
         ) : disc && (
-          <SpecField id={8}>
+          <SpecField panel="groupBuy" id={8}>
             <div className="apf-card-discount">
               <span className="apf-discount-icon">↘</span>
               降價超{disc.pct}%，勁慳${disc.save}
@@ -213,16 +213,16 @@ export default function GroupBuyFeedCard({
         <div className="apf-card-foot">
           {item.ratingNote ? (
             <>
-              <SpecField id={14}><span className="apf-dist apf-rating">{item.ratingNote}</span></SpecField>
-              <SpecField id={9}><span className="apf-dist">{item.dist}</span></SpecField>
-              <SpecField id={10}><span className="apf-area">{item.area}</span></SpecField>
-              <SpecField id={11}><span className="apf-shop">{item.shop} ›</span></SpecField>
+              <SpecField panel="groupBuy" id={14}><span className="apf-dist apf-rating">{item.ratingNote}</span></SpecField>
+              <SpecField panel="groupBuy" id={9}><span className="apf-dist">{item.dist}</span></SpecField>
+              <SpecField panel="groupBuy" id={10}><span className="apf-area">{item.area}</span></SpecField>
+              <SpecField panel="groupBuy" id={11}><span className="apf-shop">{item.shop} ›</span></SpecField>
             </>
           ) : (
             <>
-              <SpecField id={9}><span className="apf-dist">{item.dist}</span></SpecField>
-              <SpecField id={10}><span className="apf-area">{item.area}</span></SpecField>
-              <SpecField id={11}><span className="apf-shop">{item.shop} ›</span></SpecField>
+              <SpecField panel="groupBuy" id={9}><span className="apf-dist">{item.dist}</span></SpecField>
+              <SpecField panel="groupBuy" id={10}><span className="apf-area">{item.area}</span></SpecField>
+              <SpecField panel="groupBuy" id={11}><span className="apf-shop">{item.shop} ›</span></SpecField>
             </>
           )}
         </div>

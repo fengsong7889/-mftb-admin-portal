@@ -51,7 +51,14 @@ const ROOT: Record<RootKey, ConsumerScreen> = {
   mine: { key: 'mine' },
 }
 
-export default function ConsumerApp() {
+export default function ConsumerApp({ onCategoryChange, syncCategory, syncSeq, deliveryMode }: {
+  onCategoryChange?: (cat: string) => void
+  /** 右侧说明面板 Tab 下发的分类同步命令（syncSeq 自增时执行） */
+  syncCategory?: string
+  syncSeq?: number
+  /** 外卖瀑布流展示模式（说明面板切换器下发；两台手机同步） */
+  deliveryMode?: 'list' | 'card'
+}) {
   const { t } = useTranslation()
   const nav = useMobileNav<ConsumerScreen>(ROOT.home)
   const { current } = nav
@@ -91,6 +98,10 @@ export default function ConsumerApp() {
             onOpenDelivery={() => nav.push({ key: 'delivery' })}
             onOpenMarket={() => nav.push({ key: 'market' })}
             onOpenStore={openStore}
+            onCategoryChange={onCategoryChange}
+            syncCategory={syncCategory}
+            syncSeq={syncSeq}
+            deliveryMode={deliveryMode}
           />
         )
       case 'groupbuy':

@@ -1379,13 +1379,14 @@
   font-weight: 700;
 }
 
-/* 團購秒殺 + 超市秒殺 并排 */
+/* 團購秒殺 + 超市秒殺 并排（与下方分类栏的间距由分类栏 padding-top 承担） */
 .apc-flash-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 0;
 }
+.apc-flash-row > .apc-section { margin-bottom: 0; }
 .apc-flash-section {
   padding: 12px;
   border-radius: 14px;
@@ -1512,12 +1513,12 @@
 /* 分類切換（sticky 吸顶，到达顶部后固定，回滚时跟随内容） */
 .apc-sticky-cats {
   position: sticky;
-  /* 搜索栏实高 8+36+10=54px；top 取 44px 叠入被压住，padding-top 20px 使按钮顶部位于 64px，与搜索栏拉开 10px 间距（由自身底色填充，不露滚动内容） */
+  /* 44px 叠入搜索栏底部（54px，z 序压住）；padding-top 16px → 按钮顶 60px，吸顶后与搜索栏保留 6px */
   top: 44px;
   z-index: 10;
   display: flex;
   gap: 6px;
-  padding: 20px 0 10px;
+  padding: 16px 0 10px;
   background: #F3F4F6;
 }
 .apc-sticky-cat {
@@ -1864,7 +1865,7 @@
    ════════════════════════════════════════════════════════════════ */
 .apg-header {
   flex: none;
-  background: #ffe9f4;
+  background: linear-gradient(180deg, var(--apg-head-from), var(--apg-head-to));
   transition: box-shadow 0.25s ease;
 }
 .apg-header.is-scrolled { box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06); }
@@ -1905,14 +1906,14 @@
   height: 28px;
   border: none;
   background: transparent;
-  color: var(--text-1);
-  font-size: 24px;
+  color: var(--surface-1);
+  font-size: 22px;
   line-height: 1;
   cursor: pointer;
 }
-.apg-title { font-size: 17px; font-weight: 700; color: var(--text-1); }
-.apg-loc { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-2); }
-.apg-loc i { font-style: normal; color: var(--text-4); }
+.apg-title { font-size: 17px; font-weight: 700; color: var(--surface-1); }
+.apg-loc { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--surface-1); }
+.apg-loc i { font-style: normal; color: var(--surface-1); opacity: 0.85; }
 
 .apg-searchrow {
   display: flex;
@@ -1921,8 +1922,8 @@
   height: 38px;
   padding: 0 6px 0 12px;
   margin-bottom: 10px;
-  background: var(--surface-2);
-  border: 1px solid var(--warning-border);
+  background: var(--surface-1);
+  border: none;
   border-radius: 19px;
 }
 .apg-hot { flex: 1; min-width: 0; font-size: 13px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1940,35 +1941,64 @@
 }
 .apg-order-btn {
   flex: none;
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  height: 28px;
-  padding: 0 12px;
-  border: 1px solid var(--warning-border);
-  border-radius: 14px;
-  background: var(--surface-2);
-  color: var(--brand);
+  gap: 2px;
+  width: 46px;
+  padding: 6px 0 4px;
+  border: none;
+  border-radius: 12px;
+  background: var(--surface-1);
+  color: var(--text-1);
+  box-shadow: var(--shadow-1);
   font-family: inherit;
-  font-size: 12px;
+  font-size: 10px;
   cursor: pointer;
 }
-.apg-order-btn:hover { background: var(--warning-soft); }
+.apg-order-ico { font-size: 18px; line-height: 1; }
+.apg-order-txt { line-height: 1; font-weight: 600; }
+.apg-order-btn:hover { box-shadow: var(--shadow-2); transform: translateY(-1px); }
 
-/* 日料 Hero */
+/* 热词胶囊（图2：首个激活白底红字，其余半透明白） */
+.apg-hotwords {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 0 12px 10px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.apg-hotword {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 28px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-1) 28%, transparent);
+  color: var(--surface-1);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.apg-hotword.is-on {
+  background: var(--surface-1);
+  color: var(--apg-red);
+  font-weight: 700;
+}
+.apg-hotword-fire { font-size: 11px; }
+
+/* 新店 Banner 轮播（圆角大图 + 内嵌指示点） */
 .apg-hero {
   position: relative;
-  min-height: 122px;
-  padding: 14px;
-  margin-bottom: 12px;
+  height: 150px;
+  margin: 10px 12px 12px;
   border-radius: 14px;
-  color: #fff;
   overflow: hidden;
 }
-.apg-hero-badge { display: inline-block; font-size: 12px; font-weight: 700; }
-.apg-hero-title { display: block; margin-top: 10px; font-size: 30px; font-weight: 800; line-height: 1; }
-.apg-hero-title i { font-size: 16px; font-style: normal; }
-.apg-hero-title em { margin: 0 3px; font-size: 14px; font-style: normal; }
-.apg-hero-sub { display: block; margin-top: 6px; font-size: 11px; opacity: 0.9; }
 
 /* 十宮格分類 */
 .apg-cats {
@@ -1976,7 +2006,7 @@
   grid-template-columns: repeat(5, 1fr);
   gap: 10px 4px;
   padding: 12px 8px;
-  margin-bottom: 6px;
+  margin: 0 12px 6px;
   background: var(--surface-2);
   border-radius: 14px;
 }
@@ -1996,6 +2026,15 @@
 .apg-dots { display: flex; justify-content: center; gap: 4px; margin-bottom: 10px; }
 .apg-dots i { width: 6px; height: 6px; border-radius: 50%; background: #d9d9d9; }
 .apg-dots i.is-on { background: var(--brand); }
+.apg-dots-in {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  margin-bottom: 0;
+}
+.apg-dots-in i { background: color-mix(in srgb, var(--surface-1) 55%, transparent); }
+.apg-dots-in i.is-on { background: var(--surface-1); }
 
 /* 快捷胶囊 */
 .apg-pills { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
@@ -2042,7 +2081,7 @@
   cursor: pointer;
 }
 .apg-filters button.is-on { background: var(--danger-soft); border-color: var(--danger-border); color: var(--danger); font-weight: 600; }
-.apg-sortbar { display: flex; align-items: center; gap: 10px; padding: 6px 2px 10px; margin-bottom: 4px; }
+.apg-sortbar { display: flex; align-items: center; gap: 10px; padding: 6px 12px 10px; margin-bottom: 4px; }
 .apg-sortbar button { border: none; background: transparent; color: var(--text-2); font-size: 12px; cursor: pointer; }
 .apg-sortbar button.is-hl { color: var(--brand); font-weight: 600; }
 
@@ -2050,8 +2089,24 @@
 /* 團購页局部令牌：黄底胶囊无全局令牌，集中定义后使用处一律 var() 引用，
    避免裸色值散布触发主题棘轮门禁（先例见 .apcs）；下方 .apg-pill 复用同一个令牌，
    因此本段对 cssHex 棘轮的净增量为 0 */
-.apg-body {
+/* 特惠團購页根：局部令牌定义在页根（头部与滚动体共享作用域——定义在 .apg-body 上时头部拿不到，实测踩坑）；
+   每种色仅在此计 1 次 cssHex，使用处一律 var() 引用 */
+.apg-root {
   --apg-chip: #ffe58f;
+  --apg-head-from: #f4511e;
+  --apg-head-to: #ff8a3d;
+  --apg-red: #f5222d;
+  --apg-gold: #ffd666;
+  --apg-price-bg: #fff1f0;
+  --apg-track: #ffccc7;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.apg-body {
+  /* 覆写 .ap-body 的 padding：本页各块自带边距；顶部去 padding 消除吸顶空隙（露出底层滚动内容） */
+  padding: 0 0 16px;
 }
 .apg-sortbar .apg-chip {
   display: inline-flex;
@@ -2059,21 +2114,60 @@
   gap: 4px;
   height: 30px;
   padding: 0 12px;
-  border: none;
+  border: 1px solid var(--border-2);
   border-radius: 8px;
-  background: var(--apg-chip);
+  background: var(--surface-1);
   color: var(--text-1);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
 }
-/* 展开中不另取一档黄（会新增裸色值触发棘轮），同一令牌压暗一档表达“开”态 */
-.apg-sortbar .apg-chip.is-open { background: var(--apg-chip); filter: brightness(0.92); }
+/* 展开中不另取色（会新增裸色值触发棘轮），品牌色描边表达“开”态 */
+.apg-sortbar .apg-chip.is-open { border-color: var(--brand); color: var(--brand); }
+/* 左段横滑：面板胶囊 + 高亮胶囊；右段筛选图标固定（外层 flex 分段） */
+.apg-sortbar-scroll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.apg-sortbar-scroll::-webkit-scrollbar { display: none; }
+/* 神會員：渐变字 logo（复用局部红/金令牌，不新增裸色值） */
+.apg-chip-shen-logo {
+  margin-right: 1px;
+  font-weight: 900;
+  background: linear-gradient(135deg, var(--apg-red), var(--apg-gold));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.apg-chip-ico {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  color: var(--surface-1);
+  font-size: 10px;
+  font-weight: 800;
+  font-style: normal;
+}
+.apg-chip-ico--red { background: var(--apg-red); }
+.apg-chip-ico--vs { background: var(--brand); }
+.apg-chip-ico--thumb { border-radius: 50%; background: var(--apg-gold); color: var(--text-1); }
+.apg-chip.is-slider { font-size: 14px; }
 .apg-chip-caret { font-style: normal; font-size: 9px; }
 
 /* 筛选下拉面板：紧贴筛选栏展开，底部圆形 × 收起（原型内不做全屏遮罩） */
-.apg-panel-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 12px; }
+.apg-panel-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 0 12px 12px; }
 .apg-panel { width: 100%; background: var(--surface-2); border: 1px solid var(--border-2); border-radius: 14px; padding: 12px; box-shadow: var(--shadow-2), var(--card-outline); }
 .apg-panel-near { display: flex; gap: 10px; }
 .apg-panel-regions { flex: none; width: 88px; display: flex; flex-direction: column; gap: 10px; }
@@ -2149,6 +2243,256 @@
   align-items: center;
   justify-content: center;
 }
+
+/* 地图卡：附近门店入口（占位示意，接地图 SDK 后替换） */
+.apg-map {
+  position: relative;
+  display: block;
+  width: calc(100% - 24px);
+  margin: 0 12px 12px;
+  padding: 0;
+  border: none;
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: pointer;
+}
+.apg-map-img { width: 100%; height: 96px; object-fit: cover; display: block; }
+.apg-map-pill {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 14px;
+  background: var(--apg-gold);
+  color: var(--text-1);
+  font-size: 12px;
+  font-weight: 700;
+}
+.apg-map-pill i { font-style: normal; }
+.apg-map-brand {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  font-size: 10px;
+  color: var(--text-3);
+}
+
+/* 團購超級秒殺：橙色带 + 横滑秒杀卡（图3） */
+.apg-seckill {
+  margin: 4px 0 0;
+  padding: 12px 12px 14px;
+  border-radius: 14px 14px 0 0;
+  background: linear-gradient(180deg, var(--apg-head-from), var(--apg-head-to));
+}
+.apg-seckill-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.apg-seckill-title { font-size: 18px; font-weight: 800; color: var(--surface-1); }
+.apg-seckill-cd { display: inline-flex; align-items: center; gap: 2px; color: var(--surface-1); font-size: 12px; }
+.apg-seckill-cd-item {
+  min-width: 20px;
+  padding: 1px 3px;
+  border-radius: 5px;
+  background: var(--surface-1);
+  color: var(--apg-red);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+.apg-seckill-cd-suffix { margin-left: 2px; }
+.apg-seckill-more {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--surface-1);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--surface-1);
+  font-size: 11px;
+  cursor: pointer;
+}
+.apg-flash-hscroll { display: flex; gap: 10px; overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.apg-shcard {
+  position: relative;
+  flex: none;
+  width: 132px;
+  padding: 8px;
+  border: none;
+  border-radius: 12px;
+  background: var(--surface-1);
+  text-align: left;
+  cursor: pointer;
+}
+.apg-shcard-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 1;
+  padding: 2px 7px;
+  border-radius: 8px 8px 8px 2px;
+  background: var(--apg-gold);
+  color: var(--text-1);
+  font-size: 11px;
+  font-weight: 800;
+}
+.apg-shcard-img { width: 100%; height: 86px; border-radius: 10px; object-fit: cover; display: block; }
+.apg-shcard-title { display: block; margin-top: 6px; font-size: 12px; font-weight: 600; color: var(--text-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apg-shcard-price { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+.apg-shcard-now { color: var(--apg-red); font-weight: 800; font-size: 15px; }
+.apg-shcard-now i { font-size: 10px; font-style: normal; }
+.apg-shcard-price s { color: var(--text-3); font-size: 10px; }
+.apg-shcard-grab {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: var(--apg-red);
+  color: var(--surface-1);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* 页签行：未吸顶=圆形图标（图3）；吸顶=文字下划线（图4）；sticky 随滚动吸附在头部之下 */
+.apg-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.apg-tabs.is-stuck { background: var(--surface-1); box-shadow: var(--shadow-1); }
+.apg-tab { display: flex; flex-direction: column; align-items: center; gap: 3px; border: none; background: transparent; cursor: pointer; flex: none; }
+.apg-tab-ico {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-1);
+  border: 2px solid var(--border-2);
+  font-size: 16px;
+}
+.apg-tab.is-on .apg-tab-ico {
+  border-color: var(--apg-gold);
+  box-shadow: 0 0 0 2px var(--apg-gold);
+  background: color-mix(in srgb, var(--apg-gold) 28%, var(--surface-1));
+}
+.apg-tab-label { font-size: 11px; color: var(--text-2); white-space: nowrap; }
+.apg-tab.is-on .apg-tab-label { color: var(--text-1); font-weight: 700; }
+/* 吸顶态保留图标圆（对齐设计稿），仅加白底与投影表达“吸附” */
+
+/* 秒杀竖列表（图3/图4）：左=飘带图+已搶进度；右=品牌|商品+半年售+价格块+秒CTA+门店行 */
+.apg-flash-list { display: flex; flex-direction: column; gap: 10px; margin: 0 12px 14px; }
+.apg-flash { display: flex; gap: 10px; padding: 10px; background: var(--surface-2); border: 1px solid var(--border-2); border-radius: 14px; }
+.apg-flash.is-clickable { cursor: pointer; }
+.apg-flash-left { flex: none; width: 128px; }
+.apg-flash-media { position: relative; border-radius: 10px; overflow: hidden; }
+.apg-flash-ribbon {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  padding: 2px 0 8px;
+  background: var(--apg-red);
+  color: var(--surface-1);
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%);
+}
+.apg-flash-img { width: 100%; height: 108px; object-fit: cover; display: block; }
+.apg-flash-loc {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  padding: 2px 7px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--text-1) 62%, transparent);
+  color: var(--surface-1);
+  font-size: 10px;
+}
+.apg-flash-progress {
+  position: relative;
+  height: 14px;
+  margin-top: 6px;
+  border-radius: 7px;
+  background: var(--apg-track);
+  overflow: hidden;
+}
+.apg-flash-progress-fill { position: absolute; inset: 0 auto 0 0; background: var(--apg-red); border-radius: 7px; }
+.apg-flash-progress-txt {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--apg-red);
+}
+.apg-flash-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.apg-flash-title { font-size: 13px; font-weight: 700; color: var(--text-1); line-height: 1.35; }
+.apg-flash-title b { color: var(--text-brand); font-weight: 800; }
+.apg-flash-title i { font-style: normal; margin: 0 3px; color: var(--border-2); }
+.apg-flash-tags { display: flex; gap: 5px; }
+.apg-flash-sold, .apg-flash-tag {
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  color: var(--text-3);
+  font-size: 11px;
+}
+.apg-flash-pricebox {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 64px 6px 8px;
+  border-radius: 8px;
+  background: var(--apg-price-bg);
+}
+.apg-flash-price { display: flex; align-items: baseline; gap: 4px; color: var(--apg-red); font-weight: 800; font-size: 18px; }
+.apg-flash-price i { font-size: 11px; font-style: normal; }
+.apg-flash-price s { color: var(--text-3); font-size: 11px; font-weight: 400; }
+.apg-flash-discount { font-size: 10px; color: var(--text-2); }
+.apg-flash-cta {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 10px 14px 14px 10px;
+  background: linear-gradient(90deg, var(--apg-gold), var(--apg-red));
+  color: var(--surface-1);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.apg-flash-cta i { font-style: normal; font-size: 11px; }
+.apg-flash-shop { font-size: 11px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 横向滚动条隐藏（桌面预览时 hotwords/tabs/flash-hscroll 会露出灰条） */
+.apg-hotwords, .apg-tabs, .apg-flash-hscroll { scrollbar-width: none; }
+.apg-hotwords::-webkit-scrollbar, .apg-tabs::-webkit-scrollbar, .apg-flash-hscroll::-webkit-scrollbar { display: none; }
 
 /* 竖向商品列表 */
 .apg-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
@@ -4531,6 +4875,13 @@ button.apcs-card:hover { border-color: var(--warning-border); }
   animation: apf-spec-glow 1.5s linear infinite;
 }
 
+/* 红包收起行药丸较小，高亮加粗一档更醒目（劲爆券/神会员行） */
+.apf-spec-field.is-highlighted > .apw-pill,
+.apf-spec-field.is-highlighted > .apw-pill-group {
+  outline-width: 3px;
+  outline-offset: 2px;
+}
+
 /* 表格编辑态 */
 .ap-spec-panel input,
 .ap-spec-panel textarea {
@@ -4563,6 +4914,31 @@ button.apcs-card:hover { border-color: var(--warning-border); }
 }
 .ap-spec-reset:hover { background: #E2E8F0; }
 
+/* 说明面板顶部 Tab：团购瀑布流 / 外卖瀑布流（壳内分类点击自动联动切换） */
+.ap-spec-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.ap-spec-tab {
+  padding: 6px 18px;
+  border: 1px solid #CBD5E1;
+  border-radius: 18px;
+  background: #F8FAFC;
+  color: #64748B;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.ap-spec-tab:hover { background: #EFF6FF; color: #1D4ED8; border-color: #93C5FD; }
+.ap-spec-tab.is-on {
+  background: linear-gradient(135deg, #3B82F6, #2563EB);
+  border-color: #2563EB;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
+}
+
 /* ════════════════════════════════════════════════════════════════
    閃蜂外賣 · 門店瀑布流卡片（apw- 前缀，首页點「外賣」分類展示）
    No.1 门店名称（含新店/熱門角标） No.2 评分 No.3 月售
@@ -4570,12 +4946,60 @@ button.apcs-card:hover { border-color: var(--warning-border); }
    No.7 标签栏（广告推荐/算法库/金字招牌） No.8 会员红包标签
    ════════════════════════════════════════════════════════════════ */
 .apw-card {
+  position: relative; /* 減配角标的定位锚 */
   display: flex;
   gap: 10px;
   padding: 12px;
   border-radius: 14px;
   background: #fff;
   cursor: pointer;
+}
+/* 減配角标：贴卡片右上角（图3口径，替代原单行内「· 減配$0~6」文案） */
+.apw-discount-flag {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 3px 10px;
+  border-radius: 0 14px 0 10px;
+  background: linear-gradient(135deg, #FF9800, #F4511E);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+/* 信息三列（图3口径）：起送 / 配送 / 距離，各列 label+value 上下两行 */
+.apw-info-grid {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 0 16px;
+}
+.apw-info-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.apw-info-label { font-size: 10px; color: #9CA3AF; white-space: nowrap; }
+.apw-info-value { font-size: 12px; font-weight: 700; color: #1F2937; white-space: nowrap; }
+
+/* 评分行右侧：準時寶 + 配送类型标签横排（省空间） */
+.apw-rating-side {
+  margin-left: auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+/* 配送类型标签：閃蜂送/mFood送/自送/自取x折/支持自取（三选一必显，橙色描边） */
+.apw-delivery-type {
+  padding: 1px 8px;
+  border: 1px solid #FF8F00;
+  border-radius: 4px;
+  background: #fff;
+  color: #FF8F00;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 .apw-card-img {
   position: relative;
@@ -4685,26 +5109,7 @@ button.apcs-card:hover { border-color: var(--warning-border); }
   flex: none;
 }
 
-/* No.4~No.6 信息行 */
-.apw-row-info {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  overflow: hidden;
-}
-.apw-scooter { flex: none; font-size: 12px; }
-.apw-info {
-  font-size: 11px;
-  color: #6B7280;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.apw-free {
-  color: #16A34A;
-  font-style: normal;
-  font-weight: 700;
-}
+/* 信息行单行样式已由三列 .apw-info-grid 取代（图3口径）；免配送費绿字已废（免配送費→配送列「$0」+右上角「減配」角标） */
 .apw-pickup {
   color: #E65100;
   font-style: normal;
@@ -4771,4 +5176,327 @@ button.apcs-card:hover { border-color: var(--warning-border); }
   background: transparent;
   color: #E53935;
   padding: 2px 2px;
+}
+.apw-pill-green {
+  background: #16A34A;
+  color: #fff;
+}
+.apw-pill-gray {
+  background: transparent;
+  color: #6B7280;
+  padding: 2px 2px;
+}
+/* MFOOD 勁爆券（shen 膠囊的 MFOOD 皮）：紫红渐变块 + 粉底红字权益文案，两段一组 */
+.apw-pill-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.apw-pill-bao {
+  background: linear-gradient(135deg, #D946EF, #A21CAF);
+  color: #fff;
+}
+.apw-pill-bao-ico { font-size: 9px; }
+.apw-pill-bao-text {
+  background: #FCE7F3;
+  color: #DB2777;
+}
+
+/* No.8 神會員展开/收起：收起=會員行+▾；展開=券包/活动/其它三段+▴ */
+.apw-member-toggle {
+  flex: none;
+  margin-left: auto;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #F1F5F9;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+.apw-member-toggle:hover { background: #E2E8F0; color: #1E293B; }
+.apw-member-open {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.apw-member-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.apw-member-section-label {
+  flex: none;
+  width: 26px;
+  font-size: 11px;
+  color: #6B7280;
+  line-height: 20px;
+}
+.apw-member-section-tags {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap; /* 券包/活动段标签过多时自动折行 */
+  align-items: center;
+  gap: 4px;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   人氣商家皮膚（apw- 延伸；配色真源 @/constants/popularSkinTemplates，
+   與「廣告推薦系統 → 銷售定價 → 新增定價」共11套小圖配色/11張兜底海報）
+   ════════════════════════════════════════════════════════════════ */
+
+/* 小圖模式：邊框色+框內漸變由內聯 style 驅動（templateKey → SMALL_SKIN_TEMPLATES） */
+.apw-card.is-hot-small { border-radius: 12px; }
+
+/* 人氣商家「熱門」角标（大圖模式名稱前） */
+.apw-hot-flag {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #F03E3E, #FF6B35);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* 大圖模式（大圖拼列）：左側豎版海報隨右側內容拉伸，文字推到底部 */
+.apw-card.is-hot-large { gap: 8px; }
+.apw-hot-poster {
+  position: relative; /* 真实海報图绝对铺满的定位锚 */
+  flex: none;
+  width: 96px;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 6px 12px;
+  text-align: center;
+}
+/* 真实海報图（参考图切图）铺满整个左列；图内已含「人氣商家/立即進入」，不再叠加合成文字 */
+.apw-hot-poster-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.apw-hot-poster-brand {
+  width: 100%;
+  padding: 4px 3px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #D92D3A;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.3;
+  white-space: pre-line; /* 品牌名可含換行（\n） */
+  overflow: hidden;
+}
+.apw-hot-poster-mascot {
+  font-size: 44px;
+  line-height: 1.1;
+  margin-top: 4px;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.18));
+}
+.apw-hot-poster-title {
+  margin-top: auto;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.22);
+}
+.apw-hot-poster-btn {
+  margin-top: 6px;
+  padding: 3px 10px;
+  border: 1.5px solid rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* 商品拼列：1大2小，右側越界裁切營造輪播感 */
+.apw-hot-dishes {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+  overflow: hidden;
+}
+.apw-hot-dish { flex: none; width: 56px; }
+.apw-hot-dish.is-lead { width: 118px; }
+.apw-hot-dish-img {
+  position: relative;
+  width: 100%;
+  height: 62px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.apw-hot-dish.is-lead .apw-hot-dish-img { height: 84px; }
+.apw-hot-dish-img img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.apw-hot-dish-discount {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #E53935, #FF7043);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+}
+.apw-hot-dish-price {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  padding: 1px 6px 1px 4px;
+  border-radius: 0 8px 0 0;
+  background: rgba(229, 57, 53, 0.92);
+  color: #fff;
+}
+.apw-hot-dish-price em { font-style: normal; font-size: 13px; font-weight: 800; }
+.apw-hot-dish-price s { font-size: 9px; opacity: 0.85; }
+.apw-hot-dish-name {
+  display: block;
+  margin-top: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #1F2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── 外卖瀑布流 · 卡片模式（一行两店；说明面板切换，两台手机同步；样式全走语义令牌，不新增裸色值） ─── */
+.apw-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 0 10px 10px;
+}
+.apw-grid-card {
+  background: var(--surface-1);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-card-soft);
+  cursor: pointer;
+}
+.apw-grid-img {
+  position: relative;
+  aspect-ratio: 4 / 3;
+}
+.apw-grid-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.apw-grid-overlay {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  padding: 3px 8px 3px 0;
+  border-radius: 0 10px 0 0;
+  background: color-mix(in srgb, var(--text-1) 55%, transparent);
+  color: var(--surface-1);
+  font-size: 11px;
+  font-weight: 600;
+}
+.apw-grid-overlay-type {
+  background: var(--brand);
+  color: var(--on-brand);
+  padding: 3px 8px;
+  border-radius: 0 8px 0 0;
+  font-weight: 700;
+}
+.apw-grid-body {
+  padding: 8px 10px 10px;
+}
+.apw-grid-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-1);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.7em;
+}
+.apw-grid-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.apw-grid-rating {
+  color: var(--text-brand);
+  font-weight: 700;
+}
+.apw-grid-meta-divider {
+  color: var(--border-2);
+}
+.apw-grid-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+/* 说明面板 · 外卖展示模式切换器（列表/卡片）与卡片模式提示 */
+.ap-spec-mode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 16px 0;
+}
+.ap-spec-mode-label {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.ap-spec-mode-switch {
+  display: inline-flex;
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.ap-spec-mode-btn {
+  border: none;
+  background: transparent;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.ap-spec-mode-btn.is-on {
+  background: var(--brand);
+  color: var(--on-brand);
+  font-weight: 600;
+}
+.ap-spec-mode-hint {
+  margin: 6px 16px 0;
+  font-size: 12px;
+  color: var(--text-3);
 }

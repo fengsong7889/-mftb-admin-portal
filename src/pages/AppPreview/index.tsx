@@ -15,7 +15,7 @@ import MerchantApp from './MerchantApp'
 import ConsumerApp from './ConsumerApp'
 import MfoodApp from './MfoodApp'
 import { HighlightProvider, useHighlightProvider } from './SpecHighlight'
-import { loadSpecs, saveSpecs, type SpecEntry } from './groupBuySpec'
+import { SPEC_PANELS, loadSpecs, saveSpecs, type SpecEntry, type SpecPanelKey } from './groupBuySpec'
 import './appPreview.css'
 
 export default function AppPreview() {
@@ -59,16 +59,39 @@ export default function AppPreview() {
   )
 }
 
-/** 双机并排 + 可编辑规范表格（抽成子组件以使用 hooks） */
+/** 双机并排 + 可切换规范表格（抽成子组件以使用 hooks） */
 function DualView() {
-  const highlight = useHighlightProvider()
-  const [specs, setSpecs] = useSpecsState()
+  /** 当前说明面板：团购瀑布流 / 外卖瀑布流（Tab 手动切换 + 壳内分类点击自动联动） */
+  const [panelKey, setPanelKey] = useState<SpecPanelKey>('groupBuy')
+  const highlight = useHighlightProvider(panelKey)
+  /** Tab 手动切换的同步序号：自增时命令两个壳把分类切到面板对应瀑布流 */
+  const [syncSeq, setSyncSeq] = useState(0)
+  const [specsByPanel, setSpecsByPanel] = useState<Record<SpecPanelKey, SpecEntry[]>>(() => ({
+    groupBuy: loadSpecs('groupBuy'),
+    delivery: loadSpecs('delivery'),
+  }))
   const [editId, setEditId] = useState<number | null>(null)
+  /** 外卖瀑布流展示模式：列表（一行一店）/ 卡片（一行两店）；说明面板切换器下发，两台手机同步 */
+  const [deliveryMode, setDeliveryMode] = useState<'list' | 'card'>('list')
+
+  const activePanel = SPEC_PANELS.find((p) => p.key === panelKey) ?? SPEC_PANELS[0]
+  const specs = specsByPanel[panelKey]
 
   function handleEdit(id: number, field: keyof SpecEntry, value: string) {
     const next = specs.map((s) => (s.id === id ? { ...s, [field]: value } : s))
-    setSpecs(next)
-    saveSpecs(next)
+    setSpecsByPanel((prev) => ({ ...prev, [panelKey]: next }))
+    saveSpecs(panelKey, next)
+  }
+
+  /** 壳内分类切换联动：外卖类 → 外卖说明面板，其余 → 团购说明面板（只切面板，不回流命令） */
+  function handleCategoryChange(cat: string) {
+    setPanelKey(cat === 'delivery' ? 'delivery' : 'groupBuy')
+  }
+
+  /** 面板 Tab 手动切换：同时下发命令同步两个壳的分类（看哪份说明，APP 就在哪个瀑布流） */
+  function selectPanel(key: SpecPanelKey) {
+    setPanelKey(key)
+    setSyncSeq((seq) => seq + 1)
   }
 
   return (
@@ -76,14 +99,64 @@ function DualView() {
       <div className="ap-dual-wrap">
         <div className="ap-dual-item">
           <span className="ap-dual-label ap-dual-label--mfood">mFood</span>
-          <PhoneFrame><MfoodApp /></PhoneFrame>
+          <PhoneFrame>
+            <MfoodApp
+              onCategoryChange={handleCategoryChange}
+              syncCategory={panelKey === 'delivery' ? 'delivery' : 'group'}
+              syncSeq={syncSeq}
+              deliveryMode={deliveryMode}
+            />
+          </PhoneFrame>
         </div>
         <div className="ap-dual-item">
           <span className="ap-dual-label ap-dual-label--bee">閃蜂</span>
-          <PhoneFrame><ConsumerApp /></PhoneFrame>
+          <PhoneFrame>
+            <ConsumerApp
+              onCategoryChange={handleCategoryChange}
+              syncCategory={panelKey === 'delivery' ? 'delivery' : 'group'}
+              syncSeq={syncSeq}
+              deliveryMode={deliveryMode}
+            />
+          </PhoneFrame>
         </div>
         <div className="ap-spec-panel">
-          <h3>团购瀑布流 · 展示字段及标签说明</h3>
+          <div className="ap-spec-tabs">
+            {SPEC_PANELS.map((p) => (
+              <button
+                key={p.key}
+                type="button"
+                className={`ap-spec-tab${panelKey === p.key ? ' is-on' : ''}`}
+                onClick={() => selectPanel(p.key)}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          {panelKey === 'delivery' && (
+            <div className="ap-spec-mode">
+              <span className="ap-spec-mode-label">展示模式</span>
+              <div className="ap-spec-mode-switch">
+                <button
+                  type="button"
+                  className={`ap-spec-mode-btn${deliveryMode === 'list' ? ' is-on' : ''}`}
+                  onClick={() => setDeliveryMode('list')}
+                >
+                  列表模式
+                </button>
+                <button
+                  type="button"
+                  className={`ap-spec-mode-btn${deliveryMode === 'card' ? ' is-on' : ''}`}
+                  onClick={() => setDeliveryMode('card')}
+                >
+                  卡片模式
+                </button>
+              </div>
+            </div>
+          )}
+          {panelKey === 'delivery' && deliveryMode === 'card' && (
+            <p className="ap-spec-mode-hint">卡片模式为一行两店的精简卡片：起送/減配、準時寶、营业状态、标签栏、红包展开区等字段不展示，悬停说明仅标记卡片中可见字段。</p>
+          )}
+          <h3>{activePanel.label} · 展示字段及标签说明</h3>
           <table>
             <thead>
               <tr><th>品牌</th><th>名称</th><th>说明</th></tr>
@@ -138,9 +211,4 @@ function DualView() {
       </div>
     </HighlightProvider>
   )
-}
-
-function useSpecsState() {
-  const [specs, setSpecs] = useState<SpecEntry[]>(() => loadSpecs())
-  return [specs, setSpecs] as const
 }

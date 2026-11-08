@@ -6,6 +6,7 @@ import {
   getCustomPosterImages, getPosterSource, getPosterLocale, POSTER_LANGUAGES,
   type LargeLayout, type SkinSaleConfig, type PosterLocale,
 } from '@/constants/popularSkinTemplates'
+import { FALLBACK_POSTER_IMAGES } from './posterImages'
 import './SkinTemplateSection.css'
 
 // 阶段一视觉确认文案，第二阶段统一接入 i18n；店铺与商品均为效果示意。
@@ -16,12 +17,15 @@ const DISHES = [
   { emoji: '🍦', name: '新地雪糕', price: '$8.9', original: '$12', bg: 'linear-gradient(135deg, #FFE9F0, #FFC1D4)' },
 ]
 
-/** 严格按来源和语言展示，缺失的自定义图不静默替换成兜底图。 */
+/** 严格按来源和语言展示，缺失的自定义图不静默替换成兑底图。兑底图已换真实海报切图，SVG 仅作缺图兑底。 */
 export function SkinPoster({ skin, locale }: { skin: SkinSaleConfig; locale: PosterLocale }) {
   const { t } = useTranslation()
   const custom = getPosterSource(skin) === 'custom'
   const poster = getFallbackPoster(skin.fallbackPosterKey ?? '')
-  const source = custom ? getCustomPosterImages(skin)[locale] : poster ? buildPosterSvgDataUrl(poster) : undefined
+  const fallbackSource = poster
+    ? (FALLBACK_POSTER_IMAGES[poster.key] ?? buildPosterSvgDataUrl(poster))
+    : undefined
+  const source = custom ? getCustomPosterImages(skin)[locale] : fallbackSource
   const [failedSource, setFailedSource] = useState<string>()
   const src = source !== failedSource ? source : undefined
   const language = POSTER_LANGUAGES.find(item => item.locale === locale)!

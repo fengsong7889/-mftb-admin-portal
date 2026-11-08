@@ -12,6 +12,7 @@ import { useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button, Input, InputNumber, Modal, Switch, Tag, Upload, message } from 'antd'
 import { CheckCircleFilled, EyeOutlined, PlusOutlined } from '@ant-design/icons'
+import { FALLBACK_POSTER_IMAGES } from './posterImages'
 import {
   SMALL_SKIN_TEMPLATES,
   LARGE_SKIN_TEMPLATES,
@@ -415,6 +416,7 @@ export default function SkinTemplateSection({
                             className={`skin-config__poster-option${active ? ' skin-config__poster-option--active' : ''}`}
                             style={{ background: p.gradientCss }}
                             onClick={() => patchSelected({ fallbackPosterKey: p.key })}>
+                            <img className="skin-config__poster-option-img" src={FALLBACK_POSTER_IMAGES[p.key]} alt="" draggable={false} />
                             <span className="skin-config__poster-option-name">{p.name}</span>
                             {active && <span className="skin-config__poster-option-check">✓</span>}
                           </button>

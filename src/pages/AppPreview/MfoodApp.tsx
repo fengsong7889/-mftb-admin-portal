@@ -17,12 +17,19 @@ const TABS: { key: RootKey; icon: string; zh: string }[] = [
   { key: 'mine', icon: '😊', zh: '我的' },
 ]
 
-export default function MfoodApp() {
+export default function MfoodApp({ onCategoryChange, syncCategory, syncSeq, deliveryMode }: {
+  onCategoryChange?: (tab: string) => void
+  /** 右侧说明面板 Tab 下发的分类同步命令（syncSeq 自增时执行） */
+  syncCategory?: string
+  syncSeq?: number
+  /** 外卖瀑布流展示模式（说明面板切换器下发；两台手机同步） */
+  deliveryMode?: 'list' | 'card'
+}) {
   const { t } = useTranslation()
 
   return (
     <div className="ap-screen apm-root">
-      <MfoodHome />
+      <MfoodHome onCategoryChange={onCategoryChange} syncCategory={syncCategory} syncSeq={syncSeq} deliveryMode={deliveryMode} />
 
       {/* 底部 Tab 栏 */}
       <div className="ap-tabbar apm-tabbar">
