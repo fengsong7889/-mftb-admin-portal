@@ -15,7 +15,7 @@
  * 改颜色的正确流程：改 TOKEN_VALUES（浅色值 + 深色值 + 实测对比度）→ 跑生成脚本 → 跑门禁。
  * 深色取值规则与实测依据：docs/design/深浅色主题切换_可落地实施方案_2026-11-03.md §4.3 / §4.5 / §4.6
  *
- * 令牌共 80 个：语义层 + 组件层（--sidebar-*）+ 阴影/描边补偿。
+ * 令牌共 81 个：语义层 + 组件层（--sidebar-*）+ 阴影/描边补偿。
  * 业务代码只允许引用语义层；--sidebar-* 属组件层，仅壳层 CSS 可用。
  */
 :root {
@@ -33,6 +33,7 @@
   --text-3: #8C8C8C;
   --text-4: #BFBFBF;
   --on-brand: #FFFFFF;
+  --on-brand-pill: #141414;
   --text-brand: #1890FF;
   --header-text: #2D3436;
   --border-1: #D9D9D9;
@@ -116,6 +117,7 @@ html[data-theme='dark'] {
   --text-3: #9A9A9A;
   --text-4: #737373;
   --on-brand: #141414;
+  --on-brand-pill: #141414;
   --text-brand: #40A9FF;
   --header-text: #E8E8E8;
   --border-1: #424242;
@@ -210,6 +212,7 @@ html {
     --text-3: #8C8C8C;
     --text-4: #BFBFBF;
     --on-brand: #FFFFFF;
+    --on-brand-pill: #141414;
     --text-brand: #1890FF;
     --header-text: #2D3436;
     --border-1: #D9D9D9;

@@ -19,18 +19,25 @@ interface BrandTagProps {
   style?: React.CSSProperties
 }
 
-/** 閃蜂 - 金黃漸變 + 白字；mFood - 橙色漸變 + 白字 */
+/**
+ * 閃蜂 - 金黃漸變；mFood - 橙色漸變。
+ *
+ * 前景一律用 --on-brand-pill（两档都是深字），**不是白字**：
+ * 白字在 #FFB300 上实测只有 **1.79**、#FF7A45 上 **2.59**，连大字号的 3.0 门槛都不达；
+ * 换 #141414 后是 10.26 / 7.13。以前这里写白字是靠 textShadow 提升感知对比，
+ * 但 WCAG 计算不承认 text-shadow，不能当达标理由。详见方案 §33.2 与令牌表注释。
+ */
 const BRAND_STYLE: Record<'shanfeng' | 'mfood', React.CSSProperties> = {
   shanfeng: {
     background: 'linear-gradient(135deg, #FFB300 0%, #FB8C00 100%)',
-    color: '#FFFFFF',
+    color: 'var(--on-brand-pill)',
     border: 'none',
     boxShadow: '0 1px 3px rgba(251, 140, 0, 0.35)',
     textShadow: '0 1px 1px rgba(0, 0, 0, 0.18)',
   },
   mfood: {
     background: 'linear-gradient(135deg, #FF7A45 0%, #F5680C 100%)',
-    color: '#FFFFFF',
+    color: 'var(--on-brand-pill)',
     border: 'none',
     boxShadow: '0 1px 3px rgba(245, 104, 12, 0.35)',
     textShadow: '0 1px 1px rgba(0, 0, 0, 0.18)',
