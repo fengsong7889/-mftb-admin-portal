@@ -33,7 +33,7 @@ describe('特價團購筛选面板', () => {
     const user = userEvent.setup()
     renderPage()
 
-    await user.click(screen.getByRole('button', { name: '附近' }))
+    await user.click(screen.getByRole('button', { name: '附近商家' }))
     // 区域与商圈必须用全系统定版枚举（recommendConstants.REGION_TREE_DATA），不得自造地名
     expect(screen.getByRole('button', { name: '澳門區域' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '氹仔區域' })).toBeInTheDocument()
@@ -51,7 +51,7 @@ describe('特價團購筛选面板', () => {
     const user = userEvent.setup()
     renderPage()
 
-    await user.click(screen.getByRole('button', { name: '附近' }))
+    await user.click(screen.getByRole('button', { name: '附近商家' }))
     await user.click(screen.getByRole('button', { name: '澳門區域' }))
     expect(screen.getByLabelText('選擇商圈 黑沙環區')).toBeInTheDocument()
 
@@ -69,7 +69,7 @@ describe('特價團購筛选面板', () => {
     const user = userEvent.setup()
     renderPage()
 
-    await user.click(screen.getByRole('button', { name: '附近' }))
+    await user.click(screen.getByRole('button', { name: '附近商家' }))
     await user.click(screen.getByLabelText('選擇距離 2km'))
     expect(screen.getByRole('button', { name: '2km' })).toBeInTheDocument()
 
@@ -124,7 +124,7 @@ describe('特價團購筛选面板', () => {
     const user = userEvent.setup()
     renderPage()
 
-    await user.click(screen.getByRole('button', { name: '附近' }))
+    await user.click(screen.getByRole('button', { name: '附近商家' }))
     await user.click(screen.getByRole('button', { name: '全部分類' }))
     expect(screen.queryByLabelText(/^選擇距離/)).not.toBeInTheDocument()
     const panel = screen.getByRole('group', { name: '分類篩選面板' })
