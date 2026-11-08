@@ -53,7 +53,8 @@
         "pickDistrict": "选择商圈 {{value}}",
         "pickDistance": "选择距离 {{value}}",
         "pickSort": "排序方式 {{value}}",
-        "closePanel": "收起筛选面板"
+        "closePanel": "收起筛选面板",
+        "sliders": "筛选条件"
       },
       "title": "特价团购",
       "hotSearchHint": "热搜：滚动字体后台传",

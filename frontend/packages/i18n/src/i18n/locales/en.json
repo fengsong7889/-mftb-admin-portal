@@ -105,7 +105,8 @@
         "pickDistance": "Select distance {{value}}",
         "pickDistrict": "Select business area {{value}}",
         "pickSort": "Sort by {{value}}",
-        "closePanel": "Close filter panel"
+        "closePanel": "Close filter panel",
+        "sliders": "Filter conditions"
       },
       "panel": {
         "nearby": "Nearby filter panel",

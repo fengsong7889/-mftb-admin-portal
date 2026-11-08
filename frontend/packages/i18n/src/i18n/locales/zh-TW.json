@@ -53,7 +53,8 @@
         "pickDistrict": "選擇商圈 {{value}}",
         "pickDistance": "選擇距離 {{value}}",
         "pickSort": "排序方式 {{value}}",
-        "closePanel": "收起篩選面板"
+        "closePanel": "收起篩選面板",
+        "sliders": "篩選條件"
       },
       "title": "特價團購",
       "hotSearchHint": "熱搜：滾動字體後台傳",
