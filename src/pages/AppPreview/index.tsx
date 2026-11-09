@@ -18,6 +18,11 @@ import { HighlightProvider, useHighlightProvider } from './SpecHighlight'
 import { SPEC_PANELS, loadSpecs, saveSpecs, type SpecEntry, type SpecPanelKey } from './groupBuySpec'
 import './appPreview.css'
 
+/** desc 支持 **加粗** 标记：按序拆成 普通/加粗 段渲染（说明文案重点标记口径），不用 innerHTML */
+function renderDesc(text: string) {
+  return text.split(/\*\*(.+?)\*\*/g).map((part, i) => (i % 2 === 1 ? <strong key={i}>{part}</strong> : part))
+}
+
 export default function AppPreview() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -73,19 +78,33 @@ function DualView() {
     delivery: loadSpecs('delivery'),
     preferred: loadSpecs('preferred'),
     groupPage: loadSpecs('groupPage'),
+    filter: loadSpecs('filter'),
+    deliveryPage: loadSpecs('deliveryPage'),
+    searchDelivery: loadSpecs('searchDelivery'),
+    searchGroup: loadSpecs('searchGroup'),
   }))
   const [editId, setEditId] = useState<number | null>(null)
-  /** 外卖瀑布流展示模式：列表（一行一店）/ 卡片（一行两店）；说明面板切换器下发，两台手机同步 */
-  const [deliveryMode, setDeliveryMode] = useState<'list' | 'card'>('list')
+  /** 外卖瀑布流展示模式：小图（一行一店，原「列表」）/ 卡片（一行两店）/ 大图（顶部大图封面，閃蜂/MFOOD 均实现）；说明面板切换器下发，两台手机同步 */
+  const [deliveryMode, setDeliveryMode] = useState<'list' | 'card' | 'large'>('list')
+  /** 優選商家/附近好店列表大小圖模式：小圖/大圖；说明面板切换器下发，两台手机同步（同 deliveryMode 先例） */
+  const [preferredLayout, setPreferredLayout] = useState<'small' | 'large'>('large')
+  /** 美食外卖频道页瀑布流大小图模式：小图/大图；说明面板切换器下发（频道页为閃蜂专属，MFOOD 无对应页回落首页） */
+  const [deliveryPageMode, setDeliveryPageMode] = useState<'small' | 'large'>('small')
 
   const specs = specsByPanel[panelKey]
 
-  /** 面板 → 手机壳同步命令：首页两类回首页切分类；特惠团购页两类进团购页切页签 */
+  /** 面板 → 手机壳同步命令：首页两类回首页切分类；特惠团购页进团购页切页签（filter 只进页不改页签——筛选栏跨页签共享）；
+   *  delivery-page → 閃蜂进美食外賣频道页（MFOOD 无对应页，回落 home，MfoodHome 会忽略未知分类）；
+   *  search-delivery / search-group → 閃蜂打开搜索结果页并切到对应瀑布流（MFOOD 无搜索功能，未知命令在壳内被忽略） */
   const SYNC_BY_PANEL: Record<SpecPanelKey, string> = {
     groupBuy: 'group',
     delivery: 'delivery',
     groupPage: 'page-group',
     preferred: 'preferred',
+    filter: 'filter',
+    deliveryPage: 'delivery-page',
+    searchDelivery: 'search-delivery',
+    searchGroup: 'search-group',
   }
 
   function handleEdit(id: number, field: keyof SpecEntry, value: string) {
@@ -119,6 +138,9 @@ function DualView() {
               syncCategory={SYNC_BY_PANEL[panelKey]}
               syncSeq={syncSeq}
               deliveryMode={deliveryMode}
+              deliveryPageMode={deliveryPageMode}
+              preferredLayout={preferredLayout}
+              onPreferredLayoutChange={setPreferredLayout}
             />
           </PhoneFrame>
         </div>
@@ -130,20 +152,23 @@ function DualView() {
               syncCategory={SYNC_BY_PANEL[panelKey]}
               syncSeq={syncSeq}
               deliveryMode={deliveryMode}
+              deliveryPageMode={deliveryPageMode}
+              preferredLayout={preferredLayout}
+              onPreferredLayoutChange={setPreferredLayout}
             />
           </PhoneFrame>
         </div>
         <div className="ap-spec-panel">
-          {/* 横排三层：①菜单分类行 → ②该分类下瀑布流面板行 → ③条件行（如外卖卡片模式切换） */}
+          {/* 顶部控制栈（统一分段轨道语言）：①菜单分组行 → ②瀑布流面板行（主级）→ ③条件行（展示模式切换） */}
           <div className="ap-spec-tabs">
-            <div className="ap-spec-group-row">
-              {Array.from(new Set(SPEC_PANELS.map((p) => p.group))).map((group) => (
+            <div className="ap-spec-track">
+              {Array.from(new Set(SPEC_PANELS.filter((p) => !p.hidden).map((p) => p.group))).map((group) => (
                 <button
                   key={group}
                   type="button"
-                  className={`ap-spec-tab ap-spec-tab--group${activePanel.group === group ? ' is-on' : ''}`}
+                  className={`ap-spec-group-tab${activePanel.group === group ? ' is-on' : ''}`}
                   onClick={() => {
-                    const first = SPEC_PANELS.find((p) => p.group === group)
+                    const first = SPEC_PANELS.find((p) => p.group === group && !p.hidden)
                     if (first) selectPanel(first.key)
                   }}
                 >
@@ -151,44 +176,115 @@ function DualView() {
                 </button>
               ))}
             </div>
-            <div className="ap-spec-group-tabs">
-              {SPEC_PANELS.filter((p) => p.group === activePanel.group).map((p) => (
-                <button
-                  key={p.key}
-                  type="button"
-                  className={`ap-spec-tab${panelKey === p.key ? ' is-on' : ''}`}
-                  onClick={() => selectPanel(p.key)}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          {panelKey === 'delivery' && (
-            <div className="ap-spec-mode">
-              <span className="ap-spec-mode-label">展示模式</span>
-              <div className="ap-spec-mode-switch">
-                <button
-                  type="button"
-                  className={`ap-spec-mode-btn${deliveryMode === 'list' ? ' is-on' : ''}`}
-                  onClick={() => setDeliveryMode('list')}
-                >
-                  列表模式
-                </button>
-                <button
-                  type="button"
-                  className={`ap-spec-mode-btn${deliveryMode === 'card' ? ' is-on' : ''}`}
-                  onClick={() => setDeliveryMode('card')}
-                >
-                  卡片模式
-                </button>
+            {/* 面板行（次级）：单面板分组（美食外卖页）不渲染轨道，避免与标题重复的孤粒；隐藏面板（三级寻址）不进轨道 */}
+            {SPEC_PANELS.filter((p) => p.group === activePanel.group && !p.hidden).length > 1 && (
+              <div className="ap-spec-track ap-spec-track--sub">
+                {SPEC_PANELS.filter((p) => p.group === activePanel.group && !p.hidden).map((p) => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    className={`ap-spec-panel-tab${panelKey === p.key || activePanel.tabAlias === p.key ? ' is-on' : ''}`}
+                    onClick={() => selectPanel(p.key)}
+                  >
+                    {p.label}
+                  </button>
+                ))}
               </div>
-            </div>
-          )}
-          {panelKey === 'delivery' && deliveryMode === 'card' && (
-            <p className="ap-spec-mode-hint">卡片模式为一行两店的精简卡片：起送/減配、準時寶、营业状态、标签栏、红包展开区等字段不展示，悬停说明仅标记卡片中可见字段。</p>
-          )}
-          <h3>{activePanel.group} · {activePanel.label} · 展示字段及标签说明</h3>
+            )}
+            {panelKey === 'delivery' && (
+              <div className="ap-spec-mode">
+                <span className="ap-spec-mode-label">展示模式</span>
+                <div className="ap-spec-track ap-spec-track--mini">
+                  <button
+                    type="button"
+                    className={`ap-spec-mode-btn${deliveryMode === 'list' ? ' is-on' : ''}`}
+                    onClick={() => setDeliveryMode('list')}
+                  >
+                    小图模式
+                  </button>
+                  <button
+                    type="button"
+                    className={`ap-spec-mode-btn${deliveryMode === 'card' ? ' is-on' : ''}`}
+                    onClick={() => setDeliveryMode('card')}
+                  >
+                    卡片模式
+                  </button>
+                  <button
+                    type="button"
+                    className={`ap-spec-mode-btn${deliveryMode === 'large' ? ' is-on' : ''}`}
+                    onClick={() => setDeliveryMode('large')}
+                  >
+                    大图模式
+                  </button>
+                </div>
+              </div>
+            )}
+            {panelKey === 'deliveryPage' && (
+              <div className="ap-spec-mode">
+                <span className="ap-spec-mode-label">展示模式</span>
+                <div className="ap-spec-track ap-spec-track--mini">
+                  <button
+                    type="button"
+                    className={`ap-spec-mode-btn${deliveryPageMode === 'small' ? ' is-on' : ''}`}
+                    onClick={() => setDeliveryPageMode('small')}
+                  >
+                    小图模式
+                  </button>
+                  <button
+                    type="button"
+                    className={`ap-spec-mode-btn${deliveryPageMode === 'large' ? ' is-on' : ''}`}
+                    onClick={() => setDeliveryPageMode('large')}
+                  >
+                    大图模式
+                  </button>
+                </div>
+              </div>
+            )}
+            {panelKey === 'preferred' && (
+              <div className="ap-spec-mode">
+                <span className="ap-spec-mode-label">展示模式</span>
+                <div className="ap-spec-track ap-spec-track--mini">
+                  <button
+                    type="button"
+                    className={`ap-spec-mode-btn${preferredLayout === 'small' ? ' is-on' : ''}`}
+                    onClick={() => setPreferredLayout('small')}
+                  >
+                    小圖模式
+                  </button>
+                  <button
+                    type="button"
+                    className={`ap-spec-mode-btn${preferredLayout === 'large' ? ' is-on' : ''}`}
+                    onClick={() => setPreferredLayout('large')}
+                  >
+                    大圖模式
+                  </button>
+                </div>
+              </div>
+            )}
+            {/* 三级（搜索结果瀑布流）：外卖 / 团购 两条瀑布流各有一套字段说明，切换同步表格内容、锚点作用域与壳内结果页分类 */}
+            {(panelKey === 'searchDelivery' || panelKey === 'searchGroup') && (
+              <div className="ap-spec-mode">
+                <span className="ap-spec-mode-label">瀑布流</span>
+                <div className="ap-spec-track ap-spec-track--mini">
+                  <button
+                    type="button"
+                    className={`ap-spec-mode-btn${panelKey === 'searchDelivery' ? ' is-on' : ''}`}
+                    onClick={() => selectPanel('searchDelivery')}
+                  >
+                    外卖
+                  </button>
+                  <button
+                    type="button"
+                    className={`ap-spec-mode-btn${panelKey === 'searchGroup' ? ' is-on' : ''}`}
+                    onClick={() => selectPanel('searchGroup')}
+                  >
+                    团购
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          <h3>{activePanel.title ?? `${activePanel.group} · ${activePanel.label} · 展示字段及标签说明`}</h3>
           <table>
             <thead>
               <tr><th>品牌</th><th>名称</th><th>说明</th></tr>
@@ -231,7 +327,7 @@ function DualView() {
                         autoFocus
                       />
                     ) : (
-                      <span onDoubleClick={(e) => { e.stopPropagation(); setEditId(s.id) }}>{s.desc}<br/><em>{s.source}</em></span>
+                      <span onDoubleClick={(e) => { e.stopPropagation(); setEditId(s.id) }}>{renderDesc(s.desc)}<br/><em>{s.source}</em></span>
                     )}
                     {s.note && <p className="ap-spec-note">⚠ {s.note}</p>}
                   </td>

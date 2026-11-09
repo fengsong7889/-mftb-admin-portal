@@ -51,13 +51,19 @@ const ROOT: Record<RootKey, ConsumerScreen> = {
   mine: { key: 'mine' },
 }
 
-export default function ConsumerApp({ onCategoryChange, syncCategory, syncSeq, deliveryMode }: {
+export default function ConsumerApp({ onCategoryChange, syncCategory, syncSeq, deliveryMode, deliveryPageMode, preferredLayout, onPreferredLayoutChange }: {
   onCategoryChange?: (cat: string) => void
   /** 右侧说明面板 Tab 下发的分类同步命令（syncSeq 自增时执行） */
   syncCategory?: string
   syncSeq?: number
-  /** 外卖瀑布流展示模式（说明面板切换器下发；两台手机同步） */
-  deliveryMode?: 'list' | 'card'
+  /** 外卖瀑布流展示模式（说明面板切换器下发；两台手机同步；large=大图模式閃蜂/MFOOD 均实现） */
+  deliveryMode?: 'list' | 'card' | 'large'
+  /** 美食外卖频道页瀑布流大小图模式（说明面板切换器下发；閃蜂/MFOOD 两台手机同步） */
+  deliveryPageMode?: 'small' | 'large'
+  /** 優選商家列表大小圖模式（说明面板切换器下发；两台手机同步） */
+  preferredLayout?: 'small' | 'large'
+  /** 篩選面板内切换上报（说明面板闭环后下发另一台手机） */
+  onPreferredLayoutChange?: (mode: 'small' | 'large') => void
 }) {
   const { t } = useTranslation()
   const nav = useMobileNav<ConsumerScreen>(ROOT.home)
@@ -73,13 +79,20 @@ export default function ConsumerApp({ onCategoryChange, syncCategory, syncSeq, d
   const addToCart = () => setCartCount((count) => count + 1)
 
   /* 壳外说明面板同步命令：特惠团购页两类 → 进入特惠團購界面（页签由 ConsumerGroupBuy 内部切换）；
+     delivery-page → 进入美食外賣频道页（美食外卖页说明面板联动）；
+     search → 打开搜索结果页（搜索结果瀑布流说明面板联动；带热搜词直达，MFOOD 无搜索功能会忽略该命令）；
      首页两类 → 回首页根屏（分类由 ConsumerHome 内部切换） */
   const syncSeqRef = useRef(syncSeq ?? 0)
   useEffect(() => {
     if ((syncSeq ?? 0) !== syncSeqRef.current) {
       syncSeqRef.current = syncSeq ?? 0
-      if (syncCategory === 'preferred' || syncCategory === 'page-group') {
+      if (syncCategory === 'preferred' || syncCategory === 'page-group' || syncCategory === 'filter') {
         if (nav.current.key !== 'groupbuy') nav.push({ key: 'groupbuy' })
+      } else if (syncCategory === 'delivery-page') {
+        if (nav.current.key !== 'delivery') nav.push({ key: 'delivery' })
+      } else if (syncCategory === 'search-delivery' || syncCategory === 'search-group') {
+        /* 搜索结果瀑布流说明面板（三级 外卖/团购）：打开搜索结果页；壳内分类由 ConsumerSearch 按 syncFeed 切换 */
+        if (nav.current.key !== 'search') nav.push({ key: 'search', scope: 'global', keyword: '火鍋' })
       } else if ((syncCategory === 'group' || syncCategory === 'delivery') && nav.current.key !== 'home') {
         nav.reset(ROOT.home)
       }
@@ -128,6 +141,8 @@ export default function ConsumerApp({ onCategoryChange, syncCategory, syncSeq, d
             onTabChange={onCategoryChange}
             syncTab={syncCategory}
             syncSeq={syncSeq}
+            preferredLayout={preferredLayout}
+            onPreferredLayoutChange={onPreferredLayoutChange}
           />
         )
       case 'delivery':
@@ -136,6 +151,7 @@ export default function ConsumerApp({ onCategoryChange, syncCategory, syncSeq, d
             onBack={nav.back}
             onSearch={(keyword) => openSearch('delivery', undefined, keyword)}
             onOpenStore={openStore}
+            layout={deliveryPageMode}
           />
         )
       case 'market':
@@ -180,6 +196,8 @@ export default function ConsumerApp({ onCategoryChange, syncCategory, syncSeq, d
           scope={current.scope}
           merchantId={current.merchantId}
           initialKeyword={current.keyword}
+          syncFeed={syncCategory === 'search-group' ? 'groupbuy' : syncCategory === 'search-delivery' ? 'delivery' : undefined}
+          syncSeq={syncSeq}
           onBack={nav.back}
           onOpenStore={openStore}
           onSearchGlobal={(keyword) => nav.push({ key: 'search', scope: 'global', keyword })}

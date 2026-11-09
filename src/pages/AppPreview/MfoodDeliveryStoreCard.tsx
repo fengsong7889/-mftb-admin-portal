@@ -24,6 +24,7 @@
 import { useContext, useState } from 'react'
 import { getSmallTemplate, getFallbackPoster } from '@/constants/popularSkinTemplates'
 import { HighlightContext, SpecField } from './SpecHighlight'
+import { useClosingCountdown } from './useClosingCountdown'
 import BrandCover from './BrandCover'
 
 export interface MfoodMemberTag {
@@ -71,6 +72,8 @@ export interface MfoodStore {
   key: string
   /** 门店名称 */
   name: string
+  /** No.19 打烊倒计时（HH:MM:SS；距打烊 30 分钟内展示，原型 mock 固定值） */
+  closingCountdown?: string
   /** 新店角标 — 封面图左上角；可与 brandTag 同时存在 */
   isNew?: boolean
   /** 名称前品质标签（独家/品牌/连锁/金牌，四选一，部分门店无） */
@@ -81,11 +84,11 @@ export interface MfoodStore {
   monthlySales: string
   /** 起送费用，如 "$40"；免配送費门店不展示 */
   minOrder: string
-  /** 减免配送费区间，如 "$0起"；有減配时配送列固定「$0 起」+ 卡片右上角「減配」角标 */
+  /** 减免配送费区间，如 "$0~6"；配送列直接显示该区间（与无減配门店 "$5~10" 同格式）+ 卡片右上角「減配」角标 */
   deliveryDiscount?: string
   /** 配送費价格区间（如 "$5~10"）——无減配且非免配送費门店的配送列展示 */
   deliveryFee?: string
-  /** 免配送費门店置 true：配送列显示「$0」，卡片右上角标「減配」 */
+  /** 免配送費门店置 true：配送列显示「免配送費」（橙字，图2口径），不标「減配」角标 */
   freeDelivery?: boolean
   /** 配送时间，如 "30分鐘" */
   deliveryTime: string
@@ -105,6 +108,8 @@ export interface MfoodStore {
   memberSections?: MfoodMemberSection[]
   /** 门店封面图 */
   image: string
+  /** 大图模式：商家上传了门店视频（有则大图位自动播放视频，无则大图封面兜底，spec id20 口径） */
+  coverVideo?: boolean
   /** 商家 ID，用于跳转详情页 */
   merchantId: string
   /** 营业状态：缺省=正常营业(不显示横幅)；closed=已打烊(红条+原因)；preorder=接受预定单(绿条+起配时间) */
@@ -127,8 +132,8 @@ const MEMBER_STYLE: Record<MfoodMemberTag['kind'], string> = {
   gray: 'apw-pill-gray',
 }
 
-/** 名称前品质标签样式映射（独家/品牌/连锁/金牌，四选一） */
-const BRAND_TAG_STYLE: Record<string, string> = {
+/** 名称前品质标签样式映射（独家/品牌/连锁/金牌，四选一；大图模式 logo 角标复用同一配色） */
+export const BRAND_TAG_STYLE: Record<string, string> = {
   独家: 'apw-brand-tag--exclusive',
   品牌: 'apw-brand-tag--brand',
   连锁: 'apw-brand-tag--chain',
@@ -148,32 +153,8 @@ export default function MfoodDeliveryStoreCard({
   const poster = hot?.mode === 'large' && hot.posterKey ? getFallbackPoster(hot.posterKey) : undefined
   const isHotLarge = hot?.mode === 'large'
 
-  /* 神會員展開/收起（配置了 memberSections 才出現箭頭） */
-  const [memberOpen, setMemberOpen] = useState(false)
-  const hasSections = (store.memberSections?.length ?? 0) > 0
-  /* 懸停說明表「券包/活动」（id12）或「其它」（id17）行時自動展開紅包區，便於快速定位對應欄目 */
-  const { highlightId, scope } = useContext(HighlightContext)
-  const autoExpand = (highlightId === 12 || highlightId === 17) && scope === 'delivery'
-
-  /** 會員紅包膠囊渲染（MFOOD：shen = 🧨勁爆券紫红渐变块 + 粉底红字权益文案，两段一组） */
-  const renderPill = (m: MfoodMemberTag, i: number) => {
-    if (m.kind === 'shen') {
-      return (
-        <span key={`${m.kind}-${m.text}-${i}`} className="apw-pill-group">
-          <span className="apw-pill apw-pill-bao">
-            <span className="apw-pill-bao-ico" aria-hidden="true">🧨</span>
-            勁爆券
-          </span>
-          <span className="apw-pill apw-pill-bao-text">{m.text}</span>
-        </span>
-      )
-    }
-    return (
-      <span key={`${m.kind}-${m.text}-${i}`} className={`apw-pill ${MEMBER_STYLE[m.kind]}`}>
-        {m.text}
-      </span>
-    )
-  }
+  /* 打烊倒计时（No.19）：mock 初始值每秒真实递减，归零隐藏；组件卸载（切分类/刷新/重进界面）自动重置 */
+  const closing = useClosingCountdown(store.closingCountdown ?? '')
 
   /* 人氣商家小圖模式：id13 標記整卡邊框（皮膚）而非封面圖；其餘模式原樣返回 */
   const cardNode = (
@@ -182,8 +163,8 @@ export default function MfoodDeliveryStoreCard({
       style={smallSkin ? { border: `2px solid ${smallSkin.borderColor}`, background: smallSkin.gradientCss } : undefined}
       onClick={() => onOpenStore?.(store.merchantId)}
     >
-      {/* 減配角标：卡片右上角（有減配区间或免配送費时展示；免配送費不再单独展示绿字） */}
-      {(store.freeDelivery || store.deliveryDiscount) && (
+      {/* 減配角标：卡片右上角（仅有減配区间时展示；免配送費不标角标，图2口径） */}
+      {store.deliveryDiscount && (
         <SpecField panel="delivery" id={7}>
           <span className="apw-discount-flag">減配</span>
         </SpecField>
@@ -234,6 +215,15 @@ export default function MfoodDeliveryStoreCard({
           </SpecField>
         </div>
 
+        {/* 打烊倒计时标签：获取商家打烊时间，距打烊 30 分钟内展示；每秒真实递减，归零隐藏，重进界面/刷新重置。锚点 id=19 */}
+        {store.closingCountdown && !closing.expired && (
+          <SpecField panel="delivery" id={19}>
+            <div className="apw-closing-row">
+              <span className="apw-closing"><i aria-hidden="true">⏰</i>距離打烊還剩 {closing.display}</span>
+            </div>
+          </SpecField>
+        )}
+
         {/* 营业状态横幅：正常营业不显示；已打烊=红条+原因；接受预定=绿条+起配时间。锚点 id=10 */}
         {store.businessState === 'preorder' && store.preorderTime && (
           <SpecField panel="delivery" id={10}>
@@ -254,8 +244,8 @@ export default function MfoodDeliveryStoreCard({
 
         {/* 评分 id=4 + 月售 id=5（大圖模式不展示）；右侧堆叠：準時寶 id=6 + 配送类型 id=14（mFood送/自送/自取x折/支持自取） */}
         <div className="apw-row-rating">
-          <span className="apw-star" aria-hidden="true">★</span>
-          <SpecField panel="delivery" id={4}><b className="apw-rating">{store.rating}</b></SpecField>
+          {/* 评分锚点 id=4 连同 ★ 一并包裹（星为锚内子元素，悬停说明行星+分数整体描边） */}
+          <SpecField panel="delivery" id={4}><b className="apw-rating"><span className="apw-star" aria-hidden="true">★</span>{store.rating}</b></SpecField>
           {!isHotLarge && <SpecField panel="delivery" id={5}><span className="apw-sales">月售 {store.monthlySales}</span></SpecField>}
           <span className="apw-rating-side">
             {store.punctual && <SpecField panel="delivery" id={6}><span className="apw-punctual">準時寶</span></SpecField>}
@@ -269,7 +259,7 @@ export default function MfoodDeliveryStoreCard({
           </span>
         </div>
 
-        {/* 信息三列 id=7/8：起送 / 配送（免配送費互斥，減配改右上角标）/ 时间·距離（时间+距离整格共用锚点 id 8；自取折扣已移至配送类型标签） */}
+        {/* 信息三列 id=7/8：起送 / 配送（免配送費橙字且互斥，減配显示区间+右上角标）/ 时间·距離（时间+距离整格共用锚点 id 8；自取折扣已移至配送类型标签） */}
         <div className="apw-info-grid">
           <SpecField panel="delivery" id={7}>
             <div className="apw-info-cell">
@@ -280,7 +270,10 @@ export default function MfoodDeliveryStoreCard({
           <SpecField panel="delivery" id={7}>
             <div className="apw-info-cell">
               <span className="apw-info-label">配送</span>
-              <span className="apw-info-value">{store.freeDelivery ? '$0' : store.deliveryDiscount ? '$0 起' : (store.deliveryFee ?? '$0 起')}</span>
+              {/* 免配送費=橙字（图2口径，无減配角标）；減配=直接显示区间（与无減配门店同格式）；其余回退配送費区间 */}
+              <span className={`apw-info-value${store.freeDelivery ? ' apw-info-value--free' : ''}`}>
+                {store.freeDelivery ? '免配送費' : (store.deliveryDiscount ?? store.deliveryFee ?? '$0 起')}
+              </span>
             </div>
           </SpecField>
           <div className="apw-info-cell">
@@ -305,75 +298,8 @@ export default function MfoodDeliveryStoreCard({
           </SpecField>
         )}
 
-        {/* 红包区锚点：勁爆券/神會員药丸（shen）=id16；其它类目药丸（point/其它段）=id17；其它券药丸+▾▴按鈕+券包/活动段=id12；懸停 id17 自動展開（点击不触发卡片跳轉） */}
-        {hasSections && (memberOpen || autoExpand) ? (
-          <div className="apw-member-open">
-            {store.memberSections?.map((sec) => (
-              <div key={sec.label} className="apw-member-section">
-                <span className="apw-member-section-label">{sec.label}</span>
-                <div className="apw-member-section-tags">
-                  {sec.tags.map((m, i) =>
-                    m.kind === 'shen' ? (
-                      <SpecField key={`${m.kind}-${m.text}-${i}`} panel="delivery" id={16}>
-                        {renderPill(m, i)}
-                      </SpecField>
-                    ) : sec.label === '其它' ? (
-                      <SpecField key={`${m.kind}-${m.text}-${i}`} panel="delivery" id={17}>
-                        {renderPill(m, i)}
-                      </SpecField>
-                    ) : (
-                      <SpecField key={`${m.kind}-${m.text}-${i}`} panel="delivery" id={12}>
-                        {renderPill(m, i)}
-                      </SpecField>
-                    )
-                  )}
-                  {sec.label === store.memberSections?.[0]?.label && (
-                    <SpecField panel="delivery" id={12}>
-                      <button
-                        type="button"
-                        className="apw-member-toggle"
-                        aria-label="收起會員紅包"
-                        onClick={(e) => { e.stopPropagation(); setMemberOpen(false) }}
-                      >
-                        ▴
-                      </button>
-                    </SpecField>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="apw-row-member">
-            {store.memberTags.map((m, i) =>
-              m.kind === 'shen' ? (
-                <SpecField key={`${m.kind}-${m.text}-${i}`} panel="delivery" id={16}>
-                  {renderPill(m, i)}
-                </SpecField>
-              ) : m.kind === 'point' ? (
-                <SpecField key={`${m.kind}-${m.text}-${i}`} panel="delivery" id={17}>
-                  {renderPill(m, i)}
-                </SpecField>
-              ) : (
-                <SpecField key={`${m.kind}-${m.text}-${i}`} panel="delivery" id={12}>
-                  {renderPill(m, i)}
-                </SpecField>
-              )
-            )}
-            {hasSections && (
-              <SpecField panel="delivery" id={12}>
-                <button
-                  type="button"
-                  className="apw-member-toggle"
-                  aria-label="展開會員紅包"
-                  onClick={(e) => { e.stopPropagation(); setMemberOpen(true) }}
-                >
-                  ▾
-                </button>
-              </SpecField>
-            )}
-          </div>
-        )}
+        {/* 红包区（id16 勁爆券/神會員 / id12 券行 / id17 其它）：与列表/大图模式共用组件 */}
+        <MfoodMemberBlock store={store} />
 
         {/* 人氣商家大圖模式：1大2小商品拼列（首項主推：折扣角標+價格條+菜名） */}
         {isHotLarge && hot?.dishes && hot.dishes.length > 0 && (
@@ -403,5 +329,110 @@ export default function MfoodDeliveryStoreCard({
     <SpecField panel="delivery" id={13}>{cardNode}</SpecField>
   ) : (
     cardNode
+  )
+}
+
+/* ══════════ 红包区共用块（列表/大图两模式同款；MfoodDeliveryLargeCard 复用） ══════════ */
+
+/** 收起=藥丸行+▾；配置 memberSections 可展開=券包/活动/其它三段+▴；懸停說明表 id12/id17 行自動展開 */
+export function MfoodMemberBlock({ store }: { store: MfoodStore }) {
+  /* 神會員展開/收起（配置了 memberSections 才出現箭頭） */
+  const [memberOpen, setMemberOpen] = useState(false)
+  const hasSections = (store.memberSections?.length ?? 0) > 0
+  /* 懸停說明表「券包/活动」（id12）或「其它」（id17）行時自動展開紅包區，便於快速定位對應欄目 */
+  const { highlightId, scope } = useContext(HighlightContext)
+  const autoExpand = (highlightId === 12 || highlightId === 17) && scope === 'delivery'
+
+  /** 會員紅包膠囊渲染（MFOOD：shen = 🧨勁爆券紫红渐变块 + 粉底红字权益文案，两段一组） */
+  const renderPill = (m: MfoodMemberTag, i: number) => {
+    if (m.kind === 'shen') {
+      return (
+        <span key={`${m.kind}-${m.text}-${i}`} className="apw-pill-group">
+          <span className="apw-pill apw-pill-bao">
+            <span className="apw-pill-bao-ico" aria-hidden="true">🧨</span>
+            勁爆券
+          </span>
+          <span className="apw-pill apw-pill-bao-text">{m.text}</span>
+        </span>
+      )
+    }
+    return (
+      <span key={`${m.kind}-${m.text}-${i}`} className={`apw-pill ${MEMBER_STYLE[m.kind]}`}>
+        {m.text}
+      </span>
+    )
+  }
+
+  /* 红包区锚点：勁爆券/神會員药丸（shen）=id16；其它类目药丸（point/其它段）=id17；其它券药丸+▾▴按鈕+券包/活动段=id12；懸停 id17 自動展開（点击不触发卡片跳轉） */
+  if (hasSections && (memberOpen || autoExpand)) {
+    return (
+      <div className="apw-member-open">
+        {store.memberSections?.map((sec) => (
+          <div key={sec.label} className="apw-member-section">
+            <span className="apw-member-section-label">{sec.label}</span>
+            <div className="apw-member-section-tags">
+              {sec.tags.map((m, i) =>
+                m.kind === 'shen' ? (
+                  <SpecField key={`${m.kind}-${m.text}-${i}`} panel="delivery" id={16}>
+                    {renderPill(m, i)}
+                  </SpecField>
+                ) : sec.label === '其它' ? (
+                  <SpecField key={`${m.kind}-${m.text}-${i}`} panel="delivery" id={17}>
+                    {renderPill(m, i)}
+                  </SpecField>
+                ) : (
+                  <SpecField key={`${m.kind}-${m.text}-${i}`} panel="delivery" id={12}>
+                    {renderPill(m, i)}
+                  </SpecField>
+                )
+              )}
+              {sec.label === store.memberSections?.[0]?.label && (
+                <SpecField panel="delivery" id={12}>
+                  <button
+                    type="button"
+                    className="apw-member-toggle"
+                    aria-label="收起會員紅包"
+                    onClick={(e) => { e.stopPropagation(); setMemberOpen(false) }}
+                  >
+                    ▴
+                  </button>
+                </SpecField>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+  return (
+    <div className="apw-row-member">
+      {store.memberTags.map((m, i) =>
+        m.kind === 'shen' ? (
+          <SpecField key={`${m.kind}-${m.text}-${i}`} panel="delivery" id={16}>
+            {renderPill(m, i)}
+          </SpecField>
+        ) : m.kind === 'point' ? (
+          <SpecField key={`${m.kind}-${m.text}-${i}`} panel="delivery" id={17}>
+            {renderPill(m, i)}
+          </SpecField>
+        ) : (
+          <SpecField key={`${m.kind}-${m.text}-${i}`} panel="delivery" id={12}>
+            {renderPill(m, i)}
+          </SpecField>
+        )
+      )}
+      {hasSections && (
+        <SpecField panel="delivery" id={12}>
+          <button
+            type="button"
+            className="apw-member-toggle"
+            aria-label="展開會員紅包"
+            onClick={(e) => { e.stopPropagation(); setMemberOpen(true) }}
+          >
+            ▾
+          </button>
+        </SpecField>
+      )}
+    </div>
   )
 }

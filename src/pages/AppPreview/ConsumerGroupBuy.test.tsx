@@ -15,6 +15,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import i18n from '@/i18n'
+import ConsumerApp from './ConsumerApp'
 import ConsumerGroupBuy from './ConsumerGroupBuy'
 
 const noop = () => {}
@@ -128,6 +129,8 @@ describe('特價團購筛选面板', () => {
     const panel = screen.getByRole('group', { name: '更多篩選面板' })
     // 五模块（设计稿图2-5）：人均篩選器/營業時間/使用人數/偏好优惠/店鋪服務
     expect(within(panel).getByText('人均篩選器')).toBeInTheDocument()
+    // 列表大小圖切換仅優選商家页签的篩選面板展示：团购券类页签（推薦）不展示
+    expect(within(panel).queryByText('列表大小圖切換')).not.toBeInTheDocument()
     expect(within(panel).getByText('營業時間')).toBeInTheDocument()
     expect(within(panel).getByText('使用人數')).toBeInTheDocument()
     expect(within(panel).getByText(/偏好优惠/)).toBeInTheDocument()
@@ -160,7 +163,7 @@ describe('特價團購筛选面板', () => {
 
     await user.click(screen.getByRole('button', { name: '優選商家' }))
     expect(screen.getByText('翡翠茶餐廳🏆-關閘店（🔥全澳…')).toBeInTheDocument()
-    expect(screen.getByText('最高膨脹至$60')).toBeInTheDocument()
+    expect(screen.getByText('最高膨脹至$6')).toBeInTheDocument()
     expect(screen.getAllByText('代金券名稱代代金券名稱…').length).toBeGreaterThanOrEqual(3)
 
     // 收藏钮：麥田初始橙星（取消收藏），点击后全列表无收藏态
@@ -171,6 +174,46 @@ describe('特價團購筛选面板', () => {
     await user.click(screen.getByRole('button', { name: '推薦' }))
     expect(screen.queryByText('翡翠茶餐廳🏆-關閘店（🔥全澳…')).not.toBeInTheDocument()
     expect(screen.getByText('雞蛋10只（散裝）')).toBeInTheDocument()
+  })
+
+  it('優選商家篩選面板：列表大小圖切換模块单选（图2口径）', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(screen.getByRole('button', { name: '優選商家' }))
+    await user.click(screen.getByRole('button', { name: '篩選條件' }))
+    const panel = screen.getByRole('group', { name: '更多篩選面板' })
+    expect(within(panel).getByText('列表大小圖切換')).toBeInTheDocument()
+
+    // 默认大圖模式选中；点小圖切换单选态
+    const large = within(panel).getByRole('button', { name: '大圖模式' })
+    const small = within(panel).getByRole('button', { name: '小圖模式' })
+    expect(large).toHaveAttribute('aria-pressed', 'true')
+    expect(small).toHaveAttribute('aria-pressed', 'false')
+    await user.click(small)
+    expect(small).toHaveAttribute('aria-pressed', 'true')
+    expect(large).toHaveAttribute('aria-pressed', 'false')
+
+    // 完成：收起面板；小圖模式 → 優選商家瀑布流为当前小图卡（无封面）
+    await user.click(within(panel).getByRole('button', { name: '完成 (可多選)' }))
+    expect(screen.queryAllByAltText('商家封面')).toHaveLength(0)
+
+    // 重开面板切回大圖：瀑布流切换为带封面的大图卡（5 张全带封面，收藏钮移至封面右上）
+    await user.click(screen.getByRole('button', { name: '篩選條件' }))
+    const panel2 = screen.getByRole('group', { name: '更多篩選面板' })
+    await user.click(within(panel2).getByRole('button', { name: '大圖模式' }))
+    await user.click(within(panel2).getByRole('button', { name: '完成 (可多選)' }))
+    expect(screen.getAllByAltText('商家封面')).toHaveLength(5)
+  })
+
+  it('優選商家篩選面板：大小圖切换上报 onPreferredLayoutChange（说明面板闭环双机同步）', async () => {
+    const user = userEvent.setup()
+    const onPreferredLayoutChange = vi.fn()
+    render(<ConsumerGroupBuy onBack={noop} onSearch={noop} onPreferredLayoutChange={onPreferredLayoutChange} />)
+    await user.click(screen.getByRole('button', { name: '優選商家' }))
+    await user.click(screen.getByRole('button', { name: '篩選條件' }))
+    await user.click(within(screen.getByRole('group', { name: '更多篩選面板' })).getByRole('button', { name: '小圖模式' }))
+    expect(onPreferredLayoutChange).toHaveBeenLastCalledWith('small')
   })
 
   it('说明面板联动：syncTab 命令切到優選商家，页签切换回流 onTabChange', async () => {
@@ -188,6 +231,14 @@ describe('特價團購筛选面板', () => {
     // 壳内点页签回流：推薦 → page-group（壳外「特惠团购页·推荐」面板）
     await user.click(screen.getByRole('button', { name: '推薦' }))
     expect(onTabChange).toHaveBeenLastCalledWith('page-group')
+  })
+
+  it('壳级联动：syncCategory=preferred → 進入特惠團購屏并切到優選商家（雙機同步口径）', () => {
+    const { rerender } = render(<ConsumerApp syncCategory="preferred" syncSeq={0} />)
+    rerender(<ConsumerApp syncCategory="preferred" syncSeq={1} />)
+    // 優選商家大圖模式（默认）5 张卡出现 = 團購屏已打开且页签已切到優選商家
+    expect(screen.getAllByAltText('商家封面')).toHaveLength(5)
+    expect(screen.getAllByText('神會員')).toHaveLength(5)
   })
 
   it('面板互斥：展开一个即收起另一个，重复点同一按钮收起', async () => {

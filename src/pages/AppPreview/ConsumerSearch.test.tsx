@@ -28,16 +28,58 @@ describe('用户端统一搜索页', () => {
     expect(screen.queryByRole('button', { name: /紙巾/ })).not.toBeInTheDocument()
   })
 
-  it('全站搜索提交后按频道给出带图胶囊 Tab 与商家卡', async () => {
+  it('全站搜索提交后进入瀑布流结果页：5 分类可横滑，默认外賣 Tab（需求 3.1/3.3）', async () => {
     const user = userEvent.setup()
     render(<ConsumerSearch scope="global" onBack={noop} />)
 
     await user.type(screen.getByPlaceholderText('搜尋商家、商品、團購'), '麥當勞{Enter}')
 
-    expect(screen.getByText(/為你找到/)).toBeInTheDocument()
-    const deliveryTab = screen.getAllByRole('tab').find((tab) => tab.textContent?.includes('外賣'))
-    expect(deliveryTab).toBeDefined()
-    expect(screen.getAllByText(/麥當勞/).length).toBeGreaterThan(0)
+    // 5 个分类 Tab 齐备（全部/外賣/團購/超市/百貨；百貨被裁切靠横滑露出，由 CSS overflow-x 保证）
+    expect(screen.getByRole('tab', { name: /全部/ })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /百貨/ })).toBeInTheDocument()
+    // 默认落「外賣」并直接展示首页同款外卖瀑布流（小图模式门店卡）
+    expect(screen.getByRole('tab', { name: /外賣/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('毛氏海鮮火鍋飯店（湘粵融合菜）')).toBeInTheDocument()
+    // 人氣商家廣告門店僅首頁展示，搜索結果頁不含（需求：去掉最後幾個廣告門店）
+    expect(screen.queryByText('朱記燒臘飯店（氹仔店）')).not.toBeInTheDocument()
+    expect(screen.queryByText(/上海生煎王/)).not.toBeInTheDocument()
+    // 超出配送範圍 / 未入駐商家展示態：燒鵝 LOGO 蒙阴影+「超出範圍」膠囊；小貝（未入駐）評分「暫無」且 LOGO 不加標識
+    expect(screen.getByText('燒鵝仔餐廳（路環店）')).toBeInTheDocument()
+    expect(screen.getByText('小貝廚房（關閘店）')).toBeInTheDocument()
+    expect(screen.getAllByText('超出範圍')).toHaveLength(1)
+    expect(screen.getByText(/暫無/)).toBeInTheDocument()
+    // 全站不再走「綜合列表」版式：摘要与商家卡不出现
+    expect(screen.queryByText(/為你找到/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /麥當勞（威尼斯人店）/ })).not.toBeInTheDocument()
+  })
+
+  it('全站结果页切换分类：團購复用首页团购瀑布流，其余分类提示還未實現（需求 3.2/3.4）', async () => {
+    const user = userEvent.setup()
+    render(<ConsumerSearch scope="global" onBack={noop} />)
+
+    // 用 change 覆写输入，避开前面用例页面级记忆（sessions 跨用例残留）里的关键词
+    fireEvent.change(screen.getByPlaceholderText('搜尋商家、商品、團購'), { target: { value: '火鍋' } })
+    await user.click(screen.getByRole('button', { name: '搜索' }))
+
+    await user.click(screen.getByRole('tab', { name: /團購/ }))
+    // 团购瀑布流 = 特惠團購页「優選商家」小图瀑布流（数据同源 consumerPreferredFeed）
+    expect(screen.getByText('翡翠茶餐廳🏆-關閘店（🔥全澳…')).toBeInTheDocument()
+    // 搜索专属展示样例：超出范围（LOGO 阴影+胶囊）/ 未入驻（♥暫無）/ 开业时间横条
+    expect(screen.getByText('海灣火鍋城（路環店）')).toBeInTheDocument()
+    expect(screen.getAllByText('超出範圍')).toHaveLength(1)
+    expect(screen.getByText('小貝廚房（關閘店）')).toBeInTheDocument()
+    expect(screen.getByText(/暫無/)).toBeInTheDocument()
+    expect(screen.getByText('10:00 營業')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: /超市/ }))
+    expect(screen.getByText('「超市」瀑布流還未實現')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: /全部/ }))
+    expect(screen.getByText('「全部」瀑布流還未實現')).toBeInTheDocument()
+
+    // 切回外賣恢复正常瀑布流
+    await user.click(screen.getByRole('tab', { name: /外賣/ }))
+    expect(screen.getByText('毛氏海鮮火鍋飯店（湘粵融合菜）')).toBeInTheDocument()
   })
 
   it('外卖搜不到超市商品时，提供「在全站搜尋」出口', async () => {
@@ -125,15 +167,17 @@ describe('用户端统一搜索页', () => {
     expect(searchRow?.textContent).toContain('沒有匹配的店鋪或商品，點擊直接搜尋')
 
     await user.click(searchRow!)
-    expect(screen.getByText('沒有找到與「zzz」相關的結果')).toBeInTheDocument()
+    // 全站结果页已改为瀑布流版式：无匹配也落默认外賣瀑布流（关键词过滤待接搜索接口后补）
+    expect(screen.getByRole('tab', { name: /外賣/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('毛氏海鮮火鍋飯店（湘粵融合菜）')).toBeInTheDocument()
+    expect(screen.queryByText(/沒有找到與/)).not.toBeInTheDocument()
   })
 
-  it('超出配送范围的命中置灰并归入独立分组', async () => {
+  it('超出配送范围的命中置灰并归入独立分组（频道内列表版式保留）', async () => {
     const user = userEvent.setup()
-    render(<ConsumerSearch scope="global" onBack={noop} />)
+    render(<ConsumerSearch scope="groupbuy" onBack={noop} />)
 
-    // 先清空会话残留关键词，再输入并提交（点搜索按钮进结果页，需求 1.4）
-    fireEvent.change(screen.getByPlaceholderText('搜尋商家、商品、團購'), { target: { value: '自助餐' } })
+    fireEvent.change(screen.getByPlaceholderText('搜尋團購套餐、商家'), { target: { value: '自助餐' } })
     await user.click(screen.getByRole('button', { name: '搜索' }))
 
     expect(screen.getByText('超出當前配送範圍')).toBeInTheDocument()
