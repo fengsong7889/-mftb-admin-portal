@@ -20,6 +20,7 @@ import lemonTeaImg from '@/assets/consumer-home/lemontea.jpg'
 import GroupBuyFeedCard from './GroupBuyFeedCard'
 import { FEED } from './MfoodGroupFeed'
 import MfoodDeliveryStoreCard, { type MfoodStore } from './MfoodDeliveryStoreCard'
+import MfoodDeliveryLargeCard from './MfoodDeliveryLargeCard'
 import DeliveryGridCard from './DeliveryGridCard'
 import hotPosterOrangeImg from '@/assets/consumer-home/posters/poster_orange.png'
 
@@ -60,24 +61,25 @@ const FLASH_ITEMS = [
 
 /* ─── 美食外賣門店瀑布流（MFOOD 专属组件 MfoodDeliveryStoreCard；勁爆券皮；与閃蜂数据互不共用）
    门店顺序与閃蜂 DELIVERY_STORES 逐位形态对齐（新店/品质标签/打烊三态/预定/免配送費/自取/準時寶/
-   会员展开/人气商家大小图逐位同位，便于双机并排逐行对比）；门店信息为 MFOOD 独立内容，不复制閃蜂 ─── */
-const MFOOD_STORES: MfoodStore[] = [
+   会员展开/人气商家大小图逐位同位，便于双机并排逐行对比）；门店信息为 MFOOD 独立内容，不复制閃蜂。
+   首页与美食外賣频道页（MfoodDelivery）共用本数据（复制而非两份副本）─── */
+export const MFOOD_STORES: MfoodStore[] = [
   /* 1. 对齐閃蜂 s1：新店 + 品牌 + 自取折扣 + 正常营业 */
-  { key: 'ms1', name: '恆友魚蛋王（三盞燈總店）', isNew: true, brandTag: '品牌', rating: '4.9', monthlySales: '500+', minOrder: '$40', deliveryFee: '$5~10', deliveryTime: '30分鐘', distance: '1.3km', pickupDiscount: '8.8折', tags: ['全澳热门店铺', '近期千人下单'], memberTags: [{ kind: 'shen', text: '最高膨脹至30' }, { kind: 'green', text: '新客券 $5' }], image: fishPotImg, deliveryType: 'pickup', merchantId: 'mf-hangyau' },
+  { key: 'ms1', name: '恆友魚蛋王（三盞燈總店）', isNew: true, brandTag: '品牌', rating: '4.9', monthlySales: '500+', minOrder: '$40', deliveryFee: '$5~10', deliveryTime: '30分鐘', distance: '1.3km', pickupDiscount: '8.8折', tags: ['全澳热门店铺', '近期千人下单'], memberTags: [{ kind: 'shen', text: '最高膨脹至30' }, { kind: 'green', text: '新客券 $5' }], image: fishPotImg, deliveryType: 'pickup', merchantId: 'mf-hangyau', coverVideo: true },
   /* 2. 对齐閃蜂 s2：独家 + 已打烊·休息一会 */
   { key: 'ms2', name: '大堂街炸雞（總店）', brandTag: '独家', rating: '4.8', monthlySales: '4000+', minOrder: '$40', deliveryDiscount: '$0~6', deliveryTime: '29分鐘', distance: '1.4km', tags: ['全澳销量第1名', '万人收藏好店'], memberTags: [{ kind: 'shen', text: '最高膨脹至30' }, { kind: 'red', text: '满50減4' }, { kind: 'coupon', text: '領券 $10' }], image: friedChickenImg, deliveryType: 'platform', merchantId: 'mf-taihong', businessState: 'closed', closedReason: '休息一会，马上回来' },
   /* 3. 对齐閃蜂 s3：连锁 + 準時寶 + 会員可展開 */
-  { key: 'ms3', name: '龍卷堂（賈伯樂總店）', brandTag: '连锁', rating: '4.8', monthlySales: '2000+', minOrder: '$40', deliveryDiscount: '$0~3', deliveryTime: '29分鐘', distance: '1.9km', punctual: true, tags: ['高士德飯糰包類人氣第1名', '全澳飯糰包類銷量第1名'], memberTags: [{ kind: 'point', text: '双倍抵$10元' }, { kind: 'shen', text: '最高膨脹至30' }, { kind: 'green', text: '新客券 $5' }], memberSections: [ { label: '券包', tags: [{ kind: 'shen', text: '最高膨脹至30' }, { kind: 'green', text: '新客券 $5' }, { kind: 'red', text: '領券 $10 | 5 | 4' }] }, { label: '活动', tags: [{ kind: 'red', text: '6.5折起' }, { kind: 'red', text: '180减9' }, { kind: 'red', text: '110减6' }, { kind: 'red', text: '80减4' }, { kind: 'red', text: '到店自取9.5折' }, { kind: 'red', text: '收藏有禮' }] }, { label: '其它', tags: [{ kind: 'point', text: '双倍抵$10元' }, { kind: 'green', text: '食得健康' }, { kind: 'gray', text: '支持自取' }] } ], image: riceballImg, deliveryType: 'platform', merchantId: 'mf-long' },
+  { key: 'ms3', name: '龍卷堂（賈伯樂總店）', brandTag: '连锁', rating: '4.8', monthlySales: '2000+', minOrder: '$40', deliveryDiscount: '$0~3', deliveryTime: '29分鐘', distance: '1.9km', punctual: true, tags: ['高士德飯糰包類人氣第1名', '全澳飯糰包類銷量第1名'], memberTags: [{ kind: 'point', text: '双倍抵$10元' }, { kind: 'shen', text: '最高膨脹至30' }, { kind: 'green', text: '新客券 $5' }], memberSections: [ { label: '券包', tags: [{ kind: 'shen', text: '最高膨脹至30' }, { kind: 'green', text: '新客券 $5' }, { kind: 'red', text: '領券 $10 | 5 | 4' }] }, { label: '活动', tags: [{ kind: 'red', text: '6.5折起' }, { kind: 'red', text: '180减9' }, { kind: 'red', text: '110减6' }, { kind: 'red', text: '80减4' }, { kind: 'red', text: '到店自取9.5折' }, { kind: 'red', text: '收藏有禮' }] }, { label: '其它', tags: [{ kind: 'point', text: '双倍抵$10元' }, { kind: 'green', text: '食得健康' }, { kind: 'gray', text: '支持自取' }] } ], image: riceballImg, deliveryType: 'platform', merchantId: 'mf-long', closingCountdown: '00:18:32' },
   /* 4. 对齐閃蜂 s4：无标签 + 自取折扣 + 已打烊·休息打烊 */
   { key: 'ms4', name: '世記咖啡（皇朝店）', rating: '4.4', monthlySales: '200+', minOrder: '$40', deliveryDiscount: '$0~3', deliveryTime: '28分鐘', distance: '2.6km', pickupDiscount: '9.8折', tags: [], memberTags: [{ kind: 'shen', text: '最高膨脹至30' }, { kind: 'green', text: '新客券 $4' }], image: burgerImg, deliveryType: 'pickup', merchantId: 'mf-saigai', businessState: 'closed', closedReason: '休息打烊' },
   /* 5. 对齐閃蜂 s5：金牌 + 免配送費 + 準時寶 + 会員可展開 */
   { key: 'ms5', name: '六記粥麵（新馬路總店-🏆冠軍店）', brandTag: '金牌', rating: '4.8', monthlySales: '3000+', minOrder: '$40', freeDelivery: true, deliveryTime: '32分鐘', distance: '2.1km', punctual: true, tags: ['全澳米粉面馆销量第1名', '全澳好评店铺'], memberTags: [{ kind: 'point', text: '积分抵$10元' }, { kind: 'shen', text: '最高膨脹至30' }, { kind: 'green', text: '新客券 $8' }], memberSections: [ { label: '券包', tags: [{ kind: 'shen', text: '最高膨脹至30' }, { kind: 'green', text: '新客券 $8' }, { kind: 'red', text: '領券 $10 | 5 | 4' }] }, { label: '活动', tags: [{ kind: 'red', text: '7折起' }, { kind: 'red', text: '150减8' }, { kind: 'red', text: '100减5' }, { kind: 'red', text: '到店自取9折' }, { kind: 'red', text: '收藏有禮' }] }, { label: '其它', tags: [{ kind: 'point', text: '积分抵$10元' }, { kind: 'green', text: '食得健康' }, { kind: 'gray', text: '支持自取' }] } ], image: lemonTeaImg, deliveryType: 'platform', merchantId: 'mf-luk' },
   /* 6. 对齐閃蜂 s6：新店 + 无标签 + 免配送費 + 近距離 */
-  { key: 'ms6', name: '晨光早點（北區新店）', isNew: true, rating: '4.9', monthlySales: '800+', minOrder: '$30', freeDelivery: true, deliveryTime: '25分鐘', distance: '900m', tags: [], memberTags: [{ kind: 'shen', text: '最高膨脹至30' }, { kind: 'red', text: '满30減3' }], image: burgerImg, deliveryType: 'self', merchantId: 'mf-morning' },
+  { key: 'ms6', name: '晨光早點（北區新店）', isNew: true, rating: '4.9', monthlySales: '800+', minOrder: '$30', freeDelivery: true, deliveryTime: '25分鐘', distance: '900m', tags: [], memberTags: [{ kind: 'shen', text: '最高膨脹至30' }, { kind: 'red', text: '满30減3' }], image: burgerImg, deliveryType: 'self', merchantId: 'mf-morning', closingCountdown: '00:07:18', coverVideo: true },
   /* 7. 对齐閃蜂 s7：新店 + 独家 + 起送$35·減配 */
   { key: 'ms7', name: '杏香園餅店（氹仔舊城區店）', isNew: true, brandTag: '独家', rating: '4.7', monthlySales: '700+', minOrder: '$35', deliveryDiscount: '$0~4', deliveryTime: '27分鐘', distance: '3.2km', tags: ['高仕德热门店铺', '近期99人下单'], memberTags: [{ kind: 'shen', text: '最高膨脹至30' }, { kind: 'coupon', text: '領券 $5' }], image: riceballImg, deliveryType: 'platform', merchantId: 'mf-hang' },
   /* 8. 对齐閃蜂 s8：新店 + 连锁 + 免配送費 */
-  { key: 'ms8', name: '泉記美食廣場（連鎖·亞利鴉架街店）', isNew: true, brandTag: '连锁', rating: '4.6', monthlySales: '2000+', minOrder: '$35', freeDelivery: true, deliveryTime: '26分鐘', distance: '1.1km', tags: ['全澳人气店铺', '十万人收藏好店'], memberTags: [{ kind: 'shen', text: '最高膨脹至30' }, { kind: 'green', text: '新客券 $6' }], image: friedChickenImg, deliveryType: 'self', merchantId: 'mf-quan' },
+  { key: 'ms8', name: '泉記美食廣場（連鎖·亞利鴉架街店）', isNew: true, brandTag: '连锁', rating: '4.6', monthlySales: '2000+', minOrder: '$35', freeDelivery: true, deliveryTime: '26分鐘', distance: '1.1km', tags: ['全澳人气店铺', '十万人收藏好店'], memberTags: [{ kind: 'shen', text: '最高膨脹至30' }, { kind: 'green', text: '新客券 $6' }], image: friedChickenImg, deliveryType: 'self', merchantId: 'mf-quan', closingCountdown: '00:26:40' },
   /* 9. 对齐閃蜂 s9：金牌 + 已打烊·爆单 */
   { key: 'ms9', name: '鳳城珠記酒家（新口岸店）', brandTag: '金牌', rating: '4.7', monthlySales: '1500+', minOrder: '$40', deliveryDiscount: '$0~5', deliveryTime: '35分鐘', distance: '4.6km', tags: ['高仕德回头率超高店铺', '89人收藏好店'], memberTags: [{ kind: 'shen', text: '最高膨脹至30' }, { kind: 'red', text: '满80減10' }], image: fishPotImg, deliveryType: 'platform', merchantId: 'mf-fcsz', businessState: 'closed', closedReason: '爆单啦，暂停接单一会' },
   /* 10. 对齐閃蜂 s10：新店 + 无标签 + 免配送費 + 接受预定 */
@@ -94,25 +96,31 @@ export default function MfoodHome({
   onSearch,
   onOpenStore,
   onOpenGroupBuy,
+  onOpenDelivery,
   onCategoryChange,
   syncCategory,
   syncSeq,
   deliveryMode,
+  initialTab,
 }: {
   onSearch?: () => void
   onOpenStore?: (merchantId: string) => void
   /** 分类宫格「特價團購」入口 → 特惠團購页（MfoodApp 根屏切换） */
   onOpenGroupBuy?: () => void
+  /** 分类宫格「美食外賣」入口 → 美食外賣频道页（MfoodApp 根屏切换，图1 入口①） */
+  onOpenDelivery?: () => void
   /** 分类切换回调（双机视图联动右侧说明面板：美食外賣 → 外卖说明，其余 → 团购说明） */
   onCategoryChange?: (tab: string) => void
   /** 右侧说明面板 Tab 下发的分类同步命令（syncSeq 自增时执行，壳内自身切换不回流） */
   syncCategory?: string
   syncSeq?: number
-  /** 外卖瀑布流展示模式（说明面板切换器下发；两台手机同步） */
-  deliveryMode?: 'list' | 'card'
+  /** 外卖瀑布流展示模式（说明面板切换器下发；两台手机同步；large=大图模式 MFOOD 亦实现，样式与閃蜂一致） */
+  deliveryMode?: 'list' | 'card' | 'large'
+  /** 初始分类（底部 Tab「外卖」进入时定位到美食外賣） */
+  initialTab?: string
 }) {
   const bodyRef = useRef<HTMLDivElement>(null)
-  const [tab, setTab] = useState<string>(TABS[0].key)
+  const [tab, setTab] = useState<string>(initialTab ?? TABS[0].key)
   const [scrolled, setScrolled] = useState(false)
 
   /* 右侧说明面板 Tab 下发的同步命令：只在 syncSeq 变化时执行，避免壳内自身切换被面板回流覆盖；
@@ -198,7 +206,7 @@ export default function MfoodHome({
         <div className="apm-cat-section">
           <div className="apm-cat-grid">
             {CATEGORIES.map((c) => (
-              <button key={c.key} type="button" className="apm-cat-item" onClick={c.key === 'group' ? onOpenGroupBuy : undefined}>
+              <button key={c.key} type="button" className="apm-cat-item" onClick={c.key === 'group' ? onOpenGroupBuy : c.key === 'delivery' ? onOpenDelivery : undefined}>
                 {c.badge && <span className="apm-cat-badge" style={{ background: c.badgeColor }}>{c.badge}</span>}
                 <span className="apm-cat-emoji">{c.emoji}</span>
                 <span className="apm-cat-label">{c.zh}</span>
@@ -265,10 +273,14 @@ export default function MfoodHome({
           ))}
         </div>
 
-        {/* 分類對應瀑布流：特價團購/超市百貨 → 團購券卡；美食外賣 → 門店卡（MFOOD 专属组件） */}
+        {/* 分類對應瀑布流：特價團購/超市百貨 → 團購券卡；美食外賣 → 門店卡（小圖/卡片/大圖三模式，MFOOD 专属组件） */}
         <div className="apf-feed-list">
           {tab === 'delivery'
-            ? deliveryMode === 'card'
+            ? deliveryMode === 'large'
+              ? MFOOD_STORES.map((store) => (
+                  <MfoodDeliveryLargeCard key={store.key} store={store} onOpenStore={onOpenStore} />
+                ))
+              : deliveryMode === 'card'
               ? (
                   <div className="apw-grid">
                     {MFOOD_STORES.map((store) => (

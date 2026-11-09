@@ -20,13 +20,15 @@
  * 说明：占位数据与占位文案口径同 MfoodHome（不进语言包，二期统一接 i18n）；
  * 品红头部等设计稿色以全局令牌渐变近似，不新增裸色值（主题棘轮门禁）。
  */
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import burgerImg from '@/assets/consumer-home/burger.jpg'
 import friedChickenImg from '@/assets/consumer-home/friedchicken.jpg'
 import fishPotImg from '@/assets/consumer-home/fishpot.jpg'
 import lemonTeaImg from '@/assets/consumer-home/lemontea.jpg'
 import GroupBuyFeedCard from './GroupBuyFeedCard'
 import { FEED } from './MfoodGroupFeed'
+import PreferredMerchantCard, { type PreferredMerchant } from './PreferredMerchantCard'
+import { useGroupBuyFilters } from './GroupBuyFilterBar'
 
 /** 定位（占位数据） */
 const LOCATION = '財富世家半山町'
@@ -86,8 +88,16 @@ const ROUND_TABS = [
   { key: 'near', label: '附近好店', emoji: '🏪' },
 ]
 
-/** 筛选胶囊（图2；占位，原型不做真实过滤） */
-const FILTER_CHIPS = ['附近', '全部分類', '默認排序', '篩選']
+/** 附近好店页签下标（唯一渲染優選商家同款卡的页签） */
+const TAB_NEAR = 5
+
+/** 附近好店瀑布流（優選商家同款卡 · MFOOD 品牌，红包标渲染为「勐爆券」；占位数据，封面用现有贴图占位） */
+const NEAR_STORES: PreferredMerchant[] = [
+  { key: 'ns1', name: '澳門燒味工房🔥-新橋店', rating: '4.7', perPerson: '$58/人', cateArea: '燒臘·新橋商圈', dist: '180m', logoText: '燒味', logoTone: 'orange', isNew: true, cover: friedChickenImg, sales: '半年售800+', coupons: [{ icon: '券', price: '60', discount: '6折', name: '燒味雙拚優惠券' }, { icon: '惠', price: '30', discount: '8折', name: '午市快閃券' }] },
+  { key: 'ns2', name: '金沙砂鍋粥🍜-提督店', rating: '4.5', perPerson: '$45/人', cateArea: '粥麵·提督商圈', dist: '420m', logoText: '金沙', logoTone: 'red', cover: fishPotImg, inflate: '最高膨脹至$25', sales: '半年售1200+', coupons: [{ icon: '券', price: '45', discount: '6.5折', name: '砂鍋粥雙人券' }] },
+  { key: 'ns3', name: '麥記漢堡包🍔-關閘店', rating: '4.4', perPerson: '$38/人', cateArea: '快餐·關閘商圈', dist: '1.1km', logoText: '麥記', logoTone: 'blue', cover: burgerImg, sales: '半年售300+', couponPrefix: 'newbie', coupons: [{ icon: '秒', price: '25', discount: '5折', name: '早晨套餐秒殺券' }, { icon: '惠', price: '15', discount: '8.8折', name: '下午茶優惠' }] },
+  { key: 'ns4', name: '檸檬屋茶飲🍋-下環店', rating: '4.6', perPerson: '$22/人', cateArea: '茶飲·下環商圈', dist: '860m', logoText: '檸檬', logoTone: 'green', cover: lemonTeaImg, inflate: '最高膨脹至$12', sales: '半年售2600+', coupons: [{ icon: '惠', price: '12', discount: '9折', name: '凍飲第二杯半價' }] },
+]
 
 /** 瀑布流团购券：数据与首页「特價團購」瀑布流完全一致（复用 MfoodHome.FEED 唯一真源，紫色搶購态同首页） */
 
@@ -95,25 +105,85 @@ export default function MfoodGroupBuy({
   onBack,
   onSearch,
   onOpenStore,
+  onTabChange,
+  syncTab,
+  syncSeq,
+  preferredLayout,
+  onPreferredLayoutChange,
 }: {
   onBack: () => void
   onSearch?: () => void
   onOpenStore?: (merchantId: string) => void
+  /** 页签切换回流（壳外说明面板联动：附近好店 ↔ preferred 面板） */
+  onTabChange?: (tab: string) => void
+  /** 壳外说明面板下发的页签同步命令（syncSeq 自增时执行） */
+  syncTab?: string
+  syncSeq?: number
+  /** 附近好店列表大小圖模式（说明面板切换器下发，与閃蜂優選商家同步；缺省大圖） */
+  preferredLayout?: 'small' | 'large'
+  /** 篩選面板内大小图切换上报（说明面板闭环后下发另一台手机） */
+  onPreferredLayoutChange?: (mode: 'small' | 'large') => void
 }) {
   const bodyRef = useRef<HTMLDivElement>(null)
+  /** 吸顶搜索行（量高做页签接管阈值） */
+  const stickyRowRef = useRef<HTMLDivElement>(null)
+  /** 圆形图标页签行（底边触及搜索行底边 = 恰好被不透明搜索行完全盖住） */
+  const roundtabsRef = useRef<HTMLDivElement>(null)
+  /** 吸顶文字页签行（与圆签行同数据，选中项同样需滚入可视区） */
+  const stickyTabsRef = useRef<HTMLDivElement>(null)
   /** 滚动过阈值：白色吸顶搜索行出现（图2/图3） */
   const [scrolled, setScrolled] = useState(false)
-  /** 再过阈值：页签行吸顶切文字下划线态（图3） */
+  /** 图标行被吸顶层完全盖住后：吸顶文字下划线行接管（图3；动态阈值防图标行与文字行同屏重复） */
   const [tabsStuck, setTabsStuck] = useState(false)
   /** 当前激活页签（仅视觉态） */
-  const [activeTab, setActiveTab] = useState(0)
+  /* 激活页签初值直接应用 syncTab：壳为条件挂载，错过 syncSeq 变化时靠初值补上（如说明面板已在附近好店） */
+  const [activeTab, setActiveTab] = useState(syncTab === 'preferred' ? TAB_NEAR : 0)
+
+  /* 壳外说明面板同步命令：只在 syncSeq 变化时执行；preferred → 附近好店页签（page-group 命令仅配对序号，不切页签） */
+  const syncSeqRef = useRef(syncSeq ?? 0)
+  useEffect(() => {
+    if ((syncSeq ?? 0) !== syncSeqRef.current) {
+      syncSeqRef.current = syncSeq ?? 0
+      if (syncTab === 'preferred') setActiveTab(TAB_NEAR)
+    }
+  }, [syncSeq, syncTab])
+
+  /* 筛选区与閃蜂特惠團購页同一真源（GroupBuyFilterBar）：附近/全部分類/智能排序/更多篩選选项完全一致；
+     文案差异走参数（附近 vs 附近商家），营销高亮胶囊仅閃蜂展示，大小图切换模块仅附近好店页签出现 */
+  const filters = useGroupBuyFilters({
+    nearbyChipLabel: '附近',
+    showHighlightChips: false,
+    showLayoutToggle: activeTab === TAB_NEAR,
+    preferredLayout,
+    onPreferredLayoutChange,
+  })
+
+  /* 选中页签自动滚入可视区：圆签行/吸顶文字行均为 overflow-x 横滑，选中项（如附近好店）可能贴在右缘被裁。
+     必须用纯横向 scrollTo：scrollIntoView 会连带滚动垂直祖先（.mpg-body），与 tabsStuck 翻转形振荡导致页面“上滑就弹回”；jsdom 无 scrollTo，可选调用 */
+  useEffect(() => {
+    for (const bar of [roundtabsRef.current, stickyTabsRef.current]) {
+      const on = bar?.querySelector('.is-on')
+      if (!bar || !on) continue
+      const barRect = bar.getBoundingClientRect()
+      const onRect = on.getBoundingClientRect()
+      bar.scrollTo?.({
+        left: bar.scrollLeft + (onRect.left - barRect.left) - bar.clientWidth / 2 + onRect.width / 2,
+        behavior: 'smooth',
+      })
+    }
+  }, [activeTab, tabsStuck])
 
   const handleScroll = () => {
     const el = bodyRef.current
     if (!el) return
     const next = el.scrollTop > 36
     setScrolled((prev) => (prev === next ? prev : next))
-    const stuck = el.scrollTop > 300
+    /* 图标行底边触及吸顶搜索行底边 = 图标行恰好被不透明搜索行完全盖住：此刻切文字行，既无同屏重复也无布局跳变 */
+    const rowH = stickyRowRef.current?.offsetHeight ?? 44
+    const tabs = roundtabsRef.current
+    const stuck = tabs
+      ? tabs.getBoundingClientRect().top - el.getBoundingClientRect().top + tabs.offsetHeight <= rowH
+      : el.scrollTop > 300
     setTabsStuck((prev) => (prev === stuck ? prev : stuck))
   }
 
@@ -121,7 +191,7 @@ export default function MfoodGroupBuy({
     <>
       {/* 吸顶搜索行 + 吸顶页签行（图2/图3；未滚动时隐藏） */}
       <div className={`mpg-sticky-header${scrolled ? ' is-visible' : ''}`}>
-        <div className="mpg-sticky-row">
+        <div className="mpg-sticky-row" ref={stickyRowRef}>
           <button type="button" className="mpg-sticky-search" onClick={onSearch}>
             <span aria-hidden="true">🔍</span>
             <span>{KEYWORD}</span>
@@ -130,7 +200,7 @@ export default function MfoodGroupBuy({
           <span className="mpg-sticky-loc">📍 {LOCATION} ▼</span>
         </div>
         {tabsStuck && (
-          <div className="mpg-sticky-tabs">
+          <div className="mpg-sticky-tabs" ref={stickyTabsRef}>
             {ROUND_TABS.map((tb, i) => (
               <button key={tb.key} type="button" className={`mpg-sticky-tab${activeTab === i ? ' is-on' : ''}`} onClick={() => setActiveTab(i)}>
                 {tb.label}
@@ -144,8 +214,11 @@ export default function MfoodGroupBuy({
         {/* ═══ 品红渐变头部（图1） ═══ */}
         <div className="mpg-head">
           <div className="mpg-head-top">
-            <button type="button" className="mpg-title" onClick={onBack}>
-              特<i aria-hidden="true">🐝</i>惠<i aria-hidden="true">🐝</i>團<i aria-hidden="true">🐝</i>購
+            <button type="button" className="mpg-title" onClick={onBack} aria-label="特惠團購">
+              <span className="mpg-title-ch mpg-title-ch--lift">特</span>
+              <span className="mpg-title-ch">惠</span>
+              <span className="mpg-title-ch mpg-title-ch--lift">團</span>
+              <span className="mpg-title-ch">購</span>
             </button>
             <span className="mpg-loc">📍 {LOCATION} ▼</span>
           </div>
@@ -243,33 +316,38 @@ export default function MfoodGroupBuy({
         </div>
 
         {/* ═══ 圆形图标页签行（未吸顶态；吸顶后由吸顶文字行接管，图3） ═══ */}
-        <div className="mpg-roundtabs">
+        <div className="mpg-roundtabs" ref={roundtabsRef}>
           {ROUND_TABS.map((tb, i) => (
-            <button key={tb.key} type="button" className={`mpg-roundtab${activeTab === i ? ' is-on' : ''}`} onClick={() => setActiveTab(i)}>
+            <button key={tb.key} type="button" className={`mpg-roundtab${activeTab === i ? ' is-on' : ''}`} onClick={() => { setActiveTab(i); onTabChange?.(i === TAB_NEAR ? 'preferred' : 'page-group') }}>
               <span className="mpg-roundtab-ico" aria-hidden="true">{tb.emoji}</span>
               <span className="mpg-roundtab-label">{tb.label}</span>
             </button>
           ))}
         </div>
 
-        {/* 筛选胶囊（图2） */}
-        <div className="mpg-chips">
-          {FILTER_CHIPS.map((c) => (
-            <button key={c} type="button" className="mpg-chip">
-              {c} <i aria-hidden="true">▼</i>
-            </button>
-          ))}
-        </div>
+        {/* 筛选胶囊行 + 下拉面板（与閃蜂同一真源 GroupBuyFilterBar） */}
+        {filters.sortbar}
 
-        {/* ═══ 瀑布流（共享 GroupBuyFeedCard；数据与主题同首页「特價團購」） ═══ */}
-        <div className="apf-feed-list">
-          {FEED.map((it) => (
-            <GroupBuyFeedCard key={it.key} item={it} theme="purple" onOpenStore={onOpenStore} />
-          ))}
-        </div>
+        {/* ═══ 瀑布流：附近好店页签 → 優選商家同款卡（MFOOD 品牌，红包标「勐爆券」，固定小圖模式）；其余页签 → 團購券瀑布流（同首頁） ═══ */}
+        {activeTab === TAB_NEAR ? (
+          <div className="apq-feed">
+            {NEAR_STORES.map((m) => (
+              <PreferredMerchantCard key={m.key} item={m} brand="mfood" layout={filters.layout} />
+            ))}
+          </div>
+        ) : (
+          <div className="apf-feed-list">
+            {FEED.map((it) => (
+              <GroupBuyFeedCard key={it.key} item={it} theme="purple" onOpenStore={onOpenStore} />
+            ))}
+          </div>
+        )}
 
         {/* 到底：仅文字提示 */}
         <div className="mpg-end">已經到底了</div>
+
+        {/* 更多篩選底部 sheet（与閃蜂同一真源；sticky bottom:0 须留在滚动容器末尾） */}
+        {filters.moreSheet}
       </div>
     </>
   )

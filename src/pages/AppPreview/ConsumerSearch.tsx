@@ -3,7 +3,13 @@
  *
  * 5 个入口共用本组件，通过 scope 隔离搜索范围：
  * global（首页全站）/ delivery / groupbuy / market / store（店内）。
- * 结构：激活页（历史 / 热搜 / 猜你想搜）→ 输入联想 → 结果页（Tab / 排序 / 筛选 / 空态）。
+ * 结构：激活页（历史 / 热搜 / 猜你想搜）→ 输入联想 → 结果页。
+ * 结果页分两种版式：
+ * - 全站（global）：瀑布流版式——5 个分类 Tab（全部/外賣/團購/超市/百貨，横滑可露出百貨），
+ *   默认展示外賣瀑布流；外賣复用首页同款小图门店卡（含超出范围/未入驻样例），
+ *   團購复用特惠團購页「優選商家」小图瀑布流（含超出范围/未入驻/开业时间样例），
+ *   其余分类提示「還未實現」；关键词过滤后接搜索接口时再补（原型阶段瀑布流为同款 Mock）。
+ * - 频道/店内：列表版式（Tab / 排序 / 筛选 / 空态），行为不变。
  *
  * 说明：Mock 数据与检索逻辑在 consumerSearchData.ts；生产接入时替换为后端搜索接口即可，
  * 交互结构与本组件保持不变。搜索历史按作用域存 localStorage，可一键清空。
@@ -45,6 +51,10 @@ import {
   type SearchSuggestion,
   type SearchTab,
 } from './consumerSearchData'
+import { HOME_DELIVERY_SEARCH_STORES } from './consumerHomeFeed'
+import { PREFERRED_SEARCH_MERCHANTS } from './consumerPreferredFeed'
+import DeliveryStoreCard from './DeliveryStoreCard'
+import PreferredMerchantCard from './PreferredMerchantCard'
 
 /** 频道/对象自绘图标（统一描边风格，currentColor 取色）：
  *  外賣=骑手摩托、超市=購物車、團購/套餐=券票、商家=門店、商品=購物袋、綜合=四宫格、搜尋=放大鏡 */
@@ -125,6 +135,15 @@ interface SearchSession {
   filters: SearchFilter[]
 }
 
+/** 全站结果页瀑布流分类的 emoji 角标：四个频道与首页分类切换同款，全部用搜索镜 */
+const RESULT_CAT_EMOJI: Partial<Record<SearchTab, string>> = {
+  all: '🔍',
+  delivery: '🧋',
+  groupbuy: '🍲',
+  market: '🛍️',
+  department: '🧺',
+}
+
 /** 页面级记忆：搜索 → 店铺 → 返回搜索时恢复关键词与结果（取消搜索时清空） */
 const sessions = new Map<string, SearchSession>()
 
@@ -137,6 +156,9 @@ export interface ConsumerSearchProps {
   merchantId?: string
   /** 从「在全站搜尋」等跨作用域入口带入的关键词，优先于页面级记忆 */
   initialKeyword?: string
+  /** 说明面板三级瀑布流切换下发的分类命令（syncSeq 自增时执行）：delivery=外賣 / groupbuy=團購 */
+  syncFeed?: 'delivery' | 'groupbuy'
+  syncSeq?: number
   onBack: () => void
   onOpenStore?: (merchantId: string) => void
   onSearchGlobal?: (keyword: string) => void
@@ -317,6 +339,8 @@ export default function ConsumerSearch({
   scope,
   merchantId,
   initialKeyword,
+  syncFeed,
+  syncSeq,
   onBack,
   onOpenStore,
   onSearchGlobal,
@@ -331,7 +355,8 @@ export default function ConsumerSearch({
     ? {
         input: initialKeyword,
         query: initialKeyword,
-        tab: 'all' as SearchTab,
+        // 全站结果页默认展示外賣瀑布流（跨作用域入口带入关键词同样落外賣 Tab）
+        tab: (scope === 'global' ? 'delivery' : 'all') as SearchTab,
         sort: 'default' as SearchSort,
         filters: [] as SearchFilter[],
       }
@@ -361,6 +386,15 @@ export default function ConsumerSearch({
   useEffect(() => {
     sessions.set(key, { input, query, tab, sort, filters })
   }, [key, input, query, tab, sort, filters])
+
+  /* 壳外说明面板三级瀑布流切换命令：只在 syncSeq 变化时执行，避免壳内自身切 Tab 被面板回流覆盖 */
+  const syncSeqRef = useRef(syncSeq ?? 0)
+  useEffect(() => {
+    if ((syncSeq ?? 0) !== syncSeqRef.current && syncFeed) {
+      syncSeqRef.current = syncSeq ?? 0
+      setTab(syncFeed)
+    }
+  }, [syncSeq, syncFeed])
 
   const baseResults = useMemo(
     () => searchCatalog(scope, query, { merchantId, filters }),
@@ -403,7 +437,8 @@ export default function ConsumerSearch({
     }
     setInput(text)
     setQuery(text)
-    setTab('all')
+    // 每次点搜索都回到默认 Tab：全站=外賣瀑布流，其余作用域=综合列表
+    setTab(scope === 'global' ? 'delivery' : 'all')
     setCategory('all')
     setHistory(pushHistory(scope, text, merchantId))
     if (bodyRef.current) bodyRef.current.scrollTop = 0
@@ -514,6 +549,55 @@ export default function ConsumerSearch({
           ))}
         </div>
       </div>
+    </div>
+  )
+
+  /** 全站结果页 · 瀑布流版式：5 分类 Tab（横滑，百貨被裁切属设计预期）；
+   *  外賣/團購与首页完全同款（小图模式门店卡 / 团购券卡，数据同源 consumerHomeFeed），
+   *  其余分类先不做瀑布流，切到即提示「還未實現」 */
+  const renderGlobalWaterfall = () => (
+    <div className="apcs-results">
+      <div className="apcs-pills" role="tablist" aria-label={t('appConsumer.search.tablistLabel', { defaultValue: '結果分類' })}>
+        {config.tabs.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === item.key}
+            className={`apcs-pill${tab === item.key ? ' is-on' : ''}`}
+            onClick={() => {
+              setTab(item.key)
+              if (bodyRef.current) bodyRef.current.scrollTop = 0
+            }}
+          >
+            {RESULT_CAT_EMOJI[item.key] && <span aria-hidden="true">{RESULT_CAT_EMOJI[item.key]}</span>}
+            {/* label 直接取配置真值（全站 Tab 暂未入语言包，第二阶段统一登记 i18n） */}
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'delivery' && (
+        <div className="apf-feed-list">
+          {HOME_DELIVERY_SEARCH_STORES.map((store) => (
+            <DeliveryStoreCard key={store.key} store={store} onOpenStore={onOpenStore} />
+          ))}
+        </div>
+      )}
+      {tab === 'groupbuy' && (
+        <div className="apq-feed">
+          {PREFERRED_SEARCH_MERCHANTS.map((item) => (
+            <PreferredMerchantCard key={item.key} item={item} layout="small" brand="bee" />
+          ))}
+        </div>
+      )}
+      {tab !== 'delivery' && tab !== 'groupbuy' && (
+        <div className="apcs-empty">
+          <span className="apcs-empty-ico" aria-hidden="true">🚧</span>
+          <b>「{config.tabs.find((item) => item.key === tab)?.label ?? ''}」瀑布流還未實現</b>
+          <p>該分類瀑布流規劃中，先切到「外賣」或「團購」看看吧</p>
+        </div>
+      )}
     </div>
   )
 
@@ -688,7 +772,7 @@ export default function ConsumerSearch({
           </div>
         )}
 
-        {showResults && (
+        {showResults && (scope === 'global' ? renderGlobalWaterfall() : (
           <div className="apcs-results">
             <div className="apcs-summary">
               <span>{t('appConsumer.search.resultSummary', { count: results.length, defaultValue: '為你找到 {{count}} 個結果' })}</span>
@@ -771,7 +855,7 @@ export default function ConsumerSearch({
               <>
                 {tab === 'all' ? (
                   <>
-                    {nearMerchants.length > 0 && renderCards(nearMerchants, scope === 'global' ? t('appConsumer.search.groupStores', { defaultValue: '店鋪' }) : t(SEARCH_TAB_LABEL_KEY.merchant, { defaultValue: '商家' }))}
+                    {nearMerchants.length > 0 && renderCards(nearMerchants, t(SEARCH_TAB_LABEL_KEY.merchant, { defaultValue: '商家' }))}
                     {nearOffers.length > 0 && renderCards(nearOffers, offerTitle || undefined)}
                   </>
                 ) : renderCards(nearResults)}
@@ -779,7 +863,7 @@ export default function ConsumerSearch({
               </>
             )}
           </div>
-        )}
+        ))}
       </div>
     </div>
   )
