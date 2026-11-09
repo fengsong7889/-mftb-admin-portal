@@ -355,6 +355,12 @@ export const SEARCH_MERCHANTS: SearchMerchant[] = [
     rating: 4.6, monthlySales: 960, distanceKm: 1.4, address: '澳門黑沙環新街21號祐漢街市旁', deliveryMinutes: 25, deliveryFee: 0, minOrder: 40,
     coupons: ['滿60減5'], tags: ['免配送費', '可自取'], categories: ['水果', '生鮮'], status: 'open',
   },
+  {
+    /* 超配送半径样例：超市频道列表版式的「超出當前配送範圍」置灰分组回归锁（频道内瀑布流口径不用目录数据） */
+    kind: 'merchant', id: 'm-far', name: '橫琴遠倉超市（跨境自提點）', channel: 'market', image: undefined, emoji: '🏬',
+    rating: 4.2, monthlySales: 50, distanceKm: 8.5, address: '橫琴新區澳門大道1號', deliveryMinutes: 90, deliveryFee: 20, minOrder: 199,
+    coupons: [], tags: [], categories: ['超市', '倉儲'], status: 'open',
+  },
 ]
 
 export const SEARCH_PRODUCTS: SearchProduct[] = [

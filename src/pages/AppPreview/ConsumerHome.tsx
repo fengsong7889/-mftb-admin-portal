@@ -88,7 +88,11 @@ export default function ConsumerHome({
 }) {
   const { t } = useTranslation()
   const bodyRef = useRef<HTMLDivElement>(null)
-  const [cat, setCat] = useState<string>(HOME_CHANNELS[0].key)
+  /* 分类初值直接应用 syncCategory：壳为条件挂载（从团购页/频道页被面板命令拉回首页时会重新挂载），
+     错过 syncSeq 变化时靠初值补上（同 ConsumerGroupBuy 初值口径）；非法命令回落默认团购 */
+  const [cat, setCat] = useState<string>(() => (
+    syncCategory && HOME_CHANNELS.some((c) => c.key === syncCategory) ? syncCategory : HOME_CHANNELS[0].key
+  ))
   const [scrolled, setScrolled] = useState(false)
   const [shadeIndex, setShadeIndex] = useState(0)
 

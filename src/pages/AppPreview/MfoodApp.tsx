@@ -10,6 +10,8 @@ import { useTranslation } from 'react-i18next'
 import MfoodHome from './MfoodHome'
 import MfoodGroupBuy from './MfoodGroupBuy'
 import MfoodDelivery from './MfoodDelivery'
+import ConsumerSearch from './ConsumerSearch'
+import type { SearchScope } from './consumerSearchData'
 
 type RootKey = 'home' | 'group' | 'delivery' | 'market' | 'mine'
 
@@ -38,18 +40,38 @@ export default function MfoodApp({ onCategoryChange, syncCategory, syncSeq, deli
   const { t } = useTranslation()
   /** 当前根屏：仅 home / group 有页面，其余 Tab 暂回首页（原型口径） */
   const [root, setRoot] = useState<RootKey>('home')
+  /** 搜索覆盖层（同閃蜂壳结构）：null=关闭；scope 区分入口——首页=global / 美食外賣频道=delivery / 特惠團購频道=groupbuy
+   *  （频道内搜索结果页为对应瀑布流且无分类切换 Tab，与閃蜂频道内搜索同口径） */
+  const [searchScope, setSearchScope] = useState<SearchScope | null>(null)
+  /** 面板搜索命令携带的关键词（同閃蜂 nav push 的「火鍋」口径，直达结果页瀑布流）；壳内搜索框手动进入不携带 */
+  const [searchKeyword, setSearchKeyword] = useState<string | undefined>(undefined)
 
   /* 壳外说明面板同步命令：只在 syncSeq 变化时执行；preferred/page-group → 團購根屏，
-     delivery-page（美食外卖页说明面板）与首页两类 → home 之外的对应根屏（delivery-page → 美食外賣频道页）。
+     delivery-page（美食外卖页说明面板）与首页两类 → home 之外的对应根屏（delivery-page → 美食外賣频道页）；
+     search-delivery/search-group → 打开搜索结果页（分类由 ConsumerSearch 按 syncFeed 切换）。
      注意：syncCategory 必须直接透传给 MfoodGroupBuy（不得经派生 state 中转）——
      中转会晚一帧到达，子组件的 syncSeq 守卫会在 syncTab 还是旧值时先消费掉 seq，导致命令丢失 */
   const syncSeqRef = useRef(syncSeq ?? 0)
   useEffect(() => {
     if ((syncSeq ?? 0) !== syncSeqRef.current) {
       syncSeqRef.current = syncSeq ?? 0
+      /* 搜索是独立覆盖层（不在根屏状态里）：非搜索类命令必须先关覆盖层，否则根屏切了用户仍看到搜索页（MFOOD 不跟随的根因） */
+      const isSearchCmd = syncCategory === 'search-delivery' || syncCategory === 'search-group'
+        || syncCategory === 'delivery-search' || syncCategory === 'groupbuy-search'
+      if (!isSearchCmd) {
+        setSearchScope(null)
+        setSearchKeyword(undefined)
+      }
       if (syncCategory === 'preferred' || syncCategory === 'page-group' || syncCategory === 'filter') setRoot('group')
       else if (syncCategory === 'delivery-page') setRoot('delivery')
-      else if (syncCategory === 'group' || syncCategory === 'delivery') setRoot('home')
+      else if (syncCategory === 'search-delivery' || syncCategory === 'search-group') {
+        setSearchScope('global')
+        setSearchKeyword('火鍋')
+      } else if (syncCategory === 'delivery-search' || syncCategory === 'groupbuy-search') {
+        /* 美食外卖页/特惠团购页·搜索结果瀑布流面板：进入对应频道内搜索（带关键词直达结果页瀑布流，无分类 Tab） */
+        setSearchScope(syncCategory === 'delivery-search' ? 'delivery' : 'groupbuy')
+        setSearchKeyword('火鍋')
+      } else if (syncCategory === 'group' || syncCategory === 'delivery') setRoot('home')
     }
   }, [syncSeq, syncCategory])
 
@@ -59,6 +81,7 @@ export default function MfoodApp({ onCategoryChange, syncCategory, syncSeq, deli
         ? (
             <MfoodGroupBuy
               onBack={() => setRoot('home')}
+              onSearch={() => { setSearchScope('groupbuy'); setSearchKeyword(undefined) }}
               onTabChange={onCategoryChange}
               syncTab={syncCategory}
               syncSeq={syncSeq}
@@ -67,9 +90,10 @@ export default function MfoodApp({ onCategoryChange, syncCategory, syncSeq, deli
             />
           )
         : root === 'delivery'
-          ? <MfoodDelivery layout={deliveryPageMode} />
+          ? <MfoodDelivery layout={deliveryPageMode} onSearch={() => { setSearchScope('delivery'); setSearchKeyword(undefined) }} />
           : (
               <MfoodHome
+                onSearch={() => { setSearchScope('global'); setSearchKeyword(undefined) }}
                 onCategoryChange={onCategoryChange}
                 syncCategory={syncCategory}
                 syncSeq={syncSeq}
@@ -78,6 +102,20 @@ export default function MfoodApp({ onCategoryChange, syncCategory, syncSeq, deli
                 onOpenDelivery={() => setRoot('delivery')}
               />
             )}
+
+      {/* 搜索覆盖层（压在来源页之上，同閃蜂壳结构）：MFOOD 品牌瀑布流（勁爆券皮门店卡 / 附近好店卡）；
+          key 按 scope+关键词重挂载：面板命令携带关键词直达结果页（同閃蜂「火鍋」口径），手动进入落激活页 */}
+      {searchScope && (
+        <ConsumerSearch
+          key={`${searchScope}:${searchKeyword ?? ''}`}
+          brand="mfood"
+          scope={searchScope}
+          initialKeyword={searchKeyword}
+          syncFeed={syncCategory === 'search-group' ? 'groupbuy' : syncCategory === 'search-delivery' ? 'delivery' : undefined}
+          syncSeq={syncSeq}
+          onBack={() => setSearchScope(null)}
+        />
+      )}
 
       {/* 底部 Tab 栏 */}
       <div className="ap-tabbar apm-tabbar">

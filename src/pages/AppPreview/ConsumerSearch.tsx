@@ -9,7 +9,8 @@
  *   默认展示外賣瀑布流；外賣复用首页同款小图门店卡（含超出范围/未入驻样例），
  *   團購复用特惠團購页「優選商家」小图瀑布流（含超出范围/未入驻/开业时间样例），
  *   其余分类提示「還未實現」；关键词过滤后接搜索接口时再补（原型阶段瀑布流为同款 Mock）。
- * - 频道/店内：列表版式（Tab / 排序 / 筛选 / 空态），行为不变。
+ * - 频道内（delivery/groupbuy）：瀑布流版式，与首页搜索结果页对应瀑布流同款，且不展示分类切换 Tab；
+ * - 超市/店内：列表版式（Tab / 排序 / 筛选 / 空态），行为不变。
  *
  * 说明：Mock 数据与检索逻辑在 consumerSearchData.ts；生产接入时替换为后端搜索接口即可，
  * 交互结构与本组件保持不变。搜索历史按作用域存 localStorage，可一键清空。
@@ -53,7 +54,9 @@ import {
 } from './consumerSearchData'
 import { HOME_DELIVERY_SEARCH_STORES } from './consumerHomeFeed'
 import { PREFERRED_SEARCH_MERCHANTS } from './consumerPreferredFeed'
+import { MFOOD_SEARCH_STORES, MFOOD_NEAR_SEARCH_STORES } from './consumerMfoodFeed'
 import DeliveryStoreCard from './DeliveryStoreCard'
+import MfoodDeliveryStoreCard from './MfoodDeliveryStoreCard'
 import PreferredMerchantCard from './PreferredMerchantCard'
 
 /** 频道/对象自绘图标（统一描边风格，currentColor 取色）：
@@ -144,16 +147,19 @@ const RESULT_CAT_EMOJI: Partial<Record<SearchTab, string>> = {
   department: '🧺',
 }
 
-/** 页面级记忆：搜索 → 店铺 → 返回搜索时恢复关键词与结果（取消搜索时清空） */
+/** 页面级记忆：搜索 → 店铺 → 返回搜索时恢复关键词与结果（取消搜索时清空）；按品牌隔离（双机各自会话） */
 const sessions = new Map<string, SearchSession>()
 
-function sessionKey(scope: SearchScope, merchantId?: string): string {
-  return scope === 'store' ? `store:${merchantId ?? ''}` : scope
+function sessionKey(scope: SearchScope, merchantId: string | undefined, brand: 'bee' | 'mfood'): string {
+  if (scope === 'store') return `${brand}:store:${merchantId ?? ''}`
+  return `${brand}:${scope}`
 }
 
 export interface ConsumerSearchProps {
   scope: SearchScope
   merchantId?: string
+  /** 品牌：bee=閃蜂（默认）/ mfood=MFOOD；决定瀑布流卡片与数据同源口径（双 APP 刻意分叉） */
+  brand?: 'bee' | 'mfood'
   /** 从「在全站搜尋」等跨作用域入口带入的关键词，优先于页面级记忆 */
   initialKeyword?: string
   /** 说明面板三级瀑布流切换下发的分类命令（syncSeq 自增时执行）：delivery=外賣 / groupbuy=團購 */
@@ -338,6 +344,7 @@ function OfferCard({
 export default function ConsumerSearch({
   scope,
   merchantId,
+  brand = 'bee',
   initialKeyword,
   syncFeed,
   syncSeq,
@@ -347,7 +354,7 @@ export default function ConsumerSearch({
   onAddToCart,
 }: ConsumerSearchProps) {
   const { t } = useTranslation()
-  const key = sessionKey(scope, merchantId)
+  const key = sessionKey(scope, merchantId, brand)
   const memory = sessions.get(key)
   const config = SCOPE_CONFIG[scope]
   const storeName = getStoreName(merchantId)
@@ -552,54 +559,66 @@ export default function ConsumerSearch({
     </div>
   )
 
-  /** 全站结果页 · 瀑布流版式：5 分类 Tab（横滑，百貨被裁切属设计预期）；
-   *  外賣/團購与首页完全同款（小图模式门店卡 / 团购券卡，数据同源 consumerHomeFeed），
-   *  其余分类先不做瀑布流，切到即提示「還未實現」 */
-  const renderGlobalWaterfall = () => (
-    <div className="apcs-results">
-      <div className="apcs-pills" role="tablist" aria-label={t('appConsumer.search.tablistLabel', { defaultValue: '結果分類' })}>
-        {config.tabs.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            role="tab"
-            aria-selected={tab === item.key}
-            className={`apcs-pill${tab === item.key ? ' is-on' : ''}`}
-            onClick={() => {
-              setTab(item.key)
-              if (bodyRef.current) bodyRef.current.scrollTop = 0
-            }}
-          >
-            {RESULT_CAT_EMOJI[item.key] && <span aria-hidden="true">{RESULT_CAT_EMOJI[item.key]}</span>}
-            {/* label 直接取配置真值（全站 Tab 暂未入语言包，第二阶段统一登记 i18n） */}
-            {item.label}
-          </button>
-        ))}
-      </div>
+  /** 瀑布流版式结果页：
+   *  withTabs=true（首页全站搜索）：5 分类 Tab（横滑，百貨被裁切属设计预期），其余分类提示還未實現；
+   *  withTabs=false（频道内搜索：美食外賣/特價團購）：不展示分类切换按钮，直接展示该频道对应瀑布流；
+   *  外賣/團購瀑布流与首页搜索结果页完全同款（双 APP 卡片分叉，数据各自同源） */
+  const renderWaterfall = (withTabs: boolean) => {
+    const feed: SearchTab = withTabs ? tab : scope === 'groupbuy' ? 'groupbuy' : 'delivery'
+    return (
+      <div className="apcs-results">
+        {withTabs && (
+          <div className="apcs-pills" role="tablist" aria-label={t('appConsumer.search.tablistLabel', { defaultValue: '結果分類' })}>
+            {config.tabs.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                role="tab"
+                aria-selected={tab === item.key}
+                className={`apcs-pill${tab === item.key ? ' is-on' : ''}`}
+                onClick={() => {
+                  setTab(item.key)
+                  if (bodyRef.current) bodyRef.current.scrollTop = 0
+                }}
+              >
+                {RESULT_CAT_EMOJI[item.key] && <span aria-hidden="true">{RESULT_CAT_EMOJI[item.key]}</span>}
+                {/* label 直接取配置真值（全站 Tab 暂未入语言包，第二阶段统一登记 i18n） */}
+                {item.label}
+              </button>
+            ))}
+          </div>
+        )}
 
-      {tab === 'delivery' && (
-        <div className="apf-feed-list">
-          {HOME_DELIVERY_SEARCH_STORES.map((store) => (
-            <DeliveryStoreCard key={store.key} store={store} onOpenStore={onOpenStore} />
-          ))}
-        </div>
-      )}
-      {tab === 'groupbuy' && (
-        <div className="apq-feed">
-          {PREFERRED_SEARCH_MERCHANTS.map((item) => (
-            <PreferredMerchantCard key={item.key} item={item} layout="small" brand="bee" />
-          ))}
-        </div>
-      )}
-      {tab !== 'delivery' && tab !== 'groupbuy' && (
-        <div className="apcs-empty">
-          <span className="apcs-empty-ico" aria-hidden="true">🚧</span>
-          <b>「{config.tabs.find((item) => item.key === tab)?.label ?? ''}」瀑布流還未實現</b>
-          <p>該分類瀑布流規劃中，先切到「外賣」或「團購」看看吧</p>
-        </div>
-      )}
-    </div>
-  )
+        {feed === 'delivery' && (
+          <div className="apf-feed-list">
+            {/* 双 APP 瀑布流刻意分叉：閃蜂=DeliveryStoreCard / MFOOD=MfoodDeliveryStoreCard（勁爆券皮），数据各自同源 */}
+            {brand === 'mfood'
+              ? MFOOD_SEARCH_STORES.map((store) => (
+                  <MfoodDeliveryStoreCard key={store.key} store={store} />
+                ))
+              : HOME_DELIVERY_SEARCH_STORES.map((store) => (
+                  <DeliveryStoreCard key={store.key} store={store} onOpenStore={onOpenStore} />
+                ))}
+          </div>
+        )}
+        {feed === 'groupbuy' && (
+          <div className="apq-feed">
+            {/* 團購瀑布流=優選商家/附近好店同構卡：閃蜂=優選商家（神會員标）/ MFOOD=附近好店（勐爆券标） */}
+            {(brand === 'mfood' ? MFOOD_NEAR_SEARCH_STORES : PREFERRED_SEARCH_MERCHANTS).map((item) => (
+              <PreferredMerchantCard key={item.key} item={item} layout="small" brand={brand === 'mfood' ? 'mfood' : 'bee'} />
+            ))}
+          </div>
+        )}
+        {withTabs && feed !== 'delivery' && feed !== 'groupbuy' && (
+          <div className="apcs-empty">
+            <span className="apcs-empty-ico" aria-hidden="true">🚧</span>
+            <b>「{config.tabs.find((item) => item.key === tab)?.label ?? ''}」瀑布流還未實現</b>
+            <p>該分類瀑布流規劃中，先切到「外賣」或「團購」看看吧</p>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="apcs" role="dialog" aria-modal="true" aria-label={t('appConsumer.search.dialogLabel', { defaultValue: '搜尋' })}>
@@ -772,7 +791,7 @@ export default function ConsumerSearch({
           </div>
         )}
 
-        {showResults && (scope === 'global' ? renderGlobalWaterfall() : (
+        {showResults && (scope === 'global' ? renderWaterfall(true) : (scope === 'delivery' || scope === 'groupbuy') ? renderWaterfall(false) : (
           <div className="apcs-results">
             <div className="apcs-summary">
               <span>{t('appConsumer.search.resultSummary', { count: results.length, defaultValue: '為你找到 {{count}} 個結果' })}</span>

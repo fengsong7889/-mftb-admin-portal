@@ -22,8 +22,8 @@ export interface SpecEntry {
   note?: string
 }
 
-/** 说明面板 key（deliveryPage=美食外卖频道页，与首页外卖瀑布流共用 DELIVERY_SPECS 内容；searchDelivery/searchGroup=首页搜索结果瀑布流三级：外卖/团购） */
-export type SpecPanelKey = 'groupBuy' | 'delivery' | 'preferred' | 'groupPage' | 'filter' | 'deliveryPage' | 'searchDelivery' | 'searchGroup'
+/** 说明面板 key（deliveryPage=美食外卖频道页，与首页外卖瀑布流共用 DELIVERY_SPECS 内容；searchDelivery/searchGroup=首页搜索结果瀑布流三级：外卖/团购；searchDeliveryPage/searchGroupPage=频道内搜索结果瀑布流） */
+export type SpecPanelKey = 'groupBuy' | 'delivery' | 'preferred' | 'groupPage' | 'filter' | 'deliveryPage' | 'searchDelivery' | 'searchGroup' | 'searchDeliveryPage' | 'searchGroupPage'
 
 export interface SpecPanel {
   key: SpecPanelKey
@@ -151,7 +151,9 @@ export const SPEC_PANELS: SpecPanel[] = [
   { key: 'groupPage', group: '特惠团购页', label: '推荐/其它', defaults: GROUPBUY_SPECS, version: 6, anchor: 'groupBuy' },
   { key: 'preferred', group: '特惠团购页', label: '優選商家/附近門店', defaults: PREFERRED_SPECS, version: 31 },
   { key: 'filter', group: '特惠团购页', label: '篩選', defaults: FILTER_SPECS, version: 5 },
+  { key: 'searchGroupPage', group: '特惠团购页', label: '搜索结果瀑布流', defaults: [...PREFERRED_SPECS, ...SEARCH_GROUP_SPECS], version: 1, anchor: 'preferred' },
   { key: 'deliveryPage', group: '美食外卖页', label: '美食外卖瀑布流', defaults: DELIVERY_SPECS, version: 12, anchor: 'delivery', title: '美食外卖瀑布流·展示字段及标签说明' },
+  { key: 'searchDeliveryPage', group: '美食外卖页', label: '搜索结果瀑布流', defaults: [...DELIVERY_SPECS, ...SEARCH_DELIVERY_SPECS], version: 1, anchor: 'delivery' },
 ]
 
 /** 旧导出名兼容（团购默认规范，历史消费方） */
@@ -166,6 +168,8 @@ function storageKey(panel: SpecPanelKey) {
   if (panel === 'deliveryPage') return 'app-preview:delivery-page-specs'
   if (panel === 'searchDelivery') return 'app-preview:search-delivery-specs'
   if (panel === 'searchGroup') return 'app-preview:search-group-specs'
+  if (panel === 'searchDeliveryPage') return 'app-preview:search-delivery-page-specs'
+  if (panel === 'searchGroupPage') return 'app-preview:search-group-page-specs'
   return panel === 'groupBuy' ? 'app-preview:group-buy-specs' : 'app-preview:delivery-specs'
 }
 

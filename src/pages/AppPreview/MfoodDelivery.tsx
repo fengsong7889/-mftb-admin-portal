@@ -31,7 +31,7 @@ import friedChickenImg from '@/assets/consumer-home/friedchicken.jpg'
 import fishPotImg from '@/assets/consumer-home/fishpot.jpg'
 import lemonTeaImg from '@/assets/consumer-home/lemontea.jpg'
 import bbqImg from '@/assets/consumer-home/bbq.jpg'
-import { MFOOD_STORES } from './MfoodHome'
+import { MFOOD_STORES } from './consumerMfoodFeed'
 import MfoodDeliveryStoreCard from './MfoodDeliveryStoreCard'
 import MfoodDeliveryLargeCard from './MfoodDeliveryLargeCard'
 

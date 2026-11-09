@@ -82,6 +82,8 @@ function DualView() {
     deliveryPage: loadSpecs('deliveryPage'),
     searchDelivery: loadSpecs('searchDelivery'),
     searchGroup: loadSpecs('searchGroup'),
+    searchDeliveryPage: loadSpecs('searchDeliveryPage'),
+    searchGroupPage: loadSpecs('searchGroupPage'),
   }))
   const [editId, setEditId] = useState<number | null>(null)
   /** 外卖瀑布流展示模式：小图（一行一店，原「列表」）/ 卡片（一行两店）/ 大图（顶部大图封面，閃蜂/MFOOD 均实现）；说明面板切换器下发，两台手机同步 */
@@ -94,15 +96,18 @@ function DualView() {
   const specs = specsByPanel[panelKey]
 
   /** 面板 → 手机壳同步命令：首页两类回首页切分类；特惠团购页进团购页切页签（filter 只进页不改页签——筛选栏跨页签共享）；
-   *  delivery-page → 閃蜂进美食外賣频道页（MFOOD 无对应页，回落 home，MfoodHome 会忽略未知分类）；
-   *  search-delivery / search-group → 閃蜂打开搜索结果页并切到对应瀑布流（MFOOD 无搜索功能，未知命令在壳内被忽略） */
+   *  delivery-page → 双壳进美食外賣频道页；
+   *  search-delivery / search-group → 双壳打开首页搜索结果页并切到对应瀑布流（频道内搜索会被替换为首页搜索，保证与面板口径对应）；
+   *  delivery-search / groupbuy-search → 双壳进入对应频道内搜索结果页瀑布流（美食外卖页/特惠团购页·搜索结果瀑布流面板） */
   const SYNC_BY_PANEL: Record<SpecPanelKey, string> = {
     groupBuy: 'group',
     delivery: 'delivery',
     groupPage: 'page-group',
     preferred: 'preferred',
     filter: 'filter',
+    searchGroupPage: 'groupbuy-search',
     deliveryPage: 'delivery-page',
+    searchDeliveryPage: 'delivery-search',
     searchDelivery: 'search-delivery',
     searchGroup: 'search-group',
   }

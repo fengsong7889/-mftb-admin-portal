@@ -27,7 +27,9 @@ import fishPotImg from '@/assets/consumer-home/fishpot.jpg'
 import lemonTeaImg from '@/assets/consumer-home/lemontea.jpg'
 import GroupBuyFeedCard from './GroupBuyFeedCard'
 import { FEED } from './MfoodGroupFeed'
-import PreferredMerchantCard, { type PreferredMerchant } from './PreferredMerchantCard'
+/* 附近好店数据抽至 consumerMfoodFeed.ts：搜索结果页「團購」分类复用同款小图瀑布流（别名保持既有引用不变） */
+import { MFOOD_NEAR_STORES as NEAR_STORES } from './consumerMfoodFeed'
+import PreferredMerchantCard from './PreferredMerchantCard'
 import { useGroupBuyFilters } from './GroupBuyFilterBar'
 
 /** 定位（占位数据） */
@@ -91,13 +93,7 @@ const ROUND_TABS = [
 /** 附近好店页签下标（唯一渲染優選商家同款卡的页签） */
 const TAB_NEAR = 5
 
-/** 附近好店瀑布流（優選商家同款卡 · MFOOD 品牌，红包标渲染为「勐爆券」；占位数据，封面用现有贴图占位） */
-const NEAR_STORES: PreferredMerchant[] = [
-  { key: 'ns1', name: '澳門燒味工房🔥-新橋店', rating: '4.7', perPerson: '$58/人', cateArea: '燒臘·新橋商圈', dist: '180m', logoText: '燒味', logoTone: 'orange', isNew: true, cover: friedChickenImg, sales: '半年售800+', coupons: [{ icon: '券', price: '60', discount: '6折', name: '燒味雙拚優惠券' }, { icon: '惠', price: '30', discount: '8折', name: '午市快閃券' }] },
-  { key: 'ns2', name: '金沙砂鍋粥🍜-提督店', rating: '4.5', perPerson: '$45/人', cateArea: '粥麵·提督商圈', dist: '420m', logoText: '金沙', logoTone: 'red', cover: fishPotImg, inflate: '最高膨脹至$25', sales: '半年售1200+', coupons: [{ icon: '券', price: '45', discount: '6.5折', name: '砂鍋粥雙人券' }] },
-  { key: 'ns3', name: '麥記漢堡包🍔-關閘店', rating: '4.4', perPerson: '$38/人', cateArea: '快餐·關閘商圈', dist: '1.1km', logoText: '麥記', logoTone: 'blue', cover: burgerImg, sales: '半年售300+', couponPrefix: 'newbie', coupons: [{ icon: '秒', price: '25', discount: '5折', name: '早晨套餐秒殺券' }, { icon: '惠', price: '15', discount: '8.8折', name: '下午茶優惠' }] },
-  { key: 'ns4', name: '檸檬屋茶飲🍋-下環店', rating: '4.6', perPerson: '$22/人', cateArea: '茶飲·下環商圈', dist: '860m', logoText: '檸檬', logoTone: 'green', cover: lemonTeaImg, inflate: '最高膨脹至$12', sales: '半年售2600+', coupons: [{ icon: '惠', price: '12', discount: '9折', name: '凍飲第二杯半價' }] },
-]
+/** 附近好店瀑布流（優選商家同款卡 · MFOOD 品牌，红包标渲染为「勐爆券」；数据真源在 consumerMfoodFeed.ts） */
 
 /** 瀑布流团购券：数据与首页「特價團購」瀑布流完全一致（复用 MfoodHome.FEED 唯一真源，紫色搶購态同首页） */
 

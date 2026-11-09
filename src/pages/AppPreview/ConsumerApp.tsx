@@ -91,8 +91,18 @@ export default function ConsumerApp({ onCategoryChange, syncCategory, syncSeq, d
       } else if (syncCategory === 'delivery-page') {
         if (nav.current.key !== 'delivery') nav.push({ key: 'delivery' })
       } else if (syncCategory === 'search-delivery' || syncCategory === 'search-group') {
-        /* 搜索结果瀑布流说明面板（三级 外卖/团购）：打开搜索结果页；壳内分类由 ConsumerSearch 按 syncFeed 切换 */
-        if (nav.current.key !== 'search') nav.push({ key: 'search', scope: 'global', keyword: '火鍋' })
+        /* 搜索结果瀑布流说明面板（三级 外卖/团购）：面板描述的是首页搜索瀑布流，
+           未进入搜索或正停在频道内搜索时统一进入/替换为首页搜索，保证双机与面板口径对应；
+           壳内瀑布流分类由 ConsumerSearch 按 syncFeed 切换（MFOOD 壳同口径处理） */
+        if (nav.current.key !== 'search' || nav.current.scope !== 'global') {
+          nav.push({ key: 'search', scope: 'global', keyword: '火鍋' })
+        }
+      } else if (syncCategory === 'delivery-search' || syncCategory === 'groupbuy-search') {
+        /* 美食外卖页/特惠团购页·搜索结果瀑布流面板：进入对应频道内搜索（带关键词直达结果页瀑布流，无分类 Tab） */
+        const wantScope = syncCategory === 'delivery-search' ? 'delivery' : 'groupbuy'
+        if (nav.current.key !== 'search' || nav.current.scope !== wantScope) {
+          nav.push({ key: 'search', scope: wantScope, keyword: '火鍋' })
+        }
       } else if ((syncCategory === 'group' || syncCategory === 'delivery') && nav.current.key !== 'home') {
         nav.reset(ROOT.home)
       }
