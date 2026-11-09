@@ -120,6 +120,10 @@ export interface MfoodStore {
   preorderTime?: string
   /** 人氣商家皮膚（缺省=普通門店卡） */
   hotSkin?: MfoodHotSkin
+  /** 超出配送範圍（搜索結果頁展示態，同閃蜂口径）：門店 LOGO 蒙暗色阴影 + 叠「超出範圍」白膠囊；不顯示配送類型角标，點擊不進店 */
+  outOfRange?: boolean
+  /** 未入駐商家（搜索結果頁展示態，同閃蜂口径）：評分顯示「暫無」，不展示月售/標籤/紅包區/配送類型角标，點擊不進店；整卡锚点 id23 */
+  notJoined?: boolean
 }
 
 const MEMBER_STYLE: Record<MfoodMemberTag['kind'], string> = {
@@ -161,7 +165,7 @@ export default function MfoodDeliveryStoreCard({
     <div
       className={`apw-card${isHotLarge ? ' is-hot-large' : ''}${smallSkin ? ' is-hot-small' : ''}`}
       style={smallSkin ? { border: `2px solid ${smallSkin.borderColor}`, background: smallSkin.gradientCss } : undefined}
-      onClick={() => onOpenStore?.(store.merchantId)}
+      onClick={() => { if (!store.outOfRange && !store.notJoined) onOpenStore?.(store.merchantId) }}
     >
       {/* 減配角标：卡片右上角（仅有減配区间时展示；免配送費不标角标，图2口径） */}
       {store.deliveryDiscount && (
@@ -196,6 +200,13 @@ export default function MfoodDeliveryStoreCard({
           <div className="apw-card-img">
             <BrandCover seed={store.key} name={store.name} />
             {store.isNew && <SpecField panel="delivery" id={2}><span className="apw-new-tag">新店</span></SpecField>}
+            {/* 超出配送範圍（同閃蜂口径）：LOGO 蒙暗色阴影，「超出範圍」白膠囊寫在阴影上（锚点 id22） */}
+            {store.outOfRange && <span className="apw-logo-shade" aria-hidden="true" />}
+            {store.outOfRange && (
+              <SpecField panel="delivery" id={22}>
+                <span className="apw-logo-badge">超出範圍</span>
+              </SpecField>
+            )}
           </div>
         </SpecField>
       )}
@@ -244,19 +255,30 @@ export default function MfoodDeliveryStoreCard({
 
         {/* 评分 id=4 + 月售 id=5（大圖模式不展示）；右侧堆叠：準時寶 id=6 + 配送类型 id=14（mFood送/自送/自取x折/支持自取） */}
         <div className="apw-row-rating">
-          {/* 评分锚点 id=4 连同 ★ 一并包裹（星为锚内子元素，悬停说明行星+分数整体描边） */}
-          <SpecField panel="delivery" id={4}><b className="apw-rating"><span className="apw-star" aria-hidden="true">★</span>{store.rating}</b></SpecField>
-          {!isHotLarge && <SpecField panel="delivery" id={5}><span className="apw-sales">月售 {store.monthlySales}</span></SpecField>}
-          <span className="apw-rating-side">
-            {store.punctual && <SpecField panel="delivery" id={6}><span className="apw-punctual">準時寶</span></SpecField>}
-            <SpecField panel="delivery" id={14}>
-              <span className="apw-delivery-type">
-                {store.deliveryType === 'pickup'
-                  ? (store.pickupDiscount ? `自取${store.pickupDiscount}` : '支持自取')
-                  : store.deliveryType === 'self' ? '自送' : 'mFood送'}
-              </span>
+          {/* 评分锚点 id=4 连同 ★ 一并包裹；未入駐商家無平台評分，顯示「暫無」灰字（同閃蜂口径） */}
+          {store.notJoined ? (
+            <SpecField panel="delivery" id={4}>
+              <b className="apw-rating apw-rating--none"><span className="apw-star" aria-hidden="true">★</span>暫無</b>
             </SpecField>
-          </span>
+          ) : (
+            <>
+              <SpecField panel="delivery" id={4}><b className="apw-rating"><span className="apw-star" aria-hidden="true">★</span>{store.rating}</b></SpecField>
+              {!isHotLarge && <SpecField panel="delivery" id={5}><span className="apw-sales">月售 {store.monthlySales}</span></SpecField>}
+            </>
+          )}
+          {/* 配送类型（mFood送/自送/自取）：超出範圍與未入駐商家當前不可配送，角标不顯示 */}
+          {!store.notJoined && !store.outOfRange && (
+            <span className="apw-rating-side">
+              {store.punctual && <SpecField panel="delivery" id={6}><span className="apw-punctual">準時寶</span></SpecField>}
+              <SpecField panel="delivery" id={14}>
+                <span className="apw-delivery-type">
+                  {store.deliveryType === 'pickup'
+                    ? (store.pickupDiscount ? `自取${store.pickupDiscount}` : '支持自取')
+                    : store.deliveryType === 'self' ? '自送' : 'mFood送'}
+                </span>
+              </SpecField>
+            </span>
+          )}
         </div>
 
         {/* 信息三列 id=7/8：起送 / 配送（免配送費橙字且互斥，減配显示区间+右上角标）/ 时间·距離（时间+距离整格共用锚点 id 8；自取折扣已移至配送类型标签） */}
@@ -287,8 +309,8 @@ export default function MfoodDeliveryStoreCard({
           </div>
         </div>
 
-        {/* 广告标签 id=11 */}
-        {store.tags.length > 0 && (
+        {/* 广告标签 id=11（未入駐商家無平台標籤數據，不展示） */}
+        {!store.notJoined && store.tags.length > 0 && (
           <SpecField panel="delivery" id={11}>
             <div className="apw-row-tags">
               {store.tags.map((tag) => (
@@ -298,8 +320,8 @@ export default function MfoodDeliveryStoreCard({
           </SpecField>
         )}
 
-        {/* 红包区（id16 勁爆券/神會員 / id12 券行 / id17 其它）：与列表/大图模式共用组件 */}
-        <MfoodMemberBlock store={store} />
+        {/* 红包区（id16 勁爆券/神會員 / id12 券行 / id17 其它）：与列表/大图模式共用组件；未入駐商家無紅包數據，整區不渲染 */}
+        {!store.notJoined && <MfoodMemberBlock store={store} />}
 
         {/* 人氣商家大圖模式：1大2小商品拼列（首項主推：折扣角標+價格條+菜名） */}
         {isHotLarge && hot?.dishes && hot.dishes.length > 0 && (
