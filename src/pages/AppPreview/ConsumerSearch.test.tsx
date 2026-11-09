@@ -82,16 +82,42 @@ describe('用户端统一搜索页', () => {
     expect(screen.getByText('毛氏海鮮火鍋飯店（湘粵融合菜）')).toBeInTheDocument()
   })
 
-  it('外卖搜不到超市商品时，提供「在全站搜尋」出口', async () => {
+  it('外卖频道搜索结果=首页搜索结果页外卖瀑布流，且无分类切换 Tab（频道内搜索口径）', async () => {
     const user = userEvent.setup()
     const onSearchGlobal = vi.fn()
     render(<ConsumerSearch scope="delivery" onBack={noop} onSearchGlobal={onSearchGlobal} />)
 
     await user.type(screen.getByPlaceholderText('搜尋外賣商家、商品'), '紙巾{Enter}')
 
-    expect(screen.getByText('沒有找到與「紙巾」相關的結果')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: '在全站搜尋「紙巾」' }))
-    expect(onSearchGlobal).toHaveBeenCalledWith('紙巾')
+    // 瀑布流与首页搜索结果页同款（含超出范围/未入驻样例）；频道内搜索不展示分类 Tab，也不再有跨域空态出口
+    expect(screen.getByText('毛氏海鮮火鍋飯店（湘粵融合菜）')).toBeInTheDocument()
+    expect(screen.getByText('燒鵝仔餐廳（路環店）')).toBeInTheDocument()
+    expect(screen.getByText('小貝廚房（關閘店）')).toBeInTheDocument()
+    expect(screen.queryAllByRole('tab')).toHaveLength(0)
+    expect(screen.queryByRole('button', { name: /在全站搜尋/ })).not.toBeInTheDocument()
+    expect(onSearchGlobal).not.toHaveBeenCalled()
+  })
+
+  it('团购频道搜索结果=首页搜索结果页团购瀑布流（優選商家卡），同样无分类 Tab', async () => {
+    const user = userEvent.setup()
+    render(<ConsumerSearch scope="groupbuy" onBack={noop} />)
+
+    await user.type(screen.getByPlaceholderText('搜尋團購套餐、商家'), '火鍋{Enter}')
+
+    expect(screen.getByText('翡翠茶餐廳🏆-關閘店（🔥全澳…')).toBeInTheDocument()
+    expect(screen.getByText('10:00 營業')).toBeInTheDocument()
+    expect(screen.queryAllByRole('tab')).toHaveLength(0)
+  })
+
+  it('超市频道保留列表版式：分类 Tab/摘要与商品卡（含关键词高亮）', async () => {
+    const user = userEvent.setup()
+    render(<ConsumerSearch scope="market" onBack={noop} />)
+
+    await user.type(screen.getByPlaceholderText('搜尋超市商品、商家'), '紙巾{Enter}')
+
+    expect(screen.getAllByText(/紙巾/).length).toBeGreaterThan(0)
+    expect(screen.getByText(/為你找到/)).toBeInTheDocument()
+    expect(screen.getAllByRole('tab').length).toBeGreaterThan(0)
   })
 
   it('店内搜索标明本店范围，加购回传的是本店商品', async () => {
@@ -173,17 +199,17 @@ describe('用户端统一搜索页', () => {
     expect(screen.queryByText(/沒有找到與/)).not.toBeInTheDocument()
   })
 
-  it('超出配送范围的命中置灰并归入独立分组（频道内列表版式保留）', async () => {
+  it('超出配送范围的命中置灰并归入独立分组（超市频道列表版式回归锁）', async () => {
     const user = userEvent.setup()
-    render(<ConsumerSearch scope="groupbuy" onBack={noop} />)
+    render(<ConsumerSearch scope="market" onBack={noop} />)
 
-    fireEvent.change(screen.getByPlaceholderText('搜尋團購套餐、商家'), { target: { value: '自助餐' } })
+    fireEvent.change(screen.getByPlaceholderText('搜尋超市商品、商家'), { target: { value: '遠倉' } })
     await user.click(screen.getByRole('button', { name: '搜索' }))
 
     expect(screen.getByText('超出當前配送範圍')).toBeInTheDocument()
     const farCard = screen
       .getAllByRole('button')
-      .find((btn) => btn.className.includes('apcs-merchant') && btn.textContent?.includes('澳門銀河自助餐'))
+      .find((btn) => btn.className.includes('apcs-merchant') && btn.textContent?.includes('橫琴遠倉超市'))
     expect(farCard?.className).toContain('is-far')
     expect(farCard?.textContent).toContain('超出範圍')
   })
@@ -195,5 +221,26 @@ describe('用户端统一搜索页', () => {
 
     await user.click(screen.getByRole('button', { name: '返回' }))
     expect(onBack).toHaveBeenCalledTimes(1)
+  })
+
+  it('MFOOD 品牌搜索结果页：外卖=勁爆券皮门店卡、团购=附近好店卡（閃蜂同理复刻）', async () => {
+    const user = userEvent.setup()
+    render(<ConsumerSearch brand="mfood" scope="global" onBack={noop} />)
+
+    fireEvent.change(screen.getByPlaceholderText('搜尋商家、商品、團購'), { target: { value: '奶茶' } })
+    await user.click(screen.getByRole('button', { name: '搜索' }))
+
+    // 默认外賣瀑布流 = MFOOD 门店卡（基础门店，不含人气商家广告）+ 超出范围/未入驻样例
+    expect(screen.getByText('恆友魚蛋王（三盞燈總店）')).toBeInTheDocument()
+    expect(screen.queryByText(/洪馨椰子雪糕/)).not.toBeInTheDocument()
+    expect(screen.getByText('路環橋記咖啡（路環店）')).toBeInTheDocument()
+    expect(screen.getAllByText('超出範圍')).toHaveLength(1)
+    expect(screen.getByText(/暫無/)).toBeInTheDocument()
+
+    // 團購瀑布流 = 附近好店（勐爆券标）+ 超出范围/未入驻/开业时间三样例
+    await user.click(screen.getByRole('tab', { name: /團購/ }))
+    expect(screen.getByText('澳門燒味工房🔥-新橋店')).toBeInTheDocument()
+    expect(screen.getAllByText('勐爆券').length).toBeGreaterThan(0)
+    expect(screen.getByText('10:00 營業')).toBeInTheDocument()
   })
 })
