@@ -73,9 +73,18 @@ export const SEMANTIC_TOKENS = [
   'danger-callout', 'warning-deep', 'info-hover-tint',
   // success 深字档（与 warning-deep 同角色，补对称缺口；#389E0D 全站 16 处）
   'success-deep',
+  // AppPreview 用户端原型页的**舞台底**（`.ap-stage`，手机壳之外、不属于任何 APP 内容）
+  'stage-glow-from', 'stage-mid', 'stage-edge', 'stage-flat',
+  // 品牌渐变胶囊的渐变端点（并排标签 `.ap-dual-label` 与说明表品牌列共用；两档同值，理由见 TOKEN_VALUES）
+  'brand-pill-bee-from', 'brand-pill-bee-to', 'brand-pill-mfood-from', 'brand-pill-mfood-to',
+  // 壳外字段说明面板（`.ap-spec-*`）专用 slate/blue 一族：浅色严格等于站内字面量，深色按实测对比度取档
+  'spec-ink-strong', 'spec-ink', 'spec-ink-faint', 'spec-accent',
+  'spec-th-soft', 'spec-th-ink', 'spec-blue-border', 'spec-row-line',
+  'spec-field-soft', 'spec-row-soft', 'spec-divider-line',
+  'spec-note-soft', 'spec-note-border', 'spec-note-ink',
   // 阴影与描边补偿
   'shadow-1', 'shadow-2', 'shadow-3', 'shadow-card-soft',
-  'shadow-btn-hover', 'shadow-btn-active', 'shadow-popover',
+  'shadow-btn-hover', 'shadow-btn-active', 'shadow-popover', 'shadow-panel',
   'shadow-brand', 'card-outline',
 ]
 
@@ -381,6 +390,73 @@ export const TOKEN_VALUES = {
    */
   'text-hint': { light: '#999999', dark: '#8A8A8A' },
   'text-body': { light: '#666666', dark: '#A6A6A6' },
+  /*
+   * AppPreview 用户端原型页的**舞台底**（`.ap-stage`）。
+   *
+   * 它为什么算平台侧而不是壳内：`.ap-stage` 在 index.tsx 里渲染，是放手机壳与说明面板的
+   * 那一整页背景（DOM 层级判据，见 §卅二 / §35.3），**不属于任何模拟 APP 的内容配色**。
+   * 它原先不在审计的 PLATFORM_ROOTS 名单里，因此被归进「壳内应豁免」——
+   * 这就是 §32.3 警告的「`.ap-` 一把排除必然吃掉平台侧」的第一个实例：
+   * 不先把它拎出来就开豁免，深色下整页仍是 `#f4f6fb` 浅底，面板改成 `#1F1F1F` 后反而更刺眼。
+   *
+   * 深色三档取不透明实色而不是 rgba：渐变内部叠的是自身三档，rgba 档位会再混一层页面底，
+   * 结果不可预测。取值按「比面板底 `--surface-2`(#1F1F1F) 更暗」定，让面板在深色下仍然浮起；
+   * 顶端 `#241C14` 保留一点暖色，对应浅色的 #FFF3E6 品牌橙淡染。
+   * 四个值都**不进** COLOR_TO_TOKEN：它们只在渐变/简写串内部或平台页面底，入表只会增加永不命中的条目。
+   */
+  'stage-glow-from': { light: '#FFF3E6', dark: '#241C14' },
+  'stage-mid': { light: '#F4F6FB', dark: '#16181C' },
+  'stage-edge': { light: '#EEF1F7', dark: '#121417' },
+  // 真机铺满态（@media max-width:480px）的平面底，深色对齐 --surface-1
+  'stage-flat': { light: '#F5F6F8', dark: '#141414' },
+  /*
+   * 品牌渐变胶囊的两个端点（閃蜂黄 / mFood 橙），**浅深同值**。
+   *
+   * 为什么不随主题翻面：它们是品牌资产（与 BrandTag / --brand 同一口径），
+   * 原型页的交付价值就是像素级还原真实产品；翻面会把「閃蜂的黄」变成不认识的颜色。
+   * 前景统一用 `--on-brand-pill`（深字 #141414），实测四个端点上 4.86~11.30 全部达 AA，
+   * 所以不需要深色档来救对比度。
+   * ⚠ 这四个值与 `BrandTag.tsx` 的真值端点（#FFB300/#FB8C00、#FF7A45/#F5680C）**不同**：
+   *   收敛到一套会改原型浅色观感，属品牌观感决策，已登记为待确认项，不在这里顺手改。
+   */
+  'brand-pill-bee-from': { light: '#FFC107', dark: '#FFC107' },
+  'brand-pill-bee-to': { light: '#FF9800', dark: '#FF9800' },
+  'brand-pill-mfood-from': { light: '#FF6B35', dark: '#FF6B35' },
+  'brand-pill-mfood-to': { light: '#E65100', dark: '#E65100' },
+  /*
+   * 壳外字段说明面板（`.ap-spec-panel`）专用一族 —— 深色下的大片白斑就在这里。
+   *
+   * 为什么必须成族而不是收敛到现有令牌：面板用的是一整套 Tailwind slate/blue 体系，
+   * 站内没有任何等值令牌（实测 #1E293B/#DBEAFE/#93C5FD/#F1F5F9/#EFF6FF/#F0F9FF/#F8FAFC…
+   * 在 TOKEN_VALUES 里全部 0 命中），而「替换不得改变浅色观感」是硬约束
+   * （`--header-text` 已为同一件事定过口径：单独建令牌而不是收敛到 --text-1）。
+   *
+   * 浅色值逐个等于站内字面量；深色值全部实测（`contrastRatio` + rgba 先合成到实际背板）：
+   *   ink-strong #E8E8E8 on #1F1F1F = **13.4525**，on 行 hover 合成底 #222D35 = 11.4659
+   *   ink       #B0B0B0 on #1F1F1F = **7.6003**，on #222D35 = 6.4779，on 输入框合成底 #23303A = 6.2257
+   *   ink-faint #8C8C8C on #1F1F1F = **4.9017**（说明脚注 9px，只卡 AA 下限）
+   *   accent    #40A9FF on #1F1F1F = **6.5439**
+   *   th-ink    #85A5FF on 表头合成底 #253847 = **5.0846**
+   *   note-ink  #FFA940 on 提示底合成 #3E2E1E = **6.8146**
+   * ⚠ 浅色侧两处**存量欠标**不是本轮引入，令牌化不顺手修它（那会改观感），单测按存量卡下限：
+   *   `#3B82F6` on 白 = 3.6779（§33.3 已登记），`#94A3B8` on 白 = 2.5640（本轮新登）。
+   * 全部不进 COLOR_TO_TOKEN：它们是「这个面板的这些角色」，不是站内通用色语义；
+   * 入表会让 codemod 把无关站点的 #3B82F6/#93C5FD 换成面板专用名，语义错得更隐蔽。
+   */
+  'spec-ink-strong': { light: '#1E293B', dark: '#E8E8E8' },
+  'spec-ink': { light: '#475569', dark: '#B0B0B0' },
+  'spec-ink-faint': { light: '#94A3B8', dark: '#8C8C8C' },
+  'spec-accent': { light: '#3B82F6', dark: '#40A9FF' },
+  'spec-th-soft': { light: '#DBEAFE', dark: 'rgba(64,169,255,0.18)' },
+  'spec-th-ink': { light: '#1E40AF', dark: '#85A5FF' },
+  'spec-blue-border': { light: '#93C5FD', dark: 'rgba(64,169,255,0.32)' },
+  'spec-row-line': { light: '#F1F5F9', dark: '#303030' },
+  'spec-field-soft': { light: '#EFF6FF', dark: 'rgba(64,169,255,0.12)' },
+  'spec-row-soft': { light: '#F0F9FF', dark: 'rgba(64,169,255,0.10)' },
+  'spec-divider-line': { light: '#E2E8F0', dark: '#424242' },
+  'spec-note-soft': { light: '#FFF7ED', dark: 'rgba(250,140,22,0.14)' },
+  'spec-note-border': { light: '#FED7AA', dark: 'rgba(250,160,61,0.32)' },
+  'spec-note-ink': { light: '#C2410C', dark: '#FFA940' },
   // 组件层
   'sidebar-bg': { light: '#1E1E1E', dark: '#1A1A1A' },
   'sidebar-item-color': { light: '#B0B0B0', dark: '#A6A6A6' },
@@ -426,6 +502,13 @@ export const NON_COLOR_TOKENS = {
   'shadow-btn-hover': { light: '0 2px 6px rgba(0,0,0,0.1)', dark: '0 2px 6px rgba(0,0,0,0.5)' },
   'shadow-btn-active': { light: '0 4px 12px rgba(0,0,0,0.12)', dark: '0 4px 12px rgba(0,0,0,0.6)' },
   'shadow-popover': { light: '0 6px 24px rgba(0,0,0,0.12)', dark: '0 6px 24px rgba(0,0,0,0.65)' },
+  /*
+   * 说明面板的大软阴影（`0 4px 24px rgba(0,0,0,0.08)`，站内仅此 1 处）。
+   * 不并进 shadow-3（`0 8px 24px rgba(0,0,0,0.1)`）：那会改浅色观感，而严格等值是收录前提。
+   * 深色下黑色 rgba 几乎不可见，但面板底 `--surface-2` 已经比舞台底（--stage-*，#12~#24）亮一档，
+   * 层次由色阶建立；这里仍给出加深的阴影，是为了不让它成为「深色下没有层次」的那个位置。
+   */
+  'shadow-panel': { light: '0 4px 24px rgba(0,0,0,0.08)', dark: '0 4px 24px rgba(0,0,0,0.6)' },
   'shadow-brand': { light: '0 2px 4px rgba(232,114,12,0.25)', dark: '0 2px 6px rgba(232,114,12,0.35)' },
   /*
    * 描边补偿。必须写成 **可叠加的 box-shadow 形式**，不能写成 `1px solid ...` 的 border 简写：
@@ -627,6 +710,33 @@ export const EXCLUDE_SELECTOR_PREFIXES = [
   // 以前把整个 Portal/index.css 归入目录排除，结果连卡片底/描边/文字也无法令牌化（深色下满屏白斑）；
   // 改为只排除 `[data-scene=` 块，其余段正常令牌化，并由 SCENE_COLOR_BASELINE 守住 scene 色没被误改。
   '[data-scene=',
+  /*
+   * AppPreview 模拟手机原型的内容配色（方案 §卅二 / §35.3）。
+   *
+   * 语义：手机壳里跑的是「被展示的 APP」（閃蜂 / mFood / 商家端），它自己的配色不能跟随平台主题
+   * 翻面，否则原型预览失真——这与 PhoneFrame.tsx / BrandLogo.tsx 进 EXCLUDE_PATHS 是同一条决策的
+   * CSS 侧延伸。排除前先跑审计脚本按 DOM 层级分类，不要凭类名猜（实测 `.apg-panel` 像平台实为壳内）。
+   *
+   * ⚠ 这些前缀只能覆盖 appPreview 命名空间：已用全仓 CSS 比对过 1016 个类名零碰撞，
+   *   但必须配合下面的「平台侧优先」判定—— `.ap-` 这一段同时出现在壳外 chrome 上。
+   */
+  '.apc-', '.apf-', '.apm-', '.apw-', '.apd-', '.apg-', '.apmk-', '.apcs', '.apst-',
+  '.apdl-', '.apq-', '.apmf-', '.ap-',
+]
+
+/**
+ * AppPreview 壳外平台侧选择器根。**优先级高于排除区**。
+ *
+ * 为什么需要这一层：`isExcludedSelector` 用子串包含（复合选择器 `.a .b` 只要有一环在排除区就该跳过），
+ * 而 `.ap-` 这个片段同时属于设备外壳/模拟 APP 内容（`.ap-phone`、`.ap-btn`）**和壳外平台 chrome**
+ * （`.ap-spec-panel`、`.ap-stage`）。直接把 `.ap-` 加进排除清单会连说明面板一起豁免，
+ * 深色下白斑复活而棘轮完全不报错——这正是 §32.3 当年否决「10 个前缀一把排除」的理由。
+ *
+ * 名单与 `scripts/audit-app-preview-hex.py` 的 PLATFORM_ROOTS 必须一致，
+ * 单测跨文件比对钉住它（两脸孔各自演化过一次，靠人记是记不住的）。
+ */
+export const APP_PREVIEW_PLATFORM_ROOTS = [
+  '.ap-spec-', '.ap-dual-', '.ap-stage', '.ap-exit', '.ap-preview-', '.ap-page', '.ap-toolbar',
 ]
 
 /**
@@ -662,9 +772,13 @@ export const SCENE_COLOR_BASELINE = {
  * 当前规则块的选择器是否属于排除区。
  * 用子串包含而不是前缀匹配：实际选择器多为 `.login-locale-corner .ant-select-selector` 这种复合形式，
  * 只要链上任一环落在排除区，整条规则就不该被令牌化。
+ *
+ * 但 AppPreview 的壳外平台侧必须**反向优先**：命中平台根就直接判为不排除，
+ * 否则 `.ap-` 会把 `.ap-spec-panel` / `.ap-stage` 一并吞掉（见 APP_PREVIEW_PLATFORM_ROOTS）。
  */
 export function isExcludedSelector(selectorText) {
   const s = String(selectorText)
+  if (APP_PREVIEW_PLATFORM_ROOTS.some((root) => s.includes(root))) return false
   return EXCLUDE_SELECTOR_PREFIXES.some((prefix) => s.includes(prefix))
 }
 
@@ -786,6 +900,36 @@ export function contrastRatio(foreground, background) {
   if (a === null || b === null) return null
   const [hi, lo] = a >= b ? [a, b] : [b, a]
   return (hi + 0.05) / (lo + 0.05)
+}
+
+/**
+ * 把带 alpha 的 tint 合成到不透明背板，得到实际渲染色（`#rrggbb`）。
+ *
+ * 为什么需要它：`contrastRatio` 不处理 alpha（传 rgba 直接返回 null），
+ * 而深色档凡是叠加型（`-soft` / `-border` / 玻璃族）全是 rgba——
+ * 不先合成就算不出对比度，手算又会踩「tint 表达式写错静默得 NaN」那个坑。
+ * 本函数是**唯一实现**：单测里原先有三份各自写过的同一算法（补充阶 / 玻璃族 / §35.3 说明面板），
+ * 重复实现早晚与真源分叉，新断言一律改用这里。
+ *
+ * 合成公式是 `tint×alpha + 背板×(1-alpha)`；写反会得到「深底变亮绿」这种荒谬值（方案 §16.4 实踩）。
+ * tint 不带 alpha 时按不透明处理；任一通道算出非有限值或越界直接抛错，不静默返回垃圾。
+ */
+export function compositeOnto(tint, base) {
+  const t = String(tint).match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+))?\s*\)/)
+  const b = normalizeHex(base)
+  if (!t || !b) throw new Error(`compositeOnto 入参非法：tint=${tint} base=${base}`)
+  const alpha = t[4] === undefined ? 1 : Number(t[4])
+  const bg = parseInt(b.hex, 16)
+  const channels = [1, 2, 3].map((i) => {
+    const top = Number(t[i])
+    const bottom = (bg >> ((3 - i) * 8)) & 255
+    const v = Math.round(top * alpha + bottom * (1 - alpha))
+    if (!Number.isFinite(v) || v < 0 || v > 255) {
+      throw new Error(`合成出非法通道值 ${v}（tint=${tint} base=${base}）`)
+    }
+    return v.toString(16).padStart(2, '0')
+  })
+  return `#${channels.join('')}`
 }
 
 /**

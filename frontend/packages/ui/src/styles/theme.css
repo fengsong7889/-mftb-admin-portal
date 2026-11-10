@@ -15,7 +15,7 @@
  * 改颜色的正确流程：改 TOKEN_VALUES（浅色值 + 深色值 + 实测对比度）→ 跑生成脚本 → 跑门禁。
  * 深色取值规则与实测依据：docs/design/深浅色主题切换_可落地实施方案_2026-11-03.md §4.3 / §4.5 / §4.6
  *
- * 令牌共 81 个：语义层 + 组件层（--sidebar-*）+ 阴影/描边补偿。
+ * 令牌共 104 个：语义层 + 组件层（--sidebar-*）+ 阴影/描边补偿。
  * 业务代码只允许引用语义层；--sidebar-* 属组件层，仅壳层 CSS 可用。
  */
 :root {
@@ -87,6 +87,28 @@
   --brand-deep: #AD4E00;
   --text-hint: #999999;
   --text-body: #666666;
+  --stage-glow-from: #FFF3E6;
+  --stage-mid: #F4F6FB;
+  --stage-edge: #EEF1F7;
+  --stage-flat: #F5F6F8;
+  --brand-pill-bee-from: #FFC107;
+  --brand-pill-bee-to: #FF9800;
+  --brand-pill-mfood-from: #FF6B35;
+  --brand-pill-mfood-to: #E65100;
+  --spec-ink-strong: #1E293B;
+  --spec-ink: #475569;
+  --spec-ink-faint: #94A3B8;
+  --spec-accent: #3B82F6;
+  --spec-th-soft: #DBEAFE;
+  --spec-th-ink: #1E40AF;
+  --spec-blue-border: #93C5FD;
+  --spec-row-line: #F1F5F9;
+  --spec-field-soft: #EFF6FF;
+  --spec-row-soft: #F0F9FF;
+  --spec-divider-line: #E2E8F0;
+  --spec-note-soft: #FFF7ED;
+  --spec-note-border: #FED7AA;
+  --spec-note-ink: #C2410C;
   --sidebar-bg: #1E1E1E;
   --sidebar-item-color: #B0B0B0;
   --sidebar-item-hover-bg: #2A2A2A;
@@ -98,6 +120,7 @@
   --shadow-btn-hover: 0 2px 6px rgba(0,0,0,0.1);
   --shadow-btn-active: 0 4px 12px rgba(0,0,0,0.12);
   --shadow-popover: 0 6px 24px rgba(0,0,0,0.12);
+  --shadow-panel: 0 4px 24px rgba(0,0,0,0.08);
   --shadow-brand: 0 2px 4px rgba(232,114,12,0.25);
   --card-outline: 0 0 0 1px transparent;
   --sidebar-shadow: 2px 0 12px rgba(0,0,0,0.15);
@@ -171,6 +194,28 @@ html[data-theme='dark'] {
   --brand-deep: #F59432;
   --text-hint: #8A8A8A;
   --text-body: #A6A6A6;
+  --stage-glow-from: #241C14;
+  --stage-mid: #16181C;
+  --stage-edge: #121417;
+  --stage-flat: #141414;
+  --brand-pill-bee-from: #FFC107;
+  --brand-pill-bee-to: #FF9800;
+  --brand-pill-mfood-from: #FF6B35;
+  --brand-pill-mfood-to: #E65100;
+  --spec-ink-strong: #E8E8E8;
+  --spec-ink: #B0B0B0;
+  --spec-ink-faint: #8C8C8C;
+  --spec-accent: #40A9FF;
+  --spec-th-soft: rgba(64,169,255,0.18);
+  --spec-th-ink: #85A5FF;
+  --spec-blue-border: rgba(64,169,255,0.32);
+  --spec-row-line: #303030;
+  --spec-field-soft: rgba(64,169,255,0.12);
+  --spec-row-soft: rgba(64,169,255,0.10);
+  --spec-divider-line: #424242;
+  --spec-note-soft: rgba(250,140,22,0.14);
+  --spec-note-border: rgba(250,160,61,0.32);
+  --spec-note-ink: #FFA940;
   --sidebar-bg: #1A1A1A;
   --sidebar-item-color: #A6A6A6;
   --sidebar-item-hover-bg: #2E2E2E;
@@ -182,6 +227,7 @@ html[data-theme='dark'] {
   --shadow-btn-hover: 0 2px 6px rgba(0,0,0,0.5);
   --shadow-btn-active: 0 4px 12px rgba(0,0,0,0.6);
   --shadow-popover: 0 6px 24px rgba(0,0,0,0.65);
+  --shadow-panel: 0 4px 24px rgba(0,0,0,0.6);
   --shadow-brand: 0 2px 6px rgba(232,114,12,0.35);
   --card-outline: 0 0 0 1px var(--border-2);
   --sidebar-shadow: 2px 0 12px rgba(0,0,0,0.55);
@@ -266,6 +312,28 @@ html {
     --brand-deep: #AD4E00;
     --text-hint: #999999;
     --text-body: #666666;
+    --stage-glow-from: #FFF3E6;
+    --stage-mid: #F4F6FB;
+    --stage-edge: #EEF1F7;
+    --stage-flat: #F5F6F8;
+    --brand-pill-bee-from: #FFC107;
+    --brand-pill-bee-to: #FF9800;
+    --brand-pill-mfood-from: #FF6B35;
+    --brand-pill-mfood-to: #E65100;
+    --spec-ink-strong: #1E293B;
+    --spec-ink: #475569;
+    --spec-ink-faint: #94A3B8;
+    --spec-accent: #3B82F6;
+    --spec-th-soft: #DBEAFE;
+    --spec-th-ink: #1E40AF;
+    --spec-blue-border: #93C5FD;
+    --spec-row-line: #F1F5F9;
+    --spec-field-soft: #EFF6FF;
+    --spec-row-soft: #F0F9FF;
+    --spec-divider-line: #E2E8F0;
+    --spec-note-soft: #FFF7ED;
+    --spec-note-border: #FED7AA;
+    --spec-note-ink: #C2410C;
     --sidebar-bg: #1E1E1E;
     --sidebar-item-color: #B0B0B0;
     --sidebar-item-hover-bg: #2A2A2A;
@@ -277,6 +345,7 @@ html {
     --shadow-btn-hover: 0 2px 6px rgba(0,0,0,0.1);
     --shadow-btn-active: 0 4px 12px rgba(0,0,0,0.12);
     --shadow-popover: 0 6px 24px rgba(0,0,0,0.12);
+    --shadow-panel: 0 4px 24px rgba(0,0,0,0.08);
     --shadow-brand: 0 2px 4px rgba(232,114,12,0.25);
     --card-outline: 0 0 0 1px transparent;
     --sidebar-shadow: 2px 0 12px rgba(0,0,0,0.15);

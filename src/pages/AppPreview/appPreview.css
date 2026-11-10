@@ -22,7 +22,9 @@
   align-items: center;
   justify-content: center;
   padding: 28px 16px;
-  background: radial-gradient(1200px 600px at 50% -10%, #fff3e6 0%, #f4f6fb 45%, #eef1f7 100%);
+  /* 舞台底走令牌（平台侧，不是壳内模拟 APP 内容）：深色下整页跟着翻暗，
+     否则说明面板翻成 #1F1F1F 后坐在浅灰渐变上反而更刺眼（方案 §卅六） */
+  background: radial-gradient(1200px 600px at 50% -10%, var(--stage-glow-from) 0%, var(--stage-mid) 45%, var(--stage-edge) 100%);
   overflow: auto;
 }
 
@@ -771,7 +773,7 @@
     min-height: 100vh;
     /* dvh 跟随 Safari 地址栏收展；上一行 100vh 是不支持 dvh 的老浏览器兜底 */
     min-height: 100dvh;
-    background: #f5f6f8;
+    background: var(--stage-flat);
   }
   .ap-exit {
     display: none;
@@ -1176,34 +1178,10 @@
 }
 
 /* 特價團購横幅 */
-.apc-group-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 14px;
-  margin-bottom: 10px;
-  background: linear-gradient(135deg, #FBCFE8, #F9A8D4);
-  border-radius: 14px;
-  cursor: pointer;
-}
 .apc-group-banner-text {
   display: flex;
   flex-direction: column;
   gap: 2px;
-}
-.apc-group-banner-title { font-size: 18px; font-weight: 800; color: #1F2937; }
-.apc-group-banner-sub { font-size: 11px; color: #6B7280; }
-.apc-group-banner-btn {
-  margin-top: 4px;
-  align-self: flex-start;
-  padding: 3px 12px;
-  border: none;
-  border-radius: 12px;
-  background: #EC4899;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
 }
 .apc-group-banner-img { font-size: 48px; opacity: 0.9; }
 
@@ -1568,18 +1546,6 @@
   flex-direction: column;
   gap: 10px;
 }
-.apc-feed-card {
-  position: relative;
-  display: flex;
-  gap: 10px;
-  padding: 10px;
-  border: none;
-  border-radius: 14px;
-  background: #fff;
-  text-align: left;
-  cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-}
 .apc-feed-card-img {
   position: relative;
   flex: none;
@@ -1594,28 +1560,6 @@
   height: 100%;
   object-fit: cover;
 }
-.apc-feed-flash-tag {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  padding: 2px 6px;
-  border-radius: 6px;
-  background: linear-gradient(135deg, #EF4444, #DC2626);
-  color: #fff;
-  font-size: 9px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-.apc-feed-dist-tag {
-  position: absolute;
-  bottom: 4px;
-  left: 4px;
-  padding: 1px 6px;
-  border-radius: 6px;
-  background: rgba(0,0,0,0.55);
-  color: #fff;
-  font-size: 9px;
-}
 .apc-feed-card-body {
   flex: 1;
   display: flex;
@@ -1623,103 +1567,13 @@
   gap: 3px;
   min-width: 0;
 }
-.apc-feed-card-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: #1F2937;
-  line-height: 1.3;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
 .apc-feed-card-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
 }
-.apc-feed-meta-tag {
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: #F3F4F6;
-  color: #6B7280;
-  font-size: 10px;
-}
-.apc-feed-card-price-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 4px;
-  padding: 6px 8px;
-  border-radius: 10px;
-  background: linear-gradient(90deg, #FFF1F2 0%, #FFE4E9 60%, #FECDD3 100%);
-}
-.apc-feed-price {
-  font-size: 22px;
-  font-weight: 900;
-  color: #EF4444;
-}
 .apc-feed-price i { font-size: 13px; font-style: normal; }
-.apc-feed-origin {
-  font-size: 12px;
-  color: #9CA3AF;
-  text-decoration: line-through;
-}
-.apc-feed-grab-btn {
-  margin-left: auto;
-  padding: 6px 16px;
-  border: none;
-  border-radius: 16px 4px 4px 16px;
-  background: linear-gradient(135deg, #EF4444, #DC2626);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 800;
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(239,68,68,0.3);
-  position: relative;
-  overflow: hidden;
-}
-.apc-feed-grab-btn::before {
-  content: '';
-  position: absolute;
-  top: -2px;
-  left: -8px;
-  width: 20px;
-  height: calc(100% + 4px);
-  background: #FBBF24;
-  clip-path: polygon(60% 0%, 100% 40%, 70% 40%, 100% 100%, 40% 60%, 60% 60%);
-}
-.apc-feed-grab-btn.is-flash {
-  background: linear-gradient(135deg, #EC4899, #F43F5E);
-  border-radius: 16px 4px 4px 16px;
-}
-.apc-feed-off-text {
-  font-size: 10px;
-  color: #9CA3AF;
-}
 .apc-feed-off-icon { margin-right: 2px; }
-.apc-feed-shop {
-  font-size: 11px;
-  color: #9CA3AF;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.apc-feed-grabbed {
-  position: absolute;
-  bottom: 8px;
-  left: 10px;
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  padding: 2px 8px;
-  border-radius: 8px;
-  background: #FEF2F2;
-  color: #EF4444;
-  font-size: 10px;
-  font-weight: 600;
-}
 
 /* ── 共享样式（ConsumerGroupBuy / ConsumerDelivery 仍使用） ── */
 .apc-promo {
@@ -1734,7 +1588,6 @@
   overflow: hidden;
 }
 .apc-promo-title { font-size: 18px; font-weight: 700; }
-.apc-promo-title b { margin-left: 6px; color: #ffe58f; }
 .apc-promo-emoji { position: absolute; right: 16px; font-size: 42px; }
 .apc-sec { padding: 12px; margin-bottom: 12px; background: var(--surface-2); border-radius: 14px; }
 .apc-sec-head { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
@@ -1778,17 +1631,6 @@
 .apc-price-lg { font-size: 18px; }
 .apc-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .apc-gcard { position: relative; border: none; background: transparent; text-align: left; cursor: pointer; }
-.apc-gcard-badge {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  z-index: 1;
-  padding: 1px 6px;
-  border-radius: 8px;
-  background: #ff4d4f;
-  color: #fff;
-  font-size: 10px;
-}
 .apc-gcard-title {
   display: block;
   margin-top: 6px;
@@ -1827,20 +1669,7 @@
 .apc-coupon-meta { flex: 1; display: flex; flex-direction: column; }
 .apc-coupon-meta b { font-size: 12px; color: var(--text-1); }
 .apc-coupon-meta i { margin-top: 2px; font-size: 10px; font-style: normal; color: var(--text-3); }
-.apc-coupon-use { flex: none; padding: 3px 8px; border-radius: 10px; background: var(--brand); color: #fff; font-size: 11px; }
 .apc-fcard-strike { font-size: 11px; color: var(--text-4); text-decoration: line-through; }
-.apc-channel-btn {
-  width: 100%;
-  height: 42px;
-  margin-bottom: 8px;
-  border: none;
-  border-radius: 21px;
-  background: linear-gradient(135deg, #ffb347, #e8720c);
-  color: #fff;
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-}
 
 /* 回到頂部悬浮钮 */
 .apc-to-top {
@@ -2038,17 +1867,6 @@
 
 /* 快捷胶囊 */
 .apg-pills { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
-.apg-pill {
-  height: 32px;
-  border: none;
-  border-radius: 16px;
-  background: var(--apg-chip);
-  color: #874d00;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.apg-pill.is-green { background: #d9f7be; color: #237804; }
 
 /* 標題欄 · 双列 */
 .apg-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
@@ -2068,17 +1886,6 @@
   margin-bottom: 2px;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-}
-.apg-filters button {
-  flex: none;
-  height: 28px;
-  padding: 0 12px;
-  border: 1px solid #eee;
-  border-radius: 14px;
-  background: var(--surface-2);
-  color: var(--text-2);
-  font-size: 12px;
-  cursor: pointer;
 }
 .apg-filters button.is-on { background: var(--danger-soft); border-color: var(--danger-border); color: var(--danger); font-weight: 600; }
 .apg-sortbar { display: flex; align-items: center; gap: 10px; padding: 6px 12px 8px; margin-bottom: 0; }
@@ -2610,21 +2417,6 @@
 .apg-item-price { display: flex; align-items: baseline; gap: 6px; }
 .apg-item-save { font-size: 11px; color: var(--brand); }
 .apg-item-shop { font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.apg-grab {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: var(--brand);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 
 /* 到底 */
 .apg-end { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 0 24px; }
@@ -2634,46 +2426,9 @@
 /* ════════════════════════════════════════════════════════════════
    美食外賣页（apd- 前缀，同限定在 /app-preview 原型作用域）
    ════════════════════════════════════════════════════════════════ */
-.apd-searchrow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 38px;
-  padding: 0 6px 0 12px;
-  margin-bottom: 10px;
-  background: var(--surface-2);
-  border: 1px solid #e8e8e8;
-  border-radius: 19px;
-}
-.apd-search-btn {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  height: 28px;
-  padding: 0 14px;
-  border-radius: 14px;
-  background: #ffc53d;
-  color: #613400;
-  font-size: 12px;
-  font-weight: 700;
-}
 
 /* 紅包券（宽卡，红粉底） */
 .apd-coupons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-.apd-coupon {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px;
-  border: none;
-  border-radius: 12px;
-  background: linear-gradient(120deg, #ff7875, #ff4d4f);
-  color: #fff;
-  text-align: left;
-  cursor: pointer;
-}
-.apd-coupon .apc-coupon-amt { color: #fff; }
-.apd-coupon .apc-coupon-meta b { color: #fff; }
 .apd-coupon .apc-coupon-meta i { color: rgba(255, 255, 255, 0.85); }
 .apd-coupon .apc-coupon-use { background: var(--surface-2); color: var(--danger); }
 
@@ -2720,19 +2475,6 @@
   border: 1px solid var(--border-2);
   border-radius: 14px;
 }
-.apd-rail {
-  flex: none;
-  width: 54px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border-radius: 10px;
-  background: linear-gradient(160deg, #ff9ac1, #f759ab);
-  color: #fff;
-  text-align: center;
-}
 .apd-rail-emoji { font-size: 24px; }
 .apd-rail-text { font-size: 11px; font-weight: 700; line-height: 1.3; }
 .apd-card-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
@@ -2743,28 +2485,12 @@
 .apd-card-rating b { color: var(--warning); }
 .apd-card-rating i { margin-left: 6px; font-style: normal; }
 .apd-card-meta { font-size: 11px; color: var(--text-3); }
-.apd-rank { font-size: 11px; color: #874d00; }
 .apd-card-coupons { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
 .apd-coupon-chip { padding: 0 5px; border: 1px solid var(--danger-border); border-radius: 4px; color: var(--danger); font-size: 10px; }
 .apd-coupon-chip.is-member { border-color: var(--purple-border); background: var(--purple-soft); color: var(--purple); }
 .apd-products { display: flex; gap: 8px; margin-top: 6px; }
 .apd-product { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .apd-product-img { width: 100%; height: 68px; border-radius: 8px; object-fit: cover; display: block; }
-.apd-grab {
-  position: absolute;
-  right: 4px;
-  top: 44px;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--brand);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 .apd-product-price { font-size: 12px; font-weight: 700; color: var(--danger); }
 .apd-product-origin { font-size: 10px; color: var(--text-4); text-decoration: line-through; }
 .apd-note { margin-top: 4px; padding: 6px 8px; border-radius: 6px; background: var(--surface-3); color: var(--text-3); font-size: 11px; }
@@ -2779,7 +2505,6 @@
 }
 .apd-status--new { background: var(--success-soft); color: var(--success); border: 1px solid var(--success-border); }
 .apd-status--busy { background: var(--danger-soft); color: var(--danger); border: 1px solid var(--danger-border); }
-.apd-status--closed { background: var(--surface-1); color: var(--text-3); border: 1px solid #e8e8e8; }
 .apd-status--book { background: var(--warning-soft); color: var(--brand); border: 1px solid var(--warning-border); }
 
 /* 本頁自帶的 5 Tab 底欄 */
@@ -3052,11 +2777,6 @@
 .apf-setting-label { font-size: 11px; color: var(--text-2); }
 
 /* ── 美食外賣 · 可折叠吸顶头（滚动后仅保留搜索行） ────────────── */
-.apd-header {
-  flex: none;
-  background: #ffe9f4;
-  transition: box-shadow 0.25s ease;
-}
 .apd-header.is-scrolled { box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06); }
 
 .apd-header-top {
@@ -4422,32 +4142,13 @@ button.apcs-card:hover { border-color: var(--warning-border); }
 .apm-tab-sub { font-size: 9px; color: #999; white-space: nowrap; }
 
 /* 瀑布流商品卡 */
-.apm-feed-list { display: flex; flex-direction: column; gap: 0; background: #fff; border-radius: 0 0 12px 12px; padding: 10px; }
-.apm-feed-card {
-  display: flex; gap: 10px; padding: 10px 0; border: none; border-bottom: 1px solid #F3F4F6;
-  background: transparent; text-align: left; cursor: pointer;
-}
 .apm-feed-card:last-child { border-bottom: none; }
 .apm-feed-img { flex: none; width: 110px; height: 110px; border-radius: 10px; overflow: hidden; }
 .apm-feed-img img { width: 100%; height: 100%; object-fit: cover; }
 .apm-feed-body { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.apm-feed-title { font-size: 13px; font-weight: 600; color: #333; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.apm-feed-brand { color: #FF6B35; font-style: normal; font-weight: 700; }
-.apm-feed-sep { color: #ddd; margin: 0 3px; }
 .apm-feed-meta { display: flex; gap: 4px; }
-.apm-feed-meta-tag { padding: 1px 5px; border-radius: 3px; background: #F5F5F5; color: #999; font-size: 9px; }
-.apm-feed-tag-new { color: #4CAF50; background: #E8F5E9; }
-.apm-feed-price-area { margin-top: 4px; padding: 6px 8px; border-radius: 8px; background: linear-gradient(90deg, #FFF8E1 0%, #FFECB3 100%); }
 .apm-feed-price-row { display: flex; align-items: baseline; gap: 4px; }
-.apm-feed-price { font-size: 20px; font-weight: 900; color: #E53935; }
 .apm-feed-price i { font-size: 12px; font-style: normal; }
-.apm-feed-origin { font-size: 11px; color: #999; text-decoration: line-through; }
-.apm-feed-buy-btn {
-  margin-left: auto; padding: 5px 14px; border: none; border-radius: 14px 4px 4px 14px;
-  background: linear-gradient(135deg, #9C27B0, #7B1FA2); color: #fff; font-size: 13px; font-weight: 800; cursor: pointer;
-}
-.apm-feed-off { display: block; font-size: 9px; color: #999; margin-top: 2px; }
-.apm-feed-foot { display: flex; gap: 6px; font-size: 10px; color: #999; margin-top: 2px; }
 .apm-feed-shop { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* 底部 Tab 栏 */
@@ -4479,10 +4180,12 @@ button.apcs-card:hover { border-color: var(--warning-border); }
   align-items: center;
   gap: 12px;
 }
+/* 双机并排标签：品牌渐变胶囊（不翻面的品牌资产），前景取 --on-brand-pill 深字
+   ——白字在 #FFC107/#FF6B35 上只有 1.63/2.84，连大字号 3.0 门槛都不达（方案 §33.2 / §34.5） */
 .ap-dual-label {
   font-size: 13px;
   font-weight: 700;
-  color: #fff;
+  color: var(--on-brand-pill);
   letter-spacing: 0.5px;
   padding: 4px 0;
   width: 80px;
@@ -4490,10 +4193,10 @@ button.apcs-card:hover { border-color: var(--warning-border); }
   border-radius: 14px;
 }
 .ap-dual-label--mfood {
-  background: linear-gradient(135deg, #FF6B35, #E65100);
+  background: linear-gradient(135deg, var(--brand-pill-mfood-from), var(--brand-pill-mfood-to));
 }
 .ap-dual-label--bee {
-  background: linear-gradient(135deg, #FFC107, #FF9800);
+  background: linear-gradient(135deg, var(--brand-pill-bee-from), var(--brand-pill-bee-to));
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -4527,17 +4230,6 @@ button.apcs-card:hover { border-color: var(--warning-border); }
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-.apf-badge-new {
-  position: absolute;
-  top: 6px;
-  left: 0;
-  padding: 2px 8px 2px 6px;
-  border-radius: 0 6px 6px 0;
-  background: linear-gradient(135deg, #43A047, #66BB6A);
-  color: #fff;
-  font-size: 9px;
-  font-weight: 800;
 }
 .apf-ribbon {
   position: absolute;
@@ -4799,74 +4491,10 @@ button.apcs-card:hover { border-color: var(--warning-border); }
 .apf-cta-bolt { margin-right: 1px; }
 
 /* 规范标注气泡 */
-.apf-spec-badge {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #3B82F6;
-  color: #fff;
-  font-size: 9px;
-  font-weight: 800;
-  flex: none;
-  cursor: help;
-  z-index: 5;
-}
-.apf-spec-popover {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  width: 220px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: #1F2937;
-  color: #F9FAFB;
-  font-size: 10px;
-  font-weight: 400;
-  line-height: 1.4;
-  white-space: normal;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-  z-index: 100;
-  pointer-events: none;
-}
-.apf-spec-popover b { color: #60A5FA; }
-.apf-spec-popover em { color: #9CA3AF; font-style: normal; font-size: 9px; }
 
 /* 规范模式开关 */
-.apf-spec-toggle {
-  padding: 4px 12px;
-  border: 1px solid #3B82F6;
-  border-radius: 14px;
-  background: transparent;
-  color: #3B82F6;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-.apf-spec-toggle.is-on {
-  background: #3B82F6;
-  color: #fff;
-}
 
 /* 字段说明列表（静态展示在卡片下方） */
-.apf-legend {
-  margin-top: 16px;
-  padding: 14px;
-  border-radius: 12px;
-  background: #F8FAFC;
-  border: 1px solid #E2E8F0;
-}
-.apf-legend h4 {
-  margin: 0 0 10px;
-  font-size: 13px;
-  font-weight: 800;
-  color: #1E293B;
-}
 .apf-legend ol {
   list-style: none;
   margin: 0;
@@ -4880,34 +4508,19 @@ button.apcs-card:hover { border-color: var(--warning-border); }
   gap: 8px;
   align-items: flex-start;
 }
-.apf-legend-num {
-  flex: none;
-  width: 18px;
-  height: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: #3B82F6;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 800;
-  margin-top: 1px;
-}
-.apf-legend li b { font-size: 11px; color: #1E293B; display: block; }
-.apf-legend li p { margin: 2px 0 0; font-size: 10px; color: #64748B; line-height: 1.4; }
-.apf-legend li em { font-size: 9px; color: #94A3B8; font-style: normal; display: block; margin-top: 2px; }
 
-/* 手机壳外的字段规范表格面板 */
+/* 手机壳外的字段规范表格面板（平台侧 chrome，必须跟随主题）
+   底色走 --surface-2、阴影走 --shadow-panel：旧值 `background:#fff` 在深色页底下
+   对比达 16.48，是方案 §33.3 登记、§35.3 放量时仍然暴露的那块大白斑 */
 .ap-spec-panel {
   flex: 1;
   min-width: 0;
   max-height: 780px;
   overflow-y: auto;
-  background: #fff;
+  background: var(--surface-2);
   border-radius: 16px;
   padding: 20px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  box-shadow: var(--shadow-panel);
 }
 .ap-spec-panel h3 {
   display: flex;
@@ -4916,7 +4529,7 @@ button.apcs-card:hover { border-color: var(--warning-border); }
   margin: 2px 0 14px;
   font-size: 15px;
   font-weight: 800;
-  color: #1E293B;
+  color: var(--spec-ink-strong);
 }
 /* 标题前品牌渐变锚点条：与面板行主级选中丸同色系，压住下方的表格区 */
 .ap-spec-panel h3::before {
@@ -4935,21 +4548,21 @@ button.apcs-card:hover { border-color: var(--warning-border); }
 .ap-spec-panel th {
   text-align: left;
   padding: 8px 10px;
-  background: #DBEAFE;
-  color: #1E40AF;
+  background: var(--spec-th-soft);
+  color: var(--spec-th-ink);
   font-weight: 700;
   font-size: 12px;
-  border-bottom: 2px solid #93C5FD;
+  border-bottom: 2px solid var(--spec-blue-border);
 }
 .ap-spec-panel td {
   padding: 8px;
-  border-bottom: 1px solid #F1F5F9;
+  border-bottom: 1px solid var(--spec-row-line);
   vertical-align: top;
   line-height: 1.4;
 }
-.ap-spec-name b { color: #3B82F6; font-size: 10px; }
+.ap-spec-name b { color: var(--spec-accent); font-size: 10px; }
 .ap-spec-name {
-  color: #1E293B;
+  color: var(--spec-ink-strong);
   font-weight: 600;
   min-width: 90px;
   white-space: nowrap;
@@ -4968,34 +4581,26 @@ button.apcs-card:hover { border-color: var(--warning-border); }
   text-align: center;
   padding: 3px 0;
   border-radius: 14px;
-  color: #fff;
+  color: var(--on-brand-pill);
   font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
 }
 .ap-spec-brand-pill--mfood {
-  background: linear-gradient(135deg, #FF6B35, #E65100);
+  background: linear-gradient(135deg, var(--brand-pill-mfood-from), var(--brand-pill-mfood-to));
 }
 .ap-spec-brand-pill--bee {
-  background: linear-gradient(135deg, #FFC107, #FF9800);
+  background: linear-gradient(135deg, var(--brand-pill-bee-from), var(--brand-pill-bee-to));
 }
-.ap-spec-example {
-  color: #64748B;
-  font-family: monospace;
-  font-size: 10px;
-  max-width: 100px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ap-spec-desc { color: #475569; line-height: 1.5; white-space: pre-line; }
-.ap-spec-desc em { color: #94A3B8; font-style: normal; font-size: 9px; display: block; margin-top: 4px; border-top: 1px dashed #E2E8F0; padding-top: 3px; }
+.ap-spec-desc { color: var(--spec-ink); line-height: 1.5; white-space: pre-line; }
+.ap-spec-desc em { color: var(--spec-ink-faint); font-style: normal; font-size: 9px; display: block; margin-top: 4px; border-top: 1px dashed var(--spec-divider-line); padding-top: 3px; }
 .ap-spec-note {
   margin: 6px 0 0;
   padding: 4px 8px;
   border-radius: 6px;
-  background: #FFF7ED;
-  border: 1px solid #FED7AA;
-  color: #C2410C;
+  background: var(--spec-note-soft);
+  border: 1px solid var(--spec-note-border);
+  color: var(--spec-note-ink);
   font-size: 10px;
   font-weight: 600;
   line-height: 1.4;
@@ -5047,33 +4652,21 @@ button.apcs-card:hover { border-color: var(--warning-border); }
 .ap-spec-panel input,
 .ap-spec-panel textarea {
   width: 100%;
-  border: 1px solid #93C5FD;
+  border: 1px solid var(--spec-blue-border);
   border-radius: 4px;
   padding: 4px 6px;
   font-size: 11px;
   font-family: inherit;
-  background: #EFF6FF;
+  background: var(--spec-field-soft);
   outline: none;
 }
 .ap-spec-panel input:focus,
 .ap-spec-panel textarea:focus {
-  border-color: #3B82F6;
+  border-color: var(--spec-accent);
   box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
 }
-.ap-spec-panel small { font-size: 10px; color: #94A3B8; font-weight: 400; }
 .ap-spec-panel tr { cursor: pointer; transition: background 0.15s ease; }
-.ap-spec-panel tr:hover { background: #F0F9FF; }
-.ap-spec-reset {
-  margin-top: 12px;
-  padding: 4px 12px;
-  border: 1px solid #CBD5E1;
-  border-radius: 6px;
-  background: #F8FAFC;
-  color: #64748B;
-  font-size: 11px;
-  cursor: pointer;
-}
-.ap-spec-reset:hover { background: #E2E8F0; }
+.ap-spec-panel tr:hover { background: var(--spec-row-soft); }
 
 /* ── 说明面板 · 顶部控制栈：①菜单分组（主级）→ ②瀑布流面板（次级）→ ③展示模式（三级）──
    三行统一「分段轨道」语言，尺寸与强调严格逐级递减（行高 36/32/26，字号 13/12/11，
@@ -5400,11 +4993,6 @@ button.apcs-card:hover { border-color: var(--warning-border); }
 }
 
 /* 信息行单行样式已由三列 .apw-info-grid 取代（图3口径）；免配送費已改为配送列「免配送費」橙字、不标減配角标（图2口径） */
-.apw-pickup {
-  color: #E65100;
-  font-style: normal;
-  font-weight: 700;
-}
 
 /* No.7 标签栏 */
 .apw-row-tags {

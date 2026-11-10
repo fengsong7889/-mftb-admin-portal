@@ -28,9 +28,11 @@ import { describe, it, expect } from 'vitest'
 // 只能像门禁核 theme.css 那样从文本层抓出来。
 import { readFileSync } from 'node:fs'
 import {
+  APP_PREVIEW_PLATFORM_ROOTS,
   COLOR_TO_TOKEN,
   COMPONENT_TOKENS,
   EXCLUDE_PATHS,
+  EXCLUDE_SELECTOR_PREFIXES,
   INTENTIONAL_VALUE_DUPLICATES,
   NON_COLOR_TOKENS,
   REVIEW_REQUIRED,
@@ -38,6 +40,7 @@ import {
   SEMANTIC_TOKENS,
   TOKEN_VALUES,
   classifyProperty,
+  compositeOnto,
   contrastRatio,
   countBareColors,
   isExcluded,
@@ -54,7 +57,9 @@ import {
  * 新加名字进本集合前先问：这个颜色代的是“品牌/实体/编码”，还是“主题表面”？
  * 后者永远不该出现在这里，它应该去配真正的深/浅两档。
  */
-const INTENTIONAL_SAME_VALUE = new Set(['brand', 'brand-hover', 'medal-gold', 'medal-silver', 'medal-bronze', 'on-medal', 'on-brand-pill'])
+const INTENTIONAL_SAME_VALUE = new Set(['brand', 'brand-hover', 'medal-gold', 'medal-silver', 'medal-bronze', 'on-medal', 'on-brand-pill',
+  // 品牌渐变胶囊的四个端点（§35.3 / §卅六）：背景是不翻面的品牌资产，浅深同值是设计决定而不是漏改
+  'brand-pill-bee-from', 'brand-pill-bee-to', 'brand-pill-mfood-from', 'brand-pill-mfood-to'])
 
 const ALL_TOKEN_NAMES = [...SEMANTIC_TOKENS, ...COMPONENT_TOKENS]
 const ALL_TOKEN_VALUES = { ...TOKEN_VALUES, ...NON_COLOR_TOKENS }
@@ -931,5 +936,215 @@ describe('品牌渐变胶囊前景（--on-brand-pill）', () => {
     const dup = Object.entries(TOKEN_VALUES).filter(([n, v]) =>
       n !== 'on-brand-pill' && (v.light === '#141414' || v.dark === '#141414')).map(([n]) => n)
     expect(dup.length, '#141414 已被哪些令牌占用').toBeGreaterThan(0)
+  })
+})
+
+/*
+ * AppPreview 原型页的平台侧一族（§卅六：深浅色白斑修复第一批）。
+ *
+ * 为什么不能只靠棘轮守这批：本批之后会把壳内前缀族（.apc-/.apf-/…）加进选择器排除区，
+ * 一旦排除，「有人把说明面板的颜色写回字面量」在 cssHex 上完全看不出来。
+ * 所以下面用**跨文件锚定**直接读 appPreview.css：平台侧选择器里再出现裸 hex 就当场判红。
+ * 这与 §34.2 给 BrandTag 做的那条同一个理由：排除区必须配一条不受排除影响的守卫。
+ */
+describe('AppPreview 平台侧令牌族（说明面板 / 舞台底 / 品牌胶囊，§卅六）', () => {
+  const PANEL = TOKEN_VALUES['surface-2'].dark // #1F1F1F，说明面板深色下的实际背板
+  /** 本轮替换掉的站内字面量：浅色档必须逐个与之相等（「令牌化不得改浅色观感」的硬判据） */
+  const ORIGINAL = {
+    'spec-ink-strong': '#1E293B', 'spec-ink': '#475569', 'spec-ink-faint': '#94A3B8',
+    'spec-accent': '#3B82F6', 'spec-th-soft': '#DBEAFE', 'spec-th-ink': '#1E40AF',
+    'spec-blue-border': '#93C5FD', 'spec-row-line': '#F1F5F9', 'spec-field-soft': '#EFF6FF',
+    'spec-row-soft': '#F0F9FF', 'spec-divider-line': '#E2E8F0',
+    'spec-note-soft': '#FFF7ED', 'spec-note-border': '#FED7AA', 'spec-note-ink': '#C2410C',
+    'stage-glow-from': '#FFF3E6', 'stage-mid': '#F4F6FB', 'stage-edge': '#EEF1F7', 'stage-flat': '#F5F6F8',
+    'brand-pill-bee-from': '#FFC107', 'brand-pill-bee-to': '#FF9800',
+    'brand-pill-mfood-from': '#FF6B35', 'brand-pill-mfood-to': '#E65100',
+  }
+  const BRAND_PILLS = ['brand-pill-bee-from', 'brand-pill-bee-to', 'brand-pill-mfood-from', 'brand-pill-mfood-to']
+
+  it('浅色档必须逐个等于被替换的站内字面量', () => {
+    for (const [name, literal] of Object.entries(ORIGINAL)) {
+      expect(TOKEN_VALUES[name].light.toLowerCase(), name).toBe(literal.toLowerCase())
+    }
+  })
+
+  it('除品牌胶囊四端点外，深色档必须真的与浅色不同（同值就是白斑复活）', () => {
+    const same = Object.keys(ORIGINAL)
+      .filter((n) => !BRAND_PILLS.includes(n))
+      .filter((n) => TOKEN_VALUES[n].dark.toLowerCase() === TOKEN_VALUES[n].light.toLowerCase())
+    expect(same, `这些令牌没有深色档：${same.join(', ')}`).toEqual([])
+  })
+
+  it('说明面板前景在深色面板底上必须全部达 AA 4.5', () => {
+    for (const name of ['spec-ink-strong', 'spec-ink', 'spec-ink-faint', 'spec-accent']) {
+      expect(contrastRatio(TOKEN_VALUES[name].dark, PANEL), `${name} 深色 on ${PANEL}`).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+
+  it('深色档坐在合成底（表头 / 行 hover / 输入框 / 提示条）上仍必须达 AA', () => {
+    // contrastRatio 不处理 alpha，先把 rgba tint 合成到面板底再算（唯一实现 compositeOnto）。
+    const th = compositeOnto(TOKEN_VALUES['spec-th-soft'].dark, PANEL)
+    expect(contrastRatio(TOKEN_VALUES['spec-th-ink'].dark, th), `th-ink on ${th}`).toBeGreaterThanOrEqual(4.5)
+    const note = compositeOnto(TOKEN_VALUES['spec-note-soft'].dark, PANEL)
+    expect(contrastRatio(TOKEN_VALUES['spec-note-ink'].dark, note), `note-ink on ${note}`).toBeGreaterThanOrEqual(4.5)
+    for (const tint of ['spec-row-soft', 'spec-field-soft']) {
+      const bg = compositeOnto(TOKEN_VALUES[tint].dark, PANEL)
+      for (const fg of ['spec-ink-strong', 'spec-ink']) {
+        expect(contrastRatio(TOKEN_VALUES[fg].dark, bg), `${fg} on ${tint} 合成底 ${bg}`).toBeGreaterThanOrEqual(4.5)
+      }
+    }
+  })
+
+  it('浅色侧两处存量欠标按存量卡下限，不假装达标（修它要动观感，另案）', () => {
+    // #3B82F6 on 白 = 3.6779（§33.3 已登记）；#94A3B8 on 白 = 2.5640（本轮实测新登记）。
+    expect(contrastRatio(TOKEN_VALUES['spec-accent'].light, '#FFFFFF')).toBeGreaterThanOrEqual(3.6)
+    expect(contrastRatio(TOKEN_VALUES['spec-ink-faint'].light, '#FFFFFF')).toBeGreaterThanOrEqual(2.5)
+    // 同时钉住「它们确实不达标」，否则后来人会把 ≥3.6 读成已达 AA。
+    expect(contrastRatio(TOKEN_VALUES['spec-accent'].light, '#FFFFFF')).toBeLessThan(4.5)
+    expect(contrastRatio(TOKEN_VALUES['spec-ink-faint'].light, '#FFFFFF')).toBeLessThan(4.5)
+  })
+
+  it('舞台深色四档必须都暗于面板底，否则面板在深色下浮不起来', () => {
+    const panelL = relativeLuminance(PANEL)
+    for (const name of ['stage-glow-from', 'stage-mid', 'stage-edge', 'stage-flat']) {
+      expect(relativeLuminance(TOKEN_VALUES[name].dark), `${name} 深色必须比 ${PANEL} 更暗`).toBeLessThan(panelL)
+    }
+  })
+
+  it('品牌胶囊端点两档同值，深字达标而白字必须仍然不达标', () => {
+    for (const name of BRAND_PILLS) {
+      expect(TOKEN_VALUES[name].dark).toBe(TOKEN_VALUES[name].light)
+      const ep = TOKEN_VALUES[name].light
+      expect(contrastRatio(TOKEN_VALUES['on-brand-pill'].light, ep), `深字 on ${ep}`).toBeGreaterThanOrEqual(4.5)
+      // 钉住「前景为什么是深字」，防止被当成审美改动回退（与 BrandTag 那组同一手法）
+      expect(contrastRatio('#FFFFFF', ep), `白字 on ${ep} 不该被判为达 AA`).toBeLessThan(4.5)
+    }
+  })
+
+  it('全族不得进 COLOR_TO_TOKEN（面板专用语义不能让 codemod 套到无关站点）', () => {
+    const names = new Set(Object.keys(ORIGINAL))
+    for (const seg of Object.keys(COLOR_TO_TOKEN)) {
+      const hit = Object.entries(COLOR_TO_TOKEN[seg]).filter(([, token]) => names.has(String(token)))
+      expect(hit, `${seg} 段不应映射到 AppPreview 面板族`).toEqual([])
+    }
+  })
+
+  it('appPreview.css 平台侧选择器里不得再出现裸 hex（排除区的补偿守卫）', () => {
+    const css = readFileSync(
+      new URL('../../src/pages/AppPreview/appPreview.css', import.meta.url), 'utf8')
+      // 注释里的十六进制是取证数字，不是声明值；门禁同样先剥注释再计数。
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+    const PLATFORM_ROOTS = ['.ap-spec-', '.ap-dual-', '.ap-stage', '.ap-preview-', '.ap-page', '.ap-toolbar']
+    let cur = null
+    let depth = 0
+    let kf = null
+    let platformRules = 0
+    const offenders = []
+    for (const line of css.split('\n')) {
+      const head = line.includes('{') ? line.split('{')[0].trim() : ''
+      const isKf = head.startsWith('@keyframes') || head.startsWith('@-webkit-keyframes')
+      if (isKf) kf = depth
+      else if (head && kf === null) cur = head
+      const isPlatform = cur !== null && kf === null && PLATFORM_ROOTS.some((p) => cur.startsWith(p))
+      if (isPlatform) {
+        platformRules += 1
+        const hexes = line.match(/#[0-9a-fA-F]{3,8}\b/g)
+        if (hexes) offenders.push(`${cur}: ${hexes.join(' ')}`)
+      }
+      depth += (line.match(/\{/g) || []).length - (line.match(/\}/g) || []).length
+      if (kf !== null && depth <= kf) kf = null
+    }
+    // 阳性对照：扫不到平台侧规则说明判据本身失效，不能当成「已经干净」。
+    expect(platformRules, '平台侧规则数为 0 = 解析判据失效，不是通过').toBeGreaterThan(15)
+    expect(offenders, `平台侧残留裸 hex：${offenders.join(' | ')}`).toEqual([])
+    // 反向对照：本批的 var() 确实在文件里（空扫描与「真的用了令牌」两种情况要能区分）
+    expect((css.match(/var\(--spec-/g) || []).length).toBeGreaterThan(15)
+  })
+
+  it('说明面板阴影必须走 --shadow-panel（黑色 rgba 阴影在深色下几乎不可见）', () => {
+    expect(NON_COLOR_TOKENS['shadow-panel'].light).toBe('0 4px 24px rgba(0,0,0,0.08)')
+    expect(NON_COLOR_TOKENS['shadow-panel'].dark).toBe('0 4px 24px rgba(0,0,0,0.6)')
+  })
+
+  it('appPreview.css 引用的每个 var(--*) 都必须能解析（令牌名写错没有门禁会报）', () => {
+    /*
+     * 这一条不在任何其它守格里：`var(--spec-ink-stron)` 这种拼错的令牌名既不报错也不计数，
+     * 深色下只会静静地渲成无效值。本仓以前只能靠渲染层探针发现（§28.5），
+     * 但探针不入库也不进 CI，所以这里用静态比对常驻守住；渲染层仍负责验级联真的生效。
+     */
+    const raw = readFileSync(
+      new URL('../../src/pages/AppPreview/appPreview.css', import.meta.url), 'utf8')
+    const css = raw.replace(/\/\*[\s\S]*?\*\//g, '')
+    const used = new Set([...css.matchAll(/var\(\s*(--[A-Za-z0-9-]+)/g)].map((m) => m[1]))
+    // 文件内自备的局部令牌（搜索覆盖层的 --apcs-* 族）不算未解析
+    const local = new Set([...css.matchAll(/^\s*(--[A-Za-z0-9-]+)\s*:/gm)].map((m) => m[1]))
+    const known = new Set(
+      [...Object.keys(TOKEN_VALUES), ...Object.keys(NON_COLOR_TOKENS)].map((n) => `--${n}`))
+    const missing = [...used].filter((v) => !known.has(v) && !local.has(v)).sort()
+    // 阳性对照：一个 var 都没扫到 = 判据自己坏了，不能当成「全部可解析」
+    expect(used.size, '没扫到任何 var() 说明解析判据失效').toBeGreaterThan(60)
+    expect(missing, `无法解析的 var 名：${missing.join(', ')}`).toEqual([])
+  })
+})
+
+/*
+ * AppPreview 壳内豁免（§卅六 第三步）与「平台侧优先」判定。
+ *
+ * 这批断言的意义不在于排除本身，而在于排除**没有吃进平台侧**：
+ * `.ap-` 这一段同时是设备外壳（`.ap-phone`）、模拟 APP 内容（`.ap-btn`）
+ * 和壳外 chrome（`.ap-spec-panel`、`.ap-stage`）的公共前缀，
+ * 子串匹配一旦没有反向白名单，就会把说明面板一起豁免掉——深色下白斑复活而棘轮一声不响。
+ */
+describe('AppPreview 壳内选择器排除与平台侧优先', () => {
+  const SHELL = [
+    '.apc-group-card', '.apf-card', '.apm-feed-list', '.apw-pill', '.apd-header',
+    '.apg-panel', '.apmk-kpi', '.apcs', '.apcs-channel--groupbuy', '.apst-hero',
+    '.apdl-cat', '.apq-coupons', '.apmf-tag',
+    // 设备外壳与商家端内容（`.ap-` 段）
+    '.ap-phone', '.ap-phone-side--l1', '.ap-statusbar-time', '.ap-viewport',
+    '.ap-btn', '.ap-cell-price', '.ap-hero-balance', '.ap-cart-row',
+  ]
+  const PLATFORM = ['.ap-spec-panel', '.ap-dual-label', '.ap-stage', '.ap-exit', '.ap-toolbar']
+
+  it('`.ap-` 必须确实在排除清单里（否则下面的平台侧用例是空转）', () => {
+    expect(EXCLUDE_SELECTOR_PREFIXES).toContain('.ap-')
+    expect(EXCLUDE_SELECTOR_PREFIXES).toContain('.apc-')
+  })
+
+  it.each(SHELL)('壳内模拟 APP 选择器 %s 被排除', (sel) => {
+    expect(isExcludedSelector(sel)).toBe(true)
+  })
+
+  it.each(PLATFORM)('壳外平台侧选择器 %s 不得被排除', (sel) => {
+    expect(isExcludedSelector(sel)).toBe(false)
+  })
+
+  it('复合选择器里只要有一环是平台侧，整条都不得排除', () => {
+    expect(isExcludedSelector('.ap-phone .ap-spec-example')).toBe(false)
+    expect(isExcludedSelector('.ap-spec-panel .apc-card')).toBe(false)
+    // 而纯壳内链仍要排除
+    expect(isExcludedSelector('.ap-phone .apf-card')).toBe(true)
+  })
+
+  it('排除项不得误伤形近的非原型命名', () => {
+    // `.ap-` 不能命中 `.app-` / `.apex-`：那是主站别的模块的命名，被豁免就等于失去门禁
+    expect(isExcludedSelector('.app-header')).toBe(false)
+    expect(isExcludedSelector('.apex-chart')).toBe(false)
+    expect(isExcludedSelector('.content-area')).toBe(false)
+  })
+
+  it('登录页与 scene 的既有排除不受平台侧白名单影响', () => {
+    expect(isExcludedSelector('.login-card-v2')).toBe(true)
+    expect(isExcludedSelector(".portal-card-artwork[data-scene='ads']")).toBe(true)
+  })
+
+  it('平台侧名单必须与审计脚本的 PLATFORM_ROOTS 逐个相等（跨文件锚定）', () => {
+    const py = readFileSync(new URL('../audit-app-preview-hex.py', import.meta.url), 'utf8')
+    const m = py.match(/^PLATFORM_ROOTS = \(([^)]*)\)/m)
+    expect(m, '审计脚本里找不到 PLATFORM_ROOTS 常量，判据已经不存在了').not.toBeNull()
+    const pyRoots = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]).sort()
+    const jsRoots = [...APP_PREVIEW_PLATFORM_ROOTS].sort()
+    // 双向相等：任何一侧单独加/减名字都会红，避免「工具与门禁各守一套平台侧」
+    expect(jsRoots).toEqual(pyRoots)
   })
 })
