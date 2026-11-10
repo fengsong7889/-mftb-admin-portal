@@ -11,10 +11,10 @@
     "（另一侧是真债务）。豁免块内的裸色值单独作为「豁免区存量」报出，不进棘轮但不允许隐形。",
     "expectThemeFiles：theme.css 与 themeTokens.ts 是否应已存在；置 true 后文件缺失即判失败，防止门禁长期 SKIP。"
   ],
-  "cssHex": 1152,
+  "cssHex": 597,
   "inlineHex": 5070,
-  "rgbaBlack": 540,
-  "tokenized": 6259,
+  "rgbaBlack": 484,
+  "tokenized": 6872,
   "expectThemeFiles": true,
   "updatedAt": "2026-11-10"
 }
