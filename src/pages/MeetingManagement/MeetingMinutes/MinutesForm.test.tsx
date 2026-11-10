@@ -522,7 +522,8 @@ describe('會議紀要表單', () => {
     fireEvent.click(screen.getByRole('radio', { name: '全文預覽' }))
     const article = screen.getByRole('article', { name: '會議紀要正文' })
     expect(within(article).getByText('現場討論議題')).toBeInTheDocument()
-    expect(within(article).getAllByText('保留現有方案')).toHaveLength(2)
+    // 速览块已移除：结论只在 02 议题里出现一次，不再重复聚合
+    expect(within(article).getAllByText('保留現有方案')).toHaveLength(1)
     expect(within(article).getByText('填寫內容預覽 · 尚未發布')).toBeInTheDocument()
     expect(createMinutes).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('radio', { name: '填寫紀要' }))
