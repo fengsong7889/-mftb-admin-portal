@@ -9,7 +9,7 @@
  * 缺省展示两个用户端 APP 并排；加 app 参数可单独查看某一个。
  */
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import PhoneFrame from './PhoneFrame'
 import MerchantApp from './MerchantApp'
 import ConsumerApp from './ConsumerApp'
@@ -21,6 +21,43 @@ import './appPreview.css'
 /** desc 支持 **加粗** 标记：按序拆成 普通/加粗 段渲染（说明文案重点标记口径），不用 innerHTML */
 function renderDesc(text: string) {
   return text.split(/\*\*(.+?)\*\*/g).map((part, i) => (i % 2 === 1 ? <strong key={i}>{part}</strong> : part))
+}
+
+/** 分段轨道·滑动高亮容器：高亮丸（thumb）以 transform+width 过渡跟随选中项（两者皆可插值），
+ *  取代旧「选中背景硬切换」——渐变背景无法过渡插值只能瞬现，是「硬加载感」的根因；
+ *  按钮只保留文字色渐变与按压反馈。首帧在 useLayoutEffect 内完成测量，无入场动画；
+ *  setThumb 带值比较守卫，避免每渲染测量产生自激重渲染 */
+function SpecTrack({ variant, children }: { variant: 'group' | 'panel' | 'mini'; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [thumb, setThumb] = useState<CSSProperties | null>(null)
+
+  useLayoutEffect(() => {
+    const root = ref.current
+    if (!root) return
+    const measure = () => {
+      const active = root.querySelector<HTMLElement>('.is-on')
+      const next = active ? { transform: `translateX(${active.offsetLeft}px)`, width: active.offsetWidth } : null
+      setThumb((prev) => (
+        prev?.transform === next?.transform && prev?.width === next?.width ? prev : next
+      ))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(root)
+    return () => ro.disconnect()
+  })
+
+  const trackClass = variant === 'panel'
+    ? 'ap-spec-track ap-spec-track--sub'
+    : variant === 'mini'
+      ? 'ap-spec-track ap-spec-track--mini'
+      : 'ap-spec-track'
+  return (
+    <div ref={ref} className={trackClass}>
+      {thumb && <span className={`ap-spec-thumb ap-spec-thumb--${variant}`} style={thumb} aria-hidden="true" />}
+      {children}
+    </div>
+  )
 }
 
 export default function AppPreview() {
@@ -166,7 +203,7 @@ function DualView() {
         <div className="ap-spec-panel">
           {/* 顶部控制栈（统一分段轨道语言）：①菜单分组行 → ②瀑布流面板行（主级）→ ③条件行（展示模式切换） */}
           <div className="ap-spec-tabs">
-            <div className="ap-spec-track">
+            <SpecTrack variant="group">
               {Array.from(new Set(SPEC_PANELS.filter((p) => !p.hidden).map((p) => p.group))).map((group) => (
                 <button
                   key={group}
@@ -180,10 +217,10 @@ function DualView() {
                   {group}
                 </button>
               ))}
-            </div>
+            </SpecTrack>
             {/* 面板行（次级）：单面板分组（美食外卖页）不渲染轨道，避免与标题重复的孤粒；隐藏面板（三级寻址）不进轨道 */}
             {SPEC_PANELS.filter((p) => p.group === activePanel.group && !p.hidden).length > 1 && (
-              <div className="ap-spec-track ap-spec-track--sub">
+              <SpecTrack variant="panel">
                 {SPEC_PANELS.filter((p) => p.group === activePanel.group && !p.hidden).map((p) => (
                   <button
                     key={p.key}
@@ -194,12 +231,12 @@ function DualView() {
                     {p.label}
                   </button>
                 ))}
-              </div>
+              </SpecTrack>
             )}
             {panelKey === 'delivery' && (
               <div className="ap-spec-mode">
                 <span className="ap-spec-mode-label">展示模式</span>
-                <div className="ap-spec-track ap-spec-track--mini">
+                <SpecTrack variant="mini">
                   <button
                     type="button"
                     className={`ap-spec-mode-btn${deliveryMode === 'list' ? ' is-on' : ''}`}
@@ -221,13 +258,13 @@ function DualView() {
                   >
                     大图模式
                   </button>
-                </div>
+                </SpecTrack>
               </div>
             )}
             {panelKey === 'deliveryPage' && (
               <div className="ap-spec-mode">
                 <span className="ap-spec-mode-label">展示模式</span>
-                <div className="ap-spec-track ap-spec-track--mini">
+                <SpecTrack variant="mini">
                   <button
                     type="button"
                     className={`ap-spec-mode-btn${deliveryPageMode === 'small' ? ' is-on' : ''}`}
@@ -242,13 +279,13 @@ function DualView() {
                   >
                     大图模式
                   </button>
-                </div>
+                </SpecTrack>
               </div>
             )}
             {panelKey === 'preferred' && (
               <div className="ap-spec-mode">
                 <span className="ap-spec-mode-label">展示模式</span>
-                <div className="ap-spec-track ap-spec-track--mini">
+                <SpecTrack variant="mini">
                   <button
                     type="button"
                     className={`ap-spec-mode-btn${preferredLayout === 'small' ? ' is-on' : ''}`}
@@ -263,14 +300,14 @@ function DualView() {
                   >
                     大圖模式
                   </button>
-                </div>
+                </SpecTrack>
               </div>
             )}
             {/* 三级（搜索结果瀑布流）：外卖 / 团购 两条瀑布流各有一套字段说明，切换同步表格内容、锚点作用域与壳内结果页分类 */}
             {(panelKey === 'searchDelivery' || panelKey === 'searchGroup') && (
               <div className="ap-spec-mode">
                 <span className="ap-spec-mode-label">瀑布流</span>
-                <div className="ap-spec-track ap-spec-track--mini">
+                <SpecTrack variant="mini">
                   <button
                     type="button"
                     className={`ap-spec-mode-btn${panelKey === 'searchDelivery' ? ' is-on' : ''}`}
@@ -285,7 +322,7 @@ function DualView() {
                   >
                     团购
                   </button>
-                </div>
+                </SpecTrack>
               </div>
             )}
           </div>
