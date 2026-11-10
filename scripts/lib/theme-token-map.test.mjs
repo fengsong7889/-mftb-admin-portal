@@ -27,6 +27,7 @@ import { describe, it, expect } from 'vitest'
 // readFileSync 只为「读自己源码查重复键」那条断言服务：重复键在运行时会被静默合并，
 // 只能像门禁核 theme.css 那样从文本层抓出来。
 import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import {
   APP_PREVIEW_PLATFORM_ROOTS,
   COLOR_TO_TOKEN,
@@ -41,6 +42,9 @@ import {
   TOKEN_VALUES,
   classifyProperty,
   compositeOnto,
+  isExcludedCssBlock,
+  stripCssCommentsKeepLines,
+  walkCssBlocks,
   contrastRatio,
   countBareColors,
   isExcluded,
@@ -1146,5 +1150,122 @@ describe('AppPreview 壳内选择器排除与平台侧优先', () => {
     const jsRoots = [...APP_PREVIEW_PLATFORM_ROOTS].sort()
     // 双向相等：任何一侧单独加/减名字都会红，避免「工具与门禁各守一套平台侧」
     expect(jsRoots).toEqual(pyRoots)
+  })
+})
+
+/*
+ * 选择器感知的 CSS 计数（§卅七 口径变更）。
+ *
+ * 变更动机：豁免（EXCLUDE_SELECTOR_PREFIXES）原先只约束 codemod 与摸底工具，
+ * `countBareColors` 根本不认块——于是「壳内拟真配色已豁免」但账上仍当债务挂着，
+ * 两套口径互相看不见，回收三步做完 cssHex 也不降，很容易被误读成「白干了」。
+ * 下面这组断言守的是新口径的**边界**：什么该退出、什么绝不能退出。
+ */
+const HEX_LIT = /#[0-9a-fA-F]{3,8}\b/
+
+describe('walkCssBlocks 与选择器感知计数（§卅七）', () => {
+  const FIXTURE = [
+    '/* 注释里有 .login-card{color:#fff} 与花括号 { } 必须整块忽略 */',
+    '.plain { color: #111111; }',
+    '.single{background:#222222}',
+    '.multi,',
+    '.multi-b {',
+    '  border: 1px solid #333333;',
+    '}',
+    '@media (max-width: 480px) {',
+    '  .in-media { color: #444444; }',
+    '  .login-card { color: #555555; }',
+    '}',
+    '@keyframes pulse {',
+    '  0% { box-shadow: 0 0 0 2px #666666; }',
+    '  100% { box-shadow: 0 0 0 2px #666666; }',
+    '}',
+    '.login-card, .app-card { background: #777777; }',
+    '.apc-card { background: #888888; }',
+    '.ap-spec-panel { background: #999999; }',
+  ].join('\n')
+  const src = stripCssCommentsKeepLines(FIXTURE)
+  const blocks = walkCssBlocks(src)
+  const bySel = (sel) => blocks.find((b) => b.selector === sel)
+
+  it('阳性对照：块数与归属必须等于手算值（解析器坏了不能当成「没有排除块」）', () => {
+    // 注释里那两个假块不得被当成真块；@media 内部两条各自成块；关键帧整体只算一块
+    expect(blocks.length).toBe(9)
+    expect(bySel('.single')).toBeTruthy()
+    expect(bySel('.multi, .multi-b'), '多行选择器列表要归成一个块').toBeTruthy()
+    expect(bySel('.in-media'), '@media 是容器，内部规则要按普通规则交出来').toBeTruthy()
+    expect(bySel('.login-card')).toBeTruthy()
+    expect(blocks.filter((b) => b.atRule === 'keyframes').length).toBe(1)
+    expect(blocks.filter((b) => /^\s*\d+%/.test(b.selector)).length, '关键帧步不得单独成块').toBe(0)
+  })
+
+  it('rings 按逗号拆环，供「全环排除」判据使用', () => {
+    expect(bySel('.multi, .multi-b').rings).toEqual(['.multi', '.multi-b'])
+    expect(bySel('.login-card, .app-card').rings).toEqual(['.login-card', '.app-card'])
+  })
+
+  it('排除判定：整块全环排除才算排除，混排块仍计债', () => {
+    expect(isExcludedCssBlock(bySel('.login-card'))).toBe(true)
+    expect(isExcludedCssBlock(bySel('.apc-card')), '拟真 APP 壳内前缀应被豁免').toBe(true)
+    expect(isExcludedCssBlock(bySel('.ap-spec-panel')), '平台侧优先：命中平台根不得豁免').toBe(false)
+    expect(isExcludedCssBlock(bySel('.login-card, .app-card')), '混排块的另一侧是真债务').toBe(false)
+    expect(isExcludedCssBlock(blocks.find((b) => b.atRule === 'keyframes')),
+      '关键帧不参与选择器排除').toBe(false)
+  })
+
+  it('计数：豁免块内的 hex 退出 cssHex 并进 excluded', () => {
+    const stat = countBareColors(FIXTURE, 'css')
+    // 手算：保留的 hex = .plain 1 + .single 1 + .multi 1 + .in-media 1 + keyframes 2 + 混排 1 + .ap-spec-panel 1 = 8
+    expect(stat.hex).toBe(8)
+    // 豁免掉的 = .login-card 1 + .apc-card 1 = 2
+    expect(stat.excluded).toBe(2)
+  })
+
+  it('不变式：旧口径 hex === 新口径 hex + excluded（口径变更必须可逐块对账）', () => {
+    const off = countBareColors(FIXTURE, 'css', { honorSelectorExclusion: false })
+    const on = countBareColors(FIXTURE, 'css')
+    expect(off.hex, '旧口径应当等于全部声明 hex').toBe(10)
+    expect(off.hex).toBe(on.hex + on.excluded)
+  })
+
+  it('inline 口径不受影响（TSX 没有选择器概念）', () => {
+    const stat = countBareColors('<div style={{ color: "#123456" }} />', 'inline')
+    expect(stat.hex).toBe(1)
+    expect(stat.excluded).toBe(0)
+  })
+
+  it('注释里的 hex 与花括号既不计入也不改变块归属', () => {
+    const only = '/* .login-card{color:#fff} 原值 #E8720C */\n.a{color:#000000}'
+    const stat = countBareColors(only, 'css')
+    expect(stat.hex).toBe(1)
+    expect(stat.excluded).toBe(0)
+  })
+
+  it('全仓不变式：旧口径 hex === 新口径 hex + excluded（逐文件闭合，不是抽查）', () => {
+    /*
+     * 口径变更最怕「少算了什么没人知道」。这条把整个 CSS 面跑一遍，逐文件要求
+     * 旧计数与新计数加豁免量精确相等；任何一块被两个口径同时漏掉（解析器坏掉）
+     * 或同时多算（豁免过宽）都会当场红，而不是等下一轮人工对账才发现。
+     */
+    const files = execFileSync('git', ['ls-files', '--', '*.css'], { encoding: 'utf8' })
+      .split('\n').filter((p) => p && !isExcluded(p))
+    expect(files.length, '一个 CSS 都没扫到 = 判据失效').toBeGreaterThan(20)
+    const broken = []
+    let sumOld = 0
+    let sumNew = 0
+    let sumExcluded = 0
+    for (const rel of files) {
+      const body = readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8')
+      const off = countBareColors(body, 'css', { honorSelectorExclusion: false })
+      const on = countBareColors(body, 'css')
+      if (off.hex !== on.hex + on.excluded) broken.push(`${rel}: ${off.hex} ≠ ${on.hex} + ${on.excluded}`)
+      sumOld += off.hex
+      sumNew += on.hex
+      sumExcluded += on.excluded
+    }
+    expect(broken, `对账失败：${broken.slice(0, 5).join(' | ')}`).toEqual([])
+    // 阳性对照：豁免确实吃掉了东西（否则这条不变式可能只是「两边都等于全量」的空转）
+    expect(sumExcluded, '豁免区一个色值都没有 = 排除清单或解析判据失效').toBeGreaterThan(100)
+    expect(sumOld).toBe(sumNew + sumExcluded)
   })
 })

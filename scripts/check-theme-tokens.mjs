@@ -130,6 +130,8 @@ function scan() {
     inlineHex: 0,
     rgbaBlack: 0,
     tokenized: 0,
+    /** 落在豁免块里的 CSS 裸色值：不计棘轮，但必须报出来，否则豁免区就是账目上的黑洞 */
+    cssExcludedHex: 0,
     files: 0,
     excluded: 0,
     unmapped: new Map(),
@@ -162,8 +164,10 @@ function scan() {
     result.files += 1
     result.tokenized += stat.tokenized
     result.rgbaBlack += stat.rgbaBlack
-    if (kind === 'css') result.cssHex += stat.hex
-    else {
+    if (kind === 'css') {
+      result.cssHex += stat.hex
+      result.cssExcludedHex += stat.excluded
+    } else {
       result.inlineHex += stat.hex
       if (stat.hex > 0) result.byFile.set(rel, stat.hex)
     }
@@ -348,6 +352,9 @@ function writeBaseline(result) {
       'cssHex = CSS 文件里的十六进制裸色值；inlineHex = TSX/TS 引号内的十六进制裸色值；',
       'rgbaBlack = rgba(0,0,0,*) 形式的黑色阴影（深色下几乎不可见，需换成 --shadow-* + --card-outline）。',
       '统计已排除方案 §5.4 的排除区（登录页 / 门户插画 scene / PetMascot 动效变量 / 测试断言）。',
+      '自 2026-11-11 起 CSS 计数是**选择器感知**的：整块落在 EXCLUDE_SELECTOR_PREFIXES 的规',
+      '则（拟真 APP 壳内配色、登录页区段、scene 色板）不再计入 cssHex；只有一环排除的混排块仍计入',
+      '（另一侧是真债务）。豁免块内的裸色值单独作为「豁免区存量」报出，不进棘轮但不允许隐形。',
       'expectThemeFiles：theme.css 与 themeTokens.ts 是否应已存在；置 true 后文件缺失即判失败，防止门禁长期 SKIP。',
     ],
     cssHex: result.cssHex,
@@ -448,6 +455,7 @@ console.log('主题令牌门禁（check:theme-tokens）')
 console.log(`  扫描文件 ${result.files} 个（另排除 ${result.excluded} 个：登录页 / 门户插画 scene / PetMascot / 测试断言）`)
 console.log(`  CSS 裸色值 ${result.cssHex} 处 / 内联裸色值 ${result.inlineHex} 处 / 黑色 rgba 阴影 ${result.rgbaBlack} 处`)
 console.log(`  已令牌化 var(--*) 用量 ${result.tokenized} 处`)
+console.log(`  豁免区存量（不计棘轮）CSS 裸色值 ${result.cssExcludedHex} 处 —— 登录页区段 / scene 色板 / 拟真 APP 壳内`)
 if (baseline) {
   console.log(`  基线 cssHex=${baseline.cssHex} inlineHex=${baseline.inlineHex} rgbaBlack=${baseline.rgbaBlack}（expectThemeFiles=${baseline.expectThemeFiles}）`)
 }

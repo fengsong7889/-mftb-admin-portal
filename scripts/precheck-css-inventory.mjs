@@ -30,7 +30,7 @@
 import { readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
-import { COLOR_TO_TOKEN, normalizeHex, classifyProperty, isExcluded, isExcludedSelector } from './lib/theme-token-map.mjs'
+import { COLOR_TO_TOKEN, normalizeHex, classifyProperty, isExcluded, isExcludedCssBlock, walkCssBlocks, stripCssCommentsKeepLines } from './lib/theme-token-map.mjs'
 
 const ROOT = process.cwd()
 const TOP_FLAG = '--top'
@@ -48,16 +48,18 @@ const HEX_RE = /#[0-9a-fA-F]{3,8}\b/g
 const rows = []
 for (const rel of files) {
   if (isExcluded(rel)) continue
-  const src = readFileSync(resolve(ROOT, rel), 'utf8')
+  const src = stripCssCommentsKeepLines(readFileSync(resolve(ROOT, rel), 'utf8'))
   let auto = 0, manual = 0, alpha = 0
-  let sel = null
-  for (const line of src.split('\n')) {
-    // 选择器只在「本行含 {」时定标；本仓 CSS 基本一行一规则，够用且不会跨行误判
-    if (/\{/.test(line)) sel = line.slice(0, line.lastIndexOf('{'))
-    if (sel !== null && isExcludedSelector(sel)) continue
+  /*
+   * 块归属一律走 walkCssBlocks / isExcludedCssBlock（与棘轮同一份实现）。
+   * 原先本脚本自己按「本行含 {」定标：单行规则 `.a{color:#fff}` 与多行选择器前言行都会归错，
+   * 而 `countBareColors` 根本不认块——三方各自一套时，「豁免了多少」根本对不上账（§卅七）。
+   */
+  for (const block of walkCssBlocks(src)) {
+    if (isExcludedCssBlock(block)) continue
     let m
     DECL_RE.lastIndex = 0
-    while ((m = DECL_RE.exec(line))) {
+    while ((m = DECL_RE.exec(block.body))) {
       const seg = classifyProperty(m[1])
       if (!seg) continue
       for (const raw of m[2].match(HEX_RE) || []) {

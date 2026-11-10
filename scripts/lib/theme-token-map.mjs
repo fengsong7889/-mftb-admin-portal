@@ -933,11 +933,118 @@ export function compositeOnto(tint, base) {
 }
 
 /**
+ * 剥 CSS 注释但**保留换行与偏移量**，这样解析出来的字符下标仍对得上原文件行号。
+ * 不剥注释会把「原值 #E8720C」这类设计说明当成声明值（门禁与审计都踩过一次）。
+ */
+export function stripCssCommentsKeepLines(text) {
+  return String(text).replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+}
+
+/**
+ * 把 CSS 解析成规则块序列 —— **全仓唯一的一份「当前在哪个选择器块里」实现**。
+ *
+ * 为什么要抽到这里：同一件事原先有三份各自实现（`countBareColors` 根本不认块、
+ * `precheck-css-inventory` 按「本行含 {」定标、`theme-tokenize-css` 只认「以 { 结尾的行」），
+ * 三份对单行规则 `.a{color:#fff}` 的归属各不相同——而「排除区到底覆盖了哪些行」
+ * 直接决定债务账目与机械批会不会误改登录页。重复实现早晚分叉，所以收成一份，三方共用。
+ *
+ * 返回字段：
+ *   - `selector`：规范化空白后的完整选择器文本（含逗号列表）
+ *   - `rings`：按逗号拆开的各个选择器环（供「全环排除」判据用）
+ *   - `atRule`：null（普通规则）| 'keyframes'（整个关键帧块，内部百分比步不单独成块）
+ *   - `body` / `bodyStart` / `bodyEnd`：花括号内的文本与其在 src 中的字符区间（不含括号）
+ *   - `startLine` / `endLine`：块（含选择器行与收尾 `}`）占的**行区间**，供逐行改写的工具用
+ *
+ * 容器型 at-rule（`@media` / `@supports` / `@layer` / `@container`）**不作为块返回**，
+ * 而是递归进去，把它内部的规则按普通规则交出来——否则外层选择器上下文会丢。
+ */
+export function walkCssBlocks(text) {
+  const src = String(text)
+  // 行号定位用：预先记下换行符位置，二分算 offset → 行号（逐块扫描全文会退化到 O(n²)）。
+  const nl = []
+  for (let k = src.indexOf('\n'); k >= 0; k = src.indexOf('\n', k + 1)) nl.push(k)
+  const lineOf = (offset) => {
+    let lo = 0
+    let hi = nl.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (nl[mid] < offset) lo = mid + 1
+      else hi = mid
+    }
+    return lo + 1
+  }
+  const blocks = []
+  const scan = (start, end) => {
+    let i = start
+    while (i < end) {
+      const open = src.indexOf('{', i)
+      if (open < 0 || open >= end) break
+      const rawPrelude = src.slice(i, open)
+      const prelude = rawPrelude.trim()
+      // 前言行自己的起始偏移：直接用 i 会把上一个块的收尾行也算进去，
+      // 单行规则 `.a{color:#fff}` 紧跟下一个块时就会误把前者标成跳过。
+      const preludeStart = i + (rawPrelude.length - rawPrelude.replace(/^\s+/, '').length)
+      let depth = 1
+      let j = open + 1
+      for (; j < end && depth > 0; j += 1) {
+        if (src[j] === '{') depth += 1
+        else if (src[j] === '}') depth -= 1
+      }
+      const close = j - 1
+      const span = { startLine: lineOf(preludeStart), endLine: lineOf(close) }
+      if (/^@(media|supports|layer|container)\b/.test(prelude)) {
+        scan(open + 1, close)
+      } else if (/^@[-\w]*keyframes\b/.test(prelude)) {
+        blocks.push({
+          selector: prelude.replace(/\s+/g, ' '), rings: [], atRule: 'keyframes',
+          body: src.slice(open + 1, close), bodyStart: open + 1, bodyEnd: close, ...span,
+        })
+      } else if (prelude.startsWith('@')) {
+        // @font-face / @property 这类声明块：它自己就是归属单位，按普通规则交出（rings 非空，
+        // 但因为不是类选择器，isExcludedSelector 永远判不进排除区，行为与旧口径一致）
+        blocks.push({
+          selector: prelude.replace(/\s+/g, ' '), rings: [prelude.replace(/\s*\{\s*$/, '')], atRule: null,
+          body: src.slice(open + 1, close), bodyStart: open + 1, bodyEnd: close, ...span,
+        })
+      } else if (prelude) {
+        blocks.push({
+          selector: prelude.replace(/\s+/g, ' '),
+          rings: prelude.split(',').map((s) => s.trim()).filter(Boolean),
+          atRule: null, body: src.slice(open + 1, close), bodyStart: open + 1, bodyEnd: close, ...span,
+        })
+      }
+      i = close + 1
+    }
+  }
+  scan(0, src.length)
+  return blocks
+}
+
+/**
+ * 一个 CSS 块是否整体落在排除区。
+ *
+ * 判据是 **全部环都排除**，不是「任一环排除」：
+ * `.login-card, .app-card { background:#fff }` 这种混排块里，`.app-card` 一侧仍是要跟随主题的
+ * 真债务；按「任一环」跳过会把活债务静默藏起来。codemod 那边反过来仍按「任一环」跳过——
+ * 它没法只改选择器列表的一半，所以混排块整块交人工，但**计数不能跟着少算**。
+ * 关键帧不参与选择器排除（脉冲高亮色两主题都要醒目，属于另桶，见方案 §36.7）。
+ */
+export function isExcludedCssBlock(block) {
+  if (block.atRule) return false
+  return block.rings.length > 0 && block.rings.every((ring) => isExcludedSelector(ring))
+}
+
+/**
  * 统计一段源码里的裸色值与已令牌化用量。
  *
  * @param text 文件内容
- * @param kind 'css' | 'inline'（决定用哪套正则：CSS 剥注释后全量匹配，TSX 只匹配引号内）
- * @returns {{hex:number, rgbaBlack:number, tokenized:number, hits:Map<string,number>, unmapped:Map<string,number>}}
+ * @param kind 'css' | 'inline'（决定用哪套正则：CSS 剥注释后按块计数，TSX 只匹配引号内）
+ * @param options.honorSelectorExclusion 默认 true；置 false 得到**旧口径**（不认选择器排除区），
+ *   单测靠它钉不变式：`旧口径 hex === 新口径 hex + excluded`。没有这个开关，口径变更就无从对账。
+ * @returns {{hex:number, rgbaBlack:number, tokenized:number, excluded:number, hits:Map<string,number>, unmapped:Map<string,number>}}
+ *
+ * `excluded` 是「落在豁免块里的裸色值个数」：它**不计入棘轮**，但必须报出来——
+ * 否则豁免区会变成账目上的黑洞（原型里加多少固定配色都没人看得见）。
  *
  * hits 是**归一化后**全部色值的计数（含重复），调用方由它派生各类报表，
  * 不要为了统计另一类而重新跑一轮正则：全仓数千个文件 × 数十个待查色值
@@ -947,14 +1054,32 @@ export function compositeOnto(tint, base) {
  * 用于 --report 找出映射表尚未覆盖的长尾色值；REVIEW_REQUIRED 已知需人工处理，
  * 混进来会把报告淹掉。
  */
-export function countBareColors(text, kind) {
-  const source = kind === 'css' ? String(text).replace(CSS_COMMENT_RE, '') : String(text)
+export function countBareColors(text, kind, options = {}) {
+  const source = kind === 'css' ? stripCssCommentsKeepLines(String(text)) : String(text)
   const re = kind === 'css' ? HEX_RE : HEX_QUOTED_RE
+  const honorExclusion = options.honorSelectorExclusion !== false
+  /**
+   * CSS 侧先把「整体排除」的块体抹白再计数：
+   * 旧口径不认选择器排除区，导致「壳内拟真配色已豁免」但账上仍当债务挂着，
+   * 豁免与计数两套口径互相看不见（方案 §36.4 末条登记的事实）。
+   * 抹白而不是跳过整块遍历：块外的残留文本（顶层声明、@import 等）继续按老口径计数，
+   * 于是新旧数字的唯一差就是排除块本身，可逐块对账。
+   */
+  let scanSource = source
+  let excluded = 0
+  if (kind === 'css' && honorExclusion) {
+    for (const block of walkCssBlocks(source)) {
+      if (!isExcludedCssBlock(block)) continue
+      const n = (block.body.match(re) || []).length
+      excluded += n
+      scanSource = `${scanSource.slice(0, block.bodyStart)}${' '.repeat(block.bodyEnd - block.bodyStart)}${scanSource.slice(block.bodyEnd)}`
+    }
+  }
   const hits = new Map()
   const unmapped = new Map()
   let hex = 0
 
-  for (const match of source.matchAll(re)) {
+  for (const match of scanSource.matchAll(re)) {
     const normalized = normalizeHex(match[1])
     if (!normalized) continue
     hex += 1
@@ -967,8 +1092,9 @@ export function countBareColors(text, kind) {
 
   return {
     hex,
-    rgbaBlack: (source.match(RGBA_BLACK_RE) ?? []).length,
-    tokenized: (source.match(VAR_RE) ?? []).length,
+    rgbaBlack: (scanSource.match(RGBA_BLACK_RE) ?? []).length,
+    tokenized: (scanSource.match(VAR_RE) ?? []).length,
+    excluded,
     hits,
     unmapped,
   }

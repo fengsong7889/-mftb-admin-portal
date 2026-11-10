@@ -31,9 +31,13 @@
  * 未命中映射表的值一律原样保留，并由 check-theme-tokens 的棘轮基线继续记为债务——**绝不猜**。
  * 阴影走单独的 SHADOW_VALUE_TO_TOKEN（整串严格等值），只收黑色阴影；
  * 未命中的复合/彩色阴影整条不动，留给人工判定。
+ *
+ * 本脚本会写盘，所以 `transform()` 是导出的纯函数，由 `scripts/theme-tokenize-css.test.mjs` 钉住
+ * 块归属与跳过规则（2026-11-11 之前它没有任何单测，归属判据就改过一次）。
  */
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
-import { extname, join, relative } from 'node:path'
+import { extname, join, relative, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   COLOR_TO_TOKEN,
   SCAN_ROOTS,
@@ -43,6 +47,7 @@ import {
   isExcludedSelector,
   normalizeHex,
   normalizeShadowValue,
+  walkCssBlocks,
 } from './lib/theme-token-map.mjs'
 
 const ROOT = process.cwd()
@@ -51,6 +56,23 @@ const RUN = ARGS.includes('--run')
 const explicit = ARGS.indexOf('--files')
 /** --files 后跟仓库相对路径；不传则扫全部 CSS（务必先 --dry-run） */
 const targets = explicit >= 0 ? ARGS.slice(explicit + 1).filter((a) => !a.startsWith('--')) : null
+
+// 写盘工具最危险的失败是「看起来正常」：未知 flag 被静默忽略会让作用域默默退成全仓。
+// 校验必须放在 main() 里而不是模块顶层——单测 import 本文件时 process.argv 是 vitest 的
+// （带 --config 等），在顶层判「未知参数」会把整个测试进程直接 exit 掉。
+const ALLOWED_FLAGS = new Set(['--run', '--dry-run', '--files'])
+
+function validateArgs() {
+  const unknownFlag = ARGS.find((a) => a.startsWith('--') && !ALLOWED_FLAGS.has(a))
+  if (unknownFlag) {
+    console.error(`未知参数 ${unknownFlag}；可用：[--dry-run|--run] [--files <路径>…]`)
+    process.exit(1)
+  }
+  if (explicit >= 0 && targets.length === 0) {
+    console.error('--files 后面必须给至少一个路径（不传则扫全仓 CSS）')
+    process.exit(1)
+  }
+}
 
 /** 声明级匹配：属性名 + 到分号/花括号结束的值段。伪类会因 classifyProperty 返回 null 而被自然跳过 */
 const DECLARATION_RE = /([-a-zA-Z]+)\s*:\s*([^;{}]+)/g
@@ -90,15 +112,13 @@ function collectFiles() {
  * @returns {{ next: string, replaced: number, skipped: string[] }} skipped 记录「属性可识别但色值不在映射表」的情况，
  *          它们是扩充映射表的候选，静默丢掉就等于把信息扔了。
  *
- * 逐行处理是为了能追踪「当前在哪个选择器块里」：登录页、关键帧动画这些区段必须整块跳过。
- * 块上下文的三条规则：
- *   - `@keyframes X {` → 置为跳过大常量（关键帧颜色属于哪个组件无法从结构推出，交人工）
- *   - `from/to/N% {` → 沿用上一个上下文（它还在 keyframes 里）
- *   - `@media/@supports {` → 沿用外层（它只是容器，不是选择器）
+ * 块上下文一律由 `walkCssBlocks` 给（与棘轮计数、摸底工具共用同一份实现）：
+ *   - `@keyframes X {` 与其内部的 `from/to/N% {` → 整块跳过（关键帧颜色属于哪个组件无法从结构推出，交人工）
+ *   - `@media/@supports` → 容器，内部规则各自成块
+ *   - 单行规则 `.a{color:#fff}` → 归它**自己的**选择器，不再沿用上一个上下文
  */
-const KEYFRAMES = '__keyframes__'
 
-function transform(source) {
+export function transform(source) {
   // 注释替换成占位符，处理完再还原：防止把「原值 #E8720C」这类设计说明改写成令牌
   const comments = []
   const shielded = source.replace(/\/\*[\s\S]*?\*\//g, (m) => {
@@ -106,24 +126,31 @@ function transform(source) {
     return `\u0000${comments.length - 1}\u0000`
   })
 
+  /*
+   * 块归属一律走 walkCssBlocks（与棘轮计数、摸底工具同一份实现）。
+   * 旧版自己按「以 { 结尾的行」定标，单行规则 `.apw-star{color:#f59e0b}` 会被归到
+   * **上一个块的上下文**：上一块没排除就会把该豁免的固定配色改掉（登录页/scene/壳内都是这个形状）。
+   * 2026-11-11 实测仓内确实存在这种单行规则，所以改成行区间→块映射。
+   *
+   * 排除判据与计数侧刻意不同：这里用**任一环**（codemod 不能只改选择器列表的一半，
+   * 混排块整块交人工）；计数侧用**全环**（混排块另一侧是真债务，不能少算）。
+   */
+  const lineBlock = new Map()
+  for (const block of walkCssBlocks(shielded)) {
+    for (let ln = block.startLine; ln <= block.endLine; ln += 1) {
+      if (!lineBlock.has(ln)) lineBlock.set(ln, block)
+    }
+  }
+
   let replaced = 0
   const skipped = []
-  let currentSelector = ''
 
-  const nextLines = shielded.split('\n').map((line) => {
-    const opensBlock = /\{\s*$/.test(line)
-    if (opensBlock) {
-      if (/^\s*@keyframes\b/.test(line)) currentSelector = KEYFRAMES
-      else if (/^\s*(from|to|\d+%)\b/.test(line)) {
-        /* 关键帧百分比：沿用上一个上下文，不要把 KEYFRAMES 洗掉 */
-      } else if (!/^\s*@(media|supports|layer)\b/.test(line)) {
-        // @media / @supports 是容器行，不覆盖外层选择器；其余以 { 结尾的行视为规则头
-        currentSelector = line.replace(/\{\s*$/, '').trim()
-      }
-      return line
-    }
-    if (/^\s*\}/.test(line)) return line
-    if (!currentSelector || currentSelector === KEYFRAMES || isExcludedSelector(currentSelector)) return line
+  const nextLines = shielded.split('\n').map((line, idx) => {
+    const block = lineBlock.get(idx + 1)
+    if (!block || block.atRule === 'keyframes') return line
+    if (/\{\s*$/.test(line) || /^\s*\}/.test(line)) return line
+    if (block.rings.length && block.rings.some((ring) => isExcludedSelector(ring))) return line
+    const currentSelector = block.selector
 
     const rewritten = line.replace(DECLARATION_RE, (whole, prop, value) => {
       // box-shadow 优先整串匹配：同一个 rgba(0,0,0,0.06) 可以配不同的 offset/blur，
@@ -170,33 +197,41 @@ function transform(source) {
 let totalFiles = 0
 let totalReplaced = 0
 
-for (const rel of collectFiles()) {
-  if (isExcluded(rel)) {
+function main() {
+  validateArgs()
+    for (const rel of collectFiles()) {
+    if (isExcluded(rel)) {
     console.log(`SKIP（排除区） ${rel}`)
     continue
-  }
-  const abs = join(ROOT, rel)
-  if (!existsSync(abs)) {
+    }
+    const abs = join(ROOT, rel)
+    if (!existsSync(abs)) {
     console.error(`文件不存在：${rel}`)
     process.exit(1)
-  }
+    }
 
-  const before = readFileSync(abs, 'utf8')
-  const { next, replaced, skipped } = transform(before)
-  if (replaced === 0) continue
+    const before = readFileSync(abs, 'utf8')
+    const { next, replaced, skipped } = transform(before)
+    if (replaced === 0) continue
 
-  totalFiles += 1
-  totalReplaced += replaced
-  console.log(`${RUN ? '改写' : '待改'} ${rel}：${replaced} 处${skipped.length ? `（另有 ${skipped.length} 条声明含未覆盖色值）` : ''}`)
-  if (RUN) writeFileSync(abs, next)
+    totalFiles += 1
+    totalReplaced += replaced
+    console.log(`${RUN ? '改写' : '待改'} ${rel}：${replaced} 处${skipped.length ? `（另有 ${skipped.length} 条声明含未覆盖色值）` : ''}`)
+    if (RUN) writeFileSync(abs, next)
 }
 
-console.log(
-  RUN
-    ? `\n✅ 已改写 ${totalFiles} 个文件、共 ${totalReplaced} 处。请接着跑：npm run check:theme-tokens --run 下调基线，并跑测试确认无回归`
-    : `\n[dry-run] ${totalFiles} 个文件、共 ${totalReplaced} 处待改。确认无误后加 --run 执行`,
-)
+  console.log(
+    RUN
+      ? `\n✅ 已改写 ${totalFiles} 个文件、共 ${totalReplaced} 处。请接着跑：npm run check:theme-tokens --run 下调基线，并跑测试确认无回归`
+      : `\n[dry-run] ${totalFiles} 个文件、共 ${totalReplaced} 处待改。确认无误后加 --run 执行`,
+  )
 
-if (!RUN) {
-  console.log('\n提示：改写后务必人工核对 diff —— 机械替换只保证「严格等值」，不保证语义恰当（例如某处白底其实该用 --surface-3）。')
+  if (!RUN) {
+    console.log('\n提示：改写后务必人工核对 diff —— 机械替换只保证「严格等值」，不保证语义恰当（例如某处白底其实该用 --surface-3）。')
+  }
+}
+
+// 只在直接执行时跑 CLI；被单测 import 时只导出 transform，不扫盘也不写盘。
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main()
 }
