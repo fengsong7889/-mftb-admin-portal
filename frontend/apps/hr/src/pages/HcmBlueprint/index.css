@@ -17,9 +17,9 @@
   gap: 16px;
   margin-bottom: 16px;
   padding: 12px 20px;
-  background: #fff;
+  background: var(--surface-2);
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-1);
 }
 
 .hcm-bp__title {
@@ -29,7 +29,7 @@
   flex: 1;
   font-size: 16px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .hcm-bp__section-title {
@@ -39,13 +39,13 @@
   margin-bottom: 12px;
   font-size: 15px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .hcm-bp__section-hint {
   font-size: 12px;
   font-weight: 400;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 /* 卡片牆柵格：§N.1 的口徑，min 280px 自適應，屏寬越大列數越多 */
@@ -61,22 +61,22 @@
   gap: 6px;
   padding: 16px 18px;
   text-align: left;
-  background: #fff;
-  border: 1px solid #e8eaed;
+  background: var(--surface-2);
+  border: 1px solid var(--border-3);
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-card-soft);
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .hcm-bp-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-  border-color: #e8720c;
+  box-shadow: var(--shadow-3);
+  border-color: var(--brand);
 }
 
 .hcm-bp-card:focus-visible {
-  outline: 2px solid #e8720c;
+  outline: 2px solid var(--brand);
   outline-offset: 2px;
 }
 
@@ -100,18 +100,18 @@
 .hcm-bp-card__name {
   font-size: 15px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .hcm-bp-card__code {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .hcm-bp-card__meta {
   font-size: 12px;
-  color: #595959;
+  color: var(--text-2);
 }
 
 /* 來源說明限兩行：十張卡並排時高度必須一致，否則柵格會參差 */
@@ -122,7 +122,7 @@
   overflow: hidden;
   font-size: 12px;
   line-height: 1.6;
-  color: #8c8c8c;
+  color: var(--text-3);
   min-height: 38px;
 }
 
@@ -139,27 +139,27 @@
 
 .hcm-bp__question {
   padding: 12px 16px;
-  background: #fff7f0;
-  border: 1px solid #ffe7d1;
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-border);
   border-radius: 8px;
 }
 
 .hcm-bp__question-topic {
   font-size: 13px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .hcm-bp__question-detail {
   margin-top: 4px;
   font-size: 12px;
-  color: #595959;
+  color: var(--text-2);
 }
 
 .hcm-bp__question-decision {
   margin-top: 4px;
   font-size: 12px;
-  color: #e8720c;
+  color: var(--brand);
 }
 
 /* 系統骨架：左側模塊欄 + 右側原型容器 */
@@ -171,9 +171,9 @@
 }
 
 .hcm-bp-rail {
-  background: #fff;
+  background: var(--surface-2);
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-1);
   padding-bottom: 12px;
   overflow: hidden;
 }
@@ -183,7 +183,7 @@
   align-items: center;
   gap: 10px;
   padding: 4px 16px 12px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-2);
 }
 
 .hcm-bp-rail__icon {
@@ -200,12 +200,12 @@
 .hcm-bp-rail__name {
   font-size: 14px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .hcm-bp-rail__code {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
@@ -217,9 +217,9 @@
 .hcm-bp-pane {
   min-width: 0;
   padding: 16px 20px 24px;
-  background: #fff;
+  background: var(--surface-2);
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-1);
 }
 
 .hcm-bp-pane__head {
@@ -229,7 +229,7 @@
   gap: 16px;
   padding-bottom: 12px;
   margin-bottom: 16px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-2);
 }
 
 .hcm-bp-pane__title {
@@ -238,13 +238,13 @@
   gap: 8px;
   font-size: 16px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .hcm-bp-pane__sub {
   margin-top: 4px;
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 /* 原型容器內的表單頁/詳情頁自帶白色內容區，避免雙層白底產生陰影疊影 */

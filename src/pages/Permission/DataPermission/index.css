@@ -5,7 +5,7 @@
   gap: 12px;
   padding: 12px 16px;
   margin-bottom: 16px;
-  background: #fafafa;
+  background: var(--surface-3);
   border-radius: 8px;
 }
 
@@ -20,7 +20,7 @@
 .data-auth-label {
   font-size: 14px;
   font-weight: 500;
-  color: #262626;
+  color: var(--text-1);
   flex-shrink: 0;
 }
 
@@ -37,7 +37,7 @@
 .data-auth-tip {
   margin-top: 8px;
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 /* 详情弹窗：商家集团标签列表 */
@@ -46,7 +46,7 @@
   flex-wrap: wrap;
   gap: 8px;
   padding: 12px;
-  background: #fafafa;
+  background: var(--surface-3);
   border-radius: 8px;
   max-height: 320px;
   overflow-y: auto;

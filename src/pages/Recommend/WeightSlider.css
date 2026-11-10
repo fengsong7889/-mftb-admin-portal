@@ -101,7 +101,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--surface-2);
   border: 2px solid #2563eb;
   box-shadow: 0 1px 4px rgba(37, 99, 235, 0.25);
   margin-top: 2px;
@@ -133,7 +133,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--surface-2);
   border: 2px solid #2563eb;
   box-shadow: 0 1px 4px rgba(37, 99, 235, 0.25);
   cursor: pointer;

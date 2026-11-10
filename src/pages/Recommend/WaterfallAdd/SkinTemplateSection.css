@@ -314,7 +314,7 @@
 
 .skin-stage__slide .skin-stage__dish {
   border: 2px solid #fff;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  box-shadow: var(--shadow-btn-active);
 }
 
 .skin-stage__slide--0 {
@@ -410,7 +410,7 @@
 
 .skin-gallery-card:hover {
   border-color: #F59432;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-1);
 }
 
 .skin-gallery-card--selected {
@@ -812,7 +812,7 @@
 
 .skin-config__poster-option:hover {
   transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-btn-hover);
 }
 
 /* 兑底图已换真实海报切图（原渐变块仅作 img 加载前的底色兑底） */

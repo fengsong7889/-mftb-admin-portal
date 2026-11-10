@@ -65,7 +65,7 @@
 .sv2__scenario-strip small { display: block; line-height: 1.7; color: var(--text-3); font-size: 11px; margin: 10px 0; min-height: 36px; }
 .sv2__scenario-strip button > span { color: var(--brand); font-size: 12px; }
 .sv2__form-header { border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.06); overflow: hidden; margin-bottom: 16px; }
-.sv2__gradient { height: 3px; background: linear-gradient(90deg, #E8720C, #F59432, #E8720C); background-size: 200% 100%; animation: headerGradientShift 4s ease infinite; }
+.sv2__gradient { height: 3px; background: linear-gradient(90deg, var(--brand), #F59432, var(--brand)); background-size: 200% 100%; animation: headerGradientShift 4s ease infinite; }
 .sv2__form-title { padding: 16px 24px; display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
 .sv2__form-title h2 { color: var(--info); font-size: 18px; margin: 0; }
 .sv2__form-title .ant-btn { height: 36px; border-radius: 8px; }

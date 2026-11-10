@@ -138,12 +138,12 @@
   margin-bottom: 16px;
   border-radius: 16px;
   background: var(--surface-2);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-2);
 }
 
 .rdm-board-hero-bar {
   height: 4px;
-  background: linear-gradient(90deg, #e8720c, #f59432, #ffb347, #f59432, #e8720c);
+  background: linear-gradient(90deg, var(--brand), #f59432, #ffb347, #f59432, var(--brand));
   background-size: 200% 100%;
   animation: headerGradientShift 4s ease infinite;
 }
@@ -416,7 +416,7 @@
 
 .rdm-board-view-switch button[data-active="true"] {
   border-color: var(--brand-border);
-  background: linear-gradient(135deg, #fff7f0 0%, #ffffff 70%);
+  background: linear-gradient(135deg, var(--brand-soft) 0%, var(--surface-2) 70%);
   color: var(--brand);
   box-shadow: 0 2px 6px rgba(232, 114, 12, 0.16);
 }
@@ -669,7 +669,7 @@
 .rdm-board-progress-fill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #e8720c, #f59432);
+  background: linear-gradient(90deg, var(--brand), #f59432);
   transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 

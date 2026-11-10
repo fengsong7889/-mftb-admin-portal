@@ -6,12 +6,12 @@
   border-radius: 8px;
   padding: 20px 24px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-card-soft);
 }
 .algorithm-form-page--detail .algorithm-section,
 .algorithm-section--detail {
   border: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-1);
 }
 .algorithm-section__header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .algorithm-section__heading { flex: 1; min-width: 180px; margin: 0; font-size: 15px; font-weight: 600; }

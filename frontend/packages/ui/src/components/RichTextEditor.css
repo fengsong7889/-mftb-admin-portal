@@ -1,14 +1,14 @@
 /* 轻量富文本编辑器私有样式（组件级隔离，不污染全局） */
 .rte {
-  border: 1px solid #d9d9d9;
+  border: 1px solid var(--border-1);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface-2);
   overflow: hidden;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .rte:focus-within {
-  border-color: #E8720C;
+  border-color: var(--brand);
   box-shadow: 0 0 0 2px rgba(232, 114, 12, 0.12);
 }
 
@@ -18,8 +18,8 @@
   align-items: center;
   gap: 4px;
   padding: 6px 8px;
-  border-bottom: 1px solid #f0f0f0;
-  background: #fafafa;
+  border-bottom: 1px solid var(--border-2);
+  background: var(--surface-3);
 }
 
 .rte__btn {
@@ -29,7 +29,7 @@
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: #595959;
+  color: var(--text-2);
   font-size: 13px;
   line-height: 1;
   cursor: pointer;
@@ -37,8 +37,8 @@
 }
 
 .rte__btn:hover {
-  background: #FFF7E6;
-  color: #E8720C;
+  background: var(--warning-soft);
+  color: var(--brand);
 }
 
 .rte__split {
@@ -52,7 +52,7 @@
   padding: 12px 16px;
   outline: none;
   font-size: 14px;
-  color: #262626;
+  color: var(--text-1);
   line-height: 1.8;
   overflow-y: auto;
   max-height: 640px;
@@ -60,7 +60,7 @@
 
 .rte__editor:empty::before {
   content: attr(data-placeholder);
-  color: #bfbfbf;
+  color: var(--text-4);
   pointer-events: none;
 }
 
@@ -91,8 +91,8 @@
   margin: 6px 0;
   padding: 6px 12px;
   border-left: 3px solid #F59432;
-  background: #FFF7F0;
-  color: #595959;
+  background: var(--brand-soft);
+  color: var(--text-2);
 }
 
 /* 只读态：工具栏不可点、编辑区灰底（fieldset 的 disabled 管不到 contentEditable） */
@@ -102,6 +102,6 @@
 }
 
 .rte--disabled .rte__editor {
-  background: #f5f5f5;
-  color: #595959;
+  background: var(--surface-1);
+  color: var(--text-2);
 }

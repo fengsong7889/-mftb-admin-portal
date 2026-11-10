@@ -1,5 +1,5 @@
 .agent-console {
-  color: #262626;
+  color: var(--text-1);
 }
 
 .agent-console__topbar,
@@ -24,13 +24,13 @@
 .agent-console__heading h2 {
   margin: 0 0 6px;
   font-size: 18px;
-  color: #1890FF;
+  color: var(--info);
 }
 
 .agent-console__heading p {
   margin: 0;
   font-size: 13px;
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 
 .agent-console__pane {
@@ -44,16 +44,16 @@
 }
 
 .agent-console__tab > .anticon {
-  color: #E8720C;
+  color: var(--brand);
 }
 
 .agent-console__card {
-  background: #fff;
-  border: 1px solid #e8eaed;
+  background: var(--surface-2);
+  border: 1px solid var(--border-3);
   border-radius: 8px;
   padding: 20px 24px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-card-soft);
 }
 
 .agent-console h3 {
@@ -65,7 +65,7 @@
 }
 
 .agent-console h3 > .anticon {
-  color: #E8720C;
+  color: var(--brand);
 }
 
 .agent-console h4 {
@@ -75,7 +75,7 @@
 
 .agent-console__muted {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
   line-height: 1.7;
 }
 

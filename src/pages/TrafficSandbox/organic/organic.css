@@ -29,7 +29,7 @@
 .organic__context { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 22px; background: var(--surface-3); border: 1px solid var(--border-2); border-radius: 8px; padding: 12px 16px; font-size: 12px; color: var(--text-2); margin-bottom: 16px; }
 .organic__context > span:first-child { color: var(--purple); font-weight: 600; }
 .organic__context .anticon { margin-right: 4px; }
-.organic__section { background: var(--surface-2); border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); min-width: 0; }
+.organic__section { background: var(--surface-2); border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow-1); min-width: 0; }
 .organic__section-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
 .organic__section-title h3 { font-size: 15px; font-weight: 600; margin: 0; }
 .organic__section-title h3::before { content: ''; display: inline-block; height: 13px; width: 3px; border-radius: 2px; margin-right: 9px; background: var(--brand); vertical-align: -1px; }

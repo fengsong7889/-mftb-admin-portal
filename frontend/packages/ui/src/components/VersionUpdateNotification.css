@@ -18,7 +18,7 @@
 .version-update-card {
   width: 100%;
   overflow: hidden;
-  background: #fff;
+  background: var(--surface-2);
   animation: pageFadeIn 0.35s ease-out;
 }
 
@@ -31,7 +31,7 @@
   gap: 12px;
   padding: 16px 20px;
   overflow: hidden;
-  background: linear-gradient(120deg, #E8720C 0%, #F59432 58%, #FFB347 100%);
+  background: linear-gradient(120deg, var(--brand) 0%, #F59432 58%, #FFB347 100%);
   color: #fff;
 }
 
@@ -74,8 +74,8 @@
   flex-shrink: 0;
   padding: 2px 9px;
   border-radius: 10px;
-  background: #fff;
-  color: #E8720C;
+  background: var(--surface-2);
+  color: var(--brand);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.6px;
@@ -87,7 +87,7 @@
   left: 0;
   width: 28%;
   height: 2px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0), #fff, rgba(255, 255, 255, 0));
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), var(--surface-2), rgba(255, 255, 255, 0));
   animation: progressShimmer 2.4s linear infinite;
 }
 
@@ -106,10 +106,10 @@
   margin-bottom: 12px;
   padding: 5px 10px;
   border-radius: 6px;
-  background: #FAFAFA;
-  border: 1px solid #f0f0f0;
+  background: var(--surface-3);
+  border: 1px solid var(--border-2);
   font-size: 11px;
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 
 .version-update-meta-item {
@@ -129,17 +129,17 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 11px;
   font-weight: 600;
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 
 .version-update-meta code.is-latest {
-  color: #E8720C;
+  color: var(--brand);
 }
 
 .version-update-meta-time {
   margin-left: auto;
   font-size: 11px;
-  color: #8C8C8C;
+  color: var(--text-3);
   font-variant-numeric: tabular-nums;
 }
 
@@ -148,8 +148,8 @@
   margin-bottom: 12px;
   padding: 10px 12px;
   border-radius: 8px;
-  background: #FFF7F0;
-  border: 1px solid #FFE7D1;
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-border);
 }
 
 .version-update-changes-title {
@@ -158,11 +158,11 @@
   gap: 6px;
   font-size: 13px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .version-update-changes-title .anticon {
-  color: #E8720C;
+  color: var(--brand);
 }
 
 .version-update-changes-title em {
@@ -170,7 +170,7 @@
   font-size: 11px;
   font-style: normal;
   font-weight: 400;
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 
 .version-update-change-list {
@@ -190,16 +190,16 @@
   gap: 8px;
   font-size: 12px;
   line-height: 1.6;
-  color: #595959;
+  color: var(--text-2);
 }
 
 .version-update-change-list code {
   flex-shrink: 0;
   padding: 0 4px;
   border-radius: 4px;
-  background: #fff;
-  border: 1px solid #FFE7D1;
-  color: #E8720C;
+  background: var(--surface-2);
+  border: 1px solid var(--brand-border);
+  color: var(--brand);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 11px;
 }
@@ -215,7 +215,7 @@
   margin: 0 0 6px;
   font-size: 13px;
   line-height: 1.7;
-  color: #595959;
+  color: var(--text-2);
 }
 
 .version-update-hint {
@@ -225,7 +225,7 @@
   margin: 0 0 14px;
   font-size: 11px;
   line-height: 1.6;
-  color: #8C8C8C;
+  color: var(--text-3);
 }
 
 .version-update-hint > .anticon {
@@ -244,15 +244,15 @@
   height: 36px;
   padding: 0 16px;
   border-radius: 8px;
-  border-color: #D9D9D9;
-  color: #595959;
+  border-color: var(--border-1);
+  color: var(--text-2);
   font-size: 13px;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .version-update-later.ant-btn:hover {
-  border-color: #E8720C;
-  color: #E8720C;
+  border-color: var(--brand);
+  color: var(--brand);
 }
 
 .version-update-reload.ant-btn {
@@ -260,8 +260,8 @@
   min-width: 116px;
   padding: 0 18px;
   border-radius: 8px;
-  background: #E8720C;
-  border-color: #E8720C;
+  background: var(--brand);
+  border-color: var(--brand);
   color: #fff;
   font-size: 13px;
   font-weight: 600;
@@ -294,7 +294,7 @@
   padding: 0 18px;
   border: none;
   border-radius: 20px;
-  background: linear-gradient(120deg, #E8720C, #F59432);
+  background: linear-gradient(120deg, var(--brand), #F59432);
   color: #fff;
   font: inherit;
   font-size: 13px;
@@ -314,6 +314,6 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--surface-2);
   animation: statusPulse 1.6s ease-out infinite;
 }

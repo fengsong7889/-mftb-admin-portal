@@ -9,16 +9,16 @@
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
-  background: #fff;
+  background: var(--surface-2);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .asset-tag-style-thumb:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: var(--shadow-btn-active);
 }
 .asset-tag-style-thumb.selected {
-  border-color: #E8720C;
+  border-color: var(--brand);
   box-shadow: 0 2px 8px rgba(232, 114, 12, 0.25);
 }
 .asset-tag-style-thumb .thumb-check {
@@ -31,7 +31,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #E8720C;
+  background: var(--brand);
   color: #fff;
   font-size: 10px;
 }
@@ -45,9 +45,9 @@
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  border: 1px solid #e8eaed;
+  border: 1px solid var(--border-3);
   border-radius: 6px;
-  background: #fff;
+  background: var(--surface-2);
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -55,8 +55,8 @@
   border-color: #F59432;
 }
 .asset-tag-field-row.selected {
-  border-color: #E8720C;
-  background: #FFF7F0;
+  border-color: var(--brand);
+  background: var(--brand-soft);
 }
 
 /* 表單頁三欄工作區（左樣式畫廊 / 中實時預覽 / 右字段配置） */
@@ -75,8 +75,8 @@
   gap: 12px;
   min-height: 380px;
   padding: 24px;
-  background: #F5F5F5;
-  border: 1px solid #f0f0f0;
+  background: var(--surface-1);
+  border: 1px solid var(--border-2);
   border-radius: 8px;
 }
 .asset-tag-panel-scroll {
@@ -86,16 +86,16 @@
 
 /* 標籤模板卡片（列表頁卡片視圖） */
 .asset-tag-card {
-  border: 1px solid #e8eaed;
+  border: 1px solid var(--border-3);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface-2);
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-card-soft);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .asset-tag-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-3);
 }
 .asset-tag-card-header {
   display: flex;
@@ -103,18 +103,18 @@
   justify-content: space-between;
   gap: 8px;
   padding: 10px 16px;
-  background: #FAFAFA;
-  border-bottom: 1px solid #f0f0f0;
+  background: var(--surface-3);
+  border-bottom: 1px solid var(--border-2);
 }
 .asset-tag-card-body {
   display: flex;
   justify-content: center;
   padding: 20px;
-  background: #fff;
+  background: var(--surface-2);
 }
 .asset-tag-card-canvas {
-  background: #FAFAFA;
-  border: 1px solid #f0f0f0;
+  background: var(--surface-3);
+  border: 1px solid var(--border-2);
   border-radius: 6px;
   padding: 16px 20px;
 }
@@ -123,7 +123,7 @@
   align-items: center;
   gap: 16px;
   padding: 8px 16px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--border-2);
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
 }

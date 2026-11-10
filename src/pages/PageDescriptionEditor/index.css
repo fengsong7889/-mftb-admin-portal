@@ -1,15 +1,15 @@
 .page-description-editor {
-  background: #f5f5f5;
+  background: var(--surface-1);
   min-height: 100vh;
 }
 
 .page-description-editor .ant-card {
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-1);
 }
 
 .page-description-editor .ant-card-head {
-  border-bottom: 2px solid #f0f0f0;
+  border-bottom: 2px solid var(--border-2);
 }
 
 .page-description-editor .ant-card-head-title {
@@ -24,7 +24,7 @@
 }
 
 .page-description-editor .ant-input-textarea {
-  border: 1px solid #d9d9d9;
+  border: 1px solid var(--border-1);
   border-radius: 6px;
   transition: all 0.3s;
 }
@@ -34,7 +34,7 @@
 }
 
 .page-description-editor .ant-input-textarea:focus {
-  border-color: #1890ff;
+  border-color: var(--info);
   box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
 }
 
@@ -53,13 +53,13 @@
 }
 
 .page-description-editor .ant-breadcrumb > span:not(:last-child) {
-  color: #666;
+  color: var(--text-body);
   cursor: pointer;
   transition: color 0.2s;
 }
 
 .page-description-editor .ant-breadcrumb > span:not(:last-child):hover {
-  color: #1890ff;
+  color: var(--info);
 }
 
 /* Tab 样式优化 */
@@ -80,15 +80,15 @@
 /* TinyMCE 编辑器样式优化 */
 .page-description-editor .tox-tinymce {
   border-radius: 8px;
-  border: 1px solid #d9d9d9 !important;
+  border: 1px solid var(--border-1) !important;
 }
 
 .page-description-editor .tox-editor-header {
-  border-bottom: 1px solid #f0f0f0 !important;
+  border-bottom: 1px solid var(--border-2) !important;
 }
 
 .page-description-editor .tox-statusbar {
-  border-top: 1px solid #f0f0f0 !important;
+  border-top: 1px solid var(--border-2) !important;
 }
 
 /* 表单卡片间距 */

@@ -26,7 +26,7 @@
   background: var(--surface-2);
   border-radius: 12px;
   padding: 16px 24px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-2);
   border: 1px solid var(--border-2);
   border-top: 3px solid var(--brand);
   flex-shrink: 0;
@@ -42,7 +42,7 @@
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #E8720C, #FFB347);
+  background: linear-gradient(135deg, var(--brand), #FFB347);
   color: #fff;
   display: flex;
   align-items: center;
@@ -83,7 +83,7 @@
   padding: 3px 12px;
   font-size: 13px !important;
   font-weight: 600;
-  background: linear-gradient(90deg, #E8720C, #F39C12);
+  background: linear-gradient(90deg, var(--brand), #F39C12);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -367,7 +367,7 @@
   letter-spacing: 0.5px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: linear-gradient(135deg, #E8720C, #F39C12);
+  background: linear-gradient(135deg, var(--brand), #F39C12);
   color: #fff;
   white-space: nowrap;
   flex-shrink: 0;
@@ -552,7 +552,7 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C);
+  background: linear-gradient(90deg, var(--brand), #F59432, #FFB347, #F59432, var(--brand));
   background-size: 200% 100%;
   animation: headerGradientShift 4s ease infinite;
 }
@@ -682,7 +682,7 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C);
+  background: linear-gradient(90deg, var(--brand), #F59432, #FFB347, #F59432, var(--brand));
   background-size: 200% 100%;
   animation: headerGradientShift 4s ease infinite;
 }
@@ -716,7 +716,7 @@
   padding: 9px 22px;
   border-radius: 999px;
   border: none;
-  background: linear-gradient(135deg, #E8720C, #F39C12);
+  background: linear-gradient(135deg, var(--brand), #F39C12);
   color: #fff;
   font-size: 13px;
   font-weight: 600;
@@ -873,7 +873,7 @@
 }
 
 .home-chat-bubble.user .home-chat-text {
-  background: linear-gradient(135deg, #E8720C, #F39C12);
+  background: linear-gradient(135deg, var(--brand), #F39C12);
   color: #fff;
   border-top-right-radius: 4px;
   box-shadow: 0 2px 8px rgba(232, 114, 12, 0.22);
@@ -957,7 +957,7 @@
   height: 44px;
   border-radius: 12px;
   border: none;
-  background: linear-gradient(135deg, #E8720C, #F39C12);
+  background: linear-gradient(135deg, var(--brand), #F39C12);
   color: #fff;
   font-size: 16px;
   cursor: pointer;
@@ -1042,7 +1042,7 @@
   border: 1px solid var(--warning-border-soft);
   border-right: none;
   border-radius: 12px 0 0 12px;
-  background: linear-gradient(180deg, #FFF7E6, #FFFFFF);
+  background: linear-gradient(180deg, var(--warning-soft), var(--surface-2));
   color: var(--brand);
   font-size: 11px;
   cursor: pointer;
@@ -1728,7 +1728,7 @@
   background: var(--brand);
   color: #fff;
   transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(232, 114, 12, 0.25);
+  box-shadow: var(--shadow-brand);
 }
 
 /* ─────────────────────────────────────────
@@ -2213,7 +2213,7 @@
 }
 
 .home-ctx-popover-btn--new {
-  background: linear-gradient(135deg, #E8720C, #F39C12);
+  background: linear-gradient(135deg, var(--brand), #F39C12);
   color: #fff;
   box-shadow: 0 2px 8px rgba(232, 114, 12, 0.3);
 }

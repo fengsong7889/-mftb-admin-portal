@@ -47,7 +47,7 @@
 .menu-tab-item:hover {
   color: var(--brand);
   background: var(--warning-soft);
-  border-color: #ffd591;
+  border-color: var(--warning-border);
 }
 
 /* 激活态 */

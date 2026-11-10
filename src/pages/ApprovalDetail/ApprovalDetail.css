@@ -16,7 +16,7 @@
   padding: 16px 24px;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border-2);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-card-soft);
 }
 
 .approval-detail-title {
@@ -58,7 +58,7 @@
   background: var(--surface-2);
   border-radius: 8px;
   padding: 16px 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-card-soft);
 }
 
 /* 右侧审批流滚动条 — 仅在面板内容溢出时显示 */
@@ -85,7 +85,7 @@
   border-radius: 8px;
   padding: 14px 20px;
   margin-bottom: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-card-soft);
 }
 
 /* 信息网格 — 紧凑行间距 */
@@ -419,7 +419,7 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #FAAD14, #E8720C);
+  background: linear-gradient(135deg, #FAAD14, var(--brand));
   display: flex;
   align-items: center;
   justify-content: center;

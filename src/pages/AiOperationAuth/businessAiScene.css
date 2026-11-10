@@ -4,13 +4,13 @@
 .ai-scene__header {
   background: var(--surface-2);
   border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-2);
   overflow: hidden;
   margin-bottom: 16px;
 }
 .ai-scene__header-accent {
   height: 3px;
-  background: linear-gradient(90deg, #e8720c, #f59432, #ffb347, #f59432, #e8720c);
+  background: linear-gradient(90deg, var(--brand), #f59432, #ffb347, #f59432, var(--brand));
   background-size: 200% 100%;
   animation: headerGradientShift 4s ease infinite;
 }
@@ -61,7 +61,7 @@
   background: var(--surface-2);
   border: 1px solid var(--border-3);
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-card-soft);
   min-width: 0;
 }
 .ai-scene__toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }

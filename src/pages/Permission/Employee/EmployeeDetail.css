@@ -2,11 +2,11 @@
 
 /* 现代卡片样式（无边框，使用阴影） */
 .emp-detail-card {
-  background: #fff;
+  background: var(--surface-2);
   border-radius: 12px;
   padding: 20px 24px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-1);
   transition: box-shadow 0.25s ease;
 }
 
@@ -46,14 +46,14 @@
 
 .emp-info-label {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
   font-weight: 400;
   line-height: 1.4;
 }
 
 .emp-info-value {
   font-size: 14px;
-  color: #262626;
+  color: var(--text-1);
   font-weight: 500;
   line-height: 1.5;
 }
@@ -65,7 +65,7 @@
   gap: 10px;
   margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #F0F0F0;
+  border-bottom: 1px solid var(--border-2);
 }
 
 .emp-section-icon {
@@ -80,12 +80,12 @@
 
 .emp-section-icon.blue {
   background: linear-gradient(135deg, #E6F7FF, #BAE7FF);
-  color: #1890FF;
+  color: var(--info);
 }
 
 .emp-section-icon.purple {
   background: linear-gradient(135deg, #F9F0FF, #EFDBFF);
-  color: #722ED1;
+  color: var(--purple);
 }
 
 .emp-section-icon.cyan {
@@ -95,23 +95,23 @@
 
 .emp-section-icon.orange {
   background: linear-gradient(135deg, #FFF7E6, #FFE7BA);
-  color: #FA8C16;
+  color: var(--warning);
 }
 
 .emp-section-icon.green {
   background: linear-gradient(135deg, #F6FFED, #D9F7BE);
-  color: #52C41A;
+  color: var(--success);
 }
 
 .emp-section-icon.red {
   background: linear-gradient(135deg, #FFF2F0, #FFCCC7);
-  color: #FF4D4F;
+  color: var(--danger);
 }
 
 .emp-section-text {
   font-size: 16px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
   flex: 1;
 }
 
@@ -138,7 +138,7 @@
 
 .emp-stat-card.green {
   background: linear-gradient(135deg, #F6FFED, #D9F7BE);
-  border: 1px solid #B7EB8F;
+  border: 1px solid var(--success-border);
 }
 
 .emp-stat-card.red {
@@ -148,12 +148,12 @@
 
 .emp-stat-card.blue {
   background: linear-gradient(135deg, #E6F7FF, #BAE7FF);
-  border: 1px solid #91D5FF;
+  border: 1px solid var(--info-border);
 }
 
 .emp-stat-label {
   font-size: 13px;
-  color: #8C8C8C;
+  color: var(--text-3);
   margin-bottom: 8px;
 }
 
@@ -164,15 +164,15 @@
 }
 
 .emp-stat-value.green {
-  color: #52C41A;
+  color: var(--success);
 }
 
 .emp-stat-value.red {
-  color: #FF4D4F;
+  color: var(--danger);
 }
 
 .emp-stat-value.blue {
-  color: #1890FF;
+  color: var(--info);
 }
 
 /* 职务详情面板 */
@@ -200,7 +200,7 @@
   margin-bottom: 12px;
   font-size: 13px;
   font-weight: 600;
-  color: #595959;
+  color: var(--text-2);
 }
 
 .emp-pos-group-title::before {
@@ -208,19 +208,19 @@
   width: 3px;
   height: 14px;
   border-radius: 2px;
-  background: #E8720C;
+  background: var(--brand);
 }
 
 /* 时间线面板优化 */
 .emp-timeline-panel {
-  background: #FAFAFA;
+  background: var(--surface-3);
   border-radius: 12px;
   padding: 16px 20px;
 }
 
 .emp-timeline-hint {
   font-size: 12px;
-  color: #8C8C8C;
+  color: var(--text-3);
   margin-bottom: 12px;
 }
 

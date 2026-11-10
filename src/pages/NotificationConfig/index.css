@@ -43,7 +43,7 @@
   margin-bottom: 16px;
   font-size: 15px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .notification-app__icon {
@@ -54,13 +54,13 @@
   height: 28px;
   border-radius: 6px;
   font-size: 14px;
-  color: #1890FF;
-  background: #E6F7FF;
+  color: var(--info);
+  background: var(--info-soft);
 }
 
 .notification-app__icon--security {
-  color: #722ED1;
-  background: #F9F0FF;
+  color: var(--purple);
+  background: var(--purple-soft);
 }
 
 .notification-app__divider {
@@ -71,7 +71,7 @@
 }
 
 .notification-app__hint {
-  color: #8C8C8C;
+  color: var(--text-3);
   font-size: 12px;
   margin: 8px 0 0;
 }

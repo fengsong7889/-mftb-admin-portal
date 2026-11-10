@@ -7,7 +7,7 @@
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-1);
 }
 
 /* 工具条：月份标题 + 翻月/今天 + 阶段图例 */
@@ -137,7 +137,7 @@
 .meeting-cal-date--today {
   background: var(--brand);
   color: #fff;
-  box-shadow: 0 2px 4px rgba(232, 114, 12, 0.25);
+  box-shadow: var(--shadow-brand);
 }
 
 .meeting-cal-count {
@@ -239,7 +239,7 @@
   background: var(--surface-2);
   border-radius: 8px;
   padding: 16px 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-1);
 }
 
 .meeting-cal-daypanel-head {

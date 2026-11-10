@@ -36,6 +36,6 @@
 }
 
 .app-content .ant-empty-description {
-  color: #999;
+  color: var(--text-hint);
   font-size: 14px;
 }

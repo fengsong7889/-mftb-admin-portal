@@ -24,7 +24,7 @@
 .menucfg-sys-panel {
   width: 208px;
   flex-shrink: 0;
-  border: 1px solid #e8eaed;
+  border: 1px solid var(--border-3);
   border-radius: 8px;
   overflow: hidden;
   display: flex;
@@ -35,9 +35,9 @@
   padding: 10px 14px;
   font-size: 13px;
   font-weight: 600;
-  color: #595959;
-  border-bottom: 1px solid #f0f0f0;
-  background: #fafafa;
+  color: var(--text-2);
+  border-bottom: 1px solid var(--border-2);
+  background: var(--surface-3);
 }
 
 .menucfg-sys-list {
@@ -53,25 +53,25 @@
   padding: 10px 14px;
   cursor: pointer;
   font-size: 13px;
-  color: #262626;
+  color: var(--text-1);
   border-left: 3px solid transparent;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .menucfg-sys-item:hover {
-  background: #fafafa;
+  background: var(--surface-3);
 }
 
 /* 选中态：品牌橙浅底 + 左侧 3px 指示条（与侧边栏/授权中心选中语言一致） */
 .menucfg-sys-item--active {
-  background: #fff7f0;
-  border-left-color: #e8720c;
-  color: #e8720c;
+  background: var(--brand-soft);
+  border-left-color: var(--brand);
+  color: var(--brand);
   font-weight: 500;
 }
 
 .menucfg-sys-item--active:hover {
-  background: #fff7f0;
+  background: var(--brand-soft);
 }
 
 .menucfg-sys-name {
@@ -84,8 +84,8 @@
 /* 菜单数量角标 */
 .menucfg-sys-count {
   font-size: 11px;
-  color: #8c8c8c;
-  background: #f5f5f5;
+  color: var(--text-3);
+  background: var(--surface-1);
   border-radius: 8px;
   padding: 0 6px;
   line-height: 16px;
@@ -93,7 +93,7 @@
 }
 
 .menucfg-sys-item--active .menucfg-sys-count {
-  color: #e8720c;
+  color: var(--brand);
   background: #ffe7d1;
 }
 
@@ -101,7 +101,7 @@
 .menucfg-main {
   flex: 1;
   min-width: 0;
-  border: 1px solid #e8eaed;
+  border: 1px solid var(--border-3);
   border-radius: 8px;
   padding: 16px 20px 20px;
   display: flex;
@@ -115,18 +115,18 @@
   gap: 12px;
   flex-wrap: wrap;
   padding-bottom: 12px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-2);
 }
 
 .menucfg-main-title {
   font-size: 15px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .menucfg-main-sub {
   font-size: 12px;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 /* 操作项靠右成组，搜索框固定宽度避免被拉伸破坏对齐 */
@@ -143,7 +143,7 @@
 }
 
 .menucfg-search-icon {
-  color: #bfbfbf;
+  color: var(--text-4);
 }
 
 .menucfg-table .ant-table-cell {
@@ -153,42 +153,42 @@
 /* ────── 单元格文案 ────── */
 .menucfg-name {
   font-size: 13px;
-  color: #262626;
+  color: var(--text-1);
 }
 
 /* 一级菜单（系统入口目录）：名称同样可改，仅加粗以区分层级 */
 .menucfg-name--top {
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .menucfg-name-en {
   font-size: 12px;
-  color: #595959;
+  color: var(--text-2);
 }
 
 .menucfg-code {
   font-size: 12px;
-  color: #595959;
-  background: #f5f5f5;
+  color: var(--text-2);
+  background: var(--surface-1);
   padding: 2px 6px;
   border-radius: 4px;
 }
 
 .menucfg-code--key {
-  color: #722ed1;
+  color: var(--purple);
   background: transparent;
   padding: 0;
 }
 
 .menucfg-icon {
   font-size: 15px;
-  color: #595959;
+  color: var(--text-2);
 }
 
 .menucfg-muted {
   font-size: 12px;
-  color: #bfbfbf;
+  color: var(--text-4);
 }
 
 .menucfg-type-tag {

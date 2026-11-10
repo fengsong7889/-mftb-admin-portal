@@ -4,18 +4,18 @@
 
 /* 设置按钮 */
 .table-column-config-btn {
-  color: #999;
+  color: var(--text-hint);
   font-size: 16px;
   padding: 4px 8px;
 }
 
 .table-column-config-btn:hover {
-  color: #1890ff;
+  color: var(--info);
 }
 
 /* 抽屉 */
 .table-column-config-drawer .ant-drawer-header {
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-2);
   padding: 16px 24px 12px;
 }
 
@@ -25,7 +25,7 @@
 
 .table-column-config-drawer .ant-drawer-footer {
   padding: 10px 16px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--border-2);
 }
 
 .tcc-modal-title {
@@ -47,7 +47,7 @@
   align-items: center;
   gap: 16px;
   padding: 8px 0 12px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-2);
   margin-bottom: 16px;
 }
 
@@ -64,32 +64,32 @@
 .tcc-zone-label {
   font-size: 13px;
   font-weight: 600;
-  color: #666;
+  color: var(--text-body);
   margin-bottom: 8px;
   padding-left: 4px;
 }
 
 .tcc-zone-content {
   min-height: 40px;
-  border: 1px dashed #d9d9d9;
+  border: 1px dashed var(--border-1);
   border-radius: 6px;
   padding: 4px;
   transition: all 0.2s;
 }
 
 .tcc-zone-content.tcc-zone-empty {
-  background: #fafafa;
+  background: var(--surface-3);
 }
 
 .tcc-zone-main {
-  background: #fff;
+  background: var(--surface-2);
   max-height: 320px;
   overflow-y: auto;
 }
 
 /* 拖到非锁定区空白处时的容器反馈（否则用户不知道空白处也是落点） */
 .tcc-zone-main.tcc-zone-drop-end {
-  border-color: #1890ff;
+  border-color: var(--info);
   background: #f0f7ff;
 }
 
@@ -123,16 +123,16 @@
 
 .tcc-field-item.tcc-field-dragging {
   opacity: 0.4;
-  background: #e6f7ff;
+  background: var(--info-soft);
 }
 
 .tcc-field-item.tcc-field-dragover {
-  border-top: 2px solid #1890ff;
+  border-top: 2px solid var(--info);
 }
 
 .tcc-field-locked {
-  background: #f6ffed;
-  border: 1px solid #b7eb8f;
+  background: var(--success-soft);
+  border: 1px solid var(--success-border);
   margin: 4px;
   border-radius: 6px;
 }
@@ -150,7 +150,7 @@
 }
 
 .tcc-drag-handle:hover {
-  color: #999;
+  color: var(--text-hint);
 }
 
 /* 右侧拖拽图标 */
@@ -173,7 +173,7 @@
 }
 
 .tcc-unlock-btn:hover {
-  color: #ff4d4f;
+  color: var(--danger);
 }
 
 /* 底部按钮 */
@@ -192,7 +192,7 @@
 
 .tcc-field-item .ant-checkbox-checked .ant-checkbox-inner {
   background-color: #1890ff;
-  border-color: #1890ff;
+  border-color: var(--info);
 }
 
 /* 滚动条样式 */

@@ -10,16 +10,16 @@
   border-radius: 8px;
   margin-bottom: 16px;
   font-size: 14px;
-  color: #262626;
+  color: var(--text-1);
 }
 
 /* 参数值管理区域 */
 .param-values-section {
   margin-top: 24px;
   padding: 20px 24px;
-  background: #fff;
+  background: var(--surface-2);
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-card-soft);
 }
 
 .param-values-title {
@@ -28,7 +28,7 @@
   margin: 0 0 16px 0;
   font-size: 15px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
   padding-bottom: 12px;
   border-bottom: 1px dashed rgba(0, 0, 0, 0.08);
 }
@@ -39,7 +39,7 @@
 
 /* 参数类型选中行 */
 .param-type-selected {
-  background: #FFF7E6 !important;
+  background: var(--warning-soft) !important;
 }
 
 .param-type-selected:hover td {

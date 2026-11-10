@@ -9,11 +9,11 @@
 .cat-tree-panel {
   width: 300px;
   flex-shrink: 0;
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--border-2);
   border-radius: 12px;
   padding: 16px 12px;
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-card-soft);
   overflow-y: auto;
 }
 
@@ -24,13 +24,13 @@
   margin: 0 4px 12px 4px;
   font-size: 15px;
   font-weight: 600;
-  color: #262626;
+  color: var(--text-1);
   padding-bottom: 12px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-2);
 }
 
 .cat-tree-panel-title-icon {
-  color: #e8720c;
+  color: var(--brand);
   font-size: 16px;
 }
 
@@ -66,7 +66,7 @@
 .cat-tree-panel .ant-tree .ant-tree-switcher {
   line-height: 32px;
   align-self: center;
-  color: #8c8c8c;
+  color: var(--text-3);
 }
 
 .cat-tree-node {
@@ -83,15 +83,15 @@
 }
 
 .cat-tree-node-icon-root {
-  color: #e8720c;
+  color: var(--brand);
 }
 
 .cat-tree-node-icon-branch {
-  color: #1890ff;
+  color: var(--info);
 }
 
 .cat-tree-node-icon-leaf {
-  color: #52c41a;
+  color: var(--success);
 }
 
 .cat-tree-node-name {
@@ -101,7 +101,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 14px;
-  color: #262626;
+  color: var(--text-1);
 }
 
 .cat-tree-panel::-webkit-scrollbar {

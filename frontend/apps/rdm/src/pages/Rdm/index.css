@@ -24,7 +24,7 @@
   top: 0;
   bottom: 0;
   width: 4px;
-  background: linear-gradient(180deg, #E8720C, #F59432);
+  background: linear-gradient(180deg, var(--brand), #F59432);
 }
 
 /* 第一带：左边「我的工作視圖」，右边操作组 */
@@ -169,7 +169,7 @@
 
 .rdm-hero-chip--jump:hover {
   transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-btn-hover);
 }
 
 .rdm-hero-chip--brand {
@@ -209,7 +209,7 @@
   border: 1px solid var(--border-3);
   border-radius: 8px;
   background: var(--surface-2);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-card-soft);
   margin-bottom: 16px;
   overflow: hidden;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -377,7 +377,7 @@
   border: 1px solid var(--border-3);
   border-radius: 8px;
   background: var(--surface-2);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-card-soft);
   padding: 16px 20px;
   margin-bottom: 16px;
 }
@@ -598,7 +598,7 @@
   border: 1px solid var(--border-3);
   border-radius: 8px;
   background: var(--surface-2);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-card-soft);
   padding: 16px 24px 4px;
   margin-bottom: 16px;
 }
@@ -643,7 +643,7 @@
 .rdm-assign-option:hover {
   border-color: #F59432;
   transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-btn-hover);
 }
 
 .rdm-assign-option.active {
@@ -1314,7 +1314,7 @@
   border-radius: 8px;
   padding: 12px 20px;
   margin-bottom: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-card-soft);
 }
 
 .rdm-next-item {
@@ -1454,7 +1454,7 @@
 
 .rdm-milestone-row:hover {
   border-color: var(--brand-border);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-card-soft);
 }
 
 .rdm-milestone-row-head {
@@ -1500,11 +1500,11 @@
 /* 页面头部：橙色渐变顶条 + 返回 + 标题 + 视角切换（form-page-style §C.2） */
 .rdm-gantt-header {
   position: relative; background: var(--surface-2); margin-bottom: 12px;
-  border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); overflow: hidden;
+  border-radius: 12px; box-shadow: var(--shadow-2); overflow: hidden;
 }
 .rdm-gantt-header-bar {
   height: 3px;
-  background: linear-gradient(90deg, #E8720C, #F59432, #FFB347, #F59432, #E8720C);
+  background: linear-gradient(90deg, var(--brand), #F59432, #FFB347, #F59432, var(--brand));
   background-size: 200% 100%; animation: headerGradientShift 4s ease infinite;
 }
 .rdm-gantt-header-body {
@@ -1763,7 +1763,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   border-left: 3px solid var(--brand);
   border-radius: 8px;
   background: var(--surface-2);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-card-soft);
   padding: 14px 20px;
   margin-bottom: 16px;
 }
@@ -2218,7 +2218,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   border: 1px solid var(--border-3);
   border-radius: 8px;
   background: var(--surface-2);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-card-soft);
   padding: 10px 8px;
   display: flex;
   flex-direction: column;
@@ -2339,7 +2339,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
   border-radius: 8px;
   padding: 16px 20px;
   border: 1px solid var(--border-3);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-card-soft);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -2403,7 +2403,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 
 .rdm-release-stat-card--success {
   border-color: var(--success-border);
-  background: linear-gradient(135deg, #F6FFED 0%, #FFFFFF 100%);
+  background: linear-gradient(135deg, var(--success-soft) 0%, var(--surface-2) 100%);
 }
 
 .rdm-release-section {
@@ -2654,7 +2654,7 @@ button.rdm-g2-bar-pct:hover { background: rgba(0, 0, 0, .45); }
 
 .rdm-case-card:hover {
   border-color: var(--brand-border);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-1);
 }
 
 .rdm-case-head {

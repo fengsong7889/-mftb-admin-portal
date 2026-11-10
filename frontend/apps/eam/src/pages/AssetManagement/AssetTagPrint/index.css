@@ -7,7 +7,7 @@
 .tag-a4-sheet {
   width: 210mm;
   min-height: 297mm;
-  background: #fff;
+  background: var(--surface-2);
   padding: 8mm;
   margin: 0 auto 16px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
@@ -61,7 +61,7 @@
 }
 .tag-print-qr span {
   font-size: 9px;
-  color: #8c8c8c;
+  color: var(--text-3);
   line-height: 1.2;
   max-width: 50mm;
   overflow: hidden;
