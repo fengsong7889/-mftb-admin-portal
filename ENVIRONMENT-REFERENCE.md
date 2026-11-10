@@ -265,6 +265,7 @@ bash scripts/verify-sealos-env.sh   # 只发匿名请求，5 项全过退出 0�
 | 访问地址 | `https://fengsong7889.github.io/-mftb-admin-portal/` |
 | base 路径 | `/-mftb-admin-portal/`（生产环境自动加前缀） |
 | 后端 API 地址 | `https://dacnhtyrpxhc.sealoshzh.site`（来自 `.env.production` 的 `VITE_API_BASE_URL`） |
+| 深浅色主题切换 | `VITE_THEME_SWITCH_ENABLED=true`（`.env.production`，2026-11-10 生产放量）。回滚只需删这一行重推 main；只有字面 `true` 算开启，本地开发用 `.env.local` 覆盖，详见方案 §卅五 |
 | 触发部署 | push 到 main 分支 |
 | 工作流文件 | `.github/workflows/deploy.yml` |
 
