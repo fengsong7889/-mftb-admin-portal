@@ -8,6 +8,7 @@ import com.mftb.admin.dto.MeetingMinutesContent;
 import com.mftb.admin.dto.MeetingMinutesDto;
 import com.mftb.admin.entity.MeetingMinutesRevision;
 import com.mftb.admin.entity.MeetingMinutesItem;
+import com.mftb.admin.entity.MeetingMinutesItemOwner;
 import com.mftb.admin.mapper.MeetingMinutesRevisionMapper;
 import com.mftb.admin.service.MeetingMinutesPublication;
 import com.mftb.admin.entity.MeetingAttendee;
@@ -88,6 +89,7 @@ class MeetingMinutesServiceImplTest {
     private MeetingAttendeeMapper attendeeMapper;
     private SysUserMapper userMapper;
     private MeetingMinutesItemMapper itemMapper;
+    private com.mftb.admin.mapper.MeetingMinutesItemOwnerMapper ownerMapper;
     private MeetingMinutesLinkMapper linkMapper;
     private MeetingNotifyTemplateService templateService;
     private JdbcTemplate jdbc;
@@ -182,6 +184,7 @@ class MeetingMinutesServiceImplTest {
         attendeeMapper = mock(MeetingAttendeeMapper.class);
         userMapper = mock(SysUserMapper.class);
         itemMapper = mock(MeetingMinutesItemMapper.class);
+        ownerMapper = mock(com.mftb.admin.mapper.MeetingMinutesItemOwnerMapper.class);
         linkMapper = mock(MeetingMinutesLinkMapper.class);
         templateService = mock(MeetingNotifyTemplateService.class);
         jdbc = mock(JdbcTemplate.class);
@@ -208,13 +211,14 @@ class MeetingMinutesServiceImplTest {
         });
         revisionMapper = mock(MeetingMinutesRevisionMapper.class);
         attachmentService = mock(com.mftb.admin.service.MeetingMinutesAttachmentService.class);
-        publication = new MeetingMinutesPublication(minutesMapper, revisionMapper, itemMapper, linkMapper, userMapper, audit, attachmentService);
+        publication = new MeetingMinutesPublication(minutesMapper, revisionMapper, itemMapper, linkMapper, userMapper, audit,
+                attachmentService, ownerMapper);
         when(minutesMapper.lockById(anyLong())).thenAnswer(call -> minutesMapper.selectById((long) call.getArgument(0)));
         when(minutesMapper.update(any(), any())).thenReturn(1);
         service = new MeetingMinutesServiceImpl(minutesMapper, sendMapper, deliveryMapper, itemMapper, linkMapper,
                 bookingMapper, attendeeMapper, userMapper, jdbc, guard, audit, dispatcher, templateService,
                 mock(DingTalkService.class), appService, bizSeqService, publication, attachmentService,
-                mock(com.mftb.admin.mapper.MeetingMinutesAiExtractionMapper.class));
+                mock(com.mftb.admin.mapper.MeetingMinutesAiExtractionMapper.class), ownerMapper);
         ReflectionTestUtils.setField(service, "publicationEnabled", true);
         ReflectionTestUtils.setField(service, "cardEnabled", true);
         ReflectionTestUtils.setField(service, "minutesEnabled", true);
@@ -1020,6 +1024,9 @@ class MeetingMinutesServiceImplTest {
         verify(itemMapper).updateDefinition(definition.capture());
         assertEquals(40L, definition.getValue().getId());
         assertEquals(1, definition.getValue().getDisplayOrder());
+        // 旧 jar 写的草稿只有单值字段：发布不能崩，且负责人姓名不能写空（owner_name 是 NOT NULL 列）
+        assertEquals(7L, definition.getValue().getOwnerUserId());
+        assertEquals("張三", definition.getValue().getOwnerName());
         org.junit.jupiter.api.Assertions.assertNull(definition.getValue().getStatus());
         verify(itemMapper).retire(5L, 39L, 2);
     }
@@ -1057,5 +1064,167 @@ class MeetingMinutesServiceImplTest {
         send.setReceiverUserIds(List.of(1L));
         assertThrows(BusinessException.class, () -> service.send(5L, send));
         verify(dispatcher).register(any(), any(), any());
+    }
+
+    /* ==================== 多负责人（行动项 / 跟进事项） ==================== */
+
+    private static MeetingMinutesItemOwner ownerRow(long itemId, long userId, String name, String empNo, int seq) {
+        MeetingMinutesItemOwner row = new MeetingMinutesItemOwner();
+        row.setItemId(itemId);
+        row.setUserId(userId);
+        row.setUserName(name);
+        row.setEmpNo(empNo);
+        row.setSeq(seq);
+        return row;
+    }
+
+    private static MeetingMinutesContent.Action twoOwnerAction() {
+        MeetingMinutesContent.Action action = new MeetingMinutesContent.Action();
+        action.setItemId(41L);
+        action.setContent("交付預算");
+        // 新版正文只写数组：单值字段由服务端在归一时刷回首负责人缓存
+        action.setOwnerIds(List.of(7L, 8L));
+        action.setOwnerNames(List.of("張三", "王二"));
+        action.setOwnerEmpNos(List.of("MF00007", "MF00008"));
+        action.setDueDate("2026-11-01");
+        return action;
+    }
+
+    @Test
+    @DisplayName("多负责人发布：负责人真源表先删后插，事项行三列只写首负责人缓存")
+    void publicationReplacesOwnerRowsAndKeepsFirstOwnerCache() {
+        MeetingMinutes minutes = preparePublication();
+        when(userMapper.selectBatchIds(any())).thenReturn(List.of(ORGANIZER, OWNER_OF_ACTION, user(8L, "MF00008", "王二")));
+        MeetingMinutesItem existing = new MeetingMinutesItem();
+        existing.setId(41L); existing.setMinutesId(5L); existing.setKind("ACTION"); existing.setVersion(0);
+        existing.setContent("交付預算"); existing.setOwnerUserId(7L); existing.setOwnerName("張三");
+        existing.setOwnerEmpNo("MF00007"); existing.setStatus("pending");
+        existing.setDueDate(java.time.LocalDate.of(2026, 11, 1));
+        when(itemMapper.findByMinutes(5L)).thenReturn(List.of(existing));
+        when(itemMapper.updateDefinition(any())).thenReturn(1);
+        when(ownerMapper.findByMinutesIds(any())).thenReturn(List.of(ownerRow(41L, 7L, "張三", "MF00007", 1)));
+        MeetingMinutesContent content = publicationContent();
+        content.setActions(List.of(twoOwnerAction()));
+        minutes.setContentJson(JsonUtils.toJson(content));
+
+        service.publish(5L, publishForm());
+
+        ArgumentCaptor<MeetingMinutesItem> definition = ArgumentCaptor.forClass(MeetingMinutesItem.class);
+        verify(itemMapper).updateDefinition(definition.capture());
+        assertEquals(7L, definition.getValue().getOwnerUserId());
+        assertEquals("張三", definition.getValue().getOwnerName());
+        assertEquals("MF00007", definition.getValue().getOwnerEmpNo());
+        // 先删后插：逐条 diff 会留下“这条事项谁都不是负责人”的中间态，而逾期扫描与办理权限都读这张表
+        org.mockito.InOrder ordered = org.mockito.Mockito.inOrder(ownerMapper);
+        ordered.verify(ownerMapper).deleteByItem(41L);
+        @SuppressWarnings("unchecked") ArgumentCaptor<List<MeetingMinutesItemOwner>> rows = ArgumentCaptor.forClass(List.class);
+        ordered.verify(ownerMapper).insertBatch(rows.capture());
+        assertEquals(List.of(7L, 8L), rows.getValue().stream().map(MeetingMinutesItemOwner::getUserId).toList());
+        assertEquals(List.of(1, 2), rows.getValue().stream().map(MeetingMinutesItemOwner::getSeq).toList());
+        assertEquals(List.of("張三", "王二"), rows.getValue().stream().map(MeetingMinutesItemOwner::getUserName).toList());
+        assertEquals("MF00008", rows.getValue().get(1).getEmpNo());
+    }
+
+    @Test
+    @DisplayName("发布重验全量负责人：协办离职/停用一样拦住，不能只查首负责人")
+    void publicationValidatesEveryOwner() {
+        MeetingMinutes minutes = preparePublication();
+        // 首负责人在回查结果里，第 2 位不在——只校首负责人就会把已离岗的人写进台账并开催办
+        when(userMapper.selectBatchIds(any())).thenReturn(List.of(ORGANIZER, OWNER_OF_ACTION));
+        MeetingMinutesItem existing = new MeetingMinutesItem();
+        existing.setId(41L); existing.setMinutesId(5L); existing.setKind("ACTION"); existing.setVersion(0);
+        existing.setContent("交付預算"); existing.setStatus("pending");
+        when(itemMapper.findByMinutes(5L)).thenReturn(List.of(existing));
+        MeetingMinutesContent content = publicationContent();
+        content.setActions(List.of(twoOwnerAction()));
+        minutes.setContentJson(JsonUtils.toJson(content));
+
+        assertThrows(BusinessException.class, () -> service.publish(5L, publishForm()));
+        verify(revisionMapper, never()).insert(any());
+        verify(ownerMapper, never()).insertBatch(any());
+    }
+
+    @Test
+    @DisplayName("办理权限按负责人真源判定：第 2 位负责人也能回填，不再只认首负责人缓存")
+    void coOwnerFromJunctionTableCanResolve() {
+        when(guard.currentUser()).thenReturn(OWNER_OF_ACTION);
+        // 张三只是参会人兼协办：不是记录人、不是组织者、也没有纪要菜单写权限
+        when(minutesMapper.selectById(5L)).thenReturn(minutes(5L, STRANGER.getId(), 0, 0));
+        MeetingMinutesItem item = new MeetingMinutesItem();
+        item.setId(41L); item.setMinutesId(5L); item.setKind("ACTION"); item.setVersion(0);
+        item.setContent("交付預算"); item.setStatus("pending"); item.setSeq(1);
+        // 事项行缓存记的是王二（seq=1），张三只在真源表里排第 2 位
+        item.setOwnerUserId(8L); item.setOwnerName("王二"); item.setOwnerEmpNo("MF00008");
+        when(itemMapper.findByMinutes(5L)).thenReturn(List.of(item));
+        when(ownerMapper.findByItemIds(any())).thenReturn(List.of(
+                ownerRow(41L, 8L, "王二", "MF00008", 1), ownerRow(41L, 7L, "張三", "MF00007", 2)));
+
+        MeetingMinutesDto.VO vo = service.view(5L);
+        MeetingMinutesDto.ItemVO row = vo.getItems().get(0);
+        assertFalse(Boolean.TRUE.equals(vo.getCanEdit()));
+        assertEquals(List.of(8L, 7L), row.getOwnerIds());
+        assertEquals(List.of("王二", "張三"), row.getOwnerNames());
+        assertTrue(Boolean.TRUE.equals(row.getCanResolve()));
+        assertTrue(Boolean.TRUE.equals(vo.getItemOwner()));
+    }
+
+    @Test
+    @DisplayName("协办人不靠菜单写权限也能办理：服务端重验“当前用户∈负责人”，前端 canResolve 只是 UX")
+    void coOwnerCanResolveItemOnServerSide() {
+        when(guard.currentUser()).thenReturn(OWNER_OF_ACTION);
+        when(minutesMapper.selectById(5L)).thenReturn(minutes(5L, STRANGER.getId(), 0, 0));
+        MeetingMinutesItem item = new MeetingMinutesItem();
+        item.setId(41L); item.setMinutesId(5L); item.setKind("ACTION"); item.setVersion(0);
+        item.setContent("交付預算"); item.setStatus("pending");
+        item.setOwnerUserId(8L); item.setOwnerName("王二"); item.setOwnerEmpNo("MF00008");
+        when(itemMapper.selectById(41L)).thenReturn(item);
+        when(ownerMapper.findByItem(41L)).thenReturn(List.of(
+                ownerRow(41L, 8L, "王二", "MF00008", 1), ownerRow(41L, 7L, "張三", "MF00007", 2)));
+        when(itemMapper.markResolvedVersioned(anyLong(), org.mockito.ArgumentMatchers.anyInt(), anyString(), anyString(),
+                any(), any(), anyLong(), anyString())).thenReturn(1);
+        MeetingMinutesDto.ResolveForm form = new MeetingMinutesDto.ResolveForm();
+        form.setResult("completed");
+
+        service.resolveItem(41L, form);
+
+        verify(itemMapper).markResolvedVersioned(eq(41L), eq(0), eq(MeetingMinutesItem.STATUS_DONE),
+                eq("completed"), isNull(), any(), eq(OWNER_OF_ACTION.getId()), anyString());
+    }
+
+    @Test
+    @DisplayName("既不是负责人也不是记录人/行政：多负责人表里查不到本人时仍然拒")
+    void strangerOutsideOwnersStillCannotResolve() {
+        when(guard.currentUser()).thenReturn(STRANGER);
+        when(minutesMapper.selectById(5L)).thenReturn(minutes(5L, RECORDER.getId(), 0, 0));
+        MeetingMinutesItem item = new MeetingMinutesItem();
+        item.setId(41L); item.setMinutesId(5L); item.setKind("ACTION"); item.setVersion(0);
+        item.setContent("交付預算"); item.setStatus("pending");
+        item.setOwnerUserId(8L); item.setOwnerName("王二");
+        when(itemMapper.selectById(41L)).thenReturn(item);
+        when(ownerMapper.findByItem(41L)).thenReturn(List.of(ownerRow(41L, 7L, "張三", "MF00007", 1)));
+        MeetingMinutesDto.ResolveForm form = new MeetingMinutesDto.ResolveForm();
+        form.setResult("completed");
+
+        assertThrows(BusinessException.class, () -> service.resolveItem(41L, form));
+        verify(itemMapper, never()).markResolvedVersioned(anyLong(), org.mockito.ArgumentMatchers.anyInt(),
+                anyString(), anyString(), any(), any(), anyLong(), anyString());
+    }
+
+    @Test
+    @DisplayName("旧快照（只有单值字段）归一为一人：事项出参仍然是负责人数组，前端不分两套读")
+    void legacySingleOwnerIsNormalisedIntoOneElementList() {
+        when(guard.currentUser()).thenReturn(RECORDER);
+        when(minutesMapper.selectById(5L)).thenReturn(minutes(5L, RECORDER.getId(), 0, 0));
+        MeetingMinutesItem item = new MeetingMinutesItem();
+        item.setId(41L); item.setMinutesId(5L); item.setKind("ACTION"); item.setVersion(0);
+        item.setContent("交付預算"); item.setStatus("pending");
+        item.setOwnerUserId(7L); item.setOwnerName("張三"); item.setOwnerEmpNo("MF00007");
+        when(itemMapper.findByMinutes(5L)).thenReturn(List.of(item));
+        when(ownerMapper.findByItemIds(any())).thenReturn(List.of());
+
+        MeetingMinutesDto.ItemVO row = service.view(5L).getItems().get(0);
+        assertEquals(List.of(7L), row.getOwnerIds());
+        assertEquals(List.of("張三"), row.getOwnerNames());
+        assertEquals(List.of("MF00007"), row.getOwnerEmpNos());
     }
 }

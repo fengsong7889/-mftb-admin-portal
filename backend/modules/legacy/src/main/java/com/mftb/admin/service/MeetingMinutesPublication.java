@@ -9,9 +9,11 @@ import com.mftb.admin.dto.MeetingMinutesDto;
 import com.mftb.admin.entity.MeetingBooking;
 import com.mftb.admin.entity.MeetingMinutes;
 import com.mftb.admin.entity.MeetingMinutesItem;
+import com.mftb.admin.entity.MeetingMinutesItemOwner;
 import com.mftb.admin.entity.MeetingMinutesRevision;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.MeetingMinutesItemMapper;
+import com.mftb.admin.mapper.MeetingMinutesItemOwnerMapper;
 import com.mftb.admin.mapper.MeetingMinutesLinkMapper;
 import com.mftb.admin.mapper.MeetingMinutesMapper;
 import com.mftb.admin.mapper.MeetingMinutesRevisionMapper;
@@ -42,6 +44,9 @@ import java.util.stream.Collectors;
 /**
  * 新版文档的规范化与发布事务步骤。调用者必须先鉴权并持有纪要主行锁。
  * 草稿不写跟进台账，只有发布把稳定事项身份和完整文档一起提交。
+ *
+ * <p>负责人以 {@code biz_meeting_minutes_item_owner} 为唯一真源：一条事项可以有多个负责人
+ * （主办 + 协办），事项行上的三个 owner 列只是 owners[0] 的缓存，两处写入在同一事务内完成。
  */
 @Component
 @RequiredArgsConstructor
@@ -53,6 +58,7 @@ public class MeetingMinutesPublication {
     private final SysUserMapper userMapper;
     private final MeetingAuditRecorder audit;
     private final MeetingMinutesAttachmentService attachmentService;
+    private final MeetingMinutesItemOwnerMapper ownerMapper;
 
     /** 先校结构再解引用，避免空数组成员造成 500；客户端署名和确认凭据不采信。 */
     public void normalize(MeetingMinutesContent content, MeetingMinutesContent previous, SysUser operator) {
@@ -60,8 +66,8 @@ public class MeetingMinutesPublication {
         if (!content.versioned()) return;
         Set<Long> ids = new HashSet<>();
         if (content.getChairUserId() != null) ids.add(content.getChairUserId());
-        for (var action : list(content.getActions())) if (action.getOwnerUserId() != null) ids.add(action.getOwnerUserId());
-        for (var issue : list(content.getOpenIssues())) if (issue.getOwnerUserId() != null) ids.add(issue.getOwnerUserId());
+        for (var action : list(content.getActions())) ids.addAll(action.ownerUserIdList());
+        for (var issue : list(content.getOpenIssues())) ids.addAll(issue.ownerUserIdList());
         for (var person : list(content.getAttendance())) if (person.getUserId() != null) ids.add(person.getUserId());
         for (var person : list(content.getAbsentees())) if (person.getUserId() != null) ids.add(person.getUserId());
         Map<Long, SysUser> people = ids.isEmpty() ? new HashMap<>() : userMapper.selectBatchIds(ids).stream()
@@ -79,14 +85,22 @@ public class MeetingMinutesPublication {
             if (!StringUtils.hasText(topic.getTopicKey())) topic.setTopicKey(UUID.randomUUID().toString());
         }
         for (var action : list(content.getActions())) {
-            SysUser owner = people.get(action.getOwnerUserId());
-            action.setOwnerName(owner == null ? null : owner.getName());
-            action.setOwnerEmpNo(owner == null ? null : owner.getEmpId());
+            Owners owners = resolveOwners(action.ownerUserIdList(), people);
+            action.setOwnerIds(owners.ids());
+            action.setOwnerNames(owners.names());
+            action.setOwnerEmpNos(owners.empNos());
+            action.setOwnerUserId(owners.headId());
+            action.setOwnerName(owners.headName());
+            action.setOwnerEmpNo(owners.headEmpNo());
         }
         for (var issue : list(content.getOpenIssues())) {
-            SysUser owner = people.get(issue.getOwnerUserId());
-            issue.setOwnerName(owner == null ? null : owner.getName());
-            issue.setOwnerEmpNo(owner == null ? null : owner.getEmpId());
+            Owners owners = resolveOwners(issue.ownerUserIdList(), people);
+            issue.setOwnerIds(owners.ids());
+            issue.setOwnerNames(owners.names());
+            issue.setOwnerEmpNos(owners.empNos());
+            issue.setOwnerUserId(owners.headId());
+            issue.setOwnerName(owners.headName());
+            issue.setOwnerEmpNo(owners.headEmpNo());
             issue.setNeedDecisionBy(null);
         }
         Map<String, MeetingMinutesContent.Attendance> old = new HashMap<>();
@@ -208,36 +222,98 @@ public class MeetingMinutesPublication {
     private void validatePeopleForPublish(MeetingMinutesContent content) {
         Set<Long> ids = new HashSet<>();
         ids.add(content.getChairUserId());
-        for (var action : list(content.getActions())) ids.add(action.getOwnerUserId());
-        for (var issue : list(content.getOpenIssues())) ids.add(issue.getOwnerUserId());
+        for (var action : list(content.getActions())) ids.addAll(action.ownerUserIdList());
+        for (var issue : list(content.getOpenIssues())) ids.addAll(issue.ownerUserIdList());
         Map<Long, SysUser> users = userMapper.selectBatchIds(ids).stream().collect(Collectors.toMap(SysUser::getId, Function.identity()));
         for (Long id : ids) if (users.get(id) == null || !Integer.valueOf(1).equals(users.get(id).getStatus())) {
             throw new BusinessException("主持人或事項負責人已停用，請編輯草稿後重新發布");
         }
     }
 
+    /**
+     * 一組负责人：id 与两份快照按下标对齐。
+     * <p>head* 就是事项行上 owner_user_id/owner_name/owner_emp_no 三列缓存的来源，
+     * 顺序由提交时的选择顺序决定（主办在前），所以下标不能交给数据库去定。
+     */
+    record Owners(List<Long> ids, List<String> names, List<String> empNos) {
+        Long headId() {
+            return ids.isEmpty() ? null : ids.get(0);
+        }
+
+        String headName() {
+            return ids.isEmpty() ? null : snapshotAt(names, 0);
+        }
+
+        String headEmpNo() {
+            return ids.isEmpty() ? null : snapshotAt(empNos, 0);
+        }
+    }
+
+    /**
+     * 读取归一：数组缺失（旧 jar 写的草稿只有单值字段）时按一人处理，姓名与工号回退单值缓存。
+     * <p>不做这层归一，“旧草稿零迁移可读”就是空话：新 jar 拿到旧草稿会把负责人姓名发空，
+     * 而事项行的 owner_name 是 NOT NULL 列，直接写坏台账。
+     */
+    private static Owners ownersOf(List<Long> ids, List<String> names, List<String> empNos,
+                                   Long legacyId, String legacyName, String legacyEmpNo) {
+        if (ids != null && !ids.isEmpty()) {
+            return new Owners(ids, orEmpty(names), orEmpty(empNos));
+        }
+        if (legacyId == null) {
+            return new Owners(List.of(), List.of(), List.of());
+        }
+        return new Owners(List.of(legacyId), List.of(Objects.toString(legacyName, "")),
+                List.of(Objects.toString(legacyEmpNo, "")));
+    }
+
+    /**
+     * 负责人快照一律按 id 回查 sys_user 重建。
+     * <p>旧草稿正文里只有单值字段，归一为一人生效；前端传来的姓名与工号一律不采信，
+     * 它们只能当读取线索——允许自报姓名等于允许在纪要里写任意“负责人”。
+     */
+    private static Owners resolveOwners(List<Long> ids, Map<Long, SysUser> people) {
+        List<String> names = new ArrayList<>(ids.size());
+        List<String> empNos = new ArrayList<>(ids.size());
+        for (Long id : ids) {
+            SysUser user = people.get(id);
+            names.add(user == null ? null : user.getName());
+            empNos.add(user == null ? null : user.getEmpId());
+        }
+        return new Owners(List.copyOf(ids), List.copyOf(names), List.copyOf(empNos));
+    }
+
     private List<Long> synchronizeItems(MeetingMinutes minutes, MeetingMinutesContent content) {
         Map<Long, MeetingMinutesItem> rows = itemMapper.findByMinutes(minutes.getId()).stream()
                 .collect(Collectors.toMap(MeetingMinutesItem::getId, Function.identity()));
+        // 旧负责人集合只取一次：已办结事项要比较“换了人没有”，逐条查会变成 N+1
+        Map<Long, List<Long>> previousOwners = ownerMapper.findByMinutesIds(List.of(minutes.getId())).stream()
+                .collect(Collectors.groupingBy(MeetingMinutesItemOwner::getItemId,
+                        Collectors.mapping(MeetingMinutesItemOwner::getUserId, Collectors.toList())));
         List<Long> retained = new ArrayList<>();
         int order = 0;
         int actionSeq = itemMapper.nextStableSeq(minutes.getId(), MeetingMinutesItem.KIND_ACTION);
         for (var action : list(content.getActions())) {
+            Owners owners = ownersOf(action.getOwnerIds(), action.getOwnerNames(), action.getOwnerEmpNos(),
+                    action.getOwnerUserId(), action.getOwnerName(), action.getOwnerEmpNo());
             MeetingMinutesItem item = definition(minutes, rows, action.getItemId(), MeetingMinutesItem.KIND_ACTION,
-                    action.getContent(), action.getOwnerUserId(), action.getOwnerName(), action.getOwnerEmpNo(),
+                    action.getContent(), owners, previousOwners.getOrDefault(action.getItemId(), List.of()),
                     action.getDueDate(), action.getTopicKey(), action.getDeliverable(), ++order);
             persistDefinition(item, actionSeq++);
             action.setItemId(item.getId());
+            replaceOwners(item.getId(), owners);
             retained.add(item.getId());
         }
         order = 0;
         int followSeq = itemMapper.nextStableSeq(minutes.getId(), MeetingMinutesItem.KIND_FOLLOW);
         for (var issue : list(content.getOpenIssues())) {
+            Owners owners = ownersOf(issue.getOwnerIds(), issue.getOwnerNames(), issue.getOwnerEmpNos(),
+                    issue.getOwnerUserId(), issue.getOwnerName(), issue.getOwnerEmpNo());
             MeetingMinutesItem item = definition(minutes, rows, issue.getItemId(), MeetingMinutesItem.KIND_FOLLOW,
-                    issue.getContent(), issue.getOwnerUserId(), issue.getOwnerName(), issue.getOwnerEmpNo(),
+                    issue.getContent(), owners, previousOwners.getOrDefault(issue.getItemId(), List.of()),
                     issue.getDueDate(), issue.getTopicKey(), "", ++order);
             persistDefinition(item, followSeq++);
             issue.setItemId(item.getId());
+            replaceOwners(item.getId(), owners);
             retained.add(item.getId());
         }
         for (MeetingMinutesItem row : rows.values()) if (!retained.contains(row.getId())) {
@@ -247,13 +323,18 @@ public class MeetingMinutesPublication {
     }
 
     private MeetingMinutesItem definition(MeetingMinutes minutes, Map<Long, MeetingMinutesItem> rows, Long id,
-                                          String kind, String text, Long owner, String name, String empNo,
+                                          String kind, String text, Owners owners, List<Long> beforeOwners,
                                           String due, String topic, String deliverable, int order) {
         requireItem(rows, id, kind);
         MeetingMinutesItem old = id == null ? null : rows.get(id);
+        // 真源行缺失（没跑过 334 回填的库）时，事项行的首负责人缓存就是当时唯一的负责人事实；
+        // 拿空集合去比较会把“重发同一版纪要”误判成换了人，已办结事项反而再也发不出去
+        List<Long> before = beforeOwners.isEmpty() && old != null && old.getOwnerUserId() != null
+                ? List.of(old.getOwnerUserId()) : beforeOwners;
         // 已办理事项不能改成另一份责任约定后继承完成事实；可保留原项或删除后新增。
+        // 负责人比较的是全量集合而不是首负责人：换了协办同样是一份新约定。
         if (old != null && MeetingMinutesItem.STATUS_DONE.equals(old.getStatus())
-                && (!Objects.equals(old.getContent(), text) || !Objects.equals(old.getOwnerUserId(), owner)
+                && (!Objects.equals(old.getContent(), text) || !sameOwners(owners.ids(), before)
                 || !Objects.equals(old.getDueDate(), LocalDate.parse(due))
                 || !Objects.equals(Objects.toString(old.getDeliverable(), ""), Objects.toString(deliverable, "")))) {
             throw new BusinessException("已辦理事項不可更換約定或負責人，請保留原事項並新增一項");
@@ -264,15 +345,55 @@ public class MeetingMinutesPublication {
         item.setBookingId(minutes.getBookingId());
         item.setKind(kind);
         item.setContent(text);
-        item.setOwnerUserId(owner);
-        item.setOwnerName(name);
-        item.setOwnerEmpNo(Objects.toString(empNo, ""));
+        item.setOwnerUserId(owners.headId());
+        item.setOwnerName(owners.headName());
+        item.setOwnerEmpNo(Objects.toString(owners.headEmpNo(), ""));
         item.setDueDate(LocalDate.parse(due));
         item.setTopicKey(topic);
         item.setDeliverable(Objects.toString(deliverable, ""));
         item.setDisplayOrder(order);
         item.setVersion(old == null ? 0 : old.getVersion());
         return item;
+    }
+
+    /** 集合语义比较：顺序只决定展示与缓存取谁，不构成一份新的责任约定 */
+    private static boolean sameOwners(List<Long> current, List<Long> previous) {
+        return new HashSet<>(orEmpty(current)).equals(new HashSet<>(orEmpty(previous)));
+    }
+
+    /**
+     * 整体替换一条事项的负责人：先删后插，且与事项行写入处于同一个发布事务。
+     * <p>不逐条 diff：中间态下这条事项会“谁都不是负责人”，而逾期扫描与办理权限都读这张表。
+     */
+    private void replaceOwners(Long itemId, Owners owners) {
+        if (itemId == null) throw new IllegalStateException("事項主鍵未回填，負責人無法登記");
+        replaceOwners(itemId.longValue(), owners);
+    }
+
+    private void replaceOwners(long itemId, Owners owners) {
+        ownerMapper.deleteByItem(itemId);
+        if (owners.ids().isEmpty()) {
+            return;
+        }
+        List<MeetingMinutesItemOwner> rows = new ArrayList<>(owners.ids().size());
+        for (int index = 0; index < owners.ids().size(); index++) {
+            MeetingMinutesItemOwner row = new MeetingMinutesItemOwner();
+            row.setItemId(itemId);
+            row.setUserId(owners.ids().get(index));
+            row.setUserName(Objects.toString(snapshotAt(owners.names(), index), ""));
+            row.setEmpNo(Objects.toString(snapshotAt(owners.empNos(), index), ""));
+            row.setSeq(index + 1);
+            rows.add(row);
+        }
+        ownerMapper.insertBatch(rows);
+    }
+
+    private static String snapshotAt(List<String> values, int index) {
+        return index < values.size() ? values.get(index) : null;
+    }
+
+    private static <T> List<T> orEmpty(List<T> value) {
+        return value == null ? List.of() : value;
     }
 
     private void persistDefinition(MeetingMinutesItem item, int seq) {

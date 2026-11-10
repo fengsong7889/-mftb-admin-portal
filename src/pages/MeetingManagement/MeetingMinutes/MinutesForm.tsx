@@ -32,9 +32,10 @@ import RemarkTextArea from '@/components/RemarkTextArea'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   createMinutes, fetchMinutes, fetchMinutesById, searchMinutes, updateMinutes, publishMinutes, sendMinutes,
-  MINUTES_CONTENT_MAX_LENGTH, MINUTES_LIMITS, emptyMinutesContent, minutesContentLength, minutesPurposeText,
-  type MinutesAttendance, type MinutesContent, type MinutesDecisionStatus, type MinutesLinkVO, type MinutesSeriesNode, type MinutesVO,
+  MINUTES_CONTENT_MAX_LENGTH, MINUTES_LIMITS, emptyMinutesContent, minutesContentLength, minutesOwnerIds, minutesPurposeText,
+  type MinutesAttendance, type MinutesContent, type MinutesDecisionStatus, type MinutesLinkVO, type MinutesOwnerCarrier, type MinutesSeriesNode, type MinutesVO,
 } from '@/api/meetingMinutes'
+import { minutesOwners } from '@/api/meetingMinutes'
 import { backfillMeetingAttendee, fetchMeetingDetail, newMeetingRequestKey, toMeetingIsoDate, type MeetingVO } from '@/api/meeting'
 import EmployeeSelect from '@/components/EmployeeSelect'
 import { bizTypeLabels, minutesStatusMeta, phaseMeta } from '../meetingMeta'
@@ -115,14 +116,15 @@ function toContent(values: Partial<FormValues>): MinutesContent {
       .map(action => ({
         itemId: action.itemId, topicKey: action.topicKey, deliverable: action.deliverable?.trim(),
         content: action.content?.trim() ?? '',
-        // 只传负责人 id：姓名与工号快照由服务端按 id 回查，前端不传名字（与行政代订同一口径，防伪造台账）
-        ownerUserId: action.ownerIds?.[0] ?? null,
+        // 只传负责人 id 数组（主办在前）：姓名与工号快照由服务端按 id 逐个回查，前端不传名字
+        // （与行政代订同一口径，防伪造台账）；单值字段不再写，由服务端刷回首负责人缓存
+        ownerIds: action.ownerIds ?? [],
         dueDate: toMeetingIsoDate(action.dueDate),
       }))
       .filter(action => action.content),
     openIssues: (values.followUps ?? [])
       .map(issue => ({ itemId: issue.itemId, topicKey: issue.topicKey, content: issue.content?.trim() ?? '',
-        ownerUserId: issue.ownerIds?.[0], dueDate: toMeetingIsoDate(issue.dueDate) }))
+        ownerIds: issue.ownerIds ?? [], dueDate: toMeetingIsoDate(issue.dueDate) }))
       .filter(issue => issue.content),
     absentees: [],
     nextMeetingAt: values.nextMeetingAt ? values.nextMeetingAt.format('YYYY-MM-DD HH:mm') : null,
@@ -132,6 +134,17 @@ function toContent(values: Partial<FormValues>): MinutesContent {
 }
 
 /** 缺席名单由组件外的 state 承载（人选集合，不是文本字段），提交时并入正文 */
+
+/**
+ * 回显用的负责人种子：姓名与工号按 id 一组组带回 EmployeeSelect。
+ * 没有 id 的历史快照（只写了姓名）不进种子名单——选人控件只认 sys_user.id，
+ * 拿姓名当 id 会把同名的另一个人写进台账。
+ */
+function ownerSeeds(row: MinutesOwnerCarrier): { id: number; name: string; empId?: string }[] {
+  return minutesOwners(row)
+    .filter(owner => owner.id != null && owner.name)
+    .map(owner => ({ id: owner.id as number, name: owner.name, empId: owner.empNo || undefined }))
+}
 
 export default function MinutesForm() {
   const { t, i18n } = useTranslation()
@@ -276,20 +289,20 @@ export default function MinutesForm() {
               ? (vo.items ?? []).filter(item => item.kind === 'ACTION').map(item => ({
                   itemId: item.id, topicKey: item.topicKey, deliverable: item.deliverable,
                   content: item.content,
-                  ownerIds: item.ownerUserId ? [item.ownerUserId] : [],
+                  ownerIds: minutesOwnerIds(item),
                   dueDate: item.dueDate ? dayjs(item.dueDate) : null,
                 }))
               : (content.actions ?? []).map(action => ({
                   itemId: action.itemId, topicKey: action.topicKey, deliverable: action.deliverable,
                   content: action.content,
-                  ownerIds: action.ownerUserId ? [action.ownerUserId] : [],
+                  ownerIds: minutesOwnerIds(action),
                   dueDate: action.dueDate ? dayjs(action.dueDate) : null,
                 })),
             followUps: content.schemaVersion === 2 ? content.openIssues.map(item => ({ ...item,
-              ownerIds: item.ownerUserId ? [item.ownerUserId] : [], dueDate: item.dueDate ? dayjs(item.dueDate) : null,
+              ownerIds: minutesOwnerIds(item), dueDate: item.dueDate ? dayjs(item.dueDate) : null,
             })) : (vo.items ?? []).filter(item => item.kind === 'FOLLOW').map(item => ({
               itemId: item.id, topicKey: item.topicKey, content: item.content,
-              ownerIds: item.ownerUserId ? [item.ownerUserId] : [],
+              ownerIds: minutesOwnerIds(item),
               dueDate: item.dueDate ? dayjs(item.dueDate) : null,
             })),
             nextMeetingAt: content.nextMeetingAt ? dayjs(content.nextMeetingAt) : null,
@@ -305,18 +318,11 @@ export default function MinutesForm() {
           const seeds: { id: number; name: string; empId?: string }[] = [
             { id: fullMeeting.organizerId, name: fullMeeting.organizerName, empId: fullMeeting.organizerEmpNo ?? undefined },
             ...(content.chairUserId ? [{ id: content.chairUserId, name: content.chairName || '', empId: content.chairEmpNo }] : []),
-            ...content.openIssues.filter(item => item.ownerUserId).map(item => ({ id: item.ownerUserId!, name: item.ownerName || '', empId: item.ownerEmpNo })),
+            // 多负责人：每一个负责人都要进种子名单，否则 EmployeeSelect 只能按 id 回显裸编号
+            ...content.openIssues.flatMap(item => ownerSeeds(item)),
           ]
-          for (const item of vo.items ?? []) {
-            if (item.ownerUserId && item.ownerName) {
-              seeds.push({ id: item.ownerUserId, name: item.ownerName, empId: item.ownerEmpNo || undefined })
-            }
-          }
-          for (const action of content.actions ?? []) {
-            if (action.ownerUserId && action.ownerName) {
-              seeds.push({ id: action.ownerUserId, name: action.ownerName, empId: action.ownerEmpNo || undefined })
-            }
-          }
+          for (const item of vo.items ?? []) seeds.push(...ownerSeeds(item))
+          for (const action of content.actions ?? []) seeds.push(...ownerSeeds(action))
           setOwnerSeed(seeds.filter((person, index, all) => all.findIndex(other => other.id === person.id) === index))
         } else {
           form.setFieldsValue({ items: base.items, actions: [], followUps: [], chairIds: [fullMeeting.organizerId] })
@@ -423,7 +429,8 @@ export default function MinutesForm() {
     if (send && (!content.purpose || !content.chairUserId || content.items.some(item => !item.decisionStatus
       || (item.decisionStatus !== 'information' && !item.conclusion)
       || (item.decisionStatus === 'information' && !item.discussion && !item.conclusion))
-      || [...content.actions, ...content.openIssues].some(item => !item.ownerUserId || !item.dueDate)
+      // 多负责人：一个都没选才算未填负责人（服务端同样重验非空与上限）
+      || [...content.actions, ...content.openIssues].some(item => !(item.ownerIds?.length) || !item.dueDate)
       || (!!minutes.publishedRevisionId && !changeNote))) {
       message.warning(t('meeting.minutes.publicationRequired', { defaultValue: '發布前請補齊會議目的、主持人、決議狀態與內容、事項負責人及期限；修訂版需填寫修訂說明。' }))
       return
@@ -489,8 +496,8 @@ export default function MinutesForm() {
     const current: MergeInput = {
       purpose: values.purpose,
       items: (values.items ?? []).map(item => ({ topicKey: item.topicKey ?? '', topic: item.topic ?? '', discussion: item.discussion, conclusion: item.conclusion, decisionStatus: item.decisionStatus })),
-      actions: (values.actions ?? []).map(task => ({ itemId: task.itemId, topicKey: task.topicKey, content: task.content ?? '', ownerUserId: task.ownerIds?.[0] ?? null, dueDate: task.dueDate ? task.dueDate.format('YYYY-MM-DD') : null, deliverable: task.deliverable })),
-      followUps: (values.followUps ?? []).map(task => ({ itemId: task.itemId, topicKey: task.topicKey, content: task.content ?? '', ownerUserId: task.ownerIds?.[0] ?? null, dueDate: task.dueDate ? task.dueDate.format('YYYY-MM-DD') : null })),
+      actions: (values.actions ?? []).map(task => ({ itemId: task.itemId, topicKey: task.topicKey, content: task.content ?? '', ownerUserId: task.ownerIds?.[0] ?? null, ownerIds: task.ownerIds, dueDate: task.dueDate ? task.dueDate.format('YYYY-MM-DD') : null, deliverable: task.deliverable })),
+      followUps: (values.followUps ?? []).map(task => ({ itemId: task.itemId, topicKey: task.topicKey, content: task.content ?? '', ownerUserId: task.ownerIds?.[0] ?? null, ownerIds: task.ownerIds, dueDate: task.dueDate ? task.dueDate.format('YYYY-MM-DD') : null })),
     }
     const merged = mergeProposal(current, aiAssist.result!.proposal!, selection)
     const seeds = [...ownerSeed]
@@ -502,7 +509,10 @@ export default function MinutesForm() {
           if (matched?.ownerName) seeds.push({ id: task.ownerUserId, name: matched.ownerName, empId: matched.ownerEmpNo ?? undefined })
         }
       }
-      return { itemId: task.itemId, topicKey: task.topicKey, content: task.content, ownerIds: task.ownerUserId ? [task.ownerUserId] : [], dueDate: task.dueDate ? dayjs(task.dueDate) : null, deliverable: task.deliverable }
+      return { itemId: task.itemId, topicKey: task.topicKey, content: task.content,
+        // AI 只提议一个负责人；已有事项必须保留全量负责人，否则套用一次建议就把协办洗掉了
+        ownerIds: task.ownerIds?.length ? task.ownerIds : (task.ownerUserId ? [task.ownerUserId] : []),
+        dueDate: task.dueDate ? dayjs(task.dueDate) : null, deliverable: task.deliverable }
     }
     setOwnerSeed(seeds)
     appliedAi.current = {
@@ -650,7 +660,7 @@ export default function MinutesForm() {
         <div className="mm-reading-surface">
           <MinutesContentCard content={previewContent} people={ownerSeed} attachments={attachmentList} resolveAttachmentUrl={resolveAttachmentUrl}
             followUpDetails={(watchedValues?.followUps ?? []).filter(item => item.content?.trim()).map(item => ({
-              content: item.content || '', ownerUserId: item.ownerIds?.[0], dueDate: item.dueDate?.format('YYYY-MM-DD'),
+              content: item.content || '', ownerIds: item.ownerIds ?? [], dueDate: item.dueDate?.format('YYYY-MM-DD'),
             }))}
             document={{
               title: meeting?.title,
@@ -838,7 +848,8 @@ export default function MinutesForm() {
                       {/* 负责人只存 sys_user.id：姓名/工号是服务端回查的快照，前端不自报 */}
                       <div className="mm-form-grid">
                         <Form.Item label={t('meeting.minutes.owner', { defaultValue: '負責人' })} name={[field.name, 'ownerIds']} style={{ marginBottom: 0 }}>
-                          <EmployeeSelect single seed={ownerSeed} style={{ width: '100%' }} placeholder={t('meeting.minutes.ownerPlaceholder', { defaultValue: '搜尋姓名或工號' })}
+                          {/* 不设 single：一条行动项可以主办+协办，只选一个人等于把协办排除在追办与办理权限之外 */}
+                          <EmployeeSelect seed={ownerSeed} style={{ width: '100%' }} placeholder={t('meeting.minutes.ownerPlaceholder', { defaultValue: '搜尋姓名或工號' })}
                             onPick={picked => setOwnerSeed(previous => [...previous, ...picked.filter(person => !previous.some(known => known.id === person.id))])} />
                         </Form.Item>
                         <Form.Item label={t('meeting.minutes.dueDate', { defaultValue: '完成時限' })} name={[field.name, 'dueDate']} style={{ marginBottom: 0 }}>
@@ -883,7 +894,7 @@ export default function MinutesForm() {
                         <Form.Item name={[field.name, 'itemId']} hidden><Input /></Form.Item>
                         <Form.Item name={[field.name, 'topicKey']} hidden><Input /></Form.Item>
                         <Form.Item label={t('meeting.minutes.followOwner', { defaultValue: '跟進人' })} name={[field.name, 'ownerIds']} style={{ marginBottom: 0 }}>
-                          <EmployeeSelect single seed={ownerSeed} style={{ width: '100%' }} placeholder={t('meeting.minutes.ownerPlaceholder', { defaultValue: '搜尋姓名或工號' })}
+                          <EmployeeSelect seed={ownerSeed} style={{ width: '100%' }} placeholder={t('meeting.minutes.ownerPlaceholder', { defaultValue: '搜尋姓名或工號' })}
                             onPick={picked => setOwnerSeed(previous => [...previous, ...picked.filter(person => !previous.some(known => known.id === person.id))])} />
                         </Form.Item>
                         <Form.Item label={t('meeting.minutes.dueDate', { defaultValue: '完成時限' })} name={[field.name, 'dueDate']} style={{ marginBottom: 0 }}>

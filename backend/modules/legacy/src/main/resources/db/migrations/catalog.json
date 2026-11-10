@@ -3122,6 +3122,25 @@
       "comment": "新增两表及外键、唯一键和CHECK约束；活动用户生成列保证每用户仅一个处理中提取。原文快照与结果保留7天，计量元数据保留180天。开启AI前必须配置数据分级和端点批准，本迁移不授予模型权限。回滚关闭新能力并保留表及数据。"
     },
     {
+      "versionKey": "meeting:minutes-multi-owner:v1.0",
+      "module": "meeting",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "meetingMinutesSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "meeting:minutes:v1.1",
+        "meeting:minutes-publication:v2.0"
+      ],
+      "scriptFiles": [
+        "334_meeting_minutes_multi_owner.sql"
+      ],
+      "intent": "纪要事项多负责人：新增 biz_meeting_minutes_item_owner 负责人真源表，并把事项行上的单负责人回填成 seq=1 的负责人行；owner_user_id/owner_name/owner_emp_no 三列退化为「首负责人缓存」",
+      "author": "Qoder",
+      "ticket": "meeting-minutes-multi-owner",
+      "comment": "一条事项交两个人办时，旧结构只能追办一个人：另一个人既收不到逾期提醒，也没有权限回填办理结果。单独成表而不是把 owner_user_id 改成 JSON 数组，因为事项要按责任人被逾期扫描、被回填状态、被提醒去重，这些都是按行查按行更。三列不删且写路径在同一事务内由 owners[0] 派生维护：本仓库推送即上生产且无库级回滚，保留三列让旧版本 jar 仍按首负责人工作；真值在负责人表，缓存列坏了最多显示错名字，反向则会把多负责人抹成一个人。回填守卫是「本事项还没有任何负责人行」，因此与发布路径的先删后插互不覆盖；owner_user_id IS NULL 的行不回填，无负责人本身是事实，不能凭空造一个责任人。守卫式迁移自带建表，不依赖结构契约先跑（契约校验器与本初始化器同属启动期，顺序不保证）。回滚：只增表不删列，保留表与回填数据不影响旧代码；彻底清理见脚本尾部注释。"
+    },
+    {
       "versionKey": "ai:scene-config-v1.0",
       "module": "ai",
       "phase": "MODULE_STRUCTURE",

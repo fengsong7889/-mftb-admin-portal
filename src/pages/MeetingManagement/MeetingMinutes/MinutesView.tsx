@@ -20,12 +20,12 @@ import DetailPageHeader from '@/components/DetailPageHeader'
 import CardTitle from '@/components/CardTitle'
 import {
   fetchMinutesById, fetchMinutesSends, fetchMinutesRevisions, fetchMinutesRevision, minutesDeliveryTarget, resolveMinutesItem, revokeMinutesLinks, revokeBatchLink,
-  fetchMinutesAttachmentAccess, minutesAttachmentFileUrl,
+  fetchMinutesAttachmentAccess, minutesAttachmentFileUrl, minutesOwners,
   type MinutesDeliveryVO, type MinutesDocument, type MinutesRevision, type MinutesItemView, type MinutesSendBatchVO, type MinutesVO,
 } from '@/api/meetingMinutes'
 import { fetchMeetingDetail, type MeetingVO } from '@/api/meeting'
 import { bizTypeLabels, minutesStatusMeta, minutesTargetTypeLabels, notifyStatusMeta, phaseMeta } from '../meetingMeta'
-import MinutesContentCard, { MinutesNoticePreview } from './MinutesContentCard'
+import MinutesContentCard, { MinutesNoticePreview, OwnerCell } from './MinutesContentCard'
 import MinutesExportButton from './MinutesExportButton'
 import type { AttachmentUrlResolver } from './MinutesAttachments'
 import SendMinutesModal from './SendMinutesModal'
@@ -349,9 +349,10 @@ export default function MinutesView() {
                 },
                 { title: t('meeting.minutes.itemContent', { defaultValue: '事項' }), dataIndex: 'content', key: 'content' },
                 {
-                  title: t('meeting.minutes.owner', { defaultValue: '負責人' }), key: 'owner', width: 160,
-                  render: (_: unknown, row: MinutesItemView) => (row.ownerName
-                    ? `${row.ownerName}${row.ownerEmpNo ? `（${row.ownerEmpNo}）` : ''}` : '-'),
+                  title: t('meeting.minutes.owner', { defaultValue: '負責人' }), key: 'owner', width: 200,
+                  // 多人负责人：与正文共用同一个单元格，跟踪表不会只报首负责人；
+                  // 无负责人保持本表原有的「-」而不是正文的「未指派」，不把无关的文案改动夹进本批
+                  render: (_: unknown, row: MinutesItemView) => (minutesOwners(row).length > 0 ? <OwnerCell row={row} /> : '-'),
                 },
                 { title: t('meeting.minutes.dueDate', { defaultValue: '完成時限' }), dataIndex: 'dueDate', key: 'dueDate', width: 120, render: (v?: string | null) => v || '-' },
                 {

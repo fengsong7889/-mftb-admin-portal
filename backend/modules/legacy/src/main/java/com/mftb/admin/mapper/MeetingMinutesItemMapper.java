@@ -38,12 +38,17 @@ public interface MeetingMinutesItemMapper extends BaseMapper<MeetingMinutesItem>
             + "</script>")
     List<MeetingMinutesItem> findByMinutesIds(@Param("minutesIds") Collection<Long> minutesIds);
 
-    /** 还没被读的：待处理 + 已过时限 + 今天没提醒过 */
-    @Select("SELECT * FROM biz_meeting_minutes_item WHERE deleted = 0 "
-            + "AND status = 'pending' AND due_date IS NOT NULL AND due_date < #{today} "
-            + "AND owner_user_id IS NOT NULL "
-            + "AND (last_notified_at IS NULL OR DATE(last_notified_at) < CURDATE()) "
-            + "ORDER BY due_date, id LIMIT #{limit}")
+    /**
+     * 还没被读的：待处理 + 已过时限 + 今天没提醒过 + 确实有人负责。
+     * <p>“有人负责”按负责人真源表 EXISTS 判定，不看 owner_user_id 缓存列：
+     * 多负责人以后缓存列只反映首负责人，拿它当“有没有负责人”会让第 2 位及以后的人漏提。
+     * 存量单负责人行已由 334 迁移回填，旧版 v1 写入路径也会同步维护负责人行。
+     */
+    @Select("SELECT i.* FROM biz_meeting_minutes_item i WHERE i.deleted = 0 "
+            + "AND i.status = 'pending' AND i.due_date IS NOT NULL AND i.due_date < #{today} "
+            + "AND EXISTS (SELECT 1 FROM biz_meeting_minutes_item_owner o WHERE o.item_id = i.id) "
+            + "AND (i.last_notified_at IS NULL OR DATE(i.last_notified_at) < CURDATE()) "
+            + "ORDER BY i.due_date, i.id LIMIT #{limit}")
     List<MeetingMinutesItem> findDueReminders(@Param("today") LocalDate today, @Param("limit") int limit);
 
     /** 新版事项序号仅分配一次，已移除行也占用序号，绝不能复用其身份。 */

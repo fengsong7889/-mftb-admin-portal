@@ -15,6 +15,7 @@ import com.mftb.admin.entity.MeetingBooking;
 import com.mftb.admin.entity.MeetingMinutes;
 import com.mftb.admin.entity.MeetingMinutesDelivery;
 import com.mftb.admin.entity.MeetingMinutesItem;
+import com.mftb.admin.entity.MeetingMinutesItemOwner;
 import com.mftb.admin.entity.MeetingMinutesLink;
 import com.mftb.admin.entity.MeetingMinutesSend;
 import com.mftb.admin.entity.MeetingMinutesAttachment;
@@ -24,6 +25,7 @@ import com.mftb.admin.mapper.MeetingAttendeeMapper;
 import com.mftb.admin.mapper.MeetingBookingMapper;
 import com.mftb.admin.mapper.MeetingMinutesDeliveryMapper;
 import com.mftb.admin.mapper.MeetingMinutesItemMapper;
+import com.mftb.admin.mapper.MeetingMinutesItemOwnerMapper;
 import com.mftb.admin.mapper.MeetingMinutesLinkMapper;
 import com.mftb.admin.mapper.MeetingMinutesMapper;
 import com.mftb.admin.mapper.MeetingMinutesSendMapper;
@@ -58,6 +60,7 @@ import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -125,6 +128,8 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
     private final MeetingMinutesPublication publication;
     private final MeetingMinutesAttachmentService attachmentService;
     private final MeetingMinutesAiExtractionMapper extractionMapper;
+    /** 事项负责人真源表（多负责人）：事项行上的 owner_* 三列只是首负责人缓存 */
+    private final MeetingMinutesItemOwnerMapper ownerMapper;
 
     @Value("${meeting.minutes.publication-enabled:true}")
     private boolean publicationEnabled;
@@ -418,7 +423,7 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         boolean linkPublic = PublicLinkGuard.isPubliclyReachable(linkBase);
         String absolute = linkBase == null ? null : linkBase + "/#/meeting-minutes-view?token=" + token;
         MeetingMinutesRenderer.Rendered rendered = MeetingMinutesRenderer.render(minutes,
-                itemMapper.findByMinutes(minutes.getId()), linkMapper.findByMinutes(minutes.getId()),
+                withOwners(itemMapper.findByMinutes(minutes.getId())), linkMapper.findByMinutes(minutes.getId()),
                 batch.getBatchSeq(), DateTimeUtils.format(batch.getSentAt()), displayName(current)
                         + (StringUtils.hasText(current.getEmpId()) ? "（" + current.getEmpId() + "）" : ""),
                 absolute, templateService);
@@ -1044,7 +1049,13 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
                     owner == null ? "" : Objects.toString(owner.getEmpId(), ""),
                     parseDueDate(item.getDueDate()));
         }
+        // 先清掉多出来那几行事项的负责人，再物理删事项行：外键是 NO ACTION，反过来会让删除直接失败
+        ownerMapper.deleteSurplus(minutes.getId(), kind, seq);
         itemMapper.deleteSurplus(minutes.getId(), kind, seq);
+        // 旧版录入路径只有一个负责人，但逾期扫描与办理权限都改读负责人真源表：
+        // 把事项行缓存整体重建成 seq=1 的真源行，否则旧纪要的待办会整批静默漏提
+        ownerMapper.deleteByMinutesKind(minutes.getId(), kind);
+        ownerMapper.rebuildFromItemCache(minutes.getId(), kind);
     }
 
     /**
@@ -1122,8 +1133,8 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         boolean writable = Objects.equals(minutes.getRecorderUserId(), current.getId())
                 || guard.isOrganizer(booking, current) || guard.canOperateRecords(current);
         // 负责人回来更新自己那一条不需要菜单写权限：他可能连会议菜单都没有，但事是交给他办的
-        boolean owner = Objects.equals(item.getOwnerUserId(), current.getId());
-        if (!writable && !owner) {
+        boolean owner = isOwnerOf(item, current);
+        if (!owner && !writable) {
             throw new BusinessException("只有負責人、記錄人或行政可以更新此事項");
         }
         String result = trimToNull(form == null ? null : form.getResult());
@@ -1170,8 +1181,9 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         vars.put("meetingTitle", nullToEmpty(minutes.getMeetingTitle()));
         vars.put("meetingTime", nullToEmpty(minutes.getMeetingTimeText()));
         vars.put("resultLabel", MeetingMinutesRenderer.resultLabel(item.getResult()));
-        vars.put("ownerName", nullToEmpty(item.getOwnerName()));
-        vars.put("ownerEmpNo", nullToEmpty(item.getOwnerEmpNo()));
+        MeetingMinutesRenderer.OwnerDisplay display = MeetingMinutesRenderer.ownerDisplay(withOwners(item));
+        vars.put("ownerName", display.names());
+        vars.put("ownerEmpNo", display.empNos());
         vars.put("doneByName", nullToEmpty(item.getDoneByName()));
         vars.put("noteLine", StringUtils.hasText(note) ? "說明：" + note + "\n" : "");
         vars.put("viewUrl", viewUrl);
@@ -1217,6 +1229,9 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         boolean writable = Objects.equals(minutes.getRecorderUserId(), current.getId())
                 || guard.isOrganizer(booking, current) || guard.canOperateRecords(current);
         java.time.LocalDate today = java.time.LocalDate.now();
+        // 负责人一次取回本页全部事项：逐条查会让一份纪要长出一条事项一次往返
+        Map<Long, List<MeetingMinutesItemOwner>> owners = groupOwners(
+                ownerMapper.findByItemIds(rows.stream().map(MeetingMinutesItem::getId).toList()));
         List<MeetingMinutesDto.ItemVO> out = new ArrayList<>();
         for (MeetingMinutesItem row : rows) {
             MeetingMinutesDto.ItemVO vo = new MeetingMinutesDto.ItemVO();
@@ -1230,6 +1245,7 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
             vo.setOwnerUserId(row.getOwnerUserId());
             vo.setOwnerName(row.getOwnerName());
             vo.setOwnerEmpNo(row.getOwnerEmpNo());
+            applyOwners(vo, row, owners.getOrDefault(row.getId(), List.of()));
             vo.setDueDate(row.getDueDate() == null ? null : row.getDueDate().toString());
             vo.setStatus(row.getStatus());
             vo.setResult(row.getResult());
@@ -1239,10 +1255,78 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
             vo.setOverdue(MeetingMinutesItem.STATUS_PENDING.equals(row.getStatus())
                     && row.getDueDate() != null && row.getDueDate().isBefore(today));
             vo.setCanResolve(!MeetingMinutesItem.STATUS_DONE.equals(row.getStatus())
-                    && (writable || Objects.equals(row.getOwnerUserId(), current.getId())));
+                    && (writable || isOwnerOf(row, vo.getOwnerIds(), current)));
             out.add(vo);
         }
         return out;
+    }
+
+    /**
+     * 把负责人真源写进出参，并在真源行缺失时回退到事项行的首负责人缓存。
+     * <p>回退不是兼容代码而是事实陈述：没跑过 334 回填的库上，“负责人是谁”仍然只写在
+     * 事项行里。前端只读数组，不需要为新旧数据分两套渲染。
+     */
+    private static void applyOwners(MeetingMinutesDto.ItemVO vo, MeetingMinutesItem row,
+                                    List<MeetingMinutesItemOwner> rows) {
+        if (rows.isEmpty()) {
+            vo.setOwnerIds(row.getOwnerUserId() == null ? List.of() : List.of(row.getOwnerUserId()));
+            vo.setOwnerNames(row.getOwnerUserId() == null ? List.of() : List.of(Objects.toString(row.getOwnerName(), "")));
+            vo.setOwnerEmpNos(row.getOwnerUserId() == null ? List.of() : List.of(Objects.toString(row.getOwnerEmpNo(), "")));
+            return;
+        }
+        vo.setOwnerIds(rows.stream().map(MeetingMinutesItemOwner::getUserId).toList());
+        vo.setOwnerNames(rows.stream().map(owner -> Objects.toString(owner.getUserName(), "")).toList());
+        vo.setOwnerEmpNos(rows.stream().map(owner -> Objects.toString(owner.getEmpNo(), "")).toList());
+    }
+
+    private static Map<Long, List<MeetingMinutesItemOwner>> groupOwners(List<MeetingMinutesItemOwner> rows) {
+        Map<Long, List<MeetingMinutesItemOwner>> grouped = new HashMap<>();
+        for (MeetingMinutesItemOwner row : rows) {
+            grouped.computeIfAbsent(row.getItemId(), key -> new ArrayList<>()).add(row);
+        }
+        return grouped;
+    }
+
+    /**
+     * 给单条事项补上负责人真源行：群里的「事項已更新」要列出全部负责人，而不是只报首负责人。
+     * <p>读不到真源行时 ownerDisplay 会回退事项行缓存，旧库上的通知不会因此变成空白。
+     */
+    private MeetingMinutesItem withOwners(MeetingMinutesItem item) {
+        item.setOwners(ownerMapper.findByItem(item.getId()));
+        return item;
+    }
+
+    /** 批量版本：一份纪要的事项卡片只多一次往返，不逐条查 */
+    private List<MeetingMinutesItem> withOwners(List<MeetingMinutesItem> rows) {
+        if (rows.isEmpty()) {
+            return rows;
+        }
+        Map<Long, List<MeetingMinutesItemOwner>> grouped = groupOwners(
+                ownerMapper.findByItemIds(rows.stream().map(MeetingMinutesItem::getId).toList()));
+        for (MeetingMinutesItem row : rows) {
+            row.setOwners(grouped.getOrDefault(row.getId(), List.of()));
+        }
+        return rows;
+    }
+
+    /**
+     * 当前用户是否在这条事项的负责人集合里。
+     * <p>办理权限只在这里裁决一次，前端 canResolve 只是 UX：拿到别人的事项 id 直接调接口时，
+     * 真源行与首负责人缓存命中任一都算——没跑过 334 回填的库上，缓存列就是当时唯一的事实，
+     * 不能因为读不到真源行而把真正被交办的人拒在外面。
+     */
+    private boolean isOwnerOf(MeetingMinutesItem item, SysUser current) {
+        if (Objects.equals(item.getOwnerUserId(), current.getId())) {
+            return true;
+        }
+        return ownerMapper.findByItem(item.getId()).stream()
+                .anyMatch(owner -> Objects.equals(owner.getUserId(), current.getId()));
+    }
+
+    /** 出参上的负责人列表已由 {@link #applyOwners} 归一，直接按集合判定即可 */
+    private static boolean isOwnerOf(MeetingMinutesItem row, List<Long> ownerIds, SysUser current) {
+        return (ownerIds != null && ownerIds.contains(current.getId()))
+                || Objects.equals(row.getOwnerUserId(), current.getId());
     }
 
     private MeetingMinutesDto.LinkVO toLinkVO(MeetingMinutesLink link) {
@@ -1602,8 +1686,9 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
         if (writable || draft == null || !draft.versioned()) {
             vo.setLinks(linkMapper.findByMinutes(minutes.getId()).stream().map(this::toLinkVO).toList());
         }
-        vo.setItemOwner(vo.getItems().stream()
-                .anyMatch(item -> Objects.equals(item.getOwnerUserId(), current.getId())));
+        vo.setItemOwner(vo.getItems().stream().anyMatch(item ->
+                Objects.equals(item.getOwnerUserId(), current.getId())
+                        || (item.getOwnerIds() != null && item.getOwnerIds().contains(current.getId()))));
         return vo;
     }
 

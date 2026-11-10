@@ -57,6 +57,8 @@ vi.mock('@/api/meetingMinutes', async (importOriginal) => {
 // 员工选择器会自己去搜人，本用例不关心结果
 vi.mock('@/api/employee', () => ({
   fetchEmployees: vi.fn(async () => ({ records: [], total: 0 })),
+  // 回显时选择器会按 id 单人补查姓名；不给这个函数会让新用例在 effect 里直接抛错
+  fetchEmployee: vi.fn(async (id: number) => ({ id, name: `員工${id}`, empId: `MF${id}` })),
 }))
 
 import { fetchMeetingDetail, backfillMeetingAttendee } from '@/api/meeting'
@@ -760,10 +762,63 @@ describe('會議紀要表單', () => {
     await waitFor(() => expect(createMinutes).toHaveBeenCalledTimes(1))
     const payload = vi.mocked(createMinutes).mock.calls[0][0]
     expect(payload.content.items[0].topic).toBe('無敵星星項目進度討論')
-    expect(payload.content.actions[0]).toMatchObject({ content: '後端提供無敵星星接口', ownerUserId: 7, dueDate: '2026-11-06' })
+    // AI 只提议一人：进正文后就是单元素负责人数组；单值字段不再写，由服务端刷回首负责人缓存
+    expect(payload.content.actions[0]).toMatchObject({ content: '後端提供無敵星星接口', ownerIds: [7], dueDate: '2026-11-06' })
+    expect(payload.content.actions[0]).not.toHaveProperty('ownerUserId')
     // 保存同事务登记 AI 来源：携带本次套用的提取请求号与采用条目
     expect(payload.aiExtractionRequestKey).toBe('k1')
     expect(payload.appliedKeys).toEqual(expect.arrayContaining(['t1', 'a1']))
+  })
+
+  it('负责人多选：回显与保存都带全量负责人，不再只提交首位', async () => {
+    vi.mocked(fetchMinutes).mockResolvedValue({ exists: true, id: 9, bookingId: 100, canEdit: true, version: 3,
+      content: { ...emptyMinutesContent(), schemaVersion: 2, purpose: '確認交付目標', chairUserId: 1,
+        items: [], openIssues: [],
+        actions: [{ itemId: 41, content: '輸出預算明細', ownerIds: [7, 8], ownerNames: ['張三', '李四'],
+          ownerEmpNos: ['MF00007', 'MF00008'], dueDate: '2026-11-30' }],
+      },
+    })
+    renderForm()
+    fireEvent.click(await screen.findByRole('button', { name: /保存紀要/ }))
+    await waitFor(() => expect(updateMinutes).toHaveBeenCalledTimes(1))
+    const action = vi.mocked(updateMinutes).mock.calls[0][1].content.actions[0]
+    // 只取 [0] 会把协办从正文里抹掉：他既收不到逾期催办，也回填不了办理结果
+    expect(action.ownerIds).toEqual([7, 8])
+    expect(action).not.toHaveProperty('ownerUserId')
+  })
+
+  it('套用 AI 建议不抹掉已有事项的协办负责人', async () => {
+    vi.mocked(fetchMinutes).mockResolvedValue({ exists: true, id: 9, bookingId: 100, canEdit: true, version: 3,
+      content: { ...emptyMinutesContent(), schemaVersion: 2, purpose: '確認交付目標', chairUserId: 1, openIssues: [],
+        items: [{ topicKey: 'topic-1', topic: '既有議題', conclusion: '按期完成', decisionStatus: 'decided' }],
+        actions: [{ itemId: 41, topicKey: 'topic-1', content: '輸出預算明細', ownerIds: [7, 8],
+          ownerNames: ['張三', '李四'], ownerEmpNos: ['MF00007', 'MF00008'], dueDate: '2026-11-30' }],
+      },
+    })
+    vi.mocked(fetchMinutesAiStatus).mockResolvedValue({ available: true, maxInputChars: 20000, enabled: true })
+    vi.mocked(extractMinutesAi).mockResolvedValue({
+      requestKey: 'k2', status: 'succeeded', extractionSchemaVersion: 1,
+      source: { noteVersion: 1, sourceHash: 'h' },
+      proposal: {
+        items: [],
+        actions: [{ ref: 'a9', topicRef: null, content: '補充接口聯調', ownerUserId: 9, ownerName: '王五',
+          dueDate: '2026-12-05', sourceRefs: ['s1'] }],
+        openIssues: [],
+      },
+      issues: [],
+    })
+    renderForm('/meeting-minutes-form?bookingId=100&input=notes')
+    fireEvent.change(await screen.findByRole('textbox', { name: '原始筆記' }), { target: { value: '需要王五補充聯調' } })
+    await waitFor(() => expect(saveMinutesNote).toHaveBeenCalled())
+    fireEvent.click(screen.getByRole('button', { name: 'AI 輔助' }))
+    const review = await screen.findByRole('region', { name: 'AI 提取結果核對' })
+    fireEvent.click(within(review).getByRole('button', { name: '套用到紀要表單' }))
+    fireEvent.click(await screen.findByRole('button', { name: /保存紀要/ }))
+    await waitFor(() => expect(updateMinutes).toHaveBeenCalledTimes(1))
+    const actions = vi.mocked(updateMinutes).mock.calls[0][1].content.actions
+    // 新增建议只带一个负责人；已有那一条必须原封不动地保住两个人
+    expect(actions.find(item => item.content === '輸出預算明細')?.ownerIds).toEqual([7, 8])
+    expect(actions.find(item => item.content === '補充接口聯調')?.ownerIds).toEqual([9])
   })
 
   it('已有纪要默认手动，显式 AI 入口可切到自由笔记且不修改原文', async () => {

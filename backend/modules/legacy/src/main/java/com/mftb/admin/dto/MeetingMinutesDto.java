@@ -237,6 +237,14 @@ public final class MeetingMinutesDto {
         private Long ownerUserId;
         private String ownerName;
         private String ownerEmpNo;
+        /**
+         * 全量负责人（按 seq 顺序），来自 biz_meeting_minutes_item_owner 真源表。
+         * <p>上面三个单值字段是首负责人缓存，保留是为了旧客户端与旧版本服务仍能工作；
+         * 存量库上负责人行缺失的老事项，服务端回退成一条单元素列表，前端不需要分两套读。
+         */
+        private List<Long> ownerIds = new ArrayList<>();
+        private List<String> ownerNames = new ArrayList<>();
+        private List<String> ownerEmpNos = new ArrayList<>();
         /** yyyy-MM-dd */
         private String dueDate;
         /** pending/done */
@@ -248,7 +256,7 @@ public final class MeetingMinutesDto {
         private String doneByName;
         /** 已过时限且未处理（前端标红，不靠前端算日期） */
         private Boolean overdue;
-        /** 当前登录人能否更新这条的状态（负责人本人 / 记录人 / 组织者 / 行政） */
+        /** 当前登录人能否更新这条的状态（负责人之一 / 记录人 / 组织者 / 行政） */
         private Boolean canResolve;
         private Integer version;
         private String topicKey;

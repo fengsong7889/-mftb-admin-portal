@@ -5,6 +5,7 @@ import com.mftb.admin.config.migration.MigrationCatalog;
 import com.mftb.admin.config.migration.MigrationEntry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.core.annotation.Order;
 
 import java.io.IOException;
@@ -136,7 +137,8 @@ class MeetingMinutesScriptTest {
         expected.add(MeetingMinutesSchema.REVISION_TABLE);
         expected.add(MeetingMinutesSchema.ATTACHMENT_TABLE);
         expected.addAll(MeetingMinutesSchema.AI_TABLES);
-        assertEquals(expected.size(), contracts.size(), "契約數量必須與表數量一致（旧版七张 + 正式版本表 + 附件表 + AI 两表）");
+        expected.add(MeetingMinutesSchema.MULTI_OWNER_TABLE);
+        assertEquals(expected.size(), contracts.size(), "契約數量必須與表數量一致（旧版七张 + 正式版本表 + 附件表 + AI 两表 + 多负责人表）");
         for (int index = 0; index < expected.size(); index++) {
             ContractSpec spec = contracts.get(index);
             assertEquals(expected.get(index), spec.table());
@@ -326,5 +328,66 @@ class MeetingMinutesScriptTest {
         for (String forbidden : List.of("DROP ", "TRUNCATE ", "DELETE FROM")) {
             assertFalse(executable.contains(forbidden), forbidden);
         }
+    }
+
+    @Test
+    @DisplayName("多负责人表：真值与参考副本逐字一致、catalog 已登记、关键结构齐备")
+    void multiOwnerSchemaAndReferenceAreIdenticalAndRegistered() throws Exception {
+        String sql = MeetingMinutesSchema.raw(MeetingMinutesSchema.SCRIPT_MULTI_OWNER);
+        assertEquals(sql, Files.readString(Path.of("sql", MeetingMinutesSchema.SCRIPT_MULTI_OWNER)));
+        MigrationEntry entry = MigrationCatalog.readAll().stream()
+                .filter(item -> MeetingMinutesSchemaMigrationInitializer.VERSION_MULTI_OWNER.equals(item.getVersionKey()))
+                .findFirst().orElseThrow(() -> new AssertionError("meeting:minutes-multi-owner:v1.0 未登记进 catalog，启动不会自动执行"));
+        assertTrue(entry.getDependencies().contains("meeting:minutes:v1.1"),
+                "负责人表外键指向事项表，必须晚于 v1.1 执行");
+        assertEquals("meetingMinutesSchemaMigrationInitializer", entry.getExecutor());
+        assertNotNull(getClass().getClassLoader().getResource(MeetingMinutesSchema.SCRIPT_MULTI_OWNER));
+        String normalized = sql.replaceAll("\\s+", " ");
+        for (String required : List.of(
+                "CREATE TABLE IF NOT EXISTS biz_meeting_minutes_item_owner",
+                "UNIQUE KEY uk_meeting_minutes_item_owner (item_id, user_id)",
+                "KEY idx_meeting_minutes_item_owner_user (user_id, item_id)",
+                "FOREIGN KEY (item_id) REFERENCES biz_meeting_minutes_item (id)",
+                "ck_meeting_minutes_item_owner_seq CHECK (seq > 0)")) {
+            assertTrue(normalized.contains(required), "缺少结构事实: " + required);
+        }
+        // 回填守卫在「本事项还没有负责人行」上：拿掉它就会与发布路径的先删后插互相覆盖，重跑一次多一套人
+        assertTrue(normalized.contains("INSERT IGNORE INTO biz_meeting_minutes_item_owner"), "回填必须用 INSERT IGNORE");
+        assertTrue(normalized.contains("AND NOT EXISTS (SELECT 1 FROM biz_meeting_minutes_item_owner o WHERE o.item_id = i.id)"),
+                "回填必须守卫在本事项尚无负责人行");
+        assertTrue(normalized.contains("WHERE i.owner_user_id IS NOT NULL"),
+                "无负责人的事项不回填：凭空造一个责任人等于让不相干的人收催办");
+        String executable = sql.replaceAll("(?m)^\\s*--.*$", "").toUpperCase();
+        for (String forbidden : List.of("DROP ", "TRUNCATE ", "DELETE FROM", "UPDATE ")) {
+            assertFalse(executable.contains(forbidden), "可執行語句裡出現了破壞性或返工操作: " + forbidden);
+        }
+    }
+
+    @Test
+    @DisplayName("守卫式迁移自带建表：逐条执行脚本文字，不依赖结构契约先跑")
+    void multiOwnerMigrationRunsTheWholeScript() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        MeetingMinutesSchemaMigrationInitializer initializer =
+                new MeetingMinutesSchemaMigrationInitializer(jdbc, mock(SchemaVersionTracker.class));
+        ReflectionTestUtils.invokeMethod(initializer, "migrateMultiOwner");
+        List<String> statements = MeetingMinutesSchema.statements(MeetingMinutesSchema.SCRIPT_MULTI_OWNER);
+        assertEquals(2, statements.size(), "腳本只應有建表與回填兩條可執行語句");
+        ArgumentCaptor<String> executed = ArgumentCaptor.forClass(String.class);
+        verify(jdbc, org.mockito.Mockito.times(statements.size())).execute(executed.capture());
+        assertTrue(executed.getAllValues().get(0).startsWith("CREATE TABLE IF NOT EXISTS biz_meeting_minutes_item_owner"),
+                "守衛遷移必須自帶建表，不能指望契約校验器先把表補出來");
+        assertTrue(executed.getAllValues().get(1).startsWith("INSERT IGNORE INTO biz_meeting_minutes_item_owner"));
+    }
+
+    @Test
+    @DisplayName("逾期扫描改读负责人真源表：首负责人缓存不再是「有没有负责人」的依据")
+    void dueReminderScanFollowsTheOwnerTable() throws Exception {
+        String sql = String.join(" ", com.mftb.admin.mapper.MeetingMinutesItemMapper.class
+                .getMethod("findDueReminders", java.time.LocalDate.class, int.class)
+                .getAnnotation(org.apache.ibatis.annotations.Select.class).value());
+        assertTrue(sql.contains("EXISTS (SELECT 1 FROM biz_meeting_minutes_item_owner o WHERE o.item_id = i.id)"),
+                "逾期扫描要按负责人真源表判定，否则多负责人事项只会追办首负责人");
+        assertFalse(sql.contains("owner_user_id IS NOT NULL"),
+                "缓存列只反映首负责人，拿它当「有没有负责人」会让协办整批漏提");
     }
 }

@@ -63,6 +63,14 @@ public class MeetingMinutesItem {
 
     private String ownerEmpNo;
 
+    /**
+     * 全量负责人（来自 biz_meeting_minutes_item_owner 真源表），不是本表列。
+     * <p>上面三个 owner 列只是首负责人缓存；卡片与通知要把所有人都列出来，否则
+     * 协办人在钉钉里看不见自己也被追办。没加载时为空，展示侧回退到首负责人缓存。
+     */
+    @TableField(exist = false)
+    private java.util.List<MeetingMinutesItemOwner> owners;
+
     /** 完成时限；NULL=未定时限，不参与逾期扫描 */
     private LocalDate dueDate;
 

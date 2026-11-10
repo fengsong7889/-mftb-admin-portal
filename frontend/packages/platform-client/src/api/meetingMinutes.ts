@@ -35,11 +35,49 @@ export interface MinutesAction {
   topicKey?: string
   deliverable?: string
   content: string
+  /** 首负责人缓存：多负责人语义下它等于 ownerIds[0]，只为旧快照与旧客户端保留 */
   ownerUserId?: number | null
   ownerName?: string
   ownerEmpNo?: string
+  /**
+   * 全量负责人（主办在前）。
+   * 姓名/工号服务端按 id 回查 sys_user 后写回，顺序与本数组一一对应；前端只传 id。
+   */
+  ownerIds?: (number | null)[]
+  ownerNames?: (string | null)[]
+  ownerEmpNos?: (string | null)[]
   /** 'YYYY-MM-DD'，可空表示未定时限 */
   dueDate?: string | null
+}
+
+/** 事项出参里的负责人形状与正文一致，两处共用同一套读取归一与展示口径 */
+export type MinutesOwnerCarrier = Pick<MinutesAction, 'ownerIds' | 'ownerNames' | 'ownerEmpNos' | 'ownerUserId' | 'ownerName' | 'ownerEmpNo'>
+
+/** 事项负责人快照：id 可缺——更老的正文只写了姓名工号，那仍然是当时记下的负责人 */
+export interface MinutesOwnerSnapshot { id?: number; name: string; empNo: string }
+
+/**
+ * 负责人读取归一：新版读数组，旧快照只有单值字段时按一人处理——历史纪要零迁移可读。
+ * 不返回 null id：数组里混入 null 是脏数据，不该把一个空负责人渲染成一串括号。
+ */
+export function minutesOwners(row?: MinutesOwnerCarrier | null): MinutesOwnerSnapshot[] {
+  const ids = (row?.ownerIds ?? []).filter((id): id is number => typeof id === 'number')
+  if (ids.length > 0) {
+    return ids.map((id, index) => ({ id, name: row?.ownerNames?.[index] ?? '', empNo: row?.ownerEmpNos?.[index] ?? '' }))
+  }
+  if (row?.ownerUserId != null) {
+    return [{ id: row.ownerUserId, name: row.ownerName ?? '', empNo: row.ownerEmpNo ?? '' }]
+  }
+  if (row?.ownerName) return [{ name: row.ownerName, empNo: row.ownerEmpNo ?? '' }]
+  return []
+}
+
+/**
+ * 负责人 id 列表：只写了姓名、没写 id 的更老快照拿不到 id，不能进选择器（选人是按 sys_user.id 走的）。
+ * <p>宁可这一条显示不出负责人，也不能把姓名当 id 提交——那会把同名的另一个人写进台账。
+ */
+export function minutesOwnerIds(row?: MinutesOwnerCarrier | null): number[] {
+  return minutesOwners(row).map(owner => owner.id).filter((id): id is number => id != null)
 }
 
 /** 未決事項：需要后续决策的事项 */
@@ -142,8 +180,8 @@ export function minutesContentLength(content: MinutesContent): number {
   const parts: Array<string | undefined | null> = [content.nextMeetingNote, content.remark, content.summary, content.purpose]
   content.attendance?.forEach(person => parts.push(person.name, person.reason))
   content.items.forEach(item => parts.push(item.topic, item.discussion, item.conclusion))
-  content.actions.forEach(item => parts.push(item.content, item.ownerName, item.deliverable))
-  content.openIssues.forEach(item => parts.push(item.content, item.needDecisionBy))
+  content.actions.forEach(item => parts.push(item.content, item.ownerName, ...(item.ownerNames ?? []), item.deliverable))
+  content.openIssues.forEach(item => parts.push(item.content, item.needDecisionBy, ...(item.ownerNames ?? [])))
   content.absentees.forEach(item => parts.push(item.name, item.reason))
   return parts.reduce((sum, value) => sum + (value?.trim().length ?? 0), 0)
 }
@@ -245,6 +283,10 @@ export interface MinutesItemView {
   ownerUserId?: number | null
   ownerName?: string
   ownerEmpNo?: string
+  /** 全量负责人（与正文同一字段名与同一归一口径），旧事项读不到真源行时服务端回退首负责人缓存 */
+  ownerIds?: (number | null)[]
+  ownerNames?: (string | null)[]
+  ownerEmpNos?: (string | null)[]
   /** 'YYYY-MM-DD' */
   dueDate?: string | null
   /** pending/done */

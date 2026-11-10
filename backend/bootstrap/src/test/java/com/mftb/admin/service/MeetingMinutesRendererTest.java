@@ -4,6 +4,7 @@ import com.mftb.admin.constant.MeetingConstants;
 import com.mftb.admin.dto.MeetingMinutesContent;
 import com.mftb.admin.entity.MeetingMinutes;
 import com.mftb.admin.entity.MeetingMinutesItem;
+import com.mftb.admin.entity.MeetingMinutesItemOwner;
 import com.mftb.admin.util.JsonUtils;
 import com.mftb.admin.util.MinutesViewTokenUtil;
 import org.junit.jupiter.api.DisplayName;
@@ -214,5 +215,57 @@ class MeetingMinutesRendererTest {
         assertFalse(rendered.markdown().contains("紀要編號"), "查看人不关注单号：卡片不得出现纪要编号");
         assertFalse(rendered.markdown().contains("MJ202611060001"));
         assertTrue(rendered.markdown().contains("議題 1 項 · 行動 0 項 · 跟進 0 項"));
+    }
+
+    /* ==================== 多负责人 ==================== */
+
+    private static MeetingMinutesItemOwner ownerRow(long userId, String name, String empNo, int seq) {
+        MeetingMinutesItemOwner row = new MeetingMinutesItemOwner();
+        row.setUserId(userId);
+        row.setUserName(name);
+        row.setEmpNo(empNo);
+        row.setSeq(seq);
+        return row;
+    }
+
+    private static MeetingMinutesItem trackedActionWithOwners(List<MeetingMinutesItemOwner> owners) {
+        MeetingMinutesItem row = new MeetingMinutesItem();
+        row.setKind(MeetingMinutesItem.KIND_ACTION);
+        row.setSeq(1);
+        row.setContent("輸出預算明細表");
+        row.setStatus(MeetingMinutesItem.STATUS_PENDING);
+        row.setDueDate(java.time.LocalDate.parse("2026-10-31"));
+        row.setOwnerUserId(7L);
+        row.setOwnerName("張三");
+        row.setOwnerEmpNo("MF00007");
+        row.setOwners(owners);
+        return row;
+    }
+
+    @Test
+    @DisplayName("多负责人卡片：姓名与工号各自按顿号连接，不拆坏模板的「姓名（工号）」形状")
+    void rendersEveryOwnerSeparatedByIdeographicComma() {
+        MeetingMinutes minutes = minutes(List.of(), List.of(item("分攤口徑", null, "按營收分攤")));
+        MeetingMinutesRenderer.Rendered rendered = MeetingMinutesRenderer.render(minutes,
+                List.of(trackedActionWithOwners(List.of(ownerRow(7L, "張三", "MF00007", 1),
+                        ownerRow(8L, "王二", "MF00008", 2)))),
+                List.of(), 1, "2026-10-19 20:00", "李四", null, null);
+
+        String markdown = rendered.markdown();
+        assertTrue(markdown.contains("👤 **張三、王二（MF00007、MF00008）**"),
+                "协办人也得上卡片，否则钉钉里看不出这件事是两个人办的：" + markdown);
+        assertFalse(markdown.contains("張三（MF00007）**｜👤"), "不得拆成两段负责人");
+    }
+
+    @Test
+    @DisplayName("真源行未加载时回退首负责人缓存：旧库上的卡片与通知不会变成空白")
+    void fallsBackToFirstOwnerCacheWhenOwnerRowsAreMissing() {
+        MeetingMinutesRenderer.OwnerDisplay cached = MeetingMinutesRenderer.ownerDisplay(trackedActionWithOwners(null));
+        assertEquals("張三", cached.names());
+        assertEquals("MF00007", cached.empNos());
+
+        MeetingMinutesRenderer.OwnerDisplay empty = MeetingMinutesRenderer.ownerDisplay(trackedActionWithOwners(List.of()));
+        assertEquals("張三", empty.names());
+        assertTrue(MeetingMinutesRenderer.ownerDisplay(trackedActionWithOwners(List.of())).present());
     }
 }

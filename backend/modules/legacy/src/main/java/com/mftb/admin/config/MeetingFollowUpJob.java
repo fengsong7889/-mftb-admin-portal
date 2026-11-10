@@ -3,12 +3,15 @@ package com.mftb.admin.config;
 import com.mftb.admin.constant.MeetingConstants;
 import com.mftb.admin.entity.MeetingMinutes;
 import com.mftb.admin.entity.MeetingMinutesItem;
+import com.mftb.admin.entity.MeetingMinutesItemOwner;
 import com.mftb.admin.entity.SysNotificationSwitch;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.MeetingMinutesItemMapper;
+import com.mftb.admin.mapper.MeetingMinutesItemOwnerMapper;
 import com.mftb.admin.mapper.MeetingMinutesMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.service.DingTalkAppService;
+import com.mftb.admin.service.MeetingMinutesRenderer;
 import com.mftb.admin.service.MeetingNotifyTemplateService;
 import com.mftb.admin.service.NotificationAppService;
 import lombok.RequiredArgsConstructor;
@@ -22,8 +25,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -48,6 +53,7 @@ public class MeetingFollowUpJob {
     private static final int BATCH_SIZE = 200;
 
     private final MeetingMinutesItemMapper itemMapper;
+    private final MeetingMinutesItemOwnerMapper ownerMapper;
     private final MeetingMinutesMapper minutesMapper;
     private final SysUserMapper userMapper;
     private final NotificationAppService appService;
@@ -84,13 +90,16 @@ public class MeetingFollowUpJob {
                     skipped++;
                     continue;
                 }
-                SysUser owner = item.getOwnerUserId() == null ? null : userMapper.selectById(item.getOwnerUserId());
-                if (owner == null || !StringUtils.hasText(owner.getDingtalkUserId())) {
+                // 一条事项的负责人可以有多人：逾期了每个人都得知道，只追首负责人等于把协办排除在事实之外
+                List<SysUser> owners = resolveOwners(item);
+                if (owners.isEmpty()) {
                     skipped++;
                     continue;
                 }
-                if (send(item, owner, app)) {
-                    sent++;
+                for (SysUser owner : owners) {
+                    if (send(item, owner, app)) {
+                        sent++;
+                    }
                 }
             }
             log.info("跟進事項逾期提醒完成: 到期={} 已發={} 跳過={}（靜音/未綁定應用/負責人未綁钉钉）",
@@ -99,6 +108,32 @@ public class MeetingFollowUpJob {
             // 定时任务异常不能打断后续调度
             log.error("跟進事項逾期提醒作業失敗: {}", e.getMessage(), e);
         }
+    }
+
+    /**
+     * 这条事项现在该催谁：取负责人真源表全量，再按钉钉绑定过滤。
+     * <p>顺手把负责人装进事项对象，卡片里的「負責人」才能列出所有人而不是只有首负责人。
+     * <p>真源表还没有行（没跑过 334 回填的库）时按事项行上的首负责人缓存处理——
+     * 那个人确实被交办过，不能因为读不到新表就一个都不发。
+     */
+    private List<SysUser> resolveOwners(MeetingMinutesItem item) {
+        List<MeetingMinutesItemOwner> rows = ownerMapper.findByItem(item.getId());
+        item.setOwners(rows);
+        Set<Long> ids = new LinkedHashSet<>();
+        for (MeetingMinutesItemOwner row : rows) {
+            if (row.getUserId() != null) {
+                ids.add(row.getUserId());
+            }
+        }
+        if (ids.isEmpty() && item.getOwnerUserId() != null) {
+            ids.add(item.getOwnerUserId());
+        }
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return userMapper.selectBatchIds(ids).stream()
+                .filter(user -> user != null && StringUtils.hasText(user.getDingtalkUserId()))
+                .toList();
     }
 
     private boolean send(MeetingMinutesItem item, SysUser owner, NotificationAppService.Credentials app) {
@@ -117,8 +152,9 @@ public class MeetingFollowUpJob {
         vars.put("meetingTime", minutes.getMeetingTimeText());
         vars.put("dueDate", item.getDueDate() == null ? "" : item.getDueDate().toString());
         vars.put("overdueDays", String.valueOf(overdueDays));
-        vars.put("ownerName", item.getOwnerName());
-        vars.put("ownerEmpNo", item.getOwnerEmpNo());
+        MeetingMinutesRenderer.OwnerDisplay display = MeetingMinutesRenderer.ownerDisplay(item);
+        vars.put("ownerName", display.names());
+        vars.put("ownerEmpNo", display.empNos());
         vars.put("viewUrl", viewUrl);
         MeetingNotifyTemplateService.Rendered rendered =
                 templateService.render(MeetingConstants.SCENARIO_FOLLOW_OVERDUE, vars);

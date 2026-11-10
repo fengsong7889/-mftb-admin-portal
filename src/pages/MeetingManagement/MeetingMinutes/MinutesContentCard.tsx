@@ -11,7 +11,7 @@ import { Button } from 'antd'
 import { FileTextOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import type { ReactNode } from 'react'
-import { minutesPurposeText, type MinutesAction, type MinutesAttachmentVO, type MinutesAttendance, type MinutesContent, type MinutesDocument, type MinutesItemView } from '@/api/meetingMinutes'
+import { minutesOwners, minutesPurposeText, type MinutesAction, type MinutesAttachmentVO, type MinutesAttendance, type MinutesContent, type MinutesDocument, type MinutesItemView, type MinutesOwnerCarrier } from '@/api/meetingMinutes'
 import GroupLogo from '@/components/GroupLogo'
 import { bizTypeLabels } from '../meetingMeta'
 import { MinutesAttachmentList, type AttachmentUrlResolver } from './MinutesAttachments'
@@ -80,6 +80,28 @@ const ATTENDANCE_ORDER = { present: 0, unverified: 1, absent: 2 } as const
 
 function personText(name?: string, empNo?: string) {
   return name ? `${name}${empNo ? `（${empNo}）` : ''}` : undefined
+}
+
+/**
+ * 负责人单元格：一条事项可以多人，按顿号列「姓名（工号）」，主办在前。
+ *
+ * <p>三处共用本卡（免登页 / 发送预览 / 图片与PDF导出件）自动生效，不会出现
+ * 「屏幕上两个人、导出件只有一个人」的两套口径。
+ * <p>姓名拿不到时仍走既有「已指派，姓名待服务端回填」而不是静默空白；无负责人保持「未指派」。
+ * <p>查看页的事项跟踪表也复用本单元格，保证正文与跟踪表不会读出两套人名。
+ */
+export function OwnerCell({ row, people }: { row: MinutesOwnerCarrier; people?: Props['people'] }) {
+  const { t } = useTranslation()
+  const owners = minutesOwners(row)
+  if (owners.length === 0) return <>{t('meeting.minutes.publicationText.notAssigned')}</>
+  // 拼成一个字符串而不是每人一个 span：负责人列常常被表格截断，拆成多节点后
+  // 无论用户复制还是测试用例按文本查找都会拿到半截名字
+  return <>{owners.map(owner => {
+    const person = people?.find(candidate => candidate.id === owner.id)
+    const name = owner.name || person?.name || t('meeting.minutes.publicationText.employeeAssignedNamePending')
+    const empNo = owner.empNo || person?.empId || ''
+    return empNo ? `${name}（${empNo}）` : name
+  }).join('、')}</>
 }
 
 /** 仅派生阅读顺序，不改写快照；旧受邀名单不能推定实际出席。 */
@@ -230,16 +252,15 @@ export default function MinutesContentCard({ content: suppliedContent, attachmen
                   <th scope="col">{t('meeting.minutes.dueDate', { defaultValue: '完成時限' })}</th>
                   {!compact && <th scope="col">{t('meeting.minutes.publicationText.deliverableAcceptanceCriteria')}</th>}
                 </tr></thead>
-                <tbody>{actions.map((action, index) => {
-                  const person = people.find(candidate => candidate.id === action.ownerUserId)
-                  return <tr key={action.id ?? index}>
+                <tbody>{actions.map((action, index) =>
+                  <tr key={action.id ?? index}>
                     <th scope="row">{`A${String(index + 1).padStart(2, '0')}`}</th>
                     <td>{action.content}</td>
-                    <td>{action.ownerName || person?.name || (action.ownerUserId ? t('meeting.minutes.publicationText.employeeAssignedNamePending') : t('meeting.minutes.publicationText.notAssigned'))}{(action.ownerEmpNo || person?.empId) ? `（${action.ownerEmpNo || person?.empId}）` : ''}</td>
+                    <td><OwnerCell row={action} people={people} /></td>
                     <td>{action.dueDate || t('meeting.minutes.publicationText.notAssigned')}</td>
                     {!compact && <td>{action.deliverable || t('meeting.minutes.notRecorded', { defaultValue: '未記錄' })}</td>}
                   </tr>
-                })}</tbody>
+                )}</tbody>
               </table>
             </div>
           )}
@@ -259,7 +280,7 @@ export default function MinutesContentCard({ content: suppliedContent, attachmen
                 <tbody>{follows.map((item, index) => (
                   <tr key={item.id ?? index}>
                     <th scope="row">{`F${String(index + 1).padStart(2, '0')}`}</th><td>{item.content}</td>
-                    <td>{item.ownerName || people.find(person => person.id === item.ownerUserId)?.name || (item.ownerUserId ? t('meeting.minutes.publicationText.employeeAssignedNamePending') : t('meeting.minutes.publicationText.notAssigned'))}{item.ownerEmpNo ? `（${item.ownerEmpNo}）` : ''}</td>
+                    <td><OwnerCell row={item} people={people} /></td>
                     <td>{item.dueDate || t('meeting.minutes.publicationText.notAssigned')}</td>
                   </tr>
                 ))}</tbody>

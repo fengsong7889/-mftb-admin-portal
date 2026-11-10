@@ -349,4 +349,79 @@ class MeetingMinutesContentTest {
         content.setAttachments(null);
         assertDoesNotThrow(content::validate);
     }
+
+    /* ==================== 多负责人 ==================== */
+
+    @Test
+    @DisplayName("负责人读取归一：新正文读数组，旧快照只有单值字段时按一人处理")
+    void ownersNormaliseAcrossOldAndNewSnapshots() {
+        MeetingMinutesContent.Action legacy = action("輸出明細", 7L, "2026-10-31");
+        assertEquals(List.of(7L), legacy.ownerUserIdList());
+
+        MeetingMinutesContent.Action current = action("輸出明細", null, "2026-10-31");
+        current.setOwnerIds(List.of(7L, 8L));
+        assertEquals(List.of(7L, 8L), current.ownerUserIdList());
+
+        MeetingMinutesContent.OpenIssue none = new MeetingMinutesContent.OpenIssue();
+        none.setContent("待確認");
+        assertEquals(List.of(), none.ownerUserIdList());
+    }
+
+    @Test
+    @DisplayName("单条事项负责人超上限、同人重复、传 null 都在服务端拦住")
+    void ownerSetIsSizeAndDuplicateChecked() {
+        MeetingMinutesContent content = publication();
+        MeetingMinutesContent.Action full = action("交付", null, "2026-11-01");
+        full.setOwnerIds(java.util.stream.LongStream.rangeClosed(1, MeetingMinutesContent.MAX_OWNERS).boxed().toList());
+        content.setActions(new ArrayList<>(List.of(full)));
+        assertDoesNotThrow(content::validate);
+
+        MeetingMinutesContent.Action over = action("交付", null, "2026-11-01");
+        over.setOwnerIds(java.util.stream.LongStream.rangeClosed(1, MeetingMinutesContent.MAX_OWNERS + 1).boxed().toList());
+        content.setActions(new ArrayList<>(List.of(over)));
+        BusinessException tooMany = assertThrows(BusinessException.class, content::validate);
+        assertTrue(tooMany.getMessage().contains(String.valueOf(MeetingMinutesContent.MAX_OWNERS)), tooMany.getMessage());
+
+        MeetingMinutesContent.Action duplicated = action("交付", null, "2026-11-01");
+        duplicated.setOwnerIds(List.of(7L, 7L));
+        content.setActions(new ArrayList<>(List.of(duplicated)));
+        assertThrows(BusinessException.class, content::validate);
+
+        // 写了负责人列表却传 null/0：服务端回查会拿不到人，不能让它进正文
+        MeetingMinutesContent.Action dirty = action("交付", null, "2026-11-01");
+        dirty.setOwnerIds(java.util.Arrays.asList(7L, null));
+        content.setActions(new ArrayList<>(List.of(dirty)));
+        assertThrows(BusinessException.class, content::validate);
+    }
+
+    @Test
+    @DisplayName("发布完整性只认负责人数组，不再要求旧单值字段")
+    void publicationAcceptsOwnerListWithoutLegacyScalar() {
+        MeetingMinutesContent content = publication();
+        MeetingMinutesContent.Action onlyList = action("交付預算明細", null, "2026-11-01");
+        onlyList.setOwnerIds(List.of(7L, 8L));
+        content.setActions(new ArrayList<>(List.of(onlyList)));
+        assertDoesNotThrow(content::validateForPublication);
+
+        MeetingMinutesContent.Action nobody = action("交付預算明細", null, "2026-11-01");
+        content.setActions(new ArrayList<>(List.of(nobody)));
+        assertThrows(BusinessException.class, content::validateForPublication);
+    }
+
+    @Test
+    @DisplayName("负责人数组里的姓名要计入正文长度上限，不能拿数组绕过 8000 字护栏")
+    void ownerNameSnapshotsCountTowardsContentLimit() {
+        MeetingMinutesContent.Action single = action("交付", 7L, "2026-11-01");
+        single.setOwnerName("張三");
+        MeetingMinutesContent content = publication();
+        content.setActions(new ArrayList<>(List.of(single)));
+        int before = content.contentLength();
+
+        MeetingMinutesContent.Action many = action("交付", null, "2026-11-01");
+        many.setOwnerIds(List.of(7L, 8L, 9L));
+        many.setOwnerNames(List.of("張三", "王二", "李四"));
+        content.setActions(new ArrayList<>(List.of(many)));
+        // 两条姓名快照（各 2 字）进入正文长度：只算首负责人的话，数组就能绕过 8000 字护栏
+        assertEquals(before + 4, content.contentLength());
+    }
 }
