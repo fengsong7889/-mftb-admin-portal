@@ -15,7 +15,7 @@
  * 改颜色的正确流程：改 TOKEN_VALUES（浅色值 + 深色值 + 实测对比度）→ 跑生成脚本 → 跑门禁。
  * 深色取值规则与实测依据：docs/design/深浅色主题切换_可落地实施方案_2026-11-03.md §4.3 / §4.5 / §4.6
  *
- * 令牌共 104 个：语义层 + 组件层（--sidebar-*）+ 阴影/描边补偿。
+ * 令牌共 108 个：语义层 + 组件层（--sidebar-*）+ 阴影/描边补偿。
  * 业务代码只允许引用语义层；--sidebar-* 属组件层，仅壳层 CSS 可用。
  */
 :root {
@@ -109,6 +109,10 @@
   --spec-note-soft: #FFF7ED;
   --spec-note-border: #FED7AA;
   --spec-note-ink: #C2410C;
+  --pulse-blue: #3B82F6;
+  --pulse-purple: #8B5CF6;
+  --pulse-pink: #EC4899;
+  --pulse-amber: #F59E0B;
   --sidebar-bg: #1E1E1E;
   --sidebar-item-color: #B0B0B0;
   --sidebar-item-hover-bg: #2A2A2A;
@@ -216,6 +220,10 @@ html[data-theme='dark'] {
   --spec-note-soft: rgba(250,140,22,0.14);
   --spec-note-border: rgba(250,160,61,0.32);
   --spec-note-ink: #FFA940;
+  --pulse-blue: #3B82F6;
+  --pulse-purple: #8B5CF6;
+  --pulse-pink: #EC4899;
+  --pulse-amber: #F59E0B;
   --sidebar-bg: #1A1A1A;
   --sidebar-item-color: #A6A6A6;
   --sidebar-item-hover-bg: #2E2E2E;
@@ -334,6 +342,10 @@ html {
     --spec-note-soft: #FFF7ED;
     --spec-note-border: #FED7AA;
     --spec-note-ink: #C2410C;
+    --pulse-blue: #3B82F6;
+    --pulse-purple: #8B5CF6;
+    --pulse-pink: #EC4899;
+    --pulse-amber: #F59E0B;
     --sidebar-bg: #1E1E1E;
     --sidebar-item-color: #B0B0B0;
     --sidebar-item-hover-bg: #2A2A2A;

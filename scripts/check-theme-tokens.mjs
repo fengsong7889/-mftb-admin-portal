@@ -47,6 +47,7 @@ import {
   SEMANTIC_TOKENS,
   TOKEN_VALUES,
   countBareColors,
+  findExcludedBlockPollution,
   isExcluded,
 } from './lib/theme-token-map.mjs'
 
@@ -134,6 +135,8 @@ function scan() {
     cssExcludedHex: 0,
     files: 0,
     excluded: 0,
+    /** 选择器级豁免区里引用了主题令牌的块（断言 4b） */
+    blockPollution: [],
     unmapped: new Map(),
     reviewHits: new Map(),
     pollution: [],
@@ -179,6 +182,15 @@ function scan() {
 
     // 断言 4：primitive 层不得被业务代码引用（theme.css 自身在排除区内，天然豁免）
     if (/var\(\s*--(gray|orange)-\d/.test(text)) result.primitive.push(rel)
+
+    // 断言 4b（§卅八）：选择器级豁免区不得引用主题令牌。
+    // 计数不再看豁免区，所以豁免区内部的翻面在棘轮上隐形；而拟真壳内/登录页/scene 的语义就是
+    // 「不跟随主题」——里面出现 var(--*) 等于深色下跟着翻（实测回退前 30 个壳内元素全翻）。
+    if (kind === 'css') {
+      for (const hit of findExcludedBlockPollution(text)) {
+        result.blockPollution.push(`${rel} → ${hit.selector}（${hit.vars.join(', ')}）`)
+      }
+    }
   }
 
   return result
@@ -435,6 +447,11 @@ if (result.pollution.length) {
 }
 if (result.primitive.length) {
   errors.push(`primitive 层令牌被业务代码引用 ${result.primitive.length} 个文件（只允许 theme.css 内部使用）：${result.primitive.slice(0, 5).join(', ')}`)
+}
+if (result.blockPollution.length) {
+  errors.push(`选择器级豁免区引用了主题令牌 ${result.blockPollution.length} 处（这些区段语义为「不跟随主题」，方案 §卅八）：`)
+  errors.push(`   ${result.blockPollution.slice(0, 5).join('\n   ')}`)
+  errors.push('   修法：改成固定字面量（取该令牌浅色档即可，浅色观感不变），或确认该区段应该跟随主题后把它移出排除清单。')
 }
 
 /* -------------------------------------------------------------------- 输出 */

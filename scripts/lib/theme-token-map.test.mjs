@@ -47,6 +47,7 @@ import {
   walkCssBlocks,
   contrastRatio,
   countBareColors,
+  findExcludedBlockPollution,
   isExcluded,
   isExcludedSelector,
   normalizeHex,
@@ -63,7 +64,9 @@ import {
  */
 const INTENTIONAL_SAME_VALUE = new Set(['brand', 'brand-hover', 'medal-gold', 'medal-silver', 'medal-bronze', 'on-medal', 'on-brand-pill',
   // 品牌渐变胶囊的四个端点（§35.3 / §卅六）：背景是不翻面的品牌资产，浅深同值是设计决定而不是漏改
-  'brand-pill-bee-from', 'brand-pill-bee-to', 'brand-pill-mfood-from', 'brand-pill-mfood-to'])
+  'brand-pill-bee-from', 'brand-pill-bee-to', 'brand-pill-mfood-from', 'brand-pill-mfood-to',
+  // 说明面板脉冲高亮四色（§卅八）：画在浅色手机内容上，翻面就看不清，浅深同值是设计决定
+  'pulse-blue', 'pulse-purple', 'pulse-pink', 'pulse-amber'])
 
 const ALL_TOKEN_NAMES = [...SEMANTIC_TOKENS, ...COMPONENT_TOKENS]
 const ALL_TOKEN_VALUES = { ...TOKEN_VALUES, ...NON_COLOR_TOKENS }
@@ -1085,8 +1088,13 @@ describe('AppPreview 平台侧令牌族（说明面板 / 舞台底 / 品牌胶�
     const known = new Set(
       [...Object.keys(TOKEN_VALUES), ...Object.keys(NON_COLOR_TOKENS)].map((n) => `--${n}`))
     const missing = [...used].filter((v) => !known.has(v) && !local.has(v)).sort()
-    // 阳性对照：一个 var 都没扫到 = 判据自己坏了，不能当成「全部可解析」
-    expect(used.size, '没扫到任何 var() 说明解析判据失效').toBeGreaterThan(60)
+    // 阳性对照：不能拿「var 总数 > N」当对照——§卅八 把壳内 var 回退成字面量后总数就掉了，
+    // 阈值绑在一个会变的量上会把正确状态误判成判据失效。改钉「本批引入的平台侧令牌必须真在文件里」。
+    const REQUIRED = ['--surface-2', '--shadow-panel', '--on-brand-pill', '--spec-ink-strong',
+      '--spec-th-soft', '--spec-note-ink', '--stage-glow-from', '--brand-pill-bee-from']
+    for (const name of REQUIRED) {
+      expect(used.has(name), `平台侧令牌 ${name} 不在 appPreview.css 里了（被回退或被删）`).toBe(true)
+    }
     expect(missing, `无法解析的 var 名：${missing.join(', ')}`).toEqual([])
   })
 })
@@ -1267,5 +1275,114 @@ describe('walkCssBlocks 与选择器感知计数（§卅七）', () => {
     // 阳性对照：豁免确实吃掉了东西（否则这条不变式可能只是「两边都等于全量」的空转）
     expect(sumExcluded, '豁免区一个色值都没有 = 排除清单或解析判据失效').toBeGreaterThan(100)
     expect(sumOld).toBe(sumNew + sumExcluded)
+  })
+})
+
+/*
+ * 豁免区的补偿守卫（§卅八）。
+ *
+ * §卅七 之后计数不再看豁免区，于是「豁免区内部跟着主题翻面」在棘轮上完全隐形；
+ * 而拟真壳内/登录页/scene 的语义就是不跟随主题。实测回退前 30 个壳内元素全部跟随主题
+ * （一台手机一半深一半浅），靠的就是这条检测把它挡在门禁里。
+ */
+describe('findExcludedBlockPollution：豁免区不得引用主题令牌', () => {
+  const FIXTURE = [
+    '.login-card { background: var(--surface-2); }',           // 豁免区 + 主题令牌 → 污染
+    '.apc-card { color: var(--text-1); }',                     // 壳内前缀 + 主题令牌 → 污染
+    '.apc-card { color: var(--apg-gold, #FA8C16); }',          // 局部变量 → 不算污染
+    '.apc-card { background: #FFFFFF; }',                      // 固定值 → 不算污染
+    '.ap-spec-panel { background: var(--surface-2); }',        // 平台侧优先，不算污染
+    '.app-header { color: var(--text-1); }',                   // 非豁免区，不算污染
+  ].join('\n')
+
+  it('命中集合必须恰好是「豁免区 × 主题令牌」那两条', () => {
+    const hits = findExcludedBlockPollution(FIXTURE)
+    expect(hits.map((h) => h.selector).sort()).toEqual(['.apc-card', '.login-card'])
+  })
+
+  it('阳性对照：解析判据坏掉时不能报「零污染」', () => {
+    const hits = findExcludedBlockPollution(FIXTURE)
+    expect(hits.length, '一条都没命中说明块归属或令牌清单失效').toBeGreaterThan(0)
+    expect(hits[0].vars.length).toBeGreaterThan(0)
+  })
+
+  it('局部变量与平台侧都不得误报（否则会把 §卅六 的修复也判成污染）', () => {
+    const clean = [
+      '.apc-card { color: var(--apcs-pink); background: #fff; }',
+      '.ap-spec-panel { background: var(--surface-2); }',
+      '.ap-stage { background: var(--stage-mid); }',
+    ].join('\n')
+    expect(findExcludedBlockPollution(clean)).toEqual([])
+  })
+
+  it('门禁确实接了这条检测（wiring 锚定，防止只写函数不接线）', () => {
+    // 单元测只证明函数本身对；真正保护 CI 的是 check-theme-tokens.mjs 有没有调用它并把结果计入 errors。
+    // 这类「判据存在但没接线」的洞本仓踩过多次（注释声称有门禁、grep 发现无人消费）。
+    const gate = readFileSync(new URL('../check-theme-tokens.mjs', import.meta.url), 'utf8')
+    expect(gate, '门禁没有 import findExcludedBlockPollution').toContain('findExcludedBlockPollution')
+    expect(gate, '门禁没有把命中结果计入 blockPollution').toContain('blockPollution.push(')
+    expect(gate, '门禁没有因 blockPollution 报错').toContain('if (result.blockPollution.length)')
+  })
+
+  it('本仓现状必须为零污染（这条一旦变红就是有人把令牌写进了豁免区）', () => {
+    const files = execFileSync('git', ['ls-files', '--', '*.css'], { encoding: 'utf8' })
+      .split('\n').filter((p) => p && !isExcluded(p))
+    const hits = []
+    for (const rel of files) {
+      for (const h of findExcludedBlockPollution(readFileSync(new URL(`../../${rel}`, import.meta.url), 'utf8'))) {
+        hits.push(`${rel} → ${h.selector}`)
+      }
+    }
+    expect(hits, `豁免区里引用了主题令牌：${hits.slice(0, 5).join(' | ')}`).toEqual([])
+  })
+})
+
+/*
+ * 说明面板脉冲高亮环（§卅八 Batch C）：把 §36.7 的「第三桶」收进令牌体系。
+ *
+ * 这一桶之所以危险，是因为它既不在选择器排除区（关键帧没有类选择器，`isExcludedCssBlock`
+ * 对 atRule 直接返回 false），也没有登记例外——棘轮数字对不上时最容易误判成「漏改」或「回归」。
+ */
+describe('脉冲高亮令牌族 --pulse-*（§卅八）', () => {
+  const PULSE = { 'pulse-blue': '#3B82F6', 'pulse-purple': '#8B5CF6', 'pulse-pink': '#EC4899', 'pulse-amber': '#F59E0B' }
+
+  it('浅色档必须等于关键帧里被替换掉的字面量', () => {
+    for (const [name, literal] of Object.entries(PULSE)) {
+      expect(TOKEN_VALUES[name].light.toLowerCase(), name).toBe(literal.toLowerCase())
+    }
+  })
+
+  it('四档必须浅深同值（画在浅色手机内容上，翻面就成了深色环套浅色卡）', () => {
+    for (const name of Object.keys(PULSE)) {
+      expect(TOKEN_VALUES[name].dark, name).toBe(TOKEN_VALUES[name].light)
+    }
+  })
+
+  it('三个达标的脉冲色在非文本图形门槛 3.0 之上，amber 按存量卡下限并钉住它确实不达标', () => {
+    for (const name of ['pulse-blue', 'pulse-purple', 'pulse-pink']) {
+      expect(contrastRatio(TOKEN_VALUES[name].light, '#FFFFFF'), name).toBeGreaterThanOrEqual(3.0)
+    }
+    const amber = contrastRatio(TOKEN_VALUES['pulse-amber'].light, '#FFFFFF')
+    expect(amber, 'pulse-amber 存量欠标不得被读成达标').toBeLessThan(3.0)
+    expect(amber).toBeGreaterThanOrEqual(2.1)
+  })
+
+  it('四个值都不进 COLOR_TO_TOKEN（站内其它 violet/pink/amber 与脉冲语义无关）', () => {
+    for (const seg of Object.keys(COLOR_TO_TOKEN)) {
+      for (const hex of Object.keys(PULSE).map((n) => PULSE[n].slice(1).toLowerCase())) {
+        const hit = Object.entries(COLOR_TO_TOKEN[seg]).filter(([, token]) => String(token).startsWith('pulse-'))
+        expect(hit, `${seg} 段不应映射到 pulse-*`).toEqual([])
+        void hex
+      }
+    }
+  })
+
+  it('appPreview.css 的关键帧里不得再留裸 hex（第三桶已收口）', () => {
+    const css = stripCssCommentsKeepLines(readFileSync(
+      new URL('../../src/pages/AppPreview/appPreview.css', import.meta.url), 'utf8'))
+    const blocks = walkCssBlocks(css).filter((b) => b.atRule === 'keyframes')
+    expect(blocks.length, '没扫到关键帧块说明解析判据失效').toBeGreaterThan(0)
+    const left = blocks.flatMap((b) => b.body.match(/#[0-9a-fA-F]{3,8}\b/g) || [])
+    expect(left, `关键帧仍留裸 hex：${left.join(', ')}`).toEqual([])
   })
 })

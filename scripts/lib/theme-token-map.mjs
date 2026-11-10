@@ -82,6 +82,8 @@ export const SEMANTIC_TOKENS = [
   'spec-th-soft', 'spec-th-ink', 'spec-blue-border', 'spec-row-line',
   'spec-field-soft', 'spec-row-soft', 'spec-divider-line',
   'spec-note-soft', 'spec-note-border', 'spec-note-ink',
+  // 说明面板 hover 联动的脉冲高亮色（`@keyframes apf-spec-glow`）：四档浅深同值，理由见 TOKEN_VALUES
+  'pulse-blue', 'pulse-purple', 'pulse-pink', 'pulse-amber',
   // 阴影与描边补偿
   'shadow-1', 'shadow-2', 'shadow-3', 'shadow-card-soft',
   'shadow-btn-hover', 'shadow-btn-active', 'shadow-popover', 'shadow-panel',
@@ -457,6 +459,26 @@ export const TOKEN_VALUES = {
   'spec-note-soft': { light: '#FFF7ED', dark: 'rgba(250,140,22,0.14)' },
   'spec-note-border': { light: '#FED7AA', dark: 'rgba(250,160,61,0.32)' },
   'spec-note-ink': { light: '#C2410C', dark: '#FFA940' },
+  /*
+   * 说明面板的脉冲高亮环（`@keyframes apf-spec-glow`，蓝/紫/粉/琥珀四色流转）。
+   *
+   * 为什么四档浅深同值：这个环画在**手机壳内的模拟 APP 内容**上，而壳内两主题都是浅色
+   * （§卅八 把壳内回退成固定值之后这一点才真正成立）。前景跟着主题翻面，
+   * 就会出现「浅色手机上套一个深色高亮环」；不翻面才是两个主题都看得清的那个颜色。
+   * 也不能复用 `--spec-accent`：它的深色档 #40A9FF 会翻面，单独一个环翻面就是半对。
+   * （`#3B82F6` 与 `--spec-accent` 浅色同值但深色不同，所以不触发重复令牌守卫。）
+   *
+   * 实测对比度（非文本图形门槛 3.0，on 白底）：
+   *   pulse-blue 3.6779 / pulse-purple 4.2344 / pulse-pink 3.5273 / **pulse-amber 2.1477**
+   * amber 不达标是**存量欠标**（不是本轮引入）：令牌化不顺手改颜色，单测按存量卡下限
+   * 并同时钉住它 < 3.0，防止后来人把 ≥2.1 读成已达标。
+   * 四个值都**不进** COLOR_TO_TOKEN：它们是动画关键帧里的指示色，站内其它同色值
+   * （如 Tailwind violet/pink/amber 系）语义无关，入表会让 codemod 把它们刷成“脉冲专用”名。
+   */
+  'pulse-blue': { light: '#3B82F6', dark: '#3B82F6' },
+  'pulse-purple': { light: '#8B5CF6', dark: '#8B5CF6' },
+  'pulse-pink': { light: '#EC4899', dark: '#EC4899' },
+  'pulse-amber': { light: '#F59E0B', dark: '#F59E0B' },
   // 组件层
   'sidebar-bg': { light: '#1E1E1E', dark: '#1A1A1A' },
   'sidebar-item-color': { light: '#B0B0B0', dark: '#A6A6A6' },
@@ -1032,6 +1054,30 @@ export function walkCssBlocks(text) {
 export function isExcludedCssBlock(block) {
   if (block.atRule) return false
   return block.rings.length > 0 && block.rings.every((ring) => isExcludedSelector(ring))
+}
+
+/**
+ * 找出「整块落在豁免区、却引用了主题令牌」的位置。
+ *
+ * 为什么需要它：§卅七 把豁免区从计数里拿掉之后，豁免区内部发生什么就再也不会反映到棘轮上。
+ * 拟真壳内/登录页/scene 色板的语义是「不跟随主题」，一旦有人在里面写了 `var(--surface-2)`，
+ * 深色下就会跟主题翻面（本仓实测：回退前 30 个壳内元素全部跟随主题，
+ * 一台手机一半深一半浅），而门禁一声不响。这条检测就是豁免区的补偿守卫。
+ *
+ * 只报真源里的主题令牌；文件内局部变量（如 `--apg-gold` / `--apcs-pink`）不算污染——
+ * 它们本身就是固定值的局部写法，语义上止是「不翻面」。
+ */
+export function findExcludedBlockPollution(text) {
+  const src = stripCssCommentsKeepLines(text)
+  const hits = []
+  for (const block of walkCssBlocks(src)) {
+    if (!isExcludedCssBlock(block)) continue
+    const vars = [...block.body.matchAll(/var\(\s*--([a-z0-9-]+)\s*[,)]/g)]
+      .map((m) => m[1])
+      .filter((name) => name in TOKEN_VALUES || name in NON_COLOR_TOKENS)
+    if (vars.length) hits.push({ selector: block.selector, vars })
+  }
+  return hits
 }
 
 /**
