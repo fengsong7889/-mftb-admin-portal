@@ -37,6 +37,11 @@ public final class MeetingMinutesSchema {
     static final String ATTACHMENT_TABLE = "biz_meeting_minutes_attachment";
     static final String SCRIPT_AI = "318_meeting_minutes_ai.sql";
     static final List<String> AI_TABLES = List.of("biz_meeting_minutes_note", "biz_meeting_minutes_ai_extraction");
+    /** v2.2：事项多负责人真源表（外键指向 268 的事项表，契约顺序必须排在它之后） */
+    static final String SCRIPT_MULTI_OWNER = "334_meeting_minutes_multi_owner.sql";
+    static final String MULTI_OWNER_TABLE = "biz_meeting_minutes_item_owner";
+    static final List<String> MULTI_OWNER_COLUMNS = List.of(
+            "id", "item_id", "user_id", "user_name", "emp_no", "seq", "created_at");
     static final java.util.Map<String, List<String>> AI_COLUMNS = java.util.Map.of(
             AI_TABLES.get(0), List.of("id", "booking_id", "owner_user_id", "raw_text", "mentions_json", "version",
                     "content_hash", "last_request_key", "last_request_hash", "created_by", "created_at", "updated_by", "updated_at"),
@@ -167,6 +172,11 @@ public final class MeetingMinutesSchema {
             specs.add(new ContractSpec("meeting-minutes-ai:" + table, table, sliceCreate(SCRIPT_AI, table),
                     AI_COLUMNS.get(table).stream().map(name -> new ContractSpec.ColumnSpec(name, null)).toList()));
         }
+        // 多负责人真源表：外键指向事项表，因此必须排在 v1.1 之后；同样不给 ADD COLUMN 自愈，
+        // 列漂移交给启动校验卡住——手工把负责人列加回来从来不是安全动作
+        specs.add(new ContractSpec("meeting-minutes-multi-owner:" + MULTI_OWNER_TABLE, MULTI_OWNER_TABLE,
+                sliceCreate(SCRIPT_MULTI_OWNER, MULTI_OWNER_TABLE),
+                MULTI_OWNER_COLUMNS.stream().map(name -> new ContractSpec.ColumnSpec(name, null)).toList()));
         return specs;
     }
 

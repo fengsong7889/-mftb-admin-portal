@@ -70,6 +70,8 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
     /** 补充说明附件：元数据表（二进制入对象存储，不入 MySQL） */
     static final String VERSION_ATTACHMENTS = "meeting:minutes-attachments:v1.0";
     static final String VERSION_AI = "meeting:minutes-ai-v1.0";
+    /** v2.2：事项多负责人真源表 + 存量单负责人回填 */
+    static final String VERSION_MULTI_OWNER = "meeting:minutes-multi-owner:v1.0";
     /** v2.1：单批次链接作废（link_revoked 列） */
     static final String VERSION_BATCH_REVOKE = "meeting:minutes:batch-revoke:v2.1";
 
@@ -226,6 +228,9 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
         versionTracker.applyOnce(VERSION_BATCH_REVOKE, this::migrateBatchRevoke, this::verifyBatchRevoke);
         versionTracker.applyOnce(VERSION_ATTACHMENTS, this::migrateAttachments, this::verifyAttachments);
         versionTracker.applyOnce(VERSION_AI, this::migrateAiNotes, this::verifyAiNotes);
+        // 多负责人：必须在 v1.1 之后（外键指向事项表），且自带建表——守卫式迁移不能指望
+        // 结构契约先把表补出来：契约校验器与本初始化器同属启动期，顺序并不保证。
+        versionTracker.applyOnce(VERSION_MULTI_OWNER, this::migrateMultiOwner, this::verifyMultiOwner);
         // v1.2：卡片文案重排。必须在 v1.1 之后（模板表与种子先就绪）
         versionTracker.applyOnce(VERSION_TEMPLATE_COPY_V12,
                 this::refreshMeetingCardCopyV12, this::verifyMeetingCardCopyV12);
@@ -243,6 +248,7 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
         verifyPublication();
         verifyAttachments();
         verifyAiNotes();
+        verifyMultiOwner();
     }
 
     /* ==================== 迁移任务 ==================== */
@@ -390,6 +396,39 @@ public class MeetingMinutesSchemaMigrationInitializer implements CommandLineRunn
             jdbcTemplate.execute(statement);
         }
         log.info("会议纪要附件元数据表已执行: {} 条语句（{}）", statements.size(), MeetingMinutesSchema.SCRIPT_ATTACHMENTS);
+    }
+
+    /**
+     * 多负责人真源表：建表 + 把事项行上的单负责人回填成 seq=1 的负责人行。
+     * <p>整个脚本就是幂等的（CREATE IF NOT EXISTS + 守卫式 INSERT IGNORE），失败必须抛出，
+     * 不得把未完成的迁移记成成功版本。
+     */
+    private void migrateMultiOwner() {
+        List<String> statements = MeetingMinutesSchema.statements(MeetingMinutesSchema.SCRIPT_MULTI_OWNER);
+        for (String statement : statements) {
+            jdbcTemplate.execute(statement);
+        }
+        log.info("会议纪要事项多负责人表已执行: {} 条语句（{}）", statements.size(),
+                MeetingMinutesSchema.SCRIPT_MULTI_OWNER);
+    }
+
+    /**
+     * 每次启动都校验：逾期扫描与办理权限都改读负责人表，表或唯一键缺失时
+     * 表现不是报错而是「静默少提醒、少一个负责人能点办理」——比崩启动难查得多。
+     */
+    private void verifyMultiOwner() {
+        if (!tableExists(MeetingMinutesSchema.MULTI_OWNER_TABLE)) {
+            throw new IllegalStateException(MeetingMinutesSchema.MULTI_OWNER_TABLE
+                    + " 表未就绪，纪要事项负责人无法写入，逾期提醒会静默漏发");
+        }
+        if (!indexExists(MeetingMinutesSchema.MULTI_OWNER_TABLE, "uk_meeting_minutes_item_owner")) {
+            throw new IllegalStateException("负责人表缺少 uk_meeting_minutes_item_owner：并发重放会给同一事项长出两套负责人");
+        }
+        for (String column : MeetingMinutesSchema.MULTI_OWNER_COLUMNS) {
+            if (!columnExists(MeetingMinutesSchema.MULTI_OWNER_TABLE, column)) {
+                throw new IllegalStateException("负责人表缺少列：" + column);
+            }
+        }
     }
 
     /** 每次启动都校验：实体有字段而库里没列，表现是"能写不能读"，不能只靠 applyOnce 门控。 */

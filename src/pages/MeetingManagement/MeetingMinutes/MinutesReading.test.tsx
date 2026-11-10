@@ -191,6 +191,19 @@ describe('商務紀要正文', () => {
     expect(screen.queryByRole('button')).toBeNull()
   })
 
+  it('负责人单元格按顿号列出全部负责人，旧单值快照归一为一人', () => {
+    render(<MinutesContentCard content={{ ...content, schemaVersion: 2,
+      actions: [{ content: '交付預算明細', ownerIds: [7, 8], ownerNames: ['張三', '李四'],
+        ownerEmpNos: ['MF00007', 'MF00008'], dueDate: '2026-11-02' }],
+      openIssues: [{ content: '確認預算池', ownerUserId: 9, ownerName: '王五', ownerEmpNo: 'MF00009', dueDate: '2026-11-04' }],
+    }} />)
+    const actionRow = within(screen.getByRole('table', { name: '行動項' })).getByRole('rowheader', { name: 'A01' }).closest('tr')!
+    // 只渲染首负责人会把协办从事实上抹掉：导出件与屏幕不同形，事后也说不清这件事谁办的
+    expect(within(actionRow).getAllByRole('cell')[1].textContent).toBe('張三（MF00007）、李四（MF00008）')
+    const followRow = within(screen.getByRole('table', { name: '未決與跟進事項' })).getByRole('rowheader', { name: 'F01' }).closest('tr')!
+    expect(within(followRow).getAllByRole('cell')[1].textContent).toBe('王五（MF00009）')
+  })
+
   it('紧凑正文保留四列表格，隐藏事项模式不渲染两类台账', () => {
     const { rerender } = render(<MinutesContentCard content={content} compact />)
     const table = screen.getByRole('table', { name: '行動項' })
@@ -439,5 +452,20 @@ describe('紀要頁面入口', () => {
     fireEvent.click(screen.getByRole('tab', { name: '釘釘卡片預覽' }))
     fireEvent.click(screen.getByRole('button', { name: '查看紀要（預覽）' }))
     expect(article).toBeVisible()
+  })
+
+  it('事項跟踪表的負責人列出全部負責人', async () => {
+    api.fetchMinutesById.mockResolvedValue({ exists: true, id: 9, bookingId: 100, minutesNo: 'MJ-TEST-01', content,
+      items: [{ ...tracked[0], ownerIds: [7, 8], ownerNames: ['張三', '李四'], ownerEmpNos: ['MF00007', 'MF00008'] }],
+      links: [], canEdit: false, canSend: false, version: 82 })
+    api.fetchMeetingDetail.mockResolvedValue({ id: 100, title: '經營例會', roomName: '第一會議室', organizerName: '會議組織者', attendees: [], bizType: 'general' })
+    api.fetchMinutesSends.mockResolvedValue([])
+    render(<MemoryRouter initialEntries={['/meeting-minutes?id=9']}><MinutesView /></MemoryRouter>)
+    fireEvent.click(await screen.findByRole('tab', { name: '事項跟進' }))
+    // 正文卡也会渲染同一批事项（旧 schema 回退），只能拿 antd 跟踪表取证
+    const table = document.querySelector('.ant-table') as HTMLElement
+    const row = within(table).getByText('目前行動事項').closest('tr')!
+    expect(within(row).getAllByRole('cell').map(cell => cell.textContent))
+      .toContain('張三（MF00007）、李四（MF00008）')
   })
 })

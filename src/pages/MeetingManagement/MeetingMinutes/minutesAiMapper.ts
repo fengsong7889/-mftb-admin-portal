@@ -10,7 +10,7 @@
 import type { MinutesAiProposal } from '@/api/meetingMinutes'
 
 export interface MergeTopic { topicKey: string; topic: string; discussion?: string; conclusion?: string; decisionStatus?: string | null }
-export interface MergeTask { itemId?: number; topicKey?: string; content: string; ownerUserId?: number | null; dueDate?: string | null; deliverable?: string }
+export interface MergeTask { itemId?: number; topicKey?: string; content: string; ownerUserId?: number | null; ownerIds?: number[]; dueDate?: string | null; deliverable?: string }
 export interface MergeInput { purpose?: string; items: MergeTopic[]; actions: MergeTask[]; followUps: MergeTask[] }
 export interface MergeSelection { purpose: boolean; itemRefs: string[]; actionRefs: string[]; openIssueRefs: string[] }
 export interface MergeResult extends MergeInput { addedTopics: number; addedActions: number; addedFollowUps: number }

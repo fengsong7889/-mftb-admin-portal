@@ -187,10 +187,11 @@ public final class MeetingMinutesRenderer {
                 continue;
             }
             sb.append("- ").append(statusIcon(item)).append(" ").append(nullToEmpty(item.getContent()));
-            if (StringUtils.hasText(item.getOwnerName())) {
-                sb.append("｜👤 **").append(item.getOwnerName());
-                if (StringUtils.hasText(item.getOwnerEmpNo())) {
-                    sb.append("（").append(item.getOwnerEmpNo()).append("）");
+            OwnerDisplay owners = ownerDisplay(item);
+            if (owners.present()) {
+                sb.append("｜👤 **").append(owners.names());
+                if (StringUtils.hasText(owners.empNos())) {
+                    sb.append("（").append(owners.empNos()).append("）");
                 }
                 sb.append("**");
             } else {
@@ -210,6 +211,38 @@ public final class MeetingMinutesRenderer {
             sb.append("\n");
         }
         return sb.length() == 0 ? "（無）" : sb.toString().trim();
+    }
+
+    /** 负责人展示：姓名串与工号串，模板按原来的「姓名（工号）」形状原位套用 */
+    public record OwnerDisplay(String names, String empNos) {
+        boolean present() {
+            return StringUtils.hasText(names);
+        }
+    }
+
+    /**
+     * 负责人展示文本：全量姓名与全量工号各自按顿号连接。
+     * <p>模板写的是「${ownerName}（${ownerEmpNo}）」，两个变量各自成串才能保持形状不变：
+     * 只把工号留空会渲染出半截括号，把整段塞进 ownerName 又会让工号重复一遍。
+     * <p>真源行没加载（旧版事项、只读缓存列的调用方）时回退到事项行上的首负责人缓存。
+     */
+    public static OwnerDisplay ownerDisplay(MeetingMinutesItem item) {
+        List<String> names = new ArrayList<>();
+        List<String> empNos = new ArrayList<>();
+        if (item.getOwners() != null) {
+            for (var owner : item.getOwners()) {
+                if (owner == null || owner.getUserId() == null) {
+                    continue;
+                }
+                names.add(nullToEmpty(owner.getUserName()));
+                empNos.add(nullToEmpty(owner.getEmpNo()));
+            }
+        }
+        if (names.isEmpty() && StringUtils.hasText(item.getOwnerName())) {
+            names.add(nullToEmpty(item.getOwnerName()));
+            empNos.add(nullToEmpty(item.getOwnerEmpNo()));
+        }
+        return new OwnerDisplay(String.join("、", names), String.join("、", empNos));
     }
 
     private static String statusIcon(MeetingMinutesItem item) {

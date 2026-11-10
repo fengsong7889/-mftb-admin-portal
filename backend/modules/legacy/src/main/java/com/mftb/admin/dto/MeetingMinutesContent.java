@@ -1,5 +1,6 @@
 package com.mftb.admin.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.mftb.admin.common.BusinessException;
 import lombok.Data;
@@ -35,6 +36,12 @@ public class MeetingMinutesContent {
     public static final int MAX_ACTIONS = 30;
     public static final int MAX_ISSUES = 20;
     public static final int MAX_ABSENTS = 50;
+    /**
+     * 单条事项的负责人上限。
+     * <p>共同负责确实存在（主办 + 协办、跨部门共管），但把十个人塞进一条事项只会让
+     * 「谁都没负责」合法化：提醒会发给十个人，办理结果却只有一份。上限是产品约束不是技术约束。
+     */
+    public static final int MAX_OWNERS = 10;
 
     public static final int TOPIC_MAX = 100;
     public static final int TEXT_MAX = 500;
@@ -119,8 +126,10 @@ public class MeetingMinutesContent {
 
     /**
      * 行动项。
-     * <p>{@code ownerUserId} 是唯一入库的身份字段，姓名与工号是服务端按 id 回查的快照：
+     * <p>{@code ownerIds} 是多负责人的真源顺序列表，姓名与工号是服务端按 id 回查的快照：
      * 与行政代订同一口径，前端自报名字等于允许伪造台账。
+     * <p>{@code ownerUserId/ownerName/ownerEmpNo} 三个单值字段保留，语义退化为 {@code ownerIds[0]}
+     * 的首负责人缓存——旧快照（只写单值）零迁移可读，旧版本服务也仍按首负责人工作。
      */
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -133,8 +142,25 @@ public class MeetingMinutesContent {
         private Long ownerUserId;
         private String ownerName;
         private String ownerEmpNo;
+        /** 全量负责人 sys_user.id，按提交顺序；服务端写入时同步把首位刷进上面三个缓存字段 */
+        private List<Long> ownerIds;
+        private List<String> ownerNames;
+        private List<String> ownerEmpNos;
         /** 'yyyy-MM-dd' */
         private String dueDate;
+
+        /**
+         * 读取归一：新正文读 {@code ownerIds}，旧快照只有单值字段时按一人处理。
+         * <p>不 @JsonIgnore 的话，Lombok 之外的这个 getter 会被 Jackson 当成属性写进正文 JSON，
+         * 等于把同一份负责人存两遍。
+         */
+        @JsonIgnore
+        public List<Long> ownerUserIdList() {
+            if (ownerIds != null && !ownerIds.isEmpty()) {
+                return ownerIds;
+            }
+            return ownerUserId == null ? List.of() : List.of(ownerUserId);
+        }
     }
 
     @Data
@@ -147,7 +173,19 @@ public class MeetingMinutesContent {
         private Long ownerUserId;
         private String ownerName;
         private String ownerEmpNo;
+        private List<Long> ownerIds;
+        private List<String> ownerNames;
+        private List<String> ownerEmpNos;
         private String dueDate;
+
+        /** 与 {@link Action#ownerUserIdList()} 同一归一口径：历史纪要零迁移可读 */
+        @JsonIgnore
+        public List<Long> ownerUserIdList() {
+            if (ownerIds != null && !ownerIds.isEmpty()) {
+                return ownerIds;
+            }
+            return ownerUserId == null ? List.of() : List.of(ownerUserId);
+        }
     }
 
     /** 缺席人员：可以是系统内员工（有 userId），也可以是只留姓名快照的外部人员 */
@@ -212,11 +250,13 @@ public class MeetingMinutesContent {
             }
             requireWithin(action.getContent(), ACTION_MAX, "行動項");
             requireDate(action.getDueDate(), "yyyy-MM-dd", "行動項完成時限");
+            validateOwners(action.ownerUserIdList(), "行動項");
         }
         if (openIssues != null) {
             for (OpenIssue issue : openIssues) {
                 requireWithin(issue.getContent(), ACTION_MAX, "未決事項");
                 requireWithin(issue.getNeedDecisionBy(), SHORT_MAX, "決策人");
+                validateOwners(issue.ownerUserIdList(), "跟進事項");
             }
         }
         if (absentees != null) {
@@ -244,12 +284,13 @@ public class MeetingMinutesContent {
         }
         if (actions != null) {
             for (Action action : actions) {
-                sum += length(action.getContent()) + length(action.getOwnerName());
+                sum += length(action.getContent()) + ownerTextLength(action.ownerNames, action.getOwnerName());
             }
         }
         if (openIssues != null) {
             for (OpenIssue issue : openIssues) {
-                sum += length(issue.getContent()) + length(issue.getNeedDecisionBy());
+                sum += length(issue.getContent()) + length(issue.getNeedDecisionBy())
+                        + ownerTextLength(issue.ownerNames, issue.getOwnerName());
             }
         }
         if (absentees != null) {
@@ -324,10 +365,10 @@ public class MeetingMinutesContent {
             }
         }
         for (Action action : actions == null ? List.<Action>of() : actions) {
-            requireResponsible(action.getOwnerUserId(), action.getDueDate(), "行動項");
+            requireResponsible(!action.ownerUserIdList().isEmpty(), action.getDueDate(), "行動項");
         }
         for (OpenIssue issue : openIssues == null ? List.<OpenIssue>of() : openIssues) {
-            requireResponsible(issue.getOwnerUserId(), issue.getDueDate(), "跟進事項");
+            requireResponsible(!issue.ownerUserIdList().isEmpty(), issue.getDueDate(), "跟進事項");
         }
     }
 
@@ -348,12 +389,12 @@ public class MeetingMinutesContent {
         }
         Set<Long> taskIds = new HashSet<>();
         for (Action action : actions == null ? List.<Action>of() : actions) {
-            validateTask(action.getItemId(), action.getTopicKey(), action.getOwnerUserId(), action.getDueDate(), topics, taskIds);
+            validateTask(action.getItemId(), action.getTopicKey(), action.ownerUserIdList(), action.getDueDate(), topics, taskIds);
             requireWithin(action.getDeliverable(), ACTION_MAX, "交付物或驗收標準");
         }
         for (OpenIssue issue : openIssues == null ? List.<OpenIssue>of() : openIssues) {
             if (!StringUtils.hasText(issue.getContent())) throw new BusinessException("跟進事項不可留空");
-            validateTask(issue.getItemId(), issue.getTopicKey(), issue.getOwnerUserId(), issue.getDueDate(), topics, taskIds);
+            validateTask(issue.getItemId(), issue.getTopicKey(), issue.ownerUserIdList(), issue.getDueDate(), topics, taskIds);
         }
         if (attendance == null) return;
         if (attendance.size() > MAX_ATTENDANCE) throw new BusinessException("參會資料最多 " + MAX_ATTENDANCE + " 人");
@@ -381,17 +422,40 @@ public class MeetingMinutesContent {
         }
     }
 
-    private static void validateTask(Long itemId, String topicKey, Long ownerId, String dueDate,
+    private static void validateTask(Long itemId, String topicKey, List<Long> ownerIds, String dueDate,
                                      Set<String> topics, Set<Long> taskIds) {
         requirePositive(itemId, "事項");
-        requirePositive(ownerId, "負責人");
         if (itemId != null && !taskIds.add(itemId)) throw new BusinessException("事項識別碼不可重複");
         if (StringUtils.hasText(topicKey) && !topics.contains(topicKey)) throw new BusinessException("行動項關聯的議題不存在");
         requireDate(dueDate, "yyyy-MM-dd", "完成時限");
+        for (Long owner : ownerIds) requirePositive(owner, "負責人");
     }
 
-    private static void requireResponsible(Long ownerId, String dueDate, String label) {
-        if (ownerId == null || !StringUtils.hasText(dueDate)) {
+    /**
+     * 负责人集合的结构校验：条数上限与同人重复。
+     * <p>在职与存在性不在此处——那要查 sys_user，由服务层回查裁决；这里只校前端能自证的形态。
+     */
+    private static void validateOwners(List<Long> ownerIds, String label) {
+        if (ownerIds.size() > MAX_OWNERS) {
+            throw new BusinessException("每條" + label + "的負責人最多 " + MAX_OWNERS + " 人");
+        }
+        // 写了负责人列表却传 null/0：这是伪造台账的入口（服务端回查会拿不到人），直接拒
+        if (ownerIds.stream().anyMatch(id -> id == null || id <= 0)) {
+            throw new BusinessException(label + "負責人識別碼不正確");
+        }
+        if (ownerIds.stream().distinct().count() != ownerIds.size()) {
+            throw new BusinessException(label + "負責人不可重複");
+        }
+    }
+
+    /** 姓名快照长度：新版按全量负责人累计，旧快照回退单值字段 */
+    private static int ownerTextLength(List<String> names, String legacyName) {
+        if (names == null || names.isEmpty()) return length(legacyName);
+        return names.stream().mapToInt(MeetingMinutesContent::length).sum();
+    }
+
+    private static void requireResponsible(boolean hasOwner, String dueDate, String label) {
+        if (!hasOwner || !StringUtils.hasText(dueDate)) {
             throw new BusinessException("發布前每條" + label + "都必須指定負責人及完成時限");
         }
     }
