@@ -294,7 +294,9 @@
 .mm-document__participants > .mm-document__label { flex: 0 0 80px; }
 .mm-document__participants > div { flex: 1 1 180px; min-width: 0; }
 .mm-document__names { display: flex; flex-wrap: wrap; gap: 6px 20px; }
-.mm-document__attendee { display: inline-flex; align-items: baseline; flex-wrap: wrap; min-width: 0; column-gap: 4px; }
+/* 参会人芯片禁止收缩：一行排不下时整枚换行。若允许 shrink，芯片会被压窄并因自身
+   flex-wrap 把状态标签折到芯片内第二行，与下一 flex 行重叠（下载长图曾定格该重叠）。 */
+.mm-document__attendee { display: inline-flex; align-items: baseline; flex: 0 0 auto; flex-wrap: wrap; column-gap: 4px; }
 .mm-document__attendance-status { font-size: 12px; font-weight: 600; white-space: nowrap; }
 .mm-document__attendance-status--present { color: #52c41a; }
 .mm-document__attendance-status--absent, .mm-document__absentees dt { color: #ff4d4f; }

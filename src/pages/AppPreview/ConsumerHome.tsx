@@ -28,12 +28,11 @@ import DeliveryLargeCard from './DeliveryLargeCard'
 const SHADE_WORDS = hotWordsFor('global').slice(0, 5)
 const SHADE_INTERVAL_MS = 3000
 
-/* ─── 分类切换（团购 / 外卖 / 超市 / 百货）─── */
+/* ─── 分类切换（团购 / 外卖 / 超市百貨），与 MFOOD 首页三段式对齐 ─── */
 const HOME_CHANNELS = [
   { key: 'group', zh: '團購', emoji: '🍲' },
   { key: 'delivery', zh: '外賣', emoji: '🧋' },
-  { key: 'market', zh: '超市', emoji: '🛍️' },
-  { key: 'department', zh: '百貨', emoji: '🧺' },
+  { key: 'market', zh: '超市百貨', emoji: '🛒' },
 ]
 
 /* ─── 超神一口價 横滑商品 ─── */

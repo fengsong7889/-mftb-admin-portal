@@ -28,15 +28,15 @@ describe('用户端统一搜索页', () => {
     expect(screen.queryByRole('button', { name: /紙巾/ })).not.toBeInTheDocument()
   })
 
-  it('全站搜索提交后进入瀑布流结果页：5 分类可横滑，默认外賣 Tab（需求 3.1/3.3）', async () => {
+  it('全站搜索提交后进入瀑布流结果页：4 分类可横滑，默认外賣 Tab（需求 3.1/3.3）', async () => {
     const user = userEvent.setup()
     render(<ConsumerSearch scope="global" onBack={noop} />)
 
     await user.type(screen.getByPlaceholderText('搜尋商家、商品、團購'), '麥當勞{Enter}')
 
-    // 5 个分类 Tab 齐备（全部/外賣/團購/超市/百貨；百貨被裁切靠横滑露出，由 CSS overflow-x 保证）
+    // 4 个分类 Tab 齐备（全部/外賣/團購/超市百貨；超市百貨被裁切靠横滑露出，由 CSS overflow-x 保证）
     expect(screen.getByRole('tab', { name: /全部/ })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /百貨/ })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /超市百貨/ })).toBeInTheDocument()
     // 默认落「外賣」并直接展示首页同款外卖瀑布流（小图模式门店卡）
     expect(screen.getByRole('tab', { name: /外賣/ })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByText('毛氏海鮮火鍋飯店（湘粵融合菜）')).toBeInTheDocument()
@@ -64,15 +64,15 @@ describe('用户端统一搜索页', () => {
     await user.click(screen.getByRole('tab', { name: /團購/ }))
     // 团购瀑布流 = 特惠團購页「優選商家」小图瀑布流（数据同源 consumerPreferredFeed）
     expect(screen.getByText('翡翠茶餐廳🏆-關閘店（🔥全澳…')).toBeInTheDocument()
-    // 搜索专属展示样例：超出范围（LOGO 阴影+胶囊）/ 未入驻（♥暫無）/ 开业时间横条
-    expect(screen.getByText('海灣火鍋城（路環店）')).toBeInTheDocument()
-    expect(screen.getAllByText('超出範圍')).toHaveLength(1)
+    // 「超出范围」样例已按需求下线（团购搜索瀑布流不再含超范围门店）；保留未入驻（♥暫無）/ 开业时间横条
+    expect(screen.queryByText('海灣火鍋城（路環店）')).not.toBeInTheDocument()
+    expect(screen.queryByText('超出範圍')).not.toBeInTheDocument()
     expect(screen.getByText('小貝廚房（關閘店）')).toBeInTheDocument()
     expect(screen.getByText(/暫無/)).toBeInTheDocument()
     expect(screen.getByText('10:00 營業')).toBeInTheDocument()
 
     await user.click(screen.getByRole('tab', { name: /超市/ }))
-    expect(screen.getByText('「超市」瀑布流還未實現')).toBeInTheDocument()
+    expect(screen.getByText('「超市百貨」瀑布流還未實現')).toBeInTheDocument()
 
     await user.click(screen.getByRole('tab', { name: /全部/ }))
     expect(screen.getByText('「全部」瀑布流還未實現')).toBeInTheDocument()

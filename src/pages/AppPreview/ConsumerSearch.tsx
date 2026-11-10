@@ -5,7 +5,7 @@
  * global（首页全站）/ delivery / groupbuy / market / store（店内）。
  * 结构：激活页（历史 / 热搜 / 猜你想搜）→ 输入联想 → 结果页。
  * 结果页分两种版式：
- * - 全站（global）：瀑布流版式——5 个分类 Tab（全部/外賣/團購/超市/百貨，横滑可露出百貨），
+ * - 全站（global）：瀑布流版式——4 个分类 Tab（全部/外賣/團購/超市百貨，横滑），
  *   默认展示外賣瀑布流；外賣复用首页同款小图门店卡（含超出范围/未入驻样例），
  *   團購复用特惠團購页「優選商家」小图瀑布流（含超出范围/未入驻/开业时间样例），
  *   其余分类提示「還未實現」；关键词过滤后接搜索接口时再补（原型阶段瀑布流为同款 Mock）。
@@ -143,8 +143,7 @@ const RESULT_CAT_EMOJI: Partial<Record<SearchTab, string>> = {
   all: '🔍',
   delivery: '🧋',
   groupbuy: '🍲',
-  market: '🛍️',
-  department: '🧺',
+  market: '🛒',
 }
 
 /** 页面级记忆：搜索 → 店铺 → 返回搜索时恢复关键词与结果（取消搜索时清空）；按品牌隔离（双机各自会话） */
@@ -560,7 +559,7 @@ export default function ConsumerSearch({
   )
 
   /** 瀑布流版式结果页：
-   *  withTabs=true（首页全站搜索）：5 分类 Tab（横滑，百貨被裁切属设计预期），其余分类提示還未實現；
+   *  withTabs=true（首页全站搜索）：4 分类 Tab（横滑），其余分类提示還未實現；
    *  withTabs=false（频道内搜索：美食外賣/特價團購）：不展示分类切换按钮，直接展示该频道对应瀑布流；
    *  外賣/團購瀑布流与首页搜索结果页完全同款（双 APP 卡片分叉，数据各自同源） */
   const renderWaterfall = (withTabs: boolean) => {

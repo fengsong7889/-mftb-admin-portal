@@ -4570,7 +4570,8 @@ button.apcs-card:hover { border-color: var(--warning-border); }
   gap: 4px;
   min-width: 0;
 }
-/* 品牌名/标题行：负 margin+padding 外扩描边空间，id1 品牌名称锚不被行裁切 */
+/* 品牌名+商品名同排：负 margin+padding 外扩描边空间，id1/id5 高亮锚不被行裁切；
+   品牌名 flex:none 靠数据精简，商品名占余宽超宽省略号截断 */
 .apf-card-title-row {
   display: flex;
   align-items: baseline;
@@ -4590,6 +4591,8 @@ button.apcs-card:hover { border-color: var(--warning-border); }
 .apf-brand-emoji { margin-right: 2px; }
 .apf-title-sep { color: #ddd; margin: 0 2px; }
 .apf-title {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 13px;
   font-weight: 600;
   color: #1F2937;
@@ -4626,6 +4629,18 @@ button.apcs-card:hover { border-color: var(--warning-border); }
   color: #E53935;
 }
 .apf-price i { font-size: 13px; font-style: normal; }
+/* 积分价标签：现价后红色胶囊白字 + 黄闪电，字段 pointPrice 驱动，缺省不渲染；
+   小号胶囊避免挤占 CTA 宽度（价格行像素预算见 GroupBuyFeedCard 注释） */
+.apf-point-tag {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: #E53935;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex: none;
+}
 .apf-origin {
   font-size: 12px;
   color: #9CA3AF;
@@ -4633,7 +4648,7 @@ button.apcs-card:hover { border-color: var(--warning-border); }
 }
 .apf-cta {
   margin-left: auto;
-  padding: 6px 16px;
+  padding: 6px 12px;
   border: none;
   border-radius: 18px 4px 4px 18px;
   background: linear-gradient(135deg, #FF6B35, #E53935);
@@ -4667,7 +4682,9 @@ button.apcs-card:hover { border-color: var(--warning-border); }
 }
 .apf-dist { flex: none; }
 .apf-area { flex: none; }
-.apf-rating { color: #1F2937; font-weight: 700; }
+/* 评分：橙心+加粗分数（与優選商家卡 .apq-rating 同款形态，同源 --brand 令牌） */
+.apf-rating { color: var(--brand); font-weight: 700; }
+.apf-rating i { font-style: normal; margin-right: 2px; }
 .apf-shop {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4681,8 +4698,9 @@ button.apcs-card:hover { border-color: var(--warning-border); }
   gap: 8px;
   padding: 8px 0;
 }
-/* 卡片自带 margin-bottom 与容器 gap 叠加会把间隔撑到 22px；瀑布流内归零，间隔统一由 gap 控制 */
-.apf-feed-list .apf-card { margin-bottom: 0; }
+/* 卡片撞名继承订单卡通用类的 margin: 0 12px 12px，瀑布流内全部归零：
+   纵向间隔由容器 gap 控制，横向留白由 .ap-body 的 12px padding 统一提供（两壳口径一致） */
+.apf-feed-list .apf-card { margin: 0; }
 .apf-spec-toggle {
   align-self: flex-end;
   margin-bottom: 4px;
@@ -6071,17 +6089,6 @@ button.apcs-card:hover { border-color: var(--warning-border); }
 /* 券列表：橙方图标 + 红价 + 红描边折扣 pill + 灰券名截断 */
 .apq-coupons { display: flex; flex-direction: column; gap: 6px; }
 .apq-coupon { display: flex; align-items: center; gap: 6px; min-width: 0; }
-/* 券行前缀标（线上既有口径）：danger 令牌淡染粉底+红字，新客特惠/倒计时同款色彩语言 */
-.apq-coupon-pre {
-  flex: none;
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--danger) 10%, var(--surface-2));
-  color: var(--danger);
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
-}
 .apq-coupon-ico {
   flex: none;
   width: 20px;

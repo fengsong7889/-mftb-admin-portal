@@ -18,8 +18,8 @@ import riceballImg from '@/assets/consumer-home/riceball.jpg'
 export type ConsumerChannel = 'delivery' | 'groupbuy' | 'market'
 export type SearchScope = 'global' | ConsumerChannel | 'store'
 
-/** 结果页 Tab：全站用瀑布流分类 Tab（含百貨）；频道内用对象类型 Tab；店铺内不展示 Tab */
-export type SearchTab = 'all' | 'merchant' | 'product' | 'deal' | ConsumerChannel | 'department'
+/** 结果页 Tab：全站用瀑布流分类 Tab（超市百貨合并，与首页吸顶分类栏同口径）；频道内用对象类型 Tab；店铺内不展示 Tab */
+export type SearchTab = 'all' | 'merchant' | 'product' | 'deal' | ConsumerChannel
 export type SearchSort = 'default' | 'distance' | 'sales' | 'priceAsc' | 'priceDesc' | 'deliveryFee'
 export type SearchFilter = 'freeDelivery' | 'discount' | 'open' | 'pickup' | 'refundable' | 'member'
 
@@ -148,8 +148,6 @@ export const SEARCH_TAB_LABEL_KEY: Record<SearchTab, string> = {
   delivery: 'appConsumer.search.tab.delivery',
   groupbuy: 'appConsumer.search.tab.groupbuy',
   market: 'appConsumer.search.tab.market',
-  // 全站结果页瀑布流分类（label 兜底真值）；key 暂未入语言包，全站 Tab 直接渲染 label，第二阶段再登记
-  department: 'appConsumer.search.tab.department',
 }
 
 export const SEARCH_SORT_LABEL_KEY: Record<SearchSort, string> = {
@@ -175,14 +173,13 @@ export const SCOPE_CONFIG: Record<SearchScope, ScopeConfig> = {
     placeholder: '搜尋商家、商品、團購',
     hint: '可搜尋外賣、團購、超市的商家與商品',
     channels: ALL_CHANNELS,
-    /* 全站结果页瀑布流分类（设计稿 5 类，支持横滑）：外賣/團購复用首页同款瀑布流，
-       全部/超市/百貨先不做瀑布流，切到即提示「還未實現」；label 为渲染真值（不走 t()） */
+    /* 全站结果页瀑布流分类（设计稿 4 类，支持横滑）：外賣/團購复用首页同款瀑布流，
+       全部/超市百貨先不做瀑布流，切到即提示「還未實現」；label 为渲染真值（不走 t()） */
     tabs: [
       { key: 'all', label: '全部' },
       { key: 'delivery', label: '外賣' },
       { key: 'groupbuy', label: '團購' },
-      { key: 'market', label: '超市' },
-      { key: 'department', label: '百貨' },
+      { key: 'market', label: '超市百貨' },
     ],
     sorts: [
       { key: 'default', label: '綜合排序' },

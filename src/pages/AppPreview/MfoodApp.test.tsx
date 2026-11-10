@@ -29,10 +29,10 @@ describe('MFOOD 壳同步命令', () => {
     const { rerender } = render(<MfoodApp syncCategory="search-delivery" syncSeq={0} />)
     rerender(<MfoodApp syncCategory="search-delivery" syncSeq={1} />)
 
-    // 无需手动输入：携带关键词「火鍋」直达结果页，外賣瀑布流为 MFOOD 同款门店卡 + 5 分类 Tab
+    // 无需手动输入：携带关键词「火鍋」直达结果页，外賣瀑布流为 MFOOD 同款门店卡 + 4 分类 Tab
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByText('恆友魚蛋王（三盞燈總店）')).toBeInTheDocument()
-    expect(within(dialog).getAllByRole('tab')).toHaveLength(5)
+    expect(within(dialog).getAllByRole('tab')).toHaveLength(4)
   })
 
   it('美食外卖页·搜索结果瀑布流面板：进入外卖频道内搜索（无分类 Tab）', () => {
@@ -145,10 +145,10 @@ describe('MFOOD 壳同步命令', () => {
     await user.click(screen.getByText('搜尋店名或菜品'))
     expect(screen.getByPlaceholderText('搜尋外賣商家、商品')).toBeInTheDocument()
 
-    // 面板切「首页 · 搜索结果瀑布流」：覆盖层替换为首页搜索（5 分类 Tab 齐备）
+    // 面板切「首页 · 搜索结果瀑布流」：覆盖层替换为首页搜索（4 分类 Tab 齐备）
     rerender(<MfoodApp syncCategory="search-delivery" syncSeq={2} />)
     fireEvent.change(screen.getByPlaceholderText('搜尋商家、商品、團購'), { target: { value: '火鍋' } })
     await user.click(screen.getByRole('button', { name: '搜索' }))
-    expect(screen.getAllByRole('tab')).toHaveLength(5)
+    expect(screen.getAllByRole('tab')).toHaveLength(4)
   })
 })

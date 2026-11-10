@@ -67,14 +67,13 @@ export const MFOOD_SEARCH_STORES: MfoodStore[] = [
 export const MFOOD_NEAR_STORES: PreferredMerchant[] = [
   { key: 'ns1', name: '澳門燒味工房🔥-新橋店', rating: '4.7', perPerson: '$58/人', cateArea: '燒臘·新橋商圈', dist: '180m', logoText: '燒味', logoTone: 'orange', isNew: true, cover: friedChickenImg, sales: '半年售800+', coupons: [{ icon: '券', price: '60', discount: '6折', name: '燒味雙拚優惠券' }, { icon: '惠', price: '30', discount: '8折', name: '午市快閃券' }] },
   { key: 'ns2', name: '金沙砂鍋粥🍜-提督店', rating: '4.5', perPerson: '$45/人', cateArea: '粥麵·提督商圈', dist: '420m', logoText: '金沙', logoTone: 'red', cover: fishPotImg, inflate: '最高膨脹至$25', sales: '半年售1200+', coupons: [{ icon: '券', price: '45', discount: '6.5折', name: '砂鍋粥雙人券' }] },
-  { key: 'ns3', name: '麥記漢堡包🍔-關閘店', rating: '4.4', perPerson: '$38/人', cateArea: '快餐·關閘商圈', dist: '1.1km', logoText: '麥記', logoTone: 'blue', cover: burgerImg, sales: '半年售300+', couponPrefix: 'newbie', coupons: [{ icon: '秒', price: '25', discount: '5折', name: '早晨套餐秒殺券' }, { icon: '惠', price: '15', discount: '8.8折', name: '下午茶優惠' }] },
+  { key: 'ns3', name: '麥記漢堡包🍔-關閘店', rating: '4.4', perPerson: '$38/人', cateArea: '快餐·關閘商圈', dist: '1.1km', logoText: '麥記', logoTone: 'blue', cover: burgerImg, sales: '半年售300+', coupons: [{ icon: '秒', price: '25', discount: '5折', name: '早晨套餐秒殺券' }, { icon: '惠', price: '15', discount: '8.8折', name: '下午茶優惠' }] },
   { key: 'ns4', name: '檸檬屋茶飲🍋-下環店', rating: '4.6', perPerson: '$22/人', cateArea: '茶飲·下環商圈', dist: '860m', logoText: '檸檬', logoTone: 'green', cover: lemonTeaImg, inflate: '最高膨脹至$12', sales: '半年售2600+', coupons: [{ icon: '惠', price: '12', discount: '9折', name: '凍飲第二杯半價' }] },
 ]
 
-/* ─── 搜索結果頁團購瀑布流專用列表：附近好店基礎 + 超出範圍 / 未入駐 / 開業時間樣例（同閃蜂口径） ─── */
+/* ─── 搜索結果頁團購瀑布流專用列表：附近好店基礎 + 未入駐 / 開業時間樣例（同閃蜂口径；「超出範圍」样例已按需求下线） ─── */
 export const MFOOD_NEAR_SEARCH_STORES: PreferredMerchant[] = [
   ...MFOOD_NEAR_STORES,
-  { key: 'ns5', name: '海灣火鍋城（路環店）', rating: '4.7', perPerson: '$120/人', cateArea: '火鍋·路環商圈', dist: '5.6km', logoText: '海灣', logoTone: 'orange', cover: fishPotImg, sales: '半年售800+', coupons: [{ icon: '券', price: '150', discount: '7.5折', name: '火鍋雙人套餐券' }], outOfRange: true },
   { key: 'ns6', name: '小貝廚房（關閘店）', rating: '0', perPerson: '', cateArea: '輕食·關閘商圈', dist: '1.6km', logoText: '小貝', logoTone: 'green', cover: riceballImg, sales: '', coupons: [], notJoined: true },
   { key: 'ns7', name: '早安茶餐廳（新橋店）', rating: '4.5', perPerson: '$45/人', cateArea: '港式·新橋商圈', dist: '900m', logoText: '早安', logoTone: 'blue', cover: lemonTeaImg, sales: '半年售400+', coupons: [{ icon: '惠', price: '40', discount: '8.8折', name: '早餐專享優惠' }], openTimeLabel: '10:00 營業' },
 ]

@@ -50,8 +50,6 @@ export interface PreferredMerchant {
   sales: string
   /** 券列表（1~3 行） */
   coupons: { icon: '券' | '惠' | '秒'; price: string; discount: string; name: string }[]
-  /** 券行前缀标（线上既有口径，见说明 id5 末条）：newbie=「新客特惠」粉标 / countdown=倒计时粉标；缺省不渲染 */
-  couponPrefix?: 'newbie' | 'countdown'
   /** 大圖模式封面（占位贴图，待切商家真实封面） */
   cover: string
   /** 超出配送範圍（搜索結果頁團購瀑布流展示態）：LOGO 蒙暗色阴影 + 叠「超出範圍」白膠囊（与外卖瀑布流同款视觉语言） */
@@ -134,9 +132,6 @@ function PreferredCoupons({ item, maxCount }: { item: PreferredMerchant; maxCoun
     <div className="apq-coupons">
       {list.map((c, i) => (
         <div key={`${c.icon}-${i}`} className="apq-coupon">
-          {item.couponPrefix && (
-            <span className="apq-coupon-pre">{item.couponPrefix === 'countdown' ? '02:14:47' : '新客特惠'}</span>
-          )}
           <i className="apq-coupon-ico">{c.icon}</i>
           <b>${c.price}</b>
           <span className="apq-coupon-disc">{c.discount}</span>

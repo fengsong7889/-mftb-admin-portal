@@ -11,7 +11,7 @@
  *   grabbedLabel/ grabbedPct — 卡片下方已搶进度条（閃蜂：已搶19%）
  *   ctaText         — CTA 文案覆盖（秒殺 / 秒），默认「搶購」
  *   discountNote    — 降价行文案覆盖（秒殺補貼，享4.5折），默认按价格自动计算
- *   ratingNote      — 底部评分前缀（4.5分），出现时底部不再展示距离/行政区
+ *   ratingNote      — 底部评分（橙心+分数，与優選商家卡同款；两壳均展示），出现时底部为 评分→距离→行政区→门店
  */
 import { SpecField } from './SpecHighlight'
 import BrandCover from './BrandCover'
@@ -40,6 +40,8 @@ export interface GroupBuyItem {
   price: string
   /** No.7 原价 — 灰色删除线，前端自动计算 No.8 降价提示 */
   origin: string
+  /** No.7 积分价标签 — 销售价有积分抵扣时在现价后展示「⚡積分價」红标，缺省不渲染 */
+  pointPrice?: boolean
   /** No.9 定位距离 — GPS计算，小于1公里显示米，否则显示 km */
   dist: string
   /** No.10 行政区 — 门店所属区域，如"筷子基" */
@@ -71,7 +73,7 @@ export interface GroupBuyItem {
   ctaText?: string
   /** 降价行文案覆盖（如"秒殺補貼，享4.5折"），默认按价格自动计算 */
   discountNote?: string
-  /** No.14 评分 — 如"4.5分"，展示在距离/行政区之前；仅閃蜂展示，MFOOD 无此字段 */
+  /** No.14 评分 — 橙心+加粗分数（与優選商家卡同款形态），展示在距离/行政区之前；閃蜂/MFOOD 均展示 */
   ratingNote?: string
 }
 
@@ -160,20 +162,20 @@ export default function GroupBuyFeedCard({
 
       {/* 右侧内容 */}
       <div className="apf-card-body">
-        <SpecField panel="groupBuy" id={1}>
-          <div className="apf-card-title-row">
+        {/* No.1 品牌名 + No.5 商品名同排，竖线分隔；品牌名靠数据精简不截断，商品名超宽省略号截断 */}
+        <div className="apf-card-title-row">
+          <SpecField panel="groupBuy" id={1}>
             <span className="apf-brand">
               {item.brandEmoji && <span className="apf-brand-emoji">{item.brandEmoji}</span>}
               {item.brand}
             </span>
-          </div>
-        </SpecField>
-        <SpecField panel="groupBuy" id={5}>
-          <div className="apf-card-title-row">
-            <span className="apf-title-sep">|</span>
+          </SpecField>
+          {/* 分隔符不挂锚点：No.1/No.5 高亮各只圈自己的文字，不圈分隔符 */}
+          <span className="apf-title-sep">|</span>
+          <SpecField panel="groupBuy" id={5}>
             <span className="apf-title">{item.title}</span>
-          </div>
-        </SpecField>
+          </SpecField>
+        </div>
         <SpecField panel="groupBuy" id={6}>
           <div className="apf-card-meta">
             <span className="apf-meta-tag">半年售{formatSales(item.halfYearSales)}</span>
@@ -185,6 +187,7 @@ export default function GroupBuyFeedCard({
         <div className="apf-card-price-row">
           <SpecField panel="groupBuy" id={7}>
             <span className="apf-price"><i>$</i>{item.price}</span>
+            {item.pointPrice && <span className="apf-point-tag">⚡積分價</span>}
             <span className="apf-origin">${item.origin}</span>
           </SpecField>
           {item.showCta !== false && (
@@ -214,7 +217,7 @@ export default function GroupBuyFeedCard({
         <div className="apf-card-foot">
           {item.ratingNote ? (
             <>
-              <SpecField panel="groupBuy" id={14}><span className="apf-dist apf-rating">{item.ratingNote}</span></SpecField>
+              <SpecField panel="groupBuy" id={14}><span className="apf-dist apf-rating"><i aria-hidden="true">♥</i>{item.ratingNote}</span></SpecField>
               <SpecField panel="groupBuy" id={9}><span className="apf-dist">{item.dist}</span></SpecField>
               <SpecField panel="groupBuy" id={10}><span className="apf-area">{item.area}</span></SpecField>
               <SpecField panel="groupBuy" id={11}><span className="apf-shop">{item.shop} ›</span></SpecField>
