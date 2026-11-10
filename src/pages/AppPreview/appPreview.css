@@ -5069,6 +5069,7 @@ button.apcs-card:hover { border-color: var(--warning-border); }
   margin-bottom: 14px;
 }
 .ap-spec-track {
+  position: relative; /* 滑动高亮丸的定位锚 */
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -5081,8 +5082,44 @@ button.apcs-card:hover { border-color: var(--warning-border); }
 /* 次级轨道（面板行）/ 三级轨道（展示模式行）：内距与圆角逐级收窄 */
 .ap-spec-track--sub { border-radius: 9px; }
 .ap-spec-track--mini { padding: 2px; border-radius: 8px; }
-/* 主级段（菜单分组）：最大号，选中=品牌渐变丸 */
+/* 滑动高亮丸（thumb）：以 transform+width 过渡跟随选中项（两者皆可插值），
+   取代按钮自带选中背景的硬切换（渐变背景无法过渡插值、只能瞬现，是「硬加载感」根因）；
+   缓动取 ease-out 背曲线：起手快、落位稳，滑动有「跟手」感 */
+.ap-spec-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  border-radius: 8px;
+  pointer-events: none;
+  transition:
+    transform 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ap-spec-thumb--group {
+  background: linear-gradient(135deg, var(--text-brand), var(--purple));
+  box-shadow: var(--shadow-2);
+}
+.ap-spec-thumb--panel {
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--text-brand) 10%, var(--surface-2));
+  box-shadow: var(--shadow-1), inset 0 0 0 1px color-mix(in srgb, var(--text-brand) 28%, transparent);
+}
+.ap-spec-thumb--mini {
+  top: 2px;
+  bottom: 2px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  box-shadow: var(--shadow-1);
+}
+/* 系统级减弱动效偏好：高亮丸直接落位，不滑动 */
+@media (prefers-reduced-motion: reduce) {
+  .ap-spec-thumb { transition: none; }
+}
+/* 主级段（菜单分组）：最大号；选中背景由 thumb 承担，按钮只管文字色渐变与按压反馈 */
 .ap-spec-group-tab {
+  position: relative;
+  z-index: 1;
   border: none;
   border-radius: 8px;
   background: transparent;
@@ -5093,16 +5130,17 @@ button.apcs-card:hover { border-color: var(--warning-border); }
   color: var(--text-2);
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition: color 0.3s ease, transform 0.18s ease;
 }
 .ap-spec-group-tab:hover { color: var(--text-brand); }
+.ap-spec-group-tab:active { transform: scale(0.96); }
 .ap-spec-group-tab.is-on {
-  background: linear-gradient(135deg, var(--text-brand), var(--purple));
   color: var(--surface-2);
-  box-shadow: var(--shadow-2);
 }
-/* 次级段（瀑布流面板）：中号，选中=浮起白丸 */
+/* 次级段（瀑布流面板）：中号；选中染底/发丝环由 thumb 承担 */
 .ap-spec-panel-tab {
+  position: relative;
+  z-index: 1;
   border: none;
   border-radius: 7px;
   background: transparent;
@@ -5113,15 +5151,13 @@ button.apcs-card:hover { border-color: var(--warning-border); }
   color: var(--text-2);
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition: color 0.3s ease, transform 0.18s ease;
 }
 .ap-spec-panel-tab:hover { color: var(--text-brand); }
+.ap-spec-panel-tab:active { transform: scale(0.96); }
 .ap-spec-panel-tab.is-on {
-  /* 次级选中：白丸加淡品牌染底+发丝品牌环+品牌字，比主栏渐变丸轻一档但不素 */
-  background: color-mix(in srgb, var(--text-brand) 10%, var(--surface-2));
   color: var(--text-brand);
   font-weight: 600;
-  box-shadow: var(--shadow-1), inset 0 0 0 1px color-mix(in srgb, var(--text-brand) 28%, transparent);
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -5715,6 +5751,8 @@ button.apcs-card:hover { border-color: var(--warning-border); }
   color: var(--text-3);
 }
 .ap-spec-mode-btn {
+  position: relative;
+  z-index: 1;
   border: none;
   border-radius: 6px;
   background: transparent;
@@ -5724,14 +5762,13 @@ button.apcs-card:hover { border-color: var(--warning-border); }
   color: var(--text-2);
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition: color 0.3s ease, transform 0.18s ease;
 }
 .ap-spec-mode-btn:hover { color: var(--text-1); }
+.ap-spec-mode-btn:active { transform: scale(0.94); }
 .ap-spec-mode-btn.is-on {
-  background: var(--surface-2);
   color: var(--text-brand);
   font-weight: 600;
-  box-shadow: var(--shadow-1);
 }
 
 /* ── MFOOD 特惠團購页（设计稿图1-3）：品红头部/hero/宫格/秒殺页签/横滑卡/双列Banner/圆签/胶囊/吸顶 ──
