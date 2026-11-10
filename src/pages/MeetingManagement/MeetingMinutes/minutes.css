@@ -304,13 +304,8 @@
 /* 章节用统一编号与横线；表格用于信息对照，长段落保留正常的阅读节奏。 */
 .mm-document__section { margin-top: 24px; min-width: 0; }
 .mm-document__section-title { display: flex; align-items: baseline; gap: 12px; margin: 0 0 12px; padding: 0 0 8px; border-bottom: 1px solid #8c8c8c; font-size: clamp(14px, 1.4vw, 16px); color: #262626; font-weight: 700; white-space: nowrap; }
-/* 品牌色仅点缀编号和关键结论标题，正文与大面积背景保持中性。 */
+/* 品牌色仅点缀章节编号，正文与大面积背景保持中性。 */
 .mm-document__section-title > span { flex-shrink: 0; color: #e8720c; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.mm-document__summary { margin-top: 12px; padding: 12px 16px; border: 1px solid #d9d9d9; }
-.mm-document__summary > .mm-document__label { color: #e8720c; font-weight: 600; }
-/* 结论保留记录人自带的 1、2、3 标记，系统不再套一层有序列表编号（否则两套数字重叠） */
-.mm-document__conclusions { margin: 8px 0; }
-.mm-document__conclusions p { margin: 0; padding: 3px 0; white-space: pre-wrap; }
 .mm-document__muted { color: #595959; font-size: 12px; }
 /* 子网格共享标签列宽，完整容纳中英文标题，并保持讨论与结论的竖线对齐。 */
 .mm-document__topic { display: grid; grid-template-columns: minmax(132px, max-content) minmax(0, 1fr); border: 1px solid #d9d9d9; }

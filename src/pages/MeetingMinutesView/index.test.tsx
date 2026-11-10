@@ -100,7 +100,8 @@ describe('紀要免登查看頁', () => {
     fetchMinutesPage.mockResolvedValue(VIEW)
     openPage()
     await waitFor(() => expect(screen.getByText('Q4 預算復核')).toBeInTheDocument())
-    expect(screen.getAllByText(/按營收分攤/)).toHaveLength(2)
+    // 速览块已移除：结论只在 02 议题里出现一次，不再重复聚合
+    expect(screen.getAllByText(/按營收分攤/)).toHaveLength(1)
     expect(screen.getByText('輸出預算明細表')).toBeInTheDocument()
     expect(screen.getByText(/張三（MF00007）/)).toBeInTheDocument()
     const absentees = screen.getByText('缺席人員').nextElementSibling

@@ -73,9 +73,9 @@ describe('商務紀要正文', () => {
     headings.forEach(heading => {
       expect(heading.closest('section')).toHaveAttribute('class', 'mm-document__section')
     })
-    // 记录人自带的 1、2、3 标记保留原文：系统不再套有序列表编号造成两套数字重叠
-    expect(container.querySelector('.mm-document__summary ol')).toBeNull()
-    expect(container.querySelector('.mm-document__conclusions p')).toHaveTextContent('採用營收分攤口徑')
+    // 结论速览块已按定版移除：结论在 02 各议题里逐条可读，重复聚合还会把记录人手写的 **加粗** 标记原样带进正文
+    expect(container.querySelector('.mm-document__summary')).toBeNull()
+    expect(container.querySelector('.mm-document__decision p')).toHaveTextContent('採用營收分攤口徑')
   })
 
   it('只保留会议目的模块，旧目的和摘要按段落合并且不改写原数据', () => {
@@ -213,7 +213,8 @@ describe('商務紀要正文', () => {
     expect(foot).not.toBeNull()
     expect(foot?.parentElement?.lastElementChild).toBe(foot)
     expect(foot?.textContent).toContain('MJ-TEST-01')
-    expect(screen.getAllByText('採用營收分攤口徑')).toHaveLength(2)
+    // 速览块已移除：结论只在 02 议题里出现一次，不再重复聚合
+    expect(screen.getAllByText('採用營收分攤口徑')).toHaveLength(1)
     expect(screen.getByText('歷史紀要未保存完整參會名單快照')).toBeInTheDocument()
     expect(screen.getByText('工作稿 · 未鎖版')).toBeInTheDocument()
     expect(container.querySelector('.ant-timeline')).toBeNull()

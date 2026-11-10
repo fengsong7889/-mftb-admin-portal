@@ -154,7 +154,6 @@ export default function MinutesContentCard({ content: suppliedContent, attachmen
     { label: t('meeting.minutes.recorderColumn'), value: info?.recorder },
     { label: t('meeting.minutes.publicationText.meetingLocation'), value: info?.room },
   ]
-  const conclusions = items.filter(item => item.conclusion?.trim())
 
   return (
     <article className={`mm-document${info ? ' mm-document--sheet' : ''}${compact ? ' mm-document--compact' : ''}`} aria-label={t('meeting.minutes.publicationText.meetingMinutesDocument')}>
@@ -198,13 +197,7 @@ export default function MinutesContentCard({ content: suppliedContent, attachmen
       {!compact && (
         <Section title={t('meeting.minutes.purpose', { defaultValue: '會議目的' })} number="01">
           {purpose ? <p className="mm-document__body">{purpose}</p> : <p className="mm-document__muted">{t('meeting.minutes.notRecorded')}</p>}
-          <div className="mm-document__summary">
-            <div className="mm-document__label">{t('meeting.minutes.publicationText.keyConclusions')}</div>
-            {conclusions.length > 0 ? (
-              <div className="mm-document__conclusions">{conclusions.map((item, index) => <p key={index}>{item.conclusion}</p>)}</div>
-            ) : <p className="mm-document__muted">{t('meeting.minutes.publicationText.noConclusionRecordedSeeTheDiscussionBelow')}</p>}
-            <div className="mm-document__muted">{t('meeting.minutes.conclusionsSource', { defaultValue: '摘自各議題結論，實際發布狀態以文檔版本為準。' })}</div>
-          </div>
+          {/* 结论速览块已按定版移除：结论在 02 各议题里逐条可读，重复聚合还会把记录人手写的 **加粗** 标记原样带进正文 */}
         </Section>
       )}
 

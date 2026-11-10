@@ -26,6 +26,7 @@ import {
 import { fetchMeetingDetail, type MeetingVO } from '@/api/meeting'
 import { bizTypeLabels, minutesStatusMeta, minutesTargetTypeLabels, notifyStatusMeta, phaseMeta } from '../meetingMeta'
 import MinutesContentCard, { MinutesNoticePreview } from './MinutesContentCard'
+import MinutesExportButton from './MinutesExportButton'
 import type { AttachmentUrlResolver } from './MinutesAttachments'
 import SendMinutesModal from './SendMinutesModal'
 import useMinutesNavigation from './useMinutesNavigation'
@@ -59,6 +60,8 @@ export default function MinutesView() {
   const [selectedDocument, setSelectedDocument] = useState<MinutesDocument>()
   const [selectedRevisionId, setSelectedRevisionId] = useState<number>()
   const revisionRequest = useRef(0)
+  /** 正文阅读面：下载时从这里取 .mm-document 节点，导出的就是此刻屏幕上这一版 */
+  const readingSurfaceRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>()
   const [sendOpen, setSendOpen] = useState(false)
@@ -282,7 +285,13 @@ export default function MinutesView() {
         <>
           <div className="mm-reader-tools">
             <span className="mm-reader-tools__note">{minutes.hasUnpublishedChanges ? t('meeting.minutes.unpublishedChanges', { defaultValue: '存在未發布草稿；正式版本保持不變' }) : t('meeting.minutes.formalDocument', { defaultValue: '正式文檔與目前辦理進度分開閱讀' })}</span>
-            <Button size="small" icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>{t('meeting.refresh', { defaultValue: '刷新' })}</Button>
+            <Space size={8} wrap>
+              <MinutesExportButton
+                fileBase={`${t('meeting.minutes.viewTitle', { defaultValue: '會議紀要' })}_${minutes.minutesNo ?? minutesId ?? ''}_${meeting?.title ?? minutes.meetingTitle ?? ''}`}
+                getTarget={() => readingSurfaceRef.current?.querySelector<HTMLElement>('.mm-document') ?? null}
+              />
+              <Button size="small" icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>{t('meeting.refresh', { defaultValue: '刷新' })}</Button>
+            </Space>
           </div>
           <Tabs className="mm-view-tabs" activeKey={viewTab} onChange={setViewTab} items={[
             { key: 'document', label: t('meeting.minutes.body') },
@@ -295,7 +304,7 @@ export default function MinutesView() {
 
       {minutes && content && (
         <>
-          <div className="mm-reading-surface" hidden={viewTab !== 'document'}>
+          <div className="mm-reading-surface" ref={readingSurfaceRef} hidden={viewTab !== 'document'}>
             <MinutesContentCard content={content} snapshot={document} trackedItems={content.schemaVersion === 2 ? undefined : minutes.items}
               attachments={viewingAttachments} resolveAttachmentUrl={resolveAttachmentUrl}
               document={{
