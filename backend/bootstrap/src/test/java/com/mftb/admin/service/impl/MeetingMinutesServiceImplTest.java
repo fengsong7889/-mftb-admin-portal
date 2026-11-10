@@ -1227,4 +1227,17 @@ class MeetingMinutesServiceImplTest {
         assertEquals(List.of("張三"), row.getOwnerNames());
         assertEquals(List.of("MF00007"), row.getOwnerEmpNos());
     }
+
+    @Test
+    @DisplayName("无事项纪要：view 正常返回空事项，且不得以空集合查负责人表（空 IN 语法错误回归）")
+    void viewWithoutItemsNeverQueriesOwnersWithEmptyCollection() {
+        when(minutesMapper.selectById(5L)).thenReturn(minutes(5L, RECORDER.getId(), 0, 0));
+        // setUp 已把 itemMapper.findByMinutes 默认桩成空列表：模拟只存了正文、没录任何事项的纪要
+
+        MeetingMinutesDto.VO vo = service.view(5L);
+
+        assertTrue(vo.getItems().isEmpty());
+        // 真 Mapper 收到空集合会拼出 WHERE item_id IN () 的坏 SQL；Mock 不会报错，所以必须锁调用本身
+        verify(ownerMapper, never()).findByItemIds(any());
+    }
 }

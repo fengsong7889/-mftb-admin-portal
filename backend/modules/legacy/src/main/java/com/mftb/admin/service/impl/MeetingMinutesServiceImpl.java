@@ -1230,7 +1230,8 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
                 || guard.isOrganizer(booking, current) || guard.canOperateRecords(current);
         java.time.LocalDate today = java.time.LocalDate.now();
         // 负责人一次取回本页全部事项：逐条查会让一份纪要长出一条事项一次往返
-        Map<Long, List<MeetingMinutesItemOwner>> owners = groupOwners(
+        // 空集合不得下放到 Mapper：<foreach> 会拼出空 IN ()，SQL 执行即语法错误（生产 MJ202611100001 事故）
+        Map<Long, List<MeetingMinutesItemOwner>> owners = rows.isEmpty() ? Map.of() : groupOwners(
                 ownerMapper.findByItemIds(rows.stream().map(MeetingMinutesItem::getId).toList()));
         List<MeetingMinutesDto.ItemVO> out = new ArrayList<>();
         for (MeetingMinutesItem row : rows) {
