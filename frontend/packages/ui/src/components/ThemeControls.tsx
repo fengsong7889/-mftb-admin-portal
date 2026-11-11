@@ -23,10 +23,16 @@
  *    否则操作系统从浅色切到深色、图标却不动，用户会以为设置没生效。
  *
  * 为什么这里用 `useContext` 而不是 `useTheme()`：本控件挂在 HeaderBar / PortalTopBar 两个壳组件上，
- * 而 `Portal.test.tsx` 会直接渲染它们而不套 Provider。区别处理两个情形：
- *   - flag 关闭 → 返回 null，不要求 Provider（基础设施因此可以在无 Provider 的测试环境下安全存在）；
+ * 需要区分两个情形：
+ *   - flag 关闭 → 返回 null，不要求 Provider（基础设施因此可以在无 Provider 的环境下安全存在）；
  *   - flag 开启但拿不到 Context → **显式抛错**，不能静默不渲染。
  * 后者若也静默返回 null，「主题切换没生效」会成一个没人发现的缺陷。
+ *
+ * ⚠ 历史假设已更正（2026-11-11）：本注释原先写「Portal.test.tsx 会直接渲染它们而不套 Provider」，
+ * 那是 flag 关闭期的权宜口径。生产 `.env.production` 开启后，该假设让「开启态 + 整页装配」
+ * 这条分支在 CI 从未被覆盖（CI 无 `.env.local` → flag 未定义 → 走 null 分支恒绿），
+ * 而本地开灰度则因拿不到 Context 连带 38 例崩。现在 Portal.test.tsx 已套 ThemeProvider
+ * 并显式 mock 开关，默认按生产的开启态跑；下面的防呆抛错保留不变，并由该文件的专门用例守住。
  */
 import { useContext } from 'react'
 import { Dropdown, type MenuProps } from 'antd'

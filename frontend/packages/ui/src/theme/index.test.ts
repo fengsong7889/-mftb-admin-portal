@@ -65,14 +65,37 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.unstubAllEnvs()
   vi.restoreAllMocks()
 })
 
 describe('feature flag 关闭期间必须恒浅色', () => {
-  it('真实实现只在显式字符串 true 时开启，未配置即关闭', async () => {
-    // 上面已经把 ./featureFlag mock 掉了，这里必须取未 mock 的实现才能验它的默认语义
+  /**
+   * 取值语义必须由用例自己构造，不能读运行环境。
+   *
+   * 旧写法直接 `expect(actual.isThemeSwitchEnabled()).toBe(false)`，读的是本机
+   * `.env.local` 里的 VITE_THEME_SWITCH_ENABLED：本地开着灰度就判红，而 CI 没有该文件
+   * 又恒绿 —— 于是「显式 true 才开启」这条分支在 CI 从未被验证过，且本地那 1 例红
+   * 会被当成本次改动弄坏的。现在用 stubEnv 逐个构造取值，两侧环境结论一致。
+   *
+   * vitest 4 的 stubEnv 直接写 metaEnv，传 undefined 会删键（真正的「未配置」），
+   * unstubAllEnvs 精确还原；静态成员访问 import.meta.env.KEY 不受「动态属性访问」那个坑影响。
+   */
+  it('真实实现只在显式字符串 true 时开启，未配置与其它取值一律关闭', async () => {
+    // 上面已经把 ./featureFlag mock 掉了，这里必须取未 mock 的实现才能验它的真实语义
     const actual = await vi.importActual<typeof import('./featureFlag')>('./featureFlag')
-    expect(actual.isThemeSwitchEnabled()).toBe(false)
+
+    vi.stubEnv('VITE_THEME_SWITCH_ENABLED', undefined)
+    expect(actual.isThemeSwitchEnabled(), '未配置必须关闭').toBe(false)
+
+    // 只有逐字符等于 'true' 才算开启：大小写变体、布尔串、前后空白都不得放行
+    for (const raw of ['', 'false', 'TRUE', 'True', '1', 'yes', ' true', 'true ']) {
+      vi.stubEnv('VITE_THEME_SWITCH_ENABLED', raw)
+      expect(actual.isThemeSwitchEnabled(), `取值 ${JSON.stringify(raw)} 不应开启`).toBe(false)
+    }
+
+    vi.stubEnv('VITE_THEME_SWITCH_ENABLED', 'true')
+    expect(actual.isThemeSwitchEnabled(), '显式 true 必须开启（生产 .env.production 走的就是这条）').toBe(true)
   })
 
   it('即使 storage 写着 dark、系统也要深色，解析结果仍是 light', () => {

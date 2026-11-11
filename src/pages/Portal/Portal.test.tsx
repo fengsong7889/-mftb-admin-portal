@@ -9,6 +9,7 @@ import Portal from './index'
 import SystemArtwork from './SystemArtwork'
 import PortalTopBar from '@/components/PortalTopBar'
 import HeaderBar from '@/components/HeaderBar'
+import ThemeProvider from '@/theme/ThemeProvider'
 import { fetchPortalContext, type PortalSystem } from '@/api/portal'
 import { fetchMySystemAccessRequests } from '@/api/systemAccessRequest'
 import { fetchPortalFavorites, savePortalFavorites } from '@/api/auth'
@@ -23,6 +24,18 @@ import ru from '@/i18n/locales/ru.json'
 
 /** 门户收藏按 username 隔离，默认不提供 username 以保持其余用例不受影响。 */
 const authState = vi.hoisted(() => ({ username: undefined as string | undefined }))
+/**
+ * 主题灰度开关必须显式接管，不能读运行环境。
+ *
+ * 旧版本文件不 mock 它，于是结果取决于本机 `.env.local`：本地开着灰度时
+ * PortalTopBar 里的 ThemeControls 会因拿不到 Context 而抛错，连带本文件 38 例全崩；
+ * 而 CI 没有 `.env.local`，开关未定义 → 控件直接 return null → 永远绿。
+ * 生产 `.env.production` 是开启的，也就是说 CI 从来没跑过生产实际走的那条分支。
+ * 现在默认置 true（对齐生产口径），让开启态在 CI 也被覆盖，且两侧环境结论一致。
+ * 与 TopBarThemeEntry.test.tsx 用同一套机制（vi.hoisted + vi.mock），不另造开关。
+ */
+const { themeSwitchRef } = vi.hoisted(() => ({ themeSwitchRef: { enabled: true } }))
+vi.mock('@/theme/featureFlag', () => ({ isThemeSwitchEnabled: () => themeSwitchRef.enabled }))
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({
   user: { name: '测试员工', empId: 'TEST', role: 'user', username: authState.username },
   hasMenuPermission: () => true,
@@ -84,18 +97,23 @@ function SystemAccessApplyPage() {
 
 function mount(path = '/portal') {
   return render(
-    <I18nextProvider i18n={i18n}>
-      <ConfigProvider locale={enUS}>
-        <MemoryRouter initialEntries={[path]}>
-          <Routes>
-            <Route path="/portal" element={<><PortalTopBar /><Portal /><output data-testid="portal-route">/portal</output></>} />
-            <Route path="/" element={<SystemPage />} />
-            <Route path="/account-balance" element={<SystemPage />} />
-            <Route path="/system-access-apply" element={<SystemAccessApplyPage />} />
-          </Routes>
-        </MemoryRouter>
-      </ConfigProvider>
-    </I18nextProvider>,
+    // ThemeProvider 必须在 ConfigProvider 之上，与唯一装配点 src/bootstrap.tsx 的 mountApp() 同序：
+    // 主题既决定 CSS 变量也决定 antd algorithm/token，两处必须同源。
+    // 不套它的话，开关开启时 ThemeControls 会按防呆设计显式抛错（装配缺失不得静默）。
+    <ThemeProvider>
+      <I18nextProvider i18n={i18n}>
+        <ConfigProvider locale={enUS}>
+          <MemoryRouter initialEntries={[path]}>
+            <Routes>
+              <Route path="/portal" element={<><PortalTopBar /><Portal /><output data-testid="portal-route">/portal</output></>} />
+              <Route path="/" element={<SystemPage />} />
+              <Route path="/account-balance" element={<SystemPage />} />
+              <Route path="/system-access-apply" element={<SystemAccessApplyPage />} />
+            </Routes>
+          </MemoryRouter>
+        </ConfigProvider>
+      </I18nextProvider>
+    </ThemeProvider>,
   )
 }
 
@@ -158,6 +176,8 @@ async function selectLanguage(label: string) {
 beforeEach(async () => {
   localStorage.clear()
   authState.username = undefined
+  // 逐用例复位成生产口径（开启），防止某个用例改过开关后污染后续用例
+  themeSwitchRef.enabled = true
   vi.clearAllMocks()
   vi.mocked(ensureLanguageBundle).mockResolvedValue(undefined)
   vi.mocked(fetchLanguages).mockResolvedValue(configuredLanguages)
@@ -356,6 +376,7 @@ describe('门户场景卡片与授权边界', () => {
 })
 
 afterEach(() => {
+  themeSwitchRef.enabled = false
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
@@ -957,5 +978,62 @@ describe('门户多语言与系统继承', () => {
     await selectLanguage('English')
     await screen.findByRole('button', { name: 'Finance & Settlement · Enter system' })
     expect(document.title).toBe('MFTB Group Portal')
+  })
+})
+
+/**
+ * 主题入口在「门户整页」这一层的装配守卫。
+ *
+ * 为何 TopBarThemeEntry.test.tsx 不够：那份只单独渲染顶栏组件，证明「控件挂在顶栏上」；
+ * 而门户真实链路是 PortalTopBar + Portal 同页渲染，且 Provider 由 bootstrap 提供。
+ * 本组把「整页在灰度开启态下能正常渲染出入口」钉住 —— 这正是生产口径
+ * （.env.production 开启），也是过去 CI 因无 .env.local 而从未覆盖的那条分支。
+ *
+ * 断言用 class 不用文案：文案走 i18n，ja/ko/ru 静态包没有 header 段，拿名字定位会跟着语言包抖。
+ */
+describe('门户整页的主题入口装配（生产为灰度开启态）', () => {
+  const TOGGLE = '.header-theme-toggle'
+
+  it('开启态：门户整页恰好一个主题入口，且顶栏与卡片区都真的渲染了', async () => {
+    const { container } = mount()
+    await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
+    // 先坐实页面真渲染，否则计数断言在「整页空白」时也可能凑巧成立
+    expect(container.querySelector('.portal-top-bar')).toBeTruthy()
+    expect(container.querySelectorAll(TOGGLE)).toHaveLength(1)
+  })
+
+  it('开启态：进入业务系统后入口仍恰好一个（门户与系统顶栏不得叠出两份）', async () => {
+    const { container } = mount()
+    fireEvent.click(await screen.findByRole('button', { name: '財務結算系統 · 進入系統' }))
+    await screen.findByTestId('system-route')
+    expect(container.querySelector('.header-bell')).toBeTruthy()
+    expect(container.querySelectorAll(TOGGLE)).toHaveLength(1)
+  })
+
+  it('关闭态：整页不出现入口，但门户本身照常渲染（灰度语义，不是缺陷）', async () => {
+    themeSwitchRef.enabled = false
+    const { container } = mount()
+    await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
+    expect(container.querySelector('.portal-top-bar')).toBeTruthy()
+    expect(container.querySelector(TOGGLE)).toBeNull()
+  })
+
+  it('装配缺失防呆仍有效：开启态下不套 ThemeProvider 必须显式抛错，不得静默不渲染', () => {
+    // React 会把渲染期错误同时打到 console.error，这里只为保持输出干净，不吞断言。
+    // 正则只匹配 ASCII 的 ThemeProvider：错误文案里的中文经编辑链路可能被改字，拿它做断言会抖。
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      expect(() => render(
+        <I18nextProvider i18n={i18n}>
+          <ConfigProvider locale={enUS}>
+            <MemoryRouter initialEntries={['/portal']}>
+              <PortalTopBar />
+            </MemoryRouter>
+          </ConfigProvider>
+        </I18nextProvider>,
+      )).toThrow(/ThemeProvider/)
+    } finally {
+      spy.mockRestore()
+    }
   })
 })
