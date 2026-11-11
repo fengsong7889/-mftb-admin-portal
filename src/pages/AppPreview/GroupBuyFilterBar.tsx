@@ -32,6 +32,8 @@ import { SpecField } from './SpecHighlight'
 /** 「附近」页签（左列第一个）与其距离档（单选）；距离单位全球通用，不进语言包 */
 const NEARBY_TAB = 'nearby'
 const NEARBY_DISTANCES = ['500m', '1km', '2km', '3km']
+/** 「全部」占位文案（一期 UI 先行暂不进语言包，与更多篩選占位同口径） */
+const ALL_LABEL = '全部'
 
 /**
  * 「附近」面板的区域→商圈直接引用全系统唯一商圈树（recommendConstants.REGION_TREE_DATA），
@@ -151,10 +153,10 @@ export function useGroupBuyFilters({
   const [distance, setDistance] = useState<string | null>(null)
   /** 左侧当前浏览的页签（附近 或 区域 value），僅控制右列展示哪组选项，不是选中态 */
   const [activeAreaTab, setActiveAreaTab] = useState<string>(NEARBY_TAB)
-  /** 已选商圈（Region 编号）：各区域均多选，跨区域可同时保留 */
-  const [selectedRegions, setSelectedRegions] = useState<number[]>([])
-  /** 已选分类（多选，存 i18n key） */
-  const [categories, setCategories] = useState<string[]>([])
+  /** 已选地点（单选）：area=区域 value；district='all' 表示整个区域、否则为商圈编号；与距离档互斥 */
+  const [areaPick, setAreaPick] = useState<{ area: string; district: number | 'all' } | null>(null)
+  /** 已选分类（单选，存 i18n key；null=全部） */
+  const [category, setCategory] = useState<string | null>(null)
   /** 排序方式（单选，存 i18n key） */
   const [sort, setSort] = useState<string>(SORT_OPTIONS[0].key)
   /** 更多篩選·人均价格区间（双滑杆；原型仅视觉态，不做真实过滤） */
@@ -184,22 +186,22 @@ export function useGroupBuyFilters({
   /** 距离档单选：与商圈集合互斥（同一个胶囊只能表达一种地点口径），选中即收起面板 */
   const pickDistance = (value: string) => () => {
     setDistance(value)
-    setSelectedRegions([])
+    setAreaPick(null)
     setOpenPanel(null)
   }
 
-  /** 商圈多选：可勾可消（跨区域可同时保留）；一勾商圈就清掉距离档 */
-  const toggleRegion = (value: number) => () => {
-    const next = selectedRegions.includes(value)
-      ? selectedRegions.filter((v) => v !== value)
-      : [...selectedRegions, value]
-    if (next.length > selectedRegions.length) setDistance(null)
-    setSelectedRegions(next)
+  /** 商圈/区域「全部」单选：点击即执行筛选并收起面板；与距离档互斥 */
+  const pickDistrict = (area: string, district: number | 'all') => () => {
+    setAreaPick({ area, district })
+    setDistance(null)
+    setOpenPanel(null)
   }
 
-  /** 分类多选：面板保持展开，由 × 收起 */
-  const toggleCategory = (key: string) => () =>
-    setCategories((prev) => (prev.includes(key) ? prev.filter((x) => x !== key) : [...prev, key]))
+  /** 分类单选：点击即生效并收起面板；null=全部 */
+  const pickCategory = (key: string | null) => () => {
+    setCategory(key)
+    setOpenPanel(null)
+  }
 
   /** 排序单选：选中即生效并收起面板 */
   const pickSort = (key: string) => () => {
@@ -229,18 +231,20 @@ export function useGroupBuyFilters({
 
   /** 当前浏览页签对应的区域节点（附近页签无区域节点，右列展示距离档） */
   const activeArea = AREA_TREE.find((a) => a.value === activeAreaTab)
-  /** 多选回写：首个选中项 + 剩余数量（量词走模板，避免英文下语序错乱） */
-  const summarize = (first: string, total: number) =>
-    (total === 1 ? first : t('appConsumer.groupBuy.filter.multiSuffix', { first, rest: total - 1, defaultValue: '{{first}}+{{rest}}' }))
-  const selectedRegionLabels = selectedRegions.map((v) => t(REGION_TITLE_KEY[v]))
+  /** 区域右列选项：顶部「全部」+ 该区域商圈（单选） */
+  const districtOptions = activeArea
+    ? [{ value: 'all' as const, label: ALL_LABEL }, ...activeArea.children.map((c) => ({ value: c.value as number | 'all', label: t(c.titleKey) }))]
+    : null
+  const pickedArea = areaPick ? AREA_TREE.find((a) => a.value === areaPick.area) : undefined
   const nearbyBase = t('appConsumer.groupBuy.filter.nearby', { defaultValue: '附近' })
-  const nearbyLabel = selectedRegionLabels.length > 0
-    ? summarize(selectedRegionLabels[0], selectedRegionLabels.length)
+  const nearbyLabel = areaPick
+    ? (areaPick.district === 'all'
+        ? (pickedArea ? t(pickedArea.titleKey) : nearbyChipLabel)
+        : t(REGION_TITLE_KEY[areaPick.district]))
     : (distance ?? nearbyChipLabel)
-  const selectedCategoryLabels = categories.map((k) => t(k))
-  const categoryLabel = categories.length === 0
-    ? t('appConsumer.groupBuy.filter.allCategories', { defaultValue: '全部分類' })
-    : summarize(selectedCategoryLabels[0], categories.length)
+  const categoryLabel = category
+    ? t(category)
+    : t('appConsumer.groupBuy.filter.allCategories', { defaultValue: '全部分類' })
   const sortLabel = t(sort)
   /** 箭头方向跟随面板开合（▲=展开中） */
   const caret = (panel: 'nearby' | 'category' | 'sort') => (openPanel === panel ? '▲' : '▼')
@@ -347,13 +351,12 @@ export function useGroupBuyFilters({
                   ))}
                 </div>
                 <div className="apg-panel-options">
-                  {activeArea
-                    ? activeArea.children.map((child) => {
-                      const label = t(child.titleKey)
-                      const on = selectedRegions.includes(child.value)
+                  {activeArea && districtOptions
+                    ? districtOptions.map((opt) => {
+                      const on = areaPick?.area === activeArea.value && areaPick.district === opt.value
                       return (
-                        <button key={child.value} type="button" className="apg-optrow" aria-label={t('appConsumer.groupBuy.filter.pickDistrict', { value: label, defaultValue: '選擇商圈 {{value}}' })} onClick={toggleRegion(child.value)}>
-                          <span className={on ? 'is-text-on' : ''}>{label}</span>
+                        <button key={String(opt.value)} type="button" className="apg-optrow" aria-label={opt.value === 'all' ? '選擇全部' : t('appConsumer.groupBuy.filter.pickDistrict', { value: opt.label, defaultValue: '選擇商圈 {{value}}' })} onClick={pickDistrict(activeArea.value, opt.value)}>
+                          <span className={on ? 'is-text-on' : ''}>{opt.label}</span>
                           <i className={`apg-radio${on ? ' is-on' : ''}`} aria-hidden="true">{on ? '✓' : ''}</i>
                         </button>
                       )
@@ -370,15 +373,23 @@ export function useGroupBuyFilters({
 
             {openPanel === 'category' && (
               <div className="apg-panel-cats">
+                <button
+                  type="button"
+                  className={`apg-catchip${category === null ? ' is-on' : ''}`}
+                  aria-pressed={category === null}
+                  onClick={pickCategory(null)}
+                >
+                  {ALL_LABEL}
+                </button>
                 {CATEGORY_OPTIONS.map((c) => {
-                  const on = categories.includes(c.key)
+                  const on = category === c.key
                   return (
                     <button
                       key={c.key}
                       type="button"
                       className={`apg-catchip${on ? ' is-on' : ''}`}
                       aria-pressed={on}
-                      onClick={toggleCategory(c.key)}
+                      onClick={pickCategory(c.key)}
                     >
                       <span className="apg-catchip-emoji" aria-hidden="true">{c.emoji}</span>{t(c.key, { defaultValue: c.zh })}
                     </button>

@@ -62,13 +62,17 @@ export interface PreferredMerchant {
   goods?: PreferredGood[]
 }
 
-/** 搜索结果商品横滑行元素（大图+名截断+红色现价+灰色划线原价） */
+/** 搜索结果商品横滑行元素（大图+券/惠/秒角标+名截断+红色优惠价+灰色划线原价）。
+ *  与行列表 coupons 本质同为商品/券：搜索态二选一，只渲染本带图行（见组件 showGoods 判定）。 */
 export interface PreferredGood {
   name: string
   image: string
+  /** 优惠价（红粗） */
   price: string
   /** 划线原价 */
   origin?: string
+  /** 券/惠/秒角标：券=代金券、惠=其他优惠、秒=秒杀；缺省不渲染角标 */
+  icon?: '券' | '惠' | '秒'
 }
 
 /** 列表展示模式：small=小圖（当前样式）/ large=大圖（顶部大封面） */
@@ -186,6 +190,10 @@ export default function PreferredMerchantCard({ item, layout = 'small', brand = 
     </SpecField>
   )
 
+  /* 搜索态二选一：行列表商品（id5）与带图横滑行（id17）本质同为商品/券，
+     配置了 goods 且 showProducts 时只渲染带图行，行列表不渲染；页签瀑布流维持行列表。 */
+  const showGoods = Boolean(showProducts && !item.notJoined && item.goods && item.goods.length > 0)
+
   /* 未入駐商家整卡锚点 id=15（悬停说明表「未入驻门店」行点亮整张门店卡，同外卖 id23 先例） */
   const wrapNotJoined = (card: ReactElement) => (
     item.notJoined ? <SpecField panel="preferred" id={15}>{card}</SpecField> : card
@@ -239,7 +247,7 @@ export default function PreferredMerchantCard({ item, layout = 'small', brand = 
           <SpecField panel="preferred" id={1}>
             <span className="apq-name">{item.name}</span>
           </SpecField>
-          {!item.notJoined && (
+          {!item.notJoined && !showProducts && (
             <SpecField panel="preferred" id={6}>
               <button type="button" className={`apq-fav${fav ? ' is-on' : ''}`} aria-label={favLabel} aria-pressed={fav} onClick={toggleFav}>
                 {fav ? '★' : '☆'}
@@ -249,18 +257,21 @@ export default function PreferredMerchantCard({ item, layout = 'small', brand = 
         </div>
         <PreferredMeta item={item} />
         {!item.notJoined && <PreferredTags item={item} brand={brand} />}
-        {!item.notJoined && (
+        {!item.notJoined && !showGoods && (
           <SpecField panel="preferred" id={5}>
             <PreferredCoupons item={item} maxCount={3} />
           </SpecField>
         )}
-        {/* 搜索结果瀑布流专属：商品横滑行（大图+名截断+红色现价+灰色划线原价）；锚点 id17，仅 showProducts 且配置 goods 时渲染 */}
-        {showProducts && !item.notJoined && item.goods && item.goods.length > 0 && (
+        {/* 搜索结果瀑布流专属：带图商品横滑行（角标+名截断+红色优惠价+灰色划线原价）；锚点 id17，与行列表二选一 */}
+        {showGoods && (
           <SpecField panel="preferred" id={17}>
             <div className="apq-goods">
-              {item.goods.map((g) => (
+              {item.goods!.map((g) => (
                 <div key={g.name} className="apq-good">
-                  <img className="apq-good-img" src={g.image} alt={g.name} />
+                  <span className="apq-good-media">
+                    <img className="apq-good-img" src={g.image} alt={g.name} />
+                    {g.icon && <i className={`apq-good-ico apq-good-ico--${g.icon === '券' ? 'quan' : g.icon === '惠' ? 'hui' : 'miao'}`}>{g.icon}</i>}
+                  </span>
                   <span className="apq-good-name">{g.name}</span>
                   <span className="apq-good-price"><em>${g.price}</em>{g.origin && <s>${g.origin}</s>}</span>
                 </div>

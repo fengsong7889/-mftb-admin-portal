@@ -5992,6 +5992,7 @@ button.apcs-card:hover { border-color: #FFD591; }
 
 /* ═══ 搜索结果瀑布流·商品横滑行（外卖小图 apw-products / 团购大图 apq-goods）═══
    仅搜索列表配置 products/goods 且组件 showProducts 时渲染；首页/页签瀑布流不展示。
+   团购搜索态与行列表券（id5）二选一：只渲染本带图行（本质同为商品/券）。
    横滑露出更多商品，滚动条隐藏（与壳内横滑列表同款口径）。
    ⚠ 本区段属拟真 APP 壳内主题豁免区（语义为「不跟随主题」，方案 §卅八），价格与文字
    一律钉固定字面量 —— 取值即对应令牌的浅色档，与同文件 .apq-name / .apq-coupon b /
@@ -6013,7 +6014,28 @@ button.apcs-card:hover { border-color: #FFD591; }
 .apw-product-price em { font-style: normal; font-size: 13px; font-weight: 800; color: #FF4D4F; }
 .apw-product-price s { font-size: 10px; color: #8C8C8C; }
 .apq-good { flex: none; width: 104px; display: flex; flex-direction: column; gap: 3px; }
-.apq-good-img { width: 104px; height: 88px; border-radius: 8px; object-fit: cover; }
+.apq-good-media { position: relative; display: block; }
+.apq-good-img { width: 104px; height: 88px; border-radius: 8px; object-fit: cover; display: block; }
+/* 券/惠/秒角标：叠在商品图左上，与行列表 .apq-coupon-ico 同款方块白字；券=红/惠=橙/秒=洋红 */
+.apq-good-ico {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: #E8720C;
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 800;
+  font-style: normal;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+.apq-good-ico--quan { background: #FF4D4F; }
+.apq-good-ico--miao { background: #EB2F96; }
 .apq-good-name { font-size: 11px; color: #262626; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .apq-good-price { display: flex; align-items: baseline; gap: 3px; }
 .apq-good-price em { font-style: normal; font-size: 13px; font-weight: 800; color: #FF4D4F; }

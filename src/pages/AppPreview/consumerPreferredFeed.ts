@@ -37,10 +37,11 @@ export const PREFERRED_MERCHANTS: PreferredMerchant[] = [
    （「超出範圍」展示样例已按需求下线，原 pm6 海灣火鍋城随说明行一并移除） */
 /* ─── 搜索结果团购瀑布流·商品横滑行 mock（仅搜索列表附加；页签瀑布流不展示） ─── */
 const SEARCH_GOODS: PreferredGood[] = [
-  { name: '44元代50元券', image: burgerImg, price: '44', origin: '50' },
-  { name: '代10元券', image: fishPotImg, price: '8', origin: '10' },
-  { name: '雙人套餐券', image: bbqImg, price: '150', origin: '200' },
-  { name: '下午茶優惠', image: lemonTeaImg, price: '40', origin: '45' },
+  { name: '44元代50元券', image: burgerImg, price: '44', origin: '50', icon: '券' },
+  { name: '代10元券', image: fishPotImg, price: '8', origin: '10', icon: '券' },
+  { name: '雙人套餐券', image: bbqImg, price: '150', origin: '200', icon: '惠' },
+  { name: '下午茶優惠', image: lemonTeaImg, price: '40', origin: '45', icon: '惠' },
+  { name: '秒殺·招牌魚蛋粉', image: riceballImg, price: '19', origin: '32', icon: '秒' },
 ]
 
 const PREFERRED_SEARCH_BASE: PreferredMerchant[] = [

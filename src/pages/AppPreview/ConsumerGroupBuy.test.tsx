@@ -8,8 +8,8 @@
 /**
  * 用户端特價團購页 · 筛选面板交互门禁
  *
- * 钉住设计稿三张图的口径：附近=距离单选 + 三区域商圈多选、分類=多选、排序=单选；
- * 同一时刻只展开一个面板，选中结果要回写到胶囊文案。避免后续改样式时把交互语义弄丢。
+ * 钉住设计稿口径：附近=距离单选 + 三区域右列「全部」+商圈单选、分類=「全部」+单选、排序=单选；
+ * 同一时刻只展开一个面板，单选点击即执行筛选并收起，选中结果要回写到胶囊文案。避免后续改样式时把交互语义弄丢。
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
@@ -48,22 +48,29 @@ describe('特價團購筛选面板', () => {
     expect(screen.getByRole('button', { name: '1km' })).toBeInTheDocument()
   })
 
-  it('附近面板：区域商圈可多选，胶囊回写首个商圈与数量', async () => {
+  it('附近面板：区域右列顶部全部+商圈单选，点击即收起并回写', async () => {
     const user = userEvent.setup()
     renderPage()
 
     await user.click(screen.getByRole('button', { name: '附近商家' }))
     await user.click(screen.getByRole('button', { name: '澳門區域' }))
+    expect(screen.getByRole('button', { name: '選擇全部' })).toBeInTheDocument()
     expect(screen.getByLabelText('選擇商圈 黑沙環區')).toBeInTheDocument()
 
+    // 单选：点商圈即执行筛选并收起面板，胶囊回写该商圈
     await user.click(screen.getByLabelText('選擇商圈 黑沙環區'))
-    await user.click(screen.getByLabelText('選擇商圈 高士德區'))
-    // 多选面板保持展开，由 × 收起
-    expect(screen.getByLabelText('選擇商圈 新馬路區')).toBeInTheDocument()
-    await user.click(screen.getByLabelText('收起篩選面板'))
+    expect(screen.queryByLabelText('選擇商圈 高士德區')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '黑沙環區' })).toBeInTheDocument()
+  })
 
-    const chip = screen.getByRole('button', { name: '黑沙環區+1' })
-    expect(chip).toBeInTheDocument()
+  it('附近面板：区域+全部=筛选整个区域，胶囊回写区域名', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(screen.getByRole('button', { name: '附近商家' }))
+    await user.click(screen.getByRole('button', { name: '氹仔區域' }))
+    await user.click(screen.getByRole('button', { name: '選擇全部' }))
+    expect(screen.getByRole('button', { name: '氹仔區域', expanded: false })).toBeInTheDocument()
   })
 
   it('距离档与商圈互斥：同一个附近胶囊只能承载一种地点口径', async () => {
@@ -78,7 +85,6 @@ describe('特價團購筛选面板', () => {
     await user.click(screen.getByRole('button', { name: '2km' }))
     await user.click(screen.getByRole('button', { name: '澳門區域' }))
     await user.click(screen.getByLabelText('選擇商圈 高士德區'))
-    await user.click(screen.getByLabelText('收起篩選面板'))
     expect(screen.getByRole('button', { name: '高士德區' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '2km' })).not.toBeInTheDocument()
 
@@ -90,22 +96,26 @@ describe('特價團購筛选面板', () => {
     expect(screen.queryByRole('button', { name: '高士德區' })).not.toBeInTheDocument()
   })
 
-  it('分类面板：十个分类可多选，胶囊回写首个分类与数量', async () => {
+  it('分类面板：顶部全部+分类单选，点击即收起并回写', async () => {
     const user = userEvent.setup()
     renderPage()
 
     await user.click(screen.getByRole('button', { name: '全部分類' }))
     // 页面上方十宮格也有同名分类，必须把断言限定在面板容器内
     const panel = screen.getByRole('group', { name: '分類篩選面板' })
+    expect(within(panel).getByRole('button', { name: '全部' })).toBeInTheDocument()
     expect(within(panel).getByRole('button', { name: /火鍋燒肉$/ })).toBeInTheDocument()
-    expect(within(panel).getByRole('button', { name: /美容美髮$/ })).toBeInTheDocument()
 
+    // 单选：点分类即收起，胶囊回写该分类（expanded:false 区分页签同名按钮）
     await user.click(within(panel).getByRole('button', { name: /甜品飲品$/ }))
-    await user.click(within(panel).getByRole('button', { name: /自助餐$/ }))
-    expect(within(panel).getByRole('button', { name: /甜品飲品$/ })).toHaveAttribute('aria-pressed', 'true')
-    await user.click(screen.getByLabelText('收起篩選面板'))
+    expect(screen.queryByRole('group', { name: '分類篩選面板' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '甜品飲品', expanded: false })).toBeInTheDocument()
 
-    expect(screen.getByRole('button', { name: '甜品飲品+1' })).toBeInTheDocument()
+    // 选全部：回写全部分類
+    await user.click(screen.getByRole('button', { name: '甜品飲品', expanded: false }))
+    const panel2 = screen.getByRole('group', { name: '分類篩選面板' })
+    await user.click(within(panel2).getByRole('button', { name: '全部' }))
+    expect(screen.getByRole('button', { name: '全部分類', expanded: false })).toBeInTheDocument()
   })
 
   it('排序面板：五个枚举单选，选中即收起并回写胶囊', async () => {
