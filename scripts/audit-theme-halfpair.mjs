@@ -235,10 +235,15 @@ export function scan(rootDir = ROOT) {
  * 棘轮比较。抽成导出函数是为了能被单测碰到：它是「拦住新增」的最终判据，
  * 留在 main 里就只能靠人工跑一遍看脸——本项目已经为「看不见就等于没测」付过代价。
  * 规则：只允许下降；基线里没记录的项当 0（新增一类得立刻补基线，不能默认放行）。
+ *
+ * ⚠ `keys` 必须显式传入。本函数原先写死遍历 TSX 侧的 CLASSES_KEYS，
+ * CSS 侧门禁直接复用时拿到的永远是「无错」（counts 里没有那几个键，undefined > 0 为 false），
+ * 等于整个棘轮空转——这个坑是 CSS 侧单测「高于基线必须报错」那条拓出来的。
+ * 默认值只给 TSX 自己用，任何新消费方都必须带自己的类别清单。
  */
-export function compareRatchet(baseline, counts) {
+export function compareRatchet(baseline, counts, keys = CLASSES_KEYS) {
   const errors = []
-  for (const k of CLASSES_KEYS) {
+  for (const k of keys) {
     const allowed = baseline?.[k] ?? 0
     if (counts[k] > allowed) errors.push(`${k} ${allowed} → ${counts[k]}（+${counts[k] - allowed}）`)
   }

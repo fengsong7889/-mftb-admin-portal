@@ -98,6 +98,10 @@ jobs:
       # 裸色计数只降不能发现它——两侧都裸也是降；所以单独按 style 块聚合计棘轮。
       - name: Half-Pair Audit
         run: npm run check:halfpair
+      # CSS 侧半对：TSX 那个门禁只扫 .tsx，页面级 CSS 的「翻面令牌 + 钉住裸值」它看不见。
+      # 判据是翻面性（light !== dark），不是「一侧令牌一侧裸值」——后者会把品牌固定色渐变全误报。
+      - name: CSS Half-Pair Audit
+        run: npm run check:halfpair-css
       - name: i18n Coverage
         run: npm run check:i18n
       - name: i18n Fallback Copy

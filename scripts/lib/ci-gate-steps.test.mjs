@@ -43,6 +43,7 @@ const REQUIRED_STEPS = [
   'Confirm Modal Style',
   'Theme Tokens',
   'Half-Pair Audit',
+  'CSS Half-Pair Audit',
   'i18n Coverage',
   'i18n Fallback Copy',
   'i18n zh-CN Static Bundle',

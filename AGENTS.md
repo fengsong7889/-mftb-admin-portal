@@ -83,6 +83,13 @@ node scripts/audit-theme-halfpair.mjs --report                     # 看现存�
 node scripts/audit-theme-halfpair.mjs --snapshot                   # 已逐处定性后才下调基线
 node scripts/audit-theme-halfpair.mjs --baseline /tmp/pre-<目录>   # 本批差分（改前树用 git archive 导出）
 
+# CSS 侧半对门禁（TSX 那个只扫 .tsx；页面级 CSS 的「翻面令牌 + 钉住裸值」由这道守）
+# 判据是翻面性（令牌 light !== dark），不是「一侧令牌一侧裸值」——后者会把品牌固定色渐变全误报
+npm run check:halfpair-css
+node scripts/audit-theme-halfpair-css.mjs --report                     # 按文件列现存半对
+node scripts/audit-theme-halfpair-css.mjs --snapshot                   # 逐处定性后才下调基线
+node scripts/audit-theme-halfpair-css.mjs --baseline /tmp/pre-<目录>   # 本批差分
+
 # 多语言四道门禁（详见下方「多语言文案三处同步」与「免登界面的静态兜底」）
 npm run check:i18n            # 引用完整性 + 插值 + 硬编码棘轮 + 翻译库收录率棘轮
 npm run check:i18n-zhcn       # 静态 zh-CN.json 与 zh-TW.json 结构齐备
@@ -177,7 +184,7 @@ frontend/
 
 - **平台**：GitHub Actions → GitHub Pages
 - **触发**：push 到 main 分支
-- **质量门禁**：lint + typecheck + menu-consistency + dependency-boundary + stat-card-order + confirm-modal + theme-tokens + half-pair-audit + i18n + ignore-shadow + secret-scan + test（任一失败中止部署）
+- **质量门禁**：lint + typecheck + menu-consistency + dependency-boundary + stat-card-order + confirm-modal + theme-tokens + half-pair-audit + css-half-pair-audit + i18n + ignore-shadow + secret-scan + test（任一失败中止部署）
   本地 `npm run verify` 与 CI 门禁步骤必须跑同一套命令；两边失配由 `scripts/lib/ci-gate-steps.test.mjs`
   双向判红（新增门禁只改一处会被拦下来，不用靠人记）
 - **部署**：`actions/deploy-pages@v4`

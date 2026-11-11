@@ -976,6 +976,7 @@ export function stripCssCommentsKeepLines(text) {
  *   - `atRule`：null（普通规则）| 'keyframes'（整个关键帧块，内部百分比步不单独成块）
  *   - `body` / `bodyStart` / `bodyEnd`：花括号内的文本与其在 src 中的字符区间（不含括号）
  *   - `startLine` / `endLine`：块（含选择器行与收尾 `}`）占的**行区间**，供逐行改写的工具用
+ *   - `insideAt`：包在哪个 at-rule 容器里（如 `@media print`），没有则为 null
  *
  * 容器型 at-rule（`@media` / `@supports` / `@layer` / `@container`）**不作为块返回**，
  * 而是递归进去，把它内部的规则按普通规则交出来——否则外层选择器上下文会丢。
@@ -996,16 +997,21 @@ export function walkCssBlocks(text) {
     return lo + 1
   }
   const blocks = []
-  const scan = (start, end) => {
+  const scan = (start, end, insideAt = null) => {
     let i = start
     while (i < end) {
       const open = src.indexOf('{', i)
       if (open < 0 || open >= end) break
       const rawPrelude = src.slice(i, open)
-      const prelude = rawPrelude.trim()
+      // 前文里可能先跟着 `@import ...;` / `@charset ...;` 这类语句（它们没有自己的花括号），
+      // 不先切掉会把上一句当成选择器的一部分（实测：`@import '...'; .param-selected-info`）。
+      const semi = rawPrelude.lastIndexOf(';')
+      const preludeText = semi >= 0 ? rawPrelude.slice(semi + 1) : rawPrelude
+      const prelude = preludeText.trim()
       // 前言行自己的起始偏移：直接用 i 会把上一个块的收尾行也算进去，
       // 单行规则 `.a{color:#fff}` 紧跟下一个块时就会误把前者标成跳过。
-      const preludeStart = i + (rawPrelude.length - rawPrelude.replace(/^\s+/, '').length)
+      const preludeStart = i + (semi >= 0 ? semi + 1 : 0)
+        + (preludeText.length - preludeText.replace(/^\s+/, '').length)
       let depth = 1
       let j = open + 1
       for (; j < end && depth > 0; j += 1) {
@@ -1013,9 +1019,9 @@ export function walkCssBlocks(text) {
         else if (src[j] === '}') depth -= 1
       }
       const close = j - 1
-      const span = { startLine: lineOf(preludeStart), endLine: lineOf(close) }
+      const span = { startLine: lineOf(preludeStart), endLine: lineOf(close), insideAt }
       if (/^@(media|supports|layer|container)\b/.test(prelude)) {
-        scan(open + 1, close)
+        scan(open + 1, close, prelude.replace(/\s+/g, ' '))
       } else if (/^@[-\w]*keyframes\b/.test(prelude)) {
         blocks.push({
           selector: prelude.replace(/\s+/g, ' '), rings: [], atRule: 'keyframes',
