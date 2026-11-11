@@ -77,7 +77,7 @@ export const DELIVERY_SPECS: SpecEntry[] = [
   { id: 3, label: '品牌标签', desc: '1、免费标签；\n2、有以下几种：\n2.1、獨家；\n2.2、品牌；\n2.3、連鎖；\n2.4、金牌。', source: '待补充' },
   { id: 4, label: '门店评分', desc: '展示门店近6个月平均分。', source: '待补充' },
   { id: 5, label: '月售', desc: '1、【销量标签】「月銷1000+」：展示銷量；如有虛擬銷量，展示銷量=虛擬銷量+真實銷量。\n2、销量<100：直接展示銷量；\n3、100≤銷量<200：展示為100+。\n4、200≤銷量<300：展示為200+。\n5、1000≤銷量<2000：展示為1000+。\n6、2000≤銷量<3000：展示為2000+。\n7、萬位以上：1万≤銷量<1.1万 展示為1万+；1.1万≤銷量<1.2万 則顯示為1.1万+。\n8、以此類推，大於9.9万都顯示為9.9万+。', source: '待补充' },
-  { id: 6, label: '準時寶', desc: '有准时宝的商家展示此标签。', source: '待补充' },
+  { id: 6, label: '準時寶', desc: '準時寶：門店在準時寶管理裡有生效中活動且沒有被拉黑。', source: '待补充' },
   { id: 7, label: '起送·減配/免配送費', desc: '配送費：免配送費、配送費 $x~y。\n如果平臺和門店同時生效配送費活動，則優先平臺的，哪怕門店自己設置了全免配送費。\n1、免配送費：平臺/門店設置了全免，配送列直接展示「免配送費」（橙字），不标「減配」角标。\n2、配送費 $x~y：當前生效方案配送費最低檔~最高檔。檔位計算邏輯：當前所有生效方案的基礎配送費+時段加收+節假日加價-平臺/門店的配送費。\n有減配時，配送列展示減配後的配送費區間，卡片右上角标「減配」角标提示。', source: '待补充' },
   { id: 8, label: '配送时间/距离', desc: '配送时间计算方式，來自管理後臺門店配送方案裡配置。', source: '管理后台 → 门店配送方案' },
   { id: 10, label: '营业状态', desc: '1、如果正常营业，不显示状态。\n2、如果打烊，显示「已打烊」+原因。\n2.1、已打烊：休息一会，马上回来。\n2.2、已打烊：爆单啦，暂停接单一会。\n2.3、已打烊：休息打烊。\n3、如果接受预定单：接受预定，xx:xx 起开始配送。', source: '待补充' },
@@ -144,15 +144,15 @@ export const FILTER_SPECS: SpecEntry[] = [
    美食外卖页 → 閃蜂/MFOOD 美食外賣频道页瀑布流（内容与首页·外卖瀑布流一致；该组无二级篩選页签，有「展示模式」切换——小图/大图两档，大图各用自家卡片：閃蜂 DeliveryLargeCard / MFOOD MfoodDeliveryLargeCard）。 */
 export const SPEC_PANELS: SpecPanel[] = [
   { key: 'groupBuy', group: '首页', label: '团购瀑布流', defaults: GROUPBUY_SPECS, version: 18 },
-  { key: 'delivery', group: '首页', label: '外卖瀑布流', defaults: DELIVERY_SPECS, version: 35 },
-  { key: 'searchDelivery', group: '首页', label: '搜索结果瀑布流', defaults: [...DELIVERY_SPECS, ...SEARCH_DELIVERY_SPECS], version: 2, anchor: 'delivery', title: '首页 · 搜索结果·外卖瀑布流 · 展示字段及标签说明' },
+  { key: 'delivery', group: '首页', label: '外卖瀑布流', defaults: DELIVERY_SPECS, version: 36 },
+  { key: 'searchDelivery', group: '首页', label: '搜索结果瀑布流', defaults: [...DELIVERY_SPECS, ...SEARCH_DELIVERY_SPECS], version: 3, anchor: 'delivery', title: '首页 · 搜索结果·外卖瀑布流 · 展示字段及标签说明' },
   { key: 'searchGroup', group: '首页', label: '搜索结果·团购', hidden: true, tabAlias: 'searchDelivery', defaults: [...PREFERRED_SPECS, ...SEARCH_GROUP_SPECS], version: 3, anchor: 'preferred', title: '首页 · 搜索结果·团购瀑布流 · 展示字段及标签说明' },
   { key: 'groupPage', group: '特惠团购页', label: '推荐/其它', defaults: GROUPBUY_SPECS, version: 9, anchor: 'groupBuy' },
   { key: 'preferred', group: '特惠团购页', label: '優選商家/附近門店', defaults: PREFERRED_SPECS, version: 32 },
   { key: 'filter', group: '特惠团购页', label: '篩選', defaults: FILTER_SPECS, version: 5 },
   { key: 'searchGroupPage', group: '特惠团购页', label: '搜索结果瀑布流', defaults: [...PREFERRED_SPECS, ...SEARCH_GROUP_SPECS], version: 3, anchor: 'preferred' },
-  { key: 'deliveryPage', group: '美食外卖页', label: '美食外卖瀑布流', defaults: DELIVERY_SPECS, version: 13, anchor: 'delivery', title: '美食外卖瀑布流·展示字段及标签说明' },
-  { key: 'searchDeliveryPage', group: '美食外卖页', label: '搜索结果瀑布流', defaults: [...DELIVERY_SPECS, ...SEARCH_DELIVERY_SPECS], version: 2, anchor: 'delivery' },
+  { key: 'deliveryPage', group: '美食外卖页', label: '美食外卖瀑布流', defaults: DELIVERY_SPECS, version: 14, anchor: 'delivery', title: '美食外卖瀑布流·展示字段及标签说明' },
+  { key: 'searchDeliveryPage', group: '美食外卖页', label: '搜索结果瀑布流', defaults: [...DELIVERY_SPECS, ...SEARCH_DELIVERY_SPECS], version: 3, anchor: 'delivery' },
 ]
 
 /** 旧导出名兼容（团购默认规范，历史消费方） */
