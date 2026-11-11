@@ -58,6 +58,17 @@ export interface PreferredMerchant {
   notJoined?: boolean
   /** 開業時間横條（LOGO 底部深色条白字，如「10:00 營業」）；開業後不配置即隐藏 */
   openTimeLabel?: string
+  /** 搜索结果瀑布流专属：商品横滑行（大图+名+现价+划线原价）；仅搜索列表配置且 showProducts 时渲染，页签瀑布流不展示 */
+  goods?: PreferredGood[]
+}
+
+/** 搜索结果商品横滑行元素（大图+名截断+红色现价+灰色划线原价） */
+export interface PreferredGood {
+  name: string
+  image: string
+  price: string
+  /** 划线原价 */
+  origin?: string
 }
 
 /** 列表展示模式：small=小圖（当前样式）/ large=大圖（顶部大封面） */
@@ -142,7 +153,7 @@ function PreferredCoupons({ item, maxCount }: { item: PreferredMerchant; maxCoun
   )
 }
 
-export default function PreferredMerchantCard({ item, layout = 'small', brand = 'bee' }: { item: PreferredMerchant; layout?: PreferredLayout; brand?: PreferredBrand }) {
+export default function PreferredMerchantCard({ item, layout = 'small', brand = 'bee', showProducts }: { item: PreferredMerchant; layout?: PreferredLayout; brand?: PreferredBrand; showProducts?: boolean }) {
   /** 收藏仅视觉态（原型不做真实收藏） */
   const [fav, setFav] = useState(Boolean(item.fav))
   const toggleFav = () => setFav((prev) => !prev)
@@ -241,6 +252,20 @@ export default function PreferredMerchantCard({ item, layout = 'small', brand = 
         {!item.notJoined && (
           <SpecField panel="preferred" id={5}>
             <PreferredCoupons item={item} maxCount={3} />
+          </SpecField>
+        )}
+        {/* 搜索结果瀑布流专属：商品横滑行（大图+名截断+红色现价+灰色划线原价）；锚点 id17，仅 showProducts 且配置 goods 时渲染 */}
+        {showProducts && !item.notJoined && item.goods && item.goods.length > 0 && (
+          <SpecField panel="preferred" id={17}>
+            <div className="apq-goods">
+              {item.goods.map((g) => (
+                <div key={g.name} className="apq-good">
+                  <img className="apq-good-img" src={g.image} alt={g.name} />
+                  <span className="apq-good-name">{g.name}</span>
+                  <span className="apq-good-price"><em>${g.price}</em>{g.origin && <s>${g.origin}</s>}</span>
+                </div>
+              ))}
+            </div>
           </SpecField>
         )}
       </div>

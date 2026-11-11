@@ -5989,3 +5989,32 @@ button.apcs-card:hover { border-color: #FFD591; }
 .apw-large .apw-name { flex: 1; min-width: 0; }
 .apw-large .apw-punctual { margin-left: 0; }
 .apw-large .apw-row-name { overflow: visible; }
+
+/* ═══ 搜索结果瀑布流·商品横滑行（外卖小图 apw-products / 团购大图 apq-goods）═══
+   仅搜索列表配置 products/goods 且组件 showProducts 时渲染；首页/页签瀑布流不展示。
+   横滑露出更多商品，滚动条隐藏（与壳内横滑列表同款口径）。
+   ⚠ 本区段属拟真 APP 壳内主题豁免区（语义为「不跟随主题」，方案 §卅八），价格与文字
+   一律钉固定字面量 —— 取值即对应令牌的浅色档，与同文件 .apq-name / .apq-coupon b /
+   .apq-rating--none 同款同值；这里若改用 var(--*)，用户切深色时壳内配色会跟着翻面，
+   与设计稿不符（check-theme-tokens 的「豁免区引用主题令牌」ERROR 守的就是这条）。 */
+.apw-products, .apq-goods {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin-top: 6px;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.apw-products::-webkit-scrollbar, .apq-goods::-webkit-scrollbar { display: none; }
+.apw-product { flex: none; width: 64px; display: flex; flex-direction: column; gap: 3px; }
+.apw-product-img { width: 64px; height: 64px; border-radius: 8px; object-fit: cover; }
+.apw-product-name { font-size: 11px; color: #262626; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apw-product-price { display: flex; align-items: baseline; gap: 3px; }
+.apw-product-price em { font-style: normal; font-size: 13px; font-weight: 800; color: #FF4D4F; }
+.apw-product-price s { font-size: 10px; color: #8C8C8C; }
+.apq-good { flex: none; width: 104px; display: flex; flex-direction: column; gap: 3px; }
+.apq-good-img { width: 104px; height: 88px; border-radius: 8px; object-fit: cover; }
+.apq-good-name { font-size: 11px; color: #262626; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apq-good-price { display: flex; align-items: baseline; gap: 3px; }
+.apq-good-price em { font-style: normal; font-size: 13px; font-weight: 800; color: #FF4D4F; }
+.apq-good-price s { font-size: 10px; color: #8C8C8C; }

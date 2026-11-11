@@ -593,10 +593,10 @@ export default function ConsumerSearch({
             {/* 双 APP 瀑布流刻意分叉：閃蜂=DeliveryStoreCard / MFOOD=MfoodDeliveryStoreCard（勁爆券皮），数据各自同源 */}
             {brand === 'mfood'
               ? MFOOD_SEARCH_STORES.map((store) => (
-                  <MfoodDeliveryStoreCard key={store.key} store={store} />
+                  <MfoodDeliveryStoreCard key={store.key} store={store} showProducts />
                 ))
               : HOME_DELIVERY_SEARCH_STORES.map((store) => (
-                  <DeliveryStoreCard key={store.key} store={store} onOpenStore={onOpenStore} />
+                  <DeliveryStoreCard key={store.key} store={store} onOpenStore={onOpenStore} showProducts />
                 ))}
           </div>
         )}
@@ -604,7 +604,7 @@ export default function ConsumerSearch({
           <div className="apq-feed">
             {/* 團購瀑布流=優選商家/附近好店同構卡：閃蜂=優選商家（神會員标）/ MFOOD=附近好店（勐爆券标） */}
             {(brand === 'mfood' ? MFOOD_NEAR_SEARCH_STORES : PREFERRED_SEARCH_MERCHANTS).map((item) => (
-              <PreferredMerchantCard key={item.key} item={item} layout="small" brand={brand === 'mfood' ? 'mfood' : 'bee'} />
+              <PreferredMerchantCard key={item.key} item={item} layout="small" brand={brand === 'mfood' ? 'mfood' : 'bee'} showProducts />
             ))}
           </div>
         )}

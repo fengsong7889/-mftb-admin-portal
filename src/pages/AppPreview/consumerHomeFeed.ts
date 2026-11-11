@@ -21,7 +21,7 @@ import riceballImg from '@/assets/consumer-home/riceball.jpg'
 import friedChickenImg from '@/assets/consumer-home/friedchicken.jpg'
 import lemonTeaImg from '@/assets/consumer-home/lemontea.jpg'
 import hotPosterImg from '@/assets/consumer-home/posters/poster_red.png'
-import type { DeliveryStore } from './DeliveryStoreCard'
+import type { DeliveryStore, HotDish } from './DeliveryStoreCard'
 import type { GroupBuyItem } from './GroupBuyFeedCard'
 
 /* ─── 外賣瀑布流門店·基礎 10 家（No.1~No.8 見 DeliveryStoreCard；首頁與搜索結果頁共用） ─── */
@@ -49,11 +49,28 @@ export const HOME_DELIVERY_AD_STORES: DeliveryStore[] = [
 /* ─── 搜索結果頁外賣瀑布流專用列表：基礎門店 + 超出配送範圍 / 未入駐商家樣例（不含人氣商家廣告）───
    圖2 口徑：超出範圍門店 = LOGO 蒙暗色阴影，「超出範圍」白膠囊寫在阴影上，其餘信息正常（展示信息不用抄參考圖的標籤堆砌）；
    圖3 口徑：未入駐商家 = 評分「暫無」，無標籤/紅包區，LOGO 不加標識 */
-export const HOME_DELIVERY_SEARCH_STORES: DeliveryStore[] = [
+/* ─── 搜索结果外卖瀑布流·商品横滑行 mock（仅搜索列表附加；首页/频道页不展示） ─── */
+const SEARCH_PRODUCTS: HotDish[] = [
+  { name: 'Shake爆薯條', image: friedChickenImg, price: '25', origin: '28' },
+  { name: '番鬼佬豬扒包', image: burgerImg, price: '58' },
+  { name: '傳統佬澳葡飯', image: riceballImg, price: '58' },
+  { name: '珍珠奶茶', image: lemonTeaImg, price: '16', origin: '20' },
+  { name: '招牌魚蛋粉', image: fishPotImg, price: '32' },
+]
+
+const HOME_DELIVERY_SEARCH_BASE: DeliveryStore[] = [
   ...HOME_DELIVERY_STORES,
   { key: 's14', name: '燒鵝仔餐廳（路環店）', rating: '4.7', monthlySales: '2000+', minOrder: '$0', deliveryFee: '$0', deliveryTime: '24分鐘', distance: '5.6km', tags: ['千人收藏好店'], memberTags: [{ kind: 'shen', text: '最高膨至$30' }], image: lemonTeaImg, deliveryType: 'platform', merchantId: 'dl-oos', outOfRange: true },
   { key: 's15', name: '小貝廚房（關閘店）', rating: '0', monthlySales: '0', minOrder: '$0', deliveryFee: '$0', deliveryTime: '30分鐘', distance: '1.6km', tags: [], memberTags: [], image: lemonTeaImg, deliveryType: 'platform', merchantId: 'dl-nj', notJoined: true },
 ]
+export const HOME_DELIVERY_SEARCH_STORES: DeliveryStore[] = HOME_DELIVERY_SEARCH_BASE.map((s, i): DeliveryStore => (s.notJoined ? s : {
+  ...s,
+  products: [
+    SEARCH_PRODUCTS[i % SEARCH_PRODUCTS.length],
+    SEARCH_PRODUCTS[(i + 1) % SEARCH_PRODUCTS.length],
+    SEARCH_PRODUCTS[(i + 2) % SEARCH_PRODUCTS.length],
+  ],
+}))
 
 /* ─── 團購瀑布流券（共享 GroupBuyFeedCard） ─── */
 export const HOME_GROUPBUY_FEED: GroupBuyItem[] = [

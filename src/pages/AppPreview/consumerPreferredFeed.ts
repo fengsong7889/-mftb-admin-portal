@@ -20,7 +20,7 @@ import riceballImg from '@/assets/consumer-home/riceball.jpg'
 import fishPotImg from '@/assets/consumer-home/fishpot.jpg'
 import burgerImg from '@/assets/consumer-home/burger.jpg'
 import lemonTeaImg from '@/assets/consumer-home/lemontea.jpg'
-import type { PreferredMerchant } from './PreferredMerchantCard'
+import type { PreferredMerchant, PreferredGood } from './PreferredMerchantCard'
 
 /* ─── 優選商家基礎 5 家（特惠團購页「優選商家」页签与搜索结果页共用） ─── */
 export const PREFERRED_MERCHANTS: PreferredMerchant[] = [
@@ -35,8 +35,24 @@ export const PREFERRED_MERCHANTS: PreferredMerchant[] = [
    未入駐 = 僅基礎信息 + 評分「暫無」，無券列表/半年售/紅包标/收藏钮；
    開業時間 = LOGO 底部深色横條白字（如「10:00 營業」），開業後自動隱藏；
    （「超出範圍」展示样例已按需求下线，原 pm6 海灣火鍋城随说明行一并移除） */
-export const PREFERRED_SEARCH_MERCHANTS: PreferredMerchant[] = [
+/* ─── 搜索结果团购瀑布流·商品横滑行 mock（仅搜索列表附加；页签瀑布流不展示） ─── */
+const SEARCH_GOODS: PreferredGood[] = [
+  { name: '44元代50元券', image: burgerImg, price: '44', origin: '50' },
+  { name: '代10元券', image: fishPotImg, price: '8', origin: '10' },
+  { name: '雙人套餐券', image: bbqImg, price: '150', origin: '200' },
+  { name: '下午茶優惠', image: lemonTeaImg, price: '40', origin: '45' },
+]
+
+const PREFERRED_SEARCH_BASE: PreferredMerchant[] = [
   ...PREFERRED_MERCHANTS,
   { key: 'pm7', name: '小貝廚房（關閘店）', rating: '0', perPerson: '', cateArea: '輕食·關閘商圈', dist: '1.6km', logoText: '小貝', logoTone: 'green', cover: riceballImg, sales: '', coupons: [], notJoined: true },
   { key: 'pm8', name: '早安茶餐廳（新橋店）', rating: '4.5', perPerson: '$45/人', cateArea: '港式·新橋商圈', dist: '900m', logoText: '早安', logoTone: 'blue', cover: lemonTeaImg, sales: '半年售400+', coupons: [{ icon: '惠', price: '40', discount: '8.8折', name: '早餐專享優惠' }], openTimeLabel: '10:00 營業' },
 ]
+export const PREFERRED_SEARCH_MERCHANTS: PreferredMerchant[] = PREFERRED_SEARCH_BASE.map((m, i): PreferredMerchant => (m.notJoined ? m : {
+  ...m,
+  goods: [
+    SEARCH_GOODS[i % SEARCH_GOODS.length],
+    SEARCH_GOODS[(i + 1) % SEARCH_GOODS.length],
+    SEARCH_GOODS[(i + 2) % SEARCH_GOODS.length],
+  ],
+}))

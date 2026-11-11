@@ -101,6 +101,8 @@ export interface DeliveryStore {
   memberTags: MemberTag[]
   /** No.8 神會員展開區（券包/活动/其它三段）；配置後會員行右側出現展開箭頭，收起態不變 */
   memberSections?: MemberSection[]
+  /** 搜索结果瀑布流专属：门店商品横滑行（小图+名+现价+划线原价）；仅搜索列表配置且 showProducts 时渲染，首页/频道页不展示 */
+  products?: HotDish[]
   /** 门店封面图 */
   image: string
   /** 大图模式：商家上传了门店视频（有则大图位自动播放视频，无则大图封面兜底，spec id20 口径） */
@@ -143,9 +145,12 @@ export const BRAND_TAG_STYLE: Record<string, string> = {
 export default function DeliveryStoreCard({
   store,
   onOpenStore,
+  showProducts,
 }: {
   store: DeliveryStore
   onOpenStore?: (id: string) => void
+  /** 搜索结果瀑布流开关：true 才渲染商品横滑行（首页/频道页不传，维持原样） */
+  showProducts?: boolean
 }) {
   /* 人氣商家皮膚解析：配色一律從共享模板真源取，不在本頁複製色值 */
   const hot = store.hotSkin
@@ -319,6 +324,21 @@ export default function DeliveryStoreCard({
 
         {/* 红包区（id16 勁爆券·神會員 / id12 券行 / id17 其它）：与列表/大图模式共用组件；未入駐商家無紅包數據，整區不渲染 */}
         {!store.notJoined && <DeliveryMemberBlock store={store} />}
+
+        {/* 搜索结果瀑布流专属：商品横滑行（小图+名截断+红色现价+灰色划线原价）；锚点 id24，仅 showProducts 且配置 products 时渲染 */}
+        {showProducts && !store.notJoined && store.products && store.products.length > 0 && (
+          <SpecField panel="delivery" id={24}>
+            <div className="apw-products">
+              {store.products.map((p) => (
+                <div key={p.name} className="apw-product">
+                  <img className="apw-product-img" src={p.image} alt={p.name} />
+                  <span className="apw-product-name">{p.name}</span>
+                  <span className="apw-product-price"><em>${p.price}</em>{p.origin && <s>${p.origin}</s>}</span>
+                </div>
+              ))}
+            </div>
+          </SpecField>
+        )}
 
         {/* 人氣商家大圖模式：1大2小商品拼列（首項主推：折扣角標+價格條+菜名） */}
         {isHotLarge && hot?.dishes && hot.dishes.length > 0 && (

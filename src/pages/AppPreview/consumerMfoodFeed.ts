@@ -21,8 +21,8 @@ import friedChickenImg from '@/assets/consumer-home/friedchicken.jpg'
 import fishPotImg from '@/assets/consumer-home/fishpot.jpg'
 import lemonTeaImg from '@/assets/consumer-home/lemontea.jpg'
 import hotPosterOrangeImg from '@/assets/consumer-home/posters/poster_orange.png'
-import type { MfoodStore } from './MfoodDeliveryStoreCard'
-import type { PreferredMerchant } from './PreferredMerchantCard'
+import type { MfoodStore, MfoodHotDish } from './MfoodDeliveryStoreCard'
+import type { PreferredMerchant, PreferredGood } from './PreferredMerchantCard'
 
 /* ─── 美食外賣門店瀑布流（MFOOD 专属组件 MfoodDeliveryStoreCard；勁爆券皮）
    门店顺序与閃蜂 DELIVERY_STORES 逐位形态对齐（新店/品质标签/打烊三态/预定/免配送費/自取/準時寶/
@@ -57,11 +57,28 @@ export const MFOOD_STORES: MfoodStore[] = [
 ]
 
 /* ─── 搜索結果頁外賣瀑布流專用列表：基礎門店（不含人氣商家廣告）+ 超出範圍 / 未入駐樣例（同閃蜂口径） ─── */
-export const MFOOD_SEARCH_STORES: MfoodStore[] = [
+/* ─── 搜索结果外卖瀑布流·商品横滑行 mock（仅搜索列表附加；首页/频道页不展示） ─── */
+const SEARCH_PRODUCTS: MfoodHotDish[] = [
+  { name: 'Shake爆薯條', image: friedChickenImg, price: '25', origin: '28' },
+  { name: '番鬼佬豬扒包', image: burgerImg, price: '58' },
+  { name: '傳統佬澳葡飯', image: riceballImg, price: '58' },
+  { name: '珍珠奶茶', image: lemonTeaImg, price: '16', origin: '20' },
+  { name: '招牌魚蛋粉', image: fishPotImg, price: '32' },
+]
+
+const MFOOD_SEARCH_BASE: MfoodStore[] = [
   ...MFOOD_STORES.filter((store) => !store.hotSkin),
   { key: 'ms14', name: '路環橋記咖啡（路環店）', rating: '4.6', monthlySales: '700+', minOrder: '$0', deliveryFee: '$0', deliveryTime: '24分鐘', distance: '5.6km', tags: ['千人收藏好店'], memberTags: [{ kind: 'shen', text: '最高膨脹至30' }], image: lemonTeaImg, deliveryType: 'platform', merchantId: 'mf-oos', outOfRange: true },
   { key: 'ms15', name: '小貝廚房（關閘店）', rating: '0', monthlySales: '0', minOrder: '$0', deliveryFee: '$0', deliveryTime: '30分鐘', distance: '1.6km', tags: [], memberTags: [], image: lemonTeaImg, deliveryType: 'platform', merchantId: 'mf-nj', notJoined: true },
 ]
+export const MFOOD_SEARCH_STORES: MfoodStore[] = MFOOD_SEARCH_BASE.map((s, i): MfoodStore => (s.notJoined ? s : {
+  ...s,
+  products: [
+    SEARCH_PRODUCTS[i % SEARCH_PRODUCTS.length],
+    SEARCH_PRODUCTS[(i + 1) % SEARCH_PRODUCTS.length],
+    SEARCH_PRODUCTS[(i + 2) % SEARCH_PRODUCTS.length],
+  ],
+}))
 
 /* ─── 附近好店（優選商家同構卡 · MFOOD 品牌）：特惠團購页「附近好店」页签与搜索结果页共用 ─── */
 export const MFOOD_NEAR_STORES: PreferredMerchant[] = [
@@ -72,8 +89,24 @@ export const MFOOD_NEAR_STORES: PreferredMerchant[] = [
 ]
 
 /* ─── 搜索結果頁團購瀑布流專用列表：附近好店基礎 + 未入駐 / 開業時間樣例（同閃蜂口径；「超出範圍」样例已按需求下线） ─── */
-export const MFOOD_NEAR_SEARCH_STORES: PreferredMerchant[] = [
+/* ─── 搜索结果团购瀑布流·商品横滑行 mock（仅搜索列表附加；页签瀑布流不展示） ─── */
+const SEARCH_GOODS: PreferredGood[] = [
+  { name: '44元代50元券', image: burgerImg, price: '44', origin: '50' },
+  { name: '代10元券', image: fishPotImg, price: '8', origin: '10' },
+  { name: '雙人套餐券', image: riceballImg, price: '150', origin: '200' },
+  { name: '下午茶優惠', image: lemonTeaImg, price: '40', origin: '45' },
+]
+
+const MFOOD_NEAR_SEARCH_BASE: PreferredMerchant[] = [
   ...MFOOD_NEAR_STORES,
   { key: 'ns6', name: '小貝廚房（關閘店）', rating: '0', perPerson: '', cateArea: '輕食·關閘商圈', dist: '1.6km', logoText: '小貝', logoTone: 'green', cover: riceballImg, sales: '', coupons: [], notJoined: true },
   { key: 'ns7', name: '早安茶餐廳（新橋店）', rating: '4.5', perPerson: '$45/人', cateArea: '港式·新橋商圈', dist: '900m', logoText: '早安', logoTone: 'blue', cover: lemonTeaImg, sales: '半年售400+', coupons: [{ icon: '惠', price: '40', discount: '8.8折', name: '早餐專享優惠' }], openTimeLabel: '10:00 營業' },
 ]
+export const MFOOD_NEAR_SEARCH_STORES: PreferredMerchant[] = MFOOD_NEAR_SEARCH_BASE.map((m, i): PreferredMerchant => (m.notJoined ? m : {
+  ...m,
+  goods: [
+    SEARCH_GOODS[i % SEARCH_GOODS.length],
+    SEARCH_GOODS[(i + 1) % SEARCH_GOODS.length],
+    SEARCH_GOODS[(i + 2) % SEARCH_GOODS.length],
+  ],
+}))
