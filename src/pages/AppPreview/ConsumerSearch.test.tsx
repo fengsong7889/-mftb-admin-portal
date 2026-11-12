@@ -47,7 +47,7 @@ describe('用户端统一搜索页', () => {
     expect(screen.getByText('燒鵝仔餐廳（路環店）')).toBeInTheDocument()
     expect(screen.getByText('小貝廚房（關閘店）')).toBeInTheDocument()
     expect(screen.getAllByText('超出範圍')).toHaveLength(1)
-    expect(screen.getByText(/暫無/)).toBeInTheDocument()
+    expect(screen.getAllByText(/暫無/).length).toBeGreaterThan(0)
     // 全站不再走「綜合列表」版式：摘要与商家卡不出现
     expect(screen.queryByText(/為你找到/)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /麥當勞（威尼斯人店）/ })).not.toBeInTheDocument()
@@ -68,8 +68,8 @@ describe('用户端统一搜索页', () => {
     expect(screen.queryByText('海灣火鍋城（路環店）')).not.toBeInTheDocument()
     expect(screen.queryByText('超出範圍')).not.toBeInTheDocument()
     expect(screen.getByText('小貝廚房（關閘店）')).toBeInTheDocument()
-    expect(screen.getByText(/暫無/)).toBeInTheDocument()
-    expect(screen.getByText('10:00 營業')).toBeInTheDocument()
+    expect(screen.getAllByText(/暫無/).length).toBeGreaterThan(0)
+    expect(screen.queryByText('10:00 營業')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('tab', { name: /超市/ }))
     expect(screen.getByText('「超市百貨」瀑布流還未實現')).toBeInTheDocument()
@@ -105,7 +105,7 @@ describe('用户端统一搜索页', () => {
     await user.type(screen.getByPlaceholderText('搜尋團購套餐、商家'), '火鍋{Enter}')
 
     expect(screen.getByText('翡翠茶餐廳🏆-關閘店（🔥全澳…')).toBeInTheDocument()
-    expect(screen.getByText('10:00 營業')).toBeInTheDocument()
+    expect(screen.queryByText('10:00 營業')).not.toBeInTheDocument()
     expect(screen.queryAllByRole('tab')).toHaveLength(0)
   })
 
@@ -235,12 +235,12 @@ describe('用户端统一搜索页', () => {
     expect(screen.queryByText(/洪馨椰子雪糕/)).not.toBeInTheDocument()
     expect(screen.getByText('路環橋記咖啡（路環店）')).toBeInTheDocument()
     expect(screen.getAllByText('超出範圍')).toHaveLength(1)
-    expect(screen.getByText(/暫無/)).toBeInTheDocument()
+    expect(screen.getAllByText(/暫無/).length).toBeGreaterThan(0)
 
     // 團購瀑布流 = 附近好店（勐爆券标）+ 超出范围/未入驻/开业时间三样例
     await user.click(screen.getByRole('tab', { name: /團購/ }))
     expect(screen.getByText('澳門燒味工房🔥-新橋店')).toBeInTheDocument()
     expect(screen.getAllByText('勐爆券').length).toBeGreaterThan(0)
-    expect(screen.getByText('10:00 營業')).toBeInTheDocument()
+    expect(screen.queryByText('10:00 營業')).not.toBeInTheDocument()
   })
 })

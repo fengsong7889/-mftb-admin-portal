@@ -56,8 +56,8 @@ export interface PreferredMerchant {
   outOfRange?: boolean
   /** 未入駐商家（搜索結果頁團購瀑布流展示態）：評分「暫無」，無人均/券列表/半年售/紅包标/收藏钮；整卡锚点 id15 */
   notJoined?: boolean
-  /** 開業時間横條（LOGO 底部深色条白字，如「10:00 營業」）；開業後不配置即隐藏 */
-  openTimeLabel?: string
+  /** 无评分门店（随机样例）：评分位显示灰色「♥暫無」，爱心图标不变；其余信息正常展示 */
+  noRating?: boolean
   /** 搜索结果瀑布流专属：商品横滑行（大图+名+现价+划线原价）；仅搜索列表配置且 showProducts 时渲染，页签瀑布流不展示 */
   goods?: PreferredGood[]
 }
@@ -83,7 +83,7 @@ export type PreferredLayout = 'small' | 'large'
 function PreferredMeta({ item }: { item: PreferredMerchant }) {
   return (
     <div className="apq-meta">
-      {item.notJoined ? (
+      {(item.notJoined || item.noRating) ? (
         <SpecField panel="preferred" id={3}>
           <span className="apq-rating apq-rating--none"><i aria-hidden="true">♥</i>暫無</span>
         </SpecField>
@@ -179,11 +179,6 @@ export default function PreferredMerchantCard({ item, layout = 'small', brand = 
         {item.outOfRange && (
           <SpecField panel="preferred" id={14}>
             <span className="apw-logo-badge">超出範圍</span>
-          </SpecField>
-        )}
-        {item.openTimeLabel && (
-          <SpecField panel="preferred" id={16}>
-            <span className="apq-logo-time">{item.openTimeLabel}</span>
           </SpecField>
         )}
       </div>

@@ -147,6 +147,10 @@ export function useGroupBuyFilters({
   onPreferredLayoutChange,
 }: UseGroupBuyFiltersOptions): GroupBuyFilters {
   const { t } = useTranslation()
+  /** 商家瀑布流（優選商家/附近好店）vs 券瀑布流（推薦/其它）：showLayoutToggle 仅商家页签 true，复用为模块显隐判据 */
+  const merchantFeed = showLayoutToggle
+  /** 偏好优惠：食得健康全瀑布流移除；全澳格價仅商家瀑布流额外移除 */
+  const morePrefOptions = MORE_PREFS.filter((p) => p.key !== 'healthy' && !(merchantFeed && p.key === 'vs'))
   /** 当前展开的筛选面板：附近 / 分類 / 排序 / 更多篩選，同一时刻只开一个（null=收起） */
   const [openPanel, setOpenPanel] = useState<'nearby' | 'category' | 'sort' | 'more' | null>(null)
   /** 附近-距离档（单选），null 表示未选距离 */
@@ -480,20 +484,23 @@ export function useGroupBuyFilters({
               ))}
             </div>
           </section>
-          <section className="apg-more-sec">
-            <h4 className="apg-more-title">使用人數</h4>
-            <div className="apg-more-grid">
-              {MORE_PEOPLE.map((p) => (
-                <button key={p} type="button" className={`apg-more-chip${morePeople === p ? ' is-on' : ''}`} aria-pressed={morePeople === p} onClick={pickOne(setMorePeople)(p)}>
-                  {p}
-                </button>
-              ))}
-            </div>
-          </section>
+          {/* 使用人數仅券瀑布流（推薦/其它）提供；商家瀑布流（優選商家/附近好店）无此模块 */}
+          {!merchantFeed && (
+            <section className="apg-more-sec">
+              <h4 className="apg-more-title">使用人數</h4>
+              <div className="apg-more-grid">
+                {MORE_PEOPLE.map((p) => (
+                  <button key={p} type="button" className={`apg-more-chip${morePeople === p ? ' is-on' : ''}`} aria-pressed={morePeople === p} onClick={pickOne(setMorePeople)(p)}>
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
           <section className="apg-more-sec">
             <h4 className="apg-more-title">偏好优惠 <i>(可多選)</i></h4>
             <div className="apg-more-grid apg-more-grid--pref">
-              {MORE_PREFS.map((p) => (
+              {morePrefOptions.map((p) => (
                 <button key={p.key} type="button" className={`apg-more-pref${morePrefs.includes(p.key) ? ' is-on' : ''}`} aria-pressed={morePrefs.includes(p.key)} onClick={pickMany(setMorePrefs)(p.key)}>
                   <i className={`apg-pref-ico apg-pref-ico--${p.tone}`} aria-hidden="true">{p.icon}</i>
                   {p.label}

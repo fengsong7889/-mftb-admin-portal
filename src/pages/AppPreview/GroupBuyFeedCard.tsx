@@ -40,7 +40,7 @@ export interface GroupBuyItem {
   price: string
   /** No.7 原价 — 灰色删除线，前端自动计算 No.8 降价提示 */
   origin: string
-  /** No.7 积分价标签 — 销售价有积分抵扣时在现价后展示「⚡積分價」红标，缺省不渲染 */
+  /** No.7 积分价标签 — 纯积分商品：现价以数字展示（无货币单位）+「⚡積分價」红标 + 灰色划线原价，缺省不渲染 */
   pointPrice?: boolean
   /** No.9 定位距离 — GPS计算，小于1公里显示米，否则显示 km */
   dist: string
@@ -186,7 +186,7 @@ export default function GroupBuyFeedCard({
         </SpecField>
         <div className="apf-card-price-row">
           <SpecField panel="groupBuy" id={7}>
-            <span className="apf-price"><i>$</i>{item.price}</span>
+            <span className="apf-price">{!item.pointPrice && <i>$</i>}{item.price}</span>
             {item.pointPrice && <span className="apf-point-tag">⚡積分價</span>}
             <span className="apf-origin">${item.origin}</span>
           </SpecField>
@@ -214,21 +214,16 @@ export default function GroupBuyFeedCard({
             </div>
           </SpecField>
         )}
-        <div className="apf-card-foot">
-          {item.ratingNote ? (
-            <>
-              <SpecField panel="groupBuy" id={14}><span className="apf-dist apf-rating"><i aria-hidden="true">♥</i>{item.ratingNote}</span></SpecField>
-              <SpecField panel="groupBuy" id={9}><span className="apf-dist">{item.dist}</span></SpecField>
-              <SpecField panel="groupBuy" id={10}><span className="apf-area">{item.area}</span></SpecField>
-              <SpecField panel="groupBuy" id={11}><span className="apf-shop">{item.shop} ›</span></SpecField>
-            </>
-          ) : (
-            <>
-              <SpecField panel="groupBuy" id={9}><span className="apf-dist">{item.dist}</span></SpecField>
-              <SpecField panel="groupBuy" id={10}><span className="apf-area">{item.area}</span></SpecField>
-              <SpecField panel="groupBuy" id={11}><span className="apf-shop">{item.shop} ›</span></SpecField>
-            </>
-          )}
+        {/* 底部信息行整行可点：进入门店主页（评分+距离+行政区+门店名称）；无评分门店显示灰色「♥暂无」；门店名截断后「›」箭头独立不缩，始终可见 */}
+        <div className="apf-card-foot" onClick={() => onOpenStore?.(item.merchantId)}>
+          <SpecField panel="groupBuy" id={14}>
+            {item.ratingNote
+              ? <span className="apf-dist apf-rating"><i aria-hidden="true">♥</i>{item.ratingNote}</span>
+              : <span className="apf-dist apf-rating apf-rating--none"><i aria-hidden="true">♥</i>暂无</span>}
+          </SpecField>
+          <SpecField panel="groupBuy" id={9}><span className="apf-dist">{item.dist}</span></SpecField>
+          <SpecField panel="groupBuy" id={10}><span className="apf-area">{item.area}</span></SpecField>
+          <SpecField panel="groupBuy" id={11}><span className="apf-shop">{item.shop}</span><i className="apf-shop-arrow" aria-hidden="true">›</i></SpecField>
         </div>
       </div>
     </div>

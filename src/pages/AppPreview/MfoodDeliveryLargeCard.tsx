@@ -31,6 +31,7 @@
 import { SpecField } from './SpecHighlight'
 import { useClosingCountdown } from './useClosingCountdown'
 import BrandCover from './BrandCover'
+import { deliveryFromText } from './deliveryFee'
 import { BRAND_TAG_STYLE, MfoodMemberBlock, type MfoodStore } from './MfoodDeliveryStoreCard'
 
 export default function MfoodDeliveryLargeCard({ store, onOpenStore }: {
@@ -109,7 +110,7 @@ export default function MfoodDeliveryLargeCard({ store, onOpenStore }: {
 
         {/* 评分（id4，★ 一并包裹）+ 月售（id5）｜右侧：準時寶（id6）+ 配送类型（id14）— 与列表模式同款配色 */}
         <div className="apw-row-rating">
-          <SpecField panel="delivery" id={4}><b className="apw-rating"><span className="apw-star" aria-hidden="true">★</span>{store.rating}</b></SpecField>
+          <SpecField panel="delivery" id={4}>{store.noRating ? <b className="apw-rating apw-rating--none"><span className="apw-star" aria-hidden="true">★</span>暫無</b> : <b className="apw-rating"><span className="apw-star" aria-hidden="true">★</span>{store.rating}</b>}</SpecField>
           <SpecField panel="delivery" id={5}><span className="apw-sales">月售 {store.monthlySales}</span></SpecField>
           <span className="apw-rating-side">
             {store.punctual && <SpecField panel="delivery" id={6}><span className="apw-punctual">準時寶</span></SpecField>}
@@ -134,9 +135,9 @@ export default function MfoodDeliveryLargeCard({ store, onOpenStore }: {
           <SpecField panel="delivery" id={7}>
             <div className="apw-info-cell">
               <span className="apw-info-label">配送</span>
-              {/* 免配送費=橙字（列表模式同款，不标減配角标）；減配=显示区间+右上角标；其余回退配送費区间 */}
+              {/* 免配送費=橙字（列表模式同款，不标減配角标）；其余配送费按门店 key 散列 0-19 显示「$x起」+右上角标 */}
               <span className={`apw-info-value${store.freeDelivery ? ' apw-info-value--free' : ''}`}>
-                {store.freeDelivery ? '免配送費' : (store.deliveryDiscount ?? store.deliveryFee ?? '$0 起')}
+                {store.freeDelivery ? '免配送費' : deliveryFromText(store.key)}
               </span>
             </div>
           </SpecField>

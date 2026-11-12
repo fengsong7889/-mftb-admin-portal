@@ -29,7 +29,17 @@ describe('收藏按钮说明仅页签瀑布流持有', () => {
       expect(ids).not.toContain(6)
       expect(ids).toContain(17)
       expect(ids).toContain(15)
-      expect(ids).toContain(16)
+      expect(ids).not.toContain(16)
+    }
+  })
+})
+
+describe('準時寶说明引导文案与外部链接', () => {
+  it('外卖四面板的準時寶行均为引导文案并携带 MFTB-3193 链接', () => {
+    for (const key of ['delivery', 'searchDelivery', 'deliveryPage', 'searchDeliveryPage']) {
+      const row = panel(key).defaults.find((s) => s.id === 6)!
+      expect(row.desc).toContain('点击链接')
+      expect(row.link).toBe('https://devops.aliyun.com/projex/req/MFTB-3193#')
     }
   })
 })

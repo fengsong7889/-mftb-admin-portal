@@ -26,6 +26,8 @@ export interface DeliveryGridStore {
   name: string
   image: string
   rating: string
+  /** 无评分门店：★暫無 灰字，星形图标不变 */
+  noRating?: boolean
   deliveryType: 'platform' | 'self' | 'pickup'
   distance?: string
   deliveryTime: string
@@ -76,7 +78,7 @@ export default function DeliveryGridCard({ brand, store, onOpenStore }: {
         </SpecField>
         <div className="apw-grid-meta">
           <SpecField panel="delivery" id={4}>
-            <span className="apw-grid-rating">★ {store.rating}</span>
+            <span className={`apw-grid-rating${store.noRating ? ' apw-grid-rating--none' : ''}`}>★ {store.noRating ? '暫無' : store.rating}</span>
           </SpecField>
           <span className="apw-grid-meta-divider" aria-hidden="true">｜</span>
           <SpecField panel="delivery" id={14}>

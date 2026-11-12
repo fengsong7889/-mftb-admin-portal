@@ -145,6 +145,9 @@ describe('特價團購筛选面板', () => {
     expect(within(panel).getByText('使用人數')).toBeInTheDocument()
     expect(within(panel).getByText(/偏好优惠/)).toBeInTheDocument()
     expect(within(panel).getByText(/店鋪服務/)).toBeInTheDocument()
+    // 偏好优惠：食得健康全瀑布流移除；券类（推薦）保留全澳格價
+    expect(within(panel).queryByText('食得健康')).not.toBeInTheDocument()
+    expect(within(panel).getByText('全澳格價')).toBeInTheDocument()
 
     // 单选胶囊：再点同一个取消
     await user.click(within(panel).getByRole('button', { name: '0-5 時' }))
@@ -214,6 +217,24 @@ describe('特價團購筛选面板', () => {
     await user.click(within(panel2).getByRole('button', { name: '大圖模式' }))
     await user.click(within(panel2).getByRole('button', { name: '完成 (可多選)' }))
     expect(screen.getAllByAltText('商家封面')).toHaveLength(5)
+  })
+
+  it('優選商家篩選面板：无使用人數模块，偏好优惠无食得健康/全澳格價', async () => {
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(screen.getByRole('button', { name: '優選商家' }))
+    await user.click(screen.getByRole('button', { name: '篩選條件' }))
+    const panel = screen.getByRole('group', { name: '更多篩選面板' })
+    // 商家瀑布流：无使用人數模块
+    expect(within(panel).queryByText('使用人數')).not.toBeInTheDocument()
+    // 偏好优惠：食得健康/全澳格價 均不展示
+    expect(within(panel).queryByText('食得健康')).not.toBeInTheDocument()
+    expect(within(panel).queryByText('全澳格價')).not.toBeInTheDocument()
+    // 其余模块与选项仍在
+    expect(within(panel).getByText('人均篩選器')).toBeInTheDocument()
+    expect(within(panel).getByText(/偏好优惠/)).toBeInTheDocument()
+    expect(within(panel).getByText('神會員')).toBeInTheDocument()
   })
 
   it('優選商家篩選面板：大小圖切换上报 onPreferredLayoutChange（说明面板闭环双机同步）', async () => {

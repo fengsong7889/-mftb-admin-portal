@@ -371,6 +371,13 @@ function DualView() {
                     ) : (
                       <span onDoubleClick={(e) => { e.stopPropagation(); setEditId(s.id) }}>{renderDesc(s.desc)}<br/><em>{s.source}</em></span>
                     )}
+                    {s.link && (
+                      <p className="ap-spec-linkrow">
+                        <a className="ap-spec-link" href={s.link} target="_blank" rel="noopener noreferrer" title={s.link}>
+                          查看詳細描述 ↗
+                        </a>
+                      </p>
+                    )}
                     {s.note && <p className="ap-spec-note">⚠ {s.note}</p>}
                   </td>
                 </tr>

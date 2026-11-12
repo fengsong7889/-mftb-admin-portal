@@ -121,7 +121,7 @@ describe('MFOOD 壳同步命令', () => {
     fireEvent.change(screen.getByPlaceholderText('搜尋團購套餐、商家'), { target: { value: '火鍋' } })
     await user.click(screen.getByRole('button', { name: '搜索' }))
     expect(screen.getByText('澳門燒味工房🔥-新橋店')).toBeInTheDocument()
-    expect(screen.getByText('10:00 營業')).toBeInTheDocument()
+    expect(screen.queryByText('10:00 營業')).not.toBeInTheDocument()
     expect(screen.queryAllByRole('tab')).toHaveLength(0)
   })
 

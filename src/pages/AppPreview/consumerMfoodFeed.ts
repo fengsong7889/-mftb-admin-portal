@@ -33,7 +33,7 @@ export const MFOOD_STORES: MfoodStore[] = [
   /* 2. 对齐閃蜂 s2：独家 + 已打烊·休息一会 */
   { key: 'ms2', name: '大堂街炸雞（總店）', brandTag: '独家', rating: '4.8', monthlySales: '4000+', minOrder: '$40', deliveryDiscount: '$0~6', deliveryTime: '29分鐘', distance: '1.4km', tags: ['全澳销量第1名', '万人收藏好店'], memberTags: [{ kind: 'shen', text: '最高膨脹至30' }, { kind: 'red', text: '满50減4' }, { kind: 'coupon', text: '領券 $10' }], image: friedChickenImg, deliveryType: 'platform', merchantId: 'mf-taihong', businessState: 'closed', closedReason: '休息一会，马上回来' },
   /* 3. 对齐閃蜂 s3：连锁 + 準時寶 + 会員可展開 */
-  { key: 'ms3', name: '龍卷堂（賈伯樂總店）', brandTag: '连锁', rating: '4.8', monthlySales: '2000+', minOrder: '$40', deliveryDiscount: '$0~3', deliveryTime: '29分鐘', distance: '1.9km', punctual: true, tags: ['高士德飯糰包類人氣第1名', '全澳飯糰包類銷量第1名'], memberTags: [{ kind: 'point', text: '双倍抵$10元' }, { kind: 'shen', text: '最高膨脹至30' }, { kind: 'green', text: '新客券 $5' }], memberSections: [ { label: '券包', tags: [{ kind: 'shen', text: '最高膨脹至30' }, { kind: 'green', text: '新客券 $5' }, { kind: 'red', text: '領券 $10 | 5 | 4' }] }, { label: '活动', tags: [{ kind: 'red', text: '6.5折起' }, { kind: 'red', text: '180减9' }, { kind: 'red', text: '110减6' }, { kind: 'red', text: '80减4' }, { kind: 'red', text: '到店自取9.5折' }, { kind: 'red', text: '收藏有禮' }] }, { label: '其它', tags: [{ kind: 'point', text: '双倍抵$10元' }, { kind: 'green', text: '食得健康' }, { kind: 'gray', text: '支持自取' }] } ], image: riceballImg, deliveryType: 'platform', merchantId: 'mf-long', closingCountdown: '00:18:32' },
+  { key: 'ms3', noRating: true, name: '龍卷堂（賈伯樂總店）', brandTag: '连锁', rating: '4.8', monthlySales: '2000+', minOrder: '$40', deliveryDiscount: '$0~3', deliveryTime: '29分鐘', distance: '1.9km', punctual: true, tags: ['高士德飯糰包類人氣第1名', '全澳飯糰包類銷量第1名'], memberTags: [{ kind: 'point', text: '双倍抵$10元' }, { kind: 'shen', text: '最高膨脹至30' }, { kind: 'green', text: '新客券 $5' }], memberSections: [ { label: '券包', tags: [{ kind: 'shen', text: '最高膨脹至30' }, { kind: 'green', text: '新客券 $5' }, { kind: 'red', text: '領券 $10 | 5 | 4' }] }, { label: '活动', tags: [{ kind: 'red', text: '6.5折起' }, { kind: 'red', text: '180减9' }, { kind: 'red', text: '110减6' }, { kind: 'red', text: '80减4' }, { kind: 'red', text: '到店自取9.5折' }, { kind: 'red', text: '收藏有禮' }] }, { label: '其它', tags: [{ kind: 'point', text: '双倍抵$10元' }, { kind: 'green', text: '食得健康' }, { kind: 'gray', text: '支持自取' }] } ], image: riceballImg, deliveryType: 'platform', merchantId: 'mf-long', closingCountdown: '00:18:32' },
   /* 4. 对齐閃蜂 s4：无标签 + 自取折扣 + 已打烊·休息打烊 */
   { key: 'ms4', name: '世記咖啡（皇朝店）', rating: '4.4', monthlySales: '200+', minOrder: '$40', deliveryDiscount: '$0~3', deliveryTime: '28分鐘', distance: '2.6km', pickupDiscount: '9.8折', tags: [], memberTags: [{ kind: 'shen', text: '最高膨脹至30' }, { kind: 'green', text: '新客券 $4' }], image: burgerImg, deliveryType: 'pickup', merchantId: 'mf-saigai', businessState: 'closed', closedReason: '休息打烊' },
   /* 5. 对齐閃蜂 s5：金牌 + 免配送費 + 準時寶 + 会員可展開 */
@@ -41,7 +41,7 @@ export const MFOOD_STORES: MfoodStore[] = [
   /* 6. 对齐閃蜂 s6：新店 + 无标签 + 免配送費 + 近距離 */
   { key: 'ms6', name: '晨光早點（北區新店）', isNew: true, rating: '4.9', monthlySales: '800+', minOrder: '$30', freeDelivery: true, deliveryTime: '25分鐘', distance: '900m', tags: [], memberTags: [{ kind: 'shen', text: '最高膨脹至30' }, { kind: 'red', text: '满30減3' }], image: burgerImg, deliveryType: 'self', merchantId: 'mf-morning', closingCountdown: '00:07:18', coverVideo: true },
   /* 7. 对齐閃蜂 s7：新店 + 独家 + 起送$35·減配 */
-  { key: 'ms7', name: '杏香園餅店（氹仔舊城區店）', isNew: true, brandTag: '独家', rating: '4.7', monthlySales: '700+', minOrder: '$35', deliveryDiscount: '$0~4', deliveryTime: '27分鐘', distance: '3.2km', tags: ['高仕德热门店铺', '近期99人下单'], memberTags: [{ kind: 'shen', text: '最高膨脹至30' }, { kind: 'coupon', text: '領券 $5' }], image: riceballImg, deliveryType: 'platform', merchantId: 'mf-hang' },
+  { key: 'ms7', noRating: true, name: '杏香園餅店（氹仔舊城區店）', isNew: true, brandTag: '独家', rating: '4.7', monthlySales: '700+', minOrder: '$35', deliveryDiscount: '$0~4', deliveryTime: '27分鐘', distance: '3.2km', tags: ['高仕德热门店铺', '近期99人下单'], memberTags: [{ kind: 'shen', text: '最高膨脹至30' }, { kind: 'coupon', text: '領券 $5' }], image: riceballImg, deliveryType: 'platform', merchantId: 'mf-hang' },
   /* 8. 对齐閃蜂 s8：新店 + 连锁 + 免配送費 */
   { key: 'ms8', name: '泉記美食廣場（連鎖·亞利鴉架街店）', isNew: true, brandTag: '连锁', rating: '4.6', monthlySales: '2000+', minOrder: '$35', freeDelivery: true, deliveryTime: '26分鐘', distance: '1.1km', tags: ['全澳人气店铺', '十万人收藏好店'], memberTags: [{ kind: 'shen', text: '最高膨脹至30' }, { kind: 'green', text: '新客券 $6' }], image: friedChickenImg, deliveryType: 'self', merchantId: 'mf-quan', closingCountdown: '00:26:40' },
   /* 9. 对齐閃蜂 s9：金牌 + 已打烊·爆单 */
@@ -83,12 +83,12 @@ export const MFOOD_SEARCH_STORES: MfoodStore[] = MFOOD_SEARCH_BASE.map((s, i): M
 /* ─── 附近好店（優選商家同構卡 · MFOOD 品牌）：特惠團購页「附近好店」页签与搜索结果页共用 ─── */
 export const MFOOD_NEAR_STORES: PreferredMerchant[] = [
   { key: 'ns1', name: '澳門燒味工房🔥-新橋店', rating: '4.7', perPerson: '$58/人', cateArea: '燒臘·新橋商圈', dist: '180m', logoText: '燒味', logoTone: 'orange', isNew: true, cover: friedChickenImg, sales: '半年售800+', coupons: [{ icon: '券', price: '60', discount: '6折', name: '燒味雙拚優惠券' }, { icon: '惠', price: '30', discount: '8折', name: '午市快閃券' }] },
-  { key: 'ns2', name: '金沙砂鍋粥🍜-提督店', rating: '4.5', perPerson: '$45/人', cateArea: '粥麵·提督商圈', dist: '420m', logoText: '金沙', logoTone: 'red', cover: fishPotImg, inflate: '最高膨脹至$25', sales: '半年售1200+', coupons: [{ icon: '券', price: '45', discount: '6.5折', name: '砂鍋粥雙人券' }] },
+  { key: 'ns2', noRating: true, name: '金沙砂鍋粥🍜-提督店', rating: '4.5', perPerson: '$45/人', cateArea: '粥麵·提督商圈', dist: '420m', logoText: '金沙', logoTone: 'red', cover: fishPotImg, inflate: '最高膨脹至$25', sales: '半年售1200+', coupons: [{ icon: '券', price: '45', discount: '6.5折', name: '砂鍋粥雙人券' }] },
   { key: 'ns3', name: '麥記漢堡包🍔-關閘店', rating: '4.4', perPerson: '$38/人', cateArea: '快餐·關閘商圈', dist: '1.1km', logoText: '麥記', logoTone: 'blue', cover: burgerImg, sales: '半年售300+', coupons: [{ icon: '秒', price: '25', discount: '5折', name: '早晨套餐秒殺券' }, { icon: '惠', price: '15', discount: '8.8折', name: '下午茶優惠' }] },
-  { key: 'ns4', name: '檸檬屋茶飲🍋-下環店', rating: '4.6', perPerson: '$22/人', cateArea: '茶飲·下環商圈', dist: '860m', logoText: '檸檬', logoTone: 'green', cover: lemonTeaImg, inflate: '最高膨脹至$12', sales: '半年售2600+', coupons: [{ icon: '惠', price: '12', discount: '9折', name: '凍飲第二杯半價' }] },
+  { key: 'ns4', noRating: true, name: '檸檬屋茶飲🍋-下環店', rating: '4.6', perPerson: '$22/人', cateArea: '茶飲·下環商圈', dist: '860m', logoText: '檸檬', logoTone: 'green', cover: lemonTeaImg, inflate: '最高膨脹至$12', sales: '半年售2600+', coupons: [{ icon: '惠', price: '12', discount: '9折', name: '凍飲第二杯半價' }] },
 ]
 
-/* ─── 搜索結果頁團購瀑布流專用列表：附近好店基礎 + 未入駐 / 開業時間樣例（同閃蜂口径；「超出範圍」样例已按需求下线） ─── */
+/* ─── 搜索結果頁團購瀑布流專用列表：附近好店基礎 + 未入駐樣例（同閃蜂口径；「超出範圍」「開業時間」样例已按需求下线） ─── */
 /* ─── 搜索结果团购瀑布流·商品横滑行 mock（仅搜索列表附加；页签瀑布流不展示） ─── */
 const SEARCH_GOODS: PreferredGood[] = [
   { name: '44元代50元券', image: burgerImg, price: '44', origin: '50', icon: '券' },
@@ -101,7 +101,7 @@ const SEARCH_GOODS: PreferredGood[] = [
 const MFOOD_NEAR_SEARCH_BASE: PreferredMerchant[] = [
   ...MFOOD_NEAR_STORES,
   { key: 'ns6', name: '小貝廚房（關閘店）', rating: '0', perPerson: '', cateArea: '輕食·關閘商圈', dist: '1.6km', logoText: '小貝', logoTone: 'green', cover: riceballImg, sales: '', coupons: [], notJoined: true },
-  { key: 'ns7', name: '早安茶餐廳（新橋店）', rating: '4.5', perPerson: '$45/人', cateArea: '港式·新橋商圈', dist: '900m', logoText: '早安', logoTone: 'blue', cover: lemonTeaImg, sales: '半年售400+', coupons: [{ icon: '惠', price: '40', discount: '8.8折', name: '早餐專享優惠' }], openTimeLabel: '10:00 營業' },
+  { key: 'ns7', name: '早安茶餐廳（新橋店）', rating: '4.5', perPerson: '$45/人', cateArea: '港式·新橋商圈', dist: '900m', logoText: '早安', logoTone: 'blue', cover: lemonTeaImg, sales: '半年售400+', coupons: [{ icon: '惠', price: '40', discount: '8.8折', name: '早餐專享優惠' }] },
 ]
 export const MFOOD_NEAR_SEARCH_STORES: PreferredMerchant[] = MFOOD_NEAR_SEARCH_BASE.map((m, i): PreferredMerchant => (m.notJoined ? m : {
   ...m,

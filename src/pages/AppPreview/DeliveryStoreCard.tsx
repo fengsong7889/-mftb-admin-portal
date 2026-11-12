@@ -21,6 +21,7 @@ import { getSmallTemplate, getFallbackPoster } from '@/constants/popularSkinTemp
 import { HighlightContext, SpecField } from './SpecHighlight'
 import { useClosingCountdown } from './useClosingCountdown'
 import BrandCover from './BrandCover'
+import { deliveryFromText } from './deliveryFee'
 
 export interface MemberTag {
   kind: 'shen' | 'point' | 'coupon' | 'red' | 'plain' | 'green' | 'gray'
@@ -121,6 +122,8 @@ export interface DeliveryStore {
   outOfRange?: boolean
   /** 未入駐商家（搜索結果頁展示態，圖3 口徑）：評分顯示「暫無」，不展示月售/標籤/紅包區/配送類型角标，點擊不進店；LOGO 不加標識 */
   notJoined?: boolean
+  /** 无评分门店（随机样例）：评分位显示灰色「★暫無」，星形图标不变；其余信息正常展示 */
+  noRating?: boolean
 }
 
 /** 红包药丸样式映射（列表/大图两模式共用，DeliveryLargeCard 复用） */
@@ -258,7 +261,7 @@ export default function DeliveryStoreCard({
         {/* 评分 id=4 + 月售 id=5（大圖模式不展示）；右侧堆叠：準時寶 id=6 + 配送类型 id=14（閃蜂送/自送/自取x折/支持自取） */}
         <div className="apw-row-rating">
           {/* 评分锚点 id=4 连同 ★ 一并包裹（星为锚内子元素，悬停说明行星+分数整体描边）；未入駐商家無平台評分，顯示「暫無」灰字（圖3 口徑） */}
-          {store.notJoined ? (
+          {(store.notJoined || store.noRating) ? (
             <SpecField panel="delivery" id={4}>
               <b className="apw-rating apw-rating--none"><span className="apw-star" aria-hidden="true">★</span>暫無</b>
             </SpecField>
@@ -294,9 +297,9 @@ export default function DeliveryStoreCard({
           <SpecField panel="delivery" id={7}>
             <div className="apw-info-cell">
               <span className="apw-info-label">配送</span>
-              {/* 免配送費=橙字（图2口径，无減配角标）；減配=直接显示区间（与无減配门店同格式）；其余回退配送費区间 */}
+              {/* 免配送費=橙字（图2口径，无減配角标）；其余配送费按门店 key 散列 0-19 显示「$x起」，避免 mock 集中于 $0起 */}
               <span className={`apw-info-value${store.freeDelivery ? ' apw-info-value--free' : ''}`}>
-                {store.freeDelivery ? '免配送費' : (store.deliveryDiscount ?? store.deliveryFee ?? '$0 起')}
+                {store.freeDelivery ? '免配送費' : deliveryFromText(store.key)}
               </span>
             </div>
           </SpecField>
