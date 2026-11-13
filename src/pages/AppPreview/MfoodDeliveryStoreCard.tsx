@@ -17,7 +17,7 @@
  *   会员胶囊 shen = 🧨勁爆券（紫红渐变块 + 粉底红字权益文案），非閃蜂的 👑神會員。
  *
  * 字段口径与閃蜂一致：门店名称（新店角标在封面图左上角 / 名称前四选一品质标签）、
- * 评分、月售、免配送費与起送·減配互斥、配送时间、距离或自取折扣、
+ * 评分、月售、免配送費与起送·減配互斥、配送时间、距离（自取折扣标签跟在距离后）、
  * 营业状态三态（正常不显示 / 已打烊+原因 / 接受预定+起配时间）、
  * 标签栏、会员红包行（可展开：券包/活动/其它）、人氣商家皮膚（small/large）。
  */
@@ -93,11 +93,11 @@ export interface MfoodStore {
   freeDelivery?: boolean
   /** 配送时间，如 "30分鐘" */
   deliveryTime: string
-  /** 配送类型（每个商家必显示其一，優先级 platform > self > pickup）：platform=平台配送「mFood送」；self=商家自送「自送」；pickup=支持自取 */
+  /** 配送类型（角标位置统一展示占位「配送类型」，具体值由调度系统返回、每商家仅 1 个）；本字段另驱动自取折扣标签（pickup）与卡片模式叠加条外賣/自取 */
   deliveryType: 'platform' | 'self' | 'pickup'
-  /** 自取折扣（deliveryType=pickup 时展示），如 "9.5折"；无折扣则标签直接显示「支持自取」 */
+  /** 自取折扣（deliveryType=pickup 且报名自取折扣活动时展示），如 "9.5折"；标签「自取x折」跟在距离后展示（spec id25） */
   pickupDiscount?: string
-  /** 距离，如 "848m"；自取门店不传 */
+  /** 距离，如 "848m"；自取折扣标签展示在其后 */
   distance?: string
   /** 準時寶标（评分行右侧） */
   punctual?: boolean
@@ -261,7 +261,7 @@ export default function MfoodDeliveryStoreCard({
           </SpecField>
         )}
 
-        {/* 评分 id=4 + 月售 id=5（大圖模式不展示）；右侧堆叠：準時寶 id=6 + 配送类型 id=14（mFood送/自送/自取x折/支持自取） */}
+        {/* 评分 id=4 + 月售 id=5（大圖模式不展示）；右侧堆叠：準時寶 id=6 + 配送类型 id=14（统一占位「配送类型」） */}
         <div className="apw-row-rating">
           {/* 评分锚点 id=4 连同 ★ 一并包裹；未入駐商家無平台評分，顯示「暫無」灰字（同閃蜂口径） */}
           {(store.notJoined || store.noRating) ? (
@@ -274,22 +274,18 @@ export default function MfoodDeliveryStoreCard({
               {!isHotLarge && <SpecField panel="delivery" id={5}><span className="apw-sales">月售 {store.monthlySales}</span></SpecField>}
             </>
           )}
-          {/* 配送类型（mFood送/自送/自取）：超出範圍與未入駐商家當前不可配送，角标不顯示 */}
+          {/* 配送类型（此位置统一展示占位「配送类型」，不展示自送/支持自取）：超出範圍與未入駐商家當前不可配送，角标不显示 */}
           {!store.notJoined && !store.outOfRange && (
             <span className="apw-rating-side">
               {store.punctual && <SpecField panel="delivery" id={6}><span className="apw-punctual">準時寶</span></SpecField>}
               <SpecField panel="delivery" id={14}>
-                <span className="apw-delivery-type">
-                  {store.deliveryType === 'pickup'
-                    ? (store.pickupDiscount ? `自取${store.pickupDiscount}` : '支持自取')
-                    : store.deliveryType === 'self' ? '自送' : 'mFood送'}
-                </span>
+                <span className="apw-delivery-type">配送类型</span>
               </SpecField>
             </span>
           )}
         </div>
 
-        {/* 信息三列 id=7/8：起送 / 配送（免配送費橙字且互斥，減配显示区间+右上角标）/ 时间·距離（时间+距离整格共用锚点 id 8；自取折扣已移至配送类型标签） */}
+        {/* 信息三列 id=7/8：起送 / 配送（免配送費橙字且互斥，減配显示区间+右上角标）/ 时间·距離（时间+距离共用锚点 id 8；自取折扣 id25 跟在距离后） */}
         <div className="apw-info-grid">
           <SpecField panel="delivery" id={7}>
             <div className="apw-info-cell">
@@ -308,12 +304,20 @@ export default function MfoodDeliveryStoreCard({
           </SpecField>
           <div className="apw-info-cell">
             <span className="apw-info-label">时间·距离</span>
-            <SpecField panel="delivery" id={8}>
-              <span className="apw-info-value">
-                {store.deliveryTime}
-                {store.distance ? <> · {store.distance}</> : null}
-              </span>
-            </SpecField>
+            <span className="apw-info-value apw-info-value--row">
+              <SpecField panel="delivery" id={8}>
+                <span className="apw-info-td">
+                  {store.deliveryTime}
+                  {store.distance ? <> · {store.distance}</> : null}
+                </span>
+              </SpecField>
+              {/* 自取折扣（id25）：报名自取折扣活动时跟在距离后展示「自取x折」 */}
+              {store.deliveryType === 'pickup' && store.pickupDiscount && (
+                <SpecField panel="delivery" id={25}>
+                  <span className="apw-pickup-text">自取{store.pickupDiscount}</span>
+                </SpecField>
+              )}
+            </span>
           </div>
         </div>
 

@@ -10,11 +10,11 @@
  * 外卖瀑布流 · 卡片模式（一行两店精简卡片，閃蜂/MFOOD 共用，brand 区分品牌元素）
  *
  * 由说明面板「展示模式」切换器驱动（DualView 下发，两台手机同步切换）：
- *   - 大封面图 + 左下角「外賣/自取 + 距离 | 时间」叠加条
- *   - 门店名称 → 评分 ｜ 配送类型/支持自取 → 红包券行（勁爆券/神會員 + 最多 2 张券）
+ *   - 大封面图 + 左下角「外賣/自取 + 距离（+自取折扣）| 时间」叠加条
+ *   - 门店名称 → 评分 ｜ 配送类型（统一占位） → 红包券行（勁爆券/神會員 + 最多 2 张券）
  *
  * 与列表模式共用同一批 SpecField 锚点 id：封面图 15 / 名称 1 / 评分 4 /
- * 时间距离 8 / 配送类型 14 / 勁爆券·神會員 16 / 券行 12；
+ * 时间距离 8 / 配送类型 14 / 自取折扣 25 / 勁爆券·神會員 16 / 券行 12；
  * 卡片模式不渲染的字段（起送/減配、準時寶、营业状态、标签栏、红包展开区）无锚点，悬停不高亮。
  * 类名前缀 apw-grid-（外賣瀑布流卡片模式），样式全部走语义令牌（不新增裸色值）。
  */
@@ -36,11 +36,6 @@ export interface DeliveryGridStore {
   memberTags: readonly { kind: string; text: string }[]
 }
 
-const TYPE_TEXT: Record<'bee' | 'mfood', string> = {
-  bee: '閃蜂送',
-  mfood: 'mFood送',
-}
-
 export default function DeliveryGridCard({ brand, store, onOpenStore }: {
   brand: 'bee' | 'mfood'
   store: DeliveryGridStore
@@ -53,11 +48,9 @@ export default function DeliveryGridCard({ brand, store, onOpenStore }: {
     .slice(0, 2)
 
   const isPickup = store.deliveryType === 'pickup'
-  const typeText = isPickup
-    ? (store.pickupDiscount ? `自取${store.pickupDiscount}` : '支持自取')
-    : store.deliveryType === 'self' ? '自送' : TYPE_TEXT[brand]
+  /* 配送类型（id14）：此位置统一展示占位「配送类型」（具体值由调度系统返回）；自取折扣另挂距离后（id25） */
+  const typeText = '配送类型'
   const overlayType = isPickup ? '自取' : '外賣'
-  const overlayInfo = [store.distance, store.deliveryTime].filter(Boolean).join(' | ')
 
   return (
     <div className="apw-grid-card" onClick={() => onOpenStore?.(store.merchantId)}>
@@ -66,9 +59,20 @@ export default function DeliveryGridCard({ brand, store, onOpenStore }: {
           <BrandCover seed={store.merchantId} name={store.name} />
           <div className="apw-grid-overlay">
             <span className="apw-grid-overlay-type">{overlayType}</span>
-            <SpecField panel="delivery" id={8}>
-              <span className="apw-grid-overlay-info">{overlayInfo}</span>
-            </SpecField>
+            <span className="apw-grid-overlay-info">
+              <SpecField panel="delivery" id={8}>
+                <span className="apw-grid-td">{store.distance}</span>
+              </SpecField>
+              {/* 自取折扣（id25）：跟在距离后；单行不换行，超出打…截断 */}
+              {isPickup && store.pickupDiscount && (
+                <SpecField panel="delivery" id={25}>
+                  <span className="apw-pickup-text apw-grid-pickup">自取{store.pickupDiscount}</span>
+                </SpecField>
+              )}
+              <SpecField panel="delivery" id={8}>
+                <span className="apw-grid-td">{store.distance ? '| ' : ''}{store.deliveryTime}</span>
+              </SpecField>
+            </span>
           </div>
         </div>
       </SpecField>

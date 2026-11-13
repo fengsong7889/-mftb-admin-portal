@@ -108,7 +108,7 @@ const QUICK_FILTERS = [
   { key: 'q1', icon: '🎫', text: '满488減40', tone: 'red' },
   { key: 'q2', icon: '🔥', text: '勁爆券', tone: 'orange' },
   { key: 'q3', icon: '', text: '減免運費', tone: '' },
-  { key: 'q4', icon: '', text: 'mFood送', tone: '' },
+  { key: 'q4', icon: '', text: '配送类型', tone: '' },
 ]
 
 export default function MfoodDelivery({ onSearch, onOpenStore, layout }: {

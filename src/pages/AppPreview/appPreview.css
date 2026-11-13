@@ -4843,6 +4843,11 @@ button.apcs-card:hover { border-color: #FFD591; }
 .apw-info-value { font-size: 12px; font-weight: 700; color: #1F2937; white-space: nowrap; }
 /* 免配送費：配送列值橙字突出（图2口径，不标減配角标） */
 .apw-info-value--free { color: #E8720C; }
+/* 时间·距离值横排（单行不换行）：距离后接自取折扣纯文字（spec id25，无标签框省空间）；时间·距离保持完整，空间不足时折扣文字打…截断 */
+.apw-info-value--row { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.apw-info-td, .apw-grid-td { flex: none; white-space: nowrap; }
+/* 自取折扣：取消标签框改纯橙字省空间（比带框多显示数字），单行、超出打…；白底用深橙保对比 */
+.apw-pickup-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: #E65100; font-size: 10px; font-weight: 700; white-space: nowrap; }
 
 /* 评分行右侧：準時寶 + 配送类型标签横排（省空间） */
 .apw-rating-side {
@@ -4853,7 +4858,7 @@ button.apcs-card:hover { border-color: #FFD591; }
   gap: 4px;
   flex: none;
 }
-/* 配送类型标签：閃蜂送/mFood送/自送/自取x折/支持自取（三选一必显，橙色描边） */
+/* 配送类型标签：此位置统一展示占位「配送类型」（具体值由调度系统返回，不展示自送/支持自取，橙色描边）；自取折扣改纯文字 .apw-pickup-text 跟在距离后 */
 .apw-delivery-type {
   padding: 1px 8px;
   border: 1px solid #FF8F00;
@@ -5326,6 +5331,7 @@ button.apcs-card:hover { border-color: #FFD591; }
   bottom: 0;
   display: flex;
   align-items: center;
+  max-width: 100%;
   padding: 3px 8px 3px 0;
   border-radius: 0 10px 0 0;
   background: color-mix(in srgb, #262626 55%, transparent);
@@ -5339,7 +5345,18 @@ button.apcs-card:hover { border-color: #FFD591; }
   padding: 3px 8px;
   border-radius: 0 8px 0 0;
   font-weight: 700;
+  flex: none;
 }
+.apw-grid-overlay-info {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+  padding-left: 6px;
+}
+/* 卡片模式叠加条内的自取折扣纯文字：缩小一号、暗底用浅橙保对比，单行不换行、超出打…截断 */
+.apw-grid-pickup { font-size: 9px; color: #FFB74D; }
 .apw-grid-body {
   padding: 8px 10px 10px;
 }

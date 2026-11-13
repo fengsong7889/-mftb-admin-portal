@@ -21,7 +21,7 @@
  * 锚点与列表/卡片模式共用同一批 spec id（说明表不分模式）：
  *   id20 封面图/视频（大图专属）/ id15 门店 logo（新店角标 id2 嵌于 logo 左上，同列表模式口径）/
  *   id3 品牌标签（店名前）/ id1 店名 / id19 打烊倒计时 / id10 营业状态 / id4 评分 / id5 月售 /
- *   id6 準時寶 / id14 配送类型 / id7 起送·減配/免配送費 / id8 配送时间·距离 / id11 广告标签 /
+ *   id6 準時寶 / id14 配送类型 / id25 自取折扣（距离后）/ id7 起送·減配/免配送費 / id8 配送时间·距离 / id11 广告标签 /
  *   id16 勁爆券·神會員 / id12 券行 / id17 其它。
  * 信息区样式全部复用列表模式既有类（apw-row-* / apw-info-* / apw-tag / apw-pill /
  * apw-status-* / apw-closing / apw-brand-tag / apw-discount-flag），
@@ -114,16 +114,12 @@ export default function DeliveryLargeCard({ store, onOpenStore }: {
           <span className="apw-rating-side">
             {store.punctual && <SpecField panel="delivery" id={6}><span className="apw-punctual">準時寶</span></SpecField>}
             <SpecField panel="delivery" id={14}>
-              <span className="apw-delivery-type">
-                {store.deliveryType === 'pickup'
-                  ? (store.pickupDiscount ? `自取${store.pickupDiscount}` : '支持自取')
-                  : store.deliveryType === 'self' ? '自送' : '閃蜂送'}
-              </span>
+              <span className="apw-delivery-type">配送类型</span>
             </SpecField>
           </span>
         </div>
 
-        {/* 起送·減配/免配送費（id7）+ 时间·距离（id8）：三列信息格与列表模式同款 */}
+        {/* 起送·減配/免配送費（id7）+ 时间·距离（id8）+ 自取折扣（id25，距离后）：三列信息格与列表模式同款 */}
         <div className="apw-info-grid">
           <SpecField panel="delivery" id={7}>
             <div className="apw-info-cell">
@@ -142,12 +138,20 @@ export default function DeliveryLargeCard({ store, onOpenStore }: {
           </SpecField>
           <div className="apw-info-cell">
             <span className="apw-info-label">时间·距离</span>
-            <SpecField panel="delivery" id={8}>
-              <span className="apw-info-value">
-                {store.deliveryTime}
-                {store.distance ? <> · {store.distance}</> : null}
-              </span>
-            </SpecField>
+            <span className="apw-info-value apw-info-value--row">
+              <SpecField panel="delivery" id={8}>
+                <span className="apw-info-td">
+                  {store.deliveryTime}
+                  {store.distance ? <> · {store.distance}</> : null}
+                </span>
+              </SpecField>
+              {/* 自取折扣（id25）：报名自取折扣活动时跟在距离后展示「自取x折」 */}
+              {store.deliveryType === 'pickup' && store.pickupDiscount && (
+                <SpecField panel="delivery" id={25}>
+                  <span className="apw-pickup-text">自取{store.pickupDiscount}</span>
+                </SpecField>
+              )}
+            </span>
           </div>
         </div>
 
