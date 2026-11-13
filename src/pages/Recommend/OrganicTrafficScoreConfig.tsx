@@ -11,6 +11,7 @@ import MemberBonusScorePanel from './MemberBonusScorePanel'
 import SignboardScorePanel from './SignboardScorePanel'
 import StoreLabelScorePanel from './StoreLabelScorePanel'
 import TimePeriodScorePanel from './TimePeriodScorePanel'
+import DistanceDecayScorePanel, { DecayPeriodRowsEditor } from './DistanceDecayScorePanel'
 import TrafficBalancePanel from './TrafficBalancePanel'
 import { ServiceStatus, AppType } from '@mftb/contracts/recommendConstants'
 import { getSystemRuleValue } from '@/hooks/useSystemRules'
@@ -30,6 +31,7 @@ import {
   isSignboardScoreRule, DEFAULT_SIGNBOARD_SCORE_CONFIG,
   isStoreLabelScoreRule, normalizeStoreLabelScoreConfig, normalizeOrganicRuleId,
   isTimePeriodScoreRule, normalizeTimePeriodScoreConfig, DEFAULT_TIME_PERIOD_SCORE_CONFIG,
+  isDistanceDecayRule, DEFAULT_DECAY_PERIOD_CONFIG, validateDecayPeriodConfig, DECAY_DEFAULT_COEFFICIENT,
   isFreeShippingScoreRule, FREE_SHIPPING_ENROLLMENT_PREREQUISITE, normalizeFreeShippingScoreConfig,
   isMemberBonusScoreRule, normalizeMemberBonusScoreConfig,
   isOrganicRuleVisible, RETIRED_ORGANIC_RULE_IDS, DEFAULT_COUPON_SCORE_CONFIG, BUSINESS_STATE_ITEMS, isFilteredBusinessState,
@@ -41,6 +43,7 @@ import {
   type CouponScoreConfig, type SignboardScoreConfig, type FreeShippingScoreConfig, type MemberBonusScoreConfig, type OntimeRateBand, type StarTierBand, type CancelRateBand,
   type StoreLabelScoreConfig,
   type TimePeriodScoreConfig,
+  type TimePeriodScore,
 } from './organicTrafficConfig'
 import {
   fetchOrganicScoreConfig, updateDimensionWeights as apiUpdateWeights,
@@ -152,6 +155,8 @@ function voToRule(vo: OrganicRuleVO): OrganicScoreRule {
   const storeLabelConfig = vo.storeLabelConfig ? normalizeStoreLabelScoreConfig(vo.storeLabelConfig) : undefined
   // 主營時段分時段配置（STB_01）：同样只透传 JSON，不猜未写入的行该用哪些时段
   const timePeriodConfig = vo.timePeriodConfig ? normalizeTimePeriodScoreConfig(vo.timePeriodConfig) : undefined
+  // 距離衰減分時段满分配置（PLT_01）：与主營時段同形状（score 语义为满分），复用 normalize 过滤非法行
+  const decayPeriodConfig = vo.decayPeriodConfig ? normalizeTimePeriodScoreConfig(vo.decayPeriodConfig) : undefined
   return {
     // 舊語義編碼收编到數字編碼（STB_LABEL→STB_04、STB_ACT→STB_09）：後端遷移未生效的窗口内仍能按現行口径渲染
     id: normalizeOrganicRuleId(vo.ruleCode) ?? vo.ruleCode,
@@ -184,6 +189,7 @@ function voToRule(vo: OrganicRuleVO): OrganicScoreRule {
     memberBonusConfig,
     storeLabelConfig,
     timePeriodConfig,
+    decayPeriodConfig,
     trafficBalanceConfig: vo.trafficBalanceConfig ? normalizeTrafficBalanceConfig(vo.trafficBalanceConfig) : undefined,
     status: vo.status as ServiceStatus,
     builtin: vo.builtin === 1,
@@ -369,7 +375,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
           }
           if (r.id === 'PLT_01') {
             r.name = '距離衰減'
-            if (!r.decayCoefficient) r.decayCoefficient = 5
+            if (!r.decayCoefficient) r.decayCoefficient = DECAY_DEFAULT_COEFFICIENT
+            // 分時段滿分不在此注入兜底：與 STB_01 同例，由面板顯示層 ?? DEFAULT_DECAY_PERIOD_CONFIG，
+            // 避免把前端默認五檔誤標成「已保存配置」
           }
           if (r.id === 'COM_01') {
             r.name = '滿額立減'
@@ -514,6 +522,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
   const [storeLabelDrafts, setStoreLabelDrafts] = useState<Record<string, StoreLabelScoreConfig>>({})
   /** 主營時段分時段配置草稿（STB_01）：与門店標籤同一机制，本阶段仅页面草稿，落库随 time_period_config 列一并接 */
   const [timePeriodDrafts, setTimePeriodDrafts] = useState<Record<string, TimePeriodScoreConfig>>({})
+  /** 新增彈窗內距離衰減分時段滿分行（PLT_01） */
+  const [decayPeriodRows, setDecayPeriodRows] = useState<TimePeriodScore[]>([])
   /** 減免運費計分（COM_02）頁面草稿 */
   const [freeShippingDrafts, setFreeShippingDrafts] = useState<Record<string, FreeShippingScoreConfig>>({})
   /** 平台會員紅包計分（COM_06）頁面草稿 */
@@ -663,6 +673,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
       : undefined,
     timePeriodConfig: (values as any).timePeriodConfig
       ? JSON.stringify((values as any).timePeriodConfig as TimePeriodScoreConfig)
+      : undefined,
+    decayPeriodConfig: (values as any).decayPeriodConfig
+      ? JSON.stringify((values as any).decayPeriodConfig as TimePeriodScoreConfig)
       : undefined,
     trafficBalanceConfig: (values as any).trafficBalanceConfig
       ? JSON.stringify((values as any).trafficBalanceConfig as TrafficBalanceConfig)
@@ -838,17 +851,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
       message.warning('請配置固定加分分值')
       return
     }
-    // PLT_01 距離衰減校驗：滿分 + 衰減係數
-    if (ruleId === 'PLT_01') {
-      if (values.score === undefined || values.score < 0) {
-        message.warning('請配置滿分分值')
-        return
-      }
-      if (!(values as any).decayCoefficient || (values as any).decayCoefficient <= 0) {
-        message.warning('請配置衰減係數')
-        return
-      }
-    }
+    // PLT_01 已改走 DistanceDecayScorePanel（分時段滿分 + 單一衰減係數），內聯編輯不再承接該項
     // STB_09 活動加分校驗：每行需選到活動且加分分值 > 0，同一活動不得重複配置
     if (ruleId === 'STB_09') {
       const items: ActivityScoreItem[] = (values as any).activityItems || []
@@ -994,6 +997,29 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
   }
 
   /**
+   * 距離衰減面板保存（PLT_01）：分時段满分（decay_period_config）、衰減係數與評分說明一併寫庫。
+   * 失败时不更新页面状态，避免未落庫的配置被讀成已保存（request 層已彈錯）。
+   */
+  const handleSaveDecayPanel = async (rule: OrganicScoreRule, next: TimePeriodScoreConfig, coefficient: number, description: string) => {
+    if (readOnly) return
+    try {
+      const vo = await updateOrganicRule(ruleIdentifier(rule),
+        buildRulePayload({ ...rule, description, decayCoefficient: coefficient, decayPeriodConfig: next }))
+      setRules(prev => prev.map(r => (r.id === rule.id ? {
+        ...r,
+        description,
+        decayCoefficient: coefficient,
+        decayPeriodConfig: next,
+        updatedBy: vo?.updatedBy ?? r.updatedBy,
+        updatedAt: vo?.updateTime ?? r.updatedAt,
+      } : r)))
+      message.success('距離衰減分時段满分配置已保存')
+    } catch {
+      // request 層已彈錯，這裡不回寫頁面狀態
+    }
+  }
+
+  /**
    * 減免運費面板保存：報名分值、評分說明、門檻檔位與報名分護欄一併寫庫。
    * 報名計分是「報名即給分」的固定規則（平台活動與商家自建活動只生效一個），不提供關閉。
    */
@@ -1125,6 +1151,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
     setTierRows([])
     setConditionRows([])
     setMultiplierTierRows([])
+    setDecayPeriodRows([])
     setModalOpen(true)
   }
 
@@ -1138,6 +1165,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
       description: tpl.description,
       mode: tpl.mode,
       score: tpl.score ?? 0,
+      decayCoefficient: tpl.decayCoefficient,
       statDays: tpl.statDays,
       rangeScores: tpl.rangeScores ? { ...tpl.rangeScores } : undefined,
       status: tpl.status ?? ServiceStatus.ENABLED,
@@ -1146,6 +1174,8 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
     setTierRows(tpl.tiers ? [...tpl.tiers] : [])
     setConditionRows(tpl.conditionItems ? [...tpl.conditionItems] : [])
     setMultiplierTierRows(tpl.multiplierTiers ? [...tpl.multiplierTiers] : [])
+    // PLT_01 分時段滿分：預填模板五檔，彈窗內可逐檔調整
+    setDecayPeriodRows(tpl.decayPeriodConfig ? tpl.decayPeriodConfig.items.map(item => ({ ...item })) : [])
   }
 
   /** 當前選中的模板 */
@@ -1196,8 +1226,10 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
         }
       }
       if (tpl.id === 'PLT_01') {
-        if (values.score === undefined || values.score < 0) {
-          message.warning('請配置滿分分值')
+        // 滿分已改分時段配置：逐行校驗（0～500 整數、時段不重複），衰減係數仍單一必填
+        const decayError = validateDecayPeriodConfig({ items: decayPeriodRows })
+        if (decayError) {
+          message.warning(decayError)
           return
         }
         if (!(values as any).decayCoefficient || (values as any).decayCoefficient <= 0) {
@@ -1249,6 +1281,10 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
       peakTimeRanges: values.peakTimeRanges ? JSON.stringify(values.peakTimeRanges) : undefined,
       deductionPerOrder: (values as any).deductionPerOrder,
       decayCoefficient: (values as any).decayCoefficient,
+      // PLT_01 分時段满分：随创建一并落库（decay_period_config 列）
+      decayPeriodConfig: addTemplateId === 'PLT_01' && decayPeriodRows.length
+        ? JSON.stringify({ items: decayPeriodRows })
+        : undefined,
       timeRangeScores: (values as any).timeRangeScores ? JSON.stringify((values as any).timeRangeScores) : undefined,
       // STB_09 活動加分：保留已有配置（彈窗路徑不編輯活動明細）
       activityItems: editingRule?.id === 'STB_09'
@@ -1295,6 +1331,9 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
           newRule.name = tpl.name
           newRule.description = tpl.description
           newRule.mode = tpl.mode
+        }
+        if (fallbackId === 'PLT_01' && decayPeriodRows.length) {
+          newRule.decayPeriodConfig = { items: decayPeriodRows.map(item => ({ ...item })) }
         }
         setRules(prev => [...prev, newRule])
       }
@@ -1587,6 +1626,26 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                           updatedAt={rule.updatedAt}
                           readOnly={readOnly}
                           onSave={(next, desc) => { void handleSaveTimePeriodPanel(rule, next, desc) }}
+                        />
+                      </div>
+                    )
+                  }
+                  // 距離衰減（PLT_01）：滿分按五餐段獨立配置，衰減係數全局單一；
+                  // 交互形式对齐主營時段面板，試算額外帶距離維度
+                  if (isDistanceDecayRule(rule.id)) {
+                    const saved = rule.decayPeriodConfig ?? DEFAULT_DECAY_PERIOD_CONFIG
+                    return (
+                      <div className="algorithm-form__rule-body">
+                        <DistanceDecayScorePanel
+                          ruleName={rule.name}
+                          config={saved}
+                          coefficient={rule.decayCoefficient ?? DECAY_DEFAULT_COEFFICIENT}
+                          hasSavedConfig={!!rule.decayPeriodConfig?.items?.length}
+                          description={rule.description}
+                          updatedBy={rule.updatedBy}
+                          updatedAt={rule.updatedAt}
+                          readOnly={readOnly}
+                          onSave={(next, coeff, desc) => { void handleSaveDecayPanel(rule, next, coeff, desc) }}
                         />
                       </div>
                     )
@@ -1985,26 +2044,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             </div>
                           )
                         })()}
-                        {/* PLT_01 距離衰減自定義只讀顯示 */}
-                        {rule.id === 'PLT_01' && (() => {
-                          const fullScore = rule.score ?? 100
-                          const coeff = rule.decayCoefficient ?? 5
-                          return (
-                            <div className="organic-score-panel">
-                              <ScoreRow label="滿分" score={fullScore} kind="base" />
-                              <ScoreRow label="衰減係數" score={coeff} kind="decay" />
-                              <div style={{
-                                display: 'flex', alignItems: 'center', gap: 12,
-                                padding: '10px 12px', background: 'var(--info-soft)', borderRadius: 6,
-                              }}>
-                                <span style={{ fontSize: 13, color: 'var(--text-2)' }}>計算公式：得分 = 滿分 - 衰減係數 × 距離</span>
-                              </div>
-                              <div className="organic-score-note">
-                                備注：距離越遠得分越低，最低為 0 分
-                              </div>
-                            </div>
-                          )
-                        })()}
+                        {/* PLT_01 已改走 DistanceDecayScorePanel（分時段滿分 + 單一衰減係數），不再走通用只讀分支 */}
                         {rule.mode === ScoreMode.TIERED && rule.tiers?.length && rule.id !== 'PLT_03' && rule.id !== 'PLT_04' && (
                           <div>
                             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8 }}>梯度檔位明細（{rule.tiers.length} 檔）</div>
@@ -2624,43 +2664,7 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                             </div>
                           )
                         })()}
-                        {/* PLT_01 距離衰減自定義編輯 */}
-                        {rule.id === 'PLT_01' && (() => {
-                          const fullScore = form.score ?? 100
-                          const coeff = (form as any).decayCoefficient ?? 5
-                          return (
-                            <div className="organic-score-panel">
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <span style={{ fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>滿分</span>
-                                  <InputNumber
-                                    value={fullScore}
-                                    min={0} max={500} style={{ width: 110 }}
-                                    addonAfter="分"
-                                    onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], score: val ?? 100 } }) as any)}
-                                  />
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <span style={{ fontSize: 12, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>衰減係數</span>
-                                  <InputNumber
-                                    value={coeff}
-                                    min={0.1} max={100} step={0.1} style={{ width: 130 }}
-                                    addonAfter=""
-                                    onChange={val => setInlineForm(prev => ({ ...prev, [rule.id!]: { ...prev[rule.id!], decayCoefficient: val ?? 5 } }) as any)}
-                                  />
-                                </div>
-                              </div>
-                              <div style={{
-                                padding: '8px 12px', background: 'var(--info-soft)', borderRadius: 6, marginBottom: 8,
-                              }}>
-                                <span style={{ fontSize: 12, color: 'var(--text-2)' }}>計算公式：得分 = 滿分 - 衰減係數 × 距離</span>
-                              </div>
-                              <div style={{ fontSize: 11, color: 'var(--text-3)' }}>
-                                備注：距離越遠得分越低，最低為 0 分
-                              </div>
-                            </div>
-                          )
-                        })()}
+                        {/* PLT_01 已改走 DistanceDecayScorePanel（分時段滿分 + 單一衰減係數），不再需要舊滿分/係數內聯編輯器 */}
                         {/* STB_09 活動加分自定義編輯：下拉選中活動即帶出名與狀態，不需再點查詢（暫對接算法庫） */}
                         {rule.id === 'STB_09' && (() => {
                           const items: ActivityScoreItem[] = ((form as any).activityItems || [])
@@ -2992,21 +2996,17 @@ export default function OrganicTrafficScoreConfig({ readOnly = false, brand }: P
                       </div>
                     )}
 
-                    {/* DECAY（PLT_01）：滿分 + 衰減係數 */}
+                    {/* DECAY（PLT_01）：分時段滿分 + 衰減係數單一 */}
                     {tpl.id === 'PLT_01' && (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-                        <div>
-                          <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>滿分</div>
-                          <Form.Item name="score" noStyle>
-                            <InputNumber min={0} max={500} style={{ width: '100%' }} addonAfter="分" placeholder="滿分分值" />
-                          </Form.Item>
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>{t('organicTrafficScore.decayPeriod.modalMaxLabel')}</div>
+                        <div style={{ padding: '12px 14px', background: 'var(--surface-3)', borderRadius: 8, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <DecayPeriodRowsEditor items={decayPeriodRows} onChange={setDecayPeriodRows} />
                         </div>
-                        <div>
-                          <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>衰減係數</div>
-                          <Form.Item name="decayCoefficient" noStyle>
-                            <InputNumber min={0.1} max={100} step={0.1} style={{ width: '100%' }} placeholder="衰減係數" />
-                          </Form.Item>
-                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>{t('organicTrafficScore.decayPeriod.modalCoeffLabel')}</div>
+                        <Form.Item name="decayCoefficient" noStyle>
+                          <InputNumber min={0.1} max={100} step={0.1} style={{ width: '100%' }} placeholder={t('organicTrafficScore.decayPeriod.coeffLabel')} />
+                        </Form.Item>
                       </div>
                     )}
 

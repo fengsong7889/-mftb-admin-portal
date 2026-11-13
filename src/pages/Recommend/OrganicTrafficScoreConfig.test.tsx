@@ -830,3 +830,35 @@ describe('出餐時長（STB_07）：固定加分 + 自動校正開關落庫', (
       .toHaveAttribute('aria-checked', 'false')
   }, 120000)
 })
+
+describe('PLT_01 距離衰減：分時段满分落库', () => {
+  const DP = (k: string) => `organicTrafficScore.decayPeriod.${k}`
+
+  it('只读态按五时段列满分且系数单一；编辑保存把 decayPeriodConfig 与系数一并写入 payload', async () => {
+    api.update.mockResolvedValue({
+      ruleCode: 'PLT_01', dimension: 4, name: '距離衰減', description: '滿分按時段獨立配置', mode: 2,
+      score: 100, decayCoefficient: 5, status: 1, builtin: 1,
+      decayPeriodConfig: JSON.stringify({ items: [{ periodValue: 'breakfast', periodName: '早餐', score: 80 }] }),
+    })
+    await mount()
+    fireEvent.click(screen.getByRole('tab', { name: /dimPlatform/ }))
+    fireEvent.click(screen.getByText('PLT_01'))
+    const panel = within(screen.getByLabelText('距離衰減分時段滿分配置'))
+    // 五档满分清单 + 单一衰减系数行（标签只出现一次，徽标走 display.decay）
+    expect(panel.getByText('早餐')).toBeInTheDocument()
+    expect(panel.getByText('宵夜')).toBeInTheDocument()
+    expect(panel.getAllByText(DP('coeffLabel'))).toHaveLength(1)
+
+    fireEvent.click(panel.getByRole('button', { name: TP('edit') }))
+    fireEvent.change(panel.getByRole('spinbutton', { name: '第 1 行滿分' }), { target: { value: '80' } })
+    fireEvent.click(panel.getByRole('button', { name: TP('save') }))
+
+    await waitFor(() => expect(api.update).toHaveBeenCalledTimes(1))
+    const [identifier, payload] = api.update.mock.calls[0]
+    expect(identifier).toBe('PLT_01')
+    expect(payload.decayCoefficient).toBe(5)
+    const cfg = JSON.parse(payload.decayPeriodConfig)
+    expect(cfg.items).toHaveLength(5)
+    expect(cfg.items[0]).toMatchObject({ periodValue: 'breakfast', score: 80 })
+  }, 120000)
+})

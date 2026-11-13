@@ -38,6 +38,9 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
     /** 计分方式存储编码：1=规则加分（与前端 ScoreMode.RULE_BONUS 一致），用于加分规则的分值符号校验 */
     private static final int MODE_RULE_BONUS = 1;
 
+    /** 计分方式存储编码：2=衰减函数（与前端 ScoreMode.DECAY 一致），用于满分/衰减系数的符号边界校验 */
+    private static final int MODE_DECAY = 2;
+
     /** 维度 → 编码前缀映射 */
     private static final String PREFIX_COM = "COM";
     private static final String PREFIX_STB = "STB";
@@ -149,6 +152,7 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         entity.setTrafficBalanceConfig(request.getTrafficBalanceConfig());
         entity.setStoreLabelConfig(request.getStoreLabelConfig());
         entity.setTimePeriodConfig(request.getTimePeriodConfig());
+        entity.setDecayPeriodConfig(request.getDecayPeriodConfig());
         entity.setPrerequisites(request.getPrerequisites());
         entity.setStatus(request.getStatus());
         entity.setBuiltin(0);
@@ -194,6 +198,7 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         entity.setTrafficBalanceConfig(request.getTrafficBalanceConfig());
         entity.setStoreLabelConfig(request.getStoreLabelConfig());
         entity.setTimePeriodConfig(request.getTimePeriodConfig());
+        entity.setDecayPeriodConfig(request.getDecayPeriodConfig());
         entity.setPrerequisites(request.getPrerequisites());
         entity.setStatus(request.getStatus());
         entity.setUpdatedBy(operatorResolver.currentOperatorName());
@@ -310,6 +315,17 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
                 && request.getScore() != null && request.getScore() < 0) {
             throw new BusinessException("規則加分計分方式的分值不得為負: " + request.getScore());
         }
+        // 衰減函數（mode=2）通用語義：滿分（score）不得為負、衰減係數配置時必須為正——
+        // 負滿分或零/負係數會讓「距離越遠得分越低」的口徑在計分側反轉。按 mode 裁決，不按 rule_code 特判；
+        // 兩者為 null 時不拦（可選字段，沿用 createRule 補默認的既有語義）。
+        if (Integer.valueOf(MODE_DECAY).equals(request.getMode())) {
+            if (request.getScore() != null && request.getScore() < 0) {
+                throw new BusinessException("衰減函數計分方式的滿分不得為負: " + request.getScore());
+            }
+            if (request.getDecayCoefficient() != null && request.getDecayCoefficient().signum() <= 0) {
+                throw new BusinessException("衰減函數計分方式的衰減係數必須為正: " + request.getDecayCoefficient());
+            }
+        }
     }
 
     /**
@@ -392,6 +408,7 @@ public class OrganicScoreServiceImpl implements OrganicScoreService {
         vo.setTrafficBalanceConfig(entity.getTrafficBalanceConfig());
         vo.setStoreLabelConfig(entity.getStoreLabelConfig());
         vo.setTimePeriodConfig(entity.getTimePeriodConfig());
+        vo.setDecayPeriodConfig(entity.getDecayPeriodConfig());
         vo.setStatus(entity.getStatus());
         vo.setBuiltin(entity.getBuiltin());
         vo.setSortOrder(entity.getSortOrder());

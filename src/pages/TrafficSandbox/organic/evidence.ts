@@ -6,6 +6,7 @@
  * 完整许可条款见仓库根目录 LICENSE 文件。
  */
 import type { Coordinate, RuleInput, RuleResult, StoreResult } from './types'
+import { DEFAULT_ORGANIC_SCORE_RULES, decayMaxScoreOf } from '../../Recommend/organicTrafficConfig'
 
 const input = (label: string, value: RuleInput['value'], unit?: string): RuleInput => ({ label, value, unit })
 const couponCodes = new Set(['COM_01', 'COM_03', 'COM_04', 'COM_05', 'COM_07'])
@@ -74,7 +75,8 @@ export function attachSampleEvidence(store: StoreResult, userPoint: Coordinate):
     }
     if (rule.ruleCode === 'PLT_01') {
       rule.metricValue = store.distanceKm; rule.unit = 'km'
-      rule.inputs = [input('用戶WGS84座標', `${userPoint.lat}, ${userPoint.lng}`), input('門店WGS84座標', store.coordinate ? `${store.coordinate.lat}, ${store.coordinate.lng}` : null), input('球面直線距離', store.distanceKm, 'km'), input('距離滿分', 100, '原始分'), input('每公里扣分', 5, '分/km')]
+      const decayRule = DEFAULT_ORGANIC_SCORE_RULES.find(r => r.id === 'PLT_01')
+      rule.inputs = [input('用戶WGS84座標', `${userPoint.lat}, ${userPoint.lng}`), input('門店WGS84座標', store.coordinate ? `${store.coordinate.lat}, ${store.coordinate.lng}` : null), input('球面直線距離', store.distanceKm, 'km'), input('當前時段', '午餐（演示默認）'), input('時段滿分', decayMaxScoreOf(decayRule?.decayPeriodConfig, 'lunch'), '分'), input('每公里扣分', decayRule?.decayCoefficient ?? 5, '分/km'), input('滿分口徑', '按時段獨立配置，衰減係數全局單一')]
     }
     if (rule.ruleCode === 'PLT_03') {
       rule.metricValue = 45; rule.unit = '單'

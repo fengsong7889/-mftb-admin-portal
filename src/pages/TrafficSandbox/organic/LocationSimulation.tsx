@@ -16,7 +16,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useColumnConfig } from '@/hooks/useColumnConfig'
 import HelpPopover from '@/components/HelpPopover'
 import { exportToCSV } from '@/utils/exportCSV'
-import { DISTANCE_CURVE, getSampleSnapshot, POINTS, SCENES, TARGET_STORE } from './fixtures'
+import { DISTANCE_CURVE, getSampleSnapshot, POINTS, SCENES, TARGET_STORE, DECAY_MAX_LUNCH, DECAY_PER_KM } from './fixtures'
 import { coordinateError, matchSamplePoint, rankChange, rankText, readBoardQuery, scoreText } from './display'
 import { ContextStrip, DemoNotice, EligibilityTag, ScoreHeader, Section, VisualBoundary } from './ScoreParts'
 import type { Coordinate, PointId, SimulationComparison, SimulationMode, StoreResult } from './types'
@@ -107,12 +107,12 @@ export default function LocationSimulation() {
           <p><Tag color="purple">{selectedComparison?.rankDeltaText ?? '不可比較'}</Tag><span className="organic__muted">總分不等於距離分；置後／過濾不按低分處理。</span></p>
           {selectedComparison?.eligibilityTransition && <div className="organic__deduction-note">資格變化：{selectedComparison.eligibilityTransition}（完整場景演示，不是實時配送判定）</div>}
           {selectedComparison && selectedComparison.changedRuleCodes.length > 0 && <p className="organic__muted">變化規則：{selectedComparison.changedRuleCodes.join('、')}</p>}
-          <div className="organic__formula">距離原始分＝max(0, 100 − 5 × 距離km)</div>
+          <div className="organic__formula">距離原始分＝max(0, {DECAY_MAX_LUNCH}〔午餐〕 − {DECAY_PER_KM} × 距離km)</div>
         </div>
       </Section>
     </div>
-    <Section title="距離衰減曲線" description="固定示例：滿分100、每公里扣5分，20公里歸零。曲線僅代表PLT_01原始分。">
-      <VisualBoundary label="距離曲線"><Line height={170} data={DISTANCE_CURVE} xField="distance" yField="score" scale={{ x: { type: 'linear' }, y: { domain: [0, 100] } }} style={{ stroke: 'var(--purple)', lineWidth: 2 }} point={{ size: 3 }} axis={{ x: { title: '距離（km）' }, y: { title: '原始分' } }} animate={false} /></VisualBoundary>
+    <Section title="距離衰減曲線" description={`固定示例：午餐滿分${DECAY_MAX_LUNCH}、每公里扣${DECAY_PER_KM}分，${DECAY_MAX_LUNCH / DECAY_PER_KM}公里歸零。滿分按時段獨立配置，曲線取午餐檔，僅代表PLT_01原始分。`}>
+      <VisualBoundary label="距離曲線"><Line height={170} data={DISTANCE_CURVE} xField="distance" yField="score" scale={{ x: { type: 'linear' }, y: { domain: [0, DECAY_MAX_LUNCH] } }} style={{ stroke: 'var(--purple)', lineWidth: 2 }} point={{ size: 3 }} axis={{ x: { title: '距離（km）' }, y: { title: '原始分' } }} animate={false} /></VisualBoundary>
       <div className="organic__legend">{DISTANCE_CURVE.filter(p => [0, 1, 5, 20].includes(p.distance)).map(p => <span key={p.distance}>{p.distance} km → <b>{p.score} 分</b></span>)}</div>
     </Section>
     <div className="action-section"><div className="action-section-left"><Input aria-label="對比門店搜尋" placeholder="搜尋對比門店" value={keyword} maxLength={100} allowClear onChange={e => { setKeyword(e.target.value); setPage(1) }} />{hasPermission('algorithm-simulation:export') && <Button className="btn-export" icon={<ExportOutlined />} disabled={!comparison || !rows.length} onClick={handleExport}>導出演示對比</Button>}</div><div className="action-section-right">{configComponent}</div></div>

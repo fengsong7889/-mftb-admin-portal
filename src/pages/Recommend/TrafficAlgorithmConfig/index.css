@@ -161,3 +161,240 @@
 .traffic-config__formula {
   font-family: monospace;
 }
+
+/* ── 冷启动排序维度：逐维度配置卡 ── */
+.traffic-dimensions-item {
+  margin-bottom: 16px;
+}
+
+.traffic-dimensions-item > .ant-form-item-label > label {
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.traffic-dim-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.traffic-dim-cards__summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-3);
+  margin-bottom: 2px;
+}
+
+.traffic-dim-cards__count {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 12px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.traffic-dim-card {
+  border: 1px solid var(--border-3);
+  border-radius: 8px;
+  background: var(--surface-2);
+  overflow: hidden;
+  transition: border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.traffic-dim-card--active {
+  border-color: var(--brand-border);
+  box-shadow: var(--shadow-card-soft);
+}
+
+/* 卡头即 Checkbox 的 label：叠 .ant-checkbox-wrapper 提高优先级，盖住 antd 默认 inline-flex/baseline。 */
+.traffic-dim-card__header.ant-checkbox-wrapper {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  margin-inline-end: 0;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.traffic-dim-card--active .traffic-dim-card__header {
+  background: var(--brand-soft);
+}
+
+.traffic-dim-card__header .ant-checkbox {
+  margin-top: 2px;
+}
+
+.traffic-dim-card__header .ant-checkbox + span {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding-inline-start: 0;
+  padding-inline-end: 0;
+}
+
+.traffic-dim-card__title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.traffic-dim-card__name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+  line-height: 1.5;
+}
+
+.traffic-dim-card__icon {
+  display: inline-flex;
+  font-size: 14px;
+  color: var(--text-3);
+}
+
+.traffic-dim-card--active .traffic-dim-card__icon {
+  color: var(--brand);
+}
+
+.traffic-dim-card__desc {
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.traffic-dim-card__badge {
+  flex-shrink: 0;
+  margin-left: auto;
+  align-self: center;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  white-space: nowrap;
+  background: var(--surface-3);
+  color: var(--text-3);
+  border: 1px solid var(--border-2);
+}
+
+.traffic-dim-card__badge--active {
+  background: var(--brand-soft);
+  color: var(--brand);
+  border-color: var(--brand-border);
+}
+
+.traffic-dim-card__body {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-2);
+}
+
+.traffic-dim-card__body[hidden] {
+  display: none;
+}
+
+.traffic-dim-card__body .algorithm-fields {
+  margin-bottom: 0;
+}
+
+.traffic-dim-card__hint {
+  margin: 10px 0 0;
+}
+
+/* ── 紧凑行内配置：标签与控件同行，多个参数共用一行，避免每项独占一大行 ── */
+.traffic-fields-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 24px;
+  min-width: 0;
+}
+
+/* 叠 .ant-form-item 提高优先级（0,4,0），盖住 .ant-form-vertical 对 row/label 的纵向默认（0,3,0），
+   否则逐项 horizontal 会被表单级 vertical 规则压回「标签在上、控件在下」。 */
+.traffic-fields-inline .ant-form-item.ant-form-item {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.traffic-fields-inline .ant-form-item.ant-form-item .ant-form-item-row {
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.traffic-fields-inline .ant-form-item.ant-form-item .ant-form-item-label {
+  flex: 0 0 auto;
+  padding-bottom: 0;
+}
+
+.traffic-fields-inline .ant-form-item.ant-form-item .ant-form-item-label > label {
+  height: auto;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.traffic-fields-inline .ant-form-item.ant-form-item .ant-form-item-control {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.traffic-fields-inline .ant-input-number,
+.traffic-fields-inline .ant-input-number-affix-wrapper {
+  width: 110px;
+}
+
+.traffic-fields-inline .ant-select {
+  width: 180px;
+}
+
+.traffic-fields-inline .ant-checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+/* ── 浏览后相似推荐：子配置分组 ── */
+.traffic-generative-groups[hidden] {
+  display: none;
+}
+
+.traffic-field-group {
+  margin-bottom: 12px;
+}
+
+.traffic-field-group__caption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin-bottom: 8px;
+}
+
+.traffic-field-group__caption::before {
+  content: '';
+  width: 3px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--brand);
+}
+
+.traffic-field-group .algorithm-fields,
+.traffic-field-group .traffic-fields-inline {
+  margin-bottom: 0;
+}

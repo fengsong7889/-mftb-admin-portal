@@ -111,6 +111,14 @@ public class OrganicScoreRule {
      */
     private String timePeriodConfig;
 
+    /**
+     * 距離衰減分時段满分配置 JSON（[{periodValue, periodName, score}]，score 语义为该时段「满分」，仅 PLT_01 使用）。
+     * 满分改为按五餐段独立配置后，衰减系数仍全局单一（decay_coefficient）；
+     * score 保留旧满分作 legacy 计分引擎兜底（DECAY 模式把 score 当满分，置 0 会立即让距离衰减归零），
+     * 待引擎读新列后再收敛。
+     */
+    private String decayPeriodConfig;
+
     /** 服务状态: 1=启用 2=停用 */
     private Integer status;
 

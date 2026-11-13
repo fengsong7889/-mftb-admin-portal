@@ -667,7 +667,8 @@ export const SCORE_RULE_CONFIG: Array<{
   // 該 key 已進入後端 sys_translation 登記表（ja/ko/ru 靠它供文案），改 key 會丟掉已有譯文，因此只改取值不改 key。
   { dimension: ScoreDimension.STORE, ruleCode: 'STB_06', nameKey: 'scoreInsight.ruleRejectOrder', mode: ScoreMode.RULE_ADD, statDays: 30, baseScore: 50 },
   // 平台維度（PLT_02「配送範圍」已下架；PLT_04「訂單過熱調控」已并入 PLT_03 流量均衡，两条都不再出现在本表）
-  { dimension: ScoreDimension.PLATFORM, ruleCode: 'PLT_01', nameKey: 'scoreInsight.ruleDistanceDecay', mode: ScoreMode.DECAY, statDays: 1, baseScore: 30 },
+  // PLT_01 满分已改分时段配置（算法库默认五档各 100）：演示满分量级对齐午餐档 100，衰减系数全局单一住真实配置 decay_coefficient
+  { dimension: ScoreDimension.PLATFORM, ruleCode: 'PLT_01', nameKey: 'scoreInsight.ruleDistanceDecay', mode: ScoreMode.DECAY, statDays: 1, baseScore: 100 },
   { dimension: ScoreDimension.PLATFORM, ruleCode: 'PLT_03', nameKey: 'scoreInsight.ruleMerchantSupport', mode: ScoreMode.RULE_ADD, statDays: 30, baseScore: 20 },
 ]
 

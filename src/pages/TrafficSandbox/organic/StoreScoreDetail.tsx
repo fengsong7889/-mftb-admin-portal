@@ -6,19 +6,19 @@
  * 完整许可条款见仓库根目录 LICENSE 文件。
  */
 import { useState, type Key } from 'react'
-import { Descriptions, Empty, InputNumber, Segmented, Table, Tag } from 'antd'
+import { Descriptions, Empty, InputNumber, Segmented, Select, Table, Tag } from 'antd'
 import type { TableColumnsType } from 'antd'
 import DetailPageHeader from '@/components/DetailPageHeader'
-import { DEFAULT_ORGANIC_SCORE_RULES, DEFAULT_TRAFFIC_BALANCE_CONFIG } from '../../Recommend/organicTrafficConfig'
+import { DEFAULT_ORGANIC_SCORE_RULES, DEFAULT_TRAFFIC_BALANCE_CONFIG, DEFAULT_DECAY_PERIOD_CONFIG, TIME_PERIOD_KEYS, TIME_PERIOD_LABELS, decayMaxScoreOf } from '../../Recommend/organicTrafficConfig'
 import { DIMENSIONS } from './fixtures'
 import { scoreText } from './display'
 import { MatchTag, Section } from './ScoreParts'
 import DimensionGauge from './DimensionGauge'
 import type { RuleResult, ScoreSnapshot, StoreResult } from './types'
 
-/** 距离衰减算法库真值（满分/衰减系数），不在前端另写一套数 */
+/** 距离衰减算法库真值（分时段满分/衰减系数），不在前端另写一套数 */
 const DECAY_RULE = DEFAULT_ORGANIC_SCORE_RULES.find(item => item.id === 'PLT_01')
-const DECAY_MAX = DECAY_RULE?.score ?? 100
+const DECAY_CFG = DECAY_RULE?.decayPeriodConfig ?? DEFAULT_DECAY_PERIOD_CONFIG
 const DECAY_PER_KM = DECAY_RULE?.decayCoefficient ?? 5
 /** 默认试算距离 3km：外卖行业公开调研综合取值（美团研究院 2022：约 75% 订单在 3 公里内、单均约 2.9km，3km 为主流配送核心半径）；实际以用户与门店距离为准 */
 const SIM_DEFAULT_DISTANCE = 3
@@ -38,7 +38,11 @@ export default function StoreScoreDetail({ store, snapshot, onBack }: {
   const [dimension, setDimension] = useState('commercial')
   /** 距离衰减计算器：默认 3km（行业调研综合取值），用户可调；顶部「距離衰減得分」卡实时跟随 */
   const [simDistance, setSimDistance] = useState<number>(SIM_DEFAULT_DISTANCE)
-  const simScore = Math.max(0, DECAY_MAX - DECAY_PER_KM * simDistance)
+  /** 满分已改分时段配置：计算器可选当前时段，满分取该时段配置值（默认午餐） */
+  const [simPeriod, setSimPeriod] = useState<string>('lunch')
+  const simPeriodLabel = TIME_PERIOD_LABELS[simPeriod as keyof typeof TIME_PERIOD_LABELS] ?? simPeriod
+  const decayMax = decayMaxScoreOf(DECAY_CFG, simPeriod)
+  const simScore = Math.max(0, decayMax - DECAY_PER_KM * simDistance)
   const dimensionScore = (key: string) => store.dimensions.find(d => d.dimension === key)?.rawScore
   const columns: TableColumnsType<RuleResult> = [
     { key: 'code', title: '計分ID', width: 120, render: (_, r) => <span className="organic__muted">{r.ruleCode}</span> },
@@ -57,16 +61,17 @@ export default function StoreScoreDetail({ store, snapshot, onBack }: {
     <div className="organic__ev-block">
       <h5>得分構成（命中算法庫自然流量梯度）</h5>
       <div className="organic__score-cards">{(r.parts?.length ? r.parts : [{ label: r.ruleCode === 'PLT_01' ? '距離衰減得分' : r.name, score: r.ruleCode === 'PLT_01' ? simScore : r.rawScore ?? 0 }]).map(p => <div className="organic__score-card" key={p.label}><span>{p.label}</span>{p.status && <Tag color={p.status === '已停發' ? 'red' : 'default'}>{p.status}</Tag>}<b className={p.score < 0 ? 'organic__negative' : undefined}>{p.score > 0 ? '+' : ''}{scoreText(p.score)}</b>{(p.reference || p.validFrom) && <small>{[p.reference, p.validFrom && `生效 ${p.validFrom} → ${p.validTo ?? '—'}`].filter(Boolean).join(' · ')}</small>}</div>)}</div>
-      {r.parts?.length ? <div className="organic__formula">本項合計 {scoreText(r.rawScore)} 分</div> : r.ruleCode === 'PLT_01' ? <div className="organic__muted">得分 = max(0, {DECAY_MAX} − {DECAY_PER_KM} × {simDistance.toFixed(2)} km) = {scoreText(simScore)}（默認 {SIM_DEFAULT_DISTANCE} km，可用下方計算器調整）</div> : <div className="organic__muted">本項無子分構成，直接取原始分 {scoreText(r.rawScore)}</div>}
+      {r.parts?.length ? <div className="organic__formula">本項合計 {scoreText(r.rawScore)} 分</div> : r.ruleCode === 'PLT_01' ? <div className="organic__muted">得分 = max(0, {decayMax}〔{simPeriodLabel}〕 − {DECAY_PER_KM} × {simDistance.toFixed(2)} km) = {scoreText(simScore)}（默認 {SIM_DEFAULT_DISTANCE} km，可用下方計算器調整）</div> : <div className="organic__muted">本項無子分構成，直接取原始分 {scoreText(r.rawScore)}</div>}
     </div>
     {r.ruleCode === 'PLT_01' && <div className="organic__ev-block">
       <h5>距離衰減計算器</h5>
       <div className="organic__score-cards">
-        <div className="organic__score-card"><span>配置滿分</span><b>{scoreText(DECAY_MAX)}</b></div>
+        <div className="organic__score-card"><span>配置滿分（{simPeriodLabel}）</span><b>{scoreText(decayMax)}</b></div>
         <div className="organic__score-card"><span>衰減係數（每公里扣分）</span><b>−{DECAY_PER_KM.toFixed(2)}</b></div>
       </div>
-      <div className="organic__formula">公式：得分 = max(0, 滿分 − 衰減係數 × 用戶與門店直線距離km)</div>
+      <div className="organic__formula">公式：得分 = max(0, 滿分（當前時段） − 衰減係數 × 用戶與門店直線距離km)</div>
       <p className="organic__muted">提示：本項實際得分需按用戶定位與門店位置的具體距離即時計算，同一門店對不同用戶得分不同，系統無法預聚合直接納入總分。默認距離 {SIM_DEFAULT_DISTANCE} km 係外賣行業公開調研數據綜合取值（約 75% 外賣訂單配送距離在 3 公里內、單均約 2.9km，3km 為主流配送核心半徑），實際以用戶與門店的實際距離為準。</p>
+      <div className="organic__distance-sim"><span>當前時段</span><Select aria-label="當前時段" value={simPeriod} onChange={setSimPeriod} style={{ width: 150 }} options={TIME_PERIOD_KEYS.map(key => ({ value: key, label: TIME_PERIOD_LABELS[key] }))} /><b>滿分取該時段配置值，衰減係數全局單一</b></div>
       <div className="organic__distance-sim"><span>用戶與門店距離（km）</span><InputNumber aria-label="用戶與門店距離" min={0} max={999} step={0.1} precision={2} value={simDistance} onChange={value => setSimDistance(value ?? SIM_DEFAULT_DISTANCE)} style={{ width: 150 }} /><b>得分即時同步至上方「距離衰減得分」卡</b></div>
     </div>}
     {r.ruleCode === 'PLT_03' && <div className="organic__ev-block">

@@ -1,5 +1,6 @@
+import type { ReactNode } from 'react'
 import { Checkbox, Form, Input, InputNumber, Select, Switch } from 'antd'
-import { LockOutlined } from '@ant-design/icons'
+import { CheckCircleOutlined, EnvironmentOutlined, FireOutlined, LockOutlined, StarOutlined, WalletOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import MerchantStatusFields from '../AlgorithmForm/MerchantStatusFields'
 import { getTrafficFieldError, isTrafficFieldActive, TRAFFIC_FIELDS, trafficStrategyLabel, type TrafficAlgorithmValues, type TrafficFieldName } from './config'
@@ -9,10 +10,11 @@ export interface TrafficSectionProps {
   readOnly: boolean
 }
 
-/** 字段保持挂载，功能关闭只隐藏并停止该字段校验，不丢失历史值。 */
-function Fields({ names, values, readOnly }: TrafficSectionProps & { names: TrafficFieldName[] }) {
+/** 字段保持挂载，功能关闭只隐藏并停止该字段校验，不丢失历史值。
+ * compact 模式用逐项 horizontal 布局把「标签+控件」收进行内，多个参数共用一行，避免每项独占一大行。 */
+function Fields({ names, values, readOnly, compact = false }: TrafficSectionProps & { names: TrafficFieldName[]; compact?: boolean }) {
   return (
-    <div className="algorithm-fields">
+    <div className={compact ? 'traffic-fields-inline' : 'algorithm-fields'}>
       {names.map(name => {
         const field = TRAFFIC_FIELDS[name]
         const active = isTrafficFieldActive(name, values)
@@ -21,6 +23,7 @@ function Fields({ names, values, readOnly }: TrafficSectionProps & { names: Traf
           <Form.Item
             key={name}
             name={name}
+            layout={compact ? 'horizontal' : undefined}
             label={field.kind === 'hidden' ? undefined : field.label}
             hidden={!active || field.kind === 'hidden'}
             valuePropName={field.kind === 'boolean' ? 'checked' : 'value'}
@@ -124,22 +127,115 @@ export function FrequencySection(props: TrafficSectionProps) {
   )
 }
 
+/** 冷启动各排序维度的展示元数据：图标 + 一句话口径 + 该维度专属配置字段。
+ * 选项顺序与取值仍以 config.ts 的 newUserDimensions.options 为唯一真源，这里只补 UI 说明。 */
+const DIMENSION_META: Record<string, { icon: ReactNode; desc: string; fields: TrafficFieldName[]; hintKey?: string }> = {
+  remainingTraffic: { icon: <WalletOutlined />, desc: '剩余流量包余量越多，排序越靠前', fields: [] },
+  qualityScore: { icon: <StarOutlined />, desc: '质量分达到门槛的商家参与排序，分数越高越靠前', fields: ['qualityScoreThreshold'] },
+  regionPopular: { icon: <FireOutlined />, desc: '区域内热度分排名前 N% 的商家视为热门商家', fields: ['regionPopularStatsDays', 'regionPopularTopPercent', 'popularityMetrics'], hintKey: 'recommend.trafficRegionPopularCalc' },
+  completionRate: { icon: <CheckCircleOutlined />, desc: '完单率达标且订单样本充足的商家优先展示', fields: ['completionRateThreshold', 'completionMinOrderCount'], hintKey: 'recommend.trafficCompletionMinSampleHint' },
+  distance: { icon: <EnvironmentOutlined />, desc: '距离用户越近，排序越靠前', fields: [] },
+}
+
+/** 逐维度配置卡：勾选某维度即在卡内展开它自己的配置项，避免所有条件字段扎堆在一起。
+ * 作为 newUserDimensions 的受控控件接收 value/onChange；配置字段仍走 Fields 保持挂载，取消勾选不丢历史值。 */
+function ColdStartDimensionCards({ value, onChange, values, readOnly }: {
+  value?: string[]
+  onChange?: (value: string[]) => void
+  values: Partial<TrafficAlgorithmValues>
+  readOnly: boolean
+}) {
+  const { t } = useTranslation()
+  const selected = value ?? []
+  const options = TRAFFIC_FIELDS.newUserDimensions.options ?? []
+  const toggle = (dimension: string, checked: boolean) => {
+    onChange?.(checked ? [...selected, dimension] : selected.filter(item => item !== dimension))
+  }
+  return (
+    <div className="traffic-dim-cards">
+      <div className="traffic-dim-cards__summary">
+        <span className="traffic-dim-cards__count">已选 {selected.length} / {options.length}</span>
+        <span>勾选维度后在卡片内填写对应配置，未勾选的维度不参与计分</span>
+      </div>
+      {options.map(option => {
+        const meta = DIMENSION_META[option.value]
+        const checked = selected.includes(option.value)
+        return (
+          <div key={option.value} className={`traffic-dim-card${checked ? ' traffic-dim-card--active' : ''}`}>
+            {/* 整个卡头即 Checkbox 的 label，点击任意位置只触发一次勾选，禁用态由 antd 统一接管。 */}
+            <Checkbox className="traffic-dim-card__header" checked={checked} disabled={readOnly}
+              onChange={e => toggle(option.value, e.target.checked)}>
+              <span className="traffic-dim-card__title">
+                <span className="traffic-dim-card__name">
+                  <span className="traffic-dim-card__icon" aria-hidden="true">{meta.icon}</span>
+                  {option.label}
+                </span>
+                <span className="traffic-dim-card__desc">{meta.desc}</span>
+              </span>
+              <span className={`traffic-dim-card__badge${checked ? ' traffic-dim-card__badge--active' : ''}`}>
+                {meta.fields.length > 0 ? `${meta.fields.length} 项配置` : '无需额外配置'}
+              </span>
+            </Checkbox>
+            <div className="traffic-dim-card__body" hidden={!checked}>
+              {meta.fields.length > 0 && <Fields compact names={meta.fields} values={values} readOnly={readOnly} />}
+              {meta.hintKey && <p className="traffic-config__hint traffic-dim-card__hint">{t(meta.hintKey)}</p>}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/** 相似推荐子配置的轻量分组标题，把零散字段按语义聚拢。 */
+function FieldGroup({ caption, children }: { caption: string; children: ReactNode }) {
+  return (
+    <div className="traffic-field-group">
+      <span className="traffic-field-group__caption">{caption}</span>
+      {children}
+    </div>
+  )
+}
+
 export function RecommendationSection(props: TrafficSectionProps) {
   const { t } = useTranslation()
+  const generativeEnabled = props.values.generativeRecommendEnabled === true
   return (
     <>
       <h4 className="traffic-config__subtitle">无有效偏好时的冷启动</h4>
       <p className="traffic-config__hint">{t('recommend.trafficNewUserDimensionRule')}</p>
-      <Fields {...props} names={['newUserDimensions']} />
-      <Fields {...props} names={['qualityScoreThreshold', 'regionPopularStatsDays', 'popularityMetrics', 'regionPopularTopPercent', 'completionRateThreshold', 'completionMinOrderCount']} />
-      {props.values.newUserDimensions?.includes('regionPopular') && <p className="traffic-config__hint">{t('recommend.trafficRegionPopularCalc')}</p>}
-      {props.values.newUserDimensions?.includes('completionRate') && <p className="traffic-config__hint">{t('recommend.trafficCompletionMinSampleHint')}</p>}
+      <Form.Item
+        name="newUserDimensions"
+        label={TRAFFIC_FIELDS.newUserDimensions.label}
+        required
+        className="traffic-dimensions-item"
+        rules={[({ getFieldsValue }) => ({
+          validator: (_, value: unknown) => {
+            const error = getTrafficFieldError('newUserDimensions', value, getFieldsValue(true))
+            return error ? Promise.reject(new Error(error)) : Promise.resolve()
+          },
+        })]}
+      >
+        <ColdStartDimensionCards values={props.values} readOnly={props.readOnly} />
+      </Form.Item>
+
       <h4 className="traffic-config__subtitle">浏览后相似推荐</h4>
       <p className="traffic-config__hint">原“生成式推荐”，指浏览商家后在附近推荐同类投流商家，不是生成式 AI。以下参数保留现有配置。</p>
       <Fields {...props} names={['generativeRecommendEnabled']} />
-      {!props.values.generativeRecommendEnabled && <p className="traffic-config__hint">功能已关闭，子配置已保留；重新开启后可继续编辑。</p>}
-      <Fields {...props} names={['generativeTriggerMode', 'dwellTimeThreshold', 'generativeTriggerScope', 'generativeMerchantCount', 'generativePriorityMode', 'generativePriorityMode2', 'generativeDailyLimitMode', 'generativeDailyLimit', 'generativeSkipMerchantCount']} />
-      {props.values.generativeRecommendEnabled && (
+      {!generativeEnabled && <p className="traffic-config__hint">功能已关闭，子配置已保留；重新开启后可继续编辑。</p>}
+      {/* 关闭时整组隐藏但字段保持挂载，历史值不丢失。 */}
+      <div className="traffic-generative-groups" hidden={!generativeEnabled}>
+        <FieldGroup caption="触发条件">
+          <Fields compact {...props} names={['generativeTriggerMode', 'dwellTimeThreshold', 'generativeTriggerScope']} />
+        </FieldGroup>
+        <FieldGroup caption="推荐内容">
+          <Fields compact {...props} names={['generativeMerchantCount', 'generativePriorityMode', 'generativePriorityMode2']} />
+        </FieldGroup>
+        <FieldGroup caption="频次与间隔">
+          <Fields compact {...props} names={['generativeDailyLimitMode', 'generativeDailyLimit', 'generativeSkipMerchantCount']} />
+        </FieldGroup>
+      </div>
+      {generativeEnabled && (
         <div className="traffic-config__note">
           <p>每日触发次数限制不等同于商家曝光次数限制；两者需要同时满足。间隔指触发后跳过的商家点击数量。</p>
           {props.values.generativeMerchantCount === 2 && <p>两家依次选取并去重；不足两家时只展示达标商家，不重复补位。</p>}

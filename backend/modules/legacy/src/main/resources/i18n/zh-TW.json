@@ -6783,6 +6783,31 @@
         "reset": "重置試算",
         "close": "關閉",
         "fixConfigFirst": "請先修正配置：{{error}}"
+      },
+      "decayPeriod": {
+        "tag": "分時段滿分 · 衰減係數全局單一",
+        "notWired": " · 當前時段由業務系統傳入，本面板只配滿分與衰減係數",
+        "formula": "得分 = 滿分（當前時段） - 衰減係數 × 距離",
+        "calcPrefix": "計算公式：",
+        "empty": "尚未配置任何時段滿分，右上角點擊「編輯」添加時段與滿分",
+        "coeffLabel": "衰減係數",
+        "coeffSingleHint": "全局單一配置，所有時段共用",
+        "coeffEditHint": "全局單一配置，所有時段共用（每公里扣除的分數）",
+        "coeffRequired": "請配置衰減係數",
+        "saveHint": "衰減係數、分時段滿分與評分說明均會寫入後端",
+        "previewAria": "試算距離衰減",
+        "exampleEmpty": "尚未配置時段滿分，先配置至少一個時段再試算。",
+        "option": "{{label}}（滿分 {{score}} 分）",
+        "optionUnconfigured": "{{label}}（未配置，不計分）",
+        "distanceLabel": "模擬距離",
+        "unconfiguredAlert": "時段「{{label}}」未配置滿分，本次不計分",
+        "maxScoreRow": "滿分（{{label}}）",
+        "decayRow": "衰減係數 × 距離",
+        "totalLabel": "單項總得分 = max(0, 滿分 - 衰減係數 × 距離)",
+        "maxScoreWord": "滿分",
+        "editHint": "同一時段只能配一行；滿分為 0～{{limit}} 的整數；未列出的時段不計分",
+        "modalMaxLabel": "滿分（按時段分別配置）",
+        "modalCoeffLabel": "衰減係數（全局單一）"
       }
   },
   "position": {

@@ -6903,6 +6903,31 @@
         "reset": "Reset preview",
         "close": "Close",
         "fixConfigFirst": "Please fix the configuration first: {{error}}"
+      },
+      "decayPeriod": {
+        "tag": "Per-period max score · single global decay coefficient",
+        "notWired": " · The current period is provided by the business system; this panel only configures max scores and the decay coefficient",
+        "formula": "Score = max score (current period) - decay coefficient × distance",
+        "calcPrefix": "Formula: ",
+        "empty": "No period max scores configured yet. Click \"Edit\" at the top right to add periods and max scores.",
+        "coeffLabel": "Decay coefficient",
+        "coeffSingleHint": "Single global configuration shared by all periods",
+        "coeffEditHint": "Single global configuration shared by all periods (points deducted per km)",
+        "coeffRequired": "Please configure the decay coefficient",
+        "saveHint": "The decay coefficient, per-period max scores and scoring description are all saved to the backend",
+        "previewAria": "Simulate distance decay",
+        "exampleEmpty": "No period max scores configured yet. Configure at least one period before simulating.",
+        "option": "{{label}} (max {{score}} pts)",
+        "optionUnconfigured": "{{label}} (unconfigured, no score)",
+        "distanceLabel": "Simulated distance",
+        "unconfiguredAlert": "Period \"{{label}}\" has no max score configured; no score this time",
+        "maxScoreRow": "Max score ({{label}})",
+        "decayRow": "Decay coefficient × distance",
+        "totalLabel": "Total = max(0, max score - decay coefficient × distance)",
+        "maxScoreWord": "max score",
+        "editHint": "One row per period; max score is an integer 0–{{limit}}; unlisted periods do not score",
+        "modalMaxLabel": "Max score (per period)",
+        "modalCoeffLabel": "Decay coefficient (single global)"
       }
   },
   "position": {

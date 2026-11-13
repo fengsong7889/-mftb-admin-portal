@@ -6,6 +6,8 @@ import com.mftb.admin.service.impl.OrganicScoreServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.math.BigDecimal;
+
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -71,5 +73,31 @@ class OrganicScoreRuleValidationTest {
         OrganicScoreRuleRequest badStatus = request(1, 50);
         badStatus.setStatus(5);
         assertThrows(BusinessException.class, () -> validate(badStatus));
+    }
+
+    @Test
+    void rejectsNegativeMaxScoreOrNonPositiveCoefficientForDecayMode() {
+        // mode=2（衰減函數）通用邊界：滿分不得為負、係數配置時必須為正；按 mode 裁決不按 rule_code 特判
+        BusinessException negativeScore = assertThrows(BusinessException.class, () -> validate(request(2, -10)));
+        assertTrue(negativeScore.getMessage().contains("滿分不得為負"), negativeScore.getMessage());
+
+        OrganicScoreRuleRequest zeroCoeff = request(2, 100);
+        zeroCoeff.setDecayCoefficient(BigDecimal.ZERO);
+        BusinessException zeroEx = assertThrows(BusinessException.class, () -> validate(zeroCoeff));
+        assertTrue(zeroEx.getMessage().contains("衰減係數必須為正"), zeroEx.getMessage());
+
+        OrganicScoreRuleRequest negativeCoeff = request(2, 100);
+        negativeCoeff.setDecayCoefficient(new BigDecimal("-0.5"));
+        assertThrows(BusinessException.class, () -> validate(negativeCoeff));
+    }
+
+    @Test
+    void acceptsValidDecayAndKeepsNullOptionalFields() {
+        OrganicScoreRuleRequest ok = request(2, 100);
+        ok.setDecayCoefficient(new BigDecimal("5"));
+        assertDoesNotThrow(() -> validate(ok));
+        // 可選字段 null 不拦（沿用 createRule 補默認語義）；滿分 0 合法（該時段不給分）
+        assertDoesNotThrow(() -> validate(request(2, null)));
+        assertDoesNotThrow(() -> validate(request(2, 0)));
     }
 }

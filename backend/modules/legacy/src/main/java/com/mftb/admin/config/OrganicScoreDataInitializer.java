@@ -523,6 +523,18 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
         } catch (Exception e) {
             log.error("STB_01 主營時段分時段配置收敛失败：{}", e.getMessage(), e);
         }
+
+        // Step 25: PLT_01「距離衰減」满分改为五餐段独立配置 (一次性, 版本化, 带后置校验)
+        // 界面已改走 DistanceDecayScorePanel（时段 → 满分清单 + 单一衰减系数），但库里仍只有单一满分 score；
+        // 新增专用列 decay_period_config（沿用 time_period_config 先例，已在 LegacyCoreContracts 登记可自愈补列）。
+        // score 保留旧满分作 legacy 引擎兜底（DECAY 模式把 score 当满分，置 0 会立即让生产距离衰减归零）。
+        // 参考 SQL: sql/335_organic_plt01_decay_period.sql
+        try {
+            versionTracker.applyOnce("organic:plt01-decay-period-v1",
+                    this::migratePlt01DecayPeriod, this::verifyPlt01DecayPeriod);
+        } catch (Exception e) {
+            log.error("PLT_01 距離衰減分時段满分收敛失败：{}", e.getMessage(), e);
+        }
     }
 
     /**
@@ -1187,6 +1199,92 @@ public class OrganicScoreDataInitializer implements CommandLineRunner {
                 Integer.class, MAIN_TIME_SLOT_RULE_CODE);
         if (remains != null && remains > 0) {
             throw new IllegalStateException("STB_01 主營時段仍有 " + remains + " 行未写入 time_period_config，迁移未生效");
+        }
+    }
+
+    /* ────────── Step 25: PLT_01 距離衰減分時段满分 ────────── */
+
+    /** PLT_01 距離衰減规则编码 */
+    private static final String DISTANCE_DECAY_RULE_CODE = "PLT_01";
+    /** PLT_01 旧内置计分说明（作迁移守卫条件，绝不顶掉管理员自定义文案） */
+    private static final String PLT01_OLD_DESCRIPTION = "滿分按衰減係數×距離遞減，距離越遠得分越低";
+    /** PLT_01 新计分说明（与前端模板口径一致） */
+    private static final String PLT01_NEW_DESCRIPTION = "滿分按時段獨立配置，得分 = 滿分（當前時段） - 衰減係數 × 距離，距離越遠得分越低";
+    /** 改造前单一满分：五时段全预填该值，运营未调整前各时段口径与旧满分一致 */
+    private static final int PLT01_DEFAULT_MAX_SCORE = 100;
+
+    /**
+     * 把 PLT_01 的单一满分收敛为分時段满分配置：五时段全预填旧满分 100。
+     * 先确保列存在（本 Runner 跑在 SchemaContractValidator 之前，新库首启契约还未自愈补列）；
+     * 以「decay_period_config IS NULL」作守卫：运营已在界面配过满分清单的行绝不再顶掉；
+     * 计分说明以旧内置值作条件更新；score 保留旧满分作 legacy 引擎兜底，不置 0。
+     */
+    private void migratePlt01DecayPeriod() {
+        ensureDecayPeriodConfigColumn();
+        int changed = jdbcTemplate.update(
+                "UPDATE biz_organic_score_rule SET decay_period_config = ?, updated_by = 'system' "
+                        + "WHERE rule_code = ? AND deleted = 0 AND decay_period_config IS NULL",
+                buildDecayPeriodConfigJson(), DISTANCE_DECAY_RULE_CODE);
+        int descChanged = jdbcTemplate.update(
+                "UPDATE biz_organic_score_rule SET description = ?, updated_by = 'system' "
+                        + "WHERE rule_code = ? AND deleted = 0 AND description = ?",
+                PLT01_NEW_DESCRIPTION, DISTANCE_DECAY_RULE_CODE, PLT01_OLD_DESCRIPTION);
+        log.info("已將 PLT_01 距離衰減收敛為分時段满分配置：{} 行（說明收敛 {} 行；score 保留舊滿分作 legacy 引擎兜底）", changed, descChanged);
+    }
+
+    /** 默认五时段满分 JSON（与前端 DEFAULT_DECAY_PERIOD_CONFIG 同口径） */
+    private String buildDecayPeriodConfigJson() {
+        String[][] periods = {{"breakfast", "早餐"}, {"lunch", "午餐"}, {"afternoonTea", "下午茶"}, {"dinner", "晚餐"}, {"lateNight", "宵夜"}};
+        StringBuilder sb = new StringBuilder("{\"items\":[");
+        for (int i = 0; i < periods.length; i++) {
+            if (i > 0) sb.append(',');
+            sb.append("{\"periodValue\":\"").append(periods[i][0])
+                    .append("\",\"periodName\":\"").append(periods[i][1])
+                    .append("\",\"score\":").append(PLT01_DEFAULT_MAX_SCORE).append('}');
+        }
+        return sb.append("]}").toString();
+    }
+
+    /**
+     * 补列 decay_period_config（不吞异常）：不存在才 ADD COLUMN。
+     * DDL 与 LegacyCoreContracts.organicScoreRuleContract 的 ColumnSpec 逐字一致；
+     * ALTER 失败必须抛出，否则会被误记为已迁移。
+     */
+    private void ensureDecayPeriodConfigColumn() {
+        if (decayPeriodConfigColumnReady()) return;
+        jdbcTemplate.execute("ALTER TABLE `biz_organic_score_rule` ADD COLUMN `decay_period_config` TEXT DEFAULT NULL "
+                + "COMMENT '距離衰減分時段滿分配置 JSON（[{periodValue,periodName,score}]，僅 PLT_01）'");
+        log.info("已補列 biz_organic_score_rule.decay_period_config");
+    }
+
+    /** 列就绪探测：空结果集 query + 空回调（MySQL/H2 都成立；禁用 INFORMATION_SCHEMA+DATABASE() 与 queryForObject，见 time_period_config 先例注释） */
+    private boolean decayPeriodConfigColumnReady() {
+        try {
+            jdbcTemplate.query("SELECT decay_period_config FROM biz_organic_score_rule WHERE 1 = 0", rs -> { });
+            return true;
+        } catch (DataAccessException e) {
+            return false;
+        }
+    }
+
+    /**
+     * 后置校验：与 migrate 守卫同口径——只断言「不再有 decay_period_config IS NULL 的在用 PLT_01 行」
+     * 与「不再残留旧内置说明」，不断言 JSON 内容或名称等于新值；未播种（查无该行）不算失败。
+     */
+    private void verifyPlt01DecayPeriod() {
+        Integer remains = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM biz_organic_score_rule"
+                        + " WHERE rule_code = ? AND deleted = 0 AND decay_period_config IS NULL",
+                Integer.class, DISTANCE_DECAY_RULE_CODE);
+        if (remains != null && remains > 0) {
+            throw new IllegalStateException("PLT_01 距離衰減仍有 " + remains + " 行未写入 decay_period_config，迁移未生效");
+        }
+        Integer oldDesc = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM biz_organic_score_rule"
+                        + " WHERE rule_code = ? AND deleted = 0 AND description = ?",
+                Integer.class, DISTANCE_DECAY_RULE_CODE, PLT01_OLD_DESCRIPTION);
+        if (oldDesc != null && oldDesc > 0) {
+            throw new IllegalStateException("PLT_01 距離衰減仍有 " + oldDesc + " 行残留舊內置說明，迁移未生效");
         }
     }
 

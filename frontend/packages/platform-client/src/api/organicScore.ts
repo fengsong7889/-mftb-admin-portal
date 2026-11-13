@@ -42,6 +42,8 @@ export interface OrganicRuleVO {
   storeLabelConfig?: string
   /** 主營時段分時段计分配置 JSON（[{periodValue,periodName,score}]，仅 STB_01） */
   timePeriodConfig?: string
+  /** 距離衰減分時段满分配置 JSON（[{periodValue,periodName,score}]，score 为该时段满分，仅 PLT_01） */
+  decayPeriodConfig?: string
   status: number
   builtin: number
   sortOrder: number
@@ -87,6 +89,8 @@ export interface OrganicRulePayload {
   storeLabelConfig?: string
   /** 主營時段分時段计分配置 JSON（[{periodValue,periodName,score}]，仅 STB_01） */
   timePeriodConfig?: string
+  /** 距離衰減分時段满分配置 JSON（[{periodValue,periodName,score}]，score 为该时段满分，仅 PLT_01） */
+  decayPeriodConfig?: string
   status: number
 }
 

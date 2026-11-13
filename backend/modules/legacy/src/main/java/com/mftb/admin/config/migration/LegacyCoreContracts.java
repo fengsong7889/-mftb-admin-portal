@@ -522,6 +522,7 @@ public class LegacyCoreContracts implements SchemaContractProvider {
                         + "traffic_balance_config TEXT DEFAULT NULL COMMENT '流量均衡合併配置 JSON（僅 PLT_03）', "
                         + "store_label_config TEXT DEFAULT NULL COMMENT '門店標籤計分配置 JSON（僅 STB_04）', "
                         + "time_period_config TEXT DEFAULT NULL COMMENT '主營時段分時段計分配置 JSON（僅 STB_01）', "
+                        + "decay_period_config TEXT DEFAULT NULL COMMENT '距離衰減分時段滿分配置 JSON（僅 PLT_01）', "
                         + "status INT NOT NULL DEFAULT 1 COMMENT '服務狀態: 1=啟用 2=停用', "
                         + "builtin TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否系統內置', "
                         + "sort_order INT NOT NULL DEFAULT 0 COMMENT '排序號', "
@@ -554,7 +555,11 @@ public class LegacyCoreContracts implements SchemaContractProvider {
                         // 主營時段（STB_01）改为五餐段独立配分，沿用 store_label_config / traffic_balance_config 先例单独建列：
                         // 不复用 condition_items / time_range_scores，避免消费方把「当前时段命中一檔」误读成条件计分或旧配送分层结构
                         new ContractSpec.ColumnSpec("time_period_config",
-                                "ALTER TABLE biz_organic_score_rule ADD COLUMN time_period_config TEXT DEFAULT NULL COMMENT '主營時段分時段計分配置 JSON（[{periodValue,periodName,score}]，僅 STB_01）'")
+                                "ALTER TABLE biz_organic_score_rule ADD COLUMN time_period_config TEXT DEFAULT NULL COMMENT '主營時段分時段計分配置 JSON（[{periodValue,periodName,score}]，僅 STB_01）'"),
+                        // 距離衰減（PLT_01）满分改为五餐段独立配置，沿用 time_period_config 先例单独建列：
+                        // score 语义为该时段「满分」（不是加分），衰减系数仍全局单一住 decay_coefficient
+                        new ContractSpec.ColumnSpec("decay_period_config",
+                                "ALTER TABLE biz_organic_score_rule ADD COLUMN decay_period_config TEXT DEFAULT NULL COMMENT '距離衰減分時段滿分配置 JSON（[{periodValue,periodName,score}]，僅 PLT_01）'")
                 ));
     }
 

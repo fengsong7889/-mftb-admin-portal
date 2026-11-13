@@ -1261,6 +1261,90 @@ export function normalizeTimePeriodScoreConfig(
   return { items }
 }
 
+/* ────────── 距離衰減（PLT_01）：滿分分時段獨立配置 + 衰減係數全局單一 ────────── */
+
+/** 使用距離衰減分時段滿分面板的规则编码 */
+export const DISTANCE_DECAY_RULE_IDS = ['PLT_01'] as const
+
+/** 判断该计分项是否走距離衰減分時段滿分面板 */
+export const isDistanceDecayRule = (id?: string): boolean =>
+  !!id && (DISTANCE_DECAY_RULE_IDS as readonly string[]).includes(id)
+
+/** 每时段满分上限（沿用旧单一满分输入框 0～500 区间） */
+export const DECAY_MAX_SCORE_LIMIT = 500
+/** 改造前单一满分：默认五时段全预填该值，运营未调整前各时段口径与旧满分一致 */
+export const DECAY_DEFAULT_MAX_SCORE = 100
+/** 衰减系数默认值（每公里扣除的分数）：全局只有一个配置，所有时段共用 */
+export const DECAY_DEFAULT_COEFFICIENT = 5
+
+/**
+ * 默认配置：五时段全预填旧满分 100。
+ * 行形状复用 TimePeriodScore（score 语义为该时段「满分」，不是加分），
+ * 时段枚举同样复用 TIME_PERIOD_KEYS / TIME_PERIOD_LABELS，不另建名称表。
+ */
+export const DEFAULT_DECAY_PERIOD_CONFIG: TimePeriodScoreConfig = {
+  items: TIME_PERIOD_KEYS.map(period => ({
+    periodValue: period,
+    periodName: TIME_PERIOD_LABELS[period],
+    score: DECAY_DEFAULT_MAX_SCORE,
+  })),
+}
+
+/** 距離衰減試算結果 */
+export interface DistanceDecayResult {
+  /** 命中的时段档（未配置即为空） */
+  matched?: TimePeriodScore
+  /** 业务系统传了当前时段但后台未配满分：不计分，供界面提示补配 */
+  unconfigured: boolean
+  /** 当前时段满分（未配置为 0） */
+  maxScore: number
+  /** 衰减系数（全局单一配置） */
+  coefficient: number
+  /** 得分 = max(0, 满分 - 衰减系数 × 距离) */
+  total: number
+}
+
+/**
+ * 算分：满分取当前时段配置值，衰减系数全局单一。
+ * 未配置该时段、或未拿到当前时段，都按 0 分处理（不设兜底分）；得分最低 0 分。
+ */
+export function computeDistanceDecayScore(
+  cfg: TimePeriodScoreConfig,
+  coefficient: number,
+  periodValue?: string,
+  distance = 0,
+): DistanceDecayResult {
+  const matched = periodValue ? cfg.items.find(item => item.periodValue === periodValue) : undefined
+  const maxScore = matched?.score ?? 0
+  const safeCoefficient = Number.isFinite(coefficient) && coefficient > 0 ? coefficient : 0
+  const safeDistance = Number.isFinite(distance) && distance > 0 ? distance : 0
+  return {
+    matched,
+    unconfigured: !!periodValue && !matched,
+    maxScore,
+    coefficient: safeCoefficient,
+    total: Math.max(0, maxScore - safeCoefficient * safeDistance),
+  }
+}
+
+/** 沙盘/演示层复用：取指定时段的满分（未配置为 0），展示不另写一套数 */
+export const decayMaxScoreOf = (cfg: TimePeriodScoreConfig | undefined | null, periodValue: string): number =>
+  (cfg ?? DEFAULT_DECAY_PERIOD_CONFIG).items.find(item => item.periodValue === periodValue)?.score ?? 0
+
+/** 配置校驗：返回錯誤文案，null 表示通過（同一時段不得重複，滿分必須是 0～500 整數） */
+export function validateDecayPeriodConfig(cfg: TimePeriodScoreConfig): string | null {
+  const seen = new Set<string>()
+  for (let i = 0; i < cfg.items.length; i++) {
+    const item = cfg.items[i]
+    const name = item.periodName || item.periodValue || `第 ${i + 1} 行`
+    if (!item.periodValue) return `${name}請選擇時段`
+    if (seen.has(item.periodValue)) return `時段「${name}」重複配置，同一時段只能有一檔滿分`
+    seen.add(item.periodValue)
+    if (!Number.isInteger(item.score) || item.score < 0 || item.score > DECAY_MAX_SCORE_LIMIT) return `時段「${name}」的滿分必須是 0～${DECAY_MAX_SCORE_LIMIT} 的整數`
+  }
+  return null
+}
+
 /** 高峰時段定義 */
 export interface PeakTimeRange {
   /** 標籤（如「午高峰」） */
@@ -1330,6 +1414,8 @@ export interface OrganicScoreRule {
   storeLabelConfig?: StoreLabelScoreConfig
   /** 主營時段計分配置（僅 STB_01 使用：時段 → 分值清單，当前时段命中一檔即停） */
   timePeriodConfig?: TimePeriodScoreConfig
+  /** 距離衰減分時段滿分配置（僅 PLT_01 使用：時段 → 滿分清單；衰減係數全局單一，住 decayCoefficient） */
+  decayPeriodConfig?: TimePeriodScoreConfig
   /** 流量均衡合併配置（僅 PLT_03 使用：統一商家扶持與訂單過熱調控，統計口徑 + 區域梯度） */
   trafficBalanceConfig?: TrafficBalanceConfig
   status: ServiceStatus
@@ -1425,7 +1511,9 @@ export const DEFAULT_ORGANIC_SCORE_RULES: OrganicScoreRule[] = [
   { id: 'STB_09', dimension: ScoreDimension.STORE, name: '活動加分', description: '活動資料由業務系統同步，僅正常進行中的活動計分；已過期、失效或未開始的活動不加分。店鋪報名進行中的活動即得固定加分，多個活動獨立計分、可累加', mode: ScoreMode.RULE_BONUS, score: 0, activityItems: [], status: ENABLED, builtin: true },
 
   // ===== 平台維度 =====
-  { id: 'PLT_01', dimension: ScoreDimension.PLATFORM, name: '距離衰減', description: '滿分按衰減係數×距離遞減，距離越遠得分越低', mode: ScoreMode.DECAY, score: 100, decayCoefficient: 5, status: ENABLED, builtin: true },
+  // 口径改造：满分由单一值改为五餐段独立配置，衰减系数仍全局单一；
+  // score 保留旧满分作 legacy 计分引擎兜底（引擎读新列前行为不变），第二阶段随 decay_period_config 列收敛。
+  { id: 'PLT_01', dimension: ScoreDimension.PLATFORM, name: '距離衰減', description: '滿分按時段獨立配置，得分 = 滿分（當前時段） - 衰減係數 × 距離，距離越遠得分越低', mode: ScoreMode.DECAY, score: DECAY_DEFAULT_MAX_SCORE, decayCoefficient: DECAY_DEFAULT_COEFFICIENT, decayPeriodConfig: structuredClone(DEFAULT_DECAY_PERIOD_CONFIG), status: ENABLED, builtin: true },
   // PLT_02A「配送範圍」已下架：從默認計分項目錄移除並登記進 RETIRED_ORGANIC_RULE_IDS（讀取側過濾歷史庫），
   // 庫內殘留行由後端遷移 organic:retire-plt02a-v1 邏輯刪除；timeRangeScores 列與 DTO 字段保留（不改表結構、不影響其它規則）。
 ]

@@ -99,6 +99,9 @@ public class OrganicScoreRuleVO {
     /** 主營時段分時段计分配置 JSON 字符串（仅 STB_01 使用：[{periodValue, periodName, score}]） */
     private String timePeriodConfig;
 
+    /** 距離衰減分時段满分配置 JSON 字符串（仅 PLT_01 使用：[{periodValue, periodName, score}]，score 为该时段满分） */
+    private String decayPeriodConfig;
+
     /** 服务状态: 1=启用 2=停用 */
     private Integer status;
 

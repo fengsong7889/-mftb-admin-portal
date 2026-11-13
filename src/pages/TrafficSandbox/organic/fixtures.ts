@@ -7,9 +7,14 @@
  */
 import { AppType, RecommendChannel, Region } from '@mftb/contracts/recommendConstants'
 import { signboardLabelText } from '../../Recommend/signboardLabels'
-import { TIME_SLOT_AD_DEFAULT_SCORE, storeLabelText, DEFAULT_STAR_TIER_BANDS, DEFAULT_ONTIME_RATE_BANDS, AUTO_ACCEPT_DEFAULT_SCORE, MEAL_TIME_DEFAULT_SCORE, DEFAULT_CANCEL_RATE_BANDS, DEFAULT_CANCEL_MIN_ORDERS, DEFAULT_TRAFFIC_BALANCE_CONFIG } from '../../Recommend/organicTrafficConfig'
+import { TIME_SLOT_AD_DEFAULT_SCORE, storeLabelText, DEFAULT_STAR_TIER_BANDS, DEFAULT_ONTIME_RATE_BANDS, AUTO_ACCEPT_DEFAULT_SCORE, MEAL_TIME_DEFAULT_SCORE, DEFAULT_CANCEL_RATE_BANDS, DEFAULT_CANCEL_MIN_ORDERS, DEFAULT_TRAFFIC_BALANCE_CONFIG, DEFAULT_ORGANIC_SCORE_RULES, decayMaxScoreOf } from '../../Recommend/organicTrafficConfig'
 import type { Coordinate, Dimension, Eligibility, PointId, RuleResult, SamplePoint, SampleScene, ScoreSnapshot, SimulationMode, StoreResult } from './types'
 import { attachSampleEvidence } from './evidence'
+
+/** 距离衰减演示真值：满分取午餐档（演示默认时段）、系数取算法库配置，不硬编码另一套数 */
+const DECAY_RULE_CFG = DEFAULT_ORGANIC_SCORE_RULES.find(r => r.id === 'PLT_01')
+export const DECAY_MAX_LUNCH = decayMaxScoreOf(DECAY_RULE_CFG?.decayPeriodConfig, 'lunch')
+export const DECAY_PER_KM = DECAY_RULE_CFG?.decayCoefficient ?? 5
 
 // 原型文案暂用繁中，待界面确认后统一补充 i18n；所有门店和结果均为虚构。
 export const DIMENSIONS: { key: Dimension; label: string; color: string }[] = [
@@ -280,9 +285,9 @@ function baseStore(index: number, brand: AppType): StoreResult {
     metric: '已報名生效活動；減免門檻 30 元查檔', rawScore: 35, effectiveMax: 40, expression: '20 + 15 = 35；門檻檔位由運營人工按金額配置，命中即停',
   })
   const distance = rules.find(r => r.ruleCode === 'PLT_01')!
-  distance.rawScore = Math.max(0, 100 - 5 * distanceKm)
-  distance.metric = `${distanceKm.toFixed(4)} km；滿分100；每公里扣5分`
-  distance.expression = `max(0, 100 − 5 × ${distanceKm.toFixed(4)})`
+  distance.rawScore = Math.max(0, DECAY_MAX_LUNCH - DECAY_PER_KM * distanceKm)
+  distance.metric = `${distanceKm.toFixed(4)} km；午餐滿分${DECAY_MAX_LUNCH}；每公里扣${DECAY_PER_KM}分`
+  distance.expression = `max(0, ${DECAY_MAX_LUNCH} − ${DECAY_PER_KM} × ${distanceKm.toFixed(4)})`
   const missed = index % 9 === 0 ? rules.find(r => r.ruleCode === 'COM_05') : undefined
   if (missed) Object.assign(missed, { matchStatus: 'missed', reasonCode: 'NOT_ENROLLED', reason: '樣例門店未報名收藏送券', metric: '未報名', rawScore: 0, parts: [{ label: '報名分', score: 0, status: '未報名', reference: '未報名，報名分不給' }, { label: '門檻分', score: 0, reference: '未報名，不查檔' }, { label: '力度分', score: 0, reference: '未報名，不查檔' }], expression: '未報名：本項 0 分' })
   if (index === 91) Object.assign(fullReduction, { matchStatus: 'missed', reasonCode: 'GUARD_EXCEEDED', reason: '門檻高於客單價2倍，報名分停發不保留', metric: '門檻150 MOP；客單價50 MOP', rawScore: 0, activity: { activityId: 'ACT-20261024-0011', activityName: '滿額立減·萬聖場', tiers: [{ threshold: 150, discount: 70 }], matchedTier: { threshold: 150, discount: 70 }, validFrom: '2026-10-28', validTo: '2026-11-04' }, guard: { triggered: true, rule: '門檻 150 MOP 高於客單價 50 MOP 的 2 倍上限', enrollScoreSuspended: true }, parts: [{ label: '報名分', score: 0, status: '已停發', reference: '圍欄觸發：報名分停發' }, { label: '門檻分', score: 0, status: '超上限', reference: '使用門檻 ÷ 門店客單價 = 150 ÷ 50 = 3.0倍 > 2倍圍欄上限，未命中梯度' }, { label: '力度分', score: 0, reference: '圍欄觸發，本項不計分' }], expression: '圍欄觸發：報名分停發，本項 0 分' })
@@ -323,9 +328,9 @@ function createSnapshot(brand: AppType, point: PointId, scene: SampleScene, mode
     if (point === 'B' && store.coordinate) {
       store.distanceKm = sampleDistance(POINTS.B, store.coordinate)
       const r = store.rules.find(rule => rule.ruleCode === 'PLT_01')!
-      r.rawScore = Math.max(0, 100 - 5 * store.distanceKm)
-      r.metric = `${store.distanceKm.toFixed(4)} km；滿分100；每公里扣5分`
-      r.expression = `max(0, 100 − 5 × ${store.distanceKm.toFixed(4)})`
+      r.rawScore = Math.max(0, DECAY_MAX_LUNCH - DECAY_PER_KM * store.distanceKm)
+      r.metric = `${store.distanceKm.toFixed(4)} km；午餐滿分${DECAY_MAX_LUNCH}；每公里扣${DECAY_PER_KM}分`
+      r.expression = `max(0, ${DECAY_MAX_LUNCH} − ${DECAY_PER_KM} × ${store.distanceKm.toFixed(4)})`
       if (mode === 'full') {
         // 完整场景的「分项变化 + 资格变化」样例改由流量均衡驱动：配送範圍已下架，
         // 而区域梯度与「排除商家名单」本就是流量均衡（PLT_03）的配置项，不需要新造口径。
@@ -391,4 +396,4 @@ export function getSampleSnapshot(brand: AppType = AppType.SHANFENG, point: Poin
   if (!SNAPSHOTS.has(key)) SNAPSHOTS.set(key, createSnapshot(brand, point, scene, mode))
   return SNAPSHOTS.get(key)!
 }
-export const DISTANCE_CURVE = [0, 1, 2, 3, 5, 8, 10, 15, 20, 25].map(distance => ({ distance, score: Math.max(0, 100 - 5 * distance) }))
+export const DISTANCE_CURVE = [0, 1, 2, 3, 5, 8, 10, 15, 20, 25].map(distance => ({ distance, score: Math.max(0, DECAY_MAX_LUNCH - DECAY_PER_KM * distance) }))
