@@ -98,7 +98,8 @@ describe('展示模式行按页面分形与美食外卖页篩選面板', () => {
     }
     expect(labels, '商家模块已按用户口径下线，不应再出现').not.toContain('商家')
     expect(rows.some((s) => s.desc.includes('蜂蜜兌換仅閃蜂'))).toBe(true)
-    expect(rows.some((s) => s.desc.includes('无超值換購项'))).toBe(true)
+    // 活动优惠第二点「蜂蜜兌換仅閃蜂」走 note 突出显示（橙色警示框）；「无超值換購」的行为守卫在 DeliveryFilterBar.test（sheet 渲染断言）
+    expect(panel('deliveryFilter').defaults.find((s) => s.id === 12)!.note).toContain('蜂蜜兌換仅閃蜂')
   })
 
   it('特惠团购页篩選面板：sheet 各模块均有独立说明行（含回补的大小图切换）', () => {

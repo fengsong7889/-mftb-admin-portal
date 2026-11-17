@@ -139,7 +139,7 @@ export const DELIVERY_FILTER_SPECS: SpecEntry[] = [
   { id: 8, label: '時效範圍', desc: '1、时效档（30/40/50/60分鐘）+ 范围档（1KM/2KM/3KM/5KM）单选胶囊；\n2、与列表「距離」下拉共享同一单选状态：两处任一改动即互相同步；\n3、重置回未选。', source: '待补充' },
   { id: 9, label: '配送', desc: '1、配送方式（平台送/商家送/自取）+ 配送保障（準時寶）单选胶囊；\n2、与列表「配送」下拉共享同一单选状态；\n3、重置回未选。', source: '待补充' },
   { id: 11, label: '品質', desc: '1、可多選：銷量較高/五星好評/4星及以上；\n2、销量按月售进行排序；\n3、星级按商家综合分。', source: '待补充' },
-  { id: 12, label: '活动优惠', desc: '1、可多選；内容与瀑布流上方第二排「优惠活动标签」同一真源（15 项，首项随品牌：閃蜂神會員 / MFOOD勐爆券）；\n2、无超值換購项；\n3、蜂蜜兌換仅閃蜂展示。', source: '待补充' },
+  { id: 12, label: '活动优惠', desc: '1、可多選；内容与瀑布流上方第二排「优惠活动标签」同一数据源。', note: '蜂蜜兌換仅閃蜂展示。', source: '待补充' },
 ]
 
 /* ══════════ 面板五：首页搜索结果瀑布流 · 增量字段（搜索结果页外卖瀑布流专属展示态，卡片复用 DeliveryStoreCard） ══════════
@@ -213,7 +213,7 @@ export const SPEC_PANELS: SpecPanel[] = [
   { key: 'searchGroupPage', group: '特惠团购页', label: '搜索结果瀑布流', defaults: [...SEARCH_PREFERRED_SPECS, ...SEARCH_GROUP_SPECS], version: 11, anchor: 'preferred' },
   { key: 'deliveryPage', group: '美食外卖页', label: '美食外卖瀑布流', defaults: DELIVERY_PAGE_SPECS, version: 28, anchor: 'delivery', title: '美食外卖瀑布流·展示字段及标签说明' },
   { key: 'searchDeliveryPage', group: '美食外卖页', label: '搜索结果瀑布流', defaults: [...DELIVERY_PAGE_SPECS, ...SEARCH_DELIVERY_SPECS], version: 17, anchor: 'delivery' },
-  { key: 'deliveryFilter', group: '美食外卖页', label: '篩選', defaults: DELIVERY_FILTER_SPECS, version: 10 },
+  { key: 'deliveryFilter', group: '美食外卖页', label: '篩選', defaults: DELIVERY_FILTER_SPECS, version: 11 },
 ]
 
 /** 旧导出名兼容（团购默认规范，历史消费方） */
