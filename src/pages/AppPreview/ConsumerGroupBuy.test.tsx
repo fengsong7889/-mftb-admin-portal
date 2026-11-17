@@ -131,17 +131,17 @@ describe('特價團購筛选面板', () => {
     expect(screen.getByRole('button', { name: '低價優先' })).toBeInTheDocument()
   })
 
-  it('更多篩選面板：五大模块齐备，单选/多选/重置/完成口径', async () => {
+  it('更多篩選面板：券类四模块齐备，单选/多选/重置/完成口径', async () => {
     const user = userEvent.setup()
     renderPage()
 
     await user.click(screen.getByRole('button', { name: '篩選條件' }))
     const panel = screen.getByRole('group', { name: '更多篩選面板' })
-    // 五模块（设计稿图2-5）：人均篩選器/營業時間/使用人數/偏好优惠/店鋪服務
+    // 券类（推薦）四模块：人均篩選器/使用人數/偏好优惠/店鋪服務
     expect(within(panel).getByText('人均篩選器')).toBeInTheDocument()
-    // 列表大小圖切換仅優選商家页签的篩選面板展示：团购券类页签（推薦）不展示
+    // 列表大小圖切換与營業時間属商家类（優選商家）页签：团购券类页签不展示
     expect(within(panel).queryByText('列表大小圖切換')).not.toBeInTheDocument()
-    expect(within(panel).getByText('營業時間')).toBeInTheDocument()
+    expect(within(panel).queryByText('營業時間')).not.toBeInTheDocument()
     expect(within(panel).getByText('使用人數')).toBeInTheDocument()
     expect(within(panel).getByText(/偏好优惠/)).toBeInTheDocument()
     expect(within(panel).getByText(/店鋪服務/)).toBeInTheDocument()
@@ -150,10 +150,10 @@ describe('特價團購筛选面板', () => {
     expect(within(panel).getByText('全澳格價')).toBeInTheDocument()
 
     // 单选胶囊：再点同一个取消
-    await user.click(within(panel).getByRole('button', { name: '0-5 時' }))
-    expect(within(panel).getByRole('button', { name: '0-5 時' })).toHaveAttribute('aria-pressed', 'true')
-    await user.click(within(panel).getByRole('button', { name: '0-5 時' }))
-    expect(within(panel).getByRole('button', { name: '0-5 時' })).toHaveAttribute('aria-pressed', 'false')
+    await user.click(within(panel).getByRole('button', { name: '單人' }))
+    expect(within(panel).getByRole('button', { name: '單人' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(within(panel).getByRole('button', { name: '單人' }))
+    expect(within(panel).getByRole('button', { name: '單人' })).toHaveAttribute('aria-pressed', 'false')
 
     // 多选胶囊：可勾可消
     await user.click(within(panel).getByRole('button', { name: '有 WIFI' }))
@@ -219,14 +219,17 @@ describe('特價團購筛选面板', () => {
     expect(screen.getAllByAltText('商家封面')).toHaveLength(5)
   })
 
-  it('優選商家篩選面板：无使用人數模块，偏好优惠无食得健康/全澳格價', async () => {
+  it('優選商家篩選面板：有營業時間模块、无使用人數模块，偏好优惠无食得健康/全澳格價', async () => {
     const user = userEvent.setup()
     renderPage()
 
     await user.click(screen.getByRole('button', { name: '優選商家' }))
     await user.click(screen.getByRole('button', { name: '篩選條件' }))
     const panel = screen.getByRole('group', { name: '更多篩選面板' })
-    // 商家瀑布流：无使用人數模块
+    // 商家瀑布流：有營業時間模块（单选胶囊齐备），无使用人數模块
+    expect(within(panel).getByText('營業時間')).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: '0-5 時' })).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: '24 小時營業' })).toBeInTheDocument()
     expect(within(panel).queryByText('使用人數')).not.toBeInTheDocument()
     // 偏好优惠：食得健康/全澳格價 均不展示
     expect(within(panel).queryByText('食得健康')).not.toBeInTheDocument()

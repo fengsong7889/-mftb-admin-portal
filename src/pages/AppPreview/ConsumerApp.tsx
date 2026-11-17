@@ -51,7 +51,7 @@ const ROOT: Record<RootKey, ConsumerScreen> = {
   mine: { key: 'mine' },
 }
 
-export default function ConsumerApp({ onCategoryChange, syncCategory, syncSeq, deliveryMode, deliveryPageMode, preferredLayout, onPreferredLayoutChange }: {
+export default function ConsumerApp({ onCategoryChange, syncCategory, syncSeq, deliveryMode, deliveryPageMode, preferredLayout, onPreferredLayoutChange, onDeliveryPageModeChange }: {
   onCategoryChange?: (cat: string) => void
   /** 右侧说明面板 Tab 下发的分类同步命令（syncSeq 自增时执行） */
   syncCategory?: string
@@ -64,6 +64,8 @@ export default function ConsumerApp({ onCategoryChange, syncCategory, syncSeq, d
   preferredLayout?: 'small' | 'large'
   /** 篩選面板内切换上报（说明面板闭环后下发另一台手机） */
   onPreferredLayoutChange?: (mode: 'small' | 'large') => void
+  /** 美食外卖页篩選面板内大小图切换上报（说明面板闭环后下发另一台手机） */
+  onDeliveryPageModeChange?: (mode: 'small' | 'large') => void
 }) {
   const { t } = useTranslation()
   const nav = useMobileNav<ConsumerScreen>(ROOT.home)
@@ -162,6 +164,7 @@ export default function ConsumerApp({ onCategoryChange, syncCategory, syncSeq, d
             onSearch={(keyword) => openSearch('delivery', undefined, keyword)}
             onOpenStore={openStore}
             layout={deliveryPageMode}
+            onLayoutChange={onDeliveryPageModeChange}
           />
         )
       case 'market':

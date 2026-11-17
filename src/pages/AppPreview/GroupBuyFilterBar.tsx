@@ -11,7 +11,7 @@
  *
  * 四个筛选项（附近/全部分類/排序/更多篩選）的 state、选项常量与 JSX 全部内聚于此，
  * 两页各取两个出口按原 DOM 位置渲染：
- *   - sortbar：筛选胶囊行 + 三个下拉面板（页签行之后）
+ *   - sortbar：筛选胶囊行 + 三个下拉面板（apg-filter-zone 锚点内 absolute 浮层遮挡瀑布流，不推动下滑）
  *   - moreSheet：更多篩選底部 sheet（滚动容器末尾——.apg-more 是 sticky bottom:0，DOM 位置不可提前）
  *
  * 原型仅视觉态，不做真实过滤；商圈树引用全系统唯一 REGION_TREE_DATA（不得另造地名清单）。
@@ -256,8 +256,9 @@ export function useGroupBuyFilters({
   const pctLo = ((priceRange[0] - PRICE_MIN) / (PRICE_MAX - PRICE_MIN)) * 100
   const pctHi = ((priceRange[1] - PRICE_MIN) / (PRICE_MAX - PRICE_MIN)) * 100
 
+  /* 筛选区容器：relative 锚点——三个下拉面板 absolute 浮层遮挡瀑布流（2026-11 反馈：不推动下滑） */
   const sortbar = (
-    <>
+    <div className="apg-filter-zone">
       {/* 筛选胶囊：左段横滑（附近/全部分類/排序可展开面板 + 高亮胶囊），右段筛选图标固定 */}
       <div className="apg-sortbar">
         <div className="apg-sortbar-scroll">
@@ -416,7 +417,7 @@ export function useGroupBuyFilters({
           <button type="button" className="apg-panel-close" aria-label={t('appConsumer.groupBuy.filter.closePanel', { defaultValue: '收起篩選面板' })} onClick={() => setOpenPanel(null)}>✕</button>
         </div>
       )}
-    </>
+    </div>
   )
 
   const moreSheet = openPanel === 'more' ? (
@@ -442,6 +443,7 @@ export function useGroupBuyFilters({
               </section>
             </SpecField>
           )}
+          <SpecField panel="filter" id={6}>
           <section className="apg-more-sec">
             <h4 className="apg-more-title">人均篩選器</h4>
             <div className="apg-range-card">
@@ -474,18 +476,25 @@ export function useGroupBuyFilters({
               </div>
             </div>
           </section>
-          <section className="apg-more-sec">
-            <h4 className="apg-more-title">營業時間</h4>
-            <div className="apg-more-grid">
-              {MORE_HOURS.map((h) => (
-                <button key={h} type="button" className={`apg-more-chip${moreHour === h ? ' is-on' : ''}`} aria-pressed={moreHour === h} onClick={pickOne(setMoreHour)(h)}>
-                  {h}
-                </button>
-              ))}
-            </div>
-          </section>
+          </SpecField>
+          {/* 營業時間仅商家瀑布流（優選商家/附近好店）提供；券瀑布流（推薦/其它）无此模块 */}
+          {merchantFeed && (
+            <SpecField panel="filter" id={7}>
+            <section className="apg-more-sec">
+              <h4 className="apg-more-title">營業時間</h4>
+              <div className="apg-more-grid">
+                {MORE_HOURS.map((h) => (
+                  <button key={h} type="button" className={`apg-more-chip${moreHour === h ? ' is-on' : ''}`} aria-pressed={moreHour === h} onClick={pickOne(setMoreHour)(h)}>
+                    {h}
+                  </button>
+                ))}
+              </div>
+            </section>
+            </SpecField>
+          )}
           {/* 使用人數仅券瀑布流（推薦/其它）提供；商家瀑布流（優選商家/附近好店）无此模块 */}
           {!merchantFeed && (
+            <SpecField panel="filter" id={8}>
             <section className="apg-more-sec">
               <h4 className="apg-more-title">使用人數</h4>
               <div className="apg-more-grid">
@@ -496,7 +505,9 @@ export function useGroupBuyFilters({
                 ))}
               </div>
             </section>
+            </SpecField>
           )}
+          <SpecField panel="filter" id={9}>
           <section className="apg-more-sec">
             <h4 className="apg-more-title">偏好优惠 <i>(可多選)</i></h4>
             <div className="apg-more-grid apg-more-grid--pref">
@@ -508,6 +519,8 @@ export function useGroupBuyFilters({
               ))}
             </div>
           </section>
+          </SpecField>
+          <SpecField panel="filter" id={10}>
           <section className="apg-more-sec">
             <h4 className="apg-more-title">店鋪服務 <i>(可多選)</i></h4>
             <div className="apg-more-grid apg-more-grid--svc">
@@ -518,6 +531,7 @@ export function useGroupBuyFilters({
               ))}
             </div>
           </section>
+          </SpecField>
         </div>
         <div className="apg-more-footer">
           <button type="button" className="apg-more-reset" onClick={resetMore}>重置</button>

@@ -23,7 +23,7 @@ const TABS: { key: RootKey; icon: string; zh: string }[] = [
   { key: 'mine', icon: '😊', zh: '我的' },
 ]
 
-export default function MfoodApp({ onCategoryChange, syncCategory, syncSeq, deliveryMode, deliveryPageMode, preferredLayout, onPreferredLayoutChange }: {
+export default function MfoodApp({ onCategoryChange, syncCategory, syncSeq, deliveryMode, deliveryPageMode, preferredLayout, onPreferredLayoutChange, onDeliveryPageModeChange }: {
   onCategoryChange?: (tab: string) => void
   /** 右侧说明面板 Tab 下发的分类同步命令（syncSeq 自增时执行） */
   syncCategory?: string
@@ -36,6 +36,8 @@ export default function MfoodApp({ onCategoryChange, syncCategory, syncSeq, deli
   preferredLayout?: 'small' | 'large'
   /** 篩選面板内大小图切换上报（说明面板闭环后下发另一台手机） */
   onPreferredLayoutChange?: (mode: 'small' | 'large') => void
+  /** 美食外卖页篩選面板内大小图切换上报（说明面板闭环后下发另一台手机） */
+  onDeliveryPageModeChange?: (mode: 'small' | 'large') => void
 }) {
   const { t } = useTranslation()
   /** 当前根屏：仅 home / group 有页面，其余 Tab 暂回首页（原型口径） */
@@ -90,7 +92,7 @@ export default function MfoodApp({ onCategoryChange, syncCategory, syncSeq, deli
             />
           )
         : root === 'delivery'
-          ? <MfoodDelivery layout={deliveryPageMode} onSearch={() => { setSearchScope('delivery'); setSearchKeyword(undefined) }} />
+          ? <MfoodDelivery layout={deliveryPageMode} onLayoutChange={onDeliveryPageModeChange} onSearch={() => { setSearchScope('delivery'); setSearchKeyword(undefined) }} />
           : (
               <MfoodHome
                 onSearch={() => { setSearchScope('global'); setSearchKeyword(undefined) }}

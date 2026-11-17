@@ -9,10 +9,12 @@
 /**
  * 说明面板分段轨道·滑动高亮丸（SpecTrack）门禁
  *
- * 钉住三件事：
+ * 钉住四件事：
  * ① 每段轨道恰好渲染一个高亮丸，且变体类名与档位（group / panel / mini）一致；
  * ② 高亮丸的几何取自「带 .is-on 的那一项」，而不是写死首项或末项；
  * ③ 切换段落（二级面板行、三级展示模式行）后高亮丸跟随新的选中项移动。
+ * ④ 说明表「本轮口径调整」标记（changed）只给标过的行渲染徽标与调整行；
+ * ⑤ 说明表「口径作废」标记（deprecated）把 note 原文留在 <del> 内并灰化，不删文本。
  *
  * ⚠️ 本文件同时是 setThumb 值比较守卫的回归用例：测量所在的 useLayoutEffect **没有依赖数组**
  * （每次渲染都重新测量），去掉守卫后每渲染都会 setThumb 一个新对象 → state 必变 → 自激重渲染，
@@ -27,6 +29,7 @@ import { fireEvent, render, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import i18n from '@/i18n'
 import AppPreview from './index'
+import { FILTER_SPECS } from './groupBuySpec'
 
 /** 轨道内段间距（与 .ap-spec-track 的 gap 同值，只为让假几何贴近真实排布） */
 const GAP = 2
@@ -159,5 +162,70 @@ describe('说明面板分段轨道·滑动高亮丸', () => {
     const again = thumbOf(trackByVariant('group'))
     expect(again.style.transform).toBe(style.transform)
     expect(again.style.width).toBe(style.width)
+  })
+})
+
+describe('说明表「本轮口径调整」标记', () => {
+  /** 切到特惠团购页·篩選面板（徽标只在带 changed 的行上出现，需要面板内容真渲染出来） */
+  function openFilterPanel() {
+    renderPreview()
+    fireEvent.click(within(trackByVariant('group')).getByRole('button', { name: '特惠团购页' }))
+    fireEvent.click(within(trackByVariant('panel')).getByRole('button', { name: '篩選' }))
+  }
+
+  it('只有标了 changed 的行渲染徽标与调整行，且日期/文案取自真源', () => {
+    openFilterPanel()
+
+    const marked = FILTER_SPECS.filter((s) => s.changed)
+    expect(marked.length, '真源至少应有一行带本轮调整标记').toBeGreaterThan(0)
+    const tags = Array.from(document.querySelectorAll<HTMLElement>('.ap-spec-changed-tag'))
+    expect(tags).toHaveLength(marked.length)
+    expect(tags[0].textContent).toBe(`🆕 ${marked[0].changed!.date}`)
+    // 徽标只出现在壳外说明表，手机壳内不得出现此类标记物
+    expect(document.querySelectorAll('.ap-phone .ap-spec-changed-tag, .ap-phone .ap-spec-changed')).toHaveLength(0)
+
+    const lines = Array.from(document.querySelectorAll<HTMLElement>('.ap-spec-changed'))
+    expect(lines).toHaveLength(marked.length)
+    expect(lines[0].textContent).toContain(marked[0].changed!.text)
+    expect(lines[0].textContent).toContain(marked[0].changed!.date)
+  })
+
+  it('未带标记的面板（首页·团购瀑布流）不渲染任何调整徽标', () => {
+    renderPreview()
+    expect(document.querySelectorAll('.ap-spec-changed-tag, .ap-spec-changed')).toHaveLength(0)
+  })
+})
+
+describe('说明表「口径作废」note', () => {
+  /** 按名称列文本定位说明行（不写死行序，真源重排不会误红） */
+  function rowByName(name: string) {
+    const row = Array.from(document.querySelectorAll<HTMLElement>('.ap-spec-panel tbody tr'))
+      .find((r) => r.querySelector('.ap-spec-name')?.textContent?.includes(name))
+    expect(row, `说明表应有「${name}」行`).toBeTruthy()
+    return row!
+  }
+
+  it('美食外卖页·门店展示规则：沉底 note 保留原文并画删除线，同时带本轮调整徽标', () => {
+    renderPreview()
+    fireEvent.click(within(trackByVariant('group')).getByRole('button', { name: '美食外卖页' }))
+
+    const row = rowByName('门店展示规则')
+    const note = row.querySelector<HTMLElement>('.ap-spec-note')!
+    // 作废不删文本：原文仍在 del 内，样式转中性灰
+    expect(note).toHaveClass('ap-spec-note--deprecated')
+    expect(note.querySelector('del')?.textContent).toContain('沉底显示')
+    // 作废哪一轮、为何作废，同一行必须给出 changed 徽标
+    expect(row.querySelector('.ap-spec-changed-tag')).not.toBeNull()
+    expect(row.querySelector('.ap-spec-changed')?.textContent).toContain('删除了以下这句说明')
+  })
+
+  it('删除线只给标了 deprecated 的行，未标废的 note 不受影响', () => {
+    renderPreview()
+    fireEvent.click(within(trackByVariant('group')).getByRole('button', { name: '美食外卖页' }))
+
+    // DELIVERY_SPECS 当前只有 id18 一行带 note，因此标废行与 note 行数量应相等
+    expect(document.querySelectorAll('.ap-spec-note')).toHaveLength(1)
+    expect(document.querySelectorAll('.ap-spec-note--deprecated')).toHaveLength(1)
+    expect(document.querySelectorAll('.ap-spec-note del')).toHaveLength(1)
   })
 })

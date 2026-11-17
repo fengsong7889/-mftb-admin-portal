@@ -24,6 +24,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import DeliveryStoreCard, { type DeliveryStore } from './DeliveryStoreCard'
 import DeliveryLargeCard from './DeliveryLargeCard'
+import { useDeliveryFilters } from './DeliveryFilterBar'
 import bbqImg from '@/assets/consumer-home/bbq.jpg'
 import riceballImg from '@/assets/consumer-home/riceball.jpg'
 import friedChickenImg from '@/assets/consumer-home/friedchicken.jpg'
@@ -106,7 +107,10 @@ const DELIVERY_FEED: DeliveryStore[] = [
   { key: 's10', name: '早安豆漿舖（筷子基新店）', isNew: true, rating: '4.5', monthlySales: '90+', minOrder: '$20', freeDelivery: true, deliveryTime: '20分鐘', distance: '600m', tags: [], memberTags: [{ kind: 'shen', text: '$8' }], image: lemonTeaImg, pickupDiscount: '9折', deliveryType: 'pickup', merchantId: 'dl-za', businessState: 'preorder', preorderTime: '07:30' },
   { key: 's11', name: '朱記燒臘飯店（氹仔店）', rating: '4.7', monthlySales: '900+', minOrder: '$40', deliveryDiscount: '$0~5', deliveryTime: '31分鐘', distance: '2.7km', tags: ['全澳回头率超高店铺', '近期万人下单'], memberTags: [{ kind: 'shen', text: '$10' }, { kind: 'red', text: '满50減4' }], image: burgerImg, deliveryType: 'platform', merchantId: 'dl-zhu', hotSkin: { mode: 'small', templateKey: 'small_red' } },
   { key: 's12', name: '譚家三哥米線（北區店）', rating: '4.6', monthlySales: '2600+', minOrder: '$40', freeDelivery: true, deliveryTime: '28分鐘', distance: '1.2km', tags: ['全澳米粉面馆热门店铺', '近期十万人下单'], memberTags: [{ kind: 'shen', text: '最高膨至$30' }], image: riceballImg, deliveryType: 'platform', merchantId: 'dl-tan', hotSkin: { mode: 'small', templateKey: 'small_amber' } },
-  { key: 's13', name: '上海生煎王 ❤ 限時$30小炒木桶飯', rating: '4.6', monthlySales: '1200+', minOrder: '$40', deliveryDiscount: '$0~3', deliveryTime: '30分鐘', distance: '1.6km', tags: ['全澳人气店铺', '百万人收藏好店'], memberTags: [{ kind: 'shen', text: '最高膨至$30' }], image: burgerImg, deliveryType: 'platform', merchantId: 'dl-shjw', hotSkin: { mode: 'large', posterKey: 'poster_red', posterImage: bbqImg, posterBrand: '上海生煎王\n小炒木桶飯', posterMascot: '🐝', dishes: [ { name: '1.農家小炒肉木桶飯', image: fishPotImg, discount: '8.7折', price: '40', origin: '46' }, { name: '2.上海生煎（4只）', image: riceballImg, price: '64' }, { name: '3.麻辣豆腐（套餐）', image: friedChickenImg, price: '28' } ] } },
+  { key: 's13', name: '上海生煎王 ❤ 限時$30小炒木桶飯', rating: '4.6', monthlySales: '1200+', minOrder: '$40', deliveryDiscount: '$0~3', deliveryTime: '30分鐘', distance: '1.6km', tags: ['全澳人气店铺', '百万人收藏好店'], memberTags: [{ kind: 'shen', text: '最高膨至$30' }], image: burgerImg, deliveryType: 'platform', merchantId: 'dl-shjw', hotSkin: { mode: 'large', layout: 'grid', posterKey: 'poster_red', posterImage: bbqImg, posterBrand: '上海生煎王\n小炒木桶飯', posterMascot: '🐝', dishes: [ { name: '1.農家小炒肉木桶飯', image: fishPotImg, discount: '8.7折', price: '40', origin: '46' }, { name: '2.上海生煎（4只）', image: riceballImg, price: '64' }, { name: '3.麻辣豆腐（套餐）', image: friedChickenImg, price: '28' } ] } },
+  { key: 's14', name: '金門燒臘快餐（發財店）', rating: '4.8', monthlySales: '2600+', minOrder: '$35', deliveryDiscount: '$0~4', deliveryTime: '26分鐘', distance: '1.3km', tags: ['全澳燒臘銷量第1名', '万人收藏好店'], memberTags: [{ kind: 'shen', text: '最高膨至$30' }], image: bbqImg, deliveryType: 'platform', merchantId: 'dl-jm', hotSkin: { mode: 'large', layout: 'carousel', posterKey: 'poster_orange', posterBrand: '金門燒臘\n快餐專門店', posterMascot: '🏪', dishes: [ { name: '招牌燒鴨瀨粉（大）', image: bbqImg, discount: '7.5折', price: '38', origin: '50' }, { name: '蜜汁叉燒飯', image: riceballImg, price: '42' }, { name: '鼓油雞腿飯', image: fishPotImg, price: '36' } ] } },
+  { key: 's15', name: '胖哥倆肉蟹煲（氹仔店）', rating: '4.7', monthlySales: '1800+', minOrder: '$50', deliveryDiscount: '$0~5', deliveryTime: '33分鐘', distance: '2.8km', tags: ['全澳肉蟹煲熱門店鋪', '百人收藏好店'], memberTags: [{ kind: 'shen', text: '最高膨至$30' }], image: fishPotImg, deliveryType: 'platform', merchantId: 'dl-pgl', hotSkin: { mode: 'large', layout: 'triple', posterKey: 'poster_purple', posterBrand: '胖哥倆', dishes: [ { name: '招牌肉蟹煲（中煲）', image: fishPotImg, discount: '8折', price: '108', origin: '135' }, { name: '雞爪煲（小煲）', image: riceballImg, price: '78' }, { name: '明蝦雞爪煲', image: friedChickenImg, price: '128' }, { name: '牛蛙肉蟹煲', image: bbqImg, price: '138' }, { name: '排骨折蟹煲', image: burgerImg, price: '118' } ] } },
+  { key: 's16', name: '茶理人生 · 手作茶飲（新街市店）', rating: '4.9', monthlySales: '3600+', minOrder: '$25', freeDelivery: true, deliveryTime: '22分鐘', distance: '900m', tags: ['全澳奶茶銷量第1名', '近期十万人下单'], memberTags: [{ kind: 'shen', text: '最高膨至$30' }], image: lemonTeaImg, deliveryType: 'pickup', pickupDiscount: '9折', merchantId: 'dl-clrs', hotSkin: { mode: 'large', layout: 'hero', posterKey: 'poster_pink', posterImage: lemonTeaImg, posterBrand: '茶理人生', posterMascot: '🧋', dishes: [ { name: '招牌手打檸檬茶（大杯）', image: lemonTeaImg, discount: '7.05折', price: '9.9', origin: '14' }, { name: '多肉葡萄冰茶', image: fishPotImg, price: '18' }, { name: '黑糖珍珠鮮奶', image: riceballImg, price: '16' }, { name: '芒果楊枝甘露', image: lemonTeaImg, price: '22' }, { name: '宇治抹茶拿鐵', image: burgerImg, price: '20' } ] } },
 ]
 
 /** 本页自带 5 Tab 底栏（图3/4：外卖/购物车/免運費悬浮/订单/更多；占位文案不进语言包） */
@@ -123,6 +127,7 @@ export default function ConsumerDelivery({
   onSearch,
   onOpenStore,
   layout,
+  onLayoutChange,
 }: {
   onBack: () => void
   /** 搜索行点击：携带占位关键词跳搜索屏（与旧版签名一致，壳层 openSearch('delivery', …, keyword)） */
@@ -130,8 +135,12 @@ export default function ConsumerDelivery({
   onOpenStore?: (merchantId: string) => void
   /** 瀑布流展示模式（说明面板「展示模式」切换器下发）：small=小图（一行一店）/ large=大图（顶部大图封面，复用首页 DeliveryLargeCard） */
   layout?: 'small' | 'large'
+  /** 篩選面板内大小图切换上报（说明面板闭环后下发另一台手机） */
+  onLayoutChange?: (mode: 'small' | 'large') => void
 }) {
   const { t } = useTranslation()
+  /** 两排筛选栏 + 多模块篩選 sheet（sheet 渲染在滚动容器末尾，见底部） */
+  const filters = useDeliveryFilters({ brand: 'bee', layout, onLayoutChange })
   const bodyRef = useRef<HTMLDivElement>(null)
   const bannerRef = useRef<HTMLDivElement>(null)
   const bannerMainRef = useRef<HTMLDivElement>(null)
@@ -282,21 +291,8 @@ export default function ConsumerDelivery({
             </div>
           </div>
 
-          {/* 筛选胶囊行（吸顶，图3/4） */}
-          <div className="apdl-chips">
-            <span className="apg-chip"><b className="apdl-chip-amount">$30</b> 神會員</span>
-            <span className="apg-chip"><i className="apdl-chip-emoji apdl-chip-emoji--green" aria-hidden="true">🥗</i> 換口味</span>
-            <span className="apg-chip"><i className="apdl-chip-emoji apdl-chip-emoji--amber" aria-hidden="true">🧑‍🍳</i> 商家助力</span>
-            <button type="button" className="apg-chip is-slider" aria-label={t('appConsumer.groupBuy.filter.sliders', { defaultValue: '篩選條件' })}>
-              <svg className="apdl-slider-ico" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false">
-                <path d="M2 4.5h12M2 8h12M2 11.5h12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                <circle cx="6" cy="4.5" r="2.1" fill="currentColor" />
-                <circle cx="10.5" cy="8" r="2.1" fill="currentColor" />
-                <circle cx="5" cy="11.5" r="2.1" fill="currentColor" />
-              </svg>
-              篩選
-            </button>
-          </div>
+          {/* 两排筛选栏（吸顶，图3/4）：綜合排序/距離/配送下拉 + 右缘篩選；第二排优惠活动标签横滑（蜂蜜兌換閃蜂专属） */}
+          {filters.bar}
 
           {/* 商家瀑布流：首页【外卖】瀑布流的数据副本（复制而非同源，后期可单独修改）；小图/大图双模式（大图复用首页 DeliveryLargeCard） */}
           <div className="apw-feed apdl-feed">
@@ -311,6 +307,9 @@ export default function ConsumerDelivery({
           <div className="apg-end">
             <span className="apg-end-text">{t('appConsumer.common.reachedBottom', { defaultValue: '已經到我底線了' })}</span>
           </div>
+
+          {/* 多模块篩選底部 sheet（图2-5）：sticky bottom:0 浮层，DOM 位置必须在滚动容器末尾 */}
+          {filters.sheet}
         </div>
       </div>
 

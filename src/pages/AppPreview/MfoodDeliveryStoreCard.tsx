@@ -19,12 +19,14 @@
  * 字段口径与閃蜂一致：门店名称（新店角标在封面图左上角 / 名称前四选一品质标签）、
  * 评分、月售、免配送費与起送·減配互斥、配送时间、距离（自取折扣标签跟在距离后）、
  * 营业状态三态（正常不显示 / 已打烊+原因 / 接受预定+起配时间）、
- * 标签栏、会员红包行（可展开：券包/活动/其它）、人氣商家皮膚（small/large）。
+ * 标签栏、会员红包行（可展开：券包/活动/其它）、人氣商家皮膚（small/large；large 四版式由
+ * MfoodDeliveryHotCard 渲染，列表模式与大图模式同构）。
  */
 import { useContext, useState } from 'react'
-import { getSmallTemplate, getFallbackPoster } from '@/constants/popularSkinTemplates'
+import { getSmallTemplate } from '@/constants/popularSkinTemplates'
 import { HighlightContext, SpecField } from './SpecHighlight'
 import { useClosingCountdown } from './useClosingCountdown'
+import MfoodDeliveryHotCard from './MfoodDeliveryHotCard'
 import BrandCover from './BrandCover'
 import { deliveryFromText } from './deliveryFee'
 
@@ -53,11 +55,13 @@ export interface MfoodHotDish {
 
 /** 人氣商家皮膚（配色真源 @/constants/popularSkinTemplates，与定价配置同源） */
 export interface MfoodHotSkin {
-  /** small=邊框+漸變小圖；large=大圖拼列 */
+  /** small=邊框+漸變小圖；large=大圖模式版式（layout 四選一） */
   mode: 'small' | 'large'
   /** small 模式：小圖皮膚 key（SMALL_SKIN_TEMPLATES，如 small_purple） */
   templateKey?: string
-  /** large 模式：兜底海報 key（FALLBACK_POSTERS，如 poster_orange） */
+  /** large 模式版式（与定价页 LargeLayout 同名同序）：grid 大图拼列 / carousel 阶梯轮播 / triple 爆款商品横滑 / hero 主推商品横滑；缺省 grid */
+  layout?: 'grid' | 'carousel' | 'triple' | 'hero'
+  /** large 模式：兜底海報 key（FALLBACK_POSTERS，如 poster_orange）；triple 版式不使用海報 */
   posterKey?: string
   /** large 模式：海報頂部品牌短名（可含 \n 換行） */
   posterBrand?: string
@@ -65,7 +69,7 @@ export interface MfoodHotSkin {
   posterMascot?: string
   /** large 模式：真实海報图（参考图切图，优先于兜底渐变；图内已含「人氣商家/立即進入」无需叠加文字） */
   posterImage?: string
-  /** large 模式：商品拼列（1大2小，首項為主推） */
+  /** large 模式：商品列表（按版式取前 N 个：grid 3 / carousel 3 / triple·hero 5） */
   dishes?: MfoodHotDish[]
 }
 
@@ -162,16 +166,19 @@ export default function MfoodDeliveryStoreCard({
   /* 人氣商家皮膚解析：配色一律從共享模板真源取，不在本頁複製色值 */
   const hot = store.hotSkin
   const smallSkin = hot?.mode === 'small' && hot.templateKey ? getSmallTemplate(hot.templateKey) : undefined
-  const poster = hot?.mode === 'large' && hot.posterKey ? getFallbackPoster(hot.posterKey) : undefined
-  const isHotLarge = hot?.mode === 'large'
 
   /* 打烊倒计时（No.19）：mock 初始值每秒真实递减，归零隐藏；组件卸载（切分类/刷新/重进界面）自动重置 */
   const closing = useClosingCountdown(store.closingCountdown ?? '')
 
+  /* 人氣商家大圖模式：交由 MfoodDeliveryHotCard 渲染 4 版式（列表模式与大图模式同构，不被同化成普通卡） */
+  if (hot?.mode === 'large') {
+    return <MfoodDeliveryHotCard store={store} onOpenStore={onOpenStore} />
+  }
+
   /* 人氣商家小圖模式：id13 標記整卡邊框（皮膚）而非封面圖；其餘模式原樣返回 */
   const cardNode = (
     <div
-      className={`apw-card${isHotLarge ? ' is-hot-large' : ''}${smallSkin ? ' is-hot-small' : ''}`}
+      className={`apw-card${smallSkin ? ' is-hot-small' : ''}`}
       style={smallSkin ? { border: `2px solid ${smallSkin.borderColor}`, background: smallSkin.gradientCss } : undefined}
       onClick={() => { if (!store.outOfRange && !store.notJoined) onOpenStore?.(store.merchantId) }}
     >
@@ -182,23 +189,8 @@ export default function MfoodDeliveryStoreCard({
         </SpecField>
       )}
 
-      {/* 左列：大圖模式=豎版海報（id13 锚海报）；人气小圖=封面圖（id13 改标整卡边框，不标封面图）；普通卡=封面圖（封面图锚点 id=15，新店角标固定左上角） */}
-      {isHotLarge ? (
-        <SpecField panel="delivery" id={13}>
-          <div className="apw-hot-poster" style={poster ? { background: poster.gradientCss } : undefined}>
-            {hot?.posterImage ? (
-              <img className="apw-hot-poster-img" src={hot.posterImage} alt="人氣商家" />
-            ) : (
-              <>
-                <span className="apw-hot-poster-brand">{hot?.posterBrand}</span>
-                <span className="apw-hot-poster-mascot" aria-hidden="true">{hot?.posterMascot}</span>
-                <span className="apw-hot-poster-title">人氣商家</span>
-                <span className="apw-hot-poster-btn">立即進入 ▶</span>
-              </>
-            )}
-          </div>
-        </SpecField>
-      ) : hot ? (
+      {/* 左列：人气小圖=封面圖（id13 改标整卡边框，不标封面图）；普通卡=封面圖（封面图锚点 id=15，新店角标固定左上角） */}
+      {hot ? (
         <div className="apw-card-img">
           <SpecField panel="delivery" id={15}><BrandCover seed={store.key} name={store.name} /></SpecField>
           {store.isNew && <SpecField panel="delivery" id={2}><span className="apw-new-tag">新店</span></SpecField>}
@@ -221,9 +213,8 @@ export default function MfoodDeliveryStoreCard({
 
       {/* 右侧信息 */}
       <div className="apw-card-body">
-        {/* 门店名称（人氣商家大圖模式帶「熱門」角标；普通卡前缀品质标签四选一）：名称 id=1 / 品质标签 id=3 */}
+        {/* 门店名称（普通卡前缀品质标签四选一）：名称 id=1 / 品质标签 id=3 */}
         <div className="apw-row-name">
-          {isHotLarge && <span className="apw-hot-flag">熱門</span>}
           {store.brandTag && (
             <SpecField panel="delivery" id={3}>
               <span className={`apw-brand-tag ${BRAND_TAG_STYLE[store.brandTag]}`}>{store.brandTag}</span>
@@ -271,7 +262,7 @@ export default function MfoodDeliveryStoreCard({
           ) : (
             <>
               <SpecField panel="delivery" id={4}><b className="apw-rating"><span className="apw-star" aria-hidden="true">★</span>{store.rating}</b></SpecField>
-              {!isHotLarge && <SpecField panel="delivery" id={5}><span className="apw-sales">月售 {store.monthlySales}</span></SpecField>}
+              <SpecField panel="delivery" id={5}><span className="apw-sales">月售 {store.monthlySales}</span></SpecField>
             </>
           )}
           {/* 配送类型（此位置统一展示占位「配送类型」，不展示自送/支持自取）：超出範圍與未入駐商家當前不可配送，角标不显示 */}
@@ -348,27 +339,6 @@ export default function MfoodDeliveryStoreCard({
               ))}
             </div>
           </SpecField>
-        )}
-
-        {/* 人氣商家大圖模式：1大2小商品拼列（首項主推：折扣角標+價格條+菜名） */}
-        {isHotLarge && hot?.dishes && hot.dishes.length > 0 && (
-          <div className="apw-hot-dishes">
-            {hot.dishes.map((d, i) => (
-              <div key={d.name} className={`apw-hot-dish${i === 0 ? ' is-lead' : ''}`}>
-                <div className="apw-hot-dish-img">
-                  <img src={d.image} alt={d.name} />
-                  {d.discount && <span className="apw-hot-dish-discount">{d.discount}</span>}
-                  {i === 0 && (
-                    <span className="apw-hot-dish-price">
-                      <em>${d.price}</em>
-                      {d.origin && <s>${d.origin}</s>}
-                    </span>
-                  )}
-                </div>
-                {i === 0 && <span className="apw-hot-dish-name">{d.name}</span>}
-              </div>
-            ))}
-          </div>
         )}
       </div>
     </div>

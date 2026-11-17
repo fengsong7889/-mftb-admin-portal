@@ -27,21 +27,40 @@
  * apw-status-* / apw-closing / apw-brand-tag / apw-discount-flag），
  * 本文件与 appPreview.css 大图段只保留版式类（apw-large-），不新增裸色值。
  */
+import { useState } from 'react'
 import { SpecField } from './SpecHighlight'
 import { useClosingCountdown } from './useClosingCountdown'
 import BrandCover from './BrandCover'
 import { deliveryFromText } from './deliveryFee'
+import DeliveryHotCard from './DeliveryHotCard'
+import { getSmallTemplate } from '@/constants/popularSkinTemplates'
 import { BRAND_TAG_STYLE, DeliveryMemberBlock, type DeliveryStore } from './DeliveryStoreCard'
 
 export default function DeliveryLargeCard({ store, onOpenStore }: {
   store: DeliveryStore
   onOpenStore?: (merchantId: string) => void
 }) {
+  /* 收藏按钮（id26，图3 口径）：大图模式普通布局卡右上角心形钮，点击实心/空心切换；人氣商家大圖卡不展示 */
+  const [fav, setFav] = useState(false)
+
   /* 打烊倒计时（No.19）：与列表模式同款，每秒真实递减，归零隐藏 */
   const closing = useClosingCountdown(store.closingCountdown ?? '')
 
+  /* 人氣商家大圖皮膚：保持人氣商家版式（DeliveryHotCard），不切换成普通「上大图下信息」大图卡 */
+  if (store.hotSkin?.mode === 'large') {
+    return <DeliveryHotCard store={store} onOpenStore={onOpenStore} />
+  }
+
+  /* 小圖皮膚商家在大图模式下：布局同普通大图卡，但保留购买皮肤的边框+框内渐变 */
+  const smallSkin = store.hotSkin?.mode === 'small' && store.hotSkin.templateKey
+    ? getSmallTemplate(store.hotSkin.templateKey) : undefined
+
   return (
-    <div className="apw-large" onClick={() => onOpenStore?.(store.merchantId)}>
+    <div
+      className="apw-large"
+      style={smallSkin ? { border: `2px solid ${smallSkin.borderColor}`, background: smallSkin.gradientCss } : undefined}
+      onClick={() => onOpenStore?.(store.merchantId)}
+    >
       {/* 減配角标（id7）：与列表模式同款渐变角标，贴卡片（封面）右上角 */}
       {store.deliveryDiscount && (
         <SpecField panel="delivery" id={7}>
@@ -49,11 +68,22 @@ export default function DeliveryLargeCard({ store, onOpenStore }: {
         </SpecField>
       )}
 
-      {/* 封面图/视频（id20）：有视频自动播放视频，无视频大图封面兜底（必传） */}
+      {/* 封面图/视频（id20）：有视频自动播放视频，无视频大图封面兜底（必传）；右上角收藏按钮（id26，非人氣商家大圖卡展示） */}
       <SpecField panel="delivery" id={20}>
         <div className="apw-large-cover">
           <img className="apw-large-cover-img" src={store.image} alt={store.name} />
           {store.coverVideo && <span className="apw-large-play" aria-hidden="true">▶</span>}
+          <SpecField panel="delivery" id={26}>
+            <button
+              type="button"
+              className={`apw-large-fav${fav ? ' is-fav' : ''}`}
+              aria-label={fav ? '取消收藏門店' : '收藏門店'}
+              aria-pressed={fav}
+              onClick={(e) => { e.stopPropagation(); setFav((v) => !v) }}
+            >
+              {fav ? '❤' : '♡'}
+            </button>
+          </SpecField>
         </div>
       </SpecField>
 

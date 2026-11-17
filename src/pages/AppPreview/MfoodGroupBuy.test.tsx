@@ -123,16 +123,22 @@ describe('MFOOD 特惠團購', () => {
     expect(screen.getByText('澳門燒味工房🔥-新橋店')).toBeInTheDocument()
   })
 
-  it('附近好店篩選面板：大小图切换模块仅附近好店页签展示（与閃蜂同规则）', () => {
+  it('附近好店篩選面板：大小图切换与營業時間仅附近好店页签展示（与閃蜂同规则）', () => {
     render(<MfoodGroupBuy onBack={noop} />)
-    // 默认優選页签（团购券流）：更多篩選无大小图模块
+    // 默认優選页签（团购券流）：更多篩選无大小图模块、无營業時間模块
     fireEvent.click(screen.getByRole('button', { name: '篩選條件' }))
-    expect(within(screen.getByRole('group', { name: '更多篩選面板' })).queryByText('列表大小圖切換')).not.toBeInTheDocument()
+    const couponPanel = screen.getByRole('group', { name: '更多篩選面板' })
+    expect(within(couponPanel).queryByText('列表大小圖切換')).not.toBeInTheDocument()
+    expect(within(couponPanel).queryByText('營業時間')).not.toBeInTheDocument()
+    expect(within(couponPanel).getByText('使用人數')).toBeInTheDocument()
     // 再点同一篩選按鈕收起（togglePanel 互斥口径）
     fireEvent.click(screen.getByRole('button', { name: '篩選條件' }))
-    // 切附近好店：模块出现
+    // 切附近好店：两个商家类模块出现，使用人數收起
     fireEvent.click(screen.getByRole('button', { name: '附近好店' }))
     fireEvent.click(screen.getByRole('button', { name: '篩選條件' }))
-    expect(within(screen.getByRole('group', { name: '更多篩選面板' })).getByText('列表大小圖切換')).toBeInTheDocument()
+    const merchantPanel = screen.getByRole('group', { name: '更多篩選面板' })
+    expect(within(merchantPanel).getByText('列表大小圖切換')).toBeInTheDocument()
+    expect(within(merchantPanel).getByText('營業時間')).toBeInTheDocument()
+    expect(within(merchantPanel).queryByText('使用人數')).not.toBeInTheDocument()
   })
 })

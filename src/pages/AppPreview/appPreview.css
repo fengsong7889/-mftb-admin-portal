@@ -2149,6 +2149,11 @@
 .apg-pref-ico--new { background: #722ED1; font-size: 12px; font-style: italic; }
 .apg-pref-ico--env { background: linear-gradient(135deg, #52C41A, var(--apg-gold)); }
 .apg-pref-ico--healthy { background: linear-gradient(135deg, #1890FF, #52C41A); }
+/* 美食外卖优惠活动模块新增图标档：蜂蜜=金渐变 / 蓝 / 紫 / 粉（壳内豁免区，浅色档字面量） */
+.apg-pref-ico--honey { background: linear-gradient(135deg, #FA8C16, #FFD666); }
+.apg-pref-ico--blue { background: #1890FF; }
+.apg-pref-ico--purple { background: #722ED1; }
+.apg-pref-ico--pink { background: #EB2F96; }
 /* 底部操作条：二分单丸（左黑重置/右黄完成）；黑取 text-1 反色、黄复用页局部金令牌，深浅主题均成立 */
 .apg-more-footer { display: flex; padding: 12px 16px 16px; }
 .apg-more-reset {
@@ -2177,26 +2182,41 @@
 .apg-more-closebar { flex: none; display: flex; flex-direction: column; align-items: center; padding: 0 0 6px; }
 .apg-more-stem { width: 3px; height: 20px; background: #FFFFFF; }
 
-/* 筛选下拉面板：紧贴筛选栏展开，底部圆形 × 收起（原型内不做全屏遮罩） */
-.apg-panel-wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 0 12px 12px; }
-.apg-panel { width: 100%; background: #FFFFFF; border: 1px solid #F0F0F0; border-radius: 14px; padding: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06), 0 0 0 1px transparent; }
-.apg-panel-near { display: flex; gap: 10px; }
-.apg-panel-regions { flex: none; width: 88px; display: flex; flex-direction: column; gap: 10px; }
-.apg-region { height: 44px; border: 1px solid #E8EAED; border-radius: 10px; background: #FFFFFF; color: #595959; font-size: 13px; cursor: pointer; }
-.apg-region.is-on { border-color: #E8720C; background: #FFF7E6; color: #E8720C; font-weight: 600; }
-.apg-panel-options { flex: 1; min-width: 0; background: #FAFAFA; border-radius: 10px; padding: 2px 12px; max-height: 288px; overflow-y: auto; }
+/* 筛选下拉面板：absolute 浮层遮挡瀑布流（不再推动下滑），底部圆形 × 收起（原型内不做全屏遮罩） */
+.apg-filter-zone { position: relative; }
+.apg-panel-wrap { position: absolute; top: calc(100% + 2px); left: 12px; right: 12px; z-index: 40; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.apg-panel { width: 100%; background: #FFFFFF; border: 1px solid #F0F0F0; border-radius: 14px; padding: 12px; box-shadow: 0 12px 28px rgba(0,0,0,0.14); }
+/* 面板排版精致化：左页签软底圆角+缓动，右列行距/分隔线/单选环统一节奏（团购/外卖两处共用） */
+.apg-panel-near { display: flex; gap: 8px; }
+.apg-panel-regions { flex: none; width: 84px; display: flex; flex-direction: column; gap: 8px; }
+.apg-region {
+  height: 40px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: #F7F8FA;
+  color: #595959;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.apg-region.is-on { border-color: #E8720C; background: #FFF7E6; color: #E8720C; font-weight: 600; box-shadow: 0 2px 8px rgba(232,114,12,0.12); }
+/* 持有选中值的分组页签：橙字标示生效口径（浏览另一组时仍可见） */
+.apg-region.has-pick { color: #E8720C; font-weight: 600; }
+.apg-panel-options { flex: 1; min-width: 0; background: #FAFAFA; border-radius: 12px; padding: 0 14px; max-height: 264px; overflow-y: auto; }
 .apg-optrow {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 13px 2px;
+  padding: 12px 0;
   border: none;
-  border-bottom: 1px solid #F0F0F0;
+  border-bottom: 1px solid #F5F5F5;
   background: transparent;
   color: #262626;
   font-size: 13px;
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
 }
@@ -2204,8 +2224,8 @@
 .apg-optrow .is-text-on { color: #E8720C; font-weight: 600; }
 .apg-radio {
   flex: none;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border: 1px solid #D9D9D9;
   border-radius: 50%;
   background: #FFFFFF;
@@ -2213,10 +2233,11 @@
   align-items: center;
   justify-content: center;
   font-style: normal;
-  font-size: 12px;
+  font-size: 10px;
   color: transparent;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
-.apg-radio.is-on { border-color: var(--apg-chip); background: var(--apg-chip); color: #262626; font-weight: 700; }
+.apg-radio.is-on { border-color: #E8720C; background: #E8720C; color: #FFFFFF; font-weight: 700; box-shadow: 0 0 0 3px rgba(232,114,12,0.14); }
 
 /* 分類面板：三列图标胶囊，多选后黄底描边 */
 .apg-panel-cats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
@@ -4618,6 +4639,43 @@ button.apcs-card:hover { border-color: #FFD591; }
   font-weight: 600;
   line-height: 1.4;
 }
+/* 口径作废的 note（deprecated）：保留原文但整条画删除线并转中性色——橙色警示态代表仍生效，
+   灰化+删除线代表已下线；直接删文本会丢历史口径，开发/测试/设计无从对证 */
+.ap-spec-note--deprecated {
+  background: var(--spec-row-line);
+  border-color: var(--spec-divider-line);
+  color: var(--spec-ink-faint);
+}
+.ap-spec-note--deprecated del { text-decoration: line-through; }
+/* 最近一轮口径调整标记（壳外说明表 chrome，平台侧一律走主题令牌不钉裸色）：
+   名称列徽标供整列扫读“本轮改了哪几行 + 什么时间”，说明列蓝底行写清“改了什么”。
+   与橙色 note 分工：note=长期例外/警示（加 deprecated 则灰化并画删除线），changed=本轮变更，两者可同现 */
+.ap-spec-changed-tag {
+  display: block;
+  width: fit-content;
+  margin-top: 4px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--spec-field-soft);
+  border: 1px solid var(--spec-blue-border);
+  color: var(--spec-accent);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+  cursor: help;
+}
+.ap-spec-changed {
+  margin: 6px 0 0;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--spec-field-soft);
+  border: 1px solid var(--spec-blue-border);
+  color: var(--spec-accent);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+}
 /* 说明行外部详情链接：包装为按钮（新标签页跳转）；壳外平台侧 chrome，走主题令牌不钉裸色 */
 .ap-spec-linkrow { margin: 6px 0 0; }
 .ap-spec-link {
@@ -5182,12 +5240,30 @@ button.apcs-card:hover { border-color: #FFD591; }
   font-weight: 700;
 }
 
-/* 大圖模式（大圖拼列）：左側豎版海報隨右側內容拉伸，文字推到底部 */
-.apw-card.is-hot-large { gap: 8px; }
+/* 人氣商家大圖卡（4 版式共用根，DeliveryHotCard）：列表/大图两模式同构；
+   grid 大图拼列 / carousel 阶梯轮播 / triple 爆款商品横滑（LOGO+橙带，无海报）/ hero 主推商品横滑 */
+.apw-hot {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  background: #FFFFFF;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+}
+.apw-hot--triple { flex-direction: column; }
+.apw-hot-top { display: flex; gap: 8px; min-width: 0; }
+/* triple：门店LOGO 块（本版式不使用海报，LOGO 即主视觉）；新店角标嵌左上（同列表模式口径） */
+.apw-hot-logo { position: relative; flex: none; width: 88px; height: 84px; border-radius: 14px; overflow: hidden; }
+.apw-hot-logo .apf-cover { width: 100%; height: 100%; border-radius: 14px; font-size: 22px; font-weight: 800; }
+.apw-hot-logo .apw-new-tag { top: 0; left: 0; padding: 1px 5px; font-size: 8px; border-radius: 0 0 6px 0; }
+.apw-hot-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .apw-hot-poster {
   position: relative; /* 真实海報图绝对铺满的定位锚 */
   flex: none;
   width: 96px;
+  min-height: 150px; /* posterImage 版海报无固有内容高，兜底防塌缩；随右侧内容 stretch 拉伸 */
   border-radius: 10px;
   overflow: hidden;
   display: flex;
@@ -5242,6 +5318,8 @@ button.apcs-card:hover { border-color: #FFD591; }
   white-space: nowrap;
 }
 
+/* ─── MFOOD 側人氣大圖舊版式（MfoodDeliveryStoreCard 仍在用；閃蜂已遷移至 apw-hotg-*，勿混用） ─── */
+.apw-card.is-hot-large { gap: 8px; }
 /* 商品拼列：1大2小，右側越界裁切營造輪播感 */
 .apw-hot-dishes {
   display: flex;
@@ -5300,6 +5378,156 @@ button.apcs-card:hover { border-color: #FFD591; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ─── 人氣商家大圖卡商品区（apw-hotg-*；与定价页大图预览同构；拟真壳豁免区钉浅色字面量） ─── */
+
+/* grid：1大2小（首项主推价格叠图、名在图下；小图名称叠加）；行高固定，不依赖容器拉伸（容器高度 auto 时 flex:1 会塌缩） */
+.apw-hotg-grid {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  grid-template-rows: repeat(2, 46px);
+  gap: 6px;
+  margin-top: 2px;
+}
+.apw-hotg-lead { grid-row: 1 / span 2; display: flex; flex-direction: column; gap: 3px; min-height: 0; }
+.apw-hotg-lead-img { position: relative; flex: 1; min-height: 0; border-radius: 8px; overflow: hidden; }
+.apw-hotg-lead-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.apw-hotg-lead-price {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  padding: 1px 6px 1px 5px;
+  border-radius: 0 8px 0 0;
+  background: rgba(229, 57, 53, 0.92);
+  color: #fff;
+}
+.apw-hotg-lead-price em { font-style: normal; font-size: 13px; font-weight: 800; }
+.apw-hotg-lead-price s { font-size: 9px; opacity: 0.85; }
+.apw-hotg-below {
+  font-size: 10px;
+  font-weight: 600;
+  color: #595959;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.apw-hotg-mini { position: relative; border-radius: 8px; overflow: hidden; min-height: 0; }
+.apw-hotg-mini img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.apw-hotg-mini-name {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 10px 5px 2px;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.55));
+  color: #fff;
+  font-size: 9px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* carousel：发牌式扇形梯度（前卡 66%，后两张依次右移 17% 露边；顶边下沉/底边上提逐级缩小，参照设计稿）+ 折扣角标跨出图底 + 底部名称行；堆叠区固定高度 */
+.apw-hotg-carousel { display: flex; flex-direction: column; gap: 3px; margin-top: 2px; }
+.apw-hotg-stack { position: relative; height: 92px; }
+.apw-hotg-slide {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 66%;
+  border-radius: 8px;
+  overflow: visible;
+  background: #FFFFFF;
+  padding: 2px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+.apw-hotg-slide img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 6px; }
+/* 显式层序：主推前卡（is-0）压在最上层，is-1/is-2 依次垫底；后两张右移露边、顶边下沉/底边上提逐级缩小 */
+.apw-hotg-slide.is-0 { z-index: 3; }
+.apw-hotg-slide.is-1 { z-index: 2; left: 17%; top: 5px; bottom: 7px; opacity: 0.97; }
+.apw-hotg-slide.is-2 { z-index: 1; left: 34%; top: 10px; bottom: 14px; opacity: 0.92; }
+/* 折扣角标（双段式）：浅粉段放折扣、红渐变段放大价格+划线原价，跨出前卡下缘（参照设计稿） */
+.apw-hotg-deal {
+  position: absolute;
+  left: 8px;
+  bottom: -9px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: 7px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.apw-hotg-deal-off {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  background: #FFE9EC;
+  color: #E53935;
+  font-size: 10px;
+  font-weight: 700;
+}
+.apw-hotg-deal-price {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  padding: 2px 7px;
+  background: linear-gradient(135deg, #FF3D71, #E53935);
+  color: #fff;
+}
+.apw-hotg-deal-price em { font-style: normal; font-size: 14px; font-weight: 800; }
+.apw-hotg-deal-price s { font-size: 9px; opacity: 0.85; }
+.apw-hotg-carousel .apw-hotg-below { margin-top: 12px; font-size: 12px; font-weight: 600; color: #1F2937; }
+
+/* 横滑商品卡行（triple 全宽橙带：3张完整+第4张露出；hero 右侧：2张完整+第3张露一半） */
+.apw-hotg-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.apw-hotg-row::-webkit-scrollbar { display: none; }
+.apw-hotg-row.is-hero .apw-hotg-cell { flex: 0 0 38%; }
+.apw-hotg-cell {
+  flex: none;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #FFFFFF;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.apw-hotg-cell-img { position: relative; height: 56px; }
+.apw-hotg-cell-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.apw-hotg-cell-discount {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #E53935, #FF7043);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+}
+.apw-hotg-cell-name {
+  padding: 4px 6px 0;
+  font-size: 10px;
+  color: #595959;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.apw-hotg-cell-price { display: flex; align-items: baseline; gap: 3px; padding: 1px 6px 6px; }
+.apw-hotg-cell-price em { font-style: normal; font-size: 13px; font-weight: 800; color: #E53935; }
+.apw-hotg-cell-price s { font-size: 9px; color: #8C8C8C; }
+.apw-hot-band { margin-top: 2px; }
+.apw-hot-band .apw-hotg-row { padding: 8px; border-radius: 10px; background: linear-gradient(180deg, #FFE9D0, #F59432); }
+.apw-hot-band .apw-hotg-cell { flex: 0 0 27%; }
 
 /* ─── 外卖瀑布流 · 卡片模式（一行两店；说明面板切换，两台手机同步；样式全走语义令牌，不新增裸色值） ─── */
 .apw-grid {
@@ -5747,6 +5975,31 @@ button.apcs-card:hover { border-color: #FFD591; }
 .apf-cover--t4 { background: linear-gradient(135deg, #722ED1, #FF4D4F); }
 .apf-cover--t5 { background: linear-gradient(135deg, #52C41A, #722ED1); }
 
+/* ── 美食外卖频道页 · 两排筛选栏（apg-dfilter-，閃蜂/MFOOD 单一真源 DeliveryFilterBar） ──
+   第一排綜合排序（默认选中）+ 距離/配送下拉 + 右缘篩選；第二排优惠活动模块标签横滑（图3 口径）；
+   下拉面板 absolute 浮层遮挡瀑布流，不推动下滑。
+   壳内拟真配色豁免口径：中性白底灰字，品牌下划线由壳根注入 --df-accent（閃蜂=金 / MFOOD=品牌橙）；
+   圆形图标复用偏好优惠图标族，本栏缩到 18px 适配胶囊 */
+.apg-dfilter { position: relative; background: #FFFFFF; border-radius: 14px 14px 0 0; padding: 10px 12px; }
+.apg-dfilter-sort { display: flex; align-items: center; gap: 18px; }
+.apg-dfilter-sortbtn { position: relative; border: none; background: transparent; font-size: 14px; font-weight: 700; color: #595959; cursor: pointer; padding: 0 0 6px; }
+.apg-dfilter-sortbtn.is-on { color: #262626; font-weight: 800; }
+.apg-dfilter-sortbtn.is-on::after { content: ''; position: absolute; left: 50%; transform: translateX(-50%); bottom: 0; width: 16px; height: 3px; border-radius: 2px; background: var(--df-accent, #E8720C); }
+.apg-dfilter-drop { border: none; background: transparent; font-size: 14px; font-weight: 700; color: #595959; cursor: pointer; padding: 0 0 6px; }
+.apg-dfilter-more { margin-left: auto; border: none; background: transparent; font-size: 13px; font-weight: 700; color: #262626; cursor: pointer; padding: 0; }
+.apg-dfilter-drop i, .apg-dfilter-more i { font-style: normal; font-size: 10px; }
+/* 第二排横滑：隐藏滚动条 + 触摸惯性滚动，胶囊不压缩 */
+.apg-dfilter-promos { display: flex; gap: 8px; overflow-x: auto; padding-top: 8px; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.apg-dfilter-promos::-webkit-scrollbar { display: none; }
+.apg-dfilter-chip { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 12px 0 6px; border: 1px solid #E8EAED; border-radius: 15px; background: #FFFFFF; color: #262626; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.apg-dfilter-chip .apg-pref-ico { width: 18px; height: 18px; font-size: 10px; }
+/* 下拉按钮选中/展开态：品牌橙字（与 apg-sortbar is-open 同口径），caret 展开翻转向；篩選钮展开态同色 */
+.apg-dfilter-drop.is-on, .apg-dfilter-drop.is-open, .apg-dfilter-more.is-open { color: #E8720C; }
+.apg-dfilter-drop i, .apg-dfilter-more i { display: inline-block; transition: transform 0.15s ease; }
+.apg-dfilter-drop.is-open i, .apg-dfilter-more.is-open i { transform: rotate(180deg); }
+/* 下拉面板：absolute 浮层遮挡瀑布流（top:100% 贴栏底，不推动内容下滑）；内部复用附近面板视觉 */
+.apg-dfilter-panel { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; padding: 10px 12px 12px; background: #FFFFFF; border-top: 1px solid #F0F0F0; border-radius: 0 0 14px 14px; box-shadow: 0 12px 28px rgba(0,0,0,0.14); }
+
 /* ── 閃蜂·美食外賣频道页（2026-11 新设计稿图2-4：黄色主题） ──
    页根复用閃蜂局部令牌集（apg-root：--apg-gold 等），零新增裸色（主题棘轮）；
    瀑布流为首页【外卖】瀑布流的数据副本（复制而非同源）；双层吸顶=搜索行 top:0 + 筛选行 top:56px */
@@ -5852,20 +6105,16 @@ button.apcs-card:hover { border-color: #FFD591; }
 .apdl-hot-img { width: 100%; height: 72px; border-radius: 8px; object-fit: cover; }
 .apdl-hot-name { font-size: 11px; font-weight: 700; color: #262626; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .apdl-hot-meta { font-size: 10px; color: #595959; }
-/* 筛选胶囊行：双层吸顶第二层（top:56px = 搜索行高） */
-/* 筛选胶囊行（吸顶）：apg-chip 基类仅作用于 .apg-sortbar，本行需本地补齐白底胶囊（图1 口径） */
-.apdl-chips { position: sticky; top: 56px; z-index: 5; display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 8px 12px; background: #F5F5F5; scrollbar-width: none; }
-.apdl-chips::-webkit-scrollbar { display: none; }
-.apdl-chips .apg-chip { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 10px; border-radius: 15px; background: #FFFFFF; color: #262626; font-size: 12px; font-weight: 700; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-.apdl-chip-amount { color: #FF4D4F; font-weight: 800; }
-/* 彩色圆底图标（图1 口径）：绿=換口味、黄=商家助力 */
-.apdl-chip-emoji { flex: none; width: 16px; height: 16px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-style: normal; }
-.apdl-chip-emoji--green { background: #52C41A; }
-.apdl-chip-emoji--amber { background: #FA8C16; }
-/* 黄色「篩選」胶囊：滑杆图标+单行文字，跟随胶囊流式排列（去右缘 auto 留白）；覆盖全局 .apg-chip.is-slider 的淡黄底 */
-.apdl-chips .apg-chip.is-slider { padding: 0 12px; border-radius: 15px; background: var(--apg-gold, #FA8C16); color: #262626; font-size: 12px; font-weight: 800; gap: 4px; box-shadow: none; }
-.apdl-slider-ico { flex: none; }
+/* 两排筛选栏：双层吸顶第二层（top:56px = 搜索行高），样式真源见 apg-dfilter 共享段 */
+/* 两排筛选栏閃蜂壳覆写：吸顶与搜索行对齐（top:56px），品牌accent取页局部金令牌（--df-accent 定义须独立成行，供 var 解析守卫识别为局部令牌） */
+.apdl-root .apg-dfilter {
+  --df-accent: var(--apg-gold, #FA8C16);
+  position: sticky; top: 56px; z-index: 5;
+}
 .apdl-feed { padding-top: 0; }
+/* 美食外卖页瀑布流容器（apw-feed 仅此页用）：与 apf-feed-list 同口径纵列间隔；
+   修复大图模式上下卡贴合、难以区分商家边界的问题 */
+.apw-feed { display: flex; flex-direction: column; gap: 10px; padding: 8px 0; }
 
 /* ════════════════════════════════════════════════════════════════
    MFOOD · 美食外賣频道页（apmf- 前缀，图1-4；根复用 apg-root 令牌集）
@@ -5975,17 +6224,11 @@ button.apcs-card:hover { border-color: #FFD591; }
 .apmf-redbag-info b { font-size: 15px; font-weight: 900; }
 .apmf-redbag-info i { font-style: normal; font-size: 10px; opacity: 0.9; }
 .apmf-redbag-btn { border: none; border-radius: 12px; background: #FFFFFF; color: #FF4D4F; font-size: 11px; font-weight: 800; padding: 3px 10px; cursor: pointer; }
-/* 排序行 + 快捷筛选胶囊 */
-.apmf-sort-row { display: flex; align-items: center; gap: 18px; padding: 2px 12px 8px; }
-.apmf-sort { position: relative; border: none; background: transparent; font-size: 14px; font-weight: 700; color: #595959; cursor: pointer; padding: 0 0 6px; }
-.apmf-sort.is-on { color: #262626; font-weight: 800; }
-.apmf-sort.is-on::after { content: ''; position: absolute; left: 50%; transform: translateX(-50%); bottom: 0; width: 16px; height: 3px; border-radius: 2px; background: #E8720C; }
-.apmf-sort-filter { margin-left: auto; border: none; background: transparent; font-size: 13px; font-weight: 700; color: #262626; cursor: pointer; padding: 0; }
-.apmf-quick-chips { display: flex; gap: 8px; overflow-x: auto; padding: 0 12px 10px; scrollbar-width: none; }
-.apmf-quick-chips::-webkit-scrollbar { display: none; }
-.apmf-quick-chip { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 10px; border: 1px solid #E8EAED; border-radius: 14px; background: #FFFFFF; color: #262626; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-.apmf-quick-chip.is-red { color: #FF4D4F; border-color: #FFCCC7; }
-.apmf-quick-chip.is-orange { color: #E8720C; border-color: #FFE7D1; }
+/* 两排筛选栏（样式真源见 apg-dfilter 共享段） */
+/* 两排筛选栏 MFOOD 壳覆写：品牌accent取品牌橙（与旧排序行下划线同口径） */
+.apmf-root .apg-dfilter {
+  --df-accent: #E8720C;
+}
 .apmf-feed { padding-top: 0; }
 
 /* ════════════════════════════════════════════════════════════════
@@ -5996,11 +6239,30 @@ button.apcs-card:hover { border-color: #FFD591; }
    apw-status-* / apw-closing / apw-brand-tag / apw-discount-flag），本段只留版式类，
    保证「标签、数据等颜色与列表模式展示效果一致」；覆写只调布局，不改配色。
    ════════════════════════════════════════════════════════════════ */
-.apw-large { position: relative; border-radius: 14px; background: #FFFFFF; box-shadow: 0 2px 8px rgba(0,0,0,0.06); overflow: hidden; cursor: pointer; }
+.apw-large { position: relative; border-radius: 14px; background: #FFFFFF; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.09); overflow: hidden; cursor: pointer; }
 .apw-large-cover { position: relative; height: 150px; }
 .apw-large-cover-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 /* 视频播放角标：示意「上传了视频则自动播放视频」（spec id20） */
 .apw-large-play { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; border-radius: 50%; background: color-mix(in srgb, #262626 45%, transparent); color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 13px; padding-left: 3px; }
+/* 收藏按钮（id26，图3 口径）：封面右上圆形白底心形，空心=未收藏，点击变红色实心；人氣商家大圖卡不展示 */
+.apw-large-fav {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(255, 255, 255, 0.85);
+  color: #1F2937;
+  font-size: 15px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.apw-large-fav.is-fav { color: #E53935; }
 .apw-large-body { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px; }
 /* logo：44px 小方块， BrandCover 品牌字与列表模式大封面（20px）相比按比例缩小；
    新店角标嵌于 logo 左上（与列表模式同口径），沿用 .apw-new-tag 配色，只做紧凑化版式覆写 */

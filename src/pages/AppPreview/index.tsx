@@ -121,6 +121,7 @@ function DualView() {
     searchGroup: loadSpecs('searchGroup'),
     searchDeliveryPage: loadSpecs('searchDeliveryPage'),
     searchGroupPage: loadSpecs('searchGroupPage'),
+    deliveryFilter: loadSpecs('deliveryFilter'),
   }))
   const [editId, setEditId] = useState<number | null>(null)
   /** 外卖瀑布流展示模式：小图（一行一店，原「列表」）/ 卡片（一行两店）/ 大图（顶部大图封面，閃蜂/MFOOD 均实现）；说明面板切换器下发，两台手机同步 */
@@ -144,6 +145,7 @@ function DualView() {
     filter: 'filter',
     searchGroupPage: 'groupbuy-search',
     deliveryPage: 'delivery-page',
+    deliveryFilter: 'delivery-page',
     searchDeliveryPage: 'delivery-search',
     searchDelivery: 'search-delivery',
     searchGroup: 'search-group',
@@ -183,6 +185,7 @@ function DualView() {
               deliveryPageMode={deliveryPageMode}
               preferredLayout={preferredLayout}
               onPreferredLayoutChange={setPreferredLayout}
+              onDeliveryPageModeChange={setDeliveryPageMode}
             />
           </PhoneFrame>
         </div>
@@ -197,6 +200,7 @@ function DualView() {
               deliveryPageMode={deliveryPageMode}
               preferredLayout={preferredLayout}
               onPreferredLayoutChange={setPreferredLayout}
+              onDeliveryPageModeChange={setDeliveryPageMode}
             />
           </PhoneFrame>
         </div>
@@ -359,6 +363,10 @@ function DualView() {
                     ) : (
                       <span onDoubleClick={(e) => { e.stopPropagation(); setEditId(s.id) }}>{s.label}</span>
                     )}
+                    {/* 最近一轮口径调整徽标：壳外说明表专用（手机壳内禁止此类标记物），扫一列即可定位本轮回归面 */}
+                    {s.changed && (
+                      <span className="ap-spec-changed-tag" title={s.changed.text}>🆕 {s.changed.date}</span>
+                    )}
                   </td>
                   <td className="ap-spec-desc">
                     {editId === s.id ? (
@@ -378,7 +386,13 @@ function DualView() {
                         </a>
                       </p>
                     )}
-                    {s.note && <p className="ap-spec-note">⚠ {s.note}</p>}
+                    {s.changed && <p className="ap-spec-changed">本次調整（{s.changed.date}）：{s.changed.text}</p>}
+                    {/* 作废口径（deprecated）不删文本：整条画删除线并灰化，保留“曾经生效、现已下线”的痕迹 */}
+                    {s.note && (
+                      <p className={`ap-spec-note${s.deprecated ? ' ap-spec-note--deprecated' : ''}`}>
+                        {s.deprecated ? '🚫' : '⚠'} {s.deprecated ? <del>{s.note}</del> : s.note}
+                      </p>
+                    )}
                   </td>
                 </tr>
               ))}

@@ -3,8 +3,9 @@
  *
  * 设计说明：
  * - 小图模式：固定11套「边框+渐变」配色方案，每套独立售卖
- * - 大图模式：固定4套版式（大图拼列/阶梯轮播/三图并列/单品大图），每套独立售卖
- * - 大图模式左侧竖版海报：11张兜底图可选 + 自定义上传（非必填）
+ * - 大图模式：固定4套版式（大图拼列/阶梯轮播/爆款商品横滑/主推商品横滑），每套独立售卖；
+ *   爆款商品横滑为门店LOGO+全宽横滑商品卡（不使用海报），其余三套为竖版海报且顶部叠门店LOGO
+ * - 大图模式竖版海报：11张兜底图可选 + 自定义上传（非必填）
  * - 皮肤等级沿用经典/精选/旗舰/至尊四级
  *
  * 本文件是模板的唯一数据源，定价和购买页均从此导入，保证一致性。
@@ -113,10 +114,10 @@ export const SMALL_SKIN_TEMPLATES: SmallSkinTemplate[] = [
 /* ==================== 大图模式：4套版式模板 ==================== */
 
 export const LARGE_SKIN_TEMPLATES: LargeSkinTemplate[] = [
-  { key: 'large_grid', defaultName: '大图拼列', layout: 'grid', description: '左侧竖版海报 + 右侧店铺信息，下方1大2小商品图' },
-  { key: 'large_carousel', defaultName: '阶梯轮播', layout: 'carousel', description: '左侧竖版海报 + 右侧商品卡阶梯堆叠轮播' },
-  { key: 'large_triple', defaultName: '三图并列', layout: 'triple', description: '左侧竖版海报 + 右侧3张等宽商品卡并列' },
-  { key: 'large_hero', defaultName: '单品大图', layout: 'hero', description: '左侧竖版海报 + 右侧1张横向主推商品大图' },
+  { key: 'large_grid', defaultName: '大图拼列', layout: 'grid', description: '左侧竖版海报（顶部叠门店LOGO）+ 右侧店铺信息，下方1大2小商品图' },
+  { key: 'large_carousel', defaultName: '阶梯轮播', layout: 'carousel', description: '左侧竖版海报（顶部叠门店LOGO）+ 右侧商品卡阶梯堆叠轮播，带折扣角标' },
+  { key: 'large_triple', defaultName: '爆款商品横滑', layout: 'triple', description: '门店LOGO + 店铺信息，橙色渐变带内横滑爆款商品卡（3张完整+第4张露出），不使用海报' },
+  { key: 'large_hero', defaultName: '主推商品横滑', layout: 'hero', description: '左侧竖版海报（顶部叠门店LOGO）+ 右侧主推商品横滑卡（2张完整+第3张露出一半）' },
 ]
 
 /* ==================== 兜底海报图：11张（与大图模式左侧竖版海报对应） ==================== */
@@ -208,7 +209,8 @@ export function getPosterSource(skin: SkinSaleConfig): PosterSource {
 }
 
 export function getMissingPosterLanguages(skin: SkinSaleConfig) {
-  if (skin.displayMode !== 'large' || getPosterSource(skin) !== 'custom') return []
+  // triple 版式仅展示门店LOGO+横滑商品卡，不使用海报，故不校验海报语言齐备
+  if (skin.displayMode !== 'large' || skin.layout === 'triple' || getPosterSource(skin) !== 'custom') return []
   const images = getCustomPosterImages(skin)
   return POSTER_LANGUAGES.filter(({ locale }) => !images[locale])
 }

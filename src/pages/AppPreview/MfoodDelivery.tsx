@@ -34,6 +34,7 @@ import bbqImg from '@/assets/consumer-home/bbq.jpg'
 import { MFOOD_STORES } from './consumerMfoodFeed'
 import MfoodDeliveryStoreCard from './MfoodDeliveryStoreCard'
 import MfoodDeliveryLargeCard from './MfoodDeliveryLargeCard'
+import { useDeliveryFilters } from './DeliveryFilterBar'
 
 /** 定位（图1；占位） */
 const LOCATION = '澳門理工大學'
@@ -103,25 +104,21 @@ const REDBAGS = [
   { key: 'r3', amount: '20', cond: '滿 188 可用' },
 ]
 
-/** 快捷筛选胶囊（图4） */
-const QUICK_FILTERS = [
-  { key: 'q1', icon: '🎫', text: '满488減40', tone: 'red' },
-  { key: 'q2', icon: '🔥', text: '勁爆券', tone: 'orange' },
-  { key: 'q3', icon: '', text: '減免運費', tone: '' },
-  { key: 'q4', icon: '', text: '配送类型', tone: '' },
-]
-
-export default function MfoodDelivery({ onSearch, onOpenStore, layout }: {
+export default function MfoodDelivery({ onSearch, onOpenStore, layout, onLayoutChange }: {
   onSearch?: () => void
   onOpenStore?: (merchantId: string) => void
   /** 瀑布流展示模式（说明面板「展示模式」切换器下发）：small=小图（一行一店）/ large=大图（顶部大图封面，复用 MfoodDeliveryLargeCard） */
   layout?: 'small' | 'large'
+  /** 篩選面板内大小图切换上报（说明面板闭环后下发另一台手机） */
+  onLayoutChange?: (mode: 'small' | 'large') => void
 }) {
   const bodyRef = useRef<HTMLDivElement>(null)
   const bannerRef = useRef<HTMLDivElement>(null)
   const bannerMainRef = useRef<HTMLDivElement>(null)
   /** 滚动过阈值：橙头部切白底吸顶态（图2 顶部） */
   const [scrolled, setScrolled] = useState(false)
+  /** 两排筛选栏 + 多模块篩選 sheet（sheet 渲染在滚动容器末尾，见底部） */
+  const filters = useDeliveryFilters({ brand: 'mfood', layout, onLayoutChange })
 
   /* 挂载后把主 Banner 居中：两侧各露出相邻 Banner 的边缘（图1 口径）；不居中会让侧位占位卡占满首屏。
      用 rect 差值而非 offsetLeft：主卡 position:relative 会使 offsetParent 跳过滚动容器，算出偏差 */
@@ -279,20 +276,8 @@ export default function MfoodDelivery({ onSearch, onOpenStore, layout }: {
           ))}
         </div>
 
-        {/* 排序行 + 快捷筛选胶囊（图4） */}
-        <div className="apmf-sort-row">
-          <button type="button" className="apmf-sort is-on">綜合排序</button>
-          <button type="button" className="apmf-sort">距離</button>
-          <button type="button" className="apmf-sort-filter">篩選 ▾</button>
-        </div>
-        <div className="apmf-quick-chips">
-          {QUICK_FILTERS.map((q) => (
-            <button key={q.key} type="button" className={`apmf-quick-chip${q.tone ? ` is-${q.tone}` : ''}`}>
-              {q.icon && <span aria-hidden="true">{q.icon}</span>}
-              {q.text}
-            </button>
-          ))}
-        </div>
+        {/* 两排筛选栏（图4）：綜合排序/距離/配送下拉 + 右缘篩選；第二排优惠活动标签横滑（蜂蜜兌換仅閃蜂，MFOOD 不展示） */}
+        {filters.bar}
 
         {/* 商家瀑布流：直接复用首页【美食外卖】的 MFOOD_STORES；小图/大图双模式（大图复用 MfoodDeliveryLargeCard） */}
         <div className="apf-feed-list apmf-feed">
@@ -302,6 +287,9 @@ export default function MfoodDelivery({ onSearch, onOpenStore, layout }: {
               : <MfoodDeliveryStoreCard key={store.key} store={store} onOpenStore={onOpenStore} />
           ))}
         </div>
+
+        {/* 多模块篩選底部 sheet（图2-5）：sticky bottom:0 浮层，DOM 位置必须在滚动容器末尾 */}
+        {filters.sheet}
       </div>
     </div>
   )
