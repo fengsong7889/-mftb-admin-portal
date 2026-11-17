@@ -132,6 +132,11 @@ jobs:
       # 本地仍保留 `npm run build:strict` 作为单命令入口。
       - name: Build
         if: github.event_name == 'push'
+        # vite build 在本仓体量（7000+ 模块）同样越过 Node 默认 ~2GB 老生代上限，会间歇性
+        # V8 OOM（exit 134）打断部署（13d9780 即在此步 OOM）。复用 Type Check 的步骤级堆上限；
+        # 务必步骤级而非 job 级，避免上游 Test 的 vitest 多 fork 继承大堆叠成「慢=超时」假红。
+        env:
+          NODE_OPTIONS: --max-old-space-size=${{ steps.tscheap.outputs.heap }}
         run: npm run build
       # 站点装配清单（方案 §4.2）：产物 → 应用归属 + sha256，随 dist 一起发布，
       # 后续「单应用回滚 / 复用已验证旧产物」全部按该清单校验，不靠「最新版本」猜。
