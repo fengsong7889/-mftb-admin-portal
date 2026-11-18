@@ -162,6 +162,34 @@
   font-family: monospace;
 }
 
+/* 行内只放一条公式/结论，长说明收进问号弹层；卡片底与描边均取令牌。 */
+.traffic-config__formula-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-2);
+  border-radius: 6px;
+  background: var(--surface-3);
+}
+
+.traffic-config__formula-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.traffic-config__formula-row .traffic-config__formula {
+  font-size: 13px;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
 /* ── 冷启动排序维度：逐维度配置卡 ── */
 .traffic-dimensions-item {
   margin-bottom: 16px;
@@ -172,14 +200,17 @@
   color: var(--text-2);
 }
 
+/* 维度卡并排一行（自适应列宽）：每卡仅 0~1 个参数，不再纵向独占整行；窄屏自动折行。 */
 .traffic-dim-cards {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 10px;
+  align-items: stretch;
   min-width: 0;
 }
 
 .traffic-dim-cards__summary {
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -217,10 +248,10 @@
 .traffic-dim-card__header.ant-checkbox-wrapper {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 8px;
   width: 100%;
   margin-inline-end: 0;
-  padding: 12px 16px;
+  padding: 8px 12px;
   cursor: pointer;
   transition: background 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -237,7 +268,7 @@
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
   padding-inline-start: 0;
   padding-inline-end: 0;
@@ -254,7 +285,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-1);
   line-height: 1.5;
@@ -279,7 +310,7 @@
 
 .traffic-dim-card__badge {
   flex-shrink: 0;
-  margin-left: auto;
+  margin-left: 2px;
   align-self: center;
   padding: 2px 10px;
   border-radius: 12px;
@@ -297,7 +328,7 @@
 }
 
 .traffic-dim-card__body {
-  padding: 12px 16px;
+  padding: 8px 12px;
   border-top: 1px solid var(--border-2);
 }
 
@@ -309,8 +340,14 @@
   margin-bottom: 0;
 }
 
+/* 卡内下拉收窄（方向枚举仅 5 字），避免窄卡横向溢出。 */
+.traffic-dim-card__body .traffic-fields-inline .ant-select {
+  width: 120px;
+  min-width: 0;
+}
+
 .traffic-dim-card__hint {
-  margin: 10px 0 0;
+  margin: 0;
 }
 
 /* ── 紧凑行内配置：标签与控件同行，多个参数共用一行，避免每项独占一大行 ── */
@@ -397,4 +434,171 @@
 .traffic-field-group .algorithm-fields,
 .traffic-field-group .traffic-fields-inline {
   margin-bottom: 0;
+}
+
+/* 同一分组内相邻的两行行内配置（如自定义权重→同分决胜）本来都是 margin-bottom:0，会紧贴；补规范纵向间距。 */
+.traffic-field-group > .traffic-fields-inline + .traffic-fields-inline {
+  margin-top: 12px;
+}
+
+/* ── 共用候选排序规则：权重占比条 + 只读摘要 ── */
+/* 因子色点：摘要 chips 用，四色取自主题令牌。 */
+.traffic-rank-bar__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.traffic-rank-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 8px 0 4px;
+  padding: 8px 12px;
+  border: 1px dashed var(--border-3);
+  border-radius: 6px;
+  background: var(--surface-3);
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.traffic-rank-summary__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.traffic-rank-summary__title .anticon {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.traffic-rank-summary__preset {
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.traffic-rank-summary__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+/* ── 公式试算弹层：输入即时重算，形态对齐自然流量计分试算 ── */
+.traffic-trial {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.traffic-trial__fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+}
+
+.traffic-trial__field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.traffic-trial__formula {
+  font-family: monospace;
+  font-size: 13px;
+  color: var(--text-1);
+  background: var(--surface-3);
+  border: 1px solid var(--border-2);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.traffic-trial__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.traffic-trial__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.traffic-trial__result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.traffic-trial__note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* 试算四模块双栏：左①标签准入，右②相似度③决胜④排序；宽面板尽量一屏看全。 */
+.traffic-trial__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.traffic-trial__col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.traffic-trial__module {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+  background: var(--surface-2);
+  padding: 10px 12px;
+  min-width: 0;
+}
+
+.traffic-trial__module-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+@media (max-width: 900px) {
+  .traffic-trial__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.traffic-trial__merchant {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+  background: var(--surface-2);
+  padding: 10px 12px;
 }

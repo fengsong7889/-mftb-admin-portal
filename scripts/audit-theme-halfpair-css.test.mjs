@@ -140,9 +140,10 @@ describe('scan：真实仓库与临时夹具', () => {
     expect(sum, '分桶合计必须等于危险点总数，否则有站点被静默丢弃').toBe(r.hazards.length)
   })
 
-  it('真仓现状：96 处半对分布在 16 个文件（数字变了说明判据或代码动过，必须重新定性）', () => {
+  // 2026-11-18 重新定性：皮肤/投流 CSS 令牌化使半对由 96 降至 95（真实改进，非判据漂移），文件数仍 16。
+  it('真仓现状：95 处半对分布在 16 个文件（数字变了说明判据或代码动过，必须重新定性）', () => {
     const r = scan()
-    expect(r.hazards.length).toBe(96)
+    expect(r.hazards.length).toBe(95)
     expect(new Set(r.hazards.map((x) => x.file)).size).toBe(16)
   })
 })
