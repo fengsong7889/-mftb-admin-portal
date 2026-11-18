@@ -22,6 +22,7 @@ import type { WaterfallSlotConfig } from '../types'
 import { fetchAdPricingList, updateAdPricingStatus, deleteAdPricing, fetchAdRevivePricingList, updateAdRevivePricingStatus, deleteAdRevivePricing, fetchAdHotPricingList, updateAdHotPricingStatus, deleteAdHotPricing, updateAdSignboardPricingStatus, deleteAdSignboardPricing, fetchAdSignboardPricingList, fetchAdTrafficPricingList, updateAdTrafficPricingStatus, deleteAdTrafficPricing, fetchAdTimeSlotPricingList, updateAdTimeSlotPricingStatus, deleteAdTimeSlotPricing, fetchAdAlgorithms, brandToAppType, type AdPricingStar, type AdPricingHot, type AdPricingTraffic, type AdPricingTimeSlot, type AdAlgorithm } from '@/api/adPromotion'
 import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { useCardOrder } from '@/hooks/useCardOrder'
+import { HERO_CARD_STYLES, renderHeroMark } from '../../_shared/ad-promotion/heroCardStyles'
 
 /** 投流廣告：後端業務頻道碼(1/2/3) → 列表行業務頻道值 */
 const TRAFFIC_CODE_TO_BIZ: Record<number, string> = {
@@ -48,9 +49,12 @@ const TAB_ALGORITHM_MAP: Record<string, AlgorithmType[]> = {
   ],
   groupBuy: [
     AlgorithmType.INVINCIBLE_STAR,
-    AlgorithmType.HOT_REVIVE_AD,
+    AlgorithmType.TRAFFIC_AD,
   ],
 }
+
+// 注：团购到店的盤活復甦入口已下线（2026-11-18 用户拍板），不要把 HOT_REVIVE_AD 加回此数组；
+// 投流广告按同日用户要求加入团购 tab（与算法库/广告销售同口径）。
 
 /** 各業務類型（tab）對應的業務频道：外賣到家=美食外賣+超市百貨，團購到店=團購到店 */
 const TAB_BIZ_CHANNELS: Record<string, string[]> = {
@@ -640,7 +644,7 @@ export default function Waterfall() {
               key: tabKey,
               label: tabKey === 'delivery' ? t('waterfall.bizDelivery') : t('waterfall.bizGroupBuy'),
               children: (
-                <div style={{
+                <div className="algo-card-stage" style={{
                   display: 'grid',
                   gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                   gap: 16,
@@ -651,15 +655,17 @@ export default function Waterfall() {
                   ).map(card => {
                       const cardOrder = tabKey === 'delivery' ? deliveryCardOrder : groupBuyCardOrder
                       const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.POPULAR_MERCHANT_KA || card.type === AlgorithmType.GOLDEN_SIGNBOARD || card.type === AlgorithmType.TRAFFIC_AD || card.type === AlgorithmType.TIME_SLOT_AD
+                      /** hero 款：与算法库/广告销售共用同一套渐变/徽记；按钮保持本菜单自身的 查看/調整定價 */
+                      const hero = HERO_CARD_STYLES[card.type]
                       return (
                         <div
                           key={card.type}
-                          className={`algo-card-wrapper algo-card-wrapper--${ALGO_CARD_COLOR_MAP[card.type]}${!enabled ? ' disabled' : ''}`}
+                          className={`algo-card-wrapper${hero ? ` algo-card-hero algo-card-hero--${hero.variant}` : ` algo-card-wrapper--${ALGO_CARD_COLOR_MAP[card.type]}`}${!enabled ? ' disabled' : ''}`}
                           onClick={() => enabled && handleSelectType(card.type)}
                           {...cardOrder.getDragProps(card.type)}
                         >
-                          <div className="algo-card-inner">
-                            <div className="algo-card-icon">{card.icon}</div>
+                          <div className="algo-card-inner" style={hero ? { background: hero.gradient } : undefined}>
+                            <div className="algo-card-icon">{hero ? renderHeroMark(card.type) : card.icon}</div>
                             <h3 className="algo-card-title">{ALGORITHM_TYPE_LABEL[card.type]}</h3>
                             <p className="algo-card-desc">{card.description}</p>
                             <div className="algo-card-tag">

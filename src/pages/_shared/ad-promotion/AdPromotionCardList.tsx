@@ -1,6 +1,7 @@
 import { Tag, Button } from 'antd'
 import { ShoppingCartOutlined, OrderedListOutlined } from '@ant-design/icons'
 import { ALGO_CARD_COLOR_MAP } from '@mftb/contracts/recommendConstants'
+import { HERO_CARD_STYLES, renderHeroMark } from './heroCardStyles'
 import type { useCardOrder } from '@/hooks/useCardOrder'
 import type { RecommendTypeConfig } from './types'
 
@@ -30,7 +31,7 @@ export function AdPromotionCardList({
   gap?: number
 }) {
   return (
-    <div style={{
+    <div className="algo-card-stage" style={{
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
       gap: 16,
@@ -38,16 +39,19 @@ export function AdPromotionCardList({
       {cardOrder.sortCards(
         configs,
         config => config.type,
-      ).map(config => (
+      ).map(config => {
+        /** hero 款：与算法库共用同一套渐变/徽记（heroCardStyles）；按钮保持本菜单自身的 查看訂單/購買廣告 */
+        const hero = HERO_CARD_STYLES[config.type]
+        return (
         <div
           key={config.type}
-          className={`algo-card-wrapper algo-card-wrapper--${ALGO_CARD_COLOR_MAP[config.type]}${!config.enabled ? ' disabled' : ''}`}
+          className={`algo-card-wrapper${hero ? ` algo-card-hero algo-card-hero--${hero.variant}` : ` algo-card-wrapper--${ALGO_CARD_COLOR_MAP[config.type]}`}${!config.enabled ? ' disabled' : ''}`}
           onClick={() => onCardClick(config)}
           style={selectedAlgorithmType === config.type ? { outline: '2px solid #1890ff', outlineOffset: -2 } : undefined}
           {...cardOrder.getDragProps(config.type)}
         >
-          <div className="algo-card-inner">
-            <div className="algo-card-icon">{config.icon}</div>
+          <div className="algo-card-inner" style={hero ? { background: hero.gradient } : undefined}>
+            <div className="algo-card-icon">{hero ? renderHeroMark(config.type) : config.icon}</div>
             <h3 className="algo-card-title">{config.name}</h3>
             <p className="algo-card-desc">{config.description}</p>
             <div className="algo-card-tag">
@@ -82,7 +86,8 @@ export function AdPromotionCardList({
             </div>
           </div>
         </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

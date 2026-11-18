@@ -2652,6 +2652,521 @@ html:has(.login-page-video) {
 }
 
 /* ========================================================================
+   Algorithm Card (Hero) — 设计师款广告卡（算法库·美食外卖全类型）
+
+   与基类的分工：渐变底色由 TSX 内联注入（品牌装饰面，不随主题翻面，色值
+   按同文件页面头部渐变的既有先例写在渐变串内），此处只管布局、文字层、
+   hover 交互与各类型徽记。颜色全部用 rgba 白色系 + 品牌橙高亮表达，不引入
+   CSS 裸 hex（cssHex 棘轮只降不升），阴影避开 rgba(0,0,0,*)（rgbaBlack 棘轮），
+   文字/投影阴影统一用深紫黑调（九种渐变底上通用）。
+   作用域全部以 .algo-card-hero 开头：广告销售/销售定价/瀑布流共用的
+   .algo-card-wrapper 基类零改动。
+   ======================================================================== */
+/* 卡片舞台：浅色下白页直贴深色卡突兀，垫一层与页面同调的过渡层（白页→浅灰舞台→深色卡三级过渡）；
+   底色用主题令牌（深色下自动翻成页面同调深灰，视觉零变化），不钉裸值避免半对 */
+.algo-card-stage {
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--surface-1);
+}
+
+/* wrapper 变 flex column：inner 以 flex:1 满铺整卡（渐变面随 wrapper 拉伸，不露白）；
+   align-self:start 脱离网格等高拉伸 —— 行内旧卡更高会把 hero 拉到行高（实测 ~215px），
+   用户要求更矮，故按自身内容高呈现，顶部与同行对齐、底部允许参差；
+   常态柔投影让深色卡“浮”在舞台上（浅色下增强融合感，深色下几乎不可见无碍） */
+.algo-card-hero {
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+  box-shadow: 0 6px 18px rgba(24, 16, 46, 0.16);
+}
+
+.algo-card-hero .algo-card-inner {
+  flex: 1;
+  min-height: 150px;
+  padding: 18px 24px;
+  padding-right: 60px; /* 右上角小图标留位，描述行宽比首版放宽 */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 8px;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.10); /* 深底上的细描边提升质感，降噪后卡面需要轮廓 */
+}
+
+/* 图标：右上角小玻璃圆（内置置顶曝光徽记），与标题构成头部平衡，不挤压描述行宽 */
+.algo-card-hero .algo-card-icon {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 4px 12px rgba(24, 16, 46, 0.30), 0 0 16px rgba(255, 255, 255, 0.16);
+}
+
+/* ===== 各类型徽记（每类一枚：白色形 + 一处品牌橙高亮） ===== */
+
+/* 無敵星星：全澳置顶曝光 —— 上箭头 + 坑位条，首条橙亮 */
+.algo-card-mk-star {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.algo-card-mk-star i {
+  display: block;
+  border-radius: 2px;
+}
+.algo-card-mk-star-arrow {
+  width: 0;
+  height: 0;
+  border-radius: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 6px solid rgba(255, 255, 255, 0.92);
+}
+.algo-card-mk-star-bar {
+  width: 20px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.45);
+}
+.algo-card-mk-star-bar.is-first {
+  width: 24px;
+  height: 5px;
+  background: linear-gradient(90deg, rgba(255, 179, 71, 0.95), rgba(232, 114, 12, 0.95));
+  box-shadow: 0 0 8px rgba(255, 179, 71, 0.55);
+}
+.algo-card-mk-star-bar.is-dim {
+  width: 14px;
+  background: rgba(255, 255, 255, 0.26);
+}
+
+/* 盤活復甦：商圈限定置顶 —— 定位 pin 钉在坑位上，首条橙亮 */
+.algo-card-mk-revive {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.algo-card-mk-revive-pin {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+}
+.algo-card-mk-revive-pin::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(232, 114, 12, 0.95);
+}
+.algo-card-mk-revive-pin::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 2px;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 7px solid rgba(255, 255, 255, 0.92);
+}
+.algo-card-mk-revive-bar {
+  width: 16px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.45);
+}
+.algo-card-mk-revive-bar.is-first {
+  width: 20px;
+  background: linear-gradient(90deg, rgba(255, 179, 71, 0.95), rgba(232, 114, 12, 0.95));
+}
+
+/* 新店廣告：新开业门面 —— 屋顶橙亮 + 店身 + 门 */
+.algo-card-mk-store {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.algo-card-mk-store-roof {
+  width: 0;
+  height: 0;
+  border-left: 13px solid transparent;
+  border-right: 13px solid transparent;
+  border-bottom: 8px solid rgba(255, 179, 71, 0.95);
+}
+.algo-card-mk-store-body {
+  width: 22px;
+  height: 12px;
+  border-radius: 0 0 2px 2px;
+  background: rgba(255, 255, 255, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.algo-card-mk-store-door {
+  width: 6px;
+  height: 7px;
+  border-radius: 2px 2px 0 0;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+/* 品牌商家：品牌认证勋章 —— 橙亮圆章 + 双丝带 */
+.algo-card-mk-medal {
+  position: relative;
+  width: 26px;
+  height: 30px;
+}
+.algo-card-mk-medal-ribbon {
+  position: absolute;
+  top: 14px;
+  width: 6px;
+  height: 13px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.45);
+}
+.algo-card-mk-medal-ribbon.is-left {
+  left: 5px;
+  transform: rotate(-28deg);
+}
+.algo-card-mk-medal-ribbon.is-right {
+  right: 5px;
+  transform: rotate(28deg);
+}
+.algo-card-mk-medal-disc {
+  position: absolute;
+  top: 0;
+  left: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(255, 179, 71, 0.95), rgba(232, 114, 12, 0.95));
+  border: 2px solid rgba(255, 255, 255, 0.92);
+}
+
+/* 獨家商家：稀缺皇冠 —— 三尖 + 底条，中尖橙亮 */
+.algo-card-mk-crown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.algo-card-mk-crown-spikes {
+  display: flex;
+  align-items: flex-end;
+}
+.algo-card-mk-crown-spike {
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 8px solid rgba(255, 255, 255, 0.92);
+}
+.algo-card-mk-crown-spike.is-mid {
+  border-left-width: 5px;
+  border-right-width: 5px;
+  border-bottom-width: 10px;
+  border-bottom-color: rgba(255, 179, 71, 0.95);
+}
+.algo-card-mk-crown-base {
+  width: 22px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+/* 金字招牌：品质匾额 —— 顶檐 + 橙亮匾身（匾面金字线） */
+.algo-card-mk-plaque {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.algo-card-mk-plaque-top {
+  width: 24px;
+  height: 4px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.92);
+}
+.algo-card-mk-plaque-body {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  border-radius: 3px;
+  background: linear-gradient(135deg, rgba(255, 179, 71, 0.95), rgba(232, 114, 12, 0.95));
+}
+.algo-card-mk-plaque-body::after {
+  content: '';
+  position: absolute;
+  top: 7px;
+  left: 8px;
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+/* 投流廣告：商家×用户匹配 —— 两端节点 + 橙亮双向交换 */
+.algo-card-mk-match {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.algo-card-mk-match-node {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+}
+.algo-card-mk-match-swap {
+  position: relative;
+  width: 16px;
+  height: 12px;
+}
+.algo-card-mk-match-swap::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 9px solid rgba(255, 179, 71, 0.95);
+}
+.algo-card-mk-match-swap::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-right: 9px solid rgba(232, 114, 12, 0.95);
+}
+
+/* 猜你喜歡：歷史偏好命中 —— 心形（橙亮）；容器顯式 flex 同上（inline 子元素塊化必需） */
+.algo-card-mk-heart {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.algo-card-mk-heart-shape {
+  position: relative;
+  width: 11px;
+  height: 11px;
+  margin-top: 3px;
+  transform: rotate(45deg);
+  background: linear-gradient(135deg, rgba(255, 179, 71, 0.95), rgba(232, 114, 12, 0.95));
+  box-shadow: 0 0 8px rgba(255, 179, 71, 0.50);
+}
+.algo-card-mk-heart-shape::before,
+.algo-card-mk-heart-shape::after {
+  content: '';
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: rgba(232, 114, 12, 0.95);
+}
+.algo-card-mk-heart-shape::before {
+  left: -6px;
+}
+.algo-card-mk-heart-shape::after {
+  top: -6px;
+}
+
+/* 自然流量：权重分排名 —— 递增阶梯柱 + 上升箭头，最高柱橙亮 */
+.algo-card-mk-trend {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+.algo-card-mk-trend-bar {
+  width: 5px;
+  height: 11px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.70);
+}
+.algo-card-mk-trend-bar.is-low {
+  height: 7px;
+  background: rgba(255, 255, 255, 0.45);
+}
+.algo-card-mk-trend-bar.is-top {
+  height: 15px;
+  background: linear-gradient(180deg, rgba(255, 179, 71, 0.95), rgba(232, 114, 12, 0.95));
+}
+.algo-card-mk-trend-arrow {
+  width: 0;
+  height: 0;
+  margin-bottom: 13px;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 6px solid rgba(255, 255, 255, 0.92);
+}
+
+/* 人氣商家：人氣熱度火焰 —— 橙亮外焰 + 暖白內焰（KA流量加持點燃人氣）；
+   容器必須顯式 flex：內部 i 是 inline 元素，不塊化則 width/height 全部無效（實測只剩 box-shadow 光點） */
+.algo-card-mk-popular {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.algo-card-mk-popular-flame {
+  position: relative;
+  width: 14px;
+  height: 14px;
+  margin-top: 3px;
+  transform: rotate(45deg);
+  border-radius: 0 50% 50% 50%;
+  background: linear-gradient(135deg, rgba(255, 179, 71, 0.95), rgba(232, 114, 12, 0.95));
+  box-shadow: 0 0 8px rgba(255, 179, 71, 0.45);
+}
+.algo-card-mk-popular-flame::after {
+  content: '';
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 236, 204, 0.95);
+}
+
+/* 時段推薦廣告：分時段投放 —— 時間表盤：白色分針指向 12 點檔、橙亮時針指向黃金時段；
+   容器必須顯式 flex：否則 inline 表盤的 width/height 無效，只剩左右 border 拼成豎線（實測覆盤） */
+.algo-card-mk-timeslot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.algo-card-mk-timeslot-dial {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.10);
+}
+.algo-card-mk-timeslot-dial::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 3px;
+  width: 2px;
+  height: 7px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.92);
+}
+.algo-card-mk-timeslot-dial::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 9px;
+  width: 7px;
+  height: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: rgba(255, 179, 71, 0.95);
+  transform: rotate(32deg);
+  transform-origin: 1px 1px;
+}
+
+/* hover 时图标点亮：放大 + 微转（星星闪烁感） */
+.algo-card-hero:hover .algo-card-icon {
+  transform: scale(1.18) rotate(-14deg);
+}
+
+.algo-card-hero .algo-card-title {
+  font-size: 20px;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.98);
+  text-shadow: 0 2px 6px rgba(24, 16, 46, 0.35);
+}
+
+/* 覆盖基类 hover 品牌橙：渐变面上标题保持白色，hover 由卡体上浮+扫光表达 */
+.algo-card-hero:hover .algo-card-title {
+  color: rgba(255, 255, 255, 1);
+}
+
+.algo-card-hero .algo-card-desc {
+  font-size: 13px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 1px 3px rgba(24, 16, 46, 0.30);
+}
+
+/* 底部动作沿用算法库自身的「查看調整算法」Tag，仅换成玻璃胶囊形态适配深底；
+   margin-top:auto 钉底：卡体随行高等高拉伸时胶囊始终贴在卡底 */
+.algo-card-hero .algo-card-tag {
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.algo-card-hero .algo-card-tag .ant-tag {
+  margin-inline-end: 0;
+  padding: 3px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.30);
+  color: rgba(255, 255, 255, 0.95);
+  transition: background 0.3s ease;
+}
+
+.algo-card-hero:hover .algo-card-tag .ant-tag {
+  background: rgba(255, 255, 255, 0.20);
+}
+
+/* 基类的顶部 3px 装饰线在整卡渐变面上多余：重载为 hover 白光罩（径向高光渐亮，
+   opacity 0→1 沿用基类 .algo-card-wrapper:hover::before 的过渡） */
+.algo-card-hero::before {
+  height: auto;
+  bottom: 0;
+  background: radial-gradient(120% 90% at 85% 18%, rgba(255, 255, 255, 0.12), transparent 55%);
+}
+
+/* 扫光：hover 时光带自左向右掠过（overflow:hidden 由基类 wrapper 提供） */
+.algo-card-hero::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 55%;
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.14), transparent);
+  transform: translateX(-130%) skewX(-18deg);
+  transition: transform 0.6s ease;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.algo-card-hero:hover::after {
+  transform: translateX(300%) skewX(-18deg);
+}
+
+/* hover 上浮比基类再深一档，投影带紫调贴合卡面主色 */
+.algo-card-hero:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 14px 30px rgba(24, 16, 46, 0.40);
+}
+
+/* ========================================================================
    全局确认弹窗（Modal.confirm）统一样式 — 设计稿实现
    说明：Modal.confirm 的 DOM 为 .ant-modal-content > .ant-modal-header(标题)
    + .ant-modal-body > .ant-modal-confirm-body-wrapper(内容+按钮 .ant-modal-confirm-btns)

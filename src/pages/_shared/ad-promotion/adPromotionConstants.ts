@@ -17,5 +17,8 @@ export const DELIVERY_CARD_TYPES: AlgorithmType[] = [
 
 export const GROUP_BUY_CARD_TYPES: AlgorithmType[] = [
   AlgorithmType.INVINCIBLE_STAR,
-  AlgorithmType.HOT_REVIVE_AD,
+  AlgorithmType.TRAFFIC_AD,
 ]
+
+// 注：团购到店的盤活復甦入口已下线（2026-11-18 用户拍板），不要把 HOT_REVIVE_AD 加回此数组；
+// 投流广告按同日用户要求加入团购 tab（与算法库/销售定价同口径）。

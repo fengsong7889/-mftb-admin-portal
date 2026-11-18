@@ -1,16 +1,17 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { Button, Space, Table, Tag, Card, Tabs, Modal, message, Switch } from 'antd'
+import { Button, Space, Table, Tag, Card, Tabs, Modal, message, Switch, Form, Input, Select, DatePicker } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, ArrowLeftOutlined, AppstoreOutlined, ApartmentOutlined } from '@ant-design/icons'
+import { PlusOutlined, ArrowLeftOutlined, AppstoreOutlined, ApartmentOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
-import { AlgorithmType, RecommendChannel, PlacementInterface, ServiceStatus, AppType, ALGO_CARD_COLOR_MAP } from '@mftb/contracts/recommendConstants'
+import { AlgorithmType, RecommendChannel, PlacementInterface, ServiceStatus, AppType, ALGO_CARD_COLOR_MAP, APP_OPTIONS, SERVICE_STATUS_OPTIONS } from '@mftb/contracts/recommendConstants'
 import { fetchAdAlgorithms, updateAdAlgorithmStatus, deleteAdAlgorithm, fetchAlgorithmWaterfallReferences, brandToAppType, type AdAlgorithm, type WaterfallReference } from '@/api/adPromotion'
 import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { useCardOrder, type CardDragProps } from '@/hooks/useCardOrder'
 import { useAuth } from '@/contexts/AuthContext'
 import BrandTag from '@/components/BrandTag'
+import { HERO_CARD_STYLES, renderHeroMark } from '../../_shared/ad-promotion/heroCardStyles'
 
 /** 各业务类型对应的算法类型列表 */
 const TAB_ALGORITHM_MAP: Record<string, AlgorithmType[]> = {
@@ -19,16 +20,17 @@ const TAB_ALGORITHM_MAP: Record<string, AlgorithmType[]> = {
     AlgorithmType.HOT_REVIVE_AD,
     AlgorithmType.NEW_STORE_AD,
     AlgorithmType.BRAND_MERCHANT,
-    AlgorithmType.GOLD_AD,
     AlgorithmType.EXCLUSIVE_MERCHANT,
     AlgorithmType.GOLDEN_SIGNBOARD,
     AlgorithmType.TRAFFIC_AD,
     AlgorithmType.GUESS_YOU_LIKE,
     AlgorithmType.ORGANIC_TRAFFIC,
   ],
+  /** 团购到店已下线盘活复苏入口（勿加回 HOT_REVIVE_AD）；投流/自然流量按 2026-11-18 用户要求加入团购 tab */
   groupBuy: [
     AlgorithmType.INVINCIBLE_STAR,
-    AlgorithmType.HOT_REVIVE_AD,
+    AlgorithmType.TRAFFIC_AD,
+    AlgorithmType.ORGANIC_TRAFFIC,
   ],
 }
 
@@ -61,6 +63,51 @@ const toAlgorithmRecord = (vo: AdAlgorithm): AlgorithmRecord => ({
   updatedAt: vo.updatedAt ? dayjs(vo.updatedAt).format('YYYY-MM-DD HH:mm:ss') : undefined,
 })
 
+const { RangePicker } = DatePicker
+
+/** 查询条件：字段与列表列一一对应，空值一律不参与过滤 */
+interface AlgorithmSearchValues {
+  code?: string
+  name?: string
+  brand?: AppType
+  status?: ServiceStatus
+  updatedBy?: string
+  updatedAt?: [dayjs.Dayjs, dayjs.Dayjs]
+}
+
+/**
+ * 按「选中类型 + 业务 Tab + 查询条件」过滤全量记录。
+ * <p>抽成组件外纯函数：列表接口已一次性取回（size=500），查询只做前端过滤，
+ * 过滤口径必须与挂载回调、切类型、重置三处完全一致，散落三份必然漂移。
+ */
+const filterRecords = (
+  list: AlgorithmRecord[],
+  type: AlgorithmType | null,
+  businessType: 'delivery' | 'groupBuy',
+  filters: AlgorithmSearchValues,
+): AlgorithmRecord[] => {
+  const keyword = (value?: string) => value?.trim().toLowerCase() ?? ''
+  const code = keyword(filters.code)
+  const name = keyword(filters.name)
+  const updater = keyword(filters.updatedBy)
+  const [updatedFrom, updatedTo] = filters.updatedAt ?? []
+  return list.filter(item => {
+    if (businessType === 'groupBuy' ? item.channel !== RecommendChannel.GROUP_BUY : item.channel === RecommendChannel.GROUP_BUY) return false
+    if (type != null && item.type !== type) return false
+    if (code && !item.code.toLowerCase().includes(code)) return false
+    if (name && !item.name.toLowerCase().includes(name)) return false
+    if (filters.brand != null && item.brand !== filters.brand) return false
+    if (filters.status != null && item.status !== filters.status) return false
+    if (updater && !keyword(item.updatedBy).includes(updater)) return false
+    if (updatedFrom && updatedTo) {
+      if (!item.updatedAt) return false
+      const updated = dayjs(item.updatedAt)
+      if (updated.isBefore(updatedFrom, 'day') || updated.isAfter(updatedTo, 'day')) return false
+    }
+    return true
+  })
+}
+
 export default function Algorithm() {
   const navigate = useNavigate()
   const { t } = useTranslation()
@@ -79,6 +126,13 @@ export default function Algorithm() {
   // 用 ref 追蹤當前選中類型，避免 async 回調中的閉包過期問題
   const selectedTypeRef = useRef<AlgorithmType | null>(initialType)
   const businessTypeRef = useRef<'delivery' | 'groupBuy'>(tabParam || 'delivery')
+
+  const [searchForm] = Form.useForm()
+  // 查询条件用 ref 保存：挂载回调与切类型都要带着它重算列表，放进 state 只会多一次无意义渲染
+  const searchFiltersRef = useRef<AlgorithmSearchValues>({})
+  /** 品牌 / 状态查询选项（复用列表列的枚举口径，不另造一份常量） */
+  const tAppOptions = useMemo(() => APP_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
+  const tServiceStatusOptions = useMemo(() => SERVICE_STATUS_OPTIONS.map(o => ({ label: t(o.labelKey), value: o.value })), [t])
 
   // 卡片拖拽排序（順序持久化到數據庫 + localStorage，每個 Tab 獨立保存）
   const deliveryCardOrder = useCardOrder('algorithm-card-order-delivery', TAB_ALGORITHM_MAP.delivery, 'algorithm')
@@ -106,7 +160,6 @@ export default function Algorithm() {
     { type: AlgorithmType.HOT_REVIVE_AD, icon: '🔥', description: t('algorithm.descHotRevive') },
     { type: AlgorithmType.NEW_STORE_AD, icon: '🏪', description: t('algorithm.descNewStore') },
     { type: AlgorithmType.BRAND_MERCHANT, icon: '💎', description: t('algorithm.descBrandMerchant') },
-    { type: AlgorithmType.GOLD_AD, icon: '💰', description: t('algorithm.descGoldAd') },
     { type: AlgorithmType.EXCLUSIVE_MERCHANT, icon: '👑', description: t('algorithm.descExclusiveMerchant') },
     { type: AlgorithmType.GOLDEN_SIGNBOARD, icon: '🏅', description: t('algorithm.descGoldenSignboard') },
     { type: AlgorithmType.TRAFFIC_AD, icon: '📊', description: t('algorithm.descTraffic') },
@@ -114,16 +167,8 @@ export default function Algorithm() {
     { type: AlgorithmType.ORGANIC_TRAFFIC, icon: '🌿', description: t('algorithm.descOrganicTraffic') },
   ]
 
-  /** 根据业务类型过滤数据 */
-  const filterByBusinessType = (data: AlgorithmRecord[]) => {
-    if (businessType === 'groupBuy') {
-      return data.filter(item => item.channel === RecommendChannel.GROUP_BUY)
-    }
-    return data.filter(item => item.channel !== RecommendChannel.GROUP_BUY)
-  }
-
   const [filteredData, setFilteredData] = useState<AlgorithmRecord[]>(
-    initialType ? filterByBusinessType(dataList.filter(item => item.type === initialType)) : dataList
+    initialType ? filterRecords(dataList, initialType, tabParam || 'delivery', {}) : dataList
   )
 
   /** 加載算法列表 */
@@ -134,19 +179,8 @@ export default function Algorithm() {
         if (!mounted) return
         const list = (res.records ?? []).map(toAlgorithmRecord)
         setDataList(list)
-        // 按當前選中的類型過濾（用 ref 獲取最新值，避免閉包過期）
-        const curType = selectedTypeRef.current
-        const curBiz = businessTypeRef.current
-        let filtered = list
-        if (curType) {
-          filtered = filtered.filter(item => item.type === curType)
-        }
-        if (curBiz === 'groupBuy') {
-          filtered = filtered.filter(item => item.channel === RecommendChannel.GROUP_BUY)
-        } else {
-          filtered = filtered.filter(item => item.channel !== RecommendChannel.GROUP_BUY)
-        }
-        setFilteredData(filtered)
+        // 按当前选中的类型、业务 Tab 与查询条件重算列表（均用 ref 取最新值，避免闭包过期）
+        setFilteredData(filterRecords(list, selectedTypeRef.current, businessTypeRef.current, searchFiltersRef.current))
       })
       .catch(() => {})
     return () => { mounted = false }
@@ -160,14 +194,31 @@ export default function Algorithm() {
     // 同步更新 ref，確保 API 回調不會覆蓋當前選擇
     selectedTypeRef.current = type
     businessTypeRef.current = tab
-    const data = filterByBusinessType(dataList.filter(item => item.type === type))
-    setFilteredData(data)
+    // 切换类型即换了一批数据口径，上一次的查询条件必须清空，否则会带着旧条件过滤新列表
+    searchForm.resetFields()
+    searchFiltersRef.current = {}
+    setFilteredData(filterRecords(dataList, type, tab, {}))
     setSearchParams({ type: String(type), tab }, { replace: true })
+  }
+
+  /** 查询：只过滤已加载的记录，不重新发请求（列表口径与卡片入口由 type/tab 决定） */
+  const handleSearch = (values: AlgorithmSearchValues) => {
+    searchFiltersRef.current = values
+    setFilteredData(filterRecords(dataList, selectedTypeRef.current, businessTypeRef.current, values))
+  }
+
+  /** 重置：清空条件并回到当前类型 + 业务 Tab 的完整列表 */
+  const handleReset = () => {
+    searchForm.resetFields()
+    searchFiltersRef.current = {}
+    setFilteredData(filterRecords(dataList, selectedTypeRef.current, businessTypeRef.current, {}))
   }
 
   // 返回卡片选择页（清空 URL 参数，使小蜜蜂 PRD 切回卡片展示界面）
   const handleBackToCards = () => {
     setSelectedType(null)
+    searchForm.resetFields()
+    searchFiltersRef.current = {}
     setFilteredData(dataList)
     setBusinessType('delivery')
     selectedTypeRef.current = null
@@ -384,17 +435,32 @@ export default function Algorithm() {
   ]
 
   /** 渲染算法类型卡片（带高级 hover 动效，支持拖拽交换位置） */
-  const renderAlgoCard = (card: { type: AlgorithmType; icon: string; description: string }, enabled: boolean, tab: 'delivery' | 'groupBuy', dragProps: CardDragProps) => (
+  const renderAlgoCard = (card: { type: AlgorithmType; icon: string; description: string }, enabled: boolean, tab: 'delivery' | 'groupBuy', dragProps: CardDragProps) => {
+    /** 设计师款 hero 卡（美食外卖 tab 全类型）：查 HERO_CARD_STYLES 命中即走新样式。
+     *  约束：底部动作沿用算法库自身的 Tag（不得换成广告销售的 查看訂單/購買廣告 按钮）；
+     *  渐变底色是品牌装饰面（不随主题翻面），色值按既有先例写在渐变串内联
+     *  （同文件页面头部渐变同模式；渐变串内色值不进 cssHex/inlineHex 棘轮口径）。 */
+    const hero = HERO_CARD_STYLES[card.type]
+    return (
     <div
       key={card.type}
-      className={`algo-card-wrapper algo-card-wrapper--${ALGO_CARD_COLOR_MAP[card.type]}${!enabled ? ' disabled' : ''}`}
+      className={`algo-card-wrapper${hero ? ` algo-card-hero algo-card-hero--${hero.variant}` : ` algo-card-wrapper--${ALGO_CARD_COLOR_MAP[card.type]}`}${!enabled ? ' disabled' : ''}`}
       onClick={() => enabled && handleSelectType(card.type, tab)}
       {...dragProps}
     >
-      <div className="algo-card-inner">
+      <div
+        className="algo-card-inner"
+        style={hero ? { background: hero.gradient } : undefined}
+      >
         <div className="algo-card-icon">
-          {card.icon}
-          {card.type === AlgorithmType.NEW_STORE_AD && <span style={{ fontSize: 24, verticalAlign: 'top', marginLeft: 2 }}>✨</span>}
+          {hero ? (
+            renderHeroMark(card.type)
+          ) : (
+            <>
+              {card.icon}
+              {card.type === AlgorithmType.NEW_STORE_AD && <span style={{ fontSize: 24, verticalAlign: 'top', marginLeft: 2 }}>✨</span>}
+            </>
+          )}
         </div>
         <h3 className="algo-card-title">{TYPE_LABEL[card.type]}</h3>
         <p className="algo-card-desc">{card.description}</p>
@@ -407,7 +473,8 @@ export default function Algorithm() {
         </div>
       </div>
     </div>
-  )
+    )
+  }
 
   // ===== Step 1: 卡片选择页 =====
   if (selectedType === null) {
@@ -454,7 +521,7 @@ export default function Algorithm() {
                 key: 'delivery',
                 label: t('algorithm.bizDelivery'),
                 children: (
-                  <div style={{
+                  <div className="algo-card-stage" style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                     gap: 16,
@@ -473,7 +540,7 @@ export default function Algorithm() {
                 key: 'groupBuy',
                 label: t('algorithm.bizGroupBuy'),
                 children: (
-                  <div style={{
+                  <div className="algo-card-stage" style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                     gap: 16,
@@ -531,6 +598,36 @@ export default function Algorithm() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* 查询区域 */}
+      <div className="search-section">
+        <Form layout="inline" form={searchForm} onFinish={handleSearch}>
+          <Form.Item label={t('algorithm.colAlgorithmId')} name="code">
+            <Input placeholder={t('waterfall.placeholderSearch')} allowClear />
+          </Form.Item>
+          <Form.Item label={t('algorithm.colAlgorithmName')} name="name">
+            <Input placeholder={t('waterfall.placeholderSearch')} allowClear />
+          </Form.Item>
+          <Form.Item label={t('common.colBrand')} name="brand">
+            <Select placeholder={t('common.all')} options={tAppOptions} allowClear />
+          </Form.Item>
+          <Form.Item label={t('common.colStatus')} name="status">
+            <Select placeholder={t('common.all')} options={tServiceStatusOptions} allowClear />
+          </Form.Item>
+          <Form.Item label={t('algorithm.colLastUpdater')} name="updatedBy">
+            <Input placeholder={t('waterfall.placeholderSearch')} allowClear />
+          </Form.Item>
+          <Form.Item label={t('algorithm.colLastUpdateTime')} name="updatedAt">
+            <RangePicker placeholder={[t('common.startDate'), t('common.endDate')]} allowClear />
+          </Form.Item>
+          <Form.Item>
+            <div className="search-actions">
+              <Button type="primary" htmlType="submit" icon={<SearchOutlined />}>{t('common.search')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={handleReset}>{t('common.reset')}</Button>
+            </div>
+          </Form.Item>
+        </Form>
       </div>
 
       {/* 功能区域 */}
