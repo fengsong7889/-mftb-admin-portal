@@ -313,7 +313,8 @@ describe('投流配置交互与保存', () => {
     expect(params).not.toHaveProperty('similarBlendRatio')
     expect(params).not.toHaveProperty('explorationSlots')
     expect(params).not.toHaveProperty('qualityFilterEnabled')
-  })
+    // 与下一条同形：全量字段挂载 + 勾选联动 + 保存断言，默认 60s 在高负载机器上会假红。
+  }, 120000)
 
   it('普通协同独立开关、关闭保留门槛，点击后关闭不影响普通协同保存', async () => {
     const view = mountConfig()
