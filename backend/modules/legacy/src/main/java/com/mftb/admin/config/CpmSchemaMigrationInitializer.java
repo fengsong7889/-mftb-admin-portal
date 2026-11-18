@@ -12,6 +12,7 @@ import com.mftb.admin.constant.SystemCode;
 import com.mftb.admin.service.PermissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ClassPathResource;
@@ -100,6 +101,13 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
             {"biz_cpm_push_record", "event_type"},
     };
 
+    /**
+     * 系统级总开关（方案 §十四）：关掉即 cpm 菜单隐藏 + 接口拒绝。
+     * <p>默认 true，行为与改造前完全一致；只有运维显式写 cpm.enabled=false 才生效。
+     */
+    @Value("${cpm.enabled:true}")
+    private boolean cpmEnabled;
+
     private final JdbcTemplate jdbcTemplate;
     private final SchemaVersionTracker versionTracker;
     private final PermissionService permissionService;
@@ -110,6 +118,25 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce(VERSION_MENU, this::doMenuMigrate, this::verifyMenus);
         versionTracker.applyOnce(VERSION_TEMPLATE, this::doTemplateSeed, this::verifyTemplates);
         versionTracker.applyOnce(VERSION_RULE, this::doRuleSeed, this::verifyRule);
+        syncMenuVisibility();
+    }
+
+    /**
+     * 总开关落地（方案 §十四）：{@code cpm.enabled=false} 时把 cpm 菜单整棵置 0，
+     * 侧边栏与门户入口一起消失；接口侧由 {@code CpmAccessGuard.currentUser()} 同键拒绝。
+     *
+     * <p>每次启动都同步而不进 applyOnce：开关是运维手段，一旦版本化就会「只在第一次启动生效」，
+     * 之后再关掉开关也不会隐藏菜单——那正是回滚通道最容易失效的地方。
+     * 更新语句按值判定，状态本来就对得上一行也不会写，重复启动无副作用。
+     */
+    private void syncMenuVisibility() {
+        int status = cpmEnabled ? 1 : 0;
+        int changed = jdbcTemplate.update(
+                "UPDATE sys_menu SET status = ? WHERE menu_key IN ('cpm-my','cpm-report','cpm-team','cpm-template','cpm-rule') "
+                        + " AND deleted = 0 AND status <> ?", status, status);
+        if (changed > 0) {
+            log.info("持續績效選單可見性已按總開關同步: enabled={}, 更新 {} 個菜單", cpmEnabled, changed);
+        }
     }
 
     /* ==================== 1. 表结构 ==================== */

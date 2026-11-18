@@ -67,6 +67,17 @@ public interface CpmItemMapper extends BaseMapper<CpmItem> {
             + "WHERE id = #{id} AND deleted = 0")
     int syncLatestCache(@Param("id") long id, @Param("status") String status, @Param("progress") int progress);
 
+    /**
+     * 行内工时写入（user_id 进 WHERE，与软删同一条 IDOR 防线）。
+     * <p>刻意不动 version：工时是「投入侧分布统计」的旁路字段，不该让只想补个工时的人
+     * 跟另一端的正文编辑互相顶回草稿；也不进任何评价口径。
+     */
+    @Update("UPDATE biz_cpm_item SET work_hours = #{workHours}, updated_by = #{operator}, updated_at = NOW() "
+            + "WHERE id = #{id} AND user_id = #{userId} AND deleted = 0")
+    int updateWorkHoursOwned(@Param("id") long id, @Param("userId") long userId,
+                             @Param("workHours") java.math.BigDecimal workHours,
+                             @Param("operator") String operator);
+
     @Select("SELECT * FROM biz_cpm_item WHERE id = #{id} AND deleted = 0")
     CpmItem selectAliveById(@Param("id") long id);
 }

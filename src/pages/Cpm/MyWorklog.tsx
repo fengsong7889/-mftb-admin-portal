@@ -240,6 +240,10 @@ export default function MyWorklog() {
 
 /* ==================== 条目行 ==================== */
 
+/** 行内工时 chip：一键代替「打开编辑页填数字」，模板未开启时整排不出现 */
+const WORK_HOUR_CHIPS = [0.5, 1, 2, 4, 8]
+
+
 interface ItemRowProps {
   item: CpmItemVO
   dateStr: string
@@ -251,10 +255,12 @@ interface ItemRowProps {
 }
 
 function ItemRow({ item, showWorkHours, onFinish, onDelete, onEdit, onChanged }: ItemRowProps) {
+  const { t } = useTranslation()
   const [progressOpen, setProgressOpen] = useState(false)
   const [draftProgress, setDraftProgress] = useState(item.progress)
   const [draftStatus, setDraftStatus] = useState<CpmStatusValue>(item.status)
   const [draftNote, setDraftNote] = useState('')
+  const [draftHours, setDraftHours] = useState<number | undefined>(item.workHours ?? undefined)
   const [saving, setSaving] = useState(false)
 
   const sourceTag = item.sourceType !== 'manual' ? (
@@ -270,6 +276,8 @@ function ItemRow({ item, showWorkHours, onFinish, onDelete, onEdit, onChanged }:
         progress: draftStatus === CpmStatus.DONE ? 100 : draftProgress,
         status: draftStatus,
         note: draftNote.trim() || undefined,
+        // 工时只在模板开启时才提交：未开启的岗位连字段都不出现（低录入成本优先）
+        workHours: showWorkHours ? draftHours : undefined,
       })
       setProgressOpen(false)
       setDraftNote('')
@@ -310,7 +318,7 @@ function ItemRow({ item, showWorkHours, onFinish, onDelete, onEdit, onChanged }:
             open={progressOpen}
             onOpenChange={open => {
               setProgressOpen(open)
-              if (open) { setDraftProgress(item.progress); setDraftStatus(item.status) }
+              if (open) { setDraftProgress(item.progress); setDraftStatus(item.status); setDraftHours(item.workHours ?? undefined) }
             }}
             trigger="click"
             placement="left"
@@ -334,6 +342,19 @@ function ItemRow({ item, showWorkHours, onFinish, onDelete, onEdit, onChanged }:
                   options={STATUS_GROUPS.map(g => ({ label: CPM_STATUS_LABELS[g.status], value: g.status }))}
                   style={{ margin: '8px 0' }}
                 />
+                {showWorkHours && (
+                  <Space size={4} wrap style={{ marginBottom: 8 }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{t('cpm.workHours.label', { defaultValue: '工時:' })}</span>
+                    {WORK_HOUR_CHIPS.map(h => (
+                      <Tag
+                        key={h}
+                        color={draftHours === h ? 'orange' : undefined}
+                        style={{ cursor: 'pointer', marginInlineEnd: 0 }}
+                        onClick={() => setDraftHours(prev => (prev === h ? undefined : h))}
+                      >{h}h</Tag>
+                    ))}
+                  </Space>
+                )}
                 <Input
                   value={draftNote}
                   onChange={e => setDraftNote(e.target.value)}

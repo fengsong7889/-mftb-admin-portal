@@ -74,6 +74,8 @@ export interface CpmProgressForm {
   status: string
   note?: string
   updateDate?: string
+  /** 行内补记投入工时（仅分布统计；服务端夹 0~200，不进任何评价口径） */
+  workHours?: number
 }
 
 export interface CpmSnapshotEntry {

@@ -5401,6 +5401,7 @@
 "cpm.sourceRole.participant",
 "cpm.sourceRole.pm",
 "cpm.sourceRole.submitter",
+"cpm.workHours.label",
 "dataPermission.addDeptTitle",
 "dataPermission.addRoleTitle",
 "dataPermission.allMerchants",

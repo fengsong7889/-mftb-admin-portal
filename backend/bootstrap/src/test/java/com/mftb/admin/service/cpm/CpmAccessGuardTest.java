@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -90,6 +91,16 @@ class CpmAccessGuardTest {
         when(grantMapper.listTargetUserIds(anyLong())).thenReturn(List.of());
         when(grantMapper.listTargetUserIds(BOSS.getId())).thenReturn(ids);
         when(departmentMapper.selectList(any())).thenReturn(List.of());
+    }
+
+    @Test
+    @DisplayName("cpm.enabled=false 时所有取登录人的路径整条拒绝（回滚开关不留只读口子）")
+    void systemSwitchOffRejectsEveryPath() {
+        org.springframework.test.util.ReflectionTestUtils.setField(guard, "systemEnabled", false);
+        BusinessException ex = assertThrows(BusinessException.class, () -> guard.currentUser());
+        assertTrue(ex.getMessage().contains("暫停服務"), "文案要说明是停服而不是登录失效，否则用户会反复重登");
+        org.springframework.test.util.ReflectionTestUtils.setField(guard, "systemEnabled", true);
+        assertDoesNotThrow(guard::currentUser);
     }
 
     @Test

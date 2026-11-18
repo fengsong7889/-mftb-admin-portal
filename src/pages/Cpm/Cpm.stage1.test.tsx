@@ -209,6 +209,26 @@ describe('P1 我的工作記錄（真实契约）', () => {
     await waitFor(() => expect(mock.deleteCpmItem).toHaveBeenCalledWith(1))
   })
 
+  it('工时 chip 仅在模板开启时出现，随进度一起提交（不跳编辑页）', async () => {
+    const user = userEvent.setup()
+    // 研发模板 workHoursEnabled=true：同一份页面代码要能按模板开关显隐工时入口
+    mock.fetchCpmTemplates.mockResolvedValue([{
+      ...TEMPLATE[0], templateKey: 'dev', name: '研發工程師', workHoursEnabled: true,
+      categories: [{ key: 'dev', label: '開發', hint: null }],
+    }])
+    mount(<MemoryRouter><MyWorklog /></MemoryRouter>)
+    await screen.findByText('已完成的事')
+    await user.click(screen.getAllByRole('button', { name: /更新進度/ })[0])
+    await user.click(await screen.findByText('2h'))
+    await user.click(screen.getByRole('button', { name: /保存更新/ }))
+    await waitFor(() => expect(mock.addCpmProgress).toHaveBeenCalledTimes(1))
+    const payload = mock.addCpmProgress.mock.calls[0][1]
+    expect(payload.workHours).toBe(2)
+    // 夹具条目本身就是 done：状态沿用原值，进度由「done 即 100」这条口径推出，前端不自己算
+    expect(payload.status).toBe('done')
+    expect(payload.progress).toBe(100)
+  })
+
   it('关联导入：候选来自服务端，已导入行禁用按钮，導入按来源对象建条目', async () => {
     const user = userEvent.setup()
     mount(<MemoryRouter><MyWorklog /></MemoryRouter>)

@@ -172,6 +172,32 @@ class CpmWriteRulesTest {
         assertEquals(5, schedulerView.getDeadlineDay());
     }
 
+    @Test
+    @DisplayName("工时随进度写入：合法值落库、越界值拒绝，且不动乐观锁版本")
+    void progressWorkHoursValidated() {
+        CpmItemMapper itemMapper = mock(CpmItemMapper.class);
+        CpmAccessGuard guard = mock(CpmAccessGuard.class);
+        when(guard.currentUser()).thenReturn(SELF);
+        when(guard.requireOwnedItem(7L, SELF)).thenReturn(item(7L, 3));
+        CpmItemService service = new CpmItemService(itemMapper, mock(CpmItemUpdateMapper.class),
+                mock(CpmRecognitionMapper.class), mock(CpmTemplateService.class), mock(CpmPeriods.class), guard);
+
+        CpmDto.ProgressForm ok = new CpmDto.ProgressForm();
+        ok.setProgress(60);
+        ok.setStatus("doing");
+        ok.setWorkHours(new java.math.BigDecimal("2.0"));
+        service.addProgress(7L, ok);
+        verify(itemMapper).updateWorkHoursOwned(7L, SELF.getId(), new java.math.BigDecimal("2.0"), SELF.getName());
+
+        CpmDto.ProgressForm tooBig = new CpmDto.ProgressForm();
+        tooBig.setProgress(60);
+        tooBig.setStatus("doing");
+        tooBig.setWorkHours(new java.math.BigDecimal("999.9"));
+        assertThrows(BusinessException.class, () -> service.addProgress(7L, tooBig));
+        // 拒绝的那一次不得已经写进去（校验在写之前）
+        verify(itemMapper, org.mockito.Mockito.times(1)).updateWorkHoursOwned(anyLong(), anyLong(), any(), any());
+    }
+
     /* ==================== 已读回执 ==================== */
 
     @Test

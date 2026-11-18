@@ -93,6 +93,11 @@ public final class CpmDto {
         private String note;
         /** 更新日（延续带入=今天；补记历史=明确日期）；空=今天 */
         private String updateDate;
+        /**
+         * 本次投入工时（可选，模板开关决定是否暴露）。
+         * <p>只落 biz_cpm_item.work_hours 做分布统计，绝不进任何评价口径（工时≠绩效）。
+         */
+        private java.math.BigDecimal workHours;
     }
 
     @Data

@@ -17261,6 +17261,9 @@
       "reserve_failed": "Budget reservation failed",
       "unknown": "Unknown reason, please retry later or contact an administrator",
       "fallback": "The model service is unavailable, please retry later or contact an administrator"
+    },
+    "workHours": {
+      "label": "Hours:"
     }
   }
 }

@@ -22,6 +22,7 @@ import com.mftb.admin.mapper.SysDepartmentMapper;
 import com.mftb.admin.mapper.SysUserMapper;
 import com.mftb.admin.util.OperatorResolver;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -56,8 +57,21 @@ public class CpmAccessGuard {
     private final CpmReportMapper reportMapper;
     private final CpmRecognitionMapper recognitionMapper;
 
+    /**
+     * 系统级总开关（方案 §十四 回滚通道）：{@code cpm.enabled=false} 时所有使用侧/治理侧
+     * 读写一律拒绝，配合启动期把 cpm 菜单 status 置 0，做到「关掉就全站不可用」而不必回滚代码。
+     * <p>字段初始值必须是 true：本类的单测用 {@code new CpmAccessGuard(...)} 直接构造，
+     * 走不到 Spring 的 @Value 注入；默认 false 会让所有既有用例变成「系統已停用」。
+     */
+    @Value("${cpm.enabled:true}")
+    private boolean systemEnabled = true;
+
     /** 当前登录人（未登录直接业务异常，控制器不应指望切面兜这个）。 */
     public SysUser currentUser() {
+        if (!systemEnabled) {
+            // 拒绝而不是降级：数据面开关下「只读」也是一种写入前置，宁可整条链路停
+            throw new BusinessException("持續績效系統暫停服務，請聯繫管理員");
+        }
         SysUser current = operatorResolver.currentUser();
         if (current == null || current.getId() == null) {
             throw new BusinessException("登錄狀態失效，請重新登錄");

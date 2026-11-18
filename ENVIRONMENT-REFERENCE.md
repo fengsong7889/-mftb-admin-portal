@@ -122,6 +122,7 @@ cpm.notify.dry-run: ${CPM_NOTIFY_DRY_RUN:true}   # 投递只登记 skipped；验
 cpm.ai-enabled: true                             # 环境级 AI 上限（场景开关另有 ai_scene_config 默认关）
 cpm.asr.base-url/api-key/model: ${CPM_ASR_*:}    # 录音转写三件套；留空=录音入口置灰（fail-closed），粘贴不受影响
 cpm.portal-base-url: ${CPM_PORTAL_BASE_URL:}     # 钉钉卡片站内链接前缀；生产必须配公网可达地址
+cpm.enabled: ${CPM_ENABLED:true}                 # 系统级总开关（回滚通道）：false=5 个 cpm 菜单启动置隐 + /api/cpm/** 全量拒绝，只停本系统、不回滚代码
 ```
 
 > ⚠️ **连接串完全由环境变量决定，仓内不内置任何可用数据库**：

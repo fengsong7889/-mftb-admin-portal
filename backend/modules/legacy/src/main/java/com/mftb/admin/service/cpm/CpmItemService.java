@@ -48,6 +48,11 @@ public class CpmItemService {
 
     private static final Set<String> STATUSES = Set.of("todo", "doing", "done", "blocked");
     private static final Set<String> SOURCE_TYPES = Set.of("manual", "ai", "rdm_requirement", "meeting_action");
+    /**
+     * 工时上限（小时）：列是 DECIMAL(4,1)，物理上限 999.9；这里取一个远高于真实投入的整数，
+     * 目的只是把「手滑多打一个 0」挡在写库之前——工时仅供分布统计，不参与任何评价。
+     */
+    private static final java.math.BigDecimal MAX_WORK_HOURS_PER_ITEM = new java.math.BigDecimal("200.0");
 
     private final CpmItemMapper itemMapper;
     private final CpmItemUpdateMapper updateMapper;
@@ -98,7 +103,7 @@ public class CpmItemService {
         item.setStatus(StringUtils.hasText(form.getStatus()) ? form.getStatus() : "doing");
         int progress = normalizeProgress(item.getStatus(), form.getProgress());
         item.setProgress(progress);
-        item.setWorkHours(form.getWorkHours());
+        item.setWorkHours(requireWorkHours(form.getWorkHours()));
         String sourceType = StringUtils.hasText(form.getSourceType()) ? form.getSourceType() : "manual";
         if (!SOURCE_TYPES.contains(sourceType)) {
             throw new BusinessException("不支援的來源類型");
@@ -136,7 +141,7 @@ public class CpmItemService {
         LocalDate workDate = StringUtils.hasText(form.getWorkDate()) ? LocalDate.parse(form.getWorkDate()) : null;
         int affected = itemMapper.updateOwnedVersioned(id, current.getId(), version,
                 requireTitle(form.getTitle()), trimOrNull(form.getDetail(), CpmConstants.DETAIL_MAX),
-                form.getCategory(), status, progress, form.getWorkHours(), workDate, current.getName());
+                form.getCategory(), status, progress, requireWorkHours(form.getWorkHours()), workDate, current.getName());
         if (affected == 0) {
             throw new BusinessException("該記錄已被他人更新，請刷新後重試");
         }
@@ -165,6 +170,11 @@ public class CpmItemService {
         writeProgress(id, date, progress, form.getStatus(),
                 trimOrNull(form.getNote(), CpmConstants.NOTE_MAX), current);
         itemMapper.syncLatestCache(id, form.getStatus(), progress);
+        // 工时随进度一起行内填写：它是分布统计的旁路字段，服务端夹范围且不接受负数
+        java.math.BigDecimal hours = requireWorkHours(form.getWorkHours());
+        if (hours != null) {
+            itemMapper.updateWorkHoursOwned(id, current.getId(), hours, current.getName());
+        }
     }
 
     /** 延续带入：把未完结条目按今天再写一条流水（幂等：今天已有流水则跳过不报错）。 */
@@ -214,6 +224,20 @@ public class CpmItemService {
         if (StringUtils.hasText(category) && !categoryLabels().containsKey(category.trim())) {
             throw new BusinessException("分類不在任何啟用模板的詞表中");
         }
+    }
+
+    /**
+     * 工时取值校验：null=不改动；负数与超上限一律拒绝。
+     * <p>与 create/update/progress 三条写路径共用，避免「行内能存、编辑页存不下」的口径分裂。
+     */
+    private java.math.BigDecimal requireWorkHours(java.math.BigDecimal hours) {
+        if (hours == null) {
+            return null;
+        }
+        if (hours.signum() < 0 || hours.compareTo(MAX_WORK_HOURS_PER_ITEM) > 0) {
+            throw new BusinessException("工時需在 0 ~ " + MAX_WORK_HOURS_PER_ITEM.stripTrailingZeros().toPlainString() + " 小時之間");
+        }
+        return hours.setScale(1, java.math.RoundingMode.HALF_UP);
     }
 
     private String requireTitle(String title) {
