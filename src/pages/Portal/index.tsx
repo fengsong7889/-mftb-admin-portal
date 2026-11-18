@@ -102,6 +102,10 @@ const PORTAL_SYSTEM_CATALOG: readonly PortalSystem[] = [
     description: '需求文檔、人事行政制度與培訓課程的統一索引與查閱入口', icon: 'CloudOutlined',
   },
   {
+    code: 'cpm', name: '持續績效系統', nameEn: 'Continuous Performance',
+    description: '工作記錄、週期匯報與持續反饋，沉澱可追溯的績效證據', icon: 'RiseOutlined',
+  },
+  {
     code: 'iam', name: '權限管理系統', nameEn: 'IAM',
     description: '角色、功能授權、數據授權、菜單配置', icon: 'SafetyCertificateOutlined',
   },
@@ -164,7 +168,8 @@ const PORTAL_DOMAINS: readonly PortalDomain[] = [
     key: 'collab', nameKey: 'portal.domain.collab', nameFallback: '協作與交付',
     descKey: 'portal.domain.collabDesc', descFallback: '流程審批、產研交付、會議與知識協作',
     icon: <ScheduleOutlined />, tone: '#0958D9', toneBg: '#E6F0FF',
-    codes: ['oa', 'rdm', 'meeting', 'doc'],
+    // 持續績效与审批/交付/会议同域：使用者视角是全员日常工作协作，绩效治理留在 HR 结果层
+    codes: ['oa', 'rdm', 'meeting', 'doc', 'cpm'],
   },
   {
     key: 'govern', nameKey: 'portal.domain.govern', nameFallback: '智能與平台治理',

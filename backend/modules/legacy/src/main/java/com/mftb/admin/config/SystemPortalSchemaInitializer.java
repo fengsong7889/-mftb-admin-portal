@@ -472,6 +472,9 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
                         "多語言翻譯、語料維護與品質校驗，連接全球業務", "GlobalOutlined", 110},
                 {SystemCode.DOC.code(), "文檔中心系統", "Document Center",
                         "需求文檔、人事行政制度與培訓課程的統一索引與查閱入口", "CloudOutlined", 87},
+                // 88：紧跟文檔中心（同屬協作與交付域），早於權限管理（90）
+                {SystemCode.CPM.code(), "持續績效系統", "Continuous Performance",
+                        "工作記錄、週期匯報與持續反饋，沉澱可追溯的績效證據", "RiseOutlined", 88},
         };
         for (Object[] r : rows) {
             jdbcTemplate.update(
@@ -514,6 +517,8 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
                 "rdm-workbench", "rdm-requirement", "rdm-submit", "rdm-pool-group", "rdm-query",
                 "rdm-product", "rdm-delivery", "rdm-acceptance", "rdm-config-group"));
         updateMenuSystem(SystemCode.OA.code(),        List.of("process-center", "oa-requests", "workflow-config"));
+        // 持續績效（cpm）：使用侧两张 + 治理侧三张，全部一级菜单（CpmSchemaMigrationInitializer 种子）
+        updateMenuSystem(SystemCode.CPM.code(),       List.of("cpm-my", "cpm-report", "cpm-team", "cpm-template", "cpm-rule"));
         // 菜单配置是治理面菜单，归 iam 而非 platform
         updateMenuSystem(SystemCode.IAM.code(),       List.of("authorization-center", "role-management",
                 "function-permission", "data-permission", "system-authorization", "menu-config"));

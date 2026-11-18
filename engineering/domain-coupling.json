@@ -367,16 +367,33 @@
         "Agent",
         "Llm"
       ],
-      "classCount": 167,
+      "classCount": 168,
       "forwardClasses": 7,
-      "reverseClasses": 15,
-      "reverseFiles": 8,
+      "reverseClasses": 16,
+      "reverseFiles": 10,
       "reverseEdges": [
         {
           "class": "AiSceneDto",
+          "referencingFiles": 4,
+          "examples": [
+            "CpmAiService",
+            "CpmDto",
+            "MeetingMinutesAiDto"
+          ]
+        },
+        {
+          "class": "AiSceneService",
           "referencingFiles": 2,
           "examples": [
-            "MeetingMinutesAiDto",
+            "CpmAiService",
+            "MeetingMinutesAiService"
+          ]
+        },
+        {
+          "class": "AiUpstreamErrorCodes",
+          "referencingFiles": 2,
+          "examples": [
+            "CpmAiService",
             "MeetingMinutesAiService"
           ]
         },
@@ -458,13 +475,6 @@
           ]
         },
         {
-          "class": "AiSceneService",
-          "referencingFiles": 1,
-          "examples": [
-            "MeetingMinutesAiService"
-          ]
-        },
-        {
           "class": "AiToolExecLog",
           "referencingFiles": 1,
           "examples": [
@@ -484,7 +494,7 @@
       "prefixes": [
         "Ad"
       ],
-      "classCount": 125,
+      "classCount": 140,
       "forwardClasses": 22,
       "reverseClasses": 2,
       "reverseFiles": 1,
@@ -509,7 +519,7 @@
       "prefixes": [
         "Doc"
       ],
-      "classCount": 62,
+      "classCount": 63,
       "forwardClasses": 3,
       "reverseClasses": 10,
       "reverseFiles": 5,
@@ -591,10 +601,10 @@
       "prefixes": [
         "Meeting"
       ],
-      "classCount": 86,
-      "forwardClasses": 20,
-      "reverseClasses": 1,
-      "reverseFiles": 11,
+      "classCount": 91,
+      "forwardClasses": 21,
+      "reverseClasses": 2,
+      "reverseFiles": 12,
       "reverseEdges": [
         {
           "class": "MeetingMinutesSchema",
@@ -603,6 +613,13 @@
             "AiSceneConfigSchemaInitializer",
             "DocAckSchema",
             "DocApiCatalogSchema"
+          ]
+        },
+        {
+          "class": "MeetingActionSource",
+          "referencingFiles": 1,
+          "examples": [
+            "CpmSourceService"
           ]
         }
       ]
@@ -613,7 +630,7 @@
         "Synonym",
         "StopWord"
       ],
-      "classCount": 1,
+      "classCount": 2,
       "forwardClasses": 1,
       "reverseClasses": 0,
       "reverseFiles": 0,

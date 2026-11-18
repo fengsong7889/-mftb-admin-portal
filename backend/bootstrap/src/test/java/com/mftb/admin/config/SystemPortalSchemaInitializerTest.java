@@ -356,6 +356,8 @@ class SystemPortalSchemaInitializerTest {
                 Map.entry("oa", "流程審批系統"),
                 Map.entry("meeting", "會議管理系統"),
                 Map.entry("doc", "文檔中心系統"),
+                // 2026-11 新增第 19 个系统：持续绩效（过程层：记录→汇报→反馈→成果认定）
+                Map.entry("cpm", "持續績效系統"),
                 Map.entry("iam", "權限管理系統"),
                 Map.entry("platform", "平台支撐系統"),
                 Map.entry("i18n", "翻譯管理系統"));

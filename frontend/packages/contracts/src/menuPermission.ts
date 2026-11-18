@@ -1149,6 +1149,35 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'view', label: '查看全部紀要' },
     { key: 'export', label: '匯出' },
   ],
+  // ── 持續績效系統（动作集与 CpmSchemaMigrationInitializer 写入的 sys_menu.actions 逐字对齐）──
+  'cpm-my': [
+    { key: 'view', label: '查看' },
+    // 条目/进度/删除都是本人数据写操作（数据范围由服务层硬约束，动作只决定入口）
+    { key: 'edit', label: '記錄/更新進度' },
+    // 与 edit 成对授予：能记录不等于能让 AI 读原文调模型（出域+计费）
+    { key: 'ai_cpm', label: 'AI 整理記錄' },
+  ],
+  'cpm-report': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '生成/發布匯報' },
+    { key: 'ai_cpm', label: 'AI 摘要' },
+  ],
+  'cpm-team': [
+    { key: 'view', label: '查看團隊匯報' },
+    // 评论/点赞/成果认定都是写操作；范围=推导下属+显式授权，服务层硬判定
+    { key: 'edit', label: '反饋/成果認定' },
+  ],
+  'cpm-template': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '維護詞表' },
+  ],
+  'cpm-rule': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '修改規則' },
+    // 能改配置不等于能向全员群发与催办：推送/手动触发单独授予（rdm-daily-report-trigger 先例）
+    { key: 'push', label: '釘釘推送' },
+    { key: 'trigger', label: '手動催辦/補發' },
+  ],
   // 通知模板：改文案與停用模板都是寫操作
   'notification-template': [
     { key: 'view', label: '查看' },
@@ -1983,6 +2012,13 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   // 直接访问 #/meeting-minutes-list 实测：路由守卫没拦，整页壳正常渲染，
   // 只剩后端 403 把内部权限键抖在页面上。
   'meeting-minutes-list',
+  // 持續績效（後端 CpmSchemaMigrationInitializer 已種菜單並按菜单鉴权，前端同步纳入受控；
+  // 未登记 key 会被 hasMenuPermission 默认放行，治理页就成了全员可开的 fail-open）
+  'cpm-my',
+  'cpm-report',
+  'cpm-team',
+  'cpm-template',
+  'cpm-rule',
   // 通知模板/推送开关：后端 MeetingNotifyConfigController 按这两个菜单 key 做 @RequirePermission，
   // 但前端受控名单没登记 → hasMenuPermission 对未登记 key 默认放行，低权限用户能整页打开，
   // 拿到的只是一屏后端 403 报错。与 meeting-minutes-list 同一类 fail-open，一并补齐。
@@ -2402,6 +2438,15 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/notification-template': 'notification-template',
   '/notification-switch': 'notification-switch',
   '/meeting-minutes-form': 'meeting-my',
+  // 持續績效：五个菜单页 + 三个非菜单子页（守卫按精确路径校验，缺一条就是白屏/403）
+  '/cpm-my': 'cpm-my',
+  '/cpm-item-form': 'cpm-my',
+  '/cpm-report': 'cpm-report',
+  '/cpm-report-detail': 'cpm-report',
+  '/cpm-team': 'cpm-team',
+  '/cpm-template': 'cpm-template',
+  '/cpm-template-form': 'cpm-template',
+  '/cpm-rule': 'cpm-rule',
   // 文檔中心（詳情/登記/編輯為文檔庫非菜單子頁，空間表單為空間管理子頁）
   '/doc-plans': 'doc-plans',
   '/doc-plans/detail': 'doc-plans',
@@ -2505,6 +2550,12 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
 export const ROUTE_MENU_ANY_OF_MAP: Record<string, string[]> = {
   // 审批详情页：财务审批中心与 OA 流程事项两侧都能进（其余审批类型同页展示）
   '/approval-detail': ['approval-center', 'oa-requests'],
+  /*
+   * 汇报详情页：本人从「我的匯報」看自己已发布的快照，主管从「團隊匯報」看下属的快照。
+   * 后端 GET /api/cpm/reports/{id} 的读取范围同样是「本人 or 可见范围」两线并行，
+   * 前端只锚一个 key 会让另一侧永久 403（与 meeting-booking-form 同口径）。
+   */
+  '/cpm-report-detail': ['cpm-report', 'cpm-team'],
   /*
    * 移动端日报页：钉钉通知链接的落地页，读者是项目经理/产品负责人，
    * 他们通常没有「推送配置」权限。主菜单 key 仍是 rdm-daily-report-rule（侧栏高亮用），

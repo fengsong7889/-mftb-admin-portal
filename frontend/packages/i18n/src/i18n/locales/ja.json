@@ -146,7 +146,9 @@
       "docKnowledgeBase": "ナレッジ蓄積",
       "docCloudDocs": "クラウド文書",
       "docKnowledgeVault": "企業ナレッジベース",
-      "docArchiveFiles": "アーカイブ資料"
+      "docArchiveFiles": "アーカイブ資料",
+      "cpmLogStrip": "業務日誌",
+      "cpmOutcome": "実績の蓄積"
     },
     "businessSystems": "業務システム",
     "backToPortal": "グループポータルに戻る",
@@ -241,6 +243,10 @@
       "doc": {
         "name": "文書センターシステム",
         "description": "要件文書・人事総務制度・研修資料の統一インデックスと閲覧ゲートウェイ。"
+      },
+      "cpm": {
+        "name": "継続パフォーマンスシステム",
+        "description": "業務記録・定期報告・継続フィードバックで、追跡可能なパフォーマンスの証拠を蓄積"
       },
       "payroll": {
         "name": "給与福利システム",

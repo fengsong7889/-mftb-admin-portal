@@ -1329,7 +1329,9 @@
       "docKnowledgeBase": "知識沉澱",
       "docCloudDocs": "雲文檔",
       "docKnowledgeVault": "企業知識庫",
-      "docArchiveFiles": "檔案資料"
+      "docArchiveFiles": "檔案資料",
+      "cpmLogStrip": "工作日誌",
+      "cpmOutcome": "績效沉澱"
     },
     "businessSystems": "業務系統",
     "backToPortal": "返回集團門戶",
@@ -1424,6 +1426,10 @@
       "doc": {
         "name": "文檔中心系統",
         "description": "需求文檔、人事行政制度與培訓課程的統一索引與查閱入口"
+      },
+      "cpm": {
+        "name": "持續績效系統",
+        "description": "工作記錄、週期匯報與持續反饋，沉澱可追溯的績效證據"
       },
       "payroll": {
         "name": "薪酬福利系統",
@@ -17176,6 +17182,67 @@
     "field": {
       "guidanceTerminal": "終端",
       "guidanceTimeSlot": "時段"
+    }
+  },
+  "cpm": {
+    "sourceImport": {
+      "title": "關聯業務對象導入",
+      "button": "關聯導入",
+      "tip": "一鍵帶入本人的需求與會議行動項",
+      "tabRdm": "產研需求",
+      "tabMeeting": "會議行動項",
+      "search": "依需求標題或編號搜索",
+      "retry": "重試",
+      "loadError": "候選清單載入失敗",
+      "hintRdm": "只列出與本人相關（提出/負責/參與/驗收）且尚未結案的需求。",
+      "hintMeeting": "只列出本人負責或協辦的未完成會議行動項。",
+      "emptyRdm": "目前沒有與本人相關的未結案需求",
+      "emptyMeeting": "目前沒有待辦的會議行動項",
+      "import": "導入",
+      "imported": "已導入",
+      "importedToast": "已導入為工作記錄",
+      "terminated": "來源已結案",
+      "close": "關閉"
+    },
+    "sourceRole": {
+      "submitter": "我提出的",
+      "pm": "我負責產品",
+      "dev": "我負責研發",
+      "accept": "我負責驗收",
+      "participant": "我參與",
+      "owner": "我負責"
+    },
+    "meetingAction": {
+      "pending": "待處理"
+    },
+    "ai": {
+      "processing": "整理處理中，請稍後再試",
+      "failedTitle": "整理失敗"
+    },
+    "aiError": {
+      "scene_disabled": "場景未開啟",
+      "kill_switch": "AI 服務熔斷中",
+      "no_permission": "缺少 AI 動作授權",
+      "no_channel": "通道未配置",
+      "no_model_auth": "模型未授權",
+      "quota_reject": "額度不足",
+      "budget_exceeded": "預算超限",
+      "upstream_timeout": "模型響應超時",
+      "upstream_network": "無法連接模型服務",
+      "upstream_bad_json": "模型返回內容無法解析，請重試",
+      "upstream_arrearage": "模型帳號欠費，已停止調用，請聯繫管理員處理",
+      "upstream_invalid_key": "模型密鑰無效或已過期，請聯繫管理員更新",
+      "upstream_model_not_found": "模型不存在或不支援，請聯繫管理員檢查配置",
+      "upstream_rate_limited": "模型調用過於頻繁，請稍後重試",
+      "upstream_content_filter": "內容被安全過濾規則攔截，請調整原文後重試",
+      "upstream_quota_exhausted": "模型配額已耗盡，請聯繫管理員",
+      "upstream_http_error": "模型服務返回異常，請稍後重試",
+      "upstream_error": "模型服務異常，請稍後重試",
+      "channel_misconfigured": "模型通道配置缺失，請聯繫管理員",
+      "invalid_structure": "模型輸出格式異常，請重試",
+      "reserve_failed": "預算預占失敗",
+      "unknown": "原因不明，請稍後重試或聯繫管理員",
+      "fallback": "模型服務暫不可用，請稍後重試或聯繫管理員"
     }
   }
 }

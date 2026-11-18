@@ -67,6 +67,7 @@ EXTRA_FRONTEND_DIRS = {
     'iam': [('LoginLog', '登录审计，方案 §三 归权限中心')],
     'meeting': [('MeetingCheckin', '会议签到'), ('MeetingView', '会议免登查看'),
                 ('MeetingMinutesView', '会议纪要免登查看')],
+    'cpm': [('Cpm', '持续绩效系统页面（记录/汇报/团队反馈/模板/规则）')],
     'search': [('HintCreate', '搜索提示新建'), ('HintPreview', '搜索提示预览'),
                ('HotSearchPreview', '热词预览'), ('SearchVerifyDetail', '效果校验详情')],
     'platform': [('NotificationChannelForm', '通知渠道配置表单'),
@@ -99,6 +100,7 @@ BACKEND_PREFIXES = {
     'finance': ['Fin'],
     'ai': ['Ai', 'Agent', 'Llm', 'Mcp'],
     'meeting': ['Meeting', 'Mt'],
+    'cpm': ['Cpm'],
     'doc': ['Doc'],
     'oa': ['Oa', 'Workflow', 'Approver'],
     'merchant': ['Merchant', 'Store', 'Biz'],
@@ -133,6 +135,7 @@ SYSTEM_NAMES = {
     'payroll': '薪酬系统', 'attendance': '考勤系统', 'eam': '物资管理系统',
     'rdm': '产研交付系统', 'oa': '流程审批系统', 'meeting': '会议系统',
     'iam': '权限中心', 'platform': '平台支撑系统', 'i18n': '多语言系统', 'doc': '文档中心',
+    'cpm': '持续绩效系统',
 }
 
 # 本期（分系统独立工程改造方案 §一）确认优先隔离的三个域

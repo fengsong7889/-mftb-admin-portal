@@ -563,55 +563,9 @@ public class MeetingMinutesAiService {
      * <p>前端通过 AI_REASON_KEYS 映射为友好提示，用户无需查日志即可知道原因。
      */
     private static String resolveUpstreamErrorCode(Throwable cause) {
-        if (!(cause instanceof LlmHttpClient.LlmCallException le)) {
-            return "upstream_error";
-        }
-        return switch (le.getCategory()) {
-            case MISSING_KEY, MISSING_BASE_URL -> "channel_misconfigured";
-            case UPSTREAM_HTTP -> parseHttpErrorBody(le.getMessage(), le.getUpstreamStatus());
-            case TIMEOUT -> "upstream_timeout";
-            case NETWORK -> "upstream_network";
-            case BAD_JSON -> "upstream_bad_json";
-        };
-    }
-
-    /** 从上游 HTTP 错误响应体中识别常见错误类型（欠费、密钥无效、模型不存在、限流等）。 */
-    private static String parseHttpErrorBody(String message, Integer status) {
-        if (message == null) {
-            return "upstream_http_error";
-        }
-        String lower = message.toLowerCase();
-        // 阿里云欠费 / 账户异常
-        if (lower.contains("arrearage") || lower.contains("overdue-payment") || lower.contains("欠费")) {
-            return "upstream_arrearage";
-        }
-        // API Key 无效 / 过期
-        if (lower.contains("invalid_api_key") || lower.contains("incorrect api key")
-                || lower.contains("invalid api key") || lower.contains("unauthorized")) {
-            return "upstream_invalid_key";
-        }
-        // 模型不存在 / 不支持
-        if (lower.contains("model_not_found") || lower.contains("invalid model")
-                || lower.contains("does not exist") || lower.contains("not supported")) {
-            return "upstream_model_not_found";
-        }
-        // 限流
-        if (lower.contains("rate_limit") || lower.contains("too many requests")
-                || (status != null && status == 429)) {
-            return "upstream_rate_limited";
-        }
-        // 内容安全过滤
-        if (lower.contains("content_filter") || lower.contains("content_policy")
-                || lower.contains("data_inspection_failed")) {
-            return "upstream_content_filter";
-        }
-        // 配额耗尽
-        if (lower.contains("quota") || lower.contains("insufficient_quota")
-                || lower.contains("exceeded") || lower.contains("limit reached")) {
-            return "upstream_quota_exhausted";
-        }
-        // 其他 HTTP 错误保留状态码
-        return "upstream_http_" + (status != null ? status : "error");
+        // 分类已上收到 AiUpstreamErrorCodes（cpm 域另写一份时把上游失败全压成 upstream_http_error，
+        // 界面只能显示原始码）：两个域必须回同一套错误码，前端才只维护一份文案
+        return com.mftb.admin.service.agent.AiUpstreamErrorCodes.of(cause);
     }
 
     private MinutesAiModelOutput parseOutput(String content) {

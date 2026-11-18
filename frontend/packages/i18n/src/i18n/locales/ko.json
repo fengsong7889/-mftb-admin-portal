@@ -146,7 +146,9 @@
       "docKnowledgeBase": "지식 축적",
       "docCloudDocs": "클라우드 문서",
       "docKnowledgeVault": "기업 지식 저장소",
-      "docArchiveFiles": "아카이브 자료"
+      "docArchiveFiles": "아카이브 자료",
+      "cpmLogStrip": "업무 일지",
+      "cpmOutcome": "성과 축적"
     },
     "businessSystems": "업무 시스템",
     "backToPortal": "그룹 포털로 돌아가기",
@@ -241,6 +243,10 @@
       "doc": {
         "name": "문서 센터 시스템",
         "description": "요구사항 문서, 인사·행정 제도, 교육 자료의 통합 인덱스 및 열람 게이트웨이."
+      },
+      "cpm": {
+        "name": "지속 성과 시스템",
+        "description": "업무 기록, 정기 보고, 지속 피드백으로 추적 가능한 성과 증거를 축적합니다"
       },
       "payroll": {
         "name": "급여복리 시스템",

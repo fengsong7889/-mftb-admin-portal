@@ -116,6 +116,12 @@ ai.provider.crypto-key: ${AI_PROVIDER_CRYPTO_KEY}
 translation.mymemory.email: ${MYMEMORY_EMAIL:}                      # 匿名 5000 字符/天；配了提至 50000
 translation.auto-mt.enabled: ${TRANSLATION_AUTO_MT_ENABLED:true}    # 启动期后台补齐空缺语言
 translation.auto-mt.batch-limit: ${TRANSLATION_AUTO_MT_BATCH_LIMIT:2000}  # 单轮递交缺口上限
+
+# 持續績效（cpm，2026-11 新增系统）——全部有安全默认值，不配也能启动：
+cpm.notify.dry-run: ${CPM_NOTIFY_DRY_RUN:true}   # 投递只登记 skipped；验收口径默认开
+cpm.ai-enabled: true                             # 环境级 AI 上限（场景开关另有 ai_scene_config 默认关）
+cpm.asr.base-url/api-key/model: ${CPM_ASR_*:}    # 录音转写三件套；留空=录音入口置灰（fail-closed），粘贴不受影响
+cpm.portal-base-url: ${CPM_PORTAL_BASE_URL:}     # 钉钉卡片站内链接前缀；生产必须配公网可达地址
 ```
 
 > ⚠️ **连接串完全由环境变量决定，仓内不内置任何可用数据库**：

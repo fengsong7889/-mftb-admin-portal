@@ -1,0 +1,398 @@
+/**
+ * Copyright (c) 2026 fengsong7889. All Rights Reserved.
+ *
+ * 本文件为「MFTB 企业一体化管理平台软件」的组成部分。
+ * 未经著作权人书面许可，不得使用、复制、修改、再分发或用于任何商业目的。
+ * 完整许可条款见仓库根目录 LICENSE 文件。
+ */
+
+/* 持續績效系統（CPM）页面级样式：色值一律走语义令牌，禁止裸色（§K.2 / check:theme-tokens） */
+
+/* ===== 表单页头部（对齐 form-page-style：橙色渐变顶条） ===== */
+.cpm-header {
+  position: relative;
+  background: var(--surface-2);
+  margin-bottom: 16px;
+  border-radius: 12px;
+  box-shadow: var(--shadow-2);
+  overflow: hidden;
+}
+
+.cpm-header__accent {
+  height: 3px;
+  background: linear-gradient(90deg, var(--brand), var(--brand-hover), var(--warning), var(--brand-hover), var(--brand));
+  background-size: 200% 100%;
+  animation: headerGradientShift 4s ease infinite;
+}
+
+.cpm-header__body {
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cpm-header__left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.cpm-header__split {
+  width: 1px;
+  height: 20px;
+  background: var(--border-2);
+}
+
+.cpm-header__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-brand);
+}
+
+/* 模块卡片（白色 div，禁 antd Card 彩色标题头） */
+.cpm-card {
+  background: var(--surface-2);
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-1);
+  outline: var(--card-outline);
+}
+
+.cpm-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.cpm-card__icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cpm-card__icon--info { background: var(--info-soft); color: var(--info); }
+.cpm-card__icon--warn { background: var(--warning-soft); color: var(--warning); }
+.cpm-card__icon--ok { background: var(--success-soft); color: var(--success); }
+.cpm-card__icon--purple { background: var(--purple-soft); color: var(--purple); }
+
+.cpm-card__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.cpm-card__line {
+  flex: 1;
+  height: 1px;
+  background: var(--border-2);
+  margin-left: 8px;
+}
+
+.cpm-card__extra {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* ===== P1 我的工作記錄 ===== */
+.cpm-my__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.cpm-my__quickbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.cpm-my__carry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border-radius: 8px;
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-border);
+}
+
+.cpm-my__carry-chip {
+  cursor: pointer;
+}
+
+.cpm-group__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.cpm-group__count {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.cpm-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--border-2);
+}
+
+.cpm-item:last-child {
+  border-bottom: none;
+}
+
+.cpm-item__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.cpm-item__title {
+  font-size: 13px;
+  color: var(--text-1);
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.cpm-item__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.cpm-item__progress {
+  width: 120px;
+  flex-shrink: 0;
+}
+
+.cpm-item__ops {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* 被成果认定的条目：紫色徽章（识别“这是绩效证据”） */
+.cpm-item__badge-recognized {
+  color: var(--purple);
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* AI 助手抽屉 */
+.cpm-ai__disclosure {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 12px;
+}
+
+.cpm-ai__candidate {
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: var(--surface-3);
+}
+
+.cpm-ai__candidate-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cpm-ai__recorder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 0;
+}
+
+/* ===== P3 我的匯報 ===== */
+.cpm-report__period-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.cpm-report__group-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin: 12px 0 6px;
+}
+
+.cpm-report__trail {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.cpm-report__delivered {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-3);
+  padding: 8px 0 0;
+}
+
+/* 团队统计卡（§B.7 动效统计卡标准） */
+.cpm-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.cpm-stat-card {
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cpm-stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-3);
+}
+
+.cpm-stat-card__value {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.cpm-stat-card__label {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* CFR 详情操作条 */
+.cpm-cfr-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-2);
+}
+
+.cpm-comment {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--border-2);
+}
+
+.cpm-comment:last-child {
+  border-bottom: none;
+}
+
+.cpm-comment__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--info-soft);
+  color: var(--info);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.cpm-comment__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.cpm-comment__meta {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-bottom: 2px;
+}
+
+.cpm-comment__text {
+  font-size: 13px;
+  color: var(--text-1);
+}
+
+/* 成果档案时间线徽章 */
+.cpm-recognition__kind {
+  font-size: 11px;
+}
+
+/* 词表编辑器（模板管理表单） */
+.cpm-cat__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 2fr auto;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+/* 关联业务对象导入挑选器：清单行 = 标题 + 素材行，右侧唯一动作按钮 */
+.cpm-source__list {
+  max-height: 360px;
+  overflow-y: auto;
+  border: 1px solid var(--border-1);
+  border-radius: 8px;
+}
+
+.cpm-source__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-1);
+}
+
+.cpm-source__row:last-child {
+  border-bottom: none;
+}
+
+.cpm-source__main {
+  min-width: 0;
+}
+
+.cpm-source__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cpm-source__sub,
+.cpm-source__meta {
+  font-size: 12px;
+  color: var(--text-3);
+}

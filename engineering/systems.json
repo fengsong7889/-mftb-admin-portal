@@ -108,8 +108,8 @@
     "Card": 4
    },
    "testCounts": {
-    "frontend": 18,
-    "backend": 21
+    "frontend": 22,
+    "backend": 22
    }
   },
   "ai": {
@@ -209,14 +209,14 @@
     }
    },
    "backendPrefixes": {
-    "Ai": 151,
+    "Ai": 152,
     "Agent": 12,
     "Mcp": 11,
     "Llm": 4
    },
    "testCounts": {
     "frontend": 9,
-    "backend": 39
+    "backend": 40
    }
   },
   "attendance": {
@@ -254,6 +254,31 @@
    "testCounts": {
     "frontend": 1,
     "backend": 15
+   }
+  },
+  "cpm": {
+   "name": "持续绩效系统",
+   "priority": false,
+   "isolation": {
+    "frontend": "pending",
+    "backend": "pending"
+   },
+   "planned": {
+    "frontendApp": "frontend/apps/cpm",
+    "backendModule": "backend/modules/cpm"
+   },
+   "frontendDirs": {
+    "Cpm": {
+     "evidence": "naming",
+     "reason": "持续绩效系统页面（记录/汇报/团队反馈/模板/规则）"
+    }
+   },
+   "backendPrefixes": {
+    "Cpm": 45
+   },
+   "testCounts": {
+    "frontend": 1,
+    "backend": 5
    }
   },
   "doc": {
@@ -678,12 +703,12 @@
     }
    },
    "backendPrefixes": {
-    "Meeting": 87,
+    "Meeting": 91,
     "Mt": 5
    },
    "testCounts": {
-    "frontend": 17,
-    "backend": 24
+    "frontend": 18,
+    "backend": 26
    }
   },
   "merchant": {
@@ -861,7 +886,7 @@
    },
    "testCounts": {
     "frontend": 1,
-    "backend": 21
+    "backend": 22
    }
   },
   "portal": {
@@ -895,7 +920,7 @@
     "Portal": 2
    },
    "testCounts": {
-    "frontend": 5,
+    "frontend": 6,
     "backend": 1
    }
   },
@@ -962,7 +987,7 @@
     }
    },
    "backendPrefixes": {
-    "Rdm": 265
+    "Rdm": 266
    },
    "testCounts": {
     "frontend": 49,

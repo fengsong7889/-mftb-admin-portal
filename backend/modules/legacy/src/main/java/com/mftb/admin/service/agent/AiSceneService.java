@@ -2,6 +2,7 @@ package com.mftb.admin.service.agent;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.common.BusinessException;
+import com.mftb.admin.constant.CpmConstants;
 import com.mftb.admin.constant.MeetingConstants;
 import com.mftb.admin.dto.AiMyCenterDTO;
 import com.mftb.admin.dto.AiSceneDto;
@@ -41,13 +42,17 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class AiSceneService {
 
-    /** 试点场景 → 归属系统 + 需要「edit + ai_minutes」成对授予的候选菜单。 */
-    private record SceneDef(String systemCode, List<String> menus) { }
+    /** 试点场景 → 归属系统 + 需要「edit + 场景 AI 动作」成对授予的候选菜单 + 场景 AI 动作名。 */
+    private record SceneDef(String systemCode, List<String> menus, String aiAction) { }
 
     private static final Map<String, SceneDef> REGISTRY = Map.of(
             MeetingConstants.SCENE_MEETING_MINUTES,
             new SceneDef("meeting", List.of(
-                    MeetingConstants.MENU_MY, MeetingConstants.MENU_BOOKING, MeetingConstants.MENU_RECORD)));
+                    MeetingConstants.MENU_MY, MeetingConstants.MENU_BOOKING, MeetingConstants.MENU_RECORD),
+                    MeetingConstants.ACTION_AI_MINUTES),
+            CpmConstants.SCENE_CPM_REPORT,
+            new SceneDef("cpm", List.of(CpmConstants.MENU_MY, CpmConstants.MENU_REPORT),
+                    CpmConstants.ACTION_AI_CPM));
 
     private final AiSceneConfigMapper sceneMapper;
     private final AiConfigAuditService auditService;
@@ -65,6 +70,9 @@ public class AiSceneService {
     /** 会议 AI 环境级上限：默认放开，显式 false 才禁止；不代表场景已启用或员工已授权。 */
     @Value("${meeting.minutes.ai-enabled:true}")
     private boolean meetingAiEnvironmentAllowed;
+    /** 持续绩效 AI 环境级上限：同口径，显式 false 才禁止。 */
+    @Value("${cpm.ai-enabled:true}")
+    private boolean cpmAiEnvironmentAllowed;
 
     /** 场景是否被登记（未登记一律拒绝，防止用任意 sceneKey 探测）。 */
     public boolean isKnown(String sceneKey) {
@@ -87,11 +95,15 @@ public class AiSceneService {
 
     /** 环境上限：会议纪要总开关 + 该场景的环境级 yml 上限。 */
     private boolean environmentAllowed(String sceneKey) {
-        if (!minutesEnabled) {
+        if (MeetingConstants.SCENE_MEETING_MINUTES.equals(sceneKey) && !minutesEnabled) {
+            // 纪要总开关只封顶会议场景；cpm 不应被会议域的开关牵连关停
             return false;
         }
         if (MeetingConstants.SCENE_MEETING_MINUTES.equals(sceneKey)) {
             return meetingAiEnvironmentAllowed;
+        }
+        if (CpmConstants.SCENE_CPM_REPORT.equals(sceneKey)) {
+            return cpmAiEnvironmentAllowed;
         }
         return true;
     }
@@ -190,9 +202,9 @@ public class AiSceneService {
                 killEngaged ? "AI 服務已緊急熔斷" : "未處於熔斷狀態", "ai-operation-auth"));
         firstBlock = firstBlock(firstBlock, !killEngaged, "kill_switch");
 
-        boolean authorized = accountOk && hasMeetingAiPermission(user, def);
+        boolean authorized = accountOk && hasSceneAiPermission(user, def);
         checks.add(check("permission", authorized, authorized ? null : "no_permission",
-                authorized ? "具備會議編輯與 AI 整理權限" : "缺少會議系統准入或 AI 整理動作", "authorization-center"));
+                authorized ? "具備系統編輯與 AI 整理權限" : "缺少該系統准入或 AI 整理動作", "authorization-center"));
         firstBlock = firstBlock(firstBlock, authorized, "no_permission");
 
         String modelKey = null;
@@ -254,8 +266,9 @@ public class AiSceneService {
         firstBlock = firstBlock(firstBlock, dataOk, dataReason);
 
         // 执行时再校验：不宣称完整调用必然成功
-        checks.add(new AiSceneDto.Check("booking-scope", "not_checked", null,
-                "具體會議歸屬與筆記內容在執行時校驗", null));
+        boolean meetingScene = MeetingConstants.SCENE_MEETING_MINUTES.equals(sceneKey);
+        checks.add(new AiSceneDto.Check(meetingScene ? "booking-scope" : "record-scope", "not_checked", null,
+                meetingScene ? "具體會議歸屬與筆記內容在執行時校驗" : "本人記錄範圍與原文內容在執行時校驗", null));
         checks.add(new AiSceneDto.Check("budget", "not_checked", null,
                 "實際費用在執行時嚴格預占", null));
 
@@ -285,7 +298,7 @@ public class AiSceneService {
 
     /* ==================== 内部 ==================== */
 
-    private boolean hasMeetingAiPermission(SysUser user, SceneDef def) {
+    private boolean hasSceneAiPermission(SysUser user, SceneDef def) {
         if (user == null || user.getId() == null) {
             return false;
         }
@@ -294,7 +307,7 @@ public class AiSceneService {
         }
         for (String menu : def.menus()) {
             if (permissionService.hasPermission(user, menu, MeetingConstants.ACTION_EDIT)
-                    && permissionService.hasPermission(user, menu, MeetingConstants.ACTION_AI_MINUTES)) {
+                    && permissionService.hasPermission(user, menu, def.aiAction())) {
                 return true;
             }
         }
@@ -317,7 +330,7 @@ public class AiSceneService {
                     continue;
                 }
                 List<String> actions = menu.getActions() == null ? List.of() : menu.getActions().stream()
-                        .filter(a -> MeetingConstants.ACTION_EDIT.equals(a) || MeetingConstants.ACTION_AI_MINUTES.equals(a))
+                        .filter(a -> MeetingConstants.ACTION_EDIT.equals(a) || def.aiAction().equals(a))
                         .toList();
                 if (!actions.isEmpty()) {
                     out.add(new AiSceneDto.PermissionSource(menu.getMenuKey(), actions,

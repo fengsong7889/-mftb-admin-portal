@@ -788,6 +788,8 @@ export const SCENE_COLOR_BASELINE = {
   // 说明是有心添加、只是没同步文档）。补录后两边回到一致。
   payroll: '#2BCA65',
   organization: '#5E46D8',
+  // 持續績效（cpm）：橄榄绿（HSL≈80°/70%/40%），与金融绿/薪酬翠绿/文档森林绿分属不同色相家族
+  cpm: '#7EAD1F',
 }
 
 /**

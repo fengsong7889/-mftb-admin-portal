@@ -252,7 +252,7 @@ describe('门户常用入口带（收藏与最近使用）', () => {
 })
 
 describe('门户场景卡片与授权边界', () => {
-  it('上图下文、无英文副标题，全部十六张卡片各有不同场景；未授权卡片点击弹出申请引导', async () => {
+  it('上图下文、无英文副标题，全部十八张卡片各有不同场景；未授权卡片点击弹出申请引导', async () => {
     const { container } = mount()
     const card = await screen.findByRole('button', { name: '財務結算系統 · 進入系統' })
     expect(card.querySelector('.portal-card-cover > svg[data-scene="finance"]')).toBeInTheDocument()
@@ -265,8 +265,8 @@ describe('门户场景卡片与授权边界', () => {
     expect(card.querySelector('.portal-card-body .anticon')).toBeNull()
     fireEvent.click(screen.getByRole('tab', { name: /未獲得權限/ }))
     const cards = within(screen.getByRole('tabpanel')).getAllByRole('button')
-    // 目录卡片数 = sys_system 业务系统数（新增 payroll 薪酬福利系统后为 17）
-    expect(cards).toHaveLength(17)
+    // 目录卡片数 = sys_system 业务系统数（新增 cpm 持續績效系統后为 18）
+    expect(cards).toHaveLength(18)
     cards.forEach(button => {
       expect(button).toBeEnabled()
       expect(button).toHaveClass('is-locked')
@@ -279,8 +279,8 @@ describe('门户场景卡片与授权边界', () => {
     expect(loadSystemNavigation).not.toHaveBeenCalled()
     expect(localStorage.getItem('current_system_code')).toBeNull()
     const scenes = Array.from(container.querySelectorAll('[data-scene]'), image => image.getAttribute('data-scene'))
-    // 17 个目录系统 + 接口返回的 finance = 18 张卡片，每张都有专属场景插画
-    expect(new Set(scenes).size).toBe(18)
+    // 18 个目录系统 + 接口返回的 finance = 19 张卡片，每张都有专属场景插画
+    expect(new Set(scenes).size).toBe(19)
     expect(Array.from(screen.getByRole('tabpanel').querySelectorAll('.portal-card-body'), node => node.textContent).join('')).not.toMatch(/[A-Za-z]/)
   })
 
@@ -341,7 +341,7 @@ describe('门户场景卡片与授权边界', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: /取\s*消/ }))
     await waitFor(() => expect(dialog).toHaveClass(/ant-zoom-leave/))
     expect(document.querySelector('[data-testid="system-route"]')).toBeNull()
-    expect(document.querySelectorAll('.portal-card.is-locked').length).toBe(17)
+    expect(document.querySelectorAll('.portal-card.is-locked').length).toBe(18)
     expect(localStorage.getItem('current_system_code')).toBeNull()
     expect(loadSystemNavigation).not.toHaveBeenCalled()
   })
@@ -361,8 +361,8 @@ describe('门户场景卡片与授权边界', () => {
     expect(await screen.findByText(zh.portal.noSystem)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', { name: /未獲得權限/ }))
     const cards = within(screen.getByRole('tabpanel')).getAllByRole('button')
-    // 17 个业务系统 + 测试内注入的 future 系统 = 18 张未授权卡片
-    expect(cards).toHaveLength(18)
+    // 18 个业务系统 + 测试内注入的 future 系统 = 19 张未授权卡片
+    expect(cards).toHaveLength(19)
     cards.forEach(button => expect(button).toHaveClass('is-locked'))
   })
 
@@ -658,13 +658,15 @@ describe('场景区分与低干扰动效', () => {
     const tones = new Map<string, string>()
     for (const [, scene, color] of css.matchAll(/\.portal-card-artwork\[data-scene='(\w+)'\]\s*\{\s*color:\s*(#[\dA-Fa-f]{6})/g)) tones.set(scene, color)
     expect([...tones.keys()].sort()).toEqual([
-      'ads', 'ai', 'attendance', 'doc', 'eam', 'finance', 'hr', 'iam', 'meeting', 'merchant', 'merchantWorkbench', 'oa', 'organization', 'payroll', 'platform', 'rdm', 'search', 'translation',
+      'ads', 'ai', 'attendance', 'cpm', 'doc', 'eam', 'finance', 'hr', 'iam', 'meeting', 'merchant', 'merchantWorkbench', 'oa', 'organization', 'payroll', 'platform', 'rdm', 'search', 'translation',
     ].sort())
     expect(new Set(tones.values()).size).toBe(tones.size)
     // 营销与商家增长组内四张卡并排展示，色相必须彼此互斥
     expect(new Set(['ads', 'search', 'merchant', 'merchantWorkbench'].map(scene => tones.get(scene)))).toHaveLength(4)
     // 协作与交付组（oa/rdm/meeting）同样并排，会议的深蓝必须与流程琥珀、产研洋红拉开
     expect(new Set(['oa', 'rdm', 'meeting'].map(scene => tones.get(scene)))).toHaveLength(3)
+    // 持续绩效橄榄绿与同屏的三个「绿」（财务/薪酬/文档）分属不同色相家族，不得并色
+    expect(new Set(['cpm', 'finance', 'payroll', 'doc'].map(scene => tones.get(scene)))).toHaveLength(4)
   })
 
   it('每次进入门户轮换一档插画构图，连续两次不会看到同一风格', async () => {
@@ -713,6 +715,8 @@ describe('场景区分与低干扰动效', () => {
       ['meeting', 'primary'], ['meeting', 'alternate'],
       // 文檔中心两套构图各承载状态文案：主構成讲"沉淀与检索"，副構成讲"企业知识库与档案资料"
       ['doc', 'primary'], ['doc', 'alternate'],
+      // 持续绩效单套构图承载两条状态文案（速记条 + 成果章），必须渲染才能覆盖 artwork 全键
+      ['cpm', 'primary'],
     ]
     const { container } = render(<>{frames.map(([code, style]) => <SystemArtwork key={`${code}-${style}`} code={code} style={style} />)}</>)
     for (const text of Object.values(copy)) expect(container).toHaveTextContent(text)

@@ -4249,6 +4249,103 @@
       "intent": "外部参会人顿号快照列宽由 VARCHAR(500) 拓宽到 VARCHAR(3300)，让它能容纳上限内的全量名单",
       "author": "Qoder",
       "comment": "biz_meeting_booking.external_attendees（快照）与 biz_meeting_attendee 明细行表达同一批外部人，但旧实现两处上限不同源：行按 .limit(50) 截条数、快照按 truncate(joined,500) 截字符。2026-11-06 E2E 实测 100 人提交：行 50 条、快照 85 个姓名、attendee_count=51，三个数互相矛盾；而前端编辑回填读的是快照字段，于是每次编辑把 85 个 tag 提交回去、行又只留 50 个，名单每改一次飘一次。500 字根本装不下 50 人 × 64 字 + 49 个顿号 = 3249 的合法名单，只能 substring 截断，而按字符硬截会把姓名从中间切断。因此列宽提到 3300，上限/姓名列宽/快照列宽三个数统一收到 MeetingConstants（MAX_EXTERNAL_ATTENDEES / EXTERNAL_NAME_MAX / EXTERNAL_SNAPSHOT_MAX），超限改为明确拒绝不再静默截断，快照拼接按整名逐条累加。230 建表脚本同步改为 VARCHAR(3300)：新库直接建对，迁移守卫查到已达标就不再跑 DDL（ALTER 在 InnoDB 上即使无变化也要重建表）；存量库靠本迁移收敛，只改 230 对已记过 v1.0/v1.2 的环境等于没改。守卫：列不存在直接抛出不静默跳过（那意味着建表脚本没跑到位，当成已迁移会让下次不再重试）。后置校验实查 CHARACTER_MAXIMUM_LENGTH 必须 >= 3300，不能只验 ALTER 没报错——本迁移的意义就是「装得下」。回滚需先确认无 >500 字存量名单，并同步把 EXTERNAL_SNAPSHOT_MAX 改回 500。333 腳本僅作參考文檔，不可整腳本重放。参考 SQL: sql/333_meeting_external_snapshot_width.sql"
+    },
+    {
+      "versionKey": "cpm:schema:v1.0",
+      "module": "cpm",
+      "phase": "MODULE_STRUCTURE",
+      "executionType": "JAVA",
+      "executor": "cpmSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "core:schema-v10",
+        "notify:schema:v1.0"
+      ],
+      "scriptFiles": [
+        "336_cpm_core.sql"
+      ],
+      "intent": "持續績效系統 cpm 底座：12 張 biz_cpm_* 表（条目/进度流水/汇报快照/已读/评论/点赞/成果认定/可见性授权/岗位模板/汇报规则/AI 提取台账/投递记录）",
+      "author": "Qoder",
+      "ticket": "cpm-phase2",
+      "comment": "DDL 只在 classpath 资源 336_cpm_core.sql 存一份，backend/sql/ 下为参考副本。后置校验钉三件事：表存在、9 个关键唯一键就位、实体依赖列存在。uk_cpm_item_source（软删感知生成列）挡同一外部对象重复导入；uk_cpm_report_scope 挡同一人同期两份汇报互相覆盖；uk_cpm_recognition + ck_cpm_recognition_self 双保险挡「同人重复认定」与「自我认定」；uk_cpm_ai_request 是提取幂等的唯一依据。跨模块引用（sys_user）只建索引不建 FK（历史软删脏数据，会议/用车域同口径），cpm 域内表间 FK 硬约束。"
+    },
+    {
+      "versionKey": "cpm:menu:v1.0",
+      "module": "cpm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "cpmSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "core:schema-v10",
+        "core:system-portal:v1.0",
+        "cpm:schema:v1.0"
+      ],
+      "intent": "新建独立一级系统 cpm：5 个一级菜单（我的工作記錄/我的匯報/團隊匯報/模板管理/匯報規則）+ admin 授权 + 系统准入反推",
+      "author": "Qoder",
+      "ticket": "cpm-phase2",
+      "comment": "cpm 独立成系统而不并入 oa/rdm：个人工作事实是跨系统数据底座（今天接 RDM 需求来源，明天供 HR 绩效取证），叶子归属规则（一棵树同属一系统）决定并入任何一家都会锁死扩展；RDM 進度日報是管理者视角项目快照、考勤日報是打卡口径，三者职责互斥（SystemCode.CPM javadoc 同论证）。system_code 显式写入：propagateSystemToDescendants 只在门户底座跑一次，晚插入的菜单留 NULL 会让门户剪枝与准入落到未定义行为。使用侧动作集含 ai_cpm（与 edit 成对授予，涉及出域与计费必须单独授予）；cpm-rule 单独 push/trigger 动作——能改规则不等于能群发（rdm-daily-report-trigger 先例）。5 个菜单以字面量逐条调用 ensureMenu（不放进数组循环），保证 check-menu-consistency.mjs 可解析。"
+    },
+    {
+      "versionKey": "cpm:template-seed:v1.0",
+      "module": "cpm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "cpmSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "cpm:schema:v1.0"
+      ],
+      "intent": "内置 5 套岗位模板词表（product/dev/qa/ops/general）幂等补种",
+      "author": "Qoder",
+      "ticket": "cpm-phase2",
+      "comment": "ON DUPLICATE KEY UPDATE template_key=template_key（自等赋值）=只补不覆盖：管理员在模板管理里改过词表后启动重放不得打回。词表与前端演示种子逐字一致，AI 归类白名单与此同源。"
+    },
+    {
+      "versionKey": "cpm:rule-seed:v1.0",
+      "module": "cpm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "cpmSchemaMigrationInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "cpm:schema:v1.0"
+      ],
+      "intent": "汇报规则单行（rule_slot=default）补种：周期/截止/提醒/接收人/推送开关",
+      "author": "Qoder",
+      "ticket": "cpm-phase2",
+      "comment": "一期全局单行（rdm_daily_report_config 先例），部门级多规则二期再拆。唯一键保证全表恰一行，作业读到多行=口径分裂。"
+    },
+    {
+      "versionKey": "cpm:access-grant:v1.0",
+      "module": "cpm",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "cpmAccessGrantInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "cpm:menu:v1.0"
+      ],
+      "intent": "cpm 使用侧全员基线授权：cpm-my/cpm-report（view,edit,ai_cpm）+ cpm 系统准入授到所有启用角色与有效部门",
+      "author": "Qoder",
+      "ticket": "cpm-phase2",
+      "comment": "与 MeetingAccessGrantInitializer 同法：只铺使用侧两张，治理侧（cpm-team/template/rule）一律不自动授；存量员工权限走部门线，只授基底角色等于只有新人能用。不扩权只补空：非空动作集绝不动，基线菜单退役时跳过不阻断启动，每次启动重放自愈。使用侧敢给 edit+ai_cpm 的前提是写入口全部服务端资源级守卫（user_id=登录人硬约束），菜单动作只决定入口不决定数据范围。"
+    },
+    {
+      "versionKey": "ai:cpm-scene-v1.0",
+      "module": "ai",
+      "phase": "MENU_SEED",
+      "executionType": "JAVA",
+      "executor": "aiSceneConfigSchemaInitializer",
+      "status": "ACTIVE",
+      "dependencies": [
+        "ai:scene-config-v1.0",
+        "cpm:schema:v1.0"
+      ],
+      "intent": "登记业务 AI 场景 cpm_report（默认关闭）并给 ai-operation-auth 追加 cpm_ai_manage/cpm_ai_diagnose 治理动作",
+      "author": "Qoder",
+      "ticket": "cpm-phase2",
+      "comment": "INSERT IGNORE 幂等且不覆盖已有开关行；动作追加只改 sys_menu.actions 不动授权行——默认无人获得，重启不自动扩发。能管会议 AI 的默认管不了绩效 AI：预算与出域内容不同，动作分场景成对登记。"
     }
   ]
 }

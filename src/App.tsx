@@ -249,6 +249,16 @@ const MeetingMinutesPage = lazy(() => import('@/pages/MeetingMinutesView'))
 // 会议详情免登查看页（钉钉邀约卡片直达，凭 HMAC 令牌鉴权，不套后台布局）
 const MeetingViewPage = lazy(() => import('@/pages/MeetingView'))
 const MeetingMinutesAdmin = lazy(() => import('@/pages/MeetingMinutesAdmin'))
+// 持續績效系統（CPM）：菜单真值由 CpmSchemaMigrationInitializer 写入 sys_menu，
+// 全员使用侧基线授权；子页（条目编辑/汇报详情/模板表单）按 ROUTE_MENU_KEY_MAP 归各自父菜单
+const CpmMyWorklog = lazy(() => import('@/pages/Cpm/MyWorklog'))
+const CpmItemForm = lazy(() => import('@/pages/Cpm/WorklogItemForm'))
+const CpmMyReport = lazy(() => import('@/pages/Cpm/MyReport'))
+const CpmReportDetail = lazy(() => import('@/pages/Cpm/ReportDetail'))
+const CpmTeamReport = lazy(() => import('@/pages/Cpm/TeamReport'))
+const CpmReportRule = lazy(() => import('@/pages/Cpm/ReportRule'))
+const CpmTemplateList = lazy(() => import('@/pages/Cpm/TemplateList'))
+const CpmTemplateForm = lazy(() => import('@/pages/Cpm/TemplateForm'))
 const NotificationTemplateConfig = lazy(() => import('@/pages/NotificationTemplate'))
 const NotificationSwitchConfig = lazy(() => import('@/pages/NotificationSwitch'))
 // 資產標籤移動端 H5（公開頁面，掃碼直達，不含後台佈局）
@@ -668,6 +678,16 @@ function AuthenticatedLayout() {
               <Route path="/meeting-minutes" element={<MeetingMinutesView />} />
               {/* 行政侧纪要检索（會議治理 › 會議紀要）：菜单 key meeting-minutes-list */}
               <Route path="/meeting-minutes-list" element={<MeetingMinutesAdmin />} />
+              {/* 持續績效（CPM）：五个菜单页 + 三个非菜单子页，路由与 sys_menu 种子成对交付，
+                  受控登记见 CONTROLLED_MENU_KEYS / ROUTE_MENU_KEY_MAP（阶段一预览注释已随接线完成移除） */}
+              <Route path="/cpm-my" element={<CpmMyWorklog />} />
+              <Route path="/cpm-item-form" element={<CpmItemForm />} />
+              <Route path="/cpm-report" element={<CpmMyReport />} />
+              <Route path="/cpm-report-detail" element={<CpmReportDetail />} />
+              <Route path="/cpm-team" element={<CpmTeamReport />} />
+              <Route path="/cpm-rule" element={<CpmReportRule />} />
+              <Route path="/cpm-template" element={<CpmTemplateList />} />
+              <Route path="/cpm-template-form" element={<CpmTemplateForm />} />
               {/* 通知模板 / 推送开关：紧邻「通知渠道配置」的两个独立菜单 */}
               <Route path="/notification-template" element={<NotificationTemplateConfig />} />
               <Route path="/notification-switch" element={<NotificationSwitchConfig />} />

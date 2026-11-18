@@ -19,6 +19,7 @@ import PikachuFace from '@/components/PikachuFace'
 import AiLogo from '@/components/AiLogo'
 import ContextUsageIndicator from './ContextUsageIndicator'
 import TodayMeetingCard, { TodayMeetingRestoreChip } from './TodayMeetingCard'
+import WorklogSummaryCard from './WorklogSummaryCard'
 import { useTodayMeetingBar } from './useTodayMeetingBar'
 import { FAV_KEY, QUICK_PANEL_COLLAPSED_KEY, QUICK_PANEL_WIDTH_KEY, DEFAULT_QUICK_PANEL_WIDTH, MIN_QUICK_PANEL_WIDTH, MAX_QUICK_PANEL_WIDTH, QUICK_PANEL_HINT_KEY, QUICK_PANEL_HINT_NOTIFICATION_ID, loadFavorites, defaultFavorites, MAX_FAVORITES, collectHomeMenus, chineseNameToPinyinEnglish, getGreeting, MAX_IMAGE_SIZE, MAX_FILE_SIZE, DIM_SOURCE_COLOR, DIM_SOURCE_LABEL_KEY } from './homeUtils'
 import AiRichText from './AiRichText'
@@ -1579,6 +1580,9 @@ export default function Home() {
 
       {/* 今日會議概览：无 meeting-my 菜单、后端不可用、今日无会或用户已收起时整栏不渲染 */}
       <TodayMeetingCard bar={meetingBar} />
+
+      {/* 持續績效概览：无 cpm-my 菜单或 /api/cpm/summary 不可用时整栏不渲染（与今日會議同口径） */}
+      <WorklogSummaryCard />
 
       {/* 主区域：左 AI 助手 + 右快捷入口（快捷入口可收起，让聊天区吃满宽度） */}
       <div

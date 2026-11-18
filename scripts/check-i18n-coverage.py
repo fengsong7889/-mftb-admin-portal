@@ -72,6 +72,14 @@ DOMAINS = {
         'namespaces': ['rdm'],
         'files_extra': [],
     },
+    # 持续绩效（cpm，2026-11 新建域）：阶段一按「高效开发模式」允许临时硬编码，
+    # 阶段二接通后端时按 rdm 先例把存量登记为基线、此后只降不升；新增文案一律走 t()。
+    # 收敛批次：cpm 页面文案 t() 化 + zh-TW/en 同批补 key（剩余项清单）。
+    'cpm': {
+        'dirs': ['src/pages/Cpm'],
+        'namespaces': ['cpm'],
+        'files_extra': ['src/pages/Home/WorklogSummaryCard.tsx'],
+    },
 }
 
 PUBLIC_NS = ['common', 'menu', 'portal']

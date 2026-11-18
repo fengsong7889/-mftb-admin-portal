@@ -692,6 +692,12 @@ const keyToIcon: Record<string, ReactNode> = {
   // v1.3 拍平后使用侧两张一级菜单（我的會議/會議室預約）+ 會議治理分组，图标必须与后端迁移写入的一致
   'meeting-admin':       <MonitorOutlined />,
   'meeting-my':          <UsergroupAddOutlined />,
+  // 持續績效（兜底图标必须与 CpmSchemaMigrationInitializer 种子逐字一致，check:menu 双向校验）
+  'cpm-my':              <FormOutlined />,
+  'cpm-report':          <FileDoneOutlined />,
+  'cpm-team':            <TeamOutlined />,
+  'cpm-template':        <AppstoreOutlined />,
+  'cpm-rule':            <ControlOutlined />,
   'meeting-booking':     <PlusSquareOutlined />,
   'meeting-room':        <LayoutOutlined />,
   'meeting-record':      <BookOutlined />,

@@ -1434,6 +1434,7 @@ const scenes: Record<PortalSystemKey | 'generic', ReactNode> = {
    */
   meeting: <MeetingRoomScene />,
   doc: <DocKnowledgeScene />,
+  cpm: <CpmPerformanceScene />,
   generic: (
     <>
       <path d="M95 65h130v67H95Z" fill="none" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" />
@@ -1724,6 +1725,59 @@ function DocKnowledgeVaultScene() {
       <path d="M158 138h50M158 146h30" stroke="currentColor" strokeOpacity="0.45" strokeWidth="2" />
     </g>
     <g className="portal-art-motion portal-art-static"><ArtworkText label="docArchiveFiles" x={183} y={172} width={64} /></g>
+  </g>;
+}
+
+/**
+ * 持續績效（cpm）主構成：「一天沉澱成一份績效證據」。
+ * 左（三張速記條依次滑入=低門檻記錄）→ 中（週日曆彙聚 + 進度條填充=周期聚合）→
+ * 右（成長曲線畫出 + 品牌橙對勾落頂=成果認定）。
+ * 只講一個動詞「記錄並成長」；對勾是全卡唯一一次品牌橙（S3/S4）；無其它釘死色。
+ */
+function CpmPerformanceScene() {
+  return <g className="portal-cpm-scene">
+    {/* 頂部標籤條：與其它場景同一套語言（S5：淡色塊而非白底膠囊） */}
+    <rect x="64" y="9" width="192" height="26" rx="8" fill="currentColor" opacity="0.1" />
+    <g className="portal-art-motion portal-art-static"><ArtworkText label="cpmLogStrip" x={160} y={27} width={176} /></g>
+
+    {/* 左側：三張速記條依次滑入（記錄動作的視覺重量放在「來得容易」） */}
+    {[84, 104, 124].map((y, i) => (
+      <g key={y} className="portal-art-motion portal-cpm-log" style={{ animationDelay: `${i * 0.5}s` }}>
+        <rect x="26" y={y} width="70" height="14" rx="4" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.3" />
+        <circle cx="34" cy={y + 7} r="2.6" fill="currentColor" opacity="0.85" />
+        <path d={`M42 ${y + 7}h44`} stroke="currentColor" strokeOpacity="0.35" strokeWidth="2" />
+      </g>
+    ))}
+
+    {/* 動線：速記條 → 週日曆 */}
+    <path d="M100 112h18" stroke="currentColor" strokeOpacity="0.2" strokeWidth="2" strokeDasharray="3 5" />
+    <path className="portal-art-motion portal-art-draw" pathLength="1" d="M100 112h18" fill="none" stroke="currentColor" strokeWidth="2" />
+
+    {/* 中間：週日曆格（2×4）+ 進度填充條——「每天的一行字聚合成一周」 */}
+    <rect x="122" y="64" width="82" height="76" rx="8" fill="currentColor" opacity="0.07" transform="translate(3 3)" />
+    <rect x="122" y="64" width="82" height="76" rx="8" fill="var(--art-surface)" stroke="currentColor" strokeOpacity="0.28" />
+    {[[130, 74], [148, 74], [166, 74], [184, 74], [130, 92], [148, 92], [166, 92], [184, 92]].map(([x, y], i) => (
+      <rect key={i} className="portal-art-motion portal-cpm-cell" style={{ animationDelay: `${0.9 + i * 0.22}s` }}
+        x={x as number} y={y as number} width="12" height="12" rx="3" fill="currentColor" opacity="0.5" />
+    ))}
+    <g className="portal-art-motion portal-cpm-bar">
+      <rect x="130" y="114" width="66" height="7" rx="3.5" fill="currentColor" opacity="0.15" />
+      <rect x="130" y="114" width="44" height="7" rx="3.5" fill="currentColor" opacity="0.85" />
+    </g>
+
+    {/* 動線：日曆 → 曲線 */}
+    <path d="M208 102h16" stroke="currentColor" strokeOpacity="0.2" strokeWidth="2" strokeDasharray="3 5" />
+    <path className="portal-art-motion portal-art-draw" pathLength="1" d="M208 102h16" fill="none" stroke="currentColor" strokeWidth="2" />
+
+    {/* 右側：成長曲線畫出，末端品牌橙對勾落在最高點（結果標記，全卡唯一橙色） */}
+    <path className="portal-art-motion portal-art-draw" pathLength="1"
+      d="M226 128c14-6 20-30 34-36 12-5 18-22 26-26" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" style={{ animationDelay: '1.9s' }} />
+    <g className="portal-art-motion portal-cpm-check">
+      {/* 令牌而非钉死色值：新插画不得给裸色棘轮加颗粒（--on-brand 即品牌底前景） */}
+      <circle cx="288" cy="64" r="11" style={{ fill: 'var(--brand)' }} />
+      <path d="m282.6 64 3.9 4 6.8-7.4" fill="none" style={{ stroke: 'var(--on-brand)' }} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </g>
+    <g className="portal-art-motion portal-art-static"><ArtworkText label="cpmOutcome" x={256} y={150} width={68} /></g>
   </g>;
 }
 

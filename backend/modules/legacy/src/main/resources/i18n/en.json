@@ -1329,7 +1329,9 @@
       "docKnowledgeBase": "Knowledge base",
       "docCloudDocs": "Cloud docs",
       "docKnowledgeVault": "Enterprise knowledge vault",
-      "docArchiveFiles": "Archive & files"
+      "docArchiveFiles": "Archive & files",
+      "cpmLogStrip": "Work Log",
+      "cpmOutcome": "Track Record"
     },
     "businessSystems": "Business Systems",
     "backToPortal": "Back to group portal",
@@ -1424,6 +1426,10 @@
       "doc": {
         "name": "Document Center",
         "description": "A unified index and reading gateway for requirement docs, HR & admin policies, and training materials."
+      },
+      "cpm": {
+        "name": "Continuous Performance",
+        "description": "Daily work logs, periodic reports and continuous feedback that build an auditable performance record"
       },
       "payroll": {
         "name": "Payroll & Benefits",
@@ -17194,6 +17200,67 @@
     "field": {
       "guidanceTerminal": "Terminal",
       "guidanceTimeSlot": "Time slot"
+    }
+  },
+  "cpm": {
+    "sourceImport": {
+      "title": "Import From Business Objects",
+      "button": "Link Import",
+      "tip": "Bring in your requirements and meeting action items",
+      "tabRdm": "R&D requirements",
+      "tabMeeting": "Meeting actions",
+      "search": "Search by title or requirement no.",
+      "retry": "Retry",
+      "loadError": "Failed to load candidates",
+      "hintRdm": "Lists only requirements related to you (submitter / owner / participant / acceptor) that are not closed yet.",
+      "hintMeeting": "Lists only open meeting action items you own or co-own.",
+      "emptyRdm": "No open requirements related to you",
+      "emptyMeeting": "No open meeting action items",
+      "import": "Import",
+      "imported": "Already imported",
+      "importedToast": "Imported as a work log",
+      "terminated": "Source closed",
+      "close": "Close"
+    },
+    "sourceRole": {
+      "submitter": "Submitted by me",
+      "pm": "I own product",
+      "dev": "I own development",
+      "accept": "I accept",
+      "participant": "I participate",
+      "owner": "I own"
+    },
+    "meetingAction": {
+      "pending": "Pending"
+    },
+    "ai": {
+      "processing": "Still organizing, please retry shortly",
+      "failedTitle": "Organizing failed"
+    },
+    "aiError": {
+      "scene_disabled": "Scene is not enabled",
+      "kill_switch": "AI service is paused by the circuit breaker",
+      "no_permission": "You do not have the AI action permission",
+      "no_channel": "No model channel is configured",
+      "no_model_auth": "The model is not authorized",
+      "quota_reject": "Quota is insufficient",
+      "budget_exceeded": "Budget limit exceeded",
+      "upstream_timeout": "The model timed out",
+      "upstream_network": "Cannot reach the model service",
+      "upstream_bad_json": "The model response could not be parsed, please retry",
+      "upstream_arrearage": "The model account has an overdue balance; calls are stopped. Please contact an administrator",
+      "upstream_invalid_key": "The model API key is invalid or expired. Please contact an administrator",
+      "upstream_model_not_found": "The model does not exist or is unsupported. Please contact an administrator",
+      "upstream_rate_limited": "Too many model requests, please retry later",
+      "upstream_content_filter": "The content was blocked by safety filtering; please adjust the text and retry",
+      "upstream_quota_exhausted": "The model quota is exhausted. Please contact an administrator",
+      "upstream_http_error": "The model service returned an error, please retry later",
+      "upstream_error": "The model service failed, please retry later",
+      "channel_misconfigured": "The model channel is misconfigured. Please contact an administrator",
+      "invalid_structure": "The model output format is invalid, please retry",
+      "reserve_failed": "Budget reservation failed",
+      "unknown": "Unknown reason, please retry later or contact an administrator",
+      "fallback": "The model service is unavailable, please retry later or contact an administrator"
     }
   }
 }
