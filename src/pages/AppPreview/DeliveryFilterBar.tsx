@@ -16,8 +16,8 @@
  * 持有选中值的分组页签标橙（has-pick），浏览另一组时也能一眼看到生效口径。
  *
  * DELIVERY_PROMO_TAGS 是优惠活动模块标签的唯一真源：第二排胶囊与篩選 sheet「活动优惠」模块共用
- * （图5 口径：无超值換購项，蜂蜜兌換閃蜂专属）。
- * 篩選按钮打开多模块底部 sheet（列表大小圖切換/人均價/時效範圍/配送/品質/活动优惠），
+ * （2026-11 口径：含超值換購等 20 项，蜂蜜兌換閃蜂专属）。
+ * 篩選按钮打开多模块底部 sheet（列表大小圖切換/人均價/時效範圍/配送/商家/品質/活动优惠），
  * 结构与团购「更多篩選」同款（复用 apg-more-* 类），sheet 由页面渲染在滚动容器末尾（sticky bottom:0 不可提前）。
  * 大小图切换即时联动瀑布流（layout/onLayoutChange 经壳层闭环到说明面板 deliveryPageMode，双机同步）；
  * 其余筛选均为本地视觉态，不做真实过滤。
@@ -39,7 +39,7 @@ const DISTANCE_TIMES = ['30分鐘', '40分鐘', '50分鐘', '60分鐘']
 /** 距離下拉·范围档（单选） */
 const DISTANCE_RANGES = ['1KM', '2KM', '3KM', '5KM']
 /** 配送下拉·配送方式（单选；与配送保障互斥） */
-const DELIVERY_METHODS = ['平台送', '商家送', '自取']
+const DELIVERY_METHODS = ['平台送', '商家送', '到店自取']
 /** 配送下拉·配送保障（准时宝=配送时效赔付承诺；单选） */
 const DELIVERY_GUARANTEES = ['準時寶']
 
@@ -51,6 +51,13 @@ const SHEET_QUALITY = [
   { key: 'sales', label: '銷量較高', icon: '📊', tone: 'blue' },
   { key: 'fiveStar', label: '五星好評', icon: '⭐', tone: 'honey' },
   { key: 'fourStar', label: '4星及以上', icon: '⭐', tone: 'thumb' },
+]
+/** 篩選 sheet·商家模块（可多選；2026-11 按用户口径回补：必試新店/金牌商家/品牌商家/連鎖商家；icon 为占位 emoji/字样） */
+const SHEET_MERCHANTS = [
+  { key: 'newStore', label: '必試新店', icon: 'NEW', tone: 'chain' },
+  { key: 'gold', label: '金牌商家', icon: '🏅', tone: 'honey' },
+  { key: 'brand', label: '品牌商家', icon: '👑', tone: 'crown' },
+  { key: 'chain', label: '連鎖商家', icon: '🏪', tone: 'healthy' },
 ]
 /** 篩選 sheet·人均价滑杆区间（图2：$0–$100+，到顶显示 +） */
 const PRICE_MIN = 0
@@ -76,10 +83,10 @@ export interface DeliveryFilters {
  * 筛选条件·优惠活动模块标签（图3 单一真源；icon 为占位 emoji/字样，待切图后替换）。
  * tone 复用更多篩選·偏好优惠的圆形渐变图标族（apg-pref-ico--*），蜜蜂/蓝/紫/粉四档为本模块新增。
  * beeOnly=true 的标签仅閃蜂壳渲染（蜂蜜兌換为閃蜂品牌权益）。
- * 首项随品牌分流：閃蜂神會員👑 / MFOOD勐爆券🧨（mfoodLabel/mfoodIcon，同门店卡红包胶囊口径）。
+ * 首项随品牌分流：閃蜂神會員👑 / MFOOD勁爆券🧨（mfoodLabel/mfoodIcon，同门店卡红包胶囊口径）。
  */
 export const DELIVERY_PROMO_TAGS: { key: string; label: string; mfoodLabel?: string; icon: string; mfoodIcon?: string; tone: string; beeOnly?: boolean }[] = [
-  { key: 'vip', label: '神會員', mfoodLabel: '勐爆券', icon: '👑', mfoodIcon: '🧨', tone: 'crown' },
+  { key: 'vip', label: '神會員', mfoodLabel: '勁爆券', icon: '👑', mfoodIcon: '🧨', tone: 'crown' },
   { key: 'taste', label: '換口味', icon: '🥗', tone: 'chain' },
   { key: 'boost', label: '商家助力', icon: '🧑‍🍳', tone: 'thumb' },
   { key: 'official', label: '官方神券', icon: '🎫', tone: 'coupon' },
@@ -94,6 +101,11 @@ export const DELIVERY_PROMO_TAGS: { key: string; label: string; mfoodLabel?: str
   { key: 'buyGift', label: '買贈活動', icon: '🎁', tone: 'purple' },
   { key: 'discount', label: '商品折扣', icon: '🏷️', tone: 'taste' },
   { key: 'favCoupon', label: '收藏送券', icon: '❤️', tone: 'pink' },
+  { key: 'combo', label: '組合優惠', icon: '🍱', tone: 'blue' },
+  { key: 'half', label: '半價優惠', icon: '½', tone: 'vs' },
+  { key: 'pickup', label: '自取折扣', icon: '🛍️', tone: 'chain' },
+  { key: 'points', label: '集點返券', icon: '🎯', tone: 'purple' },
+  { key: 'swap', label: '超值換購', icon: '🛒', tone: 'thumb' },
 ]
 
 export function useDeliveryFilters({ brand, layout, onLayoutChange }: UseDeliveryFiltersOptions): DeliveryFilters {
@@ -110,7 +122,8 @@ export function useDeliveryFilters({ brand, layout, onLayoutChange }: UseDeliver
   const [deliveryTab, setDeliveryTab] = useState<'method' | 'guarantee'>('method')
   /** 篩選 sheet·人均价区间（原型视觉态不做真实过滤） */
   const [priceRange, setPriceRange] = useState<[number, number]>([PRICE_MIN, PRICE_MAX])
-  /** 篩選 sheet·品質/活动优惠（可多選） */
+  /** 篩選 sheet·商家/品質/活动优惠（可多選） */
+  const [sheetMerchants, setSheetMerchants] = useState<string[]>([])
   const [sheetQuality, setSheetQuality] = useState<string[]>([])
   const [sheetPrefs, setSheetPrefs] = useState<string[]>([])
   /** 列表大小圖：本地镜像（sheet 内点击即时生效）+ 外部下发同步（说明面板切换器，双机同步） */
@@ -122,7 +135,7 @@ export function useDeliveryFilters({ brand, layout, onLayoutChange }: UseDeliver
     setLocalLayout(mode)
     onLayoutChange?.(mode)
   }
-  /** 优惠活动标签：蜂蜜兌換仅閃蜂；首项文案/图标随品牌分流（閃蜂神會員👑 / MFOOD勐爆券🧨） */
+  /** 优惠活动标签：蜂蜜兌換仅閃蜂；首项文案/图标随品牌分流（閃蜂神會員👑 / MFOOD勁爆券🧨） */
   const promoTags = DELIVERY_PROMO_TAGS
     .filter((p) => !p.beeOnly || brand === 'bee')
     .map((p) => ({
@@ -161,9 +174,10 @@ export function useDeliveryFilters({ brand, layout, onLayoutChange }: UseDeliver
     setDeliveryPick(null)
     setOpenPanel(null)
   }
-  /** sheet 重置：六模块全部回默认（含与列表下拉共享的时效范围/配送），sheet 保持展开 */
+  /** sheet 重置：七模块全部回默认（含与列表下拉共享的时效范围/配送），sheet 保持展开 */
   const resetSheet = () => {
     setPriceRange([PRICE_MIN, PRICE_MAX])
+    setSheetMerchants([])
     setSheetQuality([])
     setSheetPrefs([])
     setDistancePick(null)
@@ -292,7 +306,7 @@ export function useDeliveryFilters({ brand, layout, onLayoutChange }: UseDeliver
   )
 
   const sheet = openPanel === 'filter' ? (
-    /* 多模块篩選底部面板（图2-5）：sticky 满屏罩 + 白底 sheet（六模块可滚）+ 重置/完成 + sheet 下圆形 × */
+    /* 多模块篩選底部面板（图2-5）：sticky 满屏罩 + 白底 sheet（七模块可滚）+ 重置/完成 + sheet 下圆形 × */
     <div className="apg-more">
       <div className="apg-more-sheet" role="group" aria-label="美食外賣篩選面板">
         <div className="apg-more-scroll">
@@ -381,6 +395,19 @@ export function useDeliveryFilters({ brand, layout, onLayoutChange }: UseDeliver
             </div>
           </section>
           </SpecField>
+          <SpecField panel="deliveryFilter" id={10}>
+          <section className="apg-more-sec">
+            <h4 className="apg-more-title">商家 <i>(可多選)</i></h4>
+            <div className="apg-more-grid apg-more-grid--pref">
+              {SHEET_MERCHANTS.map((p) => (
+                <button key={p.key} type="button" className={`apg-more-pref${sheetMerchants.includes(p.key) ? ' is-on' : ''}`} aria-pressed={sheetMerchants.includes(p.key)} onClick={pickMany(setSheetMerchants)(p.key)}>
+                  <i className={`apg-pref-ico apg-pref-ico--${p.tone}`} aria-hidden="true">{p.icon}</i>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </section>
+          </SpecField>
           <SpecField panel="deliveryFilter" id={11}>
           <section className="apg-more-sec">
             <h4 className="apg-more-title">品質 <i>(可多選)</i></h4>
@@ -394,7 +421,7 @@ export function useDeliveryFilters({ brand, layout, onLayoutChange }: UseDeliver
             </div>
           </section>
           </SpecField>
-          {/* 活动优惠=DELIVERY_PROMO_TAGS 真源（无超值換購项，蜂蜜兌換閃蜂专属） */}
+          {/* 活动优惠=DELIVERY_PROMO_TAGS 真源（含超值換購，蜂蜜兌換閃蜂专属） */}
           <SpecField panel="deliveryFilter" id={12}>
           <section className="apg-more-sec">
             <h4 className="apg-more-title">活动优惠 <i>(可多選)</i></h4>

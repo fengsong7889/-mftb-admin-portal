@@ -2009,26 +2009,29 @@
   background: #FFFFFF;
   border-radius: 0 0 18px 18px;
 }
-.apg-more-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 16px 6px; display: flex; flex-direction: column; gap: 24px; }
-.apg-more-sec { display: flex; flex-direction: column; gap: 14px; }
-.apg-more-title { margin: 0; color: #262626; font-size: 16px; font-weight: 700; }
-.apg-more-title i { font-style: normal; font-size: 13px; font-weight: 400; color: #595959; }
+.apg-more-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px 2px; display: flex; flex-direction: column; }
+/* 区块节奏精致化（2026-11）：发丝分隔线替代松散大间隙，标题收 13px 并把「(可多選)」由灰斜体改为迷你徽章；团购/外卖两张 sheet 共用 */
+.apg-more-sec { display: flex; flex-direction: column; gap: 12px; padding: 14px 0 16px; border-bottom: 1px solid #F4F5F6; }
+.apg-more-sec:last-child { border-bottom: none; }
+.apg-more-title { margin: 0; color: #262626; font-size: 13px; font-weight: 700; letter-spacing: 0.2px; }
+.apg-more-title i { font-style: normal; font-size: 10px; font-weight: 500; color: #8C8C8C; background: #F4F5F6; border-radius: 999px; padding: 2px 8px; margin-left: 6px; vertical-align: 1px; }
 /* 列表大小圖切換：大圖/小圖两张模式卡（图2）；选中=橙描边+浅橙底+橙色图形，未选=灰底+金色图形（全令牌零裸色） */
-.apg-more-layout { display: flex; gap: 12px; }
+.apg-more-layout { display: flex; gap: 10px; }
 .apg-layout-card {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  height: 64px;
+  gap: 8px;
+  height: 56px;
   border: 2px solid transparent;
-  border-radius: 16px;
-  background: #F5F5F5;
+  border-radius: 12px;
+  background: #F7F8FA;
   color: #262626;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   --apg-layout-ico: var(--apg-gold, #FA8C16);
 }
 .apg-layout-card.is-on {
@@ -2038,31 +2041,33 @@
   font-weight: 800;
   --apg-layout-ico: var(--apg-head-from, #E8720C);
 }
-.apg-layout-ico { position: relative; flex: none; width: 36px; height: 30px; }
-.apg-layout-ico--large::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 17px; border-radius: 5px; background: var(--apg-layout-ico); }
-.apg-layout-ico--large::after { content: ''; position: absolute; left: 0; bottom: 2px; width: 58%; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--apg-layout-ico) 45%, transparent); }
-.apg-layout-ico--small::before, .apg-layout-ico--small::after { content: ''; position: absolute; left: 0; width: 100%; height: 12px; border-radius: 4px; background: linear-gradient(90deg, var(--apg-layout-ico) 0 9px, transparent 9px 12px, color-mix(in srgb, var(--apg-layout-ico) 45%, transparent) 12px 100%); }
+.apg-layout-ico { position: relative; flex: none; width: 32px; height: 26px; }
+.apg-layout-ico--large::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 15px; border-radius: 4px; background: var(--apg-layout-ico); }
+.apg-layout-ico--large::after { content: ''; position: absolute; left: 0; bottom: 2px; width: 58%; height: 4px; border-radius: 3px; background: color-mix(in srgb, var(--apg-layout-ico) 45%, transparent); }
+.apg-layout-ico--small::before, .apg-layout-ico--small::after { content: ''; position: absolute; left: 0; width: 100%; height: 10px; border-radius: 3px; background: linear-gradient(90deg, var(--apg-layout-ico) 0 8px, transparent 8px 11px, color-mix(in srgb, var(--apg-layout-ico) 45%, transparent) 11px 100%); }
 .apg-layout-ico--small::before { top: 1px; }
 .apg-layout-ico--small::after { bottom: 1px; }
 /* 營業時間/使用人數/店鋪服務：四列灰底胶囊；选中态暖底+品牌字（与篩選按钮同一套色彩语言）
    文案一律单行（设计稿口径）：字号收窄到 11px、长名单服务档再收 10.5px，避免胶囊内换行 */
-.apg-more-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 8px; }
+.apg-more-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 8px; }
 .apg-more-chip {
-  height: 40px;
+  height: 34px;
   padding: 0;
   border: none;
-  border-radius: 20px;
-  background: #F5F5F5;
+  border-radius: 10px;
+  background: #F7F8FA;
   color: #262626;
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 .apg-more-grid--svc .apg-more-chip { font-size: 10.5px; }
-.apg-more-chip.is-on { background: #FFF7E6; color: #E8720C; font-weight: 600; box-shadow: inset 0 0 0 1px #FFD591; }
+.apg-more-chip.is-on { background: #FFF7E6; color: #E8720C; font-weight: 700; box-shadow: inset 0 0 0 1px #FFD591; }
 /* 人均篩選器：灰底圆角卡 + 橙色两端标签 + 双滑杆（轨道分段渐变由 inline style 传入，全 var() 无裸色） */
-.apg-range-card { background: #F5F5F5; border-radius: 14px; padding: 16px 14px 20px; }
-.apg-range-labels { display: flex; justify-content: space-between; margin-bottom: 16px; color: var(--apg-head-from, #E8720C); font-size: 15px; font-weight: 700; }
+.apg-range-card { background: #F7F8FA; border-radius: 12px; padding: 14px 14px 16px; }
+.apg-range-labels { display: flex; justify-content: space-between; margin-bottom: 12px; color: var(--apg-head-from, #E8720C); font-size: 13px; font-weight: 700; }
 .apg-range-track { position: relative; height: 4px; border-radius: 2px; }
 .apg-range-input {
   position: absolute;
@@ -2081,28 +2086,28 @@
 .apg-range-input::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   border: none;
   border-radius: 50%;
   background:
-    linear-gradient(var(--apg-head-from), var(--apg-head-from)) 10px 50% / 2px 10px no-repeat,
-    linear-gradient(var(--apg-head-from), var(--apg-head-from)) 16px 50% / 2px 10px no-repeat,
+    linear-gradient(var(--apg-head-from), var(--apg-head-from)) 8px 50% / 2px 8px no-repeat,
+    linear-gradient(var(--apg-head-from), var(--apg-head-from)) 14px 50% / 2px 8px no-repeat,
     #FFFFFF;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
   cursor: pointer;
   pointer-events: auto;
 }
 .apg-range-input::-moz-range-thumb {
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   border: none;
   border-radius: 50%;
   background:
-    linear-gradient(var(--apg-head-from), var(--apg-head-from)) 10px 50% / 2px 10px no-repeat,
-    linear-gradient(var(--apg-head-from), var(--apg-head-from)) 16px 50% / 2px 10px no-repeat,
+    linear-gradient(var(--apg-head-from), var(--apg-head-from)) 8px 50% / 2px 8px no-repeat,
+    linear-gradient(var(--apg-head-from), var(--apg-head-from)) 14px 50% / 2px 8px no-repeat,
     #FFFFFF;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
   cursor: pointer;
   pointer-events: auto;
 }
@@ -2112,35 +2117,36 @@
 .apg-more-pref {
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: 44px;
-  padding: 4px 8px 4px 4px;
+  gap: 7px;
+  height: 38px;
+  padding: 4px 10px 4px 4px;
   border: none;
-  border-radius: 22px;
-  background: #F5F5F5;
+  border-radius: 999px;
+  background: #F7F8FA;
   color: #262626;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
-.apg-more-pref.is-on { background: #FFF7E6; color: #E8720C; font-weight: 600; box-shadow: inset 0 0 0 1px #FFD591; }
+.apg-more-pref.is-on { background: #FFF7E6; color: #E8720C; font-weight: 700; box-shadow: inset 0 0 0 1px #FFD591; }
 .apg-pref-ico {
   flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   color: #FFFFFF;
-  font-size: 16px;
+  font-size: 13px;
   font-style: normal;
   font-weight: 800;
 }
 .apg-pref-ico--crown { background: linear-gradient(135deg, var(--apg-red), var(--apg-head-to)); }
 .apg-pref-ico--coupon { background: linear-gradient(135deg, #722ED1, var(--apg-red)); }
-.apg-pref-ico--vs { background: var(--apg-red); font-size: 13px; }
+.apg-pref-ico--vs { background: var(--apg-red); font-size: 12px; }
 .apg-pref-ico--fire { background: linear-gradient(135deg, var(--apg-head-from), var(--apg-red)); }
 .apg-pref-ico--chain { background: #52C41A; }
 .apg-pref-ico--thumb { background: #FA8C16; }
@@ -2155,27 +2161,29 @@
 .apg-pref-ico--purple { background: #722ED1; }
 .apg-pref-ico--pink { background: #EB2F96; }
 /* 底部操作条：二分单丸（左黑重置/右黄完成）；黑取 text-1 反色、黄复用页局部金令牌，深浅主题均成立 */
-.apg-more-footer { display: flex; padding: 12px 16px 16px; }
+.apg-more-footer { display: flex; padding: 10px 16px 14px; }
 .apg-more-reset {
   flex: 1;
-  height: 52px;
+  height: 48px;
   border: none;
-  border-radius: 26px 0 0 26px;
+  border-radius: 24px 0 0 24px;
   background: #262626;
   color: #FFFFFF;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
+  letter-spacing: 1px;
   cursor: pointer;
 }
 .apg-more-done {
   flex: 1;
-  height: 52px;
+  height: 48px;
   border: none;
-  border-radius: 0 26px 26px 0;
+  border-radius: 0 24px 24px 0;
   background: var(--apg-gold);
   color: #262626;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
+  letter-spacing: 1px;
   cursor: pointer;
 }
 /* sheet 下：白色细杆 + 圆形 ×（复用 .apg-panel-close）；杆外透出罩层压暗的列表 */
@@ -4710,7 +4718,7 @@ button.apcs-card:hover { border-color: #FFD591; }
   animation: apf-spec-glow 1.5s linear infinite;
 }
 
-/* 红包收起行药丸较小，高亮加粗一档更醒目（劲爆券/神会员行） */
+/* 红包收起行药丸较小，高亮加粗一档更醒目（勁爆券/神会员行） */
 .apf-spec-field.is-highlighted > .apw-pill,
 .apf-spec-field.is-highlighted > .apw-pill-group {
   outline-width: 3px;
@@ -5893,7 +5901,7 @@ button.apcs-card:hover { border-color: #FFD591; }
 .apq-rating--none, .apq-rating--none i { color: #8C8C8C; font-weight: 600; }
 .apq-sep { flex: none; width: 1px; height: 10px; background: #E8EAED; }
 .apq-cate { overflow: hidden; text-overflow: ellipsis; }
-/* 标签行：勐爆券紫标 + 膨胀紫软标 + 半年售灰标（文本不换行，胶囊不收缩，超宽裁剪；负 margin+padding 外扩描边空间） */
+/* 标签行：勁爆券紫标 + 膨胀紫软标 + 半年售灰标（文本不换行，胶囊不收缩，超宽裁剪；负 margin+padding 外扩描边空间） */
 .apq-tags { display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; padding: 6px; margin: -6px; }
 .apq-boom {
   flex: none;
@@ -6224,10 +6232,17 @@ button.apcs-card:hover { border-color: #FFD591; }
 .apmf-redbag-info b { font-size: 15px; font-weight: 900; }
 .apmf-redbag-info i { font-style: normal; font-size: 10px; opacity: 0.9; }
 .apmf-redbag-btn { border: none; border-radius: 12px; background: #FFFFFF; color: #FF4D4F; font-size: 11px; font-weight: 800; padding: 3px 10px; cursor: pointer; }
+/* MFOOD 滚动容器内边距清零（与閃蜂 .apdl-body 同口径）：默认 .ap-body 的 12px 四边内边距会让
+   瀑布流两侧露边隙、并把吸顶筛选栏顶出与头部的缝隙；上部各区块（Banner/宫格/星選/下午茶/红包）
+   已自带 12px 横向 margin/padding，清零后仅筛选栏与瀑布流贴边铺满 */
+.apmf-body { padding: 0 0 16px; }
 /* 两排筛选栏（样式真源见 apg-dfilter 共享段） */
-/* 两排筛选栏 MFOOD 壳覆写：品牌accent取品牌橙（与旧排序行下划线同口径） */
+/* 两排筛选栏 MFOOD 壳覆写：品牌accent取品牌橙（与旧排序行下划线同口径）；
+   吸顶与閃蜂一致：头部常驻滚动容器外（flex:none），故栏在 .ap-body 内 top:0 即贴头部下沿
+   （閃蜂搜索行在容器内吸顶才需 top:56px，两壳 top 不可互套）；sticky 仍作下拉面板定位锚点 */
 .apmf-root .apg-dfilter {
   --df-accent: #E8720C;
+  position: sticky; top: 0; z-index: 5;
 }
 .apmf-feed { padding-top: 0; }
 

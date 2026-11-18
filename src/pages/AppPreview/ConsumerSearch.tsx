@@ -602,7 +602,7 @@ export default function ConsumerSearch({
         )}
         {feed === 'groupbuy' && (
           <div className="apq-feed">
-            {/* 團購瀑布流=優選商家/附近好店同構卡：閃蜂=優選商家（神會員标）/ MFOOD=附近好店（勐爆券标） */}
+            {/* 團購瀑布流=優選商家/附近好店同構卡：閃蜂=優選商家（神會員标）/ MFOOD=附近好店（勁爆券标） */}
             {(brand === 'mfood' ? MFOOD_NEAR_SEARCH_STORES : PREFERRED_SEARCH_MERCHANTS).map((item) => (
               <PreferredMerchantCard key={item.key} item={item} layout="small" brand={brand === 'mfood' ? 'mfood' : 'bee'} showProducts />
             ))}

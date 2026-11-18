@@ -13,7 +13,7 @@
  * 距離下拉=时效/范围互斥单选；配送下拉=配送方式/配送保障互斥单选；
  * 面板为左分组页签+右 radio 单选行（复用附近面板视觉）；
  * 选中回写按钮文案并收起面板，再点同项取消；同一时刻只开一个下拉；
- * 綜合排序点击恢复默认（清空距離/配送）；篩選 sheet 六模块（大小图切换上报、时效范围/配送与列表共享、重置清空）。
+ * 綜合排序点击恢复默认（清空距離/配送）；篩選 sheet 七模块（大小图切换上报、时效范围/配送与列表共享、重置清空）。
  */
 import { fireEvent, render, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
@@ -31,7 +31,7 @@ function FilterHarness({ brand, layout, onLayoutChange }: { brand: DeliveryFilte
 }
 
 describe('美食外卖两排筛选栏', () => {
-  it('第一排四项齐备；第二排首项随品牌分流（閃蜂神會員/MFOOD勐爆券）、蜂蜜兌換仅閃蜂', () => {
+  it('第一排四项齐备；第二排首项随品牌分流（閃蜂神會員/MFOOD勁爆券）、蜂蜜兌換仅閃蜂', () => {
     const bee = render(<DeliveryFilterBar brand="bee" />)
     const b = within(bee.container)
     expect(b.getByRole('button', { name: '綜合排序' })).toBeTruthy()
@@ -47,7 +47,7 @@ describe('美食外卖两排筛选栏', () => {
     const mfood = render(<DeliveryFilterBar brand="mfood" />)
     const m = within(mfood.container)
     expect(m.queryByText('神會員')).toBeNull()
-    expect(m.getByText('勐爆券')).toBeTruthy()
+    expect(m.getByText('勁爆券')).toBeTruthy()
     expect(m.queryByText('蜂蜜兌換')).toBeNull()
     expect(m.getByText('收藏送券')).toBeTruthy()
   })
@@ -99,7 +99,7 @@ describe('美食外卖两排筛选栏', () => {
     fireEvent.click(c.getByRole('button', { name: '配送' }))
     const p = within(c.getByRole('group', { name: '配送篩選面板' }))
     expect(p.getByRole('button', { name: '配送保障' })).toBeTruthy()
-    for (const name of ['平台送', '商家送', '自取']) {
+    for (const name of ['平台送', '商家送', '到店自取']) {
       expect(p.getByRole('button', { name })).toBeTruthy()
     }
     // 默认浏览配送：準時寶行不在；切保障页签才在
@@ -144,17 +144,22 @@ describe('美食外卖两排筛选栏', () => {
     expect(c.queryByRole('group', { name: '距離篩選面板' })).toBeNull()
   })
 
-  it('篩選 sheet：六模块齐备、大小图切换上报、时效范围与列表共享、活动优惠无超值換購', () => {
+  it('篩選 sheet：七模块齐备、大小图切换上报、时效范围与列表共享、活动优惠含超值換購', () => {
     const onLayoutChange = vi.fn()
     const { container } = render(<FilterHarness brand="bee" layout="small" onLayoutChange={onLayoutChange} />)
     const c = within(container)
     fireEvent.click(c.getByRole('button', { name: '篩選' }))
     const s = within(c.getByRole('group', { name: '美食外賣篩選面板' }))
-    // 六模块标题齐备（多选模块带 (可多選) 尾缀；h4 直接文本不含子元素内容，故用锚定正则匹配标题本体）
-    for (const title of ['列表大小圖切換', '人均價', '時效範圍', '配送', '品質', '活动优惠']) {
+    // 七模块标题齐备（多选模块带 (可多選) 尾缀；h4 直接文本不含子元素内容，故用锚定正则匹配标题本体）
+    for (const title of ['列表大小圖切換', '人均價', '時效範圍', '配送', '商家', '品質', '活动优惠']) {
       expect(s.getByText(new RegExp(`^${title}$`))).toBeTruthy()
     }
-    expect(s.queryByText(new RegExp('^商家$'))).toBeNull()
+    // 商家模块 2026-11 回补：四选项可多選
+    for (const name of ['必試新店', '金牌商家', '品牌商家', '連鎖商家']) {
+      expect(s.getByRole('button', { name })).toBeTruthy()
+    }
+    fireEvent.click(s.getByRole('button', { name: '金牌商家' }))
+    expect(s.getByRole('button', { name: '金牌商家' }).getAttribute('aria-pressed')).toBe('true')
     // 大小图切换即时上报（瀑布流由父级随 deliveryPageMode 重渲染）
     fireEvent.click(s.getByRole('button', { name: '大圖模式' }))
     expect(onLayoutChange).toHaveBeenCalledWith('large')
@@ -165,11 +170,13 @@ describe('美食外卖两排筛选栏', () => {
     // 人均价滑杆两端值（$0–$100+）
     expect(s.getByText('$0')).toBeTruthy()
     expect(s.getByText('$100+')).toBeTruthy()
-    // 活动优惠=DELIVERY_PROMO_TAGS 真源：蜂蜜兌換閃蜂在、无超值換購；sheet 内锚点 6 处（id6~9/11/12），bar 上 6 处（id1/13/2/3/4/5），合计 12
+    // 活动优惠=DELIVERY_PROMO_TAGS 真源：蜂蜜兌換閃蜂在、超值換購按 2026-11 口径恢复；sheet 内锚点 7 处（id6~12），bar 上 6 处（id1/13/2/3/4/5），合计 13
     expect(s.getByText('蜂蜜兌換')).toBeTruthy()
-    expect(s.queryByText('超值換購')).toBeNull()
-    expect(c.getAllByRole('group', { name: '美食外賣篩選面板' })[0].querySelectorAll('[data-spec-id]')).toHaveLength(6)
-    expect(container.querySelectorAll('[data-spec-id]')).toHaveLength(12)
+    for (const tag of ['組合優惠', '半價優惠', '自取折扣', '集點返券', '超值換購']) {
+      expect(s.getByText(tag)).toBeTruthy()
+    }
+    expect(c.getAllByRole('group', { name: '美食外賣篩選面板' })[0].querySelectorAll('[data-spec-id]')).toHaveLength(7)
+    expect(container.querySelectorAll('[data-spec-id]')).toHaveLength(13)
     // 完成：收起 sheet
     fireEvent.click(s.getByRole('button', { name: /完成/ }))
     expect(c.queryByRole('group', { name: '美食外賣篩選面板' })).toBeNull()
@@ -184,9 +191,10 @@ describe('美食外卖两排筛选栏', () => {
     fireEvent.click(s.getByRole('button', { name: '2KM' }))
     fireEvent.click(s.getByRole('button', { name: '準時寶' }))
     fireEvent.click(s.getByRole('button', { name: '五星好評' }))
-    fireEvent.click(s.getByRole('button', { name: '勐爆券' }))
+    fireEvent.click(s.getByRole('button', { name: '金牌商家' }))
+    fireEvent.click(s.getByRole('button', { name: '勁爆券' }))
     fireEvent.click(s.getByRole('button', { name: '重置' }))
-    for (const name of ['2KM', '準時寶', '五星好評', '勐爆券']) {
+    for (const name of ['2KM', '準時寶', '五星好評', '金牌商家', '勁爆券']) {
       expect(s.getByRole('button', { name }).getAttribute('aria-pressed')).toBe('false')
     }
     expect(c.getByRole('button', { name: '距離' })).toBeTruthy()

@@ -237,10 +237,10 @@ describe('用户端统一搜索页', () => {
     expect(screen.getAllByText('超出範圍')).toHaveLength(1)
     expect(screen.getAllByText(/暫無/).length).toBeGreaterThan(0)
 
-    // 團購瀑布流 = 附近好店（勐爆券标）+ 超出范围/未入驻/开业时间三样例
+    // 團購瀑布流 = 附近好店（勁爆券标）+ 超出范围/未入驻/开业时间三样例
     await user.click(screen.getByRole('tab', { name: /團購/ }))
     expect(screen.getByText('澳門燒味工房🔥-新橋店')).toBeInTheDocument()
-    expect(screen.getAllByText('勐爆券').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('勁爆券').length).toBeGreaterThan(0)
     expect(screen.queryByText('10:00 營業')).not.toBeInTheDocument()
   })
 })

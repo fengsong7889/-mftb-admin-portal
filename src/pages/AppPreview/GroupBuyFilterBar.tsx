@@ -83,9 +83,6 @@ const MORE_PEOPLE = ['單人', '雙人', '3-4 人', '5-10 人', '10 人以上']
 const MORE_PREFS = [
   { key: 'vip', label: '神會員', icon: '👑', tone: 'crown' },
   { key: 'coupon', label: '津貼神券', icon: '🎫', tone: 'coupon' },
-  { key: 'vs', label: '全澳格價', icon: 'VS', tone: 'vs' },
-  { key: 'hot', label: '人氣推薦', icon: '🔥', tone: 'fire' },
-  { key: 'chain', label: '連鎖店鋪', icon: '🏪', tone: 'chain' },
   { key: 'praise', label: '好評高分', icon: '👍', tone: 'thumb' },
   { key: 'service', label: '服務優先', icon: '🛎️', tone: 'service' },
   { key: 'taste', label: '口味優先', icon: '🌶️', tone: 'taste' },
@@ -149,8 +146,8 @@ export function useGroupBuyFilters({
   const { t } = useTranslation()
   /** 商家瀑布流（優選商家/附近好店）vs 券瀑布流（推薦/其它）：showLayoutToggle 仅商家页签 true，复用为模块显隐判据 */
   const merchantFeed = showLayoutToggle
-  /** 偏好优惠：食得健康全瀑布流移除；全澳格價仅商家瀑布流额外移除 */
-  const morePrefOptions = MORE_PREFS.filter((p) => p.key !== 'healthy' && !(merchantFeed && p.key === 'vs'))
+  /** 偏好优惠：食得健康全瀑布流移除（广告类标签 全澳格價/人氣推薦/連鎖店鋪 已按 2026-11-18 口径从清单整体移除） */
+  const morePrefOptions = MORE_PREFS.filter((p) => p.key !== 'healthy')
   /** 当前展开的筛选面板：附近 / 分類 / 排序 / 更多篩選，同一时刻只开一个（null=收起） */
   const [openPanel, setOpenPanel] = useState<'nearby' | 'category' | 'sort' | 'more' | null>(null)
   /** 附近-距离档（单选），null 表示未选距离 */

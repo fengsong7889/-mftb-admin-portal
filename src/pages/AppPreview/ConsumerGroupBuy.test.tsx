@@ -145,9 +145,11 @@ describe('特價團購筛选面板', () => {
     expect(within(panel).getByText('使用人數')).toBeInTheDocument()
     expect(within(panel).getByText(/偏好优惠/)).toBeInTheDocument()
     expect(within(panel).getByText(/店鋪服務/)).toBeInTheDocument()
-    // 偏好优惠：食得健康全瀑布流移除；券类（推薦）保留全澳格價
+    // 偏好优惠：食得健康全瀑布流移除；广告类标签（全澳格價/人氣推薦/連鎖店鋪）已按 2026-11-18 口径整体移除
     expect(within(panel).queryByText('食得健康')).not.toBeInTheDocument()
-    expect(within(panel).getByText('全澳格價')).toBeInTheDocument()
+    expect(within(panel).queryByText('全澳格價')).not.toBeInTheDocument()
+    expect(within(panel).queryByText('人氣推薦')).not.toBeInTheDocument()
+    expect(within(panel).queryByText('連鎖店鋪')).not.toBeInTheDocument()
 
     // 单选胶囊：再点同一个取消
     await user.click(within(panel).getByRole('button', { name: '單人' }))
@@ -219,7 +221,7 @@ describe('特價團購筛选面板', () => {
     expect(screen.getAllByAltText('商家封面')).toHaveLength(5)
   })
 
-  it('優選商家篩選面板：有營業時間模块、无使用人數模块，偏好优惠无食得健康/全澳格價', async () => {
+  it('優選商家篩選面板：有營業時間模块、无使用人數模块，偏好优惠无食得健康与广告类标签', async () => {
     const user = userEvent.setup()
     renderPage()
 
@@ -231,9 +233,11 @@ describe('特價團購筛选面板', () => {
     expect(within(panel).getByRole('button', { name: '0-5 時' })).toBeInTheDocument()
     expect(within(panel).getByRole('button', { name: '24 小時營業' })).toBeInTheDocument()
     expect(within(panel).queryByText('使用人數')).not.toBeInTheDocument()
-    // 偏好优惠：食得健康/全澳格價 均不展示
+    // 偏好优惠：食得健康与广告类标签（全澳格價/人氣推薦/連鎖店鋪）均不展示
     expect(within(panel).queryByText('食得健康')).not.toBeInTheDocument()
     expect(within(panel).queryByText('全澳格價')).not.toBeInTheDocument()
+    expect(within(panel).queryByText('人氣推薦')).not.toBeInTheDocument()
+    expect(within(panel).queryByText('連鎖店鋪')).not.toBeInTheDocument()
     // 其余模块与选项仍在
     expect(within(panel).getByText('人均篩選器')).toBeInTheDocument()
     expect(within(panel).getByText(/偏好优惠/)).toBeInTheDocument()

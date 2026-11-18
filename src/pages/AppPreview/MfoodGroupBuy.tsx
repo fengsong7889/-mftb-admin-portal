@@ -93,7 +93,7 @@ const ROUND_TABS = [
 /** 附近好店页签下标（唯一渲染優選商家同款卡的页签） */
 const TAB_NEAR = 5
 
-/** 附近好店瀑布流（優選商家同款卡 · MFOOD 品牌，红包标渲染为「勐爆券」；数据真源在 consumerMfoodFeed.ts） */
+/** 附近好店瀑布流（優選商家同款卡 · MFOOD 品牌，红包标渲染为「勁爆券」；数据真源在 consumerMfoodFeed.ts） */
 
 /** 瀑布流团购券：数据与首页「特價團購」瀑布流完全一致（复用 MfoodHome.FEED 唯一真源，紫色搶購态同首页） */
 
@@ -324,7 +324,7 @@ export default function MfoodGroupBuy({
         {/* 筛选胶囊行 + 下拉面板（与閃蜂同一真源 GroupBuyFilterBar） */}
         {filters.sortbar}
 
-        {/* ═══ 瀑布流：附近好店页签 → 優選商家同款卡（MFOOD 品牌，红包标「勐爆券」，固定小圖模式）；其余页签 → 團購券瀑布流（同首頁） ═══ */}
+        {/* ═══ 瀑布流：附近好店页签 → 優選商家同款卡（MFOOD 品牌，红包标「勁爆券」，固定小圖模式）；其余页签 → 團購券瀑布流（同首頁） ═══ */}
         {activeTab === TAB_NEAR ? (
           <div className="apq-feed">
             {NEAR_STORES.map((m) => (

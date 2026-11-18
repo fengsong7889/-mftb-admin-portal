@@ -56,11 +56,10 @@ describe('本轮口径调整标记（changed）', () => {
     }
   })
 
-  it('優選商家类模块显隐口径已写进篩選行正文并带本轮标记', () => {
+  it('優選商家类模块显隐口径已写进篩選行正文', () => {
     const row = FILTER_SPECS.find((s) => s.id === 4)!
     expect(row.desc).toContain('營業時間模块仅商家类瀑布流')
     expect(row.desc).toContain('使用人數模块仅券类瀑布流')
-    expect(row.changed?.text).toContain('營業時間')
   })
 })
 
@@ -90,15 +89,15 @@ describe('展示模式行按页面分形与美食外卖页篩選面板', () => {
     }
   })
 
-  it('美食外卖页篩選面板：新增筛选条件逐条说明，蜂蜜兌換閃蜂专属与无超值換購口径在列', () => {
+  it('美食外卖页篩選面板：新增筛选条件逐条说明，蜂蜜兌換閃蜂专属与商家模块回补口径在列', () => {
     const rows = panel('deliveryFilter').defaults
     const labels = rows.map((s) => s.label)
-    for (const label of ['两排筛选栏', '綜合排序', '距離', '配送', '优惠活动标签', '篩選', '列表大小圖切換', '人均價', '時效範圍', '品質', '活动优惠']) {
+    for (const label of ['两排筛选栏', '綜合排序', '距離', '配送', '优惠活动标签', '篩選', '列表大小圖切換', '人均價', '時效範圍', '商家', '品質', '活动优惠']) {
       expect(labels, `篩選面板缺「${label}」行`).toContain(label)
     }
-    expect(labels, '商家模块已按用户口径下线，不应再出现').not.toContain('商家')
+    expect(labels, '商家模块 2026-11 按用户口径回补').toContain('商家')
     expect(rows.some((s) => s.desc.includes('蜂蜜兌換仅閃蜂'))).toBe(true)
-    // 活动优惠第二点「蜂蜜兌換仅閃蜂」走 note 突出显示（橙色警示框）；「无超值換購」的行为守卫在 DeliveryFilterBar.test（sheet 渲染断言）
+    // 活动优惠第二点「蜂蜜兌換仅閃蜂」走 note 突出显示（橙色警示框）；超值換購恢复的行为守卫在 DeliveryFilterBar.test（sheet 渲染断言）
     expect(panel('deliveryFilter').defaults.find((s) => s.id === 12)!.note).toContain('蜂蜜兌換仅閃蜂')
   })
 

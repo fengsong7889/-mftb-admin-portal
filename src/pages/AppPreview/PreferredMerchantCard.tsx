@@ -16,7 +16,7 @@
  * 锚点口径两模式共用同一批 spec id（说明表不分模式）：
  *   id1 店名 / id2 logo / id8 新店飘带（嵌套 id2 内） / id3 评分+人均（两段共用） /
  *   id7 品类·商圈 / id12 距离 / id4 红包标+膨胀标（两段共用） / id11 半年售 / id5 券列表 / id6 收藏钮。
- * 红包标随品牌：閃蜂=「神會員」、MFOOD=「勐爆券」（对齐外卖面板 id16 既有口径），由 brand 下发。
+ * 红包标随品牌：閃蜂=「神會員」、MFOOD=「勁爆券」（对齐外卖面板 id16 既有口径），由 brand 下发。
  *
  * 取色全走全局/页局部令牌（紫标 --purple、橙 --brand、红价 --danger），不新增裸色值。
  */
@@ -110,17 +110,17 @@ function PreferredMeta({ item }: { item: PreferredMerchant }) {
   )
 }
 
-/** 卡片品牌：bee=閃蜂（红包标「神會員」）/ mfood=MFOOD（红包标「勐爆券」） */
+/** 卡片品牌：bee=閃蜂（红包标「神會員」）/ mfood=MFOOD（红包标「勁爆券」） */
 export type PreferredBrand = 'bee' | 'mfood'
 
 /* ─── 标签行：红包标/膨胀标（共用锚点 id4）＋半年售（id11），两模式共用 ───
-   红包标随品牌：閃蜂「神會員」直接复用首页外卖瀑布流同款药丸（apw-pill-shen：👑冠标+粉红渐变，零新样式）；MFOOD「勐爆券」为紫标⚡ */
+   红包标随品牌：閃蜂「神會員」直接复用首页外卖瀑布流同款药丸（apw-pill-shen：👑冠标+粉红渐变，零新样式）；MFOOD「勁爆券」为紫标⚡ */
 function PreferredTags({ item, brand }: { item: PreferredMerchant; brand: PreferredBrand }) {
   return (
     <div className="apq-tags">
       <SpecField panel="preferred" id={4}>
         {brand === 'mfood' ? (
-          <span className="apq-boom">勐爆券<i aria-hidden="true">⚡</i></span>
+          <span className="apq-boom">勁爆券<i aria-hidden="true">⚡</i></span>
         ) : (
           <span className="apw-pill apw-pill-shen">
             <span className="apw-pill-crown" aria-hidden="true">👑</span>
