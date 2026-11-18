@@ -7,14 +7,16 @@ import {
   type LargeLayout, type SkinSaleConfig, type PosterLocale,
 } from '@/constants/popularSkinTemplates'
 import { FALLBACK_POSTER_IMAGES } from './posterImages'
+import { DISH_IMAGES } from './dishImages'
 import './SkinTemplateSection.css'
 
-// 阶段一视觉确认文案，第二阶段统一接入 i18n；店铺与商品均为效果示意。
+// 阶段一视觉确认文案，第二阶段统一接入 i18n；店铺与商品均为效果示意（商品图为示意素材，价格照参考图口径）。
 const DISHES = [
-  { emoji: '🍔', name: '招牌雙層牛堡 · 特惠一人餐', price: '$43.3', original: '$65', bg: 'linear-gradient(135deg, #FFE2B8, #FFAE5E)' },
-  { emoji: '🍟', name: '黃金薯條（大）', price: '$12.9', original: '$19', bg: 'linear-gradient(135deg, #FFF3C4, #FFD662)' },
-  { emoji: '🥤', name: '冰爽可樂（中）', price: '$5.9', original: '$9', bg: 'linear-gradient(135deg, #C9E7FF, #7FB8F0)' },
-  { emoji: '🍦', name: '新地雪糕', price: '$8.9', original: '$12', bg: 'linear-gradient(135deg, #FFE9F0, #FFC1D4)' },
+  { emoji: '🍔', name: '招牌雙層牛堡', price: '$9.9', original: '$280', img: DISH_IMAGES.dish_burger, bg: 'linear-gradient(135deg, #FFE2B8, #FFAE5E)' },
+  { emoji: '🍋', name: '招牌暴打檸檬茶', price: '$29.9', original: '$280', img: DISH_IMAGES.dish_lemon_tea, bg: 'linear-gradient(135deg, #FFF3C4, #FFD662)' },
+  { emoji: '🍟', name: '黃金薯條（大）', price: '$12.9', original: '$19', img: DISH_IMAGES.dish_fries, bg: 'linear-gradient(135deg, #C9E7FF, #7FB8F0)' },
+  { emoji: '🥤', name: '冰爽可樂（中）', price: '$5.9', original: '$9', img: DISH_IMAGES.dish_coke, bg: 'linear-gradient(135deg, #FFE9F0, #FFC1D4)' },
+  { emoji: '🍦', name: '新地雪糕', price: '$8.9', original: '$12', img: DISH_IMAGES.dish_icecream, bg: 'linear-gradient(135deg, #FFF3C4, #FFD662)' },
 ]
 
 /** 严格按来源和语言展示，缺失的自定义图不静默替换成兑底图。兑底图已换真实海报切图，SVG 仅作缺图兑底。 */
@@ -39,41 +41,96 @@ export function SkinPoster({ skin, locale }: { skin: SkinSaleConfig; locale: Pos
   )
 }
 
-function DishCard({ dish }: { dish: typeof DISHES[number] }) {
+/** 商品示意圖（高保真素材，加載失敗回退 emoji 漸變塊） */
+function DishPhoto({ dish }: { dish: typeof DISHES[number] }) {
+  const [failed, setFailed] = useState(false)
+  if (failed) return <span className="skin-stage__food" aria-hidden="true">{dish.emoji}</span>
+  return <img className="skin-stage__dish-photo" src={dish.img} alt="" draggable={false} onError={() => setFailed(true)} />
+}
+
+/** 横滑商品卡：上图下名价（triple/hero 横滑版式，4~5 张溢出裁切表示可滑） */
+function RowDishCard({ dish }: { dish: typeof DISHES[number] }) {
   return (
-    <div className="skin-stage__dish" style={{ background: dish.bg }}>
-      <span className="skin-stage__food" aria-hidden="true">{dish.emoji}</span>
-      <div className="skin-stage__dish-caption">
-        <strong>{dish.price}</strong><del>{dish.original}</del>
-        <span>{dish.name}</span>
+    <div className="skin-stage__row-dish">
+      <div className="skin-stage__row-dish-img" style={{ background: dish.bg }}>
+        <DishPhoto dish={dish} />
       </div>
+      <div className="skin-stage__row-dish-name" title={dish.name}>{dish.name}</div>
+      <div className="skin-stage__row-dish-price"><strong>{dish.price}</strong><del>{dish.original}</del></div>
     </div>
   )
 }
 
 function Dishes({ layout, animate }: { layout: LargeLayout; animate: boolean }) {
   const [current, setCurrent] = useState(0)
+  const rowRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (layout !== 'carousel' || !animate) return
     const timer = window.setInterval(() => setCurrent(value => (value + 1) % DISHES.length), 3000)
     return () => window.clearInterval(timer)
   }, [layout, animate])
+  // 横滑版式在放大预览（autoPlay）中自动滑动，画廊缩略图保持静态裁切
+  useEffect(() => {
+    if (!animate || (layout !== 'triple' && layout !== 'hero')) return
+    const timer = window.setInterval(() => {
+      const el = rowRef.current
+      if (!el) return
+      const max = el.scrollWidth - el.clientWidth
+      if (max <= 4) return
+      el.scrollLeft = el.scrollLeft + 2 >= max ? 0 : el.scrollLeft + 2
+    }, 60)
+    return () => window.clearInterval(timer)
+  }, [layout, animate])
 
   if (layout === 'carousel') {
+    const lead = DISHES[current]
     return (
       <div className="skin-stage__dishes skin-stage__dishes--carousel">
-        {[2, 1, 0].map(depth => (
-          <div className={`skin-stage__slide skin-stage__slide--${depth}`} key={depth}>
-            <DishCard dish={DISHES[(current + depth) % DISHES.length]} />
-          </div>
-        ))}
+        <div className="skin-stage__stack">
+          {[2, 1, 0].map(depth => {
+            const dish = DISHES[(current + depth) % DISHES.length]
+            return (
+              <div className={`skin-stage__slide skin-stage__slide--${depth}`} key={depth}>
+                <div className="skin-stage__dish" style={{ background: dish.bg }}>
+                  <DishPhoto dish={dish} />
+                  {depth === 0 && (
+                    <span className="skin-stage__deal-badge">
+                      <span className="skin-stage__deal-off">🏷️ 7.05折</span>
+                      <span className="skin-stage__deal-price"><strong>{lead.price}</strong><del>{lead.original}</del></span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <div className="skin-stage__below-name" title={lead.name}>{lead.name}</div>
+      </div>
+    )
+  }
+  if (layout === 'triple' || layout === 'hero') {
+    return (
+      <div ref={rowRef} className={`skin-stage__dishes skin-stage__dishes--row skin-stage__dishes--${layout}`}>
+        {DISHES.map(dish => <RowDishCard key={dish.name} dish={dish} />)}
       </div>
     )
   }
   return (
-    <div className={`skin-stage__dishes skin-stage__dishes--${layout}`}>
-      {(layout === 'hero' ? DISHES.slice(0, 1) : DISHES.slice(0, 3)).map(dish => (
-        <DishCard key={dish.name} dish={dish} />
+    <div className="skin-stage__dishes skin-stage__dishes--grid">
+      <div className="skin-stage__lead">
+        <div className="skin-stage__dish" style={{ background: DISHES[0].bg }}>
+          <DishPhoto dish={DISHES[0]} />
+          <div className="skin-stage__dish-caption skin-stage__dish-caption--price">
+            <strong>{DISHES[0].price}</strong><del>{DISHES[0].original}</del>
+          </div>
+        </div>
+        <div className="skin-stage__below-name" title={DISHES[0].name}>{DISHES[0].name}</div>
+      </div>
+      {DISHES.slice(1, 3).map(dish => (
+        <div className="skin-stage__dish" style={{ background: dish.bg }} key={dish.name}>
+          <DishPhoto dish={dish} />
+          <div className="skin-stage__dish-caption"><span>{dish.name}</span></div>
+        </div>
       ))}
     </div>
   )
@@ -118,8 +175,10 @@ export default function SkinTemplatePreview({ skin, autoPlay = false, posterLoca
   const viewportRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
   const small = skin.displayMode === 'small'
+  // triple 版式不使用海报：仅门店LOGO+店铺信息，下方全宽横滑商品卡
+  const logoOnly = !small && skin.layout === 'triple'
   const canvasWidth = small ? 560 : 760
-  const canvasHeight = small ? 140 : 300
+  const canvasHeight = small ? 140 : 470
   const palette = small ? getSmallTemplate(skin.templateKey)
     : getPosterSource(skin) === 'fallback' ? getFallbackPoster(skin.fallbackPosterKey ?? '') : undefined
   const color = palette && 'borderColor' in palette ? palette.borderColor : palette && 'color' in palette ? palette.color : '#E8720C'
@@ -143,18 +202,41 @@ export default function SkinTemplatePreview({ skin, autoPlay = false, posterLoca
     <div className="skin-preview">
       <div ref={viewportRef} className="skin-preview__viewport"
         style={{ maxWidth: canvasWidth, aspectRatio: `${canvasWidth} / ${canvasHeight}` }}>
-        <div className={`skin-stage skin-stage--${skin.displayMode}`}
+        <div className={`skin-stage skin-stage--${skin.displayMode}${logoOnly ? ' skin-stage--logo-only' : ''}`}
           style={{ width: canvasWidth, height: canvasHeight, transform: `scale(${width / canvasWidth})`,
             borderColor: color, backgroundImage, ...appearance }}>
           {small ? (
-            <div className="skin-stage__logo" aria-hidden="true">
-              🍣
-            </div>
-          ) : <SkinPoster skin={skin} locale={locale} />}
-          <div className="skin-stage__body">
-            <MerchantInfo merchantName={merchantName} />
-            {!small && <Dishes key={skin.templateKey} layout={skin.layout ?? 'grid'} animate={autoPlay} />}
-          </div>
+            <>
+              <div className="skin-stage__logo" aria-hidden="true">
+                🍣
+              </div>
+              <div className="skin-stage__body">
+                <MerchantInfo merchantName={merchantName} />
+              </div>
+            </>
+          ) : logoOnly ? (
+            <>
+              <div className="skin-stage__top">
+                <div className="skin-stage__logo skin-stage__logo-block" aria-hidden="true">🍣</div>
+                <div className="skin-stage__body">
+                  <MerchantInfo merchantName={merchantName} />
+                </div>
+              </div>
+              <Dishes key={skin.templateKey} layout="triple" animate={autoPlay} />
+            </>
+          ) : (
+            <>
+              {/* 海报来源规则不变（兜底/自定义），门店LOGO 为店铺数据叠在海报顶部 */}
+              <div className="skin-stage__poster-wrap">
+                <SkinPoster skin={skin} locale={locale} />
+                <div className="skin-stage__logo skin-stage__poster-logo" aria-hidden="true">🍣</div>
+              </div>
+              <div className="skin-stage__body">
+                <MerchantInfo merchantName={merchantName} />
+                <Dishes key={skin.templateKey} layout={skin.layout ?? 'grid'} animate={autoPlay} />
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

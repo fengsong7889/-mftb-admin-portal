@@ -366,6 +366,12 @@ export default function SkinTemplateSection({
                   {LARGE_SKIN_TEMPLATES.find(t => t.key === selectedSkin.templateKey)?.description}
                 </div>
 
+                {selectedSkin.layout === 'triple' && (
+                  <div className="skin-config__poster-local-hint">
+                    本版式僅展示門店LOGO與橫滑商品卡，無需配置海報。
+                  </div>
+                )}
+                {selectedSkin.layout !== 'triple' && (<>
                 {fieldLabel(t('recommend.popularSkin.posterLabel'), true)}
                 <div className="skin-config__poster-modes" role="group" aria-label={t('recommend.popularSkin.posterSource')}>
                   {(['fallback', 'custom'] as const).map(source => (
@@ -425,6 +431,7 @@ export default function SkinTemplateSection({
                     </div>
                   </div>
                 )}
+                </>)}
               </>
             )}
 

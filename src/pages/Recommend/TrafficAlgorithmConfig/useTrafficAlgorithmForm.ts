@@ -3,7 +3,7 @@ import { message, type FormInstance } from 'antd'
 import { useTranslation } from 'react-i18next'
 import { appTypeToBrand, brandToAppType, createAdAlgorithm, fetchAdAlgorithmDetail, updateAdAlgorithm, type AdAlgorithmRequest } from '@/api/adPromotion'
 import { AlgorithmType } from '@mftb/contracts/recommendConstants'
-import { isParamsObject, readTrafficParams, serializeTrafficParams, TRAFFIC_FIELD_NAMES, type TrafficFormIssue } from './config'
+import { isParamsObject, readTrafficParams, buildTrafficParams, TRAFFIC_FIELD_NAMES, type TrafficFormIssue } from './config'
 
 interface Options {
   enabled: boolean
@@ -90,8 +90,8 @@ export default function useTrafficAlgorithmForm({ enabled, algorithmId, readOnly
         algoName: values.name,
         algoType: AlgorithmType.TRAFFIC_AD,
         brand: appTypeToBrand(values.brand),
-        // 仅覆写投流字段，保留接口可能附带的历史扩展配置。
-        params: { ...originalParams.current, ...serializeTrafficParams(values) },
+        // 旧字段归档后再合并，避免顶层旧参数重新影响当前配置。
+        params: buildTrafficParams(values, originalParams.current),
       }
       if (algorithmId) await updateAdAlgorithm(Number(algorithmId), payload)
       else await createAdAlgorithm(payload)

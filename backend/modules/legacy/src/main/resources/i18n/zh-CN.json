@@ -9332,7 +9332,258 @@
     "selectPlaceholder": "请选择",
     "weightedRandomDesc": "按权重随机分配，权重越大被选中概率越高",
     "consistencyCheckInterval": "校验间隔",
-    "selectAlgorithmNameFirst": "请先选择算法名称"
+    "selectAlgorithmNameFirst": "请先选择算法名称",
+    "trafficCfg": {
+      "field": {
+        "statusOpen": "纳入营业中商家",
+        "statusRest": "纳入暂时休息商家",
+        "statusOverwhelmed": "纳入爆单暂停接单商家",
+        "statusClosed": "纳入已打烊商家",
+        "soldOutFilterEnabled": "售罄与下架过滤",
+        "consistencyCheckInterval": "数据一致性检查周期",
+        "productCheckInterval": "商品可用性检查周期",
+        "merchantExposureStrategy": "当前保存的曝光策略",
+        "merchantKeywordStatsMode": "商家标签统计范围",
+        "merchantKeywordStatsDays": "商家统计周期",
+        "userKeywordStatsMode": "用户标签统计范围",
+        "userKeywordStatsDays": "用户统计周期",
+        "userPreferenceMinScore": "用户偏好识别最低分",
+        "merchantPreferenceMinScore": "商家偏好识别最低分",
+        "matchThreshold": "偏好标签覆盖率门槛",
+        "maxUserTags": "参与匹配的标签上限",
+        "explorationSlots": "新偏好探索标签数",
+        "maxMerchantsPerKeyword": "同标签商家展示上限",
+        "merchantFreqHours": "同商家统计窗口",
+        "merchantFreqTimes": "同商家最多展示",
+        "keywordFreqHours": "同标签统计窗口",
+        "keywordFreqTimes": "同标签最多展示",
+        "merchantDecayDays": "商家标签衰减周期",
+        "merchantDecayPoints": "商家标签每次减分",
+        "merchantRetainedTagCount": "商家保留最热标签数",
+        "merchantTagIdleClearDays": "商家保留标签清理天数",
+        "userDecayDays": "用户标签衰减周期",
+        "userDecayPoints": "用户标签每次减分",
+        "userRetainedTagCount": "用户保留最热标签数",
+        "userTagIdleClearDays": "用户保留标签清理天数",
+        "newTagBoostMultiplier": "新标签有效分加速倍数",
+        "maxBoostTagCount": "同时加速标签上限",
+        "generativeRecommendEnabled": "浏览后相似推荐",
+        "generativeTriggerMode": "触发条件",
+        "dwellTimeThreshold": "停留时长门槛",
+        "generativeTriggerScope": "触发范围",
+        "generativeMerchantCount": "每次推荐商家数量",
+        "generativePriorityMode": "第 1 家优先级",
+        "generativePriorityMode2": "第 2 家优先级",
+        "generativeDailyLimitMode": "单用户每日触发限制",
+        "generativeDailyLimit": "单用户每日触发上限",
+        "generativeSkipMerchantCount": "再次触发前跳过商家点击",
+        "newUserDimensions": "冷启动排序维度",
+        "qualityScoreThreshold": "商家质量分门槛",
+        "regionPopularStatsDays": "热门度统计周期",
+        "popularityMetrics": "热门度指标",
+        "regionPopularTopPercent": "区域热门度前百分比",
+        "completionRateThreshold": "订单完成率门槛",
+        "completionMinOrderCount": "完成率最低订单样本",
+        "remainingTrafficDirection": "流量包排序方向",
+        "newMerchantBoostEnabled": "新商家冷启动扶持",
+        "newMerchantDays": "新商家判定天数",
+        "newMerchantExplorationSlots": "新商家探索坑位",
+        "similarRecModes": "推荐模式",
+        "similarityMetric": "相似度算法",
+        "similarityThreshold": "相似度门槛",
+        "categoryMatchLevel": "类目匹配层级",
+        "coldStartRegionScope": "区域召回范围",
+        "rankPreset": "排序策略",
+        "rankFactors": "参与排序因子",
+        "rankWeightMatch": "权重·匹配分",
+        "rankWeightTraffic": "权重·流量余量",
+        "rankWeightQuality": "权重·质量分",
+        "rankWeightDistance": "权重·距离",
+        "rankTieBreak": "同分决胜",
+        "rankPoolSize": "候选池上限",
+        "mealPeriodPriorityEnabled": "时段优先",
+        "mealPeriodFallback": "候选不足补齐",
+        "similarRankMode": "优先级来源",
+        "similarRankPreset": "独立排序策略",
+        "similarRankFactors": "独立参与因子",
+        "similarRankWeightMatch": "独立权重·匹配分",
+        "similarRankWeightTraffic": "独立权重·流量余量",
+        "similarRankWeightQuality": "独立权重·质量分",
+        "similarRankWeightDistance": "独立权重·距离",
+        "similarRankTieBreak": "独立同分决胜",
+        "similarRankScope": "排序范围",
+        "similarAnchor": "相似度锚点",
+        "similarBlendRatio": "融合时商家权重",
+        "similarChainEnabled": "允许对推荐商家再次触发",
+        "similarChainDepth": "链式触发最大层数"
+      },
+      "opt": {
+        "generativeTriggerMode": {
+          "instant": "点击即触发",
+          "dwell": "停留达到时长后触发"
+        },
+        "generativeTriggerScope": {
+          "all": "全部坑位（含非投流）",
+          "trafficOnly": "仅投流坑位"
+        },
+        "generativeDailyLimitMode": {
+          "limited": "限制次数",
+          "unlimited": "不限制"
+        },
+        "newUserDimensions": {
+          "remainingTraffic": "剩余流量包",
+          "qualityScore": "商家质量分",
+          "regionPopular": "区域热门度",
+          "completionRate": "订单完成率",
+          "distance": "距离"
+        },
+        "popularityMetrics": {
+          "orderCount": "下单数",
+          "visitCount": "访问量",
+          "repurchaseRate": "复购率"
+        },
+        "remainingTrafficDirection": {
+          "moreFirst": "剩余多优先",
+          "lessFirst": "剩余少优先"
+        },
+        "similarRecModes": {
+          "merchantSimilar": "商家相似推荐",
+          "userSimilar": "用户相似推荐",
+          "sameCategory": "同类目商家推荐"
+        },
+        "similarityMetric": {
+          "cosine": "余弦相似度",
+          "weightedJaccard": "加权 Jaccard"
+        },
+        "categoryMatchLevel": {
+          "primary": "一级类目",
+          "secondary": "二级类目"
+        },
+        "coldStartRegionScope": {
+          "delivery": "配送范围内",
+          "tradeArea": "用户所在商圈"
+        },
+        "rankPreset": {
+          "matchFirst": "匹配优先",
+          "consumeFirst": "消耗优先",
+          "custom": "自定义因子"
+        },
+        "mealPeriodFallback": {
+          "adjacent": "相邻时段投流商家",
+          "any": "全时段投流商家"
+        },
+        "similarRankMode": {
+          "inherit": "沿用投流坑位排序",
+          "independent": "独立配置"
+        },
+        "similarRankPreset": {
+          "matchFirst": "匹配优先",
+          "consumeFirst": "消耗优先",
+          "custom": "自定义因子"
+        },
+        "similarRankScope": {
+          "shared": "沿用共用排序规则",
+          "similarityOnly": "仅按相似度排序"
+        },
+        "similarAnchor": {
+          "clickedMerchant": "被点击商家标签向量",
+          "user": "当前用户标签向量",
+          "blend": "商家＋用户融合"
+        }
+      },
+      "unit": {
+        "u5206": "分钟",
+        "u5929": "天",
+        "u25": "%",
+        "u4e2a": "个",
+        "u5bb6": "家",
+        "u5c0f": "小时",
+        "u6b21": "次",
+        "u500d": "倍",
+        "u79d2": "秒",
+        "u5355": "单",
+        "u5c42": "层"
+      },
+      "group": {
+        "availability": "基础与可用性",
+        "matching": "标签与兴趣匹配",
+        "coldStart": "冷启动推荐",
+        "similarRec": "相似推荐",
+        "frequency": "频控与触发",
+        "ranking": "投流坑位排序"
+      },
+      "cap": {
+        "c1": "偏好门槛",
+        "c2": "探索标签",
+        "c3": "相似度算法（算法级）",
+        "c4": "商家标签衰减",
+        "c5": "用户标签衰减",
+        "c6": "同商家去重",
+        "c7": "相似推荐触发频次",
+        "c8": "时段优先",
+        "c9": "坑位内打分与填充",
+        "c10": "区域召回范围",
+        "c11": "推荐模式",
+        "c12": "相似度准入与锚点（商家相似／用户相似）",
+        "c13": "同类目推荐（同类目商家推荐）",
+        "c14": "触发条件",
+        "c15": "推荐数量",
+        "c16": "插入优先级",
+        "c17": "独立优先级打分"
+      },
+      "badge": {
+        "dir": "方向可配",
+        "fixed": "固定生效",
+        "none": "无需额外配置",
+        "n": "{{n}} 项配置"
+      },
+      "on": "开启",
+      "off": "关闭",
+      "allHistory": "全部历史",
+      "fixed": "固定口径",
+      "trial": {
+        "t23": "用户达标偏好标签总数",
+        "t24": "商家覆盖的偏好标签数",
+        "t25": "初始分",
+        "t26": "经过天数 t",
+        "t27": "用户分",
+        "t28": "商家分",
+        "t29": "余量比",
+        "t30": "质量分",
+        "t31": "距离",
+        "t32": "匹配分",
+        "t33": "余量比",
+        "t34": "质量分",
+        "t35": "距离",
+        "t36": "最大配送距离",
+        "t37": "A 剩余曝光量",
+        "t38": "B 剩余曝光量",
+        "t39": "C 剩余曝光量"
+      },
+      "pending": "待配置",
+      "overview": "投流配置概览",
+      "delivery": "外卖到家",
+      "dt": {
+        "17": "标签统计",
+        "18": "兴趣门槛",
+        "19": "单用户频控",
+        "20": "相似推荐",
+        "21": "坑位排序"
+      },
+      "merchant": "商家",
+      "user": "用户",
+      "matchFirst": "匹配优先",
+      "consumeFirst": "消耗优先",
+      "sel": "入选",
+      "unsel": "未入选",
+      "addRow": "加一行",
+      "qual": "达标",
+      "unqual": "未达标",
+      "counted": "计入",
+      "rejected": "落选",
+      "slotRank": "坑位排序",
+      "indepPriority": "独立优先级"
+    }
   },
   "trafficSandbox": {
     "conditionTitle": "推演条件",

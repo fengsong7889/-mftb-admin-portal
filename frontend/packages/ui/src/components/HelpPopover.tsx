@@ -43,6 +43,8 @@ interface HelpPopoverProps {
   placement?: 'top' | 'topLeft' | 'topRight' | 'bottom' | 'bottomLeft' | 'bottomRight' | 'right' | 'left'
   /** 浮层正文宽度，默认 360 */
   width?: number
+  /** 浮层正文最大高度（可选）：超出后内部滚动，避免长说明撑出屏幕看不全 */
+  maxHeight?: number
   /** 自定义触发节点；传入后替代默认问号图标（ariaLabel 仍会加到该节点上） */
   children?: ReactNode
 }
@@ -76,7 +78,7 @@ function SectionCard({ section }: { section: HelpSection }) {
 }
 
 export default function HelpPopover({
-  title, content, ariaLabel, icon = 'question', placement = 'top', width = 360, children,
+  title, content, ariaLabel, icon = 'question', placement = 'top', width = 360, maxHeight, children,
 }: HelpPopoverProps) {
   const body = isSections(content) ? (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -96,7 +98,7 @@ export default function HelpPopover({
       placement={placement}
       overlayStyle={{ maxWidth: width + 40 }}
       title={<span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-1)' }}>{title}</span>}
-      content={<div style={{ width }}>{body}</div>}
+      content={<div style={{ width, ...(maxHeight ? { maxHeight, overflowY: 'auto' as const } : {}) }}>{body}</div>}
     >
       {children ?? (
         <TriggerIcon aria-label={ariaLabel} style={{ color: 'var(--text-3)', cursor: 'pointer', marginLeft: 4 }} />

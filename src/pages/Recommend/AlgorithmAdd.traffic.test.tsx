@@ -8,7 +8,7 @@ import { ALGORITHM_TYPE_OPTIONS, AlgorithmType, RecommendChannel } from '@mftb/c
 import MenuTabs from '@/components/MenuTabs'
 
 const api = vi.hoisted(() => ({ fetch: vi.fn(), create: vi.fn(), update: vi.fn(), t: (key: string) => key, i18n: { language: 'zh-TW' } }))
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: api.t, i18n: api.i18n }) }))
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: api.t, i18n: api.i18n }), initReactI18next: { type: '3rdParty', init: () => {} } }))
 vi.mock('@/contexts/MenuContext', () => ({ useMenu: () => ({ menuTree: null, status: 'online' }) }))
 vi.mock('@/components/Sidebar', () => ({ pathToKey: {} }))
 vi.mock('antd', async importOriginal => ({
@@ -278,8 +278,11 @@ describe('算法库父页面投流接入', () => {
     await waitFor(() => expect(api.update).toHaveBeenCalledTimes(1))
     expect(api.update.mock.calls[0]).toEqual([7, expect.objectContaining({
       algoName: '实际父页面投流', algoType: 15, brand: 'flashBee',
-      params: expect.objectContaining({ statusRest: true, consistencyCheckInterval: 15, merchantExposureStrategy: 'trafficProportional' }),
+      // 曝光策略已退役：保存时归档到 legacyTrafficParams，不再回顶层
+      params: expect.objectContaining({ statusRest: true, consistencyCheckInterval: 15, trafficConfigVersion: 3,
+        legacyTrafficParams: expect.objectContaining({ merchantExposureStrategy: 'trafficProportional' }) }),
     })])
+    expect(api.update.mock.calls[0][1].params).not.toHaveProperty('merchantExposureStrategy')
     await waitFor(() => expect(screen.getByLabelText('当前路由').textContent).toBe('/promotion-algorithm'), { timeout: 5000 })
   })
 

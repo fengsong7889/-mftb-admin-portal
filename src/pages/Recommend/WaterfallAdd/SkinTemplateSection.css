@@ -90,6 +90,55 @@
   color: var(--text-3);
 }
 
+/* ---- 大图：海报外框（门店LOGO 叠顶部，海报来源规则不变） ---- */
+
+.skin-stage__poster-wrap {
+  position: relative;
+  width: 190px;
+  flex-shrink: 0;
+  align-self: stretch;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.skin-stage__poster-wrap .skin-studio__poster {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+}
+
+.skin-stage__poster-logo {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 88px;
+  height: 88px;
+  align-self: auto;
+  border-radius: 18px;
+  font-size: 40px;
+  box-shadow: var(--shadow-1);
+}
+
+/* ---- triple：门店LOGO 块 + 顶部信息行，下方全宽横滑商品卡 ---- */
+
+.skin-stage--logo-only {
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skin-stage__top {
+  display: flex;
+  gap: 12px;
+}
+
+.skin-stage__logo-block {
+  width: 170px;
+  height: 150px;
+  align-self: flex-start;
+  border-radius: 18px;
+  font-size: 56px;
+}
+
 /* ---- 右侧内容区 ---- */
 
 .skin-stage__body {
@@ -220,37 +269,75 @@
   min-height: 0;
 }
 
-/* grid: 1大2小（大图拼列）—— 左侧大图跨两行占满高度，右侧两张小图上下排列 */
+/* grid: 1大2小（大图拼列）—— 左大图跨两行、价叠图上名在图下，右两小图上下排列 */
 .skin-stage__dishes--grid {
   display: grid;
   grid-template-columns: 2fr 1fr;
   grid-template-rows: 1fr 1fr;
-  gap: 6px;
+  gap: 8px;
 }
 
-.skin-stage__dishes--grid .skin-stage__dish:first-child {
+.skin-stage__lead {
   grid-row: 1 / span 2;
-}
-
-/* triple: 三图等宽 */
-.skin-stage__dishes--triple {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-}
-
-/* hero: 单张大图铺满整行 */
-.skin-stage__dishes--hero {
   display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
 }
 
-.skin-stage__dishes--hero .skin-stage__dish {
+.skin-stage__lead .skin-stage__dish {
   flex: 1;
+  min-height: 0;
 }
 
-/* carousel: 阶梯堆叠 */
+/* row: 横滑商品卡（triple 全宽渐变底 3张完整+第4张露出 / hero 右侧 2张完整+第3张露一半） */
+.skin-stage__dishes--row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.skin-stage__dishes--row::-webkit-scrollbar {
+  display: none;
+}
+
+.skin-stage__dishes--triple {
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, var(--warning-soft), var(--brand));
+}
+
+.skin-stage__dishes--triple .skin-stage__row-dish {
+  flex: 0 0 28%;
+}
+
+.skin-stage__dishes--hero {
+  gap: 14px;
+}
+
+.skin-stage__dishes--hero .skin-stage__row-dish {
+  flex: 0 0 37%;
+}
+
+/* carousel: 发牌式阶梯堆叠（前卡 68%，后两张依次右移 17% 露出边缘，层层垫底）+ 底部名称行 */
 .skin-stage__dishes--carousel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.skin-stage__dishes--carousel .skin-stage__below-name {
+  margin-top: 20px;
+  font-size: 12px;
+}
+
+.skin-stage__stack {
   position: relative;
+  flex: 1;
+  min-height: 0;
 }
 
 /* ---- 商品卡 ---- */
@@ -268,6 +355,14 @@
 
 .skin-stage__food {
   font-size: 36px;
+}
+
+/* 商品示意圖铺满图区（加載失败回退 emoji 由容器居中承接） */
+.skin-stage__dish-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .skin-stage__dish-caption {
@@ -300,20 +395,137 @@
   white-space: nowrap;
 }
 
+/* 价格叠层（grid 大图仅叠价格） */
+.skin-stage__dish-caption--price {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 4px;
+}
+
+/* 图下名称行（grid 大图 / carousel 底部） */
+.skin-stage__below-name {
+  font-size: 12px;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* carousel 前卡折扣角标（双段式：浅粉段折扣 + 红渐变段大价格，跨出图片下缘，参照设计稿） */
+.skin-stage__slide .skin-stage__dish {
+  overflow: visible;
+}
+
+.skin-stage__slide .skin-stage__dish-photo {
+  border-radius: 6px;
+}
+
+.skin-stage__deal-badge {
+  position: absolute;
+  left: 12px;
+  bottom: -16px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.skin-stage__deal-off {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.skin-stage__deal-price {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 4px 14px;
+  background: linear-gradient(135deg, var(--danger), var(--brand));
+  color: var(--on-brand);
+}
+
+.skin-stage__deal-price strong {
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.skin-stage__deal-price del {
+  font-size: 14px;
+  opacity: 0.85;
+}
+
+/* ---- 横滑商品卡（上图下名价） ---- */
+
+.skin-stage__row-dish {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.skin-stage__row-dish-img {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.skin-stage__row-dish-img .skin-stage__food {
+  font-size: 32px;
+}
+
+.skin-stage__row-dish-name {
+  padding: 5px 8px 0;
+  font-size: 13px;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skin-stage__row-dish-price {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 2px 8px 8px;
+}
+
+.skin-stage__row-dish-price strong {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--danger);
+}
+
+.skin-stage__row-dish-price del {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
 /* ---- carousel 堆叠卡片 ---- */
 
 .skin-stage__slide {
   position: absolute;
   left: 0;
-  top: 20px;
-  bottom: 6px;
-  width: 60%;
+  top: 0;
+  bottom: 0;
+  width: 68%;
   transform-origin: left center;
   transition: transform 0.5s ease, opacity 0.5s ease;
 }
 
 .skin-stage__slide .skin-stage__dish {
-  border: 2px solid #fff;
+  border: 2px solid var(--surface-2);
   box-shadow: var(--shadow-btn-active);
 }
 
@@ -321,18 +533,21 @@
   z-index: 3;
 }
 
+/* 发牌式扇形梯度：后两张依次右移露边、顶边下沉/底边上提逐级缩小（参照设计稿） */
 .skin-stage__slide--1 {
   z-index: 2;
-  left: 21%;
-  transform: translateY(-10px) scale(0.9);
-  opacity: 0.95;
+  left: 17%;
+  top: 6px;
+  bottom: 8px;
+  opacity: 0.97;
 }
 
 .skin-stage__slide--2 {
   z-index: 1;
-  left: 43%;
-  transform: translateY(-20px) scale(0.8);
-  opacity: 0.85;
+  left: 34%;
+  top: 12px;
+  bottom: 16px;
+  opacity: 0.92;
 }
 
 /* ==================== 全宽模板画廊 ==================== */
