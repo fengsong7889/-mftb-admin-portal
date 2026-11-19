@@ -1035,7 +1035,7 @@
     "accountDisabledOk": "「…………うん、分かったよ」",
     "accountDisabledTitle": "アカウントが無効化されました",
     "alipay": "Alipay",
-    "captchaRequiredHint": "アカウント保護のため、連続でログインに失敗した後は、次回ログイン前にスライダー認証を完了する必要があります",
+    "captchaRequiredHint": "アカウントの安全を確保するため、連続してログインに失敗した場合、次回ログイン時にスライダーによるセキュリティ認証を完了する必要があります。",
     "empIdLabel": "ログイン作業番号",
     "empIdPlaceholder": "勤務先IDを入力してください",
     "empIdRequired": "勤務先IDを入力してください",

@@ -123,6 +123,7 @@ cpm.ai-enabled: true                             # 环境级 AI 上限（场景�
 cpm.asr.base-url/api-key/model: ${CPM_ASR_*:}    # 录音转写三件套；留空=录音入口置灰（fail-closed），粘贴不受影响
 cpm.portal-base-url: ${CPM_PORTAL_BASE_URL:}     # 钉钉卡片站内链接前缀；生产必须配公网可达地址
 cpm.enabled: ${CPM_ENABLED:true}                 # 系统级总开关（回滚通道）：false=5 个 cpm 菜单启动置隐 + /api/cpm/** 全量拒绝，只停本系统、不回滚代码
+cpm.rdm-sync-enabled: ${CPM_RDM_SYNC_ENABLED:false}  # 阶段三 RDM 进度回写总闸：默认关（新功能上线即改别人的交付真值是不负责任的）。关掉时条目侧回写照常保存，徽标显示「系統未開啟回寫」并说明原因；打开后回写委派 RDM 的 updateTaskProgress（写 rdm_task_progress_log + 触发交付项阶段重算），受 RDM 全部护栏约束
 ```
 
 > ⚠️ **连接串完全由环境变量决定，仓内不内置任何可用数据库**：

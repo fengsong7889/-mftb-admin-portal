@@ -396,3 +396,667 @@
   font-size: 12px;
   color: var(--text-3);
 }
+
+/* ============================================================================
+   阶段三 · 汇报公文式阅读面
+   版式对齐「会议纪要」正文卡（居中宋体抬头 + 双线 + 身份行 + 连续编号章节），
+   但色值全部走主题令牌而不是纪要里那几处裸色——新写一份不等于照搬欠账，
+   裸色棘轮只降不升，这里如果抄 #595959/#8c8c8c/#d9d9d9 会直接把门禁打回。
+   ========================================================================== */
+
+.cpm-document {
+  color: var(--text-1);
+  font-size: 14px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.cpm-document--sheet {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: clamp(16px, 4vw, 40px);
+  background: var(--surface-2);
+  border: 1px solid var(--border-1);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.cpm-document__historical {
+  margin-bottom: 16px;
+}
+
+.cpm-document__eyebrow {
+  display: grid;
+  grid-template-columns: minmax(36px, 1fr) auto minmax(84px, 1fr);
+  align-items: center;
+  gap: 8px;
+  color: var(--text-2);
+}
+
+.cpm-document__brand {
+  display: contents;
+  color: var(--text-1);
+}
+
+.cpm-document__brand > span:first-child {
+  justify-self: start;
+  display: flex;
+}
+
+/* 宋体抬头是这套版式的识别特征，属刻意保留的排版字体而不是主题色 */
+.cpm-document__brand > span:nth-child(2) {
+  font-family: 'Songti SC', 'Songti TC', 'Noto Serif CJK TC', 'PMingLiU', serif;
+  font-size: clamp(20px, 2.5vw, 26px);
+  font-weight: 600;
+  letter-spacing: 5px;
+  text-align: center;
+  color: var(--brand);
+}
+
+.cpm-document__english-title {
+  justify-self: end;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-align: right;
+}
+
+.cpm-document__rule {
+  height: 0;
+  margin-top: 16px;
+  border-top: 3px double var(--text-2);
+}
+
+.cpm-document__title {
+  margin: 24px 0 20px;
+  font-size: clamp(20px, 2.5vw, 26px);
+  line-height: 1.6;
+  font-weight: 700;
+  text-align: center;
+  color: var(--text-1);
+}
+
+.cpm-document__identity {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  padding-bottom: 10px;
+  color: var(--text-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cpm-document__identity--foot {
+  margin-top: 20px;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--border-1);
+}
+
+.cpm-document__edition {
+  margin-left: auto;
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+.cpm-document__metadata {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+  gap: 1px;
+  margin: 8px 0 0;
+  padding: 0;
+  border: 1px solid var(--text-3);
+  background: var(--border-1);
+}
+
+.cpm-document__metadata > div {
+  display: grid;
+  grid-template-columns: minmax(96px, max-content) minmax(0, 1fr);
+  min-width: 0;
+  background: var(--surface-2);
+}
+
+.cpm-document__metadata > .cpm-document__metadata-wide {
+  grid-column: 1 / -1;
+}
+
+.cpm-document__label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 8px;
+  border-right: 1px solid var(--border-1);
+  background: var(--surface-3);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.cpm-document__metadata dd {
+  margin: 0;
+  min-width: 0;
+  padding: 10px 12px;
+  color: var(--text-1);
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+.cpm-document__section {
+  margin-top: 24px;
+}
+
+/* 章节靠编号与下划线区分，不用彩色卡片：一份要导出给人读的汇报首先是文件 */
+.cpm-document__section-title {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  margin: 0 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-1);
+  color: var(--text-1);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.cpm-document__section-number {
+  color: var(--brand);
+}
+
+.cpm-document__section-extra {
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.cpm-document__group {
+  margin-bottom: 14px;
+}
+
+.cpm-document__group-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 6px;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cpm-document__group-meta {
+  color: var(--text-3);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.cpm-document__entry {
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--border-1);
+}
+
+.cpm-document__entry:last-child {
+  border-bottom: none;
+}
+
+.cpm-document__entry-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.cpm-document__entry-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+.cpm-document__entry-progress {
+  flex: 0 0 auto;
+  color: var(--text-2);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cpm-document__entry-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  color: var(--text-3);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cpm-document__trail {
+  color: var(--text-2);
+}
+
+.cpm-document__note {
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.cpm-document__empty {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.cpm-document__summary {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border-1);
+  border-radius: 6px;
+  background: var(--surface-3);
+  white-space: pre-wrap;
+}
+
+.cpm-document__segments {
+  display: grid;
+  gap: 2px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cpm-document__segments li {
+  display: flex;
+  gap: 10px;
+  color: var(--text-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cpm-document__segment-range {
+  flex: 0 0 118px;
+}
+
+.cpm-document__segment-minutes {
+  flex: 0 0 76px;
+  text-align: right;
+}
+
+.cpm-document__segment-note {
+  min-width: 0;
+  color: var(--text-3);
+}
+
+.cpm-document__tag {
+  margin: 0;
+  padding: 0 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.cpm-document__tag--doing {
+  color: var(--info);
+  background: var(--info-soft);
+  border-color: var(--info-border);
+}
+
+.cpm-document__tag--todo {
+  color: var(--warning-deep);
+  background: var(--warning-soft);
+  border-color: var(--warning-border-soft);
+}
+
+.cpm-document__tag--done {
+  color: var(--success-deep);
+  background: var(--success-soft);
+  border-color: var(--success-border-soft);
+}
+
+.cpm-document__tag--blocked {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-color: var(--danger-border);
+}
+
+.cpm-document__tag--deferred {
+  color: var(--purple);
+  background: var(--purple-soft);
+  border-color: var(--purple-border);
+}
+
+/* 已取消是中性事实而不是错误：给它红色会让人不敢取消，进而长出僵尸待办 */
+.cpm-document__tag--cancelled {
+  color: var(--text-3);
+  background: var(--surface-1);
+  border-color: var(--border-1);
+}
+
+.cpm-document__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-1);
+}
+
+/* ============================ 工时汇总区 ============================ */
+
+.cpm-time-stats {
+  display: grid;
+  gap: 16px;
+}
+
+.cpm-time-stats--empty {
+  padding: 12px;
+  border: 1px dashed var(--border-1);
+  border-radius: 6px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.cpm-time-stats__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(168px, 100%), 1fr));
+  gap: 1px;
+  border: 1px solid var(--border-1);
+  background: var(--border-1);
+}
+
+.cpm-time-stats__cell {
+  padding: 12px 14px;
+  background: var(--surface-2);
+}
+
+.cpm-time-stats__value {
+  color: var(--brand);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+
+.cpm-time-stats__label {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.cpm-time-stats__block-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.cpm-time-stats__block-title {
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cpm-time-stats__block-extra {
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cpm-time-stats__stack {
+  display: flex;
+  height: 14px;
+  border: 1px solid var(--border-1);
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--surface-3);
+}
+
+.cpm-time-stats__stack-seg {
+  min-width: 2px;
+  height: 100%;
+}
+
+.cpm-time-stats__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-top: 8px;
+}
+
+.cpm-time-stats__legend-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--text-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cpm-time-stats__legend-item i {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  align-self: center;
+}
+
+.cpm-time-stats__legend-item em {
+  color: var(--text-3);
+  font-style: normal;
+}
+
+.cpm-time-stats__footnote {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+/* 趋势柱：CSS 自绘而不是图表库——导出走浏览器截图，canvas 图表在克隆节点里会成空白块 */
+.cpm-time-trend {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 96px;
+  padding: 8px 10px 0;
+  border: 1px solid var(--border-1);
+  border-radius: 6px;
+  background: var(--surface-3);
+  overflow-x: auto;
+}
+
+.cpm-time-trend__col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1 0 26px;
+  height: 100%;
+}
+
+.cpm-time-trend__track {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  flex: 1 1 auto;
+  width: 100%;
+}
+
+.cpm-time-trend__bar {
+  width: 60%;
+  max-width: 18px;
+  min-height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--brand);
+  transition: height 0.3s ease;
+}
+
+.cpm-time-trend__bar--zero {
+  background: var(--border-1);
+}
+
+.cpm-time-trend__date {
+  color: var(--text-3);
+  font-size: 10px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.cpm-time-top {
+  display: grid;
+  gap: 6px;
+}
+
+.cpm-time-top__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cpm-time-top__title {
+  flex: 0 1 46%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-1);
+  font-size: 13px;
+}
+
+.cpm-time-top__track {
+  flex: 1 1 auto;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-1);
+  overflow: hidden;
+}
+
+.cpm-time-top__track i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--brand);
+  transition: width 0.3s ease;
+}
+
+.cpm-time-top__value {
+  flex: 0 0 auto;
+  color: var(--text-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cpm-time-top__value em {
+  margin-left: 6px;
+  color: var(--text-3);
+  font-style: normal;
+}
+
+/* ============================ 记时弹层 ============================ */
+
+.cpm-time__panel {
+  width: 340px;
+  max-width: calc(100vw - 48px);
+}
+
+.cpm-time__list {
+  max-height: 168px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+  border: 1px solid var(--border-1);
+  border-radius: 6px;
+}
+
+.cpm-time__empty {
+  padding: 10px 12px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.cpm-time__row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-2);
+}
+
+.cpm-time__row:last-child {
+  border-bottom: none;
+}
+
+.cpm-time__row-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cpm-time__row-range {
+  color: var(--text-1);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.cpm-time__row-note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.cpm-time__row-minutes {
+  flex: 0 0 auto;
+  color: var(--text-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cpm-time__draft {
+  padding: 10px;
+  border: 1px dashed var(--border-1);
+  border-radius: 6px;
+  background: var(--surface-3);
+}
+
+.cpm-time__dash {
+  color: var(--text-3);
+}
+
+.cpm-time__hint {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.cpm-time__draft-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.cpm-time__total {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-1);
+  color: var(--text-2);
+  font-size: 12px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 条目行的投入 chip：与操作列同一套色彩语言（品牌橙），不做成第二种可点样式 */
+.cpm-item__hours {
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.cpm-item__sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+}
+
+/* 反馈区在阅读面内不再套彩色卡片：它是文件的一节，不是第三个面板 */
+.cpm-document__feedback {
+  display: grid;
+  gap: 8px;
+}

@@ -17202,7 +17202,16 @@
       "imported": "已导入",
       "importedToast": "已导入为工作记录",
       "terminated": "来源已结案",
-      "close": "关闭"
+      "close": "关闭",
+      "dueBefore": "前",
+      "emptyTask": "目前没有与本人相关的未结案任务",
+      "hintRdmTask": "只列本人负责或参与的未结案任务；导入后进度更新会回写到 RDM 同一个任务。",
+      "planHours": "计划",
+      "prdTask": "PRD 任务",
+      "searchTask": "依任务标题或任务号搜索",
+      "syncHint": "开启后本条目的进度更新会回写 RDM 任务；RDM 的规则仍会拦截不合法上报",
+      "syncLabel": "回写",
+      "tabRdmTask": "产研任务"
     },
     "sourceRole": {
       "submitter": "我提出的",
@@ -17246,6 +17255,276 @@
     },
     "workHours": {
       "label": "工时:"
+    },
+    "common": {
+      "delete": "删除",
+      "edit": "编辑",
+      "item": "事项：",
+      "loadFailed": "载入失败"
+    },
+    "daily": {
+      "fileBase": "工作日报_{{date}}",
+      "footnote": "日报不需发布；正式版本只在「周报／月报」产生，因此没有 Word 出口",
+      "loadError": "日报载入失败",
+      "title": "工作日报（{{period}}）"
+    },
+    "document": {
+      "aiSummaryTag": "摘要含 AI 生成内容",
+      "brand": "持续绩效系统",
+      "draftLine": "状态：草稿（未发布）",
+      "edition": {
+        "daily": "日报 · 只读投影",
+        "draft": "草稿",
+        "legacy": "历史发送快照（无版本记录）",
+        "published": "V{{no}} 正式版本"
+      },
+      "emptyDetail": "本期间没有活跃的工作记录。",
+      "emptySummary": "本报告未填写汇总摘要。",
+      "entry": {
+        "invested": "投入 {{minutes}}",
+        "manualEstimateNote": "（手工估算，无精确起止）",
+        "source": "来源：{{label}}",
+        "startedFrom": "{{date}} 起",
+        "trail": "轨迹 {{trail}}%"
+      },
+      "footprint": "口径：条目按 itemId 去重，状态取期间内最后一笔进度流水",
+      "generatedAt": "生成于：{{time}}",
+      "groupMeta": "{{count}} 项 · {{hours}}",
+      "historicalBody": "当前生效版本与本版本的差异请以各版本发布时间为准；历史通知指向的就是当时发布的那一版。",
+      "historicalTitle": "正在阅读历史版本 V{{no}}，此版本内容不可修改",
+      "meta": {
+        "blockedValue": "{{count}} 项（需上级介入解除）",
+        "cancelledSkipped": "，已取消 {{count}} 项不计入",
+        "completion": "完成率",
+        "completionDetail": "（完成 {{done}}／应完成 {{base}}{{skipped}}）",
+        "dailyAvg": "日均投入",
+        "dailyAvgValue": "{{hours}} × {{days}} 天",
+        "deferredValue": "{{count}} 项（改期，非取消）",
+        "includesEstimate": "（含估算 {{hours}}）",
+        "itemCount": "条目数",
+        "itemCountValue": "{{count}} 项",
+        "statusDist": "状态分布",
+        "totalInvested": "总投入"
+      },
+      "owner": "汇报人：{{name}}{{empId}}",
+      "period": "周期：{{period}}",
+      "publishedAt": "发布：{{time}}",
+      "readonlyLine": "口径：当日条目投影（日报不发布、不送达）",
+      "section": {
+        "detail": "工作事项明细",
+        "feedback": "反馈与成果认定",
+        "first": "一",
+        "fourth": "四",
+        "second": "二",
+        "summary": "汇总摘要",
+        "third": "三",
+        "time": "工时投入汇总"
+      },
+      "summaryFootnote": "数字与状态来自期间内的工作记录与进度流水，AI 仅参与摘要文字起草且必须披露；模型不产生任何计数。",
+      "totalItems": "共 {{count}} 项",
+      "versionSingle": "版本 V{{no}}"
+    },
+    "export": {
+      "button": "导出",
+      "docx": "Word 文件（.docx）",
+      "docxDone": "已下载 V{{no}} 的 Word 版（服务端按冻结快照排版）",
+      "done": "已下载当前阅读版本的正文快照",
+      "failed": "下载失败，请重试",
+      "image": "长图图片（PNG）",
+      "notReady": "汇报正文尚未载入，请稍后再试",
+      "pdf": "PDF 文件（A4 分页）"
+    },
+    "period": {
+      "dailyTip": "日报是条目的当日投影，不需发布、不送达、不产正式版本",
+      "day": "日报",
+      "month": "月报",
+      "quarter": "季度报告",
+      "readonlyTag": "只读投影",
+      "week": "周报"
+    },
+    "rdmSwitch": {
+      "disabled": "已关闭回写",
+      "enabled": "已开启回写",
+      "label": "进度回写到 RDM"
+    },
+    "rdmSync": {
+      "disabled": "回写已关闭",
+      "disabledHint": "关闭后 CPM 的更动不影响 RDM",
+      "helpAria": "回写规则说明",
+      "helpBody": "PRD 任务的 100% 以「提交评审」为准；标记完成与标记阻塞必须填写说明或原因；已取消与延期属个人过程判断，不写入交付真值。以上情况 CPM 仍会正常保存，只在这里告知未同步的原因。",
+      "helpTitle": "哪些情况不会回写",
+      "noRecord": "尚无回写记录",
+      "realign": "以 RDM 当前值重新对齐",
+      "state": {
+        "conflict": "RDM 有变更",
+        "error": "回写异常",
+        "pending": "未回写",
+        "rejected": "RDM 拒绝回写",
+        "success": "已同步 RDM"
+      },
+      "syncedAt": "最近：{{time}}",
+      "task": "任务：{{taskNo}}",
+      "title": "RDM 进度回写",
+      "gateClosed": "系统未开启回写",
+      "gateClosedHint": "运维尚未在服务端开启 RDM 回写总闸（cpm.rdm-sync-enabled=false）；开启后本条目的进度更新才会写入 RDM。期间 CPM 记录照常保存。"
+    },
+    "recognition": {
+      "kind": {
+        "highlight": "亮点",
+        "milestone": "里程碑"
+      }
+    },
+    "report": {
+      "clipboardUnavailable": "剪贴板不可用",
+      "confirm": {
+        "aiGenerated": "含 AI 生成内容",
+        "aiSummary": "AI 摘要：",
+        "dryRun": "dry-run（只登记 skipped，不真发）",
+        "manualOnly": "全人工",
+        "notRecorded": "未记录",
+        "pushMode": "钉钉推送：",
+        "realPush": "真实投递",
+        "totalInvested": "总投入："
+      },
+      "confirmPublishOk": "确认发布",
+      "copied": "已复制 Markdown",
+      "copyMarkdown": "复制 Markdown",
+      "delivered": "送达 {{receivers}} 人 · 已读 {{reads}} 人",
+      "docTitle": "工作汇报（{{period}}）",
+      "draftTag": "草稿",
+      "emptyPeriod": "本期间没有活跃的工作记录",
+      "exportVersionHint": "导出的是当前检视的那一版，不是「最新版」",
+      "feedbackCount": "评论 {{comments}} · 点赞 {{likes}}",
+      "fileBase": "工作汇报_{{type}}_{{date}}_V{{no}}",
+      "pendingRevisionTag": "有新事实未入版",
+      "pendingRevisionTip": "期间内又发生了新的记录或进度流水，正式版本尚未包含；点「修订并重新发布」生成新版本",
+      "publishedTag": "已发布 V{{no}}",
+      "publishedV1": "已发布 V1",
+      "totalItems": "共 {{count}} 项",
+      "trail": "轨迹 {{trail}}%",
+      "viewFullFeedback": "查看完整反馈 →",
+      "markdown": {
+        "detailSection": "## {{no}}、工作事项明细",
+        "entry": "- {{title}} — {{status}} {{progress}}%{{trajectory}}{{invested}}",
+        "groupTitle": "### {{category}}（{{count}} 项）",
+        "invested": " · 投入 {{minutes}}",
+        "timeAvg": "- 日均投入：{{avg}} × 有投入 {{days}} 天",
+        "timeByCategory": "- 时间分配：{{items}}",
+        "timePeak": "- 单日峰值：{{date}} {{minutes}}",
+        "timeSection": "## {{no}}、工时投入汇总",
+        "timeTopItems": "- 投入最多事项：{{items}}",
+        "timeTotal": "- 总投入：{{total}}（精确记时 {{precise}}，估算 {{estimated}}）",
+        "title": "# 工作汇报（{{period}}）",
+        "trajectory": "（轨迹 {{trail}}%）"
+      }
+    },
+    "revision": {
+      "button": "修订并重新发布",
+      "current": "当前版本：",
+      "firstPublish": "首次发布",
+      "footnote": "修订不会覆盖旧版本：每一版都是当次发布的冻结快照，可追溯、可导出、可对比。",
+      "idempotent": "无变化时：",
+      "idempotentValue": "内容与说明都相同则不会产生新版本（后端按内容幂等）",
+      "impact": "影响：",
+      "impactValue": "已发出的钉钉连结会指向新版本；旧版本仍可在阅读面切换查看",
+      "includes": "新版本将包含：",
+      "includesValue": "期间内新发生的条目与进度流水",
+      "loadErrorBody": "这里刻意不退回显示当前版本：把当前版冒充历史版，比报错危险得多。",
+      "loadErrorBodyDetail": "这里刻意不退回显示当前版本：把当前版冒充历史版，会让上级把「现在」当成「当时」读。",
+      "loadErrorTitle": "历史版本 V{{no}} 正文载入失败",
+      "modalTitle": "修订并重新发布",
+      "needChangeNote": "请填写修订说明",
+      "needPublishFirst": "当前周期还没有汇报记录，请先发布",
+      "notePlaceholder": "修订说明（必填，例：补录周五两笔投入时段与一项完成事项）",
+      "publishOk": "确认发布新版本",
+      "published": "已发布 V{{no}}",
+      "unchanged": "期间内没有新事实，版本保持 V{{no}}"
+    },
+    "source": {
+      "ai": "AI 整理",
+      "meetingAction": "会议行动项",
+      "rdmRequirement": "RDM 需求",
+      "rdmTask": "RDM 任务"
+    },
+    "status": {
+      "blocked": "受阻",
+      "cancelled": "已取消",
+      "deferred": "延期",
+      "doing": "进行中",
+      "done": "已完成",
+      "todo": "待办"
+    },
+    "time": {
+      "activeDays": "有投入天数",
+      "avg": "日均（按有投入的 {{days}} 天）",
+      "byCategory": "时间分配（按分类）",
+      "byCategoryHelpAria": "时间分配口径说明",
+      "byCategoryHelpBody": "分类占比以「有记录分类的合计」为分母；总投入含来自手工工时的估算部分。带「估算」标记的部分没有精确起止，只有小时数，两者的精度不同，所以不合并陈述。",
+      "byCategoryHelpTitle": "这两个分母请分开看",
+      "estimateNote": "其中 {{estimate}} 来自手工工时（无精确起止），其余 {{precise}} 来自记时时段",
+      "estimateTag": "估算 {{hours}}",
+      "format": {
+        "hoursMinutes": "{{hours}} 小时 {{minutes}} 分",
+        "hoursOnly": "{{count}} 小时",
+        "minutesOnly": "{{count}} 分"
+      },
+      "legacy": "这一版汇报发布时还没有投入时间统计（阶段二冻结的快照），因此本节无资料可读；修订并重新发布后会带上工时维度。",
+      "notRecorded": "本期间未记录投入时间 —— 在「我的工作记录」的行内「记时」补上起止时间，再修订并重新发布即可带入本期汇报。",
+      "peak": "单日峰值",
+      "peakWithDate": "单日峰值 · {{date}}",
+      "range": {
+        "between": "{{from}}–{{to}}{{crossesMidnight}}",
+        "from": "{{time}} 起",
+        "none": "未填起止",
+        "to": "至 {{time}}"
+      },
+      "stackAria": "分类工时占比，共 {{total}}",
+      "topItems": "事项时间投入成本（Top {{count}}）",
+      "topItemsMax": "投入最多的一件事 {{hours}}",
+      "total": "总投入",
+      "trend": "每日投入趋势",
+      "trendAria": "每日投入工时柱状图",
+      "trendPeak": "峰值 {{hours}}",
+      "unitDay": " 天"
+    },
+    "timeEntry": {
+      "addSegment": "添加时段",
+      "autoComputed": "自动 {{minutes}} 分",
+      "button": "记时",
+      "crossMidnight": "跨夜",
+      "deleteConfirmOk": "确认删除",
+      "deleteConfirmTitle": "确定删除这段投入时间？",
+      "empty": "今天还没有投入时段",
+      "field": {
+        "duration": "耗时：",
+        "range": "时段："
+      },
+      "helpAria": "记时说明",
+      "helpBody": "不记时也能正常记录与汇报，这里的资料只用于工时分布与时间投入分析，不进入任何评价或排名口径。跨日的时段请勾选「跨夜」。",
+      "helpTitle": "记时是选填的投入成本记录",
+      "hint": {
+        "auto": "按起止自动计 {{minutes}} 分",
+        "either": "起止或耗时择一填写",
+        "manual": "将按手动 {{minutes}} 分记录"
+      },
+      "needBothClocks": "起止需同时填写",
+      "needDuration": "请填起止或耗时",
+      "placeholder": {
+        "end": "结束",
+        "minutes": "耗时(分)",
+        "note": "这段做了什么（选填）",
+        "start": "开始"
+      },
+      "saved": "已记录",
+      "title": "记时（{{date}}）",
+      "todayTotal": "今天合计 {{minutes}}",
+      "tooltip": "今天已记 {{minutes}}"
+    },
+    "worklog": {
+      "detailEllipsis": "详情…",
+      "finish": "完成",
+      "todayInvested": "今天 {{minutes}}",
+      "workHoursChip": "工时 {{hours}}h"
     }
   }
 }

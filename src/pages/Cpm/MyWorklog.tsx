@@ -5,22 +5,30 @@
  * 未经著作权人书面许可，不得使用、复制、修改、再分发或用于任何商业目的。
  * 完整许可条款见仓库根目录 LICENSE 文件。
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Alert, Button, DatePicker, Input, Modal, Popover, Progress, Segmented, Select, Slider, Space, Tag, Tooltip, message } from 'antd'
 import {
-  EditOutlined, HistoryOutlined, ImportOutlined,
+  EditOutlined, HistoryOutlined,
+  ImportOutlined,
   LeftOutlined, RightOutlined, RobotOutlined, ThunderboltOutlined, TrophyFilled,
 } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useTranslation } from 'react-i18next'
 import {
-  addCpmProgress, carryCpmItem, createCpmItem, deleteCpmItem, fetchCpmDay, fetchCpmTemplates,
-  type CpmDayVO, type CpmItemVO, type CpmTemplateVO,
+  addCpmProgress, carryCpmItem, createCpmItem, deleteCpmItem, fetchCpmDay, fetchCpmRdmSyncStatus, fetchCpmTemplates,
+  realignCpmRdmSync, setCpmRdmSync,
+  type CpmDayVO, type CpmItemTimeVO, type CpmItemVO, type CpmTemplateVO,
 } from '@/api/cpm'
-import { CPM_STATUS_LABELS, CpmStatus, type CpmStatusValue } from './meta'
+import {
+  CPM_SOURCE_LABELS, CPM_STATUS_ACCENTS, CPM_STATUS_DEFAULT_COLLAPSED, CPM_STATUS_LABELS,
+  CPM_STATUS_ORDER, CPM_STATUS_TAG_COLORS, CpmStatus, type CpmStatusValue,
+} from './meta'
 import AiAssistantDrawer from './AiAssistantDrawer'
 import SourceImportModal from './SourceImportModal'
+import TimeEntryPopover from './TimeEntryPopover'
+import RdmSyncBadge from './RdmSyncBadge'
+import { formatMinutes, formatSegmentRange } from './cpmTime'
 import './cpm.css'
 
 /**
@@ -35,12 +43,13 @@ import './cpm.css'
  * 绝不回退到假数据（BACKEND_CONNECTED_KEYS 名单成员）。
  */
 
-const STATUS_GROUPS: { status: CpmStatusValue; accent: string }[] = [
-  { status: CpmStatus.DOING, accent: 'var(--info)' },
-  { status: CpmStatus.TODO, accent: 'var(--warning)' },
-  { status: CpmStatus.DONE, accent: 'var(--success)' },
-  { status: CpmStatus.BLOCKED, accent: 'var(--danger)' },
-]
+/**
+ * 状态分组：顺序与颜色一律取自 meta 的真值（CPM_STATUS_ORDER / CPM_STATUS_ACCENTS），
+ * 不在页面里另排一次——日视图与汇报明细给出两种「重要程度」是最难解释的分叉。
+ */
+const STATUS_GROUPS = CPM_STATUS_ORDER.map(status => ({ status, accent: CPM_STATUS_ACCENTS[status] }))
+/** 这些组默认折叠：已取消不参与日常注意力，但事实必须看得见（折叠 ≠ 隐藏） */
+const DEFAULT_COLLAPSED = Object.fromEntries(CPM_STATUS_DEFAULT_COLLAPSED.map(status => [status, true]))
 
 export default function MyWorklog() {
   const navigate = useNavigate()
@@ -56,7 +65,19 @@ export default function MyWorklog() {
   const [quickText, setQuickText] = useState('')
   const [aiOpen, setAiOpen] = useState(false)
   const [sourceOpen, setSourceOpen] = useState(false)
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(DEFAULT_COLLAPSED)
+  /**
+   * 回写总闸状态：整页取一次，不给每行发请求。
+   * 取失败时按「开」处理（见 RdmSyncBadge 默认值）——把正常状态误报成「系统未开启」
+   * 比沉默更糟，用户会因此不去检查自己那一侧的开关。
+   */
+  const [syncGateOpen, setSyncGateOpen] = useState(true)
+
+  useEffect(() => {
+    fetchCpmRdmSyncStatus()
+      .then(status => setSyncGateOpen(status.enabled))
+      .catch(() => undefined)
+  }, [])
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -81,6 +102,15 @@ export default function MyWorklog() {
   const categories = activeTemplate?.categories ?? []
   const items = day?.items ?? []
   const carries = day?.carryCandidates ?? []
+  /**
+   * 当日时段按条目索引：日视图接口一次带回（times），不在这里逐条目补发请求。
+   * Map 记忆化而不是每次渲染重建，否则条目行会因为新 Map 而全量重渲染。
+   */
+  const timeByItem = useMemo(() => {
+    const map = new Map<number, CpmItemTimeVO>()
+    ;(day?.times ?? []).forEach(row => map.set(row.itemId, row))
+    return map
+  }, [day])
   const grouped: Record<string, CpmItemVO[]> = {}
   STATUS_GROUPS.forEach(g => { grouped[g.status] = [] })
   items.forEach(i => { (grouped[i.status] ??= []).push(i) })
@@ -207,6 +237,9 @@ export default function MyWorklog() {
                 item={item}
                 dateStr={dateStr}
                 showWorkHours={activeTemplate?.workHoursEnabled ?? false}
+                day={timeByItem.get(item.id)}
+                sync={item.rdmSync}
+                syncGateOpen={syncGateOpen}
                 onFinish={() => void handleFinish(item)}
                 onDelete={() => handleDelete(item)}
                 onEdit={() => navigate(`/cpm-item-form?id=${item.id}`)}
@@ -248,13 +281,19 @@ interface ItemRowProps {
   item: CpmItemVO
   dateStr: string
   showWorkHours: boolean
+  /** 本条目当天的投入时段（日视图一次带回，缺失=当天没记过时间） */
+  day?: CpmItemTimeVO
+  /** RDM 回写状态（仅关联过 RDM 任务的条目有值） */
+  sync: CpmItemVO['rdmSync']
+  /** 服务端回写总闸；关掉时徽标要说「系統未開啟回寫」而不是停在「未回寫」 */
+  syncGateOpen: boolean
   onFinish: () => void
   onDelete: () => void
   onEdit: () => void
   onChanged: () => Promise<void> | void
 }
 
-function ItemRow({ item, showWorkHours, onFinish, onDelete, onEdit, onChanged }: ItemRowProps) {
+function ItemRow({ item, dateStr, showWorkHours, day, sync, syncGateOpen, onFinish, onDelete, onEdit, onChanged }: ItemRowProps) {
   const { t } = useTranslation()
   const [progressOpen, setProgressOpen] = useState(false)
   const [draftProgress, setDraftProgress] = useState(item.progress)
@@ -262,6 +301,10 @@ function ItemRow({ item, showWorkHours, onFinish, onDelete, onEdit, onChanged }:
   const [draftNote, setDraftNote] = useState('')
   const [draftHours, setDraftHours] = useState<number | undefined>(item.workHours ?? undefined)
   const [saving, setSaving] = useState(false)
+  const segments = day?.segments ?? []
+  const dayMinutes = day?.dayMinutes ?? 0
+  /** 契约已随 `cpm:schema:v1.2` 扩到六值，这里不再需要向 TS 妥协的转型 */
+  const itemStatus = item.status
 
   const sourceTag = item.sourceType !== 'manual' ? (
     <Tag color={item.sourceType === 'ai' ? 'purple' : 'blue'} style={{ fontSize: 11, marginInlineEnd: 0 }}>
@@ -269,11 +312,17 @@ function ItemRow({ item, showWorkHours, onFinish, onDelete, onEdit, onChanged }:
     </Tag>
   ) : null
 
+  /**
+   * 进度写入只走一条路：交给后端。回写不在这里发起——`CpmItemService.addProgress`
+   * 在进度落库后触发 `CpmRdmSyncService`，前端再推一次会出现「本地先成功、后端后失败」
+   * 两种互相矛盾的提示，而徽标读的是后端落库后的回写结果。
+   */
   const confirmProgress = async () => {
     setSaving(true)
+    const progress = draftStatus === CpmStatus.DONE ? 100 : draftProgress
     try {
       await addCpmProgress(item.id, {
-        progress: draftStatus === CpmStatus.DONE ? 100 : draftProgress,
+        progress,
         status: draftStatus,
         note: draftNote.trim() || undefined,
         // 工时只在模板开启时才提交：未开启的岗位连字段都不出现（低录入成本优先）
@@ -291,21 +340,40 @@ function ItemRow({ item, showWorkHours, onFinish, onDelete, onEdit, onChanged }:
     <div className="cpm-item">
       <div className="cpm-item__main">
         <div className="cpm-item__title">
-          {item.status === CpmStatus.DONE ? <span style={{ color: 'var(--text-3)' }}>{item.title}</span> : item.title}
+          {/* 已完成与已取消都降为次要文本：前者是历史、后者不再占用注意力 */}
+          {itemStatus === CpmStatus.DONE || itemStatus === CpmStatus.CANCELLED
+            ? <span style={{ color: 'var(--text-3)' }}>{item.title}</span>
+            : item.title}
         </div>
         <div className="cpm-item__meta">
           <Tag style={{ marginInlineEnd: 0 }}>{item.categoryLabel}</Tag>
-          {item.status === CpmStatus.BLOCKED && <Tag color="red" style={{ marginInlineEnd: 0 }}>受阻</Tag>}
+          {/* 进行中与待办是这一行的默认语义，不重复标注；其余状态必须显式说出来 */}
+          {itemStatus !== CpmStatus.DOING && itemStatus !== CpmStatus.TODO && (
+            <Tag color={STATUS_TAG_COLOR[itemStatus]} style={{ marginInlineEnd: 0 }}>{CPM_STATUS_LABELS[itemStatus]}</Tag>
+          )}
           {sourceTag}
-          {showWorkHours && item.workHours ? <span>工時 {item.workHours}h</span> : null}
-          {item.detail && <Tooltip title={item.detail}><span style={{ color: 'var(--text-3)' }}>詳情…</span></Tooltip>}
+          {dayMinutes > 0 && (
+            <Tooltip title={segments.map(s => `${formatSegmentRange(s.startTime, s.endTime, s.crossesMidnight) ?? formatMinutes(s.durationMinutes)}`).join(' ／ ')}>
+              <span className="cpm-item__hours">{t('cpm.worklog.todayInvested', { minutes: formatMinutes(dayMinutes), defaultValue: '今天 {{minutes}}' })}</span>
+            </Tooltip>
+          )}
+          {dayMinutes === 0 && showWorkHours && item.workHours
+            ? <span className="cpm-item__hours">{t('cpm.worklog.workHoursChip', { hours: item.workHours, defaultValue: '工時 {{hours}}h' })}</span>
+            : null}
+          <RdmSyncBadge
+            sync={sync}
+            globalEnabled={syncGateOpen}
+            onToggle={async enabled => { await setCpmRdmSync(item.id, enabled); void onChanged() }}
+            onRealign={async () => { await realignCpmRdmSync(item.id); void onChanged() }}
+          />
+          {item.detail && <Tooltip title={item.detail}><span style={{ color: 'var(--text-3)' }}>{t('cpm.worklog.detailEllipsis', { defaultValue: '詳情…' })}</span></Tooltip>}
         </div>
       </div>
       <Progress
         percent={item.progress}
         size="small"
         className="cpm-item__progress"
-        status={item.status === CpmStatus.BLOCKED ? 'exception' : item.status === CpmStatus.DONE ? 'success' : 'active'}
+        status={itemStatus === CpmStatus.BLOCKED ? 'exception' : itemStatus === CpmStatus.DONE ? 'success' : 'active'}
       />
       {item.recognized && (
         <Tooltip title="已被上級成果認定（績效證據）">
@@ -314,6 +382,7 @@ function ItemRow({ item, showWorkHours, onFinish, onDelete, onEdit, onChanged }:
       )}
       <div className="cpm-item__ops">
         <Space size={0} split={<span className="action-split">|</span>}>
+          <TimeEntryPopover item={item} dateStr={dateStr} day={day} onChanged={onChanged} />
           <Popover
             open={progressOpen}
             onOpenChange={open => {
@@ -370,17 +439,19 @@ function ItemRow({ item, showWorkHours, onFinish, onDelete, onEdit, onChanged }:
           >
             <Button type="link" size="small">更新進度</Button>
           </Popover>
-          {item.status !== CpmStatus.DONE && <Button type="link" size="small" onClick={onFinish}>完成</Button>}
-          <Button type="link" size="small" icon={<EditOutlined style={{ fontSize: 11 }} />} onClick={onEdit}>編輯</Button>
-          <Button type="link" size="small" danger onClick={onDelete}>刪除</Button>
+          {itemStatus !== CpmStatus.DONE && itemStatus !== CpmStatus.CANCELLED
+            && <Button type="link" size="small" onClick={onFinish}>{t('cpm.worklog.finish', { defaultValue: '完成' })}</Button>}
+          <Button type="link" size="small" icon={<EditOutlined style={{ fontSize: 11 }} />} onClick={onEdit}>{t('cpm.common.edit', { defaultValue: '編輯' })}</Button>
+          <Button type="link" size="small" danger onClick={onDelete}>{t('cpm.common.delete', { defaultValue: '刪除' })}</Button>
         </Space>
       </div>
     </div>
   )
 }
 
-const SOURCE_LABELS: Record<string, string> = {
-  ai: 'AI 整理',
-  rdm_requirement: 'RDM 需求',
-  meeting_action: '會議行動項',
-}
+/**
+ * 来源标签与状态色板一律引用 meta 的单一真源：
+ * 页面各存一份词表，六语改造时必然出现「日视图是英文、汇报明细还是中文」这类分叉。
+ */
+const SOURCE_LABELS = CPM_SOURCE_LABELS
+const STATUS_TAG_COLOR = CPM_STATUS_TAG_COLORS

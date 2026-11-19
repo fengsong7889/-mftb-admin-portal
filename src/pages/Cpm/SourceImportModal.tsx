@@ -6,24 +6,27 @@
  * 完整许可条款见仓库根目录 LICENSE 文件。
  */
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, Input, Modal, Segmented, Space, Spin, Tag, Typography, message } from 'antd'
+import { Alert, Button, Input, Modal, Segmented, Space, Spin, Switch, Tag, Tooltip, Typography, message } from 'antd'
 import { ImportOutlined, SearchOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import {
-  createCpmItem, fetchCpmSourceMeetingActions, fetchCpmSourceRdm,
+  createCpmItem, fetchCpmSourceMeetingActions, fetchCpmSourceRdm, fetchCpmSourceRdmTasks,
   type CpmSourceVO,
 } from '@/api/cpm'
 import { RDM_STATUS_COLOR, RDM_STATUS_LABEL, type RdmStatus } from '@/constants/rdm'
 import './cpm.css'
 
 /**
- * 关联业务对象导入挑选器（方案 §五-A）。
+ * 关联业务对象导入挑选器（方案 §五-A，阶段三补 RDM 任务档）。
  *
- * 三条约束：
+ * 四条约束：
  * 1. 清单只读，落库仍走 `POST /api/cpm/items`——重复导入由唯一键裁决，这里不自建第二套裁判；
- * 2. 「哪些需求算与我相关」由 RDM 域的「某人视角」口径裁定，前端不传任何身份字段；
+ * 2. 「哪些需求/任务算与我相关」由 RDM 域的「某人视角」口径裁定，前端不传任何身份字段；
  * 3. 状态/角色词表属于来源系统：RDM 状态用 RDM_STATUS_LABEL，会议行动项 pending 用本域文案，
- *    不把上游词表抄成第二份真相。
+ *    不把上游词表抄成第二份真相；
+ * 4. **需求档不回写、任务档才回写**：RDM 的进度真值在 `rdm_work_task.progress`，
+ *    `rdm_requirement.progress` 被 RDM 日报明确判为「可能长期停留 0」，
+ *    写它等于造出第二套假真值，所以需求档只提供关联、不提供回写开关。
  *
  * 文案全部走 t() + defaultValue：本模块存量硬编码已被棘轮锁死（不可再增），
  * 新增界面必须从第一天就是多语言的。
@@ -39,7 +42,7 @@ interface Props {
   onImported: () => void
 }
 
-type SourceTab = 'rdm' | 'meeting'
+type SourceTab = 'rdm' | 'rdmTask' | 'meeting'
 
 const ROLE_KEYS: Record<string, string> = {
   submitter: 'cpm.sourceRole.submitter',
@@ -55,6 +58,8 @@ export default function SourceImportModal({ open, onClose, dateStr, templateKey,
   const [tab, setTab] = useState<SourceTab>('rdm')
   const [keyword, setKeyword] = useState('')
   const [rows, setRows] = useState<CpmSourceVO[]>([])
+  /** 行内回写开关：默认开（从任务导入就是想让两边一致），但必须一眼看得到、关得掉 */
+  const [syncFlags, setSyncFlags] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [importingRef, setImportingRef] = useState<string | null>(null)
@@ -62,7 +67,12 @@ export default function SourceImportModal({ open, onClose, dateStr, templateKey,
   const load = useCallback(async (which: SourceTab, kw: string) => {
     setLoading(true)
     try {
-      setRows(which === 'rdm' ? await fetchCpmSourceRdm(kw.trim() || undefined) : await fetchCpmSourceMeetingActions())
+      const data = which === 'rdmTask'
+        ? await fetchCpmSourceRdmTasks(kw.trim() || undefined)
+        : which === 'rdm'
+          ? await fetchCpmSourceRdm(kw.trim() || undefined)
+          : await fetchCpmSourceMeetingActions()
+      setRows(data)
       setLoadError(null)
     } catch (err) {
       // 候选清单来自别的系统，取不到时绝不能显示成「没有相关对象」——那是把故障说成结论
@@ -79,6 +89,13 @@ export default function SourceImportModal({ open, onClose, dateStr, templateKey,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, tab])
 
+  /**
+   * 导入：三个档共用一条写入路径，差别只在 `sourceType` 与是否带 `rdmSyncEnabled`。
+   *
+   * 任务档必须真写 `sourceType='rdm_task'` + `sourceRef=taskId`（而不是 manual + 本地绑定表）：
+   * 回写徽标读的是服务端落库后的回写结果，本地绑定只在这一次会话里存在，
+   * 刷新就没了的「已关联」比没有关联更误导。
+   */
   const handleImport = async (row: CpmSourceVO) => {
     setImportingRef(row.sourceRef)
     try {
@@ -93,6 +110,8 @@ export default function SourceImportModal({ open, onClose, dateStr, templateKey,
         sourceType: row.sourceType,
         sourceRef: row.sourceRef,
         sourceLabel: row.subtitle ?? undefined,
+        // 只有任务档有回写语义；需求/会议档传了这个字段后端也不会开闸
+        ...(row.sourceType === 'rdm_task' ? { rdmSyncEnabled: syncFlags[row.sourceRef] ?? true } : {}),
       })
       message.success(t('cpm.sourceImport.importedToast', { defaultValue: '已導入為工作記錄' }))
       setRows(prev => prev.map(r => (r.sourceRef === row.sourceRef ? { ...r, imported: true } : r)))
@@ -117,17 +136,20 @@ export default function SourceImportModal({ open, onClose, dateStr, templateKey,
           onChange={v => setTab(v as SourceTab)}
           options={[
             { value: 'rdm', label: t('cpm.sourceImport.tabRdm', { defaultValue: '產研需求' }) },
+            { value: 'rdmTask', label: t('cpm.sourceImport.tabRdmTask', { defaultValue: '產研任務' }) },
             { value: 'meeting', label: t('cpm.sourceImport.tabMeeting', { defaultValue: '會議行動項' }) },
           ]}
         />
-        {tab === 'rdm' && (
+        {tab !== 'meeting' && (
           <Input
             value={keyword}
             onChange={e => setKeyword(e.target.value)}
             onPressEnter={() => void load(tab, keyword)}
             allowClear
             style={{ width: 320 }}
-            placeholder={t('cpm.sourceImport.search', { defaultValue: '依需求標題或編號搜索' })}
+            placeholder={tab === 'rdm'
+              ? t('cpm.sourceImport.search', { defaultValue: '依需求標題或編號搜索' })
+              : t('cpm.sourceImport.searchTask', { defaultValue: '依任務標題或任務號搜索' })}
             suffix={<SearchOutlined style={{ color: 'var(--text-3)' }} onClick={() => void load(tab, keyword)} />}
           />
         )}
@@ -138,13 +160,67 @@ export default function SourceImportModal({ open, onClose, dateStr, templateKey,
         {!loadError && (
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             {tab === 'rdm'
-              ? t('cpm.sourceImport.hintRdm', { defaultValue: '只列出與本人相關（提出/負責/參與/驗收）且尚未結案的需求。' })
-              : t('cpm.sourceImport.hintMeeting', { defaultValue: '只列出本人負責或協辦的未完成會議行動項。' })}
+              ? t('cpm.sourceImport.hintRdm', { defaultValue: '只列出與本人相關（提出/負責/參與/驗收）且尚未結案的需求；需求級關聯不回寫進度。' })
+              : tab === 'rdmTask'
+                ? t('cpm.sourceImport.hintRdmTask', { defaultValue: '只列本人負責或參與的未結案任務；導入後進度更新會回寫到 RDM 同一個任務。' })
+                : t('cpm.sourceImport.hintMeeting', { defaultValue: '只列出本人負責或協办的未完成會議行動項。' })}
           </Typography.Text>
         )}
 
         {loading ? (
           <div style={{ textAlign: 'center', padding: 32 }}><Spin /></div>
+        ) : tab === 'rdmTask' ? (
+          rows.length === 0 && !loadError ? (
+            <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-3)', fontSize: 13 }}>
+              {t('cpm.sourceImport.emptyTask', { defaultValue: '目前沒有與本人相關的未結案任務' })}
+            </div>
+          ) : (
+            <div className="cpm-source__list">
+              {rows.map(task => (
+                <div className="cpm-source__row" key={`rdm-task-${task.sourceRef}`}>
+                  <div className="cpm-source__main">
+                    <div className="cpm-source__title">{task.title}</div>
+                    <Space size={6} wrap>
+                      <span className="cpm-source__sub">{task.externalNo}｜{task.parentTitle}</span>
+                      <Tag color={RDM_STATUS_COLOR[task.statusCode as RdmStatus] ?? 'default'}>
+                        {RDM_STATUS_LABEL[task.statusCode as RdmStatus] ?? task.statusCode}
+                      </Tag>
+                      <Tag bordered={false}>{t(ROLE_KEYS[task.role ?? ''] ?? '', { defaultValue: task.role })}</Tag>
+                      <span className="cpm-source__meta">{task.progress ?? 0}%</span>
+                      {task.planHours ? <span className="cpm-source__meta">{t('cpm.sourceImport.planHours', { defaultValue: '計劃' })} {task.planHours}h</span> : null}
+                      {task.dueDate && <span className="cpm-source__meta">{task.dueDate} {t('cpm.sourceImport.dueBefore', { defaultValue: '前' })}</span>}
+                      {task.prdTask && <Tag color="blue">{t('cpm.sourceImport.prdTask', { defaultValue: 'PRD 任務' })}</Tag>}
+                      {task.terminated && <Tag color="default">{t('cpm.sourceImport.terminated', { defaultValue: '來源已結案' })}</Tag>}
+                    </Space>
+                  </div>
+                  <Space size={8} align="center">
+                    {/* 回写开关只在导入前有意义：导入后去条目行的徽标里改，两处不各留一个开关 */}
+                    <Tooltip title={t('cpm.sourceImport.syncHint', { defaultValue: '開啟後本條目的進度更新會回寫 RDM 任務；RDM 的規則仍會攔截不合法上報' })}>
+                      <Switch
+                        size="small"
+                        checked={syncFlags[task.sourceRef] ?? true}
+                        disabled={task.imported}
+                        onChange={checked => setSyncFlags(prev => ({ ...prev, [task.sourceRef]: checked }))}
+                      />
+                    </Tooltip>
+                    <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('cpm.sourceImport.syncLabel', { defaultValue: '回寫' })}</span>
+                    <Button
+                      size="small"
+                      type={task.imported ? 'default' : 'primary'}
+                      icon={<ImportOutlined />}
+                      disabled={task.imported}
+                      loading={importingRef === task.sourceRef}
+                      onClick={() => void handleImport(task)}
+                    >
+                      {task.imported
+                        ? t('cpm.sourceImport.imported', { defaultValue: '已導入' })
+                        : t('cpm.sourceImport.import', { defaultValue: '導入' })}
+                    </Button>
+                  </Space>
+                </div>
+              ))}
+            </div>
+          )
         ) : rows.length === 0 && !loadError ? (
           <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-3)', fontSize: 13 }}>
             {tab === 'rdm'

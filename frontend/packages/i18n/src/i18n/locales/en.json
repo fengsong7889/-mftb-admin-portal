@@ -17220,7 +17220,16 @@
       "imported": "Already imported",
       "importedToast": "Imported as a work log",
       "terminated": "Source closed",
-      "close": "Close"
+      "close": "Close",
+      "dueBefore": "due",
+      "emptyTask": "No open tasks related to you",
+      "hintRdmTask": "Only tasks you own or participate in and that are still open; after import, progress updates write back to the same RDM task.",
+      "planHours": "Planned",
+      "prdTask": "PRD task",
+      "searchTask": "Search by task title or task number",
+      "syncHint": "Once on, this item’s progress updates write back to the RDM task; RDM rules still reject illegal reports",
+      "syncLabel": "Write-back",
+      "tabRdmTask": "R&D tasks"
     },
     "sourceRole": {
       "submitter": "Submitted by me",
@@ -17264,6 +17273,276 @@
     },
     "workHours": {
       "label": "Hours:"
+    },
+    "common": {
+      "delete": "Delete",
+      "edit": "Edit",
+      "item": "Item: ",
+      "loadFailed": "Failed to load"
+    },
+    "daily": {
+      "fileBase": "DailyWorklog_{{date}}",
+      "footnote": "Daily reports need no publishing; formal versions are produced only in Weekly / Monthly reports, so there is no Word export here",
+      "loadError": "Failed to load the daily report",
+      "title": "Daily Work Report ({{period}})"
+    },
+    "document": {
+      "aiSummaryTag": "Summary contains AI-generated content",
+      "brand": "Continuous Performance",
+      "draftLine": "Status: draft (not published)",
+      "edition": {
+        "daily": "Daily · read-only projection",
+        "draft": "Draft",
+        "legacy": "Historical sent snapshot (no version record)",
+        "published": "V{{no}} official version"
+      },
+      "emptyDetail": "No active work records in this period.",
+      "emptySummary": "No summary was filled in for this report.",
+      "entry": {
+        "invested": "Invested {{minutes}}",
+        "manualEstimateNote": "(manual estimate, no precise start/end)",
+        "source": "Source: {{label}}",
+        "startedFrom": "Since {{date}}",
+        "trail": "Trail {{trail}}%"
+      },
+      "footprint": "Scope: items deduplicated by itemId, status taken from the last progress entry within the period",
+      "generatedAt": "Generated at: {{time}}",
+      "groupMeta": "{{count}} items · {{hours}}",
+      "historicalBody": "Differences between the current version and this one are based on each version’s publish time; a historical notification points to the very version published at that moment.",
+      "historicalTitle": "Reading historical version V{{no}}; this version cannot be modified",
+      "meta": {
+        "blockedValue": "{{count}} items (manager intervention needed)",
+        "cancelledSkipped": ", {{count}} cancelled items excluded",
+        "completion": "Completion rate",
+        "completionDetail": "(done {{done}} / expected {{base}}{{skipped}})",
+        "dailyAvg": "Daily average",
+        "dailyAvgValue": "{{hours}} × {{days}} days",
+        "deferredValue": "{{count}} items (rescheduled, not cancelled)",
+        "includesEstimate": "(includes {{hours}} estimated)",
+        "itemCount": "Items",
+        "itemCountValue": "{{count}} items",
+        "statusDist": "Status distribution",
+        "totalInvested": "Total invested"
+      },
+      "owner": "Reporter: {{name}}{{empId}}",
+      "period": "Period: {{period}}",
+      "publishedAt": "Published: {{time}}",
+      "readonlyLine": "Scope: same-day item projection (daily reports publish and deliver nothing)",
+      "section": {
+        "detail": "Work item details",
+        "feedback": "Feedback and achievement recognition",
+        "first": "I",
+        "fourth": "IV",
+        "second": "II",
+        "summary": "Summary",
+        "third": "III",
+        "time": "Time investment overview"
+      },
+      "summaryFootnote": "Numbers and statuses come from work records and progress entries within the period; AI only drafts the summary text and must be disclosed. The model produces no counts at all.",
+      "totalItems": "{{count}} items in total",
+      "versionSingle": "Version V{{no}}"
+    },
+    "export": {
+      "button": "Export",
+      "docx": "Word file (.docx)",
+      "docxDone": "Downloaded the V{{no}} Word file (laid out by the backend from the frozen snapshot)",
+      "done": "Downloaded the body snapshot of the version you are reading",
+      "failed": "Download failed, please retry",
+      "image": "Long image (PNG)",
+      "notReady": "The report body is not loaded yet, please try again later",
+      "pdf": "PDF file (A4 paginated)"
+    },
+    "period": {
+      "dailyTip": "The daily report is a same-day projection of items: no publishing, no delivery, no formal version",
+      "day": "Daily",
+      "month": "Monthly",
+      "quarter": "Quarterly",
+      "readonlyTag": "Read-only projection",
+      "week": "Weekly"
+    },
+    "rdmSwitch": {
+      "disabled": "Write-back turned off",
+      "enabled": "Write-back turned on",
+      "label": "Write progress back to RDM"
+    },
+    "rdmSync": {
+      "disabled": "Write-back off",
+      "disabledHint": "While off, CPM changes do not affect RDM",
+      "helpAria": "Write-back rules",
+      "helpBody": "For a PRD task, 100% means \"submitted for review\"; marking done and marking blocked require a delivery note or a reason; cancelled and deferred are personal process judgements and are not written into delivery truth. In all these cases CPM still saves normally and only reports here why nothing was synced.",
+      "helpTitle": "When nothing is written back",
+      "noRecord": "No write-back record yet",
+      "realign": "Re-align with RDM’s current value",
+      "state": {
+        "conflict": "RDM changed",
+        "error": "Write-back error",
+        "pending": "Not written back",
+        "rejected": "RDM rejected write-back",
+        "success": "Synced to RDM"
+      },
+      "syncedAt": "Latest: {{time}}",
+      "task": "Task: {{taskNo}}",
+      "title": "RDM progress write-back",
+      "gateClosed": "Write-back disabled by system",
+      "gateClosedHint": "Operations has not enabled the RDM write-back master switch yet (cpm.rdm-sync-enabled=false); once it is on, this item’s progress updates will be written to RDM. CPM records keep saving normally in the meantime."
+    },
+    "recognition": {
+      "kind": {
+        "highlight": "Highlight",
+        "milestone": "Milestone"
+      }
+    },
+    "report": {
+      "clipboardUnavailable": "Clipboard unavailable",
+      "confirm": {
+        "aiGenerated": "Contains AI-generated content",
+        "aiSummary": "AI summary: ",
+        "dryRun": "dry-run (only logs skipped, sends nothing)",
+        "manualOnly": "Fully manual",
+        "notRecorded": "Not recorded",
+        "pushMode": "DingTalk push: ",
+        "realPush": "Real delivery",
+        "totalInvested": "Total invested: "
+      },
+      "confirmPublishOk": "Confirm publish",
+      "copied": "Markdown copied",
+      "copyMarkdown": "Copy Markdown",
+      "delivered": "Delivered to {{receivers}} · read by {{reads}}",
+      "docTitle": "Work Report ({{period}})",
+      "draftTag": "Draft",
+      "emptyPeriod": "No active work records in this period",
+      "exportVersionHint": "The export is the version you are viewing, not \"the latest version\"",
+      "feedbackCount": "{{comments}} comments · {{likes}} likes",
+      "fileBase": "WorkReport_{{type}}_{{date}}_V{{no}}",
+      "pendingRevisionTag": "New facts not in the version",
+      "pendingRevisionTip": "New records or progress entries appeared within the period and are not in the published version; click \"Revise and republish\" to create a new version",
+      "publishedTag": "Published V{{no}}",
+      "publishedV1": "Published V1",
+      "totalItems": "{{count}} items in total",
+      "trail": "Trail {{trail}}%",
+      "viewFullFeedback": "View full feedback →",
+      "markdown": {
+        "detailSection": "## {{no}}. Work item details",
+        "entry": "- {{title}} — {{status}} {{progress}}%{{trajectory}}{{invested}}",
+        "groupTitle": "### {{category}} ({{count}} items)",
+        "invested": " · invested {{minutes}}",
+        "timeAvg": "- Daily average: {{avg}} × {{days}} days with investment",
+        "timeByCategory": "- Time allocation: {{items}}",
+        "timePeak": "- Daily peak: {{date}} {{minutes}}",
+        "timeSection": "## {{no}}. Time investment overview",
+        "timeTopItems": "- Most invested items: {{items}}",
+        "timeTotal": "- Total invested: {{total}} (timed {{precise}}, estimated {{estimated}})",
+        "title": "# Work Report ({{period}})",
+        "trajectory": " (trail {{trail}}%)"
+      }
+    },
+    "revision": {
+      "button": "Revise and republish",
+      "current": "Current version: ",
+      "firstPublish": "First publish",
+      "footnote": "A revision never overwrites the old version: every version is the snapshot frozen at that publish, traceable, exportable and comparable.",
+      "idempotent": "If nothing changed: ",
+      "idempotentValue": "Identical content and note produce no new version (the backend is idempotent by content hash)",
+      "impact": "Impact: ",
+      "impactValue": "DingTalk links already sent will point to the new version; old versions remain switchable in the reading view",
+      "includes": "The new version will contain: ",
+      "includesValue": "Items and progress entries newly occurring within the period",
+      "loadErrorBody": "The view deliberately does not fall back to the current version: passing the current version off as a historical one is more dangerous than an error.",
+      "loadErrorBodyDetail": "The view deliberately does not fall back to the current version: passing the current version off as a historical one makes a manager read \"now\" as \"then\".",
+      "loadErrorTitle": "Failed to load the body of historical version V{{no}}",
+      "modalTitle": "Revise and republish",
+      "needChangeNote": "Please fill in a revision note",
+      "needPublishFirst": "This period has no report record yet, please publish first",
+      "notePlaceholder": "Revision note (required, e.g. added two Friday time segments and one completed item)",
+      "publishOk": "Publish new version",
+      "published": "Published V{{no}}",
+      "unchanged": "No new facts within the period; version stays V{{no}}"
+    },
+    "source": {
+      "ai": "AI organised",
+      "meetingAction": "Meeting action",
+      "rdmRequirement": "RDM requirement",
+      "rdmTask": "RDM task"
+    },
+    "status": {
+      "blocked": "Blocked",
+      "cancelled": "Cancelled",
+      "deferred": "Deferred",
+      "doing": "In progress",
+      "done": "Done",
+      "todo": "To do"
+    },
+    "time": {
+      "activeDays": "Days with investment",
+      "avg": "Daily average (over {{days}} days with investment)",
+      "byCategory": "Time allocation (by category)",
+      "byCategoryHelpAria": "How time allocation is computed",
+      "byCategoryHelpBody": "Category share uses the \"sum of recorded categories\" as denominator, while total investment includes the estimated part from manual work hours. Segments marked \"estimated\" have no precise start/end and only an hour count; the two differ in precision, so they are never merged into one statement.",
+      "byCategoryHelpTitle": "These two denominators are different",
+      "estimateNote": "{{estimate}} comes from manual work hours (no precise start/end), the remaining {{precise}} from timed segments",
+      "estimateTag": "Estimated {{hours}}",
+      "format": {
+        "hoursMinutes": "{{hours}} h {{minutes}} min",
+        "hoursOnly": "{{count}} h",
+        "minutesOnly": "{{count}} min"
+      },
+      "legacy": "This published version had no time-investment statistics (a snapshot frozen in stage two), so this section has nothing to read; revising and republishing will add the work-hour dimension.",
+      "notRecorded": "No time recorded in this period —— add start/end times inline under \"My Worklog\" via \"Time\", then revise and republish to bring them into this report.",
+      "peak": "Daily peak",
+      "peakWithDate": "Daily peak · {{date}}",
+      "range": {
+        "between": "{{from}}–{{to}}{{crossesMidnight}}",
+        "from": "Since {{time}}",
+        "none": "No start/end filled",
+        "to": "Until {{time}}"
+      },
+      "stackAria": "Work-hour share by category, {{total}} in total",
+      "topItems": "Time investment cost per item (Top {{count}})",
+      "topItemsMax": "The most invested item took {{hours}}",
+      "total": "Total invested",
+      "trend": "Daily investment trend",
+      "trendAria": "Bar chart of daily invested work hours",
+      "trendPeak": "Peak {{hours}}",
+      "unitDay": " days"
+    },
+    "timeEntry": {
+      "addSegment": "Add segment",
+      "autoComputed": "Auto {{minutes}} min",
+      "button": "Time",
+      "crossMidnight": "Overnight",
+      "deleteConfirmOk": "Confirm delete",
+      "deleteConfirmTitle": "Delete this invested time segment?",
+      "empty": "No invested time segments today",
+      "field": {
+        "duration": "Duration: ",
+        "range": "Segment: "
+      },
+      "helpAria": "About timing",
+      "helpBody": "Recording and reporting work fine without timing. The data here is only used for work-hour distribution and time-investment analysis and never enters any evaluation or ranking. Check \"Overnight\" for segments crossing midnight.",
+      "helpTitle": "Timing is an optional record of invested cost",
+      "hint": {
+        "auto": "Counted as {{minutes}} min from start/end",
+        "either": "Fill either start/end or duration",
+        "manual": "Will be recorded as manually entered {{minutes}} min"
+      },
+      "needBothClocks": "Start and end must be filled together",
+      "needDuration": "Please fill start/end or duration",
+      "placeholder": {
+        "end": "End",
+        "minutes": "Duration (min)",
+        "note": "What this segment covered (optional)",
+        "start": "Start"
+      },
+      "saved": "Recorded",
+      "title": "Time ({{date}})",
+      "todayTotal": "Today total {{minutes}}",
+      "tooltip": "{{minutes}} recorded today"
+    },
+    "worklog": {
+      "detailEllipsis": "Details…",
+      "finish": "Finish",
+      "todayInvested": "Today {{minutes}}",
+      "workHoursChip": "Hours {{hours}}h"
     }
   }
 }
