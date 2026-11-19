@@ -94,6 +94,8 @@ export interface TrialMerchant { id: string; name: string; tags: TagScore[]; rem
 export interface TrialSettings {
   userMinimum: number; merchantMinimum: number; coverageMinimum: number; metric: string;
   qualityPreference?: { enabled: boolean; line: number }; preset: string; factors: string[]; tieRule: string; direction: string; maxDistance: number
+  /** 冷启动勾选维度（集合语义、无优先级）：距离/流量归一等权综合分，质量软优选；不传默认距离＋流量。 */
+  coldStartDimensions?: readonly string[]
   /** 示例中由调用方给定的已展示/频控排除集合，不模拟真实计数。 */
   excludedMerchantIds?: readonly string[]
 }
@@ -104,7 +106,7 @@ function merchantExclusion(m: TrialMerchant, settings: TrialSettings): string {
     || (m.qualityKnown !== false && (!Number.isFinite(m.quality) || m.quality < 0 || m.quality > 5))) return '样例数据无效'
   if (m.paid !== true) return '未购本广告，仅自然层可考虑'
   if (m.remaining === 0) return '剩余曝光次数已耗尽'
-  if (!Number.isFinite(settings.maxDistance) || m.distance > settings.maxDistance) return '超出示例配送距离'
+  if (!Number.isFinite(settings.maxDistance) || m.distance > settings.maxDistance) return '超出示例最大直线距离'
   if (settings.excludedMerchantIds?.includes(m.id)) return '已在本次排除集合中（已展示或频控）'
   return ''
 }
@@ -123,7 +125,7 @@ export function evaluateInterestTrial(user: TagScore[], merchants: TrialMerchant
     const match = matchOf(user, m.tags, settings.userMinimum, settings.merchantMinimum)
     const sim = computeSimilarity(match.rows, settings.metric)
     const norm = normalizeRank({ ...m, match: sim.value }, settings.maxDistance)
-    const score = match.coldStart ? norm.distance : rankScore(settings.preset, settings.factors, norm)
+    const score = match.coldStart ? 0 : rankScore(settings.preset, settings.factors, norm)
     let reason = merchantExclusion(m, settings)
     if (reason) { /* 资格不通过时，不用标签或评分原因覆盖它。 */ }
     else if (!match.coldStart && match.coveredCount === 0) reason = '没有双方达标的共同标签'
@@ -131,10 +133,25 @@ export function evaluateInterestTrial(user: TagScore[], merchants: TrialMerchant
     else if (score === null) reason = '排序策略未配置有效因子'
     return { m, match, sim, norm, score, reason, admitted: reason === '' }
   })
+  // 冷启动综合分：勾选的距离/流量归一后等权平均；最大余量取本轮合格候选，避免被排除商家拉偏尺度。
+  if (results.some(r => r.match.coldStart)) {
+    const dims = settings.coldStartDimensions ?? ['distance', 'remainingTraffic']
+    const maxRemaining = Math.max(0, ...results.filter(r => r.admitted).map(r => r.m.remaining))
+    for (const r of results) {
+      if (!r.match.coldStart) continue
+      const parts: number[] = []
+      if (dims.includes('distance')) parts.push(r.norm.distance)
+      if (dims.includes('remainingTraffic')) {
+        const ratio = maxRemaining > 0 ? Math.min(1, r.m.remaining / maxRemaining) : 0
+        parts.push(settings.direction === 'lessFirst' ? 1 - ratio : ratio)
+      }
+      r.score = parts.length > 0 ? parts.reduce((s, x) => s + x, 0) / parts.length : 0
+    }
+  }
   const ranked = results.filter(r => r.admitted).sort((a, b) => {
     if (a.match.coldStart) {
       return coldQualityGroup(a.m, settings.qualityPreference) - coldQualityGroup(b.m, settings.qualityPreference)
-        || a.m.distance - b.m.distance || tieBreakOrder(a.m, b.m, 'trafficDirection', settings.direction)
+        || (b.score ?? 0) - (a.score ?? 0)
     }
     return (b.score ?? 0) - (a.score ?? 0) || tieBreakOrder(a.m, b.m, settings.tieRule, 'moreFirst')
   })

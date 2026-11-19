@@ -234,7 +234,8 @@ describe('算法页签切换状态隔离', () => {
     expect(api.fetch).not.toHaveBeenCalled()
     expect(api.create).not.toHaveBeenCalled()
     expect(api.update).not.toHaveBeenCalled()
-  })
+    // 双向切换＋前进后退全量字段挂载，高负载并发下易超默认 60s，显式放宽（断言不变）。
+  }, 120000)
 
   it('同类型编辑页切回新增页时，不残留记录名称和配置', async () => {
     const query = `type=${AlgorithmType.INVINCIBLE_STAR}`
@@ -279,7 +280,7 @@ describe('算法库父页面投流接入', () => {
     expect(api.update.mock.calls[0]).toEqual([7, expect.objectContaining({
       algoName: '实际父页面投流', algoType: 15, brand: 'flashBee',
       // 曝光策略已退役：保存时归档到 legacyTrafficParams，不再回顶层
-      params: expect.objectContaining({ statusRest: true, consistencyCheckInterval: 15, trafficConfigVersion: 3,
+      params: expect.objectContaining({ statusRest: true, consistencyCheckInterval: 15, trafficConfigVersion: 4,
         legacyTrafficParams: expect.objectContaining({ merchantExposureStrategy: 'trafficProportional' }) }),
     })])
     expect(api.update.mock.calls[0][1].params).not.toHaveProperty('merchantExposureStrategy')

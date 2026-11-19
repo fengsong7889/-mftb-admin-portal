@@ -39,11 +39,14 @@ export const RANK_TIE_BREAK_OPTIONS = [
 export const isTrafficOnlyRank = (preset: string, factors: string[]) =>
   preset === 'consumeFirst' || (preset === 'custom' && factors.length === 1 && factors[0] === 'traffic')
 
-/** 冷启动一期维度真源：固定生效因子 + 唯一可勾选政策维度；退役维度不再进入保存值。
+/** 冷启动一期维度真源：三个维度均可自由勾选（至少保留一项），集合语义、无优先级。
+ * 距离/剩余流量包归一后等权综合分高者先；质量分软优选（达线者先、不硬准入）。
  * sections.tsx 的维度卡与 serialize 的归一都以此为唯一真源，避免默认值/可选范围/保存值三处不一致。 */
-export const COLD_START_FIXED_DIMENSIONS = ['remainingTraffic', 'distance'] as const
-// 质量为一期可选「软优选」维度：只影响冷启动层内先后，不作全局硬准入。
-export const V1_DIMENSIONS = [...COLD_START_FIXED_DIMENSIONS, 'qualityScore'] as const
+export const V1_DIMENSIONS = ['remainingTraffic', 'qualityScore', 'distance'] as const
+/** 默认勾选＝距离＋流量：与解锁前的固定生效范围一致，存量行为不静默反转。 */
+export const COLD_START_DEFAULT_DIMENSIONS = ['distance', 'remainingTraffic'] as const
+/** v4 起三维度自由勾选＋综合分（顺序无意义）；v3 及更早为固定生效语义，读取时收敛为默认勾选。 */
+export const TRAFFIC_CONFIG_VERSION = 4
 export const RETIRED_DIMENSIONS = ['regionPopular', 'completionRate'] as const
 
 export interface TrafficAlgorithmValues {
@@ -163,7 +166,7 @@ export const TRAFFIC_DEFAULTS: TrafficAlgorithmValues = {
   generativeTriggerScope: 'all', generativeMerchantCount: 1,
   generativePriorityMode: 'matchFirst', generativePriorityMode2: 'trafficBalance',
   generativeDailyLimitMode: 'limited', generativeDailyLimit: 3, generativeSkipMerchantCount: 2,
-  newUserDimensions: [...COLD_START_FIXED_DIMENSIONS], qualityScoreThreshold: 3.5,
+  newUserDimensions: [...COLD_START_DEFAULT_DIMENSIONS], qualityScoreThreshold: 3.5,
   regionPopularStatsDays: 30, popularityMetrics: ['orderCount', 'visitCount'],
   regionPopularTopPercent: 20, completionRateThreshold: 80, completionMinOrderCount: 20,
   remainingTrafficDirection: 'moreFirst',
@@ -433,16 +436,14 @@ export function readTrafficParams(raw: unknown): TrafficAlgorithmValues {
     result[name] = (Array.isArray(value) ? [...value] : value) as TrafficAlgorithmValues[K]
   }
   TRAFFIC_FIELD_NAMES.forEach(restore)
-  // 质量软优选迁移：v3 记录直接信任现行维度（硬开关已归档，不再推导，保证往返幂等）；
-  // 旧版本：旧全局硬开关或旧维度里的 qualityScore → 冷启动 qualityScore 维度；默认关闭。
-  if (source.trafficConfigVersion !== 3) {
-    const qualityEnabled = source.qualityFilterEnabled !== undefined
+  // 质量软优选迁移：v4 记录直接信任现行勾选（内部二次 read 会把已归一值误当旧记录重迁移）；
+  // v3 及更早为固定生效语义，收敛为默认勾选，质量软优选沿用勾选；
+  // 更早版本：旧全局硬开关或旧维度里的 qualityScore → 冷启动 qualityScore 维度；默认关闭。
+  if (source.trafficConfigVersion !== TRAFFIC_CONFIG_VERSION) {
+    const qualityEnabled = source.trafficConfigVersion !== 3 && source.qualityFilterEnabled !== undefined
       ? source.qualityFilterEnabled === true
       : Array.isArray(source.newUserDimensions) && source.newUserDimensions.includes('qualityScore')
-    result.newUserDimensions = [...new Set([
-      ...COLD_START_FIXED_DIMENSIONS,
-      ...(qualityEnabled ? ['qualityScore'] : []),
-    ])]
+    result.newUserDimensions = [...COLD_START_DEFAULT_DIMENSIONS, ...(qualityEnabled ? ['qualityScore'] : [])]
   }
   // 覆盖率开关迁移：显式 null 保留待配置；缺失/旧 0 → 关闭且隐藏值回 30；旧正数 → 开启并保留；显式开关优先。
   const rawCoverage = source.matchThreshold
@@ -464,7 +465,7 @@ export function readTrafficParams(raw: unknown): TrafficAlgorithmValues {
   return result
 }
 
-/** currentVersion=3 表示写入现行版本：维度直接信任入参勾选（内部二次 read 会把已归一值误当旧记录重迁移）。 */
+/** currentVersion=4 表示写入现行版本：维度勾选直接信任入参（内部二次 read 会把已归一值误当旧记录重迁移）。 */
 export function serializeTrafficParams(values: unknown, currentVersion?: number): Partial<TrafficAlgorithmValues> {
   const result = readTrafficParams(values)
   // 统计范围已固定为全部历史：选择器字段不再挂载，存量 custom 值在保存时统一归一，
@@ -476,12 +477,13 @@ export function serializeTrafficParams(values: unknown, currentVersion?: number)
   // 区域召回收敛为两档：存量「同行政区/同城」归一为「配送范围内」，不把已废弃枚举透传回参数。
   if (result.coldStartRegionScope === 'district' || result.coldStartRegionScope === 'city') result.coldStartRegionScope = 'delivery'
   // 冷启动维度归一：剔除退役维度（regionPopular/completionRate），避免新建/存量写入不可选维度。
-  // v3 信任入参现行勾选（UI 锁定固定因子，校验保证至少一项）；旧版本强制回退固定因子。
+  // v4 信任入参勾选（UI 三维度自由勾选、校验保证至少一项，空选兜底默认勾选）；旧版本沿用 read 的旧语义收敛。
   const inputDims = isParamsObject(values) && Array.isArray(values.newUserDimensions)
     ? values.newUserDimensions.filter((d): d is string => typeof d === 'string') : result.newUserDimensions
-  result.newUserDimensions = currentVersion === 3
-    ? [...new Set(inputDims.filter(d => (V1_DIMENSIONS as readonly string[]).includes(d)))]
-    : [...new Set([...COLD_START_FIXED_DIMENSIONS, ...result.newUserDimensions])]
+  if (currentVersion === TRAFFIC_CONFIG_VERSION) {
+    const checked = [...new Set(inputDims.filter(d => (V1_DIMENSIONS as readonly string[]).includes(d)))]
+    result.newUserDimensions = checked.length > 0 ? checked : [...COLD_START_DEFAULT_DIMENSIONS]
+  }
   // 按坑位来源写入时归一到已勾选模式（read 保留原值以维持 defaults 不变量）；取消勾选后回退首个已勾选模式。
   if (result.generativeRecommendEnabled && result.similarRecModes.length > 0) {
     if (!result.similarRecModes.includes(result.similarRecSlot1Source)) result.similarRecSlot1Source = result.similarRecModes[0]
@@ -504,9 +506,9 @@ export function buildTrafficParams(values: unknown, original: Record<string, unk
     delete extras[key]
   }
   for (const key of ['newUserDimensions', 'similarRecModes'] as const) {
-    if (original.trafficConfigVersion !== 3 && Object.hasOwn(original, key)) legacy[key] ??= original[key]
+    if (original.trafficConfigVersion !== TRAFFIC_CONFIG_VERSION && Object.hasOwn(original, key)) legacy[key] ??= original[key]
   }
-  return { ...extras, ...serializeTrafficParams(values, 3), trafficConfigVersion: 3,
+  return { ...extras, ...serializeTrafficParams(values, TRAFFIC_CONFIG_VERSION), trafficConfigVersion: TRAFFIC_CONFIG_VERSION,
     ...(Object.keys(legacy).length ? { legacyTrafficParams: legacy } : {}) }
 }
 
@@ -519,6 +521,7 @@ export function isTrafficFieldActive(name: TrafficFieldName, values: Partial<Tra
   if (name === 'rankFactors') return values.rankPreset === 'custom'
   if (name === 'mealPeriodFallback') return values.mealPeriodPriorityEnabled === true
   if (name === 'qualityScoreThreshold') return (values.newUserDimensions ?? []).includes('qualityScore')
+  if (name === 'remainingTrafficDirection') return (values.newUserDimensions ?? []).includes('remainingTraffic')
   if (name === 'matchThreshold') return values.coverageFilterEnabled === true
   if (name === 'matchingUserSimilarThreshold') return values.matchingUserSimilarEnabled === true
   if (name === 'matchingUserSimilarMode') return values.matchingUserSimilarEnabled === true

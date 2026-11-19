@@ -200,6 +200,13 @@
   color: var(--text-2);
 }
 
+/* 标题内嵌问号弹层触发器：与标签文字基线对齐。 */
+.traffic-dimensions-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
 /* 维度卡并排一行（自适应列宽）：每卡仅 0~1 个参数，不再纵向独占整行；窄屏自动折行。 */
 .traffic-dim-cards {
   display: grid;
@@ -330,6 +337,19 @@
 .traffic-dim-card__body {
   padding: 8px 12px;
   border-top: 1px solid var(--border-2);
+}
+
+/* 末项取消拦截：警告色描边 + 短促抖动，提示「至少保留一项」。 */
+.traffic-dim-card--shake {
+  border-color: var(--warning);
+  animation: traffic-dim-shake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes traffic-dim-shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-3px); }
+  40%, 60% { transform: translateX(3px); }
 }
 
 .traffic-dim-card__body[hidden] {

@@ -9678,6 +9678,7 @@
         "c17": "Independent priority scoring"
       },
       "badge": {
+        "selected": "Selected",
         "dir": "Direction configurable",
         "fixed": "Fixed",
         "none": "No extra config",
@@ -9688,6 +9689,7 @@
       "allHistory": "All history",
       "fixed": "Fixed",
       "trial": {
+        "composite": "Composite score",
         "t23": "User qualified preference tags",
         "t24": "Merchant covered preference tags",
         "t25": "Initial score",
@@ -9701,7 +9703,7 @@
         "t33": "Remaining ratio",
         "t34": "Quality",
         "t35": "Distance",
-        "t36": "Max delivery distance",
+        "t36": "Max straight-line distance",
         "t37": "A remaining",
         "t38": "B remaining",
         "t39": "C remaining"

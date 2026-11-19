@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react'
-import { Checkbox, Form, Input, InputNumber, Select, Switch, type FormInstance } from 'antd'
+import { useEffect, useState, type ReactNode } from 'react'
+import { Checkbox, Form, Input, InputNumber, Select, Switch, message, type FormInstance } from 'antd'
 import { CheckCircleOutlined, EnvironmentOutlined, FireOutlined, LockOutlined, StarOutlined, WalletOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import MerchantStatusFields from '../AlgorithmForm/MerchantStatusFields'
@@ -299,21 +299,20 @@ export function FrequencySection(props: TrafficSectionProps) {
   )
 }
 
-// 一期维度真源在 config.ts（V1_DIMENSIONS）：剩余流量包/距离固定生效、质量分可勾选；
-// 区域热门度一期暂不开放、完单率并入质量分、类目打散并入展示频控的同标签上限。
+// 一期维度真源在 config.ts（V1_DIMENSIONS）：三维度自由勾选、至少一项，集合语义无优先级；
+// 距离/流量归一等权综合分，质量分软优选；区域热门度一期暂不开放、完单率并入质量分、类目打散并入展示频控的同标签上限。
 
 /** 冷启动各排序维度的展示元数据：图标 + 一句话口径 + 该维度专属配置字段。
- * 选项顺序与取值仍以 config.ts 的 newUserDimensions.options 为唯一真源，这里只补 UI 说明。
- * locked=固定生效因子（锁定勾选、不可关闭）；fixedText=无配置时的固定口径文案。 */
-const DIMENSION_META: Record<string, { icon: ReactNode; desc: string; fields: TrafficFieldName[]; hintKey?: string; fixedNote?: string; locked?: boolean; fixedText?: string }> = {
-  remainingTraffic: { icon: <WalletOutlined />, desc: '冷启动等距时比较剩余曝光次数', fields: ['remainingTrafficDirection'], locked: true },
-  distance: { icon: <EnvironmentOutlined />, desc: '可配送候选按距离由近到远', fields: [], locked: true, fixedText: '距离为冷启动首要顺序，等距再比较流量余量' },
-  qualityScore: { icon: <StarOutlined />, desc: '软优选：同层内已评分达线者先，未评分/未达线者仍保留资格', fields: ['qualityScoreThreshold'] },
+ * 选项顺序与取值仍以 config.ts 的 newUserDimensions.options 为唯一真源，这里只补 UI 说明。 */
+const DIMENSION_META: Record<string, { icon: ReactNode; desc: string; fields: TrafficFieldName[]; hintKey?: string; fixedNote?: string }> = {
+  remainingTraffic: { icon: <WalletOutlined />, desc: '剩余次数归一后参与综合分（方向可配：剩余多优先／剩余少优先）', fields: ['remainingTrafficDirection'] },
+  distance: { icon: <EnvironmentOutlined />, desc: '按直线距离近远归一后参与综合分，不硬排除远商家', fields: [] },
+  qualityScore: { icon: <StarOutlined />, desc: '软优选：勾选后达线者先，未评分/未达线仍保留资格（不参与综合分）', fields: ['qualityScoreThreshold'] },
   regionPopular: { icon: <FireOutlined />, desc: '区域内热度分排名前 N% 的商家视为热门商家', fields: ['regionPopularTopPercent'], hintKey: 'recommend.trafficRegionPopularCalc', fixedNote: '统计周期固定 30 天 · 热度指标固定为下单数' },
   completionRate: { icon: <CheckCircleOutlined />, desc: '完单率达标且订单样本充足的商家优先展示', fields: ['completionRateThreshold', 'completionMinOrderCount'], hintKey: 'recommend.trafficCompletionMinSampleHint' },
 }
 
-/** 逐维度配置卡：勾选某维度即在卡内展开它自己的配置项，避免所有条件字段扎堆在一起。
+/** 逐维度配置卡：三维度均可自由勾选（至少保留一项），无优先级；距离/流量等权综合分，质量分软优选。
  * 作为 newUserDimensions 的受控控件接收 value/onChange；配置字段仍走 Fields 保持挂载，取消勾选不丢历史值。 */
 function ColdStartDimensionCards({ value, onChange, values, readOnly }: {
   value?: string[]
@@ -323,42 +322,58 @@ function ColdStartDimensionCards({ value, onChange, values, readOnly }: {
 }) {
   const { t } = useTranslation()
   const selected = value ?? []
-  // 一期仅暴露三个因子：剩余流量包/距离固定生效，质量分可勾选；热门度与完单率退役。
+  const [blocked, setBlocked] = useState<string | null>(null)
+  useEffect(() => {
+    if (!blocked) return
+    const timer = setTimeout(() => setBlocked(null), 500)
+    return () => clearTimeout(timer)
+  }, [blocked])
+  // 一期仅暴露三个因子；热门度与完单率退役。
   const options = (TRAFFIC_FIELDS.newUserDimensions.options ?? []).filter(option => (V1_DIMENSIONS as readonly string[]).includes(option.value))
+  const labelOf = (dimension: string) => t(trafficOptionKey('newUserDimensions', dimension), { defaultValue: options.find(o => o.value === dimension)?.label ?? dimension })
   const toggle = (dimension: string, checked: boolean) => {
+    // 末项拦截：至少保留一个排序维度，警告 + 卡片抖动反馈，不写空值。
+    if (!checked && selected.length <= 1) {
+      setBlocked(dimension)
+      message.warning('冷启动排序维度至少保留一项；未勾选的维度不参与排序。')
+      return
+    }
     onChange?.(checked ? [...selected, dimension] : selected.filter(item => item !== dimension))
   }
   return (
     <div className="traffic-dim-cards">
       <div className="traffic-dim-cards__summary">
-        <span>无有效偏好时按距离由近到远，等距按流量包方向；勾选「综合评分优选」后同层内达线者先，不作硬准入、不跨餐段层。</span>
+        <span className="traffic-dim-cards__count">{t('recommend.trafficCfg.badge.selected', { defaultValue: '已选' })} {selected.length} / {options.length}</span>
+        <span>距离与剩余流量包归一后等权综合、分高者先；质量分软优选达线者先；未勾选不参与。</span>
       </div>
       {options.map(option => {
         const meta = DIMENSION_META[option.value]
-        const checked = meta.locked ? true : selected.includes(option.value)
-        const badge = meta.locked
-          ? (meta.fields.length > 0 ? t('recommend.trafficCfg.badge.dir', { defaultValue: '方向可配' }) : t('recommend.trafficCfg.badge.fixed', { defaultValue: '固定生效' }))
-          : (meta.fields.length > 0 ? t('recommend.trafficCfg.badge.n', { defaultValue: `${meta.fields.length} 项配置`, n: meta.fields.length }) : t('recommend.trafficCfg.badge.none', { defaultValue: '无需额外配置' }))
+        const checked = selected.includes(option.value)
+        const badge = meta.fields.length > 0
+          ? t('recommend.trafficCfg.badge.n', { defaultValue: `${meta.fields.length} 项配置`, n: meta.fields.length })
+          : t('recommend.trafficCfg.badge.none', { defaultValue: '无需额外配置' })
+        const hasBody = meta.fields.length > 0 || Boolean(meta.fixedNote) || Boolean(meta.hintKey)
         return (
-          <div key={option.value} className={`traffic-dim-card${checked ? ' traffic-dim-card--active' : ''}`}>
-            {/* 整个卡头即 Checkbox 的 label；固定生效因子锁定勾选，仅政策维度可切换。 */}
-            <Checkbox className="traffic-dim-card__header" checked={checked} disabled={readOnly || meta.locked}
+          <div key={option.value} className={`traffic-dim-card${checked ? ' traffic-dim-card--active' : ''}${blocked === option.value ? ' traffic-dim-card--shake' : ''}`}>
+            {/* 整个卡头即 Checkbox 的 label；三维度均可切换，末项取消在 toggle 内拦截。 */}
+            <Checkbox className="traffic-dim-card__header" checked={checked} disabled={readOnly}
               onChange={e => toggle(option.value, e.target.checked)}>
               <span className="traffic-dim-card__title">
                 <span className="traffic-dim-card__name">
                   <span className="traffic-dim-card__icon" aria-hidden="true">{meta.icon}</span>
-                  {t(trafficOptionKey('newUserDimensions', option.value), { defaultValue: option.label })}
+                  {labelOf(option.value)}
                   <span className={`traffic-dim-card__badge${checked ? ' traffic-dim-card__badge--active' : ''}`}>{badge}</span>
                 </span>
                 <span className="traffic-dim-card__desc">{meta.desc}</span>
               </span>
             </Checkbox>
-            <div className="traffic-dim-card__body" hidden={meta.locked ? false : !checked}>
-              {meta.fields.length > 0 && <Fields compact names={meta.fields} values={values} readOnly={readOnly} />}
-              {meta.fixedText && <p className="traffic-config__hint traffic-dim-card__hint">{meta.fixedText}</p>}
-              {meta.fixedNote && <p className="traffic-config__hint traffic-dim-card__hint">{meta.fixedNote}</p>}
-              {meta.hintKey && <p className="traffic-config__hint traffic-dim-card__hint">{t(meta.hintKey)}</p>}
-            </div>
+            {hasBody && (
+              <div className="traffic-dim-card__body" hidden={!checked}>
+                {meta.fields.length > 0 && <Fields compact names={meta.fields} values={values} readOnly={readOnly} />}
+                {meta.fixedNote && <p className="traffic-config__hint traffic-dim-card__hint">{meta.fixedNote}</p>}
+                {meta.hintKey && <p className="traffic-config__hint traffic-dim-card__hint">{t(meta.hintKey)}</p>}
+              </div>
+            )}
           </div>
         )
       })}
@@ -384,10 +399,10 @@ const SIMILARITY_FORMULA: Record<string, string> = {
 
 /** 排序因子元数据：展示色 + 归一口径。勾选式参与（等权相加），不再手填权重。 */
 const RANK_FACTORS: { value: string; label: string; color: string; norm: string }[] = [
-  { value: 'match', label: '匹配分', color: 'var(--brand)', norm: '直接匹配/商家相似使用相似度 sim；用户协同使用 CF；同类目无相似度、匹配分记 0；冷启动使用独立距离与软优选规则' },
+  { value: 'match', label: '匹配分', color: 'var(--brand)', norm: '直接匹配/商家相似使用相似度 sim；用户协同使用 CF；同类目无相似度、匹配分记 0；冷启动使用独立维度综合分与软优选规则' },
   { value: 'traffic', label: '剩余比例', color: 'var(--info)', norm: '自定义因子使用剩余曝光次数 ÷ 总曝光次数；消耗优先预设直接比较剩余曝光次数，不使用比例，也不受冷启动方向影响' },
   { value: 'quality', label: '质量分', color: 'var(--success)', norm: '商家质量分 ÷ 5' },
-  { value: 'distance', label: '距离', color: 'var(--purple)', norm: '1 − min(距离 ÷ 最大配送距离, 1)' },
+  { value: 'distance', label: '距离', color: 'var(--purple)', norm: '1 − min(直线距离 ÷ 最大直线距离, 1)' },
 ]
 
 /** 读当前所选因子（预设/自定义都已归一写入 Factors 字段）。 */
@@ -454,7 +469,7 @@ function RankingRule(props: TrafficSectionProps & { prefix: RankPrefix; caption:
         trial={<RankTrial values={props.values} prefix={prefix} />}
         sections={[
           { label: '因子', body: RANK_FACTORS.map(f => `${f.label}：${f.norm}`).join('\n'), tone: 'info' },
-          { label: '冷启动路径', body: '无有效用户偏好时使用冷启动顺序：距离由近到远，等距按冷启动流量包方向。这里的匹配／消耗／自定义策略只排序有匹配依据的候选。', tone: 'warn' },
+          { label: '冷启动路径', body: '无有效用户偏好时使用冷启动排序维度综合分：距离/剩余流量包归一后等权相加、分高者先，质量分软优选达线者先。这里的匹配／消耗／自定义策略只排序有匹配依据的候选。', tone: 'warn' },
         ]}
       />
     </FieldGroup>
@@ -541,7 +556,7 @@ export function ColdStartSection(props: TrafficSectionProps) {
           content={[
             { label: '配送范围内', body: '以调度系统当前配置的配送范围为召回边界。该范围由调度侧维护，可能横跨多个商圈，也可能很小；若商家做了缩圈（缩小配送范围），可召回的商家会随之减少 —— 请留意配送范围变更对冷启动量的影响。', tone: 'info' },
             { label: '用户所在商圈', body: '始终取“用户所在商圈”与“当前可配送范围”的交集。配送缩圈时可选商家减少，不以扩圈方式绕过配送限制；不足交瀑布流兜底。', tone: 'neutral' },
-            { label: '如何选择', body: '配送范围内覆盖面较广；用户所在商圈进一步限定地域。无偏好冷启动在该范围内按距离与流量方向排序，仍满足通用准入条件。', tone: 'warn' },
+            { label: '如何选择', body: '配送范围内覆盖面较广；用户所在商圈进一步限定地域。无偏好冷启动在该范围内按勾选维度综合分排序，仍满足通用准入条件。', tone: 'warn' },
           ]}
         />}
       >
@@ -549,7 +564,23 @@ export function ColdStartSection(props: TrafficSectionProps) {
       </FieldGroup>
       <Form.Item
         name="newUserDimensions"
-        label={t(trafficFieldKey('newUserDimensions'), { defaultValue: TRAFFIC_FIELDS.newUserDimensions.label })}
+        label={<span className="traffic-dimensions-label">
+          {t(trafficFieldKey('newUserDimensions'), { defaultValue: TRAFFIC_FIELDS.newUserDimensions.label })}
+          <HelpPopover
+            title="冷启动排序维度规则"
+            ariaLabel="冷启动排序维度规则"
+            width={560}
+            maxHeight={420}
+            content={[
+              { label: '综合分公式', body: '综合分 = Σ(勾选维度归一分) ÷ 勾选维度数（仅距离／剩余流量包参与综合分），分高者先。未勾选的维度完全不参与。', tone: 'info' },
+              { label: '归一（0~1）', body: '距离 = 1 − min(直线距离 ÷ 最大直线距离, 1)，越近分高；\n剩余流量包 = 剩余次数 ÷ 本轮候选最大剩余次数，「剩余少优先」时取 1 − 该值。', tone: 'neutral' },
+              { label: '质量分软优选', body: '勾选后作优选层：已评分达线者先，未评分/未达线仍保留资格，不作硬准入、不跨餐段层；不参与综合分。仅勾质量分时分层后同分保持候选顺序。', tone: 'warn' },
+              { label: '组合场景', body: '只勾距离 = 由近到远；\n只勾流量 = 按方向剩余多/少优先；\n距离＋流量 = 等权综合：余量接近时近者先、距离接近时余量多者先，「远而余量多」与「近而余量少」按综合分权衡；\n三个全勾 = 质量达线者先 ＋ 层内流量/距离综合；\n质量＋单维度 = 达线者先 ＋ 层内按该维度排序。', tone: 'info' },
+              { label: '示例（最大直线 5km、候选最大剩余 1900）', body: 'A 剩余 1900 / 4km → (1 + 0.2) ÷ 2 = 0.60；\nB 剩余 900 / 1km → (0.47 + 0.8) ÷ 2 = 0.64 → B 先：余量少但足够近可以胜出；\nC 剩余 1900 / 2km → (1 + 0.6) ÷ 2 = 0.80 → C 先：余量多且近最优。', tone: 'success' },
+              { label: '同分与兜底', body: '综合分相同保持候选输入顺序（试算不模拟随机）；至少保留一个排序维度，末项取消会被拦截。', tone: 'neutral' },
+            ]}
+          />
+        </span>}
         required
         className="traffic-dimensions-item"
         rules={[({ getFieldsValue }) => ({

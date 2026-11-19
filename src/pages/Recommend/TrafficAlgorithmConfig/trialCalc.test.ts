@@ -134,7 +134,7 @@ describe('投流公式试算纯函数', () => {
       { ...merchants[0], distance: 6 }, { ...merchants[0], paid: false },
     ], settings)
     expect(trial.ranked).toHaveLength(0)
-    expect(trial.rejected.map(r => r.reason)).toEqual(['没有双方达标的共同标签', '剩余曝光次数已耗尽', '超出示例配送距离', '未购本广告，仅自然层可考虑'])
+    expect(trial.rejected.map(r => r.reason)).toEqual(['没有双方达标的共同标签', '剩余曝光次数已耗尽', '超出示例最大直线距离', '未购本广告，仅自然层可考虑'])
   })
   it('质量不作硬准入：低分与暂无评分的已购商家仍保留资格', () => {
     const trial = evaluateInterestTrial(user, [
@@ -157,6 +157,32 @@ describe('投流公式试算纯函数', () => {
   it('冷启动不使用匹配分，匹配同分则执行质量决胜', () => {
     expect(evaluateInterestTrial([], merchants, settings).ranked.map(r => r.m.name)).toEqual(['A', 'B'])
     expect(evaluateInterestTrial(user, merchants, { ...settings, preset: 'matchFirst' }).ranked.map(r => r.m.name)).toEqual(['B', 'A'])
+  })
+  it('冷启动无优先级：单维纯排序、双维等权综合可权衡、质量软优选分层不硬排除', () => {
+    const cold = [
+      { id: 'near', paid: true, name: '近', tags: [], remaining: 900, total: 1000, quality: 2, distance: 1 },
+      { id: 'far', paid: true, name: '远', tags: [], remaining: 1900, total: 10000, quality: 4, distance: 3 },
+    ]
+    // 只勾距离：近者先，忽略流量
+    expect(evaluateInterestTrial([], cold, { ...settings, coldStartDimensions: ['distance'] }).ranked.map(r => r.m.name)).toEqual(['近', '远'])
+    // 只勾流量＋剩余多优先：余量多者先，忽略距离
+    expect(evaluateInterestTrial([], cold, { ...settings, direction: 'moreFirst', coldStartDimensions: ['remainingTraffic'] }).ranked.map(r => r.m.name)).toEqual(['远', '近'])
+    // 双维等权综合：远而余量多 (1+0.4)/2=0.7 > 近而余量少 (0.47+0.8)/2≈0.64
+    const both = evaluateInterestTrial([], cold, { ...settings, direction: 'moreFirst', coldStartDimensions: ['distance', 'remainingTraffic'] })
+    expect(both.ranked.map(r => r.m.name)).toEqual(['远', '近'])
+    expect(both.ranked[0].score).toBeCloseTo(0.7, 6)
+    expect(both.ranked[1].score).toBeCloseTo((900 / 1900 + 0.8) / 2, 6)
+    // 距离优势足够大时近而余量少可反转：远店改 4km → (1+0.2)/2=0.6 < 0.64
+    const trade = evaluateInterestTrial([], [cold[0], { ...cold[1], distance: 4 }], { ...settings, direction: 'moreFirst', coldStartDimensions: ['distance', 'remainingTraffic'] })
+    expect(trade.ranked.map(r => r.m.name)).toEqual(['近', '远'])
+    // 三个全勾：质量达线者先（远店达线），层内综合分；未达线仍保留资格
+    const all3 = evaluateInterestTrial([], cold, { ...settings, direction: 'moreFirst', coldStartDimensions: ['distance', 'remainingTraffic', 'qualityScore'], qualityPreference: { enabled: true, line: 3.5 } })
+    expect(all3.ranked.map(r => r.m.name)).toEqual(['远', '近'])
+    expect(all3.rejected).toHaveLength(0)
+    // 仅勾质量：分层后同分保持输入顺序，不硬排除
+    const qOnly = evaluateInterestTrial([], cold, { ...settings, coldStartDimensions: ['qualityScore'], qualityPreference: { enabled: true, line: 3.5 } })
+    expect(qOnly.ranked.map(r => r.m.name)).toEqual(['远', '近'])
+    expect(qOnly.rejected).toHaveLength(0)
   })
   it('协同：邻居去重支持、排除本人/零相似、CF 分母为邻居相似度之和', () => {
     const u = [{ label: '汉堡', score: 10 }]

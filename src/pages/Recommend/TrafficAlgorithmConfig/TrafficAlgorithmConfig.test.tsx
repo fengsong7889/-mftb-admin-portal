@@ -10,13 +10,13 @@ import { readTrafficParams, TRAFFIC_FIELD_NAMES, type TrafficFieldName } from '.
 import type { AdAlgorithm } from '@/api/adPromotion'
 
 const mocks = vi.hoisted(() => ({
-  fetch: vi.fn(), create: vi.fn(), update: vi.fn(), saved: vi.fn(),
+  fetch: vi.fn(), create: vi.fn(), update: vi.fn(), saved: vi.fn(), warn: vi.fn(),
   t: (key: string, opts?: { defaultValue?: string }) => opts?.defaultValue ?? key,
 }))
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: mocks.t }), initReactI18next: { type: '3rdParty', init: () => {} } }))
 vi.mock('antd', async importOriginal => ({
   ...await importOriginal<typeof import('antd')>(),
-  message: { success: vi.fn(), error: vi.fn() },
+  message: { success: vi.fn(), error: vi.fn(), warning: mocks.warn },
 }))
 vi.mock('@/api/adPromotion', async importOriginal => ({
   ...await importOriginal<typeof import('@/api/adPromotion')>(),
@@ -74,6 +74,7 @@ beforeEach(() => {
   mocks.create.mockReset().mockResolvedValue(fixture())
   mocks.update.mockReset().mockResolvedValue(fixture())
   mocks.saved.mockClear()
+  mocks.warn.mockClear()
 })
 
 describe('投流配置交互与保存', () => {
@@ -142,6 +143,47 @@ describe('投流配置交互与保存', () => {
     expect(mocks.create).not.toHaveBeenCalled()
     scroll.mockRestore()
   })
+
+  it('冷启动三维度自由勾选、末项拦截、优先级可调，子配置随勾选联动', async () => {
+    const view = mountConfig()
+    const traffic = screen.getByRole('checkbox', { name: /剩余流量包/ })
+    const quality = screen.getByRole('checkbox', { name: /商家质量分/ })
+    const distance = screen.getByRole('checkbox', { name: /距离/ })
+    // 默认距离＋流量勾选，三卡均可切换（不再锁定勾选）
+    expect(distance).toBeChecked()
+    expect(traffic).toBeChecked()
+    expect(quality).not.toBeChecked()
+    expect(distance).not.toBeDisabled()
+    expect(traffic).not.toBeDisabled()
+    expect(screen.getByText(/等权综合/)).toBeInTheDocument()
+    // 标题问号弹层展示实现规则（综合分/归一/组合场景/示例/同分兜底）
+    fireEvent.click(screen.getByRole('img', { name: '冷启动排序维度规则' }))
+    expect(await screen.findByText('综合分公式')).toBeInTheDocument()
+    expect(screen.getByText(/组合场景/)).toBeInTheDocument()
+    // 勾选质量分→优选线出现
+    fireEvent.click(quality)
+    await waitFor(() => expect(view.form.getFieldValue('newUserDimensions')).toEqual(['distance', 'remainingTraffic', 'qualityScore']))
+    expect(screen.getByRole('spinbutton', { name: '综合评分优选线' })).toBeInTheDocument()
+    // 取消质量分→优选线隐藏但历史值保留
+    fireEvent.click(quality)
+    await waitFor(() => expect(screen.queryByRole('spinbutton', { name: '综合评分优选线' })).not.toBeInTheDocument())
+    expect(view.form.getFieldValue('qualityScoreThreshold')).toBe(3.5)
+    // 取消距离→仅剩流量；方向配置仍在
+    fireEvent.click(distance)
+    await waitFor(() => expect(view.form.getFieldValue('newUserDimensions')).toEqual(['remainingTraffic']))
+    expect(screen.getByRole('combobox', { name: '流量包排序方向' })).toBeInTheDocument()
+    // 末项取消被拦截：警告＋值不变＋仍勾选
+    fireEvent.click(traffic)
+    await waitFor(() => expect(mocks.warn).toHaveBeenCalled())
+    expect(view.form.getFieldValue('newUserDimensions')).toEqual(['remainingTraffic'])
+    expect(traffic).toBeChecked()
+    // 单维度可保存，顺序即优先级
+    await act(async () => { view.form.setFieldsValue({ consistencyCheckInterval: 10 }) })
+    fireEvent.click(screen.getByRole('button', { name: /保存配置/ }))
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1))
+    expect(mocks.create.mock.calls[0][0].params.newUserDimensions).toEqual(['remainingTraffic'])
+    // 全量字段挂载＋多次勾选联动，高负载机器易超默认 60s，显式放宽。
+  }, 120000)
 
   it('编辑不显示已退役的历史策略说明，旧策略与隐藏参数仍归档保留', async () => {
     mocks.fetch.mockResolvedValue(fixture({
@@ -309,7 +351,7 @@ describe('投流配置交互与保存', () => {
     expect(params.similarityMetric).toBe('weightedJaccard')
     expect(params.similarRecSlot1Source).toBe('sameCategory')
     expect(params).not.toHaveProperty('similarRecPriority')
-    expect(params.newUserDimensions).toEqual(['remainingTraffic', 'distance'])
+    expect(params.newUserDimensions).toEqual(['distance', 'remainingTraffic'])
     expect(params).not.toHaveProperty('similarBlendRatio')
     expect(params).not.toHaveProperty('explorationSlots')
     expect(params).not.toHaveProperty('qualityFilterEnabled')
@@ -405,7 +447,7 @@ describe('投流配置交互与保存', () => {
     fireEvent.change(dialog.getAllByRole('spinbutton', { name: '用户分' })[0], { target: { value: '80' } })
     expect(values.userPreferenceMinScore).toBe(10)
     fireEvent.click(dialog.getByRole('button', { name: '无用户偏好' }))
-    await waitFor(() => expect(dialog.getByText(/无有效偏好：本例按冷启动顺序展示/)).toBeInTheDocument())
+    await waitFor(() => expect(dialog.getByText(/无有效偏好：本例按冷启动规则/)).toBeInTheDocument())
     expect(mocks.create).not.toHaveBeenCalled()
     expect(mocks.update).not.toHaveBeenCalled()
   })

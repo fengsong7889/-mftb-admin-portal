@@ -148,12 +148,16 @@ export function SimilarityTrial({ values }: { values: Partial<TrafficAlgorithmVa
   const preset = values.rankPreset ?? 'matchFirst'
   const factors = values.rankFactors ?? []
   const direction = values.remainingTrafficDirection ?? 'moreFirst'
+  const coldDims = values.newUserDimensions ?? ['distance', 'remainingTraffic']
+  const scoringLabels = coldDims.filter(d => d !== 'qualityScore').map(d => d === 'remainingTraffic' ? '剩余流量包' : '距离')
+  const coldRule = `${scoringLabels.length > 0 ? `${scoringLabels.join(' + ')} 等权综合、分高者先` : '无综合分维度'}${coldDims.includes('qualityScore') ? '，质量分软优选达线者先' : ''}`
   const tieRule = values.rankTieBreak ?? 'trafficDirection'
   const tieLabel = RANK_TIE_BREAK_OPTIONS.find(o => o.value === tieRule)?.label ?? '未配置'
   const presetLabel = preset === 'matchFirst' ? t('recommend.trafficCfg.matchFirst', { defaultValue: '匹配优先' }) : preset === 'consumeFirst' ? t('recommend.trafficCfg.consumeFirst', { defaultValue: '消耗优先' }) : `自定义因子（${(factors.length > 0 ? factors : ['match', 'quality', 'distance']).join('+')} 等权）`
   const trial = evaluateMatchingTrial({ currentUserId: 'current-user', user, neighbors: DEMO_NEIGHBORS, merchants,
     settings: { userMinimum: uMin, merchantMinimum: mMin, coverageMinimum: covMin, metric,
       qualityPreference: { enabled: (values.newUserDimensions ?? []).includes('qualityScore'), line: values.qualityScoreThreshold ?? 3.5 },
+      coldStartDimensions: coldDims,
       preset, factors, tieRule, direction, maxDistance: DEMO_MAX_DISTANCE, availableSlots,
       userSimilarEnabled: values.matchingUserSimilarEnabled === true, userSimilarThreshold: values.matchingUserSimilarThreshold ?? Number.NaN,
       mode: values.matchingUserSimilarMode ?? 'fill', ratio: values.matchingUserSimilarRatio ?? 10 },
@@ -216,7 +220,7 @@ export function SimilarityTrial({ values }: { values: Partial<TrafficAlgorithmVa
             ? `按比例预留 ${values.matchingUserSimilarRatio ?? 10}%：本例 ${trial.limit} 个坑位预留 ${trial.quota} 位给协同（向下取整）`
             : '不足时补充')
           : '未开启'}；展示数量按本轮可用坑位，不受点击后两家上限限制。</p>
-        {coldStart && <Alert type="warning" showIcon message="无有效偏好：本例按冷启动顺序展示，不调用用户协同；若开启质量软优选则同层达线者先，再按距离与流量方向排序。" />}
+        {coldStart && <Alert type="warning" showIcon message={`无有效偏好：本例按冷启动规则（${coldRule}）展示，不调用用户协同；未勾选维度不参与。`} />}
         <div className="traffic-trial__grid">
           <div className="traffic-trial__module">
             <div className="traffic-trial__module-title">① 标签准入（用户 ≥ {uMin} 入选；商家 ≥ {mMin} 达标；重合者计覆盖）</div>
@@ -281,7 +285,7 @@ export function SimilarityTrial({ values }: { values: Partial<TrafficAlgorithmVa
               <div className="traffic-trial__module-title">③ 来源内同分决胜（当前：{tieLabel}）</div>
               <p className="traffic-trial__note">直接匹配优先，协同仅补空位；不同来源的分数不混排。</p>
               <p className="traffic-trial__note">{tieDesc}</p>
-              <div className="traffic-trial__result"><Tag color="processing">{coldStart ? '冷启动由距离与流量方向决胜，不用普通匹配得分。' : tieText}</Tag></div>
+              <div className="traffic-trial__result"><Tag color="processing">{coldStart ? `冷启动按 ${coldRule}，不用普通匹配得分。` : tieText}</Tag></div>
             </div>
             <div className="traffic-trial__module">
               <div className="traffic-trial__module-title">④ 最终结果排序（当前策略：{presetLabel}；直接匹配＝{metricLabel}，协同＝CF）</div>
@@ -299,7 +303,7 @@ export function SimilarityTrial({ values }: { values: Partial<TrafficAlgorithmVa
                   <div className="traffic-trial__row" key={r.m.id}>
                     <Tag color="processing">#{i + 1}</Tag><strong>{r.m.name}</strong>
                     <Tag>{r.source === 'userSimilar' ? '用户协同补充' : coldStart ? '冷启动' : '直接兴趣匹配'}</Tag>
-                    <span>排序值 {r.score.toFixed(4)}{preset === 'consumeFirst' && !coldStart ? ' 次' : ''}{r.matchScore === null ? '' : `；${r.source === 'userSimilar' ? 'CF' : '相似度'} ${(r.matchScore * 100).toFixed(2)}%`}</span>
+                    <span>{coldStart ? t('recommend.trafficCfg.trial.composite', { defaultValue: '综合排序值' }) : '排序值'} {r.score.toFixed(4)}{!coldStart && preset === 'consumeFirst' ? ' 次' : ''}{r.matchScore === null ? '' : `；${r.source === 'userSimilar' ? 'CF' : '相似度'} ${(r.matchScore * 100).toFixed(2)}%`}</span>
                   </div>
                 ))}
                 <p>本轮选中 {trial.selected.length} 家；缺口 {trial.shortfall} 家，交既有补齐规则处理，不在本地伪造自然结果。</p>
@@ -314,7 +318,7 @@ export function SimilarityTrial({ values }: { values: Partial<TrafficAlgorithmVa
             </div>
           </div>
         </div>
-        <p className="traffic-trial__note">示例配送距离 {DEMO_MAX_DISTANCE}km；两侧标签分别达标后合并维度，缺失侧补 0。同名重复行取最高分；覆盖率门槛 {covMin === 0 ? '已关闭' : `${covMin}%`}。两种算法结果仅供对照，不等同真实曝光效果。</p>
+        <p className="traffic-trial__note">示例最大直线距离 {DEMO_MAX_DISTANCE}km；两侧标签分别达标后合并维度，缺失侧补 0。同名重复行取最高分；覆盖率门槛 {covMin === 0 ? '已关闭' : `${covMin}%`}。两种算法结果仅供对照，不等同真实曝光效果。</p>
       </TrialModal>
     </>
   )
@@ -457,7 +461,7 @@ export function RankTrial({ values, prefix }: { values: Partial<TrafficAlgorithm
       <TrialTrigger aria={`${name}试算`} onClick={() => setOpen(true)} />
       <TrialModal open={open} onClose={() => setOpen(false)} title={`${name}试算`}>
         <div className="traffic-trial__fields">
-          <Num label={t('recommend.trafficCfg.trial.t36', { defaultValue: '最大配送距离' })} value={maxDistance} onChange={setMaxDistance} min={1} max={50} unit={t(trafficUnitKey('km'), { defaultValue: 'km' })} />
+          <Num label={t('recommend.trafficCfg.trial.t36', { defaultValue: '最大直线距离' })} value={maxDistance} onChange={setMaxDistance} min={1} max={50} unit={t(trafficUnitKey('km'), { defaultValue: 'km' })} />
           <span className="traffic-trial__note">当前策略：{preset === 'matchFirst' ? t('recommend.trafficCfg.matchFirst', { defaultValue: '匹配优先' }) : preset === 'consumeFirst' ? t('recommend.trafficCfg.consumeFirst', { defaultValue: '消耗优先' }) : `自定义因子（${(factors.length > 0 ? factors : ['match', 'quality', 'distance']).join('+')} 等权）`}；消耗优先比较绝对剩余次数，自定义比较归一分。</span>
         </div>
         <div className="traffic-trial__rows">

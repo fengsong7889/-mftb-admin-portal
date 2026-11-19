@@ -21,7 +21,7 @@ describe('投流参数契约', () => {
     expect(saved).toMatchObject({ statusOpen: false, statusRest: true, statusClosed: true,
       consistencyCheckInterval: 17, soldOutFilterEnabled: false, productCheckInterval: 11,
       generativeRecommendEnabled: false, qualityScoreThreshold: 0,
-      newUserDimensions: ['remainingTraffic', 'distance'], legacyTrafficParams: { merchantExposureStrategy: 'legacy-strategy', generativePriorityMode: 'hybrid' } })
+      newUserDimensions: ['distance', 'remainingTraffic'], legacyTrafficParams: { merchantExposureStrategy: 'legacy-strategy', generativePriorityMode: 'hybrid' } })
     TRAFFIC_RETIRED_FIELDS.forEach(key => expect(saved).not.toHaveProperty(key))
     expect(trafficStrategyLabel('legacy-strategy')).toBe('legacy-strategy')
     expect(trafficStrategyLabel('trafficProportional')).toContain('历史策略')
@@ -184,10 +184,10 @@ describe('投流参数契约', () => {
     // 默认值不得包含退役维度，且落在 V1_DIMENSIONS 内
     expect(TRAFFIC_DEFAULTS.newUserDimensions.every(d => (V1_DIMENSIONS as readonly string[]).includes(d))).toBe(true)
     expect(TRAFFIC_DEFAULTS.newUserDimensions).not.toContain('regionPopular')
-    // 存量含退役维度：保存剔除；剔空后回退固定因子保证至少一项
-    expect(serializeTrafficParams(readTrafficParams({ newUserDimensions: ['remainingTraffic', 'regionPopular'] })).newUserDimensions).toEqual(['remainingTraffic', 'distance'])
-    expect(serializeTrafficParams(readTrafficParams({ newUserDimensions: ['regionPopular'] })).newUserDimensions).toEqual(['remainingTraffic', 'distance'])
-    expect(serializeTrafficParams(readTrafficParams({ newUserDimensions: ['distance'] })).newUserDimensions).toEqual(['remainingTraffic', 'distance'])
+    // 存量含退役维度：保存剔除；旧版本顺序无优先级语义，收敛为默认优先级保证至少一项
+    expect(serializeTrafficParams(readTrafficParams({ newUserDimensions: ['remainingTraffic', 'regionPopular'] })).newUserDimensions).toEqual(['distance', 'remainingTraffic'])
+    expect(serializeTrafficParams(readTrafficParams({ newUserDimensions: ['regionPopular'] })).newUserDimensions).toEqual(['distance', 'remainingTraffic'])
+    expect(serializeTrafficParams(readTrafficParams({ newUserDimensions: ['distance'] })).newUserDimensions).toEqual(['distance', 'remainingTraffic'])
     // 排序范围由优先级来源派生，消除与 similarRankMode 的语义重叠
     expect(serializeTrafficParams(readTrafficParams({ similarRankMode: 'inherit', similarRankScope: 'similarityOnly' }))).not.toHaveProperty('similarRankScope')
     expect(serializeTrafficParams(readTrafficParams({ similarRankMode: 'independent', similarRankScope: 'shared' }))).not.toHaveProperty('similarRankScope')
@@ -244,14 +244,14 @@ describe('投流参数契约', () => {
     const original = { qualityFilterEnabled: true, newUserDimensions: ['qualityScore'], generativeTriggerScope: 'all',
       similarBlendRatio: 70, extraBusinessSetting: 'keep' }
     const read = readTrafficParams(original)
-    expect(read.newUserDimensions).toEqual(['remainingTraffic', 'distance', 'qualityScore'])
+    expect(read.newUserDimensions).toEqual(['distance', 'remainingTraffic', 'qualityScore'])
     expect(getTrafficGroup('qualityScoreThreshold')).toBe('coldStart')
     expect(isTrafficFieldActive('qualityFilterEnabled', read)).toBe(false)
     expect(getTrafficFieldError('qualityScoreThreshold', null, read)).toBeDefined()
     expect(getTrafficFieldError('qualityScoreThreshold', null, { ...read, newUserDimensions: ['distance'] })).toBeUndefined()
     const saved = buildTrafficParams(read, original)
-    expect(saved).toMatchObject({ extraBusinessSetting: 'keep', trafficConfigVersion: 3,
-      newUserDimensions: ['remainingTraffic', 'distance', 'qualityScore'], legacyTrafficParams: {
+    expect(saved).toMatchObject({ extraBusinessSetting: 'keep', trafficConfigVersion: 4,
+      newUserDimensions: ['distance', 'remainingTraffic', 'qualityScore'], legacyTrafficParams: {
         qualityFilterEnabled: true, newUserDimensions: ['qualityScore'], generativeTriggerScope: 'all', similarBlendRatio: 70,
       } })
     expect(saved).not.toHaveProperty('qualityFilterEnabled')
@@ -262,6 +262,21 @@ describe('投流参数契约', () => {
     // 旧维度含 qualityScore 但无硬开关：同样迁移为软优选；两者均无则默认不启用
     expect(readTrafficParams({ newUserDimensions: ['qualityScore'] }).newUserDimensions).toContain('qualityScore')
     expect(readTrafficParams({}).newUserDimensions).not.toContain('qualityScore')
+  })
+
+  it('冷启动维度集合语义：v4 信任勾选，旧版本收敛默认勾选，方向随流量勾选激活', () => {
+    const v4 = { trafficConfigVersion: 4, newUserDimensions: ['remainingTraffic', 'qualityScore'] }
+    expect(readTrafficParams(v4).newUserDimensions).toEqual(['remainingTraffic', 'qualityScore'])
+    expect(serializeTrafficParams(v4, 4).newUserDimensions).toEqual(['remainingTraffic', 'qualityScore'])
+    // v3 及更早固定生效语义：收敛为默认勾选，质量软优选沿用勾选
+    expect(readTrafficParams({ trafficConfigVersion: 3, newUserDimensions: ['remainingTraffic', 'distance', 'qualityScore'] }).newUserDimensions)
+      .toEqual(['distance', 'remainingTraffic', 'qualityScore'])
+    // v4 空选兜底默认勾选，不写空数组
+    expect(serializeTrafficParams({ trafficConfigVersion: 4, newUserDimensions: [] }, 4).newUserDimensions).toEqual(['distance', 'remainingTraffic'])
+    // 流量方向仅在勾选剩余流量包时激活；取消后不校验但原值保留
+    expect(isTrafficFieldActive('remainingTrafficDirection', TRAFFIC_DEFAULTS)).toBe(true)
+    expect(isTrafficFieldActive('remainingTrafficDirection', { ...TRAFFIC_DEFAULTS, newUserDimensions: ['distance'] })).toBe(false)
+    expect(getTrafficFieldError('remainingTrafficDirection', 'moreFirst', { ...TRAFFIC_DEFAULTS, newUserDimensions: ['distance'] })).toBeUndefined()
   })
 
   it('用户协同为一期正式模式：保留勾选、门槛随模式激活；仅未知模式才关闭推荐', () => {
