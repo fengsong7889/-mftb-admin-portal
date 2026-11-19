@@ -4346,6 +4346,51 @@
       "author": "Qoder",
       "ticket": "cpm-phase2",
       "comment": "INSERT IGNORE 幂等且不覆盖已有开关行；动作追加只改 sys_menu.actions 不动授权行——默认无人获得，重启不自动扩发。能管会议 AI 的默认管不了绩效 AI：预算与出域内容不同，动作分场景成对登记。"
+    },
+{
+          "versionKey": "cpm:schema:v1.1",
+          "module": "cpm",
+          "phase": "MODULE_STRUCTURE",
+          "executionType": "JAVA",
+          "executor": "cpmSchemaMigrationInitializer",
+          "status": "ACTIVE",
+          "dependencies": [
+                "cpm:schema:v1.0"
+          ],
+          "intent": "阶段三投入时段表 biz_cpm_time_entry + 条目侧 first_start_at/last_end_at/work_hours_source 与 RDM 回写五列",
+          "author": "Qoder",
+          "ticket": "cpm-phase3",
+          "comment": "时段另建表而不是在条目上加一对起止时间：条目是跨周期事项（延续带入让同一条目多天写流水），一对起止只能记一次投入，日报当日工时/周报日均/月报趋势全部无源；且第二次保存会覆盖第一次的事实。时刻用 TIME + crosses_midnight 而不是 DATETIME，避免「日期列」与「时刻自带日期」在跨夜时打架。同日允许多段，因此刻意不建 UNIQUE(item_id,work_date)——与 rdm_work_log 的同日唯一累加是两种语义（那边要的是当日合计，这边要的是区间事实）。补列全部可空或有默认：旧代码不读，回滚只回代码不回结构。"
+    },
+{
+          "versionKey": "cpm:schema:v1.2",
+          "module": "cpm",
+          "phase": "MODULE_STRUCTURE",
+          "executionType": "JAVA",
+          "executor": "cpmSchemaMigrationInitializer",
+          "status": "ACTIVE",
+          "dependencies": [
+                "cpm:schema:v1.1"
+          ],
+          "intent": "状态 CHECK 扩为 todo/doing/done/blocked/cancelled/deferred（item 与 item_update 两处）+ 来源 CHECK 增加 rdm_task",
+          "author": "Qoder",
+          "ticket": "cpm-phase3",
+          "comment": "取值列表由 CpmConstants.ITEM_STATUSES / SOURCE_TYPES 排序拼出，DDL 与 Java 白名单同一真源；只加 Java 白名单不动 DDL 会让存量环境「界面点得出来、写库报數據庫操作異常」。校验必须实查 information_schema 的 CHECK_CLAUSE：约束存在但仍是旧取值时记成已迁移，比没记更危险（同 meeting:schema:v1.2 复盘）。MySQL 8 无 DROP CHECK IF EXISTS，故先查存在再 drop。刻意不加第二个状态列：两列必然长出「進行中 + 已完成」这种矛盾组合。"
+    },
+{
+          "versionKey": "cpm:report-revision:v1.0",
+          "module": "cpm",
+          "phase": "MODULE_STRUCTURE",
+          "executionType": "JAVA",
+          "executor": "cpmSchemaMigrationInitializer",
+          "status": "ACTIVE",
+          "dependencies": [
+                "cpm:schema:v1.1"
+          ],
+          "intent": "汇报正式版本表 biz_cpm_report_revision + report.published_revision_id/draft_hash + push_record.revision_id",
+          "author": "Qoder",
+          "ticket": "cpm-phase3",
+          "comment": "阶段二把 published 做成终态是为了消灭「事后偷偷改」，方向对但顺带堵死了补录：唯一出路是整期作废重发，而已发出的钉钉链接还指着旧内容。改法与纪要同一套：发布冻结一个不可变版本，修订产生 V(n+1)，通知绑定具体版本。版本表不设软删列（软删版本等于毁取证链），当前生效版由 report.published_revision_id 单点指向；revision_no 与推送批次无关，混在一起会重演「重发一次多一个版本」的口径污染。request_key+request_hash 双列沿用既有幂等协议：同键同哈希返回原版本，同键不同哈希拒绝。"
     }
   ]
 }

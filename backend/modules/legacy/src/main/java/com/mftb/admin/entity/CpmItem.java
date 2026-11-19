@@ -70,6 +70,46 @@ public class CpmItem {
     /** 预留：OKR/目标挂点，本期服务端不读取 */
     private Long targetId;
 
+    /* ---------- 阶段三：时间维度（全部由时段表回算，界面与接口都不手填） ---------- */
+
+    /** 首次开工时点 = MIN(work_date + start_time) */
+    private LocalDateTime firstStartAt;
+
+    /** 最近收工时点 = MAX(work_date + end_time)，跨夜段折算到次日 */
+    private LocalDateTime lastEndAt;
+
+    /**
+     * 工时来源：segment=时段回算，manual=手工快填。
+     *
+     * <p>为什么要单独存这一列：两种口径精度不同，汇报里的「总投入」必须能拆出
+     * 哪几项只是估算；没有这一列就只能把两种精度混成一个数字假装同源。
+     */
+    private String workHoursSource;
+
+    /* ---------- 阶段三：RDM 任务级关联与进度回写 ---------- */
+
+    /** 回写目标 rdm_work_task.id；需求级关联为 null（没有可写的进度真值） */
+    private Long rdmTaskId;
+
+    /** 1=允许把本条目进度回写 RDM */
+    private Integer rdmSyncEnabled;
+
+    /** pending/success/conflict/rejected/error */
+    private String rdmSyncState;
+
+    /** RDM 返回的原文案，界面如实回显（含拒绝原因与冲突时的当前进度） */
+    private String rdmSyncMessage;
+
+    private LocalDateTime rdmSyncedAt;
+
+    /**
+     * 上次已知的 RDM 进度，回写时作为 expectedProgress。
+     *
+     * <p>缺这一列就只能「无条件覆盖」，别人在 RDM 甘特图上刚报的进度会被我这边的
+     * 一次记录悄悄顶掉——RDM 的乐观锁本来就靠这个值生效。
+     */
+    private Integer rdmProgressSeen;
+
     /** 乐观锁：并发双端更新只有一边能赢 */
     private Integer version;
 

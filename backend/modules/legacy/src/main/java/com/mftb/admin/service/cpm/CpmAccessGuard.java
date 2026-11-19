@@ -117,7 +117,21 @@ public class CpmAccessGuard {
 
     /** 条目必须属于本人（使用侧唯一写入口径）。 */
     public CpmItem requireOwnedItem(long itemId, SysUser user) {
-        CpmItem item = itemMapper.selectAliveById(itemId);
+        return requireOwnedItem(itemMapper.selectAliveById(itemId), user);
+    }
+
+    /**
+     * 与 {@link #requireOwnedItem} 同一套归属判定，但取行时加排他锁。
+     *
+     * <p>只给「写完还要回算父行缓存」的路径用（时段增删改）。不加锁时并发写同一父行会
+     * 因为外键 S 锁升级 X 锁而死锁，且两个事务的回算结果会互相覆盖 ——
+     * 详见 {@code CpmItemMapper.selectAliveForUpdate}。
+     */
+    public CpmItem requireOwnedItemForUpdate(long itemId, SysUser user) {
+        return requireOwnedItem(itemMapper.selectAliveForUpdate(itemId), user);
+    }
+
+    private CpmItem requireOwnedItem(CpmItem item, SysUser user) {
         if (item == null) {
             throw new BusinessException("工作記錄不存在或已被刪除");
         }
@@ -125,6 +139,38 @@ public class CpmAccessGuard {
             throw new BusinessException("只能操作自己的工作記錄");
         }
         return item;
+    }
+
+    /**
+     * 汇报必须属于本人（修订重发布唯一入口的守卫）。
+     *
+     * <p>与 {@link #requireReadableReport} 刻意分开：上级读得到下属的汇报，
+     * 但「重新发布别人的内容」不是阅读权限的一部分——那会让一次误点替另一个人
+     * 向全公司重发一遍卡片。写入口只认归属人，与条目侧同一条纪律。
+     */
+    public CpmReport requireOwnedReport(long reportId, SysUser user) {
+        return requireOwnedReport(reportMapper.selectAliveById(reportId), user);
+    }
+
+    /**
+     * 与 {@link #requireOwnedReport} 同一套归属判定，但取行时加排他锁。
+     *
+     * <p>发布与修订重发布必须走这个版本：否则并发修订会在版本表的唯一索引间隙上互等，
+     * 报出来的是 InnoDB 死锁而不是「同一版本已存在」。详见
+     * {@code CpmReportMapper.selectAliveForUpdate}。
+     */
+    public CpmReport requireOwnedReportForUpdate(long reportId, SysUser user) {
+        return requireOwnedReport(reportMapper.selectAliveForUpdate(reportId), user);
+    }
+
+    private CpmReport requireOwnedReport(CpmReport report, SysUser user) {
+        if (report == null) {
+            throw new BusinessException("匯報不存在或已被移除");
+        }
+        if (!report.getUserId().equals(user.getId())) {
+            throw new BusinessException("只能修訂自己發布的匯報");
+        }
+        return report;
     }
 
     /** 汇报可读（本人 or 阅读范围内）；返回汇报本体，读回执由服务层另发。 */

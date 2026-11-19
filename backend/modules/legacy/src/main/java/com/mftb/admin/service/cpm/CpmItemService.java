@@ -12,6 +12,7 @@ import com.mftb.admin.constant.CpmConstants;
 import com.mftb.admin.dto.CpmDto;
 import com.mftb.admin.entity.CpmItem;
 import com.mftb.admin.entity.CpmItemUpdate;
+import com.mftb.admin.entity.CpmTimeEntry;
 import com.mftb.admin.entity.CpmTemplate;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.CpmItemMapper;
@@ -46,8 +47,9 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class CpmItemService {
 
-    private static final Set<String> STATUSES = Set.of("todo", "doing", "done", "blocked");
-    private static final Set<String> SOURCE_TYPES = Set.of("manual", "ai", "rdm_requirement", "meeting_action");
+    /** 取值白名单一律引用常量集合：DDL 的 CHECK 由同一集合拼出，两处不可能各写一份 */
+    private static final java.util.Set<String> STATUSES = CpmConstants.ITEM_STATUSES;
+    private static final java.util.Set<String> SOURCE_TYPES = CpmConstants.SOURCE_TYPES;
     /**
      * 工时上限（小时）：列是 DECIMAL(4,1)，物理上限 999.9；这里取一个远高于真实投入的整数，
      * 目的只是把「手滑多打一个 0」挡在写库之前——工时仅供分布统计，不参与任何评价。
@@ -57,9 +59,13 @@ public class CpmItemService {
     private final CpmItemMapper itemMapper;
     private final CpmItemUpdateMapper updateMapper;
     private final CpmRecognitionMapper recognitionMapper;
+    /** 时段读写统一走本域服务：条目侧只取实体，映射 VO 的方法只有一份 */
+    private final CpmTimeEntryService timeEntryService;
     private final CpmTemplateService templateService;
     private final CpmPeriods periods;
     private final CpmAccessGuard guard;
+    /** 进度写入后的 RDM 回写：只依赖 Mapper 与跨域端口，与本类无相互依赖，直接进构造器 */
+    private final CpmRdmSyncService rdmSyncService;
 
     /* ==================== 日视图 ==================== */
 
@@ -77,13 +83,28 @@ public class CpmItemService {
         vo.setDate(date.toString());
         Map<String, String> labels = categoryLabels();
         Set<Long> recognized = recognizedItemIds(current.getId());
+        // 当日时段一次取回后按条目分组：逐条目再查会把「打开日视图」变成 N+1 请求风暴
+        Map<Long, List<CpmTimeEntry>> segmentsOfDay = new java.util.LinkedHashMap<>();
+        timeEntryService.listOnDate(current.getId(), date)
+                .forEach(segment -> segmentsOfDay
+                        .computeIfAbsent(segment.getItemId(), k -> new ArrayList<>()).add(segment));
         itemMapper.listActiveOn(current.getId(), date).forEach(item -> {
             CpmDto.ItemVO iv = toItemVO(item, labels);
             iv.setRecognized(recognized.contains(item.getId()));
+            List<CpmTimeEntry> own = segmentsOfDay.getOrDefault(item.getId(), List.of());
+            iv.setDayMinutes(own.stream().mapToInt(CpmTimeEntry::getDurationMinutes).sum());
             vo.getItems().add(iv);
         });
         itemMapper.listCarryCandidates(current.getId(), date)
                 .forEach(item -> vo.getCarryCandidates().add(toItemVO(item, labels)));
+        // 时段明细单独随视图返回：条目行要显示「今天几段」，但不该为每个条目各发一次请求
+        segmentsOfDay.forEach((itemId, rows) -> {
+            CpmDto.ItemTimeVO time = new CpmDto.ItemTimeVO();
+            time.setItemId(itemId);
+            time.setSegments(timeEntryService.toVOList(rows));
+            time.setDayMinutes(rows.stream().mapToInt(CpmTimeEntry::getDurationMinutes).sum());
+            vo.getTimes().add(time);
+        });
         return vo;
     }
 
@@ -111,6 +132,16 @@ public class CpmItemService {
         item.setSourceType(sourceType);
         item.setSourceRef(trimOrNull(form.getSourceRef(), 64));
         item.setSourceLabel(trimOrNull(form.getSourceLabel(), 200));
+        // 任务级关联才落 rdm_task_id：需求级没有可写的进度真值（RDM 日报明确不用 requirement.progress）
+        if (CpmConstants.SOURCE_RDM_TASK.equals(sourceType)) {
+            item.setRdmTaskId(requireTaskId(form.getSourceRef()));
+            // 导入即默认允许回写，除非调用方显式关掉；总闸关闭时本列只是「意愿」，不产生副作用
+            item.setRdmSyncEnabled(Boolean.FALSE.equals(form.getRdmSyncEnabled()) ? 0 : 1);
+            item.setRdmSyncState(CpmConstants.SYNC_PENDING);
+        } else {
+            item.setRdmSyncEnabled(0);
+        }
+        item.setWorkHoursSource(item.getWorkHours() == null || item.getWorkHours().signum() <= 0 ? "none" : "manual");
         item.setTemplateKey(StringUtils.hasText(form.getTemplateKey()) ? form.getTemplateKey().trim() : null);
         item.setVersion(0);
         item.setDeleted(0);
@@ -175,6 +206,13 @@ public class CpmItemService {
         if (hours != null) {
             itemMapper.updateWorkHoursOwned(id, current.getId(), hours, current.getName());
         }
+        /*
+         * RDM 回写放在本事务最后一步，但失败绝不回滚上面的写入：过程层记录不该被交付层规则拒绝掉。
+         * 反过来也不能吞掉结果——状态一律落 rdm_sync_* 四列，界面把原因显示出来。
+         * 注意这里传的是「写入前」的 item（含 preStatus 与上次已知进度），
+         * unblock 与 progress 的区分、以及乐观锁的 expectedProgress 基准都依赖它。
+         */
+        rdmSyncService.syncAfterProgress(item, form.getStatus(), progress, form.getNote(), current);
     }
 
     /** 延续带入：把未完结条目按今天再写一条流水（幂等：今天已有流水则跳过不报错）。 */
@@ -258,6 +296,27 @@ public class CpmItemService {
         return LocalDate.parse(dateStr);
     }
 
+    /**
+     * 任务级来源的 id 校验：{@code source_ref} 必须能解析成任务 id。
+     *
+     * <p>不解析就直接写 {@code rdm_task_id}，会让「界面上关联成功、回写时才发现是脏值」
+     * 变成必然发生的一次 500；而且脏 ref 还会通过唯一键占住这个来源对象，让正确的那次导入被说成重复。
+     */
+    private static Long requireTaskId(String sourceRef) {
+        if (!StringUtils.hasText(sourceRef)) {
+            throw new BusinessException("RDM 任務關聯缺少任務 ID");
+        }
+        try {
+            long taskId = Long.parseLong(sourceRef.trim());
+            if (taskId <= 0) {
+                throw new NumberFormatException();
+            }
+            return taskId;
+        } catch (NumberFormatException e) {
+            throw new BusinessException("RDM 任務 ID 格式不正確");
+        }
+    }
+
     /** 启用模板词表并集：key→显示名（AI 白名单与条目校验同源）。 */
     Map<String, String> categoryLabels() {
         Map<String, String> labels = new java.util.LinkedHashMap<>();
@@ -306,7 +365,40 @@ public class CpmItemService {
         vo.setTemplateKey(item.getTemplateKey());
         vo.setVersion(item.getVersion());
         vo.setRecognized(false);
+        /* 阶段三：时间与回写都是「读列即得」的派生值，界面不再自己算第二遍 */
+        vo.setFirstStartAt(text(item.getFirstStartAt()));
+        vo.setLastEndAt(text(item.getLastEndAt()));
+        vo.setWorkHoursSource(item.getWorkHoursSource());
+        vo.setTotalMinutes(item.getWorkHours() == null || item.getWorkHours().signum() <= 0
+                ? null
+                : item.getWorkHours().multiply(java.math.BigDecimal.valueOf(60))
+                        .setScale(0, java.math.RoundingMode.HALF_UP).intValue());
+        vo.setRdmSync(rdmSyncOf(item));
         return vo;
+    }
+
+    /**
+     * 条目上的回写状态。
+     *
+     * <p>没有 taskId 就返回 null 而不是一个 pending 空壳：需求级/手工/会议来源的条目
+     * 永远不可能回写，给它们一个「未回寫」徽标等于制造一个点不动还一直在的假状态。
+     */
+    private static CpmDto.RdmSyncVO rdmSyncOf(CpmItem item) {
+        if (item.getRdmTaskId() == null) {
+            return null;
+        }
+        CpmDto.RdmSyncVO sync = new CpmDto.RdmSyncVO();
+        sync.setEnabled(Integer.valueOf(1).equals(item.getRdmSyncEnabled()));
+        sync.setState(item.getRdmSyncState() == null ? CpmConstants.SYNC_PENDING : item.getRdmSyncState());
+        sync.setMessage(item.getRdmSyncMessage());
+        sync.setSyncedAt(text(item.getRdmSyncedAt()));
+        sync.setTaskId(item.getRdmTaskId());
+        sync.setRdmProgress(item.getRdmProgressSeen());
+        return sync;
+    }
+
+    private static String text(java.time.LocalDateTime value) {
+        return value == null ? null : value.withNano(0).toString().replace('T', ' ');
     }
 
     private static String trimOrNull(String value, int max) {

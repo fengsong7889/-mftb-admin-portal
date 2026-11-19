@@ -45,12 +45,20 @@ public final class CpmDto {
         private String workDate;
         private BigDecimal workHours;
         private String templateKey;
-        /** manual/rdm_requirement/meeting_action（ai 走提取确认通道，不在这里） */
+        /** manual/rdm_requirement/rdm_task/meeting_action（ai 走提取确认通道，不在这里） */
         private String sourceType;
         @Size(max = 64)
         private String sourceRef;
         @Size(max = 200)
         private String sourceLabel;
+        /**
+         * 是否允许把本条目的进度回写到 RDM 任务。
+         *
+         * <p>只有 {@code sourceType=rdm_task} 时服务端才读取它：需求级关联没有可写的进度真值，
+         * 接受这个标记就会让人以为回写生效了。默认取服务端配置（总闸开时导入即默认允许），
+         * 界面给一个看得见的开关，关掉就完全不影响 CPM 记录。
+         */
+        private Boolean rdmSyncEnabled;
         /** 更新时必带：乐观锁版本 */
         private Integer version;
     }
@@ -80,6 +88,17 @@ public final class CpmDto {
         private boolean terminated;
         /** 本人是否已导入过该对象（真正防重仍靠条目唯一键） */
         private boolean imported;
+        /**
+         * 是否 PRD 类任务：它的 100% 在 RDM 侧只能通过「提交評審」达成，
+         * 界面必须预先标出来，否则用户会在 CPM 里填一个永远回写不进去的进度。
+         */
+        private boolean prdTask;
+        /** 任务号（任务档素材；需求档为 null） */
+        private String externalNo;
+        /** 所属需求标题（任务档副行素材，词表仍归 RDM 域） */
+        private String parentTitle;
+        /** 计划工时（小时）：只作展示素材，不参与 CPM 工时统计 */
+        private BigDecimal planHours;
     }
 
     @Data
@@ -118,6 +137,39 @@ public final class CpmDto {
         private Integer version;
         /** 是否有被认定记录（列表徽章用） */
         private Boolean recognized;
+        /* ---------- 阶段三：时间维度与 RDM 回写（均为只读派生值，界面不自行计算） ---------- */
+        /** 首次开工时点（时段回算） */
+        private String firstStartAt;
+        /** 最近收工时点（时段回算） */
+        private String lastEndAt;
+        /** segment=时段回算 / manual=手工快填；两者精度不同，界面要能说清数字从哪来 */
+        private String workHoursSource;
+        /** 当日投入分钟（跟随日视图查询日期） */
+        private Integer dayMinutes;
+        /** 期间累计投入分钟 */
+        private Integer totalMinutes;
+        /** RDM 回写状态；非任务级关联为 null（不给「可回写」的错觉） */
+        private RdmSyncVO rdmSync;
+    }
+
+    /**
+     * RDM 回写状态回显。
+     *
+     * <p>它存在的唯一理由是<b>让失败看得见</b>：回写被 RDM 规则拒绝或与他人的上报冲突时，
+     * CPM 的保存仍然成功（过程层不该被交付层拒），但界面必须如实说明「RDM 那侧没改成」以及原因，
+     * 否则用户会以为两边已经一致——那比不一致更糟。
+     */
+    @Data
+    public static class RdmSyncVO {
+        private Boolean enabled;
+        /** pending/success/conflict/rejected/error */
+        private String state;
+        private String message;
+        private String syncedAt;
+        private String taskNo;
+        private Long taskId;
+        /** RDM 侧当前进度：conflict 时界面给出「以 X% 重新对齐」的出路 */
+        private Integer rdmProgress;
     }
 
     @Data
@@ -127,6 +179,13 @@ public final class CpmDto {
         /** 延续建议：未完结且今天还没有流水的条目 */
         private List<ItemVO> carryCandidates = new ArrayList<>();
         private String date;
+        /**
+         * 当天各条目的投入时段明细。
+         *
+         * <p>随日视图一次返回而不是让界面逐条目再查：条目数没有上限，
+         * N 次请求会把「打开日视图」变成一次小型请求风暴（首页那种坑已经记在案）。
+         */
+        private List<ItemTimeVO> times = new ArrayList<>();
     }
 
     /* ==================== 汇报与聚合 ==================== */
@@ -142,21 +201,31 @@ public final class CpmDto {
         private String periodStart;
     }
 
-    /** 聚合快照（发布时冻结进 content_json；schemaVersion=1） */
+    /**
+     * 聚合快照（发布时冻结进 content_json；阶段三起 schemaVersion=2）。
+     *
+     * <p>读旧快照必须继续可用：V1 的历史版本行里存的是不含工时维度的 JSON，
+     * 反序列化后 {@code time} 为 null，界面据此显示「本期未記錄投入時間」而不是全 0——
+     * 「没记录」和「记录了但为零」是两件事，混起来就是把缺失误报成结论。
+     */
     @Data
     public static class Snapshot {
-        private Integer schemaVersion = 1;
+        private Integer schemaVersion = 2;
         private String periodType;
         private String periodStart;
         private String periodEnd;
         private List<Group> groups = new ArrayList<>();
         private Totals totals = new Totals();
+        /** 阶段三工时维度汇总（确定性聚合，AI 不参与任何计数） */
+        private TimeTotals time;
 
         @Data
         public static class Group {
             private String category;
             private String categoryLabel;
             private List<Entry> items = new ArrayList<>();
+            /** 本分类期间投入分钟 */
+            private Integer minutes;
         }
 
         @Data
@@ -170,6 +239,23 @@ public final class CpmDto {
             private List<Integer> trail = new ArrayList<>();
             private String sourceType;
             private String sourceLabel;
+            /** 期间投入分钟 = 精确时段 + 手工工时回退；null 表示两者都没有 */
+            private Integer minutes;
+            /** 分钟来源：segment=精确时段 manual=手工工时 none=无；精度不同必须可见 */
+            private String minutesSource;
+            /** 条目当期实际发生的时段区间（历史版本读取时来自冻结快照，不受后续补录影响） */
+            private List<Segment> segments = new ArrayList<>();
+        }
+
+        /** 冻结在快照里的一段投入（展示用，比时段表本体少归属字段） */
+        @Data
+        public static class Segment {
+            private String workDate;
+            private String startTime;
+            private String endTime;
+            private Boolean crossesMidnight;
+            private Integer durationMinutes;
+            private String note;
         }
 
         @Data
@@ -179,8 +265,160 @@ public final class CpmDto {
             private int doing;
             private int todo;
             private int blocked;
+            /** 阶段三新增两桶：老快照反序列化后为 0，等同「未使用过该状态」，不造假数据 */
+            private int cancelled;
+            private int deferred;
+        }
+
+        /**
+         * 工时汇总。
+         *
+         * <p>两条口径必须由服务端钉死（前端不得二次计算）：
+         * ① 日均分母 = <b>有投入的天数</b>，不是周期自然天数——否则周末与请假日会把日均拉成假数字；
+         * ② 精确时段与手工工时<b>分列</b>后再相加，两者精度不同，混成一个总数就是假精确。
+         */
+        @Data
+        public static class TimeTotals {
+            private int totalMinutes;
+            /** 来自时段表（精确） */
+            private int preciseMinutes;
+            /** 来自条目 work_hours 回退（估算） */
+            private int manualFallbackMinutes;
+            private int activeDays;
+            private int avgMinutesPerActiveDay;
+            private String peakDate;
+            private Integer peakMinutes;
+            private List<TimeByCategory> byCategory = new ArrayList<>();
+            private List<TimeByDay> byDay = new ArrayList<>();
+            private List<TimeByItem> topItems = new ArrayList<>();
         }
     }
+
+    /**
+     * 工时汇总投影：分类占比一行。
+     *
+     * <p>label 与 code 一起给前端：分类词表属于岗位模板，前端手上只有 code 时只能显示英文键，
+     * 而让它再去猜 label 就会与快照分组标题分叉成两种叫法。
+     */
+    @Data
+    public static class TimeByCategory {
+        private String category;
+        private String categoryLabel;
+        private Long minutes;
+    }
+
+    /** 工时汇总投影：单日投入（只给有投入的日期，补 0 占位是展示层的事） */
+    @Data
+    public static class TimeByDay {
+        private String workDate;
+        private Long minutes;
+    }
+
+    /** 工时汇总投影：事项投入成本（快照按分钟降序取 Top N 后填入 TimeTotals.topItems） */
+    @Data
+    public static class TimeByItem {
+        private Long itemId;
+        private String title;
+        private Long minutes;
+    }
+
+    /* ==================== 阶段三：投入时段 ==================== */
+
+    @Data
+    public static class TimeEntryForm {
+        /** 归属日 yyyy-MM-dd；空 = 服务端按业务时区今天 */
+        private String workDate;
+        /** 'HH:mm'；与 endTime 必须同时有或同时无（与 ck_cpm_time_range 同一约束） */
+        private String startTime;
+        private String endTime;
+        /** 结束时刻属次日；不声明却给出倒序区间一律拒绝，不猜 */
+        private Boolean crossesMidnight;
+        /** 显式覆盖耗时（分钟）；为空则由服务端按起止算出后固化 */
+        private Integer durationMinutes;
+        @Size(max = 200)
+        private String note;
+        /** 更新时必带：乐观锁版本 */
+        private Integer version;
+    }
+
+    @Data
+    public static class TimeEntryVO {
+        private Long id;
+        private Long itemId;
+        private String workDate;
+        private String startTime;
+        private String endTime;
+        private Boolean crossesMidnight;
+        private Integer durationMinutes;
+        private String note;
+        private Integer version;
+    }
+
+    /** 日视图回给界面的「条目 → 当日时段」映射（避免前端逐条目再发一次请求） */
+    @Data
+    public static class ItemTimeVO {
+        private Long itemId;
+        private List<TimeEntryVO> segments = new ArrayList<>();
+        private Integer dayMinutes;
+        private Integer totalMinutes;
+    }
+
+    /* ==================== 阶段三：版本与日报 ==================== */
+
+    @Data
+    public static class RevisionVO {
+        private Integer revisionNo;
+        private String publishedAt;
+        private String publisherName;
+        private String publisherEmpNo;
+        private String changeNote;
+        private Boolean current;
+        private Integer schemaVersion;
+        /** 修订说明之外的内容差异条数：让「这一版比上一版多了什么」在列表就能看见 */
+        private Integer itemDelta;
+    }
+
+    /**
+     * 修訂重發布表單。
+     *
+     * <p>刻意<b>不</b>要求客户端提供 requestKey：修订的幂等单元是「内容 + 修订说明」本身——
+     * 同一份内容重复提交就不该长出 V3，客户端传一个每次都不一样的 key 反而会把这件事变成
+     * 前端的责任。服务端按 (reportId, 内容摘要, 说明) 派生 key，超时重发命中唯一键即回原版本。
+     */
+    @Data
+    public static class RepublishForm {
+        @NotNull
+        private Long reportId;
+        @NotBlank
+        @Size(max = 200)
+        private String changeNote;
+        @Size(max = 2000)
+        private String summary;
+        /** 摘要是否 AI 起草（披露标记；数字永远来自聚合） */
+        private Boolean aiSummary;
+    }
+
+    /**
+     * 日报投影。
+     *
+     * <p>日报<b>不是</b> {@code biz_cpm_report} 的一行（period_type 的 CHECK 里没有 'day'）：
+     * 它就是条目在某一天的投影，读的是同一批事实。给它发布动作等于给每个人每天多加一个打卡任务，
+     * 与本模块「低录入成本 + 反内卷」的立身之本直接冲突。
+     *
+     * <p>刻意只给一份 {@code snapshot}，不再并列一个 items 列表：同一天的事实出现两种表达时，
+     * 界面两处显示的条数就可能不一致，而那种差异从来不会被当成缺陷去查。
+     */
+    @Data
+    public static class DailyVO {
+        private String date;
+        /** 与周期快照同构（periodType='day'，start=end=当日），含工时维度 */
+        private Snapshot snapshot;
+        /** 被查看的人是否为本人：上级看下属日报时界面要标出「這是 XX 的日报」 */
+        private Boolean self;
+        private String ownerName;
+        private String ownerEmpId;
+    }
+
 
     @Data
     public static class ReportVO {
@@ -196,6 +434,12 @@ public final class CpmDto {
         private Boolean aiSummary;
         private String publishedAt;
         private Snapshot snapshot;
+        /** 阶段三：当前生效版本号；NULL = 阶段二遗留的旧发布（无版本行，界面标「歷史發送快照」） */
+        private Integer revisionNo;
+        private Long publishedRevisionId;
+        /** 草稿与最近一次发布内容不一致：界面据此提示「存在未發布變更」，而不是让用户自己猜 */
+        private Boolean hasUnpublishedChanges;
+        private List<RevisionVO> revisions = new ArrayList<>();
         /** 送达/已读（receiverCount 由规则解析；readCount 回执表） */
         private Integer receiverCount;
         private Integer readCount;

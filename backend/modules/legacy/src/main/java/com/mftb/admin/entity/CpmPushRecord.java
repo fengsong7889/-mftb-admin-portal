@@ -48,6 +48,14 @@ public class CpmPushRecord {
     /** 关联对象（汇报 id / 认定 id） */
     private Long refId;
 
+    /**
+     * 本次通知绑定的正式版本（阶段三）。
+     *
+     * <p>没有它就无法回答「他收到的那一版写了什么」：修订重发布后如果通知仍指向最新内容，
+     * 已发出的卡片链接会随时间改变含义，取证与追责都失去依据。
+     */
+    private Long revisionId;
+
     /** queued/sent/skipped/failed */
     private String status;
 

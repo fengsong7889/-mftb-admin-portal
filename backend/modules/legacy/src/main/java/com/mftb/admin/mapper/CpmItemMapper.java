@@ -15,6 +15,7 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -78,6 +79,57 @@ public interface CpmItemMapper extends BaseMapper<CpmItem> {
                              @Param("workHours") java.math.BigDecimal workHours,
                              @Param("operator") String operator);
 
+    /**
+     * 工时来源标记写入：时段存在时把 work_hours 交回给时段回算，手工值退居估算。
+     *
+     * <p>与 {@link #updateWorkHoursOwned} 同一条 WHERE（归属人 + 未删），同样刻意不动 version：
+     * 工时口径不该让「补个时间」和「改正文」互相顶回草稿。
+     */
+    @Update("UPDATE biz_cpm_item SET work_hours = #{workHours}, work_hours_source = #{source}, "
+            + "first_start_at = #{firstStartAt}, last_end_at = #{lastEndAt}, "
+            + "updated_by = #{operator}, updated_at = NOW() "
+            + "WHERE id = #{id} AND user_id = #{userId} AND deleted = 0")
+    int syncTimeCache(@Param("id") long id, @Param("userId") long userId,
+                      @Param("workHours") java.math.BigDecimal workHours,
+                      @Param("source") String source,
+                      @Param("firstStartAt") LocalDateTime firstStartAt,
+                      @Param("lastEndAt") LocalDateTime lastEndAt,
+                      @Param("operator") String operator);
+
+    /**
+     * RDM 回写结果落列。
+     *
+     * <p>不动 version 且不带 status/progress：回写是「记录之后发生的副作用」，
+     * 它失败或成功都不该让本人的正文编辑撞乐观锁。
+     */
+    @Update("UPDATE biz_cpm_item SET rdm_sync_state = #{state}, rdm_sync_message = #{message}, "
+            + "rdm_synced_at = NOW(), rdm_progress_seen = #{rdmProgress}, "
+            + "updated_by = #{operator}, updated_at = NOW() "
+            + "WHERE id = #{id} AND user_id = #{userId} AND deleted = 0")
+    int updateRdmSyncResult(@Param("id") long id, @Param("userId") long userId,
+                            @Param("state") String state, @Param("message") String message,
+                            @Param("rdmProgress") Integer rdmProgress, @Param("operator") String operator);
+
+    /** 回写开关切换（导入时默认置 1，用户可关；关掉后仍保留 taskId 以便再次打开）。 */
+    @Update("UPDATE biz_cpm_item SET rdm_sync_enabled = #{enabled}, "
+            + "updated_by = #{operator}, updated_at = NOW() "
+            + "WHERE id = #{id} AND user_id = #{userId} AND deleted = 0")
+    int updateRdmSyncEnabled(@Param("id") long id, @Param("userId") long userId,
+                             @Param("enabled") int enabled, @Param("operator") String operator);
+
     @Select("SELECT * FROM biz_cpm_item WHERE id = #{id} AND deleted = 0")
     CpmItem selectAliveById(@Param("id") long id);
+
+    /**
+     * 加行锁取条目（仅写入路径用，必须在事务内）。
+     *
+     * <p>为什么时段写入要先锁条目行：{@code biz_cpm_time_entry.item_id} 上有外键，
+     * INSERT 子行时 InnoDB 会给父行加 **共享** 锁，随后的缓存 UPDATE 要把它升级成排他锁。
+     * 同一父行的两个并发时段写入各持 S 锁互等 X 锁 —— 实测就是
+     * {@code DeadlockLoserDataAccessException}（并发时段集成测试钉住）。
+     * 先对父行取 X 锁把顺序固定成「父 → 子」，两个事务改成排队而不是互咬，
+     * 顺带把「两个事务各自回算缓存、后写覆盖前写」这条更隐蔽的错也一起堵掉。
+     */
+    @Select("SELECT * FROM biz_cpm_item WHERE id = #{id} AND deleted = 0 FOR UPDATE")
+    CpmItem selectAliveForUpdate(@Param("id") long id);
 }

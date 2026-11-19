@@ -78,7 +78,7 @@ public class CpmNotifyService {
                 : String.format("完成 %d / 共 %d 項", snapshot.getTotals().getDone(), snapshot.getTotals().getTotal());
         for (Long receiverId : receivers) {
             int claimed = pushMapper.claimSlot(CpmConstants.SCENARIO_REPORT_PUBLISHED, receiverId,
-                    report.getPeriodStart(), reportId);
+                    report.getPeriodStart(), reportId, report.getPublishedRevisionId());
             if (claimed == 0) {
                 continue;
             }
@@ -89,7 +89,9 @@ public class CpmNotifyService {
             String title = "新的週期匯報：" + ownerName;
             String markdown = "### " + title + "\n\n"
                     + "- 週期：" + report.getPeriodStart() + " ~ " + report.getPeriodEnd() + "\n"
-                    + "- 概覽：" + totalsText + "\n\n"
+                    + "- 概覽：" + totalsText + "\n"
+                    // 卡片上多一行总投入，与页面同一个来源（冻结快照的工时维度），不是另算一遍
+                    + timeLine(snapshot)
                     + linkLine(reportId);
             deliver(queued, title, markdown);
         }
@@ -97,7 +99,7 @@ public class CpmNotifyService {
 
     /** 截止催办：发给未提交者本人（不发给上级群——催办是提醒不是通报，反内卷红线）。 */
     public void remindDeadline(long userId, LocalDate periodStart, String summaryText) {
-        int claimed = pushMapper.claimSlot(CpmConstants.SCENARIO_REPORT_DEADLINE_REMIND, userId, periodStart, null);
+        int claimed = pushMapper.claimSlot(CpmConstants.SCENARIO_REPORT_DEADLINE_REMIND, userId, periodStart, null, null);
         if (claimed == 0) {
             return;
         }
@@ -119,7 +121,7 @@ public class CpmNotifyService {
         }
         LocalDate periodStart = LocalDate.now();
         int claimed = pushMapper.claimSlot(CpmConstants.SCENARIO_RECOGNITION_GRANTED, recognition.getToUserId(),
-                periodStart, recognitionId);
+                periodStart, recognitionId, null);
         if (claimed == 0) {
             return;
         }
@@ -175,6 +177,21 @@ public class CpmNotifyService {
 
     private String linkLine(long reportId) {
         return "[查閱匯報全文（需登錄）](" + baseUrl() + REPORT_PATH + reportId + ")";
+    }
+
+    /**
+     * 卡片里的总投入一行。
+     *
+     * <p>读的是冻结快照自带的 {@code time}，不在这里再算一遍——「通知里的数字 = 页面数字 =
+     * 导出数字」是同一条铁律的三个面，任何一面的换算式独立存在就迟早飘开。
+     * 没有工时记录时整行不出（而不是写「0h」）：没记录与投入为零是两件事。
+     */
+    private static String timeLine(CpmDto.Snapshot snapshot) {
+        if (snapshot == null || snapshot.getTime() == null || snapshot.getTime().getTotalMinutes() <= 0) {
+            return "\n";
+        }
+        long minutes = snapshot.getTime().getTotalMinutes();
+        return String.format("- 總投入：%.1fh%n", minutes / 60d);
     }
 
     private String baseUrl() {

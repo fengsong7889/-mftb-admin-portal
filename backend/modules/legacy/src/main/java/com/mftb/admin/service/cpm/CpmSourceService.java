@@ -8,6 +8,7 @@
 package com.mftb.admin.service.cpm;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.mftb.admin.constant.CpmConstants;
 import com.mftb.admin.contracts.rdm.RdmWorkItemSource;
 import com.mftb.admin.dto.CpmDto;
 import com.mftb.admin.entity.CpmItem;
@@ -85,8 +86,54 @@ public class CpmSourceService {
         return out;
     }
 
-    /* ==================== 会议行动项 ==================== */
+    /* ==================== RDM 任务（阶段三：可回写的那一档） ==================== */
 
+    /**
+     * 本人相关的未结案 RDM 任务。
+     *
+     * <p>为什么需求档之外还要单独给一档任务：RDM 的进度真值在 {@code rdm_work_task.progress}，
+     * 而 {@code rdm_requirement.progress} 被 RDM 日报自己判为「可能长期停留 0，用它算进度
+     * 会与执行侧甘特图矛盾」。所以需求档只能做只读关联，只有任务档具备回写落点——
+     * 把回写做成需求级，等于在两边各写一套「进度」然后等它们飘开。
+     *
+     * <p>{@code prdTask} 原样透出：PRD 任务的 100% 只能通过提交评审达成，
+     * 界面预先标出来，用户就不会填一个永远回写不进去的进度再奇怪徽标为什么一直红。
+     */
+    public List<CpmDto.SourceVO> listRdmTasks(String keyword) {
+        RdmWorkItemSource source = rdmSource.getIfAvailable();
+        if (source == null) {
+            log.warn("cpm 關聯導入：RDM 任務端口無實現，返回空清單（fail-closed，不降級為直查 rdm 表）");
+            return List.of();
+        }
+        SysUser current = guard.currentUser();
+        List<RdmWorkItemSource.TaskRef> refs = source.findMyOpenTasks(current.getId(), keyword, CANDIDATE_LIMIT);
+        Set<String> imported = importedRefs(CpmConstants.SOURCE_RDM_TASK, current.getId(),
+                refs.stream().map(ref -> String.valueOf(ref.taskId())).toList());
+
+        List<CpmDto.SourceVO> out = new ArrayList<>();
+        for (RdmWorkItemSource.TaskRef ref : refs) {
+            CpmDto.SourceVO vo = new CpmDto.SourceVO();
+            vo.setSourceType(CpmConstants.SOURCE_RDM_TASK);
+            vo.setSourceRef(String.valueOf(ref.taskId()));
+            vo.setTitle(ref.title());
+            vo.setStatusCode(ref.status());
+            vo.setRole(ref.myRole());
+            vo.setProgress(ref.progress());
+            vo.setPlanHours(ref.planHours());
+            vo.setDueDate(ref.planFinishDate() == null ? null : ref.planFinishDate().format(DATE));
+            vo.setTerminated(ref.terminated());
+            vo.setPrdTask(ref.prdTask());
+            // 副行给任务号、父行给需求标题：都是来源系统的原文，CPM 不拼成一句死文案
+            vo.setExternalNo(ref.taskNo());
+            vo.setSubtitle(StringUtils.hasText(ref.taskNo()) ? ref.taskNo() : null);
+            vo.setParentTitle(ref.reqTitle());
+            vo.setImported(imported.contains(vo.getSourceRef()));
+            out.add(vo);
+        }
+        return out;
+    }
+
+    /* ==================== 会议行动项 ==================== */
     /**
      * 本人负责（含协办）的未完成行动项。归属判定与会议标题都留在会议域的
      * {@link MeetingActionSource} 实现里：cpm 不碰 biz_meeting_minutes_item_* 的列，

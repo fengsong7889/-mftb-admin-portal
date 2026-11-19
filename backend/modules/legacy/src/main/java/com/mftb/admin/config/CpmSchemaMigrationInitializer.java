@@ -36,8 +36,12 @@ import java.util.List;
  * <ul>
  *   <li>{@code cpm:schema:v1.0}：建表 + 后置校验（表/唯一键/实体依赖列就位）；</li>
  *   <li>{@code cpm:menu:v1.0}：5 个一级菜单 + admin 授权 + 系统准入反推；</li>
- *   <li>{@code cpm:template-seed:v1.0}：内置 5 套岗位模板词表（INSERT 只补不覆盖，管理员改过不顶）；</li>
- *   <li>{@code cpm:rule-seed:v1.0}：汇报规则单行（config_slot=default）。</li>
+ *   <li>{@code cpm:template-seed:v1.0}：内置 5 套岗位模板词表（INSERT 只补不覆 盖，管理员改过不顶）；</li>
+ *   <li>{@code cpm:rule-seed:v1.0}：汇报规则单行（config_slot=default）；</li>
+ *   <li>{@code cpm:schema:v1.1}：阶段三投入时段表 + 条目侧时间/回写列（337 脚本 + 逐列判定 ALTER）；</li>
+ *   <li>{@code cpm:schema:v1.2}：阶段三状态与来源 CHECK 放宽（取值由 CpmConstants 拼，
+ *       校验实查 CHECK_CLAUSE 而不是只验约束存在）；</li>
+ *   <li>{@code cpm:report-revision:v1.0}：阶段三汇报正式版本表 + 版本指向列（338 脚本）。</li>
  * </ul>
  *
  * <p><b>启动顺序</b>：取 26，必须早于 {@code PermissionAnnotationValidator(@Order 30)}
@@ -59,8 +63,15 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
     static final String VERSION_MENU = "cpm:menu:v1.0";
     static final String VERSION_TEMPLATE = "cpm:template-seed:v1.0";
     static final String VERSION_RULE = "cpm:rule-seed:v1.0";
+    /* 阶段三：新增量一律另开键——已记录 v1.0 的环境不会回头重跑旧 task（沿用 meeting 域口径） */
+    static final String VERSION_TIME_SCHEMA = "cpm:schema:v1.1";
+    static final String VERSION_ENUM_EXPAND = "cpm:schema:v1.2";
+    static final String VERSION_REVISION = "cpm:report-revision:v1.0";
 
     private static final String SCHEMA_SCRIPT = "336_cpm_core.sql";
+    private static final String TIME_SCHEMA_SCRIPT = "337_cpm_time_schema.sql";
+    private static final String REVISION_SCHEMA_SCRIPT = "338_cpm_report_revision.sql";
+
     private static final String SYSTEM_CODE = SystemCode.CPM.code();
     private static final String ADMIN_ROLE_CODE = "admin";
     private static final int MENU_TYPE_LEAF = 2;
@@ -101,6 +112,26 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
             {"biz_cpm_push_record", "event_type"},
     };
 
+    /** 阶段三新增：条目侧时间/回写列（实体按字段拼 SELECT，缺列=首次查询就报语法错） */
+    private static final String[][] TIME_ITEM_COLUMNS = {
+            {"biz_cpm_item", "first_start_at"},
+            {"biz_cpm_item", "last_end_at"},
+            {"biz_cpm_item", "work_hours_source"},
+            {"biz_cpm_item", "rdm_task_id"},
+            {"biz_cpm_item", "rdm_sync_enabled"},
+            {"biz_cpm_item", "rdm_sync_state"},
+            {"biz_cpm_item", "rdm_sync_message"},
+            {"biz_cpm_item", "rdm_synced_at"},
+            {"biz_cpm_item", "rdm_progress_seen"},
+    };
+
+    /** 阶段三新增：版本指向列 */
+    private static final String[][] REVISION_COLUMNS = {
+            {"biz_cpm_report", "published_revision_id"},
+            {"biz_cpm_report", "draft_hash"},
+            {"biz_cpm_push_record", "revision_id"},
+    };
+
     /**
      * 系统级总开关（方案 §十四）：关掉即 cpm 菜单隐藏 + 接口拒绝。
      * <p>默认 true，行为与改造前完全一致；只有运维显式写 cpm.enabled=false 才生效。
@@ -118,6 +149,9 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
         versionTracker.applyOnce(VERSION_MENU, this::doMenuMigrate, this::verifyMenus);
         versionTracker.applyOnce(VERSION_TEMPLATE, this::doTemplateSeed, this::verifyTemplates);
         versionTracker.applyOnce(VERSION_RULE, this::doRuleSeed, this::verifyRule);
+        versionTracker.applyOnce(VERSION_TIME_SCHEMA, this::doTimeSchema, this::verifyTimeSchema);
+        versionTracker.applyOnce(VERSION_ENUM_EXPAND, this::doEnumExpand, this::verifyEnumExpand);
+        versionTracker.applyOnce(VERSION_REVISION, this::doRevisionSchema, this::verifyRevisionSchema);
         syncMenuVisibility();
     }
 
@@ -322,8 +356,182 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
         }
     }
 
-    /* ==================== 通用工具（与 MeetingSchemaMigrationInitializer 同实现同守卫） ==================== */
+    /* ==================== 阶段三 5. 投入时段表 + 条目时间/回写列 ==================== */
 
+    /**
+     * 时段表建表 + 条目补列。
+     *
+     * <p>补列走 {@link #addColumnIfAbsent} 而不是把 ALTER 写进脚本：MySQL 8 没有
+     * {@code ADD COLUMN IF NOT EXISTS}，脚本重放会直接报错；而 applyOnce 只保证「本键跑一次」，
+     * 半途失败重跑时必须逐列判定，否则一列已存在就让整步永远记不上版本。
+     */
+    private void doTimeSchema() {
+        int executed = executeScript(TIME_SCHEMA_SCRIPT);
+        log.info("持續績效投入時段建表腳本已執行: {} 條語句（{}）", executed, TIME_SCHEMA_SCRIPT);
+        // 条目侧全部可空/有默认：旧代码不读这些列，回滚只需回代码，不必回结构
+        addColumnIfAbsent("biz_cpm_item", "first_start_at",
+                "ALTER TABLE biz_cpm_item ADD COLUMN first_start_at DATETIME NULL COMMENT '首次開工時點（時段回算，不是手填）'");
+        addColumnIfAbsent("biz_cpm_item", "last_end_at",
+                "ALTER TABLE biz_cpm_item ADD COLUMN last_end_at DATETIME NULL COMMENT '最近收工時點（時段回算）'");
+        addColumnIfAbsent("biz_cpm_item", "work_hours_source",
+                "ALTER TABLE biz_cpm_item ADD COLUMN work_hours_source VARCHAR(8) NOT NULL DEFAULT 'manual' "
+                        + "COMMENT '工時來源：segment=時段回算 manual=手工快填；兩者精度不同，匯總必須分列'");
+        addColumnIfAbsent("biz_cpm_item", "rdm_task_id",
+                "ALTER TABLE biz_cpm_item ADD COLUMN rdm_task_id BIGINT NULL COMMENT '進度回寫目標 rdm_work_task.id；需求級關聯為 NULL'");
+        addColumnIfAbsent("biz_cpm_item", "rdm_sync_enabled",
+                "ALTER TABLE biz_cpm_item ADD COLUMN rdm_sync_enabled TINYINT NOT NULL DEFAULT 0 COMMENT '1=允許把本條目進度回寫 RDM（導入任務時默認置 1）'");
+        addColumnIfAbsent("biz_cpm_item", "rdm_sync_state",
+                "ALTER TABLE biz_cpm_item ADD COLUMN rdm_sync_state VARCHAR(16) NULL COMMENT '回寫結果：pending/success/conflict/rejected/error'");
+        addColumnIfAbsent("biz_cpm_item", "rdm_sync_message",
+                "ALTER TABLE biz_cpm_item ADD COLUMN rdm_sync_message VARCHAR(200) NULL COMMENT '回寫結果說明（RDM 原文案，供界面如實回顯）'");
+        addColumnIfAbsent("biz_cpm_item", "rdm_synced_at",
+                "ALTER TABLE biz_cpm_item ADD COLUMN rdm_synced_at DATETIME NULL COMMENT '最近一次回寫時間'");
+        addColumnIfAbsent("biz_cpm_item", "rdm_progress_seen",
+                "ALTER TABLE biz_cpm_item ADD COLUMN rdm_progress_seen INT NULL COMMENT '上次已知的 RDM 進度，回寫時作 expectedProgress 用；缺它就只能靜默覆蓋他人交付真值'");
+    }
+
+    private void verifyTimeSchema() {
+        if (!tableExists("biz_cpm_time_entry")) {
+            throw new IllegalStateException("biz_cpm_time_entry 表未就緒，投入时段无处落库");
+        }
+        for (String[] col : TIME_ITEM_COLUMNS) {
+            if (!columnExists(col[0], col[1])) {
+                throw new IllegalStateException(col[0] + "." + col[1] + " 列缺失，时段回算与回写状态无处落值");
+            }
+        }
+        // 增强 for 的右侧必须是表达式，裸数组初始化器不合法（javadoc 里那条语法限制同此）
+        String[] timeConstraints = {"fk_cpm_time_item", "ck_cpm_time_duration", "ck_cpm_time_range"};
+        for (String constraint : timeConstraints) {
+            if (!constraintExists("biz_cpm_time_entry", constraint)) {
+                throw new IllegalStateException("biz_cpm_time_entry 缺少約束 " + constraint
+                        + "，跨夜/超 24 小時的脏时段会被原样写入统计");
+            }
+        }
+        if (!indexExists("biz_cpm_time_entry", "idx_cpm_time_user_date")) {
+            throw new IllegalStateException("biz_cpm_time_entry 缺少 idx_cpm_time_user_date，工时汇总会按人全表扫");
+        }
+    }
+
+    /* ==================== 阶段三 6. 状态与来源 CHECK 放宽 ==================== */
+
+    /**
+     * 放宽三条 CHECK 的取值集合（阶段三新增 cancelled/deferred 两个状态与 rdm_task 一种来源）。
+     *
+     * <p>为什么不能只在 Java 白名单里加值、不动 DDL：存量环境的 CHECK 仍是旧四项，
+     * 界面点得出来、写库却报「數據庫操作異常」——白名单与约束必须同时放宽，且约束取值
+     * 一律由 {@link CpmConstants} 拼出，不在这里手写第二份字面量。
+     *
+     * <p>MySQL 8 没有 {@code DROP CHECK IF EXISTS}，所以先查存在再丢；脚本副本只作参考文档。
+     */
+    private void doEnumExpand() {
+        widenStatusCheck("biz_cpm_item", "ck_cpm_item_status", "status");
+        widenStatusCheck("biz_cpm_item_update", "ck_cpm_update_status", "status");
+        if (checkConstraintExists("biz_cpm_item", "ck_cpm_item_source")) {
+            jdbcTemplate.execute("ALTER TABLE biz_cpm_item DROP CHECK ck_cpm_item_source");
+        }
+        jdbcTemplate.execute("ALTER TABLE biz_cpm_item ADD CONSTRAINT ck_cpm_item_source CHECK (source_type IN ("
+                + quotedList(CpmConstants.SOURCE_TYPES) + "))");
+    }
+
+    private void widenStatusCheck(String table, String constraint, String column) {
+        if (checkConstraintExists(table, constraint)) {
+            jdbcTemplate.execute("ALTER TABLE " + table + " DROP CHECK " + constraint);
+        }
+        jdbcTemplate.execute("ALTER TABLE " + table + " ADD CONSTRAINT " + constraint
+                + " CHECK (" + column + " IN (" + quotedList(CpmConstants.ITEM_STATUSES) + "))");
+    }
+
+    /**
+     * 校验必须实查 CHECK_CLAUSE，而不是「约束存在」。
+     *
+     * <p>本步改的是取值集合：约束在但仍是旧四项时，新状态提交照样被数据库打回，
+     * 却会被记成「已迁移」——比没记更危险（同 meeting:schema:v1.2 的复盘）。
+     */
+    private void verifyEnumExpand() {
+        for (String[] target : new String[][]{
+                {"biz_cpm_item", "ck_cpm_item_status"}, {"biz_cpm_item_update", "ck_cpm_update_status"}}) {
+            String clause = checkClauseOf(target[0], target[1]);
+            for (String status : CpmConstants.ITEM_STATUSES) {
+                if (!clause.contains("'" + status + "'")) {
+                    throw new IllegalStateException(target[0] + " 的 " + target[1]
+                            + " 仍未包含 " + status + "，该状态写库会被 CHECK 打回");
+                }
+            }
+        }
+        String sourceClause = checkClauseOf("biz_cpm_item", "ck_cpm_item_source");
+        for (String source : CpmConstants.SOURCE_TYPES) {
+            if (!sourceClause.contains("'" + source + "'")) {
+                throw new IllegalStateException("ck_cpm_item_source 仍未包含 " + source + "，该来源导入会直接失败");
+            }
+        }
+    }
+
+    /* ==================== 阶段三 7. 汇报正式版本 ==================== */
+
+    /**
+     * 版本表建表 + 汇报/推送记录补列 + 复合外键。
+     *
+     * <p>「当前生效哪一版」由 {@code biz_cpm_report.published_revision_id} 单点指向，
+     * 因此版本表自身不设软删列——软删一个版本等于毁取证链。
+     */
+    private void doRevisionSchema() {
+        int executed = executeScript(REVISION_SCHEMA_SCRIPT);
+        log.info("持續績效匯報版本建表腳本已執行: {} 條語句（{}）", executed, REVISION_SCHEMA_SCRIPT);
+        addColumnIfAbsent("biz_cpm_report", "published_revision_id",
+                "ALTER TABLE biz_cpm_report ADD COLUMN published_revision_id BIGINT NULL COMMENT '當前正式版本，NULL=階段二遺留的舊發布（無版本行）'");
+        addColumnIfAbsent("biz_cpm_report", "draft_hash",
+                "ALTER TABLE biz_cpm_report ADD COLUMN draft_hash CHAR(64) NULL COMMENT '當前工作草稿與快照的內容摘要，用於判定是否存在未發布變更'");
+        addColumnIfAbsent("biz_cpm_push_record", "revision_id",
+                "ALTER TABLE biz_cpm_push_record ADD COLUMN revision_id BIGINT NULL COMMENT '本次通知綁定的正式版本；歷史連結指向當時那一版'");
+        // 复合 FK 只在两列都在位后才能建；缺列时建约束会直接失败，宁可不建也不要吞异常
+        if (columnExists("biz_cpm_report", "published_revision_id")
+                && !constraintExists("biz_cpm_report", "fk_cpm_report_revision")) {
+            jdbcTemplate.execute("ALTER TABLE biz_cpm_report ADD CONSTRAINT fk_cpm_report_revision "
+                    + "FOREIGN KEY (id, published_revision_id) REFERENCES biz_cpm_report_revision (report_id, id)");
+        }
+        if (columnExists("biz_cpm_push_record", "revision_id")
+                && !constraintExists("biz_cpm_push_record", "fk_cpm_push_revision")) {
+            // 推送记录只有 ref_id（汇报 id 或认定 id），没有 report_id 列：
+            // 复合外键 (report_id, revision_id) 在这个表上根本不存在左列，MySQL 直接报
+            // "Key column 'report_id' doesn't exist in table"。版本行自身已由
+            // fk_cpm_revision_report 钉住所属汇报，这里只需保证 revision_id 指向真实版本。
+            jdbcTemplate.execute("ALTER TABLE biz_cpm_push_record ADD CONSTRAINT fk_cpm_push_revision "
+                    + "FOREIGN KEY (revision_id) REFERENCES biz_cpm_report_revision (id)");
+        }
+    }
+
+    private void verifyRevisionSchema() {
+        if (!tableExists("biz_cpm_report_revision")) {
+            throw new IllegalStateException("biz_cpm_report_revision 表未就緒，修訂重發布無處落版本");
+        }
+        for (String[] key : new String[][]{
+                {"biz_cpm_report_revision", "uk_cpm_revision_no"},
+                {"biz_cpm_report_revision", "uk_cpm_revision_request"},
+                {"biz_cpm_report_revision", "uk_cpm_revision_owner"}}) {
+            if (!indexExists(key[0], key[1])) {
+                throw new IllegalStateException(key[0] + " 缺少 " + key[1]
+                        + "，並發下会长出重复版本号或重复幂等键");
+            }
+        }
+        for (String[] col : REVISION_COLUMNS) {
+            if (!columnExists(col[0], col[1])) {
+                throw new IllegalStateException(col[0] + "." + col[1] + " 列缺失，当前版本指向与通知绑定无处落值");
+            }
+        }
+        if (!constraintExists("biz_cpm_report_revision", "fk_cpm_revision_report")) {
+            throw new IllegalStateException("版本表缺 fk_cpm_revision_report，孤儿版本会让历史页读出已删汇报的内容");
+        }
+        // 两处指向版本行的外键是「通知绑定当时那一版」这条口径的数据库级保证：
+        // 缺了它们，代码里的一个笔误就能让历史通知跳到新版本上，而接口一切正常。
+        if (!constraintExists("biz_cpm_report", "fk_cpm_report_revision")) {
+            throw new IllegalStateException("biz_cpm_report 缺 fk_cpm_report_revision，当前版本指针可以指向别的汇报");
+        }
+        if (!constraintExists("biz_cpm_push_record", "fk_cpm_push_revision")) {
+            throw new IllegalStateException("biz_cpm_push_record 缺 fk_cpm_push_revision，通知能绑定到不存在的版本");
+        }
+    }
+
+    /* ==================== 通用工具（与 MeetingSchemaMigrationInitializer 同实现同守卫） ==================== */
     private int executeScript(String script) {
         ClassPathResource resource = new ClassPathResource(script);
         if (!resource.exists()) {
@@ -367,6 +575,73 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
                         + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?",
                 Integer.class, table, indexName);
         return n != null && n > 0;
+    }
+
+    /**
+     * 补列（MySQL 8 无 {@code ADD COLUMN IF NOT EXISTS}，必须先查再改）。
+     *
+     * <p>失败一律抛出，不 catch：吞掉异常会让 applyOnce 误记成功版本，下次启动不再重试，
+     * 于是「生产库缺列」这种事故可以长期隐身（金字招牌Initializer 的历史教训）。
+     */
+    private void addColumnIfAbsent(String table, String column, String ddl) {
+        if (columnExists(table, column)) {
+            return;
+        }
+        jdbcTemplate.execute(ddl);
+        log.info("cpm 迁移补列完成: {}.{}", table, column);
+    }
+
+    /** 约束（含 CHECK / FK）是否已存在且处于强制状态。 */
+    private boolean constraintExists(String table, String constraintName) {
+        Integer n = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS "
+                        + "WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = ? "
+                        + "AND CONSTRAINT_NAME = ? AND ENFORCED = 'YES'",
+                Integer.class, table, constraintName);
+        return n != null && n > 0;
+    }
+
+    /**
+     * CHECK 约束存在性判定（不表名版本：MySQL 8 的 CHECK_CONSTRAINTS 没有 TABLE_NAME 列，
+     * 拿表名去筛它会报 Unknown column 并让整步迁移失败——开发库实测，同 meeting 域口径）。
+     */
+    private boolean checkConstraintExists(String table, String constraintName) {
+        return constraintExists(table, constraintName);
+    }
+
+    /**
+     * 取 CHECK 的实际谓词文本，用于证明「取值集合真的放宽了」。
+     *
+     * <p>两个必须照抄 meeting 域实测结论的细节，否则会把已放宽的约束误判成未放宽：
+     * ① MySQL 8 回传的 CHECK_CLAUSE 会给字面量加字符集引入符并转义引号
+     *    （实测 {@code _utf8mb4\'todo\'}），比对前先去掉反斜杠；
+     * ② 表名要从 TABLE_CONSTRAINTS 关联取——CHECK_CONSTRAINTS 没有 TABLE_NAME 列，
+     *    而约束名在同一 schema 内不保证全局唯一，只按约束名查会读到别的表的同名约束。
+     */
+    private String checkClauseOf(String table, String constraintName) {
+        List<String> clauses = jdbcTemplate.queryForList(
+                "SELECT cc.CHECK_CLAUSE FROM information_schema.CHECK_CONSTRAINTS cc "
+                        + "JOIN information_schema.TABLE_CONSTRAINTS tc "
+                        + "  ON tc.CONSTRAINT_SCHEMA = cc.CONSTRAINT_SCHEMA AND tc.CONSTRAINT_NAME = cc.CONSTRAINT_NAME "
+                        + "WHERE cc.CONSTRAINT_SCHEMA = DATABASE() AND cc.CONSTRAINT_NAME = ? "
+                        + "AND tc.TABLE_NAME = ? AND tc.ENFORCED = 'YES'",
+                String.class, constraintName, table);
+        if (clauses.isEmpty()) {
+            throw new IllegalStateException("約束 " + table + "." + constraintName + " 未强制存在，無法校驗其取值集合");
+        }
+        return clauses.get(0).replace("\\", "");
+    }
+
+    /** 排序集合 → SQL IN 列表字面量（取值来自 CpmConstants，DDL 与校验同一真源） */
+    private static String quotedList(java.util.Collection<String> values) {
+        StringBuilder sb = new StringBuilder();
+        for (String value : values) {
+            if (sb.length() > 0) {
+                sb.append(", ");
+            }
+            sb.append('\'').append(value).append('\'');
+        }
+        return sb.toString();
     }
 
     private Long queryMenuId(String menuKey) {

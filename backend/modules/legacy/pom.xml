@@ -58,6 +58,28 @@
             <artifactId>mftb-admin-shared</artifactId>
             <version>${project.version}</version>
         </dependency>
+
+        <!--
+          汇报 Word 导出（阶段三，cpm 域唯一使用者）。依赖评估：
+
+          1) 许可证：Apache-2.0，与本仓库的专有许可兼容；候选里 **排除 iText**（AGPL-3.0，
+             专有仓在未购买商业授权的前提下不可引入），也排除 docx4j（Apache-2.0 但依赖树更重、
+             引入 JAXB/jakarta 全家桶）与 LibreOffice 无头转换（镜像体积 +600MB 级别）。
+          2) 只用 XWPF（.docx）：不引 poi-scratchpad，.doc 老格式没有需求，多一个 artifact
+             就多一片 CVE 面。
+          3) 版本 5.4.1：POI 的历史高危集中在 &lt; 5.2.x（OOXML 解析 XXE、zip bomb），
+             5.4.x 是当前稳定线；本服务只输出服务端自建的文档、不解析外部上传的 OOXML，
+             攻击面限于「我们自己的输入」，这是本功能能安全引入 POI 的关键前提。
+          4) 体积：poi + poi-ooxml + poi-ooxml-lite + xmlbeans + commons-compress(已存在)
+             约 +12MB 进镜像；不进前端首包，与前端零耦合。
+          5) 日志：POI 走 log4j-api 门面，与 Spring Boot 的 logback 通过 log4j-to-slf4j 桥接
+             （bootstrap 已带），不引入 log4j-core，避免与既有日志实现形成两套输出。
+        -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.4.1</version>
+        </dependency>
     </dependencies>
 
     <build>

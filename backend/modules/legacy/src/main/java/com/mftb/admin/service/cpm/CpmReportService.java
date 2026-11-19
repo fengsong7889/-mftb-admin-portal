@@ -11,6 +11,7 @@ import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.constant.CpmConstants;
 import com.mftb.admin.dto.CpmDto;
 import com.mftb.admin.entity.CpmReport;
+import com.mftb.admin.entity.CpmReportRevision;
 import com.mftb.admin.entity.SysUser;
 import com.mftb.admin.mapper.CpmCommentMapper;
 import com.mftb.admin.mapper.CpmReactionMapper;
@@ -26,6 +27,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -55,6 +57,8 @@ public class CpmReportService {
     private final CpmAccessGuard guard;
     private final CpmRuleService ruleService;
     private final CpmNotifyService notifyService;
+    /** 阶段三：正式版本链。发布/修订都在同事务内写版本行，指针绑定失败整个回滚 */
+    private final CpmReportRevisionService revisionService;
 
     /* ==================== 预览 ==================== */
 
@@ -71,7 +75,16 @@ public class CpmReportService {
         CpmPeriods.Period period = periods.resolve(periodType, LocalDate.parse(periodStartStr));
         CpmReport stored = reportMapper.findOwn(current.getId(), periodType, period.start());
         if (stored != null) {
-            return toVO(stored, current);
+            CpmDto.ReportVO vo = toVO(stored, current);
+            /*
+             * 已发布的当期视图要重跑一次聚合，才能回答「期间内是不是又发生了新事实」。
+             * 没有这个信号，修订功能等于不存在——用户不会知道自己漏了什么，
+             * 而阶段二那条「已发布不可修改」的提示会一直挂着，看起来像系统坏掉了。
+             */
+            attachRevisions(vo, stored, CpmConstants.REPORT_STATUS_PUBLISHED.equals(stored.getStatus())
+                    ? snapshotBuilder.build(current.getId(), periodType, period.start(), period.end())
+                    : null);
+            return vo;
         }
         CpmReport virtual = new CpmReport();
         virtual.setUserId(current.getId());
@@ -97,7 +110,8 @@ public class CpmReportService {
         CpmReport existing = reportMapper.findOwn(current.getId(), period.periodType(), period.start());
         if (existing != null) {
             if (!CpmConstants.REPORT_STATUS_DRAFT.equals(existing.getStatus())) {
-                throw new BusinessException("匯報已發布，不可修改；如需重述請等待下一週期");
+                // 阶段三起已发布不再「等下一周期」：补录走修订重发布，旧版本照样留着
+                throw new BusinessException("匯報已發布，不可改回草稿；如需補錄請使用「修訂並重新發布」");
             }
             if (reportMapper.overwriteDraft(existing.getId(), current.getId(), snapshotJson,
                     trim(form.getSummary(), 2000), Boolean.TRUE.equals(form.getAiSummary()) ? 1 : 0,
@@ -169,14 +183,22 @@ public class CpmReportService {
             return toVO(existing, current);
         }
         if (reportMapper.publishDraft(existing.getId(), snapshotJson,
-                trim(form.getSummary(), 2000), Boolean.TRUE.equals(form.getAiSummary()) ? 1 : 0) == 0) {
+                trim(form.getSummary(), 2000), Boolean.TRUE.equals(form.getAiSummary()) ? 1 : 0,
+                revisionService.contentHash(snapshotJson, trim(form.getSummary(), 2000),
+                        Boolean.TRUE.equals(form.getAiSummary()))) == 0) {
             CpmReport latest = reportMapper.selectById(existing.getId());
             if (latest != null && CpmConstants.REPORT_STATUS_PUBLISHED.equals(latest.getStatus())) {
                 return toVO(latest, current);
             }
             throw new BusinessException("發布狀態已變更，請刷新後重試");
         }
-        final long reportId = existing.getId();
+        CpmReport published = reportMapper.selectById(existing.getId());
+        // V1 与发布同事务：指针绑不上就整个回滚，绝不留「已发布但没有版本」这种半状态
+        CpmReportRevision revision = revisionService.ensureRevision(
+                published, CpmReportRevisionService.FIRST_REVISION_NOTE, published.getPublishedAt(), current);
+        reportMapper.bindRevision(published.getId(), revision.getId());
+        published.setPublishedRevisionId(revision.getId());
+        final long reportId = published.getId();
         // 事务提交后再投递：钉钉抖动不回滚发布（同纪要 Dispatcher 的 afterCommit 口径）
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
@@ -191,6 +213,94 @@ public class CpmReportService {
         return toVO(reportMapper.selectById(reportId), current);
     }
 
+    /**
+     * 修订重发布：重新聚合 → 冻结为 V(n+1) → 指针推进 → 通知指向新版。
+     *
+     * <p>已发布不再是终态，但也不是「可以偷偷改」：每次修订都留下不可变版本与一句必填说明，
+     * 旧版本继续可查可导出。内容没有任何变化时不会产生新版本（幂等），
+     * 因为「V2 与 V1 完全一样」这种版本链只会让人怀疑版本机制本身在说谎。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public CpmDto.ReportVO republish(CpmDto.RepublishForm form) {
+        SysUser current = guard.currentUser();
+        // 锁汇报行：版本号分配与 request_key 间隙检查必须按汇报串行化（见 requireOwnedReportForUpdate）
+        CpmReport stored = guard.requireOwnedReportForUpdate(form.getReportId(), current);
+        if (!CpmConstants.REPORT_STATUS_PUBLISHED.equals(stored.getStatus())) {
+            throw new BusinessException("只有已發布的匯報才能修訂重發布");
+        }
+        if (form.getChangeNote() == null || form.getChangeNote().isBlank()) {
+            throw new BusinessException("請填寫修訂說明");
+        }
+        // 重新聚合是修订存在的唯一理由：让期间内新发生的事实（补记的时段、新写的流水）进入新版
+        CpmDto.Snapshot snapshot = snapshotBuilder.build(
+                stored.getUserId(), stored.getPeriodType(), stored.getPeriodStart(), stored.getPeriodEnd());
+        if (snapshot.getTotals().getTotal() == 0) {
+            throw new BusinessException("本週期已無活躍工作記錄，無法修訂為空匯報");
+        }
+        String snapshotJson = JsonUtils.toJson(snapshot);
+        String summary = trim(form.getSummary(), 2000);
+        boolean aiSummary = Boolean.TRUE.equals(form.getAiSummary());
+        String hash = revisionService.contentHash(snapshotJson, summary, aiSummary);
+        if (hash.equals(stored.getDraftHash())) {
+            // 内容与上次发布完全一致：直接回当前视图。此处不产生 V(n+1)，也不推送第二次
+            return toVO(stored, current);
+        }
+        String newSummary = summary == null ? stored.getSummary() : summary;
+        int newAiSummary = form.getSummary() == null && form.getAiSummary() == null
+                ? (Integer.valueOf(1).equals(stored.getAiSummary()) ? 1 : 0)
+                : (aiSummary ? 1 : 0);
+
+        CpmReport staged = new CpmReport();
+        staged.setId(stored.getId());
+        staged.setVersion(stored.getVersion());
+        staged.setContentJson(snapshotJson);
+        staged.setSummary(newSummary);
+        staged.setAiSummary(newAiSummary);
+        LocalDateTime publishedAt = LocalDateTime.now();
+        CpmReportRevision revision = revisionService.ensureRevision(
+                staged, form.getChangeNote().trim(), publishedAt, current);
+        if (reportMapper.applyRevision(stored.getId(), current.getId(), stored.getVersion(),
+                snapshotJson, newSummary, newAiSummary, hash, revision.getId(), publishedAt) == 0) {
+            throw new BusinessException("匯報已被更新，請刷新後重試");
+        }
+        final long reportId = stored.getId();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    notifyService.notifyReportPublished(reportId);
+                } catch (RuntimeException e) {
+                    log.warn("[CpmNotify] 修訂送達異常 reportId={}: {}", reportId, e.getMessage());
+                }
+            }
+        });
+        return toVO(reportMapper.selectById(reportId), current);
+    }
+
+    /**
+     * 读取指定历史版本。
+     *
+     * <p>读历史<b>不登记已读回执</b>：回执的业务含义是「他收到了这一期汇报」，
+     * 把「翻出三个月前的旧版看了一眼」也记成已读，送达统计就开始说谎。
+     * 权限仍走 {@code requireReadableReport}——能看到当期不等于能看到该人全部历史，
+     * 但既然当期可读，同一期的旧版本就是同一批内容，不额外扩大披露面。
+     */
+    public CpmDto.ReportVO revisionView(long reportId, int revisionNo) {
+        SysUser viewer = guard.currentUser();
+        CpmReport report = guard.requireReadableReport(reportId, viewer);
+        SysUser owner = report.getUserId().equals(viewer.getId()) ? viewer : userOf(report.getUserId());
+        CpmReportRevision revision = revisionService.require(reportId, revisionNo);
+        CpmDto.ReportVO vo = toVO(report, owner);
+        // 覆盖成那一版冻结的内容：当前版的 content_json/摘要与版本号都必须被替换，
+        // 只换快照不换摘要的话，界面会出现「V1 的版本号 + V2 的摘要」这种最坏的组合
+        vo.setSnapshot(revisionService.parseSnapshot(revision));
+        vo.setSummary(revision.getDigest());
+        vo.setAiSummary(Integer.valueOf(1).equals(revision.getAiSummary()));
+        vo.setPublishedAt(revision.getPublishedAt() == null ? null : revision.getPublishedAt().format(DISPLAY));
+        vo.setRevisionNo(revision.getRevisionNo());
+        return vo;
+    }
+
     /* ==================== 详情（本人或可见范围） ==================== */
 
     @Transactional(rollbackFor = Exception.class)
@@ -203,7 +313,23 @@ public class CpmReportService {
         if (!report.getUserId().equals(viewer.getId())) {
             readMapper.insertIgnore(reportId, viewer.getId());
         }
-        return toVO(report, owner);
+        CpmDto.ReportVO vo = toVO(report, owner);
+        // 上级侧不重跑聚合：「有未发布变更」是汇报人自己的判断依据，
+        // 让读者触发一次重聚合既没有消费方，又会给团队视图的每次点开加一遍统计
+        attachRevisions(vo, report, null);
+        return vo;
+    }
+
+    /**
+     * 版本列表（供界面抬头切换器与历史 tab 用）。
+     *
+     * <p>守卫与详情同一条：能看到这一期汇报，就能看到它被发布过几版——
+     * 版本链是「谁在什么时候看到了什么内容」的证据，对已经有权读内容的人不必再藏。
+     */
+    public List<CpmDto.RevisionVO> revisions(long reportId) {
+        SysUser viewer = guard.currentUser();
+        CpmReport report = guard.requireReadableReport(reportId, viewer);
+        return revisionService.list(reportId, report.getPublishedRevisionId());
     }
 
     /** 我的历史列表（倒序）。 */
@@ -272,7 +398,33 @@ public class CpmReportService {
         vo.setLikedByMe(viewer != null && stored.getId() != null
                 && reactionMapper.countActive(CpmConstants.TARGET_REPORT, stored.getId(), viewer.getId()) > 0);
         vo.setVersion(stored.getVersion());
+        vo.setPublishedRevisionId(stored.getPublishedRevisionId());
         return vo;
+    }
+
+    /**
+     * 把版本链挂到视图上，只在「单个汇报被打开」时调用。
+     *
+     * <p>历史列表不挂：那里每行都要多两次查询（版本列表 + 实时重聚合）才能给出一个
+     * 列表里根本看不见的版本号。缺字段与零值不同，宁可不给也不为列表造 N+1。
+     *
+     * @param live 已经算好的当前实时聚合快照；传 null 表示不判定「有未发布变更」
+     */
+    private void attachRevisions(CpmDto.ReportVO vo, CpmReport stored, CpmDto.Snapshot live) {
+        if (stored.getId() == null || !CpmConstants.REPORT_STATUS_PUBLISHED.equals(stored.getStatus())) {
+            return;
+        }
+        List<CpmDto.RevisionVO> revisions = revisionService.list(stored.getId(), stored.getPublishedRevisionId());
+        vo.setRevisions(revisions);
+        revisions.stream().filter(r -> Boolean.TRUE.equals(r.getCurrent())).findFirst()
+                .ifPresent(current -> vo.setRevisionNo(current.getRevisionNo()));
+        if (live != null) {
+            String liveHash = revisionService.contentHash(JsonUtils.toJson(live),
+                    stored.getSummary(), Integer.valueOf(1).equals(stored.getAiSummary()));
+            // 「有未发布变更」说的是「期间内又发生了新事实」，而不是「我改过草稿」：
+            // 已发布记录的草稿不可改，判据只能是重新聚合的结果与冻结快照的差异
+            vo.setHasUnpublishedChanges(!liveHash.equals(stored.getDraftHash()));
+        }
     }
 
     private SysUser safeCurrent() {

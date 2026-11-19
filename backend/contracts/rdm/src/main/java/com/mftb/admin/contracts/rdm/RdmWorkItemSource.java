@@ -56,4 +56,51 @@ public interface RdmWorkItemSource {
         LocalDate planDate,
         boolean terminated
     ) { }
+
+    /**
+     * 任务引用（阶段三）：CPM 的进度回写只能落到任务级，所以关联清单必须能给出任务。
+     *
+     * <p>{@code prdTask} 必须暴露：PRD 类任务的 100% 在 RDM 侧只能通过「提交評審」达成，
+     * 端口不把这个事实传出去，CPM 就无法预先拒绝一类注定被回写拒绝的操作。
+     *
+     * @param taskId          rdm_work_task.id，作为 CPM 条目的 source_ref 落库
+     * @param taskNo          任务编号（展示与回写留痕用）
+     * @param reqId           所属需求 id（界面副行素材）
+     * @param reqTitle        所属需求标题
+     * @param title           任务标题
+     * @param status          任务状态原始码，词表归 RDM 域
+     * @param progress        RDM 当前进度 0-100（同时作为回写的 expectedProgress 基准）
+     * @param planHours       计划工时（展示素材；CPM 不自建工时估算口径）
+     * @param myRole          owner=我是负责人 / participant=我参与
+     * @param planFinishDate  计划完成日，可空
+     * @param prdTask         是否 PRD 类任务（100% 需走提交评审）
+     * @param terminated      是否已结案（done/cancelled/released），允许导入但界面要提示
+     */
+    record TaskRef(
+        Long taskId,
+        String taskNo,
+        Long reqId,
+        String reqTitle,
+        String title,
+        String status,
+        Integer progress,
+        java.math.BigDecimal planHours,
+        String myRole,
+        LocalDate planFinishDate,
+        boolean prdTask,
+        boolean terminated
+    ) { }
+
+    /**
+     * 查询与指定员工相关、且尚未结案的<b>任务</b>（按截止日与最近变动排序）。
+     *
+     * <p>口径必须由 RDM 域自己给：「与我相关」在这边是 owner_user_id 命中
+     * 或 role 表/参与者表命中，与需求级的五类角色列不是同一套判定，CPM 抄一遍必然抄漏。
+     *
+     * @param userId  目标员工 sys_user.id（由调用方从登录态取，不接受前端传值）
+     * @param keyword 标题/任务号模糊匹配，可为空
+     * @param limit   返回上限（调用方负责传入合理值，实现侧不得无视）
+     * @return 任务引用列表；无匹配时返回空列表，不抛异常
+     */
+    List<TaskRef> findMyOpenTasks(long userId, String keyword, int limit);
 }

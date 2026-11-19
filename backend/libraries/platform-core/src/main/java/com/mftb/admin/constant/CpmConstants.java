@@ -69,6 +69,25 @@ public final class CpmConstants {
     public static final String STATUS_DOING = "doing";
     public static final String STATUS_DONE = "done";
     public static final String STATUS_BLOCKED = "blocked";
+    /** 已取消：不再该做的事。留在待办里会把完成率压成与交付表现无关的数字 */
+    public static final String STATUS_CANCELLED = "cancelled";
+    /** 延期：改期了。与受阻是两种管理动作——一个要解阻，一个只需重排期 */
+    public static final String STATUS_DEFERRED = "deferred";
+
+    /**
+     * 状态取值集合的唯一真源：白名单校验、SQL 期间过滤、以及 DDL 里 CHECK 的取值列表
+     * 都从这里拼（同 {@code MeetingConstants.BIZ_TYPES} 的口径）。
+     *
+     * <p>为什么必须排序后拼接：DDL 与 Java 各写一份字面量时，加一个取值就漏改一处，
+     * 后果是「界面点得出来、写库报數據庫操作異常」——阶段二踩过一次同类坑。
+     */
+    public static final java.util.SortedSet<String> ITEM_STATUSES =
+            java.util.Collections.unmodifiableSortedSet(new java.util.TreeSet<>(java.util.Arrays.asList(
+                    STATUS_TODO, STATUS_DOING, STATUS_DONE, STATUS_BLOCKED, STATUS_CANCELLED, STATUS_DEFERRED)));
+
+    /** 完成率分母排除的状态：取消不是没做完，延期仍算（事还在，只是改了期） */
+    public static final java.util.Set<String> STATUSES_EXCLUDED_FROM_COMPLETION =
+            java.util.Collections.singleton(STATUS_CANCELLED);
 
     /* ==================== 汇报周期与状态 ==================== */
 
@@ -84,7 +103,36 @@ public final class CpmConstants {
     public static final String SOURCE_MANUAL = "manual";
     public static final String SOURCE_AI = "ai";
     public static final String SOURCE_RDM = "rdm_requirement";
+    /**
+     * RDM 任务级关联（阶段三新增）：只有任务级条目才具备进度回写的落点——
+     * RDM 的进度真值在 {@code rdm_work_task.progress}，而 {@code rdm_requirement.progress}
+     * 被 RDM 日报明确判为「可能长期停留 0，用它算会与甘特图矛盾」。
+     * 因此需求级关联（{@link #SOURCE_RDM}）保持只读，不参与回写。
+     */
+    public static final String SOURCE_RDM_TASK = "rdm_task";
     public static final String SOURCE_MEETING_ACTION = "meeting_action";
+
+    /** 来源取值集合唯一真源（同上：校验与 DDL CHECK 同源） */
+    public static final java.util.SortedSet<String> SOURCE_TYPES =
+            java.util.Collections.unmodifiableSortedSet(new java.util.TreeSet<>(java.util.Arrays.asList(
+                    SOURCE_MANUAL, SOURCE_AI, SOURCE_RDM, SOURCE_RDM_TASK, SOURCE_MEETING_ACTION)));
+
+    /* ==================== RDM 回写结果（biz_cpm_item.rdm_sync_state） ==================== */
+
+    public static final String SYNC_PENDING = "pending";
+    public static final String SYNC_SUCCESS = "success";
+    /** RDM 侧进度已被他人改动：必须让本人看见并给出「重新對齊」出路，绝不静默覆盖交付真值 */
+    public static final String SYNC_CONFLICT = "conflict";
+    /** RDM 规则拒绝（PRD 只能走提交评审、完成缺交付说明、取消/延期无对应语义） */
+    public static final String SYNC_REJECTED = "rejected";
+    public static final String SYNC_ERROR = "error";
+
+    public static final java.util.SortedSet<String> SYNC_STATES =
+            java.util.Collections.unmodifiableSortedSet(new java.util.TreeSet<>(java.util.Arrays.asList(
+                    SYNC_PENDING, SYNC_SUCCESS, SYNC_CONFLICT, SYNC_REJECTED, SYNC_ERROR)));
+
+    /** 回写来源标识：写进 RDM 进度流水，让交付侧能看出这笔改动来自绩效记录 */
+    public static final String SYNC_SOURCE = "cpm";
 
     /* ==================== CFR 反馈 ==================== */
 
@@ -104,6 +152,16 @@ public final class CpmConstants {
     public static final int DETAIL_MAX = 2000;
     public static final int NOTE_MAX = 120;
     public static final int COMMENT_MAX = 500;
+    /** 时段备注列宽（与 biz_cpm_time_entry.note VARCHAR(200) 同源） */
+    public static final int TIME_NOTE_MAX = 200;
+    /** 单段耗时上限（分钟）：与 ck_cpm_time_duration 同一约束值，一天不可能超过 24 小时 */
+    public static final int MAX_DURATION_MINUTES = 1440;
+    /** 单条目单日时段数上限：防「一秒一段」把工时统计刷成噪音 */
+    public static final int TIME_ENTRIES_PER_ITEM_DAY_MAX = 20;
+    /** 修订说明列宽（与 biz_cpm_report_revision.change_note 同源） */
+    public static final int CHANGE_NOTE_MAX = 200;
+    /** 回写结果文案列宽（与 biz_cpm_item.rdm_sync_message 同源） */
+    public static final int SYNC_MESSAGE_MAX = 200;
     public static final int AI_INPUT_MAX = 20_000;
     /** AI 提取单次返回条目上限：超出即视为模型跑飞，整次拒绝（同纪要白名单口径） */
     public static final int AI_ITEMS_MAX = 30;

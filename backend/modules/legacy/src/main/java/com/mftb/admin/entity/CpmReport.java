@@ -58,6 +58,18 @@ public class CpmReport {
 
     private LocalDateTime publishedAt;
 
+    /**
+     * 当前生效的正式版本（阶段三）。
+     *
+     * <p>NULL 只有一种含义：这条记录来自阶段二那次「发布即终态」的实现，当时没有版本行。
+     * 界面把它标成「歷史發送快照」而不是伪造一个 V1——把缺过的结构说成存在过的历史，
+     * 就是让取证页开始说谎。
+     */
+    private Long publishedRevisionId;
+
+    /** 最近一次发布/草稿的内容摘要：与当前内容比对即可判定「存在未發布變更」 */
+    private String draftHash;
+
     private Integer version;
 
     @TableField(fill = FieldFill.INSERT)

@@ -66,6 +66,8 @@ class CpmConcurrencyIntegrationTest {
     @Autowired
     private CpmReportService reportService;
     @Autowired
+    private CpmTimeEntryService timeEntryService;
+    @Autowired
     private JdbcTemplate jdbc;
     @Autowired
     private SysUserMapper sysUserMapper;
@@ -92,11 +94,35 @@ class CpmConcurrencyIntegrationTest {
         if (!itemIds.isEmpty()) {
             String placeholders = String.join(",", itemIds.stream().map(x -> "?").toList());
             jdbc.update("DELETE FROM biz_cpm_item_update WHERE item_id IN (" + placeholders + ")", itemIds.toArray());
+            // 阶段三：时段是条目的子事实，必须先于条目删除，否则 FK 会挡住整轮清理
+            jdbc.update("DELETE FROM biz_cpm_time_entry WHERE item_id IN (" + placeholders + ")", itemIds.toArray());
             jdbc.update("DELETE FROM biz_cpm_comment WHERE target_type = 'item' AND target_id IN (" + placeholders + ")", itemIds.toArray());
             jdbc.update("DELETE FROM biz_cpm_recognition WHERE target_type = 'item' AND target_id IN (" + placeholders + ")", itemIds.toArray());
         }
+        // 阶段三的两条外键是**互相指向**的：revision.report_id → report.id，而
+        // report.published_revision_id → revision.id。有环就不存在"谁先删都行"的顺序 ——
+        // 必须先把汇报上的版本指针置空断开这条环，再按「推送记录 → 版本行 → 汇报」删。
+        // 顺序错一位就是 Cannot delete or update a parent row，而清理失败会静默留下版本行，
+        // 下一轮 publish 复用同一汇报行时版本号继续往上长（实测 2→4→5），
+        // 让并发幂等断言看起来像"幂等失效"——那是清理缺陷冒充业务缺陷，最难查的一类假红。
+        // 范围只圈本期本人那几条汇报——不按 id 收口就会顺手删掉别人的取证链。
+        List<Long> reportIds = jdbc.queryForList(
+                "SELECT id FROM biz_cpm_report WHERE user_id = ? AND period_start = ?",
+                Long.class, operatorId, weekStart);
+        if (!reportIds.isEmpty()) {
+            String ph = String.join(",", reportIds.stream().map(x -> "?").toList());
+            Object[] args = reportIds.toArray();
+            // 同一段 id 列表在这条 SQL 里出现两次，参数必须拼成一个扁平数组：
+            // 写成 update(sql, args, args) 会把「Object[] 数组」当成一个绑定值送进去，
+            // MySQL 报的是 Truncated incorrect DOUBLE value: '\xAC\xED\x00\x05ur…'（序列化后的 Java 数组字节码）
+            Object[] twice = java.util.stream.Stream.of(args, args).flatMap(java.util.Arrays::stream).toArray();
+            jdbc.update("UPDATE biz_cpm_report SET published_revision_id = NULL WHERE id IN (" + ph + ")", args);
+            jdbc.update("DELETE FROM biz_cpm_push_record WHERE ref_id IN (" + ph + ") OR revision_id IN "
+                    + "(SELECT id FROM biz_cpm_report_revision WHERE report_id IN (" + ph + "))", twice);
+            jdbc.update("DELETE FROM biz_cpm_report_revision WHERE report_id IN (" + ph + ")", args);
+            jdbc.update("DELETE FROM biz_cpm_report WHERE id IN (" + ph + ")", args);
+        }
         jdbc.update("DELETE FROM biz_cpm_item WHERE user_id = ? AND title LIKE ?", operatorId, marker + "%");
-        jdbc.update("DELETE FROM biz_cpm_report WHERE user_id = ? AND period_start = ?", operatorId, weekStart);
         SecurityContextHolder.clearContext();
     }
 
@@ -208,6 +234,89 @@ class CpmConcurrencyIntegrationTest {
         Integer version = jdbc.queryForObject("SELECT version FROM biz_cpm_item WHERE id = ?", Integer.class, itemId);
         assertEquals(1, version, "只允许一次成功写入把版本推到 1");
         assertTrue(outcomes.stream().noneMatch(o -> o.startsWith("ERROR:")), "并发不应冒出未收敛的异常: " + outcomes);
+    }
+
+    /* ==================== 4. 并发写投入时段（阶段三） ==================== */
+
+    @Test
+    @DisplayName("两端并发给同一条目记时段：两段都在，条目工时缓存是两段之和而不是双计")
+    void concurrentSegmentsAreAllKeptAndCachedSumIsRight() throws Exception {
+        Long itemId = itemService.create(newItemForm("时段并发条目", null)).getId();
+        itemIds.add(itemId);
+
+        List<String> outcomes = runConcurrently(2, index -> {
+            try {
+                asUser();
+                CpmDto.TimeEntryForm form = new CpmDto.TimeEntryForm();
+                form.setWorkDate(LocalDate.now().toString());
+                form.setStartTime(index == 0 ? "09:00" : "14:00");
+                form.setEndTime(index == 0 ? "10:00" : "15:30");
+                timeEntryService.create(itemId, form);
+                return "OK";
+            } catch (Exception e) {
+                return "ERROR:" + throwableChain(e);
+            }
+        });
+
+        outcomes.forEach(o -> assertEquals("OK", o, "并发记时不应有失败分支: " + outcomes));
+        // 时段之间没有唯一键（同日多段是刻意设计），所以两条都必须在——
+        // 少了任何一条，日报与周报的工时就会静默偏低，而界面上完全看不出来
+        Integer rows = jdbc.queryForObject("SELECT COUNT(*) FROM biz_cpm_time_entry WHERE item_id = ?",
+                Integer.class, itemId);
+        assertEquals(2, rows);
+        Integer cachedHours = jdbc.queryForObject(
+                "SELECT work_hours * 60 FROM biz_cpm_item WHERE id = ?", Integer.class, itemId);
+        assertEquals(150, cachedHours, "60 + 90 分钟；双计或漏计都会让缓存与明细对不上");
+        String source = jdbc.queryForObject("SELECT work_hours_source FROM biz_cpm_item WHERE id = ?",
+                String.class, itemId);
+        assertEquals("segment", source);
+        Integer minutesInDb = jdbc.queryForObject(
+                "SELECT SUM(duration_minutes) FROM biz_cpm_time_entry WHERE item_id = ?", Integer.class, itemId);
+        assertEquals(cachedHours, minutesInDb, "条目缓存必须与时段明细自洽，否则界面两个数字会打架");
+    }
+
+    /* ==================== 5. 并发修订重发布（阶段三） ==================== */
+
+    @Test
+    @DisplayName("同一份修订并发提交两次：只长出一个新版本，重发端拿到同一版本而不是 V2/V3 并存")
+    void concurrentRepublishProducesSingleNewRevision() throws Exception {
+        Long itemId = itemService.create(newItemForm("修訂併發條目", null)).getId();
+        itemIds.add(itemId);
+        Long reportId = reportService.publish(draftForm()).getId();
+        assertNotNull(reportId, "发布后应拿到汇报 id 才能测修订");
+
+        // 修订前先制造一次真实变化，否则「内容与上次发布一致」会被正确地判为无需新版本
+        CpmDto.TimeEntryForm segment = new CpmDto.TimeEntryForm();
+        segment.setWorkDate(LocalDate.now().toString());
+        segment.setDurationMinutes(45);
+        timeEntryService.create(itemId, segment);
+
+        List<String> outcomes = runConcurrently(2, index -> {
+            try {
+                asUser();
+                CpmDto.RepublishForm form = new CpmDto.RepublishForm();
+                form.setReportId(reportId);
+                form.setChangeNote("并发修订同一说明");
+                form.setSummary("并发验收摘要");
+                form.setAiSummary(false);
+                CpmDto.ReportVO vo = reportService.republish(form);
+                return String.valueOf(vo.getRevisionNo());
+            } catch (BusinessException e) {
+                return "REJECT:" + e.getMessage();
+            } catch (Exception e) {
+                return "ERROR:" + throwableChain(e);
+            }
+        });
+
+        Integer revisions = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM biz_cpm_report_revision WHERE report_id = ?", Integer.class, reportId);
+        assertEquals(2, revisions, "首发 V1 + 同一说明的并发修订只能再加一版；长出 V3 就是幂等失效");
+        Integer distinctNos = jdbc.queryForObject(
+                "SELECT COUNT(DISTINCT revision_no) FROM biz_cpm_report_revision WHERE report_id = ?",
+                Integer.class, reportId);
+        assertEquals(revisions, distinctNos, "版本号不得重复（uk_cpm_revision_no 是唯一裁判）");
+        assertTrue(outcomes.stream().noneMatch(o -> o.startsWith("ERROR:")),
+                "并发修订不应冒出未收敛的异常: " + outcomes);
     }
 
     /* ==================== 夹具辅助 ==================== */

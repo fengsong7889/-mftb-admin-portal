@@ -113,7 +113,7 @@ class CpmWriteRulesTest {
         when(itemMapper.updateOwnedVersioned(anyLong(), anyLong(), anyInt(), any(), any(), any(),
                 any(), any(), any(), any(), any())).thenReturn(0);
         CpmItemService service = new CpmItemService(itemMapper, updateMapper, recognitionMapper,
-                templateService, periods, guard);
+                mock(CpmTimeEntryService.class), templateService, periods, guard, mock(CpmRdmSyncService.class));
 
         CpmDto.ItemForm form = new CpmDto.ItemForm();
         form.setTitle("改后的标题");
@@ -141,7 +141,8 @@ class CpmWriteRulesTest {
             return 1;
         });
         CpmItemService service = new CpmItemService(itemMapper, mock(CpmItemUpdateMapper.class),
-                mock(CpmRecognitionMapper.class), templateService, mock(CpmPeriods.class), guard);
+                mock(CpmRecognitionMapper.class), mock(CpmTimeEntryService.class), templateService,
+                mock(CpmPeriods.class), guard, mock(CpmRdmSyncService.class));
 
         CpmDto.ItemForm form = new CpmDto.ItemForm();
         form.setTitle("一句回车即存");
@@ -179,8 +180,11 @@ class CpmWriteRulesTest {
         CpmAccessGuard guard = mock(CpmAccessGuard.class);
         when(guard.currentUser()).thenReturn(SELF);
         when(guard.requireOwnedItem(7L, SELF)).thenReturn(item(7L, 3));
+        // 阶段三新增两个协作对象：时段服务与回写服务。这两个用例只验工时夹范围，
+        // 给 mock 即可——回写默认返回 null，恰好等于「该条目没有任务级关联，不推 RDM」
         CpmItemService service = new CpmItemService(itemMapper, mock(CpmItemUpdateMapper.class),
-                mock(CpmRecognitionMapper.class), mock(CpmTemplateService.class), mock(CpmPeriods.class), guard);
+                mock(CpmRecognitionMapper.class), mock(CpmTimeEntryService.class),
+                mock(CpmTemplateService.class), mock(CpmPeriods.class), guard, mock(CpmRdmSyncService.class));
 
         CpmDto.ProgressForm ok = new CpmDto.ProgressForm();
         ok.setProgress(60);
@@ -213,7 +217,8 @@ class CpmWriteRulesTest {
         CpmRuleService ruleService = mock(CpmRuleService.class);
         CpmNotifyService notifyService = mock(CpmNotifyService.class);
         CpmReportService service = new CpmReportService(reportMapper, readMapper, commentMapper,
-                reactionMapper, snapshotBuilder, periods, guard, ruleService, notifyService);
+                reactionMapper, snapshotBuilder, periods, guard, ruleService, notifyService,
+                mock(CpmReportRevisionService.class));
 
         CpmReport report = new CpmReport();
         report.setId(12L);
@@ -272,7 +277,7 @@ class CpmWriteRulesTest {
     @DisplayName("催办：claimSlot 返回 0（同日已占位）即整条链路静默，不重复投递")
     void duplicateReminderIsSkippedByClaim() {
         setUpNotify(false);
-        when(pushMapper.claimSlot(anyString(), anyLong(), any(), any())).thenReturn(0);
+        when(pushMapper.claimSlot(anyString(), anyLong(), any(), any(), any())).thenReturn(0);
 
         notifyService.remindDeadline(SELF.getId(), LocalDate.of(2026, 11, 16), "本週尚未發布匯報。");
 
@@ -285,7 +290,7 @@ class CpmWriteRulesTest {
     @DisplayName("dry-run：只把占位记录标成 skipped，绝不触发真实钉钉出站")
     void dryRunNeverHitsRealChannel() {
         setUpNotify(true);
-        when(pushMapper.claimSlot(anyString(), anyLong(), any(), any())).thenReturn(1);
+        when(pushMapper.claimSlot(anyString(), anyLong(), any(), any(), any())).thenReturn(1);
         when(pushMapper.selectOne(any())).thenReturn(queued(9L, SELF.getId()));
 
         notifyService.remindDeadline(SELF.getId(), LocalDate.of(2026, 11, 16), "本週尚未發布匯報。");
@@ -375,14 +380,14 @@ class CpmWriteRulesTest {
 
         notifyService.notifyRecognition(1L);
 
-        verify(pushMapper, never()).claimSlot(anyString(), anyLong(), any(), any());
+        verify(pushMapper, never()).claimSlot(anyString(), anyLong(), any(), any(), any());
     }
 
     @Test
     @DisplayName("个人推送开关关闭：已占位的记录标 skipped，同样不出站")
     void personalPushOffMarksSkipped() {
         setUpNotify(false);
-        when(pushMapper.claimSlot(anyString(), anyLong(), any(), any())).thenReturn(1);
+        when(pushMapper.claimSlot(anyString(), anyLong(), any(), any(), any())).thenReturn(1);
         when(pushMapper.selectOne(any())).thenReturn(queued(9L, SELF.getId()));
         when(notifyRuleService.personalPushEnabled()).thenReturn(false);
 

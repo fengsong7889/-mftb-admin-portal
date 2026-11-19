@@ -30,12 +30,22 @@ public interface CpmItemUpdateMapper extends BaseMapper<CpmItemUpdate> {
     List<CpmItemUpdate> listByUserAndRange(@Param("userId") long userId,
                                            @Param("start") LocalDate start, @Param("end") LocalDate end);
 
-    /** 期间活跃条目 id 集合：work_date 或任一流水落在期间内。 */
+    /**
+     * 期间活跃条目 id 集合：work_date、任一流水、<b>或任一投入时段</b>落在期间内。
+     *
+     * <p>阶段三加上第三个 OR 分支而不是让工时只走独立聚合查询：一条只有投入时段、
+     * work_date 与流水都在期间外的情形是真实存在的（补记上周某天的起止时间），
+     * 少了这个分支，明细里不会有它，而时段合计里有它——「明细加起来 ≠ 总数」
+     * 是最难解释的一种不一致，且两边各自都「没错」。
+     */
     @Select("SELECT DISTINCT i.id FROM biz_cpm_item i "
             + "LEFT JOIN biz_cpm_item_update u ON u.item_id = i.id "
+            + "LEFT JOIN biz_cpm_time_entry t ON t.item_id = i.id AND t.deleted = 0 "
+            + "  AND t.work_date >= #{start} AND t.work_date <= #{end} "
             + "WHERE i.user_id = #{userId} AND i.deleted = 0 "
             + "AND ((i.work_date >= #{start} AND i.work_date <= #{end}) "
-            + "  OR (u.update_date >= #{start} AND u.update_date <= #{end}))")
+            + "  OR (u.update_date >= #{start} AND u.update_date <= #{end}) "
+            + "  OR t.id IS NOT NULL)")
     List<Long> listActiveItemIds(@Param("userId") long userId,
                                  @Param("start") LocalDate start, @Param("end") LocalDate end);
 

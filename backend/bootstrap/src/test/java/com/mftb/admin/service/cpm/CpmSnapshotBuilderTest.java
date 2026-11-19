@@ -13,6 +13,7 @@ import com.mftb.admin.entity.CpmItem;
 import com.mftb.admin.entity.CpmItemUpdate;
 import com.mftb.admin.mapper.CpmItemMapper;
 import com.mftb.admin.mapper.CpmItemUpdateMapper;
+import com.mftb.admin.mapper.CpmTimeEntryMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,8 @@ class CpmSnapshotBuilderTest {
 
     private CpmItemMapper itemMapper;
     private CpmItemUpdateMapper updateMapper;
+    /** 阶段三新增依赖：工时维度从时段表取；本用例组只验状态/轨迹收敛，默认给空时段 */
+    private CpmTimeEntryMapper timeMapper;
     private CpmItemService itemService;
     private CpmSnapshotBuilder builder;
     private CpmPeriods periods;
@@ -45,9 +48,11 @@ class CpmSnapshotBuilderTest {
     void setUp() {
         itemMapper = mock(CpmItemMapper.class);
         updateMapper = mock(CpmItemUpdateMapper.class);
+        timeMapper = mock(CpmTimeEntryMapper.class);
+        when(timeMapper.listByUserAndRange(anyLong(), any(), any())).thenReturn(List.of());
         itemService = mock(CpmItemService.class);
         when(itemService.categoryLabels()).thenReturn(java.util.Map.of("develop", "開發", "prd_review", "需求評審"));
-        builder = new CpmSnapshotBuilder(itemMapper, updateMapper, itemService);
+        builder = new CpmSnapshotBuilder(itemMapper, updateMapper, timeMapper, itemService);
         periods = new CpmPeriods();
         ReflectionTestUtils.setField(periods, "businessTimezone", "Asia/Shanghai");
     }

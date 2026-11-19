@@ -26,12 +26,19 @@ import java.time.LocalDate;
 @Mapper
 public interface CpmPushRecordMapper extends BaseMapper<CpmPushRecord> {
 
-    /** 抢占式占位：唯一键挡住并发重发。返回 1=本实例拿到出站权。 */
+    /**
+     * 抢占式占位：同日同事件同接收人只登记一次（IGNORE + 唯一键挡住并发重发），返回 1=本实例拿到出站权。
+     *
+     * <p>阶段三带上 {@code revisionId}：通知必须绑定「发出去的是哪一版」。
+     * 没有这一列，修订重发布之后旧卡片链接会随指针指向新版，
+     * 「他当时收到的是什么」就再也问不出来了——版本机制在送达这一层就白建了。
+     */
     @Insert("INSERT IGNORE INTO biz_cpm_push_record "
-            + "(event_type, user_id, period_start, ref_id, status, channel, created_at, updated_at) "
-            + "VALUES (#{eventType}, #{userId}, #{periodStart}, #{refId}, 'queued', 'dingtalk', NOW(), NOW())")
+            + "(event_type, user_id, period_start, ref_id, revision_id, status, channel, created_at, updated_at) "
+            + "VALUES (#{eventType}, #{userId}, #{periodStart}, #{refId}, #{revisionId}, 'queued', 'dingtalk', NOW(), NOW())")
     int claimSlot(@Param("eventType") String eventType, @Param("userId") long userId,
-                  @Param("periodStart") LocalDate periodStart, @Param("refId") Long refId);
+                  @Param("periodStart") LocalDate periodStart, @Param("refId") Long refId,
+                  @Param("revisionId") Long revisionId);
 
     @Update("UPDATE biz_cpm_push_record SET status = #{status}, reason = #{reason}, "
             + "sent_at = CASE WHEN #{status} = 'sent' THEN NOW() ELSE sent_at END, updated_at = NOW() "
