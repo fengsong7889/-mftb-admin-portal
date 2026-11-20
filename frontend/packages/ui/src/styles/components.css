@@ -2677,7 +2677,8 @@ html:has(.login-page-video) {
 .algo-card-hero {
   display: flex;
   flex-direction: column;
-  align-self: start;
+  /* 两行描述统一后，同排卡片等高，按钮沿底部对齐。 */
+  align-self: stretch;
   box-shadow: 0 6px 18px rgba(24, 16, 46, 0.16);
 }
 
@@ -3108,6 +3109,9 @@ html:has(.login-page-video) {
 .algo-card-hero .algo-card-desc {
   font-size: 13px;
   line-height: 1.7;
+  white-space: pre-line;
+  min-height: 3.4em;
+  overflow-wrap: anywhere;
   color: rgba(255, 255, 255, 0.82);
   text-shadow: 0 1px 3px rgba(24, 16, 46, 0.30);
 }

@@ -1,6 +1,7 @@
 package com.mftb.admin.service;
 
 import com.mftb.admin.dto.AdAlgorithmRequest;
+import com.mftb.admin.dto.AdAlgorithmQuery;
 import com.mftb.admin.dto.AdAlgorithmVO;
 import com.mftb.admin.dto.PageResult;
 
@@ -11,6 +12,9 @@ import java.util.Map;
  * 推广算法库服务
  */
 public interface AdAlgorithmService {
+
+    /** 带推广对象及业务范围的管理端查询，先筛选再分页。 */
+    PageResult<AdAlgorithmVO> query(AdAlgorithmQuery query);
 
     /**
      * 算法分页查询（storeCode 非空时过滤掉对该门店屏蔽的算法，供销售菜单下拉使用；hasPricing=true 时仅返回有启用定价的算法）

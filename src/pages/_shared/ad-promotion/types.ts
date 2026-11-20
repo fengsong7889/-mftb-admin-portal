@@ -52,7 +52,6 @@ export interface RecommendTypeConfig {
   type: AlgorithmType
   name: string
   icon: string
-  description: string
   enabled: boolean                // 是否已开放购买
 }
 
@@ -89,63 +88,54 @@ export const RECOMMEND_TYPE_CONFIGS: RecommendTypeConfig[] = [
     type: AlgorithmType.INVINCIBLE_STAR,
     name: '無敵星星',
     icon: '⭐',
-    description: '首頁頂部黃金坑位，強勢引流',
     enabled: true,
   },
   {
     type: AlgorithmType.HOT_REVIVE_AD,
     name: '盤活復蘇',
     icon: '🔥',
-    description: '盤活熱門商家流量，提升店鋪曝光',
     enabled: true,
   },
   {
     type: AlgorithmType.NEW_STORE_AD,
     name: '新店廣告',
     icon: '🏪',
-    description: '新店專屬推廣位，快速獲取首批顧客',
     enabled: true,
   },
   {
     type: AlgorithmType.POPULAR_MERCHANT_KA,
     name: '人氣商家',
     icon: '🏆',
-    description: '人氣商家專屬推薦位，流量加持',
     enabled: true,
   },
   {
     type: AlgorithmType.TRAFFIC_AD,
     name: '投流廣告',
     icon: '📊',
-    description: '精準匹配目標用戶，越買曝光越多',
     enabled: true,
   },
   {
     type: AlgorithmType.EXCLUSIVE_MERCHANT,
     name: '聯盟商家',
     icon: '👑',
-    description: '獨家商家專屬展示位，彰顯品牌實力',
     enabled: false,
   },
   {
     type: AlgorithmType.GOLDEN_SIGNBOARD,
     name: '金字招牌',
     icon: '🏅',
-    description: '金字招牌商家，品質保證優先推薦',
     enabled: true,
   },
   {
     type: AlgorithmType.TIME_SLOT_AD,
     name: '時段推薦廣告',
     icon: '⏰',
-    description: '按早午晚宵夜時段，精準推薦',
     enabled: true,
   },
   {
     type: AlgorithmType.PRODUCT_PROMO,
     name: '商品促銷',
     icon: '🎯',
-    description: '商品折扣秒殺活動，智能促銷匹配',
     enabled: false,
   },
 ]

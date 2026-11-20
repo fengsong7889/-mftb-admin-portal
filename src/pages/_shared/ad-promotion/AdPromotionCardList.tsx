@@ -2,6 +2,7 @@ import { Tag, Button } from 'antd'
 import { ShoppingCartOutlined, OrderedListOutlined } from '@ant-design/icons'
 import { ALGO_CARD_COLOR_MAP } from '@mftb/contracts/recommendConstants'
 import { HERO_CARD_STYLES, renderHeroMark } from './heroCardStyles'
+import AdPromotionDescription from './AdPromotionDescription'
 import type { useCardOrder } from '@/hooks/useCardOrder'
 import type { RecommendTypeConfig } from './types'
 
@@ -53,7 +54,7 @@ export function AdPromotionCardList({
           <div className="algo-card-inner" style={hero ? { background: hero.gradient } : undefined}>
             <div className="algo-card-icon">{hero ? renderHeroMark(config.type) : config.icon}</div>
             <h3 className="algo-card-title">{config.name}</h3>
-            <p className="algo-card-desc">{config.description}</p>
+            <AdPromotionDescription type={config.type} />
             <div className="algo-card-tag">
               {!config.enabled && (
                 <Tag color="default">{t('comingSoon')}</Tag>

@@ -1,5 +1,7 @@
 package com.mftb.admin.service.impl;
 
+import com.mftb.admin.service.support.AdStarAlgorithmParams;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
@@ -221,6 +223,7 @@ public class AdPricingStarServiceImpl extends
         if (algorithm == null) {
             throw new BusinessException("關聯算法不存在");
         }
+        AdStarAlgorithmParams.requireStoreCompatible(algorithm);
         return algorithm;
     }
 

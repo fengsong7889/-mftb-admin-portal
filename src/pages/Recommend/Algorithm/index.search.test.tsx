@@ -22,7 +22,7 @@
  */
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { ConfigProvider } from 'antd'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import dayjs from 'dayjs'
 import AlgorithmList from './index'
@@ -80,6 +80,23 @@ const FIXTURES: AdAlgorithm[] = [
 const STAR_ROWS = ['無敵星星首頁', '無敵星星外賣', '無敵星星超市']
 
 const starRow = () => FIXTURES[0]
+
+function ListNavigation() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  return <nav>
+    <output aria-label="列表網址">{location.pathname}{location.search}</output>
+    <button onClick={() => navigate(-1)}>後退</button>
+    <button onClick={() => navigate(1)}>前進</button>
+  </nav>
+}
+function mountGroupList(query = `type=${AlgorithmType.INVINCIBLE_STAR}&tab=groupBuy`) {
+  return render(<ConfigProvider theme={{ token: { motion: false } }}>
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }} initialEntries={[`/promotion-algorithm?${query}`]}>
+      <AlgorithmList /><ListNavigation />
+    </MemoryRouter>
+  </ConfigProvider>)
+}
 /**
  * antd 图标本身带 `role="img"` + `aria-label`（search / reload / arrow-left），
  * 会一起并进按钮的可访问名，所以按钮一律用「包含 key」的正则定位，不能写精确串。
@@ -174,7 +191,8 @@ async function switchTab(labelKey: string) {
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
-  api.list.mockResolvedValue({ records: FIXTURES, total: FIXTURES.length })
+  api.list.mockImplementation((params?: { targetType?: number }) => Promise.resolve(
+    params?.targetType === 2 ? { records: [], total: 0 } : { records: FIXTURES, total: FIXTURES.length }))
   api.fetchCardOrder.mockResolvedValue(null)
   api.saveCardOrder.mockResolvedValue(undefined)
   api.references.mockResolvedValue([])
@@ -271,11 +289,80 @@ describe('算法库列表查询区', () => {
   })
 })
 
+describe('团购无敌星星推广对象导航', () => {
+  it('既有记录默认属于门店展示，商品为空态，新增带目标且返回卡片仍在团购', async () => {
+    mountGroupList()
+    await screen.findByText('無敵星星團購')
+    expect(screen.getByRole('tab', { name: 'algorithm.targetStore' })).toHaveAttribute('aria-selected', 'true')
+    await flush(() => fireEvent.click(screen.getByRole('tab', { name: 'algorithm.targetProduct' })))
+    expect(screen.queryByText('無敵星星團購')).not.toBeInTheDocument()
+    expect(screen.getByText('algorithm.productEmpty')).toBeInTheDocument()
+    await flush(() => fireEvent.click(screen.getByRole('button', { name: /algorithm.addProductAlgorithm/ })))
+    expect(screen.getByLabelText('列表網址')).toHaveTextContent('/promotion-algorithm-add?type=1&tab=groupBuy&target=product')
+    await flush(() => fireEvent.click(screen.getByRole('button', { name: '後退' })))
+    await clickBack()
+    expect(screen.getByRole('tab', { name: 'algorithm.bizGroupBuy' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(activePane()).getAllByText('algorithm.typeInvincibleStar')).toHaveLength(1)
+  })
+
+  it('切对象及浏览器前后退同步 URL，清空查询并重置页码，不重取接口', async () => {
+    const rows = Array.from({ length: 12 }, (_, index) => ({ ...FIXTURES[4], id: 100 + index, algoName: `團購算法-${index + 1}` }))
+    api.list.mockResolvedValueOnce({ records: rows, total: rows.length })
+    const { container } = mountGroupList()
+    await screen.findByText('團購算法-1')
+    await flush(() => fireEvent.click(container.querySelector('.ant-pagination-item-2')!))
+    expect(screen.getByText('團購算法-11')).toBeInTheDocument()
+    fireEvent.change(searchBox('algorithm.colAlgorithmName'), { target: { value: '團購算法' } })
+    await clickSearch()
+    expect(container.querySelector('.ant-pagination-item-active')).toHaveAttribute('title', '1')
+    await flush(() => fireEvent.click(container.querySelector('.ant-pagination-item-2')!))
+    await flush(() => fireEvent.click(screen.getByRole('tab', { name: 'algorithm.targetProduct' })))
+    expect(searchBox('algorithm.colAlgorithmName')).toHaveValue('')
+    expect(screen.getByLabelText('列表網址')).toHaveTextContent('target=product')
+    await flush(() => fireEvent.click(screen.getByRole('button', { name: '後退' })))
+    expect(screen.getByRole('tab', { name: 'algorithm.targetStore' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('團購算法-1')).toBeInTheDocument()
+    expect(container.querySelector('.ant-pagination-item-active')).toHaveAttribute('title', '1')
+    await flush(() => fireEvent.click(screen.getByRole('button', { name: '前進' })))
+    expect(screen.getByRole('tab', { name: 'algorithm.targetProduct' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByText('團購算法-1')).not.toBeInTheDocument()
+  })
+
+  it('列表延迟响应不得把门店数据塞进商品 Tab', async () => {
+    let resolve!: (data: { records: AdAlgorithm[]; total: number }) => void
+    api.list.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    mountGroupList()
+    await flush(() => fireEvent.click(screen.getByRole('tab', { name: 'algorithm.targetProduct' })))
+    await act(async () => { resolve({ records: FIXTURES, total: FIXTURES.length }) })
+    expect(screen.queryByText('無敵星星團購')).not.toBeInTheDocument()
+    expect(screen.getByText('algorithm.productEmpty')).toBeInTheDocument()
+    await flush(() => fireEvent.click(screen.getByRole('tab', { name: 'algorithm.targetStore' })))
+    expect(screen.getByText('無敵星星團購')).toBeInTheDocument()
+  })
+
+  it.each([
+    'type=1&tab=delivery', `type=${AlgorithmType.TRAFFIC_AD}&tab=groupBuy`,
+    `type=${AlgorithmType.ORGANIC_TRAFFIC}&tab=groupBuy`,
+  ])('其他场景 %s 不出现商品分栏', async query => {
+    await act(async () => { mountGroupList(query) })
+    expect(screen.queryByRole('tab', { name: 'algorithm.targetProduct' })).not.toBeInTheDocument()
+  })
+
+  it.each(['type=1&tab=delivery&target=product', 'type=1&tab=groupBuy&target=wrong'])('非法目标 %s 不显示可操作列表', async query => {
+    await act(async () => { mountGroupList(query) })
+    expect(screen.getByText('不支援此推廣對象')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /algorithm.addAlgorithm/ })).not.toBeInTheDocument()
+    expect(api.toggleStatus).not.toHaveBeenCalled()
+    expect(api.remove).not.toHaveBeenCalled()
+  })
+})
+
 describe('算法库卡片选择页 Tab 口径', () => {
   it('团购到店含無敵星星/投流/自然流量三入口，盘活复苏仅从该 Tab 下线', async () => {
     await mountCardPage()
     await switchTab('algorithm.bizGroupBuy')
-    expect(within(activePane()).getByText('algorithm.typeInvincibleStar')).toBeInTheDocument()
+    const starCard = within(activePane()).getByText('algorithm.typeInvincibleStar').closest('.algo-card-wrapper')!
+    expect(starCard.querySelector('.algo-card-desc')).toHaveTextContent('algorithm.descInvincibleStar')
     // 2026-11-18 用户要求团购 tab 新增投流/自然流量两入口
     expect(within(activePane()).getByText('algorithm.typeTraffic')).toBeInTheDocument()
     expect(within(activePane()).getByText('algorithm.typeOrganicTraffic')).toBeInTheDocument()
@@ -285,5 +372,7 @@ describe('算法库卡片选择页 Tab 口径', () => {
     // 切回外卖到家证明下线没有越界：该 Tab 仍保留盘活复苏入口
     await switchTab('algorithm.bizDelivery')
     expect(within(activePane()).getByText('algorithm.typeHotRevive')).toBeInTheDocument()
+    const deliveryStar = within(activePane()).getByText('algorithm.typeInvincibleStar').closest('.algo-card-wrapper')!
+    expect(deliveryStar.querySelector('.algo-card-desc')).toHaveTextContent('algorithm.descInvincibleStar')
   })
 })

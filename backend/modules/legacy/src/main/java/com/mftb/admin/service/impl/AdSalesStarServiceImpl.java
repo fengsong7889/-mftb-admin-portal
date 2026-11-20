@@ -1,5 +1,7 @@
 package com.mftb.admin.service.impl;
 
+import com.mftb.admin.service.support.AdStarAlgorithmParams;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.AdInventoryVO;
@@ -453,6 +455,7 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         if (algorithm == null) {
             throw new BusinessException("算法不存在");
         }
+        AdStarAlgorithmParams.requireStoreCompatible(algorithm);
         if (algorithm.getStatus() == null || algorithm.getStatus() != 1) {
             throw new BusinessException("算法已停用，無法購買");
         }

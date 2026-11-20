@@ -1,0 +1,35 @@
+/* Copyright (c) 2026 fengsong7889. All Rights Reserved.
+ * 本文件为专有软件组成部分，未经著作权人书面许可不得使用、复制或再分发。
+ * 完整许可条款见仓库根目录 LICENSE 文件。 */
+.group-buy-star-config { min-width: 0; }
+.group-buy-star-config__header {
+  background: var(--surface-2); border-radius: 12px; overflow: hidden;
+  box-shadow: var(--shadow-1); border: 1px solid var(--border-3); margin-bottom: 16px;
+}
+.group-buy-star-config__header-accent {
+  height: 3px; background: linear-gradient(90deg, var(--brand), var(--brand-hover), var(--brand));
+  background-size: 200% 100%; animation: headerGradientShift 4s ease infinite;
+}
+.group-buy-star-config__header-body { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; padding: 16px 24px; }
+.group-buy-star-config__preview { margin-left: auto; }
+.group-buy-star-config__header-body > div { min-width: 0; border-left: 1px solid var(--border-3); padding-left: 16px; }
+.group-buy-star-config__header-body > button { flex-shrink: 0; border-radius: 8px; height: 36px; }
+.group-buy-star-config__title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.group-buy-star-config__header h2 { margin: 0; font-size: 18px; font-weight: 700; color: var(--info); }
+.group-buy-star-config__scope { font-size: 14px; color: var(--text-2); white-space: nowrap; }
+.group-buy-star-config__notice { margin-bottom: 16px; }
+.group-buy-star-config__base-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px 24px; }
+.group-buy-star-config__base-fields .ant-form-item { margin-bottom: 12px; }
+.group-buy-star-config__fields { display: flex; flex-wrap: wrap; gap: 12px 24px; margin-bottom: 16px; }
+.group-buy-star-config__fields > .ant-form-item { flex: 1 1 310px; max-width: 440px; min-width: 0; margin-bottom: 0; }
+/* 父级 vertical Form 会覆盖默认行布局，因此只在商品短参数区显式还原。 */
+.group-buy-star-config .group-buy-star-config__fields .ant-form-item-row { flex-direction: row; flex-wrap: nowrap; align-items: flex-start; }
+.group-buy-star-config .group-buy-star-config__fields .ant-form-item-label { flex: 0 0 138px; padding: 0 12px 0 0; text-align: right; }
+.group-buy-star-config .group-buy-star-config__fields .ant-form-item-label > label { height: 32px; font-size: 13px; color: var(--text-2); }
+.group-buy-star-config .group-buy-star-config__fields .ant-form-item-control { flex: 1; min-width: 0; }
+.group-buy-star-config__fields .ant-input-number-affix-wrapper,
+.group-buy-star-config__fields .ant-input-number,
+.group-buy-star-config__fields .ant-select { width: 100%; }
+.group-buy-star-config__strategy { margin: 0; padding: 12px 16px; border: 1px solid var(--border-2); border-radius: 6px; color: var(--text-2); font-size: 13px; line-height: 1.8; }
+.group-buy-star-config__hint { margin: 12px 0 0; color: var(--text-3); font-size: 12px; line-height: 1.8; }
+.group-buy-star-config__save-hint { text-align: center; font-size: 12px; color: var(--text-3); margin: 16px 0 0; }

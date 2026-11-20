@@ -1,5 +1,7 @@
 package com.mftb.admin.service.impl;
 
+import com.mftb.admin.service.support.AdStarAlgorithmParams;
+
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
@@ -178,6 +180,8 @@ public class AdWaterfallServiceImpl implements AdWaterfallService {
         Map<String, AdAlgorithm> algorithms = algorithmMapper.selectList(
                 new LambdaQueryWrapper<AdAlgorithm>().in(AdAlgorithm::getAlgoCode, algoCodes)
         ).stream().collect(Collectors.toMap(AdAlgorithm::getAlgoCode, Function.identity()));
+        // 同时覆盖坑位与自然兜底，不能将商品协议误交给门店执行链路。
+        algorithms.values().forEach(AdStarAlgorithmParams::requireStoreCompatible);
         // 仅校验坑位引用的算法必须存在（naturalAlgoId 可选，不在坑位中不强制校验）
         Set<String> slotAlgoCodes = slots.stream().map(AdWaterfallRequest.SlotItem::getAlgoId).collect(Collectors.toSet());
         for (String algoCode : slotAlgoCodes) {

@@ -87,6 +87,15 @@ export interface AdAlgorithmQuery {
   hasPricing?: boolean
   /** 銷售菜單場景：配合 hasPricing，僅返回在該業務頻下有啟用定價的算法（定價按「算法×頻」配置） */
   pricingChannel?: number
+  /** 推廣對象：1=門店 2=商品；不傳時舊消費者默認不含商品 */
+  targetType?: number
+  /** 業務適用範圍：1=外賣到家 2=團購到店（與歷史 channel 字段獨立） */
+  businessType?: number
+  code?: string
+  name?: string
+  updatedBy?: string
+  updatedFrom?: string
+  updatedTo?: string
 }
 
 /** 算法分頁查詢 */

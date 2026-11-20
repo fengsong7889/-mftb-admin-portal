@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mftb.admin.common.BusinessException;
 import com.mftb.admin.dto.AdAlgorithmRequest;
+import com.mftb.admin.dto.AdAlgorithmQuery;
 import com.mftb.admin.dto.AdAlgorithmVO;
 import com.mftb.admin.dto.AdPricingHotVO;
 import com.mftb.admin.dto.AdPricingReviveVO;
@@ -21,6 +22,8 @@ import com.mftb.admin.mapper.AdWaterfallSlotMapper;
 import com.mftb.admin.mapper.BizMerchantGroupMapper;
 import com.mftb.admin.mapper.BizStoreMapper;
 import com.mftb.admin.service.AdAlgorithmService;
+import com.mftb.admin.service.support.AdStarAlgorithmParams;
+import com.mftb.admin.service.support.AdStarAlgorithmQuerySupport;
 import com.mftb.admin.service.AdPricingHotService;
 import com.mftb.admin.service.AdPricingReviveService;
 import com.mftb.admin.service.AdPricingSignboardService;
@@ -65,9 +68,34 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
     public PageResult<AdAlgorithmVO> page(long page, long size, Integer algoType, String brand,
                                           Integer channel, Integer status, String keyword, String storeCode,
                                           Boolean hasPricing, Integer pricingChannel) {
-        page = PageResult.normalizePage(page);
-        size = PageResult.normalizeSize(size);
+        AdAlgorithmQuery query = new AdAlgorithmQuery();
+        query.setPage(page);
+        query.setSize(size);
+        query.setAlgoType(algoType);
+        query.setBrand(brand);
+        query.setChannel(channel);
+        query.setStatus(status);
+        query.setKeyword(keyword);
+        query.setStoreCode(storeCode);
+        query.setHasPricing(hasPricing);
+        query.setPricingChannel(pricingChannel);
+        return query(query);
+    }
+
+    @Override
+    public PageResult<AdAlgorithmVO> query(AdAlgorithmQuery query) {
+        long page = PageResult.normalizePage(query.getPage());
+        long size = PageResult.normalizeSize(query.getSize());
+        Integer algoType = query.getAlgoType();
+        String brand = query.getBrand();
+        Integer channel = query.getChannel();
+        Integer status = query.getStatus();
+        String keyword = query.getKeyword();
+        String storeCode = query.getStoreCode();
+        Boolean hasPricing = query.getHasPricing();
+        Integer pricingChannel = query.getPricingChannel();
         LambdaQueryWrapper<AdAlgorithm> wrapper = new LambdaQueryWrapper<>();
+        AdStarAlgorithmQuerySupport.apply(wrapper, query);
         if (algoType != null) wrapper.eq(AdAlgorithm::getAlgoType, algoType);
         if (StringUtils.hasText(brand)) wrapper.eq(AdAlgorithm::getBrand, brand);
         if (channel != null) wrapper.eq(AdAlgorithm::getChannel, channel);
@@ -220,10 +248,12 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public AdAlgorithmVO create(AdAlgorithmRequest request) {
+        Map<String, Object> params = AdStarAlgorithmParams.prepare(null, request);
         AdAlgorithm entity = new AdAlgorithm();
         entity.setAlgoCode(generateCode(request.getAlgoName(), request.getAlgoType()));
-        applyRequest(entity, request);
+        applyRequest(entity, request, params);
         if (entity.getStatus() == null) {
             entity.setStatus(1);
         }
@@ -234,9 +264,11 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public AdAlgorithmVO update(Long id, AdAlgorithmRequest request) {
-        AdAlgorithm entity = require(id);
-        applyRequest(entity, request);
+        AdAlgorithm entity = requireLocked(id);
+        Map<String, Object> params = AdStarAlgorithmParams.prepare(entity, request);
+        applyRequest(entity, request, params);
         entity.setUpdatedBy(operatorResolver.currentOperatorName());
         algorithmMapper.updateById(entity);
         return AdAlgorithmVO.from(entity);
@@ -248,7 +280,15 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
         if (status == null || (status != 1 && status != 2)) {
             throw new BusinessException("非法的服務狀態: " + status);
         }
-        AdAlgorithm entity = require(id);
+        AdAlgorithm entity = requireLocked(id);
+        if (Integer.valueOf(AdStarAlgorithmParams.ALGORITHM_TYPE).equals(entity.getAlgoType())) {
+            Map<String, Object> params = AdStarAlgorithmParams.read(entity.getParams());
+            AdStarAlgorithmParams.Metadata metadata = AdStarAlgorithmParams.metadata(params);
+            if (metadata.versioned()) {
+                params.put("revision", metadata.revision() + 1);
+                entity.setParams(AdStarAlgorithmParams.encode(params));
+            }
+        }
         entity.setStatus(status);
         entity.setUpdatedBy(operatorResolver.currentOperatorName());
         algorithmMapper.updateById(entity);
@@ -261,7 +301,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
-        AdAlgorithm entity = require(id);
+        AdAlgorithm entity = requireLocked(id);
         // 删除时级联删除引用该算法的瀑布流坑位
         cascadeDeleteSlots(entity.getAlgoCode());
         algorithmMapper.deleteById(id);
@@ -331,14 +371,22 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
         return entity;
     }
 
-    private void applyRequest(AdAlgorithm entity, AdAlgorithmRequest request) {
+    /** 所有配置更新、启停、删除在同一行锁内串行，版本判定不能与写入分离。 */
+    private AdAlgorithm requireLocked(Long id) {
+        AdAlgorithm entity = algorithmMapper.selectOne(new LambdaQueryWrapper<AdAlgorithm>()
+                .eq(AdAlgorithm::getId, id).last("FOR UPDATE"));
+        if (entity == null) throw new BusinessException("算法不存在");
+        return entity;
+    }
+
+    private void applyRequest(AdAlgorithm entity, AdAlgorithmRequest request, Map<String, Object> params) {
         entity.setAlgoName(request.getAlgoName());
         entity.setAlgoType(request.getAlgoType());
         entity.setBrand(request.getBrand());
         entity.setChannel(request.getChannel());
         entity.setPlacementInterface(request.getPlacementInterface());
         entity.setSlotCount(request.getSlotCount());
-        entity.setParams(request.getParams() == null ? null : JsonUtils.toJson(request.getParams()));
+        entity.setParams(params == null ? null : AdStarAlgorithmParams.encode(params));
         if (request.getStatus() != null) {
             entity.setStatus(request.getStatus());
         }

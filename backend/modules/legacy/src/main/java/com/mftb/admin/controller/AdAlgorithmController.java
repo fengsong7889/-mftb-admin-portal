@@ -3,6 +3,7 @@ package com.mftb.admin.controller;
 import com.mftb.admin.annotation.RequirePermission;
 import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.AdAlgorithmRequest;
+import com.mftb.admin.dto.AdAlgorithmQuery;
 import com.mftb.admin.dto.AdAlgorithmVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.dto.StatusUpdateDTO;
@@ -35,19 +36,8 @@ public class AdAlgorithmController {
     /** 算法分页查询 */
     @GetMapping
     @RequirePermission(menu = "promotion-algorithm")
-    public Result<PageResult<AdAlgorithmVO>> page(
-            @RequestParam(defaultValue = "1") long page,
-            @RequestParam(defaultValue = "10") long size,
-            @RequestParam(required = false) Integer algoType,
-            @RequestParam(required = false) String brand,
-            @RequestParam(required = false) Integer channel,
-            @RequestParam(required = false) Integer status,
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String storeCode,
-            @RequestParam(required = false) Boolean hasPricing,
-            @RequestParam(required = false) Integer pricingChannel) {
-        return Result.success(algorithmService.page(page, size, algoType, brand, channel, status,
-                keyword, storeCode, hasPricing, pricingChannel));
+    public Result<PageResult<AdAlgorithmVO>> page(@Valid AdAlgorithmQuery query) {
+        return Result.success(algorithmService.query(query));
     }
 
     /**

@@ -24,7 +24,7 @@ vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () =
 
 function LocationIndicator() {
   const location = useLocation()
-  return <output aria-label="当前路由">{location.pathname}</output>
+  return <><output aria-label="当前路由">{location.pathname}</output><output aria-label="当前查询">{location.search}</output></>
 }
 function NavigationControls({ queries }: { queries: string[] }) {
   const navigate = useNavigate()
@@ -265,6 +265,40 @@ describe('算法页签切换状态隔离', () => {
     await act(async () => { resolveOldDetail(oldDetail) })
     expect(screen.getByRole('textbox', { name: 'recommend.algoName' })).toHaveValue('当前记录')
     expect(api.fetch).toHaveBeenCalledTimes(2)
+    expect(api.update).not.toHaveBeenCalled()
+  })
+})
+
+describe('团购门店协议与导航兼容', () => {
+  it.each(['', '&target=store'])('旧链接与显式门店链接 %s 保存仍走原协议并返回团购', async target => {
+    api.fetch.mockResolvedValueOnce({ id: 7, algoName: '团购门店旧配置', algoType: AlgorithmType.INVINCIBLE_STAR, brand: 'flashBee',
+      params: JSON.stringify({ consistencyCheckInterval: 7, statusRest: true }),
+    })
+    mountPage(`type=${AlgorithmType.INVINCIBLE_STAR}&tab=groupBuy&id=7${target}`)
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'recommend.algoName' })).toHaveValue('团购门店旧配置'))
+    expect(screen.getByTestId('algorithm-merchant-status')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /common:save/ }))
+    await waitFor(() => expect(api.update).toHaveBeenCalledTimes(1))
+    const payload = api.update.mock.calls[0][1]
+    expect(payload.params).toMatchObject({ consistencyCheckInterval: 7, statusRest: true, statusOpen: true, merchantExposureStrategy: 'random' })
+    expect(payload.params).not.toHaveProperty('minSellableStock')
+    expect(payload.params).not.toHaveProperty('redemptionMode')
+    expect(payload).not.toHaveProperty('channel')
+    await waitFor(() => expect(screen.getByLabelText('当前路由')).toHaveTextContent('/promotion-algorithm'))
+    expect(screen.getByLabelText('当前查询')).toHaveTextContent('tab=groupBuy')
+    if (target) expect(screen.getByLabelText('当前查询')).toHaveTextContent('target=store')
+  })
+
+  it('只切换业务 Tab 也隔离同类型未保存的表单', async () => {
+    const delivery = `type=${AlgorithmType.INVINCIBLE_STAR}&tab=delivery`
+    const groupBuy = `type=${AlgorithmType.INVINCIBLE_STAR}&tab=groupBuy`
+    await act(async () => { mountPage(delivery, [groupBuy]) })
+    fireEvent.change(screen.getByRole('textbox', { name: 'recommend.algoName' }), { target: { value: '外卖草稿' } })
+    fireEvent.click(screen.getByRole('link', { name: groupBuy }))
+    expect(screen.getByRole('textbox', { name: 'recommend.algoName' })).toHaveValue('')
+    fireEvent.click(screen.getByRole('button', { name: /common:cancel/ }))
+    expect(screen.getByLabelText('当前查询')).toHaveTextContent('tab=groupBuy')
+    expect(api.create).not.toHaveBeenCalled()
     expect(api.update).not.toHaveBeenCalled()
   })
 })

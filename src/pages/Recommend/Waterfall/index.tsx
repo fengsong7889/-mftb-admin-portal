@@ -23,6 +23,7 @@ import { fetchAdPricingList, updateAdPricingStatus, deleteAdPricing, fetchAdRevi
 import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { useCardOrder } from '@/hooks/useCardOrder'
 import { HERO_CARD_STYLES, renderHeroMark } from '../../_shared/ad-promotion/heroCardStyles'
+import AdPromotionDescription from '../../_shared/ad-promotion/AdPromotionDescription'
 
 /** 投流廣告：後端業務頻道碼(1/2/3) → 列表行業務頻道值 */
 const TRAFFIC_CODE_TO_BIZ: Record<number, string> = {
@@ -178,13 +179,13 @@ export default function Waterfall() {
   const groupBuyCardOrder = useCardOrder('waterfall-card-order-groupBuy', TAB_ALGORITHM_MAP.groupBuy, 'waterfall')
 
   /** 广告类型卡片配置（依赖 t，定义在组件内以便响应语言切换） */
-  const ALGORITHM_TYPE_CARDS: { type: AlgorithmType; icon: string; description: string }[] = [
-    { type: AlgorithmType.INVINCIBLE_STAR, icon: '⭐', description: t('algorithm.descInvincibleStar') },
-    { type: AlgorithmType.HOT_REVIVE_AD, icon: '🔥', description: t('algorithm.descHotRevive') },
-    { type: AlgorithmType.POPULAR_MERCHANT_KA, icon: '🏆', description: t('waterfall.descPopularMerchant') },
-    { type: AlgorithmType.TRAFFIC_AD, icon: '📊', description: t('algorithm.descTraffic') },
-    { type: AlgorithmType.GOLDEN_SIGNBOARD, icon: '🏅', description: t('algorithm.descGoldenSignboard') },
-    { type: AlgorithmType.TIME_SLOT_AD, icon: '⏰', description: t('algorithm.descTimeSlotAd') },
+  const ALGORITHM_TYPE_CARDS: { type: AlgorithmType; icon: string }[] = [
+    { type: AlgorithmType.INVINCIBLE_STAR, icon: '⭐' },
+    { type: AlgorithmType.HOT_REVIVE_AD, icon: '🔥' },
+    { type: AlgorithmType.POPULAR_MERCHANT_KA, icon: '🏆' },
+    { type: AlgorithmType.TRAFFIC_AD, icon: '📊' },
+    { type: AlgorithmType.GOLDEN_SIGNBOARD, icon: '🏅' },
+    { type: AlgorithmType.TIME_SLOT_AD, icon: '⏰' },
   ]
 
   /** 算法类型标签映射（复用 algorithm 命名空间，依赖 t，定义在组件内以便响应语言切换） */
@@ -667,7 +668,7 @@ export default function Waterfall() {
                           <div className="algo-card-inner" style={hero ? { background: hero.gradient } : undefined}>
                             <div className="algo-card-icon">{hero ? renderHeroMark(card.type) : card.icon}</div>
                             <h3 className="algo-card-title">{ALGORITHM_TYPE_LABEL[card.type]}</h3>
-                            <p className="algo-card-desc">{card.description}</p>
+                            <AdPromotionDescription type={card.type} />
                             <div className="algo-card-tag">
                               {enabled ? (
                                 <Tag color="blue">{t('waterfall.viewAdjustPricing')}</Tag>

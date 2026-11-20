@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import type { CSSProperties } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Alert, Button, Form, Input, Select, message, Checkbox, InputNumber, Modal, Table, Popover, Tooltip, Switch, Spin } from 'antd'
+import { Alert, Button, Form, Input, Select, message, Checkbox, InputNumber, Modal, Table, Popover, Tooltip, Switch, Spin, Result } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, AppstoreOutlined, PlusOutlined, DeleteOutlined, QuestionCircleOutlined, ShopOutlined } from '@ant-design/icons'
 import AlgorithmSection from './AlgorithmForm/AlgorithmSection'
@@ -11,6 +11,7 @@ import dayjs from 'dayjs'
 import { fetchAdAlgorithmDetail, createAdAlgorithm, updateAdAlgorithm, appTypeToBrand, brandToAppType, type AdAlgorithmRequest } from '@/api/adPromotion'
 import OrganicTrafficScoreConfig from './OrganicTrafficScoreConfig'
 import TrafficAlgorithmConfig from './TrafficAlgorithmConfig'
+import GroupBuyStarConfig from './GroupBuyStarConfig'
 import useTrafficAlgorithmForm from './TrafficAlgorithmConfig/useTrafficAlgorithmForm'
 import { TRAFFIC_DEFAULTS } from './TrafficAlgorithmConfig/config'
 import PopularLayoutPreviewModal from '@/components/PopularLayoutPreviewModal'
@@ -70,7 +71,28 @@ const STORE_LEVEL_BLOCK_OPTIONS = [
 export default function AlgorithmAdd() {
   const [searchParams] = useSearchParams()
   // 同一路由切换页签不会自动卸载页面，按类型、记录及模式隔离整个表单状态。
-  const pageKey = JSON.stringify(['type', 'id', 'mode'].map(param => searchParams.get(param) || ''))
+  const pageKey = JSON.stringify(['type', 'id', 'mode', 'tab', 'target'].map(param => searchParams.get(param) || ''))
+  const navigate = useNavigate()
+  const { t } = useTranslation()
+  const target = searchParams.get('target')
+  const isGroupBuyStar = Number(searchParams.get('type')) === AlgorithmType.INVINCIBLE_STAR && searchParams.get('tab') === 'groupBuy'
+  const invalidTarget = (target !== null && target !== 'store' && target !== 'product') || (target === 'product' && !isGroupBuyStar)
+  const productListPath = `/promotion-algorithm?type=${AlgorithmType.INVINCIBLE_STAR}&tab=groupBuy&target=product`
+  // 仅拒绝非法对象组合；商品记录的新增/编辑/详情已接入真实读写。
+  if (invalidTarget) {
+    return <div className="content-area"><Result status="warning"
+      title="不支援此推廣對象"
+      subTitle="商品推廣僅適用於團購到店的無敵星星。"
+      extra={<Button onClick={() => navigate('/promotion-algorithm')}>{t('common:back')}</Button>} /></div>
+  }
+  if (target === 'product') {
+    const editParams = new URLSearchParams(searchParams)
+    editParams.delete('mode')
+    return <GroupBuyStarConfig key={pageKey} algorithmId={searchParams.get('id') || ''}
+      initialReadOnly={searchParams.get('mode') === 'detail'}
+      onBack={() => navigate(productListPath)} onSaved={() => navigate(productListPath)}
+      onEdit={() => navigate(`/promotion-algorithm-add?${editParams.toString()}`)} />
+  }
   return <AlgorithmAddForm key={pageKey} searchParams={searchParams} />
 }
 
@@ -80,9 +102,14 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
   const navigate = useNavigate()
   const algorithmTypeParam = searchParams.get('type') || ''
   const algorithmIdParam = searchParams.get('id') || ''
+  const listQuery = new URLSearchParams({ type: algorithmTypeParam })
+  if (searchParams.has('tab')) listQuery.set('tab', searchParams.get('tab') === 'groupBuy' ? 'groupBuy' : 'delivery')
+  if (searchParams.get('target') === 'store') listQuery.set('target', 'store')
+  const algorithmListPath = `/promotion-algorithm?${listQuery.toString()}`
   const modeParam = searchParams.get('mode') || ''
   const isDetailMode = modeParam === 'detail' // 只读详情模式
   const selectedAlgorithmType = algorithmTypeParam ? Number(algorithmTypeParam) as AlgorithmType : null
+  const isGroupBuyStore = selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR && searchParams.get('tab') === 'groupBuy'
   const isEditMode = !!algorithmIdParam && !isDetailMode // 有 id 参数且非详情模式则为编辑模式
   const [form] = Form.useForm()
   const merchantExposureStrategy = Form.useWatch('merchantExposureStrategy', form) // 监听曝光策略选择
@@ -120,7 +147,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
   const trafficForm = useTrafficAlgorithmForm({
     enabled: isTrafficAlgorithm, algorithmId: algorithmIdParam, readOnly: isDetailMode, form,
     onLoaded: setAlgoDetailData,
-    onSaved: () => navigate(`/promotion-algorithm?type=${algorithmTypeParam}`),
+    onSaved: () => navigate(algorithmListPath),
   })
 
   /** 金字招牌 - 資格條件（同一場景/統計類標籤內多條件以且/或組合） */
@@ -546,7 +573,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
 
   // 返回算法列表页
   const handleBack = () => {
-    navigate(`/promotion-algorithm?type=${algorithmTypeParam}`)
+    navigate(algorithmListPath)
   }
 
   // 进入编辑模式
@@ -690,7 +717,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
       }
       message.success(isEditMode ? t('recommend.algoUpdateSuccess') : t('recommend.algoAddSuccess'))
       setIsEditing(false)
-      navigate(`/promotion-algorithm?type=${algorithmTypeParam}`)
+      navigate(algorithmListPath)
     } catch (error) {
       // 表单校验失败不提示（antd 已标红），接口业务错误提示后端返回信息
       if (error instanceof Error) {
@@ -707,7 +734,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
           title={t('recommend.algoDetail')}
           tags={selectedAlgorithmType ? (
             <span style={{ fontSize: 14, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>
-              {TYPE_ICON[selectedAlgorithmType]} {t(TYPE_LABEL_KEY[selectedAlgorithmType])}
+              {TYPE_ICON[selectedAlgorithmType]} {t(TYPE_LABEL_KEY[selectedAlgorithmType])}{isGroupBuyStore ? ' · 門店推廣' : ''}
             </span>
           ) : undefined}
           onBack={handleBack}
@@ -748,7 +775,7 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
               </h2>
               {selectedAlgorithmType && (
                 <span style={{ fontSize: 14, color: 'var(--text-2)' }}>
-                  {TYPE_ICON[selectedAlgorithmType]} {t(TYPE_LABEL_KEY[selectedAlgorithmType])}
+                  {TYPE_ICON[selectedAlgorithmType]} {t(TYPE_LABEL_KEY[selectedAlgorithmType])}{isGroupBuyStore ? ' · 門店推廣' : ''}
                 </span>
               )}
             </div>

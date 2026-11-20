@@ -7,6 +7,7 @@
   "exports": {
     "./menuPermission": "./src/menuPermission.ts",
     "./workflowConfig": "./src/workflowConfig.ts",
+    "./starAlgorithm": "./src/starAlgorithm.ts",
     "./package.json": "./package.json"
   }
 }
