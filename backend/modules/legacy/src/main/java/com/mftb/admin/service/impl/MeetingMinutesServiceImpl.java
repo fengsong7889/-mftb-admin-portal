@@ -1175,7 +1175,8 @@ public class MeetingMinutesServiceImpl implements MeetingMinutesService {
             return;
         }
         String base = baseUrl();
-        String viewUrl = base == null ? "" : base + "/meeting-minutes?bookingId=" + booking.getId();
+        // 必须带 /#/：前端是 GitHub Pages 上的 HashRouter SPA，直接请求 /meeting-minutes 会命中 Pages 的 404
+        String viewUrl = base == null ? "" : base + "/#/meeting-minutes?bookingId=" + booking.getId();
         Map<String, String> vars = new java.util.LinkedHashMap<>();
         vars.put("itemContent", nullToEmpty(item.getContent()));
         vars.put("meetingTitle", nullToEmpty(minutes.getMeetingTitle()));

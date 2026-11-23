@@ -7,6 +7,7 @@
  */
 package com.mftb.admin.config;
 
+import com.mftb.admin.constant.MeetingConstants;
 import com.mftb.admin.entity.MeetingMinutes;
 import com.mftb.admin.entity.MeetingMinutesItem;
 import com.mftb.admin.entity.MeetingMinutesItemOwner;
@@ -167,5 +168,21 @@ class MeetingFollowUpJobTest {
 
         verify(dingTalkAppService, never()).sendWorkNotification(any(), anyLong(), anyList(), anyString(), anyString());
         verify(itemMapper).markNotified(eq(41L), any());
+    }
+
+    @Test
+    @DisplayName("逾期提醒的「打开纪要」链接带 /#/：GitHub Pages 上缺前缀会直接 404")
+    void overdueViewLinkCarriesHashRouterPrefix() {
+        when(itemMapper.findDueReminders(any(LocalDate.class), anyInt())).thenReturn(List.of(dueItem(7L)));
+        when(ownerMapper.findByItem(41L)).thenReturn(List.of(owner(41L, 7L, "張三", "MF00007", 1)));
+        when(userMapper.selectBatchIds(any())).thenReturn(List.of(user(7L, "張三", "ding-7")));
+
+        job.scan();
+
+        @SuppressWarnings("unchecked") ArgumentCaptor<java.util.Map<String, String>> vars =
+                ArgumentCaptor.forClass(java.util.Map.class);
+        verify(templateService).render(eq(MeetingConstants.SCENARIO_FOLLOW_OVERDUE), vars.capture());
+        assertEquals("https://admin.test/#/meeting-minutes?bookingId=100", vars.getValue().get("viewUrl"),
+                "SPA 走 HashRouter，链接必须带 /#/，否则 Pages 把它当静态文件路径返回 404");
     }
 }

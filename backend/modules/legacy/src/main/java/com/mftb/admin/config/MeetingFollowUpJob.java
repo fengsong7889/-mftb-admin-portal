@@ -144,8 +144,9 @@ public class MeetingFollowUpJob {
         long overdueDays = item.getDueDate() == null ? 0
                 : Math.max(1, ChronoUnit.DAYS.between(item.getDueDate(), LocalDate.now()));
         String base = app.getBaseUrl();
+        // 必须带 /#/：前端是 GitHub Pages 上的 HashRouter SPA，直接请求 /meeting-minutes 会命中 Pages 的 404
         String viewUrl = StringUtils.hasText(base)
-                ? trimSlash(base) + "/meeting-minutes?bookingId=" + minutes.getBookingId() : "";
+                ? trimSlash(base) + "/#/meeting-minutes?bookingId=" + minutes.getBookingId() : "";
         Map<String, String> vars = new LinkedHashMap<>();
         vars.put("itemContent", item.getContent());
         vars.put("meetingTitle", minutes.getMeetingTitle());
