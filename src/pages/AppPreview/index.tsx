@@ -15,6 +15,7 @@ import MerchantApp from './MerchantApp'
 import ConsumerApp from './ConsumerApp'
 import MfoodApp from './MfoodApp'
 import { HighlightProvider, useHighlightProvider } from './SpecHighlight'
+import { MerchantPreferenceProvider } from './MerchantPreference'
 import { SPEC_PANELS, loadSpecs, saveSpecs, type SpecEntry, type SpecPanelKey } from './groupBuySpec'
 import './appPreview.css'
 
@@ -79,7 +80,7 @@ export default function AppPreview() {
     return (
       <div className="ap-stage">
         <button type="button" className="ap-exit" onClick={() => navigate(`/portal?tab=${fromTab}`)}>‹ 返回企業門戶</button>
-        <PhoneFrame><ConsumerApp /></PhoneFrame>
+        <PhoneFrame><MerchantPreferenceProvider><ConsumerApp /></MerchantPreferenceProvider></PhoneFrame>
       </div>
     )
   }
@@ -87,7 +88,7 @@ export default function AppPreview() {
     return (
       <div className="ap-stage">
         <button type="button" className="ap-exit" onClick={() => navigate(`/portal?tab=${fromTab}`)}>‹ 返回企業門戶</button>
-        <PhoneFrame><MfoodApp /></PhoneFrame>
+        <PhoneFrame><MerchantPreferenceProvider><MfoodApp /></MerchantPreferenceProvider></PhoneFrame>
       </div>
     )
   }
@@ -172,6 +173,7 @@ function DualView() {
   }
 
   return (
+    <MerchantPreferenceProvider>
     <HighlightProvider value={highlight}>
       <div className="ap-dual-wrap">
         <div className="ap-dual-item">
@@ -387,6 +389,9 @@ function DualView() {
                       </p>
                     )}
                     {s.changed && <p className="ap-spec-changed">本次調整（{s.changed.date}）：{s.changed.text}</p>}
+                    {s.history?.map((change, index) => (
+                      <p key={`${change.date}-${index}`} className="ap-spec-changed ap-spec-history">历史調整（{change.date}）：{change.text}</p>
+                    ))}
                     {/* 作废口径（deprecated）不删文本：整条画删除线并灰化，保留“曾经生效、现已下线”的痕迹 */}
                     {s.note && (
                       <p className={`ap-spec-note${s.deprecated ? ' ap-spec-note--deprecated' : ''}`}>
@@ -401,5 +406,6 @@ function DualView() {
         </div>
       </div>
     </HighlightProvider>
+    </MerchantPreferenceProvider>
   )
 }

@@ -54,6 +54,11 @@ describe('本轮口径调整标记（changed）', () => {
       expect(s.changed!.date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
       expect(s.changed!.text.trim().length).toBeGreaterThan(0)
     }
+    const history = SPEC_PANELS.flatMap((p) => p.defaults).flatMap((s) => s.history ?? [])
+    for (const change of history) {
+      expect(change.date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      expect(change.text.trim().length).toBeGreaterThan(0)
+    }
   })
 
   it('優選商家类模块显隐口径已写进篩選行正文', () => {
@@ -64,11 +69,16 @@ describe('本轮口径调整标记（changed）', () => {
 })
 
 describe('外卖沉底口径已作废（note 画删除线而非删文本）', () => {
-  it('門店展示规则行保留原文并标 deprecated，作废时间/原因走 changed', () => {
+  it('門店展示规则行保留作废标记，并新增不感兴趣门店隐藏规则', () => {
     const row = DELIVERY_SPECS.find((s) => s.id === 18)!
     expect(row.note).toContain('沉底显示')
     expect(row.deprecated).toBe(true)
-    expect(row.changed?.text).toContain('删除了以下这句说明')
+    expect(row.desc).toContain('7、被標記為白名單門店')
+    expect(row.desc).toContain('8、用户设置为「不感兴趣」的门店')
+    expect(row.desc).toContain('搜索结果不受限制')
+    expect(row.changed?.date).toBe('2026-11-24')
+    expect(row.changed?.text).toContain('第8点')
+    expect(row.history).toEqual([{ date: '2026-11-16', text: '删除了以下这句说明：' }])
   })
 
   it('四个外卖面板共用同一真源，作废标记一并生效', () => {
@@ -92,8 +102,11 @@ describe('展示模式行按页面分形与美食外卖页篩選面板', () => {
   it('美食外卖页篩選面板：新增筛选条件逐条说明，蜂蜜兌換閃蜂专属与商家模块回补口径在列', () => {
     const rows = panel('deliveryFilter').defaults
     const labels = rows.map((s) => s.label)
-    for (const label of ['两排筛选栏', '綜合排序', '距離', '配送', '优惠活动标签', '篩選', '列表大小圖切換', '人均價', '時效範圍', '商家', '品質', '活动优惠']) {
+    for (const label of ['筛选栏', '优惠活动标签', '篩選', '列表大小圖切換', '人均價', '時效範圍', '配送', '商家', '品質', '活动优惠']) {
       expect(labels, `篩選面板缺「${label}」行`).toContain(label)
+    }
+    for (const label of ['两排筛选栏', '綜合排序', '距離']) {
+      expect(labels, `篩選面板不应再保留顶部旧入口「${label}」`).not.toContain(label)
     }
     expect(labels, '商家模块 2026-11 按用户口径回补').toContain('商家')
     expect(rows.some((s) => s.desc.includes('蜂蜜兌換仅閃蜂'))).toBe(true)

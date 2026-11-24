@@ -7,15 +7,10 @@
  */
 
 /**
- * 美食外賣频道页 · 瀑布流上方两排筛选栏（閃蜂 ConsumerDelivery / MFOOD MfoodDelivery 单一真源）
+ * 美食外賣频道页 · 瀑布流上方单行筛选栏（閃蜂 ConsumerDelivery / MFOOD MfoodDelivery 单一真源）
  *
- * 第一排：綜合排序（默认选中下划线）+ 距離/配送下拉（单选面板）+ 右缘篩選按钮；
- * 第二排：筛选条件「优惠活动」模块标签横滑胶囊（图3 口径），蜂蜜兌換仅閃蜂展示。
- * 距離下拉=时效/范围两档互斥单选；配送下拉=配送方式/配送保障两档互斥单选（准时宝属配送时效承诺，组名「配送保障」）。
- * 下拉面板复用特惠团购附近面板视觉（apg-panel-near：左分组页签+右 radio 单选行），
- * 持有选中值的分组页签标橙（has-pick），浏览另一组时也能一眼看到生效口径。
- *
- * DELIVERY_PROMO_TAGS 是优惠活动模块标签的唯一真源：第二排胶囊与篩選 sheet「活动优惠」模块共用
+ * 单行仅展示优惠活动标签横滑胶囊 + 右缘篩選图标按钮；蜂蜜兌換仅閃蜂展示。
+ * DELIVERY_PROMO_TAGS 是优惠活动模块标签的唯一真源：筛选栏胶囊与篩選 sheet「活动优惠」模块共用
  * （2026-11 口径：含超值換購等 20 项，蜂蜜兌換閃蜂专属）。
  * 篩選按钮打开多模块底部 sheet（列表大小圖切換/人均價/時效範圍/配送/商家/品質/活动优惠），
  * 结构与团购「更多篩選」同款（复用 apg-more-* 类），sheet 由页面渲染在滚动容器末尾（sticky bottom:0 不可提前）。
@@ -31,20 +26,14 @@ import { SpecField } from './SpecHighlight'
 /** 品牌口径：bee=閃蜂 / mfood=MFOOD（蜂蜜兌換等品牌专属标签按此分流） */
 export type DeliveryFilterBrand = 'bee' | 'mfood'
 
-/** 第一排排序项（綜合排序默认选中；排序菜单二期接，占位文案不进语言包） */
-const SORT_ITEMS = ['綜合排序']
-
-/** 距離下拉·时效档（单选；与范围互斥，同一按钮只承载一种口径） */
+/** 篩選 sheet·时效档（单选；与范围互斥，同一按钮只承载一种口径） */
 const DISTANCE_TIMES = ['30分鐘', '40分鐘', '50分鐘', '60分鐘']
-/** 距離下拉·范围档（单选） */
+/** 篩選 sheet·范围档（单选） */
 const DISTANCE_RANGES = ['1KM', '2KM', '3KM', '5KM']
-/** 配送下拉·配送方式（单选；与配送保障互斥） */
+/** 篩選 sheet·配送方式（单选；与配送保障互斥） */
 const DELIVERY_METHODS = ['平台送', '商家送', '到店自取']
-/** 配送下拉·配送保障（准时宝=配送时效赔付承诺；单选） */
+/** 篩選 sheet·配送保障（准时宝=配送时效赔付承诺；单选） */
 const DELIVERY_GUARANTEES = ['準時寶']
-
-/** 下拉面板无障碍标题 */
-const PANEL_TITLE = { distance: '距離篩選面板', delivery: '配送篩選面板' } as const
 
 /** 篩選 sheet·品質模块（可多選；命名在用户口径基础上润色：销量较高/五星好评/4星及以上；icon 为占位 emoji） */
 const SHEET_QUALITY = [
@@ -73,7 +62,7 @@ export interface UseDeliveryFiltersOptions {
 }
 
 export interface DeliveryFilters {
-  /** 两排筛选栏（渲染于瀑布流上方，閃蜂壳吸顶） */
+  /** 单行筛选栏（渲染于瀑布流上方，閃蜂壳吸顶） */
   bar: ReactElement
   /** 多模块篩選底部 sheet（渲染于滚动容器末尾——.apg-more 是 sticky bottom:0，DOM 位置不可提前） */
   sheet: ReactElement
@@ -109,17 +98,12 @@ export const DELIVERY_PROMO_TAGS: { key: string; label: string; mfoodLabel?: str
 ]
 
 export function useDeliveryFilters({ brand, layout, onLayoutChange }: UseDeliveryFiltersOptions): DeliveryFilters {
-  /** 排序单选（原型视觉态；默认綜合排序，与旧版口径一致） */
-  const [sort, setSort] = useState(SORT_ITEMS[0])
-  /** 当前展开的下拉：距離 / 配送 / 篩選 sheet，同一时刻只开一个（null=收起） */
-  const [openPanel, setOpenPanel] = useState<'distance' | 'delivery' | 'filter' | null>(null)
-  /** 距離单选（时效与范围互斥）；null=未选，按钮回默认文案 */
+  /** 当前是否展开多模块篩選 sheet（null=收起） */
+  const [openPanel, setOpenPanel] = useState<'filter' | null>(null)
+  /** 時效範圍单选（时效与范围互斥）；null=未选 */
   const [distancePick, setDistancePick] = useState<string | null>(null)
   /** 配送单选（方式与保障互斥）；null=未选 */
   const [deliveryPick, setDeliveryPick] = useState<string | null>(null)
-  /** 下拉当前浏览分组（切换只改浏览，不清选中值） */
-  const [distanceTab, setDistanceTab] = useState<'time' | 'range'>('time')
-  const [deliveryTab, setDeliveryTab] = useState<'method' | 'guarantee'>('method')
   /** 篩選 sheet·人均价区间（原型视觉态不做真实过滤） */
   const [priceRange, setPriceRange] = useState<[number, number]>([PRICE_MIN, PRICE_MAX])
   /** 篩選 sheet·商家/品質/活动优惠（可多選） */
@@ -144,19 +128,9 @@ export function useDeliveryFilters({ brand, layout, onLayoutChange }: UseDeliver
       icon: brand === 'mfood' && p.mfoodIcon ? p.mfoodIcon : p.icon,
     }))
 
-  /** 点下拉按钮：展开对应面板（含篩選 sheet），再点同一个收起 */
-  const togglePanel = (panel: 'distance' | 'delivery' | 'filter') => () =>
-    setOpenPanel((prev) => (prev === panel ? null : panel))
-  /** 单选：再点同一个取消；选中即收起面板（与特惠团购距离档同口径） */
-  const pickDistance = (value: string) => () => {
-    setDistancePick((prev) => (prev === value ? null : value))
-    setOpenPanel(null)
-  }
-  const pickDelivery = (value: string) => () => {
-    setDeliveryPick((prev) => (prev === value ? null : value))
-    setOpenPanel(null)
-  }
-  /** sheet 内单选：再点同一个取消，sheet 保持展开（与列表下拉共享同一状态，两处任一改动即互相同步） */
+  /** 点筛选图标：展开/收起多模块篩選 sheet */
+  const toggleFilter = () => setOpenPanel((prev) => (prev === 'filter' ? null : 'filter'))
+  /** sheet 内单选：再点同一个取消，sheet 保持展开 */
   const pickSheetDistance = (value: string) => () =>
     setDistancePick((prev) => (prev === value ? null : value))
   const pickSheetDelivery = (value: string) => () =>
@@ -167,14 +141,7 @@ export function useDeliveryFilters({ brand, layout, onLayoutChange }: UseDeliver
   /** 人均双滑杆：低端不得越过高端（反之亦然），越界就夹到对方位置 */
   const pickPriceMin = (value: number) => setPriceRange(([, hi]) => [Math.min(value, hi), hi])
   const pickPriceMax = (value: number) => setPriceRange(([lo]) => [lo, Math.max(value, lo)])
-  /** 綜合排序点击：恢复默认——清空距離/配送两个下拉的选中并收起面板（2026-11 反馈） */
-  const resetSort = () => {
-    setSort(SORT_ITEMS[0])
-    setDistancePick(null)
-    setDeliveryPick(null)
-    setOpenPanel(null)
-  }
-  /** sheet 重置：七模块全部回默认（含与列表下拉共享的时效范围/配送），sheet 保持展开 */
+  /** sheet 重置：七模块全部回默认（含时效范围/配送），sheet 保持展开 */
   const resetSheet = () => {
     setPriceRange([PRICE_MIN, PRICE_MAX])
     setSheetMerchants([])
@@ -188,120 +155,37 @@ export function useDeliveryFilters({ brand, layout, onLayoutChange }: UseDeliver
   const pctLo = ((priceRange[0] - PRICE_MIN) / (PRICE_MAX - PRICE_MIN)) * 100
   const pctHi = ((priceRange[1] - PRICE_MIN) / (PRICE_MAX - PRICE_MIN)) * 100
 
-  /** 右列单选行（复用 apg-optrow + apg-radio，与附近面板同款） */
-  const renderRows = (values: string[], picked: string | null, pick: (v: string) => () => void) => (
-    <div className="apg-panel-options">
-      {values.map((v) => {
-        const on = picked === v
-        return (
-          <button key={v} type="button" className="apg-optrow" aria-pressed={on} onClick={pick(v)}>
-            <span className={on ? 'is-text-on' : ''}>{v}</span>
-            <i className={`apg-radio${on ? ' is-on' : ''}`} aria-hidden="true">{on ? '✓' : ''}</i>
-          </button>
-        )
-      })}
-    </div>
-  )
-
-  /** 左列分组页签：浏览态 is-on（橙描边暖底）+ 持有选中值 has-pick（橙字） */
-  const renderTab = (label: string, on: boolean, hasPick: boolean, onClick: () => void) => (
-    <button
-      type="button"
-      className={`apg-region${on ? ' is-on' : ''}${hasPick ? ' has-pick' : ''}`}
-      aria-pressed={on}
-      onClick={onClick}
-    >
-      {label}
-    </button>
-  )
-
-  /** 綜合排序：点击即恢复默认（清空距離/配送选中，见 resetSort）；SpecField 锚点 id1=整条两排筛选栏，说明行悬停即整栏点亮 */
+  /** 单行筛选栏：活动优惠标签横滑 + 右缘筛选图标；SpecField id14=整条筛选栏 */
   const bar = (
-    <SpecField panel="deliveryFilter" id={1}>
-    <div className="apg-dfilter">
-      {/* 第一排：排序单选 + 距離/配送下拉 + 右缘篩選 */}
-      <div className="apg-dfilter-sort">
-        {SORT_ITEMS.map((s) => (
-          <SpecField key={s} panel="deliveryFilter" id={13}>
-          <button
-            type="button"
-            className={`apg-dfilter-sortbtn${sort === s ? ' is-on' : ''}`}
-            aria-pressed={sort === s}
-            onClick={resetSort}
-          >
-            {s}
-          </button>
-          </SpecField>
-        ))}
-        <SpecField panel="deliveryFilter" id={2}>
-        <button
-          type="button"
-          className={`apg-dfilter-drop${distancePick || openPanel === 'distance' ? ' is-on' : ''}${openPanel === 'distance' ? ' is-open' : ''}`}
-          aria-expanded={openPanel === 'distance'}
-          onClick={togglePanel('distance')}
-        >
-          {distancePick ?? '距離'} <i aria-hidden="true">▾</i>
-        </button>
-        </SpecField>
-        <SpecField panel="deliveryFilter" id={3}>
-        <button
-          type="button"
-          className={`apg-dfilter-drop${deliveryPick || openPanel === 'delivery' ? ' is-on' : ''}${openPanel === 'delivery' ? ' is-open' : ''}`}
-          aria-expanded={openPanel === 'delivery'}
-          onClick={togglePanel('delivery')}
-        >
-          {deliveryPick ?? '配送'} <i aria-hidden="true">▾</i>
-        </button>
+    <SpecField panel="deliveryFilter" id={14}>
+      <div className="apg-dfilter">
+        <SpecField panel="deliveryFilter" id={4}>
+          <div className="apg-dfilter-promos">
+            {promoTags.map((p) => (
+              <button key={p.key} type="button" className="apg-dfilter-chip">
+                <i className={`apg-pref-ico apg-pref-ico--${p.tone}`} aria-hidden="true">{p.icon}</i>
+                {p.label}
+              </button>
+            ))}
+          </div>
         </SpecField>
         <SpecField panel="deliveryFilter" id={5}>
-        <button
-          type="button"
-          className={`apg-dfilter-more${openPanel === 'filter' ? ' is-open' : ''}`}
-          aria-expanded={openPanel === 'filter'}
-          onClick={togglePanel('filter')}
-        >
-          篩選 <i aria-hidden="true">▾</i>
-        </button>
+          <button
+            type="button"
+            className={`apg-dfilter-more${openPanel === 'filter' ? ' is-open' : ''}`}
+            aria-label="篩選"
+            aria-expanded={openPanel === 'filter'}
+            onClick={toggleFilter}
+          >
+            <svg className="apg-slider-ico" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+              <path d="M2 4.5h12M2 8h12M2 11.5h12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              <circle cx="6" cy="4.5" r="1.9" fill="currentColor" />
+              <circle cx="10.5" cy="8" r="1.9" fill="currentColor" />
+              <circle cx="5" cy="11.5" r="1.9" fill="currentColor" />
+            </svg>
+          </button>
         </SpecField>
       </div>
-
-      {/* 距離下拉：左时效/范围页签 + 右单选行，两档互斥单选 */}
-      {openPanel === 'distance' && (
-        <div className="apg-dfilter-panel" role="group" aria-label={PANEL_TITLE.distance}>
-          <div className="apg-panel-near">
-            <div className="apg-panel-regions">
-              {renderTab('時效', distanceTab === 'time', !!distancePick && DISTANCE_TIMES.includes(distancePick), () => setDistanceTab('time'))}
-              {renderTab('範圍', distanceTab === 'range', !!distancePick && DISTANCE_RANGES.includes(distancePick), () => setDistanceTab('range'))}
-            </div>
-            {renderRows(distanceTab === 'time' ? DISTANCE_TIMES : DISTANCE_RANGES, distancePick, pickDistance)}
-          </div>
-        </div>
-      )}
-      {/* 配送下拉：左配送/配送保障页签 + 右单选行，两档互斥单选 */}
-      {openPanel === 'delivery' && (
-        <div className="apg-dfilter-panel" role="group" aria-label={PANEL_TITLE.delivery}>
-          <div className="apg-panel-near">
-            <div className="apg-panel-regions">
-              {renderTab('配送', deliveryTab === 'method', !!deliveryPick && DELIVERY_METHODS.includes(deliveryPick), () => setDeliveryTab('method'))}
-              {renderTab('配送保障', deliveryTab === 'guarantee', !!deliveryPick && DELIVERY_GUARANTEES.includes(deliveryPick), () => setDeliveryTab('guarantee'))}
-            </div>
-            {renderRows(deliveryTab === 'method' ? DELIVERY_METHODS : DELIVERY_GUARANTEES, deliveryPick, pickDelivery)}
-          </div>
-        </div>
-      )}
-
-      {/* 第二排：优惠活动模块标签横滑（左右滑动；隐藏滚动条） */}
-      <SpecField panel="deliveryFilter" id={4}>
-      <div className="apg-dfilter-promos">
-        {promoTags.map((p) => (
-          <button key={p.key} type="button" className="apg-dfilter-chip">
-            <i className={`apg-pref-ico apg-pref-ico--${p.tone}`} aria-hidden="true">{p.icon}</i>
-            {p.label}
-          </button>
-        ))}
-      </div>
-      </SpecField>
-    </div>
     </SpecField>
   )
 
@@ -370,7 +254,7 @@ export function useDeliveryFilters({ brand, layout, onLayoutChange }: UseDeliver
             </div>
           </section>
           </SpecField>
-          {/* 時效範圍/配送与列表下拉共享同一单选状态：两处任一改动即互相同步 */}
+          {/* 時效範圍/配送仅在筛选 sheet 内选择 */}
           <SpecField panel="deliveryFilter" id={8}>
           <section className="apg-more-sec">
             <h4 className="apg-more-title">時效範圍</h4>
@@ -451,7 +335,7 @@ export function useDeliveryFilters({ brand, layout, onLayoutChange }: UseDeliver
   return { bar, sheet: sheet as ReactElement }
 }
 
-/** 仅渲染两排筛选栏的便捷组件（整页接入请用 useDeliveryFilters，以在滚动容器末尾挂 sheet） */
+/** 仅渲染单行筛选栏的便捷组件（整页接入请用 useDeliveryFilters，以在滚动容器末尾挂 sheet） */
 export default function DeliveryFilterBar(props: UseDeliveryFiltersOptions) {
   const { bar } = useDeliveryFilters(props)
   return bar

@@ -22,8 +22,10 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import DeliveryStoreCard, { type DeliveryStore } from './DeliveryStoreCard'
-import DeliveryLargeCard from './DeliveryLargeCard'
+import type { DeliveryStore } from './DeliveryStoreCard'
+import { DeliveryMerchantCard, deliveryMerchantTags } from './MerchantActionCards'
+import { useMerchantExplorer } from './MerchantPreference'
+import SimilarMerchantView from './SimilarMerchantView'
 import { useDeliveryFilters } from './DeliveryFilterBar'
 import bbqImg from '@/assets/consumer-home/bbq.jpg'
 import riceballImg from '@/assets/consumer-home/riceball.jpg'
@@ -139,8 +141,10 @@ export default function ConsumerDelivery({
   onLayoutChange?: (mode: 'small' | 'large') => void
 }) {
   const { t } = useTranslation()
-  /** 两排筛选栏 + 多模块篩選 sheet（sheet 渲染在滚动容器末尾，见底部） */
+  /** 单行活动优惠筛选栏 + 多模块篩選 sheet（sheet 渲染在滚动容器末尾，见底部） */
   const filters = useDeliveryFilters({ brand: 'bee', layout, onLayoutChange })
+  const deliveryExplorer = useMerchantExplorer(DELIVERY_FEED, (store) => store.merchantId, deliveryMerchantTags)
+  const deliveryLayout = layout === 'large' ? 'large' : 'small'
   const bodyRef = useRef<HTMLDivElement>(null)
   const bannerRef = useRef<HTMLDivElement>(null)
   const bannerMainRef = useRef<HTMLDivElement>(null)
@@ -155,13 +159,27 @@ export default function ConsumerDelivery({
     if (!wrap || !main) return
     const delta = main.getBoundingClientRect().left - wrap.getBoundingClientRect().left
     wrap.scrollLeft += delta - (wrap.clientWidth - main.getBoundingClientRect().width) / 2
-  }, [])
+  }, [deliveryExplorer.similarId])
 
   const handleScroll = () => {
     const el = bodyRef.current
     if (!el) return
     const next = el.scrollTop > 40
     setScrolled((prev) => (prev === next ? prev : next))
+  }
+
+  if (deliveryExplorer.similarAnchor) {
+    return (
+      <SimilarMerchantView
+        brand="bee"
+        anchorName={deliveryExplorer.similarAnchor.name}
+        layout={deliveryLayout}
+        stores={deliveryExplorer.similarItems}
+        onBack={deliveryExplorer.closeSimilar}
+        onOpenStore={onOpenStore}
+        onFindSimilar={deliveryExplorer.openSimilar}
+      />
+    )
   }
 
   return (
@@ -291,15 +309,21 @@ export default function ConsumerDelivery({
             </div>
           </div>
 
-          {/* 两排筛选栏（吸顶，图3/4）：綜合排序/距離/配送下拉 + 右缘篩選；第二排优惠活动标签横滑（蜂蜜兌換閃蜂专属） */}
+          {/* 单行筛选栏（吸顶，图3/4）：优惠活动标签横滑 + 右缘筛选图标（蜂蜜兌換閃蜂专属） */}
           {filters.bar}
 
-          {/* 商家瀑布流：首页【外卖】瀑布流的数据副本（复制而非同源，后期可单独修改）；小图/大图双模式（大图复用首页 DeliveryLargeCard） */}
+          {/* 商家瀑布流：首页【外卖】瀑布流的数据副本（复制而非同源，后期可单独修改）；小图/大图双模式 */}
           <div className="apw-feed apdl-feed">
-            {DELIVERY_FEED.map((s) => (
-              layout === 'large'
-                ? <DeliveryLargeCard key={s.key} store={s} onOpenStore={onOpenStore} />
-                : <DeliveryStoreCard key={s.key} store={s} onOpenStore={onOpenStore} />
+            {deliveryExplorer.visibleItems.map((store) => (
+              <DeliveryMerchantCard
+                key={store.merchantId}
+                brand="bee"
+                store={store}
+                layout={deliveryLayout}
+                demo={store.merchantId === DELIVERY_FEED[0].merchantId}
+                onOpenStore={onOpenStore}
+                onFindSimilar={deliveryExplorer.openSimilar}
+              />
             ))}
           </div>
 

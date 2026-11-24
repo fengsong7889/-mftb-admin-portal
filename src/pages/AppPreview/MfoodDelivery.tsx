@@ -17,7 +17,7 @@
  *   橙色头部（定位 + 搜索框；滚动后切白底吸顶，图2）→ 活动胶囊行 →
  *   Banner 轮播（横滑 peek + 指示条）→ mFood·外賣 分类宫格（每页 2 排 × 5 列，横滑 + 页点）→
  *   星選一口價红卡（4 列商品横滑）→ 優選下午茶绿容器（2 列 × 3 行 + 換一換）→
- *   新人紅包横滑卡 → 排序行 + 快捷筛选胶囊 → 商家瀑布流。
+ *   新人紅包横滑卡 → 单行活动优惠筛选 + 筛选按钮 → 商家瀑布流。
  *
  * 瀑布流不另设计：直接复用首页【美食外卖】的 MFOOD_STORES + MfoodDeliveryStoreCard；
  * 展示模式（小图/大图）由说明面板切换器下发（deliveryPageMode → layout），大图复用
@@ -32,8 +32,9 @@ import fishPotImg from '@/assets/consumer-home/fishpot.jpg'
 import lemonTeaImg from '@/assets/consumer-home/lemontea.jpg'
 import bbqImg from '@/assets/consumer-home/bbq.jpg'
 import { MFOOD_STORES } from './consumerMfoodFeed'
-import MfoodDeliveryStoreCard from './MfoodDeliveryStoreCard'
-import MfoodDeliveryLargeCard from './MfoodDeliveryLargeCard'
+import { DeliveryMerchantCard, deliveryMerchantTags } from './MerchantActionCards'
+import { useMerchantExplorer } from './MerchantPreference'
+import SimilarMerchantView from './SimilarMerchantView'
 import { useDeliveryFilters } from './DeliveryFilterBar'
 
 /** 定位（图1；占位） */
@@ -117,8 +118,10 @@ export default function MfoodDelivery({ onSearch, onOpenStore, layout, onLayoutC
   const bannerMainRef = useRef<HTMLDivElement>(null)
   /** 滚动过阈值：橙头部切白底吸顶态（图2 顶部） */
   const [scrolled, setScrolled] = useState(false)
-  /** 两排筛选栏 + 多模块篩選 sheet（sheet 渲染在滚动容器末尾，见底部） */
+  /** 单行活动优惠筛选栏 + 多模块篩選 sheet（sheet 渲染在滚动容器末尾，见底部） */
   const filters = useDeliveryFilters({ brand: 'mfood', layout, onLayoutChange })
+  const deliveryExplorer = useMerchantExplorer(MFOOD_STORES, (store) => store.merchantId, deliveryMerchantTags)
+  const deliveryLayout = layout === 'large' ? 'large' : 'small'
 
   /* 挂载后把主 Banner 居中：两侧各露出相邻 Banner 的边缘（图1 口径）；不居中会让侧位占位卡占满首屏。
      用 rect 差值而非 offsetLeft：主卡 position:relative 会使 offsetParent 跳过滚动容器，算出偏差 */
@@ -128,13 +131,27 @@ export default function MfoodDelivery({ onSearch, onOpenStore, layout, onLayoutC
     if (!wrap || !main) return
     const delta = main.getBoundingClientRect().left - wrap.getBoundingClientRect().left
     wrap.scrollLeft += delta - (wrap.clientWidth - main.getBoundingClientRect().width) / 2
-  }, [])
+  }, [deliveryExplorer.similarId])
 
   const handleScroll = () => {
     const el = bodyRef.current
     if (!el) return
     const next = el.scrollTop > 36
     setScrolled((prev) => (prev === next ? prev : next))
+  }
+
+  if (deliveryExplorer.similarAnchor) {
+    return (
+      <SimilarMerchantView
+        brand="mfood"
+        anchorName={deliveryExplorer.similarAnchor.name}
+        layout={deliveryLayout}
+        stores={deliveryExplorer.similarItems}
+        onBack={deliveryExplorer.closeSimilar}
+        onOpenStore={onOpenStore}
+        onFindSimilar={deliveryExplorer.openSimilar}
+      />
+    )
   }
 
   return (
@@ -276,15 +293,21 @@ export default function MfoodDelivery({ onSearch, onOpenStore, layout, onLayoutC
           ))}
         </div>
 
-        {/* 两排筛选栏（图4）：綜合排序/距離/配送下拉 + 右缘篩選；第二排优惠活动标签横滑（蜂蜜兌換仅閃蜂，MFOOD 不展示） */}
+        {/* 单行筛选栏：优惠活动标签横滑 + 右缘筛选图标（蜂蜜兌換仅閃蜂，MFOOD 不展示） */}
         {filters.bar}
 
-        {/* 商家瀑布流：直接复用首页【美食外卖】的 MFOOD_STORES；小图/大图双模式（大图复用 MfoodDeliveryLargeCard） */}
+        {/* 商家瀑布流：直接复用首页【美食外卖】的 MFOOD_STORES；小图/大图双模式 */}
         <div className="apf-feed-list apmf-feed">
-          {MFOOD_STORES.map((store) => (
-            layout === 'large'
-              ? <MfoodDeliveryLargeCard key={store.key} store={store} onOpenStore={onOpenStore} />
-              : <MfoodDeliveryStoreCard key={store.key} store={store} onOpenStore={onOpenStore} />
+          {deliveryExplorer.visibleItems.map((store) => (
+            <DeliveryMerchantCard
+              key={store.merchantId}
+              brand="mfood"
+              store={store}
+              layout={deliveryLayout}
+              demo={store.merchantId === MFOOD_STORES[0].merchantId}
+              onOpenStore={onOpenStore}
+              onFindSimilar={deliveryExplorer.openSimilar}
+            />
           ))}
         </div>
 

@@ -17,7 +17,7 @@
  * 原型仅视觉态，不做真实过滤；商圈树引用全系统唯一 REGION_TREE_DATA（不得另造地名清单）。
  * 两页差异全部走参数：
  *   - nearbyChipLabel：未选时文案（閃蜂「附近商家」/ MFOOD「附近」）
- *   - showHighlightChips：营销高亮胶囊（神會員/津貼神券/全澳格價/好評高分）仅閃蜂展示
+ *   - brand：APP 品牌（閃蜂=神會員/好評高分；MFOOD=勁爆券），优惠券胶囊均支持横滑
  *   - showLayoutToggle：「列表大小圖切換」模块由父级按页签传入（閃蜂=優選商家、MFOOD=附近好店）
  *   - preferredLayout / onPreferredLayoutChange：大小图状态经说明面板闭环双机同步
  */
@@ -117,8 +117,8 @@ const PRICE_MAX = 200
 export interface UseGroupBuyFiltersOptions {
   /** 附近胶囊未选时的文案（閃蜂「附近商家」/ MFOOD「附近」） */
   nearbyChipLabel: string
-  /** 营销高亮胶囊（神會員/津貼神券/全澳格價/好評高分）仅閃蜂 true */
-  showHighlightChips?: boolean
+  /** APP 品牌：閃蜂=神會員/好評高分；MFOOD=勁爆券 */
+  brand: 'bee' | 'mfood'
   /** 「列表大小圖切換」模块显隐：父级按页签传入（優選商家/附近好店才 true） */
   showLayoutToggle: boolean
   /** 大小圖模式（说明面板切换器下发；缺省大圖） */
@@ -138,7 +138,7 @@ export interface GroupBuyFilters {
 
 export function useGroupBuyFilters({
   nearbyChipLabel,
-  showHighlightChips = false,
+  brand,
   showLayoutToggle,
   preferredLayout,
   onPreferredLayoutChange,
@@ -146,8 +146,10 @@ export function useGroupBuyFilters({
   const { t } = useTranslation()
   /** 商家瀑布流（優選商家/附近好店）vs 券瀑布流（推薦/其它）：showLayoutToggle 仅商家页签 true，复用为模块显隐判据 */
   const merchantFeed = showLayoutToggle
-  /** 偏好优惠：食得健康全瀑布流移除（广告类标签 全澳格價/人氣推薦/連鎖店鋪 已按 2026-11-18 口径从清单整体移除） */
-  const morePrefOptions = MORE_PREFS.filter((p) => p.key !== 'healthy')
+  /** 偏好优惠：红包文案随品牌变化；食得健康与广告类标签按既有口径不展示 */
+  const morePrefOptions = MORE_PREFS
+    .filter((p) => p.key !== 'healthy')
+    .map((p) => p.key === 'vip' && brand === 'mfood' ? { ...p, label: '勁爆券', icon: '⚡', tone: 'coupon' } : p)
   /** 当前展开的筛选面板：附近 / 分類 / 排序 / 更多篩選，同一时刻只开一个（null=收起） */
   const [openPanel, setOpenPanel] = useState<'nearby' | 'category' | 'sort' | 'more' | null>(null)
   /** 附近-距离档（单选），null 表示未选距离 */
@@ -258,55 +260,63 @@ export function useGroupBuyFilters({
     <div className="apg-filter-zone">
       {/* 筛选胶囊：左段横滑（附近/全部分類/排序可展开面板 + 高亮胶囊），右段筛选图标固定 */}
       <div className="apg-sortbar">
-        <div className="apg-sortbar-scroll">
-          <SpecField panel="filter" id={1}>
-            <button
-              type="button"
-              className={`apg-chip${openPanel === 'nearby' ? ' is-open' : ''}`}
-              aria-expanded={openPanel === 'nearby'}
-              onClick={togglePanel('nearby')}
-            >
-              {nearbyLabel === nearbyBase ? nearbyChipLabel : nearbyLabel}
-              {' '}
-              <i className="apg-chip-caret" aria-hidden="true">{caret('nearby')}</i>
-            </button>
-          </SpecField>
-          <SpecField panel="filter" id={2}>
-            <button
-              type="button"
-              className={`apg-chip${openPanel === 'category' ? ' is-open' : ''}`}
-              aria-expanded={openPanel === 'category'}
-              onClick={togglePanel('category')}
-            >
-              {categoryLabel} <i className="apg-chip-caret" aria-hidden="true">{caret('category')}</i>
-            </button>
-          </SpecField>
-          <SpecField panel="filter" id={3}>
-            <button
-              type="button"
-              className={`apg-chip${openPanel === 'sort' ? ' is-open' : ''}`}
-              aria-expanded={openPanel === 'sort'}
-              onClick={togglePanel('sort')}
-            >
-              {sortLabel} <i className="apg-chip-caret" aria-hidden="true">{caret('sort')}</i>
-            </button>
-          </SpecField>
-          {showHighlightChips && (
-            <>
-              <button type="button" className="apg-chip">
-                <b className="apg-chip-shen-logo" aria-hidden="true">神</b>會員
+        <div className="apg-sortbar-viewport">
+          <div className="apg-sortbar-scroll">
+            <SpecField panel="filter" id={1}>
+              <button
+                type="button"
+                className={`apg-chip apg-chip--compact${openPanel === 'nearby' ? ' is-open' : ''}`}
+                aria-expanded={openPanel === 'nearby'}
+                onClick={togglePanel('nearby')}
+              >
+                {nearbyLabel === nearbyBase ? nearbyChipLabel : nearbyLabel}
+                <i className="apg-chip-caret" aria-hidden="true">{caret('nearby')}</i>
               </button>
+            </SpecField>
+            <SpecField panel="filter" id={2}>
+              <button
+                type="button"
+                className={`apg-chip apg-chip--compact${openPanel === 'category' ? ' is-open' : ''}`}
+                aria-expanded={openPanel === 'category'}
+                onClick={togglePanel('category')}
+              >
+                {categoryLabel}<i className="apg-chip-caret" aria-hidden="true">{caret('category')}</i>
+              </button>
+            </SpecField>
+            <SpecField panel="filter" id={3}>
+              <button
+                type="button"
+                className={`apg-chip apg-chip--compact${openPanel === 'sort' ? ' is-open' : ''}`}
+                aria-expanded={openPanel === 'sort'}
+                onClick={togglePanel('sort')}
+              >
+                {sortLabel}<i className="apg-chip-caret" aria-hidden="true">{caret('sort')}</i>
+              </button>
+            </SpecField>
+            <SpecField panel="filter" id={9}>
+              <button type="button" className="apg-chip">
+                <i className="apg-chip-ico apg-chip-ico--red" aria-hidden="true">官</i>官方神券
+              </button>
+              {brand === 'mfood' ? (
+                <button type="button" className="apg-chip">
+                  <i className="apg-chip-ico apg-chip-ico--boom" aria-hidden="true">⚡</i>勁爆券
+                </button>
+              ) : (
+                <button type="button" className="apg-chip">
+                  <b className="apg-chip-shen-logo" aria-hidden="true">神</b>會員
+                </button>
+              )}
               <button type="button" className="apg-chip">
                 <i className="apg-chip-ico apg-chip-ico--red" aria-hidden="true">¥</i>津貼神券
               </button>
-              <button type="button" className="apg-chip">
-                <i className="apg-chip-ico apg-chip-ico--vs" aria-hidden="true">VS</i>全澳格價
-              </button>
-              <button type="button" className="apg-chip">
-                <i className="apg-chip-ico apg-chip-ico--thumb" aria-hidden="true">👍</i>好評高分
-              </button>
-            </>
-          )}
+              {brand === 'bee' && (
+                <button type="button" className="apg-chip">
+                  <i className="apg-chip-ico apg-chip-ico--thumb" aria-hidden="true">👍</i>好評高分
+                </button>
+              )}
+            </SpecField>
+          </div>
+          <span className="apg-sortbar-scroll-hint" aria-hidden="true">›</span>
         </div>
         <SpecField panel="filter" id={4}>
           <button

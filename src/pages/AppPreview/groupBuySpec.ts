@@ -26,9 +26,11 @@ export interface SpecEntry {
    * 最近一轮口径调整标记（壳外说明表专用，不进入手机壳）：
    * date=调整日期（YYYY-MM-DD），text=本轮改了什么（一句话说清，供开发/测试/设计快速定位变更面与回归范围）。
    * 渲染为名称列的「🆕 日期」徽标 + 说明列末尾的「本次調整」蓝底行；
-   * desc 正文是累计真值（新口径写进正文），changed 只标最近一轮——下一轮直接覆盖，历史靠 git 追。
+   * desc 正文是累计真值（新口径写进正文），changed 只标最近一轮；历史调整按时间顺序保存在 history，并在说明列逐条展示。
    */
   changed?: { date: string; text: string }
+  /** 历史调整记录：较早轮次的需求、日期与改动说明，不被后续 changed 覆盖 */
+  history?: { date: string; text: string }[]
   /**
    * 口径作废标记（仅作用于 note）：true 时该 note 原文不删、整条用删除线画掉并灰化。
    * 取【画掉而非删除】：开发/测试/设计需要看见“这条规则曾经存在、现已下线”，直接删文本会丢历史口径。
@@ -94,8 +96,14 @@ function deliveryModeDesc(scope: 'home' | 'deliveryPage'): string {
   return `外卖瀑布流支持多种展示模式（说明面板「展示模式」切换器下发，两台手机同步）：\n${steps.join('\n')}\n说明：閃蜂/MFOOD 双 APP 均已实现大图模式（红包胶囊随品牌：閃蜂👑神會員 / MFOOD🧨勁爆券）。\n说明：大图模式下，购买了人气商家小图皮肤的商家保留边框+渐变色（佈局同普通大图卡）；购买了大图皮肤的人气商家保持人气商家版式（见「人气商家」行），不切换成普通大图卡；普通佈局大图卡右上角有收藏按钮（见「收藏按钮」行）。`
 }
 
+/** 外卖与优选商家瀑布流共用商家操作说明；搜索结果面板不展示这两行。 */
+const MERCHANT_ACTION_SPECS: SpecEntry[] = [
+  { id: 27, label: '不感兴趣', desc: '1、长按商家卡片，弹出「不感兴趣 / 查找相似」操作浮层：小图模式横排，大图模式竖排，首页卡片模式采用紧凑竖排；\n2、点击「不感兴趣」后，该商家立即从当前及所有已接入该能力的商家瀑布流移除，并加入当前用户黑名单；\n3、黑名单仅对当前用户生效，不限制搜索结果，用户仍可通过搜索找到并进入该商家；\n4、解除规则：加入满60天后自动解除；用户通过搜索进入该商家并完成下单后解除；用户通过搜索进入商家详情并点击收藏后解除。', source: '用户操作 + 用户级商家黑名单', changed: { date: '2026-11-24', text: '新增商家长按浮层与不感兴趣操作，补充用户级黑名单及解除规则。' } },
+  { id: 28, label: '查找相似', desc: '1、长按商家卡片，点击「查找相似」进入相似商家瀑布流；\n2、以当前商家的标签为锚点，匹配拥有相同标签的候选商家；\n3、候选按命中标签数降序排列，同分保持原瀑布流顺序，未命中相同标签的商家不展示；\n4、相似结果继续支持长按操作，返回后回到来源瀑布流。', source: '当前商家标签 + 候选商家标签匹配', changed: { date: '2026-11-24', text: '新增查找相似入口与标签匹配瀑布流。' } },
+]
+
 export const DELIVERY_SPECS: SpecEntry[] = [
-  { id: 18, label: '门店展示规则', desc: '以下场景触发任意一条，该门店不会在瀑布流展示：\n1、門店未上架；\n2、門店沒有簽約合同或合同未生效；\n3、非本品牌門店；\n4、未開通外賣業務且超市業務的輔營沒有選擇外賣的分類；\n5、當前定位，無自取、不在平臺配送範圍內、不在自送範圍內；\n6、未入駐門店；\n7、被標記為白名單門店，且當前用戶不是白名單用戶。', source: '待补充', note: '無在售商品（包括全部售罄）和不在營業時間，且不接受預定的商家，沉底显示；', deprecated: true, changed: { date: '2026-11-16', text: '删除了以下这句说明：' } },
+  { id: 18, label: '门店展示规则', desc: '以下场景触发任意一条，该门店不会在瀑布流展示：\n1、門店未上架；\n2、門店沒有簽約合同或合同未生效；\n3、非本品牌門店；\n4、未開通外賣業務且超市業務的輔營沒有選擇外賣的分類；\n5、當前定位，無自取、不在平臺配送範圍內、不在自送範圍內；\n6、未入駐門店；\n7、被標記為白名單門店，且當前用戶不是白名單用戶；\n8、用户设置为「不感兴趣」的门店，不会对当前用户展示；黑名单解除后恢复展示，搜索结果不受限制。', source: '待补充', note: '無在售商品（包括全部售罄）和不在營業時間，且不接受預定的商家，沉底显示；', deprecated: true, changed: { date: '2026-11-24', text: '新增第8点：不感兴趣门店对当前用户隐藏，解除后恢复展示，搜索结果不受限制。' }, history: [{ date: '2026-11-16', text: '删除了以下这句说明：' }] },
   { id: 21, label: '展示模式', desc: deliveryModeDesc('home'), source: '待补充' },
   { id: 1, label: '门店名称', desc: '展示门店的名称。', source: '待补充' },
   { id: 15, label: '门店LOGO', desc: '展示商家所配置的封面图。', source: '管理后台 → 门店配置 → 门店装修配置' },
@@ -118,6 +126,7 @@ export const DELIVERY_SPECS: SpecEntry[] = [
   { id: 26, label: '收藏按钮', desc: '1、【展示】大图模式下普通佈局门店卡（含购买小图皮肤的商家）的封面图右上角：圆形白底 + 心形图标；人氣商家大圖版式卡不展示。\n2、【交互】点击心形填充为红色实心（已收藏），再次点击恢复空心描边（未收藏）。\n3、【范围】仅大图模式展示；小图模式不展示。', source: '用户收藏关系', brand: 'both' },
   { id: 19, label: '打烊倒计时', desc: '1、获取商家打烊时间；\n2、当距离打烊30分钟，就显示该标签。', source: '待补充', brand: 'both' },
   { id: 24, label: '商品展示', desc: '1、【展示】搜索结果外卖瀑布流门店卡下方新增商品横滑行：小图 + 商品名（超宽截断）+ 红色现价 + 灰色划线原价，横滑露出更多商品。\n2、【范围】仅搜索结果瀑布流（首页搜索·外卖、美食外卖页搜索）展示；首页/频道页外卖瀑布流不展示。\n3、【数据来源】取该门店在售商品列表（按商品顺序抓取）。', source: '商家主页 → 商品列表', brand: 'both' },
+  ...MERCHANT_ACTION_SPECS,
 ]
 
 /** 美食外卖页两面板专用：与首页外卖瀑布流共用 DELIVERY_SPECS 真源，仅「展示模式」行按频道页口径重写（无卡片模式，序号重排） */
@@ -125,22 +134,19 @@ const DELIVERY_PAGE_SPECS: SpecEntry[] = DELIVERY_SPECS.map((s) =>
   s.id === 21 ? { ...s, desc: deliveryModeDesc('deliveryPage') } : s,
 )
 
-/* ══════════ 面板七：美食外卖页篩選（频道页两排筛选栏 + 多模块篩選 sheet，閃蜂/MFOOD 同构，2026-11 新增） ══════════
-   本轮新增筛选条件在此逐条说明；篩選栏组件暂无 SpecField 锚点，本面板只做条件说明，不做卡片高亮联动。 */
+/* ══════════ 面板七：美食外卖页篩選（频道页单行筛选栏 + 多模块篩選 sheet，閃蜂/MFOOD 同构，2026-11 新增） ══════════
+   筛选栏与 sheet 的 SpecField 锚点均挂在 DeliveryFilterBar；顶部排序/距離/配送说明已随入口下线。 */
 export const DELIVERY_FILTER_SPECS: SpecEntry[] = [
-  { id: 1, label: '两排筛选栏', desc: '1、瀑布流上方固定两排：\n1.1、第一排：綜合排序（默认选中，点击恢复默认并清空距離/配送选中）、距離、配送、右缘篩選；\n1.2、第二排：优惠活动标签胶囊，支持左右滑动（隐藏滚动条）。\n2、两壳筛选栏均吸顶且与上层无缝贴合：閃蜂与搜索行双层吸顶，MFOOD 贴常驻头部下沿吸顶；筛选栏与瀑布流两侧贴边铺满（两壳同口径）；下拉/篩選面板均为浮层遮挡瀑布流，不推动内容下滑。', source: '待补充' },
-  { id: 13, label: '綜合排序', desc: '1、默认排序方式，位于第一排首位，选中态带品牌色下划线；\n2、点击綜合排序即恢复默认：清空距離/配送下拉的选中并收起已展开面板；\n3、具体排序逻辑按自然流量算法排序。', source: '待补充' },
-  { id: 2, label: '距離', desc: '1、下拉面板：左列「時效/範圍」分组页签 + 右列单选行（radio 圆圈）；\n2、時效档：30分鐘/40分鐘/50分鐘/60分鐘；\n3、範圍档：1KM/2KM/3KM/5KM；\n4、单选规则：时效与范围互斥（同一按钮只承载一种口径）；选中即回写按钮文案并收起面板，再点同项取消回「距離」；\n5、持有选中值的分组页签橙字标示生效口径（浏览另一组时仍可见）。', source: '待补充' },
-  { id: 3, label: '配送', desc: '1、下拉面板：左列「配送/配送保障」分组页签 + 右列单选行；\n2、配送方式：平台送/商家送/到店自取；\n3、配送保障：準時寶（配送时效赔付承诺，篩選有準時寶的商家）；\n4、单选规则与「距離」一致：两档互斥、选中回写并收起、再点同项取消。', source: '待补充' },
+  { id: 14, label: '筛选栏', desc: '筛选栏，只展示活动优惠的标签（支持左右滑动）+篩選按钮（进入筛选面板）；', source: '待补充', changed: { date: '2026-11-24', text: '美食外卖筛选栏由两排改为单行，移除综合排序/距离/配送，仅保留活动优惠标签与筛选按钮。' } },
   { id: 4, label: '优惠活动标签', desc: '1、取所有优惠活动标签：神會員（閃蜂）或勁爆券（MFOOD）/換口味/商家助力/官方神券/格價至抵/減免運費/蜂蜜兌換/滿額立減/新客優惠券/進店領券/滿返贈券/買滿贈品/買贈活動/商品折扣/收藏送券/組合優惠/半價優惠/自取折扣/集點返券/超值換購（蜂蜜兌換仅閃蜂展示）；\n2、支持左右滑动查看。', source: '待补充' },
-  { id: 5, label: '篩選', desc: '1、点击右缘「篩選」按钮打开多模块底部 sheet：白底圆角面板 + 底部黑色「重置」/黄色「完成 (可多選)」+ 面板下方圆形 × 收起；\n2、模块自上而下：列表大小圖切換/人均價/時效範圍/配送/商家/品質/活动优惠，七模块可滚动；\n3、重置清空全部模块（含与列表下拉共享的时效范围/配送），面板保持展开；完成收起。', source: '待补充' },
+  { id: 5, label: '篩選', desc: '1、点击右缘「篩選」图标按钮打开多模块底部 sheet：白底圆角面板 + 底部黑色「重置」/黄色「完成 (可多選)」+ 面板下方圆形 × 收起；\n2、模块自上而下：列表大小圖切換/人均價/時效範圍/配送/商家/品質/活动优惠，七模块可滚动；\n3、重置清空全部模块（含时效范围/配送），面板保持展开；完成收起。', source: '待补充' },
   { id: 6, label: '列表大小圖切換', desc: '1、篩選 sheet 内「大圖模式/小圖模式」单选卡；\n2、切换即时联动瀑布流，与右侧说明面板「展示模式」切换器同源联动，双机同步。', source: '待补充' },
   { id: 7, label: '人均價', desc: '1、双滑杆区间 $0–$100+，到顶显示 $100+；\n2、基于商家客单价进行筛选。', source: '待补充' },
-  { id: 8, label: '時效範圍', desc: '1、时效档（30/40/50/60分鐘）+ 范围档（1KM/2KM/3KM/5KM）单选胶囊；\n2、与列表「距離」下拉共享同一单选状态：两处任一改动即互相同步；\n3、重置回未选。', source: '待补充' },
-  { id: 9, label: '配送', desc: '1、配送方式（平台送/商家送/到店自取）+ 配送保障（準時寶）单选胶囊；\n2、与列表「配送」下拉共享同一单选状态；\n3、重置回未选。', source: '待补充' },
+  { id: 8, label: '時效範圍', desc: '1、时效档（30/40/50/60分鐘）+ 范围档（1KM/2KM/3KM/5KM）单选胶囊；\n2、筛选 sheet 内选择即时生效；\n3、重置回未选。', source: '待补充' },
+  { id: 9, label: '配送', desc: '1、配送方式（平台送/商家送/到店自取）+ 配送保障（準時寶）单选胶囊；\n2、筛选 sheet 内选择即时生效；\n3、重置回未选。', source: '待补充' },
   { id: 10, label: '商家', desc: '1、可多選：必試新店/金牌商家/品牌商家/連鎖商家；\n2、匹配对应标签（新店/金牌/品牌/连锁）的商家。', source: '待补充' },
   { id: 11, label: '品質', desc: '1、可多選：銷量較高/五星好評/4星及以上；\n2、销量按月售进行排序；\n3、星级按商家综合分。', source: '待补充' },
-  { id: 12, label: '活动优惠', desc: '1、可多選；内容与瀑布流上方第二排「优惠活动标签」同一数据源。', note: '蜂蜜兌換仅閃蜂展示。', source: '待补充' },
+  { id: 12, label: '活动优惠', desc: '1、可多選；内容与筛选栏「优惠活动标签」同一数据源。', note: '蜂蜜兌換仅閃蜂展示。', source: '待补充' },
 ]
 
 /* ══════════ 面板五：首页搜索结果瀑布流 · 增量字段（搜索结果页外卖瀑布流专属展示态，卡片复用 DeliveryStoreCard） ══════════
@@ -170,6 +176,7 @@ export const PREFERRED_SPECS: SpecEntry[] = [
   { id: 6, label: '收藏按钮', desc: '1、右上角圆形钮：\n1.1、未收藏=灰色空心星；\n1.2、已收藏=橙色实心星；\n1.3、点击切换收藏态（未收藏变为收藏，收藏变为取消收藏）；\n2、【范围】仅優選商家/附近好店页签瀑布流展示；搜索结果瀑布流（首页搜索·团购、特惠团购页搜索）不展示收藏按钮。', source: '用户收藏关系', brand: 'both' },
   { id: 13, label: '封面图', desc: '1、【展示】大尺寸横幅/瀑布流视觉封面（如招牌粉面大图），带来更强的美食沉浸感。\n2、【数据来源】：对应业务门店配置的【瀑布流主图】；\n3、【视频优先播放规则】：\n3.1、有视频优先展示视频！列表静音预加载或自动播放精选短视频；\n3.2、无视频时展示高保真瀑布流静态大图（封面图）；', source: '商家后台 → 门店配置 → 瀑布流主图', brand: 'bee' },
   { id: 17, label: '商品展示', desc: '1、【二选一】搜索结果团购瀑布流中，行列表商品（id5）与带图商品横滑行本质同为商品/券，只展示带图横滑行，行列表不渲染；優選商家/附近好店页签仍展示行列表。\n2、【展示】商家卡下方商品横滑行：大图 + 券/惠/秒角标 + 代金券名称（超宽截断）+ 红色优惠价 + 灰色划线原价，横滑露出更多商品。\n3、【字段】代金券名称、原价（灰色划线）、优惠价（红粗）、券/惠/秒标（券=代金券·红、惠=其他优惠·橙、秒=秒杀·洋红，角标叠商品图左上）。\n4、【范围】仅搜索结果瀑布流（首页搜索·团购、特惠团购页搜索）；页签瀑布流不展示。\n5、【数据来源】取该门店在售商品/券列表（按商品顺序抓取）。', source: '商家主页 → 商品列表', brand: 'both' },
+  ...MERCHANT_ACTION_SPECS,
 ]
 
 /* ══════════ 面板六：首页搜索结果·团购瀑布流增量字段（搜索结果页团购瀑布流 = 優選商家小图卡 + 两个搜索专属展示态） ══════════
@@ -193,28 +200,29 @@ export const FILTER_SPECS: SpecEntry[] = [
   { id: 6, label: '人均篩選器', desc: '1、双滑杆区间 $1–$200+，到顶显示 $200+；\n2、原型视觉态，不做真实过滤。', source: '待补充' },
   { id: 7, label: '營業時間', desc: '1、单选胶囊（再点取消）：0-5 時/5-10 時/10-14 時/14-17 時/17-21 時/21-24 時/24 小時營業；\n2、仅商家类瀑布流（優選商家/附近好店）展示，券类（推薦/其它）不展示。', source: '待补充' },
   { id: 8, label: '使用人數', desc: '1、单选胶囊（再点取消）：單人/雙人/3-4 人/5-10 人/10 人以上；\n2、仅券类瀑布流（推薦/其它）展示，商家类瀑布流不展示。', source: '待补充' },
-  { id: 9, label: '偏好优惠', desc: '1、可多選；圆形渐变图标胶囊（神會員/津貼神券/好評高分/服務優先/口味優先/新店入駐/環境優先/食得健康）；\n2、「食得健康」所有瀑布流均不展示；广告类标签（全澳格價/人氣推薦/連鎖店鋪）已整体移除。', source: '待补充', changed: { date: '2026-11-18', text: '移除广告类标签：全澳格價/人氣推薦/連鎖店鋪' } },
+  { id: 9, label: '偏好优惠', desc: '1、筛选栏支持左右滑动，支持展示偏好优惠的内容，用户点击立即触发查询。\n2、优惠券胶囊：閃蜂展示「官方神券/神會員/津貼神券」，MFOOD 展示「官方神券/勁爆券/津貼神券」；閃蜂另保留「好評高分」；\n3、更多篩選面板可多選，圆形渐变图标胶囊（神會員或勁爆券/津貼神券/好評高分/服務優先/口味優先/新店入駐/環境優先）。', source: '待补充', changed: { date: '2026-11-24', text: '压缩前三枚筛选条件并增加右缘横滑提示，使偏好优惠券露出半截；用户点击优惠券立即触发查询。' } },
   { id: 10, label: '店鋪服務', desc: '1、可多選；服务标签胶囊（有 WIFI/免費停車/可包場/有包廂/寶寶椅 等）；\n2、重置回默认，完成收起。', source: '待补充' },
 ]
 
 /* ─── 面板注册表（说明表格 Tab 与 localStorage 读写都以此为准） ───
    分组口径：首页 → 团购/外卖瀑布流/搜索结果瀑布流（外卖同款卡片 + 超出范围/未入驻两个搜索专属展示态）；
    特惠团购页 → 推荐/其它（团购卡同规格，覆盖推薦与消費賞等券类页签）/優選商家·附近門店/篩選（页面级搜索，跨两个瀑布流）；
-   美食外卖页 → 閃蜂/MFOOD 美食外賣频道页瀑布流（「展示模式」行按频道页口径重写：无卡片模式；小图/大图两档，大图各用自家卡片：閃蜂 DeliveryLargeCard / MFOOD MfoodDeliveryLargeCard）+ 篩選（频道页两排筛选栏与多模块篩選 sheet 的条件说明）。 */
+   美食外卖页 → 閃蜂/MFOOD 美食外賣频道页瀑布流（「展示模式」行按频道页口径重写：无卡片模式；小图/大图两档，大图各用自家卡片：閃蜂 DeliveryLargeCard / MFOOD MfoodDeliveryLargeCard）+ 篩選（频道页单行筛选栏与多模块篩選 sheet 的条件说明）。 */
 /** 搜索结果团购面板复用优选商家字段，但「收藏按钮」仅優選商家/附近門店页签瀑布流有，搜索态剔除 id6（卡片搜索态本就不渲染收藏钮） */
-const SEARCH_PREFERRED_SPECS = PREFERRED_SPECS.filter((s) => s.id !== 6)
+const SEARCH_PREFERRED_SPECS = PREFERRED_SPECS.filter((s) => s.id !== 6 && s.id !== 27 && s.id !== 28)
+const DELIVERY_SEARCH_BASE_SPECS = DELIVERY_SPECS.filter((s) => s.id !== 27 && s.id !== 28)
 export const SPEC_PANELS: SpecPanel[] = [
   { key: 'groupBuy', group: '首页', label: '团购瀑布流', defaults: GROUPBUY_SPECS, version: 22 },
-  { key: 'delivery', group: '首页', label: '外卖瀑布流', defaults: DELIVERY_SPECS, version: 50 },
-  { key: 'searchDelivery', group: '首页', label: '搜索结果瀑布流', defaults: [...DELIVERY_SPECS, ...SEARCH_DELIVERY_SPECS], version: 17, anchor: 'delivery', title: '首页 · 搜索结果·外卖瀑布流 · 展示字段及标签说明' },
+  { key: 'delivery', group: '首页', label: '外卖瀑布流', defaults: DELIVERY_SPECS, version: 53 },
+  { key: 'searchDelivery', group: '首页', label: '搜索结果瀑布流', defaults: [...DELIVERY_SEARCH_BASE_SPECS, ...SEARCH_DELIVERY_SPECS], version: 19, anchor: 'delivery', title: '首页 · 搜索结果·外卖瀑布流 · 展示字段及标签说明' },
   { key: 'searchGroup', group: '首页', label: '搜索结果·团购', hidden: true, tabAlias: 'searchDelivery', defaults: [...SEARCH_PREFERRED_SPECS, ...SEARCH_GROUP_SPECS], version: 12, anchor: 'preferred', title: '首页 · 搜索结果·团购瀑布流 · 展示字段及标签说明' },
   { key: 'groupPage', group: '特惠团购页', label: '推荐/其它', defaults: GROUPBUY_SPECS, version: 13, anchor: 'groupBuy' },
-  { key: 'preferred', group: '特惠团购页', label: '優選商家/附近門店', defaults: PREFERRED_SPECS, version: 39 },
-  { key: 'filter', group: '特惠团购页', label: '篩選', defaults: FILTER_SPECS, version: 12 },
+  { key: 'preferred', group: '特惠团购页', label: '優選商家/附近門店', defaults: PREFERRED_SPECS, version: 40 },
+  { key: 'filter', group: '特惠团购页', label: '篩選', defaults: FILTER_SPECS, version: 15 },
   { key: 'searchGroupPage', group: '特惠团购页', label: '搜索结果瀑布流', defaults: [...SEARCH_PREFERRED_SPECS, ...SEARCH_GROUP_SPECS], version: 12, anchor: 'preferred' },
-  { key: 'deliveryPage', group: '美食外卖页', label: '美食外卖瀑布流', defaults: DELIVERY_PAGE_SPECS, version: 28, anchor: 'delivery', title: '美食外卖瀑布流·展示字段及标签说明' },
-  { key: 'searchDeliveryPage', group: '美食外卖页', label: '搜索结果瀑布流', defaults: [...DELIVERY_PAGE_SPECS, ...SEARCH_DELIVERY_SPECS], version: 17, anchor: 'delivery' },
-  { key: 'deliveryFilter', group: '美食外卖页', label: '篩選', defaults: DELIVERY_FILTER_SPECS, version: 16 },
+  { key: 'deliveryPage', group: '美食外卖页', label: '美食外卖瀑布流', defaults: DELIVERY_PAGE_SPECS, version: 31, anchor: 'delivery', title: '美食外卖瀑布流·展示字段及标签说明' },
+  { key: 'searchDeliveryPage', group: '美食外卖页', label: '搜索结果瀑布流', defaults: [...DELIVERY_PAGE_SPECS.filter((s) => s.id !== 27 && s.id !== 28), ...SEARCH_DELIVERY_SPECS], version: 19, anchor: 'delivery' },
+  { key: 'deliveryFilter', group: '美食外卖页', label: '篩選', defaults: DELIVERY_FILTER_SPECS, version: 17 },
 ]
 
 /** 旧导出名兼容（团购默认规范，历史消费方） */

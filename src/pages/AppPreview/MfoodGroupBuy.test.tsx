@@ -89,12 +89,13 @@ describe('MFOOD 特惠團購', () => {
 
   it('附近好店页签：優選商家同款卡瀑布流（MFOOD 勁爆券标）+ 页签切换回流 + 大小圖跟随说明面板', () => {
     const onTabChange = vi.fn()
-    const { rerender } = render(<MfoodGroupBuy onBack={noop} onTabChange={onTabChange} />)
+    const { container, rerender } = render(<MfoodGroupBuy onBack={noop} onTabChange={onTabChange} />)
     fireEvent.click(screen.getByRole('button', { name: '附近好店' }))
     expect(onTabChange).toHaveBeenCalledWith('preferred')
     // 優選商家同款卡（MFOOD 品牌）：红包标渲染为「勁爆券」，字段同構
     expect(screen.getByText('澳門燒味工房🔥-新橋店')).toBeInTheDocument()
-    expect(screen.getAllByText('勁爆券')).toHaveLength(4)
+    const feed = container.querySelector('.apq-feed') as HTMLElement
+    expect(within(feed).getAllByText('勁爆券')).toHaveLength(4)
     expect(screen.getByText('最高膨脹至$25')).toBeInTheDocument()
     // 说明面板切大圖：附近好店卡同步切大图（4 张卡封面出血）
     rerender(<MfoodGroupBuy onBack={noop} onTabChange={onTabChange} preferredLayout="large" />)

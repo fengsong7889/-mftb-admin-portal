@@ -18,9 +18,9 @@ import fishPotImg from '@/assets/consumer-home/fishpot.jpg'
 import lemonTeaImg from '@/assets/consumer-home/lemontea.jpg'
 import GroupBuyFeedCard from './GroupBuyFeedCard'
 import { FEED } from './MfoodGroupFeed'
-import MfoodDeliveryStoreCard from './MfoodDeliveryStoreCard'
-import MfoodDeliveryLargeCard from './MfoodDeliveryLargeCard'
-import DeliveryGridCard from './DeliveryGridCard'
+import { DeliveryMerchantCard, deliveryMerchantTags } from './MerchantActionCards'
+import { useMerchantExplorer } from './MerchantPreference'
+import SimilarMerchantView from './SimilarMerchantView'
 import { MFOOD_STORES } from './consumerMfoodFeed'
 
 /* ─── 分类切换（特價團購 / 美食外賣 / 超市百貨）─── */
@@ -97,6 +97,8 @@ export default function MfoodHome({
       : (initialTab ?? TABS[0].key)
   ))
   const [scrolled, setScrolled] = useState(false)
+  const deliveryExplorer = useMerchantExplorer(MFOOD_STORES, (store) => store.merchantId, deliveryMerchantTags)
+  const deliveryLayout = deliveryMode === 'large' ? 'large' : deliveryMode === 'card' ? 'card' : 'small'
 
   /* 右侧说明面板 Tab 下发的同步命令：只在 syncSeq 变化时执行，避免壳内自身切换被面板回流覆盖；
      優選商家等 MFOOD 不存在的面板命令忽略，保持当前分类 */
@@ -113,6 +115,20 @@ export default function MfoodHome({
     if (!el) return
     const next = el.scrollTop > 36
     setScrolled((prev) => (prev === next ? prev : next))
+  }
+
+  if (deliveryExplorer.similarAnchor) {
+    return (
+      <SimilarMerchantView
+        brand="mfood"
+        anchorName={deliveryExplorer.similarAnchor.name}
+        layout={deliveryLayout}
+        stores={deliveryExplorer.similarItems}
+        onBack={deliveryExplorer.closeSimilar}
+        onOpenStore={onOpenStore}
+        onFindSimilar={deliveryExplorer.openSimilar}
+      />
+    )
   }
 
   return (
@@ -251,21 +267,33 @@ export default function MfoodHome({
         {/* 分類對應瀑布流：特價團購/超市百貨 → 團購券卡；美食外賣 → 門店卡（小圖/卡片/大圖三模式，MFOOD 专属组件） */}
         <div className="apf-feed-list">
           {tab === 'delivery'
-            ? deliveryMode === 'large'
-              ? MFOOD_STORES.map((store) => (
-                  <MfoodDeliveryLargeCard key={store.key} store={store} onOpenStore={onOpenStore} />
-                ))
-              : deliveryMode === 'card'
+            ? deliveryLayout === 'card'
               ? (
                   <div className="apw-grid">
-                    {MFOOD_STORES.map((store) => (
-                      <DeliveryGridCard key={store.key} brand="mfood" store={store} onOpenStore={onOpenStore} />
+                    {deliveryExplorer.visibleItems.map((store) => (
+                      <DeliveryMerchantCard
+                        key={store.merchantId}
+                        brand="mfood"
+                        store={store}
+                        layout="card"
+                        demo={store.merchantId === MFOOD_STORES[0].merchantId}
+                        onOpenStore={onOpenStore}
+                        onFindSimilar={deliveryExplorer.openSimilar}
+                      />
                     ))}
                   </div>
                 )
-              : MFOOD_STORES.map((store) => (
-              <MfoodDeliveryStoreCard key={store.key} store={store} onOpenStore={onOpenStore} />
-            ))
+              : deliveryExplorer.visibleItems.map((store) => (
+                  <DeliveryMerchantCard
+                    key={store.merchantId}
+                    brand="mfood"
+                    store={store}
+                    layout={deliveryLayout}
+                    demo={store.merchantId === MFOOD_STORES[0].merchantId}
+                    onOpenStore={onOpenStore}
+                    onFindSimilar={deliveryExplorer.openSimilar}
+                  />
+                ))
             : FEED.map((it) => (
               <GroupBuyFeedCard key={it.key} item={it} theme="purple" onOpenStore={onOpenStore} />
             ))}

@@ -686,6 +686,113 @@
   padding: 40px 20px;
 }
 
+/* ── 商家长按操作浮层（小图横排 / 大图竖排 / 卡片模式紧凑竖排） ── */
+.merchant-action-host { display: contents; -webkit-user-select: none; user-select: none; touch-action: pan-y; }
+.merchant-action-host.is-demo { position: relative; display: block; }
+/* 固定演示浮层：直接覆盖在演示商家卡片内，不依赖滚动或长按触发 */
+.merchant-action-demo {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--text-1) 66%, transparent);
+  backdrop-filter: blur(2px);
+  cursor: pointer;
+}
+.merchant-action-demo.is-card { padding: 10px; border-radius: 12px; }
+.merchant-action-demo-actions { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.merchant-action-demo.is-horizontal .merchant-action-demo-actions { max-width: 248px; }
+.merchant-action-demo.is-vertical .merchant-action-demo-actions { width: 154px; flex-direction: column; }
+.merchant-action-demo.is-card .merchant-action-demo-actions { width: 138px; flex-direction: column; gap: 8px; }
+.merchant-action-demo.is-card .merchant-action-btn { width: 100%; height: 36px; font-size: 12px; }
+.merchant-action-demo-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface-2) 88%, transparent);
+  color: var(--text-1);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.merchant-action-backdrop { position: absolute; inset: 0; z-index: 120; background: color-mix(in srgb, var(--text-1) 30%, transparent); touch-action: none; }
+.merchant-action-menu {
+  position: absolute;
+  z-index: 121;
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--surface-2) 18%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--text-1) 88%, transparent);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--text-1) 28%, transparent);
+  backdrop-filter: blur(8px);
+}
+.merchant-action-menu.is-horizontal { width: 248px; flex-direction: row; }
+.merchant-action-menu.is-vertical { width: 154px; flex-direction: column; }
+.merchant-action-menu.is-card { width: 138px; flex-direction: column; gap: 8px; padding: 8px; border-radius: 16px; }
+.merchant-action-btn {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: none;
+  border-radius: 22px;
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+.merchant-action-menu.is-card .merchant-action-btn { width: 100%; height: 36px; font-size: 12px; }
+.merchant-action-btn:hover { background: var(--surface-3); }
+.merchant-action-btn:active { transform: scale(0.97); }
+
+/* ── 找相似瀑布流 ── */
+.ap-similar-screen { height: 100%; display: flex; flex-direction: column; background: #f5f6f8; }
+.ap-similar-body { flex: 1; min-height: 0; padding: 0; }
+.ap-similar-header {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border-bottom: 1px solid #f0f0f0;
+}
+.ap-similar-back { flex: none; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 16px; background: #f5f5f5; color: #262626; font-size: 22px; cursor: pointer; }
+.ap-similar-heading { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ap-similar-heading b { color: #262626; font-size: 16px; font-weight: 800; }
+.ap-similar-heading span { overflow: hidden; color: #8c8c8c; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.ap-similar-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; color: #595959; font-size: 12px; }
+.ap-similar-summary em { flex: none; color: #1890ff; font-size: 11px; font-style: normal; font-weight: 700; }
+.ap-similar-feed { padding-top: 0; }
+.ap-similar-grid { padding-top: 0; }
+.ap-similar-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 72px 20px; color: #8c8c8c; text-align: center; }
+.ap-similar-empty span { font-size: 34px; }
+.ap-similar-empty b { color: #595959; font-size: 14px; }
+.ap-similar-empty p { margin: 0; font-size: 12px; }
+
 /* ── 触屏观感（仅 .ap-* 原型作用域） ────────────────────────────
    真机默认可点元素会带一层灰高亮、长按选中文本、双击缩放还有 300ms 延迟，
    这三项是「一眼看出不是 APP」的主要来源，统一按原生手感关掉。
@@ -1894,7 +2001,7 @@
   overscroll-behavior: contain;
 }
 .apg-filters button.is-on { background: #FFF1F0; border-color: #FFCCC7; color: #FF4D4F; font-weight: 600; }
-.apg-sortbar { display: flex; align-items: center; gap: 10px; padding: 6px 12px 8px; margin-bottom: 0; }
+.apg-sortbar { display: flex; align-items: center; gap: 8px; padding: 6px 10px 8px; margin-bottom: 0; }
 /* 瀑布流与筛选栏间隔过宽（2026-11 反馈）：團購页收起瀑布流容器顶 padding，
    胶囊→首卡 = 筛选栏底 padding 8px，与卡片间隔同节奏；
    優選商家/附近好店同款卡的 apq-feed 与团购券流统一同节奏（閃蜂/MFOOD 團購页四条容器一并收顶，首页不受影响） */
@@ -1931,27 +2038,31 @@
 .apg-sortbar .apg-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   height: 32px;
-  padding: 0 14px;
+  padding: 0 10px;
   border: 1px solid #E8EAED;
   border-radius: 8px;
   background: #FFFFFF;
   color: #262626;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  flex: none;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
+/* 前三枚查询条件固定紧凑宽度，给右侧偏好优惠券留出“露出半截”的横滑暗示 */
+.apg-sortbar .apg-chip--compact { width: 76px; justify-content: space-between; padding: 0 8px; }
 /* 展开中不另取色（会新增裸色值触发棘轮），品牌色描边表达“开”态 */
 .apg-sortbar .apg-chip.is-open { border-color: #E8720C; color: #E8720C; }
 /* 左段横滑：面板胶囊 + 高亮胶囊；右段筛选图标固定（外层 flex 分段） */
+.apg-sortbar-viewport { position: relative; flex: 1; min-width: 0; }
 .apg-sortbar-scroll {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex: 1;
+  gap: 6px;
+  width: 100%;
   min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
@@ -1959,6 +2070,26 @@
   overscroll-behavior: contain;
 }
 .apg-sortbar-scroll::-webkit-scrollbar { display: none; }
+/* 横滑提示：右缘渐变 + 箭头，明确告诉用户左侧内容还可继续滑动 */
+.apg-sortbar-scroll-hint {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  z-index: 1;
+  width: 20px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+  border-radius: 12px 0 0 12px;
+  background: linear-gradient(90deg, transparent, #ffffff);
+  color: #8c8c8c;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
 /* 神會員：渐变字 logo（复用局部红/金令牌，不新增裸色值） */
 .apg-chip-shen-logo {
   margin-right: 1px;
@@ -1982,10 +2113,10 @@
   font-style: normal;
 }
 .apg-chip-ico--red { background: var(--apg-red, #FF4D4F); }
-.apg-chip-ico--vs { background: #E8720C; }
+.apg-chip-ico--boom { background: linear-gradient(135deg, #722ed1, #ff4d4f); }
 .apg-chip-ico--thumb { border-radius: 50%; background: var(--apg-gold, #FA8C16); color: #262626; }
 /* 更多篩選：暖底+描边+滑杆图标+文字，与中性白胶囊区分；取色全走令牌，深浅主题均清晰 */
-.apg-chip.is-slider { gap: 5px; font-size: 13px; background: #FFF7E6; border-color: #FFD591; }
+.apg-chip.is-slider { gap: 5px; padding: 0 10px; font-size: 12px; background: #FFF7E6; border-color: #FFD591; }
 .apg-slider-ico { flex: none; display: block; }
 .apg-chip-caret { font-style: normal; font-size: 10px; line-height: 1; }
 
@@ -5983,30 +6114,20 @@ button.apcs-card:hover { border-color: #FFD591; }
 .apf-cover--t4 { background: linear-gradient(135deg, #722ED1, #FF4D4F); }
 .apf-cover--t5 { background: linear-gradient(135deg, #52C41A, #722ED1); }
 
-/* ── 美食外卖频道页 · 两排筛选栏（apg-dfilter-，閃蜂/MFOOD 单一真源 DeliveryFilterBar） ──
-   第一排綜合排序（默认选中）+ 距離/配送下拉 + 右缘篩選；第二排优惠活动模块标签横滑（图3 口径）；
-   下拉面板 absolute 浮层遮挡瀑布流，不推动下滑。
-   壳内拟真配色豁免口径：中性白底灰字，品牌下划线由壳根注入 --df-accent（閃蜂=金 / MFOOD=品牌橙）；
+/* ── 美食外卖频道页 · 单行筛选栏（apg-dfilter-，閃蜂/MFOOD 单一真源 DeliveryFilterBar） ──
+   仅保留优惠活动标签横滑 + 右缘筛选图标按钮；筛选面板入口固定，标签区域独立横滑。
+   壳内拟真配色豁免口径：中性白底灰字，品牌展开态由壳根注入 --df-accent（閃蜂=金 / MFOOD=品牌橙）；
    圆形图标复用偏好优惠图标族，本栏缩到 18px 适配胶囊 */
-.apg-dfilter { position: relative; background: #FFFFFF; border-radius: 14px 14px 0 0; padding: 10px 12px; }
-.apg-dfilter-sort { display: flex; align-items: center; gap: 18px; }
-.apg-dfilter-sortbtn { position: relative; border: none; background: transparent; font-size: 14px; font-weight: 700; color: #595959; cursor: pointer; padding: 0 0 6px; }
-.apg-dfilter-sortbtn.is-on { color: #262626; font-weight: 800; }
-.apg-dfilter-sortbtn.is-on::after { content: ''; position: absolute; left: 50%; transform: translateX(-50%); bottom: 0; width: 16px; height: 3px; border-radius: 2px; background: var(--df-accent, #E8720C); }
-.apg-dfilter-drop { border: none; background: transparent; font-size: 14px; font-weight: 700; color: #595959; cursor: pointer; padding: 0 0 6px; }
-.apg-dfilter-more { margin-left: auto; border: none; background: transparent; font-size: 13px; font-weight: 700; color: #262626; cursor: pointer; padding: 0; }
-.apg-dfilter-drop i, .apg-dfilter-more i { font-style: normal; font-size: 10px; }
-/* 第二排横滑：隐藏滚动条 + 触摸惯性滚动，胶囊不压缩 */
-.apg-dfilter-promos { display: flex; gap: 8px; overflow-x: auto; padding-top: 8px; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.apg-dfilter { position: relative; display: flex; align-items: center; gap: 10px; background: #FFFFFF; border-radius: 14px 14px 0 0; padding: 10px 12px; }
+/* 标签横滑：隐藏滚动条 + 触摸惯性滚动，胶囊不压缩；右侧筛选按钮不参与滚动 */
+.apg-dfilter-promos { flex: 1; min-width: 0; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 .apg-dfilter-promos::-webkit-scrollbar { display: none; }
 .apg-dfilter-chip { flex: none; display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 12px 0 6px; border: 1px solid #E8EAED; border-radius: 15px; background: #FFFFFF; color: #262626; font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; }
 .apg-dfilter-chip .apg-pref-ico { width: 18px; height: 18px; font-size: 10px; }
-/* 下拉按钮选中/展开态：品牌橙字（与 apg-sortbar is-open 同口径），caret 展开翻转向；篩選钮展开态同色 */
-.apg-dfilter-drop.is-on, .apg-dfilter-drop.is-open, .apg-dfilter-more.is-open { color: #E8720C; }
-.apg-dfilter-drop i, .apg-dfilter-more i { display: inline-block; transition: transform 0.15s ease; }
-.apg-dfilter-drop.is-open i, .apg-dfilter-more.is-open i { transform: rotate(180deg); }
-/* 下拉面板：absolute 浮层遮挡瀑布流（top:100% 贴栏底，不推动内容下滑）；内部复用附近面板视觉 */
-.apg-dfilter-panel { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; padding: 10px 12px 12px; background: #FFFFFF; border-top: 1px solid #F0F0F0; border-radius: 0 0 14px 14px; box-shadow: 0 12px 28px rgba(0,0,0,0.14); }
+/* 筛选图标按钮：图2 同款滑杆图标，无文字；展开态用品牌色 */
+.apg-dfilter-more { flex: none; width: 32px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; color: #262626; cursor: pointer; padding: 0; }
+.apg-dfilter-more.is-open { color: var(--df-accent, #E8720C); }
+.apg-dfilter-more .apg-slider-ico { display: block; }
 
 /* ── 閃蜂·美食外賣频道页（2026-11 新设计稿图2-4：黄色主题） ──
    页根复用閃蜂局部令牌集（apg-root：--apg-gold 等），零新增裸色（主题棘轮）；
@@ -6113,8 +6234,8 @@ button.apcs-card:hover { border-color: #FFD591; }
 .apdl-hot-img { width: 100%; height: 72px; border-radius: 8px; object-fit: cover; }
 .apdl-hot-name { font-size: 11px; font-weight: 700; color: #262626; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .apdl-hot-meta { font-size: 10px; color: #595959; }
-/* 两排筛选栏：双层吸顶第二层（top:56px = 搜索行高），样式真源见 apg-dfilter 共享段 */
-/* 两排筛选栏閃蜂壳覆写：吸顶与搜索行对齐（top:56px），品牌accent取页局部金令牌（--df-accent 定义须独立成行，供 var 解析守卫识别为局部令牌） */
+/* 单行筛选栏：双层吸顶第二层（top:56px = 搜索行高），样式真源见 apg-dfilter 共享段 */
+/* 单行筛选栏閃蜂壳覆写：吸顶与搜索行对齐（top:56px），品牌accent取页局部金令牌（--df-accent 定义须独立成行，供 var 解析守卫识别为局部令牌） */
 .apdl-root .apg-dfilter {
   --df-accent: var(--apg-gold, #FA8C16);
   position: sticky; top: 56px; z-index: 5;
@@ -6236,10 +6357,10 @@ button.apcs-card:hover { border-color: #FFD591; }
    瀑布流两侧露边隙、并把吸顶筛选栏顶出与头部的缝隙；上部各区块（Banner/宫格/星選/下午茶/红包）
    已自带 12px 横向 margin/padding，清零后仅筛选栏与瀑布流贴边铺满 */
 .apmf-body { padding: 0 0 16px; }
-/* 两排筛选栏（样式真源见 apg-dfilter 共享段） */
-/* 两排筛选栏 MFOOD 壳覆写：品牌accent取品牌橙（与旧排序行下划线同口径）；
+/* 单行筛选栏（样式真源见 apg-dfilter 共享段） */
+/* 单行筛选栏 MFOOD 壳覆写：品牌accent取品牌橙；
    吸顶与閃蜂一致：头部常驻滚动容器外（flex:none），故栏在 .ap-body 内 top:0 即贴头部下沿
-   （閃蜂搜索行在容器内吸顶才需 top:56px，两壳 top 不可互套）；sticky 仍作下拉面板定位锚点 */
+   （閃蜂搜索行在容器内吸顶才需 top:56px，两壳 top 不可互套） */
 .apmf-root .apg-dfilter {
   --df-accent: #E8720C;
   position: sticky; top: 0; z-index: 5;

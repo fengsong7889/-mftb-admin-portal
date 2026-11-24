@@ -157,7 +157,7 @@ function PreferredCoupons({ item, maxCount }: { item: PreferredMerchant; maxCoun
   )
 }
 
-export default function PreferredMerchantCard({ item, layout = 'small', brand = 'bee', showProducts }: { item: PreferredMerchant; layout?: PreferredLayout; brand?: PreferredBrand; showProducts?: boolean }) {
+export default function PreferredMerchantCard({ item, layout = 'small', brand = 'bee', showProducts, onOpenStore }: { item: PreferredMerchant; layout?: PreferredLayout; brand?: PreferredBrand; showProducts?: boolean; onOpenStore?: (merchantId: string) => void }) {
   /** 收藏仅视觉态（原型不做真实收藏） */
   const [fav, setFav] = useState(Boolean(item.fav))
   const toggleFav = () => setFav((prev) => !prev)
@@ -197,14 +197,14 @@ export default function PreferredMerchantCard({ item, layout = 'small', brand = 
   if (layout === 'large') {
     /* 大圖模式：封面出血（收藏钮 id6 移至封面右上）→ logo+店名/评分/标签 → 券列表横跨全宽；未入駐无收藏/标签/券列表 */
     return wrapNotJoined(
-      <div className="apq-card apq-card--lg">
+      <div className="apq-card apq-card--lg" onClick={() => { if (!item.notJoined) onOpenStore?.(item.key) }}>
         <div className="apq-lg-cover">
           <SpecField panel="preferred" id={13}>
             <img className="apq-lg-img" src={item.cover} alt="商家封面" />
           </SpecField>
           {!item.notJoined && (
             <SpecField panel="preferred" id={6}>
-              <button type="button" className={`apq-lg-fav${fav ? ' is-on' : ''}`} aria-label={favLabel} aria-pressed={fav} onClick={toggleFav}>
+              <button type="button" className={`apq-lg-fav${fav ? ' is-on' : ''}`} aria-label={favLabel} aria-pressed={fav} onClick={(event) => { event.stopPropagation(); toggleFav() }}>
                 {fav ? '★' : '☆'}
               </button>
             </SpecField>
@@ -235,7 +235,7 @@ export default function PreferredMerchantCard({ item, layout = 'small', brand = 
 
   /* 小圖模式（默认，原样式）：logo 左 + 信息区右（收藏钮在店名行尾）；未入駐仅基础信息 */
   return wrapNotJoined(
-    <div className="apq-card">
+    <div className="apq-card" onClick={() => { if (!item.notJoined) onOpenStore?.(item.key) }}>
       {logo}
       <div className="apq-main">
         <div className="apq-head">
@@ -244,7 +244,7 @@ export default function PreferredMerchantCard({ item, layout = 'small', brand = 
           </SpecField>
           {!item.notJoined && !showProducts && (
             <SpecField panel="preferred" id={6}>
-              <button type="button" className={`apq-fav${fav ? ' is-on' : ''}`} aria-label={favLabel} aria-pressed={fav} onClick={toggleFav}>
+              <button type="button" className={`apq-fav${fav ? ' is-on' : ''}`} aria-label={favLabel} aria-pressed={fav} onClick={(event) => { event.stopPropagation(); toggleFav() }}>
                 {fav ? '★' : '☆'}
               </button>
             </SpecField>

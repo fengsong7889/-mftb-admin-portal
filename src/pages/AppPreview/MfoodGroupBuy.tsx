@@ -29,7 +29,9 @@ import GroupBuyFeedCard from './GroupBuyFeedCard'
 import { FEED } from './MfoodGroupFeed'
 /* 附近好店数据抽至 consumerMfoodFeed.ts：搜索结果页「團購」分类复用同款小图瀑布流（别名保持既有引用不变） */
 import { MFOOD_NEAR_STORES as NEAR_STORES } from './consumerMfoodFeed'
-import PreferredMerchantCard from './PreferredMerchantCard'
+import { PreferredMerchantActionCard, preferredMerchantTags } from './MerchantActionCards'
+import { useMerchantExplorer } from './MerchantPreference'
+import SimilarMerchantView from './SimilarMerchantView'
 import { useGroupBuyFilters } from './GroupBuyFilterBar'
 
 /** 定位（占位数据） */
@@ -145,14 +147,15 @@ export default function MfoodGroupBuy({
   }, [syncSeq, syncTab])
 
   /* 筛选区与閃蜂特惠團購页同一真源（GroupBuyFilterBar）：附近/全部分類/智能排序/更多篩選选项完全一致；
-     文案差异走参数（附近 vs 附近商家），营销高亮胶囊仅閃蜂展示，大小图切换模块仅附近好店页签出现 */
+     文案差异走参数（附近 vs 附近商家、神會員 vs 勁爆券），大小图切换模块仅附近好店页签出现 */
   const filters = useGroupBuyFilters({
     nearbyChipLabel: '附近',
-    showHighlightChips: false,
+    brand: 'mfood',
     showLayoutToggle: activeTab === TAB_NEAR,
     preferredLayout,
     onPreferredLayoutChange,
   })
+  const preferredExplorer = useMerchantExplorer(NEAR_STORES, (item) => item.key, preferredMerchantTags)
 
   /* 选中页签自动滚入可视区：圆签行/吸顶文字行均为 overflow-x 横滑，选中项（如附近好店）可能贴在右缘被裁。
      必须用纯横向 scrollTo：scrollIntoView 会连带滚动垂直祖先（.mpg-body），与 tabsStuck 翻转形振荡导致页面“上滑就弹回”；jsdom 无 scrollTo，可选调用 */
@@ -181,6 +184,20 @@ export default function MfoodGroupBuy({
       ? tabs.getBoundingClientRect().top - el.getBoundingClientRect().top + tabs.offsetHeight <= rowH
       : el.scrollTop > 300
     setTabsStuck((prev) => (prev === stuck ? prev : stuck))
+  }
+
+  if (preferredExplorer.similarAnchor) {
+    return (
+      <SimilarMerchantView
+        brand="mfood"
+        anchorName={preferredExplorer.similarAnchor.name}
+        layout={filters.layout}
+        preferred={preferredExplorer.similarItems}
+        onBack={preferredExplorer.closeSimilar}
+        onOpenStore={onOpenStore}
+        onFindSimilar={preferredExplorer.openSimilar}
+      />
+    )
   }
 
   return (
@@ -327,8 +344,16 @@ export default function MfoodGroupBuy({
         {/* ═══ 瀑布流：附近好店页签 → 優選商家同款卡（MFOOD 品牌，红包标「勁爆券」，固定小圖模式）；其余页签 → 團購券瀑布流（同首頁） ═══ */}
         {activeTab === TAB_NEAR ? (
           <div className="apq-feed">
-            {NEAR_STORES.map((m) => (
-              <PreferredMerchantCard key={m.key} item={m} brand="mfood" layout={filters.layout} />
+            {preferredExplorer.visibleItems.map((item) => (
+              <PreferredMerchantActionCard
+                key={item.key}
+                item={item}
+                brand="mfood"
+                layout={filters.layout}
+                demo={item.key === NEAR_STORES[0].key}
+                onOpenStore={onOpenStore}
+                onFindSimilar={preferredExplorer.openSimilar}
+              />
             ))}
           </div>
         ) : (

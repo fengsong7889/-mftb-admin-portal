@@ -23,7 +23,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import GroupBuyFeedCard, { type GroupBuyItem } from './GroupBuyFeedCard'
-import PreferredMerchantCard from './PreferredMerchantCard'
+import { PreferredMerchantActionCard, preferredMerchantTags } from './MerchantActionCards'
+import { useMerchantExplorer } from './MerchantPreference'
+import SimilarMerchantView from './SimilarMerchantView'
 import { PREFERRED_MERCHANTS } from './consumerPreferredFeed'
 import { useGroupBuyFilters } from './GroupBuyFilterBar'
 import groupbuyHeroImg from '@/assets/consumer-home/groupbuy-hero.jpg'
@@ -134,11 +136,12 @@ export default function ConsumerGroupBuy({
      大小图切换模块仅優選商家页签的篩選面板展示，切换上报经说明面板闭环双机同步 */
   const filters = useGroupBuyFilters({
     nearbyChipLabel: '附近商家',
-    showHighlightChips: true,
+    brand: 'bee',
     showLayoutToggle: activeTab === TAB_PREFERRED,
     preferredLayout,
     onPreferredLayoutChange,
   })
+  const preferredExplorer = useMerchantExplorer(PREFERRED_MERCHANTS, (item) => item.key, preferredMerchantTags)
 
   /* 壳外说明面板同步命令：只在 syncSeq 变化时执行；preferred → 優選商家页签，page-group → 推薦页签 */
   const syncSeqRef = useRef(syncSeq ?? 0)
@@ -161,6 +164,20 @@ export default function ConsumerGroupBuy({
   }
 
   const openStore = (merchantId: string) => () => onOpenStore?.(merchantId)
+
+  if (preferredExplorer.similarAnchor) {
+    return (
+      <SimilarMerchantView
+        brand="bee"
+        anchorName={preferredExplorer.similarAnchor.name}
+        layout={filters.layout}
+        preferred={preferredExplorer.similarItems}
+        onBack={preferredExplorer.closeSimilar}
+        onOpenStore={onOpenStore}
+        onFindSimilar={preferredExplorer.openSimilar}
+      />
+    )
+  }
 
   return (
     <div className="apg-root">
@@ -287,8 +304,16 @@ export default function ConsumerGroupBuy({
         {/* 瀑布流：優選商家页签 → 商家卡瀑布流（图2）；其余页签 → 与首页「团购」同规格瀑布流 */}
         {activeTab === TAB_PREFERRED ? (
           <div className="apq-feed">
-            {PREFERRED_MERCHANTS.map((m) => (
-              <PreferredMerchantCard key={m.key} item={m} layout={filters.layout} brand="bee" />
+            {preferredExplorer.visibleItems.map((item) => (
+              <PreferredMerchantActionCard
+                key={item.key}
+                item={item}
+                layout={filters.layout}
+                brand="bee"
+                demo={item.key === PREFERRED_MERCHANTS[0].key}
+                onOpenStore={onOpenStore}
+                onFindSimilar={preferredExplorer.openSimilar}
+              />
             ))}
           </div>
         ) : (

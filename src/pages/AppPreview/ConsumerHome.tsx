@@ -20,9 +20,9 @@ import lemonTeaImg from '@/assets/consumer-home/lemontea.jpg'
 import { hotWordsFor } from './consumerSearchData'
 import { HOME_DELIVERY_STORES, HOME_DELIVERY_AD_STORES, HOME_GROUPBUY_FEED } from './consumerHomeFeed'
 import GroupBuyFeedCard from './GroupBuyFeedCard'
-import DeliveryStoreCard from './DeliveryStoreCard'
-import DeliveryGridCard from './DeliveryGridCard'
-import DeliveryLargeCard from './DeliveryLargeCard'
+import { DeliveryMerchantCard, deliveryMerchantTags } from './MerchantActionCards'
+import { useMerchantExplorer } from './MerchantPreference'
+import SimilarMerchantView from './SimilarMerchantView'
 
 /** 搜索底纹词：轮播全站热搜前 5 个（美团式引导，需求 1.1），点搜索框后进激活页仍可换词 */
 const SHADE_WORDS = hotWordsFor('global').slice(0, 5)
@@ -94,6 +94,8 @@ export default function ConsumerHome({
   ))
   const [scrolled, setScrolled] = useState(false)
   const [shadeIndex, setShadeIndex] = useState(0)
+  const deliveryExplorer = useMerchantExplorer(ALL_DELIVERY_STORES, (store) => store.merchantId, deliveryMerchantTags)
+  const deliveryLayout = deliveryMode === 'large' ? 'large' : deliveryMode === 'card' ? 'card' : 'small'
 
   /* 右侧说明面板 Tab 下发的同步命令：只在 syncSeq 变化时执行，避免壳内自身切换被面板回流覆盖 */
   const syncSeqRef = useRef(syncSeq ?? 0)
@@ -119,6 +121,20 @@ export default function ConsumerHome({
     if (!el) return
     const next = el.scrollTop > 36
     setScrolled((prev) => (prev === next ? prev : next))
+  }
+
+  if (deliveryExplorer.similarAnchor) {
+    return (
+      <SimilarMerchantView
+        brand="bee"
+        anchorName={deliveryExplorer.similarAnchor.name}
+        layout={deliveryLayout}
+        stores={deliveryExplorer.similarItems}
+        onBack={deliveryExplorer.closeSimilar}
+        onOpenStore={onOpenStore}
+        onFindSimilar={deliveryExplorer.openSimilar}
+      />
+    )
   }
 
   return (
@@ -356,21 +372,33 @@ export default function ConsumerHome({
         {/* 分類對應瀑布流：團購 → 團購券卡；外賣 → 門店卡（大圖/卡片/列表三模式）；其他分類暫回退團購券 */}
         <div className="apf-feed-list">
           {cat === 'delivery'
-            ? deliveryMode === 'large'
-              ? ALL_DELIVERY_STORES.map((store) => (
-                  <DeliveryLargeCard key={store.key} store={store} onOpenStore={onOpenStore} />
-                ))
-              : deliveryMode === 'card'
+            ? deliveryLayout === 'card'
               ? (
                   <div className="apw-grid">
-                    {ALL_DELIVERY_STORES.map((store) => (
-                      <DeliveryGridCard key={store.key} brand="bee" store={store} onOpenStore={onOpenStore} />
+                    {deliveryExplorer.visibleItems.map((store) => (
+                      <DeliveryMerchantCard
+                        key={store.merchantId}
+                        brand="bee"
+                        store={store}
+                        layout="card"
+                        demo={store.merchantId === ALL_DELIVERY_STORES[0].merchantId}
+                        onOpenStore={onOpenStore}
+                        onFindSimilar={deliveryExplorer.openSimilar}
+                      />
                     ))}
                   </div>
                 )
-              : ALL_DELIVERY_STORES.map((store) => (
-                <DeliveryStoreCard key={store.key} store={store} onOpenStore={onOpenStore} />
-              ))
+              : deliveryExplorer.visibleItems.map((store) => (
+                  <DeliveryMerchantCard
+                    key={store.merchantId}
+                    brand="bee"
+                    store={store}
+                    layout={deliveryLayout}
+                    demo={store.merchantId === ALL_DELIVERY_STORES[0].merchantId}
+                    onOpenStore={onOpenStore}
+                    onFindSimilar={deliveryExplorer.openSimilar}
+                  />
+                ))
             : HOME_GROUPBUY_FEED.map((it) => (
                 <GroupBuyFeedCard key={it.key} item={it} theme="orange" onOpenStore={onOpenStore} />
               ))}

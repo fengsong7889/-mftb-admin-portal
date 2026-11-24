@@ -214,9 +214,13 @@ describe('说明表「口径作废」note', () => {
     // 作废不删文本：原文仍在 del 内，样式转中性灰
     expect(note).toHaveClass('ap-spec-note--deprecated')
     expect(note.querySelector('del')?.textContent).toContain('沉底显示')
-    // 作废哪一轮、为何作废，同一行必须给出 changed 徽标
+    // 本轮新增不感兴趣规则，同一行必须给出 changed 徽标与今日日期
     expect(row.querySelector('.ap-spec-changed-tag')).not.toBeNull()
-    expect(row.querySelector('.ap-spec-changed')?.textContent).toContain('删除了以下这句说明')
+    expect(row.querySelector('.ap-spec-changed-tag')?.textContent).toContain('2026-11-24')
+    expect(row.querySelector('.ap-spec-changed')?.textContent).toContain('不感兴趣')
+    // 历史调整不被覆盖：旧日期与旧需求继续展示
+    expect(row.querySelector('.ap-spec-history')?.textContent).toContain('2026-11-16')
+    expect(row.querySelector('.ap-spec-history')?.textContent).toContain('删除了以下这句说明')
   })
 
   it('删除线只给标了 deprecated 的行，未标废的 note 不受影响', () => {
