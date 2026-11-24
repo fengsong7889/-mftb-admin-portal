@@ -120,7 +120,7 @@ export const DELIVERY_SPECS: SpecEntry[] = [
   { id: 16, label: '劲爆券/神会员', desc: '收起态红包行：閃蜂展示「神會員」、MFOOD 展示「勁爆券」，其後為紅包金額標籤。\n展示判斷（門店報名多個紅包時，按以下順序最終只展示一個）：\n1、優先判斷門店開啟【新客追加補貼】且有補貼次數（需用戶為新客）：「膨脹最高$xxx 新客再補$xx」。\n2、其次判斷門店開啟【時段追加補貼】且當前處於該時段且有補貼次數：「膨脹最高$xxx 門店再補$xx」。\n3、其次判斷平台開啟【紅包追加補貼】且有補貼次數：「膨脹最高$xxx 平台再補$xx」。\n4、以上均不滿足：默認取紅包【最高膨脹至】的最大可膨脹數值：「膨脹最高$xxx」。\n用戶有該門店多個可用滿減紅包時最多取2個：面額最高的兩個；面額相同取門檻較低者；門檻仍相同隨機取；兩個標籤按面額升序展示（第一個面額≤第二個）；僅1個紅包時直接展示。', source: '待补充' },
   { id: 12, label: '券包/活动', desc: '1、會員紅包展開後的展示（右側 ▾/▴ 為展開/收起按鈕；收起態的勁爆券/神會員見上行，「其它」見下一行）。\n2、券包：進店領券，如「新客券 $5」「領券 $10」「无门槛 $8」。\n3、活動：\n3.1、滿減優惠「滿$xx減$xx」（門檻–面額）；\n3.2、折扣商品「x折起」；\n3.3、滿贈活動「滿$xx得某贈品」；\n3.4、購贈活動「買滿$xx得某贈品」「購買xx（商品）送某贈品」；\n3.5、下單返券「返$x券」「下x單，返$x券」；自取折扣「自取x折」。', source: '待补充' },
   { id: 17, label: '其它', desc: '1、積分抵現（+金額）；\n2、活動標籤（如「食得健康」）；\n3、自取標籤（「支持自取」）；\n4、新增「積分抵$x元」標籤。\n5、「積分抵$x元」展示位置：折疊時排在勁爆券/神會員前；展開時在「其它」欄目排第一。\n6、門店報名了活動則顯示「積分抵$x」；“倍數活動”生效時顯示「雙倍抵$x」——兩者只會出現其中一個，不會同時出現。\n7、商家無預算、不在活動生效時間內、商家沒報名等情況都不會顯示。\n8、$x 計算：根據當前用戶的會員等級抵現金額及是否“倍數活動”計算；\n9、用戶未登錄時按最高用戶會員等級抵現金額計算；當【會員積分抵現規則】某個等級被下架時，顯示下一等級生效中的抵現金額（同樣需考慮“倍數活動”的金額計算）。', source: '待补充' },
-  { id: 13, label: '人气商家', desc: '1、人氣商家分為【小圖模式】和【大圖模式】2種（購買廣告皮膚後點亮）。\n1.1、小圖模式：卡片有邊框，展示信息區域有漸變色。\n1.2、大圖模式：左側有人氣商家封面圖（豎版海報），展示信息區域有漸變色，商品展示分四種版式（與銷售定價大圖皮膚同源）：\n1.2.1、大圖拼列：海報+信息+1大2小商品拼列（大圖價格疊圖、名在圖下，小圖名叠加）；\n1.2.2、階梯輪播：海報+信息+商品卡發牌式階梯堆疊，首項帶折扣角標與底部名稱行；\n1.2.3、爆款商品橫滑：門店LOGO+信息，橙色漸變帶內橫滑爆款商品卡（不使用海報，3張完整+第4張露出）；\n1.2.4、主推商品橫滑：海報+信息+右側主推商品橫滑（2張完整+第3張露一半）。\n1.3、大圖模式下：買了小圖皮膚的商家保留邊框+漸變色（佈局同普通大圖卡）；買了大圖皮膚的商家保持人氣商家版式，不切換成普通大圖卡。', source: '待补充' },
+  { id: 13, label: '人气商家', desc: '1、人氣商家分為【小圖模式】和【大圖模式】2種（購買廣告皮膚後點亮）。\n1.1、小圖模式：卡片有邊框，展示信息區域有漸變色。\n1.2、大圖模式：左側有人氣商家封面圖（豎版海報），展示信息區域有漸變色，商品展示分四種版式（與銷售定價大圖皮膚同源）：\n1.2.1、大圖拼列：海報+信息+1大2小商品拼列（大圖價格疊圖、名在圖下，小圖名叠加）；\n1.2.2、階梯輪播：海報+信息+商品卡發牌式階梯堆疊，首項帶折扣角標與底部名稱行；\n1.2.3、爆款商品橫滑：門店LOGO+信息，橙色漸變帶內橫滑爆款商品卡（不使用海報，3張完整+第4張露出）；\n1.2.4、主推商品橫滑：海報+信息+右側主推商品橫滑（2張完整+第3張露一半）；\n1.2.5、大圖模式下展示的商品按【月售】降序排列，月售越高越靠前；月售相同的商品隨機排序。\n1.3、大圖模式下：買了小圖皮膚的商家保留邊框+漸變色（佈局同普通大圖卡）；買了大圖皮膚的商家保持人氣商家版式，不切換成普通大圖卡。', source: '待补充' },
   { id: 14, label: '配送类型', desc: '1、配送类型具体返回值由调度系统返回，每个商家只会展示返回的 1 个值；\n2、此位置仅展示配送类型标签，不展示「支持自取」「自送」（自取折扣见「自取折扣」行）。', source: '调度系统返回' },
   { id: 25, label: '自取折扣', desc: '1、商家报名自取折扣活动后展示，格式为「自取x折」；\n2、展示位置：跟在「时间·距离」列的距离之后，纯文字无标签框（省空间、多显示数字），单行不换行，超出宽度以「…」截断；\n3、商家未报名自取折扣活动或无折扣时不展示。', source: '商家活动报名（自取折扣）', brand: 'both' },
   { id: 26, label: '收藏按钮', desc: '1、【展示】大图模式下普通佈局门店卡（含购买小图皮肤的商家）的封面图右上角：圆形白底 + 心形图标；人氣商家大圖版式卡不展示。\n2、【交互】点击心形填充为红色实心（已收藏），再次点击恢复空心描边（未收藏）。\n3、【范围】仅大图模式展示；小图模式不展示。', source: '用户收藏关系', brand: 'both' },
@@ -213,15 +213,15 @@ const SEARCH_PREFERRED_SPECS = PREFERRED_SPECS.filter((s) => s.id !== 6 && s.id 
 const DELIVERY_SEARCH_BASE_SPECS = DELIVERY_SPECS.filter((s) => s.id !== 27 && s.id !== 28)
 export const SPEC_PANELS: SpecPanel[] = [
   { key: 'groupBuy', group: '首页', label: '团购瀑布流', defaults: GROUPBUY_SPECS, version: 22 },
-  { key: 'delivery', group: '首页', label: '外卖瀑布流', defaults: DELIVERY_SPECS, version: 53 },
-  { key: 'searchDelivery', group: '首页', label: '搜索结果瀑布流', defaults: [...DELIVERY_SEARCH_BASE_SPECS, ...SEARCH_DELIVERY_SPECS], version: 19, anchor: 'delivery', title: '首页 · 搜索结果·外卖瀑布流 · 展示字段及标签说明' },
+  { key: 'delivery', group: '首页', label: '外卖瀑布流', defaults: DELIVERY_SPECS, version: 54 },
+  { key: 'searchDelivery', group: '首页', label: '搜索结果瀑布流', defaults: [...DELIVERY_SEARCH_BASE_SPECS, ...SEARCH_DELIVERY_SPECS], version: 20, anchor: 'delivery', title: '首页 · 搜索结果·外卖瀑布流 · 展示字段及标签说明' },
   { key: 'searchGroup', group: '首页', label: '搜索结果·团购', hidden: true, tabAlias: 'searchDelivery', defaults: [...SEARCH_PREFERRED_SPECS, ...SEARCH_GROUP_SPECS], version: 12, anchor: 'preferred', title: '首页 · 搜索结果·团购瀑布流 · 展示字段及标签说明' },
   { key: 'groupPage', group: '特惠团购页', label: '推荐/其它', defaults: GROUPBUY_SPECS, version: 13, anchor: 'groupBuy' },
   { key: 'preferred', group: '特惠团购页', label: '優選商家/附近門店', defaults: PREFERRED_SPECS, version: 41 },
   { key: 'filter', group: '特惠团购页', label: '篩選', defaults: FILTER_SPECS, version: 15 },
   { key: 'searchGroupPage', group: '特惠团购页', label: '搜索结果瀑布流', defaults: [...SEARCH_PREFERRED_SPECS, ...SEARCH_GROUP_SPECS], version: 12, anchor: 'preferred' },
-  { key: 'deliveryPage', group: '美食外卖页', label: '美食外卖瀑布流', defaults: DELIVERY_PAGE_SPECS, version: 31, anchor: 'delivery', title: '美食外卖瀑布流·展示字段及标签说明' },
-  { key: 'searchDeliveryPage', group: '美食外卖页', label: '搜索结果瀑布流', defaults: [...DELIVERY_PAGE_SPECS.filter((s) => s.id !== 27 && s.id !== 28), ...SEARCH_DELIVERY_SPECS], version: 19, anchor: 'delivery' },
+  { key: 'deliveryPage', group: '美食外卖页', label: '美食外卖瀑布流', defaults: DELIVERY_PAGE_SPECS, version: 32, anchor: 'delivery', title: '美食外卖瀑布流·展示字段及标签说明' },
+  { key: 'searchDeliveryPage', group: '美食外卖页', label: '搜索结果瀑布流', defaults: [...DELIVERY_PAGE_SPECS.filter((s) => s.id !== 27 && s.id !== 28), ...SEARCH_DELIVERY_SPECS], version: 20, anchor: 'delivery' },
   { key: 'deliveryFilter', group: '美食外卖页', label: '篩選', defaults: DELIVERY_FILTER_SPECS, version: 17 },
 ]
 
