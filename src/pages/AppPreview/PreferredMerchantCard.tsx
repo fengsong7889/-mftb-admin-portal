@@ -233,7 +233,7 @@ export default function PreferredMerchantCard({ item, layout = 'small', brand = 
     )
   }
 
-  /* 小圖模式（默认，原样式）：logo 左 + 信息区右（收藏钮在店名行尾）；未入駐仅基础信息 */
+  /* 小圖模式（默认）：logo 左 + 信息区右，不展示收藏钮；未入駐仅基础信息 */
   return wrapNotJoined(
     <div className="apq-card" onClick={() => { if (!item.notJoined) onOpenStore?.(item.key) }}>
       {logo}
@@ -242,13 +242,6 @@ export default function PreferredMerchantCard({ item, layout = 'small', brand = 
           <SpecField panel="preferred" id={1}>
             <span className="apq-name">{item.name}</span>
           </SpecField>
-          {!item.notJoined && !showProducts && (
-            <SpecField panel="preferred" id={6}>
-              <button type="button" className={`apq-fav${fav ? ' is-on' : ''}`} aria-label={favLabel} aria-pressed={fav} onClick={(event) => { event.stopPropagation(); toggleFav() }}>
-                {fav ? '★' : '☆'}
-              </button>
-            </SpecField>
-          )}
         </div>
         <PreferredMeta item={item} />
         {!item.notJoined && <PreferredTags item={item} brand={brand} />}

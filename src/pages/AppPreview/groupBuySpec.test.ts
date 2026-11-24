@@ -21,8 +21,11 @@ import { DELIVERY_SPECS, FILTER_SPECS, SPEC_PANELS } from './groupBuySpec'
 const panel = (key: string) => SPEC_PANELS.find((p) => p.key === key)!
 
 describe('收藏按钮说明仅页签瀑布流持有', () => {
-  it('優選商家/附近門店面板保留收藏按钮行', () => {
-    expect(panel('preferred').defaults.some((s) => s.id === 6)).toBe(true)
+  it('優選商家/附近門店面板保留收藏按钮行，并限定大图模式', () => {
+    const row = panel('preferred').defaults.find((s) => s.id === 6)!
+    expect(row).toBeTruthy()
+    expect(row.desc).toContain('只有大图模式下才展示收藏按钮')
+    expect(row.changed?.date).toBe('2026-11-24')
   })
 
   it('搜索结果团购两面板剔除收藏按钮行，但保留商品展示与搜索专属行', () => {

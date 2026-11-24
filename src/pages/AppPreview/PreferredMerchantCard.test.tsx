@@ -44,11 +44,12 @@ describe('搜索态商品二选一（行列表 vs 带图横滑行）', () => {
     expect(container.querySelector('.apq-coupons')).toBeNull()
   })
 
-  it('搜索态不渲染收藏按钮，页签态保留', () => {
-    const search = render(<PreferredMerchantCard item={{ ...base, goods }} showProducts />)
-    expect(search.container.querySelector('.apq-fav')).toBeNull()
-    const tab = render(<PreferredMerchantCard item={{ ...base, goods }} />)
-    expect(tab.container.querySelector('.apq-fav')).toBeTruthy()
+  it('小图模式不展示收藏按钮，大图模式展示', () => {
+    const small = render(<PreferredMerchantCard item={{ ...base, goods }} showProducts />)
+    expect(small.container.querySelector('.apq-fav')).toBeNull()
+    expect(small.container.querySelector('.apq-lg-fav')).toBeNull()
+    const large = render(<PreferredMerchantCard item={{ ...base, goods }} layout="large" />)
+    expect(large.container.querySelector('.apq-lg-fav')).toBeTruthy()
   })
 
   it('搜索态带图行字段齐备：券/惠/秒角标 + 名称 + 优惠价 + 划线原价', () => {
