@@ -7,6 +7,8 @@ import BrandTag from '@/components/BrandTag'
 import { fetchAdAlgorithms } from '@/api/adPromotion'
 import { searchWaterfallCatalog } from '@/api/waterfallCatalog'
 import type { WaterfallCatalogItem } from '@/api/waterfallCatalog'
+import { AlgorithmType } from '@mftb/contracts/recommendConstants'
+import { AdBusinessType, StarTarget } from '@mftb/contracts/starAlgorithm'
 import { getDisplayCategoryMode, NATURAL_ALGORITHM_TYPE, MAX_SLOT_POSITION } from '@mftb/contracts/waterfallTypes'
 import { readDraft, writeDraft } from './waterfallConfig/waterfallDraft'
 import type {
@@ -99,6 +101,8 @@ export default function PromotionSlotConfigSlots() {
   const catalogChannel = isSupermarket ? 'supermarket' : 'groupBuy'
   const isContentMode = !!draft && supportsContentConfig && getDisplayCategoryMode(draft) !== 'algorithm'
   const contentType = draft?.contentType ?? 'store'
+  /** 商品维度（仅团购）：坑位候选只列商品类无敌星星，与表单页/后端校验同口径 */
+  const isProductDimension = isGroupBuy && contentType === 'product'
   const brand = draft?.brand
 
   /** 算法库选项（delivery 模式） */
@@ -132,11 +136,19 @@ export default function PromotionSlotConfigSlots() {
   }, [])
 
   /** 加载可选算法（delivery：排除自然流量/人气商家/金字招牌）
-   * 只按品牌匹配，不按算法自身的 channel 过滤：頻道归属在本條瀑布流决定，算法库不收录頻道 */
+   * 只按品牌匹配，不按算法自身的 channel 过滤：頻道归属在本條瀑布流决定，算法库不收录頻道。
+   * 团购商品维度显式传 targetType=2（不传 target 的旧口径后端默认不返回商品）；
+   * 门店维度沿用旧查询，后端默认排除商品星星，其余门店型算法（投流等）照旧可选。 */
   useEffect(() => {
     if (isContentMode) return
     let active = true
-    fetchAdAlgorithms({ page: 1, size: 200, status: 1, ...(supportsContentConfig ? { brand } : {}) })
+    const query: Parameters<typeof fetchAdAlgorithms>[0] = { page: 1, size: 200, status: 1, ...(supportsContentConfig ? { brand } : {}) }
+    if (isProductDimension) {
+      query.algoType = AlgorithmType.INVINCIBLE_STAR
+      query.businessType = AdBusinessType.GROUP_BUY
+      query.targetType = StarTarget.PRODUCT
+    }
+    fetchAdAlgorithms(query)
       .then(res => {
         if (active && res.records.length > 0) {
           setAlgorithmOptions(
@@ -148,7 +160,7 @@ export default function PromotionSlotConfigSlots() {
       })
       .catch(() => { /* 保留空选项 */ })
     return () => { active = false }
-  }, [isContentMode, supportsContentConfig, brand])
+  }, [isContentMode, supportsContentConfig, brand, isProductDimension])
 
   /** 搜索团购资源（groupBuy，防抖） */
   const doSearchResource = useCallback((keyword?: string) => {

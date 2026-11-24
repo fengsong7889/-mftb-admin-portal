@@ -9,10 +9,10 @@ import com.mftb.admin.dto.PageResult;
  */
 public interface AdOrderService {
 
-    /** 订单分页查询 */
+    /** 订单分页查询（targetType 1=门店 2=商品；productId 商品编码精确匹配） */
     PageResult<AdOrderVO> page(long page, long size, String orderNo, Integer algoType,
                                String groupCode, String storeCode, Integer status,
-                               String startDate, String endDate);
+                               String startDate, String endDate, Integer targetType, String productId);
 
     /** 订单详情（含明细） */
     AdOrderDetailVO detail(String orderNo);

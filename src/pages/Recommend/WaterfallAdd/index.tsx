@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Button, Form, InputNumber, Select, Space, message, Divider, Tag, DatePicker, Switch, Modal, Checkbox, Table, Tree, Upload } from 'antd'
+import { Button, Form, InputNumber, Select, Space, message, Divider, Tag, DatePicker, Switch, Modal, Checkbox, Table, Tree, Upload, Radio } from 'antd'
 import type { UploadFile } from 'antd/es/upload/interface'
 import {
   ArrowLeftOutlined,
@@ -32,6 +32,7 @@ import {
   AREA_TO_REGIONS,
   ALGORITHM_TYPE_OPTIONS,
 } from '@mftb/contracts/recommendConstants'
+import { AdBusinessType, StarTarget } from '@mftb/contracts/starAlgorithm'
 import dayjs from 'dayjs'
 import PopularSkinPricing from './PopularSkinPricing'
 import GoldenSignboardPricing from './GoldenSignboardPricing'
@@ -201,6 +202,8 @@ function WaterfallAddGeneral() {
   const [selectedApp, setSelectedApp] = useState<AppType | undefined>(undefined)
   const [selectedChannel, setSelectedChannel] = useState<RecommendChannel | undefined>(undefined)
   const [selectedAlgorithmType, setSelectedAlgorithmType] = useState<AlgorithmType | undefined>(urlAlgorithmType ?? undefined)
+  // 团购星星的推广对象（门店/商品）：决定算法候选池与全天口径；仅团购模块参与
+  const [starTarget, setStarTarget] = useState<number>(StarTarget.STORE)
 
   // 取消扣费规则配置
   const [cancelFeeRules, setCancelFeeRules] = useState<{ id: number; maxDays: number; feePercent: number }[]>([
@@ -278,6 +281,11 @@ function WaterfallAddGeneral() {
   // 是否为盤活復蘇算法类型
   const isReviveAlgorithm = selectedAlgorithmType === AlgorithmType.HOT_REVIVE_AD
 
+  /** 团购到店模块的无敌星星定价：才展示推广对象切换 */
+  const isGroupBuyStarPricing = urlModule === 'groupBuy' && urlAlgorithmType === AlgorithmType.INVINCIBLE_STAR
+  /** 商品维度：全天售卖（商圈×日期），无餐段可售时段/餐段折扣/多时段梯度折扣 */
+  const isProductStarPricing = isGroupBuyStarPricing && starTarget === StarTarget.PRODUCT
+
   // 是否为單圖類型（無敵星星/盤活復蘇只有詳情圖，合併進基礎信息卡片）
   const isSingleImageType =
     selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR ||
@@ -297,6 +305,12 @@ function WaterfallAddGeneral() {
     if (urlAlgorithmType) {
       fetchParams.algoType = urlAlgorithmType
     }
+    if (isGroupBuyStarPricing && starTarget === StarTarget.PRODUCT) {
+      // 商品星星必须显式声明对象（不传 targetType 的旧口径后端默认不返回商品）；
+      // 门店口径由后端自动排除商品记录，无需额外参数。
+      fetchParams.businessType = AdBusinessType.GROUP_BUY
+      fetchParams.targetType = StarTarget.PRODUCT
+    }
     fetchAdAlgorithms(fetchParams as Parameters<typeof fetchAdAlgorithms>[0])
       .then(res => {
         // 过滤系统预置算法（SQL seed）及金字招牌（只需标签，不需坑位配置；algoCode 前缀 SFJZ 兜底过滤）
@@ -310,7 +324,7 @@ function WaterfallAddGeneral() {
         if (opts.length > 0) setAlgorithmSelectOptions(opts)
       })
       .catch(() => { /* 静默请求：错误不阻断页面 */ })
-  }, [urlAlgorithmType])
+  }, [urlAlgorithmType, isGroupBuyStarPricing, starTarget])
 
   // 编辑/详情模式下加载数据
   useEffect(() => {
@@ -389,6 +403,8 @@ function WaterfallAddGeneral() {
         setSelectedChannel((detail.channel ?? RecommendChannel.DELIVERY) as RecommendChannel)
         setSelectedAlgorithmType(AlgorithmType.INVINCIBLE_STAR)
         setSelectedAlgorithmInfo({ id: detail.algoId, name: detail.algoName || '' })
+        // 推广对象快照驱动切换（后端 target_type；存量记录恒为门店），编辑/详情下切换器锁定
+        setStarTarget(detail.targetType === StarTarget.PRODUCT ? StarTarget.PRODUCT : StarTarget.STORE)
         setPresaleDays(detail.presaleDays ?? 7)
         setRefundEnabled(detail.refundEnabled === 1)
         setStatus((detail.status ?? ServiceStatus.ENABLED) as ServiceStatus)
@@ -731,8 +747,8 @@ function WaterfallAddGeneral() {
           channel: selectedChannel,
           presaleDays,
           refundEnabled: refundEnabled ? 1 : 2,
-          // 「折」记法 → 后端百分比记法（6折 = 60，支持2位小数）
-          discountTiers: gradientEnabled
+          // 「折」记法 → 后端百分比记法（6折 = 60，支持2位小数）；商品维度全天单格不支持多时段梯度（后端同步强制）
+          discountTiers: gradientEnabled && !isProductStarPricing
             ? gradients.filter(g => g.count && g.discount).map(g => ({ minSlots: g.count!, discount: Math.round(g.discount! * 100) / 10 }))
             : [],
           cancelFeeTiers: cancelFeeRules.map(r => ({ remainDays: r.maxDays, ratio: r.feePercent })),
@@ -741,9 +757,9 @@ function WaterfallAddGeneral() {
           blockList: merchantLimit
             ? selectedMerchants.map(m => ({ storeCode: m.storeId, storeName: m.storeName, groupCode: m.groupId, groupName: m.groupName }))
             : [],
-          // 可售时段（规则7）：前端 night ↔ 后端 supper
-          sellTimeSlots: onlySellTimeSlots.map(s => s === 'night' ? 'supper' : s),
-          // 时段折扣配置（分商圈落库，前端「折」记法 → 后端百分比记法: 8折=80）
+          // 可售时段（规则7）：前端 night ↔ 后端 supper；商品维度固定全天
+          sellTimeSlots: isProductStarPricing ? ['fullDay'] : onlySellTimeSlots.map(s => s === 'night' ? 'supper' : s),
+          // 时段折扣配置（分商圈落库，前端「折」记法 → 后端百分比记法: 8折=80；商品维度只提交全时段折扣）
           slotDiscounts: regionPricingConfigs
             .filter(c => c.discountEnabled)
             .map(c => {
@@ -751,11 +767,11 @@ function WaterfallAddGeneral() {
               return {
                 region: c.region,
                 fullDay: toPercent(c.discounts.fullDay),
-                breakfast: toPercent(c.discounts.breakfast),
-                lunch: toPercent(c.discounts.lunch),
-                afternoon: toPercent(c.discounts.afternoon),
-                dinner: toPercent(c.discounts.dinner),
-                supper: toPercent(c.discounts.night),
+                breakfast: isProductStarPricing ? undefined : toPercent(c.discounts.breakfast),
+                lunch: isProductStarPricing ? undefined : toPercent(c.discounts.lunch),
+                afternoon: isProductStarPricing ? undefined : toPercent(c.discounts.afternoon),
+                dinner: isProductStarPricing ? undefined : toPercent(c.discounts.dinner),
+                supper: isProductStarPricing ? undefined : toPercent(c.discounts.night),
                 limitedTime: c.limitedTimeDiscount || undefined,
                 startDate: c.limitedTimeDiscount && c.discountDateRange?.[0] ? c.discountDateRange[0].format('YYYY-MM-DD') : undefined,
                 endDate: c.limitedTimeDiscount && c.discountDateRange?.[1] ? c.discountDateRange[1].format('YYYY-MM-DD') : undefined,
@@ -1055,6 +1071,32 @@ function WaterfallAddGeneral() {
                   }}
                 />
               </Form.Item>
+
+              {/* 团购星星推广对象：门店/商品决定算法候选与计价口径；后端从算法协议再裁决，不信任前端 */}
+              {isGroupBuyStarPricing && (
+                <Form.Item label={t('recommend.targetObjectLabel')} required style={{ marginBottom: 0 }}>
+                  <Radio.Group
+                    aria-label={t('recommend.targetObjectLabel')}
+                    value={starTarget}
+                    disabled={isEditMode || isDetailMode}
+                    onChange={(e) => {
+                      const next = e.target.value as number
+                      setStarTarget(next)
+                      // 切换对象即清空已选算法（候选池不同）；商品维度锁定团购到店频道（后端亦强制）
+                      form.setFieldsValue({ algorithmId: undefined })
+                      setSelectedAlgorithmInfo(null)
+                      if (next === StarTarget.PRODUCT) {
+                        setSelectedChannel(RecommendChannel.GROUP_BUY)
+                        form.setFieldsValue({ channel: RecommendChannel.GROUP_BUY })
+                      }
+                    }}
+                    options={[
+                      { value: StarTarget.STORE, label: t('algorithm:targetStore') },
+                      { value: StarTarget.PRODUCT, label: t('algorithm:targetProduct') },
+                    ]}
+                  />
+                </Form.Item>
+              )}
             </div>
             {/* 單圖類型：詳情圖置於第二行，與算法名稱左對齊 */}
             {isSingleImageType && (
@@ -1213,8 +1255,8 @@ function WaterfallAddGeneral() {
                 </span>
               </div>
 
-              {/* 可售时段（仅无敌星星） */}
-              {!isReviveAlgorithm && (
+              {/* 可售时段（仅无敌星星门店维度；商品维度固定全天售卖） */}
+              {!isReviveAlgorithm && !isProductStarPricing && (
               <div style={{ display: 'flex', gap: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 200 }}>
                   <span style={{ fontSize: 13, color: 'var(--text-2)', minWidth: 80 }}>{t('recommend.sellableTimeSlots')}</span>
@@ -1352,12 +1394,12 @@ function WaterfallAddGeneral() {
                     </div>
                   </div>
 
-                  {/* 时段售价 / 按天售价 */}
-                  {isReviveAlgorithm ? (
-                    // 盤活復蘇：按天计价
+                  {/* 时段售价 / 按天售价；商品维度全天单价（商圈×日期） */}
+                  {isReviveAlgorithm || isProductStarPricing ? (
+                    // 盤活復蘇/团购商品星星：按天计价
                     <div style={{ width: '100%' }}>
                       <Form.Item
-                        label={t('recommend.dailyPriceLabel')}
+                        label={isProductStarPricing ? t('recommend.productDailyPriceLabel') : t('recommend.dailyPriceLabel')}
                         style={{ marginBottom: 0, maxWidth: 500 }}
                       >
                         <InputNumber
@@ -1447,6 +1489,8 @@ function WaterfallAddGeneral() {
 
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                       {TIME_SLOTS.filter(slot => {
+                        // 商品维度只按全时段折扣（全天售卖无餐段）
+                        if (isProductStarPricing) return slot.key === 'fullDay'
                         // 全部时段模式：展示所有时段折扣
                         if (onlySellTimeSlots.includes('fullDay')) return true
                         // 指定时段模式：只展示已勾选的时段折扣
@@ -1559,8 +1603,8 @@ function WaterfallAddGeneral() {
             </div>
           )}
 
-          {/* 时段个数折扣配置 - 仅无敌星星显示 */}
-          {!isReviveAlgorithm && selectedRegions.length > 0 && (
+          {/* 时段个数折扣配置 - 仅无敌星星门店维度显示（商品维度全天单格无个数梯度） */}
+          {!isReviveAlgorithm && !isProductStarPricing && selectedRegions.length > 0 && (
             <div style={{ border: '1px solid var(--border-3)', borderRadius: 8, background: 'var(--surface-2)', padding: '20px 24px', marginBottom: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
                 <div style={{ width: 28, height: 28, borderRadius: 6, background: '#e6fffb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

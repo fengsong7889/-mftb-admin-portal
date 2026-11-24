@@ -6,6 +6,9 @@ import com.mftb.admin.dto.AdWaterfallRequest;
 import com.mftb.admin.dto.AdWaterfallVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.dto.StatusUpdateDTO;
+import com.mftb.admin.dto.AdWaterfallRecommendationRequest;
+import com.mftb.admin.dto.AdWaterfallRecommendationVO;
+import com.mftb.admin.service.AdWaterfallRecommendationService;
 import com.mftb.admin.service.AdWaterfallService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdWaterfallController {
 
     private final AdWaterfallService waterfallService;
+    private final AdWaterfallRecommendationService recommendationService;
 
     /** 策略分页查询 */
     @GetMapping
@@ -42,8 +46,9 @@ public class AdWaterfallController {
             @RequestParam(required = false) String strategyName,
             @RequestParam(required = false) String brand,
             @RequestParam(required = false) Integer status,
-            @RequestParam(required = false) String algoId) {
-        return Result.success(waterfallService.page(page, size, id, strategyCode, strategyName, brand, status, algoId));
+            @RequestParam(required = false) String algoId,
+            @RequestParam(required = false) Integer businessType) {
+        return Result.success(waterfallService.page(page, size, id, strategyCode, strategyName, brand, status, algoId, businessType));
     }
 
     /** 策略详情（含坑位明细 + 自然流量兜底算法，APP 按配置ID引用） */
@@ -81,5 +86,20 @@ public class AdWaterfallController {
     public Result<Void> delete(@PathVariable Long id) {
         waterfallService.delete(id);
         return Result.success();
+    }
+
+    /** 相似推荐场景绑定（未配置时返回 configured=false 的空绑定） */
+    @GetMapping("/{id}/recommendation")
+    @RequirePermission(menu = "promotion-slot-config")
+    public Result<AdWaterfallRecommendationVO> recommendation(@PathVariable Long id) {
+        return Result.success(recommendationService.get(id));
+    }
+
+    /** 更新相似推荐场景绑定与允许投流集合（expectedVersion 冲突返回 409） */
+    @PutMapping("/{id}/recommendation")
+    @RequirePermission(menu = "promotion-slot-config", action = "edit")
+    public Result<AdWaterfallRecommendationVO> updateRecommendation(@PathVariable Long id,
+                                                                  @Valid @RequestBody AdWaterfallRecommendationRequest request) {
+        return Result.success("相似推薦綁定更新成功", recommendationService.put(id, request));
     }
 }

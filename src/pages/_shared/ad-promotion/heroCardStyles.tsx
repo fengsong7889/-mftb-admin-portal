@@ -42,26 +42,47 @@ export const HERO_CARD_STYLES: Partial<Record<AlgorithmType, HeroCardStyle>> = {
 }
 
 /**
+ * 全局唯一 emoji 图标源：广告类型「名称后缀图标」与「入口卡图标」必须同源，
+ * 各菜单（算法库/瀑布流/销售/定价）一律引用本表，禁止另写 emoji 造成漂移。
+ * 语义与 hero 徽记（renderHeroMark）一一对应：星星(头部曝光)=🔆高亮、复苏=🌱、招牌勋章=🏅、品牌=💎、
+ * 投流交换=🔄、猜你喜歡心=❤️、自然阶梯=📈、人氣焰=🔥。
+ */
+export const AD_TYPE_ICON: Partial<Record<AlgorithmType, string>> = {
+  [AlgorithmType.INVINCIBLE_STAR]: '🔆',
+  [AlgorithmType.HOT_REVIVE_AD]: '🌱',
+  [AlgorithmType.NEW_STORE_AD]: '🏪',
+  [AlgorithmType.BRAND_MERCHANT]: '💎',
+  [AlgorithmType.EXCLUSIVE_MERCHANT]: '👑',
+  [AlgorithmType.GOLDEN_SIGNBOARD]: '🏅',
+  [AlgorithmType.TRAFFIC_AD]: '🔄',
+  [AlgorithmType.GUESS_YOU_LIKE]: '❤️',
+  [AlgorithmType.ORGANIC_TRAFFIC]: '📈',
+  [AlgorithmType.POPULAR_MERCHANT_KA]: '🔥',
+  [AlgorithmType.TIME_SLOT_AD]: '⏰',
+  [AlgorithmType.PRODUCT_PROMO]: '🎯',
+}
+
+/**
  * hero 徽记：每类一枚纯 CSS 图形（样式定义见 components.css 的 algo-card-mk-* 段），
  * 表达该广告的核心利益点；统一语言 = 白色形 + 一处品牌橙高亮（首坑/认证/核心动作）。
  */
 export const renderHeroMark = (type: AlgorithmType) => {
   switch (type) {
-    case AlgorithmType.INVINCIBLE_STAR: // 全澳置顶曝光：上箭头 + 坑位条，首条橙亮
+    case AlgorithmType.INVINCIBLE_STAR: // 头部流量曝光：聚光灯自上照射橙亮头部坑位（不围绕星形设计）
       return (
-        <span className="algo-card-mk-star" aria-hidden="true">
-          <i className="algo-card-mk-star-arrow" />
-          <i className="algo-card-mk-star-bar is-first" />
-          <i className="algo-card-mk-star-bar" />
-          <i className="algo-card-mk-star-bar is-dim" />
+        <span className="algo-card-mk-spot" aria-hidden="true">
+          <i className="algo-card-mk-spot-lamp" />
+          <i className="algo-card-mk-spot-beam" />
+          <i className="algo-card-mk-spot-slot" />
         </span>
       )
-    case AlgorithmType.HOT_REVIVE_AD: // 商圈限定置顶：定位 pin 钉在坑位上
+    case AlgorithmType.HOT_REVIVE_AD: // 盘活复苏：新芽生长（茎＋双叶＋橙亮芽芯）
       return (
         <span className="algo-card-mk-revive" aria-hidden="true">
-          <i className="algo-card-mk-revive-pin" />
-          <i className="algo-card-mk-revive-bar is-first" />
-          <i className="algo-card-mk-revive-bar" />
+          <i className="algo-card-mk-revive-stem" />
+          <i className="algo-card-mk-revive-leaf is-left" />
+          <i className="algo-card-mk-revive-leaf is-right" />
+          <i className="algo-card-mk-revive-bud" />
         </span>
       )
     case AlgorithmType.NEW_STORE_AD: // 新店开业：屋顶 + 店身 + 门
@@ -90,11 +111,13 @@ export const renderHeroMark = (type: AlgorithmType) => {
           <i className="algo-card-mk-crown-base" />
         </span>
       )
-    case AlgorithmType.GOLDEN_SIGNBOARD: // 品质门槛匾额：顶檐 + 橙亮匾身（金字线）
+    case AlgorithmType.GOLDEN_SIGNBOARD: // 金字招牌·高门槛荣誉：勋章绶带（白圆章＋橙亮星徽＋下垂双绶带）
       return (
         <span className="algo-card-mk-plaque" aria-hidden="true">
-          <i className="algo-card-mk-plaque-top" />
-          <i className="algo-card-mk-plaque-body" />
+          <i className="algo-card-mk-plaque-ribbon is-left" />
+          <i className="algo-card-mk-plaque-ribbon is-right" />
+          <i className="algo-card-mk-plaque-disc" />
+          <i className="algo-card-mk-plaque-emblem" />
         </span>
       )
     case AlgorithmType.TRAFFIC_AD: // 投流匹配：商家×用户双向交换

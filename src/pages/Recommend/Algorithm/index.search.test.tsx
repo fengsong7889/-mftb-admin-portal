@@ -27,6 +27,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import dayjs from 'dayjs'
 import AlgorithmList from './index'
 import { AlgorithmType, RecommendChannel, ServiceStatus } from '@mftb/contracts/recommendConstants'
+import { SIMILAR_ALGO_NAME } from '../SimilarRecommendationConfig/prototype'
 import type { AdAlgorithm } from '@/api/adPromotion'
 
 const api = vi.hoisted(() => ({
@@ -297,7 +298,7 @@ describe('团购无敌星星推广对象导航', () => {
     await flush(() => fireEvent.click(screen.getByRole('tab', { name: 'algorithm.targetProduct' })))
     expect(screen.queryByText('無敵星星團購')).not.toBeInTheDocument()
     expect(screen.getByText('algorithm.productEmpty')).toBeInTheDocument()
-    await flush(() => fireEvent.click(screen.getByRole('button', { name: /algorithm.addProductAlgorithm/ })))
+    await flush(() => fireEvent.click(screen.getByRole('button', { name: /algorithm\.addAlgorithm/ })))
     expect(screen.getByLabelText('列表網址')).toHaveTextContent('/promotion-algorithm-add?type=1&tab=groupBuy&target=product')
     await flush(() => fireEvent.click(screen.getByRole('button', { name: '後退' })))
     await clickBack()
@@ -367,8 +368,9 @@ describe('算法库卡片选择页 Tab 口径', () => {
     expect(within(activePane()).getByText('algorithm.typeTraffic')).toBeInTheDocument()
     expect(within(activePane()).getByText('algorithm.typeOrganicTraffic')).toBeInTheDocument()
     expect(within(activePane()).queryByText('algorithm.typeHotRevive')).not.toBeInTheDocument()
-    // 三张卡：卡片是进入列表的唯一入口；盤活復甦不得出现在团购 tab
-    expect(within(activePane()).getAllByText('algorithm.viewAdjustAlgorithm')).toHaveLength(3)
+    // 四张卡（含交互式相似推荐独立入口）：卡片是进入列表的唯一入口；盤活復蘇不得出现在团购 tab
+    expect(within(activePane()).getAllByText('algorithm.viewAdjustAlgorithm')).toHaveLength(4)
+    expect(within(activePane()).getByText(SIMILAR_ALGO_NAME).closest('.algo-card-wrapper')).toBeInTheDocument()
     // 切回外卖到家证明下线没有越界：该 Tab 仍保留盘活复苏入口
     await switchTab('algorithm.bizDelivery')
     expect(within(activePane()).getByText('algorithm.typeHotRevive')).toBeInTheDocument()

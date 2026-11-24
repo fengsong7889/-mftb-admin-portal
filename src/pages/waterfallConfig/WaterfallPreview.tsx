@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { Tag } from 'antd'
+import type { ReactNode } from 'react'
 import type { WaterfallBusinessType, WaterfallContentType, WaterfallLayoutColumns, WaterfallDisplayCategoryMode, WaterfallBizChannel } from '@mftb/contracts/waterfallTypes'
 import { toPreviewRows, type PreviewCard } from './previewLayout'
 
@@ -39,20 +40,12 @@ interface Props {
   phoneTime: string
 }
 
-/**
- * 高仿真手机瀑布流预览。
- * 外卖：按坑位列表展示算法名称（卡片内容仅布局示意，不声称来自算法计算）。
- * 团购：按单列/双列布局渲染固定内容与分类补位卡片。
- */
-export default function WaterfallPreview({
-  businessType, bizChannel, displayCategoryMode, contentType, layoutColumns, phoneTitle,
-  algoSlots, previewCards, naturalFallbackName, phoneTime,
-}: Props) {
-  const { t } = useTranslation()
-  const isGroupBuy = businessType === 'groupBuy'
-  const enabledAlgoSlots = algoSlots
-  const isContentPreview = (isGroupBuy || bizChannel === 'supermarket') && displayCategoryMode !== 'algorithm'
-
+/** 高仿真手机外壳（侧键／机身／刘海状态栏／导航栏／滚动内容区）。
+ *  壳样式单一真源：瀑布流策略预览与相似引擎插入样式试算共用；
+ *  机身与屏内背板代表「不可变的实物／被展示的 APP」（同 PhoneFrame 决策），不随平台主题翻面。 */
+export function PhoneShell({ title, hint, time = '9:41', height = 720, contentClassName, children }: {
+  title: string; hint?: string; time?: string; height?: number; contentClassName?: string; children: ReactNode
+}) {
   return (
     <div style={{ width: 375, flexShrink: 0, position: 'relative' }}>
       {/* 侧边按钮 */}
@@ -63,7 +56,7 @@ export default function WaterfallPreview({
 
       {/* 手机外壳 */}
       <div style={{
-        width: 375, height: 720, borderRadius: 52, position: 'relative',
+        width: 375, height, borderRadius: 52, position: 'relative',
         background: 'linear-gradient(160deg, #3E5C76 0%, #2C4A64 30%, #1B3A52 60%, #263F56 100%)',
         boxShadow: [
           '0 24px 64px rgba(20,40,65,0.40)', '0 8px 24px rgba(0,0,0,0.22)',
@@ -82,7 +75,7 @@ export default function WaterfallPreview({
           <div style={{ position: 'absolute', inset: 0, borderRadius: 42, background: '#F5F5F5', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             {/* 状态栏 */}
             <div style={{ height: 50, padding: '14px 28px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', flexShrink: 0, position: 'relative', zIndex: 5 }}>
-              <span style={{ fontSize: 15, fontWeight: 600, color: '#000', letterSpacing: 0.5 }}>{phoneTime}</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: '#000', letterSpacing: 0.5 }}>{time}</span>
               <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', width: 110, height: 30, background: '#000', borderRadius: 16, zIndex: 10 }} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                 <svg width="17" height="12" viewBox="0 0 17 12" fill="none"><rect x="0" y="9" width="3" height="3" rx="0.5" fill="#000" /><rect x="4.5" y="6" width="3" height="6" rx="0.5" fill="#000" /><rect x="9" y="3" width="3" height="9" rx="0.5" fill="#000" /><rect x="13.5" y="0" width="3" height="12" rx="0.5" fill="#000" /></svg>
@@ -93,24 +86,42 @@ export default function WaterfallPreview({
 
             {/* 导航栏 */}
             <div style={{ background: '#fff', padding: '8px 16px 12px', borderBottom: '0.5px solid rgba(0,0,0,0.08)', flexShrink: 0, textAlign: 'center' }}>
-              <div style={{ fontSize: 17, fontWeight: 700, color: '#262626', letterSpacing: 0.3 }}>{phoneTitle}</div>
-              <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 3, lineHeight: 1.4 }}>
-                {isContentPreview ? t('promotionSlotConfig:previewHintGroupBuy') : t('promotionSlotConfig:previewHintAlgorithm')}
-              </div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: '#262626', letterSpacing: 0.3 }}>{title}</div>
+              {hint && <div style={{ fontSize: 11, color: '#8c8c8c', marginTop: 3, lineHeight: 1.4 }}>{hint}</div>}
             </div>
 
             {/* 内容区 */}
-            <div style={{ flex: 1, overflow: 'auto', padding: '12px 14px 28px' }}>
-              {isContentPreview ? (
-                <GroupBuyPreview contentType={contentType} layoutColumns={layoutColumns} cards={previewCards} />
-              ) : (
-                <DeliveryPreview slots={enabledAlgoSlots} naturalFallbackName={naturalFallbackName} />
-              )}
-            </div>
+            <div className={contentClassName} style={{ flex: 1, overflow: 'auto', padding: '12px 14px 28px' }}>{children}</div>
           </div>
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * 高仿真手机瀑布流预览。
+ * 外卖：按坑位列表展示算法名称（卡片内容仅布局示意，不声称来自算法计算）。
+ * 团购：按单列/双列布局渲染固定内容与分类补位卡片。
+ */
+export default function WaterfallPreview({
+  businessType, bizChannel, displayCategoryMode, contentType, layoutColumns, phoneTitle,
+  algoSlots, previewCards, naturalFallbackName, phoneTime,
+}: Props) {
+  const { t } = useTranslation()
+  const isGroupBuy = businessType === 'groupBuy'
+  const enabledAlgoSlots = algoSlots
+  const isContentPreview = (isGroupBuy || bizChannel === 'supermarket') && displayCategoryMode !== 'algorithm'
+
+  return (
+    <PhoneShell title={phoneTitle} time={phoneTime}
+      hint={isContentPreview ? t('promotionSlotConfig:previewHintGroupBuy') : t('promotionSlotConfig:previewHintAlgorithm')}>
+      {isContentPreview ? (
+        <GroupBuyPreview contentType={contentType} layoutColumns={layoutColumns} cards={previewCards} />
+      ) : (
+        <DeliveryPreview slots={enabledAlgoSlots} naturalFallbackName={naturalFallbackName} />
+      )}
+    </PhoneShell>
   )
 }
 
@@ -163,21 +174,25 @@ function GroupBuyPreview({ contentType, layoutColumns, cards }: { contentType: W
   )
 }
 
-function PreviewCardView({ card, contentType }: { card: PreviewCard; contentType: WaterfallContentType }) {
+export function PreviewCardView({ card, contentType, badge, badgeColor = 'orange', anchor = false, emptyText }: {
+  card: PreviewCard; contentType: WaterfallContentType
+  /** 自定义左上角标（插入试算用：相似推薦／被點擊商家）；不传时固定坑位仍读 i18n 原文案。 */
+  badge?: string; badgeColor?: string; anchor?: boolean; emptyText?: string
+}) {
   const { t } = useTranslation()
   if (card.kind === 'empty') {
     return (
       <div style={{ borderRadius: 12, border: '1px dashed #d9d9d9', background: '#fafafa', minHeight: 96, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 8, textAlign: 'center' }}>
-        <span style={{ fontSize: 11, color: '#bfbfbf' }}>{t('promotionSlotConfig:candidateInsufficient')}</span>
+        <span style={{ fontSize: 11, color: '#bfbfbf' }}>{emptyText ?? t('promotionSlotConfig:candidateInsufficient')}</span>
       </div>
     )
   }
   return (
     <div style={{ borderRadius: 12, border: '1px solid #F0F0F0', background: '#fff', overflow: 'hidden' }}>
-      <div style={{ height: 72, background: card.kind === 'fixed' ? '#FFF7E6' : '#F0F5FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, position: 'relative' }}>
+      <div style={{ height: 72, background: card.kind === 'fixed' || anchor ? '#FFF7E6' : '#F0F5FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, position: 'relative' }}>
         {card.image || (contentType === 'store' ? '🏪' : '🎫')}
-        {card.kind === 'fixed' && (
-          <Tag color="orange" style={{ position: 'absolute', top: 4, left: 4, margin: 0, fontSize: 10 }}>{t('promotionSlotConfig:fixedSlotTag')}</Tag>
+        {(card.kind === 'fixed' || badge) && (
+          <Tag color={badge ? badgeColor : 'orange'} style={{ position: 'absolute', top: 4, left: 4, margin: 0, fontSize: 10 }}>{badge ?? t('promotionSlotConfig:fixedSlotTag')}</Tag>
         )}
       </div>
       <div style={{ padding: '6px 8px' }}>

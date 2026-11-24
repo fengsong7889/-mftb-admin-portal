@@ -121,12 +121,38 @@ public final class AdStarAlgorithmParams {
         return incoming;
     }
 
-    /** 旧销售、定价及瀑布流只接受门店协议；商品配置保存并不开放投放。 */
+    /** 旧销售、盘活及新店链路仍只接受门店协议；商品算法的投放开放由各链路显式裁决。 */
     public static void requireStoreCompatible(AdAlgorithm algorithm) {
         if (algorithm == null) throw new BusinessException("關聯算法不存在");
         if (Objects.equals(algorithm.getAlgoType(), ALGORITHM_TYPE)
                 && metadata(read(algorithm.getParams())).targetType() != STORE) {
             throw new BusinessException(422, "商品算法尚未接入銷售與投放，不能綁定此配置");
+        }
+    }
+
+    /** 是否无敌星星算法（algo_type=1）。 */
+    public static boolean isStar(AdAlgorithm algorithm) {
+        return algorithm != null && Objects.equals(algorithm.getAlgoType(), ALGORITHM_TYPE);
+    }
+
+    /** 星星算法的推广对象：无协议旧记录按门店读；非星星算法返回 null。 */
+    public static Integer starTargetType(AdAlgorithm algorithm) {
+        if (!isStar(algorithm)) return null;
+        Map<String, Object> params = read(algorithm.getParams());
+        return hasProtocol(params) ? metadata(params).targetType() : STORE;
+    }
+
+    /** 瀑布流坑位维度裁决：商品维度只能绑商品星星；门店维度拒绝商品星星，其余照旧。 */
+    public static void requireWaterfallDimension(AdAlgorithm algorithm, int contentType) {
+        if (!isStar(algorithm)) {
+            if (contentType == PRODUCT) throw new BusinessException(422, "商品維度瀑布流只能綁定商品無敵星星算法");
+            return;
+        }
+        int target = starTargetType(algorithm);
+        if (target != contentType) {
+            throw new BusinessException(422, contentType == PRODUCT
+                    ? "商品維度瀑布流只能綁定商品類無敵星星算法"
+                    : "門店維度瀑布流不能綁定商品類無敵星星算法");
         }
     }
 

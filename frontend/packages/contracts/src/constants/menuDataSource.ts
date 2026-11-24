@@ -338,8 +338,9 @@ export const keyToPath: Record<string, string> = {
   // 行政側紀要檢索（會議治理 › 會議紀要）
   'meeting-minutes-list':  '/meeting-minutes-list',
   // 持續績效系統（cpm）—— 獨立入口，菜单真值由 CpmSchemaMigrationInitializer 写入 sys_menu。
-  // 使用侧两张（全员基线）+ 治理侧三张（显式授权），与后端 cpm:menu:v1.0 一一对应。
+  // 使用侧两张（全员基线）+ 工时口径一张 + 治理侧三张（显式授权），对应后端 cpm:menu:v1.0 / v1.1。
   'cpm-my':                '/cpm-my',
+  'cpm-holiday':           '/cpm-holiday',
   'cpm-report':            '/cpm-report',
   'cpm-team':              '/cpm-team',
   'cpm-template':          '/cpm-template',
@@ -499,8 +500,9 @@ pathToKey['/meeting-room-rules'] = 'meeting-config'
 pathToKey['/meeting-checkin'] = 'meeting-my'
 // 持續績效子頁（非菜单项）：条目编辑独立页归「我的工作記錄」；汇报详情本人入口走 cpm-report、
 // 主管入口走 cpm-team，守卫用 ROUTE_MENU_ANY_OF_MAP 放行两者（单锚点会让其中一侧永久 403）；
-// 模板表单独立页归「模板管理」
+// 模板表单独立页归「模板管理」；節假日配置自 cpm:menu:v1.1 起是独立菜单，这里改挂 cpm-holiday 本身
 pathToKey['/cpm-item-form'] = 'cpm-my'
+pathToKey['/cpm-holiday'] = 'cpm-holiday'
 pathToKey['/cpm-report-detail'] = 'cpm-report'
 pathToKey['/cpm-template-form'] = 'cpm-template'
 // 文檔中心子頁（詳情/登記/編輯歸文檔庫，空間表單歸空間管理）：守衛與頁簽高亮才有錨點
@@ -718,8 +720,8 @@ export const BACKEND_CONNECTED_KEYS: Set<string> = new Set([
   'attendance-monthly', 'attendance-setting',
   // 会议管理：四个菜单及其详情页全部走真实 /api/meeting/*，无前端 mock 回退
   'meeting-my', 'meeting-booking', 'meeting-room', 'meeting-record', 'meeting-config', 'meeting-blacklist', 'meeting-minutes-list',
-  // 持續績效：五個菜單全部走真實 /api/cpm/*（阶段二接通；域种子菜单必须登记，否则离线路由无法阻断）
-  'cpm-my', 'cpm-report', 'cpm-team', 'cpm-template', 'cpm-rule',
+  // 持續績效：六個菜單全部走真實 /api/cpm/*（阶段二接通；域种子菜单必须登记，否则离线路由无法阻断）
+  'cpm-my', 'cpm-holiday', 'cpm-report', 'cpm-team', 'cpm-template', 'cpm-rule',
   'notification-template', 'notification-switch',
   // 文檔中心：四個菜單及子頁全部走真實 /api/doc/*，無前端 mock 回退
   'doc-library', 'doc-space', 'doc-stats', 'doc-learning',

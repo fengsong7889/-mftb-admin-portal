@@ -34,6 +34,9 @@ public class AdPricingStar {
     /** 业务频道 */
     private Integer channel;
 
+    /** 推广对象快照: 1=门店 2=商品（保存时从星星算法协议推导，非前端输入） */
+    private Integer targetType;
+
     /** 预售天数（今天起 N 天可售，超出为待开售） */
     private Integer presaleDays;
 

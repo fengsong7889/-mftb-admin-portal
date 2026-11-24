@@ -78,8 +78,13 @@ vi.mock('@/api/cpm', () => ({
 }))
 
 import * as cpmApi from '@/api/cpm'
-import MyWorklog from './MyWorklog'
-import MyReport from './MyReport'
+/* 2026-11 台账迁服务端后的挂载点说明：
+ * 旧的过渡页面 WorklogDailyFlow / ReportWorkspace 已删除，能力并回统一视图的两个标签：
+ * cpm-my 的「日视图」= WorklogDayView（条目/记时/关联导入/RDM 回写/AI 整理），
+ * cpm-report 的「發布與交付」= ReportDeliveryPanel（草稿/发布/修订/日报投影/Word）。
+ * 用例按组件挂载，断言一条不删、口径一条不放宽。 */
+import WorklogDayView from './WorklogDayView'
+import ReportDeliveryPanel from './ReportDeliveryPanel'
 import TeamReport from './TeamReport'
 import ReportDetail from './ReportDetail'
 import AiAssistantDrawer from './AiAssistantDrawer'
@@ -243,7 +248,7 @@ beforeEach(async () => {
 
 describe('P1 我的工作記錄（真实契约）', () => {
   it('加载日视图：条目、延续建议、认定徽章都按服务端数据渲染', async () => {
-    mount(<MemoryRouter><MyWorklog /></MemoryRouter>)
+    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
     expect(await screen.findByText('已完成的事')).toBeTruthy()
     expect(screen.getByText('跨週期方案推進')).toBeTruthy()
     expect(screen.getByText('已認定')).toBeTruthy()
@@ -253,7 +258,7 @@ describe('P1 我的工作記錄（真实契约）', () => {
 
   it('快捷录入回车调用 create 且不本地拼装状态', async () => {
     const user = userEvent.setup()
-    mount(<MemoryRouter><MyWorklog /></MemoryRouter>)
+    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
     const input = await screen.findByPlaceholderText(/回車即存/)
     await user.type(input, '測試快捷錄入{enter}')
     await waitFor(() => expect(mock.createCpmItem).toHaveBeenCalledTimes(1))
@@ -264,7 +269,7 @@ describe('P1 我的工作記錄（真实契约）', () => {
 
   it('延续建议点击走 carry 接口（不本地复制条目）', async () => {
     const user = userEvent.setup()
-    mount(<MemoryRouter><MyWorklog /></MemoryRouter>)
+    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
     const chip = await screen.findByText('跨週期方案推進')
     await user.click(chip)
     await waitFor(() => expect(mock.carryCpmItem).toHaveBeenCalledWith(2))
@@ -272,7 +277,7 @@ describe('P1 我的工作記錄（真实契约）', () => {
 
   it('删除必须经二次确认，确认后调用 delete', async () => {
     const user = userEvent.setup()
-    mount(<MemoryRouter><MyWorklog /></MemoryRouter>)
+    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
     await screen.findByText('已完成的事')
     const deleteButtons = screen.getAllByText('刪除')
     await user.click(deleteButtons[0])
@@ -288,7 +293,7 @@ describe('P1 我的工作記錄（真实契约）', () => {
       ...TEMPLATE[0], templateKey: 'dev', name: '研發工程師', workHoursEnabled: true,
       categories: [{ key: 'dev', label: '開發', hint: null }],
     }])
-    mount(<MemoryRouter><MyWorklog /></MemoryRouter>)
+    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
     await screen.findByText('已完成的事')
     await user.click(screen.getAllByRole('button', { name: /更新進度/ })[0])
     await user.click(await screen.findByText('2h'))
@@ -303,7 +308,7 @@ describe('P1 我的工作記錄（真实契约）', () => {
 
   it('关联导入：候选来自服务端，已导入行禁用按钮，導入按来源对象建条目', async () => {
     const user = userEvent.setup()
-    mount(<MemoryRouter><MyWorklog /></MemoryRouter>)
+    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
     await screen.findByText('已完成的事')
     await user.click(screen.getByRole('button', { name: /關聯導入/ }))
     expect(await screen.findByText('需求甲：结算改造')).toBeTruthy()
@@ -329,7 +334,7 @@ describe('P1 我的工作記錄（真实契约）', () => {
 
   it('记时：写的是时段表，不伪造一次进度更新', async () => {
     const user = userEvent.setup()
-    mount(<MemoryRouter><MyWorklog /></MemoryRouter>)
+    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
     await screen.findByText('已完成的事')
     await user.click(screen.getByRole('button', { name: /記時/ }))
     expect(await screen.findByText('今天還沒有投入時段')).toBeTruthy()
@@ -360,7 +365,7 @@ describe('P1 我的工作記錄（真实契约）', () => {
       date: '2026-11-18', items: [{ ...ITEM, status: cancelled ? 'cancelled' : 'done' }], carryCandidates: [], times: [],
     }))
     mock.addCpmProgress.mockImplementation(async () => { cancelled = true })
-    mount(<MemoryRouter><MyWorklog /></MemoryRouter>)
+    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
     await screen.findByText('已完成的事')
     await user.click(screen.getAllByRole('button', { name: /更新進度/ })[0])
     const option = [...document.querySelectorAll('.ant-segmented-item')]
@@ -377,7 +382,7 @@ describe('P1 我的工作記錄（真实契约）', () => {
 
   it('RDM 任务档：候选是任务口径，且只有任务档给回写开关', async () => {
     const user = userEvent.setup()
-    mount(<MemoryRouter><MyWorklog /></MemoryRouter>)
+    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
     await screen.findByText('已完成的事')
     await user.click(screen.getByRole('button', { name: /關聯導入/ }))
     const taskTab = [...document.querySelectorAll('.ant-segmented-item')]
@@ -408,7 +413,7 @@ describe('P1 我的工作記錄（真实契约）', () => {
       items: [{ ...ITEM, sourceType: 'rdm_task', sourceRef: '7001', rdmSync: { enabled: true, state: 'conflict', message: 'RDM 已被他人上報到 70%', taskNo: 'TASK-2026-0701', taskId: 7001, rdmProgress: 70 } }],
       carryCandidates: [], times: [],
     })
-    mount(<MemoryRouter><MyWorklog /></MemoryRouter>)
+    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
     const badge = await screen.findByRole('button', { name: /RDM 有變更/ })
     await user.click(badge)
     // 冲突必须看得见：徽标是这条链路唯一的失败出口
@@ -434,7 +439,7 @@ describe('P1 我的工作記錄（真实契约）', () => {
       carryCandidates: [], times: [],
     })
     const user = userEvent.setup()
-    mount(<MemoryRouter><MyWorklog /></MemoryRouter>)
+    mount(<MemoryRouter><WorklogDayView /></MemoryRouter>)
     const badge = await screen.findByRole('button', { name: /系統未開啟回寫/ })
     await user.click(badge)
     expect(await screen.findByText(/運維尚未在服務端開啟 RDM 回寫總閘/)).toBeTruthy()
@@ -443,14 +448,14 @@ describe('P1 我的工作記錄（真实契约）', () => {
 
 describe('P3 我的匯報（真实契约）', () => {
   it('进入即请求 current 呈现确定性初稿', async () => {
-    mount(<MemoryRouter><MyReport /></MemoryRouter>)
+    mount(<MemoryRouter><ReportDeliveryPanel /></MemoryRouter>)
     expect(await screen.findByText('自動聚合初稿')).toBeTruthy()
     expect(mock.fetchCpmCurrent).toHaveBeenCalledWith('week', expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/))
   })
 
   it('发布走二次确认并调用 publish（前端不改写快照）', async () => {
     const user = userEvent.setup()
-    mount(<MemoryRouter><MyReport /></MemoryRouter>)
+    mount(<MemoryRouter><ReportDeliveryPanel /></MemoryRouter>)
     const publishBtn = await screen.findByRole('button', { name: /發布提交/ })
     await user.click(publishBtn)
     await screen.findAllByText('確認發布並提交匯報？')
@@ -473,7 +478,7 @@ describe('P3 我的匯報（真实契约）', () => {
       { ...REVISION_V1, current: false },
     ])
     mock.fetchCpmRevision.mockResolvedValue({ ...PUBLISHED_WEEK, snapshot: SNAPSHOT_WEEK('修訂前的事项', 90) })
-    mount(<MemoryRouter><MyReport /></MemoryRouter>)
+    mount(<MemoryRouter><ReportDeliveryPanel /></MemoryRouter>)
     await user.click(await screen.findByRole('button', { name: /修訂並重新發布/ }))
     const note = await screen.findByPlaceholderText(/修訂說明/)
     await user.type(note, '補錄週五投入時段')
@@ -506,7 +511,7 @@ describe('P3 我的匯報（真实契约）', () => {
 
   it('日报档只读：没有发布动作，也没有正式版本语义', async () => {
     const user = userEvent.setup()
-    mount(<MemoryRouter><MyReport /></MemoryRouter>)
+    mount(<MemoryRouter><ReportDeliveryPanel /></MemoryRouter>)
     await screen.findByText('自動聚合初稿')
     await user.click(screen.getByText('日報'))
     expect(await screen.findByText(/工作日報（/)).toBeTruthy()
@@ -526,7 +531,7 @@ describe('P3 我的匯報（真实契约）', () => {
       ...PUBLISHED_WEEK, revisionNo: null, publishedRevisionId: null,
       snapshot: { ...PUBLISHED_WEEK.snapshot, schemaVersion: 1, time: null },
     })
-    mount(<MemoryRouter><MyReport /></MemoryRouter>)
+    mount(<MemoryRouter><ReportDeliveryPanel /></MemoryRouter>)
     expect(await screen.findAllByText(/歷史發送快照/)).toBeTruthy()
     // V1 快照没有工时维度：要说「这一版发布时还没这个功能」，不能说成「本期没记录投入时间」
     expect(await screen.findByText(/這一版匯報發布時還沒有投入時間統計/)).toBeTruthy()
@@ -540,7 +545,7 @@ describe('P3 我的匯報（真实契约）', () => {
     const revokeObjectURL = vi.fn()
     vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL }))
     mock.exportCpmReportDocx.mockResolvedValue(new Blob(['x'], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }))
-    mount(<MemoryRouter><MyReport /></MemoryRouter>)
+    mount(<MemoryRouter><ReportDeliveryPanel /></MemoryRouter>)
     await user.click(await screen.findByRole('button', { name: /導出/ }))
     await user.click(await screen.findByText('Word 文件（.docx）'))
     // 导出的必须是当前版本号：不带 revisionNo 的话，修订过一次之后用户永远只能拿到最新版
@@ -555,8 +560,10 @@ describe('P4 團隊匯報（真实契约）', () => {
   it('统计卡渲染服务端 stats，未交成员提供催办/未授权时降级显示', async () => {
     mount(<MemoryRouter><TeamReport /></MemoryRouter>)
     expect(await screen.findByText('李強')).toBeTruthy()
-    // 50% 提交率来自服务端 stats（AnimatedNumber 计数动画约 1.2s，轮询放宽）
-    expect(await screen.findByText('50%', undefined, { timeout: 3000 })).toBeTruthy()
+    // 50% 提交率来自服务端 stats。AnimatedNumber 走 rAF 缓动（1200ms），
+    // jsdom 下 rAF 跟真实时钟不一致（实测 2s 时仍停在 48%），多核争抢时更慢；
+    // 这里只拉长等待上限到与全局 asyncUtilTimeout 一致，断言值仍钉死 50%（不放宽口径）。
+    expect(await screen.findByText('50%', undefined, { timeout: 8000 })).toBeTruthy()
     expect(screen.getByText(/本期提交 1\/2/)).toBeTruthy()
   })
 

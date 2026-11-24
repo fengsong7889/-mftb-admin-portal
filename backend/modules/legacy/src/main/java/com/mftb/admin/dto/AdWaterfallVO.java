@@ -22,6 +22,22 @@ public class AdWaterfallVO {
     /** 自然流量兜底算法编码（未配置坑位读取该算法数据） */
     private String naturalAlgoId;
     private String naturalAlgoName;
+    /** 业务线: 1=外卖到家 2=团购到店 */
+    private Integer businessType;
+    /** 展示维度: 1=门店 2=商品 */
+    private Integer contentType;
+    /** 展示类目数据来源: algorithm/category/custom */
+    private String displayCategoryMode;
+    /** 展示布局: 1=单列 2=双列 */
+    private Integer layoutColumns;
+    /** 外卖业务频道 food/supermarket；团购固定 groupBuy */
+    private String bizChannel;
+    /** 类目候选排序 */
+    private String sortMode;
+    /** 类目兜底ID列表（由 JSON 列解析） */
+    private List<String> fallbackCategoryIds;
+    /** 固定展示内容坑位（由 JSON 列解析，custom模式） */
+    private List<FixedSlotItem> fixedSlots;
     /** 过滤用户不喜欢: 1=开启 2=关闭 */
     private Integer filterDislike;
     private Integer status;
@@ -41,6 +57,12 @@ public class AdWaterfallVO {
         vo.setBrand(entity.getBrand());
         vo.setNaturalAlgoId(entity.getNaturalAlgoId());
         vo.setNaturalAlgoName(entity.getNaturalAlgoName());
+        vo.setBusinessType(entity.getBusinessType() == null ? 1 : entity.getBusinessType());
+        vo.setContentType(entity.getContentType() == null ? 1 : entity.getContentType());
+        vo.setDisplayCategoryMode(entity.getDisplayCategoryMode());
+        vo.setLayoutColumns(entity.getLayoutColumns() == null ? 1 : entity.getLayoutColumns());
+        vo.setBizChannel(entity.getBizChannel());
+        vo.setSortMode(entity.getSortMode());
         vo.setFilterDislike(entity.getFilterDislike());
         vo.setStatus(entity.getStatus());
         vo.setRemark(entity.getRemark());
@@ -58,6 +80,18 @@ public class AdWaterfallVO {
         private String algoId;
         private String algoName;
         private Integer algoType;
+        private Integer status;
+    }
+
+    /** 固定展示内容坑位条目 */
+    @Data
+    public static class FixedSlotItem {
+        private Integer slotPosition;
+        private String itemId;
+        private String itemName;
+        private String categoryId;
+        private String categoryName;
+        private Integer stock;
         private Integer status;
     }
 }

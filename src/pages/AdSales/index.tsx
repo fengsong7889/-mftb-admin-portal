@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Card, Button, message, Tabs } from 'antd'
+import { Card, Button, message, Tabs, Radio, Space } from 'antd'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AlgorithmType, Region, RecommendChannel, AppType } from '@mftb/contracts/recommendConstants'
 import { useCardOrder } from '@/hooks/useCardOrder'
 import DateTimeGrid from './DateTimeGrid'
+import StarProductPurchase from './StarProductPurchase'
 import DayPicker from './DayPicker'
 import NewStoreDayPicker from './NewStoreDayPicker'
 import PopularSkinPicker from './PopularSkinPicker'
@@ -51,6 +52,7 @@ const getInitialState = (searchParams: URLSearchParams) => {
 
 export default function AdSales() {
   const { t } = useTranslation('adSales')
+  const { t: tc } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const initial = getInitialState(searchParams)
@@ -59,6 +61,8 @@ export default function AdSales() {
   const [selectedInventory, setSelectedInventory] = useState<InventoryItem | null>(initial.inventory)
   const [selectedApp, _setSelectedApp] = useState<AppType | null | undefined>(null)
   const [selectedTab, setSelectedTab] = useState<'delivery' | 'groupBuy'>('delivery')
+  // 团购星星选购的推广对象：门店复用外卖格子页，商品走全天格子选购
+  const [groupBuyStarTarget, setGroupBuyStarTarget] = useState<'store' | 'product'>('store')
 
   // 卡片拖拽排序（順序持久化到數據庫 + localStorage，每個 Tab 獨立保存）
   const deliveryCardOrder = useCardOrder('ad-sales-card-order-delivery', DELIVERY_CARD_TYPES, 'ad-sales')
@@ -78,6 +82,7 @@ export default function AdSales() {
       return
     }
     setSelectedAlgorithmType(config.type)
+    if (selectedTab === 'groupBuy' && config.type === AlgorithmType.INVINCIBLE_STAR) setGroupBuyStarTarget('store')
     // 自动生成第一条库存数据并直接进入日期选择
     const allData: InventoryItem[] = []
     Object.values(Region).forEach(region => {
@@ -206,8 +211,30 @@ export default function AdSales() {
         </Card>
       )}
 
-      {/* Step 2: 选择时段并加购 - 無敵星星 */}
-      {currentStep === 1 && selectedAlgorithmType !== AlgorithmType.NEW_STORE_AD && selectedAlgorithmType !== AlgorithmType.POPULAR_MERCHANT_KA && selectedAlgorithmType !== AlgorithmType.GOLDEN_SIGNBOARD && selectedAlgorithmType !== AlgorithmType.TRAFFIC_AD && selectedAlgorithmType !== AlgorithmType.TIME_SLOT_AD && selectedInventory && selectedInventory.algorithmType !== AlgorithmType.HOT_REVIVE_AD && (
+      {/* Step 2: 团购到店无敌星星 —— 推广对象切换（门店复用外卖格子；商品全天格子不选门店） */}
+      {currentStep === 1 && selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR && selectedTab === 'groupBuy' && (
+        <>
+          <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '12px 24px' }}>
+            <Space size={12}>
+              <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{t('targetLabel')}</span>
+              <Radio.Group value={groupBuyStarTarget} onChange={e => setGroupBuyStarTarget(e.target.value as 'store' | 'product')}>
+                <Radio.Button value="store">{tc('algorithm:targetStore')}</Radio.Button>
+                <Radio.Button value="product">{tc('algorithm:targetProduct')}</Radio.Button>
+              </Radio.Group>
+            </Space>
+          </Card>
+          {groupBuyStarTarget === 'product'
+            ? <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 24px' }}><StarProductPurchase /></Card>
+            : selectedInventory && (
+              <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 24px' }}>
+                <DateTimeGrid inventoryItem={selectedInventory} />
+              </Card>
+            )}
+        </>
+      )}
+
+      {/* Step 2: 选择时段并加购 - 無敵星星（团购 Tab 的商品/门店分支已在上方单独渲染） */}
+      {currentStep === 1 && selectedAlgorithmType !== AlgorithmType.NEW_STORE_AD && selectedAlgorithmType !== AlgorithmType.POPULAR_MERCHANT_KA && selectedAlgorithmType !== AlgorithmType.GOLDEN_SIGNBOARD && selectedAlgorithmType !== AlgorithmType.TRAFFIC_AD && selectedAlgorithmType !== AlgorithmType.TIME_SLOT_AD && !(selectedAlgorithmType === AlgorithmType.INVINCIBLE_STAR && selectedTab === 'groupBuy') && selectedInventory && selectedInventory.algorithmType !== AlgorithmType.HOT_REVIVE_AD && (
         <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '16px 24px' }}>
           <DateTimeGrid
             inventoryItem={selectedInventory}

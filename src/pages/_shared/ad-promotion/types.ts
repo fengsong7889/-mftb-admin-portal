@@ -1,6 +1,7 @@
 import dayjs from 'dayjs'
 import { AlgorithmType, Region, RecommendChannel, AppType } from '@mftb/contracts/recommendConstants'
 import { BIZ_CHANNEL, type BizChannelValue } from '@/constants/bizChannel'
+import { AD_TYPE_ICON } from './heroCardStyles'
 
 /** 时段状态枚举 */
 export enum TimeSlotStatus {
@@ -87,55 +88,55 @@ export const RECOMMEND_TYPE_CONFIGS: RecommendTypeConfig[] = [
   {
     type: AlgorithmType.INVINCIBLE_STAR,
     name: '無敵星星',
-    icon: '⭐',
+    icon: AD_TYPE_ICON[AlgorithmType.INVINCIBLE_STAR] ?? '',
     enabled: true,
   },
   {
     type: AlgorithmType.HOT_REVIVE_AD,
     name: '盤活復蘇',
-    icon: '🔥',
+    icon: AD_TYPE_ICON[AlgorithmType.HOT_REVIVE_AD] ?? '',
     enabled: true,
   },
   {
     type: AlgorithmType.NEW_STORE_AD,
     name: '新店廣告',
-    icon: '🏪',
+    icon: AD_TYPE_ICON[AlgorithmType.NEW_STORE_AD] ?? '',
     enabled: true,
   },
   {
     type: AlgorithmType.POPULAR_MERCHANT_KA,
     name: '人氣商家',
-    icon: '🏆',
+    icon: AD_TYPE_ICON[AlgorithmType.POPULAR_MERCHANT_KA] ?? '',
     enabled: true,
   },
   {
     type: AlgorithmType.TRAFFIC_AD,
     name: '投流廣告',
-    icon: '📊',
+    icon: AD_TYPE_ICON[AlgorithmType.TRAFFIC_AD] ?? '',
     enabled: true,
   },
   {
     type: AlgorithmType.EXCLUSIVE_MERCHANT,
     name: '聯盟商家',
-    icon: '👑',
+    icon: AD_TYPE_ICON[AlgorithmType.EXCLUSIVE_MERCHANT] ?? '',
     enabled: false,
   },
   {
     type: AlgorithmType.GOLDEN_SIGNBOARD,
     name: '金字招牌',
-    icon: '🏅',
+    icon: AD_TYPE_ICON[AlgorithmType.GOLDEN_SIGNBOARD] ?? '',
     enabled: true,
   },
   {
     type: AlgorithmType.TIME_SLOT_AD,
     name: '時段推薦廣告',
-    icon: '⏰',
+    icon: AD_TYPE_ICON[AlgorithmType.TIME_SLOT_AD] ?? '',
     enabled: true,
   },
   {
     type: AlgorithmType.PRODUCT_PROMO,
     name: '商品促銷',
-    icon: '🎯',
+    icon: AD_TYPE_ICON[AlgorithmType.PRODUCT_PROMO] ?? '',
     enabled: false,
   },
 ]

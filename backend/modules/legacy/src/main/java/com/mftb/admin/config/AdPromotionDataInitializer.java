@@ -75,6 +75,23 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
                 this::ensureTimeSlotPricingTables, this::verifyTimeSlotPricing);
         runVerified("時段推薦訂單明細表自動創建", "adpromo:timeslot_order_item_table:v1",
                 this::ensureTimeSlotOrderItemTable, this::verifyTimeSlotOrderItemTable);
+        runVerified("交互式相似推薦配置三表自動創建", "adpromo:similar_recommendation_tables:v1",
+                () -> {
+                    try {
+                        executeSqlScript("339_similar_recommendation.sql");
+                    } catch (java.io.IOException e) {
+                        throw new IllegalStateException("读取初始化脚本失败: 339_similar_recommendation.sql", e);
+                    }
+                }, this::verifySimilarRecommendationTables);
+        // 团购瀑布流服务端化（参考 SQL: 341_group_buy_waterfall.sql）：补列失败不记版本，下次启动重试
+        runVerified("团购瀑布流维度列补齐", "adpromo:groupbuy_waterfall_cols:v1",
+                this::ensureGroupBuyWaterfallColumns, this::verifyGroupBuyWaterfallColumns);
+        // 星星定价推广对象快照（参考 SQL: 342_star_product_pricing.sql）：商品星星开放定价的前置结构
+        runVerified("星星定價推广对象快照列补齐", "adpromo:star_pricing_target_col:v1",
+                this::ensureStarPricingTargetColumn, this::verifyStarPricingTargetColumn);
+        // 团购商品星星订单列（参考 SQL: 343_star_product_order.sql）：商品下单写 target_type/product_id/product_name
+        runVerified("商品星星訂單快照列補齊", "adpromo:star_order_product_cols:v1",
+                this::ensureStarOrderProductColumns, this::verifyStarOrderProductColumns);
         String schema = jdbcTemplate.queryForObject("SELECT DATABASE()", String.class);
         migrationLock.runExclusive("mftb:schema:" + schema, 120, () ->
                 versionTracker.applyOnce("adpromo:hot-skin-discount-v1.0",
@@ -228,8 +245,10 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
         }
         try (InputStream is = resource.getInputStream()) {
             String raw = StreamUtils.copyToString(is, StandardCharsets.UTF_8);
-            // 先去除行注释（-- 开头），避免分号分割后注释与下一条语句粘连
-            String noComment = raw.replaceAll("(?m)^\\s*--.*$", "");
+            // 先去除行注释（-- 与 # 两种形态），避免分号分割后注释与下一条语句粘连。
+            // # 也要剔：版权头模板对 .sql 就是用 # 写的（见 LICENSE-HEADER.txt），
+            // 只剔 -- 会把版权头拼到第一条 DDL 上，能不能跑就全押在 MySQL 方言兼容上
+            String noComment = raw.replaceAll("(?m)^\\s*--.*$", "").replaceAll("(?m)^\\s*#.*$", "");
             // 按分号分割并逐条执行（忽略空语句）
             for (String stmt : noComment.split(";")) {
                 String trimmed = stmt.trim();
@@ -659,6 +678,88 @@ public class AdPromotionDataInitializer implements CommandLineRunner {
             jdbcTemplate.execute(ddl);
             log.info("已为 {} 补充 {} 列", table, column);
         }
+    }
+
+    /** 交互式相似推荐配置三表后置校验：任一缺失即抛异常，不记录版本、下次启动重试。 */
+    private void verifySimilarRecommendationTables() {
+        for (String table : List.of("biz_ad_algorithm_revision", "biz_ad_waterfall_recommendation",
+                "biz_ad_waterfall_recommendation_traffic")) {
+            if (!tableExists(table)) {
+                throw new IllegalStateException("相似推荐配置表未就绪: " + table);
+            }
+        }
+        log.info("交互式相似推荐配置三表就绪");
+    }
+
+    /** 341: 团购瀑布流服务端化所需列（业务线/展示维度/内容来源/布局/频道/排序/类目兜底/固定内容）。 */
+    private void ensureGroupBuyWaterfallColumns() {
+        for (ContractSpec contract : LegacyCoreContracts.groupBuyWaterfallContracts()) {
+            for (ContractSpec.ColumnSpec column : contract.requiredColumns()) {
+                addColumnIfAbsent(contract.table(), column.column(), column.addColumnDdl());
+            }
+        }
+    }
+
+    /** 团购瀑布流维度列后置校验：缺列即抛异常使 applyOnce 不记版本、下次启动重试。 */
+    private void verifyGroupBuyWaterfallColumns() {
+        for (ContractSpec contract : LegacyCoreContracts.groupBuyWaterfallContracts()) {
+            for (ContractSpec.ColumnSpec column : contract.requiredColumns()) {
+                if (!columnExists(contract.table(), column.column())) {
+                    throw new IllegalStateException("团购瀑布流列未就绪: " + contract.table() + "." + column.column());
+                }
+            }
+        }
+        log.info("团购瀑布流维度列就绪");
+    }
+
+    /** 342: 星星定价推广对象快照列，商品星星开放定价后列表/售卖链路免解析 params 区分门店与商品。 */
+    private void ensureStarPricingTargetColumn() {
+        for (ContractSpec contract : LegacyCoreContracts.starPricingTargetContracts()) {
+            for (ContractSpec.ColumnSpec column : contract.requiredColumns()) {
+                addColumnIfAbsent(contract.table(), column.column(), column.addColumnDdl());
+            }
+        }
+    }
+
+    /** 星星定價快照列后置校验：缺列即抛异常使 applyOnce 不记版本、下次启动重试。 */
+    private void verifyStarPricingTargetColumn() {
+        for (ContractSpec contract : LegacyCoreContracts.starPricingTargetContracts()) {
+            for (ContractSpec.ColumnSpec column : contract.requiredColumns()) {
+                if (!columnExists(contract.table(), column.column())) {
+                    throw new IllegalStateException("星星定價快照列未就绪: " + contract.table() + "." + column.column());
+                }
+            }
+        }
+        log.info("星星定價推广对象快照列就绪");
+    }
+
+    /** 343: 商品星星订单快照列 + 商品编码索引；索引创建幂等（先查 statistics 再建）。 */
+    private void ensureStarOrderProductColumns() {
+        for (ContractSpec contract : LegacyCoreContracts.starOrderProductContracts()) {
+            for (ContractSpec.ColumnSpec column : contract.requiredColumns()) {
+                addColumnIfAbsent(contract.table(), column.column(), column.addColumnDdl());
+            }
+        }
+        Integer indexCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.STATISTICS WHERE table_schema = DATABASE()"
+                        + " AND table_name = 'biz_ad_order' AND index_name = 'idx_ad_order_product'",
+                Integer.class);
+        if (indexCount == null || indexCount == 0) {
+            jdbcTemplate.execute("ALTER TABLE biz_ad_order ADD KEY idx_ad_order_product (product_id)");
+            log.info("已为 biz_ad_order 补建 idx_ad_order_product 索引");
+        }
+    }
+
+    /** 商品星星订单快照列后置校验：缺列即抛异常使 applyOnce 不记版本、下次启动重试。 */
+    private void verifyStarOrderProductColumns() {
+        for (ContractSpec contract : LegacyCoreContracts.starOrderProductContracts()) {
+            for (ContractSpec.ColumnSpec column : contract.requiredColumns()) {
+                if (!columnExists(contract.table(), column.column())) {
+                    throw new IllegalStateException("商品星星訂單快照列未就緒: " + contract.table() + "." + column.column());
+                }
+            }
+        }
+        log.info("商品星星訂單快照列就緒");
     }
 
     /** 表存在性检查（供结构后置校验使用）。 */

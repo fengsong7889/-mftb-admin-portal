@@ -35,6 +35,30 @@ public class AdWaterfall {
     /** 自然流量算法名称快照 */
     private String naturalAlgoName;
 
+    /** 业务线: 1=外卖到家 2=团购到店 */
+    private Integer businessType;
+
+    /** 展示维度: 1=门店 2=商品（仅团购到店可为2） */
+    private Integer contentType;
+
+    /** 展示类目数据来源: algorithm/category/custom */
+    private String displayCategoryMode;
+
+    /** 展示布局: 1=单列 2=双列 */
+    private Integer layoutColumns;
+
+    /** 外卖业务频道: food/supermarket；团购固定 groupBuy */
+    private String bizChannel;
+
+    /** 类目候选排序: score/sales/distance/random */
+    private String sortMode;
+
+    /** 类目兜底ID数组(JSON)，商品维度算法模式的兜底内容源 */
+    private String fallbackCategoryIds;
+
+    /** 固定展示内容坑位(JSON数组, custom模式) */
+    private String fixedSlots;
+
     /** 过滤用户不喜欢: 1=开启 2=关闭 */
     private Integer filterDislike;
 

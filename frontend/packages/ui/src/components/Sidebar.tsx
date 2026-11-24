@@ -694,6 +694,8 @@ const keyToIcon: Record<string, ReactNode> = {
   'meeting-my':          <UsergroupAddOutlined />,
   // 持續績效（兜底图标必须与 CpmSchemaMigrationInitializer 种子逐字一致，check:menu 双向校验）
   'cpm-my':              <FormOutlined />,
+  // 節假日配置（cpm:menu:v1.1）：与后端种子图标逐字一致，否则门禁报「兜底图标不一致」
+  'cpm-holiday':         <CalendarOutlined />,
   'cpm-report':          <FileDoneOutlined />,
   'cpm-team':            <TeamOutlined />,
   'cpm-template':        <AppstoreOutlined />,

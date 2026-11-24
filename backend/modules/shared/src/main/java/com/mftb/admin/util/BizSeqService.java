@@ -382,6 +382,7 @@ public class BizSeqService {
             case 4 -> "algo_exclusive";
             case 6 -> "algo_guess";
             case 7 -> "algo_organic";
+            case 17 -> "algo_similar";
             case 11 -> "algo_brand";
             case 12 -> "algo_gold";
             case 13 -> "algo_signboard";

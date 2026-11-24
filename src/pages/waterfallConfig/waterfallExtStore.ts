@@ -21,7 +21,7 @@ import type {
   FixedContentSlot,
 } from '@mftb/contracts/waterfallTypes'
 import { serverKey, localKey, defaultExtension, getDisplayCategoryMode, DEFAULT_WATERFALL_SORT } from '@mftb/contracts/waterfallTypes'
-import type { WaterfallStrategy } from '@/api/adPromotion'
+import type { WaterfallFixedSlotItem, WaterfallStrategy } from '@/api/adPromotion'
 
 const SCHEMA_VERSION = 'v1'
 const EXT_PREFIX = 'wf_ext'
@@ -162,7 +162,9 @@ export function inferBusinessType(
 
 /**
  * 把后端策略 + 本地扩展 + 业务线推断合并为列表视图。
- * 扩展字段优先；无扩展时按引用算法频道推断，推断不出默认 delivery 且标记未确认。
+ * 团购服务端化后后端字段是配置真值；但存量记录的 VO 默认值（businessType=1）与历史本地扩展
+ * 无法区分，因此仍按「扩展优先→后端字段→频道推断」过渡：新建团购记录无扩展，直接读后端。
+ * 存量超市记录的完整草稿仍存扩展（localDraft），优先回显。
  */
 export function mergeServerToStrategies(
   serverList: WaterfallStrategy[],
@@ -172,9 +174,10 @@ export function mergeServerToStrategies(
   return serverList.map(s => {
     const ext = s.id != null ? extMap[String(s.id)] : undefined
     const inferred = ext ? undefined : inferBusinessType(s.slots, algoChannelByCode)
+    const serverBusiness = s.businessType === 2 ? 'groupBuy' as const : s.businessType === 1 ? 'delivery' as const : undefined
     const businessType: WaterfallBusinessType =
-      ext?.businessType ?? inferred ?? 'delivery'
-    const confirmed = ext?.confirmed ?? inferred != null
+      ext?.businessType ?? serverBusiness ?? inferred ?? 'delivery'
+    const confirmed = ext?.confirmed ?? (serverBusiness != null || inferred != null)
     return {
       key: serverKey(s.id as number),
       source: 'server' as const,
@@ -187,9 +190,9 @@ export function mergeServerToStrategies(
       updatedBy: s.updatedBy,
       updatedAt: s.updatedAt,
       businessType,
-      contentType: ext?.contentType ?? 'store',
-      layoutColumns: ext?.layoutColumns ?? (1 as WaterfallLayoutColumns),
-      bizChannel: ext?.bizChannel ?? ('food' as WaterfallBizChannel),
+      contentType: ext?.contentType ?? (s.contentType === 2 ? 'product' : 'store'),
+      layoutColumns: ext?.layoutColumns ?? (s.layoutColumns === 2 ? 2 : 1),
+      bizChannel: ext?.bizChannel ?? (s.bizChannel === 'supermarket' ? 'supermarket' : 'food'),
       filterDislike: s.filterDislike,
       naturalAlgoName: s.naturalAlgoName,
       businessConfirmed: confirmed,
@@ -220,7 +223,23 @@ export function mergeLocalToStrategies(list: WaterfallDraft[]): WaterfallListVie
   }))
 }
 
-/** 从后端策略 + 扩展构造完整草稿（编辑/详情用） */
+/** 后端固定内容坑位 → 草稿结构（列名不同构：position/status 默认启用）。 */
+function serverFixedSlotsToDraft(items: WaterfallFixedSlotItem[] | null | undefined, contentType: WaterfallContentType, brand?: string): FixedContentSlot[] {
+  return (items ?? []).map(item => ({
+    position: item.slotPosition,
+    contentType,
+    itemId: item.itemId,
+    itemName: item.itemName,
+    brand,
+    categoryId: item.categoryId ?? undefined,
+    categoryName: item.categoryName ?? undefined,
+    stock: item.stock ?? undefined,
+    status: (item.status === 2 ? 2 : 1) as 1 | 2,
+  }))
+}
+
+/** 从后端策略 + 扩展构造完整草稿（编辑/详情用）。
+ * 团购服务端化后后端字段是配置真值；存量超市记录继续优先回显扩展/localDraft。 */
 export function buildDraftFromServer(
   s: WaterfallStrategy,
   ext?: WaterfallExtension,
@@ -229,6 +248,10 @@ export function buildDraftFromServer(
   if (ext?.localDraft) {
     return { ...ext.localDraft, key: serverKey(s.id as number), source: 'server', id: s.id, strategyCode: s.strategyCode, status: s.status === 2 ? 2 : 1 }
   }
+  const businessType: WaterfallBusinessType = ext?.businessType ?? (s.businessType === 2 ? 'groupBuy' : 'delivery')
+  const contentType: WaterfallContentType = ext?.contentType ?? (s.contentType === 2 ? 'product' : 'store')
+  const displayCategoryMode: WaterfallDisplayCategoryMode =
+    ext?.displayCategoryMode ?? (s.displayCategoryMode as WaterfallDisplayCategoryMode | null | undefined) ?? getDisplayCategoryMode(base)
   return {
     key: serverKey(s.id as number),
     source: 'server',
@@ -236,12 +259,12 @@ export function buildDraftFromServer(
     strategyCode: s.strategyCode,
     strategyName: s.strategyName,
     brand: s.brand,
-    businessType: base.businessType,
-    contentType: base.contentType,
-    displayCategoryMode: getDisplayCategoryMode(base),
-    sortMode: ext?.sortMode ?? DEFAULT_WATERFALL_SORT,
-    layoutColumns: base.layoutColumns,
-    bizChannel: base.bizChannel ?? 'food',
+    businessType,
+    contentType,
+    displayCategoryMode,
+    sortMode: ext?.sortMode ?? (s.sortMode as WaterfallSortMode | null | undefined) ?? DEFAULT_WATERFALL_SORT,
+    layoutColumns: ext?.layoutColumns ?? (s.layoutColumns === 2 ? 2 : 1),
+    bizChannel: ext?.bizChannel ?? (s.bizChannel === 'supermarket' ? 'supermarket' : 'food'),
     filterDislike: (s.filterDislike === 1 ? 1 : 2),
     status: (s.status === 2 ? 2 : 1),
     remark: s.remark,
@@ -255,8 +278,8 @@ export function buildDraftFromServer(
       brand: undefined,
       status: (sl.status === 2 ? 2 : 1) as 1 | 2,
     })),
-    fallbackCategoryIds: base.fallbackCategoryIds ?? [],
-    fixedSlots: base.fixedSlots ?? [],
+    fallbackCategoryIds: ext?.fallbackCategoryIds ?? s.fallbackCategoryIds ?? [],
+    fixedSlots: ext?.fixedSlots ?? serverFixedSlotsToDraft(s.fixedSlots, contentType, s.brand),
     businessConfirmed: base.confirmed,
   }
 }

@@ -1,0 +1,35 @@
+/* Copyright (c) 2026 fengsong7889. All Rights Reserved.
+ * 本文件为专有软件组成部分，未经著作权人书面许可不得使用、复制或再分发。
+ * 完整许可条款见仓库根目录 LICENSE 文件。 */
+/* 团购商品星星选购：全天格子（商圈×日期），颜色一律取设计令牌 */
+.star-product-purchase { min-width: 0; }
+.star-product-purchase__summary {
+  display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 14px;
+  padding: 10px 14px; border: 1px solid var(--border-2); border-radius: 6px;
+  background: var(--surface-3); font-size: 13px; color: var(--text-2);
+}
+.star-product-purchase__summary b { font-weight: 600; color: var(--text-1); }
+.star-product-purchase__footer {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  margin-top: 16px; padding: 12px 24px; border: 1px solid var(--border-2); border-radius: 8px;
+  background: var(--surface-2); font-size: 13px; color: var(--text-2);
+}
+.star-product-purchase__footer .ant-btn { border-radius: 8px; height: 36px; }
+.star-product-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  min-width: 104px; padding: 6px 8px; font: inherit; cursor: pointer; text-align: center;
+  border: 1px solid var(--border-2); border-radius: 6px; background: var(--surface-2);
+  color: var(--text-1); font-size: 12px; transition: all 0.2s;
+}
+.star-product-cell:hover:not(:disabled) { border-color: var(--brand); color: var(--brand); }
+.star-product-cell--selected {
+  border-color: var(--brand); background: var(--brand-soft); color: var(--brand);
+  box-shadow: var(--shadow-brand);
+}
+.star-product-cell--disabled, .star-product-cell--disabled:hover { cursor: not-allowed; color: var(--text-3); background: var(--surface-3); }
+.star-product-cell--off {
+  display: flex; min-width: 104px; padding: 6px 8px; justify-content: center;
+  border: 1px dashed var(--border-2); border-radius: 6px;
+  color: var(--text-3); font-size: 12px; background: transparent;
+}
+.star-product-cell__remaining { color: var(--text-3); font-size: 11px; }

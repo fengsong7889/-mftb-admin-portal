@@ -206,6 +206,10 @@ export function toDetailOrder(
     groupName: vo.groupName || '-',
     storeId: vo.storeCode || '-',
     storeName: vo.storeName || '-',
+    // 商品訂單：商家区改顯团购商品（適用門店由業務系統預配置，不下發到訂單）
+    targetType: vo.targetType ?? 1,
+    productId: vo.productId,
+    productName: vo.productName,
     storeAddress: vo.storeAddress,
     purchaseDate: fmt(vo.orderTime).slice(0, 10),
     originalPrice: vo.originalAmount,

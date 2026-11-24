@@ -61,16 +61,23 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
 
     static final String VERSION_SCHEMA = "cpm:schema:v1.0";
     static final String VERSION_MENU = "cpm:menu:v1.0";
+    /** 節假日配置菜单（v1.0 已落库，按不修改已应用迁移的规矩另开一位） */
+    static final String VERSION_MENU_HOLIDAY = "cpm:menu:v1.1";
     static final String VERSION_TEMPLATE = "cpm:template-seed:v1.0";
     static final String VERSION_RULE = "cpm:rule-seed:v1.0";
     /* 阶段三：新增量一律另开键——已记录 v1.0 的环境不会回头重跑旧 task（沿用 meeting 域口径） */
     static final String VERSION_TIME_SCHEMA = "cpm:schema:v1.1";
     static final String VERSION_ENUM_EXPAND = "cpm:schema:v1.2";
     static final String VERSION_REVISION = "cpm:report-revision:v1.0";
+    /** 台账底座：工作項分组 + 工时口径日历 + 条目侧排期/计划属性/备注列 */
+    static final String VERSION_WORKLOG_SCHEMA = "cpm:schema:v1.3";
+    /** 全局法定名单种子：没有它，每个员工都要自己重标一遍节假日，而工时是全局口径 */
+    static final String VERSION_CALENDAR_SEED = "cpm:calendar-seed:v1.0";
 
     private static final String SCHEMA_SCRIPT = "336_cpm_core.sql";
     private static final String TIME_SCHEMA_SCRIPT = "337_cpm_time_schema.sql";
     private static final String REVISION_SCHEMA_SCRIPT = "338_cpm_report_revision.sql";
+    private static final String WORKLOG_SCHEMA_SCRIPT = "344_cpm_worklog_ledger.sql";
 
     private static final String SYSTEM_CODE = SystemCode.CPM.code();
     private static final String ADMIN_ROLE_CODE = "admin";
@@ -147,11 +154,14 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
     public void run(String... args) {
         versionTracker.applyOnce(VERSION_SCHEMA, this::doSchemaMigrate, this::verifySchema);
         versionTracker.applyOnce(VERSION_MENU, this::doMenuMigrate, this::verifyMenus);
+        versionTracker.applyOnce(VERSION_MENU_HOLIDAY, this::doHolidayMenuMigrate, this::verifyHolidayMenu);
         versionTracker.applyOnce(VERSION_TEMPLATE, this::doTemplateSeed, this::verifyTemplates);
         versionTracker.applyOnce(VERSION_RULE, this::doRuleSeed, this::verifyRule);
         versionTracker.applyOnce(VERSION_TIME_SCHEMA, this::doTimeSchema, this::verifyTimeSchema);
         versionTracker.applyOnce(VERSION_ENUM_EXPAND, this::doEnumExpand, this::verifyEnumExpand);
         versionTracker.applyOnce(VERSION_REVISION, this::doRevisionSchema, this::verifyRevisionSchema);
+        versionTracker.applyOnce(VERSION_WORKLOG_SCHEMA, this::doWorklogSchema, this::verifyWorklogSchema);
+        versionTracker.applyOnce(VERSION_CALENDAR_SEED, this::doCalendarSeed, this::verifyCalendarSeed);
         syncMenuVisibility();
     }
 
@@ -166,7 +176,7 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
     private void syncMenuVisibility() {
         int status = cpmEnabled ? 1 : 0;
         int changed = jdbcTemplate.update(
-                "UPDATE sys_menu SET status = ? WHERE menu_key IN ('cpm-my','cpm-report','cpm-team','cpm-template','cpm-rule') "
+                "UPDATE sys_menu SET status = ? WHERE menu_key IN ('cpm-my','cpm-holiday','cpm-report','cpm-team','cpm-template','cpm-rule') "
                         + " AND deleted = 0 AND status <> ?", status, status);
         if (changed > 0) {
             log.info("持續績效選單可見性已按總開關同步: enabled={}, 更新 {} 個菜單", cpmEnabled, changed);
@@ -219,6 +229,39 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
         deriveSystemAccess();
         permissionService.evictAll();
         log.info("持續績效菜單已就緒（5 個一級菜單，system_code={}）", SYSTEM_CODE);
+    }
+
+    /**
+     * cpm:menu:v1.1——新增「節假日配置」一级菜单。
+     *
+     * <p>v1.0 已在开发库/生产库落过，按「不修改已应用迁移」的铁律只增不改；
+     * 单独开一个版本位，新鲜库与存量库走同一条路径。
+     *
+     * <p>为什么单独成菜单而不是 cpm-my 的子页：它改的是「工时怎么算」这条全局口径
+     * （节假日/補班/調休/請假直接决定台账耗时与汇报数字），影响面超出工作記錄页，
+     * 在菜单上看得见、也能在授权中心单独收回，比藏在页面按钮里更可控。
+     * 图标 CalendarOutlined 在 cpm 系统内未占用（hr-leave、rdm 交付周报属其他系统）。
+     */
+    private void doHolidayMenuMigrate() {
+        // 同 v1.0：menuKey/名称/路径/组件/图标必须逐条字面量，check-menu-consistency 只识别这种形态
+        ensureMenu(null, "cpm-holiday", "節假日配置", "/cpm-holiday",
+                "HolidayConfig", "CalendarOutlined", 6, CpmConstants.ACTIONS_VIEW_EDIT, "Holiday Calendar");
+        Long adminRoleId = queryAdminRoleId();
+        if (adminRoleId != null) {
+            upsertRoleGrant(adminRoleId, "cpm-holiday", CpmConstants.ACTIONS_VIEW_EDIT);
+        }
+        permissionService.evictAll();
+        log.info("持續績效菜單已補齊：節假日配置（cpm-holiday）");
+    }
+
+    private void verifyHolidayMenu() {
+        Integer ok = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_menu WHERE menu_key = ? AND deleted = 0 AND status = 1 "
+                        + "AND system_code = ? AND parent_id IS NULL",
+                Integer.class, CpmConstants.MENU_HOLIDAY, SYSTEM_CODE);
+        if (ok == null || ok == 0) {
+            throw new IllegalStateException("CPM 菜單 " + CpmConstants.MENU_HOLIDAY + " 未就緒（缺失/归属/启用态不符）");
+        }
     }
 
     /** 与 AttendanceMenuInitializer/MeetingSchemaMigrationInitializer 同签名同参数序，勿改 */
@@ -528,6 +571,123 @@ public class CpmSchemaMigrationInitializer implements CommandLineRunner {
         }
         if (!constraintExists("biz_cpm_push_record", "fk_cpm_push_revision")) {
             throw new IllegalStateException("biz_cpm_push_record 缺 fk_cpm_push_revision，通知能绑定到不存在的版本");
+        }
+    }
+
+    /* ==================== 台账 8. 工作項分组 + 工时口径日历 ==================== */
+
+    /** 台账给条目补的列（全部可空或有默认）：旧代码不读这些列，回滚只需回代码不必回结构 */
+    private static final String[][] WORKLOG_ITEM_COLUMNS = {
+            {"biz_cpm_item", "group_id"},
+            {"biz_cpm_item", "plan_start"},
+            {"biz_cpm_item", "plan_end"},
+            {"biz_cpm_item", "plan_type"},
+            {"biz_cpm_item", "inserted_at"},
+            {"biz_cpm_item", "note_html"},
+            {"biz_cpm_item", "note_text"},
+    };
+
+    /**
+     * 全局法定名单种子（user_id=0）。
+     *
+     * <p>为什么由系统铺而不是让用户自己标：工时是全局口径，法定假日对所有人一致。
+     * 不铺的话每个新员工入职都要把当年节假日重标一遍，漏标的人周报数字就是错的。
+     *
+     * <p>用 INSERT IGNORE 而不是先查后插：{@code uk_cpm_calendar_day} 已经把
+     * 「同人同日」锁住，重复启动只会被唯一键挡回，不会盖掉运维后来改过的名单。
+     */
+    private static final String[] SEED_HOLIDAYS_2026 = {
+            "2026-01-01", "2026-01-02", "2026-01-03",
+            "2026-02-15", "2026-02-16", "2026-02-17", "2026-02-18", "2026-02-19",
+            "2026-02-20", "2026-02-21", "2026-02-22",
+            "2026-04-04", "2026-04-05", "2026-04-06",
+            "2026-05-01", "2026-05-02", "2026-05-03", "2026-05-04", "2026-05-05",
+            "2026-06-19", "2026-06-20", "2026-06-21",
+            "2026-09-25", "2026-09-26", "2026-09-27",
+            "2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04",
+            "2026-10-05", "2026-10-06", "2026-10-07",
+    };
+
+    /** 调休上班的周末（全局）：只有这一类计入工时 */
+    private static final String[] SEED_MAKEUPS_2026 = {"2026-02-14", "2026-02-28", "2026-10-10"};
+
+    private void doWorklogSchema() {
+        int executed = executeScript(WORKLOG_SCHEMA_SCRIPT);
+        log.info("持續績效台账建表脚本已执行: {} 条语句（{}）", executed, WORKLOG_SCHEMA_SCRIPT);
+        addColumnIfAbsent("biz_cpm_item", "group_id",
+                "ALTER TABLE biz_cpm_item ADD COLUMN group_id BIGINT NULL COMMENT '所属工作項 biz_cpm_worklog_group.id；NULL=未分组（旧日报流水）'");
+        addColumnIfAbsent("biz_cpm_item", "plan_start",
+                "ALTER TABLE biz_cpm_item ADD COLUMN plan_start DATE NULL COMMENT '计划起日（甘特条左端）；与时段回算的 first_start_at 是两种语义'");
+        addColumnIfAbsent("biz_cpm_item", "plan_end",
+                "ALTER TABLE biz_cpm_item ADD COLUMN plan_end DATE NULL COMMENT '计划止日（甘特条右端）'");
+        addColumnIfAbsent("biz_cpm_item", "plan_type",
+                "ALTER TABLE biz_cpm_item ADD COLUMN plan_type VARCHAR(16) NOT NULL DEFAULT 'planned' COMMENT 'planned=原计划 inserted=临时插入（周会要单独能念出来）'");
+        addColumnIfAbsent("biz_cpm_item", "inserted_at",
+                "ALTER TABLE biz_cpm_item ADD COLUMN inserted_at DATE NULL COMMENT '标记为临时插入的日期；原计划为 NULL'");
+        addColumnIfAbsent("biz_cpm_item", "note_html",
+                "ALTER TABLE biz_cpm_item ADD COLUMN note_html TEXT NULL COMMENT '备注富文本（服务端白名单净化后入库）'");
+        addColumnIfAbsent("biz_cpm_item", "note_text",
+                "ALTER TABLE biz_cpm_item ADD COLUMN note_text VARCHAR(2000) NULL COMMENT '备注纯文本降级：搜索/导出/推送用它，保证导出文本=页面文本'");
+        // 外键只在列就位后加：先有列再有约束，否则存量库的 ALTER 会因列不存在而半途中断
+        if (!constraintExists("biz_cpm_item", "fk_cpm_item_group")) {
+            jdbcTemplate.execute("ALTER TABLE biz_cpm_item ADD CONSTRAINT fk_cpm_item_group "
+                    + "FOREIGN KEY (group_id) REFERENCES biz_cpm_worklog_group (id)");
+        }
+        if (!constraintExists("biz_cpm_item", "ck_cpm_item_plan_type")) {
+            jdbcTemplate.execute("ALTER TABLE biz_cpm_item ADD CONSTRAINT ck_cpm_item_plan_type "
+                    + "CHECK (plan_type IN (" + quotedList(CpmConstants.PLAN_TYPES) + "))");
+        }
+        if (!constraintExists("biz_cpm_item", "ck_cpm_item_plan_range")) {
+            jdbcTemplate.execute("ALTER TABLE biz_cpm_item ADD CONSTRAINT ck_cpm_item_plan_range "
+                    + "CHECK (plan_start IS NULL OR plan_end IS NULL OR plan_end >= plan_start)");
+        }
+    }
+
+    private void verifyWorklogSchema() {
+        for (String table : new String[] {"biz_cpm_worklog_group", "biz_cpm_work_calendar"}) {
+            if (!tableExists(table)) {
+                throw new IllegalStateException(table + " 表未就绪，工作台账无处落库");
+            }
+        }
+        // 两条唯一键是并发正确性的全部依靠：缺一条就会长出同名工作項或同日双份口径
+        for (String[] key : new String[][] {
+                {"biz_cpm_worklog_group", "uk_cpm_group_title"},
+                {"biz_cpm_work_calendar", "uk_cpm_calendar_day"},
+        }) {
+            if (!indexExists(key[0], key[1])) {
+                throw new IllegalStateException(key[0] + " 缺少 " + key[1]
+                        + "，重复导入会让同一工作項/同一天口径长出两行");
+            }
+        }
+        for (String[] col : WORKLOG_ITEM_COLUMNS) {
+            if (!columnExists(col[0], col[1])) {
+                throw new IllegalStateException(col[0] + "." + col[1] + " 列缺失，台账排期与计划属性无处落值");
+            }
+        }
+    }
+
+    private void doCalendarSeed() {
+        int inserted = 0;
+        for (String date : SEED_HOLIDAYS_2026) {
+            inserted += jdbcTemplate.update("INSERT IGNORE INTO biz_cpm_work_calendar "
+                    + "(user_id, work_date, day_type, created_by, updated_by, deleted) "
+                    + "VALUES (0, ?, 'holiday', 'system', 'system', 0)", date);
+        }
+        for (String date : SEED_MAKEUPS_2026) {
+            inserted += jdbcTemplate.update("INSERT IGNORE INTO biz_cpm_work_calendar "
+                    + "(user_id, work_date, day_type, created_by, updated_by, deleted) "
+                    + "VALUES (0, ?, 'makeup', 'system', 'system', 0)", date);
+        }
+        log.info("全局工时口径日历已种子化: 本次写入 {} 行（节假日 {} / 補班 {}）",
+                inserted, SEED_HOLIDAYS_2026.length, SEED_MAKEUPS_2026.length);
+    }
+
+    private void verifyCalendarSeed() {
+        Integer n = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM biz_cpm_work_calendar WHERE deleted = 0 AND user_id = 0", Integer.class);
+        if (n == null || n < SEED_HOLIDAYS_2026.length) {
+            throw new IllegalStateException("全局法定名单未种子就位（当前 " + n + " 行），"
+                    + "否则每个人的节假日都要自己重标，周报工时会各算一套");
         }
     }
 

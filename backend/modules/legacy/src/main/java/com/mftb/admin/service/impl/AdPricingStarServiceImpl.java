@@ -120,13 +120,13 @@ public class AdPricingStarServiceImpl extends
 
     @Override
     protected void preCreate(AdPricingStarRequest request) {
-        requireAlgorithm(request.getAlgoId());
+        requireAlgorithm(request.getAlgoId(), request.getChannel());
         requireChannelUnique(request.getAlgoId(), request.getChannel(), null);
     }
 
     @Override
     protected void preUpdate(Long id, AdPricingStarRequest request) {
-        requireAlgorithm(request.getAlgoId());
+        requireAlgorithm(request.getAlgoId(), request.getChannel());
         requireChannelUnique(request.getAlgoId(), request.getChannel(), id);
     }
 
@@ -174,21 +174,32 @@ public class AdPricingStarServiceImpl extends
 
     @Override
     protected void applyRequest(AdPricingStar entity, AdPricingStarRequest request) {
-        AdAlgorithm algorithm = requireAlgorithm(request.getAlgoId());
+        AdAlgorithm algorithm = requireAlgorithm(request.getAlgoId(), request.getChannel());
+        int targetType = resolveTargetType(algorithm);
+        boolean product = targetType == AdStarAlgorithmParams.PRODUCT;
+        if (product) {
+            // 商品维度全天口径：格子=商圈×日期，无餐段可售时段/餐段折扣/多时段梯度折扣。
+            requireProductAllDay(request);
+        }
+        entity.setTargetType(targetType);
         entity.setAlgoId(algorithm.getId());
         entity.setAlgoName(algorithm.getAlgoName());
         entity.setBrand(StringUtils.hasText(request.getBrand()) ? request.getBrand() : algorithm.getBrand());
-        entity.setChannel(request.getChannel() != null ? request.getChannel() : algorithm.getChannel());
+        // 商品星星固定团购到店频道（算法协议不携带频道，不能退回「取算法旧频道」的门店口径）。
+        entity.setChannel(product ? GROUP_BUY_CHANNEL
+                : request.getChannel() != null ? request.getChannel() : algorithm.getChannel());
         entity.setPresaleDays(request.getPresaleDays());
         entity.setRefundEnabled(request.getRefundEnabled() == null ? 1 : request.getRefundEnabled());
-        entity.setDiscountTiers(request.getDiscountTiers() == null ? null : JsonUtils.toJson(request.getDiscountTiers()));
+        entity.setDiscountTiers(product || request.getDiscountTiers() == null ? null : JsonUtils.toJson(request.getDiscountTiers()));
         entity.setCancelFeeTiers(request.getCancelFeeTiers() == null ? null : JsonUtils.toJson(request.getCancelFeeTiers()));
         entity.setBlockMerchant(request.getBlockMerchant() == null ? 2 : request.getBlockMerchant());
         entity.setBlockList(request.getBlockList() == null ? null : JsonUtils.toJson(request.getBlockList()));
-        entity.setSellTimeSlots(request.getSellTimeSlots() == null ? null : JsonUtils.toJson(request.getSellTimeSlots()));
+        entity.setSellTimeSlots(product ? JsonUtils.toJson(List.of("fullDay"))
+                : request.getSellTimeSlots() == null ? null : JsonUtils.toJson(request.getSellTimeSlots()));
         // 清理不在可售时段内的折扣字段，防止脏数据残留
         entity.setSlotDiscounts(request.getSlotDiscounts() == null ? null
-                : JsonUtils.toJson(sanitizeSlotDiscounts(request.getSlotDiscounts(), request.getSellTimeSlots())));
+                : JsonUtils.toJson(sanitizeSlotDiscounts(request.getSlotDiscounts(),
+                        product ? List.of("fullDay") : request.getSellTimeSlots())));
         if (request.getStatus() != null) {
             entity.setStatus(request.getStatus());
         }
@@ -218,13 +229,47 @@ public class AdPricingStarServiceImpl extends
 
     /* ==================== 内部方法 ==================== */
 
-    private AdAlgorithm requireAlgorithm(Long algoId) {
+    /** 团购到店业务频道（RecommendChannel.GROUP_BUY=4）：商品星星定价唯一可用频道。 */
+    private static final int GROUP_BUY_CHANNEL = 4;
+
+    private AdAlgorithm requireAlgorithm(Long algoId, Integer channel) {
         AdAlgorithm algorithm = algorithmMapper.selectById(algoId);
         if (algorithm == null) {
             throw new BusinessException("關聯算法不存在");
         }
-        AdStarAlgorithmParams.requireStoreCompatible(algorithm);
+        // 商品星星不再被全局拒绝，但仅开放团购到店频道；门店星星/旧协议记录保持原样。
+        Integer target = AdStarAlgorithmParams.starTargetType(algorithm);
+        if (target != null && target == AdStarAlgorithmParams.PRODUCT && !Objects.equals(channel, GROUP_BUY_CHANNEL)) {
+            throw new BusinessException(422, "商品無敵星星僅支持團購到店頻道定價");
+        }
         return algorithm;
+    }
+
+    /** 推广对象快照：星星按协议 targetType，无协议旧记录按门店；非星星算法不参与商品口径。 */
+    private static int resolveTargetType(AdAlgorithm algorithm) {
+        Integer target = AdStarAlgorithmParams.starTargetType(algorithm);
+        return target == null ? AdStarAlgorithmParams.STORE : target;
+    }
+
+    /** 商品维度全天口径安全校验（前端隐藏只是 UX，服务端必须拒绝餐段配置写入库）。 */
+    private void requireProductAllDay(AdPricingStarRequest request) {
+        if (request.getDiscountTiers() != null && !request.getDiscountTiers().isEmpty()) {
+            throw new BusinessException(422, "商品定價不支持多時段梯度折扣");
+        }
+        List<String> slots = request.getSellTimeSlots();
+        boolean allDayOnly = slots == null || slots.isEmpty()
+                || (slots.size() == 1 && "fullDay".equals(slots.get(0)));
+        if (!allDayOnly) {
+            throw new BusinessException(422, "商品維度只支持全天售賣，不可指定餐段時段");
+        }
+        if (request.getSlotDiscounts() != null) {
+            for (AdPricingStarRequest.RegionSlotDiscount discount : request.getSlotDiscounts()) {
+                if (discount.getBreakfast() != null || discount.getLunch() != null || discount.getAfternoon() != null
+                        || discount.getDinner() != null || discount.getSupper() != null) {
+                    throw new BusinessException(422, "商品定價不支持餐段折扣，請只使用全時段折扣");
+                }
+            }
+        }
     }
 
     private void saveRegionPrices(Long pricingId, AdPricingStarRequest request) {

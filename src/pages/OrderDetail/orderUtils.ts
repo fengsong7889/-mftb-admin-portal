@@ -93,6 +93,12 @@ export interface OrderItem {
   groupName: string
   storeId: string
   storeName: string
+  /** 推廣對象快照: 1=門店 2=商品（商品訂單商家区改显团购商品） */
+  targetType?: number
+  /** 團購商品編碼快照（僅商品訂單） */
+  productId?: string
+  /** 團購商品名稱快照（僅商品訂單） */
+  productName?: string
   storeAddress?: string  // 门店地址（来自 biz_store.address）
   purchaseDate: string
   originalPrice: number
@@ -133,9 +139,9 @@ export interface OrderItem {
 
 /* ---- 后端订单映射 ---- */
 
-/** 餐段时段 key → 中文名称 */
+/** 餐段时段 key → 中文名称；fullDay=商品維度全天售卖格 */
 export const MEAL_SLOT_LABEL: Record<string, string> = {
-  breakfast: '早餐', lunch: '午餐', afternoon: '下午茶', dinner: '晚餐', supper: '宵夜',
+  breakfast: '早餐', lunch: '午餐', afternoon: '下午茶', dinner: '晚餐', supper: '宵夜', fullDay: '全天',
 }
 
 /** 后端频道 → 前端频道（3=超市百货 4=团购到店，其余归美食外卖） */

@@ -9,9 +9,10 @@
  * 交互形态对齐自然流量计分面板试算（小按钮+弹层、输入即时重算、只读态仍可用）；
  * 纯函数导出供单测，弹层只做演示计算，不写库、不替代后端重验。 */
 import { useState, type ReactNode } from 'react'
-import { Alert, Button, ConfigProvider, Input, InputNumber, Modal, Select, Tag } from 'antd'
+import { Alert, Button, ConfigProvider, Input, InputNumber, Modal, Select, Space, Tag } from 'antd'
 import { useTranslation } from 'react-i18next'
-import { CalculatorOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { CalculatorOutlined, DeleteOutlined, PlusOutlined, QuestionCircleOutlined, LineChartOutlined } from '@ant-design/icons'
+import AlgorithmSection from '../AlgorithmForm/AlgorithmSection'
 import { RANK_TIE_BREAK_OPTIONS, TRAFFIC_FIELDS, rankField, trafficOptionKey, trafficUnitKey, type RankPrefix, type TrafficAlgorithmValues } from './config'
 import { computeCoverage, decayState, evaluateMatchingTrial, evaluateClickTrial, collaborativeScores, normalizeRank, rankScore, tieBreakOrder, type RankNorms, type TagScore, type TrialMerchant, type RankInput, type Neighbor } from './trialCalcMath'
 
@@ -24,11 +25,12 @@ function TrialTrigger({ aria, onClick }: { aria: string; onClick: () => void }) 
   )
 }
 
-function TrialModal({ open, onClose, title, width = 600, maxHeight = 480, children }: { open: boolean; onClose: () => void; title: string; width?: number | string; maxHeight?: number | string; children: ReactNode }) {
+function TrialModal({ open, onClose, title, width = 600, maxHeight = 480, centered = false, footer = null, children }: { open: boolean; onClose: () => void; title: string; width?: number | string; maxHeight?: number | string; centered?: boolean; footer?: ReactNode; children: ReactNode }) {
   return (
-    <Modal open={open} onCancel={onClose} footer={null} width={width} title={title}>
+    <Modal open={open} onCancel={onClose} footer={footer} width={width} centered={centered} title={title}
+      styles={{ body: { maxHeight, overflowY: 'auto' } }}>
       <ConfigProvider componentDisabled={false}>
-        <div className="traffic-trial" style={{ maxHeight, overflowY: 'auto' }}>{children}</div>
+        <div className="traffic-trial">{children}</div>
       </ConfigProvider>
     </Modal>
   )
@@ -76,38 +78,64 @@ export function CoverageTrial({ values }: { values: Partial<TrafficAlgorithmValu
   )
 }
 
-/** 衰减试算：选商家/用户侧，读当前配置参数，输入初始分与经过天数即时重算。 */
+/** 衰减试算：对齐自然流量计分面板的宽敞弹层（760 居中 + 模块分区 + 快捷案例 + 统一宽输入）。
+ * 选商家/用户侧读当前全局配置，输入初始分/经过天数/闲置天数即时重算；只读态仍可用。 */
+const DECAY_CASES = [
+  { name: '新商家・7 天', side: 'merchant' as const, initial: 12, elapsed: 7, idle: 0 },
+  { name: '復購用戶・30 天', side: 'user' as const, initial: 40, elapsed: 30, idle: 2 },
+  { name: '閒置清理邊界', side: 'merchant' as const, initial: 12, elapsed: 30, idle: 30 },
+]
 export function DecayTrial({ values }: { values: Partial<TrafficAlgorithmValues> }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [side, setSide] = useState<'merchant' | 'user'>('merchant')
   const [initial, setInitial] = useState(12)
   const [elapsed, setElapsed] = useState(30)
+  const [idleDays, setIdleDays] = useState(0)
   const decayDays = (side === 'merchant' ? values.merchantDecayDays : values.userDecayDays) ?? 7
   const decayPoints = (side === 'merchant' ? values.merchantDecayPoints : values.userDecayPoints) ?? 1
-  const [idleDays, setIdleDays] = useState(0)
   const clearDays = (side === 'merchant' ? values.merchantTagIdleClearDays : values.userTagIdleClearDays) ?? null
   const minimum = (side === 'merchant' ? values.merchantPreferenceMinScore : values.userPreferenceMinScore) ?? 10
   const { steps, score, expired, qualified } = decayState(initial, elapsed, decayDays, decayPoints, idleDays, clearDays, minimum)
+  const reset = () => { setSide('merchant'); setInitial(12); setElapsed(30); setIdleDays(0) }
+  const field = (label: string, control: ReactNode) => (
+    <div className="decay-trial-field"><span className="decay-trial-field__label">{label}</span>{control}</div>
+  )
   return (
     <>
       <TrialTrigger aria="衰减试算" onClick={() => setOpen(true)} />
-      <TrialModal open={open} onClose={() => setOpen(false)} title="标签有效分衰减试算">
-        <div className="traffic-trial__fields">
-          <label className="traffic-trial__field">
-            <span>侧</span>
-            <Select value={side} onChange={setSide} style={{ width: 100 }} options={[{ label: t('recommend.trafficCfg.merchant', { defaultValue: '商家' }), value: 'merchant' }, { label: t('recommend.trafficCfg.user', { defaultValue: '用户' }), value: 'user' }]} />
-          </label>
-          <Num label={t('recommend.trafficCfg.trial.t25', { defaultValue: '初始分' })} value={initial} onChange={setInitial} min={0} max={1000} unit={t(trafficUnitKey('分'), { defaultValue: '分' })} />
-          <Num label={t('recommend.trafficCfg.trial.t26', { defaultValue: '经过天数 t' })} value={elapsed} onChange={setElapsed} min={0} max={365} unit={t(trafficUnitKey('天'), { defaultValue: '天' })} />
-          <Num label="距最后有效订单新增" value={idleDays} onChange={setIdleDays} min={0} max={365} unit="天" />
-        </div>
-        <div className="traffic-trial__formula">score = max(0, {initial} − {steps} × {decayPoints})；{expired ? `闲置达到 ${clearDays} 天，清零后` : '周期衰减后'}有效分 = {score}</div>
-        <div className="traffic-trial__result">
-          <span>当前配置：每 {decayDays} 天减 {decayPoints} 分</span>
-          <Tag color={qualified ? 'success' : 'default'}>{expired ? '无新增到期，退出有效标签' : score === 0 ? '已归零，不参与匹配' : qualified ? '仍达到偏好门槛' : '有正分，但未达偏好门槛'}</Tag>
-        </div>
-        <p className="traffic-trial__note">闲置计时不因定时衰减重置；清理只影响推荐有效分，不删除原始订单历史。清理天数：{clearDays ?? '不启用'}；偏好门槛：{minimum} 分。</p>
+      <TrialModal open={open} onClose={() => setOpen(false)} title="标签有效分衰减试算" width={760} centered maxHeight="70vh"
+        footer={<Space><Button onClick={reset}>重置試算</Button><Button onClick={() => setOpen(false)}>關閉</Button></Space>}>
+        <AlgorithmSection title="試算輸入" icon={<CalculatorOutlined />} tone="info">
+          <div className="decay-trial-grid">
+            {field('側', <Select value={side} onChange={setSide} options={[{ label: t('recommend.trafficCfg.merchant', { defaultValue: '商家' }), value: 'merchant' }, { label: t('recommend.trafficCfg.user', { defaultValue: '用户' }), value: 'user' }]} />)}
+            {field('初始分', <InputNumber aria-label="初始分" value={initial} min={0} max={1000} addonAfter={t(trafficUnitKey('分'), { defaultValue: '分' })} onChange={v => setInitial(typeof v === 'number' ? v : 0)} />)}
+            {field('經過天數 t', <InputNumber aria-label="經過天數 t" value={elapsed} min={0} max={365} addonAfter={t(trafficUnitKey('天'), { defaultValue: '天' })} onChange={v => setElapsed(typeof v === 'number' ? v : 0)} />)}
+            {field('距最後有效訂單新增', <InputNumber aria-label="距最後有效訂單新增" value={idleDays} min={0} max={365} addonAfter="天" onChange={v => setIdleDays(typeof v === 'number' ? v : 0)} />)}
+          </div>
+          <p className="decay-trial-hint">讀取當前全局配置：每 {decayDays} 天減 {decayPoints} 分；閒置清理天數：{clearDays ?? '不啟用'}。</p>
+          <div className="decay-trial-cases">
+            {DECAY_CASES.map(c => <Button key={c.name} size="small" aria-label={c.name}
+              onClick={() => { setSide(c.side); setInitial(c.initial); setElapsed(c.elapsed); setIdleDays(c.idle) }}>{c.name}</Button>)}
+          </div>
+        </AlgorithmSection>
+        <AlgorithmSection title="衰減推演" icon={<LineChartOutlined />} tone="strategy">
+          <div className="decay-trial-calc">
+            <div className="traffic-trial__formula">score = max(0, {initial} − {steps} × {decayPoints})；{expired ? `闲置达到 ${clearDays} 天，清零后` : '周期衰减后'}有效分 = {score}</div>
+            <div className="traffic-trial__result">
+              <span className={`organic-score-value ${qualified ? 'organic-score-value--bonus' : 'organic-score-value--disabled'}`}>
+                <span className="organic-score-value__badge">有效分</span>
+                <span className="organic-score-value__number">{score}</span>
+              </span>
+              <Tag color={qualified ? 'success' : 'default'}>{expired ? '无新增到期，退出有效标签' : score === 0 ? '已归零，不参与匹配' : qualified ? '仍达到偏好门槛' : '有正分，但未达偏好门槛'}</Tag>
+            </div>
+            <p className="traffic-trial__note">偏好门槛：{minimum} 分；达到门槛才进入标签匹配候选。</p>
+          </div>
+        </AlgorithmSection>
+        <AlgorithmSection title="口徑說明" icon={<QuestionCircleOutlined />} tone="info">
+          <p className="algorithm-form__hint">有效分 = max(0, 初始分 − floor(經過天數 / 週期) × 每次減分)；閒置達清理天數則清零退出有效標籤。</p>
+          <p className="algorithm-form__hint">闲置计时不因定时衰减重置；清理只影响推荐有效分，不删除原始订单历史。清理天数：{clearDays ?? '不启用'}。</p>
+        </AlgorithmSection>
       </TrialModal>
     </>
   )
@@ -386,7 +414,7 @@ export function ClickRecTrial({ values }: { values: Partial<TrafficAlgorithmValu
         <Alert type="info" showIcon message="局部试算：被点击商家 → 付费推荐名单" description="读取业务为第 1/2 位选择的优先来源，按位取人、不足回补其余已启用来源。候选需已购本广告，排除被点击商家、按商家 ID 去重。仅模拟选取，不执行真实瀑布流插入、曝光或扣量。" />
         <div className="traffic-trial__fields">
           <Num label="示例点击后可用投流坑位" value={availableSlots} onChange={setAvailableSlots} min={0} max={5} unit="个" />
-          <span>配置数量 {values.generativeMerchantCount ?? '待配置'} 家；本轮最多 {limit} 家；{prefix === 'rank' ? '沿用投流坑位排序' : '独立排序'}；第 1 位优先 {sourceLabel[values.similarRecSlot1Source ?? 'merchantSimilar'] ?? '商家相似'}{limit >= 2 ? `，第 2 位优先 ${sourceLabel[values.similarRecSlot2Source ?? 'userSimilar'] ?? '用户协同'}` : ''}</span>
+          <span>配置数量 {values.generativeMerchantCount ?? '待配置'} 家；本轮最多 {limit} 家；{prefix === 'rank' ? '沿用匹配路径排序' : '独立排序'}；第 1 位优先 {sourceLabel[values.similarRecSlot1Source ?? 'merchantSimilar'] ?? '商家相似'}{limit >= 2 ? `，第 2 位优先 ${sourceLabel[values.similarRecSlot2Source ?? 'userSimilar'] ?? '用户协同'}` : ''}</span>
         </div>
         <div className="traffic-trial__grid">
           <div className="traffic-trial__module">

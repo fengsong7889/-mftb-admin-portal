@@ -68,7 +68,8 @@ export default function GroupBuyStarConfig({ algorithmId = '', initialReadOnly =
 
     <Form<ProductStarPreviewValues> form={form} layout="vertical" disabled={formDisabled}
       initialValues={PRODUCT_STAR_PREVIEW_DEFAULTS} onValuesChange={(_, next: ProductStarPreviewValues) => setValues(next)}>
-      <AlgorithmSection title={t('recommend.starProduct.basicInfo')} icon={<AppstoreOutlined />} tone="info" readOnly={readOnly}>
+      {/* 与 AlgorithmAdd 各广告类型统一的基础定义模块名；键 recommend.starProduct.basicInfoTitle（繁中真源）。 */}
+      <AlgorithmSection title={t('recommend.starProduct.basicInfoTitle')} icon={<AppstoreOutlined />} tone="info" readOnly={readOnly}>
         <div className="group-buy-star-config__base-fields">
           <Form.Item name="name" label={t('recommend.algoName')} rules={[{ required: true, whitespace: true, message: t('recommend.algoNamePh') }, { max: 100, message: t('recommend.starProduct.nameMax') }]}>
             <Input placeholder={t('recommend.algoNamePh')} maxLength={100} />

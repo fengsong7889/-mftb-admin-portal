@@ -424,6 +424,7 @@ versionTracker.applyOnce(V_INIT_EAM_TRANSFER_RULE, () -> {
                 {"algo_gold", "點金廣告算法ID", "算法庫", "SFJD", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"algo_signboard", "金字招牌算法ID", "算法庫", "SFJZ", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"algo_promo", "商品促銷算法ID", "算法庫", "SFSP", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
+                {"algo_similar", "交互式相似推薦算法ID", "算法庫", "SFJH", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"config_waterfall", "瀑布流策略", "瀑布流配置", "PB", "YYYYMMDD", "3", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"ad_order_star", "無敵星星訂單", "廣告銷售", "DDWD", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},
                 {"ad_order_new_store", "新店廣告訂單", "廣告銷售", "DDXD", "YYYYMMDD", "4", "0", "{prefix} + YYYYMMDD + {n}位自增序號"},

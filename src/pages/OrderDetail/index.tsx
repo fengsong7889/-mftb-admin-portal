@@ -739,12 +739,24 @@ export default function OrderDetail() {
             <span>{order.groupName}</span>
             <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{t('orderDetail.idSuffix', { id: order.groupId })}</span>
           </Descriptions.Item>
-          <Descriptions.Item label={t('orderDetail.colStore')}>
-            <span>{order.storeName}</span>
-            <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{t('orderDetail.idSuffix', { id: order.storeId })}</span>
+          <Descriptions.Item label={order.targetType === 2 ? t('orderDetail.colProduct') : t('orderDetail.colStore')}>
+            {order.targetType === 2 ? (
+              <>
+                <span>{order.productName ?? '-'}</span>
+                <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{t('orderDetail.idSuffix', { id: order.productId ?? '-' })}</span>
+              </>
+            ) : (
+              <>
+                <span>{order.storeName}</span>
+                <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{t('orderDetail.idSuffix', { id: order.storeId })}</span>
+              </>
+            )}
           </Descriptions.Item>
           <Descriptions.Item label={t('orderDetail.colStoreRegion')}>
-            {order.storeAddress || <span style={{ color: 'var(--text-4)' }}>—</span>}
+            {order.targetType === 2
+              /* 商品訂單適用門店由團購業務系統預配置，不在订单快照展示 */
+              ? <span style={{ color: 'var(--text-3)' }}>{t('orderDetail.productStoreNote')}</span>
+              : (order.storeAddress || <span style={{ color: 'var(--text-4)' }}>—</span>)}
           </Descriptions.Item>
         </Descriptions>
                   </Card>

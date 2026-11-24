@@ -3,6 +3,7 @@ package com.mftb.admin.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -28,6 +29,14 @@ public class AdStarOrderRequest {
     /** 归属BD */
     private String bdEmpId;
 
+    /** 团购商品编码：商品星星下单必填，门店订单禁传；服务端按算法协议裁决归属 */
+    @Size(max = 64, message = "商品編碼過長")
+    private String productId;
+
+    /** 团购商品名称快照（仅商品订单；真实目录接入后由服务端覆盖） */
+    @Size(max = 128, message = "商品名稱過長")
+    private String productName;
+
     /** 業務頻道（1=大首頁 2=外賣頻道 3=超市百貨 4=團購到店）：定價按「算法×頻道」配置，下單/加購必須指定 */
     private Integer channel;
 
@@ -45,7 +54,7 @@ public class AdStarOrderRequest {
         private LocalDate bizDate;
         /** 商圈 */
         private Integer region;
-        /** 餐段时段: breakfast/lunch/afternoon/dinner/supper */
+        /** 餐段时段: breakfast/lunch/afternoon/dinner/supper；商品维度固定 fullDay */
         private String mealSlot;
     }
 }

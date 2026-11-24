@@ -117,6 +117,8 @@ export interface WaterfallSlotConfig {
   algorithmId: number                 // 关联算法ID
   algorithmName: string               // 关联算法名称(冗余字段,便于展示)
   algorithmType: AlgorithmType        // 算法类型(冗余字段,便于筛选)
+  /** 仅星星定价：推广对象快照 1=门店 2=商品（后端 target_type，列表商品标签用） */
+  starTargetType?: number
   
   // 销售日期范围
   salesStartDate?: string             // 销售日期起

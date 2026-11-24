@@ -1178,6 +1178,11 @@ export const MENU_ACTIONS_MAP: Record<string, Array<{ key: string; label: string
     { key: 'push', label: '釘釘推送' },
     { key: 'trigger', label: '手動催辦/補發' },
   ],
+  // 節假日配置：维护名单就是它的全部动作（没有推送/导入导出类治理动作）
+  'cpm-holiday': [
+    { key: 'view', label: '查看' },
+    { key: 'edit', label: '維護節假日名單' },
+  ],
   // 通知模板：改文案與停用模板都是寫操作
   'notification-template': [
     { key: 'view', label: '查看' },
@@ -2015,6 +2020,7 @@ export const CONTROLLED_MENU_KEYS: string[] = [
   // 持續績效（後端 CpmSchemaMigrationInitializer 已種菜單並按菜单鉴权，前端同步纳入受控；
   // 未登记 key 会被 hasMenuPermission 默认放行，治理页就成了全员可开的 fail-open）
   'cpm-my',
+  'cpm-holiday',
   'cpm-report',
   'cpm-team',
   'cpm-template',
@@ -2438,9 +2444,10 @@ export const ROUTE_MENU_KEY_MAP: Record<string, string> = {
   '/notification-template': 'notification-template',
   '/notification-switch': 'notification-switch',
   '/meeting-minutes-form': 'meeting-my',
-  // 持續績效：五个菜单页 + 三个非菜单子页（守卫按精确路径校验，缺一条就是白屏/403）
+  // 持續績效：六个菜单页 + 两个非菜单子页（守卫按精确路径校验，缺一条就是白屏/403）
   '/cpm-my': 'cpm-my',
   '/cpm-item-form': 'cpm-my',
+  '/cpm-holiday': 'cpm-holiday',
   '/cpm-report': 'cpm-report',
   '/cpm-report-detail': 'cpm-report',
   '/cpm-team': 'cpm-team',

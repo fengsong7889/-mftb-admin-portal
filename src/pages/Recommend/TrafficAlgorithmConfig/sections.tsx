@@ -1,12 +1,13 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Checkbox, Form, Input, InputNumber, Select, Switch, message, type FormInstance } from 'antd'
 import { CheckCircleOutlined, EnvironmentOutlined, FireOutlined, LockOutlined, StarOutlined, WalletOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
 import MerchantStatusFields from '../AlgorithmForm/MerchantStatusFields'
 import { TIME_PERIOD_KEYS, TIME_PERIOD_LABELS } from '../organicTrafficConfig'
 import HelpPopover, { type HelpSection } from '@/components/HelpPopover'
-import { CoverageTrial, DecayTrial, SimilarityTrial, RankTrial, ClickRecTrial } from './trialCalc'
-import { getTrafficFieldError, isTrafficFieldActive, RANK_CUSTOM_DEFAULT_FACTORS, RANK_TIE_BREAK_OPTIONS, isTrafficOnlyRank, rankField, TRAFFIC_FIELDS, trafficFieldKey, trafficOptionKey, trafficUnitKey, V1_DIMENSIONS, type RankPrefix, type TrafficAlgorithmValues, type TrafficFieldName } from './config'
+import { CoverageTrial, SimilarityTrial, RankTrial, ClickRecTrial } from './trialCalc'
+import { TagDecayReference } from '../TagDecaySettings'
+import { getTrafficFieldError, isTrafficFieldActive, RANK_CUSTOM_DEFAULT_FACTORS, RANK_TIE_BREAK_OPTIONS, RANK_TIE_TO_FACTOR, deadTieBreaks, rankField, TRAFFIC_FIELDS, trafficFieldKey, trafficOptionKey, trafficUnitKey, V1_DIMENSIONS, type RankPrefix, type TrafficAlgorithmValues, type TrafficFieldName } from './config'
 
 export interface TrafficSectionProps {
   values: Partial<TrafficAlgorithmValues>
@@ -33,13 +34,14 @@ function Fields({ names, values, readOnly, compact = false, disabledWhen, onChan
         const active = isTrafficFieldActive(name, values)
         const disabled = readOnly || field.disabled || disabledWhen?.(name) || undefined
         const extra = onChangeExtra ? { onChange: (value: unknown) => onChangeExtra(name, value) } : {}
-        const opts = (optionsFor?.(name) ?? field.options)?.map(o => ({ value: o.value, label: field.translateOptions === false ? o.label : t(trafficOptionKey(name, o.value), { defaultValue: o.label }) }))
+        // 选项文案统一走语言包（2026-11-23 已补齐 opt.* 双语译文并摘除 translateOptions 绕过）。
+        const opts = (optionsFor?.(name) ?? field.options)?.map(o => ({ value: o.value, label: t(trafficOptionKey(name, o.value), { defaultValue: o.label }) }))
         return (
           <Form.Item
             key={name}
             name={name}
             layout={compact ? 'horizontal' : undefined}
-            label={field.kind === 'hidden' ? undefined : field.translateLabel === false ? field.label : t(trafficFieldKey(name), { defaultValue: field.label })}
+            label={field.kind === 'hidden' ? undefined : t(trafficFieldKey(name), { defaultValue: field.label })}
             hidden={!active || field.kind === 'hidden'}
             valuePropName={field.kind === 'boolean' ? 'checked' : 'value'}
             dependencies={field.dependencies}
@@ -77,7 +79,7 @@ export function AvailabilitySection(props: TrafficSectionProps) {
         return error ? Promise.reject(new Error(error)) : Promise.resolve()
       } }]} />
       <Fields {...props} names={['soldOutFilterEnabled']} />
-      <p className="traffic-config__hint">付费投流以购买流量包为投放资格；暂无综合评分的已购商家不被排除。评分仅作冷启动「软优选」（见冷启动推荐），不作全局硬准入。</p>
+      <p className="traffic-config__hint">付费投流以购买流量包为投放资格；暂无综合评分的已购商家不被排除。评分仅作冷启动「软优选」（见排序规则·冷启动排序），不作全局硬准入。</p>
       {(props.values.statusRest || props.values.statusOverwhelmed || props.values.statusClosed || !props.values.soldOutFilterEnabled) && (
         <p className="traffic-config__warning" role="status">当前允许部分不可即时购买的候选进入配置范围；请核查营业状态与售罄过滤，避免用户看到买不到的商品。</p>
       )}
@@ -137,43 +139,24 @@ export function MatchingSection(props: TrafficSectionProps) {
   const { t } = useTranslation()
   const staleCustom = props.values.merchantKeywordStatsMode === 'custom' || props.values.userKeywordStatsMode === 'custom'
   const metric = props.values.similarityMetric ?? 'cosine'
+  // 多子标题模块：整体缩进形成「模块 > 子块 > 参数」层级（同相似推荐引擎页口径）。
   return (
-    <>
-      <p className="traffic-config__hint">已确认计数口径：同一订单内，同一标准标签商家和用户各加 1；多份商品不重复计数。原始订单计数与推荐有效分分开。</p>
+    <div className="traffic-section--tree">
+      <p className="traffic-config__hint">已確認計數口徑：商家按完成訂單商品走量，每件其標準標籤 +1；用戶按不同商品類型計分——同訂單同類型多件不重複、不同類型同標籤各 +1。僅已完成訂單；原始訂單計數與推薦有效分分開。</p>
       <FixedStatsCard staleCustom={staleCustom} />
+      <h4 className="traffic-config__subtitle">① 准入門檻</h4>
       <FieldGroup caption={t('recommend.trafficCfg.cap.c1', { defaultValue: '偏好门槛' })}>
         <Fields compact {...props} names={['userPreferenceMinScore', 'merchantPreferenceMinScore']} />
       </FieldGroup>
       <p className="traffic-config__hint">商家标签由众多买家订单聚合（卖 10 单汉堡=+10），用户标签仅本人订单累加（买 10 次才+10），量级不对称，故商家门槛应显著高于用户门槛。</p>
-      <FieldGroup caption="最低覆盖比例（可选）">
+      <h4 className="traffic-config__subtitle">② 直接匹配規則（主路）</h4>
+      <FieldGroup caption={t('recommend.trafficCfg.cap.c19', { defaultValue: '最低覆盖比例（可选）' })}>
         {/* 门槛值保持挂载透传：开关关闭仅隐藏不卸载，历史值不丢、字段注册不缺。 */}
         <Fields compact {...props} names={['coverageFilterEnabled', 'matchThreshold']} />
         <p className="traffic-config__hint">{props.values.coverageFilterEnabled
           ? '开启后，直接标签匹配须达到该覆盖比例；仅约束用户—商家直接匹配，协同与冷启动不适用。'
           : '关闭时不额外限制覆盖比例，但直接标签匹配仍须至少命中一个双方达标的有效标签。'}</p>
       </FieldGroup>
-      <FieldGroup caption="用户协同补充（普通投流）" help={<HelpPopover
-        title="普通投流协同补充" ariaLabel="普通投流协同补充说明"
-        content={[
-          { label: '何时启用', body: '直接兴趣匹配不足以填满本轮投流坑位时，才用相似用户的有效成交商家补充。直接匹配已足够时不额外插入；关闭点击后相似推荐不影响此开关。', tone: 'info' },
-          { label: '只推荐投流商家', body: '通过用户标签找邻居，再计算其成交店的 CF 得分；最终只保留已购本广告、余量充足且业务可用的商家。协同与直接匹配按商家 ID 去重。', tone: 'warn' },
-          { label: '独立准入', body: '协同不要求候选商家与当前用户直接命中标签，也不套用最低覆盖比例；否则无法扩展兴趣。无有效用户标签时不计算协同，仍走冷启动。', tone: 'neutral' },
-          { label: '数量与排序', body: '展示数量由本轮属于本投流广告的坑位决定，不套用点击后两家上限。不足时补充：直接匹配优先、协同只补缺口（50 位直接 30 家→协同补 20）。按比例预留：协同先占坑位×比例（向下取整，50×10%=5），即使直接匹配充足也预留；任一路不足名额回补另一路。各来源内按投流坑位排序，协同匹配分=CF，不与直接相似度混排。', tone: 'info' },
-          { label: '比例取整', body: '向下取整：本广告 3 位×10%=0.3→该批不预留协同；若要长期接近 10%，需执行层跨批次累计余数（本轮未实现）。比例分母是本广告坑位，不是瀑布流总位置。', tone: 'warn' },
-          { label: '数据边界', body: '仅在同一区域/餐段内补充，不越过履约与频控限制。仍不足交既有补齐规则及自然层处理。本轮为配置与匿名本地试算，真实消费者数据未接入。', tone: 'neutral' },
-        ]}
-      />}>
-        <Fields compact {...props} names={['matchingUserSimilarEnabled', 'matchingUserSimilarThreshold', 'matchingUserSimilarMode', 'matchingUserSimilarRatio']} />
-        <p className="traffic-config__hint">{props.values.matchingUserSimilarEnabled
-          ? (props.values.matchingUserSimilarMode === 'ratio'
-            ? `按比例预留：协同占本投流广告坑位的 ${props.values.matchingUserSimilarRatio ?? 10}%（向下取整），其余给直接匹配；协同不足时名额回补直接匹配。`
-            : '不足时补充：直接匹配优先，仅在有缺口时用协同补充合格投流商家。')
-          : '默认关闭；开启后只影响本投流广告坑位，与点击后推荐独立配置。可在下方相似度试算查看案例。'}</p>
-      </FieldGroup>
-      {/* 曝光策略/标签上限为只读历史或退役口径：保持挂载透传但移出可见分组，历史值不丢。 */}
-      <div hidden>
-        <Fields compact {...props} names={['merchantExposureStrategy', 'maxUserTags', 'explorationSlots', 'merchantRetainedTagCount', 'userRetainedTagCount', 'qualityFilterEnabled']} />
-      </div>
       <FormulaHelp
         formula="覆盖率 = 商家覆盖的偏好标签数 ÷ 用户偏好标签总数"
         title="现有覆盖率口径"
@@ -196,6 +179,7 @@ export function MatchingSection(props: TrafficSectionProps) {
           width={560}
           maxHeight={420}
           content={[
+            { label: '作用对象', body: '相似度首先是「直接匹配」的打分：当前用户 × 候选商家 的标签向量相似度，匹配优先预设即按它排序。它同时被用户协同复用于找 用户×用户 邻居；但协同的商家得分是 CF 投票、不是相似度本身。故本配置属于直接匹配主路，而非仅服务协同。', tone: 'info' },
             { label: '两种算法可独立对照', body: '每条投流算法配置可选择余弦或加权 Jaccard，再由不同瀑布流引用。比较效果时保持其他筛选、时段与排序条件一致。同一公式不保证不同场景的分数分布一致，门槛需要分别验证。', tone: 'info' },
             { label: '余弦相似度', body: '两侧各自按门槛筛选，以标签并集对齐，缺失一侧补 0。分值点积除以完整向量模长，比较偏好分布；不能只保留共同标签计算分母。', tone: 'neutral' },
             { label: '加权 Jaccard', body: '完整向量的 Σmin ÷ Σmax，权重使用各侧有效分。它对绝对量级敏感；与余弦得分不同是正常的，不能直接复用同一个阈值。两种算法均保留供业务对照。', tone: 'neutral' },
@@ -224,52 +208,59 @@ export function MatchingSection(props: TrafficSectionProps) {
           { label: '标签一致性', body: '正式数据按标准标签 ID 对齐。试算使用标签名代替 ID，空名称不参与，同名重复行合并取最高分，不重复累加分值或覆盖数量。', tone: 'neutral' },
         ]}
       />
-      <h4 className="traffic-config__subtitle">标签有效分衰减</h4>
-      <p className="traffic-config__hint">按周期减分；归零或无新增计数达到清理天数时退出有效标签。清理天数留空则仅按分值衰减，原始订单历史不删除。</p>
-      <FieldGroup caption={t('recommend.trafficCfg.cap.c4', { defaultValue: '商家标签衰减' })}>
-        <Fields compact {...props} names={['merchantDecayDays', 'merchantDecayPoints']} />
-        <Fields compact {...props} names={['merchantTagIdleClearDays']} />
-      </FieldGroup>
-      <FieldGroup caption={t('recommend.trafficCfg.cap.c5', { defaultValue: '用户标签衰减' })}>
-        <Fields compact {...props} names={['userDecayDays', 'userDecayPoints']} />
-        <Fields compact {...props} names={['userTagIdleClearDays']} />
-      </FieldGroup>
-      <FormulaHelp
-        formula="score(t) = max(0, initial_score − floor(t / decayDays) × decayPoints)"
-        title="标签有效分衰减公式"
-        ariaLabel="标签有效分衰减说明"
-        trial={<DecayTrial values={props.values} />}
-        width={560}
-        maxHeight={420}
-        sections={[
-          { label: '衰减', body: '按「天」计：每经过 decayDays 天减 decayPoints 分，不是每分钟或每周。t 为距上次记录经过的天数。', tone: 'info' },
-          { label: '有效性', body: '正分也可能低于偏好门槛；零分和过期标签不参与匹配。无偏好用户走冷启动，不代表老商家重新取得新店资格。', tone: 'neutral' },
-          { label: '无新增清理', body: '从该标签最后一次有效订单增量计时，定时衰减不刷新这个时间。达到 M 天时有效分清零；M 留空则不按闲置时长清理。', tone: 'warn' },
-          { label: '例子', body: '初始 12 分，每 7 天减 1 分；30 天后衰减结果为 8 分。如果另配置 30 天无新增清理且确已闲置 30 天，最终有效分为 0。', tone: 'neutral' },
+      <p className="traffic-config__hint">管線：准入門檻篩有效標籤 → 覆蓋比例（可選）作直接匹配准入 → 相似度即直接匹配的排序分（匹配優先預設按它排序）→ 排序规则（匹配路径）取前 N。覆蓋率只作准入、不作排序分。</p>
+      <h4 className="traffic-config__subtitle">③ 用戶協同補充（可選・補缺口或探索配額）</h4>
+      <FieldGroup caption={t('recommend.trafficCfg.cap.c20', { defaultValue: '用户协同补充（普通投流）' })} help={<HelpPopover
+        title="普通投流协同补充" ariaLabel="普通投流协同补充说明"
+        content={[
+          { label: '何时启用', body: '直接兴趣匹配不足以填满本轮投流坑位时，才用相似用户的有效成交商家补充。直接匹配已足够时不额外插入；关闭点击后相似推荐不影响此开关。', tone: 'info' },
+          { label: '只推荐投流商家', body: '通过用户标签找邻居，再计算其成交店的 CF 得分；最终只保留已购本广告、余量充足且业务可用的商家。协同与直接匹配按商家 ID 去重。', tone: 'warn' },
+          { label: '独立准入', body: '协同不要求候选商家与当前用户直接命中标签，也不套用最低覆盖比例；否则无法扩展兴趣。无有效用户标签时不计算协同，仍走冷启动。', tone: 'neutral' },
+          { label: '数量与排序', body: '展示数量由本轮属于本投流广告的坑位决定，不套用点击后两家上限。不足时补充：直接匹配优先、协同只补缺口（50 位直接 30 家→协同补 20）。按比例预留：协同先占坑位×比例（向下取整，50×10%=5），即使直接匹配充足也预留；任一路不足名额回补另一路。各来源内按投流坑位排序，协同匹配分=CF，不与直接相似度混排。', tone: 'info' },
+          { label: '比例取整', body: '向下取整：本广告 3 位×10%=0.3→该批不预留协同；若要长期接近 10%，需执行层跨批次累计余数（本轮未实现）。比例分母是本广告坑位，不是瀑布流总位置。', tone: 'warn' },
+          { label: '与直接匹配的算法关系', body: '两路共用同一「相似度算法」度量用户侧相似：直接匹配算 用户×商家 标签相似度；协同先用该度量找 用户×用户 邻居，再按邻居有效成交加权投票得 CF 分（CF 分不是余弦/Jaccard 本身）。故协同门槛（邻居相似度）与直接覆盖比例独立标定，不能混用同一阈值。', tone: 'info' },
+          { label: '实用性边界', body: '直接标签匹配只要有订单历史即可用，是可靠主路；协同依赖足够多的相似邻居成交重叠，数据稀疏时返回很少甚至为空——不足时补充会自然退化为纯直接匹配，不硬凑；按比例预留在协同为空时把名额回补直接匹配。', tone: 'warn' },
+          { label: '数据边界', body: '仅在同一区域/餐段内补充，不越过履约与频控限制。仍不足交既有补齐规则及自然层处理。本轮为配置与匿名本地试算，真实消费者数据未接入。', tone: 'neutral' },
         ]}
-      />
+      />}>
+        <Fields compact {...props} names={['matchingUserSimilarEnabled', 'matchingUserSimilarThreshold', 'matchingUserSimilarMode', 'matchingUserSimilarRatio']} />
+        <p className="traffic-config__hint">{props.values.matchingUserSimilarEnabled
+          ? (props.values.matchingUserSimilarMode === 'ratio'
+            ? `按比例预留＝探索配额：即使直接匹配充足，也先给协同留「本广告坑位 × ${props.values.matchingUserSimilarRatio ?? 10}%」（向下取整；坑位少时取整为 0 即不预留），其余给直接匹配；任一路不足名额回补另一路。`
+            : '不足时补充＝保护直接匹配：直接匹配充足时不展示协同；仅当直接候选填不满本轮坑位才用协同补缺口。坑位少或直接商家多时协同不出现。')
+          : '默认关闭；开启后只影响本投流广告坑位，与点击后推荐独立配置。可在上方相似度试算查看案例。'}</p>
+      </FieldGroup>
+      {/* 曝光策略/标签上限为只读历史或退役口径：保持挂载透传但移出可见分组，历史值不丢。 */}
+      <div hidden>
+        <Fields compact {...props} names={['merchantExposureStrategy', 'maxUserTags', 'explorationSlots', 'merchantRetainedTagCount', 'userRetainedTagCount', 'qualityFilterEnabled']} />
+      </div>
+      <TagDecayReference />
       {/* 新标签加速一期退役：保持挂载透传存量，历史值不丢。 */}
       <div hidden>
         <Fields {...props} names={['newTagBoostMultiplier', 'maxBoostTagCount']} />
       </div>
-    </>
+    </div>
   )
 }
 
 export function FrequencySection(props: TrafficSectionProps) {
   const { t } = useTranslation()
-  const generativeEnabled = props.values.generativeRecommendEnabled === true
   return (
     <>
-      <p className="traffic-config__hint">投流广告绑定在瀑布流的若干坑位，用户可连续刷新多页；频控保证同商家在去重窗口内不重复出现。</p>
+      <p className="traffic-config__hint">投流广告绑定在瀑布流的若干坑位，用户可连续刷新多页；商家频控限制本广告筛选出的商家对同一用户在窗口内的曝光次数（上限非配额）。</p>
       <FieldGroup
-        caption={t('recommend.trafficCfg.cap.c6', { defaultValue: '同商家去重' })}
+        caption={t('recommend.trafficCfg.cap.c6', { defaultValue: '同商家曝光频控' })}
         help={<HelpPopover
-          title="同商家去重口径"
-          ariaLabel="同商家去重说明"
+          title="同商家曝光频控口径"
+          ariaLabel="同商家曝光频控说明"
+          width={560}
+          maxHeight={420}
           content={[
-            { label: '窗口与次数', body: '窗口＝统计时长（支持 0.5 小时＝30 分钟）；次数＝窗口内同商家最多展示几次。次数设 1，即刷新时同商家不重复。', tone: 'info' },
-            { label: '与其他频控分工', body: '此处限「单商家曝光次数」；「相似推荐触发频次」限「发起推荐频率」；跨广告坑位的同商家去重由瀑布流统一计数，此处仅约束本算法候选池。', tone: 'neutral' },
+            { label: '为何不叫去重', body: '本算法每轮候选内商家天然唯一（每家至多参与一次打分与占位），不存在轮内去重；本配置限制的是跨轮曝光频率：同一用户在窗口内看到同一商家的次数上限。与其他广告坑位的同屏重复由瀑布流层跨坑位去重承担。', tone: 'info' },
+            { label: '窗口与次数（上限非配额）', body: '窗口＝统计时长（支持 0.5 小时＝30 分钟），以当前请求时刻滚动回看，不整点重置、不刷新清零；次数＝窗口内同商家最多曝光几次，是允许出现的上限而非保证出现的配额：商家每轮仍须通过准入与排序，实际赢得坑位并曝光才计数一次。次数设 1，即刷新时同商家不重复。', tone: 'info' },
+            { label: '轮转机制', body: '打分覆盖全部已购本广告的商家（不截断）；已曝光商家占用窗口配额后，刷新在全量候选内自然轮转到其他合格商家，实现付费流量轮转；候选全部达频控上限时不放宽上限强行展示，由瀑布流自然流补位。', tone: 'neutral' },
+            { label: '计数范围（独立计数）', body: '本频控按广告算法实例独立计数：同一瀑布流共存无敌星星、新店广告、招牌、全域相似策略等多种广告类型，各类型（及同类型多实例）的频控语义与产品承诺各自独立，跨类型或跨实例共享计数会使规则极其复杂，故各自在自己的表单内配置与计数；同一用户在本算法内跨会话共用计数，不按坑位、页面或算法版本清零。', tone: 'neutral' },
+            { label: '与跨广告去重分工', body: '此处仅约束本算法候选池（单商家曝光频率）；跨广告类型的同屏同商家重复（如投流坑位与相似插入坑位同时出现）由瀑布流层跨坑位去重承担，两层语义不同、不互相替代；瀑布流去重配置与执行尚未接入，接入前同屏重复以执行侧实现进度为准。', tone: 'warn' },
           ]}
         />}
       >
@@ -279,22 +270,8 @@ export function FrequencySection(props: TrafficSectionProps) {
       <div hidden>
         <Fields {...props} names={['maxMerchantsPerKeyword', 'keywordFreqHours', 'keywordFreqTimes']} />
       </div>
-      <div hidden={!generativeEnabled}>
-        <FieldGroup
-          caption={t('recommend.trafficCfg.cap.c7', { defaultValue: '相似推荐触发频次' })}
-          help={<HelpPopover
-            title="触发频次说明"
-            ariaLabel="触发频次说明"
-            content={[
-              { label: '不限制 / 限制次数', body: '不限制＝每次达标点击都触发相似推荐；限制次数＝一个用户一天最多触发 N 次（跨会话累计），达上限后当日不再触发。', tone: 'info' },
-              { label: '与同商家去重的分工', body: '此处限“触发次数”（发起推荐频率）；同商家去重限“单商家曝光次数”，两者不同轴、同时满足才展示。原“跳过商家点击”冷却与二者重叠，一期收敛移除。', tone: 'warn' },
-            ]}
-          />}
-        >
-          <Fields compact {...props} names={['generativeDailyLimitMode', 'generativeDailyLimit']} />
-        </FieldGroup>
-      </div>
-      <div className="traffic-config__note">普通投流与商家相似推荐需共用频控计数。候选全部达到去重上限时，不放宽限制强行展示，由自然流量补位。</div>
+
+      <div className="traffic-config__note">各广告类型（及同类型多实例）的频控独立计数，不跨类型或跨实例共享（如投流与全域相似策略各自计数）。候选全部达到频控上限时，不放宽限制强行展示，由自然流量补位。</div>
     </>
   )
 }
@@ -382,7 +359,7 @@ function ColdStartDimensionCards({ value, onChange, values, readOnly }: {
 }
 
 /** 相似推荐子配置的轻量分组标题，把零散字段按语义聚拢；help 传入问号弹层，紧随标题显示。 */
-function FieldGroup({ caption, help, children }: { caption: string; help?: ReactNode; children: ReactNode }) {
+export function FieldGroup({ caption, help, children }: { caption: string; help?: ReactNode; children: ReactNode }) {
   return (
     <div className="traffic-field-group">
       <span className="traffic-field-group__caption">{caption}{help}</span>
@@ -399,10 +376,11 @@ const SIMILARITY_FORMULA: Record<string, string> = {
 
 /** 排序因子元数据：展示色 + 归一口径。勾选式参与（等权相加），不再手填权重。 */
 const RANK_FACTORS: { value: string; label: string; color: string; norm: string }[] = [
-  { value: 'match', label: '匹配分', color: 'var(--brand)', norm: '直接匹配/商家相似使用相似度 sim；用户协同使用 CF；同类目无相似度、匹配分记 0；冷启动使用独立维度综合分与软优选规则' },
+  { value: 'match', label: '匹配分', color: 'var(--brand)', norm: '相关性轴：用户偏好与商家标签分布的对齐度（相似度 sim，余弦对绝对量级不敏感）；直接匹配/商家相似用 sim、协同用 CF、同类目记 0、冷启动用独立维度综合分' },
   { value: 'traffic', label: '剩余比例', color: 'var(--info)', norm: '自定义因子使用剩余曝光次数 ÷ 总曝光次数；消耗优先预设直接比较剩余曝光次数，不使用比例，也不受冷启动方向影响' },
   { value: 'quality', label: '质量分', color: 'var(--success)', norm: '商家质量分 ÷ 5' },
   { value: 'distance', label: '距离', color: 'var(--purple)', norm: '1 − min(直线距离 ÷ 最大直线距离, 1)' },
+  { value: 'tagHeat', label: '匹配标签热度', color: 'var(--warning)', norm: '供给强度轴：商家在「已命中交集标签」上的有效分之和 ÷ 候选最大值（0~1），答“对味的标签里谁卖得更强”（牛肉面 A=2000 优于 B=1210）；与匹配分不同轴、不重复计分，仅在匹配达标者内部起次级排序作用' },
 ]
 
 /** 读当前所选因子（预设/自定义都已归一写入 Factors 字段）。 */
@@ -420,9 +398,19 @@ function RankingRule(props: TrafficSectionProps & { prefix: RankPrefix; caption:
   const tieField = rankField(prefix, 'TieBreak')
   const preset = props.values[presetField] ?? 'matchFirst'
   const isCustom = preset === 'custom'
-  const factors = props.values[factorsField] ?? []
-  const trafficOnly = isTrafficOnlyRank(preset, factors)
-  const tieOptions = RANK_TIE_BREAK_OPTIONS.filter(o => !(trafficOnly && o.value === 'trafficDirection'))
+  const factors = useMemo(() => props.values[factorsField] ?? [], [props.values, factorsField])
+  // 死选项：决胜维度≡主排序单一轴时永远打不平同分（匹配优先×匹配分、消耗优先×余量方向、自定义单因子×同轴）。
+  const dead = useMemo(() => deadTieBreaks(preset, factors), [preset, factors])
+  // 自定义：同分决胜仅可从已勾选因子（映射决胜语义）或随机/热度中选；预设：全词表；两模式均剔除死选项。
+  const tieOptions = isCustom
+    ? RANK_TIE_BREAK_OPTIONS.filter(o => (o.value === 'random' || o.value === 'tagHeat' || factors.includes(RANK_TIE_TO_FACTOR[o.value] ?? '')) && !dead.includes(o.value))
+    : RANK_TIE_BREAK_OPTIONS.filter(o => !dead.includes(o.value))
+  // 存量/切换后若当前决胜不在允许集合（如自定义未勾质量却存 quality、匹配优先存 match），自动迁移到首个允许项。
+  useEffect(() => {
+    const allowed = tieOptions
+    const cur = props.values[tieField]
+    if (cur && !allowed.some(o => o.value === cur)) props.form?.setFieldsValue({ [tieField]: allowed[0]?.value ?? 'random' })
+  }, [tieOptions, tieField, props.form, props.values])
   const formula = preset === 'matchFirst' ? 'score = 标签匹配得分（商家×用户标签重叠）'
     : preset === 'consumeFirst' ? 'score = 流量包剩余量（匹配达标者内）'
     : 'score = Σ(所选因子归一分) ÷ 所选因子数'
@@ -441,6 +429,8 @@ function RankingRule(props: TrafficSectionProps & { prefix: RankPrefix; caption:
           { label: '打分公式', body: `${formula}。分数高者先占坑位。`, tone: 'info' },
           { label: '预设口径', body: '匹配优先＝按标签匹配得分排序；消耗优先＝匹配达标者内按流量包剩余量排序（余量相同再走同分决胜，不用「按流量包方向」）。', tone: 'neutral' },
           { label: '自定义组合与取舍', body: '勾选的因子先各自归一到 0~1 再等权相加，比的是综合分而非单科最高。例：A 匹配 0.9/质量 0.4 → 0.65；B 匹配 0.3/质量 0.9 → 0.60 → A 先。若某因子是硬要求（如质量必须≥3.5），请用门槛过滤而非排序因子。', tone: 'warn' },
+          { label: '匹配分 vs 匹配标签热度', body: '两轴不重复：匹配分＝相关性（分布对齐，余弦对量级不敏感），答“是否对味”；匹配标签热度＝供给强度（已命中标签上商家有效分总量），答“对味里谁卖得更强”。热度只统计已命中标签，故只在匹配达标者内部起作用，是次级排序信号而非准入。用余弦时热度补量级、互补不重复；用加权 Jaccard（本身含量级）时热度与其部分相关，属可选增强。', tone: 'info' },
+          { label: '因子与决胜的关系', body: isCustom ? '自定义：主分＝勾选因子等权归一和；同分决胜仅能从勾选因子或随机/热度中选，是「主排序→次级打破平局」串联，不引入未勾选因子；仅勾单因子时该同轴决胜项也被剔除（主分同分即该因子同分）。' : '预设：主分＝单轴（匹配/余量）；同分决胜为独立次级准则，可用主排序未用的维度打破平局；但与主排序同轴的选项被剔除（匹配优先无「匹配分高者优先」、消耗优先无「剩余曝光次数多者优先」），同分后再比同轴永远打不平。', tone: 'warn' },
           { label: '因子归一（0~1）', body: RANK_FACTORS.map(f => `${f.label}：${f.norm}`).join('\n'), tone: 'neutral' },
           { label: '同分决胜与坑位填充', body: scenario, tone: 'warn' },
           { label: '与频控分工', body: '排序决定「谁先展示」，频控决定「同商家能否再展示」；二者串联，候选全部达去重上限时由自然流量补位。', tone: 'neutral' },
@@ -453,7 +443,10 @@ function RankingRule(props: TrafficSectionProps & { prefix: RankPrefix; caption:
         const next = value as string
         const nextFactors = next === 'custom' ? (factors.length > 0 ? factors : [...RANK_CUSTOM_DEFAULT_FACTORS]) : []
         const patch: Record<string, unknown> = { [factorsField]: nextFactors }
-        if (isTrafficOnlyRank(next, nextFactors) && props.values[tieField] === 'trafficDirection') patch[tieField] = 'quality'
+        const nextDead = deadTieBreaks(next, nextFactors)
+        if (nextDead.includes(String(props.values[tieField]))) {
+          patch[tieField] = RANK_TIE_BREAK_OPTIONS.find(o => !nextDead.includes(o.value))?.value ?? 'quality'
+        }
         props.form?.setFieldsValue(patch)
       }} />
       <p className="traffic-config__hint">{desc}</p>
@@ -462,6 +455,8 @@ function RankingRule(props: TrafficSectionProps & { prefix: RankPrefix; caption:
         <Fields compact {...props} names={[factorsField]} />
       </div>
       <Fields compact {...props} names={[tieField]} optionsFor={n => (n === tieField ? tieOptions : undefined)} />
+      <p className="traffic-config__hint">{isCustom ? '自定义模式：同分决胜只能从已勾选因子（或随机探索）中选择，未勾选的因子不会进入决胜，避免「没勾质量却能按质量决胜」的歧义；仅勾单因子时该同轴决胜项同样剔除。' : '预设模式：无因子勾选，同分决胜是独立于主排序的次级准则，用主排序未用的维度打破平局；与主排序同轴的选项已剔除（如匹配优先无「匹配分高者优先」——同分已意味着匹配分相等，再比匹配分永远打不平）。'}</p>
+      <p className="traffic-config__hint">管線：准入門檻 → 覆蓋比例（可選准入）→ 匹配分（相似度＝相關性，主排序）→ 可選因子（熱度/餘量/質量/距離）等權綜合 → 坑位取前 N。匹配分不是「重疊標籤得分之和」（那是熱度/覆蓋的口徑）；熱度只在匹配達標者內部比「誰賣得更強」。</p>
       <FormulaHelp
         formula={formula}
         title={`${caption}公式`}
@@ -469,7 +464,7 @@ function RankingRule(props: TrafficSectionProps & { prefix: RankPrefix; caption:
         trial={<RankTrial values={props.values} prefix={prefix} />}
         sections={[
           { label: '因子', body: RANK_FACTORS.map(f => `${f.label}：${f.norm}`).join('\n'), tone: 'info' },
-          { label: '冷启动路径', body: '无有效用户偏好时使用冷启动排序维度综合分：距离/剩余流量包归一后等权相加、分高者先，质量分软优选达线者先。这里的匹配／消耗／自定义策略只排序有匹配依据的候选。', tone: 'warn' },
+          { label: '冷启动路径', body: '无有效用户偏好时走排序规则②冷启动排序：用户冷启动按距离/剩余流量包归一等权综合、分高者先，质量分软优选达线者先；商家 0 标签不在本算法探索（新店曝光由瀑布流新店广告承担）。这里的匹配／消耗／自定义策略只排序有匹配依据的候选。', tone: 'warn' },
         ]}
       />
     </FieldGroup>
@@ -498,13 +493,42 @@ function SharedRankSummary({ values, prefix, title, ariaLabel }: {
   )
 }
 
-/** 投流坑位排序模块：只决定本广告占用坑位内的商家先后（冷启动与兴趣匹配召回都走这套）。
- * 跨广告类型（无敌星星/新店广告等）的坑位顺序由瀑布流策略的坑位序号决定，不在本模块范围。 */
-export function RankingSection(props: TrafficSectionProps) {
+/** 召回范围模块：决定投流商家抓取范围，对匹配/冷启动两路候选池同时生效；
+ * 付费资格、营业状态与商品可购买等准入见「基础与可用性」。 */
+export function RecallSection(props: TrafficSectionProps) {
   const { t } = useTranslation()
   return (
-    <>
-      <p className="traffic-config__hint">只排「购买本广告的商家」在本广告占用坑位内的先后顺序：全量已购商家参与打分，瀑布流按其坑位数（如 50 坑）取前 N 家展示；其他广告类型（无敌星星、新店广告等）的坑位位置与顺序由瀑布流策略的坑位序号决定，不受本模块影响。</p>
+    <div className="traffic-section--tree">
+      <p className="traffic-config__hint">召回范围决定「哪些商家能进入本广告候选池」，匹配与冷启动两条路径都受其约束；商家召回范围 ∩ 区域召回范围 ∩ 通用准入（付费资格、营业状态、商品可购买）＝ 候选池。</p>
+      <FieldGroup
+        caption={t('recommend.trafficCfg.cap.c18', { defaultValue: '商家召回范围' })}
+        help={<HelpPopover
+          title="商家召回范围口径"
+          ariaLabel="商家召回范围说明"
+          content={[
+            { label: '当前口径', body: '本算法只在「已购本投流广告且流量包有余量」的商家池内召回，匹配与冷启动两路同池；未购商家即使质量分再高也不进入本广告候选，扣量与计费只作用于已购商家。', tone: 'info' },
+            { label: '为什么不放开全量商家', body: '投流广告是付费坑位产品：曝光按流量包扣量计费，混入未购商家会挤占已购商家坑位、破坏扣量与计费口径；未购商家的曝光由瀑布流自然流算法与其兜底坑位承担，不属于本算法。', tone: 'warn' },
+            { label: '「全量商家」预留', body: '该档位当前仅展示、不可选择，执行服务未接入；若未来开放，需另立混排与计费契约（哪些自然坑位可混投、如何扣量、是否另立广告产品）后再启用。', tone: 'neutral' },
+          ]}
+        />}
+      >
+        <Fields compact {...props} names={['recallMerchantScope']} disabledWhen={() => true} />
+        <p className="traffic-config__hint">固定口径：仅召回已购本广告的投流商家；「全量商家」为预留档位（待开放），全量曝光由瀑布流自然流承担。</p>
+      </FieldGroup>
+      <FieldGroup
+        caption={t('recommend.trafficCfg.cap.c10', { defaultValue: '区域召回范围' })}
+        help={<HelpPopover
+          title="区域召回范围口径"
+          ariaLabel="区域召回范围说明"
+          content={[
+            { label: '配送范围内', body: '以调度系统当前配置的配送范围为召回边界，匹配与冷启动两路候选池都受其约束。该范围由调度侧维护，可能横跨多个商圈，也可能很小；若商家做了缩圈（缩小配送范围），可召回的商家会随之减少 —— 请留意配送范围变更对候选池量的影响。', tone: 'info' },
+            { label: '用户所在商圈', body: '始终取“用户所在商圈”与“当前可配送范围”的交集。配送缩圈时可选商家减少，不以扩圈方式绕过配送限制；不足交瀑布流兜底。', tone: 'neutral' },
+            { label: '如何选择', body: '配送范围内覆盖面较广；用户所在商圈进一步限定地域。两路召回都在该范围内取候选：匹配路径再按标签命中过滤，冷启动按勾选维度综合分排序，仍满足通用准入条件。', tone: 'warn' },
+          ]}
+        />}
+      >
+        <Fields compact {...props} names={['coldStartRegionScope']} />
+      </FieldGroup>
       <FieldGroup
         caption={t('recommend.trafficCfg.cap.c8', { defaultValue: '时段优先' })}
         help={<HelpPopover
@@ -513,9 +537,9 @@ export function RankingSection(props: TrafficSectionProps) {
           width={560}
           maxHeight={420}
           content={[
-            { label: '作用', body: `排序前先按当前餐段过滤候选：只提取「主营时段＝当前时段」的匹配商家进入排序，避免早餐时段被午餐/晚餐高分商家挤占。当前时段由业务系统传入（${TIME_PERIOD_KEYS.map(k => TIME_PERIOD_LABELS[k]).join('/')}），本模块不配时间区间。`, tone: 'info' },
-            { label: '相邻时段投流商家', body: '先排当前主营时段；不足时先补相邻主营时段，再补其余时段。补充只来自购买本广告且符合全部准入条件的商家。', tone: 'warn' },
-            { label: '全时段投流商家', body: '先排当前主营时段；不足时直接从其余时段的合格投流商家补充，不设置相邻时段优先层。', tone: 'neutral' },
+            { label: '作用', body: `召回时先按当前餐段过滤候选：只提取「主营时段＝当前时段」的商家进入候选池，避免早餐时段被午餐/晚餐高分商家挤占。当前时段由业务系统传入（${TIME_PERIOD_KEYS.map(k => TIME_PERIOD_LABELS[k]).join('/')}），本模块不配时间区间。`, tone: 'info' },
+            { label: '相邻时段投流商家', body: '先取当前主营时段；不足时先补相邻主营时段，再补其余时段。补充只来自购买本广告且符合全部准入条件的商家。', tone: 'warn' },
+            { label: '全时段投流商家', body: '先取当前主营时段；不足时直接从其余时段的合格投流商家补充，不设置相邻时段优先层。', tone: 'neutral' },
             { label: '层内排序与兜底', body: '每层独立排序、跨层去重；后补层不得挤到前层之前。两种策略仍不足时，瀑布流使用其已配置的自然流算法补位，不放宽配送、商品可购买或频控限制。', tone: 'neutral' },
           ]}
         />}
@@ -523,45 +547,48 @@ export function RankingSection(props: TrafficSectionProps) {
         <Fields compact {...props} names={['mealPeriodPriorityEnabled', 'mealPeriodFallback']} />
         {props.values.mealPeriodPriorityEnabled && <p className="traffic-config__hint">{props.values.mealPeriodFallback === 'adjacent' ? '当前时段 → 相邻时段 → 其余时段投流商家' : '当前时段 → 其余时段投流商家'}；层内排序、跨层去重，仍不足交瀑布流自然流兜底。</p>}
       </FieldGroup>
+    </div>
+  )
+}
+
+/** 排序规则模块：① 匹配路径排序（双方有达标标签）② 冷启动排序（用户 0 标签 / 商家 0 标签）。
+ * 只决定本广告占用坑位内的商家先后；跨广告类型（无敌星星/新店广告等）的坑位顺序由瀑布流策略的坑位序号决定。 */
+export function RankingSection(props: TrafficSectionProps) {
+  const { t } = useTranslation()
+  return (
+    <div className="traffic-section--tree">
+      <p className="traffic-config__hint">排序分两条路径：① 匹配路径——用户与商家都有达标标签且命中共同标签，按匹配因子排序；② 冷启动——用户 0 标签走用户冷启动综合分；商家 0 标签不在本算法探索（新店曝光由瀑布流「新店广告」承担）。候选池抓取范围见「召回范围」模块。</p>
+      <h4 className="traffic-config__subtitle">① 匹配路径排序（用户有标签 × 商家有标签）</h4>
       <RankingRule
         {...props}
         prefix="rank"
         caption={t('recommend.trafficCfg.cap.c9', { defaultValue: '坑位内打分与填充' })}
-        scenario="同分按「同分决胜」配置打破平局；打分覆盖全部已购本广告的商家（不截断），瀑布流按其坑位数取前 N 家展示（如 50 坑取前 50）；刷新靠同商家去重在全量候选内自然轮转，候选全部达去重上限时由瀑布流自然流兜底。"
+        scenario="同分按「同分决胜」配置打破平局；打分覆盖全部已购本广告的商家（不截断），瀑布流按其坑位数取前 N 家展示（如 50 坑取前 50）；刷新靠同商家频控在全量候选内自然轮转，候选全部达频控上限时由瀑布流自然流兜底。"
         extraHelp={[
           { label: '作用边界', body: '本模块只影响本广告坑位内的商家顺序；整条瀑布流的坑位编排（含其他广告类型与自然流量兜底）由瀑布流策略统一决定。', tone: 'info' },
           { label: '预算与消耗', body: '投流预算即商家流量包购买量，按购买量消耗、由执行服务扣量护栏防超耗；本模块不另设日预算/出价/计费模式。', tone: 'warn' },
         ]}
       />
+      <h4 className="traffic-config__subtitle">② 冷启动排序（用户 0 标签 / 商家 0 标签）</h4>
+      <ColdStartRankingBranch {...props} />
       <p className="traffic-config__hint">先满足“基础与可用性”的通用准入条件，再计算排序分；质量门槛与质量排序因子分别控制“能否进入”和“先后顺序”。</p>
       {/* 权重数值/候选池上限已退役：保持挂载透传存量，历史值不丢。 */}
       <div hidden>
         <Fields compact {...props} names={['rankWeightMatch', 'rankWeightTraffic', 'rankWeightQuality', 'rankWeightDistance', 'rankPoolSize']} />
       </div>
-    </>
+    </div>
   )
 }
 
-/** 冷启动推荐模块：围绕用户所在区域的召回维度卡；展示顺序交由投流坑位排序。 */
-export function ColdStartSection(props: TrafficSectionProps) {
+/** 冷启动排序分支：用户冷启动（用户 0 标签，全量已购池维度综合分）；商家 0 标签不在本算法探索，新店曝光由瀑布流新店广告坑位承担。
+ * 召回范围已上移「召回范围」模块；本分支只决定冷启动候选内的先后。 */
+function ColdStartRankingBranch(props: TrafficSectionProps) {
   const { t } = useTranslation()
+  const dims = props.values.newUserDimensions ?? []
+  const qualityOnly = dims.length === 1 && dims[0] === 'qualityScore'
   return (
     <>
-      <p className="traffic-config__hint">用户没有达到最低分的偏好标签时走区域冷启动；仍需符合配送、商品可购买与通用质量门槛。</p>
-      <FieldGroup
-        caption={t('recommend.trafficCfg.cap.c10', { defaultValue: '区域召回范围' })}
-        help={<HelpPopover
-          title="区域召回范围口径"
-          ariaLabel="区域召回范围说明"
-          content={[
-            { label: '配送范围内', body: '以调度系统当前配置的配送范围为召回边界。该范围由调度侧维护，可能横跨多个商圈，也可能很小；若商家做了缩圈（缩小配送范围），可召回的商家会随之减少 —— 请留意配送范围变更对冷启动量的影响。', tone: 'info' },
-            { label: '用户所在商圈', body: '始终取“用户所在商圈”与“当前可配送范围”的交集。配送缩圈时可选商家减少，不以扩圈方式绕过配送限制；不足交瀑布流兜底。', tone: 'neutral' },
-            { label: '如何选择', body: '配送范围内覆盖面较广；用户所在商圈进一步限定地域。无偏好冷启动在该范围内按勾选维度综合分排序，仍满足通用准入条件。', tone: 'warn' },
-          ]}
-        />}
-      >
-        <Fields compact {...props} names={['coldStartRegionScope']} />
-      </FieldGroup>
+      <p className="traffic-config__hint">用户冷启动：用户没有达到最低分的偏好标签时，在召回范围内对全部已购商家（无论有无标签）按下列维度综合分排序；仍需符合配送、商品可购买与通用质量门槛。</p>
       <Form.Item
         name="newUserDimensions"
         label={<span className="traffic-dimensions-label">
@@ -572,6 +599,7 @@ export function ColdStartSection(props: TrafficSectionProps) {
             width={560}
             maxHeight={420}
             content={[
+              { label: '四象限分工', body: '用户有标签×商家有标签 → ① 匹配路径排序；\n用户有标签×商家 0 标签 → 本算法不探索，新店曝光由瀑布流「新店广告」坑位承担；\n用户 0 标签（无论商家有无标签）→ 用户冷启动维度综合分。', tone: 'info' },
               { label: '综合分公式', body: '综合分 = Σ(勾选维度归一分) ÷ 勾选维度数（仅距离／剩余流量包参与综合分），分高者先。未勾选的维度完全不参与。', tone: 'info' },
               { label: '归一（0~1）', body: '距离 = 1 − min(直线距离 ÷ 最大直线距离, 1)，越近分高；\n剩余流量包 = 剩余次数 ÷ 本轮候选最大剩余次数，「剩余少优先」时取 1 − 该值。', tone: 'neutral' },
               { label: '质量分软优选', body: '勾选后作优选层：已评分达线者先，未评分/未达线仍保留资格，不作硬准入、不跨餐段层；不参与综合分。仅勾质量分时分层后同分保持候选顺序。', tone: 'warn' },
@@ -592,6 +620,10 @@ export function ColdStartSection(props: TrafficSectionProps) {
       >
         <ColdStartDimensionCards values={props.values} readOnly={props.readOnly} />
       </Form.Item>
+      {qualityOnly && (
+        <p className="traffic-config__warning" role="status">仅勾质量分：软优选分层后层内保持候选顺序，无综合分信号；建议加勾距离或剩余流量包。</p>
+      )}
+      <p className="traffic-config__hint">商家 0 标签不在本算法探索：新店曝光由瀑布流「新店广告」坑位承担，本算法不重复扶持（与已退役的新商家冷启动扶持同口径）。</p>
       {/* 一期退役维度/新商家扶持字段保持挂载但不渲染（新店曝光由瀑布流「新店广告」坑位承担），历史值不丢。 */}
       <div hidden>
         <Fields compact {...props} names={['regionPopularStatsDays', 'popularityMetrics', 'regionPopularTopPercent', 'completionRateThreshold', 'completionMinOrderCount', 'newMerchantBoostEnabled', 'newMerchantDays', 'newMerchantExplorationSlots']} />
@@ -713,7 +745,7 @@ export function SimilarRecSection(props: TrafficSectionProps) {
             title="插入优先级口径"
             ariaLabel="插入优先级说明"
             content={[
-              { label: '沿用投流坑位排序', body: '各来源内部使用投流坑位排序及同分决胜：商家相似路的匹配分为商家相似度，协同路为 CF，同类目没有相似度（匹配分为 0）。来源间按名额规则取人，不相加或混排分数。', tone: 'info' },
+              { label: '沿用匹配路径排序', body: '各来源内部使用匹配路径排序及同分决胜：商家相似路的匹配分为商家相似度，协同路为 CF，同类目没有相似度（匹配分为 0）。来源间按名额规则取人，不相加或混排分数。', tone: 'info' },
               { label: '独立配置', body: '为点击后插入的相似候选单独设一套权重/决胜，只影响插入坑位、不影响本广告坑位排序；适合想强推上下文相关或强推消耗的场景。', tone: 'warn' },
               { label: '坑位来源', body: '坑位总数与序号由瀑布流策略配置；本模块只决定「插入候选内谁先占坑」，不改变坑位数量。', tone: 'neutral' },
             ]}
@@ -722,11 +754,11 @@ export function SimilarRecSection(props: TrafficSectionProps) {
           <Fields compact {...props} names={['similarRankMode']} />
         </FieldGroup>
         <div hidden={independent}>
-          <SharedRankSummary values={props.values} prefix="rank" title="投流坑位排序" ariaLabel="共用排序规则摘要" />
-          <p className="traffic-config__hint">当前沿用投流坑位排序；独立配置仅调整点击后候选的排序策略，不改变准入门槛。</p>
+          <SharedRankSummary values={props.values} prefix="rank" title="匹配路径排序" ariaLabel="共用排序规则摘要" />
+          <p className="traffic-config__hint">当前沿用匹配路径排序；独立配置仅调整点击后候选的排序策略，不改变准入门槛。</p>
         </div>
         <div hidden={!independent}>
-          <p className="traffic-config__hint">高级配置：仅影响点击后推荐，默认继承投流坑位排序。</p>
+          <p className="traffic-config__hint">高级配置：仅影响点击后推荐，默认继承匹配路径排序。</p>
           <RankingRule
             {...props}
             prefix="similarRank"

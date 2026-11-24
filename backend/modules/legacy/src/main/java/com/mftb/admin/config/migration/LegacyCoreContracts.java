@@ -34,6 +34,14 @@ public class LegacyCoreContracts implements SchemaContractProvider {
         combined.add(permAuditLogContract());
         // 文檔中心：索引與留痕三表為 doc 域關鍵寫入路徑，啟動自愈防遷移漏執行
         combined.addAll(docCenterContracts());
+        // 交互式相似推薦配置三表：綁定/版本是推薦執行與計費的配置真源，缺表會把場景綁定打成 500
+        combined.addAll(similarRecommendationContracts());
+        // 团购瀑布流服务端化：实体已带业务线/展示维度/内容来源列，缺列会让团购瀑布流读写与列表直接报错
+        combined.addAll(groupBuyWaterfallContracts());
+        // 星星定价推广对象快照：售卖链路免解析算法 params 区分门店/商品，缺列会让定价保存报 Unknown column
+        combined.addAll(starPricingTargetContracts());
+        // 团购商品星星订单：商品下单写入推广对象与商品快照列，缺列会让商品订单落库直接报错
+        combined.addAll(starOrderProductContracts());
         combined.addAll(com.mftb.admin.config.DocNativeSchema.contracts());
         // 文檔中心 P0 知識庫地基：分類/標籤/資產/主體 ACL/密級/統一檢索
         combined.addAll(com.mftb.admin.config.DocKnowledgeSchema.contracts());
@@ -826,6 +834,138 @@ public class LegacyCoreContracts implements SchemaContractProvider {
                                 new ContractSpec.ColumnSpec("path_id", "ADD COLUMN path_id BIGINT NOT NULL COMMENT '所屬路徑ID'"),
                                 new ContractSpec.ColumnSpec("node_id", "ADD COLUMN node_id BIGINT NOT NULL COMMENT '文檔ID'"),
                                 new ContractSpec.ColumnSpec("sort_order", "ADD COLUMN sort_order INT NOT NULL DEFAULT 0 COMMENT '路徑內順序'"))));
+    }
+
+    /** 交互式相似推薦配置三表契約（DDL 與 339 腳本逐字一致）。 */
+    public static List<ContractSpec> similarRecommendationContracts() {
+        return List.of(
+                new ContractSpec("similar-recommendation-revision", "biz_ad_algorithm_revision",
+                        "CREATE TABLE IF NOT EXISTS biz_ad_algorithm_revision ("
+                                + "id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID', "
+                                + "algorithm_id BIGINT NOT NULL COMMENT '算法主键(biz_ad_algorithm.id)', "
+                                + "revision INT NOT NULL COMMENT '算法内版本序号，从1递增', "
+                                + "schema_version INT NOT NULL DEFAULT 1 COMMENT '参数协议版本', "
+                                + "params_snapshot JSON NOT NULL COMMENT '不可变参数快照(已通过schema校验)', "
+                                + "content_hash CHAR(64) NOT NULL COMMENT '规范化快照摘要(SHA-256)', "
+                                + "created_by VARCHAR(64) COMMENT '发布人', "
+                                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '发布时间', "
+                                + "UNIQUE KEY uk_algo_revision (algorithm_id, revision), "
+                                + "UNIQUE KEY uk_algo_revision_ref (algorithm_id, id), "
+                                + "KEY idx_revision_algorithm (algorithm_id), "
+                                + "CONSTRAINT fk_revision_algorithm FOREIGN KEY (algorithm_id) REFERENCES biz_ad_algorithm (id) ON DELETE RESTRICT, "
+                                + "CONSTRAINT ck_revision_no CHECK (revision > 0), "
+                                + "CONSTRAINT ck_revision_schema CHECK (schema_version > 0)"
+                                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='算法不可变版本表(交互式相似推荐)'",
+                        List.of()),
+                new ContractSpec("similar-recommendation-binding", "biz_ad_waterfall_recommendation",
+                        "CREATE TABLE IF NOT EXISTS biz_ad_waterfall_recommendation ("
+                                + "id BIGINT PRIMARY KEY AUTO_INCREMENT COMMENT '主键ID', "
+                                + "waterfall_id BIGINT NOT NULL COMMENT '瀑布流策略主键(biz_ad_waterfall.id)', "
+                                + "scene_code TINYINT NOT NULL DEFAULT 1 COMMENT '场景: 1=详情返回瀑布流 2/3=预留首期不可启用', "
+                                + "algorithm_id BIGINT NOT NULL COMMENT '相似推荐算法主键(type17)', "
+                                + "algorithm_revision_id BIGINT NOT NULL COMMENT '引用的不可变版本主键', "
+                                + "enabled TINYINT NOT NULL DEFAULT 0 COMMENT '启用: 0=关闭 1=启用', "
+                                + "candidate_scope TINYINT NOT NULL DEFAULT 1 COMMENT '候选范围: 1=全部合格商家 2=仅有效投流商家', "
+                                + "business_type TINYINT NOT NULL COMMENT '业务类型: 1=外卖到家 2=团购到店(服务端校验)', "
+                                + "biz_channel TINYINT NOT NULL COMMENT '业务频道: 1=美食外卖 2=超市百货 3=团购到店(服务端校验)', "
+                                + "version BIGINT NOT NULL DEFAULT 0 COMMENT '乐观锁版本', "
+                                + "updated_by VARCHAR(64) COMMENT '最后更新人', "
+                                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间', "
+                                + "updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间', "
+                                + "UNIQUE KEY uk_waterfall_scene (waterfall_id, scene_code), "
+                                + "KEY idx_rec_revision (algorithm_revision_id), "
+                                + "KEY idx_rec_algorithm (algorithm_id, enabled), "
+                                + "CONSTRAINT fk_rec_waterfall FOREIGN KEY (waterfall_id) REFERENCES biz_ad_waterfall (id) ON DELETE RESTRICT, "
+                                + "CONSTRAINT fk_rec_revision FOREIGN KEY (algorithm_revision_id, algorithm_id) REFERENCES biz_ad_algorithm_revision (algorithm_id, id) ON DELETE RESTRICT, "
+                                + "CONSTRAINT ck_rec_scene CHECK (scene_code IN (1, 2, 3)), "
+                                + "CONSTRAINT ck_rec_enabled CHECK (enabled IN (0, 1)), "
+                                + "CONSTRAINT ck_rec_scope CHECK (candidate_scope IN (1, 2))"
+                                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='瀑布流相似推荐场景绑定表'",
+                        List.of()),
+                new ContractSpec("similar-recommendation-traffic", "biz_ad_waterfall_recommendation_traffic",
+                        "CREATE TABLE IF NOT EXISTS biz_ad_waterfall_recommendation_traffic ("
+                                + "binding_id BIGINT NOT NULL COMMENT '场景绑定主键', "
+                                + "traffic_algorithm_id BIGINT NOT NULL COMMENT '允许的投流算法主键(type15)', "
+                                + "created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间', "
+                                + "PRIMARY KEY (binding_id, traffic_algorithm_id), "
+                                + "KEY idx_rec_traffic_algo (traffic_algorithm_id), "
+                                + "CONSTRAINT fk_rec_traffic_binding FOREIGN KEY (binding_id) REFERENCES biz_ad_waterfall_recommendation (id) ON DELETE CASCADE, "
+                                + "CONSTRAINT fk_rec_traffic_algo FOREIGN KEY (traffic_algorithm_id) REFERENCES biz_ad_algorithm (id) ON DELETE RESTRICT"
+                                + ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='相似推荐允许投流算法集合表'",
+                        List.of()));
+    }
+
+    /**
+     * 团购瀑布流维度列契约（DDL 与 sql/341_group_buy_waterfall.sql 逐字一致）：
+     * biz_ad_waterfall 自 13 脚本起全环境存在，因此只声明补列自愈（createTableIfMissing=null）；
+     * AdWaterfall 实体已带这些字段，缺列会让团购瀑布流保存/列表直接 Unknown column 报错。
+     */
+    public static List<ContractSpec> groupBuyWaterfallContracts() {
+        return List.of(new ContractSpec(
+                "groupbuy-waterfall-dimension-cols",
+                "biz_ad_waterfall",
+                null,
+                List.of(
+                        new ContractSpec.ColumnSpec("business_type",
+                                "ALTER TABLE biz_ad_waterfall ADD COLUMN business_type TINYINT NOT NULL DEFAULT 1"
+                                        + " COMMENT '业务线: 1=外卖到家 2=团购到店'"),
+                        new ContractSpec.ColumnSpec("content_type",
+                                "ALTER TABLE biz_ad_waterfall ADD COLUMN content_type TINYINT NOT NULL DEFAULT 1"
+                                        + " COMMENT '展示维度: 1=门店 2=商品（仅团购到店可为2）'"),
+                        new ContractSpec.ColumnSpec("display_category_mode",
+                                "ALTER TABLE biz_ad_waterfall ADD COLUMN display_category_mode VARCHAR(16) DEFAULT NULL"
+                                        + " COMMENT '展示类目数据来源: algorithm=算法提供 category=类目 custom=自定义'"),
+                        new ContractSpec.ColumnSpec("layout_columns",
+                                "ALTER TABLE biz_ad_waterfall ADD COLUMN layout_columns TINYINT NOT NULL DEFAULT 1"
+                                        + " COMMENT '展示布局: 1=单列 2=双列'"),
+                        new ContractSpec.ColumnSpec("biz_channel",
+                                "ALTER TABLE biz_ad_waterfall ADD COLUMN biz_channel VARCHAR(16) DEFAULT NULL"
+                                        + " COMMENT '外卖业务频道: food/supermarket；团购固定 groupBuy'"),
+                        new ContractSpec.ColumnSpec("sort_mode",
+                                "ALTER TABLE biz_ad_waterfall ADD COLUMN sort_mode VARCHAR(16) DEFAULT NULL"
+                                        + " COMMENT '类目候选排序: score/sales/distance/random'"),
+                        new ContractSpec.ColumnSpec("fallback_category_ids",
+                                "ALTER TABLE biz_ad_waterfall ADD COLUMN fallback_category_ids JSON DEFAULT NULL"
+                                        + " COMMENT '类目兜底ID数组(商品/门店类目模式；商品维度算法模式的兜底)'"),
+                        new ContractSpec.ColumnSpec("fixed_slots",
+                                "ALTER TABLE biz_ad_waterfall ADD COLUMN fixed_slots JSON DEFAULT NULL"
+                                        + " COMMENT '固定展示内容坑位数组(custom模式: position/itemId/itemName/stock/status)'"))));
+    }
+
+    /**
+     * 星星定价推广对象快照列契约（DDL 与 sql/342_star_product_pricing.sql 逐字一致）：
+     * 表自早期脚本全环境存在，只声明补列自愈；存量记录默认 1=门店与历史语义一致。
+     */
+    public static List<ContractSpec> starPricingTargetContracts() {
+        return List.of(new ContractSpec(
+                "star-pricing-target-type",
+                "biz_ad_pricing_star",
+                null,
+                List.of(new ContractSpec.ColumnSpec("target_type",
+                        "ALTER TABLE biz_ad_pricing_star ADD COLUMN target_type TINYINT NOT NULL DEFAULT 1"
+                                + " COMMENT '推广对象快照: 1=门店 2=商品（保存时从星星算法协议推导）'"))));
+    }
+
+    /**
+     * 团购商品星星订单列契约（DDL 与 sql/343_star_product_order.sql 逐字一致）：
+     * biz_ad_order 自初始 schema 全环境存在，只声明补列自愈；存量订单默认 1=门店、商品列为空。
+     * 商品编码索引不阻断业务，不入必需列契约，由迁移任务幂等补建。
+     */
+    public static List<ContractSpec> starOrderProductContracts() {
+        return List.of(new ContractSpec(
+                "star-order-product-cols",
+                "biz_ad_order",
+                null,
+                List.of(
+                        new ContractSpec.ColumnSpec("target_type",
+                                "ALTER TABLE biz_ad_order ADD COLUMN target_type TINYINT NOT NULL DEFAULT 1"
+                                        + " COMMENT '推广对象快照: 1=门店 2=商品（下单时从星星算法协议推导）'"),
+                        new ContractSpec.ColumnSpec("product_id",
+                                "ALTER TABLE biz_ad_order ADD COLUMN product_id VARCHAR(64) DEFAULT NULL"
+                                        + " COMMENT '团购商品编码快照（仅商品订单；真实目录接入后为外部系统ID）'"),
+                        new ContractSpec.ColumnSpec("product_name",
+                                "ALTER TABLE biz_ad_order ADD COLUMN product_name VARCHAR(128) DEFAULT NULL"
+                                        + " COMMENT '团购商品名称快照（仅商品订单）'"))));
     }
 
     /** V0 AI 治理底座契约（与 {@code AiGovernanceSchemaInitializer} 同构，确保启动自愈）。 */

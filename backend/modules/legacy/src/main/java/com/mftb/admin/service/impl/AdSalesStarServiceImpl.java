@@ -47,14 +47,16 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
  * 无敌星星广告销售服务实现（库存查询 + 下单扣款）
  * <p>
- * 售卖单位: 商圈 x 日期 x 5餐段时段, 按商圈每日销售个数(dailySalesLimit)控制库存，
- * 默认 1 即独家占；退款/取消后释放可再售。
- * 格子单价 = 商圈日单价 / 5, 多选格子按梯度折扣计价后从推广金账户扣款。
+ * 售卖单位: 门店维度为商圈 x 日期 x 5餐段时段，商品维度为商圈 x 日期全天（meal_slot=fullDay），
+ * 均按商圈每日销售个数(dailySalesLimit)控制库存，默认 1 即独家占；退款/取消后释放可再售。
+ * 格子单价: 门店=商圈日单价/5，商品=商圈日单价；多选格子按梯度折扣计价后从推广金账户扣款。
+ * 商品星星仅开放团购到店频道；商品归属集团真实校验待团购目录接入，订单归属记集团+商品。
  */
 @Slf4j
 @Service
@@ -63,6 +65,12 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
 
     /** 5 个餐段时段 */
     public static final List<String> MEAL_SLOTS = List.of("breakfast", "lunch", "afternoon", "dinner", "supper");
+
+    /** 商品维度全天售卖格子的时段标识（复用明细表 meal_slot 列，不新建表） */
+    public static final String ALL_DAY_SLOT = "fullDay";
+
+    /** 团购到店业务频道：商品星星唯一开放频道（RecommendChannel.GROUP_BUY=4） */
+    private static final int GROUP_BUY_CHANNEL = 4;
 
     /** 各时段开始小时: 早餐6/午餐10/下午茶13/晚餐17/宵夜21（到达开始时间后当天该时段不可售） */
     private static final Map<String, Integer> SLOT_START_HOURS = Map.of(
@@ -89,6 +97,10 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
     @Override
     public AdInventoryVO inventory(Long algoId, String storeCode, String groupCode, Integer channel) {
         AdAlgorithm algorithm = requireActiveAlgorithm(algoId);
+        boolean product = isProductStar(algorithm);
+        if (product && !Objects.equals(channel, GROUP_BUY_CHANNEL)) {
+            throw new BusinessException(422, "商品無敵星星僅支持團購到店頻道購買");
+        }
         AdPricingStarVO pricing = requireActivePricing(algoId, channel);
         if (pricing.getRegionPrices().isEmpty()) {
             throw new BusinessException("該算法未配置商圈計價");
@@ -102,7 +114,9 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         LocalDate endDate = today.plusDays(pricing.getPresaleDays() - 1L);
         Map<String, Integer> occupied = occupiedCounts(today, endDate);
         Map<String, Set<String>> lockGroups = activeLockGroups(algoId, today, endDate);
-        Set<String> sellSlots = parseSellSlots(pricing.getSellTimeSlots());
+        Set<String> sellSlots = parseSellSlots(pricing.getSellTimeSlots(), product);
+        List<String> slots = allowedSlots(product);
+        BigDecimal cellDivisor = product ? BigDecimal.ONE : BigDecimal.valueOf(MEAL_SLOTS.size());
 
         AdInventoryVO vo = new AdInventoryVO();
         vo.setAlgoId(algoId);
@@ -111,11 +125,11 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         vo.setSlotDiscounts(pricing.getSlotDiscounts());
         for (AdPricingStarVO.RegionPriceItem regionPrice : pricing.getRegionPrices()) {
             BigDecimal cellPrice = AdCalcUtils.round2(regionPrice.getDailyPrice()
-                    .divide(BigDecimal.valueOf(MEAL_SLOTS.size()), RoundingMode.HALF_UP));
+                    .divide(cellDivisor, RoundingMode.HALF_UP));
             int salesLimit = regionPrice.getDailySalesLimit() == null || regionPrice.getDailySalesLimit() < 1
                     ? 1 : regionPrice.getDailySalesLimit();
             for (LocalDate date = today; !date.isAfter(endDate); date = date.plusDays(1)) {
-                for (String slot : MEAL_SLOTS) {
+                for (String slot : slots) {
                     AdInventoryVO.Cell cell = new AdInventoryVO.Cell();
                     cell.setBizDate(date);
                     cell.setRegion(regionPrice.getRegion());
@@ -133,7 +147,7 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         // 保证前端按日期/商圈/餐段稳定渲染
         vo.getCells().sort(Comparator.comparing(AdInventoryVO.Cell::getBizDate)
                 .thenComparing(AdInventoryVO.Cell::getRegion)
-                .thenComparing(c -> MEAL_SLOTS.indexOf(c.getMealSlot())));
+                .thenComparing(AdInventoryVO.Cell::getMealSlot));
         return vo;
     }
 
@@ -168,6 +182,22 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         if (pricing.getRegionPrices().isEmpty()) {
             throw new BusinessException("該算法未配置商圈計價");
         }
+        boolean product = isProductStar(algorithm);
+        if (product) {
+            // 商品维度：团购频道＋必带商品＋不选门店＋同商品同格禁重复购买；推广对象由算法协议推导，不信任前端
+            if (!Objects.equals(request.getChannel(), GROUP_BUY_CHANNEL)) {
+                throw new BusinessException(422, "商品無敵星星僅支持團購到店頻道購買");
+            }
+            if (!StringUtils.hasText(request.getProductId())) {
+                throw new BusinessException(422, "商品購買必須指定商品");
+            }
+            if (StringUtils.hasText(request.getStoreCode())) {
+                throw new BusinessException(422, "商品購買不選門店，適用門店由團購業務系統決定");
+            }
+            requireProductNotPurchased(algorithm, request);
+        } else if (StringUtils.hasText(request.getProductId())) {
+            throw new BusinessException(422, "僅商品算法訂單可攜帶商品標識");
+        }
         String brand = algorithm.getBrand();
         // 屏蔽商家拦截（规则6）
         requireNotBlocked(pricing, request.getStoreCode(), request.getGroupCode());
@@ -179,7 +209,8 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         LocalDate today = LocalDate.now();
         LocalDateTime now = LocalDateTime.now();
         LocalDate endDate = today.plusDays(pricing.getPresaleDays() - 1L);
-        Set<String> sellSlots = parseSellSlots(pricing.getSellTimeSlots());
+        Set<String> sellSlots = parseSellSlots(pricing.getSellTimeSlots(), product);
+        List<String> slotsAllowed = allowedSlots(product);
         Map<Integer, BigDecimal> regionDailyPrice = new LinkedHashMap<>();
         Map<Integer, Integer> regionSalesLimit = new LinkedHashMap<>();
         for (AdPricingStarVO.RegionPriceItem item : pricing.getRegionPrices()) {
@@ -192,8 +223,8 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
             if (cell.getBizDate() == null || cell.getRegion() == null || !StringUtils.hasText(cell.getMealSlot())) {
                 throw new BusinessException("格子信息不完整");
             }
-            if (!MEAL_SLOTS.contains(cell.getMealSlot())) {
-                throw new BusinessException("非法的餐段時段: " + cell.getMealSlot());
+            if (!slotsAllowed.contains(cell.getMealSlot())) {
+                throw new BusinessException("非法的時段: " + cell.getMealSlot());
             }
             if (cell.getBizDate().isBefore(today) || cell.getBizDate().isAfter(endDate)) {
                 throw new BusinessException("購買日期超出預售窗口(" + today + " ~ " + endDate + ")");
@@ -230,10 +261,10 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
                     cell.getBizDate(), cell.getRegion(), cell.getMealSlot(), limit);
         }
 
-        // 4. 计价: 先时段折扣（全时段/单独时段），再按时段个数梯度折上折
-        BigDecimal cellUnitDivisor = BigDecimal.valueOf(MEAL_SLOTS.size());
+        // 4. 计价: 先时段折扣（全时段/单独时段），再按时段个数梯度折上折；商品维度格子价=商圈日单价且只按全时段折扣
+        BigDecimal cellUnitDivisor = product ? BigDecimal.ONE : BigDecimal.valueOf(MEAL_SLOTS.size());
         Map<Integer, Map<String, Object>> slotDiscountByRegion = parseSlotDiscounts(pricing.getSlotDiscounts());
-        // 同日期同商圈选购的餐段集合：集齐全部 5 段时适用全时段折扣
+        // 同日期同商圈选购的餐段集合：集齐全部 5 段时适用全时段折扣（商品维度天然全天）
         Map<String, Set<String>> coveredSlotsByDateRegion = new LinkedHashMap<>();
         for (AdStarOrderRequest.CellSelection cell : request.getCells()) {
             coveredSlotsByDateRegion
@@ -253,7 +284,7 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
             Set<String> covered = coveredSlotsByDateRegion.get(cell.getBizDate() + "|" + cell.getRegion());
             BigDecimal factor = slotDiscountFactor(
                     slotDiscountByRegion.get(cell.getRegion()), cell.getMealSlot(),
-                    covered != null && covered.containsAll(MEAL_SLOTS));
+                    product || (covered != null && covered.containsAll(MEAL_SLOTS)));
             BigDecimal discounted = AdCalcUtils.round2(cellPrice.multiply(factor)
                     .divide(BigDecimal.valueOf(100), RoundingMode.HALF_UP));
             cellDiscountedMap.put(key, discounted);
@@ -289,6 +320,10 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         order.setGroupName(orderSupport.resolveGroupName(request.getGroupCode()));
         order.setStoreCode(store != null ? store.getStoreCode() : request.getStoreCode());
         order.setStoreName(store != null ? store.getStoreName() : null);
+        // 推广对象与商品快照：target_type 由算法协议推导；商品名称为客户端快照，真实目录接入后由服务端覆盖
+        order.setTargetType(product ? 2 : 1);
+        order.setProductId(product ? request.getProductId().trim() : null);
+        order.setProductName(product ? trimmedOrNull(request.getProductName()) : null);
         order.setBdEmpId(request.getBdEmpId());
         // 下单人快照: 当前登录的业务人员
         orderSupport.applyOperatorSnapshot(order);
@@ -327,10 +362,12 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         }
 
         // 7. 扣款 + 写消费明细（财务写入链: 按充值批次 FIFO 拆分挂批次号, 变动类别=广告类型）
+        // 财务明细的业务线标签以命中定价的频道为准：团购到店订单不能继续记成外卖，否则对账报表串业务线
         String changeType = AdAlgoTypeNames.of(algorithm.getAlgoType());
+        String financeChannelLabel = Objects.equals(order.getChannel(), GROUP_BUY_CHANNEL) ? "團購" : "外賣";
         String firstDetailId = finWriteChainService.writeAdConsume(
                 request.getGroupCode(), order.getGroupName(), brand,
-                order.getStoreCode(), order.getStoreName(), "外賣",
+                order.getStoreCode(), order.getStoreName(), financeChannelLabel,
                 actualTotal, changeType, request.getBdEmpId(),
                 changeType + "廣告購買 訂單" + orderNo, orderNo, now);
 
@@ -358,17 +395,25 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void lockCells(AdStarOrderRequest request) {
-        requireActiveAlgorithm(request.getAlgoId());
+        AdAlgorithm lockAlgorithm = requireActiveAlgorithm(request.getAlgoId());
+        boolean product = isProductStar(lockAlgorithm);
         AdPricingStarVO pricing = requireActivePricing(request.getAlgoId(), request.getChannel());
         if (pricing.getRegionPrices().isEmpty()) {
             throw new BusinessException("該算法未配置商圈計價");
+        }
+        if (product && !Objects.equals(request.getChannel(), GROUP_BUY_CHANNEL)) {
+            throw new BusinessException(422, "商品無敵星星僅支持團購到店頻道購買");
+        }
+        if (product && !StringUtils.hasText(request.getProductId())) {
+            throw new BusinessException(422, "商品購買必須指定商品");
         }
         requireNotBlocked(pricing, request.getStoreCode(), request.getGroupCode());
 
         LocalDate today = LocalDate.now();
         LocalDateTime now = LocalDateTime.now();
         LocalDate endDate = today.plusDays(pricing.getPresaleDays() - 1L);
-        Set<String> sellSlots = parseSellSlots(pricing.getSellTimeSlots());
+        Set<String> sellSlots = parseSellSlots(pricing.getSellTimeSlots(), product);
+        List<String> slotsAllowed = allowedSlots(product);
         Set<Integer> configuredRegions = new HashSet<>();
         Map<Integer, Integer> regionSalesLimit = new LinkedHashMap<>();
         for (AdPricingStarVO.RegionPriceItem item : pricing.getRegionPrices()) {
@@ -383,8 +428,8 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
             if (cell.getBizDate() == null || cell.getRegion() == null || !StringUtils.hasText(cell.getMealSlot())) {
                 throw new BusinessException("格子信息不完整");
             }
-            if (!MEAL_SLOTS.contains(cell.getMealSlot())) {
-                throw new BusinessException("非法的餐段時段: " + cell.getMealSlot());
+            if (!slotsAllowed.contains(cell.getMealSlot())) {
+                throw new BusinessException("非法的時段: " + cell.getMealSlot());
             }
             if (cell.getBizDate().isBefore(today) || cell.getBizDate().isAfter(endDate)) {
                 throw new BusinessException("鎖定日期超出預售窗口");
@@ -455,11 +500,56 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
         if (algorithm == null) {
             throw new BusinessException("算法不存在");
         }
-        AdStarAlgorithmParams.requireStoreCompatible(algorithm);
+        // 商品星星不再全局拒绝：由本链路按频道显式开放（团购到店），门店维度行为不变
         if (algorithm.getStatus() == null || algorithm.getStatus() != 1) {
             throw new BusinessException("算法已停用，無法購買");
         }
         return algorithm;
+    }
+
+    /** 推广对象判定：星星算法按协议 targetType，无协议/非星星一律门店语义。 */
+    private static boolean isProductStar(AdAlgorithm algorithm) {
+        Integer target = AdStarAlgorithmParams.starTargetType(algorithm);
+        return target != null && target == AdStarAlgorithmParams.PRODUCT;
+    }
+
+    /** 可售卖格子时段集合：商品维度全天单格（商圈×日期），门店维度 5 餐段。 */
+    private static List<String> allowedSlots(boolean product) {
+        return product ? List.of(ALL_DAY_SLOT) : MEAL_SLOTS;
+    }
+
+    private static String trimmedOrNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    /**
+     * 同商品同格重复购买拦截：同一算法 + 商品在有效订单（待推广/推广中/已推广）中
+     * 已占用任一请求格子时拒绝。商品归属集团的真实校验待团购目录接口接入（例外登记见
+     * docs 方案 P4）；当前校验格式、集团账户授权与订单唯一性，不信任前端归属声明。
+     */
+    private void requireProductNotPurchased(AdAlgorithm algorithm, AdStarOrderRequest request) {
+        List<AdOrder> existing = orderMapper.selectList(new LambdaQueryWrapper<AdOrder>()
+                .eq(AdOrder::getAlgoId, algorithm.getId())
+                .eq(AdOrder::getProductId, request.getProductId().trim())
+                .in(AdOrder::getStatus, 1, 2, 3));
+        if (existing.isEmpty()) {
+            return;
+        }
+        List<Long> orderIds = existing.stream().map(AdOrder::getId).toList();
+        long duplicated = itemMapper.selectCount(new LambdaQueryWrapper<AdOrderItemStar>()
+                .in(AdOrderItemStar::getOrderId, orderIds)
+                .in(AdOrderItemStar::getDeliveryStatus, 1, 2)
+                .and(wrapper -> {
+                    for (AdStarOrderRequest.CellSelection cell : request.getCells()) {
+                        wrapper.or(group -> group
+                                .eq(AdOrderItemStar::getBizDate, cell.getBizDate())
+                                .eq(AdOrderItemStar::getRegion, cell.getRegion())
+                                .eq(AdOrderItemStar::getMealSlot, cell.getMealSlot()));
+                    }
+                }));
+        if (duplicated > 0) {
+            throw new BusinessException(422, "該商品在選定日期/商圈已有有效推廣訂單，請換個格子或續費原訂單");
+        }
     }
 
     /**
@@ -560,6 +650,14 @@ public class AdSalesStarServiceImpl implements AdSalesStarService {
                 throw new BusinessException("該商家已被屏蔽，無法購買該算法廣告");
             }
         }
+    }
+
+    /** 解析可售时段: 商品维度固定全天；门店维度空或含 fullDay 表示全部餐段（规则7） */
+    private static Set<String> parseSellSlots(String sellTimeSlotsJson, boolean product) {
+        if (product) {
+            return Set.of(ALL_DAY_SLOT);
+        }
+        return parseSellSlots(sellTimeSlotsJson);
     }
 
     /** 解析可售时段: 空或含 fullDay 表示全部时段（规则7） */

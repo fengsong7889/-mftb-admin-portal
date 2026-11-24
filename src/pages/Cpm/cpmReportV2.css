@@ -1,0 +1,658 @@
+/**
+ * Copyright (c) 2026 fengsong7889. All Rights Reserved.
+ *
+ * 本文件为「MFTB 企业一体化管理平台软件」的组成部分。
+ * 未经著作权人书面许可，不得使用、复制、修改、再分发或用于任何商业目的。
+ * 完整许可条款见仓库根目录 LICENSE 文件。
+ */
+
+/* ==================== 工具條（sticky） ==================== */
+
+.rp-bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  border-radius: 10px;
+  box-shadow: var(--shadow-1), var(--card-outline);
+}
+.rp-bar__nav {
+  display: flex;
+  gap: 4px;
+}
+.rp-bar__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.rp-bar__actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+/* ==================== 文檔面 ==================== */
+
+.rp-doc {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px 32px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  border-radius: 12px;
+  box-shadow: var(--shadow-card-soft), var(--card-outline);
+}
+.rp-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-2);
+}
+.rp-head__left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.rp-head__logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: var(--on-brand);
+  background: linear-gradient(135deg, var(--brand), var(--brand-hover));
+  box-shadow: var(--shadow-brand);
+}
+.rp-head h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-1);
+  line-height: 1.2;
+}
+.rp-head p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.rp-head__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.rp-overview {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 16px 0 4px;
+  padding: 12px 16px;
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-border);
+  border-radius: 10px;
+}
+.rp-overview__text {
+  flex: 1;
+  min-width: 0;
+}
+.rp-overview__text p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-1);
+}
+
+/* ==================== 章節 ==================== */
+
+.rp-sec {
+  margin-top: 24px;
+}
+.rp-sec__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.rp-sec__no {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-border);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+.rp-sec__head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.rp-sec__line {
+  flex: 1;
+  height: 1px;
+  background: var(--border-2);
+}
+.rp-none {
+  margin: 0;
+  padding: 8px 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* ==================== 01 概覽卡 ==================== */
+
+.rp-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.rp-stat {
+  padding: 14px 12px;
+  border-radius: 12px;
+  background: var(--stat-bg);
+  border: 1px solid color-mix(in srgb, var(--stat-color) 13%, transparent);
+  text-align: center;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.rp-stat:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-3);
+}
+.rp-stat__icon {
+  font-size: 18px;
+  color: var(--stat-color);
+  margin-bottom: 4px;
+}
+.rp-stat__num {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--stat-color);
+  font-variant-numeric: tabular-nums;
+}
+.rp-stat__label {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+.rp-stat__extra {
+  margin-top: 6px;
+}
+
+/* ==================== 02 核心產出 ==================== */
+
+.rp-outputs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rp-output {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--success-soft);
+  border: 1px solid color-mix(in srgb, var(--success) 25%, transparent);
+  border-radius: 10px;
+}
+.rp-output__icon {
+  color: var(--success);
+  font-size: 16px;
+}
+.rp-output__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.rp-output__main b {
+  font-size: 13px;
+  color: var(--text-1);
+}
+.rp-output__group {
+  font-size: 11px;
+  color: var(--g);
+  background: color-mix(in srgb, var(--g) 12%, var(--surface-2));
+  padding: 1px 8px;
+  border-radius: 999px;
+}
+.rp-output__date {
+  font-size: 12px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.rp-output__hours {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==================== 03 進度對比 ==================== */
+
+.rp-cmp {
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  border-radius: 10px;
+}
+.rp-cmp__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rp-cmp__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--g);
+}
+.rp-cmp__head b {
+  font-size: 13px;
+  color: var(--text-1);
+}
+.rp-cmp__head > span {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.rp-cmp__track {
+  position: relative;
+  height: 10px;
+  margin: 12px 0 4px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text-4) 18%, var(--surface-2));
+}
+.rp-cmp__start {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--g) 30%, var(--surface-2));
+}
+.rp-cmp__end {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 6px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--g) 62%, var(--surface-2)), var(--g));
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.rp-cmp__mark {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--text-2);
+  opacity: 0.55;
+}
+.rp-cmp__nums {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.rp-cmp__tasks {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rp-cmp__task {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.rp-cmp__task-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+}
+.rp-cmp__pill {
+  flex: none;
+  width: 90px;
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--p) 15%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--p) 35%, transparent);
+  overflow: hidden;
+}
+.rp-cmp__pill i {
+  display: block;
+  height: 100%;
+  background: var(--p);
+  border-radius: 4px;
+}
+.rp-cmp__task-num {
+  flex: none;
+  width: 92px;
+  font-size: 11px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.rp-cmp__task-hours {
+  flex: none;
+  width: 40px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==================== 04 工時分布 ==================== */
+
+.rp-hours {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+.rp-hours__bars {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rp-hours__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rp-hours__label {
+  flex: none;
+  width: 140px;
+  font-size: 12px;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rp-hours__track {
+  flex: 1;
+  height: 12px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text-4) 15%, var(--surface-2));
+  overflow: hidden;
+}
+.rp-hours__fill {
+  height: 100%;
+  min-width: 2px;
+  border-radius: 6px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.rp-hours__val {
+  flex: none;
+  width: 90px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.rp-spark {
+  padding: 12px;
+  border: 1px solid var(--border-2);
+  border-radius: 10px;
+  background: var(--surface-3);
+}
+.rp-spark__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-3);
+  margin-bottom: 8px;
+}
+.rp-spark__svg {
+  display: block;
+  width: 100%;
+  height: 64px;
+}
+.rp-spark__axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-3);
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==================== 05 風險與備註 ==================== */
+
+.rp-risks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rp-risk {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid;
+}
+.rp-risk > .anticon {
+  margin-top: 2px;
+}
+.rp-risk b {
+  display: block;
+  font-size: 13px;
+  color: var(--text-1);
+}
+.rp-risk span {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.rp-risk--overdue {
+  background: var(--danger-soft);
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+.rp-risk--overdue > .anticon {
+  color: var(--danger);
+}
+.rp-risk--note {
+  background: var(--warning-soft);
+  border-color: color-mix(in srgb, var(--warning) 30%, transparent);
+}
+.rp-risk--note > .anticon {
+  color: var(--warning-deep);
+}
+.rp-risk__note {
+  white-space: pre-line;
+}
+.rp-risk div.rp-risk__note {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-2);
+  white-space: normal;
+}
+
+/* ==================== 03 臨時插入工作 ==================== */
+
+.rp-inserts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rp-insert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--warning-soft);
+  border: 1px dashed color-mix(in srgb, var(--warning-deep) 45%, transparent);
+  border-radius: 10px;
+}
+.rp-insert > .anticon {
+  color: var(--warning-deep);
+  font-size: 14px;
+}
+.rp-insert__main {
+  flex: 1;
+  min-width: 0;
+}
+.rp-insert__main b {
+  display: block;
+  font-size: 13px;
+  color: var(--text-1);
+}
+.rp-insert__main span {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.rp-insert__hours {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.rp-insert__prog {
+  font-size: 11px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.rp-risk--backlog {
+  background: var(--surface-3);
+  border-color: var(--border-1);
+}
+.rp-risk--backlog > .anticon {
+  color: var(--text-3);
+}
+
+/* ==================== 06 下期計劃 ==================== */
+
+.rp-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rp-plan__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface-3);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.rp-plan__date {
+  flex: none;
+  width: 80px;
+  font-weight: 600;
+  color: var(--brand-deep);
+  font-variant-numeric: tabular-nums;
+}
+.rp-plan__row b {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rp-plan__group {
+  color: var(--text-3);
+  font-size: 11px;
+}
+.rp-plan__hours {
+  color: var(--text-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-foot {
+  margin-top: 24px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border-1);
+  font-size: 11px;
+  color: var(--text-3);
+}
+.rp-empty {
+  padding: 48px 0;
+  text-align: center;
+}
+.rp-empty .ant-btn {
+  margin-top: 12px;
+}
+
+@media (max-width: 900px) {
+  .rp-doc {
+    padding: 20px 16px;
+  }
+  .rp-head {
+    flex-direction: column;
+  }
+  .rp-head__meta {
+    align-items: flex-start;
+  }
+  .rp-stats {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+  .rp-hours {
+    grid-template-columns: 1fr;
+  }
+  .rp-hours__label {
+    width: 100px;
+  }
+}
+
+/* ==================== 核心概覽行内標記（風險/插入/待排期/覆蓋） ==================== */
+/* 原「臨時插入」「風險」各占一节，读起来累；缩成概览下的一行标记，明细仍在 02/04 节 */
+
+.rp-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-2);
+}
+.rp-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.rp-flag .anticon {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.rp-flag b {
+  color: var(--text-1);
+  font-weight: 600;
+}

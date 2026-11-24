@@ -45,9 +45,11 @@ public class AdOrderController {
             @RequestParam(required = false) String storeCode,
             @RequestParam(required = false) Integer status,
             @RequestParam(required = false) String startDate,
-            @RequestParam(required = false) String endDate) {
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) Integer targetType,
+            @RequestParam(required = false) String productId) {
         return Result.success(orderService.page(page, size, orderNo, algoType, groupCode, storeCode,
-                status, startDate, endDate));
+                status, startDate, endDate, targetType, productId));
     }
 
     /** 订单详情（含明细） */

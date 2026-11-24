@@ -7,7 +7,7 @@ import PromotionSlotConfigAdd from '../PromotionSlotConfigAdd'
 import PromotionSlotConfigSlots from '../PromotionSlotConfigSlots'
 import { emptyDraft, listLocalStrategies, upsertLocalStrategy } from './waterfallExtStore'
 import { readDraft, writeDraft } from './waterfallDraft'
-import { fetchAdAlgorithms } from '@/api/adPromotion'
+import { fetchAdAlgorithms, createWaterfall } from '@/api/adPromotion'
 import { AlgorithmType } from '@mftb/contracts/recommendConstants'
 import { GROUP_BUY_CHANNEL, SUPERMARKET_CHANNEL } from '@mftb/contracts/waterfallTypes'
 import zh from '@/i18n/locales/zh-TW.json'
@@ -15,7 +15,11 @@ import zh from '@/i18n/locales/zh-TW.json'
 vi.mock('@/api/adPromotion', () => ({
   fetchAdAlgorithms: vi.fn().mockResolvedValue({ records: [] }),
   fetchWaterfallDetail: vi.fn(), createWaterfall: vi.fn(), updateWaterfall: vi.fn(),
+  fetchWaterfallRecommendation: vi.fn().mockResolvedValue({ configured: false, waterfallId: 0, sceneCode: 1, enabled: 0, candidateScope: 1, version: 0, trafficAlgorithmIds: [] }),
+  fetchAdAlgorithmRevisions: vi.fn().mockResolvedValue([]),
+  updateWaterfallRecommendation: vi.fn(), publishAdAlgorithmRevision: vi.fn(),
 }))
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { username: 'waterfall-test' }, hasPermission: () => true, hasMenuPermission: () => true }) }))
 vi.mock('@/components/DetailPageHeader', () => ({ default: () => <h2>瀑布流詳情</h2> }))
 vi.mock('./WaterfallPreview', () => ({ default: () => <div>預覽</div> }))
 
@@ -31,6 +35,8 @@ beforeEach(() => {
   sessionStorage.clear()
   localStorage.clear()
   vi.mocked(fetchAdAlgorithms).mockReset().mockResolvedValue({ records: [], total: 0 })
+  // 团购保存已服务端化：新建返回正式 ID，否则成功分支拿不到记录主键
+  vi.mocked(createWaterfall).mockReset().mockResolvedValue({ id: 88 } as Awaited<ReturnType<typeof createWaterfall>>)
 })
 afterAll(() => { vi.restoreAllMocks(); configure({ asyncUtilTimeout: 1000, defaultHidden: false }) })
 
@@ -72,6 +78,20 @@ const contentChannels = [
 ] as const
 
 describe('瀑布流布局及算法字段显示', () => {
+  it('相似推荐引用融入行为设置区，本地草稿不开放绑定且不污染正式草稿', async () => {
+    const draft = { ...emptyDraft('groupBuy', 'flashBee'), key: 'new_groupBuy_similar', strategyName: '相似推薦布局', displayCategoryMode: 'category' as const }
+    writeDraft(draft)
+    await act(async () => { renderForm('/promotion-slot-config-add?biz=groupBuy&draftKey=new_groupBuy_similar') })
+    // 第五轮场景化重构后绑定区引擎下拉名为「引擎版本」；旧断言引用的 SIMILAR_ALGO_NAME 标题已不在绑定区
+    const selector = screen.getByRole('combobox', { name: '引擎版本' })
+    const behavior = screen.getByRole('switch', { name: zh.promotionSlotConfig.filterDislike }).parentElement!.parentElement!
+    expect(behavior).toContainElement(selector)
+    expect(screen.queryByText('詳情返回相似推薦')).not.toBeInTheDocument()
+    expect(screen.getByText('請先保存為正式瀑布流記錄，再配置場景綁定。')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '保存綁定' })).not.toBeInTheDocument()
+    expect(readDraft(draft.key)).not.toHaveProperty('recommendation')
+    expect(readDraft(draft.key)?.algoSlots).toEqual([])
+  })
   it('仅美食外卖显示展示布局，切换频道隐藏控件但保留布局值', async () => {
     await act(async () => { renderForm('/promotion-slot-config-add?biz=delivery') })
     const layout = screen.getByLabelText('展示佈局')
@@ -216,9 +236,12 @@ describe('团购瀑布流表单和路由往返', () => {
     }
     fireEvent.click(screen.getByRole('button', { name: /保\s*存/ }))
     await screen.findByText('已回到列表')
-    const [saved] = listLocalStrategies()
-    expect(saved).toMatchObject({ strategyName: '验证自定义', brand: 'flashBee', displayCategoryMode: 'custom', sortMode: 'distance', fallbackCategoryIds: [] })
-    expect(saved.fixedSlots.map(slot => slot.position)).toEqual([1, 2])
+    // 团购已服务端化：保存走后端接口且不再新增本地草稿；固定内容按服务端字段名整体替换
+    expect(createWaterfall).toHaveBeenCalledTimes(1)
+    const saved = vi.mocked(createWaterfall).mock.calls[0][0]
+    expect(saved).toMatchObject({ strategyName: '验证自定义', brand: 'flashBee', businessType: 2, contentType: 1, displayCategoryMode: 'custom', sortMode: 'distance', fallbackCategoryIds: [] })
+    expect(saved.fixedSlots?.map(slot => slot.slotPosition)).toEqual([1, 2])
+    expect(listLocalStrategies()).toHaveLength(0)
   }, 120000)
 
   it('超市百货自定义模式只展示固定内容，不再提供排序与分类兜底', async () => {
@@ -265,6 +288,37 @@ describe('团购瀑布流表单和路由往返', () => {
     expect(within(container.querySelector<HTMLElement>('.ant-table-body')!).getByText('GD9002')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /保\s*存/ }))
     await screen.findByText('已回到列表')
-    expect(listLocalStrategies()[0].fixedSlots).toHaveLength(2)
+    // 团购导入后保存同样落服务端；商品维度 contentType=2
+    expect(vi.mocked(createWaterfall).mock.calls[0][0]).toMatchObject({ contentType: 2, displayCategoryMode: 'custom' })
+    expect(vi.mocked(createWaterfall).mock.calls[0][0]?.fixedSlots).toHaveLength(2)
+    expect(listLocalStrategies()).toHaveLength(0)
+  }, 60000)
+})
+
+describe('团购商品维度算法提供模式', () => {
+  it('候选按 targetType=2 拉取，自然兜底换成商品类目兜底，缺类目时拦截保存', async () => {
+    const draft = { ...emptyDraft('groupBuy', 'flashBee'), key: 'new_groupBuy_product_algo', strategyName: '驗證商品維度', displayCategoryMode: 'algorithm' as const, contentType: 'product' as const }
+    writeDraft(draft)
+    renderForm('/promotion-slot-config-add?biz=groupBuy&draftKey=new_groupBuy_product_algo')
+    await screen.findByDisplayValue('驗證商品維度')
+    await waitFor(() => expect(fetchAdAlgorithms).toHaveBeenCalledWith(expect.objectContaining({ algoType: 1, businessType: 2, targetType: 2 })))
+    // 门店型自然流量不可用；商品类目兜底必填（文案待 i18n 接入后改读 zh 键）
+    expect(screen.queryByRole('combobox', { name: zh.promotionSlotConfig.naturalFallback })).not.toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: '商品類目兜底' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /保\s*存/ }))
+    expect(await screen.findByText('請至少選擇一個商品類目兜底')).toBeInTheDocument()
+    expect(createWaterfall).not.toHaveBeenCalled()
+  }, 60000)
+
+  it('门店维度算法模式仍请求自然流量兜底候选且不带 targetType 参数', async () => {
+    const draft = { ...emptyDraft('groupBuy', 'flashBee'), key: 'new_groupBuy_store_algo', strategyName: '驗證門店維度', displayCategoryMode: 'algorithm' as const }
+    writeDraft(draft)
+    renderForm('/promotion-slot-config-add?biz=groupBuy&draftKey=new_groupBuy_store_algo')
+    await screen.findByDisplayValue('驗證門店維度')
+    await waitFor(() => expect(fetchAdAlgorithms).toHaveBeenCalled())
+    const lastCall = vi.mocked(fetchAdAlgorithms).mock.calls.at(-1)?.[0]
+    expect(lastCall).not.toHaveProperty('targetType')
+    expect(screen.getByRole('combobox', { name: zh.promotionSlotConfig.naturalFallback })).toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: '商品類目兜底' })).not.toBeInTheDocument()
   }, 60000)
 })

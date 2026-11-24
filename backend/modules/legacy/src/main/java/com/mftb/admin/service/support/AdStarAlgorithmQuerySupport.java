@@ -43,10 +43,15 @@ public final class AdStarAlgorithmQuerySupport {
         }
         if (business != null) {
             wrapper.and(w -> {
+                w.or(sim -> sim.eq(AdAlgorithm::getAlgoType, AdSimilarAlgorithmParams.ALGORITHM_TYPE)
+                        .apply("JSON_CONTAINS(JSON_EXTRACT(" + SAFE_PARAMS + ", '$.applicableBusinessTypes'), {0}) = 1",
+                                String.valueOf(business)));
                 w.nested(versioned -> versioned.eq(AdAlgorithm::getAlgoType, AdStarAlgorithmParams.ALGORITHM_TYPE)
                         .apply(HAS_SCOPE + " = 1")
                         .apply("JSON_CONTAINS(" + BUSINESSES + ", {0}) = 1", String.valueOf(business)));
                 w.or(legacy -> {
+                    // type17 的业务范围只认参数内 applicableBusinessTypes，不能走旧频道推断分支。
+                    legacy.ne(AdAlgorithm::getAlgoType, AdSimilarAlgorithmParams.ALGORITHM_TYPE);
                     legacy.and(noScope -> noScope.ne(AdAlgorithm::getAlgoType, AdStarAlgorithmParams.ALGORITHM_TYPE)
                             .or().apply(HAS_SCOPE + " = 0"));
                     if (business == AdStarAlgorithmParams.GROUP_BUY_BUSINESS) legacy.eq(AdAlgorithm::getChannel, LEGACY_GROUP_BUY_CHANNEL);

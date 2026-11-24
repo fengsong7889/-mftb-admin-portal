@@ -1,0 +1,141 @@
+/**
+ * Copyright (c) 2026 fengsong7889. All Rights Reserved.
+ * 本文件属专有软件组成部分，未经著作权人书面许可不得使用、复制或再分发。
+ * 完整许可条款见仓库根目录 LICENSE 文件。
+ */
+.similar-prototype { color: var(--text-1); }
+.similar-prototype__notice { margin-bottom: 16px; }
+.similar-prototype__header { background: var(--surface-2); border-radius: 12px; overflow: hidden; margin-bottom: 16px; box-shadow: var(--shadow-1), var(--card-outline); border: 1px solid var(--border-3); }
+.similar-prototype__accent { height: 3px; background: linear-gradient(90deg, var(--brand), var(--brand-hover), var(--warning), var(--brand-hover), var(--brand)); background-size: 200% 100%; animation: headerGradientShift 4s ease infinite; }
+.similar-prototype__header-body { padding: 16px 24px; display: flex; align-items: center; gap: 16px; }
+.similar-prototype__header h2 { margin: 0; font-size: 18px; font-weight: 700; color: var(--text-brand); }
+.similar-prototype__divider-v { width: 1px; height: 20px; background: var(--border-1); flex-shrink: 0; }
+.similar-prototype__title-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.similar-prototype__subtitle { font-size: 14px; color: var(--text-2); white-space: nowrap; }
+.similar-prototype__header-extra { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.similar-prototype__trial-modal { max-height: 72vh; overflow-y: auto; }
+.similar-binding { min-width: 0; }
+.similar-binding__label { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; color: var(--text-2); font-size: 13px; }
+.similar-binding .ant-select { width: 100%; }
+.similar-binding__options { display: grid; gap: 8px; margin-top: 10px; }
+.similar-binding__options label { color: var(--text-2); font-size: 12px; }
+.similar-binding__error { color: var(--warning); font-size: 12px; margin: 8px 0 0; }
+.similar-prototype__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 20px; }
+/* 基础信息仅名称/品牌两字段，两列占满（与其它广告表单同口径）。 */
+.similar-prototype__grid--basic { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.similar-prototype__grid .ant-select, .similar-prototype__grid .ant-input, .similar-prototype__grid .ant-input-number { width: 100%; }
+/* 带 suffix 单位的数字框会多包一层 affix-wrapper；不单独给宽度就退化为内容宽，与同排 Select 长短不齐（与 AlgorithmForm/Traffic 同口径）。 */
+.similar-prototype__grid .ant-input-number-affix-wrapper { width: 100%; }
+.similar-prototype__grid .ant-input-number-affix-wrapper > .ant-input-number { flex: 1; min-width: 0; }
+/* 参数区三列栅格：标签内容宽紧跟控件（间距恒小，不再因固定列宽留大空隙），控件统一固定宽 240px 等长不参差；
+   必填星号悬挂于对齐线左侧，标签首字与子块标题文字对齐；行内禁止换行（hover 步进箭头不再撑出换行）。 */
+.similar-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px 24px; padding-left: 12px; }
+.similar-grid-3 .ant-form-item.ant-form-item { margin-bottom: 14px; }
+/* 叠 .ant-form-item 抬特异性（同投流口径）：压回 vertical 表单的纵向默认并强制行不换行；标签与控件垂直居中。 */
+.similar-grid-3 .ant-form-item.ant-form-item .ant-form-item-row { flex-direction: row; align-items: center; flex-wrap: nowrap; }
+.similar-grid-3 .ant-form-item.ant-form-item .ant-form-item-label { flex: 0 0 auto; max-width: none; min-width: 0; text-align: left; padding: 0; }
+.similar-grid-3 .ant-form-item-label > label { height: auto; font-size: 13px; color: var(--text-2); }
+/* 星号悬挂：拉出对齐线左侧，标签首字仍落在栅格缩进线上与子块标题文字对齐。 */
+.similar-grid-3 .ant-form-item-label > label.ant-form-item-required::before { margin-inline-start: -12px; margin-inline-end: 4px; }
+.similar-grid-3 .ant-form-item.ant-form-item .ant-form-item-control { flex: 0 0 220px; max-width: 220px; min-width: 0; }
+/* 控件填满固定 220px 控件列：同排同列等长；宽度足够完整显示最长枚举（無停留門檻，返回時展示 ≈ 205px 含箭头）；
+   affix-wrapper 必须显式声明，否则带 suffix 的数字框退化为内容宽。 */
+.similar-grid-3 .ant-select, .similar-grid-3 .ant-input-number, .similar-grid-3 .ant-input-number-affix-wrapper { width: 100%; }
+.similar-grid-3 .ant-input-number-affix-wrapper > .ant-input-number { flex: 1; min-width: 0; width: 100%; }
+/* 窄屏降列：三列下「最长标签 130px + 220px 控件」会超出格宽被压缩（行 nowrap+shrink），导致控件长短参差、枚举截断；
+   ≤1440px 改两列、≤1080px 改单列，保证控件恒为 220px 等长。 */
+@media (max-width: 1440px) { .similar-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1080px) { .similar-grid-3 { grid-template-columns: minmax(0, 1fr); } }
+/* —— 行内合并：字段与其试算入口共用一行，避免试算独占一行浪费纵向空间。 —— */
+.similar-inline-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; }
+/* 覆盖 algorithm-section「最后一个 Form.Item 留 12px」规则：靠多一层类名抬特异性，不依赖声明顺序。 */
+.similar-prototype .traffic-field-group .similar-inline-row .ant-form-item,
+.similar-prototype .traffic-field-group .similar-inline-row .ant-form-item:last-child { margin-bottom: 0; }
+/* 同款陷阱：行内最后一个字段被 .similar-prototype .algorithm-section .ant-form-item:last-child{margin-bottom:12px}
+   以更高特异性命中，整项高 12px，在 align-items:center 下把同排其余字段压低 6px，视觉即「第二个配置项没对齐」；必须清零。 */
+.similar-prototype .traffic-field-group .traffic-fields-inline .ant-form-item.ant-form-item:last-child { margin-bottom: 0; }
+.similar-inline-row .ant-checkbox-group { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.similar-prototype__hint { font-size: 12px; line-height: 1.8; color: var(--text-3); margin: 8px 0 16px; }
+.similar-prototype__status { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+.similar-prototype__footer { display: flex; gap: 24px; padding: 16px 24px; font-size: 12px; color: var(--text-3); }
+.similar-prototype__preview { padding: 20px; background: var(--surface-sunken); border: 1px solid var(--border-3); border-radius: 12px; }
+.similar-prototype__preview-layout { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+.similar-prototype__controls { flex: 1 1 320px; min-width: 280px; }
+.similar-prototype__controls label { display: block; font-size: 13px; margin-bottom: 6px; color: var(--text-2); }
+.similar-prototype__controls .ant-select { width: 100%; }
+.similar-prototype__control { margin-bottom: 16px; }
+.similar-prototype__phone { width: 364px; flex-shrink: 0; background: var(--surface-2); border: 2px solid var(--border-1); border-radius: 24px; padding: 16px; box-shadow: var(--shadow-2), var(--card-outline); }
+.similar-prototype__phone-top { display: flex; align-items: center; justify-content: space-between; padding: 6px 4px 14px; border-bottom: 1px solid var(--border-2); }
+.similar-prototype__feed { height: 432px; overflow: auto; padding: 12px 0; overflow-anchor: none; }
+.similar-prototype__feed-row { display: grid; gap: 8px; margin-bottom: 8px; }
+.similar-prototype__feed-row--double { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.similar-prototype__feed-card { border: 1px solid var(--border-3); border-radius: 8px; padding: 12px; background: var(--surface-2); color: var(--text-1); min-width: 0; }
+.similar-prototype__feed-card p { font-size: 12px; color: var(--text-3); margin: 6px 0; }
+.similar-prototype__feed-card strong { font-size: 13px; }
+.similar-prototype__feed-card--anchor { border-color: var(--brand-border); background: var(--brand-soft); }
+.similar-prototype__feed-card--rec { border-color: var(--info-border); background: var(--info-soft); }
+.similar-prototype__feed-card .ant-btn { white-space: normal; height: auto; padding: 2px 0; }
+.similar-prototype__detail { padding: 24px 12px; min-height: 360px; }
+.similar-prototype__detail h4 { margin: 12px 0; }
+.similar-prototype__detail p { color: var(--text-2); line-height: 1.8; }
+.similar-prototype__reasons { margin: 12px 0 0; color: var(--text-3); font-size: 12px; line-height: 1.8; }
+.similar-prototype .algorithm-section .ant-form-item:last-child { margin-bottom: 12px; }
+/* —— 多场景引擎：场景总览卡片、契约标签、绑定覆盖栅格（仅布局与令牌取色）。 —— */
+.similar-scene-overview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.similar-scene-card { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--border-3); border-radius: 8px; background: var(--surface-2); padding: 12px 14px; min-width: 0; }
+.similar-scene-card.is-reserved { background: var(--surface-sunken); opacity: 0.75; }
+.similar-scene-card__head { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-1); }
+.similar-scene-card__icon { font-size: 16px; }
+.similar-scene-card__badge { margin-left: auto; font-size: 11px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--border-2); color: var(--text-3); white-space: nowrap; }
+.similar-scene-card__badge.is-live { color: var(--text-brand); border-color: var(--info-border); background: var(--info-soft); }
+.similar-scene-card__meta { margin: 0; font-size: 12px; line-height: 1.7; color: var(--text-2); }
+.similar-scene-card__summary { margin: 0; font-size: 12px; line-height: 1.7; color: var(--text-3); }
+.similar-scene-refs { margin: 0; padding-left: 18px; font-size: 13px; color: var(--text-2); line-height: 2; }
+.similar-scene-refs em { font-style: normal; margin-left: 8px; font-size: 12px; color: var(--text-3); }
+.similar-binding__engine { margin-top: 10px; }
+.similar-binding__pending { margin: 10px 0 0; font-size: 12px; line-height: 1.7; color: var(--text-3); }
+.scene-contract { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.scene-contract__tag { font-size: 12px; line-height: 1.6; padding: 1px 8px; border-radius: 4px; border: 1px solid var(--border-2); background: var(--surface-2); color: var(--text-2); }
+.scene-contract__tag.is-paid { color: var(--brand); border-color: var(--brand-border); background: var(--brand-soft); }
+.scene-contract__summary { margin: 8px 0 0; font-size: 12px; line-height: 1.7; color: var(--text-3); }
+.scene-override-block { margin-top: 12px; border: 1px solid var(--border-3); border-radius: 8px; background: var(--surface-2); padding: 10px 12px; }
+.scene-override-block__title { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--text-1); }
+.scene-override-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; }
+.scene-override-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+/* display:flex 会压过 [hidden] 的 UA 默认 display:none：条件隐藏的场景字段必须显式守卫（同 algorithm-section__body 口径）。 */
+.scene-override-field[hidden] { display: none; }
+.scene-override-field label { font-size: 12px; color: var(--text-3); }
+.scene-override-field .ant-select, .scene-override-field .ant-input-number { width: 100%; }
+/* 场景专属数字字段同样带 suffix 单位，补齐 affix-wrapper 以免宽度塌陷。 */
+.scene-override-field .ant-input-number-affix-wrapper { width: 100%; }
+.scene-override-field .ant-input-number-affix-wrapper > .ant-input-number { flex: 1; min-width: 0; }
+.scene-override-note { margin: 8px 0 0; font-size: 12px; line-height: 1.7; color: var(--text-3); }
+
+/* —— ④ 插入樣式：回插動效與高亮（僅呈現層，不影響召回/排序/計費）。duration/delay 由內聯 style 注入。 —— */
+.similar-insert--fade { animation-name: similar-insert-fade; animation-timing-function: cubic-bezier(.22, .9, .3, 1); animation-fill-mode: both; }
+.similar-insert--slide { animation-name: similar-insert-slide; animation-timing-function: cubic-bezier(.22, .9, .3, 1); animation-fill-mode: both; }
+.similar-insert--none { animation: none; }
+.similar-insert--highlight { border-color: var(--brand-border); box-shadow: 0 0 0 1px var(--brand-border), 0 8px 20px -10px var(--brand); }
+@keyframes similar-insert-fade { from { opacity: 0; transform: scale(.96) translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes similar-insert-slide { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+/* 無障礙：用戶偏好低動效時降級為直接插入，不阻塞核心預覽。 */
+@media (prefers-reduced-motion: reduce) { .similar-insert--fade, .similar-insert--slide { animation: none; } }
+
+/* —— 插入樣式专用试算：左侧呈现层操作＋右侧瀑布流策略同款手机壳（壳／卡片单一真源 WaterfallPreview）。 —— */
+.insert-trial { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: start; }
+.insert-trial__controls { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.insert-trial__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.insert-trial__field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.insert-trial__field > label { font-size: 12px; font-weight: 500; color: var(--text-3); }
+.insert-trial__field .ant-select, .insert-trial__field .ant-input-number, .insert-trial__field .ant-input-number-affix-wrapper { width: 100%; }
+.insert-trial__status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--text-3); }
+.insert-trial__hint { margin: 0; font-size: 12px; line-height: 1.7; color: var(--text-3); }
+.insert-trial__actions { display: flex; gap: 8px; }
+/* 动效／高亮作用于卡片外包层：透明描边让高亮描边有附着面；壳内配色随消费者端 mock 不翻面。 */
+.insert-trial__rec-wrap { border-radius: 12px; border: 1px solid transparent; }
+/* 壳内容区：单列卡片序列＋自绘细滚动条（仅滚动条 chrome 取平台令牌）。 */
+.insert-trial-feed { display: flex; flex-direction: column; gap: 10px; }
+.insert-trial-feed::-webkit-scrollbar { width: 4px; }
+.insert-trial-feed::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
+.insert-trial-feed::-webkit-scrollbar-track { background: transparent; }
+@media (max-width: 720px) { .insert-trial { grid-template-columns: 1fr; } }

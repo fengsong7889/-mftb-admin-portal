@@ -27,6 +27,12 @@ export interface BaseOrderItem {
   groupName: string
   storeId: string
   storeName: string
+  /** 推廣對象快照: 1=門店 2=商品（商品訂單門店列改顯商品） */
+  targetType?: number
+  /** 團購商品編碼快照（僅商品訂單） */
+  productId?: string
+  /** 團購商品名稱快照（僅商品訂單） */
+  productName?: string
   mealSlots: string[]
   dateSlots?: DateSlotGroup[]
   purchaseDays?: string[]

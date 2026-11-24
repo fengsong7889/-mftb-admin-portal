@@ -41,6 +41,10 @@ export interface MockCatalogItem {
   deliveryTime?: string
   /** 剩余库存（仅商品；undefined 表示不限库存） */
   stock?: number
+  /** 归属集团（商品购买链路字段；真实接入后由团购业务系统返回，接口就绪前不得开放生产售卖） */
+  groupCode?: string
+  /** 归属集团名称快照 */
+  groupName?: string
 }
 
 /** 门店分类 */
@@ -91,12 +95,12 @@ const ITEMS: MockCatalogItem[] = [
   { id: 'MD4001', name: '全澳西餐銷量第1名·威尼斯西餐廳', contentType: 'store', brand: 'flashBee', categoryId: 'sc_west', enabled: true, rating: 4.9, monthlySales: 3200, image: '🍝', distance: '600m', deliveryTime: '26分鐘' },
   // 空分類無資源
   // 团购商品
-  { id: 'GD9001', name: '【火鍋】雙人海鮮火鍋套餐（含飲品任選）', contentType: 'product', brand: 'flashBee', categoryId: 'pc_set', enabled: true, rating: 4.7, monthlySales: 560, price: 299, originPrice: 458, stock: 88, image: '🍲' },
-  { id: 'GD9002', name: '【19店通用】100元代金券（新花城超級市場）【新】', contentType: 'product', brand: 'flashBee', categoryId: 'pc_voucher', enabled: true, monthlySales: 242, price: 97, originPrice: 100, image: '🎫' },
-  { id: 'GD9003', name: '招牌暴打檸檬茶(中杯)', contentType: 'product', brand: 'mFood', categoryId: 'pc_drink', enabled: true, rating: 4.5, monthlySales: 1196, price: 26.1, originPrice: 29, stock: 200, image: '🧋' },
-  { id: 'GD9004', name: '五星酒店自助晚餐·雙人套餐（含酒水暢飲·週末節假日通用·限時特惠搶購價）', contentType: 'product', brand: 'flashBee', categoryId: 'pc_buffet', enabled: true, rating: 4.8, monthlySales: 320, price: 599, originPrice: 899, stock: 12, image: '🍽️' },
-  { id: 'GD9005', name: '【已下架】下午茶套餐(失效示例)', contentType: 'product', brand: 'flashBee', categoryId: 'pc_set', enabled: false, monthlySales: 0, price: 88, originPrice: 128, stock: 0, image: '🍰' },
-  { id: 'GD9006', name: '烤糖粉粿奶茶(中杯)', contentType: 'product', brand: 'mFood', categoryId: 'pc_drink', enabled: true, rating: 4.6, monthlySales: 630, price: 26.1, originPrice: 29, stock: 150, image: '🧋' },
+  { id: 'GD9001', name: '【火鍋】雙人海鮮火鍋套餐（含飲品任選）', contentType: 'product', brand: 'flashBee', categoryId: 'pc_set', enabled: true, rating: 4.7, monthlySales: 560, price: 299, originPrice: 458, stock: 88, image: '🍲', groupCode: 'GRP0001', groupName: '閃蜂餐飲集團（样例）' },
+  { id: 'GD9002', name: '【19店通用】100元代金券（新花城超級市場）【新】', contentType: 'product', brand: 'flashBee', categoryId: 'pc_voucher', enabled: true, monthlySales: 242, price: 97, originPrice: 100, image: '🎫', groupCode: 'GRP0001', groupName: '閃蜂餐飲集團（样例）' },
+  { id: 'GD9003', name: '招牌暴打檸檬茶(中杯)', contentType: 'product', brand: 'mFood', categoryId: 'pc_drink', enabled: true, rating: 4.5, monthlySales: 1196, price: 26.1, originPrice: 29, stock: 200, image: '🧋', groupCode: 'GRP0002', groupName: 'M美食茶飲集團（样例）' },
+  { id: 'GD9004', name: '五星酒店自助晚餐·雙人套餐（含酒水暢飲·週末節假日通用·限時特惠搶購價）', contentType: 'product', brand: 'flashBee', categoryId: 'pc_buffet', enabled: true, rating: 4.8, monthlySales: 320, price: 599, originPrice: 899, stock: 12, image: '🍽️', groupCode: 'GRP0003', groupName: '澳門酒店餐飲集團（样例）' },
+  { id: 'GD9005', name: '【已下架】下午茶套餐(失效示例)', contentType: 'product', brand: 'flashBee', categoryId: 'pc_set', enabled: false, monthlySales: 0, price: 88, originPrice: 128, stock: 0, image: '🍰', groupCode: 'GRP0001', groupName: '閃蜂餐飲集團（样例）' },
+  { id: 'GD9006', name: '烤糖粉粿奶茶(中杯)', contentType: 'product', brand: 'mFood', categoryId: 'pc_drink', enabled: true, rating: 4.6, monthlySales: 630, price: 26.1, originPrice: 29, stock: 150, image: '🧋', groupCode: 'GRP0002', groupName: 'M美食茶飲集團（样例）' },
 ]
 
 const CATEGORY_MAP = new Map(CATEGORIES.map(c => [c.id, c]))
@@ -146,11 +150,13 @@ export function mockCategoryName(id: string): string | undefined {
   return CATEGORY_MAP.get(id)?.name
 }
 
-/** 分页搜索资源（按内容类型 / 品牌 / 分类 / 关键词） */
+/** 分页搜索资源（按内容类型 / 品牌 / 分类 / 集团归属 / 关键词） */
 export function mockSearchItems(params: {
   contentType: WaterfallContentType
   brand?: string
   categoryId?: string
+  /** 集团归属过滤（商品购买链路）：传入时仅返回显式绑定该集团的资源 */
+  groupCode?: string
   keyword?: string
   channel?: WaterfallCatalogChannel
   page: number
@@ -158,6 +164,7 @@ export function mockSearchItems(params: {
 }): { records: MockCatalogItem[]; total: number } {
   let list = ITEMS.filter(i => i.contentType === params.contentType && (i.channel ?? 'groupBuy') === (params.channel ?? 'groupBuy'))
   if (params.brand) list = list.filter(i => i.brand === params.brand)
+  if (params.groupCode) list = list.filter(i => i.groupCode === params.groupCode)
   if (params.categoryId) list = list.filter(i => i.categoryId === params.categoryId)
   if (params.keyword) {
     const kw = params.keyword.toLowerCase()

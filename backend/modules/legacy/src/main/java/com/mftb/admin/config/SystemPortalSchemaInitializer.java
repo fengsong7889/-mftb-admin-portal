@@ -517,8 +517,8 @@ public class SystemPortalSchemaInitializer implements CommandLineRunner {
                 "rdm-workbench", "rdm-requirement", "rdm-submit", "rdm-pool-group", "rdm-query",
                 "rdm-product", "rdm-delivery", "rdm-acceptance", "rdm-config-group"));
         updateMenuSystem(SystemCode.OA.code(),        List.of("process-center", "oa-requests", "workflow-config"));
-        // 持續績效（cpm）：使用侧两张 + 治理侧三张，全部一级菜单（CpmSchemaMigrationInitializer 种子）
-        updateMenuSystem(SystemCode.CPM.code(),       List.of("cpm-my", "cpm-report", "cpm-team", "cpm-template", "cpm-rule"));
+        // 持續績效（cpm）：使用侧两张 + 工时口径一张 + 治理侧三张，全部一级菜单（CpmSchemaMigrationInitializer 种子）
+        updateMenuSystem(SystemCode.CPM.code(),       List.of("cpm-my", "cpm-holiday", "cpm-report", "cpm-team", "cpm-template", "cpm-rule"));
         // 菜单配置是治理面菜单，归 iam 而非 platform
         updateMenuSystem(SystemCode.IAM.code(),       List.of("authorization-center", "role-management",
                 "function-permission", "data-permission", "system-authorization", "menu-config"));

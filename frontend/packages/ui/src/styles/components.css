@@ -2715,85 +2715,87 @@ html:has(.login-page-video) {
 
 /* ===== 各类型徽记（每类一枚：白色形 + 一处品牌橙高亮） ===== */
 
-/* 無敵星星：全澳置顶曝光 —— 上箭头 + 坑位条，首条橙亮 */
-.algo-card-mk-star {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-}
-.algo-card-mk-star i {
-  display: block;
-  border-radius: 2px;
-}
-.algo-card-mk-star-arrow {
-  width: 0;
-  height: 0;
-  border-radius: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-bottom: 6px solid rgba(255, 255, 255, 0.92);
-}
-.algo-card-mk-star-bar {
-  width: 20px;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.45);
-}
-.algo-card-mk-star-bar.is-first {
+/* 無敵星星：头部流量曝光 —— 聚光灯自上照射橙亮头部坑位（不围绕星形） */
+.algo-card-mk-spot {
+  position: relative;
   width: 24px;
-  height: 5px;
+  height: 24px;
+}
+.algo-card-mk-spot-lamp {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 8px;
+  height: 4px;
+  margin-left: -4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.92);
+}
+.algo-card-mk-spot-beam {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 20px;
+  height: 14px;
+  margin-left: -10px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.12));
+  clip-path: polygon(35% 0%, 65% 0%, 100% 100%, 0% 100%);
+}
+.algo-card-mk-spot-slot {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 18px;
+  height: 4px;
+  margin-left: -9px;
+  border-radius: 2px;
   background: linear-gradient(90deg, rgba(255, 179, 71, 0.95), rgba(232, 114, 12, 0.95));
   box-shadow: 0 0 8px rgba(255, 179, 71, 0.55);
 }
-.algo-card-mk-star-bar.is-dim {
-  width: 14px;
-  background: rgba(255, 255, 255, 0.26);
-}
 
-/* 盤活復甦：商圈限定置顶 —— 定位 pin 钉在坑位上，首条橙亮 */
+/* 盤活復甦：新芽生长 —— 茎 + 双叶 + 橙亮芽芯（激活/复苏/增长） */
 .algo-card-mk-revive {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-}
-.algo-card-mk-revive-pin {
   position: relative;
-  width: 12px;
+  width: 24px;
+  height: 22px;
+}
+.algo-card-mk-revive-stem {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 2px;
   height: 12px;
-  border-radius: 50%;
+  margin-left: -1px;
+  border-radius: 1px;
   background: rgba(255, 255, 255, 0.92);
 }
-.algo-card-mk-revive-pin::before {
-  content: '';
+.algo-card-mk-revive-leaf {
   position: absolute;
-  top: 4px;
-  left: 4px;
-  width: 4px;
-  height: 4px;
+  bottom: 8px;
+  width: 10px;
+  height: 7px;
+  background: rgba(255, 255, 255, 0.92);
+}
+.algo-card-mk-revive-leaf.is-left {
+  left: 2px;
+  border-radius: 0 70% 0 70%;
+  transform: rotate(-8deg);
+}
+.algo-card-mk-revive-leaf.is-right {
+  right: 2px;
+  border-radius: 70% 0 70% 0;
+  transform: rotate(8deg);
+}
+.algo-card-mk-revive-bud {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
   border-radius: 50%;
   background: rgba(232, 114, 12, 0.95);
-}
-.algo-card-mk-revive-pin::after {
-  content: '';
-  position: absolute;
-  bottom: -6px;
-  left: 2px;
-  width: 0;
-  height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 7px solid rgba(255, 255, 255, 0.92);
-}
-.algo-card-mk-revive-bar {
-  width: 16px;
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.45);
-}
-.algo-card-mk-revive-bar.is-first {
-  width: 20px;
-  background: linear-gradient(90deg, rgba(255, 179, 71, 0.95), rgba(232, 114, 12, 0.95));
+  box-shadow: 0 0 8px rgba(255, 179, 71, 0.55);
 }
 
 /* 新店廣告：新开业门面 —— 屋顶橙亮 + 店身 + 门 */
@@ -2890,35 +2892,47 @@ html:has(.login-page-video) {
   background: rgba(255, 255, 255, 0.92);
 }
 
-/* 金字招牌：品质匾额 —— 顶檐 + 橙亮匾身（匾面金字线） */
+/* 金字招牌：高门槛荣誉勋章 —— 白圆章 + 橙亮星徽 + 下垂双绶带 */
 .algo-card-mk-plaque {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-.algo-card-mk-plaque-top {
-  width: 24px;
-  height: 4px;
-  border-radius: 1px;
-  background: rgba(255, 255, 255, 0.92);
-}
-.algo-card-mk-plaque-body {
   position: relative;
-  width: 28px;
-  height: 16px;
-  border-radius: 3px;
-  background: linear-gradient(135deg, rgba(255, 179, 71, 0.95), rgba(232, 114, 12, 0.95));
+  width: 24px;
+  height: 24px;
 }
-.algo-card-mk-plaque-body::after {
-  content: '';
+.algo-card-mk-plaque-ribbon {
   position: absolute;
-  top: 7px;
-  left: 8px;
-  width: 12px;
-  height: 2px;
-  border-radius: 1px;
+  top: 12px;
+  width: 6px;
+  height: 11px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 0 0 3px 3px;
+}
+.algo-card-mk-plaque-ribbon.is-left {
+  left: 4px;
+  transform: rotate(16deg);
+}
+.algo-card-mk-plaque-ribbon.is-right {
+  right: 4px;
+  transform: rotate(-16deg);
+}
+.algo-card-mk-plaque-disc {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  border-radius: 50%;
   background: rgba(255, 255, 255, 0.92);
+}
+.algo-card-mk-plaque-emblem {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 10px;
+  height: 9px;
+  margin-left: -5px;
+  background: linear-gradient(135deg, rgba(255, 179, 71, 0.95), rgba(232, 114, 12, 0.95));
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
 }
 
 /* 投流廣告：商家×用户匹配 —— 两端节点 + 橙亮双向交换 */
@@ -2960,6 +2974,9 @@ html:has(.login-page-video) {
   border-bottom: 4px solid transparent;
   border-right: 9px solid rgba(232, 114, 12, 0.95);
 }
+
+/* 交互式相似推荐：双磁铁相互吸引 SVG（SimilarEngineIcon）；hero 深色底上 body 覆写为白 */
+.algo-card-icon .similar-engine-icon { color: rgba(255, 255, 255, 0.95); }
 
 /* 猜你喜歡：歷史偏好命中 —— 心形（橙亮）；容器顯式 flex 同上（inline 子元素塊化必需） */
 .algo-card-mk-heart {
@@ -3143,6 +3160,9 @@ html:has(.login-page-video) {
   height: auto;
   bottom: 0;
   background: radial-gradient(120% 90% at 85% 18%, rgba(255, 255, 255, 0.12), transparent 55%);
+  /* 该高光层铺满整卡且 z-index 高于 .algo-card-inner，必须放行指针事件，
+     否则「查看訂單/購買廣告」按钮点不到，点击全部冒泡到卡片容器的 onCardClick。 */
+  pointer-events: none;
 }
 
 /* 扫光：hover 时光带自左向右掠过（overflow:hidden 由基类 wrapper 提供） */

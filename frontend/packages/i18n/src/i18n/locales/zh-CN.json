@@ -5945,7 +5945,9 @@
     "giftDeductShort": "抵扣",
     "fullGiftHint": "赠送天数全额抵扣，无需支付推广金",
     "orderNo": "订单编号",
-    "colSlot": "广告位"
+    "colSlot": "广告位",
+    "colProduct": "团购商品",
+    "productStoreNote": "适用门店由团购业务系统决定"
   },
   "translationManage": {
     "catCommon": "公共字段",
@@ -6207,7 +6209,11 @@
     "localSaveSuccess": "已保存到本地（未发布，App 暂不生效）",
     "localOnlyBanner": "团购到店配置本期仅前端保存（模拟数据），不会下发至 App；后端接入后生效",
     "localTag": "本地",
-    "unpublishedTag": "未发布"
+    "unpublishedTag": "未发布",
+    "productCategoryFallback": "商品类目兜底",
+    "productCategoryFallbackHint": "未被算法坑位覆盖的商品坑位由所选类目自动补位；商品维度不支持门店型自然流量兜底。",
+    "productCategoryFallbackRequired": "请至少选择一个商品类目兜底",
+    "productAlgorithmModeHint": "坑位仅可绑定商品类无敌星星；未被坑位覆盖的部分由商品类目兜底补位。"
   },
   "promotionWordLibrary": {
     "colRank": "排名",
@@ -8510,7 +8516,35 @@
     "trafficNotAllowRefundHint": "不支持订单退款，流量包购买后不可退还",
     "trafficStatusHint": "停用后该频道所有流量包停止售卖，已生成订单不受影响",
     "trafficOrderSuccess": "订单提交成功",
-    "trafficPricingSaveFailed": "定价配置保存失败，请稍后重试"
+    "trafficPricingSaveFailed": "定价配置保存失败，请稍后重试",
+    "targetLabel": "推广对象",
+    "choosePromoProduct": "选择推广商品",
+    "productStarAlgoPh": "选择商品星星算法",
+    "productStarAlgoEmpty": "当前品牌尚无已定价的商品星星算法",
+    "productSearchPh": "搜索并选择团购商品",
+    "groupLabel": "归属集团",
+    "storePresetTag": "适用门店由团购业务系统预配置",
+    "productNoGroupAlert": "该商品缺少归属集团信息，无法扣款；请重选商品或等待团购目录接口接入。",
+    "dayRegionGridTitle": "商圈 × 日期（全天售卖）",
+    "selectAlgoProductFirst": "选择算法与商品后展示可购格子",
+    "pendingSale": "待开售",
+    "remainingCount": "剩余",
+    "confirmSubmitTitle": "确认提交订单？",
+    "confirmProductLine": "商品：{{name}}（{{id}}）",
+    "confirmGroupLine": "归属集团：{{name}}",
+    "confirmCellLine": "格子数：{{count}} 个（商圈×日期全天）",
+    "confirmPayLine": "预计扣款：MOP {{amount}}（推广金）",
+    "orderSuccessTitle": "下单成功",
+    "orderSuccessContent": "订单号 {{orderNo}}，实付 MOP {{amount}}。可在「推广订单管理」查看与退款。",
+    "selectedCellsLabel": "已选",
+    "totalLabel": "合计",
+    "finalPayNote": "最终实付以确认单为准（含商圈全时段折扣）",
+    "lockExpiredMsg": "部分加购格子已超时释放，请重新选择",
+    "cellUnavailableMsg": "该格子暂不可加购",
+    "submitOrderWithPromo": "提交订单（推广金支付）",
+    "unavailableCell": "不可售",
+    "loadInventoryFailed": "库存加载失败，请重试",
+    "applyStoresLabel": "适用门店"
   },
   "recommend": {
     "appShanfeng": "闪蜂",
@@ -9086,7 +9120,33 @@
       "wrongType": "当前记录不是无敌星星算法，不能在此页面编辑",
       "invalidParams": "商品配置格式无效或版本不支持，请刷新后重试",
       "lastUpdater": "最后更新人",
-      "lastUpdateTime": "最后更新时间"
+      "lastUpdateTime": "最后更新时间",
+      "basicInfoTitle": "基础信息",
+      "filterTitle": "展示资格过滤",
+      "filterTag": "系统内置 · 只读",
+      "filterHelpTitle": "过滤规则对接说明",
+      "filterHelpCurrentLabel": "当前口径",
+      "filterHelpCurrentBody": "四项条件由团购业务系统内置裁决，本算法只定时校验并更新合格商品队列，不重复配置这些规则。",
+      "filterHelpNextLabel": "后续对接",
+      "filterHelpNextBody": "团购侧规则配置下发后，本模块按同一结构接入开关与参数，逐项解锁即可，页面无需重做。",
+      "filterNote": "以上条件由团购业务系统裁决，本页只读展示、不可操作；规则配置下发后可直接在本模块对接开关与参数。",
+      "effectPrefix": "结果",
+      "ruleDelistedLabel": "商品已下架",
+      "ruleDelistedDesc": "已下架的商品由团购业务系统统一排除，不进入本算法的候选商品队列。",
+      "ruleDelistedEffect": "移出候选队列",
+      "ruleSoldOutLabel": "商品已售罄",
+      "ruleSoldOutDesc": "售罄商品暂停展示；补货恢复可购后，于下一次定时校验自动回到队列。",
+      "ruleSoldOutEffect": "暂停展示，补货后恢复",
+      "ruleSaleWindowLabel": "未在销售时间内",
+      "ruleSaleWindowDesc": "仅处于团购销售时间窗口内的商品具备展示资格，超出时段自动排除。",
+      "ruleSaleWindowEffect": "非销售时段隐藏",
+      "ruleWaterfallScopeLabel": "不在瀑布流展示范围",
+      "ruleWaterfallScopeDesc": "商品须位于当前瀑布流策略的展示范围内，未纳入坑位的商品不参与分配。",
+      "ruleWaterfallScopeEffect": "不参与坑位分配",
+      "scopeTarget": "校验对象",
+      "scopeTargetValue": "已通过资格过滤的候选商品",
+      "scopeAction": "校验动作",
+      "scopeActionValue": "移出失效商品 · 补入恢复资格商品"
     },
     "saveFailed": "保存失败",
     "merchantPosMin": "商家位置至少为 1",
@@ -9392,7 +9452,7 @@
         "userKeywordStatsDays": "用户统计周期",
         "userPreferenceMinScore": "用户偏好识别最低分",
         "merchantPreferenceMinScore": "商家偏好识别最低分",
-        "matchThreshold": "偏好标签覆盖率门槛",
+        "matchThreshold": "最低覆盖比例",
         "maxUserTags": "参与匹配的标签上限",
         "explorationSlots": "新偏好探索标签数",
         "maxMerchantsPerKeyword": "同标签商家展示上限",
@@ -9403,11 +9463,11 @@
         "merchantDecayDays": "商家标签衰减周期",
         "merchantDecayPoints": "商家标签每次减分",
         "merchantRetainedTagCount": "商家保留最热标签数",
-        "merchantTagIdleClearDays": "商家保留标签清理天数",
+        "merchantTagIdleClearDays": "商家标签无新增清理天数",
         "userDecayDays": "用户标签衰减周期",
         "userDecayPoints": "用户标签每次减分",
         "userRetainedTagCount": "用户保留最热标签数",
-        "userTagIdleClearDays": "用户保留标签清理天数",
+        "userTagIdleClearDays": "用户标签无新增清理天数",
         "newTagBoostMultiplier": "新标签有效分加速倍数",
         "maxBoostTagCount": "同时加速标签上限",
         "generativeRecommendEnabled": "浏览后相似推荐",
@@ -9421,7 +9481,7 @@
         "generativeDailyLimit": "单用户每日触发上限",
         "generativeSkipMerchantCount": "再次触发前跳过商家点击",
         "newUserDimensions": "冷启动排序维度",
-        "qualityScoreThreshold": "商家质量分门槛",
+        "qualityScoreThreshold": "综合评分优选线",
         "regionPopularStatsDays": "热门度统计周期",
         "popularityMetrics": "热门度指标",
         "regionPopularTopPercent": "区域热门度前百分比",
@@ -9436,6 +9496,7 @@
         "similarityThreshold": "相似度门槛",
         "categoryMatchLevel": "类目匹配层级",
         "coldStartRegionScope": "区域召回范围",
+        "recallMerchantScope": "商家召回范围",
         "rankPreset": "排序策略",
         "rankFactors": "参与排序因子",
         "rankWeightMatch": "权重·匹配分",
@@ -9458,7 +9519,17 @@
         "similarAnchor": "相似度锚点",
         "similarBlendRatio": "融合时商家权重",
         "similarChainEnabled": "允许对推荐商家再次触发",
-        "similarChainDepth": "链式触发最大层数"
+        "similarChainDepth": "链式触发最大层数",
+        "qualityFilterEnabled": "启用商家质量门槛",
+        "coverageFilterEnabled": "启用最低覆盖比例",
+        "matchingUserSimilarEnabled": "启用用户协同补充",
+        "matchingUserSimilarThreshold": "协同补充最低用户相似度",
+        "matchingUserSimilarMode": "协同补充方式",
+        "matchingUserSimilarRatio": "协同预留比例",
+        "similarRecPriority": "候补填充顺序（已退役）",
+        "similarRecSlot1Source": "第 1 位优先来源",
+        "similarRecSlot2Source": "第 2 位优先来源",
+        "userSimilarThreshold": "相似用户最低相似度"
       },
       "opt": {
         "generativeTriggerMode": {
@@ -9491,7 +9562,7 @@
         },
         "similarRecModes": {
           "merchantSimilar": "商家相似推荐",
-          "userSimilar": "用户相似推荐",
+          "userSimilar": "用户协同推荐",
           "sameCategory": "同类目商家推荐"
         },
         "similarityMetric": {
@@ -9506,6 +9577,10 @@
           "delivery": "配送范围内",
           "tradeArea": "用户所在商圈"
         },
+        "recallMerchantScope": {
+          "trafficOnly": "仅投流商家",
+          "allMerchants": "全量商家（待开放）"
+        },
         "rankPreset": {
           "matchFirst": "匹配优先",
           "consumeFirst": "消耗优先",
@@ -9516,7 +9591,7 @@
           "any": "全时段投流商家"
         },
         "similarRankMode": {
-          "inherit": "沿用投流坑位排序",
+          "inherit": "沿用匹配路径排序",
           "independent": "独立配置"
         },
         "similarRankPreset": {
@@ -9532,6 +9607,39 @@
           "clickedMerchant": "被点击商家标签向量",
           "user": "当前用户标签向量",
           "blend": "商家＋用户融合"
+        },
+        "matchingUserSimilarMode": {
+          "fill": "不足时补充（默认・直接匹配优先）",
+          "ratio": "按比例预留（探索配额・直接充足也预留）"
+        },
+        "similarRecPriority": {
+          "merchantFirst": "按顺序（商家相似优先）",
+          "userFirst": "用户协同优先"
+        },
+        "similarRecSlot1Source": {
+          "merchantSimilar": "商家相似推荐",
+          "userSimilar": "用户协同推荐",
+          "sameCategory": "同类目商家推荐"
+        },
+        "similarRecSlot2Source": {
+          "merchantSimilar": "商家相似推荐",
+          "userSimilar": "用户协同推荐",
+          "sameCategory": "同类目商家推荐"
+        },
+        "rankFactors": {
+          "match": "匹配分",
+          "traffic": "剩余比例",
+          "quality": "质量分",
+          "distance": "距离",
+          "tagHeat": "匹配标签热度"
+        },
+        "rankTieBreak": {
+          "trafficDirection": "剩余曝光次数多者优先",
+          "quality": "质量分高者优先",
+          "distance": "距离近者优先",
+          "random": "随机探索",
+          "tagHeat": "匹配标签热度高者优先",
+          "match": "匹配分高者优先"
         }
       },
       "unit": {
@@ -9549,11 +9657,12 @@
       },
       "group": {
         "availability": "基础与可用性",
+        "recall": "召回范围",
         "matching": "标签与兴趣匹配",
         "coldStart": "冷启动推荐",
         "similarRec": "相似推荐",
-        "frequency": "频控与触发",
-        "ranking": "投流坑位排序"
+        "frequency": "商家频控",
+        "ranking": "排序规则"
       },
       "cap": {
         "c1": "偏好门槛",
@@ -9561,7 +9670,7 @@
         "c3": "相似度算法（算法级）",
         "c4": "商家标签衰减",
         "c5": "用户标签衰减",
-        "c6": "同商家去重",
+        "c6": "同商家曝光频控",
         "c7": "相似推荐触发频次",
         "c8": "时段优先",
         "c9": "坑位内打分与填充",
@@ -9572,7 +9681,10 @@
         "c14": "触发条件",
         "c15": "推荐数量",
         "c16": "插入优先级",
-        "c17": "独立优先级打分"
+        "c17": "独立优先级打分",
+        "c18": "商家召回范围",
+        "c19": "最低覆盖比例（可选）",
+        "c20": "用户协同补充（普通投流）"
       },
       "badge": {
         "selected": "已选",
@@ -9628,6 +9740,108 @@
       "rejected": "落选",
       "slotRank": "坑位排序",
       "indepPriority": "独立优先级"
+    },
+    "targetObjectLabel": "推广对象",
+    "productDailyPriceLabel": "全日单价（商品全天售卖）",
+    "tagDecay": {
+      "rules": {
+        "merchantTitle": "商家侧・供给热度",
+        "merchantBadge": "供给画像",
+        "merchantSub": "商家标签热度来自真实成交供给，以商品标准标签为唯一画像来源。",
+        "m1Title": "商品带标・画像来源",
+        "m1Body": "商品自带标准标签，系统据此为商家建立供给侧标签画像；标签 ID 与用户侧同一套标准，保证跨侧可匹配。",
+        "m2Title": "逐件计分・完成即加",
+        "m3Title": "复购沉淀・线性累计",
+        "m4Title": "有效订单口径",
+        "mMetric1Value": "+1",
+        "mMetric1Label": "每件完成商品",
+        "mMetric2Value": "走量",
+        "mMetric2Label": "按交付件数",
+        "mMetric3Value": "仅已完成",
+        "mMetric3Label": "订单计分",
+        "userTitle": "用户侧・偏好强度",
+        "userBadge": "偏好画像",
+        "userSub": "用户偏好强度来自真实成交行为，与商家侧共用同一套标签与衰变口径。",
+        "u1Title": "行为带标・偏好画像",
+        "u1Body": "用户每完成一笔订单，商品标准标签写入用户偏好画像，不依赖点击或浏览等轻行为。",
+        "u2Title": "同类去重・异类累计",
+        "u3Title": "复购强化・强度刻画",
+        "u4Title": "有效订单口径",
+        "uMetric1Value": "+1",
+        "uMetric1Label": "每种商品",
+        "uMetric2Value": "同类去重",
+        "uMetric2Label": "异类累计",
+        "uMetric3Value": "仅已完成",
+        "uMetric3Label": "订单计分",
+        "m2Body": "每卖出 <c>1</c> 件已完成订单商品，其标准标签为商家有效分 <c>+1</c>；按<c>走量</c>累加，真实交付越多、该标签供给热度越高。",
+        "m3Body": "同标签随完成商品件数<c>线性</c>累加，沉淀为原始累计分，刻画供给热度与经营稳定度。",
+        "m4Body": "仅<c>已完成</c>订单计分；取消、全额退款订单不产生自增。",
+        "u2Body": "同一订单中，<c>不同</c>商品命中同一标签各 <c>+1</c>（珍珠奶茶＋芋圆奶茶＋红豆奶茶→奶茶<c>+3</c>）；同一商品多件只计 <c>1</c> 次，避免单笔囤货灌分。",
+        "u3Body": "单内去重、单外累加：跨订单重复购买同类标签<c>线性</c>累计，刻画偏好广度与强度。",
+        "u4Body": "仅<c>已完成</c>订单计分；与商家侧共用同一衰变与闲置清理口径。"
+      },
+      "rulesSection": "标签加分规则",
+      "rulesFootnote": "原始累计与衰减后有效分分离储存：衰变与闲置清理只作用于推荐有效分，不删除原始订单计数历史；商家／用户匹配门槛仍由各算法独立设定。全局衰变保留线性基线，并提供 A 增量刷新时钟（每次有效新增重置该标签衰变计时，活跃标签不被误衰）与 B 饱和压缩（有效分按上限非线性收敛，抑制商家走量造成的头部膨胀）两项可选增强，第二阶段接入后端计算。",
+      "referenceAria": "全局标签衰变规则引用",
+      "referenceLabel": "引用全局标签衰变规则 · V{{revision}}",
+      "title": "全局标签衰变规则",
+      "referenceHelpAria": "全局标签衰变规则说明",
+      "refSingleSourceTitle": "统一来源",
+      "refSingleSource": "在算法库顶部「全局标签衰变规则」集中配置，投流及相似推荐共用，业务 Tab 不另外产生副本。",
+      "sideMerchant": "商家",
+      "sideUser": "用户",
+      "refBoundaryTitle": "接入边界",
+      "refBoundary": "本轮只统一前端配置来源，尚未发布到真实标签计算服务。既有后端参数待第二阶段迁移，原始订单计数不变。",
+      "discardTitle": "放弃尚未保存的变更？",
+      "discardLeaveBody": "全局规则尚未更新，离开将放弃本次调整。",
+      "discardOk": "放弃变更",
+      "keepEditing": "继续编辑",
+      "discardCancelBody": "全局规则尚未更新，取消将放弃本次调整并回到查看。",
+      "saveFailed": "保存失败",
+      "saved": "已更新本分页共用规则，尚未发布至后端",
+      "saveConfirmTitle": "确认更新全局标签衰变规则？",
+      "saveConfirmBody": "保存后本分页共用规则立即生效（所有算法引用同一全局规则，尚未发布至后端）。",
+      "saveConfirmOk": "确认保存",
+      "saveConfirmCancel": "返回编辑",
+      "edit": "编辑",
+      "notice": "全局规则原型：目前只在本分页保留，刷新后清空，尚未接入后端。",
+      "decaySection": "标签有效分衰变",
+      "decayHelpTitle": "衰变口径",
+      "decayHelpAria": "衰变口径说明",
+      "linearTitle": "线性衰变",
+      "linear": "有效分 = max(0, 初始有效分 − floor(经过天数 / 周期) × 每次减分)。原始订单累计不删除。",
+      "idleTitle": "闲置清理",
+      "idle": "从最后一次有效订单新增标签计数起算，定时衰变不刷新该时间。清理天数留空代表不按闲置清零。",
+      "sharedTitle": "共用执行",
+      "shared": "各算法只引用这套全局规则和同一份有效标签结果，不重复衰变；匹配门槛仍由各算法独立设定。",
+      "strategyTitle": "策略组合",
+      "strategy": "线性基线 + 可选 A 增量刷新衰变时钟 + B 饱和压缩；A 保护活跃标签、B 抑制商家走量头部膨胀，第二阶段于后端落地。",
+      "merchantGroup": "商家标签",
+      "userGroup": "用户标签",
+      "placeholderNoClear": "留空不启用",
+      "saturationGroup": "饱和压缩上限",
+      "saturationHint": "B 以该上限为渐近线：原始 +1 持续累计，推荐有效分 = 上限 ×(1−e^(−原始分/上限))，非线性收敛且恒不超过上限，用以抑制商家走量造成的头部膨胀；默认为基础上限（商家 50000／用户 1000），第二阶段于后端计算。",
+      "cancel": "取消",
+      "save": "保存",
+      "error": {
+        "integerRange": "{{label}}须为 {{min}}–{{max}} {{unit}} 之间的整数",
+        "invalidPolicy": "全局标签衰变规则无效",
+        "revisionConflict": "规则已更新，请重新载入后再保存"
+      },
+      "refMerchant": "每 {{days}} 天减 {{points}} 分；{{clearDays}} 天无新增清理。",
+      "refMerchantOff": "每 {{days}} 天减 {{points}} 分；不按闲置天数清理。",
+      "refUser": "每 {{days}} 天减 {{points}} 分；{{clearDays}} 天无新增清理。",
+      "refUserOff": "每 {{days}} 天减 {{points}} 分；不按闲置天数清理。",
+      "field": {
+        "merchantDecayDays": "商家衰变周期",
+        "merchantDecayPoints": "商家每次减分",
+        "merchantTagIdleClearDays": "商家无新增清理",
+        "userDecayDays": "用户衰变周期",
+        "userDecayPoints": "用户每次减分",
+        "userTagIdleClearDays": "用户无新增清理",
+        "merchantSaturationCap": "商家有效分上限",
+        "userSaturationCap": "用户有效分上限"
+      }
     }
   },
   "trafficSandbox": {
@@ -17564,6 +17778,424 @@
       "finish": "完成",
       "todayInvested": "今天 {{minutes}}",
       "workHoursChip": "工时 {{hours}}h"
+    },
+    "archive": {
+      "aiSummary": "AI 摘要",
+      "historyLoadFailed": "历史汇报载入失败",
+      "itemMeta": "{{total}} 项 · 完成 {{done}}",
+      "noHistory": "还没有历史汇报",
+      "noRecognition": "还没有收到成果认定",
+      "published": "已发布",
+      "recognitionLoadFailed": "成果档案载入失败",
+      "recognitionMeta": "认定人：{{by}} · {{at}} · 周期 {{period}}",
+      "recognitionNote": "认定即绩效证据，期末可供 HR 绩效考核取数（二期接口）",
+      "recognitionTitle": "上级认可记录"
+    },
+    "gantt": {
+      "action": {
+        "addItem": "新增工作项",
+        "collapseLeft": "收合左栏",
+        "expandLeft": "展开左栏",
+        "gantt": "甘特",
+        "ganttSwitchTip": "开启显示甘特图，关闭切换为列表",
+        "list": "列表",
+        "showWeekends": "显示周末",
+        "today": "回到今天"
+      },
+      "badge": {
+        "leave": "请",
+        "makeup": "班",
+        "rest": "休",
+        "today": "今"
+      },
+      "caliber": {
+        "p1": "耗时 = 区间工作日 × {{hours}}h；周末与节假日自动剔除，调休上班计入，请假/调休不计。",
+        "p2": "点击色条看详情/改进度 · 拖拽色块移动 · 拉伸右缘改结束 · 双击格子排期 · 行首手柄拖拽排序。",
+        "p3": "虚线边＋「插」角标＝临时插入工作项；行内 ⚡ 可标记/取消。",
+        "title": "工作日口径"
+      },
+      "cell": {
+        "restTip": "周末/节假日不计入工时，请选择工作日"
+      },
+      "col": {
+        "done": "完成",
+        "end": "结束日期",
+        "hours": "耗时",
+        "item": "工作项",
+        "note": "备注原因",
+        "progress": "当前进度",
+        "start": "开始日期",
+        "task": "任务子项"
+      },
+      "confirm": {
+        "deleteItemTitle": "确定删除整个工作项？",
+        "deleteTaskTitle": "确定删除该子任务？",
+        "labelContains": "包含：",
+        "labelItem": "工作项：",
+        "labelTask": "子任务：",
+        "subtaskCount": "{{count}} 个子任务，一并删除"
+      },
+      "csv": {
+        "colEnd": "结束日期",
+        "colGroup": "工作项",
+        "colHours": "耗时(小时)",
+        "colNote": "备注原因",
+        "colProgress": "当前进度",
+        "colStart": "开始日期",
+        "colStatus": "完成状态",
+        "colTask": "任务子项",
+        "fileBase": "我的工作记录_{{date}}"
+      },
+      "date": {
+        "schedule": "排期"
+      },
+      "dayType": {
+        "compOff": "调休",
+        "holiday": "节假日",
+        "leave": "请假",
+        "makeup": "补班"
+      },
+      "density": {
+        "compact": "紧凑",
+        "loose": "宽松",
+        "standard": "标准"
+      },
+      "empty": {
+        "desc": "新增一个工作项标题，拆分子任务并排期，甘特图会按工作日自动铺开。",
+        "loadSeed": "载入示例数据",
+        "title": "还没有工作项台账"
+      },
+      "emptyFiltered": {
+        "clear": "清除筛选",
+        "desc": "调整关键词或状态筛选，或清除筛选查看全部工作项。",
+        "title": "没有符合条件的记录"
+      },
+      "export": {
+        "csv": "Excel 表格（CSV）",
+        "failed": "导出失败，请重试",
+        "fileBase": "我的工作记录_{{date}}",
+        "imageDone": "已下载当前台账的长图快照",
+        "pdfDone": "已下载当前台账的 A4 分页 PDF"
+      },
+      "hours": {
+        "tip": "{{days}} 个工作日 × {{hours}}h（周末/节假日不计）",
+        "value": "{{hours}}小时"
+      },
+      "inline": {
+        "clickToEdit": "点击修改"
+      },
+      "insert": {
+        "flag": "插",
+        "markTip": "标记为临时插入",
+        "noDate": "日期未记",
+        "tag": "临时",
+        "tagTip": "临时插入・{{date}}",
+        "unmarkTip": "取消临时插入标记"
+      },
+      "msg": {
+        "csvDone": "已导出 CSV，Excel 可直接打开",
+        "endBeforeStart": "结束日期不能早于开始日期，已对齐开始日期",
+        "insertedMarked": "已标记临时插入（{{date}}）",
+        "itemDeleted": "已删除工作项。",
+        "planRestored": "已恢复为原计划",
+        "sheetNotReady": "台账尚未载入",
+        "taskDeleted": "已删除子任务。",
+        "syncFailed": "保存失败，请重试"
+      },
+      "newItemTitle": "新工作项",
+      "note": {
+        "bold": "加粗",
+        "clear": "清除",
+        "clearFormat": "清除格式",
+        "clickToFill": "点击填写",
+        "color": "字色",
+        "italic": "斜体",
+        "save": "保存备注",
+        "sizeLg": "大",
+        "sizeMd": "标准",
+        "sizeSm": "小",
+        "sizeTip": "字号・{{size}}",
+        "sizeXl": "特大",
+        "tip": "支持加粗／斜体／下划线／字色／字号；保存时自动净化。列表备注悬停即可阅读全文，无需点击。",
+        "title": "备注・{{title}}",
+        "underline": "下划线"
+      },
+      "period": {
+        "back": "回本期",
+        "next": "下一期",
+        "prev": "上一期"
+      },
+      "plan": {
+        "inserted": "临时插入",
+        "planned": "原计划"
+      },
+      "pop": {
+        "editNote": "编辑备注",
+        "footer": "拖拽色块移动 · 拉伸右缘改结束 · 双击格子排期",
+        "hours": "耗时",
+        "insertedAt": "{{date}} 插入",
+        "noNote": "尚无备注",
+        "note": "备注",
+        "plan": "计划",
+        "planType": "属性",
+        "progress": "进度",
+        "workdays": "{{days}} 个工作日 × {{hours}}h"
+      },
+      "preset": {
+        "custom": "自定义",
+        "lastMonth": "上月",
+        "lastWeek": "上周",
+        "month": "本月",
+        "week": "本周"
+      },
+      "range": {
+        "all": "全部时间",
+        "monthFormat": "YYYY 年 MM 月",
+        "week": "第 {{week}} 周（{{start}} ~ {{end}}）"
+      },
+      "req": {
+        "addTask": "添加子任务",
+        "deleteItem": "删除工作项"
+      },
+      "search": {
+        "allItem": "全部工作项",
+        "allPlan": "全部属性",
+        "allStatus": "全部状态",
+        "cycle": "工作周期",
+        "keyword": "关键词",
+        "keywordPlaceholder": "工作项 / 子任务 / 备注",
+        "plan": "计划属性",
+        "status": "状态"
+      },
+      "stat": {
+        "avg": "项目平均进度",
+        "avgTip": "区间内任务的当前平均进度",
+        "doingNowTip": "当前状态为进行中",
+        "doingTip": "期末进度 1–99%",
+        "doneInPeriod": "本期完成",
+        "doneNowTip": "当前状态为已完成",
+        "doneTip": "完成时点落在查询区间（与汇报同口径）",
+        "hours": "总耗时（工作日口径）",
+        "hoursTip": "区间交集工作日 × 8h",
+        "insertedAllTip": "全部标记为临时插入的工作项",
+        "insertedTip": "插入时点落在查询区间",
+        "pendingNow": "待完成",
+        "pendingNowTip": "当前状态为待处理/待排期",
+        "pendingStart": "待启动",
+        "pendingTip": "期末进度 0%"
+      },
+      "status": {
+        "deriveTip": "由进度自动判定：100% 已完成；1–99% 进行中；0% 待处理；未排期为待排期",
+        "plan": "待排期",
+        "todo": "待处理"
+      },
+      "subtaskN": "子任务 {{count}}",
+      "suffix": {
+        "item": " 项",
+        "percent": "%"
+      },
+      "tabbar": {
+        "summary": "{{tasks}} 个子任务 · {{workdays}} 个工作日"
+      },
+      "undo": "撤销",
+      "weekNth": "第{{count}}周",
+      "weekdayShort": [
+        "日",
+        "一",
+        "二",
+        "三",
+        "四",
+        "五",
+        "六"
+      ],
+      "import": {
+        "button": "导入本地台账",
+        "done": "已导入本地台账（{{count}} 个工作项）"
+      },
+      "loadFailed": "台账载入失败",
+      "loading": "台账加载中…",
+      "loadingDesc": "数据来自服务端台账，工时按工作日口径计算。",
+      "tab": {
+        "day": "日视图",
+        "ledger": "工作台账"
+      }
+    },
+    "holiday": {
+      "add": "添加",
+      "addTip": "自动识别：工作日→节假日，周末→补班。请假/调休请手动选择类型。",
+      "autoDetect": "自动识别",
+      "card": {
+        "add": "添加日期",
+        "addNote": "四类型",
+        "configured": "已配置日期（{{count}}）",
+        "configuredNote": "× 恢复口径",
+        "quick": "快速操作",
+        "quickNote": "仅 {{year}} 年"
+      },
+      "clearContent": "将移除 {{year}} 年全部节假日、补班、调休与请假登记，恢复默认周末休息口径。",
+      "clearOk": "确认清空",
+      "clearTitle": "清空 {{year}} 年节假日配置？",
+      "clearYear": "清空本年",
+      "importStatutory": "导入法定节假日",
+      "menu": "节假日配置",
+      "monthFormat": "YYYY 年 MM 月",
+      "msg": {
+        "applied": "{{date}} 已设为{{type}}",
+        "cleared": "已清空 {{year}} 年配置",
+        "imported": "已导入 {{year}} 年法定节假日 {{holidays}} 天・补班 {{makeups}} 天",
+        "restored": "{{date}} 已恢复为{{kind}}口径",
+        "reverted": "{{date}} 已恢复默认口径",
+        "setHoliday": "{{date}} 设为节假日（不计工时）",
+        "setMakeup": "{{date}} 设为补班（计工时）",
+        "refreshed": "已同步系统法定假日名单",
+        "saveFailed": "口径保存失败，已回滚"
+      },
+      "noneInYear": "本年暂无配置",
+      "pickDate": "选择日期",
+      "quickTip": "导入仅合并节假日与补班名单，不动调休/请假；清空前会二次确认。",
+      "subtitle": "工作日口径：节假日/调休/请假不计工时，补班计入；改动实时同步台账与汇报",
+      "tip": {
+        "revert": "{{type}}・点击恢复默认口径",
+        "weekendToMakeup": "周末・点击设为补班",
+        "workdayToHoliday": "工作日・点击设为节假日"
+      },
+      "title": "节假日配置",
+      "today": "今天",
+      "unitDay": "天",
+      "weekendRest": "周末休息",
+      "weekendShort": "周末休",
+      "workday": "工作日",
+      "workdaysYear": "全年工作日",
+      "loadFailed": "日历载入失败",
+      "refreshStatutory": "同步系统法定假日"
+    },
+    "workReport": {
+      "anchor": "锚点日期",
+      "autoDraftTag": "自动聚合草稿",
+      "backlog": {
+        "count": "待排期积压 {{count}} 项",
+        "note": "未排期任务不计工时，建议尽快落入计划"
+      },
+      "caliber": "口径：工作日 × {{hours}}h・周末/节假日剔除",
+      "copyDone": "已复制 Markdown（导出文本 = 页面文本）",
+      "copyMarkdown": "复制 Markdown",
+      "daily": "每日投入（工作日口径）",
+      "doneOn": "{{date}} 完成",
+      "editSummary": "编辑本期总结",
+      "empty": {
+        "action": "去工作记录记一笔",
+        "desc": "台账还没有工作记录，汇报无米下锅"
+      },
+      "export": {
+        "fileBase": "工作汇报_{{period}}_{{date}}",
+        "imageDone": "已下载当前汇报的长图快照",
+        "pdfDone": "已下载当前汇报的 A4 分页 PDF"
+      },
+      "flat": "持平",
+      "foot": "数据来源：工作记录台账（甘特／列表同源）· 进度对比取期初/期末流水快照 · 工时按工作日口径扣减。",
+      "generatedAt": "生成于 {{time}}",
+      "groupMeta": "{{count}} 项 · {{hours}}h · 完成 {{done}}",
+      "groups": {
+        "none": "本期无已排期的工作项任务。"
+      },
+      "hours": {
+        "none": "本期无工时投入（排期与查询区间无交集工作日）。"
+      },
+      "insertedOn": "{{group}}・{{date}} 插入",
+      "inserts": {
+        "none": "本期无临时插入，计划按原排期执行。"
+      },
+      "label": {
+        "dayFormat": "YYYY 年 MM 月 DD 日",
+        "monthFormat": "YYYY 年 MM 月",
+        "quarter": "{{year}} 年 Q{{q}}",
+        "week": "第 {{week}} 周（{{start}} ~ {{end}}）"
+      },
+      "md": {
+        "avgProgress": "- 平均进度：{{from}}% → {{to}}%",
+        "groupDelta": "- 期初 {{from}}% → 期末 {{to}}%（{{delta}}%）",
+        "groupRow": "- {{task}} — {{from}}% → {{to}}% · {{hours}}h",
+        "groupTitle": "### {{title}}（{{count}} 项 · {{hours}}h）",
+        "insertItem": "- {{task}}（{{group}}）— {{at}} 插入 · {{hours}}h · {{from}}% → {{to}}%",
+        "invested": "- 投入工时：{{hours}}h（工作日 × {{perDay}}h，周末/节假日剔除）",
+        "noInsert": "- 本期无临时插入，计划按原排期执行",
+        "noOutput": "- 本期无完成事项",
+        "noPlan": "- 暂无已排期的下期事项",
+        "noRisk": "- 本期无逾期与风险备注",
+        "noteItem": "- [备注] {{task}}：{{note}}",
+        "outputItem": "- {{task}}（{{group}}）— {{doneAt}} 完成 · {{hours}}h",
+        "overview": "- 完成 {{done}} 项／进行中 {{doing}} 项／覆盖 {{total}} 项",
+        "peak": "- 单日峰值：{{date}} {{hours}}h",
+        "planItem": "- {{task}}（{{group}}）— {{start}} 开始 · 预计 {{hours}}h",
+        "riskItem": "- [逾期 {{days}} 天] {{task}}（{{group}}）— 结束 {{end}} · {{progress}}%",
+        "riskLine": "- 风险 {{risks}} 项・临时插入 {{inserted}} 项・待排期 {{backlog}} 项",
+        "s1": "## 一、核心概览",
+        "s2": "## 二、本期内容",
+        "s3": "## 三、下期计划",
+        "s4": "## 四、风险与备注",
+        "s5": "## 五、工时分布",
+        "s6": "## 六、风险与备注",
+        "s7": "## 七、下期计划",
+        "shareRow": "- {{title}}：{{hours}}h（{{share}}%）",
+        "title": "# 工作汇报（{{period}}）",
+        "contentRow": "- {{task}}{{inserted}} — {{from}}% → {{to}}% · {{hours}}h · {{status}}",
+        "insertedMark": "［临时插入］",
+        "noContent": "- 本期无已排期的工作项任务",
+        "backlogItem": "- [待排期] {{count}} 项未排期任务不计工时"
+      },
+      "outputs": {
+        "none": "本期无完成事项——进行中的推进见下节。"
+      },
+      "ov": {
+        "backlog": "{{count}} 项待排期",
+        "cover": "本期覆盖 {{total}} 项子任务，完成 {{done}} 项",
+        "hours": "投入 {{hours}}h（工作日口径）",
+        "inserted": "临时插入 {{count}} 项",
+        "progress": "平均进度 {{from}}% → {{to}}%（{{delta}}%）",
+        "risks": "{{count}} 项逾期需关注",
+        "sep": "，"
+      },
+      "overdueDays": "逾期 {{days}} 天",
+      "overdueShort": "逾期 {{days}}d",
+      "peak": "峰值 {{date}} · {{hours}}h",
+      "periodEnd": "期末 {{v}}%",
+      "periodStart": "期初 {{v}}%",
+      "plan": {
+        "estimate": "预计 {{hours}}h",
+        "none": "暂无已排期的下期事项。"
+      },
+      "reporter": "汇报人：本人",
+      "riskLine": "{{group}} · 结束 {{end}} · 进度 {{progress}}%",
+      "risks": {
+        "none": "本期无逾期、风险备注与待排期积压。"
+      },
+      "section": {
+        "hours": "工时分布",
+        "inserts": "临时插入工作",
+        "outputs": "核心产出",
+        "overview": "核心概览",
+        "plan": "下期计划",
+        "progress": "工作项进度对比",
+        "risks": "风险与备注",
+        "content": "本期内容"
+      },
+      "stat": {
+        "avgEnd": "期末平均进度",
+        "hours": "投入工时",
+        "risks": "风险事项"
+      },
+      "summaryPlaceholder": "写一句本期总结（留空则用自动概述，导出同文）",
+      "tab": {
+        "archive": "个人成果档案",
+        "history": "历史汇报",
+        "read": "汇报阅读",
+        "delivery": "发布与交付"
+      },
+      "thisPeriod": "本期",
+      "title": "工作汇报",
+      "covered": "本期覆盖",
+      "loadFailed": "汇报载入失败",
+      "loading": "汇报聚合中…"
     }
   }
 }

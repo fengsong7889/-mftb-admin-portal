@@ -132,4 +132,69 @@ public interface CpmItemMapper extends BaseMapper<CpmItem> {
      */
     @Select("SELECT * FROM biz_cpm_item WHERE id = #{id} AND deleted = 0 FOR UPDATE")
     CpmItem selectAliveForUpdate(@Param("id") long id);
+
+    /* ==================== 台账（cpm:schema:v1.3） ==================== */
+
+    /**
+     * 台账一次读回本人全部未删条目（分组与未分组都要）。
+     *
+     * <p>刻意不按分组过滤也不按日期过滤：台账的「全部」档要看历史全量，
+     * 日期档在前端/服务层再筛；上限 2000 行是防止有人把这张表当数据仓库拉，
+     * 真到那个量级应该先做归档而不是先把列宽拉大。
+     */
+    @Select("SELECT * FROM biz_cpm_item WHERE deleted = 0 AND user_id = #{userId} "
+            + "ORDER BY COALESCE(plan_start, work_date) ASC, id ASC LIMIT 2000")
+    List<CpmItem> listLedger(@Param("userId") long userId);
+
+    /** 台账字段更新：带归属人与乐观锁，version 不符影响 0 行由服务层转「请刷新重试」。 */
+    @Update("<script>UPDATE biz_cpm_item SET"
+            + "<if test='groupId != null'> group_id = #{groupId},</if>"
+            + "<if test='title != null'> title = #{title},</if>"
+            + "<if test='category != null'> category = #{category},</if>"
+            + "<if test='planStart != null'> plan_start = #{planStart},</if>"
+            + "<if test='planEnd != null'> plan_end = #{planEnd},</if>"
+            + "<if test='planType != null'> plan_type = #{planType},</if>"
+            + "<if test='status != null'> status = #{status},</if>"
+            + "<if test='progress != null'> progress = #{progress},</if>"
+            + "<if test='noteHtml != null'> note_html = #{noteHtml},</if>"
+            + "<if test='noteText != null'> note_text = #{noteText},</if>"
+            + "<if test='clearStart'> plan_start = NULL,</if>"
+            + "<if test='clearEnd'> plan_end = NULL,</if>"
+            + "<if test='clearInsertedAt'> inserted_at = NULL,</if>"
+            + "<if test='insertedAt != null'> inserted_at = #{insertedAt},</if>"
+            + " version = version + 1, updated_by = #{operator}, updated_at = NOW()"
+            + " WHERE id = #{id} AND user_id = #{userId} AND deleted = 0 AND version = #{version}</script>")
+    int updateLedgerFields(@Param("id") long id, @Param("userId") long userId, @Param("version") int version,
+                           @Param("groupId") Long groupId, @Param("title") String title,
+                           @Param("category") String category,
+                           @Param("planStart") java.time.LocalDate planStart, @Param("planEnd") java.time.LocalDate planEnd,
+                           @Param("clearStart") boolean clearStart, @Param("clearEnd") boolean clearEnd,
+                           @Param("planType") String planType, @Param("insertedAt") java.time.LocalDate insertedAt,
+                           @Param("clearInsertedAt") boolean clearInsertedAt,
+                           @Param("status") String status, @Param("progress") Integer progress,
+                           @Param("noteHtml") String noteHtml, @Param("noteText") String noteText,
+                           @Param("operator") String operator);
+
+    /** 恢复一条被误删的条目（台账删除供的「撒销」走这里，不新建重复事实）。 */
+    @Update("UPDATE biz_cpm_item SET deleted = 0, updated_by = #{operator}, updated_at = NOW() "
+            + "WHERE id = #{id} AND user_id = #{userId} AND deleted = 1")
+    int restoreOwned(@Param("id") long id, @Param("userId") long userId, @Param("operator") String operator);
+
+    /** 批量软删某工作項下的子任务（删除工作項时与分组同事务，避免留下无主的排期）。 */
+    @Update("UPDATE biz_cpm_item SET deleted = 1, updated_by = #{operator}, updated_at = NOW() "
+            + "WHERE group_id = #{groupId} AND user_id = #{userId} AND deleted = 0")
+    int softDeleteByGroup(@Param("groupId") long groupId, @Param("userId") long userId,
+                          @Param("operator") String operator);
+
+    /** 恢复某工作項下的子任务（撒销删除）。 */
+    @Update("UPDATE biz_cpm_item SET deleted = 0, updated_by = #{operator}, updated_at = NOW() "
+            + "WHERE group_id = #{groupId} AND user_id = #{userId} AND deleted = 1")
+    int restoreByGroup(@Param("groupId") long groupId, @Param("userId") long userId,
+                       @Param("operator") String operator);
+
+    /** 子任务改排期后同步首次记录日：汇报聚合仍按 work_date 分组，计划日与归属日不能各说一套。 */
+    @Update("UPDATE biz_cpm_item SET work_date = #{workDate}, updated_by = #{operator}, updated_at = NOW() "
+            + "WHERE id = #{id} AND user_id = #{userId} AND deleted = 0")
+    int updateWorkDate(@Param("id") long id, @Param("userId") long userId,
+                       @Param("workDate") java.time.LocalDate workDate, @Param("operator") String operator);
 }

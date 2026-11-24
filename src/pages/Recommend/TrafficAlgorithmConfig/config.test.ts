@@ -36,6 +36,12 @@ describe('投流参数契约', () => {
     expect(getTrafficFieldError('matchThreshold', null, { ...values, coverageFilterEnabled: true })).toContain('请填写')
   })
 
+  it('商家召回范围只接受已开放的「仅投流商家」，预留档位一律拒绝', () => {
+    expect(getTrafficFieldError('recallMerchantScope', 'trafficOnly', TRAFFIC_DEFAULTS)).toBeUndefined()
+    expect(getTrafficFieldError('recallMerchantScope', 'allMerchants', TRAFFIC_DEFAULTS)).toContain('尚未开放')
+    expect(getTrafficGroup('recallMerchantScope')).toBe('recall')
+  })
+
   it('数组独立复制，不污染默认值或接口快照', () => {
     const original = { newUserDimensions: ['distance'] }
     const restored = readTrafficParams(original)
@@ -110,8 +116,9 @@ describe('投流参数契约', () => {
   })
 
   it('总排序/冷启动/相似推荐各自独立成组，触发频次归频控', () => {
-    expect(getTrafficGroup('newUserDimensions')).toBe('coldStart')
-    expect(getTrafficGroup('coldStartRegionScope')).toBe('coldStart')
+    // 第四轮分组归位：冷启动维度/优选线入「排序规则」组，区域召回范围入「召回」组；旧 coldStart 分组已退役
+    expect(getTrafficGroup('newUserDimensions')).toBe('ranking')
+    expect(getTrafficGroup('coldStartRegionScope')).toBe('recall')
     expect(getTrafficGroup('rankPreset')).toBe('ranking')
     expect(getTrafficGroup('rankPoolSize')).toBe('ranking')
     expect(getTrafficGroup('similarRecModes')).toBe('similarRec')
@@ -245,7 +252,7 @@ describe('投流参数契约', () => {
       similarBlendRatio: 70, extraBusinessSetting: 'keep' }
     const read = readTrafficParams(original)
     expect(read.newUserDimensions).toEqual(['distance', 'remainingTraffic', 'qualityScore'])
-    expect(getTrafficGroup('qualityScoreThreshold')).toBe('coldStart')
+    expect(getTrafficGroup('qualityScoreThreshold')).toBe('ranking')
     expect(isTrafficFieldActive('qualityFilterEnabled', read)).toBe(false)
     expect(getTrafficFieldError('qualityScoreThreshold', null, read)).toBeDefined()
     expect(getTrafficFieldError('qualityScoreThreshold', null, { ...read, newUserDimensions: ['distance'] })).toBeUndefined()

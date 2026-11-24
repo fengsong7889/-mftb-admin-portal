@@ -21,6 +21,8 @@ public class AdPricingStarVO {
     private String algoName;
     private String brand;
     private Integer channel;
+    /** 推广对象快照: 1=门店 2=商品 */
+    private Integer targetType;
     private Integer presaleDays;
     private Integer refundEnabled;
     /** 多时段梯度折扣 JSON 字符串 */
@@ -51,6 +53,7 @@ public class AdPricingStarVO {
         vo.setAlgoName(entity.getAlgoName());
         vo.setBrand(entity.getBrand());
         vo.setChannel(entity.getChannel());
+        vo.setTargetType(entity.getTargetType() == null ? 1 : entity.getTargetType());
         vo.setPresaleDays(entity.getPresaleDays());
         vo.setRefundEnabled(entity.getRefundEnabled());
         vo.setDiscountTiers(entity.getDiscountTiers());

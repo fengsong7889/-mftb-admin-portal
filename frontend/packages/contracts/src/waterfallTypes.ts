@@ -14,8 +14,14 @@
 /** 业务线：外卖到家 / 团购到店 */
 export type WaterfallBusinessType = 'delivery' | 'groupBuy'
 
+/** 业务线前后端编码（与后端 biz_ad_waterfall.business_type 对齐） */
+export const BUSINESS_TYPE_CODE: Record<WaterfallBusinessType, 1 | 2> = { delivery: 1, groupBuy: 2 }
+
 /** 展示内容类型：门店 / 商品（团购二选一；外卖固定 store） */
 export type WaterfallContentType = 'store' | 'product'
+
+/** 展示维度前后端编码（与后端 content_type 及星星协议 targetType 同值） */
+export const CONTENT_TYPE_CODE: Record<WaterfallContentType, 1 | 2> = { store: 1, product: 2 }
 
 /** 展示类目的数据来源；旧团购配置未保存该字段时沿用分类模式。 */
 export type WaterfallDisplayCategoryMode = 'algorithm' | 'category' | 'custom'

@@ -53,6 +53,15 @@ public class AdOrder {
     /** 门店名称快照 */
     private String storeName;
 
+    /** 推广对象快照: 1=门店 2=商品（下单时从星星算法协议推导） */
+    private Integer targetType;
+
+    /** 团购商品编码快照（仅商品订单；真实目录接入后为外部系统ID） */
+    private String productId;
+
+    /** 团购商品名称快照（仅商品订单） */
+    private String productName;
+
     /** 归属BD */
     private String bdEmpId;
 

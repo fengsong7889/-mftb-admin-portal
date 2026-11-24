@@ -12,6 +12,8 @@ import { fetchAdAlgorithmDetail, createAdAlgorithm, updateAdAlgorithm, appTypeTo
 import OrganicTrafficScoreConfig from './OrganicTrafficScoreConfig'
 import TrafficAlgorithmConfig from './TrafficAlgorithmConfig'
 import GroupBuyStarConfig from './GroupBuyStarConfig'
+import SimilarRecommendationConfig from './SimilarRecommendationConfig'
+import { SIMILAR_PREVIEW_TYPE } from './SimilarRecommendationConfig/prototype'
 import useTrafficAlgorithmForm from './TrafficAlgorithmConfig/useTrafficAlgorithmForm'
 import { TRAFFIC_DEFAULTS } from './TrafficAlgorithmConfig/config'
 import PopularLayoutPreviewModal from '@/components/PopularLayoutPreviewModal'
@@ -84,6 +86,9 @@ export default function AlgorithmAdd() {
       title="不支援此推廣對象"
       subTitle="商品推廣僅適用於團購到店的無敵星星。"
       extra={<Button onClick={() => navigate('/promotion-algorithm')}>{t('common:back')}</Button>} /></div>
+  }
+  if (Number(searchParams.get('type')) === SIMILAR_PREVIEW_TYPE) {
+    return <SimilarRecommendationConfig searchParams={searchParams} />
   }
   if (target === 'product') {
     const editParams = new URLSearchParams(searchParams)
@@ -808,8 +813,8 @@ function AlgorithmAddForm({ searchParams }: { searchParams: URLSearchParams }) {
           ...(isTrafficAlgorithm ? TRAFFIC_DEFAULTS : {}),
         }}
       >
-      {/* 算法选择区域 */}
-      <AlgorithmSection title={t('recommend.algoSelect')} icon={<AppstoreOutlined />} tone="info">
+      {/* 算法基础定义区域：全广告类型统一模块名；i18n 键待第二阶段补齐（recommend.basicAttributes）。 */}
+      <AlgorithmSection title="基礎信息" icon={<AppstoreOutlined />} tone="info">
         <div className="algorithm-fields">
           <Form.Item
             label={t('recommend.algoName')}

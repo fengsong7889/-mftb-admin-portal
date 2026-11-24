@@ -30,6 +30,8 @@ public class CpmSchemaContracts implements SchemaContractProvider {
         list.add(reportRevisionContract());
         list.add(reportRevisionPointerContract());
         list.add(pushRecordRevisionContract());
+        list.add(worklogGroupContract());
+        list.add(workCalendarContract());
         return list;
     }
 
@@ -118,5 +120,69 @@ public class CpmSchemaContracts implements SchemaContractProvider {
                 List.of(new ContractSpec.ColumnSpec("revision_id",
                         "ALTER TABLE biz_cpm_push_record ADD COLUMN revision_id BIGINT NULL"
                                 + " COMMENT '本次通知綁定的正式版本；歷史連結指向當時那一版'")));
+    }
+
+    /**
+     * biz_cpm_worklog_group：台账工作項分组的结构契约。
+     *
+     * <p>这里的 DDL 必须与 344_cpm_worklog_ledger.sql **逐字一致**（索引名、CHECK 名、注释都算）：
+     * 副本一旦漂开，自愈建出来的表就和迁移建出来的表不是同一张，两处口径会长期共存且都"能用"。
+     */
+    private ContractSpec worklogGroupContract() {
+        return new ContractSpec(
+                "cpm-worklog-group-table",
+                "biz_cpm_worklog_group",
+                "CREATE TABLE IF NOT EXISTS biz_cpm_worklog_group ( id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键', "
+                        + "user_id BIGINT NOT NULL COMMENT '归属人 sys_user.id（一律服务端由 JWT 注入，请求体无身份字段位置）', "
+                        + "title VARCHAR(200) NOT NULL COMMENT '工作項标题（界面即「需求标题」列）', "
+                        + "hue TINYINT NOT NULL DEFAULT 0 COMMENT '合并单元格色相下标，取值域=前端 GROUP_COLORS 长度（令牌色板，不是裸色）', "
+                        + "sort_order INT NOT NULL DEFAULT 0 COMMENT '台账内排序：行序是用户手工拖出来的事实，必须落库', "
+                        + "rdm_requirement_id BIGINT NULL COMMENT '可选关联产研需求 rdm_requirement.id；自由命名为主，等同需求是例外', "
+                        + "created_by VARCHAR(64) NOT NULL DEFAULT '' COMMENT '创建人', "
+                        + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间', "
+                        + "updated_by VARCHAR(64) NOT NULL DEFAULT '' COMMENT '最后更新人', "
+                        + "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后更新时间', "
+                        + "deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0=正常 1=已删', "
+                        + "active_user BIGINT GENERATED ALWAYS AS (CASE WHEN deleted = 0 THEN user_id END) STORED COMMENT '软删感知唯一作用域：归属人', "
+                        + "active_title VARCHAR(200) GENERATED ALWAYS AS (CASE WHEN deleted = 0 THEN title END) STORED COMMENT '软删感知唯一作用域：标题', "
+                        + "PRIMARY KEY (id), UNIQUE KEY uk_cpm_group_title (active_user, active_title), "
+                        + "KEY idx_cpm_group_user_sort (user_id, sort_order), "
+                        + "CONSTRAINT ck_cpm_group_hue CHECK (hue >= 0 AND hue <= 7) ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='CPM 工作項（台账分组）：子任务 biz_cpm_item 的归属主线",
+                List.of(
+                        new ContractSpec.ColumnSpec("user_id", null),
+                        new ContractSpec.ColumnSpec("title", null),
+                        new ContractSpec.ColumnSpec("hue", null),
+                        new ContractSpec.ColumnSpec("sort_order", null)));
+    }
+
+    /**
+     * biz_cpm_work_calendar：台账工时口径日历的结构契约。
+     *
+     * <p>这里的 DDL 必须与 344_cpm_worklog_ledger.sql **逐字一致**（索引名、CHECK 名、注释都算）：
+     * 副本一旦漂开，自愈建出来的表就和迁移建出来的表不是同一张，两处口径会长期共存且都"能用"。
+     */
+    private ContractSpec workCalendarContract() {
+        return new ContractSpec(
+                "cpm-work-calendar-table",
+                "biz_cpm_work_calendar",
+                "CREATE TABLE IF NOT EXISTS biz_cpm_work_calendar ( id BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键', "
+                        + "user_id BIGINT NOT NULL DEFAULT 0 COMMENT '0=全局法定名单（節假日/補班）；其他=本人（調休/請假）。不用 NULL 是因为唯一键含 NULL 可并存多行', "
+                        + "work_date DATE NOT NULL COMMENT '被标记的日期（Asia/Shanghai 业务日）', "
+                        + "day_type VARCHAR(16) NOT NULL COMMENT 'holiday=節假日 makeup=補班 comp_off=調休 leave=請假（只有補班计工时）', "
+                        + "note VARCHAR(200) NULL COMMENT '备注（如「春节」「年假」），只作解释不参与计算', "
+                        + "created_by VARCHAR(64) NOT NULL DEFAULT '' COMMENT '创建人', "
+                        + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间', "
+                        + "updated_by VARCHAR(64) NOT NULL DEFAULT '' COMMENT '最后更新人', "
+                        + "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最后更新时间', "
+                        + "deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除：0=正常 1=已删', "
+                        + "active_user BIGINT GENERATED ALWAYS AS (CASE WHEN deleted = 0 THEN user_id END) STORED COMMENT '软删感知唯一作用域：归属人（含 0=全局）', "
+                        + "active_date DATE GENERATED ALWAYS AS (CASE WHEN deleted = 0 THEN work_date END) STORED COMMENT '软删感知唯一作用域：日期', "
+                        + "PRIMARY KEY (id), UNIQUE KEY uk_cpm_calendar_day (active_user, active_date), "
+                        + "KEY idx_cpm_calendar_date (work_date), CONSTRAINT ck_cpm_calendar_type CHECK (day_type IN ('holiday', "
+                        + "'makeup', 'comp_off', 'leave')) ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='CPM 工时口径日历：工作日判定唯一真源（周末默认休，補班例外计，其余三类扣减）",
+                List.of(
+                        new ContractSpec.ColumnSpec("user_id", null),
+                        new ContractSpec.ColumnSpec("work_date", null),
+                        new ContractSpec.ColumnSpec("day_type", null)));
     }
 }

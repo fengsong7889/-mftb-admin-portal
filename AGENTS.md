@@ -240,8 +240,10 @@ frontend/
 | `form-page-style.md` | 新增/编辑/详情类表单页面 | 页面头部（橙色渐变动画条 + 返回按钮）、白色 div 模块卡片（禁用 antd Card 彩色标题头）、图标色块配色约定、表单布局（vertical Form、行内配置项标签右对齐）、底部 `.form-footer` 操作按钮 |
 | `security-architecture-quality.md` | 前后端开发 | 安全元规则、总原则、开发工作流、前后端规范、数据库设计、API 契约、测试门禁、完成定义、禁止清单、检查清单 |
 | `business-data-dictionary.md` | 涉及业务枚举值 | 系统级枚举常量（品牌、业务类型、状态等） |
-| `efficient-dev-mode.md` | 涉及界面调整 | 高效开发模式（两阶段交付：先 UI 后 i18n/后端/数据库） |
+| `efficient-dev-mode.md` | 涉及界面调整 | 高效开发模式（两阶段交付：先 UI 后 i18n/后端/数据库；**第一阶段仅改 UI 且不跑任何测试/typecheck/lint/门禁，待用户确认界面后第二阶段统一补验证**） |
 | `portal-and-workbench.md` | **改企业门户 / 新增或下线业务系统 / 做工作台看板** | 新增系统的 7 件事、插画六条铁律、场景色板表、动效节拍、我的常用 F1~F7、门户验证口径 |
+
+> **高效开发模式·验证时序（用户明确要求，优先级最高）**：凡**仅改前端界面**的调整任务，修改完成后**先不跑任何测试**（单测/typecheck/lint/各类门禁一律跳过），先把界面交用户确认；待用户确认界面无误后，再在第二阶段统一补做测试与验证。此约定优先于 `edit-verification.md` 的即时验证要求（仅针对第一阶段纯 UI 任务）；涉及后端/数据库/共享逻辑的改动仍按 `edit-verification.md` 执行。详见 `.qoder/rules/efficient-dev-mode.md`。
 
 ---
 
@@ -432,6 +434,39 @@ const { configComponent, applyConfig } = useColumnConfig('page-key', columnMeta,
 
 自检：`src/pages/TrafficSandbox/OrganicScorePages.test.tsx` 断言展开入口 `className` 同时含 `ant-btn-link` 与页面自有类，
 且只校内容（`+N ▾`），不校颜色。
+
+---
+
+## 配置参数单位置于输入框后方（前端 UI 强制规范）
+
+> 背景：相似推荐引擎与全局标签衰变页曾把单位写进字段标签（「同商家統計窗口（小時）」「停留時長門檻（秒）」），
+> 行内布局的固定标签列宽会把括号裁掉半个，且标签长短不一导致跳行对不齐。投流广告已采用单位后置，现升级为全局约定。
+
+**所有带单位的配置参数，单位一律置于输入框后方，禁止写进字段标签（label）。**
+
+```tsx
+// ✅ 单位在控件右侧：标签短而齐整，括号不会被列宽裁切
+<Form.Item name="merchantFreqHours" label="同商家統計窗口" layout="horizontal">
+  <InputNumber min={0.5} max={24} precision={1} suffix={<span className="traffic-config__unit">小時</span>} />
+</Form.Item>
+
+// ❌ 单位进标签：被固定列宽裁切，且破坏跳行对齐
+<Form.Item name="merchantFreqHours" label="同商家統計窗口（小時）" ... />
+```
+
+**强制约束：**
+1. 字段 schema（`NUMBER_FIELDS` / `TRAFFIC_FIELDS` / `TAG_DECAY_FIELDS` / `OverrideField` 等）把单位独立成 `unit` 字段，
+   `label` 只写参数名；渲染处统一用 `suffix` 输出，校验文案用 `${min}–${max} ${unit}` 拼接。
+2. 首选 `suffix`（单位贴输入框内侧右方，与投流广告一致）；`addonAfter`（灰底外挂）只允许出现在必须保留
+   `addonBefore` 前缀文案的控件上，新建页面不得用它当默认。
+3. 单位文字取弱化令牌（`--text-3`）+ 12px，不引入裸色；单位不算入参数名的一部分（i18n 抽取时归入 unit 字段）。
+4. 行内（horizontal）字段组的标签列必须与控件**垂直居中**：`.ant-form-item-row { align-items: center; }`，
+   不得让标签置顶（antd 默认 `label { height: 32px }` 被覆写为 `auto` 时就会置顶错位）。
+5. 参考实现：`src/pages/Recommend/TrafficAlgorithmConfig/sections.tsx`（`Fields` 的 suffix 渲染与行内居中）、
+   `src/pages/Recommend/SimilarRecommendationConfig/prototype.ts`（`NUMBER_FIELDS` 的 `label/unit` 拆分）。
+
+自检：`grep -rn "label=\"[^\"]*（[次天秒小時分钟%）\"]" src/pages` 与元组式 `['xxx（单位）', min, max]` 均应为空；
+广告配置界面里单位一旦出现在标签中即为违规。
 
 ---
 

@@ -396,6 +396,14 @@
 .traffic-fields-inline .ant-form-item.ant-form-item .ant-form-item-label {
   flex: 0 0 auto;
   padding-bottom: 0;
+  /* 标签首字对齐子块标题文字（色条 3px + 间隙 8px = 11px） */
+  padding-left: 11px;
+}
+
+/* 必填星号悬挂到对齐线左侧（与子块色条对齐），不推右标签首字。 */
+.traffic-fields-inline .ant-form-item-label > label.ant-form-item-required::before {
+  margin-inline-start: -11px;
+  margin-inline-end: 4px;
 }
 
 .traffic-fields-inline .ant-form-item.ant-form-item .ant-form-item-label > label {
@@ -422,6 +430,12 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px 12px;
+}
+
+/* 多子标题模块（召回范围/标签与兴趣匹配/排序规则）：正文整体缩进，形成「模块 > 子块 > 参数」层级；
+   基础信息、基础与可用性、数据与商品检查等单层模块不套此容器，保持顶格。 */
+.traffic-section--tree {
+  padding-left: 16px;
 }
 
 /* ── 浏览后相似推荐：子配置分组 ── */
@@ -621,4 +635,53 @@
   border-radius: 8px;
   background: var(--surface-2);
   padding: 10px 12px;
+}
+
+/* 衰变试算输入：两列堆叠字段（标签在上、控件全宽），统一尺寸、留白充足。 */
+.decay-trial-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.decay-trial-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.decay-trial-field__label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-3);
+}
+
+.decay-trial-field .ant-select,
+.decay-trial-field .ant-input-number,
+.decay-trial-field .ant-input-number-affix-wrapper { width: 100%; }
+
+.decay-trial-hint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.7;
+}
+
+.decay-trial-cases {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* 衰变推演：公式块与有效分行之间保留间隔，避免贴合。 */
+.decay-trial-calc {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+@media (max-width: 720px) {
+  .decay-trial-grid { grid-template-columns: 1fr; }
 }

@@ -65,6 +65,14 @@ describe('投流公式试算纯函数', () => {
     expect(normalizeRank({ match: 0, remaining: 0, total: 1000, quality: 0, distance: 9 }, 5).distance).toBe(0)
   })
 
+  it('匹配标签热度因子按候选交集最大值归一并参与等权综合', () => {
+    const n = normalizeRank({ match: 0.5, remaining: 100, total: 1000, quality: 2, distance: 4, tagHeat: 3000 }, 5, 6000)
+    expect(n.tagHeat).toBeCloseTo(0.5, 6)
+    expect(rankScore('custom', ['match', 'tagHeat'], n)).toBeCloseTo(0.5, 6)
+    // 未传 maxTagHeat（如冷启动/协同路径）时热度记 0，不凭空造分
+    expect(normalizeRank({ match: 0.5, remaining: 100, total: 1000, quality: 2, distance: 4, tagHeat: 3000 }, 5).tagHeat).toBe(0)
+  })
+
   it('同分决胜：质量高者先/距离近者先/余量方向反转/随机仍同分', () => {
     const a = { quality: 2, distance: 4, remaining: 0.8 }
     const b = { quality: 4.5, distance: 1, remaining: 0.2 }

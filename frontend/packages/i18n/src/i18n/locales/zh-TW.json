@@ -5945,7 +5945,9 @@
     "giftDeductShort": "抵扣",
     "fullGiftHint": "贈送天數全額抵扣，無需支付推廣金",
     "orderNo": "訂單編號",
-    "colSlot": "廣告位"
+    "colSlot": "廣告位",
+    "colProduct": "團購商品",
+    "productStoreNote": "適用門店由團購業務系統決定"
   },
   "translationManage": {
     "catCommon": "公共字段",
@@ -6207,7 +6209,11 @@
     "localSaveSuccess": "已保存到本地（未發布，App 暫不生效）",
     "localOnlyBanner": "團購到店配置本期僅前端保存（模擬數據），不會下發至 App；後端接入後生效",
     "localTag": "本地",
-    "unpublishedTag": "未發布"
+    "unpublishedTag": "未發布",
+    "productCategoryFallback": "商品類目兜底",
+    "productCategoryFallbackHint": "未被算法坑位覆蓋的商品坑位由所選類目自動補位；商品維度不支持門店型自然流量兜底。",
+    "productCategoryFallbackRequired": "請至少選擇一個商品類目兜底",
+    "productAlgorithmModeHint": "坑位僅可綁定商品類無敵星星；未被坑位覆蓋的部分由商品類目兜底補位。"
   },
   "promotionWordLibrary": {
     "colRank": "排名",
@@ -6290,10 +6296,10 @@
     "bizGroupBuy": "團購到店",
     "algorithmList": "算法列表",
     "addAlgorithm": "新增算法",
-        "targetStore": "門店推廣",
-        "targetProduct": "商品推廣",
-        "addProductAlgorithm": "新增商品算法",
-        "productEmpty": "暫無商品算法，點擊右上角新增",
+    "targetStore": "門店推廣",
+    "targetProduct": "商品推廣",
+    "addProductAlgorithm": "新增商品算法",
+    "productEmpty": "暫無商品算法，點擊右上角新增",
     "colAlgorithmId": "算法ID",
     "colAlgorithmName": "算法名稱",
     "colLastUpdater": "最後更新人",
@@ -8510,7 +8516,35 @@
     "trafficNotAllowRefundHint": "不支持訂單退款，流量包購買後不可退還",
     "trafficStatusHint": "停用後該頻道所有流量包停止售賣，已生成訂單不受影響",
     "trafficOrderSuccess": "訂單提交成功",
-    "trafficPricingSaveFailed": "定價配置保存失敗，請稍後重試"
+    "trafficPricingSaveFailed": "定價配置保存失敗，請稍後重試",
+    "targetLabel": "推廣對象",
+    "choosePromoProduct": "選擇推廣商品",
+    "productStarAlgoPh": "選擇商品星星算法",
+    "productStarAlgoEmpty": "當前品牌尚無已定價的商品星星算法",
+    "productSearchPh": "搜索並選擇團購商品",
+    "groupLabel": "歸屬集團",
+    "storePresetTag": "適用門店由團購業務系統預配置",
+    "productNoGroupAlert": "該商品缺少歸屬集團信息，無法扣款；請重選商品或等待團購目錄接口接入。",
+    "dayRegionGridTitle": "商圈 × 日期（全天售賣）",
+    "selectAlgoProductFirst": "選擇算法與商品後展示可購格子",
+    "pendingSale": "待開售",
+    "remainingCount": "剩餘",
+    "confirmSubmitTitle": "確認提交訂單？",
+    "confirmProductLine": "商品：{{name}}（{{id}}）",
+    "confirmGroupLine": "歸屬集團：{{name}}",
+    "confirmCellLine": "格子數：{{count}} 個（商圈×日期全天）",
+    "confirmPayLine": "預計扣款：MOP {{amount}}（推廣金）",
+    "orderSuccessTitle": "下單成功",
+    "orderSuccessContent": "訂單號 {{orderNo}}，實付 MOP {{amount}}。可在「推廣訂單管理」查看與退款。",
+    "selectedCellsLabel": "已選",
+    "totalLabel": "合計",
+    "finalPayNote": "最終實付以確認單為準（含商圈全時段折扣）",
+    "lockExpiredMsg": "部分加購格子已超時釋放，請重新選擇",
+    "cellUnavailableMsg": "該格子暫不可加購",
+    "submitOrderWithPromo": "提交訂單（推廣金支付）",
+    "unavailableCell": "不可售",
+    "loadInventoryFailed": "庫存加載失敗，請重試",
+    "applyStoresLabel": "適用門店"
   },
   "recommend": {
     "appShanfeng": "閃蜂",
@@ -9055,39 +9089,65 @@
     "selectedMerchants": "已選擇 {{count}} 個商家",
     "algoUpdateSuccess": "算法更新成功",
     "algoAddSuccess": "算法新增成功",
-        "starProduct": {
-          "targetProduct": "商品推廣",
-          "preview": "查看只讀預覽",
-          "basicInfo": "基本信息",
-          "nameMax": "最多 100 字",
-          "checkTitle": "商品展示校驗",
-          "eligibilityHelpTitle": "展示資格由團購業務系統判定",
-          "eligibilityHelp": "商品已下架、已售罄、未在銷售時間內，或不在當前瀑布流展示時，由團購業務系統排除。本算法只定時校驗並更新合格商品隊列，不重複配置這些規則。",
-          "intervalLabel": "一致性檢查週期",
-          "intervalRule": "請填寫 1–1440 的整數",
-          "minuteUnit": "分鐘",
-          "intervalHint": "每隔指定分鐘數，向團購業務系統校驗商品是否符合當前瀑布流的展示要求。",
-          "strategyTitle": "算法策略",
-          "strategyHelpTitle": "有限坑位的分配方式",
-          "roundRobinBody": "所有合格已購商品輪流獲得展示機會。新增或恢復展示資格的商品加入隊尾；不合格商品移出，不重置其餘商品的輪播順序。",
-          "randomBody": "每批從合格已購商品中等概率、不放回抽取。實現簡單，但短期可能重複命中，不能保證每件商品均勻曝光。",
-          "commonBoundaryLabel": "共同邊界",
-          "commonBoundaryBody": "坑位數由瀑布流決定。同批不重複，商品不足時交回瀑布流補位；不按銷量或折扣加權。輪詢計算平衡的是分配機會，不是實際可見曝光或成交承諾。",
-          "strategyLabel": "商品曝光策略",
-          "strategyRequired": "請選擇商品曝光策略",
-          "strategySummaryAria": "商品曝光策略摘要",
-          "roundRobinSummary": "合格已購商品依次輪播，每批按可用坑位數取出、同批不重複，再移至隊尾；批內位置隨機分配，避免商品長期佔同一位置。",
-          "randomSummary": "每批從合格已購商品中隨機抽取，數量不超過可用坑位、同批不重複；短期可能有商品多次出現，也有商品尚未展示。",
-          "loadFailed": "商品配置加載失敗",
-          "loading": "正在加載商品配置…",
-          "retry": "重試",
-          "conflict": "配置已被修改，請重新載入後再保存",
-          "invalidId": "算法編號無效",
-          "wrongType": "當前記錄不是無敵星星算法，不能在此頁面編輯",
-          "invalidParams": "商品配置格式無效或版本不支持，請刷新後重試",
-          "lastUpdater": "最後更新人",
-          "lastUpdateTime": "最後更新時間"
-        },
+    "starProduct": {
+      "targetProduct": "商品推廣",
+      "preview": "查看只讀預覽",
+      "basicInfo": "基本信息",
+      "nameMax": "最多 100 字",
+      "checkTitle": "商品展示校驗",
+      "eligibilityHelpTitle": "展示資格由團購業務系統判定",
+      "eligibilityHelp": "商品已下架、已售罄、未在銷售時間內，或不在當前瀑布流展示時，由團購業務系統排除。本算法只定時校驗並更新合格商品隊列，不重複配置這些規則。",
+      "intervalLabel": "一致性檢查週期",
+      "intervalRule": "請填寫 1–1440 的整數",
+      "minuteUnit": "分鐘",
+      "intervalHint": "每隔指定分鐘數，向團購業務系統校驗商品是否符合當前瀑布流的展示要求。",
+      "strategyTitle": "算法策略",
+      "strategyHelpTitle": "有限坑位的分配方式",
+      "roundRobinBody": "所有合格已購商品輪流獲得展示機會。新增或恢復展示資格的商品加入隊尾；不合格商品移出，不重置其餘商品的輪播順序。",
+      "randomBody": "每批從合格已購商品中等概率、不放回抽取。實現簡單，但短期可能重複命中，不能保證每件商品均勻曝光。",
+      "commonBoundaryLabel": "共同邊界",
+      "commonBoundaryBody": "坑位數由瀑布流決定。同批不重複，商品不足時交回瀑布流補位；不按銷量或折扣加權。輪詢計算平衡的是分配機會，不是實際可見曝光或成交承諾。",
+      "strategyLabel": "商品曝光策略",
+      "strategyRequired": "請選擇商品曝光策略",
+      "strategySummaryAria": "商品曝光策略摘要",
+      "roundRobinSummary": "合格已購商品依次輪播，每批按可用坑位數取出、同批不重複，再移至隊尾；批內位置隨機分配，避免商品長期佔同一位置。",
+      "randomSummary": "每批從合格已購商品中隨機抽取，數量不超過可用坑位、同批不重複；短期可能有商品多次出現，也有商品尚未展示。",
+      "loadFailed": "商品配置加載失敗",
+      "loading": "正在加載商品配置…",
+      "retry": "重試",
+      "conflict": "配置已被修改，請重新載入後再保存",
+      "invalidId": "算法編號無效",
+      "wrongType": "當前記錄不是無敵星星算法，不能在此頁面編輯",
+      "invalidParams": "商品配置格式無效或版本不支持，請刷新後重試",
+      "lastUpdater": "最後更新人",
+      "lastUpdateTime": "最後更新時間",
+      "basicInfoTitle": "基礎信息",
+      "filterTitle": "展示資格過濾",
+      "filterTag": "系統內置 · 只讀",
+      "filterHelpTitle": "過濾規則對接說明",
+      "filterHelpCurrentLabel": "當前口徑",
+      "filterHelpCurrentBody": "四項條件由團購業務系統內置裁決，本算法只定時校驗並更新合格商品隊列，不重複配置這些規則。",
+      "filterHelpNextLabel": "後續對接",
+      "filterHelpNextBody": "團購側規則配置下發後，本模塊按同一結構接入開關與參數，逐項解鎖即可，頁面無需重做。",
+      "filterNote": "以上條件由團購業務系統裁決，本頁只讀展示、不可操作；規則配置下發後可直接在本模塊對接開關與參數。",
+      "effectPrefix": "結果",
+      "ruleDelistedLabel": "商品已下架",
+      "ruleDelistedDesc": "已下架的商品由團購業務系統統一排除，不進入本算法的候選商品隊列。",
+      "ruleDelistedEffect": "移出候選隊列",
+      "ruleSoldOutLabel": "商品已售罄",
+      "ruleSoldOutDesc": "售罄商品暫停展示；補貨恢復可購後，於下一次定時校驗自動回到隊列。",
+      "ruleSoldOutEffect": "暫停展示，補貨後恢復",
+      "ruleSaleWindowLabel": "未在銷售時間內",
+      "ruleSaleWindowDesc": "僅處於團購銷售時間窗口內的商品具備展示資格，超出時段自動排除。",
+      "ruleSaleWindowEffect": "非銷售時段隱藏",
+      "ruleWaterfallScopeLabel": "不在瀑布流展示範圍",
+      "ruleWaterfallScopeDesc": "商品須位於當前瀑布流策略的展示範圍內，未納入坑位的商品不參與分配。",
+      "ruleWaterfallScopeEffect": "不参与坑位分配",
+      "scopeTarget": "校驗對象",
+      "scopeTargetValue": "已通過資格過濾的候選商品",
+      "scopeAction": "校驗動作",
+      "scopeActionValue": "移出失效商品 · 補入恢復資格商品"
+    },
     "saveFailed": "保存失败",
     "merchantPosMin": "商家位置至少為 1",
     "unitOrder": "單",
@@ -9392,7 +9452,7 @@
         "userKeywordStatsDays": "用戶統計週期",
         "userPreferenceMinScore": "用戶偏好識別最低分",
         "merchantPreferenceMinScore": "商家偏好識別最低分",
-        "matchThreshold": "偏好標籤覆蓋率門檻",
+        "matchThreshold": "最低覆蓋比例",
         "maxUserTags": "參與匹配的標籤上限",
         "explorationSlots": "新偏好探索標籤數",
         "maxMerchantsPerKeyword": "同標籤商家展示上限",
@@ -9403,11 +9463,11 @@
         "merchantDecayDays": "商家標籤衰減週期",
         "merchantDecayPoints": "商家標籤每次減分",
         "merchantRetainedTagCount": "商家保留最熱標籤數",
-        "merchantTagIdleClearDays": "商家保留標籤清理天數",
+        "merchantTagIdleClearDays": "商家標籤無新增清理天數",
         "userDecayDays": "用戶標籤衰減週期",
         "userDecayPoints": "用戶標籤每次減分",
         "userRetainedTagCount": "用戶保留最熱標籤數",
-        "userTagIdleClearDays": "用戶保留標籤清理天數",
+        "userTagIdleClearDays": "用戶標籤無新增清理天數",
         "newTagBoostMultiplier": "新標籤有效分加速倍數",
         "maxBoostTagCount": "同時加速標籤上限",
         "generativeRecommendEnabled": "瀏覽後相似推薦",
@@ -9421,7 +9481,7 @@
         "generativeDailyLimit": "單用戶每日觸發上限",
         "generativeSkipMerchantCount": "再次觸發前跳過商家點擊",
         "newUserDimensions": "冷啓動排序維度",
-        "qualityScoreThreshold": "商家質量分門檻",
+        "qualityScoreThreshold": "綜合評分優選線",
         "regionPopularStatsDays": "熱門度統計週期",
         "popularityMetrics": "熱門度指標",
         "regionPopularTopPercent": "區域熱門度前百分比",
@@ -9436,6 +9496,7 @@
         "similarityThreshold": "相似度門檻",
         "categoryMatchLevel": "類目匹配層級",
         "coldStartRegionScope": "區域召回範圍",
+        "recallMerchantScope": "商家召回範圍",
         "rankPreset": "排序策略",
         "rankFactors": "參與排序因子",
         "rankWeightMatch": "權重·匹配分",
@@ -9458,7 +9519,17 @@
         "similarAnchor": "相似度錨點",
         "similarBlendRatio": "融合時商家權重",
         "similarChainEnabled": "允許對推薦商家再次觸發",
-        "similarChainDepth": "鏈式觸發最大層數"
+        "similarChainDepth": "鏈式觸發最大層數",
+        "qualityFilterEnabled": "啟用商家質量門檻",
+        "coverageFilterEnabled": "啟用最低覆蓋比例",
+        "matchingUserSimilarEnabled": "啟用用戶協同補充",
+        "matchingUserSimilarThreshold": "協同補充最低用戶相似度",
+        "matchingUserSimilarMode": "協同補充方式",
+        "matchingUserSimilarRatio": "協同預留比例",
+        "similarRecPriority": "候補填充順序（已退役）",
+        "similarRecSlot1Source": "第 1 位優先來源",
+        "similarRecSlot2Source": "第 2 位優先來源",
+        "userSimilarThreshold": "相似用戶最低相似度"
       },
       "opt": {
         "generativeTriggerMode": {
@@ -9491,7 +9562,7 @@
         },
         "similarRecModes": {
           "merchantSimilar": "商家相似推薦",
-          "userSimilar": "用戶相似推薦",
+          "userSimilar": "用戶協同推薦",
           "sameCategory": "同類目商家推薦"
         },
         "similarityMetric": {
@@ -9506,6 +9577,10 @@
           "delivery": "配送範圍內",
           "tradeArea": "用戶所在商圈"
         },
+        "recallMerchantScope": {
+          "trafficOnly": "僅投流商家",
+          "allMerchants": "全量商家（待開放）"
+        },
         "rankPreset": {
           "matchFirst": "匹配優先",
           "consumeFirst": "消耗優先",
@@ -9516,7 +9591,7 @@
           "any": "全時段投流商家"
         },
         "similarRankMode": {
-          "inherit": "沿用投流坑位排序",
+          "inherit": "沿用匹配路徑排序",
           "independent": "獨立配置"
         },
         "similarRankPreset": {
@@ -9532,6 +9607,39 @@
           "clickedMerchant": "被點擊商家標籤向量",
           "user": "當前用戶標籤向量",
           "blend": "商家＋用戶融合"
+        },
+        "matchingUserSimilarMode": {
+          "fill": "不足時補充（默認・直接匹配優先）",
+          "ratio": "按比例預留（探索配額・直接充足也預留）"
+        },
+        "similarRecPriority": {
+          "merchantFirst": "按順序（商家相似優先）",
+          "userFirst": "用戶協同優先"
+        },
+        "similarRecSlot1Source": {
+          "merchantSimilar": "商家相似推薦",
+          "userSimilar": "用戶協同推薦",
+          "sameCategory": "同類目商家推薦"
+        },
+        "similarRecSlot2Source": {
+          "merchantSimilar": "商家相似推薦",
+          "userSimilar": "用戶協同推薦",
+          "sameCategory": "同類目商家推薦"
+        },
+        "rankFactors": {
+          "match": "匹配分",
+          "traffic": "剩餘比例",
+          "quality": "質量分",
+          "distance": "距離",
+          "tagHeat": "匹配標籤熱度"
+        },
+        "rankTieBreak": {
+          "trafficDirection": "剩餘曝光次數多者优先",
+          "quality": "質量分高者优先",
+          "distance": "距離近者优先",
+          "random": "隨機探索",
+          "tagHeat": "匹配標籤熱度高者优先",
+          "match": "匹配分高者优先"
         }
       },
       "unit": {
@@ -9549,11 +9657,12 @@
       },
       "group": {
         "availability": "基礎與可用性",
+        "recall": "召回範圍",
         "matching": "標籤與興趣匹配",
         "coldStart": "冷啓動推薦",
         "similarRec": "相似推薦",
-        "frequency": "頻控與觸發",
-        "ranking": "投流坑位排序"
+        "frequency": "商家頻控",
+        "ranking": "排序規則"
       },
       "cap": {
         "c1": "偏好門檻",
@@ -9561,7 +9670,7 @@
         "c3": "相似度算法（算法級）",
         "c4": "商家標籤衰減",
         "c5": "用戶標籤衰減",
-        "c6": "同商家去重",
+        "c6": "同商家曝光頻控",
         "c7": "相似推薦觸發頻次",
         "c8": "時段優先",
         "c9": "坑位內打分與填充",
@@ -9572,7 +9681,10 @@
         "c14": "觸發條件",
         "c15": "推薦數量",
         "c16": "插入優先級",
-        "c17": "獨立優先級打分"
+        "c17": "獨立優先級打分",
+        "c18": "商家召回範圍",
+        "c19": "最低覆蓋比例（可選）",
+        "c20": "用戶協同補充（普通投流）"
       },
       "badge": {
         "selected": "已選",
@@ -9628,6 +9740,108 @@
       "rejected": "落選",
       "slotRank": "坑位排序",
       "indepPriority": "獨立優先級"
+    },
+    "targetObjectLabel": "推廣對象",
+    "productDailyPriceLabel": "全日單價（商品全天售賣）",
+    "tagDecay": {
+      "rules": {
+        "merchantTitle": "商家側・供給熱度",
+        "merchantBadge": "供給畫像",
+        "merchantSub": "商家標籤熱度來自真實成交供給，以商品標準標籤為唯一畫像來源。",
+        "m1Title": "商品帶標・畫像來源",
+        "m1Body": "商品自帶標準標籤，系統據此為商家建立供給側標籤畫像；標籤 ID 與用戶側同一套標準，保證跨側可匹配。",
+        "m2Title": "逐件計分・完成即加",
+        "m3Title": "復購沉澱・線性累計",
+        "m4Title": "有效訂單口徑",
+        "mMetric1Value": "+1",
+        "mMetric1Label": "每件完成商品",
+        "mMetric2Value": "走量",
+        "mMetric2Label": "按交付件數",
+        "mMetric3Value": "僅已完成",
+        "mMetric3Label": "訂單計分",
+        "userTitle": "用戶側・偏好強度",
+        "userBadge": "偏好畫像",
+        "userSub": "用戶偏好強度來自真實成交行為，與商家側共用同一套標籤與衰變口徑。",
+        "u1Title": "行為帶標・偏好畫像",
+        "u1Body": "用戶每完成一筆訂單，商品標準標籤寫入用戶偏好畫像，不依賴點擊或瀏覽等輕行為。",
+        "u2Title": "同類去重・異類累計",
+        "u3Title": "復購強化・強度刻畫",
+        "u4Title": "有效訂單口徑",
+        "uMetric1Value": "+1",
+        "uMetric1Label": "每種商品",
+        "uMetric2Value": "同類去重",
+        "uMetric2Label": "異類累計",
+        "uMetric3Value": "僅已完成",
+        "uMetric3Label": "訂單計分",
+        "m2Body": "每賣出 <c>1</c> 件已完成訂單商品，其標準標籤為商家有效分 <c>+1</c>；按<c>走量</c>累加，真實交付越多、該標籤供給熱度越高。",
+        "m3Body": "同標籤隨完成商品件數<c>線性</c>累加，沉澱為原始累計分，刻畫供給熱度與經營穩定度。",
+        "m4Body": "僅<c>已完成</c>訂單計分；取消、全額退款訂單不產生自增。",
+        "u2Body": "同一訂單中，<c>不同</c>商品命中同一標籤各 <c>+1</c>（珍珠奶茶＋芋圓奶茶＋紅豆奶茶→奶茶<c>+3</c>）；同一商品多件只計 <c>1</c> 次，避免單筆囤貨灌分。",
+        "u3Body": "單內去重、單外累加：跨訂單重複購買同類標籤<c>線性</c>累計，刻畫偏好廣度與強度。",
+        "u4Body": "僅<c>已完成</c>訂單計分；與商家側共用同一衰變與閒置清理口徑。"
+      },
+      "rulesSection": "標籤加分規則",
+      "rulesFootnote": "原始累計與衰減後有效分分離儲存：衰變與閒置清理只作用於推薦有效分，不刪除原始訂單計數歷史；商家／用戶匹配門檻仍由各算法獨立設定。全局衰變保留線性基線，並提供 A 增量刷新時鐘（每次有效新增重置該標籤衰變計時，活躍標籤不被誤衰）與 B 飽和壓縮（有效分按上限非線性收斂，抑制商家走量造成的頭部膨脹）兩項可選增強，第二階段接入後端計算。",
+      "referenceAria": "全局標籤衰變規則引用",
+      "referenceLabel": "引用全局標籤衰變規則 · V{{revision}}",
+      "title": "全局標籤衰變規則",
+      "referenceHelpAria": "全局標籤衰變規則說明",
+      "refSingleSourceTitle": "統一来源",
+      "refSingleSource": "在算法庫頂部「全局標籤衰變規則」集中配置，投流及相似推薦共用，業務 Tab 不另外產生副本。",
+      "sideMerchant": "商家",
+      "sideUser": "用戶",
+      "refBoundaryTitle": "接入邊界",
+      "refBoundary": "本輪只統一前端配置來源，尚未發布到真實標籤計算服務。既有後端參數待第二階段遷移，原始訂單計數不變。",
+      "discardTitle": "放棄尚未保存的變更？",
+      "discardLeaveBody": "全局規則尚未更新，離開將放棄本次調整。",
+      "discardOk": "放棄變更",
+      "keepEditing": "繼續編輯",
+      "discardCancelBody": "全局規則尚未更新，取消將放棄本次調整並回到查看。",
+      "saveFailed": "保存失敗",
+      "saved": "已更新本分頁共用規則，尚未發佈至後端",
+      "saveConfirmTitle": "確認更新全局標籤衰變規則？",
+      "saveConfirmBody": "保存後本分頁共用規則立即生效（所有算法引用同一全局規則，尚未發佈至後端）。",
+      "saveConfirmOk": "確認保存",
+      "saveConfirmCancel": "返回編輯",
+      "edit": "編輯",
+      "notice": "全局規則原型：目前只在本分頁保留，刷新後清空，尚未接入後端。",
+      "decaySection": "標籤有效分衰變",
+      "decayHelpTitle": "衰變口徑",
+      "decayHelpAria": "衰變口徑說明",
+      "linearTitle": "線性衰變",
+      "linear": "有效分 = max(0, 初始有效分 − floor(經過天數 / 週期) × 每次減分)。原始訂單累計不刪除。",
+      "idleTitle": "閒置清理",
+      "idle": "從最後一次有效訂單新增標籤計數起算，定時衰變不刷新該時間。清理天數留空代表不按閒置清零。",
+      "sharedTitle": "共用執行",
+      "shared": "各算法只引用這套全局規則和同一份有效標籤結果，不重複衰變；匹配門檻仍由各算法獨立設定。",
+      "strategyTitle": "策略組合",
+      "strategy": "線性基線 + 可選 A 增量刷新衰變時鐘 + B 飽和壓縮；A 保護活躍標籤、B 抑制商家走量頭部膨脹，第二階段於後端落地。",
+      "merchantGroup": "商家標籤",
+      "userGroup": "用戶標籤",
+      "placeholderNoClear": "留空不啟用",
+      "saturationGroup": "飽和壓縮上限",
+      "saturationHint": "B 以該上限為漸近線：原始 +1 持續累計，推薦有效分 = 上限 ×(1−e^(−原始分/上限))，非線性收斂且恆不超過上限，用以抑制商家走量造成的頭部膨脹；默認為基礎上限（商家 50000／用戶 1000），第二階段於後端計算。",
+      "cancel": "取消",
+      "save": "保存",
+      "error": {
+        "integerRange": "{{label}}須為 {{min}}–{{max}} {{unit}} 之間的整數",
+        "invalidPolicy": "全局標籤衰變規則無效",
+        "revisionConflict": "規則已更新，請重新載入後再保存"
+      },
+      "refMerchant": "每 {{days}} 天減 {{points}} 分；{{clearDays}} 天無新增清理。",
+      "refMerchantOff": "每 {{days}} 天減 {{points}} 分；不按閒置天數清理。",
+      "refUser": "每 {{days}} 天減 {{points}} 分；{{clearDays}} 天無新增清理。",
+      "refUserOff": "每 {{days}} 天減 {{points}} 分；不按閒置天數清理。",
+      "field": {
+        "merchantDecayDays": "商家衰變週期",
+        "merchantDecayPoints": "商家每次減分",
+        "merchantTagIdleClearDays": "商家無新增清理",
+        "userDecayDays": "用戶衰變週期",
+        "userDecayPoints": "用戶每次減分",
+        "userTagIdleClearDays": "用戶無新增清理",
+        "merchantSaturationCap": "商家有效分上限",
+        "userSaturationCap": "用戶有效分上限"
+      }
     }
   },
   "trafficSandbox": {
@@ -17564,6 +17778,424 @@
       "finish": "完成",
       "todayInvested": "今天 {{minutes}}",
       "workHoursChip": "工時 {{hours}}h"
+    },
+    "archive": {
+      "aiSummary": "AI 摘要",
+      "historyLoadFailed": "歷史匯報載入失敗",
+      "itemMeta": "{{total}} 項 · 完成 {{done}}",
+      "noHistory": "還沒有歷史匯報",
+      "noRecognition": "還沒有收到成果認定",
+      "published": "已發布",
+      "recognitionLoadFailed": "成果檔案載入失敗",
+      "recognitionMeta": "認定人：{{by}} · {{at}} · 週期 {{period}}",
+      "recognitionNote": "認定即績效證據，期末可供 HR 績效考核取數（二期接口）",
+      "recognitionTitle": "上級認可記錄"
+    },
+    "gantt": {
+      "action": {
+        "addItem": "新增工作項",
+        "collapseLeft": "收合左欄",
+        "expandLeft": "展開左欄",
+        "gantt": "甘特",
+        "ganttSwitchTip": "開啟顯示甘特圖，關閉切換為列表",
+        "list": "列表",
+        "showWeekends": "顯示周末",
+        "today": "回到今天"
+      },
+      "badge": {
+        "leave": "請",
+        "makeup": "班",
+        "rest": "休",
+        "today": "今"
+      },
+      "caliber": {
+        "p1": "耗時 = 區間工作日 × {{hours}}h；周末與節假日自動剔除，調休上班計入，請假/調休不計。",
+        "p2": "點擊色條看詳情/改進度 · 拖拽色塊移動 · 拉伸右緣改結束 · 雙擊格子排期 · 行首手柄拖拽排序。",
+        "p3": "虛線邊＋「插」角標＝臨時插入工作項；行內 ⚡ 可標記/取消。",
+        "title": "工作日口徑"
+      },
+      "cell": {
+        "restTip": "周末/節假日不計入工時，請選擇工作日"
+      },
+      "col": {
+        "done": "完成",
+        "end": "結束日期",
+        "hours": "耗時",
+        "item": "工作項",
+        "note": "備註原因",
+        "progress": "當前進度",
+        "start": "開始日期",
+        "task": "任務子項"
+      },
+      "confirm": {
+        "deleteItemTitle": "確定刪除整個工作項？",
+        "deleteTaskTitle": "確定刪除該子任務？",
+        "labelContains": "包含：",
+        "labelItem": "工作項：",
+        "labelTask": "子任務：",
+        "subtaskCount": "{{count}} 個子任務，一併刪除"
+      },
+      "csv": {
+        "colEnd": "結束日期",
+        "colGroup": "工作項",
+        "colHours": "耗時(小時)",
+        "colNote": "備註原因",
+        "colProgress": "當前進度",
+        "colStart": "開始日期",
+        "colStatus": "完成狀態",
+        "colTask": "任務子項",
+        "fileBase": "我的工作記錄_{{date}}"
+      },
+      "date": {
+        "schedule": "排期"
+      },
+      "dayType": {
+        "compOff": "調休",
+        "holiday": "節假日",
+        "leave": "請假",
+        "makeup": "補班"
+      },
+      "density": {
+        "compact": "緊湊",
+        "loose": "寬鬆",
+        "standard": "標準"
+      },
+      "empty": {
+        "desc": "新增一個工作項標題，拆分子任務並排期，甘特圖會按工作日自動鋪開。",
+        "loadSeed": "載入示例數據",
+        "title": "還沒有工作項台账"
+      },
+      "emptyFiltered": {
+        "clear": "清除篩選",
+        "desc": "調整關鍵詞或狀態篩選，或清除篩選查看全部工作項。",
+        "title": "沒有符合條件的記錄"
+      },
+      "export": {
+        "csv": "Excel 表格（CSV）",
+        "failed": "導出失敗，請重試",
+        "fileBase": "我的工作記錄_{{date}}",
+        "imageDone": "已下載當前台账的長圖快照",
+        "pdfDone": "已下載當前台账的 A4 分頁 PDF"
+      },
+      "hours": {
+        "tip": "{{days}} 個工作日 × {{hours}}h（周末/節假日不計）",
+        "value": "{{hours}}小時"
+      },
+      "inline": {
+        "clickToEdit": "點擊修改"
+      },
+      "insert": {
+        "flag": "插",
+        "markTip": "標記為臨時插入",
+        "noDate": "日期未記",
+        "tag": "臨時",
+        "tagTip": "臨時插入・{{date}}",
+        "unmarkTip": "取消臨時插入標記"
+      },
+      "msg": {
+        "csvDone": "已導出 CSV，Excel 可直接打開",
+        "endBeforeStart": "結束日期不能早於開始日期，已對齊開始日期",
+        "insertedMarked": "已標記臨時插入（{{date}}）",
+        "itemDeleted": "已刪除工作項。",
+        "planRestored": "已恢復為原計劃",
+        "sheetNotReady": "台账尚未載入",
+        "taskDeleted": "已刪除子任務。",
+        "syncFailed": "保存失敗，請重試"
+      },
+      "newItemTitle": "新工作項",
+      "note": {
+        "bold": "加粗",
+        "clear": "清除",
+        "clearFormat": "清除格式",
+        "clickToFill": "點擊填寫",
+        "color": "字色",
+        "italic": "斜體",
+        "save": "保存備註",
+        "sizeLg": "大",
+        "sizeMd": "標準",
+        "sizeSm": "小",
+        "sizeTip": "字號・{{size}}",
+        "sizeXl": "特大",
+        "tip": "支持加粗／斜體／下劃線／字色／字號；保存時自動淨化。列表備註懸停即可閱讀全文，無需點擊。",
+        "title": "備註・{{title}}",
+        "underline": "下劃線"
+      },
+      "period": {
+        "back": "回本期",
+        "next": "下一期",
+        "prev": "上一期"
+      },
+      "plan": {
+        "inserted": "臨時插入",
+        "planned": "原計劃"
+      },
+      "pop": {
+        "editNote": "編輯備註",
+        "footer": "拖拽色塊移動 · 拉伸右緣改結束 · 雙擊格子排期",
+        "hours": "耗時",
+        "insertedAt": "{{date}} 插入",
+        "noNote": "尚無備註",
+        "note": "備註",
+        "plan": "計劃",
+        "planType": "屬性",
+        "progress": "進度",
+        "workdays": "{{days}} 個工作日 × {{hours}}h"
+      },
+      "preset": {
+        "custom": "自定義",
+        "lastMonth": "上月",
+        "lastWeek": "上週",
+        "month": "本月",
+        "week": "本週"
+      },
+      "range": {
+        "all": "全部時間",
+        "monthFormat": "YYYY 年 MM 月",
+        "week": "第 {{week}} 週（{{start}} ~ {{end}}）"
+      },
+      "req": {
+        "addTask": "添加子任務",
+        "deleteItem": "刪除工作項"
+      },
+      "search": {
+        "allItem": "全部工作項",
+        "allPlan": "全部屬性",
+        "allStatus": "全部狀態",
+        "cycle": "工作週期",
+        "keyword": "關鍵詞",
+        "keywordPlaceholder": "工作項 / 子任務 / 備註",
+        "plan": "計劃屬性",
+        "status": "狀態"
+      },
+      "stat": {
+        "avg": "項目平均進度",
+        "avgTip": "區間內任務的當前平均進度",
+        "doingNowTip": "當前狀態為進行中",
+        "doingTip": "期末進度 1–99%",
+        "doneInPeriod": "本期完成",
+        "doneNowTip": "當前狀態為已完成",
+        "doneTip": "完成時點落在查詢區間（與匯報同口徑）",
+        "hours": "總耗時（工作日口徑）",
+        "hoursTip": "區間交集工作日 × 8h",
+        "insertedAllTip": "全部標記為臨時插入的工作項",
+        "insertedTip": "插入時點落在查詢區間",
+        "pendingNow": "待完成",
+        "pendingNowTip": "當前狀態為待處理/待排期",
+        "pendingStart": "待啟動",
+        "pendingTip": "期末進度 0%"
+      },
+      "status": {
+        "deriveTip": "由進度自動判定：100% 已完成；1–99% 進行中；0% 待處理；未排期為待排期",
+        "plan": "待排期",
+        "todo": "待處理"
+      },
+      "subtaskN": "子任務 {{count}}",
+      "suffix": {
+        "item": " 項",
+        "percent": "%"
+      },
+      "tabbar": {
+        "summary": "{{tasks}} 個子任務 · {{workdays}} 個工作日"
+      },
+      "undo": "撤銷",
+      "weekNth": "第{{count}}週",
+      "weekdayShort": [
+        "日",
+        "一",
+        "二",
+        "三",
+        "四",
+        "五",
+        "六"
+      ],
+      "import": {
+        "button": "導入本地台账",
+        "done": "已導入本地台账（{{count}} 個工作項）"
+      },
+      "loadFailed": "台账載入失敗",
+      "loading": "台账加載中…",
+      "loadingDesc": "數據來自服務端台账，工時按工作日口徑計算。",
+      "tab": {
+        "day": "日视图",
+        "ledger": "工作台账"
+      }
+    },
+    "holiday": {
+      "add": "添加",
+      "addTip": "自動識別：工作日→節假日，周末→補班。請假/調休請手動選擇類型。",
+      "autoDetect": "自動識別",
+      "card": {
+        "add": "添加日期",
+        "addNote": "四類型",
+        "configured": "已配置日期（{{count}}）",
+        "configuredNote": "× 恢復口徑",
+        "quick": "快速操作",
+        "quickNote": "僅 {{year}} 年"
+      },
+      "clearContent": "將移除 {{year}} 年全部節假日、補班、調休與請假登記，恢復默認周末休息口徑。",
+      "clearOk": "確認清空",
+      "clearTitle": "清空 {{year}} 年节假日配置？",
+      "clearYear": "清空本年",
+      "importStatutory": "導入法定節假日",
+      "menu": "節假日配置",
+      "monthFormat": "YYYY 年 MM 月",
+      "msg": {
+        "applied": "{{date}} 已設為{{type}}",
+        "cleared": "已清空 {{year}} 年配置",
+        "imported": "已導入 {{year}} 年法定節假日 {{holidays}} 天・補班 {{makeups}} 天",
+        "restored": "{{date}} 已恢復為{{kind}}口徑",
+        "reverted": "{{date}} 已恢復默認口徑",
+        "setHoliday": "{{date}} 設為節假日（不計工時）",
+        "setMakeup": "{{date}} 設為補班（計工時）",
+        "refreshed": "已同步系統法定假日名單",
+        "saveFailed": "口徑保存失敗，已回滾"
+      },
+      "noneInYear": "本年暫無配置",
+      "pickDate": "選擇日期",
+      "quickTip": "導入僅合併節假日與補班名單，不動調休/請假；清空前會二次確認。",
+      "subtitle": "工作日口徑：節假日/調休/請假不計工時，補班計入；改動實時同步台账與匯報",
+      "tip": {
+        "revert": "{{type}}・點擊恢復默認口徑",
+        "weekendToMakeup": "周末・點擊設為補班",
+        "workdayToHoliday": "工作日・點擊設為節假日"
+      },
+      "title": "節假日配置",
+      "today": "今天",
+      "unitDay": "天",
+      "weekendRest": "周末休息",
+      "weekendShort": "周末休",
+      "workday": "工作日",
+      "workdaysYear": "全年工作日",
+      "loadFailed": "日曆載入失敗",
+      "refreshStatutory": "同步系統法定假日"
+    },
+    "workReport": {
+      "anchor": "錨點日期",
+      "autoDraftTag": "自動聚合草稿",
+      "backlog": {
+        "count": "待排期積壓 {{count}} 項",
+        "note": "未排期任務不計工時，建議尽快落入計劃"
+      },
+      "caliber": "口徑：工作日 × {{hours}}h・周末/節假日剔除",
+      "copyDone": "已複製 Markdown（導出文本 = 頁面文本）",
+      "copyMarkdown": "複製 Markdown",
+      "daily": "每日投入（工作日口徑）",
+      "doneOn": "{{date}} 完成",
+      "editSummary": "編輯本期總結",
+      "empty": {
+        "action": "去工作記錄記一筆",
+        "desc": "台账還沒有工作記錄，匯報無米下鍋"
+      },
+      "export": {
+        "fileBase": "工作匯報_{{period}}_{{date}}",
+        "imageDone": "已下載當前匯報的長圖快照",
+        "pdfDone": "已下載當前匯報的 A4 分頁 PDF"
+      },
+      "flat": "持平",
+      "foot": "數據來源：工作記錄台账（甘特／列表同源）· 進度對比取期初/期末流水快照 · 工時按工作日口徑扣減。",
+      "generatedAt": "生成於 {{time}}",
+      "groupMeta": "{{count}} 項 · {{hours}}h · 完成 {{done}}",
+      "groups": {
+        "none": "本期無已排期的工作項任務。"
+      },
+      "hours": {
+        "none": "本期無工時投入（排期與查詢區間無交集工作日）。"
+      },
+      "insertedOn": "{{group}}・{{date}} 插入",
+      "inserts": {
+        "none": "本期無臨時插入，計劃按原排期執行。"
+      },
+      "label": {
+        "dayFormat": "YYYY 年 MM 月 DD 日",
+        "monthFormat": "YYYY 年 MM 月",
+        "quarter": "{{year}} 年 Q{{q}}",
+        "week": "第 {{week}} 週（{{start}} ~ {{end}}）"
+      },
+      "md": {
+        "avgProgress": "- 平均進度：{{from}}% → {{to}}%",
+        "groupDelta": "- 期初 {{from}}% → 期末 {{to}}%（{{delta}}%）",
+        "groupRow": "- {{task}} — {{from}}% → {{to}}% · {{hours}}h",
+        "groupTitle": "### {{title}}（{{count}} 項 · {{hours}}h）",
+        "insertItem": "- {{task}}（{{group}}）— {{at}} 插入 · {{hours}}h · {{from}}% → {{to}}%",
+        "invested": "- 投入工時：{{hours}}h（工作日 × {{perDay}}h，周末/節假日剔除）",
+        "noInsert": "- 本期無臨時插入，計劃按原排期執行",
+        "noOutput": "- 本期無完成事項",
+        "noPlan": "- 暫無已排期的下期事項",
+        "noRisk": "- 本期無逾期與風險備註",
+        "noteItem": "- [備註] {{task}}：{{note}}",
+        "outputItem": "- {{task}}（{{group}}）— {{doneAt}} 完成 · {{hours}}h",
+        "overview": "- 完成 {{done}} 項／進行中 {{doing}} 項／覆蓋 {{total}} 項",
+        "peak": "- 單日峰值：{{date}} {{hours}}h",
+        "planItem": "- {{task}}（{{group}}）— {{start}} 開始 · 預計 {{hours}}h",
+        "riskItem": "- [逾期 {{days}} 天] {{task}}（{{group}}）— 結束 {{end}} · {{progress}}%",
+        "riskLine": "- 風險 {{risks}} 項・臨時插入 {{inserted}} 項・待排期 {{backlog}} 項",
+        "s1": "## 一、核心概覽",
+        "s2": "## 二、本期內容",
+        "s3": "## 三、下期計劃",
+        "s4": "## 四、風險與備註",
+        "s5": "## 五、工時分布",
+        "s6": "## 六、風險與備註",
+        "s7": "## 七、下期計劃",
+        "shareRow": "- {{title}}：{{hours}}h（{{share}}%）",
+        "title": "# 工作匯報（{{period}}）",
+        "contentRow": "- {{task}}{{inserted}} — {{from}}% → {{to}}% · {{hours}}h · {{status}}",
+        "insertedMark": "［臨時插入］",
+        "noContent": "- 本期無已排期的工作項任務",
+        "backlogItem": "- [待排期] {{count}} 項未排期任務不計工時"
+      },
+      "outputs": {
+        "none": "本期無完成事項——進行中的推進見下節。"
+      },
+      "ov": {
+        "backlog": "{{count}} 項待排期",
+        "cover": "本期覆蓋 {{total}} 項子任務，完成 {{done}} 項",
+        "hours": "投入 {{hours}}h（工作日口徑）",
+        "inserted": "臨時插入 {{count}} 項",
+        "progress": "平均進度 {{from}}% → {{to}}%（{{delta}}%）",
+        "risks": "{{count}} 項逾期需關注",
+        "sep": "，"
+      },
+      "overdueDays": "逾期 {{days}} 天",
+      "overdueShort": "逾期 {{days}}d",
+      "peak": "峰值 {{date}} · {{hours}}h",
+      "periodEnd": "期末 {{v}}%",
+      "periodStart": "期初 {{v}}%",
+      "plan": {
+        "estimate": "預計 {{hours}}h",
+        "none": "暫無已排期的下期事項。"
+      },
+      "reporter": "匯報人：本人",
+      "riskLine": "{{group}} · 結束 {{end}} · 進度 {{progress}}%",
+      "risks": {
+        "none": "本期無逾期、風險備註與待排期積壓。"
+      },
+      "section": {
+        "hours": "工時分布",
+        "inserts": "臨時插入工作",
+        "outputs": "核心產出",
+        "overview": "核心概覽",
+        "plan": "下期計劃",
+        "progress": "工作項進度對比",
+        "risks": "風險與備註",
+        "content": "本期內容"
+      },
+      "stat": {
+        "avgEnd": "期末平均進度",
+        "hours": "投入工時",
+        "risks": "風險事項"
+      },
+      "summaryPlaceholder": "寫一句本期總結（留空則用自動概述，導出同文）",
+      "tab": {
+        "archive": "個人成果檔案",
+        "history": "歷史匯報",
+        "read": "匯報閱讀",
+        "delivery": "發布與交付"
+      },
+      "thisPeriod": "本期",
+      "title": "工作匯報",
+      "covered": "本期覆蓋",
+      "loadFailed": "匯報載入失敗",
+      "loading": "匯報聚合中…"
     }
   }
 }

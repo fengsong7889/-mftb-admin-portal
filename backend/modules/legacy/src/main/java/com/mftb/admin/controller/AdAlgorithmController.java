@@ -5,8 +5,11 @@ import com.mftb.admin.common.Result;
 import com.mftb.admin.dto.AdAlgorithmRequest;
 import com.mftb.admin.dto.AdAlgorithmQuery;
 import com.mftb.admin.dto.AdAlgorithmVO;
+import com.mftb.admin.dto.AdAlgorithmRevisionVO;
 import com.mftb.admin.dto.PageResult;
+import com.mftb.admin.dto.AdRevisionPublishDTO;
 import com.mftb.admin.dto.StatusUpdateDTO;
+import com.mftb.admin.service.AdAlgorithmRevisionService;
 import com.mftb.admin.service.AdAlgorithmService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +35,7 @@ import java.util.Map;
 public class AdAlgorithmController {
 
     private final AdAlgorithmService algorithmService;
+    private final AdAlgorithmRevisionService revisionService;
 
     /** 算法分页查询 */
     @GetMapping
@@ -94,6 +98,22 @@ public class AdAlgorithmController {
     public Result<Void> delete(@PathVariable Long id) {
         algorithmService.delete(id);
         return Result.success();
+    }
+
+    /** 发布交互式相似推荐算法的不可变版本（expectedRevision 冲突返回 409） */
+    @PostMapping("/{id}/revisions")
+    @RequirePermission(menu = "promotion-algorithm", action = "create")
+    public Result<AdAlgorithmRevisionVO> publishRevision(@PathVariable Long id,
+                                                       @RequestBody(required = false) AdRevisionPublishDTO dto) {
+        return Result.success("算法版本發布成功",
+                revisionService.publish(id, dto == null ? null : dto.getExpectedRevision()));
+    }
+
+    /** 算法不可变版本列表（倒序） */
+    @GetMapping("/{id}/revisions")
+    @RequirePermission(menu = "promotion-algorithm")
+    public Result<List<AdAlgorithmRevisionVO>> revisions(@PathVariable Long id) {
+        return Result.success(revisionService.list(id));
     }
 
     /** 查询引用该算法的瀑布流配置列表 */

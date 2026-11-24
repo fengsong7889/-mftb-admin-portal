@@ -22,7 +22,7 @@ import type { WaterfallSlotConfig } from '../types'
 import { fetchAdPricingList, updateAdPricingStatus, deleteAdPricing, fetchAdRevivePricingList, updateAdRevivePricingStatus, deleteAdRevivePricing, fetchAdHotPricingList, updateAdHotPricingStatus, deleteAdHotPricing, updateAdSignboardPricingStatus, deleteAdSignboardPricing, fetchAdSignboardPricingList, fetchAdTrafficPricingList, updateAdTrafficPricingStatus, deleteAdTrafficPricing, fetchAdTimeSlotPricingList, updateAdTimeSlotPricingStatus, deleteAdTimeSlotPricing, fetchAdAlgorithms, brandToAppType, type AdPricingStar, type AdPricingHot, type AdPricingTraffic, type AdPricingTimeSlot, type AdAlgorithm } from '@/api/adPromotion'
 import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { useCardOrder } from '@/hooks/useCardOrder'
-import { HERO_CARD_STYLES, renderHeroMark } from '../../_shared/ad-promotion/heroCardStyles'
+import { HERO_CARD_STYLES, renderHeroMark, AD_TYPE_ICON } from '../../_shared/ad-promotion/heroCardStyles'
 import AdPromotionDescription from '../../_shared/ad-promotion/AdPromotionDescription'
 
 /** 投流廣告：後端業務頻道碼(1/2/3) → 列表行業務頻道值 */
@@ -146,6 +146,8 @@ const toPricingRow = (vo: AdPricingStar, algoType: AlgorithmType): WaterfallSlot
   algorithmId: vo.algoId,
   algorithmName: vo.algoName || '-',
   algorithmType: algoType,
+  // 星星/盘活等同源 VO 的推广对象快照；列表只对商品星星加标签，门店不加（存量外卖行保持无标签）
+  starTargetType: algoType === AlgorithmType.INVINCIBLE_STAR ? vo.targetType : undefined,
   merchantLimit: 'unlimited',
   regionLimit: 'unlimited',
   status: (vo.status ?? ServiceStatus.ENABLED) as ServiceStatus,
@@ -180,13 +182,9 @@ export default function Waterfall() {
 
   /** 广告类型卡片配置（依赖 t，定义在组件内以便响应语言切换） */
   const ALGORITHM_TYPE_CARDS: { type: AlgorithmType; icon: string }[] = [
-    { type: AlgorithmType.INVINCIBLE_STAR, icon: '⭐' },
-    { type: AlgorithmType.HOT_REVIVE_AD, icon: '🔥' },
-    { type: AlgorithmType.POPULAR_MERCHANT_KA, icon: '🏆' },
-    { type: AlgorithmType.TRAFFIC_AD, icon: '📊' },
-    { type: AlgorithmType.GOLDEN_SIGNBOARD, icon: '🏅' },
-    { type: AlgorithmType.TIME_SLOT_AD, icon: '⏰' },
-  ]
+    AlgorithmType.INVINCIBLE_STAR, AlgorithmType.HOT_REVIVE_AD, AlgorithmType.POPULAR_MERCHANT_KA,
+    AlgorithmType.TRAFFIC_AD, AlgorithmType.GOLDEN_SIGNBOARD, AlgorithmType.TIME_SLOT_AD,
+  ].map(type => ({ type, icon: AD_TYPE_ICON[type] ?? '' }))
 
   /** 算法类型标签映射（复用 algorithm 命名空间，依赖 t，定义在组件内以便响应语言切换） */
   const ALGORITHM_TYPE_LABEL: Record<AlgorithmType, string> = {
@@ -508,7 +506,14 @@ export default function Waterfall() {
       dataIndex: 'promotionName',
       key: 'promotionName',
       width: 200,
-      render: (text: string) => <strong>{text}</strong>,
+      render: (text: string, record) => (
+        <Space size={6}>
+          <strong>{text}</strong>
+          {record.algorithmType === AlgorithmType.INVINCIBLE_STAR && record.starTargetType === 2 && (
+            <Tag color="geekblue">{t('promotionSlotConfig:contentTypeProduct')}</Tag>
+          )}
+        </Space>
+      ),
     },
     { 
       title: t('common.colBrand'), 

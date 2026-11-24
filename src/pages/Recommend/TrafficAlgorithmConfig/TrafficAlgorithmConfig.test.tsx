@@ -6,14 +6,21 @@ import i18n from '@/i18n'
 import TrafficAlgorithmConfig from './index'
 import { ClickRecTrial, SimilarityTrial } from './trialCalc'
 import useTrafficAlgorithmForm from './useTrafficAlgorithmForm'
-import { readTrafficParams, TRAFFIC_FIELD_NAMES, type TrafficFieldName } from './config'
+import { readTrafficParams, TRAFFIC_FIELD_NAMES, TRAFFIC_FIELDS, type TrafficFieldName } from './config'
+import { getTagDecayPolicy, saveTagDecayPolicy, TAG_DECAY_FIELDS } from '../TagDecaySettings/store'
 import type { AdAlgorithm } from '@/api/adPromotion'
 
 const mocks = vi.hoisted(() => ({
   fetch: vi.fn(), create: vi.fn(), update: vi.fn(), saved: vi.fn(), warn: vi.fn(),
-  t: (key: string, opts?: { defaultValue?: string }) => opts?.defaultValue ?? key,
+  // 与真 i18next 对齐：除 defaultValue 外的选项当作插值变量，否则带 {{var}} 的文案（如衰变引用版本号）会原样输出。
+  t: (key: string, opts?: Record<string, unknown>) => {
+    const text = typeof opts?.defaultValue === 'string' ? opts.defaultValue : key
+    return Object.entries(opts ?? {}).reduce((acc, [name, value]) =>
+      (name === 'defaultValue' ? acc : acc.split(`{{${name}}}`).join(String(value))), text)
+  },
 }))
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: mocks.t }), initReactI18next: { type: '3rdParty', init: () => {} } }))
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { username: 'traffic-test' } }) }))
 vi.mock('antd', async importOriginal => ({
   ...await importOriginal<typeof import('antd')>(),
   message: { success: vi.fn(), error: vi.fn(), warning: mocks.warn },
@@ -80,7 +87,7 @@ beforeEach(() => {
 describe('投流配置交互与保存', () => {
   it('频控组默认折叠，全部字段仍注册且摘要跟随修改', async () => {
     const view = mountConfig()
-    const heading = screen.getByRole('button', { name: '频控与触发', expanded: false })
+    const heading = screen.getByRole('button', { name: '商家频控', expanded: false })
     expect(heading).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByText('历史策略说明（不参与当前排序）')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '曝光比例试算' })).not.toBeInTheDocument()
@@ -88,16 +95,20 @@ describe('投流配置交互与保存', () => {
     const fixedStats: TrafficFieldName[] = ['merchantKeywordStatsMode', 'merchantKeywordStatsDays', 'userKeywordStatsMode', 'userKeywordStatsDays']
     const registeredNames = view.form.getFieldsError().map(field => field.name[0])
     expect(registeredNames).toEqual(expect.arrayContaining(
-      TRAFFIC_FIELD_NAMES.filter(name => !fixedStats.includes(name)),
+      TRAFFIC_FIELD_NAMES.filter(name => !fixedStats.includes(name) && !(name in TAG_DECAY_FIELDS)
+        && TRAFFIC_FIELDS[name].group !== 'similarRec' && !['userSimilarThreshold', 'generativeDailyLimitMode', 'generativeDailyLimit'].includes(name)),
     ))
     fireEvent.click(heading)
     fireEvent.change(screen.getByRole('spinbutton', { name: '同商家最多展示' }), { target: { value: '7' } })
     await waitFor(() => expect(screen.getByLabelText('投流配置概览')).toHaveTextContent('同店 2 小时 / 7 次'))
-    // 标签衰减已并入「标签与兴趣匹配」组（默认展开）。
-    expect(screen.getByRole('spinbutton', { name: '商家标签衰减周期' })).toHaveValue('7')
-    fireEvent.change(screen.getByRole('spinbutton', { name: '商家标签衰减周期' }), { target: { value: '12' } })
+    // 衰变只引用全局来源，原有后端数据保留但没有可编辑控件。
+    expect(screen.queryByRole('spinbutton', { name: '商家标签衰减周期' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('全局標籤衰變規則引用')).toBeInTheDocument()
+    const policy = getTagDecayPolicy('traffic-test')
+    act(() => saveTagDecayPolicy('traffic-test', { ...policy.values, merchantDecayDays: 12 }, policy.revision))
+    expect(screen.getByLabelText('全局標籤衰變規則引用')).toHaveTextContent(`V${policy.revision + 1}`)
     fireEvent.click(heading)
-    expect(view.form.getFieldValue('merchantDecayDays')).toBe(12)
+    expect(view.form.getFieldValue('merchantDecayDays')).toBe(7)
     expect(screen.queryByRole('spinbutton', { name: '同商家最多展示' })).not.toBeInTheDocument()
     // 全量字段注册断言 + 折叠展开切换，在高负载机器上易超默认 60s，显式放宽。
   }, 120000)
@@ -114,12 +125,12 @@ describe('投流配置交互与保存', () => {
     scroll.mockRestore()
   })
 
-  it('关闭相似推荐和售罄过滤时不校验隐藏子项，保存 false、0 和检查周期', async () => {
+  it('移除返回推荐控件后保留历史false及空值，不影响售罄与当前字段校验', async () => {
     const view = mountConfig()
     await act(async () => {
-      view.form.setFieldsValue({ consistencyCheckInterval: 17, statusRest: true, explorationSlots: 0, dwellTimeThreshold: null, productCheckInterval: null })
+      view.form.setFieldsValue({ consistencyCheckInterval: 17, statusRest: true, explorationSlots: 0, generativeRecommendEnabled: false, dwellTimeThreshold: null, productCheckInterval: null })
     })
-    fireEvent.click(screen.getByRole('switch', { name: '浏览后相似推荐' }))
+    expect(screen.queryByRole('switch', { name: '浏览后相似推荐' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('switch', { name: '售罄与下架过滤' }))
     expect(screen.queryByRole('spinbutton', { name: '停留时长门槛' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /保存配置/ }))
@@ -128,9 +139,8 @@ describe('投流配置交互与保存', () => {
       consistencyCheckInterval: 17, statusRest: true, statusClosed: false, coverageFilterEnabled: false, matchThreshold: 30,
       generativeRecommendEnabled: false, soldOutFilterEnabled: false, dwellTimeThreshold: null, productCheckInterval: null,
     })
-    fireEvent.click(screen.getByRole('switch', { name: '浏览后相似推荐' }))
-    await waitFor(() => expect(screen.getByRole('spinbutton', { name: '停留时长门槛' })).toBeInTheDocument())
     expect(view.form.getFieldValue('dwellTimeThreshold')).toBeNull()
+    expect(view.form.getFieldsError().map(f => f.name[0])).not.toContain('generativeRecommendEnabled')
     // 全量字段挂载 + 两次开关切换，在高负载机器上易超默认 60s，显式放宽。
   }, 120000)
 
@@ -277,18 +287,33 @@ describe('投流配置交互与保存', () => {
     // 只读态全量字段禁用断言，在高负载机器上易超默认 60s，显式放宽。
   }, 120000)
 
-  it('投流坑位排序置末且与冷启动/相似推荐独立；预设回写因子，自定义勾选子集，相似可切独立优先级', async () => {
+  it('标签与兴趣匹配拆为三区域：准入／直接匹配（含相似度）／协同，相似度不再跟在协同后', () => {
+    mountConfig()
+    const r1 = screen.getByText('① 准入門檻')
+    const r2 = screen.getByText('② 直接匹配規則（主路）')
+    const r3 = screen.getByText('③ 用戶協同補充（可選・補缺口或探索配額）')
+    expect(r1).toBeInTheDocument()
+    expect(r2).toBeInTheDocument()
+    expect(r3).toBeInTheDocument()
+    // 相似度算法属于直接匹配区域②，且位于协同区域③之前（消除「相似度只服务协同」误解）
+    const sim = screen.getByRole('combobox', { name: '相似度算法' })
+    expect(r2.compareDocumentPosition(sim) & 4).toBeTruthy()
+    expect(sim.compareDocumentPosition(r3) & 4).toBeTruthy()
+  })
+
+  it('排序规则置末且与冷启动/相似推荐独立；预设回写因子，自定义勾选子集，相似可切独立优先级', async () => {
     const view = mountConfig()
     const navigation = screen.getByRole('navigation', { name: '投流配置分组导航' })
     const navNames = within(navigation).getAllByRole('button').map(b => b.textContent)
-    expect(navNames).toEqual(['基础与可用性', '标签与兴趣匹配', '冷启动推荐', '相似推荐', '频控与触发', '投流坑位排序'])
-    expect(screen.getByRole('button', { name: '投流坑位排序', expanded: true })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '冷启动推荐', expanded: true })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '相似推荐', expanded: true })).toBeInTheDocument()
+    // 分组重构后真源：coldStart 退役，拆为「召回范围」+「排序规则」（与 config.ts TRAFFIC_GROUPS 同序）
+    expect(navNames).toEqual(['基础与可用性', '召回范围', '标签与兴趣匹配', '排序规则', '商家频控'])
+    expect(screen.getByRole('button', { name: '排序规则', expanded: true })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '召回范围', expanded: true })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '相似推荐' })).not.toBeInTheDocument()
     // 默认匹配优先：单轴排序，不展示因子勾选；摘要显示按匹配得分
     expect(screen.queryByRole('checkbox', { name: '匹配分' })).not.toBeInTheDocument()
-    expect(screen.getByLabelText('共用排序规则摘要')).toHaveTextContent('匹配优先')
-    expect(screen.getByLabelText('共用排序规则摘要')).toHaveTextContent('按匹配得分')
+    expect(screen.queryByLabelText('共用排序规则摘要')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('投流配置概览')).toHaveTextContent('匹配优先')
     const preset = screen.getByRole('combobox', { name: '排序策略' })
     fireEvent.mouseDown(preset)
     fireEvent.click(await screen.findByText('消耗优先'))
@@ -308,14 +333,47 @@ describe('投流配置交互与保存', () => {
     // 自定义＝勾选子集：默认回退匹配/质量/距离，取消匹配分后仅余质量/距离
     fireEvent.click(screen.getByRole('checkbox', { name: '匹配分' }))
     await waitFor(() => expect(view.form.getFieldValue('rankFactors')).toEqual(['quality', 'distance']))
-    // 相似推荐切独立配置：出现独立排序策略（预设单轴，其因子勾选亦隐藏）
-    const scope = screen.getByRole('combobox', { name: '优先级来源' })
-    fireEvent.mouseDown(scope)
-    fireEvent.click(await screen.findByText('独立配置'))
-    await waitFor(() => expect(screen.getByRole('combobox', { name: '独立排序策略' })).toBeInTheDocument())
+    expect(screen.queryByRole('combobox', { name: '优先级来源' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: '独立排序策略' })).not.toBeInTheDocument()
     expect(screen.getAllByRole('checkbox', { name: '匹配分' })).toHaveLength(1)
     // 多次 antd Select 开合 + 全量字段挂载，在低配/高负载机器上易超默认 60s，显式放宽。
   }, 180000)
+
+  it('商家召回范围锁定仅投流商家；与主排序同轴的同分决胜作为死选项全模式剔除', async () => {
+    const view = mountConfig()
+    // 召回范围·商家侧：付费坑位产品的固定口径，控件整体锁定（下拉不可展开），
+    // 预留档位「全量商家」以选中值以外的固定口径提示呈现。
+    const scope = screen.getByRole('combobox', { name: '商家召回范围' })
+    expect(scope).toBeDisabled()
+    const scopeGroup = scope.closest('.traffic-field-group') as HTMLElement
+    expect(scopeGroup).toHaveTextContent('仅投流商家')
+    expect(scopeGroup).toHaveTextContent('「全量商家」为预留档位')
+    // 预设态因子行必须整体隐藏，且 hidden 落在外层裸 div：同一元素带 display:flex 类会盖掉 [hidden]。
+    const factorsInline = screen.getByText('参与排序因子').closest('.traffic-fields-inline') as HTMLElement
+    expect(factorsInline.parentElement?.hasAttribute('hidden')).toBe(true)
+    expect(factorsInline.parentElement?.className).not.toContain('traffic-fields-inline')
+    expect(factorsInline).not.toBeVisible()
+    // 匹配优先（默认）：主分就是匹配分，同分再比匹配分永远打不平，该选项必须不存在。
+    const tie = screen.getByRole('combobox', { name: '同分决胜' })
+    fireEvent.mouseDown(tie)
+    const tieOpt = await screen.findByRole('option', { name: '质量分高者优先' })
+    const tieDrop = tieOpt.closest('.ant-select-dropdown') as HTMLElement
+    expect(within(tieDrop).queryByRole('option', { name: '匹配分高者优先' })).not.toBeInTheDocument()
+    fireEvent.mouseDown(document.body)
+    // 自定义仅勾单因子（距离）：该因子映射的决胜同样剔除，随机探索保留。
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '排序策略' }))
+    fireEvent.click(await screen.findByText('自定义因子'))
+    const factorItem = screen.getByText('参与排序因子').closest('.ant-form-item') as HTMLElement
+    fireEvent.click(within(factorItem).getByRole('checkbox', { name: '匹配分' }))
+    fireEvent.click(within(factorItem).getByRole('checkbox', { name: '质量分' }))
+    await waitFor(() => expect(view.form.getFieldValue('rankFactors')).toEqual(['distance']))
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: '同分决胜' }))
+    const single = (await screen.findByRole('option', { name: '随机探索' })).closest('.ant-select-dropdown') as HTMLElement
+    expect(within(single).queryByRole('option', { name: '距离近者优先' })).not.toBeInTheDocument()
+    expect(within(single).getByRole('option', { name: '随机探索' })).toBeInTheDocument()
+    // 切到自定义后因子行必须可见（与上一行预设态隐藏成对，锁住显隐联动）。
+    expect(factorsInline).toBeVisible()
+  }, 120000)
 
   it('时段优先开关控制补齐策略可见性', async () => {
     mountConfig()
@@ -328,19 +386,14 @@ describe('投流配置交互与保存', () => {
     await waitFor(() => expect(screen.getByRole('combobox', { name: '候选不足补齐' })).toBeInTheDocument())
   }, 120000)
 
-  it('只选同类目时融合旧字段不阻断保存，两种算法始终可选；用户协同勾选后门槛随模式出现', async () => {
+  it('历史相似来源仅保留数据不挂载，普通投流仍支持相似度指标与保存', async () => {
     const view = mountConfig()
-    // 用户协同为一期正式模式：默认未勾选，勾选后出现独立相似度门槛
-    const userSimilar = screen.getByRole('checkbox', { name: '用户协同推荐' })
-    expect(userSimilar).not.toBeChecked()
-    expect(screen.queryByRole('spinbutton', { name: '相似用户最低相似度' })).not.toBeInTheDocument()
-    fireEvent.click(userSimilar)
-    await waitFor(() => expect(screen.getByRole('spinbutton', { name: '相似用户最低相似度' })).toBeInTheDocument())
-    // 按坑位选来源：第 2 位仅 2 家时出现；取消勾选后来源回退到已勾选模式
-    expect(screen.getByRole('combobox', { name: '第 1 位优先来源' })).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: '用户协同推荐' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: '第 1 位优先来源' })).not.toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: '第 2 位优先来源' })).not.toBeInTheDocument()
-    await act(async () => { view.form.setFieldsValue({ generativeMerchantCount: 2, similarRecSlot1Source: 'userSimilar' }) })
-    expect(screen.getByRole('combobox', { name: '第 2 位优先来源' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '点击后推荐试算' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '商家频控', expanded: false }))
+    expect(screen.queryByText('相似推荐触发频次')).not.toBeInTheDocument()
     await act(async () => { view.form.setFieldsValue({ consistencyCheckInterval: 10,
       similarRecModes: ['sameCategory'], similarAnchor: 'blend', similarBlendRatio: null, similarityMetric: 'weightedJaccard' }) })
     expect(screen.getByRole('combobox', { name: '相似度算法' })).toBeInTheDocument()
@@ -368,8 +421,8 @@ describe('投流配置交互与保存', () => {
     fireEvent.change(threshold, { target: { value: '85' } })
     await waitFor(() => expect(view.form.getFieldValue('matchingUserSimilarThreshold')).toBe(85))
     // 点击后关闭不影响普通协同；门槛与开关独立保存
-    fireEvent.click(screen.getByRole('switch', { name: '浏览后相似推荐' }))
-    await act(async () => { view.form.setFieldsValue({ consistencyCheckInterval: 10, userSimilarThreshold: null }) })
+    expect(screen.queryByRole('switch', { name: '浏览后相似推荐' })).not.toBeInTheDocument()
+    await act(async () => { view.form.setFieldsValue({ consistencyCheckInterval: 10, generativeRecommendEnabled: false, userSimilarThreshold: null }) })
     fireEvent.click(screen.getByRole('button', { name: /保存配置/ }))
     await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1))
     expect(mocks.create.mock.calls[0][0].params).toMatchObject({ matchingUserSimilarEnabled: true,

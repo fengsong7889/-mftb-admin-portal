@@ -1,23 +1,24 @@
-// 待界面确认后统一补充 i18n；参数键与现有接口保持兼容。
+// 短标签/选项走 t(key, { defaultValue: 源文案 })（键见本文件末尾 trafficCfg.*）；长句业务口径按 Recommend 域惯例保留硬编码。
+// 参数键与现有接口保持兼容：新键只加不改，旧键退役后仍挂载透传存量。
 import i18n from '@/i18n'
 
-export type TrafficGroup = 'availability' | 'matching' | 'ranking' | 'coldStart' | 'similarRec' | 'frequency'
+export type TrafficGroup = 'availability' | 'recall' | 'matching' | 'ranking' | 'similarRec' | 'frequency'
 
-// 六组流水线：准入 → 标签/匹配 → 冷启动召回 → 点击后相似推荐 → 频控/展示 → 投流坑位排序。
-// 排序模块置末：它只决定「本广告占用坑位内」的商家先后，跨广告类型的坑位顺序由瀑布流策略的坑位序号决定。
-export const TRAFFIC_GROUPS: { key: TrafficGroup; title: string }[] = [
+// 六组流水线：准入 → 召回范围（抓取范围，约束匹配/冷启动两路）→ 标签/匹配 → 排序规则（① 匹配路径 ② 冷启动）→ 点击后相似推荐 → 频控/展示。
+// 召回先定「谁能进候选池」，排序只定「池内谁先」；跨广告类型的坑位顺序由瀑布流策略的坑位序号决定。
+export const TRAFFIC_GROUPS: { key: TrafficGroup; title: string; translateTitle?: boolean }[] = [
   { key: 'availability', title: '基础与可用性' },
+  { key: 'recall', title: '召回范围' },
   { key: 'matching', title: '标签与兴趣匹配' },
-  { key: 'coldStart', title: '冷启动推荐' },
+  { key: 'ranking', title: '排序规则' },
   { key: 'similarRec', title: '相似推荐' },
-  { key: 'frequency', title: '频控与触发' },
-  { key: 'ranking', title: '投流坑位排序' },
+  { key: 'frequency', title: '商家频控' },
 ]
 
 /** 排序预设＝单轴排序：匹配优先按匹配得分、消耗优先按流量包剩余量（匹配达标者内）。
  * 自定义因子＝勾选子集归一后等权相加。预设不展示/不校验因子勾选。 */
 export const RANK_CUSTOM_DEFAULT_FACTORS = ['match', 'quality', 'distance']
-/** 两套排序字段前缀：rank=投流坑位排序；similarRank=点击后相似推荐独立优先级。 */
+/** 两套排序字段前缀：rank=排序规则① 匹配路径；similarRank=点击后相似推荐独立优先级。 */
 export const RANK_PREFIXES = ['rank', 'similarRank'] as const
 export type RankPrefix = typeof RANK_PREFIXES[number]
 export const rankField = <P extends RankPrefix, S extends string>(prefix: P, suffix: S): `${P}${S}` & TrafficFieldName => `${prefix}${suffix}` as `${P}${S}` & TrafficFieldName
@@ -27,6 +28,7 @@ export const RANK_FACTOR_OPTIONS = [
   { label: '剩余比例', value: 'traffic' },
   { label: '质量分', value: 'quality' },
   { label: '距离', value: 'distance' },
+  { label: '匹配标签热度', value: 'tagHeat' },
 ]
 /** 同分决胜基础选项；「按流量包方向」在纯余量排序时无意义，由 normalize/ UI 过滤。 */
 export const RANK_TIE_BREAK_OPTIONS = [
@@ -34,10 +36,25 @@ export const RANK_TIE_BREAK_OPTIONS = [
   { label: '质量分高者优先', value: 'quality' },
   { label: '距离近者优先', value: 'distance' },
   { label: '随机探索', value: 'random' },
+  { label: '匹配标签热度高者优先', value: 'tagHeat' },
+  { label: '匹配分高者优先', value: 'match' },
 ]
 /** 纯余量排序（消耗优先 / 自定义仅勾余量）时「按流量包方向」决胜无意义。 */
 export const isTrafficOnlyRank = (preset: string, factors: string[]) =>
   preset === 'consumeFirst' || (preset === 'custom' && factors.length === 1 && factors[0] === 'traffic')
+/** 同分决胜选项 → 排序因子映射（单一真源）：自定义模式下决胜只能选已勾选因子映射／随机／热度，投流与相似引擎插入排序共用。 */
+export const RANK_TIE_TO_FACTOR: Record<string, string> = { trafficDirection: 'traffic', quality: 'quality', distance: 'distance', tagHeat: 'tagHeat', match: 'match' }
+/** 同分决胜死选项：决胜维度≡主排序单一轴时永远打不平同分（匹配优先×匹配分高者优先、消耗优先×剩余曝光次数多者优先、
+ *  自定义仅勾单因子×该因子映射项）。把旧 isTrafficOnlyRank 只针对余量的特例推广为全因子通用规则，投流与相似引擎共用。 */
+export const deadTieBreaks = (preset: string, factors: string[]): string[] => {
+  if (preset === 'matchFirst') return ['match']
+  if (preset === 'consumeFirst') return ['trafficDirection']
+  if (preset === 'custom' && factors.length === 1) {
+    const axis = factors[0]
+    return Object.keys(RANK_TIE_TO_FACTOR).filter(key => RANK_TIE_TO_FACTOR[key] === axis)
+  }
+  return []
+}
 
 /** 冷启动一期维度真源：三个维度均可自由勾选（至少保留一项），集合语义、无优先级。
  * 距离/剩余流量包归一后等权综合分高者先；质量分软优选（达线者先、不硬准入）。
@@ -128,6 +145,7 @@ export interface TrafficAlgorithmValues {
   mealPeriodPriorityEnabled: boolean
   mealPeriodFallback: string
   coldStartRegionScope: string
+  recallMerchantScope: string
   similarRankMode: string
   similarRankPreset: string
   similarRankFactors: string[]
@@ -178,6 +196,7 @@ export const TRAFFIC_DEFAULTS: TrafficAlgorithmValues = {
   rankTieBreak: 'trafficDirection', rankPoolSize: 100,
   mealPeriodPriorityEnabled: true, mealPeriodFallback: 'adjacent',
   coldStartRegionScope: 'delivery',
+  recallMerchantScope: 'trafficOnly',
   similarRankMode: 'inherit', similarRankPreset: 'matchFirst', similarRankFactors: [],
   similarRankWeightMatch: 60, similarRankWeightTraffic: 20, similarRankWeightQuality: 10, similarRankWeightDistance: 10,
   similarRankTieBreak: 'trafficDirection',
@@ -196,9 +215,6 @@ interface FieldDefinition {
   options?: { label: string; value: string }[]
   dependencies?: TrafficFieldName[]
   disabled?: boolean
-  /** 本轮已变更语义的显示文案不再读取旧译文；待界面确认后同步翻译。 */
-  translateLabel?: boolean
-  translateOptions?: boolean
 }
 const priorityOptions = [
   { label: '匹配度优先', value: 'matchFirst' },
@@ -227,24 +243,25 @@ export const TRAFFIC_FIELDS: Record<TrafficFieldName, FieldDefinition> = {
   userPreferenceMinScore: numberField('用户偏好识别最低分', 'matching', 1, 100, '分'),
   merchantPreferenceMinScore: numberField('商家偏好识别最低分', 'matching', 1, 1000, '分'),
   // 全局质量硬开关已退役：付费但暂无评分的商家不应被排除；质量改为冷启动软优选（qualityScore 维度）。
-  qualityFilterEnabled: { label: '启用商家质量门槛', group: 'availability', kind: 'boolean', translateLabel: false },
-  coverageFilterEnabled: { label: '启用最低覆盖比例', group: 'matching', kind: 'boolean', translateLabel: false },
-  matchThreshold: { ...numberField('最低覆盖比例', 'matching', 1, 100, '%', ['coverageFilterEnabled']), translateLabel: false },
+  qualityFilterEnabled: { label: '启用商家质量门槛', group: 'availability', kind: 'boolean' },
+  coverageFilterEnabled: { label: '启用最低覆盖比例', group: 'matching', kind: 'boolean' },
+  matchThreshold: { ...numberField('最低覆盖比例', 'matching', 1, 100, '%', ['coverageFilterEnabled']) },
   // 普通投流与点击后协同独立启用、独立调门槛，共用用户邻居与 CF 计算；旧记录缺省关闭。
-  matchingUserSimilarEnabled: { label: '启用用户协同补充', group: 'matching', kind: 'boolean', translateLabel: false },
-  matchingUserSimilarThreshold: { ...numberField('协同补充最低用户相似度', 'matching', 1, 100, '%', ['matchingUserSimilarEnabled']), translateLabel: false },
-  // 补充方式：不足时补充＝直接匹配优先、协同只补缺口；按比例预留＝协同占本广告坑位的固定比例（向下取整）。
-  matchingUserSimilarMode: { label: '协同补充方式', group: 'matching', kind: 'select', translateLabel: false, translateOptions: false,
+  matchingUserSimilarEnabled: { label: '启用用户协同补充', group: 'matching', kind: 'boolean' },
+  matchingUserSimilarThreshold: { ...numberField('协同补充最低用户相似度', 'matching', 1, 100, '%', ['matchingUserSimilarEnabled']) },
+  // 补充方式：不足时补充＝直接匹配优先、协同只补缺口（保护付费直接匹配曝光）；
+  // 按比例预留＝探索配额，即使直接匹配充足也先给协同留坑位×比例（向下取整），任一路不足回补另一路。
+  matchingUserSimilarMode: { label: '协同补充方式', group: 'matching', kind: 'select',
     dependencies: ['matchingUserSimilarEnabled'], options: [
-      { label: '不足时补充', value: 'fill' }, { label: '按比例预留', value: 'ratio' },
+      { label: '不足时补充（默认・直接匹配优先）', value: 'fill' }, { label: '按比例预留（探索配额・直接充足也预留）', value: 'ratio' },
     ] },
-  matchingUserSimilarRatio: { ...numberField('协同预留比例', 'matching', 1, 100, '%', ['matchingUserSimilarEnabled', 'matchingUserSimilarMode']), translateLabel: false },
+  matchingUserSimilarRatio: { ...numberField('协同预留比例', 'matching', 1, 100, '%', ['matchingUserSimilarEnabled', 'matchingUserSimilarMode']) },
   // 标签上限已退役：按分截断会漏掉排名靠后但与对方重合的标签；匹配改为全部达标标签参与，字段保持挂载透传存量。
   maxUserTags: numberField('参与匹配的标签上限', 'matching', 1, 20, '个'),
   // 探索位＝达标标签之外额外纳入的新标签数（加法，不再从上限里扣）；只参与相似度、不计入覆盖率分母。
   explorationSlots: numberField('新偏好探索标签数', 'matching', 0, 10, '个'),
   maxMerchantsPerKeyword: numberField('同标签商家展示上限', 'frequency', 1, 10, '家'),
-  // 外卖去重窗口不必整小时：支持小数（0.5 小时=30 分钟），下限 0.5 小时。
+  // 外卖频控窗口不必整小时：支持小数（0.5 小时=30 分钟），下限 0.5 小时。
   merchantFreqHours: { ...numberField('同商家统计窗口', 'frequency', 0.5, 24, '小时'), precision: 1 },
   merchantFreqTimes: numberField('同商家最多展示', 'frequency', 1, 20, '次'),
   keywordFreqHours: numberField('同标签统计窗口', 'frequency', 1, 24, '小时'),
@@ -253,11 +270,11 @@ export const TRAFFIC_FIELDS: Record<TrafficFieldName, FieldDefinition> = {
   merchantDecayPoints: numberField('商家标签每次减分', 'matching', 1, 100, '分'),
   // 保留＝豁免「衰减到0即删」（保留最热 N 个）；清理＝保留标签无变动过期；二者不矛盾，口径见 sections 衰减弹层。
   merchantRetainedTagCount: numberField('商家保留最热标签数', 'matching', 0, 50, '个'),
-  merchantTagIdleClearDays: { ...numberField('商家标签无新增清理天数', 'matching', 1, 365, '天'), translateLabel: false },
+  merchantTagIdleClearDays: { ...numberField('商家标签无新增清理天数', 'matching', 1, 365, '天') },
   userDecayDays: numberField('用户标签衰减周期', 'matching', 1, 365, '天'),
   userDecayPoints: numberField('用户标签每次减分', 'matching', 1, 100, '分'),
   userRetainedTagCount: numberField('用户保留最热标签数', 'matching', 0, 50, '个'),
-  userTagIdleClearDays: { ...numberField('用户标签无新增清理天数', 'matching', 1, 365, '天'), translateLabel: false },
+  userTagIdleClearDays: { ...numberField('用户标签无新增清理天数', 'matching', 1, 365, '天') },
   newTagBoostMultiplier: numberField('新标签有效分加速倍数', 'matching', 1, 10, '倍'),
   maxBoostTagCount: numberField('同时加速标签上限', 'matching', 1, 50, '个'),
   generativeRecommendEnabled: { label: '浏览后相似推荐', group: 'similarRec', kind: 'boolean' },
@@ -277,46 +294,46 @@ export const TRAFFIC_FIELDS: Record<TrafficFieldName, FieldDefinition> = {
   ] },
   generativeDailyLimit: numberField('单用户每日触发上限', 'frequency', 1, 50, '次', ['generativeRecommendEnabled', 'generativeDailyLimitMode']),
   generativeSkipMerchantCount: numberField('再次触发前跳过商家点击', 'similarRec', 0, 50, '家', ['generativeRecommendEnabled']),
-  newUserDimensions: { label: '冷启动排序维度', group: 'coldStart', kind: 'multiple', options: [
+  newUserDimensions: { label: '冷启动排序维度', group: 'ranking', kind: 'multiple', options: [
     { label: '剩余流量包', value: 'remainingTraffic' }, { label: '商家质量分', value: 'qualityScore' },
     { label: '区域热门度', value: 'regionPopular' }, { label: '订单完成率', value: 'completionRate' }, { label: '距离', value: 'distance' },
   ] },
-  qualityScoreThreshold: { ...numberField('综合评分优选线', 'coldStart', 0, 5, '分', ['newUserDimensions']), precision: 1, translateLabel: false },
-  regionPopularStatsDays: numberField('热门度统计周期', 'coldStart', 1, 365, '天', ['newUserDimensions']),
-  popularityMetrics: { label: '热门度指标', group: 'coldStart', kind: 'multiple', dependencies: ['newUserDimensions'], options: [
+  qualityScoreThreshold: { ...numberField('综合评分优选线', 'ranking', 0, 5, '分', ['newUserDimensions']), precision: 1 },
+  regionPopularStatsDays: numberField('热门度统计周期', 'ranking', 1, 365, '天', ['newUserDimensions']),
+  popularityMetrics: { label: '热门度指标', group: 'ranking', kind: 'multiple', dependencies: ['newUserDimensions'], options: [
     { label: '下单数', value: 'orderCount' }, { label: '访问量', value: 'visitCount' }, { label: '复购率', value: 'repurchaseRate' },
   ] },
-  regionPopularTopPercent: numberField('区域热门度前百分比', 'coldStart', 1, 100, '%', ['newUserDimensions']),
-  completionRateThreshold: numberField('订单完成率门槛', 'coldStart', 0, 100, '%', ['newUserDimensions']),
-  completionMinOrderCount: numberField('完成率最低订单样本', 'coldStart', 1, 10000, '单', ['newUserDimensions']),
+  regionPopularTopPercent: numberField('区域热门度前百分比', 'ranking', 1, 100, '%', ['newUserDimensions']),
+  completionRateThreshold: numberField('订单完成率门槛', 'ranking', 0, 100, '%', ['newUserDimensions']),
+  completionMinOrderCount: numberField('完成率最低订单样本', 'ranking', 1, 10000, '单', ['newUserDimensions']),
   // 一期：剩余流量包方向可配（剩余多优先/剩余少优先），默认剩余多优先以加速大包消耗。
-  remainingTrafficDirection: { label: '流量包排序方向', group: 'coldStart', kind: 'select', options: [
+  remainingTrafficDirection: { label: '流量包排序方向', group: 'ranking', kind: 'select', options: [
     { label: '剩余多优先', value: 'moreFirst' }, { label: '剩余少优先', value: 'lessFirst' },
   ] },
   // 新商家冷启动已退役：瀑布流已配置「新店广告」坑位承担新店曝光，本算法不再重复扶持；字段保持挂载透传存量。
-  newMerchantBoostEnabled: { label: '新商家冷启动扶持', group: 'coldStart', kind: 'boolean' },
-  newMerchantDays: numberField('新商家判定天数', 'coldStart', 1, 90, '天', ['newMerchantBoostEnabled']),
-  newMerchantExplorationSlots: numberField('新商家探索坑位', 'coldStart', 0, 10, '个', ['newMerchantBoostEnabled']),
+  newMerchantBoostEnabled: { label: '新商家冷启动扶持', group: 'ranking', kind: 'boolean' },
+  newMerchantDays: numberField('新商家判定天数', 'ranking', 1, 90, '天', ['newMerchantBoostEnabled']),
+  newMerchantExplorationSlots: numberField('新商家探索坑位', 'ranking', 0, 10, '个', ['newMerchantBoostEnabled']),
   // 相似推荐三模式（可叠加）：商家相似/用户相似/同类目；相似度基于标签有效分向量。
-  similarRecModes: { label: '推荐模式', group: 'similarRec', kind: 'multiple', translateOptions: false, dependencies: ['generativeRecommendEnabled'], options: [
+  similarRecModes: { label: '推荐模式', group: 'similarRec', kind: 'multiple', dependencies: ['generativeRecommendEnabled'], options: [
     { label: '商家相似推荐', value: 'merchantSimilar' }, { label: '用户协同推荐', value: 'userSimilar' }, { label: '同类目商家推荐', value: 'sameCategory' },
   ] },
   // 全局填充顺序已退役：改为按坑位选来源（见 similarRecSlot1/2Source），保持挂载透传存量。
-  similarRecPriority: { label: '候选填充顺序（已退役）', group: 'similarRec', kind: 'select', translateLabel: false, translateOptions: false,
+  similarRecPriority: { label: '候选填充顺序（已退役）', group: 'similarRec', kind: 'select',
     dependencies: ['generativeRecommendEnabled'], options: [
       { label: '按顺序（商家相似优先）', value: 'merchantFirst' },
       { label: '用户协同优先', value: 'userFirst' },
     ] },
   // 按坑位选优先来源：可选项只列已勾选模式；第 2 位仅在选择 2 家时激活。
-  similarRecSlot1Source: { label: '第 1 位优先来源', group: 'similarRec', kind: 'select', translateLabel: false, translateOptions: false,
+  similarRecSlot1Source: { label: '第 1 位优先来源', group: 'similarRec', kind: 'select',
     dependencies: ['generativeRecommendEnabled'], options: [
       { label: '商家相似推荐', value: 'merchantSimilar' }, { label: '用户协同推荐', value: 'userSimilar' }, { label: '同类目商家推荐', value: 'sameCategory' },
     ] },
-  similarRecSlot2Source: { label: '第 2 位优先来源', group: 'similarRec', kind: 'select', translateLabel: false, translateOptions: false,
+  similarRecSlot2Source: { label: '第 2 位优先来源', group: 'similarRec', kind: 'select',
     dependencies: ['generativeRecommendEnabled', 'generativeMerchantCount'], options: [
       { label: '商家相似推荐', value: 'merchantSimilar' }, { label: '用户协同推荐', value: 'userSimilar' }, { label: '同类目商家推荐', value: 'sameCategory' },
     ] },
-  userSimilarThreshold: { ...numberField('相似用户最低相似度', 'similarRec', 1, 100, '%', ['generativeRecommendEnabled', 'similarRecModes']), translateLabel: false },
+  userSimilarThreshold: { ...numberField('相似用户最低相似度', 'similarRec', 1, 100, '%', ['generativeRecommendEnabled', 'similarRecModes']) },
   // 算法级相似度算法：兴趣匹配匹配分与相似推荐相似度共用；覆盖率只管兴趣匹配准入（广度），相似度管排序（强度）。
   // 不随相似推荐开关门控：相似推荐关闭时兴趣匹配仍用它算匹配分。
   similarityMetric: { label: '相似度算法', group: 'matching', kind: 'select', options: [
@@ -326,46 +343,50 @@ export const TRAFFIC_FIELDS: Record<TrafficFieldName, FieldDefinition> = {
   categoryMatchLevel: { label: '类目匹配层级', group: 'similarRec', kind: 'select', dependencies: ['generativeRecommendEnabled', 'similarRecModes'], options: [
     { label: '一级类目', value: 'primary' }, { label: '二级类目', value: 'secondary' },
   ] },
-  // ── 冷启动·区域召回范围（仅两档：配送范围内 / 用户所在商圈；口径见 sections.tsx 问号弹层）──
-  coldStartRegionScope: { label: '区域召回范围', group: 'coldStart', kind: 'select', options: [
+  // ── 召回范围·商家侧（锁定口径：只召回已购本广告的投流商家；「全量商家」仅展示预留，执行未接入）──
+  recallMerchantScope: { label: '商家召回范围', group: 'recall', kind: 'select', options: [
+    { label: '仅投流商家', value: 'trafficOnly' }, { label: '全量商家（待开放）', value: 'allMerchants' },
+  ] },
+  // ── 召回范围（约束匹配/冷启动两路候选池；仅两档：配送范围内 / 用户所在商圈；口径见 sections.tsx 问号弹层）──
+  coldStartRegionScope: { label: '区域召回范围', group: 'recall', kind: 'select', options: [
     { label: '配送范围内', value: 'delivery' }, { label: '用户所在商圈', value: 'tradeArea' },
   ] },
-  // ── 投流坑位排序（独立模块：本广告占用坑位内的候选集→坑位）──
+  // ── 排序规则①：匹配路径排序（双方有达标标签的候选集→坑位）──
   rankPreset: { label: '排序策略', group: 'ranking', kind: 'select', options: [
     { label: '匹配优先', value: 'matchFirst' }, { label: '消耗优先', value: 'consumeFirst' },
     { label: '自定义因子', value: 'custom' },
   ] },
-  rankFactors: { label: '参与排序因子', group: 'ranking', kind: 'multiple', options: RANK_FACTOR_OPTIONS, translateOptions: false },
+  rankFactors: { label: '参与排序因子', group: 'ranking', kind: 'multiple', options: RANK_FACTOR_OPTIONS },
   // 权重数值已退役（改为勾选因子等权）：保持挂载透传存量，不再展示/校验。
   rankWeightMatch: numberField('权重·匹配分', 'ranking', 0, 100, '%'),
   rankWeightTraffic: numberField('权重·流量余量', 'ranking', 0, 100, '%'),
   rankWeightQuality: numberField('权重·质量分', 'ranking', 0, 100, '%'),
   rankWeightDistance: numberField('权重·距离', 'ranking', 0, 100, '%'),
-  rankTieBreak: { label: '同分决胜', group: 'ranking', kind: 'select', options: RANK_TIE_BREAK_OPTIONS, translateOptions: false },
+  rankTieBreak: { label: '同分决胜', group: 'ranking', kind: 'select', options: RANK_TIE_BREAK_OPTIONS },
   // 候选池上限已退役：坑位数由瀑布流策略决定，本算法对全量已购商家打分排序；
   // 截断会使长尾广告主永不轮转、违背按购买量消耗。保持挂载透传存量。
   rankPoolSize: numberField('候选池上限', 'ranking', 10, 2000, '家'),
   // 时段优先＝排序前先按当前餐段过滤候选（主营时段＝当前时段）；不足时只在已购本广告的投流商家内分层补，
   // 仍不足由瀑布流按其配置的兜底自然流算法补位（不在本模块配）。
-  mealPeriodPriorityEnabled: { label: '时段优先', group: 'ranking', kind: 'boolean' },
-  mealPeriodFallback: { label: '候选不足补齐', group: 'ranking', kind: 'select', dependencies: ['mealPeriodPriorityEnabled'], options: [
+  mealPeriodPriorityEnabled: { label: '时段优先', group: 'recall', kind: 'boolean' },
+  mealPeriodFallback: { label: '候选不足补齐', group: 'recall', kind: 'select', dependencies: ['mealPeriodPriorityEnabled'], options: [
     { label: '相邻时段投流商家', value: 'adjacent' }, { label: '全时段投流商家', value: 'any' },
   ] },
   // ── 相似推荐·独立优先级（可沿用总排序或独立配置）──
   similarRankMode: { label: '优先级来源', group: 'similarRec', kind: 'select', dependencies: ['generativeRecommendEnabled'], options: [
-    { label: '沿用投流坑位排序', value: 'inherit' }, { label: '独立配置', value: 'independent' },
+    { label: '沿用匹配路径排序', value: 'inherit' }, { label: '独立配置', value: 'independent' },
   ] },
   similarRankPreset: { label: '独立排序策略', group: 'similarRec', kind: 'select', dependencies: ['generativeRecommendEnabled', 'similarRankMode'], options: [
     { label: '匹配优先', value: 'matchFirst' }, { label: '消耗优先', value: 'consumeFirst' },
     { label: '自定义因子', value: 'custom' },
   ] },
-  similarRankFactors: { label: '独立参与因子', group: 'similarRec', kind: 'multiple', dependencies: ['generativeRecommendEnabled', 'similarRankMode'], options: RANK_FACTOR_OPTIONS, translateOptions: false },
+  similarRankFactors: { label: '独立参与因子', group: 'similarRec', kind: 'multiple', dependencies: ['generativeRecommendEnabled', 'similarRankMode'], options: RANK_FACTOR_OPTIONS },
   similarRankWeightMatch: numberField('独立权重·匹配分', 'similarRec', 0, 100, '%', ['generativeRecommendEnabled', 'similarRankMode']),
   similarRankWeightTraffic: numberField('独立权重·流量余量', 'similarRec', 0, 100, '%', ['generativeRecommendEnabled', 'similarRankMode']),
   similarRankWeightQuality: numberField('独立权重·质量分', 'similarRec', 0, 100, '%', ['generativeRecommendEnabled', 'similarRankMode']),
   similarRankWeightDistance: numberField('独立权重·距离', 'similarRec', 0, 100, '%', ['generativeRecommendEnabled', 'similarRankMode']),
-  similarRankTieBreak: { label: '独立同分决胜', group: 'similarRec', kind: 'select', dependencies: ['generativeRecommendEnabled', 'similarRankMode'], options: RANK_TIE_BREAK_OPTIONS, translateOptions: false },
-  // 退役：排序范围/链式触发已被「优先级来源」与每日上限+同商家去重取代，保持挂载透传存量。
+  similarRankTieBreak: { label: '独立同分决胜', group: 'similarRec', kind: 'select', dependencies: ['generativeRecommendEnabled', 'similarRankMode'], options: RANK_TIE_BREAK_OPTIONS },
+  // 退役：排序范围/链式触发已被「优先级来源」与每日上限+同商家曝光频控取代，保持挂载透传存量。
   similarRankScope: { label: '排序范围', group: 'similarRec', kind: 'select', dependencies: ['generativeRecommendEnabled'], options: [
     { label: '沿用共用排序规则', value: 'shared' }, { label: '仅按相似度排序', value: 'similarityOnly' },
   ] },
@@ -410,8 +431,10 @@ function normalizeRankPreset(target: TrafficAlgorithmValues, prefix: RankPrefix)
     if (target[factorsField].length === 0) target[factorsField] = [...RANK_CUSTOM_DEFAULT_FACTORS]
   }
   if (target[presetField] !== 'custom') target[factorsField] = []
-  if (isTrafficOnlyRank(target[presetField], target[factorsField]) && target[tieField] === 'trafficDirection') {
-    target[tieField] = 'quality'
+  // 死选项迁移：当前决胜与主排序同轴时永远打不平，归一到首个活选项。
+  const dead = deadTieBreaks(target[presetField], target[factorsField])
+  if (dead.includes(String(target[tieField]))) {
+    target[tieField] = RANK_TIE_BREAK_OPTIONS.find(o => !dead.includes(o.value))?.value ?? 'random'
   }
 }
 
@@ -552,6 +575,8 @@ export function getTrafficFieldError(name: TrafficFieldName, value: unknown, val
   // 保留标签数/无变动清零天数可留空：留空＝不保留/不清零，不视为缺填。
   if (value === null && ['merchantRetainedTagCount', 'userRetainedTagCount', 'merchantTagIdleClearDays', 'userTagIdleClearDays'].includes(name)) return
   if (value === undefined || value === null || value === '') return `请填写${label}`
+  // 预留档位只展示不可用：执行服务尚未接入「全量商家」混排与计费契约，任何写入路径（直改参数/旧数据）都按无效拒绝。
+  if (name === 'recallMerchantScope' && value !== 'trafficOnly') return `${label}当前仅支持「仅投流商家」，全量商家档位尚未开放`
   if (field.kind === 'number') {
     if (typeof value !== 'number' || !Number.isFinite(value)) return `${label}必须为有效数字`
     if (value < field.min! || value > field.max!) return `${label}须在 ${field.min}～${field.max} 之间`
@@ -591,5 +616,6 @@ export const trafficUnitKey = (unit: string): string => {
   }
   return keys[unit] ?? `recommend.trafficCfg.unit.u${Array.from(unit, c => c.codePointAt(0)!.toString(16)).join('_')}`
 }
-export const trafficFieldLabel = (name: TrafficFieldName): string => TRAFFIC_FIELDS[name].translateLabel === false
-  ? TRAFFIC_FIELDS[name].label : i18n.t(trafficFieldKey(name), { defaultValue: TRAFFIC_FIELDS[name].label })
+/** 字段标签统一走语言包（2026-11-22 已补齐 14 个 field key 的繁中/英文译文并摘除 translateLabel 绕过）；
+ *  defaultValue 保留代码简中标签，作为缺译文时的可见兜底。 */
+export const trafficFieldLabel = (name: TrafficFieldName): string => i18n.t(trafficFieldKey(name), { defaultValue: TRAFFIC_FIELDS[name].label })

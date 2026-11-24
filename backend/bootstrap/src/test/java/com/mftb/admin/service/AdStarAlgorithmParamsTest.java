@@ -47,6 +47,25 @@ class AdStarAlgorithmParamsTest {
         record.setParams(AdStarAlgorithmParams.encode(params));
         return record;
     }
+    /** 非星星算法（如投流 type15）：不参与推广对象裁决 */
+    static AdAlgorithm nonStar(int algoType) {
+        AdAlgorithm record = new AdAlgorithm();
+        record.setId(9L);
+        record.setAlgoType(algoType);
+        record.setBrand("flashBee");
+        return record;
+    }
+    /** 团购门店星星 v1 协议参数 */
+    static Map<String, Object> store(int revision) {
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("schemaVersion", 1);
+        params.put("applicableBusinessTypes", List.of(2));
+        params.put("targetType", 1);
+        params.put("revision", revision);
+        params.put("storeRules", Map.of("consistencyCheckInterval", 5, "merchantExposureStrategy", "random",
+                "statusOpen", true, "statusRest", false, "statusOverwhelmed", false, "statusClosed", false));
+        return params;
+    }
 
     @Test void createAndUpdateAdvanceRevisionWithoutMutatingCaller() {
         AdAlgorithmRequest create = request(product(0));
@@ -122,5 +141,28 @@ class AdStarAlgorithmParamsTest {
     @ParameterizedTest @ValueSource(strings = {"[]", "null", "{broken", "{} {}", "{\"a\":1,\"a\":2}"})
     void malformedPersistedParamsDoNotBecomeEmptyDefaults(String raw) {
         assertThrows(BusinessException.class, () -> AdStarAlgorithmParams.read(raw));
+    }
+
+    @Test void waterfallDimensionBindsStarsByTargetTypeOnly() {
+        // 门店维度：可绑门店星星、无协议旧记录与其他门店型算法（投流等）；拒绝商品星星
+        assertDoesNotThrow(() -> AdStarAlgorithmParams.requireWaterfallDimension(record(store(1)), 1));
+        assertDoesNotThrow(() -> AdStarAlgorithmParams.requireWaterfallDimension(record(Map.of("statusOpen", true)), 1));
+        assertDoesNotThrow(() -> AdStarAlgorithmParams.requireWaterfallDimension(nonStar(15), 1));
+        assertThrows(BusinessException.class, () -> AdStarAlgorithmParams.requireWaterfallDimension(record(product(1)), 1));
+        // 商品维度：只能绑商品星星；门店星星/旧记录/任何非星星算法均拒绝
+        assertDoesNotThrow(() -> AdStarAlgorithmParams.requireWaterfallDimension(record(product(1)), 2));
+        assertThrows(BusinessException.class, () -> AdStarAlgorithmParams.requireWaterfallDimension(record(store(1)), 2));
+        assertThrows(BusinessException.class, () -> AdStarAlgorithmParams.requireWaterfallDimension(record(Map.of("statusOpen", true)), 2));
+        assertThrows(BusinessException.class, () -> AdStarAlgorithmParams.requireWaterfallDimension(nonStar(15), 2));
+    }
+
+    @Test void starTargetTypeDistinguishesProtocolFromLegacyAndNonStar() {
+        assertEquals(1, AdStarAlgorithmParams.starTargetType(record(store(1))));
+        assertEquals(2, AdStarAlgorithmParams.starTargetType(record(product(1))));
+        // 无协议旧记录按门店读，不自动升级成商品
+        assertEquals(1, AdStarAlgorithmParams.starTargetType(record(Map.of("statusOpen", true))));
+        assertNull(AdStarAlgorithmParams.starTargetType(nonStar(15)));
+        // 非法协议不得静默降级为门店，必须报错阻断绑定
+        assertThrows(BusinessException.class, () -> AdStarAlgorithmParams.starTargetType(record(Map.of("targetType", 2))));
     }
 }

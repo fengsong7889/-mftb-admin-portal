@@ -322,7 +322,13 @@ export default function PromotionOrderManage() {
       title: t('promotionOrderManage.colStoreInfo'),
       key: 'storeInfo',
       width: 180,
-      render: (_, record) => (
+      render: (_, record) => record.targetType === 2 ? (
+        // 商品訂單不選門店：本列改顯歸屬商品（適用門店由團購業務系統預配置）
+        <Space direction="vertical" size={0}>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{record.productId ?? '-'}</span>
+          <span>{record.productName ?? '-'}</span>
+        </Space>
+      ) : (
         <Space direction="vertical" size={0}>
           <span style={{ fontSize: 12, color: '#8C8C8C' }}>{record.storeId}</span>
           <span>{record.storeName}</span>

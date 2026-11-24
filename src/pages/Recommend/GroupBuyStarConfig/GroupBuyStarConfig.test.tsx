@@ -112,7 +112,8 @@ describe('团购商品无敌星星真实读写', () => {
     expect(screen.getByRole('heading', { name: 'recommend.addAlgo' })).toBeInTheDocument()
     expect(intervalInput()).toHaveValue('5')
     expect(screen.getAllByRole('spinbutton')).toHaveLength(1)
-    expect(container.querySelectorAll('.algorithm-section')).toHaveLength(3)
+    // 展示资格过滤（并行紧凑清单）为本次新增模块；总数 4
+    expect(container.querySelectorAll('.algorithm-section')).toHaveLength(4)
     expect(strategySelect().closest('.ant-select')).toHaveTextContent('recommend.roundRobinCalc')
     expect(PRODUCT_STAR_PREVIEW_DEFAULTS).toEqual({ consistencyCheckInterval: 5, exposureStrategy: ProductExposureStrategy.ROUND_ROBIN })
     expect(screen.queryByRole('switch')).not.toBeInTheDocument()

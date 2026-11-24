@@ -91,6 +91,8 @@ export interface AdAlgorithmQuery {
   targetType?: number
   /** 業務適用範圍：1=外賣到家 2=團購到店（與歷史 channel 字段獨立） */
   businessType?: number
+  /** 調用用途：library=算法庫 / scenario=場景引用 / slot=基礎坑位 / sales=銷售；舊消費者不傳則不返回 type17 */
+  usage?: 'library' | 'scenario' | 'slot' | 'sales'
   code?: string
   name?: string
   updatedBy?: string
@@ -151,7 +153,78 @@ export function deleteAdAlgorithm(id: number) {
 export interface WaterfallReference {
   strategyCode: string
   strategyName: string
-  slotPosition: number
+  slotPosition: number | null
+  /** slot=坑位 / natural=自然兜底 / similar=相似推薦場景綁定 */
+  refType?: 'slot' | 'natural' | 'similar'
+}
+
+/** 算法不可變版本（相似推薦引擎發布快照） */
+export interface AlgorithmRevision {
+  id: number
+  algorithmId: number
+  revision: number
+  schemaVersion: number
+  params: Record<string, unknown>
+  contentHash: string
+  createdBy?: string
+  createdAt?: string
+  algorithmName?: string
+  brand?: string
+}
+
+/** 發布不可變版本請求 */
+export interface RevisionPublishRequest { expectedRevision?: number | null }
+
+/** 瀑布流相似推薦場景綁定視圖 */
+export interface WaterfallRecommendation {
+  configured: boolean
+  id?: number
+  waterfallId: number
+  sceneCode: number
+  algorithmId?: number
+  algorithmRevisionId?: number
+  revisionNo?: number
+  algorithmName?: string
+  enabled: number
+  candidateScope: number
+  businessType?: number
+  bizChannel?: number
+  version: number
+  trafficAlgorithmIds: number[]
+  updatedBy?: string
+  updatedAt?: string
+}
+
+/** 瀑布流相似推薦場景綁定請求 */
+export interface WaterfallRecommendationRequest {
+  sceneCode: number
+  algorithmRevisionId?: number | null
+  enabled: number
+  candidateScope: number
+  businessType: number
+  bizChannel: number
+  trafficAlgorithmIds?: number[]
+  expectedVersion?: number | null
+}
+
+/** 算法不可變版本列表（倒序） */
+export function fetchAdAlgorithmRevisions(algorithmId: number) {
+  return request.get<unknown, AlgorithmRevision[]>(`/ad/algorithms/${algorithmId}/revisions`, SILENT)
+}
+
+/** 發布算法不可變版本（expectedRevision 衝突返回 409） */
+export function publishAdAlgorithmRevision(algorithmId: number, data: RevisionPublishRequest) {
+  return request.post<unknown, AlgorithmRevision>(`/ad/algorithms/${algorithmId}/revisions`, data, SILENT)
+}
+
+/** 瀑布流相似推薦場景綁定（未配置時 configured=false） */
+export function fetchWaterfallRecommendation(waterfallId: number) {
+  return request.get<unknown, WaterfallRecommendation>(`/ad/waterfall/${waterfallId}/recommendation`, SILENT)
+}
+
+/** 更新瀑布流相似推薦場景綁定與允許投流集合 */
+export function updateWaterfallRecommendation(waterfallId: number, data: WaterfallRecommendationRequest) {
+  return request.put<unknown, WaterfallRecommendation>(`/ad/waterfall/${waterfallId}/recommendation`, data, SILENT)
 }
 
 /** 查詢引用該算法的瀑布流配置列表 */
@@ -181,6 +254,8 @@ export interface AdPricingStar {
   algoName?: string
   brand?: AdBrand | string
   channel?: number
+  /** 推廣對象快照: 1=門店 2=商品（後端保存時從星星算法協議推导） */
+  targetType?: number
   /** 預售天數（今天起 N 天可售） */
   presaleDays: number
   /** 退款開關: 1=允許退款 2=不允許 */
@@ -336,8 +411,12 @@ export interface AdStarOrderRequest {
   bdEmpId?: string
   /** 業務頻道：定價按「算法×頻道」配置，不傳则後端退回「取最新一條」的旧口径 */
   channel?: number
+  /** 團購商品編碼：商品星星下單必填，門店訂單禁傳 */
+  productId?: string
+  /** 團購商品名稱快照（僅商品訂單） */
+  productName?: string
   remark?: string
-  /** 選購的格子列表（組合商圈在前端拆解後傳入） */
+  /** 選購的格子列表（組合商圈在前端拆解後傳入；商品維度 mealSlot 固定 fullDay） */
   cells: { bizDate: string; region: number; mealSlot: string }[]
 }
 
@@ -398,6 +477,12 @@ export interface AdOrder {
   groupName?: string
   storeCode?: string
   storeName?: string
+  /** 推廣對象快照: 1=門店 2=商品 */
+  targetType?: number
+  /** 團購商品編碼快照（僅商品訂單） */
+  productId?: string
+  /** 團購商品名稱快照（僅商品訂單） */
+  productName?: string
   bdEmpId?: string
   /** 下单人类型: 1=商家 2=业务人员 */
   operatorType?: number
@@ -472,6 +557,10 @@ export interface AdOrderQuery {
   algoType?: number
   groupCode?: string
   storeCode?: string
+  /** 推廣對象篩選: 1=門店 2=商品 */
+  targetType?: number
+  /** 商品編碼精確匹配（商品訂單） */
+  productId?: string
   status?: number
   /** 下單時間起 YYYY-MM-DD */
   startDate?: string
@@ -943,6 +1032,22 @@ export interface WaterfallStrategy {
   /** 自然流量兜底算法编码（未配置坑位讀取該算法數據） */
   naturalAlgoId?: string | null
   naturalAlgoName?: string
+  /** 業務線: 1=外賣到家 2=團購到店（後端列默認 1，語義對齊 starAlgorithm.AdBusinessType） */
+  businessType?: number
+  /** 展示維度: 1=門店 2=商品（僅團購到店可為 2） */
+  contentType?: number
+  /** 展示類目來源: algorithm/category/custom */
+  displayCategoryMode?: string | null
+  /** 展示佈局: 1=單列 2=雙列 */
+  layoutColumns?: number
+  /** 業務頻道: food/supermarket（外賣）；groupBuy（團購） */
+  bizChannel?: string | null
+  /** 類目候選排序: score/sales/distance/random */
+  sortMode?: string | null
+  /** 類目兜底ID列表（後端 JSON 列解析） */
+  fallbackCategoryIds?: string[] | null
+  /** 固定展示內容坑位（custom 模式，後端 JSON 列解析） */
+  fixedSlots?: WaterfallFixedSlotItem[] | null
   /** 過濾用戶不喜歡: 1=開啟 2=關閉 */
   filterDislike?: number
   /** 服務狀態: 1=啟用 2=停用 */
@@ -968,7 +1073,19 @@ export interface WaterfallSlotItem {
   status?: number
 }
 
-/** 瀑布流策略新增/編輯請求（坑位明細整體替換） */
+/** 固定展示內容坑位條目（custom 模式；內容為外部目錄資源） */
+export interface WaterfallFixedSlotItem {
+  slotPosition: number
+  itemId: string
+  itemName: string
+  categoryId?: string | null
+  categoryName?: string | null
+  /** 剩餘庫存快照（僅商品；null=不限） */
+  stock?: number | null
+  status?: number
+}
+
+/** 瀑布流策略新增/編輯請求（坑位明細與固定內容整體替換） */
 export interface WaterfallStrategyRequest {
   strategyName: string
   brand?: string
@@ -977,6 +1094,16 @@ export interface WaterfallStrategyRequest {
   status?: number
   remark?: string
   slots?: { slotPosition: number; algoId: string; status?: number }[]
+  /** 業務線: 1=外賣(默認) 2=團購到店 */
+  businessType?: number
+  /** 展示維度: 1=門店(默認) 2=商品 */
+  contentType?: number
+  displayCategoryMode?: string | null
+  layoutColumns?: number
+  bizChannel?: string | null
+  sortMode?: string | null
+  fallbackCategoryIds?: string[]
+  fixedSlots?: { slotPosition: number; itemId: string; itemName: string; categoryId?: string; categoryName?: string; stock?: number; status?: number }[]
 }
 
 /** 瀑布流策略查詢參數 */
@@ -990,6 +1117,8 @@ export interface WaterfallQuery {
   strategyName?: string
   brand?: string
   status?: number
+  /** 業務線過濾: 1=外賣 2=團購；後端分頁前過濾 */
+  businessType?: number
   /** 按算法過濾（包含該算法的策略） */
   algoId?: number
   /** 最後更新人（模糊匹配） */

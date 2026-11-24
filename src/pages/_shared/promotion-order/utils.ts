@@ -18,9 +18,9 @@ export function formatTimestamp(t?: string | number): string {
   return String(t).replace('T', ' ').slice(0, 19)
 }
 
-/** 餐段 key → 中文名稱映射 */
+/** 餐段 key → 中文名稱映射；fullDay=商品維度全天售卖格 */
 export const MEAL_SLOT_CN: Record<string, string> = {
-  breakfast: '早餐', lunch: '午餐', afternoon: '下午茶', dinner: '晚餐', supper: '宵夜',
+  breakfast: '早餐', lunch: '午餐', afternoon: '下午茶', dinner: '晚餐', supper: '宵夜', fullDay: '全天',
 }
 
 /**
@@ -72,6 +72,10 @@ export function toBaseOrderItem(vo: AdOrder): BaseOrderItem {
     groupName: vo.groupName || '-',
     storeId: vo.storeCode || '-',
     storeName: vo.storeName || '-',
+    // 推廣對象與商品快照：列表按 targetType=2 将门店列改显团购商品
+    targetType: vo.targetType ?? 1,
+    productId: vo.productId,
+    productName: vo.productName,
     mealSlots,
     dateSlots,
     purchaseDays,

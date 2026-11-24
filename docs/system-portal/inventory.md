@@ -121,6 +121,7 @@
 | `doc-stats` | 閱讀統計 | `doc` | 頂級菜單（**P2 新增，doc:menu:v1.2**），icon `BarChartOutlined`；actions `view`（頁面純唯讀，不種 edit）；期間窗口（7/30/90 天）內按文檔聚合的閱讀口徑看板 |
 | `doc-learning` | 學習路徑 | `doc` | 頂級菜單（**P2 新增，doc:menu:v1.3**），icon `FlagOutlined`；actions `view,edit`；新人入職包/培訓清單（有序文檔集合 + 本人完成度，已讀由留痕推導）；子頁 `/doc-learning/detail`、`/doc-learning/form` 歸本菜單 |
 | `cpm-my` / `cpm-report` | 我的工作記錄 / 我的匯報 | `cpm` | 使用側兩張一級菜單（**cpm:menu:v1.0**），actions `view,edit,ai_cpm`（AI 動作與 edit 成對授予，同紀要 ai_minutes 口徑）；全员基線授權由 `CpmAccessGrantInitializer` 每次啟動重放（僅這兩張）；非菜單子頁 `/cpm-item-form` 歸 `cpm-my`、`/cpm-report-detail` 以 anyOf 放行 `cpm-report`/`cpm-team` |
+| `cpm-holiday` | 節假日配置 | `cpm` | 使用側工時口徑頁一級菜單（**cpm:menu:v1.1 新增**），icon `CalendarOutlined`（cpm 系統內唯一，hr-leave / rdm 交付周報屬其他系統）；actions `view,edit`；它改的是「節假日/補班/調休/請假怎麼扣工時」這條全局口徑，直接決定台账耗时与汇报数字，因此单独成菜单而不是 `cpm-my` 的子页（原 `/cpm-holiday` 挂 `cpm-my` 守卫的形态已改挂本菜单） |
 | `cpm-team` / `cpm-template` / `cpm-rule` | 團隊匯報 / 模板管理 / 匯報規則 | `cpm` | 治理側三張一級菜單，**不自動鋪給全员**，由授權中心显式勾选；`cpm-rule` 动作集含 `push`/`trigger`——能改规则不等于能群发（rdm-daily-report-trigger 先例）；催办永远只提醒本人，无跨人排名视图（反内卷红线） |
 
 > 歷史分組 `doc-center-management` 已由 doc:menu:v1.1 解除（邏輯刪除+清授權）：系統視圖按 system_code 剪枝，一級分組沒有運行時職責只多一次展開。門戶業務域歸類：doc 屬「協作與交付」（collab），使用視角為全員查閱知識，空間治理入口留在系統內。

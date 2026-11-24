@@ -6065,7 +6065,9 @@
     "giftDeductShort": "deduction",
     "fullGiftHint": "Fully covered by gift days, no promo balance payment needed",
     "orderNo": "Order No.",
-    "colSlot": "Placement"
+    "colSlot": "Placement",
+    "colProduct": "Group-buy product",
+    "productStoreNote": "Applicable stores decided by the group-buy system"
   },
   "translationManage": {
     "catCommon": "Common Fields",
@@ -6327,7 +6329,11 @@
     "localSaveSuccess": "Saved locally (unpublished, not effective in App)",
     "localOnlyBanner": "Group Buy config is frontend-only this phase (mock data) and won't be delivered to App until backend integration",
     "localTag": "Local",
-    "unpublishedTag": "Unpublished"
+    "unpublishedTag": "Unpublished",
+    "productCategoryFallback": "Product category fallback",
+    "productCategoryFallbackHint": "Cells not covered by algorithms are auto-filled from selected product categories; the product dimension does not support store-type organic fallback.",
+    "productCategoryFallbackRequired": "Select at least one product category fallback",
+    "productAlgorithmModeHint": "Slots can only bind product Invincible Star algorithms; uncovered cells fall back to product categories."
   },
   "promotionWordLibrary": {
     "colRank": "Rank",
@@ -6410,10 +6416,10 @@
     "bizGroupBuy": "Group Buy",
     "algorithmList": "Algorithm List",
     "addAlgorithm": "Add Algorithm",
-        "targetStore": "Store Promotion",
-        "targetProduct": "Product Promotion",
-        "addProductAlgorithm": "Add Product Algorithm",
-        "productEmpty": "No product algorithms yet. Use Add in the top right.",
+    "targetStore": "Store Promotion",
+    "targetProduct": "Product Promotion",
+    "addProductAlgorithm": "Add Product Algorithm",
+    "productEmpty": "No product algorithms yet. Use Add in the top right.",
     "colAlgorithmId": "Algorithm ID",
     "colAlgorithmName": "Algorithm Name",
     "colLastUpdater": "Last Updated By",
@@ -8630,7 +8636,35 @@
     "trafficNotAllowRefundHint": "Order refunds are not supported; traffic packages are non-refundable once purchased",
     "trafficStatusHint": "When disabled, all traffic packages of this channel stop being sold; existing orders are unaffected",
     "trafficOrderSuccess": "Order submitted successfully",
-    "trafficPricingSaveFailed": "Failed to save pricing config, please retry later"
+    "trafficPricingSaveFailed": "Failed to save pricing config, please retry later",
+    "targetLabel": "Promotion Target",
+    "choosePromoProduct": "Select Promoted Product",
+    "productStarAlgoPh": "Select product star algorithm",
+    "productStarAlgoEmpty": "No priced product star algorithm under this brand yet",
+    "productSearchPh": "Search and select a group-buy product",
+    "groupLabel": "Owning Group",
+    "storePresetTag": "Applicable stores preset by the group-buy system",
+    "productNoGroupAlert": "This product has no owning group, so payment is unavailable. Re-select the product or wait for the group-buy catalog integration.",
+    "dayRegionGridTitle": "District × Date (all-day sale)",
+    "selectAlgoProductFirst": "Select an algorithm and a product to view purchasable cells",
+    "pendingSale": "Not on sale",
+    "remainingCount": "Left",
+    "confirmSubmitTitle": "Confirm this order?",
+    "confirmProductLine": "Product: {{name}} ({{id}})",
+    "confirmGroupLine": "Owning group: {{name}}",
+    "confirmCellLine": "Cells: {{count}} (district × date, all-day)",
+    "confirmPayLine": "Estimated payment: MOP {{amount}} (Promotion Fund)",
+    "orderSuccessTitle": "Order placed",
+    "orderSuccessContent": "Order {{orderNo}} paid MOP {{amount}}. View and refund in Promotion Order Management.",
+    "selectedCellsLabel": "Selected",
+    "totalLabel": "Total",
+    "finalPayNote": "Final amount is subject to the confirmation page (includes all-day district discounts)",
+    "lockExpiredMsg": "Some locked cells expired and were released. Please re-select",
+    "cellUnavailableMsg": "This cell is currently unavailable",
+    "submitOrderWithPromo": "Submit order (Promotion Fund)",
+    "unavailableCell": "Unavailable",
+    "loadInventoryFailed": "Failed to load inventory. Please retry",
+    "applyStoresLabel": "Applicable stores"
   },
   "recommend": {
     "appShanfeng": "ShanFeng",
@@ -9175,39 +9209,65 @@
     "selectedMerchants": "Selected {{count}} merchants",
     "algoUpdateSuccess": "Algorithm updated successfully",
     "algoAddSuccess": "Algorithm added successfully",
-        "starProduct": {
-          "targetProduct": "Product Promotion",
-          "preview": "View read-only preview",
-          "basicInfo": "Basic Info",
-          "nameMax": "Up to 100 characters",
-          "checkTitle": "Product Display Check",
-          "eligibilityHelpTitle": "Eligibility is decided by the group-buy system",
-          "eligibilityHelp": "Products that are delisted, sold out, outside the sale window, or not shown in the current waterfall are excluded by the group-buy system. This algorithm only periodically checks and refreshes the eligible product queue; it does not reconfigure those rules.",
-          "intervalLabel": "Consistency check interval",
-          "intervalRule": "Enter an integer from 1 to 1440",
-          "minuteUnit": "min",
-          "intervalHint": "Every specified number of minutes, check with the group-buy system whether products meet the current waterfall display requirements.",
-          "strategyTitle": "Algorithm Strategy",
-          "strategyHelpTitle": "How limited slots are allocated",
-          "roundRobinBody": "All eligible purchased products take turns being shown. Newly added or re-eligible products join the tail; ineligible products are removed without resetting the rotation order of the rest.",
-          "randomBody": "Each batch draws uniformly without replacement from eligible purchased products. Simple, but may repeat in the short term and cannot guarantee even exposure per product.",
-          "commonBoundaryLabel": "Shared boundary",
-          "commonBoundaryBody": "Slot count is set by the waterfall. No duplicates within a batch; when products are insufficient the waterfall fills the rest. No weighting by sales or discount. Round robin balances allocation opportunity, not actual visible exposure or a conversion promise.",
-          "strategyLabel": "Product exposure strategy",
-          "strategyRequired": "Select a product exposure strategy",
-          "strategySummaryAria": "Product exposure strategy summary",
-          "roundRobinSummary": "Eligible purchased products rotate in order; each batch takes up to the available slots without duplicates, then moves to the tail. Positions within a batch are randomized so a product does not hold the same slot long-term.",
-          "randomSummary": "Each batch draws randomly from eligible purchased products, up to the available slots and without duplicates. In the short term some products may appear repeatedly while others have not yet been shown.",
-          "loadFailed": "Failed to load product config",
-          "loading": "Loading product config…",
-          "retry": "Retry",
-          "conflict": "The config was modified. Reload before saving again.",
-          "invalidId": "Invalid algorithm ID",
-          "wrongType": "This record is not an Invincible Star algorithm and cannot be edited here",
-          "invalidParams": "Product config is invalid or its version is unsupported. Refresh and retry.",
-          "lastUpdater": "Last updated by",
-          "lastUpdateTime": "Last updated at"
-        },
+    "starProduct": {
+      "targetProduct": "Product Promotion",
+      "preview": "View read-only preview",
+      "basicInfo": "Basic Info",
+      "nameMax": "Up to 100 characters",
+      "checkTitle": "Product Display Check",
+      "eligibilityHelpTitle": "Eligibility is decided by the group-buy system",
+      "eligibilityHelp": "Products that are delisted, sold out, outside the sale window, or not shown in the current waterfall are excluded by the group-buy system. This algorithm only periodically checks and refreshes the eligible product queue; it does not reconfigure those rules.",
+      "intervalLabel": "Consistency check interval",
+      "intervalRule": "Enter an integer from 1 to 1440",
+      "minuteUnit": "min",
+      "intervalHint": "Every specified number of minutes, check with the group-buy system whether products meet the current waterfall display requirements.",
+      "strategyTitle": "Algorithm Strategy",
+      "strategyHelpTitle": "How limited slots are allocated",
+      "roundRobinBody": "All eligible purchased products take turns being shown. Newly added or re-eligible products join the tail; ineligible products are removed without resetting the rotation order of the rest.",
+      "randomBody": "Each batch draws uniformly without replacement from eligible purchased products. Simple, but may repeat in the short term and cannot guarantee even exposure per product.",
+      "commonBoundaryLabel": "Shared boundary",
+      "commonBoundaryBody": "Slot count is set by the waterfall. No duplicates within a batch; when products are insufficient the waterfall fills the rest. No weighting by sales or discount. Round robin balances allocation opportunity, not actual visible exposure or a conversion promise.",
+      "strategyLabel": "Product exposure strategy",
+      "strategyRequired": "Select a product exposure strategy",
+      "strategySummaryAria": "Product exposure strategy summary",
+      "roundRobinSummary": "Eligible purchased products rotate in order; each batch takes up to the available slots without duplicates, then moves to the tail. Positions within a batch are randomized so a product does not hold the same slot long-term.",
+      "randomSummary": "Each batch draws randomly from eligible purchased products, up to the available slots and without duplicates. In the short term some products may appear repeatedly while others have not yet been shown.",
+      "loadFailed": "Failed to load product config",
+      "loading": "Loading product config…",
+      "retry": "Retry",
+      "conflict": "The config was modified. Reload before saving again.",
+      "invalidId": "Invalid algorithm ID",
+      "wrongType": "This record is not an Invincible Star algorithm and cannot be edited here",
+      "invalidParams": "Product config is invalid or its version is unsupported. Refresh and retry.",
+      "lastUpdater": "Last updated by",
+      "lastUpdateTime": "Last updated at",
+      "basicInfoTitle": "Basic Information",
+      "filterTitle": "Display Eligibility Filter",
+      "filterTag": "Built-in · Read-only",
+      "filterHelpTitle": "Filter rule integration",
+      "filterHelpCurrentLabel": "Current scope",
+      "filterHelpCurrentBody": "All four conditions are decided by the group-buy system. This algorithm only periodically refreshes the eligible product queue without reconfiguring them.",
+      "filterHelpNextLabel": "Future integration",
+      "filterHelpNextBody": "Once rule configuration is delivered, this module accepts switches and parameters in the same structure, unlocked item by item, without reworking the page.",
+      "filterNote": "These conditions are decided by the group-buy system, shown read-only here. After rule delivery, switches and parameters can be integrated directly in this module.",
+      "effectPrefix": "Result",
+      "ruleDelistedLabel": "Product delisted",
+      "ruleDelistedDesc": "Delisted products are excluded by the group-buy system and never enter this algorithm’s candidate queue.",
+      "ruleDelistedEffect": "Removed from candidate queue",
+      "ruleSoldOutLabel": "Product sold out",
+      "ruleSoldOutDesc": "Sold-out products pause display; once restocked they rejoin at the next scheduled check.",
+      "ruleSoldOutEffect": "Hidden until restocked",
+      "ruleSaleWindowLabel": "Outside sale window",
+      "ruleSaleWindowDesc": "Only products within the group-buy sale window are eligible; others are excluded automatically.",
+      "ruleSaleWindowEffect": "Hidden outside sale window",
+      "ruleWaterfallScopeLabel": "Not in waterfall scope",
+      "ruleWaterfallScopeDesc": "Products must be within the current waterfall strategy scope; unslotted products do not participate.",
+      "ruleWaterfallScopeEffect": "Excluded from slot allocation",
+      "scopeTarget": "Check scope",
+      "scopeTargetValue": "Candidate products that passed eligibility filter",
+      "scopeAction": "Check action",
+      "scopeActionValue": "Remove invalid products · re-add products restored to eligible"
+    },
     "saveFailed": "Save failed",
     "merchantPosMin": "Merchant position must be at least 1",
     "unitOrder": "orders",
@@ -9512,7 +9572,7 @@
         "userKeywordStatsDays": "User stats window",
         "userPreferenceMinScore": "User preference min score",
         "merchantPreferenceMinScore": "Merchant preference min score",
-        "matchThreshold": "Preference tag coverage threshold",
+        "matchThreshold": "Minimum coverage ratio",
         "maxUserTags": "Max matching tags (retired)",
         "explorationSlots": "New preference exploration tags",
         "maxMerchantsPerKeyword": "Max merchants per tag",
@@ -9523,11 +9583,11 @@
         "merchantDecayDays": "Merchant tag decay period",
         "merchantDecayPoints": "Merchant tag decay points",
         "merchantRetainedTagCount": "Merchant retained hot tags",
-        "merchantTagIdleClearDays": "Merchant retained tag idle-clear days",
+        "merchantTagIdleClearDays": "Merchant tag idle-clear days",
         "userDecayDays": "User tag decay period",
         "userDecayPoints": "User tag decay points",
         "userRetainedTagCount": "User retained hot tags",
-        "userTagIdleClearDays": "User retained tag idle-clear days",
+        "userTagIdleClearDays": "User tag idle-clear days",
         "newTagBoostMultiplier": "New tag score boost multiplier",
         "maxBoostTagCount": "Max boosted tags",
         "generativeRecommendEnabled": "Post-browse similar recommendation",
@@ -9541,7 +9601,7 @@
         "generativeDailyLimit": "Per-user daily trigger cap",
         "generativeSkipMerchantCount": "Skip merchant clicks before retrigger",
         "newUserDimensions": "Cold-start ranking dimensions",
-        "qualityScoreThreshold": "Merchant quality score threshold",
+        "qualityScoreThreshold": "Quality score preference line",
         "regionPopularStatsDays": "Popularity stats window",
         "popularityMetrics": "Popularity metrics",
         "regionPopularTopPercent": "Regional popularity top percent",
@@ -9556,6 +9616,7 @@
         "similarityThreshold": "Similarity threshold",
         "categoryMatchLevel": "Category match level",
         "coldStartRegionScope": "Region recall scope",
+        "recallMerchantScope": "Merchant recall scope",
         "rankPreset": "Ranking strategy",
         "rankFactors": "Ranking factors",
         "rankWeightMatch": "Weight: match",
@@ -9578,7 +9639,17 @@
         "similarAnchor": "Similarity anchor",
         "similarBlendRatio": "Merchant weight in blend",
         "similarChainEnabled": "Allow retrigger on recommended merchant",
-        "similarChainDepth": "Max chain depth"
+        "similarChainDepth": "Max chain depth",
+        "qualityFilterEnabled": "Enable merchant quality threshold",
+        "coverageFilterEnabled": "Enable minimum coverage ratio",
+        "matchingUserSimilarEnabled": "Enable user-collaborative supplement",
+        "matchingUserSimilarThreshold": "Minimum user similarity for collaborative supplement",
+        "matchingUserSimilarMode": "Collaborative supplement mode",
+        "matchingUserSimilarRatio": "Collaboration reserved ratio",
+        "similarRecPriority": "Candidate fill order (retired)",
+        "similarRecSlot1Source": "Preferred source for slot 1",
+        "similarRecSlot2Source": "Preferred source for slot 2",
+        "userSimilarThreshold": "Minimum similar-user similarity"
       },
       "opt": {
         "generativeTriggerMode": {
@@ -9610,9 +9681,9 @@
           "lessFirst": "Less remaining first"
         },
         "similarRecModes": {
-          "merchantSimilar": "Merchant-similar",
-          "userSimilar": "User-similar",
-          "sameCategory": "Same-category"
+          "merchantSimilar": "Merchant similarity",
+          "userSimilar": "User collaborative filtering",
+          "sameCategory": "Same category"
         },
         "similarityMetric": {
           "cosine": "Cosine similarity",
@@ -9626,6 +9697,10 @@
           "delivery": "Within delivery range",
           "tradeArea": "User trade area"
         },
+        "recallMerchantScope": {
+          "trafficOnly": "Paid traffic merchants only",
+          "allMerchants": "All merchants (not yet open)"
+        },
         "rankPreset": {
           "matchFirst": "Match first",
           "consumeFirst": "Consume first",
@@ -9636,7 +9711,7 @@
           "any": "All-period paid merchants"
         },
         "similarRankMode": {
-          "inherit": "Inherit slot ranking",
+          "inherit": "Inherit matching-path ranking",
           "independent": "Independent"
         },
         "similarRankPreset": {
@@ -9662,16 +9737,37 @@
           "hybrid": "Hybrid score (legacy)"
         },
         "rankFactors": {
-          "match": "Match",
-          "traffic": "Traffic",
-          "quality": "Quality",
-          "distance": "Distance"
+          "match": "Match score",
+          "traffic": "Remaining ratio",
+          "quality": "Quality score",
+          "distance": "Distance",
+          "tagHeat": "Matched tag heat"
         },
         "rankTieBreak": {
-          "trafficDirection": "By traffic direction",
-          "quality": "Higher quality first",
-          "distance": "Closer first",
-          "random": "Random explore"
+          "trafficDirection": "More remaining impressions first",
+          "quality": "Higher quality score first",
+          "distance": "Closer distance first",
+          "random": "Random exploration",
+          "tagHeat": "Higher matched tag heat first",
+          "match": "Higher match score first"
+        },
+        "matchingUserSimilarMode": {
+          "fill": "Fill on shortfall (default · direct match first)",
+          "ratio": "Reserve by ratio (exploration quota · reserved even when direct match suffices)"
+        },
+        "similarRecPriority": {
+          "merchantFirst": "By order (merchant similarity first)",
+          "userFirst": "User collaborative filtering first"
+        },
+        "similarRecSlot1Source": {
+          "merchantSimilar": "Merchant similarity",
+          "userSimilar": "User collaborative filtering",
+          "sameCategory": "Same category"
+        },
+        "similarRecSlot2Source": {
+          "merchantSimilar": "Merchant similarity",
+          "userSimilar": "User collaborative filtering",
+          "sameCategory": "Same category"
         }
       },
       "unit": {
@@ -9689,11 +9785,12 @@
       },
       "group": {
         "availability": "Basics & availability",
+        "recall": "Recall scope",
         "matching": "Tags & interest matching",
         "coldStart": "Cold-start recommendation",
         "similarRec": "Similar recommendation",
-        "frequency": "Frequency & trigger",
-        "ranking": "Paid slot ranking"
+        "frequency": "Merchant frequency control",
+        "ranking": "Ranking rules"
       },
       "cap": {
         "c1": "Preference threshold",
@@ -9701,7 +9798,7 @@
         "c3": "Similarity algorithm (algorithm-level)",
         "c4": "Merchant tag decay",
         "c5": "User tag decay",
-        "c6": "Same-merchant dedup",
+        "c6": "Same-merchant exposure frequency",
         "c7": "Similar-rec trigger frequency",
         "c8": "Meal-period priority",
         "c9": "In-slot scoring & filling",
@@ -9712,7 +9809,10 @@
         "c14": "Trigger condition",
         "c15": "Recommendation count",
         "c16": "Insertion priority",
-        "c17": "Independent priority scoring"
+        "c17": "Independent priority scoring",
+        "c18": "Merchant recall scope",
+        "c19": "Minimum coverage (optional)",
+        "c20": "User collaborative fill (standard traffic)"
       },
       "badge": {
         "selected": "Selected",
@@ -9768,6 +9868,108 @@
       "rejected": "Rejected",
       "slotRank": "Slot ranking",
       "indepPriority": "Independent priority"
+    },
+    "targetObjectLabel": "Promotion Target",
+    "productDailyPriceLabel": "Daily price (product all-day sale)",
+    "tagDecay": {
+      "title": "Global Tag Decay Rules",
+      "notice": "Global rule prototype: kept in this tab only, cleared on refresh, not yet published to the backend.",
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel",
+      "rulesSection": "Tag Scoring Rules",
+      "decaySection": "Tag Effective Score Decay",
+      "merchantGroup": "Merchant Tags",
+      "userGroup": "User Tags",
+      "saturationGroup": "Saturation Cap",
+      "placeholderNoClear": "Empty to disable",
+      "saturationHint": "B treats the cap as an asymptote: raw +1 keeps accumulating while the effective score = cap × (1 − e^(−raw/cap)), converging non-linearly and never exceeding the cap, which damps the head start created by merchant volume. Defaults are baseline caps (merchant 50000 / user 1000); the calculation lands in the backend in phase 2.",
+      "referenceAria": "Global tag decay rule reference",
+      "referenceHelpAria": "Global tag decay rule reference details",
+      "referenceLabel": "Referencing global tag decay rules · V{{revision}}",
+      "decayHelpTitle": "Decay basis",
+      "decayHelpAria": "Decay basis details",
+      "linearTitle": "Linear decay",
+      "linear": "effective = max(0, initial effective score − floor(days elapsed / period) × points per step). Raw order totals are never deleted.",
+      "idleTitle": "Idle cleanup",
+      "idle": "The clock starts from the last effective order that added a tag score; periodic decay does not reset it. An empty cleanup period means no idle reset.",
+      "sharedTitle": "Shared execution",
+      "shared": "Every algorithm references this single global rule and the same set of effective tags without re-decaying; matching thresholds remain per-algorithm settings.",
+      "strategyTitle": "Strategy combination",
+      "strategy": "Linear baseline plus optional A (incremental decay-clock refresh) and B (saturation compression): A protects active tags, B damps merchant volume inflation. Both land in the backend in phase 2.",
+      "refSingleSourceTitle": "Single source",
+      "refSingleSource": "Configured centrally at the top of the algorithm library and shared by traffic and similar recommendations; business tabs never create their own copies.",
+      "sideMerchant": "Merchant",
+      "sideUser": "User",
+      "refMerchant": "−{{points}} every {{days}} days; cleared after {{clearDays}} days without new orders.",
+      "refMerchantOff": "−{{points}} every {{days}} days; no idle cleanup.",
+      "refUser": "−{{points}} every {{days}} days; cleared after {{clearDays}} days without new orders.",
+      "refUserOff": "−{{points}} every {{days}} days; no idle cleanup.",
+      "refBoundaryTitle": "Integration boundary",
+      "refBoundary": "This round only unifies the frontend configuration source; it is not yet published to the real tag computation service. Existing backend parameters migrate in phase 2 and raw order counts stay unchanged.",
+      "discardTitle": "Discard unsaved changes?",
+      "discardLeaveBody": "The global rule has not been saved; leaving discards this edit.",
+      "discardCancelBody": "The global rule has not been saved; cancelling discards this edit and returns to view mode.",
+      "discardOk": "Discard changes",
+      "keepEditing": "Keep editing",
+      "saveConfirmTitle": "Update the global tag decay rules?",
+      "saveConfirmBody": "Once saved, the shared rule for this tab takes effect immediately (every algorithm references the same global rule; not yet published to the backend).",
+      "saveConfirmOk": "Confirm save",
+      "saveConfirmCancel": "Back to editing",
+      "saveFailed": "Save failed",
+      "saved": "Shared rule updated for this tab; not yet published to the backend.",
+      "rules": {
+        "merchantTitle": "Merchant side · Supply heat",
+        "merchantBadge": "Supply profile",
+        "merchantSub": "Merchant tag heat comes from real fulfilled supply, and product standard tags are the only profile source.",
+        "m1Title": "Tagged products · profile source",
+        "m1Body": "Products carry standard tags, from which the system builds the merchant supply-side profile; tag IDs follow the same standard as the user side, keeping both sides matchable.",
+        "m2Title": "Per item · added on completion",
+        "m2Body": "Every <c>1</c> completed-order item sold adds <c>+1</c> to that standard tag for the merchant; it accumulates by <c>volume</c>, so more real delivery means higher tag supply heat.",
+        "m3Title": "Repurchase sediment · linear accumulation",
+        "m3Body": "The same tag accumulates <c>linearly</c> with completed item count and settles into the raw score, describing supply heat and operational stability.",
+        "m4Title": "Valid order basis",
+        "m4Body": "Only <c>completed</c> orders score; cancelled or fully refunded orders add nothing.",
+        "mMetric1Value": "+1",
+        "mMetric1Label": "per completed item",
+        "mMetric2Value": "Volume",
+        "mMetric2Label": "by items delivered",
+        "mMetric3Value": "Completed only",
+        "mMetric3Label": "order scoring",
+        "userTitle": "User side · Preference strength",
+        "userBadge": "Preference profile",
+        "userSub": "User preference strength comes from real purchase behaviour and shares the tag and decay basis with the merchant side.",
+        "u1Title": "Behaviour tags · preference profile",
+        "u1Body": "Each completed order writes product standard tags into the user preference profile; it never relies on clicks or views.",
+        "u2Title": "Dedup per type · accumulate across types",
+        "u2Body": "Within one order, each <c>different</c> product hitting the same tag adds <c>+1</c> (taro milk tea + bubble milk tea + red-bean milk tea → milk tea <c>+3</c>); multiple units of the same product count only <c>1</c> time, preventing bulk-order inflation.",
+        "u3Title": "Repurchase reinforcement · strength profiling",
+        "u3Body": "Deduplicated inside an order, accumulated across orders: repeat purchases of the same tag add up <c>linearly</c>, describing preference breadth and strength.",
+        "u4Title": "Valid order basis",
+        "u4Body": "Only <c>completed</c> orders score, sharing the same decay and idle-cleanup basis as the merchant side.",
+        "uMetric1Value": "+1",
+        "uMetric1Label": "per product type",
+        "uMetric2Value": "Dedup by type",
+        "uMetric2Label": "accumulate across types",
+        "uMetric3Value": "Completed only",
+        "uMetric3Label": "order scoring"
+      },
+      "rulesFootnote": "Raw totals and decayed effective scores are stored separately: decay and idle cleanup only affect the recommendation score and never delete raw order count history; merchant and user matching thresholds stay per-algorithm. The global decay keeps a linear baseline and offers two optional enhancements — A incremental clock refresh (each valid addition resets that tag’s decay timer so active tags are not wrongly decayed) and B saturation compression (effective scores converge non-linearly under a cap, damping the head start created by merchant volume) — both computed in the backend in phase 2.",
+      "error": {
+        "integerRange": "{{label}} must be an integer between {{min}} and {{max}} {{unit}}",
+        "invalidPolicy": "The global tag decay rule set is invalid",
+        "revisionConflict": "The rule has been updated; reload before saving"
+      },
+      "field": {
+        "merchantDecayDays": "Merchant tag decay period",
+        "merchantDecayPoints": "Merchant decay points per period",
+        "merchantTagIdleClearDays": "Merchant idle cleanup window",
+        "userDecayDays": "User tag decay period",
+        "userDecayPoints": "User decay points per period",
+        "userTagIdleClearDays": "User idle cleanup window",
+        "merchantSaturationCap": "Merchant effective score cap",
+        "userSaturationCap": "User effective score cap"
+      }
     }
   },
   "trafficSandbox": {
@@ -17582,6 +17784,424 @@
       "finish": "Finish",
       "todayInvested": "Today {{minutes}}",
       "workHoursChip": "Hours {{hours}}h"
+    },
+    "archive": {
+      "aiSummary": "AI Summary",
+      "historyLoadFailed": "Failed to load report history",
+      "itemMeta": "{{total}} items · {{done}} done",
+      "noHistory": "No report history yet",
+      "noRecognition": "No recognition received yet",
+      "published": "Published",
+      "recognitionLoadFailed": "Failed to load recognition archive",
+      "recognitionMeta": "By {{by}} · {{at}} · Period {{period}}",
+      "recognitionNote": "Recognitions are performance evidence and feed HR reviews at period end (phase-2 API)",
+      "recognitionTitle": "Manager Approvals"
+    },
+    "gantt": {
+      "action": {
+        "addItem": "New work item",
+        "collapseLeft": "Collapse left",
+        "expandLeft": "Expand left",
+        "gantt": "Gantt",
+        "ganttSwitchTip": "On shows the Gantt chart, off switches to the list",
+        "list": "List",
+        "showWeekends": "Show weekends",
+        "today": "Back to today"
+      },
+      "badge": {
+        "leave": "Lv",
+        "makeup": "Wk",
+        "rest": "Off",
+        "today": "T"
+      },
+      "caliber": {
+        "p1": "Duration = workdays in range × {{hours}}h; weekends and holidays are excluded automatically, makeup shifts count, comp leave and personal leave do not.",
+        "p2": "Click a bar for details/progress · drag to move · pull the right edge to change the end · double-click a cell to schedule · drag the row handle to reorder.",
+        "p3": "A dashed border with the Ins flag marks an ad-hoc insertion; the inline ⚡ toggles it.",
+        "title": "Workday basis"
+      },
+      "cell": {
+        "restTip": "Weekends and holidays are not billable hours, please pick a workday"
+      },
+      "col": {
+        "done": "Done",
+        "end": "End date",
+        "hours": "Hours",
+        "item": "Work item",
+        "note": "Notes / reason",
+        "progress": "Progress",
+        "start": "Start date",
+        "task": "Subtask"
+      },
+      "confirm": {
+        "deleteItemTitle": "Delete this whole work item?",
+        "deleteTaskTitle": "Delete this subtask?",
+        "labelContains": "Includes:",
+        "labelItem": "Work item: ",
+        "labelTask": "Subtask: ",
+        "subtaskCount": "{{count}} subtasks, deleted together"
+      },
+      "csv": {
+        "colEnd": "End date",
+        "colGroup": "Work item",
+        "colHours": "Hours",
+        "colNote": "Notes / reason",
+        "colProgress": "Progress",
+        "colStart": "Start date",
+        "colStatus": "Status",
+        "colTask": "Subtask",
+        "fileBase": "MyWorkLog_{{date}}"
+      },
+      "date": {
+        "schedule": "Unscheduled"
+      },
+      "dayType": {
+        "compOff": "Comp leave",
+        "holiday": "Holiday",
+        "leave": "Leave",
+        "makeup": "Makeup shift"
+      },
+      "density": {
+        "compact": "Compact",
+        "loose": "Loose",
+        "standard": "Standard"
+      },
+      "empty": {
+        "desc": "Add a work item title, split it into subtasks and schedule them; the Gantt lays out by workday automatically.",
+        "loadSeed": "Load sample data",
+        "title": "No work item ledger yet"
+      },
+      "emptyFiltered": {
+        "clear": "Clear filters",
+        "desc": "Adjust the keyword or status filter, or clear filters to see all work items.",
+        "title": "No records match the filters"
+      },
+      "export": {
+        "csv": "Excel sheet (CSV)",
+        "failed": "Export failed, please retry",
+        "fileBase": "MyWorkLog_{{date}}",
+        "imageDone": "Downloaded the long-image snapshot of the current ledger",
+        "pdfDone": "Downloaded the A4 paginated PDF of the current ledger"
+      },
+      "hours": {
+        "tip": "{{days}} workdays × {{hours}}h (weekends/holidays excluded)",
+        "value": "{{hours}} h"
+      },
+      "inline": {
+        "clickToEdit": "Click to edit"
+      },
+      "insert": {
+        "flag": "Ins",
+        "markTip": "Mark as ad-hoc insertion",
+        "noDate": "date not recorded",
+        "tag": "Ad-hoc",
+        "tagTip": "Ad-hoc insertion · {{date}}",
+        "unmarkTip": "Remove the ad-hoc insertion mark"
+      },
+      "msg": {
+        "csvDone": "CSV exported and can be opened in Excel",
+        "endBeforeStart": "The end date cannot precede the start date; it has been aligned to the start date",
+        "insertedMarked": "Marked as ad-hoc insertion ({{date}})",
+        "itemDeleted": "Work item deleted.",
+        "planRestored": "Restored to the original plan",
+        "sheetNotReady": "The ledger is not loaded yet",
+        "taskDeleted": "Subtask deleted.",
+        "syncFailed": "Save failed, please retry"
+      },
+      "newItemTitle": "New work item",
+      "note": {
+        "bold": "Bold",
+        "clear": "Clear",
+        "clearFormat": "Clear formatting",
+        "clickToFill": "Click to fill in",
+        "color": "Text color",
+        "italic": "Italic",
+        "save": "Save note",
+        "sizeLg": "Large",
+        "sizeMd": "Normal",
+        "sizeSm": "Small",
+        "sizeTip": "Font size · {{size}}",
+        "sizeXl": "Huge",
+        "tip": "Supports bold / italic / underline / color / size, sanitized on save. Hovering a list note shows the full text without clicking.",
+        "title": "Note · {{title}}",
+        "underline": "Underline"
+      },
+      "period": {
+        "back": "Back to current",
+        "next": "Next period",
+        "prev": "Previous period"
+      },
+      "plan": {
+        "inserted": "Ad-hoc insertion",
+        "planned": "Original plan"
+      },
+      "pop": {
+        "editNote": "Edit note",
+        "footer": "Drag to move · pull the right edge to change the end · double-click to schedule",
+        "hours": "Hours",
+        "insertedAt": "Inserted {{date}}",
+        "noNote": "No note yet",
+        "note": "Note",
+        "plan": "Plan",
+        "planType": "Type",
+        "progress": "Progress",
+        "workdays": "{{days}} workdays × {{hours}}h"
+      },
+      "preset": {
+        "custom": "Custom",
+        "lastMonth": "Last month",
+        "lastWeek": "Last week",
+        "month": "This month",
+        "week": "This week"
+      },
+      "range": {
+        "all": "All time",
+        "monthFormat": "MMMM YYYY",
+        "week": "Week {{week}} ({{start}} ~ {{end}})"
+      },
+      "req": {
+        "addTask": "Add subtask",
+        "deleteItem": "Delete work item"
+      },
+      "search": {
+        "allItem": "All work items",
+        "allPlan": "All types",
+        "allStatus": "All statuses",
+        "cycle": "Work cycle",
+        "keyword": "Keyword",
+        "keywordPlaceholder": "Work item / subtask / note",
+        "plan": "Plan type",
+        "status": "Status"
+      },
+      "stat": {
+        "avg": "Average progress",
+        "avgTip": "Current average progress of tasks in range",
+        "doingNowTip": "Current status is in progress",
+        "doingTip": "End-of-period progress 1–99%",
+        "doneInPeriod": "Done this period",
+        "doneNowTip": "Current status is done",
+        "doneTip": "Completion date falls in the queried range (same basis as the report)",
+        "hours": "Total hours (workday basis)",
+        "hoursTip": "Workdays in the range intersection × 8h",
+        "insertedAllTip": "All work items marked as ad-hoc insertions",
+        "insertedTip": "Insertion date falls in the queried range",
+        "pendingNow": "To finish",
+        "pendingNowTip": "Current status is pending or unscheduled",
+        "pendingStart": "Not started",
+        "pendingTip": "End-of-period progress 0%"
+      },
+      "status": {
+        "deriveTip": "Derived from progress: 100% done; 1–99% in progress; 0% pending; unscheduled stays unscheduled",
+        "plan": "Unscheduled",
+        "todo": "Pending"
+      },
+      "subtaskN": "Subtask {{count}}",
+      "suffix": {
+        "item": " items",
+        "percent": "%"
+      },
+      "tabbar": {
+        "summary": "{{tasks}} subtasks · {{workdays}} workdays"
+      },
+      "undo": "Undo",
+      "weekNth": "Week {{count}}",
+      "weekdayShort": [
+        "S",
+        "M",
+        "T",
+        "W",
+        "T",
+        "F",
+        "S"
+      ],
+      "import": {
+        "button": "Import my local ledger",
+        "done": "Imported the local ledger ({{count}} work items)"
+      },
+      "loadFailed": "Failed to load the ledger",
+      "loading": "Loading the ledger…",
+      "loadingDesc": "Data comes from the server-side ledger; hours follow the workday basis.",
+      "tab": {
+        "day": "Day view",
+        "ledger": "Work ledger"
+      }
+    },
+    "holiday": {
+      "add": "Add",
+      "addTip": "Auto detection: workday → holiday, weekend → makeup shift. Pick the type manually for leave and comp leave.",
+      "autoDetect": "Auto detect",
+      "card": {
+        "add": "Add date",
+        "addNote": "Four types",
+        "configured": "Configured dates ({{count}})",
+        "configuredNote": "× restores the basis",
+        "quick": "Quick actions",
+        "quickNote": "{{year}} only"
+      },
+      "clearContent": "Removes all holidays, makeup shifts, comp leave and leave entries of {{year}} and restores the default weekend-off basis.",
+      "clearOk": "Confirm clear",
+      "clearTitle": "Clear the {{year}} holiday configuration?",
+      "clearYear": "Clear this year",
+      "importStatutory": "Import statutory holidays",
+      "menu": "Holiday settings",
+      "monthFormat": "MMMM YYYY",
+      "msg": {
+        "applied": "{{date}} set to {{type}}",
+        "cleared": "Cleared the {{year}} configuration",
+        "imported": "Imported {{holidays}} statutory holidays and {{makeups}} makeup shifts for {{year}}",
+        "restored": "{{date}} restored to the {{kind}} basis",
+        "reverted": "{{date}} restored to the default basis",
+        "setHoliday": "{{date}} set as a holiday (no hours)",
+        "setMakeup": "{{date}} set as a makeup shift (hours count)",
+        "refreshed": "Synced the system statutory holiday list",
+        "saveFailed": "Failed to save the basis, rolled back"
+      },
+      "noneInYear": "No configuration this year",
+      "pickDate": "Pick a date",
+      "quickTip": "Import only merges the holiday and makeup lists and never touches comp leave or leave; clearing asks for confirmation first.",
+      "subtitle": "Workday basis: holidays, comp leave and personal leave do not count; makeup shifts do. Changes sync to the ledger and reports live.",
+      "tip": {
+        "revert": "{{type}} · click to restore the default basis",
+        "weekendToMakeup": "Weekend · click to set as a makeup shift",
+        "workdayToHoliday": "Workday · click to set as a holiday"
+      },
+      "title": "Holiday settings",
+      "today": "Today",
+      "unitDay": " days",
+      "weekendRest": "weekend off",
+      "weekendShort": "Weekend",
+      "workday": "Workday",
+      "workdaysYear": "Workdays this year",
+      "loadFailed": "Failed to load the calendar",
+      "refreshStatutory": "Sync statutory holidays"
+    },
+    "workReport": {
+      "anchor": "Anchor date",
+      "autoDraftTag": "Auto-aggregated draft",
+      "backlog": {
+        "count": "{{count}} items unscheduled",
+        "note": "Unscheduled tasks bill no hours; please put them into a plan soon"
+      },
+      "caliber": "Basis: workday × {{hours}}h · weekends/holidays excluded",
+      "copyDone": "Markdown copied (exported text = page text)",
+      "copyMarkdown": "Copy Markdown",
+      "daily": "Daily investment (workday basis)",
+      "doneOn": "Done {{date}}",
+      "editSummary": "Edit the period summary",
+      "empty": {
+        "action": "Log something in the work records",
+        "desc": "The ledger has no work records yet, so there is nothing to report"
+      },
+      "export": {
+        "fileBase": "WorkReport_{{period}}_{{date}}",
+        "imageDone": "Downloaded the long-image snapshot of the current report",
+        "pdfDone": "Downloaded the A4 paginated PDF of the current report"
+      },
+      "flat": "Flat",
+      "foot": "Data source: work record ledger (Gantt and list share one source) · progress comparison uses the start/end snapshots of the history trail · hours follow the workday basis.",
+      "generatedAt": "Generated at {{time}}",
+      "groupMeta": "{{count}} items · {{hours}}h · {{done}} done",
+      "groups": {
+        "none": "No scheduled work items in this period."
+      },
+      "hours": {
+        "none": "No hours invested in this period (no workday intersection between the schedule and the queried range)."
+      },
+      "insertedOn": "{{group}} · inserted {{date}}",
+      "inserts": {
+        "none": "No ad-hoc insertion this period; the plan ran as scheduled."
+      },
+      "label": {
+        "dayFormat": "MMM D, YYYY",
+        "monthFormat": "MMMM YYYY",
+        "quarter": "{{year}} Q{{q}}",
+        "week": "Week {{week}} ({{start}} ~ {{end}})"
+      },
+      "md": {
+        "avgProgress": "- Average progress: {{from}}% → {{to}}%",
+        "groupDelta": "- Start {{from}}% → End {{to}}% ({{delta}}%)",
+        "groupRow": "- {{task}} — {{from}}% → {{to}}% · {{hours}}h",
+        "groupTitle": "### {{title}} ({{count}} items · {{hours}}h)",
+        "insertItem": "- {{task}} ({{group}}) — inserted {{at}} · {{hours}}h · {{from}}% → {{to}}%",
+        "invested": "- Hours invested: {{hours}}h (workday × {{perDay}}h, weekends/holidays excluded)",
+        "noInsert": "- No ad-hoc insertion this period; the plan ran as scheduled",
+        "noOutput": "- Nothing completed this period",
+        "noPlan": "- No scheduled items for the next period",
+        "noRisk": "- No overdue items or risk notes this period",
+        "noteItem": "- [Note] {{task}}: {{note}}",
+        "outputItem": "- {{task}} ({{group}}) — done {{doneAt}} · {{hours}}h",
+        "overview": "- Done {{done}} / In progress {{doing}} / Covered {{total}}",
+        "peak": "- Daily peak: {{date}} {{hours}}h",
+        "planItem": "- {{task}} ({{group}}) — starts {{start}} · estimated {{hours}}h",
+        "riskItem": "- [Overdue {{days}} days] {{task}} ({{group}}) — due {{end}} · {{progress}}%",
+        "riskLine": "- Risks {{risks}} · ad-hoc {{inserted}} · unscheduled {{backlog}}",
+        "s1": "## 1. Core overview",
+        "s2": "## 2. Period content",
+        "s3": "## 3. Next period plan",
+        "s4": "## 4. Risks and notes",
+        "s5": "## 5. Time distribution",
+        "s6": "## 6. Risks and notes",
+        "s7": "## 7. Next period plan",
+        "shareRow": "- {{title}}: {{hours}}h ({{share}}%)",
+        "title": "# Work Report ({{period}})",
+        "contentRow": "- {{task}}{{inserted}} — {{from}}% → {{to}}% · {{hours}}h · {{status}}",
+        "insertedMark": " [ad-hoc]",
+        "noContent": "- No scheduled work items in this period",
+        "backlogItem": "- [Unscheduled] {{count}} items have no schedule and bill no hours"
+      },
+      "outputs": {
+        "none": "Nothing completed this period — see the next section for in-flight work."
+      },
+      "ov": {
+        "backlog": "{{count}} items unscheduled",
+        "cover": "This period covers {{total}} subtasks, {{done}} completed",
+        "hours": "{{hours}}h invested (workday basis)",
+        "inserted": "{{count}} ad-hoc insertions",
+        "progress": "Average progress {{from}}% → {{to}}% ({{delta}}%)",
+        "risks": "{{count}} overdue items need attention",
+        "sep": ", "
+      },
+      "overdueDays": "Overdue {{days}} days",
+      "overdueShort": "Overdue {{days}}d",
+      "peak": "Peak {{date}} · {{hours}}h",
+      "periodEnd": "End {{v}}%",
+      "periodStart": "Start {{v}}%",
+      "plan": {
+        "estimate": "Estimated {{hours}}h",
+        "none": "No scheduled items for the next period."
+      },
+      "reporter": "Reporter: myself",
+      "riskLine": "{{group}} · due {{end}} · {{progress}}%",
+      "risks": {
+        "none": "No overdue items, risk notes or unscheduled backlog this period."
+      },
+      "section": {
+        "hours": "Time distribution",
+        "inserts": "Ad-hoc insertions",
+        "outputs": "Key outcomes",
+        "overview": "Core overview",
+        "plan": "Next period plan",
+        "progress": "Work item progress comparison",
+        "risks": "Risks and notes",
+        "content": "Period content"
+      },
+      "stat": {
+        "avgEnd": "End-of-period progress",
+        "hours": "Hours invested",
+        "risks": "Risk items"
+      },
+      "summaryPlaceholder": "Write one line as the period summary (leave empty to use the auto overview, same text on export)",
+      "tab": {
+        "archive": "Personal achievements",
+        "history": "Report history",
+        "read": "Report view",
+        "delivery": "Publish & delivery"
+      },
+      "thisPeriod": "Current",
+      "title": "Work Report",
+      "covered": "Covered",
+      "loadFailed": "Failed to load the report",
+      "loading": "Aggregating the report…"
     }
   }
 }

@@ -2,9 +2,9 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Alert, Button, Form, Tag, type FormInstance } from 'antd'
 import { useTranslation } from 'react-i18next'
 import i18n from '@/i18n'
-import { AimOutlined, FieldTimeOutlined, ShareAltOutlined, ShopOutlined, SortDescendingOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { AimOutlined, EnvironmentOutlined, FieldTimeOutlined, ShopOutlined, SortDescendingOutlined } from '@ant-design/icons'
 import AlgorithmSection from '../AlgorithmForm/AlgorithmSection'
-import { AvailabilitySection, MatchingSection, FrequencySection, RankingSection, ColdStartSection, SimilarRecSection } from './sections'
+import { AvailabilitySection, RecallSection, MatchingSection, FrequencySection, RankingSection } from './sections'
 import { getTrafficGroup, TRAFFIC_FIELDS, TRAFFIC_GROUPS, trafficGroupKey, trafficOptionKey, type TrafficAlgorithmValues, type TrafficFormIssue, type TrafficGroup } from './config'
 import './index.css'
 
@@ -14,10 +14,15 @@ interface Props {
   errors: TrafficFormIssue[]
 }
 
-const GROUP_ICONS: Record<TrafficGroup, ReactNode> = {
-  availability: <ShopOutlined />, matching: <AimOutlined />, ranking: <SortDescendingOutlined />, coldStart: <ThunderboltOutlined />, similarRec: <ShareAltOutlined />, frequency: <FieldTimeOutlined />,
+// 返回推荐已上移瀑布流，历史参数仅留在表单数据中兼容，绝不挂载其编辑控件。
+const VISIBLE_GROUPS = TRAFFIC_GROUPS.filter(group => group.key !== 'similarRec')
+const GROUP_ICONS: Partial<Record<TrafficGroup, ReactNode>> = {
+  availability: <ShopOutlined />, recall: <EnvironmentOutlined />, matching: <AimOutlined />, ranking: <SortDescendingOutlined />, frequency: <FieldTimeOutlined />,
 }
 const amount = (value: number | null | undefined) => value == null ? i18n.t('recommend.trafficCfg.pending', { defaultValue: '待配置' }) : String(value)
+/** 本轮改名的组标题旧译文会覆盖新文案：translateTitle=false 时直接用源标题，第二阶段 i18n 同步后恢复 t()。 */
+const groupTitleOf = (group: { key: TrafficGroup; title: string; translateTitle?: boolean }, t: (key: string, opts: { defaultValue: string }) => string) =>
+  group.translateTitle === false ? group.title : t(trafficGroupKey(group.key), { defaultValue: group.title })
 /** 旧记录可能仍存有已废弃的自定义周期值，展示口径统一为全部历史。 */
 const hasLegacyCustomStats = (values: Partial<TrafficAlgorithmValues>) =>
   values.merchantKeywordStatsMode === 'custom' || values.userKeywordStatsMode === 'custom'
@@ -27,7 +32,7 @@ export default function TrafficAlgorithmConfig({ form, readOnly = false, errors 
   const { t } = useTranslation()
   const values: Partial<TrafficAlgorithmValues> = Form.useWatch([], { form, preserve: true }) ?? form.getFieldsValue(true)
   const [expanded, setExpanded] = useState<Record<TrafficGroup, boolean>>({
-    availability: true, matching: true, ranking: true, coldStart: true, similarRec: true, frequency: false,
+    availability: true, recall: true, matching: true, ranking: true, similarRec: true, frequency: false,
   })
 
   const handleLocateField = (name: string) => {
@@ -66,12 +71,11 @@ export default function TrafficAlgorithmConfig({ form, readOnly = false, errors 
   }
 
   const sectionProps = { values, readOnly, form }
-  const sections: Record<TrafficGroup, ReactNode> = {
+  const sections: Partial<Record<TrafficGroup, ReactNode>> = {
     availability: <AvailabilitySection {...sectionProps} />,
+    recall: <RecallSection {...sectionProps} />,
     matching: <MatchingSection {...sectionProps} />,
     ranking: <RankingSection {...sectionProps} />,
-    coldStart: <ColdStartSection {...sectionProps} />,
-    similarRec: <SimilarRecSection {...sectionProps} />,
     frequency: <FrequencySection {...sectionProps} />,
   }
 
@@ -85,11 +89,10 @@ export default function TrafficAlgorithmConfig({ form, readOnly = false, errors 
           <div><dt>{t('recommend.trafficCfg.dt.17', { defaultValue: '标签统计' })}</dt><dd>商家与用户均为：全部历史（固定口径）{hasLegacyCustomStats(values) && <span className="traffic-config__secondary">· 旧自定义周期已失效</span>}</dd></div>
           <div><dt>{t('recommend.trafficCfg.dt.18', { defaultValue: '兴趣门槛' })}</dt><dd>用户 ≥ {amount(values.userPreferenceMinScore)} 分 / 商家 ≥ {amount(values.merchantPreferenceMinScore)} 分；{values.coverageFilterEnabled ? `最低覆盖 ${amount(values.matchThreshold)}%` : '覆盖过滤关闭（仍须共同标签）'}；{values.matchingUserSimilarEnabled ? (values.matchingUserSimilarMode === 'ratio' ? `协同预留 ${amount(values.matchingUserSimilarRatio)}% 坑位` : '不足时协同补充投流商家') : '普通协同补充关闭'}</dd></div>
           <div><dt>{t('recommend.trafficCfg.dt.19', { defaultValue: '单用户频控' })}</dt><dd>同店 {amount(values.merchantFreqHours)} 小时 / {amount(values.merchantFreqTimes)} 次</dd></div>
-          <div><dt>{t('recommend.trafficCfg.dt.20', { defaultValue: '相似推荐' })}</dt><dd>{values.generativeRecommendEnabled === undefined ? '待配置' : values.generativeRecommendEnabled ? `开启 · 每次最多 ${amount(values.generativeMerchantCount)} 家 · 仅合格投流商家` : '关闭 · 子配置已保留'}</dd></div>
-          <div><dt>{t('recommend.trafficCfg.dt.21', { defaultValue: '坑位排序' })}</dt><dd>{t(trafficOptionKey('rankPreset', values.rankPreset ?? 'matchFirst'), { defaultValue: TRAFFIC_FIELDS.rankPreset.options?.find(o => o.value === (values.rankPreset ?? 'matchFirst'))?.label })} · 全量已购商家参与排序</dd></div>
+          <div><dt>排序规则</dt><dd>匹配：{t(trafficOptionKey('rankPreset', values.rankPreset ?? 'matchFirst'), { defaultValue: TRAFFIC_FIELDS.rankPreset.options?.find(o => o.value === (values.rankPreset ?? 'matchFirst'))?.label })} · 冷启动 {(values.newUserDimensions ?? []).length} 维综合</dd></div>
         </dl>
         <nav className="traffic-config__navigation" aria-label="投流配置分组导航">
-          {TRAFFIC_GROUPS.map(group => <Button key={group.key} size="small" disabled={false} onClick={() => handleNavigate(group.key)}>{t(trafficGroupKey(group.key), { defaultValue: group.title })}</Button>)}
+          {VISIBLE_GROUPS.map(group => <Button key={group.key} size="small" disabled={false} onClick={() => handleNavigate(group.key)}>{groupTitleOf(group, t)}</Button>)}
         </nav>
       </div>
 
@@ -101,10 +104,10 @@ export default function TrafficAlgorithmConfig({ form, readOnly = false, errors 
         />
       )}
 
-      {TRAFFIC_GROUPS.map(group => {
+      {VISIBLE_GROUPS.map(group => {
         const errorCount = errors.filter(error => getTrafficGroup(error.name) === group.key).length
         return (
-          <AlgorithmSection key={group.key} title={t(trafficGroupKey(group.key), { defaultValue: group.title })} icon={GROUP_ICONS[group.key]}
+          <AlgorithmSection key={group.key} title={groupTitleOf(group, t)} icon={GROUP_ICONS[group.key]}
             tone={group.key === 'availability' ? 'info' : 'strategy'}
             readOnly={readOnly} expanded={expanded[group.key]}
             headingId={`traffic-heading-${group.key}`} bodyId={`traffic-body-${group.key}`}

@@ -110,6 +110,45 @@ public class CpmItem {
      */
     private Integer rdmProgressSeen;
 
+    /* ---------- 台账（cpm:schema:v1.3）：工作項归属 / 计划排期 / 计划属性 / 富文本备注 ---------- */
+
+    /**
+     * 所属工作項 biz_cpm_worklog_group.id；NULL=未分组（旧的日报流水条目）。
+     *
+     * <p>台账读取时未分组的条目会汇到一个虚拟分组里展示，而不是藏起来：
+     * 只按分组过滤会让「昨天快捷录入的一行」在页面上凭空消失，
+     * 用户看到的就是「记了但没了」，比多一个分组更糟。
+     */
+    private Long groupId;
+
+    /**
+     * 计划起日（甘特条左端）。
+     *
+     * <p>不复用 first_start_at/last_end_at：那两列由投入时段回算，语义是
+     * 「实际什么时候干了」；用它画计划条会把还没开始的任务显示成已经干过。
+     */
+    private LocalDate planStart;
+
+    /** 计划止日（甘特条右端） */
+    private LocalDate planEnd;
+
+    /** planned=原计划 / inserted=计划冻结后临时插入（周会要单独能念出来） */
+    private String planType;
+
+    /** 标记为临时插入的日期；原计划为 NULL */
+    private LocalDate insertedAt;
+
+    /**
+     * 备注富文本（服务端白名单净化后入库）。
+     *
+     * <p>与 detail 分开：detail 是日报正文的纯文本说明，note 是台账行内的排版备注，
+     * 两者出口不同（备注会进导出与推送），混成一列就会把标签带进纯文本场景。
+     */
+    private String noteHtml;
+
+    /** 备注纯文本降级：搜索、Markdown 导出、CSV 用它，保证「导出文本 = 页面文本」 */
+    private String noteText;
+
     /** 乐观锁：并发双端更新只有一边能赢 */
     private Integer version;
 

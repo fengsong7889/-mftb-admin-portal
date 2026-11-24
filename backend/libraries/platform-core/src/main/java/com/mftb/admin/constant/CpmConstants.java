@@ -34,6 +34,12 @@ public final class CpmConstants {
     public static final String MENU_TEMPLATE = "cpm-template";
     /** 匯報規則：治理侧，周期/提醒/接收人/推送配置 */
     public static final String MENU_RULE = "cpm-rule";
+    /**
+     * 節假日配置：工作記錄的工时口径页（日历点选节假日/補班/調休/請假）。
+     * 单独成菜单而不是 cpm-my 的子页：它改的是「工时怎么算」这条全局口径，
+     * 影响所有台账与汇报数字，值得在菜单上看得见、也能单独收回授权。
+     */
+    public static final String MENU_HOLIDAY = "cpm-holiday";
 
     /* ==================== 授权动作 ==================== */
 
@@ -179,4 +185,50 @@ public final class CpmConstants {
 
     /** 汇报规则单行槽位（对齐 rdm_daily_report_config 先例：唯一键保证全表一行） */
     public static final String RULE_SLOT_DEFAULT = "default";
+
+    /* ==================== 台账：排期 / 计划属性 / 工时口径（cpm:schema:v1.3） ==================== */
+
+    /** 每个工作日折算工时（小时）。界面、汇报、导出共用这一个常数；改它等于改所有人的周报数字 */
+    public static final int WORKLOG_HOURS_PER_DAY = 8;
+
+    /** 计划属性：期初已排期 */
+    public static final String PLAN_TYPE_PLANNED = "planned";
+    /** 计划属性：计划冻结后临时安排进来的工作，周会要单独能念出来 */
+    public static final String PLAN_TYPE_INSERTED = "inserted";
+    public static final java.util.SortedSet<String> PLAN_TYPES =
+            java.util.Collections.unmodifiableSortedSet(new java.util.TreeSet<>(java.util.Arrays.asList(
+                    PLAN_TYPE_PLANNED, PLAN_TYPE_INSERTED)));
+
+    /** 日历类型：法定节假日，不计工时（全局名单） */
+    public static final String DAY_TYPE_HOLIDAY = "holiday";
+    /** 日历类型：周末上班，计工时（全局名单，唯一计入的例外） */
+    public static final String DAY_TYPE_MAKEUP = "makeup";
+    /** 日历类型：工作日换休，不计工时（本人名单） */
+    public static final String DAY_TYPE_COMP_OFF = "comp_off";
+    /** 日历类型：请假不在岗，不计工时（本人名单） */
+    public static final String DAY_TYPE_LEAVE = "leave";
+    public static final java.util.SortedSet<String> DAY_TYPES =
+            java.util.Collections.unmodifiableSortedSet(new java.util.TreeSet<>(java.util.Arrays.asList(
+                    DAY_TYPE_HOLIDAY, DAY_TYPE_MAKEUP, DAY_TYPE_COMP_OFF, DAY_TYPE_LEAVE)));
+
+    /** 只有補班计入工时，其余三类都从工作日扣除——判定只在这里写一次 */
+    public static boolean dayTypeCountsAsWork(String dayType) {
+        return DAY_TYPE_MAKEUP.equals(dayType);
+    }
+
+    /** 全局法定名单（节假日/补班）；调休/请假属个人 */
+    public static boolean dayTypeIsGlobal(String dayType) {
+        return DAY_TYPE_HOLIDAY.equals(dayType) || DAY_TYPE_MAKEUP.equals(dayType);
+    }
+
+    /** 台账子任务的默认分类：台账界面不提供分类选择，写死 general 避免把用户输入当白名单绕过口 */
+    public static final String LEDGER_CATEGORY = "general";
+
+    /** 工作項色相下标上限（与前端 GROUP_COLORS 长度同源，超出即取模而不是报错） */
+    public static final int GROUP_HUE_MAX = 6;
+    /** 台账一次读取的最大天数：季报 92 天，留一倍余量；超限说明调用方在拉全量 */
+    public static final int WORKLOG_RANGE_MAX_DAYS = 400;
+    /** 一次性导入本地台账的上限（工作項数 / 单工作項子任务数） */
+    public static final int IMPORT_GROUP_MAX = 100;
+    public static final int IMPORT_TASK_MAX_PER_GROUP = 200;
 }

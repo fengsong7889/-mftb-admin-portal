@@ -36,4 +36,7 @@ public class AdAlgorithmQuery {
     @Size(max = 100) private String updatedBy;
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) private LocalDateTime updatedFrom;
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) private LocalDateTime updatedTo;
+    /** 调用用途: library=算法库 / scenario=场景引用选择器 / slot=基础坑位 / sales=销售菜单。
+     *  未声明的旧消费者默认不获得交互式相似推荐(type17)，避免未适配界面误展示。 */
+    @Size(max = 20) private String usage;
 }

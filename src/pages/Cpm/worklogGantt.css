@@ -1,0 +1,1169 @@
+/**
+ * Copyright (c) 2026 fengsong7889. All Rights Reserved.
+ *
+ * 本文件为「MFTB 企业一体化管理平台软件」的组成部分。
+ * 未经著作权人书面许可，不得使用、复制、修改、再分发或用于任何商业目的。
+ * 完整许可条款见仓库根目录 LICENSE 文件。
+ */
+
+/* ==================== 操作區：功能全左、新增右 ==================== */
+
+.wg-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.wg-actions__left {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.wg-actions__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+/* 搜索區內的時間欄：快捷檔 + 翻期 + 讀數芯片同行可折行 */
+.wg-time-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 工作週期字段獨佔一整行：內部單行，查詢/重置緊隨其後——
+   條件短則貼近、條件長（自定義區間）則自然後移；其餘字段保持全局四列 grid */
+.search-section.wg-search .wg-item-cycle {
+  grid-column: 1 / -1;
+  padding-top: 0;
+}
+.wg-cycle-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.wg-search-btns {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.search-section.wg-search .wg-time-field {
+  flex-wrap: nowrap;
+}
+.search-section.wg-search .ant-segmented-item-label {
+  padding: 0 8px;
+  min-height: 28px;
+  line-height: 28px;
+}
+.search-section.wg-search .wg-rangechip {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+@media (max-width: 767.98px) {
+  .search-section.wg-search .wg-item-cycle {
+    grid-column: auto;
+  }
+  .search-section.wg-search .wg-time-field {
+    flex-wrap: wrap;
+  }
+}
+.wg-periodnav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.wg-rangechip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  white-space: nowrap;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--info-soft);
+  border: 1px solid var(--info-border);
+  color: var(--text-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.wg-rangechip .anticon {
+  color: var(--info);
+  font-size: 12px;
+}
+
+/* ==================== 時間維度查詢條 ==================== */
+
+.wg-timebar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.wg-timebar__label {
+  font-size: 12px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==================== 列表模式（同一數據源的另一呈現） ==================== */
+
+.wg-h--sortable {
+  cursor: pointer;
+  gap: 4px;
+}
+.wg-h--sortable:hover {
+  background: color-mix(in srgb, var(--surface-2) 16%, var(--info-deep));
+}
+.wg-h--sortable .anticon {
+  font-size: 10px;
+}
+.wg-sheet--list .wg-left {
+  width: 100%;
+  position: static;
+  box-shadow: none;
+}
+.wg-sheet--list .wg-right {
+  display: none;
+}
+.wg-sheet--list .wg-c--note {
+  flex: 1;
+  width: auto;
+}
+.wg-sheet--list .wg-h--note {
+  flex: 1;
+  width: auto !important;
+}
+
+/* ==================== 頁頭 ==================== */
+
+.cpm-my__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.cpm-my__head-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cpm-my__head-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--brand-soft), color-mix(in srgb, var(--brand) 22%, var(--surface-2)));
+  border: 1px solid var(--brand-border);
+  color: var(--brand);
+  font-size: 16px;
+}
+.cpm-my__head-title h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-1);
+  line-height: 1.2;
+}
+.cpm-my__head-title p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* ==================== 統計卡片（§B.7 三段式動效卡，搜索區下方） ==================== */
+
+.wg-stats {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
+  margin: 0 0 16px;
+}
+.wg-stat {
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--stat-bg, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--stat-color, var(--text-1)) 13%, transparent);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  cursor: default;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.wg-stat:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-3);
+}
+.wg-stat__icon {
+  font-size: 20px;
+  color: var(--stat-color, var(--text-1));
+  margin-bottom: 6px;
+}
+.wg-stat__num {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--stat-color, var(--text-1));
+  font-variant-numeric: tabular-nums;
+}
+.wg-stat__label {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+@media (max-width: 1100px) {
+  .wg-stats {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+}
+
+/* ==================== 提示條 ==================== */
+
+.wg-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--text-2);
+  background: var(--info-soft);
+  border: 1px solid var(--info-border);
+  border-radius: 8px;
+}
+.wg-hint .anticon {
+  color: var(--info);
+}
+.wg-hint b {
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+/* ==================== 表格主體：冻结窗格 ==================== */
+
+.wg-sheet {
+  --wg-req: 148px;
+  --wg-task: 210px;
+  --wg-date: 116px;
+  --wg-hours: 78px;
+  --wg-prog: 128px;
+  --wg-status: 84px;
+  --wg-note: 208px;
+  --wg-row-h: 44px;
+  --wg-add-h: 36px;
+  --wg-head-h: 60px;
+  border: 1px solid var(--border-1);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-2);
+  box-shadow: var(--shadow-card-soft), var(--card-outline);
+}
+.wg-scroll {
+  overflow: auto;
+  max-height: calc(100vh - 330px);
+  min-height: 320px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--brand) 50%, var(--surface-3)) var(--surface-3);
+}
+.wg-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.wg-scroll::-webkit-scrollbar-track {
+  background: var(--surface-3);
+}
+.wg-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--brand) 45%, var(--surface-3));
+  border-radius: 6px;
+  border: 2px solid var(--surface-3);
+}
+.wg-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--brand-hover);
+}
+.wg-scroll::-webkit-scrollbar-corner {
+  background: var(--surface-3);
+}
+.wg-body {
+  display: flex;
+  width: max-content;
+  min-width: 100%;
+}
+.wg-left {
+  flex: none;
+  position: sticky;
+  left: 0;
+  z-index: 30;
+  width: calc(var(--wg-req) + var(--wg-task) + var(--wg-date) * 2 + var(--wg-hours) + var(--wg-prog) + var(--wg-status) + var(--wg-note));
+  background: var(--surface-2);
+  box-shadow: 2px 0 0 var(--border-1);
+}
+.wg-right {
+  flex: none;
+}
+
+/* ---- 表頭 ---- */
+
+.wg-lhead {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  height: var(--wg-head-h);
+  background: var(--info-deep);
+}
+.wg-lhead__cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--surface-2);
+  border-right: 1px solid color-mix(in srgb, var(--surface-2) 22%, transparent);
+  letter-spacing: 0.5px;
+}
+.wg-rhead {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: var(--wg-head-h);
+}
+.wg-weeks {
+  display: flex;
+  height: 28px;
+}
+.wg-week {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--surface-2);
+  background: color-mix(in srgb, var(--info-deep) 84%, var(--surface-2));
+  border-right: 1px solid color-mix(in srgb, var(--surface-2) 22%, transparent);
+}
+.wg-week small {
+  font-weight: 400;
+  font-size: 10px;
+  opacity: 0.85;
+}
+.wg-days {
+  display: flex;
+  height: 32px;
+  background: var(--info-deep);
+}
+.wg-day {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.1;
+  color: var(--surface-2);
+  border-right: 1px solid color-mix(in srgb, var(--surface-2) 16%, transparent);
+}
+.wg-day b {
+  font-size: 12px;
+  font-weight: 600;
+}
+.wg-day small {
+  font-size: 9px;
+  opacity: 0.8;
+}
+.wg-day--rest {
+  background: color-mix(in srgb, var(--info-deep) 42%, var(--surface-3));
+  color: color-mix(in srgb, var(--surface-2) 72%, transparent);
+}
+.wg-day--today {
+  background: var(--brand);
+  color: var(--on-brand);
+}
+.wg-day--today small {
+  opacity: 1;
+  font-weight: 600;
+}
+
+/* ---- 需求分組（合併單元格） ---- */
+
+.wg-group,
+.wg-group-r {
+  border-top: 1px solid var(--border-1);
+}
+.wg-body > .wg-left > .wg-group:first-child,
+.wg-body > .wg-right > .wg-group-r:first-child {
+  border-top: none;
+}
+.wg-group {
+  display: flex;
+  align-items: stretch;
+}
+.wg-req {
+  flex: none;
+  width: var(--wg-req);
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 8px 10px 8px 13px;
+  background: color-mix(in srgb, var(--group-color) 10%, var(--surface-2));
+  border-right: 1px solid var(--border-2);
+}
+.wg-req::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--group-color);
+}
+.wg-req__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+  line-height: 1.4;
+  word-break: break-all;
+}
+.wg-req__ops {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  display: flex;
+  gap: 0;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.wg-req:hover .wg-req__ops {
+  opacity: 1;
+}
+.wg-rows {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---- 行與單元格 ---- */
+
+.wg-row {
+  display: flex;
+  height: var(--wg-row-h);
+}
+.wg-row + .wg-row {
+  border-top: 1px solid var(--border-2);
+}
+.wg-c {
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border-right: 1px solid var(--border-2);
+  transition: background 0.15s;
+}
+.wg-row.is-hover .wg-c {
+  background: color-mix(in srgb, var(--info) 6%, var(--surface-2));
+}
+.wg-c--task { width: var(--wg-task); gap: 4px; }
+.wg-c--start, .wg-c--end { width: var(--wg-date); justify-content: center; }
+.wg-c--hours { width: var(--wg-hours); justify-content: flex-end; font-variant-numeric: tabular-nums; color: var(--text-1); }
+.wg-c--prog { width: var(--wg-prog); gap: 6px; cursor: pointer; }
+.wg-c--status { width: var(--wg-status); justify-content: center; }
+.wg-c--note { width: var(--wg-note); cursor: pointer; }
+.wg-c--note:hover .wg-note-text {
+  color: var(--brand);
+}
+
+.wg-task__grip {
+  color: var(--text-4);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.2s;
+  flex: none;
+}
+.wg-row:hover .wg-task__grip {
+  opacity: 1;
+}
+.wg-task__title {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wg-task__title--done {
+  color: var(--text-3);
+}
+.wg-row__ops {
+  flex: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.wg-row:hover .wg-row__ops {
+  opacity: 1;
+}
+.wg-row--drop {
+  box-shadow: inset 0 2px 0 var(--brand);
+}
+
+.wg-date-btn {
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  transition: all 0.15s;
+}
+.wg-date-btn:hover {
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+.wg-date-btn--empty {
+  color: var(--text-3);
+  border: 1px dashed var(--border-1);
+}
+
+.wg-prog-track {
+  flex: 1;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--prog-color) 12%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--prog-color) 32%, transparent);
+}
+.wg-prog-fill {
+  height: 100%;
+  border-radius: 7px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--prog-color) 55%, var(--surface-2)), var(--prog-color));
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.wg-prog-num {
+  flex: none;
+  width: 36px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.wg-note-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-2);
+  white-space: pre-line;
+  transition: color 0.15s;
+}
+.wg-note-text--empty {
+  color: var(--text-3);
+}
+
+/* ---- 添加子任務行 ---- */
+
+.wg-addrow {
+  height: var(--wg-add-h);
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  background: var(--surface-3);
+  border-top: 1px dashed var(--border-1);
+}
+.wg-addrow-r {
+  height: var(--wg-add-h);
+  background: var(--surface-3);
+  border-top: 1px dashed var(--border-1);
+}
+
+/* ---- 右側時間軸 ---- */
+
+.wg-rrow {
+  display: flex;
+  height: var(--wg-row-h);
+  position: relative;
+}
+.wg-rrow + .wg-rrow {
+  border-top: 1px solid var(--border-2);
+}
+.wg-cell {
+  flex: none;
+  position: relative;
+  height: 100%;
+  border-right: 1px solid var(--border-2);
+  background: var(--surface-2);
+  transition: background 0.15s;
+}
+.wg-rrow.is-hover .wg-cell {
+  background: color-mix(in srgb, var(--info) 6%, var(--surface-2));
+}
+.wg-cell--rest {
+  background:
+    repeating-linear-gradient(45deg,
+      color-mix(in srgb, var(--text-4) 14%, transparent) 0 3px,
+      transparent 3px 7px),
+    var(--surface-3);
+}
+.wg-cell--holiday {
+  background: color-mix(in srgb, var(--warning) 12%, var(--surface-2));
+}
+.wg-cell--leave {
+  background: color-mix(in srgb, var(--purple) 12%, var(--surface-2));
+}
+
+/* ---- 臨時插入標識 ---- */
+
+.wg-insert-tag {
+  flex: none;
+  margin-inline-end: 0;
+  font-size: 10px;
+  line-height: 16px;
+  padding: 0 4px;
+}
+.wg-bar--inserted {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--warning-deep) 70%, transparent);
+}
+.wg-bar__flag {
+  position: absolute;
+  left: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 0 4px;
+  border-radius: 5px;
+  background: var(--warning-deep);
+  color: var(--surface-2);
+  pointer-events: none;
+}
+.wg-lg-inserted {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  border: 1px dashed var(--warning-deep);
+  background: color-mix(in srgb, var(--warning-deep) 12%, var(--surface-2));
+}
+
+/* ---- 日期单元格：borderless DatePicker 即单元格 ---- */
+
+.wg-c--start .ant-picker,
+.wg-c--end .ant-picker {
+  width: 100%;
+  padding: 0 4px;
+}
+.wg-datepick input {
+  font-size: 12px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.wg-datepick--empty {
+  border: 1px dashed var(--border-1);
+  border-radius: 4px;
+}
+.wg-datepick--empty input::placeholder {
+  color: var(--text-3);
+}
+
+/* ---- 備註：懸停直讀 + 富文本彈窗 ---- */
+
+.wg-note-hover {
+  max-width: 380px;
+  max-height: 280px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-1);
+  scrollbar-width: thin;
+}
+.wg-note-preview {
+  max-height: 96px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-2);
+  padding: 6px 8px;
+  background: var(--surface-3);
+  border-radius: 6px;
+}
+.wg-note-empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.wg-note-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+}
+.wg-note-toolbar button {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-1);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.wg-note-toolbar button:hover {
+  background: var(--surface-2);
+  border-color: var(--border-1);
+}
+.wg-note-toolbar__sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border-1);
+  margin: 0 4px;
+}
+.wg-note-swatch {
+  width: 18px !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  border: 1px solid var(--border-1) !important;
+}
+.wg-note-editor {
+  min-height: 220px;
+  max-height: 380px;
+  overflow: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-1);
+  outline: none;
+}
+.wg-note-editor:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 18%, transparent);
+}
+.wg-note-tip {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+/* ---- 左下角口徑芯片 ---- */
+
+.wg-tabbar__left {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.wg-caliber-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--info-border);
+  background: var(--info-soft);
+  color: var(--text-2);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.wg-caliber-chip:hover {
+  color: var(--info);
+  border-color: var(--info);
+}
+.wg-caliber-chip .anticon {
+  color: var(--info);
+  font-size: 11px;
+}
+.wg-caliber-pop {
+  max-width: 360px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.wg-caliber-pop p {
+  margin: 0 0 6px;
+}
+.wg-caliber-pop p:last-child {
+  margin-bottom: 0;
+}
+.wg-cell--today {
+  background: color-mix(in srgb, var(--brand) 7%, var(--surface-2));
+  box-shadow: inset 1px 0 0 var(--brand-border), inset -1px 0 0 var(--brand-border);
+}
+
+/* ---- 連續圆角色條（参考产研甘特：色條 + 右端 % 標籤） ---- */
+
+.wg-bar {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 22px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--bar-color) 18%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--bar-color) 45%, transparent);
+  cursor: grab;
+  touch-action: none;
+  overflow: hidden;
+  transition: filter 0.15s, box-shadow 0.15s;
+  z-index: 4;
+}
+.wg-bar:hover {
+  filter: brightness(1.05);
+  box-shadow: var(--shadow-1);
+}
+.wg-bar:active {
+  cursor: grabbing;
+}
+.wg-bar--dragging {
+  filter: brightness(1.08);
+  box-shadow: var(--shadow-2);
+  z-index: 6;
+}
+.wg-bar__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 11px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--bar-color) 62%, var(--surface-2)), var(--bar-color));
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.wg-bar__chip {
+  position: absolute;
+  right: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--text-1) 78%, transparent);
+  color: var(--surface-2);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.wg-bar__chip-out {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  z-index: 4;
+}
+.wg-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -2px;
+  width: 10px;
+  cursor: ew-resize;
+  z-index: 2;
+}
+.wg-resize::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 12px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--surface-2) 90%, transparent);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.wg-bar:hover .wg-resize::after {
+  opacity: 1;
+}
+.wg-drag-tip {
+  position: absolute;
+  top: -28px;
+  z-index: 60;
+  padding: 3px 9px;
+  border-radius: 6px;
+  background: var(--text-1);
+  color: var(--surface-2);
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: var(--shadow-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 快捷檔位 chips（圖4 樣式） ---- */
+
+.wg-chips {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.wg-chip {
+  padding: 2px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-1);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.wg-chip:hover {
+  color: var(--brand);
+  border-color: var(--brand-border);
+}
+.wg-chip--active {
+  color: var(--brand);
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  font-weight: 600;
+}
+
+/* ---- 色條詳情卡（参考产研甘特 hover 卡） ---- */
+
+.wg-bar-pop {
+  width: 320px;
+}
+.wg-bar-pop__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.wg-bar-pop__head b {
+  font-size: 13px;
+  color: var(--text-1);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wg-bar-pop__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.wg-bar-pop__row > span:first-child {
+  flex: none;
+  width: 32px;
+  color: var(--text-3);
+}
+.wg-bar-pop__row b {
+  color: var(--text-1);
+  font-variant-numeric: tabular-nums;
+}
+.wg-bar-pop__row small {
+  color: var(--text-3);
+  font-size: 11px;
+}
+.wg-bar-pop__row i {
+  color: var(--text-3);
+  font-style: normal;
+}
+.wg-bar-pop footer {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-1);
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+/* ---- 左欄收合：只留需求標題 + 任務子項，甘特更寬 ---- */
+
+.wg-sheet--collapsed {
+  --wg-req: 120px;
+  --wg-task: 220px;
+}
+.wg-sheet--collapsed .wg-left {
+  width: calc(var(--wg-req) + var(--wg-task));
+}
+.wg-sheet--collapsed .wg-h--start,
+.wg-sheet--collapsed .wg-h--end,
+.wg-sheet--collapsed .wg-h--hours,
+.wg-sheet--collapsed .wg-h--prog,
+.wg-sheet--collapsed .wg-h--status,
+.wg-sheet--collapsed .wg-h--note,
+.wg-sheet--collapsed .wg-c--start,
+.wg-sheet--collapsed .wg-c--end,
+.wg-sheet--collapsed .wg-c--hours,
+.wg-sheet--collapsed .wg-c--prog,
+.wg-sheet--collapsed .wg-c--status,
+.wg-sheet--collapsed .wg-c--note {
+  display: none;
+}
+
+/* ---- 離屏截圖宿主：展開滾動區截整張台账，不影響真實 DOM ---- */
+
+.wg-capture-host {
+  position: fixed;
+  left: -100000px;
+  top: 0;
+}
+.wg-capture-host .wg-scroll {
+  overflow: visible;
+  max-height: none;
+  min-height: 0;
+}
+.wg-capture-host .wg-left {
+  position: static;
+  box-shadow: none;
+}
+.wg-capture-host .wg-sheet {
+  box-shadow: none;
+}
+
+/* ---- 底部 sheet 標籤欄 ---- */
+
+.wg-tabbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 12px;
+  background: var(--surface-3);
+  border-top: 1px solid var(--border-2);
+  font-size: 11px;
+  color: var(--text-3);
+}
+.wg-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.wg-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.wg-legend__item i {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+/* ---- 空狀態 ---- */
+
+.wg-empty {
+  padding: 56px 24px;
+  text-align: center;
+  background: var(--surface-2);
+}
+.wg-empty h3 {
+  margin: 16px 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.wg-empty p {
+  margin: 0 0 18px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* ---- 行內編輯 ---- */
+
+.wg-inline {
+  cursor: text;
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin: -1px -4px;
+  transition: background 0.15s;
+}
+.wg-inline:hover {
+  background: color-mix(in srgb, var(--info) 10%, transparent);
+}
+
+/* ---- 節假日彈層 ---- */
+
+.wg-holiday-pop {
+  width: 320px;
+}
+.wg-holiday-pop h4 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.wg-holiday-pop .wg-holiday-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+  max-height: 132px;
+  overflow: auto;
+}
+.wg-holiday-pop .wg-holiday-add {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.wg-holiday-pop footer {
+  font-size: 11px;
+  color: var(--text-3);
+  border-top: 1px dashed var(--border-1);
+  padding-top: 8px;
+}
+
+@media (max-width: 1100px) {
+  .wg-sheet {
+    --wg-req: 110px;
+    --wg-task: 150px;
+    --wg-date: 92px;
+    --wg-hours: 60px;
+    --wg-prog: 96px;
+    --wg-status: 70px;
+    --wg-note: 140px;
+  }
+  /* 窄視口左欄不再冻结：整體橫滾，保證甘特可達 */
+  .wg-left {
+    position: static;
+    box-shadow: none;
+    border-right: 1px solid var(--border-1);
+  }
+}
+
+@media (max-width: 900px) {
+  .wg-scroll {
+    max-height: calc(100vh - 260px);
+  }
+  .cpm-my__head-title p {
+    display: none;
+  }
+}

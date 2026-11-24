@@ -1,0 +1,182 @@
+/**
+ * Copyright (c) 2026 fengsong7889. All Rights Reserved.
+ * 本文件为「MFTB 企业一体化管理平台软件」的组成部分，属专有代码。
+ * 完整许可条款见仓库根目录 LICENSE 文件。
+ */
+
+/* 全局标签衰变页：加分规则双栏卡片 + 编号步骤 + 数字徽标。
+   仅布局与令牌取色，不引入裸色；深浅主题由 theme.css 令牌自动翻面。 */
+
+.tag-scoring-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.tag-scoring-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+  background: var(--surface-2);
+  padding: 14px 16px;
+  min-width: 0;
+}
+
+.tag-scoring-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+.tag-scoring-card__side {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--brand-border);
+  border-radius: 4px;
+  background: var(--warning-soft);
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.tag-scoring-card__sub {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.7;
+}
+
+.tag-scoring-step {
+  display: flex;
+  gap: 10px;
+  padding: 9px 0;
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.7;
+}
+
+.tag-scoring-step + .tag-scoring-step {
+  border-top: 1px dashed var(--border-3);
+}
+
+.tag-scoring-step__index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tag-scoring-step__body { min-width: 0; }
+
+.tag-scoring-step__title {
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+/* 凸显数字：等宽数字 + 品牌色加粗，供 +1／僅已完成／線性 等关键口径使用。 */
+.tag-scoring-num {
+  color: var(--brand);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tag-scoring-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.tag-scoring-metric {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--brand-border);
+  border-radius: 6px;
+  background: var(--warning-soft);
+}
+
+.tag-scoring-metric__number {
+  color: var(--brand);
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.tag-scoring-metric__label {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.tag-scoring-footnote {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-3);
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.8;
+}
+
+@media (max-width: 900px) {
+  .tag-scoring-grid { grid-template-columns: 1fr; }
+}
+
+/* 衰变参数三列对齐栅格：标签固定宽右对齐、控件铺满，消除长短标签造成的纵向错位。 */
+.tag-decay-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px 24px;
+}
+
+.tag-decay-fields .ant-form-item.ant-form-item { margin-bottom: 14px; }
+/* 行内配置：标签与控件垂直居中（与投流行内字段同口径），避免标签置顶造成的视觉错位。 */
+.tag-decay-fields .ant-form-item .ant-form-item-row { align-items: center; }
+/* 配置参数单位一律置于输入框后方（AGENTS.md 强制约定）。 */
+.tag-decay-unit { color: var(--text-3); font-size: 12px; white-space: nowrap; }
+
+.tag-decay-fields .ant-form-item-label {
+  flex: 0 0 132px;
+  max-width: 132px;
+  min-width: 132px;
+  text-align: right;
+  padding: 0;
+}
+
+.tag-decay-fields .ant-form-item-label > label {
+  height: auto;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.tag-decay-fields .ant-form-item-control {
+  flex: 1 1 auto;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.tag-decay-fields .ant-input-number,
+.tag-decay-fields .ant-input-number-affix-wrapper { width: 100%; }
+
+@media (max-width: 900px) {
+  .tag-decay-fields { grid-template-columns: 1fr; }
+  .tag-decay-fields .ant-form-item-label { flex-basis: auto; max-width: none; min-width: 0; text-align: left; }
+}

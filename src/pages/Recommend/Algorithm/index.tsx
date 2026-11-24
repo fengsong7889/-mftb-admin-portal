@@ -11,8 +11,12 @@ import { useColumnConfig } from '@/hooks/useColumnConfig'
 import { useCardOrder, type CardDragProps } from '@/hooks/useCardOrder'
 import { useAuth } from '@/contexts/AuthContext'
 import BrandTag from '@/components/BrandTag'
-import { HERO_CARD_STYLES, renderHeroMark } from '../../_shared/ad-promotion/heroCardStyles'
+import { HERO_CARD_STYLES, renderHeroMark, AD_TYPE_ICON } from '../../_shared/ad-promotion/heroCardStyles'
 import AdPromotionDescription from '../../_shared/ad-promotion/AdPromotionDescription'
+import SimilarAlgorithmLibrary from '../SimilarRecommendationConfig/Library'
+import { SimilarEngineIcon } from '../SimilarRecommendationConfig/PrototypeParts'
+import { SIMILAR_ALGO_DESC, SIMILAR_ALGO_NAME, SIMILAR_HERO_GRADIENT, SIMILAR_PREVIEW_TYPE } from '../SimilarRecommendationConfig/prototype'
+import TagDecaySettings, { TagDecayEntry } from '../TagDecaySettings'
 
 /** 各业务类型对应的算法类型列表 */
 const TAB_ALGORITHM_MAP: Record<string, AlgorithmType[]> = {
@@ -132,6 +136,16 @@ const filterProductRecords = (list: AlgorithmRecord[], filters: AlgorithmSearchV
 }
 
 export default function Algorithm() {
+  const [params] = useSearchParams()
+  if (params.get('settings') === 'tag-decay') return <TagDecaySettings />
+  // 原型单独挂载，不能进入旧算法列表的真实启停、删除和取数流程。
+  if (Number(params.get('type')) === SIMILAR_PREVIEW_TYPE && (!params.has('target') || params.get('target') === 'store')) {
+    return <SimilarAlgorithmLibrary key={params.get('tab') ?? 'delivery'} />
+  }
+  return <LegacyAlgorithm />
+}
+
+function LegacyAlgorithm() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const { hasMenuPermission } = useAuth()
@@ -185,16 +199,9 @@ export default function Algorithm() {
   }
   /** 广告类型卡片配置（依赖 t，定义在组件内以便响应语言切换） */
   const ALGORITHM_TYPE_CARDS: { type: AlgorithmType; icon: string }[] = [
-    { type: AlgorithmType.INVINCIBLE_STAR, icon: '⭐' },
-    { type: AlgorithmType.HOT_REVIVE_AD, icon: '🔥' },
-    { type: AlgorithmType.NEW_STORE_AD, icon: '🏪' },
-    { type: AlgorithmType.BRAND_MERCHANT, icon: '💎' },
-    { type: AlgorithmType.EXCLUSIVE_MERCHANT, icon: '👑' },
-    { type: AlgorithmType.GOLDEN_SIGNBOARD, icon: '🏅' },
-    { type: AlgorithmType.TRAFFIC_AD, icon: '📊' },
-    { type: AlgorithmType.GUESS_YOU_LIKE, icon: '💡' },
-    { type: AlgorithmType.ORGANIC_TRAFFIC, icon: '🌿' },
-  ]
+    AlgorithmType.INVINCIBLE_STAR, AlgorithmType.HOT_REVIVE_AD, AlgorithmType.NEW_STORE_AD, AlgorithmType.BRAND_MERCHANT,
+    AlgorithmType.EXCLUSIVE_MERCHANT, AlgorithmType.GOLDEN_SIGNBOARD, AlgorithmType.TRAFFIC_AD, AlgorithmType.GUESS_YOU_LIKE, AlgorithmType.ORGANIC_TRAFFIC,
+  ].map(type => ({ type, icon: AD_TYPE_ICON[type] ?? '' }))
 
   const filteredData = useMemo(() => filterRecords(dataList, selectedType, businessType, searchFilters),
     [dataList, selectedType, businessType, searchFilters])
@@ -274,10 +281,10 @@ export default function Algorithm() {
       // 按策略分组显示
       const groupedRefs = refs.reduce((acc, ref) => {
         const key = `${ref.strategyCode}|${ref.strategyName}`
-        if (!acc[key]) acc[key] = { strategyCode: ref.strategyCode, strategyName: ref.strategyName, positions: [] }
+        if (!acc[key]) acc[key] = { strategyCode: ref.strategyCode, strategyName: ref.strategyName, positions: [] as Array<number | null> }
         acc[key].positions.push(ref.slotPosition)
         return acc
-      }, {} as Record<string, { strategyCode: string; strategyName: string; positions: number[] }>)
+      }, {} as Record<string, { strategyCode: string; strategyName: string; positions: Array<number | null> }>)
       const groupedList = Object.values(groupedRefs)
 
       Modal.confirm({
@@ -296,7 +303,7 @@ export default function Algorithm() {
                   {groupedList.map((g, i) => (
                     <div key={i} style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>
                       <code style={{ background: 'var(--surface-1)', padding: '1px 4px', borderRadius: 3 }}>{g.strategyCode}</code>
-                      {' '}{g.strategyName}（{t('algorithm.affectedSlots', { positions: g.positions.join(', ') })}）
+                      {' '}{g.strategyName}（{t('algorithm.affectedSlots', { positions: g.positions.filter(p => p != null).join(', ') || '場景綁定' })}）
                     </div>
                   ))}
                 </div>
@@ -339,10 +346,10 @@ export default function Algorithm() {
     // 按策略分组显示
     const groupedRefs = references.reduce((acc, ref) => {
       const key = `${ref.strategyCode}|${ref.strategyName}`
-      if (!acc[key]) acc[key] = { strategyCode: ref.strategyCode, strategyName: ref.strategyName, positions: [] }
+      if (!acc[key]) acc[key] = { strategyCode: ref.strategyCode, strategyName: ref.strategyName, positions: [] as Array<number | null> }
       acc[key].positions.push(ref.slotPosition)
       return acc
-    }, {} as Record<string, { strategyCode: string; strategyName: string; positions: number[] }>)
+    }, {} as Record<string, { strategyCode: string; strategyName: string; positions: Array<number | null> }>)
     const groupedList = Object.values(groupedRefs)
     const hasRefs = references.length > 0
 
@@ -362,7 +369,7 @@ export default function Algorithm() {
                 {groupedList.map((g, i) => (
                   <div key={i} style={{ fontSize: 12, color: 'var(--text-2)', marginBottom: 4 }}>
                     <code style={{ background: 'var(--surface-1)', padding: '1px 4px', borderRadius: 3 }}>{g.strategyCode}</code>
-                    {' '}{g.strategyName}（{t('algorithm.affectedSlots', { positions: g.positions.join(', ') })}）
+                    {' '}{g.strategyName}（{t('algorithm.affectedSlots', { positions: g.positions.filter(p => p != null).join(', ') || '場景綁定' })}）
                   </div>
                 ))}
               </div>
@@ -536,6 +543,7 @@ export default function Algorithm() {
               {t('algorithm.algorithmLibraryDesc')}
             </p>
           </div>
+          <Space><TagDecayEntry />
           <Button type="primary" icon={<ApartmentOutlined />}
             onClick={() => navigate('/promotion-algorithm-flow')}
             style={{
@@ -543,7 +551,7 @@ export default function Algorithm() {
               borderRadius: 8, height: 36, padding: '0 18px',
               boxShadow: '0 2px 6px rgba(232,114,12,0.25)',
             }}
-          >{t('algorithm.businessFlow')}</Button>
+          >{t('algorithm.businessFlow')}</Button></Space>
         </div>
       </div>
 
@@ -568,6 +576,18 @@ export default function Algorithm() {
                         const enabled = card.type === AlgorithmType.INVINCIBLE_STAR || card.type === AlgorithmType.HOT_REVIVE_AD || card.type === AlgorithmType.NEW_STORE_AD || card.type === AlgorithmType.EXCLUSIVE_MERCHANT || card.type === AlgorithmType.BRAND_MERCHANT || card.type === AlgorithmType.ORGANIC_TRAFFIC || card.type === AlgorithmType.GUESS_YOU_LIKE || card.type === AlgorithmType.GOLDEN_SIGNBOARD || card.type === AlgorithmType.TRAFFIC_AD || card.type === AlgorithmType.POPULAR_MERCHANT_KA
                         return renderAlgoCard(card, enabled, 'delivery', deliveryCardOrder.getDragProps(card.type))
                       })}
+                    {/* 入口卡与其他广告类型同构：同一套 hero wrapper/inner/玻璃圆图标/标题/描述/Tag 与 hover 动效，仅颜色与文案不同。 */}
+                    <div key={SIMILAR_PREVIEW_TYPE} className="algo-card-wrapper algo-card-hero algo-card-hero--similar"
+                      onClick={() => setSearchParams({ type: String(SIMILAR_PREVIEW_TYPE), tab: 'delivery' })}>
+                      <div className="algo-card-inner" style={{ background: SIMILAR_HERO_GRADIENT }}>
+                        <div className="algo-card-icon">
+                          <SimilarEngineIcon size={30} />
+                        </div>
+                        <h3 className="algo-card-title">{SIMILAR_ALGO_NAME}</h3>
+                        <p className="algo-card-desc">{SIMILAR_ALGO_DESC}</p>
+                        <div className="algo-card-tag"><Tag color="blue">{t('algorithm.viewAdjustAlgorithm')}</Tag></div>
+                      </div>
+                    </div>
                   </div>
                 ),
               },
@@ -584,6 +604,17 @@ export default function Algorithm() {
                       ALGORITHM_TYPE_CARDS.filter(card => TAB_ALGORITHM_MAP.groupBuy.includes(card.type)),
                       card => card.type,
                     ).map(card => renderAlgoCard(card, true, 'groupBuy', groupBuyCardOrder.getDragProps(card.type)))}
+                    <div key={SIMILAR_PREVIEW_TYPE} className="algo-card-wrapper algo-card-hero algo-card-hero--similar"
+                      onClick={() => setSearchParams({ type: String(SIMILAR_PREVIEW_TYPE), tab: 'groupBuy' })}>
+                      <div className="algo-card-inner" style={{ background: SIMILAR_HERO_GRADIENT }}>
+                        <div className="algo-card-icon">
+                          <SimilarEngineIcon size={30} />
+                        </div>
+                        <h3 className="algo-card-title">{SIMILAR_ALGO_NAME}</h3>
+                        <p className="algo-card-desc">{SIMILAR_ALGO_DESC}</p>
+                        <div className="algo-card-tag"><Tag color="blue">{t('algorithm.viewAdjustAlgorithm')}</Tag></div>
+                      </div>
+                    </div>
                   </div>
                 ),
               },
@@ -672,7 +703,7 @@ export default function Algorithm() {
       {/* 功能区域 */}
       <div className="action-section">
         <Space>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleGoToAdd}>{isProductPreview ? t('algorithm.addProductAlgorithm') : t('algorithm.addAlgorithm')}</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleGoToAdd}>{t('algorithm.addAlgorithm')}</Button>
         </Space>
         {configComponent}
       </div>

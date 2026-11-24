@@ -5,252 +5,153 @@
  * 未经著作权人书面许可，不得使用、复制、修改、再分发或用于任何商业目的。
  * 完整许可条款见仓库根目录 LICENSE 文件。
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useAuth } from '@/contexts/AuthContext'
-import { Alert, Button, Empty, Input, Modal, Segmented, Space, Spin, Tabs, Tag, Timeline, Tooltip, message } from 'antd'
+import { Alert, Button, DatePicker, Dropdown, Empty, Input, Segmented, Tabs, Tag, Tooltip, message, type MenuProps } from 'antd'
 import {
-  CopyOutlined, FileTextOutlined, HistoryOutlined, LeftOutlined,
-  ReloadOutlined, RobotOutlined, RightOutlined, SendOutlined, TrophyFilled,
+  CheckCircleOutlined, CopyOutlined, DownloadOutlined, EditOutlined, FileImageOutlined,
+  FilePdfOutlined, LeftOutlined, RightOutlined, RiseOutlined, FallOutlined,
+  WarningOutlined, TrophyFilled, FieldTimeOutlined, ThunderboltOutlined,
 } from '@ant-design/icons'
-import {
-  fetchCpmCurrent, fetchCpmReportAiSummary, fetchCpmRevision, fetchCpmRevisions, listMyCpmReports,
-  publishCpmReport, republishCpmReport, saveCpmDraft, fetchMyRecognitions, fetchCpmRule,
-  type CpmReportVO, type CpmRecognitionVO, type CpmRevisionVO,
-} from '@/api/cpm'
-import {
-  CPM_PERIOD_LABELS, PUBLISHABLE_PERIODS, RECOGNITION_KIND_LABELS, CpmPeriod, type CpmPeriodValue,
-} from './meta'
-import { cpmPeriodRange, snapshotToMarkdown } from './cpmPeriod'
-import { formatHours } from './cpmTime'
-import SnapshotView from './SnapshotView'
-import DailyReport from './DailyReport'
-import CpmReportDocument from './CpmReportDocument'
-import CpmExportButton from './CpmExportButton'
-import { buildDocModel } from './cpmDocument'
-import './cpm.css'
+import dayjs, { type Dayjs } from 'dayjs'
+import isoWeek from 'dayjs/plugin/isoWeek'
+import quarterOfYear from 'dayjs/plugin/quarterOfYear'
+import AnimatedNumber from '@/components/AnimatedNumber'
+import { exportDocument, type DocumentExportKind } from '@/utils/documentExport'
+import { CPM_PERIOD_LABELS, CpmPeriod, type CpmPeriodValue } from './meta'
+import { GROUP_COLORS, HOURS_PER_DAY, fmt, progressColor } from './worklogGanttModel'
+import { autoOverview, reportToMarkdown, type ReportGroupRow, type WorkReport } from './worklogReport'
+import { fetchWorkReport, toWorkReport } from './worklogApi'
+import { noteToDisplayHtml } from './noteRich'
+import { RecognitionArchive, HistoryList } from './CpmReportArchive'
+import ReportDeliveryPanel from './ReportDeliveryPanel'
+import './worklogGantt.css'
+import './cpmReportV2.css'
+
+dayjs.extend(isoWeek)
+dayjs.extend(quarterOfYear)
 
 /**
- * P3 我的匯報（cpm-report，使用侧）。
+ * 我的匯報（cpm-report）：从工作记录台账确定性聚合的阅读面。
  *
- * 口径铁律（方案 §五-C）：
- * - 初稿/数字全部来自服务端确定性聚合，前端不重算（通知里的数字=页面数字）；
- * - AI 摘要=可选润色，产物标「AI 生成」；空周期不给按钮；
- * - 发布即提交：后端条件 UPDATE 幂等，重复点击不会二次触发推送。
+ * 版式收敛（2026-11 用户反馈「模块太多读着累」）：只留四节——
+ * 01 核心概覽、02 本期內容（工时投入 + 进度对比 + 进度 + 状态，一次看同一批事实）、
+ * 03 下期計劃、04 風險與備註。原来的「核心產出／臨時插入／工時分布」三节并入
+ * 02 的行内标记与概览句：产出=状态列的已完成，插入=行内「插」标，工时=每行小时数，
+ * 信息一条不丢，只是不再各占一个标题。
+ *
+ * 数字全部来自台账事实（前端不重算第二套口径），AI 不参与计数。
  */
 
-const newSummaryKey = () => `cpm-abs-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+/** 与 cpmPeriod.cpmPeriodRange 同口径（周一起算 isoWeek），支持自定义锚点日期；只算区间，不取词 */
+function rangeFor(type: CpmPeriodValue, offset: number, anchor: Dayjs | null): { start: Dayjs; end: Dayjs } {
+  const now = anchor ?? dayjs()
+  if (type === 'day') {
+    const b = now.add(offset, 'day')
+    return { start: b, end: b }
+  }
+  if (type === 'week') {
+    const b = now.startOf('isoWeek').add(offset * 7, 'day')
+    return { start: b, end: b.add(6, 'day') }
+  }
+  if (type === 'month') {
+    const b = now.startOf('month').add(offset, 'month')
+    return { start: b, end: b.endOf('month') }
+  }
+  const b = now.startOf('quarter').add(offset, 'quarter')
+  return { start: b, end: b.endOf('quarter') }
+}
+
+/**
+ * 区间读数走 i18n：月份/星期的 dayjs format 串本身就是地区差异
+ * （中文「YYYY 年 MM 月」vs 英文「MMMM YYYY」）。
+ * 取词函数由调用方传入而不是自己拿 i18n 单例：这样 useMemo 对 t 的依赖是真实的，
+ * 切语言重算不会被人当「多余依赖」删掉。
+ */
+function periodLabel(type: CpmPeriodValue, start: Dayjs, end: Dayjs, tr: (key: string, options: Record<string, unknown>) => string): string {
+  if (type === 'day') return start.format(tr('cpm.workReport.label.dayFormat', { defaultValue: 'YYYY 年 MM 月 DD 日' }))
+  if (type === 'week') {
+    return tr('cpm.workReport.label.week', { week: start.isoWeek(), start: start.format('MM-DD'), end: end.format('MM-DD'), defaultValue: '第 {{week}} 週（{{start}} ~ {{end}}）' })
+  }
+  if (type === 'month') return start.format(tr('cpm.workReport.label.monthFormat', { defaultValue: 'YYYY 年 MM 月' }))
+  return tr('cpm.workReport.label.quarter', { year: start.year(), q: start.quarter(), defaultValue: '{{year}} 年 Q{{q}}' })
+}
 
 export default function MyReport() {
-  const navigate = useNavigate()
-  const { t } = useTranslation()
-  const { user } = useAuth()
+  const { t, i18n } = useTranslation()
   const [periodType, setPeriodType] = useState<CpmPeriodValue>(CpmPeriod.WEEK)
   const [offset, setOffset] = useState(0)
-  /** range 必须按 (periodType, offset) 记忆化：dayjs 对象每次新建会让 reload 引用抖动，
-   *  发布成功后立刻被重跑的 current 顶回草稿视图（发布=被撤销，是这个模块最恶劣的竞态） */
-  const range = useMemo(() => cpmPeriodRange(periodType, offset), [periodType, offset])
-  const periodStartStr = range.start.format('YYYY-MM-DD')
-  const periodEndStr = range.end.format('YYYY-MM-DD')
-  /** 日报档不向 current 接口取数：它没有 report 实体，只是条目的当日投影 */
-  const isDaily = periodType === CpmPeriod.DAY
-
-  const [report, setReport] = useState<CpmReportVO | null>(null)
+  const [anchor, setAnchor] = useState<Dayjs | null>(null)
+  const [summary, setSummary] = useState('')
+  const [editingSummary, setEditingSummary] = useState(false)
+  const [exportBusy, setExportBusy] = useState<DocumentExportKind | null>(null)
+  const [report, setReport] = useState<WorkReport | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [summary, setSummary] = useState<string | null>(null)
-  const [aiSummary, setAiSummary] = useState(false)
-  const [summarizing, setSummarizing] = useState(false)
-  const [publishing, setPublishing] = useState(false)
-  const [dryRun, setDryRun] = useState(true)
-  const [revisions, setRevisions] = useState<CpmRevisionVO[]>([])
-  const [activeRevision, setActiveRevision] = useState<number | undefined>()
-  /**
-   * 正在阅读的历史版本内容（服务端冻结快照）。
-   *
-   * 单独存一份而不是「本地重算」：历史版本一旦可重算，补录一条记录就能改写过去。
-   * undefined=未加载/看当前版，null=加载失败（界面必须如实说，不能悄悄退回当前版）。
-   */
-  const [revisionView, setRevisionView] = useState<CpmReportVO | null | undefined>(undefined)
-  const [republishOpen, setRepublishOpen] = useState(false)
-  const [changeNote, setChangeNote] = useState('')
-  const docRef = useRef<HTMLElement | null>(null)
+  const docRef = useRef<HTMLDivElement>(null)
 
-  const reload = useCallback(async () => {
+  const range = useMemo(() => {
+    const r = rangeFor(periodType, offset, anchor)
+    return { ...r, label: periodLabel(periodType, r.start, r.end, t) }
+  }, [periodType, offset, anchor, t])
+
+  // 汇报数字全部来自服务端聚合：前端不再从台账自己算一遍（通知/Word/页面必须同一个数）
+  const load = useCallback(async () => {
     setLoading(true)
     try {
-      // 日报是投影：没有 report 实体，取数与渲染全部交给 DailyReport（同一个 SnapshotBuilder 口径）
-      if (isDaily) {
-        setReport(null)
-        setRevisions([])
-        setActiveRevision(undefined)
-        setLoadError(null)
-        return
-      }
-      const vo = await fetchCpmCurrent(periodType, periodStartStr)
-      setReport(vo)
-      setSummary(vo.summary ?? null)
-      setAiSummary(vo.aiSummary)
-      // 版本列表跟着快照走：修订重发布后必须立刻看到新的 V(n)，不能等用户刷新页面
-      if (vo.id && vo.status === 'published') {
-        const list = await fetchCpmRevisions(vo.id)
-        setRevisions(list)
-        setActiveRevision(list.find(r => r.current)?.revisionNo ?? list[0]?.revisionNo)
-      } else {
-        setRevisions([])
-        setActiveRevision(undefined)
-      }
-      setRevisionView(undefined)
+      setReport(toWorkReport(await fetchWorkReport(periodType, fmt(range.start))))
       setLoadError(null)
-    } catch (err) {
-      setReport(null)
-      setLoadError(err instanceof Error ? err.message : '載入失敗')
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : t('cpm.workReport.loadFailed', { defaultValue: '匯報載入失敗' }))
     } finally {
       setLoading(false)
     }
-  }, [isDaily, periodType, periodStartStr])
+  }, [periodType, range.start, t])
 
-  useEffect(() => { void reload() }, [reload])
-  useEffect(() => {
-    fetchCpmRule().then(r => setDryRun(r.notifyDryRun)).catch(() => undefined)
-  }, [])
+  useEffect(() => { void load() }, [load])
 
-  const snapshot = report?.snapshot ?? null
-  const published = report?.status === 'published'
-  const futurePeriod = offset > 0
-  const currentRevision = revisions.find(r => r.current)?.revisionNo ?? revisions[0]?.revisionNo ?? report?.revisionNo ?? 1
-  const viewingHistorical = !!activeRevision && activeRevision !== currentRevision
-  /**
-   * 阅读面渲染的那一份快照：看当前版本就是发布冻结值，看历史版本就取该版本冻结值。
-   * 必须是「取哪一份」的判定而不是「重算一份」——历史版本可编辑就等于取证链断了。
-   */
-  const viewingSnapshot = viewingHistorical ? revisionView?.snapshot ?? null : snapshot
-  const historicalFailed = viewingHistorical && revisionView === null
-  const docModel = useMemo(() => buildDocModel(viewingSnapshot), [viewingSnapshot])
+  const overview = report ? autoOverview(report) : ''
 
-  /** 切换版本时按需取该版冻结内容：一版一份，不在列表接口里把所有历史正文都拖回来 */
-  const handleRevisionChange = async (revisionNo: number) => {
-    setActiveRevision(revisionNo)
-    setRevisionView(undefined)
-    if (!report?.id) return
-    const sameAsCurrent = revisionNo === currentRevision
-    if (sameAsCurrent) {
-      setRevisionView(undefined)
-      return
-    }
+  const runExport = async (kind: DocumentExportKind) => {
+    const src = docRef.current
+    if (!src) return
+    setExportBusy(kind)
+    const host = document.createElement('div')
+    host.className = 'wg-capture-host'
+    const clone = src.cloneNode(true) as HTMLElement
+    host.appendChild(clone)
+    document.body.appendChild(host)
     try {
-      setRevisionView(await fetchCpmRevision(report.id, revisionNo))
-    } catch {
-      // 明确置 null 让界面报「这一版正文没取到」，而不是默默显示当前版冒充历史版
-      setRevisionView(null)
-    }
-  }
-
-  const handleAiSummary = async () => {
-    setSummarizing(true)
-    try {
-      const result = await fetchCpmReportAiSummary({
-        requestKey: newSummaryKey(), periodType, periodStart: range.start.format('YYYY-MM-DD'),
+      const fileBase = i18n.t('cpm.workReport.export.fileBase', {
+        period: CPM_PERIOD_LABELS[periodType], date: fmt(range.start),
+        defaultValue: '工作匯報_{{period}}_{{date}}',
       })
-      setSummary(result.text)
-      setAiSummary(true)
-      message.success('摘要草稿已生成，可再編輯')
+      await exportDocument(clone, kind, fileBase, { alias: 'cpm-report-v2', fallbackName: 'report' })
+      message.success(kind === 'image'
+        ? i18n.t('cpm.workReport.export.imageDone', { defaultValue: '已下載當前匯報的長圖快照' })
+        : i18n.t('cpm.workReport.export.pdfDone', { defaultValue: '已下載當前匯報的 A4 分頁 PDF' }))
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : i18n.t('cpm.gantt.export.failed', { defaultValue: '導出失敗，請重試' }))
     } finally {
-      setSummarizing(false)
+      host.remove()
+      setExportBusy(null)
     }
   }
-
-  const handleSaveDraft = async () => {
-    await saveCpmDraft({ periodType, periodStart: range.start.format('YYYY-MM-DD'), summary: summary ?? undefined, aiSummary })
-    message.success('草稿已保存')
-    await reload()
-  }
-
-  const handlePublish = () => {
-    Modal.confirm({
-      title: '確認發布並提交匯報？',
-      className: 'custom-confirm-modal',
-      icon: <span className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></span>,
-      content: (
-        <div className="confirm-info-card">
-          <div className="confirm-info-row"><span>週期：</span><b>{range.label}</b></div>
-          <div className="confirm-info-row"><span>條目數：</span><b>{snapshot?.totals.total ?? 0} 項（完成 {snapshot?.totals.done ?? 0}）</b></div>
-          <div className="confirm-info-row">
-            <span>{t('cpm.report.confirm.totalInvested', { defaultValue: '總投入：' })}</span>
-            <b>{docModel.time && docModel.time.totalMinutes > 0
-              ? formatHours(docModel.time.totalMinutes)
-              : t('cpm.report.confirm.notRecorded', { defaultValue: '未記錄' })}</b>
-          </div>
-          <div className="confirm-info-row"><span>{t('cpm.report.confirm.aiSummary', { defaultValue: 'AI 摘要：' })}</span><b>{aiSummary ? t('cpm.report.confirm.aiGenerated', { defaultValue: '含 AI 生成內容' }) : t('cpm.report.confirm.manualOnly', { defaultValue: '全人工' })}</b></div>
-          <div className="confirm-info-row"><span>{t('cpm.report.confirm.pushMode', { defaultValue: '釘釘推送：' })}</span><b>{dryRun ? t('cpm.report.confirm.dryRun', { defaultValue: 'dry-run（只登記 skipped，不真發）' }) : t('cpm.report.confirm.realPush', { defaultValue: '真實投遞' })}</b></div>
-        </div>
-      ),
-      okText: t('cpm.report.confirmPublishOk', { defaultValue: '確認發布' }),
-      cancelText: t('common.cancel', { defaultValue: '取消' }),
-      onOk: async () => {
-        setPublishing(true)
-        try {
-          await publishCpmReport({ periodType, periodStart: range.start.format('YYYY-MM-DD'), summary: summary ?? undefined, aiSummary })
-          // 重新取一次 current：V1 由服务端在发布事务里冻结，版本列表与编号都必须来自后端
-          // （本地拼一份出来，界面就会展示一份数据库里没有的版本）
-          await reload()
-          message.success(t('cpm.report.publishedV1', { defaultValue: '已發布 V1' }))
-        } finally {
-          setPublishing(false)
-        }
-      },
-    })
-  }
-
-  /**
-   * 修订重发布：服务端重新聚合 → 冻结为 V(n+1) → 通知指向新版本。
-   *
-   * 为什么不能直接改已发布内容：已发出的钉钉卡片链接指向的是当时那一版，
-   * 覆盖旧版本会让「他收到的是什么」变成不可回答的问题（纪要为此专门建了版本表）。
-   *
-   * 为什么前端不再自己「先 preview 再提交」：预览值与提交值之间隔着一次重算，
-   * 并发补录会让冻结的那一版不是用户确认的那一版。聚合在服务端一次做完。
-   */
-  const handleRepublish = async () => {
-    if (!report?.id) {
-      message.warning(t('cpm.revision.needPublishFirst', { defaultValue: '當前週期還沒有匯報記錄，請先發布' }))
-      return
-    }
-    if (!changeNote.trim()) {
-      message.warning(t('cpm.revision.needChangeNote', { defaultValue: '請填寫修訂說明' }))
-      return
-    }
-    setPublishing(true)
+  const copyMarkdown = async () => {
+    if (!report) return
     try {
-      const vo = await republishCpmReport({
-        reportId: report.id,
-        changeNote: changeNote.trim(),
-        summary: summary ?? undefined,
-        aiSummary,
-      })
-      setRepublishOpen(false)
-      setChangeNote('')
-      await reload()
-      // 内容真的变了才有新版本；无变化时后端幂等返回同一版，提示口径必须跟着变
-      const no = vo.revisionNo ?? currentRevision
-      message.success(no > currentRevision
-        ? t('cpm.revision.published', { no, defaultValue: '已發布 V{{no}}' })
-        : t('cpm.revision.unchanged', { no, defaultValue: '期間內沒有新事實，版本保持 V{{no}}' }))
-    } finally {
-      setPublishing(false)
-    }
-  }
-
-  const handleCopyMarkdown = async () => {
-    const md = snapshotToMarkdown(range.label, viewingSnapshot, summary ?? undefined, { time: docModel.time })
-    try {
-      await navigator.clipboard.writeText(md)
-      message.success(t('cpm.report.copied', { defaultValue: '已複製 Markdown' }))
+      await navigator.clipboard.writeText(reportToMarkdown(report, range.label, summary))
+      message.success(i18n.t('cpm.workReport.copyDone', { defaultValue: '已複製 Markdown（導出文本 = 頁面文本）' }))
     } catch {
-      message.error(t('cpm.report.clipboardUnavailable', { defaultValue: '剪貼板不可用' }))
+      message.error(i18n.t('cpm.report.clipboardUnavailable', { defaultValue: '剪貼板不可用' }))
     }
   }
+  const exportItems: MenuProps['items'] = [
+    { key: 'image', icon: <FileImageOutlined />, label: t('cpm.export.image', { defaultValue: '長圖圖片（PNG）' }) },
+    { key: 'pdf', icon: <FilePdfOutlined />, label: t('cpm.export.pdf', { defaultValue: 'PDF 文件（A4 分頁）' }) },
+  ]
+
+  const delta = report ? report.totals.avgEnd - report.totals.avgStart : 0
 
   return (
     <div className="content-area">
@@ -258,286 +159,334 @@ export default function MyReport() {
         items={[
           {
             key: 'report',
-            label: '匯報生成',
+            label: t('cpm.workReport.tab.read', { defaultValue: '匯報閱讀' }),
             children: (
               <>
                 {loadError && (
-                  <Alert type="error" showIcon style={{ marginBottom: 14 }} message="匯報載入失敗" description={loadError}
-                    action={<Button size="small" onClick={() => void reload()}>重試</Button>} />
+                  <Alert type="error" showIcon style={{ marginBottom: 14 }}
+                    message={t('cpm.workReport.loadFailed', { defaultValue: '匯報載入失敗' })} description={loadError}
+                    action={<Button size="small" onClick={() => void load()}>{t('cpm.sourceImport.retry', { defaultValue: '重試' })}</Button>} />
                 )}
-                <div className="cpm-report__period-bar">
+                <div className="rp-bar">
                   <Segmented
                     value={periodType}
                     onChange={v => { setPeriodType(v as CpmPeriodValue); setOffset(0) }}
                     options={Object.values(CpmPeriod).map(p => ({ label: CPM_PERIOD_LABELS[p], value: p }))}
                   />
-                  <Space.Compact>
-                    <Button icon={<LeftOutlined />} onClick={() => setOffset(o => o - 1)} aria-label="上一期" />
-                    <Button onClick={() => setOffset(0)}>本期</Button>
-                    <Button icon={<RightOutlined />} disabled={offset >= 0} onClick={() => setOffset(o => o + 1)} aria-label="下一期" />
-                  </Space.Compact>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>{range.label}</span>
-                  {isDaily ? (
-                    <Tooltip title={t('cpm.period.dailyTip', { defaultValue: '日報是條目的當日投影，不需發布、不送達、不產正式版本' })}>
-                      <Tag>{t('cpm.period.readonlyTag', { defaultValue: '只讀投影' })}</Tag>
-                    </Tooltip>
-                  ) : (report && !loading && (
-                    <Tag color={published ? 'green' : 'orange'}>
-                      {published
-                        ? t('cpm.report.publishedTag', { no: currentRevision, defaultValue: '已發布 V{{no}}' })
-                        : t('cpm.report.draftTag', { defaultValue: '草稿' })}
-                    </Tag>
-                  ))}
-                  {published && report?.hasUnpublishedChanges && (
-                    <Tooltip title={t('cpm.report.pendingRevisionTip', { defaultValue: '期間內又發生了新的記錄或進度流水，正式版本尚未包含；點「修訂並重新發布」生成新版本' })}>
-                      <Tag color="gold">{t('cpm.report.pendingRevisionTag', { defaultValue: '有新事實未入版' })}</Tag>
-                    </Tooltip>
-                  )}
+                  <div className="rp-bar__nav">
+                    <Button size="small" icon={<LeftOutlined />} onClick={() => setOffset(o => o - 1)} aria-label={t('cpm.gantt.period.prev', { defaultValue: '上一期' })} />
+                    <Button size="small" onClick={() => { setOffset(0); setAnchor(null) }}>{t('cpm.workReport.thisPeriod', { defaultValue: '本期' })}</Button>
+                    <Button size="small" icon={<RightOutlined />} disabled={offset >= 0} onClick={() => setOffset(o => o + 1)} aria-label={t('cpm.gantt.period.next', { defaultValue: '下一期' })} />
+                  </div>
+                  <DatePicker
+                    size="small"
+                    value={anchor}
+                    onChange={v => { setAnchor(v); setOffset(0) }}
+                    placeholder={t('cpm.workReport.anchor', { defaultValue: '錨點日期' })}
+                    allowClear
+                  />
+                  <span className="rp-bar__label">{range.label}</span>
+                  <Tag color="blue">{t('cpm.workReport.autoDraftTag', { defaultValue: '自動聚合草稿' })}</Tag>
+                  <div className="rp-bar__actions">
+                    <Button size="small" icon={<CopyOutlined />} onClick={() => void copyMarkdown()}>{t('cpm.workReport.copyMarkdown', { defaultValue: '複製 Markdown' })}</Button>
+                    <Dropdown trigger={['click']} disabled={!!exportBusy} menu={{ items: exportItems, onClick: ({ key }) => void runExport(key as DocumentExportKind) }}>
+                      <Button size="small" className="btn-export" icon={<DownloadOutlined />} loading={!!exportBusy}>{t('common.export', { defaultValue: '導出' })}</Button>
+                    </Dropdown>
+                  </div>
                 </div>
 
-                {!isDaily && futurePeriod && (
-                  <Alert type="warning" showIcon style={{ marginBottom: 14 }} message="尚不屬於過去週期，僅可預覽聚合，不能發布未來匯報。" />
-                )}
+                {loading && !report ? (
+                  <div className="rp-empty">
+                    <Empty description={t('cpm.workReport.loading', { defaultValue: '匯報聚合中…' })} />
+                  </div>
+                ) : !report || (report.totals.total === 0 && report.plan.length === 0 && report.totals.backlog === 0) ? (
+                  <div className="rp-empty">
+                    <Empty description={t('cpm.workReport.empty.desc', { defaultValue: '台账還沒有工作記錄，匯報無米下鍋' })} />
+                    <Button type="primary" onClick={() => { location.hash = '#/cpm-my' }}>{t('cpm.workReport.empty.action', { defaultValue: '去工作記錄記一筆' })}</Button>
+                  </div>
+                ) : (
+                  <div className="rp-doc" ref={docRef} data-period={range.label}>
+                    {/* 抬頭 */}
+                    <header className="rp-head">
+                      <div className="rp-head__left">
+                        <span className="rp-head__logo"><FieldTimeOutlined /></span>
+                        <div>
+                          <h1>{t('cpm.workReport.title', { defaultValue: '工作匯報' })}</h1>
+                          <p>{range.label} · {fmt(range.start)} ~ {fmt(range.end)}</p>
+                        </div>
+                      </div>
+                      <div className="rp-head__meta">
+                        <span>{t('cpm.workReport.reporter', { defaultValue: '匯報人：本人' })}</span>
+                        <span>{t('cpm.workReport.generatedAt', { time: dayjs().format('YYYY-MM-DD HH:mm'), defaultValue: '生成於 {{time}}' })}</span>
+                        <span>{t('cpm.workReport.caliber', { hours: HOURS_PER_DAY, defaultValue: '口徑：工作日 × {{hours}}h・周末/節假日剔除' })}</span>
+                      </div>
+                    </header>
 
-                {isDaily ? (
-                  <DailyReport date={range.start} periodLabel={range.label} ownerName={user?.name} ownerEmpId={user?.username} />
-                ) : loading ? (
-                  <div style={{ textAlign: 'center', padding: 48 }}><Spin size="large" /></div>
-                ) : published && report ? (
-                  <>
-                    {historicalFailed && (
-                      <Alert
-                        type="error"
-                        showIcon
-                        style={{ marginBottom: 14 }}
-                        message={t('cpm.revision.loadErrorTitle', { no: activeRevision ?? '', defaultValue: '歷史版本 V{{no}} 正文載入失敗' })}
-                        description={t('cpm.revision.loadErrorBody', { defaultValue: '這裡刻意不退回顯示當前版本：把當前版冒充歷史版，比報錯危險得多。' })}
-                        action={<Button size="small" onClick={() => void handleRevisionChange(activeRevision ?? currentRevision)}>{t('common.retry', { defaultValue: '重試' })}</Button>}
-                      />
-                    )}
-                    <CpmReportDocument
-                      docTitle={t('cpm.report.docTitle', { period: range.label, defaultValue: '工作匯報（{{period}}）' })}
-                      ownerName={report.ownerName ?? user?.name}
-                      ownerEmpId={report.ownerEmpId ?? user?.username}
-                      periodLabel={range.label}
-                      status="published"
-                      publishedAt={report.publishedAt}
-                      model={docModel}
-                      summary={report.summary}
-                      aiSummary={report.aiSummary}
-                      revisions={revisions}
-                      activeRevision={activeRevision}
-                      onRevisionChange={no => void handleRevisionChange(no)}
-                      historical={viewingHistorical}
-                      range={{ start: periodStartStr, end: periodEndStr }}
-                      rootRef={docRef}
-                      delivery={(
-                        <div className="cpm-report__delivered">
-                          <span>{t('cpm.report.delivered', { receivers: report.receiverCount, reads: report.readCount, defaultValue: '送達 {{receivers}} 人 · 已讀 {{reads}} 人' })}</span>
-                          <span>{t('cpm.report.feedbackCount', { comments: report.commentCount, likes: report.likeCount, defaultValue: '評論 {{comments}} · 點讚 {{likes}}' })}</span>
-                          <span onClick={() => navigate(`/cpm-report-detail?id=${report.id}`)}>{t('cpm.report.viewFullFeedback', { defaultValue: '查看完整反饋 →' })}</span>
+                    {/* 概述 */}
+                    <div className="rp-overview">
+                      <div className="rp-overview__text">
+                        {editingSummary ? (
+                          <Input.TextArea
+                            autoFocus
+                            rows={2}
+                            maxLength={500}
+                            value={summary}
+                            onChange={e => setSummary(e.target.value)}
+                            onBlur={() => setEditingSummary(false)}
+                            placeholder={t('cpm.workReport.summaryPlaceholder', { defaultValue: '寫一句本期總結（留空則用自動概述，導出同文）' })}
+                          />
+                        ) : (
+                          <p>{summary.trim() || overview}</p>
+                        )}
+                      </div>
+                      <Tooltip title={t('cpm.workReport.editSummary', { defaultValue: '編輯本期總結' })}>
+                        <Button size="small" type="text" icon={<EditOutlined />} onClick={() => setEditingSummary(true)} />
+                      </Tooltip>
+                    </div>
+
+                    {/* 01 核心概覽 */}
+                    <Section no="01" title={t('cpm.workReport.section.overview', { defaultValue: '核心概覽' })}>
+                      <div className="rp-stats rp-stats--4">
+                        <RpStat label={t('cpm.gantt.stat.doneInPeriod', { defaultValue: '本期完成' })} value={report.totals.done} suffix={t('cpm.gantt.suffix.item', { defaultValue: ' 項' })} color="var(--success)" bg="var(--success-soft)" icon={<CheckCircleOutlined />} />
+                        <RpStat label={t('cpm.status.doing', { defaultValue: '進行中' })} value={report.totals.inProgress} suffix={t('cpm.gantt.suffix.item', { defaultValue: ' 項' })} color="var(--info)" bg="var(--info-soft)" icon={<RiseOutlined />} />
+                        <RpStat label={t('cpm.workReport.stat.avgEnd', { defaultValue: '期末平均進度' })} value={report.totals.avgEnd} suffix="%" color="var(--brand)" bg="var(--brand-soft)" icon={<FieldTimeOutlined />}
+                          extra={<DeltaChip delta={delta} />} />
+                        <RpStat label={t('cpm.workReport.stat.hours', { defaultValue: '投入工時' })} value={report.totals.hours} suffix=" h" color="var(--purple)" bg="var(--purple-soft)" icon={<FieldTimeOutlined />} />
+                      </div>
+                      {/* 风险与临时插入不再各占一节，缩成概览行内标记：读的人先看到量，再去看明细 */}
+                      <div className="rp-flags">
+                        <span className="rp-flag"><WarningOutlined />{t('cpm.workReport.stat.risks', { defaultValue: '風險事項' })} <b>{report.totals.risks}</b></span>
+                        <span className="rp-flag"><ThunderboltOutlined />{t('cpm.gantt.plan.inserted', { defaultValue: '臨時插入' })} <b>{report.totals.inserted}</b></span>
+                        <span className="rp-flag">{t('cpm.gantt.status.plan', { defaultValue: '待排期' })} <b>{report.totals.backlog}</b></span>
+                        <span className="rp-flag">{t('cpm.workReport.covered', { defaultValue: '本期覆蓋' })} <b>{report.totals.total}</b></span>
+                      </div>
+                    </Section>
+
+                    {/* 02 本期內容：工时投入 + 进度对比 + 进度 + 状态 合在同一批块里 */}
+                    <Section no="02" title={t('cpm.workReport.section.content', { defaultValue: '本期內容' })}>
+                      {report.groups.length === 0 ? (
+                        <p className="rp-none">{t('cpm.workReport.groups.none', { defaultValue: '本期無已排期的工作項任務。' })}</p>
+                      ) : (
+                        <>
+                          {report.groups.map(g => <GroupBlock key={g.group.id} g={g} />)}
+                          <DailySpark report={report} />
+                        </>
+                      )}
+                    </Section>
+
+                    {/* 03 下期計劃 */}
+                    <Section no="03" title={t('cpm.workReport.section.plan', { defaultValue: '下期計劃' })}>
+                      {report.plan.length === 0 ? (
+                        <p className="rp-none">{t('cpm.workReport.plan.none', { defaultValue: '暫無已排期的下期事項。' })}</p>
+                      ) : (
+                        <div className="rp-plan">
+                          {report.plan.map(r => (
+                            <div key={r.task.id} className="rp-plan__row">
+                              <span className="rp-plan__date">{r.task.start}</span>
+                              <b>{r.task.title}</b>
+                              <span className="rp-plan__group">{r.group.title}</span>
+                              {r.task.planType === 'inserted' && (
+                                <Tag color="volcano" className="wg-insert-tag">{t('cpm.gantt.insert.tag', { defaultValue: '臨時' })}</Tag>
+                              )}
+                              <span className="rp-plan__hours">{t('cpm.workReport.plan.estimate', { hours: r.hours, defaultValue: '預計 {{hours}}h' })}</span>
+                            </div>
+                          ))}
                         </div>
                       )}
-                      actions={(
-                        <Space size={8} wrap>
-                          <Button icon={<CopyOutlined />} onClick={() => void handleCopyMarkdown()}>{t('cpm.report.copyMarkdown', { defaultValue: '複製 Markdown' })}</Button>
-                          <CpmExportButton
-                            getTarget={() => docRef.current}
-                            fileBase={t('cpm.report.fileBase', { type: CPM_PERIOD_LABELS[periodType], date: periodStartStr, no: activeRevision ?? currentRevision, defaultValue: '工作匯報_{{type}}_{{date}}_V{{no}}' })}
-                            reportId={report.id}
-                            revisionNo={activeRevision ?? currentRevision}
-                          />
-                          <Button icon={<HistoryOutlined />} onClick={() => setRepublishOpen(true)}>{t('cpm.revision.button', { defaultValue: '修訂並重新發布' })}</Button>
-                        </Space>
+                    </Section>
+
+                    {/* 04 風險與備註 */}
+                    <Section no="04" title={t('cpm.workReport.section.risks', { defaultValue: '風險與備註' })}>
+                      {report.risks.length === 0 && report.notes.length === 0 && report.totals.backlog === 0 ? (
+                        <p className="rp-none">{t('cpm.workReport.risks.none', { defaultValue: '本期無逾期、風險備註與待排期積壓。' })}</p>
+                      ) : (
+                        <div className="rp-risks">
+                          {report.risks.map(r => (
+                            <div key={r.task.id} className="rp-risk rp-risk--overdue">
+                              <WarningOutlined />
+                              <div>
+                                <b>{r.task.title}</b>
+                                <span>{t('cpm.workReport.riskLine', { group: r.group.title, end: r.task.end, progress: r.pEnd, defaultValue: '{{group}} · 結束 {{end}} · 進度 {{progress}}%' })}</span>
+                              </div>
+                              <Tag color="red">{t('cpm.workReport.overdueDays', { days: r.overdueDays, defaultValue: '逾期 {{days}} 天' })}</Tag>
+                            </div>
+                          ))}
+                          {report.notes.map(r => (
+                            <div key={r.task.id} className="rp-risk rp-risk--note">
+                              <EditOutlined />
+                              <div>
+                                <b>{r.task.title}</b>
+                                <div className="rp-risk__note" dangerouslySetInnerHTML={{ __html: noteToDisplayHtml(r.task.note) }} />
+                              </div>
+                            </div>
+                          ))}
+                          {report.totals.backlog > 0 && (
+                            <div className="rp-risk rp-risk--backlog">
+                              <FieldTimeOutlined />
+                              <div>
+                                <b>{t('cpm.workReport.backlog.count', { count: report.totals.backlog, defaultValue: '待排期積壓 {{count}} 項' })}</b>
+                                <span>{t('cpm.workReport.backlog.note', { defaultValue: '未排期任務不計工時，建議尽快落入計劃' })}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       )}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <div className="cpm-card">
-                      <div className="cpm-card__title-row">
-                        <div className="cpm-card__icon cpm-card__icon--ok"><FileTextOutlined style={{ fontSize: 14 }} /></div>
-                        <span className="cpm-card__title">自動聚合初稿</span>
-                        <div className="cpm-card__line" />
-                        <span className="cpm-card__extra">確定性口徑：僅來自期間條目與進度流水，AI 不參與計數</span>
-                        <Button size="small" icon={<ReloadOutlined />} onClick={() => void reload()}>刷新</Button>
-                      </div>
-                      <SnapshotView snapshot={snapshot} />
-                    </div>
+                    </Section>
 
-                    <div className="cpm-card">
-                      <div className="cpm-card__title-row">
-                        <div className="cpm-card__icon cpm-card__icon--purple"><RobotOutlined style={{ fontSize: 14 }} /></div>
-                        <span className="cpm-card__title">匯總摘要（選填）</span>
-                        <div className="cpm-card__line" />
-                        {aiSummary && <Tag color="purple">AI 生成</Tag>}
-                      </div>
-                      <Input.TextArea
-                        rows={4}
-                        value={summary ?? ''}
-                        onChange={e => { setSummary(e.target.value); setAiSummary(false) }}
-                        maxLength={1000}
-                        showCount
-                        placeholder="寫一句本週總結，或點「AI 摘要」由模型起草後你再改"
-                        style={{ resize: 'none' }}
-                        disabled={futurePeriod}
-                      />
-                      <div style={{ marginTop: 10 }}>
-                        <Button icon={<RobotOutlined />} loading={summarizing} onClick={() => void handleAiSummary()}
-                          disabled={futurePeriod || !snapshot || snapshot.totals.total === 0}>
-                          AI 摘要
-                        </Button>
-                      </div>
-                    </div>
-
-                    {!futurePeriod && PUBLISHABLE_PERIODS.includes(periodType) && (
-                      <div className="form-footer">
-                        <Space>
-                          <Button onClick={() => void handleSaveDraft()}>保存草稿</Button>
-                          <Button type="primary" icon={<SendOutlined />} loading={publishing} onClick={handlePublish}
-                            disabled={!snapshot || snapshot.totals.total === 0}>
-                            發布提交
-                          </Button>
-                        </Space>
-                      </div>
-                    )}
-                  </>
+                    <footer className="rp-foot">
+                      {t('cpm.workReport.foot', { defaultValue: '數據來源：工作記錄台账（甘特／列表同源）· 進度對比取期初/期末流水快照 · 工時按工作日口徑扣減。' })}
+                    </footer>
+                  </div>
                 )}
               </>
             ),
           },
           {
-            key: 'archive',
-            label: (<Space size={6}><TrophyFilled style={{ color: 'var(--purple)' }} />個人成果檔案</Space>),
-            children: <RecognitionArchive />,
+            key: 'delivery',
+            label: t('cpm.workReport.tab.delivery', { defaultValue: '發布與交付' }),
+            children: <ReportDeliveryPanel />,
           },
           {
-            key: 'history',
-            label: '歷史匯報',
-            children: <HistoryList />,
+            key: 'archive',
+            label: (<span><TrophyFilled style={{ color: 'var(--purple)' }} /> {t('cpm.workReport.tab.archive', { defaultValue: '個人成果檔案' })}</span>),
+            children: <RecognitionArchive />,
           },
+          { key: 'history', label: t('cpm.workReport.tab.history', { defaultValue: '歷史匯報' }), children: <HistoryList /> },
         ]}
       />
-
-      <Modal
-        title={t('cpm.revision.modalTitle', { defaultValue: '修訂並重新發布' })}
-        open={republishOpen}
-        onOk={() => void handleRepublish()}
-        onCancel={() => { setRepublishOpen(false); setChangeNote('') }}
-        okText={t('cpm.revision.publishOk', { defaultValue: '確認發布新版本' })}
-        cancelText={t('common.cancel', { defaultValue: '取消' })}
-        confirmLoading={publishing}
-      >
-        <div className="confirm-info-card" style={{ marginBottom: 12 }}>
-          <div className="confirm-info-row"><span>{t('cpm.revision.current', { defaultValue: '當前版本：' })}</span><b>V{currentRevision}</b></div>
-          <div className="confirm-info-row"><span>{t('cpm.revision.includes', { defaultValue: '新版本將包含：' })}</span><b>{t('cpm.revision.includesValue', { defaultValue: '期間內新發生的條目與進度流水' })}</b></div>
-          <div className="confirm-info-row"><span>{t('cpm.revision.impact', { defaultValue: '影響：' })}</span><b>{t('cpm.revision.impactValue', { defaultValue: '已發出的釘釘連結會指向新版本；舊版本仍可在閱讀面切換查看' })}</b></div>
-          <div className="confirm-info-row"><span>{t('cpm.revision.idempotent', { defaultValue: '無變化時：' })}</span><b>{t('cpm.revision.idempotentValue', { defaultValue: '內容與說明都相同則不會產生新版本（後端按內容冪等）' })}</b></div>
-        </div>
-        <Input.TextArea
-          rows={3}
-          value={changeNote}
-          onChange={e => setChangeNote(e.target.value)}
-          maxLength={200}
-          showCount
-          placeholder={t('cpm.revision.notePlaceholder', { defaultValue: '修訂說明（必填，例：補錄週五兩筆投入時段與一項完成事項）' })}
-          style={{ resize: 'none' }}
-        />
-        <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-3)' }}>
-          {t('cpm.revision.footnote', { defaultValue: '修訂不會覆蓋舊版本：每一版都是當次發布的凍結快照，可追溯、可導出、可對比。' })}
-        </div>
-      </Modal>
     </div>
   )
 }
 
-/* ==================== 成果档案 ==================== */
+/* ==================== 版式元件 ==================== */
 
-function RecognitionArchive() {
-  const [records, setRecords] = useState<CpmRecognitionVO[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let alive = true
-    fetchMyRecognitions()
-      .then(list => { if (alive) setRecords(list) })
-      .catch(err => { if (alive) setError(err instanceof Error ? err.message : '載入失敗') })
-    return () => { alive = false }
-  }, [])
-
-  if (error) return <Alert type="error" showIcon message="成果檔案載入失敗" description={error} />
-  if (!records) return <div style={{ textAlign: 'center', padding: 32 }}><Spin /></div>
-  if (records.length === 0) {
-    return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="還沒有收到成果認定" />
-  }
+function Section({ no, title, children }: { no: string; title: string; children: ReactNode }) {
   return (
-    <div className="cpm-card">
-      <div className="cpm-card__title-row">
-        <div className="cpm-card__icon cpm-card__icon--purple"><TrophyFilled style={{ fontSize: 14 }} /></div>
-        <span className="cpm-card__title">上級認可記錄</span>
-        <div className="cpm-card__line" />
-        <span className="cpm-card__extra">認定即績效證據，期末可供 HR 績效考核取數（二期接口）</span>
+    <section className="rp-sec">
+      <div className="rp-sec__head">
+        <span className="rp-sec__no">{no}</span>
+        <h2>{title}</h2>
+        <div className="rp-sec__line" />
       </div>
-      <Timeline
-        items={records.map(r => ({
-          color: r.kind === 'milestone' ? 'purple' : 'blue',
-          children: (
-            <div>
-              <Space size={6} wrap>
-                <Tag className="cpm-recognition__kind" color={r.kind === 'milestone' ? 'purple' : 'blue'}>
-                  {RECOGNITION_KIND_LABELS[r.kind]}
-                </Tag>
-                <b style={{ fontSize: 13, color: 'var(--text-1)' }}>{r.targetTitle}</b>
-              </Space>
-              <div style={{ fontSize: 12, color: 'var(--text-2)', marginTop: 4 }}>{r.comment}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>
-                認定人：{r.fromName} · {r.createdAt} · 週期 {r.periodTag}
-              </div>
-            </div>
-          ),
-        }))}
-      />
-    </div>
+      {children}
+    </section>
   )
 }
 
-/* ==================== 历史汇报 ==================== */
-
-function HistoryList() {
-  const [list, setList] = useState<CpmReportVO[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let alive = true
-    listMyCpmReports()
-      .then(rows => { if (alive) setList(rows) })
-      .catch(err => { if (alive) setError(err instanceof Error ? err.message : '載入失敗') })
-    return () => { alive = false }
-  }, [])
-
-  if (error) return <Alert type="error" showIcon message="歷史匯報載入失敗" description={error} />
-  if (!list) return <div style={{ textAlign: 'center', padding: 32 }}><Spin /></div>
-  if (list.length === 0) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="還沒有歷史匯報" />
+function DeltaChip({ delta }: { delta: number }) {
+  const { t } = useTranslation()
+  if (delta === 0) return <Tag style={{ marginInlineEnd: 0 }}>{t('cpm.workReport.flat', { defaultValue: '持平' })}</Tag>
   return (
-    <div className="cpm-card">
-      {list.map(r => (
-        <div className="cpm-item" key={`${r.periodType}-${r.periodStart}`}>
-          <div className="cpm-item__main">
-            <div className="cpm-item__title">{CPM_PERIOD_LABELS[r.periodType as CpmPeriodValue] ?? r.periodType} · {r.periodStart} ~ {r.periodEnd}</div>
-            <div className="cpm-item__meta">
-              <Tag color={r.status === 'published' ? 'green' : 'orange'} style={{ marginInlineEnd: 0 }}>
-                {r.status === 'published' ? '已發布' : '草稿'}
-              </Tag>
-              <span>{r.snapshot?.totals.total ?? 0} 項 · 完成 {r.snapshot?.totals.done ?? 0}</span>
-              {r.aiSummary && <Tag color="purple" style={{ marginInlineEnd: 0 }}>AI 摘要</Tag>}
-            </div>
-          </div>
-        </div>
-      ))}
+    <Tag color={delta > 0 ? 'green' : 'red'} style={{ marginInlineEnd: 0 }}>
+      {delta > 0 ? <RiseOutlined /> : <FallOutlined />} {delta > 0 ? '+' : ''}{delta}%
+    </Tag>
+  )
+}
+
+function RpStat({ label, value, suffix, color, bg, icon, extra }: {
+  label: string; value: number; suffix: string; color: string; bg: string; icon: ReactNode; extra?: ReactNode
+}) {
+  return (
+    <div className="rp-stat" style={{ '--stat-color': color, '--stat-bg': bg } as CSSProperties}>
+      <div className="rp-stat__icon">{icon}</div>
+      <div className="rp-stat__num"><AnimatedNumber value={value} suffix={suffix} /></div>
+      <div className="rp-stat__label">{label}</div>
+      {extra && <div className="rp-stat__extra">{extra}</div>}
     </div>
   )
 }
 
-/* ==================== Markdown 导出 ==================== */
+/**
+ * 本期內容的一块：一个工作項的工时、进度对比、每条子任务的进度与状态。
+ * 原来分散在「核心產出／工作項進度對比／工時分布」三节的信息在这里一次读完。
+ */
+function GroupBlock({ g }: { g: ReportGroupRow }) {
+  const { t } = useTranslation()
+  const color = GROUP_COLORS[g.group.hue % GROUP_COLORS.length]
+  return (
+    <div className="rp-cmp" style={{ '--g': color } as CSSProperties}>
+      <div className="rp-cmp__head">
+        <i className="rp-cmp__dot" />
+        <b>{g.group.title}</b>
+        <span>{t('cpm.workReport.groupMeta', { count: g.rows.length, hours: g.hours, done: g.doneCount, defaultValue: '{{count}} 項 · {{hours}}h · 完成 {{done}}' })}</span>
+        <DeltaChip delta={g.avgEnd - g.avgStart} />
+      </div>
+      <div className="rp-cmp__track">
+        <div className="rp-cmp__start" style={{ width: `${g.avgStart}%` }} />
+        <div className="rp-cmp__end" style={{ width: `${g.avgEnd}%` }} />
+        <i className="rp-cmp__mark" style={{ left: `${g.avgStart}%` }} />
+      </div>
+      <div className="rp-cmp__nums">
+        <span>{t('cpm.workReport.periodStart', { v: g.avgStart, defaultValue: '期初 {{v}}%' })}</span>
+        <span>{t('cpm.workReport.periodEnd', { v: g.avgEnd, defaultValue: '期末 {{v}}%' })}</span>
+      </div>
+      <div className="rp-cmp__tasks">
+        {g.rows.map(r => (
+          <div key={r.task.id} className="rp-cmp__task">
+            <span className="rp-cmp__task-title">{r.task.title}</span>
+            {r.task.planType === 'inserted' && (
+              <Tooltip title={t('cpm.gantt.insert.tagTip', { date: r.task.insertedAt ?? r.task.start ?? t('cpm.gantt.insert.noDate', { defaultValue: '日期未記' }), defaultValue: '臨時插入・{{date}}' })}>
+                <Tag color="volcano" className="wg-insert-tag">{t('cpm.gantt.insert.tag', { defaultValue: '臨時' })}</Tag>
+              </Tooltip>
+            )}
+            <span className="rp-cmp__pill" style={{ '--p': progressColor(r.pEnd) } as CSSProperties}>
+              <i style={{ width: `${r.pEnd}%` }} />
+            </span>
+            <span className="rp-cmp__task-num">{r.pStart}% → {r.pEnd}%</span>
+            <span className="rp-cmp__task-hours">{r.hours}h</span>
+            <Tag color={statusTagColor(r)} style={{ marginInlineEnd: 0 }}>{statusLabel(r, t)}</Tag>
+            {r.overdueDays > 0 && <Tag color="red" style={{ marginInlineEnd: 0 }}>{t('cpm.workReport.overdueShort', { days: r.overdueDays, defaultValue: '逾期 {{days}}d' })}</Tag>}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
-/* Markdown 导出与周期导航已抽至 cpmPeriod.ts：多处共用一份口径（导出文本=页面文本） */
+/** 行内状态：与台账同一推导（完成时点在本期=本期完成，否则按期末进度） */
+function statusOf(r: ReportGroupRow['rows'][number]): 'done' | 'doing' | 'todo' {
+  if (r.doneAt) return 'done'
+  return r.pEnd > 0 ? 'doing' : 'todo'
+}
+function statusTagColor(r: ReportGroupRow['rows'][number]): string {
+  return r.doneAt ? 'green' : r.pEnd > 0 ? 'blue' : 'orange'
+}
+function statusLabel(r: ReportGroupRow['rows'][number], t: (key: string, options: Record<string, unknown>) => string): string {
+  const key = statusOf(r)
+  return key === 'done'
+    ? t('cpm.status.done', { defaultValue: '已完成' })
+    : key === 'doing' ? t('cpm.status.doing', { defaultValue: '進行中' }) : t('cpm.gantt.status.todo', { defaultValue: '待處理' })
+}
+
+function DailySpark({ report }: { report: WorkReport }) {
+  const { t } = useTranslation()
+  const max = Math.max(1, ...report.daily.map(d => d.hours))
+  const n = report.daily.length
+  const bw = 100 / n
+  return (
+    <div className="rp-spark">
+      <div className="rp-spark__head">
+        <span>{t('cpm.workReport.daily', { defaultValue: '每日投入（工作日口徑）' })}</span>
+        {report.peak && <span>{t('cpm.workReport.peak', { date: report.peak.key, hours: report.peak.hours, defaultValue: '峰值 {{date}} · {{hours}}h' })}</span>}
+      </div>
+      <svg viewBox="0 0 100 30" preserveAspectRatio="none" className="rp-spark__svg" aria-hidden="true">
+        {report.daily.map((d, i) => (
+          <rect
+            key={d.key}
+            x={i * bw + bw * 0.15}
+            y={30 - (d.hours / max) * 26 - 2}
+            width={bw * 0.7}
+            height={Math.max(d.hours > 0 ? 2 : 0.6, (d.hours / max) * 26)}
+            rx={0.6}
+            fill={d.rest ? 'var(--border-2)' : d.hours > 0 ? 'var(--brand)' : 'var(--border-2)'}
+            opacity={d.rest ? 0.6 : d.hours > 0 ? 0.85 : 0.6}
+          />
+        ))}
+      </svg>
+      <div className="rp-spark__axis">
+        <span>{report.start}</span>
+        <span>{report.end}</span>
+      </div>
+    </div>
+  )
+}

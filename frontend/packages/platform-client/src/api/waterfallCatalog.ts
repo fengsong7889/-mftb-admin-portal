@@ -30,11 +30,16 @@ export async function fetchWaterfallCategories(
   return mockListCategories(contentType, brand, channel)
 }
 
-/** 分页搜索资源（门店 / 商品） */
+/** 分页搜索资源（门店 / 商品）
+ * 真实契约预留：接入团购业务系统后对应
+ * GET /groupbuy/catalog/products?keyword&groupCode&brand&page&size
+ * → {records:[{id,name,groupCode,groupName,price,stock,enabled}],total}，仅替换本层实现。 */
 export async function searchWaterfallCatalog(params: {
   contentType: WaterfallContentType
   brand?: string
   categoryId?: string
+  /** 集团归属过滤（商品购买链路；真实接入后为权限内集团） */
+  groupCode?: string
   keyword?: string
   channel?: WaterfallCatalogChannel
   page?: number
@@ -45,6 +50,7 @@ export async function searchWaterfallCatalog(params: {
     contentType: params.contentType,
     brand: params.brand,
     categoryId: params.categoryId,
+    groupCode: params.groupCode,
     keyword: params.keyword,
     channel: params.channel,
     page: params.page ?? 1,

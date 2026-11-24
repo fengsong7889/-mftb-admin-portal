@@ -28,6 +28,12 @@ public class AdOrderVO {
     private String groupName;
     private String storeCode;
     private String storeName;
+    /** 推广对象快照: 1=门店 2=商品 */
+    private Integer targetType;
+    /** 团购商品编码快照（仅商品订单） */
+    private String productId;
+    /** 团购商品名称快照（仅商品订单） */
+    private String productName;
     private String bdEmpId;
     private Integer operatorType;
     private String operatorId;
@@ -121,6 +127,9 @@ public class AdOrderVO {
         vo.setGroupName(entity.getGroupName());
         vo.setStoreCode(entity.getStoreCode());
         vo.setStoreName(entity.getStoreName());
+        vo.setTargetType(entity.getTargetType() == null ? 1 : entity.getTargetType());
+        vo.setProductId(entity.getProductId());
+        vo.setProductName(entity.getProductName());
         vo.setBdEmpId(entity.getBdEmpId());
         vo.setOperatorType(entity.getOperatorType());
         vo.setOperatorId(entity.getOperatorId());

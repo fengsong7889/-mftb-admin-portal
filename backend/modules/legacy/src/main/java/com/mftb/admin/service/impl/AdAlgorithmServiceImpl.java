@@ -13,15 +13,18 @@ import com.mftb.admin.dto.AdPricingStarVO;
 import com.mftb.admin.dto.PageResult;
 import com.mftb.admin.entity.AdAlgorithm;
 import com.mftb.admin.entity.AdWaterfall;
+import com.mftb.admin.entity.AdWaterfallRecommendation;
 import com.mftb.admin.entity.AdWaterfallSlot;
 import com.mftb.admin.entity.BizMerchantGroup;
 import com.mftb.admin.entity.BizStore;
 import com.mftb.admin.mapper.AdAlgorithmMapper;
 import com.mftb.admin.mapper.AdWaterfallMapper;
+import com.mftb.admin.mapper.AdWaterfallRecommendationMapper;
 import com.mftb.admin.mapper.AdWaterfallSlotMapper;
 import com.mftb.admin.mapper.BizMerchantGroupMapper;
 import com.mftb.admin.mapper.BizStoreMapper;
 import com.mftb.admin.service.AdAlgorithmService;
+import com.mftb.admin.service.support.AdSimilarAlgorithmParams;
 import com.mftb.admin.service.support.AdStarAlgorithmParams;
 import com.mftb.admin.service.support.AdStarAlgorithmQuerySupport;
 import com.mftb.admin.service.AdPricingHotService;
@@ -54,6 +57,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
     private final AdAlgorithmMapper algorithmMapper;
     private final AdWaterfallSlotMapper waterfallSlotMapper;
     private final AdWaterfallMapper waterfallMapper;
+    private final AdWaterfallRecommendationMapper waterfallRecommendationMapper;
     private final AdPricingStarService pricingService;
     private final AdPricingReviveService revivePricingService;
     private final AdPricingHotService hotPricingService;
@@ -96,6 +100,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
         Integer pricingChannel = query.getPricingChannel();
         LambdaQueryWrapper<AdAlgorithm> wrapper = new LambdaQueryWrapper<>();
         AdStarAlgorithmQuerySupport.apply(wrapper, query);
+        applyUsageScope(wrapper, query.getUsage());
         if (algoType != null) wrapper.eq(AdAlgorithm::getAlgoType, algoType);
         if (StringUtils.hasText(brand)) wrapper.eq(AdAlgorithm::getBrand, brand);
         if (channel != null) wrapper.eq(AdAlgorithm::getChannel, channel);
@@ -247,10 +252,35 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
         return AdAlgorithmVO.from(entity);
     }
 
+    /** 用途筛选：未声明用途的旧消费者与坑位/销售场景默认排除 type17，避免未适配界面误展示或误售。 */
+    private void applyUsageScope(LambdaQueryWrapper<AdAlgorithm> wrapper, String usage) {
+        if (usage == null || usage.isBlank() || "slot".equals(usage) || "sales".equals(usage)) {
+            wrapper.ne(AdAlgorithm::getAlgoType, AdSimilarAlgorithmParams.ALGORITHM_TYPE);
+            return;
+        }
+        if (!"library".equals(usage) && !"scenario".equals(usage)) {
+            throw new BusinessException(422, "算法查詢用途無效");
+        }
+    }
+
+    /** 参数校验按算法类型分派：type17 走独立协议，type1 继续星星协议，其余保持原透传。 */
+    private Map<String, Object> prepareParams(AdAlgorithm current, AdAlgorithmRequest request) {
+        if (AdSimilarAlgorithmParams.isSimilarType(request.getAlgoType())) {
+            if (current != null && !AdSimilarAlgorithmParams.isSimilarType(current.getAlgoType())) {
+                throw new BusinessException(422, "算法類型不可跨類變更");
+            }
+            return AdSimilarAlgorithmParams.validate(request.getParams());
+        }
+        if (current != null && AdSimilarAlgorithmParams.isSimilarType(current.getAlgoType())) {
+            throw new BusinessException(422, "算法類型不可跨類變更");
+        }
+        return AdStarAlgorithmParams.prepare(current, request);
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public AdAlgorithmVO create(AdAlgorithmRequest request) {
-        Map<String, Object> params = AdStarAlgorithmParams.prepare(null, request);
+        Map<String, Object> params = prepareParams(null, request);
         AdAlgorithm entity = new AdAlgorithm();
         entity.setAlgoCode(generateCode(request.getAlgoName(), request.getAlgoType()));
         applyRequest(entity, request, params);
@@ -267,7 +297,7 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
     @Transactional(rollbackFor = Exception.class)
     public AdAlgorithmVO update(Long id, AdAlgorithmRequest request) {
         AdAlgorithm entity = requireLocked(id);
-        Map<String, Object> params = AdStarAlgorithmParams.prepare(entity, request);
+        Map<String, Object> params = prepareParams(entity, request);
         applyRequest(entity, request, params);
         entity.setUpdatedBy(operatorResolver.currentOperatorName());
         algorithmMapper.updateById(entity);
@@ -302,6 +332,12 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         AdAlgorithm entity = requireLocked(id);
+        // 场景绑定引用保护：被瀑布流相似推荐引用的算法禁止删除（不级联删绑定）
+        Long bindings = waterfallRecommendationMapper.selectCount(new LambdaQueryWrapper<AdWaterfallRecommendation>()
+                .eq(AdWaterfallRecommendation::getAlgorithmId, id));
+        if (bindings != null && bindings > 0) {
+            throw new BusinessException("算法已被瀑布流相似推薦綁定引用，不能刪除");
+        }
         // 删除时级联删除引用该算法的瀑布流坑位
         cascadeDeleteSlots(entity.getAlgoCode());
         algorithmMapper.deleteById(id);
@@ -347,7 +383,27 @@ public class AdAlgorithmServiceImpl implements AdAlgorithmService {
             }
         }
 
-        // 2. 查询自然流量兜底引用（biz_ad_waterfall.natural_algo_id）
+        // 2. 查询相似推荐场景绑定引用（biz_ad_waterfall_recommendation）
+        List<AdWaterfallRecommendation> similarRefs = waterfallRecommendationMapper.selectList(
+                new LambdaQueryWrapper<AdWaterfallRecommendation>()
+                        .eq(AdWaterfallRecommendation::getAlgorithmId, algoId));
+        if (!similarRefs.isEmpty()) {
+            Map<Long, AdWaterfall> similarWaterfalls = waterfallMapper.selectBatchIds(
+                    similarRefs.stream().map(AdWaterfallRecommendation::getWaterfallId).distinct().toList())
+                    .stream().collect(java.util.stream.Collectors.toMap(AdWaterfall::getId, Function.identity()));
+            for (AdWaterfallRecommendation binding : similarRefs) {
+                AdWaterfall w = similarWaterfalls.get(binding.getWaterfallId());
+                if (w == null) continue;
+                Map<String, Object> ref = new HashMap<>();
+                ref.put("strategyCode", w.getStrategyCode());
+                ref.put("strategyName", w.getStrategyName());
+                ref.put("slotPosition", null);
+                ref.put("refType", "similar");
+                result.add(ref);
+            }
+        }
+
+        // 3. 查询自然流量兜底引用（biz_ad_waterfall.natural_algo_id）
         List<AdWaterfall> naturalRefs = waterfallMapper.selectList(
                 new LambdaQueryWrapper<AdWaterfall>()
                         .eq(AdWaterfall::getNaturalAlgoId, algoCode));

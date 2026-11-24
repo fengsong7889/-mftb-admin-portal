@@ -103,6 +103,7 @@ class BizSeqServiceTest {
         assertEquals("algo_signboard", BizSeqService.algoRuleKey(13));
         assertEquals("algo_promo", BizSeqService.algoRuleKey(14));
         assertEquals("algo_traffic", BizSeqService.algoRuleKey(15));
+        assertEquals("algo_similar", BizSeqService.algoRuleKey(17));
     }
 
     @Test

@@ -113,7 +113,7 @@ public class AdOrderServiceImpl implements AdOrderService {
     @Override
     public PageResult<AdOrderVO> page(long page, long size, String orderNo, Integer algoType,
                                       String groupCode, String storeCode, Integer status,
-                                      String startDate, String endDate) {
+                                      String startDate, String endDate, Integer targetType, String productId) {
         page = PageResult.normalizePage(page);
         size = PageResult.normalizeSize(size);
         LambdaQueryWrapper<AdOrder> wrapper = new LambdaQueryWrapper<>();
@@ -129,6 +129,9 @@ public class AdOrderServiceImpl implements AdOrderService {
         if (algoType != null) wrapper.eq(AdOrder::getAlgoType, algoType);
         if (StringUtils.hasText(groupCode)) wrapper.eq(AdOrder::getGroupCode, groupCode);
         if (StringUtils.hasText(storeCode)) wrapper.eq(AdOrder::getStoreCode, storeCode);
+        // 推广对象/商品筛选在 SQL 分页前进行；存量订单 target_type 默认 1=门店
+        if (targetType != null) wrapper.eq(AdOrder::getTargetType, targetType);
+        if (StringUtils.hasText(productId)) wrapper.eq(AdOrder::getProductId, productId.trim());
         if (status != null) wrapper.eq(AdOrder::getStatus, status);
         if (StringUtils.hasText(startDate)) wrapper.ge(AdOrder::getOrderTime, LocalDate.parse(startDate).atStartOfDay());
         if (StringUtils.hasText(endDate)) wrapper.le(AdOrder::getOrderTime, LocalDate.parse(endDate).atTime(23, 59, 59));

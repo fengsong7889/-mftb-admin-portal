@@ -1,0 +1,348 @@
+/**
+ * Copyright (c) 2026 fengsong7889. All Rights Reserved.
+ *
+ * 本文件为「MFTB 企业一体化管理平台软件」的组成部分。
+ * 未经著作权人书面许可，不得使用、复制、修改、再分发或用于任何商业目的。
+ * 完整许可条款见仓库根目录 LICENSE 文件。
+ */
+
+/* ==================== 頁面頭部（全局新增/表单页规范） ==================== */
+
+.hc-pagehead {
+  position: relative;
+  background: var(--surface-2);
+  border-radius: 12px;
+  box-shadow: var(--shadow-2);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.hc-pagehead__bar {
+  height: 3px;
+  background: linear-gradient(90deg, var(--brand), var(--brand-hover), var(--brand), var(--brand-hover));
+  background-size: 200% 100%;
+  animation: headerGradientShift 4s ease infinite;
+}
+.hc-pagehead__row {
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.hc-pagehead__left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+.hc-back.ant-btn {
+  border-radius: 8px;
+  height: 36px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: var(--shadow-brand);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.hc-pagehead__divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-3);
+}
+.hc-pagehead h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-brand);
+}
+.hc-pagehead__sub {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.hc-pagehead__years {
+  display: flex;
+  gap: 6px;
+}
+
+/* ==================== 統計與圖例 ==================== */
+
+.hc-stats {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 8px 14px;
+  margin-bottom: 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  border-radius: 10px;
+  box-shadow: var(--shadow-card-soft), var(--card-outline);
+}
+.hc-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.hc-stat b {
+  color: var(--text-1);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.hc-stat i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+}
+.hc-stat--legend {
+  color: var(--text-3);
+}
+.hc-lg-work {
+  background: var(--surface-3);
+  border: 1px solid var(--border-1);
+}
+.hc-lg-rest {
+  background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--text-4) 22%, transparent) 0 2px, transparent 2px 4px), var(--surface-3);
+}
+.hc-lg-holiday {
+  background: var(--warning-soft);
+  border: 1px solid var(--warning-border);
+}
+.hc-lg-makeup {
+  background: var(--info-soft);
+  border: 1px solid var(--info-border);
+}
+.hc-lg-today {
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 2px var(--brand);
+}
+
+/* ==================== 年歷 + 側欄 ==================== */
+
+.hc-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  align-items: start;
+}
+.hc-cal {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.hc-month {
+  padding: 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  border-radius: 10px;
+  box-shadow: var(--shadow-card-soft), var(--card-outline);
+}
+.hc-month__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-1);
+  margin-bottom: 6px;
+}
+.hc-month__week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 2px;
+}
+.hc-month__week span {
+  text-align: center;
+  font-size: 10px;
+  color: var(--text-3);
+}
+.hc-month__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.hc-day {
+  height: 26px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--surface-3);
+  color: var(--text-2);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: all 0.15s;
+  padding: 0;
+}
+.hc-day:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+  transform: translateY(-1px);
+}
+.hc-day--out {
+  opacity: 0.35;
+  cursor: default;
+}
+.hc-day--out:hover {
+  border-color: transparent;
+  color: var(--text-2);
+  transform: none;
+}
+.hc-day--rest {
+  background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--text-4) 16%, transparent) 0 3px, transparent 3px 6px), var(--surface-3);
+  color: var(--text-3);
+}
+.hc-day--holiday {
+  background: var(--warning-soft);
+  border-color: var(--warning-border);
+  color: var(--warning-deep);
+  font-weight: 600;
+}
+.hc-day--compoff {
+  background: color-mix(in srgb, var(--warning-deep) 10%, var(--surface-2));
+  border: 1px dashed var(--warning-deep);
+  color: var(--warning-deep);
+  font-weight: 600;
+}
+.hc-day--leave {
+  background: var(--purple-soft);
+  border-color: var(--purple-border);
+  color: var(--purple);
+  font-weight: 600;
+}
+.hc-day--makeup {
+  background: var(--info-soft);
+  border-color: var(--info-border);
+  color: var(--info);
+  font-weight: 600;
+}
+.hc-day--today {
+  box-shadow: inset 0 0 0 2px var(--brand);
+}
+
+/* ==================== 側欄 ==================== */
+
+.hc-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: sticky;
+  top: 12px;
+}
+.hc-card {
+  padding: 16px 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-3);
+  border-radius: 8px;
+  box-shadow: var(--shadow-card-soft), var(--card-outline);
+}
+.hc-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.hc-card__icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+.hc-card__icon--blue {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.hc-card__icon--info {
+  background: var(--info-soft);
+  color: var(--info);
+}
+.hc-card__icon--orange {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.hc-card__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.hc-card__line {
+  flex: 1;
+  height: 1px;
+  background: var(--border-2);
+  margin-left: 8px;
+}
+.hc-card__note {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.hc-card h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.hc-side__add {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hc-side__addrow {
+  display: flex;
+  gap: 8px;
+}
+.hc-side__tip {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--text-3);
+}
+.hc-side__ops {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.hc-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-height: 220px;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--brand) 50%, var(--surface-3)) var(--surface-3);
+}
+.hc-tags::-webkit-scrollbar {
+  width: 8px;
+}
+.hc-tags::-webkit-scrollbar-track {
+  background: var(--surface-3);
+}
+.hc-tags::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--brand) 45%, var(--surface-3));
+  border-radius: 4px;
+}
+
+@media (max-width: 1280px) {
+  .hc-cal {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 992px) {
+  .hc-layout {
+    grid-template-columns: 1fr;
+  }
+  .hc-side {
+    position: static;
+  }
+  .hc-cal {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .hc-cal {
+    grid-template-columns: 1fr;
+  }
+}

@@ -60,25 +60,26 @@ export function computeSimilarity(rows: SimRow[], metric: string) {
   return { dot, sumA2, sumB2, sumMin, sumMax, cosine, jaccard, value: metric === 'weightedJaccard' ? jaccard : cosine }
 }
 
-export interface RankNorms { match: number; traffic: number; quality: number; distance: number; remaining: number }
-export interface RankInput { match: number; remaining: number; total: number; quality: number; distance: number; qualityKnown?: boolean }
+export interface RankNorms { match: number; traffic: number; quality: number; distance: number; remaining: number; tagHeat: number }
+export interface RankInput { match: number; remaining: number; total: number; quality: number; distance: number; qualityKnown?: boolean; tagHeat?: number }
 /** 自定义因子归一；剩余次数单独保留，消费预设不能误用比例或冷启动的方向。
  * 暂无评分不获得质量加分（记0），但不被过滤——付费资格与评分解耦。 */
-export function normalizeRank(raw: RankInput, maxDistance: number): RankNorms {
+export function normalizeRank(raw: RankInput, maxDistance: number, maxTagHeat = 0): RankNorms {
   const clamp = (v: number) => Math.min(1, Math.max(0, v))
   return {
     match: clamp(raw.match), remaining: raw.remaining,
     traffic: raw.total > 0 ? clamp(raw.remaining / raw.total) : 0,
     quality: raw.qualityKnown === false ? 0 : clamp(raw.quality / 5),
     distance: maxDistance > 0 ? 1 - clamp(raw.distance / maxDistance) : 0,
+    tagHeat: maxTagHeat > 0 ? clamp((raw.tagHeat ?? 0) / maxTagHeat) : 0,
   }
 }
 /** 消耗优先按绝对剩余次数降序；自定义空选或非法选项不生成误导性的默认得分。 */
 export function rankScore(preset: string, factors: string[], n: RankNorms): number | null {
   if (preset === 'matchFirst') return n.match
   if (preset === 'consumeFirst') return n.remaining
-  if (preset !== 'custom' || !factors.length || factors.some(f => !['match', 'traffic', 'quality', 'distance'].includes(f))) return null
-  const selected = [...new Set(factors)] as Array<'match' | 'traffic' | 'quality' | 'distance'>
+  if (preset !== 'custom' || !factors.length || factors.some(f => !['match', 'traffic', 'quality', 'distance', 'tagHeat'].includes(f))) return null
+  const selected = [...new Set(factors)] as Array<'match' | 'traffic' | 'quality' | 'distance' | 'tagHeat'>
   return selected.reduce((sum, factor) => sum + n[factor], 0) / selected.length
 }
 
@@ -121,10 +122,16 @@ function coldQualityGroup(m: TrialMerchant, pref?: { enabled: boolean; line: num
 /** 兴趣匹配局部试算，返回过程与排除原因；不会假装已模拟时段、真实支付资格或曝光计数。
  * 质量不再硬过滤；覆盖率关闭时仍须至少一个共同达标标签。 */
 export function evaluateInterestTrial(user: TagScore[], merchants: TrialMerchant[], settings: TrialSettings) {
-  const results = merchants.map(m => {
+  const prelim = merchants.map(m => {
     const match = matchOf(user, m.tags, settings.userMinimum, settings.merchantMinimum)
     const sim = computeSimilarity(match.rows, settings.metric)
-    const norm = normalizeRank({ ...m, match: sim.value }, settings.maxDistance)
+    // 命中标签热度：商家在「双方均达标」交集标签上的有效分之和，反映“卖得更好”的供给强度。
+    const rawTagHeat = match.rows.reduce((s, r) => s + (r.a > 0 && r.b > 0 ? r.a : 0), 0)
+    return { m, match, sim, rawTagHeat }
+  })
+  const maxTagHeat = Math.max(0, ...prelim.map(p => p.rawTagHeat))
+  const results = prelim.map(({ m, match, sim, rawTagHeat }) => {
+    const norm = normalizeRank({ ...m, match: sim.value, tagHeat: rawTagHeat }, settings.maxDistance, maxTagHeat)
     const score = match.coldStart ? 0 : rankScore(settings.preset, settings.factors, norm)
     let reason = merchantExclusion(m, settings)
     if (reason) { /* 资格不通过时，不用标签或评分原因覆盖它。 */ }
@@ -153,7 +160,7 @@ export function evaluateInterestTrial(user: TagScore[], merchants: TrialMerchant
       return coldQualityGroup(a.m, settings.qualityPreference) - coldQualityGroup(b.m, settings.qualityPreference)
         || (b.score ?? 0) - (a.score ?? 0)
     }
-    return (b.score ?? 0) - (a.score ?? 0) || tieBreakOrder(a.m, b.m, settings.tieRule, 'moreFirst')
+    return (b.score ?? 0) - (a.score ?? 0) || tieBreakOrder({ ...a.m, tagHeat: a.norm.tagHeat, match: a.norm.match }, { ...b.m, tagHeat: b.norm.tagHeat, match: b.norm.match }, settings.tieRule, 'moreFirst')
   })
   return { results, ranked, rejected: results.filter(r => !r.admitted) }
 }
@@ -202,7 +209,7 @@ function rankSource(items: Array<{ m: TrialMerchant; matchScore: number | null }
     const norm = normalizeRank({ ...m, match: matchScore ?? 0 }, settings.maxDistance)
     const score = rankScore(settings.preset, settings.factors, norm)
     return score === null ? [] : [{ m, source, matchScore, score }]
-  }).sort((a, b) => b.score - a.score || tieBreakOrder(a.m, b.m, settings.tieRule, 'moreFirst')))
+  }).sort((a, b) => b.score - a.score || tieBreakOrder({ ...a.m, match: a.matchScore ?? 0 }, { ...b.m, match: b.matchScore ?? 0 }, settings.tieRule, 'moreFirst')))
 }
 
 interface CollaborativeTrialInput {
@@ -308,11 +315,13 @@ export function evaluateClickTrial(opts: CollaborativeTrialInput & { anchorMerch
     shortfall: limit - selected.length, rejected: checked.filter(x => x.reason) }
 }
 
-export interface TieRaw { quality: number; distance: number; remaining: number; qualityKnown?: boolean }
+export interface TieRaw { quality: number; distance: number; remaining: number; qualityKnown?: boolean; tagHeat?: number; match?: number }
 /** 同分决胜：返回负数＝a 先、正数＝b 先、0＝仍同分（随机探索）。与配置页 RANK_TIE_BREAK_OPTIONS 同口径。 */
 export function tieBreakOrder(a: TieRaw, b: TieRaw, rule: string, direction: string): number {
   if (rule === 'quality') return (b.qualityKnown === false ? 0 : b.quality) - (a.qualityKnown === false ? 0 : a.quality)
   if (rule === 'distance') return a.distance - b.distance
   if (rule === 'trafficDirection') return direction === 'lessFirst' ? a.remaining - b.remaining : b.remaining - a.remaining
+  if (rule === 'tagHeat') return (b.tagHeat ?? 0) - (a.tagHeat ?? 0)
+  if (rule === 'match') return (b.match ?? 0) - (a.match ?? 0)
   return 0
 }

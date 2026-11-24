@@ -5,6 +5,8 @@ import type { ColumnsType } from 'antd/es/table'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { ArrowLeftOutlined, SaveOutlined, PlusOutlined, QuestionCircleOutlined, AppstoreOutlined, UploadOutlined, DownloadOutlined } from '@ant-design/icons'
 import DetailPageHeader from '@/components/DetailPageHeader'
+import { AdBusinessType, StarTarget } from '@mftb/contracts/starAlgorithm'
+import { AlgorithmType } from '@mftb/contracts/recommendConstants'
 import {
   fetchAdAlgorithms, fetchWaterfallDetail, createWaterfall, updateWaterfall,
 } from '@/api/adPromotion'
@@ -19,14 +21,16 @@ import {
   ALGO_TYPE_LABEL, ALGO_TYPE_COLOR,
   CONTENT_TYPE_OPTIONS, LAYOUT_OPTIONS, BUSINESS_TYPE_LABEL_KEY, BIZ_CHANNEL_OPTIONS,
   serverKey, localKey, getDisplayCategoryMode, NATURAL_ALGORITHM_TYPE, DEFAULT_WATERFALL_SORT,
+  BUSINESS_TYPE_CODE, CONTENT_TYPE_CODE,
 } from '@mftb/contracts/waterfallTypes'
 import {
   getExtension, setExtension, getLocalStrategy, upsertLocalStrategy,
-  buildDraftFromServer, newLocalId,
+  buildDraftFromServer, newLocalId, removeExtension, removeLocalStrategy,
 } from './waterfallConfig/waterfallExtStore'
 import { writeDraft, readDraft, clearDraft, newSessionKey } from './waterfallConfig/waterfallDraft'
 import { buildGroupBuyPreview, type PreviewCard } from './waterfallConfig/previewLayout'
 import WaterfallPreview from './waterfallConfig/WaterfallPreview'
+import WaterfallBinding from './Recommend/SimilarRecommendationConfig/WaterfallBinding'
 
 /** 品牌选项（与后端 brand 枚举对齐） */
 const APP_OPTIONS = [
@@ -105,6 +109,8 @@ function PromotionSlotConfigForm() {
   const supportsContentConfig = isGroupBuy || isSupermarket
   const catalogChannel = isSupermarket ? 'supermarket' : 'groupBuy'
   const useAlgorithmSlots = !supportsContentConfig || displayCategoryMode === 'algorithm'
+  /** 商品维度（仅团购）：坑位只能绑商品星星，兜底改用商品类目，不支持门店型自然流量。 */
+  const isProductDimension = isGroupBuy && contentType === 'product'
   /** 内容型频道（团购/超市百货）且非算法模式（分类/自定义）：走本地扩展保存 */
   const contentCategoryMode = supportsContentConfig && displayCategoryMode !== 'algorithm'
   /** 固定展示内容仅「自定义」模式可用；「门店类目/商品类目」只允许选择分类 */
@@ -151,29 +157,38 @@ function PromotionSlotConfigForm() {
     return () => clearInterval(id)
   }, [])
 
-  /** 加载算法库（外卖兜底/坑位；团购不使用假算法）
+  /** 加载算法库（外卖兜底/坑位；团购按展示维度过滤）
    * 候选只按品牌匹配，不按算法自身的 channel 字段过滤：業務頻道是「本條瀑布流」的属性，
-   * 算法库不收录频道（其他广告类型也没有该字段），同一條算法可以被不同频道的瀑布流复用。*/
+   * 算法库不收录频道（其他广告类型也没有该字段），同一條算法可以被不同频道的瀑布流复用。
+   * 商品维度显式传 targetType=2 才能命中商品星星；不传 target 的旧口径后端默认不返回商品。 */
   useEffect(() => {
     let active = true
     setAlgorithmOptions([])
-    fetchAdAlgorithms({ page: 1, size: 200, status: 1, ...(supportsContentConfig ? { brand } : {}) })
+    const query: Parameters<typeof fetchAdAlgorithms>[0] = { page: 1, size: 200, status: 1 }
+    if (supportsContentConfig && brand) query.brand = brand
+    if (isProductDimension) {
+      // 商品维度只列商品类无敌星星：后端对不传 targetType 的旧消费者默认隐藏商品记录，必须显式声明。
+      query.algoType = AlgorithmType.INVINCIBLE_STAR
+      query.businessType = AdBusinessType.GROUP_BUY
+      query.targetType = StarTarget.PRODUCT
+    }
+    fetchAdAlgorithms(query)
       .then(res => {
         const filtered = (res.records ?? []).filter(a => a.algoCode && !a.algoCode.startsWith('SFJZ') && (!supportsContentConfig || a.brand === brand))
         if (active) setAlgorithmOptions(filtered.map(a => ({ label: a.algoName, value: a.algoCode, type: a.algoType, brand: a.brand })))
       })
       .catch(() => { /* 保留降级空选项 */ })
     return () => { active = false }
-  }, [supportsContentConfig, brand])
+  }, [supportsContentConfig, brand, isProductDimension])
 
-  /** 团购分类 */
+  /** 团购分类：类目/自定义模式用分类兜底；商品维度算法模式也以商品类目兜底，同样需要类目候选 */
   useEffect(() => {
     setCategories([])
-    if (!supportsContentConfig || useAlgorithmSlots || !brand) return
+    if (!supportsContentConfig || (!isProductDimension && useAlgorithmSlots) || !brand) return
     let active = true
     fetchWaterfallCategories(contentType, brand, catalogChannel).then(list => { if (active) setCategories(list) }).catch(() => { if (active) setCategories([]) })
     return () => { active = false }
-  }, [supportsContentConfig, useAlgorithmSlots, contentType, brand, catalogChannel])
+  }, [supportsContentConfig, isProductDimension, useAlgorithmSlots, contentType, brand, catalogChannel])
 
   /** 团购候选（预览补位） */
   useEffect(() => {
@@ -220,14 +235,14 @@ function PromotionSlotConfigForm() {
     return () => { active = false }
   }, [editIdParam, localIdParam, location.key, isNew, isLocal, isServer, isDetailMode, draftKey, bizParam, applyDraft, t])
 
-  /** 组装当前草稿 */
+  /** 组装当前草稿：团购已服务端化，source 不再整体走 local；超市新记录非算法模式仍存本地。 */
   const buildDraft = (): WaterfallDraft => {
     const values = form.getFieldsValue()
     return {
       key: draftKey,
-      source: isLocal || isGroupBuy || (!isServer && !useAlgorithmSlots) ? 'local' : 'server',
+      source: isLocal || (!isGroupBuy && !isServer && !useAlgorithmSlots) ? 'local' : 'server',
       id: isServer ? Number(editIdParam) : undefined,
-      localId: isLocal ? localIdParam : (isNew && (isGroupBuy || !useAlgorithmSlots) ? draftKey.replace(/^new_/, '') : undefined),
+      localId: isLocal ? localIdParam : (isNew && !isGroupBuy && !useAlgorithmSlots ? draftKey.replace(/^new_/, '') : undefined),
       strategyName: values.promotionName || '',
       brand: values.app,
       businessType,
@@ -257,12 +272,21 @@ function PromotionSlotConfigForm() {
     navigate(`/promotion-slot-config-slots?${q.toString()}`)
   }
 
-  /** 内容类型切换（团购）：清理不兼容的分类/坑位 */
+  /** 内容类型切换（团购）：坑位/兜底绑定展示维度，切换即全量清空重配 */
   const handleChangeContentType = (next: WaterfallContentType) => {
     if (next === contentType || importBusyRef.current) return
     setImportIssues([])
-    const hasConfig = fallbackCategoryIds.length > 0 || fixedSlots.length > 0
-    if (!hasConfig) { setContentType(next); setHasUnsavedChanges(true); return }
+    const apply = () => {
+      setContentType(next)
+      setFallbackCategoryIds([])
+      setFixedSlots([])
+      setAlgoSlots([])
+      setNaturalAlgoId(undefined)
+      setNaturalAlgoName(undefined)
+      setHasUnsavedChanges(true)
+    }
+    const hasConfig = fallbackCategoryIds.length > 0 || fixedSlots.length > 0 || algoSlots.length > 0 || !!naturalAlgoId
+    if (!hasConfig) { apply(); return }
     Modal.confirm({
       icon: <div className="confirm-icon-wrapper"><span className="confirm-icon-text">!</span></div>,
       title: t('promotionSlotConfig:switchContentTypeTitle'),
@@ -270,7 +294,7 @@ function PromotionSlotConfigForm() {
       content: t('promotionSlotConfig:switchContentTypeContent'),
       okText: t('common:confirm'),
       cancelText: t('common:cancel'),
-      onOk: () => { setContentType(next); setFallbackCategoryIds([]); setFixedSlots([]); setHasUnsavedChanges(true) },
+      onOk: apply,
     })
   }
 
@@ -376,11 +400,47 @@ function PromotionSlotConfigForm() {
     if (importBusyRef.current) return
     try {
       const values = await form.validateFields()
-      if (useAlgorithmSlots && !naturalAlgoId) { message.warning(t('promotionSlotConfig:fallbackAlgoRequired')); return }
+      if (useAlgorithmSlots && !isProductDimension && !naturalAlgoId) { message.warning(t('promotionSlotConfig:fallbackAlgoRequired')); return }
       if (contentCategoryMode && displayCategoryMode === 'category' && fallbackCategoryIds.length === 0) { message.warning(t('promotionSlotConfig:categoryFallbackRequired')); return }
+      // 商品维度算法模式以商品类目兜底（与后端校验同口径）
+      if (isProductDimension && useAlgorithmSlots && fallbackCategoryIds.length === 0) { message.warning(t('promotionSlotConfig:productCategoryFallbackRequired')); return }
       // 自定义模式不提供分类兜底，必须至少配置一个启用的固定展示内容（待第二阶段迁入 i18n）
       if (contentCategoryMode && displayCategoryMode === 'custom' && !fixedSlots.some(s => s.status === 1)) { message.warning('請至少配置一個啟用的門店／商品坑位'); return }
       setSaving(true)
+
+      if (isGroupBuy) {
+        // 团购：全量走后端——业务线/展示维度/内容来源/类目兜底/固定内容已落 biz_ad_waterfall，
+        // 前端校验不是安全边界，维度匹配与模式一致性由后端 validateSlots 再裁决。
+        const request: WaterfallStrategyRequest = {
+          strategyName: values.promotionName,
+          brand: values.app,
+          businessType: BUSINESS_TYPE_CODE.groupBuy,
+          contentType: CONTENT_TYPE_CODE[contentType],
+          displayCategoryMode,
+          layoutColumns,
+          bizChannel: 'groupBuy',
+          sortMode,
+          filterDislike: filterDislike ? 1 : 2,
+          status: isServer ? undefined : 1,
+          naturalAlgoId: useAlgorithmSlots && !isProductDimension ? naturalAlgoId ?? null : null,
+          slots: useAlgorithmSlots ? algoSlots.map(item => ({ slotPosition: item.position, algoId: item.algorithmId, status: item.status })) : [],
+          fallbackCategoryIds: displayCategoryMode === 'category' || (isProductDimension && useAlgorithmSlots) ? fallbackCategoryIds : [],
+          fixedSlots: displayCategoryMode === 'custom'
+            ? fixedSlots.map(s => ({ slotPosition: s.position, itemId: s.itemId, itemName: s.itemName, categoryId: s.categoryId, categoryName: s.categoryName, stock: s.stock, status: s.status }))
+            : [],
+        }
+        let serverId = isServer ? Number(editIdParam) : undefined
+        try {
+          if (isServer) { const res = await updateWaterfall(serverId as number, request); serverId = res.id ?? serverId }
+          else { const res = await createWaterfall(request); serverId = res.id }
+        } catch { message.error(t('promotionSlotConfig:saveFailed')); setSaving(false); return }
+        // 配置真值已进后端：清理同一记录的历史本地痕迹与升级前本地草稿，防止扩展/草稿盖掉服务端回显
+        if (serverId != null) removeExtension(serverId)
+        if (isLocal && localIdParam) removeLocalStrategy(localIdParam)
+        message.success(t('promotionSlotConfig:saveSuccessMsg'))
+        handleReturnToList()
+        return
+      }
 
       if (isServer && contentCategoryMode) {
         const draft = buildDraft()
@@ -413,7 +473,7 @@ function PromotionSlotConfigForm() {
         return
       }
 
-      // 团购：整体存本地（后端不支持这些字段），不向算法坑位接口塞门店/商品
+      // 超市百货新记录非算法模式：整体存本地（团购已服务端化），不向算法坑位接口塞门店/商品
       const draft = buildDraft()
       const localId = isLocal ? localIdParam : newLocalId()
       const saved: WaterfallDraft = { ...draft, source: 'local', localId, key: localKey(localId) }
@@ -470,7 +530,9 @@ function PromotionSlotConfigForm() {
       : '僅按所選商品分類自動獲取內容，不支持固定展示內容配置。')
     : displayCategoryMode === 'custom'
       ? '展示內容僅來自下方固定展示內容配置，不設分類兜底。'
-      : t('promotionSlotConfig:sourceHint_algorithm')
+      : isProductDimension
+        ? t('promotionSlotConfig:productAlgorithmModeHint')
+        : t('promotionSlotConfig:sourceHint_algorithm')
 
   const phoneTitle = t('promotionSlotConfig:waterfallPreview', { appName: t(APP_LABEL[brand ?? 'flashBee'] || 'common:flashBee') })
 
@@ -538,8 +600,8 @@ function PromotionSlotConfigForm() {
         </div>
       )}
 
-      {supportsContentConfig && (
-        <Alert type="warning" showIcon style={{ marginBottom: 16 }} message={t(isGroupBuy ? 'promotionSlotConfig:localOnlyBanner' : 'promotionSlotConfig:supermarketLocalBanner')} />
+      {isSupermarket && (
+        <Alert type="warning" showIcon style={{ marginBottom: 16 }} message={t('promotionSlotConfig:supermarketLocalBanner')} />
       )}
 
       {/* 基础信息 */}
@@ -601,6 +663,10 @@ function PromotionSlotConfigForm() {
             </div>
             <Switch aria-label={t('promotionSlotConfig:filterDislike')} checked={filterDislike} disabled={isDetailMode || importing} checkedChildren={t('promotionSlotConfig:enabled')} unCheckedChildren={t('promotionSlotConfig:disabled')} onChange={c => { setFilterDislike(c); setHasUnsavedChanges(true) }} />
           </div>
+          {/* 相似推荐场景绑定：独立 PUT 保存，不并入瀑布流基础保存请求。 */}
+          <WaterfallBinding waterfallId={isServer ? Number(editIdParam) : undefined} brand={brand}
+            businessType={isGroupBuy ? 2 : 1} bizChannel={isGroupBuy ? 3 : bizChannel === 'supermarket' ? 2 : 1}
+            contentType={contentType} columns={layoutColumns} readOnly={isDetailMode || importing} />
           {supportsContentConfig && (
             <div>
               <label htmlFor="waterfall-display-category" style={{ display: 'block', fontSize: 13, color: '#595959', marginBottom: 8 }}>{t('promotionSlotConfig:displayCategory')}</label>
@@ -675,8 +741,8 @@ function PromotionSlotConfigForm() {
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: leftHasCard ? 'flex-start' : 'center' }}>
         {leftHasCard && (
         <div style={{ flex: '1 1 480px', minWidth: 0 }}>
-          {/* 兜底区域（仅团购/超市百货算法模式；外卖自然流量兜底已移入上方展示与过滤设置） */}
-          {supportsContentConfig && useAlgorithmSlots && (
+          {/* 兜底区域（仅团购门店/超市百货算法模式；商品维度不支持门店型自然流量） */}
+          {supportsContentConfig && !isProductDimension && useAlgorithmSlots && (
             <div style={cardShellStyle}>
               {cardTitle(<AppstoreOutlined style={{ fontSize: 14, color: '#FA8C16' }} />, '#FFF7F0', t('promotionSlotConfig:naturalFallback'))}
               <Select
@@ -690,6 +756,27 @@ function PromotionSlotConfigForm() {
                 onChange={value => { setNaturalAlgoId(value); setNaturalAlgoName(naturalAlgoOptions.find(a => a.value === value)?.label); setHasUnsavedChanges(true) }}
               />
               <div style={{ fontSize: 12, color: '#8C8C8C', marginTop: 8 }}>{t('promotionSlotConfig:channelAlgorithmHint')}</div>
+            </div>
+          )}
+
+          {/* 商品维度算法模式：商品类目兜底（门店型自然流量不可用） */}
+          {isProductDimension && useAlgorithmSlots && (
+            <div style={cardShellStyle}>
+              {cardTitle(<AppstoreOutlined style={{ fontSize: 14, color: 'var(--warning)' }} />, 'var(--warning-soft)', t('promotionSlotConfig:productCategoryFallback'))}
+              <Select
+                mode="multiple"
+                aria-label={t('promotionSlotConfig:productCategoryFallback')}
+                value={fallbackCategoryIds}
+                disabled={isDetailMode || importing || !brand}
+                allowClear
+                optionFilterProp="label"
+                style={{ width: '100%' }}
+                placeholder={t('promotionSlotConfig:selectProductCategories')}
+                options={categories.map(c => ({ label: c.name, value: c.id }))}
+                maxTagCount="responsive"
+                onChange={(vals: string[]) => { setFallbackCategoryIds(vals); setHasUnsavedChanges(true) }}
+              />
+              <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8 }}>{t('promotionSlotConfig:productCategoryFallbackHint')}</div>
             </div>
           )}
 

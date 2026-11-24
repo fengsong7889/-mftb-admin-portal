@@ -252,6 +252,7 @@ const MeetingMinutesAdmin = lazy(() => import('@/pages/MeetingMinutesAdmin'))
 // 持續績效系統（CPM）：菜单真值由 CpmSchemaMigrationInitializer 写入 sys_menu，
 // 全员使用侧基线授权；子页（条目编辑/汇报详情/模板表单）按 ROUTE_MENU_KEY_MAP 归各自父菜单
 const CpmMyWorklog = lazy(() => import('@/pages/Cpm/MyWorklog'))
+const CpmHolidayConfig = lazy(() => import('@/pages/Cpm/HolidayConfig'))
 const CpmItemForm = lazy(() => import('@/pages/Cpm/WorklogItemForm'))
 const CpmMyReport = lazy(() => import('@/pages/Cpm/MyReport'))
 const CpmReportDetail = lazy(() => import('@/pages/Cpm/ReportDetail'))
@@ -681,6 +682,7 @@ function AuthenticatedLayout() {
               {/* 持續績效（CPM）：五个菜单页 + 三个非菜单子页，路由与 sys_menu 种子成对交付，
                   受控登记见 CONTROLLED_MENU_KEYS / ROUTE_MENU_KEY_MAP（阶段一预览注释已随接线完成移除） */}
               <Route path="/cpm-my" element={<CpmMyWorklog />} />
+              <Route path="/cpm-holiday" element={<CpmHolidayConfig />} />
               <Route path="/cpm-item-form" element={<CpmItemForm />} />
               <Route path="/cpm-report" element={<CpmMyReport />} />
               <Route path="/cpm-report-detail" element={<CpmReportDetail />} />
